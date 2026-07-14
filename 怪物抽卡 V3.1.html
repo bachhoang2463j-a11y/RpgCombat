@@ -1,0 +1,1253 @@
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>深渊高塔与调查员驻地</title>
+    <style>
+        /* 基础重置 */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        @font-face { font-family: 'GameFont'; src: local('Microsoft YaHei'), local('SimHei'), sans-serif; }
+        body { font-family: 'GameFont', sans-serif; background-color: #050505; background-image: radial-gradient(circle at center, #1a0a0a 0%, #000000 100%); color: #d4c4a8; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; overflow-x: hidden; user-select: none; }
+        .nav-tabs { display: flex; gap: 30px; margin-bottom: 40px; border-bottom: 2px solid #2a1111; padding-bottom: 10px; }
+        .nav-tab { font-size: 1.3rem; color: #8a7c6b; cursor: pointer; transition: all 0.3s; letter-spacing: 2px; }
+        .nav-tab:hover { color: #d4c4a8; }
+        .nav-tab.active { color: #ff3333; text-shadow: 0 0 15px rgba(255,51,51,0.5); border-bottom: 3px solid #ff3333; padding-bottom: 5px; }
+        .view-section { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 800px; animation: fade-in 0.4s ease forwards; }
+        .view-section.active { display: flex; }
+        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 高塔 UI */
+        .difficulty-selector { display: flex; gap: 20px; margin-bottom: 30px; }
+        .diff-btn { background: #0f0f0f; border: 1px solid #3a3225; color: #8a7c6b; padding: 10px 30px; font-size: 1.1rem; cursor: pointer; clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%); transition: all 0.3s; }
+        .diff-btn.active { border-color: #8b1c1c; color: #ff3333; background: #1a0a0a; text-shadow: 0 0 8px rgba(255, 51, 51, 0.5); }
+        .tower-grid { display: flex; flex-direction: column; gap: 15px; width: 100%; max-width: 500px; }
+        .floor-btn { background: #0a0a0a; border: 2px solid #2a241a; padding: 15px 25px; color: #d4c4a8; font-size: 1.2rem; cursor: pointer; display: flex; justify-content: space-between; transition: all 0.2s; }
+        .floor-btn:hover { background: #141414; border-color: #8b1c1c; transform: scale(1.02); }
+
+        /* 驻地 Roster UI */
+        .roster-header { width: 100%; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2a1111; padding-bottom: 10px; margin-bottom: 20px; }
+        .roster-title { font-size: 1.5rem; color: #ff3333; }
+        .roster-count { font-size: 1.2rem; color: #8a7c6b; }
+        .roster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; width: 100%; }
+        .empty-roster { color: #4a3825; font-size: 1.2rem; text-align: center; width: 100%; grid-column: 1 / -1; padding: 40px; border: 1px dashed #2a1111; }
+        .inv-card { background: #0a0a0a; border: 1px solid #3a241a; padding: 15px; display: flex; flex-direction: column; gap: 10px; transition: all 0.2s; }
+        .inv-card.selected { border-color: #ff3333; box-shadow: 0 0 15px rgba(139,28,28,0.3); background: #1a0a0a; }
+        .inv-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+        .inv-name-wrap { display: flex; flex-direction: column; }
+        .inv-name { font-size: 1.3rem; color: #e0d4c3; font-weight: bold; }
+        .inv-class { font-size: 0.9rem; color: #a88960; }
+        .rarity-badge { padding: 2px 6px; font-size: 0.8rem; border: 1px solid; border-radius: 2px; }
+        .rarity-Normal { color: #8a7c6b; border-color: #8a7c6b; }
+        .rarity-Elite { color: #a375d6; border-color: #a375d6; text-shadow: 0 0 5px rgba(163,117,214,0.5); }
+        .rarity-Legendary { color: #ffb84d; border-color: #ffb84d; text-shadow: 0 0 10px rgba(255,184,77,0.8); }
+        .rarity-EasterEgg { color: #ff3333; border-color: #ff3333; text-shadow: 0 0 10px rgba(255,51,51,0.8); background: #2a0505; }
+        .inv-stats-mini { font-family: monospace; color: #8a7c6b; font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 8px; }
+        .inv-skills-mini { font-size: 0.8rem; color: #705a3f; max-height: 80px; overflow-y: auto; padding-right: 5px; }
+        .inv-skills-mini::-webkit-scrollbar { width: 2px; }
+        .inv-skills-mini::-webkit-scrollbar-thumb { background: #4a1515; }
+        .inv-actions { display: flex; gap: 10px; margin-top: auto; padding-top: 10px; border-top: 1px solid #1a0a0a; }
+        .btn-card { flex: 1; padding: 8px; background: #111; border: 1px solid #3a241a; color: #a88960; cursor: pointer; transition: all 0.2s; }
+        .btn-card:hover { background: #222; color: #d4c4a8; }
+        .btn-select.active { background: #4a1515; border-color: #8b1c1c; color: #fff; }
+        .btn-fire:hover { background: #3a0a0a; color: #ff3333; border-color: #8b1c1c; }
+
+        /* 模态框 */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.9); z-index: 100; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-content { background: #0d0d0d; border: 1px solid #4a1515; padding: 30px; width: 90%; max-width: 800px; transform: scale(0.95); transition: all 0.3s; display: flex; flex-direction: column; box-shadow: 0 0 50px rgba(139, 28, 28, 0.2); max-height: 90vh; overflow-y: auto; }
+        .modal-overlay.active .modal-content { transform: scale(1); }
+        .modal-content::-webkit-scrollbar { width: 4px; }
+        .modal-content::-webkit-scrollbar-thumb { background: #4a1515; }
+        .modal-title { font-size: 1.8rem; font-weight: 700; margin-bottom: 20px; color: #ff3333; text-align: center; letter-spacing: 5px; }
+        
+        .battle-preview { display: flex; flex-direction: column; gap: 20px; margin-bottom: 30px; }
+        .preview-group { border: 1px solid #2a1111; padding: 15px; background: #050505; }
+        .preview-title { font-size: 1.2rem; color: #a88960; margin-bottom: 10px; border-bottom: 1px solid #2a1111; padding-bottom: 5px; }
+        .entity-list { display: flex; flex-wrap: wrap; gap: 10px; }
+        .entity-tag { background: #1a0a0a; border: 1px solid #3a1515; padding: 5px 10px; color: #d4c4a8; font-size: 0.9rem; }
+        .entity-tag.hero { border-color: #4a3825; color: #a88960; }
+        .entity-tag.monster { border-color: #8b1c1c; color: #ff3333; }
+
+        .recruit-showcase { display: flex; flex-direction: column; gap: 15px; margin-bottom: 30px; }
+        .inv-full-skills { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; color: #8a7c6b; margin-top: 10px; }
+        .input-group { display: flex; flex-direction: column; gap: 8px; margin-top: 15px; }
+        .input-group label { color: #a88960; font-size: 1rem; }
+        .input-group input, .input-group textarea { background: #050505; border: 1px solid #4a3825; color: #e0d4c3; padding: 12px; font-family: 'GameFont', sans-serif; font-size: 1rem; outline: none; transition: border 0.3s; }
+        .input-group input:focus, .input-group textarea:focus { border-color: #8b1c1c; box-shadow: inset 0 0 10px rgba(139,28,28,0.2); }
+        .input-group textarea { resize: none; height: 80px; }
+
+        .action-group { display: flex; flex-wrap: wrap; gap: 15px; width: 100%; }
+        .battle-data-option { width: 100%; display: flex; align-items: center; gap: 9px; padding: 10px 12px; box-sizing: border-box; background: #0a0a0a; border: 1px solid #4a3825; color: #d4c4a8; font-size: 0.92rem; cursor: pointer; }
+        .battle-data-option input { width: 16px; height: 16px; accent-color: #8b1c1c; cursor: pointer; }
+        .action-btn { flex: 1; padding: 15px; font-size: 1.1rem; font-weight: 600; cursor: pointer; border: 1px solid; transition: all 0.2s; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
+        .btn-retreat { background: #0a0a0a; border-color: #3a3225; color: #8a7c6b; }
+        .btn-retreat:hover { background: #1a1a1a; color: #d4c4a8; }
+        .btn-redraw { background: #1a130a; border-color: #705a3f; color: #d4c4a8; }
+        .btn-redraw:hover { background: #2a1f10; color: #fff; }
+        .btn-engage { background: #4a1515; border-color: #8b1c1c; color: #fff; }
+        .btn-engage:hover { background: #8b1c1c; border-color: #ff3333; box-shadow: 0 0 15px rgba(139,28,28,0.6); }
+        .sys-msg { font-size: 0.9rem; color: #ff3333; margin-top: 15px; opacity: 0; text-align: center; }
+        
+        .recruit-launch-box { display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 50px; background:#0a0a0a; border:1px solid #3a241a; width:100%; max-width:500px; text-align:center; gap:20px; }
+        .btn-recruit-execute { background: #1a0505; border: 1px solid #8b1c1c; color: #ff3333; padding: 20px 40px; font-size: 1.5rem; font-weight: bold; cursor: pointer; letter-spacing: 5px; clip-path: polygon(15px 0, 100% 0, calc(100% - 15px) 100%, 0 100%); transition: all 0.3s; }
+        .btn-recruit-execute:hover { background: #3a0a0a; transform: scale(1.05); box-shadow: 0 0 25px rgba(139,28,28,0.6); }
+
+    </style>
+</head>
+<body>
+
+    <div class="nav-tabs">
+        <div class="nav-tab active" onclick="switchTab('tower')">深渊高塔试炼</div>
+        <div class="nav-tab" onclick="switchTab('roster')">调查员驻地</div>
+        <div class="nav-tab" onclick="switchTab('recruit')">招募大厅</div>
+    </div>
+
+    <!-- 高塔 -->
+    <div id="view-tower" class="view-section active">
+        <div class="difficulty-selector">
+            <button class="diff-btn active" onclick="setDifficulty('normal', 0)">普通难度</button>
+            <button class="diff-btn" onclick="setDifficulty('hard', 1)">困难难度</button>
+        </div>
+        <div class="tower-grid">
+            <button class="floor-btn" onclick="explore(1)"><span class="floor-name">探索第一层</span><span class="floor-info" id="info-t1">3只 [一级]</span></button>
+            <button class="floor-btn" onclick="explore(2)"><span class="floor-name">探索第二层</span><span class="floor-info" id="info-t2">2只 [二级]</span></button>
+            <button class="floor-btn" onclick="explore(3)"><span class="floor-name">探索第三层</span><span class="floor-info" id="info-t3">1只 [三级]</span></button>
+            <button class="floor-btn" onclick="explore(4)"><span class="floor-name">探索第四层</span><span class="floor-info" id="info-t4">1只 [四级]</span></button>
+            <button class="floor-btn" onclick="explore(5)"><span class="floor-name">挑战塔顶</span><span class="floor-info" id="info-t5">1只 [五级]</span></button>
+        </div>
+    </div>
+
+    <!-- 驻地 -->
+    <div id="view-roster" class="view-section" style="max-width:1200px;">
+        <div class="roster-header">
+            <div class="roster-title">驻地人员编制 <button class="btn-card" style="font-size:0.8rem; padding:4px 8px; margin-left:10px; color:#ff3333; border-color:#8b1c1c;" onclick="clearData()">清空存档</button></div>
+            <div class="roster-count"><span id="squad-count">0</span> / 4 出战 | <span id="roster-count">0</span> / 12 容量</div>
+        </div>
+        <div class="roster-grid" id="roster-grid">
+            <div class="empty-roster">驻地空无一人，请前往招募大厅。</div>
+        </div>
+    </div>
+
+    <!-- 招募 -->
+    <div id="view-recruit" class="view-section">
+        <div class="recruit-launch-box">
+            <div style="color:#8a7c6b; font-size:1.1rem; line-height:1.6;">
+                世界边缘的危机正在逼近...<br>
+                密斯卡托尼克大学发出了紧急招募令。<br>
+                你是否准备好迎接未知的命运？
+            </div>
+            <button class="btn-recruit-execute" onclick="executeRecruit()">发起档案检索</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="result-modal">
+        <div class="modal-content">
+            <div class="modal-title" id="modal-title">...</div>
+            
+            <div class="battle-preview" id="modal-battle-preview" style="display:none;">
+                <div class="preview-group">
+                    <div class="preview-title">我方出战队伍 (The Investigators)</div>
+                    <div class="entity-list" id="squad-list"></div>
+                </div>
+                <div class="preview-group">
+                    <div class="preview-title">深渊阴影 (The Mythos)</div>
+                    <div class="entity-list" id="enemy-list"></div>
+                </div>
+            </div>
+
+            <div class="recruit-showcase" id="modal-recruit-showcase" style="display:none;"></div>
+
+            <div class="action-group" id="modal-actions"></div>
+            <div class="sys-msg" id="sys-msg">指令已同步至世界终端...</div>
+        </div>
+    </div>
+
+    <script>
+        const MONSTERS = [
+  {
+    "name": "🐟〈深潜者〉",
+    "tier": 1,
+    "id": 1
+  },
+  {
+    "name": "🐟〈混种深潜者〉",
+    "tier": 1,
+    "id": 2
+  },
+  {
+    "name": "👹〈沃尔人〉",
+    "tier": 1,
+    "id": 3
+  },
+  {
+    "name": "👹〈雅迪斯之民〉",
+    "tier": 1,
+    "id": 4
+  },
+  {
+    "name": "🪱〈地狱水蛭〉",
+    "tier": 1,
+    "id": 5
+  },
+  {
+    "name": "👹〈萨悌〉",
+    "tier": 1,
+    "id": 6
+  },
+  {
+    "name": "🐍〈蛇人〉",
+    "tier": 1,
+    "id": 7
+  },
+  {
+    "name": "👹〈伊戈罗纳克之仆〉",
+    "tier": 1,
+    "id": 8
+  },
+  {
+    "name": "👹〈米里·尼格利〉",
+    "tier": 1,
+    "id": 9
+  },
+  {
+    "name": "🐀〈人面鼠〉",
+    "tier": 1,
+    "id": 10
+  },
+  {
+    "name": "🐍〈伊格之子〉",
+    "tier": 1,
+    "id": 11
+  },
+  {
+    "name": "🐍〈地蠕(A/B型)〉",
+    "tier": 1,
+    "id": 12
+  },
+  {
+    "name": "👹〈黄衣之王侍臣〉",
+    "tier": 1,
+    "id": 13
+  },
+  {
+    "name": "👹〈乔乔人〉",
+    "tier": 1,
+    "id": 14
+  },
+  {
+    "name": "👹〈夜魇〉",
+    "tier": 1,
+    "id": 15
+  },
+  {
+    "name": "👹〈沃米人(平常)〉",
+    "tier": 1,
+    "id": 16
+  },
+  {
+    "name": "👹〈祖·图米-戈〉",
+    "tier": 1,
+    "id": 17
+  },
+  {
+    "name": "👹〈希帕波利亚人〉",
+    "tier": 1,
+    "id": 18
+  },
+  {
+    "name": "👹〈昌格纳·方庚次级弟兄〉",
+    "tier": 1,
+    "id": 19
+  },
+  {
+    "name": "👹〈格拉基之仆〉",
+    "tier": 1,
+    "id": 20
+  },
+  {
+    "name": "🐍〈地蠕(C型)〉",
+    "tier": 1,
+    "id": 21
+  },
+  {
+    "name": "🐖〈猪人〉",
+    "tier": 1,
+    "id": 22
+  },
+  {
+    "name": "👹〈斯芬克斯之子〉",
+    "tier": 1,
+    "id": 23
+  },
+  {
+    "name": "👹〈潜沙怪〉",
+    "tier": 1,
+    "id": 24
+  },
+  {
+    "name": "👹〈墓中之兽〉",
+    "tier": 1,
+    "id": 25
+  },
+  {
+    "name": "👹〈乌波-萨斯拉之子(中等体型)〉",
+    "tier": 1,
+    "id": 26
+  },
+  {
+    "name": "🐟〈空鱼(次级)〉",
+    "tier": 1,
+    "id": 27
+  },
+  {
+    "name": "🪲〈夏恩(夏盖妖虫)〉",
+    "tier": 1,
+    "id": 28
+  },
+  {
+    "name": "🐺〈黑狗〉",
+    "tier": 1,
+    "id": 29
+  },
+  {
+    "name": "🧟〈骷髅〉",
+    "tier": 1,
+    "id": 30
+  },
+  {
+    "name": "🔥〈鬼火〉",
+    "tier": 1,
+    "id": 31
+  },
+  {
+    "name": "🌾〈稻草人〉",
+    "tier": 1,
+    "id": 32
+  },
+  {
+    "name": "🧟〈僵尸〉",
+    "tier": 1,
+    "id": 33
+  },
+  {
+    "name": "🧛〈吸血鬼〉",
+    "tier": 1,
+    "id": 34
+  },
+  {
+    "name": "🦇〈大型蝙蝠(集群)〉",
+    "tier": 1,
+    "id": 35
+  },
+  {
+    "name": "🦅〈鹰/秃鹰〉",
+    "tier": 1,
+    "id": 36
+  },
+  {
+    "name": "🐈〈山猫/猞猁〉",
+    "tier": 1,
+    "id": 37
+  },
+  {
+    "name": "🐈〈山狮/豹〉",
+    "tier": 1,
+    "id": 38
+  },
+  {
+    "name": "🐺〈狗/豺狼/狼〉",
+    "tier": 1,
+    "id": 39
+  },
+  {
+    "name": "🐈〈普通猫〉",
+    "tier": 1,
+    "id": 40
+  },
+  {
+    "name": "👹〈海鳗〉",
+    "tier": 1,
+    "id": 41
+  },
+  {
+    "name": "🐍〈毒蛇〉",
+    "tier": 1,
+    "id": 42
+  },
+  {
+    "name": "🐢〈拟鳄龟〉",
+    "tier": 1,
+    "id": 43
+  },
+  {
+    "name": "🐺〈鬣狗〉",
+    "tier": 1,
+    "id": 44
+  },
+  {
+    "name": "🐍〈蟒蛇〉",
+    "tier": 1,
+    "id": 45
+  },
+  {
+    "name": "🐢〈真鳄龟〉",
+    "tier": 1,
+    "id": 46
+  },
+  {
+    "name": "🐪〈骆驼〉",
+    "tier": 1,
+    "id": 47
+  },
+  {
+    "name": "💤〖梦境结晶器守护者〗",
+    "tier": 2,
+    "id": 48
+  },
+  {
+    "name": "👹〖夏盖混种 (成熟形态)〗",
+    "tier": 2,
+    "id": 49
+  },
+  {
+    "name": "👻〖食尸鬼〗",
+    "tier": 2,
+    "id": 50
+  },
+  {
+    "name": "🦇〖拜亚基〗",
+    "tier": 2,
+    "id": 51
+  },
+  {
+    "name": "🍄〖枯败者〗",
+    "tier": 2,
+    "id": 52
+  },
+  {
+    "name": "🐛〖行走的蠕虫〗",
+    "tier": 2,
+    "id": 53
+  },
+  {
+    "name": "🧟〖复生者〗",
+    "tier": 2,
+    "id": 54
+  },
+  {
+    "name": "💨〖界外幽鬼 (普通型)〗",
+    "tier": 2,
+    "id": 55
+  },
+  {
+    "name": "🕷️〖艾霍特之子〗",
+    "tier": 2,
+    "id": 56
+  },
+  {
+    "name": "💨〖化尘者〗",
+    "tier": 2,
+    "id": 57
+  },
+  {
+    "name": "🐙〖修格斯主宰 (真实形态)〗",
+    "tier": 2,
+    "id": 58
+  },
+  {
+    "name": "🔥〖炎之精〗",
+    "tier": 2,
+    "id": 59
+  },
+  {
+    "name": "👹〖昆扬之民〗",
+    "tier": 2,
+    "id": 60
+  },
+  {
+    "name": "🐍〖伊格的眷族〗",
+    "tier": 2,
+    "id": 61
+  },
+  {
+    "name": "👹〖不可名状誓言的信徒〗",
+    "tier": 2,
+    "id": 62
+  },
+  {
+    "name": "🕷️〖阿特拉克-纳克亚之女〗",
+    "tier": 2,
+    "id": 63
+  },
+  {
+    "name": "🦇〖空鬼〗",
+    "tier": 2,
+    "id": 64
+  },
+  {
+    "name": "👹〖哈斯塔的眷族〗",
+    "tier": 2,
+    "id": 65
+  },
+  {
+    "name": "👹〖黑暗蠕行者〗",
+    "tier": 2,
+    "id": 66
+  },
+  {
+    "name": "👹〖妖鬼〗",
+    "tier": 2,
+    "id": 67
+  },
+  {
+    "name": "🧊〖利克斯星住民〗",
+    "tier": 2,
+    "id": 68
+  },
+  {
+    "name": "🦀〖米-戈 (各种形态)〗",
+    "tier": 2,
+    "id": 69
+  },
+  {
+    "name": "🦇〖尼洪·古力〗",
+    "tier": 2,
+    "id": 70
+  },
+  {
+    "name": "🦑〖幽格〗",
+    "tier": 2,
+    "id": 71
+  },
+  {
+    "name": "🐺〖冷原食尸猎犬〗",
+    "tier": 2,
+    "id": 72
+  },
+  {
+    "name": "🦑〖克苏鲁的仆役 (成熟)〗",
+    "tier": 2,
+    "id": 73
+  },
+  {
+    "name": "🦑〖外神仆役〗",
+    "tier": 2,
+    "id": 74
+  },
+  {
+    "name": "🦍〖变异沃米人〗",
+    "tier": 2,
+    "id": 75
+  },
+  {
+    "name": "🦇〖风行者〗",
+    "tier": 2,
+    "id": 76
+  },
+  {
+    "name": "🌱〖齐克洛尔死亡藤蔓〗",
+    "tier": 2,
+    "id": 77
+  },
+  {
+    "name": "🦇〖昌格纳·方庚上级弟兄〗",
+    "tier": 2,
+    "id": 78
+  },
+  {
+    "name": "🦇〖佩特苏齐〗",
+    "tier": 2,
+    "id": 79
+  },
+  {
+    "name": "🦇〖斯洛阿住民〗",
+    "tier": 2,
+    "id": 80
+  },
+  {
+    "name": "🦇〖灵体猎手〗",
+    "tier": 2,
+    "id": 81
+  },
+  {
+    "name": "🧻〖木乃伊〗",
+    "tier": 2,
+    "id": 82
+  },
+  {
+    "name": "🦍〖巨型多毛原始人〗",
+    "tier": 2,
+    "id": 83
+  },
+  {
+    "name": "🐺〖狼人〗",
+    "tier": 2,
+    "id": 84
+  },
+  {
+    "name": "🦇〖泽西恶魔〗",
+    "tier": 2,
+    "id": 85
+  },
+  {
+    "name": "🐊〖短吻鳄/鳄鱼〗",
+    "tier": 2,
+    "id": 86
+  },
+  {
+    "name": "🐅〖狮子〗",
+    "tier": 2,
+    "id": 87
+  },
+  {
+    "name": "🦍〖大猩猩〗",
+    "tier": 2,
+    "id": 88
+  },
+  {
+    "name": "🐻〖熊(灰熊/北极熊)〗",
+    "tier": 2,
+    "id": 89
+  },
+  {
+    "name": "🦏〖河马〗",
+    "tier": 2,
+    "id": 90
+  },
+  {
+    "name": "🦌〖麋鹿〗",
+    "tier": 2,
+    "id": 91
+  },
+  {
+    "name": "🐅〖老虎〗",
+    "tier": 2,
+    "id": 92
+  },
+  {
+    "name": "🦑〖巨型章鱼〗",
+    "tier": 2,
+    "id": 93
+  },
+  {
+    "name": "🦑〖巨型乌贼〗",
+    "tier": 2,
+    "id": 94
+  },
+  {
+    "name": "⬛⟪闪尼先生 (真实形态)⟫",
+    "tier": 3,
+    "id": 95
+  },
+  {
+    "name": "🪲⟪夏盖塑造者⟫",
+    "tier": 3,
+    "id": 96
+  },
+  {
+    "name": "🦅⟪夏塔克鸟⟫",
+    "tier": 3,
+    "id": 97
+  },
+  {
+    "name": "🦅⟪星海鱼鹰⟫",
+    "tier": 3,
+    "id": 98
+  },
+  {
+    "name": "🧟⟪廷达洛斯混种⟫",
+    "tier": 3,
+    "id": 99
+  },
+  {
+    "name": "🦑⟪莎布-尼古拉斯之子⟫",
+    "tier": 3,
+    "id": 100
+  },
+  {
+    "name": "👤⟪古神的寄养儿⟫",
+    "tier": 3,
+    "id": 101
+  },
+  {
+    "name": "⬛⟪原型修格斯⟫",
+    "tier": 3,
+    "id": 102
+  },
+  {
+    "name": "🦠⟪深渊住民⟫",
+    "tier": 3,
+    "id": 103
+  },
+  {
+    "name": "🐸⟪纳伽埃⟫",
+    "tier": 3,
+    "id": 104
+  },
+  {
+    "name": "🩸⟪星之精⟫",
+    "tier": 3,
+    "id": 105
+  },
+  {
+    "name": "🐛⟪钻地魔虫 (三/四龄)⟫",
+    "tier": 3,
+    "id": 106
+  },
+  {
+    "name": "🎭⟪查寇塔⟫",
+    "tier": 3,
+    "id": 107
+  },
+  {
+    "name": "👽⟪伊斯人 (旧体)⟫",
+    "tier": 3,
+    "id": 108
+  },
+  {
+    "name": "✨⟪空间吞噬者⟫",
+    "tier": 3,
+    "id": 109
+  },
+  {
+    "name": "🦠⟪尼约格萨的子嗣⟫",
+    "tier": 3,
+    "id": 110
+  },
+  {
+    "name": "🧟⟪百万蒙宠者⟫",
+    "tier": 3,
+    "id": 111
+  },
+  {
+    "name": "🐍⟪惊惧猎手⟫",
+    "tier": 3,
+    "id": 112
+  },
+  {
+    "name": "🧛⟪尼约斯-科盖⟫",
+    "tier": 3,
+    "id": 113
+  },
+  {
+    "name": "🛢️⟪古老者⟫",
+    "tier": 3,
+    "id": 114
+  },
+  {
+    "name": "⬛⟪无形眷族⟫",
+    "tier": 3,
+    "id": 115
+  },
+  {
+    "name": "🗿⟪魔像⟫",
+    "tier": 3,
+    "id": 116
+  },
+  {
+    "name": "🌱⟪食人植物⟫",
+    "tier": 3,
+    "id": 117
+  },
+  {
+    "name": "🦏⟪黑犀牛⟫",
+    "tier": 3,
+    "id": 118
+  },
+  {
+    "name": "🐘⟪非洲象⟫",
+    "tier": 3,
+    "id": 119
+  },
+  {
+    "name": "🐋⟪杀人鲸⟫",
+    "tier": 3,
+    "id": 120
+  },
+  {
+    "name": "🪲◈伊斯人 (新甲虫躯体)◈",
+    "tier": 4,
+    "id": 121
+  },
+  {
+    "name": "🦄◈诺弗-刻◈",
+    "tier": 4,
+    "id": 122
+  },
+  {
+    "name": "👁️◈外神幼体◈",
+    "tier": 4,
+    "id": 123
+  },
+  {
+    "name": "🌈◈星之彩◈",
+    "tier": 4,
+    "id": 124
+  },
+  {
+    "name": "🦑◈旧日支配者幼体◈",
+    "tier": 4,
+    "id": 125
+  },
+  {
+    "name": "🦠◈绿渊眷族◈",
+    "tier": 4,
+    "id": 126
+  },
+  {
+    "name": "🐸◈撒托古亚之后裔◈",
+    "tier": 4,
+    "id": 127
+  },
+  {
+    "name": "⬛◈修格斯◈",
+    "tier": 4,
+    "id": 128
+  },
+  {
+    "name": "📐◈廷达洛斯猎犬◈",
+    "tier": 4,
+    "id": 129
+  },
+  {
+    "name": "🌌◈犹格-索托斯的子嗣◈",
+    "tier": 4,
+    "id": 130
+  },
+  {
+    "name": "⚙️◈齐克洛尔星怪◈",
+    "tier": 4,
+    "id": 131
+  },
+  {
+    "name": "🌲◈黑山羊幼崽◈",
+    "tier": 4,
+    "id": 132
+  },
+  {
+    "name": "👻◈无形马◈",
+    "tier": 4,
+    "id": 133
+  },
+  {
+    "name": "🦕◈湖怪◈",
+    "tier": 4,
+    "id": 134
+  },
+  {
+    "name": "🦈◈巨齿鲨◈",
+    "tier": 4,
+    "id": 135
+  },
+  {
+    "name": "🐛♱⸨巨噬蠕虫⸩♱",
+    "tier": 5,
+    "id": 136
+  },
+  {
+    "name": "🐙♱⸨克苏鲁的星之眷族⸩♱",
+    "tier": 5,
+    "id": 137
+  },
+  {
+    "name": "🌪️♱⸨飞水螅⸩♱",
+    "tier": 5,
+    "id": 138
+  },
+  {
+    "name": "❄️♱⸨伊塔库亚的眷族⸩♱",
+    "tier": 5,
+    "id": 139
+  },
+  {
+    "name": "⏳♱⸨廷达洛斯统主⸩♱",
+    "tier": 5,
+    "id": 140
+  },
+  {
+    "name": "🌊♱⸨黑海藻⸩♱",
+    "tier": 5,
+    "id": 141
+  },
+  {
+    "name": "🐛♱⸨钻地魔虫⸩♱",
+    "tier": 5,
+    "id": 142
+  }
+];
+        const RARITIES = [
+            { id: "Normal", name: "普通", prob: 0.60 },
+            { id: "Elite", name: "精英", prob: 0.30 },
+            { id: "Legendary", name: "传奇", prob: 0.10 }
+        ];
+
+        // 14 专属普通调查员
+        const NORMAL_INVESTIGATORS = [
+            { name: "“退伍老兵” 杰瑞", bg: "退伍老兵。", rarity: RARITIES[0], cls: "防守者", hp: 120, mp: 15, atk: 30, armor: 15, speed: 40, skills: ["【沉重盾击】[眩晕;power:40][单防;power:20][Aim:50]", "【坚守阵地】[单盾;power:30][嘲讽;power:50][MP:2]", "【格挡架势】[免伤;power:50][反应:近战][MP:3]"] },
+            { name: "“防暴警” 布鲁斯", bg: "防暴警。", rarity: RARITIES[0], cls: "防守者", hp: 130, mp: 10, atk: 40, armor: 20, speed: 45, skills: ["【防暴棍扫击】[群攻;power:50][Aim:60]", "【掩护队友】[群盾;power:20][MP:3]", "【防弹盾牌】[免伤;power:50][反应:远程][MP:3]"] },
+            { name: "“黑市拳手” 马克", bg: "黑市拳手。", rarity: RARITIES[0], cls: "狂战士", hp: 140, mp: 10, atk: 40, armor: 10, speed: 50, skills: ["【野蛮重拳】[单体;power:60][HP:5][Aim:70]", "【狂化】[单增;power:30][嘲讽;power:30]", "【以伤换伤】[反击;power:40][反应:近战]"] },
+            { name: "“暴徒” 汉斯", bg: "暴徒。", rarity: RARITIES[0], cls: "狂战士", hp: 135, mp: 12, atk: 45, armor: 5, speed: 55, skills: ["【胡乱劈砍】[群攻;power:50][Aim:50]", "【怒吼】[群增;power:15]", "【嗜血本能】[单回;power:30][单增;power:10][HP:10]"] },
+            { name: "“飞贼” 汤米", bg: "飞贼。", rarity: RARITIES[0], cls: "风行者", hp: 100, mp: 15, atk: 30, armor: 5, speed: 70, skills: ["【左轮速射】[单体(枪击);power:50][Aim:60][远程]", "【寻找掩体】[单避;power:40][Turns:1]", "【翻滚躲避】[免伤;power:50][反应:远程][MP:2]"] },
+            { name: "“跑酷者” 里昂", bg: "跑酷者。", rarity: RARITIES[0], cls: "风行者", hp: 110, mp: 18, atk: 25, armor: 8, speed: 75, skills: ["【跳跃飞踢】[单体;power:50][Aim:60][近战]", "【吸引火力】[单避;power:30][嘲讽;power:20][MP:2]", "【侧闪规避】[免伤;power:50][反应:近战][MP:2]"] },
+            { name: "“地下毒师” 沃尔特", bg: "地下毒师。", rarity: RARITIES[0], cls: "灾厄使", hp: 105, mp: 25, atk: 20, armor: 5, speed: 45, skills: ["【自制酸液】[单降;power:30][Aim:70][MP:3]", "【刺鼻气味】[群盲;power:20][MP:4]", "【麻醉剂】[单降;power:40][MP:3]"] },
+            { name: "“黑心药剂师” 艾伦", bg: "黑心药剂师。", rarity: RARITIES[0], cls: "灾厄使", hp: 100, mp: 30, atk: 15, armor: 0, speed: 50, skills: ["【毒镖投掷】[单降;power:20][Aim:80][远程]", "【致幻烟雾】[群降;power:15][MP:5]", "【毒素护体】[反击;power:30][反应:近战][MP:3]"] },
+            { name: "“私家侦探” 雷蒙德", bg: "私家侦探。", rarity: RARITIES[0], cls: "隐匿者", hp: 110, mp: 15, atk: 35, armor: 10, speed: 60, skills: ["【消音手枪】[单体(枪击);power:60][Aim:80][远程]", "【藏匿暗处】[嘲讽;power:-30][MP:2]", "【战术卧倒】[免伤;power:50][反应:远程][MP:2]"] },
+            { name: "“冷血杀手” 维克多", bg: "冷血杀手。", rarity: RARITIES[0], cls: "隐匿者", hp: 100, mp: 12, atk: 40, armor: 5, speed: 65, skills: ["【割喉匕首】[单体;power:60][单降;power:15][Aim:75][近战]", "【弱点观察】[单增;power:25][MP:2]", "【招架卸力】[免伤;power:50][反应:近战][MP:2]"] },
+            { name: "“街头神棍” 阿莱斯特", bg: "街头神棍。", rarity: RARITIES[0], cls: "施法者", hp: 100, mp: 50, atk: 10, armor: 0, speed: 40, skills: ["【次级爆燃】[群攻;power:50][Aim:70][MP:5][法术]", "【念力护盾】[单盾;power:30][MP:4][法术]", "【法力偏折】[免伤;power:50][反应:法术][MP:5]"] },
+            { name: "“民俗学者” 伊芙琳", bg: "民俗学者。", rarity: RARITIES[0], cls: "施法者", hp: 105, mp: 45, atk: 12, armor: 0, speed: 45, skills: ["【恶念诅咒】[单降;power:40][Aim:80][MP:4][法术]", "【灵视分享】[群增;power:15][MP:6][法术]", "【迷惑阵】[群盲;power:25][MP:5][法术]"] },
+            { name: "“小镇神父” 托马斯", bg: "小镇神父。", rarity: RARITIES[0], cls: "圣职者", hp: 115, mp: 35, atk: 15, armor: 5, speed: 40, skills: ["【银十字击】[单体;power:50][Aim:80][近战]", "【急救包扎】[单回;power:40][MP:3]", "【神圣庇护】[免伤;power:50][反应:法术][MP:4]"] },
+            { name: "“战地护士” 南丁格尔", bg: "战地护士。", rarity: RARITIES[0], cls: "圣职者", hp: 105, mp: 30, atk: 10, armor: 0, speed: 45, skills: ["【手术刀投掷】[单体;power:50][Aim:70][远程]", "【群体鼓舞】[群回;power:20][MP:5]", "【镇定剂注射】[单盾;power:25][MP:3]"] }
+        ];
+
+        // 14 专属精英调查员
+        const ELITE_INVESTIGATORS = [
+            { name: "“铁卫” 鲍勃", bg: "重火力前排。", rarity: RARITIES[1], cls: "防守者", hp: 160, mp: 15, atk: 40, armor: 30, speed: 40, skills: ["【重型防暴棍】[单体;power:50][眩晕;power:20][Aim:60]", "【榴弹发射器】[群攻(爆炸);power:120][Aim:70][TP:30][远程]", "【坚守阵线】[群盾;power:40][嘲讽;power:60][MP:3]", "【防弹拒马】[单防;power:80][反应:远程][MP:2]"] },
+            { name: "“坚岩” 斯隆", bg: "火力压制流。", rarity: RARITIES[1], cls: "防守者", hp: 150, mp: 20, atk: 35, armor: 40, speed: 35, skills: ["【温切斯特步枪】[单体(枪击);power:80][Aim:65][远程]", "【交叉火力网】[群攻(枪击);power:100][群降;power:20][Aim:80][TP:40][远程]", "【不退一步】[单防;power:50][嘲讽;power:80][MP:2]", "【肩甲硬扛】[单盾;power:60][反应:近战][MP:2]"] },
+            { name: "“屠夫” 杰克", bg: "电锯穿透流。", rarity: RARITIES[1], cls: "狂战士", hp: 155, mp: 10, atk: 50, armor: 15, speed: 50, skills: ["【大砍刀劈斩】[单体;power:70][HP:5][Aim:65][近战]", "【血腥电锯】[单体(穿透);power:180][HP:15][Aim:80][TP:40][近战]", "【无尽愤怒】[单增;power:50][单避;power:-20]", "【痛觉迟钝】[免伤;power:60][反应:近战][HP:5]"] },
+            { name: "“撕裂者” 洛根", bg: "反击狂化流。", rarity: RARITIES[1], cls: "狂战士", hp: 145, mp: 15, atk: 55, armor: 10, speed: 55, skills: ["【狂乱爪击】[群攻;power:40][HP:5][Aim:60][近战]", "【致命突袭】[单体;power:150][眩晕;power:40][HP:10][Aim:90][TP:30][近战]", "【战意咆哮】[群增;power:30][HP:5]", "【濒死反扑】[反击;power:80][反应:近战]"] },
+            { name: "“鹰眼” 克林特", bg: "超高单体狙击。", rarity: RARITIES[1], cls: "风行者", hp: 130, mp: 20, atk: 35, armor: 15, speed: 80, skills: ["【制式步枪】[单体(枪击);power:90][Aim:80][远程]", "【穿甲反器材狙击】[单体(穿透);power:200][单盲;power:40][Aim:100][TP:40][远程]", "【高台占位】[单避;power:40][单增;power:30][Turns:2]", "【敏锐直觉】[回避;power:100][反应:远程][MP:3]"] },
+            { name: "“迅影” 艾莉丝", bg: "冲锋枪清杂。", rarity: RARITIES[1], cls: "风行者", hp: 135, mp: 25, atk: 30, armor: 10, speed: 85, skills: ["【冲锋枪扫射】[群攻(枪击);power:50][Aim:60][远程]", "【枪林弹雨】[群攻(枪击);power:120][Aim:80][TP:30][远程]", "【肾上腺素注射】[群避;power:40][MP:4]", "【滑铲规避】[回避;power:120][反应:近战][MP:2]"] },
+            { name: "“瘟疫” 霍乱", bg: "大范围致盲。", rarity: RARITIES[1], cls: "灾厄使", hp: 125, mp: 35, atk: 25, armor: 10, speed: 50, skills: ["【强酸投掷】[单降;power:40][单体;power:30][Aim:70][MP:2]", "【芥子气炸弹】[群攻;power:80][群盲;power:50][Aim:80][TP:35][远程]", "【生化防线】[群降;power:30][MP:4]", "【毒雾隐蔽】[单避;power:60][反应:远程][MP:3]"] },
+            { name: "“毒蝎” 萨斯", bg: "极致单体控制。", rarity: RARITIES[1], cls: "灾厄使", hp: 120, mp: 40, atk: 30, armor: 15, speed: 60, skills: ["【淬毒弩箭】[单体(穿透);power:40][单降;power:30][Aim:80][远程]", "【神经毒素注射】[单体;power:100][眩晕;power:80][Aim:90][TP:40][近战]", "【剧毒涂抹】[单增;power:40][MP:3]", "【毒液喷溅】[单盲;power:80][反应:近战][MP:3]"] },
+            { name: "“夜魔” 布莱克", bg: "隐身刺杀。", rarity: RARITIES[1], cls: "隐匿者", hp: 125, mp: 20, atk: 45, armor: 15, speed: 75, skills: ["【飞刀连掷】[单体;power:60][Aim:75][远程]", "【无声绞杀】[单体(穿透);power:180][单盲;power:40][Aim:100][TP:40][近战]", "【气息遮蔽】[嘲讽;power:-50][单增;power:30][MP:2]", "【暗影遁入】[单避;power:100][反应:远程][MP:2]"] },
+            { name: "“幻影” 米娅", bg: "高速闪避绽放。", rarity: RARITIES[1], cls: "隐匿者", hp: 120, mp: 25, atk: 40, armor: 10, speed: 80, skills: ["【袖剑突刺】[单体;power:50][单盲;power:20][Aim:80][近战]", "【死亡绽放】[群攻;power:110][Aim:90][TP:35][近战]", "【致命标记】[单降;power:50][MP:3]", "【残影闪躲】[回避;power:100][反应:近战][MP:3]"] },
+            { name: "“秘术师” 罗兰", bg: "神话控制法师。", rarity: RARITIES[1], cls: "施法者", hp: 110, mp: 70, atk: 15, armor: 5, speed: 45, skills: ["【旧印冲击】[单体;power:60][Aim:80][MP:5][法术]", "【星之眷族束缚】[群攻;power:90][群盲;power:60][Aim:90][MP:10][TP:40][法术]", "【魔力狂涌】[单增;power:50][MP:5]", "【以太护盾】[单盾;power:80][反应:法术][MP:4]"] },
+            { name: "“异教徒” 卡门", bg: "扭曲穿透法师。", rarity: RARITIES[1], cls: "施法者", hp: 115, mp: 65, atk: 10, armor: 0, speed: 50, skills: ["【精神鞭笞】[单体;power:40][单降;power:30][Aim:70][MP:4][法术]", "【尤格之视】[群攻(穿透);power:140][Aim:100][MP:15][TP:30][法术]", "【时空扭曲】[群避;power:30][MP:8][法术]", "【精神屏障】[免伤;power:80][反应:法术][MP:4]"] },
+            { name: "“苦行僧” 亚伯", bg: "战斗牧师。", rarity: RARITIES[1], cls: "圣职者", hp: 140, mp: 50, atk: 20, armor: 20, speed: 40, skills: ["【驱魔圣锤】[单体;power:50][Aim:70][近战]", "【神圣新星】[群攻;power:70][群回;power:80][Aim:90][MP:10][TP:40][法术]", "【圣水洗礼】[群回;power:40][MP:6]", "【信仰之盾】[单盾;power:100][反应:法术][MP:3]"] },
+            { name: "“修女” 玛丽亚", bg: "究极团补。", rarity: RARITIES[1], cls: "圣职者", hp: 130, mp: 60, atk: 15, armor: 15, speed: 45, skills: ["【惩戒圣光】[单体;power:40][单盲;power:20][Aim:80][MP:3][法术]", "【大天使之拥】[群回;power:120][群防;power:60][MP:15][TP:35][法术]", "【神圣祝福】[群防;power:40][MP:5]", "【光明偏折】[免伤;power:80][反应:远程][MP:3]"] }
+        ];
+
+        // 4 新增传奇调查员 (可编辑)
+        const LEGENDARY_INVESTIGATORS = [
+            { name: "“不灭狂怒” 奥拉夫", bg: "极致吸血与反击机制。", rarity: RARITIES[2], cls: "狂战士", hp: 200, mp: 20, atk: 80, armor: 30, speed: 60, skills: ["【血之狂热】[单增;power:50][再动;power:1][HP:10]", "【死战不休】[反击;power:0][再动;power:1][HP:5]", "【狂神降临】[嘲讽;power:200][群增;power:100][turns:1][HP:30]", "【猩红风暴】[群穿透;power:120][HP:20][TP:40]", "【血肉逢生】[单回;power:200][单防;power:100][HP:0][MP:10]", "【绞肉机】[穿透;power:300][HP:30][TP:60]", "【沸血之躯】[免伤;power:100][反应][MP:2]"] },
+            { name: "“神风” 零", bg: "超高闪避与多次行动。", rarity: RARITIES[2], cls: "风行者", hp: 130, mp: 30, atk: 60, armor: 20, speed: 120, skills: ["【缩地成寸】[单避;power:100][再动;power:1][Turns:1][MP:2]", "【双枪乱舞】[群攻;power:120][Aim:150][远程][MP:3]", "【燕返突刺】[穿透;power:180][Aim:200][近战]", "【神风连斩】[群攻;power:300][单避;power:100][Aim:120][TP:50][近战]", "【幻影迷踪】[回避;power:100][反应][MP:5]", "【弱点狙杀】[单体(枪击);power:300][单降;power:100][Aim:999][TP:80][远程]"] },
+            { name: "“深渊感染” 瘟疫", bg: "毁天灭地的群体负面状态。", rarity: RARITIES[2], cls: "灾厄使", hp: 140, mp: 80, atk: 40, armor: 20, speed: 50, skills: ["【万物凋零】[群降;power:10][群盲;power:10][再动;power:1][MP:2]", "【剧毒新星】[群攻;power:80][单盲;power:20][MP:10]", "【神经溶解】[眩晕;power:100][Aim:200][TP:40]", "【酸性血液】[反击;power:0][单降;power:50]", "【虚无化身】[回避;power:500][反应:远程][MP:5]", "【深渊凝视】[群穿透;power:200][群降;power:40][Aim:150][TP:80]"] },
+            { name: "“奇迹化身” 弥赛亚", bg: "无可匹敌的绝对救援与全能屏障。", rarity: RARITIES[2], cls: "圣职者", hp: 150, mp: 120, atk: 30, armor: 30, speed: 50, skills: ["【真言术：耀】[单回;power:50][再动;power:1][MP:3][法术]", "【神迹降临】[群回;power:300][群防;power:150][TP:50][MP:20][法术]", "【光辉结界】[群盾;power:100][群避;power:10][MP:15][法术]", "【绝对净化】[单增;power:50][群增;power:20][MP:20][法术]", "【信仰壁垒】[免伤;power:200][反应][MP:3][法术]"] }
+        ];
+
+        // 3 彩蛋英雄 (锁定)
+        const EASTER_EGGS = {
+            "埃利奥特": { name: "埃利奥特", bg: "掌握着禁忌魔法的施法者。", rarity: {id:"EasterEgg", name:"传奇"}, cls: "施法者", hp: 100, mp: 110, atk: 20, armor: 40, speed: 50, skills: [ "【迅捷愈合法】[单回;power:30][再动;power:1][MP:3][法术]", "【拉莱耶造雾术】[群盲;power:20][再动;power:1][MP:2][法术]", "【压缩爆燃】[群攻;power:70][群降;power:20][Aim:90][MP:5][法术][特效:火焰01]", "【召雷术】[群攻;power:240][MP:10][Aim:300][TP:40][法术][特效:雷击01]", "【归尘礼赞】[穿透;power:280][单降;power:100][Aim:999][MP:10][HP:10][TP:30][法术][特效:圣光01]", "【纳克提特障壁术】[群盾;power:200][MP:10][TP:20][法术]", "【萨维奇三连发】[单体(枪击);power:90][Aim:70][远程]", "【伊西斯之拥】[群回;power:100][MP:10][法术]", "【飞沙化甲】[单防;power:100][MP:5][法术]", "【净蚀反冲】[单盲;power:900][Turns:1][反应:法术][法术]", "【折影步】[回避;power:900][MP:4][反应:近战][法术]", "【巫师护盾】[单盾;power:180][MP:4][反应][法术]" ] },
+            "弗兰克": { name: "弗兰克", bg: "重炮手与战壕老兵。", rarity: {id:"EasterEgg", name:"传奇"}, cls: "防守者", hp: 180, mp: 17, atk: 60, armor: 60, speed: 65, skills: [ "【重击推撞】[眩晕;power:60][单防;power:30][嘲讽;power:100][Aim:40]", "【柯尔特三连发】[单体(枪击);power:180][Aim:70][远程]", "【温切斯特独头弹】[单体(枪击);power:100][单降;power:10][Aim:100][远程]", "【双管猎象枪】[单体(枪击);power:240][单降;power:20][Aim:80][MP:0][TP:40][远程]", "【克虏伯1918型】[单体(枪击);power:360][单降;power:60][Aim:110][MP:0][TP:100][远程]", "【战壕格斗术】[单避;power:160][Turns:1][MP:2][反应:近战]", "【膛火还击】[单体(枪击);power:80][Aim:50][反应][远程]" ] },
+            "玛德琳": { name: "玛德琳", bg: "寂静的刺客。", rarity: {id:"EasterEgg", name:"传奇"}, cls: "隐匿者", hp: 140, mp: 14, atk: 40, armor: 40, speed: 80, skills: [ "【无迹可寻】[嘲讽;power:-50][单避;power:10][再动;power:1][MP:2]", "【寂静指令】[群增;power:30]", "【关节锁】[单体;power:50][单盲;power:30][Aim:110][MP:3]", "【从西班牙射击】[单体(枪击);power:60][Aim:120][远程]", "【柯尔特三连发】[单体(枪击);power:180][Aim:70][远程][MP:3]", "【死亡编织】[群攻;power:80][远程][MP:2]", "【唯快不破】[回避;power:240][反应:近战][MP:2]" ] }
+        };
+
+        let currentTab = 'tower';
+        let roster = [];
+        let selectedIndices = new Set();
+        let easterEggsDrawn = [];
+        let tempRecruit = null;
+        let tempEncounter = [];
+
+        function saveData() {
+            localStorage.setItem('invRoster', JSON.stringify(roster));
+            localStorage.setItem('invEEDrawn', JSON.stringify(easterEggsDrawn));
+            localStorage.setItem('invSelectedIndices', JSON.stringify([...selectedIndices]));
+        }
+
+        function loadData() {
+            try {
+                const r = localStorage.getItem('invRoster');
+                if (r) roster = JSON.parse(r);
+                const ee = localStorage.getItem('invEEDrawn');
+                if (ee) easterEggsDrawn = JSON.parse(ee);
+                const selected = localStorage.getItem('invSelectedIndices');
+                if (selected) {
+                    const savedIndices = JSON.parse(selected);
+                    if (Array.isArray(savedIndices)) {
+                        selectedIndices = new Set(savedIndices.filter(i => Number.isInteger(i) && i >= 0 && i < roster.length));
+                    }
+                }
+            } catch(e) { console.error('Failed to load data', e); }
+        }
+        loadData();
+
+        function clearData() {
+            if (confirm("警告：这会清空驻地所有调查员（包括已锁定的彩蛋英雄的抽取记录），且不可恢复！确定要清空吗？")) {
+                roster = [];
+                easterEggsDrawn = [];
+                selectedIndices.clear();
+                saveData();
+                renderRoster();
+            }
+        }
+
+        function switchTab(mode) {
+            currentTab = mode;
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+            document.querySelector(`.nav-tab[onclick="switchTab('${mode}')"]`).classList.add('active');
+            document.getElementById(`view-${mode}`).classList.add('active');
+            if (mode === 'roster') renderRoster();
+        }
+        function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+        function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+        function generateId() { return Math.random().toString(36).substr(2, 9); }
+
+        // --- RECRUIT ---
+        function executeRecruit() {
+            if (roster.length >= 12) { alert("驻地已满 (12/12)，请先解雇部分调查员！"); return; }
+            
+            const roll = Math.random();
+            let isEasterEgg = false;
+            let eeKey = null;
+
+            if (roll < 0.10) { 
+                if (Math.random() < 0.30) {
+                    const availableEE = Object.keys(EASTER_EGGS).filter(k => !easterEggsDrawn.includes(k));
+                    if (availableEE.length > 0) { isEasterEgg = true; eeKey = pickRandom(availableEE); }
+                }
+            }
+
+            if (isEasterEgg) {
+                tempRecruit = JSON.parse(JSON.stringify(EASTER_EGGS[eeKey]));
+                tempRecruit.id = generateId();
+                tempRecruit.eeKey = eeKey;
+            } else {
+                let rarityObj = RARITIES[0];
+                if (roll < 0.10) rarityObj = RARITIES[2]; else if (roll < 0.40) rarityObj = RARITIES[1];
+                
+                if (rarityObj.id === 'Normal') {
+                    let base = pickRandom(NORMAL_INVESTIGATORS);
+                    tempRecruit = JSON.parse(JSON.stringify(base));
+                    tempRecruit.id = generateId();
+                    tempRecruit.eeKey = null;
+                } else if (rarityObj.id === 'Elite') {
+                    let base = pickRandom(ELITE_INVESTIGATORS);
+                    tempRecruit = JSON.parse(JSON.stringify(base));
+                    tempRecruit.id = generateId();
+                    tempRecruit.eeKey = null;
+                } else if (rarityObj.id === 'Legendary') {
+                    let base = pickRandom(LEGENDARY_INVESTIGATORS);
+                    tempRecruit = JSON.parse(JSON.stringify(base));
+                    tempRecruit.id = generateId();
+                    tempRecruit.eeKey = null;
+                }
+            }
+            showRecruitModal();
+        }
+
+        // --- ROSTER ---
+        function acceptRecruit() {
+            if (roster.length >= 12) return;
+            const nameInput = document.getElementById('modal-name');
+            const bgInput = document.getElementById('modal-bg');
+            if (nameInput) tempRecruit.name = nameInput.value.trim() || tempRecruit.name;
+            if (bgInput) tempRecruit.bg = bgInput.value.trim() || tempRecruit.bg;
+
+            roster.push(tempRecruit);
+            if (tempRecruit.eeKey) easterEggsDrawn.push(tempRecruit.eeKey);
+            closeModal();
+            saveData();
+            switchTab('roster'); // User requested: jump directly, no alert
+        }
+        
+        function renderRoster() {
+            document.getElementById('roster-count').innerText = roster.length;
+            document.getElementById('squad-count').innerText = selectedIndices.size;
+            const grid = document.getElementById('roster-grid');
+            if (roster.length === 0) { grid.innerHTML = `<div class="empty-roster">驻地空无一人，请前往招募大厅。</div>`; return; }
+            grid.innerHTML = '';
+            roster.forEach((inv, i) => {
+                const isSelected = selectedIndices.has(i);
+                grid.innerHTML += `
+                    <div class="inv-card ${isSelected ? 'selected' : ''}">
+                        <div class="inv-card-header">
+                            <div class="inv-name-wrap"><span class="inv-name">${inv.name}</span><span class="inv-class">${inv.cls}</span></div>
+                            <span class="rarity-badge rarity-${inv.rarity.id}">${inv.rarity.name}</span>
+                        </div>
+                        <div class="inv-stats-mini">HP:${inv.hp} | MP:${inv.mp} | Spd:${inv.speed} | Def:${inv.armor}</div>
+                        <div class="inv-skills-mini">${inv.skills.join('<br>')}</div>
+                        <div class="inv-actions">
+                            <button class="btn-card btn-select ${isSelected ? 'active' : ''}" onclick="toggleSelect(${i})">${isSelected ? '取消出战' : '选择出战'}</button>
+                            <button class="btn-card btn-fire" onclick="fireInvestigator(${i})">解雇</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        
+        function toggleSelect(i) {
+            if (selectedIndices.has(i)) { selectedIndices.delete(i); }
+            else {
+                if (selectedIndices.size >= 4) { alert("最多只能选择 4 名调查员出战！"); return; }
+                selectedIndices.add(i);
+            }
+            saveData();
+            renderRoster();
+        }
+        
+        function fireInvestigator(i) {
+            if (confirm(`确定要解雇 ${roster[i].name} 吗？`)) {
+                selectedIndices.delete(i);
+                roster.splice(i, 1);
+                selectedIndices.clear();
+                saveData();
+                renderRoster();
+            }
+        }
+
+        // --- TOWER ---
+        let currentDifficulty = 'normal';
+        let currentFloor = 1;
+        const TOWER_CONFIGS = {
+            normal: { 1: [{tier: 1, count: 3}], 2: [{tier: 2, count: 2}], 3: [{tier: 3, count: 1}], 4: [{tier: 4, count: 1}], 5: [{tier: 5, count: 1}] },
+            hard: { 1: [{tier: 1, count: 5}], 2: [{tier: 2, count: 4}], 3: [{tier: 3, count: 3}], 4: [{tier: 4, count: 2}, {tier: 2, count: 2}], 5: [{tier: 5, count: 1}, {tier: 4, count: 1}, {tier: 3, count: 1}] }
+        };
+        const numMap = {1:'一', 2:'二', 3:'三', 4:'四', 5:'五'};
+        function setDifficulty(diff, index) {
+            currentDifficulty = diff;
+            const btns = document.querySelectorAll('.diff-btn');
+            btns.forEach(b => b.classList.remove('active'));
+            btns[index].classList.add('active');
+            for(let i=1; i<=5; i++) document.getElementById(`info-t${i}`).innerText = TOWER_CONFIGS[diff][i].map(c => `${c.count}只 [${numMap[c.tier]}级]`).join(' + ');
+        }
+        function explore(floor) {
+            currentFloor = floor;
+            if (selectedIndices.size === 0) { alert("出战人数为 0！请先前往【调查员驻地】选择出战人员。"); return; }
+            tempEncounter = [];
+            TOWER_CONFIGS[currentDifficulty][floor].forEach(c => {
+                for(let i=0; i<c.count; i++) {
+                    const pool = MONSTERS.filter(m => m.tier === c.tier);
+                    if (pool.length > 0) tempEncounter.push(pickRandom(pool));
+                }
+            });
+            showBattleModal();
+        }
+
+        // --- MODALS ---
+        function showRecruitModal() {
+            document.getElementById('modal-title').innerText = "新兵档案检索完毕";
+            document.getElementById('modal-battle-preview').style.display = 'none';
+            document.getElementById('modal-recruit-showcase').style.display = 'flex';
+            
+            const d = tempRecruit;
+            
+            let editSection = '';
+            if (!d.eeKey) {
+                editSection = `
+                    <div class="input-group">
+                        <label>重命名</label>
+                        <input type="text" id="modal-name" value="${d.name}">
+                    </div>
+                    <div class="input-group">
+                        <label>修改档案</label>
+                        <textarea id="modal-bg">${d.bg}</textarea>
+                    </div>
+                `;
+            } else {
+                editSection = `<div style="color:#ff3333; font-weight:bold; margin-top:15px;">【传奇彩蛋英雄】档案已被锁定，不可篡改。</div>`;
+            }
+
+            document.getElementById('modal-recruit-showcase').innerHTML = `
+                <div style="border:1px solid #3a241a; background:#0a0a0a; padding:20px;">
+                    <div style="display:flex; justify-content:space-between; border-bottom:1px solid #2a1111; padding-bottom:10px;">
+                        <div><span style="font-size:1.5rem; color:#e0d4c3; font-weight:bold;">${d.name}</span> <span style="color:#8b1c1c;">${d.cls}</span></div>
+                        <span class="rarity-badge rarity-${d.rarity.id}">${d.rarity.name}</span>
+                    </div>
+                    ${d.eeKey ? `<div style="color:#705a3f; font-style:italic; margin:10px 0;">"${d.bg}"</div>` : ''}
+                    <div style="color:#a88960; font-family:monospace; font-size:1.1rem; margin-top:10px;">HP:${d.hp} | MP:${d.mp} | Atk:${d.atk} | Def:${d.armor} | Spd:${d.speed}</div>
+                    <div class="inv-full-skills">${d.skills.map(s => `<div>- ${s}</div>`).join('')}</div>
+                    ${editSection}
+                </div>
+            `;
+            
+            document.getElementById('modal-actions').innerHTML = `
+                <button class="action-btn btn-retreat" onclick="closeModal()">拒绝录用</button>
+                <button class="action-btn btn-redraw" onclick="executeRecruit()">重新检索</button>
+                <button class="action-btn btn-engage" onclick="acceptRecruit()">纳入驻地</button>
+            `;
+            document.getElementById('result-modal').classList.add('active');
+        }
+
+        function showBattleModal() {
+            document.getElementById('modal-title').innerText = "战前确认：生死之战";
+            document.getElementById('modal-recruit-showcase').style.display = 'none';
+            document.getElementById('modal-battle-preview').style.display = 'flex';
+            
+            const sList = document.getElementById('squad-list');
+            sList.innerHTML = Array.from(selectedIndices).map(i => `<div class="entity-tag hero">${roster[i].name} (${roster[i].cls})</div>`).join('');
+            
+            const eList = document.getElementById('enemy-list');
+            eList.innerHTML = tempEncounter.map(m => `<div class="entity-tag monster">${m.name} [${numMap[m.tier]}级]</div>`).join('');
+            
+            document.getElementById('modal-actions').innerHTML = `
+                <label class="battle-data-option" title="取消勾选后只发送战前叙事，不会发送完整战斗数据或重置角色状态。">
+                    <input type="checkbox" id="send-combat-data" checked>
+                    <span>发送战斗数据（仅首次初始化新战斗时勾选）</span>
+                </label>
+                <button class="action-btn btn-retreat" onclick="closeModal()">撤退</button>
+                <button class="action-btn btn-engage" style="flex:2;" onclick="deployBattle()">全员降临战场！</button>
+            `;
+            document.getElementById('result-modal').classList.add('active');
+        }
+
+        function closeModal() { document.getElementById('result-modal').classList.remove('active'); }
+
+        function deployBattle() {
+            const btns = document.querySelectorAll('.action-btn');
+            btns.forEach(b => b.style.pointerEvents = 'none');
+            const sendCombatData = document.getElementById('send-combat-data')?.checked ?? true;
+            
+            let squadBlocks = Array.from(selectedIndices).map(idx => {
+                let d = roster[idx];
+                let skStr = d.skills.map(s => `          - "${s}"`).join('\n');
+                return `    - 角色:
+        名字: "${d.name}"
+        属性: "[HP:${d.hp}/${d.hp}][MP:${d.mp}/${d.mp}][Atk:${d.atk}][Armor:${d.armor}][Speed:${d.speed}][职业:${d.cls}]"
+        技能:
+${skStr}`;
+            }).join('\n');
+
+            const monsterNames = tempEncounter.map(m => `- ${m.name}`).join('\n');
+
+            const combatDataSection = sendCombatData ? `
+你本次回复需要在文本描写后输出<Combat_block>，用于战斗数据初始化。
+
+<Combat_block>需严格遵守yaml生成，调查员的数据已给出，怪物的请查看<monster>标签中对应的<Combat_block>数据。你只需要拼接已有的我方角色和敌方怪物词条！不要自行发挥！
+
+以下是格式示例，再次提醒，我方列表已由程序脚本自动生成，你需要完整复制，敌方列表则是一个示例，你需要读取怪物数据：
+<Combat_block>
+战斗数据栏:
+  我方列表:
+${squadBlocks}
+       
+  敌方列表:
+    - 角色:
+        名字: "👻示例怪物"
+        属性: "[HP:130/130][MP:13/13][Atk:40][Armor:0][Speed:65][行动次数:3]"
+        技能:
+          - "【撕裂利爪】[单体;power:60][近战]"
+          - "【死缠啃咬】[单体;power:25][单降;power:15][MP:2][近战]"
+          - "【橡胶韧皮】[免伤;power:50][MP:1][反应:远程]"
+          - "【幽暗凝视】[单盲;power:20][Turn:3][MP:3][法术]"
+</Combat_block>` : `
+<Combat_block>需严格遵守yaml生成，调查员的技能和属性前文已给出，怪物的请查看<monster>标签中对应的<Combat_block>数据。你只需要拼接已有的我方角色和敌方怪物词条！不要自行发挥！`;
+
+            const command = `这是一组克苏鲁世界观中的调查员小队，他们打算挑战一座高塔。如果这是游戏开场，你需要首先描写他们在出发前各自的介绍，并以对话的形式表现他们各自为何而挑战高塔。如果之前已经有战斗和对话，继续故事！
+
+现在，调查员们进入了第${currentFloor}层，他们遇到了以下敌人：
+${monsterNames}
+
+你需要描述战前的侦察与反侦察交锋，然后将叙事停留在开战的前一刻，等待玩家返回结果。
+${combatDataSection}`;
+            
+            const textarea = window.parent.document.getElementById('send_textarea');
+            if (textarea) {
+                textarea.value = command;
+                textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            
+            document.getElementById('sys-msg').style.opacity = '1';
+            setTimeout(() => {
+                closeModal();
+                btns.forEach(b => b.style.pointerEvents = 'auto');
+                document.getElementById('sys-msg').style.opacity = '0';
+            }, 1500);
+        }
+    </script>
+</body>
+</html>
+```
