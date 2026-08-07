@@ -8,3 +8,4 @@
 | 2026-08-07 | V3.9 升级：职业被动系统（CLASS_PASSIVES）模块化重构 | L39 | f4b81c2 |
 | 2026-08-07 | V3.9 视觉增强：先天被动 UI 徽章显示（狂战士/风行者） | L51 | 6cfc5e8 |
 | 2026-08-07 | V3.95 升级：轻量级事件总线（CombatEvents）架构重构 (Effect System Step 2) | L62 | ea9d71d |
+| 2026-08-08 | V4.0 里程碑：Effect System 标签处理器（TAG_HANDLERS）与全架构重构完成 (Effect System Step 1 & 2 终集) | L75 | 1a5f464 |

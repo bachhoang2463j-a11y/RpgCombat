@@ -69,3 +69,16 @@
   5. 同步更新 `SPEC.md` 与 `LOG-INDEX.md`。
 - **涉及函数/模块**：`CombatEvents` (事件总线), `EVENTS` (事件常量表), `nextTurn()` (TURN_START/BUFF_EXPIRED 事件点), `endTurn()` & `executeSkillAction()` (TURN_END 事件点), `applySingleTagEffect()` (ON_FATAL_DAMAGE/AFTER_DAMAGE/AFTER_HEAL 事件点)
 - **决策原因**：完成 Effect System 架构优化的第二步，实现时机性逻辑与核心流程的完全事件解耦，使得后续任何自定义 Buff、触发器或新职业被动均可通过 `CombatEvents.on()` 监听触发，无需侵入核心战斗结算代码。
+
+---
+
+## [LOG-007] 2026-08-08 — V4.0 里程碑：Effect System 标签处理器（TAG_HANDLERS）与全架构重构完成 (Effect System Step 1 & 2 终集)
+
+- **变更行为**：
+  1. 将核心战斗引擎正式升级为 `战斗前端-爬塔 V4.html`。
+  2. 实现 `TAG_HANDLERS` 策略模式处理器注册表与 `resolveTagHandler` 标签匹配器，将 `applySingleTagEffect()` 中散落的 13 个 else-if 标签分支（包含命中、闪避、防御、免伤、护盾、回避、反击、嘲讽、隐匿、攻击增益、回复、再动等）彻底解耦并模块化独立注册。
+  3. 至此全面完成 Effect System 架构改造的前两步（第一步标签注册表解耦 + 第二步 CombatEvents 事件总线），消除巨型 if-else 与硬编码隐性耦合。
+  4. 经手操实测全套战斗流程正常，零报错无异常。
+  5. 同步更新 `SPEC.md`、`LOG.md` 与 `LOG-INDEX.md` 并提交推送到 GitHub。
+- **涉及函数/模块**：`TAG_HANDLERS` (标签策略注册表), `resolveTagHandler()` (标签分发求解器), `applySingleTagEffect()` (400 行 else-if 简化为注册表查找)
+- **决策原因**：完成 Effect System 架构改造里程碑，将引擎扩展性提升至全新高度。后续新增自定义标签只需通过 `registerTagHandler` 注册即可完成，无需修改核心分发函数。
