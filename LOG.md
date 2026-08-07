@@ -107,3 +107,15 @@
   4. 经手操测试，反应/看破窗口收放功能正常运行。
 - **涉及函数/模块**：`promptReaction()` (反应选择弹窗), `promptKanpo()` (看破选择弹窗), `shelvePrompt()` (弹窗收起与悬浮按钮), `cleanupPrompt()` (弹窗清理)
 - **决策原因**：在等待玩家选择反应/看破时战斗处于暂停状态，此改动让玩家可以先与角色对话，再随时返回选择，不打断角色扮演体验。
+
+---
+
+## [LOG-010] 2026-08-08 — V4.1 看破演出升级：识破-反制-无效化仪式感特效
+
+- **变更行为**：
+  1. 新增 `playKanpoEffect()` 看破专属演出流程：屏幕压暗 → 敌方技能冻结锁环 → 看破英雄金色之眼 → 金色粒子流汇聚 → 敌方技能斜斩/破碎/无效化印章 → 全屏脉冲闪光。
+  2. 新增 `spawnGoldStream()` / `spawnGoldBurst()` 金色琥珀粒子效果，复用 `CanvasFxEngine` 粒子层。
+  3. 新增 `KANPO_SOUND_KEY` 与 `playKanpoSound()` 独立看破音效接口，默认复用 `hitDown`（debuff 音效），后续可单独更换。
+  4. `checkKanpoInterrupt()` 不再直接 `ctx.cancelled = true`，改为等待演出完成后再标记取消，避免敌方技能被瞬间掐断。
+- **涉及函数/模块**：`playKanpoEffect()` (看破演出编排), `spawnGoldStream()` / `spawnGoldBurst()` (金色粒子效果), `playKanpoSound()` (独立音效接口), `checkKanpoInterrupt()` (看破中断流程)
+- **决策原因**：当前看破失效后敌方技能被无缝掐断，战略反制缺乏辨识度；通过冻结、金色识破之眼、粒子汇聚与无效化印章建立“识破-反制-无效化”的仪式感闭环。

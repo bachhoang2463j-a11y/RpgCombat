@@ -473,6 +473,49 @@
     }
     .llm-thinking-dot:nth-child(2) { animation-delay: 0.2s; }
     .llm-thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    /* ==== 看破战略演出 ==== */
+    @keyframes kanpo-dim-in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes kanpo-eye-pulse {
+      0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+      20% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+      45% { transform: translate(-50%, -50%) scale(0.95); opacity: 1; }
+      72% { transform: translate(-50%, -50%) scale(1.3); opacity: 0.9; }
+      100% { transform: translate(-50%, -50%) scale(1.55); opacity: 0; }
+    }
+    @keyframes kanpo-ring-pulse {
+      0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0.9; }
+      100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+    }
+    @keyframes kanpo-lock-pulse {
+      0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+      25% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+      80% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1.2); opacity: 0; }
+    }
+    @keyframes kanpo-shatter {
+      0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+      20% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+      60% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1.35); opacity: 0; }
+    }
+    @keyframes kanpo-slash {
+      0% { transform: translate(-50%, -50%) rotate(-45deg) scaleX(0); opacity: 1; }
+      35% { transform: translate(-50%, -50%) rotate(-45deg) scaleX(1.2); opacity: 1; }
+      100% { transform: translate(-50%, -50%) rotate(-45deg) scaleX(1.5); opacity: 0; }
+    }
+    @keyframes kanpo-flash {
+      0% { opacity: 0; }
+      25% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    .kanpo-dim { position: fixed; inset: 0; z-index: 140; pointer-events: none; background: rgba(0,0,0,0.45); animation: kanpo-dim-in 0.25s ease-out forwards; }
+    .kanpo-eye { position: fixed; z-index: 150; pointer-events: none; animation: kanpo-eye-pulse 1s ease-out forwards; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+    .kanpo-ring { position: fixed; z-index: 149; pointer-events: none; animation: kanpo-ring-pulse 0.7s ease-out forwards; }
+    .kanpo-lock { position: fixed; z-index: 148; pointer-events: none; animation: kanpo-lock-pulse 0.9s ease-out forwards; }
+    .kanpo-shatter { position: fixed; z-index: 151; pointer-events: none; animation: kanpo-shatter 0.8s ease-out forwards; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+    .kanpo-slash { position: fixed; z-index: 152; pointer-events: none; animation: kanpo-slash 0.55s ease-out forwards; }
+    .kanpo-flash { position: fixed; inset: 0; z-index: 153; pointer-events: none; background: radial-gradient(circle, rgba(255,237,213,0.9), rgba(251,191,36,0.35) 45%, transparent 75%); animation: kanpo-flash 0.45s ease-out forwards; }
   </style>
 </head>
 <body class="w-full h-[100dvh] min-h-[600px] bg-black text-gray-100 overflow-hidden relative select-none">
@@ -782,6 +825,12 @@ const audioUrls = {
 const audioCache = {};
 for (let key in audioUrls) { audioCache[key] = new Audio(audioUrls[key]); audioCache[key].preload = 'auto'; }
 window.playSound = (key) => { if (audioCache[key]) { try { let sound = audioCache[key].cloneNode(); sound.volume = 0.5; sound.play().catch(e => {}); } catch(e) { console.warn('playSound error:', e); } } };
+
+// 看破音效独立接口：默认复用 debuff 音效，后续可单独更换
+const KANPO_SOUND_KEY = 'hitDown';
+function playKanpoSound() {
+    playSound(KANPO_SOUND_KEY);
+}
 window.isExecutingCutin = false; 
 
 async function playExecutionAnimation(hero, killedEnemies) {
@@ -1159,6 +1208,116 @@ function spawnHealParticles(x, y, colorTheme = 'green') {
             }
         });
     }
+}
+
+function getDomCenter(dom) {
+    if (!dom) return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    const rect = dom.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+}
+
+function spawnGoldStream(x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const dist = Math.max(1, Math.hypot(dx, dy));
+    const baseAngle = Math.atan2(dy, dx);
+    const colors = ['#fbbf24', '#f59e0b', '#fff7ed', '#fde68a'];
+
+    for (let i = 0; i < 28; i++) {
+        const t = i / 28;
+        const px = x1 + dx * t + (Math.random() - 0.5) * 34;
+        const py = y1 + dy * t + (Math.random() - 0.5) * 34;
+        const speed = 3.2 + Math.random() * 3.8;
+        const spread = (Math.random() - 0.5) * 1.1;
+        const vx = Math.cos(baseAngle + spread) * speed;
+        const vy = Math.sin(baseAngle + spread) * speed;
+        const color = colors[Math.floor(Math.random() * colors.length)];
+
+        fxEngine.addParticle({
+            x: px,
+            y: py,
+            vx: vx,
+            vy: vy,
+            drag: 0.985,
+            age: 0,
+            life: 520 + Math.random() * 320,
+            size: 2.5 + Math.random() * 3,
+            color: color,
+            draw(ctx, pct) {
+                const alpha = Math.sin(pct * Math.PI) * 0.95;
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * (1 - pct * 0.35), 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = this.size * 0.7;
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                ctx.lineTo(this.x - this.vx * 1.4, this.y - this.vy * 1.4);
+                ctx.stroke();
+                ctx.fillStyle = '#fbbf24';
+                ctx.globalAlpha = alpha * 0.3;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 2.2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
+    }
+}
+
+function spawnGoldBurst(x, y) {
+    const colors = ['#fbbf24', '#f59e0b', '#fff7ed', '#fde68a'];
+    for (let i = 0; i < 38; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 2.5 + Math.random() * 7.5;
+        const size = 2.5 + Math.random() * 3.6;
+        const color = colors[Math.floor(Math.random() * colors.length)];
+
+        fxEngine.addParticle({
+            x: x + (Math.random() - 0.5) * 24,
+            y: y + (Math.random() - 0.5) * 24,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            drag: 0.96,
+            age: 0,
+            life: 420 + Math.random() * 380,
+            size: size,
+            color: color,
+            draw(ctx, pct) {
+                const alpha = Math.sin(pct * Math.PI) * 0.95;
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * (1 - pct * 0.5), 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#f59e0b';
+                ctx.globalAlpha = alpha * 0.35;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 2.4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
+    }
+
+    fxEngine.addParticle({
+        x: x,
+        y: y,
+        vx: 0,
+        vy: 0,
+        age: 0,
+        life: 360,
+        maxRadius: 95,
+        draw(ctx, pct) {
+            const radius = this.maxRadius * pct;
+            ctx.strokeStyle = '#fbbf24';
+            ctx.globalAlpha = (1 - pct) * 0.9;
+            ctx.lineWidth = 5 * (1 - pct);
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+    });
 }
 
 function spawnExplosionParticles(x, y, scale = 1) {
@@ -4068,6 +4227,130 @@ function promptKanpo(candidates, attacker, incomingSkill) {
     });
 }
 
+async function playKanpoEffect(caster, enemy, skill) {
+    const heroDom = document.getElementById(`hero-card-${caster.id}`);
+    const enemyDom = document.getElementById(`${enemy.id}-sprite`);
+    const heroCenter = getDomCenter(heroDom);
+    const enemyCenter = getDomCenter(enemyDom);
+
+    const elements = [];
+    const cleanup = () => elements.forEach(el => { if (el && el.parentNode) el.parentNode.removeChild(el); });
+
+    // 1. 屏幕压暗 + 敌方技能“冻结”
+    const dim = document.createElement('div');
+    dim.className = 'kanpo-dim';
+    document.body.appendChild(dim);
+    elements.push(dim);
+
+    const lock = document.createElement('div');
+    lock.className = 'kanpo-lock';
+    lock.style.left = `${enemyCenter.x}px`;
+    lock.style.top = `${enemyCenter.y}px`;
+    lock.style.width = '150px';
+    lock.style.height = '150px';
+    lock.innerHTML = `
+        <svg style="position:absolute;left:50%;top:50%;width:150px;height:150px;transform:translate(-50%,-50%);filter:drop-shadow(0 0 18px rgba(251,191,36,0.85));" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="42" stroke="#fbbf24" stroke-width="3" fill="none" opacity="0.95" stroke-dasharray="10 8" />
+            <path d="M30,50 L45,50 L45,35 L55,35 L55,50 L70,50 M50,50 L50,62" stroke="#fde68a" stroke-width="7" stroke-linecap="round" fill="none" />
+            <circle cx="50" cy="62" r="8" fill="none" stroke="#fff7ed" stroke-width="2" />
+        </svg>`;
+    document.body.appendChild(lock);
+    elements.push(lock);
+
+    // 2. 看破英雄金色之眼
+    const eye = document.createElement('div');
+    eye.className = 'kanpo-eye';
+    eye.style.left = `${heroCenter.x}px`;
+    eye.style.top = `${heroCenter.y}px`;
+    eye.style.width = '220px';
+    eye.style.height = '170px';
+    eye.innerHTML = `
+        <div style="font-size:15px;font-weight:900;color:#fde68a;text-shadow:0 0 14px #f59e0b;letter-spacing:2px;margin-bottom:2px;">看破识破！</div>
+        <svg style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:190px;height:190px;filter:drop-shadow(0 0 22px rgba(245,158,11,0.9));" viewBox="0 0 120 120">
+            <defs>
+                <radialGradient id="kanpo-eye-glow" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#fff7ed" stop-opacity="1" />
+                    <stop offset="45%" stop-color="#fbbf24" stop-opacity="0.85" />
+                    <stop offset="100%" stop-color="#f59e0b" stop-opacity="0" />
+                </radialGradient>
+            </defs>
+            <circle cx="60" cy="60" r="52" fill="url(#kanpo-eye-glow)" />
+            <path d="M14,60 Q34,28 60,28 Q86,28 106,60 Q86,92 60,92 Q34,92 14,60 Z" fill="#78350f" stroke="#fbbf24" stroke-width="4" />
+            <circle cx="60" cy="60" r="24" fill="#fde68a" stroke="#fff7ed" stroke-width="3" />
+            <circle cx="60" cy="60" r="8" fill="#fff7ed" />
+            <path d="M38,60 Q48,52 60,52 Q72,52 82,60" stroke="#f59e0b" stroke-width="3" fill="none" opacity="0.9" />
+        </svg>`;
+    document.body.appendChild(eye);
+    elements.push(eye);
+
+    spawnGoldStream(heroCenter.x, heroCenter.y, enemyCenter.x, enemyCenter.y);
+    if (heroDom) createFloatingText(heroDom, '看破识破！', 'text-amber-300');
+
+    await sleep(430);
+
+    // 3. 金色粒子汇聚命中敌方
+    const ring = document.createElement('div');
+    ring.className = 'kanpo-ring';
+    ring.style.left = `${enemyCenter.x}px`;
+    ring.style.top = `${enemyCenter.y}px`;
+    ring.style.width = '220px';
+    ring.style.height = '220px';
+    ring.innerHTML = `
+        <svg style="position:absolute;left:50%;top:50%;width:220px;height:220px;transform:translate(-50%,-50%);filter:drop-shadow(0 0 22px rgba(245,158,11,0.9));" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="30" stroke="#fbbf24" stroke-width="4" fill="none" />
+            <circle cx="50" cy="50" r="42" stroke="#fde68a" stroke-width="2" fill="none" stroke-dasharray="6 6" />
+        </svg>`;
+    document.body.appendChild(ring);
+    elements.push(ring);
+
+    spawnGoldBurst(enemyCenter.x, enemyCenter.y);
+    await sleep(260);
+
+    // 4. 斜斩 + 无效化印章 + 全屏脉冲
+    playKanpoSound();
+
+    const flash = document.createElement('div');
+    flash.className = 'kanpo-flash';
+    document.body.appendChild(flash);
+    elements.push(flash);
+
+    const slash = document.createElement('div');
+    slash.className = 'kanpo-slash';
+    slash.style.left = `${enemyCenter.x}px`;
+    slash.style.top = `${enemyCenter.y}px`;
+    slash.style.width = '180px';
+    slash.style.height = '180px';
+    slash.innerHTML = `
+        <svg style="position:absolute;left:50%;top:50%;width:180px;height:180px;transform:translate(-50%,-50%);filter:drop-shadow(0 0 18px rgba(251,191,36,0.95));" viewBox="0 0 100 100">
+            <path d="M10,90 L90,10" stroke="#f59e0b" stroke-width="8" stroke-linecap="round" fill="none" />
+            <path d="M22,90 L95,17" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.9" />
+        </svg>`;
+    document.body.appendChild(slash);
+    elements.push(slash);
+
+    const shatter = document.createElement('div');
+    shatter.className = 'kanpo-shatter';
+    shatter.style.left = `${enemyCenter.x}px`;
+    shatter.style.top = `${enemyCenter.y - 45}px`;
+    shatter.style.width = '240px';
+    shatter.style.height = '150px';
+    shatter.innerHTML = `
+        <div style="font-size:17px;font-weight:900;color:#fde68a;text-shadow:0 0 16px #f59e0b;letter-spacing:3px;margin-bottom:2px;">无效化</div>
+        <svg style="width:150px;height:150px;filter:drop-shadow(0 0 24px rgba(251,191,36,0.9));" viewBox="0 0 100 100">
+            <path d="M50,12 L58,42 L88,50 L58,58 L50,88 L42,58 L12,50 L42,42 Z" fill="#fbbf24" opacity="0.9" />
+            <path d="M42,50 L70,50 L55,65 L50,48 L62,38 Z" fill="#fff7ed" opacity="0.95" />
+            <path d="M24,24 L38,38 M62,62 L76,76 M24,76 L38,62 M62,38 L76,24" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" opacity="0.8" />
+        </svg>`;
+    document.body.appendChild(shatter);
+    elements.push(shatter);
+
+    if (enemyDom) createFloatingText(enemyDom, '技能无效化！', 'text-amber-300');
+    if (window.triggerScreenShake) window.triggerScreenShake(5, 320);
+
+    await sleep(720);
+    cleanup();
+}
+
 async function checkKanpoInterrupt(ctx) {
     const incomingType = ctx.skill.damageType || '近战';
 
@@ -4099,12 +4382,7 @@ async function checkKanpoInterrupt(ctx) {
         if (chosen.skill.tpCost) chosen.hero.tp -= chosen.skill.tpCost;
         updateHeroUI(chosen.hero);
 
-        playSound('taunt');
-        const heroDom = document.getElementById(`hero-card-${chosen.hero.id}`);
-        if (heroDom) {
-            playSVGEffect(heroDom, 'buff');
-            createFloatingText(heroDom, `看破!`, 'text-amber-300');
-        }
+        await playKanpoEffect(chosen.hero, ctx.caster, ctx.skill);
         addHistory(`   ⛔ ${chosen.hero.name} 施展【${chosen.skill.name}】看穿了敌方气路，【${ctx.skill.name}】被彻底无效化！`);
         ctx.cancelled = true;
     }
