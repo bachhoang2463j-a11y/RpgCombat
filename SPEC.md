@@ -4,7 +4,7 @@
 
 ## 1. 项目目标与定位
 
-本项目旨在提供一个**轻量级、单文件、零依赖、无后端需求的通用 RPG 回合制战斗引擎前端** (`战斗前端-爬塔 V3.9.html`)。
+本项目旨在提供一个**轻量级、单文件、零依赖、无后端需求的通用 RPG 回合制战斗引擎前端** (`战斗前端-爬塔 V3.95.html`)。
 
 引擎专注于：
 - 为角色扮演（Roleplay）、跑团及 SillyTavern（酒馆）场景提供即时计算、高可观赏性、可互动调优的战斗模拟器。
@@ -23,9 +23,9 @@
 3. **标准化数据交互接口 (Standardized Protocol)**：
    - 统一采用 `<Combat_block>` 格式包裹 YAML 数据作为系统与酒馆/LLM 的通信标准。
    - 格式解析具有高容错性，自动兼容缺失属性与默认技能赋予。
-4. **高可拓展的技能与职业标签系统 (Tag-based & Modular Mechanics)**：
+4. **高可拓展的技能、事件与职业被动系统 (Tag-based, Event Bus & Modular Passives)**：
    - 技能效果由标签构成（如 `[单体;power:30]`, `[反应:近战]`, `[特效:火焰01]`）。
-   - 7 大职业被动采用 **`CLASS_PASSIVES` 模块化注册表架构**，通过生命周期钩子（`onBattleInit`、`modifyStats`、`onFatalDamage`、`onAfterDamageDealt`、`onOverheal` 等）独立定义，彻底消除核心引擎代码中的硬编码判断。
+   - 7 大职业被动采用 **`CLASS_PASSIVES` 模块化注册表架构** 结合 **`CombatEvents` 轻量事件总线**，将生命周期钩子（`ON_FATAL_DAMAGE`、`AFTER_DAMAGE`、`AFTER_HEAL`、`TURN_END` 等）通过事件订阅模式解耦，彻底消除核心引擎代码中的硬编码分支。
 
 ---
 
@@ -37,6 +37,7 @@
 - 反应拦截系统（受击前二次判定与反击/避险）。
 - 敌方智慧旁白系统与 FGO 风格 Boss 充能大招（Cut-in 特写）。
 - **模块化职业被动系统 (`CLASS_PASSIVES`)**：覆盖防守者、狂战士、风行者、灾厄使/施毒者、隐匿者、施法者、圣职者/支援者。
+- **轻量事件总线 (`CombatEvents`)**：发布/订阅模式处理 `TURN_START`, `TURN_END`, `BEFORE_DAMAGE`, `AFTER_DAMAGE`, `AFTER_HEAL`, `ON_FATAL_DAMAGE`, `BUFF_APPLIED`, `BUFF_EXPIRED` 等生命周期事件。
 - 全效编辑器（实时编辑角色属性、技能标签、智慧标记与多动次数）。
 - 粒子 Canvas 与 WebM 高清透明特效渲染引擎。
 - LLM API 对话气泡与战后小说模板生成器。
@@ -76,5 +77,5 @@
 1. **兼容性**：单 HTML 文件在 Chrome / Edge 浏览器下运行正常，零控制台报错。
 2. **数据完整性**：粘贴符合规范的 `<Combat_block>` 格式能够正确建立战场单位。
 3. **编辑器响应**：运行时修改任何属性或技能，下一次行动立刻生效。
-4. **被动模块化验证**：职业被动完全由 `CLASS_PASSIVES` 钩子驱动，包含防守者锁血、隐匿者回避、狂战士属性缩放等均正常生效。
+4. **被动模块化与事件驱动验证**：职业被动完全由 `CLASS_PASSIVES` 与 `CombatEvents` 事件总线驱动，包含防守者锁血、隐匿者回避、狂战士属性缩放等均正常生效。
 5. **稳定度**：连续战斗 50 回合以上无内存泄漏或动画卡死现象。
