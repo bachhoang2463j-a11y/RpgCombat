@@ -3707,6 +3707,95 @@ registerClassPassive('施毒者', corruptorPassive);
 
 window.CLASS_PASSIVES = CLASS_PASSIVES;
 
+// ==========================================
+// 轻量事件总线 (CombatEvents) — 第二步架构
+// ==========================================
+const EVENTS = {
+    TURN_START:      'turn_start',      // 回合开始（毒 tick、眩晕检查前）
+    TURN_END:        'turn_end',        // 回合结束（充能积攒、多重施法触发）
+    BEFORE_DAMAGE:   'before_damage',   // 伤害结算前（可修改 rawDamage）
+    AFTER_DAMAGE:    'after_damage',    // 伤害结算后（淬毒、眩晕、仇恨附加）
+    BEFORE_HEAL:     'before_heal',     // 治疗前
+    AFTER_HEAL:      'after_heal',      // 治疗后（溢出转盾）
+    ON_KILL:         'on_kill',         // 目标被击杀时
+    ON_FATAL_DAMAGE: 'on_fatal_damage', // 致命伤害时（毅力留存、回避致命）
+    ON_DODGE:        'on_dodge',        // 闪避成功时
+    BUFF_APPLIED:    'buff_applied',    // Buff 施加时
+    BUFF_EXPIRED:    'buff_expired',    // Buff 过期时
+};
+
+const CombatEvents = {
+    _listeners: {},
+
+    on(event, listener, priority = 0) {
+        if (!this._listeners[event]) this._listeners[event] = [];
+        this._listeners[event].push({ fn: listener, priority });
+        this._listeners[event].sort((a, b) => b.priority - a.priority);
+        return this; // 支持链式调用
+    },
+
+    off(event, listener) {
+        if (!this._listeners[event]) return;
+        this._listeners[event] = this._listeners[event].filter(l => l.fn !== listener);
+    },
+
+    emit(event, ctx = {}) {
+        const listeners = this._listeners[event];
+        if (!listeners || listeners.length === 0) return;
+        for (const l of listeners) {
+            l.fn(ctx);
+            if (ctx.cancelled) break; // 支持拦截中断（如免死触发后阻止继续处理）
+        }
+    }
+};
+window.CombatEvents = CombatEvents;
+window.EVENTS = EVENTS;
+
+// ==========================================
+// 职业被动 → 事件订阅（生命周期型钩子）
+// 注意：值修改型钩子(modifyStats/modifyDamageMultiplier等)
+//       仍保留在 CLASS_PASSIVES 直接调用，此处只迁移时机型钩子
+// ==========================================
+
+// 防守者：毅力留存 (priority=10，高于隐匿者，先触发)
+CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
+    if (ctx.target.classType !== '防守者') return;
+    const p = CLASS_PASSIVES['防守者'];
+    if (p && p.onFatalDamage) p.onFatalDamage(ctx);
+}, 10);
+
+// 隐匿者：回避致命 (priority=5，防守者毅力失效后才触发)
+CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
+    if (ctx.target.classType !== '隐匿者') return;
+    const p = CLASS_PASSIVES['隐匿者'];
+    if (p && p.onFatalDamage) p.onFatalDamage(ctx);
+}, 5);
+
+// 灾厄使/施毒者：伤害后淬毒 (priority=5)
+CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
+    const p = CLASS_PASSIVES[ctx.caster.classType];
+    if (p && p.onAfterDamageDealt) {
+        p.onAfterDamageDealt(ctx.caster, ctx.target, ctx.targetDom, ctx.incomingDamageType);
+    }
+}, 5);
+
+// 圣职者/支援者：溢出治疗转盾 (priority=5)
+CombatEvents.on(EVENTS.AFTER_HEAL, (ctx) => {
+    const p = CLASS_PASSIVES[ctx.caster.classType];
+    if (p && p.onOverheal) {
+        ctx.extraText = p.onOverheal(ctx.caster, ctx.target, ctx.targetDom, ctx.oldHp, ctx.actualPower) || '';
+    }
+}, 5);
+
+// 施法者：多重施法 (priority=5，技能释放后触发)
+CombatEvents.on(EVENTS.TURN_END, (ctx) => {
+    if (!ctx.skill) return;
+    const p = CLASS_PASSIVES[ctx.entity.classType];
+    if (p && p.onSkillExecuted) {
+        p.onSkillExecuted(ctx.entity, ctx.skill, ctx.isReactionTrigger || false);
+    }
+}, 5);
+
 function getEffectiveStats(entity) { 
     let finalAtk = entity.atk || 0; 
     let finalDef = entity.def || 0; 
@@ -4011,16 +4100,13 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         hpDmg += casterPassive.modifyTrueDamage(caster);
     }
     
-    // === 致命伤害避死被动判定 (模块化调用) ===
+    // === 致命伤害避死判定 → 事件总线 (ON_FATAL_DAMAGE) ===
     if (wasAlive && target.hp - hpDmg <= 0) {
-        const targetPassive = CLASS_PASSIVES[target.classType];
-        if (targetPassive && targetPassive.onFatalDamage) {
-            let fatalCtx = { target, targetDom, hpDmg, shieldDmg, prevented: false };
-            targetPassive.onFatalDamage(fatalCtx);
-            if (fatalCtx.prevented) {
-                hpDmg = fatalCtx.hpDmg;
-                if (fatalCtx.shieldDmg !== undefined) shieldDmg = fatalCtx.shieldDmg;
-            }
+        const fatalCtx = { target, targetDom, hpDmg, shieldDmg, prevented: false, cancelled: false };
+        CombatEvents.emit(EVENTS.ON_FATAL_DAMAGE, fatalCtx);
+        if (fatalCtx.prevented) {
+            hpDmg = fatalCtx.hpDmg;
+            if (fatalCtx.shieldDmg !== undefined) shieldDmg = fatalCtx.shieldDmg;
         }
     }
     
@@ -4065,10 +4151,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         return '__killed__'; // 标志被击杀，上层统一收集后播放特写
     }
     
-    // === 职业被动附加状态 (模块化调用) ===
-    if (casterPassive && casterPassive.onAfterDamageDealt) {
-        casterPassive.onAfterDamageDealt(caster, target, targetDom, incomingDamageType);
-    }
+    // === 伤害后附加状态 → 事件总线 (AFTER_DAMAGE) ===
+    CombatEvents.emit(EVENTS.AFTER_DAMAGE, { caster, target, targetDom, incomingDamageType, hpDmg, shieldDmg });
   } 
   else if (tag.includes('瞄')) { 
       playSound('hitUp'); playSVGEffect(targetDom, 'buff'); 
@@ -4136,10 +4220,10 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
       const oldHp = target.hp;
       target.hp = Math.min(target.maxHp, target.hp + actualPower); 
       let extraText = '';
-      const casterPassive = CLASS_PASSIVES[caster.classType];
-      if (casterPassive && casterPassive.onOverheal) {
-          extraText = casterPassive.onOverheal(caster, target, targetDom, oldHp, actualPower) || '';
-      }
+      // === 治疗后溢出处理 → 事件总线 (AFTER_HEAL) ===
+      const healCtx = { caster, target, targetDom, oldHp, actualPower, extraText: '' };
+      CombatEvents.emit(EVENTS.AFTER_HEAL, healCtx);
+      extraText = healCtx.extraText;
       createFloatingText(targetDom, `+${actualPower}HP`, 'text-emerald-400'); 
       addHistory(`   ↳ 治愈了 ${target.name}，恢复 ${actualPower} 点生命。${extraText}`); 
   }
@@ -4201,11 +4285,8 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     if (caster.id.startsWith('h')) updateHeroUI(caster); else updateEnemyUI(caster);
     showLog(`${caster.name} 施展了【${skill.name}】！`); 
     
-    // === 职业技能释放被动 (模块化调用，如施法者多重施法) ===
-    const casterSkillPassive = CLASS_PASSIVES[caster.classType];
-    if (casterSkillPassive && casterSkillPassive.onSkillExecuted) {
-        casterSkillPassive.onSkillExecuted(caster, skill, isReactionTrigger);
-    }
+    // === 技能释放完毕 → 事件总线 (TURN_END 携带 skill 信息，供施法者多重施法等订阅) ===
+    CombatEvents.emit(EVENTS.TURN_END, { entity: caster, skill, isReactionTrigger });
     
     let targetStr = "";
     if (skill.type.includes('群')) targetStr = skill.type.includes('回') || skill.type.includes('增') || skill.type.includes('防') || skill.type.includes('盾') || skill.type.includes('避') || skill.type.includes('反击') ? "全体友方" : "全体敌方";
@@ -4461,6 +4542,9 @@ async function nextTurn() {
   
   let isStunned = false;
   if (!currentEntity.isExtraTurn && currentEntity.ref.buffs && currentEntity.ref.buffs.length > 0) { 
+      // === 回合开始事件 → 事件总线 (TURN_START) ===
+      CombatEvents.emit(EVENTS.TURN_START, { entity: currentEntity.ref });
+      
       isStunned = currentEntity.ref.buffs.some(b => b.type === 'stun');
       currentEntity.ref.buffs.forEach(b => {
           b.duration--;
@@ -4472,6 +4556,10 @@ async function nextTurn() {
               addHistory(`   🦠 [${currentEntity.ref.name}] 毒性发作，受到了 ${poisonDmg} 点真实伤害！`);
           }
       }); 
+      
+      // === Buff 过期事件 → 事件总线 (BUFF_EXPIRED) ===
+      const expiredBuffs = currentEntity.ref.buffs.filter(b => b.duration <= 0);
+      expiredBuffs.forEach(b => CombatEvents.emit(EVENTS.BUFF_EXPIRED, { entity: currentEntity.ref, buff: b }));
       currentEntity.ref.buffs = currentEntity.ref.buffs.filter(b => b.duration > 0); 
   }
   
@@ -4509,7 +4597,13 @@ async function nextTurn() {
   }
 }
 
-async function endTurn() { state.queueIndex++; await nextTurn(); }
+async function endTurn() {
+    const current = state.actionQueue[state.queueIndex];
+    // === 回合结束事件 → 事件总线 (TURN_END) — 无载利时仅通知实体，技能信息由 executeSkillAction 单独 emit ===
+    if (current) CombatEvents.emit(EVENTS.TURN_END, { entity: current.ref, skill: null, isReactionTrigger: false });
+    state.queueIndex++;
+    await nextTurn();
+}
 
 function retreatBattle() {
     showLog("正在撤离战场...");
