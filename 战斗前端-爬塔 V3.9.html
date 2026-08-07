@@ -3368,6 +3368,22 @@ function updateBuffUI(entity) {
   if (totalDef > 0) html += `<div class="text-blue-400 text-[8px] sm:text-[10px] bg-black/60 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">🛡️+${totalDef}</div>`;
   else if (totalDef < 0) html += `<div class="text-purple-400 text-[8px] sm:text-[10px] bg-black/60 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">🛡️${totalDef}</div>`;
   
+  // === 职业先天被动 UI 徽章（狂战士浴血/死斗、风行者 TP 闪避）===
+  if (entity.classType === '狂战士') {
+      if (entity.hp < entity.maxHp && entity.maxHp > 0) {
+          const lostRatio = (entity.maxHp - entity.hp) / entity.maxHp;
+          const lostPct = Math.floor(lostRatio * 100);
+          if (lostPct > 0) {
+              html += `<div class="text-rose-300 text-[8px] sm:text-[10px] bg-rose-950/80 border border-rose-600/60 px-1 rounded backdrop-blur font-mono shadow-md animate-pulse">🩸浴血+${lostPct}%</div>`;
+          }
+      }
+      if (entity.hp < entity.maxHp * 0.3) {
+          html += `<div class="text-red-400 text-[8px] sm:text-[10px] bg-black/80 border border-red-500/80 px-1 rounded backdrop-blur font-mono shadow-md animate-bounce">💀死斗(穿透)</div>`;
+      }
+  } else if (entity.classType === '风行者' && entity.tp > 0) {
+      html += `<div class="text-teal-200 text-[8px] sm:text-[10px] bg-teal-950/80 border border-teal-500/50 px-1 rounded backdrop-blur font-mono shadow-md">💨风行避+${entity.tp}</div>`;
+  }
+  
   buffContainer.innerHTML = html;
 }
 
