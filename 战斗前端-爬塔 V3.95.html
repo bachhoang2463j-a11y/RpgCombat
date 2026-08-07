@@ -3541,6 +3541,165 @@ function updateEnemyUI(enemy) {
 }
 
 // ==========================================
+// 标签处理器注册表 (TAG_HANDLERS) — 第一步架构
+// 每个标签独立注册，分发逻辑与标签实现彻底解耦
+// ctx 结构: { caster, target, targetDom, targetType, tag, actualPower, effectTurns, multiplier, skill, globalTurns }
+// ==========================================
+const TAG_HANDLERS = {};
+
+function registerTagHandler(tagKey, handler) {
+    TAG_HANDLERS[tagKey] = handler;
+}
+
+// --- 命中/闪避类 ---
+registerTagHandler('瞄', (ctx) => {
+    playSound('hitUp'); playSVGEffect(ctx.targetDom, 'buff');
+    ctx.target.buffs = ctx.target.buffs || [];
+    ctx.target.buffs.push({ type: 'hit', value: ctx.actualPower, duration: ctx.effectTurns });
+    createFloatingText(ctx.targetDom, `准+${ctx.actualPower}% ${ctx.effectTurns}回 `, 'text-yellow-300');
+    addHistory(`   ↳ 提升了 ${ctx.target.name} ${ctx.actualPower}% 的命中率 持续${ctx.effectTurns}回合。`);
+});
+
+registerTagHandler('盲', (ctx) => {
+    playSound('hitDown'); playSVGEffect(ctx.targetDom, 'debuff');
+    ctx.target.buffs = ctx.target.buffs || [];
+    ctx.target.buffs.push({ type: 'hit', value: -ctx.actualPower, duration: ctx.effectTurns });
+    createFloatingText(ctx.targetDom, `准-${ctx.actualPower}% ${ctx.effectTurns}回 `, 'text-purple-400');
+    addHistory(`   ↳ 干扰了 ${ctx.target.name} 的视线，命中率下降 ${ctx.actualPower}% 持续${ctx.effectTurns}回合。`);
+});
+
+// --- 防御类 ---
+registerTagHandler('降', (ctx) => {
+    playSound('defDown'); playSVGEffect(ctx.targetDom, 'debuff');
+    ctx.target.buffs = ctx.target.buffs || [];
+    ctx.target.buffs.push({ type: 'def', value: -ctx.actualPower, duration: ctx.effectTurns });
+    createFloatingText(ctx.targetDom, `防-${ctx.actualPower} ${ctx.effectTurns}回 `, 'text-purple-400');
+    addHistory(`   ↳ 削弱了 ${ctx.target.name} 的防御力。`);
+});
+
+registerTagHandler('[免伤]', (ctx) => {
+    playSound('defUp'); playSVGEffect(ctx.targetDom, 'shield');
+    ctx.target.buffs = ctx.target.buffs || [];
+    ctx.target.buffs.push({ type: 'damageGuard', value: ctx.actualPower, duration: 9999, isConsumable: true });
+    createFloatingText(ctx.targetDom, `免伤+${ctx.actualPower} 1次`, 'text-sky-300');
+    addHistory(`   ↳ ${ctx.target.name} 获得【免伤】，下一次受击时防御增加 ${ctx.actualPower} 点并立即消耗。`);
+});
+
+registerTagHandler('防', (ctx) => {
+    playSound('defUp'); playSVGEffect(ctx.targetDom, 'shield');
+    ctx.target.buffs = ctx.target.buffs || [];
+    ctx.target.buffs.push({ type: 'def', value: ctx.actualPower, duration: ctx.effectTurns });
+    createFloatingText(ctx.targetDom, `防+${ctx.actualPower} ${ctx.effectTurns}回 `, 'text-blue-400');
+    addHistory(`   ↳ 提升了 ${ctx.target.name} 的防御力。`);
+});
+
+registerTagHandler('盾', (ctx) => {
+    playSound('shieldUp'); playSVGEffect(ctx.targetDom, 'shield');
+    ctx.target.shield = (ctx.target.shield || 0) + ctx.actualPower;
+    createFloatingText(ctx.targetDom, `护盾+${ctx.actualPower}`, 'text-slate-300');
+    addHistory(`   ↳ 为 ${ctx.target.name} 附加了一层能吸收 ${ctx.actualPower} 点伤害的护盾。`);
+});
+
+// --- 闪避/反击类 ---
+registerTagHandler('[回避]', (ctx) => {
+    playSound('defUp'); playSVGEffect(ctx.targetDom, 'buff');
+    ctx.target.buffs = ctx.target.buffs || [];
+    ctx.target.buffs.push({ type: 'eva', value: ctx.actualPower, duration: ctx.effectTurns, isConsumable: true });
+    createFloatingText(ctx.targetDom, `避+${ctx.actualPower} 1次`, 'text-teal-300');
+    addHistory(`   ↳ 提升了 ${ctx.target.name} 的身法，下一次受击时回避几率增加 ${ctx.actualPower}。`);
+});
+registerTagHandler('[群避]', (ctx) => {
+    playSound('defUp'); playSVGEffect(ctx.targetDom, 'buff');
+    ctx.target.buffs = ctx.target.buffs || [];
+    ctx.target.buffs.push({ type: 'eva', value: ctx.actualPower, duration: ctx.effectTurns, isConsumable: false });
+    createFloatingText(ctx.targetDom, `避+${ctx.actualPower} ${ctx.effectTurns}回 `, 'text-teal-300');
+    addHistory(`   ↳ 提升了 ${ctx.target.name} 的身法，回避几率增加 ${ctx.actualPower}，持续 ${ctx.effectTurns} 回合。`);
+});
+registerTagHandler('[单避]', (ctx) => {
+    playSound('defUp'); playSVGEffect(ctx.targetDom, 'buff');
+    ctx.target.buffs = ctx.target.buffs || [];
+    ctx.target.buffs.push({ type: 'eva', value: ctx.actualPower, duration: ctx.effectTurns, isConsumable: false });
+    createFloatingText(ctx.targetDom, `避+${ctx.actualPower} ${ctx.effectTurns}回 `, 'text-teal-300');
+    addHistory(`   ↳ 提升了 ${ctx.target.name} 的身法，回避几率增加 ${ctx.actualPower}，持续 ${ctx.effectTurns} 回合。`);
+});
+
+registerTagHandler('反击', (ctx) => {
+    playSound('defUp'); playSVGEffect(ctx.targetDom, 'buff');
+    ctx.target.buffs = ctx.target.buffs || [];
+    ctx.target.buffs.push({ type: 'counter', value: ctx.actualPower, duration: ctx.effectTurns });
+    createFloatingText(ctx.targetDom, `反击架势 ${ctx.effectTurns}回 `, 'text-amber-300');
+    addHistory(`   ↳ ${ctx.target.name} 摆出了反击架势，准备在闪避(近战)后予以痛击(附加威力+${ctx.actualPower})，持续${ctx.effectTurns}回合。`);
+});
+
+// --- 嘲讽/隐匿类 ---
+registerTagHandler('嘲', (ctx) => {
+    if (ctx.actualPower >= 0) playSound('taunt'); else playSound('hide');
+    playSVGEffect(ctx.targetDom, 'taunt');
+    const dur = ctx.globalTurns !== null ? ctx.globalTurns : ctx.effectTurns;
+    ctx.target.buffs = ctx.target.buffs || [];
+    ctx.target.buffs.push({ type: 'taunt', value: ctx.actualPower, duration: dur });
+    if (ctx.actualPower >= 0) {
+        createFloatingText(ctx.targetDom, `仇恨+${ctx.actualPower} ${dur}回 `, 'text-red-400');
+        addHistory(`   ↳ ${ctx.target.name} 散发出强烈的气息，吸引敌方火力(仇恨+${ctx.actualPower})，持续${dur}回合！`);
+    } else {
+        createFloatingText(ctx.targetDom, `隐匿${ctx.actualPower} ${dur}回 `, 'text-gray-400');
+        addHistory(`   ↳ ${ctx.target.name} 隐蔽了身形，降低自身存在感(仇恨${ctx.actualPower})，持续${dur}回合！`);
+    }
+});
+
+// --- 强化类 ---
+registerTagHandler('增', (ctx) => {
+    playSound('atkUp'); playSVGEffect(ctx.targetDom, 'buff');
+    ctx.target.buffs = ctx.target.buffs || [];
+    ctx.target.buffs.push({ type: 'atk', value: ctx.actualPower, duration: ctx.effectTurns });
+    createFloatingText(ctx.targetDom, `攻+${ctx.actualPower} ${ctx.effectTurns}回 `, 'text-orange-400');
+    addHistory(`   ↳ 强化了 ${ctx.target.name} 的攻击力。`);
+});
+
+// --- 回复类 ---
+registerTagHandler('回蓝', (ctx) => {
+    playSound('mpHeal'); playSVGEffect(ctx.targetDom, 'mpHeal');
+    ctx.target.mp = Math.min(ctx.target.maxMp, ctx.target.mp + ctx.actualPower);
+    createFloatingText(ctx.targetDom, `+${ctx.actualPower}MP`, 'text-cyan-400');
+    addHistory(`   ↳ 为 ${ctx.target.name} 恢复了 ${ctx.actualPower} 点法力值。`);
+});
+
+registerTagHandler('回', (ctx) => {
+    playSound('hpHeal'); playSVGEffect(ctx.targetDom, 'heal');
+    const oldHp = ctx.target.hp;
+    ctx.target.hp = Math.min(ctx.target.maxHp, ctx.target.hp + ctx.actualPower);
+    const healCtx = { caster: ctx.caster, target: ctx.target, targetDom: ctx.targetDom, oldHp, actualPower: ctx.actualPower, extraText: '' };
+    CombatEvents.emit(EVENTS.AFTER_HEAL, healCtx);
+    createFloatingText(ctx.targetDom, `+${ctx.actualPower}HP`, 'text-emerald-400');
+    addHistory(`   ↳ 治愈了 ${ctx.target.name}，恢复 ${ctx.actualPower} 点生命。${healCtx.extraText}`);
+});
+
+// --- 行动类 ---
+registerTagHandler('再动', (ctx) => {
+    playSound('atkUp'); playSVGEffect(ctx.targetDom, 'buff');
+    const turns = ctx.actualPower > 0 ? Math.floor(ctx.actualPower) : 1;
+    for (let i = 0; i < turns; i++) {
+        state.actionQueue.splice(state.queueIndex + 1, 0, { type: ctx.targetType, ref: ctx.target, isExtraTurn: true });
+    }
+    createFloatingText(ctx.targetDom, `再动+${turns}`, 'text-fuchsia-400');
+    addHistory(`   ↳ ⚡ ${ctx.target.name} 获得了连续行动机会，再动 ${turns} 次！`);
+});
+
+/**
+ * 标准化标签：找到注册的 key 中第一个包含在 tag 字符串内的匹配项
+ * 精确匹配优先（如 [免伤]、[回避]），其次字符串包含匹配
+ */
+function resolveTagHandler(tag) {
+    // 1. 精确匹配优先
+    if (TAG_HANDLERS[tag]) return TAG_HANDLERS[tag];
+    // 2. 遍历注册的 key，找第一个 tag 包含该 key 的处理器
+    for (const key of Object.keys(TAG_HANDLERS)) {
+        if (tag.includes(key)) return TAG_HANDLERS[key];
+    }
+    return null;
+}
+
+// ==========================================
 // 职业被动系统 (CLASS_PASSIVES) 模块化注册表
 // ==========================================
 const CLASS_PASSIVES = {};
@@ -4153,92 +4312,14 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     
     // === 伤害后附加状态 → 事件总线 (AFTER_DAMAGE) ===
     CombatEvents.emit(EVENTS.AFTER_DAMAGE, { caster, target, targetDom, incomingDamageType, hpDmg, shieldDmg });
-  } 
-  else if (tag.includes('瞄')) { 
-      playSound('hitUp'); playSVGEffect(targetDom, 'buff'); 
-      target.buffs = target.buffs || []; 
-      target.buffs.push({ type: 'hit', value: actualPower, duration: effectTurns }); 
-      createFloatingText(targetDom, `准+${actualPower}% ${effectTurns}回 `, 'text-yellow-300'); 
-      addHistory(`   ↳ 提升了 ${target.name} ${actualPower}% 的命中率 持续${effectTurns}回合。`); 
-  }
-  else if (tag.includes('盲')) { 
-      playSound('hitDown'); playSVGEffect(targetDom, 'debuff'); 
-      target.buffs = target.buffs || []; 
-      target.buffs.push({ type: 'hit', value: -actualPower, duration: effectTurns }); 
-      createFloatingText(targetDom, `准-${actualPower}% ${effectTurns}回 `, 'text-purple-400'); 
-      addHistory(`   ↳ 干扰了 ${target.name} 的视线，命中率下降 ${actualPower}% 持续${effectTurns}回合。`); 
-  }
-  else if (tag.includes('降')) { playSound('defDown'); playSVGEffect(targetDom, 'debuff'); target.buffs = target.buffs || []; target.buffs.push({ type: 'def', value: -actualPower, duration: effectTurns }); createFloatingText(targetDom, `防-${actualPower} ${effectTurns}回 `, 'text-purple-400'); addHistory(`   ↳ 削弱了 ${target.name} 的防御力。`); }
-  else if (tag.includes('嘲')) { 
-      if (actualPower >= 0) playSound('taunt'); else playSound('hide');
-      playSVGEffect(targetDom, 'taunt'); 
-      const dur = globalTurns !== null ? globalTurns : effectTurns;
-      target.buffs = target.buffs || []; target.buffs.push({ type: 'taunt', value: actualPower, duration: dur }); 
-      if (actualPower >= 0) {
-          createFloatingText(targetDom, `仇恨+${actualPower} ${dur}回 `, 'text-red-400'); 
-          addHistory(`   ↳ ${target.name} 散发出强烈的气息，吸引敌方火力(仇恨+${actualPower})，持续${dur}回合！`); 
-      } else {
-          createFloatingText(targetDom, `隐匿${actualPower} ${dur}回 `, 'text-gray-400'); 
-          addHistory(`   ↳ ${target.name} 隐蔽了身形，降低自身存在感(仇恨${actualPower})，持续${dur}回合！`); 
-      }
-  }
-  else if (tag.includes('回蓝')) { playSound('mpHeal'); playSVGEffect(targetDom, 'mpHeal'); target.mp = Math.min(target.maxMp, target.mp + actualPower); createFloatingText(targetDom, `+${actualPower}MP`, 'text-cyan-400'); addHistory(`   ↳ 为 ${target.name} 恢复了 ${actualPower} 点法力值。`); }
-  else if (tag === '[免伤]') {
-      playSound('defUp'); playSVGEffect(targetDom, 'shield');
-      target.buffs = target.buffs || [];
-      // 不随回合衰减，直到下一次攻击结算；可用较高威力实现指定攻击类型的免疫。
-      target.buffs.push({ type: 'damageGuard', value: actualPower, duration: 9999, isConsumable: true });
-      createFloatingText(targetDom, `免伤+${actualPower} 1次`, 'text-sky-300');
-      addHistory(`   ↳ ${target.name} 获得【免伤】，下一次受击时防御增加 ${actualPower} 点并立即消耗。`);
-  }
-  else if (tag === '[回避]' || tag === '[群避]' || tag === '[单避]') { 
-      playSound('defUp'); playSVGEffect(targetDom, 'buff'); 
-      target.buffs = target.buffs || []; 
-      
-      // 明确逻辑：[回避] 是一次性消耗品，[群避] 和 [单避] 则是持续多回合的 Buff
-      const isOneTime = (tag === '[回避]');
-      
-      target.buffs.push({ type: 'eva', value: actualPower, duration: effectTurns, isConsumable: isOneTime }); 
-      
-      if (isOneTime) {
-          createFloatingText(targetDom, `避+${actualPower} 1次`, 'text-teal-300'); 
-          addHistory(`   ↳ 提升了 ${target.name} 的身法，下一次受击时回避几率增加 ${actualPower}。`); 
-      } else {
-          createFloatingText(targetDom, `避+${actualPower} ${effectTurns}回 `, 'text-teal-300'); 
-          addHistory(`   ↳ 提升了 ${target.name} 的身法，回避几率增加 ${actualPower}，持续 ${effectTurns} 回合。`); 
-      }
-  }
-  else if (tag.includes('反击')) { 
-      playSound('defUp'); playSVGEffect(targetDom, 'buff'); 
-      target.buffs = target.buffs || []; 
-      target.buffs.push({ type: 'counter', value: actualPower, duration: effectTurns }); 
-      createFloatingText(targetDom, `反击架势 ${effectTurns}回 `, 'text-amber-300'); 
-      addHistory(`   ↳ ${target.name} 摆出了反击架势，准备在闪避(近战)后予以痛击(附加威力+${actualPower})，持续${effectTurns}回合。`); 
-  }
-  else if (tag.includes('回')) { 
-      playSound('hpHeal'); playSVGEffect(targetDom, 'heal'); 
-      const oldHp = target.hp;
-      target.hp = Math.min(target.maxHp, target.hp + actualPower); 
-      let extraText = '';
-      // === 治疗后溢出处理 → 事件总线 (AFTER_HEAL) ===
-      const healCtx = { caster, target, targetDom, oldHp, actualPower, extraText: '' };
-      CombatEvents.emit(EVENTS.AFTER_HEAL, healCtx);
-      extraText = healCtx.extraText;
-      createFloatingText(targetDom, `+${actualPower}HP`, 'text-emerald-400'); 
-      addHistory(`   ↳ 治愈了 ${target.name}，恢复 ${actualPower} 点生命。${extraText}`); 
-  }
-  else if (tag.includes('增')) { playSound('atkUp'); playSVGEffect(targetDom, 'buff'); target.buffs = target.buffs || []; target.buffs.push({ type: 'atk', value: actualPower, duration: effectTurns }); createFloatingText(targetDom, `攻+${actualPower} ${effectTurns}回 `, 'text-orange-400'); addHistory(`   ↳ 强化了 ${target.name} 的攻击力。`); } 
-  else if (tag.includes('防')) { playSound('defUp'); playSVGEffect(targetDom, 'shield'); target.buffs = target.buffs || []; target.buffs.push({ type: 'def', value: actualPower, duration: effectTurns }); createFloatingText(targetDom, `防+${actualPower} ${effectTurns}回 `, 'text-blue-400'); addHistory(`   ↳ 提升了 ${target.name} 的防御力。`); } 
-  else if (tag.includes('盾')) { playSound('shieldUp'); playSVGEffect(targetDom, 'shield'); target.shield = (target.shield || 0) + actualPower; createFloatingText(targetDom, `护盾+${actualPower}`, 'text-slate-300'); addHistory(`   ↳ 为 ${target.name} 附加了一层能吸收 ${actualPower} 点伤害的护盾。`); }
-  else if (tag.includes('再动')) { 
-      playSound('atkUp'); 
-      playSVGEffect(targetDom, 'buff'); 
-      const turns = actualPower > 0 ? Math.floor(actualPower) : 1;
-      for(let i = 0; i < turns; i++) {
-          state.actionQueue.splice(state.queueIndex + 1, 0, { type: targetType, ref: target, isExtraTurn: true });
-      }
-      createFloatingText(targetDom, `再动+${turns}`, 'text-fuchsia-400'); 
-      addHistory(`   ↳ ⚡ ${target.name} 获得了连续行动机会，再动 ${turns} 次！`); 
+  } else {
+    // === 非伤害标签 → TAG_HANDLERS 注册表分发 ===
+    const handler = resolveTagHandler(tag);
+    if (handler) {
+        handler({ caster, target, targetDom, targetType, tag, actualPower, effectTurns, multiplier, skill, globalTurns });
+    } else {
+        console.warn(`[TAG_HANDLERS] 未找到标签处理器: "${tag}"`);
+    }
   }
 
   if (targetType === 'enemy') updateEnemyUI(target); else updateHeroUI(target);
