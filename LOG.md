@@ -82,3 +82,16 @@
   5. 同步更新 `SPEC.md`、`LOG.md` 与 `LOG-INDEX.md` 并提交推送到 GitHub。
 - **涉及函数/模块**：`TAG_HANDLERS` (标签策略注册表), `resolveTagHandler()` (标签分发求解器), `applySingleTagEffect()` (400 行 else-if 简化为注册表查找)
 - **决策原因**：完成 Effect System 架构改造里程碑，将引擎扩展性提升至全新高度。后续新增自定义标签只需通过 `registerTagHandler` 注册即可完成，无需修改核心分发函数。
+
+---
+
+## [LOG-008] 2026-08-08 — V4.0 看破系统补全：标签解析与技能编辑器下拉
+
+- **变更行为**：
+  1. `parseSkill()` 支持解析 `[看破:类型]` 标签，并将结果写入技能对象的 `kanpoTarget` 字段；`[看破]` 简写默认视为 `all`。
+  2. `getKanpoTarget()` 优先读取 `skill.kanpoTarget`，并保留旧数据从 `type/type2/type3` 反查的兼容路径。
+  3. 技能编辑器我方技能行新增“看破”下拉栏，选项为 `无看破 / 看破(全能) / 看破(近战) / 看破(远程) / 看破(法术)`，与反应下拉并列。
+  4. `syncEditorDataToMemory()` 同步 `kanpoTarget`；`addHeroSkill()` 新建技能默认 `kanpoTarget: null`。
+  5. 经手操实测，我方【净蚀反冲】可通过技能编辑器设为 `看破(法术)`，成功看破敌方【极地暴风雪】。
+- **涉及函数/模块**：`parseSkill()` (标签解析), `getKanpoTarget()` (看破目标判定), `openEditor()` (技能编辑器 UI), `syncEditorDataToMemory()` (编辑器数据同步), `addHeroSkill()` (新建技能默认值)
+- **决策原因**：修复 `[看破:X]` 标签未被解析导致技能对象缺少看破目标、技能编辑器无看破选项、看破弹窗不触发的问题。
