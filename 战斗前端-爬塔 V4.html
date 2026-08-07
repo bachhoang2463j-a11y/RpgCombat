@@ -3870,6 +3870,7 @@ window.CLASS_PASSIVES = CLASS_PASSIVES;
 // 轻量事件总线 (CombatEvents) — 第二步架构
 // ==========================================
 const EVENTS = {
+    BEFORE_SKILL_RESOLVE: 'before_skill_resolve', // 技能宣告后、结算前（看破中断点）
     TURN_START:      'turn_start',      // 回合开始（毒 tick、眩晕检查前）
     TURN_END:        'turn_end',        // 回合结束（充能积攒、多重施法触发）
     BEFORE_DAMAGE:   'before_damage',   // 伤害结算前（可修改 rawDamage）
@@ -3903,7 +3904,16 @@ const CombatEvents = {
         if (!listeners || listeners.length === 0) return;
         for (const l of listeners) {
             l.fn(ctx);
-            if (ctx.cancelled) break; // 支持拦截中断（如免死触发后阻止继续处理）
+            if (ctx.cancelled) break; // 支持拦截中断
+        }
+    },
+
+    async emitAsync(event, ctx = {}) {
+        const listeners = this._listeners[event];
+        if (!listeners || listeners.length === 0) return;
+        for (const l of listeners) {
+            await l.fn(ctx);
+            if (ctx.cancelled) break; // 支持拦截中断
         }
     }
 };
@@ -3954,6 +3964,126 @@ CombatEvents.on(EVENTS.TURN_END, (ctx) => {
         p.onSkillExecuted(ctx.entity, ctx.skill, ctx.isReactionTrigger || false);
     }
 }, 5);
+
+// ==========================================
+// 【看破】战略中断系统 (Kanpo Interrupt System)
+// ==========================================
+function getKanpoTarget(skill) {
+    if (!skill) return null;
+    const allTypes = [skill.type, skill.type2, skill.type3].filter(Boolean);
+    for (const t of allTypes) {
+        if (t.includes('看破')) {
+            const match = t.match(/\[?看破:?([^\]\s]*)\]?/);
+            if (match) return match[1] || 'all';
+            return 'all';
+        }
+    }
+    return null;
+}
+
+function promptKanpo(candidates, attacker, incomingSkill) {
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 z-[200] bg-black/70 backdrop-blur-md flex items-center justify-center transition-opacity duration-300';
+        overlay.id = 'kanpo-prompt';
+
+        const incomingDmgType = incomingSkill ? (incomingSkill.damageType || '近战') : '近战';
+
+        let candidatesHtml = '';
+        candidates.forEach((cand, index) => {
+            const hero = cand.hero;
+            const skill = cand.skill;
+            let costHtml = '';
+            if (skill.cost > 0 || (!skill.hpCost && !skill.tpCost)) costHtml += `<span class="text-sky-200 px-0.5">-${skill.cost}MP</span>`;
+            if (skill.hpCost > 0) costHtml += `<span class="text-red-300 px-0.5">-${skill.hpCost}HP</span>`;
+            if (skill.tpCost > 0) costHtml += `<span class="text-green-300 px-0.5">-${skill.tpCost}TP</span>`;
+
+            candidatesHtml += `
+                <button class="w-full py-2.5 sm:py-3 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-500 hover:to-orange-500 rounded-xl text-xs sm:text-sm font-bold shadow-[0_0_15px_rgba(245,158,11,0.4)] transition-all transform hover:scale-105 mb-2 text-white flex justify-between px-4 items-center border border-amber-400/30" onclick="resolveKanpo(${index})">
+                    <div class="flex items-center gap-2">
+                        <img src="${hero.img}" class="w-6 h-6 rounded-full border border-amber-300 object-cover">
+                        <span class="font-black text-amber-200">${hero.name}</span>
+                        <span class="text-white">⚡ ${skill.name}</span>
+                    </div>
+                    <span class="font-mono flex gap-1">${costHtml}</span>
+                </button>`;
+        });
+        candidatesHtml += `<button class="w-full py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-xs sm:text-sm font-bold shadow transition-colors text-gray-300 border border-gray-600 mt-2" onclick="resolveKanpo(-1)">放弃看破 (承受效果)</button>`;
+
+        overlay.innerHTML = `
+            <div class="bg-slate-900/95 border-2 border-amber-500/80 rounded-2xl p-5 sm:p-6 w-11/12 max-w-xs sm:max-w-md shadow-[0_0_60px_rgba(245,158,11,0.5)] transform scale-95 animate-[enter-hero_0.3s_forwards]">
+                <div class="flex items-center gap-3 mb-4 border-b border-amber-500/30 pb-3">
+                    <div class="w-10 h-10 rounded-full bg-amber-950/80 border border-amber-500 flex items-center justify-center text-xl shrink-0">👁️</div>
+                    <div>
+                        <h3 class="text-amber-400 font-black text-sm sm:text-base tracking-widest flex items-center gap-2">看破契机！<span class="text-[10px] px-1.5 py-0.5 bg-amber-900/60 border border-amber-500/40 rounded text-amber-200 font-mono">STRATEGIC INTERRUPT</span></h3>
+                        <p class="text-[10px] sm:text-xs text-gray-300 mt-0.5">${attacker.name} 正发动 <span class="text-rose-400 font-bold">【${incomingSkill.name}】</span> <span class="text-amber-300">[${incomingDmgType}]</span></p>
+                    </div>
+                </div>
+                <div class="text-[11px] sm:text-xs text-gray-400 mb-3 bg-black/40 p-2 rounded border border-gray-800">
+                    💡 使用【看破】技能可完全抵消敌方本次攻击的全盘效果。
+                </div>
+                ${candidatesHtml}
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        window.resolveKanpo = (index) => {
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.remove();
+                if (index === -1) resolve(null);
+                else resolve(candidates[index]);
+            }, 200);
+        };
+    });
+}
+
+async function checkKanpoInterrupt(ctx) {
+    const incomingType = ctx.skill.damageType || '近战';
+
+    const kanpoCandidates = [];
+    heroesData.filter(h => h.isAlive).forEach(hero => {
+        (hero.skills || []).forEach(s => {
+            const kanpoTarget = getKanpoTarget(s);
+            if (!kanpoTarget) return;
+            
+            // 严格检测资源门槛 (MP, HP, TP)
+            if (s.cost > hero.mp) return;
+            if ((s.hpCost || 0) >= hero.hp) return;
+            if ((s.tpCost || 0) > hero.tp) return;
+
+            // 检测攻击类型匹配
+            if (kanpoTarget === 'all' || incomingType.includes(kanpoTarget) || kanpoTarget.includes(incomingType)) {
+                kanpoCandidates.push({ hero, skill: s });
+            }
+        });
+    });
+
+    if (kanpoCandidates.length === 0) return;
+
+    const chosen = await promptKanpo(kanpoCandidates, ctx.caster, ctx.skill);
+    if (chosen) {
+        // 扣除代价
+        chosen.hero.mp -= chosen.skill.cost || 0;
+        if (chosen.skill.hpCost) chosen.hero.hp -= chosen.skill.hpCost;
+        if (chosen.skill.tpCost) chosen.hero.tp -= chosen.skill.tpCost;
+        updateHeroUI(chosen.hero);
+
+        playSound('taunt');
+        const heroDom = document.getElementById(`hero-card-${chosen.hero.id}`);
+        if (heroDom) {
+            playSVGEffect(heroDom, 'buff');
+            createFloatingText(heroDom, `看破!`, 'text-amber-300');
+        }
+        addHistory(`   ⛔ ${chosen.hero.name} 施展【${chosen.skill.name}】看穿了敌方气路，【${ctx.skill.name}】被彻底无效化！`);
+        ctx.cancelled = true;
+    }
+}
+
+// 订阅 BEFORE_SKILL_RESOLVE 事件
+CombatEvents.on(EVENTS.BEFORE_SKILL_RESOLVE, async (ctx) => {
+    await checkKanpoInterrupt(ctx);
+});
 
 function getEffectiveStats(entity) { 
     let finalAtk = entity.atk || 0; 
@@ -4365,6 +4495,16 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     
     if (caster.id.startsWith('h')) updateHeroUI(caster); else updateEnemyUI(caster);
     showLog(`${caster.name} 施展了【${skill.name}】！`); 
+    
+    // === 技能解构与广播前：【看破】战略中断窗口 (BEFORE_SKILL_RESOLVE) ===
+    if (!isReactionTrigger && caster.id.startsWith('e')) {
+        const kanpoCtx = { caster, skill, cancelled: false };
+        await CombatEvents.emitAsync(EVENTS.BEFORE_SKILL_RESOLVE, kanpoCtx);
+        if (kanpoCtx.cancelled) {
+            addHistory(`   ⛔ 技能【${skill.name}】被看破破局，完全无效化！`);
+            return;
+        }
+    }
     
     // === 技能释放完毕 → 事件总线 (TURN_END 携带 skill 信息，供施法者多重施法等订阅) ===
     CombatEvents.emit(EVENTS.TURN_END, { entity: caster, skill, isReactionTrigger });
