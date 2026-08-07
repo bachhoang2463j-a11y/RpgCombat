@@ -1,4 +1,4 @@
-﻿```html
+```html
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -3175,12 +3175,11 @@ function buildCombatDataFromYAML(yamlContent) {
                 const img = AVATAR_MAP[cleanName] || AVATAR_MAP[data["名字"]] || DEFAULT_HERO_IMG;
                 let skills = []; if (data["技能"] && Array.isArray(data["技能"])) skills = data["技能"].map(parseSkill);
                 
-                let initialBuffs = [];
-                if (attrs.classType === '防守者') initialBuffs.push({ type: 'counter', value: 0, duration: 9999, permanent: true });
-                let baseTauntBonus = (attrs.classType === '隐匿者') ? -50 : (attrs.classType === '防守者' ? 100 : 0);
-                let shieldVal = (attrs.classType === '施法者') ? Math.floor(attrs.maxMp * 0.5) : 0;
-                
-                tempHeroes.push({ id: 'h' + index, name: cleanName, img: img, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: shieldVal, actCount: attrs.actCount, isAlive: true, buffs: initialBuffs, isDefending: false, hitBonus: 0, evaBonus: 0, burstActivated: false, skills: skills, classType: attrs.classType, isWise: attrs.isWise || false, baseTauntBonus: baseTauntBonus });
+                let heroObj = { id: 'h' + index, name: cleanName, img: img, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: 0, actCount: attrs.actCount, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, burstActivated: false, skills: skills, classType: attrs.classType, isWise: attrs.isWise || false, baseTauntBonus: 0 };
+                if (window.CLASS_PASSIVES && CLASS_PASSIVES[attrs.classType]?.onBattleInit) {
+                    CLASS_PASSIVES[attrs.classType].onBattleInit(heroObj);
+                }
+                tempHeroes.push(heroObj);
             });
         }
         if (block["敌方列表"]) {
@@ -3191,12 +3190,11 @@ function buildCombatDataFromYAML(yamlContent) {
                 const img = AVATAR_MAP[cleanName] || AVATAR_MAP[data["名字"]]; 
                 let skills = []; if (data["技能"] && Array.isArray(data["技能"])) skills = data["技能"].map(parseSkill);
                 
-                let initialBuffs = [];
-                if (attrs.classType === '防守者') initialBuffs.push({ type: 'counter', value: 0, duration: 9999, permanent: true });
-                let baseTauntBonus = (attrs.classType === '隐匿者') ? -50 : (attrs.classType === '防守者' ? 100 : 0);
-                let shieldVal = (attrs.classType === '施法者') ? Math.floor(attrs.maxMp * 0.5) : 0;
-                
-                tempEnemies.push({ id: 'e' + index, name: cleanName, emoji: emoji, img: img, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, currentCharge: 0, size: 'text-5xl sm:text-7xl', atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: shieldVal, actCount: attrs.actCount, isAlive: true, buffs: initialBuffs, isDefending: false, hitBonus: 0, evaBonus: 0, skills: skills, classType: attrs.classType, isWise: attrs.isWise || false, baseTauntBonus: baseTauntBonus });
+                let enemyObj = { id: 'e' + index, name: cleanName, emoji: emoji, img: img, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, currentCharge: 0, size: 'text-5xl sm:text-7xl', atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: 0, actCount: attrs.actCount, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, skills: skills, classType: attrs.classType, isWise: attrs.isWise || false, baseTauntBonus: 0 };
+                if (window.CLASS_PASSIVES && CLASS_PASSIVES[attrs.classType]?.onBattleInit) {
+                    CLASS_PASSIVES[attrs.classType].onBattleInit(enemyObj);
+                }
+                tempEnemies.push(enemyObj);
             });
         }
         heroesData = tempHeroes; enemiesData = tempEnemies;
@@ -3526,6 +3524,173 @@ function updateEnemyUI(enemy) {
   }
 }
 
+// ==========================================
+// 职业被动系统 (CLASS_PASSIVES) 模块化注册表
+// ==========================================
+const CLASS_PASSIVES = {};
+
+function registerClassPassive(className, passiveDef) {
+    CLASS_PASSIVES[className] = passiveDef;
+}
+
+// 1. 防守者
+registerClassPassive('防守者', {
+    onBattleInit(entity) {
+        entity.buffs = entity.buffs || [];
+        if (!entity.buffs.some(b => b.type === 'counter' && b.permanent)) {
+            entity.buffs.push({ type: 'counter', value: 0, duration: 9999, permanent: true });
+        }
+        entity.baseTauntBonus = 100;
+    },
+    modifyStats(entity, stats) {
+        stats.hit += Math.floor(stats.taunt / 10);
+    },
+    onFatalDamage(ctx) {
+        if (!ctx.target.hasTriggeredGrit) {
+            ctx.target.hasTriggeredGrit = true;
+            ctx.hpDmg = ctx.target.hp - 1;
+            ctx.prevented = true;
+            setTimeout(() => {
+                if (ctx.targetDom) createFloatingText(ctx.targetDom, '毅力留存!', 'text-yellow-400');
+                if (window.playSound) playSound('taunt');
+            }, 300);
+            addHistory(`   ↳ 🛡️ ${ctx.target.name} 触发被动【毅力】，强制保留了 1 点生命值避免死亡！`);
+            return true;
+        }
+        return false;
+    }
+});
+
+// 2. 狂战士
+registerClassPassive('狂战士', {
+    modifyStats(entity, stats) {
+        if (entity.maxHp > 0) {
+            const lostRatio = (entity.maxHp - entity.hp) / entity.maxHp;
+            stats.atk = Math.floor(stats.atk * (1 + lostRatio));
+        }
+    },
+    checkPierce(caster) {
+        return caster.hp < caster.maxHp * 0.3;
+    },
+    modifyTrueDamage(caster) {
+        if (caster.hp < caster.maxHp * 0.3) {
+            return Math.floor((caster.maxHp - caster.hp) * 0.1);
+        }
+        return 0;
+    }
+});
+
+// 3. 风行者
+registerClassPassive('风行者', {
+    modifyStats(entity, stats) {
+        stats.eva += (entity.tp || 0);
+    }
+});
+
+// 4. 隐匿者
+registerClassPassive('隐匿者', {
+    onBattleInit(entity) {
+        entity.baseTauntBonus = -50;
+    },
+    onFatalDamage(ctx) {
+        if (!ctx.target.hasTriggeredAvoidFatal) {
+            ctx.target.hasTriggeredAvoidFatal = true;
+            ctx.hpDmg = 0;
+            ctx.shieldDmg = 0;
+            ctx.prevented = true;
+            setTimeout(() => {
+                if (ctx.targetDom) createFloatingText(ctx.targetDom, '回避致命!', 'text-indigo-400');
+                if (window.playSound) playSound('miss');
+            }, 300);
+            addHistory(`   ↳ 👤 ${ctx.target.name} 触发被动【回避】，在致命伤害临身的一瞬闪避，完美免除本次伤害！`);
+            return true;
+        }
+        return false;
+    },
+    modifyDamageDealt(caster, skill) {
+        if (skill && (skill.damageType === '远程' || skill.damageType?.includes('远程') || skill.damageType?.includes('弓') || skill.damageType?.includes('枪'))) {
+            const effectiveTaunt = getEffectiveStats(caster).taunt;
+            const stealthBonus = Math.max(0, 100 - effectiveTaunt);
+            return Math.floor(stealthBonus / 10);
+        }
+        return 0;
+    },
+    onAfterDamageDealt(caster, target, targetDom, incomingDamageType) {
+        if ((incomingDamageType === '近战' || incomingDamageType.includes('近战') || incomingDamageType.includes('剑') || incomingDamageType.includes('刺')) && target.isAlive) {
+            const effectiveTaunt = getEffectiveStats(caster).taunt;
+            const stealthVal = Math.max(0, 100 - effectiveTaunt);
+            const stunChance = stealthVal / 10;
+            if (Math.random() * 100 < stunChance) {
+                target.buffs = target.buffs || [];
+                target.buffs.push({ type: 'stun', value: 1, duration: 1 });
+                if (targetDom) createFloatingText(targetDom, `暗袭眩晕!`, 'text-yellow-300');
+                addHistory(`   ↳ ${target.name} 被隐匿者的奇袭命中弱点，眩晕了！(隐匿${stealthVal}点→概率${stunChance.toFixed(1)}%)`);
+            }
+        }
+    }
+});
+
+// 5. 施法者
+registerClassPassive('施法者', {
+    onBattleInit(entity) {
+        entity.shield = (entity.shield || 0) + Math.floor(entity.maxMp * 0.5);
+    },
+    onSkillExecuted(caster, skill, isReactionTrigger) {
+        if (skill.cost > 0 && !isReactionTrigger) {
+            const multiCastChance = Math.min(0.3, (skill.cost / 100) * 2);
+            if (Math.random() < multiCastChance) {
+                state.actionQueue.splice(state.queueIndex + 1, 0, { type: caster.id.startsWith('h') ? 'hero' : 'enemy', ref: caster, isExtraTurn: true });
+                addHistory(`   🌟 ${caster.name} 的法力产生共鸣，引发了多重施法(获得额外行动回合)！`);
+                const casterDom = caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`);
+                if(casterDom) setTimeout(() => createFloatingText(casterDom, '多重施法!', 'text-fuchsia-400'), 500);
+            }
+        }
+    }
+});
+
+// 6. 圣职者 / 支援者
+const clericPassive = {
+    onOverheal(caster, target, targetDom, oldHp, actualPower) {
+        const overflow = (oldHp + actualPower) - target.maxHp;
+        if (overflow > 0) {
+            target.shield = (target.shield || 0) + overflow;
+            if (targetDom) setTimeout(() => { createFloatingText(targetDom, `盾+${overflow}`, 'text-slate-300'); }, 400);
+            return ` 溢出的治疗转化为 ${overflow} 点护盾。`;
+        }
+        return '';
+    }
+};
+registerClassPassive('圣职者', clericPassive);
+registerClassPassive('支援者', clericPassive);
+
+// 7. 灾厄使 / 施毒者
+const corruptorPassive = {
+    modifyDamageMultiplier(caster, target) {
+        const debuffCount = (target.buffs || []).filter(b => b.duration > 0 && (
+            b.type === 'poison' ||
+            b.type === 'stun' ||
+            (b.type === 'def' && b.value < 0) ||
+            (b.type === 'hit' && b.value < 0) ||
+            (b.type === 'eva' && b.value < 0) ||
+            (b.type === 'atk' && b.value < 0)
+        )).length;
+        return debuffCount * 0.15;
+    },
+    onAfterDamageDealt(caster, target, targetDom) {
+        if (target.isAlive) {
+            const cStats = getEffectiveStats(caster);
+            target.buffs = target.buffs || [];
+            target.buffs.push({ type: 'poison', value: Math.floor(cStats.atk * 0.3), duration: 3 });
+            if (targetDom) createFloatingText(targetDom, `中毒!`, 'text-purple-400');
+            addHistory(`   ↳ ${target.name} 被施加了剧毒！`);
+        }
+    }
+};
+registerClassPassive('灾厄使', corruptorPassive);
+registerClassPassive('施毒者', corruptorPassive);
+
+window.CLASS_PASSIVES = CLASS_PASSIVES;
+
 function getEffectiveStats(entity) { 
     let finalAtk = entity.atk || 0; 
     let finalDef = entity.def || 0; 
@@ -3541,17 +3706,13 @@ function getEffectiveStats(entity) {
         if(b.type === 'taunt') finalTaunt += b.value;
     }); 
     
-    // === 职业被动属性调整 ===
-    if (entity.classType === '防守者') {
-        finalHit += Math.floor(finalTaunt / 10);
-    } else if (entity.classType === '狂战士') {
-        if (entity.maxHp > 0) {
-            const lostRatio = (entity.maxHp - entity.hp) / entity.maxHp;
-            finalAtk = Math.floor(finalAtk * (1 + lostRatio));
-        }
-    } else if (entity.classType === '风行者') {
-        finalEva += (entity.tp || 0);
+    // === 职业被动属性调整 (模块化注册表调用) ===
+    let statsObj = { atk: finalAtk, def: finalDef, hit: finalHit, eva: finalEva, taunt: finalTaunt };
+    const passive = CLASS_PASSIVES[entity.classType];
+    if (passive && passive.modifyStats) {
+        passive.modifyStats(entity, statsObj);
     }
+    finalAtk = statsObj.atk; finalDef = statsObj.def; finalHit = statsObj.hit; finalEva = statsObj.eva; finalTaunt = statsObj.taunt;
     
     // 隐匿者的最低嘲讽可以为负值（代表绝对隐匿），但其他人不能低于1
     if (entity.classType !== '隐匿者') {
@@ -3809,25 +3970,16 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     
     let rawDamage = Math.max(1, Math.floor(baseDmg * (0.8 + Math.random() * 0.4)));
     
-    const isPierce = tag.includes('穿透') || (caster.classType === '狂战士' && caster.hp < caster.maxHp * 0.3);
+    const isPierce = tag.includes('穿透') || (CLASS_PASSIVES[caster.classType]?.checkPierce?.(caster) || false);
     
-    // === 职业被动增伤 ===
+    // === 职业被动增伤 (模块化调用) ===
     let dmgMultiplier = 1;
-    if (caster.classType === '灾厄使' || caster.classType === '施毒者') {
-        const debuffCount = (target.buffs || []).filter(b => b.duration > 0 && (
-            b.type === 'poison' ||                     // 中毒
-            b.type === 'stun' ||                       // 眩晕
-            (b.type === 'def' && b.value < 0) ||       // 降防
-            (b.type === 'hit' && b.value < 0) ||       // 致盲/降准
-            (b.type === 'eva' && b.value < 0) ||       // 降闪
-            (b.type === 'atk' && b.value < 0)          // 降攻
-        )).length;
-        dmgMultiplier += debuffCount * 0.15;
+    const casterPassive = CLASS_PASSIVES[caster.classType];
+    if (casterPassive && casterPassive.modifyDamageMultiplier) {
+        dmgMultiplier += casterPassive.modifyDamageMultiplier(caster, target);
     }
-    if (caster.classType === '隐匿者' && (skill && (skill.damageType === '远程' || skill.damageType?.includes('远程') || skill.damageType?.includes('弓') || skill.damageType?.includes('枪')))) {
-        const effectiveTaunt = getEffectiveStats(caster).taunt;
-        const stealthBonus = Math.max(0, 100 - effectiveTaunt);
-        rawDamage += Math.floor(stealthBonus / 10);
+    if (casterPassive && casterPassive.modifyDamageDealt) {
+        rawDamage += casterPassive.modifyDamageDealt(caster, skill);
     }
     rawDamage = Math.floor(rawDamage * dmgMultiplier);
     
@@ -3838,30 +3990,21 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         addHistory(`   ↳ 🛡️ ${target.name} 的【免伤】生效，本次攻击的防御额外提高 ${consumedGuardValue} 点。`);
     }
     
-    // 狂战士死斗真实伤害
-    if (caster.classType === '狂战士' && caster.hp < caster.maxHp * 0.3) {
-        hpDmg += Math.floor((caster.maxHp - caster.hp) * 0.1);
+    // 狂战士死斗真实伤害 (模块化调用)
+    if (casterPassive && casterPassive.modifyTrueDamage) {
+        hpDmg += casterPassive.modifyTrueDamage(caster);
     }
     
-    // === 致命伤害避死被动判定 ===
+    // === 致命伤害避死被动判定 (模块化调用) ===
     if (wasAlive && target.hp - hpDmg <= 0) {
-        if (target.classType === '防守者' && !target.hasTriggeredGrit) {
-            target.hasTriggeredGrit = true;
-            hpDmg = target.hp - 1; // 强制扣剩1点生命值
-            setTimeout(() => {
-                createFloatingText(targetDom, '毅力留存!', 'text-yellow-400');
-                playSound('taunt');
-            }, 300);
-            addHistory(`   ↳ 🛡️ ${target.name} 触发被动【毅力】，强制保留了 1 点生命值避免死亡！`);
-        } else if (target.classType === '隐匿者' && !target.hasTriggeredAvoidFatal) {
-            target.hasTriggeredAvoidFatal = true;
-            hpDmg = 0; // 完全回避/免伤本轮HP扣减
-            shieldDmg = 0; // 完全回避/免伤本轮护盾扣减
-            setTimeout(() => {
-                createFloatingText(targetDom, '回避致命!', 'text-indigo-400');
-                playSound('miss');
-            }, 300);
-            addHistory(`   ↳ 👤 ${target.name} 触发被动【回避】，在致命伤害临身的一瞬闪避，完美免除本次伤害！`);
+        const targetPassive = CLASS_PASSIVES[target.classType];
+        if (targetPassive && targetPassive.onFatalDamage) {
+            let fatalCtx = { target, targetDom, hpDmg, shieldDmg, prevented: false };
+            targetPassive.onFatalDamage(fatalCtx);
+            if (fatalCtx.prevented) {
+                hpDmg = fatalCtx.hpDmg;
+                if (fatalCtx.shieldDmg !== undefined) shieldDmg = fatalCtx.shieldDmg;
+            }
         }
     }
     
@@ -3906,23 +4049,9 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         return '__killed__'; // 标志被击杀，上层统一收集后播放特写
     }
     
-    // === 职业被动附加状态 ===
-    if ((caster.classType === '灾厄使' || caster.classType === '施毒者') && target.isAlive) {
-        target.buffs = target.buffs || [];
-        target.buffs.push({ type: 'poison', value: Math.floor(cStats.atk * 0.3), duration: 3 });
-        createFloatingText(targetDom, `中毒!`, 'text-purple-400');
-        addHistory(`   ↳ ${target.name} 被施加了剧毒！`);
-    }
-    if (caster.classType === '隐匿者' && (incomingDamageType === '近战' || incomingDamageType.includes('近战') || incomingDamageType.includes('剑') || incomingDamageType.includes('刺')) && target.isAlive) {
-        const effectiveTaunt = getEffectiveStats(caster).taunt; // 含 baseTauntBonus + buff 的完整嘲讽
-        const stealthVal = Math.max(0, 100 - effectiveTaunt); // 嘲讽值越低，隐匿越深
-        const stunChance = stealthVal / 10; // 每10点隐匿深度=1%概率
-        if (Math.random() * 100 < stunChance) {
-            target.buffs = target.buffs || [];
-            target.buffs.push({ type: 'stun', value: 1, duration: 1 });
-            createFloatingText(targetDom, `暗袭眩晕!`, 'text-yellow-300');
-            addHistory(`   ↳ ${target.name} 被隐匿者的奇袭命中弱点，眩晕了！(隐匿${stealthVal}点→概率${stunChance.toFixed(1)}%)`);
-        }
+    // === 职业被动附加状态 (模块化调用) ===
+    if (casterPassive && casterPassive.onAfterDamageDealt) {
+        casterPassive.onAfterDamageDealt(caster, target, targetDom, incomingDamageType);
     }
   } 
   else if (tag.includes('瞄')) { 
@@ -3991,13 +4120,9 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
       const oldHp = target.hp;
       target.hp = Math.min(target.maxHp, target.hp + actualPower); 
       let extraText = '';
-      if (caster.classType === '圣职者' || caster.classType === '支援者') {
-          const overflow = (oldHp + actualPower) - target.maxHp;
-          if (overflow > 0) {
-              target.shield = (target.shield || 0) + overflow;
-              extraText = ` 溢出的治疗转化为 ${overflow} 点护盾。`;
-              setTimeout(() => { if (targetDom) createFloatingText(targetDom, `盾+${overflow}`, 'text-slate-300'); }, 400);
-          }
+      const casterPassive = CLASS_PASSIVES[caster.classType];
+      if (casterPassive && casterPassive.onOverheal) {
+          extraText = casterPassive.onOverheal(caster, target, targetDom, oldHp, actualPower) || '';
       }
       createFloatingText(targetDom, `+${actualPower}HP`, 'text-emerald-400'); 
       addHistory(`   ↳ 治愈了 ${target.name}，恢复 ${actualPower} 点生命。${extraText}`); 
@@ -4060,15 +4185,10 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     if (caster.id.startsWith('h')) updateHeroUI(caster); else updateEnemyUI(caster);
     showLog(`${caster.name} 施展了【${skill.name}】！`); 
     
-    // === 施法者多重施法 ===
-    if (caster.classType === '施法者' && skill.cost > 0 && !isReactionTrigger) {
-        const multiCastChance = Math.min(0.3, (skill.cost / 100) * 2);
-        if (Math.random() < multiCastChance) {
-            state.actionQueue.splice(state.queueIndex + 1, 0, { type: caster.id.startsWith('h') ? 'hero' : 'enemy', ref: caster, isExtraTurn: true });
-            addHistory(`   🌟 ${caster.name} 的法力产生共鸣，引发了多重施法(获得额外行动回合)！`);
-            const casterDom = caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`);
-            if(casterDom) setTimeout(() => createFloatingText(casterDom, '多重施法!', 'text-fuchsia-400'), 500);
-        }
+    // === 职业技能释放被动 (模块化调用，如施法者多重施法) ===
+    const casterSkillPassive = CLASS_PASSIVES[caster.classType];
+    if (casterSkillPassive && casterSkillPassive.onSkillExecuted) {
+        casterSkillPassive.onSkillExecuted(caster, skill, isReactionTrigger);
     }
     
     let targetStr = "";
@@ -5029,8 +5149,11 @@ function saveEditor() {
     h.hitBonus = 0; 
     h.evaBonus = 0; 
     h.burstActivated = false; 
-    h.baseTauntBonus = (h.classType === '隐匿者') ? -50 : (h.classType === '防守者' ? 100 : 0);
-    h.shield = (h.classType === '施法者') ? Math.floor(h.maxMp * 0.5) : 0;
+    h.baseTauntBonus = 0;
+    h.shield = 0;
+    if (window.CLASS_PASSIVES && CLASS_PASSIVES[h.classType]?.onBattleInit) {
+        CLASS_PASSIVES[h.classType].onBattleInit(h);
+    }
     delete h.hasTriggeredGrit;
     delete h.hasTriggeredAvoidFatal;
   });
@@ -5042,8 +5165,11 @@ function saveEditor() {
     e.isDefending = false; 
     e.hitBonus = 0; 
     e.evaBonus = 0; 
-    e.baseTauntBonus = (e.classType === '隐匿者') ? -50 : (e.classType === '防守者' ? 100 : 0);
-    e.shield = (e.classType === '施法者') ? Math.floor(e.maxMp * 0.5) : 0;
+    e.baseTauntBonus = 0;
+    e.shield = 0;
+    if (window.CLASS_PASSIVES && CLASS_PASSIVES[e.classType]?.onBattleInit) {
+        CLASS_PASSIVES[e.classType].onBattleInit(e);
+    }
     delete e.hasTriggeredGrit;
     delete e.hasTriggeredAvoidFatal;
   });
