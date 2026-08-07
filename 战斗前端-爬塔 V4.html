@@ -3973,6 +3973,28 @@ CombatEvents.on(EVENTS.TURN_END, (ctx) => {
 // ==========================================
 // 【看破】战略中断系统 (Kanpo Interrupt System)
 // ==========================================
+function shelvePrompt(overlay, reopenId, label) {
+    overlay.style.display = 'none';
+    let btn = document.getElementById(reopenId);
+    if (!btn) {
+        btn = document.createElement('button');
+        btn.id = reopenId;
+        document.body.appendChild(btn);
+    }
+    btn.textContent = label;
+    btn.style.cssText = 'position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom, 0px) + 64px);transform:translateX(-50%);z-index:210;padding:10px 18px;border-radius:9999px;background:rgba(20,25,40,0.95);border:1px solid rgba(255,255,255,0.25);color:#fff;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,0.45);cursor:pointer;pointer-events:auto;max-width:calc(100vw - 24px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+    btn.onclick = () => {
+        btn.remove();
+        overlay.style.display = 'flex';
+    };
+}
+
+function cleanupPrompt(overlay, reopenId) {
+    const btn = document.getElementById(reopenId);
+    if (btn) btn.remove();
+    if (overlay && overlay.parentNode) overlay.remove();
+}
+
 function getKanpoTarget(skill) {
     if (!skill) return null;
     if (skill.kanpoTarget) return skill.kanpoTarget;
@@ -3992,6 +4014,7 @@ function promptKanpo(candidates, attacker, incomingSkill) {
         const overlay = document.createElement('div');
         overlay.className = 'fixed inset-0 z-[200] bg-black/70 backdrop-blur-md flex items-center justify-center transition-opacity duration-300';
         overlay.id = 'kanpo-prompt';
+        const reopenId = 'kanpo-reopen';
 
         const incomingDmgType = incomingSkill ? (incomingSkill.damageType || '近战') : '近战';
 
@@ -4024,6 +4047,7 @@ function promptKanpo(candidates, attacker, incomingSkill) {
                         <h3 class="text-amber-400 font-black text-sm sm:text-base tracking-widest flex items-center gap-2">看破契机！<span class="text-[10px] px-1.5 py-0.5 bg-amber-900/60 border border-amber-500/40 rounded text-amber-200 font-mono">STRATEGIC INTERRUPT</span></h3>
                         <p class="text-[10px] sm:text-xs text-gray-300 mt-0.5">${attacker.name} 正发动 <span class="text-rose-400 font-bold">【${incomingSkill.name}】</span> <span class="text-amber-300">[${incomingDmgType}]</span></p>
                     </div>
+                    <button class="ml-auto shrink-0 text-[9px] sm:text-[10px] px-2 py-1 rounded border border-amber-500/40 text-amber-200 hover:bg-amber-500/20 transition-colors" onclick="shelvePrompt(document.getElementById('kanpo-prompt'), 'kanpo-reopen', '继续看破')">收起</button>
                 </div>
                 <div class="text-[11px] sm:text-xs text-gray-400 mb-3 bg-black/40 p-2 rounded border border-gray-800">
                     💡 使用【看破】技能可完全抵消敌方本次攻击的全盘效果。
@@ -4036,7 +4060,7 @@ function promptKanpo(candidates, attacker, incomingSkill) {
         window.resolveKanpo = (index) => {
             overlay.style.opacity = '0';
             setTimeout(() => {
-                overlay.remove();
+                cleanupPrompt(overlay, reopenId);
                 if (index === -1) resolve(null);
                 else resolve(candidates[index]);
             }, 200);
@@ -4141,6 +4165,7 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill) {
         const overlay = document.createElement('div');
         overlay.className = 'fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center transition-opacity duration-300';
         overlay.id = `reaction-prompt-${hero.id}`;
+        const reopenId = `reaction-reopen-${hero.id}`;
 
         const incomingDmgType = incomingSkill ? (incomingSkill.damageType || '近战') : '近战';
 
@@ -4163,6 +4188,7 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill) {
                         <h3 class="text-indigo-400 font-bold text-sm sm:text-base tracking-widest">即将遭受攻击</h3>
                         <p class="text-[10px] sm:text-xs text-gray-400">面临 ${attacker.name} 的 <span class="text-orange-300">[${incomingDmgType}]</span> 攻击</p>
                     </div>
+                    <button class="ml-auto shrink-0 text-[9px] sm:text-[10px] px-2 py-1 rounded border border-indigo-400/40 text-indigo-200 hover:bg-indigo-400/20 transition-colors" onclick="shelvePrompt(document.getElementById('reaction-prompt-${hero.id}'), 'reaction-reopen-${hero.id}', '继续反应')">收起</button>
                 </div>
                 ${skillHtml}
             </div>
@@ -4172,7 +4198,7 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill) {
         window.resolveReaction = (index) => {
             overlay.style.opacity = '0';
             setTimeout(() => {
-                overlay.remove();
+                cleanupPrompt(overlay, reopenId);
                 if (index === -1) resolve(null);
                 else resolve(reactionSkills[index]);
             }, 200);
