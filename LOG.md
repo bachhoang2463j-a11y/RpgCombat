@@ -130,3 +130,17 @@
   3. 未配置 LLM 或已有请求进行中时沿用现有 `llmState.isRequesting` 保护，不阻塞战斗。
 - **涉及函数/模块**：`triggerKanpoNarration()` (看破旁白触发), `checkKanpoInterrupt()` (看破中断流程), `requestLLMResponse()` (LLM 请求复用)
 - **决策原因**：看破是战略反制，需要让敌方与我方角色通过旁白建立“敌方震惊、我方识破”的叙事反馈，提升演出后的情绪延续感。
+
+---
+
+## [LOG-012] 2026-08-11 — V4.1 防御恢复 TP/MP 百分比可自定义（localStorage 持久化）
+
+- **变更行为**：
+  1. 新增 `defendSettings` 全局设置对象（`mpRecoverPct: 20`、`tpRecoverPct: 25`，默认与旧行为等效）与 `loadDefendSettings()` / `persistDefendSettings()` 读写函数，持久化键 `DEFEND_VAR_KEY = 'rpg_combat_defend_settings'`，采用 localStorage 存储。
+  2. `actionDefend()` 中防御恢复由硬编码改为百分比口径：MP 恢复 `maxMp * mpRecoverPct%`，TP 恢复由“固定 +25 点”统一为 `maxTp * tpRecoverPct%`。
+  3. 技能修改器（`openEditor()`）最上方新增“⚙️ 战斗全局设置：防御恢复”区块，两个 0–100% 的 MP/TP 恢复百分比输入框。
+  4. `saveEditor()` 保存时读取输入值，经 `clampPct()` 钳制到 0–100 后写入 `defendSettings` 并持久化。
+  5. 脚本初始化末尾调用 `loadDefendSettings()`，刷新页面后设置自动恢复。
+  6. 经 syntax 校验（Node 提取 `<script>` 校验）通过，零报错。
+- **涉及函数/模块**：`defendSettings` (全局设置对象), `loadDefendSettings()` / `persistDefendSettings()` / `clampPct()` (持久化与钳制), `actionDefend()` (防御恢复生效点), `openEditor()` (编辑器 UI 全局设置区), `saveEditor()` (设置读取与持久化)
+- **决策原因**：防御恢复 TP/MP 原为硬编码常量（MP 20%、TP 固定 +25），无法按战局或角色平衡需求灵活调整；现改为 0–100% 可配置并持久化，方便测试人员即时调整平衡性，且默认值与旧行为完全一致，无回归。
