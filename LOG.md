@@ -185,3 +185,18 @@
   7. 经 syntax 校验（Node 提取 `<script>` 校验，4 个 script 全部 OK）通过，零报错。
 - **涉及函数/模块**：`EVENTS.ON_DODGE` & `CombatEvents.emitAsync` (事件广播), `CLASS_PASSIVES['防守者'].onDodge` (被动钩子), `CombatEvents.on(EVENTS.ON_DODGE)` (事件订阅), `playPowerCounterEffect()` / `POWER_COUNTER_SOUND_URL` (强力反击演出与音效), `spawnPowerBurst()` (红色发散粒子), CSS keyframes (`.power-crosshair/.power-burst/.power-flash/.power-glow`)
 - **决策原因**：强化防守者"闪避后反击"的威胁感与演出辨识度，提供一种无视伤害类型限制、可与常规反击叠加的爆发型反击手段；采用 `ON_DODGE` 事件 + `CLASS_PASSIVES` 钩子的模块化接入，不侵入核心战斗结算代码。演出方案经多轮迭代：由"圆锥冲击波飞行"简化为"瞄准准心 + 防守者红芒 + 血花溅射"，在保持华丽度的同时规避粒子卡顿。
+
+---
+
+## [LOG-016] 2026-08-11 — 强力反击视觉特效重构与 VFX 设计指南文档
+
+- **变更行为**：
+  1. 重构【强力反击】（`playPowerCounterEffect`）视觉特效与打击感：
+     - **瞄准框残留修复**：在反击触发瞬间强制移除 `targeting-mode-enemy` CSS 类，消除玩家选敌残留的大准星。
+     - **蓄力与爆发分离**：将前摇提升至 350ms，新增红色聚气粒子向防守者汇聚（`spawnChargeUpParticles`），使蓄力阶段视觉清晰可见。
+     - **命中准星替换刀光**：替换有渲染方块截断问题的 SVG 刀光，改为 90px 精准红色准心（`pc-crosshair`：虚线圆环+十字光臂+辉光），配合 `pc-crosshair-hit` 贝塞尔弹入旋转消退动画。
+  2. 根目录生成 `VFX_DESIGN_GUIDE.md`（视觉特效设计与实现指南）：
+     - 归纳独立 SVG/CSS 特效模式与 WebM 叠加 + 粒子 + 全屏辉光的五层大招模型。
+     - 记录 SVG Filter 渲染方块避坑规范、Blob URL 预加载机制、多通道并发音效及开发 Check-list。
+- **涉及函数/模块**：`playPowerCounterEffect()` (强力反击演出), `.pc-crosshair` / `@keyframes pc-crosshair-hit` (命中准星), `VFX_DESIGN_GUIDE.md` (设计指南)
+- **决策原因**：解决强力反击特效软绵绵、蓄力受击同步、SVG Filter 方块边界截断等视觉瑕疵；归纳沉淀 VFX 规范文档以指导后续技能特效开发。
