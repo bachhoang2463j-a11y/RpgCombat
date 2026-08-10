@@ -1081,21 +1081,41 @@ window.triggerScreenShake = function(intensity = 6, duration = 300) {
 function spawnDodgeSmokeParticles(x, y) {
     if (typeof fxEngine === 'undefined' || !fxEngine) return;
     for (let i = 0; i < 20; i++) {
+        // 以点为中心，向左右横散 + 上浮：速度 x 方向均匀铺开，y 方向恒为向上
         const speed = 2 + Math.random() * 5;
-        const vx = speed * (Math.random() - 0.5); // spread horizontally
-        const vy = speed * (Math.random() * 0.4 - 0.2); // spread vertically slightly
+        const vx = speed * (Math.random() - 0.5) * 1.8; // 左右扩散
+        const vy = -speed * (0.3 + Math.random() * 0.6); // 恒向上
+        const size = 18 + Math.random() * 26;
+        const life = 700 + Math.random() * 500;
         fxEngine.addParticle({
-            x: x + (Math.random() - 0.5) * 20,
-            y: y + (Math.random() - 0.5) * 10,
+            x: x + (Math.random() - 0.5) * 16,
+            y: y + (Math.random() - 0.5) * 8,
             vx: vx,
             vy: vy,
             gravity: -0.05, // floats up slightly
             drag: 0.90, // slows down quickly
-            size: 15 + Math.random() * 25,
+            age: 0,
+            life: life,
+            size: size,
             color: '#cbd5e1', // slate-300 light gray smoke
-            alpha: 0.4 + Math.random() * 0.3,
-            fadeRate: 0.02 + Math.random() * 0.02,
-            blendMode: 'normal'
+            alpha: 0.45 + Math.random() * 0.3,
+            blendMode: 'normal',
+            draw(ctx, pct) {
+                // 环形扩散：半径随生命周期增长，中心与边缘透明、中间一圈烟带，
+                // 形成以点为中心向外散开的烟圈，而非原地淡出的实心圆点
+                const ringR = this.size * (0.25 + pct * 1.7);
+                ctx.globalCompositeOperation = this.blendMode || 'normal';
+                ctx.globalAlpha = this.alpha * (1 - pct);
+                ctx.translate(this.x, this.y);
+                const g = ctx.createRadialGradient(0, 0, ringR * 0.35, 0, 0, ringR);
+                g.addColorStop(0, 'rgba(203,213,225,0)');
+                g.addColorStop(0.55, this.color);
+                g.addColorStop(1, 'rgba(203,213,225,0)');
+                ctx.fillStyle = g;
+                ctx.beginPath();
+                ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+                ctx.fill();
+            }
         });
     }
 }
