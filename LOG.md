@@ -200,3 +200,13 @@
      - 记录 SVG Filter 渲染方块避坑规范、Blob URL 预加载机制、多通道并发音效及开发 Check-list。
 - **涉及函数/模块**：`playPowerCounterEffect()` (强力反击演出), `.pc-crosshair` / `@keyframes pc-crosshair-hit` (命中准星), `VFX_DESIGN_GUIDE.md` (设计指南)
 - **决策原因**：解决强力反击特效软绵绵、蓄力受击同步、SVG Filter 方块边界截断等视觉瑕疵；归纳沉淀 VFX 规范文档以指导后续技能特效开发。
+---
+
+## [LOG-017] 2026-08-11 — 优化闪避视觉特效
+
+- **变更行为**：
+  1. 新增 .dodge-shake CSS 动画，将闪避时的晃动持续时间延长至 0.5s，并加大水平晃动（±10px）与倾斜（±5度）幅度，采用贝塞尔缓动曲线提升物理反馈感。
+  2. 新增 spawnDodgeSmokeParticles() 函数，在成功闪避时于角色图标底部生成向两侧和下方扩散的浅灰色烟雾粒子，模拟快速移动激起的扬尘。
+  3. 修改闪避结算逻辑（isDodged 分支），将原有的通用 .shake（0.2s）替换为 .dodge-shake 并调用新增的烟雾粒子函数。
+- **涉及函数/模块**：\isDodged\ (闪避结算分支), \.dodge-shake\ (CSS 动画), \spawnDodgeSmokeParticles()\ (烟雾粒子生成)
+- **决策原因**：原有闪避特效仅短暂轻微晃动，且与其他受击晃动混用，容易被忽略。通过解耦闪避专属晃动并增加扬尘粒子，提升了闪避动作的实体感与视觉辨识度。
