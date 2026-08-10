@@ -4571,6 +4571,10 @@ async function playPowerCounterEffect(counter, victim, counterDom) {
     document.getElementById('enemies-container')?.classList.remove('targeting-mode-enemy');
     document.getElementById('heroes-container')?.classList.remove('targeting-mode-hero');
 
+    // ── 观感缓冲：先让"闪避"特效（烟雾 + 抖动，约 500ms）完整呈现，再开始聚气 ──
+    // 避免强力反击的聚气红光/粒子立刻盖过闪避演出，导致角色看起来"径直打了敌人一下"
+    await sleep(500);
+
     // ── 阶段1：蓄力前摇（350ms）── 聚气光效 + 蓄力音效 + 聚气粒子
     playSound('atkUp');
     const heroCard = counterDom.closest ? counterDom.closest('.hero-card-inner') : null;

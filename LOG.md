@@ -224,3 +224,16 @@
   4. 经 syntax 校验（Node 提取 `<script>` 校验）通过，零报错；重置功能实测有效。
 - **涉及函数/模块**：`applyPersistedRoster()` (合并后同步缓存，修复点), `resetBattle()` (重置还原依赖缓存), `buildCombatDataFromYAML()` (缓存初次建立), 文件重命名 (`战斗前端-爬塔 V4.5.html`)
 - **决策原因**：重置与刷新行为不一致暴露了缓存快照与实际数据源脱节的问题；让缓存与持久化合并结果保持同步，使"重置"与"刷新"语义一致，均恢复持久化保存的技能版本。
+
+---
+
+## [LOG-019] 2026-08-11 — V4.8 升级：眩晕/普攻TP/强力反击演出优化
+
+- **变更行为**：
+  1. **眩晕修复（多动敌人）**：眩晕改为**每次行动**（含多动单位的额外行动）都判定——被眩晕即跳过其"下一次行动"，并即时消耗眩晕状态；常规 Buff 计时/毒 tick/TURN_START 事件仍仅在首次（非额外）行动执行一次，避免重复结算。
+  2. **普攻 TP 恢复可配置**：新增 `defendSettings.basicAttackTp`（默认 20 点），可在编辑器"战斗全局设置：防御/普攻恢复"中配置并 localStorage 持久化；普攻（`actionAttack`）读取该值，普通技能仍保留固定 +5，避免重复叠加。
+  3. **强力反击演出优化**：`playPowerCounterEffect` 开头加入 500ms 观感缓冲，让"闪避"特效（烟雾 + `dodge-shake` 抖动）完整呈现后再开始聚气，避免 `power-glow` 的 `!important` 动画立即覆盖闪避演出，使演出呈现"闪避 → 反应 → 强力反击"的清晰时序。
+  4. 版本号升级至 **V4.8**，核心引擎文件由 `战斗前端-爬塔 V4.5.html` 重命名为 `战斗前端-爬塔 V4.8.html`。
+  5. 同步更新 `README.md`（当前版本 V4.8）与 `SPEC.md`（文件名引用 V4.8）。
+- **涉及函数/模块**：`nextTurn()`/`startRound()` (眩晕判定与多动处理), `defendSettings.basicAttackTp` (普攻TP配置), `actionAttack` (普攻TP恢复), `executeSkillAction` (技能TP恢复去重), `playPowerCounterEffect()` (强力反击演出), `openEditor()`/`saveEditor()` (编辑器与持久化), 文件重命名 (`战斗前端-爬塔 V4.8.html`)
+- **决策原因**：修复多动敌人眩晕时序错误、消除普攻TP恢复写死、改进强力反击的视觉时序，使"闪避后强力反击"的演出清晰可辨。
