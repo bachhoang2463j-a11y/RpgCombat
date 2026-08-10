@@ -1079,7 +1079,7 @@ window.triggerScreenShake = function(intensity = 6, duration = 300) {
 
 // 粒子类型生成函数集
 function spawnDodgeSmokeParticles(x, y) {
-    if (!window.fxEngine) return;
+    if (typeof fxEngine === 'undefined' || !fxEngine) return;
     for (let i = 0; i < 20; i++) {
         const speed = 2 + Math.random() * 5;
         const vx = speed * (Math.random() - 0.5); // spread horizontally
