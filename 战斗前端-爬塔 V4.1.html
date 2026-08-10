@@ -3429,6 +3429,7 @@ function loadManualData() {
 
 function onCombatDataReceived(yamlStr) {
     if (buildCombatDataFromYAML(yamlStr)) {
+        applyPersistedRoster();
         document.getElementById('loading-title').innerText = "战局已构建";
         document.getElementById('loading-title').classList.add('text-emerald-400');
         document.getElementById('loading-tip').innerText = "环境数据读取完毕";
@@ -5788,6 +5789,7 @@ function saveEditor() {
   defendSettings.mpRecoverPct = clampPct(document.getElementById('edit-defend-mp-pct').value);
   defendSettings.tpRecoverPct = clampPct(document.getElementById('edit-defend-tp-pct').value);
   persistDefendSettings();
+  persistHeroesRoster();
   heroesData.forEach(h => { 
     if(h.hp > h.maxHp) h.hp = h.maxHp; 
     if(h.mp > h.maxMp) h.mp = h.maxMp; 
@@ -5931,6 +5933,75 @@ function loadDefendSettings() {
 
 function persistDefendSettings() {
   try { localStorage.setItem(DEFEND_VAR_KEY, JSON.stringify(defendSettings)); } catch(e) {}
+}
+
+// ---- 我方角色技能持久化：存到酒馆助手 chat 变量（聊天记录 JSON）----
+const ROSTER_VAR_KEY = 'rpg_combat_roster';
+const ROSTER_VERSION = 1;
+
+// 序列化：heroesData → 可存对象数组（仅角色配置字段 + 技能集，不含 DOM/战斗态字段）
+function serializeHeroesForSave() {
+  return heroesData.map(h => ({
+    name: h.name,
+    config: {
+      img: h.img, classType: h.classType, isWise: h.isWise,
+      maxHp: h.maxHp, maxMp: h.maxMp, maxTp: h.maxTp,
+      atk: h.atk, def: h.def, spd: h.spd, actCount: h.actCount
+    },
+    skills: h.skills.map(s => ({
+      name: s.name, isReaction: s.isReaction, reactionTarget: s.reactionTarget, kanpoTarget: s.kanpoTarget,
+      damageType: s.damageType, fxTag: s.fxTag, cost: s.cost, hpCost: s.hpCost, tpCost: s.tpCost,
+      hit: s.hit, turns: s.turns, type: s.type, power: s.power, type2: s.type2, power2: s.power2, type3: s.type3, power3: s.power3
+    }))
+  }));
+}
+
+// 写入：saveEditor 内调用，把清洗后的我方阵容写入 chat 变量（直接依赖酒馆助手，无降级）
+function persistHeroesRoster() {
+  const payload = { version: ROSTER_VERSION, heroes: serializeHeroesForSave() };
+  insertOrAssignVariables({ [ROSTER_VAR_KEY]: payload }, { type: 'chat' });
+}
+
+// 读取：从 chat 变量读回 payload（含版本/结构校验）
+function readRoster() {
+  try {
+    const vars = getVariables({ type: 'chat' });
+    const payload = vars && vars[ROSTER_VAR_KEY];
+    if (payload && payload.version === ROSTER_VERSION && Array.isArray(payload.heroes)) return payload;
+    return null;
+  } catch(e) { return null; }
+}
+
+// 合并：对 heroesData 中每个角色，按名匹配持久化角色
+//   - 同名角色：配置字段以持久化为准；技能集 = 持久化技能 + Combat_block 新增技能（追加）
+//   - 找不到同名：保留 Combat_block 原样
+function applyPersistedRoster() {
+  const payload = readRoster();
+  if (!payload) return;
+  const savedByName = new Map(payload.heroes.map(r => [r.name, r]));
+  heroesData.forEach(h => {
+    const saved = savedByName.get(h.name);
+    if (!saved) return;
+    // 覆盖配置字段（保留 id / 当前 hp/mp/tp 等战斗态字段）
+    const cfg = saved.config || {};
+    if (cfg.img != null) h.img = cfg.img;
+    if (cfg.classType != null) h.classType = cfg.classType;
+    if (cfg.isWise != null) h.isWise = cfg.isWise;
+    if (cfg.maxHp != null) h.maxHp = cfg.maxHp;
+    if (cfg.maxMp != null) h.maxMp = cfg.maxMp;
+    if (cfg.maxTp != null) h.maxTp = cfg.maxTp;
+    if (cfg.atk != null) h.atk = cfg.atk;
+    if (cfg.def != null) h.def = cfg.def;
+    if (cfg.spd != null) h.spd = cfg.spd;
+    if (cfg.actCount != null) h.actCount = cfg.actCount;
+    // 技能集：以持久化技能为基准，追加 Combat_block 新增技能
+    const savedSkills = Array.isArray(saved.skills) ? saved.skills : [];
+    const finalSkills = savedSkills.slice();
+    h.skills.forEach(cbSkill => {
+      if (!finalSkills.some(s => s.name === cbSkill.name)) finalSkills.push(cbSkill);
+    });
+    h.skills = finalSkills;
+  });
 }
 
 // ---- 设置面板 UI ----
