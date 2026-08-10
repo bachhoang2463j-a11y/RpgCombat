@@ -6290,6 +6290,9 @@ function applyPersistedRoster() {
     const cbNewSkills = h.skills.filter(cbSkill => !savedSkills.some(s => s.name === cbSkill.name));
     h.skills = [...cbNewSkills, ...savedSkills];
   });
+  // 合并完成后同步初始缓存，使"重置"恢复的也是持久化合并后的版本（而非 Combat_block 原始快照）
+  initialHeroesCache = JSON.parse(JSON.stringify(heroesData));
+  initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData));
 }
 
 // ---- 设置面板 UI ----

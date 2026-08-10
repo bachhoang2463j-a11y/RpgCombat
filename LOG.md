@@ -210,3 +210,17 @@
   3. 修改闪避结算逻辑（isDodged 分支），将原有的通用 .shake（0.2s）替换为 .dodge-shake 并调用新增的烟雾粒子函数。
 - **涉及函数/模块**：\isDodged\ (闪避结算分支), \.dodge-shake\ (CSS 动画), \spawnDodgeSmokeParticles()\ (烟雾粒子生成)
 - **决策原因**：原有闪避特效仅短暂轻微晃动，且与其他受击晃动混用，容易被忽略。通过解耦闪避专属晃动并增加扬尘粒子，提升了闪避动作的实体感与视觉辨识度。
+
+---
+
+## [LOG-018] 2026-08-11 — V4.5 修复重置清空持久化技能 bug + 版本升级
+
+- **变更行为**：
+  1. **修复重置 bug**：点击战斗界面右上角"重置"按钮后，缓存角色技能被清空（回退到 Combat_block 原始快照），但完整刷新页面会恢复。
+     - 根因：`initialHeroesCache` 在 `buildCombatDataFromYAML()` 中被赋值为**未合并持久化**的 Combat_block 原始快照（L3518），而 `applyPersistedRoster()` 在其后（L3585）才把持久化技能合并进 `heroesData`。`resetBattle()` 依赖此缓存还原，导致重置后技能回退而非持久化版；刷新页面重新走合并流程故能恢复。
+     - 修复（方案 A）：在 `applyPersistedRoster()` 合并完成后，同步更新 `initialHeroesCache`/`initialEnemiesCache`，使缓存始终反映持久化合并后的最终数据。无持久化数据时提前 return，缓存维持 Combat_block 版，逻辑正确。
+  2. 版本号升级至 **V4.5**，核心引擎文件由 `战斗前端-爬塔 V4.3.html` 重命名为 `战斗前端-爬塔 V4.5.html`。
+  3. 同步更新 `README.md`（当前版本 V4.5）与 `SPEC.md`（文件名引用 V4.5）。
+  4. 经 syntax 校验（Node 提取 `<script>` 校验）通过，零报错；重置功能实测有效。
+- **涉及函数/模块**：`applyPersistedRoster()` (合并后同步缓存，修复点), `resetBattle()` (重置还原依赖缓存), `buildCombatDataFromYAML()` (缓存初次建立), 文件重命名 (`战斗前端-爬塔 V4.5.html`)
+- **决策原因**：重置与刷新行为不一致暴露了缓存快照与实际数据源脱节的问题；让缓存与持久化合并结果保持同步，使"重置"与"刷新"语义一致，均恢复持久化保存的技能版本。
