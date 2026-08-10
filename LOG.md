@@ -119,3 +119,14 @@
   4. `checkKanpoInterrupt()` 不再直接 `ctx.cancelled = true`，改为等待演出完成后再标记取消，避免敌方技能被瞬间掐断。
 - **涉及函数/模块**：`playKanpoEffect()` (看破演出编排), `spawnGoldStream()` / `spawnGoldBurst()` (金色粒子效果), `playKanpoSound()` (独立音效接口), `checkKanpoInterrupt()` (看破中断流程)
 - **决策原因**：当前看破失效后敌方技能被无缝掐断，战略反制缺乏辨识度；通过冻结、金色识破之眼、粒子汇聚与无效化印章建立“识破-反制-无效化”的仪式感闭环。
+
+---
+
+## [LOG-011] 2026-08-08 — V4.1 看破旁白：敌方震惊/我方反应，复用 LLM 接口
+
+- **变更行为**：
+  1. 看破演出完成后，新增 `triggerKanpoNarration()` 按旁白开关触发 LLM 台词。
+  2. 只开敌方旁白时敌方说震惊台词；只开我方旁白时看破英雄说反应台词；双方都开时同一轮请求双方各说一句。
+  3. 未配置 LLM 或已有请求进行中时沿用现有 `llmState.isRequesting` 保护，不阻塞战斗。
+- **涉及函数/模块**：`triggerKanpoNarration()` (看破旁白触发), `checkKanpoInterrupt()` (看破中断流程), `requestLLMResponse()` (LLM 请求复用)
+- **决策原因**：看破是战略反制，需要让敌方与我方角色通过旁白建立“敌方震惊、我方识破”的叙事反馈，提升演出后的情绪延续感。

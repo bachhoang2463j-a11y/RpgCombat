@@ -4384,6 +4384,7 @@ async function checkKanpoInterrupt(ctx) {
 
         await playKanpoEffect(chosen.hero, ctx.caster, ctx.skill);
         addHistory(`   ⛔ ${chosen.hero.name} 施展【${chosen.skill.name}】看穿了敌方气路，【${ctx.skill.name}】被彻底无效化！`);
+        await triggerKanpoNarration(chosen.hero, chosen.skill, ctx.caster, ctx.skill);
         ctx.cancelled = true;
     }
 }
@@ -5174,7 +5175,7 @@ function showBattleResult(type) {
 
     let promptTemplate = "";
     if (type === 'retreat') {
-        promptTemplate = `[系统指令：请根据以下战局记录，以小说般充满画面感、具有张力的笔触，描写出这场战斗完整的详细过程。玩家小队选择了主动撤离战场（请根据战局记录自行判断局势，可能是觉得无需再做无谓的缠斗，不代表是被打败逃跑）。着重描写他们脱离战斗的过程、动作细节以及心理状态。]\n\n<战局记录>\n${historyText}\n</战局记录>\n${summaryText}\n\n[附加指令：请在描写的最后，确认并应用上述小队成员的最新状态。]\n\n严禁使用任何游戏词汇！严格根据伤势标签描写当前的状态！请开始你的描写。小说化描写结束后，请另起一行，仅输出【初始化】`;
+        promptTemplate = `[系统指令：请根据以下战局记录，以小说般充满画面感、具有张力的笔触，描写出这场战斗完整的详细过程。玩家小队选择了主动撤离战场（请根据战局记录自行判断局势，可能是觉得无需再做无谓的缠斗，不代表是被打败逃跑）。着重描写他们脱离战斗的过程、动作细节以及心理状态。]\n\n<战局记录>\n${historyText}\n</战局记录>\n${summaryText}\n\n[附加指令：请在描写的最后，确认并应用上述小队成员的最新状态。]\n\n严禁使用任何游戏词汇！严格根据伤势标签描写当前的状态！请开始你的描写。`;
     } else {
         promptTemplate = `[系统指令：请根据以下战局记录，以小说般充满画面感、具有张力的笔触，描写出这场惊心动魄的战斗过程。注重动作细节、技能特效的光影、人物的心理状态，以及最终${type === 'win' ? '走向胜利的高光时刻' : '惨烈落败的绝望收场'}。]\n\n<战局记录>\n${historyText}\n</战局记录>\n${summaryText}\n\n[附加指令：请在描写的最后，确认并应用上述小队成员的最新状态。]\n\n严禁使用任何游戏词汇！严格根据伤势标签描写单次攻击的效果！请开始你的描写。小说化描写结束后，请另起一行，仅输出 【初始化】。`;
     }
@@ -6114,6 +6115,20 @@ async function triggerAllyAutoSpeak(hero) {
   // 构建触发词，要求根据最新行动说话 (历史记录会在 callLLMAPI 中自动附带)
   const trigger = `[系统指令：请基于最新战报中你的行动，以【${hero.name}】的口吻说出一句符合其最新动作的简短台词。严格不要带任何前缀和引号！]`;
   await requestLLMResponse(trigger, [hero], true);
+}
+
+// ---- 看破后旁白：按开关让敌方/我方角色各说一句 ----
+async function triggerKanpoNarration(caster, kanpoSkill, enemy, blockedSkill) {
+  if (!llmState.apiUrl || !llmState.apiKey) return;
+  if (llmState.isRequesting) return;
+
+  const targets = [];
+  if (llmState.allyAutoSpeak && caster.isAlive) targets.push(caster);
+  if (llmState.enemyAutoSpeak && enemy.isAlive) targets.push(enemy);
+  if (targets.length === 0) return;
+
+  const trigger = `[系统指令：我方角色 ${caster.name} 刚刚使用【${kanpoSkill.name}】看破了敌方 ${enemy.name} 的技能【${blockedSkill.name}】，并将其彻底无效化。请让以下参战角色各说一句符合当前战况的简短台词：敌方必须震惊、难以置信；我方则体现识破后的从容、自信或嘲讽。格式：角色名：「台词」。严禁添加任何其他内容。]`;
+  await requestLLMResponse(trigger, targets, true);
 }
 
 // ---- 调用 LLM API ----
