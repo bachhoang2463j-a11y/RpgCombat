@@ -144,3 +144,17 @@
   6. 经 syntax 校验（Node 提取 `<script>` 校验）通过，零报错。
 - **涉及函数/模块**：`defendSettings` (全局设置对象), `loadDefendSettings()` / `persistDefendSettings()` / `clampPct()` (持久化与钳制), `actionDefend()` (防御恢复生效点), `openEditor()` (编辑器 UI 全局设置区), `saveEditor()` (设置读取与持久化)
 - **决策原因**：防御恢复 TP/MP 原为硬编码常量（MP 20%、TP 固定 +25），无法按战局或角色平衡需求灵活调整；现改为 0–100% 可配置并持久化，方便测试人员即时调整平衡性，且默认值与旧行为完全一致，无回归。
+
+---
+
+## [LOG-013] 2026-08-11 — V4.1 我方角色技能持久化到酒馆聊天记录 chat 变量
+
+- **变更行为**：
+  1. 新增 `ROSTER_VAR_KEY = 'rpg_combat_roster'` 单一键，将我方角色"配置字段 + 技能集"序列化存入酒馆助手 **chat 变量**（即聊天记录 JSON 的 `chat_metadata.variables`），随聊天文件导出；用 `insertOrAssignVariables` 增量写入，避免覆盖其他聊天变量。
+  2. `saveEditor()` 追加 `persistHeroesRoster()`，玩家点击编辑器"保存"即**立刻落盘**，删除/修改技能无需刷新。
+  3. `onCombatDataReceived()` 在 `buildCombatDataFromYAML()` 成功后、`initUI()` 前调用 `applyPersistedRoster()` 合并。
+  4. 合并规则（持久化优先）：同名角色配置字段以持久化为准；同名技能以持久化版本覆盖；`Combat_block` 新增技能追加进战局不丢弃；持久化中无同名角色则保留 `Combat_block` 原版。
+  5. 仅持久化我方角色，敌方不持久化（敌人由 `Combat_block` 动态生成）。
+  6. 经 syntax 校验（Node 提取 `<script>` 校验）通过，零报错。
+- **涉及函数/模块**：`ROSTER_VAR_KEY` / `ROSTER_VERSION` (持久化常量), `serializeHeroesForSave()` (白名单序列化), `persistHeroesRoster()` (写入 chat 变量), `readRoster()` (读取与校验), `applyPersistedRoster()` (按名合并), `saveEditor()` (落盘触发点), `onCombatDataReceived()` (加载合并挂载点)
+- **决策原因**：角色技能原仅存于浏览器内存，刷新即丢，且每次依赖 LLM 透过 `<Combat_block>` 重新传递、无法固定玩家偏好的技能数值；localStorage 以浏览器地址为依据、跨聊天共享会导致不同聊天的角色技能串味。改用酒馆助手 `chat` 类型变量将技能绑定到**聊天记录文件**，实现"清空 combatstatus 刷新后同名角色技能仍在、新建聊天对话后技能消失"的精确生命周期，且点保存即落盘，无需刷新。
