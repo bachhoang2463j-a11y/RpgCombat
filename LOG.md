@@ -170,3 +170,18 @@
   4. 经 syntax 校验（Node 提取 `<script>` 校验）通过，零报错。
 - **涉及函数/模块**：`applyPersistedRoster()` (技能合并置顶逻辑), 文件重命名 (`战斗前端-爬塔 V4.3.html`)
 - **决策原因**：版本升级遵循项目历史惯例（每次升版重命名核心文件）；`Combat_block` 新增技能置顶，让玩家在技能编辑器中优先看到新出现的技能，提升可发现性。
+
+---
+
+## [LOG-015] 2026-08-11 — V4.3 防守者新增【强力反击】被动 + 红色瞄准演出
+
+- **变更行为**：
+  1. 首次启用 `EVENTS.ON_DODGE` 事件（此前仅定义未 emit）：在 `applySingleTagEffect()` 闪避成功分支内、常规反击判定前，`await CombatEvents.emitAsync(EVENTS.ON_DODGE, { target, caster, targetDom, incomingDamageType, skill })` 广播。
+  2. `CLASS_PASSIVES['防守者']` 新增 `async onDodge(ctx)` 钩子：闪避成功时按概率 `POWER_COUNTER_CHANCE`（测试期 50%，注释标明可调回 5%）触发强力反击，以 `2 × 当前有效攻击力` 结算伤害（经 `calculateDamage` 正常受防御减免），实际扣血 `caster.hp`，补充破盾/飘字/历史/UI 刷新。
+  3. 事件适配层新增 `CombatEvents.on(EVENTS.ON_DODGE, ...)` 订阅，按 `classType === '防守者'` 过滤并调用 `onDodge`。
+  4. 新增 `playPowerCounterEffect()` 分幕演出（约 1 秒）：防守者头像泛起红色光芒（仿极限爆发红色系光晕）→ 被反击者图标上浮现红色瞄准准心 → 播放专属音效 `shot01.mp3` 的同时血花飞溅 + 全屏红色脉冲 + 震屏。
+  5. 血花采用仿【群攻(爆炸)】外层发散粒子（带重力、速度衰减、白色高光核心，改红/暗红色系），并叠加红色双环冲击波；粒子量控制在 22 个左右，避免卡顿。
+  6. 强力反击与常规反击**完全独立**，可同时触发；**无视**"仅近战"限制；命中后**不触发**防守者"嘲讽值永久+20"（仅常规反击保留）。
+  7. 经 syntax 校验（Node 提取 `<script>` 校验，4 个 script 全部 OK）通过，零报错。
+- **涉及函数/模块**：`EVENTS.ON_DODGE` & `CombatEvents.emitAsync` (事件广播), `CLASS_PASSIVES['防守者'].onDodge` (被动钩子), `CombatEvents.on(EVENTS.ON_DODGE)` (事件订阅), `playPowerCounterEffect()` / `POWER_COUNTER_SOUND_URL` (强力反击演出与音效), `spawnPowerBurst()` (红色发散粒子), CSS keyframes (`.power-crosshair/.power-burst/.power-flash/.power-glow`)
+- **决策原因**：强化防守者"闪避后反击"的威胁感与演出辨识度，提供一种无视伤害类型限制、可与常规反击叠加的爆发型反击手段；采用 `ON_DODGE` 事件 + `CLASS_PASSIVES` 钩子的模块化接入，不侵入核心战斗结算代码。演出方案经多轮迭代：由"圆锥冲击波飞行"简化为"瞄准准心 + 防守者红芒 + 血花溅射"，在保持华丽度的同时规避粒子卡顿。

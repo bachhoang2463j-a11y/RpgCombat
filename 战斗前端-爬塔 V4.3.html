@@ -516,6 +516,19 @@
     .kanpo-shatter { position: fixed; z-index: 151; pointer-events: none; animation: kanpo-shatter 0.8s ease-out forwards; display: flex; align-items: center; justify-content: center; flex-direction: column; }
     .kanpo-slash { position: fixed; z-index: 152; pointer-events: none; animation: kanpo-slash 0.55s ease-out forwards; }
     .kanpo-flash { position: fixed; inset: 0; z-index: 153; pointer-events: none; background: radial-gradient(circle, rgba(255,237,213,0.9), rgba(251,191,36,0.35) 45%, transparent 75%); animation: kanpo-flash 0.45s ease-out forwards; }
+
+    @keyframes power-crosshair-in { 0% { transform: translate(-50%,-50%) scale(0.3); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.15); opacity: 1; } }
+    @keyframes power-burst-pulse { 0% { transform: translate(-50%,-50%) scale(0.1); opacity: 0; } 8% { transform: translate(-50%,-50%) scale(1.6); opacity: 1; } 25% { transform: translate(-50%,-50%) scale(1.2); opacity: 0.9; } 100% { transform: translate(-50%,-50%) scale(1.85); opacity: 0; } }
+    @keyframes power-flash-bright { 0% { opacity: 0; } 12% { opacity: 1; } 30% { opacity: 0.55; } 100% { opacity: 0; } }
+    @keyframes power-flash-red { 0% { opacity: 0; } 15% { opacity: 0.85; } 100% { opacity: 0; } }
+    @keyframes power-stop-slam { 0% { transform: translate(-50%,-50%) scale(1.6) rotate(0deg); opacity: 1; } 12% { transform: translate(-50%,-50%) scale(0.9) rotate(6deg); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.1) rotate(0deg); opacity: 0; } }
+    @keyframes power-glow-pulse { 0% { box-shadow: 0 0 10px 2px rgba(255,60,60,0.6); border-color: rgba(255,60,60,0.8); } 50% { box-shadow: 0 0 25px 10px rgba(255,60,60,1); border-color: rgba(255,60,60,1); transform: scale(1.02); } 100% { box-shadow: 0 0 10px 2px rgba(255,60,60,0.6); border-color: rgba(255,60,60,0.8); } }
+    .power-crosshair { position: fixed; z-index: 152; pointer-events: none; animation: power-crosshair-in 0.12s cubic-bezier(0.05, 1.2, 0.3, 1) forwards; }
+    .power-burst { position: fixed; z-index: 151; pointer-events: none; animation: power-burst-pulse 0.22s cubic-bezier(0.05, 1.2, 0.3, 1) forwards; }
+    .power-stop-slam { position: fixed; z-index: 150; pointer-events: none; animation: power-stop-slam 0.22s cubic-bezier(0.05, 1.2, 0.3, 1) forwards; }
+    .power-flash-bright { position: fixed; inset: 0; z-index: 153; pointer-events: none; background: #fff; animation: power-flash-bright 0.18s ease-out forwards; }
+    .power-flash-red { position: fixed; inset: 0; z-index: 154; pointer-events: none; background: radial-gradient(circle, rgba(255,208,194,0.95), rgba(255,60,60,0.55) 45%, transparent 75%); animation: power-flash-red 0.3s ease-out forwards; }
+    .power-glow { animation: power-glow-pulse 0.8s ease-in-out infinite !important; z-index: 15; }
   </style>
 </head>
 <body class="w-full h-[100dvh] min-h-[600px] bg-black text-gray-100 overflow-hidden relative select-none">
@@ -927,6 +940,7 @@ class CanvasFxEngine {
         this.ctx = null;
         this.particles = [];
         this.animationFrameId = null;
+        this.hitStop = 0; // 定帧剩余毫秒：>0 时粒子冻结，制造重击顿挫感
         this.init();
     }
 
@@ -973,6 +987,11 @@ class CanvasFxEngine {
     }
 
     update() {
+        // Hit Stop 定帧：命中瞬间冻结粒子若干毫秒，制造"重击砸进肉里"的顿挫落差
+        if (this.hitStop > 0) {
+            this.hitStop -= 16.7;
+            return;
+        }
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
             p.age += 16.7; // 假设每帧约16.7毫秒
@@ -1316,6 +1335,53 @@ function spawnGoldBurst(x, y) {
             ctx.beginPath();
             ctx.arc(this.x, this.y, radius, 0, Math.PI * 2);
             ctx.stroke();
+        }
+    });
+}
+
+function spawnPowerBurst(x, y) {
+    // 强力反击命中：红色血花爆碎（仿【群攻(爆炸)】外层发散粒子，红色系）
+    // 优化：数量略减、尺寸更大、初速翻倍、寿命减半 → 像"炸碎"而非"飘散"
+    for (let i = 0; i < 18; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 6 + Math.random() * 16;
+        const colors = ['#ff4d4d', '#ff8a5c', '#a30000', '#7f1d1d'];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        fxEngine.addParticle({
+            x: x, y: y,
+            vx: speed * Math.cos(angle), vy: speed * Math.sin(angle),
+            gravity: 0.12, drag: 0.94, age: 0,
+            life: 170 + Math.random() * 140,
+            size: 4 + Math.random() * 5, color,
+            draw(ctx, pct) {
+                const alpha = 1 - pct;
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size * (1 - pct * 0.6), 0, Math.PI * 2); ctx.fill();
+                if (pct < 0.35) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.globalAlpha = alpha * 0.85;
+                    ctx.beginPath(); ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2); ctx.fill();
+                }
+            }
+        });
+    }
+    // 冲击波更大双环（红外白内，覆盖更广）
+    fxEngine.addParticle({
+        x: x, y: y, vx: 0, vy: 0, age: 0, life: 260,
+        maxRadius: 180,
+        draw(ctx, pct) {
+            const r = this.maxRadius * Math.sin(pct * Math.PI / 2);
+            ctx.strokeStyle = '#ff2020';
+            ctx.lineWidth = 10 * (1 - pct);
+            ctx.globalAlpha = 1 - pct;
+            ctx.beginPath(); ctx.arc(this.x, this.y, r, 0, Math.PI * 2); ctx.stroke();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 4 * (1 - pct);
+            ctx.beginPath(); ctx.arc(this.x, this.y, r * 0.8, 0, Math.PI * 2); ctx.stroke();
+            ctx.strokeStyle = '#a30000';
+            ctx.lineWidth = 3 * (1 - pct);
+            ctx.beginPath(); ctx.arc(this.x, this.y, r * 1.12, 0, Math.PI * 2); ctx.stroke();
         }
     });
 }
@@ -3898,6 +3964,34 @@ registerClassPassive('防守者', {
             return true;
         }
         return false;
+    },
+    // 【强力反击】被动：闪避成功时按概率触发，无视伤害类型限制，以双倍攻击力反击（独立于常规反击，可同时触发）
+    async onDodge(ctx) {
+        const { target, caster, targetDom } = ctx;
+        if (!target.isAlive) return;
+        const POWER_COUNTER_CHANCE = 50; // 触发概率（测试期 50%，可调回 5%）
+        if (Math.random() * 100 >= POWER_COUNTER_CHANCE) return;
+
+        const tStatsForCounter = getEffectiveStats(target);
+        const counterRawDmg = tStatsForCounter.atk * 2; // 双倍攻击力
+        const { hpDmg: counterHpDmg, shieldDmg: counterShieldDmg } = calculateDamage(counterRawDmg, caster);
+
+        // 播放红色圆锥冲击波特效（音效在冲击波射出瞬间播放）
+        await playPowerCounterEffect(target, caster, targetDom);
+
+        const casterDom = caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`);
+        caster.hp -= counterHpDmg;
+        if (casterDom) casterDom.classList.add('shake'); setTimeout(() => { if (casterDom) casterDom.classList.remove('shake') }, 400);
+
+        if (counterShieldDmg > 0 && counterHpDmg === 0) {
+            createFloatingText(casterDom, `强力反击 -${counterShieldDmg} 破盾`, 'text-red-300');
+            addHistory(`   ⚔️ ${target.name} 发动【强力反击】！对 ${caster.name} 的护盾造成了 ${counterShieldDmg} 点破坏。`);
+        } else {
+            createFloatingText(casterDom, `强力反击 -${counterHpDmg}`, 'text-red-400');
+            addHistory(`   ⚔️ ${target.name} 发动【强力反击】！以双倍力量重创 ${caster.name}，造成了 ${counterHpDmg} 点伤害！${counterShieldDmg>0?` (附带破盾${counterShieldDmg})`:''}`);
+        }
+        if (caster.id.startsWith('h')) updateHeroUI(caster); else updateEnemyUI(caster);
+        if (target.id.startsWith('h')) updateHeroUI(target); else updateEnemyUI(target);
     }
 });
 
@@ -4104,6 +4198,13 @@ CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
     const p = CLASS_PASSIVES['隐匿者'];
     if (p && p.onFatalDamage) p.onFatalDamage(ctx);
 }, 5);
+
+// 防守者：强力反击 (闪避成功时按概率触发)
+CombatEvents.on(EVENTS.ON_DODGE, async (ctx) => {
+    if (ctx.target.classType !== '防守者') return;
+    const p = CLASS_PASSIVES['防守者'];
+    if (p && p.onDodge) await p.onDodge(ctx);
+});
 
 // 灾厄使/施毒者：伤害后淬毒 (priority=5)
 CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
@@ -4352,6 +4453,105 @@ async function playKanpoEffect(caster, enemy, skill) {
     cleanup();
 }
 
+// 强力反击专属音效（冲击波射出瞬间播放）
+const POWER_COUNTER_SOUND_URL = 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/shot01.mp3';
+
+async function playPowerCounterEffect(counter, victim, counterDom) {
+    const counterCenter = getDomCenter(counterDom);
+    const victimDom = victim.id.startsWith('h') ? document.getElementById(`hero-card-${victim.id}`) : document.getElementById(`${victim.id}-sprite`);
+    const victimCenter = getDomCenter(victimDom);
+
+    const elements = [];
+    const cleanup = () => elements.forEach(el => { if (el && el.parentNode) el.parentNode.removeChild(el); });
+
+    const battleScene = document.getElementById('battle-scene');
+
+    // 1. 防守者头像泛起红色光芒（仿极限爆发，红色系）
+    const heroCard = counterDom.closest ? counterDom.closest('.hero-card-inner') : null;
+    if (heroCard) {
+        heroCard.classList.remove('burst-active', 'burst-ready');
+        heroCard.classList.add('power-glow');
+    }
+
+    // 2. 被反击者图标上出现红色瞄准准心（蓄力 120ms，快速收缩聚拢制造张力）
+    const crosshair = document.createElement('div');
+    crosshair.className = 'power-crosshair';
+    crosshair.style.left = `${victimCenter.x}px`;
+    crosshair.style.top = `${victimCenter.y}px`;
+    crosshair.style.width = '160px';
+    crosshair.style.height = '160px';
+    crosshair.innerHTML = `
+        <svg style="position:absolute;left:50%;top:50%;width:160px;height:160px;transform:translate(-50%,-50%);filter:drop-shadow(0 0 18px rgba(255,60,60,0.95));" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" fill="none" stroke="#ff4d4d" stroke-width="3" stroke-dasharray="10 8" opacity="0.95" />
+            <circle cx="50" cy="50" r="10" fill="none" stroke="#ff4d4d" stroke-width="3" />
+            <path d="M50,4 L50,22 M50,78 L50,96 M4,50 L22,50 M78,50 L96,50" stroke="#ff4d4d" stroke-width="4" stroke-linecap="round" />
+            <path d="M50,30 L50,42 M50,58 L50,70 M30,50 L42,50 M58,50 L70,50" stroke="#ffd0c2" stroke-width="2" stroke-linecap="round" />
+        </svg>`;
+    document.body.appendChild(crosshair);
+    elements.push(crosshair);
+
+    await sleep(120);
+
+    // 3. 命中瞬间：播放音效 + 血花爆碎 + 斩击白刃 + 全屏爆闪，并触发 Hit Stop 定帧
+    playCustomAudio(POWER_COUNTER_SOUND_URL);
+
+    spawnPowerBurst(victimCenter.x, victimCenter.y);
+
+    // 爆裂星芒（陡峭曲线，一帧撑爆）
+    const burst = document.createElement('div');
+    burst.className = 'power-burst';
+    burst.style.left = `${victimCenter.x}px`;
+    burst.style.top = `${victimCenter.y}px`;
+    burst.style.width = '200px';
+    burst.style.height = '200px';
+    burst.innerHTML = `
+        <svg style="position:absolute;left:50%;top:50%;width:200px;height:200px;transform:translate(-50%,-50%);filter:drop-shadow(0 0 24px rgba(255,60,60,0.95));" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="14" fill="#ff4d4d" />
+            <path d="M50,50 L50,8 M50,50 L92,32 M50,50 L92,68 M50,50 L50,92 M50,50 L8,68 M50,50 L8,32" stroke="#ff8a5c" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.9" />
+            <circle cx="50" cy="50" r="34" fill="none" stroke="#a30000" stroke-width="3" stroke-dasharray="7 6" opacity="0.9" />
+        </svg>`;
+    document.body.appendChild(burst);
+    elements.push(burst);
+
+    // 贯穿斩击白刃（借用刀光思路，只留 1~2 帧，带出速度感）
+    const slam = document.createElement('div');
+    slam.className = 'power-stop-slam';
+    slam.style.left = `${victimCenter.x}px`;
+    slam.style.top = `${victimCenter.y}px`;
+    slam.innerHTML = `
+        <svg style="position:absolute;left:50%;top:50%;width:260px;height:260px;transform:translate(-50%,-50%);filter:drop-shadow(0 0 18px rgba(255,255,255,0.9));" viewBox="0 0 100 100">
+            <path d="M6,50 L94,50" stroke="#ffffff" stroke-width="6" stroke-linecap="round" fill="none" />
+            <path d="M50,6 L50,94" stroke="#ffffff" stroke-width="6" stroke-linecap="round" fill="none" />
+            <path d="M6,50 L94,50" stroke="#ff4d4d" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.8" />
+        </svg>`;
+    document.body.appendChild(slam);
+    elements.push(slam);
+
+    // 全屏双重爆闪：先纯白瞬时爆闪，再红色冲击泛光
+    const flashBright = document.createElement('div');
+    flashBright.className = 'power-flash-bright';
+    document.body.appendChild(flashBright);
+    elements.push(flashBright);
+
+    const flashRed = document.createElement('div');
+    flashRed.className = 'power-flash-red';
+    document.body.appendChild(flashRed);
+    elements.push(flashRed);
+
+    // 受击者重颤 + 强化震屏（命中帧最抖，随后快速衰减）
+    if (victimDom) victimDom.classList.add('shake'); setTimeout(() => { if (victimDom) victimDom.classList.remove('shake') }, 400);
+    if (window.triggerScreenShake) window.triggerScreenShake(14, 260);
+
+    // Hit Stop 定帧：冻结粒子 80ms，营造"重击砸中"的顿挫落差
+    fxEngine.hitStop = 80;
+
+    await sleep(200);
+
+    // 清除防守者红色光芒与全部临时元素
+    if (heroCard) heroCard.classList.remove('power-glow');
+    cleanup();
+}
+
 async function checkKanpoInterrupt(ctx) {
     const incomingType = ctx.skill.damageType || '近战';
 
@@ -4584,7 +4784,10 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
       consumeOneTimeDamageGuard();
       playSound('miss'); if(targetDom) targetDom.classList.add('shake'); setTimeout(() => { if(targetDom) targetDom.classList.remove('shake') }, 200); createFloatingText(targetDom, `闪避`, 'text-gray-400');
       addHistory(`   ↳ 但被 ${target.name} 敏捷地闪避了！`);
-      
+
+      // 强力反击被动：闪避成功时按概率触发（独立于常规反击，无视伤害类型限制）
+      await CombatEvents.emitAsync(EVENTS.ON_DODGE, { target, caster, targetDom, incomingDamageType, skill });
+
       // 反击判定 (仅针对近战)
       if (target.isAlive && target.buffs && target.buffs.some(b => b.type === 'counter')) {
           if (incomingDamageType === '近战' || incomingDamageType === '[近战]' || (!incomingDamageType.includes('远程') && !incomingDamageType.includes('法术'))) {
