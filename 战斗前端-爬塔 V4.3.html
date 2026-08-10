@@ -5994,13 +5994,10 @@ function applyPersistedRoster() {
     if (cfg.def != null) h.def = cfg.def;
     if (cfg.spd != null) h.spd = cfg.spd;
     if (cfg.actCount != null) h.actCount = cfg.actCount;
-    // 技能集：以持久化技能为基准，追加 Combat_block 新增技能
+    // 技能集：以持久化技能为基准，Combat_block 新增技能放置于列表最顶部
     const savedSkills = Array.isArray(saved.skills) ? saved.skills : [];
-    const finalSkills = savedSkills.slice();
-    h.skills.forEach(cbSkill => {
-      if (!finalSkills.some(s => s.name === cbSkill.name)) finalSkills.push(cbSkill);
-    });
-    h.skills = finalSkills;
+    const cbNewSkills = h.skills.filter(cbSkill => !savedSkills.some(s => s.name === cbSkill.name));
+    h.skills = [...cbNewSkills, ...savedSkills];
   });
 }
 

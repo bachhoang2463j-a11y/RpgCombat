@@ -158,3 +158,15 @@
   6. 经 syntax 校验（Node 提取 `<script>` 校验）通过，零报错。
 - **涉及函数/模块**：`ROSTER_VAR_KEY` / `ROSTER_VERSION` (持久化常量), `serializeHeroesForSave()` (白名单序列化), `persistHeroesRoster()` (写入 chat 变量), `readRoster()` (读取与校验), `applyPersistedRoster()` (按名合并), `saveEditor()` (落盘触发点), `onCombatDataReceived()` (加载合并挂载点)
 - **决策原因**：角色技能原仅存于浏览器内存，刷新即丢，且每次依赖 LLM 透过 `<Combat_block>` 重新传递、无法固定玩家偏好的技能数值；localStorage 以浏览器地址为依据、跨聊天共享会导致不同聊天的角色技能串味。改用酒馆助手 `chat` 类型变量将技能绑定到**聊天记录文件**，实现"清空 combatstatus 刷新后同名角色技能仍在、新建聊天对话后技能消失"的精确生命周期，且点保存即落盘，无需刷新。
+
+---
+
+## [LOG-014] 2026-08-11 — V4.3 版本升级 + Combat_block 新增技能置顶
+
+- **变更行为**：
+  1. 版本号升级至 **V4.3**，核心引擎文件由 `战斗前端-爬塔 V4.1.html` 重命名为 `战斗前端-爬塔 V4.3.html`（遵循历史版本重命名惯例）。
+  2. `applyPersistedRoster()` 合并逻辑微调：`Combat_block` 中持久化不存在的新增技能，由**追加到列表末尾**改为**置顶到技能列表最顶部**。
+  3. 同步更新 `README.md`（当前版本 V4.3）与 `SPEC.md`（文件名引用 V4.3）。
+  4. 经 syntax 校验（Node 提取 `<script>` 校验）通过，零报错。
+- **涉及函数/模块**：`applyPersistedRoster()` (技能合并置顶逻辑), 文件重命名 (`战斗前端-爬塔 V4.3.html`)
+- **决策原因**：版本升级遵循项目历史惯例（每次升版重命名核心文件）；`Combat_block` 新增技能置顶，让玩家在技能编辑器中优先看到新出现的技能，提升可发现性。
