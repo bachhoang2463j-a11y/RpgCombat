@@ -771,6 +771,7 @@ const SKILL_TYPES = [
   '[单增]', '[群防]', '[单防]', '[群盾]', '[单盾]',
   '[群回蓝]', '[单回蓝]', '[群瞄]', '[单瞄]', '[群降]', '[单降]', '[群盲]', '[单盲]', '[嘲讽]', '[反击]', '[群反击]', '[再动]', '[回避]', '[群避]', '[单避]',
   '[眩晕]', '[群眩晕]', '[穿透]', '[群穿透]', '[免伤]',
+  '[驱散]', '[群驱散]',
   '[近战]', '[远程]', '[法术]'
 ];
 
@@ -3462,6 +3463,11 @@ function parseSkill(skillStr) {
     // [限N次] 本场战斗次数限制（仅我方）：用尽后主动技能面板变灰、反应/看破静默失效
     let limitMatch = skillStr.match(/\[限(\d+)次?\]/i);
     let maxUses = limitMatch ? parseInt(limitMatch[1]) : 0;
+
+    // [驱散:N]/[群驱散:N] 驱散负面状态（仅我方）：N 可选，无数字默认 1
+    let dispelMatch = skillStr.match(/\[(群驱散|驱散)(?::(\d+))?\]/i);
+    let dispelRaw = dispelMatch ? dispelMatch[1] : null;
+    let dispelCount = dispelRaw ? (dispelMatch[2] ? parseInt(dispelMatch[2]) : 1) : 0;
     
     // 解析伤害类型 (近战, 远程, 法术) - 默认为null
     let dmgTypeMatch = skillStr.match(/\[(近战|远程|法术)\]/);
@@ -3505,6 +3511,18 @@ function parseSkill(skillStr) {
         powers[0] = types[0] === '[再动]' ? 1 : 50; 
     } 
     else { types[0] = '[单体]'; powers[0] = 20; }
+
+    // [驱散]/[群驱散] 填入标签槽：若主槽是纯兜底即占用主槽，否则填入第一个空闲槽（计数存于 power）
+    if (dispelRaw) {
+        const dispelTag = dispelRaw === '群驱散' ? '[群驱散]' : '[驱散]';
+        if (types[0] === '[单体]' && powers[0] === 20) {
+            types[0] = dispelTag; powers[0] = dispelCount;
+        } else {
+            for (let i = 1; i < 3; i++) {
+                if (types[i] === '[无]') { types[i] = dispelTag; powers[i] = dispelCount; break; }
+            }
+        }
+    }
     
     // 解析 [特效:xxx] 标签 → skill.fxTag
     let fxTagMatch = skillStr.match(/\[特效:([^\]]+)\]/i);
@@ -4024,6 +4042,27 @@ registerTagHandler('增', (ctx) => {
     ctx.target.buffs.push({ type: 'atk', value: ctx.actualPower, duration: ctx.effectTurns });
     createFloatingText(ctx.targetDom, `攻+${ctx.actualPower} ${ctx.effectTurns}回 `, 'text-orange-400');
     addHistory(`   ↳ 强化了 ${ctx.target.name} 的攻击力。`);
+});
+
+// --- 驱散类（我方专属）---
+registerTagHandler('驱散', (ctx) => {
+    playSound('defUp'); playSVGEffect(ctx.targetDom, 'buff');
+    ctx.target.buffs = ctx.target.buffs || [];
+    const count = Math.max(1, Math.floor(ctx.actualPower || 1));
+    // 复用灾厄使被动的负面判定谓词（项目内"何为负面"的权威定义）
+    const isDebuff = b => b.duration > 0 && (
+        b.type === 'poison' ||
+        b.type === 'stun' ||
+        (b.type === 'def' && b.value < 0) ||
+        (b.type === 'hit' && b.value < 0) ||
+        (b.type === 'eva' && b.value < 0) ||
+        (b.type === 'atk' && b.value < 0)
+    );
+    const removed = []; const keep = [];
+    for (const b of ctx.target.buffs) { if (isDebuff(b) && removed.length < count) removed.push(b); else keep.push(b); }
+    ctx.target.buffs = keep;
+    createFloatingText(ctx.targetDom, removed.length ? `驱散 ${removed.length} 负面` : '无负面', 'text-emerald-300');
+    addHistory(removed.length ? `   ↳ ${ctx.target.name} 净化了 ${removed.length} 个负面状态！` : `   ↳ ${ctx.target.name} 身上没有负面状态可驱散。`);
 });
 
 // --- 回复类 ---
@@ -5319,7 +5358,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     
     for (let item of tagList) {
         const tag = item.tag; const tagPower = item.power;
-        const isBeneficial = tag.includes('回') || tag.includes('增') || tag.includes('防') || tag.includes('盾') || tag.includes('瞄') || tag.includes('嘲') || tag.includes('再动') || tag.includes('避') || tag.includes('免伤') || tag.includes('反击');
+        const isBeneficial = tag.includes('回') || tag.includes('增') || tag.includes('防') || tag.includes('盾') || tag.includes('瞄') || tag.includes('嘲') || tag.includes('再动') || tag.includes('避') || tag.includes('免伤') || tag.includes('反击') || tag.includes('驱散');
         const isAoe = tag.includes('群'); const casterIsHero = caster.id.startsWith('h');
         const allies = casterIsHero ? heroesData.filter(h=>h.isAlive) : enemiesData.filter(e=>e.isAlive);
         const opponents = casterIsHero ? enemiesData.filter(e=>e.isAlive) : heroesData.filter(h=>h.isAlive);
@@ -6058,7 +6097,7 @@ function classifySkill(skill) {
   // 敌方单体伤害/妨害标签：命中任一即需进入敌方选目标（即使第一个标签是群攻）
   const hasEnemyTargetTag = tags.some(t => !t.includes('群') && (t.includes('单体') || t.includes('穿透') || t.includes('眩晕') || t.includes('降') || t.includes('盲')));
   // 纯有益单体标签：用于 [他人] 技能选我方目标（含 单X 前缀与 嘲讽/回避/免伤/反击 等单目标有益标签）
-  const hasSingleBuff = tags.some(t => !t.includes('群') && (t.includes('单回') || t.includes('单增') || t.includes('单防') || t.includes('单盾') || t.includes('单瞄') || t.includes('嘲') || t.includes('避') || t.includes('免伤') || t.includes('反击')));
+  const hasSingleBuff = tags.some(t => !t.includes('群') && (t.includes('单回') || t.includes('单增') || t.includes('单防') || t.includes('单盾') || t.includes('单瞄') || t.includes('嘲') || t.includes('避') || t.includes('免伤') || t.includes('反击') || t.includes('驱散')));
   const hasOthers = !!skill.isOthers;
   return { hasEnemyTargetTag, hasSingleBuff, hasOthers };
 }
@@ -6253,6 +6292,7 @@ function updateMenu(hero) {
     else if(skill.type.includes('回蓝')) { tagColor = 'text-cyan-400'; tagBorder = 'border-cyan-800/60'; } 
     else if(skill.type.includes('避')) { tagColor = 'text-teal-300'; tagBorder = 'border-teal-800/60'; }
     else if(skill.type.includes('回')) { tagColor = 'text-emerald-400'; tagBorder = 'border-emerald-800/60'; } 
+    else if(skill.type.includes('驱散')) { tagColor = 'text-emerald-400'; tagBorder = 'border-emerald-800/60'; } 
     else if(skill.type.includes('盾')) { tagColor = 'text-slate-300'; tagBorder = 'border-slate-600/60'; } 
     else if(skill.type.includes('瞄')) { tagColor = 'text-yellow-300'; tagBorder = 'border-yellow-800/60'; } 
     else if(skill.type.includes('降') || skill.type.includes('盲')) { tagColor = 'text-purple-400'; tagBorder = 'border-purple-800/60'; } 

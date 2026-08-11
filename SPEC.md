@@ -4,7 +4,7 @@
 
 ## 1. 项目目标与定位
 
-本项目旨在提供一个**轻量级、单文件、零依赖、无后端需求的通用 RPG 回合制战斗引擎前端** (`战斗前端-爬塔 V5.4.html`)。
+本项目旨在提供一个**轻量级、单文件、零依赖、无后端需求的通用 RPG 回合制战斗引擎前端** (`战斗前端-爬塔 V5.5.html`)。
 
 引擎专注于：
 - 为角色扮演（Roleplay）、跑团及 SillyTavern（酒馆）场景提供即时计算、高可观赏性、可互动调优的战斗模拟器。
@@ -94,11 +94,19 @@
 - **回合推进**：蓄力 `remaining` 仅在该英雄**非额外行动**（`!isExtraTurn`）时 -1；归零后该英雄回合展示**【释放蓄力/终止蓄力】**菜单，由玩家选择释放（含目标选择）或终止。
 - **敌方不改**：现有 `[Charge]/[充能]/[蓄力]` 大招充能槽（FGO 风格）完全独立，不受影响。
 
+### 4.2.2 `[驱散:N]` / `[群驱散:N]` 负面状态驱散（我方专属）
+
+- **`[驱散:N]`**：对我方单个目标驱散 N 个负面 buff；**`[群驱散:N]`**：对我方全体各驱散 N 个。`N` 可选，无数字默认 1（如 `[驱散]`、`[群驱散:3]`）。
+- **目标负面判定**（复用灾厄使被动口径）：`poison`/`stun`，以及负值 `def`/`hit`/`eva`/`atk`。无负面时显示"无负面"占位反馈，不报错。
+- **目标取向**：`[驱散]` 属**纯增益单体**标签——不带 `[他人]` 只能对自己施放，带 `[他人]` 可进入"我方选目标"（对任意我方角色）；`[群驱散]` 因含`群`走 AOE，对我方全体直接施放。
+- **实现**：`parseSkill()` 解析 `[驱散:N]`/`[群驱散:N]`（计数存入标签槽 `power`，自然沿用爆发倍率与持久化）；`TAG_HANDLERS['驱散']` 按计数移除最多 N 个负面；`isBeneficial` 与 `classifySkill().hasSingleBuff` 均将其归为增益单体。
+- **仅影响我方**：敌方 AI 索敌/技能选择不受影响。
+
 ### 4.3 目标取向与 `[他人]` 标签标准
 
 - **目标取向判定（全标签扫描）**：技能的目标取向由 `classifySkill()` 扫描 `type/type2/type3` 全部标签一次定好，**顺序无关**：
   - 含任一敌方单体伤害/妨害标签（`单体/穿透/眩晕/单降/单盲`）→ 进入**敌方选目标**（即使第一个标签是群攻）。
-  - 含 `[他人]` 且含任一纯有益单体标签（`单回/单增/单防/单盾/单瞄/嘲/避/免伤/反击`）→ 进入**我方选目标**（不排除自己）。
+  - 含 `[他人]` 且含任一纯有益单体标签（`单回/单增/单防/单盾/单瞄/嘲/避/免伤/反击/驱散`）→ 进入**我方选目标**（不排除自己）。
   - 其余（纯群 AOE / 纯单体有益无他人 / 纯单体伤害兜底）→ 直接施放（纯单体有益无他人时对自己施放）。
 - **`[他人]` 标签**：独立布尔标记 `skill.isOthers`（类似 `isReaction`/`kanpoTarget`，不占标签槽位）。只有带 `[他人]` 的单体有益技能才能对"其他角色"（含自己）施放；不带 `[他人]` 的单体有益技能只能对自己施放。
 - **敌方 AI**：目标选择逻辑不变（`selectEnemySkillAndTarget`），`[他人]` 对其零副作用。
@@ -107,7 +115,7 @@
 
 ## 5. 代码结构与函数参考 (Function Reference)
 
-> 单文件引擎内联所有 JS，按职责划分为以下模块。行号基于 `战斗前端-爬塔 V5.4.html`（约 7140 行）。
+> 单文件引擎内联所有 JS，按职责划分为以下模块。行号基于 `战斗前端-爬塔 V5.5.html`（约 7210 行）。
 
 ### 5.1 数据常量与全局配置
 
@@ -122,7 +130,7 @@
 | `LLM_VAR_KEY` | 6182 | LLM 设置在酒馆 chat 变量中的存储键。 |
 | `DEFEND_VAR_KEY` | 6229 | 防御恢复设置在酒馆变量中的存储键。 |
 | `ROSTER_VAR_KEY` | 6250 | 我方角色配置持久化的酒馆变量键。 |
-| `ROSTER_VERSION` | 6251 | 角色配置序列化版本号。 |
+| `ROSTER_VERSION` | 6656 | 角色配置序列化版本号。 |
 
 ### 5.2 粒子/视觉特效引擎 (VFX)
 
@@ -164,7 +172,7 @@
 | :--- | :--- | :--- |
 | `getCleanNameAndEmoji` | 3426 | 从名字中提取纯净名称与 emoji。 |
 | `parseAttributes` | 3433 | 解析角色属性串 `[HP:..][Atk:..]...` 为对象。 |
-| `parseSkill` | 3443 | 解析技能串 `【名】[标签]...` 为技能对象。 |
+| `parseSkill` | 3444 | 解析技能串 `【名】[标签]...` 为技能对象。 |
 | `buildCombatDataFromYAML` | 3501 | 将 `<Combat_block>` YAML 内容构建为战局数据（我方/敌方列表）。 |
 | `startSTPolling` | 3548 | 轮询侦测酒馆聊天记录中的 `<Combat_block>` 标签并自动建局。 |
 | `loadManualData` | 3593 | 手动加载战局数据入口。 |
@@ -178,14 +186,14 @@
 | `addHistory` | 846 | 追加一条战斗历史记录。 |
 | `initUI` | 3618 | 初始化界面绑定与事件。 |
 | `createCompactBarHTML` | 3664 | 生成紧凑血/蓝/盾条 HTML。 |
-| `updateBuffUI` | 3671 | 刷新角色的 Buff 图标悬停 UI。 |
+| `updateBuffUI` | 3704 | 刷新角色的 Buff 图标悬停 UI。 |
 | `renderTurnQueue` | 3728 | 渲染时间轴（行动顺序图标）。 |
 | `showLog` | 3754 | 顶部临时提示条（2.5s 淡出）。 |
 | `createFloatingText` | 3755 | 飘字（可扩展为 burst 大字）。 |
 | `updateHeroUI` | 3757 | 刷新面板我方角色卡。 |
 | `updateEnemyUI` | 3819 | 刷新面板敌方角色卡。 |
 | `showEnemyInfo` | 5763 | 弹窗展示敌方详情。 |
-| `updateMenu` | 5886 | 更新角色菜单（含 `getDisplayType` 子函数）。 |
+| `updateMenu` | 6277 | 更新角色菜单（含 `getDisplayType` 子函数）。 |
 | `updateActiveHeroDisplay` | 5962 | 更新当前行动者高亮显示。 |
 | `openSkillMenu` / `closeSkillMenu` | 5977/5978 | 打开/关闭技能菜单。 |
 | `cancelTargeting` | 5760 | 取消目标选择状态并复位 UI。 |
@@ -194,10 +202,10 @@
 
 | 标识符 | 行号 | 作用 |
 | :--- | :--- | :--- |
-| `TAG_HANDLERS` | 3888 | 标签策略注册表本体。 |
-| `registerTagHandler` | 3890 | 注册一个标签处理函数。 |
-| `resolveTagHandler` | 4037 | 按标签名查找并分发到对应处理器。 |
-| `CLASS_PASSIVES` | 4050 | 职业被动注册表本体。 |
+| `TAG_HANDLERS` | 3931 | 标签策略注册表本体。 |
+| `registerTagHandler` | 3933 | 注册一个标签处理函数。 |
+| `resolveTagHandler` | 4101 | 按标签名查找并分发到对应处理器。 |
+| `CLASS_PASSIVES` | 4114 | 职业被动注册表本体。 |
 | `registerClassPassive` | 4052 | 注册一个职业被动定义。 |
 | `EVENTS` | 4306 | 事件总线事件名枚举（详见 §5.6）。 |
 | `CombatEvents` | 4321 | 发布/订阅事件总线（`on`/`emit`/`emitAsync`，支持优先级）。 |
@@ -246,8 +254,8 @@
 | `continueCharge` | 5971 | 蓄力中"继续蓄力"：消耗本回合推进蓄力。 |
 | `cancelCharge` | 5979 | 终止蓄力：清除蓄力状态并消耗本回合。 |
 | `renderHeroMenu` / `updateChargeMenu` | 5990/6003 | 蓄力中渲染专用菜单（继续/释放/终止），否则渲染正常菜单。 |
-| `classifySkill` | 5867 | 技能目标取向分类：全标签扫描一次定好（敌方单体/他人/纯群/纯单体有益）。 |
-| `prepareSkillTarget` | 5880 | 玩家技能选目标准备（按 `classifySkill` 结果进入敌方/我方/直接施放）。 |
+| `classifySkill` | 6095 | 技能目标取向分类：全标签扫描一次定好（敌方单体/他人/纯群/纯单体有益）。 |
+| `prepareSkillTarget` | 6106 | 玩家技能选目标准备（按 `classifySkill` 结果进入敌方/我方/直接施放）。 |
 | `promptReaction` | 4836 | 反应拦截弹窗（含 `window.resolveReaction` 回调）。 |
 | `promptKanpo` | 4468 | 看破弹窗（含 `window.resolveKanpo` 回调、`shelvePrompt`/`cleanupPrompt` 收起逻辑）。 |
 | `getKanpoTarget` | 4454 | 判断技能是否可被某角色看破。 |
@@ -267,7 +275,7 @@
 | `addEnemySkill` / `removeEnemySkill` | 6258/6259 | 敌方技能增删。 |
 | `addHero` / `removeHero` | 6260/6261 | 我方角色增删。 |
 | `addEnemy` / `removeEnemy` | 6262/6263 | 敌方角色增删。 |
-| `serializeHeroesForSave` | 6372 | 序列化我方角色配置用于持久化。 |
+| `serializeHeroesForSave` | 6659 | 序列化我方角色配置用于持久化。 |
 | `persistHeroesRoster` | 6389 | 将我方角色配置写入酒馆 chat 变量。 |
 | `readRoster` | 6395 | 从酒馆 chat 变量读取角色配置。 |
 | `applyPersistedRoster` | 6407 | 合并持久化角色配置（同步缓存，供重置恢复）。 |
