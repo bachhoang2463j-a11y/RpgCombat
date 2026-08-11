@@ -343,3 +343,14 @@
 - **涉及函数/模块**：`parseSkill()`（解析 `[延迟]`/`[加速]` → `skill.delay`/`skill.haste`）、新增 `handleChargeSkill()`（蓄力入口 / 库存抵扣）、`releaseCharge()`/`doReleaseCharge()`（释放蓄力 + 目标取向 + 施加加速）、`continueCharge()`（继续蓄力）、`cancelCharge()`（终止蓄力：**不结束回合，恢复本回合正常行动面板**）、`renderHeroMenu()`/`updateChargeMenu()`（蓄力专用菜单渲染）、`prepareSkillTarget()`（独立 `[加速]` 增益直接+库存）、`prepareAttack()`/`actionDefend()`（蓄力中守卫）、`nextTurn()`（蓄力回合推进 / 归零展示释放菜单 / 死亡清空）、`handleTargetClick()`（`release_charge` 目标选择分支）、`updateBuffUI()`（蓄力/加速徽章）、`syncEditorDataToMemory()`/`serializeHeroesForSave()`/`addHeroSkill()`（编辑器与持久化）
 - **决策原因**：需求明确"蓄力期间可反应与看破、但不可主动行动"+"加速按所需回合抵扣、仅影响后续"+"一个技能可同时带延迟与加速实现解锁型技能"。为避免与现有 `[蓄力]`（敌方 FGO 大招充能槽）冲突，按用户确认采用**新标签 `[延迟]`**；敌方机制完全不动。**交互定版**：蓄力流程改为玩家可控（继续/终止/释放），修复"蓄力>1 回合时角色卡死"与"单体蓄力无法选目标"两个 bug。
 - **经验证**：Node 提取 `<script>` 语法校验通过，零报错；核心抵扣/释放逻辑经 Node 模拟验证（`[延迟:3][加速:9]` 二次使用 `effective=0, 库存9→6`；`[延迟:3][加速:3]` 二次使用立即释放）。
+
+## [LOG-029] 2026-08-12 — 修复 `[加速]` 无法与其它标签同时触发 / 无法施加给他人
+
+- **变更行为**：
+  1. **统一加速结算入口**：`[加速:N]` 改为在 `executeSkillAction()` 结尾统一施加（与其它标签同时触发），而非此前 `prepareSkillTarget()`/`doReleaseCharge()` 中的独立短路分支。
+  2. **可施加给他人**：加速目标取向遵循 `skill.isOthers`——若技能带 `[他人]` 且所选目标为我方角色，则加速施加到所选目标；否则施加到施法者自身。`[加速:3][回避;power:100][他人]` 现在可对任意我方角色同时施加「回避」buff 与「+3 加速库存」。
+  3. **蓄力技能加速与伤害同触发**：`handleChargeSkill()` 蓄力状态保存完整技能（含 `haste`），`doReleaseCharge()` 不再剥离/手动加加速，直接交给 `executeSkillAction` 统一结算。`[穿透(枪击);power:280][延迟:3][加速:3]` 现在蓄力完成后释放时**同时**造成伤害并 +3 加速库存。
+  4. **移除独立加速分支**：`prepareSkillTarget()` 中原先"仅加速、直接结束回合"的独立分支已删除，纯 `[加速:N]` 技能（无其它标签）也能正常进入目标选择/正常结算。
+- **涉及函数/模块**：`executeSkillAction()`（结尾新增 `skill.haste > 0` 统一施加）、`handleChargeSkill()`（蓄力状态保存完整含 haste 技能）、`doReleaseCharge()`（去除剥离/手动加速）、`prepareSkillTarget()`（去除独立加速短路分支）
+- **决策原因**：经手操实测，此前 `[加速]` 被当作"独立技能类型"短路处理，导致无法与回避等 buff 叠加、无法对他人施放；蓄力技能因 `haste` 被剥离丢失导致释放后无加速。改为统一结算入口后，加速成为普通技能效果，与其它标签天然组合。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；逻辑经代码走查验证（`[加速][回避][他人]` 对目标同时施加回避+加速；`[穿透][延迟:3][加速:3]` 释放时伤害+加速同时结算）。

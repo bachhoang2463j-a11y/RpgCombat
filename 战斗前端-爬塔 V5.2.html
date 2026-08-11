@@ -5391,6 +5391,22 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         await playExecutionAnimation(caster, _pendingKills);
         window.isExecutingCutin = false;
     }
+
+    // [加速:N] 永久加速库存：作为技能的附加效果施加（可与其它标签同时触发）
+    // 目标取向：若技能带 [他人] 且是纯增益单体，则施加到所选目标；否则施加到施法者自身
+    if (skill.haste > 0) {
+        let hasteTarget = caster;
+        if (primaryTarget && primaryTarget.id.startsWith('h') && skill.isOthers) {
+            hasteTarget = primaryTarget;
+        }
+        hasteTarget.hasteStore = (hasteTarget.hasteStore || 0) + skill.haste;
+        const hasteDom = hasteTarget.id.startsWith('h')
+            ? document.getElementById(`hero-card-${hasteTarget.id}`)
+            : document.getElementById(`${hasteTarget.id}-sprite`);
+        if (hasteDom) { createFloatingText(hasteDom, `⚡加速+${skill.haste}`, 'text-cyan-300'); playSound('atkUp'); }
+        addHistory(`   ↳ ⚡ ${hasteTarget.name} 获得 ${skill.haste} 点永久加速库存！`);
+        if (hasteTarget.id.startsWith('h')) updateHeroUI(hasteTarget); else updateEnemyUI(hasteTarget);
+    }
     
     // 清空必中Buff
     if (tagList.some(t => t.tag.includes('攻') || t.tag.includes('单体') || t.tag.includes('穿透') || t.tag.includes('眩晕'))) { 
@@ -5899,15 +5915,15 @@ function prepareAttack() {
 }
 
 // [延迟:N] 蓄力技能入口：用当前[加速]库存抵扣所需回合，进入蓄力状态（remaining 决定释放时机）
-// 顺序：先蓄力 → 完成后由玩家选择释放才结算（含自身[加速]），先用剥离了 haste 的副本避免本次重复加库存
+// 顺序：先蓄力 → 完成后由玩家选择释放才结算（含自身[加速]），释放时由 executeSkillAction 统一施加加速
 async function handleChargeSkill(hero, skillIndex) {
   if (state.isAnimating) return;
   const skill = hero.skills[skillIndex];
   const hasteStore = hero.hasteStore || 0;
   const effective = Math.max(0, skill.delay - hasteStore);
   hero.hasteStore = Math.max(0, hasteStore - skill.delay); // covered = min(hasteStore, delay)
-  // 进入蓄力状态（remaining<=0 表示已就绪、本回合即可选择释放）
-  hero.currentDelay = { skill: { ...skill, haste: 0 }, remaining: effective };
+  // 进入蓄力状态（保存完整 skill（含 haste），释放时由 executeSkillAction 统一施加）
+  hero.currentDelay = { skill: { ...skill }, remaining: effective };
   closeSkillMenu();
   updateHeroUI(hero);
   if (effective <= 0) {
@@ -5948,7 +5964,7 @@ async function releaseCharge() {
   await doReleaseCharge(hero, null);
 }
 
-// 实际释放蓄力技能：结算原技能（含自身[加速] → 完成时才施加到 hero.hasteStore）
+// 实际释放蓄力技能：结算原技能（含自身[加速]，由 executeSkillAction 统一施加）
 async function doReleaseCharge(hero, target) {
   const entry = hero.currentDelay; if (!entry) { state.isAnimating = false; return; }
   hero.currentDelay = null;
@@ -5956,14 +5972,9 @@ async function doReleaseCharge(hero, target) {
   state.isAnimating = true;
   showLog(`⚡ ${hero.name} 释放【${skill.name}】！`);
   addHistory(`   ⚡ [${hero.name}] 释放【${skill.name}】！`);
-  // 释放时才施加自身[加速]库存（永久，不随回合过期）
-  if (skill.haste > 0) {
-    hero.hasteStore = (hero.hasteStore || 0) + skill.haste;
-    addHistory(`   ⚡ [${hero.name}] 获得 ${skill.haste} 点加速库存！`);
-  }
   updateHeroUI(hero);
   const multiplier = await triggerBurstIfNeeded(hero);
-  await executeSkillAction(hero, target, { ...skill, haste: 0 }, multiplier);
+  await executeSkillAction(hero, target, skill, multiplier);
   await endTurn();
 }
 
@@ -6034,18 +6045,6 @@ async function prepareSkillTarget(skillIndex) {
   const hero = state.actionQueue[state.queueIndex].ref; const skill = hero.skills[skillIndex];
   // [延迟:N] 蓄力技能：先按当前[加速]库存抵扣，剩余>0 进入蓄力等待，否则立即释放本回合
   if (skill.delay > 0) { await handleChargeSkill(hero, skillIndex); return; }
-  // 独立 [加速:N] 增益技能（无延迟）：直接增加永久加速库存，消耗本回合
-  if (skill.haste > 0) {
-    if (state.isAnimating) return;
-    state.isAnimating = true; closeSkillMenu();
-    hero.hasteStore = (hero.hasteStore || 0) + skill.haste;
-    updateHeroUI(hero);
-    showLog(`⚡ ${hero.name} 获得 ${skill.haste} 点加速库存！`);
-    addHistory(`   ⚡ [${hero.name}] 获得 ${skill.haste} 点加速库存！`);
-    createFloatingText(document.getElementById(`hero-card-${hero.id}`), `⚡加速+${skill.haste}`, 'text-cyan-300');
-    await endTurn();
-    return;
-  }
   const { hasEnemyTargetTag, hasSingleBuff, hasOthers } = classifySkill(skill);
   // 圣职者/支援者 祈愿（极限爆发）
   if (hero.burstActivated && (hero.classType === '圣职者' || hero.classType === '支援者')) {
