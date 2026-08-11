@@ -654,6 +654,7 @@
         <button onclick="openSkillMenu()" class="w-full py-1.5 sm:py-2 text-left px-2 sm:px-3 text-xs sm:text-sm text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all hover:pl-4 group"><span class="text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity absolute left-1.5 sm:left-2">•</span> 技能</button>
         <button onclick="actionDefend()" class="w-full py-1.5 sm:py-2 text-left px-2 sm:px-3 text-xs sm:text-sm text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all hover:pl-4 group"><span class="text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity absolute left-1.5 sm:left-2">•</span> 防御</button>
       </div>
+      <div id="charge-menu" class="flex-1 flex-col p-1 sm:p-1.5 gap-[1px] sm:gap-0.5 justify-center relative" style="display:none"></div>
       <div id="skill-menu" class="absolute inset-0 bg-slate-900/95 flex flex-col p-1 sm:p-1.5 transform translate-x-full transition-transform duration-300 z-10">
         <div class="flex justify-between items-center mb-1 px-1.5 sm:px-2 pb-1 border-b border-white/10 shrink-0"><span class="text-[9px] sm:text-[11px] text-cyan-300 font-bold">选择技能</span><button onclick="closeSkillMenu()" class="text-[8px] sm:text-[10px] text-white/40 hover:text-white transition-colors">返回</button></div>
         <div id="skill-list" class="flex flex-col gap-1 sm:gap-1.5 overflow-y-auto custom-scrollbar pr-0.5 sm:pr-1 flex-1 pb-1"></div>
@@ -3451,6 +3452,13 @@ function parseSkill(skillStr) {
     let chargeMatch = skillStr.match(/\[(?:Charge|充能|蓄力):(\d+)\]/i);
     let charge = chargeMatch ? parseInt(chargeMatch[1]) : 0;
     
+    // [延迟:N] 蓄力等待：先蓄力N回合，完成后才释放并结算（含自身[加速]）
+    let delayMatch = skillStr.match(/\[延迟:(\d+)\]/i);
+    let delay = delayMatch ? parseInt(delayMatch[1]) : 0;
+    // [加速:N] 永久加速库存：蓄力结算完成时才施加到角色身上，之后每次蓄力按所需回合抵扣
+    let hasteMatch = skillStr.match(/\[加速:(\d+)\]/i);
+    let haste = hasteMatch ? parseInt(hasteMatch[1]) : 0;
+    
     // 解析伤害类型 (近战, 远程, 法术) - 默认为null
     let dmgTypeMatch = skillStr.match(/\[(近战|远程|法术)\]/);
     let damageType = dmgTypeMatch ? dmgTypeMatch[1] : null;
@@ -3498,7 +3506,7 @@ function parseSkill(skillStr) {
     let fxTagMatch = skillStr.match(/\[特效:([^\]]+)\]/i);
     let fxTag = fxTagMatch ? fxTagMatch[1].trim() : null;
 
-    return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, hit: hit, turns: turns, type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, damageType: damageType, isOthers: isOthers, fxTag: fxTag };
+    return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, hit: hit, turns: turns, type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, damageType: damageType, isOthers: isOthers, fxTag: fxTag };
 }
 
 function buildCombatDataFromYAML(yamlContent) {
@@ -3515,7 +3523,7 @@ function buildCombatDataFromYAML(yamlContent) {
                 const img = AVATAR_MAP[cleanName] || AVATAR_MAP[data["名字"]] || DEFAULT_HERO_IMG;
                 let skills = []; if (data["技能"] && Array.isArray(data["技能"])) skills = data["技能"].map(parseSkill);
                 
-                let heroObj = { id: 'h' + index, name: cleanName, img: img, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: 0, actCount: attrs.actCount, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, burstActivated: false, skills: skills, classType: attrs.classType, isWise: attrs.isWise || false, baseTauntBonus: 0 };
+                let heroObj = { id: 'h' + index, name: cleanName, img: img, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: 0, actCount: attrs.actCount, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, burstActivated: false, skills: skills, classType: attrs.classType, isWise: attrs.isWise || false, baseTauntBonus: 0, hasteStore: 0, currentDelay: null };
                 if (window.CLASS_PASSIVES && CLASS_PASSIVES[attrs.classType]?.onBattleInit) {
                     CLASS_PASSIVES[attrs.classType].onBattleInit(heroObj);
                 }
@@ -3725,6 +3733,16 @@ function updateBuffUI(entity) {
       }
   } else if (entity.classType === '风行者' && entity.tp > 0) {
       html += `<div class="text-teal-200 text-[8px] sm:text-[10px] bg-teal-950/80 border border-teal-500/50 px-1 rounded backdrop-blur font-mono shadow-md">💨风行避+${entity.tp}</div>`;
+  }
+  
+  // === [延迟] 蓄力状态 / [加速] 库存徽章（仅我方英雄）===
+  if (entity.id.startsWith('h')) {
+      if (entity.currentDelay && entity.currentDelay.remaining > 0) {
+          html += `<div class="text-yellow-200 text-[8px] sm:text-[10px] bg-yellow-950/80 border border-yellow-500/60 px-1 rounded backdrop-blur font-mono shadow-md animate-pulse">⏳蓄力${entity.currentDelay.remaining}·${entity.currentDelay.skill.name}</div>`;
+      }
+      if ((entity.hasteStore || 0) > 0) {
+          html += `<div class="text-cyan-200 text-[8px] sm:text-[10px] bg-cyan-950/80 border border-cyan-500/60 px-1 rounded backdrop-blur font-mono shadow-md">⚡加速x${entity.hasteStore}</div>`;
+      }
   }
   
   buffContainer.innerHTML = html;
@@ -5531,8 +5549,15 @@ async function nextTurn() {
       }
   }
   
+  // === [延迟] 蓄力回合推进：仅本回合首次（非额外）行动时 -1（独立于 buffs，保证无 buff 也能推进）===
+  if (!currentEntity.isExtraTurn && currentEntity.type === 'hero' && currentEntity.ref.currentDelay) {
+      currentEntity.ref.currentDelay.remaining--;
+      updateHeroUI(currentEntity.ref);
+  }
+  
   if (currentEntity.ref.hp <= 0) {
       currentEntity.ref.isAlive = false;
+      if (currentEntity.ref.currentDelay) currentEntity.ref.currentDelay = null; // 蓄力中死亡：清空蓄力
       addHistory(`   💀 [${currentEntity.ref.name}] 重伤不治，倒下了！`);
       if(currentEntity.type === 'hero') updateHeroUI(currentEntity.ref); else updateEnemyUI(currentEntity.ref);
       endTurn();
@@ -5557,8 +5582,14 @@ async function nextTurn() {
 
   if (currentEntity.type === 'hero') {
     document.getElementById('enemy-turn-overlay').classList.add('opacity-0', 'pointer-events-none');
-    updateActiveHeroDisplay(currentEntity.ref.id); updateMenu(currentEntity.ref);
-    state.isAnimating = false; playSound('heroTurn'); showLog(`[${currentEntity.ref.name}] 行动`);
+    updateActiveHeroDisplay(currentEntity.ref.id); renderHeroMenu(currentEntity.ref);
+    state.isAnimating = false; playSound('heroTurn');
+    if (currentEntity.ref.currentDelay) {
+      // 蓄力中：菜单由 renderHeroMenu 渲染蓄力专用选项
+      showLog(currentEntity.ref.currentDelay.remaining <= 0 ? `⚡ ${currentEntity.ref.name} 蓄力就绪` : `⏳ ${currentEntity.ref.name} 蓄力中`);
+    } else {
+      showLog(`[${currentEntity.ref.name}] 行动`);
+    }
   } else {
     document.getElementById('enemy-turn-overlay').classList.remove('opacity-0', 'pointer-events-none');
     updateActiveHeroDisplay(null); state.isAnimating = true; await executeEnemyTurn(currentEntity.ref);
@@ -5860,8 +5891,131 @@ async function executeEnemyTurn(enemy) {
 }
 
 function prepareAttack() {
-  if (state.isAnimating) return; state.isTargeting = true; state.pendingAction = { type: 'attack', isBeneficial: false, hit: 130 };
+  if (state.isAnimating) return;
+  const hero = state.actionQueue[state.queueIndex]?.ref;
+  if (hero && hero.currentDelay) { showLog(`⏳ ${hero.name} 正在蓄力，无法普攻！`); return; }
+  state.isTargeting = true; state.pendingAction = { type: 'attack', isBeneficial: false, hit: 130 };
   document.getElementById('target-menu').classList.remove('translate-y-full'); document.getElementById('enemies-container').classList.add('targeting-mode-enemy'); document.getElementById('target-hint').innerHTML = `<span class="text-rose-400">请选择敌方目标</span>`; showLog("请选择目标。");
+}
+
+// [延迟:N] 蓄力技能入口：用当前[加速]库存抵扣所需回合，进入蓄力状态（remaining 决定释放时机）
+// 顺序：先蓄力 → 完成后由玩家选择释放才结算（含自身[加速]），先用剥离了 haste 的副本避免本次重复加库存
+async function handleChargeSkill(hero, skillIndex) {
+  if (state.isAnimating) return;
+  const skill = hero.skills[skillIndex];
+  const hasteStore = hero.hasteStore || 0;
+  const effective = Math.max(0, skill.delay - hasteStore);
+  hero.hasteStore = Math.max(0, hasteStore - skill.delay); // covered = min(hasteStore, delay)
+  // 进入蓄力状态（remaining<=0 表示已就绪、本回合即可选择释放）
+  hero.currentDelay = { skill: { ...skill, haste: 0 }, remaining: effective };
+  closeSkillMenu();
+  updateHeroUI(hero);
+  if (effective <= 0) {
+    // 加速足够，本回合即可释放：保持当前回合，展示释放/终止菜单
+    addHistory(`   ⚡ [${hero.name}] 蓄力就绪，可立即释放【${skill.name}】！`);
+    state.isAnimating = false;
+    renderHeroMenu(hero);
+    showLog(`⚡ ${hero.name} 蓄力就绪，请选择操作`);
+    return;
+  }
+  // 需要蓄力：消耗本回合
+  addHistory(`   ⏳ [${hero.name}] 开始蓄力【${skill.name}】，还需 ${effective} 回合完成！`);
+  state.isAnimating = true;
+  await endTurn();
+}
+
+// 蓄力完成：计算目标取向并进入选目标或直接释放
+async function releaseCharge() {
+  const hero = state.actionQueue[state.queueIndex]?.ref;
+  const entry = hero?.currentDelay; if (!entry) return;
+  const skill = entry.skill;
+  const { hasEnemyTargetTag, hasSingleBuff, hasOthers } = classifySkill(skill);
+  if (hasEnemyTargetTag) {
+    state.isTargeting = true; state.pendingAction = { type: 'release_charge' };
+    document.getElementById('target-menu').classList.remove('translate-y-full');
+    document.getElementById('enemies-container').classList.add('targeting-mode-enemy');
+    document.getElementById('target-hint').innerHTML = `<span class="text-rose-400">请选择敌方目标</span>`;
+    return;
+  }
+  if (hasOthers && hasSingleBuff) {
+    state.isTargeting = true; state.pendingAction = { type: 'release_charge' };
+    document.getElementById('target-menu').classList.remove('translate-y-full');
+    document.getElementById('heroes-container').classList.add('targeting-mode-hero');
+    document.getElementById('target-hint').innerHTML = `<span class="text-emerald-400">请选择我方目标</span>`;
+    return;
+  }
+  // 纯群 AOE / 自身增益（无他人）→ 直接释放
+  await doReleaseCharge(hero, null);
+}
+
+// 实际释放蓄力技能：结算原技能（含自身[加速] → 完成时才施加到 hero.hasteStore）
+async function doReleaseCharge(hero, target) {
+  const entry = hero.currentDelay; if (!entry) { state.isAnimating = false; return; }
+  hero.currentDelay = null;
+  const skill = entry.skill;
+  state.isAnimating = true;
+  showLog(`⚡ ${hero.name} 释放【${skill.name}】！`);
+  addHistory(`   ⚡ [${hero.name}] 释放【${skill.name}】！`);
+  // 释放时才施加自身[加速]库存（永久，不随回合过期）
+  if (skill.haste > 0) {
+    hero.hasteStore = (hero.hasteStore || 0) + skill.haste;
+    addHistory(`   ⚡ [${hero.name}] 获得 ${skill.haste} 点加速库存！`);
+  }
+  updateHeroUI(hero);
+  const multiplier = await triggerBurstIfNeeded(hero);
+  await executeSkillAction(hero, target, { ...skill, haste: 0 }, multiplier);
+  await endTurn();
+}
+
+// 蓄力中：继续蓄力（消耗本回合，蓄力回合数推进）
+function continueCharge() {
+  const hero = state.actionQueue[state.queueIndex]?.ref;
+  if (!hero || !hero.currentDelay) return;
+  state.isAnimating = true;
+  endTurn();
+}
+
+// 终止蓄力：清除蓄力状态并消耗本回合
+function cancelCharge() {
+  const hero = state.actionQueue[state.queueIndex]?.ref;
+  if (!hero || !hero.currentDelay) return;
+  hero.currentDelay = null;
+  updateHeroUI(hero);
+  addHistory(`   💨 [${hero.name}] 终止了蓄力！`);
+  // 终止蓄力后不结束回合，恢复本回合正常行动面板（普攻/技能/防御）
+  state.isAnimating = false;
+  renderHeroMenu(hero);
+  showLog(`⚠️ ${hero.name} 终止蓄力，可正常行动`);
+}
+
+// 根据英雄当前状态渲染右侧菜单：蓄力中 → 蓄力专用菜单；否则 → 正常 普攻/技能/防御 菜单
+function renderHeroMenu(hero) {
+  if (hero.currentDelay) {
+    const mm = document.getElementById('main-menu'); if (mm) mm.style.display = 'none';
+    const cm = document.getElementById('charge-menu'); if (cm) cm.style.display = 'flex';
+    updateChargeMenu(hero);
+  } else {
+    const mm = document.getElementById('main-menu'); if (mm) mm.style.display = 'flex';
+    const cm = document.getElementById('charge-menu'); if (cm) cm.style.display = 'none';
+    updateMenu(hero);
+  }
+}
+
+// 蓄力专用菜单内容：蓄力中 →【继续蓄力/终止蓄力】；就绪 →【释放蓄力/终止蓄力】
+function updateChargeMenu(hero) {
+  const cm = document.getElementById('charge-menu'); if (!cm) return;
+  const entry = hero.currentDelay; if (!entry) return;
+  const ready = entry.remaining <= 0;
+  const btnCls = 'w-full py-1.5 sm:py-2 text-left px-2 sm:px-3 text-xs sm:text-sm text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all';
+  const name = entry.skill.name;
+  cm.innerHTML = ready
+    ? `<div class="text-center text-[9px] sm:text-[11px] text-yellow-300 font-bold tracking-widest mb-1 px-1">蓄力完成·${name}</div>
+       <button onclick="releaseCharge()" class="${btnCls}"><span class="text-yellow-400">•</span> 1.释放蓄力</button>
+       <button onclick="cancelCharge()" class="${btnCls} text-rose-300"><span class="text-rose-400">•</span> 2.终止蓄力</button>`
+    : `<div class="text-center text-[9px] sm:text-[11px] text-yellow-300 font-bold tracking-widest mb-1 px-1">蓄力中·${name}</div>
+       <div class="text-center text-[9px] text-white/50 mb-1 px-1">还需 ${entry.remaining} 回合</div>
+       <button onclick="continueCharge()" class="${btnCls}"><span class="text-cyan-400">•</span> 1.继续蓄力</button>
+       <button onclick="cancelCharge()" class="${btnCls} text-rose-300"><span class="text-rose-400">•</span> 2.终止蓄力</button>`;
 }
 
 // 技能目标取向分类：扫描全部三个标签（type/type2/type3），一次定好，消除顺序依赖
@@ -5876,8 +6030,22 @@ function classifySkill(skill) {
   return { hasEnemyTargetTag, hasSingleBuff, hasOthers };
 }
 
-function prepareSkillTarget(skillIndex) {
+async function prepareSkillTarget(skillIndex) {
   const hero = state.actionQueue[state.queueIndex].ref; const skill = hero.skills[skillIndex];
+  // [延迟:N] 蓄力技能：先按当前[加速]库存抵扣，剩余>0 进入蓄力等待，否则立即释放本回合
+  if (skill.delay > 0) { await handleChargeSkill(hero, skillIndex); return; }
+  // 独立 [加速:N] 增益技能（无延迟）：直接增加永久加速库存，消耗本回合
+  if (skill.haste > 0) {
+    if (state.isAnimating) return;
+    state.isAnimating = true; closeSkillMenu();
+    hero.hasteStore = (hero.hasteStore || 0) + skill.haste;
+    updateHeroUI(hero);
+    showLog(`⚡ ${hero.name} 获得 ${skill.haste} 点加速库存！`);
+    addHistory(`   ⚡ [${hero.name}] 获得 ${skill.haste} 点加速库存！`);
+    createFloatingText(document.getElementById(`hero-card-${hero.id}`), `⚡加速+${skill.haste}`, 'text-cyan-300');
+    await endTurn();
+    return;
+  }
   const { hasEnemyTargetTag, hasSingleBuff, hasOthers } = classifySkill(skill);
   // 圣职者/支援者 祈愿（极限爆发）
   if (hero.burstActivated && (hero.classType === '圣职者' || hero.classType === '支援者')) {
@@ -5972,6 +6140,17 @@ async function handleTargetClick(target, targetType) {
   }
   if (state.isAnimating || !target.isAlive) return;
   const action = state.pendingAction; const hero = state.actionQueue[state.queueIndex].ref;
+  if (action.type === 'release_charge') {
+      const entry = hero.currentDelay;
+      if (!entry) { state.isAnimating = false; return; }
+      const { hasEnemyTargetTag, hasSingleBuff, hasOthers } = classifySkill(entry.skill);
+      if (hasEnemyTargetTag && targetType !== 'enemy') return;
+      if (!hasEnemyTargetTag && hasOthers && hasSingleBuff && targetType !== 'hero') return;
+      const chosen = target;
+      cancelTargeting(); state.isAnimating = true;
+      await doReleaseCharge(hero, chosen);
+      return;
+  }
   if (action.type === 'supporter_burst') {
       if (targetType !== 'hero') return;
       if (target.id === hero.id) { showLog("祈愿必须选择其他队友！"); return; }
@@ -6024,11 +6203,14 @@ async function executeHeroSkillAction(skillIndex, primaryTarget) {
 }
 
 async function actionDefend() {
-  if (state.isAnimating) return; playSound('defUp'); state.isAnimating = true; const hero = state.actionQueue[state.queueIndex].ref;
-  hero.mp = Math.min(hero.maxMp, hero.mp + Math.floor(hero.maxMp * defendSettings.mpRecoverPct / 100)); hero.tp = Math.min(hero.maxTp, hero.tp + Math.floor(hero.maxTp * defendSettings.tpRecoverPct / 100));
-  hero.isDefending = true; hero.hitBonus = (hero.hitBonus || 0) + 30; updateHeroUI(hero);
-  createFloatingText(document.getElementById(`hero-card-${hero.id}`), `防卫姿态`, 'text-emerald-300'); 
-  addHistory(`> ${hero.name} 采取了防卫姿态，回防聚气！`);
+  if (state.isAnimating) return;
+  const hero = state.actionQueue[state.queueIndex]?.ref;
+  if (hero && hero.currentDelay) { showLog(`⏳ ${hero.name} 正在蓄力，无法防御！`); return; }
+  playSound('defUp'); state.isAnimating = true; const hero2 = state.actionQueue[state.queueIndex].ref;
+  hero2.mp = Math.min(hero2.maxMp, hero2.mp + Math.floor(hero2.maxMp * defendSettings.mpRecoverPct / 100)); hero2.tp = Math.min(hero2.maxTp, hero2.tp + Math.floor(hero2.maxTp * defendSettings.tpRecoverPct / 100));
+  hero2.isDefending = true; hero2.hitBonus = (hero2.hitBonus || 0) + 30; updateHeroUI(hero2);
+  createFloatingText(document.getElementById(`hero-card-${hero2.id}`), `防卫姿态`, 'text-emerald-300'); 
+  addHistory(`> ${hero2.name} 采取了防卫姿态，回防聚气！`);
   await sleep(1000); await endTurn();
 }
 
@@ -6154,7 +6336,7 @@ function openEditor() {
   html += `<div><h3 class="text-sm sm:text-lg font-bold text-cyan-400 mb-3 sm:mb-4 flex items-center gap-2 w-full"><span>❖</span> 我方角色 <button onclick="addHero()" class="text-[10px] sm:text-[11px] bg-cyan-900/50 hover:bg-cyan-800 text-cyan-200 px-2 sm:px-3 py-1 sm:py-1.5 rounded ml-auto transition-colors border border-cyan-700/50">+ 添加</button></h3><div class="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">`;
   heroesData.forEach((h, i) => {
     html += `<div class="bg-black/30 p-3 sm:p-4 rounded-xl border border-gray-800 relative group hover:border-cyan-900/50 transition-colors flex flex-col"><button onclick="removeHero(${i})" class="absolute right-1 top-1 sm:right-2 sm:top-2 w-6 h-6 flex items-center justify-center rounded-full bg-red-900/30 text-red-500/50 hover:bg-red-600 hover:text-white transition-all z-10 border border-transparent hover:border-red-400 opacity-0 group-hover:opacity-100" title="移除此角色">✕</button><div class="flex gap-2 mb-3 sm:mb-4 items-center border-b border-gray-800 pb-2"><span class="text-[10px] sm:text-xs text-gray-500">名称</span><input type="text" id="edit-h-${i}-name" value="${h.name}" class="edit-input w-16 sm:w-24 text-xs sm:text-sm font-bold text-yellow-200"><span class="text-[10px] sm:text-xs text-gray-500 ml-2">职业</span><select id="edit-h-${i}-class" class="edit-input w-16 sm:w-24 text-[10px] sm:text-xs text-cyan-300 font-bold"><option value="" ${!h.classType ? 'selected' : ''}>无</option><option value="防守者" ${h.classType === '防守者' ? 'selected' : ''}>防守者</option><option value="隐匿者" ${h.classType === '隐匿者' ? 'selected' : ''}>隐匿者</option><option value="施法者" ${h.classType === '施法者' ? 'selected' : ''}>施法者</option><option value="狂战士" ${h.classType === '狂战士' ? 'selected' : ''}>狂战士</option><option value="风行者" ${h.classType === '风行者' ? 'selected' : ''}>风行者</option><option value="圣职者" ${h.classType === '圣职者' ? 'selected' : ''}>圣职者</option><option value="灾厄使" ${h.classType === '灾厄使' ? 'selected' : ''}>灾厄使</option></select><span class="text-[10px] sm:text-xs text-gray-500 ml-auto">头像</span><input type="text" id="edit-h-${i}-img" value="${h.img}" class="edit-input flex-1 min-w-[80px] text-[10px] sm:text-xs text-gray-400" placeholder="链接"></div><div class="grid grid-cols-4 lg:grid-cols-7 gap-x-1.5 gap-y-2 sm:gap-x-2 sm:gap-y-3 text-[9px] sm:text-[10px] mb-3 sm:mb-4"><div class="flex flex-col"><label class="text-rose-400 mb-1">HP</label><input type="number" id="edit-h-${i}-hp" value="${h.hp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-gray-500 mb-1">MaxHP</label><input type="number" id="edit-h-${i}-maxHp" value="${h.maxHp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-cyan-400 mb-1">MP</label><input type="number" id="edit-h-${i}-mp" value="${h.mp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-gray-500 mb-1">MaxMP</label><input type="number" id="edit-h-${i}-maxMp" value="${h.maxMp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-orange-400 mb-1">攻击</label><input type="number" id="edit-h-${i}-atk" value="${h.atk}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-blue-400 mb-1">防御</label><input type="number" id="edit-h-${i}-def" value="${h.def}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-yellow-400 mb-1 font-bold">速度</label><input type="number" id="edit-h-${i}-spd" value="${h.spd}" class="edit-input w-full font-mono text-yellow-200"></div></div><div class="bg-black/40 p-2 sm:p-3 rounded border border-gray-800/50 flex-1"><div class="text-[9px] sm:text-[11px] text-gray-400 mb-2 sm:mb-3 font-bold tracking-wider flex justify-between items-center"><span>技能配置 (支持3重标签)</span><button onclick="addHeroSkill(${i})" class="text-[9px] sm:text-[10px] text-cyan-400 hover:text-cyan-300 border border-cyan-900/50 rounded px-1.5 py-0.5 sm:px-2 sm:py-1 transition-colors">+ 添加</button></div><div class="space-y-2 sm:space-y-3">`;
-    h.skills.forEach((s, si) => { html += `<div class="bg-black/50 p-1.5 sm:p-2 rounded border border-gray-700/50 relative pr-6 sm:pr-8"><button onclick="removeHeroSkill(${i}, ${si})" class="absolute right-1 sm:right-2 top-1 sm:top-2 text-gray-600 hover:text-red-500 font-bold transition-colors" title="移除此技能">✕</button><div class="flex gap-1.5 sm:gap-2 items-center mb-1.5 sm:mb-2 flex-wrap"><input type="text" id="edit-h-${i}-s-${si}-name" value="${s.name}" class="edit-input w-24 sm:w-32 text-[10px] sm:text-xs text-gray-100 font-bold" placeholder="技能名"><select id="edit-h-${i}-s-${si}-reaction" class="edit-input w-20 sm:w-24 text-[9px] sm:text-[10px] text-indigo-300 font-bold"><option value="none" ${!s.isReaction ? 'selected' : ''}>非反应</option><option value="all" ${s.isReaction && s.reactionTarget === 'all' ? 'selected' : ''}>反应(全能)</option><option value="近战" ${s.isReaction && s.reactionTarget === '近战' ? 'selected' : ''}>反应(近战)</option><option value="远程" ${s.isReaction && s.reactionTarget === '远程' ? 'selected' : ''}>反应(远程)</option><option value="法术" ${s.isReaction && s.reactionTarget === '法术' ? 'selected' : ''}>反应(法术)</option></select><select id="edit-h-${i}-s-${si}-kanpo" class="edit-input w-20 sm:w-24 text-[9px] sm:text-[10px] text-amber-300 font-bold"><option value="none" ${!s.kanpoTarget ? 'selected' : ''}>无看破</option><option value="all" ${s.kanpoTarget === 'all' ? 'selected' : ''}>看破(全能)</option><option value="近战" ${s.kanpoTarget === '近战' ? 'selected' : ''}>看破(近战)</option><option value="远程" ${s.kanpoTarget === '远程' ? 'selected' : ''}>看破(远程)</option><option value="法术" ${s.kanpoTarget === '法术' ? 'selected' : ''}>看破(法术)</option></select><label class="flex items-center gap-1 text-[9px] sm:text-[10px] text-emerald-300 cursor-pointer whitespace-nowrap" title="带此标签的技能可对任意我方角色施放"><input type="checkbox" id="edit-h-${i}-s-${si}-others" ${s.isOthers ? 'checked' : ''} class="accent-emerald-500">他人</label><select id="edit-h-${i}-s-${si}-dmgType" class="edit-input w-16 sm:w-20 text-[9px] sm:text-[10px] text-orange-200 font-bold"><option value="" ${!s.damageType ? 'selected' : ''}>无(近战)</option><option value="近战" ${s.damageType === '近战' ? 'selected' : ''}>近战</option><option value="远程" ${s.damageType === '远程' ? 'selected' : ''}>远程</option><option value="法术" ${s.damageType === '法术' ? 'selected' : ''}>法术</option></select><select id="edit-h-${i}-s-${si}-fxTag" class="edit-input w-16 sm:w-20 text-[9px] sm:text-[10px] text-yellow-300 font-bold">${['特效:无', ...Object.keys(WEBM_FX_REGISTRY)].map(f => { const val = f === '特效:无' ? '' : f; const isSel = (s.fxTag || '') === val; const label = f === '特效:无' ? '无特效' : f; return `<option value="${val}" ${isSel ? 'selected' : ''}>${label}</option>`; }).join('')}</select><span class="text-[9px] sm:text-[10px] text-sky-400 ml-auto">MP</span><input type="number" id="edit-h-${i}-s-${si}-cost" value="${s.cost}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-sky-200"><span class="text-[9px] sm:text-[10px] text-red-400">HP</span><input type="number" id="edit-h-${i}-s-${si}-hpCost" value="${s.hpCost || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-red-200"><span class="text-[9px] sm:text-[10px] text-green-400">TP</span><input type="number" id="edit-h-${i}-s-${si}-tpCost" value="${s.tpCost || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-green-200"><span class="text-[9px] sm:text-[10px] text-gray-500">准%(Aim)</span><input type="number" id="edit-h-${i}-s-${si}-hit" value="${s.hit}" class="edit-input w-10 sm:w-12 text-[9px] sm:text-[10px] font-mono text-yellow-200"><span class="text-[9px] sm:text-[10px] text-gray-500">回数</span><input type="number" id="edit-h-${i}-s-${si}-turns" value="${s.turns || ''}" class="edit-input w-10 sm:w-12 text-[9px] sm:text-[10px] font-mono text-purple-200" placeholder="默认"></div><div class="flex flex-wrap gap-1.5 sm:gap-2"><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-cyan-200 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power" value="${s.power}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type2" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-gray-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power2" value="${s.power2}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type3" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-gray-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power3" value="${s.power3}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div></div></div>`; });
+    h.skills.forEach((s, si) => { html += `<div class="bg-black/50 p-1.5 sm:p-2 rounded border border-gray-700/50 relative pr-6 sm:pr-8"><button onclick="removeHeroSkill(${i}, ${si})" class="absolute right-1 sm:right-2 top-1 sm:top-2 text-gray-600 hover:text-red-500 font-bold transition-colors" title="移除此技能">✕</button><div class="flex gap-1.5 sm:gap-2 items-center mb-1.5 sm:mb-2 flex-wrap"><input type="text" id="edit-h-${i}-s-${si}-name" value="${s.name}" class="edit-input w-24 sm:w-32 text-[10px] sm:text-xs text-gray-100 font-bold" placeholder="技能名"><select id="edit-h-${i}-s-${si}-reaction" class="edit-input w-20 sm:w-24 text-[9px] sm:text-[10px] text-indigo-300 font-bold"><option value="none" ${!s.isReaction ? 'selected' : ''}>非反应</option><option value="all" ${s.isReaction && s.reactionTarget === 'all' ? 'selected' : ''}>反应(全能)</option><option value="近战" ${s.isReaction && s.reactionTarget === '近战' ? 'selected' : ''}>反应(近战)</option><option value="远程" ${s.isReaction && s.reactionTarget === '远程' ? 'selected' : ''}>反应(远程)</option><option value="法术" ${s.isReaction && s.reactionTarget === '法术' ? 'selected' : ''}>反应(法术)</option></select><select id="edit-h-${i}-s-${si}-kanpo" class="edit-input w-20 sm:w-24 text-[9px] sm:text-[10px] text-amber-300 font-bold"><option value="none" ${!s.kanpoTarget ? 'selected' : ''}>无看破</option><option value="all" ${s.kanpoTarget === 'all' ? 'selected' : ''}>看破(全能)</option><option value="近战" ${s.kanpoTarget === '近战' ? 'selected' : ''}>看破(近战)</option><option value="远程" ${s.kanpoTarget === '远程' ? 'selected' : ''}>看破(远程)</option><option value="法术" ${s.kanpoTarget === '法术' ? 'selected' : ''}>看破(法术)</option></select><label class="flex items-center gap-1 text-[9px] sm:text-[10px] text-emerald-300 cursor-pointer whitespace-nowrap" title="带此标签的技能可对任意我方角色施放"><input type="checkbox" id="edit-h-${i}-s-${si}-others" ${s.isOthers ? 'checked' : ''} class="accent-emerald-500">他人</label><select id="edit-h-${i}-s-${si}-dmgType" class="edit-input w-16 sm:w-20 text-[9px] sm:text-[10px] text-orange-200 font-bold"><option value="" ${!s.damageType ? 'selected' : ''}>无(近战)</option><option value="近战" ${s.damageType === '近战' ? 'selected' : ''}>近战</option><option value="远程" ${s.damageType === '远程' ? 'selected' : ''}>远程</option><option value="法术" ${s.damageType === '法术' ? 'selected' : ''}>法术</option></select><select id="edit-h-${i}-s-${si}-fxTag" class="edit-input w-16 sm:w-20 text-[9px] sm:text-[10px] text-yellow-300 font-bold">${['特效:无', ...Object.keys(WEBM_FX_REGISTRY)].map(f => { const val = f === '特效:无' ? '' : f; const isSel = (s.fxTag || '') === val; const label = f === '特效:无' ? '无特效' : f; return `<option value="${val}" ${isSel ? 'selected' : ''}>${label}</option>`; }).join('')}</select><span class="text-[9px] sm:text-[10px] text-sky-400 ml-auto">MP</span><input type="number" id="edit-h-${i}-s-${si}-cost" value="${s.cost}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-sky-200"><span class="text-[9px] sm:text-[10px] text-red-400">HP</span><input type="number" id="edit-h-${i}-s-${si}-hpCost" value="${s.hpCost || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-red-200"><span class="text-[9px] sm:text-[10px] text-green-400">TP</span><input type="number" id="edit-h-${i}-s-${si}-tpCost" value="${s.tpCost || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-green-200"><span class="text-[9px] sm:text-[10px] text-gray-500">准%(Aim)</span><input type="number" id="edit-h-${i}-s-${si}-hit" value="${s.hit}" class="edit-input w-10 sm:w-12 text-[9px] sm:text-[10px] font-mono text-yellow-200"><span class="text-[9px] sm:text-[10px] text-gray-500">回数</span><input type="number" id="edit-h-${i}-s-${si}-turns" value="${s.turns || ''}" class="edit-input w-10 sm:w-12 text-[9px] sm:text-[10px] font-mono text-purple-200" placeholder="默认"><span class="text-[9px] sm:text-[10px] text-yellow-300">延迟(蓄力)</span><input type="number" id="edit-h-${i}-s-${si}-delay" value="${s.delay || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-yellow-200" placeholder="0"><span class="text-[9px] sm:text-[10px] text-cyan-300">加速</span><input type="number" id="edit-h-${i}-s-${si}-haste" value="${s.haste || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-cyan-200" placeholder="0"></div><div class="flex flex-wrap gap-1.5 sm:gap-2"><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-cyan-200 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power" value="${s.power}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type2" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-gray-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power2" value="${s.power2}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type3" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-gray-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power3" value="${s.power3}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div></div></div>`; });
     html += `</div></div></div>`;
   });
   html += `<div><h3 class="text-sm sm:text-lg font-bold text-rose-500 mb-3 sm:mb-4 mt-4 sm:mt-6 flex items-center gap-2 w-full"><span>❖</span> 敌方单位 <button onclick="addEnemy()" class="text-[10px] sm:text-[11px] bg-rose-900/50 hover:bg-rose-800 text-rose-200 px-2 sm:px-3 py-1 sm:py-1.5 rounded ml-auto transition-colors border border-rose-700/50">+ 添加</button></h3><div class="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">`;
@@ -6201,6 +6383,8 @@ function syncEditorDataToMemory() {
         s.tpCost = Number(document.getElementById(`edit-h-${i}-s-${si}-tpCost`).value);
         s.hit = Number(document.getElementById(`edit-h-${i}-s-${si}-hit`).value);
         s.turns = document.getElementById(`edit-h-${i}-s-${si}-turns`).value !== '' ? Number(document.getElementById(`edit-h-${i}-s-${si}-turns`).value) : null;
+        s.delay = Number(document.getElementById(`edit-h-${i}-s-${si}-delay`).value) || 0;
+        s.haste = Number(document.getElementById(`edit-h-${i}-s-${si}-haste`).value) || 0;
         s.type = document.getElementById(`edit-h-${i}-s-${si}-type`).value;
         s.power = Number(document.getElementById(`edit-h-${i}-s-${si}-power`).value);
         s.type2 = document.getElementById(`edit-h-${i}-s-${si}-type2`).value;
@@ -6285,7 +6469,7 @@ function saveEditor() {
   initialHeroesCache = JSON.parse(JSON.stringify(heroesData)); initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData));
   closeEditor(); initUI(); if(state.isGameStarted) { showLog("设置已覆盖生效！"); setTimeout(() => startRound(), 1000); }
 }
-function addHeroSkill(hi) { syncEditorDataToMemory(); heroesData[hi].skills.push({ name: '新技能', isReaction: false, reactionTarget: 'all', kanpoTarget: null, isOthers: false, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, hit: 100 }); openEditor(); }
+function addHeroSkill(hi) { syncEditorDataToMemory(); heroesData[hi].skills.push({ name: '新技能', isReaction: false, reactionTarget: 'all', kanpoTarget: null, isOthers: false, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, hit: 100, delay: 0, haste: 0 }); openEditor(); }
 function removeHeroSkill(hi, si) { syncEditorDataToMemory(); heroesData[hi].skills.splice(si, 1); openEditor(); }
 function addEnemySkill(ei) { syncEditorDataToMemory(); enemiesData[ei].skills.push({ name: '新技能', isOthers: false, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, charge: 0, hit: 100 }); openEditor(); }
 function removeEnemySkill(ei, si) { syncEditorDataToMemory(); enemiesData[ei].skills.splice(si, 1); openEditor(); }
@@ -6412,7 +6596,7 @@ function serializeHeroesForSave() {
     skills: h.skills.map(s => ({
       name: s.name, isReaction: s.isReaction, reactionTarget: s.reactionTarget, kanpoTarget: s.kanpoTarget,
       isOthers: !!s.isOthers, damageType: s.damageType, fxTag: s.fxTag, cost: s.cost, hpCost: s.hpCost, tpCost: s.tpCost,
-      hit: s.hit, turns: s.turns, type: s.type, power: s.power, type2: s.type2, power2: s.power2, type3: s.type3, power3: s.power3
+      hit: s.hit, turns: s.turns, delay: s.delay || 0, haste: s.haste || 0, type: s.type, power: s.power, type2: s.type2, power2: s.power2, type3: s.type3, power3: s.power3
     }))
   }));
 }
