@@ -3674,10 +3674,11 @@ function updateBuffUI(entity) {
   let totalTaunt = 0;
   let totalHit = entity.hitBonus || 0; 
   let totalEva = entity.evaBonus || 0;
-  let isCountering = false; let counterPower = 0; let oneTimeGuard = 0;
+  let isCountering = false; let counterPower = 0; let oneTimeGuard = 0; let concealAtk = 0;
   
   (entity.buffs || []).forEach(b => { 
-      if(b.type === 'atk') { totalAtk += b.value; maxAtkDur = Math.max(maxAtkDur, b.duration); } 
+      if(b.type === 'atk' && !b.isConcealAtk) { totalAtk += b.value; maxAtkDur = Math.max(maxAtkDur, b.duration); } 
+      if(b.type === 'atk' && b.isConcealAtk) { concealAtk += b.value; }
       if(b.type === 'def') { totalDef += b.value; maxDefDur = Math.max(maxDefDur, b.duration); } 
       if(b.type === 'damageGuard') { oneTimeGuard += b.value; }
       if(b.type === 'taunt') { totalTaunt += b.value; } 
@@ -3701,6 +3702,7 @@ function updateBuffUI(entity) {
   
   if (totalEva > 0) html += `<div class="text-teal-300 text-[8px] sm:text-[10px] bg-black/70 border border-teal-900/50 px-1 rounded backdrop-blur font-mono shadow-md">💨避+${totalEva}</div>`;
   if (oneTimeGuard > 0) html += `<div class="text-sky-300 text-[8px] sm:text-[10px] bg-black/70 border border-sky-500/50 px-1 rounded backdrop-blur font-mono shadow-md animate-pulse">🛡️免伤+${oneTimeGuard} 1次</div>`;
+  if (concealAtk > 0) html += `<div class="text-orange-400 text-[8px] sm:text-[10px] bg-black/70 border border-orange-500/50 px-1 rounded backdrop-blur font-mono shadow-md animate-pulse">🎯隐匿急袭+${concealAtk} 1次</div>`;
   
   if (totalAtk > 0) html += `<div class="text-orange-400 text-[8px] sm:text-[10px] bg-black/60 border border-orange-900/50 px-1 rounded backdrop-blur font-mono shadow-md">⚔️+${totalAtk}</div>`;
   if (totalDef > 0) html += `<div class="text-blue-400 text-[8px] sm:text-[10px] bg-black/60 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">🛡️+${totalDef}</div>`;
@@ -3982,6 +3984,11 @@ registerTagHandler('嘲', (ctx) => {
     } else {
         createFloatingText(ctx.targetDom, `隐匿${ctx.actualPower} ${dur}回 `, 'text-gray-400');
         addHistory(`   ↳ ${ctx.target.name} 隐蔽了身形，降低自身存在感(仇恨${ctx.actualPower})，持续${dur}回合！`);
+        // 隐匿者：临时负[嘲]计入隐匿值阈值判定（击杀/闪避/负[嘲]累积均可跨80/100触发再动/急袭）
+        if (ctx.target.classType === '隐匿者') {
+            const p = CLASS_PASSIVES['隐匿者'];
+            if (p && p.checkStealthThresholds) p.checkStealthThresholds(ctx.target, ctx.targetDom);
+        }
     }
 });
 
@@ -4139,6 +4146,60 @@ registerClassPassive('风行者', {
 registerClassPassive('隐匿者', {
     onBattleInit(entity) {
         entity.baseTauntBonus = -50;
+        entity.stealthValue = 50;             // 隐匿值（初始负嘲讽深度 = 100 - 有效嘲讽 = 50）
+        entity.stealthCycleProcessed = false; // 再动锁定标记：触发后再动置true，跌回80以下解锁
+    },
+    // 计算当前隐匿值 = 100 - 有效嘲讽（有效嘲讽含 baseTauntBonus + 临时负[嘲]buff）
+    // 击杀/闪避的隐匿深度固化为 baseTauntBonus；临时负[嘲]buff 单独叠加（3回合后自然消失）
+    computeStealthValue(entity) {
+        const effectiveTaunt = getEffectiveStats(entity).taunt;
+        return Math.max(0, 100 - effectiveTaunt);
+    },
+    // 隐匿值阈值判定统一入口（击杀/闪避/临时负[嘲]/buff到期回落 均调用）
+    checkStealthThresholds(entity, targetDom) {
+        const stealthVal = this.computeStealthValue(entity);
+        // 跌回 80 以下 → 解锁再动锁定（配合临时负[嘲]buff到期回落）
+        if (stealthVal < 80) {
+            entity.stealthCycleProcessed = false;
+            return;
+        }
+        // === 隐匿值 >= 80：触发一次【再动】（每循环一次，跌回80以下解锁）===
+        if (stealthVal >= 80 && !entity.stealthCycleProcessed) {
+            entity.stealthCycleProcessed = true;
+            state.actionQueue.splice(state.queueIndex + 1, 0, { type: entity.id.startsWith('h') ? 'hero' : 'enemy', ref: entity, isExtraTurn: true });
+            if (targetDom) createFloatingText(targetDom, '再动!', 'text-fuchsia-400');
+            addHistory(`   ⚡ ${entity.name} 隐匿值突破 ${stealthVal}，触发【再动】！`);
+        }
+        // === 隐匿值 >= 100：获得下一次非反应攻击 +80 攻击力（单次消耗），随后回归 50 ===
+        if (stealthVal >= 100) {
+            entity.buffs = entity.buffs || [];
+            entity.buffs = entity.buffs.filter(b => !(b.isConcealAtk));
+            entity.buffs.push({ type: 'atk', value: 80, duration: 3, isConcealAtk: true });
+            // 消耗掉助其突破100的临时隐匿（负[嘲]buff），使隐匿值真正回归 50 开启新循环
+            entity.buffs = entity.buffs.filter(b => !(b.type === 'taunt' && b.value < 0));
+            if (targetDom) createFloatingText(targetDom, '隐匿急袭+80 1次', 'text-orange-400');
+            addHistory(`   🎯 ${entity.name} 隐匿值突破 100，下一次非反应攻击攻击力 +80！(隐匿值回归 50)`);
+            entity.baseTauntBonus = -50;
+            entity.stealthValue = 50;
+            entity.stealthCycleProcessed = false;
+        }
+        if (entity.id.startsWith('h')) updateHeroUI(entity);
+    },
+    // 击杀/闪避累积隐匿值（仅 +amount 固化进永久隐匿深度 baseTauntBonus；
+    // 临时负[嘲]buff 保持临时，到期自动消失，其贡献由 checkStealthThresholds 读取有效嘲讽一并计入阈值）
+    gainStealth(entity, amount, targetDom) {
+        const permanentStealth = Math.max(0, -(entity.baseTauntBonus || 0));
+        entity.baseTauntBonus = -(permanentStealth + amount);
+        this.checkStealthThresholds(entity, targetDom);
+    },
+    onKill(ctx) {
+        if (ctx.caster.classType !== '隐匿者') return;
+        const casterDom = ctx.caster.id.startsWith('h') ? document.getElementById(`hero-card-${ctx.caster.id}`) : document.getElementById(`${ctx.caster.id}-sprite`);
+        this.gainStealth(ctx.caster, 30, casterDom);
+    },
+    onDodge(ctx) {
+        if (ctx.target.classType !== '隐匿者') return;
+        this.gainStealth(ctx.target, 4, ctx.targetDom);
     },
     onFatalDamage(ctx) {
         if (!ctx.target.hasTriggeredAvoidFatal) {
@@ -4318,6 +4379,26 @@ CombatEvents.on(EVENTS.ON_DODGE, async (ctx) => {
     if (ctx.target.classType !== '防守者') return;
     const p = CLASS_PASSIVES['防守者'];
     if (p && p.onDodge) await p.onDodge(ctx);
+});
+
+// 隐匿者：击杀累积隐匿值 +30 (ON_KILL：被我方击杀敌方时触发)
+CombatEvents.on(EVENTS.ON_KILL, (ctx) => {
+    const p = CLASS_PASSIVES[ctx.caster.classType];
+    if (p && p.onKill) p.onKill(ctx);
+});
+
+// 隐匿者：闪避成功累积隐匿值 +4 (闪避成功时触发，与防守者强力反击并存)
+CombatEvents.on(EVENTS.ON_DODGE, (ctx) => {
+    const p = CLASS_PASSIVES[ctx.target.classType];
+    if (p && p.onDodge) p.onDodge(ctx);
+});
+
+// 隐匿者：临时负[嘲]buff 到期 → 隐匿值回落，若跌回80以下解锁再动锁定
+CombatEvents.on(EVENTS.BUFF_EXPIRED, (ctx) => {
+    if (!ctx.buff || !(ctx.buff.type === 'taunt' && ctx.buff.value < 0)) return;
+    if (ctx.entity.classType !== '隐匿者') return;
+    const p = CLASS_PASSIVES['隐匿者'];
+    if (p && p.checkStealthThresholds) p.checkStealthThresholds(ctx.entity);
 });
 
 // 灾厄使/施毒者：伤害后淬毒 (priority=5)
@@ -5071,6 +5152,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     if (targetType === 'enemy' && caster.id.startsWith('h') && wasAlive && target.hp <= 0) {
         addHistory(`   💥 致命一击！彻底撕裂了 ${target.name} 的身躯！`);
         updateEnemyUI(target); // 立即更新UI：触发isAlive=false、灰化、从行动队列中剔除
+        // === 击杀事件 → 事件总线 (ON_KILL)：供隐匿者击杀累积隐匿值等被动订阅 ===
+        CombatEvents.emit(EVENTS.ON_KILL, { caster, target, targetDom });
         return '__killed__'; // 标志被击杀，上层统一收集后播放特写
     }
     
@@ -5112,6 +5195,10 @@ function getTauntTarget(heroArray) {
 
 async function executeSkillAction(caster, primaryTarget, skill, multiplier, isReactionTrigger = false) {
     const _pendingKills = []; // 收集本次技能中所有被击杀的敌人，最后统一播放特写
+    // 记录本次技能开始前是否已持有隐匿急袭 buff：
+    // 若该 buff 是由本次技能自身（隐匿值累积跨100）刚刚授予的，则不应被本次技能消耗，留给下一次攻击
+    const hadConcealAtkBefore = caster.classType === '隐匿者' && !isReactionTrigger
+        && caster.buffs && caster.buffs.some(b => b.isConcealAtk);
     // === 多重资源扣除 ===
     caster.mp -= skill.cost; 
     if (skill.hpCost) caster.hp -= skill.hpCost;
@@ -5290,6 +5377,18 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
             caster.hitBonus = 0; 
             if(caster.id.startsWith('h')) updateHeroUI(caster); else updateEnemyUI(caster); 
         } 
+    }
+
+    // 隐匿者：隐匿急袭（下一次非反应攻击 +80）— 仅由真正的攻击技能结算后消耗移除
+    // 条件：① 本技能为攻击技能（攻/单体/穿透/眩晕标签）；② 急袭 buff 在本技能开始前已存在
+    //       （若急袭 buff 是由本技能自身累积隐匿值跨100刚授予的，则留给下一次攻击，避免纯buff/带隐匿攻击技能瞬间吞噬）
+    const isAttackSkill = tagList.some(t => t.tag.includes('攻') || t.tag.includes('单体') || t.tag.includes('穿透') || t.tag.includes('眩晕'));
+    if (isAttackSkill && hadConcealAtkBefore && caster.buffs && caster.buffs.some(b => b.isConcealAtk)) {
+        caster.buffs = caster.buffs.filter(b => !(b.isConcealAtk));
+        const casterDom = caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`);
+        if (casterDom) createFloatingText(casterDom, '隐匿攻势已释放', 'text-orange-400');
+        addHistory(`   🎯 ${caster.name} 的隐匿急袭已释放，攻击力加成消失。`);
+        if(caster.id.startsWith('h')) updateHeroUI(caster); else updateEnemyUI(caster);
     }
 
     // 友方自动发言钉子：我方角色技能结算完毕后触发

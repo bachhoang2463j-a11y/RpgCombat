@@ -4,7 +4,7 @@
 
 ## 1. 项目目标与定位
 
-本项目旨在提供一个**轻量级、单文件、零依赖、无后端需求的通用 RPG 回合制战斗引擎前端** (`战斗前端-爬塔 V4.9.html`)。
+本项目旨在提供一个**轻量级、单文件、零依赖、无后端需求的通用 RPG 回合制战斗引擎前端** (`战斗前端-爬塔 V5.0.html`)。
 
 引擎专注于：
 - 为角色扮演（Roleplay）、跑团及 SillyTavern（酒馆）场景提供即时计算、高可观赏性、可互动调优的战斗模拟器。
@@ -77,11 +77,17 @@
   - $P_{\text{强力反击}} = 10\% + \max(0, \text{有效仇恨} - 200) \times 0.2\%$，无上限。
   - 打出一次强力反击后，防守者仇恨回归天生 200 点，几率随之重置。
 
+- **隐匿者隐匿值累积**：
+  - 隐匿值 $= 100 - \text{有效嘲讽}$（有效嘲讽含 `baseTauntBonus` 永久深度 + 临时 `[嘲]` 负值 buff）。
+  - 初始 50；击杀 +30、成功闪避 +4（固化为 `baseTauntBonus` 永久降低嘲讽）；临时负 `[嘲]` 技能按数值累加（默认 3 回合后自然消失、隐匿值回落）。
+  - 隐匿值 $\ge 80$：触发 1 次【再动】（跌回 80 以下解锁，可再次触发）。
+  - 隐匿值 $\ge 100$：获得下一次非反应攻击 +80 攻击力（单次消耗，参考【回避】/【免伤】），随后隐匿值回归 50 开启新循环。
+
 ---
 
 ## 5. 代码结构与函数参考 (Function Reference)
 
-> 单文件引擎内联所有 JS，按职责划分为以下模块。行号基于 `战斗前端-爬塔 V4.9.html`（约 6807 行）。
+> 单文件引擎内联所有 JS，按职责划分为以下模块。行号基于 `战斗前端-爬塔 V5.0.html`（约 6925 行）。
 
 ### 5.1 数据常量与全局配置
 
@@ -168,15 +174,15 @@
 
 | 标识符 | 行号 | 作用 |
 | :--- | :--- | :--- |
-| `TAG_HANDLERS` | 3886 | 标签策略注册表本体。 |
-| `registerTagHandler` | 3888 | 注册一个标签处理函数。 |
-| `resolveTagHandler` | 4030 | 按标签名查找并分发到对应处理器。 |
-| `CLASS_PASSIVES` | 4043 | 职业被动注册表本体。 |
-| `registerClassPassive` | 4045 | 注册一个职业被动定义。 |
-| `EVENTS` | 4238 | 事件总线事件名枚举（详见 §5.6）。 |
-| `CombatEvents` | 4253 | 发布/订阅事件总线（`on`/`emit`/`emitAsync`，支持优先级）。 |
-| `getEffectiveStats` | 4699 | 计算实体含 Buff 修正后的有效面板属性。 |
-| `calculateDamage` | 4730 | 结算最终伤害（含护盾吸收、穿透判定）。 |
+| `TAG_HANDLERS` | 3888 | 标签策略注册表本体。 |
+| `registerTagHandler` | 3890 | 注册一个标签处理函数。 |
+| `resolveTagHandler` | 4037 | 按标签名查找并分发到对应处理器。 |
+| `CLASS_PASSIVES` | 4050 | 职业被动注册表本体。 |
+| `registerClassPassive` | 4052 | 注册一个职业被动定义。 |
+| `EVENTS` | 4306 | 事件总线事件名枚举（详见 §5.6）。 |
+| `CombatEvents` | 4321 | 发布/订阅事件总线（`on`/`emit`/`emitAsync`，支持优先级）。 |
+| `getEffectiveStats` | 4791 | 计算实体含 Buff 修正后的有效面板属性。 |
+| `calculateDamage` | 4822 | 结算最终伤害（含护盾吸收、穿透判定）。 |
 
 ### 5.6 事件总线 `EVENTS` 键参考
 
@@ -190,88 +196,88 @@
 | `AFTER_DAMAGE` | 伤害结算后（淬毒、眩晕、仇恨附加） | 灾厄使被动 |
 | `AFTER_HEAL` | 治疗后（溢出转盾） | 圣职者被动 |
 | `ON_FATAL_DAMAGE` | 致命伤害时（毅力留存、回避致命） | 防守者/隐匿者被动 |
-| `ON_DODGE` | 闪避成功时 | 防守者强力反击 |
-| `BUFF_EXPIRED` | Buff 过期时 | 回合主循环 |
+| `ON_DODGE` | 闪避成功时 | 防守者强力反击 / 隐匿者隐匿值+4 |
+| `ON_KILL` | 目标被击杀时 | 隐匿者隐匿值+30 |
+| `BUFF_EXPIRED` | Buff 过期时 | 回合主循环 / 隐匿者临时负[嘲]回落解锁 |
 
-> ⚠️ **预留但尚未接线（Reserved / Not Wired）**（初期搭框架预留，当前无任何 `emit` 与 `on`，**不会触发**）。以下 4 个键是设计意图的"骨架"，为未来玩法扩充预留，**切勿误以为它们已生效**——若直接 `CombatEvents.on(...)` 订阅将静默失效，需先补上对应的 `emit` 调用点：
+> ⚠️ **预留但尚未接线（Reserved / Not Wired）**（初期搭框架预留，当前无任何 `emit` 与 `on`，**不会触发**）。以下 3 个键是设计意图的"骨架"，为未来玩法扩充预留，**切勿误以为它们已生效**——若直接 `CombatEvents.on(...)` 订阅将静默失效，需先补上对应的 `emit` 调用点：
 
 | 预留事件键 | 设计意图 | 可支撑的未来玩法 |
 | :--- | :--- | :--- |
 | `BEFORE_DAMAGE` | 伤害结算前（可修改 `rawDamage`） | 实时减伤/暴击/元素克制/反伤荆棘/护盾优先级钩子 |
 | `BEFORE_HEAL` | 治疗前 | 治疗爆发/转化/抑制、濒死救援加成 |
-| `ON_KILL` | 目标被击杀时 | 处决/击杀回资源/尸爆连锁/复仇战意/Boss 充能 |
 | `BUFF_APPLIED` | Buff 施加时 | Buff 叠加刷新规则、净化反应、状态联动、免疫 |
 
-> 订阅方可通过子代理梳理确认：目前仅上述 8 个键被实际 `CombatEvents.on(...)` 订阅，其余 4 个预留键无任何调用点。
+> 订阅方可通过子代理梳理确认：目前实际 `CombatEvents.on(...)` 订阅的键为 `BEFORE_SKILL_RESOLVE`/`TURN_START`/`TURN_END`/`AFTER_DAMAGE`/`AFTER_HEAL`/`ON_FATAL_DAMAGE`/`ON_DODGE`/`ON_KILL`/`BUFF_EXPIRED`，其余 3 个预留键（`BEFORE_DAMAGE`/`BEFORE_HEAL`/`BUFF_APPLIED`）无任何调用点。
 
 ### 5.7 战斗主流程（核心循环）
 
 | 函数 | 行号 | 作用 |
 | :--- | :--- | :--- |
-| `startGame` | 5319 | 初始化战局并启动第一回合。 |
-| `startRound` | 5343 | 时间轴排轴、回合主循环（TURN_START/TURN_END、毒 tick、眩晕、充能）。 |
-| `getTauntTarget` | 5082 | 按仇恨轮盘概率选取敌方单体的目标。 |
-| `selectEnemySkillAndTarget` | 5568 | 敌方 AI 决策：选技能与目标（含 `isHighYieldSkill` 辅助）。 |
-| `isHighYieldSkill` | 5543 | 判断技能是否为高收益（用于敌方 AI 策略）。 |
-| `prepareAttack` | 5738 | 玩家普通攻击准备。 |
-| `prepareSkillTarget` | 5743 | 玩家技能选目标准备。 |
-| `promptReaction` | 4744 | 反应拦截弹窗（含 `window.resolveReaction` 回调）。 |
-| `promptKanpo` | 4380 | 看破弹窗（含 `window.resolveKanpo` 回调、`shelvePrompt`/`cleanupPrompt` 收起逻辑）。 |
-| `getKanpoTarget` | 4366 | 判断技能是否可被某角色看破。 |
-| `retreatBattle` | 5452 | 战术撤退入口。 |
-| `showBattleResult` / `closeBattleResult` | 5458/5502 | 战后结算面板显示/关闭。 |
-| `sendResultToTavern` | 5508 | 将战后小说文本注入酒馆对话框。 |
+| `startGame` | 5423 | 初始化战局并启动第一回合。 |
+| `startRound` | 5447 | 时间轴排轴、回合主循环（TURN_START/TURN_END、毒 tick、眩晕、充能）。 |
+| `getTauntTarget` | 5176 | 按仇恨轮盘概率选取敌方单体的目标。 |
+| `selectEnemySkillAndTarget` | 5682 | 敌方 AI 决策：选技能与目标（含 `isHighYieldSkill` 辅助）。 |
+| `isHighYieldSkill` | 5657 | 判断技能是否为高收益（用于敌方 AI 策略）。 |
+| `prepareAttack` | 5852 | 玩家普通攻击准备。 |
+| `prepareSkillTarget` | 5857 | 玩家技能选目标准备。 |
+| `promptReaction` | 4836 | 反应拦截弹窗（含 `window.resolveReaction` 回调）。 |
+| `promptKanpo` | 4468 | 看破弹窗（含 `window.resolveKanpo` 回调、`shelvePrompt`/`cleanupPrompt` 收起逻辑）。 |
+| `getKanpoTarget` | 4454 | 判断技能是否可被某角色看破。 |
+| `retreatBattle` | 5566 | 战术撤退入口。 |
+| `showBattleResult` / `closeBattleResult` | 5572/5616 | 战后结算面板显示/关闭。 |
+| `sendResultToTavern` | 5622 | 将战后小说文本注入酒馆对话框。 |
 
 ### 5.8 编辑器与持久化
 
 | 函数 | 行号 | 作用 |
 | :--- | :--- | :--- |
-| `resetBattle` | 5980 | 重置战斗（恢复初始缓存快照）。 |
-| `openEditor` / `closeEditor` | 5999/6031 | 全效编辑器打开/关闭。 |
-| `syncEditorDataToMemory` | 6032 | 将编辑器表单同步回内存数据。 |
-| `saveEditor` | 6098 | 保存编辑器改动并持久化。 |
-| `addHeroSkill` / `removeHeroSkill` | 6140/6141 | 我方技能增删。 |
-| `addEnemySkill` / `removeEnemySkill` | 6142/6143 | 敌方技能增删。 |
-| `addHero` / `removeHero` | 6144/6145 | 我方角色增删。 |
-| `addEnemy` / `removeEnemy` | 6146/6147 | 敌方角色增删。 |
-| `serializeHeroesForSave` | 6254 | 序列化我方角色配置用于持久化。 |
-| `persistHeroesRoster` | 6271 | 将我方角色配置写入酒馆 chat 变量。 |
-| `readRoster` | 6277 | 从酒馆 chat 变量读取角色配置。 |
-| `applyPersistedRoster` | 6289 | 合并持久化角色配置（同步缓存，供重置恢复）。 |
+| `resetBattle` | 6095 | 重置战斗（恢复初始缓存快照）。 |
+| `openEditor` / `closeEditor` | 6114/6146 | 全效编辑器打开/关闭。 |
+| `syncEditorDataToMemory` | 6147 | 将编辑器表单同步回内存数据。 |
+| `saveEditor` | 6213 | 保存编辑器改动并持久化。 |
+| `addHeroSkill` / `removeHeroSkill` | 6256/6257 | 我方技能增删。 |
+| `addEnemySkill` / `removeEnemySkill` | 6258/6259 | 敌方技能增删。 |
+| `addHero` / `removeHero` | 6260/6261 | 我方角色增删。 |
+| `addEnemy` / `removeEnemy` | 6262/6263 | 敌方角色增删。 |
+| `serializeHeroesForSave` | 6372 | 序列化我方角色配置用于持久化。 |
+| `persistHeroesRoster` | 6389 | 将我方角色配置写入酒馆 chat 变量。 |
+| `readRoster` | 6395 | 从酒馆 chat 变量读取角色配置。 |
+| `applyPersistedRoster` | 6407 | 合并持久化角色配置（同步缓存，供重置恢复）。 |
 
 ### 5.9 防御恢复与 LLM 设置（持久化）
 
 | 函数 | 行号 | 作用 |
 | :--- | :--- | :--- |
-| `clampPct` | 6232 | 将数值收敛到 0–100 百分比。 |
-| `loadDefendSettings` | 6234 | 读取防御恢复设置。 |
-| `persistDefendSettings` | 6245 | 持久化防御恢复设置。 |
-| `initLLMPresets` | 6171 | 初始化 LLM 预设列表。 |
-| `openLLMSettings` / `closeLLMSettings` | 6319/6325 | LLM 设置面板开关。 |
-| `switchLLMPreset` | 6329 | 切换 LLM 预设（可保存当前）。 |
+| `clampPct` | 6349 | 将数值收敛到 0–100 百分比。 |
+| `loadDefendSettings` | 6351 | 读取防御恢复设置。 |
+| `persistDefendSettings` | 6363 | 持久化防御恢复设置。 |
+| `initLLMPresets` | 6287 | 初始化 LLM 预设列表。 |
+| `openLLMSettings` / `closeLLMSettings` | 6437/6443 | LLM 设置面板开关。 |
+| `switchLLMPreset` | 6447 | 切换 LLM 预设（可保存当前）。 |
 
 ### 5.10 对话与 LLM 叙事系统
 
 | 函数 | 行号 | 作用 |
 | :--- | :--- | :--- |
-| `initChatInputArea` | 6382 | 初始化底部对话输入区。 |
-| `sendPlayerChat` | 6486 | 玩家发送对话。 |
-| `toggleAllyAutoSpeak` / `updateAllyToggleUI` | 6401/6407 | 友方自动旁白开关与 UI。 |
-| `toggleEnemyAutoSpeak` / `updateEnemyToggleUI` | 6419/6425 | 敌方自动旁白开关与 UI。 |
-| `triggerAllyAutoSpeak` | 6518 | 触发友方英雄主动性旁白。 |
-| `triggerEnemyAutoSpeak` | 6606 | 触发敌方智慧旁白。 |
-| `triggerKanpoNarration` | 6528 | 看破后触发震惊/反应旁白。 |
-| `requestLLMResponse` | 6542 | 请求 LLM 生成对话气泡（统一入口）。 |
-| `callLLMAPI` | 6614 | 调用 OpenAI 兼容 `/chat/completions` 接口（含酒馆上下文抓取）。 |
-| `showChatBubble` | 6438 | 显示对话气泡。 |
-| `showThinkingBubble` | 6586 | 显示"思考中"气泡。 |
-| `parseLLMResponse` | 6785 | 解析 LLM 返回文本为角色气泡数据。 |
+| `initChatInputArea` | 6500 | 初始化底部对话输入区。 |
+| `sendPlayerChat` | 6604 | 玩家发送对话。 |
+| `toggleAllyAutoSpeak` / `updateAllyToggleUI` | 6519/6525 | 友方自动旁白开关与 UI。 |
+| `toggleEnemyAutoSpeak` / `updateEnemyToggleUI` | 6537/6543 | 敌方自动旁白开关与 UI。 |
+| `triggerAllyAutoSpeak` | 6636 | 触发友方英雄主动性旁白。 |
+| `triggerEnemyAutoSpeak` | 6724 | 触发敌方智慧旁白。 |
+| `triggerKanpoNarration` | 6646 | 看破后触发震惊/反应旁白。 |
+| `requestLLMResponse` | 6660 | 请求 LLM 生成对话气泡（统一入口）。 |
+| `callLLMAPI` | 6732 | 调用 OpenAI 兼容 `/chat/completions` 接口（含酒馆上下文抓取）。 |
+| `showChatBubble` | 6556 | 显示对话气泡。 |
+| `showThinkingBubble` | 6704 | 显示"思考中"气泡。 |
+| `parseLLMResponse` | 6903 | 解析 LLM 返回文本为角色气泡数据。 |
 
 ---
 
 ## 6. 预留事件钩子扩充指引 (Future: Reserved Event Hooks)
 
-初期搭框架时，`EVENTS` 中预留了 4 个事件键（`BEFORE_DAMAGE` / `BEFORE_HEAL` / `ON_KILL` / `BUFF_APPLIED`），它们**将来可能被用到**，用于在事件流的关键节点上挂载玩法模块。接入规范如下：
+初期搭框架时，`EVENTS` 中预留了 4 个事件键（`BEFORE_DAMAGE` / `BEFORE_HEAL` / `ON_KILL` / `BUFF_APPLIED`），其中 `ON_KILL` 已在 V5.0 中被隐匿者被动接线（击杀累积隐匿值），其余 3 个仍为预留。它们用于在事件流的关键节点上挂载玩法模块。接入规范如下：
 
 1. **先补 `emit` 调用点**：在伤害/治疗/击杀/Buff 结算代码中，于对应时机调用 `CombatEvents.emit[Async](EVENTS.XXX, ctx)`，传入完整上下文（至少含 `caster`、`target`、`targetDom`、`incomingDamageType`、`rawDamage` 等）。
 2. **再注册 `on` 订阅**：通过 `CombatEvents.on(EVENTS.XXX, handler, priority)` 挂载玩法逻辑（如职业被动、标签效果）。
