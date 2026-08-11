@@ -446,6 +446,16 @@
 - **涉及文件**：`战斗前端-爬塔 V5.5.html`（CSS Glow 样式、`audioUrls` 对象、`CanvasFxEngine` 扩展、蓄力处理函数）。
 - **决策原因**：替换原先无动效的潦草蓄力展示。结合程序物理雷电折线、色变脉冲、火花爆发与高品质音频，赋予我方角色蓄力过程极强的仪式感与大招能量积聚反馈。
 
+---
+
+## [LOG-037] 2026-08-12 — 修复蓄力雷电框延迟显现 bug (fxEngine 全局作用域绑定)
+
+- **变更行为**：
+  1. **补全 `window.fxEngine = fxEngine` 全局挂载**：`const fxEngine = new CanvasFxEngine()` 声明在模块域，`triggerHeroChargeStart`/`Ready`/`Release` 内部检查 `if (window.fxEngine)` 导致判断为 `undefined`，无法在按下蓄力技能的瞬间即时调用 `fxEngine.startLoop()`。显式挂载到 `window.fxEngine` 并修正内部调用直接为 `if (fxEngine) fxEngine.startLoop()`。
+  2. **修复结果**：英雄点击 `[延迟]` 技能开始蓄力的瞬间，Canvas 特效引擎渲染循环被立刻激活，苍蓝雷电电弧与 `.charge-glow-cyan` 辉光边框 0 延迟即刻从无平滑渐变出现，不再需要等待后续看破或 Buff 触发 `addParticle` 才被动唤醒。
+- **涉及文件**：`战斗前端-爬塔 V5.5.html`（`fxEngine` 初始化及 `triggerHeroCharge*` 触发函数）。
+- **决策原因**：修复运行时 Bug，确保 UI 与动效响应绝对即时。
+
 
 
 
