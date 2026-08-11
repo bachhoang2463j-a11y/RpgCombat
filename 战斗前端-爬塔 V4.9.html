@@ -4076,8 +4076,10 @@ registerClassPassive('防守者', {
     async onDodge(ctx) {
         const { target, caster, targetDom } = ctx;
         if (!target.isAlive) return;
-        const POWER_COUNTER_CHANCE = 10; // 触发概率
-        if (Math.random() * 100 >= POWER_COUNTER_CHANCE) return;
+        // 强力反击几率随仇恨提升：基础 10%，每超出防守者天生仇恨(200) 1 点 +0.2%，无上限
+        const effectiveHate = getEffectiveStats(target).taunt;
+        const powerCounterChance = 10 + Math.max(0, effectiveHate - 200) * 0.2;
+        if (Math.random() * 100 >= powerCounterChance) return;
 
         const tStatsForCounter = getEffectiveStats(target);
         const counterRawDmg = tStatsForCounter.atk * 2; // 双倍攻击力
@@ -4098,6 +4100,11 @@ registerClassPassive('防守者', {
             addHistory(`   ⚔️ ${target.name} 发动【强力反击】！以双倍力量重创 ${caster.name}，造成了 ${counterHpDmg} 点伤害！${counterShieldDmg>0?` (附带破盾${counterShieldDmg})`:''}`);
         }
         if (caster.id.startsWith('h')) updateHeroUI(caster); else updateEnemyUI(caster);
+        // 打出强力反击后，防守者仇恨回归"天生重装"档位（有效仇恨200），几率随之下一次反击重置
+        target.buffs = (target.buffs || []).filter(b => b.type !== 'taunt'); // 清除临时嘲讽buff
+        target.baseTauntBonus = 100;                                          // 回归防守者天生重装修正
+        createFloatingText(targetDom, '仇恨重置!', 'text-orange-300');
+        addHistory(`   ↳ 💢 ${target.name} 打出强力反击后气息收敛，仇恨回归 ${getEffectiveStats(target).taunt} 点！`);
         if (target.id.startsWith('h')) updateHeroUI(target); else updateEnemyUI(target);
     }
 });
