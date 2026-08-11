@@ -118,6 +118,14 @@
     @keyframes svg-taunt { 0% { transform: translate(-50%, -50%) scale(2); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(0.9); opacity: 1; filter: drop-shadow(0 0 20px #ef4444); } 70% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 0; } }
     .anim-taunt { animation: svg-taunt 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
 
+    /* 敌方攻击预兆：红色光晕闪过，暗示即将发动攻击（drop-shadow 跟随图像轮廓） */
+    @keyframes enemyOmen {
+      0%   { filter: drop-shadow(0 0 0px rgba(239, 68, 68, 0)); }
+      35%  { filter: drop-shadow(0 0 18px rgba(239, 68, 68, 0.95)); }
+      100% { filter: drop-shadow(0 0 0px rgba(239, 68, 68, 0)); }
+    }
+    .enemy-omen { animation: enemyOmen 400ms ease-out forwards; }
+
     /* ==== 全新高级渲染特效 (黑体辐射、流体火焰、耀斑、闪电频闪) ==== */
     
     /* 爆炸黑体辐射扩散 */
@@ -5905,7 +5913,30 @@ async function executeEnemyTurn(enemy) {
   const isChargeFull = chargeSkill && enemy.currentCharge >= chargeSkill.charge;
 
   const sprite = document.getElementById(`enemy-box-${enemy.id}`);
-  
+
+  // 提前选技能，以便在显示预兆光晕前判断技能类型
+  const validSkills = enemy.skills.filter(s =>
+      (!s.charge || s.charge === 0) &&
+      !s.isReaction &&
+      enemy.mp >= s.cost &&
+      enemy.hp > (s.hpCost || 0) &&
+      (enemy.tp || 0) >= (s.tpCost || 0) &&
+      !(enemy.cooldowns && enemy.cooldowns[s.name] > 0) &&
+      !(s.type.includes('单') && s.type.includes('回') && enemy.hp >= enemy.maxHp * 0.95)
+  );
+  const aliveEnemies = enemiesData.filter(e => e.isAlive);
+  const aliveHeroes = heroesData.filter(h => h.isAlive);
+
+  let selectedSkill = null; let specificTarget = null;
+  if (isChargeFull) {
+      selectedSkill = chargeSkill;
+      specificTarget = getTauntTarget(aliveHeroes);
+  } else {
+      const decision = selectEnemySkillAndTarget(enemy, validSkills, aliveEnemies, aliveHeroes);
+      selectedSkill = decision.selectedSkill;
+      specificTarget = decision.specificTarget;
+  }
+
   if (isChargeFull) {
       showLog(`⚠️ ${enemy.name} 释放致命一击！`);
       
@@ -5921,33 +5952,17 @@ async function executeEnemyTurn(enemy) {
       }
       
   } else {
-      showLog(`${enemy.name} 行动中...`); 
-      if(sprite) sprite.style.transform = 'scale(1.05)'; 
-      await sleep(400); 
-  }
-  if(sprite) sprite.style.transform = '';
-  
-  // 从池子里排除掉充能大招（除非已经满充能），排除掉被动反应技能，排除CD中技能，排除满血溢出群回
-  const validSkills = enemy.skills.filter(s => 
-      (!s.charge || s.charge === 0) && 
-      !s.isReaction && 
-      enemy.mp >= s.cost && 
-      enemy.hp > (s.hpCost || 0) && 
-      (enemy.tp || 0) >= (s.tpCost || 0) &&
-      !(enemy.cooldowns && enemy.cooldowns[s.name] > 0) &&
-      !(s.type.includes('单') && s.type.includes('回') && enemy.hp >= enemy.maxHp * 0.95)
-  ); 
-  const aliveEnemies = enemiesData.filter(e => e.isAlive); 
-  const aliveHeroes = heroesData.filter(h => h.isAlive); 
-  
-  let selectedSkill = null; let specificTarget = null;
-  if (isChargeFull) {
-      selectedSkill = chargeSkill;
-      specificTarget = getTauntTarget(aliveHeroes);
-  } else {
-      const decision = selectEnemySkillAndTarget(enemy, validSkills, aliveEnemies, aliveHeroes);
-      selectedSkill = decision.selectedSkill;
-      specificTarget = decision.specificTarget;
+      showLog(`${enemy.name} 行动中...`);
+      // 仅攻击/控制技能（含伤害标签）才显示红色攻击预兆；buff/治疗/减防等不显示
+      const DAMAGE_TAGS = ['单体', '群攻', '穿透', '群穿透', '眩晕', '群眩晕'];
+      const isAttackSkill = !selectedSkill || DAMAGE_TAGS.some(tag =>
+          [selectedSkill.type, selectedSkill.type2, selectedSkill.type3].some(t => t && t.includes(tag))
+      );
+      if (sprite && isAttackSkill) {
+          sprite.classList.add('enemy-omen');
+          setTimeout(() => sprite.classList.remove('enemy-omen'), 400);
+      }
+      await sleep(400);
   }
   
   const multiplier = await triggerBurstIfNeeded(enemy);
