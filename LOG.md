@@ -354,3 +354,17 @@
 - **涉及函数/模块**：`executeSkillAction()`（结尾新增 `skill.haste > 0` 统一施加）、`handleChargeSkill()`（蓄力状态保存完整含 haste 技能）、`doReleaseCharge()`（去除剥离/手动加速）、`prepareSkillTarget()`（去除独立加速短路分支）
 - **决策原因**：经手操实测，此前 `[加速]` 被当作"独立技能类型"短路处理，导致无法与回避等 buff 叠加、无法对他人施放；蓄力技能因 `haste` 被剥离丢失导致释放后无加速。改为统一结算入口后，加速成为普通技能效果，与其它标签天然组合。
 - **经验证**：Node 提取 `<script>` 语法校验通过，零报错；逻辑经代码走查验证（`[加速][回避][他人]` 对目标同时施加回避+加速；`[穿透][延迟:3][加速:3]` 释放时伤害+加速同时结算）。
+
+## [LOG-030] 2026-08-12 — V5.4 版本升级：新增 `[限N次]` 技能本场战斗次数限制标签（我方专属）
+
+- **变更行为**：
+  1. **新增 `[限N次]` 标签**：限制某技能**本场战斗**内可使用的总次数（如 `[限1次]`、`[限3次]`）。`parseSkill()` 解析 `[限(\d+)次?]` → 技能对象新增 `maxUses`（上限）与 `usesRemaining`（本场剩余，初始=满值）。
+  2. **主动技能面板**：累计用尽后技能栏中该技能**变灰不可选中**（`cursor-not-allowed`、不绑定点击），并显示红色 `[用尽]` 徽章；尚有余量时显示琥珀色 `[限N]` 剩余次数徽章。
+  3. **反应/看破技能**（本就不显示在主动面板）：用尽后**后台静默失效**，不再出现在反应/看破弹窗候选；但弹窗按钮会**备注剩余次数**（如 `[限2次]`）。
+  4. **消耗时机**：统一在 `executeSkillAction()` 资源扣除处递减——天然覆盖普通施放、蓄力（`[延迟]`）释放、反应技三条路径；看破成功使用时在 `checkKanpoInterrupt()` 单独递减。蓄力释放传入的是 `currentDelay.skill` 浅拷贝，故按技能名定位到真实技能对象再递减，避免拷贝不同步。
+  5. **仅作用于我方**：敌方 AI 技能选择（`enemyAction`/`selectEnemySkillAndTarget`/`validSkills`）完全不受影响。
+  6. **编辑器与持久化**：我方技能行新增「限次」数字输入框；`syncEditorDataToMemory()` 读写 `maxUses` 并重置 `usesRemaining`；`serializeHeroesForSave()` 序列化 `maxUses`，持久化加载后自动初始化本场剩余次数。
+  7. **次数生命周期**：本场战斗内累计，战斗重置/新战局自动恢复满值（`initialHeroesCache` 快照在 `parseSkill` 时已含满值 `usesRemaining`）。
+- **涉及函数/模块**：`parseSkill()`（解析 `[限N次]` → `maxUses`/`usesRemaining`）、`executeSkillAction()`（资源扣除处统一递减）、`applySingleTagEffect()`（反应技过滤）、`promptReaction()`（弹窗备注剩余次数）、`checkKanpoInterrupt()`（看破候选过滤 + 成功使用时递减）、`promptKanpo()`（弹窗备注）、`updateMenu()`（主动技能面板变灰 + 徽章）、`openEditor()`（限次输入框）、`syncEditorDataToMemory()`（读写限次字段）、`serializeHeroesForSave()`/`applyPersistedRoster()`（持久化）
+- **决策原因**：需求希望给强力/稀有技能增加"本场战斗使用次数"约束，提升战术资源管理深度。用户明确该标签**仅影响我方角色**，故不触碰敌方 AI 选择逻辑；反应/看破不显示在主动面板，用尽后静默失效即可，只需在弹窗备注剩余次数。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；逻辑经代码走查验证（`[限1次]` 主动技能用一次后变灰 `[用尽]`；`[限3次]` 反应/看破技能弹窗显示剩余次数、用尽后不再出现；蓄力释放正确消耗；持久化保存/加载后限次保留）。

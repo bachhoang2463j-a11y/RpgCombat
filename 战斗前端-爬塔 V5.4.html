@@ -3458,6 +3458,10 @@ function parseSkill(skillStr) {
     // [加速:N] 永久加速库存：蓄力结算完成时才施加到角色身上，之后每次蓄力按所需回合抵扣
     let hasteMatch = skillStr.match(/\[加速:(\d+)\]/i);
     let haste = hasteMatch ? parseInt(hasteMatch[1]) : 0;
+
+    // [限N次] 本场战斗次数限制（仅我方）：用尽后主动技能面板变灰、反应/看破静默失效
+    let limitMatch = skillStr.match(/\[限(\d+)次?\]/i);
+    let maxUses = limitMatch ? parseInt(limitMatch[1]) : 0;
     
     // 解析伤害类型 (近战, 远程, 法术) - 默认为null
     let dmgTypeMatch = skillStr.match(/\[(近战|远程|法术)\]/);
@@ -3506,7 +3510,7 @@ function parseSkill(skillStr) {
     let fxTagMatch = skillStr.match(/\[特效:([^\]]+)\]/i);
     let fxTag = fxTagMatch ? fxTagMatch[1].trim() : null;
 
-    return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, hit: hit, turns: turns, type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, damageType: damageType, isOthers: isOthers, fxTag: fxTag };
+    return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, hit: hit, turns: turns, type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, damageType: damageType, isOthers: isOthers, fxTag: fxTag };
 }
 
 function buildCombatDataFromYAML(yamlContent) {
@@ -4503,13 +4507,14 @@ function promptKanpo(candidates, attacker, incomingSkill) {
             if (skill.cost > 0 || (!skill.hpCost && !skill.tpCost)) costHtml += `<span class="text-sky-200 px-0.5">-${skill.cost}MP</span>`;
             if (skill.hpCost > 0) costHtml += `<span class="text-red-300 px-0.5">-${skill.hpCost}HP</span>`;
             if (skill.tpCost > 0) costHtml += `<span class="text-green-300 px-0.5">-${skill.tpCost}TP</span>`;
+            const limitNote = skill.maxUses > 0 ? `<span class="text-amber-200 px-0.5">[限${skill.usesRemaining ?? skill.maxUses}次]</span>` : '';
 
             candidatesHtml += `
                 <button class="w-full py-2.5 sm:py-3 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-500 hover:to-orange-500 rounded-xl text-xs sm:text-sm font-bold shadow-[0_0_15px_rgba(245,158,11,0.4)] transition-all transform hover:scale-105 mb-2 text-white flex justify-between px-4 items-center border border-amber-400/30" onclick="resolveKanpo(${index})">
                     <div class="flex items-center gap-2">
                         <img src="${hero.img}" class="w-6 h-6 rounded-full border border-amber-300 object-cover">
                         <span class="font-black text-amber-200">${hero.name}</span>
-                        <span class="text-white">⚡ ${skill.name}</span>
+                        <span class="text-white">⚡ ${skill.name} ${limitNote}</span>
                     </div>
                     <span class="font-mono flex gap-1">${costHtml}</span>
                 </button>`;
@@ -4779,6 +4784,8 @@ async function checkKanpoInterrupt(ctx) {
             if (s.cost > hero.mp) return;
             if ((s.hpCost || 0) >= hero.hp) return;
             if ((s.tpCost || 0) > hero.tp) return;
+            // [限N次] 用尽后静默失效（不再出现在看破弹窗候选）
+            if (s.maxUses > 0 && (s.usesRemaining ?? s.maxUses) <= 0) return;
 
             // 检测攻击类型匹配
             if (kanpoTarget === 'all' || incomingType.includes(kanpoTarget) || kanpoTarget.includes(incomingType)) {
@@ -4795,6 +4802,9 @@ async function checkKanpoInterrupt(ctx) {
         chosen.hero.mp -= chosen.skill.cost || 0;
         if (chosen.skill.hpCost) chosen.hero.hp -= chosen.skill.hpCost;
         if (chosen.skill.tpCost) chosen.hero.tp -= chosen.skill.tpCost;
+        // [限N次] 看破成功使用时消耗真实技能剩余次数
+        const realSkill = chosen.hero.skills.find(s => s.name === chosen.skill.name);
+        if (realSkill && realSkill.maxUses > 0) realSkill.usesRemaining = Math.max(0, (realSkill.usesRemaining ?? realSkill.maxUses) - 1);
         updateHeroUI(chosen.hero);
 
         await playKanpoEffect(chosen.hero, ctx.caster, ctx.skill);
@@ -4869,8 +4879,9 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill) {
              if (skill.cost > 0 || (!skill.hpCost && !skill.tpCost)) costHtml += `<span class="text-indigo-200 px-0.5">-${skill.cost}MP</span>`;
              if (skill.hpCost > 0) costHtml += `<span class="text-red-300 px-0.5">-${skill.hpCost}HP</span>`;
              if (skill.tpCost > 0) costHtml += `<span class="text-green-300 px-0.5">-${skill.tpCost}TP</span>`;
+             const limitNote = skill.maxUses > 0 ? `<span class="text-rose-300 px-0.5">[限${skill.usesRemaining ?? skill.maxUses}次]</span>` : '';
              
-             skillHtml += `<button class="w-full py-2.5 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-lg text-xs sm:text-sm font-bold shadow-lg transition-all transform hover:scale-105 mb-2 text-white flex justify-between px-4 items-center" onclick="resolveReaction(${index})"><span>⚡ ${skill.name}</span><span class="font-mono flex gap-1">${costHtml}</span></button>`;
+             skillHtml += `<button class="w-full py-2.5 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-lg text-xs sm:text-sm font-bold shadow-lg transition-all transform hover:scale-105 mb-2 text-white flex justify-between px-4 items-center" onclick="resolveReaction(${index})"><span>⚡ ${skill.name} ${limitNote}</span><span class="font-mono flex gap-1">${costHtml}</span></button>`;
         });
         skillHtml += `<button class="w-full py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs sm:text-sm font-bold shadow-lg transition-colors text-gray-300 border border-gray-600 mt-2" onclick="resolveReaction(-1)">跳过 (不反应)</button>`;
 
@@ -4939,6 +4950,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
             if (s.cost > target.mp) return false;
             if ((s.hpCost || 0) >= target.hp) return false;
             if ((s.tpCost || 0) > target.tp) return false;
+            // [限N次] 用尽后静默失效（不再出现在反应弹窗候选）
+            if (s.maxUses > 0 && (s.usesRemaining ?? s.maxUses) <= 0) return false;
             // 智能过滤反应条件
             if (s.reactionTarget !== 'all' && s.reactionTarget !== incomingDamageType) return false;
             return true;
@@ -5224,6 +5237,15 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     caster.mp -= skill.cost; 
     if (skill.hpCost) caster.hp -= skill.hpCost;
     if (skill.tpCost) caster.tp -= skill.tpCost;
+
+    // === [限N次] 本场战斗次数消耗（仅我方）===
+    // 蓄力释放传入的是 currentDelay.skill 浅拷贝，故按技能名定位到真实技能对象再递减
+    if (caster.id.startsWith('h')) {
+        const heroSkill = caster.skills.find(s => s.name === skill.name);
+        if (heroSkill && heroSkill.maxUses > 0) {
+            heroSkill.usesRemaining = Math.max(0, (heroSkill.usesRemaining ?? heroSkill.maxUses) - 1);
+        }
+    }
     
     if (caster.id.startsWith('h') && (skill.type.includes('再动') || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动')))) {
         if (!state.usedExtraTurnSkillsThisRound) state.usedExtraTurnSkillsThisRound = new Set();
@@ -6220,8 +6242,10 @@ function updateMenu(hero) {
     if (skill.isReaction || skill.kanpoTarget) return;
     const isExtraTurnSkill = skill.type.includes('再动') || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
     const isUsedExtraTurn = isExtraTurnSkill && state.usedExtraTurnSkillsThisRound && state.usedExtraTurnSkillsThisRound.has(skill.name);
+    const usesLeft = skill.maxUses > 0 ? (skill.usesRemaining ?? skill.maxUses) : 0;
+    const isUsesExhausted = skill.maxUses > 0 && usesLeft <= 0;
     
-    const isEnough = hero.mp >= skill.cost && hero.hp > (skill.hpCost || 0) && hero.tp >= (skill.tpCost || 0) && !isUsedExtraTurn; 
+    const isEnough = hero.mp >= skill.cost && hero.hp > (skill.hpCost || 0) && hero.tp >= (skill.tpCost || 0) && !isUsedExtraTurn && !isUsesExhausted; 
     const btn = document.createElement('button');
     btn.className = `w-full py-1.5 text-left px-1.5 sm:px-2 rounded transition-all flex flex-col items-start group shrink-0 ${isEnough ? 'hover:bg-cyan-900/40 border border-transparent hover:border-cyan-900/50 cursor-pointer' : 'opacity-70 border border-transparent cursor-not-allowed'}`;
     let tagColor = 'text-gray-400'; let tagBorder = 'border-gray-600/50';
@@ -6259,6 +6283,12 @@ function updateMenu(hero) {
     let typeHtml = `<span class="${tagColor} text-[7px] sm:text-[9px] font-bold border ${tagBorder} bg-black/40 px-0.5 rounded leading-tight shadow-sm">${mainTypeText}</span>`;
     if (isUsedExtraTurn) {
         typeHtml += `<span class="text-rose-400 text-[7px] sm:text-[9px] font-bold border border-rose-800/60 bg-rose-900/40 px-0.5 rounded leading-tight shadow-sm ml-0.5">[限次]</span>`;
+    }
+    if (skill.maxUses > 0) {
+        const usedBadge = isUsesExhausted
+            ? `<span class="text-rose-400 text-[7px] sm:text-[9px] font-bold border border-rose-800/60 bg-rose-900/40 px-0.5 rounded leading-tight shadow-sm ml-0.5">[用尽]</span>`
+            : `<span class="text-amber-400 text-[7px] sm:text-[9px] font-bold border border-amber-800/60 bg-amber-900/40 px-0.5 rounded leading-tight shadow-sm ml-0.5">[限${usesLeft}]</span>`;
+        typeHtml += usedBadge;
     }
     
     delete typeCounts[mainType];
@@ -6335,7 +6365,7 @@ function openEditor() {
   html += `<div><h3 class="text-sm sm:text-lg font-bold text-cyan-400 mb-3 sm:mb-4 flex items-center gap-2 w-full"><span>❖</span> 我方角色 <button onclick="addHero()" class="text-[10px] sm:text-[11px] bg-cyan-900/50 hover:bg-cyan-800 text-cyan-200 px-2 sm:px-3 py-1 sm:py-1.5 rounded ml-auto transition-colors border border-cyan-700/50">+ 添加</button></h3><div class="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">`;
   heroesData.forEach((h, i) => {
     html += `<div class="bg-black/30 p-3 sm:p-4 rounded-xl border border-gray-800 relative group hover:border-cyan-900/50 transition-colors flex flex-col"><button onclick="removeHero(${i})" class="absolute right-1 top-1 sm:right-2 sm:top-2 w-6 h-6 flex items-center justify-center rounded-full bg-red-900/30 text-red-500/50 hover:bg-red-600 hover:text-white transition-all z-10 border border-transparent hover:border-red-400 opacity-0 group-hover:opacity-100" title="移除此角色">✕</button><div class="flex gap-2 mb-3 sm:mb-4 items-center border-b border-gray-800 pb-2"><span class="text-[10px] sm:text-xs text-gray-500">名称</span><input type="text" id="edit-h-${i}-name" value="${h.name}" class="edit-input w-16 sm:w-24 text-xs sm:text-sm font-bold text-yellow-200"><span class="text-[10px] sm:text-xs text-gray-500 ml-2">职业</span><select id="edit-h-${i}-class" class="edit-input w-16 sm:w-24 text-[10px] sm:text-xs text-cyan-300 font-bold"><option value="" ${!h.classType ? 'selected' : ''}>无</option><option value="防守者" ${h.classType === '防守者' ? 'selected' : ''}>防守者</option><option value="隐匿者" ${h.classType === '隐匿者' ? 'selected' : ''}>隐匿者</option><option value="施法者" ${h.classType === '施法者' ? 'selected' : ''}>施法者</option><option value="狂战士" ${h.classType === '狂战士' ? 'selected' : ''}>狂战士</option><option value="风行者" ${h.classType === '风行者' ? 'selected' : ''}>风行者</option><option value="圣职者" ${h.classType === '圣职者' ? 'selected' : ''}>圣职者</option><option value="灾厄使" ${h.classType === '灾厄使' ? 'selected' : ''}>灾厄使</option></select><span class="text-[10px] sm:text-xs text-gray-500 ml-auto">头像</span><input type="text" id="edit-h-${i}-img" value="${h.img}" class="edit-input flex-1 min-w-[80px] text-[10px] sm:text-xs text-gray-400" placeholder="链接"></div><div class="grid grid-cols-4 lg:grid-cols-7 gap-x-1.5 gap-y-2 sm:gap-x-2 sm:gap-y-3 text-[9px] sm:text-[10px] mb-3 sm:mb-4"><div class="flex flex-col"><label class="text-rose-400 mb-1">HP</label><input type="number" id="edit-h-${i}-hp" value="${h.hp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-gray-500 mb-1">MaxHP</label><input type="number" id="edit-h-${i}-maxHp" value="${h.maxHp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-cyan-400 mb-1">MP</label><input type="number" id="edit-h-${i}-mp" value="${h.mp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-gray-500 mb-1">MaxMP</label><input type="number" id="edit-h-${i}-maxMp" value="${h.maxMp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-orange-400 mb-1">攻击</label><input type="number" id="edit-h-${i}-atk" value="${h.atk}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-blue-400 mb-1">防御</label><input type="number" id="edit-h-${i}-def" value="${h.def}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-yellow-400 mb-1 font-bold">速度</label><input type="number" id="edit-h-${i}-spd" value="${h.spd}" class="edit-input w-full font-mono text-yellow-200"></div></div><div class="bg-black/40 p-2 sm:p-3 rounded border border-gray-800/50 flex-1"><div class="text-[9px] sm:text-[11px] text-gray-400 mb-2 sm:mb-3 font-bold tracking-wider flex justify-between items-center"><span>技能配置 (支持3重标签)</span><button onclick="addHeroSkill(${i})" class="text-[9px] sm:text-[10px] text-cyan-400 hover:text-cyan-300 border border-cyan-900/50 rounded px-1.5 py-0.5 sm:px-2 sm:py-1 transition-colors">+ 添加</button></div><div class="space-y-2 sm:space-y-3">`;
-    h.skills.forEach((s, si) => { html += `<div class="bg-black/50 p-1.5 sm:p-2 rounded border border-gray-700/50 relative pr-6 sm:pr-8"><button onclick="removeHeroSkill(${i}, ${si})" class="absolute right-1 sm:right-2 top-1 sm:top-2 text-gray-600 hover:text-red-500 font-bold transition-colors" title="移除此技能">✕</button><div class="flex gap-1.5 sm:gap-2 items-center mb-1.5 sm:mb-2 flex-wrap"><input type="text" id="edit-h-${i}-s-${si}-name" value="${s.name}" class="edit-input w-24 sm:w-32 text-[10px] sm:text-xs text-gray-100 font-bold" placeholder="技能名"><select id="edit-h-${i}-s-${si}-reaction" class="edit-input w-20 sm:w-24 text-[9px] sm:text-[10px] text-indigo-300 font-bold"><option value="none" ${!s.isReaction ? 'selected' : ''}>非反应</option><option value="all" ${s.isReaction && s.reactionTarget === 'all' ? 'selected' : ''}>反应(全能)</option><option value="近战" ${s.isReaction && s.reactionTarget === '近战' ? 'selected' : ''}>反应(近战)</option><option value="远程" ${s.isReaction && s.reactionTarget === '远程' ? 'selected' : ''}>反应(远程)</option><option value="法术" ${s.isReaction && s.reactionTarget === '法术' ? 'selected' : ''}>反应(法术)</option></select><select id="edit-h-${i}-s-${si}-kanpo" class="edit-input w-20 sm:w-24 text-[9px] sm:text-[10px] text-amber-300 font-bold"><option value="none" ${!s.kanpoTarget ? 'selected' : ''}>无看破</option><option value="all" ${s.kanpoTarget === 'all' ? 'selected' : ''}>看破(全能)</option><option value="近战" ${s.kanpoTarget === '近战' ? 'selected' : ''}>看破(近战)</option><option value="远程" ${s.kanpoTarget === '远程' ? 'selected' : ''}>看破(远程)</option><option value="法术" ${s.kanpoTarget === '法术' ? 'selected' : ''}>看破(法术)</option></select><label class="flex items-center gap-1 text-[9px] sm:text-[10px] text-emerald-300 cursor-pointer whitespace-nowrap" title="带此标签的技能可对任意我方角色施放"><input type="checkbox" id="edit-h-${i}-s-${si}-others" ${s.isOthers ? 'checked' : ''} class="accent-emerald-500">他人</label><select id="edit-h-${i}-s-${si}-dmgType" class="edit-input w-16 sm:w-20 text-[9px] sm:text-[10px] text-orange-200 font-bold"><option value="" ${!s.damageType ? 'selected' : ''}>无(近战)</option><option value="近战" ${s.damageType === '近战' ? 'selected' : ''}>近战</option><option value="远程" ${s.damageType === '远程' ? 'selected' : ''}>远程</option><option value="法术" ${s.damageType === '法术' ? 'selected' : ''}>法术</option></select><select id="edit-h-${i}-s-${si}-fxTag" class="edit-input w-16 sm:w-20 text-[9px] sm:text-[10px] text-yellow-300 font-bold">${['特效:无', ...Object.keys(WEBM_FX_REGISTRY)].map(f => { const val = f === '特效:无' ? '' : f; const isSel = (s.fxTag || '') === val; const label = f === '特效:无' ? '无特效' : f; return `<option value="${val}" ${isSel ? 'selected' : ''}>${label}</option>`; }).join('')}</select><span class="text-[9px] sm:text-[10px] text-sky-400 ml-auto">MP</span><input type="number" id="edit-h-${i}-s-${si}-cost" value="${s.cost}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-sky-200"><span class="text-[9px] sm:text-[10px] text-red-400">HP</span><input type="number" id="edit-h-${i}-s-${si}-hpCost" value="${s.hpCost || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-red-200"><span class="text-[9px] sm:text-[10px] text-green-400">TP</span><input type="number" id="edit-h-${i}-s-${si}-tpCost" value="${s.tpCost || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-green-200"><span class="text-[9px] sm:text-[10px] text-gray-500">准%(Aim)</span><input type="number" id="edit-h-${i}-s-${si}-hit" value="${s.hit}" class="edit-input w-10 sm:w-12 text-[9px] sm:text-[10px] font-mono text-yellow-200"><span class="text-[9px] sm:text-[10px] text-gray-500">回数</span><input type="number" id="edit-h-${i}-s-${si}-turns" value="${s.turns || ''}" class="edit-input w-10 sm:w-12 text-[9px] sm:text-[10px] font-mono text-purple-200" placeholder="默认"><span class="text-[9px] sm:text-[10px] text-yellow-300">延迟(蓄力)</span><input type="number" id="edit-h-${i}-s-${si}-delay" value="${s.delay || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-yellow-200" placeholder="0"><span class="text-[9px] sm:text-[10px] text-cyan-300">加速</span><input type="number" id="edit-h-${i}-s-${si}-haste" value="${s.haste || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-cyan-200" placeholder="0"></div><div class="flex flex-wrap gap-1.5 sm:gap-2"><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-cyan-200 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power" value="${s.power}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type2" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-gray-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power2" value="${s.power2}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type3" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-gray-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power3" value="${s.power3}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div></div></div>`; });
+    h.skills.forEach((s, si) => { html += `<div class="bg-black/50 p-1.5 sm:p-2 rounded border border-gray-700/50 relative pr-6 sm:pr-8"><button onclick="removeHeroSkill(${i}, ${si})" class="absolute right-1 sm:right-2 top-1 sm:top-2 text-gray-600 hover:text-red-500 font-bold transition-colors" title="移除此技能">✕</button><div class="flex gap-1.5 sm:gap-2 items-center mb-1.5 sm:mb-2 flex-wrap"><input type="text" id="edit-h-${i}-s-${si}-name" value="${s.name}" class="edit-input w-24 sm:w-32 text-[10px] sm:text-xs text-gray-100 font-bold" placeholder="技能名"><select id="edit-h-${i}-s-${si}-reaction" class="edit-input w-20 sm:w-24 text-[9px] sm:text-[10px] text-indigo-300 font-bold"><option value="none" ${!s.isReaction ? 'selected' : ''}>非反应</option><option value="all" ${s.isReaction && s.reactionTarget === 'all' ? 'selected' : ''}>反应(全能)</option><option value="近战" ${s.isReaction && s.reactionTarget === '近战' ? 'selected' : ''}>反应(近战)</option><option value="远程" ${s.isReaction && s.reactionTarget === '远程' ? 'selected' : ''}>反应(远程)</option><option value="法术" ${s.isReaction && s.reactionTarget === '法术' ? 'selected' : ''}>反应(法术)</option></select><select id="edit-h-${i}-s-${si}-kanpo" class="edit-input w-20 sm:w-24 text-[9px] sm:text-[10px] text-amber-300 font-bold"><option value="none" ${!s.kanpoTarget ? 'selected' : ''}>无看破</option><option value="all" ${s.kanpoTarget === 'all' ? 'selected' : ''}>看破(全能)</option><option value="近战" ${s.kanpoTarget === '近战' ? 'selected' : ''}>看破(近战)</option><option value="远程" ${s.kanpoTarget === '远程' ? 'selected' : ''}>看破(远程)</option><option value="法术" ${s.kanpoTarget === '法术' ? 'selected' : ''}>看破(法术)</option></select><label class="flex items-center gap-1 text-[9px] sm:text-[10px] text-emerald-300 cursor-pointer whitespace-nowrap" title="带此标签的技能可对任意我方角色施放"><input type="checkbox" id="edit-h-${i}-s-${si}-others" ${s.isOthers ? 'checked' : ''} class="accent-emerald-500">他人</label><select id="edit-h-${i}-s-${si}-dmgType" class="edit-input w-16 sm:w-20 text-[9px] sm:text-[10px] text-orange-200 font-bold"><option value="" ${!s.damageType ? 'selected' : ''}>无(近战)</option><option value="近战" ${s.damageType === '近战' ? 'selected' : ''}>近战</option><option value="远程" ${s.damageType === '远程' ? 'selected' : ''}>远程</option><option value="法术" ${s.damageType === '法术' ? 'selected' : ''}>法术</option></select><select id="edit-h-${i}-s-${si}-fxTag" class="edit-input w-16 sm:w-20 text-[9px] sm:text-[10px] text-yellow-300 font-bold">${['特效:无', ...Object.keys(WEBM_FX_REGISTRY)].map(f => { const val = f === '特效:无' ? '' : f; const isSel = (s.fxTag || '') === val; const label = f === '特效:无' ? '无特效' : f; return `<option value="${val}" ${isSel ? 'selected' : ''}>${label}</option>`; }).join('')}</select><span class="text-[9px] sm:text-[10px] text-sky-400 ml-auto">MP</span><input type="number" id="edit-h-${i}-s-${si}-cost" value="${s.cost}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-sky-200"><span class="text-[9px] sm:text-[10px] text-red-400">HP</span><input type="number" id="edit-h-${i}-s-${si}-hpCost" value="${s.hpCost || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-red-200"><span class="text-[9px] sm:text-[10px] text-green-400">TP</span><input type="number" id="edit-h-${i}-s-${si}-tpCost" value="${s.tpCost || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-green-200"><span class="text-[9px] sm:text-[10px] text-gray-500">准%(Aim)</span><input type="number" id="edit-h-${i}-s-${si}-hit" value="${s.hit}" class="edit-input w-10 sm:w-12 text-[9px] sm:text-[10px] font-mono text-yellow-200"><span class="text-[9px] sm:text-[10px] text-gray-500">回数</span><input type="number" id="edit-h-${i}-s-${si}-turns" value="${s.turns || ''}" class="edit-input w-10 sm:w-12 text-[9px] sm:text-[10px] font-mono text-purple-200" placeholder="默认"><span class="text-[9px] sm:text-[10px] text-yellow-300">延迟(蓄力)</span><input type="number" id="edit-h-${i}-s-${si}-delay" value="${s.delay || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-yellow-200" placeholder="0"><span class="text-[9px] sm:text-[10px] text-cyan-300">加速</span><input type="number" id="edit-h-${i}-s-${si}-haste" value="${s.haste || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-cyan-200" placeholder="0"><span class="text-[9px] sm:text-[10px] text-fuchsia-300">限次</span><input type="number" id="edit-h-${i}-s-${si}-limit" value="${s.maxUses || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-fuchsia-200" placeholder="0"></div><div class="flex flex-wrap gap-1.5 sm:gap-2"><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-cyan-200 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power" value="${s.power}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type2" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-gray-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power2" value="${s.power2}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type3" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-gray-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power3" value="${s.power3}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div></div></div>`; });
     html += `</div></div></div>`;
   });
   html += `<div><h3 class="text-sm sm:text-lg font-bold text-rose-500 mb-3 sm:mb-4 mt-4 sm:mt-6 flex items-center gap-2 w-full"><span>❖</span> 敌方单位 <button onclick="addEnemy()" class="text-[10px] sm:text-[11px] bg-rose-900/50 hover:bg-rose-800 text-rose-200 px-2 sm:px-3 py-1 sm:py-1.5 rounded ml-auto transition-colors border border-rose-700/50">+ 添加</button></h3><div class="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">`;
@@ -6384,6 +6414,8 @@ function syncEditorDataToMemory() {
         s.turns = document.getElementById(`edit-h-${i}-s-${si}-turns`).value !== '' ? Number(document.getElementById(`edit-h-${i}-s-${si}-turns`).value) : null;
         s.delay = Number(document.getElementById(`edit-h-${i}-s-${si}-delay`).value) || 0;
         s.haste = Number(document.getElementById(`edit-h-${i}-s-${si}-haste`).value) || 0;
+        s.maxUses = Number(document.getElementById(`edit-h-${i}-s-${si}-limit`).value) || 0;
+        s.usesRemaining = s.maxUses;
         s.type = document.getElementById(`edit-h-${i}-s-${si}-type`).value;
         s.power = Number(document.getElementById(`edit-h-${i}-s-${si}-power`).value);
         s.type2 = document.getElementById(`edit-h-${i}-s-${si}-type2`).value;
@@ -6595,7 +6627,7 @@ function serializeHeroesForSave() {
     skills: h.skills.map(s => ({
       name: s.name, isReaction: s.isReaction, reactionTarget: s.reactionTarget, kanpoTarget: s.kanpoTarget,
       isOthers: !!s.isOthers, damageType: s.damageType, fxTag: s.fxTag, cost: s.cost, hpCost: s.hpCost, tpCost: s.tpCost,
-      hit: s.hit, turns: s.turns, delay: s.delay || 0, haste: s.haste || 0, type: s.type, power: s.power, type2: s.type2, power2: s.power2, type3: s.type3, power3: s.power3
+      hit: s.hit, turns: s.turns, delay: s.delay || 0, haste: s.haste || 0, maxUses: s.maxUses || 0, type: s.type, power: s.power, type2: s.type2, power2: s.power2, type3: s.type3, power3: s.power3
     }))
   }));
 }
@@ -6642,6 +6674,8 @@ function applyPersistedRoster() {
     const savedSkills = Array.isArray(saved.skills) ? saved.skills : [];
     const cbNewSkills = h.skills.filter(cbSkill => !savedSkills.some(s => s.name === cbSkill.name));
     h.skills = [...cbNewSkills, ...savedSkills];
+    // [限N次] 持久化加载后初始化本场剩余次数（新战局从满值重新开始）
+    h.skills.forEach(sk => { if (sk.maxUses > 0 && sk.usesRemaining == null) sk.usesRemaining = sk.maxUses; });
   });
   // 合并完成后同步初始缓存，使"重置"恢复的也是持久化合并后的版本（而非 Combat_block 原始快照）
   initialHeroesCache = JSON.parse(JSON.stringify(heroesData));
