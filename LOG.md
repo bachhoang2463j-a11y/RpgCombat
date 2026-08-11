@@ -400,9 +400,9 @@
   2. **初始行动面板升级**：`#main-menu` 摒弃原简陋文本列表，升级为图 2 高质感精致按钮风格（`⚔️ 普攻攻击` / `⚡ 释放技能` / `🛡️ 防御姿态`）。
   3. **蓄力菜单深蓝配色**：重构 `updateChargeMenu(hero)` 配色方案，将原棕红杂色替换为科技感深蓝渐变（`bg-gradient-to-r from-cyan-700 to-blue-700`），与 260px 玻璃透明面板完全契合。
   4. **卡片内边距微调**：`updateMenu(hero)` 内部内边距微调为 `p-1.5`，确保 260px 宽度下 3 排布局精致美观。
-- **涉及函数/模块**：`战斗前端-爬塔 V5.5.html` 中的 `#menu-container`、`#main-menu`、`updateChargeMenu()`、`updateMenu()`、[`demo_skill_ui.html`](file:///D:/Project/RpgCombat/demo_skill_ui.html)。
+- **涉及函数/模块**：`战斗前端-爬塔 V5.5.html` 中的 `#menu-container`、`#main-menu`、`updateChargeMenu()`、`updateMenu()`。
 - **决策原因**：根据用户反馈 320px 偏大，将长宽各按约 20% 缩减（260px × 172px），并将初始面板按用户指名的图 2 高质感按钮风格重构，同时将蓄力菜单调为蓝色系，兼顾紧凑视觉与高品质表现。
-- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；`demo_skill_ui.html` 与主源文件同步完成验证。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；主源文件同步完成验证。
 
 ---
 
