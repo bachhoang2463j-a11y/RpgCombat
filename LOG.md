@@ -431,6 +431,21 @@
 - **涉及文件**：`战斗前端-爬塔 V5.5.html`（CSS 动画区、`audioUrls` 对象、`executeEnemyTurn` 函数）。
 - **决策原因**：用户体验调优。将物理运动学的后撤/前冲、极高频剧烈抖动、光学爆发以及高品质怪兽咆哮音效完美融为一体；并将主线程等待对齐至突刺爆发帧（330ms），消除了滞后感，使打击反应行云流水。
 
+---
+
+## [LOG-036] 2026-08-12 — V5.7 我方角色蓄力[延迟]替换为物理雷电全生命周期过渡动效 + 专属音效
+
+- **变更行为**：
+  1. **接入全生命周期 Canvas 雷电系统 (Scheme 1)**：在 `CanvasFxEngine` 扩展了我方英雄 `[延迟]` 蓄力雷电渲染管线（`drawHeroChargeLightningOverlay`），实时沿卡片四周生成折线雷电电弧、白亮线芯、动态 Glow 发光边框以及散射飞溅火花（sparks）。
+  2. **三阶状态过渡动效与 Card Glow 样式**：
+     - **开始蓄力 (`charging`)**：苍蓝电弧（`#38bdf8`）从无平滑显现，英雄卡片亮起 `.charge-glow-cyan` 辉光。
+     - **蓄力完成 (`ready`)**：电弧颜色从苍蓝渐变色变至邪术紫（`#c084fc`），触发一道向外放大的紫色冲击波环（`shockwaveRadius`），英雄卡片切换为 `.charge-glow-purple` 紫色高能辉光。
+     - **释放技能 (`burst`)**：紫色雷电向外剧烈外扩爆裂（`burstScale` 1.0 ➔ 2.5），大量电火花向四周爆发散射并渐隐消散。
+  3. **专属音效集成**：在 `audioUrls` 注册 `herocharge`（开始蓄力）与 `herochargedone`（蓄力完成）音频 URL，分别在 `handleChargeSkill` 与 `startRound`/`triggerHeroChargeReady` 节点触发调用。
+  4. **状态与生命周期自动联动**：在 `handleChargeSkill`、`startRound`（蓄力回合数推进）、`doReleaseCharge`（释放）、`cancelCharge`（终止）以及重伤/死亡节点完备串联，彻底替换原先无动效的静态蓄力。
+- **涉及文件**：`战斗前端-爬塔 V5.5.html`（CSS Glow 样式、`audioUrls` 对象、`CanvasFxEngine` 扩展、蓄力处理函数）。
+- **决策原因**：替换原先无动效的潦草蓄力展示。结合程序物理雷电折线、色变脉冲、火花爆发与高品质音频，赋予我方角色蓄力过程极强的仪式感与大招能量积聚反馈。
+
 
 
 
