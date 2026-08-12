@@ -102,6 +102,15 @@
 - **实现**：`parseSkill()` 解析 `[驱散:N]`/`[群驱散:N]`（计数存入标签槽 `power`，自然沿用爆发倍率与持久化）；`TAG_HANDLERS['驱散']` 按计数移除最多 N 个负面；`isBeneficial` 与 `classifySkill().hasSingleBuff` 均将其归为增益单体。
 - **仅影响我方**：敌方 AI 索敌/技能选择不受影响。
 
+### 4.2.3 `[肃正]` 全队共享伪实体肉盾屏障机制
+
+- **`[肃正]` / `[肃正:N]`**：为我方小队生成/累加全队共享的“伪实体肉盾”圣域结界屏障（`teamBarrier`）。屏障数值与各英雄个人护盾（`entity.shield`）完全独立，开局清零，无上限可无限叠加。
+- **伪实体肉盾索敌拦截**：当 `teamBarrier > 0` 时，敌方单体索敌函数（`getTauntTarget`）强制归集命中屏障伪目标（`barrierStandIn`）。我方英雄处于完全保护状态，不被单独选中，不触发个人闪避 roll。
+- **Armor = 0 与无视穿透**：屏障不享受减伤护甲（`Armor=0`），按 `min(teamBarrier, rawDamage)` 全额吸收原始伤害；屏障全额抵挡 `[穿透]` / `[群穿透]` 攻击，无法绕过屏障扣减生命值。
+- **群攻单次扣减与泄漏**：敌方群攻针对屏障实体**仅命中扣减 1 次**屏障数值；碎盾瞬间溢出的泄漏伤害（`rawDamage - teamBarrier`）平铺分发给我方全体英雄，续走各自的护甲与 HP 管线。
+- **负面隔离与演出**：全额隔离敌方非伤害 Debuff，跳过受击后反应弹窗（看破不受影响）。受击时触发蜂窝网格过载与屏幕震动，破碎时触发全屏红闪与碎裂音效。
+- **底层关联函数**：`applyBarrierHit()` (`index.html:5930`)、`getTauntTarget()` (`index.html:6015`)、`executeSkillAction()` (`index.html:6220`)、`TAG_HANDLERS['肃正']` (`index.html:4620`)、`updateTeamBarrierUI()` (`index.html:4394`)。
+
 ### 4.3 目标取向与 `[他人]` 标签标准
 
 - **目标取向判定（全标签扫描）**：技能的目标取向由 `classifySkill()` 扫描 `type/type2/type3` 全部标签一次定好，**顺序无关**：
