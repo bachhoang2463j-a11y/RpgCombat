@@ -2607,9 +2607,10 @@ function spawnLightParticles(x, y) {
 // ==========================================
 const WEBM_FX_REGISTRY = {
     '火焰01': { url: 'https://files.catbox.moe/eyfwd9.webm',                                              scale: 1.4, particles: 'fire_aoe',    audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/fire01.mp3' },
-    '冰霜01': { url: 'https://files.catbox.moe/tr9n9i.webm',                                              scale: 1.4, particles: 'frost',    audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/freeze01.mp3'                                                       },
+    '冰霜01': { url: 'https://files.catbox.moe/tr9n9i.webm',                                              scale: 1.4, particles: 'frost',       audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/freeze01.mp3' },
     '雷击01': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/450.webm',               scale: 1.4, particles: 'thunder_aoe', audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/thunder01.mp3' },
-    '圣光01': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/414.webm',               scale: 1.4, particles: 'holy_light', audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/light01.mp3' },
+    '圣光01': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/414.webm',               scale: 1.4, particles: 'holy_light',  audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/light01.mp3' },
+    '双枪扫射': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/strafe-ezremove02.mp4', scale: 1.4, particles: 'gunshot',    audioUrl: null },
     // 在此继续添加：
     // '火焰02': { url: 'https://...', scale: 1.2, particles: 'fire_aoe',    audioUrl: 'https://...' },
     // '冰霜02': { url: 'https://...', scale: 1.6, particles: 'frost',        audioUrl: 'https://...' },
@@ -2700,31 +2701,107 @@ function playWebMFX(x, y, fxTag) {
     const entry = WEBM_FX_REGISTRY[fxTag];
     if (!entry || !entry.url) { if (fxTag) console.warn('[FX] 未找到特效或无url:', fxTag); return; }
 
-    const baseSize = Math.min(window.innerWidth, window.innerHeight);
-    const vSize = Math.round(baseSize * (entry.scale ?? 1.4));
+    // 独立音效处理：如果注册了独立音效地址，播放独立音频
+    if (entry.audioUrl) {
+        playCustomAudio(entry.audioUrl);
+    }
 
+    const baseSize = Math.min(window.innerWidth, window.innerHeight);
+    const targetSize = Math.round(baseSize * (entry.scale ?? 1.4));
+
+    // 隐藏底层的 Video 节点
     const vw = document.createElement('video');
     vw.src = _fxVideoBlobCache.get(entry.url) || entry.url;
     vw.autoplay = true;
     vw.loop = false;
-    vw.muted = true;
+    vw.crossOrigin = 'anonymous';
+    // 若指定了独立音效，则视频静音；未指定独立音效时（如带内嵌扫射音效的 MP4/WebM），播放视频原声音轨
+    vw.muted = entry.audioUrl ? true : false;
     vw.playsInline = true;
-    // 注意：不要加 object-fit，让视频元素直接占满 vSize×vSize 的容器
-    // 若素材本身是方形且内容充充分布就能达到预期尺寸
-    vw.style.cssText = [
+    vw.style.display = 'none';
+
+    // 顶层 Canvas 渲染节点
+    const vCanvas = document.createElement('canvas');
+    vCanvas.style.cssText = [
         'position:fixed',
         `left:${x}px`,
         `top:${y}px`,
-        `width:${vSize}px`,
-        `height:${vSize}px`,
         'transform:translate(-50%,-50%)',
         'z-index:96',
-        'pointer-events:none',
-        'mix-blend-mode:screen',
+        'pointer-events:none'
     ].join(';');
+
     document.body.appendChild(vw);
-    vw.addEventListener('ended', () => vw.remove());
-    setTimeout(() => { if (vw.parentNode) vw.remove(); }, 4500);
+    document.body.appendChild(vCanvas);
+
+    const vCtx = vCanvas.getContext('2d', { willReadFrequently: true });
+
+    // 动态按原视频分辨率比例计算 Canvas 尺寸（决不拉伸变形）
+    vw.onloadedmetadata = () => {
+        const nativeW = vw.videoWidth || 1920;
+        const nativeH = vw.videoHeight || 1080;
+        const aspect = nativeW / nativeH;
+        vCanvas.width = targetSize;
+        vCanvas.height = Math.round(targetSize / aspect);
+    };
+
+    vw.play().catch(e => console.warn('[FX] 视频播放受到限制或自动播放拦截:', e));
+
+    let animId;
+    function processVideoFrame() {
+        if (vw.paused || vw.ended) {
+            vCanvas.remove();
+            vw.remove();
+            return;
+        }
+
+        const cw = vCanvas.width || targetSize;
+        const ch = vCanvas.height || Math.round(targetSize * 9 / 16);
+
+        // 计算尾部 0.35s 渐隐 (Fade-out)
+        let fadeAlpha = 1.0;
+        if (vw.duration && vw.currentTime > vw.duration - 0.35) {
+            fadeAlpha = Math.max(0, (vw.duration - vw.currentTime) / 0.35);
+        }
+
+        vCtx.clearRect(0, 0, cw, ch);
+        vCtx.drawImage(vw, 0, 0, cw, ch);
+
+        // Alpha 柔和平滑抠图：将黑底转换为 PNG 级 Alpha 透明，无黑框、无锯齿
+        try {
+            const imgData = vCtx.getImageData(0, 0, cw, ch);
+            const d = imgData.data;
+            for (let i = 0; i < d.length; i += 4) {
+                const maxVal = Math.max(d[i], d[i+1], d[i+2]);
+                if (maxVal < 12) {
+                    d[i+3] = 0;
+                } else if (maxVal < 80) {
+                    const alphaFactor = ((maxVal - 12) / 68) * fadeAlpha;
+                    d[i+3] = Math.floor(d[i+3] * alphaFactor);
+                } else {
+                    d[i+3] = Math.floor(d[i+3] * fadeAlpha);
+                }
+            }
+            vCtx.putImageData(imgData, 0, 0);
+        } catch (e) {
+            vCanvas.style.mixBlendMode = 'screen';
+        }
+
+        animId = requestAnimationFrame(processVideoFrame);
+    }
+
+    vw.onplay = () => { animId = requestAnimationFrame(processVideoFrame); };
+    vw.onended = () => {
+        cancelAnimationFrame(animId);
+        if (vCanvas.parentNode) vCanvas.remove();
+        if (vw.parentNode) vw.remove();
+    };
+
+    setTimeout(() => {
+        cancelAnimationFrame(animId);
+        if (vCanvas.parentNode) vCanvas.remove();
+        if (vw.parentNode) vw.remove();
+    }, 4500);
 }
 
 // ==========================================
