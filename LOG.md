@@ -517,6 +517,18 @@
 - **涉及文件**：`README.md`、`SPEC.md`、`战斗前端-爬塔 V5.8.html`（原 `战斗前端-爬塔 V5.7.html`）。
 - **决策原因**：完成【肃正】伪实体肉盾机制迭代后升级版本号至 V5.8，归档版本规范并保持全局文档标识一致。
 
+---
+
+## [LOG-043] 2026-08-13 — 【肃正】全队笼罩式金光圣域屏障 Visual FX 视觉升级
+
+- **变更行为**：
+  1. **【肃正】屏障 DOM 结构与 UI 重构**：将原本放置在角色头像上方的长条横幅，升级为笼罩整个我方英雄小队的 `3D 弧形金光圣域屏障`（`.team-barrier-wrapper` / `.team-barrier-dome`），并搭配内嵌 SVG 蜂窝能量网格与流光边界。
+  2. **解决文字裁切**：将悬浮标题徽章 `#barrier-header-badge` 独立于 `overflow: hidden` 容器之外，确保“🛡️ 圣域帷幕 数值”100% 完整显示无裁切。
+  3. **受击光晕与波纹动效**：在 `applyBarrierHit()` 受击反馈中接入击打能量涟漪（`.barrier-hit-ripple`）、蜂窝网格过载高亮（`.barrier-hex-spotlight`）与结界压缩抖动（`.barrier-hit-impact`）。
+  4. **严禁改动逻辑**：所有伤害结算、全队伪实体肉盾单次群攻扣减、数值生命周期及事件逻辑保持 100% 原样不变。
+- **涉及文件**：`index.html`（`<style>` 样式、`TEAM_BARRIER_BANNER_HTML`、`updateTeamBarrierUI`、`applyBarrierHit`）。
+- **决策原因**：响应需求将【肃正】屏障视觉升级为全队笼罩式金光结界，提升战斗演出代入感与视觉品质，同时严格保持底层逻辑不变。
+
 
 
 
