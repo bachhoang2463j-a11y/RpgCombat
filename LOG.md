@@ -565,6 +565,13 @@
 - **涉及文件**：`index.html`（`WEBM_FX_REGISTRY`、`playWebMFX`）。
 - **决策原因**：完成短前摇【双枪扫射】特效的源文件集成，并全面重构升级 WebM/MP4 特效播放引擎，完美解决实体黑框、视频拉伸与硬边锯齿等全套渲染难题。
 
+---
+
+## [LOG-047] 2026-08-13 — 升级版本号至 V6.0 (优化特效音量 2.5 倍增益与版本号更新)
+
+- **变更行为**：升级版本号至 V6.0。优化 `playWebMFX` 原声音轨 2.5 倍 Web Audio 增益放大与 `audioUrl: 'none'` 音轨独占模式；清理 demo 文件。
+- **涉及文件**：`index.html`、`README.md`、`SPEC.md`、`LOG.md`、`LOG-INDEX.md`。
+
 
 
 
