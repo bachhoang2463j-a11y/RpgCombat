@@ -51,13 +51,20 @@
 3. **Canvas 粒子溅射层 (`fx-canvas`)**
    - 作用：提供动态物理细节（碎石、火星、烟雾）。
    - 实现：`spawnCanvasParticles()`。渲染时引擎使用 `globalCompositeOperation = 'screen'` 让发光粒子色彩叠加更加耀眼。包含重力(`gravity`)和空气阻力(`drag`)算法。
-4. **WebM 透明视频层 (`playWebMFX`)**
-   - 作用：展现复杂的逐帧魔法阵、能量柱等。
-   - 实现：利用 `mix-blend-mode: screen` 过滤 WebM 的纯黑背景，将高亮部分与战场场景完美融合。
-5. **受击反馈与顿帧 (Hit Feedback & HitStop)**
-   - **顿帧**：通过设置 `fxEngine.hitStop = 80`（冻结粒子引擎80ms），模拟刀剑入肉的停滞感。
-   - **屏幕震动**：`triggerScreenShake(intensity, duration)`。
-   - **剪影闪烁**：`spawnHitFlash(targetDom)` 配合 CSS `brightness(5) saturate(0)` 让受击者全白闪烁。
+4. **WebM / MP4 视频特效 (`playWebMFX`) 最佳实践与避坑指南**
+   - **【避坑】浏览器 GPU 图层隔离与实体黑框**：
+     - 直接给 HTML5 `<video>` 标签添加 CSS `mix-blend-mode: screen` 时，由于现代浏览器将视频隔离在独立的 GPU 合成图层中，往往只会与视频本身的黑底做混合，导致屏幕上残存巨大的**实体黑色方框**。
+     - **解决方案（Canvas 2D 逐像素 Alpha 抠图）**：前端 `playWebMFX` 采用 **Luminance-to-Alpha** 色彩抠图引擎。逐帧将视频绘制到离屏 Canvas 上，通过遍历像素 `Math.max(r, g, b) < 12` 强制将黑底转化为真正的 **PNG 级 Alpha 0 透明度**，彻底消除黑框。
+   - **【制作】AI 视频压暗黑底与平滑羽化**：
+     - AI 视频生成工具（可灵/Runway/海螺等）导出的黑底视频因 H.264 有损压缩常带有 `RGB 12, 12, 18` 的暗灰噪点。
+     - **处理方法**：可在剪辑软件中将“黑色阶/阴影”调低 10% 压沉为纯黑；或在前端处理时开启 `contrast(160%)` 对比度压暗滤镜。同时前端采用 `12~80` 灰阶平滑羽化渐变，确保亮色轮廓边缘 **100% 高清抗锯齿、决无硬边锯齿**。
+   - **【形变】自适应宽高比**：
+     - 读取 `videoWidth` 与 `videoHeight` 动态按原分辨率比例计算 Canvas 尺寸（`targetWidth / aspect`），避免将 `16:9` 矩形视频强行挤压成正方形导致画面形变拉伸（例如圆形准星变椭圆）。
+   - **【渐隐】尾部 0.35s 柔和 Fade-out**：
+     - 在视频播放最后 `0.35s` 自动计算 `fadeAlpha` 全局透明度衰减，使特效自然淡出，消除硬断切感。
+   - **【音频】音量 2.5 倍 Gain 增益与音效独占 (`audioUrl: 'none'`)**：
+     - **音量 2.5 倍放大**：在 JS 中通过 **Web Audio API** (`GainNode`) 建立音轨增益（`gainNode.gain.value = 2.5`），将视频原声音量放大约 **2.5 倍**，音效更爆破震撼。
+     - **独占抑制**：在 `WEBM_FX_REGISTRY` 注册项中填入 `audioUrl: 'none'`，可激活引擎的“音效独占”机制，自动压制默认的 `atk1` / `atk2` 普通打击音效，仅播放 2.5 倍放大的视频原声。
 
 ---
 

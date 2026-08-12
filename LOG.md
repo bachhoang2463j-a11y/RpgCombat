@@ -572,6 +572,15 @@
 - **变更行为**：升级版本号至 V6.0。优化 `playWebMFX` 原声音轨 2.5 倍 Web Audio 增益放大与 `audioUrl: 'none'` 音轨独占模式；清理 demo 文件。
 - **涉及文件**：`index.html`、`README.md`、`SPEC.md`、`LOG.md`、`LOG-INDEX.md`。
 
+---
+
+## [LOG-048] 2026-08-13 — 集成【克虏伯重狙】特效与补充 VFX 开发避坑指南文档
+
+- **变更行为**：
+  1. **挂载克虏伯重狙特效**：在 `WEBM_FX_REGISTRY` 注册表新增 `'克虏伯重狙'` 特效资源（`snipe-ezremove.mp4`），并配置 `audioUrl: 'none'` 激活 2.5 倍原声放大与音效独占。
+  2. **完善 VFX 开发指南**：在 `VFX_DESIGN_GUIDE.md` 补充 GPU 图层隔离黑框原因、Luminance Alpha 抠图原理、AI 视频黑底压暗、抗锯齿羽化与音量增益放大规范。
+- **涉及文件**：`index.html`、`VFX_DESIGN_GUIDE.md`、`LOG.md`、`LOG-INDEX.md`。
+
 
 
 
