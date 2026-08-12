@@ -5702,6 +5702,12 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
       createFloatingText(targetDom, `闪避`, 'text-gray-400');
       addHistory(`   ↳ 但被 ${target.name} 敏捷地闪避了！`);
 
+      // 闪避成功：我方英雄借身法走位积攒 +5 TP（与受击+10、施法+5 并列的潜能来源）
+      if (targetType === 'hero') {
+          target.tp = Math.min(target.maxTp, target.tp + 5);
+          updateHeroUI(target);
+      }
+
       // 强力反击被动：闪避成功时按概率触发（独立于常规反击，无视伤害类型限制）
       await CombatEvents.emitAsync(EVENTS.ON_DODGE, { target, caster, targetDom, incomingDamageType, skill });
 
