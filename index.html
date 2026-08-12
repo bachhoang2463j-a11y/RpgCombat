@@ -4759,9 +4759,10 @@ registerClassPassive('隐匿者', {
         entity.baseTauntBonus = -50;
         entity.stealthValue = 50;             // 隐匿值（初始负嘲讽深度 = 100 - 有效嘲讽 = 50）
         entity.stealthCycleProcessed = false; // 再动锁定标记：触发后再动置true，跌回80以下解锁
+        entity.stealthHitThisRound = false;   // 本回合是否被敌方攻击命中（受击标记，用于"未受击+10"累积）
     },
     // 计算当前隐匿值 = 100 - 有效嘲讽（有效嘲讽含 baseTauntBonus + 临时负[嘲]buff）
-    // 击杀/闪避的隐匿深度固化为 baseTauntBonus；临时负[嘲]buff 单独叠加（3回合后自然消失）
+    // 击杀/未受击的隐匿深度固化为 baseTauntBonus；临时负[嘲]buff 单独叠加（3回合后自然消失）
     computeStealthValue(entity) {
         const effectiveTaunt = getEffectiveStats(entity).taunt;
         return Math.max(0, 100 - effectiveTaunt);
@@ -4781,15 +4782,15 @@ registerClassPassive('隐匿者', {
             if (targetDom) createFloatingText(targetDom, '再动!', 'text-fuchsia-400');
             addHistory(`   ⚡ ${entity.name} 隐匿值突破 ${stealthVal}，触发【再动】！`);
         }
-        // === 隐匿值 >= 100：获得下一次非反应攻击 +80 攻击力（单次消耗），随后回归 50 ===
+        // === 隐匿值 >= 100：获得下一次非反应攻击 +50 攻击力（单次消耗），随后回归 50 ===
         if (stealthVal >= 100) {
             entity.buffs = entity.buffs || [];
             entity.buffs = entity.buffs.filter(b => !(b.isConcealAtk));
-            entity.buffs.push({ type: 'atk', value: 80, duration: 3, isConcealAtk: true });
+            entity.buffs.push({ type: 'atk', value: 50, duration: 3, isConcealAtk: true });
             // 消耗掉助其突破100的临时隐匿（负[嘲]buff），使隐匿值真正回归 50 开启新循环
             entity.buffs = entity.buffs.filter(b => !(b.type === 'taunt' && b.value < 0));
-            if (targetDom) createFloatingText(targetDom, '隐匿急袭+80 1次', 'text-orange-400');
-            addHistory(`   🎯 ${entity.name} 隐匿值突破 100，下一次非反应攻击攻击力 +80！(隐匿值回归 50)`);
+            if (targetDom) createFloatingText(targetDom, '隐匿急袭+50 1次', 'text-orange-400');
+            addHistory(`   🎯 ${entity.name} 隐匿值突破 100，下一次非反应攻击攻击力 +50！(隐匿值回归 50)`);
             entity.baseTauntBonus = -50;
             entity.stealthValue = 50;
             entity.stealthCycleProcessed = false;
@@ -4807,10 +4808,6 @@ registerClassPassive('隐匿者', {
         if (ctx.caster.classType !== '隐匿者') return;
         const casterDom = ctx.caster.id.startsWith('h') ? document.getElementById(`hero-card-${ctx.caster.id}`) : document.getElementById(`${ctx.caster.id}-sprite`);
         this.gainStealth(ctx.caster, 30, casterDom);
-    },
-    onDodge(ctx) {
-        if (ctx.target.classType !== '隐匿者') return;
-        this.gainStealth(ctx.target, 4, ctx.targetDom);
     },
     onFatalDamage(ctx) {
         if (!ctx.target.hasTriggeredAvoidFatal) {
@@ -4996,12 +4993,6 @@ CombatEvents.on(EVENTS.ON_DODGE, async (ctx) => {
 CombatEvents.on(EVENTS.ON_KILL, (ctx) => {
     const p = CLASS_PASSIVES[ctx.caster.classType];
     if (p && p.onKill) p.onKill(ctx);
-});
-
-// 隐匿者：闪避成功累积隐匿值 +4 (闪避成功时触发，与防守者强力反击并存)
-CombatEvents.on(EVENTS.ON_DODGE, (ctx) => {
-    const p = CLASS_PASSIVES[ctx.target.classType];
-    if (p && p.onDodge) p.onDodge(ctx);
 });
 
 // 隐匿者：临时负[嘲]buff 到期 → 隐匿值回落，若跌回80以下解锁再动锁定
@@ -5775,6 +5766,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     }
     
     target.hp -= hpDmg; if (targetType === 'hero') target.tp = Math.min(target.maxTp, target.tp + (10 * multiplier)); 
+    // 隐匿者：被敌方攻击命中 → 标记本回合已受伤（不累积"未受击+10"；护盾/屏障全挡、-0 同样算受伤）
+    if (targetType === 'hero' && target.classType === '隐匿者') target.stealthHitThisRound = true; 
     if(targetDom) targetDom.classList.add('shake'); setTimeout(() => { if(targetDom) targetDom.classList.remove('shake') }, 400);
     
     let severityStr = "";
@@ -6279,6 +6272,15 @@ function startRound() {
   // 使用带有衰减的 queueSpd 进行排序，避免连动怪完全霸占时间轴
   allEntities.sort((a, b) => b.queueSpd - a.queueSpd);
   state.actionQueue = allEntities; state.queueIndex = 0; 
+  // 隐匿者被动：一回合内未被敌方攻击命中 → 隐匿值 +10（每回合结束统一结算，被命中过的隐匿者不累积）
+  // 置于排轴之后：gainStealth 触发的【再动】splice 不会因重建 actionQueue 而被丢弃
+  heroesData.forEach(h => {
+    if (h.isAlive && h.classType === '隐匿者' && !h.stealthHitThisRound) {
+      const p = CLASS_PASSIVES['隐匿者'];
+      if (p && p.gainStealth) p.gainStealth(h, 10, document.getElementById(`hero-card-${h.id}`));
+    }
+    h.stealthHitThisRound = false; // 每次进入新回合清零受击标记
+  });
   addHistory(`\n=== 第 ${state.round} 回合 ===`);
   state.round++;
   nextTurn();
