@@ -6048,16 +6048,19 @@ function getTauntTarget(heroArray) {
     return heroArray[heroArray.length - 1]; // Fallback
 }
 
-async function executeSkillAction(caster, primaryTarget, skill, multiplier, isReactionTrigger = false) {
+async function executeSkillAction(caster, primaryTarget, skill, multiplier, isReactionTrigger = false, skipCost = false) {
     const _pendingKills = []; // 收集本次技能中所有被击杀的敌人，最后统一播放特写
     // 记录本次技能开始前是否已持有隐匿急袭 buff：
     // 若该 buff 是由本次技能自身（隐匿值累积跨100）刚刚授予的，则不应被本次技能消耗，留给下一次攻击
     const hadConcealAtkBefore = caster.classType === '隐匿者' && !isReactionTrigger
         && caster.buffs && caster.buffs.some(b => b.isConcealAtk);
     // === 多重资源扣除 ===
-    caster.mp -= skill.cost; 
-    if (skill.hpCost) caster.hp -= skill.hpCost;
-    if (skill.tpCost) caster.tp -= skill.tpCost;
+    // 蓄力[延迟]技能的资源已在 handleChargeSkill 蓄力开始时实时扣除，释放时跳过（skipCost）避免重复
+    if (!skipCost) {
+        caster.mp -= skill.cost; 
+        if (skill.hpCost) caster.hp -= skill.hpCost;
+        if (skill.tpCost) caster.tp -= skill.tpCost;
+    }
 
     // === [限N次] 本场战斗次数消耗（仅我方）===
     // 蓄力释放传入的是 currentDelay.skill 浅拷贝，故按技能名定位到真实技能对象再递减
@@ -6809,6 +6812,14 @@ function prepareAttack() {
 async function handleChargeSkill(hero, skillIndex) {
   if (state.isAnimating) return;
   const skill = hero.skills[skillIndex];
+  // 蓄力即押注资源：实时扣除 MP/HP/TP（蓄力完成释放时不再重复扣除，见 doReleaseCharge）
+  if (hero.mp < skill.cost || hero.hp <= (skill.hpCost || 0) || hero.tp < (skill.tpCost || 0)) {
+      showLog("释放条件不足！"); return;
+  }
+  hero.mp -= skill.cost;
+  if (skill.hpCost) hero.hp -= skill.hpCost;
+  if (skill.tpCost) hero.tp -= skill.tpCost;
+  updateHeroUI(hero);
   const hasteStore = hero.hasteStore || 0;
   const effective = Math.max(0, skill.delay - hasteStore);
   hero.hasteStore = Math.max(0, hasteStore - skill.delay); // covered = min(hasteStore, delay)
@@ -6855,7 +6866,8 @@ async function releaseCharge() {
   await doReleaseCharge(hero, null);
 }
 
-// 实际释放蓄力技能：结算原技能（含自身[加速]，由 executeSkillAction 统一施加）
+// 实际释放蓄力技能：结算原技能效果（含自身[加速]，由 executeSkillAction 统一施加）
+// 注意：MP/HP/TP 已在蓄力开始时实时扣除（handleChargeSkill），此处传 skipCost 避免重复扣除
 async function doReleaseCharge(hero, target) {
   const entry = hero.currentDelay; if (!entry) { state.isAnimating = false; return; }
   triggerHeroChargeRelease(hero);
@@ -6866,7 +6878,7 @@ async function doReleaseCharge(hero, target) {
   addHistory(`   ⚡ [${hero.name}] 释放【${skill.name}】！`);
   updateHeroUI(hero);
   const multiplier = await triggerBurstIfNeeded(hero);
-  await executeSkillAction(hero, target, skill, multiplier);
+  await executeSkillAction(hero, target, skill, multiplier, false, true);
   await endTurn();
 }
 
