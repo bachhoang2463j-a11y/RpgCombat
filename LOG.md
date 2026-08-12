@@ -476,6 +476,48 @@
 - **涉及文件**：`demo_skill_ui.html`（已删除）、`demo_charge_lightning.html`（已删除）。
 - **决策原因**：响应用户要求清理临时测试页面，确保 Git 仓库和项目根目录整洁纯粹。
 
+---
+
+## [LOG-040] 2026-08-12 — 新增【肃正】全队共享护盾标签机制
+
+- **变更行为**：
+  1. **全队共享屏障数据层**：新增模块级全局变量 `teamBarrier`（当前共享屏障值）与 `teamBarrierMax`（历史峰值供 UI 进度条基准），与各角色自身的 `entity.shield` 完全独立，`startGame()` 新战局时清零。
+  2. **施放标签 `[肃正]`**：在 `SKILL_TYPES` 数组加入 `[肃正]` 使编辑器下拉可选；`parseSkill` 的 `singleTagMatches` 正则补入 `肃正` 以支持无 power 写法；`isBeneficial` 补 `tag.includes('肃正')` 避免目标选择误判为伤害类；`executeSkillAction` 目标锚定施法者自身（与 `[再动]` 同分支）。注册 `TAG_HANDLERS['肃正']`：`teamBarrier += actualPower`、播盾特效、施法者飘字、更新共享盾横幅。
+  3. **伤害拦截（核心）**：在 `applySingleTagEffect` 伤害分支、`calculateDamage` 之前插入屏障拦截——`targetType === 'hero'` 且屏障存在时，先按 `min(teamBarrier, rawDamage)` 全额吸收原始伤害（**armor=0**：不减伤直接扣，穿透 `isPierce` 攻击同样撞屏障），剩余泄漏量 `rawDamage` 续走角色自身 Armor → 个人护盾 → 防御姿态 → HP 的正常管线。**群攻"挡一次，泄漏给全员"**：屏障作为"单个目标"只被群攻命中一次，批次首次结算吸收一次命中量后，将泄漏量经 `barrierAoELeak` 共享给全体成员，后续成员不再重复扣屏障。屏障可无限叠加。
+  4. **屏障 UI**：在 `#heroes-container` 顶部新增"🛡️ 圣域帷幕"全局横幅（屏障值 + 进度条），值为 0 时隐藏；新增 `updateTeamBarrierUI()` 刷新。屏障吸收时在受击目标上飘字并写入战局历史。
+  5. **视觉反馈修正**：屏障完全挡下伤害（`hpDmg===0 && barrierAbsorb>0`）时补充分支，避免显示误导性的 `-0` 红色飘字。
+- **涉及文件**：`战斗前端-爬塔 V5.7.html`（模块变量区、`SKILL_TYPES`、`parseSkill`、`TAG_HANDLERS`、`executeSkillAction`、`applySingleTagEffect` 伤害分支、`#heroes-container` HTML、`updateTeamBarrierUI`）。
+- **决策原因**：响应需求新增集"全队共享、不可被穿透、armor=0、群攻只命中一次"于一体的独特护盾标签，为团队提供战略级抵挡手段，区别于现有单角色护盾。
+
+---
+
+## [LOG-041] 2026-08-12 — 【肃正】屏障升级为"伪实体肉盾" + 修复 UI 横幅 bug
+
+- **变更行为**：
+  1. **修复 UI 横幅 bug（根因）**：`initUI()` 每次调用都执行 `heroesContainer.innerHTML = ''`，把静态写在 `#heroes-container` 内的 `#team-barrier-banner` 删掉，导致横幅在首次构建后永久消失。将横幅 HTML 抽成常量 `TEAM_BARRIER_BANNER_HTML`，在 `initUI()` 清空容器后 `insertAdjacentHTML('afterbegin', ...)` 重建，覆盖数据就绪/重置/编辑器保存三处调用点。
+  2. **屏障成为"伪实体肉盾"（核心）**：屏障存在期间，我方角色完全不被敌方攻击选中、不进入各自的闪避判定。
+     - `getTauntTarget()` 开头判断 `teamBarrier > 0` → 返回屏障伪目标（`barrierStandIn`，`id:'barrier'`、`spd:0`、`isBarrierTarget:true`），使敌方单体攻击的目标选择直接命中屏障。
+     - `applySingleTagEffect()` 顶部新增屏障伪目标特判：伤害类攻击 → 调用 `applyBarrierHit()` 直接命中屏障（**无闪避 spd=0 不 roll、跳过反应弹窗、穿透也撞屏障**）；非伤害负面效果（降/盲等）被屏障格挡，我方不受益也不受害。
+     - 新增 `applyBarrierHit()`：复用主伤害管线公式计算 rawDamage，屏障 `armor=0` 全额吸收，**全挡到被打破为止**；破碎那一击溢出部分：单体→打代理目标（`proxyHero`），群攻→打全员，均走正常闪避+减伤管线。
+     - `executeSkillAction()` 敌方对我方群攻：屏障存在时整个群攻被屏障命中一次（伪实体肉盾），我方成员不闪避、不被选中。
+  3. **反应弹窗**：屏障存在时我方不受击，跳过反应弹窗（被动防御无意义）；**看破不受影响**——看破经 `BEFORE_SKILL_RESOLVE` 事件在技能结算前主动拦截，独立于受击目标。
+  4. **状态清理**：`startGame()` 补充重置 `barrierStandIn`。
+  5. **屏障受击反馈**：`applyBarrierHit()` 中为屏障横幅接入与角色受击一致的演出——白色剪影泛白（`spawnHitFlash`，依伤害强度分级）、横幅抖动（`.shake`）、屏幕震动（`triggerScreenShake`）、打击音效（单体 `atk2`/群攻 `atk1`）；屏障破碎时追加全屏红闪 + 强力震屏 + `kill` 破碎音效。
+- **涉及文件**：`战斗前端-爬塔 V5.7.html`（`initUI`、`TEAM_BARRIER_BANNER_HTML`、`getTauntTarget`、`applySingleTagEffect`、`applyBarrierHit`、`executeSkillAction`、`startGame`）。
+- **决策原因**：响应用户需求，将【肃正】从"数值挡伤害"升级为"一个伪实体肉盾角色"——屏障存在期间我方角色等同处于无敌状态，攻击全部被屏障吸收，直到屏障被打破，实现"新增一个角色直到敌方击杀他"的战术语义。
+
+---
+
+## [LOG-042] 2026-08-13 — 升级版本号至 V5.8 (重命名引擎主文件为 战斗前端-爬塔 V5.8.html 并更新文档规范)
+
+- **变更行为**：
+  1. **引擎主文件重命名**：使用 `git mv` 将 `战斗前端-爬塔 V5.7.html` 重命名为 `战斗前端-爬塔 V5.8.html`。
+  2. **更新项目三件套文档说明**：同步更新 `README.md` 中的当前版本号为 **V5.8**，并更新 `SPEC.md` 中的主文件路径与版本引用。
+  3. **定版【肃正】机制**：包含【肃正】全队共享屏障数据层、伪实体肉盾拦截逻辑与 UI 横幅持久重建。
+- **涉及文件**：`README.md`、`SPEC.md`、`战斗前端-爬塔 V5.8.html`（原 `战斗前端-爬塔 V5.7.html`）。
+- **决策原因**：完成【肃正】伪实体肉盾机制迭代后升级版本号至 V5.8，归档版本规范并保持全局文档标识一致。
+
+
 
 
 

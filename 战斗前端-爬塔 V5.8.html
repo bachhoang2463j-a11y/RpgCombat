@@ -705,7 +705,9 @@
   <!-- 悬浮 UI 层 -->
   <div class="absolute bottom-[52px] left-0 w-full p-1.5 sm:p-6 flex flex-col-reverse sm:flex-row items-end justify-between gap-1.5 sm:gap-4 z-20 pointer-events-none pb-2 sm:pb-6">
     
-    <div id="heroes-container" class="w-full sm:flex-1 grid grid-cols-4 gap-1 sm:gap-4 max-w-2xl pointer-events-auto relative"></div>
+    <div id="heroes-container" class="w-full sm:flex-1 grid grid-cols-4 gap-1 sm:gap-4 max-w-2xl pointer-events-auto relative">
+      <!-- 【肃正】全队共享屏障横幅由 initUI() 动态重建（见 TEAM_BARRIER_BANNER_HTML） -->
+    </div>
     
     <div id="menu-container" class="w-[260px] h-[172px] bg-slate-950/95 backdrop-blur-xl rounded-xl border border-slate-700/80 border-t-2 border-t-cyan-500/80 flex flex-col overflow-hidden transition-all duration-300 relative shadow-[0_15px_35px_rgba(0,0,0,0.9)] pointer-events-auto self-end mb-1 sm:mb-0">
       <div id="active-hero-name" class="text-center text-[10px] sm:text-xs py-1 text-white/80 bg-white/5 tracking-widest uppercase border-b border-white/10 font-bold">等待指令</div>
@@ -838,6 +840,7 @@ const SKILL_TYPES = [
   '[群回蓝]', '[单回蓝]', '[群瞄]', '[单瞄]', '[群降]', '[单降]', '[群盲]', '[单盲]', '[嘲讽]', '[反击]', '[群反击]', '[再动]', '[回避]', '[群避]', '[单避]',
   '[眩晕]', '[群眩晕]', '[穿透]', '[群穿透]', '[免伤]',
   '[驱散]', '[群驱散]',
+  '[肃正]',
   '[近战]', '[远程]', '[法术]'
 ];
 
@@ -3758,6 +3761,28 @@ let initialHeroesCache = []; let initialEnemiesCache = [];
 console.log('CRITICAL_LOG: 2. Before state initialization');
 const state = { round: 1, actionQueue: [], queueIndex: 0, isGameStarted: false, isAnimating: false, isTargeting: false, pendingAction: null, usedExtraTurnSkillsThisRound: new Set() };
 
+// 【肃正】全队共享护盾：一个全局的"单个目标"，与各角色自身的 entity.shield 完全独立。
+// 屏障最先挨打（在 Armor 减伤之前全额吸收原始伤害），穿透攻击同样撞屏障，可无限叠加。
+let teamBarrier = 0;       // 当前共享屏障值
+let teamBarrierMax = 0;    // 历史峰值（用于 UI 进度条基准）
+// 【肃正】群攻语义辅助：屏障作为"单个目标"只被群攻命中一次，吸收第一次命中量后，
+// 将该泄漏量共享给全体成员（"挡一次，泄漏给全员"）。仅在本次群攻结算批次内有效。
+let barrierAoEActive = false;  // 当前是否处于群攻命中我方的屏障批次
+let barrierAoELeak = null;     // 群攻批次内每个成员共用的泄漏量
+// 【肃正】屏障作为"伪实体肉盾"：屏障存在时我方角色不被选中、不闪避，攻击直接命中屏障。
+// barrierStandIn 缓存当前代理 hero 引用，供 getTauntTarget 选中屏障、以及碎片溢出时打到的角色。
+let barrierStandIn = null;
+
+// 【肃正】全队共享屏障横幅 HTML 常量（initUI 清空容器后会重建，须在此保证 id 完整）
+const TEAM_BARRIER_BANNER_HTML = `
+  <div id="team-barrier-banner" class="col-span-4 -mt-1 sm:-mt-2 mb-0.5 flex items-center gap-2 px-2 py-1 rounded-lg bg-gradient-to-r from-cyan-950/80 via-slate-900/80 to-cyan-950/80 border border-cyan-500/50 shadow-[0_0_14px_rgba(6,182,212,0.25)] pointer-events-none" style="display:none">
+    <span class="text-cyan-300 text-[10px] sm:text-xs font-bold tracking-wider">🛡️ 圣域帷幕</span>
+    <div class="flex-1 h-1.5 rounded-full bg-slate-800/80 overflow-hidden">
+      <div id="team-barrier-bar" class="h-full rounded-full bg-gradient-to-r from-cyan-500 to-sky-400 transition-all duration-300" style="width:100%"></div>
+    </div>
+    <span id="team-barrier-value" class="text-cyan-200 text-[10px] sm:text-xs font-bold tabular-nums">0</span>
+  </div>`;
+
 function getCleanNameAndEmoji(rawName) {
     const emojiRegex = /^([\uD800-\uDBFF][\uDC00-\uDFFF]|\p{Emoji_Presentation}|\p{Emoji}\uFE0F?)\s*/u;
     const match = rawName.match(emojiRegex);
@@ -3831,7 +3856,7 @@ function parseSkill(skillStr) {
     
     let typeMatches = [...skillStr.matchAll(/\[(.*?);power:(-?\d+)\]/gi)];
     let types = ['[无]', '[无]', '[无]']; let powers = [0, 0, 0];
-    let singleTagMatches = [...skillStr.matchAll(/\[(群攻.*?|单体.*?|群回|单回|单瞄|群防|单防|群盾|单盾|嘲讽|群降|再动|回避|群避|单避|免伤|反击|群反击)\]/gi)];
+    let singleTagMatches = [...skillStr.matchAll(/\[(群攻.*?|单体.*?|群回|单回|单瞄|群防|单防|群盾|单盾|嘲讽|群降|再动|回避|群避|单避|免伤|反击|群反击|肃正)\]/gi)];
     
     if (typeMatches.length > 0) { 
         for (let i = 0; i < Math.min(typeMatches.length, 3); i++) { 
@@ -3984,6 +4009,9 @@ function onCombatDataReceived(yamlStr) {
 function initUI() {
   const heroesContainer = document.getElementById('heroes-container'); const enemiesContainer = document.getElementById('enemies-container');
   heroesContainer.innerHTML = ''; enemiesContainer.innerHTML = '';
+  // 【肃正】重建全队共享屏障横幅（清空容器后补回，覆盖数据就绪/重置/编辑器保存三处调用）
+  heroesContainer.insertAdjacentHTML('afterbegin', TEAM_BARRIER_BANNER_HTML);
+  updateTeamBarrierUI();
   heroesData.forEach((hero, index) => {
     hero.dom = document.createElement('div'); hero.dom.className = `relative transition-all duration-300 min-w-[70px] ${!hero.isAlive ? 'opacity-40 grayscale' : ''}`; hero.dom.id = `hero-wrap-${hero.id}`;
     if (state.isGameStarted) { hero.dom.classList.add('anim-enter-hero'); hero.dom.style.animationDelay = `${index * 0.08}s`; setTimeout(() => { if (hero.dom) hero.dom.classList.remove('anim-enter-hero'); }, 800 + index * 80); } else { hero.dom.classList.add('opacity-0'); }
@@ -4101,6 +4129,18 @@ function updateBuffUI(entity) {
   }
   
   buffContainer.innerHTML = html;
+}
+
+// 【肃正】全队共享屏障 UI 刷新：值为 0 时隐藏横幅
+function updateTeamBarrierUI() {
+  const banner = document.getElementById('team-barrier-banner');
+  if (!banner) return;
+  if (teamBarrier <= 0) { banner.style.display = 'none'; return; }
+  banner.style.display = 'flex';
+  const bar = document.getElementById('team-barrier-bar');
+  const valEl = document.getElementById('team-barrier-value');
+  if (bar) bar.style.width = `${teamBarrierMax > 0 ? Math.min(100, (teamBarrier / teamBarrierMax) * 100) : 100}%`;
+  if (valEl) valEl.textContent = Math.floor(teamBarrier);
 }
 
 function renderTurnQueue() {
@@ -4314,6 +4354,17 @@ registerTagHandler('盾', (ctx) => {
     ctx.target.shield = (ctx.target.shield || 0) + ctx.actualPower;
     createFloatingText(ctx.targetDom, `护盾+${ctx.actualPower}`, 'text-slate-300');
     addHistory(`   ↳ 为 ${ctx.target.name} 附加了一层能吸收 ${ctx.actualPower} 点伤害的护盾。`);
+});
+
+// 【肃正】全队共享护盾：写入全局 teamBarrier，与各角色自身 shield 完全独立。
+// 屏障最先挨打（armor=0 全额吸收原始伤害）、穿透也吸收、可无限叠加。
+registerTagHandler('肃正', (ctx) => {
+    playSound('shieldUp'); playSVGEffect(ctx.targetDom, 'shield');
+    teamBarrier += ctx.actualPower;
+    if (teamBarrier > teamBarrierMax) teamBarrierMax = teamBarrier;
+    createFloatingText(ctx.targetDom, `🛡️ 圣域帷幕 +${ctx.actualPower}`, 'text-cyan-300');
+    addHistory(`   ↳ ${ctx.caster.name} 展开【圣域帷幕】，为全队架起一层可吸收 ${ctx.actualPower} 点伤害的共享屏障（当前 ${teamBarrier}）。`);
+    updateTeamBarrierUI();
 });
 
 // --- 闪避/反击类 ---
@@ -5292,6 +5343,16 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
   const isDamage = tag.includes('攻') || tag.includes('单体') || tag.includes('穿透') || tag.includes('眩晕');
   const isHarmful = isDamage || tag.includes('降') || tag.includes('盲');
   const incomingDamageType = skill ? (skill.damageType || '近战') : '近战';
+
+  // 【肃正】屏障伪目标特判：屏障存在时我方角色不被选中，命中屏障。
+  // 屏障只吸收伤害类攻击；非伤害的负面效果（降/盲等）无法命中屏障，被屏障格挡（我方不受益也不受害）。
+  if (target.isBarrierTarget) {
+    if (isDamage) {
+      return await applyBarrierHit(caster, target, tag, tagPower, skill, multiplier);
+    }
+    addHistory(`   ↳ 🛡️ ${caster.name} 的负面效果被【圣域帷幕】圣域所格挡，无法触及我方角色。`);
+    return;
+  }
   
   let isDodged = false;
   let effectTurns = globalTurns !== null ? globalTurns : 3;
@@ -5499,6 +5560,36 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     rawDamage = Math.floor(rawDamage * dmgMultiplier);
     
     const wasAlive = target.hp > 0; 
+    
+    // === 【肃正】全队共享屏障拦截 ===
+    // 屏障最先挨打：在 Armor 减伤之前全额吸收原始伤害（armor=0），穿透攻击同样撞屏障。
+    // 屏障是全局值，作为"单个目标"只被攻击命中一次。
+    // 单体/非群攻：每次按自身命中量吸收。群攻：批次首个目标结算一次吸收，泄漏量经 barrierAoELeak 共享给全员。
+    let barrierAbsorb = 0;
+    if (targetType === 'hero' && (teamBarrier > 0 || barrierAoELeak !== null) && rawDamage > 0) {
+        let hitAmount;
+        if (barrierAoEActive) {
+            // 群攻批次：所有成员复用同一个泄漏量（屏障只吸收了一次命中量）
+            if (barrierAoELeak !== null) {
+                hitAmount = 0;                    // 屏障已在批次首目标吸收，本目标不再重复扣
+                rawDamage = barrierAoELeak;       // 沿用共享的泄漏量
+            } else {
+                hitAmount = Math.min(teamBarrier, rawDamage);
+                barrierAoELeak = rawDamage - hitAmount || 0; // 记录共享泄漏量
+            }
+        } else {
+            hitAmount = Math.min(teamBarrier, rawDamage);   // 单体：按自身命中量吸收
+        }
+        barrierAbsorb = hitAmount;
+        teamBarrier -= hitAmount;
+        rawDamage -= hitAmount;   // 剩余泄漏量续走下方正常减伤管线
+        if (barrierAbsorb > 0) {
+            updateTeamBarrierUI();
+            createFloatingText(targetDom, `-${barrierAbsorb} 圣域帷幕`, 'text-cyan-300');
+            addHistory(`   ↳ 🛡️ 【圣域帷幕】替全队挡下了 ${barrierAbsorb} 点伤害（剩余 ${teamBarrier}）。`);
+        }
+    }
+    
     let { hpDmg, shieldDmg } = calculateDamage(rawDamage, target, isPierce);
     const consumedGuardValue = consumeOneTimeDamageGuard();
     if (consumedGuardValue > 0) {
@@ -5534,6 +5625,9 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     if (shieldDmg > 0 && hpDmg === 0) { 
         createFloatingText(targetDom, `-${shieldDmg} 破盾`, 'text-slate-300'); 
         addHistory(`   ↳ 对 ${target.name} 的护盾造成了 ${shieldDmg} 点破坏。`); 
+    }
+    else if (hpDmg === 0 && barrierAbsorb > 0) {
+        // 已被【圣域帷幕】完全挡下，飘字与历史已在屏障拦截处记录
     }
     else { 
         createFloatingText(targetDom, `-${hpDmg}`, 'text-rose-500'); 
@@ -5578,9 +5672,79 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
   if (targetType === 'enemy') updateEnemyUI(target); else updateHeroUI(target);
 }
 
+// === 【肃正】屏障命中结算（伪实体肉盾承受攻击） ===
+// 屏障作为"单个目标"被攻击命中：无闪避（spd=0 不 roll）、无反应弹窗、穿透也撞屏障。
+// 屏障全挡到被打破为止；破碎那一击的溢出部分：单体→打代理目标，群攻→打全员（均走正常闪避+减伤管线）。
+async function applyBarrierHit(caster, barrierTarget, tag, tagPower, skill, multiplier) {
+  const cStats = getEffectiveStats(caster);
+  // 与主伤害管线一致的伤害计算
+  let buffAtkBonus = cStats.atk - (caster.atk || 0);
+  let baseDmg = 0;
+  if (tagPower === 0) baseDmg = cStats.atk * multiplier;
+  else baseDmg = (tagPower * multiplier) + (buffAtkBonus * multiplier);
+  let rawDamage = Math.max(1, Math.floor(baseDmg * (0.8 + Math.random() * 0.4)));
+  let dmgMultiplier = 1;
+  const casterPassive = CLASS_PASSIVES[caster.classType];
+  if (casterPassive && casterPassive.modifyDamageMultiplier) dmgMultiplier += casterPassive.modifyDamageMultiplier(caster, barrierTarget);
+  if (casterPassive && casterPassive.modifyDamageDealt) rawDamage += casterPassive.modifyDamageDealt(caster, skill);
+  rawDamage = Math.floor(rawDamage * dmgMultiplier);
+
+  // 屏障吸收（armor=0，穿透也吸收）
+  const absorb = Math.min(teamBarrier, rawDamage);
+  teamBarrier -= absorb;
+  const overflow = rawDamage - absorb;
+  // ===== 屏障受击反馈（复用角色受击的泛白/震屏/音效）=====
+  const barrierDom = document.getElementById('team-barrier-banner');
+  if (absorb > 0) {
+    // 音效：与角色受到伤害相同的打击音效
+    if (tag.includes('群攻')) playSound('atk1'); else playSound('atk2');
+    // 屏障横幅受击抖动
+    if (barrierDom) { barrierDom.classList.add('shake'); setTimeout(() => { if (barrierDom) barrierDom.classList.remove('shake'); }, 400); }
+    // 受击泛白（白色剪影闪烁 + 全屏红闪 + 爆裂粒子，依伤害强度分级）
+    if (window.spawnHitFlash && barrierDom) {
+      const intensity = Math.min(1, absorb / Math.max(1, teamBarrierMax));
+      if (intensity > 0.08) window.spawnHitFlash(barrierDom, intensity);
+    }
+    // 屏幕震动
+    if (window.triggerScreenShake) window.triggerScreenShake(absorb >= teamBarrierMax * 0.5 ? 8 : 4, 280);
+    // 屏障横幅飘字
+    createFloatingText(barrierDom, `-${absorb}`, 'text-cyan-200');
+    updateTeamBarrierUI();
+    addHistory(`   ↳ 🛡️ 【圣域帷幕】替全队挡下了 ${absorb} 点伤害（剩余 ${teamBarrier}）。`);
+  }
+  if (teamBarrier <= 0) {
+    teamBarrier = 0; updateTeamBarrierUI();
+    // 破碎额外演出：全屏红闪 + 强烈震屏 + 破碎音效
+    if (window.triggerScreenShake) window.triggerScreenShake(14, 420);
+    if (window.spawnHitFlash && barrierDom) window.spawnHitFlash(barrierDom, 0.9);
+    playSound('kill');
+    addHistory(`   💥 【圣域帷幕】轰然破碎！`);
+  }
+
+  // 溢出部分：屏障已破，单体→打代理目标，群攻→打全员
+  if (overflow > 0) {
+    const isAoe = tag.includes('群');
+    const targets = isAoe ? heroesData.filter(h => h.isAlive) : (barrierTarget.proxyHero ? [barrierTarget.proxyHero] : []);
+    for (const t of targets) {
+      if (!t || !t.isAlive) continue;
+      await applySingleTagEffect(caster, t, tag, tagPower, skill.hit, multiplier, skill.turns, skill);
+    }
+  }
+}
+
 // 基于嘲讽值的轮盘赌算法选择目标
 function getTauntTarget(heroArray) {
     if (heroArray.length === 0) return null;
+    // 【肃正】屏障作为"伪实体肉盾"：屏障存在期间，敌方攻击的目标选择直接命中屏障，
+    // 我方角色完全不被选中。屏障 id 以 'barrier' 开头，特判走屏障拦截分支。
+    if (teamBarrier > 0) {
+        barrierStandIn = {
+            id: 'barrier', isAlive: true, isBarrierTarget: true, name: '圣域帷幕',
+            spd: 0, buffs: [], classType: null, skills: [],
+            dom: null, proxyHero: heroArray[Math.floor(Math.random() * heroArray.length)]
+        };
+        return barrierStandIn;
+    }
     let totalTauntPool = 0;
     const heroesWithTaunt = heroArray.map(h => {
         const tauntVal = Math.max(1, getEffectiveStats(h).taunt);
@@ -5691,13 +5855,13 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     
     for (let item of tagList) {
         const tag = item.tag; const tagPower = item.power;
-        const isBeneficial = tag.includes('回') || tag.includes('增') || tag.includes('防') || tag.includes('盾') || tag.includes('瞄') || tag.includes('嘲') || tag.includes('再动') || tag.includes('避') || tag.includes('免伤') || tag.includes('反击') || tag.includes('驱散');
+        const isBeneficial = tag.includes('回') || tag.includes('增') || tag.includes('防') || tag.includes('盾') || tag.includes('瞄') || tag.includes('嘲') || tag.includes('再动') || tag.includes('避') || tag.includes('免伤') || tag.includes('反击') || tag.includes('驱散') || tag.includes('肃正');
         const isAoe = tag.includes('群'); const casterIsHero = caster.id.startsWith('h');
         const allies = casterIsHero ? heroesData.filter(h=>h.isAlive) : enemiesData.filter(e=>e.isAlive);
         const opponents = casterIsHero ? enemiesData.filter(e=>e.isAlive) : heroesData.filter(h=>h.isAlive);
         let targets = [];
         
-        if (tag.includes('再动')) { 
+        if (tag.includes('再动') || tag.includes('肃正')) { 
             targets = [caster]; 
         } else if (isAoe) { 
             targets = isBeneficial ? allies : opponents; 
@@ -5770,11 +5934,24 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         }
 
         // 将并发的 Promise.all 改为顺序遍历，自然兼容多角色依次弹窗反应
-        for (let t of targets) {
-            const killResult = await applySingleTagEffect(caster, t, tag, tagPower, skill.hit, multiplier, skill.turns, skill);
-            if (killResult === '__killed__') _pendingKills.push(t);
-            if (isAoe && targets.length > 1) await sleep(200); // 为群攻添加视觉节奏感
+        // 【肃正】群攻语义：屏障作为"单个目标"只被群攻命中一次，泄漏量共享给全体成员
+        const prevAoEActive = barrierAoEActive;
+        const prevAoELeak = barrierAoELeak;
+        if (isAoe) { barrierAoEActive = true; barrierAoELeak = null; }
+        // 【肃正】敌方对我方的群攻：屏障存在时，整个群攻被屏障命中一次（伪实体肉盾），我方成员不闪避、不被选中
+        if (isAoe && !casterIsHero && !isBeneficial && teamBarrier > 0) {
+            const proxy = (targets[0] && !targets[0].isBarrierTarget) ? targets[0] : heroesData.find(h => h.isAlive);
+            barrierStandIn = { id: 'barrier2', isAlive: true, isBarrierTarget: true, name: '圣域帷幕', spd: 0, buffs: [], classType: null, skills: [], dom: null, proxyHero: proxy };
+            await applySingleTagEffect(caster, barrierStandIn, tag, tagPower, skill.hit, multiplier, skill.turns, skill);
+        } else {
+            for (let t of targets) {
+                const killResult = await applySingleTagEffect(caster, t, tag, tagPower, skill.hit, multiplier, skill.turns, skill);
+                if (killResult === '__killed__') _pendingKills.push(t);
+                if (isAoe && targets.length > 1) await sleep(200); // 为群攻添加视觉节奏感
+            }
         }
+        barrierAoEActive = prevAoEActive;  // 恢复语境（避免跨批次串扰）
+        if (!isAoe || barrierAoELeak === null) barrierAoELeak = prevAoELeak;
         await sleep(500); 
     }
     
@@ -5861,6 +6038,9 @@ async function triggerBurstIfNeeded(caster) {
 function startGame() {
   state.isGameStarted = true;
   battleHistory = [];
+  
+  // 【肃正】新战局重置全队共享屏障
+  teamBarrier = 0; teamBarrierMax = 0; barrierStandIn = null; updateTeamBarrierUI();
   
   // 初始化避死被动触发状态
   heroesData.forEach(h => { delete h.hasTriggeredGrit; delete h.hasTriggeredAvoidFatal; });
