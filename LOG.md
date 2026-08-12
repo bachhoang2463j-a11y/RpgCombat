@@ -581,7 +581,14 @@
   2. **完善 VFX 开发指南**：在 `VFX_DESIGN_GUIDE.md` 补充 GPU 图层隔离黑框原因、Luminance Alpha 抠图原理、AI 视频黑底压暗、抗锯齿羽化与音量增益放大规范。
 - **涉及文件**：`index.html`、`VFX_DESIGN_GUIDE.md`、`LOG.md`、`LOG-INDEX.md`。
 
+---
 
+## [LOG-049] 2026-08-13 — 修复极限爆发（Burst）激活时 TP 技能误选与"释放条件不足"失败 Bug
 
-
+- **变更行为**：
+  1. **新增爆发中禁用 TP 技能逻辑**：在 `updateMenu` 中添加 `isBurstBlocked = hero.burstActivated && skill.tpCost > 0` 判定。因开启极限爆发后施技能会在结算时将 TP 清零（`triggerBurstIfNeeded`），消耗 TP 的技能若在此状态下施放必定会导致 `hero.tp < skill.tpCost` 判定失败报错“释放条件不足！”，故在菜单中将其设为禁用灰色遮罩（`disabled-card`）。
+  2. **禁用提示与徽章红色预警**：被禁用的 TP 技能显示 `⚠️ 爆发中禁 NTP` 明确原因，TP 消耗徽章同步渲染为红色警告框（`text-rose-400 border-rose-500/80 bg-rose-950`）。
+  3. **头像点击实时刷新技能菜单**：在头像点击切换爆发回调 `handleTargetClick` 中补充 `updateMenu(target)` 重新渲染调用，解决英雄回合中途开启/关闭爆发时技能菜单 UI 未实时刷新导致旧状态残留的问题。
+- **涉及文件**：`index.html`（`handleTargetClick`、`updateMenu`）、`README.md`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：修复在极限爆发激活状态下误选 TP 技能导致行动无效与“释放条件不足”错误的体验问题，并确保回合中途切换爆发状态时 UI 即时同步。
 

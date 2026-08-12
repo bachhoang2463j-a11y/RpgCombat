@@ -7027,6 +7027,8 @@ async function handleTargetClick(target, targetType) {
               if (!target.burstActivated) { target.burstActivated = true; playSound('avatarClick'); createFloatingText(document.getElementById(`hero-card-${target.id}`), "潜能解封!", "text-yellow-400"); } 
               else { target.burstActivated = false; playSound('avatarClick'); createFloatingText(document.getElementById(`hero-card-${target.id}`), "气机收敛", "text-gray-400"); }
               updateHeroUI(target);
+              // 切换极限爆发后立即重渲染技能菜单：TP 技能在爆发激活时禁用不可选
+              updateMenu(target);
         }
      }
      if (targetType === 'enemy') {
@@ -7123,7 +7125,9 @@ function updateMenu(hero) {
     const isMpEnough = hero.mp >= skill.cost;
     const isHpEnough = hero.hp > (skill.hpCost || 0);
     const isTpEnough = hero.tp >= (skill.tpCost || 0);
-    const isEnough = isMpEnough && isHpEnough && isTpEnough && !isUsedExtraTurn && !isUsesExhausted;
+    // 极限爆发激活时，施法会将 TP 清零（triggerBurstIfNeeded），TP 消耗技能必然释放失败 → 禁用不可选
+    const isBurstBlocked = hero.burstActivated && skill.tpCost > 0;
+    const isEnough = isMpEnough && isHpEnough && isTpEnough && !isBurstBlocked && !isUsedExtraTurn && !isUsesExhausted;
 
     let themeClass = 'skill-card-default';
     let typeBadgeStyle = 'bg-slate-800 text-slate-300 border-slate-600/60';
@@ -7221,7 +7225,7 @@ function updateMenu(hero) {
       costBadgesHtml += `<span class="text-[8px] font-mono-num font-bold px-1 py-0.2 rounded border ${errClass} leading-none">❤️ ${skill.hpCost} HP</span>`;
     }
     if (skill.tpCost > 0) {
-      const errClass = !isTpEnough ? 'text-rose-400 border-rose-500/80 bg-rose-950' : 'text-emerald-300 border-emerald-800/60 bg-emerald-950/60';
+      const errClass = (!isTpEnough || isBurstBlocked) ? 'text-rose-400 border-rose-500/80 bg-rose-950' : 'text-emerald-300 border-emerald-800/60 bg-emerald-950/60';
       costBadgesHtml += `<span class="text-[8px] font-mono-num font-bold px-1 py-0.2 rounded border ${errClass} leading-none">🔥 ${skill.tpCost} TP</span>`;
     }
     if (!costBadgesHtml) {
@@ -7242,6 +7246,7 @@ function updateMenu(hero) {
     let notEnoughNotice = '';
     if (!isUsesExhausted && !isUsedExtraTurn && !isEnough) {
       let missingArr = [];
+      if (isBurstBlocked) missingArr.push('爆发中禁' + (skill.tpCost) + 'TP');
       if (!isMpEnough) missingArr.push('MP不足');
       if (!isHpEnough) missingArr.push('HP不足');
       if (!isTpEnough) missingArr.push('TP不足');
