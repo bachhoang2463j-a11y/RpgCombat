@@ -980,7 +980,7 @@ console.log('CRITICAL_LOG: 1. Script tag start');
 const SKILL_TYPES = [
   '[无]', '[群攻]', '[群攻(爆炸)]', '[群攻(雷)]', '[单体]', '[单体(枪击)]', '[单体(火焰)]', '[单体(光)]', '[群回]', '[单回]', '[群增]', 
   '[单增]', '[群防]', '[单防]', '[群盾]', '[单盾]',
-  '[群回蓝]', '[单回蓝]', '[群瞄]', '[单瞄]', '[群降]', '[单降]', '[群盲]', '[单盲]', '[群滞]', '[单滞]', '[群弱]', '[单弱]', '[嘲讽]', '[反击]', '[群反击]', '[再动]', '[回避]', '[群避]', '[单避]',
+  '[群回蓝]', '[单回蓝]', '[群冲]', '[单冲]', '[群瞄]', '[单瞄]', '[群降]', '[单降]', '[群盲]', '[单盲]', '[群滞]', '[单滞]', '[群弱]', '[单弱]', '[嘲讽]', '[反击]', '[群反击]', '[再动]', '[回避]', '[群避]', '[单避]',
   '[眩晕]', '[群眩晕]', '[穿透]', '[群穿透]', '[免伤]',
   '[驱散]', '[群驱散]',
   '[肃正]',
@@ -4735,6 +4735,13 @@ registerTagHandler('回蓝', (ctx) => {
     addHistory(`   ↳ 为 ${ctx.target.name} 恢复了 ${ctx.actualPower} 点法力值。`);
 });
 
+registerTagHandler('冲', (ctx) => {
+    playSound('mpHeal'); playSVGEffect(ctx.targetDom, 'mpHeal');
+    ctx.target.tp = Math.min(ctx.target.maxTp, ctx.target.tp + ctx.actualPower);
+    createFloatingText(ctx.targetDom, `+${ctx.actualPower}TP`, 'text-emerald-300');
+    addHistory(`   ↳ 为 ${ctx.target.name} 恢复了 ${ctx.actualPower} 点潜能(TP)。`);
+});
+
 registerTagHandler('回', (ctx) => {
     playSound('hpHeal'); playSVGEffect(ctx.targetDom, 'heal');
     const oldHp = ctx.target.hp;
@@ -6118,7 +6125,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     CombatEvents.emit(EVENTS.TURN_END, { entity: caster, skill, isReactionTrigger });
     
     let targetStr = "";
-    if (skill.type.includes('群')) targetStr = skill.type.includes('回') || skill.type.includes('增') || skill.type.includes('防') || skill.type.includes('盾') || skill.type.includes('避') || skill.type.includes('反击') ? "全体友方" : "全体敌方";
+    if (skill.type.includes('群')) targetStr = skill.type.includes('回') || skill.type.includes('冲') || skill.type.includes('增') || skill.type.includes('防') || skill.type.includes('盾') || skill.type.includes('避') || skill.type.includes('反击') ? "全体友方" : "全体敌方";
     else targetStr = primaryTarget ? primaryTarget.name : "目标";
     
     if(isReactionTrigger) {
@@ -6145,7 +6152,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
             else if (skill.type.includes('雷') || skill.type.includes('枪击')) chargeColor = '#60a5fa';
             else if (skill.type.includes('光')) chargeColor = '#fde047';
             else if (skill.type.includes('攻') || skill.type.includes('单体')) chargeColor = '#fb7185';
-            else if (skill.type.includes('回') || skill.type.includes('增')) chargeColor = '#34d399';
+            else if (skill.type.includes('回') || skill.type.includes('冲') || skill.type.includes('增')) chargeColor = '#34d399';
             
             const casterRect = casterDomForFx.getBoundingClientRect();
             window.spawnChargeUpParticles(
@@ -6162,7 +6169,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     
     for (let item of tagList) {
         const tag = item.tag; const tagPower = item.power;
-        const isBeneficial = tag.includes('回') || tag.includes('增') || tag.includes('防') || tag.includes('盾') || tag.includes('瞄') || tag.includes('嘲') || tag.includes('再动') || tag.includes('避') || tag.includes('免伤') || tag.includes('反击') || tag.includes('驱散') || tag.includes('肃正');
+        const isBeneficial = tag.includes('回') || tag.includes('冲') || tag.includes('增') || tag.includes('防') || tag.includes('盾') || tag.includes('瞄') || tag.includes('嘲') || tag.includes('再动') || tag.includes('避') || tag.includes('免伤') || tag.includes('反击') || tag.includes('驱散') || tag.includes('肃正');
         const isAoe = tag.includes('群'); const casterIsHero = caster.id.startsWith('h');
         const allies = casterIsHero ? heroesData.filter(h=>h.isAlive) : enemiesData.filter(e=>e.isAlive);
         const opponents = casterIsHero ? enemiesData.filter(e=>e.isAlive) : heroesData.filter(h=>h.isAlive);
@@ -6970,7 +6977,7 @@ function classifySkill(skill) {
   // 敌方单体伤害/妨害标签：命中任一即需进入敌方选目标（即使第一个标签是群攻）
   const hasEnemyTargetTag = tags.some(t => !t.includes('群') && (t.includes('单体') || t.includes('穿透') || t.includes('眩晕') || t.includes('降') || t.includes('盲') || t.includes('滞') || t.includes('弱')));
   // 纯有益单体标签：用于 [他人] 技能选我方目标（含 单X 前缀与 嘲讽/回避/免伤/反击 等单目标有益标签）
-  const hasSingleBuff = tags.some(t => !t.includes('群') && (t.includes('单回') || t.includes('单增') || t.includes('单防') || t.includes('单盾') || t.includes('单瞄') || t.includes('嘲') || t.includes('避') || t.includes('免伤') || t.includes('反击') || t.includes('驱散')));
+  const hasSingleBuff = tags.some(t => !t.includes('群') && (t.includes('单回') || t.includes('单增') || t.includes('单防') || t.includes('单盾') || t.includes('单瞄') || t.includes('单冲') || t.includes('嘲') || t.includes('避') || t.includes('免伤') || t.includes('反击') || t.includes('驱散')));
   const hasOthers = !!skill.isOthers;
   return { hasEnemyTargetTag, hasSingleBuff, hasOthers };
 }
@@ -7220,7 +7227,7 @@ function updateMenu(hero) {
       let colorStyle = 'bg-slate-900/80 text-slate-300 border-slate-700';
 
       if (cleanTag.includes('攻') || cleanTag.includes('单体') || cleanTag.includes('穿透')) colorStyle = 'bg-rose-950/80 text-rose-300 border-rose-800/70';
-      else if (cleanTag.includes('回') || cleanTag.includes('驱散')) colorStyle = 'bg-emerald-950/80 text-emerald-300 border-emerald-800/70';
+      else if (cleanTag.includes('回') || cleanTag.includes('冲') || cleanTag.includes('驱散')) colorStyle = 'bg-emerald-950/80 text-emerald-300 border-emerald-800/70';
       else if (cleanTag.includes('盾') || cleanTag.includes('防')) colorStyle = 'bg-blue-950/80 text-blue-300 border-blue-800/70';
       else if (cleanTag.includes('降') || cleanTag.includes('盲') || cleanTag.includes('滞') || cleanTag.includes('弱') || cleanTag.includes('眩晕')) colorStyle = 'bg-purple-950/80 text-purple-300 border-purple-800/70';
       else if (cleanTag.includes('再动')) colorStyle = 'bg-fuchsia-950/80 text-fuchsia-300 border-fuchsia-700/70 font-bold';
