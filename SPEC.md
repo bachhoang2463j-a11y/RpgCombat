@@ -118,6 +118,19 @@
 - **负面隔离与演出**：全额隔离敌方非伤害 Debuff，跳过受击后反应弹窗（看破不受影响）。受击时触发蜂窝网格过载与屏幕震动，破碎时触发全屏红闪与碎裂音效。
 - **底层关联函数**：`applyBarrierHit()` (`index.html:5930`)、`getTauntTarget()` (`index.html:6015`)、`executeSkillAction()` (`index.html:6220`)、`TAG_HANDLERS['肃正']` (`index.html:4620`)、`updateTeamBarrierUI()` (`index.html:4394`)。
 
+### 4.2.5 `[中毒]` / `[燃烧]` 持续伤害（DoT）标签
+
+- **`[中毒;power:x]` / `[群中毒;power:x]`**：施加毒素层，每回合造成固定真实伤害，**叠层加深**——每次施放直接叠加新毒层，各层独立发作、互不覆盖（与灾厄使/施毒者淬毒攻击的 push 叠加语义一致）。Buff 结构 `{ type:'poison', value, duration }`。
+- **`[燃烧;power:x]` / `[群燃烧;power:x]`**：施加火焰层，每回合造成固定真实伤害，**灼烧禁疗**——重复施放不叠层、仅刷新强度与持续时间；燃烧期间目标受到的 HP 治疗/回复效果**减半**（`[回]` handler 在治疗前检测 `b.type==='burn'`，`AFTER_HEAL` 事件传减半后的值，溢出转盾联动自动一致）。Buff 结构 `{ type:'burn', value, duration }`（同一目标仅一层）。
+- **共同规则**：
+  - `power` 即每回合真实伤害，直接扣 HP，**无视护甲/个人护盾/肃正屏障/免伤**（复用 `nextTurn` 毒 tick 的直接扣血管线，不经 `calculateDamage`）。
+  - 默认持续 3 回合，支持 `[持续:N]` 调整（经 `skill.turns → globalTurns → effectTurns` 管线）。
+  - 受极限爆发倍率影响：施放时 `actualPower = power × multiplier`。
+  - 纯 debuff 路线（与 降/盲/滞/弱 同级）：不做闪避判定，可被【肃正】屏障格挡。
+  - 目标取向：单目标进入敌方选目标，`[群X]` 走 AOE 打全体敌方（`classifySkill` 排除群前缀、`isBeneficial` 不含毒/燃 → 天然判为减益）。
+- **负面口径**：【驱散】可清除毒/燃，灾厄使"痛打落水狗"将毒/燃计入负面增伤（两处负面谓词均含 `poison`/`burn`）；敌方 AI 的 `isDebuff` 识别 中毒/燃烧、`heroesWithoutDebuff` 将二者计入已中负面。
+- **底层关联函数**：`TAG_HANDLERS['中毒']` / `TAG_HANDLERS['燃烧']` (`index.html:4622/4632`)、`nextTurn()` 毒/燃 tick (`index.html:6483`)、`updateBuffUI()` 状态徽章 (`index.html:4363`)、`[回]` 治疗禁疗 (`index.html:4780`)。
+
 ### 4.3 目标取向与 `[他人]` 标签标准
 
 - **目标取向判定（全标签扫描）**：技能的目标取向由 `classifySkill()` 扫描 `type/type2/type3` 全部标签一次定好，**顺序无关**：

@@ -982,6 +982,7 @@ const SKILL_TYPES = [
   '[单增]', '[群防]', '[单防]', '[群盾]', '[单盾]',
   '[群回蓝]', '[单回蓝]', '[群冲]', '[单冲]', '[群瞄]', '[单瞄]', '[群降]', '[单降]', '[群盲]', '[单盲]', '[群滞]', '[单滞]', '[群弱]', '[单弱]', '[嘲讽]', '[反击]', '[群反击]', '[再动]', '[回避]', '[群避]', '[单避]',
   '[眩晕]', '[群眩晕]', '[穿透]', '[群穿透]', '[免伤]',
+  '[中毒]', '[群中毒]', '[燃烧]', '[群燃烧]',
   '[驱散]', '[群驱散]',
   '[肃正]',
   '[近战]', '[远程]', '[法术]'
@@ -4116,7 +4117,7 @@ function parseSkill(skillStr) {
     
     let typeMatches = [...skillStr.matchAll(/\[(.*?);power:(-?\d+)\]/gi)];
     let types = ['[无]', '[无]', '[无]']; let powers = [0, 0, 0];
-    let singleTagMatches = [...skillStr.matchAll(/\[(群攻.*?|单体.*?|群回|单回|单瞄|群防|单防|群盾|单盾|嘲讽|群降|群滞|单滞|群弱|单弱|再动|回避|群避|单避|免伤|反击|群反击|肃正)\]/gi)];
+    let singleTagMatches = [...skillStr.matchAll(/\[(群攻.*?|单体.*?|群回|单回|单瞄|群防|单防|群盾|单盾|嘲讽|群降|群滞|单滞|群弱|单弱|中毒|群中毒|燃烧|群燃烧|再动|回避|群避|单避|免伤|反击|群反击|肃正)\]/gi)];
     
     if (typeMatches.length > 0) { 
         for (let i = 0; i < Math.min(typeMatches.length, 3); i++) { 
@@ -4329,6 +4330,7 @@ function updateBuffUI(entity) {
   let totalHit = entity.hitBonus || 0; 
   let totalEva = entity.evaBonus || 0;
   let isCountering = false; let counterPower = 0; let oneTimeGuard = 0; let concealAtk = 0;
+  let totalPoison = 0; let maxPoisonDur = 0; let burnPower = 0; let burnDur = 0;
   
   (entity.buffs || []).forEach(b => { 
       if(b.type === 'atk' && !b.isConcealAtk) { totalAtk += b.value; maxAtkDur = Math.max(maxAtkDur, b.duration); } 
@@ -4339,6 +4341,8 @@ function updateBuffUI(entity) {
       if(b.type === 'hit') { totalHit += b.value; }
       if(b.type === 'eva') { totalEva += b.value; }
       if(b.type === 'counter') { isCountering = true; counterPower += b.value; }
+      if(b.type === 'poison') { totalPoison += b.value; maxPoisonDur = Math.max(maxPoisonDur, b.duration); }
+      if(b.type === 'burn') { burnPower = b.value; burnDur = b.duration; }
   });
   
   let html = '';
@@ -4356,6 +4360,8 @@ function updateBuffUI(entity) {
   
   if (totalEva > 0) html += `<div class="text-teal-300 text-[8px] sm:text-[10px] bg-black/70 border border-teal-900/50 px-1 rounded backdrop-blur font-mono shadow-md">💨避+${totalEva}</div>`;
   else if (totalEva < 0) html += `<div class="text-purple-400 text-[8px] sm:text-[10px] bg-black/70 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">💨避${totalEva}</div>`;
+  if (totalPoison > 0) html += `<div class="text-purple-400 text-[8px] sm:text-[10px] bg-black/60 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">☠️毒${totalPoison}·${maxPoisonDur}回</div>`;
+  if (burnPower > 0) html += `<div class="text-orange-400 text-[8px] sm:text-[10px] bg-black/60 border border-orange-600/50 px-1 rounded backdrop-blur font-mono shadow-md">🔥燃${burnPower}·${burnDur}回</div>`;
   if (oneTimeGuard > 0) html += `<div class="text-sky-300 text-[8px] sm:text-[10px] bg-black/70 border border-sky-500/50 px-1 rounded backdrop-blur font-mono shadow-md animate-pulse">🛡️免伤+${oneTimeGuard} 1次</div>`;
   if (concealAtk > 0) html += `<div class="text-orange-400 text-[8px] sm:text-[10px] bg-black/70 border border-orange-500/50 px-1 rounded backdrop-blur font-mono shadow-md animate-pulse">🎯隐匿急袭+${concealAtk} 1次</div>`;
   
@@ -4611,6 +4617,34 @@ registerTagHandler('弱', (ctx) => {
     addHistory(`   ↳ 削弱了 ${ctx.target.name} 的攻击力。`);
 });
 
+// --- 持续伤害(DoT)类 ---
+// 【中毒】：叠层加深——每次施放直接叠加新毒层，各层独立发作、互不覆盖（与灾厄使淬毒同语义）
+registerTagHandler('中毒', (ctx) => {
+    playSound('defDown'); playSVGEffect(ctx.targetDom, 'debuff');
+    ctx.target.buffs = ctx.target.buffs || [];
+    const dotPower = Math.max(1, Math.floor(ctx.actualPower));
+    ctx.target.buffs.push({ type: 'poison', value: dotPower, duration: ctx.effectTurns });
+    createFloatingText(ctx.targetDom, `中毒 ${dotPower} ${ctx.effectTurns}回`, 'text-purple-400');
+    addHistory(`   ↳ ${ctx.target.name} 中了剧毒，每回合将承受 ${dotPower} 点真实伤害 持续${ctx.effectTurns}回合！`);
+});
+
+// 【燃烧】：灼烧禁疗——重复施放不叠层、仅刷新强度与持续时间；燃烧期间目标受到的治疗减半
+registerTagHandler('燃烧', (ctx) => {
+    playSound('defDown'); playSVGEffect(ctx.targetDom, 'debuff');
+    ctx.target.buffs = ctx.target.buffs || [];
+    const dotPower = Math.max(1, Math.floor(ctx.actualPower));
+    const existing = ctx.target.buffs.find(b => b.type === 'burn');
+    if (existing) {
+        existing.value = dotPower; existing.duration = ctx.effectTurns;
+        createFloatingText(ctx.targetDom, `燃烧加剧 ${dotPower} ${ctx.effectTurns}回`, 'text-orange-400');
+        addHistory(`   ↳ ${ctx.target.name} 的灼烧加深，每回合真实伤害提升至 ${dotPower} 点 持续${ctx.effectTurns}回合（燃烧期间治疗减半）！`);
+    } else {
+        ctx.target.buffs.push({ type: 'burn', value: dotPower, duration: ctx.effectTurns });
+        createFloatingText(ctx.targetDom, `燃烧 ${dotPower} ${ctx.effectTurns}回`, 'text-orange-400');
+        addHistory(`   ↳ ${ctx.target.name} 被烈焰缠身，每回合将承受 ${dotPower} 点真实伤害 持续${ctx.effectTurns}回合（燃烧期间治疗减半）！`);
+    }
+});
+
 registerTagHandler('[免伤]', (ctx) => {
     playSound('defUp'); playSVGEffect(ctx.targetDom, 'shield');
     ctx.target.buffs = ctx.target.buffs || [];
@@ -4714,6 +4748,7 @@ registerTagHandler('驱散', (ctx) => {
     // 复用灾厄使被动的负面判定谓词（项目内"何为负面"的权威定义）
     const isDebuff = b => b.duration > 0 && (
         b.type === 'poison' ||
+        b.type === 'burn' ||
         b.type === 'stun' ||
         (b.type === 'def' && b.value < 0) ||
         (b.type === 'hit' && b.value < 0) ||
@@ -4745,11 +4780,14 @@ registerTagHandler('冲', (ctx) => {
 registerTagHandler('回', (ctx) => {
     playSound('hpHeal'); playSVGEffect(ctx.targetDom, 'heal');
     const oldHp = ctx.target.hp;
-    ctx.target.hp = Math.min(ctx.target.maxHp, ctx.target.hp + ctx.actualPower);
-    const healCtx = { caster: ctx.caster, target: ctx.target, targetDom: ctx.targetDom, oldHp, actualPower: ctx.actualPower, extraText: '' };
+    // 【燃烧】灼烧禁疗：燃烧期间目标受到的 HP 治疗/回复效果减半
+    const isBurning = (ctx.target.buffs || []).some(b => b.type === 'burn');
+    const healAmount = isBurning ? Math.floor(ctx.actualPower / 2) : ctx.actualPower;
+    ctx.target.hp = Math.min(ctx.target.maxHp, ctx.target.hp + healAmount);
+    const healCtx = { caster: ctx.caster, target: ctx.target, targetDom: ctx.targetDom, oldHp, actualPower: healAmount, extraText: isBurning ? '（🔥燃烧下愈合受阻，治疗减半）' : '' };
     CombatEvents.emit(EVENTS.AFTER_HEAL, healCtx);
-    createFloatingText(ctx.targetDom, `+${ctx.actualPower}HP`, 'text-emerald-400');
-    addHistory(`   ↳ 治愈了 ${ctx.target.name}，恢复 ${ctx.actualPower} 点生命。${healCtx.extraText}`);
+    createFloatingText(ctx.targetDom, `+${healAmount}HP`, isBurning ? 'text-orange-400' : 'text-emerald-400');
+    addHistory(`   ↳ 治愈了 ${ctx.target.name}，恢复 ${healAmount} 点生命。${healCtx.extraText}`);
 });
 
 // --- 行动类 ---
@@ -5007,6 +5045,7 @@ const corruptorPassive = {
     modifyDamageMultiplier(caster, target) {
         const debuffCount = (target.buffs || []).filter(b => b.duration > 0 && (
             b.type === 'poison' ||
+            b.type === 'burn' ||
             b.type === 'stun' ||
             (b.type === 'def' && b.value < 0) ||
             (b.type === 'hit' && b.value < 0) ||
@@ -6441,12 +6480,13 @@ async function nextTurn() {
           
           currentEntity.ref.buffs.forEach(b => {
               b.duration--;
-              if (b.type === 'poison') {
-                  const poisonDmg = b.value;
-                  currentEntity.ref.hp -= poisonDmg;
+              if (b.type === 'poison' || b.type === 'burn') {
+                  const dotDmg = b.value;
+                  const isBurn = b.type === 'burn';
+                  currentEntity.ref.hp -= dotDmg;
                   const targetDom = currentEntity.ref.id.startsWith('h') ? document.getElementById(`hero-card-${currentEntity.ref.id}`) : document.getElementById(`${currentEntity.ref.id}-sprite`);
-                  if (targetDom) { createFloatingText(targetDom, `毒 -${poisonDmg}`, 'text-purple-400'); targetDom.classList.add('shake'); setTimeout(() => targetDom.classList.remove('shake'), 400); }
-                  addHistory(`   🦠 [${currentEntity.ref.name}] 毒性发作，受到了 ${poisonDmg} 点真实伤害！`);
+                  if (targetDom) { createFloatingText(targetDom, `${isBurn ? '火' : '毒'} -${dotDmg}`, isBurn ? 'text-orange-400' : 'text-purple-400'); targetDom.classList.add('shake'); setTimeout(() => targetDom.classList.remove('shake'), 400); }
+                  addHistory(`   ${isBurn ? '🔥' : '🦠'} [${currentEntity.ref.name}] ${isBurn ? '灼烧' : '毒性'}发作，受到了 ${dotDmg} 点真实伤害！`);
               }
           }); 
           
@@ -6653,7 +6693,7 @@ function selectEnemySkillAndTarget(enemy, validSkills, aliveEnemies, aliveHeroes
         
         const isHeal = skill.type.includes('回');
         const isBuff = skill.type.includes('增') || skill.type.includes('防') || skill.type.includes('盾') || skill.type.includes('避') || skill.type.includes('反击');
-        const isDebuff = skill.type.includes('降') || skill.type.includes('盲') || skill.type.includes('滞') || skill.type.includes('弱');
+        const isDebuff = skill.type.includes('降') || skill.type.includes('盲') || skill.type.includes('滞') || skill.type.includes('弱') || skill.type.includes('中毒') || skill.type.includes('燃烧');
         const isAtk = skill.type.includes('单体') || skill.type.includes('群攻') || skill.type.includes('穿透');
         
         // 治疗技能逻辑
@@ -6675,7 +6715,7 @@ function selectEnemySkillAndTarget(enemy, validSkills, aliveEnemies, aliveHeroes
         // 减益技能逻辑
         if (isDebuff) {
             // 检查英雄是否大部分已经被上了Debuff (只要存在负面效果)
-            const heroesWithoutDebuff = aliveHeroes.filter(h => !h.buffs || !h.buffs.some(b => b.value < 0 || b.type==='stun' || b.type==='poison'));
+            const heroesWithoutDebuff = aliveHeroes.filter(h => !h.buffs || !h.buffs.some(b => b.value < 0 || b.type==='stun' || b.type==='poison' || b.type==='burn'));
             if (heroesWithoutDebuff.length > 0) {
                 weight += 120; // 只要有人没中，就非常喜欢放
                 target = getTauntTarget(heroesWithoutDebuff);
@@ -7229,7 +7269,7 @@ function updateMenu(hero) {
       if (cleanTag.includes('攻') || cleanTag.includes('单体') || cleanTag.includes('穿透')) colorStyle = 'bg-rose-950/80 text-rose-300 border-rose-800/70';
       else if (cleanTag.includes('回') || cleanTag.includes('冲') || cleanTag.includes('驱散')) colorStyle = 'bg-emerald-950/80 text-emerald-300 border-emerald-800/70';
       else if (cleanTag.includes('盾') || cleanTag.includes('防')) colorStyle = 'bg-blue-950/80 text-blue-300 border-blue-800/70';
-      else if (cleanTag.includes('降') || cleanTag.includes('盲') || cleanTag.includes('滞') || cleanTag.includes('弱') || cleanTag.includes('眩晕')) colorStyle = 'bg-purple-950/80 text-purple-300 border-purple-800/70';
+      else if (cleanTag.includes('降') || cleanTag.includes('盲') || cleanTag.includes('滞') || cleanTag.includes('弱') || cleanTag.includes('眩晕') || cleanTag.includes('中毒') || cleanTag.includes('燃烧')) colorStyle = 'bg-purple-950/80 text-purple-300 border-purple-800/70';
       else if (cleanTag.includes('再动')) colorStyle = 'bg-fuchsia-950/80 text-fuchsia-300 border-fuchsia-700/70 font-bold';
       else if (cleanTag.includes('避')) colorStyle = 'bg-teal-950/80 text-teal-300 border-teal-700/70';
       else if (cleanTag.includes('嘲')) colorStyle = 'bg-amber-950/80 text-amber-300 border-amber-800/70';
