@@ -61,6 +61,20 @@
 ```
 - `[智慧]`：标识敌方具备智力，在战场中可触发敌方发言与气泡回应。
 
+### 4.1.1 场地战前准备效果协议（V6.14）
+
+- **语法**：`我方列表` 行支持后缀 `(场地:场地名)`（如 `我方列表(场地:有备而来):`），冒号兼容半角 `:` 与全角 `：`。解析通过扫描 `Object.keys(block)` 中 `startsWith('我方列表')` 的键 + 正则 `场地[:：]([^)\]]+)` 提取（`resolveHeroListKey`，index.html:4282），兼容带/不带后缀两种键名——修复了"带后缀键使 `block["我方列表"]` 取不到导致整队静默变空"的隐患。`敌方列表` 不支持场地。未注册场地名忽略并 `console.warn`，战斗正常建立；无标签时 `activeField = null`，无场地效果。
+- **注册表 `FIELD_EFFECTS`**（index.html:4053）：每条目 `{ desc, buffs?, onApply? }`。`buffs` 为回合型效果（对每个英雄 push 真实 buff，带 `fieldBuff: true` 标记）；`onApply(heroes)` 为开局一次性效果。
+- **注入时机**（`applyFieldEffects`，index.html:4297）：`buildCombatDataFromYAML` 内、`heroesData` 赋值后 / `initialHeroesCache` 快照前调用 → 场地 buff 与开局资源进入重置缓存，**resetBattle 后保留**；职业被动 `onBattleInit` 在其之前执行。
+- **机制语义（全复用既有体系，零特判）**：
+  - `hit/eva` buff 自动被命中公式（`attackerHitCap = skill.hit + 有效命中`、`defenderSpdCap = target.spd + 有效闪避`）与 `getEffectiveStats` 读取；`spd` buff 自动被 `getEffectiveSpeed` 读取（行动排轴 + 撤离判定），不写回基础 `spd`、不影响闪避。
+  - 衰减语义与全游戏「持续 N 回合」buff 一致：该角色每回合**首次（非额外）行动**时 `duration--`（`nextTurn` 的 `!isExtraTurn` 守卫），**再动/多重施法/多动单位额外行动不消耗场地回合**。
+  - **不可驱散**：`fieldBuff` 标记使【驱散】handler 的负面谓词（index.html:4926 `!b.fieldBuff`）跳过场地 debuff。
+  - **不影响反应技能**：反应技二次闪避只读取"本次反应新添加的 eva buff"，天然不受场地闪避增减影响。
+- **10 个注册场地**：有备而来（hit+30×3）、猝不及防（eva-20×1）、背水一战（atk+15×3）、严阵以待（def+15×2）、居高临下（spd+10×2）、劳师远征（spd-10×2）、雾霭弥漫（hit-10+eva+10×9999）、士气高涨（TP+20）、补给充沛（MP+30%）、装备精良（护盾=MaxHP×20%）。
+- **UI**：右上角按钮区【记录】左侧静态徽章 `#field-badge`（`updateFieldBadgeUI`，index.html:4099 控制显示/名称/描述，hover 弹出效果描述）；`startGame` 开场写入 `🏟️ 场地：场地名 — 描述` 战局日志。
+- **底层关联函数**：`FIELD_EFFECTS`（4053）、`resolveHeroListKey`（4282）、`applyFieldEffects`（4297）、`buildCombatDataFromYAML`（4306）、`updateFieldBadgeUI`（4099）。
+
 ### 4.2 判定公式标准
 - **命中与闪避**：
   - $Hit_{max} = 100 + \text{命中Buff}$
@@ -195,6 +209,8 @@
 | `DEFEND_VAR_KEY` | 6229 | 防御恢复设置在酒馆变量中的存储键。 |
 | `ROSTER_VAR_KEY` | 6250 | 我方角色配置持久化的酒馆变量键。 |
 | `ROSTER_VERSION` | 6656 | 角色配置序列化版本号。 |
+| `FIELD_EFFECTS` | 4053 | 场地效果注册表：`场地名 → { desc, buffs?, onApply? }`，10 个预置场地（详见 §4.1.1）。 |
+| `activeField` | 4095 | 当前战局场地名（null = 无场地效果）。 |
 
 ### 5.2 粒子/视觉特效引擎 (VFX)
 
@@ -237,10 +253,12 @@
 | `getCleanNameAndEmoji` | 3426 | 从名字中提取纯净名称与 emoji。 |
 | `parseAttributes` | 3433 | 解析角色属性串 `[HP:..][Atk:..]...` 为对象。 |
 | `parseSkill` | 3444 | 解析技能串 `【名】[标签]...` 为技能对象。 |
-| `buildCombatDataFromYAML` | 3501 | 将 `<Combat_block>` YAML 内容构建为战局数据（我方/敌方列表）。 |
+| `buildCombatDataFromYAML` | 4306 | 将 `<Combat_block>` YAML 内容构建为战局数据（我方/敌方列表，含场地键解析与效果注入）。 |
 | `startSTPolling` | 3548 | 轮询侦测酒馆聊天记录中的 `<Combat_block>` 标签并自动建局。 |
 | `loadManualData` | 3593 | 手动加载战局数据入口。 |
 | `onCombatDataReceived` | 3603 | 收到战局数据后的统一入口处理。 |
+| `resolveHeroListKey` | 4282 | 扫描 `我方列表*` 键提取 `(场地:xx)` 场地名（兼容半/全角冒号），返回 `{ key, field }`。 |
+| `applyFieldEffects` | 4297 | 注入场地效果：回合型 buff（`fieldBuff` 标记防驱散）+ 开局一次性 `onApply`。 |
 
 ### 5.4 UI 渲染与交互
 
@@ -249,6 +267,7 @@
 | `toggleFullScreen` | 830 | 切换全屏。 |
 | `addHistory` | 846 | 追加一条战斗历史记录。 |
 | `initUI` | 3618 | 初始化界面绑定与事件。 |
+| `updateFieldBadgeUI` | 4099 | 刷新右上角场地徽章（显示/隐藏/名称/效果描述）。 |
 | `createCompactBarHTML` | 3664 | 生成紧凑血/蓝/盾条 HTML。 |
 | `updateBuffUI` | 3704 | 刷新角色的 Buff 图标悬停 UI。 |
 | `renderTurnQueue` | 3728 | 渲染时间轴（行动顺序图标）。 |
