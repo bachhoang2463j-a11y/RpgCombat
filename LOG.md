@@ -702,3 +702,13 @@
   6. **文档**：`SPEC.md` §4.2.4 补全新参数与机制说明。
 - **涉及文件**：`index.html`、`SPEC.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：需求要求屏障具备"对所有伤害固定护甲值"与"对特定伤害类型额外免伤"两种强化维度，并让屏障文案随技能名变化以增强技能辨识度。解析上采用 `[肃正:子类型]` 内联语法 + `;Armor:N` 附加参数，与既有 `[看破:法术]`/`[反应:近战]` 的子类型体系风格一致；减免顺序"先克制减半、再扣护甲、后进吸收"严格遵循需求描述（在被护甲减免之前进行额外免伤）。
+
+## [LOG-059] 2026-08-16 — 反应/看破弹窗新增敌方技能详情展示（伤害属性/攻击类型/威力/命中/单体目标）
+
+- **变更行为**：
+  1. **新增共用详情行构造函数 `buildSkillDetailHTML(skill, showTarget, target)`**（`index.html`，位于 `getKanpoTarget` 之后）：按 `skill.damageType || '近战'` 输出伤害属性徽章；扫描 `type/type2/type3` 三槽含 `群` 判定攻击类型（单体/群攻）；`power > 0` 显示 `威力 N`、否则显示 `威力 普攻`（敌方无技能时的 mock 普攻 `power:0`）；`hit` 默认 100（显示技能 `[Hit:N]` 配置值）；`showTarget=true` 时群攻显示 `目标 全体敌方`、单体显示目标名（屏障拦截时目标为 `barrierStandIn`，显示 `屏障·名字`）。输出 Tailwind `font-mono` 小字号详情行，两个弹窗复用。
+  2. **反应弹窗 `promptReaction`**（`index.html`）：头部改为 `面临 X 的【技能名】`（原仅显示攻击者名与伤害类型），下方新增 `buildSkillDetailHTML(incomingSkill)` 详情行；移除原局部变量 `incomingDmgType`。
+  3. **看破弹窗 `promptKanpo`**（`index.html`）：签名新增第 4 参 `incomingTarget`；头部保留技能名，下方新增 `buildSkillDetailHTML(incomingSkill, true, incomingTarget)` 详情行（含攻击类型与单体目标）；移除原 `incomingDmgType`。
+  4. **目标信息链路传递**（`index.html` 两处）：`executeSkillAction` 内看破中断点 `kanpoCtx` 追加 `target: primaryTarget`；`checkKanpoInterrupt` 调用 `promptKanpo` 时透传 `ctx.target`。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：需求要求反应/看破弹窗展示敌方技能威力与命中率、看破弹窗展示攻击类型与单体攻击目标，让玩家能依据技能强度与受击目标精准决策是否消耗资源打断/应对。目标信息在 `executeSkillAction` 宣告点已由 `primaryTarget` 持有（屏障存在时为 `barrierStandIn` 伪实体），故仅需透传即可，无需改动索敌与结算流程。

@@ -5275,14 +5275,33 @@ function getKanpoTarget(skill) {
     return null;
 }
 
-function promptKanpo(candidates, attacker, incomingSkill) {
+// 构建技能详情行（反应/看破弹窗共用）：伤害属性、攻击类型、威力、命中、目标
+function buildSkillDetailHTML(skill, showTarget, target) {
+    if (!skill) return '';
+    const dmgType = skill.damageType || '近战';
+    const isAoe = [skill.type, skill.type2, skill.type3].some(t => t && String(t).includes('群'));
+    const powerText = (skill.power || 0) > 0 ? `威力 ${skill.power}` : '威力 普攻';
+    const hitText = `命中 ${skill.hit ?? 100}`;
+    let targetText = '';
+    if (showTarget) {
+        if (isAoe) targetText = '目标 全体敌方';
+        else if (target) targetText = target.isBarrierTarget ? `目标 屏障·${target.name}` : `目标 ${target.name}`;
+    }
+    return '<p class="text-[10px] sm:text-xs font-mono text-gray-400 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">'
+        + `<span class="text-orange-300">[${dmgType}]</span>`
+        + `<span class="text-gray-200">${isAoe ? '群攻' : '单体'}</span>`
+        + `<span class="text-cyan-300">${powerText}</span>`
+        + `<span class="text-violet-300">${hitText}</span>`
+        + (targetText ? `<span class="text-emerald-300">${targetText}</span>` : '')
+        + '</p>';
+}
+
+function promptKanpo(candidates, attacker, incomingSkill, incomingTarget) {
     return new Promise(resolve => {
         const overlay = document.createElement('div');
         overlay.className = 'fixed inset-0 z-[200] bg-black/70 backdrop-blur-md flex items-center justify-center transition-opacity duration-300';
         overlay.id = 'kanpo-prompt';
         const reopenId = 'kanpo-reopen';
-
-        const incomingDmgType = incomingSkill ? (incomingSkill.damageType || '近战') : '近战';
 
         let candidatesHtml = '';
         candidates.forEach((cand, index) => {
@@ -5312,7 +5331,8 @@ function promptKanpo(candidates, attacker, incomingSkill) {
                     <div class="w-10 h-10 rounded-full bg-amber-950/80 border border-amber-500 flex items-center justify-center text-xl shrink-0">👁️</div>
                     <div>
                         <h3 class="text-amber-400 font-black text-sm sm:text-base tracking-widest flex items-center gap-2">看破契机！<span class="text-[10px] px-1.5 py-0.5 bg-amber-900/60 border border-amber-500/40 rounded text-amber-200 font-mono">STRATEGIC INTERRUPT</span></h3>
-                        <p class="text-[10px] sm:text-xs text-gray-300 mt-0.5">${attacker.name} 正发动 <span class="text-rose-400 font-bold">【${incomingSkill.name}】</span> <span class="text-amber-300">[${incomingDmgType}]</span></p>
+                        <p class="text-[10px] sm:text-xs text-gray-300 mt-0.5">${attacker.name} 正发动 <span class="text-rose-400 font-bold">【${incomingSkill.name}】</span></p>
+                        ${buildSkillDetailHTML(incomingSkill, true, incomingTarget)}
                     </div>
                     <button class="ml-auto shrink-0 text-[9px] sm:text-[10px] px-2 py-1 rounded border border-amber-500/40 text-amber-200 hover:bg-amber-500/20 transition-colors" onclick="shelvePrompt(document.getElementById('kanpo-prompt'), 'kanpo-reopen', '继续看破')">收起</button>
                 </div>
@@ -5581,7 +5601,7 @@ async function checkKanpoInterrupt(ctx) {
 
     if (kanpoCandidates.length === 0) return;
 
-    const chosen = await promptKanpo(kanpoCandidates, ctx.caster, ctx.skill);
+    const chosen = await promptKanpo(kanpoCandidates, ctx.caster, ctx.skill, ctx.target);
     if (chosen) {
         // 扣除代价
         chosen.hero.mp -= chosen.skill.cost || 0;
@@ -5656,8 +5676,6 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill) {
         overlay.id = `reaction-prompt-${hero.id}`;
         const reopenId = `reaction-reopen-${hero.id}`;
 
-        const incomingDmgType = incomingSkill ? (incomingSkill.damageType || '近战') : '近战';
-
         let skillHtml = '';
         reactionSkills.forEach((skill, index) => {
              let costHtml = '';
@@ -5676,7 +5694,8 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill) {
                     <img src="${hero.img}" class="w-10 h-10 rounded-full border border-indigo-400 object-cover">
                     <div>
                         <h3 class="text-indigo-400 font-bold text-sm sm:text-base tracking-widest">即将遭受攻击</h3>
-                        <p class="text-[10px] sm:text-xs text-gray-400">面临 ${attacker.name} 的 <span class="text-orange-300">[${incomingDmgType}]</span> 攻击</p>
+                        <p class="text-[10px] sm:text-xs text-gray-400">面临 ${attacker.name} 的 <span class="text-orange-300">【${incomingSkill ? incomingSkill.name : '攻击'}】</span></p>
+                        ${incomingSkill ? buildSkillDetailHTML(incomingSkill) : ''}
                     </div>
                     <button class="ml-auto shrink-0 text-[9px] sm:text-[10px] px-2 py-1 rounded border border-indigo-400/40 text-indigo-200 hover:bg-indigo-400/20 transition-colors" onclick="shelvePrompt(document.getElementById('reaction-prompt-${hero.id}'), 'reaction-reopen-${hero.id}', '继续反应')">收起</button>
                 </div>
@@ -6226,7 +6245,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     
     // === 技能解构与广播前：【看破】战略中断窗口 (BEFORE_SKILL_RESOLVE) ===
     if (!isReactionTrigger && caster.id.startsWith('e')) {
-        const kanpoCtx = { caster, skill, cancelled: false };
+        const kanpoCtx = { caster, skill, target: primaryTarget, cancelled: false };
         await CombatEvents.emitAsync(EVENTS.BEFORE_SKILL_RESOLVE, kanpoCtx);
         if (kanpoCtx.cancelled) {
             addHistory(`   ⛔ 技能【${skill.name}】被看破破局，完全无效化！`);
