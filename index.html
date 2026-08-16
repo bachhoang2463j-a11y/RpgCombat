@@ -4142,6 +4142,11 @@ function parseSkill(skillStr) {
     let kanpoMatch = skillStr.match(/\[看破(?::([^\]]+))?\]/i);
     if (kanpoMatch) kanpoTarget = kanpoMatch[1] ? kanpoMatch[1].trim() : 'all';
     
+    // 解析舍身目标类型（我方专属：替闪避失败的角色承受本次攻击，全盘接下；与反应同级触发、优先级在看破之下）
+    let sheshenTarget = null;
+    let sheshenMatch = skillStr.match(/\[舍身(?::([^\]]+))?\]/i);
+    if (sheshenMatch) sheshenTarget = sheshenMatch[1] ? sheshenMatch[1].trim() : 'all';
+    
     // 解析 [他人] 标签 → skill.isOthers（独立布尔标记，允许该技能对"其他角色"施放）
     let isOthers = /\[他人\]/i.test(skillStr);
     // 解析 [必中] 标签 → skill.guaranteedHit（独立布尔标记：跳过命中/闪避判定，伤害与减益必中，模拟大范围妨害）
@@ -4197,7 +4202,7 @@ function parseSkill(skillStr) {
     let fxTagMatch = skillStr.match(/\[特效:([^\]]+)\]/i);
     let fxTag = fxTagMatch ? fxTagMatch[1].trim() : null;
 
-    return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, hit: hit, turns: turns, type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor };
+    return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, hit: hit, turns: turns, type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, sheshenTarget: sheshenTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor };
 }
 
 function buildCombatDataFromYAML(yamlContent) {
@@ -5401,6 +5406,21 @@ function getKanpoTarget(skill) {
     return null;
 }
 
+// 【舍身】目标类型兼容读取：优先结构字段，兜底扫描类型槽里的 [舍身:xx] 旧数据
+function getSheshenTarget(skill) {
+    if (!skill) return null;
+    if (skill.sheshenTarget) return skill.sheshenTarget;
+    const allTypes = [skill.type, skill.type2, skill.type3].filter(Boolean);
+    for (const t of allTypes) {
+        if (t.includes('舍身')) {
+            const match = t.match(/\[?舍身:?([^\]\s]*)\]?/);
+            if (match) return match[1] || 'all';
+            return 'all';
+        }
+    }
+    return null;
+}
+
 // 构建技能详情行（反应/看破弹窗共用）：伤害属性、攻击类型、威力、命中、目标
 function buildSkillDetailHTML(skill, showTarget, target) {
     if (!skill) return '';
@@ -5795,36 +5815,54 @@ function calculateDamage(rawDmg, target, isPierce = false) {
     return { hpDmg: dmg, shieldDmg: shieldDmg }; 
 }
 
-function promptReaction(hero, reactionSkills, attacker, incomingSkill) {
+function promptReaction(hero, reactionSkills, attacker, incomingSkill, sheshenCandidates = []) {
     return new Promise(resolve => {
         const overlay = document.createElement('div');
         overlay.className = 'fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center transition-opacity duration-300';
         overlay.id = `reaction-prompt-${hero.id}`;
         const reopenId = `reaction-reopen-${hero.id}`;
 
+        const hasReaction = reactionSkills.length > 0;
+        const hasSheshen = sheshenCandidates.length > 0;
+        const onlySheshen = hasSheshen && !hasReaction;
+        // 合并候选：反应在前、舍身在后，由 type 区分（玩家选择后按合并数组下标回传）
+        const candidates = [
+            ...reactionSkills.map(skill => ({ type: 'reaction', hero: hero, skill })),
+            ...sheshenCandidates.map(c => ({ type: 'sheshen', hero: c.hero, skill: c.skill }))
+        ];
+        // 候选渲染模板：反应紫 / 舍身钢蓝两种外观
+        const costOf = skill => {
+            let costHtml = '';
+            if (skill.cost > 0 || (!skill.hpCost && !skill.tpCost)) costHtml += `<span class="text-indigo-200 px-0.5">-${skill.cost}MP</span>`;
+            if (skill.hpCost > 0) costHtml += `<span class="text-red-300 px-0.5">-${skill.hpCost}HP</span>`;
+            if (skill.tpCost > 0) costHtml += `<span class="text-green-300 px-0.5">-${skill.tpCost}TP</span>`;
+            return costHtml;
+        };
+        const limitOf = skill => skill.maxUses > 0 ? `<span class="text-rose-300 px-0.5">[限${skill.usesRemaining ?? skill.maxUses}次]</span>` : '';
+
         let skillHtml = '';
-        reactionSkills.forEach((skill, index) => {
-             let costHtml = '';
-             if (skill.cost > 0 || (!skill.hpCost && !skill.tpCost)) costHtml += `<span class="text-indigo-200 px-0.5">-${skill.cost}MP</span>`;
-             if (skill.hpCost > 0) costHtml += `<span class="text-red-300 px-0.5">-${skill.hpCost}HP</span>`;
-             if (skill.tpCost > 0) costHtml += `<span class="text-green-300 px-0.5">-${skill.tpCost}TP</span>`;
-             const limitNote = skill.maxUses > 0 ? `<span class="text-rose-300 px-0.5">[限${skill.usesRemaining ?? skill.maxUses}次]</span>` : '';
-             
-             skillHtml += `<button class="w-full py-2.5 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-lg text-xs sm:text-sm font-bold shadow-lg transition-all transform hover:scale-105 mb-2 text-white flex justify-between px-4 items-center" onclick="resolveReaction(${index})"><span>⚡ ${skill.name} ${limitNote}</span><span class="font-mono flex gap-1">${costHtml}</span></button>`;
+        candidates.forEach((cand, index) => {
+            if (cand.type === 'reaction') {
+                skillHtml += `<button class="w-full py-2.5 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-lg text-xs sm:text-sm font-bold shadow-lg transition-all transform hover:scale-105 mb-2 text-white flex justify-between px-4 items-center" onclick="resolveReaction(${index})"><span>⚡ ${cand.skill.name} ${limitOf(cand.skill)}</span><span class="font-mono flex gap-1">${costOf(cand.skill)}</span></button>`;
+            } else {
+                skillHtml += `<button class="w-full py-2.5 sm:py-3 bg-gradient-to-r from-sky-700 to-blue-700 hover:from-sky-600 hover:to-blue-600 rounded-lg text-xs sm:text-sm font-bold shadow-lg transition-all transform hover:scale-105 mb-2 text-white flex justify-between px-4 items-center border border-sky-400/30" onclick="resolveReaction(${index})"><span class="flex items-center gap-1.5 min-w-0"><img src="${cand.hero.img}" class="w-5 h-5 rounded-full border border-sky-300 object-cover shrink-0"><span class="text-sky-200 font-black truncate">${cand.hero.name}</span><span class="truncate">🛡️ ${cand.skill.name} ${limitOf(cand.skill)}</span></span><span class="font-mono flex gap-1 shrink-0">${costOf(cand.skill)}</span></button>`;
+            }
         });
-        skillHtml += `<button class="w-full py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs sm:text-sm font-bold shadow-lg transition-colors text-gray-300 border border-gray-600 mt-2" onclick="resolveReaction(-1)">跳过 (不反应)</button>`;
+        const skipText = onlySheshen ? '承受攻击' : '跳过 (不反应)';
+        skillHtml += `<button class="w-full py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs sm:text-sm font-bold shadow-lg transition-colors text-gray-300 border border-gray-600 mt-2" onclick="resolveReaction(-1)">${skipText}</button>`;
 
         overlay.innerHTML = `
-            <div class="bg-slate-900/95 border border-indigo-500/50 rounded-2xl p-5 sm:p-6 w-11/12 max-w-xs sm:max-w-sm shadow-[0_0_50px_rgba(79,70,229,0.4)] transform scale-95 animate-[enter-hero_0.3s_forwards]">
+            <div class="bg-slate-900/95 ${onlySheshen ? 'border border-sky-500/50 shadow-[0_0_50px_rgba(56,189,248,0.35)]' : 'border border-indigo-500/50 shadow-[0_0_50px_rgba(79,70,229,0.4)]'} rounded-2xl p-5 sm:p-6 w-11/12 max-w-xs sm:max-w-sm transform scale-95 animate-[enter-hero_0.3s_forwards]">
                 <div class="flex items-center gap-3 mb-4 border-b border-white/10 pb-3">
-                    <img src="${hero.img}" class="w-10 h-10 rounded-full border border-indigo-400 object-cover">
+                    <img src="${hero.img}" class="w-10 h-10 rounded-full ${onlySheshen ? 'border border-sky-400' : 'border border-indigo-400'} object-cover">
                     <div>
-                        <h3 class="text-indigo-400 font-bold text-sm sm:text-base tracking-widest">即将遭受攻击</h3>
+                        <h3 class="${onlySheshen ? 'text-sky-400' : 'text-indigo-400'} font-bold text-sm sm:text-base tracking-widest">即将遭受攻击</h3>
                         <p class="text-[10px] sm:text-xs text-gray-400">面临 ${attacker.name} 的 <span class="text-orange-300">【${incomingSkill ? incomingSkill.name : '攻击'}】</span></p>
                         ${incomingSkill ? buildSkillDetailHTML(incomingSkill) : ''}
                     </div>
                     <button class="ml-auto shrink-0 text-[9px] sm:text-[10px] px-2 py-1 rounded border border-indigo-400/40 text-indigo-200 hover:bg-indigo-400/20 transition-colors" onclick="shelvePrompt(document.getElementById('reaction-prompt-${hero.id}'), 'reaction-reopen-${hero.id}', '继续反应')">收起</button>
                 </div>
+                ${hasSheshen && hasReaction ? `<div class="text-[10px] sm:text-[11px] text-gray-400 mb-2 bg-black/40 p-1.5 rounded border border-gray-800">🛡️ <span class="text-sky-300">舍身拦截</span>：由另一位角色替你承受本次攻击（必中、全盘接下）。</div>` : ''}
                 ${skillHtml}
             </div>
         `;
@@ -5835,10 +5873,100 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill) {
             setTimeout(() => {
                 cleanupPrompt(overlay, reopenId);
                 if (index === -1) resolve(null);
-                else resolve(reactionSkills[index]);
+                else resolve(candidates[index]);
             }, 200);
         };
     });
+}
+
+// 目标反应/舍身拦截判定：目标初次闪避失败后触发。
+// - 弹窗合并展示目标自身反应技能 +（可选）其他角色舍身候选；
+// - 选择反应 → 释放反应技并做二次闪避判定，返回 { dodged }；
+// - 选择舍身 → 扣守护者资源并执行演出，返回 { usedSheshen: true, guardian }；
+// - 无候选或放弃 → 返回空结果，调用方继续走受击管线。
+async function runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, sheshenCandidates) {
+    const targetType = target.id.startsWith('h') ? 'hero' : 'enemy';
+    const reactionSkills = target.skills.filter(s => {
+        if (!s.isReaction) return false;
+        if (s.cost > target.mp) return false;
+        if ((s.hpCost || 0) >= target.hp) return false;
+        if ((s.tpCost || 0) > target.tp) return false;
+        // [限N次] 用尽后静默失效（不再出现在反应弹窗候选）
+        if (s.maxUses > 0 && (s.usesRemaining ?? s.maxUses) <= 0) return false;
+        // 智能过滤反应条件
+        if (s.reactionTarget !== 'all' && s.reactionTarget !== incomingDamageType) return false;
+        return true;
+    });
+
+    if (reactionSkills.length === 0 && (!sheshenCandidates || sheshenCandidates.length === 0)) {
+        return { dodged: false, guardian: null, usedSheshen: false };
+    }
+
+    let chosen = null;
+    if (targetType === 'hero') {
+        // 我方角色：弹出合并面板（反应 + 舍身）让玩家手动选择
+        chosen = await promptReaction(target, reactionSkills, caster, skill, sheshenCandidates || []);
+    } else {
+        // 敌方角色：AI 自动从满足条件的反应技中随机挑选一个释放（舍身为我方专属，敌方不触发）
+        chosen = reactionSkills.length > 0 ? { type: 'reaction', hero: target, skill: reactionSkills[Math.floor(Math.random() * reactionSkills.length)] } : null;
+    }
+
+    if (chosen && chosen.type === 'sheshen') {
+        // ============ 【舍身】分支：由另一位角色替目标承受本次攻击（必中、全盘接下）============
+        const guardian = chosen.hero;
+        guardian.mp -= chosen.skill.cost || 0;
+        if (chosen.skill.hpCost) guardian.hp -= chosen.skill.hpCost;
+        if (chosen.skill.tpCost) guardian.tp -= chosen.skill.tpCost;
+        // [限N次] 舍身成功使用时消耗真实技能剩余次数
+        const realSkill = guardian.skills.find(s => s.name === chosen.skill.name);
+        if (realSkill && realSkill.maxUses > 0) realSkill.usesRemaining = Math.max(0, (realSkill.usesRemaining ?? realSkill.maxUses) - 1);
+        updateHeroUI(guardian);
+
+        addHistory(`   🛡️ ${guardian.name} 施展【${chosen.skill.name}】舍身护佑，替 ${target.name} 承受攻击！`);
+        // 轻量演出：聚焦暗化 + 钢蓝蓄力粒子
+        const guardianDom = document.getElementById(`hero-card-${guardian.id}`);
+        if (guardianDom) {
+            if (window.spawnFocusOverlay) window.spawnFocusOverlay(guardianDom, 600);
+            const gRect = guardianDom.getBoundingClientRect();
+            if (window.spawnChargeUpParticles) window.spawnChargeUpParticles(
+                gRect.left + gRect.width / 2, gRect.top + gRect.height / 2, '#38bdf8', 480
+            );
+        }
+        await sleep(520); // 视觉停顿
+        return { dodged: false, guardian, usedSheshen: true };
+    }
+
+    if (chosen) {
+        // ============ 反应分支 ============
+        const chosenSkill = chosen.skill;
+        // 快照反应执行前的 Buff 列表，用于之后精确对比找到本次反应新增的 Buff
+        const buffsBefore = [...(target.buffs || [])];
+
+        // 释放反应技能
+        await executeSkillAction(target, caster, chosenSkill, 1, true);
+        await sleep(400); // 视觉停顿
+
+        // 3. 检查刚刚的反应是否生成了回避Buff（只匹配本次反应中新添加的 buff，防止误伤已有持久型 buff）
+        const newlyAddedEvaBuff = (target.buffs || []).find(b => b.type === 'eva' && !buffsBefore.includes(b));
+
+        if (newlyAddedEvaBuff) {
+            // 【核心】二次闪避判定：抛弃基础速度，纯看这个技能给了多少回避值！
+            const pureReactionEva = Math.max(1, newlyAddedEvaBuff.value);
+            const latestCStats = getEffectiveStats(caster);
+            const latestAttackerHitCap = Math.max(1, (hitChance !== undefined ? hitChance : 100) + latestCStats.hit);
+
+            const dodged = Math.floor(Math.random() * pureReactionEva) + 1 > Math.floor(Math.random() * latestAttackerHitCap) + 1;
+
+            // 如果是本次反应临时增加的单次消耗型（[回避]），判定完就直接删掉
+            if (newlyAddedEvaBuff.isConsumable) {
+                target.buffs = target.buffs.filter(b => b !== newlyAddedEvaBuff);
+            }
+
+            if (targetType === 'hero') updateHeroUI(target); else updateEnemyUI(target);
+            return { dodged, guardian: null, usedSheshen: false };
+        }
+    }
+    return { dodged: false, guardian: null, usedSheshen: false };
 }
 
 async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, multiplier, globalTurns, skill) {
@@ -5891,56 +6019,37 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
 // 2. 如果初次判定失败 (即将挨打)，触发敌我双方的反应拦截！
     // 注：即使敌方带【必中】也能触发反应拦截（必中仅跳过被动闪避 roll，仍可被反应技/看破主动化解）
     if (!isDodged) {
-        const reactionSkills = target.skills.filter(s => {
-            if (!s.isReaction) return false;
-            if (s.cost > target.mp) return false;
-            if ((s.hpCost || 0) >= target.hp) return false;
-            if ((s.tpCost || 0) > target.tp) return false;
-            // [限N次] 用尽后静默失效（不再出现在反应弹窗候选）
-            if (s.maxUses > 0 && (s.usesRemaining ?? s.maxUses) <= 0) return false;
-            // 智能过滤反应条件
-            if (s.reactionTarget !== 'all' && s.reactionTarget !== incomingDamageType) return false;
-            return true;
-        });
+        // 【舍身】候选收集：目标闪避失败后，我方其他存活角色可用舍身技能替其承受本次攻击。
+        // 仅限单体攻击（群攻 v1 不触发）；屏障在场时攻击被屏障归集命中屏障伪目标、不会进入此处。
+        let sheshenCandidates = [];
+        if (targetType === 'hero' && !tag.includes('群')) {
+            heroesData.filter(h => h.isAlive && h.id !== target.id).forEach(guardian => {
+                (guardian.skills || []).forEach(s => {
+                    const sheshenTarget = getSheshenTarget(s);
+                    if (!sheshenTarget) return;
+                    if (s.cost > guardian.mp) return;
+                    if ((s.hpCost || 0) >= guardian.hp) return;
+                    if ((s.tpCost || 0) > guardian.tp) return;
+                    // [限N次] 用尽后静默失效
+                    if (s.maxUses > 0 && (s.usesRemaining ?? s.maxUses) <= 0) return;
+                    // 类型匹配（同看破的 includes 双向匹配）
+                    if (sheshenTarget !== 'all' && !incomingDamageType.includes(sheshenTarget) && !sheshenTarget.includes(incomingDamageType)) return;
+                    sheshenCandidates.push({ hero: guardian, skill: s });
+                });
+            });
+        }
 
-        if (reactionSkills.length > 0) {
-            let chosenSkill = null;
-            
-            if (targetType === 'hero') {
-                // 我方角色：弹出面板让玩家手动选择
-                chosenSkill = await promptReaction(target, reactionSkills, caster, skill);
-            } else {
-                // 敌方角色：AI 自动从满足条件的反应技中随机挑选一个释放
-                chosenSkill = reactionSkills[Math.floor(Math.random() * reactionSkills.length)];
-            }
-
-            if (chosenSkill) {
-                // 快照反应执行前的 Buff 列表，用于之后精确对比找到本次反应新增的 Buff
-                const buffsBefore = [...(target.buffs || [])];
-
-                // 释放反应技能
-                await executeSkillAction(target, caster, chosenSkill, 1, true);
-                await sleep(400); // 视觉停顿
-
-                // 3. 检查刚刚的反应是否生成了回避Buff（只匹配本次反应中新添加的 buff，防止误伤已有持久型 buff）
-                const newlyAddedEvaBuff = (target.buffs || []).find(b => b.type === 'eva' && !buffsBefore.includes(b));
-                
-                if (newlyAddedEvaBuff) {
-                    // 【核心】二次闪避判定：抛弃基础速度，纯看这个技能给了多少回避值！
-                    const pureReactionEva = Math.max(1, newlyAddedEvaBuff.value);
-                    const latestCStats = getEffectiveStats(caster);
-                    const latestAttackerHitCap = Math.max(1, (hitChance !== undefined ? hitChance : 100) + latestCStats.hit);
-                    
-                    isDodged = Math.floor(Math.random() * pureReactionEva) + 1 > Math.floor(Math.random() * latestAttackerHitCap) + 1;
-                    
-                    // 如果是本次反应临时增加的单次消耗型（[回避]），判定完就直接删掉
-                    if (newlyAddedEvaBuff.isConsumable) {
-                        target.buffs = target.buffs.filter(b => b !== newlyAddedEvaBuff);
-                    }
-                    
-                    if (targetType === 'hero') updateHeroUI(target); else updateEnemyUI(target);
-                }
-            }
+        // 拦截判定：目标自身反应技能 +（可选）其他角色舍身候选 合并弹窗
+        const intercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, sheshenCandidates);
+        if (intercept.usedSheshen && intercept.guardian) {
+            // 【舍身】生效：受击目标切换为守护者（跳过闪避、必中），后续管线对守护者完整结算，原目标毫发无伤
+            target = intercept.guardian;
+            targetDom = document.getElementById(`hero-card-${target.id}`);
+            // 守护者自身也可用反应技化解本次攻击（不再提供舍身候选，避免连锁舍身）
+            const guardianIntercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, []);
+            if (guardianIntercept.dodged) isDodged = true;
+        } else if (intercept.dodged) {
+            isDodged = true;
         }
     }
 
@@ -7079,6 +7188,7 @@ async function executeEnemyTurn(enemy) {
   const validSkills = enemy.skills.filter(s =>
       (!s.charge || s.charge === 0) &&
       !s.isReaction &&
+      !s.sheshenTarget &&
       enemy.mp >= s.cost &&
       enemy.hp > (s.hpCost || 0) &&
       (enemy.tp || 0) >= (s.tpCost || 0) &&
@@ -7503,8 +7613,8 @@ async function actionDefend() {
 function updateMenu(hero) {
   if (!hero) return; const skillList = document.getElementById('skill-list'); skillList.innerHTML = '';
   hero.skills.forEach((skill, idx) => {
-    // 反应/看破技能为被动触发，不列入主动技能面板（结算仍从完整 skills 数组扫描）
-    if (skill.isReaction || skill.kanpoTarget) return;
+    // 反应/看破/舍身技能为被动触发，不列入主动技能面板（结算仍从完整 skills 数组扫描）
+    if (skill.isReaction || skill.kanpoTarget || skill.sheshenTarget) return;
     const isExtraTurnSkill = skill.type.includes('再动') || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
     const isUsedExtraTurn = isExtraTurnSkill && state.usedExtraTurnSkillsThisRound && state.usedExtraTurnSkillsThisRound.has(skill.name);
     const usesLeft = skill.maxUses > 0 ? (skill.usesRemaining ?? skill.maxUses) : 0;
@@ -7715,7 +7825,7 @@ function openEditor() {
   html += `<div><h3 class="text-sm sm:text-lg font-bold text-cyan-400 mb-3 sm:mb-4 flex items-center gap-2 w-full"><span>❖</span> 我方角色 <button onclick="addHero()" class="text-[10px] sm:text-[11px] bg-cyan-900/50 hover:bg-cyan-800 text-cyan-200 px-2 sm:px-3 py-1 sm:py-1.5 rounded ml-auto transition-colors border border-cyan-700/50">+ 添加</button></h3><div class="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">`;
   heroesData.forEach((h, i) => {
     html += `<div class="bg-black/30 p-3 sm:p-4 rounded-xl border border-gray-800 relative group hover:border-cyan-900/50 transition-colors flex flex-col"><button onclick="removeHero(${i})" class="absolute right-1 top-1 sm:right-2 sm:top-2 w-6 h-6 flex items-center justify-center rounded-full bg-red-900/30 text-red-500/50 hover:bg-red-600 hover:text-white transition-all z-10 border border-transparent hover:border-red-400 opacity-0 group-hover:opacity-100" title="移除此角色">✕</button><div class="flex gap-2 mb-3 sm:mb-4 items-center border-b border-gray-800 pb-2"><span class="text-[10px] sm:text-xs text-gray-500">名称</span><input type="text" id="edit-h-${i}-name" value="${h.name}" class="edit-input w-16 sm:w-24 text-xs sm:text-sm font-bold text-yellow-200"><span class="text-[10px] sm:text-xs text-gray-500 ml-2">职业</span><select id="edit-h-${i}-class" class="edit-input w-16 sm:w-24 text-[10px] sm:text-xs text-cyan-300 font-bold"><option value="" ${!h.classType ? 'selected' : ''}>无</option><option value="防守者" ${h.classType === '防守者' ? 'selected' : ''}>防守者</option><option value="隐匿者" ${h.classType === '隐匿者' ? 'selected' : ''}>隐匿者</option><option value="施法者" ${h.classType === '施法者' ? 'selected' : ''}>施法者</option><option value="狂战士" ${h.classType === '狂战士' ? 'selected' : ''}>狂战士</option><option value="风行者" ${h.classType === '风行者' ? 'selected' : ''}>风行者</option><option value="圣职者" ${h.classType === '圣职者' ? 'selected' : ''}>圣职者</option><option value="灾厄使" ${h.classType === '灾厄使' ? 'selected' : ''}>灾厄使</option></select><span class="text-[10px] sm:text-xs text-gray-500 ml-auto">头像</span><input type="text" id="edit-h-${i}-img" value="${h.img}" class="edit-input flex-1 min-w-[80px] text-[10px] sm:text-xs text-gray-400" placeholder="链接"></div><div class="grid grid-cols-4 lg:grid-cols-7 gap-x-1.5 gap-y-2 sm:gap-x-2 sm:gap-y-3 text-[9px] sm:text-[10px] mb-3 sm:mb-4"><div class="flex flex-col"><label class="text-rose-400 mb-1">HP</label><input type="number" id="edit-h-${i}-hp" value="${h.hp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-gray-500 mb-1">MaxHP</label><input type="number" id="edit-h-${i}-maxHp" value="${h.maxHp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-cyan-400 mb-1">MP</label><input type="number" id="edit-h-${i}-mp" value="${h.mp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-gray-500 mb-1">MaxMP</label><input type="number" id="edit-h-${i}-maxMp" value="${h.maxMp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-orange-400 mb-1">攻击</label><input type="number" id="edit-h-${i}-atk" value="${h.atk}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-blue-400 mb-1">防御</label><input type="number" id="edit-h-${i}-def" value="${h.def}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-yellow-400 mb-1 font-bold">速度</label><input type="number" id="edit-h-${i}-spd" value="${h.spd}" class="edit-input w-full font-mono text-yellow-200"></div></div><div class="bg-black/40 p-2 sm:p-3 rounded border border-gray-800/50 flex-1"><div class="text-[9px] sm:text-[11px] text-gray-400 mb-2 sm:mb-3 font-bold tracking-wider flex justify-between items-center"><span>技能配置 (支持3重标签)</span><button onclick="addHeroSkill(${i})" class="text-[9px] sm:text-[10px] text-cyan-400 hover:text-cyan-300 border border-cyan-900/50 rounded px-1.5 py-0.5 sm:px-2 sm:py-1 transition-colors">+ 添加</button></div><div class="space-y-2 sm:space-y-3">`;
-    h.skills.forEach((s, si) => { html += `<div class="bg-black/50 p-1.5 sm:p-2 rounded border border-gray-700/50 relative pr-6 sm:pr-8"><button onclick="removeHeroSkill(${i}, ${si})" class="absolute right-1 sm:right-2 top-1 sm:top-2 text-gray-600 hover:text-red-500 font-bold transition-colors" title="移除此技能">✕</button><div class="flex gap-1.5 sm:gap-2 items-center mb-1.5 sm:mb-2 flex-wrap"><input type="text" id="edit-h-${i}-s-${si}-name" value="${s.name}" class="edit-input w-24 sm:w-32 text-[10px] sm:text-xs text-gray-100 font-bold" placeholder="技能名"><select id="edit-h-${i}-s-${si}-reaction" class="edit-input w-20 sm:w-24 text-[9px] sm:text-[10px] text-indigo-300 font-bold"><option value="none" ${!s.isReaction ? 'selected' : ''}>非反应</option><option value="all" ${s.isReaction && s.reactionTarget === 'all' ? 'selected' : ''}>反应(全能)</option><option value="近战" ${s.isReaction && s.reactionTarget === '近战' ? 'selected' : ''}>反应(近战)</option><option value="远程" ${s.isReaction && s.reactionTarget === '远程' ? 'selected' : ''}>反应(远程)</option><option value="法术" ${s.isReaction && s.reactionTarget === '法术' ? 'selected' : ''}>反应(法术)</option></select><select id="edit-h-${i}-s-${si}-kanpo" class="edit-input w-20 sm:w-24 text-[9px] sm:text-[10px] text-amber-300 font-bold"><option value="none" ${!s.kanpoTarget ? 'selected' : ''}>无看破</option><option value="all" ${s.kanpoTarget === 'all' ? 'selected' : ''}>看破(全能)</option><option value="近战" ${s.kanpoTarget === '近战' ? 'selected' : ''}>看破(近战)</option><option value="远程" ${s.kanpoTarget === '远程' ? 'selected' : ''}>看破(远程)</option><option value="法术" ${s.kanpoTarget === '法术' ? 'selected' : ''}>看破(法术)</option></select><label class="flex items-center gap-1 text-[9px] sm:text-[10px] text-emerald-300 cursor-pointer whitespace-nowrap" title="带此标签的技能可对任意我方角色施放"><input type="checkbox" id="edit-h-${i}-s-${si}-others" ${s.isOthers ? 'checked' : ''} class="accent-emerald-500">他人</label><label class="flex items-center gap-1 text-[9px] sm:text-[10px] text-rose-300 cursor-pointer whitespace-nowrap" title="带此标签的技能跳过命中判定，伤害与妨害效果必中"><input type="checkbox" id="edit-h-${i}-s-${si}-guaranteed" ${s.guaranteedHit ? 'checked' : ''} class="accent-rose-500">必中</label><select id="edit-h-${i}-s-${si}-dmgType" class="edit-input w-16 sm:w-20 text-[9px] sm:text-[10px] text-orange-200 font-bold"><option value="" ${!s.damageType ? 'selected' : ''}>无(近战)</option><option value="近战" ${s.damageType === '近战' ? 'selected' : ''}>近战</option><option value="远程" ${s.damageType === '远程' ? 'selected' : ''}>远程</option><option value="法术" ${s.damageType === '法术' ? 'selected' : ''}>法术</option></select><select id="edit-h-${i}-s-${si}-fxTag" class="edit-input w-16 sm:w-20 text-[9px] sm:text-[10px] text-yellow-300 font-bold">${['特效:无', ...Object.keys(WEBM_FX_REGISTRY)].map(f => { const val = f === '特效:无' ? '' : f; const isSel = (s.fxTag || '') === val; const label = f === '特效:无' ? '无特效' : f; return `<option value="${val}" ${isSel ? 'selected' : ''}>${label}</option>`; }).join('')}</select><span class="text-[9px] sm:text-[10px] text-sky-400 ml-auto">MP</span><input type="number" id="edit-h-${i}-s-${si}-cost" value="${s.cost}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-sky-200"><span class="text-[9px] sm:text-[10px] text-red-400">HP</span><input type="number" id="edit-h-${i}-s-${si}-hpCost" value="${s.hpCost || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-red-200"><span class="text-[9px] sm:text-[10px] text-green-400">TP</span><input type="number" id="edit-h-${i}-s-${si}-tpCost" value="${s.tpCost || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-green-200"><span class="text-[9px] sm:text-[10px] text-gray-500">准%(Aim)</span><input type="number" id="edit-h-${i}-s-${si}-hit" value="${s.hit}" class="edit-input w-10 sm:w-12 text-[9px] sm:text-[10px] font-mono text-yellow-200"><span class="text-[9px] sm:text-[10px] text-gray-500">回数</span><input type="number" id="edit-h-${i}-s-${si}-turns" value="${s.turns || ''}" class="edit-input w-10 sm:w-12 text-[9px] sm:text-[10px] font-mono text-purple-200" placeholder="默认"><span class="text-[9px] sm:text-[10px] text-yellow-300">延迟(蓄力)</span><input type="number" id="edit-h-${i}-s-${si}-delay" value="${s.delay || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-yellow-200" placeholder="0"><span class="text-[9px] sm:text-[10px] text-cyan-300">加速</span><input type="number" id="edit-h-${i}-s-${si}-haste" value="${s.haste || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-cyan-200" placeholder="0"><span class="text-[9px] sm:text-[10px] text-fuchsia-300">限次</span><input type="number" id="edit-h-${i}-s-${si}-limit" value="${s.maxUses || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-fuchsia-200" placeholder="0"></div><div class="flex flex-wrap gap-1.5 sm:gap-2"><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-cyan-200 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power" value="${s.power}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type2" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-gray-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power2" value="${s.power2}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type3" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-gray-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power3" value="${s.power3}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div></div></div>`; });
+    h.skills.forEach((s, si) => { html += `<div class="bg-black/50 p-1.5 sm:p-2 rounded border border-gray-700/50 relative pr-6 sm:pr-8"><button onclick="removeHeroSkill(${i}, ${si})" class="absolute right-1 sm:right-2 top-1 sm:top-2 text-gray-600 hover:text-red-500 font-bold transition-colors" title="移除此技能">✕</button><div class="flex gap-1.5 sm:gap-2 items-center mb-1.5 sm:mb-2 flex-wrap"><input type="text" id="edit-h-${i}-s-${si}-name" value="${s.name}" class="edit-input w-24 sm:w-32 text-[10px] sm:text-xs text-gray-100 font-bold" placeholder="技能名"><select id="edit-h-${i}-s-${si}-reaction" class="edit-input w-20 sm:w-24 text-[9px] sm:text-[10px] text-indigo-300 font-bold"><option value="none" ${!s.isReaction ? 'selected' : ''}>非反应</option><option value="all" ${s.isReaction && s.reactionTarget === 'all' ? 'selected' : ''}>反应(全能)</option><option value="近战" ${s.isReaction && s.reactionTarget === '近战' ? 'selected' : ''}>反应(近战)</option><option value="远程" ${s.isReaction && s.reactionTarget === '远程' ? 'selected' : ''}>反应(远程)</option><option value="法术" ${s.isReaction && s.reactionTarget === '法术' ? 'selected' : ''}>反应(法术)</option></select><select id="edit-h-${i}-s-${si}-kanpo" class="edit-input w-20 sm:w-24 text-[9px] sm:text-[10px] text-amber-300 font-bold"><option value="none" ${!s.kanpoTarget ? 'selected' : ''}>无看破</option><option value="all" ${s.kanpoTarget === 'all' ? 'selected' : ''}>看破(全能)</option><option value="近战" ${s.kanpoTarget === '近战' ? 'selected' : ''}>看破(近战)</option><option value="远程" ${s.kanpoTarget === '远程' ? 'selected' : ''}>看破(远程)</option><option value="法术" ${s.kanpoTarget === '法术' ? 'selected' : ''}>看破(法术)</option></select><select id="edit-h-${i}-s-${si}-sheshen" class="edit-input w-20 sm:w-24 text-[9px] sm:text-[10px] text-sky-300 font-bold"><option value="none" ${!s.sheshenTarget ? 'selected' : ''}>无舍身</option><option value="all" ${s.sheshenTarget === 'all' ? 'selected' : ''}>舍身(全能)</option><option value="近战" ${s.sheshenTarget === '近战' ? 'selected' : ''}>舍身(近战)</option><option value="远程" ${s.sheshenTarget === '远程' ? 'selected' : ''}>舍身(远程)</option><option value="法术" ${s.sheshenTarget === '法术' ? 'selected' : ''}>舍身(法术)</option></select><label class="flex items-center gap-1 text-[9px] sm:text-[10px] text-emerald-300 cursor-pointer whitespace-nowrap" title="带此标签的技能可对任意我方角色施放"><input type="checkbox" id="edit-h-${i}-s-${si}-others" ${s.isOthers ? 'checked' : ''} class="accent-emerald-500">他人</label><label class="flex items-center gap-1 text-[9px] sm:text-[10px] text-rose-300 cursor-pointer whitespace-nowrap" title="带此标签的技能跳过命中判定，伤害与妨害效果必中"><input type="checkbox" id="edit-h-${i}-s-${si}-guaranteed" ${s.guaranteedHit ? 'checked' : ''} class="accent-rose-500">必中</label><select id="edit-h-${i}-s-${si}-dmgType" class="edit-input w-16 sm:w-20 text-[9px] sm:text-[10px] text-orange-200 font-bold"><option value="" ${!s.damageType ? 'selected' : ''}>无(近战)</option><option value="近战" ${s.damageType === '近战' ? 'selected' : ''}>近战</option><option value="远程" ${s.damageType === '远程' ? 'selected' : ''}>远程</option><option value="法术" ${s.damageType === '法术' ? 'selected' : ''}>法术</option></select><select id="edit-h-${i}-s-${si}-fxTag" class="edit-input w-16 sm:w-20 text-[9px] sm:text-[10px] text-yellow-300 font-bold">${['特效:无', ...Object.keys(WEBM_FX_REGISTRY)].map(f => { const val = f === '特效:无' ? '' : f; const isSel = (s.fxTag || '') === val; const label = f === '特效:无' ? '无特效' : f; return `<option value="${val}" ${isSel ? 'selected' : ''}>${label}</option>`; }).join('')}</select><span class="text-[9px] sm:text-[10px] text-sky-400 ml-auto">MP</span><input type="number" id="edit-h-${i}-s-${si}-cost" value="${s.cost}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-sky-200"><span class="text-[9px] sm:text-[10px] text-red-400">HP</span><input type="number" id="edit-h-${i}-s-${si}-hpCost" value="${s.hpCost || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-red-200"><span class="text-[9px] sm:text-[10px] text-green-400">TP</span><input type="number" id="edit-h-${i}-s-${si}-tpCost" value="${s.tpCost || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-green-200"><span class="text-[9px] sm:text-[10px] text-gray-500">准%(Aim)</span><input type="number" id="edit-h-${i}-s-${si}-hit" value="${s.hit}" class="edit-input w-10 sm:w-12 text-[9px] sm:text-[10px] font-mono text-yellow-200"><span class="text-[9px] sm:text-[10px] text-gray-500">回数</span><input type="number" id="edit-h-${i}-s-${si}-turns" value="${s.turns || ''}" class="edit-input w-10 sm:w-12 text-[9px] sm:text-[10px] font-mono text-purple-200" placeholder="默认"><span class="text-[9px] sm:text-[10px] text-yellow-300">延迟(蓄力)</span><input type="number" id="edit-h-${i}-s-${si}-delay" value="${s.delay || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-yellow-200" placeholder="0"><span class="text-[9px] sm:text-[10px] text-cyan-300">加速</span><input type="number" id="edit-h-${i}-s-${si}-haste" value="${s.haste || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-cyan-200" placeholder="0"><span class="text-[9px] sm:text-[10px] text-fuchsia-300">限次</span><input type="number" id="edit-h-${i}-s-${si}-limit" value="${s.maxUses || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-fuchsia-200" placeholder="0"></div><div class="flex flex-wrap gap-1.5 sm:gap-2"><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-cyan-200 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power" value="${s.power}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type2" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-gray-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power2" value="${s.power2}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type3" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-gray-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power3" value="${s.power3}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div></div></div>`; });
     html += `</div></div></div>`;
   });
   html += `<div><h3 class="text-sm sm:text-lg font-bold text-rose-500 mb-3 sm:mb-4 mt-4 sm:mt-6 flex items-center gap-2 w-full"><span>❖</span> 敌方单位 <button onclick="addEnemy()" class="text-[10px] sm:text-[11px] bg-rose-900/50 hover:bg-rose-800 text-rose-200 px-2 sm:px-3 py-1 sm:py-1.5 rounded ml-auto transition-colors border border-rose-700/50">+ 添加</button></h3><div class="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">`;
@@ -7754,6 +7864,8 @@ function syncEditorDataToMemory() {
         s.reactionTarget = reactionVal === 'none' ? 'all' : reactionVal;
         let kanpoVal = document.getElementById(`edit-h-${i}-s-${si}-kanpo`).value;
         s.kanpoTarget = kanpoVal === 'none' ? null : kanpoVal;
+        let sheshenVal = document.getElementById(`edit-h-${i}-s-${si}-sheshen`).value;
+        s.sheshenTarget = sheshenVal === 'none' ? null : sheshenVal;
         s.isOthers = document.getElementById(`edit-h-${i}-s-${si}-others`).checked;
         s.guaranteedHit = document.getElementById(`edit-h-${i}-s-${si}-guaranteed`).checked;
         s.damageType = document.getElementById(`edit-h-${i}-s-${si}-dmgType`).value;
@@ -7852,7 +7964,7 @@ function saveEditor() {
   initialHeroesCache = JSON.parse(JSON.stringify(heroesData)); initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData));
   closeEditor(); initUI(); if(state.isGameStarted) { showLog("设置已覆盖生效！"); setTimeout(() => startRound(), 1000); }
 }
-function addHeroSkill(hi) { syncEditorDataToMemory(); heroesData[hi].skills.push({ name: '新技能', isReaction: false, reactionTarget: 'all', kanpoTarget: null, isOthers: false, guaranteedHit: false, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, hit: 100, delay: 0, haste: 0 }); openEditor(); }
+function addHeroSkill(hi) { syncEditorDataToMemory(); heroesData[hi].skills.push({ name: '新技能', isReaction: false, reactionTarget: 'all', kanpoTarget: null, sheshenTarget: null, isOthers: false, guaranteedHit: false, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, hit: 100, delay: 0, haste: 0 }); openEditor(); }
 function removeHeroSkill(hi, si) { syncEditorDataToMemory(); heroesData[hi].skills.splice(si, 1); openEditor(); }
 function addEnemySkill(ei) { syncEditorDataToMemory(); enemiesData[ei].skills.push({ name: '新技能', isOthers: false, guaranteedHit: false, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, charge: 0, hit: 100 }); openEditor(); }
 function removeEnemySkill(ei, si) { syncEditorDataToMemory(); enemiesData[ei].skills.splice(si, 1); openEditor(); }
@@ -7977,7 +8089,7 @@ function serializeHeroesForSave() {
       atk: h.atk, def: h.def, spd: h.spd, actCount: h.actCount
     },
     skills: h.skills.map(s => ({
-      name: s.name, isReaction: s.isReaction, reactionTarget: s.reactionTarget, kanpoTarget: s.kanpoTarget,
+      name: s.name, isReaction: s.isReaction, reactionTarget: s.reactionTarget, kanpoTarget: s.kanpoTarget, sheshenTarget: s.sheshenTarget || null,
       isOthers: !!s.isOthers, guaranteedHit: !!s.guaranteedHit, damageType: s.damageType, fxTag: s.fxTag, cost: s.cost, hpCost: s.hpCost, tpCost: s.tpCost,
       hit: s.hit, turns: s.turns, delay: s.delay || 0, haste: s.haste || 0, maxUses: s.maxUses || 0, type: s.type, power: s.power, type2: s.type2, power2: s.power2, type3: s.type3, power3: s.power3, barrierSub: s.barrierSub || null, barrierArmor: s.barrierArmor || 0
     }))
