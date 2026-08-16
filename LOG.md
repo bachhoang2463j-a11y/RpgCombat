@@ -729,3 +729,14 @@
   3. **编辑与持久化**：`SKILL_TYPES` 追加 `[必中]`；技能编辑器每行新增「必中」复选框（hero/enemy 技能行的「他人」旁，id `edit-h/e-…-guaranteed`）；`syncEditorDataToMemory` 读回；`addHeroSkill`/`addEnemySkill`/`addHero`/`addEnemy` 默认对象、`serializeHeroesForSave` 均追加 `guaranteedHit` 字段（持久化不丢失）；技能面板新增 `🎯必中` 徽章。
 - **涉及文件**：`index.html`、`README.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：需求要求 buff/减益同样受命中率影响，让高闪避单位能规避妨害、同时多段攻击只需命中一次即可挂满减益，丰富攻击命中与妨害施加的联动博弈；`[必中]` 标签则用于大范围妨害（如暴风雪/造雾术）锁定施加、不受闪避影响。实现上复用既有 `skill.hit` 命中管线与 `skill` 跨槽共享对象，以最小侵入承载"共享一次攻击判定结论"，并保持我方增益无条件生效以不破坏治疗/辅助体验。
+
+---
+
+## [LOG-061] 2026-08-17 — 三项职业被动优化（风行者回避致命 / 狂战士毅力留存 / 强力反击与普通反击互斥）（升级 V6.9）
+
+- **变更行为**：
+  1. **风行者新增【被动 - 回避致命】**（`index.html`）：风行者原本仅 `modifyStats`（Eva += TP），现复用隐匿者同款机制——每场战斗一次，遭受致命伤害时完美回避免除伤害（一次性标记 `hasTriggeredAvoidFatal`，`hpDmg=0`/`shieldDmg=0`/`prevented=true`，飘字"回避致命!" indigo）。事件总线 `ON_FATAL_DAMAGE` 新增守卫 `classType !== '风行者'`（priority=5，与隐匿者同档）。
+  2. **狂战士新增【被动 - 毅力留存】**（`index.html`）：狂战士原本仅 `modifyStats`/`checkPierce`/`modifyTrueDamage`，现复用防守者同款机制——每场战斗一次，承受致命伤害时强制保留 1 点 HP（一次性标记 `hasTriggeredGrit`，`hpDmg = hp - 1`/`prevented=true`，飘字"毅力留存!" yellow）。事件总线 `ON_FATAL_DAMAGE` 新增守卫 `classType !== '狂战士'`（priority=10，与防守者同档）。
+  3. **防守者强力反击与普通反击互斥**（`index.html`）：因防守者经 `onBattleInit` 永久持有 `counter` buff，闪避近战攻击时若强力反击触发，紧接着的普通反击判定仍为真，导致一击内双重反击。现设互斥标记：闪避成功分支在 `emitAsync(EVENTS.ON_DODGE)` 前 `target.powerCounterFired = false` 复位；`onDodge` 打出强力反击后（仇恨重置处）置 `target.powerCounterFired = true`；普通反击守卫追加 `&& !target.powerCounterFired`。效果：强力反击命中后跳过同次闪避的普通反击，避免重复伤害/重复"仇恨反击+20"；未触发强力反击时普通反击逻辑完全不变。
+- **涉及文件**：`index.html`、`README.md`、`SPEC.md`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：需求要求 ①风行者和隐匿者一样具备规避致命、②狂战士和防守者一样具备毅力留存，③修复防守者强力反击与普通反击在同一闪避内双发的问题。前两者通过复用既有的 `onFatalDamage` 机制与同名一次性标记（战斗开始已统一 `delete` 清零），以零/低侵入接入 `CLASS_PASSIVES` 与事件总线；后者以最小侵入增设 `powerCounterFired` 互斥标记实现"强力反击触发即跳过普通反击"，保持日常普通反击行为不变，并同步补全 README/SPEC 说明并升级版本号为 V6.9 发布。

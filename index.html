@@ -4931,6 +4931,7 @@ registerClassPassive('防守者', {
         // 打出强力反击后，防守者仇恨回归"天生重装"档位（有效仇恨200），几率随之下一次反击重置
         target.buffs = (target.buffs || []).filter(b => b.type !== 'taunt'); // 清除临时嘲讽buff
         target.baseTauntBonus = 100;                                          // 回归防守者天生重装修正
+        target.powerCounterFired = true;                                      // 本次闪避已触发强力反击 → 跳过普通反击
         createFloatingText(targetDom, '仇恨重置!', 'text-orange-300');
         addHistory(`   ↳ 💢 ${target.name} 打出强力反击后气息收敛，仇恨回归 ${getEffectiveStats(target).taunt} 点！`);
         if (target.id.startsWith('h')) updateHeroUI(target); else updateEnemyUI(target);
@@ -4953,6 +4954,21 @@ registerClassPassive('狂战士', {
             return Math.floor((caster.maxHp - caster.hp) * 0.1);
         }
         return 0;
+    },
+    // 【被动 - 毅力留存】每场战斗一次，承受致命伤害时强制保留 1 点 HP 避免死亡（与防守者同款机制）
+    onFatalDamage(ctx) {
+        if (!ctx.target.hasTriggeredGrit) {
+            ctx.target.hasTriggeredGrit = true;
+            ctx.hpDmg = ctx.target.hp - 1;
+            ctx.prevented = true;
+            setTimeout(() => {
+                if (ctx.targetDom) createFloatingText(ctx.targetDom, '毅力留存!', 'text-yellow-400');
+                if (window.playSound) playSound('taunt');
+            }, 300);
+            addHistory(`   ↳ 🛡️ ${ctx.target.name} 触发被动【毅力】，强制保留了 1 点生命值避免死亡！`);
+            return true;
+        }
+        return false;
     }
 });
 
@@ -4960,6 +4976,22 @@ registerClassPassive('狂战士', {
 registerClassPassive('风行者', {
     modifyStats(entity, stats) {
         stats.eva += (entity.tp || 0);
+    },
+    // 【被动 - 规避致命】每场战斗一次，遭受致命伤害时完美回避免除伤害（与隐匿者同款机制）
+    onFatalDamage(ctx) {
+        if (!ctx.target.hasTriggeredAvoidFatal) {
+            ctx.target.hasTriggeredAvoidFatal = true;
+            ctx.hpDmg = 0;
+            ctx.shieldDmg = 0;
+            ctx.prevented = true;
+            setTimeout(() => {
+                if (ctx.targetDom) createFloatingText(ctx.targetDom, '回避致命!', 'text-indigo-400');
+                if (window.playSound) playSound('miss');
+            }, 300);
+            addHistory(`   ↳ 👤 ${ctx.target.name} 触发被动【回避】，在致命伤害临身的一瞬闪避，完美免除本次伤害！`);
+            return true;
+        }
+        return false;
     }
 });
 
@@ -5186,10 +5218,24 @@ CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
     if (p && p.onFatalDamage) p.onFatalDamage(ctx);
 }, 10);
 
+// 狂战士：毅力留存 (priority=10，与防守者同档)
+CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
+    if (ctx.target.classType !== '狂战士') return;
+    const p = CLASS_PASSIVES['狂战士'];
+    if (p && p.onFatalDamage) p.onFatalDamage(ctx);
+}, 10);
+
 // 隐匿者：回避致命 (priority=5，防守者毅力失效后才触发)
 CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
     if (ctx.target.classType !== '隐匿者') return;
     const p = CLASS_PASSIVES['隐匿者'];
+    if (p && p.onFatalDamage) p.onFatalDamage(ctx);
+}, 5);
+
+// 风行者：回避致命 (priority=5，与隐匿者同档)
+CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
+    if (ctx.target.classType !== '风行者') return;
+    const p = CLASS_PASSIVES['风行者'];
     if (p && p.onFatalDamage) p.onFatalDamage(ctx);
 }, 5);
 
@@ -5853,11 +5899,13 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
           updateHeroUI(target);
       }
 
+      target.powerCounterFired = false; // 复位本次闪避的强力反击标记，仅反映当前这一击
+
       // 强力反击被动：闪避成功时按概率触发（独立于常规反击，无视伤害类型限制）
       await CombatEvents.emitAsync(EVENTS.ON_DODGE, { target, caster, targetDom, incomingDamageType, skill });
 
-      // 反击判定 (仅针对近战)
-      if (target.isAlive && target.buffs && target.buffs.some(b => b.type === 'counter')) {
+      // 反击判定 (仅针对近战)；若本次闪避已触发强力反击，则不再同时触发普通反击
+      if (target.isAlive && target.buffs && !target.powerCounterFired && target.buffs.some(b => b.type === 'counter')) {
           if (incomingDamageType === '近战' || incomingDamageType === '[近战]' || (!incomingDamageType.includes('远程') && !incomingDamageType.includes('法术'))) {
               const counterBuff = target.buffs.find(b => b.type === 'counter');
               const tStatsForCounter = getEffectiveStats(target);
