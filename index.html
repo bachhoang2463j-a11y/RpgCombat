@@ -5812,7 +5812,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
       : Math.floor(Math.random() * defenderSpdCap) + 1 > Math.floor(Math.random() * attackerHitCap) + 1;
 
 // 2. 如果初次判定失败 (即将挨打)，触发敌我双方的反应拦截！
-    if (!isDodged && !(skill && skill.guaranteedHit)) {
+    // 注：即使敌方带【必中】也能触发反应拦截（必中仅跳过被动闪避 roll，仍可被反应技/看破主动化解）
+    if (!isDodged) {
         const reactionSkills = target.skills.filter(s => {
             if (!s.isReaction) return false;
             if (s.cost > target.mp) return false;

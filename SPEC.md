@@ -69,6 +69,11 @@
   - $Roll_{Def} = \text{Random}(1 \sim Eva_{max})$
   - 若 $Roll_{Def} > Roll_{Atk}$，则判定为闪避成功。
 
+- **`[必中]` 与反应拦截（V6.10 起）**：
+  - `[必中]` 仅跳过**被动闪避 roll**（`isDodged = false`，伤害/妨害恒定命中无法被被动闪避规避）。
+  - `[必中]` **不豁免主动化解**：目标仍会触发反应拦截（我方弹反应面板、敌方 AI 自动反应）与看破中断（`checkKanpoInterrupt`），反应技/看破仍可将必中伤害规避或无效化。
+  - 对应入口条件：反应拦截由 `!isDodged && !(skill && skill.guaranteedHit)` 改为 `!isDodged`。
+
 - **仇恨分布算法**：
   - 基础嘲讽值：防守者 (200)，普通 (100)，隐匿者 (50)。
   - 选中概率：$P(i) = \frac{\text{嘲讽值}_i}{\sum \text{嘲讽值}}$。
