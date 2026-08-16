@@ -740,3 +740,5 @@
   3. **防守者强力反击与普通反击互斥**（`index.html`）：因防守者经 `onBattleInit` 永久持有 `counter` buff，闪避近战攻击时若强力反击触发，紧接着的普通反击判定仍为真，导致一击内双重反击。现设互斥标记：闪避成功分支在 `emitAsync(EVENTS.ON_DODGE)` 前 `target.powerCounterFired = false` 复位；`onDodge` 打出强力反击后（仇恨重置处）置 `target.powerCounterFired = true`；普通反击守卫追加 `&& !target.powerCounterFired`。效果：强力反击命中后跳过同次闪避的普通反击，避免重复伤害/重复"仇恨反击+20"；未触发强力反击时普通反击逻辑完全不变。
 - **涉及文件**：`index.html`、`README.md`、`SPEC.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：需求要求 ①风行者和隐匿者一样具备规避致命、②狂战士和防守者一样具备毅力留存，③修复防守者强力反击与普通反击在同一闪避内双发的问题。前两者通过复用既有的 `onFatalDamage` 机制与同名一次性标记（战斗开始已统一 `delete` 清零），以零/低侵入接入 `CLASS_PASSIVES` 与事件总线；后者以最小侵入增设 `powerCounterFired` 互斥标记实现"强力反击触发即跳过普通反击"，保持日常普通反击行为不变，并同步补全 README/SPEC 说明并升级版本号为 V6.9 发布。
+
+- **⚠️ 已知遗留 Bug 备注（与本次改动无关，来自更早的 `[必中]` 实现）**：敌方技能带 `[必中]` 标签时会**跳过敌方/我方角色反应技能的触发**。根源在 `index.html` 反应拦截入口 `if (!isDodged && !(skill && skill.guaranteedHit))`（原 L5815，本次改动后行号可能位移）——`[必中]` 令该条件恒为假，故敌方必中技能不弹我方反应面板、也无法触发看破打断。待后续版本修复方向：让 `[必中]` 仅跳过闪避/命中 roll（`isDodged = false`），而保留反应拦截与看破判定，使必中妨害仍可被仓促应对。已同步备注至 `README.md` §5 第 4 点。
