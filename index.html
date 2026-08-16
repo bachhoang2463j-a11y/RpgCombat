@@ -816,6 +816,11 @@
 
   <!-- 顶部控制按钮 -->
   <div class="absolute top-2 sm:top-4 right-2 sm:right-4 z-50 flex gap-1.5 sm:gap-2">
+    <!-- 【场地】徽章：位于【记录】左侧，hover 弹出效果描述（updateFieldBadgeUI 控制显示） -->
+    <div id="field-badge" class="group glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-amber-400 hover:text-amber-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md cursor-help" style="display:none">
+      <span>🏟️</span> <span id="field-badge-name">场地</span>
+      <div id="field-badge-tip" class="hidden group-hover:block absolute right-0 top-full mt-2 z-[60] pointer-events-none bg-slate-950/95 backdrop-blur-md border border-slate-700/80 rounded-lg px-3 py-2 text-[10px] sm:text-xs font-normal text-slate-300 whitespace-nowrap shadow-[0_8px_24px_rgba(0,0,0,0.6)]"></div>
+    </div>
     <button onclick="showHistoryOnly()" class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-purple-400 hover:text-purple-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md">
       <span>📜</span> <span class="hidden sm:inline">记录</span>
     </button>
@@ -4036,6 +4041,73 @@ let barrierAoELeak = null;     // 群攻批次内每个成员共用的泄漏量
 // barrierStandIn 缓存当前代理 hero 引用，供 getTauntTarget 选中屏障、以及碎片溢出时打到的角色。
 let barrierStandIn = null;
 
+// ==========================================
+// 【场地】战前准备效果系统（V6.14）
+// YAML 我方列表行支持后缀 (场地:xx)，战斗开始时为我方全体注入战前准备状态的 buff/debuff。
+// - buffs：回合型效果，对每个英雄 push 真实 buff（fieldBuff 标记 = 不可被【驱散】清除），
+//   衰减语义与全游戏 buff 一致（该角色每回合"首次行动"时 duration--，再动/多动额外行动不消耗）；
+//   type 复用既有体系：hit/eva 进命中与闪避公式，spd 进 getEffectiveSpeed（仅排轴、不影响闪避）。
+// - onApply(heroes)：开局一次性效果（资源型，注入点在 initialHeroesCache 之前 → resetBattle 后保留）。
+// 仅作用于我方；敌方不受影响。
+// ==========================================
+const FIELD_EFFECTS = {
+  '有备而来': {
+    desc: '战前充分备战，前三回合命中率大幅提升',
+    buffs: [ { type: 'hit', value: 30, duration: 3 } ]
+  },
+  '猝不及防': {
+    desc: '开场遭突袭，第一回合闪避率下降（本人行动后即回过神来）',
+    buffs: [ { type: 'eva', value: -20, duration: 1 } ]
+  },
+  '背水一战': {
+    desc: '退无可退，前三回合攻击力提升',
+    buffs: [ { type: 'atk', value: 15, duration: 3 } ]
+  },
+  '严阵以待': {
+    desc: '列阵防御，前两回合防御力提升',
+    buffs: [ { type: 'def', value: 15, duration: 2 } ]
+  },
+  '居高临下': {
+    desc: '占据地形优势，前两回合行动顺序提前',
+    buffs: [ { type: 'spd', value: 10, duration: 2 } ]
+  },
+  '劳师远征': {
+    desc: '长途跋涉疲惫，前两回合行动顺序延后',
+    buffs: [ { type: 'spd', value: -10, duration: 2 } ]
+  },
+  '雾霭弥漫': {
+    desc: '雾气弥漫视野受限但便于隐蔽，全场命中降低、闪避提升',
+    buffs: [ { type: 'hit', value: -10, duration: 9999 }, { type: 'eva', value: 10, duration: 9999 } ]
+  },
+  '士气高涨': {
+    desc: '战前动员，全体潜能（TP）+20',
+    onApply(heroes) { heroes.forEach(h => { h.tp = Math.min(h.maxTp || 100, (h.tp || 0) + 20); }); }
+  },
+  '补给充沛': {
+    desc: '战前补给充分，全体法力（MP）恢复上限 30%',
+    onApply(heroes) { heroes.forEach(h => { if (h.maxMp) h.mp = Math.min(h.maxMp, h.mp + Math.floor(h.maxMp * 0.3)); }); }
+  },
+  '装备精良': {
+    desc: '战前披甲完备，全体获得最大生命 20% 的护盾',
+    onApply(heroes) { heroes.forEach(h => { h.shield = Math.max(h.shield || 0, Math.floor(h.maxHp * 0.2)); }); }
+  }
+};
+let activeField = null; // 当前战局场地名（null = 无场地效果）
+
+// 【场地】右上角按钮区徽章（静态 HTML 位于顶部控制区、【记录】按钮左侧），
+// 仅在 updateFieldBadgeUI 中控制显示/隐藏与名字，hover 弹出效果描述。
+function updateFieldBadgeUI() {
+  const badge = document.getElementById('field-badge'); if (!badge) return;
+  if (activeField && FIELD_EFFECTS[activeField]) {
+    badge.style.display = 'flex';
+    const nameEl = document.getElementById('field-badge-name');
+    if (nameEl) nameEl.textContent = activeField;
+    const tipEl = document.getElementById('field-badge-tip');
+    if (tipEl) tipEl.textContent = FIELD_EFFECTS[activeField].desc;
+    badge.title = FIELD_EFFECTS[activeField].desc;
+  } else { badge.style.display = 'none'; }
+}
+
 // 【肃正】全队共享屏障横幅 HTML 常量（initUI 清空容器后会重建，须在此保证 id 完整）
 const TEAM_BARRIER_BANNER_HTML = `
   <div id="team-barrier-wrapper" class="team-barrier-wrapper" style="display:none">
@@ -4205,14 +4277,42 @@ function parseSkill(skillStr) {
     return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, hit: hit, turns: turns, type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, sheshenTarget: sheshenTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor };
 }
 
+// 解析"我方列表(场地:xx)"键：返回 { key, field }。无后缀场地时 field = null（key 为兼容读取的键名）。
+// 未注册的场地名忽略并控制台警告（战斗正常建立，仅无场地效果）。
+function resolveHeroListKey(block) {
+    const key = Object.keys(block).find(k => k.startsWith('我方列表'));
+    if (!key) return null;
+    let field = null;
+    const m = key.match(/场地[:：]([^)\]]+)/);
+    if (m) {
+        const name = m[1].trim();
+        if (!FIELD_EFFECTS[name]) console.warn(`[场地] 未注册的场地「${name}」，已忽略（可用：${Object.keys(FIELD_EFFECTS).join(' / ')}）`);
+        else field = name;
+    }
+    return { key, field };
+}
+
+// 注入场地效果：回合型 buff（fieldBuff 标记防驱散）+ 开局一次性 onApply。
+// 调用时机在 heroesData 赋值后、initialHeroesCache 快照前 → 效果进入重置缓存，resetBattle 后保留。
+function applyFieldEffects(heroes) {
+    if (!activeField) return;
+    const fe = FIELD_EFFECTS[activeField];
+    (fe.buffs || []).forEach(tpl => {
+        heroes.forEach(h => h.buffs.push({ type: tpl.type, value: tpl.value, duration: tpl.duration, fieldBuff: true }));
+    });
+    if (fe.onApply) fe.onApply(heroes);
+}
+
 function buildCombatDataFromYAML(yamlContent) {
     try {
         const parsed = jsyaml.load(yamlContent);
         if (!parsed || !parsed["战斗数据栏"]) throw new Error("YAML 缺少 '战斗数据栏' 节点");
         const block = parsed["战斗数据栏"];
+        const heroList = resolveHeroListKey(block);
+        activeField = heroList ? heroList.field : null;
         let tempHeroes = []; let tempEnemies = [];
-        if (block["我方列表"]) {
-            block["我方列表"].forEach((item, index) => {
+        if (heroList && block[heroList.key]) {
+            block[heroList.key].forEach((item, index) => {
                 const data = item["角色"]; if(!data) return;
                 const { emoji, name: cleanName } = getCleanNameAndEmoji(data["名字"] || `英雄${index}`);
                 const attrs = parseAttributes(data["属性"] || "");
@@ -4242,6 +4342,7 @@ function buildCombatDataFromYAML(yamlContent) {
             });
         }
         heroesData = tempHeroes; enemiesData = tempEnemies;
+        applyFieldEffects(heroesData);
         initialHeroesCache = JSON.parse(JSON.stringify(heroesData)); initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData));
         return true;
     } catch (e) { return false; }
@@ -4328,6 +4429,8 @@ function initUI() {
   // 【肃正】重建全队共享屏障横幅（清空容器后补回，覆盖数据就绪/重置/编辑器保存三处调用）
   heroesContainer.insertAdjacentHTML('afterbegin', TEAM_BARRIER_BANNER_HTML);
   updateTeamBarrierUI();
+  // 【场地】右上角徽章为静态 HTML，此处仅刷新显示/名称
+  updateFieldBadgeUI();
   heroesData.forEach((hero, index) => {
     hero.dom = document.createElement('div'); hero.dom.className = `relative transition-all duration-300 min-w-[70px] ${!hero.isAlive ? 'opacity-40 grayscale' : ''}`; hero.dom.id = `hero-wrap-${hero.id}`;
     if (state.isGameStarted) { hero.dom.classList.add('anim-enter-hero'); hero.dom.style.animationDelay = `${index * 0.08}s`; setTimeout(() => { if (hero.dom) hero.dom.classList.remove('anim-enter-hero'); }, 800 + index * 80); } else { hero.dom.classList.add('opacity-0'); }
@@ -4823,7 +4926,8 @@ registerTagHandler('驱散', (ctx) => {
     ctx.target.buffs = ctx.target.buffs || [];
     const count = Math.max(1, Math.floor(ctx.actualPower || 1));
     // 复用灾厄使被动的负面判定谓词（项目内"何为负面"的权威定义）
-    const isDebuff = b => b.duration > 0 && (
+    // fieldBuff 标记 = 场地战前状态，不可被驱散清除
+    const isDebuff = b => !b.fieldBuff && b.duration > 0 && (
         b.type === 'poison' ||
         b.type === 'burn' ||
         b.type === 'stun' ||
@@ -6772,6 +6876,7 @@ function startGame() {
   setTimeout(() => {
     document.getElementById('start-screen').classList.add('hidden');
     showLog("战斗正式开始！"); addHistory(`--- 战斗已拉开帷幕 ---`);
+    if (activeField && FIELD_EFFECTS[activeField]) addHistory(`🏟️ 场地：${activeField} — ${FIELD_EFFECTS[activeField].desc}`);
     heroesData.forEach((h, index) => { if(h.dom) { h.dom.classList.remove('opacity-0'); h.dom.classList.add('anim-enter-hero'); h.dom.style.animationDelay = `${index * 0.08}s`; setTimeout(() => h.dom.classList.remove('anim-enter-hero'), 800 + index * 80); } });
     enemiesData.forEach((e, index) => { if(e.dom) { e.dom.classList.remove('opacity-0'); e.dom.classList.add('anim-enter-enemy'); e.dom.style.animationDelay = `${index * 0.08}s`; setTimeout(() => e.dom.classList.remove('anim-enter-enemy'), 800 + index * 80); } });
     setTimeout(() => startRound(), 800);
