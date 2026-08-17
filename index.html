@@ -5227,6 +5227,8 @@ function updateEnemyUI(enemy) {
           if(hpBar) hpBar.style.width = `${(enemy.hp / enemy.maxHp) * 100}%`;
           return;
       }
+      // 真正死亡：触发智慧死亡旁白（[复活]敌人复活后再死同样走此分支再次触发）
+      tryTriggerEnemyDeathSpeak(enemy);
       enemy.isAlive = false; enemy.shield = 0; enemy.buffs = []; enemy.isDefending = false; enemy.hitBonus = 0; enemy.evaBonus = 0; 
       if(sprite) { sprite.classList.remove('breathe', 'enemy-sprite'); sprite.classList.add('opacity-0', 'scale-50'); } 
       setTimeout(() => { if(enemy.dom) enemy.dom.style.display = 'none'; }, 500); 
@@ -6791,7 +6793,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
                   createFloatingText(casterDom, `反击 -${counterHpDmg}`, 'text-amber-400'); 
                   addHistory(`   ⚔️ ${target.name} 闪避并趁势反击！迅速一击命中了 ${caster.name}，造成了 ${counterHpDmg} 点伤害！${counterShieldDmg>0?` (附带破盾${counterShieldDmg})`:''}`); 
               }
-              if (caster.id.startsWith('h')) updateHeroUI(caster); else updateEnemyUI(caster);
+              if (caster.id.startsWith('h')) updateHeroUI(caster);
+              else { tryTriggerEnemyLowHpSpeak(caster); updateEnemyUI(caster); }
               if (target.id.startsWith('h')) updateHeroUI(target); else updateEnemyUI(target);
           } else {
               addHistory(`   ↳ ${target.name} 虽处于反击架势，但无法触及并反击[${incomingDamageType}]攻击！`);
@@ -7003,7 +7006,13 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     }
   }
 
-  if (targetType === 'enemy') updateEnemyUI(target); else updateHeroUI(target);
+  // 敌方血量跌破 30% 触发智慧低血旁白（致死伤害走下方击杀收口触发死亡旁白）
+  if (targetType === 'enemy') {
+    tryTriggerEnemyLowHpSpeak(target);
+    updateEnemyUI(target);
+  } else {
+    updateHeroUI(target);
+  }
 }
 
 // === 【肃正】屏障护甲与属性克制减免 ===
@@ -7530,6 +7539,8 @@ async function nextTurn() {
                   const dotDmg = b.value;
                   const isBurn = b.type === 'burn';
                   currentEntity.ref.hp -= dotDmg;
+                  // 敌方 DoT 扣血后触发智慧低血旁白判定（致死由下方死亡收口触发死亡旁白）
+                  if (!currentEntity.ref.id.startsWith('h')) tryTriggerEnemyLowHpSpeak(currentEntity.ref);
                   const targetDom = currentEntity.ref.id.startsWith('h') ? document.getElementById(`hero-card-${currentEntity.ref.id}`) : document.getElementById(`${currentEntity.ref.id}-sprite`);
                   if (targetDom) { createFloatingText(targetDom, `${isBurn ? '火' : '毒'} -${dotDmg}`, isBurn ? 'text-orange-400' : 'text-purple-400'); targetDom.classList.add('shake'); setTimeout(() => targetDom.classList.remove('shake'), 400); }
                   addHistory(`   ${isBurn ? '🔥' : '🦠'} [${currentEntity.ref.name}] ${isBurn ? '灼烧' : '毒性'}发作，受到了 ${dotDmg} 点真实伤害！`);
@@ -7562,6 +7573,8 @@ async function nextTurn() {
       const revived = currentEntity.type !== 'hero' && tryReviveEnemy(currentEntity.ref,
           document.getElementById(`${currentEntity.ref.id}-sprite`));
       if (!revived) {
+          // 敌方 DoT 致死：触发智慧死亡旁白（此路径手动置死、不经过 updateEnemyUI 致死分支，故单独判定）
+          if (currentEntity.type !== 'hero') tryTriggerEnemyDeathSpeak(currentEntity.ref);
           currentEntity.ref.isAlive = false;
           if (currentEntity.ref.currentDelay) {
               resetHeroChargeEffect(currentEntity.ref);
@@ -9071,11 +9084,20 @@ async function requestLLMResponse(playerText, targetAllies, isAutoSpeak = false)
       const lines = parseLLMResponse(result);
       console.log('[LLM Chat Debug] Parsed response lines:', lines);
       if (lines.length > 0) {
-        // 按序显示各角色气泡，间隔500ms
+        // 按序显示各角色气泡，间隔500ms；同名实例（如 食尸鬼*2）按调用顺序分配到本次目标集中未用的实例，避免全部归属第一个
+        const usedTargetIds = new Set();
         for (let i = 0; i < lines.length; i++) {
           const { name, line } = lines[i];
-          const hero = heroesData.find(h => h.name === name && h.isAlive) || enemiesData.find(e => e.name === name && e.isAlive) || targetAllies[i % targetAllies.length];
+          // 1. 优先在本次请求的目标集内按名字分配未用实例（同名敌人各实例各归各）
+          let hero = targetAllies.find(t => t.name === name && t.isAlive && !usedTargetIds.has(t.id));
+          // 2. 目标集内未命中 → 全局按名查找（覆盖玩家/已死亡/非目标集角色，保持原语义）
+          if (!hero) hero = heroesData.find(h => h.name === name && h.isAlive) || enemiesData.find(e => e.name === name && e.isAlive);
+          // 3. 名字完全对不上（LLM 输出了不在场角色名）→ 回退到目标集内任意未用实例，保证气泡仍能显示
+          if (!hero) hero = targetAllies.find(t => t.isAlive && !usedTargetIds.has(t.id));
+          // 4. 最终兜底
+          if (!hero) hero = targetAllies[i % targetAllies.length];
           if (hero) {
+            usedTargetIds.add(hero.id);
             await new Promise(r => setTimeout(r, i === 0 ? 0 : 600));
             showChatBubble(hero, line, false);
             addHistory(`[对话] ${hero.name}：「${line}」`);
@@ -9124,6 +9146,37 @@ async function triggerEnemyAutoSpeak(enemy) {
   if (llmState.isRequesting) return;
   const trigger = `[系统指令：现在轮到你的回合，请以【${enemy.name}】的口吻说出一句符合当前战局的简短台词，体现你作为敌方的立场与态度。严格不要带任何前缀和引号！]`;
   await requestLLMResponse(trigger, [enemy], true);
+}
+
+// ---- 智慧敌方低血量旁白：生命跌破 30% 时以本人口吻说话（仅[智慧]敌人，受敌方旁白开关控制）----
+async function triggerEnemyLowHpSpeak(enemy) {
+  if (!llmState.apiUrl || !llmState.apiKey) return;
+  if (llmState.isRequesting) return;
+  const trigger = `[系统指令：敌方 ${enemy.name} 生命已跌至 30% 以下、危在旦夕。请以【${enemy.name}】的口吻说出一句符合当前绝境处境的简短台词（可为负隅顽抗、绝望嘶吼、不甘或放狠话）。严格不要带任何前缀和引号！]`;
+  await requestLLMResponse(trigger, [enemy], true);
+}
+
+// ---- 智慧敌方死亡旁白：被击杀时以本人口吻留下最后台词（仅[智慧]敌人，受敌方旁白开关控制）----
+async function triggerEnemyDeathSpeak(enemy) {
+  if (!llmState.apiUrl || !llmState.apiKey) return;
+  if (llmState.isRequesting) return;
+  const trigger = `[系统指令：敌方 ${enemy.name} 刚刚被击败，请以【${enemy.name}】的口吻说出一句简短的临死台词（可为悔恨、愤恨、解脱或诅咒）。严格不要带任何前缀和引号！]`;
+  await requestLLMResponse(trigger, [enemy], true);
+}
+
+// ---- 敌方低血量旁白触发判定：仅[智慧]敌方 + 开关开启 + 存活 + ≤30% + 本场尚未因跌破30%说过话 ----
+function tryTriggerEnemyLowHpSpeak(enemy) {
+  if (!enemy || enemy.id.startsWith('h')) return;
+  if (enemy.isWise && llmState.enemyAutoSpeak && !enemy.hasLowHpNarrated && enemy.maxHp > 0 && enemy.hp > 0 && enemy.hp / enemy.maxHp <= 0.3) {
+    enemy.hasLowHpNarrated = true;
+    triggerEnemyLowHpSpeak(enemy);
+  }
+}
+
+// ---- 敌方死亡旁白触发判定：仅[智慧]敌方 + 开关开启（[复活]敌人复活后再死可再次触发）----
+function tryTriggerEnemyDeathSpeak(enemy) {
+  if (!enemy || enemy.id.startsWith('h')) return;
+  if (enemy.isWise && llmState.enemyAutoSpeak) triggerEnemyDeathSpeak(enemy);
 }
 
 // ---- 实际 API 请求 ----
