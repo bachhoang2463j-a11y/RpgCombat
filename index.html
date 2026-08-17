@@ -945,7 +945,7 @@
             <h2 class="text-xl sm:text-3xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-violet-200 to-violet-500 drop-shadow-md">世界书管理</h2>
             <div class="text-[10px] sm:text-sm text-gray-400 mt-1 sm:mt-2 tracking-widest">绑定敌方图鉴世界书 · 词条开关 · 数据预览</div>
         </div>
-        <div id="worldbook-manager-body" class="p-4 sm:p-6 flex-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
+        <div id="worldbook-manager-body" class="p-4 sm:p-6 flex-1 flex flex-col gap-1 overflow-hidden custom-scrollbar">
             <div class="text-xs text-gray-400 p-4 text-center">📚 正在初始化...</div>
         </div>
         <div class="px-4 sm:px-6 py-3 sm:py-4 bg-black/40 border-t border-gray-700/50 flex justify-end gap-2 sm:gap-4 items-center">
@@ -1023,6 +1023,46 @@
 
 <script>
 console.log('CRITICAL_LOG: 1. Script tag start');
+// ---- 诊断探头（V6.20+，纯观察零行为影响）：全局异常捕获 + 顶部红条 ----
+(function () {
+    window.__dbgErrors = [];
+    function dbgRender() {
+        try {
+            const errs = window.__dbgErrors || [];
+            let el = document.getElementById('__dbg_error_bar');
+            if (!errs.length) { if (el) el.remove(); return; }
+            if (!el) {
+                el = document.createElement('div');
+                el.id = '__dbg_error_bar';
+                el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc2626;color:#fff;font:12px/1.5 monospace;padding:6px 10px;max-height:40vh;overflow:auto;box-shadow:0 2px 10px rgba(0,0,0,.5)';
+                document.documentElement.appendChild(el);
+            }
+            el.innerHTML = '<div style="font-weight:bold;margin-bottom:2px">⚠️ 运行异常 ' + errs.length + ' 条（诊断探头）</div>' + errs.slice(0, 5).map(function (e) {
+                return '<div style="border-top:1px solid rgba(255,255,255,.3);padding:2px 0">[' + e.time + '] ' + e.message + (e.src ? ' — ' + e.src : '') + (e.line ? ' :' + e.line : '');
+            }).join('');
+        } catch (err) { /* 探头自身异常不扩散 */ }
+    }
+    function dbgRecord(o) {
+        try { window.__dbgErrors.push(o); if (window.__dbgErrors.length > 20) window.__dbgErrors.shift(); } catch (e) {}
+        dbgRender();
+    }
+    window.addEventListener('error', function (e) {
+        dbgRecord({ time: new Date().toLocaleTimeString(), message: e.message || '未知错误', src: e.filename || e.srcElement && e.srcElement.id || '', line: e.lineno });
+        console.error('CRITICAL_LOG: GLOBAL_ERROR:', e.message, e.filename, e.lineno, e);
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+        const r = e.reason;
+        dbgRecord({ time: new Date().toLocaleTimeString(), message: 'Promise rejection: ' + (r && (r.message || r.reason) || String(r)) });
+        console.error('CRITICAL_LOG: UNHANDLED_REJECTION:', r);
+    });
+    window.onerror = function (msg, src, line) {
+        dbgRecord({ time: new Date().toLocaleTimeString(), message: msg, src: src, line: line });
+        console.error('CRITICAL_LOG: ONERROR:', msg, src, line);
+        return false; // 不吞错误，让浏览器继续默认行为
+    };
+    // 若初始化后仍无红条，则一切正常；延迟 800ms 首绘兜底
+    setTimeout(dbgRender, 800);
+})();
 // ==========================================
 // 全局常量与技能池
 // ==========================================
@@ -4600,31 +4640,34 @@ function renderWorldbookManager() {
     const body = document.getElementById('worldbook-manager-body');
     if (!body) return;
     body.innerHTML = `
-      <!-- ① 绑定世界书（可搜索单选列表 + 刷新） -->
-      <div class="border border-gray-700/50 rounded-lg bg-black/30 p-2">
-        <div class="text-[10px] sm:text-xs font-bold text-violet-300 flex items-center justify-between mb-1">
-          <span>📚 绑定世界书</span>
-          <button onclick="refreshWorldbookData()" class="px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-bold text-violet-300 hover:text-white hover:bg-white/10 border border-violet-500/40 transition-colors">🔄 刷新</button>
+      <!-- 两列主区：左=世界书列表 / 右=词条列表 (约 1:4) -->
+      <div class="flex gap-3 flex-1 min-h-0">
+        <!-- ① 左列：绑定世界书（可搜索单选列表 + 刷新） -->
+        <div class="w-[22%] min-w-[170px] border border-gray-700/50 rounded-lg bg-black/30 p-2 flex flex-col min-h-0">
+          <div class="text-[10px] sm:text-xs font-bold text-violet-300 flex items-center justify-between mb-1">
+            <span>📚 世界书</span>
+            <button onclick="refreshWorldbookData()" class="px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-bold text-violet-300 hover:text-white hover:bg-white/10 border border-violet-500/40 transition-colors">🔄 刷新</button>
+          </div>
+          <input id="worldbook-name-search" placeholder="🔍 搜索世界书..." oninput="renderWorldbookNameList()" class="w-full bg-black/50 border border-gray-600 rounded px-2 py-1 text-[10px] sm:text-xs text-gray-200 outline-none focus:border-violet-400 mb-1" spellcheck="false">
+          <div id="worldbook-name-list" class="flex-1 overflow-y-auto custom-scrollbar space-y-0.5 pr-1"></div>
+          <div id="worldbook-bound-info" class="text-[9px] sm:text-[10px] text-gray-500 mt-1 truncate"></div>
         </div>
-        <input id="worldbook-name-search" placeholder="🔍 搜索世界书..." oninput="renderWorldbookNameList()" class="w-full bg-black/50 border border-gray-600 rounded px-2 py-1 text-[10px] sm:text-xs text-gray-200 outline-none focus:border-violet-400 mb-1" spellcheck="false">
-        <div id="worldbook-name-list" class="max-h-24 overflow-y-auto custom-scrollbar space-y-0.5 pr-1"></div>
-        <div id="worldbook-bound-info" class="text-[9px] sm:text-[10px] text-gray-500 mt-1 truncate"></div>
-      </div>
-      <!-- ② 词条列表（搜索 + 激活置顶 + 独立滚动） -->
-      <div class="border border-gray-700/50 rounded-lg bg-black/30 p-2 flex flex-col min-h-0">
-        <div class="text-[10px] sm:text-xs font-bold text-violet-300 flex items-center justify-between mb-1">
-          <span>🗂️ 词条列表 <span id="worldbook-entry-count" class="text-gray-500 font-normal"></span></span>
+        <!-- ② 右列：词条列表（搜索 + 启用置顶 + 独立滚动） -->
+        <div class="flex-1 min-w-0 border border-gray-700/50 rounded-lg bg-black/30 p-2 flex flex-col min-h-0">
+          <div class="text-[10px] sm:text-xs font-bold text-violet-300 flex items-center justify-between mb-1">
+            <span>🗂️ 词条列表 <span id="worldbook-entry-count" class="text-gray-500 font-normal"></span></span>
+          </div>
+          <input id="worldbook-entry-search" placeholder="🔍 搜索词条..." oninput="renderWorldbookEntryList()" class="w-full bg-black/50 border border-gray-600 rounded px-2 py-1 text-[10px] sm:text-xs text-gray-200 outline-none focus:border-violet-400 mb-1" spellcheck="false">
+          <div id="worldbook-entry-list" class="flex-1 overflow-y-auto custom-scrollbar space-y-0.5 pr-1"></div>
         </div>
-        <input id="worldbook-entry-search" placeholder="🔍 搜索词条..." oninput="renderWorldbookEntryList()" class="w-full bg-black/50 border border-gray-600 rounded px-2 py-1 text-[10px] sm:text-xs text-gray-200 outline-none focus:border-violet-400 mb-1" spellcheck="false">
-        <div id="worldbook-entry-list" class="max-h-[36vh] overflow-y-auto custom-scrollbar space-y-0.5 pr-1"></div>
       </div>
-      <!-- ③ 当前载入敌人 -->
-      <div class="border border-gray-700/50 rounded-lg bg-black/30 p-2">
-        <div class="text-[10px] sm:text-xs font-bold text-violet-300 mb-1">⚔️ 当前载入敌人</div>
-        <div id="worldbook-loaded-enemies" class="max-h-24 overflow-y-auto custom-scrollbar space-y-0.5 pr-1"></div>
+      <!-- ③ 底部通栏：当前战斗敌人 -->
+      <div class="border border-gray-700/50 rounded-lg bg-black/30 p-2 shrink-0">
+        <div class="text-[10px] sm:text-xs font-bold text-violet-300 mb-1">⚔️ 当前战斗敌人</div>
+        <div id="worldbook-loaded-enemies" class="max-h-[20vh] overflow-y-auto custom-scrollbar space-y-0.5 pr-1"></div>
       </div>
-      <!-- ④ 词条数据预览 -->
-      <div id="worldbook-detail-panel" class="hidden border border-violet-500/30 rounded-lg bg-black/40 p-2">
+      <!-- ④ 词条数据预览（保持既有功能，第 3 步再改行内展开） -->
+      <div id="worldbook-detail-panel" class="hidden border border-violet-500/30 rounded-lg bg-black/40 p-2 shrink-0">
         <div class="flex items-center justify-between mb-1">
           <div id="worldbook-detail-title" class="text-[10px] sm:text-xs font-bold text-violet-300 truncate">词条数据</div>
           <button onclick="closeWorldbookDetail()" class="text-gray-400 hover:text-white text-[10px] px-1.5">✕</button>
@@ -4745,7 +4788,11 @@ function closeWorldbookDetail() {
 let pollingInterval;
 console.log('CRITICAL_LOG: 3. Before startSTPolling definition');
 function startSTPolling() {
+    console.log('CRITICAL_LOG: 7. startSTPolling entered');
+    let tickCount = 0;
     pollingInterval = setInterval(() => {
+        tickCount++;
+        if (tickCount === 1) console.log('CRITICAL_LOG: 8. ST polling tick #1');
         try {
             let messageContent = null;
             if (typeof getCurrentMessage === 'function') {
@@ -4778,6 +4825,7 @@ if (lastStartIdx !== -1 && lastEndIdx !== -1 && lastEndIdx > lastStartIdx) {
     }, 1000);
 
     setTimeout(() => {
+        console.log('CRITICAL_LOG: 9. ST polling 5s fallback fired (轮询在跑但未扫到 Combat_block)');
         if(heroesData.length === 0) {
             document.getElementById('loading-title').innerText = "未检测到环境联动";
             document.getElementById('loading-title').classList.remove('animate-pulse', 'text-transparent', 'bg-clip-text');
@@ -9133,17 +9181,29 @@ function parseLLMResponse(text) {
 
 // ---- 初始化：加载设置 ----
 console.log('CRITICAL_LOG: 5. At script initialization end');
+console.log('CRITICAL_LOG: 5.1 loadLLMSettings() before');
 loadLLMSettings();
+console.log('CRITICAL_LOG: 5.2 loadLLMSettings() done');
 loadDefendSettings();
+console.log('CRITICAL_LOG: 5.3 loadWorldbookSettings() before');
 loadWorldbookSettings();
+console.log('CRITICAL_LOG: 5.4 loadWorldbookSettings() done -> boundName=' + worldbookSettings.boundName);
 // 【世界书】非酒馆助手环境隐藏右上角入口；酒馆环境未手动绑定时自动绑定角色卡/聊天文件世界书
 updateWorldbookBtnVisibility();
-autoBindWorldbook();
+console.log('CRITICAL_LOG: 5.5 autoBindWorldbook() before');
+const __dbgAutoBound = autoBindWorldbook();
+console.log('CRITICAL_LOG: 5.6 autoBindWorldbook() done -> boundName=' + __dbgAutoBound);
 // 后台预加载自动绑定世界书词条数据，点击【世界书载入】时即可直接使用（失败静默，不影响启动）
-if (worldbookSettings.boundName) { loadWorldbookData().catch(() => {}); }
+if (worldbookSettings.boundName) {
+    console.log('CRITICAL_LOG: 5.7 loadWorldbookData() start bound=' + worldbookSettings.boundName);
+    loadWorldbookData().then(ok => { console.log('CRITICAL_LOG: 5.8 loadWorldbookData() done ok=' + ok); }).catch(e => { console.log('CRITICAL_LOG: 5.8 loadWorldbookData() FAILED', e); });
+} else {
+    console.log('CRITICAL_LOG: 5.7 no boundName, skip loadWorldbookData');
+}
 
 console.log('CRITICAL_LOG: 6. Calling startSTPolling immediately');
 startSTPolling();
+console.log('CRITICAL_LOG: 10. startSTPolling invoked');
 </script>
 </body>
 </html>

@@ -912,3 +912,21 @@
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`（README 维持 V6.16 现状，无需改动）。
 - **决策原因**：① 用户明确要求「一步一步来」——先回到已知正常的 V6.16，优先解决最容易确认的激活敌人显示 bug；② V6.16 在用户环境实测正常，任何超出该基线的改动都可能与卡死相关，因此**采用手术式最小改动原则**：只修一个 bug、不叠功能；③ 卡死根因至今未明（逐字节 diff 显示改动与轮询零交集，但用户实测证明改动版必卡、基线版必不卡），需要后续用"基线 + 单项功能逐步叠加"的方式定位，本轮不做任何猜测性加固。
 - **版本确认**：用户实测本轮改动无误，版本号定版为 **V6.20**（V6.17~6.19 均因严重 bug 回退未落地），README 同步更新。
+
+## [LOG-075] 2026-08-18 — 第 0 步：诊断探头（全局异常红条 + 轮询/初始化打点，纯观察零行为变化）
+
+- **变更行为**：
+  1. **全局异常捕获（`<script>` 开头，index.html:1026 起）**：自执行 IIFE 注册 `window.addEventListener('error')` / `unhandledrejection` / `window.onerror`，错误收进 `window.__dbgErrors`（最多 20 条），首次出错时**惰性创建顶部红条**（`fixed top:0 inset-inline:0 z-index:99999`，白字列表含时间/消息/来源/行号，最多 5 条、超出滚动），无错时不占任何 DOM；红条渲染自身包 try/catch，探头不许成为新 bug 源。**只新增 fixed 覆盖层，不触碰任何现有 DOM/逻辑**。
+  2. **`startSTPolling` 打点（index.html:4787 起）**：函数入口 `CRITICAL_LOG: 7. startSTPolling entered`；setInterval 回调**首轮** tick `CRITICAL_LOG: 8. ST polling tick #1`（仅打首轮防刷屏）；5 秒兜底 setTimeout 触发 `CRITICAL_LOG: 9. ST polling 5s fallback fired`（说明轮询在跑但未扫到 Combat_block）。
+  3. **顶层初始化序列细化打点（index.html:9159 起）**：`5.1 loadLLMSettings() before` → `5.2 done` → `5.3 loadWorldbookSettings() before` → `5.4 done -> boundName=xx` → `5.5 autoBindWorldbook() before` → `5.6 done -> boundName=xx` → `5.7 loadWorldbookData() start/无绑定跳过` → `5.8 done ok=xx / FAILED`（`loadWorldbookData().catch(()=>{})` 改为 `.then(...).catch(...)` **仅追加打点，行为不变仍静默**）；`startSTPolling()` 后新增 `10. startSTPolling invoked`。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：V6.17/V6.18 两次整体回退均"改动版必卡、基线版必不卡"，但逐字节 diff 显示改动与轮询/加载页零交集——静态分析只能证明"代码没写错"，无法证明"运行时无异常"，且 `loadWorldbookSettings`/`autoBindWorldbook`/`loadWorldbookData` 均有 try/catch 吞异常、无红错。故本次**零行为变化**只加观测：①全局异常红条兜住"异常被吞"盲区；② 7/8/9 打点补齐用户日志缺失的"初始化完成之后"环节（7 未出=初始化中断，8 无 9 有=轮询在跑但扫不到，全无=脚本未执行到 startSTPolling）；③初始化每步打点定位具体中断点。为后续"基线+单项功能逐步叠加"（两列布局→分组树→行内展开）提供可复现的定位手段。
+
+## [LOG-076] 2026-08-18 — 第 1 步两列布局实测通过，用户确认当前布局已满足需求，跳过后续功能步骤，定版 V6.22
+
+- **变更行为**：
+  1. **第 1 步两列布局（纯 HTML 模板重构，功能零变化）**：`renderWorldbookManager()`（index.html:4642）模板由单列堆叠改为 **`flex gap-3` 两列主区 + 底部通栏敌人**——左列 `w-[22%] min-w-[170px]` 世界书列表（可搜索单选行 + 🔄 刷新 + 绑定信息）、右列 `flex-1 min-w-0` 词条列表（搜索 + 启用置顶 + 独立滚动）、底部通栏「⚔️ 当前战斗敌人」（max-h-[20vh]）；外层 `#worldbook-manager-body` 由 `overflow-y-auto` 改 `overflow-hidden`，左右两列各自 `overflow-y-auto` 分区滚动。**渲染函数（renderWorldbookNameList/EntryList/LoadedEnemies）、detail 预览面板、轮询、初始化序列全部原样未动**（仅保留第 0 步诊断探头）。
+  2. **跳过后续步骤**：按用户决定，当前两列布局已满足需求，**不再实施** 第 2 步词条分组树（comment 分类）、第 3 步行内展开正文/XSS 防护/移除 detail 面板——`renderWorldbookEntryList` 保持扁平列表 + 启用置顶，词条「查看」仍走独立预览面板。
+  3. **版本定版 V6.22**：README 版本号 V6.20 → V6.22。
+- **涉及文件**：`index.html`、`README.md`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：第 0 步诊断探头先确认基线健康（CRITICAL_LOG 2~10 完整、轮询在跑、5s 兜底正常触发），第 1 步纯模板重构后用户实测两列布局功能无误——**两处独立改动均未复现卡死，证明布局模板与渲染逻辑不是卡死源**（连续两次回退的问题已被逐小步隔离）。用户实测确认后认为两列布局已满足最初需求，跳过分组树/行内展开等增强，以当前形态定版，减少非必要改动面。
