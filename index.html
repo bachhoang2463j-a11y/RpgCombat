@@ -806,7 +806,10 @@
   <div id="start-screen" class="absolute inset-0 bg-black/80 backdrop-blur-sm z-[110] flex flex-col items-center justify-center transition-opacity duration-1000">
     <div id="loading-title" class="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-gray-200 to-gray-500 tracking-[0.2em] mb-8 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] animate-pulse">正在监听环境数据...</div>
     <div id="loading-tip" class="text-gray-400 text-xs sm:text-sm tracking-widest mb-12">等待 LLM 输出 &lt;Combat_block&gt; 正则标签</div>
-    <button id="start-btn" onclick="startGame()" class="hidden px-8 py-3 bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 border border-gray-500 hover:border-blue-400 text-blue-100 rounded-full tracking-widest transition-all duration-300 shadow-[0_0_20px_rgba(0,0,0,0.5)] transform hover:scale-105">数据已就绪，开始战斗</button>
+    <div id="start-actions" class="hidden mt-2 items-center justify-center gap-3 sm:gap-4 flex-col sm:flex-row">
+      <button id="start-btn" onclick="startGame()" class="px-8 py-3 bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 border border-gray-500 hover:border-blue-400 text-blue-100 rounded-full tracking-widest transition-all duration-300 shadow-[0_0_20px_rgba(0,0,0,0.5)] transform hover:scale-105">🧾 Yaml 载入</button>
+      <button id="worldbook-start-btn" onclick="startGameFromWorldbook()" class="hidden px-8 py-3 bg-gradient-to-r from-indigo-800 to-indigo-700 hover:from-indigo-700 hover:to-indigo-600 border border-indigo-500 hover:border-violet-400 text-violet-100 rounded-full tracking-widest transition-all duration-300 shadow-[0_0_20px_rgba(0,0,0,0.5)] transform hover:scale-105">📚 世界书载入</button>
+    </div>
     <div id="manual-input-box" class="mt-8 w-11/12 max-w-2xl hidden flex-col items-center">
       <div class="text-xs text-rose-400 mb-2">未检测到酒馆上下文，可在此手动粘贴测试数据：</div>
       <textarea id="manual-yaml" class="w-full h-32 sm:h-40 bg-gray-900/80 text-xs text-cyan-200 p-3 rounded border border-gray-700 font-mono shadow-inner outline-none focus:border-cyan-500"></textarea>
@@ -821,6 +824,9 @@
       <span>🏟️</span> <span id="field-badge-name">场地</span>
       <div id="field-badge-tip" class="hidden group-hover:block absolute right-0 top-full mt-2 z-[60] pointer-events-none bg-slate-950/95 backdrop-blur-md border border-slate-700/80 rounded-lg px-3 py-2 text-[10px] sm:text-xs font-normal text-slate-300 whitespace-nowrap shadow-[0_8px_24px_rgba(0,0,0,0.6)]"></div>
     </div>
+    <button id="worldbook-mgr-btn" onclick="openWorldbookManager()" class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-violet-400 hover:text-violet-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md">
+      <span>📚</span> <span class="hidden sm:inline">世界书</span>
+    </button>
     <button onclick="showHistoryOnly()" class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-purple-400 hover:text-purple-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md">
       <span>📜</span> <span class="hidden sm:inline">记录</span>
     </button>
@@ -923,6 +929,22 @@
         </div>
         <div class="px-4 sm:px-6 py-3 sm:py-4 bg-black/40 border-t border-gray-700/50 flex justify-end gap-2 sm:gap-4 items-center">
             <button onclick="closeHistoryOnly()" class="px-3 sm:px-6 py-1.5 sm:py-2.5 rounded-lg text-[10px] sm:text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors border border-transparent hover:border-gray-600">关闭</button>
+        </div>
+    </div>
+  </div>
+
+  <!-- 世界书管理模态框（绑定世界书 / 词条开关 / 数据查看 / 当前载入敌人） -->
+  <div id="worldbook-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] hidden flex-col items-center justify-center p-2 sm:p-4 transition-opacity duration-500 opacity-0">
+    <div class="w-full max-w-3xl bg-slate-900/80 border border-gray-700/50 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[90vh]">
+        <div class="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-700/50 text-center relative bg-gradient-to-r from-slate-800/60 via-violet-800/40 to-slate-800/60">
+            <h2 class="text-xl sm:text-3xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-violet-200 to-violet-500 drop-shadow-md">世界书管理</h2>
+            <div class="text-[10px] sm:text-sm text-gray-400 mt-1 sm:mt-2 tracking-widest">绑定敌方图鉴世界书 · 词条开关 · 数据预览</div>
+        </div>
+        <div id="worldbook-manager-body" class="p-4 sm:p-6 flex-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
+            <div class="text-xs text-gray-400 p-4 text-center">📚 正在初始化...</div>
+        </div>
+        <div class="px-4 sm:px-6 py-3 sm:py-4 bg-black/40 border-t border-gray-700/50 flex justify-end gap-2 sm:gap-4 items-center">
+            <button onclick="closeWorldbookManager()" class="px-3 sm:px-6 py-1.5 sm:py-2.5 rounded-lg text-[10px] sm:text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors border border-transparent hover:border-gray-600">关闭</button>
         </div>
     </div>
   </div>
@@ -4145,6 +4167,14 @@ function getCleanNameAndEmoji(rawName) {
     return { emoji: '👾', name: rawName.trim() };
 }
 
+// 解析名字串末尾的 *N / ×N 数量后缀（如 "《冰雪随从》*2"）→ { baseName, count }。
+// 兼容半角星号 * 与全角乘号 ×；仅敌方列表使用，不匹配时 count=1（原样单个）。
+function parseNameMultiplier(rawName) {
+    const m = String(rawName || '').match(/^(.*?)\s*[*×]\s*(\d+)\s*$/);
+    if (m) return { baseName: m[1].trim(), count: Math.max(0, parseInt(m[2], 10)) };
+    return { baseName: String(rawName || '').trim(), count: 1 };
+}
+
 function parseAttributes(attrStr) {
     let hp = attrStr.match(/\[HP:(\d+)\/(\d+)\]/i); let mp = attrStr.match(/\[MP:(\d+)\/(\d+)\]/i);
     let atk = attrStr.match(/\[Atk:(\d+)\]/i); let armor = attrStr.match(/\[Armor:(\d+)\]/i); let speed = attrStr.match(/\[Speed:(\d+)\]/i);
@@ -4303,6 +4333,22 @@ function applyFieldEffects(heroes) {
     if (fe.onApply) fe.onApply(heroes);
 }
 
+// 将单个敌方项（名字/属性/技能）解析为一个敌人对象。
+// 供 buildCombatDataFromYAML 敌方循环与【世界书载入】条目解析复用；id 由调用方保证唯一。
+function parseEnemyItem(data, index) {
+    const rawName = data["名字"] || `怪物${index}`;
+    const { emoji, name: cleanName } = getCleanNameAndEmoji(rawName);
+    const attrs = parseAttributes(data["属性"] || "");
+    const img = AVATAR_MAP[cleanName] || AVATAR_MAP[rawName]; 
+    let skills = []; if (data["技能"] && Array.isArray(data["技能"])) skills = data["技能"].map(parseSkill);
+    
+    let enemyObj = { id: 'e' + index, name: cleanName, emoji: emoji, img: img, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, currentCharge: 0, size: 'text-5xl sm:text-7xl', atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: 0, actCount: attrs.actCount, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, skills: skills, classType: attrs.classType, isWise: attrs.isWise || false, baseTauntBonus: 0 };
+    if (window.CLASS_PASSIVES && CLASS_PASSIVES[attrs.classType]?.onBattleInit) {
+        CLASS_PASSIVES[attrs.classType].onBattleInit(enemyObj);
+    }
+    return enemyObj;
+}
+
 function buildCombatDataFromYAML(yamlContent) {
     try {
         const parsed = jsyaml.load(yamlContent);
@@ -4327,18 +4373,15 @@ function buildCombatDataFromYAML(yamlContent) {
             });
         }
         if (block["敌方列表"]) {
-            block["敌方列表"].forEach((item, index) => {
+            block["敌方列表"].forEach((item) => {
                 const data = item["角色"]; if(!data) return;
-                const { emoji, name: cleanName } = getCleanNameAndEmoji(data["名字"] || `怪物${index}`);
-                const attrs = parseAttributes(data["属性"] || "");
-                const img = AVATAR_MAP[cleanName] || AVATAR_MAP[data["名字"]]; 
-                let skills = []; if (data["技能"] && Array.isArray(data["技能"])) skills = data["技能"].map(parseSkill);
-                
-                let enemyObj = { id: 'e' + index, name: cleanName, emoji: emoji, img: img, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, currentCharge: 0, size: 'text-5xl sm:text-7xl', atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: 0, actCount: attrs.actCount, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, skills: skills, classType: attrs.classType, isWise: attrs.isWise || false, baseTauntBonus: 0 };
-                if (window.CLASS_PASSIVES && CLASS_PASSIVES[attrs.classType]?.onBattleInit) {
-                    CLASS_PASSIVES[attrs.classType].onBattleInit(enemyObj);
+                // 支持名字末尾 *N / ×N 数量后缀（如 "《冰雪随从》*2"）：展开为 N 个独立敌人（各自独立 HP/槽位）
+                const { baseName, count } = parseNameMultiplier(data["名字"] || `怪物${tempEnemies.length}`);
+                if (count <= 0) return;
+                const itemData = Object.assign({}, data, { "名字": baseName });
+                for (let i = 0; i < count; i++) {
+                    tempEnemies.push(parseEnemyItem(itemData, tempEnemies.length));
                 }
-                tempEnemies.push(enemyObj);
             });
         }
         heroesData = tempHeroes; enemiesData = tempEnemies;
@@ -4346,6 +4389,246 @@ function buildCombatDataFromYAML(yamlContent) {
         initialHeroesCache = JSON.parse(JSON.stringify(heroesData)); initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData));
         return true;
     } catch (e) { return false; }
+}
+
+// ==========================================
+// 【世界书】敌方数据载入系统（酒馆助手环境）
+// 绑定酒馆世界书（敌方图鉴）→ 按敌人名字匹配词条 → 用词条内嵌 <Combat_block> 精确载入敌方数据
+// ==========================================
+const WORLDBOOK_VAR_KEY = 'rpg_combat_worldbook_settings';
+let worldbookSettings = { boundName: null, entries: {} }; // entries[uid] = { enabled }，未记录 = 默认启用
+let worldbookCache = [];    // 当前绑定世界书条目数组
+let worldbookIndex = {};    // 检索键（词条名/别名，小写）→ 条目
+
+function isWorldbookAvailable() {
+    return typeof getWorldbook === 'function' && typeof getWorldbookNames === 'function';
+}
+
+// 非酒馆助手环境隐藏右上角【世界书管理】入口
+function updateWorldbookBtnVisibility() {
+    const btn = document.getElementById('worldbook-mgr-btn');
+    if (btn) btn.style.display = isWorldbookAvailable() ? '' : 'none';
+}
+
+function loadWorldbookSettings() {
+    try {
+        const raw = localStorage.getItem(WORLDBOOK_VAR_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (typeof parsed.boundName === 'string') worldbookSettings.boundName = parsed.boundName;
+        if (parsed.entries && typeof parsed.entries === 'object') worldbookSettings.entries = parsed.entries;
+    } catch (e) {}
+}
+function persistWorldbookSettings() {
+    try { localStorage.setItem(WORLDBOOK_VAR_KEY, JSON.stringify(worldbookSettings)); } catch (e) {}
+}
+
+// 以词条 name + 别名 keys 建立小写检索表
+function buildWorldbookIndex() {
+    worldbookIndex = {};
+    worldbookCache.forEach(entry => {
+        const keys = [entry.name, ...(Array.isArray(entry.keys) ? entry.keys : [])];
+        keys.forEach(k => {
+            const nk = String(k || '').trim().toLowerCase();
+            if (nk) worldbookIndex[nk] = entry;
+        });
+    });
+}
+
+async function loadWorldbookData() {
+    worldbookCache = []; worldbookIndex = {};
+    if (!worldbookSettings.boundName) return false;
+    try {
+        const entries = await getWorldbook(worldbookSettings.boundName);
+        if (!Array.isArray(entries)) return false;
+        worldbookCache = entries;
+        buildWorldbookIndex();
+        return true;
+    } catch (e) {
+        console.warn('[世界书] 读取失败：', worldbookSettings.boundName, e);
+        return false;
+    }
+}
+
+function isWorldbookEntryEnabled(entry) {
+    const rec = worldbookSettings.entries && worldbookSettings.entries[entry.uid];
+    return !rec || rec.enabled !== false; // 未记录 = 默认启用
+}
+
+// 按名字匹配图鉴词条：①词条名精确 ②别名精确 ③双向包含（≥2 字防误匹配）
+function resolveWorldbookEnemy(name) {
+    if (!worldbookCache.length) return null;
+    const { name: clean } = getCleanNameAndEmoji(String(name || '').trim());
+    if (!clean) return null;
+    const lower = clean.toLowerCase();
+    if (worldbookIndex[lower]) return worldbookIndex[lower];
+    for (const entry of worldbookCache) {
+        const names = [entry.name, ...(Array.isArray(entry.keys) ? entry.keys : [])];
+        const hit = names.some(k => {
+            const nk = String(k || '').trim().toLowerCase();
+            if (!nk) return false;
+            return (nk.includes(lower) || lower.includes(nk)) && Math.max(nk.length, lower.length) >= 2;
+        });
+        if (hit) return entry;
+    }
+    return null;
+}
+
+// 从词条 content 提取内嵌敌方单体 <Combat_block> 并解析为 { 名字, 属性, 技能 }
+function parseWorldbookEntryEnemy(entry) {
+    const m = String(entry.content || '').match(/<Combat_block>([\s\S]*?)<\/Combat_block>/i);
+    if (!m) return null;
+    try {
+        const parsed = jsyaml.load(m[1]);
+        if (!parsed || typeof parsed !== 'object') return null;
+        return { "名字": parsed["名字"], "属性": parsed["属性"] || '', "技能": parsed["技能"] };
+    } catch (e) { return null; }
+}
+
+// 【世界书载入】入口：按名字用图鉴词条数据替换敌方（未命中保留 Yaml 原样）
+async function startGameFromWorldbook() {
+    if (state.isGameStarted) { showLog("世界书载入仅可在准备页使用"); return; }
+    if (!isWorldbookAvailable()) { showLog("未检测到酒馆助手环境，无法读取世界书"); return; }
+    if (!worldbookSettings.boundName) { alert("尚未绑定世界书，请先点击右上角【📚 世界书管理】选择要绑定的世界书"); return; }
+    if (!worldbookCache.length) {
+        const ok = await loadWorldbookData();
+        if (!ok) { alert("世界书读取失败，请确认「" + worldbookSettings.boundName + "」存在且已启用（可点右上角【📚 世界书管理】刷新）"); return; }
+    }
+    if (!enemiesData.length) { showLog("当前战局没有敌方单位"); return; }
+
+    let hitCount = 0; const missNames = []; const wbLogs = [];
+    enemiesData = enemiesData.map(enemy => {
+        const entry = resolveWorldbookEnemy(enemy.name);
+        if (!entry || !isWorldbookEntryEnabled(entry)) { missNames.push(enemy.name); return enemy; }
+        const cbData = parseWorldbookEntryEnemy(entry);
+        if (!cbData) { missNames.push(enemy.name); return enemy; }
+        hitCount++;
+        const fresh = parseEnemyItem(cbData, 0);
+        fresh.id = enemy.id; // 保留原槽位 id
+        wbLogs.push(`📚 图鉴载入：${enemy.name} → 图鉴条目「${entry.name}」`);
+        return fresh;
+    });
+    wbLogs.push(`📚 世界书载入完成：命中 ${hitCount} 个条目${missNames.length ? `，未命中 ${missNames.length} 个（${missNames.join('、')}）保留原数据` : ''}`);
+    showLog(`图鉴命中 ${hitCount} 个敌人`);
+
+    if (hitCount === 0) {
+        alert("未在图鉴「" + worldbookSettings.boundName + "」中找到任何匹配敌人，战局未开始。请检查绑定与词条开关，或改用【Yaml 载入】");
+        return;
+    }
+
+    initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData)); // 替换后重置战斗也保留图鉴数据
+    initUI();
+    startGame();
+    wbLogs.forEach(t => addHistory(t)); // startGame 会清空 battleHistory，故在其后补写
+}
+
+// ---- 【世界书管理】弹窗 ----
+function openWorldbookManager() {
+    const modal = document.getElementById('worldbook-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    setTimeout(() => modal.classList.remove('opacity-0'), 50);
+    renderWorldbookManager();
+}
+
+function closeWorldbookManager() {
+    const modal = document.getElementById('worldbook-modal');
+    if (!modal) return;
+    modal.classList.add('opacity-0');
+    setTimeout(() => { modal.classList.add('hidden'); modal.classList.remove('flex'); }, 500);
+}
+
+function worldbookNamesList() {
+    try { return (typeof getWorldbookNames === 'function') ? (getWorldbookNames() || []) : []; }
+    catch (e) { console.warn('[世界书] getWorldbookNames 失败', e); return []; }
+}
+
+function renderWorldbookManager() {
+    const body = document.getElementById('worldbook-manager-body');
+    if (!body) return;
+    const names = worldbookNamesList();
+    const options = ['<option value="">（未绑定）</option>'].concat(
+        names.map(n => `<option value="${n}" ${n === worldbookSettings.boundName ? 'selected' : ''}>${n}</option>`)
+    );
+    body.innerHTML = `
+      <div class="text-xs sm:text-sm font-bold text-violet-300 flex items-center gap-2 mb-1">📚 绑定世界书</div>
+      <div class="flex items-center gap-2 mb-3">
+        <select id="worldbook-bind-select" onchange="bindWorldbook(this.value)" class="flex-1 bg-black/50 border border-gray-600 rounded-lg px-2 py-1.5 text-xs text-gray-200 outline-none focus:border-violet-400">${options}</select>
+        <button onclick="refreshWorldbookData()" class="px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold text-violet-300 hover:text-white hover:bg-white/10 border border-violet-500/40 transition-colors">🔄 刷新</button>
+      </div>
+      ${worldbookSettings.boundName
+        ? `<div class="text-[10px] sm:text-xs text-gray-400 mb-3">已绑定：<span class="text-violet-300 font-bold">${worldbookSettings.boundName}</span>${worldbookCache.length ? `（${worldbookCache.length} 个条目）` : '（未加载）'}</div>`
+        : '<div class="text-[10px] sm:text-xs text-amber-400 mb-3">⚠️ 未绑定世界书 —— 选择上方世界书后即可载入其词条。</div>'}
+      <div class="text-xs sm:text-sm font-bold text-violet-300 flex items-center gap-2 mb-1">🗂️ 词条列表</div>
+      <div id="worldbook-entry-list" class="max-h-48 overflow-y-auto custom-scrollbar border border-gray-700/50 rounded-lg bg-black/30 p-2 space-y-1 mb-3">${worldbookCache.length ? renderWorldbookEntryList() : '<div class="text-[10px] text-gray-500 p-2">暂无数据 —— 绑定世界书后自动加载。</div>'}</div>
+      <div class="text-xs sm:text-sm font-bold text-violet-300 flex items-center gap-2 mb-1">⚔️ 当前载入敌人</div>
+      <div class="max-h-40 overflow-y-auto custom-scrollbar border border-gray-700/50 rounded-lg bg-black/30 p-2 space-y-1">${renderWorldbookLoadedEnemies()}</div>
+      <div id="worldbook-detail-panel" class="hidden mt-3 border border-violet-500/30 rounded-lg bg-black/40 p-2">
+        <div class="flex items-center justify-between mb-1">
+          <div id="worldbook-detail-title" class="text-[10px] sm:text-xs font-bold text-violet-300 truncate">词条数据</div>
+          <button onclick="closeWorldbookDetail()" class="text-gray-400 hover:text-white text-[10px] px-1.5">✕</button>
+        </div>
+        <textarea id="worldbook-detail-content" readonly class="w-full max-h-40 min-h-24 bg-black/50 border border-gray-600 rounded-lg p-2 text-[10px] sm:text-xs text-gray-300 font-mono outline-none custom-scrollbar" spellcheck="false"></textarea>
+      </div>`;
+}
+
+function renderWorldbookEntryList() {
+    if (!worldbookCache.length) return '<div class="text-[10px] text-gray-500 p-2">暂无条目</div>';
+    return worldbookCache.map(entry => {
+        const enabled = isWorldbookEntryEnabled(entry);
+        return `<div class="flex items-center gap-2 text-[10px] sm:text-xs text-gray-300 py-0.5">
+          <input type="checkbox" ${enabled ? 'checked' : ''} data-uid="${entry.uid}" onchange="toggleWorldbookEntry(this.dataset.uid, this.checked)" class="accent-violet-500">
+          <span class="flex-1 truncate ${enabled ? '' : 'line-through text-gray-500'}">${entry.name || '(未命名)'}</span>
+          <button onclick="showWorldbookEntryDetail('${entry.uid}')" class="text-violet-300 hover:text-white border border-violet-500/30 rounded px-1.5 py-0.5 text-[9px] transition-colors">查看</button>
+        </div>`;
+    }).join('');
+}
+
+function renderWorldbookLoadedEnemies() {
+    if (!enemiesData.length) return '<div class="text-[10px] text-gray-500 p-2">暂无载入敌人 —— 构建战局后展示</div>';
+    return enemiesData.map(e => `<div class="text-[10px] sm:text-xs text-gray-300 py-0.5 truncate">${e.name} <span class="text-gray-500">· HP ${e.hp}/${e.maxHp} · ${e.skills.length} 技能</span></div>`).join('');
+}
+
+function bindWorldbook(name) {
+    worldbookSettings.boundName = name || null;
+    if (!name) { worldbookCache = []; worldbookIndex = {}; }
+    persistWorldbookSettings();
+    refreshWorldbookData();
+}
+
+async function refreshWorldbookData() {
+    const body = document.getElementById('worldbook-manager-body');
+    if (!body) return;
+    if (!worldbookSettings.boundName) { renderWorldbookManager(); return; }
+    body.innerHTML = '<div class="text-xs text-gray-400 p-4 text-center">📚 正在读取世界书「' + worldbookSettings.boundName + '」...</div>';
+    const ok = await loadWorldbookData();
+    renderWorldbookManager();
+    if (!ok) alert("世界书「" + worldbookSettings.boundName + "」读取失败，请确认名称正确且已开启");
+}
+
+function toggleWorldbookEntry(uid, enabled) {
+    worldbookSettings.entries[uid] = { enabled: !!enabled };
+    persistWorldbookSettings();
+    const list = document.getElementById('worldbook-entry-list');
+    if (list) list.innerHTML = renderWorldbookEntryList();
+}
+
+function showWorldbookEntryDetail(uid) {
+    const entry = worldbookCache.find(e => String(e.uid) === String(uid));
+    if (!entry) return;
+    const panel = document.getElementById('worldbook-detail-panel');
+    const ta = document.getElementById('worldbook-detail-content');
+    const nameEl = document.getElementById('worldbook-detail-title');
+    if (!panel || !ta || !nameEl) return;
+    nameEl.textContent = entry.name || '(未命名)';
+    ta.value = entry.content || '';
+    panel.classList.remove('hidden');
+}
+
+function closeWorldbookDetail() {
+    const panel = document.getElementById('worldbook-detail-panel');
+    if (panel) panel.classList.add('hidden');
 }
 
 // ==========================================
@@ -4415,7 +4698,11 @@ function onCombatDataReceived(yamlStr) {
         document.getElementById('loading-title').classList.add('text-emerald-400');
         document.getElementById('loading-tip').innerText = "环境数据读取完毕";
         document.getElementById('manual-input-box').classList.add('hidden');
+        // 展示载入按钮组：Yaml 载入始终可用；世界书载入仅酒馆助手环境可用
+        document.getElementById('start-actions').classList.remove('hidden');
+        document.getElementById('start-actions').classList.add('flex');
         document.getElementById('start-btn').classList.remove('hidden');
+        document.getElementById('worldbook-start-btn').classList.toggle('hidden', !isWorldbookAvailable());
         initUI(); 
     } else { alert("战局构建失败，请检查 <Combat_block> YAML 格式是否规范！"); }
 }
@@ -4431,6 +4718,8 @@ function initUI() {
   updateTeamBarrierUI();
   // 【场地】右上角徽章为静态 HTML，此处仅刷新显示/名称
   updateFieldBadgeUI();
+  // 【世界书】非酒馆助手环境隐藏右上角管理入口
+  updateWorldbookBtnVisibility();
   heroesData.forEach((hero, index) => {
     hero.dom = document.createElement('div'); hero.dom.className = `relative transition-all duration-300 min-w-[70px] ${!hero.isAlive ? 'opacity-40 grayscale' : ''}`; hero.dom.id = `hero-wrap-${hero.id}`;
     if (state.isGameStarted) { hero.dom.classList.add('anim-enter-hero'); hero.dom.style.animationDelay = `${index * 0.08}s`; setTimeout(() => { if (hero.dom) hero.dom.classList.remove('anim-enter-hero'); }, 800 + index * 80); } else { hero.dom.classList.add('opacity-0'); }
@@ -8735,6 +9024,9 @@ function parseLLMResponse(text) {
 console.log('CRITICAL_LOG: 5. At script initialization end');
 loadLLMSettings();
 loadDefendSettings();
+loadWorldbookSettings();
+// 【世界书】非酒馆助手环境隐藏右上角入口
+updateWorldbookBtnVisibility();
 
 console.log('CRITICAL_LOG: 6. Calling startSTPolling immediately');
 startSTPolling();

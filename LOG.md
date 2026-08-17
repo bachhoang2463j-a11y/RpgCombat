@@ -832,3 +832,19 @@
   7. **用户实测反馈修订**：① 全角冒号兼容——正则 `场地:([^)\]]+)` 扩展为 `场地[:：]([^)\]]+)`，支持 `(场地：有备而来)` 全角冒号写法（用户输入即为此格式，修复后生效）；② 徽章位置——按用户要求由战场顶部悬浮改为**右上角按钮区、【记录】按钮左侧**（`index.html` 顶部控制区静态 HTML `#field-badge`，样式与记录按钮一致，`group-hover` 在徽章下方弹出效果描述），移除原 `FIELD_BADGE_HTML` 动态注入与重建逻辑，`updateFieldBadgeUI` 仅控制显示/名称/描述。
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`（README/SPEC 待用户确认本轮有效后更新）。
 - **决策原因**：需求为跑团战前准备阶段提供"场地"抽象——在战斗开始时为我方注入对应 buff/debuff，无标签即无效果。与用户厘清三个关键设计：①【猝不及防】应为"本人第一回合行动后消失"的突袭语义（已按此实现，其余回合型效果口径与全游戏「持续 N 回合」buff 一致）；②场地效果为战前环境状态，不可被【驱散】清除（`fieldBuff` 标记）；③全部复用既有 buff 体系（type/duration/衰减/显示），仅新增注册表与键名解析，改动面最小。回合计数采用 `state.round`（第 1 回合期间恒为 1），开场日志用于场地效果可溯源。
+
+## [LOG-068] 2026-08-18 — 新增【世界书】敌方数据载入系统 + 敌方名字 `*N` 数量后缀（V6.15 代码先行）
+
+- **变更行为**：
+  1. **敌方名字 `*N` 数量后缀**：`名字: "❄️《冰雪随从》*2"` 表示载入 2 个该敌人（独立列表项、仅敌方列表生效）。新增 `parseNameMultiplier`（index.html:4150，兼容半角 `*` 与全角 `×`，count=0 时跳过该敌人）；敌方构建循环改为先拆 `{baseName,count}` 再按 count 循环 `parseEnemyItem` 展开（index.html:4358-4366），`*2` 不进显示名、id 用 `'e'+tempEnemies.length` 保证唯一、`AVATAR_MAP` 兜底改用 baseName。同时从敌方循环提取独立辅助函数 `parseEnemyItem(data, index)`（index.html:4315），供 YAML 敌方循环与图鉴条目解析复用（属性/技能/职业被动 onBattleInit 逻辑原样迁入）。
+  2. **准备页按钮拆分**：`#start-btn` 单按钮替换为 `#start-actions` 容器双按钮——**【🧾 Yaml 载入】**（`onclick="startGame()"`，保持原逻辑）+ **【📚 世界书载入】**（`onclick="startGameFromWorldbook()"`，新逻辑）；`onCombatDataReceived` 改为显示按钮组并按 `isWorldbookAvailable()` 控制世界书按钮显隐。
+  3. **世界书核心系统**（index.html:4376 起，`buildCombatDataFromYAML` 之后新增区块）：
+     - **持久化**：`WORLDBOOK_VAR_KEY='rpg_combat_worldbook_settings'`（localStorage，仿 defendSettings 模式），`worldbookSettings = { boundName, entries }`（entries[uid]={enabled}，未记录=默认启用），`loadWorldbookSettings`/`persistWorldbookSettings`。
+     - **读取**：`isWorldbookAvailable()`（检测酒馆助手 `getWorldbook`/`getWorldbookNames`）；`loadWorldbookData()`（async，`await getWorldbook(boundName)` → `worldbookCache` + `buildWorldbookIndex()` 以词条名+别名 keys 建小写检索表）；`isWorldbookEntryEnabled(entry)`。
+     - **匹配**：`resolveWorldbookEnemy(name)` —— 剥离 emoji 后 ①词条名精确 ②别名精确 ③双向包含（≥2 字防误匹配），返回词条（由索引或遍历兜底）。
+     - **载入**：`parseWorldbookEntryEnemy(entry)` 从词条 content 正则提取内嵌 `<Combat_block>` 并用 `jsyaml.load` 解析为 `{名字,属性,技能}`（已实测图鉴 29 个条目全部可解析）；`startGameFromWorldbook()`（async）——已开战提示、未绑定/未加载时自动加载，遍历 `enemiesData` 按名字匹配（含别名/包含），命中 → `parseEnemyItem` 完整替换（保留原槽位 id，名字/属性/技能以图鉴为准），未命中 → 原样保留；`addHistory` 写 `📚 图鉴载入：xxx → 条目「yyy」` + 命中统计；全部未命中则提示不开始；重新快照 `initialEnemiesCache`（重置后保留图鉴数据）→ `initUI()` → `startGame()`。
+  4. **右上角【📚 世界书管理】按钮**：插入顶部按钮区场地徽章与【记录】之间（index.html:827，样式与其他按钮一致，`onclick="openWorldbookManager()"`）；非酒馆环境由 `updateWorldbookBtnVisibility()`（index.html:4393）隐藏（启动时 + initUI 两处调用）。
+  5. **世界书管理弹窗** `#worldbook-modal`（index.html:936）：复刻 battle-history-modal 三段式骨架（`z-[120]` 500ms 淡入淡出），body 由 `renderWorldbookManager()` 动态渲染三个区块——①**绑定世界书**：下拉框（`getWorldbookNames()` 全量 + 未绑定，选中即持久化）+「🔄 刷新」按钮；②**词条列表**：全部词条（名称 + 启用开关 checkbox + 「查看」按钮），开关切换即时持久化并重渲染，查看弹条目 content 原文；③**当前载入敌人**：当前 `enemiesData`（名字/HP/技能数摘要）。底部「关闭」。
+  6. **环境降级**：非酒馆助手环境（无 `getWorldbook`）隐藏右上角入口与准备页世界书按钮，Yaml 载入流程完全不受影响。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`（README/SPEC 待用户确认本轮有效后更新）。
+- **决策原因**：需求①为敌方图鉴化提供"名字点名即可精确载入"路径——LLM 无需手写属性/技能，避免摘录幻觉；与用户确认四项决策：**按敌方名字匹配**（LLM 照旧输出名字即可）、**未命中保留 LLM 原样数据**（图鉴外临场新敌人不受影响）、**localStorage 持久化**（绑定名+开关状态数据量小，与现有持久化模式一致）、**非酒馆环境隐藏并提示**（世界书接口依赖酒馆助手 iframe 环境）。需求②为跑团多敌场景——`*2` 乘数后缀仅敌方列表生效（我方靠编辑器/持久化维护，数量固定），独立列表项写法避免 js-yaml 重复键冲突；`parseEnemyItem` 提取为共用辅助函数，Yaml 路径与世界书路径天然共享同一解析管线（含职业被动 onBattleInit），保证两条载入路径行为一致。
