@@ -4212,12 +4212,18 @@ function getCleanNameAndEmoji(rawName) {
     return { emoji: '👾', name: rawName.trim() };
 }
 
-// 解析名字串末尾的 *N / ×N 数量后缀（如 "《冰雪随从》*2"）→ { baseName, count }。
+// 解析敌方名字：剥离末尾/身内 `[...]` 标签（[复活]/[智慧] 等通用变种标签）并解析 *N / ×N 数量后缀
+// （如 "食尸鬼×2[复活]" → { baseName:'食尸鬼', count:2, tags:['[复活]'] }）。
 // 兼容半角星号 * 与全角乘号 ×；仅敌方列表使用，不匹配时 count=1（原样单个）。
-function parseNameMultiplier(rawName) {
-    const m = String(rawName || '').match(/^(.*?)\s*[*×]\s*(\d+)\s*$/);
-    if (m) return { baseName: m[1].trim(), count: Math.max(0, parseInt(m[2], 10)) };
-    return { baseName: String(rawName || '').trim(), count: 1 };
+// 顺序固定：先剥标签再解析数量 —— 故半角 "食尸鬼*2[复活]" 会先剥成 "食尸鬼*2" 再被 *N 匹配展开，无需专用兜底。
+function parseNameTagAndMultiplier(rawName) {
+    const src = String(rawName || '').trim();
+    const tags = [];
+    const stripped = src.replace(/\[[^\]]*\]/g, (m) => { tags.push(m); return ''; });
+    const m = stripped.match(/^(.*?)\s*[*×]\s*(\d+)\s*$/);
+    const count = m ? Math.max(0, parseInt(m[2], 10)) : 1;
+    const baseName = (m ? m[1] : stripped).trim() || src.trim();
+    return { baseName, count, tags };
 }
 
 function parseAttributes(attrStr) {
@@ -4380,14 +4386,20 @@ function applyFieldEffects(heroes) {
 
 // 将单个敌方项（名字/属性/技能）解析为一个敌人对象。
 // 供 buildCombatDataFromYAML 敌方循环与【世界书载入】条目解析复用；id 由调用方保证唯一。
-function parseEnemyItem(data, index) {
+// tags：名字内剥离出的 `[...]` 变种标签（[复活]/[智慧] 等）；世界书路径经 buildCombatDataFromYAML 传入。
+function parseEnemyItem(data, index, tags) {
     const rawName = data["名字"] || `怪物${index}`;
     const { emoji, name: cleanName } = getCleanNameAndEmoji(rawName);
     const attrs = parseAttributes(data["属性"] || "");
     const img = AVATAR_MAP[cleanName] || AVATAR_MAP[rawName]; 
     let skills = []; if (data["技能"] && Array.isArray(data["技能"])) skills = data["技能"].map(parseSkill);
+    const nameTags = Array.isArray(tags) ? tags : [];
+    // [智慧]：属性栏 || 名字标签（布尔合并，重复挂载幂等无害）；[复活]：名字标签置1（仅一次复活）
+    const isWise = attrs.isWise || nameTags.includes('[智慧]');
+    const reviveCount = nameTags.includes('[复活]') ? 1 : 0;
+    // 保留原始名字标签，供世界书载入替换时继承（名字标签在世界书模式下依旧合法）
     
-    let enemyObj = { id: 'e' + index, name: cleanName, emoji: emoji, img: img, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, currentCharge: 0, size: 'text-5xl sm:text-7xl', atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: 0, actCount: attrs.actCount, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, skills: skills, classType: attrs.classType, isWise: attrs.isWise || false, baseTauntBonus: 0 };
+    let enemyObj = { id: 'e' + index, name: cleanName, emoji: emoji, img: img, nameTags: nameTags, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, currentCharge: 0, size: 'text-5xl sm:text-7xl', atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: 0, actCount: attrs.actCount, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, skills: skills, classType: attrs.classType, isWise: isWise, reviveCount: reviveCount, baseTauntBonus: 0 };
     if (window.CLASS_PASSIVES && CLASS_PASSIVES[attrs.classType]?.onBattleInit) {
         CLASS_PASSIVES[attrs.classType].onBattleInit(enemyObj);
     }
@@ -4421,11 +4433,12 @@ function buildCombatDataFromYAML(yamlContent) {
             block["敌方列表"].forEach((item) => {
                 const data = item["角色"]; if(!data) return;
                 // 支持名字末尾 *N / ×N 数量后缀（如 "《冰雪随从》*2"）：展开为 N 个独立敌人（各自独立 HP/槽位）
-                const { baseName, count } = parseNameMultiplier(data["名字"] || `怪物${tempEnemies.length}`);
+                // 同时剥离名字内 `[...]` 变种标签（[复活]/[智慧]），标签随 itemData 一并传入 parseEnemyItem
+                const { baseName, count, tags } = parseNameTagAndMultiplier(data["名字"] || `怪物${tempEnemies.length}`);
                 if (count <= 0) return;
                 const itemData = Object.assign({}, data, { "名字": baseName });
                 for (let i = 0; i < count; i++) {
-                    tempEnemies.push(parseEnemyItem(itemData, tempEnemies.length));
+                    tempEnemies.push(parseEnemyItem(itemData, tempEnemies.length, tags));
                 }
             });
         }
@@ -4573,7 +4586,8 @@ async function startGameFromWorldbook() {
         const cbData = parseWorldbookEntryEnemy(entry);
         if (!cbData) { missNames.push(enemy.name); return enemy; }
         hitCount++;
-        const fresh = parseEnemyItem(cbData, 0);
+        // 世界书条目替换时继承原 LLM 名字上的 `[...]` 变种标签（如 [复活]/[智慧]）——名字标签在世界书模式下依旧合法
+        const fresh = parseEnemyItem(cbData, 0, Array.isArray(enemy.nameTags) ? enemy.nameTags : []);
         fresh.id = enemy.id; // 保留原槽位 id
         wbLogs.push(`📚 图鉴载入：${enemy.name} → 图鉴条目「${entry.name}」`);
         return fresh;
@@ -5121,6 +5135,19 @@ function updateHeroUI(hero) {
   }
 }
 
+// 【复活】敌方死亡复活：带 [复活] 名字标签的敌人第一次被击杀时以 30% 最大血量原地复活（仅敌方、仅一次）。
+// 供 updateEnemyUI 死亡收口 / ON_FATAL_DAMAGE / DoT 回合起始致死三处调用；复活成功返回 true（跳过死亡处理）。
+function tryReviveEnemy(enemy, dom) {
+    if (!enemy || enemy.id.startsWith('h') || !enemy.reviveCount || enemy.reviveCount <= 0) return false;
+    enemy.reviveCount--;
+    enemy.hp = Math.floor(enemy.maxHp * 0.3);
+    enemy.shield = 0; enemy.buffs = []; enemy.isDefending = false;
+    if (dom) createFloatingText(dom, '复活!', 'text-emerald-300');
+    if (window.playSound) playSound('hpHeal');
+    addHistory(`   ↳ 💀 ${enemy.name} 被击倒……却猛地站了起来！以 ${Math.floor(enemy.maxHp * 0.3)}/${enemy.maxHp} 点生命复活！`);
+    return true;
+}
+
 function updateEnemyUI(enemy) {
   enemy.hp = Math.max(0, Math.min(enemy.hp, enemy.maxHp)); 
   enemy.mp = Math.max(0, Math.min(enemy.mp, enemy.maxMp));
@@ -5174,7 +5201,13 @@ function updateEnemyUI(enemy) {
       }
   }
 
-  if (enemy.hp <= 0 && enemy.isAlive) { 
+  if (enemy.hp <= 0 && enemy.isAlive) {
+      // 【复活】敌人带 [复活] 标签：第一次被击杀时以 30% 血原地复活（覆盖普攻/反击/强力反击/直接减血击杀收口）
+      if (tryReviveEnemy(enemy, sprite)) {
+          updateBuffUI(enemy);
+          if(hpBar) hpBar.style.width = `${(enemy.hp / enemy.maxHp) * 100}%`;
+          return;
+      }
       enemy.isAlive = false; enemy.shield = 0; enemy.buffs = []; enemy.isDefending = false; enemy.hitBonus = 0; enemy.evaBonus = 0; 
       if(sprite) { sprite.classList.remove('breathe', 'enemy-sprite'); sprite.classList.add('opacity-0', 'scale-50'); } 
       setTimeout(() => { if(enemy.dom) enemy.dom.style.display = 'none'; }, 500); 
@@ -5872,6 +5905,15 @@ CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
     const p = CLASS_PASSIVES['风行者'];
     if (p && p.onFatalDamage) p.onFatalDamage(ctx);
 }, 5);
+
+// 敌人：[复活] 击杀时以 30% 血复活（priority=8，位于毅力留存/回避致命被动之下；仅敌方、仅一次）
+CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
+    if (ctx.prevented) return; // 已被毅力留存等被动阻止，不再复活
+    const t = ctx.target;
+    if (t.id.startsWith('h') || !t.reviveCount || t.reviveCount <= 0) return;
+    ctx.hpDmg = 0;                     // 先归零本次伤害，复活回血后才不会被随后扣减再次带走
+    if (tryReviveEnemy(t, ctx.targetDom)) ctx.prevented = true; // 复活成功 → 本次不致死、不判假击杀
+}, 8);
 
 // 防守者：强力反击 (闪避成功时按概率触发)
 CombatEvents.on(EVENTS.ON_DODGE, async (ctx) => {
@@ -7431,15 +7473,20 @@ async function nextTurn() {
   }
   
   if (currentEntity.ref.hp <= 0) {
-      currentEntity.ref.isAlive = false;
-      if (currentEntity.ref.currentDelay) {
-          resetHeroChargeEffect(currentEntity.ref);
-          currentEntity.ref.currentDelay = null; // 蓄力中死亡：清空蓄力
+      // 【复活】DoT（中毒/燃烧）在回合起始致死时先尝试原地复活——复活成功则不判死、沿用下方正常行动流程
+      const revived = currentEntity.type !== 'hero' && tryReviveEnemy(currentEntity.ref,
+          document.getElementById(`${currentEntity.ref.id}-sprite`));
+      if (!revived) {
+          currentEntity.ref.isAlive = false;
+          if (currentEntity.ref.currentDelay) {
+              resetHeroChargeEffect(currentEntity.ref);
+              currentEntity.ref.currentDelay = null; // 蓄力中死亡：清空蓄力
+          }
+          addHistory(`   💀 [${currentEntity.ref.name}] 重伤不治，倒下了！`);
+          if(currentEntity.type === 'hero') updateHeroUI(currentEntity.ref); else updateEnemyUI(currentEntity.ref);
+          endTurn();
+          return;
       }
-      addHistory(`   💀 [${currentEntity.ref.name}] 重伤不治，倒下了！`);
-      if(currentEntity.type === 'hero') updateHeroUI(currentEntity.ref); else updateEnemyUI(currentEntity.ref);
-      endTurn();
-      return;
   }
   if(currentEntity.type === 'hero') updateHeroUI(currentEntity.ref); else updateEnemyUI(currentEntity.ref);
 
