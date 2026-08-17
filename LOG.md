@@ -863,3 +863,12 @@
   6. **同项多名字兼容性确认**：实测 js-yaml@4.1.0 对同一 `- 角色:` 下重复 `名字:` 键抛 `duplicated mapping key` 使整局构建失败——用户贴的"同项两行名字"字面写法不兼容，正确写法是**独立列表项**（一项一敌，`*2` 后缀在名字串内）；纯名字（无属性/技能）单敌经实测解析 OK，配合第 4 条兜底可正常上场。
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：①上一版世界书载入要求先手动绑定，与"点开即用"预期矛盾且造成死锁（不绑定进不去、进不去无法绑定）——按用户要求改为自动绑定角色卡世界书，备选回退全局/聊天世界书兜底，保证多数场景可直接载入；②世界书较多时靠下拉定位太慢，增加对世界书与词条的双层搜索，且激活词条置顶符合"启用优先"的操作直觉；③按钮突兀的紫色与会场灰蓝整体风格冲突，统一配色；④兼容用户在聊天流里输出的"仅名字点名"精简格式，由缺省属性兜底保证可解析、再由图鉴匹配补全。
+
+## [LOG-069] 2026-08-18 — 世界书系统实测反馈修订：自动绑定角色卡世界书 + 管理面板搜索/置顶/二级滚动 + 载入按钮配色统一
+
+- **变更行为**：
+  1. **自动绑定世界书（修复"不绑定进不去"交互死锁）**：新增 `autoBindWorldbook()`（index.html:4587，位于 `worldbookNamesList` 后）——已手动绑定则保持；未绑定时依次尝试 `getCharWorldbookNames('current')` 的 `primary` → `additional[0]`，兜底 `getChatWorldbookName('current')`，命中即写入 `worldbookSettings.boundName` 并持久化。接线三处：① 启动序列 `autoBindWorldbook()`（index.html:9071）；② `startGameFromWorldbook()` 未绑定分支改为先 `autoBindWorldbook()`，仍无则提示手动绑定；③ `openWorldbookManager()` 打开时未绑定自动绑定，且已绑定未加载时自动 `refreshWorldbookData()` 拉取词条。启动后若自动绑定成功，后台异步 `loadWorldbookData()` 预加载词条（失败静默），点击【世界书载入】即可直接使用。
+  2. **管理面板重构（搜索 + 激活置顶 + 二级滚动）**：`renderWorldbookManager()` 重写为四个独立区块，每块自带滚动（`max-h` + `overflow-y-auto custom-scrollbar`），消除信息挤压——① **绑定世界书**：下拉 select 改为**可搜索名称列表**（`#worldbook-name-search` 过滤，`renderWorldbookNameList()` 渲染 ○/● 单选行，点击即绑定）；② **词条列表**：新增搜索框（`#worldbook-entry-search`，匹配词条名+别名 keys）+ **启用词条置顶排序**（`isWorldbookEntryEnabled` 分组后 stable sort）+ 条目计数 `（x/y）`；③ **当前载入敌人** 独立滚动区；④ **词条数据预览** 折叠面板。`renderWorldbookEntryList()` 改为写 DOM（含空态与计数），`toggleWorldbookEntry` 改走新渲染函数。
+  3. **准备页【世界书载入】按钮配色**：由紫色渐变改为与【Yaml 载入】一致的 `from-gray-800 to-gray-700` + `text-blue-100`（整体风格统一，仅文案区分）。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`（README/SPEC 待用户确认本轮有效后更新）。
+- **决策原因**：用户实测反馈三点——① 原设计"未绑定则提示手动绑定"在角色卡已绑定世界书的酒馆环境构成交互死锁（不进管理面板无法绑定、但进入准备页点载入又拦在前面），按反馈改为**自动继承角色卡绑定的世界书**（primary → additional 优先，聊天文件兜底），手动绑定仍优先；② 原面板三区块共享一个滚动容器、词条多时信息拥挤不可读，按反馈改为**每区块独立二级滚动**，并新增世界书/词条双搜索框与**激活词条置顶**（启用在前便于快速确认生效词条）；③ 载入按钮原为紫色渐变、与整体蓝灰风格突兀，按反馈统一为 Yaml 按钮同款配色。

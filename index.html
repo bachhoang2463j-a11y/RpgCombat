@@ -4338,8 +4338,7 @@ function applyFieldEffects(heroes) {
 function parseEnemyItem(data, index) {
     const rawName = data["名字"] || `怪物${index}`;
     const { emoji, name: cleanName } = getCleanNameAndEmoji(rawName);
-    // 仅有名字（无属性/技能）的敌方：赋一套基础属性兜底（供冲突单列、无数据点名等情况解析出可上场实体），载入后仍会按图鉴匹配
-    const attrs = parseAttributes(data["属性"] || "[HP:100/100][MP:10/10][Atk:40][Armor:5][Speed:55]");
+    const attrs = parseAttributes(data["属性"] || "");
     const img = AVATAR_MAP[cleanName] || AVATAR_MAP[rawName]; 
     let skills = []; if (data["技能"] && Array.isArray(data["技能"])) skills = data["技能"].map(parseSkill);
     
@@ -4400,31 +4399,9 @@ const WORLDBOOK_VAR_KEY = 'rpg_combat_worldbook_settings';
 let worldbookSettings = { boundName: null, entries: {} }; // entries[uid] = { enabled }，未记录 = 默认启用
 let worldbookCache = [];    // 当前绑定世界书条目数组
 let worldbookIndex = {};    // 检索键（词条名/别名，小写）→ 条目
-let worldbookSearch = '';   // 管理面板词条搜索词（世界书与词条搜索共用此输入）
 
 function isWorldbookAvailable() {
     return typeof getWorldbook === 'function' && typeof getWorldbookNames === 'function';
-}
-
-// 自动绑定角色卡当前绑定的世界书：优先本地已绑定 > 角色卡主世界书 > 聊天文件世界书 > 全局开启世界书（取第一个）
-function autoBindWorldbook() {
-    if (!isWorldbookAvailable()) return null;
-    if (worldbookSettings.boundName) return worldbookSettings.boundName;
-    try {
-        let picked = null;
-        if (typeof getCharWorldbookNames === 'function') {
-            try { const cw = getCharWorldbookNames('current'); if (cw && cw.primary) picked = cw.primary; } catch (e) {}
-        }
-        if (!picked && typeof getChatWorldbookName === 'function') {
-            try { picked = getChatWorldbookName('current'); } catch (e) {}
-        }
-        if (!picked && typeof getGlobalWorldbookNames === 'function') {
-            const names = getGlobalWorldbookNames() || [];
-            if (names.length) picked = names[0];
-        }
-        if (picked) { worldbookSettings.boundName = picked; persistWorldbookSettings(); }
-        return picked;
-    } catch (e) { return null; }
 }
 
 // 非酒馆助手环境隐藏右上角【世界书管理】入口
@@ -4512,12 +4489,13 @@ function parseWorldbookEntryEnemy(entry) {
 async function startGameFromWorldbook() {
     if (state.isGameStarted) { showLog("世界书载入仅可在准备页使用"); return; }
     if (!isWorldbookAvailable()) { showLog("未检测到酒馆助手环境，无法读取世界书"); return; }
-    // 自动绑定角色卡已绑定的世界书（本地未绑定时）
-    const bound = autoBindWorldbook();
-    if (!bound) { alert("未检测到可用世界书（请先在酒馆为角色卡绑定敌方图鉴世界书，或点右上角【📚 世界书管理】选择）"); return; }
+    if (!worldbookSettings.boundName) {
+        const auto = autoBindWorldbook();
+        if (!auto) { alert("未检测到已绑定的世界书，请点击右上角【📚 世界书管理】手动绑定"); return; }
+    }
     if (!worldbookCache.length) {
         const ok = await loadWorldbookData();
-        if (!ok) { alert("世界书「" + worldbookSettings.boundName + "」读取失败，请确认其存在且已启用（可点右上角【📚 世界书管理】刷新）"); return; }
+        if (!ok) { alert("世界书读取失败，请确认「" + worldbookSettings.boundName + "」存在且已启用（可点右上角【📚 世界书管理】刷新）"); return; }
     }
     if (!enemiesData.length) { showLog("当前战局没有敌方单位"); return; }
 
@@ -4554,7 +4532,11 @@ function openWorldbookManager() {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     setTimeout(() => modal.classList.remove('opacity-0'), 50);
+    // 未手动绑定时自动绑定角色卡/聊天文件绑定的世界书
+    if (!worldbookSettings.boundName) autoBindWorldbook();
     renderWorldbookManager();
+    // 已绑定但未加载数据 → 自动加载词条
+    if (worldbookSettings.boundName && !worldbookCache.length) refreshWorldbookData();
 }
 
 function closeWorldbookManager() {
@@ -4569,67 +4551,112 @@ function worldbookNamesList() {
     catch (e) { console.warn('[世界书] getWorldbookNames 失败', e); return []; }
 }
 
+// 自动绑定：未手动绑定时，优先取角色卡绑定的世界书（primary → additional 第一个），兜底聊天文件绑定的世界书
+function autoBindWorldbook() {
+    if (!isWorldbookAvailable()) return null;
+    if (worldbookSettings.boundName) return worldbookSettings.boundName;
+    let name = null;
+    try {
+        if (typeof getCharWorldbookNames === 'function') {
+            const cwb = getCharWorldbookNames('current');
+            if (cwb) name = cwb.primary || (Array.isArray(cwb.additional) && cwb.additional[0]) || null;
+        }
+    } catch (e) {}
+    try {
+        if (!name && typeof getChatWorldbookName === 'function') name = getChatWorldbookName('current');
+    } catch (e) {}
+    if (name) { worldbookSettings.boundName = name; persistWorldbookSettings(); }
+    return name;
+}
+
 function renderWorldbookManager() {
     const body = document.getElementById('worldbook-manager-body');
     if (!body) return;
-    // 优先使用全局开启的世界书列表（getGlobalWorldbookNames），否则回退到全部世界书（getWorldbookNames）
-    let names = [];
-    try { names = (typeof getGlobalWorldbookNames === 'function') ? (getGlobalWorldbookNames() || []) : []; }
-    catch (e) {}
-    if (!names.length) names = worldbookNamesList();
-    // 已绑定世界书不在列表中时也并入，保证 select 能选中显示
-    if (worldbookSettings.boundName && !names.includes(worldbookSettings.boundName)) names = [worldbookSettings.boundName].concat(names);
-    const options = ['<option value="">（未绑定）</option>'].concat(
-        names.map(n => `<option value="${n}" ${n === worldbookSettings.boundName ? 'selected' : ''}>${n}</option>`)
-    );
     body.innerHTML = `
-      <div class="text-xs sm:text-sm font-bold text-violet-300 flex items-center gap-2 mb-1">📚 绑定世界书</div>
-      <div class="flex items-center gap-2 mb-2">
-        <select id="worldbook-bind-select" onchange="bindWorldbook(this.value)" class="flex-1 bg-black/50 border border-gray-600 rounded-lg px-2 py-1.5 text-xs text-gray-200 outline-none focus:border-violet-400">${options}</select>
-        <button onclick="refreshWorldbookData()" class="px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold text-violet-300 hover:text-white hover:bg-white/10 border border-violet-500/40 transition-colors">🔄 刷新</button>
+      <!-- ① 绑定世界书（可搜索单选列表 + 刷新） -->
+      <div class="border border-gray-700/50 rounded-lg bg-black/30 p-2">
+        <div class="text-[10px] sm:text-xs font-bold text-violet-300 flex items-center justify-between mb-1">
+          <span>📚 绑定世界书</span>
+          <button onclick="refreshWorldbookData()" class="px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-bold text-violet-300 hover:text-white hover:bg-white/10 border border-violet-500/40 transition-colors">🔄 刷新</button>
+        </div>
+        <input id="worldbook-name-search" placeholder="🔍 搜索世界书..." oninput="renderWorldbookNameList()" class="w-full bg-black/50 border border-gray-600 rounded px-2 py-1 text-[10px] sm:text-xs text-gray-200 outline-none focus:border-violet-400 mb-1" spellcheck="false">
+        <div id="worldbook-name-list" class="max-h-24 overflow-y-auto custom-scrollbar space-y-0.5 pr-1"></div>
+        <div id="worldbook-bound-info" class="text-[9px] sm:text-[10px] text-gray-500 mt-1 truncate"></div>
       </div>
-      <div class="text-[10px] sm:text-xs text-gray-500 mb-2">🔎 搜索世界书 / 词条：</div>
-      <input type="text" id="worldbook-search-input" value="" oninput="worldbookSearch=this.value; worldbookSmartSwitch(); renderWorldbookManager();" placeholder="输入世界书名称或词条名称/内容关键字…" class="w-full bg-black/50 border border-gray-700 rounded-lg px-2 py-1.5 mb-3 text-xs text-gray-200 placeholder-gray-500 outline-none focus:border-violet-400">
-      ${names.length ? `<div class="text-[10px] sm:text-xs text-gray-500 mb-3">📚 可用世界书<span class="text-gray-400">（${names.length} 个）</span>：<span class="text-cyan-300">${names.join('、')}</span></div>` : '<div class="text-[10px] sm:text-xs text-amber-400 mb-3">⚠️ 酒馆中未启用任何世界书 —— 请先在酒馆启用图鉴世界书。</div>'}
-      ${worldbookSettings.boundName
-        ? `<div class="text-[10px] sm:text-xs text-gray-400 mb-3">已绑定：<span class="text-violet-300 font-bold">${worldbookSettings.boundName}</span>${worldbookCache.length ? `（${worldbookCache.length} 个条目）` : '（未加载）'}</div>`
-        : '<div class="text-[10px] sm:text-xs text-amber-400 mb-3">⚠️ 未绑定世界书 —— 选择上方世界书后即可载入其词条。</div>'}
-      <div class="text-xs sm:text-sm font-bold text-violet-300 flex items-center gap-2 mb-1">🗂️ 词条列表</div>
-      <div id="worldbook-entry-list" class="max-h-52 overflow-y-auto custom-scrollbar border border-gray-700/50 rounded-lg bg-black/30 p-2 space-y-1 mb-3">${worldbookCache.length ? renderWorldbookEntryList() : '<div class="text-[10px] text-gray-500 p-2">暂无数据 —— 绑定世界书后自动加载。</div>'}</div>
-      <div class="text-xs sm:text-sm font-bold text-violet-300 flex items-center gap-2 mb-1">⚔️ 当前载入敌人</div>
-      <div class="max-h-40 overflow-y-auto custom-scrollbar border border-gray-700/50 rounded-lg bg-black/30 p-2 space-y-1">${renderWorldbookLoadedEnemies()}</div>
-      <div id="worldbook-detail-panel" class="hidden mt-3 border border-violet-500/30 rounded-lg bg-black/40 p-2">
+      <!-- ② 词条列表（搜索 + 激活置顶 + 独立滚动） -->
+      <div class="border border-gray-700/50 rounded-lg bg-black/30 p-2 flex flex-col min-h-0">
+        <div class="text-[10px] sm:text-xs font-bold text-violet-300 flex items-center justify-between mb-1">
+          <span>🗂️ 词条列表 <span id="worldbook-entry-count" class="text-gray-500 font-normal"></span></span>
+        </div>
+        <input id="worldbook-entry-search" placeholder="🔍 搜索词条..." oninput="renderWorldbookEntryList()" class="w-full bg-black/50 border border-gray-600 rounded px-2 py-1 text-[10px] sm:text-xs text-gray-200 outline-none focus:border-violet-400 mb-1" spellcheck="false">
+        <div id="worldbook-entry-list" class="max-h-[36vh] overflow-y-auto custom-scrollbar space-y-0.5 pr-1"></div>
+      </div>
+      <!-- ③ 当前载入敌人 -->
+      <div class="border border-gray-700/50 rounded-lg bg-black/30 p-2">
+        <div class="text-[10px] sm:text-xs font-bold text-violet-300 mb-1">⚔️ 当前载入敌人</div>
+        <div id="worldbook-loaded-enemies" class="max-h-24 overflow-y-auto custom-scrollbar space-y-0.5 pr-1"></div>
+      </div>
+      <!-- ④ 词条数据预览 -->
+      <div id="worldbook-detail-panel" class="hidden border border-violet-500/30 rounded-lg bg-black/40 p-2">
         <div class="flex items-center justify-between mb-1">
           <div id="worldbook-detail-title" class="text-[10px] sm:text-xs font-bold text-violet-300 truncate">词条数据</div>
           <button onclick="closeWorldbookDetail()" class="text-gray-400 hover:text-white text-[10px] px-1.5">✕</button>
         </div>
         <textarea id="worldbook-detail-content" readonly class="w-full max-h-40 min-h-24 bg-black/50 border border-gray-600 rounded-lg p-2 text-[10px] sm:text-xs text-gray-300 font-mono outline-none custom-scrollbar" spellcheck="false"></textarea>
       </div>`;
-    // 重渲染后恢复搜索框焦点与值
-    const input = document.getElementById('worldbook-search-input');
-    if (input) input.value = worldbookSearch;
+    renderWorldbookNameList();
+    renderWorldbookEntryList();
+    renderWorldbookLoadedEnemies();
+    const info = document.getElementById('worldbook-bound-info');
+    if (info) {
+        info.textContent = worldbookSettings.boundName
+            ? `已绑定：${worldbookSettings.boundName}${worldbookCache.length ? `（${worldbookCache.length} 个条目）` : '（未加载）'}`
+            : '⚠️ 未绑定世界书 —— 点击上方世界书名称即可绑定';
+    }
 }
 
+// 世界书名称搜索列表（radio 风格，点击绑定）
+function renderWorldbookNameList() {
+    const box = document.getElementById('worldbook-name-list');
+    if (!box) return;
+    const q = ((document.getElementById('worldbook-name-search') && document.getElementById('worldbook-name-search').value) || '').trim().toLowerCase();
+    const names = worldbookNamesList().filter(n => !q || n.toLowerCase().includes(q));
+    if (!names.length) { box.innerHTML = '<div class="text-[9px] sm:text-[10px] text-gray-500 p-1">无匹配世界书</div>'; return; }
+    box.innerHTML = names.map(n => {
+        const active = n === worldbookSettings.boundName;
+        return `<div class="flex items-center gap-1.5 text-[10px] sm:text-xs cursor-pointer py-0.5 px-1 rounded hover:bg-white/5 ${active ? 'text-violet-300 font-bold bg-white/5' : 'text-gray-400 hover:text-white'}" onclick="bindWorldbook('${n}')">
+          <span>${active ? '●' : '○'}</span><span class="truncate">${n}</span>
+        </div>`;
+    }).join('');
+}
+
+// 词条搜索 + 激活（启用）词条置顶
 function renderWorldbookEntryList() {
-    if (!worldbookCache.length) return '<div class="text-[10px] text-gray-500 p-2">暂无条目</div>';
-    const kw = worldbookSearch.trim().toLowerCase();
-    // 过滤：名称/别名/可命中敌人名（resolveWorldbookEnemy 命中该词条即列入）/词条内容关键字
-    const filtered = worldbookCache.filter(entry => {
-        if (!kw) return true;
-        const haystack = [entry.name, ...(Array.isArray(entry.keys) ? entry.keys : [])].join(' ').toLowerCase();
-        if (haystack.includes(kw) || String(entry.content || '').toLowerCase().includes(kw)) return true;
-        // 搜索当前战局敌方名是否命中该词条（供按敌人名字检索）
-        return enemiesData.some(enemy => resolveWorldbookEnemy(enemy.name) === entry);
+    const list = document.getElementById('worldbook-entry-list');
+    if (!list) return;
+    const count = document.getElementById('worldbook-entry-count');
+    if (!worldbookCache.length) {
+        if (count) count.textContent = '';
+        list.innerHTML = '<div class="text-[9px] sm:text-[10px] text-gray-500 p-2">暂无词条 —— 绑定世界书后自动加载</div>';
+        return;
+    }
+    const q = ((document.getElementById('worldbook-entry-search') && document.getElementById('worldbook-entry-search').value) || '').trim().toLowerCase();
+    let entries = worldbookCache.filter(e => {
+        const hay = String(e.name || '') + ' ' + (Array.isArray(e.keys) ? e.keys.join(' ') : '');
+        return !q || hay.toLowerCase().includes(q);
     });
-    // 激活词条置顶：启用的排前面（保持原相对顺序）
-    const sorted = filtered.slice().sort((a, b) => (isWorldbookEntryEnabled(b) ? 1 : 0) - (isWorldbookEntryEnabled(a) ? 1 : 0));
-    if (!sorted.length) return `<div class="text-[10px] text-gray-500 p-2">${kw ? '未匹配到词条（“' + kw + '”）' : '暂无条目'}</div>`;
-    return sorted.map(entry => {
+    entries = entries.slice().sort((a, b) => {
+        const ea = isWorldbookEntryEnabled(a) ? 0 : 1, eb = isWorldbookEntryEnabled(b) ? 0 : 1;
+        return ea - eb;
+    });
+    if (count) count.textContent = `（${entries.length}/${worldbookCache.length}）`;
+    if (!entries.length) { list.innerHTML = '<div class="text-[9px] sm:text-[10px] text-gray-500 p-2">无匹配词条</div>'; return; }
+    list.innerHTML = entries.map(entry => {
         const enabled = isWorldbookEntryEnabled(entry);
         return `<div class="flex items-center gap-2 text-[10px] sm:text-xs text-gray-300 py-0.5">
           <input type="checkbox" ${enabled ? 'checked' : ''} data-uid="${entry.uid}" onchange="toggleWorldbookEntry(this.dataset.uid, this.checked)" class="accent-violet-500">
           <span class="flex-1 truncate ${enabled ? '' : 'line-through text-gray-500'}">${entry.name || '(未命名)'}</span>
-          <button onclick="showWorldbookEntryDetail('${entry.uid}')" class="text-violet-300 hover:text-white border border-violet-500/30 rounded px-1.5 py-0.5 text-[9px] transition-colors ${enabled ? '' : 'opacity-50'}">查看</button>
+          <button onclick="showWorldbookEntryDetail('${entry.uid}')" class="text-violet-300 hover:text-white border border-violet-500/30 rounded px-1.5 py-0.5 text-[9px] transition-colors">查看</button>
         </div>`;
     }).join('');
 }
@@ -4644,20 +4671,6 @@ function bindWorldbook(name) {
     if (!name) { worldbookCache = []; worldbookIndex = {}; }
     persistWorldbookSettings();
     refreshWorldbookData();
-}
-
-// 搜索词在世界书列表唯一命中时自动切换绑定（并同步加载词条，缩窄搜索范围）
-function worldbookSmartSwitch() {
-    const kw = worldbookSearch.trim().toLowerCase();
-    if (!kw) return;
-    let names = [];
-    try { names = (typeof getGlobalWorldbookNames === 'function') ? (getGlobalWorldbookNames() || []) : []; }
-    catch (e) {}
-    if (!names.length) names = worldbookNamesList();
-    const hits = names.filter(n => n.toLowerCase().includes(kw));
-    if (hits.length === 1 && hits[0] !== worldbookSettings.boundName) {
-        bindWorldbook(hits[0]); // bindWorldbook 内部会 refreshWorldbookData 并触发二次 render
-    }
 }
 
 async function refreshWorldbookData() {
@@ -4783,12 +4796,6 @@ function initUI() {
   updateFieldBadgeUI();
   // 【世界书】非酒馆助手环境隐藏右上角管理入口
   updateWorldbookBtnVisibility();
-  // 【世界书】准备页构建后自动绑定角色卡世界书并预加载词条（便于玩家直接点【世界书载入】，也供管理面板直接展示）
-  if (isWorldbookAvailable() && !worldbookSettings.boundName) autoBindWorldbook();
-  if (worldbookSettings.boundName && !worldbookCache.length && !window._wbPreloading) {
-    window._wbPreloading = true;
-    loadWorldbookData().finally(() => { window._wbPreloading = false; });
-  }
   heroesData.forEach((hero, index) => {
     hero.dom = document.createElement('div'); hero.dom.className = `relative transition-all duration-300 min-w-[70px] ${!hero.isAlive ? 'opacity-40 grayscale' : ''}`; hero.dom.id = `hero-wrap-${hero.id}`;
     if (state.isGameStarted) { hero.dom.classList.add('anim-enter-hero'); hero.dom.style.animationDelay = `${index * 0.08}s`; setTimeout(() => { if (hero.dom) hero.dom.classList.remove('anim-enter-hero'); }, 800 + index * 80); } else { hero.dom.classList.add('opacity-0'); }
@@ -9094,10 +9101,11 @@ console.log('CRITICAL_LOG: 5. At script initialization end');
 loadLLMSettings();
 loadDefendSettings();
 loadWorldbookSettings();
-// 【世界书】非酒馆助手环境隐藏右上角入口
+// 【世界书】非酒馆助手环境隐藏右上角入口；酒馆环境未手动绑定时自动绑定角色卡/聊天文件世界书
 updateWorldbookBtnVisibility();
-// 【世界书】自动绑定角色卡当前绑定的世界书（本地未绑定时），供后续快速载入
-if (isWorldbookAvailable()) autoBindWorldbook();
+autoBindWorldbook();
+// 后台预加载自动绑定世界书词条数据，点击【世界书载入】时即可直接使用（失败静默，不影响启动）
+if (worldbookSettings.boundName) { loadWorldbookData().catch(() => {}); }
 
 console.log('CRITICAL_LOG: 6. Calling startSTPolling immediately');
 startSTPolling();
