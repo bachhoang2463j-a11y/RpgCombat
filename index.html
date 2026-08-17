@@ -4408,9 +4408,17 @@ function parseEnemyItem(data, index, tags) {
     const allTags = nameTags.concat(attrTags);
     const isWise = attrs.isWise || allTags.includes('[智慧]');
     const reviveCount = allTags.includes('[复活]') ? 1 : 0;
+    // 类型减伤映射（敌方专属）：[流体]→远程 / [虚形]→近战 / [破法]→法术，各减免 50%
+    const resistMap = {};
+    if (allTags.includes('[流体]')) resistMap['远程'] = 0.5;
+    if (allTags.includes('[虚形]')) resistMap['近战'] = 0.5;
+    if (allTags.includes('[破法]')) resistMap['法术'] = 0.5;
+    // 状态免疫（敌方专属）：[防火]→免疫点燃 / [耐毒]→免疫中毒
+    const immuneBurn = allTags.includes('[防火]');
+    const immunePoison = allTags.includes('[耐毒]');
     // 保留原始名字标签，供世界书载入替换时继承（名字标签在世界书模式下依旧合法）
     
-    let enemyObj = { id: 'e' + index, name: cleanName, emoji: emoji, img: img, nameTags: nameTags, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, currentCharge: 0, size: 'text-5xl sm:text-7xl', atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: 0, actCount: attrs.actCount, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, skills: skills, classType: attrs.classType, isWise: isWise, reviveCount: reviveCount, baseTauntBonus: 0 };
+    let enemyObj = { id: 'e' + index, name: cleanName, emoji: emoji, img: img, nameTags: nameTags, tags: allTags, resistMap: resistMap, immuneBurn: immuneBurn, immunePoison: immunePoison, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, currentCharge: 0, size: 'text-5xl sm:text-7xl', atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: 0, actCount: attrs.actCount, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, skills: skills, classType: attrs.classType, isWise: isWise, reviveCount: reviveCount, baseTauntBonus: 0 };
     if (window.CLASS_PASSIVES && CLASS_PASSIVES[attrs.classType]?.onBattleInit) {
         CLASS_PASSIVES[attrs.classType].onBattleInit(enemyObj);
     }
@@ -5283,6 +5291,12 @@ registerTagHandler('弱', (ctx) => {
 // --- 持续伤害(DoT)类 ---
 // 【中毒】：叠层加深——每次施放直接叠加新毒层，各层独立发作、互不覆盖（与灾厄使淬毒同语义）
 registerTagHandler('中毒', (ctx) => {
+    // 【耐毒】敌方免疫中毒：跳过施加
+    if (ctx.target && ctx.target.immunePoison) {
+        if (ctx.targetDom) createFloatingText(ctx.targetDom, '免疫·毒', 'text-lime-300');
+        addHistory(`   ↳ 💠 ${ctx.target.name} 的【耐毒】体质免疫了剧毒！`);
+        return;
+    }
     playSound('defDown'); playSVGEffect(ctx.targetDom, 'debuff');
     ctx.target.buffs = ctx.target.buffs || [];
     const dotPower = Math.max(1, Math.floor(ctx.actualPower));
@@ -5293,6 +5307,12 @@ registerTagHandler('中毒', (ctx) => {
 
 // 【燃烧】：灼烧禁疗——重复施放不叠层、仅刷新强度与持续时间；燃烧期间目标受到的治疗减半
 registerTagHandler('燃烧', (ctx) => {
+    // 【防火】敌方免疫点燃：跳过施加
+    if (ctx.target && ctx.target.immuneBurn) {
+        if (ctx.targetDom) createFloatingText(ctx.targetDom, '免疫·燃', 'text-orange-300');
+        addHistory(`   ↳ 🔥 ${ctx.target.name} 的【防火】躯体免疫了灼烧！`);
+        return;
+    }
     playSound('defDown'); playSVGEffect(ctx.targetDom, 'debuff');
     ctx.target.buffs = ctx.target.buffs || [];
     const dotPower = Math.max(1, Math.floor(ctx.actualPower));
@@ -5926,6 +5946,18 @@ CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
     if (tryReviveEnemy(t, ctx.targetDom)) ctx.prevented = true; // 复活成功 → 本次不致死、不判假击杀
 }, 8);
 
+// 敌人：【再生】每回合开始回复最大 HP 10%（仅敌方、存活时；上限不超过 maxHp）
+CombatEvents.on(EVENTS.TURN_START, (ctx) => {
+    const e = ctx.entity;
+    if (!e || e.id.startsWith('h') || !e.isAlive || !e.tags || !e.tags.includes('[再生]')) return;
+    const healAmt = Math.max(1, Math.floor(e.maxHp * 0.1));
+    if (e.hp >= e.maxHp) return;
+    e.hp = Math.min(e.maxHp, e.hp + healAmt);
+    const dom = e.id ? document.getElementById(`${e.id}-sprite`) : null;
+    if (dom) createFloatingText(dom, `再生 +${healAmt}`, 'text-green-300');
+    addHistory(`   ↳ 💚 ${e.name} 的【再生】体质恢复了 ${healAmt} 点生命（${Math.floor(e.hp)}/${e.maxHp}）。`);
+});
+
 // 防守者：强力反击 (闪避成功时按概率触发)
 CombatEvents.on(EVENTS.ON_DODGE, async (ctx) => {
     if (ctx.target.classType !== '防守者') return;
@@ -5952,6 +5984,16 @@ CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
     const p = CLASS_PASSIVES[ctx.caster.classType];
     if (p && p.onAfterDamageDealt) {
         p.onAfterDamageDealt(ctx.caster, ctx.target, ctx.targetDom, ctx.incomingDamageType);
+    }
+    // 敌人【吸血】：对英雄造成实际伤害时，吸取其 30% 转化为自身回复（仅敌方施法者、存活时）
+    const caster = ctx.caster;
+    if (caster && !caster.id.startsWith('h') && caster.tags && caster.tags.includes('[吸血]') && caster.isAlive && (ctx.hpDmg > 0)) {
+        const drain = Math.max(1, Math.floor(ctx.hpDmg * 0.3));
+        caster.hp = Math.min(caster.maxHp, caster.hp + drain);
+        const casterDom = caster.id ? document.getElementById(`${caster.id}-sprite`) : null;
+        if (casterDom) createFloatingText(casterDom, `吸血 +${drain}`, 'text-red-300');
+        addHistory(`   ↳ 🧛 ${caster.name} 的【吸血】吸取了 ${drain} 点生命（${Math.floor(caster.hp)}/${caster.maxHp}）。`);
+        updateEnemyUI(caster);
     }
 }, 5);
 
@@ -6398,6 +6440,11 @@ function getEffectiveStats(entity) {
     }
     finalAtk = statsObj.atk; finalDef = statsObj.def; finalHit = statsObj.hit; finalEva = statsObj.eva; finalTaunt = statsObj.taunt;
     
+    // 敌人【狂暴】：HP ≤ 30% 时攻击 +50%（肉鸽"半血狂怒"；仅敌方）
+    if (entity.id && !entity.id.startsWith('h') && entity.tags && entity.tags.includes('[狂暴]') && entity.maxHp > 0 && entity.hp / entity.maxHp <= 0.3) {
+        finalAtk = Math.floor(finalAtk * 1.5);
+    }
+    
     // 隐匿者的最低嘲讽可以为负值（代表绝对隐匿），但其他人不能低于1
     if (entity.classType !== '隐匿者') {
         finalTaunt = Math.max(1, finalTaunt); // 嘲讽值下限为 1
@@ -6418,6 +6465,22 @@ function calculateDamage(rawDmg, target, isPierce = false) {
         else { shieldDmg = target.shield; dmg -= target.shield; target.shield = 0; } 
     } 
     return { hpDmg: dmg, shieldDmg: shieldDmg }; 
+}
+
+// 敌方变种标签类型减伤：【流体】远程-50% / 【虚形】近战-50% / 【破法】法术-50%。
+// 作用于折算前的原始伤害（与屏障克制同型独立减伤系数）；【穿透】无视的是护甲、仍吃此属性减伤。
+// target 无 resistMap（英雄/无标签敌人）时原样返回。dom 用于减伤飘字（可省略）。
+function applyEnemyTypeResist(rawDmg, damageType, target, dom) {
+    if (!target || !target.resistMap || !damageType || !(rawDmg > 0)) return rawDmg;
+    const resist = target.resistMap[damageType];
+    if (!resist) return rawDmg;
+    const reduced = Math.max(1, Math.floor(rawDmg * resist));
+    if (reduced < rawDmg) {
+        if (dom) createFloatingText(dom, `-${rawDmg - reduced} 抗性`, 'text-sky-300');
+        addHistory(`   ↳ 🛡️ ${target.name} 的【${damageType}】抗性使伤害减少了 ${rawDmg - reduced} 点。`);
+        return reduced;
+    }
+    return rawDmg;
 }
 
 function promptReaction(hero, reactionSkills, attacker, incomingSkill, sheshenCandidates = []) {
@@ -6702,7 +6765,9 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
               const counterBuff = target.buffs.find(b => b.type === 'counter');
               const tStatsForCounter = getEffectiveStats(target);
               const counterRawDmg = counterBuff.value + tStatsForCounter.atk;
-              const { hpDmg: counterHpDmg, shieldDmg: counterShieldDmg } = calculateDamage(counterRawDmg, caster);
+              // 反击为近战伤害：若被反击者是带【虚形】的敌方，先套近战减伤
+              const counterDmgToCaster = (caster.id.startsWith('h')) ? counterRawDmg : applyEnemyTypeResist(counterRawDmg, '近战', caster, caster ? document.getElementById(`${caster.id}-sprite`) : null);
+              const { hpDmg: counterHpDmg, shieldDmg: counterShieldDmg } = calculateDamage(counterDmgToCaster, caster);
               
               await sleep(300); 
               const casterDom = caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`);
@@ -6836,6 +6901,9 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         if (teamBarrier <= 0) { barrierArmor = 0; barrierSub = null; }
     }
     
+    // 敌方变种标签类型减伤（【流体/虚形/破法】）：屏障之后、护甲结算之前，对目标侧的对应伤害类型减半
+    rawDamage = applyEnemyTypeResist(rawDamage, incomingDamageType, target, targetDom);
+    
     let { hpDmg, shieldDmg } = calculateDamage(rawDamage, target, isPierce);
     const consumedGuardValue = consumeOneTimeDamageGuard();
     if (consumedGuardValue > 0) {
@@ -6891,10 +6959,16 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     }
 
     if (tag.includes('眩晕') && target.isAlive) {
-        target.buffs = target.buffs || [];
-        target.buffs.push({ type: 'stun', value: 1, duration: 1 });
-        createFloatingText(targetDom, `眩晕!`, 'text-yellow-300');
-        addHistory(`   ↳ ${target.name} 被重重击晕，将跳过下一次行动！`);
+        // 【钢体】敌方免疫眩晕：跳过施加
+        if (target.tags && target.tags.includes('[钢体]')) {
+            if (targetDom) createFloatingText(targetDom, '免疫·眩晕', 'text-yellow-300');
+            addHistory(`   ↳ 🛡️ ${target.name} 的【钢体】纹丝不动，免疫了眩晕！`);
+        } else {
+            target.buffs = target.buffs || [];
+            target.buffs.push({ type: 'stun', value: 1, duration: 1 });
+            createFloatingText(targetDom, `眩晕!`, 'text-yellow-300');
+            addHistory(`   ↳ ${target.name} 被重重击晕，将跳过下一次行动！`);
+        }
     }
 
     if (targetType === 'enemy' && caster.id.startsWith('h') && wasAlive && target.hp <= 0) {
