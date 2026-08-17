@@ -857,3 +857,13 @@
   3. **准备页【世界书载入】按钮配色**：由紫色渐变改为与【Yaml 载入】一致的 `from-gray-800 to-gray-700` + `text-blue-100`（整体风格统一，仅文案区分）。
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`（README/SPEC 待用户确认本轮有效后更新）。
 - **决策原因**：用户实测反馈三点——① 原设计"未绑定则提示手动绑定"在角色卡已绑定世界书的酒馆环境构成交互死锁（不进管理面板无法绑定、但进入准备页点载入又拦在前面），按反馈改为**自动继承角色卡绑定的世界书**（primary → additional 优先，聊天文件兜底），手动绑定仍优先；② 原面板三区块共享一个滚动容器、词条多时信息拥挤不可读，按反馈改为**每区块独立二级滚动**，并新增世界书/词条双搜索框与**激活词条置顶**（启用在前便于快速确认生效词条）；③ 载入按钮原为紫色渐变、与整体蓝灰风格突兀，按反馈统一为 Yaml 按钮同款配色。
+
+
+## [LOG-070] 2026-08-18 — 准备页新增世界书选择下拉 + 修复 COC7 人类 NPC 图鉴 V1/V2 加载失败（缺顶层 name 字段）
+
+- **变更行为**：
+  1. **准备页【世界书载入】入口升级**：`#worldbook-start-btn` 由裸按钮升级为 `#worldbook-start-wrap` 容器（按钮 + 下拉选择器 `#worldbook-start-select`，与 Yaml 按钮同风格、容器 `flex-col items-center`）。新增 `initWorldbookStartPicker()`（index.html:4406，位于 `updateWorldbookBtnVisibility` 后）填充下拉：`worldbookNamesList()` 全部可用世界书 +「（选择要载入的图鉴世界书）」空项，默认选中当前绑定名；下拉 `onchange="bindWorldbook(this.value)"` 即时绑定。`onCombatDataReceived` 显隐逻辑改为控制 `worldbook-start-wrap`（酒馆环境才显示）。`startGameFromWorldbook()` 载入时**优先采用下拉选中值**（`picked` 与当前绑定不同则改写绑定并持久化），再回退 `autoBindWorldbook()`，彻底绕开"绑定世界书里没有怪物却弹错误"的死锁路径。
+  2. **COC7-人类NPC战斗图鉴 V1.0/V2.0 加载失败修复（根因）**：诊断确认——两本图鉴 JSON 顶层**缺失 `name` 字段**（仅有 `entries`），而 SillyTavern 导入世界书时世界书名称取自顶层 `name`，缺失时回退默认名 → 前端按自动绑定名 `getWorldbook(boundName)` 抛"世界书不存在" → 显示加载失败（正常图鉴均有 name，与"其他正常"现象吻合）。**修复**：给两本 JSON 补顶层 `name`（`COC7-人类NPC战斗图鉴V1.0` / `V2.0`），导入后名称稳定、可被精确匹配。两本均为 19 条（18 条含内嵌 `<Combat_block>`，1 条 overview 索引）。
+  3. **加载失败容错**：`refreshWorldbookData()` 与 `startGameFromWorldbook()` 的读取失败 alert 均追加**当前可用世界书清单**（`worldbookNamesList()` 逐行列名），帮助识别名称不匹配/未导入的问题，不再只给一句笼统报错。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`、`C:/Users/ELevin/Desktop/奈亚拉托提普的面具/COC7-人类NPC战斗图鉴V1.0.json`、`COC7-人类NPC战斗图鉴V2.0.json`（桌面图鉴数据）。
+- **决策原因**：① 上一版自动绑定依赖"角色卡绑定的世界书恰好是怪物图鉴"，当绑定世界书无怪物时点载入会直接报错且无法在本页纠正——按用户要求改为**准备页就地选择世界书**（最干脆），下拉选中即生效，载入逻辑优先用用户显式选择，自动绑定仅作兜底；② 用户实测"两本人类 NPC 图鉴加载失败、其他正常"，差异恰在顶层 `name` 字段缺失导致导入名回退，补上后导入名与绑定名一致即可正常加载；③ 失败提示列出可用世界书，避免"不知道有哪些名字可选"的二次困惑。

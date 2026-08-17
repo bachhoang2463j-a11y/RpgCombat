@@ -806,9 +806,14 @@
   <div id="start-screen" class="absolute inset-0 bg-black/80 backdrop-blur-sm z-[110] flex flex-col items-center justify-center transition-opacity duration-1000">
     <div id="loading-title" class="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-gray-200 to-gray-500 tracking-[0.2em] mb-8 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] animate-pulse">正在监听环境数据...</div>
     <div id="loading-tip" class="text-gray-400 text-xs sm:text-sm tracking-widest mb-12">等待 LLM 输出 &lt;Combat_block&gt; 正则标签</div>
-    <div id="start-actions" class="hidden mt-2 items-center justify-center gap-3 sm:gap-4 flex-col sm:flex-row">
+    <div id="start-actions" class="hidden mt-2 items-center justify-center gap-3 sm:gap-6 flex-col sm:flex-row">
       <button id="start-btn" onclick="startGame()" class="px-8 py-3 bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 border border-gray-500 hover:border-blue-400 text-blue-100 rounded-full tracking-widest transition-all duration-300 shadow-[0_0_20px_rgba(0,0,0,0.5)] transform hover:scale-105">🧾 Yaml 载入</button>
-      <button id="worldbook-start-btn" onclick="startGameFromWorldbook()" class="hidden px-8 py-3 bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 border border-gray-500 hover:border-blue-400 text-blue-100 rounded-full tracking-widest transition-all duration-300 shadow-[0_0_20px_rgba(0,0,0,0.5)] transform hover:scale-105">📚 世界书载入</button>
+      <div id="worldbook-start-wrap" class="hidden flex-col items-center gap-1.5">
+        <button id="worldbook-start-btn" onclick="startGameFromWorldbook()" class="px-8 py-3 bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 border border-gray-500 hover:border-blue-400 text-blue-100 rounded-full tracking-widest transition-all duration-300 shadow-[0_0_20px_rgba(0,0,0,0.5)] transform hover:scale-105">📚 世界书载入</button>
+        <select id="worldbook-start-select" onchange="bindWorldbook(this.value)" class="bg-gray-900/80 border border-gray-700 hover:border-blue-400 rounded-full px-3 py-1 text-[10px] sm:text-xs text-gray-300 outline-none w-56 sm:w-64 text-center transition-colors" title="选择要载入的图鉴世界书">
+          <option value="">（未选择世界书）</option>
+        </select>
+      </div>
     </div>
     <div id="manual-input-box" class="mt-8 w-11/12 max-w-2xl hidden flex-col items-center">
       <div class="text-xs text-rose-400 mb-2">未检测到酒馆上下文，可在此手动粘贴测试数据：</div>
@@ -4410,6 +4415,17 @@ function updateWorldbookBtnVisibility() {
     if (btn) btn.style.display = isWorldbookAvailable() ? '' : 'none';
 }
 
+// 准备页【世界书载入】下拉选择器：列出全部可用世界书，默认选中当前绑定
+function initWorldbookStartPicker() {
+    const sel = document.getElementById('worldbook-start-select');
+    if (!sel || !isWorldbookAvailable()) return;
+    const names = worldbookNamesList();
+    const opts = ['<option value="">（选择要载入的图鉴世界书）</option>'].concat(
+        names.map(n => `<option value="${n}" ${n === worldbookSettings.boundName ? 'selected' : ''}>${n}</option>`)
+    );
+    sel.innerHTML = opts;
+}
+
 function loadWorldbookSettings() {
     try {
         const raw = localStorage.getItem(WORLDBOOK_VAR_KEY);
@@ -4489,13 +4505,24 @@ function parseWorldbookEntryEnemy(entry) {
 async function startGameFromWorldbook() {
     if (state.isGameStarted) { showLog("世界书载入仅可在准备页使用"); return; }
     if (!isWorldbookAvailable()) { showLog("未检测到酒馆助手环境，无法读取世界书"); return; }
+    // 优先使用准备页下拉所选世界书（用户明确指定）；否则回退自动绑定
+    const picker = document.getElementById('worldbook-start-select');
+    const picked = picker && picker.value ? picker.value : null;
+    if (picked && picked !== worldbookSettings.boundName) {
+        worldbookSettings.boundName = picked;
+        persistWorldbookSettings();
+    }
     if (!worldbookSettings.boundName) {
         const auto = autoBindWorldbook();
-        if (!auto) { alert("未检测到已绑定的世界书，请点击右上角【📚 世界书管理】手动绑定"); return; }
+        if (!auto) { alert("未检测到已绑定的世界书，请在准备页下拉框选择要载入的世界书，或点击右上角【📚 世界书管理】手动绑定"); return; }
     }
     if (!worldbookCache.length) {
         const ok = await loadWorldbookData();
-        if (!ok) { alert("世界书读取失败，请确认「" + worldbookSettings.boundName + "」存在且已启用（可点右上角【📚 世界书管理】刷新）"); return; }
+        if (!ok) {
+            const avail = worldbookNamesList();
+            alert("世界书「" + worldbookSettings.boundName + "」读取失败，请确认名称正确且已开启。\n\n当前可用世界书：" + (avail.length ? '\n· ' + avail.join('\n· ') : '（无）'));
+            return;
+        }
     }
     if (!enemiesData.length) { showLog("当前战局没有敌方单位"); return; }
 
@@ -4680,7 +4707,10 @@ async function refreshWorldbookData() {
     body.innerHTML = '<div class="text-xs text-gray-400 p-4 text-center">📚 正在读取世界书「' + worldbookSettings.boundName + '」...</div>';
     const ok = await loadWorldbookData();
     renderWorldbookManager();
-    if (!ok) alert("世界书「" + worldbookSettings.boundName + "」读取失败，请确认名称正确且已开启");
+    if (!ok) {
+        const avail = worldbookNamesList();
+        alert("世界书「" + worldbookSettings.boundName + "」读取失败，请确认名称正确且已开启。\n\n当前可用世界书：" + (avail.length ? '\n· ' + avail.join('\n· ') : '（无）'));
+    }
 }
 
 function toggleWorldbookEntry(uid, enabled) {
@@ -4774,11 +4804,14 @@ function onCombatDataReceived(yamlStr) {
         document.getElementById('loading-title').classList.add('text-emerald-400');
         document.getElementById('loading-tip').innerText = "环境数据读取完毕";
         document.getElementById('manual-input-box').classList.add('hidden');
-        // 展示载入按钮组：Yaml 载入始终可用；世界书载入仅酒馆助手环境可用
+        // 展示载入按钮组：Yaml 载入始终可用；世界书载入仅酒馆助手环境可用（含世界书选择下拉）
         document.getElementById('start-actions').classList.remove('hidden');
         document.getElementById('start-actions').classList.add('flex');
         document.getElementById('start-btn').classList.remove('hidden');
-        document.getElementById('worldbook-start-btn').classList.toggle('hidden', !isWorldbookAvailable());
+        const wbOk = isWorldbookAvailable();
+        const wbWrap = document.getElementById('worldbook-start-wrap');
+        if (wbWrap) wbWrap.classList.toggle('hidden', !wbOk);
+        if (wbOk) initWorldbookStartPicker();
         initUI(); 
     } else { alert("战局构建失败，请检查 <Combat_block> YAML 格式是否规范！"); }
 }
