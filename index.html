@@ -4689,8 +4689,10 @@ function renderWorldbookEntryList() {
 }
 
 function renderWorldbookLoadedEnemies() {
-    if (!enemiesData.length) return '<div class="text-[10px] text-gray-500 p-2">暂无载入敌人 —— 构建战局后展示</div>';
-    return enemiesData.map(e => `<div class="text-[10px] sm:text-xs text-gray-300 py-0.5 truncate">${e.name} <span class="text-gray-500">· HP ${e.hp}/${e.maxHp} · ${e.skills.length} 技能</span></div>`).join('');
+    const box = document.getElementById('worldbook-loaded-enemies');
+    if (!box) return;
+    if (!enemiesData.length) { box.innerHTML = '<div class="text-[10px] text-gray-500 p-2">暂无载入敌人 —— 构建战局后展示</div>'; return; }
+    box.innerHTML = enemiesData.map(e => `<div class="text-[10px] sm:text-xs text-gray-300 py-0.5 truncate">${e.name} <span class="text-gray-500">· HP ${e.hp}/${e.maxHp} · ${e.skills.length} 技能</span></div>`).join('');
 }
 
 function bindWorldbook(name) {

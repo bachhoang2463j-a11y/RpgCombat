@@ -867,3 +867,48 @@
   3. **加载失败容错**：`refreshWorldbookData()` 与 `startGameFromWorldbook()` 的读取失败 alert 均追加**当前可用世界书清单**（`worldbookNamesList()` 逐行列名），帮助识别名称不匹配/未导入的问题，不再只给一句笼统报错。
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`、`C:/Users/ELevin/Desktop/奈亚拉托提普的面具/COC7-人类NPC战斗图鉴V1.0.json`、`COC7-人类NPC战斗图鉴V2.0.json`（桌面图鉴数据）。
 - **决策原因**：① 上一版自动绑定依赖"角色卡绑定的世界书恰好是怪物图鉴"，当绑定世界书无怪物时点载入会直接报错且无法在本页纠正——按用户要求改为**准备页就地选择世界书**（最干脆），下拉选中即生效，载入逻辑优先用用户显式选择，自动绑定仅作兜底；② 用户实测"两本人类 NPC 图鉴加载失败、其他正常"，差异恰在顶层 `name` 字段缺失导致导入名回退，补上后导入名与绑定名一致即可正常加载；③ 失败提示列出可用世界书，避免"不知道有哪些名字可选"的二次困惑。
+
+## [LOG-071] 2026-08-18 — 世界书管理弹窗重构为现代两列布局 + 修复当前载入敌人不显示 bug（V6.17 代码先行）
+
+> ⚠️ **回退记录**：本改动（V6.17）在实测中出现严重 bug，`index.html` 已整体回退至 `f9ae832`（V6.16 状态）。本条目仅保留为历史记录，不再代表当前代码，详见 LOG-072。
+
+- **变更行为**：
+  1. **修复「当前载入敌人」不显示的 bug（根因）**：`renderWorldbookLoadedEnemies()`（index.html:4690）原实现**只调用却没有把返回值写入容器**——`renderWorldbookManager()` 中 `renderWorldbookLoadedEnemies();` 丢掉了返回的 HTML 字符串，导致 `#worldbook-loaded-enemies` 容器永远停留在初始占位、激活敌人从不展示。重构后该函数改为**直接写入容器**（`box.innerHTML = ...`），底部通栏正确展示当前 `enemiesData` 摘要（名字 · HP · 技能数）。
+  2. **弹窗重构为现代两列布局**（左右比例约 1:4）：`#worldbook-manager-body` 由单列堆叠改为 **`flex gap-3` 两列主区 + 底部通栏敌人区三层结构**——**左列（w-[20%] min-w-[160px]）**为世界书列表（📚 世界书 + 🔄 刷新 + 搜索框 + 可滚动名称单选框 + 绑定信息）；**右列（flex-1 min-w-0）**为词条列表（🗂️ 词条列表计数 + 搜索框 + 可滚动词条行）；**底部通栏**为当前载入敌人（⚔️ 当前载入敌人，max-h-[20vh]）。外层 `worldbook-manager-body` 由 `overflow-y-auto` 改为 `overflow-hidden`，主区两列 `flex-1 min-h-0` + 各自 `overflow-y-auto`，实现**左右两列表格各自独立滚动、不再整窗滚**。
+  3. **搜索栏摆放**：左列顶部世界书搜索（`#worldbook-name-search`）、右列顶部词条搜索（`#worldbook-entry-search`），各管其列。
+  4. **词条详情改为内嵌展开正文**：移除 `#worldbook-detail-panel` 独立预览面板（含 `showWorldbookEntryDetail`/`closeWorldbookDetail`/detail DOM），词条行新增 **▶/▼ 展开按钮**调用 `toggleWorldbookEntryExpand()`（index.html:4700）在该行下方内嵌显示词条 `content` 原文（`whitespace-pre-wrap font-mono`、`max-h-40 overflow-y-auto` 防爆长文）。词条行由「展开按钮 + 启用开关 + 名字」组成；`renderWorldbookEntryList()` 改为直接写容器；`toggleWorldbookEntry()` 同步改为直接重渲染。**展开状态持久化**：模块级 `worldbookExpanded` 集合（index.html:4407）记录已展开 uid，经 `worldbookSettings.entries[uid].expanded` 写入 localStorage（`loadWorldbookSettings` 恢复），关闭弹窗重开仍保留各词条展开/收起状态。
+  5. **XSS 防护**：新增 `escapeHtml()`（index.html:4740），词条名与敌人名输出统一转义（原「查看」用 textarea 赋值天然安全，改为 innerHTML 内嵌展开后必须转义）。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`（README/SPEC 待用户确认本轮有效后更新；桌面图鉴 JSON 未改动）。
+- **决策原因**：① 需求为「当前激活敌人未显示 + 优化窗口布局」——前是因**渲染函数返回值未落容器**的疏漏；后参考现代 PC 软件两列（左右约 1:4~5，左选世界书、右看词条），词条详情按**用户在讨论中明确「不需要分组树、保持扁平列表、详情改为内嵌展开正文」**实现，故移除独立预览面板改为条目内嵌展开；② 外层改 `overflow-hidden` 让左右两列各自滚动，符合现代列表窗口「分区滚动」体验；③ 转义词条名/敌人名属数据安全底线，避免世界书词条内容直接注入 innerHTML 造成 XSS。
+
+## [LOG-072] 2026-08-18 — V6.17 世界书弹窗两列布局重构实测出现严重 bug，整体回退至 V6.16
+
+- **变更行为**：
+  1. **整体回退**：V6.17 代码先行版（`index.html` 世界书管理弹窗两列布局重构）在实测中出现严重 bug，用户已将主文件回退至 `f9ae832`（HEAD）。回退后管理弹窗恢复为 V6.16 的分区块二级滚动布局（① 绑定世界书 ② 词条列表 ③ 当前载入敌人 ④ 词条数据预览），V6.17 的两列布局、词条行内展开正文（`toggleWorldbookEntryExpand` / `worldbookExpanded` 持久化）、`escapeHtml`、`renderWorldbookLoadedEnemies` 返回值落容器等改动**全部撤销**——V6.17 曾修复的「当前载入敌人不显示」旧 bug 随之复现（该函数仍只返回字符串未写入容器，index.html:4691）。
+  2. **版本**：当前代码保持 V6.16（世界书 V6.15/16 功能完整保留：准备页世界书选择下拉、`*N` 数量后缀、自动绑定三处接线 + 后台预载、双搜索/激活置顶、加载失败列出可用世界书）；V6.17 不落地。
+  3. **文档同步**：README 版本号对齐 V6.16 并补世界书系统说明（不含已回退的 V6.17）；LOG-071 保留为历史记录并标记已回退；LOG-INDEX 同步更新。
+- **涉及文件**：`index.html`（用户回退）、`LOG.md`、`LOG-INDEX.md`、`README.md`。
+- **决策原因**：用户实测 V6.17 重构出现严重 bug，优先保障管理弹窗可用性而选择**整体回退**（而非逐条修补），后续再另起迭代重做该 UI 优化；文档先行同步回当前真实代码状态，避免 README/LOG 描述与代码不一致误导后续施工。
+
+## [LOG-073] 2026-08-18 — 世界书管理弹窗两列布局重构（comment 分组树+行内展开）+ 修复敌人通栏 bug + 轮询卡死加固（V6.18 代码先行）
+
+> ⚠️ **回退记录**：V6.18 代码先行版在用户实测中**仍卡在「等待 LLM 输出正则标签」**（刷新浏览器/切换浏览器/重启酒馆均复现），而 V6.16 版本正常——判定改动引入了回归，`index.html` 已整体回退至 `f9ae832`（V6.16）并仅保留 LOG-074 的最小修复。本条目仅保留为历史记录，不再代表当前代码。
+
+- **变更行为**：
+  1. **修复「当前载入敌人」不显示 bug（根因）**：`renderWorldbookLoadedEnemies()`（index.html:4718）改为**直接写入容器**（`box.innerHTML = ...`，原实现只 return 字符串、`renderWorldbookManager` 裸调用丢弃返回值导致容器永远空白）；并按名字**聚合 `*N` 展开后的敌人数量**（`*N` 在构建期展开为独立敌人、对象无 count 字段，前端 Map 聚合）——`食尸鬼*2` 显示为 `食尸鬼 ×2`，一行一个名字。
+  2. **弹窗重构为现代两列布局**（左右约 1:4.5）：`#worldbook-manager-body` 由单列堆叠改为 **`flex gap-3` 两列主区 + 底部通栏敌人**三层结构——**左列（w-[22%] min-w-[170px]）**📚 世界书列表（🔄 刷新 + 搜索 + 可滚动单选行 + 绑定信息）；**右列（flex-1 min-w-0）**🗂️ 词条列表（计数 + 搜索 + 可滚动分组树）；**底部通栏**⚔️ 当前战斗敌人（max-h-[20vh]）。外层由 `overflow-y-auto` 改 `overflow-hidden`，左右两列 `flex-1 min-h-0` + 各自 `overflow-y-auto` 分区滚动，不再整窗滚。
+  3. **词条列表改为 comment 分类分组树**：`renderWorldbookEntryList()`（index.html:4657）重写为分组树渲染（直接写容器）——分组键取 `(entry.comment||'').trim()` 首分类（`split(/[,，]/)[0]`），空归「未分类」且排最后；组行 `[▶/▼] 组名 (启用数/总数)` 点击折叠/展开整组；词条行 `[▶/▼] [启用checkbox] 词条名`，▶/▼ 行内展开显示词条 `content` 原文（`whitespace-pre-wrap font-mono max-h-40 overflow-y-auto` 防爆长文）；组内保持**启用置顶 + 中文名稳定排序**；搜索非空时强制展开全部组以展示命中项。新增 `toggleWorldbookEntryExpand(uid)`（词条展开状态存 `worldbookSettings.entries[uid].expanded`，**保留 enabled 位向后兼容**既有 localStorage）与 `toggleWorldbookCategory(name)`（分类折叠存 `worldbookSettings.catCollapsed[组名]`，`loadWorldbookSettings` 恢复、`persistWorldbookSettings` 整体序列化已覆盖）。
+  4. **移除词条数据预览面板**：删除 `showWorldbookEntryDetail` / `closeWorldbookDetail` 函数与 `#worldbook-detail-panel` DOM（原「查看」按钮改为行内展开正文，不再需要独立预览面板）。
+  5. **XSS 防护**：新增 `escapeHtml()`（index.html:4780），词条名/组名/content/世界书名输出统一转义；世界书名称列表与词条行交互改 **`data-*` 属性传值 + `onclick="fn(this.dataset.xx)"`**（世界书列表由 `onclick="bindWorldbook('${n}')"` 内联字符串改为 `this.dataset.name`，绕开名字含引号时内联进 JS 源码字符串的隐患）。
+  6. **轮询卡死加固（Bug C，避免卡在「等待 LLM 输出正则标签」）**：`startSTPolling()`（index.html:4745）两处消息读取由只读 `actualMsg.message` 单字段改为字段兼容 `message || mes || content || raw_content`（与 `callLLMAPI` index.html:9029 同口径——SillyTavern 原生消息字段为 `mes`，仅 JS-Slash-Runner 用 `message`，单字段读取在环境切换时永远扫不到）；`<Combat_block>` 检测由 `lastIndexOf` 精确匹配（大小写敏感、不兼容空白）改为惰性正则 `/<Combat_block>([\s\S]*?)<\/Combat_block>/i`（与 `parseWorldbookEntryEnemy` 同款）。轮询频率 1s、5 秒兜底提示、顶层同步初始化顺序均未改动。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`（README 待用户确认本轮有效后更新）。
+- **决策原因**：① 用户实测反馈「当前激活敌人未显示」——根因是渲染函数返回值未落容器（V6.17 曾修复过、随整体回退而复现），本次直接改为写容器并顺带按名字聚合 `*N` 数量（用户测试数据 `食尸鬼*2` 场景）；② 用户按示意图要求现代 PC 软件两列布局（左右约 1:4~5，左选世界书、右看词条）+ 词条按分类分组树 + 行内展开正文——分组数据源经与用户确认采用 **SillyTavern 词条标准 `comment` 分类字段**（此前从未使用，未填分类的词条归「未分类」组）；③ 卡死在「等待 LLM 输出正则标签」经逐字节 diff 排查确认与 V6.17 改动**零交集**（114 行 diff 全在弹窗内部），真正脆弱点是轮询单字段读取 + 标签精确匹配，本次加固两点（字段兼容 + 惰性正则）以彻底避免环境切换时的无限等待；④ XSS 转义与 data-* 传值属数据安全底线，词条 content/名字/组名/世界书名均来自外部导入数据，不得直接注入 innerHTML。
+
+## [LOG-074] 2026-08-18 — V6.18 世界书弹窗重构实测仍卡死，整体回退 V6.16 + 仅修复「当前载入敌人不显示」最小改动
+
+- **变更行为**：
+  1. **整体回退**：V6.18 代码先行版（世界书管理弹窗两列布局 + comment 分组树 + 轮询加固）在用户实测中**仍卡在「等待 LLM 输出正则标签」**——刷新浏览器、切换浏览器、重启酒馆均复现，而切换回 V6.16 立即正常。判定改动引入回归（范围与 V6.17 完全一致，连续两次整体回退，期间用户实测正常版本均未包含这些改动），`index.html` 已 `git checkout` 回退至 `f9ae832`（V6.16）。
+  2. **最小修复（唯一保留的代码改动）**：`renderWorldbookLoadedEnemies()`（index.html:4691）由「只 return 字符串」改为**直接写入容器** `box.innerHTML = ...`（`renderWorldbookManager` 在 4636 行裸调用、原返回值被丢弃导致「当前载入敌人」永远空白）。**仅此一处 6 行改动**，其余 V6.18 全部功能（两列布局/分组树/轮询加固/escapeHtml）均未保留。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`（README 维持 V6.16 现状，无需改动）。
+- **决策原因**：① 用户明确要求「一步一步来」——先回到已知正常的 V6.16，优先解决最容易确认的激活敌人显示 bug；② V6.16 在用户环境实测正常，任何超出该基线的改动都可能与卡死相关，因此**采用手术式最小改动原则**：只修一个 bug、不叠功能；③ 卡死根因至今未明（逐字节 diff 显示改动与轮询零交集，但用户实测证明改动版必卡、基线版必不卡），需要后续用"基线 + 单项功能逐步叠加"的方式定位，本轮不做任何猜测性加固。
+- **版本确认**：用户实测本轮改动无误，版本号定版为 **V6.20**（V6.17~6.19 均因严重 bug 回退未落地），README 同步更新。
