@@ -956,3 +956,13 @@
   3. **版本号升级**：README `V6.22 → V6.23`。
 - **涉及文件**：`README.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：按 Coding rule，用户实测确认本轮功能有效无误后才更新 README 并升版本号；LOG-077 为代码施工记录、本轮为文档定版本感谢记录，分两条以保持施工日志可溯源。
+
+## [LOG-079] 2026-08-18 — 敌方变种标签双写入点通用化：属性栏 `[...]` 与名字 `[...]` 等价（V6.23 后续，未升版本号）
+
+- **变更行为**：
+  1. **`parseAttributes` 通用标签收集**（index.html:4242）：在原有数值/职业字段解析（HP/MP/Atk/Armor/Speed/行动/职业 + `[智慧]→isWise`）之外，新增收集——先用 `ignored` 正则剔除已解析的带值字段，再把剩余的所有裸 `[...]` 纯标签（无冒号/斜杠）收集进返回的 `attrTags` 数组（含括号，如 `[复活]`）。返回对象新增 `attrTags` 字段，**非破坏**：hero 路径（parseAttributes 第二处调用，index.html:4430）不消费它，完全无影响。
+  2. **`parseEnemyItem` 双写入点合并**（index.html:4405-4410）：名字标签 `nameTags` 与 属性栏标签 `attrTags` 合并为单一命名空间 `allTags`，`[智慧]` 用 `attrs.isWise || allTags.includes('[智慧]')`（布尔合并、幂等）、`[复活]` 用 `allTags.includes('[复活]') ? 1 : 0`（置1、仅一次）。效果：**属性栏写 `[复活]` 与名字写 `[复活]` 完全等价**；未来新增任意变种标签（如 `[狂暴]`）在属性栏或名字两处都无需再改解析代码，只需在语义处用 `allTags.includes('[标签]')` 取值。
+  3. **世界书路径自行覆盖**：世界书替换时仍用 `enemy.nameTags`（LLM 名字标签）透传，而属性栏标签由词条 `属性` 经 `parseAttributes` 重建 `attrTags`，二者在 `parseEnemyItem` 内自然合并，无需额外接线。
+  4. **编辑器保存不丢**：`syncEditorDataToMemory` 仍只写 `e.isWise`、不动 `reviveCount`，已载入 `[复活]` 的敌人在编辑器编辑保存后保留复活标记；被编辑器清空的 `reviveCount` 由 `enemiesData` 深克隆从 `initialEnemiesCache` 恢复，行为不变。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：用户确认希望「属性栏」与「名字」两个写入点对所有变种标签通用（含未来新增标签），而非仅当前 `[复活]`/`[智慧]` 两个硬编码。真·通用实现将解析与语义解耦：解析端统一收集裸标签、语义端统一按标签名取值，后续扩展零解析改动。按 Coding rule 本轮仅施工记录、不升版本号不改 README（待用户实测「属性栏 [复活] 与名字 [复活] 均生效、字段解析不受干扰」后定版升 V6.24 并补 README §3.9 双写入点说明）。

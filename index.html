@@ -4233,7 +4233,16 @@ function parseAttributes(attrStr) {
     let classMatch = attrStr.match(/\[(?:职业|职阶|Class|Role)[:：]([^\]]+)\]/i);
     let classType = classMatch ? classMatch[1].trim() : null;
     let wiseMatch = attrStr.match(/\[智慧\]/i);
-    return { hp: hp ? parseInt(hp[1]) : 100, maxHp: hp ? parseInt(hp[2]) : 100, mp: mp ? parseInt(mp[1]) : 50, maxMp: mp ? parseInt(mp[2]) : 50, atk: atk ? parseInt(atk[1]) : 10, def: armor ? parseInt(armor[1]) : 5, spd: speed ? parseInt(speed[1]) : 100, actCount: act ? parseInt(act[1]) : 1, classType: classType, isWise: !!wiseMatch };
+    // 通用变种标签收集：先剔除已解析的带值字段，剩余的所有裸 `[xxx]`（如 [复活][智慧]）收集进 attrTags。
+    // 使「属性栏」与「名字」两种写入点对所有变种标签通用，未来新增标签两处都无需改解析代码。
+    let attrTags = [];
+    if (attrStr) {
+        const ignored = /\[(?:HP|MP|Atk|Armor|Speed|行动|行动次数|Act|职业|职阶|Class|Role)[:：][^\]]*\]/gi;
+        const without = attrStr.replace(ignored, '');
+        const pure = without.match(/\[[^\]\[:：]*\]/g);
+        if (pure) attrTags = pure;
+    }
+    return { hp: hp ? parseInt(hp[1]) : 100, maxHp: hp ? parseInt(hp[2]) : 100, mp: mp ? parseInt(mp[1]) : 50, maxMp: mp ? parseInt(mp[2]) : 50, atk: atk ? parseInt(atk[1]) : 10, def: armor ? parseInt(armor[1]) : 5, spd: speed ? parseInt(speed[1]) : 100, actCount: act ? parseInt(act[1]) : 1, classType: classType, isWise: !!wiseMatch, attrTags: attrTags };
 }
 
 function parseSkill(skillStr) {
@@ -4394,9 +4403,11 @@ function parseEnemyItem(data, index, tags) {
     const img = AVATAR_MAP[cleanName] || AVATAR_MAP[rawName]; 
     let skills = []; if (data["技能"] && Array.isArray(data["技能"])) skills = data["技能"].map(parseSkill);
     const nameTags = Array.isArray(tags) ? tags : [];
-    // [智慧]：属性栏 || 名字标签（布尔合并，重复挂载幂等无害）；[复活]：名字标签置1（仅一次复活）
-    const isWise = attrs.isWise || nameTags.includes('[智慧]');
-    const reviveCount = nameTags.includes('[复活]') ? 1 : 0;
+    const attrTags = Array.isArray(attrs.attrTags) ? attrs.attrTags : [];
+    // 属性栏标签 + 名字标签统一为一个命名空间：任一位置写变种标签都生效，重复挂载幂等无害
+    const allTags = nameTags.concat(attrTags);
+    const isWise = attrs.isWise || allTags.includes('[智慧]');
+    const reviveCount = allTags.includes('[复活]') ? 1 : 0;
     // 保留原始名字标签，供世界书载入替换时继承（名字标签在世界书模式下依旧合法）
     
     let enemyObj = { id: 'e' + index, name: cleanName, emoji: emoji, img: img, nameTags: nameTags, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, currentCharge: 0, size: 'text-5xl sm:text-7xl', atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: 0, actCount: attrs.actCount, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, skills: skills, classType: attrs.classType, isWise: isWise, reviveCount: reviveCount, baseTauntBonus: 0 };
