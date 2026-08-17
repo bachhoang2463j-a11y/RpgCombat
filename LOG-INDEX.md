@@ -80,5 +80,5 @@
 | 2026-08-18 | V6.17 世界书弹窗两列布局重构实测出现严重 bug，index.html 整体回退至 f9ae832（V6.16 状态，世界书 V6.15/16 功能保留；「当前载入敌人不显示」旧 bug 复现）；README 版本号对齐 V6.16 + 补世界书系统说明（不含 V6.17） | L884 | 7a88f62 |
 | 2026-08-18 | V6.18 世界书管理弹窗重做两列布局（左世界书/右词条各独立滚动 + 底部敌人通栏）+ 词条按 comment 分类分组树 + 行内展开正文（expanded/catCollapsed 持久化）+ 修复「当前载入敌人不显示」bug（改直接写容器 + *N 聚合计数）+ 轮询卡死加固（消息字段兼容 mes/content + Combat_block 惰性正则）+ escapeHtml/data-* 防 XSS ⚠️ 已整体回退（见 LOG-074） | L893 | 7a88f62 |
 | 2026-08-18 | V6.18 实测仍卡在「等待 LLM 输出正则标签」（刷新/切浏览器/重启酒馆均复现），index.html 整体回退至 f9ae832（V6.16）；仅保留一处最小修复——renderWorldbookLoadedEnemies 改直接写容器（修复「当前载入敌人不显示」，+4/-2）；用户实测确认无误，版本定版 V6.20 | L907 | 7a88f62 |
-| 2026-08-18 | 第 0 步诊断探头（纯观察零行为变化）：全局异常捕获（error/unhandledrejection/onerror → 顶部红条 __dbgErrors）+ startSTPolling 打点 7/8/9（入口/首轮 tick/5s 兜底）+ 初始化序列细化打点 5.1~5.8/10（定位 loadLLMSettings/loadWorldbookSettings/autoBindWorldbook/loadWorldbookData 中断点）；为逐步叠加功能定位卡死根因提供手段 | L916 | 待补 |
-| 2026-08-18 | 第 1 步两列布局（纯模板重构）实测通过：renderWorldbookManager 改 flex 两列（左 22% 世界书/右词条各独立滚动 + 底部敌人通栏）+ 外层 overflow-hidden，渲染函数/预览面板/轮询零改动；用户确认布局已满足需求，跳过分组树/行内展开步骤，定版 V6.22 | L925 | 待补 |
+| 2026-08-18 | 第 0 步诊断探头（纯观察零行为变化）：全局异常捕获（error/unhandledrejection/onerror → 顶部红条 __dbgErrors）+ startSTPolling 打点 7/8/9（入口/首轮 tick/5s 兜底）+ 初始化序列细化打点 5.1~5.8/10（定位 loadLLMSettings/loadWorldbookSettings/autoBindWorldbook/loadWorldbookData 中断点）；为逐步叠加功能定位卡死根因提供手段 | L916 | 185fd7c |
+| 2026-08-18 | 第 1 步两列布局（纯模板重构）实测通过：renderWorldbookManager 改 flex 两列（左 22% 世界书/右词条各独立滚动 + 底部敌人通栏）+ 外层 overflow-hidden，渲染函数/预览面板/轮询零改动；用户确认布局已满足需求，跳过分组树/行内展开步骤，定版 V6.22 | L925 | 185fd7c |
