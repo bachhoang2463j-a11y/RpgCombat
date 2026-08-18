@@ -93,3 +93,4 @@
 | 2026-08-18 | V6.26 定版：同名归属+低血/死亡旁白实测确认，README §2.1 新增敌方旁白三档触发点说明（回合开始/跌破30%绝境台词/临死台词）+ §3.9 [智慧] 条目改写、版本号 V6.25→V6.26 | L1026 | bea39f4 |
 | 2026-08-19 | 我方角色多动（行动次数）编辑器入口 + 剩余行动提示徽章：引擎/排轴/YAML/持久化早已敌我通用零改动，仅补 openEditor 我方「行动」输入框（lg:grid-cols-8）+ syncEditorDataToMemory 读取 + addHero 默认 actCount:1 + updateActiveHeroDisplay 剩余行动徽章（覆盖 actCount 与再动插队），未升版本号 | L1037 | 5cea917 |
 | 2026-08-19 | V6.27 定版：我方多动实测确认，README §1 属性字段补充可选 [行动次数:N]/[Act:N]（我方/敌方通用）+ §4.2 标题升级为「多次行动与蓄力机制」并追加我方多动条目（编辑器「行动」框或 YAML 写入、行动面板 ⏩ 剩余 N 次行动提示、多动语义与敌方一致）、版本号 V6.26→V6.27 | L1048 | 5cea917 |
+| 2026-08-19 | 我方新增两档旁白触发点（未升版本号）：①力竭倒下（updateHeroUI 死亡分支 + DoT 回合起始致死路径两处收口）与保命被动（ON_FATAL_DAMAGE prevented 后按 hasTriggeredGrit/hasTriggeredAvoidFatal 取被动名）旁白，含 1 号位玩家；②被治疗旁白——executeSkillAction 精确匹配 [单回]/[群回] 收集实际回血且非施法者自身的我方目标，收尾钉子改为一次 LLM 调用合并治疗者+被治疗者台词（triggerAllyHealSpeak，省 token），治疗者沿用仅非 1 号位自动发言 | L1059 | 6bd096a |
