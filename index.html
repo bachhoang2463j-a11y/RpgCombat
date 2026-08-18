@@ -30,7 +30,7 @@
     /* ==== 史诗击杀特效 ==== */
     @keyframes exec-hero-in { 0% { transform: translateX(-100vw) skewX(15deg); opacity: 0; } 60% { transform: translateX(20px) skewX(-5deg); opacity: 1; } 100% { transform: translateX(0) skewX(0); opacity: 1; } }
     @keyframes exec-enemy-in { 0% { transform: translateX(100vw) skewX(-15deg); opacity: 0; } 60% { transform: translateX(-20px) skewX(5deg); opacity: 1; } 100% { transform: translateX(0) skewX(0); opacity: 1; } }
-    @keyframes exec-slash { 0% { transform: translate(-50%, -50%) rotate(-15deg) scaleX(0); opacity: 1; } 50% { transform: translate(-50%, -50%) rotate(-15deg) scaleX(1); opacity: 1; height: 15px; } 100% { transform: translate(-50%, -50%) rotate(-15deg) scaleX(1.2); opacity: 0; height: 0px; } }
+    @keyframes exec-slash { 0% { transform: translate(-50%, -50%) rotate(var(--exec-slash-rot, -15deg)) scaleX(0); opacity: 1; } 50% { transform: translate(-50%, -50%) rotate(var(--exec-slash-rot, -15deg)) scaleX(1); opacity: 1; height: 15px; } 100% { transform: translate(-50%, -50%) rotate(var(--exec-slash-rot, -15deg)) scaleX(1.2); opacity: 0; height: 0px; } }
     @keyframes exec-shatter-top { 0% { transform: translate(0, 0) rotate(0deg); opacity: 1; filter: brightness(1) drop-shadow(0 0 10px rgba(255,0,0,0)); } 100% { transform: translate(80px, -80px) rotate(20deg); opacity: 0; filter: brightness(2) drop-shadow(0 0 30px red); } }
     @keyframes exec-shatter-bottom { 0% { transform: translate(0, 0) rotate(0deg); opacity: 1; filter: brightness(1); } 100% { transform: translate(-80px, 80px) rotate(-20deg); opacity: 0; filter: brightness(0.2); } }
     @keyframes exec-vs-pop { 0% { transform: translate(-50%, -50%) scale(5); opacity: 0; filter: blur(10px); } 10% { transform: translate(-50%, -50%) scale(0.8); opacity: 1; filter: blur(0px); } 20% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; } 80% { transform: translate(-50%, -50%) scale(1); opacity: 1; text-shadow: 0 0 30px #f43f5e, 0 0 60px #be123c; } 100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; } }
@@ -1181,6 +1181,12 @@ window.isExecutingCutin = false;
 
 async function playExecutionAnimation(hero, killedEnemies) {
     return new Promise(resolve => {
+        // 刀光定位：全屏横屏时视口宽高比剧变，w-[200vw] 长线配合 -15deg 旋转会产生巨大的垂直偏移
+        // （横屏 1920px 宽 → 垂直偏移约 500px），刀光会脱离敌方图标区、翘到屏幕左上方。
+        // 横屏收紧：缩短长度 + 减小倾角，让刀光始终横过敌方图标；竖屏保持原视觉。
+        const isLandscape = window.innerWidth > window.innerHeight;
+        const slashWidth = isLandscape ? 'min(120vw, 1800px)' : 'min(200vw, 900px)';
+        const slashRot = isLandscape ? '-6deg' : '-15deg';
         const overlay = document.createElement('div');
         overlay.className = 'fixed inset-0 z-[200] bg-black/60 flex items-center justify-center overflow-hidden transition-opacity duration-300';
         
@@ -1209,7 +1215,7 @@ async function playExecutionAnimation(hero, killedEnemies) {
                     ${enemiesHtml}
                 </div>
             </div>
-            <div class="absolute w-[200vw] h-1.5 sm:h-2 bg-white left-1/2 top-1/2 origin-center -translate-x-1/2 -translate-y-1/2 opacity-0 anim-exec-slash shadow-[0_0_20px_#f43f5e,0_0_40px_#fff] z-20"></div>
+            <div class="absolute h-1.5 sm:h-2 bg-white left-1/2 top-1/2 origin-center -translate-x-1/2 -translate-y-1/2 opacity-0 anim-exec-slash shadow-[0_0_20px_#f43f5e,0_0_40px_#fff] z-20" style="width:${slashWidth}; --exec-slash-rot:${slashRot};"></div>
         `;
         document.body.appendChild(overlay);
         setTimeout(() => { playSound('kill'); const scene = document.getElementById('battle-scene'); if(scene) { scene.classList.add('shake'); setTimeout(() => scene.classList.remove('shake'), 400); } }, 400);
@@ -4409,16 +4415,29 @@ function parseEnemyItem(data, index, tags) {
     const isWise = attrs.isWise || allTags.includes('[智慧]');
     const reviveCount = allTags.includes('[复活]') ? 1 : 0;
     // 类型减伤映射（敌方专属）：[流体]→远程 / [虚形]→近战 / [破法]→法术，各减免 50%
+    // 【要害】→ 受群攻技能伤害减免 50%（AoE 哨兵 key，攻击为群攻时查表命中）
     const resistMap = {};
     if (allTags.includes('[流体]')) resistMap['远程'] = 0.5;
     if (allTags.includes('[虚形]')) resistMap['近战'] = 0.5;
     if (allTags.includes('[破法]')) resistMap['法术'] = 0.5;
+    if (allTags.includes('[要害]')) resistMap['AoE'] = 0.5;
     // 状态免疫（敌方专属）：[防火]→免疫点燃 / [耐毒]→免疫中毒
     const immuneBurn = allTags.includes('[防火]');
     const immunePoison = allTags.includes('[耐毒]');
+    // 死亡自爆（敌方专属）：[自爆:群伤/群火/群毒/群穿]（可带 ;power:N，缺省 50）→ 死亡时对全体我方结算对应效果
+    let explode = null;
+    const explodeTag = allTags.find(t => /^\[自爆:/.test(t));
+    if (explodeTag) {
+        const m = explodeTag.match(/^\[自爆:([^\];]+?)(?:;power:(\d+))?\]$/);
+        if (m && ['群伤', '群火', '群毒', '群穿'].includes(m[1])) {
+            explode = { type: m[1], power: m[2] !== undefined ? parseInt(m[2]) : 50 };
+        } else {
+            console.warn(`[自爆] 标签格式或子类型无法识别，已忽略：${explodeTag}（支持 [自爆:群伤/群火/群毒/群穿;power:N]）`);
+        }
+    }
     // 保留原始名字标签，供世界书载入替换时继承（名字标签在世界书模式下依旧合法）
     
-    let enemyObj = { id: 'e' + index, name: cleanName, emoji: emoji, img: img, nameTags: nameTags, tags: allTags, resistMap: resistMap, immuneBurn: immuneBurn, immunePoison: immunePoison, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, currentCharge: 0, size: 'text-5xl sm:text-7xl', atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: 0, actCount: attrs.actCount, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, skills: skills, classType: attrs.classType, isWise: isWise, reviveCount: reviveCount, baseTauntBonus: 0 };
+    let enemyObj = { id: 'e' + index, name: cleanName, emoji: emoji, img: img, nameTags: nameTags, tags: allTags, resistMap: resistMap, immuneBurn: immuneBurn, immunePoison: immunePoison, explode: explode, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, currentCharge: 0, size: 'text-5xl sm:text-7xl', atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: 0, actCount: attrs.actCount, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, skills: skills, classType: attrs.classType, isWise: isWise, reviveCount: reviveCount, baseTauntBonus: 0 };
     if (window.CLASS_PASSIVES && CLASS_PASSIVES[attrs.classType]?.onBattleInit) {
         CLASS_PASSIVES[attrs.classType].onBattleInit(enemyObj);
     }
@@ -5169,6 +5188,92 @@ function tryReviveEnemy(enemy, dom) {
     return true;
 }
 
+// ==========================================
+// 【自爆】敌方死亡自爆：带 [自爆:群伤/群火/群毒/群穿]（可带 ;power:N，缺省 50）的敌人真正死亡时，
+// 对全体我方结算一次完整技能管线（逐目标闪避/反应拦截/可被看破打断/屏障吸收/护盾抵挡），与敌方 AI 施法同款 executeSkillAction。
+// 仅在"真正死亡"两处收口触发（updateEnemyUI 死亡分支 / nextTurn DoT 致死路径，均已在 isAlive=false 之后接线）；
+// 与 [复活] 自洽：第一次死亡被复活拦截→不自爆，复活后再死→正常自爆。
+// 多敌人同回合自爆经 selfDestructChain 串行执行，避免并发动画/结算交错。
+// ==========================================
+let selfDestructChain = Promise.resolve();
+let selfDestructCount = 0; // 排队中/执行中的自爆任务数：endTurn 汇合点据此等待，保证自爆演出（含看破/反应弹窗）期间主回合循环挂起
+function triggerEnemySelfDestruct(enemy) {
+    if (!enemy || enemy.id.startsWith('h') || !enemy.explode) return;
+    selfDestructCount++;
+    selfDestructChain = selfDestructChain.then(async () => {
+        try {
+            await doEnemySelfDestruct(enemy);
+        } catch (e) {
+            console.error('自爆结算异常:', e);
+        } finally {
+            selfDestructCount--; // 无论成败都复位计数，防止 endTurn 轮询卡死
+        }
+    });
+}
+async function doEnemySelfDestruct(enemy) {
+    const boom = enemy.explode;
+    if (!boom) return;
+    const subLabel = boom.type;
+    const spriteDom = enemy.id ? document.getElementById(`${enemy.id}-sprite`) : null;
+
+    // 构造合成技能：纯群攻/纯群减益，零消耗（已死敌人不能再扣自身资源）。
+    // 群火→[群燃烧]、群毒→[群中毒] 走纯减益路径（逐目标闪避，闪避成功连状态也不中）；群穿→[群穿透] 无视防御。
+    // isSelfDestruct 标记：自爆不可被反击（攻击者已死亡，反击会打到不存在的目标上），见反击/强力反击守卫。
+    // skipKanpoWindow 标记：看破判定已在下方前摇后手动执行（checkKanpoInterrupt），executeSkillAction 内不再重复弹窗。
+    const boomSkill = {
+        name: `自爆·${subLabel}`,
+        type: boom.type === '群火' ? '[群燃烧]' : boom.type === '群毒' ? '[群中毒]' : boom.type === '群穿' ? '[群穿透]' : '[群攻]',
+        power: boom.power, type2: '[无]', power2: 0, type3: '[无]', power3: 0,
+        hit: 100, cost: 0, hpCost: 0, tpCost: 0, damageType: '法术', turns: 3,
+        guaranteedHit: false, isReaction: false, isSelfDestruct: true, skipKanpoWindow: true
+    };
+
+    // 前摇预警：自爆敌人死亡时保留尸体（见 updateEnemyUI 死亡分支），此处复用敌方攻击预警红色轮廓光晕
+    // （enemy-omen）+ 专属预警音效 + 飘字，让玩家看清是哪个敌人即将自爆
+    if (spriteDom) {
+        spriteDom.style.display = '';
+        spriteDom.classList.remove('opacity-0', 'scale-50', 'breathe');
+        spriteDom.classList.add('enemy-omen');
+        if (window.playSound) playSound('monsterAttack');
+        createFloatingText(spriteDom, '💥 自爆预警!', 'text-red-400');
+    }
+    addHistory(`   ⚠️ ${enemy.name} 濒死之际气息暴走——自爆前兆！`);
+    await sleep(600); // 前摇时长与 enemy-omen 动画（600ms）对齐
+
+    // === 看破判定前置于爆炸演出之前：被看破则本次自爆被彻底无效化（无爆炸、无伤害），避免"先爆炸再看破"的演出矛盾 ===
+    // 复用现役 checkKanpoInterrupt（index.html:6455，BEFORE_SKILL_RESOLVE 订阅的同一函数）——扣费/[限N次]/旁白/演出全复用
+    const kanpoCtx = { caster: enemy, skill: boomSkill, target: null, cancelled: false };
+    await checkKanpoInterrupt(kanpoCtx);
+    if (kanpoCtx.cancelled) {
+        addHistory(`   ⛔ 自爆·${subLabel} 被看破破局，完全无效化！`);
+        // 看破成功：无爆炸演出，直接收尾隐藏尸体
+        if (spriteDom) {
+            spriteDom.classList.remove('enemy-omen');
+            spriteDom.classList.add('opacity-0', 'scale-50');
+            setTimeout(() => { if (spriteDom) spriteDom.style.display = 'none'; if (enemy.dom) enemy.dom.style.display = 'none'; }, 500);
+        }
+        return;
+    }
+
+    // 演出：爆炸粒子 + 震屏 + 音效（以敌人当前位置为中心）
+    const center = (spriteDom && spriteDom.getBoundingClientRect().width > 0) ? getDomCenter(spriteDom) : null;
+    if (center) {
+        spawnExplosionParticles(center.x, center.y, 1.4);
+        const scene = document.getElementById('battle-scene');
+        if (scene) { scene.classList.add('shake'); setTimeout(() => scene.classList.remove('shake'), 500); }
+    }
+    if (window.playSound) playSound('kill');
+    addHistory(`💥 ${enemy.name} 自爆了！（${boom.power} 威力，波及全体我方）`);
+
+    await executeSkillAction(enemy, null, boomSkill, 1);
+    // 收尾：自爆结算完成后隐藏尸体（前摇期间保留可见）
+    if (spriteDom) {
+        spriteDom.classList.remove('enemy-omen');
+        spriteDom.classList.add('opacity-0', 'scale-50');
+        setTimeout(() => { if (spriteDom) spriteDom.style.display = 'none'; if (enemy.dom) enemy.dom.style.display = 'none'; }, 500);
+    }
+}
+
 function updateEnemyUI(enemy) {
   enemy.hp = Math.max(0, Math.min(enemy.hp, enemy.maxHp)); 
   enemy.mp = Math.max(0, Math.min(enemy.mp, enemy.maxMp));
@@ -5232,8 +5337,15 @@ function updateEnemyUI(enemy) {
       // 真正死亡：触发智慧死亡旁白（[复活]敌人复活后再死同样走此分支再次触发）
       tryTriggerEnemyDeathSpeak(enemy);
       enemy.isAlive = false; enemy.shield = 0; enemy.buffs = []; enemy.isDefending = false; enemy.hitBonus = 0; enemy.evaBonus = 0; 
-      if(sprite) { sprite.classList.remove('breathe', 'enemy-sprite'); sprite.classList.add('opacity-0', 'scale-50'); } 
-      setTimeout(() => { if(enemy.dom) enemy.dom.style.display = 'none'; }, 500); 
+      // 【自爆】真正死亡后触发自爆（isAlive 置 false 之后接线，异步入队不会与本分支重复触发；[复活] 拦截成功早已 return）
+      triggerEnemySelfDestruct(enemy);
+      // 自爆敌人保留尸体供前摇演出（doEnemySelfDestruct 前摇/爆炸结算后收尾隐藏）；普通敌人立即播放消失演出
+      if (enemy.explode) {
+          if(sprite) { sprite.classList.remove('breathe', 'enemy-sprite'); }
+      } else {
+          if(sprite) { sprite.classList.remove('breathe', 'enemy-sprite'); sprite.classList.add('opacity-0', 'scale-50'); } 
+          setTimeout(() => { if(enemy.dom) enemy.dom.style.display = 'none'; }, 500); 
+      }
       renderTurnQueue(); 
       addHistory(`[战况] 💀 ${enemy.name} 被击溃了！`); 
   }
@@ -5963,7 +6075,9 @@ CombatEvents.on(EVENTS.TURN_START, (ctx) => {
 });
 
 // 防守者：强力反击 (闪避成功时按概率触发)
+// 守卫：自爆（isSelfDestruct）触发闪避时不反击——攻击者（施法者）已死亡，反击会打到不存在的目标上
 CombatEvents.on(EVENTS.ON_DODGE, async (ctx) => {
+    if (ctx.skill && ctx.skill.isSelfDestruct) return;
     if (ctx.target.classType !== '防守者') return;
     const p = CLASS_PASSIVES['防守者'];
     if (p && p.onDodge) await p.onDodge(ctx);
@@ -6471,17 +6585,21 @@ function calculateDamage(rawDmg, target, isPierce = false) {
     return { hpDmg: dmg, shieldDmg: shieldDmg }; 
 }
 
-// 敌方变种标签类型减伤：【流体】远程-50% / 【虚形】近战-50% / 【破法】法术-50%。
+// 敌方变种标签类型减伤：【流体】远程-50% / 【虚形】近战-50% / 【破法】法术-50% / 【要害】群攻-50%。
 // 作用于折算前的原始伤害（与屏障克制同型独立减伤系数）；【穿透】无视的是护甲、仍吃此属性减伤。
 // target 无 resistMap（英雄/无标签敌人）时原样返回。dom 用于减伤飘字（可省略）。
-function applyEnemyTypeResist(rawDmg, damageType, target, dom) {
-    if (!target || !target.resistMap || !damageType || !(rawDmg > 0)) return rawDmg;
-    const resist = target.resistMap[damageType];
+// isAoE 为 true 时查表 key 为 'AoE'（【要害】），否则按伤害类型查表；反击等单体场景传 false。
+function applyEnemyTypeResist(rawDmg, damageType, target, dom, isAoE = false) {
+    if (!target || !target.resistMap || !(rawDmg > 0)) return rawDmg;
+    const resistKey = isAoE ? 'AoE' : damageType;
+    if (!resistKey) return rawDmg;
+    const resist = target.resistMap[resistKey];
     if (!resist) return rawDmg;
+    const tagName = isAoE ? '要害' : damageType;
     const reduced = Math.max(1, Math.floor(rawDmg * resist));
     if (reduced < rawDmg) {
         if (dom) createFloatingText(dom, `-${rawDmg - reduced} 抗性`, 'text-sky-300');
-        addHistory(`   ↳ 🛡️ ${target.name} 的【${damageType}】抗性使伤害减少了 ${rawDmg - reduced} 点。`);
+        addHistory(`   ↳ 🛡️ ${target.name} 的【${tagName}】抗性使伤害减少了 ${rawDmg - reduced} 点。`);
         return reduced;
     }
     return rawDmg;
@@ -6763,14 +6881,15 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
       // 强力反击被动：闪避成功时按概率触发（独立于常规反击，无视伤害类型限制）
       await CombatEvents.emitAsync(EVENTS.ON_DODGE, { target, caster, targetDom, incomingDamageType, skill });
 
-      // 反击判定 (仅针对近战)；若本次闪避已触发强力反击，则不再同时触发普通反击
-      if (target.isAlive && target.buffs && !target.powerCounterFired && target.buffs.some(b => b.type === 'counter')) {
+      // 反击判定 (仅针对近战)；若本次闪避已触发强力反击，则不再同时触发普通反击。
+      // 守卫：自爆（isSelfDestruct）不可被反击——攻击者（施法者）已死亡，反击会打到不存在的目标上
+      if (!(skill && skill.isSelfDestruct) && caster.isAlive && target.isAlive && target.buffs && !target.powerCounterFired && target.buffs.some(b => b.type === 'counter')) {
           if (incomingDamageType === '近战' || incomingDamageType === '[近战]' || (!incomingDamageType.includes('远程') && !incomingDamageType.includes('法术'))) {
               const counterBuff = target.buffs.find(b => b.type === 'counter');
               const tStatsForCounter = getEffectiveStats(target);
               const counterRawDmg = counterBuff.value + tStatsForCounter.atk;
               // 反击为近战伤害：若被反击者是带【虚形】的敌方，先套近战减伤
-              const counterDmgToCaster = (caster.id.startsWith('h')) ? counterRawDmg : applyEnemyTypeResist(counterRawDmg, '近战', caster, caster ? document.getElementById(`${caster.id}-sprite`) : null);
+              const counterDmgToCaster = (caster.id.startsWith('h')) ? counterRawDmg : applyEnemyTypeResist(counterRawDmg, '近战', caster, caster ? document.getElementById(`${caster.id}-sprite`) : null, false);
               const { hpDmg: counterHpDmg, shieldDmg: counterShieldDmg } = calculateDamage(counterDmgToCaster, caster);
               
               await sleep(300); 
@@ -6906,8 +7025,9 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         if (teamBarrier <= 0) { barrierArmor = 0; barrierSub = null; }
     }
     
-    // 敌方变种标签类型减伤（【流体/虚形/破法】）：屏障之后、护甲结算之前，对目标侧的对应伤害类型减半
-    rawDamage = applyEnemyTypeResist(rawDamage, incomingDamageType, target, targetDom);
+    // 敌方变种标签类型减伤（【流体/虚形/破法/要害】）：屏障之后、护甲结算之前，对目标侧的对应伤害类型减半；
+    // 群攻标签（含 [群穿透] 等）判定为 AoE，命中【要害】的 AoE 哨兵 key
+    rawDamage = applyEnemyTypeResist(rawDamage, incomingDamageType, target, targetDom, tag.includes('群'));
     
     let { hpDmg, shieldDmg } = calculateDamage(rawDamage, target, isPierce);
     const consumedGuardValue = consumeOneTimeDamageGuard();
@@ -7200,7 +7320,8 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     showLog(`${caster.name} 施展了【${skill.name}】！`); 
     
     // === 技能解构与广播前：【看破】战略中断窗口 (BEFORE_SKILL_RESOLVE) ===
-    if (!isReactionTrigger && caster.id.startsWith('e')) {
+    // skipKanpoWindow 标记：自爆合成技能已在 doEnemySelfDestruct 前摇后手动执行过看破判定（checkKanpoInterrupt），此处跳过避免二次弹窗
+    if (!isReactionTrigger && caster.id.startsWith('e') && !(skill && skill.skipKanpoWindow)) {
         const kanpoCtx = { caster, skill, target: primaryTarget, cancelled: false };
         await CombatEvents.emitAsync(EVENTS.BEFORE_SKILL_RESOLVE, kanpoCtx);
         if (kanpoCtx.cancelled) {
@@ -7374,6 +7495,9 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     
     // 所有技能结算同步完成后，统一播放一次击杀特写
     if (_pendingKills.length > 0 && caster.id.startsWith('h')) {
+        // 击杀特写严格在死亡自爆演出（前摇/看破/爆炸/尸体完全消失）全部完成后播放，避免与自爆演出交错；
+        // 无自爆时 selfDestructCount 为 0，while 立即跳过
+        while (selfDestructCount > 0) await sleep(50);
         while (window.isExecutingCutin) await sleep(100);
         window.isExecutingCutin = true;
         await playExecutionAnimation(caster, _pendingKills);
@@ -7595,6 +7719,8 @@ async function nextTurn() {
           // 敌方 DoT 致死：触发智慧死亡旁白（此路径手动置死、不经过 updateEnemyUI 致死分支，故单独判定）
           if (currentEntity.type !== 'hero') tryTriggerEnemyDeathSpeak(currentEntity.ref);
           currentEntity.ref.isAlive = false;
+          // 【自爆】DoT 致死路径单独接线（此路径已手动置死，随后 updateEnemyUI 的死亡分支守卫失效，不会重复触发）
+          if (currentEntity.type !== 'hero') triggerEnemySelfDestruct(currentEntity.ref);
           if (currentEntity.ref.currentDelay) {
               resetHeroChargeEffect(currentEntity.ref);
               currentEntity.ref.currentDelay = null; // 蓄力中死亡：清空蓄力
@@ -7641,6 +7767,11 @@ async function nextTurn() {
 }
 
 async function endTurn() {
+    // === 自爆链汇合点：等待排队中/执行中的死亡自爆（含其看破/反应弹窗）全部结算完成再推进回合 ===
+    // 自爆跑在脱离主链的 selfDestructChain 上（triggerEnemySelfDestruct fire-and-forget），若不等待，
+    // 弹窗挂起期间后台回合会照常推进（下一个行动者/操作菜单/时间轴刷新），造成"怪异延迟"。
+    // 无自爆时 selfDestructCount 为 0，while 立即跳过，零开销。
+    while (selfDestructCount > 0) await sleep(50);
     const current = state.actionQueue[state.queueIndex];
     // === 回合结束事件 → 事件总线 (TURN_END) — 无载利时仅通知实体，技能信息由 executeSkillAction 单独 emit ===
     if (current) CombatEvents.emit(EVENTS.TURN_END, { entity: current.ref, skill: null, isReactionTrigger: false });
@@ -8188,6 +8319,56 @@ function cancelTargeting() { state.isTargeting = false; state.pendingAction = nu
 
 function showEnemyInfo(enemy) {
   const modal = document.getElementById('editor-modal');
+  // 变种标签徽章区：敌方专属 [xxx] 变种标签（名字/属性栏双写入点收集于 enemy.tags，含 [自爆:x] 带参数形式）
+  // 映射为可读徽章；未识别/不带参数的裸标签（如 [自爆:群伤] 已解析进 explode）仍原样展示，避免遗漏
+  const TAG_BADGE = {
+    '[复活]': ['复活', '死后30%血量复活一次', 'text-emerald-300 bg-emerald-900/40 border-emerald-600/60'],
+    '[智慧]': ['智慧', '三档智慧旁白（回合开始/跌破30%/临死）', 'text-rose-300 bg-rose-900/40 border-rose-600/60'],
+    '[流体]': ['流体', '远程伤害 -50%', 'text-sky-300 bg-sky-900/40 border-sky-600/60'],
+    '[虚形]': ['虚形', '近战伤害 -50%', 'text-sky-300 bg-sky-900/40 border-sky-600/60'],
+    '[破法]': ['破法', '法术伤害 -50%', 'text-sky-300 bg-sky-900/40 border-sky-600/60'],
+    '[要害]': ['要害', '群攻伤害 -50%', 'text-sky-300 bg-sky-900/40 border-sky-600/60'],
+    '[防火]': ['防火', '免疫点燃', 'text-orange-300 bg-orange-900/40 border-orange-600/60'],
+    '[耐毒]': ['耐毒', '免疫中毒', 'text-purple-300 bg-purple-900/40 border-purple-600/60'],
+    '[钢体]': ['钢体', '免疫眩晕', 'text-slate-300 bg-slate-800/50 border-slate-600/60'],
+    '[再生]': ['再生', '每回合回复最大HP 10%', 'text-green-300 bg-green-900/40 border-green-600/60'],
+    '[狂暴]': ['狂暴', 'HP≤30% 时攻击力 +50%', 'text-red-300 bg-red-900/40 border-red-600/60'],
+    '[吸血]': ['吸血', '造成实际伤害时吸取 30% 生命', 'text-red-300 bg-red-900/40 border-red-600/60']
+  };
+  const EXPLODE_SUB_BADGE = {
+    '群伤': ['群伤', '死亡自爆：对全体我方造成非穿透伤害', 'text-red-300 bg-red-950/50 border-red-700/60'],
+    '群穿': ['群穿', '死亡自爆：对全体我方造成穿透伤害（无视防御）', 'text-red-300 bg-red-950/50 border-red-700/60'],
+    '群火': ['群火', '死亡自爆：对全体我方施加燃烧（禁疗）', 'text-orange-300 bg-orange-950/50 border-orange-700/60'],
+    '群毒': ['群毒', '死亡自爆：对全体我方施加中毒（叠层）', 'text-purple-300 bg-purple-950/50 border-purple-700/60']
+  };
+  let tagHtml = '';
+  if (enemy.tags && enemy.tags.length) {
+    const handled = [];
+    const seen = new Set();
+    enemy.tags.forEach(tag => {
+      // 自爆标签：已解析进 explode，展示为「自爆·子类型」徽章
+      if (/^\[自爆:/.test(tag) && enemy.explode) {
+        const sub = EXPLODE_SUB_BADGE[enemy.explode.type];
+        if (sub && !seen.has('自爆')) {
+          handled.push(`<span title="${sub[1]}（威力 ${enemy.explode.power}）" class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${sub[2]} cursor-help">💥 自爆·${sub[0]}</span>`);
+          seen.add('自爆');
+        }
+        return;
+      }
+      if (seen.has(tag)) return;
+      seen.add(tag);
+      if (TAG_BADGE[tag]) {
+        const [label, tip, cls] = TAG_BADGE[tag];
+        handled.push(`<span title="${tip}" class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${cls} cursor-help">${label}</span>`);
+      } else {
+        handled.push(`<span title="${tag}" class="px-2 py-0.5 rounded-full border text-[10px] font-bold text-gray-300 bg-gray-800/60 border-gray-600/60 cursor-help">${tag}</span>`);
+      }
+    });
+    tagHtml = `<div class="mb-3">
+      <div class="text-gray-400 text-xs font-bold mb-1.5 uppercase tracking-wider">变种标签</div>
+      <div class="flex flex-wrap gap-1.5">${handled.join('') || '<span class="text-gray-600 text-xs">无</span>'}</div>
+    </div>`;
+  }
   let skillsHtml = enemy.skills.map(skill => {
     return `<div class="bg-gray-800 p-2 rounded border border-gray-700 text-sm mb-2">
       <div class="text-rose-400 font-bold mb-1">${skill.name}</div>
@@ -8225,6 +8406,7 @@ function showEnemyInfo(enemy) {
          <div class="text-center"><div class="text-gray-400 text-xs">Armor</div><div class="text-white font-bold">${enemy.def}</div></div>
          <div class="text-center"><div class="text-gray-400 text-xs">Speed</div><div class="text-white font-bold">${enemy.spd}</div></div>
       </div>
+      ${tagHtml}
       <h4 class="text-gray-400 text-xs font-bold mb-2 uppercase tracking-wider">技能面板</h4>
       <div class="max-h-[50vh] overflow-y-auto pr-1 custom-scrollbar">
         ${skillsHtml || '<div class="text-gray-500 text-sm text-center py-2">无技能</div>'}

@@ -1082,3 +1082,68 @@
   3. **版本号升级**：README `V6.27 → V6.28`。
 - **涉及文件**：`README.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：按 Coding rule，用户实测确认本轮功能有效无误后更新 README 并升版本号定版；LOG-088 为代码施工记录、本轮为文档定版记录，分两条保持可溯源。
+
+## [LOG-090] 2026-08-19 — 敌方新增 5 个变种标签：自爆四件套 + 【要害】（未升版本号）
+
+- **变更行为**：
+  1. **背景**：用户希望限制玩家滥用 AOE、提高单体攻击地位，为敌方新增类似 [复活] 的特性标签。经方案确认定版范围：**自爆四件套（[自爆:群伤/群火/群毒/群穿]）+ 【要害】群攻减伤**。
+  2. **标签解析**（`parseEnemyItem`，index.html:4399-4455）：新增 `[要害]` → `resistMap['AoE'] = 0.5`（与 [流体]/[虚形]/[破法] 并排）；新增自爆解析 `const explodeTag = allTags.find(t => /^\[自爆:/.test(t))`，正则 `/^\[自爆:([^\];]+?)(?:;power:(\d+))?\]$/` 解析子类型（群伤/群火/群毒/群穿，未知忽略并 console.warn）与 power（缺省 50），存入 `enemyObj.explode = { type, power }`（与 reviveCount/isWise 同风格）。双写入点（名字/属性栏）自动通吃，无标签时 explode=null 零行为变化。
+  3. **【要害】减伤**（`applyEnemyTypeResist`，index.html:6531-6552）：签名加第 5 参 `isAoE`，查表 key 改 `isAoE ? 'AoE' : damageType`，减伤飘字/战报在 isAoE 时写「【要害】」。调用点 6927 主伤害管线传 `tag.includes('群')`（此时 tag 必为攻击类，不误伤 [群回] 等）；反击路径 6786 补第 5 参 false（反击为单体近战）。【要害】含穿透语义对齐流体家族：群攻（含 [群穿透]）伤害 -50%，单体不受影响。
+  4. **自爆触发函数**（新增，index.html:5186-5233，位于 tryReviveEnemy 之后）：`triggerEnemySelfDestruct(enemy)` 检查 `enemy.explode`，用全局 `selfDestructChain` Promise 链串行化多敌人同回合自爆；`doEnemySelfDestruct(enemy)`（async）先播爆炸粒子（spawnExplosionParticles 1.4 倍 + 战场 shake + 死亡音效）并写 `💥 xxx 自爆了！` 战报，再构造合成技能对象 `{ name:'自爆·群X', type: 群火?'[群燃烧]':群毒?'[群中毒]':群穿?'[群穿透]':'[群攻]', power, hit:100, cost/hpCost/tpCost:0, damageType:'法术', turns:3, guaranteedHit:false, isReaction:false }`（零消耗防已死敌人二次扣资源），`await executeSkillAction(enemy, null, boomSkill, 1)` 与敌方 AI 施法同款调用。**完整管线**：逐目标独立闪避、可触发反应拦截、可被【看破】打断、【肃正】屏障吸收+泄漏、防御/护盾/保命被动/飘字战报全复用；群火/群毒走纯减益路径（闪避成功连状态也不中）。
+  5. **两处真正死亡收口接线**（与 [复活] 自洽：复活拦截成功早已 return/跳过，自爆只在真正死亡触发）：
+     - `updateEnemyUI` 死亡分支（index.html:5283-5288）：`tryTriggerEnemyDeathSpeak` 之后、`isAlive=false` 之后、死亡演出前插入 `triggerEnemySelfDestruct(enemy)`——异步 promise.then 天然晚于当前同步死亡块执行，不会与本分支重复触发；
+     - `nextTurn` DoT（毒/灼烧）回合起始致死路径（index.html:7652-7658）：`revived=false` 分支内 `isAlive=false` 之后单独接线（此路径手动置死、updateEnemyUI 死亡分支守卫失效不会二次触发）。
+  6. **副作用排查结论**（子代理探索 + 人工复核）：`executeSkillAction` 对 caster 调用 `updateEnemyUI` 在 7217 行、自爆异步入队晚于外层死亡同步块执行，安全；`promptKanpo`→`buildSkillDetailHTML` 对 primaryTarget=null 安全（群攻显示"目标 全体敌方"）；`TURN_END` 多重施法订阅对无 classType 敌方有 `p &&` 守卫；死亡后 caster 无 buffs/classType，`getEffectiveStats` 与 CLASS_PASSIVES 查找均安全。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：用户确认自爆本体伤害参数化（`;power:N` 缺省 50）、自爆走完整反制管线（可闪避/反应/看破/屏障）、群火/群毒为纯状态（无直接伤害）、【要害】减伤 50%。设计上刻意复用既有管线而非特判写死：合成技能走 executeSkillAction 使自爆天然获得屏障/看破/反应/保命被动全套交互；【要害】挂 resistMap 哨兵 key 与流体家族同构，未来新增群攻减伤系标签零解析改动。本轮仅施工记录、不升版本号不改 README（待用户实测确认后定版升 V6.29 并补 README §3.9 说明）。
+
+## [LOG-091] 2026-08-19 — 自爆三处体验修复：不可被反击 + 自爆前摇动效 + 详情面板变种标签显示
+
+- **变更行为**：
+  1. **修复自爆可被反击的 bug**：自爆由合成技能经 executeSkillAction 结算，玩家闪避成功时会触发反击判定——但自爆施法者（敌人）已死亡，导致反击打到不存在的目标上（飘字/战报/伤害都落在已死敌人上）。修复双守卫：
+     - 合成技能加 `isSelfDestruct: true` 标记（index.html:5231）；
+     - 普通反击入口守卫：`!(skill && skill.isSelfDestruct) && caster.isAlive`（index.html:6851）；
+     - 强力反击守卫：ON_DODGE 订阅（index.html:6045）开头 `if (ctx.skill && ctx.skill.isSelfDestruct) return;`——防守者强力反击无视伤害类型，仅靠普通反击的近战限制挡不住，必须单独拦截。
+  2. **自爆前摇动效**：此前自爆敌人在死亡分支立即播消失动画，玩家完全不知道发生了什么就全队掉血。现改为：自爆敌人在 `updateEnemyUI` 死亡分支**保留尸体**（`if (enemy.explode)` 分支跳过立即消失演出，index.html:5308-5313）；`doEnemySelfDestruct` 在结算前复用敌方攻击预警动效——尸体 `enemy-omen` 红色轮廓光晕（600ms）+ `monsterAttack` 预警音效 + `💥 自爆预警!` 飘字 + 战报 `⚠️ xxx 自爆前兆`，`await sleep(600)` 与动画时长对齐后播爆炸粒子/震屏/爆炸音效再进 executeSkillAction；自爆结算完成后收尾隐藏尸体（opacity-0 + display none）。前摇期间玩家有完整看破/反应决策窗口。
+  3. **详情面板变种标签显示**（`showEnemyInfo`，index.html:8276-8340）：新增「变种标签」区块，枚举 `enemy.tags`（名字/属性栏双写入点收集的完整命名空间）渲染为可读徽章：已支持的 12 个标签全部映射（复活/智慧/流体/虚形/破法/要害/防火/耐毒/钢体/再生/狂暴/吸血），hover 显示效果描述；`[自爆:群X]` 合并展示为「💥 自爆·群X」徽章（含威力 tooltip）；未识别标签原样兜底展示（灰色 `[xxx]`），保证未来新标签零解析改动即可见。徽章区插入属性行与技能面板之间。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：① 反击对已死目标造成伤害是明显逻辑错误，根因在强力反击无视伤害类型 + 自爆施法者死亡；用 `isSelfDestruct` 单一标记做双守卫，比在回调里反复判断更内聚，未来任何"亡语类"结算技能均可复用该标记。② 自爆前摇复用既有的 `enemy-omen` 预警体系（攻击预警动画+音效），与敌方普通攻击的预警语言完全一致，玩家无需学习新视觉；保留尸体使预警有实体锚点，爆炸后再消失，演出闭环。③ 详情面板直接渲染 `enemy.tags` 原始命名空间而非逐字段特判，天然覆盖全部现有标签与未来新增标签，符合"双写入点/通用命名空间"架构。本轮为修复记录，README 定版（V6.29）仍待用户实测确认后另行记录。
+
+## [LOG-092] 2026-08-19 — 修复自爆看破/反应弹窗打断演出：自爆链与主链串行化 + 先看破后爆炸
+
+- **变更行为**：
+  1. **背景**：用户反馈自爆触发看破弹窗会打断演出、产生怪异延迟。探索确认根因有二：① 自爆跑在脱离主链的 `selfDestructChain`（fire-and-forget）上，弹窗挂起期间后台回合照常推进（下一个行动者/操作菜单/时间轴刷新）——正常敌方攻击的弹窗在主链 `await` 上、逻辑本就冻结，唯独自爆链例外；② 爆炸演出（粒子/震屏/音效）在看破窗口之前播放，玩家决策时"已经炸了"，演出自相矛盾。
+  2. **自爆链与主链串行化**（index.html:5193-5205 + endTurn 汇合点 7760-7766）：`triggerEnemySelfDestruct` 维护 `selfDestructCount`（入队 ++、`selfDestructChain.then` 内 try/catch/finally 中 --）；`endTurn()`（async，所有调用点均 await）开头加 `while (selfDestructCount > 0) await sleep(50);`——自爆演出（含看破/反应弹窗）期间主回合循环挂起，弹窗时游戏逻辑真正暂停；无自爆时计数 0 立即跳过零开销；异常有兜底防轮询卡死。
+  3. **先看破后爆炸**（doEnemySelfDestruct 重构，index.html:5207-5270）：合成技能 `boomSkill` 加 `skipKanpoWindow: true`；执行序改为 预警(600ms) → **手动看破判定** `await checkKanpoInterrupt({ caster: enemy, skill: boomSkill, target: null, cancelled: false })` → 被看破则无爆炸直接收尾隐藏尸体（战报 `⛔ 自爆·群X 被看破破局`）→ 通过才播爆炸演出 → `executeSkillAction` 结算。复用现役 checkKanpoInterrupt（BEFORE_SKILL_RESOLVE 同一函数），扣费/[限N次]/旁白/演出全复用；`buildSkillDetailHTML` 对 target=null 安全（群攻显示"目标 全体敌方"）。
+  4. **executeSkillAction 看破窗口守卫**（index.html:7318）：条件加 `&& !(skill && skill.skipKanpoWindow)`——自爆跳过内建窗口避免二次弹窗；正常敌方技能行为零变化。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：用户选定"仅逻辑串行"深度（不引入全局 gamePaused/不冻结粒子/CSS 动画，改动最小且足以消除弹窗时后台推进的怪异感）+ "修复先看破后爆炸"。endTurn 是唯一被所有回合路径 await 的汇合点，在此等待自爆链成本最低；checkKanpoInterrupt 独立可调用，看破判定天然适配前移到爆炸前。本轮为修复记录，README 定版（V6.29）仍待用户实测确认后另行记录。
+
+## [LOG-093] 2026-08-19 — 修复自爆敌人死亡幽灵占位（空血条/残留 buff 图标不消失）
+
+- **变更行为**：
+  1. **背景**：用户实测反馈自爆敌人死亡后遗留幽灵占位——上一次改动测试留下**空血条**、本次改动测试留下 **buff 图标残留**，共同点都是敌人不会完全消失。
+  2. **根因**：普通死亡路径（`updateEnemyUI` 死亡分支 else 分支，index.html:5340-5341）隐藏的是**整个敌人卡片容器** `enemy.dom`（`#enemy-box-*`，内含名字/buff 容器/sprite/血条/充能格，见 renderEnemies 4949-4966），所以血条与 buff 图标一并消失；而自爆敌人走 `enemy.explode` 分支保留尸体供前摇演出，收尾（`doEnemySelfDestruct` 两处，index.html:5244-5247 看破取消路径与 5263-5267 结算完成路径）只操作了 `spriteDom`（`#enemy-id-sprite`）——**血条容器与 buff 容器（`${enemy.id}-buffs`）未隐藏**，于是空血条/残留 buff 图标滞留在战场上。
+  3. **修复**：两处自爆收尾改为同时隐藏 `spriteDom` 与整个 `enemy.dom` 容器（`if (enemy.dom) enemy.dom.style.display = 'none'`，index.html:5247/5267），与普通死亡路径完全一致——前摇期间保留尸体与血条供玩家识别目标，结算完成后整卡消失（含血条/buff/充能格），不再幽灵占位。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：幽灵占位根因是自爆收尾只隐藏 sprite 子节点而漏掉容器；改为隐藏 `enemy.dom` 容器与普通死亡路径对齐，语义统一（"死亡即整卡消失"），也避免后续新增敌人子元素时再次遗漏。本轮为修复记录，README 定版（V6.29）仍待用户实测确认后另行记录。
+
+## [LOG-094] 2026-08-19 — 击杀特写时序 + 横屏刀光错位修复
+
+- **变更行为**：
+  1. **击杀特写严格在自爆敌人完全消失后播放**（index.html:7498-7501）：此前击杀特写（playExecutionAnimation）在我方英雄技能结算的 `_pendingKills` 分支直接播放，早于 `endTurn` 的自爆链汇合等待——自爆敌人还在前摇/爆炸演出中（尸体未消失）特写就抢先横斩，演出交错。修复：`_pendingKills` 分支开头（isExecutingCutin 自旋之前）加 `while (selfDestructCount > 0) await sleep(50);`，击杀特写严格等自爆演出（含看破/爆炸/尸体完全消失）全部完成后播放；无自爆时计数 0 立即跳过，行为零变化。
+  2. **全屏横屏击杀刀光错位**（index.html:1184-1189 + 1218 + CSS keyframes 33 行）：根因——刀光 `w-[200vw]`（横屏 1920px 屏宽 → 3840px 长线）+ rotate(-15deg) 产生约 500px 垂直偏移，线端脱离敌方图标区、翘到屏幕左上方（"我方角色头顶左边"）。修复：按视口方向动态调整——`isLandscape = innerWidth > innerHeight` 时刀光缩短为 `min(120vw, 1800px)` 且倾角收紧为 `-6deg`（CSS 变量 `--exec-slash-rot`，keyframes 改用变量），使刀光始终横过敌方图标区；竖屏保持 `min(200vw, 900px)` + `-15deg` 原视觉。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：① 击杀特写是"技能收尾演出"，语义上应晚于目标消失演出——在播放点等待自爆链与 endTurn 汇合点等待同构，复用同一 `selfDestructCount` 计数，改动一行；② 刀光错位是横屏视口宽高比剧变放大了长线旋转的垂直偏移，按方向收紧长度/角度比改 CSS 定位更贴合斩击感（刀光仍从中心向两侧展开横扫），CSS 变量让 keyframes 零硬编码、竖屏零回归。本轮为修复记录，README 定版（V6.29）仍待用户实测确认后另行记录。
+
+## [LOG-095] 2026-08-19 — V6.29 定版：自爆四件套+【要害】实测确认 + README §3.9 补充
+
+- **变更行为**：
+  1. **实测确认**：用户确认（1）自爆四件套（群伤/群火/群毒/群穿）与【要害】全部生效——群伤非穿透吃防御、群穿穿透吃护盾不吃防御、群火/群毒纯状态、要害群攻减伤 50%；（2）自爆完整反制管线（可闪避/反应拦截/看破打断/屏障吸收）、[复活]+[自爆] 组合（第一次死复活不自爆、再死才自爆）；（3）自爆演出（预警→看破判定→爆炸→整卡消失）、不可被反击、多自爆串行、击杀特写晚于自爆演出、横屏刀光定位全部符合预期。版本定版 V6.29。
+  2. **README 文档更新（V6.28 → V6.29）**：
+     - **§1 敌方名字变种标签条目**：标签数 11 → 16，列举补充 `[要害]`（群攻伤害 -50%）与 `[自爆:群伤/群火/群毒/群穿]`（死亡自爆，可带 `;power:N`）。
+     - **§3.9 标题升级 V6.29**；新增两个标签条目：`[要害]`（群攻减伤，与流体家族同型、单体不受影响）与 `[自爆:群X]` 四件套（死亡自爆完整管线、语法/数值口径、反制与演出细节、与 [复活] 自洽）；组合示例区追加自爆组合示例（[复活][自爆] 与 *2 群穿）。
+     - **§9 世界书系统**：标签支持数 11 → 16。
+  3. **LOG-INDEX 回填**：LOG-090/091/092/093/094 的 HASH 回填为对应代码提交。
+- **涉及文件**：`README.md`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：按 Coding rule，用户实测确认本轮功能有效无误后更新 README 并升版本号定版；LOG-090~094 为代码施工与四轮修复记录、本轮为文档定版记录，分条保持可溯源。
