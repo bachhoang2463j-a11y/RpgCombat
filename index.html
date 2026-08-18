@@ -2950,9 +2950,10 @@ const WEBM_FX_REGISTRY = {
     '冰霜01': { url: 'https://files.catbox.moe/tr9n9i.webm',                                              scale: 1.4, particles: 'frost',       audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/freeze01.mp3' },
     '雷击01': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/450.webm',               scale: 1.4, particles: 'thunder_aoe', audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/thunder01.mp3' },
     '圣光01': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/414.webm',               scale: 1.4, particles: 'holy_light',  audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/light01.mp3' },
-    '双枪扫射': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/strafe-ezremove02.mp4', scale: 1.4, particles: 'gunshot',    audioUrl: 'none' },
+    '双枪扫射': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/strafe-ezremove03.mp4', scale: 0.9, particles: 'gunshot',    audioUrl: 'none', delay: 2.2 },
     '克虏伯重狙': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/snipe-ezremove.mp4',  scale: 1.5, particles: 'gunshot',    audioUrl: 'none' },
     // 在此继续添加：
+    // delay 可选（单位：秒）：特效播放后、伤害结算前的等待时长，用于长特效演出与伤害数字同步；未配置则立即结算
     // '火焰02': { url: 'https://...', scale: 1.2, particles: 'fire_aoe',    audioUrl: 'https://...' },
     // '冰霜02': { url: 'https://...', scale: 1.6, particles: 'frost',        audioUrl: 'https://...' },
     // '雷击02': { url: 'https://...', scale: 1.0, particles: 'thunder_aoe',  audioUrl: 'https://...' },
@@ -7754,6 +7755,11 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                         }
                     }
                 }
+            }
+
+            // 特效演出与伤害结算同步：注册表配置 delay（秒）时，等待该时长让特效演出先行播放到打击点，再结算伤害
+            if (isAttackTag && WEBM_FX_REGISTRY[skill.fxTag] && WEBM_FX_REGISTRY[skill.fxTag].delay) {
+                await sleep(Math.round(WEBM_FX_REGISTRY[skill.fxTag].delay * 1000));
             }
         } else {
             // 没有配置自定义特效标签时，根据群攻子类型播放对应的默认 Canvas 全局特效
