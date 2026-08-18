@@ -6124,7 +6124,7 @@ CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
         addHistory(`   ↳ 🧛 ${caster.name} 的【吸血】吸取了 ${drain} 点生命（${Math.floor(caster.hp)}/${caster.maxHp}）。`);
         updateEnemyUI(caster);
     }
-    // 敌人【荆棘】：被近战命中时反弹 30% 实际伤害（走正常减伤管线——受攻击者护甲/护盾/防御姿态减免；
+    // 敌人【荆棘】：被近战命中时反弹 50% 实际伤害（下限 10 点）——走正常减伤管线（受攻击者护甲/护盾/防御姿态减免）；
     // 反弹致命伤害经 ON_FATAL_DAMAGE 可被保命被动救场；与【吸血】同管道，致死一击早退不触发 → 斩杀可规避反伤）
     const thornTarget = ctx.target;
     const attacker = ctx.caster;
@@ -6132,7 +6132,8 @@ CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
         && thornTarget.isAlive && (ctx.hpDmg > 0) && attacker && attacker.isAlive
         && ctx.incomingDamageType && (ctx.incomingDamageType === '近战' || ctx.incomingDamageType === '[近战]'
             || (!ctx.incomingDamageType.includes('远程') && !ctx.incomingDamageType.includes('法术')))) {
-        const reflectRaw = Math.floor(ctx.hpDmg * 0.3);
+        // 反弹原始值 = 实际伤害 50%，至少 10 点；随后仍走正常减伤管线（护甲/护盾/防御姿态照常减免）
+        const reflectRaw = Math.max(10, Math.floor(ctx.hpDmg * 0.5));
         let { hpDmg: reflectHp, shieldDmg: reflectShield } = calculateDamage(reflectRaw, attacker, false);
         // 反弹致命：先走 ON_FATAL_DAMAGE 让毅力留存/回避致命可救场（复用主伤害管线同款判定与旁白）
         if (attacker.hp - reflectHp <= 0) {
@@ -8435,7 +8436,7 @@ function showEnemyInfo(enemy) {
     '[狂暴]': ['狂暴', 'HP≤30% 时攻击力 +50%', 'text-red-300 bg-red-900/40 border-red-600/60'],
     '[吸血]': ['吸血', '造成实际伤害时吸取 30% 生命', 'text-red-300 bg-red-900/40 border-red-600/60'],
     '[蜕皮]': ['蜕皮', '首次HP跌破50%：清除全部debuff + 回血30% + 永久攻击+50%', 'text-amber-300 bg-amber-900/40 border-amber-600/60'],
-    '[荆棘]': ['荆棘', '被近战命中时反弹 30% 实际伤害', 'text-green-300 bg-green-900/40 border-green-600/60'],
+    '[荆棘]': ['荆棘', '被近战命中时反弹 50% 实际伤害（下限10）', 'text-green-300 bg-green-900/40 border-green-600/60'],
     '[连动]': ['连动', 'HP≤30% 时立刻行动一次（一次性）', 'text-fuchsia-300 bg-fuchsia-900/40 border-fuchsia-600/60']
   };
   const EXPLODE_SUB_BADGE = {
