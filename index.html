@@ -6132,8 +6132,11 @@ CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
         && thornTarget.isAlive && (ctx.hpDmg > 0) && attacker && attacker.isAlive
         && ctx.incomingDamageType && (ctx.incomingDamageType === '近战' || ctx.incomingDamageType === '[近战]'
             || (!ctx.incomingDamageType.includes('远程') && !ctx.incomingDamageType.includes('法术')))) {
-        // 反弹原始值 = 实际伤害 50%，至少 10 点；随后仍走正常减伤管线（护甲/护盾/防御姿态照常减免）
-        const reflectRaw = Math.max(10, Math.floor(ctx.hpDmg * 0.5));
+        // 反弹原始值 = 实际伤害 50%（原始值不做下限）；随后走正常减伤管线（护甲/护盾/防御姿态照常减免）
+        const reflectRaw0 = Math.floor(ctx.hpDmg * 0.5);
+        // 【荆棘】真实伤害下限：护甲减免后（护盾吸收前）不足 10 点则垫高原始反伤值（10 + 攻击者防御），
+        // 使护甲结算后至少 10 点——避免 -1/-3 等无关痛痒的挠痒反伤；防御姿态/护盾等主动减伤仍照常生效
+        const reflectRaw = Math.max(reflectRaw0, 10 + getEffectiveStats(attacker).def);
         let { hpDmg: reflectHp, shieldDmg: reflectShield } = calculateDamage(reflectRaw, attacker, false);
         // 反弹致命：先走 ON_FATAL_DAMAGE 让毅力留存/回避致命可救场（复用主伤害管线同款判定与旁白）
         if (attacker.hp - reflectHp <= 0) {
@@ -8436,7 +8439,7 @@ function showEnemyInfo(enemy) {
     '[狂暴]': ['狂暴', 'HP≤30% 时攻击力 +50%', 'text-red-300 bg-red-900/40 border-red-600/60'],
     '[吸血]': ['吸血', '造成实际伤害时吸取 30% 生命', 'text-red-300 bg-red-900/40 border-red-600/60'],
     '[蜕皮]': ['蜕皮', '首次HP跌破50%：清除全部debuff + 回血30% + 永久攻击+50%', 'text-amber-300 bg-amber-900/40 border-amber-600/60'],
-    '[荆棘]': ['荆棘', '被近战命中时反弹 50% 实际伤害（下限10）', 'text-green-300 bg-green-900/40 border-green-600/60'],
+    '[荆棘]': ['荆棘', '被近战命中时反弹 50% 实际伤害（护甲减免后保底10）', 'text-green-300 bg-green-900/40 border-green-600/60'],
     '[连动]': ['连动', 'HP≤30% 时立刻行动一次（一次性）', 'text-fuchsia-300 bg-fuchsia-900/40 border-fuchsia-600/60']
   };
   const EXPLODE_SUB_BADGE = {
