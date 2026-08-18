@@ -1217,3 +1217,136 @@
   3. **LOG-INDEX 回填**：LOG-100 的 HASH 已回填（aaff15e）；本轮追加 LOG-101 行并回填 HASH。
 - **涉及文件**：`README.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：按 Coding rule，用户实测确认本轮功能有效无误后更新 README 并升版本号定版；LOG-098 为三标签代码施工记录、LOG-099/100 为【荆棘】数值两次修正记录、本轮为文档定版记录，分条保持可溯源。
+
+## [LOG-102] 2026-08-19 — 击杀结算动画按伤害类型分流：近战风格一 / 法术风格三 / 远程风格四（未升版本号）
+
+- **变更行为**：
+  1. **需求背景**：`demo-execution.html` 独立原型中已打磨出 5 套击杀结算动画风格（Style 1 同轴斜切刀光 / Style 2 居合一闪 / Style 3 次元裂隙·空间碎镜 / Style 4 战术锁定·矩阵激光切割 / Style 5 星穹漫画）。用户指定接入主引擎三套：**近战击杀 → Style 1（改进后的原版，刀光同轴定位）**、**法术击杀 → Style 3**、**远程击杀 → Style 4**。
+  2. **CSS 层（index.html `<style>` 顶部）**：
+     - Google Fonts 导入追加 `family=Cinzel:wght@700;900`（Style 4 的 ELIMINATED 等英文艺术字所需）；
+     - 删除旧「史诗击杀特效」`exec-*` 全套（`exec-hero-in`/`exec-enemy-in`/`exec-slash`/`exec-shatter-top/bottom`/`exec-vs-pop` + `.anim-exec-*` 类，已确认仅被旧 `playExecutionAnimation` 引用、无其它使用者），替换为新多风格 keyframes：通用 `.font-cinzel` / `.text-outline-thick` / `.heavy-shake` + `@keyframes heavy-shake-anim`；Style 1 的 `s1-hero-in`/`s1-enemy-in`/`s1-slash-anim`/`s1-top-shatter`/`s1-bottom-shatter`/`s1-vs-anim`；Style 3 的 `s3-rift-beam`/`s3-shard-1~4`；Style 4 的 `s4-hud-ring`/`s4-laser-horiz`/`s4-laser-vert`。全部原样取自 demo（关键帧与 CSS 变量 `--hero-ox/oy`、`--enemy-ox/oy`、`--slash-rot` 语义一致）。
+  3. **`playExecutionAnimation(hero, killedEnemies, damageType)` 重写**（index.html:1251，签名新增第三参数 `damageType`，缺省 `'近战'`）：保留原 Promise 封装 / `z-[200]` 全屏 overlay / `enemy.img ? img : emoji` 适配 / fade-out + resolve 生命周期 / `playSound('kill')` + 震屏收尾。内部按类型分发三套演出：
+     - **Style 1（近战，默认）**：横竖屏同轴数学完整移植（横屏 rot -7° / 竖屏 -14°，`tan(rotRad)` 计算英雄/敌人垂直偏移，使其落在刀光旋转轴上，解决旧版刀光脱离敌我图标的问题）；敌人区由外层 `translate(var(--enemy-ox),var(--enemy-oy))` 定位 + 内层 `s1-enemy-in` flex 并排，**每敌各自上下两半 `s1-top/bottom-shatter` 碎裂**（多敌适配：外层负责斜轴定位、内层逐敌滑入，避免 demo 单敌的 transform 叠置）；刀光 `width:140vw` + `s1-slash-anim`；中心「击破/全灭」玫瑰红艺术字。
+     - **Style 3（法术）**：紫粉 `bg-slate-950/85` + 双裂隙光带 `s3-rift-beam`；英雄紫色圆头像入场；**每敌四象限晶体碎片** `s3-shard-1~4` 崩解（右 10vw 区 flex 并排）；中心渐变剪贴文字「湮灭/全灭」（`from-purple-400 via-fuchsia-300 to-rose-400`）；开场 `playSound('burst')`，killDelay 250ms。
+     - **Style 4（远程）**：青黑 `bg-slate-950/80` + 青色 HUD 蜂窝点阵底纹；英雄战术框（青色边框 + `OPERATOR: ${hero.name}` 标签）；**每敌旋转锁定环 `s4-hud-ring` + 水平/垂直十字激光 `s4-laser-horiz/vert` + 上下两半碎裂**；中心 Cinzel「ELIMINATED / 全灭」+「TARGET NEUTRALIZED」徽章；开场 `playSound('taunt')`，killDelay 280ms。
+  4. **多敌尺寸自适应**：`sizeCls` / `unitSize` 按击杀数 1 / 2 / 3+ 三档收缩（emoji 字号与单元尺寸），避免竖屏群攻全灭时敌人区溢出裁切；文字规则统一「单敌风格字 / 多敌全灭」。
+  5. **调用点**（index.html:7762）：`await playExecutionAnimation(caster, _pendingKills, skill.damageType || '近战')`——`skill` 在 `executeSkillAction` 作用域内可直接读取，`selfDestructCount` 等待 + `isExecutingCutin` 互斥锁保持不变。
+  6. **音效零新增**：全部复用现有 `audioUrls` 中已存在的 `kill`/`burst`/`taunt` key。
+- **涉及文件**：`index.html`、`LOG.md`。
+- **决策原因**：按用户指定方案把 demo 打磨完毕的三套风格按伤害类型接入唯一击杀特写入口；`damageType` 从 `skill.damageType || '近战'` 取（引擎全链路统一口径，未显式标注类型默认近战）；"每个敌人各自完整演出对应风格"由用户确认（群攻多杀时逐敌完整演出，视觉最忠实于风格，DOM 随敌数增长但战斗停顿时间不变）；删除旧 `exec-*` 层因新函数已完整覆盖其唯一使用者、避免残留死代码（Coding rule 手术式修改）；Style 2/5 与 DoT/反击/荆棘等其它击杀来源不在本轮范围。本轮为代码施工记录、未升版本号不改 README/SPEC（待用户实测确认后定版升 V 并补 README §2.2）。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；三风格 HTML 模板变量绑定走查（英雄 `hero.img/name`、敌 `img/emoji/name` 均有值兜底）；旧 `exec-*` 引用零残留；音效 key 存在性确认。
+
+## [LOG-103] 2026-08-19 — 击杀动画性能优化：纯 transform 化 + 激光全局单组（未升版本号）
+
+- **变更行为**：
+  1. **背景/Bug**：用户实测远程击杀特效（Style 4）帧率较低。根因有两处：
+     - **CSS 动画属性**：`s4-laser-horiz/vert` 动画 `height`/`width`（+ `filter: drop-shadow`）——尺寸属性动画强制每帧 **layout + repaint（CPU 主线程）**，无法 GPU 合成；150vw/150vh 的全屏级激光元素还叠加 `filter` 每帧采样，开销最大。
+     - **元素数量**：十字激光原为**每个敌人各插一组**（群攻 3 敌 = 6 条全屏级动画元素重叠），多敌时绘制浪费翻倍。
+  2. **全局优化原则**：击杀动画（近战/法术/远程）中所有 `height`/`width`/`filter: drop-shadow` 动画全部改写为**纯 `transform`（scaleX/scaleY）+ 静态 `box-shadow` 辉光**——transform/opacity 由 GPU 合成器处理、不触发 layout，辉光从动画帧中移除后由元素静态 box-shadow 承担（视觉不变）：
+     - `s1-slash-anim`：height 2→16→8→0 → `scaleY 0.25→2→1→0`（相对 base `h-2/h-2.5`）；`filter: drop-shadow` 移除，辉光由刀光元素既有静态 `shadow-[0_0_20px_#f43f5e,0_0_50px_#fff]` 承担。
+     - `s3-rift-beam`：height 0→160→90→0 → `scaleY 0→1→0.5625→0`（相对 base `h-40`=160px）；`filter: drop-shadow` 移除，辉光由裂隙细线既有静态 `shadow-[0_0_30px_#c084fc,0_0_60px_#a855f7]` 承担。
+     - `s4-laser-horiz/vert`：height/width 0→5→2→0 → `scaleY/scaleX 0→1.25→0.5→0`（相对 base `h-1/w-1`=4px）；`filter: drop-shadow` 移除，改静态 `box-shadow: 0 0 15px #06b6d4, 0 0 35px #06b6d4`。
+     - `s1-top-shatter`：移除 `filter: drop-shadow(0 0 25px #f43f5e)`（保留 `brightness` 爆亮——brightness 走 GPU 光栅化开销低，视觉爆亮效果保留）。
+  3. **Style 4 结构性降载**：
+     - 十字激光从**每敌一组**提升为**屏幕中心全局单组**（仅保留 1 组水平 + 1 组垂直，位于敌人区之上、全屏切割视觉不变）——群攻多敌时由 6 条全屏激光降至 2 条，多敌数量越多收益越大。
+     - HUD 蜂窝点阵底纹加 `transform: translateZ(0)` 隔离层：静态背景独立成层、光栅化一次即缓存，不被相邻动画层波及重绘。
+  4. **`will-change: transform, opacity`**：全部动画元素（刀光/裂隙/激光/碎裂片/英雄入场/艺术字）显式声明，提示浏览器提前合成器层、避免动画启动瞬间的层提升卡顿。
+- **涉及文件**：`index.html`、`LOG.md`。
+- **决策原因**：帧率问题的本质是"每帧强制 layout + repaint 的尺寸动画 × 全屏级超大元素 × 多敌重复"，三点逐项化解——动画改纯 transform 直指根因（Chrome 渲染管线标准优化：width/height 动画永远 CPU layout，transform 动画 GPU 合成）；激光全局单组消除重复的全屏绘制（画面语义不变：十字切割仍是全屏贯通效果）；底纹隔离 + will-change 消除潜在层间重绘。视觉保真：辉光全部由静态 box-shadow 承担、碎裂片保留 brightness 爆亮、裂隙/激光的粗细变化用 scaleY 等比还原。**大幅降低触发次数与每帧成本，效果几乎不变**。本轮为代码施工记录、未升版本号不改 README/SPEC（待用户实测确认帧率达标后并入 LOG-102 一并定版）。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；击杀动画 CSS 区块 grep 确认零 `height:`/`width:`/`filter: drop-shadow` 残留（残留命中均为敌方大招 cutin-* 与呼吸动画等无关区域）；`s4-laser` 出现 4 处 = CSS 定义 2 + JS 全局单组 2，群攻多敌不再按敌复制。
+
+## [LOG-104] 2026-08-19 — 远程击杀动画替换为「极速战术狙杀」狙击镜版（未升版本号）
+
+- **变更行为**：
+  1. **背景**：LOG-103 性能优化后近战/法术已流畅，远程（旧 Style 4 十字激光版）仍有卡顿。用户已自行在 `demo-execution.html` 将 Style 4 重构为「🎯 极速战术狙杀（Ultra-Fast Sniper Scope）」轻量化方案并实测达标，要求将主引擎现有的远程击杀替换为新版。
+  2. **CSS 层（index.html `<style>`）**：删除旧 `s4-hud-ring` / `s4-laser-horiz` / `s4-laser-vert` 三个 keyframes，替换为狙击版六条：
+     - `s4-scope-lock`（SVG 准星缩放锁定：`scale3d 2.4→1→1.3` + rotate，纯 transform）
+     - `s4-bullet-streak`（贯穿全屏子弹光束：`scaleX 0→1→1.1` + `scaleY 1→0.5→0`——demo 原 height 6→3→0 动画按 LOG-103 原则改 scaleY，base `h-1.5`=6px）
+     - `s4-shockwave-ring`（激波环：纯 `scale 0.1→3.2` 扩散——demo 原 border-width 6→2→0 动画移除、改静态 `border-2`，避免每帧 border 重绘）
+     - `s4-sniper-text`（「击破」艺术字：`scale 3.5→0.95→1.08→1→1.25`——demo 原 `filter: blur` 移除）
+     - `s4-enemy-split-left/right`（敌人左右两半贯穿碎裂：`translate3d ±75px` + rotate + brightness，纯 GPU transform）
+  3. **JS 层（`playExecutionAnimation` 远程分支整体替换）**：
+     - 背景 `bg-slate-950/75`（去掉旧 HUD 蜂窝底纹层，随 demo 新方案）；
+     - **左侧狙击手 HUD 视窗**：青色细边框 + `SNIPER: ${hero.name}` + `CALIBER: 12.7MM` 标签（用实际击杀者身份替代 demo 硬编码的 sean）；
+     - **居中文字**：`[ TARGET NEUTRALIZED ]` 胶囊徽章 + Cinzel「击 破」渐变字（`from-cyan-200 via-cyan-400 to-teal-500`）；多敌显示「全灭」；
+     - **每敌单元**（多敌并排，尺寸三档收缩复用 `unitSize`）：极简 SVG 战术瞄准准星（纯矢量，`width:110%;height:110%` 相对单元缩放）+ 激波环（`width:78%`）+ 敌人左右贯穿碎裂（`enemyVisual` img/emoji 适配）；
+     - **全局单条超音速子弹光束**：160vw 渐变色条贯穿全屏（穿透整个敌人区，替代旧版每敌十字激光）；
+     - 时序：0ms `playSound('taunt')`、240ms `playSound('kill')` + `heavy-shake`（killDelay 240）；
+     - 全部动画元素带 `will-change: transform, opacity`。
+  4. **性能要点**：新版以「极速狙击」替换旧「激光切割」的代价大幅下降——全屏级激光元素从旧版 2 条（×每敌重复隐患）降为全局 1 条子弹光束；准星为纯 SVG 矢量（静态光栅化后仅 transform 缩放）；敌人碎裂用 `translate3d`（GPU 合成）；无任何 width/height/border-width/filter 动画残留（除碎片保留的 GPU 化 `brightness` 爆亮）。
+- **涉及文件**：`index.html`、`LOG.md`。
+- **决策原因**：按用户指示"查看 demo 中新的风格四修改，将现有远程击杀替换之"——demo 新版是用户实测优化的参考实现（注释明确「纯 GPU 硬件加速变换 translate3d/scale3d，零卡顿，60FPS」），主引擎完整移植并适配：击杀者身份（`hero.img/name`）替代 demo 固定角色、`enemyVisual` 支持 img/emoji、多敌并排逐敌完整演出（沿用用户已确认的多敌原则）、`playSound` 复用现有音效 key（taunt/kill 零新增）。移植时把 demo 中残留的三处非 transform 动画（bullet height / ring border-width / text blur）也一并按 LOG-103 原则纯 transform 化，确保替换后依旧零重绘。本轮为代码施工记录、未升版本号不改 README/SPEC（待用户实测确认帧率与视觉后并入 LOG-102/103 一并定版）。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；旧 `s4-laser` / `s4-hud-ring` / `ELIMINATED` / `OPERATOR:` 引用零残留；新六条 keyframes + JS 引用齐全。
+
+## [LOG-105] 2026-08-19 — 击杀动画碎裂片爆亮降档：去除过曝白/红闪（未升版本号）
+
+- **变更行为**：
+  1. **背景/Bug**：用户实测反馈——显示击杀敌人时出现刺眼的"全屏红色闪烁"，一次击杀多个敌人时闪烁叠加、伤眼睛。根因有二：
+     - **碎裂片过曝爆亮**：三套风格的敌人碎裂片动画都把视觉内容（emoji/图片）亮度提到 `brightness(2~2.2)`，浅色敌人会过曝成白/红闪光；且碎裂片为**每敌重复**元素（Style 1 每敌 1 片、Style 3 每敌 4 片、Style 4 每敌 1 片），全部在 0.24~0.28s 同一时刻爆亮——群攻 3 敌时 Style 3 同时 12 个 2 倍过曝点叠加，刺眼感成倍放大。
+     - **全屏级红辉光**（风格核心，仅 1 条不叠加）：Style 1 刀光 `shadow 0 0 20px #f43f5e` 玫瑰红辉光横贯全屏——保留不动（改进版原版动画的既定视觉）。
+  2. **数值调整**：碎裂片 `brightness` 爆亮降档——`s1-top-shatter` 2.2 → **1.4**；`s3-shard-1~4` 与 `s4-enemy-split-left` 2 → **1.35**（5 处）；`s4-enemy-split-right` 暗侧 0.3 保持。保留"击碎瞬间爆亮"的语义与上下半片亮/暗对比，但不再过曝成白闪，多敌叠加时的整体亮度峰值显著下降。
+- **涉及文件**：`index.html`、`LOG.md`。
+- **决策原因**：刺眼感的本质是"每敌重复元素 × 同一时刻 × 2 倍以上过曝"的乘积效应。碎裂片是击杀动画的通用组件（三套风格共享碎裂语义），统一降档到 1.35~1.4 倍既保留击碎反馈又不伤眼；全屏刀光/裂隙/光束等风格核心光效仅单条、不随敌数叠加，保持不动（避免破坏既定风格）。若后续仍觉刺眼可进一步降到 1.2 或错峰碎裂动画时间。本轮为代码施工记录、未升版本号不改 README/SPEC（待用户实测确认后并入 LOG-102~104 一并定版）。
+- **经验证**：grep 确认碎裂片 brightness 现值全部 1.4/1.35（2.0/2.2 残留 0）；Node 提取 `<script>` 语法校验通过，零报错。
+
+## [LOG-106] 2026-08-19 — 受击全屏红闪与白闪降档：定位并修复"击杀前整屏红色连续闪烁"（未升版本号）
+
+- **变更行为**：
+  1. **背景/Bug 定位**：用户反馈"全屏震红在击杀特效**之前**出现、整屏红色连续闪烁数次"，且上轮（LOG-105 碎裂片降档）无改善——说明闪烁**不在击杀 overlay 内**。定位到根因：**受击闪光 `window.spawnHitFlash`**（index.html:3968）——它属于伤害结算管线，任何一次命中都会触发，且发生在击杀 overlay 出现**之前**：
+     - **全屏红色暗闪**（L3972）：`intensity > 0.3` 时向 canvas 加一个 `#ff2020` 全屏填充粒子，alpha 最高 `intensity × 0.35`、`life:120`（按粒子引擎每帧 16.7ms 计 ≈ **2 秒**的全屏红色淡出）；
+     - **白色剪影三连闪**（L3986）：重创（intensity > 0.45）时受击者 `brightness(5) saturate(0)` **连续闪 3 次**；
+     - **多敌叠加**：调用点在 `applySingleTagEffect` 每次命中都触发（L7379），群攻命中 N 个敌人 = N 个全屏红粒子叠加 + 每敌 3 连闪，叠加后刺眼感成倍放大。
+  2. **数值降档**（保持"重创反馈"语义、大幅降低伤眼程度）：
+     - 全屏红粒子：alpha 系数 `intensity × 0.35 → 0.16`（约减半），寿命 `life:120 → 70`（约 2 秒 → 1.2 秒）；
+     - 白色剪影闪：`brightness(5) → 2.4`（保留泛白剪影但不再致盲；`saturate(0)` 黑白化保留）。
+  3. **影响面**：`spawnHitFlash` 为全局受击反馈（敌人受击/英雄受击/屏障受击/屏障破碎 L7534 均走此函数），降档对所有重创受击生效——用户反馈"击杀前整屏红"即由此消除；普通轻伤（intensity ≤ 0.3）本就不触发红闪、单闪也一并温和化。
+- **涉及文件**：`index.html`、`LOG.md`。
+- **决策原因**：上轮 LOG-105 误判为击杀 overlay 碎裂片过曝，用户澄清闪烁在特效之前——实为伤害结算管线的受击闪光，与击杀演出无关。修复直接对准 `spawnHitFlash`：全屏红是"整屏红"的直接来源、white 三连闪是"连续闪烁数次"的来源、每敌独立触发是"多敌叠加"的来源，三处一并降档。保留触发阈值与闪次结构（重创仍三连闪、普通仍单闪），仅降强度/时长，视觉反馈层次不变。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；grep 确认新值 `life:70` / `alpha × 0.16` / `brightness(2.4)` 就位。
+
+## [LOG-107] 2026-08-19 — 受击红闪改为「血溅镜头」边缘径向暗红渐变（未升版本号）
+
+- **变更行为**：
+  1. **背景**：LOG-106 将全屏红 alpha/life 降档后用户仍觉刺眼，要求改为**屏幕边缘径向渐变暗红边框**（"像血飞溅到了镜头上"）——中心保持干净不遮战斗主体。
+  2. **实现**（`spawnHitFlash` 全屏红粒子 → 边缘 vignette）：用 `ctx.createRadialGradient` 绘制暗红边框——渐变内圈（中心起 42% 半径）全透明、0.72 处半透明暗红（`rgba(127,29,29,…)`）、最外圈加深暗红（`rgba(88,16,16,…)`），整体 alpha 系数 `intensity × 0.6`、寿命 `life:70`（约 1.2 秒）随 pct 淡出。每次命中仍独立触发一次（多敌叠加时仅边缘加深，中心始终干净）。
+- **涉及文件**：`index.html`、`LOG.md`。
+- **决策原因**：用户明确指定视觉方案——"血溅到镜头"即边缘 vignette：中心区域完全不受影响（观战/操作视线不遮挡），暗红低饱和（red-900 系）替代原先高饱和 `#ff2020`，径向渐变天然在视觉上"从边缘向中心渗入"的血渍感，且多敌叠加不会变成整屏红。渐变每帧由单个粒子创建一次，开销可忽略（保持 LOG-103 性能原则）。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；渐变三档 colorStop（0 透明 / 0.72 半透明 / 1 深红）与 alpha/life 就位。
+
+## [LOG-108] 2026-08-19 — 带 WebM 特效的大招击杀演出延迟 1s，避免与技能演出重叠（未升版本号）
+
+- **变更行为**：
+  1. **背景/Bug**：技能带 `[特效:xxx]`（WebM 特效大招，如火焰01/雷暴等）时，击杀结算动画会在技能特效演出尚未播完时立即播放，两段全屏演出重叠互相干扰。
+  2. **修复**（`executeSkillAction` 击杀特写块，index.html:7805）：在 `selfDestructCount` 自爆等待与 `isExecutingCutin` 互斥锁之后、调用 `playExecutionAnimation` 之前，追加 `if (skill.fxTag) await sleep(1000);`——技能存在 `[特效:]` 标签（解析为 `skill.fxTag`，非空）时击杀演出延迟约 1s，让 WebM 大招演出先行完整播放。无特效标签技能零影响（立即播放，行为不变）。
+- **涉及文件**：`index.html`、`LOG.md`。
+- **决策原因**：WebM 特效系统（`playWebMFX`）时长普遍在 1s 级，用户明确要求"延迟 1s 左右"。延迟放在互斥锁内（`isExecutingCutin = true` 之前）——等待期间不抢占锁，敌方大招 cut-in 若同时发生仍可正常排队；复用既有 `skill.fxTag` 字段（解析与技能编辑器下拉共用同一来源），判断成本为零。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；`skill.fxTag` 字段存在性确认（L4618 解析、L9088/9094 编辑器引用）。
+
+## [LOG-109] 2026-08-19 — 结算弹窗【返回查看残局】改为收起 + 战斗记录去除世界书激活情况（未升版本号）
+
+- **变更行为**：
+  1. **【返回查看残局】改为收起而非完全消失**（`closeBattleResult`，index.html:8224）：点击后弹窗淡出隐藏，同时底部生成悬浮「📋 重新打开结算」胶囊按钮（复用 `shelvePrompt` 同款恢复按钮机制：fixed 底部居中 z-210、点击移除按钮并重新以 `flex` 显示弹窗）——玩家可随时恢复结算弹窗，重新打开【发送至酒馆输入框】发送战局记录到酒馆，无需等待新一轮战斗结束。按钮文案「返回查看残局」的语义与"收起"一致（原为直接销毁弹窗）。
+  2. **发送成功路径改为彻底关闭**（`sendResultToTavern`，index.html:8268）：发送成功后不再调用 `closeBattleResult`（避免残留「重新打开结算」悬浮按钮——发送已完成无需恢复），改为内联彻底关闭（淡出隐藏 + 清理 `battle-result-reopen` 按钮）。
+  3. **战斗记录不再写入世界书激活情况**（世界书载入流程，index.html:4891）：删除 `wbLogs.forEach(t => addHistory(t))`——战局记录/结算面板/发送到酒馆的内容中不再出现「📚 图鉴载入：xx → 图鉴条目」与「📚 世界书载入完成：命中 N 个条目」这些行。`wbLogs` 数组保留、`showLog('图鉴命中 N 个敌人')` 载入提示保留（用户仍能看到命中反馈）；激活情况依靠【📚 世界书管理】窗口查看。
+- **涉及文件**：`index.html`、`LOG.md`。
+- **决策原因**：① 用户反馈——战斗结束后想再打开弹窗发送战斗记录到酒馆，但【查看残局】把弹窗完全销毁，只能等下一轮战斗。采用与反应/看破弹窗一致的「收起 + 悬浮恢复按钮」交互（shelvePrompt 是项目既有的收起范式，零新增样式），发送成功则彻底关闭避免多余按钮。② 用户明确——战斗记录主要用于 AI 续写，世界书激活明细（图鉴载入/命中数）属于系统元信息、混入会污染叙事输入；激活情况在世界书管理窗口一目了然。删除仅影响 `battleHistory` 写入，不触碰世界书载入逻辑本身（命中/替换/UI 提示全保留）。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；`wbLogs.forEach(t => addHistory(t))` 残留 0；`battle-result-reopen` 引用 3 处（创建/移除/清理）就位。
+
+## [LOG-110] 2026-08-19 — V7.0 定版：击杀结算动画多风格分流与系列优化实测确认 + README 更新
+
+- **变更行为**：
+  1. **实测确认**：用户确认 LOG-102~109 全部功能有效无误（另用户手动删除了结算模板中残留的「输出【初始化】」提示词文案）：
+     - **LOG-102** 击杀动画按伤害类型分流（近战 Style1 同轴斜切 / 法术 Style3 次元裂隙 / 远程 Style4 战术锁定）；
+     - **LOG-103** 纯 transform 化性能优化（近战/法术已流畅）；
+     - **LOG-104** 远程击杀替换为「极速战术狙杀」狙击镜版（用户 demo 重构方案移植，帧率达标）；
+     - **LOG-105** 碎裂片爆亮降档、**LOG-106** 受击全屏红闪定位降档、**LOG-107** 改为「血溅镜头」边缘径向暗红渐变（刺眼问题解决）；
+     - **LOG-108** WebM 特效大招击杀演出延迟 1s（不与技能演出重叠）；
+     - **LOG-109** 结算弹窗【返回查看残局】改为收起可恢复 + 战斗记录去除世界书激活情况。
+  2. **版本号 V6.31 → V7.0**：击杀演出系统从单一动画升级为按伤害类型分流的完整多风格体系 + 系列性能与视觉优化，跨入 V7.0 主版本。
+  3. **README 文档更新（V6.31 → V7.0）**：
+     - 顶部版本号 `V6.31 → V7.0`；
+     - **§2.2** 新增「🎬 击杀结算动画（V7.0）」条目（三风格分流细节、群攻多杀、性能优化、受击血溅镜头、WebM 大招延迟、结算弹窗收起）；
+     - **§2.2** 战局记录条目后补充「战局记录不含世界书激活情况（V7.0）」说明。
+  4. **LOG-INDEX 回填**：LOG-102~109 的 HASH 回填为对应代码提交。
+- **涉及文件**：`README.md`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：按 Coding rule，用户实测确认本轮功能有效无误后更新 README 并升版本号定版；LOG-102~109 为逐轮代码施工记录、本轮为定版文档记录，分条保持可溯源。
