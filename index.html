@@ -927,13 +927,15 @@
     <div class="w-full max-w-3xl bg-slate-900/80 border border-gray-700/50 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[90vh]">
         <div class="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-700/50 text-center relative bg-gradient-to-r from-slate-800/60 via-slate-700/30 to-slate-800/60">
             <h2 class="text-xl sm:text-3xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-slate-200 to-slate-500 drop-shadow-md">战局记录</h2>
-            <div class="text-[10px] sm:text-sm text-gray-400 mt-1 sm:mt-2 tracking-widest">仅查看本次战斗历史，不发送至酒馆</div>
+            <div class="text-[10px] sm:text-sm text-gray-400 mt-1 sm:mt-2 tracking-widest">查看本次战斗历史 · 可随时结束战斗并将过程发送至酒馆</div>
         </div>
         <div class="p-4 sm:p-6 flex-1 flex flex-col gap-3 sm:gap-4 overflow-y-auto custom-scrollbar">
             <textarea id="history-preview" readonly class="w-full flex-1 min-h-[250px] bg-black/50 border border-gray-600 rounded-xl p-3 sm:p-4 text-[10px] sm:text-sm text-gray-300 leading-relaxed font-mono focus:border-cyan-500 outline-none shadow-inner custom-scrollbar" spellcheck="false"></textarea>
         </div>
         <div class="px-4 sm:px-6 py-3 sm:py-4 bg-black/40 border-t border-gray-700/50 flex justify-end gap-2 sm:gap-4 items-center">
+            <button id="history-edit-toggle" onclick="toggleHistoryEdit()" class="px-3 sm:px-6 py-1.5 sm:py-2.5 rounded-lg text-[10px] sm:text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors border border-transparent hover:border-gray-600">🔓 解锁编辑</button>
             <button onclick="closeHistoryOnly()" class="px-3 sm:px-6 py-1.5 sm:py-2.5 rounded-lg text-[10px] sm:text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors border border-transparent hover:border-gray-600">关闭</button>
+            <button onclick="endBattleAndSendToTavern()" class="px-4 sm:px-8 py-1.5 sm:py-2.5 rounded-lg text-[10px] sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.4)] transform hover:-translate-y-0.5 flex items-center gap-1.5 sm:gap-2">📤 结束当前战斗，将过程发送到酒馆</button>
         </div>
     </div>
   </div>
@@ -7815,12 +7817,16 @@ async function attemptRetreat() {
     showBattleResult('retreat');
 }
 
-// 右上角【记录】：仅只读展示本次战局记录，不写撤离文案、不发送酒馆
+// 右上角【记录】：只读展示本次战局记录，不写撤离文案、不发送酒馆（发送入口见 endBattleAndSendToTavern）
 function showHistoryOnly() {
     const modal = document.getElementById('battle-history-modal');
     const preview = document.getElementById('history-preview');
     if (!modal || !preview) return;
     preview.value = battleHistory.length ? battleHistory.join('\n') : '（暂无战局记录）';
+    // 默认锁定：每次打开重置为只读 + 解锁按钮恢复初始文案（编辑产物仅用于本次发送，不写回 battleHistory）
+    preview.readOnly = true;
+    const toggleBtn = document.getElementById('history-edit-toggle');
+    if (toggleBtn) { toggleBtn.innerHTML = '🔓 解锁编辑'; toggleBtn.classList.remove('from-emerald-600', 'to-emerald-500', 'text-white'); toggleBtn.classList.add('text-gray-400'); }
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     setTimeout(() => { modal.classList.remove('opacity-0'); }, 50);
@@ -7830,6 +7836,36 @@ function closeHistoryOnly() {
     const modal = document.getElementById('battle-history-modal');
     modal.classList.add('opacity-0');
     setTimeout(() => { modal.classList.add('hidden'); modal.classList.remove('flex'); }, 500);
+}
+
+// 【解锁编辑】：记录默认锁定（只读），点击解锁后可自由编辑，便于发送前微调战局文案
+function toggleHistoryEdit() {
+    const preview = document.getElementById('history-preview');
+    const toggleBtn = document.getElementById('history-edit-toggle');
+    if (!preview || !toggleBtn) return;
+    const unlocked = preview.readOnly; // true=当前锁定 → 本次解锁
+    preview.readOnly = !unlocked;
+    if (unlocked) {
+        toggleBtn.innerHTML = '🔒 已解锁 · 点击锁定';
+        toggleBtn.classList.remove('text-gray-400');
+        toggleBtn.classList.add('from-emerald-600', 'to-emerald-500', 'text-white', 'bg-gradient-to-r');
+    } else {
+        toggleBtn.innerHTML = '🔓 解锁编辑';
+        toggleBtn.classList.add('text-gray-400');
+        toggleBtn.classList.remove('from-emerald-600', 'to-emerald-500', 'text-white', 'bg-gradient-to-r');
+    }
+}
+
+// 记录弹窗【结束当前战斗，将过程发送到酒馆】：玩家自由决定何时结束战斗，
+// 只把战局记录（默认；解锁编辑后为玩家微调内容）原样注入酒馆输入框——不生成任何旁白/续写文案，默认由玩家手写发展。
+// 不终止战斗循环：玩家后悔可随时关闭/返回，继续战斗。
+function endBattleAndSendToTavern() {
+    const preview = document.getElementById('history-preview');
+    const text = preview ? preview.value : (battleHistory.length ? battleHistory.join('\n') : '');
+    if (!text || text.trim() === '') { showLog("暂无战局记录，无法发送"); return; }
+    closeHistoryOnly();
+    if (injectTextToTavern(text)) showLog("✅ 战局记录已发送至酒馆输入框");
+    else showLog("❌ 战局记录发送失败，请检查酒馆连接");
 }
 
 function showBattleResult(type) {
@@ -7882,36 +7918,42 @@ function closeBattleResult() {
     setTimeout(() => { modal.classList.add('hidden'); modal.classList.remove('flex'); }, 500);
 }
 
-function sendResultToTavern() {
-    const text = document.getElementById('result-prompt').value;
-    if (!text || text.trim() === '') return;
-
+// 将文本注入酒馆聊天输入框（复用发送逻辑：优先 #send_textarea，找不到时走 /send 命令回退）
+function injectTextToTavern(text) {
+    if (!text || text.trim() === '') return false;
     try {
         const $textarea = $(parent.document).find('#send_textarea');
         if ($textarea.length === 0) {
             if (typeof triggerSlash === 'function') triggerSlash(`/send ${text}|/trigger`);
             else alert("未检测到酒馆聊天框，发送失败。");
-            return;
+            return false;
         }
         const currentContent = $textarea.val() || '';
         const separator = currentContent.trim() ? '\n\n' : '';
         $textarea.val(currentContent + separator + text.trim());
         $textarea.trigger('input');
-        
-        const btn = document.querySelector('#battle-result-modal button:last-child');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = `✅ 已填充至输入框`;
-        btn.classList.add('from-emerald-600', 'to-emerald-500');
-        setTimeout(() => {
-            btn.innerHTML = originalText;
-            btn.classList.remove('from-emerald-600', 'to-emerald-500');
-            closeBattleResult();
-        }, 1500);
-
+        return true;
     } catch (error) {
         if (typeof triggerSlash === 'function') triggerSlash(`/send ${text}|/trigger`);
         else console.log(text);
+        return false;
     }
+}
+
+function sendResultToTavern() {
+    const text = document.getElementById('result-prompt').value;
+    if (!text || text.trim() === '') return;
+    if (!injectTextToTavern(text)) return;
+
+    const btn = document.querySelector('#battle-result-modal button:last-child');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = `✅ 已填充至输入框`;
+    btn.classList.add('from-emerald-600', 'to-emerald-500');
+    setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.classList.remove('from-emerald-600', 'to-emerald-500');
+        closeBattleResult();
+    }, 1500);
 }
 
 // ==========================================
