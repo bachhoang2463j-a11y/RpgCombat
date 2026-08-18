@@ -6076,6 +6076,15 @@ CombatEvents.on(EVENTS.TURN_START, (ctx) => {
     addHistory(`   ↳ 💚 ${e.name} 的【再生】体质恢复了 ${healAmt} 点生命（${Math.floor(e.hp)}/${e.maxHp}）。`);
 });
 
+// 敌人：【连动】入场即低血时也触发（一次性）——否则场面上没有"跌破50%/30%"的瞬间，低血敌人在其回合开始才满足条件
+// 插队与 tryTriggerEnemyLink 同款；linked 守卫防重复，避免与受击触发叠加
+CombatEvents.on(EVENTS.TURN_START, (ctx) => {
+    const e = ctx.entity;
+    if (!e || e.id.startsWith('h') || !e.isAlive || !e.tags || !e.tags.includes('[连动]')) return;
+    if (e.linked || e.maxHp <= 0 || e.hp <= 0 || e.hp / e.maxHp > 0.3) return;
+    tryTriggerEnemyLink(e);
+});
+
 // 防守者：强力反击 (闪避成功时按概率触发)
 // 守卫：自爆（isSelfDestruct）触发闪避时不反击——攻击者（施法者）已死亡，反击会打到不存在的目标上
 CombatEvents.on(EVENTS.ON_DODGE, async (ctx) => {
@@ -6114,6 +6123,39 @@ CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
         if (casterDom) createFloatingText(casterDom, `吸血 +${drain}`, 'text-red-300');
         addHistory(`   ↳ 🧛 ${caster.name} 的【吸血】吸取了 ${drain} 点生命（${Math.floor(caster.hp)}/${caster.maxHp}）。`);
         updateEnemyUI(caster);
+    }
+    // 敌人【荆棘】：被近战命中时反弹 30% 实际伤害（走正常减伤管线——受攻击者护甲/护盾/防御姿态减免；
+    // 反弹致命伤害经 ON_FATAL_DAMAGE 可被保命被动救场；与【吸血】同管道，致死一击早退不触发 → 斩杀可规避反伤）
+    const thornTarget = ctx.target;
+    const attacker = ctx.caster;
+    if (thornTarget && !thornTarget.id.startsWith('h') && thornTarget.tags && thornTarget.tags.includes('[荆棘]')
+        && thornTarget.isAlive && (ctx.hpDmg > 0) && attacker && attacker.isAlive
+        && ctx.incomingDamageType && (ctx.incomingDamageType === '近战' || ctx.incomingDamageType === '[近战]'
+            || (!ctx.incomingDamageType.includes('远程') && !ctx.incomingDamageType.includes('法术')))) {
+        const reflectRaw = Math.floor(ctx.hpDmg * 0.3);
+        let { hpDmg: reflectHp, shieldDmg: reflectShield } = calculateDamage(reflectRaw, attacker, false);
+        // 反弹致命：先走 ON_FATAL_DAMAGE 让毅力留存/回避致命可救场（复用主伤害管线同款判定与旁白）
+        if (attacker.hp - reflectHp <= 0) {
+            const fatalCtx = { target: attacker, targetDom: attacker.id && attacker.id.startsWith('h') ? document.getElementById(`hero-card-${attacker.id}`) : document.getElementById(`${attacker.id}-sprite`), hpDmg: reflectHp, shieldDmg: reflectShield, prevented: false, cancelled: false };
+            CombatEvents.emit(EVENTS.ON_FATAL_DAMAGE, fatalCtx);
+            if (fatalCtx.prevented) {
+                reflectHp = fatalCtx.hpDmg;
+                if (fatalCtx.shieldDmg !== undefined) reflectShield = fatalCtx.shieldDmg;
+                if (attacker.id.startsWith('h') && llmState.allyAutoSpeak) {
+                    const passiveName = attacker.hasTriggeredGrit ? '毅力留存' : (attacker.hasTriggeredAvoidFatal ? '回避致命' : null);
+                    if (passiveName) triggerAllyFatalSaveSpeak(attacker, passiveName);
+                }
+            }
+        }
+        if (reflectHp > 0 || reflectShield > 0) {
+            attacker.hp -= reflectHp;
+            const attackerDom = attacker.id && attacker.id.startsWith('h') ? document.getElementById(`hero-card-${attacker.id}`) : document.getElementById(`${attacker.id}-sprite`);
+            if (attackerDom) { attackerDom.classList.add('shake'); setTimeout(() => attackerDom.classList.remove('shake'), 400); }
+            const brokeShield = reflectShield > 0 && reflectHp === 0;
+            if (attackerDom) createFloatingText(attackerDom, brokeShield ? `荆棘 -${reflectShield} 破盾` : `荆棘 -${reflectHp}`, brokeShield ? 'text-slate-300' : 'text-green-400');
+            addHistory(`   🌵 [${thornTarget.name}] 的【荆棘】反伤了 ${attacker.name}，造成了 ${reflectHp} 点伤害${reflectShield > 0 ? `（含破盾 ${reflectShield}）` : ''}！`);
+            if (attacker.id.startsWith('h')) updateHeroUI(attacker); else updateEnemyUI(attacker);
+        }
     }
 }, 5);
 
@@ -6565,6 +6607,12 @@ function getEffectiveStats(entity) {
         finalAtk = Math.floor(finalAtk * 1.5);
     }
     
+    // 敌人【蜕皮】：已蜕皮（首次 HP 跌破 50%）后攻击力永久 +50%（Boss 二阶段；仅敌方）
+    // 与【狂暴】同为标记+被动读取（非 buff 对象），不随回合过期/不被驱散清除，跨【复活】仍永久
+    if (entity.id && !entity.id.startsWith('h') && entity.tags && entity.tags.includes('[蜕皮]') && entity.molted) {
+        finalAtk = Math.floor(finalAtk * 1.5);
+    }
+    
     // 隐匿者的最低嘲讽可以为负值（代表绝对隐匿），但其他人不能低于1
     if (entity.classType !== '隐匿者') {
         finalTaunt = Math.max(1, finalTaunt); // 嘲讽值下限为 1
@@ -6917,7 +6965,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
                   addHistory(`   ⚔️ ${target.name} 闪避并趁势反击！迅速一击命中了 ${caster.name}，造成了 ${counterHpDmg} 点伤害！${counterShieldDmg>0?` (附带破盾${counterShieldDmg})`:''}`); 
               }
               if (caster.id.startsWith('h')) updateHeroUI(caster);
-              else { tryTriggerEnemyLowHpSpeak(caster); updateEnemyUI(caster); }
+              else { tryTriggerEnemyLowHpSpeak(caster); tryTriggerEnemyMolt(caster); tryTriggerEnemyLink(caster); updateEnemyUI(caster); }
               if (target.id.startsWith('h')) updateHeroUI(target); else updateEnemyUI(target);
           } else {
               addHistory(`   ↳ ${target.name} 虽处于反击架势，但无法触及并反击[${incomingDamageType}]攻击！`);
@@ -7138,6 +7186,9 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
   // 敌方血量跌破 30% 触发智慧低血旁白（致死伤害走下方击杀收口触发死亡旁白）
   if (targetType === 'enemy') {
     tryTriggerEnemyLowHpSpeak(target);
+    // 【蜕皮】首次跌破50%触发二阶段；【连动】≤30% 时插队立刻行动一次（均为一次性，致死伤害不触发）
+    tryTriggerEnemyMolt(target);
+    tryTriggerEnemyLink(target);
     updateEnemyUI(target);
   } else {
     updateHeroUI(target);
@@ -7594,6 +7645,8 @@ function startGame() {
   // 初始化避死被动触发状态
   heroesData.forEach(h => { delete h.hasTriggeredGrit; delete h.hasTriggeredAvoidFatal; });
   enemiesData.forEach(e => { delete e.hasTriggeredGrit; delete e.hasTriggeredAvoidFatal; });
+  // 初始化敌方变种标签一次性触发状态（【蜕皮】/【连动】本场仅一次；重置/新战局经缓存深拷贝天然复原）
+  enemiesData.forEach(e => { delete e.molted; delete e.linked; });
   
   // 利用开场动画的时间窗口，在后台静默预加载所有技能特效资源
   preloadBattleAssets();
@@ -7685,7 +7738,12 @@ async function nextTurn() {
                   const isBurn = b.type === 'burn';
                   currentEntity.ref.hp -= dotDmg;
                   // 敌方 DoT 扣血后触发智慧低血旁白判定（致死由下方死亡收口触发死亡旁白）
-                  if (!currentEntity.ref.id.startsWith('h')) tryTriggerEnemyLowHpSpeak(currentEntity.ref);
+                  if (!currentEntity.ref.id.startsWith('h')) {
+                      tryTriggerEnemyLowHpSpeak(currentEntity.ref);
+                      // 【蜕皮】首次跌破50%触发二阶段；【连动】≤30% 插队行动（DoT 致死不触发，与主伤害管线同规则）
+                      tryTriggerEnemyMolt(currentEntity.ref);
+                      tryTriggerEnemyLink(currentEntity.ref);
+                  }
                   const targetDom = currentEntity.ref.id.startsWith('h') ? document.getElementById(`hero-card-${currentEntity.ref.id}`) : document.getElementById(`${currentEntity.ref.id}-sprite`);
                   if (targetDom) { createFloatingText(targetDom, `${isBurn ? '火' : '毒'} -${dotDmg}`, isBurn ? 'text-orange-400' : 'text-purple-400'); targetDom.classList.add('shake'); setTimeout(() => targetDom.classList.remove('shake'), 400); }
                   addHistory(`   ${isBurn ? '🔥' : '🦠'} [${currentEntity.ref.name}] ${isBurn ? '灼烧' : '毒性'}发作，受到了 ${dotDmg} 点真实伤害！`);
@@ -8375,7 +8433,10 @@ function showEnemyInfo(enemy) {
     '[钢体]': ['钢体', '免疫眩晕', 'text-slate-300 bg-slate-800/50 border-slate-600/60'],
     '[再生]': ['再生', '每回合回复最大HP 10%', 'text-green-300 bg-green-900/40 border-green-600/60'],
     '[狂暴]': ['狂暴', 'HP≤30% 时攻击力 +50%', 'text-red-300 bg-red-900/40 border-red-600/60'],
-    '[吸血]': ['吸血', '造成实际伤害时吸取 30% 生命', 'text-red-300 bg-red-900/40 border-red-600/60']
+    '[吸血]': ['吸血', '造成实际伤害时吸取 30% 生命', 'text-red-300 bg-red-900/40 border-red-600/60'],
+    '[蜕皮]': ['蜕皮', '首次HP跌破50%：清除全部debuff + 回血30% + 永久攻击+50%', 'text-amber-300 bg-amber-900/40 border-amber-600/60'],
+    '[荆棘]': ['荆棘', '被近战命中时反弹 30% 实际伤害', 'text-green-300 bg-green-900/40 border-green-600/60'],
+    '[连动]': ['连动', 'HP≤30% 时立刻行动一次（一次性）', 'text-fuchsia-300 bg-fuchsia-900/40 border-fuchsia-600/60']
   };
   const EXPLODE_SUB_BADGE = {
     '群伤': ['群伤', '死亡自爆：对全体我方造成非穿透伤害', 'text-red-300 bg-red-950/50 border-red-700/60'],
@@ -9458,6 +9519,46 @@ function tryTriggerEnemyLowHpSpeak(enemy) {
     triggerEnemyLowHpSpeak(enemy);
   }
 }
+
+// ---- 敌方【蜕皮】触发判定：首次 HP 跌破 50% → 清除全部 debuff + 回血 30% + 永久 atk +50%（Boss 二阶段；仅敌方）----
+// 用【驱散】同款负面谓词清空 debuff（毒/燃/晕/降防/降准/降避/降攻）；受击后一次阈值检查，
+// 仅在此刻判定一次（molted 一次性标记），致死伤害走击杀早退不触发 → 天然形成"斩杀线"决策。
+function tryTriggerEnemyMolt(enemy) {
+  if (!enemy || enemy.id.startsWith('h') || enemy.molted) return;
+  if (!enemy.tags || !enemy.tags.includes('[蜕皮]')) return;
+  if (!enemy.isAlive || enemy.maxHp <= 0 || enemy.hp / enemy.maxHp >= 0.5) return;
+  enemy.molted = true;
+  // 清除自身全部负面状态（复用【驱散】同款负面谓词：含 fieldBuff 场地状态与 duration<=0 已过期项过滤语义一致）
+  const isDebuff = b => !b.fieldBuff && b.duration > 0 && (
+    b.type === 'poison' || b.type === 'burn' || b.type === 'stun' ||
+    (b.type === 'def' && b.value < 0) || (b.type === 'hit' && b.value < 0) ||
+    (b.type === 'eva' && b.value < 0) || (b.type === 'atk' && b.value < 0)
+  );
+  const cleared = (enemy.buffs || []).filter(isDebuff).length;
+  enemy.buffs = (enemy.buffs || []).filter(b => !isDebuff(b));
+  // 回血 30%（封顶上限 maxHp）
+  const healAmt = Math.max(1, Math.floor(enemy.maxHp * 0.3));
+  const oldHp = enemy.hp;
+  enemy.hp = Math.min(enemy.maxHp, enemy.hp + healAmt);
+  const dom = enemy.id ? document.getElementById(`${enemy.id}-sprite`) : null;
+  if (dom) { createFloatingText(dom, '蜕皮!', 'text-amber-300'); dom.classList.add('shake'); setTimeout(() => dom.classList.remove('shake'), 400); }
+  addHistory(`   🐍 [${enemy.name}] 的【蜕皮】发动！${cleared ? `净化了 ${cleared} 个负面状态，` : ''}恢复了 ${Math.floor(enemy.hp - oldHp)} 点生命（${Math.floor(enemy.hp)}/${enemy.maxHp}）并永久进入二阶段（攻击+50%）！`);
+}
+
+// ---- 敌方【连动】触发判定：HP ≤ 30% 时立刻行动一次（一次性；仅敌方）----
+// 插队方式与【再动】同款 splice（queueIndex+1），由 endTurn→nextTurn 正常拾取执行；
+// linked 一次性标记防【再生】回血震荡反复触发刷额外行动。
+function tryTriggerEnemyLink(enemy) {
+  if (!enemy || enemy.id.startsWith('h') || enemy.linked) return;
+  if (!enemy.tags || !enemy.tags.includes('[连动]')) return;
+  if (!enemy.isAlive || enemy.maxHp <= 0 || enemy.hp <= 0 || enemy.hp / enemy.maxHp > 0.3) return;
+  enemy.linked = true;
+  state.actionQueue.splice(state.queueIndex + 1, 0, { type: 'enemy', ref: enemy, isExtraTurn: true });
+  const dom = enemy.id ? document.getElementById(`${enemy.id}-sprite`) : null;
+  if (dom) createFloatingText(dom, '连动!', 'text-fuchsia-400');
+  addHistory(`   🔗 [${enemy.name}] 残血爆发【连动】，立刻行动一次！`);
+}
+
 
 // ---- 敌方死亡旁白触发判定：仅[智慧]敌方 + 开关开启（[复活]敌人复活后再死可再次触发）----
 function tryTriggerEnemyDeathSpeak(enemy) {

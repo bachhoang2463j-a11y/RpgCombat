@@ -1171,4 +1171,17 @@
 - **涉及文件**：`README.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：按 Coding rule，用户实测确认本轮功能有效无误后更新 README 并升版本号定版；LOG-096 为代码施工记录（含首版 `isBattleEnded` 停止循环方案被用户否决后的定稿说明）、本轮为文档定版记录，分两条保持可溯源。
 
+## [LOG-098] 2026-08-19 — 新增敌方变种标签【蜕皮】【荆棘】【连动】（未升版本号）
+
+- **变更行为**：
+  1. **【蜕皮】**（Boss 二阶段）：首次 HP 跌破 50% 时——清除自身全部 debuff（毒/燃/晕/降防/降准/降避/降攻，复用【驱散】同款负面谓词）+ 回血 30%（封顶 maxHp）+ 永久攻击 +50%。永久攻击采用 `molted` 一次性标记 + `getEffectiveStats` 被动读取（与【狂暴】同型，非 buff 对象）——不随回合过期、不被驱散清除、跨【复活】仍永久。受击后一次阈值检查（`tryTriggerEnemyMolt`），致死伤害走击杀早退不触发 → 天然形成"斩杀线"决策。
+  2. **【荆棘】**：被**近战**命中时反弹 30% **实际伤害**（`AFTER_DAMAGE` 事件内与【吸血】同管道）。反弹走**正常减伤管线**（`calculateDamage`，受攻击者护甲/护盾/防御姿态减免）；反弹致命伤害先 emit `ON_FATAL_DAMAGE` 让毅力留存/回避致命可救场（复用主伤害管线同款判定 + 保命旁白 `triggerAllyFatalSaveSpeak`）。与【吸血】一致，致死一击早退于 AFTER_DAMAGE → 斩杀【荆棘】敌人不反弹；反伤不经过【肃正】屏障（与【吸血】同管道，不加屏障分流）。
+  3. **【连动】**：HP ≤ 30% 时立刻行动一次（**一次性** `linked` 标记）。插队方式与【再动】同款 `state.actionQueue.splice(queueIndex+1, ...)` 由 `endTurn→nextTurn` 正常拾取；守卫 `enemy.hp > 0`（DoT 致死不触发）。**TURN_START 额外订阅**覆盖"入场即低血"场景（场面上无跌破瞬间时轮到其回合开始才满足条件），与受击触发共用 `linked` 守卫防重复。
+  4. **受击漏斗接线**（与现有 `tryTriggerEnemyLowHpSpeak` 并排，三处全覆盖）：主伤害管线（`applySingleTagEffect` 敌方受击收尾）、反击路径（敌方 caster 被普通反击/强力反击扣血）、DoT tick（`nextTurn` 毒/燃烧回合起始扣血）。
+  5. **UI**：详情弹窗 `TAG_BADGE` 注册表追加 3 条可读徽章（【蜕皮】琥珀/【荆棘】翠绿/【连动】品红 + hover 描述）；`startGame` 初始化敌人一次性标记复位（`delete e.molted/linked`，与 `hasTriggeredGrit` 等并列）。
+  6. **零解析改动**：三标签经既有双写入点（名字后缀/属性栏）自动收集进 `enemy.tags`，不触碰 `parseEnemyItem`/`parseSkill`/`SKILL_TYPES`。
+- **涉及函数/模块**：`getEffectiveStats()`（【蜕皮】永久 atk 被动读取）、新增 `tryTriggerEnemyMolt()` / `tryTriggerEnemyLink()`（阈值辅助）、`applySingleTagEffect()` 敌方受击收尾 / 反击路径 / `nextTurn()` DoT tick（三处受击漏斗接线）、`CombatEvents.on(TURN_START)`（【连动】入场低血）、`CombatEvents.on(AFTER_DAMAGE)`（【荆棘】反伤，与【吸血】同 handler）、`showEnemyInfo()` 的 `TAG_BADGE`（徽章注册表）、`startGame()`（一次性标记复位）
+- **决策原因**：需求新增三类 Boss/精英向敌方标签——【蜕皮】制造"斩杀线"决策（受击后一次阈值检查、清 debuff + 回血 + 永久增攻的二阶段设计）；【荆棘】克制无脑平砍（近战反弹 30% 实际伤害，走正常减伤管线与保命被动救场，斩杀可规避形成博弈）；【连动】残血爆发（首次 ≤30% 立刻行动一次，一次性防【再生】回血震荡刷爆）。全部复用现有事件管道与插队模式实现，遵循项目"变种标签运行时挂钩、零解析改动"的既有架构。本轮为代码施工记录、未升版本号不改 README/SPEC（待用户实测确认后定版 V6.31 并补 README §3.9）。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；逻辑经代码走查验证（[蜕皮] 40%→清 debuff+回血+永久 atk / 一波斩杀不触发；[荆棘] 近战反弹、远程法术不反弹、护盾吸收、保命被动救场、斩杀不反弹；[连动] 首次 ≤30% 插队行动、一次性不重复、DoT 致死不触发、TURN_START 入场低血兜底）。
+
 
