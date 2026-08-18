@@ -5145,6 +5145,8 @@ function updateHeroUI(hero) {
       document.getElementById(`${hero.id}-status`).classList.remove('hidden'); 
       renderTurnQueue(); 
       addHistory(`[战况] ⚠️ ${hero.name} 重伤倒下了！`); 
+      // 我方力竭倒下旁白：HP 归 0 倒下时留下临别台词（含 1 号位玩家，受友方旁白开关控制）
+      if (llmState.allyAutoSpeak) triggerAllyDownSpeak(hero);
   } else if (hero.hp > 0 && !hero.isAlive) { 
       hero.isAlive = true; 
       hero.dom.classList.remove('opacity-40', 'grayscale'); 
@@ -6925,6 +6927,11 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         if (fatalCtx.prevented) {
             hpDmg = fatalCtx.hpDmg;
             if (fatalCtx.shieldDmg !== undefined) shieldDmg = fatalCtx.shieldDmg;
+            // 我方保命被动旁白：触发【毅力留存】/【回避致命】死里逃生时以本人口吻说话（含 1 号位玩家，受友方旁白开关控制）
+            if (targetType === 'hero' && llmState.allyAutoSpeak) {
+                const passiveName = target.hasTriggeredGrit ? '毅力留存' : (target.hasTriggeredAvoidFatal ? '回避致命' : null);
+                if (passiveName) triggerAllyFatalSaveSpeak(target, passiveName);
+            }
         }
     }
     
@@ -7249,6 +7256,8 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     // 初始化本次技能结算的共享命中结论容器（跨标签共享：减益是否命中取决于同技能攻击的判定结果）
     if (skill) skill._bdg = { targetHit: {}, targetResolved: {} };
     let tagList = [{ tag: skill.type, power: skill.power }, { tag: skill.type2, power: skill.power2 || 0 }, { tag: skill.type3, power: skill.power3 || 0 }].filter(t => t.tag && t.tag !== '[无]');
+    // 收集本次技能中实际回血的我方被治疗者（供治疗旁白合并使用：一次 LLM 调用让治疗者与被治疗者各说一句）
+    const healedTargets = []; const healedIds = new Set();
     // 排序：攻击/控制标签优先于减益标签，保证每个目标先完成攻击命中判定，后续减益才能共享"至少一次命中"的结论
     const isDmgTag = t => t.tag.includes('攻') || t.tag.includes('单体') || t.tag.includes('穿透') || t.tag.includes('眩晕');
     const isDebuffTag = t => t.tag.includes('降') || t.tag.includes('盲') || t.tag.includes('滞') || t.tag.includes('弱') || t.tag.includes('中毒') || t.tag.includes('燃烧') || t.tag.includes('缓');
@@ -7346,8 +7355,15 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
             await applySingleTagEffect(caster, barrierStandIn, tag, tagPower, skill.hit, multiplier, skill.turns, skill);
         } else {
             for (let t of targets) {
+                // 治疗旁白收集：记录治疗前 HP，结算后实际回血（排除满血/禁疗 0 回复）且非施法者自身的我方目标计入被治疗者
+                const isHpHealTag = tag === '[单回]' || tag === '[群回]';
+                const hpBefore = (isHpHealTag && t.id.startsWith('h')) ? t.hp : undefined;
                 const killResult = await applySingleTagEffect(caster, t, tag, tagPower, skill.hit, multiplier, skill.turns, skill);
                 if (killResult === '__killed__') _pendingKills.push(t);
+                if (isHpHealTag && hpBefore !== undefined && t.id !== caster.id && t.hp > hpBefore && !healedIds.has(t.id)) {
+                    healedIds.add(t.id);
+                    healedTargets.push(t);
+                }
                 if (isAoe && targets.length > 1) await sleep(200); // 为群攻添加视觉节奏感
             }
         }
@@ -7401,10 +7417,13 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     }
 
     // 友方自动发言钉子：我方角色技能结算完毕后触发
-    if (caster.id.startsWith('h')) {
-        const heroIdx = heroesData.findIndex(h => h.id === caster.id);
-        if (heroIdx > 0 && llmState.allyAutoSpeak && caster.isAlive) {
-            triggerAllyAutoSpeak(caster);
+    // 治疗技能（单回/群回）改为一次 LLM 调用合并治疗者与被治疗者台词；其余技能维持原"仅非 1 号位自动发言"
+    if (caster.id.startsWith('h') && llmState.allyAutoSpeak && caster.isAlive) {
+        if (healedTargets.length > 0) {
+            triggerAllyHealSpeak(caster, healedTargets);
+        } else {
+            const heroIdx = heroesData.findIndex(h => h.id === caster.id);
+            if (heroIdx > 0) triggerAllyAutoSpeak(caster);
         }
     }
 
@@ -7581,6 +7600,8 @@ async function nextTurn() {
               currentEntity.ref.currentDelay = null; // 蓄力中死亡：清空蓄力
           }
           addHistory(`   💀 [${currentEntity.ref.name}] 重伤不治，倒下了！`);
+          // 我方 DoT（毒/灼烧）回合起始致死：此处先置 isAlive=false，不走 updateHeroUI 死亡分支，故单独触发力竭倒下旁白
+          if (currentEntity.type === 'hero' && llmState.allyAutoSpeak) triggerAllyDownSpeak(currentEntity.ref);
           if(currentEntity.type === 'hero') updateHeroUI(currentEntity.ref); else updateEnemyUI(currentEntity.ref);
           endTurn();
           return;
@@ -9057,6 +9078,41 @@ async function triggerAllyAutoSpeak(hero) {
   // 构建触发词，要求根据最新行动说话 (历史记录会在 callLLMAPI 中自动附带)
   const trigger = `[系统指令：请基于最新战报中你的行动，以【${hero.name}】的口吻说出一句符合其最新动作的简短台词。严格不要带任何前缀和引号！]`;
   await requestLLMResponse(trigger, [hero], true);
+}
+
+// ---- 我方力竭倒下旁白：角色 HP 归 0 倒下时以本人口吻留下临别台词（受友方旁白开关控制，含 1 号位玩家）----
+async function triggerAllyDownSpeak(hero) {
+  if (!llmState.apiUrl || !llmState.apiKey) return;
+  if (llmState.isRequesting) return;
+  const trigger = `[系统指令：我方角色 ${hero.name} 力竭倒下、重伤昏迷。请以【${hero.name}】的口吻说出一句简短的临别台词（可为不甘、遗言、痛呼或诀别）。严格不要带任何前缀和引号！]`;
+  await requestLLMResponse(trigger, [hero], true);
+}
+
+// ---- 我方保命被动旁白：触发【毅力留存】/【回避致命】死里逃生时以本人口吻说话（受友方旁白开关控制，含 1 号位玩家）----
+async function triggerAllyFatalSaveSpeak(hero, passiveName) {
+  if (!llmState.apiUrl || !llmState.apiKey) return;
+  if (llmState.isRequesting) return;
+  const trigger = `[系统指令：我方角色 ${hero.name} 遭受致命攻击，触发了被动【${passiveName}】强行保住了性命。请以【${hero.name}】的口吻说出一句简短的台词（可为死里逃生的喘息、强撑的倔强或后怕）。严格不要带任何前缀和引号！]`;
+  await requestLLMResponse(trigger, [hero], true);
+}
+
+// ---- 我方被治疗旁白：一次 LLM 调用合并治疗者与被治疗者台词，节省 token ----
+// 治疗者沿用"仅非 1 号位自动发言"规则；被治疗者（含 1 号位玩家）全部纳入说话。
+async function triggerAllyHealSpeak(healer, healedTargets) {
+  if (!llmState.apiUrl || !llmState.apiKey) return;
+  if (llmState.isRequesting) return;
+
+  const speakers = [];
+  // 治疗者：仅非 1 号位（heroesData[0] 玩家主控角色不自动发言）说话
+  const healerIdx = heroesData.findIndex(h => h.id === healer.id);
+  if (healerIdx > 0 && healer.isAlive) speakers.push(healer);
+  // 被治疗者：全部纳入（含 1 号位）
+  healedTargets.forEach(t => { if (t.isAlive && !speakers.some(s => s.id === t.id)) speakers.push(t); });
+  if (speakers.length === 0) return;
+
+  const healedNames = healedTargets.map(t => t.name).join('、');
+  const trigger = `[系统指令：我方角色 ${healer.name} 刚刚为 ${healedNames} 施放了治疗，缓解了他们的伤势。请让以下参战角色各说一句符合当前战况的简短台词：治疗者体现施术的意图与对队友的关怀，被治疗者表达伤势缓解后的回应。格式：角色名：「台词」，每人单独一行。严禁添加任何其他内容。]`;
+  await requestLLMResponse(trigger, speakers, true);
 }
 
 // ---- 看破后旁白：按开关让敌方/我方角色各说一句 ----

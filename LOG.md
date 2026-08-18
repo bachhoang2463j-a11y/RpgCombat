@@ -1055,3 +1055,20 @@
   3. **版本号升级**：README `V6.26 → V6.27`。
 - **涉及文件**：`README.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：按 Coding rule，用户实测确认本轮功能有效无误后更新 README 并升版本号定版；LOG-086 为代码施工记录、本轮为文档定版记录，分两条保持可溯源。
+
+## [LOG-088] 2026-08-19 — 我方新增两档旁白触发点：力竭倒下/保命被动 + 被治疗合并旁白（未升版本号）
+
+- **变更行为**：
+  1. **新增 3 个旁白触发函数**（index.html，位于 `triggerAllyAutoSpeak` 之后）：
+     - `triggerAllyDownSpeak(hero)`：**力竭倒下旁白**——角色 HP 归 0 倒下时以本人口吻留下临别台词（不甘/遗言/痛呼/诀别）。
+     - `triggerAllyFatalSaveSpeak(hero, passiveName)`：**保命被动旁白**——触发【毅力留存】/【回避致命】死里逃生时以本人口吻说话（死里逃生喘息/强撑倔强/后怕）。
+     - `triggerAllyHealSpeak(healer, healedTargets)`：**被治疗合并旁白**——一次 LLM 调用合并治疗者与被治疗者台词（格式 `角色名：「台词」`），节省 token。
+  2. **治疗旁白合并（群回/单回）**：`executeSkillAction` 目标遍历循环中精确匹配 HP 治疗标签（`tag === '[单回]' || tag === '[群回]'`，排除 `[回避]`/`[回蓝]` 等含"回"字的标签），记录治疗前 HP 并收集**实际回血**（排除满血/燃烧禁疗 0 回复）且**非施法者自身**的我方目标；技能结算收尾的友方发言钉子改为：有被治疗者时调用 `triggerAllyHealSpeak`（治疗者+被治疗者一次对话），否则回退原 `triggerAllyAutoSpeak`（非治疗技能行为零变化）。
+  3. **保命被动旁白接线**：`applySingleTagEffect` 的 `ON_FATAL_DAMAGE` 事件块 `fatalCtx.prevented` 后，按 `target.hasTriggeredGrit`（毅力留存）→ `target.hasTriggeredAvoidFatal`（回避致命）取被动名，我方目标且开关开启时触发。无 heroIdx 排除（**含 1 号位玩家**，用户确认倒下/保命为剧情高光时刻 1 号位也发言）。
+  4. **力竭倒下旁白接线**（两处死亡收口）：
+     - `updateHeroUI` 死亡分支（`hero.hp <= 0 && hero.isAlive`，天然恰好一次）——覆盖敌方攻击/反击/强力反击/hpCost 自伤全部致死路径；
+     - `nextTurn` DoT（毒/灼烧）回合起始致死路径——该路径先置 `isAlive=false` 不走 updateHeroUI 分支，单独接线。
+     - 均含 1 号位、受「友方旁白」开关控制。
+  5. **1 号位参与规则**（用户确认）：触发①倒下/保命含 1 号位；触发②被治疗时 1 号位作为**被治疗者**说话、作为治疗者仍不自动发言（维持"玩家不自动说话"约定）。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：用户需求"为我方角色新增旁白触发点"——倒下/保命是被动受动事件的一次性剧情高光，与"主动行动时不自动说话"的既有约定不同，故含 1 号位；被治疗因群回一次常有多角色，若沿用逐角色单独调用会连发多个 LLM 请求，故参照 `triggerKanpoNarration` 多角色模板改为**一次调用返回所有治疗者与被治疗者台词**（`requestLLMResponse` 按名分发气泡已支持）；治疗者沿用"仅非 1 号位自动发言"避免玩家被 AI 抢占说话。HP 治疗标签精确匹配 `[单回]/[群回]` 而非 `includes('回')`，杜绝误收 `[回避]`（含"回"字）与 `[回蓝]`（先命中 `'回蓝'` handler 但标签串含"回"）。本轮仅施工记录、不升版本号不改 README（待用户实测确认后定版升 V 并补 README 说明）。
