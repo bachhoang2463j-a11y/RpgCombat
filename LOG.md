@@ -1413,3 +1413,12 @@
   4. **SPEC 文档更新**：§4.2 判定公式标准新增「极限爆发附加必中（V7.2）」与「看破威力过滤（V7.2）」两条标准（含实现位置 `burstGuarantee` 派生点 index.html:7113 / 过滤拦截点 6817）。
 - **涉及文件**：`README.md`、`SPEC.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：按 Coding rule，用户实测确认本轮功能有效无误后更新 README 并升版本号定版；两项改动均为战斗机制/判定标准级变更，SPEC 判定公式章节同步补充保持「标准即现状」；LOG-114 为代码施工记录、本轮为定版文档记录，分条保持可溯源。
+
+## [LOG-116] 2026-08-19 — 16 个全局音效源从 catbox.moe 迁移至 jsdelivr 托管（未升版本号）
+
+- **变更行为**：
+  1. **音效源迁移**（`index.html` `audioUrls`，L1249-1261）：将 16 个 `files.catbox.moe` 外链（hitUp/mpHeal/defDown/atk2/atk1/atkUp/hpHeal/taunt/hitDown/shieldUp/defUp/miss/burst/avatarClick/heroTurn/kill）全部替换为 `https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/{key}.mp3`——文件已在同一 GitHub 仓库按代码键值命名备齐（如 `atk1` → `atk1.mp3`）；既有 4 个 jsdelivr 音效（hide/monsterAttack/herocharge/herochargedone）保持不变。
+  2. **加载机制零改动**：`audioCache` 页面加载即 `preload='auto'` 预拉、`playSound` 克隆播放等既有机制完全不动，仅替换资源地址。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：实测 `files.catbox.moe`（承载 16/20 个全局音效）当前网络不可达（连接被重置 ECONNRESET），而 `cdn.jsdelivr.net` 可达——远程音效资源加载失败/缓慢是"释放技能时音效延迟、甚至无声"的网络层根因（音效播放本身为同步 fire-and-forget、不阻塞技能流程）。迁移至可达 CDN 后页面加载即预拉即可正常出声。16 个 mp3 由用户上传至 `bachhoang2463j-a11y/test1` 仓库并按键值命名，URL 与代码 key 一一对应、可读可维护。
+- **经验证**：Node 提取 `<script>`（单 script）语法校验通过，零报错；`files.catbox.moe` 在 audioUrls 内残留 0（剩余 3 处 catbox 引用为玩家头像兜底 jpg 与火焰/冰霜 WebM 视频，不在本次范围）；jsdelivr 数据 API 确认 16 个文件全部就位，`atk1.mp3` 实测返回 `audio/mpeg`。
