@@ -2965,11 +2965,20 @@ const WEBM_FX_REGISTRY = {
  * 播放自定义音效
  * @param {string} url - 音效地址
  */
-// 音频预缓存 Map：key=url, value=HTMLAudioElement（已预加载）
+// 音频预缓存 Map：key=url, value=HTMLAudioElement（未预热时的回退路径）
 const _fxAudioCache = new Map();
+// 音频 Blob URL 缓存 Map：key=url, value=blobUrl（fetch 全量预载，播放即时；fetch 中为 null 占位）
+const _fxAudioBlobCache = new Map();
 
 function playCustomAudio(url) {
     if (!url || url === 'none') return;
+    const blobUrl = _fxAudioBlobCache.get(url);
+    if (blobUrl) {
+        // Blob 已全量预载：本地数据立即播放，零网络等待
+        const audio = new Audio(blobUrl);
+        audio.play().catch(e => console.warn('[FX] 音效播放失败:', e));
+        return;
+    }
     const cached = _fxAudioCache.get(url);
     if (cached) {
         // 克隆节点以支持同时多次播放
@@ -3007,12 +3016,22 @@ function preloadBattleAssets() {
         const entry = WEBM_FX_REGISTRY[tag];
         if (!entry) return;
 
-        // 1. 预缓存音频
-        if (entry.audioUrl && !_fxAudioCache.has(entry.audioUrl)) {
-            const audio = new Audio(entry.audioUrl);
-            audio.preload = 'auto';
-            _fxAudioCache.set(entry.audioUrl, audio);
-            console.log(`[预加载] 音效: ${tag} → ${entry.audioUrl}`);
+        // 1. 预缓存音频（fetch → Blob URL 全量预载，与视频同款；preload='auto' 对非挂载元素不可靠，播放时仍会现场拉取大文件）
+        if (entry.audioUrl && !_fxAudioBlobCache.has(entry.audioUrl)) {
+            // 先占位防止重复 fetch
+            _fxAudioBlobCache.set(entry.audioUrl, null);
+            fetch(entry.audioUrl)
+                .then(r => r.blob())
+                .then(blob => {
+                    const blobUrl = URL.createObjectURL(blob);
+                    _fxAudioBlobCache.set(entry.audioUrl, blobUrl);
+                    console.log(`[预加载] 音效: ${tag} → 已缓存为 Blob`);
+                })
+                .catch(e => {
+                    // 失败删除占位，允许后续重试
+                    _fxAudioBlobCache.delete(entry.audioUrl);
+                    console.warn(`[预加载] 音效加载失败: ${tag}`, e);
+                });
         }
 
         // 2. 预缓存视频（fetch → Blob URL，避免每次播放重新请求网络）
