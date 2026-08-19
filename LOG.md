@@ -1422,3 +1422,15 @@
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：实测 `files.catbox.moe`（承载 16/20 个全局音效）当前网络不可达（连接被重置 ECONNRESET），而 `cdn.jsdelivr.net` 可达——远程音效资源加载失败/缓慢是"释放技能时音效延迟、甚至无声"的网络层根因（音效播放本身为同步 fire-and-forget、不阻塞技能流程）。迁移至可达 CDN 后页面加载即预拉即可正常出声。16 个 mp3 由用户上传至 `bachhoang2463j-a11y/test1` 仓库并按键值命名，URL 与代码 key 一一对应、可读可维护。
 - **经验证**：Node 提取 `<script>`（单 script）语法校验通过，零报错；`files.catbox.moe` 在 audioUrls 内残留 0（剩余 3 处 catbox 引用为玩家头像兜底 jpg 与火焰/冰霜 WebM 视频，不在本次范围）；jsdelivr 数据 API 确认 16 个文件全部就位，`atk1.mp3` 实测返回 `audio/mpeg`。
+
+> **⚠️ 已回退**（LOG-117 前）：实测基础音效无改善且出现延迟，用户指出"延迟的从来不是基础音效，而是火焰/雷的技能特效音效"，主文件已回退恢复 catbox 源（提交 f1d2614），本 LOG 记录保留。真正根因与修复见 LOG-117。
+
+## [LOG-117] 2026-08-19 — FX 特效音效预热升级为 fetch→Blob 全量预载，根治火焰/雷技能音效延迟（未升版本号）
+
+- **变更行为**（`index.html`）：
+  1. **新增 `_fxAudioBlobCache`**（Map：url → blobUrl，fetch 全量预载，fetch 中为 null 占位防重复）。
+  2. **`preloadBattleAssets` 音频预热改造**（L3019-3035）：原 `new Audio(url); preload='auto'` 对**非 DOM 挂载元素不可靠**（多数浏览器不真正下载数据，播放时仍现场拉取整段大文件）→ 改为与视频同款 `fetch → blob → URL.createObjectURL` 全量预载；成功打点 `[预加载] 音效: {tag} → 已缓存为 Blob`，失败打点并**删除占位允许重试**。
+  3. **`playCustomAudio` 优先 Blob**（L2973-2999）：`_fxAudioBlobCache` 命中 → `new Audio(blobUrl)` 本地数据立即播放（零网络等待）；Blob 未就绪（null 占位）→ 回退 `_fxAudioCache` cloneNode 克隆；无缓存 → 现场 `new Audio` + 补缓存（原路径）。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：实测基础音效无延迟、**延迟的是火焰/雷技能特效音效**——FX 音效（fire01 202KB / thunder01 290KB）为**大文件**，且 `preloadBattleAssets` 对其只用 `preload='auto'`（非挂载 Audio 元素不可靠），导致首次释放技能时 `playCustomAudio` 现场拉取整段大文件 → "点击技能后音效才加载"。视频预热用的是 fetch→Blob（真·全量下载）而音频没有，两者不对称。升级为与视频完全对称的 Blob 全量预载后，战斗载入即下载完毕，播放走本地 Blob URL 瞬时出声。保留 `_fxAudioCache` 回退路径，Blob 未完成时不改变既有行为。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；Node 模拟验证 `playCustomAudio` 四场景（无缓存现场 new Audio 补缓存 / Blob 就绪直接 Blob 播放 / Blob 占位中回退克隆 / `none` 不播放）全部通过；`_fxAudioBlobCache` 引用 6 处（定义/读取/占位/成功/失败删除）就位。
