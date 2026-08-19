@@ -1434,3 +1434,16 @@
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：实测基础音效无延迟、**延迟的是火焰/雷技能特效音效**——FX 音效（fire01 202KB / thunder01 290KB）为**大文件**，且 `preloadBattleAssets` 对其只用 `preload='auto'`（非挂载 Audio 元素不可靠），导致首次释放技能时 `playCustomAudio` 现场拉取整段大文件 → "点击技能后音效才加载"。视频预热用的是 fetch→Blob（真·全量下载）而音频没有，两者不对称。升级为与视频完全对称的 Blob 全量预载后，战斗载入即下载完毕，播放走本地 Blob URL 瞬时出声。保留 `_fxAudioCache` 回退路径，Blob 未完成时不改变既有行为。
 - **经验证**：Node 提取 `<script>` 语法校验通过，零报错；Node 模拟验证 `playCustomAudio` 四场景（无缓存现场 new Audio 补缓存 / Blob 就绪直接 Blob 播放 / Blob 占位中回退克隆 / `none` 不播放）全部通过；`_fxAudioBlobCache` 引用 6 处（定义/读取/占位/成功/失败删除）就位。
+
+## [LOG-118] 2026-08-19 — 属性持久化开关：攻击/护甲/速度可选持久化（未升版本号）
+
+- **变更行为**（`index.html`）：
+  1. **设置模型**（L9414-9421）：`defendSettings` 新增三个布尔字段 `persistAtk` / `persistDef` / `persistSpd`，**默认全 false（=YAML 优先）**；`loadDefendSettings` 补充带类型校验的恢复（L9435-9437），与防御恢复同用 `DEFEND_VAR_KEY` localStorage 持久化。
+  2. **编辑器 UI**（openEditor L9180）：「战斗全局设置」区块标题追加「· 属性持久化」，新增**持久化攻击 / 持久化护甲 / 持久化速度**三个独立复选框（`edit-persist-atk/def/spd`），附说明文字「勾选=新战局读聊天记录旧值覆盖 YAML；不勾选=优先读 YAML，YAML 无该项才回退聊天记录」。
+  3. **saveEditor**（L9288-9291）：三个复选框读入 `defendSettings` 并随 `persistDefendSettings` 一并落盘。
+  4. **构建时记录 YAML 属性来源**（`buildCombatDataFromYAML` L4729-4733）：捕获属性字符串并计算 `statSource = { atk: /\[Atk:\d+\]/, def: /\[Armor:\d+\]/, spd: /\[Speed:\d+\]/ }`（与 `parseAttributes` 同正则，可解析出值才算 YAML 已定义），存入 heroObj。
+  5. **加载门控**（`applyPersistedRoster` L9501-9503）：atk/def/spd 覆盖条件改为 `cfg.x != null && (defendSettings.persistX || !(h.statSource||{}).x)`。
+- **行为矩阵**：勾选→聊天记录覆盖 YAML（原逻辑不变）；未勾选+YAML 有该项→保留 YAML 实时值；未勾选+YAML 无该项→回退聊天记录；未勾选+无聊天记录值→保留 YAML 解析默认值（攻击10/护甲5/速度100）。保存到聊天记录始终照常写入，切换勾选无损来回。
+- **涉及文件**：`index.html`、`README.md`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：跑团过程中角色 atk/armor/speed 会随剧情实时变化（YAML 属性栏已更新），但旧聊天记录持久化的旧值会无条件覆盖新 YAML 值，导致实时更新失效。三个独立勾选栏让用户按属性粒度选择「持久化锁定旧值」还是「YAML 实时优先」，默认不勾选贴合"实时属性应生效"的主流诉求，同时保留原行为一键可回。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；`statSource` 写入/读取/深拷贝快照链路就位；三处（定义/UI/saveEditor/应用门控）引用闭环，未勾选时 YAML 定义项不再被聊天记录覆盖。
