@@ -88,6 +88,15 @@
   - `[必中]` **不豁免主动化解**：目标仍会触发反应拦截（我方弹反应面板、敌方 AI 自动反应）与看破中断（`checkKanpoInterrupt`），反应技/看破仍可将必中伤害规避或无效化。
   - 对应入口条件：反应拦截由 `!isDodged && !(skill && skill.guaranteedHit)` 改为 `!isDodged`。
 
+- **极限爆发附加必中（V7.2）**：
+  - 我方英雄激活极限爆发（`multiplier === 2` 且 `caster.id.startsWith('h')`）时，本次施放的伤害与敌方减益（降/盲/滞/弱/中毒/燃烧/缓）**恒命中**，语义与 `[必中]` 完全一致：仅跳过被动闪避 roll，仍可被反应技/看破主动化解。
+  - 实现：`applySingleTagEffect` 顶部派生 `const burstGuarantee = multiplier === 2 && caster.id.startsWith('h')`（index.html:7113），初次闪避判定（7149）与减益必中判断（7461）两处与 `skill.guaranteedHit` 并列短路；`multiplier === 2` 仅由 `triggerBurstIfNeeded` 产生，零新增状态、无清理需求。
+  - 仅我方生效；敌方满 TP 自动爆发不附加必中。
+
+- **看破威力过滤（V7.2）**：
+  - `defendSettings.kanpoFilterEnabled`（默认 true）/ `kanpoFilterThreshold`（默认 100），编辑器「战斗全局设置」区块配置，localStorage 持久化（同 `DEFEND_VAR_KEY`）。
+  - `checkKanpoInterrupt` 顶部（index.html:6817）：开启时取 `ctx.skill.power/power2/power3` 最大值，`maxPower <= 阈值` 直接早退不弹窗——主链（`BEFORE_SKILL_RESOLVE`）与自爆路径（`doEnemySelfDestruct`）同一入口一并拦截；早退不设置 `ctx.cancelled`，事件语义零破坏。
+
 - **仇恨分布算法**：
   - 基础嘲讽值：防守者 (200)，普通 (100)，隐匿者 (50)。
   - 选中概率：$P(i) = \frac{\text{嘲讽值}_i}{\sum \text{嘲讽值}}$。
