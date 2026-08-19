@@ -6813,6 +6813,12 @@ async function playPowerCounterEffect(counter, victim, counterDom) {
 }
 
 async function checkKanpoInterrupt(ctx) {
+    // 看破过滤（可开关，编辑器「战斗全局设置」配置，默认开启阈值 100）：
+    // 敌方技能所有标签 power 最大值 ≤ 阈值时直接跳过看破，不弹窗（避免弹窗过于频繁）
+    if (defendSettings.kanpoFilterEnabled) {
+        const maxPower = Math.max(ctx.skill.power || 0, ctx.skill.power2 || 0, ctx.skill.power3 || 0);
+        if (maxPower <= defendSettings.kanpoFilterThreshold) return;
+    }
     const incomingType = ctx.skill.damageType || '近战';
 
     const kanpoCandidates = [];
@@ -7103,6 +7109,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
   const isDamage = tag.includes('攻') || tag.includes('单体') || tag.includes('穿透') || tag.includes('眩晕');
   const isHarmful = isDamage || tag.includes('降') || tag.includes('盲');
   const incomingDamageType = skill ? (skill.damageType || '近战') : '近战';
+  // 极限爆发（仅我方消耗100TP激活）附加必中：本次伤害与减益恒命中（镜像 [必中] 语义，仍可被反应/看破主动化解）
+  const burstGuarantee = multiplier === 2 && caster.id.startsWith('h');
   // 减益标签判断：作用于敌方的非伤害效果（降/盲/滞/弱/中毒/燃烧/缓）
   const isDebuffTag = tag.includes('降') || tag.includes('盲') || tag.includes('滞') || tag.includes('弱') || tag.includes('中毒') || tag.includes('燃烧') || tag.includes('缓');
 
@@ -7137,8 +7145,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     const attackerHitCap = Math.max(1, (hitChance !== undefined ? hitChance : 100) + initialCStats.hit);
     const defenderSpdCap = Math.max(1, (target.spd || 0) + initialTStats.eva);
 
-    // 初次闪避判定 (基于基础速度和当前面板)；【必中】跳过命中判定恒命中
-    isDodged = (skill && skill.guaranteedHit) ? false
+    // 初次闪避判定 (基于基础速度和当前面板)；【必中】跳过命中判定恒命中；极限爆发附加必中同样跳过
+    isDodged = (skill && (skill.guaranteedHit || burstGuarantee)) ? false
       : Math.floor(Math.random() * defenderSpdCap) + 1 > Math.floor(Math.random() * attackerHitCap) + 1;
 
 // 2. 如果初次判定失败 (即将挨打)，触发敌我双方的反应拦截！
@@ -7450,7 +7458,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     // === 非伤害标签 → TAG_HANDLERS 注册表分发 ===
     // 仅敌方减益需受命中判定影响；我方增益（回/冲/增/防/盾/瞄/嘲/再动/避/免伤/反击/驱散/肃正等）保持无条件生效。
     // 减益是否落空：命中结论由 _bdg 记录（纯减益首标签/"跟随攻击"的判定均已在判断管线完成），此处只判断、不重复 roll/动效。
-    if (targetType === 'enemy' && isDebuffTag && !(skill && skill.guaranteedHit)) {
+    if (targetType === 'enemy' && isDebuffTag && !(skill && (skill.guaranteedHit || burstGuarantee))) {
       const resolved = !!(skill && skill._bdg && skill._bdg.targetResolved[target.id]);
       const hit = resolved ? skill._bdg.targetHit[target.id] === true : !isDodged;
       if (!hit) {
@@ -9147,7 +9155,7 @@ function openEditor() {
     savedScrollTop = oldContainer.scrollTop;
   }
   let html = `<div id="editor-scroll-container" class="bg-[#1a1c23] border border-gray-700 p-3 sm:p-6 rounded-2xl w-full max-w-[95vw] max-h-[90vh] overflow-y-auto shadow-[0_0_50px_rgba(0,0,0,0.8)] relative custom-scrollbar"><div class="flex justify-between items-center mb-4 sm:mb-6 sticky top-0 bg-[#1a1c23]/95 backdrop-blur z-20 pb-2 sm:pb-4 border-b border-gray-700/50 pt-1 sm:pt-2"><div><h2 class="text-lg sm:text-2xl font-bold text-yellow-500 tracking-wider">数据覆写 <span class="hidden sm:inline text-xs font-normal text-gray-400 ml-2">临时修改数值</span></h2></div><div class="flex gap-2 sm:gap-3"><button onclick="closeEditor()" class="px-3 sm:px-4 py-1 sm:py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded text-xs sm:text-sm transition-colors">取消</button><button onclick="saveEditor()" class="px-3 sm:px-6 py-1 sm:py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded text-xs sm:text-sm font-bold shadow-lg transition-all transform hover:scale-105">保存</button></div></div><div class="space-y-6 sm:space-y-8 pb-10">`;
-  html += `<div class="bg-black/30 p-3 sm:p-4 rounded-xl border border-gray-800"><h3 class="text-sm sm:text-lg font-bold text-amber-400 mb-3 sm:mb-4 flex items-center gap-2 w-full"><span>⚙️</span> 战斗全局设置：防御/普攻恢复</h3><div class="grid grid-cols-2 gap-2 sm:gap-4 text-[10px] sm:text-xs"><div class="flex items-center gap-2"><label class="text-cyan-400 whitespace-nowrap">防御恢复 MP</label><input type="number" min="0" max="100" value="${defendSettings.mpRecoverPct}" id="edit-defend-mp-pct" class="edit-input w-16 sm:w-20 font-mono text-sky-200"><span class="text-gray-500">%</span></div><div class="flex items-center gap-2"><label class="text-green-400 whitespace-nowrap">防御恢复 TP</label><input type="number" min="0" max="100" value="${defendSettings.tpRecoverPct}" id="edit-defend-tp-pct" class="edit-input w-16 sm:w-20 font-mono text-emerald-200"><span class="text-gray-500">%</span></div><div class="flex items-center gap-2"><label class="text-orange-400 whitespace-nowrap">普攻恢复 TP</label><input type="number" min="0" max="100" value="${defendSettings.basicAttackTp}" id="edit-attack-tp" class="edit-input w-16 sm:w-20 font-mono text-orange-200"><span class="text-gray-500">点</span></div></div></div>`;
+  html += `<div class="bg-black/30 p-3 sm:p-4 rounded-xl border border-gray-800"><h3 class="text-sm sm:text-lg font-bold text-amber-400 mb-3 sm:mb-4 flex items-center gap-2 w-full"><span>⚙️</span> 战斗全局设置：防御/普攻恢复 · 看破过滤</h3><div class="grid grid-cols-2 gap-2 sm:gap-4 text-[10px] sm:text-xs"><div class="flex items-center gap-2"><label class="text-cyan-400 whitespace-nowrap">防御恢复 MP</label><input type="number" min="0" max="100" value="${defendSettings.mpRecoverPct}" id="edit-defend-mp-pct" class="edit-input w-16 sm:w-20 font-mono text-sky-200"><span class="text-gray-500">%</span></div><div class="flex items-center gap-2"><label class="text-green-400 whitespace-nowrap">防御恢复 TP</label><input type="number" min="0" max="100" value="${defendSettings.tpRecoverPct}" id="edit-defend-tp-pct" class="edit-input w-16 sm:w-20 font-mono text-emerald-200"><span class="text-gray-500">%</span></div><div class="flex items-center gap-2"><label class="text-orange-400 whitespace-nowrap">普攻恢复 TP</label><input type="number" min="0" max="100" value="${defendSettings.basicAttackTp}" id="edit-attack-tp" class="edit-input w-16 sm:w-20 font-mono text-orange-200"><span class="text-gray-500">点</span></div><div class="flex items-center gap-2"><label class="text-fuchsia-400 whitespace-nowrap">看破过滤</label><input type="checkbox" id="edit-kanpo-filter" ${defendSettings.kanpoFilterEnabled ? 'checked' : ''} class="accent-fuchsia-500"><span class="text-gray-500">敌方技能威力 ≤</span><input type="number" min="0" max="10000" value="${defendSettings.kanpoFilterThreshold}" id="edit-kanpo-threshold" class="edit-input w-16 sm:w-20 font-mono text-fuchsia-200"><span class="text-gray-500">时不弹看破窗</span></div></div></div>`;
   html += `<div><h3 class="text-sm sm:text-lg font-bold text-cyan-400 mb-3 sm:mb-4 flex items-center gap-2 w-full"><span>❖</span> 我方角色 <button onclick="addHero()" class="text-[10px] sm:text-[11px] bg-cyan-900/50 hover:bg-cyan-800 text-cyan-200 px-2 sm:px-3 py-1 sm:py-1.5 rounded ml-auto transition-colors border border-cyan-700/50">+ 添加</button></h3><div class="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">`;
   heroesData.forEach((h, i) => {
     html += `<div class="bg-black/30 p-3 sm:p-4 rounded-xl border border-gray-800 relative group hover:border-cyan-900/50 transition-colors flex flex-col"><button onclick="removeHero(${i})" class="absolute right-1 top-1 sm:right-2 sm:top-2 w-6 h-6 flex items-center justify-center rounded-full bg-red-900/30 text-red-500/50 hover:bg-red-600 hover:text-white transition-all z-10 border border-transparent hover:border-red-400 opacity-0 group-hover:opacity-100" title="移除此角色">✕</button><div class="flex gap-2 mb-3 sm:mb-4 items-center border-b border-gray-800 pb-2"><span class="text-[10px] sm:text-xs text-gray-500">名称</span><input type="text" id="edit-h-${i}-name" value="${h.name}" class="edit-input w-16 sm:w-24 text-xs sm:text-sm font-bold text-yellow-200"><span class="text-[10px] sm:text-xs text-gray-500 ml-2">职业</span><select id="edit-h-${i}-class" class="edit-input w-16 sm:w-24 text-[10px] sm:text-xs text-cyan-300 font-bold"><option value="" ${!h.classType ? 'selected' : ''}>无</option><option value="防守者" ${h.classType === '防守者' ? 'selected' : ''}>防守者</option><option value="隐匿者" ${h.classType === '隐匿者' ? 'selected' : ''}>隐匿者</option><option value="施法者" ${h.classType === '施法者' ? 'selected' : ''}>施法者</option><option value="狂战士" ${h.classType === '狂战士' ? 'selected' : ''}>狂战士</option><option value="风行者" ${h.classType === '风行者' ? 'selected' : ''}>风行者</option><option value="圣职者" ${h.classType === '圣职者' ? 'selected' : ''}>圣职者</option><option value="灾厄使" ${h.classType === '灾厄使' ? 'selected' : ''}>灾厄使</option></select><span class="text-[10px] sm:text-xs text-gray-500 ml-auto">头像</span><input type="text" id="edit-h-${i}-img" value="${h.img}" class="edit-input flex-1 min-w-[80px] text-[10px] sm:text-xs text-gray-400" placeholder="链接"></div><div class="grid grid-cols-4 lg:grid-cols-8 gap-x-1.5 gap-y-2 sm:gap-x-2 sm:gap-y-3 text-[9px] sm:text-[10px] mb-3 sm:mb-4"><div class="flex flex-col"><label class="text-rose-400 mb-1">HP</label><input type="number" id="edit-h-${i}-hp" value="${h.hp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-gray-500 mb-1">MaxHP</label><input type="number" id="edit-h-${i}-maxHp" value="${h.maxHp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-cyan-400 mb-1">MP</label><input type="number" id="edit-h-${i}-mp" value="${h.mp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-gray-500 mb-1">MaxMP</label><input type="number" id="edit-h-${i}-maxMp" value="${h.maxMp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-orange-400 mb-1">攻击</label><input type="number" id="edit-h-${i}-atk" value="${h.atk}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-blue-400 mb-1">防御</label><input type="number" id="edit-h-${i}-def" value="${h.def}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-yellow-400 mb-1 font-bold">速度</label><input type="number" id="edit-h-${i}-spd" value="${h.spd}" class="edit-input w-full font-mono text-yellow-200"></div><div class="flex flex-col"><label class="text-amber-400 mb-1 font-bold" title="一回合行动次数，每次行动速度依次 -10 衰减">行动</label><input type="number" min="1" id="edit-h-${i}-act" value="${h.actCount || 1}" class="edit-input w-full font-mono text-amber-200"></div></div><div class="bg-black/40 p-2 sm:p-3 rounded border border-gray-800/50 flex-1"><div class="text-[9px] sm:text-[11px] text-gray-400 mb-2 sm:mb-3 font-bold tracking-wider flex justify-between items-center"><span>技能配置 (支持3重标签)</span><button onclick="addHeroSkill(${i})" class="text-[9px] sm:text-[10px] text-cyan-400 hover:text-cyan-300 border border-cyan-900/50 rounded px-1.5 py-0.5 sm:px-2 sm:py-1 transition-colors">+ 添加</button></div><div class="space-y-2 sm:space-y-3">`;
@@ -9253,6 +9261,8 @@ function saveEditor() {
   defendSettings.mpRecoverPct = clampPct(document.getElementById('edit-defend-mp-pct').value);
   defendSettings.tpRecoverPct = clampPct(document.getElementById('edit-defend-tp-pct').value);
   defendSettings.basicAttackTp = Math.max(0, Math.min(100, Number(document.getElementById('edit-attack-tp').value) || 0));
+  defendSettings.kanpoFilterEnabled = document.getElementById('edit-kanpo-filter').checked;
+  defendSettings.kanpoFilterThreshold = Math.max(0, Math.min(10000, Number(document.getElementById('edit-kanpo-threshold').value) || 0));
   persistDefendSettings();
   persistHeroesRoster();
   heroesData.forEach(h => { 
@@ -9381,8 +9391,8 @@ async function persistLLMSettings() {
 
 // ---- 防御恢复/普攻恢复设置：localStorage 持久化 ----
 const DEFEND_VAR_KEY = 'rpg_combat_defend_settings';
-// 战斗全局设置：defend(s) 防御恢复 + basicAttack 普攻恢复
-const defendSettings = { mpRecoverPct: 20, tpRecoverPct: 25, basicAttackTp: 20 };
+// 战斗全局设置：defend(s) 防御恢复 + basicAttack 普攻恢复 + kanpoFilter 看破过滤
+const defendSettings = { mpRecoverPct: 20, tpRecoverPct: 25, basicAttackTp: 20, kanpoFilterEnabled: true, kanpoFilterThreshold: 100 };
 
 function clampPct(v) { v = Number(v); if (isNaN(v)) return 20; return Math.max(0, Math.min(100, v)); }
 
@@ -9394,6 +9404,8 @@ function loadDefendSettings() {
       if (typeof parsed.mpRecoverPct === 'number') defendSettings.mpRecoverPct = clampPct(parsed.mpRecoverPct);
       if (typeof parsed.tpRecoverPct === 'number') defendSettings.tpRecoverPct = clampPct(parsed.tpRecoverPct);
       if (typeof parsed.basicAttackTp === 'number') defendSettings.basicAttackTp = Math.max(0, Math.min(100, parsed.basicAttackTp));
+      if (typeof parsed.kanpoFilterEnabled === 'boolean') defendSettings.kanpoFilterEnabled = parsed.kanpoFilterEnabled;
+      if (typeof parsed.kanpoFilterThreshold === 'number') defendSettings.kanpoFilterThreshold = Math.max(0, Math.min(10000, parsed.kanpoFilterThreshold));
     }
   } catch(e) {}
 }

@@ -1387,3 +1387,29 @@
   4. **LOG-INDEX 回填**：LOG-112 的 HASH 回填为对应代码提交；LOG-113 本记录。
 - **涉及文件**：`README.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：按 Coding rule，用户实测确认本轮功能有效无误后更新 README 并升版本号定版；LOG-112 为代码施工记录、本轮为定版文档记录，分条保持可溯源。
+
+## [LOG-114] 2026-08-19 — 极限爆发附加必中 + 看破过滤设置（未升版本号）
+
+- **变更行为**：
+  1. **极限爆发附加必中（仅我方）**：我方英雄消耗 100 TP 激活「极限爆发」（`multiplier === 2`）时，本次攻击的伤害与敌方减益（降/盲/滞/弱/中毒/燃烧/缓）**恒命中**。实现零新增状态——在 `applySingleTagEffect` 顶部以 `const burstGuarantee = multiplier === 2 && caster.id.startsWith('h')` 派生（index.html:7113），两处既有判定接入该标记：初次闪避判定（7149 `skill.guaranteedHit || burstGuarantee` 短路）+ 减益必中判断（7461 镜像）。天然镜像 `[必中]` 全部语义：仍可被反应技/看破主动化解；普攻爆发（`mockAttackSkill` 新建对象）与蓄力释放路径（8628 传同一 multiplier）一并覆盖；**敌方**满 TP 自动爆发（`triggerBurstIfNeeded` 敌方分支）不受影响、难度不变。
+  2. **看破过滤设置（可开关 + 阈值，默认开启 x=100）**：`defendSettings` 新增 `kanpoFilterEnabled: true / kanpoFilterThreshold: 100`（index.html:9395），localStorage 持久化（9407-9408 恢复、9264-9265 保存，`persistDefendSettings` 既有调用自动落盘）。
+  3. **设置 UI**（`openEditor`「⚙️ 战斗全局设置」区块，index.html:9158）：新增一行「看破过滤」——复选框 `edit-kanpo-filter`（accent-fuchsia-500）+ 阈值数字输入 `edit-kanpo-threshold`（0~10000，默认 100），区块标题改为「战斗全局设置：防御/普攻恢复 · 看破过滤」；`saveEditor` 读取两字段。
+  4. **过滤拦截**（`checkKanpoInterrupt` 顶部，index.html:6817-6821）：开启时取敌方技能三个标签槽 `power/power2/power3` 最大值，`maxPower <= 阈值` 则直接 `return` 不弹看破窗。该函数是看破唯一入口，主链（`BEFORE_SKILL_RESOLVE` 事件）与自爆路径（`doEnemySelfDestruct`）**两条路一并拦截**；早退不设置 `ctx.cancelled`，事件语义零破坏（被过滤技能正常结算、自爆正常爆炸）。`maxPower` 与 `parseSkill` 解析结果对齐（裸 `[单体]` 默认 50、无标签兜底 20 也会被过滤）。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：① 极限爆发需消耗满槽 100 TP（需受击/施法/闪避积攒多轮），是珍贵的一次性资源——附加必中让高额翻倍输出稳定落点，避免「攒满爆发却被闪避」的挫败感；仅对我方生效（用户指定），敌方自动爆发保持原判定；选用 `multiplier === 2` 判定而非改 `skill.guaranteedHit` 字段，避免污染持久化技能定义且无需回滚清理。② 看破弹窗在敌方每次攻击时都可能打断战斗节奏，用户希望只对高威力（power > x）技能弹窗；过滤放在 `checkKanpoInterrupt` 顶部（而非 `promptKanpo` 内部）可在候选扫描前零成本早退，且天然覆盖自爆路径。③ 设置并入既有「战斗全局设置」区块，复用 `defendSettings` localStorage 持久化模式，与防御恢复同生命周期、零新增存储结构。
+- **经验证**：Node 提取 `<script>`（8992 行）语法校验通过，零报错；`burstGuarantee` 定义 1 处 + 引用 2 处（7149/7461）、`kanpoFilter` 引用 5 处（6818/6820/9395/9407-9408/9264-9265）、`edit-kanpo-*` DOM 读写成对（9158 渲染 / 9264-9265 保存）就位；`multiplier === 2` 仅由 `triggerBurstIfNeeded` 产生（已核对 9 处 `executeSkillAction` 调用点的 multiplier 来源，其余均传字面量 1）。
+
+## [LOG-115] 2026-08-19 — V7.2 定版：极限爆发附加必中 + 看破过滤设置实测确认 + README/SPEC 更新
+
+- **变更行为**：
+  1. **实测确认**：用户确认 LOG-114 两项功能有效无误——① 我方极限爆发（消耗 100 TP）本次攻击/技能伤害与敌方减益恒命中；② 看破过滤默认开启（阈值 100），敌方低威力技能不弹看破窗，关闭开关恢复原行为，刷新页面设置保留。
+  2. **版本号 V7.1 → V7.2**：两项战斗机制新增（爆发附加必中 + 看破威力过滤）跨入 V7.2 次版本。
+  3. **README 文档更新（V7.1 → V7.2）**：
+     - 顶部版本号 `V7.1 → V7.2`；
+     - **§2.2** TP（潜能槽）条目补「激活爆发后本次攻击/技能附加【必中】效果」（镜像 `[必中]` 语义、仅我方生效）；
+     - **§2.2** 新增「👁️ 看破过滤设置（V7.2）」条目（复选框 + 阈值输入，默认开启阈值 100，威力最大值 > 阈值才弹窗，localStorage 持久化）；
+     - **§4.3** 看破机制补「威力过滤（V7.2）」条目（过滤在候选扫描前生效，主链 + 自爆两处一并拦截）；
+     - **§5** 判定公式新增第 5 点「极限爆发附加必中（V7.2）」。
+  4. **SPEC 文档更新**：§4.2 判定公式标准新增「极限爆发附加必中（V7.2）」与「看破威力过滤（V7.2）」两条标准（含实现位置 `burstGuarantee` 派生点 index.html:7113 / 过滤拦截点 6817）。
+- **涉及文件**：`README.md`、`SPEC.md`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：按 Coding rule，用户实测确认本轮功能有效无误后更新 README 并升版本号定版；两项改动均为战斗机制/判定标准级变更，SPEC 判定公式章节同步补充保持「标准即现状」；LOG-114 为代码施工记录、本轮为定版文档记录，分条保持可溯源。
