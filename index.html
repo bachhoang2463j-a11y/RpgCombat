@@ -6040,6 +6040,18 @@ registerClassPassive('风行者', {
     modifyStats(entity, stats) {
         stats.eva += (entity.tp || 0);
     },
+    // 【被动 - 多重施法】消耗MP释放技能时（非反应技），按耗蓝量概率引发法力共鸣，立刻获得一个额外的行动回合（原施法者被动转交）
+    onSkillExecuted(caster, skill, isReactionTrigger) {
+        if (skill.cost > 0 && !isReactionTrigger) {
+            const multiCastChance = Math.min(0.3, (skill.cost / 100) * 2);
+            if (Math.random() < multiCastChance) {
+                state.actionQueue.splice(state.queueIndex + 1, 0, { type: caster.id.startsWith('h') ? 'hero' : 'enemy', ref: caster, isExtraTurn: true });
+                addHistory(`   🌟 ${caster.name} 的法力产生共鸣，引发了多重施法(获得额外行动回合)！`);
+                const casterDom = caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`);
+                if(casterDom) setTimeout(() => createFloatingText(casterDom, '多重施法!', 'text-fuchsia-400'), 500);
+            }
+        }
+    },
     // 【被动 - 规避致命】每场战斗一次，遭受致命伤害时完美回避免除伤害（与隐匿者同款机制）
     onFatalDamage(ctx) {
         if (!ctx.target.hasTriggeredAvoidFatal) {
@@ -6157,18 +6169,36 @@ registerClassPassive('施法者', {
     onBattleInit(entity) {
         entity.shield = (entity.shield || 0) + Math.floor(entity.maxMp * 0.5);
     },
-    onSkillExecuted(caster, skill, isReactionTrigger) {
-        if (skill.cost > 0 && !isReactionTrigger) {
-            const multiCastChance = Math.min(0.3, (skill.cost / 100) * 2);
-            if (Math.random() < multiCastChance) {
-                state.actionQueue.splice(state.queueIndex + 1, 0, { type: caster.id.startsWith('h') ? 'hero' : 'enemy', ref: caster, isExtraTurn: true });
-                addHistory(`   🌟 ${caster.name} 的法力产生共鸣，引发了多重施法(获得额外行动回合)！`);
-                const casterDom = caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`);
-                if(casterDom) setTimeout(() => createFloatingText(casterDom, '多重施法!', 'text-fuchsia-400'), 500);
+    // 【被动 - 法力回响】每消耗 1 点 MP 有 2% 概率获得 1 点永久加速库存与 15 点 TP。
+    // 加速永久存在（仅被蓄力[延迟]抵扣消耗，不随回合过期），TP 按上限封顶叠加。
+    onManaSpent(entity, mpSpent) {
+        let hasteGain = 0;
+        let tpGain = 0;
+        for (let i = 0; i < mpSpent; i++) {
+            if (Math.random() < 0.02) {
+                hasteGain += 1;
+                tpGain += 15;
             }
         }
+        if (hasteGain <= 0) return;
+        entity.hasteStore = (entity.hasteStore || 0) + hasteGain;
+        entity.tp = Math.min(entity.maxTp || 100, (entity.tp || 0) + tpGain);
+        const dom = entity.id.startsWith('h') ? document.getElementById(`hero-card-${entity.id}`) : document.getElementById(`${entity.id}-sprite`);
+        if (dom) {
+            createFloatingText(dom, `⚡加速+${hasteGain}`, 'text-cyan-300');
+            createFloatingText(dom, `✦TP+${tpGain}`, 'text-amber-300');
+        }
+        addHistory(`   ⚡ ${entity.name} 的法力产生回响，获得 ${hasteGain} 点永久加速与 ${tpGain} 点潜能！`);
+        if (entity.id.startsWith('h')) updateHeroUI(entity); else updateEnemyUI(entity);
     }
 });
+
+// 通用分发器：角色消耗 MP 后按职业被动统一结算（法力回响等）
+function notifyManaSpent(entity, mpSpent) {
+    if (!entity || !mpSpent) return;
+    const p = CLASS_PASSIVES[entity.classType];
+    if (p && p.onManaSpent) p.onManaSpent(entity, mpSpent);
+}
 
 // 6. 圣职者 / 支援者
 const clericPassive = {
@@ -6418,7 +6448,7 @@ CombatEvents.on(EVENTS.AFTER_HEAL, (ctx) => {
     }
 }, 5);
 
-// 施法者：多重施法 (priority=5，技能释放后触发)
+// 风行者：多重施法 (priority=5，技能释放后触发，原施法者被动转交)
 CombatEvents.on(EVENTS.TURN_END, (ctx) => {
     if (!ctx.skill) return;
     const p = CLASS_PASSIVES[ctx.entity.classType];
@@ -6813,6 +6843,8 @@ async function checkKanpoInterrupt(ctx) {
         chosen.hero.mp -= chosen.skill.cost || 0;
         if (chosen.skill.hpCost) chosen.hero.hp -= chosen.skill.hpCost;
         if (chosen.skill.tpCost) chosen.hero.tp -= chosen.skill.tpCost;
+        // 消耗 MP 后按职业被动结算（施法者【法力回响】）
+        if ((chosen.skill.cost || 0) > 0) notifyManaSpent(chosen.hero, chosen.skill.cost);
         // [限N次] 看破成功使用时消耗真实技能剩余次数
         const realSkill = chosen.hero.skills.find(s => s.name === chosen.skill.name);
         if (realSkill && realSkill.maxUses > 0) realSkill.usesRemaining = Math.max(0, (realSkill.usesRemaining ?? realSkill.maxUses) - 1);
@@ -7008,6 +7040,8 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
         guardian.mp -= chosen.skill.cost || 0;
         if (chosen.skill.hpCost) guardian.hp -= chosen.skill.hpCost;
         if (chosen.skill.tpCost) guardian.tp -= chosen.skill.tpCost;
+        // 消耗 MP 后按职业被动结算（施法者【法力回响】）
+        if ((chosen.skill.cost || 0) > 0) notifyManaSpent(guardian, chosen.skill.cost);
         // [限N次] 舍身成功使用时消耗真实技能剩余次数
         const realSkill = guardian.skills.find(s => s.name === chosen.skill.name);
         if (realSkill && realSkill.maxUses > 0) realSkill.usesRemaining = Math.max(0, (realSkill.usesRemaining ?? realSkill.maxUses) - 1);
@@ -7598,6 +7632,8 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         caster.mp -= skill.cost; 
         if (skill.hpCost) caster.hp -= skill.hpCost;
         if (skill.tpCost) caster.tp -= skill.tpCost;
+        // 消耗 MP 后按职业被动结算（施法者【法力回响】）
+        if (!skipCost && skill.cost > 0) notifyManaSpent(caster, skill.cost);
     }
 
     // === [限N次] 本场战斗次数消耗（仅我方）===
@@ -7634,7 +7670,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         }
     }
     
-    // === 技能释放完毕 → 事件总线 (TURN_END 携带 skill 信息，供施法者多重施法等订阅) ===
+    // === 技能释放完毕 → 事件总线 (TURN_END 携带 skill 信息，供风行者多重施法等订阅) ===
     CombatEvents.emit(EVENTS.TURN_END, { entity: caster, skill, isReactionTrigger });
     
     let targetStr = "";
@@ -8532,6 +8568,8 @@ async function handleChargeSkill(hero, skillIndex) {
   const hasteStore = hero.hasteStore || 0;
   const effective = Math.max(0, skill.delay - hasteStore);
   hero.hasteStore = Math.max(0, hasteStore - skill.delay); // covered = min(hasteStore, delay)
+  // 法力回响的加速落账在 effective 计算之后：本次蓄力所需回合数不受新加速影响，新加速仅对后续蓄力生效
+  if (skill.cost > 0) notifyManaSpent(hero, skill.cost);
   // 进入蓄力状态（保存完整 skill（含 haste），释放时由 executeSkillAction 统一施加）
   hero.currentDelay = { skill: { ...skill }, remaining: effective };
   triggerHeroChargeStart(hero);

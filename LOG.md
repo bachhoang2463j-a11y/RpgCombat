@@ -1360,3 +1360,30 @@
   4. **击杀演出不受影响**：击杀特写前对所有带 `[特效:]` 技能的固定 `await sleep(1000)`（LOG-108）保持不变（用户选择仅用于伤害结算）。
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：特效播放原为 fire-and-forget 同步调用（`playWebMFX` 无 Promise），视频起播后伤害立即结算，长短特效无法按需同步——per-特效 `delay` 比固定值更灵活，未配置特效零影响；复用既有 `sleep` 工具（L5358）与 `executeSkillAction` 的 async 链，等待期间回合引擎暂停、反应/看破弹窗在伤害结算时照常触发。
+
+## [LOG-112] 2026-08-19 — 职业被动调整：多重施法移交风行者 + 施法者新增【法力回响】（未升版本号）
+
+- **变更行为**：
+  1. **【多重施法】由施法者移交风行者**（`CLASS_PASSIVES['风行者']`，index.html:6044）：`onSkillExecuted(caster, skill, isReactionTrigger)` 逻辑完整复制自原施法者版——消耗 MP 释放技能（`cost > 0` 且非反应技）时按 `min(0.3, cost/100*2)` 概率向行动队列插队一个额外行动回合 + 飘字「多重施法!」+ 战报。**零新增订阅**：现有 `TURN_END` 通用订阅（index.html:6453，按 `CLASS_PASSIVES[entity.classType].onSkillExecuted` 调度）自动接管，订阅/emit 注释同步「施法者→风行者」。
+  2. **施法者被动改为【法力回响】**（`CLASS_PASSIVES['施法者']`，index.html:6174）：移除 `onSkillExecuted`（【法能护罩】`onBattleInit` 保留），新增 `onManaSpent(entity, mpSpent)`——**每消耗 1 点 MP 独立 2% 概率**判定，命中则 +1 永久加速库存（`hasteStore`，仅被蓄力抵扣、不过期）+15 点 TP（`Math.min(maxTp, tp + n)` 封顶）；触发时战报 + 飘字（`⚡加速+N` / `✦TP+M`）+ `updateHeroUI/updateEnemyUI` 刷新 ⚡加速xN 徽章。
+  3. **通用分发器 `notifyManaSpent(entity, mpSpent)`**（index.html:6197）：`CLASS_PASSIVES[entity.classType].onManaSpent` 查表分发，四类角色通用（未来新被动零成本挂接）。
+  4. **四处扣蓝点接线**（每处一行，`cost` 即实际消耗）：
+     - **主施法入口**（`executeSkillAction`，index.html:7636）：`!skipCost && skill.cost > 0` 时扣蓝后 `notifyManaSpent(caster, skill.cost)`——含反应技，与全局施法 +5 TP（7619）**增量叠加**，一次主动施法最高 +20 TP（不覆盖、不超过 maxTp）。
+     - **蓄力押注**（`handleChargeSkill`，index.html:8572）：在 `effective` 与旧加速抵扣计算**之后**落账——本次蓄力所需回合数不受新加速影响，新加速仅对**后续**蓄力生效（用户明确要求"新增加速不对本次蓄力生效"）。
+     - **看破**（index.html:6847）：扣蓝后 `notifyManaSpent(chosen.hero, chosen.skill.cost)`。
+     - **舍身**（index.html:7044）：扣蓝后 `notifyManaSpent(guardian, chosen.skill.cost)`。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：用户指定两职业被动方案——①风行者获得原施法者的【多重施法】插队能力；②施法者改为"消耗 MP 概率回馈资源"（每 1 MP 独立 2%：1 加速 + 15 TP）。【法力回响】与旧【多重施法】均为「施法后按耗蓝结算」的同类时机，故沿用 `onSkillExecuted`→`onManaSpent` 的钩子模式；但触发源从"技能释放事件"改为"扣蓝点即时结算"以严格贴合「每消耗 1 点 mp」语义（覆盖主动/反应/蓄力/看破/舍身全部扣蓝途径）。蓄力路径落账顺序特意放在 `effective` 计算之后，避免新加速影响本次蓄力（加速永久保留语义 = 只服务未来蓄力）。TP 与全局施法 +5 TP 为独立 `Math.min` 增量叠加，不互相覆盖。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；`notifyManaSpent` 定义 1 处 + 接线 4 处（7636/8572/6847/7044）就位；`onSkillExecuted` 仅存于风行者（6044）+ 通用订阅调度（6455-6456）；风行者插队逻辑与原施法者版逐行一致（均无 `[再动]` 型回合次数守卫，概率插队语义不变）。
+
+## [LOG-113] 2026-08-19 — V7.1 定版：职业被动调整实测确认 + README 更新
+
+- **变更行为**：
+  1. **实测确认**：用户确认 LOG-112 功能有效无误——风行者获得【多重施法】（消耗 MP 技能概率插队额外行动回合）；施法者改为【法力回响】（每消耗 1 MP 独立 2% 概率：+1 永久加速 +15 TP，覆盖主动/反应/蓄力/看破/舍身全部扣蓝途径）；蓄力路径新加速不影响本次蓄力；主动施法法力回响 +15 TP 与全局 +5 TP 增量叠加（一次最高 +20 TP）。
+  2. **版本号 V7.0 → V7.1**：职业被动体系调整（被动归属变更 + 新被动机制）跨入 V7.1 次版本。
+  3. **README 文档更新（V7.0 → V7.1）**：
+     - 顶部版本号 `V7.0 → V7.1`；
+     - **§7 职业被动**：风行者新增【被动 - 多重施法（V7.1 转交）】条目（原施法者被动转交）；施法者【多重施法】改写为【被动 - 法力回响（V7.1）】（每 1 MP 独立 2% 概率 +1 永久加速 +15 TP、TP 与全局 +5 叠加不覆盖、全扣蓝途径均计算、蓄力新加速不对本次生效）。
+  4. **LOG-INDEX 回填**：LOG-112 的 HASH 回填为对应代码提交；LOG-113 本记录。
+- **涉及文件**：`README.md`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：按 Coding rule，用户实测确认本轮功能有效无误后更新 README 并升版本号定版；LOG-112 为代码施工记录、本轮为定版文档记录，分条保持可溯源。
