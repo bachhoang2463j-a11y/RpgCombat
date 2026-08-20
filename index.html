@@ -343,6 +343,58 @@
 
     .mask-fade-y { -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); }
     .text-outline { text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 1px 2px rgba(0,0,0,0.8); }
+
+    /* ========================================================
+       左侧行动条动效（纯视觉层，V：回合切换/再动爆闪/回合光晕）
+       ======================================================== */
+    /* 新行动者接管：金色聚焦冲击（崩铁原味弹簧过冲） */
+    @keyframes queue-focus-ring {
+      0%   { transform: scale(0.88); box-shadow: 0 0 0 rgba(250, 204, 21, 0); }
+      45%  { transform: scale(1.22); box-shadow: 0 0 35px rgba(250, 204, 21, 1), 0 0 60px rgba(234, 179, 8, 0.8); }
+      100% { transform: scale(1.1);  box-shadow: 0 0 20px rgba(250, 204, 21, 0.9); }
+    }
+    .queue-focus-surge { animation: queue-focus-ring 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+    /* 再动爆闪：闪电能量爆发入场（仅当再动项成为当前行动者瞬间） */
+    @keyframes extra-lightning-burst {
+      0%   { transform: scale(0.1) rotate(-20deg); opacity: 0; filter: brightness(4) drop-shadow(0 0 40px #fbbf24); }
+      30%  { transform: scale(1.5) rotate(6deg);   opacity: 1; filter: brightness(3.2) drop-shadow(0 0 70px #f59e0b); }
+      65%  { transform: scale(0.92) rotate(-3deg); filter: brightness(1.7); }
+      100% { transform: scale(1.0) rotate(0deg);   opacity: 1; filter: brightness(1); }
+    }
+    .extra-turn-burst-enter {
+      animation: extra-lightning-burst 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      z-index: 55 !important;
+    }
+    /* 再动冲击波金色圆环（扩散 2.6x，配合行动条容器裁切避免大面积溢出） */
+    @keyframes lightning-shockwave {
+      0%   { transform: translate(-50%, -50%) scale(0.2); opacity: 1; border-width: 4px; }
+      50%  { opacity: 0.9; }
+      100% { transform: translate(-50%, -50%) scale(2.6);  opacity: 0; border-width: 1px; }
+    }
+    .lightning-shockwave-ring {
+      position: absolute; left: 50%; top: 50%; width: 100%; height: 100%;
+      border-radius: 9999px;
+      border: 3px solid #fbbf24;
+      box-shadow: 0 0 25px #fbbf24, inset 0 0 15px #f59e0b;
+      pointer-events: none;
+      animation: lightning-shockwave 0.6s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+      z-index: 50;
+    }
+    /* 「⚡再动」角标：持续呼吸发光（常驻于未行动的再动插队项） */
+    @keyframes extra-badge-glow {
+      0%, 100% { transform: scale(1);   filter: drop-shadow(0 0 6px rgba(251,191,36,0.9)); }
+      50%      { transform: scale(1.2); filter: drop-shadow(0 0 15px rgba(251,191,36,1)); }
+    }
+    .extra-badge-active { animation: extra-badge-glow 1.2s ease-in-out infinite; }
+
+    /* 新回合开始：全队按阵营色发出一次光晕（赛博光轨，0.6s，逐项错峰） */
+    @keyframes queue-round-glow {
+      0%   { box-shadow: 0 0 0 var(--glow-c); transform: scale(1); }
+      35%  { box-shadow: 0 0 26px var(--glow-c), 0 0 46px var(--glow-c); transform: scale(1.12); }
+      100% { box-shadow: 0 0 10px var(--glow-c); transform: scale(1); }
+    }
+    .queue-round-glow { animation: queue-round-glow 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
     
     .edit-input { background: rgba(0,0,0,0.5); border: 1px solid #475569; border-radius: 4px; padding: 4px 6px; color: #fff; outline: none; transition: border-color 0.2s; }
     .edit-input:focus { border-color: #eab308; }
@@ -5353,26 +5405,136 @@ function updateTeamBarrierUI() {
   }
 }
 
+// ---- 左侧行动条动效辅助状态（纯视觉层，数据层 state.actionQueue / queueIndex 零改动）----
+let _queueUidCounter = 0;            // 队列条目 uid 分配器（FLIP 定位 + 行动切换判定）
+let _prevQueueCurrentUid = null;     // 上次渲染的当前行动者 uid（聚焦冲击 / 再动爆闪切换判定）
+let _roundStartGlowPending = false;  // 新回合开始光晕待触发标记（startRound 置位、本函数消费一次）
+const _TURN_QUEUE_ANIM_MS = 600;     // 行动条动效基准时长（0.6s）
+const _TURN_QUEUE_EASE = 'cubic-bezier(0.34, 1.45, 0.64, 1)'; // 崩铁原味弹簧缓动
+
 function renderTurnQueue() {
-  const container = document.getElementById('turn-order-container'); container.innerHTML = '';
-  state.actionQueue.forEach((item, index) => {
-    if (!item.ref.isAlive) return;
-    const isCurrent = index === state.queueIndex && state.isGameStarted;
+  const container = document.getElementById('turn-order-container');
+  if (!container) return;
+
+  // 1. FIRST：记录现有节点的绝对位置（FLIP 定位用）
+  const firstRects = new Map();
+  Array.from(container.querySelectorAll('.turn-queue-item')).forEach(node => {
+    const id = node.getAttribute('data-item-uid');
+    if (id) firstRects.set(id, node.getBoundingClientRect());
+  });
+
+  // 回合开始光晕标记只消费一次（startRound 置位），本帧渲染即清零
+  const isRoundStart = _roundStartGlowPending;
+  _roundStartGlowPending = false;
+
+  // 2. 渲染：视觉轮转——当前行动者恒在顶部，已行动者滚回队尾（环形扫描跳过死亡）
+  container.innerHTML = '';
+  container.scrollTop = 0; // 当前恒在顶部，无需滚动居中
+  let visualIdx = 0;       // 存活单位的视觉序号（0 = 当前行动者）
+  let currentUid = null;   // 本帧当前行动者的 uid（无当前行动者时为 null）
+  const glowNodes = [];
+  const q = state.actionQueue;
+  const curRef = (q[state.queueIndex] && q[state.queueIndex].ref) || null;
+
+  for (let ri = 0; ri < q.length; ri++) {
+    const realIndex = (state.queueIndex + ri) % q.length;
+    const item = q[realIndex];
+    if (!item || !item.ref || !item.ref.isAlive) continue;
+    if (!item.uid) item.uid = ++_queueUidCounter;
+
+    const isCurrent = visualIdx === 0 && state.isGameStarted && curRef && curRef.isAlive;
+    const isExtra = item.isExtraTurn && item.queueSpd === undefined; // 再动/多重施法/连动/祈愿 插队项
+    const justSwitched = item.uid !== _prevQueueCurrentUid;
+
     const borderCol = item.type === 'hero' ? 'border-cyan-400' : 'border-rose-500';
     const bgCol = item.type === 'hero' ? 'bg-cyan-900/50' : 'bg-rose-900/50';
-    const highlight = isCurrent ? 'scale-110 ring-2 ring-yellow-400 z-10' : 'opacity-70 scale-90 blur-[1px]';
-    const currentIdAttr = isCurrent ? `id="current-turn-item"` : '';
-    const content = (item.type === 'hero' || item.ref.img) ? `<img src="${item.ref.img}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-sm sm:text-2xl">${item.ref.emoji}</div>`;
-    container.innerHTML += `<div ${currentIdAttr} class="w-8 h-8 sm:w-12 sm:h-12 rounded-full border-2 ${borderCol} ${bgCol} overflow-hidden shadow-lg transition-all duration-500 ${highlight} relative flex-shrink-0" title="${item.ref.name}">${content}${isCurrent ? `<div class="absolute -right-1 sm:-right-2 top-1/2 -translate-y-1/2 text-yellow-400 text-[8px] sm:text-xs font-bold animate-pulse drop-shadow-md">◀</div>` : ''}</div>`;
-  });
-    setTimeout(() => {
-    const curr = document.getElementById('current-turn-item');
-    const container = document.getElementById('turn-order-container');
-    if (curr && container) {
-      const scrollTarget = curr.offsetTop - container.clientHeight / 2 + curr.clientHeight / 2;
-      container.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+    const highlight = isCurrent ? 'scale-110 ring-2 ring-yellow-400 z-30' : 'opacity-70 scale-90 blur-[1px]';
+
+    const content = (item.type === 'hero' || item.ref.img)
+      ? `<img src="${item.ref.img}" class="w-full h-full object-cover">`
+      : `<div class="w-full h-full flex items-center justify-center text-sm sm:text-2xl">${item.ref.emoji}</div>`;
+
+    // 「⚡再动」角标：仅未行动的插队项常驻（realIndex >= queueIndex = 尚未轮到；已行动滚回队尾后消失）
+    const badgeHtml = (isExtra && realIndex >= state.queueIndex)
+      ? `<div class="extra-badge-active absolute -top-1.5 -right-1.5 z-40 flex items-center justify-center px-1 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-300 border border-white shadow-[0_0_10px_rgba(251,191,36,1)]"><span class="text-[8px] sm:text-[9px] font-black text-slate-950 leading-none">⚡再动</span></div>`
+      : '';
+    const currentCursor = isCurrent
+      ? `<div class="absolute -right-1 sm:-right-2 top-1/2 -translate-y-1/2 text-yellow-400 text-[8px] sm:text-xs font-bold animate-pulse drop-shadow-md">◀</div>`
+      : '';
+
+    const itemDiv = document.createElement('div');
+    // 外层不设 overflow-hidden（让冲击环/角标可溢出显示），头像由内层圆形裁切
+    itemDiv.className = `turn-queue-item relative w-8 h-8 sm:w-12 sm:h-12 rounded-full border-2 ${borderCol} ${bgCol} shadow-lg transition-all duration-300 ${highlight} flex-shrink-0`;
+    itemDiv.setAttribute('data-item-uid', item.uid);
+    itemDiv.title = item.ref.name;
+    itemDiv.innerHTML = `<div class="w-full h-full rounded-full overflow-hidden relative">${content}</div>${badgeHtml}${currentCursor}`;
+    container.appendChild(itemDiv);
+
+    // 3. 动效挂点
+    if (isCurrent) {
+      currentUid = item.uid;
+      // 回合开始光晕全队覆盖当前项，本帧不叠加聚焦/爆闪（两种 animation 互斥）
+      if (!isRoundStart && justSwitched) {
+        if (isExtra) {
+          // 再动爆闪：闪电能量爆发 + 金色冲击环
+          itemDiv.classList.add('extra-turn-burst-enter');
+          const ring = document.createElement('div');
+          ring.className = 'lightning-shockwave-ring';
+          itemDiv.appendChild(ring);
+          setTimeout(() => ring.remove(), 800);
+        } else {
+          // 崩铁原味：新行动者金色聚焦冲击
+          itemDiv.classList.add('queue-focus-surge');
+          setTimeout(() => itemDiv.classList.remove('queue-focus-surge'), 650);
+        }
+      }
     }
-  }, 100);
+
+    // 新回合开始：全队按阵营色发出一次光晕（赛博光轨，逐项 40ms 错峰）
+    if (isRoundStart) {
+      const glowColor = isExtra
+        ? 'rgba(251,191,36,0.9)'
+        : (item.type === 'hero' ? 'rgba(6,182,212,0.85)' : 'rgba(244,63,94,0.85)');
+      itemDiv.style.setProperty('--glow-c', glowColor);
+      itemDiv.classList.add('queue-round-glow');
+      itemDiv.style.animationDelay = `${visualIdx * 40}ms`;
+      glowNodes.push(itemDiv);
+    }
+
+    visualIdx++;
+  }
+
+  // 4. FLIP：存活节点从旧位置弹簧滑向新位置（行动切换整列上移 / 已行动者滚回队尾 / 速度重排）
+  Array.from(container.querySelectorAll('.turn-queue-item')).forEach(node => {
+    const id = node.getAttribute('data-item-uid');
+    const firstRect = firstRects.get(id);
+    if (!firstRect) return;
+    const lastRect = node.getBoundingClientRect();
+    const deltaY = firstRect.top - lastRect.top;
+    const deltaX = firstRect.left - lastRect.left;
+    if (Math.abs(deltaY) > 1 || Math.abs(deltaX) > 1) {
+      node.style.transition = 'none';
+      node.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0)`;
+      node.offsetHeight; // force reflow
+      node.style.transition = `transform ${_TURN_QUEUE_ANIM_MS}ms ${_TURN_QUEUE_EASE}, box-shadow ${_TURN_QUEUE_ANIM_MS}ms ease`;
+      node.style.transform = 'translate3d(0, 0, 0)';
+      setTimeout(() => {
+        node.style.transition = '';
+        node.style.transform = ''; // 回落至 Tailwind scale 工具类（transition-all 300ms 平滑过渡）
+      }, _TURN_QUEUE_ANIM_MS + 50);
+    }
+  });
+
+  // 5. 收尾：回合光晕批量清理 / 记录当前行动者 uid（供下次切换判定）
+  if (glowNodes.length) {
+    const glowCleanupMs = _TURN_QUEUE_ANIM_MS + (glowNodes.length) * 40 + 100;
+    setTimeout(() => glowNodes.forEach(n => {
+      n.classList.remove('queue-round-glow');
+      n.style.animationDelay = '';
+      n.style.removeProperty('--glow-c');
+    }), glowCleanupMs);
+  }
+  _prevQueueCurrentUid = currentUid;
 }
 
 // ==========================================
@@ -8030,6 +8192,8 @@ function startRound() {
   });
   addHistory(`\n=== 第 ${state.round} 回合 ===`);
   state.round++;
+  // 新回合开始：全队行动条图标按阵营色发出一次光晕（赛博光轨，renderTurnQueue 消费一次）
+  _roundStartGlowPending = true;
   nextTurn();
 }
 

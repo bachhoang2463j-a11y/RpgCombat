@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>左侧行动条动效方案测试 Demo - 1:1 复刻战场</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;600;700;900&family=Cinzel:wght@700;900&display=swap');
+    
+    body { 
+      font-family: 'Noto Sans SC', sans-serif; 
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    
+    .font-cinzel { font-family: 'Cinzel', serif; }
+
+    .glass-panel {
+      background: rgba(20, 25, 35, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+    }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* 单位呼吸与待机动效 */
+    @keyframes breathe {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-5px) scale(1.02); }
+    }
+    .breathe { animation: breathe 3.5s ease-in-out infinite; }
+
+    /* 行动条轨道背景线 */
+    .timeline-rail {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      transform: translateX(-50%);
+      background: linear-gradient(180deg, rgba(250,204,21,0.9) 0%, rgba(6,182,212,0.7) 25%, rgba(99,102,241,0.5) 60%, rgba(255,255,255,0.05) 100%);
+      box-shadow: 0 0 12px rgba(6,182,212,0.6);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* 能量光粒子脉冲沿着轨道下行 */
+    @keyframes rail-pulse {
+      0% { transform: translateY(-100%); opacity: 0; }
+      30% { opacity: 1; }
+      100% { transform: translateY(800%); opacity: 0; }
+    }
+    .rail-pulse-beam {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 2px;
+      height: 45px;
+      background: linear-gradient(180deg, transparent, #38bdf8, #fff);
+      box-shadow: 0 0 14px #38bdf8;
+      animation: rail-pulse 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    /* 当前行动者指示光环 */
+    @keyframes current-turn-glow {
+      0%, 100% { box-shadow: 0 0 15px rgba(250, 204, 21, 0.8), inset 0 0 8px rgba(250, 204, 21, 0.6); }
+      50% { box-shadow: 0 0 30px rgba(250, 204, 21, 1), 0 0 45px rgba(234, 179, 8, 0.7), inset 0 0 12px rgba(250, 204, 21, 0.9); }
+    }
+    .current-turn-active {
+      animation: current-turn-glow 1.8s ease-in-out infinite;
+    }
+
+    /* ========================================================
+       传送带平滑轮转动效 (Conveyor Belt Next Turn Animation)
+       ======================================================== */
+    @keyframes conveyor-exit-anim {
+      0% { transform: translate3d(0, 0, 0) scale(1.1); opacity: 1; filter: brightness(1.2); }
+      35% { transform: translate3d(-30px, -18px, 0) scale(0.9); opacity: 0.8; filter: brightness(1.8); }
+      100% { transform: translate3d(-60px, -45px, 0) scale(0.4); opacity: 0; filter: blur(3px); }
+    }
+    .conveyor-exit {
+      animation: conveyor-exit-anim 0.5s cubic-bezier(0.3, 0, 0.2, 1) forwards !important;
+      pointer-events: none;
+      z-index: 60 !important;
+    }
+
+    @keyframes conveyor-enter-bottom-anim {
+      0% { transform: translate3d(0, 45px, 0) scale(0.5); opacity: 0; filter: blur(2px); }
+      65% { transform: translate3d(0, -3px, 0) scale(1.02); opacity: 1; filter: blur(0); }
+      100% { transform: translate3d(0, 0, 0) scale(0.95); opacity: 0.85; }
+    }
+    .conveyor-enter-bottom {
+      animation: conveyor-enter-bottom-anim 0.55s cubic-bezier(0.34, 1.5, 0.64, 1) forwards;
+    }
+
+    /* 新行动者接管聚焦冲击 */
+    @keyframes active-focus-ring {
+      0% { transform: scale(0.88); box-shadow: 0 0 0 rgba(250, 204, 21, 0); }
+      45% { transform: scale(1.22); box-shadow: 0 0 35px rgba(250, 204, 21, 1), 0 0 60px rgba(234, 179, 8, 0.8); }
+      100% { transform: scale(1.1); box-shadow: 0 0 20px rgba(250, 204, 21, 0.9); }
+    }
+    .active-focus-surge {
+      animation: active-focus-ring 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    /* ========================================================
+       再动爆闪插队与自然切换 (Extra Turn Lightning Burst)
+       ======================================================== */
+    @keyframes extra-lightning-burst {
+      0% { 
+        transform: scale(0.1) rotate(-20deg); 
+        opacity: 0; 
+        filter: brightness(4) drop-shadow(0 0 40px #fbbf24); 
+      }
+      30% { 
+        transform: scale(1.5) rotate(6deg); 
+        opacity: 1; 
+        filter: brightness(3.2) drop-shadow(0 0 70px #f59e0b); 
+      }
+      65% { 
+        transform: scale(0.92) rotate(-3deg); 
+        filter: brightness(1.7); 
+      }
+      100% { 
+        transform: scale(1.0) rotate(0deg); 
+        opacity: 1; 
+        filter: brightness(1); 
+      }
+    }
+    .extra-turn-burst-enter {
+      animation: extra-lightning-burst 0.65s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      z-index: 55 !important;
+    }
+
+    @keyframes lightning-shockwave {
+      0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; border-width: 4px; }
+      50% { opacity: 0.9; }
+      100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; border-width: 1px; }
+    }
+    .lightning-shockwave-ring {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 100%;
+      height: 100%;
+      border-radius: 9999px;
+      border: 3px solid #fbbf24;
+      box-shadow: 0 0 25px #fbbf24, inset 0 0 15px #f59e0b;
+      pointer-events: none;
+      animation: lightning-shockwave 0.75s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+      z-index: 50;
+    }
+
+    @keyframes extra-badge-glow {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 6px rgba(251,191,36,0.9)); }
+      50% { transform: scale(1.2); filter: drop-shadow(0 0 15px rgba(251,191,36,1)); }
+    }
+    .extra-badge-active {
+      animation: extra-badge-glow 1.2s ease-in-out infinite;
+    }
+
+    /* ========================================================
+       速度变化右上角角标 (Speed Change Badges)
+       ======================================================== */
+    @keyframes badge-pop-up {
+      0% { transform: scale(0) translateY(8px); opacity: 0; }
+      40% { transform: scale(1.35) translateY(-2px); opacity: 1; }
+      70% { transform: scale(0.95) translateY(0); }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    @keyframes badge-pop-down {
+      0% { transform: scale(0) translateY(-8px); opacity: 0; }
+      40% { transform: scale(1.35) translateY(2px); opacity: 1; }
+      70% { transform: scale(0.95) translateY(0); }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    @keyframes badge-float-arrow {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-2px); }
+    }
+    @keyframes badge-float-arrow-down {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(2px); }
+    }
+
+    .spd-badge-up {
+      animation: badge-pop-up 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    .spd-badge-up .arrow-icon {
+      animation: badge-float-arrow 1.2s ease-in-out infinite 0.4s;
+    }
+
+    .spd-badge-down {
+      animation: badge-pop-down 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    .spd-badge-down .arrow-icon {
+      animation: badge-float-arrow-down 1.2s ease-in-out infinite 0.4s;
+    }
+
+    /* 速度数值漂浮飘字 */
+    @keyframes float-spd-num-up {
+      0% { opacity: 0; transform: translate(16px, 8px) scale(0.7); }
+      20% { opacity: 1; transform: translate(22px, -4px) scale(1.1); }
+      70% { opacity: 1; transform: translate(26px, -14px) scale(1); }
+      100% { opacity: 0; transform: translate(28px, -24px) scale(0.85); }
+    }
+    @keyframes float-spd-num-down {
+      0% { opacity: 0; transform: translate(16px, -8px) scale(0.7); }
+      20% { opacity: 1; transform: translate(22px, 4px) scale(1.1); }
+      70% { opacity: 1; transform: translate(26px, 14px) scale(1); }
+      100% { opacity: 0; transform: translate(28px, 24px) scale(0.85); }
+    }
+    .spd-float-up {
+      animation: float-spd-num-up 1.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    .spd-float-down {
+      animation: float-spd-num-down 1.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    /* ========================================================
+       方案专属特效样式
+       ======================================================== */
+    /* 方案2: 赛博光轨残影 */
+    @keyframes cyber-trail-up {
+      0% { opacity: 0.9; transform: translateY(20px) scaleY(1.4); filter: blur(2px); }
+      100% { opacity: 0; transform: translateY(-40px) scaleY(0.5); filter: blur(6px); }
+    }
+    @keyframes cyber-trail-down {
+      0% { opacity: 0.9; transform: translateY(-20px) scaleY(1.4); filter: blur(2px); }
+      100% { opacity: 0; transform: translateY(40px) scaleY(0.5); filter: blur(6px); }
+    }
+    .cyber-trail-up {
+      box-shadow: 0 10px 25px rgba(56, 189, 248, 0.8), 0 0 35px rgba(16, 185, 129, 0.6) !important;
+    }
+    .cyber-trail-down {
+      box-shadow: 0 -10px 25px rgba(244, 63, 94, 0.8), 0 0 35px rgba(217, 70, 239, 0.6) !important;
+    }
+
+    /* 方案3: 3D 浮空立体感 */
+    .card-3d-floating {
+      transform: translate3d(14px, 0, 30px) scale(1.12) !important;
+      box-shadow: -8px 12px 28px rgba(0, 0, 0, 0.8), 0 0 20px rgba(250, 204, 21, 0.6) !important;
+      z-index: 50 !important;
+    }
+
+    /* 方案4: 流体磁吸波浪涟漪 */
+    @keyframes magnetic-ripple {
+      0% { transform: scale(0.8); opacity: 1; border-width: 3px; }
+      100% { transform: scale(2.2); opacity: 0; border-width: 1px; }
+    }
+    .magnetic-ripple-wave {
+      position: absolute;
+      inset: -4px;
+      border-radius: 9999px;
+      border: 2px solid #38bdf8;
+      pointer-events: none;
+      animation: magnetic-ripple 0.65s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+    }
+
+    /* 遮罩边缘淡出 */
+    .mask-fade-y {
+      mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%);
+    }
+
+    .hero-card-inner.burst-ready {
+      border-color: #fbbf24;
+      box-shadow: 0 0 15px rgba(251, 191, 36, 0.4);
+    }
+    .hero-card-inner.burst-active {
+      border-color: #f59e0b;
+      box-shadow: 0 0 25px rgba(245, 158, 11, 0.8);
+      animation: pulse 2s infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 overflow-hidden w-screen h-screen relative">
+
+  <!-- ========================================================
+       顶部控制栏与动效方案选择区
+       ======================================================== -->
+  <header class="absolute top-0 left-0 w-full z-50 p-2 sm:p-3 flex flex-wrap items-center justify-between gap-2 pointer-events-auto bg-slate-950/85 backdrop-blur-md border-b border-slate-800/80">
+    <div class="flex items-center gap-2 sm:gap-3">
+      <div class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></div>
+      <h1 class="text-xs sm:text-sm font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-amber-300 to-rose-400">
+        行动条动效实验室 · 传送带与再动爆闪插队
+      </h1>
+      <span id="current-scheme-tag" class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/60 hidden sm:inline-block">
+        方案 1：崩铁原味平滑弹簧
+      </span>
+    </div>
+
+    <!-- 方案切换 Tab -->
+    <div class="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-700/70 text-[10px] sm:text-xs">
+      <button onclick="setScheme('star-rail')" id="tab-star-rail" class="scheme-tab-btn px-2.5 sm:px-3 py-1 rounded-lg font-bold transition-all bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-[0_0_12px_rgba(6,182,212,0.4)]">
+        1. 崩铁原味
+      </button>
+      <button onclick="setScheme('cyber-warp')" id="tab-cyber-warp" class="scheme-tab-btn px-2.5 sm:px-3 py-1 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition-all">
+        2. 赛博光轨
+      </button>
+      <button onclick="setScheme('float-3d')" id="tab-float-3d" class="scheme-tab-btn px-2.5 sm:px-3 py-1 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition-all">
+        3. 3D悬浮
+      </button>
+      <button onclick="setScheme('magnetic-wave')" id="tab-magnetic-wave" class="scheme-tab-btn px-2.5 sm:px-3 py-1 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition-all">
+        4. 流体磁吸
+      </button>
+    </div>
+
+    <!-- 速度/时长与开关设置 -->
+    <div class="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs">
+      <div class="flex items-center gap-1 bg-slate-900/80 px-2 py-1 rounded-lg border border-slate-800">
+        <span class="text-slate-400 text-[10px]">⏱️ 动效时长:</span>
+        <select id="anim-duration-select" onchange="setDuration(this.value)" class="bg-transparent text-amber-300 font-mono font-bold outline-none cursor-pointer">
+          <option value="350" class="bg-slate-900">快速 (0.35s)</option>
+          <option value="600" selected class="bg-slate-900">标准 (0.60s)</option>
+          <option value="1000" class="bg-slate-900">沉浸 (1.00s)</option>
+          <option value="2000" class="bg-slate-900">慢动作 (2.00s)</option>
+        </select>
+      </div>
+
+      <button onclick="toggleBadge()" id="btn-toggle-badge" class="px-2.5 py-1 rounded-lg border border-emerald-500/50 bg-emerald-950/50 text-emerald-300 font-bold hover:bg-emerald-900/60 transition-all flex items-center gap-1 shadow-sm">
+        <span>🟢 变速角标: 开</span>
+      </button>
+
+      <button onclick="toggleFloatNum()" id="btn-toggle-float" class="px-2.5 py-1 rounded-lg border border-cyan-500/50 bg-cyan-950/50 text-cyan-300 font-bold hover:bg-cyan-900/60 transition-all flex items-center gap-1 shadow-sm">
+        <span>🔢 数值飘字: 开</span>
+      </button>
+
+      <button onclick="resetQueueDemo()" class="px-2.5 py-1 rounded-lg border border-rose-500/40 bg-rose-950/40 text-rose-300 font-bold hover:bg-rose-900/60 transition-all flex items-center gap-1 shadow-sm">
+        <span>🔄 重置</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================
+       1:1 复刻全屏战场区域 (Battle Scene)
+       ======================================================== -->
+  <main class="absolute inset-0 top-[52px] bg-gradient-to-br from-indigo-950 via-slate-900 to-emerald-950 overflow-hidden z-0" id="battle-scene">
+    <div class="absolute inset-0 opacity-25 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-300 via-transparent to-transparent pointer-events-none"></div>
+    <div class="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-black/85 via-black/30 to-transparent z-0 pointer-events-none"></div>
+
+    <!-- 顶部战斗提示横幅 -->
+    <div class="absolute top-4 w-full flex justify-center z-30 pointer-events-none">
+      <div id="battle-log" class="glass-panel px-6 py-1.5 rounded-full text-xs sm:text-sm font-medium tracking-wide text-white/90 transition-all duration-300 transform border border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.2)]">
+        ⚡ 点击右下角【⚔️ 传送带推进】或【✨ 爆闪插队再动】观察全新动效
+      </div>
+    </div>
+
+    <!-- ========================================================
+         左侧核心：时间轴轨道与头像容器
+         ======================================================== -->
+    <div class="absolute left-2 sm:left-6 top-6 bottom-44 sm:bottom-48 w-14 sm:w-20 z-40 pointer-events-auto flex flex-col items-center select-none">
+      <div class="mb-2 px-2 py-0.5 rounded-full bg-slate-900/90 border border-slate-700 text-[9px] sm:text-[10px] font-bold text-slate-300 tracking-wider flex items-center gap-1 shadow-md">
+        <span class="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span>
+        <span>行动顺</span>
+      </div>
+
+      <div class="relative w-full flex-1 flex flex-col items-center">
+        <div class="timeline-rail">
+          <div class="rail-pulse-beam"></div>
+        </div>
+
+        <div id="turn-order-container" class="relative w-full h-full flex flex-col gap-2.5 sm:gap-3.5 items-center overflow-y-auto no-scrollbar mask-fade-y py-4 scroll-smooth">
+          <!-- 动态渲染行动队列单元 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 中部：敌方阵列 -->
+    <div id="enemies-container" class="absolute inset-0 z-10 flex flex-wrap items-center justify-center gap-8 sm:gap-20 pb-44 sm:pb-52 px-12 pointer-events-auto">
+      <!-- 动态填充敌方卡片 -->
+    </div>
+  </main>
+
+  <!-- ========================================================
+       悬浮 UI 层：底部我方英雄卡片 + 右侧操作面板
+       ======================================================== -->
+  <footer class="absolute bottom-14 sm:bottom-16 left-0 w-full px-2 sm:px-6 flex flex-col-reverse sm:flex-row items-end justify-between gap-2 sm:gap-4 z-20 pointer-events-none">
+    <!-- 我方小队 4 英雄卡片 -->
+    <div id="heroes-container" class="w-full sm:flex-1 grid grid-cols-4 gap-1.5 sm:gap-3 max-w-2xl pointer-events-auto relative">
+      <!-- 动态填充英雄卡片 -->
+    </div>
+
+    <!-- 右侧行动面板 -->
+    <div id="menu-container" class="w-[260px] h-[172px] bg-slate-950/95 backdrop-blur-xl rounded-xl border border-slate-700/80 border-t-2 border-t-cyan-500/80 flex flex-col overflow-hidden shadow-[0_15px_35px_rgba(0,0,0,0.9)] pointer-events-auto self-end mb-1 sm:mb-0">
+      <div id="active-hero-name" class="text-center text-[10px] sm:text-xs py-1 text-cyan-300 bg-white/5 tracking-widest uppercase border-b border-white/10 font-bold flex items-center justify-center gap-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+        <span id="current-actor-text">当前行动：李长风</span>
+      </div>
+      <div id="main-menu" class="flex-1 flex flex-col p-1.5 gap-1 justify-center relative bg-slate-900/50">
+        <!-- 传送带推进按钮 -->
+        <button onclick="demoConveyorNextTurn()" class="w-full py-1.5 px-3 bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-500 hover:from-amber-500 hover:to-yellow-400 border border-amber-300 rounded-lg text-xs font-bold text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.4)] hover:scale-[1.01] transition-all flex items-center justify-between">
+          <span class="flex items-center gap-1.5"><span>⏩</span> 传送带平滑轮转</span>
+          <span class="text-[10px] bg-black/30 text-white px-1.5 py-0.5 rounded font-mono font-bold">NEXT ▶</span>
+        </button>
+        <!-- 再动爆闪插队演示 -->
+        <button onclick="demoExtraTurnSequence('h2')" class="w-full py-1.5 px-3 bg-gradient-to-r from-purple-950 via-indigo-900 to-purple-900 hover:from-purple-900 hover:to-indigo-800 border border-purple-400/80 rounded-lg text-xs font-bold text-white shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:scale-[1.01] transition-all flex items-center justify-between">
+          <span class="flex items-center gap-1.5"><span class="text-amber-300 animate-pulse">⚡</span> 李长风·爆闪再动</span>
+          <span class="text-[10px] text-amber-300 font-mono bg-black/40 px-1 rounded">插队+切换</span>
+        </button>
+        <!-- 提速演示 -->
+        <button onclick="demoHeroSpeedUp('h2')" class="w-full py-1.5 px-3 bg-slate-900/80 hover:bg-cyan-950/60 border border-slate-700/80 hover:border-cyan-500/60 rounded-lg text-xs font-bold text-slate-200 hover:text-cyan-300 transition-all flex items-center justify-between">
+          <span class="flex items-center gap-1.5"><span class="text-cyan-400">💨</span> 李长风·疾风瞬步</span>
+          <span class="text-[10px] text-emerald-400 font-mono">+40 速 🟢</span>
+        </button>
+        <!-- 减速演示 -->
+        <button onclick="demoEnemySlowDown('e1')" class="w-full py-1.5 px-3 bg-slate-900/80 hover:bg-rose-950/60 border border-slate-700/80 hover:border-rose-500/60 rounded-lg text-xs font-bold text-slate-200 hover:text-rose-300 transition-all flex items-center justify-between">
+          <span class="flex items-center gap-1.5"><span class="text-rose-400">❄️</span> 极寒冰缚·苍狼</span>
+          <span class="text-[10px] text-rose-400 font-mono">-40 速 🔴</span>
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ========================================================
+       底部悬浮快速测试工具条 (Action Dock)
+       ======================================================== -->
+  <nav class="absolute bottom-0 left-0 w-full h-12 sm:h-14 bg-slate-950/90 border-t border-slate-800 backdrop-blur-xl z-50 px-2 sm:px-6 flex items-center justify-between gap-2">
+    <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-1">
+      <span class="text-[10px] sm:text-xs text-slate-400 font-bold shrink-0">🎮 动效测试:</span>
+      
+      <!-- 传送带推进 -->
+      <button onclick="demoConveyorNextTurn()" class="px-2.5 py-1 rounded bg-amber-900/70 hover:bg-amber-800 text-amber-200 border border-amber-400/60 text-[10px] sm:text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 shadow-sm">
+        <span>⏩ 传送带推进</span>
+      </button>
+
+      <!-- 爆闪插队再动 -->
+      <button onclick="demoExtraTurnSequence('h1')" class="px-2.5 py-1 rounded bg-purple-900/70 hover:bg-purple-800 text-purple-200 border border-purple-400/60 text-[10px] sm:text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 shadow-sm">
+        <span>⚡ 烈阳剑尊爆闪再动</span>
+      </button>
+
+      <button onclick="demoHeroSpeedUp('h2')" class="px-2.5 py-1 rounded bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 border border-cyan-500/50 text-[10px] sm:text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 shadow-sm">
+        <span>💨 李长风+40速</span>
+      </button>
+
+      <button onclick="demoEnemySlowDown('e1')" class="px-2.5 py-1 rounded bg-rose-900/60 hover:bg-rose-800 text-rose-200 border border-rose-500/50 text-[10px] sm:text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 shadow-sm">
+        <span>🐌 苍狼-40速</span>
+      </button>
+
+      <button onclick="demoTeamSpeedUp()" class="px-2.5 py-1 rounded bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 border border-emerald-500/50 text-[10px] sm:text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 shadow-sm">
+        <span>🌟 我方全队[群速]</span>
+      </button>
+
+      <button onclick="demoTeamSlowDown()" class="px-2.5 py-1 rounded bg-red-950 hover:bg-red-900 text-red-200 border border-red-500/50 text-[10px] sm:text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 shadow-sm">
+        <span>❄️ 敌方全队[群缓]</span>
+      </button>
+
+      <button onclick="demoRandomChaos()" class="px-2.5 py-1 rounded bg-fuchsia-900/60 hover:bg-fuchsia-800 text-fuchsia-200 border border-fuchsia-500/50 text-[10px] sm:text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 shadow-sm">
+        <span>🔀 随机速度大乱斗</span>
+      </button>
+    </div>
+
+    <!-- 自动循环演示开关 -->
+    <div class="flex items-center gap-1.5 shrink-0">
+      <button id="btn-auto-demo" onclick="toggleAutoDemo()" class="px-3 py-1 rounded-lg border border-indigo-500/50 bg-indigo-950/60 text-indigo-300 font-bold text-[10px] sm:text-xs hover:bg-indigo-900/80 transition-all flex items-center gap-1.5">
+        <span id="auto-demo-icon">▶</span> <span>自动演练循环</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ========================================================
+       核心 JavaScript 逻辑与 FLIP 动效引擎
+       ======================================================== -->
+  <script>
+    // --- 初始战斗数据 ---
+    const HEROES_INIT = [
+      { id: 'h1', name: '烈阳剑尊', classType: '防守者', hp: 100, maxHp: 100, mp: 50, maxMp: 50, tp: 85, maxTp: 100, spd: 110, img: 'https://www.imgur.la/images/2026/03/06/lyt.jpg', buffs: [] },
+      { id: 'h2', name: '李长风', classType: '风行者', hp: 85, maxHp: 85, mp: 60, maxMp: 60, tp: 45, maxTp: 100, spd: 135, img: 'https://www.imgur.la/images/2026/03/06/lcft.jpg', buffs: [] },
+      { id: 'h3', name: '玛德琳', classType: '施法者', hp: 75, maxHp: 75, mp: 120, maxMp: 120, tp: 30, maxTp: 100, spd: 95, img: 'https://imgur.la/images/2026/06/25/585bf7f2f1559168b419b8be56da36a6.png', buffs: [] },
+      { id: 'h4', name: '索恩', classType: '狂战士', hp: 110, maxHp: 110, mp: 40, maxMp: 40, tp: 65, maxTp: 100, spd: 105, img: 'https://imgur.la/images/2026/08/13/77fcdf0fd006c4ff1ccae30774322270.png', buffs: [] }
+    ];
+
+    const ENEMIES_INIT = [
+      { id: 'e1', name: '青眼苍狼', hp: 120, maxHp: 120, spd: 115, emoji: '🐺', charge: 2, maxCharge: 3, buffs: [] },
+      { id: 'e2', name: '噬魂幽影', hp: 90, maxHp: 90, spd: 140, emoji: '👻', charge: 1, maxCharge: 2, buffs: [] },
+      { id: 'e3', name: '铁甲狂犀', hp: 200, maxHp: 200, spd: 80, emoji: '🦏', charge: 3, maxCharge: 4, buffs: [] },
+      { id: 'e4', name: '极寒祭司', hp: 80, maxHp: 80, spd: 100, emoji: '🧙‍♂️', charge: 1, maxCharge: 3, buffs: [] }
+    ];
+
+    let heroes = JSON.parse(JSON.stringify(HEROES_INIT));
+    let enemies = JSON.parse(JSON.stringify(ENEMIES_INIT));
+
+    // 全局动效状态
+    const animConfig = {
+      scheme: 'star-rail', // 'star-rail' | 'cyber-warp' | 'float-3d' | 'magnetic-wave'
+      duration: 600, // ms
+      showBadge: true,
+      showFloatNum: true,
+      autoDemoTimer: null,
+      isAnimating: false
+    };
+
+    // 方案描述映射
+    const SCHEME_NAMES = {
+      'star-rail': '方案 1：崩铁原味平滑弹簧 (FLIP Spring & Rails)',
+      'cyber-warp': '方案 2：赛博流光残影推进 (Cyber Warp & Light Trail)',
+      'float-3d': '方案 3：3D悬浮错峰卡牌 (3D Float & Stagger Snap)',
+      'magnetic-wave': '方案 4：流体磁吸波浪 (Liquid Magnetic Wave)'
+    };
+
+    // 缓动曲线映射
+    const SCHEME_EASINGS = {
+      'star-rail': 'cubic-bezier(0.34, 1.45, 0.64, 1)', // 经典轻微过冲弹性
+      'cyber-warp': 'cubic-bezier(0.16, 1, 0.3, 1)',    // 极速冲刺突进
+      'float-3d': 'cubic-bezier(0.22, 1, 0.36, 1)',      // 优雅浮起吸附
+      'magnetic-wave': 'cubic-bezier(0.68, -0.4, 0.32, 1.4)' // 磁场回弹
+    };
+
+    // 队列数据状态
+    let actionQueue = [];
+    let queueIndex = 0;
+
+    // 获取实体有效速度
+    function getEffectiveSpeed(entity) {
+      const buffSpd = (entity.buffs || []).filter(b => b.type === 'spd').reduce((sum, b) => sum + b.value, 0);
+      return (entity.spd || 0) + buffSpd;
+    }
+
+    // 初始化行动队列
+    function buildInitialQueue() {
+      actionQueue = [];
+      heroes.forEach(h => actionQueue.push({ id: h.id, type: 'hero', ref: h, queueSpd: getEffectiveSpeed(h) }));
+      enemies.forEach(e => actionQueue.push({ id: e.id, type: 'enemy', ref: e, queueSpd: getEffectiveSpeed(e) }));
+      
+      // 按速度降序排列
+      actionQueue.sort((a, b) => b.queueSpd - a.queueSpd);
+      queueIndex = 0;
+    }
+
+    // ========================================================
+    // 传送带平滑轮转核心引擎 (Conveyor Belt Next Turn Engine)
+    // ========================================================
+    async function demoConveyorNextTurn() {
+      if (animConfig.isAnimating || actionQueue.length === 0) return;
+      animConfig.isAnimating = true;
+
+      const container = document.getElementById('turn-order-container');
+      if (!container) return;
+
+      const currentItem = actionQueue[0];
+      showToast(`⏩ 传送带轮转：【${currentItem.ref.name}】行动完毕，下一位就位！`);
+
+      // 1. FIRST: 记录当前所有节点的绝对位置
+      const firstRects = new Map();
+      const nodes = Array.from(container.querySelectorAll('.turn-queue-item'));
+      nodes.forEach(node => {
+        const id = node.getAttribute('data-item-uid');
+        if (id) firstRects.set(id, node.getBoundingClientRect());
+      });
+
+      // 2. 队首节点执行平滑出圈消失动效 (Conveyor Exit)
+      const topNode = nodes[0];
+      if (topNode) {
+        topNode.classList.add('conveyor-exit');
+      }
+
+      // 3. 数据层更新：队首出队并重新加入队尾
+      const finished = actionQueue.shift();
+      actionQueue.push(finished);
+      queueIndex = 0;
+
+      // 等待 150ms 让出圈动画先行，紧接着传送带整体上滑
+      await new Promise(r => setTimeout(r, 120));
+
+      // 4. LAST: 渲染新的 DOM 结构 (底部新插入的节点附加进场动效)
+      renderTurnQueueDOM();
+
+      // 5. INVERT & PLAY: 其余节点整体平滑向上滑动一个槽位
+      const lastNodes = Array.from(container.querySelectorAll('.turn-queue-item'));
+      const duration = animConfig.duration;
+      const easing = SCHEME_EASINGS[animConfig.scheme] || 'cubic-bezier(0.34, 1.45, 0.64, 1)';
+
+      lastNodes.forEach((node, idx) => {
+        const id = node.getAttribute('data-item-uid');
+        const firstRect = firstRects.get(id);
+
+        if (firstRect) {
+          const lastRect = node.getBoundingClientRect();
+          const deltaY = firstRect.top - lastRect.top;
+          const deltaX = firstRect.left - lastRect.left;
+
+          if (Math.abs(deltaY) > 1 || Math.abs(deltaX) > 1) {
+            node.style.transition = 'none';
+            node.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0)`;
+
+            // Force reflow
+            node.offsetHeight;
+
+            node.style.transition = `transform ${duration}ms ${easing}, box-shadow ${duration}ms ease`;
+            node.style.transform = 'translate3d(0, 0, 0)';
+
+            setTimeout(() => {
+              node.style.transition = '';
+            }, duration + 50);
+          }
+        } else if (idx === lastNodes.length - 1) {
+          // 刚循环到底部的节点，从下方自然滑入
+          node.classList.add('conveyor-enter-bottom');
+          setTimeout(() => node.classList.remove('conveyor-enter-bottom'), duration + 100);
+        }
+
+        // 新接管行动权的第 1 项触发高亮聚焦冲击波
+        if (idx === 0) {
+          node.classList.add('active-focus-surge');
+          setTimeout(() => node.classList.remove('active-focus-surge'), 650);
+        }
+      });
+
+      updateActiveActorDisplay();
+
+      setTimeout(() => {
+        animConfig.isAnimating = false;
+      }, duration + 150);
+    }
+
+    // ========================================================
+    // 两阶段再动爆闪插队与自然切换 (Extra Turn Two-Phase Engine)
+    // ========================================================
+    async function demoExtraTurnSequence(heroId) {
+      if (animConfig.isAnimating) return;
+      animConfig.isAnimating = true;
+
+      const hero = heroes.find(h => h.id === heroId) || heroes[0];
+      const container = document.getElementById('turn-order-container');
+      if (!container) return;
+
+      const extraUid = `extra_${hero.id}_${Date.now()}`;
+      showToast(`⚡【${hero.name}】施放再动技能：爆发能量，插队获得额外行动！`);
+
+      // 阶段 1: 测量当前位置并插入新图标 (FLIP 让下方元素自然下移让位)
+      const firstRects = new Map();
+      const nodes = Array.from(container.querySelectorAll('.turn-queue-item'));
+      nodes.forEach(node => {
+        const id = node.getAttribute('data-item-uid');
+        if (id) firstRects.set(id, node.getBoundingClientRect());
+      });
+
+      // 插入到当前行动者之后 (第 1 位，即将紧接着行动)
+      actionQueue.splice(1, 0, {
+        uid: extraUid,
+        id: hero.id,
+        type: 'hero',
+        ref: hero,
+        isExtra: true,
+        queueSpd: 999
+      });
+
+      // 重新渲染 DOM
+      renderTurnQueueDOM();
+
+      // 下方受挤压节点平滑向下移动，新插入节点执行爆闪冲击
+      const lastNodes = Array.from(container.querySelectorAll('.turn-queue-item'));
+      const duration = animConfig.duration;
+      const easing = SCHEME_EASINGS[animConfig.scheme] || 'cubic-bezier(0.34, 1.45, 0.64, 1)';
+
+      lastNodes.forEach((node) => {
+        const id = node.getAttribute('data-item-uid');
+        const firstRect = firstRects.get(id);
+
+        if (firstRect) {
+          const lastRect = node.getBoundingClientRect();
+          const deltaY = firstRect.top - lastRect.top;
+          if (Math.abs(deltaY) > 1) {
+            node.style.transition = 'none';
+            node.style.transform = `translate3d(0, ${deltaY}px, 0)`;
+            node.offsetHeight; // force reflow
+            node.style.transition = `transform ${duration}ms ${easing}`;
+            node.style.transform = 'translate3d(0, 0, 0)';
+            setTimeout(() => { node.style.transition = ''; }, duration + 50);
+          }
+        } else if (id === extraUid) {
+          // 新增节点爆闪插队动画
+          node.classList.add('extra-turn-burst-enter');
+          
+          // 添加金色能量光环涟漪
+          const shockwave = document.createElement('div');
+          shockwave.className = 'lightning-shockwave-ring';
+          node.appendChild(shockwave);
+          setTimeout(() => shockwave.remove(), 800);
+        }
+      });
+
+      // 阶段 2: 停顿 550ms 让玩家清晰感知爆闪插队后，传送带自然推进切换到新增图标
+      await new Promise(r => setTimeout(r, 550));
+
+      showToast(`✨ 行动权自然切换至【${hero.name}】的再动回合！`);
+      animConfig.isAnimating = false;
+      await demoConveyorNextTurn();
+    }
+
+    // ========================================================
+    // FLIP (First-Last-Invert-Play) 速度变动重排引擎
+    // ========================================================
+    function reorderQueueWithFLIP(options = {}) {
+      const container = document.getElementById('turn-order-container');
+      if (!container) return;
+
+      const {
+        changedEntityId = null,
+        spdDelta = 0
+      } = options;
+
+      // 1. FIRST: 测量当前所有节点的位置
+      const firstRects = new Map();
+      const nodes = container.querySelectorAll('.turn-queue-item');
+      nodes.forEach(node => {
+        const id = node.getAttribute('data-item-uid');
+        if (id) firstRects.set(id, node.getBoundingClientRect());
+      });
+
+      // 2. 数据层重排：保持已行动前缀不变，对其余按最新速度排序
+      const done = actionQueue.slice(0, 1);
+      const rest = actionQueue.slice(1);
+      rest.forEach(item => {
+        if (!item.isExtra) {
+          item.queueSpd = getEffectiveSpeed(item.ref);
+        }
+      });
+      rest.sort((a, b) => b.queueSpd - a.queueSpd);
+      actionQueue = done.concat(rest);
+
+      // 3. LAST: 渲染新的 DOM 结构
+      renderTurnQueueDOM(changedEntityId, spdDelta);
+
+      // 4. INVERT & PLAY: 计算位移差并执行过渡动画
+      const lastNodes = container.querySelectorAll('.turn-queue-item');
+      const duration = animConfig.duration;
+      const easing = SCHEME_EASINGS[animConfig.scheme] || 'cubic-bezier(0.34, 1.45, 0.64, 1)';
+
+      lastNodes.forEach((node, idx) => {
+        const id = node.getAttribute('data-item-uid');
+        const firstRect = firstRects.get(id);
+
+        if (firstRect) {
+          const lastRect = node.getBoundingClientRect();
+          const deltaY = firstRect.top - lastRect.top;
+          const deltaX = firstRect.left - lastRect.left;
+
+          if (Math.abs(deltaY) > 1 || Math.abs(deltaX) > 1) {
+            node.style.transition = 'none';
+            
+            if (animConfig.scheme === 'float-3d') {
+              node.style.transform = `translate3d(${deltaX + 12}px, ${deltaY}px, 20px) scale(1.08)`;
+              node.classList.add('card-3d-floating');
+            } else if (animConfig.scheme === 'cyber-warp') {
+              node.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0) scaleY(${deltaY > 0 ? 1.25 : 0.85})`;
+              if (deltaY > 0) node.classList.add('cyber-trail-up');
+              else node.classList.add('cyber-trail-down');
+            } else if (animConfig.scheme === 'magnetic-wave') {
+              node.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0) rotate(${deltaY > 0 ? -4 : 4}deg)`;
+            } else {
+              node.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0)`;
+            }
+
+            node.offsetHeight; // force reflow
+
+            const staggerDelay = animConfig.scheme === 'float-3d' ? idx * 25 : 0;
+            node.style.transition = `transform ${duration}ms ${easing} ${staggerDelay}ms, box-shadow ${duration}ms ease, opacity ${duration}ms ease`;
+            node.style.transform = 'translate3d(0, 0, 0) scale(1) rotate(0deg)';
+
+            setTimeout(() => {
+              node.classList.remove('card-3d-floating', 'cyber-trail-up', 'cyber-trail-down');
+              node.style.transition = '';
+            }, duration + staggerDelay + 50);
+          }
+        }
+      });
+
+      updateActiveActorDisplay();
+    }
+
+    // ========================================================
+    // 渲染行动条 DOM 结构
+    // ========================================================
+    function renderTurnQueueDOM(changedId = null, spdDelta = 0) {
+      const container = document.getElementById('turn-order-container');
+      if (!container) return;
+
+      container.innerHTML = '';
+
+      actionQueue.forEach((item, index) => {
+        // 给每个项分配唯一 UID
+        if (!item.uid) item.uid = `${item.ref.id}_${Math.random().toString(36).substr(2, 6)}`;
+        
+        const isCurrent = index === 0;
+        const isHero = item.type === 'hero';
+        const isExtra = item.isExtra;
+        const entityId = item.ref.id;
+
+        const borderCol = isExtra ? 'border-amber-400 shadow-[0_0_16px_rgba(251,191,36,0.9)]' : 
+                          isHero ? 'border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 
+                          'border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.4)]';
+        
+        const bgCol = isExtra ? 'bg-amber-950/80' : isHero ? 'bg-cyan-950/70' : 'bg-rose-950/70';
+        const highlight = isCurrent ? 'scale-110 ring-2 ring-yellow-400 z-30 current-turn-active' : 'opacity-85 scale-95 hover:opacity-100 hover:scale-105';
+
+        const avatarContent = item.ref.img ? 
+          `<img src="${item.ref.img}" class="w-full h-full object-cover rounded-full" onerror="this.src='https://imgur.la/images/2026/08/13/9adb95d5df1b99ebe2f6670acd47a5b5.png'">` : 
+          `<div class="w-full h-full flex items-center justify-center text-base sm:text-2xl">${item.ref.emoji || '👾'}</div>`;
+
+        const spdVal = getEffectiveSpeed(item.ref);
+        const isTargetChanged = changedId && (entityId === changedId);
+        let badgeHtml = '';
+        let floatNumHtml = '';
+
+        // 速度变化角标
+        if (isTargetChanged && animConfig.showBadge && spdDelta !== 0) {
+          const isUp = spdDelta > 0;
+          if (isUp) {
+            badgeHtml = `
+              <div class="spd-badge-up absolute -top-1 -right-1 z-40 flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-gradient-to-tr from-emerald-600 via-green-400 to-emerald-200 border border-white shadow-[0_0_10px_rgba(16,185,129,1)]">
+                <span class="arrow-icon text-[9px] sm:text-[11px] font-black text-slate-950 leading-none">▲</span>
+              </div>
+            `;
+            if (animConfig.showFloatNum) {
+              floatNumHtml = `<div class="spd-float-up absolute -right-6 top-0 z-50 text-[10px] sm:text-xs font-black text-emerald-300 font-mono drop-shadow-[0_0_6px_rgba(16,185,129,0.9)] whitespace-nowrap pointer-events-none">+${spdDelta}速</div>`;
+            }
+          } else {
+            badgeHtml = `
+              <div class="spd-badge-down absolute -top-1 -right-1 z-40 flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-gradient-to-tr from-rose-700 via-red-500 to-rose-300 border border-white shadow-[0_0_10px_rgba(244,63,94,1)]">
+                <span class="arrow-icon text-[9px] sm:text-[11px] font-black text-white leading-none">▼</span>
+              </div>
+            `;
+            if (animConfig.showFloatNum) {
+              floatNumHtml = `<div class="spd-float-down absolute -right-6 top-0 z-50 text-[10px] sm:text-xs font-black text-rose-400 font-mono drop-shadow-[0_0_6px_rgba(244,63,94,0.9)] whitespace-nowrap pointer-events-none">${spdDelta}速</div>`;
+            }
+          }
+        }
+
+        // 再动专属角标
+        if (isExtra) {
+          badgeHtml = `
+            <div class="extra-badge-active absolute -top-1.5 -right-1.5 z-40 flex items-center justify-center px-1 py-0.2 rounded-full bg-gradient-to-r from-amber-500 to-yellow-300 border border-white shadow-[0_0_10px_rgba(251,191,36,1)]">
+              <span class="text-[8px] sm:text-[9px] font-black text-slate-950 leading-none">⚡再动</span>
+            </div>
+          `;
+        }
+
+        const currentCursor = isCurrent ? `
+          <div class="absolute -right-2 top-1/2 -translate-y-1/2 text-yellow-400 text-[9px] sm:text-xs font-black animate-pulse drop-shadow-[0_0_8px_rgba(250,204,21,0.9)]">◀</div>
+        ` : '';
+
+        const rankPill = `
+          <div class="absolute -left-1 -bottom-1 z-20 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-slate-950/90 border border-slate-700 flex items-center justify-center text-[7px] sm:text-[9px] font-mono font-bold text-slate-300">
+            ${index + 1}
+          </div>
+        `;
+
+        const itemDiv = document.createElement('div');
+        itemDiv.className = `turn-queue-item relative w-9 h-9 sm:w-12 sm:h-12 rounded-full border-2 ${borderCol} ${bgCol} shadow-xl transition-all duration-300 flex-shrink-0 cursor-pointer ${highlight}`;
+        itemDiv.setAttribute('data-item-uid', item.uid);
+        itemDiv.setAttribute('data-entity-id', entityId);
+        itemDiv.title = `${item.ref.name} (速度: ${spdVal}${isExtra ? ' · 再动' : ''})`;
+
+        itemDiv.innerHTML = `
+          <div class="w-full h-full rounded-full overflow-hidden relative">
+            ${avatarContent}
+          </div>
+          ${rankPill}
+          ${badgeHtml}
+          ${floatNumHtml}
+          ${currentCursor}
+        `;
+
+        itemDiv.onclick = () => {
+          showToast(`已选中: ${item.ref.name} (速度: ${spdVal}${isExtra ? ' · 再动' : ''})`);
+        };
+
+        container.appendChild(itemDiv);
+      });
+    }
+
+    // ========================================================
+    // 战场场景渲染 (英雄与敌方阵列 1:1 复刻)
+    // ========================================================
+    function renderBattleScene() {
+      // 1. 渲染英雄卡片
+      const heroesContainer = document.getElementById('heroes-container');
+      heroesContainer.innerHTML = '';
+      heroes.forEach(h => {
+        const heroDiv = document.createElement('div');
+        heroDiv.className = 'relative transition-all duration-300 min-w-[70px]';
+        heroDiv.id = `hero-card-${h.id}`;
+        
+        const spd = getEffectiveSpeed(h);
+        const spdBuff = (h.buffs || []).filter(b => b.type === 'spd').reduce((s, b) => s + b.value, 0);
+        const spdTag = spdBuff > 0 ? `<span class="text-emerald-400 font-mono text-[8px]">⚡+${spdBuff}</span>` : 
+                       spdBuff < 0 ? `<span class="text-rose-400 font-mono text-[8px]">🐌${spdBuff}</span>` : '';
+
+        heroDiv.innerHTML = `
+          <div class="hero-card-inner bg-[#18181b] rounded-lg overflow-hidden relative border border-gray-800 shadow-2xl transition-all ${h.tp >= h.maxTp ? 'burst-ready' : ''}">
+            <div class="w-full h-12 sm:h-16 relative bg-gray-900 border-b border-gray-700">
+              <div class="absolute top-0 left-0 w-full bg-gradient-to-b from-black/80 to-transparent px-1.5 py-0.5 text-[9px] sm:text-xs font-bold text-white z-10 flex justify-between">
+                <span>${h.name}</span>
+                <span>${spdTag}</span>
+              </div>
+              <img src="${h.img}" class="w-full h-full object-cover">
+            </div>
+            <div class="px-1.5 py-1 flex flex-col gap-0.5 text-[8px] sm:text-[10px]">
+              <div class="flex justify-between items-center text-yellow-400 font-mono font-bold">
+                <span>HP</span><span>${h.hp}/${h.maxHp}</span>
+              </div>
+              <div class="w-full h-1 bg-gray-800 rounded-full overflow-hidden">
+                <div class="h-full bg-yellow-400" style="width: ${(h.hp/h.maxHp)*100}%"></div>
+              </div>
+              <div class="flex justify-between items-center text-cyan-400 font-mono font-bold mt-0.5">
+                <span>MP</span><span>${h.mp}/${h.maxMp}</span>
+              </div>
+              <div class="w-full h-1 bg-gray-800 rounded-full overflow-hidden">
+                <div class="h-full bg-cyan-400" style="width: ${(h.mp/h.maxMp)*100}%"></div>
+              </div>
+            </div>
+          </div>
+        `;
+        heroesContainer.appendChild(heroDiv);
+      });
+
+      // 2. 渲染敌人卡片
+      const enemiesContainer = document.getElementById('enemies-container');
+      enemiesContainer.innerHTML = '';
+      enemies.forEach(e => {
+        const enemyDiv = document.createElement('div');
+        enemyDiv.className = 'flex flex-col items-center group relative cursor-pointer';
+        enemyDiv.id = `enemy-box-${e.id}`;
+        
+        const spd = getEffectiveSpeed(e);
+        const spdBuff = (e.buffs || []).filter(b => b.type === 'spd').reduce((s, b) => s + b.value, 0);
+        const spdTag = spdBuff > 0 ? `<span class="text-emerald-400 font-mono text-[9px]">⚡+${spdBuff}</span>` : 
+                       spdBuff < 0 ? `<span class="text-rose-400 font-mono text-[9px]">🐌${spdBuff}</span>` : '';
+
+        enemyDiv.innerHTML = `
+          <div class="text-white/80 text-[10px] sm:text-xs bg-black/60 px-2 py-0.5 rounded backdrop-blur-md whitespace-nowrap mb-1 flex items-center gap-1 border border-white/10 shadow-md">
+            <span>${e.name}</span>
+            ${spdTag}
+          </div>
+          <div class="enemy-sprite text-4xl sm:text-6xl drop-shadow-[0_10px_15px_rgba(0,0,0,0.6)] breathe transition-all duration-300 my-1">
+            ${e.emoji}
+          </div>
+          <div class="w-12 sm:w-20 h-1.5 bg-black/60 rounded-full overflow-hidden border border-gray-700 shadow-sm mt-1">
+            <div class="h-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]" style="width: ${(e.hp/e.maxHp)*100}%"></div>
+          </div>
+        `;
+        enemiesContainer.appendChild(enemyDiv);
+      });
+    }
+
+    // 更新当前行动者提示文字
+    function updateActiveActorDisplay() {
+      const current = actionQueue[0];
+      const actorText = document.getElementById('current-actor-text');
+      if (current && actorText) {
+        actorText.innerText = `当前行动：${current.ref.name}${current.isExtra ? ' (再动)' : ''}`;
+      }
+    }
+
+    // 提示横幅浮动通知
+    function showToast(msg) {
+      const logEl = document.getElementById('battle-log');
+      if (!logEl) return;
+      logEl.innerText = msg;
+      logEl.classList.remove('opacity-0', 'scale-95');
+      logEl.classList.add('opacity-100', 'scale-100');
+      clearTimeout(logEl._timer);
+      logEl._timer = setTimeout(() => {
+        logEl.classList.add('opacity-0', 'scale-95');
+      }, 2400);
+    }
+
+    // ========================================================
+    // 交互测试动作函数 (Demo Actions)
+    // ========================================================
+    
+    // 1. 单体提速
+    function demoHeroSpeedUp(heroId) {
+      const hero = heroes.find(h => h.id === heroId);
+      if (!hero) return;
+
+      const boost = 40;
+      hero.buffs = (hero.buffs || []).filter(b => b.type !== 'spd');
+      hero.buffs.push({ type: 'spd', value: boost, duration: 3 });
+
+      showToast(`⚡【${hero.name}】施放疾风术：速度提升 +${boost} 点！触发排轴向上平滑超车`);
+      renderBattleScene();
+      reorderQueueWithFLIP({ changedEntityId: hero.id, spdDelta: boost });
+    }
+
+    // 2. 单体减速
+    function demoEnemySlowDown(enemyId) {
+      const enemy = enemies.find(e => e.id === enemyId);
+      if (!enemy) return;
+
+      const slow = -40;
+      enemy.buffs = (enemy.buffs || []).filter(b => b.type !== 'spd');
+      enemy.buffs.push({ type: 'spd', value: slow, duration: 3 });
+
+      showToast(`❄️【${enemy.name}】被施加极寒减速：速度降低 ${slow} 点！触发排轴向后退条`);
+      renderBattleScene();
+      reorderQueueWithFLIP({ changedEntityId: enemy.id, spdDelta: slow });
+    }
+
+    // 3. 我方全体加速
+    function demoTeamSpeedUp() {
+      const boost = 30;
+      heroes.forEach(h => {
+        h.buffs = (h.buffs || []).filter(b => b.type !== 'spd');
+        h.buffs.push({ type: 'spd', value: boost, duration: 3 });
+      });
+
+      showToast(`🌟 全队施放【群速】：我方全体速度 +${boost} 点，小队集体冲顶！`);
+      renderBattleScene();
+      reorderQueueWithFLIP({ changedEntityId: heroes[1].id, spdDelta: boost });
+    }
+
+    // 4. 敌方全体减速
+    function demoTeamSlowDown() {
+      const slow = -30;
+      enemies.forEach(e => {
+        e.buffs = (e.buffs || []).filter(b => b.type !== 'spd');
+        e.buffs.push({ type: 'spd', value: slow, duration: 3 });
+      });
+
+      showToast(`🕸️ 施放【群缓】：敌方全体速度 -${Math.abs(slow)} 点，敌方批量向后退条！`);
+      renderBattleScene();
+      reorderQueueWithFLIP({ changedEntityId: enemies[0].id, spdDelta: slow });
+    }
+
+    // 5. 随机速度大乱斗
+    function demoRandomChaos() {
+      const all = [...heroes, ...enemies];
+      all.forEach(unit => {
+        const delta = (Math.floor(Math.random() * 9) - 4) * 10; // -40 ~ +40
+        unit.buffs = (unit.buffs || []).filter(b => b.type !== 'spd');
+        if (delta !== 0) unit.buffs.push({ type: 'spd', value: delta, duration: 2 });
+      });
+
+      showToast(`🔀 触发随机速度大乱斗：全场速度扰动，展示多轨道交叉平滑重排`);
+      renderBattleScene();
+      reorderQueueWithFLIP({ changedEntityId: heroes[0].id, spdDelta: 20 });
+    }
+
+    // 6. 重置队列
+    function resetQueueDemo() {
+      heroes = JSON.parse(JSON.stringify(HEROES_INIT));
+      enemies = JSON.parse(JSON.stringify(ENEMIES_INIT));
+      buildInitialQueue();
+      renderBattleScene();
+      renderTurnQueueDOM();
+      updateActiveActorDisplay();
+      showToast(`🔄 队伍与时间轴已重置为初始状态`);
+    }
+
+    // ========================================================
+    // 控制与方案切换
+    // ========================================================
+    function setScheme(schemeKey) {
+      animConfig.scheme = schemeKey;
+      
+      document.querySelectorAll('.scheme-tab-btn').forEach(btn => {
+        btn.className = 'scheme-tab-btn px-2.5 sm:px-3 py-1 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition-all';
+      });
+      const activeTab = document.getElementById(`tab-${schemeKey}`);
+      if (activeTab) {
+        activeTab.className = 'scheme-tab-btn px-2.5 sm:px-3 py-1 rounded-lg font-bold transition-all bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-[0_0_12px_rgba(6,182,212,0.4)]';
+      }
+
+      const tag = document.getElementById('current-scheme-tag');
+      if (tag) tag.innerText = SCHEME_NAMES[schemeKey] || schemeKey;
+
+      showToast(`已切换动效方案: ${SCHEME_NAMES[schemeKey]}`);
+      demoRandomChaos();
+    }
+
+    function setDuration(val) {
+      animConfig.duration = parseInt(val, 10);
+      showToast(`动效时长已设置为: ${val}ms`);
+    }
+
+    function toggleBadge() {
+      animConfig.showBadge = !animConfig.showBadge;
+      const btn = document.getElementById('btn-toggle-badge');
+      if (animConfig.showBadge) {
+        btn.className = 'px-2.5 py-1 rounded-lg border border-emerald-500/50 bg-emerald-950/50 text-emerald-300 font-bold hover:bg-emerald-900/60 transition-all flex items-center gap-1 shadow-sm';
+        btn.innerHTML = '<span>🟢 变速角标: 开</span>';
+      } else {
+        btn.className = 'px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-900 text-gray-400 font-bold hover:bg-gray-800 transition-all flex items-center gap-1 shadow-sm';
+        btn.innerHTML = '<span>⚪ 变速角标: 关</span>';
+      }
+      showToast(`变速角标已${animConfig.showBadge ? '开启' : '关闭'}`);
+    }
+
+    function toggleFloatNum() {
+      animConfig.showFloatNum = !animConfig.showFloatNum;
+      const btn = document.getElementById('btn-toggle-float');
+      if (animConfig.showFloatNum) {
+        btn.className = 'px-2.5 py-1 rounded-lg border border-cyan-500/50 bg-cyan-950/50 text-cyan-300 font-bold hover:bg-cyan-900/60 transition-all flex items-center gap-1 shadow-sm';
+        btn.innerHTML = '<span>🔢 数值飘字: 开</span>';
+      } else {
+        btn.className = 'px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-900 text-gray-400 font-bold hover:bg-gray-800 transition-all flex items-center gap-1 shadow-sm';
+        btn.innerHTML = '<span>⚪ 数值飘字: 关</span>';
+      }
+      showToast(`数值飘字已${animConfig.showFloatNum ? '开启' : '关闭'}`);
+    }
+
+    // 自动演练循环
+    function toggleAutoDemo() {
+      const btn = document.getElementById('btn-auto-demo');
+      const icon = document.getElementById('auto-demo-icon');
+      
+      if (animConfig.autoDemoTimer) {
+        clearInterval(animConfig.autoDemoTimer);
+        animConfig.autoDemoTimer = null;
+        btn.classList.remove('bg-rose-950', 'border-rose-500', 'text-rose-300');
+        btn.classList.add('bg-indigo-950/60', 'border-indigo-500/50', 'text-indigo-300');
+        icon.innerText = '▶';
+        showToast(`已停止自动演练循环`);
+      } else {
+        const demoActions = [
+          () => demoConveyorNextTurn(),
+          () => demoHeroSpeedUp('h2'),
+          () => demoExtraTurnSequence('h2'),
+          () => demoEnemySlowDown('e1'),
+          () => demoConveyorNextTurn(),
+          () => demoTeamSpeedUp(),
+          () => demoConveyorNextTurn(),
+          () => demoRandomChaos()
+        ];
+        let step = 0;
+        animConfig.autoDemoTimer = setInterval(() => {
+          demoActions[step % demoActions.length]();
+          step++;
+        }, 2000);
+
+        btn.classList.remove('bg-indigo-950/60', 'border-indigo-500/50', 'text-indigo-300');
+        btn.classList.add('bg-rose-950', 'border-rose-500', 'text-rose-300');
+        icon.innerText = '⏹';
+        showToast(`已启动自动演练循环 (传送带轮转 + 爆闪插队再动 + 变速超车)`);
+      }
+    }
+
+    // 页面初始化加载
+    window.addEventListener('DOMContentLoaded', () => {
+      buildInitialQueue();
+      renderBattleScene();
+      renderTurnQueueDOM();
+      updateActiveActorDisplay();
+    });
+  </script>
+</body>
+</html>

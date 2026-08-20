@@ -1447,3 +1447,16 @@
 - **涉及文件**：`index.html`、`README.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：跑团过程中角色 atk/armor/speed 会随剧情实时变化（YAML 属性栏已更新），但旧聊天记录持久化的旧值会无条件覆盖新 YAML 值，导致实时更新失效。三个独立勾选栏让用户按属性粒度选择「持久化锁定旧值」还是「YAML 实时优先」，默认不勾选贴合"实时属性应生效"的主流诉求，同时保留原行为一键可回。
 - **经验证**：Node 提取 `<script>` 语法校验通过，零报错；`statSource` 写入/读取/深拷贝快照链路就位；三处（定义/UI/saveEditor/应用门控）引用闭环，未勾选时 YAML 定义项不再被聊天记录覆盖。
+
+## [LOG-119] 2026-08-20 — 左侧行动条 UI 动效升级：崩铁原味回合切换 + 再动爆闪 + 新回合赛博光轨（纯视觉层，未升版本号）
+
+- **变更行为**（`index.html`，仅改视觉层，`state.actionQueue`/`queueIndex`/排序/splice 插队全部零改动）：
+  1. **渲染层视觉轮转（核心）**：`renderTurnQueue` 由"全量重建 + 指针高亮"改为"环形扫描 + FLIP 平滑位移"——视觉队列从 `state.queueIndex` 起环形取存活项，**当前行动者恒在顶部**（崩铁时间轴标准形态），已行动者滚回队尾。数据层指针语义不变（`queueIndex++` 不轮转数组），仅渲染顺序模拟轮转。
+  2. **回合切换（崩铁原味）**：每次行动切换后其余图标 0.6s 弹簧 FLIP 上移一格、已行动者平滑滑回队尾、新行动者触发 0.6s 金色聚焦冲击（`queue-focus-surge`，scale 0.88→1.22→1.1 过冲回弹）。
+  3. **再动爆闪**：再动/多重施法/隐匿者/祈愿/连动 插队项（`isExtraTurn && queueSpd === undefined`，与多动单位天然区分）成为当前行动者的瞬间触发 0.6s 闪电能量爆发（`extra-turn-burst-enter`）+ 0.6s 金色冲击波圆环（`lightning-shockwave-ring`，扩散 2.6x 防容器裁切）；未行动的插队项常驻「⚡再动」呼吸发光角标（`extra-badge-active`），已行动滚回队尾后消失。
+  4. **新回合开始（赛博光轨）**：`startRound` 置 `_roundStartGlowPending`，`renderTurnQueue` 消费一次——全队图标按阵营色（我方青 `rgba(6,182,212,0.85)` / 敌方玫红 `rgba(244,63,94,0.85)` / 再动金 `rgba(251,191,36,0.9)`）发出 0.6s 光晕（`queue-round-glow`，CSS 变量 `--glow-c`），逐项 40ms 错峰，0.8s+ 批量清理。
+  5. **速度重排平滑位移**：`reorderRemainingQueue` 内嵌的 `renderTurnQueue` 自动带 FLIP → `[单速]/[群速]/[单缓]/[群缓]` 触发实时重排时图标 0.6s 弹簧平滑滑动到新位置（不改变排序结果）。
+  6. **uid 分配**：队列条目对象分配稳定 `uid`（跨渲染复用，FLIP 定位 + 行动切换判定）；startRound 重建队列 → 新 uid → 自然触发回合光晕且不误触发聚焦。移除原 `scrollTo` 居中逻辑（当前恒在顶部，改 `scrollTop=0`），`current-turn-item` 不再使用。
+- **涉及文件**：`index.html`、`LOG.md`。
+- **决策原因**：用户要求优化左侧行动条 UI 动效（不改逻辑），方案来自 `demo-turn-queue.html` 实测验证的"传送带 + 再动爆闪"demo。主文件数据层是"指针前移"而非 demo 的 shift/push 轮转，故用渲染层视觉轮转复刻同等视觉效果（当前行动者置顶 + FLIP 弹簧位移 + 聚焦冲击），数据层零改动。三组动效（回合切换/再动爆闪/新回合光晕）统一 0.6s 基准；新回合光晕按阵营色（用户确认粒度）而非职业色；速度重排采用崩铁弹簧 FLIP（用户确认方案）。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；新 CSS class 定义/引用闭环（focus-surge/burst-enter/shockwave-ring/badge-active/round-glow 各 1 定义 + 触发点就位）；模块状态 `_queueUidCounter`/`_prevQueueCurrentUid`/`_roundStartGlowPending` 写读闭环（置位 8195 / 消费 5427-5428）；Node 模拟核心渲染逻辑验证：行动切换视觉置顶、uid 跨渲染稳定、再动插队识别与角标条件（realIndex≥queueIndex）、新回合重建触发全队光晕，全部符合预期；旧 `scrollTo`/`current-turn-item` 残留 0。
