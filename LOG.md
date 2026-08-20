@@ -1473,3 +1473,29 @@
   3. **仓库全量同步与推流**：完成本地 git 提交、`LOG-INDEX.md` 索引回填与远程分支推送。
 - **涉及文件**：`README.md`、`LOG.md`、`LOG-INDEX.md`。
 - **经验证**：浏览器与 Node.js 双重校验通过，实战流转、再动插队、变速位移与回合光晕演出均稳定流畅。
+
+## [LOG-121] 2026-08-20 — 【肃正】屏障三项改造：固定耐久上限 + 存在时灰卡禁用 + 类型配色 + 受击白屏竞态修复（未升版本号）
+
+- **变更行为**（`index.html`）：
+  1. **屏障创建语义改为固定耐久上限**（`registerTagHandler('肃正')`，L6104-6116）：原 `teamBarrier += ctx.actualPower` 无限叠加、`teamBarrierMax` 仅作 UI 历史峰值分母且击破不重置——导致"1000 屏障击破后施放 100 屏障显示 100/1000"。改为**覆盖式全新创建**：`teamBarrier = teamBarrierMax = ctx.actualPower`（每次施放以本次技能 power×倍率为耐久上限），护甲/克制属性/名字照旧跟随本次技能；两处击破收口（主管线 L7755 与 `applyBarrierHit` L7968）在 `barrierArmor/barrierSub` 归零的同时补 `teamBarrierMax = 0`，保证下次创建分母准确。
+  2. **屏障存在时所有【肃正】技能灰卡禁用（纯视觉，零运行时拦截）**：`updateMenu`（L9332-9353）新增辅助 `skillHasBarrierTag(skill)`（三标签槽任一含"肃正"）与 `isBarrierBlocked = teamBarrier > 0 && skillHasBarrierTag(skill)`，并入 `isEnough` 判定；missingArr（L9479）补 `屏障存在中` 提示。灰卡自动生效：`disabled-card` 置灰 + `if (isEnough) btn.onclick` 不绑定点击 → 点击无响应、不扣资源，蓄力入口同被挡（handleChargeSkill 走同一技能面板）。**不修改** executeSkillAction / handleChargeSkill。
+  3. **屏障类型配色**：屏障 CSS 全量变量化（默认金色=法术），`.team-barrier-wrapper` 定义 `--br-*` 变量组（穹顶渐变/边框/流动描边/SVG 网格与中心光晕三 stop/徽章/进度条/受击涟漪/蜂窝聚光/受击辉光），新增 `[data-theme="blue"]`（远程→科幻青蓝系）与 `[data-theme="white"]`（无属性/近战→银白系）覆盖同一组变量；SVG 模板内硬编码色值改用 `var(--br-*)` 并被 CSS 选择器规则（L927-930）兜底覆盖。JS 新增 `getBarrierTheme()`（远程→blue / 法术→gold / 其余→white），`updateTeamBarrierUI`（L5544）写入 `wrapper.dataset.theme`，创建/击破/属性变化自动跟随。
+  4. **修复受击白屏竞态**（`spawnHitFlash`，L4152-4160）：根因是重叠调用（屏障为全局伪目标，多敌连续受击/群攻/破碎闪重叠概率高）使 `originalFilter` 捕获到上一次遗留的白色滤镜，恢复定时器顺序错乱导致 `style.filter` 永久卡 `brightness(2.4) saturate(0)`。修复：每元素持久捕获一次 `targetDom._flashOrigFilter`，恢复始终用持久值，重叠不再互相污染（全局通用，所有单位受益）。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：用户复现"先高耐久后低耐久"上限错乱，确认需要"创建时技能数值为耐久上限"的精准反映；刷新机制经两方案（A 存在时禁止释放 / B 多层堆叠）对比后选 A，且进一步简化为**纯灰卡视觉禁用**——复用资源不足的 `isEnough` 判定链路（`disabled-card` 置灰 + 无 onclick 点击无响应），零运行时拦截、蓄力自然被挡；屏障类型配色让无属性/近战/远程/法术四种屏障一眼可辨，呼应屏障刷新机制收敛后"每次创建即新屏障"的语义。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；`teamBarrierMax` 赋值/归零点、`skillHasBarrierTag`/`isBarrierBlocked`、`data-theme`、CSS 变量引用闭环，屏障样式块无残留硬编码金色。
+
+## [LOG-122] 2026-08-20 — V7.6 定版：【肃正】屏障三项改造实测确认 + README/SPEC/LOG-INDEX 更新
+
+- **变更行为**：
+  1. **版本号升级 V7.5 → V7.6**：【肃正】全队共享屏障体系重大改造（固定耐久上限全新创建、屏障存在时灰卡禁用、克制属性动态主题配色金/蓝/银白）以及受击白屏滤镜持久化修复实测确认无误，跨入 **V7.6** 版本。
+  2. **README.md 同步定版**：
+     - 顶部版本号标定为 `V7.6`；
+     - **§2.2** 完善「🛡️ 圣域帷幕与【肃正】全队共享屏障（V7.6）」条目，明确固定耐久上限、灰卡禁用机制与动态主题配色；
+     - **§3.2** 同步更新 `[肃正]` 标签条目说明。
+  3. **SPEC.md 同步定版**：
+     - **§4.2.4** 同步更新 `[肃正]` 全队共享屏障创建语义（固定耐久上限、灰卡禁用规则与主题配色）。
+  4. **仓库全量同步与推流**：完成本地 git 提交、`LOG-INDEX.md` 索引回填与远程分支推送。
+- **涉及文件**：`README.md`、`SPEC.md`、`LOG.md`、`LOG-INDEX.md`。
+- **经验证**：浏览器与 Node.js 双重校验通过，屏障创建、灰卡禁用与克制主题切换均稳定符合设计。
+

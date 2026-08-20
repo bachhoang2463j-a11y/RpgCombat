@@ -827,8 +827,25 @@
     .disabled-card { opacity: 0.5; filter: grayscale(0.4); cursor: not-allowed !important; border-left-color: #64748b !important; background: rgba(15, 23, 42, 0.7) !important; box-shadow: none !important; }
     .exhausted-card { opacity: 0.4; filter: grayscale(0.85); cursor: not-allowed !important; border-left-color: #ef4444 !important; background: rgba(30, 10, 15, 0.7) !important; }
 
-    /* ==== 【肃正】全队笼罩式金光圣域屏障 ==== */
+    /* ==== 【肃正】全队笼罩式圣域屏障（主题色走 CSS 变量，默认金色=法术，蓝=远程，白=无/近战）==== */
     .team-barrier-wrapper {
+      /* 金色（法术·默认） */
+      --br-dome-bg: radial-gradient(ellipse at center, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.04) 65%, rgba(217, 119, 6, 0.15) 100%);
+      --br-shadow: 0 0 25px rgba(245, 158, 11, 0.3), inset 0 0 20px rgba(251, 191, 36, 0.25), inset 0 0 50px rgba(217, 119, 6, 0.12);
+      --br-border: rgba(251, 191, 36, 0.65);
+      --br-border-flow: rgba(254, 240, 138, 0.85);
+      --br-mesh: rgba(251, 191, 36, 0.22);
+      --br-svg-0: #fef08a; --br-svg-1: #f59e0b; --br-svg-2: #b45309;
+      --br-badge-bg: linear-gradient(135deg, rgba(120, 53, 15, 0.95), rgba(69, 26, 3, 0.95));
+      --br-badge-border: rgba(253, 230, 138, 0.85);
+      --br-badge-shadow: 0 4px 16px rgba(245, 158, 11, 0.6), inset 0 0 8px rgba(251, 191, 36, 0.35);
+      --br-track-border: rgba(251, 191, 36, 0.4);
+      --br-fill-a: #f59e0b; --br-fill-b: #fef08a; --br-fill-shadow: #fbbf24;
+      --br-ripple-border: #fef08a;
+      --br-ripple-bg: radial-gradient(circle, rgba(255, 255, 255, 0.75) 0%, rgba(251, 191, 36, 0.4) 40%, transparent 75%);
+      --br-ripple-shadow: 0 0 25px #fbbf24, 0 0 50px #f59e0b, inset 0 0 20px #fff7ed;
+      --br-hex-bg: radial-gradient(circle, rgba(254, 240, 138, 0.9) 0%, rgba(245, 158, 11, 0.5) 45%, transparent 75%);
+      --br-hit-shadow: 0 0 45px rgba(254, 240, 138, 0.8), inset 0 0 40px rgba(251, 191, 36, 0.7);
       position: absolute;
       inset: -10px -12px -10px -12px;
       pointer-events: none;
@@ -836,16 +853,53 @@
       transition: opacity 0.4s ease, transform 0.2s ease;
     }
 
+    /* 科幻蓝（远程） */
+    .team-barrier-wrapper[data-theme="blue"] {
+      --br-dome-bg: radial-gradient(ellipse at center, rgba(34, 211, 238, 0.1) 0%, rgba(14, 165, 233, 0.04) 65%, rgba(2, 132, 199, 0.15) 100%);
+      --br-shadow: 0 0 25px rgba(14, 165, 233, 0.3), inset 0 0 20px rgba(34, 211, 238, 0.25), inset 0 0 50px rgba(3, 105, 161, 0.12);
+      --br-border: rgba(34, 211, 238, 0.65);
+      --br-border-flow: rgba(165, 243, 252, 0.85);
+      --br-mesh: rgba(34, 211, 238, 0.22);
+      --br-svg-0: #67e8f9; --br-svg-1: #0ea5e9; --br-svg-2: #0369a1;
+      --br-badge-bg: linear-gradient(135deg, rgba(12, 74, 110, 0.95), rgba(8, 47, 73, 0.95));
+      --br-badge-border: rgba(125, 211, 252, 0.85);
+      --br-badge-shadow: 0 4px 16px rgba(14, 165, 233, 0.6), inset 0 0 8px rgba(34, 211, 238, 0.35);
+      --br-track-border: rgba(34, 211, 238, 0.4);
+      --br-fill-a: #0ea5e9; --br-fill-b: #7dd3fc; --br-fill-shadow: #38bdf8;
+      --br-ripple-border: #7dd3fc;
+      --br-ripple-bg: radial-gradient(circle, rgba(255, 255, 255, 0.75) 0%, rgba(14, 165, 233, 0.4) 40%, transparent 75%);
+      --br-ripple-shadow: 0 0 25px #38bdf8, 0 0 50px #0284c7, inset 0 0 20px #e0f2fe;
+      --br-hex-bg: radial-gradient(circle, rgba(125, 211, 252, 0.9) 0%, rgba(14, 165, 233, 0.5) 45%, transparent 75%);
+      --br-hit-shadow: 0 0 45px rgba(125, 211, 252, 0.8), inset 0 0 40px rgba(34, 211, 238, 0.7);
+    }
+
+    /* 银白（无属性 / 近战） */
+    .team-barrier-wrapper[data-theme="white"] {
+      --br-dome-bg: radial-gradient(ellipse at center, rgba(226, 232, 240, 0.12) 0%, rgba(148, 163, 184, 0.04) 65%, rgba(100, 116, 139, 0.15) 100%);
+      --br-shadow: 0 0 25px rgba(203, 213, 225, 0.3), inset 0 0 20px rgba(226, 232, 240, 0.25), inset 0 0 50px rgba(100, 116, 139, 0.12);
+      --br-border: rgba(226, 232, 240, 0.65);
+      --br-border-flow: rgba(248, 250, 252, 0.85);
+      --br-mesh: rgba(226, 232, 240, 0.22);
+      --br-svg-0: #f1f5f9; --br-svg-1: #cbd5e1; --br-svg-2: #64748b;
+      --br-badge-bg: linear-gradient(135deg, rgba(51, 65, 85, 0.95), rgba(30, 41, 59, 0.95));
+      --br-badge-border: rgba(226, 232, 240, 0.85);
+      --br-badge-shadow: 0 4px 16px rgba(148, 163, 184, 0.6), inset 0 0 8px rgba(226, 232, 240, 0.35);
+      --br-track-border: rgba(226, 232, 240, 0.4);
+      --br-fill-a: #94a3b8; --br-fill-b: #e2e8f0; --br-fill-shadow: #cbd5e1;
+      --br-ripple-border: #e2e8f0;
+      --br-ripple-bg: radial-gradient(circle, rgba(255, 255, 255, 0.75) 0%, rgba(148, 163, 184, 0.4) 40%, transparent 75%);
+      --br-ripple-shadow: 0 0 25px #cbd5e1, 0 0 50px #94a3b8, inset 0 0 20px #f8fafc;
+      --br-hex-bg: radial-gradient(circle, rgba(226, 232, 240, 0.9) 0%, rgba(148, 163, 184, 0.5) 45%, transparent 75%);
+      --br-hit-shadow: 0 0 45px rgba(226, 232, 240, 0.8), inset 0 0 40px rgba(148, 163, 184, 0.7);
+    }
+
     .team-barrier-dome {
       position: absolute;
       inset: 0;
       border-radius: 16px;
-      background: radial-gradient(ellipse at center, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.04) 65%, rgba(217, 119, 6, 0.15) 100%);
-      box-shadow: 
-        0 0 25px rgba(245, 158, 11, 0.3),
-        inset 0 0 20px rgba(251, 191, 36, 0.25),
-        inset 0 0 50px rgba(217, 119, 6, 0.12);
-      border: 1.5px solid rgba(251, 191, 36, 0.65);
+      background: var(--br-dome-bg);
+      box-shadow: var(--br-shadow);
+      border: 1.5px solid var(--br-border);
       overflow: hidden;
     }
 
@@ -855,7 +909,7 @@
       inset: -2px;
       border-radius: 18px;
       padding: 2px;
-      background: linear-gradient(120deg, transparent 20%, rgba(254, 240, 138, 0.85) 50%, transparent 80%);
+      background: linear-gradient(120deg, transparent 20%, var(--br-border-flow) 50%, transparent 80%);
       background-size: 200% 200%;
       animation: barrier-border-flow 3.5s linear infinite;
       -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -868,6 +922,12 @@
       0% { background-position: 0% 50%; }
       100% { background-position: 200% 50%; }
     }
+
+    /* SVG 网格与中心光晕走主题变量（模板内硬编码色值被此处 CSS 覆盖） */
+    .team-barrier-wrapper #hex-pattern path { stroke: var(--br-mesh); }
+    .team-barrier-wrapper #barrier-center-glow stop:nth-child(1) { stop-color: var(--br-svg-0); }
+    .team-barrier-wrapper #barrier-center-glow stop:nth-child(2) { stop-color: var(--br-svg-1); }
+    .team-barrier-wrapper #barrier-center-glow stop:nth-child(3) { stop-color: var(--br-svg-2); }
 
     .barrier-svg-mesh {
       position: absolute;
@@ -883,9 +943,9 @@
       top: -15px;
       left: 50%;
       transform: translateX(-50%);
-      background: linear-gradient(135deg, rgba(120, 53, 15, 0.95), rgba(69, 26, 3, 0.95));
-      border: 1px solid rgba(253, 230, 138, 0.85);
-      box-shadow: 0 4px 16px rgba(245, 158, 11, 0.6), inset 0 0 8px rgba(251, 191, 36, 0.35);
+      background: var(--br-badge-bg);
+      border: 1px solid var(--br-badge-border);
+      box-shadow: var(--br-badge-shadow);
       border-radius: 20px;
       padding: 3px 14px;
       display: flex;
@@ -903,13 +963,13 @@
       background: rgba(0, 0, 0, 0.7);
       border-radius: 4px;
       overflow: hidden;
-      border: 1px solid rgba(251, 191, 36, 0.4);
+      border: 1px solid var(--br-track-border);
     }
 
     .barrier-progress-fill {
       height: 100%;
-      background: linear-gradient(90deg, #f59e0b, #fef08a);
-      box-shadow: 0 0 8px #fbbf24;
+      background: linear-gradient(90deg, var(--br-fill-a), var(--br-fill-b));
+      box-shadow: 0 0 8px var(--br-fill-shadow);
       transition: width 0.3s ease-out;
     }
 
@@ -930,9 +990,9 @@
     .barrier-hit-ripple {
       position: absolute;
       border-radius: 50%;
-      border: 3px solid #fef08a;
-      background: radial-gradient(circle, rgba(255, 255, 255, 0.75) 0%, rgba(251, 191, 36, 0.4) 40%, transparent 75%);
-      box-shadow: 0 0 25px #fbbf24, 0 0 50px #f59e0b, inset 0 0 20px #fff7ed;
+      border: 3px solid var(--br-ripple-border);
+      background: var(--br-ripple-bg);
+      box-shadow: var(--br-ripple-shadow);
       pointer-events: none;
       z-index: 42;
       animation: barrier-ripple-expand 0.55s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
@@ -951,14 +1011,14 @@
       pointer-events: none;
       z-index: 41;
       animation: hex-flash-glow 0.6s ease-out forwards;
-      background: radial-gradient(circle, rgba(254, 240, 138, 0.9) 0%, rgba(245, 158, 11, 0.5) 45%, transparent 75%);
+      background: var(--br-hex-bg);
       mix-blend-mode: screen;
     }
 
     .barrier-hit-impact {
       animation: barrier-shake-compress 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards;
       border-color: #fff7ed !important;
-      box-shadow: 0 0 45px rgba(254, 240, 138, 0.8), inset 0 0 40px rgba(251, 191, 36, 0.7) !important;
+      box-shadow: var(--br-hit-shadow);
     }
 
     @keyframes barrier-shake-compress {
@@ -4140,7 +4200,10 @@ window.spawnHitFlash = function(targetDom, intensity = 0.5) {
     }
     
     // 受击者白色剪影闪烁（通过 CSS filter 实现；降档：brightness 5→2.4，保留泛白但不再致盲）
-    const originalFilter = targetDom.style.filter;
+    // 每元素持久捕获一次原始 filter，恢复用持久值——避免连续受击/群攻多段时两次调用重叠，
+    // 第二次捕获到第一次遗留的白色滤镜导致 style.filter 永久卡白（屏障伪目标全局受击时概率最高）
+    if (targetDom._flashOrigFilter === undefined) targetDom._flashOrigFilter = targetDom.style.filter;
+    const originalFilter = targetDom._flashOrigFilter;
     const flashSteps = intensity > 0.45 ? 3 : 1;  // 重创三连闪，普通单闪
     let step = 0;
     
@@ -4596,12 +4659,12 @@ const TEAM_BARRIER_BANNER_HTML = `
       <svg class="barrier-svg-mesh" viewBox="0 0 400 200" preserveAspectRatio="none">
         <defs>
           <pattern id="hex-pattern" width="24" height="27.7" patternUnits="userSpaceOnUse">
-            <path d="M12 0 L24 6.9 L24 20.7 L12 27.7 L0 20.7 L0 6.9 Z" fill="none" stroke="rgba(251, 191, 36, 0.22)" stroke-width="1" />
+            <path d="M12 0 L24 6.9 L24 20.7 L12 27.7 L0 20.7 L0 6.9 Z" fill="none" stroke="var(--br-mesh)" stroke-width="1" />
           </pattern>
           <radialGradient id="barrier-center-glow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#fef08a" stop-opacity="0.2" />
-            <stop offset="70%" stop-color="#f59e0b" stop-opacity="0.06" />
-            <stop offset="100%" stop-color="#b45309" stop-opacity="0" />
+            <stop offset="0%" stop-color="var(--br-svg-0)" stop-opacity="0.2" />
+            <stop offset="70%" stop-color="var(--br-svg-1)" stop-opacity="0.06" />
+            <stop offset="100%" stop-color="var(--br-svg-2)" stop-opacity="0" />
           </radialGradient>
         </defs>
         <rect width="100%" height="100%" fill="url(#barrier-center-glow)" />
@@ -5464,12 +5527,21 @@ function updateBuffUI(entity) {
   buffContainer.innerHTML = html;
 }
 
+// 屏障主题配色：法术=金色（默认变量，不设主题）、远程=科幻蓝、无属性/近战=银白
+function getBarrierTheme() {
+  if (barrierSub === '远程') return 'blue';
+  if (barrierSub === '法术') return 'gold';
+  return 'white';
+}
+
 // 【肃正】全队共享屏障 UI 刷新：值为 0 时隐藏横幅
 function updateTeamBarrierUI() {
   const wrapper = document.getElementById('team-barrier-wrapper') || document.getElementById('team-barrier-banner');
   if (!wrapper) return;
   if (teamBarrier <= 0) { wrapper.style.display = 'none'; return; }
   wrapper.style.display = 'block';
+  // 主题色：按克制属性设 data-theme（gold 为默认变量，显式设回 gold 无害）
+  wrapper.dataset.theme = getBarrierTheme();
   const bar = document.getElementById('team-barrier-bar');
   const valEl = document.getElementById('team-barrier-value');
   const nameEl = document.getElementById('team-barrier-name');
@@ -6025,13 +6097,14 @@ registerTagHandler('盾', (ctx) => {
 });
 
 // 【肃正】全队共享护盾：写入全局 teamBarrier，与各角色自身 shield 完全独立。
-// 屏障最先挨打（armor=0 全额吸收原始伤害）、穿透也吸收、可无限叠加。
-// 显式覆盖规则：仅当施放携带 Armor/子类型参数时才更新屏障护甲/克制属性；裸 [肃正] 补盾不改属性。
-// 屏障名字始终跟随施放技能的技能名（teamBarrierName）。
+// 屏障最先挨打（armor=0 全额吸收原始伤害）、穿透也吸收。
+// 创建语义（V7.3 待定）：每次施放以本次技能 power×倍率为耐久上限（覆盖式全新创建，不再叠加），
+// 屏障存在期间所有【肃正】技能在技能面板灰卡禁用（见 updateMenu isBarrierBlocked），击破后才可重新施放。
+// 护甲/克制属性/名字始终跟随本次施放技能。
 registerTagHandler('肃正', (ctx) => {
     playSound('shieldUp'); playSVGEffect(ctx.targetDom, 'shield');
-    teamBarrier += ctx.actualPower;
-    if (teamBarrier > teamBarrierMax) teamBarrierMax = teamBarrier;
+    teamBarrier = ctx.actualPower;
+    teamBarrierMax = ctx.actualPower;
     if (ctx.skill && ctx.skill.barrierArmor > 0) barrierArmor = ctx.skill.barrierArmor;
     if (ctx.skill && ctx.skill.barrierSub) barrierSub = ctx.skill.barrierSub;
     if (ctx.skill && ctx.skill.name) teamBarrierName = ctx.skill.name;
@@ -6040,7 +6113,7 @@ registerTagHandler('肃正', (ctx) => {
     else if (barrierArmor > 0) barrierDesc = `（护甲 ${barrierArmor}）`;
     else if (barrierSub) barrierDesc = `（克制 ${barrierSub}）`;
     createFloatingText(ctx.targetDom, `🛡️ ${teamBarrierName} +${ctx.actualPower}`, 'text-cyan-300');
-    addHistory(`   ↳ ${ctx.caster.name} 展开【${teamBarrierName}】，为全队架起一层可吸收 ${ctx.actualPower} 点伤害的共享屏障（当前 ${teamBarrier}）${barrierDesc}。`);
+    addHistory(`   ↳ ${ctx.caster.name} 展开【${teamBarrierName}】，为全队架起一层可吸收 ${ctx.actualPower} 点伤害的共享屏障（${teamBarrier}/${teamBarrierMax}）${barrierDesc}。`);
     updateTeamBarrierUI();
 });
 
@@ -7678,8 +7751,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
             createFloatingText(targetDom, `-${barrierAbsorb} ${teamBarrierName}`, 'text-cyan-300');
             addHistory(`   ↳ 🛡️ 【${teamBarrierName}】替全队挡下了 ${barrierAbsorb} 点伤害（剩余 ${teamBarrier}）。`);
         }
-        // 屏障护甲/克制属性随屏障消散而重置（群攻泄漏路径同样适用）
-        if (teamBarrier <= 0) { barrierArmor = 0; barrierSub = null; }
+        // 屏障护甲/克制属性/耐久上限随屏障消散而重置（群攻泄漏路径同样适用）
+        if (teamBarrier <= 0) { teamBarrierMax = 0; barrierArmor = 0; barrierSub = null; }
     }
     
     // 敌方变种标签类型减伤（【流体/虚形/破法/要害】）：屏障之后、护甲结算之前，对目标侧的对应伤害类型减半；
@@ -7891,8 +7964,8 @@ async function applyBarrierHit(caster, barrierTarget, tag, tagPower, skill, mult
   }
   if (teamBarrier <= 0) {
     teamBarrier = 0; updateTeamBarrierUI();
-    // 屏障破碎：护甲/克制属性随屏障一并消散，回归默认
-    barrierArmor = 0; barrierSub = null;
+    // 屏障破碎：耐久上限/护甲/克制属性随屏障一并消散，回归默认
+    teamBarrierMax = 0; barrierArmor = 0; barrierSub = null;
     // 破碎额外演出：全屏红闪 + 强烈震屏 + 破碎音效
     if (window.triggerScreenShake) window.triggerScreenShake(14, 420);
     if (window.spawnHitFlash && barrierDom) window.spawnHitFlash(barrierDom, 0.9);
@@ -9255,6 +9328,11 @@ async function actionDefend() {
   await sleep(1000); await endTurn();
 }
 
+// 判断技能是否携带【肃正】标签（三标签槽任一含"肃正"即可，供屏障存在时灰卡禁用）
+function skillHasBarrierTag(skill) {
+  return [skill.type, skill.type2, skill.type3].some(t => t && t.includes('肃正'));
+}
+
 function updateMenu(hero) {
   if (!hero) return; const skillList = document.getElementById('skill-list'); skillList.innerHTML = '';
   hero.skills.forEach((skill, idx) => {
@@ -9270,7 +9348,9 @@ function updateMenu(hero) {
     const isTpEnough = hero.tp >= (skill.tpCost || 0);
     // 极限爆发激活时，施法会将 TP 清零（triggerBurstIfNeeded），TP 消耗技能必然释放失败 → 禁用不可选
     const isBurstBlocked = hero.burstActivated && skill.tpCost > 0;
-    const isEnough = isMpEnough && isHpEnough && isTpEnough && !isBurstBlocked && !isUsedExtraTurn && !isUsesExhausted;
+    // 【肃正】屏障存在时，所有肃正技能灰卡不可选（击破后才能重新施放）
+    const isBarrierBlocked = teamBarrier > 0 && skillHasBarrierTag(skill);
+    const isEnough = isMpEnough && isHpEnough && isTpEnough && !isBurstBlocked && !isUsedExtraTurn && !isUsesExhausted && !isBarrierBlocked;
 
     let themeClass = 'skill-card-default';
     let typeBadgeStyle = 'bg-slate-800 text-slate-300 border-slate-600/60';
@@ -9396,6 +9476,7 @@ function updateMenu(hero) {
     if (!isUsesExhausted && !isUsedExtraTurn && !isEnough) {
       let missingArr = [];
       if (isBurstBlocked) missingArr.push('爆发中禁' + (skill.tpCost) + 'TP');
+      if (isBarrierBlocked) missingArr.push('屏障存在中');
       if (!isMpEnough) missingArr.push('MP不足');
       if (!isHpEnough) missingArr.push('HP不足');
       if (!isTpEnough) missingArr.push('TP不足');
