@@ -345,8 +345,39 @@
     .text-outline { text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 1px 2px rgba(0,0,0,0.8); }
 
     /* ========================================================
-       左侧行动条动效（纯视觉层，V：回合切换/再动爆闪/回合光晕）
+       左侧行动条动效（纯视觉层：崩铁原味轮转/两段式再动爆闪/赛博光轨/串流灯带/变速角标）
        ======================================================== */
+    /* 行动条轨道背景线（串流灯带） */
+    .timeline-rail {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      transform: translateX(-50%);
+      background: linear-gradient(180deg, rgba(250,204,21,0.85) 0%, rgba(6,182,212,0.65) 25%, rgba(99,102,241,0.45) 60%, rgba(255,255,255,0.05) 100%);
+      box-shadow: 0 0 10px rgba(6,182,212,0.55);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* 能量光粒子脉冲沿着轨道下行 */
+    @keyframes rail-pulse {
+      0% { transform: translateY(-100%); opacity: 0; }
+      30% { opacity: 1; }
+      100% { transform: translateY(800%); opacity: 0; }
+    }
+    .rail-pulse-beam {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 2px;
+      height: 40px;
+      background: linear-gradient(180deg, transparent, #38bdf8, #fff);
+      box-shadow: 0 0 12px #38bdf8;
+      animation: rail-pulse 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
     /* 新行动者接管：金色聚焦冲击（崩铁原味弹簧过冲） */
     @keyframes queue-focus-ring {
       0%   { transform: scale(0.88); box-shadow: 0 0 0 rgba(250, 204, 21, 0); }
@@ -381,12 +412,54 @@
       animation: lightning-shockwave 0.6s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
       z-index: 50;
     }
-    /* 「⚡再动」角标：持续呼吸发光（常驻于未行动的再动插队项） */
+    /* 「⚡再动」角标：持续呼吸发光（精致置顶，居中不遮挡面部） */
     @keyframes extra-badge-glow {
-      0%, 100% { transform: scale(1);   filter: drop-shadow(0 0 6px rgba(251,191,36,0.9)); }
-      50%      { transform: scale(1.2); filter: drop-shadow(0 0 15px rgba(251,191,36,1)); }
+      0%, 100% { transform: translateX(-50%) scale(1);   filter: drop-shadow(0 0 6px rgba(251,191,36,0.9)); }
+      50%      { transform: translateX(-50%) scale(1.15); filter: drop-shadow(0 0 14px rgba(251,191,36,1)); }
     }
     .extra-badge-active { animation: extra-badge-glow 1.2s ease-in-out infinite; }
+
+    /* 速度变化右上角角标 (Speed Change Badges) */
+    @keyframes badge-pop-up {
+      0% { transform: scale(0) translateY(8px); opacity: 0; }
+      40% { transform: scale(1.35) translateY(-2px); opacity: 1; }
+      70% { transform: scale(0.95) translateY(0); }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    @keyframes badge-pop-down {
+      0% { transform: scale(0) translateY(-8px); opacity: 0; }
+      40% { transform: scale(1.35) translateY(2px); opacity: 1; }
+      70% { transform: scale(0.95) translateY(0); }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    @keyframes badge-float-arrow {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-2px); }
+    }
+    @keyframes badge-float-arrow-down {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(2px); }
+    }
+    .spd-badge-up { animation: badge-pop-up 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+    .spd-badge-up .arrow-icon { animation: badge-float-arrow 1.2s ease-in-out infinite 0.4s; }
+    .spd-badge-down { animation: badge-pop-down 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+    .spd-badge-down .arrow-icon { animation: badge-float-arrow-down 1.2s ease-in-out infinite 0.4s; }
+
+    /* 速度数值漂浮飘字 */
+    @keyframes float-spd-num-up {
+      0% { opacity: 0; transform: translate(14px, 6px) scale(0.7); }
+      20% { opacity: 1; transform: translate(20px, -4px) scale(1.08); }
+      70% { opacity: 1; transform: translate(24px, -12px) scale(1); }
+      100% { opacity: 0; transform: translate(26px, -20px) scale(0.85); }
+    }
+    @keyframes float-spd-num-down {
+      0% { opacity: 0; transform: translate(14px, -6px) scale(0.7); }
+      20% { opacity: 1; transform: translate(20px, 4px) scale(1.08); }
+      70% { opacity: 1; transform: translate(24px, 12px) scale(1); }
+      100% { opacity: 0; transform: translate(26px, 20px) scale(0.85); }
+    }
+    .spd-float-up { animation: float-spd-num-up 1.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    .spd-float-down { animation: float-spd-num-down 1.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 
     /* 新回合开始：全队按阵营色发出一次光晕（赛博光轨，0.6s，逐项错峰） */
     @keyframes queue-round-glow {
@@ -997,8 +1070,15 @@
     <div class="absolute top-10 sm:top-8 w-full flex justify-center z-40 pointer-events-none">
       <div id="battle-log" class="glass-panel px-4 sm:px-6 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-light tracking-wide text-white/90 opacity-0 transition-opacity duration-300 transform -translate-y-4">整装待发...</div>
     </div>
-    <!-- 左侧：行动顺序队列 -->
-    <div id="turn-order-container" class="absolute left-1 sm:left-6 top-20 sm:top-24 bottom-[220px] sm:bottom-48 w-12 sm:w-16 z-30 pointer-events-auto flex flex-col gap-2 sm:gap-3 overflow-y-auto no-scrollbar mask-fade-y py-6 sm:py-12 scroll-smooth"></div>
+    <!-- 左侧：行动顺序队列与能量导轨 -->
+    <div class="absolute left-1 sm:left-4 md:left-6 top-16 sm:top-20 bottom-44 sm:bottom-48 w-12 sm:w-14 z-30 pointer-events-auto flex flex-col items-center select-none">
+      <div class="relative w-full h-full flex flex-col items-center">
+        <div class="timeline-rail">
+          <div class="rail-pulse-beam"></div>
+        </div>
+        <div id="turn-order-container" class="relative w-full h-full flex flex-col gap-2 sm:gap-2.5 items-center overflow-y-auto no-scrollbar mask-fade-y py-3 scroll-smooth"></div>
+      </div>
+    </div>
     <div id="enemies-container" class="absolute inset-0 z-10 flex flex-wrap items-center justify-center gap-6 sm:gap-24 pb-40 sm:pb-48 transition-all duration-300 px-8"></div>
   </div>
 
@@ -5409,6 +5489,7 @@ function updateTeamBarrierUI() {
 let _queueUidCounter = 0;            // 队列条目 uid 分配器（FLIP 定位 + 行动切换判定）
 let _prevQueueCurrentUid = null;     // 上次渲染的当前行动者 uid（聚焦冲击 / 再动爆闪切换判定）
 let _roundStartGlowPending = false;  // 新回合开始光晕待触发标记（startRound 置位、本函数消费一次）
+const _recentSpeedChanges = new Map(); // 速度变动追踪总线：entityId -> { delta, time }
 const _TURN_QUEUE_ANIM_MS = 600;     // 行动条动效基准时长（0.6s）
 const _TURN_QUEUE_EASE = 'cubic-bezier(0.34, 1.45, 0.64, 1)'; // 崩铁原味弹簧缓动
 
@@ -5446,28 +5527,71 @@ function renderTurnQueue() {
     const isExtra = item.isExtraTurn && item.queueSpd === undefined; // 再动/多重施法/连动/祈愿 插队项
     const justSwitched = item.uid !== _prevQueueCurrentUid;
 
-    const borderCol = item.type === 'hero' ? 'border-cyan-400' : 'border-rose-500';
-    const bgCol = item.type === 'hero' ? 'bg-cyan-900/50' : 'bg-rose-900/50';
+    const borderCol = isExtra ? 'border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.8)]' : 
+                      (item.type === 'hero' ? 'border-cyan-400' : 'border-rose-500');
+    const bgCol = isExtra ? 'bg-amber-950/70' : 
+                  (item.type === 'hero' ? 'bg-cyan-900/50' : 'bg-rose-900/50');
     const highlight = isCurrent ? 'scale-110 ring-2 ring-yellow-400 z-30' : 'opacity-70 scale-90 blur-[1px]';
 
     const content = (item.type === 'hero' || item.ref.img)
-      ? `<img src="${item.ref.img}" class="w-full h-full object-cover">`
+      ? `<img src="${item.ref.img}" class="w-full h-full object-cover rounded-full">`
       : `<div class="w-full h-full flex items-center justify-center text-sm sm:text-2xl">${item.ref.emoji}</div>`;
 
-    // 「⚡再动」角标：仅未行动的插队项常驻（realIndex >= queueIndex = 尚未轮到；已行动滚回队尾后消失）
-    const badgeHtml = (isExtra && realIndex >= state.queueIndex)
-      ? `<div class="extra-badge-active absolute -top-1.5 -right-1.5 z-40 flex items-center justify-center px-1 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-300 border border-white shadow-[0_0_10px_rgba(251,191,36,1)]"><span class="text-[8px] sm:text-[9px] font-black text-slate-950 leading-none">⚡再动</span></div>`
+    // 序号徽章（左下角 #1, #2...）
+    const rankPill = `
+      <div class="absolute -left-1 -bottom-1 z-20 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-slate-950/95 border border-slate-700 flex items-center justify-center text-[7px] sm:text-[9px] font-mono font-bold text-slate-300 shadow-sm pointer-events-none">
+        ${visualIdx + 1}
+      </div>
+    `;
+
+    // 「⚡再动」角标：精美琥珀流金置顶（未行动插队项常驻，已行动滚回队尾后消失）
+    const extraBadgeHtml = (isExtra && realIndex >= state.queueIndex)
+      ? `<div class="extra-badge-active absolute -top-1.5 left-1/2 -translate-x-1/2 z-40 flex items-center justify-center px-1.5 py-0.2 rounded-full bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-300 border border-amber-200/90 shadow-[0_0_10px_rgba(251,191,36,0.9)] text-[7px] sm:text-[8px] font-black text-slate-950 leading-none whitespace-nowrap pointer-events-none">⚡再动</div>`
       : '';
+
+    // 速度变动角标与漂浮数值（🟢▲ 提速 / 🔴▼ 降速）
+    const speedChg = _recentSpeedChanges.get(item.ref.id);
+    let spdBadgeHtml = '';
+    let spdFloatHtml = '';
+
+    if (speedChg && (Date.now() - speedChg.time < 2000)) {
+      const isUp = speedChg.delta > 0;
+      if (isUp) {
+        spdBadgeHtml = `
+          <div class="spd-badge-up absolute -top-1 -right-1 z-40 flex items-center justify-center w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-gradient-to-tr from-emerald-600 via-green-400 to-emerald-200 border border-white shadow-[0_0_8px_rgba(16,185,129,0.9)] pointer-events-none">
+            <span class="arrow-icon text-[8px] sm:text-[9px] font-black text-slate-950 leading-none">▲</span>
+          </div>
+        `;
+        spdFloatHtml = `<div class="spd-float-up absolute -right-6 top-0 z-50 text-[9px] sm:text-[10px] font-black text-emerald-300 font-mono drop-shadow-[0_0_6px_rgba(16,185,129,0.9)] whitespace-nowrap pointer-events-none">+${speedChg.delta}速</div>`;
+      } else {
+        spdBadgeHtml = `
+          <div class="spd-badge-down absolute -top-1 -right-1 z-40 flex items-center justify-center w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-gradient-to-tr from-rose-700 via-red-500 to-rose-300 border border-white shadow-[0_0_8px_rgba(244,63,94,0.9)] pointer-events-none">
+            <span class="arrow-icon text-[8px] sm:text-[9px] font-black text-white leading-none">▼</span>
+          </div>
+        `;
+        spdFloatHtml = `<div class="spd-float-down absolute -right-6 top-0 z-50 text-[9px] sm:text-[10px] font-black text-rose-400 font-mono drop-shadow-[0_0_6px_rgba(244,63,94,0.9)] whitespace-nowrap pointer-events-none">${speedChg.delta}速</div>`;
+      }
+    }
+
     const currentCursor = isCurrent
       ? `<div class="absolute -right-1 sm:-right-2 top-1/2 -translate-y-1/2 text-yellow-400 text-[8px] sm:text-xs font-bold animate-pulse drop-shadow-md">◀</div>`
       : '';
 
     const itemDiv = document.createElement('div');
-    // 外层不设 overflow-hidden（让冲击环/角标可溢出显示），头像由内层圆形裁切
-    itemDiv.className = `turn-queue-item relative w-8 h-8 sm:w-12 sm:h-12 rounded-full border-2 ${borderCol} ${bgCol} shadow-lg transition-all duration-300 ${highlight} flex-shrink-0`;
+    // 外层不设 overflow-hidden（让冲击环/角标可溢出显示），尺寸优化为精致响应式
+    itemDiv.className = `turn-queue-item relative w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 ${borderCol} ${bgCol} shadow-lg transition-all duration-300 ${highlight} flex-shrink-0 cursor-pointer`;
     itemDiv.setAttribute('data-item-uid', item.uid);
     itemDiv.title = item.ref.name;
-    itemDiv.innerHTML = `<div class="w-full h-full rounded-full overflow-hidden relative">${content}</div>${badgeHtml}${currentCursor}`;
+    itemDiv.innerHTML = `
+      <div class="w-full h-full rounded-full overflow-hidden relative">
+        ${content}
+      </div>
+      ${rankPill}
+      ${extraBadgeHtml}
+      ${spdBadgeHtml}
+      ${spdFloatHtml}
+      ${currentCursor}
+    `;
     container.appendChild(itemDiv);
 
     // 3. 动效挂点
@@ -6052,6 +6176,9 @@ registerTagHandler('速', (ctx) => {
     ctx.target.buffs.push({ type: 'spd', value: +ctx.actualPower, duration: ctx.effectTurns });
     createFloatingText(ctx.targetDom, `速+${ctx.actualPower} ${ctx.effectTurns}回`, 'text-cyan-300');
     addHistory(`   ↳ ⚡ ${ctx.target.name} 获得疾风加持，行动顺序提前（速度+${ctx.actualPower} 持续${ctx.effectTurns}回合）。`);
+    if (ctx.target && ctx.target.id) {
+        _recentSpeedChanges.set(ctx.target.id, { delta: +ctx.actualPower, time: Date.now() });
+    }
     if (ctx.skill) ctx.skill._speedChanged = true;
 });
 
@@ -6061,6 +6188,9 @@ registerTagHandler('缓', (ctx) => {
     ctx.target.buffs.push({ type: 'spd', value: -ctx.actualPower, duration: ctx.effectTurns });
     createFloatingText(ctx.targetDom, `速-${ctx.actualPower} ${ctx.effectTurns}回`, 'text-purple-400');
     addHistory(`   ↳ 🐌 ${ctx.target.name} 受到迟滞，行动顺序延后（速度-${ctx.actualPower} 持续${ctx.effectTurns}回合）。`);
+    if (ctx.target && ctx.target.id) {
+        _recentSpeedChanges.set(ctx.target.id, { delta: -ctx.actualPower, time: Date.now() });
+    }
     if (ctx.skill) ctx.skill._speedChanged = true;
 });
 
