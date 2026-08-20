@@ -127,6 +127,7 @@
 | 2026-08-19 | 属性持久化开关（未升版本号）：攻击/护甲/速度三项可选持久化——defendSettings 新增 persistAtk/persistDef/persistSpd 三布尔（默认全 false=YAML 优先，localStorage 持久化），编辑器「战斗全局设置」新增三个独立复选框，buildCombatDataFromYAML 记录 statSource（YAML 是否显式定义该项），applyPersistedRoster 覆盖条件改为「勾选 或 YAML 未定义」才用聊天记录覆盖；未勾选时 YAML 实时值优先、YAML 无该项回退聊天记录 | L1438 | 02d4947 |
 | 2026-08-20 | 左侧行动条 UI 动效全面升级：崩铁原味轮转 + 再动两段式爆闪 + 赛博光轨 + 串流灯带 + 变速角标（纯视觉层，未升版本号） | L1451 | 2d7ca04 |
 | 2026-08-20 | V7.5 定版：左侧行动条 UI 动效全面升级实测确认，README 版本号 V7.2→V7.5、§2.2 时间轴完善 6 大核心视觉动效特性（崩铁原味轮转/两阶段再动爆闪/赛博光轨/串流灯带/变速角标/响应式序号）；LOG-119 HASH 回填 | L1466 | 04f9d3a |
-| 2026-08-20 | 【肃正】屏障三项改造（未升版本号）：固定耐久上限（创建=技能 power×倍率，击破归零上限）+ 屏障存在时肃正技能灰卡禁用（skillHasBarrierTag/isBarrierBlocked 并入 isEnough，纯视觉零拦截）+ 屏障类型配色（无/近战=银白、远程=科幻蓝、法术=金，CSS 变量化 data-theme）+ 修复受击白屏竞态（spawnHitFlash 持久 originalFilter） | L1477 | 待回填 |
-| 2026-08-20 | V7.6 定版：【肃正】屏障三项改造实测确认，README/SPEC 版本号 V7.5→V7.6 与 §2.2/§3.2/§4.2.4 条目更新；LOG-121 HASH 回填 | L1488 | 待回填 |
+| 2026-08-20 | 【肃正】屏障三项改造（未升版本号）：固定耐久上限（创建=技能 power×倍率，击破归零上限）+ 屏障存在时肃正技能灰卡禁用（skillHasBarrierTag/isBarrierBlocked 并入 isEnough，纯视觉零拦截）+ 屏障类型配色（无/近战=银白、远程=科幻蓝、法术=金，CSS 变量化 data-theme）+ 修复受击白屏竞态（spawnHitFlash 持久 originalFilter） | L1477 | 0ec5f9b |
+| 2026-08-20 | V7.6 定版：【肃正】屏障三项改造实测确认，README/SPEC 版本号 V7.5→V7.6 与 §2.2/§3.2/§4.2.4 条目更新；LOG-121 HASH 回填 | L1488 | 0ec5f9b |
+
 
