@@ -126,3 +126,4 @@
 | 2026-08-19 | FX 特效音效预热升级为 fetch→Blob 全量预载（未升版本号）：新增 _fxAudioBlobCache；preloadBattleAssets 音频预热由 new Audio+preload='auto'（非挂载元素不可靠、播放时现场拉取大文件）改为 fetch→Blob→ObjectURL 与视频同款，成功/失败打点 + 失败删占位可重试；playCustomAudio 优先 Blob 本地播放（零网络等待），_fxAudioCache 保留为回退路径 | L1428 | 13dafe1 |
 | 2026-08-19 | 属性持久化开关（未升版本号）：攻击/护甲/速度三项可选持久化——defendSettings 新增 persistAtk/persistDef/persistSpd 三布尔（默认全 false=YAML 优先，localStorage 持久化），编辑器「战斗全局设置」新增三个独立复选框，buildCombatDataFromYAML 记录 statSource（YAML 是否显式定义该项），applyPersistedRoster 覆盖条件改为「勾选 或 YAML 未定义」才用聊天记录覆盖；未勾选时 YAML 实时值优先、YAML 无该项回退聊天记录 | L1438 | 02d4947 |
 | 2026-08-20 | 左侧行动条 UI 动效全面升级：崩铁原味轮转 + 再动两段式爆闪 + 赛博光轨 + 串流灯带 + 变速角标（纯视觉层，未升版本号） | L1451 | 2d7ca04 |
+| 2026-08-20 | V7.5 定版：左侧行动条 UI 动效全面升级实测确认，README 版本号 V7.2→V7.5、§2.2 时间轴完善 6 大核心视觉动效特性（崩铁原味轮转/两阶段再动爆闪/赛博光轨/串流灯带/变速角标/响应式序号）；LOG-119 HASH 回填 | L1466 | pending |
