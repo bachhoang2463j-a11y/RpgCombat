@@ -125,4 +125,4 @@
 | 2026-08-19 | 回退 16 个音效的 jsdelivr 迁移恢复 catbox.moe 源：实测基础音效无改善且出现延迟，用户澄清真正延迟的是火焰/雷技能特效音效；保留 c30971f/d148efd 历史记录 | L1436 | f1d2614 |
 | 2026-08-19 | FX 特效音效预热升级为 fetch→Blob 全量预载（未升版本号）：新增 _fxAudioBlobCache；preloadBattleAssets 音频预热由 new Audio+preload='auto'（非挂载元素不可靠、播放时现场拉取大文件）改为 fetch→Blob→ObjectURL 与视频同款，成功/失败打点 + 失败删占位可重试；playCustomAudio 优先 Blob 本地播放（零网络等待），_fxAudioCache 保留为回退路径 | L1428 | 13dafe1 |
 | 2026-08-19 | 属性持久化开关（未升版本号）：攻击/护甲/速度三项可选持久化——defendSettings 新增 persistAtk/persistDef/persistSpd 三布尔（默认全 false=YAML 优先，localStorage 持久化），编辑器「战斗全局设置」新增三个独立复选框，buildCombatDataFromYAML 记录 statSource（YAML 是否显式定义该项），applyPersistedRoster 覆盖条件改为「勾选 或 YAML 未定义」才用聊天记录覆盖；未勾选时 YAML 实时值优先、YAML 无该项回退聊天记录 | L1438 | 02d4947 |
-| 2026-08-20 | 左侧行动条 UI 动效升级：崩铁原味回合切换 + 再动爆闪 + 新回合赛博光轨（纯视觉层，未升版本号） | L1451 | pending |
+| 2026-08-20 | 左侧行动条 UI 动效升级：崩铁原味回合切换 + 再动爆闪 + 新回合赛博光轨（纯视觉层，未升版本号） | L1451 | 0ce48ec |
