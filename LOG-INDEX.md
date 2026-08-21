@@ -129,5 +129,7 @@
 | 2026-08-20 | V7.5 定版：左侧行动条 UI 动效全面升级实测确认，README 版本号 V7.2→V7.5、§2.2 时间轴完善 6 大核心视觉动效特性（崩铁原味轮转/两阶段再动爆闪/赛博光轨/串流灯带/变速角标/响应式序号）；LOG-119 HASH 回填 | L1466 | 04f9d3a |
 | 2026-08-20 | 【肃正】屏障三项改造（未升版本号）：固定耐久上限（创建=技能 power×倍率，击破归零上限）+ 屏障存在时肃正技能灰卡禁用（skillHasBarrierTag/isBarrierBlocked 并入 isEnough，纯视觉零拦截）+ 屏障类型配色（无/近战=银白、远程=科幻蓝、法术=金，CSS 变量化 data-theme）+ 修复受击白屏竞态（spawnHitFlash 持久 originalFilter） | L1477 | 0ec5f9b |
 | 2026-08-20 | V7.6 定版：【肃正】屏障三项改造实测确认，README/SPEC 版本号 V7.5→V7.6 与 §2.2/§3.2/§4.2.4 条目更新；LOG-121 HASH 回填 | L1488 | 0ec5f9b |
+| 2026-08-21 | 修复思考型模型局内对话被截断（未升版本号）：max_tokens 可配置（面板新增输入框默认 4096，替换硬编码 300）+ 关闭思考开关（best-effort 发送 thinking:false）+ 响应兜底解析 + finish_reason 截断检测提示；根因=gcli 代理将 max_tokens 映射 Gemini maxOutputTokens 连思考一起计算（deepseek v4f 思考分开计量故正常） | L1502 | 42e2f4e |
+| 2026-08-21 | V7.7 定版：思考型模型对话截断修复实测确认（gemini-3-flash-preview 台词完整不再截断），README 版本号 V7.6→V7.7 + §2.1 对话设置补 max_tokens/关闭思考两项说明；LOG-123 HASH 回填 | L1513 | 42e2f4e |
 
 
