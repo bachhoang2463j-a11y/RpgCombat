@@ -1499,3 +1499,26 @@
 - **涉及文件**：`README.md`、`SPEC.md`、`LOG.md`、`LOG-INDEX.md`。
 - **经验证**：浏览器与 Node.js 双重校验通过，屏障创建、灰卡禁用与克制主题切换均稳定符合设计。
 
+## [LOG-123] 2026-08-21 — 修复思考型模型局内对话被截断：max_tokens 可配置 + 关闭思考开关 + 截断检测（未升版本号）
+
+- **变更行为**（`index.html`）：
+  1. **根因定位**：`callLLMAPI` 硬编码 `max_tokens: 300`（原 L10445）。经 OpenAI 兼容代理（gcli.ggchan.dev/v1）转发时 `max_tokens` 映射为 Gemini 的 `maxOutputTokens`，**思考 token 计入该上限**——gemini-3-flash-preview 为思考型模型，300 预算被思考耗尽导致正文被截断；而 gemini-2.5-flash-lite（非思考型）与 deepseek v4f（DeepSeek 官方接口将思考 `reasoning_content` 与正文分开计量，`max_tokens` 仅限制正文）均正常。非安全限制，提示词内容无关。参考对比项目（酒馆助手脚本-生图助手，同渠道 `maxTokens: 8192` 正常返回）确认差异点即 token 预算。
+  2. **设置面板新增两项**（`#llm-max-tokens` 输入框 256~8192 默认 4096，提示"思考型模型思考 token 计入该上限，过低会导致回应被截断"；`#llm-disable-thinking` 复选框，标注"仅部分代理支持，发送 thinking:false"）。
+  3. **状态与持久化接线**：`defaultPreset`/`llmState` 新增 `maxTokens: 4096`/`disableThinking: false`；`initLLMPresets` p[0] 拷贝、`switchLLMPreset` 读写、`saveLLMSettings` 拷贝、`persistLLMSettings` toSave 五处同步；`loadLLMSettings` 走 `Object.assign` 兼容旧数据（缺字段自动保留默认值，老用户无需重配）。
+  4. **`callLLMAPI` 请求与响应**：`max_tokens: llmState.maxTokens || 4096` 替换硬编码 300；勾选关闭思考时附加 `thinking: false`（best-effort，仅部分代理透传，未知字段多数代理静默忽略）；响应兜底解析（对齐参考脚本顺序）`message.content` → `reasoning_content` → `reasoning` → `choice.text` → `data.content/output/response/result`，正文优先；截断检测 `finish_reason === 'length'` → `console.warn` + `showLog('⚠️ AI 回应被截断，请在【💬 对话】中调高 max_tokens')`。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：用户报告经反向代理 gcli 渠道使用 gemini-3-flash-preview 局内对话频繁被截断（gemini-2.5-flash-lite / deepseek v4f 正常），明确提示词无敏感内容非安全限制；经对比同渠道正常返回的参考脚本，确认唯一关键差异为 `max_tokens` 预算。方案选「max_tokens 可配置 + 截断检测」最小改动直击根因，不移植参考脚本的越狱式生图提示词（与局内对话无关）；「关闭思考」为 best-effort 开关以应对代理透传不确定性。
+- **经验证**：Node 提取 `<script>` 语法校验通过，零报错；面板新增字段与 `switchLLMPreset` 读写闭环、`persistLLMSettings` 序列化字段齐备、`callLLMAPI` 请求体/响应兜底/截断检测逻辑就位。
+
+## [LOG-124] 2026-08-21 — V7.7 定版：max_tokens 可配置 + 关闭思考开关实测确认 + README/LOG-INDEX 更新
+
+- **变更行为**：
+  1. **版本号升级 V7.6 → V7.7**：思考型模型局内对话截断修复（max_tokens 可配置、关闭思考开关、响应兜底解析、截断检测）经用户酒馆实测确认无误（gemini-3-flash-preview 台词完整不再截断），跨入 **V7.7** 版本。
+  2. **README.md 同步定版**：
+     - 顶部版本号标定为 `V7.7`；
+     - **§2.1** 完善「💬 对话」设置条目，新增 **max_tokens（最大输出）** 与 **🧠 关闭思考** 两项说明（含思考型模型 token 计入上限导致截断的原理与 `thinking:false` 的 best-effort 语义）。
+  3. **仓库全量同步与推流**：完成本地 git 提交、`LOG-INDEX.md` 索引回填（LOG-123 HASH）与远程分支推送。
+- **涉及文件**：`README.md`、`LOG.md`、`LOG-INDEX.md`。
+- **经验证**：用户酒馆实测 gemini-3-flash-preview 局内对话多轮台词完整，修复生效。
+
+
