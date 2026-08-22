@@ -136,6 +136,8 @@
 | 2026-08-23 | 我方英雄回合开始语音系统（按名字绑定，未升版本号）：HERO_VOICE_LINES 注册表（埃利奥特/玛德琳/弗兰克/索恩×7句，逐条显式列出）＋playHeroTurnVoice 按回合号/血量选句＋preloadHeroVoices 预载＋state.currentRound 记录当前回合＋nextTurn hero 分支 !isExtraTurn 守卫（再动/额外行动不播） | L1550 | f148ce8 |
 | 2026-08-23 | 世界书敌方词条「描述」提取并在敌方详情弹窗展示「📚 世界书资料」区块（未升版本号）：extractWorldbookDescription 正则提取描述行＋startGameFromWorldbook 挂载 fresh.wbSource＋showEnemyInfo 插入暗色资料卡片（YAML 载入敌人隐藏） | L1569 | 354a5e8 |
 | 2026-08-23 | V7.9 定版：我方英雄回合开始语音系统与世界书敌方资料展示实测确认，README 版本号 V7.8→V7.9、§2.2 英雄语音与敌方详情条目更新、§9 世界书说明更新；LOG-129/130 HASH 回填 | L1586 | 354a5e8 |
+| 2026-08-23 | 敌人详情面板 (Enemy Info Modal) UI 现代化重构与 20% 高透光升级（未升版本号）：方案 A 双列全息战术面板（.cyber-modal-enemy）+ 20% 超透光毛玻璃背景 + 三维属性微缩右移至技能标题行 + 释放左侧「📚 世界书图鉴档案」大空间 + 1:1 对标我方 3-Row 高密度技能卡片（四向伤害类型徽章与分色胶囊）+ 全量 19 种变种标签专属图标与独立发光呼吸动效（tag-fx-*） | L1598 | a7b0fd9 |
+| 2026-08-23 | V8.0 定版：敌人详情面板现代化重构与 20% 高透光战术目镜实测确认，README 版本号 V7.9→V8.0、§2.2 敌方详情面板条目更新；LOG-131/132 HASH 回填 | L1622 | a7b0fd9 |
 
 
 

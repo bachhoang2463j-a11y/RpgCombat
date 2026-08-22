@@ -1059,6 +1059,71 @@
       80% { transform: scale(1.005) translateX(1px); }
       100% { transform: scale(1); }
     }
+
+    /* 敌人详情面板 20% 超透光卡片与微光特效 */
+    .cyber-modal-enemy {
+      background: radial-gradient(130% 120% at 20% 0%, rgba(30, 41, 59, 0.20) 0%, rgba(15, 23, 42, 0.28) 100%);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(6, 182, 212, 0.4);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.65), 0 0 30px rgba(6, 182, 212, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+    .cyber-corner {
+      position: absolute; width: 8px; height: 8px; border-color: rgba(6, 182, 212, 0.8);
+    }
+    .cyber-corner-tl { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
+    .cyber-corner-tr { top: -1px; right: -1px; border-top: 2px solid; border-right: 2px solid; }
+    .cyber-corner-bl { bottom: -1px; left: -1px; border-bottom: 2px solid; border-left: 2px solid; }
+    .cyber-corner-br { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
+
+    .enemy-skill-inspect-item {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .enemy-skill-inspect-item:hover {
+      transform: translateY(-1.5px);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 10px rgba(6, 182, 212, 0.25);
+    }
+
+    /* 变种特质 19 种独立动效 */
+    @keyframes fx-revive { 0%, 100% { box-shadow: 0 0 5px rgba(16,185,129,0.35); } 50% { box-shadow: 0 0 16px rgba(16,185,129,0.85), inset 0 0 6px rgba(16,185,129,0.4); } }
+    @keyframes fx-wise { 0%, 100% { box-shadow: 0 0 5px rgba(244,63,94,0.35); } 50% { box-shadow: 0 0 16px rgba(244,63,94,0.85), inset 0 0 6px rgba(244,63,94,0.4); } }
+    @keyframes fx-molt { 0%, 100% { box-shadow: 0 0 5px rgba(245,158,11,0.35); } 50% { box-shadow: 0 0 18px rgba(245,158,11,0.9), inset 0 0 6px rgba(245,158,11,0.45); } }
+    @keyframes fx-thorn { 0%, 100% { box-shadow: 0 0 5px rgba(34,197,94,0.3); } 50% { box-shadow: 0 0 14px rgba(34,197,94,0.75); } }
+    @keyframes fx-link { 0%, 100% { box-shadow: 0 0 6px rgba(217,70,239,0.4); transform: scale(1); } 50% { box-shadow: 0 0 18px rgba(217,70,239,0.95), inset 0 0 6px rgba(217,70,239,0.5); transform: scale(1.02); } }
+    @keyframes fx-rage { 0%, 100% { box-shadow: 0 0 5px rgba(239,68,68,0.35); } 50% { box-shadow: 0 0 16px rgba(239,68,68,0.9); } }
+    @keyframes fx-leech { 0%, 100% { box-shadow: 0 0 4px rgba(225,29,72,0.35); } 50% { box-shadow: 0 0 15px rgba(225,29,72,0.85); } }
+    @keyframes fx-regen { 0%, 100% { box-shadow: 0 0 4px rgba(74,222,128,0.3); } 50% { box-shadow: 0 0 14px rgba(74,222,128,0.75); } }
+    @keyframes fx-shield-cyan { 0%, 100% { box-shadow: 0 0 4px rgba(6,182,212,0.25); } 50% { box-shadow: 0 0 12px rgba(6,182,212,0.65); } }
+    @keyframes fx-shield-ghost { 0%, 100% { box-shadow: 0 0 4px rgba(129,140,248,0.25); } 50% { box-shadow: 0 0 13px rgba(129,140,248,0.65); } }
+    @keyframes fx-shield-magic { 0%, 100% { box-shadow: 0 0 4px rgba(168,85,247,0.25); } 50% { box-shadow: 0 0 13px rgba(168,85,247,0.7); } }
+    @keyframes fx-shield-aoe { 0%, 100% { box-shadow: 0 0 4px rgba(20,184,166,0.25); } 50% { box-shadow: 0 0 13px rgba(20,184,166,0.7); } }
+    @keyframes fx-fireproof { 0%, 100% { box-shadow: 0 0 4px rgba(249,115,22,0.3); } 50% { box-shadow: 0 0 12px rgba(249,115,22,0.7); } }
+    @keyframes fx-poisonproof { 0%, 100% { box-shadow: 0 0 4px rgba(168,85,247,0.3); } 50% { box-shadow: 0 0 13px rgba(168,85,247,0.7); } }
+    @keyframes fx-ironbody { 0%, 100% { box-shadow: 0 0 4px rgba(148,163,184,0.3); } 50% { box-shadow: 0 0 12px rgba(148,163,184,0.7); } }
+    @keyframes fx-explode-red { 0%, 100% { box-shadow: 0 0 6px rgba(239,68,68,0.4); transform: scale(1); } 50% { box-shadow: 0 0 18px rgba(239,68,68,0.95), inset 0 0 6px rgba(239,68,68,0.4); transform: scale(1.025); } }
+    @keyframes fx-explode-pierce { 0%, 100% { box-shadow: 0 0 6px rgba(244,63,94,0.4); transform: scale(1); } 50% { box-shadow: 0 0 18px rgba(244,63,94,0.95), inset 0 0 6px rgba(244,63,94,0.4); transform: scale(1.025); } }
+    @keyframes fx-explode-fire { 0%, 100% { box-shadow: 0 0 6px rgba(249,115,22,0.4); transform: scale(1); } 50% { box-shadow: 0 0 18px rgba(249,115,22,0.95), inset 0 0 6px rgba(249,115,22,0.4); transform: scale(1.025); } }
+    @keyframes fx-explode-poison { 0%, 100% { box-shadow: 0 0 6px rgba(168,85,247,0.4); transform: scale(1); } 50% { box-shadow: 0 0 18px rgba(168,85,247,0.95), inset 0 0 6px rgba(168,85,247,0.4); transform: scale(1.025); } }
+
+    .tag-fx-revive { animation: fx-revive 2.4s infinite ease-in-out; }
+    .tag-fx-wise { animation: fx-wise 2.2s infinite ease-in-out; }
+    .tag-fx-molt { animation: fx-molt 2s infinite ease-in-out; }
+    .tag-fx-thorn { animation: fx-thorn 2.8s infinite ease-in-out; }
+    .tag-fx-link { animation: fx-link 1.8s infinite ease-in-out; }
+    .tag-fx-rage { animation: fx-rage 2s infinite ease-in-out; }
+    .tag-fx-leech { animation: fx-leech 2.5s infinite ease-in-out; }
+    .tag-fx-regen { animation: fx-regen 2.6s infinite ease-in-out; }
+    .tag-fx-fluid { animation: fx-shield-cyan 3s infinite ease-in-out; }
+    .tag-fx-ghost { animation: fx-shield-ghost 3s infinite ease-in-out; }
+    .tag-fx-magic { animation: fx-shield-magic 3s infinite ease-in-out; }
+    .tag-fx-aoe { animation: fx-shield-aoe 3s infinite ease-in-out; }
+    .tag-fx-fireproof { animation: fx-fireproof 2.8s infinite ease-in-out; }
+    .tag-fx-poisonproof { animation: fx-poisonproof 2.8s infinite ease-in-out; }
+    .tag-fx-ironbody { animation: fx-ironbody 3.2s infinite ease-in-out; }
+    .tag-fx-explode-dmg { animation: fx-explode-red 1.6s infinite ease-in-out; }
+    .tag-fx-explode-pierce { animation: fx-explode-pierce 1.5s infinite ease-in-out; }
+    .tag-fx-explode-fire { animation: fx-explode-fire 1.6s infinite ease-in-out; }
+    .tag-fx-explode-poison { animation: fx-explode-poison 1.6s infinite ease-in-out; }
   </style>
 </head>
 <body class="w-full h-[100dvh] min-h-[600px] bg-black text-gray-100 overflow-hidden relative select-none">
@@ -9333,113 +9398,241 @@ function cancelTargeting() { state.isTargeting = false; state.pendingAction = nu
 
 function showEnemyInfo(enemy) {
   const modal = document.getElementById('editor-modal');
-  // 变种标签徽章区：敌方专属 [xxx] 变种标签（名字/属性栏双写入点收集于 enemy.tags，含 [自爆:x] 带参数形式）
-  // 映射为可读徽章；未识别/不带参数的裸标签（如 [自爆:群伤] 已解析进 explode）仍原样展示，避免遗漏
-  const TAG_BADGE = {
-    '[复活]': ['复活', '死后30%血量复活一次', 'text-emerald-300 bg-emerald-900/40 border-emerald-600/60'],
-    '[智慧]': ['智慧', '三档智慧旁白（回合开始/跌破30%/临死）', 'text-rose-300 bg-rose-900/40 border-rose-600/60'],
-    '[流体]': ['流体', '远程伤害 -50%', 'text-sky-300 bg-sky-900/40 border-sky-600/60'],
-    '[虚形]': ['虚形', '近战伤害 -50%', 'text-sky-300 bg-sky-900/40 border-sky-600/60'],
-    '[破法]': ['破法', '法术伤害 -50%', 'text-sky-300 bg-sky-900/40 border-sky-600/60'],
-    '[要害]': ['要害', '群攻伤害 -50%', 'text-sky-300 bg-sky-900/40 border-sky-600/60'],
-    '[防火]': ['防火', '免疫点燃', 'text-orange-300 bg-orange-900/40 border-orange-600/60'],
-    '[耐毒]': ['耐毒', '免疫中毒', 'text-purple-300 bg-purple-900/40 border-purple-600/60'],
-    '[钢体]': ['钢体', '免疫眩晕', 'text-slate-300 bg-slate-800/50 border-slate-600/60'],
-    '[再生]': ['再生', '每回合回复最大HP 10%', 'text-green-300 bg-green-900/40 border-green-600/60'],
-    '[狂暴]': ['狂暴', 'HP≤30% 时攻击力 +50%', 'text-red-300 bg-red-900/40 border-red-600/60'],
-    '[吸血]': ['吸血', '造成实际伤害时吸取 30% 生命', 'text-red-300 bg-red-900/40 border-red-600/60'],
-    '[蜕皮]': ['蜕皮', '首次HP跌破50%：清除全部debuff + 回血30% + 永久攻击+50%', 'text-amber-300 bg-amber-900/40 border-amber-600/60'],
-    '[荆棘]': ['荆棘', '被近战命中时反弹 50% 实际伤害（护甲减免后保底10）', 'text-green-300 bg-green-900/40 border-green-600/60'],
-    '[连动]': ['连动', 'HP≤30% 时立刻行动一次（一次性）', 'text-fuchsia-300 bg-fuchsia-900/40 border-fuchsia-600/60']
+  modal.className = "fixed inset-0 bg-black/15 backdrop-blur-sm z-[100] flex items-center justify-center p-3 sm:p-6 overflow-hidden transition-all duration-300";
+
+  // 变种标签精细元数据 (19 种敌方变种标签全部涵盖：名称、描述、动效 class、专属配色与精美图标)
+  const VARIANT_TAG_CONFIG = {
+    '[复活]': { name: '复活', tip: '死后以 30% 生命值复活一次', fxClass: 'tag-fx-revive', style: 'text-emerald-300 bg-emerald-950/70 border-emerald-500/80', icon: '✨' },
+    '[智慧]': { name: '智慧', tip: '三档智慧旁白（回合开始/低血/死亡）', fxClass: 'tag-fx-wise', style: 'text-rose-300 bg-rose-950/70 border-rose-500/80', icon: '🧠' },
+    '[蜕皮]': { name: '蜕皮', tip: '首次跌破50%：清除全部debuff + 回血30% + 永久攻击+50%', fxClass: 'tag-fx-molt', style: 'text-amber-300 bg-amber-950/70 border-amber-500/80', icon: '🐍' },
+    '[荆棘]': { name: '荆棘', tip: '被近战命中反弹 50% 实际伤害（护甲减免后保底10）', fxClass: 'tag-fx-thorn', style: 'text-green-300 bg-green-950/70 border-green-500/80', icon: '🌵' },
+    '[连动]': { name: '连动', tip: 'HP≤30% 时立刻额外行动一次（一次性）', fxClass: 'tag-fx-link', style: 'text-fuchsia-300 bg-fuchsia-950/70 border-fuchsia-500/80', icon: '⚡' },
+    '[狂暴]': { name: '狂暴', tip: 'HP≤30% 时攻击力 +50%', fxClass: 'tag-fx-rage', style: 'text-red-300 bg-red-950/70 border-red-500/80', icon: '🩸' },
+    '[吸血]': { name: '吸血', tip: '造成实际伤害时吸取 30% 转化为自身生命', fxClass: 'tag-fx-leech', style: 'text-rose-300 bg-rose-950/70 border-rose-500/80', icon: '🧛' },
+    '[再生]': { name: '再生', tip: '每回合开始回复 10% 最大生命值', fxClass: 'tag-fx-regen', style: 'text-emerald-300 bg-emerald-950/70 border-emerald-500/80', icon: '🌿' },
+    '[流体]': { name: '流体', tip: '受到的远程伤害 -50%', fxClass: 'tag-fx-fluid', style: 'text-sky-300 bg-sky-950/70 border-sky-500/80', icon: '💧' },
+    '[虚形]': { name: '虚形', tip: '受到的近战伤害 -50%', fxClass: 'tag-fx-ghost', style: 'text-indigo-300 bg-indigo-950/70 border-indigo-500/80', icon: '👻' },
+    '[破法]': { name: '破法', tip: '受到的法术伤害 -50%', fxClass: 'tag-fx-magic', style: 'text-purple-300 bg-purple-950/70 border-purple-500/80', icon: '🔮' },
+    '[要害]': { name: '要害', tip: '受到的群攻伤害 -50%', fxClass: 'tag-fx-aoe', style: 'text-teal-300 bg-teal-950/70 border-teal-500/80', icon: '💠' },
+    '[防火]': { name: '防火', tip: '免疫点燃（燃烧）状态施加', fxClass: 'tag-fx-fireproof', style: 'text-orange-300 bg-orange-950/70 border-orange-500/80', icon: '🔥' },
+    '[耐毒]': { name: '耐毒', tip: '免疫中毒状态施加', fxClass: 'tag-fx-poisonproof', style: 'text-purple-300 bg-purple-950/70 border-purple-500/80', icon: '🧪' },
+    '[钢体]': { name: '钢体', tip: '免疫眩晕控制状态', fxClass: 'tag-fx-ironbody', style: 'text-slate-300 bg-slate-800/80 border-slate-500/80', icon: '⛓️' },
+    '[自爆:群伤]': { name: '自爆·群伤', tip: '死亡自爆：对全体我方造成直接物理伤害', fxClass: 'tag-fx-explode-dmg', style: 'text-red-300 bg-red-950/75 border-red-500/80', icon: '💥' },
+    '[自爆:群穿]': { name: '自爆·群穿', tip: '死亡自爆：对全体我方造成穿透伤害（无视护甲）', fxClass: 'tag-fx-explode-pierce', style: 'text-rose-300 bg-rose-950/75 border-rose-500/80', icon: '🗡️' },
+    '[自爆:群火]': { name: '自爆·群火', tip: '死亡自爆：对全体我方施加燃烧（灼烧禁疗）', fxClass: 'tag-fx-explode-fire', style: 'text-orange-300 bg-orange-950/75 border-orange-500/80', icon: '🔥' },
+    '[自爆:群毒]': { name: '自爆·群毒', tip: '死亡自爆：对全体我方施加中毒（多层叠毒）', fxClass: 'tag-fx-explode-poison', style: 'text-purple-300 bg-purple-950/75 border-purple-500/80', icon: '🧪' }
   };
-  const EXPLODE_SUB_BADGE = {
-    '群伤': ['群伤', '死亡自爆：对全体我方造成非穿透伤害', 'text-red-300 bg-red-950/50 border-red-700/60'],
-    '群穿': ['群穿', '死亡自爆：对全体我方造成穿透伤害（无视防御）', 'text-red-300 bg-red-950/50 border-red-700/60'],
-    '群火': ['群火', '死亡自爆：对全体我方施加燃烧（禁疗）', 'text-orange-300 bg-orange-950/50 border-orange-700/60'],
-    '群毒': ['群毒', '死亡自爆：对全体我方施加中毒（叠层）', 'text-purple-300 bg-purple-950/50 border-purple-700/60']
+  const EXPLODE_SUB_CONF = {
+    '群伤': { name: '自爆·群伤', tip: '死亡自爆：对全体我方造成直接物理伤害', fxClass: 'tag-fx-explode-dmg', style: 'text-red-300 bg-red-950/75 border-red-500/80', icon: '💥' },
+    '群穿': { name: '自爆·群穿', tip: '死亡自爆：对全体我方造成穿透伤害（无视护甲）', fxClass: 'tag-fx-explode-pierce', style: 'text-rose-300 bg-rose-950/75 border-rose-500/80', icon: '🗡️' },
+    '群火': { name: '自爆·群火', tip: '死亡自爆：对全体我方施加燃烧（禁疗）', fxClass: 'tag-fx-explode-fire', style: 'text-orange-300 bg-orange-950/75 border-orange-500/80', icon: '🔥' },
+    '群毒': { name: '自爆·群毒', tip: '死亡自爆：对全体我方施加中毒（叠层）', fxClass: 'tag-fx-explode-poison', style: 'text-purple-300 bg-purple-950/75 border-purple-500/80', icon: '🧪' }
   };
+
   let tagHtml = '';
   if (enemy.tags && enemy.tags.length) {
     const handled = [];
     const seen = new Set();
     enemy.tags.forEach(tag => {
-      // 自爆标签：已解析进 explode，展示为「自爆·子类型」徽章
       if (/^\[自爆:/.test(tag) && enemy.explode) {
-        const sub = EXPLODE_SUB_BADGE[enemy.explode.type];
-        if (sub && !seen.has('自爆')) {
-          handled.push(`<span title="${sub[1]}（威力 ${enemy.explode.power}）" class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${sub[2]} cursor-help">💥 自爆·${sub[0]}</span>`);
+        const sub = EXPLODE_SUB_CONF[enemy.explode.type] || { name: `自爆·${enemy.explode.type}`, tip: `死亡自爆（威力 ${enemy.explode.power}）`, fxClass: 'tag-fx-explode-dmg', style: 'text-red-300 bg-red-950/75 border-red-500/80', icon: '💥' };
+        if (!seen.has('自爆')) {
+          handled.push(`<span title="${sub.tip}（威力 ${enemy.explode.power}）" class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${sub.style} ${sub.fxClass} flex items-center gap-1 cursor-help transition-transform hover:scale-105 shadow-sm"><span>${sub.icon}</span> ${sub.name}</span>`);
           seen.add('自爆');
         }
         return;
       }
       if (seen.has(tag)) return;
       seen.add(tag);
-      if (TAG_BADGE[tag]) {
-        const [label, tip, cls] = TAG_BADGE[tag];
-        handled.push(`<span title="${tip}" class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${cls} cursor-help">${label}</span>`);
-      } else {
-        handled.push(`<span title="${tag}" class="px-2 py-0.5 rounded-full border text-[10px] font-bold text-gray-300 bg-gray-800/60 border-gray-600/60 cursor-help">${tag}</span>`);
-      }
+      const conf = VARIANT_TAG_CONFIG[tag] || { name: tag, tip: tag, fxClass: 'tag-fx-ironbody', style: 'text-slate-300 bg-slate-900/70 border-slate-700', icon: '🔹' };
+      handled.push(`<span title="${conf.tip}" class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${conf.style} ${conf.fxClass} flex items-center gap-1 cursor-help transition-transform hover:scale-105 shadow-sm"><span>${conf.icon}</span> ${conf.name}</span>`);
     });
-    tagHtml = `<div class="mb-3">
-      <div class="text-gray-400 text-xs font-bold mb-1.5 uppercase tracking-wider">变种标签</div>
-      <div class="flex flex-wrap gap-1.5">${handled.join('') || '<span class="text-gray-600 text-xs">无</span>'}</div>
+    tagHtml = `<div class="mb-2">
+      <div class="text-[10px] text-cyan-400 font-bold tracking-wider uppercase mb-1.5 flex items-center justify-between">
+        <span class="flex items-center gap-1"><span>🧬</span> 变种特质与被动</span>
+      </div>
+      <div class="flex flex-wrap gap-1.5">${handled.join('') || '<span class="text-slate-500 text-xs">无特殊变种标签</span>'}</div>
     </div>`;
   }
-  // 世界书资料区块：仅世界书载入的敌人（带 wbSource）渲染；YAML 载入敌人整块隐藏
+
   let wbHtml = '';
   if (enemy.wbSource) {
     const src = enemy.wbSource;
-    const descHtml = src.desc
-      ? `<div class="text-xs text-gray-200 leading-relaxed bg-black/30 border border-violet-500/20 rounded p-2">${src.desc}</div>`
-      : `<div class="text-xs text-gray-500">词条无描述文字</div>`;
-    wbHtml = `<div class="mb-3">
-      <div class="text-gray-400 text-xs font-bold mb-1.5 uppercase tracking-wider">📚 世界书资料</div>
-      ${descHtml}
+    const descText = src.desc ? src.desc : '词条无描述文字';
+    wbHtml = `<div class="flex-1 bg-black/25 rounded-xl p-3 border border-violet-500/30 flex flex-col gap-1.5 min-h-[140px]">
+      <div class="text-[10px] text-violet-300 font-bold tracking-wider uppercase flex items-center justify-between border-b border-violet-500/20 pb-1 shrink-0">
+        <span class="flex items-center gap-1"><span>📚</span> 世界书图鉴档案</span>
+        <span class="text-[9px] text-violet-400/70 font-mono">LORE ENTRY</span>
+      </div>
+      <p class="text-xs text-slate-200/90 leading-relaxed overflow-y-auto custom-scrollbar pr-1 flex-1">${descText}</p>
     </div>`;
   }
-  let skillsHtml = enemy.skills.map(skill => {
-    return `<div class="bg-gray-800 p-2 rounded border border-gray-700 text-sm mb-2">
-      <div class="text-rose-400 font-bold mb-1">${skill.name}</div>
-      <div class="flex flex-wrap gap-1 mb-1 text-xs">
-        <span class="px-1.5 py-0.5 bg-gray-700 rounded text-gray-300">类型: ${skill.type}</span>
-        ${skill.power ? `<span class="px-1.5 py-0.5 bg-rose-900/50 text-rose-300 rounded">威力: ${skill.power}</span>` : ''}
-        ${skill.mp ? `<span class="px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded">MP: ${skill.mp}</span>` : ''}
-        ${skill.tp ? `<span class="px-1.5 py-0.5 bg-yellow-900/50 text-yellow-300 rounded">TP: ${skill.tp}</span>` : ''}
-        ${skill.charge ? `<span class="px-1.5 py-0.5 bg-purple-900/50 text-purple-300 rounded">蓄力: ${skill.charge}</span>` : ''}
-        ${skill.turn ? `<span class="px-1.5 py-0.5 bg-indigo-900/50 text-indigo-300 rounded">持续: ${skill.turn}</span>` : ''}
+
+  let skillsHtml = (enemy.skills || []).map(skill => {
+    let typeBadge = '';
+    let borderLeftAccent = 'border-l-2 border-l-slate-500';
+    let cardBg = 'bg-slate-900/40 hover:bg-slate-850/50 border-slate-700/50';
+
+    if (skill.damageType === '近战') {
+      typeBadge = `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded border bg-rose-950/80 text-rose-300 border-rose-500/70 flex items-center gap-0.5 leading-tight">🗡️ 近战</span>`;
+      borderLeftAccent = 'border-l-2 border-l-rose-500';
+    } else if (skill.damageType === '远程') {
+      typeBadge = `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded border bg-amber-950/80 text-amber-300 border-amber-500/70 flex items-center gap-0.5 leading-tight">🎯 远程</span>`;
+      borderLeftAccent = 'border-l-2 border-l-amber-500';
+    } else if (skill.damageType === '法术') {
+      typeBadge = `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded border bg-purple-950/80 text-purple-300 border-purple-500/70 flex items-center gap-0.5 leading-tight">⚡ 法术</span>`;
+      borderLeftAccent = 'border-l-2 border-l-purple-500';
+    } else {
+      typeBadge = `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded border bg-slate-900 text-slate-400 border-slate-700 flex items-center gap-0.5 leading-tight">🌀 固有</span>`;
+    }
+
+    let pills = [];
+    if (skill.type) {
+      let clean = skill.type.replace(/[\\[\\]]/g, '');
+      let style = 'bg-slate-900/70 text-slate-300 border-slate-700/70';
+      if (clean.includes('攻') || clean.includes('单体') || clean.includes('群攻') || clean.includes('穿透') || clean.includes('群穿')) style = 'bg-rose-950/70 text-rose-300 border-rose-700/70 font-bold';
+      else if (clean.includes('回') || clean.includes('冲') || clean.includes('驱散')) style = 'bg-emerald-950/70 text-emerald-300 border-emerald-700/70';
+      else if (clean.includes('盾') || clean.includes('防') || clean.includes('回避') || clean.includes('避')) style = 'bg-blue-950/70 text-blue-300 border-blue-700/70';
+      else if (clean.includes('增') || clean.includes('狂暴') || clean.includes('速')) style = 'bg-orange-950/70 text-orange-300 border-orange-700/70';
+      else if (clean.includes('弱') || clean.includes('降') || clean.includes('盲') || clean.includes('滞') || clean.includes('缓') || clean.includes('中毒') || clean.includes('燃烧') || clean.includes('眩晕')) style = 'bg-purple-950/70 text-purple-300 border-purple-700/70';
+      
+      let pVal = skill.power ? `<span class="font-mono-num ml-0.5">${skill.power}</span>` : '';
+      pills.push(`<span class="text-[9px] px-1.5 py-0.2 rounded border ${style} flex items-center leading-none">${clean} ${pVal}</span>`);
+    }
+    if (skill.type2 && skill.type2 !== '[无]') {
+      let clean = skill.type2.replace(/[\\[\\]]/g, '');
+      let style = 'bg-slate-900/70 text-slate-300 border-slate-700/70';
+      let pVal = skill.power2 ? `<span class="font-mono-num ml-0.5">${skill.power2}</span>` : '';
+      pills.push(`<span class="text-[9px] px-1.5 py-0.2 rounded border ${style} flex items-center leading-none">${clean} ${pVal}</span>`);
+    }
+    if (skill.type3 && skill.type3 !== '[无]') {
+      let clean = skill.type3.replace(/[\\[\\]]/g, '');
+      let style = 'bg-slate-900/70 text-slate-300 border-slate-700/70';
+      let pVal = skill.power3 ? `<span class="font-mono-num ml-0.5">${skill.power3}</span>` : '';
+      pills.push(`<span class="text-[9px] px-1.5 py-0.2 rounded border ${style} flex items-center leading-none">${clean} ${pVal}</span>`);
+    }
+
+    if (skill.charge) {
+      pills.push(`<span class="text-[9px] px-1.5 py-0.2 rounded border bg-purple-950/80 text-purple-300 border-purple-500/80 font-bold flex items-center gap-0.5 leading-none">⏳ 充能:${skill.charge}</span>`);
+    }
+    if (skill.cost || skill.mp) {
+      pills.push(`<span class="text-[9px] font-mono-num font-bold px-1.5 py-0.2 rounded border bg-cyan-950/80 text-cyan-300 border-cyan-700 leading-none">💧 ${skill.cost || skill.mp} MP</span>`);
+    }
+    if (skill.tp || skill.tpCost) {
+      pills.push(`<span class="text-[9px] font-mono-num font-bold px-1.5 py-0.2 rounded border bg-emerald-950/80 text-emerald-300 border-emerald-700 leading-none">🔥 ${skill.tp || skill.tpCost} TP</span>`);
+    }
+    if (skill.hit && skill.hit !== 100) {
+      pills.push(`<span class="text-[9px] font-mono-num px-1 py-0.2 rounded border bg-slate-900/80 text-slate-400 border-slate-700 leading-none">🎯 命中:${skill.hit}</span>`);
+    }
+    if (skill.turn) {
+      pills.push(`<span class="text-[9px] px-1.5 py-0.2 rounded border bg-indigo-950/80 text-indigo-300 border-indigo-700 leading-none">持续:${skill.turn}回</span>`);
+    }
+
+    return `
+      <div class="enemy-skill-inspect-item p-2 rounded-xl border ${cardBg} ${borderLeftAccent} flex flex-col gap-1.5 shadow-sm">
+        <div class="flex items-center justify-between gap-1.5">
+          <span class="text-xs font-bold text-slate-100 tracking-wide">${skill.name}</span>
+          ${typeBadge}
+        </div>
+        <div class="flex items-center gap-1 flex-wrap">
+          ${pills.join('')}
+        </div>
       </div>
-    </div>`;
+    `;
   }).join('');
 
+  const hpPercent = Math.max(0, Math.min(100, Math.floor((enemy.hp / enemy.maxHp) * 100)));
+  const mpPercent = enemy.maxMp > 0 ? Math.max(0, Math.min(100, Math.floor((enemy.mp / enemy.maxMp) * 100))) : 0;
+  const skillCount = (enemy.skills || []).length;
+
   modal.innerHTML = `
-    <div class="bg-gray-900 border border-gray-700 rounded-xl max-w-sm w-full mx-auto p-4 sm:p-6 text-white shadow-2xl relative" onclick="event.stopPropagation()">
-      <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
-        <h3 class="text-lg sm:text-xl font-bold flex items-center gap-2">
-           <span class="text-2xl">${enemy.emoji || '☠️'}</span> ${enemy.name} ${enemy.isWise ? '<span class="text-[10px] px-2 py-0.5 bg-rose-900/50 text-rose-300 rounded-full border border-rose-700/50 align-middle">智慧</span>' : ''}
-        </h3>
-        <button onclick="closeEditor()" class="text-gray-400 hover:text-white transition-colors text-2xl leading-none">&times;</button>
-      </div>
-      <div class="grid grid-cols-2 gap-4 mb-4">
-        <div class="bg-gray-800 p-2 rounded text-center border border-gray-700">
-           <div class="text-gray-400 text-xs mb-1">HP</div>
-           <div class="text-rose-400 font-bold">${Math.floor(enemy.hp)} / ${enemy.maxHp}</div>
+    <div class="cyber-modal-enemy w-full max-w-3xl rounded-2xl p-4 sm:p-5 relative text-white flex flex-col max-h-[88vh] sm:max-h-[84vh] overflow-hidden" onclick="event.stopPropagation()">
+      <div class="cyber-corner cyber-corner-tl"></div>
+      <div class="cyber-corner cyber-corner-tr"></div>
+      <div class="cyber-corner cyber-corner-bl"></div>
+      <div class="cyber-corner cyber-corner-br"></div>
+
+      <!-- 顶栏 -->
+      <div class="flex items-center justify-between border-b border-slate-700/50 pb-2.5 mb-3 shrink-0">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <span class="text-2xl sm:text-3xl filter drop-shadow">${enemy.emoji || '☠️'}</span>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <h2 class="text-base sm:text-lg font-black text-slate-100 tracking-wider truncate">${enemy.name}</h2>
+              ${enemy.isWise ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-950/80 text-rose-300 border border-rose-500/80 tag-fx-wise flex items-center gap-1"><span>🧠</span> 智慧单位</span>` : ''}
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-950/60 text-cyan-300 border border-cyan-700/50">TARGET INSPECT</span>
+            </div>
+          </div>
         </div>
-        <div class="bg-gray-800 p-2 rounded text-center border border-gray-700">
-           <div class="text-gray-400 text-xs mb-1">MP</div>
-           <div class="text-blue-400 font-bold">${Math.floor(enemy.mp)} / ${enemy.maxMp}</div>
+        <button onclick="closeEditor()" class="w-7 h-7 rounded-full bg-slate-800/80 hover:bg-rose-900/60 border border-slate-600/70 hover:border-rose-500 text-slate-300 hover:text-white flex items-center justify-center transition-all text-base leading-none">✕</button>
+      </div>
+
+      <!-- 主体双列 -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-3.5 sm:gap-5 flex-1 min-h-0 overflow-y-auto md:overflow-hidden pr-0.5">
+        
+        <!-- 左侧栏 (5/12) -->
+        <div class="md:col-span-5 flex flex-col gap-2.5 min-h-0 md:overflow-y-auto custom-scrollbar pr-1">
+          <!-- 生命与法力仪表 -->
+          <div class="bg-slate-900/40 rounded-xl p-2.5 border border-slate-700/50 flex flex-col gap-2 shadow-inner">
+            <div>
+              <div class="flex justify-between items-center text-[11px] mb-1">
+                <span class="text-rose-400 font-bold flex items-center gap-1"><span>❤️</span> 生命上限 HP</span>
+                <span class="font-mono-num font-bold text-rose-200">${Math.floor(enemy.hp)} / ${enemy.maxHp}</span>
+              </div>
+              <div class="w-full h-2 bg-black/60 rounded-full overflow-hidden border border-rose-950/80 p-0.5">
+                <div class="h-full bg-gradient-to-r from-rose-600 via-rose-500 to-rose-400 rounded-full shadow-[0_0_10px_rgba(244,63,94,0.6)]" style="width: ${hpPercent}%;"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between items-center text-[11px] mb-1">
+                <span class="text-cyan-400 font-bold flex items-center gap-1"><span>💧</span> 法力储备 MP</span>
+                <span class="font-mono-num font-bold text-cyan-200">${Math.floor(enemy.mp)} / ${enemy.maxMp}</span>
+              </div>
+              <div class="w-full h-1.5 bg-black/60 rounded-full overflow-hidden border border-cyan-950/80 p-0.5">
+                <div class="h-full bg-gradient-to-r from-cyan-600 via-cyan-500 to-teal-400 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.6)]" style="width: ${mpPercent}%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 变种特质 -->
+          ${tagHtml}
+
+          <!-- 世界书资料档案 (大空间舒展展示) -->
+          ${wbHtml}
         </div>
+
+        <!-- 右侧栏 (7/12) -->
+        <div class="md:col-span-7 flex flex-col min-h-0">
+          <!-- 技能标题行 + 攻防速微型胶囊 -->
+          <div class="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-800/60 shrink-0">
+            <div class="text-xs text-cyan-300 font-bold tracking-wider uppercase flex items-center gap-1.5 shrink-0">
+              <span>⚔️</span> 技能战备 <span class="text-[10px] text-slate-400 font-mono">(${skillCount})</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] font-mono-num font-bold px-2 py-0.5 rounded-md bg-slate-900/75 border border-rose-800/60 text-rose-300 shadow-sm flex items-center gap-1">
+                <span>⚔️</span> ATK:<span class="text-white font-bold ml-0.5">${enemy.atk}</span>
+              </span>
+              <span class="text-[10px] font-mono-num font-bold px-2 py-0.5 rounded-md bg-slate-900/75 border border-blue-800/60 text-blue-300 shadow-sm flex items-center gap-1">
+                <span>🛡️</span> DEF:<span class="text-white font-bold ml-0.5">${enemy.def}</span>
+              </span>
+              <span class="text-[10px] font-mono-num font-bold px-2 py-0.5 rounded-md bg-slate-900/75 border border-cyan-800/60 text-cyan-300 shadow-sm flex items-center gap-1">
+                <span>⚡</span> SPD:<span class="text-white font-bold ml-0.5">${enemy.spd}</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- 技能卡片列表 -->
+          <div class="flex-1 flex flex-col gap-2 overflow-y-auto custom-scrollbar pr-1 min-h-[180px]">
+            ${skillsHtml || '<div class="text-slate-500 text-sm text-center py-4">无技能</div>'}
+          </div>
+        </div>
+
       </div>
-      <div class="flex justify-between text-sm bg-gray-800 p-2 rounded border border-gray-700 mb-4 px-4">
-         <div class="text-center"><div class="text-gray-400 text-xs">Atk</div><div class="text-white font-bold">${enemy.atk}</div></div>
-         <div class="text-center"><div class="text-gray-400 text-xs">Armor</div><div class="text-white font-bold">${enemy.def}</div></div>
-         <div class="text-center"><div class="text-gray-400 text-xs">Speed</div><div class="text-white font-bold">${enemy.spd}</div></div>
-      </div>
-      ${tagHtml}
-      ${wbHtml}
-      <h4 class="text-gray-400 text-xs font-bold mb-2 uppercase tracking-wider">技能面板</h4>
-      <div class="max-h-[50vh] overflow-y-auto pr-1 custom-scrollbar">
-        ${skillsHtml || '<div class="text-gray-500 text-sm text-center py-2">无技能</div>'}
+
+      <!-- 底部说明栏 -->
+      <div class="mt-2.5 pt-2 border-t border-slate-800/50 flex justify-between items-center text-[10px] text-slate-400 shrink-0">
+        <span>💡 点击半透明背景或右上角 ✕ 即可关闭返回战场</span>
+        <span class="text-cyan-400 font-mono">20% 超透光战术目镜</span>
       </div>
     </div>
   `;
@@ -9757,7 +9950,7 @@ function resetBattle(btn) {
 // 编辑器系统
 // ==========================================
 function openEditor() {
-  const modal = document.getElementById('editor-modal'); modal.classList.remove('hidden'); modal.classList.add('flex');
+  const modal = document.getElementById('editor-modal'); modal.className = "fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 overflow-y-auto";
   // 记录当前滚动容器的滚动条位置，防止重绘 innerHTML 时跳回顶部
   let savedScrollTop = 0;
   const oldContainer = document.getElementById('editor-scroll-container');

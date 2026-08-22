@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>敌人详情面板 UI 重构方案 A - 20%超透光与19种变种特质全图鉴</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Cinzel:wght@700;900&display=swap');
+    
+    :root {
+      --panel-opacity: 0.20;
+      --backdrop-alpha: 0.12;
+    }
+
+    body { font-family: 'Noto Sans SC', sans-serif; }
+    .font-cinzel { font-family: 'Cinzel', serif; }
+    .font-mono-num { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
+
+    /* 战场通用毛玻璃 */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35);
+    }
+
+    /* 滚动条美化 */
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.4); border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(6, 182, 212, 0.7); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+
+    /* 呼吸动效 */
+    @keyframes breathe-anim {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px rgba(0,0,0,0.5)); }
+      50% { transform: scale(1.025); filter: drop-shadow(0 0 20px rgba(6,182,212,0.35)); }
+    }
+    .breathe { animation: breathe-anim 3.2s ease-in-out infinite; }
+
+    /* 时间轴导轨与粒子脉冲 */
+    .timeline-rail {
+      position: absolute;
+      top: 0; bottom: 0; width: 2px;
+      left: 50%; transform: translateX(-50%);
+      background: linear-gradient(180deg, rgba(6,182,212,0.6) 0%, rgba(244,63,94,0.4) 50%, rgba(251,191,36,0.5) 100%);
+      z-index: 0;
+    }
+
+    /* ========================================================
+       19 种变种特质独立发光与动态呼吸动效 (Unique Variant Tag FX)
+       ======================================================== */
+    /* 1. 复活 - 翡翠回生脉冲 */
+    @keyframes fx-revive {
+      0%, 100% { box-shadow: 0 0 5px rgba(16,185,129,0.35); border-color: rgba(16,185,129,0.6); }
+      50% { box-shadow: 0 0 16px rgba(16,185,129,0.85), inset 0 0 6px rgba(16,185,129,0.4); border-color: rgba(52,211,153,1); }
+    }
+    /* 2. 智慧 - 绯红神经脉冲 */
+    @keyframes fx-wise {
+      0%, 100% { box-shadow: 0 0 5px rgba(244,63,94,0.35); }
+      50% { box-shadow: 0 0 16px rgba(244,63,94,0.85), inset 0 0 6px rgba(244,63,94,0.4); }
+    }
+    /* 3. 蜕皮 - 琥珀金芒流光 */
+    @keyframes fx-molt {
+      0%, 100% { box-shadow: 0 0 5px rgba(245,158,11,0.35); }
+      50% { box-shadow: 0 0 18px rgba(245,158,11,0.9), inset 0 0 6px rgba(245,158,11,0.45); }
+    }
+    /* 4. 荆棘 - 尖刺暗绿光芒 */
+    @keyframes fx-thorn {
+      0%, 100% { box-shadow: 0 0 5px rgba(34,197,94,0.3); }
+      50% { box-shadow: 0 0 14px rgba(34,197,94,0.75), inset 0 0 5px rgba(34,197,94,0.3); }
+    }
+    /* 5. 连动 - 紫电闪烁过载 */
+    @keyframes fx-link {
+      0%, 100% { box-shadow: 0 0 6px rgba(217,70,239,0.4); transform: scale(1); }
+      50% { box-shadow: 0 0 18px rgba(217,70,239,0.95), inset 0 0 6px rgba(217,70,239,0.5); transform: scale(1.02); }
+    }
+    /* 6. 狂暴 - 鲜血狂怒灼烧 */
+    @keyframes fx-rage {
+      0%, 100% { box-shadow: 0 0 5px rgba(239,68,68,0.35); }
+      50% { box-shadow: 0 0 16px rgba(239,68,68,0.9), inset 0 0 6px rgba(239,68,68,0.4); }
+    }
+    /* 7. 吸血 - 猩红抽取吸虹 */
+    @keyframes fx-leech {
+      0%, 100% { box-shadow: 0 0 4px rgba(225,29,72,0.35); }
+      50% { box-shadow: 0 0 15px rgba(225,29,72,0.85); }
+    }
+    /* 8. 再生 - 治愈翠绿光环 */
+    @keyframes fx-regen {
+      0%, 100% { box-shadow: 0 0 4px rgba(74,222,128,0.3); }
+      50% { box-shadow: 0 0 14px rgba(74,222,128,0.75); }
+    }
+    /* 9-12. 伤害减免 (流体/虚形/破法/要害) - 科技青蓝/幽魂紫屏障 */
+    @keyframes fx-shield-cyan {
+      0%, 100% { box-shadow: 0 0 4px rgba(6,182,212,0.25); }
+      50% { box-shadow: 0 0 12px rgba(6,182,212,0.65); }
+    }
+    @keyframes fx-shield-ghost {
+      0%, 100% { box-shadow: 0 0 4px rgba(129,140,248,0.25); }
+      50% { box-shadow: 0 0 13px rgba(129,140,248,0.65); }
+    }
+    @keyframes fx-shield-magic {
+      0%, 100% { box-shadow: 0 0 4px rgba(168,85,247,0.25); }
+      50% { box-shadow: 0 0 13px rgba(168,85,247,0.7); }
+    }
+    @keyframes fx-shield-aoe {
+      0%, 100% { box-shadow: 0 0 4px rgba(20,184,166,0.25); }
+      50% { box-shadow: 0 0 13px rgba(20,184,166,0.7); }
+    }
+    /* 13-15. 状态免疫 (防火/耐毒/钢体) */
+    @keyframes fx-fireproof {
+      0%, 100% { box-shadow: 0 0 4px rgba(249,115,22,0.3); }
+      50% { box-shadow: 0 0 12px rgba(249,115,22,0.7); }
+    }
+    @keyframes fx-poisonproof {
+      0%, 100% { box-shadow: 0 0 4px rgba(168,85,247,0.3); }
+      50% { box-shadow: 0 0 13px rgba(168,85,247,0.7); }
+    }
+    @keyframes fx-ironbody {
+      0%, 100% { box-shadow: 0 0 4px rgba(148,163,184,0.3); }
+      50% { box-shadow: 0 0 12px rgba(148,163,184,0.7); }
+    }
+    /* 16-19. 自爆四件套 - 危险烈焰跳动 */
+    @keyframes fx-explode-red {
+      0%, 100% { box-shadow: 0 0 6px rgba(239,68,68,0.4); transform: scale(1); }
+      50% { box-shadow: 0 0 18px rgba(239,68,68,0.95), inset 0 0 6px rgba(239,68,68,0.4); transform: scale(1.025); }
+    }
+    @keyframes fx-explode-fire {
+      0%, 100% { box-shadow: 0 0 6px rgba(249,115,22,0.4); transform: scale(1); }
+      50% { box-shadow: 0 0 18px rgba(249,115,22,0.95), inset 0 0 6px rgba(249,115,22,0.4); transform: scale(1.025); }
+    }
+    @keyframes fx-explode-poison {
+      0%, 100% { box-shadow: 0 0 6px rgba(168,85,247,0.4); transform: scale(1); }
+      50% { box-shadow: 0 0 18px rgba(168,85,247,0.95), inset 0 0 6px rgba(168,85,247,0.4); transform: scale(1.025); }
+    }
+
+    .tag-fx-revive { animation: fx-revive 2.4s infinite ease-in-out; }
+    .tag-fx-wise { animation: fx-wise 2.2s infinite ease-in-out; }
+    .tag-fx-molt { animation: fx-molt 2s infinite ease-in-out; }
+    .tag-fx-thorn { animation: fx-thorn 2.8s infinite ease-in-out; }
+    .tag-fx-link { animation: fx-link 1.8s infinite ease-in-out; }
+    .tag-fx-rage { animation: fx-rage 2s infinite ease-in-out; }
+    .tag-fx-leech { animation: fx-leech 2.5s infinite ease-in-out; }
+    .tag-fx-regen { animation: fx-regen 2.6s infinite ease-in-out; }
+    .tag-fx-fluid { animation: fx-shield-cyan 3s infinite ease-in-out; }
+    .tag-fx-ghost { animation: fx-shield-ghost 3s infinite ease-in-out; }
+    .tag-fx-magic { animation: fx-shield-magic 3s infinite ease-in-out; }
+    .tag-fx-aoe { animation: fx-shield-aoe 3s infinite ease-in-out; }
+    .tag-fx-fireproof { animation: fx-fireproof 2.8s infinite ease-in-out; }
+    .tag-fx-poisonproof { animation: fx-poisonproof 2.8s infinite ease-in-out; }
+    .tag-fx-ironbody { animation: fx-ironbody 3.2s infinite ease-in-out; }
+    .tag-fx-explode-dmg { animation: fx-explode-red 1.6s infinite ease-in-out; }
+    .tag-fx-explode-pierce { animation: fx-explode-red 1.5s infinite ease-in-out; }
+    .tag-fx-explode-fire { animation: fx-explode-fire 1.6s infinite ease-in-out; }
+    .tag-fx-explode-poison { animation: fx-explode-poison 1.6s infinite ease-in-out; }
+
+    /* 方案 A: 20% 超透光战术面板 (极致透光毛玻璃) */
+    .cyber-modal-card-20 {
+      background: radial-gradient(130% 120% at 20% 0%, rgba(30, 41, 59, var(--panel-opacity, 0.20)) 0%, rgba(15, 23, 42, calc(var(--panel-opacity, 0.20) + 0.08)) 100%);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(6, 182, 212, 0.4);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.6), 0 0 30px rgba(6, 182, 212, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+    .cyber-corner {
+      position: absolute; width: 8px; height: 8px; border-color: rgba(6, 182, 212, 0.8);
+    }
+    .cyber-corner-tl { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
+    .cyber-corner-tr { top: -1px; right: -1px; border-top: 2px solid; border-right: 2px solid; }
+    .cyber-corner-bl { bottom: -1px; left: -1px; border-bottom: 2px solid; border-left: 2px solid; }
+    .cyber-corner-br { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
+
+    /* 技能卡片精细 hover 动效 */
+    .enemy-skill-item {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .enemy-skill-item:hover {
+      transform: translateY(-1.5px);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 10px rgba(6, 182, 212, 0.25);
+    }
+  </style>
+</head>
+<body class="w-full h-[100dvh] bg-black text-gray-100 overflow-hidden relative select-none font-sans">
+
+  <!-- ========================================================
+       顶部方案状态与控制栏
+       ======================================================== -->
+  <header class="absolute top-2 left-2 right-2 z-50 flex flex-wrap items-center justify-between gap-2 px-3 py-2 glass-panel rounded-xl border border-cyan-500/40 bg-slate-950/70">
+    <div class="flex items-center gap-2">
+      <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+      <h1 class="text-xs sm:text-sm font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-teal-200 to-indigo-300">方案 A【20% 超透光全息】· 19 种变种标签独立图标与动效</h1>
+      <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/60 font-mono font-bold">已采纳定版</span>
+    </div>
+
+    <!-- 测试敌方角色切换 -->
+    <div class="flex items-center gap-2">
+      <select id="enemy-selector" onchange="switchEnemy(this.value)" class="bg-slate-900/90 text-xs text-cyan-200 border border-cyan-500/40 rounded-lg px-2.5 py-1 outline-none focus:border-cyan-400 cursor-pointer shadow-sm">
+        <option value="0">❄️ †(伊塔库亚的眷族)† [智慧] (用户原怪)</option>
+        <option value="1">💥 爆弹魔 [复活][智慧][自爆:群火]</option>
+        <option value="2">👑 荆棘兽王 [蜕皮][荆棘][连动][狂暴]</option>
+        <option value="3">🌟 变种特质全图鉴展示怪 (19 种标签全特质合集)</option>
+      </select>
+
+      <!-- 半透明度调节滑块 -->
+      <div class="flex items-center gap-1.5 bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-700 text-xs text-slate-200">
+        <span class="text-cyan-300 font-bold">透光度:</span>
+        <input type="range" min="10" max="90" value="20" class="w-20 accent-cyan-400 cursor-pointer" oninput="setOpacity(this.value)">
+        <span id="opacity-val" class="font-mono text-cyan-300 text-[11px] font-bold">20%</span>
+      </div>
+
+      <button onclick="toggleModal()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-bold transition-all shadow-md flex items-center gap-1">
+        <span id="toggle-btn-text">✕ 关闭面板预览</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================
+       1:1 战斗场景全景背景 (战场、时间轴、英雄区、技能区)
+       ======================================================== -->
+  <div class="absolute inset-0 bg-gradient-to-br from-indigo-950 via-slate-900 to-emerald-950 overflow-hidden z-0 pointer-events-none">
+    <div class="absolute inset-0 opacity-35 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-400 via-transparent to-transparent"></div>
+    <div class="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-0"></div>
+
+    <!-- 顶部状态栏与战报 -->
+    <div class="absolute top-14 w-full flex justify-center z-30">
+      <div class="glass-panel px-5 py-1.5 rounded-full text-xs font-medium tracking-wide text-cyan-200 border border-cyan-500/30 flex items-center gap-2 shadow-lg">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+        <span>🏟️ 场地：有备而来（命中 +30） | 第 2 回合 · 20% 透光度下背景战斗完全清晰可见</span>
+      </div>
+    </div>
+
+    <!-- 左侧行动时间轴 (1:1 复刻) -->
+    <div class="absolute left-3 top-24 bottom-32 w-12 z-20 flex flex-col items-center select-none pointer-events-auto">
+      <div class="relative w-full h-full flex flex-col items-center">
+        <div class="timeline-rail"></div>
+        <div class="relative w-full h-full flex flex-col gap-2.5 items-center py-2">
+          <!-- 行动项 1 (当前敌方) -->
+          <div class="w-10 h-10 rounded-full border-2 border-rose-500 bg-slate-900 flex items-center justify-center text-lg shadow-[0_0_15px_rgba(244,63,94,0.8)] relative z-10 scale-110">
+            <span id="turn-enemy-emoji">❄️</span>
+            <span class="absolute -top-1 -right-1 bg-rose-600 text-[8px] font-black text-white px-1 rounded-full border border-rose-400">NOW</span>
+          </div>
+          <!-- 行动项 2 (埃利奥特) -->
+          <div class="w-9 h-9 rounded-full border-2 border-cyan-400 bg-slate-900 flex items-center justify-center text-base shadow-[0_0_10px_rgba(6,182,212,0.6)] relative z-10">
+            🗡️
+            <span class="absolute -bottom-1 -left-1 bg-slate-800 text-[8px] font-bold text-cyan-300 px-1 rounded border border-cyan-600/50">#2</span>
+          </div>
+          <!-- 行动项 3 (玛德琳 再动) -->
+          <div class="w-9 h-9 rounded-full border-2 border-amber-400 bg-slate-900 flex items-center justify-center text-base shadow-[0_0_12px_rgba(251,191,36,0.7)] relative z-10">
+            ⚡
+            <span class="absolute -top-1 -right-1 bg-amber-500 text-[7px] font-black text-slate-950 px-1 rounded-full">再动</span>
+          </div>
+          <!-- 行动项 4 (弗兰克) -->
+          <div class="w-8 h-8 rounded-full border border-slate-600 bg-slate-900/80 flex items-center justify-center text-sm opacity-70">
+            🛡️
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 战场中央：敌方单位 (可点击触发详情弹窗) -->
+    <div class="absolute inset-0 flex items-center justify-center pb-24 z-10 pointer-events-auto">
+      <div id="enemy-battle-card" onclick="openModal()" class="flex flex-col items-center cursor-pointer group transform transition-all duration-300 hover:scale-105">
+        <!-- 敌方模型头像 -->
+        <div class="relative w-28 h-28 sm:w-36 sm:h-36 rounded-2xl bg-gradient-to-b from-slate-800/80 to-slate-950/90 border-2 border-rose-500/60 flex items-center justify-center text-5xl sm:text-6xl shadow-[0_0_35px_rgba(244,63,94,0.4)] group-hover:border-cyan-400 group-hover:shadow-[0_0_40px_rgba(6,182,212,0.6)] transition-all breathe">
+          <span id="enemy-sprite-icon">❄️</span>
+          <!-- 智慧光晕 / 状态角标 -->
+          <span id="enemy-sprite-badge" class="absolute -top-2 -right-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-900/90 text-rose-300 border border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)]">智慧</span>
+          
+          <!-- 悬浮点击提示 -->
+          <div class="absolute inset-0 bg-cyan-950/50 backdrop-blur-[2px] rounded-2xl opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-cyan-200 text-xs font-bold transition-opacity">
+            <span>🔍 点击查看详情</span>
+          </div>
+        </div>
+
+        <!-- 敌方血条与名称 -->
+        <div class="mt-3 text-center">
+          <div class="text-sm sm:text-base font-black tracking-wider text-rose-200 drop-shadow flex items-center gap-1.5 justify-center">
+            <span id="enemy-card-name">†(伊塔库亚的眷族)†</span>
+          </div>
+          <!-- 血条 -->
+          <div class="w-40 h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-700 mt-1 shadow-inner">
+            <div id="enemy-card-hp-bar" class="h-full bg-gradient-to-r from-rose-600 to-rose-400 rounded-full" style="width: 100%;"></div>
+          </div>
+          <div class="text-[10px] text-slate-400 font-mono mt-0.5 font-mono-num" id="enemy-card-hp-text">550 / 550 HP</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 悬浮 UI 底层：我方 4 位英雄 + 右下角技能面板 -->
+    <div class="absolute bottom-3 left-0 w-full px-3 sm:px-6 flex flex-col-reverse sm:flex-row items-end justify-between gap-3 z-20 pointer-events-auto">
+      
+      <!-- 我方英雄阵列 -->
+      <div class="grid grid-cols-4 gap-2 sm:gap-3 max-w-xl w-full">
+        <!-- 埃利奥特 -->
+        <div class="glass-panel p-2 rounded-xl border border-cyan-500/40 bg-slate-950/70">
+          <div class="flex items-center gap-1.5 mb-1">
+            <span class="text-base">🗡️</span>
+            <span class="text-xs font-bold text-cyan-200 truncate">埃利奥特</span>
+          </div>
+          <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mb-1"><div class="bg-rose-500 h-full w-[85%]"></div></div>
+          <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden"><div class="bg-cyan-400 h-full w-[60%]"></div></div>
+        </div>
+        <!-- 玛德琳 -->
+        <div class="glass-panel p-2 rounded-xl border border-purple-500/40 bg-slate-950/70">
+          <div class="flex items-center gap-1.5 mb-1">
+            <span class="text-base">⚡</span>
+            <span class="text-xs font-bold text-purple-200 truncate">玛德琳</span>
+          </div>
+          <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mb-1"><div class="bg-rose-500 h-full w-[95%]"></div></div>
+          <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden"><div class="bg-cyan-400 h-full w-[80%]"></div></div>
+        </div>
+        <!-- 弗兰克 -->
+        <div class="glass-panel p-2 rounded-xl border border-emerald-500/40 bg-slate-950/70">
+          <div class="flex items-center gap-1.5 mb-1">
+            <span class="text-base">🛡️</span>
+            <span class="text-xs font-bold text-emerald-200 truncate">弗兰克</span>
+          </div>
+          <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mb-1"><div class="bg-rose-500 h-full w-[100%]"></div></div>
+          <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden"><div class="bg-cyan-400 h-full w-[40%]"></div></div>
+        </div>
+        <!-- 索恩 -->
+        <div class="glass-panel p-2 rounded-xl border border-amber-500/40 bg-slate-950/70">
+          <div class="flex items-center gap-1.5 mb-1">
+            <span class="text-base">🎯</span>
+            <span class="text-xs font-bold text-amber-200 truncate">索恩</span>
+          </div>
+          <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mb-1"><div class="bg-rose-500 h-full w-[70%]"></div></div>
+          <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden"><div class="bg-cyan-400 h-full w-[90%]"></div></div>
+        </div>
+      </div>
+
+      <!-- 右下角我方技能操作面板 -->
+      <div class="w-[260px] h-[172px] bg-slate-950/90 backdrop-blur-xl rounded-xl border border-slate-700 border-t-2 border-t-cyan-500/80 flex flex-col overflow-hidden shadow-[0_15px_35px_rgba(0,0,0,0.9)] shrink-0">
+        <div class="text-center text-[10px] py-0.5 text-cyan-300 bg-cyan-950/40 tracking-widest uppercase border-b border-cyan-800/40 font-bold flex items-center justify-center gap-1">
+          <span>⚔️ 我方技能栏示例 (参考样式)</span>
+        </div>
+        <div class="flex-1 p-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
+          <div class="p-1 rounded-lg border border-rose-800/60 bg-rose-950/30 flex flex-col gap-0.5">
+            <div class="flex justify-between items-center">
+              <span class="text-xs font-bold text-slate-100">赤阳剑气</span>
+              <span class="text-[8px] font-bold px-1 py-0.2 rounded border bg-rose-950 text-rose-300 border-rose-500/60">🗡️ 近战</span>
+            </div>
+            <div class="flex gap-1 flex-wrap">
+              <span class="text-[8px] px-1 py-0.2 rounded border bg-rose-950/80 text-rose-300 border-rose-800/70">单体40</span>
+              <span class="text-[8px] px-1 py-0.2 rounded border bg-cyan-950 text-cyan-300 border-cyan-800">💧 10 MP</span>
+            </div>
+          </div>
+          <div class="p-1 rounded-lg border border-blue-800/60 bg-blue-950/30 flex flex-col gap-0.5">
+            <div class="flex justify-between items-center">
+              <span class="text-xs font-bold text-slate-100">烈阳守护</span>
+              <span class="text-[8px] font-bold px-1 py-0.2 rounded border bg-blue-950 text-blue-300 border-blue-500/60">🛡️ 固有</span>
+            </div>
+            <div class="flex gap-1 flex-wrap">
+              <span class="text-[8px] px-1 py-0.2 rounded border bg-blue-950/80 text-blue-300 border-blue-800/70">单防20</span>
+              <span class="text-[8px] px-1 py-0.2 rounded border bg-indigo-950 text-indigo-300 border-indigo-700">持续3回</span>
+              <span class="text-[8px] px-1 py-0.2 rounded border bg-cyan-950 text-cyan-300 border-cyan-800">💧 15 MP</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       【方案 A 容器】: 20% 超透光战术全息玻璃面板
+       ==================================================================== -->
+  <div id="modal-container-A" class="fixed inset-0 z-40 flex items-center justify-center p-3 sm:p-6 transition-all duration-300" style="background-color: rgba(0, 0, 0, var(--backdrop-alpha, 0.12));" onclick="closeModalOnBackdrop(event, this)">
+    <div class="cyber-modal-card-20 w-full max-w-3xl rounded-2xl p-4 sm:p-5 relative text-white flex flex-col max-h-[88vh] sm:max-h-[84vh] overflow-hidden" onclick="event.stopPropagation()">
+      <!-- 四角高精科技线框 -->
+      <div class="cyber-corner cyber-corner-tl"></div>
+      <div class="cyber-corner cyber-corner-tr"></div>
+      <div class="cyber-corner cyber-corner-bl"></div>
+      <div class="cyber-corner cyber-corner-br"></div>
+
+      <!-- 顶栏：敌人全名 + 智慧/危险徽章 + 关闭按钮 -->
+      <div class="flex items-center justify-between border-b border-slate-700/50 pb-2.5 mb-3 shrink-0">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <span class="text-2xl sm:text-3xl filter drop-shadow" id="schemeA-emoji">❄️</span>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <h2 class="text-base sm:text-lg font-black text-slate-100 tracking-wider truncate" id="schemeA-name">†(伊塔库亚的眷族)†</h2>
+              <span id="schemeA-wise-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-950/80 text-rose-300 border border-rose-500/80 tag-fx-wise flex items-center gap-1">
+                <span>🧠</span> 智慧单位
+              </span>
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-950/60 text-cyan-300 border border-cyan-700/50">TARGET INSPECT</span>
+            </div>
+          </div>
+        </div>
+        <button onclick="toggleModal()" class="w-7 h-7 rounded-full bg-slate-800/80 hover:bg-rose-900/60 border border-slate-600/70 hover:border-rose-500 text-slate-300 hover:text-white flex items-center justify-center transition-all text-base leading-none">
+          ✕
+        </button>
+      </div>
+
+      <!-- 主体：双列排版 (左 42% 纯净资料与特质，右 58% 属性胶囊+技能卡片) -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-3.5 sm:gap-5 flex-1 min-h-0 overflow-y-auto md:overflow-hidden pr-0.5">
+        
+        <!-- 左侧栏 (5/12)：血蓝仪表 + 变种特质 + 【大空间】世界书资料档案 -->
+        <div class="md:col-span-5 flex flex-col gap-3 min-h-0 md:overflow-y-auto custom-scrollbar pr-1">
+          
+          <!-- 生命与法力仪表盘 (极简紧凑) -->
+          <div class="bg-slate-900/40 rounded-xl p-2.5 border border-slate-700/50 flex flex-col gap-2 shadow-inner">
+            <!-- HP 条 -->
+            <div>
+              <div class="flex justify-between items-center text-[11px] mb-1">
+                <span class="text-rose-400 font-bold flex items-center gap-1"><span>❤️</span> 生命上限 HP</span>
+                <span class="font-mono-num font-bold text-rose-200" id="schemeA-hp-val">550 / 550</span>
+              </div>
+              <div class="w-full h-2 bg-black/60 rounded-full overflow-hidden border border-rose-950/80 p-0.5">
+                <div id="schemeA-hp-bar" class="h-full bg-gradient-to-r from-rose-600 via-rose-500 to-rose-400 rounded-full shadow-[0_0_10px_rgba(244,63,94,0.6)]" style="width: 100%;"></div>
+              </div>
+            </div>
+            <!-- MP 条 -->
+            <div>
+              <div class="flex justify-between items-center text-[11px] mb-1">
+                <span class="text-cyan-400 font-bold flex items-center gap-1"><span>💧</span> 法力储备 MP</span>
+                <span class="font-mono-num font-bold text-cyan-200" id="schemeA-mp-val">16 / 16</span>
+              </div>
+              <div class="w-full h-1.5 bg-black/60 rounded-full overflow-hidden border border-cyan-950/80 p-0.5">
+                <div id="schemeA-mp-bar" class="h-full bg-gradient-to-r from-cyan-600 via-cyan-500 to-teal-400 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.6)]" style="width: 100%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 变种特质 (带发光呼吸与动效) -->
+          <div id="schemeA-tags-block">
+            <div class="text-[10px] text-cyan-400 font-bold tracking-wider uppercase mb-1.5 flex items-center justify-between">
+              <span class="flex items-center gap-1"><span>🧬</span> 变种特质与被动</span>
+              <span class="text-[9px] text-slate-400 font-normal font-mono">Hover 查看效果</span>
+            </div>
+            <div id="schemeA-tags-container" class="flex flex-wrap gap-1.5">
+              <!-- 动态填充 19 种标签 -->
+            </div>
+          </div>
+
+          <!-- 📚 世界书图鉴资料卡 (获得充足大空间，舒展展示) -->
+          <div id="schemeA-wb-block" class="flex-1 bg-black/25 rounded-xl p-3 border border-violet-500/30 flex flex-col gap-1.5 min-h-[140px]">
+            <div class="text-[10px] text-violet-300 font-bold tracking-wider uppercase flex items-center justify-between border-b border-violet-500/20 pb-1 shrink-0">
+              <span class="flex items-center gap-1"><span>📚</span> 世界书图鉴档案</span>
+              <span class="text-[9px] text-violet-400/70 font-mono">LORE ENTRY</span>
+            </div>
+            <p id="schemeA-wb-desc" class="text-xs text-slate-200/90 leading-relaxed overflow-y-auto custom-scrollbar pr-1 flex-1">
+              描述: 伊塔库亚的混血后代，能操控天气。外貌：人形但巨大，全身覆盖白毛，手脚有利爪，能呼出暴风雪。习性：生活在极寒地区，召唤暴风雪吞噬旅人。
+            </p>
+          </div>
+        </div>
+
+        <!-- 右侧栏 (7/12)：三维属性胶囊行 + 高密度技能战备面板 -->
+        <div class="md:col-span-7 flex flex-col min-h-0">
+          
+          <!-- 右侧顶行：技能标题 + 【右移的攻防速微型胶囊】 -->
+          <div class="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-800/60 shrink-0">
+            <div class="text-xs text-cyan-300 font-bold tracking-wider uppercase flex items-center gap-1.5 shrink-0">
+              <span>⚔️</span> 技能战备 <span id="schemeA-skill-count" class="text-[10px] text-slate-400 font-mono">(4)</span>
+            </div>
+
+            <!-- 三项属性胶囊 (微缩整齐排布，如 [ATK:100] [DEF:0] [SPD:115]) -->
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] font-mono-num font-bold px-2 py-0.5 rounded-md bg-slate-900/75 border border-rose-800/60 text-rose-300 shadow-sm flex items-center gap-1">
+                <span>⚔️</span> ATK:<span id="schemeA-atk" class="text-white font-bold ml-0.5">100</span>
+              </span>
+              <span class="text-[10px] font-mono-num font-bold px-2 py-0.5 rounded-md bg-slate-900/75 border border-blue-800/60 text-blue-300 shadow-sm flex items-center gap-1">
+                <span>🛡️</span> DEF:<span id="schemeA-armor" class="text-white font-bold ml-0.5">0</span>
+              </span>
+              <span class="text-[10px] font-mono-num font-bold px-2 py-0.5 rounded-md bg-slate-900/75 border border-cyan-800/60 text-cyan-300 shadow-sm flex items-center gap-1">
+                <span>⚡</span> SPD:<span id="schemeA-speed" class="text-white font-bold ml-0.5">115</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- 技能卡片滚动容器 (固定高度，自适应，彻底消除父级滚动) -->
+          <div id="schemeA-skills-list" class="flex-1 flex flex-col gap-2 overflow-y-auto custom-scrollbar pr-1 min-h-[180px]">
+            <!-- 动态生成 1:1 对标技能卡片 -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 底部辅助说明栏 -->
+      <div class="mt-2.5 pt-2 border-t border-slate-800/50 flex justify-between items-center text-[10px] text-slate-400 shrink-0">
+        <span>💡 20% 高透玻璃 · 战场动态一览无余 · 19 种变种特质独立图标动效</span>
+        <span class="text-cyan-400 font-mono">方案 A · 终版设计</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       JavaScript 逻辑与 19 种变种标签全量图鉴数据
+       ======================================================== -->
+  <script>
+    // 变种标签精细元数据 (19 种敌方变种标签全部涵盖：名称、描述、动效 class、专属配色与精美图标)
+    const VARIANT_TAG_CONFIG = {
+      // 1. 生命与机制
+      '[复活]': { name: '复活', tip: '死后以 30% 生命值复活一次', fxClass: 'tag-fx-revive', style: 'text-emerald-300 bg-emerald-950/70 border-emerald-500/80', icon: '✨' },
+      '[智慧]': { name: '智慧', tip: '三档智慧旁白（回合开始/低血/死亡）', fxClass: 'tag-fx-wise', style: 'text-rose-300 bg-rose-950/70 border-rose-500/80', icon: '🧠' },
+      '[蜕皮]': { name: '蜕皮', tip: '首次跌破50%：清除全部debuff + 回血30% + 永久攻击+50%', fxClass: 'tag-fx-molt', style: 'text-amber-300 bg-amber-950/70 border-amber-500/80', icon: '🐍' },
+      '[荆棘]': { name: '荆棘', tip: '被近战命中反弹 50% 实际伤害（护甲减免后保底10）', fxClass: 'tag-fx-thorn', style: 'text-green-300 bg-green-950/70 border-green-500/80', icon: '🌵' },
+      '[连动]': { name: '连动', tip: 'HP≤30% 时立刻额外行动一次（一次性）', fxClass: 'tag-fx-link', style: 'text-fuchsia-300 bg-fuchsia-950/70 border-fuchsia-500/80', icon: '⚡' },
+      '[狂暴]': { name: '狂暴', tip: 'HP≤30% 时攻击力 +50%', fxClass: 'tag-fx-rage', style: 'text-red-300 bg-red-950/70 border-red-500/80', icon: '🩸' },
+      '[吸血]': { name: '吸血', tip: '造成实际伤害时吸取 30% 转化为自身生命', fxClass: 'tag-fx-leech', style: 'text-rose-300 bg-rose-950/70 border-rose-500/80', icon: '🧛' },
+      '[再生]': { name: '再生', tip: '每回合开始回复 10% 最大生命值', fxClass: 'tag-fx-regen', style: 'text-emerald-300 bg-emerald-950/70 border-emerald-500/80', icon: '🌿' },
+
+      // 2. 伤害类型减免 (减免 50%)
+      '[流体]': { name: '流体', tip: '受到的远程伤害 -50%', fxClass: 'tag-fx-fluid', style: 'text-sky-300 bg-sky-950/70 border-sky-500/80', icon: '💧' },
+      '[虚形]': { name: '虚形', tip: '受到的近战伤害 -50%', fxClass: 'tag-fx-ghost', style: 'text-indigo-300 bg-indigo-950/70 border-indigo-500/80', icon: '👻' },
+      '[破法]': { name: '破法', tip: '受到的法术伤害 -50%', fxClass: 'tag-fx-magic', style: 'text-purple-300 bg-purple-950/70 border-purple-500/80', icon: '🔮' },
+      '[要害]': { name: '要害', tip: '受到的群攻伤害 -50%', fxClass: 'tag-fx-aoe', style: 'text-teal-300 bg-teal-950/70 border-teal-500/80', icon: '💠' },
+
+      // 3. 状态免疫
+      '[防火]': { name: '防火', tip: '免疫点燃（燃烧）状态施加', fxClass: 'tag-fx-fireproof', style: 'text-orange-300 bg-orange-950/70 border-orange-500/80', icon: '🔥' },
+      '[耐毒]': { name: '耐毒', tip: '免疫中毒状态施加', fxClass: 'tag-fx-poisonproof', style: 'text-purple-300 bg-purple-950/70 border-purple-500/80', icon: '🧪' },
+      '[钢体]': { name: '钢体', tip: '免疫眩晕控制状态', fxClass: 'tag-fx-ironbody', style: 'text-slate-300 bg-slate-800/80 border-slate-500/80', icon: '⛓️' },
+
+      // 4. 自爆四形态
+      '[自爆:群伤]': { name: '自爆·群伤', tip: '死亡自爆：对全体我方造成直接物理伤害', fxClass: 'tag-fx-explode-dmg', style: 'text-red-300 bg-red-950/75 border-red-500/80', icon: '💥' },
+      '[自爆:群穿]': { name: '自爆·群穿', tip: '死亡自爆：对全体我方造成穿透伤害（无视护甲）', fxClass: 'tag-fx-explode-pierce', style: 'text-rose-300 bg-rose-950/75 border-rose-500/80', icon: '🗡️' },
+      '[自爆:群火]': { name: '自爆·群火', tip: '死亡自爆：对全体我方施加燃烧（灼烧禁疗）', fxClass: 'tag-fx-explode-fire', style: 'text-orange-300 bg-orange-950/75 border-orange-500/80', icon: '🔥' },
+      '[自爆:群毒]': { name: '自爆·群毒', tip: '死亡自爆：对全体我方施加中毒（多层叠加）', fxClass: 'tag-fx-explode-poison', style: 'text-purple-300 bg-purple-950/75 border-purple-500/80', icon: '🧪' }
+    };
+
+    // 预设敌人数据 (新增全图鉴测试怪物)
+    const ENEMIES_DATA = [
+      {
+        name: "†(伊塔库亚的眷族)†",
+        emoji: "❄️",
+        hp: 550, maxHp: 550,
+        mp: 16, maxMp: 16,
+        atk: 100, def: 0, spd: 115,
+        isWise: true,
+        tags: ["[智慧]"],
+        wbSource: {
+          desc: "描述: 伊塔库亚的混血后代，能操控天气。外貌：人形但巨大，全身覆盖白毛，手脚有利爪，能呼出暴风雪。习性：生活在极寒地区，召唤暴风雪吞噬旅人。"
+        },
+        skills: [
+          { name: "极寒利爪撕裂", type: "单体", power: 180, damageType: "近战", hit: 100 },
+          { name: "极地暴风雪", type: "群攻", power: 150, charge: 4, damageType: "法术", cost: 16 },
+          { name: "乘风隐没之影", type: "回避", power: 200, damageType: "法术" },
+          { name: "风雪狂暴", type: "单增", power: 50, damageType: "" }
+        ]
+      },
+      {
+        name: "爆弹魔",
+        emoji: "💥",
+        hp: 420, maxHp: 420,
+        mp: 30, maxMp: 30,
+        atk: 85, def: 15, spd: 125,
+        isWise: true,
+        tags: ["[复活]", "[智慧]", "[自爆:群火]", "[防火]"],
+        explode: { type: "群火", power: 40 },
+        wbSource: {
+          desc: "描述: 狂热的炼金爆破狂徒，全身捆绑着炼金火药，死后会引爆全身引发漫天烈火。"
+        },
+        skills: [
+          { name: "火花飞掷", type: "单体", power: 120, damageType: "远程", hit: 110 },
+          { name: "烈焰新星", type: "群攻", power: 160, damageType: "法术", cost: 15 },
+          { name: "烟幕隐匿", type: "回避", power: 150, damageType: "" },
+          { name: "燃油喷洒", type: "群燃烧", power: 30, damageType: "远程" }
+        ]
+      },
+      {
+        name: "荆棘兽王",
+        emoji: "👑",
+        hp: 880, maxHp: 880,
+        mp: 40, maxMp: 40,
+        atk: 140, def: 35, spd: 95,
+        isWise: false,
+        tags: ["[蜕皮]", "[荆棘]", "[连动]", "[狂暴]"],
+        wbSource: {
+          desc: "描述: 远古森林深处的巨角兽王，体表覆盖着反伤硬刺，濒死时会褪下旧甲狂化。"
+        },
+        skills: [
+          { name: "地动山摇·重踏", type: "群攻", power: 190, damageType: "近战", cost: 20 },
+          { name: "尖刺突击", type: "穿透", power: 160, damageType: "近战" },
+          { name: "兽王咆哮", type: "群弱", power: 30, damageType: "法术" },
+          { name: "狂兽撕咬", type: "单体", power: 220, damageType: "近战" }
+        ]
+      },
+      {
+        name: "全变种特质·终极测试体",
+        emoji: "🌟",
+        hp: 9999, maxHp: 9999,
+        mp: 999, maxMp: 999,
+        atk: 250, def: 80, spd: 140,
+        isWise: true,
+        // 全部 19 种标签一次性集齐展示
+        tags: [
+          "[复活]", "[智慧]", "[蜕皮]", "[荆棘]", "[连动]", "[狂暴]", "[吸血]", "[再生]",
+          "[流体]", "[虚形]", "[破法]", "[要害]",
+          "[防火]", "[耐毒]", "[钢体]",
+          "[自爆:群伤]", "[自爆:群穿]", "[自爆:群火]", "[自爆:群毒]"
+        ],
+        wbSource: {
+          desc: "描述: 包含当前游戏引擎全部 19 种变种特质的终极实体，用于检验所有标签的独特图标、专属配色、浮动提示与动态光晕特效。"
+        },
+        skills: [
+          { name: "灭世神罚", type: "群穿", power: 300, charge: 5, damageType: "法术", cost: 50 },
+          { name: "虚空连斩", type: "单体", power: 240, damageType: "近战", hit: 120 },
+          { name: "以太引力波", type: "群缓", power: 40, damageType: "法术" },
+          { name: "绝对防御立场", type: "单盾", power: 500, damageType: "" }
+        ]
+      }
+    ];
+
+    let currentEnemyIndex = 0;
+    let isModalOpen = true;
+
+    // 生成现代 1:1 对标我方的高质感技能卡片 HTML
+    function renderModernSkillCards(skills) {
+      return skills.map(skill => {
+        let typeBadge = '';
+        let borderLeftAccent = 'border-l-2 border-l-slate-500';
+        let cardBg = 'bg-slate-900/40 hover:bg-slate-800/50 border-slate-700/50';
+
+        if (skill.damageType === '近战') {
+          typeBadge = `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded border bg-rose-950/80 text-rose-300 border-rose-500/70 flex items-center gap-0.5 leading-tight">🗡️ 近战</span>`;
+          borderLeftAccent = 'border-l-2 border-l-rose-500';
+        } else if (skill.damageType === '远程') {
+          typeBadge = `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded border bg-amber-950/80 text-amber-300 border-amber-500/70 flex items-center gap-0.5 leading-tight">🎯 远程</span>`;
+          borderLeftAccent = 'border-l-2 border-l-amber-500';
+        } else if (skill.damageType === '法术') {
+          typeBadge = `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded border bg-purple-950/80 text-purple-300 border-purple-500/70 flex items-center gap-0.5 leading-tight">⚡ 法术</span>`;
+          borderLeftAccent = 'border-l-2 border-l-purple-500';
+        } else {
+          typeBadge = `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded border bg-slate-900 text-slate-400 border-slate-700 flex items-center gap-0.5 leading-tight">🌀 固有</span>`;
+        }
+
+        let pills = [];
+        if (skill.type) {
+          let clean = skill.type.replace(/[\[\]]/g, '');
+          let style = 'bg-slate-900/70 text-slate-300 border-slate-700/70';
+          if (clean.includes('单体') || clean.includes('群攻') || clean.includes('穿透') || clean.includes('群穿')) style = 'bg-rose-950/70 text-rose-300 border-rose-700/70 font-bold';
+          else if (clean.includes('回') || clean.includes('驱散')) style = 'bg-emerald-950/70 text-emerald-300 border-emerald-700/70';
+          else if (clean.includes('盾') || clean.includes('防') || clean.includes('回避') || clean.includes('避')) style = 'bg-blue-950/70 text-blue-300 border-blue-700/70';
+          else if (clean.includes('增') || clean.includes('狂暴')) style = 'bg-orange-950/70 text-orange-300 border-orange-700/70';
+          else if (clean.includes('弱') || clean.includes('降') || clean.includes('盲') || clean.includes('滞') || clean.includes('缓') || clean.includes('中毒') || clean.includes('燃烧')) style = 'bg-purple-950/70 text-purple-300 border-purple-700/70';
+          
+          let pVal = skill.power ? `<span class="font-mono-num ml-0.5">${skill.power}</span>` : '';
+          pills.push(`<span class="text-[9px] px-1.5 py-0.2 rounded border ${style} flex items-center leading-none">${clean} ${pVal}</span>`);
+        }
+
+        if (skill.charge) {
+          pills.push(`<span class="text-[9px] px-1.5 py-0.2 rounded border bg-purple-950/80 text-purple-300 border-purple-500/80 font-bold flex items-center gap-0.5 leading-none">⏳ 充能:${skill.charge}</span>`);
+        }
+        if (skill.cost) {
+          pills.push(`<span class="text-[9px] font-mono-num font-bold px-1.5 py-0.2 rounded border bg-cyan-950/80 text-cyan-300 border-cyan-700 leading-none">💧 ${skill.cost} MP</span>`);
+        }
+        if (skill.hit && skill.hit !== 100) {
+          pills.push(`<span class="text-[9px] font-mono-num px-1 py-0.2 rounded border bg-slate-900/80 text-slate-400 border-slate-700 leading-none">🎯 命中:${skill.hit}</span>`);
+        }
+
+        return `
+          <div class="enemy-skill-item p-2 rounded-xl border ${cardBg} ${borderLeftAccent} flex flex-col gap-1.5 shadow-sm">
+            <div class="flex items-center justify-between gap-1.5">
+              <span class="text-xs font-bold text-slate-100 tracking-wide">${skill.name}</span>
+              ${typeBadge}
+            </div>
+            <div class="flex items-center gap-1 flex-wrap">
+              ${pills.join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 渲染变种标签 HTML (19 种独立图标与动效)
+    function renderVariantTags(tags) {
+      if (!tags || !tags.length) return '<span class="text-xs text-slate-500">无特殊变种标签</span>';
+      return tags.map(tag => {
+        const conf = VARIANT_TAG_CONFIG[tag] || { name: tag, tip: tag, fxClass: 'tag-fx-ironbody', style: 'text-slate-300 bg-slate-900/70 border-slate-700', icon: '🔹' };
+        return `
+          <span title="${conf.tip}" class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${conf.style} ${conf.fxClass} flex items-center gap-1 cursor-help transition-transform hover:scale-105 shadow-sm">
+            <span>${conf.icon}</span> ${conf.name}
+          </span>
+        `;
+      }).join('');
+    }
+
+    // 刷新 UI 数据
+    function updateAllViews() {
+      const enemy = ENEMIES_DATA[currentEnemyIndex];
+
+      // 战场中央模型
+      document.getElementById('enemy-sprite-icon').innerText = enemy.emoji;
+      document.getElementById('turn-enemy-emoji').innerText = enemy.emoji;
+      document.getElementById('enemy-card-name').innerText = enemy.name;
+      document.getElementById('enemy-card-hp-text').innerText = `${enemy.hp} / ${enemy.maxHp} HP`;
+      document.getElementById('enemy-card-hp-bar').style.width = `${(enemy.hp / enemy.maxHp) * 100}%`;
+      document.getElementById('enemy-sprite-badge').style.display = enemy.isWise ? 'block' : 'none';
+
+      const modernSkillsHtml = renderModernSkillCards(enemy.skills);
+      const tagsHtml = renderVariantTags(enemy.tags);
+
+      // 方案 A 渲染
+      document.getElementById('schemeA-emoji').innerText = enemy.emoji;
+      document.getElementById('schemeA-name').innerText = enemy.name;
+      document.getElementById('schemeA-wise-badge').style.display = enemy.isWise ? 'inline-flex' : 'none';
+      document.getElementById('schemeA-hp-val').innerText = `${enemy.hp} / ${enemy.maxHp}`;
+      document.getElementById('schemeA-hp-bar').style.width = `${(enemy.hp / enemy.maxHp) * 100}%`;
+      document.getElementById('schemeA-mp-val').innerText = `${enemy.mp} / ${enemy.maxMp}`;
+      document.getElementById('schemeA-mp-bar').style.width = `${(enemy.mp / enemy.maxMp) * 100}%`;
+      document.getElementById('schemeA-atk').innerText = enemy.atk;
+      document.getElementById('schemeA-armor').innerText = enemy.def;
+      document.getElementById('schemeA-speed').innerText = enemy.spd;
+      document.getElementById('schemeA-tags-container').innerHTML = tagsHtml;
+      document.getElementById('schemeA-wb-desc').innerText = enemy.wbSource ? enemy.wbSource.desc : '词条无描述文字';
+      document.getElementById('schemeA-skill-count').innerText = `(${enemy.skills.length})`;
+      document.getElementById('schemeA-skills-list').innerHTML = modernSkillsHtml;
+    }
+
+    function switchEnemy(idx) {
+      currentEnemyIndex = parseInt(idx, 10);
+      updateAllViews();
+    }
+
+    // 透光度调节
+    function setOpacity(val) {
+      const alpha = (val / 100).toFixed(2);
+      const backdropAlpha = (val * 0.42 / 100).toFixed(2);
+      document.documentElement.style.setProperty('--panel-opacity', alpha);
+      document.documentElement.style.setProperty('--backdrop-alpha', backdropAlpha);
+      document.getElementById('opacity-val').innerText = `${val}%`;
+    }
+
+    function toggleModal() {
+      const modal = document.getElementById('modal-container-A');
+      if (!modal) return;
+      if (modal.classList.contains('hidden')) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        isModalOpen = true;
+        document.getElementById('toggle-btn-text').innerText = '✕ 关闭面板预览';
+      } else {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        isModalOpen = false;
+        document.getElementById('toggle-btn-text').innerText = '👁️ 重新呼出面板';
+      }
+    }
+
+    function openModal() {
+      const modal = document.getElementById('modal-container-A');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        isModalOpen = true;
+        document.getElementById('toggle-btn-text').innerText = '✕ 关闭面板预览';
+      }
+    }
+
+    function closeModalOnBackdrop(e, container) {
+      if (e.target === container) {
+        toggleModal();
+      }
+    }
+
+    // 初始化渲染
+    window.addEventListener('DOMContentLoaded', () => {
+      updateAllViews();
+      setOpacity(20);
+    });
+  </script>
+</body>
+</html>
