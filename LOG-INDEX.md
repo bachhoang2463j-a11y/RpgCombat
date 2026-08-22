@@ -134,8 +134,8 @@
 | 2026-08-22 | V7.8 定版：远程击杀特写重构为1920年代【芝加哥打字机】风格实测确认，README 版本号 V7.7→V7.8、§2.2 击杀结算动画条目更新；LOG-125 HASH 回填 | L1533 | ff904b8 |
 | 2026-08-22 | 音效与WebM的GitHub迁移实测卡顿回退+归档至备份目录（未升版本号）：因GitHub/CDN并发限制导致连续播放卡顿，主程序回退Catbox源以保流畅；GitHub替换版与演示页归档移入备份目录 | L1540 | 8628e47 |
 | 2026-08-23 | 我方英雄回合开始语音系统（按名字绑定，未升版本号）：HERO_VOICE_LINES 注册表（埃利奥特/玛德琳/弗兰克/索恩×7句，逐条显式列出）＋playHeroTurnVoice 按回合号/血量选句＋preloadHeroVoices 预载＋state.currentRound 记录当前回合＋nextTurn hero 分支 !isExtraTurn 守卫（再动/额外行动不播） | L1550 | f148ce8 |
-| 2026-08-23 | 世界书敌方词条「描述」提取并在敌方详情弹窗展示「📚 世界书资料」区块（未升版本号）：extractWorldbookDescription 正则提取描述行＋startGameFromWorldbook 挂载 fresh.wbSource＋showEnemyInfo 插入暗色资料卡片（YAML 载入敌人隐藏） | L1569 | 待回填 |
-| 2026-08-23 | V7.9 定版：我方英雄回合开始语音系统与世界书敌方资料展示实测确认，README 版本号 V7.8→V7.9、§2.2 英雄语音与敌方详情条目更新、§9 世界书说明更新；LOG-129/130 HASH 回填 | L1586 | 待回填 |
+| 2026-08-23 | 世界书敌方词条「描述」提取并在敌方详情弹窗展示「📚 世界书资料」区块（未升版本号）：extractWorldbookDescription 正则提取描述行＋startGameFromWorldbook 挂载 fresh.wbSource＋showEnemyInfo 插入暗色资料卡片（YAML 载入敌人隐藏） | L1569 | 354a5e8 |
+| 2026-08-23 | V7.9 定版：我方英雄回合开始语音系统与世界书敌方资料展示实测确认，README 版本号 V7.8→V7.9、§2.2 英雄语音与敌方详情条目更新、§9 世界书说明更新；LOG-129/130 HASH 回填 | L1586 | 354a5e8 |
 
 
 
