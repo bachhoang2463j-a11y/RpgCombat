@@ -133,10 +133,7 @@
 | 2026-08-21 | V7.7 定版：思考型模型对话截断修复实测确认（gemini-3-flash-preview 台词完整不再截断），README 版本号 V7.6→V7.7 + §2.1 对话设置补 max_tokens/关闭思考两项说明；LOG-123 HASH 回填 | L1513 | 42e2f4e |
 | 2026-08-22 | V7.8 定版：远程击杀特写重构为1920年代【芝加哥打字机】风格实测确认，README 版本号 V7.7→V7.8、§2.2 击杀结算动画条目更新；LOG-125 HASH 回填 | L1533 | ff904b8 |
 | 2026-08-22 | 音效与WebM的GitHub迁移实测卡顿回退+归档至备份目录（未升版本号）：因GitHub/CDN并发限制导致连续播放卡顿，主程序回退Catbox源以保流畅；GitHub替换版与演示页归档移入备份目录 | L1540 | 8628e47 |
-
-
-
-
+| 2026-08-23 | 我方英雄回合开始语音系统（按名字绑定，未升版本号）：HERO_VOICE_LINES 注册表（埃利奥特/玛德琳/弗兰克/索恩×7句，逐条显式列出）＋playHeroTurnVoice 按回合号/血量选句＋preloadHeroVoices 预载＋state.currentRound 记录当前回合＋nextTurn hero 分支 !isExtraTurn 守卫（再动/额外行动不播） | L1550 | f148ce8 |
 
 
 
