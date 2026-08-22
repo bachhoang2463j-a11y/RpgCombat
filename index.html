@@ -5236,6 +5236,16 @@ function parseWorldbookEntryEnemy(entry) {
     } catch (e) { return null; }
 }
 
+// 从词条正文提取「描述」行（中英文兼容：描述：/ Description: / Desc:）。
+// 仅匹配到换行或 < 为止（防吞入后续 属性/战斗 区块或 <Combat_block>）；无描述返回空串。
+// 直接返回完整匹配行（m[0]），保留原文冒号风格（半/全角）与冒号后的空格，避免自行拼接丢失。
+function extractWorldbookDescription(content) {
+    if (!content) return '';
+    const m = String(content).match(/(描述|Description|Desc)\s*[：:]\s*([^\n<]+)/i);
+    if (!m) return '';
+    return m[0].trim();
+}
+
 // 【世界书载入】入口：按名字用图鉴词条数据替换敌方（未命中保留 Yaml 原样）
 async function startGameFromWorldbook() {
     if (state.isGameStarted) { showLog("世界书载入仅可在准备页使用"); return; }
@@ -5271,6 +5281,12 @@ async function startGameFromWorldbook() {
         // 世界书条目替换时继承原 LLM 名字上的 `[...]` 变种标签（如 [复活]/[智慧]）——名字标签在世界书模式下依旧合法
         const fresh = parseEnemyItem(cbData, 0, Array.isArray(enemy.nameTags) ? enemy.nameTags : []);
         fresh.id = enemy.id; // 保留原槽位 id
+        // 世界书来源：详情弹窗「世界书资料」区块数据源（纯字符串，可序列化，随 initialEnemiesCache 重置保留）
+        fresh.wbSource = {
+            wbName: worldbookSettings.boundName,   // 来源世界书名
+            entryName: entry.name,                 // 词条名
+            desc: extractWorldbookDescription(entry.content)  // 词条「描述」行（可能为空串）
+        };
         wbLogs.push(`📚 图鉴载入：${enemy.name} → 图鉴条目「${entry.name}」`);
         return fresh;
     });
@@ -9370,6 +9386,18 @@ function showEnemyInfo(enemy) {
       <div class="flex flex-wrap gap-1.5">${handled.join('') || '<span class="text-gray-600 text-xs">无</span>'}</div>
     </div>`;
   }
+  // 世界书资料区块：仅世界书载入的敌人（带 wbSource）渲染；YAML 载入敌人整块隐藏
+  let wbHtml = '';
+  if (enemy.wbSource) {
+    const src = enemy.wbSource;
+    const descHtml = src.desc
+      ? `<div class="text-xs text-gray-200 leading-relaxed bg-black/30 border border-violet-500/20 rounded p-2">${src.desc}</div>`
+      : `<div class="text-xs text-gray-500">词条无描述文字</div>`;
+    wbHtml = `<div class="mb-3">
+      <div class="text-gray-400 text-xs font-bold mb-1.5 uppercase tracking-wider">📚 世界书资料</div>
+      ${descHtml}
+    </div>`;
+  }
   let skillsHtml = enemy.skills.map(skill => {
     return `<div class="bg-gray-800 p-2 rounded border border-gray-700 text-sm mb-2">
       <div class="text-rose-400 font-bold mb-1">${skill.name}</div>
@@ -9408,6 +9436,7 @@ function showEnemyInfo(enemy) {
          <div class="text-center"><div class="text-gray-400 text-xs">Speed</div><div class="text-white font-bold">${enemy.spd}</div></div>
       </div>
       ${tagHtml}
+      ${wbHtml}
       <h4 class="text-gray-400 text-xs font-bold mb-2 uppercase tracking-wider">技能面板</h4>
       <div class="max-h-[50vh] overflow-y-auto pr-1 custom-scrollbar">
         ${skillsHtml || '<div class="text-gray-500 text-sm text-center py-2">无技能</div>'}
