@@ -8281,7 +8281,7 @@ async function applyBarrierHit(caster, barrierTarget, tag, tagPower, skill, mult
 }
 
 // 基于嘲讽值的轮盘赌算法选择目标
-function getTauntTarget(heroArray) {
+function getTauntTarget(heroArray, wiseFocus) {
     if (heroArray.length === 0) return null;
     // 【肃正】屏障作为"伪实体肉盾"：屏障存在期间，敌方攻击的目标选择直接命中屏障，
     // 我方角色完全不被选中。屏障 id 以 'barrier' 开头，特判走屏障拦截分支。
@@ -8292,6 +8292,13 @@ function getTauntTarget(heroArray) {
             dom: null, proxyHero: heroArray[Math.floor(Math.random() * heroArray.length)]
         };
         return barrierStandIn;
+    }
+    // 【智慧】威胁感知：带 [智慧] 标签的敌人无视嘲讽，优先集火最残血英雄（HP ≤ 30%）
+    if (wiseFocus) {
+        const lowHpHeroes = heroArray.filter(h => h.maxHp > 0 && h.hp / h.maxHp <= 0.3);
+        if (lowHpHeroes.length > 0) {
+            return lowHpHeroes.sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))[0];
+        }
     }
     let totalTauntPool = 0;
     const heroesWithTaunt = heroArray.map(h => {
@@ -8432,12 +8439,12 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                 if (isBeneficial) {
                     targets = [allies[Math.floor(Math.random()*allies.length)]];
                 } else {
-                    targets = [casterIsHero ? opponents[Math.floor(Math.random()*opponents.length)] : getTauntTarget(opponents)];
+                    targets = [casterIsHero ? opponents[Math.floor(Math.random()*opponents.length)] : getTauntTarget(opponents, caster.isWise)];
                 }
             } else {
                 const targetIsAlly = (casterIsHero && primaryTarget.id.startsWith('h')) || (!casterIsHero && primaryTarget.id.startsWith('e'));
                 if (isBeneficial) targets = targetIsAlly ? [primaryTarget] : [caster];
-                else targets = !targetIsAlly ? [primaryTarget] : [casterIsHero ? opponents[Math.floor(Math.random()*opponents.length)] : getTauntTarget(opponents)];
+                else targets = !targetIsAlly ? [primaryTarget] : [casterIsHero ? opponents[Math.floor(Math.random()*opponents.length)] : getTauntTarget(opponents, caster.isWise)];
             }
         }
 
@@ -9065,7 +9072,7 @@ function selectEnemySkillAndTarget(enemy, validSkills, aliveEnemies, aliveHeroes
     // 为每个可用技能进行上下文评分 (Contextual Scoring)
     const scoredSkills = validSkills.map(skill => {
         let weight = 0;
-        let target = getTauntTarget(aliveHeroes); // 默认目标
+        let target = getTauntTarget(aliveHeroes, enemy.isWise); // 默认目标（智慧敌人威胁感知）
         
         const isHeal = skill.type.includes('回');
         const isBuff = skill.type.includes('增') || skill.type.includes('防') || skill.type.includes('盾') || skill.type.includes('避') || skill.type.includes('反击');
@@ -9094,7 +9101,7 @@ function selectEnemySkillAndTarget(enemy, validSkills, aliveEnemies, aliveHeroes
             const heroesWithoutDebuff = aliveHeroes.filter(h => !h.buffs || !h.buffs.some(b => b.value < 0 || b.type==='stun' || b.type==='poison' || b.type==='burn'));
             if (heroesWithoutDebuff.length > 0) {
                 weight += 120; // 只要有人没中，就非常喜欢放
-                target = getTauntTarget(heroesWithoutDebuff);
+                target = getTauntTarget(heroesWithoutDebuff, enemy.isWise);
             } else {
                 weight += 0; // 全中了就不放了，纯浪费蓝
             }
@@ -9121,7 +9128,7 @@ function selectEnemySkillAndTarget(enemy, validSkills, aliveEnemies, aliveHeroes
     if (possibleSkills.length === 0) {
         return { 
             selectedSkill: validSkills[Math.floor(Math.random() * validSkills.length)], 
-            specificTarget: getTauntTarget(aliveHeroes) 
+            specificTarget: getTauntTarget(aliveHeroes, enemy.isWise) 
         };
     }
 
@@ -9164,7 +9171,7 @@ async function executeEnemyTurn(enemy) {
   let selectedSkill = null; let specificTarget = null;
   if (isChargeFull) {
       selectedSkill = chargeSkill;
-      specificTarget = getTauntTarget(aliveHeroes);
+      specificTarget = getTauntTarget(aliveHeroes, enemy.isWise);
   } else {
       const decision = selectEnemySkillAndTarget(enemy, validSkills, aliveEnemies, aliveHeroes);
       selectedSkill = decision.selectedSkill;
@@ -9186,6 +9193,22 @@ async function executeEnemyTurn(enemy) {
       }
       
   } else {
+      // === 【内置 AI】低蓝回蓝：蓝量低于最大蓝量 30% 时，消耗本次行动恢复 30%（向上取整）法力 ===
+      // 次于充能大招：充能满时优先放大招（isChargeFull 分支已提前 return），此分支仅在大招未满时执行
+      if (enemy.mp < Math.ceil(enemy.maxMp * 0.3) && enemy.mp < enemy.maxMp) {
+          const regenAmount = Math.ceil(enemy.maxMp * 0.3);
+          enemy.mp = Math.min(enemy.maxMp, enemy.mp + regenAmount);
+          updateEnemyUI(enemy);
+          playSound('mpHeal');
+          const _manaDom = document.getElementById(`${enemy.id}-sprite`);
+          if (_manaDom) { playSVGEffect(_manaDom, 'mpHeal'); createFloatingText(_manaDom, `+${regenAmount}MP`, 'text-cyan-400'); }
+          showLog(`🔋 ${enemy.name} 魔力匮乏，消耗本次行动恢复法力！`);
+          addHistory(`   ↳ 🔋 ${enemy.name} 魔力匮乏，消耗本次行动恢复 ${regenAmount} 点法力。`);
+          await sleep(500); // 让回蓝演出可见
+          await endTurn();
+          return;
+      }
+
       showLog(`${enemy.name} 行动中...`);
       // 仅攻击/控制技能（含伤害标签）才显示红色攻击预兆；buff/治疗/减防等不显示
       const DAMAGE_TAGS = ['单体', '群攻', '穿透', '群穿透', '眩晕', '群眩晕'];
@@ -9223,7 +9246,7 @@ async function executeEnemyTurn(enemy) {
       }
       await executeSkillAction(enemy, specificTarget, selectedSkill, multiplier); 
   } else {
-      const target = getTauntTarget(aliveHeroes);
+      const target = getTauntTarget(aliveHeroes, enemy.isWise);
       const mockAttackSkill = { type: '[单体]', type2: '[无]', type3: '[无]', power: 0, power2: 0, power3: 0, hit: 130, cost: 0, name: '猛击', damageType: '近战', isReaction: false, reactionTarget: 'all' };
       await executeSkillAction(enemy, target, mockAttackSkill, multiplier);
   }
