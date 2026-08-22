@@ -6107,9 +6107,9 @@ function tryReviveEnemy(enemy, dom) {
     enemy.reviveCount--;
     enemy.hp = Math.floor(enemy.maxHp * 0.3);
     enemy.shield = 0; enemy.buffs = []; enemy.isDefending = false;
-    if (dom) createFloatingText(dom, '复活!', 'text-emerald-300');
+    if (dom) createFloatingText(dom, '死里逃生!', 'text-emerald-300');
     if (window.playSound) playSound('hpHeal');
-    addHistory(`   ↳ 💀 ${enemy.name} 被击倒……却猛地站了起来！以 ${Math.floor(enemy.maxHp * 0.3)}/${enemy.maxHp} 点生命复活！`);
+    addHistory(`   ↳ 💀 [${enemy.name}] 遭受致命一击倒地……却强行撑住一口气猛地站起（死里逃生）！恢复了 ${Math.floor(enemy.maxHp * 0.3)}/${enemy.maxHp} 点生命重返战场！`);
     return true;
 }
 
@@ -6160,9 +6160,9 @@ async function doEnemySelfDestruct(enemy) {
         spriteDom.classList.remove('opacity-0', 'scale-50', 'breathe');
         spriteDom.classList.add('enemy-omen');
         if (window.playSound) playSound('monsterAttack');
-        createFloatingText(spriteDom, '💥 自爆预警!', 'text-red-400');
+        createFloatingText(spriteDom, '💥 绝命反扑!', 'text-red-400');
     }
-    addHistory(`   ⚠️ ${enemy.name} 濒死之际气息暴走——自爆前兆！`);
+    addHistory(`   ⚠️ [${enemy.name}] 濒死之际体内残存力量狂暴失控——绝命反扑前兆！`);
     await sleep(600); // 前摇时长与 enemy-omen 动画（600ms）对齐
 
     // === 看破判定前置于爆炸演出之前：被看破则本次自爆被彻底无效化（无爆炸、无伤害），避免"先爆炸再看破"的演出矛盾 ===
@@ -6170,7 +6170,7 @@ async function doEnemySelfDestruct(enemy) {
     const kanpoCtx = { caster: enemy, skill: boomSkill, target: null, cancelled: false };
     await checkKanpoInterrupt(kanpoCtx);
     if (kanpoCtx.cancelled) {
-        addHistory(`   ⛔ 自爆·${subLabel} 被看破破局，完全无效化！`);
+        addHistory(`   ⛔ [${enemy.name}] 的绝命反扑（${subLabel}）被看破破局，完全无效化！`);
         // 看破成功：无爆炸演出，直接收尾隐藏尸体
         if (spriteDom) {
             spriteDom.classList.remove('enemy-omen');
@@ -6188,7 +6188,15 @@ async function doEnemySelfDestruct(enemy) {
         if (scene) { scene.classList.add('shake'); setTimeout(() => scene.classList.remove('shake'), 500); }
     }
     if (window.playSound) playSound('kill');
-    addHistory(`💥 ${enemy.name} 自爆了！（${boom.power} 威力，波及全体我方）`);
+    if (boom.type === '群火') {
+        addHistory(`   🔥 [${enemy.name}] 倒地之际狂暴烈焰/易燃物质爆燃，灼热火浪席卷全场！（施加灼烧，持续 3 回合）`);
+    } else if (boom.type === '群毒') {
+        addHistory(`   🧪 [${enemy.name}] 倒地之际毒素囊袋/毒物爆裂，致命毒瘴弥漫全场！（施加剧毒，持续 3 回合）`);
+    } else if (boom.type === '群穿') {
+        addHistory(`   🗡️ [${enemy.name}] 临死触发残余锐芒/绝命暗器，破甲狂澜贯穿全场！（无视防御造成 ${boom.power} 穿透伤害）`);
+    } else {
+        addHistory(`   💥 [${enemy.name}] 濒死引爆了潜藏能量/发动绝命反扑，剧烈冲击波波及全体！（${boom.power} 威力，波及全体我方）`);
+    }
 
     await executeSkillAction(enemy, null, boomSkill, 1);
     // 收尾：自爆结算完成后隐藏尸体（前摇期间保留可见）
@@ -6335,7 +6343,7 @@ registerTagHandler('中毒', (ctx) => {
     // 【耐毒】敌方免疫中毒：跳过施加
     if (ctx.target && ctx.target.immunePoison) {
         if (ctx.targetDom) createFloatingText(ctx.targetDom, '免疫·毒', 'text-lime-300');
-        addHistory(`   ↳ 💠 ${ctx.target.name} 的【耐毒】体质免疫了剧毒！`);
+        addHistory(`   ↳ 🧪 [${ctx.target.name}] 具备毒素抗性/耐受体质，免疫了剧毒侵蚀！`);
         return;
     }
     playSound('defDown'); playSVGEffect(ctx.targetDom, 'debuff');
@@ -6351,7 +6359,7 @@ registerTagHandler('燃烧', (ctx) => {
     // 【防火】敌方免疫点燃：跳过施加
     if (ctx.target && ctx.target.immuneBurn) {
         if (ctx.targetDom) createFloatingText(ctx.targetDom, '免疫·燃', 'text-orange-300');
-        addHistory(`   ↳ 🔥 ${ctx.target.name} 的【防火】躯体免疫了灼烧！`);
+        addHistory(`   ↳ 🔥 [${ctx.target.name}] 耐火防护/抗热体质阻绝了烈焰，免疫了灼烧！`);
         return;
     }
     playSound('defDown'); playSVGEffect(ctx.targetDom, 'debuff');
@@ -7032,17 +7040,21 @@ CombatEvents.on(EVENTS.TURN_START, (ctx) => {
     if (e.hp >= e.maxHp) return;
     e.hp = Math.min(e.maxHp, e.hp + healAmt);
     const dom = e.id ? document.getElementById(`${e.id}-sprite`) : null;
-    if (dom) createFloatingText(dom, `再生 +${healAmt}`, 'text-green-300');
-    addHistory(`   ↳ 💚 ${e.name} 的【再生】体质恢复了 ${healAmt} 点生命（${Math.floor(e.hp)}/${e.maxHp}）。`);
+    if (dom) createFloatingText(dom, `调息 +${healAmt}`, 'text-green-300');
+    addHistory(`   ↳ 💚 [${e.name}] 凭借【持续调息/自愈本能】平复伤势，恢复了 ${healAmt} 点生命（${Math.floor(e.hp)}/${e.maxHp}）。`);
 });
 
-// 敌人：【连动】入场即低血时也触发（一次性）——否则场面上没有"跌破50%/30%"的瞬间，低血敌人在其回合开始才满足条件
+// 敌人：【连动】/【狂暴】入场即低血时也触发（一次性）——否则场面上没有"跌破50%/30%"的瞬间，低血敌人在其回合开始才满足条件
 // 插队与 tryTriggerEnemyLink 同款；linked 守卫防重复，避免与受击触发叠加
 CombatEvents.on(EVENTS.TURN_START, (ctx) => {
     const e = ctx.entity;
-    if (!e || e.id.startsWith('h') || !e.isAlive || !e.tags || !e.tags.includes('[连动]')) return;
-    if (e.linked || e.maxHp <= 0 || e.hp <= 0 || e.hp / e.maxHp > 0.3) return;
-    tryTriggerEnemyLink(e);
+    if (!e || e.id.startsWith('h') || !e.isAlive || !e.tags) return;
+    if (e.tags.includes('[狂暴]')) tryTriggerEnemyRage(e);
+    if (e.tags.includes('[连动]')) {
+        if (!e.linked && e.maxHp > 0 && e.hp > 0 && e.hp / e.maxHp <= 0.3) {
+            tryTriggerEnemyLink(e);
+        }
+    }
 });
 
 // 防守者：强力反击 (闪避成功时按概率触发)
@@ -7080,8 +7092,8 @@ CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
         const drain = Math.max(1, Math.floor(ctx.hpDmg * 0.3));
         caster.hp = Math.min(caster.maxHp, caster.hp + drain);
         const casterDom = caster.id ? document.getElementById(`${caster.id}-sprite`) : null;
-        if (casterDom) createFloatingText(casterDom, `吸血 +${drain}`, 'text-red-300');
-        addHistory(`   ↳ 🧛 ${caster.name} 的【吸血】吸取了 ${drain} 点生命（${Math.floor(caster.hp)}/${caster.maxHp}）。`);
+        if (casterDom) createFloatingText(casterDom, `嗜血 +${drain}`, 'text-red-300');
+        addHistory(`   ↳ 🩸 [${caster.name}] 触发【嗜血/生机掠夺】，从凶狠的命中中汲取战意与生机，恢复了 ${drain} 点生命（${Math.floor(caster.hp)}/${caster.maxHp}）。`);
         updateEnemyUI(caster);
     }
     // 敌人【荆棘】：被近战命中时反弹 50% 实际伤害（下限 10 点）——走正常减伤管线（受攻击者护甲/护盾/防御姿态减免）；
@@ -7116,8 +7128,8 @@ CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
             const attackerDom = attacker.id && attacker.id.startsWith('h') ? document.getElementById(`hero-card-${attacker.id}`) : document.getElementById(`${attacker.id}-sprite`);
             if (attackerDom) { attackerDom.classList.add('shake'); setTimeout(() => attackerDom.classList.remove('shake'), 400); }
             const brokeShield = reflectShield > 0 && reflectHp === 0;
-            if (attackerDom) createFloatingText(attackerDom, brokeShield ? `荆棘 -${reflectShield} 破盾` : `荆棘 -${reflectHp}`, brokeShield ? 'text-slate-300' : 'text-green-400');
-            addHistory(`   🌵 [${thornTarget.name}] 的【荆棘】反伤了 ${attacker.name}，造成了 ${reflectHp} 点伤害${reflectShield > 0 ? `（含破盾 ${reflectShield}）` : ''}！`);
+            if (attackerDom) createFloatingText(attackerDom, brokeShield ? `反震 -${reflectShield} 破盾` : `反震 -${reflectHp}`, brokeShield ? 'text-slate-300' : 'text-green-400');
+            addHistory(`   ↳ ⚔️ [${thornTarget.name}] 触发【受击反震/护体反伤】，强烈的反冲力波及了近身攻击的 ${attacker.name}，造成了 ${reflectHp} 点伤害${reflectShield > 0 ? `（含破盾 ${reflectShield}）` : ''}！`);
             if (attacker.id.startsWith('h')) updateHeroUI(attacker); else updateEnemyUI(attacker);
         }
     }
@@ -7941,7 +7953,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
                   addHistory(`   ⚔️ ${target.name} 闪避并趁势反击！迅速一击命中了 ${caster.name}，造成了 ${counterHpDmg} 点伤害！${counterShieldDmg>0?` (附带破盾${counterShieldDmg})`:''}`); 
               }
               if (caster.id.startsWith('h')) updateHeroUI(caster);
-              else { tryTriggerEnemyLowHpSpeak(caster); tryTriggerEnemyMolt(caster); tryTriggerEnemyLink(caster); updateEnemyUI(caster); }
+              else { tryTriggerEnemyLowHpSpeak(caster); tryTriggerEnemyMolt(caster); tryTriggerEnemyRage(caster); tryTriggerEnemyLink(caster); updateEnemyUI(caster); }
               if (target.id.startsWith('h')) updateHeroUI(target); else updateEnemyUI(target);
           } else {
               addHistory(`   ↳ ${target.name} 虽处于反击架势，但无法触及并反击[${incomingDamageType}]攻击！`);
@@ -8118,7 +8130,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         // 【钢体】敌方免疫眩晕：跳过施加
         if (target.tags && target.tags.includes('[钢体]')) {
             if (targetDom) createFloatingText(targetDom, '免疫·眩晕', 'text-yellow-300');
-            addHistory(`   ↳ 🛡️ ${target.name} 的【钢体】纹丝不动，免疫了眩晕！`);
+            addHistory(`   ↳ ⛓️ [${target.name}] 强韧意志/抗震结构硬抗了冲击，免疫了眩晕！`);
         } else {
             target.buffs = target.buffs || [];
             target.buffs.push({ type: 'stun', value: 1, duration: 1 });
@@ -8164,6 +8176,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     tryTriggerEnemyLowHpSpeak(target);
     // 【蜕皮】首次跌破50%触发二阶段；【连动】≤30% 时插队立刻行动一次（均为一次性，致死伤害不触发）
     tryTriggerEnemyMolt(target);
+    tryTriggerEnemyRage(target);
     tryTriggerEnemyLink(target);
     updateEnemyUI(target);
   } else {
@@ -8637,8 +8650,8 @@ function startGame() {
   // 初始化避死被动触发状态
   heroesData.forEach(h => { delete h.hasTriggeredGrit; delete h.hasTriggeredAvoidFatal; });
   enemiesData.forEach(e => { delete e.hasTriggeredGrit; delete e.hasTriggeredAvoidFatal; });
-  // 初始化敌方变种标签一次性触发状态（【蜕皮】/【连动】本场仅一次；重置/新战局经缓存深拷贝天然复原）
-  enemiesData.forEach(e => { delete e.molted; delete e.linked; });
+  // 初始化敌方变种标签一次性触发状态（【蜕皮】/【连动】/【狂暴】本场仅一次；重置/新战局经缓存深拷贝天然复原）
+  enemiesData.forEach(e => { delete e.molted; delete e.linked; delete e.hasRageNarrated; });
   
   // 利用开场动画的时间窗口，在后台静默预加载所有技能特效资源
   preloadBattleAssets();
@@ -8739,6 +8752,7 @@ async function nextTurn() {
                       tryTriggerEnemyLowHpSpeak(currentEntity.ref);
                       // 【蜕皮】首次跌破50%触发二阶段；【连动】≤30% 插队行动（DoT 致死不触发，与主伤害管线同规则）
                       tryTriggerEnemyMolt(currentEntity.ref);
+                      tryTriggerEnemyRage(currentEntity.ref);
                       tryTriggerEnemyLink(currentEntity.ref);
                   }
                   const targetDom = currentEntity.ref.id.startsWith('h') ? document.getElementById(`hero-card-${currentEntity.ref.id}`) : document.getElementById(`${currentEntity.ref.id}-sprite`);
@@ -10749,8 +10763,19 @@ function tryTriggerEnemyMolt(enemy) {
   const oldHp = enemy.hp;
   enemy.hp = Math.min(enemy.maxHp, enemy.hp + healAmt);
   const dom = enemy.id ? document.getElementById(`${enemy.id}-sprite`) : null;
-  if (dom) { createFloatingText(dom, '蜕皮!', 'text-amber-300'); dom.classList.add('shake'); setTimeout(() => dom.classList.remove('shake'), 400); }
-  addHistory(`   🐍 [${enemy.name}] 的【蜕皮】发动！${cleared ? `净化了 ${cleared} 个负面状态，` : ''}恢复了 ${Math.floor(enemy.hp - oldHp)} 点生命（${Math.floor(enemy.hp)}/${enemy.maxHp}）并永久进入二阶段（攻击+50%）！`);
+  if (dom) { createFloatingText(dom, '绝境爆发!', 'text-amber-300'); dom.classList.add('shake'); setTimeout(() => dom.classList.remove('shake'), 400); }
+  addHistory(`   💥 [${enemy.name}] 生命跌破极限，触发【绝境爆发】（二阶段觉醒）！${cleared ? `强行排除了 ${cleared} 个负面状态，` : ''}伤势稳固并恢复了 ${Math.floor(enemy.hp - oldHp)} 点生命（${Math.floor(enemy.hp)}/${enemy.maxHp}），进入狂怒强化状态（攻击+50%）！`);
+}
+
+// ---- 敌方【狂暴】文案触发判定：首次 HP ≤ 30% 时记录战报（仅记录文案与飘字，不影响数值被动读取；仅敌方、一次性）----
+function tryTriggerEnemyRage(enemy) {
+  if (!enemy || enemy.id.startsWith('h') || enemy.hasRageNarrated) return;
+  if (!enemy.tags || !enemy.tags.includes('[狂暴]')) return;
+  if (!enemy.isAlive || enemy.maxHp <= 0 || enemy.hp <= 0 || enemy.hp / enemy.maxHp > 0.3) return;
+  enemy.hasRageNarrated = true;
+  const dom = enemy.id ? document.getElementById(`${enemy.id}-sprite`) : null;
+  if (dom) createFloatingText(dom, '狂暴!', 'text-red-400');
+  addHistory(`   ↳ 🩸 [${enemy.name}] 伤势沉重陷入【濒死狂怒】，凶暴之气大涨（攻击力提升 50%）！`);
 }
 
 // ---- 敌方【连动】触发判定：HP ≤ 30% 时立刻行动一次（一次性；仅敌方）----
@@ -10763,8 +10788,8 @@ function tryTriggerEnemyLink(enemy) {
   enemy.linked = true;
   state.actionQueue.splice(state.queueIndex + 1, 0, { type: 'enemy', ref: enemy, isExtraTurn: true });
   const dom = enemy.id ? document.getElementById(`${enemy.id}-sprite`) : null;
-  if (dom) createFloatingText(dom, '连动!', 'text-fuchsia-400');
-  addHistory(`   🔗 [${enemy.name}] 残血爆发【连动】，立刻行动一次！`);
+  if (dom) createFloatingText(dom, '抢攻!', 'text-fuchsia-400');
+  addHistory(`   ↳ ⚡ [${enemy.name}] 濒死求生本能激发（绝境抢攻），不顾伤势立刻抢先反扑！`);
 }
 
 
