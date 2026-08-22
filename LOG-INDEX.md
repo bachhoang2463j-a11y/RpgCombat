@@ -132,7 +132,7 @@
 | 2026-08-21 | 修复思考型模型局内对话被截断（未升版本号）：max_tokens 可配置（面板新增输入框默认 4096，替换硬编码 300）+ 关闭思考开关（best-effort 发送 thinking:false）+ 响应兜底解析 + finish_reason 截断检测提示；根因=gcli 代理将 max_tokens 映射 Gemini maxOutputTokens 连思考一起计算（deepseek v4f 思考分开计量故正常） | L1502 | 42e2f4e |
 | 2026-08-21 | V7.7 定版：思考型模型对话截断修复实测确认（gemini-3-flash-preview 台词完整不再截断），README 版本号 V7.6→V7.7 + §2.1 对话设置补 max_tokens/关闭思考两项说明；LOG-123 HASH 回填 | L1513 | 42e2f4e |
 | 2026-08-22 | V7.8 定版：远程击杀特写重构为1920年代【芝加哥打字机】风格实测确认，README 版本号 V7.7→V7.8、§2.2 击杀结算动画条目更新；LOG-125 HASH 回填 | L1533 | ff904b8 |
-| 2026-08-22 | 音效与WebM的GitHub迁移实测卡顿回退+归档至备份目录（未升版本号）：因GitHub/CDN并发限制导致连续播放卡顿，主程序回退Catbox源以保流畅；GitHub替换版与演示页归档移入备份目录 | L1540 | ffcf47f |
+| 2026-08-22 | 音效与WebM的GitHub迁移实测卡顿回退+归档至备份目录（未升版本号）：因GitHub/CDN并发限制导致连续播放卡顿，主程序回退Catbox源以保流畅；GitHub替换版与演示页归档移入备份目录 | L1540 | 8628e47 |
 
 
 
