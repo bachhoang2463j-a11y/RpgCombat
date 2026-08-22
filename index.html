@@ -1456,6 +1456,82 @@ const AVATAR_MAP = {
 const DEFAULT_HERO_IMG = 'https://imgur.la/images/2026/08/13/9adb95d5df1b99ebe2f6670acd47a5b5.png';
 
 // ==========================================
+// 我方英雄回合语音（按名字绑定）
+// 每个我方角色在本回合首次行动时播放一句绑定台词；再动/额外行动不播。
+// 规则：第一回合固定 first；后续回合 HP>50% 从 turn 随机、HP<=50% 从 low 随机。
+// 文件名经 GitHub API 逐文件核实（命名/格式不完全统一，故逐条显式列出）。
+// ==========================================
+const HERO_VOICE_BASE = 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main';
+const HERO_VOICE_LINES = {
+  "索恩": {
+    first: '索恩/索恩_第一回合.mp3',
+    turn: ['索恩/索恩_开始回合1.mp3', '索恩/索恩_开始回合2.mp3', '索恩/索恩_开始回合3.mp3'],
+    low: ['索恩/索恩_半血1.mp3', '索恩/索恩_半血2.mp3', '索恩/索恩_半血3.mp3']
+  },
+  "埃利奥特": {
+    first: '埃利奥特/埃利奥特_开始回合.wav', // 无"第一回合"文件，用无编号的"开始回合"充当
+    turn: ['埃利奥特/埃利奥特_回合开始1.wav', '埃利奥特/埃利奥特_回合开始2.wav', '埃利奥特/埃利奥特_回合开始3.wav'],
+    low: ['埃利奥特/埃利奥特_半血1.mp3', '埃利奥特/埃利奥特_半血2.wav', '埃利奥特/埃利奥特_半血3.wav']
+  },
+  "玛德琳": {
+    first: '玛德琳/玛德琳_第一回合.mp3',
+    turn: ['玛德琳/玛德琳_开始回合1.wav', '玛德琳/玛德琳_开始回合2.wav', '玛德琳/玛德琳_开始回合3.wav'],
+    low: ['玛德琳/玛德琳_半血1.wav', '玛德琳/玛德琳_半血2.wav', '玛德琳/玛德琳_半血3.wav']
+  },
+  "弗兰克": {
+    first: '弗兰克/弗兰克_第一回合.mp3',
+    turn: ['弗兰克/弗兰克_回合开始1.wav', '弗兰克/弗兰克_回合开始2.wav', '弗兰克/弗兰克_回合开始3.wav'],
+    low: ['弗兰克/弗兰克_半血1.wav', '弗兰克/弗兰克_半血2.wav', '弗兰克/弗兰克_半血3.wav']
+  }
+};
+
+/** 从台词池中随机选一句，排除上回合已播过的台词（若池子只剩一句则允许重复） */
+function pickHeroVoice(pool, exclude) {
+  const candidates = pool.filter(f => f !== exclude);
+  const list = candidates.length > 0 ? candidates : pool;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+/** 播放英雄的本回合语音（仅本回合首次行动时由 nextTurn 调用） */
+function playHeroTurnVoice(hero) {
+  const cfg = HERO_VOICE_LINES[hero.name];
+  if (!cfg) return; // 未配置语音的英雄静默跳过
+  let file;
+  if (state.currentRound <= 1) {
+    file = cfg.first;
+  } else if (hero.maxHp > 0 && hero.hp / hero.maxHp <= 0.5) {
+    file = pickHeroVoice(cfg.low, hero.lastVoiceFile);
+  } else {
+    file = pickHeroVoice(cfg.turn, hero.lastVoiceFile);
+  }
+  if (file) {
+    hero.lastVoiceFile = file; // 记录本回合台词，下回合随机时排除，避免连续重复
+    playCustomAudio(HERO_VOICE_BASE + '/' + file, 2); // 音量放大 2 倍
+  }
+}
+
+/** 战斗开始时静默预载参战英雄的语音为 Blob，播放零网络等待（与 preloadBattleAssets 同款） */
+function preloadHeroVoices() {
+  const urls = new Set();
+  heroesData.forEach(h => {
+    const cfg = HERO_VOICE_LINES[h.name];
+    if (!cfg) return;
+    urls.add(cfg.first);
+    cfg.turn.forEach(f => urls.add(f));
+    cfg.low.forEach(f => urls.add(f));
+  });
+  urls.forEach(rel => {
+    const url = HERO_VOICE_BASE + '/' + rel;
+    if (_fxAudioBlobCache.has(url)) return;
+    _fxAudioBlobCache.set(url, null); // 占位防重复 fetch
+    fetch(url)
+      .then(r => r.blob())
+      .then(blob => { _fxAudioBlobCache.set(url, URL.createObjectURL(blob)); })
+      .catch(e => { _fxAudioBlobCache.delete(url); console.warn('[预加载] 英雄语音加载失败:', rel, e); });
+  });
+}
+
+// ==========================================
 // 全屏控制
 // ==========================================
 function toggleFullScreen() {
@@ -3237,18 +3313,20 @@ const WEBM_FX_REGISTRY = {
 /**
  * 播放自定义音效
  * @param {string} url - 音效地址
+ * @param {number} [volume] - 音量增益倍率（>1 用 Web Audio GainNode 放大，默认 1 不调整）
  */
 // 音频预缓存 Map：key=url, value=HTMLAudioElement（未预热时的回退路径）
 const _fxAudioCache = new Map();
 // 音频 Blob URL 缓存 Map：key=url, value=blobUrl（fetch 全量预载，播放即时；fetch 中为 null 占位）
 const _fxAudioBlobCache = new Map();
 
-function playCustomAudio(url) {
+function playCustomAudio(url, volume) {
     if (!url || url === 'none') return;
     const blobUrl = _fxAudioBlobCache.get(url);
     if (blobUrl) {
         // Blob 已全量预载：本地数据立即播放，零网络等待
         const audio = new Audio(blobUrl);
+        applyAudioVolume(audio, volume);
         audio.play().catch(e => console.warn('[FX] 音效播放失败:', e));
         return;
     }
@@ -3256,13 +3334,33 @@ function playCustomAudio(url) {
     if (cached) {
         // 克隆节点以支持同时多次播放
         const clone = cached.cloneNode();
+        applyAudioVolume(clone, volume);
         clone.play().catch(e => console.warn('[FX] 音效播放失败:', e));
     } else {
         // 缓存未命中时直接播放，同时补缓存
         const audio = new Audio(url);
         audio.preload = 'auto';
         _fxAudioCache.set(url, audio);
+        applyAudioVolume(audio, volume);
         audio.play().catch(e => console.warn('[FX] 音效播放失败:', e));
+    }
+}
+
+// 用 Web Audio GainNode 放大音量（HTMLAudioElement.volume 上限为 1，无法直接 >1；复用 playWebMFX 增益先例）
+function applyAudioVolume(audio, volume) {
+    if (!volume || volume === 1) return;
+    try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        const audioCtx = new AudioContextClass();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const source = audioCtx.createMediaElementSource(audio);
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.value = volume;
+        source.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+    } catch (e) {
+        console.warn('[FX] Web Audio 音量增益放大未开启:', e);
     }
 }
 
@@ -8420,6 +8518,8 @@ function startGame() {
   
   // 利用开场动画的时间窗口，在后台静默预加载所有技能特效资源
   preloadBattleAssets();
+  // 同时预载参战英雄的回合语音
+  preloadHeroVoices();
   
   // 显示聊天输入区，设置玩家头像
   initChatInputArea();
@@ -8475,6 +8575,7 @@ function startRound() {
     h.stealthHitThisRound = false; // 每次进入新回合清零受击标记
   });
   addHistory(`\n=== 第 ${state.round} 回合 ===`);
+  state.currentRound = state.round; // 记录当前进行中回合号（state.round 自增前，第一回合=1）
   state.round++;
   // 新回合开始：全队行动条图标按阵营色发出一次光晕（赛博光轨，renderTurnQueue 消费一次）
   _roundStartGlowPending = true;
@@ -8586,6 +8687,8 @@ async function nextTurn() {
     document.getElementById('enemy-turn-overlay').classList.add('opacity-0', 'pointer-events-none');
     updateActiveHeroDisplay(currentEntity.ref.id); renderHeroMenu(currentEntity.ref);
     state.isAnimating = false; playSound('heroTurn');
+    // 我方英雄回合语音：仅本回合首次（非额外）行动播放，再动/额外行动不播
+    if (!currentEntity.isExtraTurn) playHeroTurnVoice(currentEntity.ref);
     if (currentEntity.ref.currentDelay) {
       // 蓄力中：菜单由 renderHeroMenu 渲染蓄力专用选项
       showLog(currentEntity.ref.currentDelay.remaining <= 0 ? `⚡ ${currentEntity.ref.name} 蓄力就绪` : `⏳ ${currentEntity.ref.name} 蓄力中`);

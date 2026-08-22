@@ -1547,6 +1547,25 @@
 - **决策原因**：依据用户实机测试结论，GitHub/jsDelivr CDN 在高频并发语音场景下体验欠佳，回退原源以性能流畅为第一优先级，并将实验版本入库备份。
 - **经验证**：`index.html` 运行流畅，备份文件齐全。
 
+## [LOG-128] 2026-08-23 — 我方英雄回合开始语音系统（按名字绑定，未升版本号）
+
+- **变更行为**（`index.html`）：
+  1. **语音规则**：每个我方角色在本回合**首次行动**时播放一句绑定台词；再动/多重施法/多动单位额外行动**不播放**。
+     - 第一回合：固定播放"第一回合"专属句；
+     - 后续回合 HP > 50%：从"开始回合"3 句中随机播放 1 句；
+     - 后续回合 HP ≤ 50%：从"半血"3 句中随机播放 1 句；
+     - 未配置语音的英雄静默跳过；敌方不受影响。
+  2. **新增注册表** `HERO_VOICE_LINES`（`index.html` 位于 `AVATAR_MAP` 之后）：4 角色 × 7 句，key 用运行时 `hero.name`（已剥 emoji 的干净显示名）直接命中。文件名经 **GitHub API 逐文件核实**——四角色命名/格式不统一（索恩全 mp3；埃利奥特混用 wav/mp3 且无"第一回合"文件，用无编号的「埃利奥特_开始回合.wav」充当第一回合句；玛德琳/弗兰克第一回合 mp3 + 其余 wav），故逐条显式列出而非统一模板。
+  3. **播放函数** `playHeroTurnVoice(hero)`：查表 → 按回合号/血量选句 → `playCustomAudio()`（复用现有 3 级缓存播放器，零改动）。
+  4. **预载函数** `preloadHeroVoices()`：`startGame` 时遍历参战英雄，将绑定 7 句 fetch→Blob 存入现有 `_fxAudioBlobCache`（与 `preloadBattleAssets` 同款），播放零网络等待。
+  5. **回合号记录**：`state` 新增 `currentRound`（当前进行中回合号，第一回合=1），`startRound` 在 `addHistory` 后、`state.round++` 前赋值；`resetBattle` 重置 `state.round=1` 时随首次 `startRound` 自动校准，无需额外处理。
+  6. **挂载点**：`nextTurn` 的 hero 分支（`playSound('heroTurn')` 后）以 `!currentEntity.isExtraTurn` 守卫调用——该条件精确等价"本回合首次主行动"（startRound 排轴 i===0 为 isExtraTurn=false；再动/多重施法/连动/多动后续行动均为 true），无需额外 Set 去重；挂载点位于眩晕跳过与死亡判定之后，被眩晕/已死亡英雄不播语音。
+  7. **音量 2 倍（追加）**：`playCustomAudio` 新增可选 `volume` 参数，超过 1 的增益用 Web Audio GainNode 实现（`applyAudioVolume`，复用 `playWebMFX` 视频原声 2.5 倍增益先例——`HTMLAudioElement.volume` 上限为 1 无法直接放大）；语音调用传 `2`，其余 6 处音效调用不传参行为零变化。
+  8. **不重复上回合台词（追加）**：新增 `pickHeroVoice(pool, exclude)` 在随机前排除上一句（池子只剩一句时允许重复）；`playHeroTurnVoice` 把本回合选中句记录到 `hero.lastVoiceFile`，下回合随机时排除；新战局经 `resetBattle` 缓存深拷贝自动清零，无需显式清理。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：为用户新增的四个角色（埃利奥特/玛德琳/弗兰克/索恩）绑定个性化回合语音，增强回合开局仪式感；复用既有 `playCustomAudio` 播放器与 `_fxAudioBlobCache` 预载机制，零新增音频基础设施。
+- **经验证**：4 个 script 块 node 语法检查通过；语音映射 28 条与 GitHub API 真实文件逐一对应无缺失；10 项选择逻辑单测通过（第一回合/半血以上/半血以下/边界 50%/未配置静默）；追加后 7 项单测通过（turn/low 池连续 10 回合无相邻重复、第一回合固定 first、跨池切换不受误排除、音量恒 2、HP 恰 50% 走 low）。实机语音播放与音量待用户确认。
+
 
 
 
