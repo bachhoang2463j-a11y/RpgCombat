@@ -1620,6 +1620,62 @@ function addHistory(msg) { battleHistory.push(msg); }
 // ==========================================
 // 音效与特效引擎
 // ==========================================
+// 音频预缓存 Map：key=url, value=HTMLAudioElement（未预热时的回退路径）
+const _fxAudioCache = new Map();
+// 音频 Blob URL 缓存 Map：key=url, value=blobUrl（fetch 全量预载，播放即时；fetch 中为 null 占位）
+const _fxAudioBlobCache = new Map();
+
+// 用 Web Audio GainNode 放大音量（支持 Blob URL 本地音量硬件级放大；HTMLAudioElement.volume 上限为 1，无法直接 >1；复用 playWebMFX 增益先例）
+function applyAudioVolume(audio, volume) {
+    if (!volume || volume === 1) return;
+    try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        const audioCtx = new AudioContextClass();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const source = audioCtx.createMediaElementSource(audio);
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.value = volume;
+        source.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+    } catch (e) {
+        console.warn('[FX] Web Audio 音量增益放大未开启:', e);
+    }
+}
+
+/**
+ * 播放自定义音效（支持 Blob 预载零延迟与 Web Audio GainNode 音量放大）
+ * @param {string} url - 音效地址
+ * @param {number} [volume] - 音量增益倍率（>1 用 Web Audio GainNode 放大，默认 1 不调整）
+ */
+function playCustomAudio(url, volume) {
+    if (!url || url === 'none') return;
+    const blobUrl = _fxAudioBlobCache.get(url);
+    if (blobUrl) {
+        // Blob 已全量预载：本地数据立即播放，零网络等待，零跨域 CORS 拦截，支持 GainNode 增益
+        const audio = new Audio(blobUrl);
+        applyAudioVolume(audio, volume);
+        audio.play().catch(e => console.warn('[FX] 音效播放失败:', e));
+        return;
+    }
+    const cached = _fxAudioCache.get(url);
+    if (cached) {
+        // 克隆节点以支持同时多次播放
+        const clone = cached.cloneNode();
+        if (volume && volume !== 1) applyAudioVolume(clone, volume);
+        else clone.volume = 0.5;
+        clone.play().catch(e => console.warn('[FX] 音效播放失败:', e));
+    } else {
+        // 缓存未命中时直接播放，同时补缓存
+        const audio = new Audio(url);
+        audio.preload = 'auto';
+        _fxAudioCache.set(url, audio);
+        if (volume && volume !== 1) applyAudioVolume(audio, volume);
+        else audio.volume = 0.5;
+        audio.play().catch(e => console.warn('[FX] 音效播放失败:', e));
+    }
+}
+
 const audioUrls = {
     'hitUp': 'https://files.catbox.moe/7ef8mk.mp3', 'mpHeal': 'https://files.catbox.moe/vo2w0z.mp3',
     'defDown': 'https://files.catbox.moe/oa0q52.mp3', 'atk2': 'https://files.catbox.moe/7w223l.mp3',
@@ -1632,11 +1688,41 @@ const audioUrls = {
     'shot': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/shot01.mp3',
     'monsterAttack': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/monsterattack2.mp3',
     'herocharge': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/herocharge.mp3',
-    'herochargedone': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/herochargedone.mp3'
+    'herochargedone': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/herochargedone.mp3',
+    'combatKill': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/combat_kill.mp3',
+    'magicKill': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/magic_kill.wav'
 };
+
+// 预热全量基础音效为 Blob URL，确保零延迟与 Web Audio API 无跨域限制
+for (let key in audioUrls) {
+    const u = audioUrls[key];
+    if (u && !_fxAudioBlobCache.has(u)) {
+        _fxAudioBlobCache.set(u, null);
+        fetch(u)
+            .then(r => r.blob())
+            .then(blob => { _fxAudioBlobCache.set(u, URL.createObjectURL(blob)); })
+            .catch(e => { _fxAudioBlobCache.delete(u); });
+    }
+}
+
 const audioCache = {};
 for (let key in audioUrls) { audioCache[key] = new Audio(audioUrls[key]); audioCache[key].preload = 'auto'; }
-window.playSound = (key) => { if (audioCache[key]) { try { let sound = audioCache[key].cloneNode(); sound.volume = 0.5; sound.play().catch(e => {}); } catch(e) { console.warn('playSound error:', e); } } };
+
+window.playSound = (key, volume = 1) => {
+    const url = audioUrls[key];
+    if (url && volume && volume !== 1) {
+        // 音量放大直接复用引擎统一的 playCustomAudio 与 Web Audio GainNode
+        playCustomAudio(url, volume);
+    } else if (audioCache[key]) {
+        try {
+            let sound = audioCache[key].cloneNode();
+            sound.volume = 0.5;
+            sound.play().catch(e => {});
+        } catch(e) {
+            console.warn('playSound error:', e);
+        }
+    }
+};
 
 // 看破音效独立接口：默认复用 debuff 音效，后续可单独更换
 const KANPO_SOUND_KEY = 'hitDown';
@@ -1864,12 +1950,14 @@ async function playExecutionAnimation(hero, killedEnemies, damageType) {
         overlay.innerHTML = html;
         document.body.appendChild(overlay);
 
-        // 风格开场音效
-        if (type === '法术') playSound('burst');
-        else if (type === '远程') playSound('shot');
+        // 风格开场音效（击杀相关 2 倍音量）
+        if (type === '法术') playSound('burst', 2);
+        else if (type === '远程') playSound('shot', 2);
 
         setTimeout(() => {
-            playSound('kill');
+            playSound('kill', 2);
+            if (type === '近战') playSound('combatKill', 2);
+            else if (type === '法术') playSound('magicKill', 2);
             const scene = document.getElementById('battle-scene');
             if (scene) { scene.classList.add('heavy-shake'); setTimeout(() => scene.classList.remove('heavy-shake'), 500); }
         }, killDelay);
@@ -3375,59 +3463,7 @@ const WEBM_FX_REGISTRY = {
     // '爆炸01': { url: null,          scale: 0,   particles: 'explosion'                             },
 };
 
-/**
- * 播放自定义音效
- * @param {string} url - 音效地址
- * @param {number} [volume] - 音量增益倍率（>1 用 Web Audio GainNode 放大，默认 1 不调整）
- */
-// 音频预缓存 Map：key=url, value=HTMLAudioElement（未预热时的回退路径）
-const _fxAudioCache = new Map();
-// 音频 Blob URL 缓存 Map：key=url, value=blobUrl（fetch 全量预载，播放即时；fetch 中为 null 占位）
-const _fxAudioBlobCache = new Map();
 
-function playCustomAudio(url, volume) {
-    if (!url || url === 'none') return;
-    const blobUrl = _fxAudioBlobCache.get(url);
-    if (blobUrl) {
-        // Blob 已全量预载：本地数据立即播放，零网络等待
-        const audio = new Audio(blobUrl);
-        applyAudioVolume(audio, volume);
-        audio.play().catch(e => console.warn('[FX] 音效播放失败:', e));
-        return;
-    }
-    const cached = _fxAudioCache.get(url);
-    if (cached) {
-        // 克隆节点以支持同时多次播放
-        const clone = cached.cloneNode();
-        applyAudioVolume(clone, volume);
-        clone.play().catch(e => console.warn('[FX] 音效播放失败:', e));
-    } else {
-        // 缓存未命中时直接播放，同时补缓存
-        const audio = new Audio(url);
-        audio.preload = 'auto';
-        _fxAudioCache.set(url, audio);
-        applyAudioVolume(audio, volume);
-        audio.play().catch(e => console.warn('[FX] 音效播放失败:', e));
-    }
-}
-
-// 用 Web Audio GainNode 放大音量（HTMLAudioElement.volume 上限为 1，无法直接 >1；复用 playWebMFX 增益先例）
-function applyAudioVolume(audio, volume) {
-    if (!volume || volume === 1) return;
-    try {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContextClass) return;
-        const audioCtx = new AudioContextClass();
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        const source = audioCtx.createMediaElementSource(audio);
-        const gainNode = audioCtx.createGain();
-        gainNode.gain.value = volume;
-        source.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-    } catch (e) {
-        console.warn('[FX] Web Audio 音量增益放大未开启:', e);
-    }
-}
 
 // 视频 Blob URL 缓存 Map：key=url, value=blobUrl
 const _fxVideoBlobCache = new Map();

@@ -1634,6 +1634,34 @@
 - **涉及文件**：`README.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：完成敌人详情面板全息重构与全变种标签视觉系统落地，通过用户实战测试确认，正式定版发布 V8.0。
 
+---
+
+## [LOG-133] 2026-08-23 — 击杀特写音效替换（combat_kill / magic_kill）与全击杀音效 2 倍音量放大（未升版本号）
+
+- **变更行为**：
+  1. **近战击杀音效替换**：在 `audioUrls` 中注册 `combatKill: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/combat_kill.mp3'`，将 `playExecutionAnimation` 近战击破时刻音效由 `heroTurn` 替换为 `combatKill`。
+  2. **法术击杀音效替换**：在 `audioUrls` 中注册 `magicKill: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/magic_kill.wav'`，将 `playExecutionAnimation` 法术击破时刻音效由 `hitDown` 替换为 `magicKill`。
+  3. **击杀全系音效 2 倍音量复用引擎既有机制（playCustomAudio + _fxAudioBlobCache）**：
+     - 将引擎原有的 `_fxAudioCache`、`_fxAudioBlobCache`、`applyAudioVolume` 与 `playCustomAudio` 统一置顶声明，并在开局将 `audioUrls` 全量静默预热为本地 `blob:` 内存 URL；
+     - `window.playSound(key, volume = 1)` 接口无缝对接引擎成熟的 `playCustomAudio(url, volume)`：
+       - `volume > 1`（如 `volume = 2`）时直接调用 `playCustomAudio(url, 2)`，通过 `_fxAudioBlobCache` 本地 Blob URL 加载后走 `applyAudioVolume` 挂载 `GainNode`（`gainNode.gain.value = 2.0`），由于 Blob URL 属于本地同源对象，彻底杜绝跨域静音拦截，输出纯正 2.0 倍硬件级震撼音量；
+       - `volume = 1`（默认）时保持基准 0.5 原生音量播放；
+     - 击杀特写中的所有音效（法术开场 `burst`、远程开场 `shot`、击破重音 `kill`、近战击破 `combatKill`、法术击破 `magicKill`）统一以 `volume = 2`（2 倍音量）调用播放。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：彻底复用引擎既有的 `preloadHeroVoices` / `preloadBattleAssets` 同款 Blob 预载与 `playCustomAudio` 增益管道，兼顾零网络延迟与 2 倍硬件级音量放大。
+---
+
+## [LOG-134] 2026-08-23 — V8.1 定版：击杀特写专属音频重构与 2.0 倍硬件级音量增益发布
+
+- **变更行为**：
+  1. 用户实战测试击杀特写音效确认无误，正式定版发布 V8.1。
+  2. 更新 `README.md` 版本号由 V8.0 升级至 V8.1，并在 §2.2 击杀结算动画条目中补充近战（`combat_kill.mp3`）、法术（`magic_kill.wav`）专属音频与全系击杀 2.0 倍 Web Audio GainNode 硬件增益说明。
+- **涉及文件**：`README.md`、`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：全面提升近战、法术、远程三系伤害类型的击杀特写音频打击感与震撼力，完成全战局高光时刻的视听品质跃迁。
+
+
+
+
 
 
 
