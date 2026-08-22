@@ -6896,26 +6896,19 @@ registerClassPassive('施法者', {
     onBattleInit(entity) {
         entity.shield = (entity.shield || 0) + Math.floor(entity.maxMp * 0.5);
     },
-    // 【被动 - 法力回响】每消耗 1 点 MP 有 2% 概率获得 1 点永久加速库存与 15 点 TP。
+    // 【被动 - 法力回响】每次消耗 MP 单次判定：概率 = 消耗MP × 2%（上限 100%），成功获得 1 点永久加速库存与 15 点 TP。
     // 加速永久存在（仅被蓄力[延迟]抵扣消耗，不随回合过期），TP 按上限封顶叠加。
     onManaSpent(entity, mpSpent) {
-        let hasteGain = 0;
-        let tpGain = 0;
-        for (let i = 0; i < mpSpent; i++) {
-            if (Math.random() < 0.02) {
-                hasteGain += 1;
-                tpGain += 15;
-            }
-        }
-        if (hasteGain <= 0) return;
-        entity.hasteStore = (entity.hasteStore || 0) + hasteGain;
-        entity.tp = Math.min(entity.maxTp || 100, (entity.tp || 0) + tpGain);
+        const chance = Math.min(100, mpSpent * 2); // 每 1 MP 对应 2%，30 MP → 60%
+        if (Math.random() * 100 >= chance) return;
+        entity.hasteStore = (entity.hasteStore || 0) + 1;
+        entity.tp = Math.min(entity.maxTp || 100, (entity.tp || 0) + 15);
         const dom = entity.id.startsWith('h') ? document.getElementById(`hero-card-${entity.id}`) : document.getElementById(`${entity.id}-sprite`);
         if (dom) {
-            createFloatingText(dom, `⚡加速+${hasteGain}`, 'text-cyan-300');
-            createFloatingText(dom, `✦TP+${tpGain}`, 'text-amber-300');
+            createFloatingText(dom, `⚡加速+1`, 'text-cyan-300');
+            createFloatingText(dom, `✦TP+15`, 'text-amber-300');
         }
-        addHistory(`   ⚡ ${entity.name} 的法力产生回响，获得 ${hasteGain} 点永久加速与 ${tpGain} 点潜能！`);
+        addHistory(`   ⚡ ${entity.name} 的法力产生回响，获得 1 点永久加速与 15 点潜能！`);
         if (entity.id.startsWith('h')) updateHeroUI(entity); else updateEnemyUI(entity);
     }
 });
@@ -7744,7 +7737,7 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill, sheshenCa
 // - 选择反应 → 释放反应技并做二次闪避判定，返回 { dodged }；
 // - 选择舍身 → 扣守护者资源并执行演出，返回 { usedSheshen: true, guardian }；
 // - 无候选或放弃 → 返回空结果，调用方继续走受击管线。
-async function runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, sheshenCandidates) {
+async function runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, sheshenCandidates, isAttack = false, isPierce = false) {
     const targetType = target.id.startsWith('h') ? 'hero' : 'enemy';
     const reactionSkills = target.skills.filter(s => {
         if (!s.isReaction) return false;
@@ -7755,6 +7748,11 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
         if (s.maxUses > 0 && (s.usesRemaining ?? s.maxUses) <= 0) return false;
         // 智能过滤反应条件
         if (s.reactionTarget !== 'all' && s.reactionTarget !== incomingDamageType) return false;
+        // 【免伤】反应技只应对攻击类技能：非攻击类（纯 debuff/增益）不触发，避免白耗资源挂上无效免伤
+        const hasGuard = [s.type, s.type2, s.type3].some(t => t && t.includes('免伤'));
+        if (hasGuard && !isAttack) return false;
+        // 穿透攻击：免伤对穿透无效，智慧敌人节约资源不触发（非智慧敌人照旧触发）
+        if (hasGuard && isPierce && target.isWise) return false;
         return true;
     });
 
@@ -7838,6 +7836,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
   
   // 区分纯伤害和纯Debuff
   const isDamage = tag.includes('攻') || tag.includes('单体') || tag.includes('穿透') || tag.includes('眩晕');
+  // 穿透判定（与伤害管线 calculateDamage 同款口径）：免伤对穿透无效，供智慧敌人反应节约资源判断
+  const isPierce = tag.includes('穿透') || (CLASS_PASSIVES[caster.classType]?.checkPierce?.(caster) || false);
   const isHarmful = isDamage || tag.includes('降') || tag.includes('盲');
   const incomingDamageType = skill ? (skill.damageType || '近战') : '近战';
   // 极限爆发（仅我方消耗100TP激活）附加必中：本次伤害与减益恒命中（镜像 [必中] 语义，仍可被反应/看破主动化解）
@@ -7904,13 +7904,13 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         }
 
         // 拦截判定：目标自身反应技能 +（可选）其他角色舍身候选 合并弹窗
-        const intercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, sheshenCandidates);
+        const intercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, sheshenCandidates, isDamage, isPierce);
         if (intercept.usedSheshen && intercept.guardian) {
             // 【舍身】生效：受击目标切换为守护者（跳过闪避、必中），后续管线对守护者完整结算，原目标毫发无伤
             target = intercept.guardian;
             targetDom = document.getElementById(`hero-card-${target.id}`);
             // 守护者自身也可用反应技化解本次攻击（不再提供舍身候选，避免连锁舍身）
-            const guardianIntercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, []);
+            const guardianIntercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, [], isDamage, isPierce);
             if (guardianIntercept.dodged) isDodged = true;
         } else if (intercept.dodged) {
             isDodged = true;
