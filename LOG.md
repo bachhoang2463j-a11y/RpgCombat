@@ -1699,6 +1699,18 @@
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：提升战局历史记录输出给 LLM 进行剧情小说总结时的跨物种泛用性与叙事沉浸感，彻底消除小混混/野兽等非特定生物触发变种时的 OOC 违和。
 
+---
+
+## [LOG-138] 2026-08-23 — 敌方随机变异系统（可选开关 + 每标签独立概率，纯视觉演出不写战报）
+
+- **变更行为**：
+  1. **新增可选开关「🧬 敌方随机变异」（默认关闭）**：⚙️ 设置 → 战斗全局设置区块新增复选框 + 每标签概率输入框（默认 1%，范围 0~100%，0 等价关闭），`defendSettings` 新增 `mutationEnabled:false` / `mutationPercent:1`，随既有 `DEFEND_VAR_KEY` localStorage 管道持久化（`loadDefendSettings` typeof 校验 + clamp、`saveEditor` 读 DOM）。
+  2. **`applyRandomMutation(allTags, percent)` 变异注入**：位于 `parseEnemyItem` 内 `allTags` 合并之后、派生字段（`isWise`/`reviveCount`/`resistMap`/`immuneBurn`/`immunePoison`/`explode`）计算之前——YAML 载入与世界书载入两条路径全覆盖，派生自动正确零改动；注入发生在 `initialEnemiesCache` 快照之前，resetBattle 后变异保留、不重复 roll。
+  3. **变异池与冲突规则**：15 个普通标签（复活/智慧/流体/虚形/破法/要害/防火/耐毒/钢体/再生/狂暴/吸血/蜕皮/荆棘/连动）各按概率独立 roll + 自爆四形态（群伤/群火/群毒/群穿）互斥组（数学保持 19 个独立 1% 事件，P(≥1)≈17.38%、P(=5)≈0.000101%）；**去重**——敌人已带标签直接跳过（同名绝不重复挂载），已带任一 `[自爆:xxx]` 则自爆组整体跳过，命中多个只取第一个。
+  4. **纯视觉演出、绝不写战报**：`parseEnemyItem` 返回 `mutatedFrom` 标记；`startGame` 敌人入场循环中对变异敌人播放金色闪光变身动效（新增 `mutation-transform` keyframes + `spawnBurstAura` 金色光柱扩散环）+ 金色「变异」飘字（`createFloatingText`），**不调用 `addHistory`**——battleHistory / 发送到酒馆内容零「变异」字样，避免污染 LLM 续写 lore 与泄露威胁信息；详情弹窗自动显示变异标签徽章（既有 fallback）。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：为系统增加可玩性（战局开始时敌方随机获得变种标签的未知性），同时严守战报纯净性——战局记录用于 LLM 剧情续写（克苏鲁等世界观下变异文案不 lore），威胁信息改由玩家通过开场变身演出直观感知，符合"战报不直接反映威胁"的定位。
+
 
 
 
