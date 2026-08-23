@@ -1861,3 +1861,15 @@
 - **涉及文件**：`index.html`、`README.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：修复复活后二次 DoT 致死等全部 DoT 致死路径的幽灵占位不一致，补齐与直伤 (`updateEnemyUI:6341`) / 自爆 (`doEnemySelfDestruct:6284` + LOG-093) 同款的 `enemy.dom display:none` 收口时序；点击拦截消除 `0 HP` 幽灵详情误触；保持 `triggerEnemySelfDestruct` 与 `endTurn selfDestructCount` 等待链、复活 `reviveCount--` 幂等不受影响，仅动 UI 守卫不触 `calculateDamage/ON_KILL/击杀特写`。
 
+
+## [LOG-151] 2026-08-24 — 屏障 Armor 完全格挡演绎 + 高阶/传奇首秀旁白与蓄力阶段旁白 (V9.3)
+
+- **变更行为**：
+  1. **屏障零伤轻量反馈（LOG-151a）**：`index.html:applyBarrierHit(~8638)` 的 `if(absorb>0)` 正常吸收分支后补 `else if(rawDamage>0 && dmgToBarrier===0)` —— 复用 `barrier-hit-impact(350ms)+barrier-hit-ripple 120px(600ms)+barrier-hex-spotlight(650ms)+spawnHitFlash 0.15+triggerScreenShake(3,180)+atk2`，飘字按主因 `🛡️ 护甲格挡/克制格挡`，战报 `↳ 🛡️ 【屏障名】以护甲/克制完全格挡了本次攻击（raw→0）`，不扣耐久/护甲/克制、不触发破碎/泄漏；`applySingleTagEffect(~8426)` 的英雄直击路径亦对 `hitAmount===0 && rawDamage===0 && barrierAoELeak===null` 的完全格挡补同款轻量演出（群攻批次仅首目标演出一次，避免泄漏量复用误判）。
+  2. **新增 [高阶]/[传奇]/[神术] 叙事标签（LOG-151b）**：`SKILL_TYPES` 追加 `'[高阶]','[传奇]','[神术]'`；`parseSkill:5106` 新增 `isHighTier/isLegendary`（`[神术]` 归一为 `传奇`，传奇覆盖高阶互斥），`singleTagMatches` 白名单同步；`formatTagPill:10362` 为 `传奇/神术→amber-950/90 金`、`高阶→violet-950/90 紫` 加粗；技能卡首排新增 `⬥高阶/✦传奇` 徽章；编辑器 `openEditor` 新增 `高阶/传奇` 复选框、互斥写入、持久化 `serializeHeroesForSave`。
+  3. **敌人阶位判定（等级直判+相对倍数兜底，LOG-151c）**：新增 `parseWorldbookLevel(content)` 正则 `等级：X级` 行（`Ⅰ/五级/♱`与`Ⅱ/四级/◈→legend`，`三级/Ⅲ/二级/〖/⟪→elite`，`一级/ⅤⅣ/〈→fodder`）与 `getEnemyTier(enemy)` 两段式（等级命中直返；否则以存活我方均值 `rHp/rAtk/rArm/act/hasEliteMechanic` 倍数兜底 `rHp≥2.8||rArm≥2.8||act≥4→legend`，`rHp≥1.6||rAtk≥1.5||rArm≥1.8||act≥2→elite`，抗修仙等膨胀写死阈值），数据源 `wbSource.desc/_worldbookRawContent/resolveWorldbookEnemy` 反查，随 `initialEnemiesCache` 深拷贝保留。
+  4. **技能释放首秀合并旁白（释放者本人+最高阶智慧敌，首秀一轮制，LOG-151d）**：`executeSkillAction` 末尾由 `ally旁白→enemyTier旁白` 双 fire-and-forget 改为 `isHighTierFirst = !highTierNarrated.has(key)` 分支——首秀走 `triggerHighTierCombinedSpeak(caster,skill,healedTargets)` 一次 `requestLLMResponse`（释放者收集同原 `治疗合并/非1号位单人` 且受 `allyAutoSpeak` 守卫，1号位仅敌方说话；智慧敌仅取 `maxRank = max(getEnemyTier)` 的最高阶同阶 `wiseTargets`，受 `enemyAutoSpeak` 守卫），提示词按 `tierLabel·dmgType` 与 `rarityDesc/dmgDesc` 并拼 **单阶严格指令**（`fodder→必恐慌溃散绝不可从容`，`elite→必忌惮凝重绝不可恐慌/俯视`，`legend→必无畏审视/点评绝不可恐慌`），非首秀回落原正常我方旁白；新增 `state.highTierNarrated:Set`（`startGame`/`resetBattle` 清空），`key = casterId::skillName`，避免整场商业互吹。
+  5. **蓄力三阶段旁白（LOG-151e）**：新增 `_collectAllySpeakerForCharge`（`allyAutoSpeak && idx>0` 才返回 `[caster]`）与 `triggerChargeStageSpeak(caster,skill,stage)`——高阶/传奇仅 `start` 首秀走上述 `最高阶敌+释放者` 合并特色旁白，`continue`/二次 `start`/非首秀均回落正常我方一句（`蓄力开始/持续蓄力`），普通蓄力仅释放者本人一句；植入 `handleChargeSkill` 的 `currentDelay` 落账后 `start` 与 `continueCharge` 的 `endTurn` 前 `continue`（释放阶段复用 `executeSkillAction` 的首秀合并，不另注避免同 tick 双 request）。
+  6. **版本号升级至 V9.3**：`README.md:3` `当前版本：V9.2 → V9.3`；新增 `README §3.6 高阶/传奇叙事标签`（类型修饰、首秀×最高阶×严格分镜、编辑器徽章与蓄力变体语义）。
+- **涉及文件**：`index.html`、`README.md`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：修复 `rawDamage<=barrierArmor` 时屏障静默无反馈的错觉（复用纯减益阻挡轻量演出，零耐久操作）；新增高阶/传奇为纯叙事稀有度分层（无数值效果），按用户要求“首秀仅最高敌+严格分镜，后续走正常我方旁白”与“蓄力三阶段释放者本人说话”补齐，避免小模型跨阶串味与整场互吹；蓄力链跨回合隔离 `isRequesting` 单锁。
