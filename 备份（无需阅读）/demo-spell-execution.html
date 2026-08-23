@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>法术击杀·打击感升级 Demo 演示 (顿帧与震屏优化)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;700;900&family=Cinzel:wght@700;900&family=Share+Tech+Mono&display=swap');
+    
+    body { 
+      font-family: 'Noto Sans SC', sans-serif; 
+      user-select: none;
+      background: #060913;
+      color: #fff;
+    }
+    
+    .font-cinzel { font-family: 'Cinzel', serif; }
+    .font-mono-tech { font-family: 'Share Tech Mono', monospace; }
+    
+    .glass-panel {
+      background: rgba(13, 17, 28, 0.72);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(168, 85, 247, 0.22);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.55), 0 0 15px rgba(168, 85, 247, 0.1);
+    }
+
+    .text-outline-thick {
+      text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0 0 25px rgba(0,0,0,1);
+    }
+    .text-outline-purple {
+      text-shadow: -2px -2px 0 #2e1065, 2px -2px 0 #2e1065, -2px 2px 0 #2e1065, 2px 2px 0 #2e1065, 0 0 35px #a855f7;
+    }
+
+    .breathe-purple { animation: breathe-purple 4s ease-in-out infinite alternate; }
+    @keyframes breathe-purple { 
+      0% { transform: translateY(0px); filter: drop-shadow(0 5px 15px rgba(168,85,247,0.15)); } 
+      100% { transform: translateY(-6px); filter: drop-shadow(0 15px 30px rgba(192,132,252,0.3)); } 
+    }
+
+    /* ====================================================
+       原版震屏（仅挂载于 scene，overlay 未震动）
+       ==================================================== */
+    .heavy-shake-orig { animation: heavy-shake-anim-orig 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+    @keyframes heavy-shake-anim-orig {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+      20%, 60% { transform: translate3d(-10px, 4px, 0) scale(1.02) rotate(-1deg); }
+      30%, 70% { transform: translate3d(12px, -5px, 0) scale(1.03) rotate(1.5deg); }
+      40% { transform: translate3d(-14px, 3px, 0) scale(1.01) rotate(-2deg); }
+      50% { transform: translate3d(10px, -3px, 0) scale(1.02) rotate(1deg); }
+      80% { transform: translate3d(5px, 2px, 0) scale(1) rotate(0.5deg); }
+    }
+
+    /* ====================================================
+       优化版震屏：视口空间两段式震屏 (高频共振 + 空间爆碎重震)
+       ==================================================== */
+    .magic-viewport-shake-soft { animation: magic-shake-soft-anim 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+    .magic-viewport-shake-std { animation: magic-shake-std-anim 0.55s cubic-bezier(0.15, 0.9, 0.25, 1) both; }
+    .magic-viewport-shake-heavy { animation: magic-shake-heavy-anim 0.65s cubic-bezier(0.12, 0.95, 0.2, 1) both; }
+
+    @keyframes magic-shake-std-anim {
+      0% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+      8% { transform: translate3d(-14px, -8px, 0) scale(1.025) rotate(-1.4deg); }
+      18% { transform: translate3d(16px, 9px, 0) scale(1.02) rotate(1.6deg); }
+      30% { transform: translate3d(-12px, 6px, 0) scale(1.012) rotate(-0.9deg); }
+      45% { transform: translate3d(9px, -5px, 0) scale(1.006) rotate(0.6deg); }
+      60% { transform: translate3d(-5px, 3px, 0) scale(1.002) rotate(-0.3deg); }
+      75% { transform: translate3d(3px, -2px, 0) scale(1) rotate(0.1deg); }
+      100% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+    }
+
+    @keyframes magic-shake-heavy-anim {
+      0% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+      6% { transform: translate3d(-20px, -12px, 0) scale(1.045) rotate(-2.2deg); }
+      16% { transform: translate3d(22px, 14px, 0) scale(1.035) rotate(2.4deg); }
+      28% { transform: translate3d(-18px, 10px, 0) scale(1.02) rotate(-1.5deg); }
+      42% { transform: translate3d(13px, -8px, 0) scale(1.01) rotate(1deg); }
+      60% { transform: translate3d(-8px, 5px, 0) scale(1.005) rotate(-0.5deg); }
+      80% { transform: translate3d(4px, -3px, 0) scale(1.0) rotate(0.2deg); }
+      100% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+    }
+
+    @keyframes magic-shake-soft-anim {
+      0% { transform: translate3d(0, 0, 0); }
+      15% { transform: translate3d(-8px, -5px, 0) scale(1.015); }
+      30% { transform: translate3d(9px, 6px, 0) scale(1.01); }
+      50% { transform: translate3d(-6px, 3px, 0); }
+      70% { transform: translate3d(4px, -2px, 0); }
+      100% { transform: translate3d(0, 0, 0); }
+    }
+
+    /* ====================================================
+       【模式 1: 原版基准】线性碎片飞散 (无顿帧)
+       ==================================================== */
+    @keyframes orig-s3-rift-beam {
+      0% { transform: translate(-50%, -50%) rotate(-14deg) scaleX(0) scaleY(0); opacity: 0; }
+      15% { transform: translate(-50%, -50%) rotate(-14deg) scaleX(1) scaleY(1); opacity: 1; }
+      70% { transform: translate(-50%, -50%) rotate(-14deg) scaleX(1.05) scaleY(0.5625); opacity: 1; }
+      100% { transform: translate(-50%, -50%) rotate(-14deg) scaleX(0) scaleY(0); opacity: 0; }
+    }
+    @keyframes orig-s3-shard-1 { 0% { transform: translate(0, 0) scale(1); opacity: 1; } 100% { transform: translate(-90px, -70px) rotate(-35deg) scale(0.2); opacity: 0; filter: brightness(1.35); } }
+    @keyframes orig-s3-shard-2 { 0% { transform: translate(0, 0) scale(1); opacity: 1; } 100% { transform: translate(100px, -50px) rotate(40deg) scale(0.1); opacity: 0; filter: brightness(1.35); } }
+    @keyframes orig-s3-shard-3 { 0% { transform: translate(0, 0) scale(1); opacity: 1; } 100% { transform: translate(-70px, 80px) rotate(-45deg) scale(0.2); opacity: 0; filter: brightness(1.35); } }
+    @keyframes orig-s3-shard-4 { 0% { transform: translate(0, 0) scale(1); opacity: 1; } 100% { transform: translate(80px, 90px) rotate(30deg) scale(0.1); opacity: 0; filter: brightness(1.35); } }
+    @keyframes orig-s1-vs-anim {
+      0% { transform: translate(-50%, -50%) scale(4.5); opacity: 0; filter: blur(16px); }
+      14% { transform: translate(-50%, -50%) scale(0.9); opacity: 1; filter: blur(0px); }
+      24% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+      75% { transform: translate(-50%, -50%) scale(1); opacity: 1; text-shadow: 0 0 35px #a855f7, 0 0 70px #7c3aed; }
+      100% { transform: translate(-50%, -50%) scale(1.3); opacity: 0; }
+    }
+
+    /* ====================================================
+       【优化版】核心顿帧模型 (Hitstop: 蓄势 -> 定格150ms -> 炸裂)
+       纯 CSS 关键帧驱动，0 额外 DOM，0 额外 GPU 粒子开销
+       ==================================================== */
+    @keyframes opt-s3-rift-beam {
+      0% { transform: translate(-50%, -50%) rotate(-14deg) scaleX(0) scaleY(0.1); opacity: 0; }
+      12% { transform: translate(-50%, -50%) rotate(-14deg) scaleX(1.15) scaleY(1.4); opacity: 1; filter: brightness(1.8); }
+      22% { transform: translate(-50%, -50%) rotate(-14deg) scaleX(1) scaleY(1); opacity: 1; }
+      /* 22%~45% 空间光带张力定格微浮 */
+      45% { transform: translate(-50%, -50%) rotate(-14deg) scaleX(1.02) scaleY(0.85); opacity: 1; }
+      100% { transform: translate(-50%, -50%) rotate(-14deg) scaleX(1.2) scaleY(0); opacity: 0; }
+    }
+
+    /* 碎片 1：左上 (20%~42% 空间定格 150ms，仅微裂 4px，42% 后高速弹射) */
+    @keyframes opt-s3-shard-1 {
+      0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+      20% { transform: translate(-4px, -3px) rotate(-3deg) scale(1.02); opacity: 1; filter: brightness(1.7); }
+      /* 核心定格区间 (Hitstop Hold) */
+      40% { transform: translate(-7px, -5px) rotate(-5deg) scale(1.01); opacity: 1; filter: brightness(1.5); }
+      /* 爆发弹散 */
+      100% { transform: translate(-130px, -95px) rotate(-45deg) scale(0.15); opacity: 0; filter: brightness(1.2); }
+    }
+
+    /* 碎片 2：右上 */
+    @keyframes opt-s3-shard-2 {
+      0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+      20% { transform: translate(5px, -3px) rotate(3deg) scale(1.02); opacity: 1; filter: brightness(1.7); }
+      /* 核心定格区间 */
+      40% { transform: translate(8px, -4px) rotate(5deg) scale(1.01); opacity: 1; filter: brightness(1.5); }
+      /* 爆发弹散 */
+      100% { transform: translate(140px, -85px) rotate(50deg) scale(0.1); opacity: 0; filter: brightness(1.2); }
+    }
+
+    /* 碎片 3：左下 */
+    @keyframes opt-s3-shard-3 {
+      0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+      20% { transform: translate(-3px, 4px) rotate(-4deg) scale(1.02); opacity: 1; filter: brightness(1.7); }
+      /* 核心定格区间 */
+      40% { transform: translate(-6px, 7px) rotate(-6deg) scale(1.01); opacity: 1; filter: brightness(1.5); }
+      /* 爆发弹散 */
+      100% { transform: translate(-110px, 115px) rotate(-55deg) scale(0.15); opacity: 0; filter: brightness(1.2); }
+    }
+
+    /* 碎片 4：右下 */
+    @keyframes opt-s3-shard-4 {
+      0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+      20% { transform: translate(4px, 4px) rotate(3deg) scale(1.02); opacity: 1; filter: brightness(1.7); }
+      /* 核心定格区间 */
+      40% { transform: translate(7px, 7px) rotate(5deg) scale(1.01); opacity: 1; filter: brightness(1.5); }
+      /* 爆发弹散 */
+      100% { transform: translate(125px, 120px) rotate(42deg) scale(0.1); opacity: 0; filter: brightness(1.2); }
+    }
+
+    /* 空间湮灭文字：重砸下压 + 定格滞空 + 冲击波扩张 */
+    @keyframes opt-s3-text-stamp {
+      0% { transform: translate(-50%, -50%) scale(3.8) rotate(-4deg); opacity: 0; filter: blur(20px); }
+      16% { transform: translate(-50%, -50%) scale(0.92) rotate(0deg); opacity: 1; filter: blur(0px); }
+      24% { transform: translate(-50%, -50%) scale(1.06); opacity: 1; }
+      /* 24%~72% 强力定格展示 */
+      72% { transform: translate(-50%, -50%) scale(1); opacity: 1; text-shadow: 0 0 45px #c084fc, 0 0 90px #9333ea; }
+      100% { transform: translate(-50%, -50%) scale(1.3) rotate(2deg); opacity: 0; filter: blur(10px); }
+    }
+
+    /* 英雄滑入 */
+    @keyframes s1-hero-in {
+      0% { transform: translate(-50%, -50%) translateX(-70vw) skewX(15deg); opacity: 0; }
+      70% { transform: translate(-50%, -50%) translateX(15px) skewX(-4deg); opacity: 1; }
+      100% { transform: translate(-50%, -50%) translateX(0) skewX(0); opacity: 1; }
+    }
+
+    /* 虚空暗角脉冲 (GPU 纯合成层，不增重绘) */
+    @keyframes void-vignette-pulse {
+      0% { opacity: 0; transform: scale(0.92); }
+      20% { opacity: 1; transform: scale(1); }
+      70% { opacity: 0.85; transform: scale(1.02); }
+      100% { opacity: 0; transform: scale(1.05); }
+    }
+  </style>
+</head>
+<body class="w-screen h-screen overflow-hidden relative select-none">
+
+  <!-- ========================================== -->
+  <!-- 顶部控制栏 (Floating Modern Controls) -->
+  <!-- ========================================== -->
+  <header class="fixed top-3 left-1/2 -translate-x-1/2 z-50 w-[96%] max-w-5xl glass-panel rounded-2xl p-3 sm:p-4 transition-all duration-300">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <!-- 标题与状态 -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-purple-950/80 border border-purple-500/60 flex items-center justify-center shadow-[0_0_15px_#a855f7]">
+          <span class="text-xl">🔮</span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-sm sm:text-base font-black tracking-wider text-purple-200">法术击杀·打击感升级实测</h1>
+            <span class="px-2 py-0.5 text-[10px] rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono-tech">Hitstop & Shake Lab</span>
+          </div>
+          <p class="text-[11px] text-purple-400/80 hidden sm:block">0 额外性能消耗 · 纯 CSS 顿帧重构 + 视口空间两段式震屏</p>
+        </div>
+      </div>
+
+      <!-- 快捷触发与模式 -->
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="btn-fire" onclick="triggerMagicExecution()" class="px-5 py-2 rounded-xl font-black text-sm tracking-wider bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-[0_0_25px_rgba(168,85,247,0.5)] active:scale-95 transition-all flex items-center gap-2 border border-fuchsia-300/40">
+          <span>⚡ 播放法术击杀</span>
+          <span class="text-xs bg-white/20 px-1.5 py-0.5 rounded font-mono-tech">[Space]</span>
+        </button>
+        <button onclick="toggleLabPanel()" class="px-3 py-2 rounded-xl text-xs font-bold bg-slate-800/80 hover:bg-slate-700/80 text-purple-200 border border-purple-500/30 transition-all">
+          ⚙️ 调优面板
+        </button>
+      </div>
+    </div>
+
+    <!-- 方案选择快捷切换条 (Segmented Pill) -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-3 pt-3 border-t border-purple-500/20 text-xs font-bold">
+      <button onclick="selectMode('original')" id="mode-btn-original" class="mode-pill py-1.5 px-2 rounded-lg border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-all text-center">
+        1. 原版基准 (无顿帧/平滑)
+      </button>
+      <button onclick="selectMode('hitstop')" id="mode-btn-hitstop" class="mode-pill py-1.5 px-2 rounded-lg border border-transparent text-slate-400 hover:text-purple-300 hover:bg-purple-950/40 transition-all text-center">
+        2. 方案 A (纯顿帧增强)
+      </button>
+      <button onclick="selectMode('shake')" id="mode-btn-shake" class="mode-pill py-1.5 px-2 rounded-lg border border-transparent text-slate-400 hover:text-purple-300 hover:bg-purple-950/40 transition-all text-center">
+        3. 方案 B (视口震屏增强)
+      </button>
+      <button onclick="selectMode('combo')" id="mode-btn-combo" class="mode-pill py-1.5 px-2 rounded-lg border border-purple-500/80 bg-purple-900/40 text-purple-200 shadow-[0_0_15px_rgba(168,85,247,0.3)] transition-all text-center">
+        4. 终极融合 (推荐定版 ★)
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================== -->
+  <!-- 展开式微调面板 (Floating Lab Drawer) -->
+  <!-- ========================================== -->
+  <div id="lab-drawer" class="fixed top-36 sm:top-28 right-4 z-40 w-80 glass-panel rounded-2xl p-4 transition-all duration-300 transform translate-x-0">
+    <div class="flex items-center justify-between pb-2 border-b border-purple-500/20 mb-3">
+      <span class="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+        <span>🧪</span> 实时参数微调实验室
+      </span>
+      <button onclick="toggleLabPanel()" class="text-xs text-slate-400 hover:text-white">✕</button>
+    </div>
+
+    <div class="space-y-3.5 text-xs">
+      <!-- 目标数量 -->
+      <div>
+        <label class="text-slate-300 font-bold block mb-1.5">敌人数量 (多目标自适应测试)：</label>
+        <div class="grid grid-cols-3 gap-1.5">
+          <button onclick="setEnemyCount(1)" id="cnt-btn-1" class="cnt-pill py-1 rounded bg-purple-600 text-white font-bold text-center">单体 (湮灭)</button>
+          <button onclick="setEnemyCount(2)" id="cnt-btn-2" class="cnt-pill py-1 rounded bg-slate-800/80 text-slate-400 hover:text-white text-center">双人 (全灭)</button>
+          <button onclick="setEnemyCount(3)" id="cnt-btn-3" class="cnt-pill py-1 rounded bg-slate-800/80 text-slate-400 hover:text-white text-center">三人 (全灭)</button>
+        </div>
+      </div>
+
+      <!-- 震屏强度 -->
+      <div>
+        <label class="text-slate-300 font-bold block mb-1.5">震屏强度 (Screen Shake)：</label>
+        <select id="shake-level" class="w-full bg-slate-900/90 border border-purple-500/40 rounded-lg px-2.5 py-1.5 text-purple-200 outline-none">
+          <option value="none">关闭震屏 (None)</option>
+          <option value="soft">轻度共振 (Soft)</option>
+          <option value="std" selected>标准空间重震 (Standard 推荐)</option>
+          <option value="heavy">狂暴撕裂重震 (Heavy 极致打击)</option>
+        </select>
+      </div>
+
+      <!-- 慢动作开关 -->
+      <div>
+        <label class="text-slate-300 font-bold block mb-1.5">播放速度 (逐帧分析力学节奏)：</label>
+        <div class="grid grid-cols-3 gap-1.5">
+          <button onclick="setSpeed(1.0)" id="spd-btn-1" class="spd-pill py-1 rounded bg-purple-600 text-white font-bold text-center">1.0x 正常</button>
+          <button onclick="setSpeed(0.5)" id="spd-btn-05" class="spd-pill py-1 rounded bg-slate-800/80 text-slate-400 hover:text-white text-center">0.5x 慢放</button>
+          <button onclick="setSpeed(0.25)" id="spd-btn-025" class="spd-pill py-1 rounded bg-slate-800/80 text-slate-400 hover:text-white text-center">0.25x 极慢</button>
+        </div>
+      </div>
+
+      <!-- 音效开关 -->
+      <div class="flex items-center justify-between pt-1 border-t border-purple-500/20">
+        <span class="text-slate-300 font-bold">2.0x 硬件级音效增益</span>
+        <input type="checkbox" id="sound-toggle" checked class="accent-purple-500 w-4 h-4 cursor-pointer">
+      </div>
+
+      <!-- 说明卡片 -->
+      <div class="p-2 rounded-xl bg-purple-950/40 border border-purple-500/20 text-[10px] text-purple-300/90 leading-relaxed">
+        💡 <strong class="text-purple-200">顿帧核心原理</strong>：在 250ms 音效波峰时刻，碎片产生裂缝后瞬间定格 150ms 绝对静止，积蓄张力后极速弹散，营造空间被强大魔力击穿的物理质感。
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 模拟战场背景 (Live Battle Stage) -->
+  <!-- ========================================== -->
+  <main id="battle-scene" class="w-full h-full flex flex-col items-center justify-center relative transition-transform duration-75">
+    <!-- 战场环境星空与流光背景 -->
+    <div class="absolute inset-0 bg-gradient-to-b from-[#0a0f24] via-[#080d1e] to-[#040711] pointer-events-none"></div>
+    <div class="absolute inset-0 opacity-20 bg-[radial-gradient(#a855f7_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-purple-600/10 blur-[100px] rounded-full pointer-events-none"></div>
+
+    <!-- 阵营对峙视效容器 -->
+    <div class="relative z-10 w-[92%] max-w-4xl flex items-center justify-between px-4 sm:px-12">
+      <!-- 我方施法英雄 -->
+      <div class="flex flex-col items-center gap-3 breathe-purple">
+        <div class="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full border-4 border-purple-400/80 p-1 bg-slate-900 shadow-[0_0_30px_rgba(168,85,247,0.4)]">
+          <img id="hero-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&h=300&fit=crop&crop=faces" class="w-full h-full object-cover rounded-full">
+          <span class="absolute -bottom-2 bg-gradient-to-r from-purple-700 to-indigo-700 text-[11px] font-bold px-3 py-0.5 rounded-full border border-purple-300/40 text-purple-100 shadow">玛德琳 (施法者)</span>
+        </div>
+        <div class="text-center">
+          <div class="text-xs font-mono-tech text-purple-300">HP: 100/100 · MP: 80/80</div>
+          <div class="text-[11px] text-fuchsia-400 font-bold mt-0.5">⚡ 极限法术蓄势中</div>
+        </div>
+      </div>
+
+      <!-- 居中 VS 徽章 -->
+      <div class="flex flex-col items-center gap-1 opacity-70">
+        <div class="text-2xl sm:text-3xl font-black font-cinzel text-purple-400/40">VS</div>
+        <div class="text-[10px] text-slate-500 font-mono-tech">READY TO CAST</div>
+      </div>
+
+      <!-- 敌方受击目标群 -->
+      <div id="enemy-preview-container" class="flex items-center gap-4 breathe-purple" style="animation-delay: -2s;">
+        <!-- 由 JS 动态根据敌人数量渲染 -->
+      </div>
+    </div>
+
+    <!-- 底部状态与快捷指引 -->
+    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 text-center pointer-events-none">
+      <div class="text-xs text-purple-300/70 font-mono-tech tracking-wider">
+        当前模式：<span id="current-mode-label" class="text-purple-200 font-bold">终极融合版 (顿帧 150ms + 视口空间重震)</span>
+      </div>
+      <div class="text-[11px] text-slate-500 mt-1">
+        点击顶部按钮或按下 <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-purple-300">空格键</kbd> 随时触发法术击杀特写
+      </div>
+    </div>
+  </main>
+
+  <!-- ==================================================== -->
+  <!-- 核心逻辑脚本 -->
+  <!-- ==================================================== -->
+  <script>
+    // 当前全局测试状态
+    let currentMode = 'combo'; // 'original' | 'hitstop' | 'shake' | 'combo'
+    let enemyCount = 1;
+    let playSpeed = 1.0;
+    let isAnimating = false;
+
+    // 预设敌人数据
+    const ENEMIES_POOL = [
+      { name: '暗影魔导士', emoji: '🧙‍♂️', img: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=200&h=200&fit=crop' },
+      { name: '虚空掠夺者', emoji: '👾', img: '' },
+      { name: '深渊石像鬼', emoji: '🗿', img: '' }
+    ];
+
+    // 初始化渲染敌方阵地
+    function renderEnemyPreview() {
+      const container = document.getElementById('enemy-preview-container');
+      const enemies = ENEMIES_POOL.slice(0, enemyCount);
+      
+      container.innerHTML = enemies.map(enemy => `
+        <div class="flex flex-col items-center gap-2">
+          <div class="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl border-2 border-rose-500/50 p-1 bg-slate-900/90 shadow-[0_0_25px_rgba(244,63,94,0.3)] flex items-center justify-center">
+            ${enemy.img 
+              ? `<img src="${enemy.img}" class="w-full h-full object-cover rounded-xl">` 
+              : `<div class="text-5xl drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]">${enemy.emoji}</div>`}
+          </div>
+          <div class="text-center">
+            <span class="text-xs font-bold text-rose-300">${enemy.name}</span>
+            <div class="text-[10px] font-mono-tech text-rose-400/80">HP: 0/120 (濒死)</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // 切换模式
+    function selectMode(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.mode-pill').forEach(btn => {
+        btn.classList.remove('border-purple-500/80', 'bg-purple-900/40', 'text-purple-200', 'shadow-[0_0_15px_rgba(168,85,247,0.3)]');
+        btn.classList.add('border-transparent', 'text-slate-400');
+      });
+      const targetBtn = document.getElementById(`mode-btn-${mode}`);
+      if (targetBtn) {
+        targetBtn.classList.remove('border-transparent', 'text-slate-400');
+        targetBtn.classList.add('border-purple-500/80', 'bg-purple-900/40', 'text-purple-200', 'shadow-[0_0_15px_rgba(168,85,247,0.3)]');
+      }
+
+      const labels = {
+        'original': '原版基准 (无顿帧 / 线性平滑漂移 / 仅底层震屏)',
+        'hitstop': '方案 A (纯顿帧增强 · 150ms 空间定格 · 无视口震屏)',
+        'shake': '方案 B (视口震屏增强 · 视口两段式重震 · 无定格)',
+        'combo': '终极融合版 (推荐定版 ★ · 150ms 空间顿帧 + 视口级空间重震)'
+      };
+      document.getElementById('current-mode-label').textContent = labels[mode];
+    }
+
+    // 设置目标数
+    function setEnemyCount(n) {
+      enemyCount = n;
+      document.querySelectorAll('.cnt-pill').forEach(btn => {
+        btn.classList.remove('bg-purple-600', 'text-white', 'font-bold');
+        btn.classList.add('bg-slate-800/80', 'text-slate-400');
+      });
+      document.getElementById(`cnt-btn-${n}`).classList.remove('bg-slate-800/80', 'text-slate-400');
+      document.getElementById(`cnt-btn-${n}`).classList.add('bg-purple-600', 'text-white', 'font-bold');
+      renderEnemyPreview();
+    }
+
+    // 设置播放速度
+    function setSpeed(spd) {
+      playSpeed = spd;
+      document.querySelectorAll('.spd-pill').forEach(btn => {
+        btn.classList.remove('bg-purple-600', 'text-white', 'font-bold');
+        btn.classList.add('bg-slate-800/80', 'text-slate-400');
+      });
+      const idMap = { 1.0: '1', 0.5: '05', 0.25: '025' };
+      document.getElementById(`spd-btn-${idMap[spd]}`).classList.remove('bg-slate-800/80', 'text-slate-400');
+      document.getElementById(`spd-btn-${idMap[spd]}`).classList.add('bg-purple-600', 'text-white', 'font-bold');
+    }
+
+    // 切换调优抽屉
+    function toggleLabPanel() {
+      const drawer = document.getElementById('lab-drawer');
+      drawer.classList.toggle('translate-x-96');
+      drawer.classList.toggle('opacity-0');
+      drawer.classList.toggle('pointer-events-none');
+    }
+
+    // ====================================================
+    // 战斗引擎源文件击杀音频管线 (Blob 预载 + Web Audio 2.0x GainNode 硬件级增益)
+    // 完全对接 index.html 原版击杀音效：burst (0ms) + kill & magicKill (250ms)
+    // ====================================================
+    const _fxAudioCache = new Map();
+    const _fxAudioBlobCache = new Map();
+
+    function applyAudioVolume(audio, volume) {
+      if (!volume || volume === 1) return;
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        const audioCtx = new AudioContextClass();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const source = audioCtx.createMediaElementSource(audio);
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.value = volume;
+        source.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+      } catch (e) {
+        console.warn('[FX] Web Audio 音量增益放大未开启:', e);
+      }
+    }
+
+    function playCustomAudio(url, volume) {
+      if (!url || url === 'none') return;
+      if (!document.getElementById('sound-toggle').checked) return;
+      const blobUrl = _fxAudioBlobCache.get(url);
+      if (blobUrl) {
+        const audio = new Audio(blobUrl);
+        applyAudioVolume(audio, volume);
+        audio.play().catch(e => console.warn('[FX] 音效播放失败:', e));
+        return;
+      }
+      const cached = _fxAudioCache.get(url);
+      if (cached) {
+        const clone = cached.cloneNode();
+        if (volume && volume !== 1) applyAudioVolume(clone, volume);
+        else clone.volume = 0.5;
+        clone.play().catch(e => console.warn('[FX] 音效播放失败:', e));
+      } else {
+        const audio = new Audio(url);
+        audio.preload = 'auto';
+        _fxAudioCache.set(url, audio);
+        if (volume && volume !== 1) applyAudioVolume(audio, volume);
+        else audio.volume = 0.5;
+        audio.play().catch(e => console.warn('[FX] 音效播放失败:', e));
+      }
+    }
+
+    // 源文件真实音效注册表
+    const audioUrls = {
+      'burst': 'https://files.catbox.moe/042wyg.mp3',
+      'kill': 'https://files.catbox.moe/20yjkp.mp3',
+      'magicKill': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/magic_kill.wav'
+    };
+
+    // 预热全量基础音效为 Blob URL，确保零延迟与 Web Audio API 无跨域限制
+    for (let key in audioUrls) {
+      const u = audioUrls[key];
+      if (u && !_fxAudioBlobCache.has(u)) {
+        _fxAudioBlobCache.set(u, null);
+        fetch(u)
+          .then(r => r.blob())
+          .then(blob => { _fxAudioBlobCache.set(u, URL.createObjectURL(blob)); })
+          .catch(e => { _fxAudioBlobCache.delete(u); });
+      }
+    }
+
+    const audioCache = {};
+    for (let key in audioUrls) {
+      audioCache[key] = new Audio(audioUrls[key]);
+      audioCache[key].preload = 'auto';
+    }
+
+    window.playSound = (key, volume = 1) => {
+      if (!document.getElementById('sound-toggle').checked) return;
+      const url = audioUrls[key];
+      if (url && volume && volume !== 1) {
+        playCustomAudio(url, volume);
+      } else if (audioCache[key]) {
+        try {
+          let sound = audioCache[key].cloneNode();
+          sound.volume = 0.5;
+          sound.play().catch(e => {});
+        } catch(e) {
+          console.warn('playSound error:', e);
+        }
+      }
+    };
+
+    // ====================================================
+    // 核心特写播放总调度
+    // ====================================================
+    async function triggerMagicExecution() {
+      if (isAnimating) return;
+      isAnimating = true;
+      const fireBtn = document.getElementById('btn-fire');
+      fireBtn.classList.add('opacity-50', 'pointer-events-none');
+
+      const killedEnemies = ENEMIES_POOL.slice(0, enemyCount);
+      const hero = {
+        name: '玛德琳',
+        img: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&h=300&fit=crop&crop=faces'
+      };
+
+      const n = killedEnemies.length;
+      const sizeCls = n > 2 ? 'text-[3rem] sm:text-[4.5rem]' : n > 1 ? 'text-[4rem] sm:text-[6rem]' : 'text-[5.5rem] sm:text-[8rem]';
+      const unitSize = n > 2 ? 'clamp(38px,10vh,110px)' : n > 1 ? 'clamp(58px,15vh,150px)' : 'clamp(80px,18vh,170px)';
+      
+      const enemyVisual = enemy => enemy.img
+        ? `<img src="${enemy.img}" class="w-full h-full object-contain rounded-xl" />`
+        : `<div class="${sizeCls} drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">${enemy.emoji || '☠️'}</div>`;
+
+      // 决定是否应用顿帧关键帧
+      const useHitstop = (currentMode === 'hitstop' || currentMode === 'combo');
+      // 决定是否应用视口震屏
+      const useViewportShake = (currentMode === 'shake' || currentMode === 'combo');
+
+      // 动画名分配
+      const beamAnim = useHitstop ? 'opt-s3-rift-beam' : 'orig-s3-rift-beam';
+      const shardAnim1 = useHitstop ? 'opt-s3-shard-1' : 'orig-s3-shard-1';
+      const shardAnim2 = useHitstop ? 'opt-s3-shard-2' : 'orig-s3-shard-2';
+      const shardAnim3 = useHitstop ? 'opt-s3-shard-3' : 'orig-s3-shard-3';
+      const shardAnim4 = useHitstop ? 'opt-s3-shard-4' : 'orig-s3-shard-4';
+      const textAnim = useHitstop ? 'opt-s3-text-stamp' : 'orig-s1-vs-anim';
+
+      // 动画时间基数 (受慢动作 playSpeed 影响)
+      const baseDuration = (1.2 / playSpeed).toFixed(2);
+      const shardDuration = (0.9 / playSpeed).toFixed(2);
+      const textDuration = (1.1 / playSpeed).toFixed(2);
+      const shardDelay = (0.22 / playSpeed).toFixed(2);
+      const textDelay = (0.24 / playSpeed).toFixed(2);
+
+      // 敌人 HTML
+      const enemiesHtml = killedEnemies.map(enemy => `
+        <div class="flex flex-col items-center gap-1 shrink-0 ${useHitstop ? 'enemy-hitstop-target' : ''}">
+          <div style="width:${unitSize};height:${unitSize};" class="relative flex items-center justify-center">
+            <div class="absolute inset-0 flex items-center justify-center opacity-0" 
+                 style="clip-path: polygon(0 0, 50% 0, 50% 50%, 0 50%); animation: ${shardAnim1} ${shardDuration}s ${shardDelay}s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+            <div class="absolute inset-0 flex items-center justify-center opacity-0" 
+                 style="clip-path: polygon(50% 0, 100% 0, 100% 50%, 50% 50%); animation: ${shardAnim2} ${shardDuration}s ${shardDelay}s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+            <div class="absolute inset-0 flex items-center justify-center opacity-0" 
+                 style="clip-path: polygon(0 50%, 50% 50%, 50% 100%, 0 100%); animation: ${shardAnim3} ${shardDuration}s ${shardDelay}s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+            <div class="absolute inset-0 flex items-center justify-center opacity-0" 
+                 style="clip-path: polygon(50% 50%, 100% 50%, 100% 100%, 50% 100%); animation: ${shardAnim4} ${shardDuration}s ${shardDelay}s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+          </div>
+          <div class="text-purple-300 text-[10px] sm:text-xs font-bold tracking-widest whitespace-nowrap">${enemy.name}</div>
+        </div>
+      `).join('');
+
+      // 创建全屏遮罩 Overlay
+      const overlay = document.createElement('div');
+      overlay.className = 'fixed inset-0 z-[200] flex items-center justify-center overflow-hidden transition-opacity duration-300 pointer-events-none bg-slate-950/85';
+
+      // 内层视口容器 (用于直接挂载视口震屏，解决旧版 overlay 不随 scene 震动的脱节问题)
+      overlay.innerHTML = `
+        <div id="overlay-viewport" class="w-full h-full relative flex items-center justify-center">
+          <!-- 1. 虚空深暗紫暗角脉冲 (Lens Vignette) -->
+          <div class="absolute inset-0 pointer-events-none z-10 opacity-0"
+               style="background: radial-gradient(circle, transparent 30%, rgba(88,28,135,0.45) 70%, rgba(15,3,25,0.92) 100%); animation: void-vignette-pulse ${baseDuration}s cubic-bezier(0.1, 0.8, 0.2, 1) both;"></div>
+
+          <!-- 2. 紫红高能空间裂隙光带 (纯 scaleY 驱动，GPU 零重绘) -->
+          <div class="absolute h-40 w-[170vw] bg-gradient-to-r from-transparent via-purple-600/50 to-transparent left-1/2 top-1/2 opacity-0 z-10"
+               style="animation: ${beamAnim} ${baseDuration}s ${(0.18 / playSpeed).toFixed(2)}s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;"></div>
+          <div class="absolute h-40 w-[170vw] bg-fuchsia-300 left-1/2 top-1/2 opacity-0 z-20 shadow-[0_0_35px_#c084fc,0_0_70px_#a855f7]"
+               style="animation: ${beamAnim} ${baseDuration}s ${(0.18 / playSpeed).toFixed(2)}s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;"></div>
+
+          <!-- 3. 左侧英雄入场 -->
+          <div class="absolute left-[12vw] top-1/2 -translate-y-1/2 opacity-0 z-20"
+               style="animation: s1-hero-in ${(0.3 / playSpeed).toFixed(2)}s cubic-bezier(0.12, 0.8, 0.3, 1) both; will-change: transform, opacity;">
+            <div class="w-28 h-28 sm:w-40 sm:h-40 rounded-full border-4 border-purple-400 overflow-hidden shadow-[0_0_40px_#a855f7] bg-gray-900">
+              <img src="${hero.img}" class="w-full h-full object-cover">
+            </div>
+          </div>
+
+          <!-- 4. 空间湮灭大字 -->
+          <div class="font-cinzel text-[clamp(3.8rem,9.5vw,9.5rem)] italic font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-fuchsia-200 to-rose-400 text-outline-purple absolute left-1/2 top-1/2 opacity-0 z-30 tracking-[0.3em] whitespace-nowrap"
+               style="animation: ${textAnim} ${textDuration}s ${textDelay}s ease-out both; will-change: transform, opacity;">
+            ${n > 1 ? '全灭' : '湮灭'}
+          </div>
+
+          <!-- 5. 右侧敌人区 (每敌四象限晶体碎片崩解) -->
+          <div class="absolute right-[10vw] top-1/2 -translate-y-1/2 z-20 flex items-center gap-3 sm:gap-4">
+            ${enemiesHtml}
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+
+      // 原版开场音效：burst (2.0x 音量)
+      playSound('burst', 2);
+
+      // 击碎时刻 (killDelay 约 250ms，慢放模式下等比缩放)
+      const killDelay = Math.round(250 / playSpeed);
+      setTimeout(() => {
+        // 原版击破音效：kill + magicKill (2.0x 音量)
+        playSound('kill', 2);
+        playSound('magicKill', 2);
+
+        const shakeLevel = document.getElementById('shake-level').value;
+        const scene = document.getElementById('battle-scene');
+        const viewport = document.getElementById('overlay-viewport');
+
+        if (shakeLevel !== 'none') {
+          const shakeCls = shakeLevel === 'heavy' ? 'magic-viewport-shake-heavy' : shakeLevel === 'soft' ? 'magic-viewport-shake-soft' : 'magic-viewport-shake-std';
+          
+          if (useViewportShake) {
+            // 优化版：直接震动 overlay 视口（特效主角一起震）
+            if (viewport) {
+              viewport.classList.add(shakeCls);
+              setTimeout(() => viewport.classList.remove(shakeCls), 600 / playSpeed);
+            }
+          }
+          
+          // 同时震动底层战场
+          if (scene) {
+            scene.classList.add(useViewportShake ? shakeCls : 'heavy-shake-orig');
+            setTimeout(() => scene.classList.remove(useViewportShake ? shakeCls : 'heavy-shake-orig'), 550 / playSpeed);
+          }
+        }
+      }, killDelay);
+
+      // 动画收尾销毁
+      const totalDuration = Math.round(1450 / playSpeed);
+      setTimeout(() => {
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+          overlay.remove();
+          isAnimating = false;
+          fireBtn.classList.remove('opacity-50', 'pointer-events-none');
+        }, 300);
+      }, totalDuration);
+    }
+
+    // 键盘空格键监听
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && !isAnimating) {
+        e.preventDefault();
+        triggerMagicExecution();
+      }
+    });
+
+    // 初始化
+    renderEnemyPreview();
+    selectMode('combo');
+  </script>
+</body>
+</html>
