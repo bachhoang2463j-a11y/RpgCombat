@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>看破契机弹窗 (Kanpo Modal) UI 现代化重构演示</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Rajdhani:wght@600;700&family=Orbitron:wght@600;800;900&display=swap');
+    
+    body {
+      font-family: 'Noto Sans SC', sans-serif;
+      background-color: #070b14;
+      color: #f1f5f9;
+      overflow-x: hidden;
+    }
+    .font-rajdhani { font-family: 'Rajdhani', sans-serif; }
+    .font-orbitron { font-family: 'Orbitron', sans-serif; }
+    .font-mono-num { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
+
+    /* ========================================================
+       看破微缩高亮发光体系 (Tag-FX Gold / Amber)
+       ======================================================== */
+    @keyframes fx-pulse-amber {
+      0%, 100% { box-shadow: 0 0 4px rgba(245,158,11,0.35); border-color: rgba(245,158,11,0.6); }
+      50% { box-shadow: 0 0 14px rgba(245,158,11,0.9), inset 0 0 4px rgba(245,158,11,0.3); border-color: rgba(251,191,36,1); }
+    }
+    @keyframes fx-pulse-red {
+      0%, 100% { box-shadow: 0 0 4px rgba(244,63,94,0.4); border-color: rgba(244,63,94,0.7); }
+      50% { box-shadow: 0 0 14px rgba(244,63,94,0.9), inset 0 0 4px rgba(244,63,94,0.3); border-color: rgba(251,113,133,1); }
+    }
+    @keyframes fx-pulse-cyan {
+      0%, 100% { box-shadow: 0 0 4px rgba(6,182,212,0.3); border-color: rgba(6,182,212,0.5); }
+      50% { box-shadow: 0 0 10px rgba(6,182,212,0.75); border-color: rgba(34,211,238,0.9); }
+    }
+
+    .tag-fx-amber { animation: fx-pulse-amber 2s infinite ease-in-out; }
+    .tag-fx-fatal { animation: fx-pulse-red 1.8s infinite ease-in-out; }
+    .tag-fx-cyan { animation: fx-pulse-cyan 2.2s infinite ease-in-out; }
+
+    /* 滚动条轻量美化 */
+    .custom-scrollbar::-webkit-scrollbar { width: 3px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(245,158,11,0.3); border-radius: 3px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(245,158,11,0.6); }
+
+    /* 弹窗全息玻璃核心样式（默认 40% 不透明度） */
+    .kanpo-modal-glass {
+      background-color: rgba(2, 6, 23, var(--modal-opacity, 0.40));
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      box-shadow: 0 0 50px rgba(245, 158, 11, 0.3), inset 0 0 20px rgba(255, 255, 255, 0.02);
+    }
+
+    /* 看破断招 VFX 动画 */
+    @keyframes kanpo-eye-pulse {
+      0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0; }
+      40% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    }
+    @keyframes kanpo-slash {
+      0% { clip-path: polygon(0 0, 0 0, 0 100%, 0 100%); transform: scale(1.3); }
+      50% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); transform: scale(1); }
+      100% { opacity: 0; transform: scale(0.95); }
+    }
+    @keyframes kanpo-flash {
+      0% { opacity: 0.9; }
+      100% { opacity: 0; }
+    }
+    @keyframes screen-shake {
+      0%, 100% { transform: translate(0, 0); }
+      20% { transform: translate(-4px, 3px); }
+      40% { transform: translate(4px, -3px); }
+      60% { transform: translate(-3px, -2px); }
+      80% { transform: translate(3px, 2px); }
+    }
+    .anim-shake { animation: screen-shake 0.32s ease-in-out; }
+  </style>
+</head>
+<body id="app-body" class="min-h-screen flex flex-col items-center justify-start p-3 sm:p-5 select-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#070b14] to-[#03060c]">
+
+  <!-- 顶部控制台 -->
+  <header class="w-full max-w-2xl mb-4 bg-slate-900/80 backdrop-blur-md border border-slate-700/60 rounded-xl p-3 shadow-xl flex flex-col md:flex-row items-center justify-between gap-3 z-50">
+    <div class="flex items-center gap-2.5">
+      <div class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></div>
+      <div>
+        <h1 class="text-xs sm:text-sm font-bold text-white tracking-wider flex items-center gap-2">
+          <span>👁️ 看破契机 (Kanpo Modal) UI 现代化重构</span>
+          <span class="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono">KANPO.WAV</span>
+        </h1>
+        <p class="text-[10px] text-slate-400">40% 高透光全息毛玻璃 + 紧凑威胁胶囊 + 75% 空间优先排布看破候选</p>
+      </div>
+    </div>
+
+    <!-- 音效与动画试听/试看 -->
+    <div class="flex items-center gap-1.5">
+      <button onclick="playKanpoAudio()" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 flex items-center gap-1 transition-all shadow-sm">
+        <span>🔊 试听 kanpo.wav</span>
+      </button>
+      <button onclick="simulateKanpoVFX()" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 flex items-center gap-1 transition-all shadow-sm">
+        <span>⚡ 模拟断招演出</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 战况用例切换与透明度调整 -->
+  <div class="w-full max-w-2xl mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
+    <div class="flex items-center gap-1.5 flex-wrap">
+      <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">战况切换：</span>
+      <button onclick="switchPreset('case1')" id="preset-case1" class="preset-btn text-[10px] px-2.5 py-0.5 rounded font-medium bg-amber-950/80 border border-amber-500/60 text-amber-200 transition-all">
+        📸 场景 1：伊塔库亚暴风 (群攻·双人看破候选)
+      </button>
+      <button onclick="switchPreset('case2')" id="preset-case2" class="preset-btn text-[10px] px-2.5 py-0.5 rounded font-medium bg-slate-800/80 border border-slate-700 text-slate-300 transition-all hover:bg-slate-700">
+        💀 场景 2：利爪撕裂 (单体高危·弗兰克看破)
+      </button>
+      <button onclick="switchPreset('case3')" id="preset-case3" class="preset-btn text-[10px] px-2.5 py-0.5 rounded font-medium bg-slate-800/80 border border-slate-700 text-slate-300 transition-all hover:bg-slate-700">
+        ⚡ 场景 3：克虏伯重狙 (远程穿透)
+      </button>
+    </div>
+
+    <!-- 透明度微调 -->
+    <div class="flex items-center gap-1 bg-black/60 px-2 py-0.5 rounded-lg border border-slate-800 text-[10px]">
+      <span class="text-slate-400">底色透明度:</span>
+      <button onclick="setOpacity(0.40)" id="btn-op-40" class="op-btn px-1.5 py-0.2 rounded font-bold bg-amber-500 text-black">40% (默认)</button>
+      <button onclick="setOpacity(0.60)" id="btn-op-60" class="op-btn px-1.5 py-0.2 rounded text-slate-400 hover:text-white">60%</button>
+      <button onclick="setOpacity(0.90)" id="btn-op-90" class="op-btn px-1.5 py-0.2 rounded text-slate-400 hover:text-white">90%</button>
+    </div>
+  </div>
+
+  <!-- 模拟战场背景 -->
+  <div id="battle-bg" class="fixed inset-0 pointer-events-none z-0 transition-opacity duration-500 opacity-60">
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_35%_45%,_rgba(245,158,11,0.18),_transparent_65%)]"></div>
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_65%_55%,_rgba(79,70,229,0.2),_transparent_65%)]"></div>
+    
+    <div class="absolute left-6 md:left-20 top-1/2 -translate-y-1/2 w-48 h-64 border border-amber-500/25 rounded-2xl bg-amber-950/20 backdrop-blur-xs flex flex-col items-center justify-center text-amber-300/60 text-xs gap-2 shadow-[0_0_30px_rgba(245,158,11,0.1)]">
+      <div class="w-14 h-14 rounded-full border-2 border-amber-400/40 bg-slate-800/60 flex items-center justify-center text-xl shadow-inner">👁️</div>
+      <span class="font-bold">我方待命英雄</span>
+      <span class="text-[10px] text-amber-400/40 font-mono">MADELYN / ELLIOT</span>
+    </div>
+    <div class="absolute right-6 md:right-20 top-1/2 -translate-y-1/2 w-48 h-64 border border-rose-500/25 rounded-2xl bg-rose-950/20 backdrop-blur-xs flex flex-col items-center justify-center text-rose-300/60 text-xs gap-2 shadow-[0_0_30px_rgba(244,63,94,0.1)]">
+      <div class="w-14 h-14 rounded-full border-2 border-rose-400/40 bg-slate-800/60 flex items-center justify-center text-xl shadow-inner">👹</div>
+      <span class="font-bold">敌方施法中</span>
+      <span class="text-[10px] text-rose-400/40 font-mono" id="bg-enemy-name">†《伊塔库亚的眷族》†</span>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 看破弹窗容器                                                               -->
+  <!-- ========================================================================= -->
+  <main class="w-full flex items-center justify-center relative z-10 py-2 my-auto">
+
+    <div id="kanpo-modal" class="kanpo-modal-glass w-full max-w-sm sm:max-w-[430px] rounded-2xl p-4 sm:p-5 transition-all duration-300 relative overflow-hidden">
+      
+      <!-- 顶部黄金流光渐变顶边 -->
+      <div class="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent opacity-90"></div>
+
+      <!-- 头部对峙与看破契机（紧凑 1 行） -->
+      <div class="flex items-center justify-between gap-2.5 pb-2.5 mb-2 border-b border-amber-500/30 relative">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-9 h-9 rounded-full bg-amber-950/80 border-2 border-amber-400 flex items-center justify-center text-lg shrink-0 shadow-[0_0_12px_rgba(245,158,11,0.5)] tag-fx-amber">
+            👁️
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5">
+              <h3 class="text-amber-300 font-bold text-xs sm:text-sm tracking-wider">看破契机！</h3>
+              <span class="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono border border-amber-500/40">INTERRUPT</span>
+            </div>
+            <div class="text-[10px] text-slate-300 truncate flex items-center gap-1 mt-0.5">
+              <span class="text-slate-400 truncate" id="k-attacker-name">†《伊塔库亚的眷族》†</span>
+              <span class="text-rose-400 font-bold shrink-0" id="k-skill-name">【极地狂啸暴风】</span>
+            </div>
+          </div>
+        </div>
+        <button onclick="simulateToast('已收起看破弹窗，战斗状态栏保留恢复入口')" class="shrink-0 text-[10px] px-2 py-0.5 rounded border border-amber-500/40 text-amber-200 hover:bg-amber-500/20 transition-all">收起</button>
+      </div>
+
+      <!-- 敌方来袭技能属性微缩胶囊条 (1 行) -->
+      <div class="flex items-center justify-between text-[10px] font-mono px-2.5 py-1 bg-black/40 rounded-lg border border-white/10 mb-2">
+        <div class="flex items-center gap-1.5">
+          <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30" id="k-dmg-type">🔮 法术</span>
+          <span class="px-1.5 py-0.2 rounded text-[9px] bg-slate-800/80 text-slate-300 font-bold" id="k-target-scope">群体</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400">威力 <strong class="text-cyan-300" id="k-power-val">200</strong></span>
+          <span class="text-slate-400">命中 <strong class="text-indigo-300" id="k-hit-val">120</strong></span>
+        </div>
+      </div>
+
+      <!-- 核心承伤威胁与收益测算胶囊 (微缩高度 ~55px) -->
+      <div id="k-telemetry-box" class="mb-2.5 rounded-xl p-2 bg-black/40 border border-amber-500/30 text-[10px] font-mono-num">
+        <div class="flex flex-wrap items-center justify-between gap-1 font-bold">
+          <!-- 原始威力 -->
+          <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-900/80 border border-slate-700">
+            <span class="text-slate-400 text-[9px]">⚔️ 敌方输出</span>
+            <span class="text-white" id="k-raw-val">160~240</span>
+          </div>
+          <!-- 被指定的我方角色或群体 -->
+          <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-900/80 border border-slate-700">
+            <span class="text-amber-400 text-[9px]">🎯 指定目标</span>
+            <span class="text-amber-200 font-bold" id="k-designated-target">全体我方</span>
+          </div>
+          <!-- 看破收益 -->
+          <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-950/80 border border-amber-500/70 text-amber-200 tag-fx-amber">
+            <span class="text-[9px]">🛡️ 拦截</span>
+            <span class="font-black text-xs">全盘无效化</span>
+          </div>
+        </div>
+        <!-- 辅助机制提示行 -->
+        <div class="flex items-center justify-between text-[9px] text-slate-400 mt-1.5 px-0.5">
+          <div class="flex items-center gap-1.5 text-amber-300">
+            <span>💡 成功发动将完全抵消本次技能全部伤害与控制效果</span>
+          </div>
+          <div class="text-emerald-400 font-bold text-[9px]">
+            ⚡ 插队判定
+          </div>
+        </div>
+      </div>
+
+      <!-- 看破候选技能列表（占据 75% 视觉重心） -->
+      <div class="space-y-1.5 max-h-[230px] overflow-y-auto custom-scrollbar pr-0.5" id="kanpo-skills-list">
+        
+        <!-- 候选技能 1: 玛德琳 · 占星视界 -->
+        <button onclick="executeKanpoChoice('玛德琳', '占星视界')" class="group w-full px-3 py-2 bg-gradient-to-r from-amber-950/80 via-orange-950/70 to-slate-900/90 hover:from-amber-600 hover:to-orange-600 rounded-xl border border-amber-500/50 hover:border-amber-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md">
+          <div class="flex items-center gap-2 min-w-0">
+            <img src="https://imgur.la/images/2026/06/25/4ee5c7965be0fb288591efb0114099d0.png" class="w-6 h-6 rounded-full border border-amber-300 object-cover shrink-0">
+            <div class="text-left min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="text-amber-300 font-black truncate">玛德琳</span>
+                <span class="text-white truncate">⚡ 占星视界</span>
+                <span class="text-[8px] px-1 py-0.2 rounded bg-amber-400/20 text-amber-200 border border-amber-400/30 shrink-0">全能看破</span>
+              </div>
+            </div>
+          </div>
+          <div class="font-mono text-[11px] font-bold text-amber-300 bg-black/40 px-2 py-0.5 rounded border border-amber-500/30 group-hover:bg-amber-900/60 flex gap-1 shrink-0">
+            -4 MP
+          </div>
+        </button>
+
+        <!-- 候选技能 2: 埃利奥特 · 洞察之眼 -->
+        <button onclick="executeKanpoChoice('埃利奥特', '洞察之眼')" class="group w-full px-3 py-2 bg-gradient-to-r from-amber-950/80 via-orange-950/70 to-slate-900/90 hover:from-amber-600 hover:to-orange-600 rounded-xl border border-amber-500/50 hover:border-amber-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md">
+          <div class="flex items-center gap-2 min-w-0">
+            <img src="https://imgur.la/images/2026/06/25/31a4dd84a831e3f76082542bf12fcf19.png" class="w-6 h-6 rounded-full border border-amber-300 object-cover shrink-0">
+            <div class="text-left min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="text-amber-300 font-black truncate">埃利奥特</span>
+                <span class="text-white truncate">⚡ 洞察之眼</span>
+                <span class="text-[8px] px-1 py-0.2 rounded bg-amber-400/20 text-amber-200 border border-amber-400/30 shrink-0">法术看破</span>
+              </div>
+            </div>
+          </div>
+          <div class="font-mono text-[11px] font-bold text-amber-300 bg-black/40 px-2 py-0.5 rounded border border-amber-500/30 group-hover:bg-amber-900/60 flex gap-1 shrink-0">
+            -3 MP
+          </div>
+        </button>
+
+      </div>
+
+      <!-- 放弃看破按钮 -->
+      <button onclick="simulateToast('放弃看破，直接承受技能效果')" class="w-full py-2 bg-slate-900/70 hover:bg-slate-800/90 text-slate-400 hover:text-slate-200 rounded-xl text-xs font-bold transition-colors border border-slate-800 mt-2.5">
+        放弃看破 (承受效果)
+      </button>
+    </div>
+
+  </main>
+
+  <!-- 交互反馈 Toast 提示容器 -->
+  <div id="toast" class="fixed bottom-5 z-50 bg-slate-900/95 border border-amber-500 text-white text-xs px-3 py-2 rounded-lg shadow-xl transition-all duration-300 opacity-0 translate-y-3 pointer-events-none flex items-center gap-2">
+    <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+    <span id="toast-msg">交互反馈</span>
+  </div>
+
+  <script>
+    // kanpo.wav 音频对象 (真实加载 test1 远端音频)
+    const KANPO_AUDIO_URL = 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/kanpo.wav';
+    const kanpoAudio = new Audio(KANPO_AUDIO_URL);
+
+    function playKanpoAudio() {
+      try {
+        kanpoAudio.currentTime = 0;
+        kanpoAudio.play().then(() => {
+          simulateToast('🔊 正在播放 kanpo.wav 音效');
+        }).catch(err => {
+          console.warn('Audio play blocked:', err);
+          simulateToast('🔊 音频播放受浏览器自动播放限制，请与页面交互');
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // 模拟看破断招全套 VFX 演出
+    function simulateKanpoVFX() {
+      const body = document.getElementById('app-body');
+      
+      // 1. 播放 kanpo.wav 音效
+      playKanpoAudio();
+
+      // 2. 屏幕震动
+      body.classList.remove('anim-shake');
+      void body.offsetWidth; // reflow
+      body.classList.add('anim-shake');
+      setTimeout(() => body.classList.remove('anim-shake'), 400);
+
+      // 3. 闪光与斩击演出层
+      const flash = document.createElement('div');
+      flash.className = 'fixed inset-0 z-[100] pointer-events-none bg-radial-gradient from-amber-200/90 via-amber-400/40 to-transparent animate-[kanpo-flash_0.5s_ease-out_forwards]';
+      flash.style.background = 'radial-gradient(circle, rgba(254,243,199,0.85), rgba(245,158,11,0.4) 40%, transparent 70%)';
+      document.body.appendChild(flash);
+
+      const slash = document.createElement('div');
+      slash.className = 'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] pointer-events-none flex flex-col items-center justify-center animate-[kanpo-eye-pulse_0.7s_ease-out_forwards]';
+      slash.innerHTML = `
+        <div class="text-2xl font-black text-amber-200 drop-shadow-[0_0_15px_rgba(245,158,11,1)] tracking-widest mb-1">⚡ 技能无效化！</div>
+        <div class="text-xs font-mono text-amber-300 bg-black/70 px-3 py-1 rounded-full border border-amber-400/60 shadow-[0_0_20px_rgba(245,158,11,0.6)]">STRATEGIC NULLIFIED</div>
+      `;
+      document.body.appendChild(slash);
+
+      setTimeout(() => {
+        if (flash.parentNode) flash.parentNode.removeChild(flash);
+        if (slash.parentNode) slash.parentNode.removeChild(slash);
+      }, 900);
+
+      simulateToast('⚡ 看破识破！触发 kanpo.wav 音效与全盘无效化演出');
+    }
+
+    // 执行玩家选择
+    function executeKanpoChoice(heroName, skillName) {
+      simulateKanpoVFX();
+      simulateToast(`【${heroName}】发动【${skillName}】！成功看破并无效化敌方攻击！`);
+    }
+
+    // 动态调整弹窗透明度
+    function setOpacity(val) {
+      document.getElementById('kanpo-modal').style.setProperty('--modal-opacity', val);
+
+      document.querySelectorAll('.op-btn').forEach(btn => {
+        btn.classList.remove('bg-amber-500', 'text-black', 'font-bold');
+        btn.classList.add('text-slate-400', 'hover:text-white');
+      });
+      const targetId = val === 0.40 ? 'btn-op-40' : (val === 0.60 ? 'btn-op-60' : 'btn-op-90');
+      const activeBtn = document.getElementById(targetId);
+      if (activeBtn) {
+        activeBtn.classList.remove('text-slate-400', 'hover:text-white');
+        activeBtn.classList.add('bg-amber-500', 'text-black', 'font-bold');
+      }
+      simulateToast(`弹窗底色不透明度已调整为：${Math.round(val * 100)}%`);
+    }
+
+    // 预设用例切换
+    const presets = {
+      case1: {
+        attackerName: "†《伊塔库亚的眷族》†",
+        skillName: "【极地狂啸暴风】",
+        dmgType: "🔮 法术",
+        targetScope: "群体",
+        powerVal: "200",
+        hitVal: "120",
+        rawVal: "160~240",
+        designatedTarget: "全体我方",
+        skillsHtml: `
+          <button onclick="executeKanpoChoice('玛德琳', '占星视界')" class="group w-full px-3 py-2 bg-gradient-to-r from-amber-950/80 via-orange-950/70 to-slate-900/90 hover:from-amber-600 hover:to-orange-600 rounded-xl border border-amber-500/50 hover:border-amber-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md">
+            <div class="flex items-center gap-2 min-w-0">
+              <img src="https://imgur.la/images/2026/06/25/4ee5c7965be0fb288591efb0114099d0.png" class="w-6 h-6 rounded-full border border-amber-300 object-cover shrink-0">
+              <div class="text-left min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-amber-300 font-black truncate">玛德琳</span>
+                  <span class="text-white truncate">⚡ 占星视界</span>
+                  <span class="text-[8px] px-1 py-0.2 rounded bg-amber-400/20 text-amber-200 border border-amber-400/30 shrink-0">全能看破</span>
+                </div>
+              </div>
+            </div>
+            <div class="font-mono text-[11px] font-bold text-amber-300 bg-black/40 px-2 py-0.5 rounded border border-amber-500/30 group-hover:bg-amber-900/60 flex gap-1 shrink-0">-4 MP</div>
+          </button>
+          <button onclick="executeKanpoChoice('埃利奥特', '洞察之眼')" class="group w-full px-3 py-2 bg-gradient-to-r from-amber-950/80 via-orange-950/70 to-slate-900/90 hover:from-amber-600 hover:to-orange-600 rounded-xl border border-amber-500/50 hover:border-amber-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md">
+            <div class="flex items-center gap-2 min-w-0">
+              <img src="https://imgur.la/images/2026/06/25/31a4dd84a831e3f76082542bf12fcf19.png" class="w-6 h-6 rounded-full border border-amber-300 object-cover shrink-0">
+              <div class="text-left min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-amber-300 font-black truncate">埃利奥特</span>
+                  <span class="text-white truncate">⚡ 洞察之眼</span>
+                  <span class="text-[8px] px-1 py-0.2 rounded bg-amber-400/20 text-amber-200 border border-amber-400/30 shrink-0">法术看破</span>
+                </div>
+              </div>
+            </div>
+            <div class="font-mono text-[11px] font-bold text-amber-300 bg-black/40 px-2 py-0.5 rounded border border-amber-500/30 group-hover:bg-amber-900/60 flex gap-1 shrink-0">-3 MP</div>
+          </button>
+        `
+      },
+      case2: {
+        attackerName: "†《伊塔库亚的眷族》†",
+        skillName: "【极寒利爪撕裂】",
+        dmgType: "🗡️ 近战",
+        targetScope: "单体",
+        powerVal: "180",
+        hitVal: "120",
+        rawVal: "168~252",
+        designatedTarget: "埃利奥特",
+        skillsHtml: `
+          <button onclick="executeKanpoChoice('弗兰克', '战壕洞察')" class="group w-full px-3 py-2 bg-gradient-to-r from-amber-950/80 via-orange-950/70 to-slate-900/90 hover:from-amber-600 hover:to-orange-600 rounded-xl border border-amber-500/50 hover:border-amber-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md">
+            <div class="flex items-center gap-2 min-w-0">
+              <img src="https://imgur.la/images/2026/06/25/26f001dbe399876cd74978bbe12a265b.png" class="w-6 h-6 rounded-full border border-amber-300 object-cover shrink-0">
+              <div class="text-left min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-amber-300 font-black truncate">弗兰克</span>
+                  <span class="text-white truncate">⚡ 战壕洞察</span>
+                  <span class="text-[8px] px-1 py-0.2 rounded bg-amber-400/20 text-amber-200 border border-amber-400/30 shrink-0">近战看破</span>
+                </div>
+              </div>
+            </div>
+            <div class="font-mono text-[11px] font-bold text-amber-300 bg-black/40 px-2 py-0.5 rounded border border-amber-500/30 group-hover:bg-amber-900/60 flex gap-1 shrink-0">-2 MP</div>
+          </button>
+        `
+      },
+      case3: {
+        attackerName: "†《黑旗军狙击手》†",
+        skillName: "【克虏伯穿甲重狙】",
+        dmgType: "🎯 远程",
+        targetScope: "单体",
+        powerVal: "220",
+        hitVal: "140",
+        rawVal: "176~264",
+        designatedTarget: "索恩",
+        skillsHtml: `
+          <button onclick="executeKanpoChoice('索恩', '盾阵预读')" class="group w-full px-3 py-2 bg-gradient-to-r from-amber-950/80 via-orange-950/70 to-slate-900/90 hover:from-amber-600 hover:to-orange-600 rounded-xl border border-amber-500/50 hover:border-amber-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md">
+            <div class="flex items-center gap-2 min-w-0">
+              <img src="https://imgur.la/images/2026/08/13/77fcdf0fd006c4ff1ccae30774322270.png" class="w-6 h-6 rounded-full border border-amber-300 object-cover shrink-0">
+              <div class="text-left min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-amber-300 font-black truncate">索恩</span>
+                  <span class="text-white truncate">⚡ 盾阵预读</span>
+                  <span class="text-[8px] px-1 py-0.2 rounded bg-amber-400/20 text-amber-200 border border-amber-400/30 shrink-0">远程看破</span>
+                </div>
+              </div>
+            </div>
+            <div class="font-mono text-[11px] font-bold text-amber-300 bg-black/40 px-2 py-0.5 rounded border border-amber-500/30 group-hover:bg-amber-900/60 flex gap-1 shrink-0">-3 MP</div>
+          </button>
+        `
+      }
+    };
+
+    function switchPreset(key) {
+      document.querySelectorAll('.preset-btn').forEach(b => {
+        b.classList.remove('bg-amber-950/80', 'border-amber-500/60', 'text-amber-200');
+        b.classList.add('bg-slate-800/80', 'border-slate-700', 'text-slate-300');
+      });
+      const activeBtn = document.getElementById('preset-' + key);
+      activeBtn.classList.remove('bg-slate-800/80', 'border-slate-700', 'text-slate-300');
+      activeBtn.classList.add('bg-amber-950/80', 'border-amber-500/60', 'text-amber-200');
+
+      const data = presets[key];
+      document.getElementById('k-attacker-name').innerText = data.attackerName;
+      document.getElementById('bg-enemy-name').innerText = data.attackerName;
+      document.getElementById('k-skill-name').innerText = data.skillName;
+      document.getElementById('k-dmg-type').innerText = data.dmgType;
+      document.getElementById('k-target-scope').innerText = data.targetScope;
+      document.getElementById('k-power-val').innerText = data.powerVal;
+      document.getElementById('k-hit-val').innerText = data.hitVal;
+      document.getElementById('k-raw-val').innerText = data.rawVal;
+      document.getElementById('k-designated-target').innerText = data.designatedTarget;
+      document.getElementById('kanpo-skills-list').innerHTML = data.skillsHtml;
+
+      simulateToast(`已切换至：${activeBtn.innerText}`);
+    }
+
+    // 交互反馈 Toast
+    let toastTimer = null;
+    function simulateToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-msg');
+      toastMsg.innerText = msg;
+      toast.classList.remove('opacity-0', 'translate-y-3');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-3');
+      }, 2200);
+    }
+  </script>
+</body>
+</html>
