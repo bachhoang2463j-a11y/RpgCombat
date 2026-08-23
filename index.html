@@ -6175,6 +6175,14 @@ function updateHeroUI(hero) {
       document.getElementById(`${hero.id}-status`).classList.add('hidden'); 
       renderTurnQueue(); 
       addHistory(`[战况] 🌟 ${hero.name} 重新站了起来！`);
+  } else if (hero.hp <= 0 && !hero.isAlive && hero.dom && !hero.dom.classList.contains('opacity-40')) {
+      // 兜底：DoT 回合起始致死路径已在 nextTurn 先置 isAlive=false 再调本函数，导致主分支守卫失效（与敌方幽灵同源）。
+      hero.shield = 0; hero.buffs = []; hero.isDefending = false; hero.hitBonus = 0; hero.evaBonus = 0; hero.burstActivated = false;
+      hero.dom.classList.add('opacity-40', 'grayscale');
+      if(cardInner) cardInner.classList.remove('ring-2', 'ring-yellow-400', 'scale-105');
+      const st = document.getElementById(`${hero.id}-status`);
+      if(st) st.classList.remove('hidden');
+      renderTurnQueue(); updateBuffUI(hero);
   }
 }
 
@@ -6359,6 +6367,17 @@ function updateEnemyUI(enemy) {
       }
       renderTurnQueue(); 
       addHistory(`[战况] 💀 ${enemy.name} 被击溃了！`); 
+  } else if (enemy.hp <= 0 && !enemy.isAlive && enemy.dom && enemy.dom.style.display !== 'none') {
+      // 兜底：DoT 回合起始致死路径已在 nextTurn 先置 isAlive=false 再调本函数，导致主分支守卫失效（幽灵占位）。
+      // 此处幂等补一次隐藏与状态清理，与主分支同款时序，不重复触发自爆（nextTurn 已接线）。
+      enemy.shield = 0; enemy.buffs = []; enemy.isDefending = false; enemy.hitBonus = 0; enemy.evaBonus = 0;
+      if (enemy.explode) {
+          if(sprite) { sprite.classList.remove('breathe', 'enemy-sprite'); }
+      } else {
+          if(sprite) { sprite.classList.remove('breathe', 'enemy-sprite'); sprite.classList.add('opacity-0', 'scale-50'); }
+          setTimeout(() => { if(enemy.dom) enemy.dom.style.display = 'none'; }, 500);
+      }
+      renderTurnQueue(); updateBuffUI(enemy);
   }
 }
 
@@ -9791,6 +9810,7 @@ function cancelTargeting() { state.isTargeting = false; state.pendingAction = nu
 
 
 function showEnemyInfo(enemy) {
+  if (!enemy || enemy.isAlive === false) return;
   const modal = document.getElementById('editor-modal');
   modal.className = "fixed inset-0 bg-black/15 backdrop-blur-sm z-[100] flex items-center justify-center p-3 sm:p-6 overflow-hidden transition-all duration-300";
 
@@ -10037,6 +10057,7 @@ function showEnemyInfo(enemy) {
 
 async function handleTargetClick(target, targetType) {
   if (!state.isTargeting) {
+     if (targetType === 'enemy' && !target.isAlive) return;
      if (targetType === 'hero' && state.isGameStarted && !state.isAnimating) {
         const currentActor = state.actionQueue[state.queueIndex]?.ref;
         if (currentActor && currentActor.id === target.id && target.tp >= target.maxTp) {

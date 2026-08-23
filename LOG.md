@@ -1848,3 +1848,16 @@
   4. **版本号升级至 V9.1**：`README.md` `当前版本：V9.0 → V9.1`。
 - **涉及文件**：`index.html`、`README.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：修复用户反馈的"闪避后减益仍命中"不一致，使混合技能的减益严格跟随同次攻击的命中结论（成功闪避/反应成功则整体落空、`_bdg.targetHit` 共享），符合 `SPEC §5` 与 `README` 已落地的跨标签命中共享设计。
+---
+
+## [LOG-150] 2026-08-24 — 复活怪 DoT 二次致死幽灵占位修复 (V9.2)
+
+- **变更行为**：
+  1. **根因**：`nextTurn` (index.html:9106) 的 DoT 回合起始致死路径对敌方敌人先在 `currentEntity.ref.isAlive=false` + `triggerEnemySelfDestruct`（非自爆直接 return）后再调 `updateEnemyUI`，导致 `updateEnemyUI:6341` 的 `if(enemy.hp<=0 && enemy.isAlive)` 守卫整体跳过——`enemy.dom` 保持 `display:flex` + `breathe` 常驻 flex 槽位（白幽灵），`buffs` 未清空故 `毒60·2回` 仍显示，`enemies-container gap-24` 不塌缩。复活补充：纯 `[复活]` 怪首次 DoT 致死经 `tryReviveEnemy:6183` 清 `buffs=[]` 并回 30% 血（拦截成功不隐藏），二次被重上毒后再次 DoT 致死时 `reviveCount` 已为 0，若二次致死走直伤 `8429` 或为 `[复活][自爆]` 则分别由 `6357` / `doEnemySelfDestruct:6284` 正确隐藏，唯纯 `[复活]` 二次 DoT 真死无兜底必现幽灵；`handleTargetClick:1038` 非瞄准态与 `showEnemyInfo:9793` 均无 `isAlive` 守卫，500ms 过渡期内仍可点击弹窗显示 `0/130`。
+  2. **修复 `updateEnemyUI` 兜底（index.html:6341）**：追加 `else if (enemy.hp<=0 && !enemy.isAlive && enemy.dom && enemy.dom.style.display !== "none")` 分支，幂等补一次与主分支同款隐藏与状态清理（`shield=0/buffs=[]/isDefending=false/hitBonus=0/evaBonus=0`；非自爆 `sprite opacity-0 scale-50 + 500ms dom display:none` / 自爆仅去 `breathe` 留尸体由自爆链收尾）+ `renderTurnQueue + updateBuffUI`，`display:none` 已隐藏不重复动，不重复触发自爆（`nextTurn` 已接线）。
+  3. **修复 `updateHeroUI` 兜底（index.html:6163）**：追加 `else if (hero.hp<=0 && !hero.isAlive && hero.dom && !hero.dom.classList.contains("opacity-40"))` 分支，同款幂等补灰化（`opacity-40 grayscale` + 状态角标 + `renderTurnQueue/updateBuffUI`），与敌方同源（DoT 先置死绕过主分支）。
+  4. **封堵已死幽灵点击（index.html:1038/9793）**：`handleTargetClick` 非瞄准态首行加 `if(targetType==="enemy" && !target.isAlive) return`；`showEnemyInfo` 顶部加 `if(!enemy || enemy.isAlive===false) return`，500ms 过渡期内点击静默拦截，不弹 `0/130` 详情；`enemiesData` 仍保留死对象供日志/胜负 `filter(isAlive)` 查询。
+  5. **版本号升级至 V9.2**：`README.md` `当前版本：V9.1 → V9.2`。
+- **涉及文件**：`index.html`、`README.md`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：修复复活后二次 DoT 致死等全部 DoT 致死路径的幽灵占位不一致，补齐与直伤 (`updateEnemyUI:6341`) / 自爆 (`doEnemySelfDestruct:6284` + LOG-093) 同款的 `enemy.dom display:none` 收口时序；点击拦截消除 `0 HP` 幽灵详情误触；保持 `triggerEnemySelfDestruct` 与 `endTurn selfDestructCount` 等待链、复活 `reviveCount--` 幂等不受影响，仅动 UI 守卫不触 `calculateDamage/ON_KILL/击杀特写`。
+
