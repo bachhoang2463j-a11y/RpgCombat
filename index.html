@@ -56,21 +56,17 @@
       text-shadow: -2px -2px 0 #3f0000, 2px -2px 0 #3f0000, -2px 2px 0 #3f0000, 2px 2px 0 #3f0000, 0 0 35px #991b1b;
     }
 
-    /* ==== Style 1 近战：完美同轴斜切 ==== */
+    /* ==== Style 1 & 通用：斜向滑入与碎裂 (保留供 Style 3 及切片复用) ==== */
     @keyframes s1-hero-in {
       0% { transform: translate(-50%, -50%) translate(var(--hero-ox), var(--hero-oy)) translateX(-70vw) skewX(15deg); opacity: 0; }
       70% { transform: translate(-50%, -50%) translate(var(--hero-ox), var(--hero-oy)) translateX(15px) skewX(-4deg); opacity: 1; }
       100% { transform: translate(-50%, -50%) translate(var(--hero-ox), var(--hero-oy)) translateX(0) skewX(0); opacity: 1; }
     }
-    /* 敌人区容器已由外层定位（-50% + --enemy-ox/oy），此处仅为滑入动画 */
     @keyframes s1-enemy-in {
       0% { transform: translateX(70vw) skewX(-15deg); opacity: 0; }
       70% { transform: translateX(-15px) skewX(4deg); opacity: 1; }
       100% { transform: translateX(0) skewX(0); opacity: 1; }
     }
-    /* 性能优化：height/filter 动画全部改为纯 transform（scaleY 表达粗细变化），
-       刀光辉光由元素静态 box-shadow 承担——width/height 动画会强制每帧 layout+repaint（CPU），
-       纯 transform 可由 GPU 合成，帧率提升明显 */
     @keyframes s1-slash-anim {
       0% { transform: translate(-50%, -50%) rotate(var(--slash-rot)) scaleX(0) scaleY(0.25); opacity: 0; }
       10% { transform: translate(-50%, -50%) rotate(var(--slash-rot)) scaleX(0) scaleY(2); opacity: 1; }
@@ -91,6 +87,27 @@
       24% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
       75% { transform: translate(-50%, -50%) scale(1); opacity: 1; text-shadow: 0 0 35px #f43f5e, 0 0 70px #be123c; }
       100% { transform: translate(-50%, -50%) scale(1.3); opacity: 0; }
+    }
+
+    /* ==== Style 2 近战：居合一闪·残影定格 ==== */
+    @keyframes s2-hero-blur-dash {
+      0% { transform: translate3d(-50%, -50%, 0) translateX(-60vw) scale(0.7); opacity: 0; filter: blur(25px); }
+      15% { transform: translate3d(-50%, -50%, 0) translateX(-10vw) scale(1.1); opacity: 1; filter: blur(0); }
+      35% { transform: translate3d(-50%, -50%, 0) translateX(25vw) scale(1); opacity: 1; }
+      75% { transform: translate3d(-50%, -50%, 0) translateX(25vw) scale(1); opacity: 1; }
+      100% { transform: translate3d(-50%, -50%, 0) translateX(55vw) scale(0.9); opacity: 0; }
+    }
+    @keyframes s2-blade-flash {
+      0% { transform: translate3d(-50%, -50%, 0) rotate(-10deg) scaleX(0) scaleY(0.2); opacity: 0; }
+      15% { transform: translate3d(-50%, -50%, 0) rotate(-10deg) scaleX(1) scaleY(1); opacity: 1; }
+      100% { transform: translate3d(-50%, -50%, 0) rotate(-10deg) scaleX(1.15) scaleY(0); opacity: 0; }
+    }
+    @keyframes s2-ink-stamp {
+      0% { transform: translate3d(-50%, -50%, 0) scale(0.3) rotate(-15deg); opacity: 0; filter: blur(12px); }
+      18% { transform: translate3d(-50%, -50%, 0) scale(1.3) rotate(0deg); opacity: 1; filter: blur(0); }
+      28% { transform: translate3d(-50%, -50%, 0) scale(1); opacity: 1; }
+      75% { transform: translate3d(-50%, -50%, 0) scale(1.05); opacity: 1; }
+      100% { transform: translate3d(-50%, -50%, 0) scale(1.4); opacity: 0; filter: blur(8px); }
     }
 
     /* ==== Style 3 法术：次元裂隙·空间碎镜 ==== */
@@ -1766,15 +1783,19 @@ async function playExecutionAnimation(hero, killedEnemies, damageType) {
             const splatters = [
                 `M20,10 C35,2 50,15 45,30 C55,40 60,60 45,70 C30,80 15,65 10,50 C5,35 10,18 20,10 Z`,
                 `M30,5 C45,5 55,20 50,35 C65,30 75,45 70,60 C55,75 40,70 30,80 C15,75 10,55 15,40 C5,25 20,10 30,5 Z`,
-                `M15,20 C30,10 50,10 40,30 C55,35 60,55 45,65 C35,75 20,80 15,60 C5,45 5,30 15,20 Z`
+                `M15,20 C30,10 50,10 40,30 C55,35 60,55 45,65 C35,75 20,80 15,60 C5,45 5,30 15,20 Z`,
+                `M25,12 C40,4 55,18 48,32 C60,42 62,65 48,72 C32,82 18,68 12,52 C8,38 12,20 25,12 Z`
             ];
             let splatItems = '';
             const positions = [
-                { top: '15%', left: '18%', scale: 1.3, rot: -25, delay: '0.12s' },
-                { top: '68%', left: '22%', scale: 1.1, rot: 45, delay: '0.15s' },
-                { top: '22%', right: '16%', scale: 1.5, rot: 15, delay: '0.14s' },
-                { top: '62%', right: '20%', scale: 1.2, rot: -60, delay: '0.18s' },
-                { top: '42%', left: '48%', scale: 1.6, rot: 10, delay: '0.1s' }
+                { top: '16%', left: '18%', scale: 1.35, rot: -25, delay: '0.18s' },
+                { top: '66%', left: '24%', scale: 1.15, rot: 45, delay: '0.22s' },
+                { top: '24%', right: '18%', scale: 1.45, rot: 15, delay: '0.20s' },
+                { top: '60%', right: '22%', scale: 1.25, rot: -60, delay: '0.24s' },
+                { top: '44%', left: '48%', scale: 1.65, rot: 10, delay: '0.16s' },
+                { top: '12%', left: '42%', scale: 1.1, rot: 75, delay: '0.25s' },
+                { top: '78%', right: '35%', scale: 1.3, rot: -40, delay: '0.26s' },
+                { top: '38%', left: '10%', scale: 1.2, rot: -15, delay: '0.21s' }
             ];
             for (let i = 0; i < Math.min(count, positions.length); i++) {
                 const p = positions[i];
@@ -1784,18 +1805,18 @@ async function playExecutionAnimation(hero, killedEnemies, damageType) {
                          style="${p.top ? `top:${p.top};` : ''} ${p.left ? `left:${p.left};` : ''} ${p.right ? `right:${p.right};` : ''} width:140px; height:140px; --splat-rot:${p.rot}deg; animation: blood-splat-burst 1.1s ${p.delay} cubic-bezier(0.12, 0.85, 0.25, 1) both; will-change: transform, opacity;">
                         <svg viewBox="0 0 100 100" class="w-full h-full fill-red-800 drop-shadow-[0_0_10px_#580c0c]" style="filter: drop-shadow(0 0 8px #3f0000);">
                             <path d="${path}" />
-                            <circle cx="85" cy="20" r="4" class="fill-red-700"/>
-                            <circle cx="15" cy="88" r="3.5" class="fill-red-900"/>
+                            <circle cx="85" cy="20" r="4.5" class="fill-red-700"/>
+                            <circle cx="15" cy="88" r="4" class="fill-red-900"/>
                             <circle cx="90" cy="75" r="5" class="fill-red-800"/>
-                            <circle cx="5" cy="15" r="3" class="fill-red-700"/>
+                            <circle cx="5" cy="15" r="3.5" class="fill-red-700"/>
                         </svg>
                     </div>`;
             }
             const drips = `
                 <div class="absolute top-0 right-[28%] w-1 bg-gradient-to-b from-red-700 via-red-900 to-transparent rounded-full opacity-0 z-40 pointer-events-none"
-                     style="height:120px; animation: blood-drip-flow 1.2s 0.2s ease-out both;"></div>
+                     style="height:140px; animation: blood-drip-flow 1.25s 0.22s ease-out both;"></div>
                 <div class="absolute top-0 left-[25%] w-1.5 bg-gradient-to-b from-red-800 via-red-950 to-transparent rounded-full opacity-0 z-40 pointer-events-none"
-                     style="height:160px; animation: blood-drip-flow 1.3s 0.16s ease-out both;"></div>`;
+                     style="height:170px; animation: blood-drip-flow 1.35s 0.18s ease-out both;"></div>`;
             return splatItems + drips;
         }
 
@@ -1906,58 +1927,53 @@ async function playExecutionAnimation(hero, killedEnemies, damageType) {
                 <!-- 屏幕真实喷溅血液 -->
                 ${createBloodSplatterHtml(5)}`;
         } else {
-            // Style 1（近战，默认）：完美同轴斜切——英雄/敌人/刀光共用同一旋转轴线
-            // 横屏收紧倾角（扁平刀光更贴水平），竖屏加大倾角，配合 tan() 垂直补偿避免刀光脱离敌我图标
-            overlay.className += ' bg-black/70';
-            const isLandscape = window.innerWidth > window.innerHeight;
-            const rot = isLandscape ? -7 : -14;
-            const rotRad = (rot * Math.PI) / 180;
-            const heroOffsetX = -window.innerWidth * 0.36;
-            const heroOffsetY = heroOffsetX * Math.tan(rotRad);
-            const enemyOffsetX = window.innerWidth * 0.36;
-            const enemyOffsetY = enemyOffsetX * Math.tan(rotRad);
-            overlay.style.setProperty('--hero-ox', `${heroOffsetX}px`);
-            overlay.style.setProperty('--hero-oy', `${heroOffsetY}px`);
-            overlay.style.setProperty('--enemy-ox', `${enemyOffsetX}px`);
-            overlay.style.setProperty('--enemy-oy', `${enemyOffsetY}px`);
-            overlay.style.setProperty('--slash-rot', `${rot}deg`);
+            // Style 2（近战，默认）：⚔️ 居合一闪·血溅镜头（8朵血花 + 镜头深暗红暗角）
+            overlay.className += ' bg-black/85';
+            killDelay = 280;
 
             const enemiesHtml = killedEnemies.map(enemy => `
                 <div class="flex flex-col items-center gap-1 shrink-0">
                     <div style="width:${unitSize};height:${unitSize};" class="relative flex items-center justify-center">
-                        <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(0 0, 100% 0, 100% 44%, 0 56%); animation: s1-top-shatter 0.75s 0.28s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
-                        <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(0 56%, 100% 44%, 100% 100%, 0 100%); animation: s1-bottom-shatter 0.75s 0.28s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(0 0, 100% 0, 100% 44%, 0 56%); animation: s1-top-shatter 0.8s 0.28s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(0 56%, 100% 44%, 100% 100%, 0 100%); animation: s1-bottom-shatter 0.8s 0.28s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
                     </div>
-                    <div class="text-rose-300 text-[10px] sm:text-xs font-bold tracking-widest whitespace-nowrap">${enemy.name}</div>
+                    <div class="text-rose-300 text-[10px] sm:text-xs font-bold tracking-widest whitespace-nowrap drop-shadow">${enemy.name}</div>
                 </div>`).join('');
 
             html = `
-                <!-- 击杀者英雄（沿斜轴入场） -->
-                <div class="absolute left-1/2 top-1/2 opacity-0 z-10"
-                     style="animation: s1-hero-in 0.3s cubic-bezier(0.12, 0.8, 0.3, 1) both; will-change: transform, opacity;">
-                    <div style="width:clamp(85px,20vh,190px);height:clamp(85px,20vh,190px);"
-                         class="rounded-full border-4 border-yellow-400 overflow-hidden shadow-[0_0_35px_rgba(250,204,21,0.9)] bg-gray-900 flex items-center justify-center">
+                <!-- 1. 镜头深暗红暗角 (Lens Vignette) 与 8 朵飞溅血花 (彻底替代刺眼白闪) -->
+                <div class="absolute inset-0 pointer-events-none z-10 opacity-0"
+                     style="background: radial-gradient(circle, transparent 25%, rgba(160,10,10,0.55) 60%, rgba(80,0,0,0.92) 100%); animation: blood-vignette-pulse 1.15s cubic-bezier(0.1, 0.8, 0.2, 1) both;"></div>
+                ${createBloodSplatterHtml(8)}
+
+                <!-- 2. 全屏撕裂光带与锐利刀光核心 (GPU scaleY 驱动) -->
+                <div class="absolute h-24 w-[180vw] bg-gradient-to-r from-transparent via-rose-600/50 to-transparent left-1/2 top-1/2 opacity-0 z-10"
+                     style="animation: s2-blade-flash 0.9s 0.25s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;"></div>
+                <div class="absolute h-1.5 bg-rose-400 w-[180vw] left-1/2 top-1/2 opacity-0 z-20 shadow-[0_0_30px_#f43f5e,0_0_60px_#fff]"
+                     style="animation: s2-blade-flash 0.9s 0.25s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;"></div>
+
+                <!-- 3. 英雄残影极速瞬步穿梭 (从左侧穿刺至右侧定格) -->
+                <div class="absolute left-1/2 top-1/2 opacity-0 z-30" 
+                     style="animation: s2-hero-blur-dash 1.2s cubic-bezier(0.14, 1, 0.28, 1) both; will-change: transform, opacity, filter;">
+                    <div class="w-32 h-32 sm:w-44 sm:h-44 rounded-full border-4 border-rose-500 overflow-hidden shadow-[0_0_40px_#f43f5e] bg-black">
                         <img src="${hero.img}" class="w-full h-full object-cover">
                     </div>
                 </div>
 
-                <!-- 被击杀敌人区（沿斜轴定位 + 并排多敌） -->
-                <div class="absolute left-1/2 top-1/2 z-10" style="transform:translate(-50%,-50%) translate(var(--enemy-ox),var(--enemy-oy));">
-                    <div class="flex items-center gap-2 sm:gap-3 opacity-0"
-                         style="animation: s1-enemy-in 0.3s cubic-bezier(0.12, 0.8, 0.3, 1) both; will-change: transform, opacity;">
-                        ${enemiesHtml}
+                <!-- 4. 居中金石水墨印章大字「斬」/「全滅」-->
+                <div class="absolute left-1/2 top-1/2 opacity-0 z-30 flex flex-col items-center pointer-events-none" 
+                     style="animation: s2-ink-stamp 1.2s 0.28s cubic-bezier(0.14, 1, 0.28, 1) both; will-change: transform, opacity;">
+                    <div class="font-cinzel text-[clamp(4.5rem,12vw,12rem)] font-black text-rose-500 text-outline-crimson tracking-wider drop-shadow-[0_0_50px_#e11d48]">
+                        ${n > 1 ? '全 滅' : '斬'}
+                    </div>
+                    <div class="text-rose-200 text-xs sm:text-base font-bold tracking-[0.8em] -mt-3 sm:-mt-5 uppercase drop-shadow">
+                        ${n > 1 ? 'ALL TARGETS NEUTRALIZED' : 'EXECUTION COMPLETE'}
                     </div>
                 </div>
 
-                <!-- 全屏同轴刀光发光线 -->
-                <div class="absolute h-2 sm:h-2.5 bg-white left-1/2 top-1/2 origin-center opacity-0 z-20 shadow-[0_0_20px_#f43f5e,0_0_50px_#fff]"
-                     style="width: 140vw; animation: s1-slash-anim 0.5s 0.28s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">
-                </div>
-
-                <!-- 居中击破艺术字 -->
-                <div class="text-[clamp(3.5rem,9vw,9rem)] italic font-black text-rose-500 text-outline-thick absolute left-1/2 top-1/2 opacity-0 z-30 tracking-[0.25em] whitespace-nowrap drop-shadow-[0_0_35px_rgba(244,63,94,0.8)]"
-                     style="animation: s1-vs-anim 1.1s 0.28s ease-out both; will-change: transform, opacity;">
-                    ${n > 1 ? '全灭' : '击破'}
+                <!-- 5. 右侧被斩敌人碎裂区 (支持单体与多目标 flex 排布) -->
+                <div class="absolute right-[12vw] top-1/2 -translate-y-1/2 z-20 flex items-center gap-2 sm:gap-4">
+                    ${enemiesHtml}
                 </div>`;
         }
 
@@ -1967,6 +1983,7 @@ async function playExecutionAnimation(hero, killedEnemies, damageType) {
         // 风格开场音效（击杀相关 2 倍音量）
         if (type === '法术') playSound('burst', 2);
         else if (type === '远程') playSound('shot', 2);
+        else if (type === '近战') playSound('atk1', 2);
 
         setTimeout(() => {
             playSound('kill', 2);
@@ -1976,7 +1993,7 @@ async function playExecutionAnimation(hero, killedEnemies, damageType) {
             if (scene) { scene.classList.add('heavy-shake'); setTimeout(() => scene.classList.remove('heavy-shake'), 500); }
         }, killDelay);
 
-        setTimeout(() => { overlay.style.opacity = '0'; setTimeout(() => { overlay.remove(); resolve(); }, 300); }, 1400);
+        setTimeout(() => { overlay.style.opacity = '0'; setTimeout(() => { overlay.remove(); resolve(); }, 300); }, 1450);
     });
 }
 
