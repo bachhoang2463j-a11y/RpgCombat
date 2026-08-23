@@ -7256,6 +7256,95 @@ function buildSkillDetailHTML(skill, showTarget, target) {
         + '</p>';
 }
 
+// 反应弹窗伤害预览：凡技能带伤害类标签（单体/群攻/穿透/眩晕）逐段显示
+// 「威力 + 攻击增减buff → 原始伤害区间 → 减去目标护甲后的具体HP伤害区间」；
+// 穿透伤害与「最大伤害 ≥ 目标剩余HP（可能致死）」强制高亮警示。
+function buildReactionDamagePreview(attacker, target, skill, multiplier = 1) {
+    if (!skill) return '';
+    const mult = multiplier || 1;
+    const cStats = getEffectiveStats(attacker);
+    // 攻击增减 buff 对伤害的影响（含 atk 增益/降攻/狂暴/蜕皮/职业被动），可为负
+    const buffAtkBonus = cStats.atk - (attacker.atk || 0);
+
+    // 与主管线 isDamage 同口径筛选伤害标签槽（覆盖 单体/群攻/穿透/眩晕 及其群形态）
+    const damageSlots = [
+        { tag: skill.type, power: skill.power },
+        { tag: skill.type2, power: skill.power2 },
+        { tag: skill.type3, power: skill.power3 }
+    ].filter(s => s.tag && s.tag !== '[无]'
+        && (String(s.tag).includes('攻') || String(s.tag).includes('单体') || String(s.tag).includes('穿透') || String(s.tag).includes('眩晕')));
+    if (damageSlots.length === 0) return '';
+
+    const incomingDamageType = skill.damageType || '近战';
+
+    const segments = damageSlots.map(slot => {
+        const tagPower = slot.power || 0;
+        const isPierce = String(slot.tag).includes('穿透') || (CLASS_PASSIVES[attacker.classType]?.checkPierce?.(attacker) || false);
+
+        // 与 applySingleTagEffect 主管线同款基础伤害
+        let baseDmg = tagPower === 0 ? cStats.atk * mult : (tagPower * mult) + (buffAtkBonus * mult);
+
+        // 职业被动增伤（modifyDamageMultiplier / modifyDamageDealt）
+        let dmgMultiplier = 1;
+        const casterPassive = CLASS_PASSIVES[attacker.classType];
+        if (casterPassive && casterPassive.modifyDamageMultiplier) dmgMultiplier += casterPassive.modifyDamageMultiplier(attacker, target);
+        let rawMin = Math.max(1, Math.floor(baseDmg * 0.8));
+        let rawMax = Math.max(1, Math.floor(baseDmg * 1.2));
+        if (casterPassive && casterPassive.modifyDamageDealt) {
+            const dealtBonus = casterPassive.modifyDamageDealt(attacker, skill);
+            rawMin += dealtBonus;
+            rawMax += dealtBonus;
+        }
+        rawMin = Math.max(1, Math.floor(rawMin * dmgMultiplier));
+        rawMax = Math.max(1, Math.floor(rawMax * dmgMultiplier));
+
+        // 【肃正】屏障在场时的吸收提示：按 applyBarrierResist 折算后扣团队屏障（只读备份，不污染状态）
+        let barrierNote = '';
+        if (target.id && target.id.startsWith('h') && teamBarrier > 0) {
+            const dmgToBarrierMin = applyBarrierResist(rawMin, incomingDamageType);
+            const dmgToBarrierMax = applyBarrierResist(rawMax, incomingDamageType);
+            rawMin = Math.max(0, rawMin - Math.min(teamBarrier, dmgToBarrierMin));
+            rawMax = Math.max(0, rawMax - Math.min(teamBarrier, dmgToBarrierMax));
+            barrierNote = `<div class="text-[10px] text-cyan-300 mt-0.5">🛡️ 屏障将吸收部分伤害（${teamBarrierName}）</div>`;
+        }
+
+        // 减甲后具体 HP 伤害区间：对 min/max 边界各算一次（浅拷贝防 calculateDamage 改写真实 shield）
+        const calcMin = calculateDamage(rawMin, Object.assign({}, target, { shield: target.shield || 0 }), isPierce);
+        const calcMax = calculateDamage(rawMax, Object.assign({}, target, { shield: target.shield || 0 }), isPierce);
+
+        // 高亮：穿透（琥珀） / 最大伤害 ≥ 剩余HP 可能致死（红）
+        const isFatal = calcMax.hpDmg >= (target.hp || 0);
+        const borderCls = isPierce ? 'border-amber-500/60' : (isFatal ? 'border-rose-500/70' : 'border-white/10');
+        const powerLabel = tagPower === 0 ? `普攻 攻击${cStats.atk}` : `威力 ${tagPower * mult}`;
+        const buffLabel = buffAtkBonus === 0 ? '' : `[攻${buffAtkBonus > 0 ? '+' : ''}${buffAtkBonus}]`;
+        const armorLabel = isPierce ? '无视护甲' : `有效防御 ${getEffectiveStats(target).def}`;
+        const pierceMark = isPierce ? '<span class="text-amber-400 font-bold">⚡穿透</span>' : '';
+        const fatalMark = isFatal ? `<div class="text-[10px] font-bold text-rose-400 animate-pulse mt-0.5">💀 可能致命（剩余 HP ${target.hp}）</div>` : '';
+
+        // 减甲后中间伤害 = HP伤害 + 护盾吸收量（防御姿态减半已在 calculateDamage 内体现）
+        const afterArmorMin = calcMin.hpDmg + calcMin.shieldDmg;
+        const afterArmorMax = calcMax.hpDmg + calcMax.shieldDmg;
+        // 护盾单独披露：护盾吸收后才是最终 HP 伤害（穿透无视护盾，天然无此段）
+        const hasShield = !isPierce && (target.shield || 0) > 0;
+        const shieldAbsMin = calcMin.shieldDmg;
+        const shieldAbsMax = calcMax.shieldDmg;
+        const shieldAbsLabel = shieldAbsMin === shieldAbsMax ? `${shieldAbsMin}` : `${shieldAbsMin}~${shieldAbsMax}`;
+        const defendNote = target.isDefending ? ' · 防御减半' : '';
+        const armorLine = `🛡️ ${armorLabel}${defendNote} → ${hasShield ? `${afterArmorMin}~${afterArmorMax}` : `HP ${calcMin.hpDmg}~${calcMax.hpDmg}`}`;
+        const shieldLine = hasShield ? `<div class="text-sky-300">🛡️ 护盾吸收 ${shieldAbsLabel} → HP ${calcMin.hpDmg}~${calcMax.hpDmg}</div>` : '';
+
+        return `<div class="bg-black/40 border ${borderCls} rounded-lg px-2.5 py-1.5 mb-1.5 text-[10px] sm:text-[11px] font-mono leading-snug">
+            ${barrierNote}
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5"><span class="text-gray-200">${powerLabel}</span>${buffLabel ? `<span class="text-emerald-300">${buffLabel}</span>` : ''}<span class="text-gray-500">→ 原始 ${rawMin}~${rawMax}</span>${pierceMark}</div>
+            <div class="${isFatal ? 'text-rose-300 font-bold' : 'text-gray-300'}">${armorLine}</div>
+            ${shieldLine}
+            ${fatalMark}
+        </div>`;
+    }).join('');
+
+    return `<div class="mt-1 mb-1">${segments}</div>`;
+}
+
 function promptKanpo(candidates, attacker, incomingSkill, incomingTarget) {
     return new Promise(resolve => {
         const overlay = document.createElement('div');
@@ -7668,7 +7757,7 @@ function applyEnemyTypeResist(rawDmg, damageType, target, dom, isAoE = false) {
     return rawDmg;
 }
 
-function promptReaction(hero, reactionSkills, attacker, incomingSkill, sheshenCandidates = []) {
+function promptReaction(hero, reactionSkills, attacker, incomingSkill, sheshenCandidates = [], multiplier = 1) {
     return new Promise(resolve => {
         const overlay = document.createElement('div');
         overlay.className = 'fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center transition-opacity duration-300';
@@ -7715,6 +7804,7 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill, sheshenCa
                     </div>
                     <button class="ml-auto shrink-0 text-[9px] sm:text-[10px] px-2 py-1 rounded border border-indigo-400/40 text-indigo-200 hover:bg-indigo-400/20 transition-colors" onclick="shelvePrompt(document.getElementById('reaction-prompt-${hero.id}'), 'reaction-reopen-${hero.id}', '继续反应')">收起</button>
                 </div>
+                ${incomingSkill ? buildReactionDamagePreview(attacker, hero, incomingSkill, multiplier) : ''}
                 ${hasSheshen && hasReaction ? `<div class="text-[10px] sm:text-[11px] text-gray-400 mb-2 bg-black/40 p-1.5 rounded border border-gray-800">🛡️ <span class="text-sky-300">舍身拦截</span>：由另一位角色替你承受本次攻击（必中、全盘接下）。</div>` : ''}
                 ${skillHtml}
             </div>
@@ -7737,7 +7827,7 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill, sheshenCa
 // - 选择反应 → 释放反应技并做二次闪避判定，返回 { dodged }；
 // - 选择舍身 → 扣守护者资源并执行演出，返回 { usedSheshen: true, guardian }；
 // - 无候选或放弃 → 返回空结果，调用方继续走受击管线。
-async function runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, sheshenCandidates, isAttack = false, isPierce = false) {
+async function runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, sheshenCandidates, isAttack = false, isPierce = false, multiplier = 1) {
     const targetType = target.id.startsWith('h') ? 'hero' : 'enemy';
     const reactionSkills = target.skills.filter(s => {
         if (!s.isReaction) return false;
@@ -7763,7 +7853,7 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
     let chosen = null;
     if (targetType === 'hero') {
         // 我方角色：弹出合并面板（反应 + 舍身）让玩家手动选择
-        chosen = await promptReaction(target, reactionSkills, caster, skill, sheshenCandidates || []);
+        chosen = await promptReaction(target, reactionSkills, caster, skill, sheshenCandidates || [], multiplier);
     } else {
         // 敌方角色：AI 自动从满足条件的反应技中随机挑选一个释放（舍身为我方专属，敌方不触发）
         chosen = reactionSkills.length > 0 ? { type: 'reaction', hero: target, skill: reactionSkills[Math.floor(Math.random() * reactionSkills.length)] } : null;
@@ -7904,13 +7994,13 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         }
 
         // 拦截判定：目标自身反应技能 +（可选）其他角色舍身候选 合并弹窗
-        const intercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, sheshenCandidates, isDamage, isPierce);
+        const intercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, sheshenCandidates, isDamage, isPierce, multiplier);
         if (intercept.usedSheshen && intercept.guardian) {
             // 【舍身】生效：受击目标切换为守护者（跳过闪避、必中），后续管线对守护者完整结算，原目标毫发无伤
             target = intercept.guardian;
             targetDom = document.getElementById(`hero-card-${target.id}`);
             // 守护者自身也可用反应技化解本次攻击（不再提供舍身候选，避免连锁舍身）
-            const guardianIntercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, [], isDamage, isPierce);
+            const guardianIntercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, [], isDamage, isPierce, multiplier);
             if (guardianIntercept.dodged) isDodged = true;
         } else if (intercept.dodged) {
             isDodged = true;
