@@ -248,6 +248,15 @@
     @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px) rotate(-1deg); } 50% { transform: translateX(3px) rotate(1deg); } 75% { transform: translateX(-3px) rotate(-0.5deg); } }
     .shake { animation: shake 0.4s ease-in-out; }
 
+    /* 眩晕星环：头顶常驻 + 左右微晃（不灰化） */
+    .stun-fx { display: flex; align-items: center; gap: 4px; filter: drop-shadow(0 0 6px rgba(251,191,36,0.85)); animation: stun-sway 1.1s ease-in-out infinite; }
+    .stun-fx.hidden { display: none !important; }
+    .stun-star { font-size: 11px; line-height: 1; color: #fde047; text-shadow: 0 0 8px rgba(251,191,36,0.95), 0 1px 2px rgba(0,0,0,0.8); animation: stun-twinkle 0.9s ease-in-out infinite alternate; }
+    .stun-star:nth-child(2) { animation-delay: 0.15s; }
+    .stun-star:nth-child(3) { animation-delay: 0.30s; }
+    @keyframes stun-sway { 0%, 100% { transform: translateX(-50%) translateX(0) rotate(0deg); } 25% { transform: translateX(-50%) translateX(-2px) rotate(-1.6deg); } 75% { transform: translateX(-50%) translateX(2px) rotate(1.6deg); } }
+    @keyframes stun-twinkle { 0% { opacity: 0.72; transform: scale(0.92); } 100% { opacity: 1; transform: scale(1.14); } }
+
     @keyframes dodge-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-10px) rotate(-5deg); } 40% { transform: translateX(10px) rotate(5deg); } 60% { transform: translateX(-6px) rotate(-2deg); } 80% { transform: translateX(4px) rotate(2deg); } }
     .dodge-shake { animation: dodge-shake 0.5s cubic-bezier(0.22, 0.61, 0.36, 1); }
 
@@ -5786,6 +5795,7 @@ function initUI() {
     enemy.dom.innerHTML = `
       <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 sm:-top-8 text-white/70 text-[9px] sm:text-xs bg-black/40 px-2 py-1 rounded backdrop-blur-md whitespace-nowrap z-50 pointer-events-none">${enemy.name}</div>
       <div id="${enemy.id}-buffs" class="absolute top-0 flex gap-1 justify-center w-full z-20 pointer-events-none flex-wrap"></div>
+      <div id="${enemy.id}-stunFx" class="stun-fx hidden absolute -top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none"><span class="stun-star">★</span><span class="stun-star">★</span><span class="stun-star">★</span></div>
       <div id="${enemy.id}-sprite" class="enemy-sprite ${visualClass} drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] breathe transition-all duration-300 mt-2 sm:mt-4 flex justify-center items-center">${enemyVisual}</div>
       <div class="w-10 sm:w-16 h-1 sm:h-1.5 bg-black/50 mt-2 sm:mt-4 rounded-full overflow-hidden backdrop-blur-sm relative pointer-events-none"><div id="${enemy.id}-hp-bar" class="h-full bg-rose-500 w-full transition-all duration-500 ease-out shadow-[0_0_8px_rgba(244,63,94,0.8)]"></div></div>
       ${chargeHtml}
@@ -5879,6 +5889,16 @@ function updateBuffUI(entity) {
   }
   
   buffContainer.innerHTML = html;
+  // 眩晕星环显隐联动（不灰化，仅头顶星环+微晃）
+  updateStunVisual(entity);
+}
+
+function updateStunVisual(entity) {
+  const stunEl = document.getElementById(`${entity.id}-stunFx`);
+  if (!stunEl) return;
+  const isStunned = (entity.buffs || []).some(b => b.type === 'stun');
+  const shouldShow = isStunned && entity.isAlive !== false;
+  stunEl.classList.toggle('hidden', !shouldShow);
 }
 
 // 屏障主题配色：法术=金色（默认变量，不设主题）、远程=科幻蓝、无属性/近战=银白
@@ -8081,6 +8101,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     if (isDamage) {
       return await applyBarrierHit(caster, target, tag, tagPower, skill, multiplier);
     }
+    triggerBarrierDebuffBlock(caster, skill, target);
     addHistory(`   ↳ 🛡️ ${caster.name} 的负面效果被【${teamBarrierName}】圣域所格挡，无法触及我方角色。`);
     return;
   }
@@ -8458,6 +8479,40 @@ function applyBarrierResist(rawDamage, incomingDamageType) {
     if (barrierSub && barrierSub === incomingDamageType) d = Math.floor(d * 0.5);
     if (barrierArmor > 0) d = Math.max(0, d - barrierArmor);
     return d;
+}
+
+// === 【肃正】纯减益阻挡轻量演出（不扣耐久，仅视觉反馈） ===
+function triggerBarrierDebuffBlock(caster, skill, barrierTarget) {
+  // 群攻批次去重：同一群减益批次仅首个目标演出一次
+  if (barrierAoEActive && barrierTarget && barrierTarget._debuffBlockDone) return;
+  if (barrierAoEActive && barrierTarget) barrierTarget._debuffBlockDone = true;
+  const barrierDom = document.getElementById('team-barrier-dome') || document.getElementById('team-barrier-wrapper') || document.getElementById('team-barrier-banner');
+  if (!barrierDom) return;
+  barrierDom.classList.remove('barrier-hit-impact');
+  void barrierDom.offsetWidth;
+  barrierDom.classList.add('barrier-hit-impact');
+  setTimeout(() => { if (barrierDom) barrierDom.classList.remove('barrier-hit-impact'); }, 350);
+  const bRect = barrierDom.getBoundingClientRect();
+  const impactX = bRect.width / 2;
+  const impactY = bRect.height / 2;
+  const ripple = document.createElement('div');
+  ripple.className = 'barrier-hit-ripple';
+  ripple.style.left = `${impactX}px`;
+  ripple.style.top = `${impactY}px`;
+  ripple.style.width = '120px';
+  ripple.style.height = '120px';
+  barrierDom.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 600);
+  const hexSpot = document.createElement('div');
+  hexSpot.className = 'barrier-hex-spotlight';
+  hexSpot.style.left = `${impactX}px`;
+  hexSpot.style.top = `${impactY}px`;
+  barrierDom.appendChild(hexSpot);
+  setTimeout(() => hexSpot.remove(), 650);
+  if (window.spawnHitFlash) window.spawnHitFlash(barrierDom, 0.18);
+  if (window.triggerScreenShake) window.triggerScreenShake(3, 180);
+  createFloatingText(barrierDom, '🛡️ 格挡', 'text-cyan-200');
+  try { playSound('atk2'); } catch(e) {}
 }
 
 // === 【肃正】屏障命中结算（伪实体肉盾承受攻击） ===

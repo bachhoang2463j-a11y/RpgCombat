@@ -1825,3 +1825,14 @@
 - **涉及文件**：`index.html`、`demo-iai-blood.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：响应用户对于减少屏幕刺眼强光、引入血腥张力与护眼暗黑视觉反馈的调优需求。
 
+
+---
+
+## [LOG-148] 2026-08-24 — 眩晕头顶星环可视化与屏障纯减益阻挡演出（V9.0）
+
+- **变更行为**：
+  1. **眩晕可视化（仅头顶星环+微晃，不灰化）**：在 `index.html` 敌人卡初始化 `initUI` 中为每个敌人预埋常驻容器 `#\${id}-stunFx`（`stun-fx hidden absolute -top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none`，三颗 `★`），新增样式 `.stun-fx` + `.stun-star` + `@keyframes stun-sway`（1.1s 微晃 ±2px/±1.6deg）+ `@keyframes stun-twinkle`（0.9s 错峰闪烁），色值为琥珀金 `#fde047`。新增 `updateStunVisual(entity)` 检测 `buffs.some(b=>b.type==='stun') && isAlive` 切换 `hidden`，在 `updateBuffUI` 末尾联动调用，生命周期与 `type:'stun'` 完全一致（`applySingleTagEffect` 施加后显示、`nextTurn` 跳过下一次行动后自动隐藏，`[钢体]` 免疫不显示，多动额外行动亦吃眩晕）。
+  2. **屏障纯减益阻挡演出（仅演出不扣耐久）**：在 `applySingleTagEffect` 的 `isBarrierTarget && !isDamage` 静默格挡分支前插入 `triggerBarrierDebuffBlock(caster, skill, target)`。新增函数 `triggerBarrierDebuffBlock` 复用 `team-barrier-dome` 的 `barrier-hit-impact` + `barrier-hit-ripple(120px)` + `barrier-hex-spotlight` + `spawnHitFlash(0.18)` + `triggerScreenShake(3,180)` + `🛡️ 格挡` 飘字 + `atk2` 音效，强度约为伤害受击的 60%，**零耐久操作**（不读写 `teamBarrier/teamBarrierMax/barrierArmor/barrierSub`）。群攻纯减益通过 `barrierAoEActive` 去重，同一批次仅首个目标演出一次。
+  3. **版本号升级至 V9.0**：`README.md` `当前版本：V8.6 → V9.0`。
+- **涉及文件**：`index.html`、`README.md`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：响应用户需求——被眩晕敌人需有常驻可确认标记（采用最轻量的头顶星环+微晃，不做灰化遮挡），屏障存在时纯减益被静默格挡需有可感知的阻挡反馈但保持原有全额格挡语义不扣耐久。
