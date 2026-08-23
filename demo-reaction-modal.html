@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>反应拦截弹窗 (Reaction Modal) UI - 全息紧凑方案 (透明度调低 30%)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Rajdhani:wght@600;700&family=Orbitron:wght@600;800;900&display=swap');
+    
+    body {
+      font-family: 'Noto Sans SC', sans-serif;
+      background-color: #070b14;
+      color: #f1f5f9;
+      overflow-x: hidden;
+    }
+    .font-rajdhani { font-family: 'Rajdhani', sans-serif; }
+    .font-orbitron { font-family: 'Orbitron', sans-serif; }
+    .font-mono-num { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
+
+    /* ========================================================
+       高亮呼吸与发光动效 (Tag-FX 微缩高亮系统)
+       ======================================================== */
+    @keyframes fx-pulse-red {
+      0%, 100% { box-shadow: 0 0 4px rgba(244,63,94,0.4); border-color: rgba(244,63,94,0.7); }
+      50% { box-shadow: 0 0 14px rgba(244,63,94,0.9), inset 0 0 4px rgba(244,63,94,0.3); border-color: rgba(251,113,133,1); }
+    }
+    @keyframes fx-pulse-amber {
+      0%, 100% { box-shadow: 0 0 4px rgba(245,158,11,0.35); border-color: rgba(245,158,11,0.6); }
+      50% { box-shadow: 0 0 12px rgba(245,158,11,0.85); border-color: rgba(251,191,36,0.95); }
+    }
+    @keyframes fx-pulse-cyan {
+      0%, 100% { box-shadow: 0 0 4px rgba(6,182,212,0.3); border-color: rgba(6,182,212,0.5); }
+      50% { box-shadow: 0 0 10px rgba(6,182,212,0.75); border-color: rgba(34,211,238,0.9); }
+    }
+
+    .tag-fx-fatal { animation: fx-pulse-red 1.8s infinite ease-in-out; }
+    .tag-fx-amber { animation: fx-pulse-amber 2s infinite ease-in-out; }
+    .tag-fx-cyan { animation: fx-pulse-cyan 2.2s infinite ease-in-out; }
+
+    /* 滚动条轻量美化 */
+    .custom-scrollbar::-webkit-scrollbar { width: 3px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 3px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.6); }
+
+    /* 弹窗全息玻璃核心样式（支持动态透明度） */
+    .reaction-modal-glass {
+      background-color: rgba(2, 6, 23, var(--modal-opacity, 0.40));
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(99, 102, 241, 0.38);
+      box-shadow: 0 0 45px rgba(79, 70, 229, 0.25), inset 0 0 20px rgba(255, 255, 255, 0.02);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start p-3 sm:p-5 select-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#070b14] to-[#03060c]">
+
+  <!-- 顶部控制台 -->
+  <header class="w-full max-w-2xl mb-4 bg-slate-900/80 backdrop-blur-md border border-slate-700/60 rounded-xl p-3 shadow-xl flex flex-col md:flex-row items-center justify-between gap-3 z-50">
+    <div class="flex items-center gap-2.5">
+      <div class="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-ping"></div>
+      <div>
+        <h1 class="text-xs sm:text-sm font-bold text-white tracking-wider flex items-center gap-2">
+          <span>⚡ 反应拦截弹窗 · 方案 1 (全息紧凑胶囊)</span>
+          <span class="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">透明度-30%</span>
+        </h1>
+        <p class="text-[10px] text-slate-400">已降低底色不透明度至 60%，透光毛玻璃质感显著提升，预留 75% 空间给技能</p>
+      </div>
+    </div>
+
+    <!-- 透明度动态微调器 -->
+    <div class="flex items-center gap-2 bg-black/60 px-2.5 py-1 rounded-lg border border-slate-800 text-[11px]">
+      <span class="text-slate-400 shrink-0 font-medium">底色透明度:</span>
+      <div class="flex items-center gap-1">
+        <button onclick="setOpacity(0.90)" id="btn-op-90" class="op-btn px-2 py-0.5 rounded text-[10px] text-slate-400 hover:text-white hover:bg-slate-800">
+          90% (原版)
+        </button>
+        <button onclick="setOpacity(0.60)" id="btn-op-60" class="op-btn px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white shadow-sm">
+          60% (当前-30%)
+        </button>
+        <button onclick="setOpacity(0.40)" id="btn-op-40" class="op-btn px-2 py-0.5 rounded text-[10px] text-slate-400 hover:text-white hover:bg-slate-800">
+          40% (超高透)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 测试战况快速切换 -->
+  <div class="w-full max-w-2xl mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
+    <div class="flex items-center gap-1.5 flex-wrap">
+      <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">战况切换：</span>
+      <button onclick="switchPreset('case1')" id="preset-case1" class="preset-btn text-[10px] px-2.5 py-0.5 rounded font-medium bg-indigo-950/80 border border-indigo-500/60 text-indigo-200 transition-all">
+        📸 埃利奥特 (防御减半+护盾+弗兰克舍身)
+      </button>
+      <button onclick="switchPreset('case2')" id="preset-case2" class="preset-btn text-[10px] px-2.5 py-0.5 rounded font-medium bg-slate-800/80 border border-slate-700 text-slate-300 transition-all hover:bg-slate-700">
+        💀 弗兰克 (无盾致命承伤 108~192)
+      </button>
+      <button onclick="switchPreset('case3')" id="preset-case3" class="preset-btn text-[10px] px-2.5 py-0.5 rounded font-medium bg-slate-800/80 border border-slate-700 text-slate-300 transition-all hover:bg-slate-700">
+        ⚡ 穿透狙击 (无视护甲直接扣血)
+      </button>
+    </div>
+    <div class="text-[10px] text-slate-400">
+      <label class="flex items-center gap-1 cursor-pointer">
+        <input type="checkbox" id="bg-toggle" onchange="toggleBackground(this.checked)" checked class="rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-0">
+        <span>战场背景高亮</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- 模拟战场背景（高透光下清晰透显背景阵地） -->
+  <div id="battle-bg" class="fixed inset-0 pointer-events-none z-0 transition-opacity duration-500 opacity-60">
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_35%_45%,_rgba(79,70,229,0.22),_transparent_65%)]"></div>
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_65%_55%,_rgba(244,63,94,0.2),_transparent_65%)]"></div>
+    
+    <!-- 战场剪影元素 -->
+    <div class="absolute left-6 md:left-20 top-1/2 -translate-y-1/2 w-48 h-64 border border-cyan-500/25 rounded-2xl bg-cyan-950/20 backdrop-blur-xs flex flex-col items-center justify-center text-cyan-300/60 text-xs gap-2 shadow-[0_0_30px_rgba(6,182,212,0.1)]">
+      <div class="w-14 h-14 rounded-full border-2 border-cyan-400/40 bg-slate-800/60 flex items-center justify-center text-xl shadow-inner">🛡️</div>
+      <span class="font-bold">我方战线阵地</span>
+      <span class="text-[10px] text-cyan-400/40 font-mono">ELLIOT / FRANK</span>
+    </div>
+    <div class="absolute right-6 md:right-20 top-1/2 -translate-y-1/2 w-48 h-64 border border-rose-500/25 rounded-2xl bg-rose-950/20 backdrop-blur-xs flex flex-col items-center justify-center text-rose-300/60 text-xs gap-2 shadow-[0_0_30px_rgba(244,63,94,0.1)]">
+      <div class="w-14 h-14 rounded-full border-2 border-rose-400/40 bg-slate-800/60 flex items-center justify-center text-xl shadow-inner">👹</div>
+      <span class="font-bold">敌对首领阵地</span>
+      <span class="text-[10px] text-rose-400/40 font-mono">ITHAQUA KIN</span>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 弹窗容器（方案 1：全息紧凑胶囊）                                           -->
+  <!-- ========================================================================= -->
+  <main class="w-full flex items-center justify-center relative z-10 py-2 my-auto">
+
+    <div id="reaction-modal" class="reaction-modal-glass w-full max-w-sm sm:max-w-[420px] rounded-2xl p-4 sm:p-5 transition-all duration-300 relative overflow-hidden">
+      
+      <!-- 顶部全息流光顶边 -->
+      <div class="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-400 to-transparent opacity-80"></div>
+
+      <!-- 头部对峙信息（紧凑 1 行） -->
+      <div class="flex items-center justify-between gap-2.5 pb-2.5 mb-2.5 border-b border-white/10 relative">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <img id="hero-img" src="https://imgur.la/images/2026/06/25/31a4dd84a831e3f76082542bf12fcf19.png" class="w-9 h-9 rounded-full border-2 border-indigo-400 object-cover shrink-0 shadow-[0_0_10px_rgba(99,102,241,0.5)]">
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5">
+              <span class="text-indigo-300 font-bold text-xs sm:text-sm tracking-wider">即将遭受攻击</span>
+              <span class="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-mono border border-indigo-500/30">REACTION</span>
+            </div>
+            <div class="text-[10px] text-slate-300 truncate flex items-center gap-1 mt-0.5">
+              <span class="truncate text-slate-400" id="attacker-name">†《伊塔库亚的眷族》†</span>
+              <span class="text-amber-300 font-bold shrink-0" id="skill-name">【极寒利爪撕裂】</span>
+            </div>
+          </div>
+        </div>
+        <button onclick="simulateToast('已收起反应弹窗，战斗状态栏保留恢复入口')" class="shrink-0 text-[10px] px-2 py-0.5 rounded border border-indigo-400/40 text-indigo-300 hover:bg-indigo-500/20 transition-all">收起</button>
+      </div>
+
+      <!-- 敌方技能属性微缩胶囊条 (超紧凑 1 行) -->
+      <div class="flex items-center justify-between text-[10px] font-mono px-2.5 py-1 bg-black/40 rounded-lg border border-white/10 mb-2.5">
+        <div class="flex items-center gap-1.5">
+          <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30" id="dmg-type">🗡️ 近战</span>
+          <span class="px-1.5 py-0.2 rounded text-[9px] bg-slate-800/80 text-slate-300">单体</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400">威力 <strong class="text-cyan-300" id="power-val">180</strong></span>
+          <span class="text-slate-400">命中 <strong class="text-indigo-300" id="hit-val">120</strong></span>
+        </div>
+      </div>
+
+      <!-- 核心承伤测算微缩卡片 (极简高亮图标与胶囊，高度仅 ~55px) -->
+      <div id="telemetry-box" class="mb-3 rounded-xl p-2 bg-black/40 border border-indigo-500/30 transition-all">
+        
+        <!-- 第一行：原始威力 ➔ 减甲 ➔ 护盾 ➔ 最终扣血 (图标胶囊流) -->
+        <div class="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono-num font-bold">
+          
+          <!-- 原始攻击胶囊 -->
+          <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-900/80 border border-slate-700">
+            <span class="text-slate-400 text-[9px]">⚔️ 原伤</span>
+            <span class="text-white" id="raw-val">168~252</span>
+            <span class="text-[8px] text-emerald-400" id="buff-val">(+30)</span>
+          </div>
+
+          <!-- 减免/防御胶囊 -->
+          <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-900/80 border border-slate-700" id="def-capsule">
+            <span class="text-cyan-400 text-[9px]" id="def-title">🛡️ 防40·减半</span>
+            <span class="text-cyan-300" id="after-armor-val">64~106</span>
+          </div>
+
+          <!-- 最终承伤高亮胶囊 (带动态 tag-fx 呼吸) -->
+          <div id="final-capsule" class="flex items-center gap-1 px-2 py-0.5 rounded bg-rose-950/80 border border-rose-500/60 text-rose-300">
+            <span class="text-[9px]">🩸 HP</span>
+            <span class="text-rose-200 font-black text-xs" id="hp-loss-val">46~88</span>
+          </div>
+        </div>
+
+        <!-- 第二行：辅助提示（护盾抵扣、舍身状态与致命警示） -->
+        <div class="flex items-center justify-between text-[9px] text-slate-400 mt-1.5 px-0.5">
+          <div class="flex items-center gap-1.5" id="shield-note">
+            <span class="text-sky-300">🛡️ 护盾吸收: <strong>18</strong></span>
+          </div>
+          <div id="alert-badge" class="text-emerald-400 font-bold flex items-center gap-1">
+            <span>● 处于安全承伤区间</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 舍身拦截机制说明（紧凑徽章化） -->
+      <div id="sheshen-notice" class="mb-2.5 px-2.5 py-1 rounded-lg bg-sky-950/50 border border-sky-500/40 text-[9px] sm:text-[10px] text-sky-200 flex items-center gap-1.5">
+        <span class="text-sky-400 text-xs shrink-0">🛡️</span>
+        <span class="truncate"><strong class="text-sky-300">舍身拦截可用</strong>：可指派队友挺身而出，替你全盘接下本次攻击。</span>
+      </div>
+
+      <!-- 反应技能列表（占据最大视觉重心，高密度卡片） -->
+      <div class="space-y-1.5 max-h-[230px] overflow-y-auto custom-scrollbar pr-0.5" id="skills-list">
+        
+        <!-- 技能 1: 自身反应技能 (折影步) -->
+        <button onclick="simulateToast('发动【折影步】！身法回避重新判定闪避...')" class="group w-full px-3 py-2 bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900/80 hover:from-indigo-600 hover:to-purple-600 rounded-xl border border-indigo-500/40 hover:border-indigo-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md">
+          <div class="flex items-center gap-2">
+            <span class="text-indigo-400 group-hover:text-white text-sm">⚡</span>
+            <div class="text-left">
+              <div class="flex items-center gap-1.5">
+                <span class="text-white font-black">折影步</span>
+                <span class="text-[8px] px-1 py-0.2 rounded bg-indigo-400/20 text-indigo-300 border border-indigo-400/30">身法回避</span>
+              </div>
+            </div>
+          </div>
+          <div class="font-mono text-[11px] font-bold text-indigo-300 bg-black/40 px-2 py-0.5 rounded border border-indigo-500/30 group-hover:bg-indigo-900/60">
+            -4 MP
+          </div>
+        </button>
+
+        <!-- 技能 2: 自身反应技能 (巫师护盾) -->
+        <button onclick="simulateToast('发动【巫师护盾】！生成魔法护盾抵挡...')" class="group w-full px-3 py-2 bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900/80 hover:from-indigo-600 hover:to-purple-600 rounded-xl border border-indigo-500/40 hover:border-indigo-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md">
+          <div class="flex items-center gap-2">
+            <span class="text-indigo-400 group-hover:text-white text-sm">⚡</span>
+            <div class="text-left">
+              <div class="flex items-center gap-1.5">
+                <span class="text-white font-black">巫师护盾</span>
+                <span class="text-[8px] px-1 py-0.2 rounded bg-purple-400/20 text-purple-300 border border-purple-400/30">单盾格挡</span>
+              </div>
+            </div>
+          </div>
+          <div class="font-mono text-[11px] font-bold text-indigo-300 bg-black/40 px-2 py-0.5 rounded border border-indigo-500/30 group-hover:bg-indigo-900/60">
+            -4 MP
+          </div>
+        </button>
+
+        <!-- 技能 3: 舍身守护者卡片 (弗兰克) -->
+        <div id="sheshen-item">
+          <button onclick="simulateToast('【弗兰克】挺身而出！发动【紧急格挡】替埃利奥特承受攻击！')" class="group w-full px-3 py-2 bg-gradient-to-r from-sky-950/80 via-blue-950/70 to-slate-900/80 hover:from-sky-600 hover:to-blue-600 rounded-xl border border-sky-500/50 hover:border-sky-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md">
+            <div class="flex items-center gap-2">
+              <img src="https://imgur.la/images/2026/06/25/26f001dbe399876cd74978bbe12a265b.png" class="w-5 h-5 rounded-full border border-sky-400 object-cover shrink-0">
+              <div class="text-left">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-sky-300 font-black">弗兰克</span>
+                  <span class="text-white">🛡️ 紧急格挡</span>
+                  <span class="text-[8px] px-1 py-0.2 rounded bg-sky-400/20 text-sky-200 border border-sky-400/30">舍身</span>
+                </div>
+              </div>
+            </div>
+            <div class="font-mono text-[11px] font-bold text-sky-300 bg-black/40 px-2 py-0.5 rounded border border-sky-500/30 group-hover:bg-sky-900/60">
+              -1 MP
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- 底部跳过按钮 -->
+      <button onclick="simulateToast('跳过反应，直接承受伤害')" class="w-full py-2 bg-slate-900/70 hover:bg-slate-800/90 text-slate-400 hover:text-slate-200 rounded-xl text-xs font-bold transition-colors border border-slate-800 mt-2.5">
+        跳过 (不反应)
+      </button>
+    </div>
+
+  </main>
+
+  <!-- 交互反馈 Toast 提示容器 -->
+  <div id="toast" class="fixed bottom-5 z-50 bg-slate-900/95 border border-indigo-500 text-white text-xs px-3 py-2 rounded-lg shadow-xl transition-all duration-300 opacity-0 translate-y-3 pointer-events-none flex items-center gap-2">
+    <span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
+    <span id="toast-msg">交互反馈</span>
+  </div>
+
+  <script>
+    // 动态调整弹窗底色透明度
+    function setOpacity(val) {
+      document.getElementById('reaction-modal').style.setProperty('--modal-opacity', val);
+
+      document.querySelectorAll('.op-btn').forEach(btn => {
+        btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-sm', 'font-bold');
+        btn.classList.add('text-slate-400', 'hover:text-white', 'hover:bg-slate-800');
+      });
+      const targetId = val === 0.90 ? 'btn-op-90' : (val === 0.60 ? 'btn-op-60' : 'btn-op-40');
+      const activeBtn = document.getElementById(targetId);
+      if (activeBtn) {
+        activeBtn.classList.remove('text-slate-400', 'hover:text-white', 'hover:bg-slate-800');
+        activeBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-sm', 'font-bold');
+      }
+      simulateToast(`弹窗底色不透明度已调整为：${Math.round(val * 100)}%`);
+    }
+
+    // 预设战况数据
+    const presets = {
+      case1: {
+        // 用户截图实况 2：埃利奥特 (防御减半 + 护盾18 + 弗兰克舍身)
+        heroImg: "https://imgur.la/images/2026/06/25/31a4dd84a831e3f76082542bf12fcf19.png",
+        rawVal: "168~252", buffVal: "(+30)",
+        defTitle: "🛡️ 防40·减半",
+        afterArmorVal: "64~106",
+        shieldVal: "18", hpLossVal: "46~88",
+        isFatal: false, isPierce: false, hasShield: true, hasSheshen: true,
+        alertText: "● 处于安全承伤区间",
+        badgeClass: "text-emerald-400 font-bold"
+      },
+      case2: {
+        // 用户截图实况 1：弗兰克 (可能致命 108~192 HP)
+        heroImg: "https://imgur.la/images/2026/06/25/26f001dbe399876cd74978bbe12a265b.png",
+        rawVal: "168~252", buffVal: "(+30)",
+        defTitle: "🛡️ 有效防60",
+        afterArmorVal: "108~192",
+        shieldVal: "0", hpLossVal: "108~192",
+        isFatal: true, isPierce: false, hasShield: false, hasSheshen: false,
+        alertText: "💀 致命风险 (MAX 192 ≥ HP 180)",
+        badgeClass: "text-rose-400 font-bold animate-pulse"
+      },
+      case3: {
+        // 穿透攻击
+        heroImg: "https://imgur.la/images/2026/06/25/31a4dd84a831e3f76082542bf12fcf19.png",
+        rawVal: "120~160", buffVal: "(无)",
+        defTitle: "⚡ 无视护甲",
+        afterArmorVal: "120~160",
+        shieldVal: "0", hpLossVal: "120~160",
+        isFatal: false, isPierce: true, hasShield: false, hasSheshen: true,
+        alertText: "⚡ 穿透攻击 (无视防御与护盾)",
+        badgeClass: "text-amber-300 font-bold"
+      }
+    };
+
+    function switchPreset(key) {
+      document.querySelectorAll('.preset-btn').forEach(b => {
+        b.classList.remove('bg-indigo-950/80', 'border-indigo-500/60', 'text-indigo-200');
+        b.classList.add('bg-slate-800/80', 'border-slate-700', 'text-slate-300');
+      });
+      const activeBtn = document.getElementById('preset-' + key);
+      activeBtn.classList.remove('bg-slate-800/80', 'border-slate-700', 'text-slate-300');
+      activeBtn.classList.add('bg-indigo-950/80', 'border-indigo-500/60', 'text-indigo-200');
+
+      const data = presets[key];
+
+      document.getElementById('hero-img').src = data.heroImg;
+      document.getElementById('raw-val').innerText = data.rawVal;
+      document.getElementById('buff-val').innerText = data.buffVal;
+      document.getElementById('def-title').innerText = data.defTitle;
+      document.getElementById('after-armor-val').innerText = data.afterArmorVal;
+      document.getElementById('hp-loss-val').innerText = data.hpLossVal;
+      document.getElementById('alert-badge').className = data.badgeClass;
+      document.getElementById('alert-badge').innerHTML = data.alertText;
+
+      const shieldNote = document.getElementById('shield-note');
+      if (data.hasShield) {
+        shieldNote.innerHTML = `<span class="text-sky-300">🛡️ 护盾吸收: <strong>${data.shieldVal}</strong></span>`;
+      } else {
+        shieldNote.innerHTML = `<span class="text-slate-500">无护盾吸收</span>`;
+      }
+
+      const finalCapsule = document.getElementById('final-capsule');
+      if (data.isFatal) {
+        finalCapsule.className = 'flex items-center gap-1 px-2 py-0.5 rounded bg-rose-950/80 border border-rose-500 text-rose-200 tag-fx-fatal';
+      } else if (data.isPierce) {
+        finalCapsule.className = 'flex items-center gap-1 px-2 py-0.5 rounded bg-amber-950/80 border border-amber-500 text-amber-200 tag-fx-amber';
+      } else {
+        finalCapsule.className = 'flex items-center gap-1 px-2 py-0.5 rounded bg-slate-900/80 border border-slate-700 text-rose-300';
+      }
+
+      // 舍身提示与卡片
+      const sheshenNotice = document.getElementById('sheshen-notice');
+      const sheshenItem = document.getElementById('sheshen-item');
+      if (data.hasSheshen) {
+        sheshenNotice.classList.remove('hidden');
+        sheshenItem.classList.remove('hidden');
+      } else {
+        sheshenNotice.classList.add('hidden');
+        sheshenItem.classList.add('hidden');
+      }
+
+      simulateToast(`已切换战况：${activeBtn.innerText}`);
+    }
+
+    // 交互反馈 Toast
+    let toastTimer = null;
+    function simulateToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-msg');
+      toastMsg.innerText = msg;
+      toast.classList.remove('opacity-0', 'translate-y-3');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-3');
+      }, 2000);
+    }
+
+    // 背景虚化切换
+    function toggleBackground(enabled) {
+      const bg = document.getElementById('battle-bg');
+      bg.style.opacity = enabled ? '0.6' : '0.05';
+    }
+  </script>
+</body>
+</html>

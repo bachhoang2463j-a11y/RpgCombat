@@ -1133,6 +1133,8 @@
     .tag-fx-explode-pierce { animation: fx-explode-pierce 1.5s infinite ease-in-out; }
     .tag-fx-explode-fire { animation: fx-explode-fire 1.6s infinite ease-in-out; }
     .tag-fx-explode-poison { animation: fx-explode-poison 1.6s infinite ease-in-out; }
+    @keyframes fx-pulse-fatal { 0%, 100% { box-shadow: 0 0 4px rgba(244,63,94,0.4); border-color: rgba(244,63,94,0.7); } 50% { box-shadow: 0 0 14px rgba(244,63,94,0.9), inset 0 0 4px rgba(244,63,94,0.3); border-color: rgba(251,113,133,1); } }
+    .tag-fx-fatal { animation: fx-pulse-fatal 1.8s infinite ease-in-out; }
   </style>
 </head>
 <body class="w-full h-[100dvh] min-h-[600px] bg-black text-gray-100 overflow-hidden relative select-none">
@@ -7247,13 +7249,18 @@ function buildSkillDetailHTML(skill, showTarget, target) {
         if (isAoe) targetText = '目标 全体敌方';
         else if (target) targetText = target.isBarrierTarget ? `目标 屏障·${target.name}` : `目标 ${target.name}`;
     }
-    return '<p class="text-[10px] sm:text-xs font-mono text-gray-400 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">'
-        + `<span class="text-orange-300">[${dmgType}]</span>`
-        + `<span class="text-gray-200">${isAoe ? '群攻' : '单体'}</span>`
-        + `<span class="text-cyan-300">${powerText}</span>`
-        + `<span class="text-violet-300">${hitText}</span>`
+    const dmgIcon = dmgType === '远程' ? '🎯 远程' : (dmgType === '法术' ? '🔮 法术' : '🗡️ 近战');
+    return `<div class="flex items-center justify-between text-[10px] font-mono px-2.5 py-1 bg-black/40 rounded-lg border border-white/10 mb-2">`
+        + `<div class="flex items-center gap-1.5">`
+        + `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">${dmgIcon}</span>`
+        + `<span class="px-1.5 py-0.2 rounded text-[9px] bg-slate-800/80 text-slate-300">${isAoe ? '群攻' : '单体'}</span>`
+        + `</div>`
+        + `<div class="flex items-center gap-2">`
+        + `<span class="text-slate-400">威力 <strong class="text-cyan-300">${(skill.power || 0) > 0 ? skill.power : '普攻'}</strong></span>`
+        + `<span class="text-slate-400">命中 <strong class="text-indigo-300">${skill.hit ?? 100}</strong></span>`
         + (targetText ? `<span class="text-emerald-300">${targetText}</span>` : '')
-        + '</p>';
+        + `</div>`
+        + `</div>`;
 }
 
 // 反应弹窗伤害预览：凡技能带伤害类标签（单体/群攻/穿透/眩晕）逐段显示
@@ -7305,7 +7312,7 @@ function buildReactionDamagePreview(attacker, target, skill, multiplier = 1) {
             const dmgToBarrierMax = applyBarrierResist(rawMax, incomingDamageType);
             rawMin = Math.max(0, rawMin - Math.min(teamBarrier, dmgToBarrierMin));
             rawMax = Math.max(0, rawMax - Math.min(teamBarrier, dmgToBarrierMax));
-            barrierNote = `<div class="text-[10px] text-cyan-300 mt-0.5">🛡️ 屏障将吸收部分伤害（${teamBarrierName}）</div>`;
+            barrierNote = `<span class="text-cyan-300">🛡️ 屏障吸收（${teamBarrierName}）</span>`;
         }
 
         // 减甲后具体 HP 伤害区间：对 min/max 边界各算一次（浅拷贝防 calculateDamage 改写真实 shield）
@@ -7314,35 +7321,60 @@ function buildReactionDamagePreview(attacker, target, skill, multiplier = 1) {
 
         // 高亮：穿透（琥珀） / 最大伤害 ≥ 剩余HP 可能致死（红）
         const isFatal = calcMax.hpDmg >= (target.hp || 0);
-        const borderCls = isPierce ? 'border-amber-500/60' : (isFatal ? 'border-rose-500/70' : 'border-white/10');
-        const powerLabel = tagPower === 0 ? `普攻 攻击${cStats.atk}` : `威力 ${tagPower * mult}`;
-        const buffLabel = buffAtkBonus === 0 ? '' : `[攻${buffAtkBonus > 0 ? '+' : ''}${buffAtkBonus}]`;
-        const armorLabel = isPierce ? '无视护甲' : `有效防御 ${getEffectiveStats(target).def}`;
-        const pierceMark = isPierce ? '<span class="text-amber-400 font-bold">⚡穿透</span>' : '';
-        const fatalMark = isFatal ? `<div class="text-[10px] font-bold text-rose-400 animate-pulse mt-0.5">💀 可能致命（剩余 HP ${target.hp}）</div>` : '';
+        const powerLabel = tagPower === 0 ? `普攻${cStats.atk}` : `原伤`;
+        const buffLabel = buffAtkBonus === 0 ? '' : `(${buffAtkBonus > 0 ? '+' : ''}${buffAtkBonus})`;
+        const armorLabel = isPierce ? '⚡无视护甲' : `🛡️防${getEffectiveStats(target).def}${target.isDefending ? '·减半' : ''}`;
 
         // 减甲后中间伤害 = HP伤害 + 护盾吸收量（防御姿态减半已在 calculateDamage 内体现）
         const afterArmorMin = calcMin.hpDmg + calcMin.shieldDmg;
         const afterArmorMax = calcMax.hpDmg + calcMax.shieldDmg;
-        // 护盾单独披露：护盾吸收后才是最终 HP 伤害（穿透无视护盾，天然无此段）
         const hasShield = !isPierce && (target.shield || 0) > 0;
         const shieldAbsMin = calcMin.shieldDmg;
         const shieldAbsMax = calcMax.shieldDmg;
         const shieldAbsLabel = shieldAbsMin === shieldAbsMax ? `${shieldAbsMin}` : `${shieldAbsMin}~${shieldAbsMax}`;
-        const defendNote = target.isDefending ? ' · 防御减半' : '';
-        const armorLine = `🛡️ ${armorLabel}${defendNote} → ${hasShield ? `${afterArmorMin}~${afterArmorMax}` : `HP ${calcMin.hpDmg}~${calcMax.hpDmg}`}`;
-        const shieldLine = hasShield ? `<div class="text-sky-300">🛡️ 护盾吸收 ${shieldAbsLabel} → HP ${calcMin.hpDmg}~${calcMax.hpDmg}</div>` : '';
 
-        return `<div class="bg-black/40 border ${borderCls} rounded-lg px-2.5 py-1.5 mb-1.5 text-[10px] sm:text-[11px] font-mono leading-snug">
-            ${barrierNote}
-            <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5"><span class="text-gray-200">${powerLabel}</span>${buffLabel ? `<span class="text-emerald-300">${buffLabel}</span>` : ''}<span class="text-gray-500">→ 原始 ${rawMin}~${rawMax}</span>${pierceMark}</div>
-            <div class="${isFatal ? 'text-rose-300 font-bold' : 'text-gray-300'}">${armorLine}</div>
-            ${shieldLine}
-            ${fatalMark}
+        const finalCapsuleClass = isFatal 
+            ? 'flex items-center gap-1 px-2 py-0.5 rounded bg-rose-950/80 border border-rose-500/80 text-rose-200 tag-fx-fatal'
+            : (isPierce 
+                ? 'flex items-center gap-1 px-2 py-0.5 rounded bg-amber-950/80 border border-amber-500/80 text-amber-200 tag-fx-molt'
+                : 'flex items-center gap-1 px-2 py-0.5 rounded bg-slate-900/80 border border-slate-700 text-rose-300');
+
+        const alertBadge = isFatal
+            ? `<span class="text-rose-400 font-bold animate-pulse text-[9px]">💀 致命风险 (MAX ${calcMax.hpDmg} ≥ HP ${target.hp})</span>`
+            : (isPierce
+                ? `<span class="text-amber-300 font-bold text-[9px]">⚡ 穿透攻击</span>`
+                : `<span class="text-emerald-400 font-medium text-[9px]">● 安全承伤区间</span>`);
+
+        return `<div class="mb-2 rounded-xl p-2 bg-black/40 border border-indigo-500/30 text-[10px] font-mono-num">
+            <div class="flex flex-wrap items-center justify-between gap-1 font-bold">
+                <!-- 原始攻击胶囊 -->
+                <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-900/80 border border-slate-700">
+                    <span class="text-slate-400 text-[9px]">⚔️ ${powerLabel}</span>
+                    <span class="text-white">${rawMin}~${rawMax}</span>
+                    ${buffLabel ? `<span class="text-[8px] text-emerald-400">${buffLabel}</span>` : ''}
+                </div>
+                <!-- 减免/防御胶囊 -->
+                <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-900/80 border border-slate-700">
+                    <span class="${isPierce ? 'text-amber-400' : 'text-cyan-400'} text-[9px]">${armorLabel}</span>
+                    <span class="${isPierce ? 'text-amber-300' : 'text-cyan-300'}">${hasShield ? `${afterArmorMin}~${afterArmorMax}` : `${calcMin.hpDmg}~${calcMax.hpDmg}`}</span>
+                </div>
+                <!-- 最终扣血胶囊 -->
+                <div class="${finalCapsuleClass}">
+                    <span class="text-[9px]">🩸 HP</span>
+                    <span class="font-black text-xs">${calcMin.hpDmg}~${calcMax.hpDmg}</span>
+                </div>
+            </div>
+            <!-- 辅助说明行：护盾抵扣、屏障吸收与致命警示 -->
+            <div class="flex items-center justify-between text-[9px] text-slate-400 mt-1.5 px-0.5">
+                <div class="flex items-center gap-1.5">
+                    ${hasShield ? `<span class="text-sky-300">🛡️ 护盾吸收: <strong>${shieldAbsLabel}</strong></span>` : (barrierNote ? barrierNote : '<span class="text-slate-500">无护盾吸收</span>')}
+                </div>
+                <div>${alertBadge}</div>
+            </div>
         </div>`;
     }).join('');
 
-    return `<div class="mt-1 mb-1">${segments}</div>`;
+    return segments;
 }
 
 function promptKanpo(candidates, attacker, incomingSkill, incomingTarget) {
@@ -7785,28 +7817,43 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill, sheshenCa
         let skillHtml = '';
         candidates.forEach((cand, index) => {
             if (cand.type === 'reaction') {
-                skillHtml += `<button class="w-full py-2.5 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-lg text-xs sm:text-sm font-bold shadow-lg transition-all transform hover:scale-105 mb-2 text-white flex justify-between px-4 items-center" onclick="resolveReaction(${index})"><span>⚡ ${cand.skill.name} ${limitOf(cand.skill)}</span><span class="font-mono flex gap-1">${costOf(cand.skill)}</span></button>`;
+                skillHtml += `<button class="group w-full px-3 py-2 bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900/80 hover:from-indigo-600 hover:to-purple-600 rounded-xl border border-indigo-500/40 hover:border-indigo-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md mb-1.5" onclick="resolveReaction(${index})"><div class="flex items-center gap-2"><span class="text-indigo-400 group-hover:text-white text-sm">⚡</span><div class="text-left"><div class="flex items-center gap-1.5"><span class="text-white font-black">${cand.skill.name}</span>${limitOf(cand.skill)}</div></div></div><div class="font-mono text-[11px] font-bold text-indigo-300 bg-black/40 px-2 py-0.5 rounded border border-indigo-500/30 group-hover:bg-indigo-900/60 flex gap-1">${costOf(cand.skill)}</div></button>`;
             } else {
-                skillHtml += `<button class="w-full py-2.5 sm:py-3 bg-gradient-to-r from-sky-700 to-blue-700 hover:from-sky-600 hover:to-blue-600 rounded-lg text-xs sm:text-sm font-bold shadow-lg transition-all transform hover:scale-105 mb-2 text-white flex justify-between px-4 items-center border border-sky-400/30" onclick="resolveReaction(${index})"><span class="flex items-center gap-1.5 min-w-0"><img src="${cand.hero.img}" class="w-5 h-5 rounded-full border border-sky-300 object-cover shrink-0"><span class="text-sky-200 font-black truncate">${cand.hero.name}</span><span class="truncate">🛡️ ${cand.skill.name} ${limitOf(cand.skill)}</span></span><span class="font-mono flex gap-1 shrink-0">${costOf(cand.skill)}</span></button>`;
+                skillHtml += `<button class="group w-full px-3 py-2 bg-gradient-to-r from-sky-950/80 via-blue-950/70 to-slate-900/80 hover:from-sky-600 hover:to-blue-600 rounded-xl border border-sky-500/50 hover:border-sky-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md mb-1.5" onclick="resolveReaction(${index})"><div class="flex items-center gap-2 min-w-0"><img src="${cand.hero.img}" class="w-5 h-5 rounded-full border border-sky-400 object-cover shrink-0"><div class="text-left min-w-0"><div class="flex items-center gap-1.5"><span class="text-sky-300 font-black truncate">${cand.hero.name}</span><span class="text-white truncate">🛡️ ${cand.skill.name}</span><span class="text-[8px] px-1 py-0.2 rounded bg-sky-400/20 text-sky-200 border border-sky-400/30 shrink-0">舍身</span>${limitOf(cand.skill)}</div></div></div><div class="font-mono text-[11px] font-bold text-sky-300 bg-black/40 px-2 py-0.5 rounded border border-sky-500/30 group-hover:bg-sky-900/60 flex gap-1 shrink-0">${costOf(cand.skill)}</div></button>`;
             }
         });
         const skipText = onlySheshen ? '承受攻击' : '跳过 (不反应)';
-        skillHtml += `<button class="w-full py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs sm:text-sm font-bold shadow-lg transition-colors text-gray-300 border border-gray-600 mt-2" onclick="resolveReaction(-1)">${skipText}</button>`;
+        skillHtml += `<button class="w-full py-2 bg-slate-900/70 hover:bg-slate-800/90 rounded-xl text-xs font-bold shadow-lg transition-colors text-slate-400 hover:text-slate-200 border border-slate-800 mt-2" onclick="resolveReaction(-1)">${skipText}</button>`;
+
+        const modalBgClass = onlySheshen
+            ? 'bg-slate-950/40 backdrop-blur-xl border border-sky-500/40 shadow-[0_0_45px_rgba(56,189,248,0.3)]'
+            : 'bg-slate-950/40 backdrop-blur-xl border border-indigo-500/40 shadow-[0_0_45px_rgba(79,70,229,0.35)]';
 
         overlay.innerHTML = `
-            <div class="bg-slate-900/95 ${onlySheshen ? 'border border-sky-500/50 shadow-[0_0_50px_rgba(56,189,248,0.35)]' : 'border border-indigo-500/50 shadow-[0_0_50px_rgba(79,70,229,0.4)]'} rounded-2xl p-5 sm:p-6 w-11/12 max-w-xs sm:max-w-sm transform scale-95 animate-[enter-hero_0.3s_forwards]">
-                <div class="flex items-center gap-3 mb-4 border-b border-white/10 pb-3">
-                    <img src="${hero.img}" class="w-10 h-10 rounded-full ${onlySheshen ? 'border border-sky-400' : 'border border-indigo-400'} object-cover">
-                    <div>
-                        <h3 class="${onlySheshen ? 'text-sky-400' : 'text-indigo-400'} font-bold text-sm sm:text-base tracking-widest">即将遭受攻击</h3>
-                        <p class="text-[10px] sm:text-xs text-gray-400">面临 ${attacker.name} 的 <span class="text-orange-300">【${incomingSkill ? incomingSkill.name : '攻击'}】</span></p>
-                        ${incomingSkill ? buildSkillDetailHTML(incomingSkill) : ''}
+            <div class="${modalBgClass} rounded-2xl p-4 sm:p-5 w-11/12 max-w-sm sm:max-w-[420px] transform scale-95 animate-[enter-hero_0.3s_forwards] relative overflow-hidden">
+                <div class="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-400 to-transparent opacity-80"></div>
+                <div class="flex items-center justify-between gap-2.5 pb-2.5 mb-2 border-b border-white/10 relative">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <img src="${hero.img}" class="w-9 h-9 rounded-full ${onlySheshen ? 'border-2 border-sky-400' : 'border-2 border-indigo-400'} object-cover shrink-0 shadow-[0_0_10px_rgba(99,102,241,0.5)]">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-1.5">
+                                <h3 class="${onlySheshen ? 'text-sky-300' : 'text-indigo-300'} font-bold text-xs sm:text-sm tracking-wider">即将遭受攻击</h3>
+                                <span class="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-mono border border-indigo-500/30">REACTION</span>
+                            </div>
+                            <div class="text-[10px] text-slate-300 truncate flex items-center gap-1 mt-0.5">
+                                <span class="text-slate-400 truncate">面临 ${attacker.name} 的</span>
+                                <span class="text-amber-300 font-bold shrink-0">【${incomingSkill ? incomingSkill.name : '攻击'}】</span>
+                            </div>
+                        </div>
                     </div>
-                    <button class="ml-auto shrink-0 text-[9px] sm:text-[10px] px-2 py-1 rounded border border-indigo-400/40 text-indigo-200 hover:bg-indigo-400/20 transition-colors" onclick="shelvePrompt(document.getElementById('reaction-prompt-${hero.id}'), 'reaction-reopen-${hero.id}', '继续反应')">收起</button>
+                    <button class="shrink-0 text-[10px] px-2 py-0.5 rounded border border-indigo-400/40 text-indigo-200 hover:bg-indigo-400/20 transition-colors" onclick="shelvePrompt(document.getElementById('reaction-prompt-${hero.id}'), 'reaction-reopen-${hero.id}', '继续反应')">收起</button>
                 </div>
+                ${incomingSkill ? buildSkillDetailHTML(incomingSkill) : ''}
                 ${incomingSkill ? buildReactionDamagePreview(attacker, hero, incomingSkill, multiplier) : ''}
-                ${hasSheshen && hasReaction ? `<div class="text-[10px] sm:text-[11px] text-gray-400 mb-2 bg-black/40 p-1.5 rounded border border-gray-800">🛡️ <span class="text-sky-300">舍身拦截</span>：由另一位角色替你承受本次攻击（必中、全盘接下）。</div>` : ''}
-                ${skillHtml}
+                ${hasSheshen && hasReaction ? `<div class="mb-2 px-2.5 py-1 rounded-lg bg-sky-950/50 border border-sky-500/40 text-[9px] sm:text-[10px] text-sky-200 flex items-center gap-1.5"><span class="text-sky-400 text-xs shrink-0">🛡️</span><span class="truncate"><strong class="text-sky-300">舍身拦截可用</strong>：可指派队友挺身而出，替你全盘接下本次攻击。</span></div>` : ''}
+                <div class="space-y-1 max-h-[230px] overflow-y-auto custom-scrollbar pr-0.5">
+                    ${skillHtml}
+                </div>
             </div>
         `;
         document.body.appendChild(overlay);
