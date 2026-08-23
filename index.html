@@ -8438,9 +8438,9 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     CombatEvents.emit(EVENTS.AFTER_DAMAGE, { caster, target, targetDom, incomingDamageType, hpDmg, shieldDmg });
   } else {
     // === 非伤害标签 → TAG_HANDLERS 注册表分发 ===
-    // 仅敌方减益需受命中判定影响；我方增益（回/冲/增/防/盾/瞄/嘲/再动/避/免伤/反击/驱散/肃正等）保持无条件生效。
+    // 敌我双方非伤害减益（降/盲/滞/弱/中毒/燃烧/缓）均受命中判定影响：同技能内减益随攻击命中（_bdg 共享），纯减益首标签独立掷骰；我方增益保持无条件生效。
     // 减益是否落空：命中结论由 _bdg 记录（纯减益首标签/"跟随攻击"的判定均已在判断管线完成），此处只判断、不重复 roll/动效。
-    if (targetType === 'enemy' && isDebuffTag && !(skill && (skill.guaranteedHit || burstGuarantee))) {
+    if (isDebuffTag && !(skill && (skill.guaranteedHit || burstGuarantee))) {
       const resolved = !!(skill && skill._bdg && skill._bdg.targetResolved[target.id]);
       const hit = resolved ? skill._bdg.targetHit[target.id] === true : !isDodged;
       if (!hit) {

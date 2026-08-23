@@ -1836,3 +1836,15 @@
   3. **版本号升级至 V9.0**：`README.md` `当前版本：V8.6 → V9.0`。
 - **涉及文件**：`index.html`、`README.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：响应用户需求——被眩晕敌人需有常驻可确认标记（采用最轻量的头顶星环+微晃，不做灰化遮挡），屏障存在时纯减益被静默格挡需有可感知的阻挡反馈但保持原有全额格挡语义不扣耐久。
+
+---
+
+## [LOG-149] 2026-08-24 — 混合技能减益未随闪避落空修复（V9.1）
+
+- **变更行为**：
+  1. **根因**：`applySingleTagEffect` 非伤害分支的减益落空门控为 `targetType==='enemy' && isDebuffTag`，`食尸鬼【幽暗凝视】[单体;power:25][单盲;power:20]` 攻击我方 `索恩` 时，首个 `单体` 标签已正确掷骰（含 `随机 roll` 与 `runReactionIntercept` 二次闪避/舍身）并写入 `skill._bdg.targetResolved/targetHit`，但后续 `单盲` 因 `targetType==='hero'` 跳过 `_bdg` 共享结论检查，无条件进 `TAG_HANDLERS['盲']`，导致闪避成功后 `单盲` 仍命中——与 `README §5.3` 的"减益随攻击一同落空"语义不一致。
+  2. **修复（1 行手术式修改）**：`index.html:8443` 去掉 `targetType==='enemy' &&`，改为 `if (isDebuffTag && !(skill && (skill.guaranteedHit || burstGuarantee)))`，使敌我双方非伤害减益（降/盲/滞/弱/中毒/燃烧/缓）统一受 `_bdg` 共享结论门控；配套更新 `8440-8442` 注释口径为"敌我双方非伤害减益均受命中判定影响"。
+  3. **兼容性**：`isDebuffTag` 白名单（降/盲/滞/弱/中毒/燃烧/缓）本就不含我方增益标签（回/冲/增/防/盾/瞄/嘲/再动/避/免伤/反击/驱散/肃正/速），有益技能不受影响；`[必中]`/`burstGuarantee` 仍短路恒命中但可被反应/看破化解；`[眩晕]` 归 `isDamage` 分支，不受此门控影响；`[钢体]/[防火]/[耐毒]` 免疫与 `triggerBarrierDebuffBlock` 阻挡分支均早于此门控，不受影响。
+  4. **版本号升级至 V9.1**：`README.md` `当前版本：V9.0 → V9.1`。
+- **涉及文件**：`index.html`、`README.md`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：修复用户反馈的"闪避后减益仍命中"不一致，使混合技能的减益严格跟随同次攻击的命中结论（成功闪避/反应成功则整体落空、`_bdg.targetHit` 共享），符合 `SPEC §5` 与 `README` 已落地的跨标签命中共享设计。
