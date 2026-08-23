@@ -7479,25 +7479,17 @@ function promptKanpo(candidates, attacker, incomingSkill, incomingTarget) {
                 <div class="mb-2.5 rounded-xl p-2 bg-black/40 border border-amber-500/30 text-[10px] font-mono">
                     <div class="flex flex-wrap items-center justify-between gap-1 font-bold">
                         ${rawDmgHtml ? `
-                        <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-900/80 border border-slate-700">
-                            <span class="text-slate-400 text-[9px]">⚔️ 敌方输出</span>
-                            <span class="text-white">${rawDmgHtml}</span>
+                        <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-500/70 text-amber-200">
+                            <span class="text-amber-400 text-[9px]">⚔️ 敌方输出</span>
+                            <span class="text-white font-bold">${rawDmgHtml}</span>
                         </div>` : ''}
-                        <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-900/80 border border-slate-700">
+                        <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-500/70 text-amber-200">
                             <span class="text-amber-400 text-[9px]">🎯 指定目标</span>
                             <span class="text-amber-200 font-bold">${designatedTarget}</span>
                         </div>
                         <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-950/80 border border-amber-500/70 text-amber-200 tag-fx-amber">
                             <span class="text-[9px]">🛡️ 拦截</span>
                             <span class="font-black text-xs">全盘无效化</span>
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-between text-[9px] text-slate-400 mt-1.5 px-0.5">
-                        <div class="flex items-center gap-1.5 text-amber-300">
-                            <span>💡 成功发动将完全抵消本次技能全部伤害与控制效果</span>
-                        </div>
-                        <div class="text-emerald-400 font-bold text-[9px]">
-                            ⚡ 插队判定
                         </div>
                     </div>
                 </div>
