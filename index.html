@@ -319,12 +319,18 @@
       100% { transform: scale(1) translate(0, 0); filter: brightness(1); }
     }
 
-    /* ==== [特效:连续扫射] N敌=N线并发·扇形扫射（移植自 demo-strafe-particles.html，无WebM，纯Canvas+CSS） ==== */
+    /* ==== [特效:连续扫射] N敌=N线并发·扇形扫射（移植自 demo-continuous-fire.html 极道狂热·重度狂暴版，无WebM，纯Canvas+CSS） ==== */
     .strafe-shake { animation: strafe-recoil-anim 0.08s linear infinite alternate; }
     @keyframes strafe-recoil-anim {
       0% { transform: translate3d(-3px, 2px, 0) scale(1.006) rotate(-0.3deg); }
       50% { transform: translate3d(3px, -2px, 0) scale(1.004) rotate(0.4deg); }
       100% { transform: translate3d(-2px, -3px, 0) scale(1.008) rotate(-0.2deg); }
+    }
+    .strafe-shake-heavy { animation: strafe-recoil-heavy-anim 0.06s linear infinite alternate; }
+    @keyframes strafe-recoil-heavy-anim {
+      0% { transform: translate3d(-6px, 4px, 0) scale(1.015) rotate(-0.6deg); }
+      50% { transform: translate3d(6px, -4px, 0) scale(1.01) rotate(0.8deg); }
+      100% { transform: translate3d(-4px, -6px, 0) scale(1.02) rotate(-0.4deg); }
     }
     .target-bullet-stutter { animation: target-stutter-anim 0.07s ease-in-out infinite alternate; }
     @keyframes target-stutter-anim {
@@ -339,17 +345,23 @@
       100% { transform: translate(-50%, -120%) scale(0.85); opacity: 0; }
     }
     @keyframes strafe-vignette-pulse {
-      0% { opacity: 0; }
-      6% { opacity: 1; }
-      88% { opacity: 0.95; }
-      100% { opacity: 0; }
+      0% { opacity: 0; transform: scale(0.94); }
+      12% { opacity: 1; transform: scale(1); }
+      85% { opacity: 0.9; transform: scale(1.02); }
+      100% { opacity: 0; transform: scale(1.05); }
     }
     @keyframes strafe-blood-dot-fade {
-      0% { transform: scale(0.3); opacity: 0; }
-      10% { transform: scale(1.15); opacity: 1; }
-      20% { transform: scale(1); opacity: 0.92; }
-      85% { opacity: 0.85; }
-      100% { transform: scale(1.05) translateY(10px); opacity: 0; }
+      0% { transform: scale(0.12) rotate(var(--splat-rot, 0deg)); opacity: 0; }
+      22% { transform: scale(1.12) rotate(var(--splat-rot, 0deg)); opacity: 1; }
+      38% { transform: scale(1) rotate(var(--splat-rot, 0deg)); opacity: 0.96; }
+      75% { transform: scale(1.01) translateY(4px) rotate(var(--splat-rot, 0deg)); opacity: 0.88; }
+      100% { transform: scale(1.04) translateY(12px) rotate(var(--splat-rot, 0deg)); opacity: 0; }
+    }
+    @keyframes strafe-blood-drip-flow {
+      0% { transform: scaleY(0); opacity: 0; transform-origin: top; }
+      25% { transform: scaleY(1); opacity: 0.95; }
+      70% { transform: scaleY(1.06) translateY(8px); opacity: 0.85; }
+      100% { transform: scaleY(1.12) translateY(18px); opacity: 0; }
     }
 
     /* ==== 敌方大招切入特效 (Boss Cut-in) ==== */
@@ -3920,58 +3932,127 @@ function spawnPoisonParticles(x, y) {
 
 // ==========================================
 // [特效:连续扫射] N敌=N线并发·快照·装饰性连发（纯Canvas+CSS，无WebM）
-// 移植自 demo-strafe-particles.html：扇形交错弹道+抛壳+跳弹火花+连发微震
-// 约束：单次结算装饰，视觉 fire-and-forget（setInterval 70ms×18），结算 await 反应期间后台持续渲染
+// 移植自 demo-continuous-fire.html 极道狂热·重度狂暴版：扇形交错弹道+抛壳+跳弹火花+电影级镜头血溅+超密连发重震
+// 约束：单次结算装饰，视觉 fire-and-forget（setInterval 50ms×52），结算 await 反应期间后台持续渲染
 // ==========================================
 let _strafeTimer = null;
 let _strafeLock = false;
 let _strafeShakeEls = [];
+
 function _spawnStrafeTracer(x1, y1, x2, y2) {
-    const spreadX = (Math.random() - 0.5) * 35;
-    const spreadY = (Math.random() - 0.5) * 35;
+    const spreadX = (Math.random() - 0.5) * 30;
+    const spreadY = (Math.random() - 0.5) * 30;
+    const targetX = x2 + spreadX;
+    const targetY = y2 + spreadY;
     fxEngine.addParticle({
-        x1, y1, x2: x2 + spreadX, y2: y2 + spreadY,
-        vx: 0, vy: 0, age: 0, life: 200,
+        x1, y1, x2: targetX, y2: targetY,
+        vx: 0, vy: 0,
+        age: 0, life: 120, // 约 100-120ms 高速飞行曳光子弹束
+        trailLength: 0.38 + Math.random() * 0.15,
+        width: 3.2,
         draw: function(ctx, pct) {
-            const a = Math.max(0, 1 - pct);
+            if (pct >= 1) return;
+            const headX = this.x1 + (this.x2 - this.x1) * pct;
+            const headY = this.y1 + (this.y2 - this.y1) * pct;
+            const tailProg = Math.max(0, pct - this.trailLength);
+            const tailX = this.x1 + (this.x2 - this.x1) * tailProg;
+            const tailY = this.y1 + (this.y2 - this.y1) * tailProg;
+
             ctx.save();
-            ctx.strokeStyle = `rgba(254,240,138,${a})`;
+            const grad = ctx.createLinearGradient(tailX, tailY, headX, headY);
+            grad.addColorStop(0, 'rgba(245, 158, 11, 0)');
+            grad.addColorStop(0.5, 'rgba(251, 191, 36, 0.75)');
+            grad.addColorStop(0.9, 'rgba(254, 240, 138, 0.95)');
+            grad.addColorStop(1, '#ffffff');
+
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = this.width;
+            ctx.lineCap = 'round';
             ctx.shadowColor = '#f59e0b';
-            ctx.shadowBlur = 12;
-            ctx.lineWidth = 2.5;
+            ctx.shadowBlur = 10;
             ctx.beginPath();
-            ctx.moveTo(this.x1, this.y1);
-            ctx.lineTo(this.x2, this.y2);
+            ctx.moveTo(tailX, tailY);
+            ctx.lineTo(headX, headY);
             ctx.stroke();
+
+            // 子弹头部白炽光核
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowBlur = 14;
+            ctx.beginPath();
+            ctx.arc(headX, headY, this.width * 0.8, 0, Math.PI * 2);
+            ctx.fill();
+
             ctx.restore();
         }
     });
 }
+
 function _spawnStrafeMuzzleFlash(x, y, isLeft) {
+    const rot = Math.random() * Math.PI * 2;
+    const baseSize = 18 + Math.random() * 8;
     fxEngine.addParticle({
         x: x, y: y,
-        vx: (isLeft ? -1 : 1) * (1 + Math.random() * 2),
+        vx: (isLeft ? -1 : 1) * (0.8 + Math.random() * 1.5),
         vy: -0.5,
         drag: 0.9,
-        age: 0, life: 90,
+        age: 0, life: 100,
         draw: function(ctx, pct) {
             const a = Math.max(0, 1 - pct);
             ctx.save();
             ctx.globalAlpha = a;
+            ctx.translate(this.x, this.y);
+            ctx.rotate(rot);
+
+            // 星芒核心
             ctx.fillStyle = '#ffffff';
-            ctx.shadowColor = '#f59e0b';
-            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#fbbf24';
+            ctx.shadowBlur = 16;
+            const s = baseSize * (1 + (1 - a) * 0.4);
             ctx.beginPath();
-            ctx.arc(this.x, this.y, 14 * (1 - pct * 0.5), 0, Math.PI * 2);
+            ctx.moveTo(0, -s);
+            ctx.lineTo(s * 0.25, -s * 0.25);
+            ctx.lineTo(s, 0);
+            ctx.lineTo(s * 0.25, s * 0.25);
+            ctx.lineTo(0, s);
+            ctx.lineTo(-s * 0.25, s * 0.25);
+            ctx.lineTo(-s, 0);
+            ctx.lineTo(-s * 0.25, -s * 0.25);
+            ctx.closePath();
             ctx.fill();
-            ctx.fillStyle = '#fef08a';
+
+            // 激波光环
+            ctx.strokeStyle = `rgba(254,240,138,${a * 0.8})`;
+            ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.arc(this.x, this.y, 22 * (1 - pct * 0.5), 0, Math.PI * 2);
+            ctx.arc(0, 0, s * 0.7, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+    });
+
+    // 枪口青烟缕缕
+    fxEngine.addParticle({
+        x: x + (Math.random() - 0.5) * 8,
+        y: y - 4,
+        vx: (Math.random() - 0.5) * 1.0,
+        vy: -(1.0 + Math.random() * 1.5),
+        drag: 0.96, gravity: 0,
+        age: 0, life: 400 + Math.random() * 250,
+        size: 8 + Math.random() * 10,
+        draw: function(ctx, pct) {
+            const a = (1 - pct) * 0.3;
+            ctx.save();
+            ctx.globalAlpha = a;
+            ctx.fillStyle = 'rgba(203, 213, 225, 0.4)';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size * (1 + pct * 0.8), 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
         }
     });
 }
+
 function _spawnStrafeCasing(x, y, isLeft) {
     const angle = (isLeft ? -135 : 45) + (Math.random() * 30 - 15);
     const speed = 4 + Math.random() * 4;
@@ -4001,6 +4082,7 @@ function _spawnStrafeCasing(x, y, isLeft) {
         }
     });
 }
+
 let _strafeBloodOverlay = null;
 
 function _createStrafeScreenBloodOverlay() {
@@ -4008,116 +4090,77 @@ function _createStrafeScreenBloodOverlay() {
     wrap.className = 'fixed inset-0 pointer-events-none overflow-hidden';
     wrap.style.zIndex = '138';
     
-    // 暗红边缘压暗 (Crimson Vignette) - 2.55s 脉冲
-    const vignette = `<div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(circle, transparent 36%, rgba(136,8,8,0.38) 72%, rgba(69,10,10,0.88) 100%); animation: strafe-vignette-pulse 2.55s cubic-bezier(0.1,0.8,0.2,1) both;"></div>`;
+    // 暗红边缘压暗 (Crimson Vignette) - 2.65s 脉冲
+    const vignette = `<div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(circle, transparent 32%, rgba(136,8,8,0.45) 70%, rgba(65,8,8,0.95) 100%); animation: strafe-vignette-pulse 2.65s cubic-bezier(0.1,0.8,0.2,1) both;"></div>`;
 
-    // 独立手工绘制的多形态血块（有机飞溅血花、方形斜角撕裂血痕、双相连圆血池、泪滴痕、菱形碎块与微尘点群）
-    const bloodElements = [
-        // 1. 左上角：大型有机飞溅血斑
-        `<div class="absolute pointer-events-none opacity-0" style="top:12%; left:10%; width:110px; height:110px; transform:rotate(-15deg); animation:strafe-blood-dot-fade 2.45s 0.06s cubic-bezier(0.12,0.85,0.25,1) both;">
-            <svg viewBox="0 0 100 100" class="w-full h-full" style="filter: drop-shadow(0 0 8px #450a0a);">
-                <path d="M25,15 C45,5 75,18 68,38 C80,50 78,75 58,82 C38,88 18,72 12,50 C8,32 15,20 25,15 Z" fill="#7f1d1d"/>
-                <path d="M30,22 C45,15 65,25 60,40 C68,50 65,68 50,72 C35,76 22,65 18,48 C15,35 22,25 30,22 Z" fill="#991b1b"/>
-                <circle cx="82" cy="25" r="4.5" fill="#7f1d1d"/>
-                <circle cx="88" cy="45" r="3.5" fill="#991b1b"/>
-                <circle cx="20" cy="85" r="4" fill="#881337"/>
-            </svg>
-        </div>`,
-        
-        // 2. 右上角：方形斜角撕裂血痕
-        `<div class="absolute pointer-events-none opacity-0" style="top:14%; right:12%; width:95px; height:55px; transform:rotate(12deg); animation:strafe-blood-dot-fade 2.45s 0.12s cubic-bezier(0.12,0.85,0.25,1) both;">
-            <svg viewBox="0 0 80 50" class="w-full h-full" style="filter: drop-shadow(0 0 6px #450a0a);">
-                <polygon points="5,10 70,5 75,35 15,45" fill="#881337"/>
-                <polygon points="12,14 62,10 66,30 18,38" fill="#991b1b"/>
-                <rect x="4" y="8" width="10" height="10" rx="2" fill="#7f1d1d" transform="rotate(15 8 12)"/>
-                <circle cx="76" cy="42" r="3" fill="#b91c1c"/>
-            </svg>
-        </div>`,
-
-        // 3. 左下角：双相连圆形重溅血池
-        `<div class="absolute pointer-events-none opacity-0" style="bottom:18%; left:12%; width:100px; height:65px; transform:rotate(8deg); animation:strafe-blood-dot-fade 2.45s 0.18s cubic-bezier(0.12,0.85,0.25,1) both;">
-            <svg viewBox="0 0 90 60" class="w-full h-full" style="filter: drop-shadow(0 0 7px #450a0a);">
-                <circle cx="30" cy="30" r="18" fill="#7f1d1d"/>
-                <circle cx="60" cy="28" r="14" fill="#881337"/>
-                <path d="M26,18 Q45,28 58,18 Q45,38 26,38 Z" fill="#7f1d1d"/>
-                <circle cx="28" cy="28" r="11" fill="#991b1b"/>
-                <circle cx="58" cy="27" r="8" fill="#b91c1c"/>
-                <circle cx="76" cy="18" r="3.5" fill="#7f1d1d"/>
-                <circle cx="12" cy="44" r="3" fill="#991b1b"/>
-            </svg>
-        </div>`,
-
-        // 4. 右下角：圆形集中重击血滴核
-        `<div class="absolute pointer-events-none opacity-0" style="bottom:22%; right:14%; width:75px; height:75px; animation:strafe-blood-dot-fade 2.45s 0.22s cubic-bezier(0.12,0.85,0.25,1) both;">
-            <svg viewBox="0 0 60 60" class="w-full h-full" style="filter: drop-shadow(0 0 6px #450a0a);">
-                <circle cx="28" cy="28" r="18" fill="#7f1d1d"/>
-                <circle cx="26" cy="26" r="12" fill="#991b1b"/>
-                <circle cx="48" cy="18" r="4" fill="#991b1b"/>
-                <circle cx="44" cy="42" r="4.5" fill="#7f1d1d"/>
-                <circle cx="12" cy="46" r="3" fill="#dc2626"/>
-            </svg>
-        </div>`,
-
-        // 5. 顶端居中偏右：垂落泪滴形血痕
-        `<div class="absolute pointer-events-none opacity-0" style="top:4%; right:30%; width:36px; height:75px; animation:strafe-blood-dot-fade 2.45s 0.35s cubic-bezier(0.12,0.85,0.25,1) both;">
-            <svg viewBox="0 0 40 80" class="w-full h-full" style="filter: drop-shadow(0 0 5px #450a0a);">
-                <path d="M20,5 C28,25 35,45 32,62 C29,75 11,75 8,62 C5,45 12,25 20,5 Z" fill="#7f1d1d"/>
-                <path d="M20,12 C25,28 30,46 28,58 C26,68 14,68 12,58 C10,46 15,28 20,12 Z" fill="#991b1b"/>
-                <circle cx="20" cy="74" r="3" fill="#dc2626"/>
-            </svg>
-        </div>`,
-
-        // 6. 左侧中段：菱形破碎块
-        `<div class="absolute pointer-events-none opacity-0" style="top:42%; left:8%; width:65px; height:65px; transform:rotate(-20deg); animation:strafe-blood-dot-fade 2.45s 0.28s cubic-bezier(0.12,0.85,0.25,1) both;">
-            <svg viewBox="0 0 70 70" class="w-full h-full" style="filter: drop-shadow(0 0 6px #450a0a);">
-                <polygon points="35,8 62,28 50,62 18,55 10,24" fill="#881337"/>
-                <polygon points="34,16 54,32 44,52 22,46 16,28" fill="#991b1b"/>
-                <circle cx="58" cy="58" r="3.5" fill="#dc2626"/>
-                <circle cx="8" cy="40" r="2.5" fill="#7f1d1d"/>
-            </svg>
-        </div>`,
-
-        // 7. 右侧中段：细小微尘血点群
-        `<div class="absolute pointer-events-none opacity-0" style="top:48%; right:9%; width:55px; height:55px; animation:strafe-blood-dot-fade 2.45s 0.42s cubic-bezier(0.12,0.85,0.25,1) both;">
-            <svg viewBox="0 0 50 50" class="w-full h-full" style="filter: drop-shadow(0 0 4px #450a0a);">
-                <circle cx="15" cy="18" r="6.5" fill="#991b1b"/>
-                <circle cx="34" cy="12" r="4.5" fill="#7f1d1d"/>
-                <circle cx="28" cy="35" r="5.5" fill="#991b1b"/>
-                <circle cx="42" cy="38" r="3.5" fill="#dc2626"/>
-                <circle cx="8" cy="32" r="2" fill="#7f1d1d"/>
-            </svg>
-        </div>`,
-
-        // 8. 下方偏中：单颗凝结血滴
-        `<div class="absolute pointer-events-none opacity-0" style="bottom:12%; left:42%; width:42px; height:42px; animation:strafe-blood-dot-fade 2.45s 0.52s cubic-bezier(0.12,0.85,0.25,1) both;">
-            <svg viewBox="0 0 40 40" class="w-full h-full" style="filter: drop-shadow(0 0 5px #450a0a);">
-                <circle cx="20" cy="20" r="14" fill="#7f1d1d"/>
-                <circle cx="18" cy="18" r="8.5" fill="#b91c1c"/>
-                <circle cx="28" cy="28" r="3" fill="#7f1d1d"/>
-            </svg>
-        </div>`
+    // 8 组独立手工绘制的高阶有机流体 Splatter SVG 路径（100% 继承击杀特写级贝塞尔曲线与湿润微滴）
+    const splatters = [
+        `M22,12 C40,4 68,14 62,35 C75,44 78,68 60,78 C42,86 18,74 12,54 C8,38 12,22 22,12 Z`,
+        `M32,6 C48,4 62,18 56,36 C72,32 82,48 76,64 C60,82 42,76 32,86 C16,80 8,58 14,42 C4,26 22,10 32,6 Z`,
+        `M18,22 C34,10 56,12 46,34 C62,38 68,60 52,72 C38,82 22,86 16,66 C6,50 6,32 18,22 Z`,
+        `M26,14 C44,5 60,20 52,36 C66,46 68,70 52,80 C36,90 20,74 14,56 C9,40 14,22 26,14 Z`
     ];
 
-    wrap.innerHTML = vignette + bloodElements.join('');
+    const positions = [
+        { top: '8%', left: '8%', size: 140, rot: -22, delay: '0.08s' },
+        { top: '12%', right: '10%', size: 155, rot: 35, delay: '0.16s' },
+        { bottom: '15%', left: '10%', size: 135, rot: 15, delay: '0.25s' },
+        { bottom: '18%', right: '8%', size: 160, rot: -45, delay: '0.35s' },
+        { top: '4%', left: '38%', size: 110, rot: 65, delay: '0.48s' },
+        { bottom: '8%', right: '35%', size: 125, rot: -15, delay: '0.65s' },
+        { top: '48%', left: '4%', size: 115, rot: -55, delay: '0.85s' },
+        { top: '52%', right: '5%', size: 120, rot: 40, delay: '1.05s' }
+    ];
+
+    const bloodItems = positions.map((p, idx) => {
+        const path = splatters[idx % splatters.length];
+        return `
+            <div class="absolute pointer-events-none opacity-0 z-40"
+                 style="${p.top ? `top:${p.top};` : ''} ${p.bottom ? `bottom:${p.bottom};` : ''} ${p.left ? `left:${p.left};` : ''} ${p.right ? `right:${p.right};` : ''} width:${p.size}px; height:${p.size}px; --splat-rot:${p.rot}deg; animation: strafe-blood-dot-fade 2.45s ${p.delay} cubic-bezier(0.12, 0.85, 0.25, 1) both;">
+              <svg viewBox="0 0 100 100" class="w-full h-full" style="filter: drop-shadow(0 0 10px #450a0a) drop-shadow(0 0 4px #7f1d1d);">
+                <path d="${path}" fill="#7f1d1d" />
+                <path d="${path}" fill="#991b1b" transform="scale(0.85) translate(8, 8)" opacity="0.9" />
+                <circle cx="85" cy="18" r="4.5" fill="#991b1b"/>
+                <circle cx="15" cy="85" r="3.5" fill="#7f1d1d"/>
+                <circle cx="92" cy="72" r="5" fill="#881337"/>
+                <circle cx="6" cy="16" r="3" fill="#991b1b"/>
+                <circle cx="70" cy="92" r="2.5" fill="#dc2626"/>
+                <circle cx="35" cy="28" r="1.8" fill="#ffffff" opacity="0.6"/>
+                <circle cx="58" cy="45" r="1.5" fill="#ffffff" opacity="0.5"/>
+              </svg>
+            </div>`;
+    }).join('');
+
+    // 屏幕上方垂落流淌血泪 (Blood Drip Rivulets)
+    const dripItems = `
+        <div class="absolute top-0 right-[25%] w-1.5 bg-gradient-to-b from-red-700 via-red-900 to-transparent rounded-full opacity-0 z-40 pointer-events-none"
+             style="height:150px; animation: strafe-blood-drip-flow 2.5s 0.25s ease-out both; filter: drop-shadow(0 0 6px #450a0a);"></div>
+        <div class="absolute top-0 left-[22%] w-2 bg-gradient-to-b from-red-800 via-red-950 to-transparent rounded-full opacity-0 z-40 pointer-events-none"
+             style="height:180px; animation: strafe-blood-drip-flow 2.6s 0.45s ease-out both; filter: drop-shadow(0 0 6px #450a0a);"></div>
+        <div class="absolute top-0 right-[42%] w-1 bg-gradient-to-b from-red-600 via-red-900 to-transparent rounded-full opacity-0 z-40 pointer-events-none"
+             style="height:120px; animation: strafe-blood-drip-flow 2.4s 0.65s ease-out both; filter: drop-shadow(0 0 5px #450a0a);"></div>`;
+
+    wrap.innerHTML = vignette + bloodItems + dripItems;
     return wrap;
 }
 
 function _spawnStrafeBloodSplatter(x, y, count) {
     const n = count || 6;
+    const colors = ['#dc2626', '#b91c1c', '#991b1b', '#7f1d1d', '#450a0a'];
     for (let i = 0; i < n; i++) {
         const ang = Math.random() * Math.PI * 2;
         const spd = 3.0 + Math.random() * 6.5;
-        const colors = ['#ef4444', '#dc2626', '#991b1b', '#7f1d1d', '#450a0a'];
         const col = colors[Math.floor(Math.random() * colors.length)];
         fxEngine.addParticle({
-            x: x + (Math.random() - 0.5) * 40,
-            y: y + (Math.random() - 0.5) * 40,
+            x: x + (Math.random() - 0.5) * 35,
+            y: y + (Math.random() - 0.5) * 35,
             vx: Math.cos(ang) * spd,
             vy: Math.sin(ang) * spd - 1.2,
-            drag: 0.94, gravity: 0.22,
-            age: 0, life: 400 + Math.random() * 300,
-            size: 2.2 + Math.random() * 3.5,
+            drag: 0.93, gravity: 0.22,
+            age: 0, life: 450 + Math.random() * 300,
+            size: 2.5 + Math.random() * 3.5,
             color: col,
+            angle: Math.random() * Math.PI * 2,
             draw: function(ctx, pct) {
                 const a = Math.max(0, 1 - pct);
                 if (a <= 0.01) return;
@@ -4125,10 +4168,10 @@ function _spawnStrafeBloodSplatter(x, y, count) {
                 ctx.globalAlpha = a * 0.95;
                 ctx.fillStyle = this.color;
                 ctx.shadowColor = '#450a0a';
-                ctx.shadowBlur = 4;
+                ctx.shadowBlur = 5;
                 ctx.beginPath();
-                const stretch = 1 + (1 - pct) * 0.8;
-                ctx.ellipse(this.x, this.y, this.size * stretch, this.size * 0.7, ang, 0, Math.PI * 2);
+                const stretch = 1 + (1 - pct) * 0.6;
+                ctx.ellipse(this.x, this.y, this.size * stretch, this.size * 0.8, this.angle, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.restore();
             }
@@ -4140,46 +4183,61 @@ function _spawnStrafeHitSparks(x, y, count) {
     const n = count || 8;
     for (let i = 0; i < n; i++) {
         const ang = Math.random() * Math.PI * 2;
-        const spd = 4.0 + Math.random() * 8.0;
+        const spd = 4.0 + Math.random() * 8.5;
         fxEngine.addParticle({
-            x: x + (Math.random()-0.5)*50,
-            y: y + (Math.random()-0.5)*50,
-            vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd,
-            drag: 0.93, gravity: 0.05,
-            age: 0, life: 350 + Math.random()*250,
-            size: 2.8 + Math.random()*3.2,
-            color: Math.random()>0.35 ? '#fef08a' : '#f97316',
+            x: x + (Math.random() - 0.5) * 40,
+            y: y + (Math.random() - 0.5) * 40,
+            vx: Math.cos(ang) * spd,
+            vy: Math.sin(ang) * spd - 1.5,
+            drag: 0.92, gravity: 0.15,
+            age: 0, life: 300 + Math.random() * 200,
+            size: 2.2 + Math.random() * 1.8,
+            color: Math.random() > 0.35 ? '#fef08a' : '#f97316',
             draw: function(ctx, pct) {
                 const a = Math.max(0, 1 - pct);
                 if (a <= 0.01) return;
                 ctx.save();
                 ctx.globalAlpha = a;
-                ctx.fillStyle = this.color;
+                ctx.strokeStyle = this.color;
                 ctx.shadowColor = this.color;
-                ctx.shadowBlur = 10;
+                ctx.shadowBlur = 8;
+                ctx.lineWidth = this.size;
                 ctx.beginPath();
-                const r = this.size * Math.max(0.2, (1 - pct * 0.7) * 1.5);
-                ctx.arc(this.x, this.y, r, 0, Math.PI*2);
-                ctx.fill();
+                ctx.moveTo(this.x, this.y);
+                ctx.lineTo(this.x - this.vx * 2.5, this.y - this.vy * 2.5);
+                ctx.stroke();
                 ctx.restore();
             }
         });
     }
 }
+
 function startStrafeBurst(casterId, coordsSnapshot) {
     if (_strafeLock || !coordsSnapshot || coordsSnapshot.length === 0) return;
     _strafeLock = true;
     const battleScene = document.getElementById('battle-scene');
-    const heroCard = document.getElementById(`hero-card-${casterId}`);
-    let casterX = window.innerWidth * 0.18, casterY = window.innerHeight * 0.78;
+    
+    // 出膛点定位：从卡片上边缘（武器发射区）发射，避开角色面部
+    const heroCard = document.getElementById(`hero-card-${casterId}`) || document.getElementById(`hero-wrap-${casterId}`);
+    let casterMuzzleLeftX = window.innerWidth * 0.18, casterMuzzleRightX = window.innerWidth * 0.22, casterMuzzleY = window.innerHeight * 0.76;
     if (heroCard) {
         const cr = heroCard.getBoundingClientRect();
-        casterX = cr.left + cr.width/2;
-        casterY = cr.top + cr.height/2;
+        casterMuzzleLeftX = cr.left + cr.width * 0.25;
+        casterMuzzleRightX = cr.left + cr.width * 0.75;
+        casterMuzzleY = cr.top + 4; // 上边缘武器出膛点，避开面部
+    } else if (!casterId.startsWith('h')) {
+        const enemySprite = document.getElementById(`${casterId}-sprite`) || document.getElementById(`enemy-box-${casterId}`);
+        if (enemySprite) {
+            const er = enemySprite.getBoundingClientRect();
+            casterMuzzleLeftX = er.left + er.width * 0.3;
+            casterMuzzleRightX = er.left + er.width * 0.7;
+            casterMuzzleY = er.bottom - 4;
+        }
     }
+
     // 挂震颤与受击高光：暂停 breathe 避免 transform 冲突，添加 target-bullet-stutter
     _strafeShakeEls = [];
-    if (battleScene) { battleScene.classList.add('strafe-shake'); _strafeShakeEls.push(battleScene); }
+    if (battleScene) { battleScene.classList.add('strafe-shake-heavy'); _strafeShakeEls.push(battleScene); }
     coordsSnapshot.forEach(c => {
         if (c.dom) {
             c.dom.classList.remove('breathe');
@@ -4188,14 +4246,15 @@ function startStrafeBurst(casterId, coordsSnapshot) {
         }
     });
 
-    // 挂载屏幕边缘暗红压暗与细小血点覆盖层
+    // 挂载屏幕边缘暗红压暗与电影级流体血点覆盖层
     const fxRoot = document.getElementById('fx-layer') || document.body;
     if (_strafeBloodOverlay) { try { _strafeBloodOverlay.remove(); } catch(e) {} }
     _strafeBloodOverlay = _createStrafeScreenBloodOverlay();
     fxRoot.appendChild(_strafeBloodOverlay);
 
     let shotCount = 0;
-    const totalTicks = 36; // 2520ms/70ms = 36 发 (时长扩大为 2 倍)
+    const intervalMs = 50; // 50ms 极道狂暴超密连发
+    const totalTicks = 52; // 2600ms / 50ms = 52 发
     const nTargets = coordsSnapshot.length;
 
     // 扇形扫射动态序列生成
@@ -4212,16 +4271,16 @@ function startStrafeBurst(casterId, coordsSnapshot) {
     _strafeTimer = setInterval(() => {
         shotCount++;
         const isLeft = shotCount % 2 === 0;
-        const gunX = casterX + (isLeft ? -25 : 25);
-        const gunY = casterY;
+        const gunX = isLeft ? casterMuzzleLeftX : casterMuzzleRightX;
+        const gunY = casterMuzzleY;
 
-        // 1. 施法者枪口爆火
+        // 1. 施法者枪口爆火与青烟
         _spawnStrafeMuzzleFlash(gunX, gunY, isLeft);
 
-        // 2. 抛壳：每 tick 1 枚，左右交替
-        _spawnStrafeCasing(gunX, gunY, isLeft);
+        // 2. 抛壳：左右交替抛射
+        _spawnStrafeCasing(gunX + (isLeft ? -15 : 15), gunY + 8, isLeft);
 
-        // 3. 动态扇形扫射主目标（火花 + 飞溅血花）
+        // 3. 动态扇形扫射主目标（高速曳光弹束 + 跳弹火星 + 飞溅血肉）
         const mainIdx = sweepIndices[shotCount % sweepIndices.length];
         const mainTarget = coordsSnapshot[mainIdx];
         _spawnStrafeTracer(gunX, gunY, mainTarget.x, mainTarget.y);
@@ -4232,21 +4291,23 @@ function startStrafeBurst(casterId, coordsSnapshot) {
         if (nTargets > 1 && shotCount % 2 === 0) {
             const altIdx = (mainIdx + 1) % nTargets;
             const altTarget = coordsSnapshot[altIdx];
-            const altGunX = casterX + (isLeft ? 25 : -25);
+            const altGunX = isLeft ? casterMuzzleRightX : casterMuzzleLeftX;
             _spawnStrafeTracer(altGunX, gunY, altTarget.x, altTarget.y);
             _spawnStrafeHitSparks(altTarget.x, altTarget.y, 6);
             _spawnStrafeBloodSplatter(altTarget.x, altTarget.y, 4);
         }
 
-        // 4. 音效限频：每 2 tick 一次，枪击穿透/普通枪声复用，中小口径随机
+        // 4. 音效限频：每 2 tick 一次，中小口径随机枪声
         if (shotCount % 2 === 0 && typeof playRandomStandardGunshot === 'function') {
             try { playRandomStandardGunshot(); } catch(e) {}
         }
         if (shotCount >= totalTicks) stopStrafeBurst();
-    }, 70);
-    // 兜底：2650ms 后强制清场
-    setTimeout(() => stopStrafeBurst(), 2650);
+    }, intervalMs);
+
+    // 兜底：2750ms 后强制清场
+    setTimeout(() => stopStrafeBurst(), 2750);
 }
+
 function stopStrafeBurst() {
     if (_strafeTimer) { clearInterval(_strafeTimer); _strafeTimer = null; }
     if (_strafeBloodOverlay) {
@@ -4255,7 +4316,7 @@ function stopStrafeBurst() {
     }
     _strafeShakeEls.forEach(el => {
         if (!el) return;
-        el.classList.remove('strafe-shake');
+        el.classList.remove('strafe-shake', 'strafe-shake-heavy');
         el.classList.remove('target-bullet-stutter');
         if (el.classList.contains('enemy-sprite')) {
             el.classList.add('breathe');
