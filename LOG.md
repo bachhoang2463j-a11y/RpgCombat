@@ -1873,3 +1873,14 @@
   6. **版本号升级至 V9.3**：`README.md:3` `当前版本：V9.2 → V9.3`；新增 `README §3.6 高阶/传奇叙事标签`（类型修饰、首秀×最高阶×严格分镜、编辑器徽章与蓄力变体语义）。
 - **涉及文件**：`index.html`、`README.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：修复 `rawDamage<=barrierArmor` 时屏障静默无反馈的错觉（复用纯减益阻挡轻量演出，零耐久操作）；新增高阶/传奇为纯叙事稀有度分层（无数值效果），按用户要求“首秀仅最高敌+严格分镜，后续走正常我方旁白”与“蓄力三阶段释放者本人说话”补齐，避免小模型跨阶串味与整场互吹；蓄力链跨回合隔离 `isRequesting` 单锁。
+
+## [LOG-152] 2026-08-25 — 异种坏死雾/生体流转特效 + 辅助技能特效解限 + 中毒粒子 (V9.4)
+
+- **变更行为**：
+  1. **新增 `spawnPoisonParticles(x,y)` 中毒/坏死雾粒子（`index.html:3486`）**：四层层次对齐 `spawnFrostParticles/spawnFireAOEParticles` 规范——第1层墨绿毒雾光幕（`rgba(132,204,22)/rgba(34,197,94)/rgba(88,28,135)` 全屏径向渐变，`life 1250`）；第2层 55 颗腐蚀气泡/毒晶向外迸射（`a3e635/4ade80/22c55e/84cc16/c084fc` 随机，气泡带白点高光+拖尾、毒晶菱形旋转）；第3层 4 层毒环扩散（扁椭圆 `ellipse 0.36`，`a3e635/65a30d/22c55e/4c1d95`，偶数环虚线错层 + 内层柔白叠加）；第4层 28 团上升毒瘴（`86efac/a78bfa` 双色大团柔雾，`drag 0.985` 慢上浮横漂）；末置全屏毒绿闪 `4d7c0f 0.28` + `triggerScreenShake(5,320)`。
+  2. **特效注册表 `WEBM_FX_REGISTRY`（`index.html:3644/3654`）**：`particles` 可选值注释补全为 `frost|fire_aoe|thunder_aoe|holy_light|poison|thunder|explosion|light|gunshot|null`；`异种坏死雾` 由 `particles:'gunshot'` 改为 `particles:'poison'`（`scale 1.0` 与视频同步微调）、`delay 0.2` 保留；新增 `生体流转: heart.mp4 scale 0.8 particles:fire_aoe`；`双枪扫射` 视频更新为 `strafe-ezremove07.mp4`。
+  3. **调度链路补齐**：`window.spawnCanvasParticles` 补 `poison → spawnPoisonParticles`；`playAOEEffect` AOE 粒子分支补 `poison/gunshot`；`executeSkillAction` 单体粒子分支同步补 `poison/gunshot`——此前两者对 `gunshot` 均无分支、仅剩视频硬撑。
+  4. **解开特效类型限制（核心 fix，`index.html:9082`）**：原 `if(skill.fxTag){ isAttackTag=攻/单体/穿透/眩晕; if(isAoe&&isAttackTag)...}` 导致 `[群中毒][群弱][群滞]` 等纯减益/辅助技能永不触发——因 `isAttackTag` 为 false 直接静默。现改为 **只要携带 `[特效:xxx]` 就播一次，不再限制标签类型**：`if(skill&&skill.fxTag&&!skill._fxPlayed){ skill._fxPlayed=true; if(isAoe)按有益/有害自动选容器 playAOEEffect else 单体 playWebMFX； if(delay) sleep(delay) }`。多标签技能（`【异种坏死雾】` 含 3 群标签）由 `_fxPlayed` 去重仅播一次；群体容器按 `isBeneficial`（回/冲/增/防/盾/瞄/嘲/再动/避/免伤/反击/驱散/肃正/速）自动选——增益打己方容器、减益打敌方容器，`[群回][群盾]` 辅助加特效落点正确；`delay` 同步去 `isAttackTag` 门控；末尾 `delete skill._fxPlayed; delete skill._bdg;` 复位保证下次释放仍可触发。
+  5. **文档规范**：`Coding rule.md` 新增 §五 Git 提交流程与 Hash 回填规范（严防 `commit --amend` 自指死循环，标准两步提交法）。
+- **涉及文件**：`index.html`、`Coding rule.md`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：修复用户反馈的“`【异种坏死雾】[群中毒][群弱][群滞][特效:异种坏死雾]` 不显示特效”——根因为辅助类标签被 `isAttackTag` 门控拦截；同时为后续辅助类技能加特效预留通用通道，并提供与黑底雾视频叠加的专用毒雾粒子基底。
