@@ -67,3 +67,25 @@
 
 ## 四、README 更新时机
 - 仅在我确认"本轮工作有效无误"后，才更新 README.md。未确认前不要擅自改写项目现状描述。
+
+## 五、Git 提交流程与 Hash 回填规范（严防自指死循环）
+
+> **⚠️ 核心死循环陷阱**：Git Commit Hash 是对整棵提交树（Tree）内容和元数据的 SHA-1 计算。修改 `LOG.md` 或 `LOG-INDEX.md` 会改变文件内容，从而必然产生新的 Commit Hash。**绝对禁止使用 `git commit --amend` 试图强行将包含该 Hash 的 Commit 与文件内记录的 Hash 保持一致**，否则会导致 `修改 Hash → amend 导致新 Hash → 再次修改 Hash → 再次 amend` 的无限死循环。
+
+### 标准单向回填流（两步提交法）：
+1. **第一步（业务/代码提交）**：
+   - 业务代码修改并测试通过后，先提交业务 Commit：
+     ```bash
+     git add <修改的代码/业务文件>
+     git commit -m "feat/fix: <功能简述>"
+     ```
+   - 此时得到本次业务变更的稳定 Git Hash（例如 `f92b874`）。
+2. **第二步（日志回填与文档提交）**：
+   - 将上述生成的 Git Hash（`f92b874`）回填写入 `LOG.md` 与 `LOG-INDEX.md` 的对应新行中；
+   - 提交日志与文档改动（**单向提交，禁止 amend 回退**）：
+     ```bash
+     git add LOG.md LOG-INDEX.md [README.md]
+     git commit -m "docs(log): record <f92b874> in LOG and LOG-INDEX"
+     ```
+3. **第三步（推送到远程）**：
+   - 直接推送到远程仓库：`git push origin <branch>`。

@@ -3480,12 +3480,168 @@ function spawnLightParticles(x, y) {
 }
 
 // ==========================================
+// 中毒/坏死雾群体特效 —— Canvas 腐蚀毒雾粒子（基底层，不含视频）
+// 层次：毒雾光幕 / 腐蚀气泡飞溅 / 毒环扩散 / 上升毒瘴
+// ==========================================
+function spawnPoisonParticles(x, y) {
+    // 第1层 — 墨绿毒雾光幕（全屏辐射，中心黄绿、外围紫蚀）
+    fxEngine.addParticle({
+        x: 0, y: 0, vx: 0, vy: 0, age: 0, life: 1250,
+        draw: function(ctx, pct) {
+            var a = pct < 0.18 ? (pct / 0.18) * 0.34 : Math.max(0, (1 - pct) / 0.82 * 0.34);
+            var grd = ctx.createRadialGradient(x, y, 0, x, y, ctx.canvas.width * 0.68);
+            grd.addColorStop(0, 'rgba(132,204,22,' + a + ')');
+            grd.addColorStop(0.35, 'rgba(34,197,94,' + (a * 0.55) + ')');
+            grd.addColorStop(0.65, 'rgba(88,28,135,' + (a * 0.22) + ')');
+            grd.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = grd;
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        }
+    });
+
+    // 第2层 — 55颗腐蚀气泡/毒晶向外迸射
+    for (var i = 0; i < 55; i++) {
+        (function() {
+            var delay = Math.random() * 380;
+            var angle = Math.random() * Math.PI * 2;
+            var speed = 2.2 + Math.random() * 7;
+            var sz = 2.5 + Math.random() * 6;
+            var colSet = ['#a3e635','#4ade80','#22c55e','#84cc16','#c084fc'];
+            var col = colSet[Math.floor(Math.random() * colSet.length)];
+            var isBubble = Math.random() > 0.35;
+            setTimeout(function() {
+                fxEngine.addParticle({
+                    x: x + (Math.random() - 0.5) * 44,
+                    y: y + (Math.random() - 0.5) * 44,
+                    vx: speed * Math.cos(angle),
+                    vy: speed * Math.sin(angle) - 1.2,
+                    drag: 0.93, gravity: 0.05,
+                    age: 0, life: 520 + Math.random() * 520,
+                    size: sz, color: col, isBubble: isBubble,
+                    draw: function(ctx, pct) {
+                        var a = pct < 0.12 ? pct / 0.12 : Math.max(0, 1 - pct * 1.25);
+                        ctx.globalAlpha = a * 0.96;
+                        ctx.save();
+                        ctx.translate(this.x, this.y);
+                        if (this.isBubble) {
+                            ctx.fillStyle = this.color;
+                            ctx.beginPath();
+                            ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.globalAlpha = a * 0.55;
+                            ctx.fillStyle = '#ffffff';
+                            ctx.beginPath();
+                            ctx.arc(-this.size * 0.28, -this.size * 0.32, this.size * 0.32, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.globalAlpha = a * 0.22;
+                            ctx.fillStyle = this.color;
+                            ctx.beginPath();
+                            ctx.arc(-this.vx * 0.6, -this.vy * 0.6, this.size * 0.45, 0, Math.PI * 2);
+                            ctx.fill();
+                        } else {
+                            ctx.rotate(pct * Math.PI * 2.5);
+                            ctx.fillStyle = this.color;
+                            ctx.beginPath();
+                            ctx.moveTo(0, -this.size * 1.5);
+                            ctx.lineTo(this.size * 0.45, 0);
+                            ctx.lineTo(0, this.size * 1.5);
+                            ctx.lineTo(-this.size * 0.45, 0);
+                            ctx.closePath();
+                            ctx.fill();
+                        }
+                        ctx.restore();
+                    }
+                });
+            }, delay);
+        })();
+    }
+
+    // 第3层 — 4层毒环由内向外扩散（扁椭圆，模拟毒雾冲击）
+    [0, 110, 230, 360].forEach(function(wDelay, wIdx) {
+        setTimeout(function() {
+            fxEngine.addParticle({
+                x: x, y: y, vx: 0, vy: 0, age: 0, life: 750,
+                wIdx: wIdx,
+                draw: function(ctx, pct) {
+                    var maxR = 75 + this.wIdx * 38;
+                    var r = pct * maxR;
+                    var a = Math.max(0, (1 - pct) * 0.92);
+                    ctx.globalAlpha = a;
+                    ctx.strokeStyle = ['#a3e635','#65a30d','#22c55e','#4c1d95'][this.wIdx];
+                    ctx.lineWidth = Math.max(0.5, 3.2 - pct * 2.8);
+                    if (this.wIdx % 2 === 0) { ctx.setLineDash([7, 5]); ctx.lineDashOffset = -pct * 30; }
+                    ctx.beginPath();
+                    ctx.ellipse(this.x, this.y + 14, r, r * 0.36, 0, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]); ctx.lineDashOffset = 0;
+                    if (this.wIdx < 2) {
+                        ctx.globalAlpha = a * 0.28;
+                        ctx.strokeStyle = '#ecfccb';
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.ellipse(this.x, this.y + 14, r * 0.86, r * 0.31, 0, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                }
+            });
+        }, wDelay);
+    });
+
+    // 第4层 — 28团上升毒瘴（大团柔和毒雾，缓慢上浮 + 横向漂移）
+    for (var i = 0; i < 28; i++) {
+        (function() {
+            var delay = Math.random() * 650;
+            setTimeout(function() {
+                var isPurple = Math.random() > 0.68;
+                fxEngine.addParticle({
+                    x: x + (Math.random() - 0.5) * 200,
+                    y: y + 18 + Math.random() * 42,
+                    vx: (Math.random() - 0.5) * 0.9,
+                    vy: -(0.35 + Math.random() * 1.0),
+                    drag: 0.985, gravity: 0,
+                    age: 0, life: 950 + Math.random() * 750,
+                    size: 14 + Math.random() * 22,
+                    isPurple: isPurple,
+                    draw: function(ctx, pct) {
+                        var a = pct < 0.18 ? pct / 0.18 : Math.max(0, 1 - pct);
+                        ctx.globalAlpha = a * 0.17;
+                        ctx.fillStyle = this.isPurple ? '#a78bfa' : '#86efac';
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, this.size * (1 + pct * 0.55), 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.globalAlpha = a * 0.09;
+                        ctx.fillStyle = this.isPurple ? '#6d28d9' : '#14532d';
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, this.size * 0.55, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                });
+            }, delay);
+        })();
+    }
+
+    // 全屏毒绿闪（侵蚀瞬间）
+    fxEngine.addParticle({
+        x: 0, y: 0, vx: 0, vy: 0, age: 0, life: 260,
+        draw: function(ctx, pct) {
+            if (pct > 0.3) return;
+            ctx.fillStyle = '#4d7c0f';
+            ctx.globalAlpha = (1 - pct / 0.3) * 0.28;
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        }
+    });
+
+    window.triggerScreenShake(5, 320);
+}
+
+// ==========================================
 // ★ 特效注册表 ★
 // 视觉效果完全由 [特效:xxx] 标签驱动，与技能 tag 文字无关
 // url:       WebM 视频地址（null = 仅粒子，无视频）
 // scale:     视频尺寸倍数（以屏幕短边为基准，0.5~3.0）
 // particles: Canvas 粒子类型（决定背景粒子层的视觉风格）
-//            可选值: 'frost' | 'fire_aoe' | 'thunder' | 'explosion' | 'light' | null
+//            可选值: 'frost' | 'fire_aoe' | 'thunder_aoe' | 'holy_light' | 'poison' | 'thunder' | 'explosion' | 'light' | 'gunshot' | null
 // audioUrl:  独立的音效文件地址（覆盖默认的攻击音效）
 // ==========================================
 const WEBM_FX_REGISTRY = {
@@ -3493,8 +3649,10 @@ const WEBM_FX_REGISTRY = {
     '冰霜01': { url: 'https://files.catbox.moe/tr9n9i.webm',                                              scale: 1.4, particles: 'frost',       audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/freeze01.mp3' },
     '雷击01': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/450.webm',               scale: 1.4, particles: 'thunder_aoe', audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/thunder01.mp3' },
     '圣光01': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/414.webm',               scale: 1.4, particles: 'holy_light',  audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/light01.mp3' },
-    '双枪扫射': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/strafe-ezremove05.mp4', scale: 0.9, particles: 'gunshot',    audioUrl: 'none', delay: 0.5 },
+    '双枪扫射': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/strafe-ezremove07.mp4', scale: 0.9, particles: 'gunshot',    audioUrl: 'none', delay: 0.5 },
     '克虏伯重狙': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/snipe-ezremove.mp4',  scale: 1.5, particles: 'gunshot',    audioUrl: 'none' },
+    '异种坏死雾': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/fog.mp4', scale: 1.0, particles: 'poison',     audioUrl: 'none', delay: 0.2 },
+    '生体流转': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/heart.mp4', scale: 0.8, particles: 'fire_aoe',     audioUrl: 'none' },
     // 在此继续添加：
     // delay 可选（单位：秒）：特效播放后、伤害结算前的等待时长，用于长特效演出与伤害数字同步；未配置则立即结算
     // '火焰02': { url: 'https://...', scale: 1.2, particles: 'fire_aoe',    audioUrl: 'https://...' },
@@ -4370,6 +4528,7 @@ window.spawnCanvasParticles = function(type, x, y) {
     else if (type === 'thunder_single') spawnThunderParticles(x, y, false);
     else if (type === 'gunshot') spawnGunshotParticles(x, y);
     else if (type === 'light') spawnLightParticles(x, y);
+    else if (type === 'poison') spawnPoisonParticles(x, y);
     else if (type === 'frost') spawnFrostParticles(x, y);
     else if (type === 'fire_aoe') spawnFireAOEParticles(x, y);
 };
@@ -4788,9 +4947,11 @@ function playAOEEffect(containerId, type, fxTag) {
     else if (pType === 'fire_aoe')    { spawnFireAOEParticles(x, y); }
     else if (pType === 'thunder_aoe') { spawnThunderAOEParticles(x, y); }
     else if (pType === 'holy_light')  { spawnHolyLightAOEParticles(x, y); }
+    else if (pType === 'poison')      { spawnPoisonParticles(x, y); }
     else if (pType === 'thunder')     { spawnThunderParticles(x, y, true); }
     else if (pType === 'explosion')   { spawnExplosionParticles(x, y, 1.6); }
     else if (pType === 'light')       { spawnLightParticles(x, y); }
+    else if (pType === 'gunshot')     { spawnGunshotParticles(x, y); }
 
     // 2. WebM 视频层（url 为 null 则跳过）
     if (fxEntry.url) {
@@ -8920,14 +9081,18 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         }
 
         // === 视觉效果由 [特效:xxx] 标签独立决定，与 tag 文字内容完全无关 ===
-        if (skill && skill.fxTag) {
-            const isAttackTag = tag.includes('攻') || tag.includes('单体') || tag.includes('穿透') || tag.includes('眩晕');
-            if (isAoe && isAttackTag) {
-                // 群攻：在敌方/友方容器中心播放 AOE 特效
-                const containerId = casterIsHero ? 'enemies-container' : 'heroes-container';
+        // 只要携带 [特效:xxx] 就播放一次，不再限制标签类型（中毒/燃烧/辅助亦可触发）
+        if (skill && skill.fxTag && !skill._fxPlayed) {
+            skill._fxPlayed = true;
+            if (isAoe) {
+                // 群体：在敌方/友方容器中心播放 AOE 特效（含毒雾/辅助等非攻击标签）
+                const isBeneficialFx = tag.includes('回') || tag.includes('冲') || tag.includes('增') || tag.includes('防') || tag.includes('盾') || tag.includes('瞄') || tag.includes('嘲') || tag.includes('再动') || tag.includes('避') || tag.includes('免伤') || tag.includes('反击') || tag.includes('驱散') || tag.includes('肃正') || tag.includes('速');
+                const containerId = isBeneficialFx
+                    ? (casterIsHero ? 'heroes-container' : 'enemies-container')
+                    : (casterIsHero ? 'enemies-container' : 'heroes-container');
                 playAOEEffect(containerId, null, skill.fxTag);
-            } else if (!isAoe && isAttackTag) {
-                // 单体攻击：在目标位置播放特效
+            } else {
+                // 单体：在目标位置播放特效
                 const firstTarget = targets[0];
                 if (firstTarget) {
                     const tId = firstTarget.id;
@@ -8952,9 +9117,11 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                             else if (pType === 'fire_aoe')    { spawnFireAOEParticles(tx, ty); }
                             else if (pType === 'thunder_aoe') { spawnThunderAOEParticles(tx, ty); }
                             else if (pType === 'holy_light')  { spawnHolyLightAOEParticles(tx, ty); }
+                            else if (pType === 'poison')      { spawnPoisonParticles(tx, ty); }
                             else if (pType === 'thunder')     { spawnThunderParticles(tx, ty, false); }
                             else if (pType === 'explosion')   { spawnExplosionParticles(tx, ty, 0.8); }
                             else if (pType === 'light')       { spawnLightParticles(tx, ty); }
+                            else if (pType === 'gunshot')     { spawnGunshotParticles(tx, ty); }
                             // 单体 WebM
                             if (fxEntry.url) playWebMFX(tx, ty, skill.fxTag);
                         }
@@ -8963,10 +9130,10 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
             }
 
             // 特效演出与伤害结算同步：注册表配置 delay（秒）时，等待该时长让特效演出先行播放到打击点，再结算伤害
-            if (isAttackTag && WEBM_FX_REGISTRY[skill.fxTag] && WEBM_FX_REGISTRY[skill.fxTag].delay) {
+            if (WEBM_FX_REGISTRY[skill.fxTag] && WEBM_FX_REGISTRY[skill.fxTag].delay) {
                 await sleep(Math.round(WEBM_FX_REGISTRY[skill.fxTag].delay * 1000));
             }
-        } else {
+        } else if (!skill || !skill.fxTag) {
             // 没有配置自定义特效标签时，根据群攻子类型播放对应的默认 Canvas 全局特效
             const isAttackTag = tag.includes('攻') || tag.includes('单体') || tag.includes('穿透') || tag.includes('眩晕');
             if (isAoe && isAttackTag) {
@@ -9055,6 +9222,10 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         addHistory(`   🎯 ${caster.name} 的隐匿急袭已释放，攻击力加成消失。`);
         if(caster.id.startsWith('h')) updateHeroUI(caster); else updateEnemyUI(caster);
     }
+
+    // 本次技能特效已播标记复位（保证下次释放同一技能仍可触发）
+    if (skill && skill._fxPlayed) delete skill._fxPlayed;
+    delete skill._bdg;
 
     // 高阶/传奇首秀旁白：每技能本场仅首次走合并特色旁白，后续转回正常我方旁白，避免持续互吹
     const isHighTierSkill = !!(skill && (skill.isHighTier || skill.isLegendary));
