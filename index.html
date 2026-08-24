@@ -338,6 +338,19 @@
       80% { transform: translate(-50%, -95%) scale(1); opacity: 0.9; }
       100% { transform: translate(-50%, -120%) scale(0.85); opacity: 0; }
     }
+    @keyframes strafe-vignette-pulse {
+      0% { opacity: 0; }
+      6% { opacity: 1; }
+      88% { opacity: 0.95; }
+      100% { opacity: 0; }
+    }
+    @keyframes strafe-blood-dot-fade {
+      0% { transform: scale(0.3); opacity: 0; }
+      10% { transform: scale(1.15); opacity: 1; }
+      20% { transform: scale(1); opacity: 0.92; }
+      85% { opacity: 0.85; }
+      100% { transform: scale(1.05) translateY(10px); opacity: 0; }
+    }
 
     /* ==== 敌方大招切入特效 (Boss Cut-in) ==== */
     @keyframes cutin-overlay {
@@ -3988,6 +4001,75 @@ function _spawnStrafeCasing(x, y, isLeft) {
         }
     });
 }
+let _strafeBloodOverlay = null;
+
+function _createStrafeScreenBloodOverlay() {
+    const wrap = document.createElement('div');
+    wrap.className = 'fixed inset-0 pointer-events-none overflow-hidden';
+    wrap.style.zIndex = '138';
+    
+    // 暗红边缘压暗 (Crimson Vignette) - 2.55s 脉冲
+    const vignette = `<div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(circle, transparent 38%, rgba(136,8,8,0.38) 72%, rgba(69,10,10,0.88) 100%); animation: strafe-vignette-pulse 2.55s cubic-bezier(0.1,0.8,0.2,1) both;"></div>`;
+
+    // 屏幕镜头细小血滴点群 (Fine Screen Blood Droplets)
+    const bloodPositions = [
+        { top: '15%', left: '12%', sz: 42, delay: '0.08s' },
+        { top: '24%', left: '20%', sz: 30, delay: '0.35s' },
+        { top: '70%', left: '14%', sz: 48, delay: '0.18s' },
+        { top: '62%', left: '26%', sz: 28, delay: '0.55s' },
+        { top: '18%', right: '15%', sz: 46, delay: '0.12s' },
+        { top: '28%', right: '22%', sz: 32, delay: '0.42s' },
+        { top: '72%', right: '16%', sz: 52, delay: '0.22s' },
+        { top: '56%', right: '28%', sz: 28, delay: '0.65s' },
+        { top: '35%', left: '44%', sz: 38, delay: '0.28s' },
+        { top: '48%', right: '40%', sz: 40, delay: '0.48s' },
+        { top: '12%', left: '32%', sz: 34, delay: '0.75s' },
+        { top: '78%', right: '35%', sz: 36, delay: '0.85s' }
+    ];
+
+    let bloodDots = '';
+    bloodPositions.forEach(p => {
+        bloodDots += `<div class="absolute pointer-events-none opacity-0" style="${p.top?`top:${p.top};`:''}${p.left?`left:${p.left};`:''}${p.right?`right:${p.right};`:''}width:${p.sz}px;height:${p.sz}px;animation:strafe-blood-dot-fade 2.45s ${p.delay} cubic-bezier(0.12,0.85,0.25,1) both;"><svg viewBox="0 0 60 60" class="w-full h-full fill-red-800" style="filter: drop-shadow(0 0 6px #450a0a);"><circle cx="30" cy="30" r="13" class="fill-red-900" /><circle cx="30" cy="30" r="9" class="fill-red-700" /><circle cx="20" cy="18" r="4" class="fill-red-800" /><circle cx="42" cy="22" r="3.5" class="fill-red-900" /><circle cx="40" cy="42" r="4.5" class="fill-red-800" /><circle cx="18" cy="38" r="3" class="fill-red-700" /><circle cx="28" cy="46" r="2.5" class="fill-red-600"/></svg></div>`;
+    });
+
+    wrap.innerHTML = vignette + bloodDots;
+    return wrap;
+}
+
+function _spawnStrafeBloodSplatter(x, y, count) {
+    const n = count || 6;
+    for (let i = 0; i < n; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 3.0 + Math.random() * 6.5;
+        const colors = ['#ef4444', '#dc2626', '#991b1b', '#7f1d1d', '#450a0a'];
+        const col = colors[Math.floor(Math.random() * colors.length)];
+        fxEngine.addParticle({
+            x: x + (Math.random() - 0.5) * 40,
+            y: y + (Math.random() - 0.5) * 40,
+            vx: Math.cos(ang) * spd,
+            vy: Math.sin(ang) * spd - 1.2,
+            drag: 0.94, gravity: 0.22,
+            age: 0, life: 400 + Math.random() * 300,
+            size: 2.2 + Math.random() * 3.5,
+            color: col,
+            draw: function(ctx, pct) {
+                const a = Math.max(0, 1 - pct);
+                if (a <= 0.01) return;
+                ctx.save();
+                ctx.globalAlpha = a * 0.95;
+                ctx.fillStyle = this.color;
+                ctx.shadowColor = '#450a0a';
+                ctx.shadowBlur = 4;
+                ctx.beginPath();
+                const stretch = 1 + (1 - pct) * 0.8;
+                ctx.ellipse(this.x, this.y, this.size * stretch, this.size * 0.7, ang, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        });
+    }
+}
+
 function _spawnStrafeHitSparks(x, y, count) {
     const n = count || 8;
     for (let i = 0; i < n; i++) {
@@ -4039,8 +4121,15 @@ function startStrafeBurst(casterId, coordsSnapshot) {
             _strafeShakeEls.push(c.dom);
         }
     });
+
+    // 挂载屏幕边缘暗红压暗与细小血点覆盖层
+    const fxRoot = document.getElementById('fx-layer') || document.body;
+    if (_strafeBloodOverlay) { try { _strafeBloodOverlay.remove(); } catch(e) {} }
+    _strafeBloodOverlay = _createStrafeScreenBloodOverlay();
+    fxRoot.appendChild(_strafeBloodOverlay);
+
     let shotCount = 0;
-    const totalTicks = 18; // 1300ms/70ms = 18 发
+    const totalTicks = 36; // 2520ms/70ms = 36 发 (时长扩大为 2 倍)
     const nTargets = coordsSnapshot.length;
 
     // 扇形扫射动态序列生成
@@ -4066,11 +4155,12 @@ function startStrafeBurst(casterId, coordsSnapshot) {
         // 2. 抛壳：每 tick 1 枚，左右交替
         _spawnStrafeCasing(gunX, gunY, isLeft);
 
-        // 3. 动态扇形扫射主目标
+        // 3. 动态扇形扫射主目标（火花 + 飞溅血花）
         const mainIdx = sweepIndices[shotCount % sweepIndices.length];
         const mainTarget = coordsSnapshot[mainIdx];
         _spawnStrafeTracer(gunX, gunY, mainTarget.x, mainTarget.y);
-        _spawnStrafeHitSparks(mainTarget.x, mainTarget.y, 10);
+        _spawnStrafeHitSparks(mainTarget.x, mainTarget.y, 8);
+        _spawnStrafeBloodSplatter(mainTarget.x, mainTarget.y, 6);
 
         // 偶数发双枪交叉射击（副枪射向相邻目标，形成真正的双枪火力网）
         if (nTargets > 1 && shotCount % 2 === 0) {
@@ -4078,7 +4168,8 @@ function startStrafeBurst(casterId, coordsSnapshot) {
             const altTarget = coordsSnapshot[altIdx];
             const altGunX = casterX + (isLeft ? 25 : -25);
             _spawnStrafeTracer(altGunX, gunY, altTarget.x, altTarget.y);
-            _spawnStrafeHitSparks(altTarget.x, altTarget.y, 7);
+            _spawnStrafeHitSparks(altTarget.x, altTarget.y, 6);
+            _spawnStrafeBloodSplatter(altTarget.x, altTarget.y, 4);
         }
 
         // 4. 音效限频：每 2 tick 一次，枪击穿透/普通枪声复用，中小口径随机
@@ -4087,11 +4178,15 @@ function startStrafeBurst(casterId, coordsSnapshot) {
         }
         if (shotCount >= totalTicks) stopStrafeBurst();
     }, 70);
-    // 兜底：1350ms 后强制清场
-    setTimeout(() => stopStrafeBurst(), 1350);
+    // 兜底：2650ms 后强制清场
+    setTimeout(() => stopStrafeBurst(), 2650);
 }
 function stopStrafeBurst() {
     if (_strafeTimer) { clearInterval(_strafeTimer); _strafeTimer = null; }
+    if (_strafeBloodOverlay) {
+        try { _strafeBloodOverlay.remove(); } catch(e) {}
+        _strafeBloodOverlay = null;
+    }
     _strafeShakeEls.forEach(el => {
         if (!el) return;
         el.classList.remove('strafe-shake');
@@ -9275,11 +9370,6 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     }
     else { 
         createFloatingText(targetDom, `-${hpDmg}`, 'text-rose-500'); 
-        if (_isStrafeFxHit && targetDom) {
-            setTimeout(() => {
-                createFloatingText(targetDom, '💥 12段密集扫射', 'text-amber-300 font-mono text-xs sm:text-base');
-            }, 120);
-        }
         addHistory(`   ↳ 命中了 ${target.name}，造成了 ${hpDmg} 点实质伤害${severityStr}！${shieldDmg>0?` 并击碎了${shieldDmg}点护盾 `:''} 当前状态: ${Math.floor(Math.max(0, target.hp))}/${target.maxHp} `);
         
         // ===== 受击闪白与爆裂粒子（依伤害量分级触发）=====

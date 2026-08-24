@@ -66,6 +66,19 @@
       80% { transform: translate(-50%, -95%) scale(1); opacity: 0.9; }
       100% { transform: translate(-50%, -120%) scale(0.85); opacity: 0; }
     }
+    @keyframes strafe-vignette-pulse {
+      0% { opacity: 0; }
+      6% { opacity: 1; }
+      88% { opacity: 0.95; }
+      100% { opacity: 0; }
+    }
+    @keyframes strafe-blood-dot-fade {
+      0% { transform: scale(0.3); opacity: 0; }
+      10% { transform: scale(1.15); opacity: 1; }
+      20% { transform: scale(1); opacity: 0.92; }
+      85% { opacity: 0.85; }
+      100% { transform: scale(1.05) translateY(10px); opacity: 0; }
+    }
   </style>
 </head>
 <body class="w-screen h-screen overflow-hidden relative select-none bg-[#050811]">
@@ -470,21 +483,41 @@
       });
     }
 
-    // 3. 目标受击密集跳弹火花
+    // 3. 目标受击密集跳弹火花与血花
     function spawnHitSparks(x, y, count = 8) {
       for (let i = 0; i < count; i++) {
         const angle = Math.random() * Math.PI * 2;
-        const speed = 3.5 + Math.random() * 7.5;
+        const speed = 4.0 + Math.random() * 8.0;
         particles.push({
-          x: x + (Math.random() - 0.5) * 30,
-          y: y + (Math.random() - 0.5) * 30,
+          x: x + (Math.random() - 0.5) * 50,
+          y: y + (Math.random() - 0.5) * 50,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          drag: 0.94,
-          size: 2.2 + Math.random() * 2.5,
-          color: Math.random() > 0.3 ? '#fef08a' : '#f97316',
-          blur: 8,
+          drag: 0.93,
+          size: 2.8 + Math.random() * 3.2,
+          color: Math.random() > 0.35 ? '#fef08a' : '#f97316',
+          blur: 10,
           life: 0.8 + Math.random() * 0.4
+        });
+      }
+    }
+
+    function spawnBloodSplatter(x, y, count = 6) {
+      const colors = ['#ef4444', '#dc2626', '#991b1b', '#7f1d1d', '#450a0a'];
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 3.0 + Math.random() * 6.5;
+        const col = colors[Math.floor(Math.random() * colors.length)];
+        particles.push({
+          x: x + (Math.random() - 0.5) * 40,
+          y: y + (Math.random() - 0.5) * 40,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 1.2,
+          drag: 0.94,
+          size: 2.2 + Math.random() * 3.5,
+          color: col,
+          blur: 4,
+          life: 0.9 + Math.random() * 0.4
         });
       }
     }
@@ -504,6 +537,31 @@
           life: 0.35
         });
       }
+    }
+
+    function createDemoBloodOverlay() {
+      const wrap = document.createElement('div');
+      wrap.className = 'fixed inset-0 pointer-events-none overflow-hidden';
+      wrap.style.zIndex = '138';
+      const vignette = `<div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(circle, transparent 38%, rgba(136,8,8,0.38) 72%, rgba(69,10,10,0.88) 100%); animation: strafe-vignette-pulse 2.55s cubic-bezier(0.1,0.8,0.2,1) both;"></div>`;
+      const bloodPositions = [
+        { top: '15%', left: '12%', sz: 42, delay: '0.08s' },
+        { top: '24%', left: '20%', sz: 30, delay: '0.35s' },
+        { top: '70%', left: '14%', sz: 48, delay: '0.18s' },
+        { top: '62%', left: '26%', sz: 28, delay: '0.55s' },
+        { top: '18%', right: '15%', sz: 46, delay: '0.12s' },
+        { top: '28%', right: '22%', sz: 32, delay: '0.42s' },
+        { top: '72%', right: '16%', sz: 52, delay: '0.22s' },
+        { top: '56%', right: '28%', sz: 28, delay: '0.65s' },
+        { top: '35%', left: '44%', sz: 38, delay: '0.28s' },
+        { top: '48%', right: '40%', sz: 40, delay: '0.48s' }
+      ];
+      let bloodDots = '';
+      bloodPositions.forEach(p => {
+        bloodDots += `<div class="absolute pointer-events-none opacity-0" style="${p.top?`top:${p.top};`:''}${p.left?`left:${p.left};`:''}${p.right?`right:${p.right};`:''}width:${p.sz}px;height:${p.sz}px;animation:strafe-blood-dot-fade 2.45s ${p.delay} cubic-bezier(0.12,0.85,0.25,1) both;"><svg viewBox="0 0 60 60" class="w-full h-full fill-red-800" style="filter: drop-shadow(0 0 6px #450a0a);"><circle cx="30" cy="30" r="13" class="fill-red-900" /><circle cx="30" cy="30" r="9" class="fill-red-700" /><circle cx="20" cy="18" r="4" class="fill-red-800" /><circle cx="42" cy="22" r="3.5" class="fill-red-900" /><circle cx="40" cy="42" r="4.5" class="fill-red-800" /><circle cx="18" cy="38" r="3" class="fill-red-700" /><circle cx="28" cy="46" r="2.5" class="fill-red-600"/></svg></div>`;
+      });
+      wrap.innerHTML = vignette + bloodDots;
+      return wrap;
     }
 
     // ==========================================
@@ -556,8 +614,15 @@
         playStrafeVideo(groupCenter.x, groupCenter.y);
       }
 
-      // 3. 启动持续扫射连续粒子流 (持续 1.3s，按 70ms 间隔高频击发)
-      const durationMs = 1300;
+      // 挂载屏幕血点与暗红暗角覆盖层
+      let bloodOverlay = null;
+      if (currentScheme !== 4) {
+        bloodOverlay = createDemoBloodOverlay();
+        fxLayer.appendChild(bloodOverlay);
+      }
+
+      // 3. 启动持续扫射连续粒子流 (持续 2.6s，按 70ms 间隔高频击发)
+      const durationMs = 2600;
       const intervalMs = currentScheme === 2 ? 50 : 70;
       const totalShots = Math.floor(durationMs / intervalMs);
       let shotCount = 0;
@@ -600,18 +665,19 @@
         if (showTracers) {
           spawnTracer(casterX + (isLeft ? -20 : 20), casterY, currentTgt.x, currentTgt.y);
           if (shotCount % 2 === 0) {
-            // 第二枪打随机相邻目标
             const altIdx = (targetIdx + 1) % 3;
             spawnTracer(casterX + (isLeft ? 20 : -20), casterY, enemyCoords[altIdx].x, enemyCoords[altIdx].y);
           }
         }
 
-        // 目标跳弹与命中火花
+        // 目标跳弹与命中火花 + 飞溅血花
         if (showHits) {
-          spawnHitSparks(currentTgt.x, currentTgt.y, currentScheme === 2 ? 12 : 7);
+          spawnHitSparks(currentTgt.x, currentTgt.y, currentScheme === 2 ? 12 : 8);
+          spawnBloodSplatter(currentTgt.x, currentTgt.y, currentScheme === 2 ? 8 : 5);
           if (shotCount % 2 === 0) {
             const altIdx = (targetIdx + 1) % 3;
-            spawnHitSparks(enemyCoords[altIdx].x, enemyCoords[altIdx].y, 5);
+            spawnHitSparks(enemyCoords[altIdx].x, enemyCoords[altIdx].y, 6);
+            spawnBloodSplatter(enemyCoords[altIdx].x, enemyCoords[altIdx].y, 4);
           }
         }
 
@@ -625,28 +691,26 @@
           clearInterval(strafeTimer);
           battleScene.classList.remove('strafe-shake');
           enemies.forEach(e => e.classList.remove('target-bullet-stutter'));
+          if (bloodOverlay) bloodOverlay.remove();
         }
       }, intervalMs);
 
-      // 4. 浮动连击飘字 (在 3 敌人头顶同步弹出群体伤害)
+      // 4. 浮动伤害飘字 (在 3 敌人头顶同步弹出群体伤害)
       enemies.forEach((enemy, idx) => {
         const tgt = enemyCoords[idx];
-        const dmg = idx === 1 ? '-185' : '-162';
+        const dmg = idx === 1 ? '-240' : '-195';
         const floatersHtml = `
           <div class="absolute pointer-events-none z-[190] text-center"
-               style="left: ${tgt.x}px; top: ${tgt.y}px; animation: strafe-dmg-pop 1.2s ${idx * 0.08}s cubic-bezier(0.12, 0.9, 0.25, 1) both;">
+               style="left: ${tgt.x}px; top: ${tgt.y}px; animation: strafe-dmg-pop 1.4s ${idx * 0.08}s cubic-bezier(0.12, 0.9, 0.25, 1) both;">
             <div class="font-cinzel text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-100 via-amber-400 to-amber-600 text-outline-gold tracking-wider whitespace-nowrap">
               ${dmg}
-            </div>
-            <div class="mt-1 text-[10px] font-bold font-mono text-yellow-300 bg-yellow-950/90 px-1.5 py-0.5 rounded-full border border-yellow-400/50 shadow-md">
-              💥 群体扫射
             </div>
           </div>
         `;
         const floaterEl = document.createElement('div');
         floaterEl.innerHTML = floatersHtml;
         fxLayer.appendChild(floaterEl);
-        setTimeout(() => floaterEl.remove(), 1400);
+        setTimeout(() => floaterEl.remove(), 1600);
       });
 
       // 5. 扣减 3 敌人血条
@@ -654,15 +718,15 @@
         const hpBar = document.getElementById(`enemy-hp-bar-${i}`);
         if (hpBar) {
           const curW = parseInt(hpBar.style.width || '100');
-          const nextW = Math.max(10, curW - (i === 2 ? 22 : 35));
+          const nextW = Math.max(10, curW - (i === 2 ? 35 : 45));
           hpBar.style.width = `${nextW}%`;
           if (nextW <= 10) {
-            setTimeout(() => { hpBar.style.width = '100%'; }, 1600);
+            setTimeout(() => { hpBar.style.width = '100%'; }, 2700);
           }
         }
       }
 
-      const delayTime = isSlowMo ? 3000 : 1600;
+      const delayTime = isSlowMo ? 5000 : 2800;
       setTimeout(() => {
         isFiring = false;
       }, delayTime);
