@@ -1685,7 +1685,7 @@ const SKILL_TYPES = [
   '[中毒]', '[群中毒]', '[燃烧]', '[群燃烧]',
   '[单速]', '[群速]', '[单缓]', '[群缓]',
   '[驱散]', '[群驱散]',
-  '[肃正]',
+  '[肃正]', '[肃正:近战]', '[肃正:远程]', '[肃正:法术]',
   '[必中]',
   '[高阶]', '[传奇]', '[神术]',
   '[近战]', '[远程]', '[法术]'
@@ -11819,6 +11819,15 @@ function resetBattle(btn) {
 // 编辑器系统
 // ==========================================
 function openEditor() {
+  // 【肃正】自愈已污染存档：[无] + barrierSub 残留 → 重建 type，避免显 [无]（下次保存即干净）
+  try {
+    [...(heroesData||[]), ...(enemiesData||[])].forEach(ent => (ent.skills||[]).forEach(s => {
+      if (s.barrierSub && !((s.type||'')+ (s.type2||'') + (s.type3||'')).includes('肃正')) {
+        const _hasSz = [s.type,s.type2,s.type3].some(t=>t&&t.includes('肃正'));
+        if (!_hasSz) s.type = `[肃正:${s.barrierSub}]`;
+      }
+    }));
+  } catch(e) {}
   const modal = document.getElementById('editor-modal'); modal.className = "fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 overflow-y-auto";
   // 记录当前滚动容器的滚动条位置，防止重绘 innerHTML 时跳回顶部
   let savedScrollTop = 0;
@@ -11896,6 +11905,15 @@ function syncEditorDataToMemory() {
         s.power2 = Number(document.getElementById(`edit-h-${i}-s-${si}-power2`).value);
         s.type3 = document.getElementById(`edit-h-${i}-s-${si}-type3`).value;
         s.power3 = Number(document.getElementById(`edit-h-${i}-s-${si}-power3`).value); 
+        // 【肃正】子类型回写：三槽任一为肃正时以主/副槽解析 barrierSub
+        const _allSkillTypes = [s.type, s.type2, s.type3];
+        const _szType = _allSkillTypes.find(t => t && t.includes('肃正'));
+        if (_szType) {
+            const _m = _szType.match(/\[肃正(?::(近战|远程|法术))?/);
+            s.barrierSub = (_m && _m[1]) ? _m[1] : null;
+        } else if (s.barrierSub) {
+            // 三槽均非肃正且为纯误残留（如首次保存劣化后的 [无] 孤儿），保留 barrierSub 供自愈分支重建 type
+        }
     });
   });
   enemiesData.forEach((e, i) => {
@@ -11929,6 +11947,10 @@ function syncEditorDataToMemory() {
         s.power2 = Number(document.getElementById(`edit-e-${i}-s-${si}-power2`).value);
         s.type3 = document.getElementById(`edit-e-${i}-s-${si}-type3`).value;
         s.power3 = Number(document.getElementById(`edit-e-${i}-s-${si}-power3`).value); 
+        // 【肃正】敌方同步：三槽解析 barrierSub
+        const _eAllTypes = [s.type, s.type2, s.type3];
+        const _eSz = _eAllTypes.find(t => t && t.includes('肃正'));
+        if (_eSz) { const _em = _eSz.match(/\[肃正(?::(近战|远程|法术))?/); s.barrierSub = (_em && _em[1]) ? _em[1] : null; }
     });
   });
 }
@@ -12174,10 +12196,14 @@ function applyPersistedRoster() {
     if (cfg.actCount != null) h.actCount = cfg.actCount;
     // 技能集：以持久化技能为基准，Combat_block 新增技能放置于列表最顶部
     const savedSkills = Array.isArray(saved.skills) ? saved.skills : [];
+    // 【肃正】自愈：污染档 type="[无]" 但 barrierSub 残留，下次载入即重建
+    savedSkills.forEach(s => { if (s.barrierSub && !((s.type||'')+(s.type2||'')+(s.type3||'')).includes('肃正')) { const _has=false; if (!_has) s.type = `[肃正:${s.barrierSub}]`; } });
     const cbNewSkills = h.skills.filter(cbSkill => !savedSkills.some(s => s.name === cbSkill.name));
     h.skills = [...cbNewSkills, ...savedSkills];
     // [限N次] 持久化加载后初始化本场剩余次数（新战局从满值重新开始）
     h.skills.forEach(sk => { if (sk.maxUses > 0 && sk.usesRemaining == null) sk.usesRemaining = sk.maxUses; });
+    // 合并后自愈当前英雄（覆盖污染）
+    h.skills.forEach(sk => { if (sk.barrierSub && !((sk.type||'')+(sk.type2||'')+(sk.type3||'')).includes('肃正')) sk.type = `[肃正:${sk.barrierSub}]`; });
   });
   // 合并完成后同步初始缓存，使"重置"恢复的也是持久化合并后的版本（而非 Combat_block 原始快照）
   initialHeroesCache = JSON.parse(JSON.stringify(heroesData));
