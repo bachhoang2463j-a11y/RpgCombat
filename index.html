@@ -363,6 +363,12 @@
       70% { transform: scaleY(1.06) translateY(8px); opacity: 0.85; }
       100% { transform: scaleY(1.12) translateY(18px); opacity: 0; }
     }
+    .hero-recoil-pulse { animation: hero-recoil-pulse-anim 0.06s cubic-bezier(0.22, 0.61, 0.36, 1); }
+    @keyframes hero-recoil-pulse-anim {
+      0% { transform: translate3d(0, 0, 0) scale(1); filter: brightness(1); }
+      18% { transform: translate3d(-4px, 1px, 0) scale(1.012) rotate(-0.7deg); filter: brightness(1.18); }
+      100% { transform: translate3d(0, 0, 0) scale(1); filter: brightness(1); }
+    }
 
     /* ==== 敌方大招切入特效 (Boss Cut-in) ==== */
     @keyframes cutin-overlay {
@@ -3938,6 +3944,8 @@ function spawnPoisonParticles(x, y) {
 let _strafeTimer = null;
 let _strafeLock = false;
 let _strafeShakeEls = [];
+let _strafeCasterRecoilEl = null;
+let _strafePulseEl = null;
 
 function _spawnStrafeTracer(x1, y1, x2, y2) {
     const spreadX = (Math.random() - 0.5) * 30;
@@ -4235,11 +4243,30 @@ function startStrafeBurst(casterId, coordsSnapshot) {
         }
     }
 
-    // 挂震颤与受击高光：暂停 breathe 避免 transform 冲突，添加 target-bullet-stutter
+    // 挂震颤与受击高光：暂停 breathe 避免 transform 冲突，添加 target-bullet-stutter；施法者头像后坐力常驻高频
     _strafeShakeEls = [];
     if (battleScene) { battleScene.classList.add('strafe-shake-heavy'); _strafeShakeEls.push(battleScene); }
+    // 施法者头像后坐力：持续高频抖动叠加每发脉冲，模仿扫射后坐力（内层 hero-card 为动画载体，避免与 hover 冲突）
+    let _strafeCasterCard = document.getElementById(`hero-card-${casterId}`) || document.getElementById(`hero-wrap-${casterId}`);
+    _strafeCasterRecoilEl = null;
+    _strafePulseEl = null;
+    if (_strafeCasterCard) {
+        // 用头像内层容器承载脉冲动画，避免与 strafe-shake-heavy 的 transform 互斥覆盖
+        const recoilInner = _strafeCasterCard.querySelector('img') || _strafeCasterCard;
+        _strafePulseEl = recoilInner;
+        _strafeCasterRecoilEl = _strafeCasterCard;
+        _strafeCasterCard.classList.remove('breathe');
+        _strafeCasterCard.classList.add('strafe-shake-heavy');
+        _strafeShakeEls.push(_strafeCasterCard);
+    }
+    // 目标硬直上限 5：仅前 5 个目标挂 target-bullet-stutter，避免 7/10 敌时 12 个 infinite 动画同时合成导致丢帧
+    const _STUTTER_LIMIT = 5;
+    const _stutterTargets = coordsSnapshot.slice(0, Math.min(coordsSnapshot.length, _STUTTER_LIMIT));
+    const _stutterDomSet = new Set(_stutterTargets.map(c => c.dom).filter(Boolean));
     coordsSnapshot.forEach(c => {
         if (c.dom) {
+            if (_strafeCasterCard && c.dom === _strafeCasterCard) return;
+            if (!_stutterDomSet.has(c.dom)) return;
             c.dom.classList.remove('breathe');
             c.dom.classList.add('target-bullet-stutter');
             _strafeShakeEls.push(c.dom);
@@ -4280,24 +4307,46 @@ function startStrafeBurst(casterId, coordsSnapshot) {
         // 2. 抛壳：左右交替抛射
         _spawnStrafeCasing(gunX + (isLeft ? -15 : 15), gunY + 8, isLeft);
 
-        // 3. 动态扇形扫射主目标（高速曳光弹束 + 跳弹火星 + 飞溅血肉）
+        // 3. 动态扇形扫射主目标（高速曳光弹束 + 跳弹火星 + 飞溅血肉）— 粒子按敌数线性缩放并设硬上限
         const mainIdx = sweepIndices[shotCount % sweepIndices.length];
         const mainTarget = coordsSnapshot[mainIdx];
+        // 线性分档：1-3敌全量 10/8，4-6敌 8/6，7-10敌 6/4
+        let _mainSparks = 10, _mainGore = 8;
+        if (nTargets >= 7) { _mainSparks = 6; _mainGore = 4; }
+        else if (nTargets >= 4) { _mainSparks = 8; _mainGore = 6; }
+        // 单 tick 硬上限：火星+血雾 ≤14（副枪另计，见下）
+        if (_mainSparks + _mainGore > 14) { _mainGore = 14 - _mainSparks; }
         _spawnStrafeTracer(gunX, gunY, mainTarget.x, mainTarget.y);
-        _spawnStrafeHitSparks(mainTarget.x, mainTarget.y, 8);
-        _spawnStrafeBloodSplatter(mainTarget.x, mainTarget.y, 6);
+        _spawnStrafeHitSparks(mainTarget.x, mainTarget.y, _mainSparks);
+        _spawnStrafeBloodSplatter(mainTarget.x, mainTarget.y, _mainGore);
 
-        // 偶数发双枪交叉射击（副枪射向相邻目标，形成真正的双枪火力网）
+        // 偶数发双枪交叉射击（副枪射向相邻目标，形成真正的双枪火力网）— 高压下限幅或跳过
         if (nTargets > 1 && shotCount % 2 === 0) {
-            const altIdx = (mainIdx + 1) % nTargets;
-            const altTarget = coordsSnapshot[altIdx];
-            const altGunX = isLeft ? casterMuzzleRightX : casterMuzzleLeftX;
-            _spawnStrafeTracer(altGunX, gunY, altTarget.x, altTarget.y);
-            _spawnStrafeHitSparks(altTarget.x, altTarget.y, 6);
-            _spawnStrafeBloodSplatter(altTarget.x, altTarget.y, 4);
+            // 7敌以上每4发才发副枪，进一步降峰值
+            if (nTargets >= 7 && shotCount % 4 !== 0) {
+                // skip alt this tick
+            } else {
+                let _altSparks = 6, _altGore = 4;
+                if (nTargets >= 7) { _altSparks = 2; _altGore = 1; }
+                else if (nTargets >= 4) { _altSparks = 4; _altGore = 2; }
+                const altIdx = (mainIdx + 1) % nTargets;
+                const altTarget = coordsSnapshot[altIdx];
+                const altGunX = isLeft ? casterMuzzleRightX : casterMuzzleLeftX;
+                _spawnStrafeTracer(altGunX, gunY, altTarget.x, altTarget.y);
+                _spawnStrafeHitSparks(altTarget.x, altTarget.y, _altSparks);
+                _spawnStrafeBloodSplatter(altTarget.x, altTarget.y, _altGore);
+            }
         }
 
-        // 4. 音效限频：每 2 tick 一次，中小口径随机枪声
+        // 4. 施法者头像后坐力脉冲：内层 img 承载脉冲动画，避免与外层 strafe-shake-heavy 的 transform 互斥 — 限频 100ms
+        if (_strafePulseEl && shotCount % 2 === 0) {
+            _strafePulseEl.classList.remove('hero-recoil-pulse');
+            void _strafePulseEl.offsetWidth;
+            _strafePulseEl.classList.add('hero-recoil-pulse');
+            const _pulseEl = _strafePulseEl;
+            setTimeout(() => { if (_pulseEl) _pulseEl.classList.remove('hero-recoil-pulse'); }, 45);
+        }
+        // 5. 音效限频：每 2 tick 一次，中小口径随机枪声
         if (shotCount % 2 === 0 && typeof playRandomStandardGunshot === 'function') {
             try { playRandomStandardGunshot(); } catch(e) {}
         }
@@ -4314,15 +4363,26 @@ function stopStrafeBurst() {
         try { _strafeBloodOverlay.remove(); } catch(e) {}
         _strafeBloodOverlay = null;
     }
+    const _restoreBreatheTargets = [];
     _strafeShakeEls.forEach(el => {
         if (!el) return;
         el.classList.remove('strafe-shake', 'strafe-shake-heavy');
-        el.classList.remove('target-bullet-stutter');
-        if (el.classList.contains('enemy-sprite')) {
-            el.classList.add('breathe');
+        el.classList.remove('target-bullet-stutter', 'hero-recoil-pulse');
+        if (el.classList.contains('enemy-sprite') || (el.id && el.id.endsWith('-sprite'))) {
+            _restoreBreatheTargets.push(el);
         }
     });
+    if (_strafePulseEl) { try { _strafePulseEl.classList.remove('hero-recoil-pulse'); } catch(e) {} }
+    _strafePulseEl = null;
+    _strafeCasterRecoilEl = null;
     _strafeShakeEls = [];
+    // 延迟一帧再恢复 breathe，避免与同一 tick 内 updateEnemyUI 的守卫竞争；并做 id 去重避免重复绘制
+    const _seen = new Set();
+    _restoreBreatheTargets.forEach(el => {
+        const key = el.id || el;
+        if (_seen.has(key)) return; _seen.add(key);
+        if (!el.classList.contains('breathe') && el.isConnected !== false) el.classList.add('breathe');
+    });
     setTimeout(() => { _strafeLock = false; }, 220);
 }
 window.startStrafeBurst = startStrafeBurst;
@@ -7308,14 +7368,16 @@ function updateEnemyUI(enemy) {
       }
   }
   
-  // 满充能时的红色狂暴频闪
+  // 满充能时的红色狂暴频闪（扫射期间 _strafeLock 守卫避免把 breathe 抢回覆盖 target-bullet-stutter）
   if (sprite) {
       if (maxCharge > 0 && enemy.currentCharge >= maxCharge && enemy.isAlive) {
           sprite.classList.add('charge-full-danger');
           sprite.classList.remove('breathe');
       } else {
           sprite.classList.remove('charge-full-danger');
-          if (enemy.isAlive && !sprite.classList.contains('breathe')) sprite.classList.add('breathe');
+          if (enemy.isAlive && !sprite.classList.contains('breathe') && !sprite.classList.contains('target-bullet-stutter') && (typeof _strafeLock === 'undefined' || !_strafeLock)) {
+              sprite.classList.add('breathe');
+          }
       }
   }
 
@@ -9478,7 +9540,10 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     target.hp -= hpDmg; if (targetType === 'hero') target.tp = Math.min(target.maxTp, target.tp + (10 * multiplier)); 
     // 隐匿者：被敌方攻击命中 → 标记本回合已受伤（不累积"未受击+10"；护盾/屏障全挡、-0 同样算受伤）
     if (targetType === 'hero' && target.classType === '隐匿者') target.stealthHitThisRound = true; 
-    if(targetDom) targetDom.classList.add('shake'); setTimeout(() => { if(targetDom) targetDom.classList.remove('shake') }, 400);
+    // 连续扫射期间抑制单次受击 shake，避免与 target-bullet-stutter 的 transform 互斥（高频硬直已足够）
+    const _inStrafe = (typeof _strafeLock !== 'undefined' && _strafeLock) || (targetDom && targetDom.classList.contains('target-bullet-stutter'));
+    if(targetDom && !_inStrafe) targetDom.classList.add('shake'); 
+    if(targetDom && !_inStrafe) setTimeout(() => { if(targetDom) targetDom.classList.remove('shake') }, 400);
     
     let severityStr = "";
     if (hpDmg > 0) {
@@ -9916,9 +9981,11 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         }
 
         // === 视觉效果由 [特效:xxx] 标签独立决定，与 tag 文字内容完全无关 ===
-        // [特效:连续扫射] N敌=N线并发·快照·装饰性连发：fire-and-forget，后台 setInterval 70ms 持续 N 线，结算 await 反应期间不阻塞
+        // [特效:连续扫射] N敌=N线并发·快照·装饰性连发：fire-and-forget 起播（setInterval 50ms×52=2.6s），伤害并行结算，尾部阻塞至演出完结
         if (skill && skill.fxTag === '连续扫射' && !skill._fxPlayed) {
             skill._fxPlayed = true;
+            // 阻塞语义：记录起播时间，尾部 await 剩余时长至 2750ms（与 stop 兜底对齐），避免被伤害结算提前截断
+            if (skill._strafeBurstStart == null) skill._strafeBurstStart = Date.now();
             // 快照：按本次技能的对手集合冻结坐标（群攻=全存活敌，单体=主目标），后续 tick 复用冻结坐标，死靶淡出不转火、新增不追入
             const _strafeOpponents = (caster.id.startsWith('h') ? enemiesData.filter(e=>e.isAlive) : heroesData.filter(h=>h.isAlive));
             const _strafeSnapshotTargets = tag.includes('群') ? _strafeOpponents.slice() : (targets[0] ? [targets[0]] : []);
@@ -10071,8 +10138,14 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         if(caster.id.startsWith('h')) updateHeroUI(caster); else updateEnemyUI(caster);
     }
 
-    // [特效:连续扫射] 装饰收尾：结算串行已走完，兜底清场（幂等，定时器内已自清此处仅补漏）
-    if (skill && skill.fxTag === '连续扫射') { try { stopStrafeBurst(); } catch(e) {} }
+    // [特效:连续扫射] 装饰收尾：阻塞至 2.6s 演完再清场（伤害早已在并行中结算，此处仅保证视觉不被提前截断）
+    if (skill && skill.fxTag === '连续扫射' && skill._strafeBurstStart != null) {
+        const _elapsed = Date.now() - skill._strafeBurstStart;
+        const _remain = 2750 - _elapsed; // 与 startStrafeBurst 兜底 2750ms 对齐（含 150ms 缓冲）
+        if (_remain > 0) await sleep(_remain);
+        try { stopStrafeBurst(); } catch(e) {}
+        delete skill._strafeBurstStart;
+    }
     // 本次技能特效已播标记复位（保证下次释放同一技能仍可触发）
     if (skill && skill._fxPlayed) delete skill._fxPlayed;
     delete skill._bdg;
@@ -11566,6 +11639,10 @@ function closeSkillMenu() { document.getElementById('skill-menu').classList.add(
 
 function resetBattle(btn) {
   if (btn.innerText === "确认重置？") {
+    try { if (typeof stopStrafeBurst === 'function') stopStrafeBurst(); } catch(e) {}
+    // 清理可能残留的连续扫射临时状态（重置后技能对象为全新拷贝，但仍幂等清理以防旧引用）
+    heroesData.forEach(h => h.skills && h.skills.forEach(s => { delete s._fxPlayed; delete s._strafeBurstStart; }));
+    enemiesData.forEach(e => e.skills && e.skills.forEach(s => { delete s._fxPlayed; delete s._strafeBurstStart; }));
     heroesData = JSON.parse(JSON.stringify(initialHeroesCache)); enemiesData = JSON.parse(JSON.stringify(initialEnemiesCache));
     state.round = 1; state.queueIndex = 0; state.isAnimating = false; state.isTargeting = false; state.pendingAction = null;
     if (state.highTierNarrated) state.highTierNarrated.clear();
