@@ -1456,7 +1456,7 @@
         <div id="turn-order-container" class="relative w-full h-full flex flex-col gap-2 sm:gap-2.5 items-center overflow-y-auto no-scrollbar mask-fade-y py-3 scroll-smooth"></div>
       </div>
     </div>
-    <div id="enemies-container" class="absolute inset-0 z-10 flex flex-wrap items-center justify-center gap-6 sm:gap-24 pb-40 sm:pb-48 transition-all duration-300 px-8"></div>
+    <div id="enemies-container" class="absolute left-2 sm:left-6 right-2 sm:right-6 top-[10%] bottom-[190px] sm:bottom-[220px] z-10 flex flex-col items-center justify-start gap-2 sm:gap-3 overflow-visible transition-all duration-300 pointer-events-none"></div>
   </div>
 
   <!-- 悬浮 UI 层 -->
@@ -1833,6 +1833,8 @@ function toggleFullScreen() {
     else if (document.msExitFullscreen) document.msExitFullscreen();
   }
 }
+// 敌方列数完全由设置决定，不再自动重排（避免全屏切换时敌人短暂消失）
+void 0;
 
 // ==========================================
 // 战局录像机 (Battle History)
@@ -6218,7 +6220,7 @@ function parseEnemyItem(data, index, tags) {
     }
     // 保留原始名字标签，供世界书载入替换时继承（名字标签在世界书模式下依旧合法）
     
-    let enemyObj = { id: 'e' + index, name: cleanName, emoji: emoji, img: img, nameTags: nameTags, tags: allTags, mutatedFrom: mutatedFrom, resistMap: resistMap, immuneBurn: immuneBurn, immunePoison: immunePoison, explode: explode, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, currentCharge: 0, size: 'text-5xl sm:text-7xl', atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: 0, actCount: attrs.actCount, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, skills: skills, classType: attrs.classType, isWise: isWise, reviveCount: reviveCount, baseTauntBonus: 0, _worldbookRawContent: (typeof data._worldbookRawContent === 'string' ? data._worldbookRawContent : '') };
+    let enemyObj = { id: 'e' + index, name: cleanName, emoji: emoji, img: img, nameTags: nameTags, tags: allTags, mutatedFrom: mutatedFrom, resistMap: resistMap, immuneBurn: immuneBurn, immunePoison: immunePoison, explode: explode, hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, tp: 0, maxTp: 100, currentCharge: 0, size: 'text-5xl sm:text-7xl', atk: attrs.atk, def: attrs.def, spd: attrs.spd, shield: 0, actCount: attrs.actCount, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, skills: skills, classType: attrs.classType, isWise: isWise, reviveCount: reviveCount, baseTauntBonus: 0, _worldbookRawContent: (typeof data._worldbookRawContent === 'string' ? data._worldbookRawContent : ''), row: null, tier: null };
     if (window.CLASS_PASSIVES && CLASS_PASSIVES[attrs.classType]?.onBattleInit) {
         CLASS_PASSIVES[attrs.classType].onBattleInit(enemyObj);
     }
@@ -6266,6 +6268,7 @@ function buildCombatDataFromYAML(yamlContent) {
         }
         heroesData = tempHeroes; enemiesData = tempEnemies;
         applyFieldEffects(heroesData);
+        assignEnemyRows();
         initialHeroesCache = JSON.parse(JSON.stringify(heroesData)); initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData));
         return true;
     } catch (e) { return false; }
@@ -6446,6 +6449,23 @@ function getEnemyTier(enemy) {
     return 'fodder';
 }
 
+// ---- 敌方前后排棋盘：最高阶锚后排 + 均衡分半随机打散 ----
+function assignEnemyRows() {
+    if (!enemiesData || !enemiesData.length) return;
+    // 若已全量分配则跳过（世界书重载后会重新赋值 needs case 由调用方保证）
+    const rankOf = t => t === 'legend' ? 2 : t === 'elite' ? 1 : 0;
+    const scored = enemiesData.map((e, i) => ({ e, i, rank: rankOf(getEnemyTier(e)) }));
+    scored.sort((a, b) => b.rank - a.rank || a.i - b.i);
+    const n = scored.length, nBack = Math.ceil(n / 2);
+    const anchor = scored[0]; anchor.e.row = 'back'; anchor.e.tier = ['fodder','elite','legend'][anchor.rank];
+    const pool = scored.slice(1);
+    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp; }
+    pool.slice(0, nBack - 1).forEach(s => { s.e.row = 'back';  s.e.tier = ['fodder','elite','legend'][s.rank]; });
+    pool.slice(nBack - 1).forEach(s => { s.e.row = 'front'; s.e.tier = ['fodder','elite','legend'][s.rank]; });
+}
+function hasAliveFront() { return enemiesData.some(e => e.isAlive && e.row === 'front'); }
+function hasAliveBack() { return enemiesData.some(e => e.isAlive && e.row === 'back'); }
+
 // 【世界书载入】入口：按名字用图鉴词条数据替换敌方（未命中保留 Yaml 原样）
 async function startGameFromWorldbook() {
     if (state.isGameStarted) { showLog("世界书载入仅可在准备页使用"); return; }
@@ -6499,6 +6519,7 @@ async function startGameFromWorldbook() {
         return;
     }
 
+    assignEnemyRows();
     initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData)); // 替换后重置战斗也保留图鉴数据
     initUI();
     startGame();
@@ -6813,28 +6834,87 @@ function initUI() {
     hero.dom.onclick = () => handleTargetClick(hero, 'hero');
     heroesContainer.appendChild(hero.dom); updateBuffUI(hero); 
   });
-  enemiesData.forEach((enemy, index) => {
-    enemy.dom = document.createElement('div'); enemy.dom.className = `flex flex-col items-center group relative ${!enemy.isAlive ? 'hidden' : ''} cursor-pointer`; enemy.dom.id = `enemy-box-${enemy.id}`;
-    if (state.isGameStarted) { enemy.dom.classList.add('anim-enter-enemy'); enemy.dom.style.animationDelay = `${index * 0.08}s`; setTimeout(() => { if (enemy.dom) enemy.dom.classList.remove('anim-enter-enemy'); }, 800 + index * 80); } else { enemy.dom.classList.add('opacity-0'); }
-    enemy.dom.onclick = () => handleTargetClick(enemy, 'enemy'); 
-    const enemyVisual = enemy.img ? `<img src="${enemy.img}" class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 object-cover rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.8)]" />` : enemy.emoji;
-    const visualClass = enemy.img ? "" : enemy.size;
-    
-    // 只保留高度占位符，由 updateEnemyUI 动态生成实际的充能格子
-    let chargeHtml = '';
-    const maxCharge = Math.max(0, ...enemy.skills.map(s => s.charge || 0));
-    if (maxCharge > 0) chargeHtml = `<div id="${enemy.id}-charge-pips" class="flex justify-center mt-2 pointer-events-none h-3 items-center"></div>`;
-    
-    enemy.dom.innerHTML = `
-      <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 sm:-top-8 text-white/70 text-[9px] sm:text-xs bg-black/40 px-2 py-1 rounded backdrop-blur-md whitespace-nowrap z-50 pointer-events-none">${enemy.name}</div>
-      <div id="${enemy.id}-buffs" class="absolute top-0 flex gap-1 justify-center w-full z-20 pointer-events-none flex-wrap"></div>
-      <div id="${enemy.id}-stunFx" class="stun-fx hidden absolute -top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none"><span class="stun-star">★</span><span class="stun-star">★</span><span class="stun-star">★</span></div>
-      <div id="${enemy.id}-sprite" class="enemy-sprite ${visualClass} drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] breathe transition-all duration-300 mt-2 sm:mt-4 flex justify-center items-center">${enemyVisual}</div>
-      <div class="w-10 sm:w-16 h-1 sm:h-1.5 bg-black/50 mt-2 sm:mt-4 rounded-full overflow-hidden backdrop-blur-sm relative pointer-events-none"><div id="${enemy.id}-hp-bar" class="h-full bg-rose-500 w-full transition-all duration-500 ease-out shadow-[0_0_8px_rgba(244,63,94,0.8)]"></div></div>
-      ${chargeHtml}
-    `;
-    enemiesContainer.appendChild(enemy.dom); setTimeout(() => { updateEnemyUI(enemy); updateBuffUI(enemy); }, 50);
-  });
+  // ---- 敌人前后排棋盘：按 row 分组渲染（桌面双排立体 / 移动端 3×4 网格）----
+  window.renderEnemyFormation = window.renderEnemyFormation || function(){
+    const enemiesContainer2 = document.getElementById('enemies-container');
+    if (!enemiesContainer2 || !enemiesData || !enemiesData.length) return;
+    enemiesContainer2.innerHTML = '';
+    // 老存档兜底：row 缺失时补算
+    if (enemiesData.some(e => !e.row)) assignEnemyRows();
+    const backEnemies = enemiesData.filter(e => e.row === 'back');
+    const frontEnemies = enemiesData.filter(e => e.row === 'front');
+    const isMobile = window.innerWidth < 640;
+    // 自适应：桌面与移动端均按 Demo 自收敛（保证宽屏不四行）
+    const nBack = Math.max(1, backEnemies.length), nFront = Math.max(1, frontEnemies.length);
+    let gapBack = 28, gapFront = 36, frontY = 48, backScale = 0.68, frontScale = 1.0;
+    // 可用宽以战场容器实测为准（酒馆侧栏挤压时 window.innerWidth ≠ 战场宽度）
+    const battleSceneW = (document.getElementById('battle-scene')?.clientWidth || document.getElementById('enemies-container')?.clientWidth || window.innerWidth);
+    const availW = Math.max(320, battleSceneW - 96);
+    if (!isMobile) {
+      const needBack = nBack * 64 + (nBack - 1) * gapBack;
+      const needFront = nFront * 64 + (nFront - 1) * gapFront;
+      const needMax = Math.max(needBack, needFront, 320);
+      if (needMax > availW) {
+        const eff = Math.max(0.60, availW / needMax);
+        gapBack = Math.max(10, Math.round(gapBack * eff));
+        gapFront = Math.max(10, Math.round(gapFront * eff));
+        backScale = Math.max(0.55, 0.68 * eff);
+        frontScale = Math.max(0.62, 1.0 * eff);
+      }
+    } else {
+      gapBack = Math.min(28, nBack >= 4 ? 8 : 12);
+      gapFront = Math.min(36, nFront >= 4 ? 10 : 14);
+      const effBack = Math.min(1.0, 320 / (nBack * 42 + (nBack - 1) * gapBack));
+      const effFront = Math.min(1.0, 320 / (nFront * 42 + (nFront - 1) * gapFront));
+      const eff = Math.min(effBack, effFront, 1.0);
+      backScale = 0.68 * Math.max(0.60, eff);
+      frontScale = 1.0 * Math.max(0.62, eff);
+      frontY = Math.min(frontY, 28);
+    }
+    function buildEnemyDom(enemy, index, isBack){
+      const el = document.createElement('div');
+      const sc = isBack ? backScale : frontScale;
+      el.className = `flex flex-col items-center group relative ${!enemy.isAlive ? 'hidden' : ''} cursor-pointer pointer-events-auto shrink-0`;
+      el.id = `enemy-box-${enemy.id}`;
+      el.dataset.row = enemy.row || '';
+      if (state.isGameStarted) { el.classList.add('anim-enter-enemy'); el.style.animationDelay = `${index * 0.08}s`; setTimeout(() => { if (el) el.classList.remove('anim-enter-enemy'); }, 800 + index * 80); } else { el.classList.add('opacity-0'); }
+      el.style.transform = `scale(${sc})`;
+      el.style.filter = isBack ? 'brightness(0.82) saturate(0.92)' : '';
+      el.onclick = () => handleTargetClick(enemy, 'enemy');
+      const enemyVisual = enemy.img ? `<img src="${enemy.img}" class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 object-cover rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.8)]" />` : enemy.emoji;
+      const visualClass = enemy.img ? "" : enemy.size;
+      let chargeHtml = '';
+      const maxCharge = Math.max(0, ...enemy.skills.map(s => s.charge || 0));
+      if (maxCharge > 0) chargeHtml = `<div id="${enemy.id}-charge-pips" class="flex justify-center mt-2 pointer-events-none h-3 items-center"></div>`;
+      el.innerHTML = `
+        <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 sm:-top-8 text-white/70 text-[9px] sm:text-xs bg-black/40 px-2 py-1 rounded backdrop-blur-md whitespace-nowrap z-50 pointer-events-none">${enemy.name}</div>
+        <div id="${enemy.id}-buffs" class="absolute top-0 flex gap-1 justify-center w-full z-20 pointer-events-none flex-wrap"></div>
+        <div id="${enemy.id}-stunFx" class="stun-fx hidden absolute -top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none"><span class="stun-star">★</span><span class="stun-star">★</span><span class="stun-star">★</span></div>
+        <div id="${enemy.id}-sprite" class="enemy-sprite ${visualClass} drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] breathe transition-all duration-300 mt-2 sm:mt-4 flex justify-center items-center">${enemyVisual}</div>
+        <div class="w-10 sm:w-16 h-1 sm:h-1.5 bg-black/50 mt-2 sm:mt-4 rounded-full overflow-hidden backdrop-blur-sm relative pointer-events-none"><div id="${enemy.id}-hp-bar" class="h-full bg-rose-500 w-full transition-all duration-500 ease-out shadow-[0_0_8px_rgba(244,63,94,0.8)]"></div></div>
+        ${chargeHtml}
+      `;
+      enemy.dom = el;
+      return el;
+    }
+    function appendRow(list, isBack){
+      if (!list.length) return;
+      // 固定视觉2行：1行前排 + 1行后排，永不拆 3×4 子行（视觉2行，逻辑前后排不变）
+      const row = document.createElement('div');
+      row.className = `flex items-center justify-center flex-nowrap pointer-events-none ${isBack ? 'z-10' : 'z-20'}`;
+      row.style.gap = (isBack ? gapBack : gapFront) + 'px';
+      if (!isBack && frontEnemies.length && backEnemies.length) row.style.transform = `translateY(${frontY}px)`;
+      list.forEach((e, i) => row.appendChild(buildEnemyDom(e, e.id.charCodeAt(1), isBack)));
+      enemiesContainer2.appendChild(row);
+    }
+    // 后排在上、前排在下（立体纵深）
+    if (backEnemies.length) appendRow(backEnemies, true);
+    if (frontEnemies.length) appendRow(frontEnemies, false);
+    if (backEnemies.length && !frontEnemies.length) enemiesContainer2.style.justifyContent = 'center';
+    else enemiesContainer2.style.justifyContent = 'flex-start';
+    enemiesData.forEach(e => setTimeout(() => { updateEnemyUI(e); updateBuffUI(e); }, 50));
+  };
+  window.renderEnemyFormation();
 }
 
 function createCompactBarHTML(id, type, label, val, max, colorClass, isTp = false, shield = 0) {
@@ -9205,7 +9285,13 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     // 1. 获取初次判定时的属性
     const initialCStats = getEffectiveStats(caster);
     const initialTStats = getEffectiveStats(target);
-    const attackerHitCap = Math.max(1, (hitChance !== undefined ? hitChance : 100) + initialCStats.hit);
+    let attackerHitCap = Math.max(1, (hitChance !== undefined ? hitChance : 100) + initialCStats.hit);
+    // 后排掩护：后排存活时，远程/法术打前排命中 -ceil(目标敏捷×30%)（敏捷取目标 getEffectiveSpeed，目标越快越难命中）
+    if (skill && (skill.damageType === '远程' || skill.damageType === '法术') && targetType === 'enemy' && target.row === 'front' && hasAliveBack() && caster.id.startsWith('h')) {
+      const penalty = Math.ceil(getEffectiveSpeed(target) * 0.3);
+      attackerHitCap = Math.max(1, attackerHitCap - penalty);
+      if (!skill._rowPenaltyLogged) { addHistory(`   ↳ 后排掩护：${caster.name} 远程/法术命中 -${penalty}（${target.name}敏捷${getEffectiveSpeed(target)}×30%）`); skill._rowPenaltyLogged = true; }
+    }
     const defenderSpdCap = Math.max(1, (target.spd || 0) + initialTStats.eva);
 
     // 初次闪避判定 (基于基础速度和当前面板)；【必中】跳过命中判定恒命中；极限爆发附加必中同样跳过
@@ -9965,13 +10051,25 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         if (tag.includes('再动') || tag.includes('肃正')) { 
             targets = [caster]; 
         } else if (isAoe) { 
-            targets = isBeneficial ? allies : opponents; 
+            if (!isBeneficial && casterIsHero && skill && skill.damageType === '近战' && hasAliveFront()) {
+              // 群攻近战有前排时仅命中前排（后排被掩护）
+              const frontOnly = opponents.filter(e => e.row !== 'back');
+              targets = frontOnly.length ? frontOnly : opponents;
+              if (frontOnly.length < opponents.length && !skill._frontOnlyLogged) { addHistory('   ↳ 前排掩护：近战群攻仅命中前排'); skill._frontOnlyLogged = true; }
+            } else {
+              targets = isBeneficial ? allies : opponents;
+            }
         } else {
             if (!primaryTarget) {
                 if (isBeneficial) {
                     targets = [allies[Math.floor(Math.random()*allies.length)]];
                 } else {
-                    targets = [casterIsHero ? opponents[Math.floor(Math.random()*opponents.length)] : getTauntTarget(opponents, caster.isWise)];
+                    // 保底随机：近战在有前排时随机不到后排
+                    let pool = opponents;
+                    if (casterIsHero && skill && skill.damageType === '近战' && hasAliveFront()) {
+                      const f = opponents.filter(e => e.row !== 'back'); if (f.length) pool = f;
+                    }
+                    targets = [casterIsHero ? pool[Math.floor(Math.random()*pool.length)] : getTauntTarget(pool, caster.isWise)];
                 }
             } else {
                 const targetIsAlly = (casterIsHero && primaryTarget.id.startsWith('h')) || (!casterIsHero && primaryTarget.id.startsWith('e'));
@@ -11262,6 +11360,8 @@ function showEnemyInfo(enemy) {
             <div class="flex items-center gap-2 flex-wrap">
               <h2 class="text-base sm:text-lg font-black text-slate-100 tracking-wider truncate">${enemy.name}</h2>
               ${enemy.isWise ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-950/80 text-rose-300 border border-rose-500/80 tag-fx-wise flex items-center gap-1"><span>🧠</span> 智慧单位</span>` : ''}
+              <span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${enemy.row==='front' ? 'bg-amber-950/80 text-amber-300 border-amber-500/70' : 'bg-sky-950/80 text-sky-300 border-sky-500/70'}">${enemy.row==='front' ? '⬇ 前排' : '⬆ 后排'}</span>
+              ${enemy.tier ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold border ${enemy.tier==='legend' ? 'bg-amber-950/70 text-amber-300 border-amber-500/60' : enemy.tier==='elite' ? 'bg-violet-950/70 text-violet-300 border-violet-500/60' : 'bg-slate-800/80 text-slate-300 border-slate-600/60'}">${enemy.tier==='legend' ? '首领' : enemy.tier==='elite' ? '精英' : '杂兵'}</span>` : ''}
               <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-950/60 text-cyan-300 border border-cyan-700/50">TARGET INSPECT</span>
             </div>
           </div>
@@ -11298,6 +11398,14 @@ function showEnemyInfo(enemy) {
 
           <!-- 变种特质 -->
           ${tagHtml}
+          <!-- 前后排棋盘 -->
+          <div class="bg-slate-900/40 rounded-xl p-2.5 border ${enemy.row==='front' ? 'border-amber-700/40' : 'border-sky-700/40'} flex flex-col gap-1.5">
+            <div class="text-[10px] font-bold tracking-wider uppercase flex items-center gap-1.5 ${enemy.row==='front' ? 'text-amber-300' : 'text-sky-300'}">
+              <span>${enemy.row==='front' ? '⬇ 前排' : '⬆ 后排'}</span>
+              <span class="text-slate-500 font-normal normal-case">· ${enemy.row==='front' ? '掩护后排·近战不可越过' : '受前排掩护·阻挡近战'}</span>
+            </div>
+            <p class="text-[10px] text-slate-400 leading-relaxed">${enemy.row==='front' ? '存在前排时，敌方后排不受近战攻击；存在后排时，对前排的远程/法术命中降低目标敏捷的30%（向上取整，目标越快越难命中）。' : '前排未清时，近战无法突进后排；后排存在时，对前排的远程/法术命中降低目标敏捷的30%（目标越快越难命中）。'}</p>
+          </div>
 
           <!-- 世界书资料档案 (大空间舒展展示) -->
           ${wbHtml}
@@ -11362,6 +11470,19 @@ async function handleTargetClick(target, targetType) {
      return;
   }
   if (state.isAnimating || !target.isAlive) return;
+  // ---- 前后排：单体近战点后排拦截（有前排时近战不可突进后排，顶部提示后回退不耗回合）----
+  {
+    const _pa = state.pendingAction;
+    let _curDmg = null;
+    if (_pa) {
+      if (_pa.type === 'release_charge') { const _e = state.actionQueue[state.queueIndex]?.ref?.currentDelay?.skill; if (_e) _curDmg = _e.damageType || '近战'; }
+      else if (_pa.type === 'skill') { const _s = state.actionQueue[state.queueIndex]?.ref?.skills?.[_pa.skillIndex]; if (_s) _curDmg = _s.damageType || null; }
+      else if (_pa.type === 'attack') _curDmg = '近战';
+    }
+    if (_curDmg === '近战' && targetType === 'enemy' && target.row === 'back' && hasAliveFront()) {
+      showLog('前排未清，近战无法突进后排'); cancelTargeting(); const _h = state.actionQueue[state.queueIndex]?.ref; if (_h) updateMenu(_h); return;
+    }
+  }
   const action = state.pendingAction; const hero = state.actionQueue[state.queueIndex].ref;
   if (action.type === 'release_charge') {
       const entry = hero.currentDelay;
