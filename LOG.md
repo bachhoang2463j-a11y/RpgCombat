@@ -1976,3 +1976,15 @@
   5. **极道狂热·重度狂暴参数定版（`index.html:4256`）**：扫射节奏提升至 50ms 超密连发（52 发/2.6s）、强力后坐力震颤（`.strafe-shake-heavy`）、高能金属跳弹火花、血肉飞雾与枪口星芒青烟协同。
 - **涉及文件**：`index.html`、`demo-continuous-fire.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：响应用户对屏幕模拟血块违和（几何方块不自然）与弹道/出火点表现力不足的反馈，按用户指定的“重度狂暴”方案将击杀特效级流体血液与高速曳光弹幕系统全量集成至主工程。
+
+## [LOG-161] 2026-08-25 — [特效:连续扫射]2.6s演出阻塞+英雄后坐力+呼吸守卫+DemoV2对齐及高压限频限量(V9.9)
+
+- **变更行为**：
+  1. **2.6s视觉不被截断且阻塞回合（`index.html:9953/10109`）**：`executeSkillAction` 对 `fxTag==='连续扫射'` 记录 `skill._strafeBurstStart = Date.now()`（`_fxPlayed` 首标签时冻结），尾部按 `2750 - elapsed` `await sleep` 至 2.6s +150ms 缓冲后才 `stopStrafeBurst()`，保证伤害/闪避已在并行中结算但全屏弹道/枪口/血溅延续至 2.6s，`nextTurn/endTurn` 被 `await` 天然阻塞不可操作。
+  2. **施法者英雄后坐力（`index.html:366/3944/4246`）**：新增 `hero-recoil-pulse 0.06s cubic-bezier(0.22,0.61,0.36,1)` 后坐微踢（`translateX -4px + brightness 1.18`），外层 `hero-card` 承载 `strafe-shake-heavy 0.06s infinite` 常驻抖动，内层 `img` 承载每发脉冲，彻底避免同元素 `transform` 互斥；`resetBattle` 幂等清理 `stopStrafeBurst` 与 `skill._fxPlayed/_strafeBurstStart` 残留。
+  3. **呼吸/抖动互斥修复（`index.html:7352/9524`）**：`updateEnemyUI` 的满充能与 `breathe` 回写加 `_strafeLock` 与 `target-bullet-stutter` 双重守卫，扫射窗口内不把 `breathe` 抢回覆盖硬直；`stopStrafeBurst` 无条件为 `enemy-sprite` 恢复 `breathe` 并去重；单次受击 `shake 0.4s` 在 `target-bullet-stutter` 存在时抑制，仅保留高频硬直与闪白。
+  4. **Demo版本2峰值对齐（`index.html:4309`）**：主目标火星 `8→10`、血雾 `6→8`，对齐 `demo-continuous-fire.html:918/921` 的 `10/8` 重度狂暴峰值；副枪保持 `6/4`，与 10/8 主峰形成双线火力网。
+  5. **高压限频限量（`index.html:4263/4314/4322`）**：`pulse` 限频 `50ms→100ms（shotCount%2===0，45ms移除）`，强制重排减半；受击硬直上限 5（`_STUTTER_LIMIT=5` 仅前5目标挂 `target-bullet-stutter`）；粒子按敌数线性分档（1-3:10/8，4-6:8/6，7-10:6/4 且副枪每4发一次 2/1，硬上限14），10敌 52发由 ~1200 粒子减至 ~600，彻底解决 7/10 敌时头像闪烁/缺失。
+  6. **版本号 9.9 定版（`README.md:3`）**：`V9.8→V9.9`，摘要 `V9.9：[特效:连续扫射]极道狂热定版—2.6s演出不被伤害管线截断且阻塞回合+英雄头像后坐力常驻/脉冲+呼吸/硬直互斥修复+Demo版本2峰值对齐+7/10敌高压限频限量（脉冲100ms/目标5上限/粒子分档硬上限）`。
+- **涉及文件**：`index.html`、`README.md`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：用户要求 2.6s 演出不被回避/扣血结算提前结束且计入回避判定后仍完整播放、英雄头像加入后坐力、修复 breathe/受击抖动冲突并 1:1 对齐 Demo 版本2 打击感；压力测试发现 7/10 敌时头像因高频重排与无限动画/粒子爆炸闪烁缺失，按用户确认的限频/限量方案手术修复并 9.9 定版。
