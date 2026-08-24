@@ -543,24 +543,80 @@
       const wrap = document.createElement('div');
       wrap.className = 'fixed inset-0 pointer-events-none overflow-hidden';
       wrap.style.zIndex = '138';
-      const vignette = `<div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(circle, transparent 38%, rgba(136,8,8,0.38) 72%, rgba(69,10,10,0.88) 100%); animation: strafe-vignette-pulse 2.55s cubic-bezier(0.1,0.8,0.2,1) both;"></div>`;
-      const bloodPositions = [
-        { top: '15%', left: '12%', sz: 42, delay: '0.08s' },
-        { top: '24%', left: '20%', sz: 30, delay: '0.35s' },
-        { top: '70%', left: '14%', sz: 48, delay: '0.18s' },
-        { top: '62%', left: '26%', sz: 28, delay: '0.55s' },
-        { top: '18%', right: '15%', sz: 46, delay: '0.12s' },
-        { top: '28%', right: '22%', sz: 32, delay: '0.42s' },
-        { top: '72%', right: '16%', sz: 52, delay: '0.22s' },
-        { top: '56%', right: '28%', sz: 28, delay: '0.65s' },
-        { top: '35%', left: '44%', sz: 38, delay: '0.28s' },
-        { top: '48%', right: '40%', sz: 40, delay: '0.48s' }
+      const vignette = `<div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(circle, transparent 36%, rgba(136,8,8,0.38) 72%, rgba(69,10,10,0.88) 100%); animation: strafe-vignette-pulse 2.55s cubic-bezier(0.1,0.8,0.2,1) both;"></div>`;
+      
+      const bloodElements = [
+        `<div class="absolute pointer-events-none opacity-0" style="top:12%; left:10%; width:110px; height:110px; transform:rotate(-15deg); animation:strafe-blood-dot-fade 2.45s 0.06s cubic-bezier(0.12,0.85,0.25,1) both;">
+            <svg viewBox="0 0 100 100" class="w-full h-full" style="filter: drop-shadow(0 0 8px #450a0a);">
+                <path d="M25,15 C45,5 75,18 68,38 C80,50 78,75 58,82 C38,88 18,72 12,50 C8,32 15,20 25,15 Z" fill="#7f1d1d"/>
+                <path d="M30,22 C45,15 65,25 60,40 C68,50 65,68 50,72 C35,76 22,65 18,48 C15,35 22,25 30,22 Z" fill="#991b1b"/>
+                <circle cx="82" cy="25" r="4.5" fill="#7f1d1d"/>
+                <circle cx="88" cy="45" r="3.5" fill="#991b1b"/>
+                <circle cx="20" cy="85" r="4" fill="#881337"/>
+            </svg>
+        </div>`,
+        `<div class="absolute pointer-events-none opacity-0" style="top:14%; right:12%; width:95px; height:55px; transform:rotate(12deg); animation:strafe-blood-dot-fade 2.45s 0.12s cubic-bezier(0.12,0.85,0.25,1) both;">
+            <svg viewBox="0 0 80 50" class="w-full h-full" style="filter: drop-shadow(0 0 6px #450a0a);">
+                <polygon points="5,10 70,5 75,35 15,45" fill="#881337"/>
+                <polygon points="12,14 62,10 66,30 18,38" fill="#991b1b"/>
+                <rect x="4" y="8" width="10" height="10" rx="2" fill="#7f1d1d" transform="rotate(15 8 12)"/>
+                <circle cx="76" cy="42" r="3" fill="#b91c1c"/>
+            </svg>
+        </div>`,
+        `<div class="absolute pointer-events-none opacity-0" style="bottom:18%; left:12%; width:100px; height:65px; transform:rotate(8deg); animation:strafe-blood-dot-fade 2.45s 0.18s cubic-bezier(0.12,0.85,0.25,1) both;">
+            <svg viewBox="0 0 90 60" class="w-full h-full" style="filter: drop-shadow(0 0 7px #450a0a);">
+                <circle cx="30" cy="30" r="18" fill="#7f1d1d"/>
+                <circle cx="60" cy="28" r="14" fill="#881337"/>
+                <path d="M26,18 Q45,28 58,18 Q45,38 26,38 Z" fill="#7f1d1d"/>
+                <circle cx="28" cy="28" r="11" fill="#991b1b"/>
+                <circle cx="58" cy="27" r="8" fill="#b91c1c"/>
+                <circle cx="76" cy="18" r="3.5" fill="#7f1d1d"/>
+                <circle cx="12" cy="44" r="3" fill="#991b1b"/>
+            </svg>
+        </div>`,
+        `<div class="absolute pointer-events-none opacity-0" style="bottom:22%; right:14%; width:75px; height:75px; animation:strafe-blood-dot-fade 2.45s 0.22s cubic-bezier(0.12,0.85,0.25,1) both;">
+            <svg viewBox="0 0 60 60" class="w-full h-full" style="filter: drop-shadow(0 0 6px #450a0a);">
+                <circle cx="28" cy="28" r="18" fill="#7f1d1d"/>
+                <circle cx="26" cy="26" r="12" fill="#991b1b"/>
+                <circle cx="48" cy="18" r="4" fill="#991b1b"/>
+                <circle cx="44" cy="42" r="4.5" fill="#7f1d1d"/>
+                <circle cx="12" cy="46" r="3" fill="#dc2626"/>
+            </svg>
+        </div>`,
+        `<div class="absolute pointer-events-none opacity-0" style="top:4%; right:30%; width:36px; height:75px; animation:strafe-blood-dot-fade 2.45s 0.35s cubic-bezier(0.12,0.85,0.25,1) both;">
+            <svg viewBox="0 0 40 80" class="w-full h-full" style="filter: drop-shadow(0 0 5px #450a0a);">
+                <path d="M20,5 C28,25 35,45 32,62 C29,75 11,75 8,62 C5,45 12,25 20,5 Z" fill="#7f1d1d"/>
+                <path d="M20,12 C25,28 30,46 28,58 C26,68 14,68 12,58 C10,46 15,28 20,12 Z" fill="#991b1b"/>
+                <circle cx="20" cy="74" r="3" fill="#dc2626"/>
+            </svg>
+        </div>`,
+        `<div class="absolute pointer-events-none opacity-0" style="top:42%; left:8%; width:65px; height:65px; transform:rotate(-20deg); animation:strafe-blood-dot-fade 2.45s 0.28s cubic-bezier(0.12,0.85,0.25,1) both;">
+            <svg viewBox="0 0 70 70" class="w-full h-full" style="filter: drop-shadow(0 0 6px #450a0a);">
+                <polygon points="35,8 62,28 50,62 18,55 10,24" fill="#881337"/>
+                <polygon points="34,16 54,32 44,52 22,46 16,28" fill="#991b1b"/>
+                <circle cx="58" cy="58" r="3.5" fill="#dc2626"/>
+                <circle cx="8" cy="40" r="2.5" fill="#7f1d1d"/>
+            </svg>
+        </div>`,
+        `<div class="absolute pointer-events-none opacity-0" style="top:48%; right:9%; width:55px; height:55px; animation:strafe-blood-dot-fade 2.45s 0.42s cubic-bezier(0.12,0.85,0.25,1) both;">
+            <svg viewBox="0 0 50 50" class="w-full h-full" style="filter: drop-shadow(0 0 4px #450a0a);">
+                <circle cx="15" cy="18" r="6.5" fill="#991b1b"/>
+                <circle cx="34" cy="12" r="4.5" fill="#7f1d1d"/>
+                <circle cx="28" cy="35" r="5.5" fill="#991b1b"/>
+                <circle cx="42" cy="38" r="3.5" fill="#dc2626"/>
+                <circle cx="8" cy="32" r="2" fill="#7f1d1d"/>
+            </svg>
+        </div>`,
+        `<div class="absolute pointer-events-none opacity-0" style="bottom:12%; left:42%; width:42px; height:42px; animation:strafe-blood-dot-fade 2.45s 0.52s cubic-bezier(0.12,0.85,0.25,1) both;">
+            <svg viewBox="0 0 40 40" class="w-full h-full" style="filter: drop-shadow(0 0 5px #450a0a);">
+                <circle cx="20" cy="20" r="14" fill="#7f1d1d"/>
+                <circle cx="18" cy="18" r="8.5" fill="#b91c1c"/>
+                <circle cx="28" cy="28" r="3" fill="#7f1d1d"/>
+            </svg>
+        </div>`
       ];
-      let bloodDots = '';
-      bloodPositions.forEach(p => {
-        bloodDots += `<div class="absolute pointer-events-none opacity-0" style="${p.top?`top:${p.top};`:''}${p.left?`left:${p.left};`:''}${p.right?`right:${p.right};`:''}width:${p.sz}px;height:${p.sz}px;animation:strafe-blood-dot-fade 2.45s ${p.delay} cubic-bezier(0.12,0.85,0.25,1) both;"><svg viewBox="0 0 60 60" class="w-full h-full fill-red-800" style="filter: drop-shadow(0 0 6px #450a0a);"><circle cx="30" cy="30" r="13" class="fill-red-900" /><circle cx="30" cy="30" r="9" class="fill-red-700" /><circle cx="20" cy="18" r="4" class="fill-red-800" /><circle cx="42" cy="22" r="3.5" class="fill-red-900" /><circle cx="40" cy="42" r="4.5" class="fill-red-800" /><circle cx="18" cy="38" r="3" class="fill-red-700" /><circle cx="28" cy="46" r="2.5" class="fill-red-600"/></svg></div>`;
-      });
-      wrap.innerHTML = vignette + bloodDots;
+
+      wrap.innerHTML = vignette + bloodElements.join('');
       return wrap;
     }
 
