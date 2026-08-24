@@ -254,6 +254,71 @@
       100% { opacity: 0; }
     }
 
+    /* ==== [单体(枪击)] 中小口径枪击重构 + [特效:枪击穿透] 弱点贯穿（移植自 demo-gunshot-vfx.html） ==== */
+    .gunshot-shake { animation: gunshot-shake-anim 0.18s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+    @keyframes gunshot-shake-anim {
+      0%, 100% { transform: translate(0, 0); }
+      20% { transform: translate(-5px, 3px) scale(1.008); }
+      45% { transform: translate(6px, -4px) scale(1.005); }
+      70% { transform: translate(-3px, 2px); }
+      85% { transform: translate(2px, -1px); }
+    }
+    .pierce-shake { animation: pierce-shake-anim 0.26s cubic-bezier(0.25, 1, 0.5, 1) both; }
+    @keyframes pierce-shake-anim {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      15% { transform: translate(10px, -6px) rotate(1.2deg) scale(1.018); }
+      35% { transform: translate(-12px, 5px) rotate(-1.5deg) scale(1.012); }
+      60% { transform: translate(6px, -3px) rotate(0.6deg); }
+      80% { transform: translate(-3px, 1px) rotate(-0.3deg); }
+    }
+    @keyframes gunshot-core-flash {
+      0% { transform: translate(-50%, -50%) scale(0.15) rotate(0deg); opacity: 0; filter: brightness(2.5); }
+      18% { transform: translate(-50%, -50%) scale(1.18) rotate(12deg); opacity: 1; filter: brightness(1.8); }
+      40% { transform: translate(-50%, -50%) scale(1.02) rotate(20deg); opacity: 0.9; }
+      100% { transform: translate(-50%, -50%) scale(1.35) rotate(35deg); opacity: 0; }
+    }
+    @keyframes gunshot-spark-ray {
+      0% { transform: translate(-50%, -50%) scale(0.1) rotate(var(--ray-rot, 0deg)); opacity: 1; }
+      35% { transform: translate(-50%, -50%) scale(1.15) translateY(-22px) rotate(var(--ray-rot, 0deg)); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1.35) translateY(-42px) rotate(var(--ray-rot, 0deg)); opacity: 0; }
+    }
+    @keyframes gunshot-shock-ring {
+      0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; stroke-width: 6; }
+      50% { transform: translate(-50%, -50%) scale(1.6); opacity: 0.75; stroke-width: 2.5; }
+      100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; stroke-width: 1; }
+    }
+    @keyframes enemy-gunshot-flinch {
+      0% { transform: scale(1) translate(0, 0); filter: brightness(1); }
+      20% { transform: scale(0.95) translate(6px, -4px); filter: brightness(2) drop-shadow(0 0 15px #fbbf24); }
+      50% { transform: scale(1.03) translate(-3px, 2px); filter: brightness(1.3); }
+      100% { transform: scale(1) translate(0, 0); filter: brightness(1); }
+    }
+    @keyframes pierce-weakpoint-lock {
+      0% { transform: translate(-50%, -50%) scale(2.2) rotate(-45deg); opacity: 0; }
+      25% { transform: translate(-50%, -50%) scale(0.95) rotate(0deg); opacity: 1; }
+      45% { transform: translate(-50%, -50%) scale(1.05) rotate(5deg); opacity: 1; filter: drop-shadow(0 0 15px #38bdf8); }
+      70% { transform: translate(-50%, -50%) scale(1.15) rotate(10deg); opacity: 0.8; }
+      100% { transform: translate(-50%, -50%) scale(1.4) rotate(20deg); opacity: 0; }
+    }
+    @keyframes pierce-beam-penetrate {
+      0% { transform: translate(-50%, -50%) scaleX(0.1) scaleY(2.2); opacity: 0; }
+      15% { transform: translate(-50%, -50%) scaleX(1.15) scaleY(1); opacity: 1; filter: brightness(2.2) drop-shadow(0 0 15px #0ea5e9); }
+      40% { transform: translate(-50%, -50%) scaleX(1) scaleY(0.7); opacity: 0.9; }
+      100% { transform: translate(-50%, -50%) scaleX(1.3) scaleY(0); opacity: 0; }
+    }
+    @keyframes pierce-exit-cone {
+      0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
+      30% { transform: translate(30px, -50%) scale(1.4); opacity: 1; }
+      100% { transform: translate(75px, -50%) scale(2.0); opacity: 0; }
+    }
+    @keyframes enemy-pierce-stutter {
+      0% { transform: scale(1) translate(0, 0); filter: brightness(1); }
+      12% { transform: scale(0.92) translate(14px, -2px) skewX(-4deg); filter: brightness(2.8) contrast(1.4) drop-shadow(0 0 25px #38bdf8); }
+      30% { transform: scale(1.06) translate(-10px, 4px) skewX(2deg); filter: brightness(1.6) drop-shadow(0 0 15px #0284c7); }
+      60% { transform: scale(0.98) translate(4px, -1px); filter: brightness(1.2); }
+      100% { transform: scale(1) translate(0, 0); filter: brightness(1); }
+    }
+
     /* ==== 敌方大招切入特效 (Boss Cut-in) ==== */
     @keyframes cutin-overlay {
       0% { opacity: 0; backdrop-filter: blur(0px); }
@@ -1798,7 +1863,12 @@ const audioUrls = {
     'herochargedone': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/herochargedone.mp3',
     'combatKill': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/combat_kill.mp3',
     'magicKill': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/magic_kill.wav',
-    'kanpo': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/kanpo.wav'
+    'kanpo': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/kanpo.wav',
+    // [单体(枪击)] 中小口径随机 + [特效:枪击穿透] 专属（移植自 demo-gunshot-vfx.html，test1 仓库）
+    'gunshot1': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/gunshot1.mp3',
+    'gunshot2': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/gunshot2.mp3',
+    'gunshot3': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/gunshot3.mp3',
+    'gunshot_pierce': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/gunshot_pierce.mp3'
 };
 
 // 预热全量基础音效为 Blob URL，确保零延迟与 Web Audio API 无跨域限制
@@ -1836,6 +1906,14 @@ window.playSound = (key, volume = 1) => {
 const KANPO_SOUND_KEY = 'kanpo';
 function playKanpoSound() {
     playSound(KANPO_SOUND_KEY);
+}
+
+// [单体(枪击)] 中小口径随机枪声：每次独立射击从 gunshot1~3 随机抽取（移植自 demo-gunshot-vfx.html:397 playRandomStandardGunshot）
+function playRandomStandardGunshot() {
+    const candidates = ['gunshot1', 'gunshot2', 'gunshot3'];
+    const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+    playSound(chosen, 0.95);
+    return chosen;
 }
 window.isExecutingCutin = false; 
 
@@ -3317,7 +3395,29 @@ function spawnGunshotParticles(x, y) {
         }
     });
     
-    window.triggerScreenShake(3, 150);
+    // 中小口径轻快微震 180ms（与 demo gunshot-shake 一致，CSS 驱动）
+    const _gsScene = document.getElementById('battle-scene');
+    if (_gsScene) {
+        _gsScene.classList.remove('gunshot-shake', 'pierce-shake', 'ranged-heavy-shake');
+        void _gsScene.offsetWidth;
+        _gsScene.classList.add('gunshot-shake');
+        setTimeout(() => _gsScene.classList.remove('gunshot-shake'), 180);
+    } else {
+        window.triggerScreenShake(3, 150);
+    }
+}
+
+// [特效:枪击穿透] 弱点贯穿：与 playSVGEffect 的 SVG 同源的 Canvas 轻量补充（锐利后坐震屏 + 轨迹光束仅由 SVG 承担，此处仅震屏）
+function spawnGunshotPierceParticles(x, y) {
+    const scene = document.getElementById('battle-scene');
+    if (scene) {
+        scene.classList.remove('gunshot-shake', 'pierce-shake', 'ranged-heavy-shake');
+        void scene.offsetWidth;
+        scene.classList.add('pierce-shake');
+        setTimeout(() => scene.classList.remove('pierce-shake'), 260);
+    } else {
+        window.triggerScreenShake(6, 260);
+    }
 }
 
 // ===== [特效:远程重击] 方案1：双管重爆（枪口烈火+5血块+重震）== 复刻 demo-ranged-heavy-hit.html 方案1 =====
@@ -3804,6 +3904,7 @@ const WEBM_FX_REGISTRY = {
     '异种坏死雾': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/fog.mp4', scale: 0.8, particles: 'poison',     audioUrl: 'none', delay: 0.2 },
     '生体流转': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/heart.mp4', scale: 0.4, particles: 'fire_aoe',     audioUrl: 'none' },
     '远程重击': { url: '', scale: 1.0, particles: 'ranged_heavy', audioUrl: 'none' },
+    '枪击穿透': { url: '', scale: 1.0, particles: 'gunshot_pierce', audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/gunshot_pierce.mp3' },
     // 在此继续添加：
     // delay 可选（单位：秒）：特效播放后、伤害结算前的等待时长，用于长特效演出与伤害数字同步；未配置则立即结算
     // '火焰02': { url: 'https://...', scale: 1.2, particles: 'fire_aoe',    audioUrl: 'https://...' },
@@ -4678,6 +4779,7 @@ window.spawnCanvasParticles = function(type, x, y) {
     else if (type === 'explosion_single') spawnExplosionParticles(x, y, 0.7);
     else if (type === 'thunder_single') spawnThunderParticles(x, y, false);
     else if (type === 'gunshot') spawnGunshotParticles(x, y);
+    else if (type === 'gunshot_pierce') spawnGunshotPierceParticles(x, y);
     else if (type === 'ranged_heavy') { const _rhDom = document.elementFromPoint(x,y)?.closest('[id$="-sprite"],[id^="hero-card-"]') || null; spawnRangedHeavyParticles(x, y, _rhDom); }
     else if (type === 'light') spawnLightParticles(x, y);
     else if (type === 'poison') spawnPoisonParticles(x, y);
@@ -5104,6 +5206,7 @@ function playAOEEffect(containerId, type, fxTag) {
     else if (pType === 'explosion')   { spawnExplosionParticles(x, y, 1.6); }
     else if (pType === 'light')       { spawnLightParticles(x, y); }
     else if (pType === 'gunshot')     { spawnGunshotParticles(x, y); }
+    else if (pType === 'gunshot_pierce'){ spawnGunshotPierceParticles(x, y); }
     else if (pType === 'ranged_heavy'){ spawnRangedHeavyParticles(x, y, null); }
 
     // 2. WebM 视频层（url 为 null 则跳过）
@@ -5145,10 +5248,57 @@ function playSVGEffect(targetDom, type) {
     else if (type === 'shield') { svgWrapper.className = 'anim-shield'; innerHTML = `<svg class="absolute" style="width: 80px; height: 80px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><path d="M50,10 L90,30 L90,60 C90,80 50,95 50,95 C50,95 10,80 10,60 L10,30 Z" fill="#cbd5e1" opacity="0.8" stroke="#f8fafc" stroke-width="3" style="filter: drop-shadow(0 0 10px #e2e8f0);" /></svg>`; duration = 600; }
     else if (type === 'mpHeal') { svgWrapper.className = 'anim-mp'; innerHTML = `<svg class="absolute" style="width: 60px; height: 60px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><path d="M50,15 C50,15 25,50 25,70 C25,85 35,95 50,95 C65,95 75,85 75,70 C75,50 50,15 50,15 Z" fill="#38bdf8" opacity="0.8" style="filter: drop-shadow(0 0 10px #7dd3fc);" /><circle cx="50" cy="50" r="45" stroke="#bae6fd" stroke-width="2" fill="none" opacity="0.5" /></svg>`; duration = 800; }
     else if (type === 'taunt') { svgWrapper.className = 'anim-taunt'; innerHTML = `<svg class="absolute" style="width: 80px; height: 80px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><path d="M25,25 L45,45 M75,25 L55,45 M35,75 Q50,60 65,75" stroke="#ef4444" stroke-width="6" stroke-linecap="round" fill="none" filter="url(#bloom-red)" /><circle cx="50" cy="50" r="45" stroke="#fca5a5" stroke-width="3" fill="none" stroke-dasharray="10,10" opacity="0.8" /></svg>`; duration = 700; }
-    else if (type === 'gunshot') { 
-        svgWrapper.className = 'anim-gunshot'; 
-        innerHTML = `<svg class="absolute" style="width: 60px; height: 60px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><circle cx="50" cy="50" r="15" fill="#fcd34d" /><circle cx="50" cy="50" r="25" stroke="#fef08a" stroke-width="4" fill="none" opacity="0.8"/></svg>`; 
-        duration = 300; 
+    else if (type === 'gunshot') {
+        // [单体(枪击)] 中小口径重构：激波双圈 + 6向火星 + 十字星芒核心（移植自 demo-gunshot-vfx.html:463 createStandardGunshotSvg）
+        svgWrapper.style.width = '140px'; svgWrapper.style.height = '140px';
+        svgWrapper.style.transform = 'translate(-50%, -50%)';
+        innerHTML = `
+          <svg viewBox="0 0 100 100" class="absolute inset-0 w-full h-full" style="animation: gunshot-shock-ring 0.28s cubic-bezier(0.1,0.8,0.2,1) both; filter: drop-shadow(0 0 8px #f59e0b);">
+            <circle cx="50" cy="50" r="22" stroke="#fef08a" stroke-width="3" fill="none" />
+            <circle cx="50" cy="50" r="16" stroke="#f97316" stroke-width="2" fill="none" stroke-dasharray="4 3" opacity="0.8"/>
+          </svg>
+          <div class="absolute inset-0 flex items-center justify-center">
+            ${[0,60,120,180,240,300].map(deg => `<div class="absolute w-1.5 h-8 bg-gradient-to-t from-transparent via-amber-300 to-white rounded-full opacity-0" style="--ray-rot:${deg}deg; animation: gunshot-spark-ray 0.26s cubic-bezier(0.15,0.85,0.35,1) both; filter: drop-shadow(0 0 6px #f59e0b);"></div>`).join('')}
+          </div>
+          <div class="absolute left-1/2 top-1/2 w-full h-full pointer-events-none" style="animation: gunshot-core-flash 0.32s cubic-bezier(0.12,0.9,0.25,1) both; will-change: transform, opacity;">
+            <svg viewBox="0 0 100 100" class="w-full h-full" style="filter: drop-shadow(0 0 15px #f59e0b) drop-shadow(0 0 25px #ea580c);">
+              <defs><radialGradient id="std-gun-grad-${Date.now()}" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#ffffff" /><stop offset="35%" stop-color="#fef08a" /><stop offset="70%" stop-color="#f97316" /><stop offset="100%" stop-color="#dc2626" stop-opacity="0" /></radialGradient></defs>
+              <polygon points="50,15 56,40 85,50 56,60 50,85 44,60 15,50 44,40" fill="url(#std-gun-grad-${Date.now()})" />
+              <circle cx="50" cy="50" r="14" fill="#ffffff" style="filter: drop-shadow(0 0 8px #fff);" />
+              <circle cx="50" cy="50" r="22" fill="#fde047" opacity="0.6" />
+            </svg>
+          </div>`;
+        // 受击微颤由调用方 applySingleTagEffect 的 targetDom 动画承担，此处仅挂载视觉
+        duration = 650;
+    }
+    else if (type === 'gunshot_pierce') {
+        // [特效:枪击穿透] 弱点贯穿：菱形准星锁定 + 超音速光束 + 背部破片 + 核心激波双圈
+        svgWrapper.style.width = '220px'; svgWrapper.style.height = '220px';
+        svgWrapper.style.transform = 'translate(-50%, -50%)';
+        innerHTML = `
+          <div class="absolute left-1/2 top-1/2 w-full h-full pointer-events-none" style="animation: pierce-weakpoint-lock 0.65s cubic-bezier(0.15,0.9,0.2,1) both; will-change: transform, opacity;">
+            <svg viewBox="0 0 120 120" class="w-full h-full fill-none stroke-current text-sky-400" style="filter: drop-shadow(0 0 12px #38bdf8);">
+              <polygon points="60,10 110,60 60,110 10,60" stroke-width="2.5" stroke="#38bdf8" stroke-dasharray="8 4" fill="none"/>
+              <circle cx="60" cy="60" r="38" stroke="#0ea5e9" stroke-width="1.8" fill="none" />
+              <line x1="60" y1="5" x2="60" y2="35" stroke="#f0f9ff" stroke-width="2.5"/>
+              <line x1="60" y1="85" x2="60" y2="115" stroke="#f0f9ff" stroke-width="2.5"/>
+              <line x1="5" y1="60" x2="35" y2="60" stroke="#f0f9ff" stroke-width="2.5"/>
+              <line x1="85" y1="60" x2="115" y2="60" stroke="#f0f9ff" stroke-width="2.5"/>
+              <circle cx="60" cy="60" r="6" fill="#38bdf8"/>
+            </svg>
+          </div>
+          <div class="absolute left-1/2 top-1/2 w-[340px] h-6 bg-gradient-to-r from-transparent via-cyan-200 to-sky-500 opacity-0 pointer-events-none" style="left:50%; top:50%; transform: translate(-50%,-50%) rotate(-12deg); animation: pierce-beam-penetrate 0.45s cubic-bezier(0.1,0.9,0.2,1) both; will-change: transform, opacity; filter: drop-shadow(0 0 15px #0284c7);"></div>
+          <div class="absolute left-1/2 top-1/2 pointer-events-none opacity-0" style="animation: pierce-exit-cone 0.5s 0.05s ease-out both;">
+            <svg viewBox="0 0 100 100" class="w-32 h-32 fill-sky-200" style="filter: drop-shadow(0 0 10px #38bdf8);">
+              <polygon points="50,45 80,30 65,48 95,50 65,55 85,70 50,55" fill="#e0f2fe"/>
+              <circle cx="85" cy="35" r="3" fill="#bae6fd" /><circle cx="95" cy="55" r="2.5" fill="#fff" /><circle cx="75" cy="65" r="2" fill="#7dd3fc" />
+            </svg>
+          </div>
+          <svg viewBox="0 0 100 100" class="absolute inset-0 w-full h-full stroke-current fill-none pointer-events-none" style="animation: gunshot-shock-ring 0.35s cubic-bezier(0.1,0.8,0.2,1) both; filter: drop-shadow(0 0 15px #38bdf8);">
+            <circle cx="50" cy="50" r="28" stroke="#38bdf8" stroke-width="4" fill="none" />
+            <circle cx="50" cy="50" r="18" stroke="#ffffff" stroke-width="3" fill="none" />
+          </svg>`;
+        duration = 750;
     }
     else if (type === 'fire') { 
         svgWrapper.className = 'anim-fire'; 
@@ -8530,6 +8680,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
   }
   
   let isDodged = false;
+  // ★ 本发枪击互斥标记（需置于 isDamage 分支外，否则纯减益返回时后续命中分支读取会 ReferenceError）
+  let _gunshotFiredThisHit = false;
   let effectTurns = globalTurns !== null ? globalTurns : 3;
 
   // 【免伤】是预存的一次性防御：只对下一次攻击生效，结算后立即移除。
@@ -8606,8 +8758,36 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     }
 
     // 4. 结算闪避成功的效果 (飘字 + 判定反击)
+    // ★ 枪击感保留：即便闪避，[单体(枪击)] 与 [特效:枪击穿透] 仍需逐发呈现"开火感"（枪声+枪口视觉）
+    //     三连发/多段等同一技能内多发调用时，每发独立开火，不按 skill 去重
+    const _isPierceFxDodge = skill && skill.fxTag === '枪击穿透';
+    const _isGunshotTagDodge = tag.includes('枪击') && !(skill && skill.fxTag === '远程重击');
+    const _shouldGunshotOnDodge = _isPierceFxDodge || _isGunshotTagDodge;
     if (isDodged) {
       consumeOneTimeDamageGuard();
+      if (_shouldGunshotOnDodge) {
+          _gunshotFiredThisHit = true;
+          if (_isPierceFxDodge) {
+              const _pe = WEBM_FX_REGISTRY[skill.fxTag];
+              if (_pe && _pe.audioUrl) playCustomAudio(_pe.audioUrl);
+              if (targetDom) {
+                  playSVGEffect(targetDom, 'gunshot_pierce');
+                  targetDom.style.animation = 'none'; void targetDom.offsetWidth;
+                  targetDom.style.animation = 'enemy-pierce-stutter 0.45s cubic-bezier(0.15,0.85,0.35,1) both';
+              }
+              const _ps = document.getElementById('battle-scene');
+              if (_ps) { _ps.classList.remove('gunshot-shake','pierce-shake','ranged-heavy-shake'); void _ps.offsetWidth; _ps.classList.add('pierce-shake'); setTimeout(()=>_ps.classList.remove('pierce-shake'),260); }
+          } else {
+              if (typeof playRandomStandardGunshot === 'function') playRandomStandardGunshot();
+              if (targetDom) {
+                  playSVGEffect(targetDom, 'gunshot');
+                  targetDom.style.animation = 'none'; void targetDom.offsetWidth;
+                  targetDom.style.animation = 'enemy-gunshot-flinch 0.22s ease-out both';
+              }
+              const _gs = document.getElementById('battle-scene');
+              if (_gs) { _gs.classList.remove('gunshot-shake','pierce-shake','ranged-heavy-shake'); void _gs.offsetWidth; _gs.classList.add('gunshot-shake'); setTimeout(()=>_gs.classList.remove('gunshot-shake'),180); }
+          }
+      }
       playSound('miss'); 
       if(targetDom) {
           targetDom.classList.add('dodge-shake'); 
@@ -8679,31 +8859,57 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
   const tStats = getEffectiveStats(target);
 
   if (tag.includes('攻') || tag.includes('单体') || tag.includes('穿透') || tag.includes('眩晕')) {
-    // 音效：有自定义 audioUrl 用自定义，无则播默认音效
-    if (skill && skill.fxTag) {
-        const _fxEntry = WEBM_FX_REGISTRY[skill.fxTag];
-        if (_fxEntry && _fxEntry.audioUrl) {
-            playCustomAudio(_fxEntry.audioUrl);
+    // 音效+视觉：枪击类逐发独立开火（_gunshotFiredThisHit 仅本发内互斥，跨发不共享，避免三连发"1响2哑"）
+    // ★ 重击豁免：[特效:远程重击]（即"枪击重击"）由 executeSkillAction 独占已播全套重击演出，此处不再叠加中小口径枪声
+    const _isHeavyFx = skill && skill.fxTag === '远程重击';
+    const _isGunshotFxSkill = skill && skill.fxTag === '枪击穿透';
+    const _isGunshotTagHit = tag.includes('枪击') && !_isHeavyFx;
+    if (_isHeavyFx) {
+        // 重击专属：本函数不再播音效/视觉，executeSkillAction 已处理（spawnRangedHeavyParticles + 重震+血溅）
+    } else if (_isGunshotFxSkill || _isGunshotTagHit) {
+        if (_gunshotFiredThisHit) {
+            // 本发闪避已呈现开火感，命中不再重复
+        } else {
+            if (_isGunshotFxSkill) {
+                const _fxEntry = WEBM_FX_REGISTRY[skill.fxTag];
+                if (_fxEntry && _fxEntry.audioUrl) playCustomAudio(_fxEntry.audioUrl);
+                if (!tag.includes('群')) {
+                    playSVGEffect(targetDom, 'gunshot_pierce');
+                    if (targetDom) { targetDom.style.animation = 'none'; void targetDom.offsetWidth; targetDom.style.animation = 'enemy-pierce-stutter 0.45s cubic-bezier(0.15,0.85,0.35,1) both'; }
+                }
+            } else if (_isGunshotTagHit) {
+                if (typeof playRandomStandardGunshot === 'function') playRandomStandardGunshot();
+                else if (tag.includes('群攻')) playSound('atk1'); else playSound('atk2');
+                if (!tag.includes('群')) {
+                    let _eff = 'slash';
+                    if (tag.includes('枪击')) _eff = 'gunshot';
+                    else if (tag.includes('火焰')) _eff = 'fire';
+                    else if (tag.includes('光')) _eff = 'light';
+                    else if (tag.includes('爆炸')) _eff = 'explosion_single';
+                    else if (tag.includes('雷')) _eff = 'thunder_single';
+                    playSVGEffect(targetDom, _eff);
+                    if (_eff === 'gunshot' && targetDom) { targetDom.style.animation = 'none'; void targetDom.offsetWidth; targetDom.style.animation = 'enemy-gunshot-flinch 0.22s ease-out both'; }
+                }
+            }
+        }
+    } else {
+        // 非枪击分支：保持原音效与默认刀光
+        if (skill && skill.fxTag) {
+            const _fxEntry = WEBM_FX_REGISTRY[skill.fxTag];
+            if (_fxEntry && _fxEntry.audioUrl) playCustomAudio(_fxEntry.audioUrl);
+            else if (tag.includes('群攻')) playSound('atk1'); else playSound('atk2');
         } else {
             if (tag.includes('群攻')) playSound('atk1'); else playSound('atk2');
         }
-    } else {
-        if (tag.includes('群攻')) playSound('atk1'); else playSound('atk2');
-    }
-    
-    // 攻击方到目标的视觉效果
-    // 若技能有 [特效:xxx] 标签，跳过默认刀光/元素SVG，由特效层接管视觉
-    // 如果是无标签群攻，由于在父级已触发了全局 Canvas 爆炸，此处也不再播放单体 SVG
-    // 目标展示的受击效果（肆动、高亮等）由后续的 spawnHitFlash 触发
-    if (!(skill && skill.fxTag)) {
-        if (!tag.includes('群')) {
-            let effectType = 'slash';
-            if (tag.includes('枪击')) effectType = 'gunshot';
-            else if (tag.includes('火焰')) effectType = 'fire';
-            else if (tag.includes('光')) effectType = 'light';
-            else if (tag.includes('爆炸')) effectType = 'explosion_single'; 
-            else if (tag.includes('雷')) effectType = 'thunder_single';
-            playSVGEffect(targetDom, effectType); 
+        if (!(skill && skill.fxTag)) {
+            if (!tag.includes('群')) {
+                let effectType = 'slash';
+                if (tag.includes('火焰')) effectType = 'fire';
+                else if (tag.includes('光')) effectType = 'light';
+                else if (tag.includes('爆炸')) effectType = 'explosion_single';
+                else if (tag.includes('雷')) effectType = 'thunder_single';
+                playSVGEffect(targetDom, effectType);
+            }
         }
     }
     
@@ -9283,6 +9489,8 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
             }
         } else if (skill && skill.fxTag && !skill._fxPlayed) {
             skill._fxPlayed = true;
+            // ★ 去重：预播特效的音效/粒子仅播一次（首标签），后续同技能的标签不再重复触发前置特效
+            //     真正的命中特效/音效由 applySingleTagEffect 内统一结算（命中/闪避均有对应表现），此处不再播音效与粒子
             if (isAoe) {
                 // 群体：在敌方/友方容器中心播放 AOE 特效（含毒雾/辅助等非攻击标签）
                 const isBeneficialFx = tag.includes('回') || tag.includes('冲') || tag.includes('增') || tag.includes('防') || tag.includes('盾') || tag.includes('瞄') || tag.includes('嘲') || tag.includes('再动') || tag.includes('避') || tag.includes('免伤') || tag.includes('反击') || tag.includes('驱散') || tag.includes('肃正') || tag.includes('速');
@@ -9291,38 +9499,17 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                     : (casterIsHero ? 'enemies-container' : 'heroes-container');
                 playAOEEffect(containerId, null, skill.fxTag);
             } else {
-                // 单体：在目标位置播放特效
-                const firstTarget = targets[0];
-                if (firstTarget) {
-                    const tId = firstTarget.id;
-                    const tDom = tId.startsWith('h')
-                        ? document.getElementById(`hero-card-${tId}`)
-                        : document.getElementById(`${tId}-sprite`);
-                    if (tDom) {
-                        const tr = tDom.getBoundingClientRect();
-                        const tx = tr.left + tr.width / 2, ty = tr.top + tr.height / 2;
-                        const fxEntry = WEBM_FX_REGISTRY[skill.fxTag];
-                        if (fxEntry) {
-                            // 音效：有 audioUrl 用自定义，否则回退默认
-                            if (fxEntry.audioUrl) {
-                                playCustomAudio(fxEntry.audioUrl);
-                            } else {
-                                if (tag.includes('群攻')) playSound('atk1'); else playSound('atk2');
-                            }
-
-                            // 单体粒子
-                            const pType = fxEntry.particles;
-                            if (pType === 'frost')            { spawnFrostParticles(tx, ty); }
-                            else if (pType === 'fire_aoe')    { spawnFireAOEParticles(tx, ty); }
-                            else if (pType === 'thunder_aoe') { spawnThunderAOEParticles(tx, ty); }
-                            else if (pType === 'holy_light')  { spawnHolyLightAOEParticles(tx, ty); }
-                            else if (pType === 'poison')      { spawnPoisonParticles(tx, ty); }
-                            else if (pType === 'thunder')     { spawnThunderParticles(tx, ty, false); }
-                            else if (pType === 'explosion')   { spawnExplosionParticles(tx, ty, 0.8); }
-                            else if (pType === 'light')       { spawnLightParticles(tx, ty); }
-                            else if (pType === 'gunshot')     { spawnGunshotParticles(tx, ty); }
-                            // 单体 WebM
-                            if (fxEntry.url) playWebMFX(tx, ty, skill.fxTag);
+                // 单体前摇：仅 WebM 视频需要预播（伤害同步前先播视频），纯粒子/音效交由 applySingleTagEffect 命中时统一播，避免双播
+                const fxEntry = WEBM_FX_REGISTRY[skill.fxTag];
+                if (fxEntry && fxEntry.url) {
+                    const firstTarget = targets[0];
+                    if (firstTarget) {
+                        const tDom = firstTarget.id.startsWith('h')
+                            ? document.getElementById(`hero-card-${firstTarget.id}`)
+                            : document.getElementById(`${firstTarget.id}-sprite`);
+                        if (tDom) {
+                            const tr = tDom.getBoundingClientRect();
+                            playWebMFX(tr.left + tr.width / 2, tr.top + tr.height / 2, skill.fxTag);
                         }
                     }
                 }
