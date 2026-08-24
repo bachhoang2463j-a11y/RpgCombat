@@ -1921,3 +1921,16 @@
   3. **版本号升级至 V9.8**：`README.md:3` `V9.3 → V9.8`，补 `V9.5-V9.8` 摘要行指向 `LOG-154~155`。
 - **涉及文件**：`index.html`、`README.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：修复三连发中闪避/反应闪避后"后续无特效无音效"与远程重击自带重击音效叠加中小口径枪声的双播；修复块级 `let` 越界致 `applySingleTagEffect` 全量 Promise rejection 卡死。
+
+## [LOG-156] 2026-08-25 — 源码添加 [特效:连续扫射]（纯Canvas粒子+抛壳+多线并发）及演练Demo (V9.9)
+
+- **变更行为**：
+  1. **注册 [特效:连续扫射]（`index.html:4067`）**：`WEBM_FX_REGISTRY` 中注册 `'连续扫射': { url: '', scale: 1.0, particles: 'strafe_burst', audioUrl: 'none' }`。
+  2. **实现 Canvas 连续扫射粒子流（`index.html:3909-4045`）**：新增 `startStrafeBurst` 与 `stopStrafeBurst`，包含 `_spawnStrafeTracer` 弹道光束、`_spawnStrafeCasing` 物理抛壳、`_spawnStrafeHitSparks` 受击跳弹火花，并通过 70ms 定时器驱动多线并发与随机枪声。
+  3. **结算管线接入（`index.html:8920/9635`）**：在 `executeSkillAction` 与 `applySingleTagEffect` 中接入 `连续扫射` 专属分支，避免装饰性连发与单点枪火重复叠加。
+  4. **演练 Demo 归档**：
+     - `demo-melee-heavy-hit.html`：【近战重击】与【重击推撞】破防重击、推撞气浪、眩晕星环演示。
+     - `demo-strafe-particles.html`：【双枪扫射】3目标扇形交错弹幕、物理抛壳、受击跳弹与连发微震演练。
+     - `备份（无需阅读）/demo-gunshot-vfx.html`：中小口径单体枪击与枪击穿透演示归档。
+- **涉及文件**：`index.html`、`demo-melee-heavy-hit.html`、`demo-strafe-particles.html`、`备份（无需阅读）/demo-gunshot-vfx.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：用户在源码中添加纯粒子/SVG版连续扫射，并存档相关演练 Demo 资产供后续打击感调优与分析。
