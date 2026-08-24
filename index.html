@@ -6449,19 +6449,39 @@ function getEnemyTier(enemy) {
     return 'fodder';
 }
 
-// ---- 敌方前后排棋盘：最高阶锚后排 + 均衡分半随机打散 ----
+// ---- 敌方前后排棋盘：最高阶锚后排 + 均衡分半（幂等/无随机，避免保存后闪排）----
 function assignEnemyRows() {
     if (!enemiesData || !enemiesData.length) return;
-    // 若已全量分配则跳过（世界书重载后会重新赋值 needs case 由调用方保证）
+    // 幂等：已全量分配则不重排，避免保存后 Fisher-Yates 随机导致闪动
+    if (enemiesData.every(e => e.row === 'front' || e.row === 'back')) return;
     const rankOf = t => t === 'legend' ? 2 : t === 'elite' ? 1 : 0;
-    const scored = enemiesData.map((e, i) => ({ e, i, rank: rankOf(getEnemyTier(e)) }));
-    scored.sort((a, b) => b.rank - a.rank || a.i - b.i);
-    const n = scored.length, nBack = Math.ceil(n / 2);
-    const anchor = scored[0]; anchor.e.row = 'back'; anchor.e.tier = ['fodder','elite','legend'][anchor.rank];
-    const pool = scored.slice(1);
-    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp; }
-    pool.slice(0, nBack - 1).forEach(s => { s.e.row = 'back';  s.e.tier = ['fodder','elite','legend'][s.rank]; });
-    pool.slice(nBack - 1).forEach(s => { s.e.row = 'front'; s.e.tier = ['fodder','elite','legend'][s.rank]; });
+    const n = enemiesData.length, nBackNeed = Math.ceil(n / 2);
+    const curBack = enemiesData.filter(e => e.row === 'back').length;
+    const curFront = enemiesData.filter(e => e.row === 'front').length;
+    // 全量缺失：确定性分排（去随机），最高阶锚后排，其余按原序切半
+    const allMissing = enemiesData.every(e => !e.row);
+    if (allMissing) {
+        const scored = enemiesData.map((e, i) => ({ e, i, rank: rankOf(getEnemyTier(e)) }));
+        scored.sort((a, b) => b.rank - a.rank || a.i - b.i);
+        const anchor = scored[0]; anchor.e.row = 'back'; anchor.e.tier = ['fodder','elite','legend'][anchor.rank];
+        const pool = scored.slice(1);
+        // 去随机：保持排序稳定，避免保存重触发乱序
+        pool.slice(0, nBackNeed - 1).forEach(s => { s.e.row = 'back';  s.e.tier = ['fodder','elite','legend'][s.rank]; });
+        pool.slice(nBackNeed - 1).forEach(s => { s.e.row = 'front'; s.e.tier = ['fodder','elite','legend'][s.rank]; });
+        return;
+    }
+    // 部分缺失：仅补缺失项，保持已有 row 稳定，确定性补齐至 nBackNeed
+    let backCount = curBack;
+    const needFill = enemiesData.map((e, i) => ({ e, i, rank: rankOf(getEnemyTier(e)) })).filter(x => !x.e.row);
+    needFill.sort((a, b) => b.rank - a.rank || a.i - b.i);
+    needFill.forEach(s => {
+        const tierName = ['fodder','elite','legend'][s.rank];
+        s.e.tier = tierName;
+        if (backCount < nBackNeed) { s.e.row = 'back'; backCount++; }
+        else s.e.row = 'front';
+    });
+    // 补 tier（已有 row 但 tier 缺失的旧存档）
+    enemiesData.forEach((e, i) => { if (!e.tier) e.tier = ['fodder','elite','legend'][rankOf(getEnemyTier(e))]; });
 }
 function hasAliveFront() { return enemiesData.some(e => e.isAlive && e.row === 'front'); }
 function hasAliveBack() { return enemiesData.some(e => e.isAlive && e.row === 'back'); }
@@ -6834,12 +6854,13 @@ function initUI() {
     hero.dom.onclick = () => handleTargetClick(hero, 'hero');
     heroesContainer.appendChild(hero.dom); updateBuffUI(hero); 
   });
-  // ---- 敌人前后排棋盘：按 row 分组渲染（桌面双排立体 / 移动端 3×4 网格）----
-  window.renderEnemyFormation = window.renderEnemyFormation || function(){
+  // ---- 敌人前后排棋盘：按 row 分组渲染（固定视觉2行，逻辑前/后排决定玩法）----
+  window.renderEnemyFormation = function(){
     const enemiesContainer2 = document.getElementById('enemies-container');
     if (!enemiesContainer2 || !enemiesData || !enemiesData.length) return;
-    enemiesContainer2.innerHTML = '';
-    // 老存档兜底：row 缺失时补算
+    // 用离屏 fragment 原子替换，避免 innerHTML='' 瞬间空容器导致的“消失”
+    const frag = document.createDocumentFragment();
+    // 老存档兜底：row 缺失时补算（幂等、无随机）
     if (enemiesData.some(e => !e.row)) assignEnemyRows();
     const backEnemies = enemiesData.filter(e => e.row === 'back');
     const frontEnemies = enemiesData.filter(e => e.row === 'front');
@@ -6877,7 +6898,9 @@ function initUI() {
       el.className = `flex flex-col items-center group relative ${!enemy.isAlive ? 'hidden' : ''} cursor-pointer pointer-events-auto shrink-0`;
       el.id = `enemy-box-${enemy.id}`;
       el.dataset.row = enemy.row || '';
-      if (state.isGameStarted) { el.classList.add('anim-enter-enemy'); el.style.animationDelay = `${index * 0.08}s`; setTimeout(() => { if (el) el.classList.remove('anim-enter-enemy'); }, 800 + index * 80); } else { el.classList.add('opacity-0'); }
+      // 保存路径原地刷新：不重触发入场/隐身，避免“空1s再右侧滑入”
+      if (window._isSaving) { /* 静止可见，保留 breathe */ }
+      else if (state.isGameStarted) { el.classList.add('anim-enter-enemy'); el.style.animationDelay = `${index * 0.08}s`; setTimeout(() => { if (el) el.classList.remove('anim-enter-enemy'); }, 800 + index * 80); } else { el.classList.add('opacity-0'); }
       el.style.transform = `scale(${sc})`;
       el.style.filter = isBack ? 'brightness(0.82) saturate(0.92)' : '';
       el.onclick = () => handleTargetClick(enemy, 'enemy');
@@ -6897,22 +6920,27 @@ function initUI() {
       enemy.dom = el;
       return el;
     }
-    function appendRow(list, isBack){
+    function appendRow(list, isBack, target){
       if (!list.length) return;
-      // 固定视觉2行：1行前排 + 1行后排，永不拆 3×4 子行（视觉2行，逻辑前后排不变）
       const row = document.createElement('div');
       row.className = `flex items-center justify-center flex-nowrap pointer-events-none ${isBack ? 'z-10' : 'z-20'}`;
       row.style.gap = (isBack ? gapBack : gapFront) + 'px';
       if (!isBack && frontEnemies.length && backEnemies.length) row.style.transform = `translateY(${frontY}px)`;
       list.forEach((e, i) => row.appendChild(buildEnemyDom(e, e.id.charCodeAt(1), isBack)));
-      enemiesContainer2.appendChild(row);
+      (target||enemiesContainer2).appendChild(row);
     }
-    // 后排在上、前排在下（立体纵深）
-    if (backEnemies.length) appendRow(backEnemies, true);
-    if (frontEnemies.length) appendRow(frontEnemies, false);
-    if (backEnemies.length && !frontEnemies.length) enemiesContainer2.style.justifyContent = 'center';
-    else enemiesContainer2.style.justifyContent = 'flex-start';
-    enemiesData.forEach(e => setTimeout(() => { updateEnemyUI(e); updateBuffUI(e); }, 50));
+    const _fragTarget = frag;
+    if (backEnemies.length) appendRow(backEnemies, true, _fragTarget);
+    if (frontEnemies.length) appendRow(frontEnemies, false, _fragTarget);
+    // 原子替换：先构建 frag 再一次性上屏，避免 innerHTML='' 空白闪烁；屏蔽 transition-all 的空帧动画
+    const _justify = (backEnemies.length && !frontEnemies.length) ? 'center' : 'flex-start';
+    const _prevTransition = enemiesContainer2.style.transition;
+    enemiesContainer2.style.transition = 'none';
+    enemiesContainer2.replaceChildren(frag);
+    enemiesContainer2.style.justifyContent = _justify;
+    // 同步刷新血条/Buff，避免 30ms 异步命中旧 detached 节点
+    enemiesData.forEach(e => { updateEnemyUI(e); updateBuffUI(e); });
+    requestAnimationFrame(() => { enemiesContainer2.style.transition = _prevTransition; });
   };
   window.renderEnemyFormation();
 }
@@ -7455,8 +7483,16 @@ function updateEnemyUI(enemy) {
           sprite.classList.remove('breathe');
       } else {
           sprite.classList.remove('charge-full-danger');
-          if (enemy.isAlive && !sprite.classList.contains('breathe') && !sprite.classList.contains('target-bullet-stutter') && (typeof _strafeLock === 'undefined' || !_strafeLock)) {
-              sprite.classList.add('breathe');
+          if (enemy.isAlive) {
+              if (sprite.classList.contains('target-bullet-stutter')) {
+                  // 扫射抖动期间不抢回，避免覆盖 stutter
+              } else if ((typeof _strafeLock === 'undefined' || !_strafeLock)) {
+                  if (!sprite.classList.contains('breathe')) sprite.classList.add('breathe');
+              } else if (window._isSaving) {
+                  // 保存清场后强制恢复 breathe，避免锁粘住永久透明
+                  sprite.classList.remove('target-bullet-stutter');
+                  if (!sprite.classList.contains('breathe')) sprite.classList.add('breathe');
+              }
           }
       }
   }
@@ -11897,6 +11933,13 @@ function syncEditorDataToMemory() {
   });
 }
 function saveEditor() {
+  // 保存前清扫射演出残留：避免 z-index:138 血渍/抖动锁遮挡“消失”错觉
+  try { if (typeof stopStrafeBurst === 'function') stopStrafeBurst(); } catch(e) {}
+  try { if (typeof _strafeTimer !== 'undefined' && _strafeTimer) { clearInterval(_strafeTimer); _strafeTimer = null; } } catch(e) {}
+  try { if (typeof _strafeLock !== 'undefined') _strafeLock = false; } catch(e) {}
+  try { const _ov = document.querySelector('.strafe-blood-overlay'); if (_ov) _ov.remove(); if (typeof _strafeBloodOverlay !== 'undefined' && _strafeBloodOverlay) { try { _strafeBloodOverlay.remove(); } catch(e2) {} _strafeBloodOverlay = null; } } catch(e) {}
+  try { heroesData.forEach(h => h.skills && h.skills.forEach(s => { delete s._fxPlayed; delete s._strafeBurstStart; })); } catch(e) {}
+  try { enemiesData.forEach(e2 => e2.skills && e2.skills.forEach(s => { delete s._fxPlayed; delete s._strafeBurstStart; })); } catch(e) {}
   syncEditorDataToMemory();
   defendSettings.mpRecoverPct = clampPct(document.getElementById('edit-defend-mp-pct').value);
   defendSettings.tpRecoverPct = clampPct(document.getElementById('edit-defend-tp-pct').value);
@@ -11944,7 +11987,7 @@ function saveEditor() {
     delete e.hasTriggeredAvoidFatal;
   });
   initialHeroesCache = JSON.parse(JSON.stringify(heroesData)); initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData));
-  closeEditor(); initUI(); if(state.isGameStarted) { showLog("设置已覆盖生效！"); setTimeout(() => startRound(), 1000); }
+  closeEditor(); window._isSaving = true; initUI(); window._isSaving = false; requestAnimationFrame(() => { window._isSaving = false; }); if(state.isGameStarted) { showLog("设置已覆盖生效！"); setTimeout(() => startRound(), 1000); }
 }
 function addHeroSkill(hi) { syncEditorDataToMemory(); heroesData[hi].skills.push({ name: '新技能', isReaction: false, reactionTarget: 'all', kanpoTarget: null, sheshenTarget: null, isOthers: false, guaranteedHit: false, isHighTier: false, isLegendary: false, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, hit: 100, delay: 0, haste: 0 }); openEditor(); }
 function removeHeroSkill(hi, si) { syncEditorDataToMemory(); heroesData[hi].skills.splice(si, 1); openEditor(); }
@@ -11952,7 +11995,7 @@ function addEnemySkill(ei) { syncEditorDataToMemory(); enemiesData[ei].skills.pu
 function removeEnemySkill(ei, si) { syncEditorDataToMemory(); enemiesData[ei].skills.splice(si, 1); openEditor(); }
 function addHero() { syncEditorDataToMemory(); heroesData.push({ id: 'h' + Date.now(), name: '新角色', img: DEFAULT_HERO_IMG, classType: null, hp: 400, maxHp: 400, mp: 200, maxMp: 200, tp: 0, maxTp: 100, atk: 80, def: 30, spd: 100, shield: 0, actCount: 1, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, burstActivated: false, skills: [ { name: '攻击', isReaction: false, reactionTarget: 'all', damageType: null, fxTag: null, guaranteedHit: false, cost: 0, hpCost: 0, tpCost: 0, hit: 100, type: '[单体]', power: 60, type2: '[无]', power2: 0, type3: '[无]', power3: 0 } ] }); openEditor(); }
 function removeHero(i) { if (heroesData.length <= 1) return alert("至少保留一名我方！"); if (confirm("删除角色？")) { syncEditorDataToMemory(); heroesData.splice(i, 1); openEditor(); } }
-function addEnemy() { syncEditorDataToMemory(); enemiesData.push({ id: 'e' + Date.now(), name: '新怪物', emoji: '👾', classType: null, hp: 500, maxHp: 500, mp: 200, maxMp: 200, size: 'text-5xl', atk: 90, def: 20, spd: 90, shield: 0, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, currentCharge: 0, isWise: false, skills: [ { name: '撕咬', damageType: null, fxTag: null, guaranteedHit: false, cost: 0, hpCost: 0, tpCost: 0, charge: 0, hit: 100, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0 } ] }); openEditor(); }
+function addEnemy() { syncEditorDataToMemory(); enemiesData.push({ id: 'e' + Date.now(), name: '新怪物', emoji: '👾', classType: null, hp: 500, maxHp: 500, mp: 200, maxMp: 200, size: 'text-5xl', atk: 90, def: 20, spd: 90, shield: 0, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, currentCharge: 0, isWise: false, row: 'front', tier: 'fodder', skills: [ { name: '撕咬', damageType: null, fxTag: null, guaranteedHit: false, cost: 0, hpCost: 0, tpCost: 0, charge: 0, hit: 100, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0 } ] }); openEditor(); }
 function removeEnemy(i) { if (enemiesData.length <= 1) return alert("至少保留一只怪物！"); if (confirm("删除怪物？")) { syncEditorDataToMemory(); enemiesData.splice(i, 1); openEditor(); } }
 
 // ==========================================
