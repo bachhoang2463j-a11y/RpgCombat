@@ -1884,3 +1884,20 @@
   5. **文档规范**：`Coding rule.md` 新增 §五 Git 提交流程与 Hash 回填规范（严防 `commit --amend` 自指死循环，标准两步提交法）。
 - **涉及文件**：`index.html`、`Coding rule.md`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：修复用户反馈的“`【异种坏死雾】[群中毒][群弱][群滞][特效:异种坏死雾]` 不显示特效”——根因为辅助类标签被 `isAttackTag` 门控拦截；同时为后续辅助类技能加特效预留通用通道，并提供与黑底雾视频叠加的专用毒雾粒子基底。
+
+## [LOG-153] 2026-08-25 — 新增 [特效:远程重击] 特效（枪口爆炸+镜头溅血+重震屏+强力枪声）
+
+- **变更行为**：
+  1. **新增 `[特效:远程重击]` 特效渲染与编排器（`index.html:3649/3799/9259`）**：
+     - `WEBM_FX_REGISTRY` 注册 `'远程重击': { url: '', scale: 1.0, particles: 'ranged_heavy', audioUrl: 'none' }`，无需外部视频纯由 Canvas 粒子、SVG 与 DOM 构成。
+     - `createRangedHeavyMuzzleHtml()`：敌人受击中心生成双管交叠高热烈焰爆风（白热内芯+金黄与烈橙多角星芒+硝烟云雾+膨胀激波环+八向火星喷射，0.75s 动效）。
+     - `createRangedHeavyBloodHtml()`：全屏 Fixed 镜头顶层生成 5 团有机曲线溅血 SVG 块、2 条自上而下垂落血痕与边缘暗红脉冲暗角（1.15s~1.35s 动效）。
+     - `spawnRangedHeavyParticles(x, y, targetDom)`：受击目标猛烈受击后仰顿挫动画 `enemy-heavy-hit-recoil` + `triggerScreenShake(7, 480)` 重震屏 + 飘字与粒子调度。
+  2. **音频引擎接入强力反击枪声与超重低音**：
+     - 复用 `POWER_COUNTER_SOUND_URL`（`shot01.mp3`）与 `hitDown.mp3`，并基于 Web Audio API 动态合成物理级超重低音冲击波（`playRangedHeavySubBass`，140Hz→32Hz 混响）。
+  3. **技能执行调度独占**：
+     - `executeSkillAction` 拦截 `skill.fxTag === '远程重击'`，单体目标独占调度重击全套流程（枪口爆炸+镜头溅血+重震屏+强力枪声），群攻误配时自动降级为轻量枪火避免错位。
+  4. **演练 Demo 归档**：
+     - `备份（无需阅读）/demo-ranged-heavy-hit.html` 提供 4 方案实时对比、慢动作分解与目标切换。
+- **涉及文件**：`index.html`、`备份（无需阅读）/demo-ranged-heavy-hit.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：满足用户对 `【双管猎象枪】` 等重型远程火器的高冲击力打击感需求，将单体枪击受击反馈升级为电影级枪口爆炸、镜头喷溅血块、剧烈震屏与高辨识度强力反击重枪声。
