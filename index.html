@@ -319,6 +319,26 @@
       100% { transform: scale(1) translate(0, 0); filter: brightness(1); }
     }
 
+    /* ==== [特效:连续扫射] N敌=N线并发·扇形扫射（移植自 demo-strafe-particles.html，无WebM，纯Canvas+CSS） ==== */
+    .strafe-shake { animation: strafe-recoil-anim 0.08s linear infinite alternate; }
+    @keyframes strafe-recoil-anim {
+      0% { transform: translate3d(-3px, 2px, 0) scale(1.006) rotate(-0.3deg); }
+      50% { transform: translate3d(3px, -2px, 0) scale(1.004) rotate(0.4deg); }
+      100% { transform: translate3d(-2px, -3px, 0) scale(1.008) rotate(-0.2deg); }
+    }
+    .target-bullet-stutter { animation: target-stutter-anim 0.07s ease-in-out infinite alternate; }
+    @keyframes target-stutter-anim {
+      0% { transform: translate3d(3px, -2px, 0) scale(0.98); filter: brightness(2) contrast(1.3) drop-shadow(0 0 20px #f59e0b); }
+      100% { transform: translate3d(-3px, 2px, 0) scale(1.02); filter: brightness(1.4) drop-shadow(0 0 10px #f97316); }
+    }
+    @keyframes strafe-dmg-pop {
+      0% { transform: translate(-50%, 0%) scale(0.3); opacity: 0; }
+      20% { transform: translate(-50%, -50%) scale(1.35); opacity: 1; }
+      40% { transform: translate(-50%, -75%) scale(1.05); opacity: 1; }
+      80% { transform: translate(-50%, -95%) scale(1); opacity: 0.9; }
+      100% { transform: translate(-50%, -120%) scale(0.85); opacity: 0; }
+    }
+
     /* ==== 敌方大招切入特效 (Boss Cut-in) ==== */
     @keyframes cutin-overlay {
       0% { opacity: 0; backdrop-filter: blur(0px); }
@@ -1863,7 +1883,7 @@ const audioUrls = {
     'herochargedone': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/herochargedone.mp3',
     'combatKill': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/combat_kill.mp3',
     'magicKill': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/magic_kill.wav',
-    'kanpo': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/kanpo.wav',
+    'kanpo': 'https://files.catbox.moe/oa0q52.mp3',
     // [单体(枪击)] 中小口径随机 + [特效:枪击穿透] 专属（移植自 demo-gunshot-vfx.html，test1 仓库）
     'gunshot1': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/gunshot1.mp3',
     'gunshot2': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/gunshot2.mp3',
@@ -3886,6 +3906,145 @@ function spawnPoisonParticles(x, y) {
 }
 
 // ==========================================
+// [特效:连续扫射] N敌=N线并发·快照·装饰性连发（纯Canvas+CSS，无WebM）
+// 移植自 demo-strafe-particles.html：扇形交错弹道+抛壳+跳弹火花+连发微震
+// 约束：单次结算装饰，视觉 fire-and-forget（setInterval 70ms×18），结算 await 反应期间后台持续渲染
+// ==========================================
+let _strafeTimer = null;
+let _strafeLock = false;
+let _strafeShakeEls = [];
+function _spawnStrafeTracer(x1, y1, x2, y2) {
+    const spreadX = (Math.random() - 0.5) * 35;
+    const spreadY = (Math.random() - 0.5) * 35;
+    fxEngine.addParticle({
+        x1, y1, x2: x2 + spreadX, y2: y2 + spreadY,
+        vx: 0, vy: 0, age: 0, life: 200,
+        draw: function(ctx, pct) {
+            const a = Math.max(0, 1 - pct);
+            ctx.save();
+            ctx.strokeStyle = `rgba(254,240,138,${a})`;
+            ctx.shadowColor = '#f59e0b';
+            ctx.shadowBlur = 12;
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(this.x1, this.y1);
+            ctx.lineTo(this.x2, this.y2);
+            ctx.stroke();
+            ctx.restore();
+        }
+    });
+}
+function _spawnStrafeCasing(x, y, isLeft) {
+    const angle = (isLeft ? -135 : 45) + (Math.random() * 30 - 15);
+    const speed = 4 + Math.random() * 4;
+    const rad = angle * Math.PI / 180;
+    fxEngine.addParticle({
+        x, y,
+        vx: Math.cos(rad) * speed,
+        vy: Math.sin(rad) * speed - 3,
+        gravity: 0.32, drag: 1,
+        angle: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.4,
+        age: 0, life: 1000,
+        w: 3.5, h: 7.5,
+        draw: function(ctx, pct) {
+            const a = Math.max(0, Math.min(1, (1 - pct) * 2));
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.angle + this.rotSpeed * this.age / 16.7);
+            ctx.globalAlpha = a;
+            ctx.fillStyle = '#fbbf24';
+            ctx.shadowColor = '#d97706';
+            ctx.shadowBlur = 4;
+            ctx.fillRect(-this.w/2, -this.h/2, this.w, this.h);
+            ctx.fillStyle = `rgba(255,255,255,${a})`;
+            ctx.fillRect(-this.w/4, -this.h/2, this.w/2, this.h/2);
+            ctx.restore();
+        }
+    });
+}
+function _spawnStrafeHitSparks(x, y, count) {
+    for (let i = 0; i < count; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 3.5 + Math.random() * 7.5;
+        fxEngine.addParticle({
+            x: x + (Math.random()-0.5)*30,
+            y: y + (Math.random()-0.5)*30,
+            vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd,
+            drag: 0.94, gravity: 0,
+            age: 0, life: 480 + Math.random()*320,
+            size: 2.2 + Math.random()*2.5,
+            color: Math.random()>0.3 ? '#fef08a' : '#f97316',
+            draw: function(ctx, pct) {
+                const a = Math.max(0, 1 - pct);
+                if (a <= 0.01) return;
+                ctx.save();
+                ctx.globalAlpha = a;
+                ctx.fillStyle = this.color;
+                ctx.shadowColor = this.color;
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * (pct>0.5 ? 1 : pct*2 + 0.2), 0, Math.PI*2);
+                ctx.fill();
+                ctx.restore();
+            }
+        });
+    }
+}
+function startStrafeBurst(casterId, coordsSnapshot) {
+    if (_strafeLock || !coordsSnapshot || coordsSnapshot.length === 0) return;
+    _strafeLock = true;
+    const battleScene = document.getElementById('battle-scene');
+    const heroCard = document.getElementById(`hero-card-${casterId}`);
+    let casterX = window.innerWidth * 0.18, casterY = window.innerHeight * 0.78;
+    if (heroCard) {
+        const cr = heroCard.getBoundingClientRect();
+        casterX = cr.left + cr.width/2;
+        casterY = cr.top + cr.height/2;
+    }
+    // 挂震颤：场景 + 全部快照目标对应 sprite（淡出前已冻结，非动态重扫）
+    _strafeShakeEls = [];
+    if (battleScene) { battleScene.classList.add('strafe-shake'); _strafeShakeEls.push(battleScene); }
+    coordsSnapshot.forEach(c => {
+        if (c.dom) { c.dom.classList.add('target-bullet-stutter'); _strafeShakeEls.push(c.dom); }
+    });
+    // 注：hero-card 结构未内置 demo 的 caster-muzzle-flare-l/r，不强设火光，视觉由弹道/抛壳/火花承载
+    let shotCount = 0;
+    const totalTicks = 18; // 1300ms/70ms
+    _strafeTimer = setInterval(() => {
+        shotCount++;
+        const isLeft = shotCount % 2 === 0;
+        // 抛壳：每 tick 1 枚，左右交替
+        _spawnStrafeCasing(casterX + (isLeft ? -25 : 25), casterY, isLeft);
+        // N线并发：每目标各 1 线（单体=1线，群攻=全快照）
+        coordsSnapshot.forEach(c => {
+            _spawnStrafeTracer(casterX + (isLeft ? -20 : 20), casterY, c.x, c.y);
+            _spawnStrafeHitSparks(c.x, c.y, 7);
+        });
+        // 音效限频：每 2 tick 一次，枪击穿透/普通枪声复用，中小口径随机
+        if (shotCount % 2 === 0 && typeof playRandomStandardGunshot === 'function') {
+            try { playRandomStandardGunshot(); } catch(e) {}
+        }
+        if (shotCount >= totalTicks) stopStrafeBurst();
+    }, 70);
+    // 兜底：1300ms 后强制清场（结算串行可能更长，stopStrafeBurst 幂等）
+    setTimeout(() => stopStrafeBurst(), 1350);
+}
+function stopStrafeBurst() {
+    if (_strafeTimer) { clearInterval(_strafeTimer); _strafeTimer = null; }
+    _strafeShakeEls.forEach(el => {
+        if (!el) return;
+        el.classList.remove('strafe-shake');
+        el.classList.remove('target-bullet-stutter');
+    });
+    _strafeShakeEls = [];
+    // 延迟解锁，避免同技能内多标签重复触发
+    setTimeout(() => { _strafeLock = false; }, 220);
+}
+window.startStrafeBurst = startStrafeBurst;
+window.stopStrafeBurst = stopStrafeBurst;
+
+// ==========================================
 // ★ 特效注册表 ★
 // 视觉效果完全由 [特效:xxx] 标签驱动，与技能 tag 文字无关
 // url:       WebM 视频地址（null = 仅粒子，无视频）
@@ -3895,8 +4054,8 @@ function spawnPoisonParticles(x, y) {
 // audioUrl:  独立的音效文件地址（覆盖默认的攻击音效）
 // ==========================================
 const WEBM_FX_REGISTRY = {
-    '火焰01': { url: 'https://files.catbox.moe/eyfwd9.webm',                                              scale: 1.4, particles: 'fire_aoe',    audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/fire01.mp3' },
-    '冰霜01': { url: 'https://files.catbox.moe/tr9n9i.webm',                                              scale: 1.4, particles: 'frost',       audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/freeze01.mp3' },
+    '火焰01': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/fire.webm',                                              scale: 1.4, particles: 'fire_aoe',    audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/fire01.mp3' },
+    '冰霜01': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/ice.webm',                                              scale: 1.4, particles: 'frost',       audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/freeze01.mp3' },
     '雷击01': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/450.webm',               scale: 1.4, particles: 'thunder_aoe', audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/thunder01.mp3' },
     '圣光01': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/414.webm',               scale: 1.4, particles: 'holy_light',  audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/light01.mp3' },
     '双枪扫射': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/strafe-ezremove05.mp4', scale: 0.9, particles: 'gunshot',    audioUrl: 'none', delay: 0.5 },
@@ -3905,6 +4064,7 @@ const WEBM_FX_REGISTRY = {
     '生体流转': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/heart.mp4', scale: 0.4, particles: 'fire_aoe',     audioUrl: 'none' },
     '远程重击': { url: '', scale: 1.0, particles: 'ranged_heavy', audioUrl: 'none' },
     '枪击穿透': { url: '', scale: 1.0, particles: 'gunshot_pierce', audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/gunshot_pierce.mp3' },
+    '连续扫射': { url: '', scale: 1.0, particles: 'strafe_burst', audioUrl: 'none' },
     // 在此继续添加：
     // delay 可选（单位：秒）：特效播放后、伤害结算前的等待时长，用于长特效演出与伤害数字同步；未配置则立即结算
     // '火焰02': { url: 'https://...', scale: 1.2, particles: 'fire_aoe',    audioUrl: 'https://...' },
@@ -8760,9 +8920,11 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     // 4. 结算闪避成功的效果 (飘字 + 判定反击)
     // ★ 枪击感保留：即便闪避，[单体(枪击)] 与 [特效:枪击穿透] 仍需逐发呈现"开火感"（枪声+枪口视觉）
     //     三连发/多段等同一技能内多发调用时，每发独立开火，不按 skill 去重
+    //     连续扫射装饰已覆盖全场弹道，闪避不再叠加单点枪火
+    const _isStrafeFx = skill && skill.fxTag === '连续扫射';
     const _isPierceFxDodge = skill && skill.fxTag === '枪击穿透';
-    const _isGunshotTagDodge = tag.includes('枪击') && !(skill && skill.fxTag === '远程重击');
-    const _shouldGunshotOnDodge = _isPierceFxDodge || _isGunshotTagDodge;
+    const _isGunshotTagDodge = !_isStrafeFx && tag.includes('枪击') && !(skill && skill.fxTag === '远程重击');
+    const _shouldGunshotOnDodge = !_isStrafeFx && (_isPierceFxDodge || _isGunshotTagDodge);
     if (isDodged) {
       consumeOneTimeDamageGuard();
       if (_shouldGunshotOnDodge) {
@@ -8859,8 +9021,12 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
   const tStats = getEffectiveStats(target);
 
   if (tag.includes('攻') || tag.includes('单体') || tag.includes('穿透') || tag.includes('眩晕')) {
+    const _isStrafeFxHit = skill && skill.fxTag === '连续扫射';
+    if (_isStrafeFxHit) {
+        // 连续扫射装饰已覆盖全场 N 线并发+火花+微震，本发不再叠加单点枪火（避免装饰与命中双播）
+    } else {
     // 音效+视觉：枪击类逐发独立开火（_gunshotFiredThisHit 仅本发内互斥，跨发不共享，避免三连发"1响2哑"）
-    // ★ 重击豁免：[特效:远程重击]（即"枪击重击"）由 executeSkillAction 独占已播全套重击演出，此处不再叠加中小口径枪声
+    // ★ 重击豁免：[特效:远程重击] 由 executeSkillAction 独占已播全套重击演出，此处不再叠加中小口径枪声
     const _isHeavyFx = skill && skill.fxTag === '远程重击';
     const _isGunshotFxSkill = skill && skill.fxTag === '枪击穿透';
     const _isGunshotTagHit = tag.includes('枪击') && !_isHeavyFx;
@@ -8912,6 +9078,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
             }
         }
     }
+    } // end _isStrafeFxHit guard
     
     // 剥离出纯粹由 Buff 带来的攻击力增益
     let buffAtkBonus = cStats.atk - (caster.atk || 0); 
@@ -9465,8 +9632,19 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         }
 
         // === 视觉效果由 [特效:xxx] 标签独立决定，与 tag 文字内容完全无关 ===
-        // [特效:远程重击] 单体重击：独占重击编排器（枪口爆炸+5血块+重震屏+强力枪声），不走通用粒子/WebM
-        if (skill && skill.fxTag === '远程重击' && !skill._fxPlayed) {
+        // [特效:连续扫射] N敌=N线并发·快照·装饰性连发：fire-and-forget，后台 setInterval 70ms 持续 N 线，结算 await 反应期间不阻塞
+        if (skill && skill.fxTag === '连续扫射' && !skill._fxPlayed) {
+            skill._fxPlayed = true;
+            // 快照：按本次技能的对手集合冻结坐标（群攻=全存活敌，单体=主目标），后续 tick 复用冻结坐标，死靶淡出不转火、新增不追入
+            const _strafeOpponents = (caster.id.startsWith('h') ? enemiesData.filter(e=>e.isAlive) : heroesData.filter(h=>h.isAlive));
+            const _strafeSnapshotTargets = tag.includes('群') ? _strafeOpponents.slice() : (targets[0] ? [targets[0]] : []);
+            const _strafeCoords = _strafeSnapshotTargets.map(t => {
+                const _sd = t.id.startsWith('h') ? document.getElementById(`hero-card-${t.id}`) : document.getElementById(`${t.id}-sprite`);
+                if (_sd) { const _sr = _sd.getBoundingClientRect(); return { x:_sr.left+_sr.width/2, y:_sr.top+_sr.height/2, dom:_sd }; }
+                return null;
+            }).filter(Boolean);
+            if (_strafeCoords.length) { try { startStrafeBurst(caster.id, _strafeCoords); } catch(e) { console.warn('[Strafe] start failed', e); } }
+        } else if (skill && skill.fxTag === '远程重击' && !skill._fxPlayed) {
             skill._fxPlayed = true;
             if (isAoe) {
                 // 首版仅单体重击：群攻误配重击标签时回退为轻量枪火，不触发重震/血溅，避免容器错位
@@ -9609,6 +9787,8 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         if(caster.id.startsWith('h')) updateHeroUI(caster); else updateEnemyUI(caster);
     }
 
+    // [特效:连续扫射] 装饰收尾：结算串行已走完，兜底清场（幂等，定时器内已自清此处仅补漏）
+    if (skill && skill.fxTag === '连续扫射') { try { stopStrafeBurst(); } catch(e) {} }
     // 本次技能特效已播标记复位（保证下次释放同一技能仍可触发）
     if (skill && skill._fxPlayed) delete skill._fxPlayed;
     delete skill._bdg;
