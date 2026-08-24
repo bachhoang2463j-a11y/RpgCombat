@@ -3934,6 +3934,31 @@ function _spawnStrafeTracer(x1, y1, x2, y2) {
         }
     });
 }
+function _spawnStrafeMuzzleFlash(x, y, isLeft) {
+    fxEngine.addParticle({
+        x: x, y: y,
+        vx: (isLeft ? -1 : 1) * (1 + Math.random() * 2),
+        vy: -0.5,
+        drag: 0.9,
+        age: 0, life: 90,
+        draw: function(ctx, pct) {
+            const a = Math.max(0, 1 - pct);
+            ctx.save();
+            ctx.globalAlpha = a;
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowColor = '#f59e0b';
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 14 * (1 - pct * 0.5), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fef08a';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 22 * (1 - pct * 0.5), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+    });
+}
 function _spawnStrafeCasing(x, y, isLeft) {
     const angle = (isLeft ? -135 : 45) + (Math.random() * 30 - 15);
     const speed = 4 + Math.random() * 4;
@@ -3964,17 +3989,18 @@ function _spawnStrafeCasing(x, y, isLeft) {
     });
 }
 function _spawnStrafeHitSparks(x, y, count) {
-    for (let i = 0; i < count; i++) {
+    const n = count || 8;
+    for (let i = 0; i < n; i++) {
         const ang = Math.random() * Math.PI * 2;
-        const spd = 3.5 + Math.random() * 7.5;
+        const spd = 4.0 + Math.random() * 8.0;
         fxEngine.addParticle({
-            x: x + (Math.random()-0.5)*30,
-            y: y + (Math.random()-0.5)*30,
+            x: x + (Math.random()-0.5)*50,
+            y: y + (Math.random()-0.5)*50,
             vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd,
-            drag: 0.94, gravity: 0,
-            age: 0, life: 480 + Math.random()*320,
-            size: 2.2 + Math.random()*2.5,
-            color: Math.random()>0.3 ? '#fef08a' : '#f97316',
+            drag: 0.93, gravity: 0.05,
+            age: 0, life: 350 + Math.random()*250,
+            size: 2.8 + Math.random()*3.2,
+            color: Math.random()>0.35 ? '#fef08a' : '#f97316',
             draw: function(ctx, pct) {
                 const a = Math.max(0, 1 - pct);
                 if (a <= 0.01) return;
@@ -3982,9 +4008,10 @@ function _spawnStrafeHitSparks(x, y, count) {
                 ctx.globalAlpha = a;
                 ctx.fillStyle = this.color;
                 ctx.shadowColor = this.color;
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = 10;
                 ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * (pct>0.5 ? 1 : pct*2 + 0.2), 0, Math.PI*2);
+                const r = this.size * Math.max(0.2, (1 - pct * 0.7) * 1.5);
+                ctx.arc(this.x, this.y, r, 0, Math.PI*2);
                 ctx.fill();
                 ctx.restore();
             }
@@ -4002,32 +4029,65 @@ function startStrafeBurst(casterId, coordsSnapshot) {
         casterX = cr.left + cr.width/2;
         casterY = cr.top + cr.height/2;
     }
-    // 挂震颤：场景 + 全部快照目标对应 sprite（淡出前已冻结，非动态重扫）
+    // 挂震颤与受击高光：暂停 breathe 避免 transform 冲突，添加 target-bullet-stutter
     _strafeShakeEls = [];
     if (battleScene) { battleScene.classList.add('strafe-shake'); _strafeShakeEls.push(battleScene); }
     coordsSnapshot.forEach(c => {
-        if (c.dom) { c.dom.classList.add('target-bullet-stutter'); _strafeShakeEls.push(c.dom); }
+        if (c.dom) {
+            c.dom.classList.remove('breathe');
+            c.dom.classList.add('target-bullet-stutter');
+            _strafeShakeEls.push(c.dom);
+        }
     });
-    // 注：hero-card 结构未内置 demo 的 caster-muzzle-flare-l/r，不强设火光，视觉由弹道/抛壳/火花承载
     let shotCount = 0;
-    const totalTicks = 18; // 1300ms/70ms
+    const totalTicks = 18; // 1300ms/70ms = 18 发
+    const nTargets = coordsSnapshot.length;
+
+    // 扇形扫射动态序列生成
+    const sweepIndices = [];
+    if (nTargets === 1) {
+        sweepIndices.push(0);
+    } else if (nTargets === 2) {
+        sweepIndices.push(0, 1);
+    } else {
+        for (let i = 0; i < nTargets; i++) sweepIndices.push(i);
+        for (let i = nTargets - 2; i > 0; i--) sweepIndices.push(i);
+    }
+
     _strafeTimer = setInterval(() => {
         shotCount++;
         const isLeft = shotCount % 2 === 0;
-        // 抛壳：每 tick 1 枚，左右交替
-        _spawnStrafeCasing(casterX + (isLeft ? -25 : 25), casterY, isLeft);
-        // N线并发：每目标各 1 线（单体=1线，群攻=全快照）
-        coordsSnapshot.forEach(c => {
-            _spawnStrafeTracer(casterX + (isLeft ? -20 : 20), casterY, c.x, c.y);
-            _spawnStrafeHitSparks(c.x, c.y, 7);
-        });
-        // 音效限频：每 2 tick 一次，枪击穿透/普通枪声复用，中小口径随机
+        const gunX = casterX + (isLeft ? -25 : 25);
+        const gunY = casterY;
+
+        // 1. 施法者枪口爆火
+        _spawnStrafeMuzzleFlash(gunX, gunY, isLeft);
+
+        // 2. 抛壳：每 tick 1 枚，左右交替
+        _spawnStrafeCasing(gunX, gunY, isLeft);
+
+        // 3. 动态扇形扫射主目标
+        const mainIdx = sweepIndices[shotCount % sweepIndices.length];
+        const mainTarget = coordsSnapshot[mainIdx];
+        _spawnStrafeTracer(gunX, gunY, mainTarget.x, mainTarget.y);
+        _spawnStrafeHitSparks(mainTarget.x, mainTarget.y, 10);
+
+        // 偶数发双枪交叉射击（副枪射向相邻目标，形成真正的双枪火力网）
+        if (nTargets > 1 && shotCount % 2 === 0) {
+            const altIdx = (mainIdx + 1) % nTargets;
+            const altTarget = coordsSnapshot[altIdx];
+            const altGunX = casterX + (isLeft ? 25 : -25);
+            _spawnStrafeTracer(altGunX, gunY, altTarget.x, altTarget.y);
+            _spawnStrafeHitSparks(altTarget.x, altTarget.y, 7);
+        }
+
+        // 4. 音效限频：每 2 tick 一次，枪击穿透/普通枪声复用，中小口径随机
         if (shotCount % 2 === 0 && typeof playRandomStandardGunshot === 'function') {
             try { playRandomStandardGunshot(); } catch(e) {}
         }
         if (shotCount >= totalTicks) stopStrafeBurst();
     }, 70);
-    // 兜底：1300ms 后强制清场（结算串行可能更长，stopStrafeBurst 幂等）
+    // 兜底：1350ms 后强制清场
     setTimeout(() => stopStrafeBurst(), 1350);
 }
 function stopStrafeBurst() {
@@ -4036,9 +4096,11 @@ function stopStrafeBurst() {
         if (!el) return;
         el.classList.remove('strafe-shake');
         el.classList.remove('target-bullet-stutter');
+        if (el.classList.contains('enemy-sprite')) {
+            el.classList.add('breathe');
+        }
     });
     _strafeShakeEls = [];
-    // 延迟解锁，避免同技能内多标签重复触发
     setTimeout(() => { _strafeLock = false; }, 220);
 }
 window.startStrafeBurst = startStrafeBurst;
@@ -9213,6 +9275,11 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     }
     else { 
         createFloatingText(targetDom, `-${hpDmg}`, 'text-rose-500'); 
+        if (_isStrafeFxHit && targetDom) {
+            setTimeout(() => {
+                createFloatingText(targetDom, '💥 12段密集扫射', 'text-amber-300 font-mono text-xs sm:text-base');
+            }, 120);
+        }
         addHistory(`   ↳ 命中了 ${target.name}，造成了 ${hpDmg} 点实质伤害${severityStr}！${shieldDmg>0?` 并击碎了${shieldDmg}点护盾 `:''} 当前状态: ${Math.floor(Math.max(0, target.hp))}/${target.maxHp} `);
         
         // ===== 受击闪白与爆裂粒子（依伤害量分级触发）=====
