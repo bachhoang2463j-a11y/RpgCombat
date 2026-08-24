@@ -1901,3 +1901,23 @@
      - `备份（无需阅读）/demo-ranged-heavy-hit.html` 提供 4 方案实时对比、慢动作分解与目标切换。
 - **涉及文件**：`index.html`、`备份（无需阅读）/demo-ranged-heavy-hit.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：满足用户对 `【双管猎象枪】` 等重型远程火器的高冲击力打击感需求，将单体枪击受击反馈升级为电影级枪口爆炸、镜头喷溅血块、剧烈震屏与高辨识度强力反击重枪声。
+
+## [LOG-154] 2026-08-25 — 单体(枪击)视觉体系重构 + 新增[特效:枪击穿透] (V9.5-V9.7)
+
+- **变更行为**：
+  1. **单体(枪击)重构为中小口径体系（`index.html:258/5226`）**：`playSVGEffect` 的 `gunshot` 分支由旧双黄圈 `60px/300ms` 重写为 Demo `demo-gunshot-vfx.html:463 createStandardGunshotSvg` 三层 `140px/650ms`——激波双圈 `gunshot-shock-ring 0.28s` + 6向火星 `gunshot-spark-ray 0.26s`（`--ray-rot` 60°均分）+ 十字星芒核心 `gunshot-core-flash 0.32s`（`radialGradient #fef08a/#f97316` + `r14白芯/r22黄晕`）；受击补 `enemy-gunshot-flinch 0.22s`；新增 CSS `gunshot-shake 0.18s` 轻快微震与 `pierce-shake 0.26s` 锐利后坐（`index.html:258`，与重击 `ranged-heavy 0.48s` 三档分级）。
+  2. **音频随机化（`index.html:1867/1911`）**：`audioUrls` 新增 `gunshot1/2/3 + gunshot_pierce`（`test1@main` jsdelivr），`_fxAudioBlobCache fetch→blob` 预载；新增 `playRandomStandardGunshot()` 每次独立射击随机抽取 `gunshot1~3`（`volume 0.95`）；`applySingleTagEffect:8831` 单体枪击走随机音替代旧 `atk2`。
+  3. **新增通用标签 `[特效:枪击穿透]`（`index.html:3907/5250`）**：`WEBM_FX_REGISTRY` 注册 `'枪击穿透': { url:'', particles:'gunshot_pierce', audioUrl:'gunshot_pierce.mp3' }`（纯粒子无视频先例同 `远程重击`）；`playSVGEffect gunshot_pierce:5274` 四层——菱形弱点准星 `pierce-weakpoint-lock 0.65s` + 超音速贯穿光束 `pierce-beam-penetrate 0.45s（340×6 -12°）` + 背部破片 `pierce-exit-cone 0.5s` + 核心双圈 `shock-ring 0.35s`；新增 `spawnGunshotPierceParticles:3411` 锐利后坐震屏；`playAOEEffect:5209 / spawnCanvasParticles:4782 / executeSkillAction单体:9488` 各补 `gunshot_pierce` 分支；编辑器下拉 `Object.keys(WEBM_FX_REGISTRY)` 自动出现。
+  4. **管线去重与执行收口**：`executeSkillAction:9471` 的通用 `fxTag` 预播分支改为仅 `WebM url` 预播（纯粒子/音效交由 `applySingleTagEffect` 命中时统一播，避免"点击即播+命中再播"双响）；`applySingleTagEffect` 对 `枪击穿透` 单体走 `gunshot_pierce` 受击 `enemy-pierce-stutter 0.45s`，对无特效枪击走 `gunshot`。
+  5. **闪避枪感保留**：`applySingleTagEffect:8759` 闪避分支对枪击/穿透补开火感（枪声+枪口视觉+对应震屏），避免"静默闪避"。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：用户要求"改写整个单体(枪击)绑定特效 + 手动赋予的穿透弱点特效"，且中小口径每次独立射击随机音；Demo 已验证三档震屏与音效分流，手术式移植至 `playSVGEffect/WEBM_FX_REGISTRY` 双入口。
+
+## [LOG-155] 2026-08-25 — 多段枪击逐发修复 + 远程重击双播豁免 + 作用域越界热修 (V9.8)
+
+- **变更行为**：
+  1. **多段逐发修复（`index.html:8759/8862`）**：`【柯尔特三连发】[单体(枪击);power:75]×3` 三连发为同一 `skill` 对象的 3 次 `applySingleTagEffect` 调用，旧 `skill._gunshotFxFired` 按技能单比特去重致"1响2哑"。改为本发内 `let _gunshotFiredThisHit=false` 互斥（闪避内置 true，命中分支 `if(_gunshotFiredThisHit) skip`），跨发不共享，后续两发不受首发闪避影响；闪避标记上提至函数顶层 `let isDodged` 之后（`8682`），避免纯减益首标签 `return` 时块级作用域外读取 `ReferenceError: _gunshotFiredThisHit is not defined` 致全链卡死（`03:28:50` 诊断探头）。
+  2. **远程重击双播豁免（`index.html:8763/8864`）**：`[特效:远程重击]`（用户所称"枪击重击"）由 `executeSkillAction:9450 spawnRangedHeavyParticles` 独占已播重击全套（枪口爆炸+重震+重击音效），`applySingleTagEffect` 又因 `tag` 含"枪击"叠加中小口径随机枪声致双响。命中与闪避两处均加 `_isHeavyFx = skill.fxTag==='远程重击'` 豁免，重击分支直接跳过枪击分支。
+  3. **版本号升级至 V9.8**：`README.md:3` `V9.3 → V9.8`，补 `V9.5-V9.8` 摘要行指向 `LOG-154~155`。
+- **涉及文件**：`index.html`、`README.md`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：修复三连发中闪避/反应闪避后"后续无特效无音效"与远程重击自带重击音效叠加中小口径枪声的双播；修复块级 `let` 越界致 `applySingleTagEffect` 全量 Promise rejection 卡死。
