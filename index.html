@@ -12144,28 +12144,58 @@ function openEditor() {
   html += `<div class="mt-1.5 pt-1.5 border-t border-slate-700/40 flex items-center justify-between text-[10px] text-slate-400 shrink-0"><div class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span><span>竖屏抗挤压已就绪</span></div><div class="font-mono text-slate-500">READY</div></div>`;
   html += `</div>`; // close #editor-scroll-container
   modal.innerHTML = html;
-  bindHeroFoldControls(modal);
+  bindEditorSectionTabs(modal);
+  bindCharacterFoldControls(modal, '我方角色', false);
+  bindCharacterFoldControls(modal, '敌方单位', true);
   if (savedScrollTop > 0) {
     const nc=document.getElementById('editor-scroll-container'); if(nc) nc.scrollTop=savedScrollTop;
     const ms=document.getElementById('main-scroll-area'); if(ms) ms.scrollTop=savedScrollTop;
   }
 }
 
-function bindHeroFoldControls(modal) {
+function bindEditorSectionTabs(modal) {
   var headings = Array.prototype.slice.call(modal.querySelectorAll('h3'));
   var heroTitle = headings.filter(function (el) { return (el.textContent || '').indexOf('我方角色') >= 0; })[0];
-  var heroGrid = heroTitle && heroTitle.nextElementSibling;
-  if (!heroGrid) return;
-  Array.prototype.slice.call(heroGrid.children).forEach(function (card) {
+  var enemyTitle = headings.filter(function (el) { return (el.textContent || '').indexOf('敌方单位') >= 0; })[0];
+  if (!heroTitle || !enemyTitle || heroTitle.parentElement.parentElement !== enemyTitle.parentElement.parentElement) return;
+  var heroSection = heroTitle.parentElement;
+  var enemySection = enemyTitle.parentElement;
+  var tabBar = document.createElement('div');
+  tabBar.className = 'flex items-center gap-1.5 mb-2';
+  var heroTab = document.createElement('button');
+  var enemyTab = document.createElement('button');
+  heroTab.type = 'button'; enemyTab.type = 'button';
+  function setTab(active) {
+    var heroOn = active === 'hero';
+    heroSection.classList.toggle('hidden', !heroOn);
+    enemySection.classList.toggle('hidden', heroOn);
+    heroTab.className = heroOn ? 'px-3 py-1.5 rounded-lg bg-cyan-950/80 text-cyan-200 border border-cyan-600/60 text-xs font-bold' : 'px-3 py-1.5 rounded-lg bg-slate-900/70 text-slate-400 border border-slate-700/60 text-xs font-bold';
+    enemyTab.className = heroOn ? 'px-3 py-1.5 rounded-lg bg-slate-900/70 text-slate-400 border border-slate-700/60 text-xs font-bold' : 'px-3 py-1.5 rounded-lg bg-rose-950/80 text-rose-200 border border-rose-600/60 text-xs font-bold';
+  }
+  heroTab.textContent = '🛡️ 我方英雄 (' + heroesData.length + ')';
+  enemyTab.textContent = '👾 敌方单位 (' + enemiesData.length + ')';
+  heroTab.onclick = function () { setTab('hero'); };
+  enemyTab.onclick = function () { setTab('enemy'); };
+  tabBar.appendChild(heroTab); tabBar.appendChild(enemyTab);
+  heroSection.parentElement.insertBefore(tabBar, heroSection);
+  setTab('hero');
+}
+
+function bindCharacterFoldControls(modal, titleText, isEnemy) {
+  var headings = Array.prototype.slice.call(modal.querySelectorAll('h3'));
+  var title = headings.filter(function (el) { return (el.textContent || '').indexOf(titleText) >= 0; })[0];
+  var grid = title && title.nextElementSibling;
+  if (!grid) return;
+  Array.prototype.slice.call(grid.children).forEach(function (card) {
     var parts = Array.prototype.slice.call(card.children);
     var header = parts[1];
     var foldParts = parts.slice(2);
     if (!header || !foldParts.length) return;
     var button = document.createElement('button');
     button.type = 'button';
-    button.className = 'ml-auto px-1.5 py-0.5 text-[10px] text-cyan-300 border border-cyan-800/60 rounded hover:bg-cyan-900/40';
+    button.className = isEnemy ? 'ml-auto px-1.5 py-0.5 text-[10px] text-rose-300 border border-rose-800/60 rounded hover:bg-rose-900/40' : 'ml-auto px-1.5 py-0.5 text-[10px] text-cyan-300 border border-cyan-800/60 rounded hover:bg-cyan-900/40';
     button.textContent = '折叠';
-    button.title = '折叠/展开我方角色信息';
+    button.title = '折叠/展开' + titleText + '信息';
     button.onclick = function (event) {
       event.stopPropagation();
       var collapsed = foldParts[0].classList.contains('hidden');
@@ -12187,9 +12217,9 @@ function bindHeroFoldControls(modal) {
       if (!skillHeader || !skillBody.length) return;
       var skillButton = document.createElement('button');
       skillButton.type = 'button';
-      skillButton.className = 'ml-auto px-1.5 py-0.5 text-[10px] text-cyan-300 border border-cyan-800/60 rounded hover:bg-cyan-900/40';
+      skillButton.className = isEnemy ? 'ml-auto px-1.5 py-0.5 text-[10px] text-rose-300 border border-rose-800/60 rounded hover:bg-rose-900/40' : 'ml-auto px-1.5 py-0.5 text-[10px] text-cyan-300 border border-cyan-800/60 rounded hover:bg-cyan-900/40';
       skillButton.textContent = '展开';
-      skillButton.title = '折叠/展开我方技能参数';
+      skillButton.title = '折叠/展开' + (isEnemy ? '敌方' : '我方') + '技能参数';
       skillButton.setAttribute('aria-expanded', 'false');
       skillButton.onclick = function (event) {
         event.stopPropagation();
