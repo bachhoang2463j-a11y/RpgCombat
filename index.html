@@ -12204,7 +12204,8 @@ function bindCharacterFoldControls(modal, titleText, isEnemy) {
   var title = headings.filter(function (el) { return (el.textContent || '').indexOf(titleText) >= 0; })[0];
   var grid = title && title.nextElementSibling;
   if (!grid) return;
-  Array.prototype.slice.call(grid.children).forEach(function (card) {
+  Array.prototype.slice.call(grid.children).forEach(function (card, cardIndex) {
+    var entity = (isEnemy ? enemiesData : heroesData)[cardIndex] || {};
     var cardKind = isEnemy ? 'char-card-enemy' : 'char-card-hero';
     card.classList.remove('bg-black/30', 'p-3', 'sm:p-4', 'rounded-xl', 'border-gray-800', 'hover:border-cyan-900/50', 'hover:border-rose-900/50', 'transition-colors');
     card.classList.add(cardKind, 'rounded-lg', 'overflow-hidden');
@@ -12213,51 +12214,64 @@ function bindCharacterFoldControls(modal, titleText, isEnemy) {
     var foldParts = parts.slice(2);
     if (!header || !foldParts.length) return;
     header.classList.remove('mb-2', 'mb-3', 'sm:mb-3', 'sm:mb-4', 'border-b', 'border-gray-800', 'pb-2');
-    header.classList.add('px-2.5', 'sm:px-3', 'py-2', 'bg-slate-900/80', 'transition-colors', 'flex-wrap', 'min-w-0');
+    header.classList.add('px-2.5', 'sm:px-3', 'py-2', 'pr-10', 'bg-slate-900/80', 'hover:bg-slate-800/90', 'transition-colors', 'flex-wrap', 'min-w-0', 'cursor-pointer');
+    var avatar = document.createElement('div');
+    avatar.className = isEnemy ? 'w-6 h-6 rounded overflow-hidden border border-rose-500/40 bg-black/40 shrink-0 flex items-center justify-center text-xs' : 'w-6 h-6 rounded overflow-hidden border border-cyan-500/40 bg-black/40 shrink-0 flex items-center justify-center text-xs';
+    if (entity.img) {
+      var avatarImg = document.createElement('img');
+      avatarImg.src = entity.img;
+      avatarImg.className = 'w-full h-full object-cover';
+      avatarImg.onerror = function () { avatar.textContent = isEnemy ? (entity.emoji || '👾') : '👤'; };
+      avatar.appendChild(avatarImg);
+    } else {
+      avatar.textContent = isEnemy ? (entity.emoji || '👾') : '👤';
+    }
+    header.insertBefore(avatar, header.firstChild);
     if (foldParts[0]) {
       foldParts[0].classList.add('px-2.5', 'sm:px-3', 'pt-2.5', 'sm:pt-3', 'bg-black/40');
     }
-    var button = document.createElement('button');
-    button.type = 'button';
-    button.className = isEnemy ? 'ml-auto px-1.5 py-0.5 text-[10px] text-rose-300 border border-rose-800/60 rounded hover:bg-rose-900/40' : 'ml-auto px-1.5 py-0.5 text-[10px] text-cyan-300 border border-cyan-800/60 rounded hover:bg-cyan-900/40';
-    button.textContent = '折叠';
-    button.title = '折叠/展开' + titleText + '信息';
-    button.onclick = function (event) {
-      event.stopPropagation();
+    var arrow = document.createElement('span');
+    arrow.className = isEnemy ? 'absolute right-8 top-2.5 text-rose-400 text-xs transition-transform duration-200 pointer-events-none' : 'absolute right-8 top-2.5 text-cyan-400 text-xs transition-transform duration-200 pointer-events-none';
+    arrow.textContent = '▼';
+    card.appendChild(arrow);
+    header.onclick = function (event) {
+      if (event.target && event.target.closest && event.target.closest('input,select,label,button')) return;
       var collapsed = foldParts[0].classList.contains('hidden');
       foldParts.forEach(function (part) { part.classList.toggle('hidden', !collapsed); });
       card.classList.toggle('is-expanded', collapsed);
-      button.textContent = collapsed ? '折叠' : '展开';
-      button.setAttribute('aria-expanded', collapsed ? 'true' : 'false');
+      arrow.classList.toggle('rotate-180', collapsed);
+      header.setAttribute('aria-expanded', collapsed ? 'true' : 'false');
     };
     foldParts.forEach(function (part) { part.classList.add('hidden'); });
     card.classList.remove('is-expanded');
-    button.textContent = '展开';
-    button.setAttribute('aria-expanded', 'false');
-    header.appendChild(button);
+    header.setAttribute('aria-expanded', 'false');
     var skillPanel = parts[3];
     var skillList = skillPanel && skillPanel.querySelector('.space-y-2, .space-y-3');
     if (!skillList) return;
     Array.prototype.slice.call(skillList.children).forEach(function (skillCard) {
+      skillCard.classList.remove('bg-black/50', 'p-1.5', 'sm:p-2', 'pr-6', 'sm:pr-8', 'border', 'border-gray-700/50');
+      skillCard.classList.add('skill-card-item', 'rounded', 'overflow-hidden', 'relative');
       var skillParts = Array.prototype.slice.call(skillCard.children);
       var skillHeader = skillParts[1];
       var skillBody = skillParts.slice(2);
       if (!skillHeader || !skillBody.length) return;
-      var skillButton = document.createElement('button');
-      skillButton.type = 'button';
-      skillButton.className = isEnemy ? 'ml-auto px-1.5 py-0.5 text-[10px] text-rose-300 border border-rose-800/60 rounded hover:bg-rose-900/40' : 'ml-auto px-1.5 py-0.5 text-[10px] text-cyan-300 border border-cyan-800/60 rounded hover:bg-cyan-900/40';
-      skillButton.textContent = '展开';
-      skillButton.title = '折叠/展开' + (isEnemy ? '敌方' : '我方') + '技能参数';
-      skillButton.setAttribute('aria-expanded', 'false');
-      skillButton.onclick = function (event) {
-        event.stopPropagation();
+      skillHeader.classList.remove('mb-1.5', 'sm:mb-2');
+      skillHeader.classList.add('px-2', 'py-1.5', 'pr-12', 'cursor-pointer', 'bg-slate-900/50', 'hover:bg-slate-800/80', 'transition-colors');
+      var skillArrow = document.createElement('span');
+      skillArrow.className = isEnemy ? 'absolute right-7 top-2 text-rose-400 text-[10px] transition-transform duration-200 pointer-events-none' : 'absolute right-7 top-2 text-cyan-400 text-[10px] transition-transform duration-200 pointer-events-none';
+      skillArrow.textContent = '▼';
+      skillCard.appendChild(skillArrow);
+      skillHeader.onclick = function (event) {
+        if (event.target && event.target.closest && event.target.closest('input,select,label,button')) return;
         var skillCollapsed = skillBody[0].classList.contains('hidden');
         skillBody.forEach(function (part) { part.classList.toggle('hidden', !skillCollapsed); });
-        skillButton.textContent = skillCollapsed ? '折叠' : '展开';
-        skillButton.setAttribute('aria-expanded', skillCollapsed ? 'true' : 'false');
+        skillCard.classList.toggle('is-expanded', skillCollapsed);
+        skillArrow.classList.toggle('rotate-180', skillCollapsed);
+        skillHeader.setAttribute('aria-expanded', skillCollapsed ? 'true' : 'false');
       };
-      skillBody.forEach(function (part) { part.classList.add('hidden'); });
-      skillHeader.appendChild(skillButton);
+      skillBody.forEach(function (part, bodyIndex) { part.classList.add('hidden', 'px-2', 'pb-2'); if (bodyIndex === 0) part.classList.add('pt-2'); });
+      skillCard.classList.remove('is-expanded');
+      skillHeader.setAttribute('aria-expanded', 'false');
     });
   });
 }
