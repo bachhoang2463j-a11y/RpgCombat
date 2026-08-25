@@ -12157,7 +12157,7 @@ function bindEditorSectionTabs(modal) {
   var headings = Array.prototype.slice.call(modal.querySelectorAll('h3'));
   var heroTitle = headings.filter(function (el) { return (el.textContent || '').indexOf('我方角色') >= 0; })[0];
   var enemyTitle = headings.filter(function (el) { return (el.textContent || '').indexOf('敌方单位') >= 0; })[0];
-  if (!heroTitle || !enemyTitle || heroTitle.parentElement.parentElement !== enemyTitle.parentElement.parentElement) return;
+  if (!heroTitle || !enemyTitle) return;
   var heroSection = heroTitle.parentElement;
   var enemySection = enemyTitle.parentElement;
   var tabBar = document.createElement('div');
@@ -12177,7 +12177,14 @@ function bindEditorSectionTabs(modal) {
   heroTab.onclick = function () { setTab('hero'); };
   enemyTab.onclick = function () { setTab('enemy'); };
   tabBar.appendChild(heroTab); tabBar.appendChild(enemyTab);
-  heroSection.parentElement.insertBefore(tabBar, heroSection);
+  var originalParent = heroSection.parentElement;
+  if (!originalParent) return;
+  originalParent.insertBefore(tabBar, heroSection);
+  var sectionHost = document.createElement('div');
+  sectionHost.className = 'editor-faction-tabs-content';
+  originalParent.insertBefore(sectionHost, heroSection);
+  sectionHost.appendChild(heroSection);
+  if (enemySection !== heroSection) sectionHost.appendChild(enemySection);
   setTab('hero');
 }
 
