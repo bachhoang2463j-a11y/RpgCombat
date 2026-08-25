@@ -12205,10 +12205,18 @@ function bindCharacterFoldControls(modal, titleText, isEnemy) {
   var grid = title && title.nextElementSibling;
   if (!grid) return;
   Array.prototype.slice.call(grid.children).forEach(function (card) {
+    var cardKind = isEnemy ? 'char-card-enemy' : 'char-card-hero';
+    card.classList.remove('bg-black/30', 'p-3', 'sm:p-4', 'rounded-xl', 'border-gray-800', 'hover:border-cyan-900/50', 'hover:border-rose-900/50', 'transition-colors');
+    card.classList.add(cardKind, 'rounded-lg', 'overflow-hidden');
     var parts = Array.prototype.slice.call(card.children);
     var header = parts[1];
     var foldParts = parts.slice(2);
     if (!header || !foldParts.length) return;
+    header.classList.remove('mb-2', 'mb-3', 'sm:mb-3', 'sm:mb-4', 'border-b', 'border-gray-800', 'pb-2');
+    header.classList.add('px-2.5', 'sm:px-3', 'py-2', 'bg-slate-900/80', 'transition-colors', 'flex-wrap', 'min-w-0');
+    if (foldParts[0]) {
+      foldParts[0].classList.add('px-2.5', 'sm:px-3', 'pt-2.5', 'sm:pt-3', 'bg-black/40');
+    }
     var button = document.createElement('button');
     button.type = 'button';
     button.className = isEnemy ? 'ml-auto px-1.5 py-0.5 text-[10px] text-rose-300 border border-rose-800/60 rounded hover:bg-rose-900/40' : 'ml-auto px-1.5 py-0.5 text-[10px] text-cyan-300 border border-cyan-800/60 rounded hover:bg-cyan-900/40';
@@ -12218,10 +12226,12 @@ function bindCharacterFoldControls(modal, titleText, isEnemy) {
       event.stopPropagation();
       var collapsed = foldParts[0].classList.contains('hidden');
       foldParts.forEach(function (part) { part.classList.toggle('hidden', !collapsed); });
+      card.classList.toggle('is-expanded', collapsed);
       button.textContent = collapsed ? '折叠' : '展开';
       button.setAttribute('aria-expanded', collapsed ? 'true' : 'false');
     };
     foldParts.forEach(function (part) { part.classList.add('hidden'); });
+    card.classList.remove('is-expanded');
     button.textContent = '展开';
     button.setAttribute('aria-expanded', 'false');
     header.appendChild(button);
