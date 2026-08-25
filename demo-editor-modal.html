@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>RPG Combat - 现代游戏化数据覆写与技能编辑器 (竖屏抗挤压优化版)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Cinzel:wght@700;900&family=JetBrains+Mono:wght@500;700&display=swap');
+    
+    body {
+      font-family: 'Noto Sans SC', sans-serif;
+      background-color: #070a12;
+      color: #e2e8f0;
+      user-select: none;
+      overflow-x: hidden;
+    }
+
+    .font-cinzel { font-family: 'Cinzel', serif; }
+    .font-mono-num { font-family: 'JetBrains Mono', monospace; font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
+
+    /* 20% 高透光战术目镜卡片背景 */
+    .cyber-modal-editor {
+      background: radial-gradient(135% 120% at 15% 0%, rgba(22, 30, 46, 0.32) 0%, rgba(11, 17, 32, 0.40) 100%);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 35px rgba(6, 182, 212, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+
+    /* 角色折叠卡片 */
+    .char-card-hero {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(6, 182, 212, 0.22);
+      transition: all 0.2s ease;
+    }
+    .char-card-hero:hover {
+      border-color: rgba(6, 182, 212, 0.45);
+    }
+    .char-card-hero.is-expanded {
+      border-color: rgba(6, 182, 212, 0.65);
+      background: rgba(13, 20, 36, 0.9);
+      box-shadow: 0 6px 24px -4px rgba(6, 182, 212, 0.18);
+    }
+
+    .char-card-enemy {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(244, 63, 94, 0.22);
+      transition: all 0.2s ease;
+    }
+    .char-card-enemy:hover {
+      border-color: rgba(244, 63, 94, 0.45);
+    }
+    .char-card-enemy.is-expanded {
+      border-color: rgba(244, 63, 94, 0.65);
+      background: rgba(20, 15, 28, 0.9);
+      box-shadow: 0 6px 24px -4px rgba(244, 63, 94, 0.18);
+    }
+
+    /* 技能二级折叠条目 */
+    .skill-card-item {
+      background: rgba(10, 15, 28, 0.85);
+      border: 1px solid rgba(51, 65, 85, 0.6);
+      transition: all 0.18s ease;
+    }
+    .skill-card-item:hover {
+      border-color: rgba(100, 116, 139, 0.8);
+      background: rgba(15, 23, 42, 0.95);
+    }
+    .skill-card-item.is-expanded {
+      border-color: rgba(56, 189, 248, 0.55);
+      background: rgba(11, 18, 33, 0.98);
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+    }
+
+    /* 科技边角修饰 */
+    .cyber-corner {
+      position: absolute; width: 8px; height: 8px; border-color: rgba(6, 182, 212, 0.85); pointer-events: none;
+    }
+    .cyber-corner-tl { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
+    .cyber-corner-tr { top: -1px; right: -1px; border-top: 2px solid; border-right: 2px solid; }
+    .cyber-corner-bl { bottom: -1px; left: -1px; border-bottom: 2px solid; border-left: 2px solid; }
+    .cyber-corner-br { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
+
+    /* 现代扁平输入控件 */
+    .edit-input-game {
+      background: rgba(6, 10, 20, 0.9);
+      border: 1px solid rgba(71, 85, 105, 0.6);
+      border-radius: 5px;
+      color: #f8fafc;
+      padding: 4px 8px;
+      font-size: 12px;
+      line-height: 1.3;
+      transition: all 0.15s ease;
+      outline: none;
+    }
+    .edit-input-game:focus {
+      border-color: rgba(6, 182, 212, 0.9);
+      background: rgba(11, 19, 36, 1);
+      box-shadow: 0 0 8px rgba(6, 182, 212, 0.3);
+    }
+    .edit-input-game:hover {
+      border-color: rgba(148, 163, 184, 0.7);
+    }
+
+    /* 滚动条 */
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.4); border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(6, 182, 212, 0.7); }
+
+    /* 模拟手机竖屏容器 */
+    .viewport-mobile {
+      max-width: 420px !important;
+      max-height: 860px !important;
+      border: 4px solid #334155 !important;
+      border-radius: 32px !important;
+      box-shadow: 0 0 60px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
+    }
+
+    /* 药丸开关按钮 */
+    .tag-toggle-pill {
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-size: 10px;
+      font-weight: 700;
+      border-width: 1px;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .tag-toggle-pill.active {
+      box-shadow: 0 0 8px currentColor;
+      filter: brightness(1.15);
+    }
+    .tag-toggle-pill.inactive {
+      opacity: 0.4;
+      filter: grayscale(0.8);
+      border-color: rgba(100, 116, 139, 0.4) !important;
+      background: transparent !important;
+      color: #94a3b8 !important;
+    }
+
+    /* ========================================================
+       竖屏自适应增强规则 (当处于手机竖屏或容器 < 640px 时)
+       ======================================================== */
+    .viewport-mobile .desktop-single-row,
+    @media (max-width: 640px) {
+      .desktop-single-row {
+        display: none !important;
+      }
+      .mobile-multi-row {
+        display: flex !important;
+      }
+    }
+
+    .mobile-multi-row {
+      display: none;
+    }
+    .desktop-single-row {
+      display: flex;
+    }
+
+    .viewport-mobile .mobile-multi-row {
+      display: flex !important;
+    }
+    .viewport-mobile .desktop-single-row {
+      display: none !important;
+    }
+
+    /* 竖屏下的网格列数覆盖 */
+    .viewport-mobile .grid-stats-responsive {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+    .viewport-mobile .grid-costs-responsive {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+    .viewport-mobile .grid-reactions-responsive {
+      grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+    }
+    .viewport-mobile .grid-tags-responsive {
+      grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-1 sm:p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#070b14] to-[#03060c] relative">
+
+  <!-- 模拟背景 -->
+  <div class="fixed inset-0 pointer-events-none opacity-20 overflow-hidden">
+    <div class="absolute top-10 left-10 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
+    <div class="absolute bottom-10 right-10 w-96 h-96 bg-rose-500/10 rounded-full blur-3xl"></div>
+    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 flex gap-8 text-5xl opacity-40">
+      <span>👻</span><span>👻</span><span>❄️</span>
+    </div>
+  </div>
+
+  <!-- 顶部演示控制栏 -->
+  <div class="w-full max-w-5xl mb-2 flex flex-wrap items-center justify-between gap-2 px-2 z-20">
+    <div class="flex items-center gap-2">
+      <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+      <h1 class="text-xs sm:text-sm font-bold text-slate-100 tracking-wide">
+        RPG Combat · 技能与角色编辑器 <span class="text-[10px] px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-700/60 ml-1">V10.0 竖屏防挤压版</span>
+      </h1>
+    </div>
+
+    <!-- 手机竖屏切换与全折叠控制 -->
+    <div class="flex items-center gap-2">
+      <button id="toggle-viewport-btn" onclick="toggleViewportMode()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-600/70 flex items-center gap-1 transition-all shadow">
+        <span id="viewport-icon">📱</span> <span id="viewport-text">手机竖屏模式 (420px)</span>
+      </button>
+      <button onclick="toggleAllAccordions(true)" class="px-2.5 py-1 bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 text-xs font-semibold rounded-lg border border-cyan-700/50 transition-all">
+        📂 全部展开
+      </button>
+      <button onclick="toggleAllAccordions(false)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition-all">
+        📁 全部收起
+      </button>
+    </div>
+  </div>
+
+  <!-- 编辑器主弹窗主体容器 -->
+  <div id="editor-container" class="cyber-modal-editor w-full max-w-5xl rounded-2xl p-2.5 sm:p-4 relative text-slate-100 flex flex-col max-h-[92vh] sm:max-h-[88vh] overflow-hidden shadow-2xl transition-all duration-300 z-10">
+    
+    <!-- 装饰边角 -->
+    <div class="cyber-corner cyber-corner-tl"></div>
+    <div class="cyber-corner cyber-corner-tr"></div>
+    <div class="cyber-corner cyber-corner-bl"></div>
+    <div class="cyber-corner cyber-corner-br"></div>
+
+    <!-- 弹窗顶栏 (Header) -->
+    <div class="flex items-center justify-between border-b border-slate-700/50 pb-2 mb-2 shrink-0">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="text-base text-yellow-400">⚙️</span>
+        <h2 class="text-sm sm:text-base font-black text-yellow-400 tracking-wider">数据覆写</h2>
+        <span class="text-[10px] text-slate-400 hidden sm:inline">实时修改角色与技能数值</span>
+        <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-600/50">DATA OVERRIDE</span>
+      </div>
+
+      <!-- 右上角操作按钮 -->
+      <div class="flex items-center gap-1.5">
+        <button onclick="mockNotification('已取消修改')" class="px-2.5 py-1 bg-slate-800/90 hover:bg-slate-700 text-slate-300 rounded text-xs font-semibold transition-all border border-slate-700">
+          取消
+        </button>
+        <button onclick="saveAndPreview()" class="px-3.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded text-xs font-bold shadow-[0_0_12px_rgba(16,185,129,0.35)] transition-all flex items-center gap-1">
+          <span>💾</span> 保存应用
+        </button>
+      </div>
+    </div>
+
+    <!-- 滚动主体内容区 -->
+    <div id="main-scroll-area" class="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-0.5 space-y-2.5">
+      
+      <!-- ========================================================
+           全局设置手风琴 (Global Settings)
+           ======================================================== -->
+      <div class="bg-slate-900/70 rounded-lg border border-amber-500/25 overflow-hidden">
+        <div onclick="toggleGlobalSettings()" class="px-3 py-1.5 bg-amber-950/20 hover:bg-amber-950/35 cursor-pointer flex items-center justify-between gap-2 border-b border-amber-500/20 transition-colors">
+          <div class="flex items-center gap-2 flex-wrap min-w-0">
+            <span class="text-amber-400 text-xs">⚙️</span>
+            <span class="text-xs font-bold text-amber-300">战斗全局设置</span>
+            <div class="flex items-center gap-1.5 flex-wrap text-[10px] text-slate-400 font-mono-num">
+              <span class="px-1.5 py-0.2 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-800/50">MP恢复 <span id="summary-mp-pct">20</span>%</span>
+              <span class="px-1.5 py-0.2 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/50">TP恢复 <span id="summary-tp-pct">25</span>%</span>
+              <span class="px-1.5 py-0.2 rounded bg-orange-950/60 text-orange-300 border border-orange-800/50">普攻TP +<span id="summary-atk-tp">20</span></span>
+              <span class="px-1.5 py-0.2 rounded bg-fuchsia-950/60 text-fuchsia-300 border border-fuchsia-800/50">看破 ≤<span id="summary-kanpo-th">100</span></span>
+              <span class="px-1.5 py-0.2 rounded bg-lime-950/60 text-lime-300 border border-lime-800/50">变异 <span id="summary-mutation">1</span>%</span>
+            </div>
+          </div>
+          <span id="global-settings-icon" class="text-slate-400 text-xs transition-transform duration-200">▼</span>
+        </div>
+
+        <div id="global-settings-body" class="p-2.5 bg-black/25 space-y-2 text-xs">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div class="flex items-center justify-between bg-slate-900/90 px-2 py-1.5 rounded border border-slate-700/60">
+              <span class="text-cyan-400 text-[11px]">防御恢复 MP</span>
+              <div class="flex items-center gap-0.5">
+                <input type="number" min="0" max="100" value="20" id="set-def-mp" class="edit-input-game w-12 font-mono-num text-right text-cyan-200" onchange="syncGlobalSummary()">
+                <span class="text-slate-500 text-[10px]">%</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between bg-slate-900/90 px-2 py-1.5 rounded border border-slate-700/60">
+              <span class="text-emerald-400 text-[11px]">防御恢复 TP</span>
+              <div class="flex items-center gap-0.5">
+                <input type="number" min="0" max="100" value="25" id="set-def-tp" class="edit-input-game w-12 font-mono-num text-right text-emerald-200" onchange="syncGlobalSummary()">
+                <span class="text-slate-500 text-[10px]">%</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between bg-slate-900/90 px-2 py-1.5 rounded border border-slate-700/60">
+              <span class="text-orange-400 text-[11px]">普攻恢复 TP</span>
+              <div class="flex items-center gap-0.5">
+                <input type="number" min="0" max="100" value="20" id="set-atk-tp" class="edit-input-game w-12 font-mono-num text-right text-orange-200" onchange="syncGlobalSummary()">
+                <span class="text-slate-500 text-[10px]">点</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between bg-slate-900/90 px-2 py-1.5 rounded border border-slate-700/60">
+              <label class="flex items-center gap-1 text-fuchsia-400 text-[11px] cursor-pointer">
+                <input type="checkbox" id="set-kanpo-enabled" checked class="accent-fuchsia-500" onchange="syncGlobalSummary()"> 看破≤
+              </label>
+              <input type="number" min="0" max="10000" value="100" id="set-kanpo-threshold" class="edit-input-game w-14 font-mono-num text-right text-fuchsia-200" onchange="syncGlobalSummary()">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+            <div class="bg-slate-900/90 px-2.5 py-1.5 rounded border border-slate-700/60 flex items-center justify-between gap-2">
+              <span class="text-slate-300 font-semibold flex items-center gap-1"><span>💾</span> 属性持久化:</span>
+              <div class="flex items-center gap-2">
+                <label class="flex items-center gap-0.5 text-orange-300 cursor-pointer"><input type="checkbox" id="set-persist-atk" class="accent-orange-500"> 攻</label>
+                <label class="flex items-center gap-0.5 text-blue-300 cursor-pointer"><input type="checkbox" id="set-persist-def" class="accent-blue-500"> 防</label>
+                <label class="flex items-center gap-0.5 text-yellow-300 cursor-pointer"><input type="checkbox" id="set-persist-spd" class="accent-yellow-500"> 速</label>
+              </div>
+            </div>
+
+            <div class="bg-slate-900/90 px-2.5 py-1.5 rounded border border-slate-700/60 flex items-center justify-between gap-2">
+              <label class="flex items-center gap-1 text-lime-300 font-semibold cursor-pointer">
+                <input type="checkbox" id="set-mutation-enabled" checked class="accent-lime-500" onchange="syncGlobalSummary()"> 🧬 敌方随机变异
+              </label>
+              <div class="flex items-center gap-1">
+                <span class="text-slate-400 text-[10px]">概率:</span>
+                <input type="number" min="0" max="100" value="1" id="set-mutation-pct" class="edit-input-game w-12 font-mono-num text-right text-lime-200" onchange="syncGlobalSummary()">
+                <span class="text-slate-500 text-[10px]">%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================================
+           阵营分栏 Tab
+           ======================================================== -->
+      <div class="flex items-center justify-between gap-2 border-b border-slate-700/50 pb-1.5">
+        <div class="flex items-center gap-1 p-0.5 bg-slate-900/90 rounded-lg border border-slate-700/70">
+          <button id="tab-btn-heroes" onclick="switchPartyTab('heroes')" class="px-2.5 py-1 rounded text-xs font-bold transition-all bg-cyan-950 text-cyan-300 border border-cyan-600/50 shadow flex items-center gap-1">
+            <span>🛡️</span> 我方英雄 <span id="hero-count-badge" class="px-1 py-0.2 rounded-full bg-cyan-500/20 text-[9px] font-mono-num">4</span>
+          </button>
+          <button id="tab-btn-enemies" onclick="switchPartyTab('enemies')" class="px-2.5 py-1 rounded text-xs font-bold transition-all text-slate-400 hover:text-rose-300 hover:bg-rose-950/40 flex items-center gap-1">
+            <span>👾</span> 敌方单位 <span id="enemy-count-badge" class="px-1 py-0.2 rounded-full bg-rose-500/20 text-[9px] font-mono-num text-rose-300">3</span>
+          </button>
+        </div>
+
+        <button id="add-entity-btn" onclick="addNewEntity()" class="px-2.5 py-1 bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 text-xs font-bold rounded border border-cyan-500/40 transition-all flex items-center gap-1 shadow-sm">
+          <span>+</span> 添加角色
+        </button>
+      </div>
+
+      <!-- ========================================================
+           我方角色列表 (Heroes List)
+           ======================================================== -->
+      <div id="heroes-list-container" class="space-y-2">
+        <!-- 动态渲染 -->
+      </div>
+
+      <!-- ========================================================
+           敌方怪物列表 (Enemies List)
+           ======================================================== -->
+      <div id="enemies-list-container" class="space-y-2 hidden">
+        <!-- 动态渲染 -->
+      </div>
+
+    </div>
+
+    <!-- 底部状态摘要 -->
+    <div class="mt-1.5 pt-1.5 border-t border-slate-700/40 flex items-center justify-between text-[10px] text-slate-400 shrink-0">
+      <div class="flex items-center gap-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        <span>竖屏抗挤压已就绪：折叠栏与数值矩阵智能分层，彻底杜绝文字截断与同行动挤压。</span>
+      </div>
+      <div class="font-mono text-slate-500">READY</div>
+    </div>
+
+  </div>
+
+  <!-- Toast 提示框 -->
+  <div id="toast-notify" class="fixed bottom-4 right-4 z-50 transform translate-y-16 opacity-0 transition-all duration-200 bg-slate-900/95 border border-cyan-500 text-cyan-200 px-3 py-2 rounded-lg shadow-xl text-xs font-bold flex items-center gap-1.5">
+    <span>✨</span> <span id="toast-text">通知内容</span>
+  </div>
+
+  <!-- ========================================================
+       交互逻辑与数据脚本
+       ======================================================== -->
+  <script>
+    const CLASS_OPTIONS = ['防守者', '隐匿者', '施法者', '狂战士', '风行者', '圣职者', '灾厄使'];
+    const DAMAGE_TYPES = [
+      { val: '', label: '无(近战)' },
+      { val: '近战', label: '🗡️ 近战' },
+      { val: '远程', label: '🎯 远程' },
+      { val: '法术', label: '⚡ 法术' }
+    ];
+    const FX_TAG_LIST = ['特效:无', '火焰01', '冰霜01', '雷击01', '圣光01', '双枪扫射', '连续扫射', '克虏伯重狙', '异种坏死雾', '生体流转', '远程重击', '枪击穿透'];
+    const SKILL_TYPES_ALL = [
+      '[无]', '[单体]', '[群攻]', '[穿透]', '[群穿透]', '[眩晕]', '[群眩晕]',
+      '[单回]', '[群回]', '[单回蓝]', '[群回蓝]', '[单冲]', '[群冲]',
+      '[单盾]', '[群盾]', '[肃正]', '[肃正:近战]', '[肃正:远程]', '[肃正:法术]',
+      '[单增]', '[群增]', '[单防]', '[群防]', '[单速]', '[群速]', '[单瞄]', '[群瞄]',
+      '[免伤]', '[驱散]', '[群驱散]', '[单降]', '[群降]', '[单盲]', '[群盲]',
+      '[单缓]', '[群缓]', '[单滞]', '[群滞]', '[单弱]', '[群弱]',
+      '[中毒]', '[群中毒]', '[燃烧]', '[群燃烧]', '[嘲讽]', '[再动]',
+      '[反击]', '[群反击]', '[回避]', '[单避]', '[群避]'
+    ];
+
+    let currentTab = 'heroes';
+    let isGlobalSettingsOpen = false;
+
+    let heroesData = [
+      {
+        id: 'h1',
+        name: '埃利奥特',
+        classType: '施法者',
+        img: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces',
+        hp: 100, maxHp: 100, mp: 110, maxMp: 110, tp: 0, maxTp: 100,
+        atk: 20, def: 40, spd: 500, actCount: 1,
+        isExpanded: true,
+        skills: [
+          {
+            id: 's1_1',
+            name: '迅捷愈合法',
+            isReaction: false, reactionTarget: 'all', kanpoTarget: null, sheshenTarget: null,
+            isOthers: true, guaranteedHit: false, isHighTier: false, isLegendary: false,
+            damageType: '法术', fxTag: '',
+            type: '[单回]', power: 45, type2: '[无]', power2: 0, type3: '[无]', power3: 0,
+            cost: 3, hpCost: 6, tpCost: 0, hit: 100, turns: null, delay: 0, haste: 0, maxUses: 0,
+            barrierArmor: 0, dispelPower: 0,
+            isExpanded: false
+          },
+          {
+            id: 's1_2',
+            name: '奥术圣域壁垒',
+            isReaction: false, reactionTarget: 'all', kanpoTarget: null, sheshenTarget: null,
+            isOthers: false, guaranteedHit: true, isHighTier: true, isLegendary: false,
+            damageType: '法术', fxTag: '圣光01',
+            type: '[肃正:法术]', power: 120, type2: '[单盾]', power2: 40, type3: '[无]', power3: 0,
+            cost: 25, hpCost: 0, tpCost: 0, hit: 100, turns: null, delay: 1, haste: 0, maxUses: 2,
+            barrierArmor: 30, dispelPower: 0,
+            isExpanded: false
+          }
+        ]
+      },
+      {
+        id: 'h2',
+        name: '玛德琳',
+        classType: '防守者',
+        img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=faces',
+        hp: 320, maxHp: 320, mp: 50, maxMp: 50, tp: 20, maxTp: 100,
+        atk: 45, def: 80, spd: 95, actCount: 1,
+        isExpanded: false,
+        skills: [
+          {
+            id: 's2_1',
+            name: '盾牌猛击',
+            isReaction: false, reactionTarget: 'all', kanpoTarget: null, sheshenTarget: null,
+            isOthers: false, guaranteedHit: false, isHighTier: false, isLegendary: false,
+            damageType: '近战', fxTag: '',
+            type: '[单体]', power: 60, type2: '[眩晕]', power2: 1, type3: '[无]', power3: 0,
+            cost: 10, hpCost: 0, tpCost: 0, hit: 100, turns: null, delay: 0, haste: 0, maxUses: 0,
+            barrierArmor: 0, dispelPower: 0,
+            isExpanded: false
+          }
+        ]
+      },
+      {
+        id: 'h3',
+        name: '弗兰克',
+        classType: '狂战士',
+        img: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=faces',
+        hp: 280, maxHp: 280, mp: 30, maxMp: 30, tp: 10, maxTp: 100,
+        atk: 75, def: 25, spd: 120, actCount: 2,
+        isExpanded: false,
+        skills: [
+          {
+            id: 's3_1',
+            name: '极道狂热·连续扫射',
+            isReaction: false, reactionTarget: 'all', kanpoTarget: null, sheshenTarget: null,
+            isOthers: false, guaranteedHit: false, isHighTier: false, isLegendary: true,
+            damageType: '远程', fxTag: '连续扫射',
+            type: '[群攻]', power: 90, type2: '[群穿透]', power2: 30, type3: '[单弱]', power3: 15,
+            cost: 15, hpCost: 20, tpCost: 50, hit: 110, turns: null, delay: 0, haste: 0, maxUses: 1,
+            barrierArmor: 0, dispelPower: 0,
+            isExpanded: false
+          }
+        ]
+      },
+      {
+        id: 'h4',
+        name: '索恩',
+        classType: '隐匿者',
+        img: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=100&h=100&fit=crop&crop=faces',
+        hp: 160, maxHp: 160, mp: 80, maxMp: 80, tp: 40, maxTp: 100,
+        atk: 55, def: 20, spd: 240, actCount: 1,
+        isExpanded: false,
+        skills: [
+          {
+            id: 's4_1',
+            name: '克虏伯高精狙杀',
+            isReaction: false, reactionTarget: 'all', kanpoTarget: '远程', sheshenTarget: null,
+            isOthers: false, guaranteedHit: true, isHighTier: true, isLegendary: false,
+            damageType: '远程', fxTag: '克虏伯重狙',
+            type: '[穿透]', power: 140, type2: '[无]', power2: 0, type3: '[无]', power3: 0,
+            cost: 20, hpCost: 0, tpCost: 0, hit: 180, turns: null, delay: 2, haste: 2, maxUses: 3,
+            barrierArmor: 0, dispelPower: 0,
+            isExpanded: false
+          }
+        ]
+      }
+    ];
+
+    let enemiesData = [
+      {
+        id: 'e1',
+        name: '青眼苍狼·领主',
+        emoji: '🐺', classType: '狂战士', img: '',
+        hp: 450, maxHp: 450, mp: 100, maxMp: 100,
+        atk: 50, def: 30, spd: 140, actCount: 2,
+        isWise: true, row: 'back', tier: 'legend',
+        isExpanded: true,
+        skills: [
+          {
+            id: 'es1_1',
+            name: '残月撕咬', damageType: '近战', isOthers: false, guaranteedHit: false, fxTag: '火焰01',
+            type: '[单体]', power: 65, type2: '[流血]', power2: 15, type3: '[无]', power3: 0,
+            cost: 15, hpCost: 0, tpCost: 0, charge: 0, hit: 100, turns: null,
+            isExpanded: false
+          },
+          {
+            id: 'es1_2',
+            name: '灭世狼嗥', damageType: '法术', isOthers: false, guaranteedHit: true, fxTag: '雷击01',
+            type: '[群攻]', power: 110, type2: '[群弱]', power2: 20, type3: '[群盲]', power3: 15,
+            cost: 30, hpCost: 0, tpCost: 0, charge: 3, hit: 120, turns: 3,
+            isExpanded: false
+          }
+        ]
+      },
+      {
+        id: 'e2',
+        name: '食尸鬼侍从 A',
+        emoji: '👻', classType: null, img: '',
+        hp: 120, maxHp: 120, mp: 40, maxMp: 40,
+        atk: 25, def: 15, spd: 90, actCount: 1,
+        isWise: false, row: 'front', tier: 'fodder',
+        isExpanded: false,
+        skills: [
+          {
+            id: 'es2_1',
+            name: '爪击', damageType: '近战', isOthers: false, guaranteedHit: false, fxTag: '',
+            type: '[单体]', power: 35, type2: '[无]', power2: 0, type3: '[无]', power3: 0,
+            cost: 5, hpCost: 0, tpCost: 0, charge: 0, hit: 95, turns: null,
+            isExpanded: false
+          }
+        ]
+      },
+      {
+        id: 'e3',
+        name: '食尸鬼侍从 B',
+        emoji: '👻', classType: null, img: '',
+        hp: 120, maxHp: 120, mp: 40, maxMp: 40,
+        atk: 25, def: 15, spd: 90, actCount: 1,
+        isWise: false, row: 'front', tier: 'fodder',
+        isExpanded: false,
+        skills: [
+          {
+            id: 'es3_1',
+            name: '自爆突袭', damageType: '近战', isOthers: false, guaranteedHit: false, fxTag: '火焰01',
+            type: '[自爆:群伤]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0,
+            cost: 0, hpCost: 0, tpCost: 0, charge: 0, hit: 100, turns: null,
+            isExpanded: false
+          }
+        ]
+      }
+    ];
+
+    function initRender() {
+      renderHeroes();
+      renderEnemies();
+      updateCounters();
+      syncGlobalSettingsUI();
+    }
+
+    function updateCounters() {
+      document.getElementById('hero-count-badge').textContent = heroesData.length;
+      document.getElementById('enemy-count-badge').textContent = enemiesData.length;
+    }
+
+    // 渲染我方英雄列表
+    function renderHeroes() {
+      const container = document.getElementById('heroes-list-container');
+      container.innerHTML = heroesData.map((h, hi) => {
+        const isExp = h.isExpanded;
+
+        return `
+          <div class="char-card-hero rounded-lg overflow-hidden ${isExp ? 'is-expanded' : ''}" id="hero-card-${hi}">
+            
+            <!-- 一级折叠栏 (Collapsed Header) - 智能双层/单层响应式布局 -->
+            <div onclick="toggleCharFold('hero', ${hi})" class="px-2.5 sm:px-3 py-2 cursor-pointer bg-slate-900/80 hover:bg-slate-800/90 transition-colors flex flex-col gap-1.5">
+              
+              <!-- 第一行：头像 + 角色名 + 职业 + 右侧控制 (永远舒展不截断) -->
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0">
+                  <div class="w-6 h-6 rounded overflow-hidden border border-cyan-500/40 bg-black/40 shrink-0 flex items-center justify-center">
+                    ${h.img ? `<img src="${h.img}" class="w-full h-full object-cover" onerror="this.src='';this.parentElement.innerHTML='👤'"/>` : `<span class="text-xs">👤</span>`}
+                  </div>
+                  <span class="font-bold text-xs sm:text-sm text-yellow-200 tracking-wide">${h.name || '未命名'}</span>
+                  ${h.classType ? `<span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/60 shrink-0">${h.classType}</span>` : `<span class="text-[10px] text-slate-500 shrink-0">无职业</span>`}
+                </div>
+
+                <!-- 桌面端紧凑数值 (在桌面端直接挂载在右侧) -->
+                <div class="desktop-single-row items-center gap-2 ml-auto mr-1 font-mono-num text-[11px]">
+                  <span class="px-2 py-0.5 rounded bg-rose-950/70 border border-rose-800/60 text-rose-300">
+                    <span class="text-[9px] text-rose-400 font-bold">HP</span> <span class="font-bold">${h.hp}</span><span class="text-rose-500/60">/</span>${h.maxHp}
+                  </span>
+                  <span class="px-2 py-0.5 rounded bg-cyan-950/70 border border-cyan-800/60 text-cyan-300">
+                    <span class="text-[9px] text-cyan-400 font-bold">MP</span> <span class="font-bold">${h.mp}</span><span class="text-cyan-500/60">/</span>${h.maxMp}
+                  </span>
+                  <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px]">技能: ${h.skills.length}</span>
+                </div>
+
+                <!-- 控制按钮 -->
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <button onclick="event.stopPropagation(); removeEntity('hero', ${hi})" class="w-5 h-5 rounded hover:bg-rose-900/70 text-slate-500 hover:text-rose-300 flex items-center justify-center text-xs transition-colors" title="删除角色">✕</button>
+                  <span class="text-cyan-400 text-xs transition-transform duration-200 ${isExp ? 'rotate-180' : ''}">▼</span>
+                </div>
+              </div>
+
+              <!-- 第二行：竖屏移动端专属数值展示 (避免单行挤压，保证数字完整) -->
+              <div class="mobile-multi-row items-center gap-1.5 font-mono-num text-[10px] pt-0.5 border-t border-slate-800/50">
+                <span class="px-2 py-0.5 rounded bg-rose-950/70 border border-rose-800/60 text-rose-300">
+                  <span class="text-[9px] text-rose-400 font-bold">HP</span> <span class="font-bold">${h.hp}</span>/${h.maxHp}
+                </span>
+                <span class="px-2 py-0.5 rounded bg-cyan-950/70 border border-cyan-800/60 text-cyan-300">
+                  <span class="text-[9px] text-cyan-400 font-bold">MP</span> <span class="font-bold">${h.mp}</span>/${h.maxMp}
+                </span>
+                <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[9px] ml-auto">技能数: ${h.skills.length}</span>
+              </div>
+
+            </div>
+
+            <!-- 一级展开内容区 (通过 hidden 彻底封闭，杜绝漏底) -->
+            <div class="${isExp ? '' : 'hidden'} p-2.5 sm:p-3 space-y-3 bg-black/40 border-t border-cyan-950/60">
+              
+              <!-- 基础属性 -->
+              <div class="space-y-2">
+                <div class="flex items-center gap-1 text-[11px] font-bold text-cyan-400 border-l-2 border-cyan-500 pl-1.5">
+                  角色核心属性
+                </div>
+
+                <!-- 基本信息行 -->
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 text-xs">
+                  <div class="sm:col-span-3 flex items-center gap-1">
+                    <span class="text-slate-400 text-[11px] whitespace-nowrap">名称</span>
+                    <input type="text" value="${h.name}" oninput="updateHeroProp(${hi}, 'name', this.value)" class="edit-input-game w-full font-bold text-yellow-200">
+                  </div>
+                  <div class="sm:col-span-3 flex items-center gap-1">
+                    <span class="text-slate-400 text-[11px] whitespace-nowrap">职业</span>
+                    <select onchange="updateHeroProp(${hi}, 'classType', this.value)" class="edit-input-game w-full text-cyan-300 font-bold">
+                      <option value="" ${!h.classType ? 'selected' : ''}>无</option>
+                      ${CLASS_OPTIONS.map(c => `<option value="${c}" ${h.classType === c ? 'selected' : ''}>${c}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="sm:col-span-6 flex items-center gap-1">
+                    <span class="text-slate-400 text-[11px] whitespace-nowrap">头像URL</span>
+                    <input type="text" value="${h.img || ''}" oninput="updateHeroProp(${hi}, 'img', this.value)" class="edit-input-game w-full text-slate-400 font-mono-num text-[11px]" placeholder="https://...">
+                  </div>
+                </div>
+
+                <!-- 8 项核心数值矩阵 (自适应双列/四列/八列，彻底根治挤压) -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 text-[11px] grid-stats-responsive">
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col">
+                    <span class="text-rose-400 font-semibold text-[10px]">❤️ HP 当前</span>
+                    <input type="number" value="${h.hp}" oninput="updateHeroProp(${hi}, 'hp', Number(this.value))" class="edit-input-game w-full font-mono-num text-rose-200 mt-0.5">
+                  </div>
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col">
+                    <span class="text-slate-400 text-[10px]">MaxHP 上限</span>
+                    <input type="number" value="${h.maxHp}" oninput="updateHeroProp(${hi}, 'maxHp', Number(this.value))" class="edit-input-game w-full font-mono-num text-slate-300 mt-0.5">
+                  </div>
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col">
+                    <span class="text-cyan-400 font-semibold text-[10px]">💧 MP 当前</span>
+                    <input type="number" value="${h.mp}" oninput="updateHeroProp(${hi}, 'mp', Number(this.value))" class="edit-input-game w-full font-mono-num text-cyan-200 mt-0.5">
+                  </div>
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col">
+                    <span class="text-slate-400 text-[10px]">MaxMP 上限</span>
+                    <input type="number" value="${h.maxMp}" oninput="updateHeroProp(${hi}, 'maxMp', Number(this.value))" class="edit-input-game w-full font-mono-num text-slate-300 mt-0.5">
+                  </div>
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col">
+                    <span class="text-orange-400 font-semibold text-[10px]">⚔️ 攻击(Atk)</span>
+                    <input type="number" value="${h.atk}" oninput="updateHeroProp(${hi}, 'atk', Number(this.value))" class="edit-input-game w-full font-mono-num text-orange-200 mt-0.5">
+                  </div>
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col">
+                    <span class="text-blue-400 font-semibold text-[10px]">🛡️ 防御(Def)</span>
+                    <input type="number" value="${h.def}" oninput="updateHeroProp(${hi}, 'def', Number(this.value))" class="edit-input-game w-full font-mono-num text-blue-200 mt-0.5">
+                  </div>
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col">
+                    <span class="text-yellow-400 font-semibold text-[10px]">⚡ 速度(Spd)</span>
+                    <input type="number" value="${h.spd}" oninput="updateHeroProp(${hi}, 'spd', Number(this.value))" class="edit-input-game w-full font-mono-num text-yellow-200 mt-0.5">
+                  </div>
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col">
+                    <span class="text-amber-400 font-semibold text-[10px]">⏩ 行动次数</span>
+                    <input type="number" min="1" value="${h.actCount || 1}" oninput="updateHeroProp(${hi}, 'actCount', Number(this.value))" class="edit-input-game w-full font-mono-num text-amber-200 mt-0.5">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 技能列表 (二级折叠) -->
+              <div class="space-y-1.5 pt-1">
+                <div class="flex items-center justify-between border-b border-cyan-900/40 pb-1">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-cyan-400 text-xs font-bold">⚡ 技能列表</span>
+                    <span class="text-[10px] text-slate-500">(${h.skills.length}项)</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button onclick="toggleAllHeroSkills(${hi}, true)" class="text-[10px] text-slate-400 hover:text-cyan-300">展开全部</button>
+                    <span class="text-slate-600 text-[10px]">|</span>
+                    <button onclick="toggleAllHeroSkills(${hi}, false)" class="text-[10px] text-slate-400 hover:text-cyan-300">收起全部</button>
+                    <button onclick="addHeroSkill(${hi})" class="px-2 py-0.5 bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 text-[10px] font-bold rounded border border-cyan-600/50 flex items-center gap-0.5">
+                      <span>+</span> 新增技能
+                    </button>
+                  </div>
+                </div>
+
+                <div class="space-y-1.5">
+                  ${renderSkillsList('hero', hi, h.skills)}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 渲染敌方怪物列表
+    function renderEnemies() {
+      const container = document.getElementById('enemies-list-container');
+      container.innerHTML = enemiesData.map((e, ei) => {
+        const isExp = e.isExpanded;
+
+        return `
+          <div class="char-card-enemy rounded-lg overflow-hidden ${isExp ? 'is-expanded' : ''}" id="enemy-card-${ei}">
+            
+            <!-- 一级折叠栏 -->
+            <div onclick="toggleCharFold('enemy', ${ei})" class="px-2.5 sm:px-3 py-2 cursor-pointer bg-slate-900/80 hover:bg-slate-800/90 transition-colors flex flex-col gap-1.5">
+              
+              <!-- 第一行：头像 + 名称 + 特质徽章 + 控制 -->
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0">
+                  <div class="w-6 h-6 rounded overflow-hidden border border-rose-500/40 bg-black/40 shrink-0 flex items-center justify-center text-sm">
+                    ${e.emoji || '👾'}
+                  </div>
+                  <span class="font-bold text-xs sm:text-sm text-rose-200 tracking-wide">${e.name || '未命名怪物'}</span>
+                  ${e.isWise ? `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-950 text-rose-300 border border-rose-600/80 shrink-0">🧠 智慧</span>` : ''}
+                  <span class="px-1.5 py-0.2 rounded text-[9px] font-bold border shrink-0 ${e.row === 'front' ? 'bg-amber-950 text-amber-300 border-amber-500/70' : 'bg-sky-950 text-sky-300 border-sky-500/70'}">${e.row === 'front' ? '⬇ 前排' : '⬆ 后排'}</span>
+                  ${e.tier ? `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold border shrink-0 ${e.tier === 'legend' ? 'bg-amber-950 text-amber-300 border-amber-500' : e.tier === 'elite' ? 'bg-violet-950 text-violet-300 border-violet-500' : 'bg-slate-800 text-slate-300 border-slate-600'}">${e.tier === 'legend' ? '首领' : e.tier === 'elite' ? '精英' : '杂兵'}</span>` : ''}
+                </div>
+
+                <!-- 桌面端紧凑数值 -->
+                <div class="desktop-single-row items-center gap-2 ml-auto mr-1 font-mono-num text-[11px]">
+                  <span class="px-2 py-0.5 rounded bg-rose-950/70 border border-rose-800/60 text-rose-300">
+                    <span class="text-[9px] text-rose-400 font-bold">HP</span> <span class="font-bold">${e.hp}</span><span class="text-rose-500/60">/</span>${e.maxHp}
+                  </span>
+                  <span class="px-2 py-0.5 rounded bg-cyan-950/70 border border-cyan-800/60 text-cyan-300">
+                    <span class="text-[9px] text-cyan-400 font-bold">MP</span> <span class="font-bold">${e.mp}</span><span class="text-cyan-500/60">/</span>${e.maxMp}
+                  </span>
+                  <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px]">技能: ${e.skills.length}</span>
+                </div>
+
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <button onclick="event.stopPropagation(); removeEntity('enemy', ${ei})" class="w-5 h-5 rounded hover:bg-rose-900/70 text-slate-500 hover:text-rose-300 flex items-center justify-center text-xs transition-colors" title="删除怪物">✕</button>
+                  <span class="text-rose-400 text-xs transition-transform duration-200 ${isExp ? 'rotate-180' : ''}">▼</span>
+                </div>
+              </div>
+
+              <!-- 第二行：竖屏移动端专属数值 -->
+              <div class="mobile-multi-row items-center gap-1.5 font-mono-num text-[10px] pt-0.5 border-t border-slate-800/50">
+                <span class="px-2 py-0.5 rounded bg-rose-950/70 border border-rose-800/60 text-rose-300">
+                  <span class="text-[9px] text-rose-400 font-bold">HP</span> <span class="font-bold">${e.hp}</span>/${e.maxHp}
+                </span>
+                <span class="px-2 py-0.5 rounded bg-cyan-950/70 border border-cyan-800/60 text-cyan-300">
+                  <span class="text-[9px] text-cyan-400 font-bold">MP</span> <span class="font-bold">${e.mp}</span>/${e.maxMp}
+                </span>
+                <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[9px] ml-auto">技能数: ${e.skills.length}</span>
+              </div>
+
+            </div>
+
+            <!-- 一级展开内容区 -->
+            <div class="${isExp ? '' : 'hidden'} p-2.5 sm:p-3 space-y-3 bg-black/40 border-t border-rose-950/60">
+              
+              <div class="space-y-2">
+                <div class="flex items-center gap-1 text-[11px] font-bold text-rose-400 border-l-2 border-rose-500 pl-1.5">
+                  怪物核心属性
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 text-xs">
+                  <div class="sm:col-span-2 flex items-center gap-1">
+                    <span class="text-slate-400 text-[11px] whitespace-nowrap">图标</span>
+                    <input type="text" value="${e.emoji || '👾'}" oninput="updateEnemyProp(${ei}, 'emoji', this.value)" class="edit-input-game w-full text-center text-sm font-bold">
+                  </div>
+                  <div class="sm:col-span-3 flex items-center gap-1">
+                    <span class="text-slate-400 text-[11px] whitespace-nowrap">名称</span>
+                    <input type="text" value="${e.name}" oninput="updateEnemyProp(${ei}, 'name', this.value)" class="edit-input-game w-full font-bold text-rose-200">
+                  </div>
+                  <div class="sm:col-span-2 flex items-center gap-1">
+                    <span class="text-slate-400 text-[11px] whitespace-nowrap">阵型</span>
+                    <select onchange="updateEnemyProp(${ei}, 'row', this.value)" class="edit-input-game w-full text-amber-300 font-bold">
+                      <option value="front" ${e.row === 'front' ? 'selected' : ''}>⬇ 前排</option>
+                      <option value="back" ${e.row === 'back' ? 'selected' : ''}>⬆ 后排</option>
+                    </select>
+                  </div>
+                  <div class="sm:col-span-2 flex items-center gap-1">
+                    <span class="text-slate-400 text-[11px] whitespace-nowrap">阶位</span>
+                    <select onchange="updateEnemyProp(${ei}, 'tier', this.value)" class="edit-input-game w-full text-violet-300 font-bold">
+                      <option value="fodder" ${e.tier === 'fodder' ? 'selected' : ''}>杂兵</option>
+                      <option value="elite" ${e.tier === 'elite' ? 'selected' : ''}>精英</option>
+                      <option value="legend" ${e.tier === 'legend' ? 'selected' : ''}>首领</option>
+                    </select>
+                  </div>
+                  <div class="sm:col-span-3 flex items-center gap-2 bg-slate-900/90 px-2 py-1 rounded border border-slate-700/60">
+                    <label class="flex items-center gap-1 text-rose-300 cursor-pointer text-[11px]">
+                      <input type="checkbox" ${e.isWise ? 'checked' : ''} onchange="updateEnemyProp(${ei}, 'isWise', this.checked)" class="accent-rose-500">
+                      🧠 智慧残血集火
+                    </label>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 text-[11px] grid-stats-responsive">
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col">
+                    <span class="text-rose-400 font-semibold text-[10px]">❤️ HP 当前</span>
+                    <input type="number" value="${e.hp}" oninput="updateEnemyProp(${ei}, 'hp', Number(this.value))" class="edit-input-game w-full font-mono-num text-rose-200 mt-0.5">
+                  </div>
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col">
+                    <span class="text-slate-400 text-[10px]">MaxHP 上限</span>
+                    <input type="number" value="${e.maxHp}" oninput="updateEnemyProp(${ei}, 'maxHp', Number(this.value))" class="edit-input-game w-full font-mono-num text-slate-300 mt-0.5">
+                  </div>
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col">
+                    <span class="text-cyan-400 font-semibold text-[10px]">💧 MP 当前</span>
+                    <input type="number" value="${e.mp}" oninput="updateEnemyProp(${ei}, 'mp', Number(this.value))" class="edit-input-game w-full font-mono-num text-cyan-200 mt-0.5">
+                  </div>
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col">
+                    <span class="text-slate-400 text-[10px]">MaxMP 上限</span>
+                    <input type="number" value="${e.maxMp}" oninput="updateEnemyProp(${ei}, 'maxMp', Number(this.value))" class="edit-input-game w-full font-mono-num text-slate-300 mt-0.5">
+                  </div>
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col">
+                    <span class="text-orange-400 font-semibold text-[10px]">⚔️ 攻击(Atk)</span>
+                    <input type="number" value="${e.atk}" oninput="updateEnemyProp(${ei}, 'atk', Number(this.value))" class="edit-input-game w-full font-mono-num text-orange-200 mt-0.5">
+                  </div>
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col">
+                    <span class="text-blue-400 font-semibold text-[10px]">🛡️ 防御(Def)</span>
+                    <input type="number" value="${e.def}" oninput="updateEnemyProp(${ei}, 'def', Number(this.value))" class="edit-input-game w-full font-mono-num text-blue-200 mt-0.5">
+                  </div>
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col">
+                    <span class="text-yellow-400 font-semibold text-[10px]">⚡ 速度(Spd)</span>
+                    <input type="number" value="${e.spd}" oninput="updateEnemyProp(${ei}, 'spd', Number(this.value))" class="edit-input-game w-full font-mono-num text-yellow-200 mt-0.5">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 技能列表 -->
+              <div class="space-y-1.5 pt-1">
+                <div class="flex items-center justify-between border-b border-rose-900/40 pb-1">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-rose-400 text-xs font-bold">⚡ 技能列表</span>
+                    <span class="text-[10px] text-slate-500">(${e.skills.length}项)</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button onclick="toggleAllEnemySkills(${ei}, true)" class="text-[10px] text-slate-400 hover:text-rose-300">展开全部</button>
+                    <span class="text-slate-600 text-[10px]">|</span>
+                    <button onclick="toggleAllEnemySkills(${ei}, false)" class="text-[10px] text-slate-400 hover:text-rose-300">收起全部</button>
+                    <button onclick="addEnemySkill(${ei})" class="px-2 py-0.5 bg-rose-900/60 hover:bg-rose-800 text-rose-200 text-[10px] font-bold rounded border border-rose-600/50 flex items-center gap-0.5">
+                      <span>+</span> 新增技能
+                    </button>
+                  </div>
+                </div>
+
+                <div class="space-y-1.5">
+                  ${renderSkillsList('enemy', ei, e.skills)}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 渲染技能列表 (二级折叠) - 响应式抗挤压
+    function renderSkillsList(partyType, entityIdx, skills) {
+      return skills.map((s, si) => {
+        const isExp = s.isExpanded;
+        const dmgBadge = s.damageType === '近战' ? '🗡️' : s.damageType === '远程' ? '🎯' : s.damageType === '法术' ? '⚡' : '🌀';
+        const isHero = partyType === 'hero';
+
+        return `
+          <div class="skill-card-item rounded overflow-hidden ${isExp ? 'is-expanded' : ''}" id="${partyType}-${entityIdx}-skill-${si}">
+            
+            <!-- 二级折叠栏 (严格遵循规范：只显示【技能名】【MP】【TP】【HP】【延迟】) - 智能响应式 -->
+            <div onclick="toggleSkillFold('${partyType}', ${entityIdx}, ${si})" class="px-2.5 py-1.5 cursor-pointer bg-slate-900/90 hover:bg-slate-800/90 transition-colors flex flex-col gap-1">
+              
+              <!-- 第一行：图标 + 技能名 + 效果徽章 + 控制 (永远舒展不截断) -->
+              <div class="flex items-center justify-between gap-1.5">
+                <div class="flex items-center gap-1.5 flex-wrap min-w-0">
+                  <span class="text-xs shrink-0">${dmgBadge}</span>
+                  <span class="text-xs font-bold text-slate-100 tracking-wide">${s.name || '新技能'}</span>
+                  
+                  <span class="px-1.5 py-0.2 rounded text-[9px] font-mono-num font-semibold bg-slate-800 text-cyan-300 border border-slate-700 shrink-0">${s.type} ${s.power || ''}</span>
+                  ${s.isOthers ? `<span class="px-1 py-0.2 rounded text-[8px] bg-emerald-950 text-emerald-300 border border-emerald-700 shrink-0">他人</span>` : ''}
+                  ${s.guaranteedHit ? `<span class="px-1 py-0.2 rounded text-[8px] bg-rose-950 text-rose-300 border border-rose-700 shrink-0">必中</span>` : ''}
+                  ${s.isHighTier ? `<span class="px-1 py-0.2 rounded text-[8px] bg-violet-950 text-violet-300 border border-violet-700 shrink-0">高阶</span>` : ''}
+                  ${s.isLegendary ? `<span class="px-1 py-0.2 rounded text-[8px] bg-amber-950 text-amber-300 border border-amber-700 shrink-0">传奇</span>` : ''}
+                </div>
+
+                <!-- 桌面端紧凑消耗 -->
+                <div class="desktop-single-row items-center gap-1 ml-auto mr-1 font-mono-num text-[10px]">
+                  <span class="px-1.5 py-0.2 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">💧MP:${s.cost || 0}</span>
+                  <span class="px-1.5 py-0.2 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">🔥TP:${s.tpCost || 0}</span>
+                  <span class="px-1.5 py-0.2 rounded bg-rose-950/80 text-rose-300 border border-rose-800/60">🩸HP:${s.hpCost || 0}</span>
+                  ${isHero ? `<span class="px-1.5 py-0.2 rounded bg-amber-950/80 text-amber-300 border border-amber-800/60">⏳延迟:${s.delay || 0}</span>` : `<span class="px-1.5 py-0.2 rounded bg-purple-950/80 text-purple-300 border border-purple-800/60">⏳充能:${s.charge || 0}</span>`}
+                </div>
+
+                <div class="flex items-center gap-1 shrink-0">
+                  <button onclick="event.stopPropagation(); removeSkill('${partyType}', ${entityIdx}, ${si})" class="w-4 h-4 rounded hover:bg-red-900/60 text-slate-500 hover:text-red-300 flex items-center justify-center text-[10px] transition-colors" title="删除技能">✕</button>
+                  <span class="text-slate-400 text-[10px] transition-transform duration-200 ${isExp ? 'rotate-180' : ''}">▼</span>
+                </div>
+              </div>
+
+              <!-- 第二行：竖屏移动端专属消耗栏 (清晰不重叠) -->
+              <div class="mobile-multi-row items-center gap-1 font-mono-num text-[9px] flex-wrap pt-0.5 border-t border-slate-800/40">
+                <span class="px-1.5 py-0.2 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">💧MP:${s.cost || 0}</span>
+                <span class="px-1.5 py-0.2 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">🔥TP:${s.tpCost || 0}</span>
+                <span class="px-1.5 py-0.2 rounded bg-rose-950/80 text-rose-300 border border-rose-800/60">🩸HP:${s.hpCost || 0}</span>
+                ${isHero ? `<span class="px-1.5 py-0.2 rounded bg-amber-950/80 text-amber-300 border border-amber-800/60">⏳延迟:${s.delay || 0}</span>` : `<span class="px-1.5 py-0.2 rounded bg-purple-950/80 text-purple-300 border border-purple-800/60">⏳充能:${s.charge || 0}</span>`}
+              </div>
+
+            </div>
+
+            <!-- 二级展开表单区 -->
+            <div class="${isExp ? '' : 'hidden'} p-2 sm:p-2.5 space-y-2 bg-black/50 border-t border-slate-800">
+              
+              <!-- 模块 A：基础设定与修饰开关 -->
+              <div class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 text-xs items-center">
+                <div class="sm:col-span-3 flex items-center gap-1">
+                  <span class="text-slate-400 text-[11px] whitespace-nowrap">名称</span>
+                  <input type="text" value="${s.name}" oninput="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'name', this.value)" class="edit-input-game w-full font-bold text-slate-100" placeholder="技能名">
+                </div>
+                <div class="sm:col-span-2 flex items-center gap-1">
+                  <span class="text-slate-400 text-[11px] whitespace-nowrap">属性</span>
+                  <select onchange="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'damageType', this.value)" class="edit-input-game w-full text-orange-300 font-bold">
+                    ${DAMAGE_TYPES.map(d => `<option value="${d.val}" ${s.damageType === d.val ? 'selected' : ''}>${d.label}</option>`).join('')}
+                  </select>
+                </div>
+                <div class="sm:col-span-3 flex items-center gap-1">
+                  <span class="text-slate-400 text-[11px] whitespace-nowrap">特效</span>
+                  <select onchange="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'fxTag', this.value)" class="edit-input-game w-full text-yellow-300 font-bold">
+                    ${FX_TAG_LIST.map(f => {
+                      const val = f === '特效:无' ? '' : f;
+                      return `<option value="${val}" ${(s.fxTag || '') === val ? 'selected' : ''}>${f}</option>`;
+                    }).join('')}
+                  </select>
+                </div>
+                
+                <!-- 药丸风格的修饰开关 -->
+                <div class="sm:col-span-4 flex items-center gap-1.5 flex-wrap">
+                  <span onclick="toggleSkillTag('${partyType}', ${entityIdx}, ${si}, 'isOthers')" class="tag-toggle-pill border-emerald-500 text-emerald-300 bg-emerald-950/70 ${s.isOthers ? 'active' : 'inactive'}">
+                    <span>👥</span> 他人
+                  </span>
+                  <span onclick="toggleSkillTag('${partyType}', ${entityIdx}, ${si}, 'guaranteedHit')" class="tag-toggle-pill border-rose-500 text-rose-300 bg-rose-950/70 ${s.guaranteedHit ? 'active' : 'inactive'}">
+                    <span>🎯</span> 必中
+                  </span>
+                  ${isHero ? `
+                    <span onclick="toggleSkillTag('${partyType}', ${entityIdx}, ${si}, 'isHighTier')" class="tag-toggle-pill border-violet-500 text-violet-300 bg-violet-950/70 ${s.isHighTier ? 'active' : 'inactive'}">
+                      <span>⬥</span> 高阶
+                    </span>
+                    <span onclick="toggleSkillTag('${partyType}', ${entityIdx}, ${si}, 'isLegendary')" class="tag-toggle-pill border-amber-500 text-amber-300 bg-amber-950/70 ${s.isLegendary ? 'active' : 'inactive'}">
+                      <span>✦</span> 传奇
+                    </span>
+                  ` : ''}
+                </div>
+              </div>
+
+              <!-- 模块 B：反制策略 (反应 / 看破 / 舍身) -->
+              ${isHero ? `
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-xs bg-slate-900/70 p-1.5 rounded border border-slate-800 grid-reactions-responsive">
+                  <div class="flex items-center gap-1">
+                    <span class="text-indigo-400 text-[11px] whitespace-nowrap font-bold">反应</span>
+                    <select onchange="updateReaction('${partyType}', ${entityIdx}, ${si}, this.value)" class="edit-input-game w-full text-indigo-300 text-[11px]">
+                      <option value="none" ${!s.isReaction ? 'selected' : ''}>非反应</option>
+                      <option value="all" ${s.isReaction && s.reactionTarget === 'all' ? 'selected' : ''}>反应(全能)</option>
+                      <option value="近战" ${s.isReaction && s.reactionTarget === '近战' ? 'selected' : ''}>反应(近战)</option>
+                      <option value="远程" ${s.isReaction && s.reactionTarget === '远程' ? 'selected' : ''}>反应(远程)</option>
+                      <option value="法术" ${s.isReaction && s.reactionTarget === '法术' ? 'selected' : ''}>反应(法术)</option>
+                    </select>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <span class="text-amber-400 text-[11px] whitespace-nowrap font-bold">看破</span>
+                    <select onchange="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'kanpoTarget', this.value === 'none' ? null : this.value)" class="edit-input-game w-full text-amber-300 text-[11px]">
+                      <option value="none" ${!s.kanpoTarget ? 'selected' : ''}>无看破</option>
+                      <option value="all" ${s.kanpoTarget === 'all' ? 'selected' : ''}>看破(全能)</option>
+                      <option value="近战" ${s.kanpoTarget === '近战' ? 'selected' : ''}>看破(近战)</option>
+                      <option value="远程" ${s.kanpoTarget === '远程' ? 'selected' : ''}>看破(远程)</option>
+                      <option value="法术" ${s.kanpoTarget === '法术' ? 'selected' : ''}>看破(法术)</option>
+                    </select>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <span class="text-sky-400 text-[11px] whitespace-nowrap font-bold">舍身</span>
+                    <select onchange="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'sheshenTarget', this.value === 'none' ? null : this.value)" class="edit-input-game w-full text-sky-300 text-[11px]">
+                      <option value="none" ${!s.sheshenTarget ? 'selected' : ''}>无舍身</option>
+                      <option value="all" ${s.sheshenTarget === 'all' ? 'selected' : ''}>舍身(全能)</option>
+                      <option value="近战" ${s.sheshenTarget === '近战' ? 'selected' : ''}>舍身(近战)</option>
+                      <option value="远程" ${s.sheshenTarget === '远程' ? 'selected' : ''}>舍身(远程)</option>
+                      <option value="法术" ${s.sheshenTarget === '法术' ? 'selected' : ''}>舍身(法术)</option>
+                    </select>
+                  </div>
+                </div>
+              ` : ''}
+
+              <!-- 模块 C：消耗与节奏数值矩阵 (竖屏智能转 2 列) -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 text-[11px] grid-costs-responsive">
+                <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-800 flex items-center justify-between gap-1">
+                  <span class="text-sky-400 whitespace-nowrap text-[10px]">💧 MP耗</span>
+                  <input type="number" value="${s.cost || 0}" oninput="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'cost', Number(this.value))" class="edit-input-game w-14 font-mono-num text-right text-sky-200">
+                </div>
+                <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-800 flex items-center justify-between gap-1">
+                  <span class="text-rose-400 whitespace-nowrap text-[10px]">🩸 HP耗</span>
+                  <input type="number" value="${s.hpCost || 0}" oninput="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'hpCost', Number(this.value))" class="edit-input-game w-14 font-mono-num text-right text-rose-200">
+                </div>
+                <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-800 flex items-center justify-between gap-1">
+                  <span class="text-emerald-400 whitespace-nowrap text-[10px]">🔥 TP耗</span>
+                  <input type="number" value="${s.tpCost || 0}" oninput="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'tpCost', Number(this.value))" class="edit-input-game w-14 font-mono-num text-right text-emerald-200">
+                </div>
+                <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-800 flex items-center justify-between gap-1">
+                  <span class="text-yellow-400 whitespace-nowrap text-[10px]">🎯 命中(Aim)</span>
+                  <input type="number" value="${s.hit || 100}" oninput="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'hit', Number(this.value))" class="edit-input-game w-14 font-mono-num text-right text-yellow-200">
+                </div>
+                <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-800 flex items-center justify-between gap-1">
+                  <span class="text-purple-400 whitespace-nowrap text-[10px]">⏱️ 持续回</span>
+                  <input type="number" value="${s.turns || ''}" oninput="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'turns', this.value ? Number(this.value) : null)" class="edit-input-game w-14 font-mono-num text-right text-purple-200" placeholder="默认">
+                </div>
+
+                ${isHero ? `
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-800 flex items-center justify-between gap-1">
+                    <span class="text-yellow-300 whitespace-nowrap text-[10px]">⏳ 延迟</span>
+                    <input type="number" value="${s.delay || 0}" oninput="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'delay', Number(this.value))" class="edit-input-game w-14 font-mono-num text-right text-yellow-200">
+                  </div>
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-800 flex items-center justify-between gap-1">
+                    <span class="text-fuchsia-300 whitespace-nowrap text-[10px]">🚫 限次</span>
+                    <input type="number" value="${s.maxUses || 0}" oninput="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'maxUses', Number(this.value))" class="edit-input-game w-14 font-mono-num text-right text-fuchsia-200" placeholder="0">
+                  </div>
+                ` : `
+                  <div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-800 flex items-center justify-between gap-1 col-span-2">
+                    <span class="text-rose-400 whitespace-nowrap text-[10px] font-bold">⏳ 充能(大招)</span>
+                    <input type="number" value="${s.charge || 0}" oninput="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'charge', Number(this.value))" class="edit-input-game w-16 font-mono-num text-right text-rose-200" placeholder="0">
+                  </div>
+                `}
+              </div>
+
+              <!-- 模块 D：三重标签组合与威力配置 -->
+              <div class="space-y-1">
+                <div class="text-[10px] text-slate-400 font-bold flex items-center justify-between flex-wrap gap-1">
+                  <span>三重复合标签槽位:</span>
+                  ${isHero ? `
+                    <div class="flex items-center gap-3 text-[10px]">
+                      <span class="text-cyan-400 font-normal">🛡️ 屏障护甲: <input type="number" value="${s.barrierArmor || 0}" oninput="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'barrierArmor', Number(this.value))" class="edit-input-game w-12 font-mono-num text-right text-cyan-200"> 点</span>
+                      <span class="text-emerald-400 font-normal">✨ 驱散量: <input type="number" value="${s.dispelPower || 0}" oninput="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'dispelPower', Number(this.value))" class="edit-input-game w-12 font-mono-num text-right text-emerald-200"> 层</span>
+                    </div>
+                  ` : ''}
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 grid-tags-responsive">
+                  <div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60">
+                    <select onchange="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'type', this.value)" class="edit-input-game w-full text-cyan-300 font-bold text-[10px]">
+                      ${SKILL_TYPES_ALL.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}
+                    </select>
+                    <span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span>
+                    <input type="number" value="${s.power || 0}" oninput="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'power', Number(this.value))" class="edit-input-game w-14 font-mono-num text-right text-emerald-200">
+                  </div>
+
+                  <div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60">
+                    <select onchange="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'type2', this.value)" class="edit-input-game w-full text-slate-300 font-bold text-[10px]">
+                      ${SKILL_TYPES_ALL.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}
+                    </select>
+                    <span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span>
+                    <input type="number" value="${s.power2 || 0}" oninput="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'power2', Number(this.value))" class="edit-input-game w-14 font-mono-num text-right text-emerald-200">
+                  </div>
+
+                  <div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60">
+                    <select onchange="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'type3', this.value)" class="edit-input-game w-full text-slate-300 font-bold text-[10px]">
+                      ${SKILL_TYPES_ALL.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}
+                    </select>
+                    <span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span>
+                    <input type="number" value="${s.power3 || 0}" oninput="updateSkillProp('${partyType}', ${entityIdx}, ${si}, 'power3', Number(this.value))" class="edit-input-game w-14 font-mono-num text-right text-emerald-200">
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ==========================================
+    // 状态管理与交互
+    // ==========================================
+
+    function switchPartyTab(tab) {
+      currentTab = tab;
+      const heroContainer = document.getElementById('heroes-list-container');
+      const enemyContainer = document.getElementById('enemies-list-container');
+      const btnHeroes = document.getElementById('tab-btn-heroes');
+      const btnEnemies = document.getElementById('tab-btn-enemies');
+      const addBtn = document.getElementById('add-entity-btn');
+
+      if (tab === 'heroes') {
+        heroContainer.classList.remove('hidden');
+        enemyContainer.classList.add('hidden');
+        btnHeroes.className = "px-2.5 py-1 rounded text-xs font-bold transition-all bg-cyan-950 text-cyan-300 border border-cyan-600/50 shadow flex items-center gap-1";
+        btnEnemies.className = "px-2.5 py-1 rounded text-xs font-bold transition-all text-slate-400 hover:text-rose-300 hover:bg-rose-950/40 flex items-center gap-1";
+        addBtn.innerHTML = "<span>+</span> 添加我方角色";
+        addBtn.className = "px-2.5 py-1 bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 text-xs font-bold rounded border border-cyan-500/40 transition-all flex items-center gap-1 shadow-sm";
+      } else {
+        heroContainer.classList.add('hidden');
+        enemyContainer.classList.remove('hidden');
+        btnEnemies.className = "px-2.5 py-1 rounded text-xs font-bold transition-all bg-rose-950 text-rose-300 border border-rose-600/50 shadow flex items-center gap-1";
+        btnHeroes.className = "px-2.5 py-1 rounded text-xs font-bold transition-all text-slate-400 hover:text-cyan-300 hover:bg-cyan-950/40 flex items-center gap-1";
+        addBtn.innerHTML = "<span>+</span> 添加敌方怪物";
+        addBtn.className = "px-2.5 py-1 bg-rose-900/60 hover:bg-rose-800 text-rose-200 text-xs font-bold rounded border border-rose-500/40 transition-all flex items-center gap-1 shadow-sm";
+      }
+    }
+
+    function toggleGlobalSettings() {
+      isGlobalSettingsOpen = !isGlobalSettingsOpen;
+      const el = document.getElementById('global-settings-body');
+      const icon = document.getElementById('global-settings-icon');
+      if (isGlobalSettingsOpen) {
+        el.classList.remove('hidden');
+        icon.classList.add('rotate-180');
+      } else {
+        el.classList.add('hidden');
+        icon.classList.remove('rotate-180');
+      }
+    }
+
+    function syncGlobalSettingsUI() {
+      const el = document.getElementById('global-settings-body');
+      const icon = document.getElementById('global-settings-icon');
+      if (isGlobalSettingsOpen) {
+        el.classList.remove('hidden');
+        icon.classList.add('rotate-180');
+      } else {
+        el.classList.add('hidden');
+        icon.classList.remove('rotate-180');
+      }
+    }
+
+    function toggleCharFold(partyType, idx) {
+      if (partyType === 'hero') {
+        heroesData[idx].isExpanded = !heroesData[idx].isExpanded;
+      } else {
+        enemiesData[idx].isExpanded = !enemiesData[idx].isExpanded;
+      }
+      renderHeroes();
+      renderEnemies();
+    }
+
+    function toggleSkillFold(partyType, entityIdx, skillIdx) {
+      if (partyType === 'hero') {
+        heroesData[entityIdx].skills[skillIdx].isExpanded = !heroesData[entityIdx].skills[skillIdx].isExpanded;
+      } else {
+        enemiesData[entityIdx].skills[skillIdx].isExpanded = !enemiesData[entityIdx].skills[skillIdx].isExpanded;
+      }
+      renderHeroes();
+      renderEnemies();
+    }
+
+    function toggleSkillTag(partyType, entityIdx, skillIdx, tagKey) {
+      let s = partyType === 'hero' ? heroesData[entityIdx].skills[skillIdx] : enemiesData[entityIdx].skills[skillIdx];
+      s[tagKey] = !s[tagKey];
+      renderHeroes();
+      renderEnemies();
+    }
+
+    function toggleAllAccordions(open) {
+      heroesData.forEach(h => {
+        h.isExpanded = open;
+        h.skills.forEach(s => s.isExpanded = open);
+      });
+      enemiesData.forEach(e => {
+        e.isExpanded = open;
+        e.skills.forEach(s => s.isExpanded = open);
+      });
+      isGlobalSettingsOpen = open;
+      syncGlobalSettingsUI();
+      renderHeroes();
+      renderEnemies();
+      mockNotification(open ? '已全部展开' : '已全部收起');
+    }
+
+    function toggleAllHeroSkills(hi, open) {
+      heroesData[hi].skills.forEach(s => s.isExpanded = open);
+      renderHeroes();
+    }
+    function toggleAllEnemySkills(ei, open) {
+      enemiesData[ei].skills.forEach(s => s.isExpanded = open);
+      renderEnemies();
+    }
+
+    function updateHeroProp(hi, prop, val) { heroesData[hi][prop] = val; }
+    function updateEnemyProp(ei, prop, val) { enemiesData[ei][prop] = val; }
+    function updateSkillProp(partyType, entityIdx, skillIdx, prop, val) {
+      if (partyType === 'hero') heroesData[entityIdx].skills[skillIdx][prop] = val;
+      else enemiesData[entityIdx].skills[skillIdx][prop] = val;
+    }
+    function updateReaction(partyType, entityIdx, skillIdx, val) {
+      const s = heroesData[entityIdx].skills[skillIdx];
+      s.isReaction = val !== 'none';
+      s.reactionTarget = val === 'none' ? 'all' : val;
+    }
+
+    function addNewEntity() {
+      if (currentTab === 'heroes') {
+        heroesData.push({
+          id: 'h' + Date.now(),
+          name: '新角色', classType: null, img: '',
+          hp: 300, maxHp: 300, mp: 100, maxMp: 100, atk: 50, def: 30, spd: 100, actCount: 1,
+          isExpanded: true,
+          skills: [{
+            id: 's_new', name: '攻击', isReaction: false, reactionTarget: 'all', kanpoTarget: null, sheshenTarget: null,
+            isOthers: false, guaranteedHit: false, damageType: '近战', fxTag: '',
+            type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0,
+            cost: 0, hpCost: 0, tpCost: 0, hit: 100, turns: null, delay: 0, haste: 0, maxUses: 0,
+            barrierArmor: 0, dispelPower: 0, isExpanded: true
+          }]
+        });
+        renderHeroes();
+        mockNotification('已添加我方新角色');
+      } else {
+        enemiesData.push({
+          id: 'e' + Date.now(),
+          name: '新怪物', emoji: '👾', classType: null, img: '',
+          hp: 400, maxHp: 400, mp: 100, maxMp: 100, atk: 40, def: 20, spd: 90, actCount: 1,
+          isWise: false, row: 'front', tier: 'fodder', isExpanded: true,
+          skills: [{
+            id: 'es_new', name: '撕咬', damageType: '近战', isOthers: false, guaranteedHit: false, fxTag: '',
+            type: '[单体]', power: 45, type2: '[无]', power2: 0, type3: '[无]', power3: 0,
+            cost: 0, hpCost: 0, tpCost: 0, charge: 0, hit: 100, turns: null, isExpanded: true
+          }]
+        });
+        renderEnemies();
+        mockNotification('已添加敌方新怪物');
+      }
+      updateCounters();
+    }
+
+    function removeEntity(partyType, idx) {
+      if (partyType === 'hero') {
+        if (heroesData.length <= 1) return alert('至少保留一名我方角色！');
+        if (confirm(`确定要删除我方角色【${heroesData[idx].name}】吗？`)) {
+          heroesData.splice(idx, 1);
+          renderHeroes();
+          updateCounters();
+          mockNotification('已移除角色');
+        }
+      } else {
+        if (enemiesData.length <= 1) return alert('至少保留一只敌方怪物！');
+        if (confirm(`确定要删除怪物【${enemiesData[idx].name}】吗？`)) {
+          enemiesData.splice(idx, 1);
+          renderEnemies();
+          updateCounters();
+          mockNotification('已移除怪物');
+        }
+      }
+    }
+
+    function addHeroSkill(hi) {
+      heroesData[hi].skills.push({
+        id: 'hs_' + Date.now(),
+        name: '新技能', isReaction: false, reactionTarget: 'all', kanpoTarget: null, sheshenTarget: null,
+        isOthers: false, guaranteedHit: false, damageType: '', fxTag: '',
+        type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0,
+        cost: 10, hpCost: 0, tpCost: 0, hit: 100, turns: null, delay: 0, haste: 0, maxUses: 0,
+        barrierArmor: 0, dispelPower: 0, isExpanded: true
+      });
+      renderHeroes();
+      mockNotification(`已为【${heroesData[hi].name}】添加新技能`);
+    }
+
+    function addEnemySkill(ei) {
+      enemiesData[ei].skills.push({
+        id: 'es_' + Date.now(),
+        name: '新技能', damageType: '', isOthers: false, guaranteedHit: false, fxTag: '',
+        type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0,
+        cost: 10, hpCost: 0, tpCost: 0, charge: 0, hit: 100, turns: null, isExpanded: true
+      });
+      renderEnemies();
+      mockNotification(`已为【${enemiesData[ei].name}】添加新技能`);
+    }
+
+    function removeSkill(partyType, entityIdx, skillIdx) {
+      if (partyType === 'hero') heroesData[entityIdx].skills.splice(skillIdx, 1);
+      else enemiesData[entityIdx].skills.splice(skillIdx, 1);
+      renderHeroes();
+      renderEnemies();
+      mockNotification('已移除技能');
+    }
+
+    function syncGlobalSummary() {
+      document.getElementById('summary-mp-pct').textContent = document.getElementById('set-def-mp').value;
+      document.getElementById('summary-tp-pct').textContent = document.getElementById('set-def-tp').value;
+      document.getElementById('summary-atk-tp').textContent = document.getElementById('set-atk-tp').value;
+      document.getElementById('summary-kanpo-th').textContent = document.getElementById('set-kanpo-threshold').value;
+      document.getElementById('summary-mutation').textContent = document.getElementById('set-mutation-pct').value;
+    }
+
+    let isMobileView = false;
+    function toggleViewportMode() {
+      isMobileView = !isMobileView;
+      const container = document.getElementById('editor-container');
+      const icon = document.getElementById('viewport-icon');
+      const text = document.getElementById('viewport-text');
+
+      if (isMobileView) {
+        container.classList.add('viewport-mobile');
+        icon.textContent = "💻";
+        text.textContent = "桌面宽屏模式";
+        mockNotification("已切换为手机竖屏模拟 (420px)");
+      } else {
+        container.classList.remove('viewport-mobile');
+        icon.textContent = "📱";
+        text.textContent = "手机竖屏模式 (420px)";
+        mockNotification("已切换为桌面宽屏模式");
+      }
+    }
+
+    function saveAndPreview() {
+      mockNotification('✅ 数据已成功保存并即刻生效！');
+    }
+
+    function mockNotification(msg) {
+      const toast = document.getElementById('toast-notify');
+      const toastText = document.getElementById('toast-text');
+      toastText.textContent = msg;
+      toast.classList.remove('translate-y-16', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-16', 'opacity-0');
+      }, 1800);
+    }
+
+    initRender();
+  </script>
+</body>
+</html>
