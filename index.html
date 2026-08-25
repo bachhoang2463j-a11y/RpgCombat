@@ -1749,7 +1749,11 @@ const DEFAULT_HERO_IMG = 'https://imgur.la/images/2026/08/13/9adb95d5df1b99ebe2f
 // 规则：第一回合固定 first；后续回合 HP>50% 从 turn 随机、HP<=50% 从 low 随机。
 // 文件名经 GitHub API 逐文件核实（命名/格式不完全统一，故逐条显式列出）。
 // ==========================================
-const HERO_VOICE_BASE = 'http://192.168.110.83:8000/my_assets';
+// 资源基址：独立 Python 托管 D:\Project\my_assets (Threading + CORS)，根即服务根，无需再拼 /my_assets
+// 可通过 window.__RPG_ASSET_BASE__ 临时覆盖（如切回旧 8000 调试）
+const ASSET_ORIGIN = window.__RPG_ASSET_BASE__ || 'http://192.168.110.83:8766';
+const ASSET_BASE = ASSET_ORIGIN;
+const HERO_VOICE_BASE = ASSET_BASE;
 const HERO_VOICE_LINES = {
   "索恩": {
     first: '索恩/索恩_第一回合.mp3',
@@ -1902,35 +1906,35 @@ function playCustomAudio(url, volume) {
 }
 
 const audioUrls = {
-    'hitUp': 'http://192.168.110.83:8000/my_assets/hitUp.mp3',
-    'mpHeal': 'http://192.168.110.83:8000/my_assets/mpHeal.mp3',
-    'defDown': 'http://192.168.110.83:8000/my_assets/defDown.mp3',
-    'atk2': 'http://192.168.110.83:8000/my_assets/atk2.mp3',
-    'atk1': 'http://192.168.110.83:8000/my_assets/atk1.mp3',
-    'atkUp': 'http://192.168.110.83:8000/my_assets/atkUp.mp3',
-    'hpHeal': 'http://192.168.110.83:8000/my_assets/hpHeal.mp3',
-    'taunt': 'http://192.168.110.83:8000/my_assets/taunt.mp3',
-    'hide': 'http://192.168.110.83:8000/my_assets/hide.mp3',
-    'hitDown': 'http://192.168.110.83:8000/my_assets/hitDown.mp3',
-    'shieldUp': 'http://192.168.110.83:8000/my_assets/shieldUp.mp3',
-    'defUp': 'http://192.168.110.83:8000/my_assets/defUp.mp3',
-    'miss': 'http://192.168.110.83:8000/my_assets/miss.mp3',
-    'burst': 'http://192.168.110.83:8000/my_assets/burst.mp3',
-    'avatarClick': 'http://192.168.110.83:8000/my_assets/avatarClick.mp3',
-    'heroTurn': 'http://192.168.110.83:8000/my_assets/heroTurn.mp3',
-    'kill': 'http://192.168.110.83:8000/my_assets/kill.mp3',
-    'shot': 'http://192.168.110.83:8000/my_assets/shot01.mp3',
-    'monsterAttack': 'http://192.168.110.83:8000/my_assets/monsterattack2.mp3',
-    'herocharge': 'http://192.168.110.83:8000/my_assets/herocharge.mp3',
-    'herochargedone': 'http://192.168.110.83:8000/my_assets/herochargedone.mp3',
-    'combatKill': 'http://192.168.110.83:8000/my_assets/combat_kill.mp3',
-    'magicKill': 'http://192.168.110.83:8000/my_assets/magic_kill.wav',
-    'kanpo': 'http://192.168.110.83:8000/my_assets/defDown.mp3',
+    'hitUp': `${ASSET_BASE}/hitUp.mp3`,
+    'mpHeal': `${ASSET_BASE}/mpHeal.mp3`,
+    'defDown': `${ASSET_BASE}/defDown.mp3`,
+    'atk2': `${ASSET_BASE}/atk2.mp3`,
+    'atk1': `${ASSET_BASE}/atk1.mp3`,
+    'atkUp': `${ASSET_BASE}/atkUp.mp3`,
+    'hpHeal': `${ASSET_BASE}/hpHeal.mp3`,
+    'taunt': `${ASSET_BASE}/taunt.mp3`,
+    'hide': `${ASSET_BASE}/hide.mp3`,
+    'hitDown': `${ASSET_BASE}/hitDown.mp3`,
+    'shieldUp': `${ASSET_BASE}/shieldUp.mp3`,
+    'defUp': `${ASSET_BASE}/defUp.mp3`,
+    'miss': `${ASSET_BASE}/miss.mp3`,
+    'burst': `${ASSET_BASE}/burst.mp3`,
+    'avatarClick': `${ASSET_BASE}/avatarClick.mp3`,
+    'heroTurn': `${ASSET_BASE}/heroTurn.mp3`,
+    'kill': `${ASSET_BASE}/kill.mp3`,
+    'shot': `${ASSET_BASE}/shot01.mp3`,
+    'monsterAttack': `${ASSET_BASE}/monsterattack2.mp3`,
+    'herocharge': `${ASSET_BASE}/herocharge.mp3`,
+    'herochargedone': `${ASSET_BASE}/herochargedone.mp3`,
+    'combatKill': `${ASSET_BASE}/combat_kill.mp3`,
+    'magicKill': `${ASSET_BASE}/magic_kill.wav`,
+    'kanpo': `${ASSET_BASE}/defDown.mp3`,
     // [单体(枪击)] 中小口径随机 + [特效:枪击穿透] 专属
-    'gunshot1': 'http://192.168.110.83:8000/my_assets/gunshot1.mp3',
-    'gunshot2': 'http://192.168.110.83:8000/my_assets/gunshot2.mp3',
-    'gunshot3': 'http://192.168.110.83:8000/my_assets/gunshot3.mp3',
-    'gunshot_pierce': 'http://192.168.110.83:8000/my_assets/gunshot_pierce.mp3'
+    'gunshot1': `${ASSET_BASE}/gunshot1.mp3`,
+    'gunshot2': `${ASSET_BASE}/gunshot2.mp3`,
+    'gunshot3': `${ASSET_BASE}/gunshot3.mp3`,
+    'gunshot_pierce': `${ASSET_BASE}/gunshot_pierce.mp3`
 };
 
 // 预热全量基础音效为 Blob URL，确保零延迟与 Web Audio API 无跨域限制
@@ -4409,16 +4413,16 @@ window.stopStrafeBurst = stopStrafeBurst;
 // audioUrl:  独立的音效文件地址（覆盖默认的攻击音效）
 // ==========================================
 const WEBM_FX_REGISTRY = {
-    '火焰01': { url: 'http://192.168.110.83:8000/my_assets/fire.webm',                                              scale: 1.4, particles: 'fire_aoe',    audioUrl: 'http://192.168.110.83:8000/my_assets/fire01.mp3' },
-    '冰霜01': { url: 'http://192.168.110.83:8000/my_assets/ice.webm',                                              scale: 1.4, particles: 'frost',       audioUrl: 'http://192.168.110.83:8000/my_assets/freeze01.mp3' },
-    '雷击01': { url: 'http://192.168.110.83:8000/my_assets/450.webm',               scale: 1.4, particles: 'thunder_aoe', audioUrl: 'http://192.168.110.83:8000/my_assets/thunder01.mp3' },
-    '圣光01': { url: 'http://192.168.110.83:8000/my_assets/414.webm',               scale: 1.4, particles: 'holy_light',  audioUrl: 'http://192.168.110.83:8000/my_assets/light01.mp3' },
-    '双枪扫射': { url: 'http://192.168.110.83:8000/my_assets/strafe-ezremove05.mp4', scale: 0.9, particles: 'gunshot',    audioUrl: 'none', delay: 0.5 },
-    '克虏伯重狙': { url: 'http://192.168.110.83:8000/my_assets/snipe-ezremove.mp4',  scale: 1.5, particles: 'gunshot',    audioUrl: 'none' },
-    '异种坏死雾': { url: 'http://192.168.110.83:8000/my_assets/fog.mp4', scale: 0.8, particles: 'poison',     audioUrl: 'none', delay: 0.2 },
-    '生体流转': { url: 'http://192.168.110.83:8000/my_assets/heart.mp4', scale: 0.4, particles: 'fire_aoe',     audioUrl: 'none' },
+    '火焰01': { url: `${ASSET_BASE}/fire.webm`,                                              scale: 1.4, particles: 'fire_aoe',    audioUrl: `${ASSET_BASE}/fire01.mp3` },
+    '冰霜01': { url: `${ASSET_BASE}/ice.webm`,                                              scale: 1.4, particles: 'frost',       audioUrl: `${ASSET_BASE}/freeze01.mp3` },
+    '雷击01': { url: `${ASSET_BASE}/450.webm`,               scale: 1.4, particles: 'thunder_aoe', audioUrl: `${ASSET_BASE}/thunder01.mp3` },
+    '圣光01': { url: `${ASSET_BASE}/414.webm`,               scale: 1.4, particles: 'holy_light',  audioUrl: `${ASSET_BASE}/light01.mp3` },
+    '双枪扫射': { url: `${ASSET_BASE}/strafe-ezremove05.mp4`, scale: 0.9, particles: 'gunshot',    audioUrl: 'none', delay: 0.5 },
+    '克虏伯重狙': { url: `${ASSET_BASE}/snipe-ezremove.mp4`,  scale: 1.5, particles: 'gunshot',    audioUrl: 'none' },
+    '异种坏死雾': { url: `${ASSET_BASE}/fog.mp4`, scale: 0.8, particles: 'poison',     audioUrl: 'none', delay: 0.2 },
+    '生体流转': { url: `${ASSET_BASE}/heart.mp4`, scale: 0.4, particles: 'fire_aoe',     audioUrl: 'none' },
     '远程重击': { url: '', scale: 1.0, particles: 'ranged_heavy', audioUrl: 'none' },
-    '枪击穿透': { url: '', scale: 1.0, particles: 'gunshot_pierce', audioUrl: 'http://192.168.110.83:8000/my_assets/gunshot_pierce.mp3' },
+    '枪击穿透': { url: '', scale: 1.0, particles: 'gunshot_pierce', audioUrl: `${ASSET_BASE}/gunshot_pierce.mp3` },
     '连续扫射': { url: '', scale: 1.0, particles: 'strafe_burst', audioUrl: 'none' },
     // 在此继续添加：
     // delay 可选（单位：秒）：特效播放后、伤害结算前的等待时长，用于长特效演出与伤害数字同步；未配置则立即结算
@@ -8853,8 +8857,8 @@ async function playKanpoEffect(caster, enemy, skill) {
 }
 
 // 强力反击专属音效（冲击波射出瞬间播放）—— 远程重击复用同一枪声
-const POWER_COUNTER_SOUND_URL = 'http://192.168.110.83:8000/my_assets/shot01.mp3';
-const RANGED_HEAVY_HITDOWN_URL = 'http://192.168.110.83:8000/my_assets/hitDown.mp3';
+const POWER_COUNTER_SOUND_URL = `${ASSET_BASE}/shot01.mp3`;
+const RANGED_HEAVY_HITDOWN_URL = `${ASSET_BASE}/hitDown.mp3`;
 let _rangedHeavyAudioCtx = null;
 function getRangedHeavyAudioContext() {
     if (!_rangedHeavyAudioCtx) {
@@ -9086,24 +9090,23 @@ function calculateDamage(rawDmg, target, isPierce = false) {
     return { hpDmg: dmg, shieldDmg: shieldDmg }; 
 }
 
-// 敌方变种标签类型减伤：【流体】远程-50% / 【虚形】近战-50% / 【破法】法术-50% / 【要害】群攻-50%。
+// 敌方变种标签类型减伤：【流体】远程-50% / 【虚形】近战-50% / 【破法】法术-50% / 【要害】群攻-50%（类型与 AoE 独立判定、可叠加至 25%）。
 // 作用于折算前的原始伤害（与屏障克制同型独立减伤系数）；【穿透】无视的是护甲、仍吃此属性减伤。
 // target 无 resistMap（英雄/无标签敌人）时原样返回。dom 用于减伤飘字（可省略）。
-// isAoE 为 true 时查表 key 为 'AoE'（【要害】），否则按伤害类型查表；反击等单体场景传 false。
+// damageType 与 isAoE 分别命中对应抗性并顺序相乘；反击等单体场景传 isAoE=false。
 function applyEnemyTypeResist(rawDmg, damageType, target, dom, isAoE = false) {
     if (!target || !target.resistMap || !(rawDmg > 0)) return rawDmg;
-    const resistKey = isAoE ? 'AoE' : damageType;
-    if (!resistKey) return rawDmg;
-    const resist = target.resistMap[resistKey];
-    if (!resist) return rawDmg;
-    const tagName = isAoE ? '要害' : damageType;
-    const reduced = Math.max(1, Math.floor(rawDmg * resist));
-    if (reduced < rawDmg) {
-        if (dom) createFloatingText(dom, `-${rawDmg - reduced} 抗性`, 'text-sky-300');
-        addHistory(`   ↳ 🛡️ ${target.name} 的【${tagName}】抗性使伤害减少了 ${rawDmg - reduced} 点。`);
-        return reduced;
+    let dmg = rawDmg;
+    const hits = [];
+    const typeResist = damageType ? target.resistMap[damageType] : null;
+    if (typeResist) { dmg = Math.max(1, Math.floor(dmg * typeResist)); hits.push(damageType); }
+    if (isAoE && target.resistMap['AoE']) { dmg = Math.max(1, Math.floor(dmg * target.resistMap['AoE'])); hits.push('要害'); }
+    if (hits.length && dmg < rawDmg) {
+        if (dom) createFloatingText(dom, `-${rawDmg - dmg} 抗性`, 'text-sky-300');
+        addHistory(`   ↳ 🛡️ ${target.name} 的【${hits.join('】【')}】抗性使伤害减少了 ${rawDmg - dmg} 点。`);
+        return dmg;
     }
-    return rawDmg;
+    return dmg;
 }
 
 function promptReaction(hero, reactionSkills, attacker, incomingSkill, sheshenCandidates = [], multiplier = 1) {
@@ -11806,6 +11809,9 @@ function closeSkillMenu() { document.getElementById('skill-menu').classList.add(
 function resetBattle(btn) {
   if (btn.innerText === "确认重置？") {
     try { if (typeof stopStrafeBurst === 'function') stopStrafeBurst(); } catch(e) {}
+    try { if (typeof _strafeTimer !== 'undefined' && _strafeTimer) { clearInterval(_strafeTimer); _strafeTimer = null; } } catch(e) {}
+    try { if (typeof _strafeLock !== 'undefined') _strafeLock = false; } catch(e) {}
+    try { const _ov = document.querySelector('.strafe-blood-overlay'); if (_ov) _ov.remove(); if (typeof _strafeBloodOverlay !== 'undefined' && _strafeBloodOverlay) { try { _strafeBloodOverlay.remove(); } catch(e2) {} _strafeBloodOverlay = null; } } catch(e) {}
     // 清理可能残留的连续扫射临时状态（重置后技能对象为全新拷贝，但仍幂等清理以防旧引用）
     heroesData.forEach(h => h.skills && h.skills.forEach(s => { delete s._fxPlayed; delete s._strafeBurstStart; }));
     enemiesData.forEach(e => e.skills && e.skills.forEach(s => { delete s._fxPlayed; delete s._strafeBurstStart; }));
@@ -11813,7 +11819,7 @@ function resetBattle(btn) {
     state.round = 1; state.queueIndex = 0; state.isAnimating = false; state.isTargeting = false; state.pendingAction = null;
     if (state.highTierNarrated) state.highTierNarrated.clear();
     battleHistory = [];
-    initUI();
+    window._isSaving = true; initUI(); window._isSaving = false; requestAnimationFrame(() => { window._isSaving = false; });
     if (state.isGameStarted) { showLog("战斗状态已重置！"); setTimeout(() => startRound(), 1000); }
     btn.innerHTML = "<span>🔄</span> <span class='hidden sm:inline'>重置</span>"; btn.classList.remove('bg-rose-600/80', 'text-white', 'border-rose-500'); btn.classList.add('text-emerald-400');
   } else {

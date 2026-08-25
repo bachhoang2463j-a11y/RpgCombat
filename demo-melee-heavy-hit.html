@@ -312,10 +312,11 @@
     // ==========================================
     // 音频引擎 (调用 parry_Weapon_GuardBreak.wav + Web Audio GainNode 放大)
     // ==========================================
+    const ASSET_BASE = window.__RPG_ASSET_BASE__ || 'http://192.168.110.83:8766';
     const SOUNDS = {
-      guardBreak: 'http://192.168.110.83:8000/my_assets/parry_Weapon_GuardBreak.wav',
-      hitDown: 'http://192.168.110.83:8000/my_assets/hitDown.mp3',
-      oldAtk2: 'http://192.168.110.83:8000/my_assets/atk2.mp3'
+      guardBreak: `${ASSET_BASE}/parry_Weapon_GuardBreak.wav`,
+      hitDown: `${ASSET_BASE}/hitDown.mp3`,
+      oldAtk2: `${ASSET_BASE}/atk2.mp3`
     };
 
     let audioContext = null;
