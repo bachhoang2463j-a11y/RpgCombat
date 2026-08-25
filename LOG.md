@@ -2041,5 +2041,13 @@
   3. **大招视频与特效音效本地化（`index.html:4411`）**：`WEBM_FX_REGISTRY` 中火焰01、冰霜01、雷击01、圣光01、双枪扫射、克虏伯重狙、异种坏死雾、生体流转、枪击穿透等 WebM/MP4 视频与专属音频全量迁移至本地 my_assets。
   4. **独立音频常量与 Demo 页本地化（`index.html:8856`、`demo-melee-heavy-hit.html:316`）**：`POWER_COUNTER_SOUND_URL`、`RANGED_HEAVY_HITDOWN_URL` 及演练 Demo 音效统一接入本地服务。
 - **涉及文件**：`index.html`、`demo-melee-heavy-hit.html`、`LOG.md`、`LOG-INDEX.md`。
-- **决策原因**：告别云端及 Catbox/CDN 不稳定托管与网络波动导致的加载延迟，将所有音频和视频资产彻底迁移至本地 SillyTavern 静态资源服务，实现局域网内纯本地秒级零延迟极速加载。
 
+## [LOG-167] 2026-08-25 — 适配本地 my_assets 独立服务端口 8766、动态 Base 重构及逻辑加固
+
+- **变更行为**：
+  1. **服务端口与基准路径统一（`index.html:1754`、`demo-melee-heavy-hit.html:315`）**：适配独立 Threading+CORS 静态服务器（默认端口 8766），`ASSET_BASE` 默认指向 `http://192.168.110.83:8766`，并支持通过 `window.__RPG_ASSET_BASE__` 动态无侵入覆盖。
+  2. **特效与独立音频链接模板化（`index.html:4416`、`8860`）**：`WEBM_FX_REGISTRY`、`POWER_COUNTER_SOUND_URL`、`RANGED_HEAVY_HITDOWN_URL` 等全量重构为 `${ASSET_BASE}/...` 模板字符串，彻底消除硬编码端口与冗余子路径。
+  3. **抗性减伤多维独立判定与叠加优化（`index.html:9090`）**：`applyEnemyTypeResist` 优化为伤害类型抗性（流体/虚形/破法）与【要害】群攻抗性独立判定并相乘计算，支持战报同时显示多抗性命中。
+  4. **战斗重置状态与扫射残余全面清理（`index.html:11809`）**：`resetBattle` 补充对 `_strafeTimer`、`_strafeLock`、`_strafeBloodOverlay` 的安全解绑与清理，并在 `initUI` 重置时锁定 `_isSaving` 防护，杜绝重置触发非预期数据保存。
+- **涉及文件**：`index.html`、`demo-melee-heavy-hit.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：配合独立静态资源仓库及 8766 端口专用跨域服务器上线，将 RpgCombat 全部外链统一为可配置的动态 Base；同时修复抗性判定与战斗重置清理边界，保障系统稳定性。
