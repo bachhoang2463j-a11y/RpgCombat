@@ -12161,22 +12161,31 @@ function bindEditorSectionTabs(modal) {
   var heroSection = heroTitle.parentElement;
   var enemySection = enemyTitle.parentElement;
   var tabBar = document.createElement('div');
-  tabBar.className = 'flex items-center gap-1.5 mb-2';
+  tabBar.className = 'flex items-center justify-between gap-2 border-b border-slate-700/50 pb-1.5 mb-2';
+  var tabGroup = document.createElement('div');
+  tabGroup.className = 'flex items-center gap-1 p-0.5 bg-slate-900/90 rounded-lg border border-slate-700/70';
   var heroTab = document.createElement('button');
   var enemyTab = document.createElement('button');
+  var addButton = document.createElement('button');
   heroTab.type = 'button'; enemyTab.type = 'button';
+  addButton.type = 'button';
   function setTab(active) {
     var heroOn = active === 'hero';
+    window.__editorFactionTab = heroOn ? 'hero' : 'enemy';
     heroSection.classList.toggle('hidden', !heroOn);
     enemySection.classList.toggle('hidden', heroOn);
-    heroTab.className = heroOn ? 'px-3 py-1.5 rounded-lg bg-cyan-950/80 text-cyan-200 border border-cyan-600/60 text-xs font-bold' : 'px-3 py-1.5 rounded-lg bg-slate-900/70 text-slate-400 border border-slate-700/60 text-xs font-bold';
-    enemyTab.className = heroOn ? 'px-3 py-1.5 rounded-lg bg-slate-900/70 text-slate-400 border border-slate-700/60 text-xs font-bold' : 'px-3 py-1.5 rounded-lg bg-rose-950/80 text-rose-200 border border-rose-600/60 text-xs font-bold';
+    heroTab.className = heroOn ? 'px-2.5 py-1 rounded text-xs font-bold transition-all bg-cyan-950 text-cyan-300 border border-cyan-600/50 shadow flex items-center gap-1' : 'px-2.5 py-1 rounded text-xs font-bold transition-all text-slate-400 hover:text-cyan-300 hover:bg-cyan-950/40 flex items-center gap-1';
+    enemyTab.className = heroOn ? 'px-2.5 py-1 rounded text-xs font-bold transition-all text-slate-400 hover:text-rose-300 hover:bg-rose-950/40 flex items-center gap-1' : 'px-2.5 py-1 rounded text-xs font-bold transition-all bg-rose-950 text-rose-300 border border-rose-600/50 shadow flex items-center gap-1';
+    addButton.className = heroOn ? 'px-2.5 py-1 bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 text-xs font-bold rounded border border-cyan-500/40 transition-all flex items-center gap-1 shadow-sm' : 'px-2.5 py-1 bg-rose-900/60 hover:bg-rose-800 text-rose-200 text-xs font-bold rounded border border-rose-500/40 transition-all flex items-center gap-1 shadow-sm';
+    addButton.textContent = heroOn ? '+ 添加我方角色' : '+ 添加敌方怪物';
+    addButton.onclick = heroOn ? function () { addHero(); } : function () { addEnemy(); };
   }
-  heroTab.textContent = '🛡️ 我方英雄 (' + heroesData.length + ')';
-  enemyTab.textContent = '👾 敌方单位 (' + enemiesData.length + ')';
+  heroTab.innerHTML = '<span>🛡️</span> 我方英雄 <span class="px-1 py-0.2 rounded-full bg-cyan-500/20 text-[9px] font-mono-num">' + heroesData.length + '</span>';
+  enemyTab.innerHTML = '<span>👾</span> 敌方单位 <span class="px-1 py-0.2 rounded-full bg-rose-500/20 text-[9px] font-mono-num text-rose-300">' + enemiesData.length + '</span>';
   heroTab.onclick = function () { setTab('hero'); };
   enemyTab.onclick = function () { setTab('enemy'); };
-  tabBar.appendChild(heroTab); tabBar.appendChild(enemyTab);
+  tabGroup.appendChild(heroTab); tabGroup.appendChild(enemyTab);
+  tabBar.appendChild(tabGroup); tabBar.appendChild(addButton);
   var originalParent = heroSection.parentElement;
   if (!originalParent) return;
   originalParent.insertBefore(tabBar, heroSection);
@@ -12185,7 +12194,9 @@ function bindEditorSectionTabs(modal) {
   originalParent.insertBefore(sectionHost, heroSection);
   sectionHost.appendChild(heroSection);
   if (enemySection !== heroSection) sectionHost.appendChild(enemySection);
-  setTab('hero');
+  heroTitle.classList.add('hidden');
+  enemyTitle.classList.add('hidden');
+  setTab(window.__editorFactionTab === 'enemy' ? 'enemy' : 'hero');
 }
 
 function bindCharacterFoldControls(modal, titleText, isEnemy) {
