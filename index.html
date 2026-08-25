@@ -1471,6 +1471,9 @@
     }
     .edit-input-game:focus { border-color: rgba(6, 182, 212, 0.9); background: rgba(11, 19, 36, 1); box-shadow: 0 0 8px rgba(6, 182, 212, 0.3); }
     .edit-input-game:hover { border-color: rgba(148, 163, 184, 0.7); }
+    .edit-input-game::-webkit-outer-spin-button,
+    .edit-input-game::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .edit-input-game[type=number] { -moz-appearance: textfield; }
     .tag-toggle-pill {
       cursor: pointer; display: inline-flex; align-items: center; gap: 3px;
       padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700;
@@ -12110,260 +12113,621 @@ function resetBattle(btn) {
 // ==========================================
 // 编辑器系统
 // ==========================================
-function openEditor() {
-  // 【肃正】自愈已污染存档：[无] + barrierSub 残留 → 重建 type，避免显 [无]（下次保存即干净）
-  try {
-    [...(heroesData||[]), ...(enemiesData||[])].forEach(ent => (ent.skills||[]).forEach(s => {
-      if (s.barrierSub && !((s.type||'')+ (s.type2||'') + (s.type3||'')).includes('肃正')) {
-        const _hasSz = [s.type,s.type2,s.type3].some(t=>t&&t.includes('肃正'));
-        if (!_hasSz) s.type = `[肃正:${s.barrierSub}]`;
-      }
-    }));
-  } catch(e) {}
-  const modal = document.getElementById('editor-modal'); modal.onclick=null; modal.className = "fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 overflow-y-auto";
+function openEditor(keepScroll) {
+  const modal = document.getElementById('editor-modal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
   let savedScrollTop = 0;
-  const oldContainer = document.getElementById('editor-scroll-container');
-  if (oldContainer) savedScrollTop = oldContainer.scrollTop;
-  const oldMain = document.getElementById('main-scroll-area'); if(oldMain && oldMain.scrollTop>savedScrollTop) savedScrollTop=oldMain.scrollTop;
-  let html = `<div id="editor-scroll-container" class="cyber-modal-editor w-full max-w-5xl rounded-2xl p-2.5 sm:p-4 relative text-slate-100 flex flex-col max-h-[92vh] sm:max-h-[88vh] overflow-hidden shadow-2xl transition-all duration-300 z-10"><div class="cyber-corner cyber-corner-tl"></div><div class="cyber-corner cyber-corner-tr"></div><div class="cyber-corner cyber-corner-bl"></div><div class="cyber-corner cyber-corner-br"></div><div class="flex items-center justify-between border-b border-slate-700/50 pb-2 mb-2 shrink-0"><div class="flex items-center gap-2 min-w-0"><span class="text-base text-yellow-400">⚙️</span><h2 class="text-sm sm:text-base font-black text-yellow-400 tracking-wider">数据覆写</h2><span class="text-[10px] text-slate-400 hidden sm:inline">临时修改数值</span><span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-600/50 hidden sm:inline">DATA OVERRIDE</span></div><div class="flex items-center gap-1.5"><button onclick="closeEditor()" class="px-2.5 py-1 bg-slate-800/90 hover:bg-slate-700 text-slate-300 rounded text-xs font-semibold border border-slate-700">取消</button><button onclick="saveEditor()" class="px-3.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded text-xs font-bold shadow-[0_0_12px_rgba(16,185,129,0.35)] flex items-center gap-1"><span>💾</span> 保存</button></div></div><div id="main-scroll-area" class="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-0.5 space-y-2.5">`;
-  var _globalExp = window.__editorGlobalExpanded; if(_globalExp==null) _globalExp=false;
-  html += `<div class="bg-slate-900/70 rounded-lg border border-amber-500/25 overflow-hidden"><div onclick="toggleGlobalEditor()" class="px-3 py-1.5 bg-amber-950/20 hover:bg-amber-950/35 cursor-pointer flex items-center justify-between gap-2 border-b border-amber-500/20 transition-colors"><div class="flex items-center gap-2 flex-wrap min-w-0"><span class="text-amber-400 text-xs">⚙️</span><span class="text-xs font-bold text-amber-300">战斗全局设置</span><div class="flex items-center gap-1.5 flex-wrap text-[10px] text-slate-400 font-mono-num"><span class="px-1.5 py-0.2 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-800/50">MP恢复 <span>${defendSettings.mpRecoverPct}</span>%</span><span class="px-1.5 py-0.2 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/50">TP恢复 <span>${defendSettings.tpRecoverPct}</span>%</span><span class="px-1.5 py-0.2 rounded bg-orange-950/60 text-orange-300 border border-orange-800/50">普攻TP +<span>${defendSettings.basicAttackTp}</span></span><span class="px-1.5 py-0.2 rounded bg-fuchsia-950/60 text-fuchsia-300 border border-fuchsia-800/50">看破 ≤<span>${defendSettings.kanpoFilterThreshold}</span></span><span class="px-1.5 py-0.2 rounded bg-lime-950/60 text-lime-300 border border-lime-800/50">变异 <span>${defendSettings.mutationPercent}</span>%</span></div></div><span class="text-slate-400 text-xs transition-transform ${_globalExp?'rotate-180':''}">▼</span></div><div class="${_globalExp?'':'hidden'} p-2.5 bg-black/25 space-y-2 text-xs"><div class="grid grid-cols-2 sm:grid-cols-4 gap-2"><div class="flex items-center justify-between bg-slate-900/90 px-2 py-1.5 rounded border border-slate-700/60"><span class="text-cyan-400 text-[11px]">防御恢复 MP</span><div class="flex items-center gap-0.5"><input type="number" min="0" max="100" value="${defendSettings.mpRecoverPct}" id="edit-defend-mp-pct" class="edit-input-game w-12 font-mono-num text-right text-cyan-200"><span class="text-slate-500 text-[10px]">%</span></div></div><div class="flex items-center justify-between bg-slate-900/90 px-2 py-1.5 rounded border border-slate-700/60"><span class="text-emerald-400 text-[11px]">防御恢复 TP</span><div class="flex items-center gap-0.5"><input type="number" min="0" max="100" value="${defendSettings.tpRecoverPct}" id="edit-defend-tp-pct" class="edit-input-game w-12 font-mono-num text-right text-emerald-200"><span class="text-slate-500 text-[10px]">%</span></div></div><div class="flex items-center justify-between bg-slate-900/90 px-2 py-1.5 rounded border border-slate-700/60"><span class="text-orange-400 text-[11px]">普攻恢复 TP</span><div class="flex items-center gap-0.5"><input type="number" min="0" max="100" value="${defendSettings.basicAttackTp}" id="edit-attack-tp" class="edit-input-game w-12 font-mono-num text-right text-orange-200"><span class="text-slate-500 text-[10px]">点</span></div></div><div class="flex items-center justify-between bg-slate-900/90 px-2 py-1.5 rounded border border-slate-700/60"><label class="flex items-center gap-1 text-fuchsia-400 text-[11px] cursor-pointer"><input type="checkbox" id="edit-kanpo-filter" ${defendSettings.kanpoFilterEnabled ? 'checked' : ''} class="accent-fuchsia-500"> 看破≤</label><input type="number" min="0" max="10000" value="${defendSettings.kanpoFilterThreshold}" id="edit-kanpo-threshold" class="edit-input-game w-14 font-mono-num text-right text-fuchsia-200"></div></div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]"><div class="bg-slate-900/90 px-2.5 py-1.5 rounded border border-slate-700/60 flex items-center justify-between gap-2"><span class="text-slate-300 font-semibold flex items-center gap-1"><span>💾</span> 属性持久化:</span><div class="flex items-center gap-2"><label class="flex items-center gap-0.5 text-orange-300 cursor-pointer"><input type="checkbox" id="edit-persist-atk" ${defendSettings.persistAtk ? 'checked' : ''} class="accent-orange-500"> 攻</label><label class="flex items-center gap-0.5 text-blue-300 cursor-pointer"><input type="checkbox" id="edit-persist-def" ${defendSettings.persistDef ? 'checked' : ''} class="accent-blue-500"> 防</label><label class="flex items-center gap-0.5 text-yellow-300 cursor-pointer"><input type="checkbox" id="edit-persist-spd" ${defendSettings.persistSpd ? 'checked' : ''} class="accent-yellow-500"> 速</label></div></div><div class="bg-slate-900/90 px-2.5 py-1.5 rounded border border-slate-700/60 flex items-center justify-between gap-2"><label class="flex items-center gap-1 text-lime-300 font-semibold cursor-pointer"><input type="checkbox" id="edit-mutation-enabled" ${defendSettings.mutationEnabled ? 'checked' : ''} class="accent-lime-500"> 🧬 敌方随机变异</label><div class="flex items-center gap-1"><span class="text-slate-400 text-[10px]">概率:</span><input type="number" min="0" max="100" value="${defendSettings.mutationPercent}" id="edit-mutation-percent" class="edit-input-game w-12 font-mono-num text-right text-lime-200"><span class="text-slate-500 text-[10px]">%</span></div></div></div></div></div>`;
-  html += `<div><h3 class="text-sm sm:text-lg font-bold text-cyan-400 mb-3 sm:mb-4 flex items-center gap-2 w-full"><span>❖</span> 我方角色 <button onclick="addHero()" class="text-[10px] sm:text-[11px] bg-cyan-900/50 hover:bg-cyan-800 text-cyan-200 px-2 sm:px-3 py-1 sm:py-1.5 rounded ml-auto transition-colors border border-cyan-700/50">+ 添加</button></h3><div class="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">`;
+  if (keepScroll) {
+    const sc = document.getElementById('main-scroll-area') || document.getElementById('editor-scroll-container');
+    if (sc) savedScrollTop = sc.scrollTop;
+  }
+  const _globalExp = !!window.__editorGlobalExpanded;
+  
+  let html = `<div id="editor-scroll-container" class="cyber-modal-editor bg-slate-950/95 border border-cyan-500/50 p-2 sm:p-4 rounded-xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-[0_0_50px_rgba(6,182,212,0.25)] relative text-gray-200 overflow-hidden custom-scrollbar">`;
+  html += `<div class="cyber-corner cyber-corner-tl"></div><div class="cyber-corner cyber-corner-tr"></div><div class="cyber-corner cyber-corner-bl"></div><div class="cyber-corner cyber-corner-br"></div>`;
+  
+  // 顶栏 Header
+  html += `<div class="flex items-center justify-between pb-2 border-b border-cyan-500/30 gap-2 shrink-0">`;
+  html += `<div class="flex items-center gap-2 min-w-0"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping shrink-0"></span><h2 class="text-xs sm:text-base font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-amber-300 truncate">数据覆写</h2><span class="text-[9px] px-1.5 py-0.2 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-700/60 font-mono tracking-widest hidden sm:inline-block">DATA OVERRIDE</span></div>`;
+  html += `<div class="flex items-center gap-1.5 shrink-0"><button onclick="closeEditor()" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-600/70 transition-all">取消</button><button onclick="saveEditor()" class="px-3.5 py-1 text-xs font-bold rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)] border border-emerald-400/50 transition-all flex items-center gap-1"><span>💾</span> 保存应用</button></div>`;
+  html += `</div>`;
+
+  // 主滚动区域
+  html += `<div id="main-scroll-area" class="flex-1 overflow-y-auto pr-1 space-y-2.5 custom-scrollbar my-2">`;
+  
+  // 全局战斗设置手风琴
+  html += `<div class="bg-slate-900/70 rounded-lg border border-amber-500/25 overflow-hidden"><div onclick="toggleGlobalEditor()" class="px-3 py-1.5 bg-amber-950/20 hover:bg-amber-950/35 cursor-pointer flex items-center justify-between gap-2 border-b border-amber-500/20 transition-colors"><div class="flex items-center gap-2 flex-wrap min-w-0"><span class="text-amber-400 text-xs">⚙️</span><span class="text-xs font-bold text-amber-300">战斗全局设置</span><div class="flex items-center gap-1.5 flex-wrap text-[10px] text-slate-400 font-mono-num"><span class="px-1.5 py-0.2 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-800/50">MP恢复 <span id="summary-mp-pct">${defendSettings.mpRecoverPct}</span>%</span><span class="px-1.5 py-0.2 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/50">TP恢复 <span id="summary-tp-pct">${defendSettings.tpRecoverPct}</span>%</span><span class="px-1.5 py-0.2 rounded bg-orange-950/60 text-orange-300 border border-orange-800/50">普攻TP +<span id="summary-atk-tp">${defendSettings.basicAttackTp}</span></span><span class="px-1.5 py-0.2 rounded bg-fuchsia-950/60 text-fuchsia-300 border border-fuchsia-800/50">看破 ≤<span id="summary-kanpo-th">${defendSettings.kanpoFilterThreshold}</span></span><span class="px-1.5 py-0.2 rounded bg-lime-950/60 text-lime-300 border border-lime-800/50">变异 <span id="summary-mutation">${defendSettings.mutationPercent}</span>%</span></div></div><span id="global-settings-icon" class="text-slate-400 text-xs transition-transform duration-200 ${_globalExp?'rotate-180':''}">▼</span></div><div id="global-settings-body" class="${_globalExp?'':'hidden'} p-2.5 bg-black/25 space-y-2 text-xs"><div class="grid grid-cols-2 sm:grid-cols-4 gap-2"><div class="flex items-center justify-between bg-slate-900/90 px-2 py-1.5 rounded border border-slate-700/60"><span class="text-cyan-400 text-[11px]">防御恢复 MP</span><div class="flex items-center gap-0.5"><input type="number" min="0" max="100" value="${defendSettings.mpRecoverPct}" id="edit-defend-mp-pct" class="edit-input-game w-12 font-mono-num text-right text-cyan-200" oninput="syncGlobalEditorSummary()"><span class="text-slate-500 text-[10px]">%</span></div></div><div class="flex items-center justify-between bg-slate-900/90 px-2 py-1.5 rounded border border-slate-700/60"><span class="text-emerald-400 text-[11px]">防御恢复 TP</span><div class="flex items-center gap-0.5"><input type="number" min="0" max="100" value="${defendSettings.tpRecoverPct}" id="edit-defend-tp-pct" class="edit-input-game w-12 font-mono-num text-right text-emerald-200" oninput="syncGlobalEditorSummary()"><span class="text-slate-500 text-[10px]">%</span></div></div><div class="flex items-center justify-between bg-slate-900/90 px-2 py-1.5 rounded border border-slate-700/60"><span class="text-orange-400 text-[11px]">普攻恢复 TP</span><div class="flex items-center gap-0.5"><input type="number" min="0" max="100" value="${defendSettings.basicAttackTp}" id="edit-attack-tp" class="edit-input-game w-12 font-mono-num text-right text-orange-200" oninput="syncGlobalEditorSummary()"><span class="text-slate-500 text-[10px]">点</span></div></div><div class="flex items-center justify-between bg-slate-900/90 px-2 py-1.5 rounded border border-slate-700/60"><label class="flex items-center gap-1 text-fuchsia-400 text-[11px] cursor-pointer"><input type="checkbox" id="edit-kanpo-filter" ${defendSettings.kanpoFilterEnabled ? 'checked' : ''} class="accent-fuchsia-500" onchange="syncGlobalEditorSummary()"> 看破≤</label><input type="number" min="0" max="10000" value="${defendSettings.kanpoFilterThreshold}" id="edit-kanpo-threshold" class="edit-input-game w-14 font-mono-num text-right text-fuchsia-200" oninput="syncGlobalEditorSummary()"></div></div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]"><div class="bg-slate-900/90 px-2.5 py-1.5 rounded border border-slate-700/60 flex items-center justify-between gap-2"><span class="text-slate-300 font-semibold flex items-center gap-1"><span>💾</span> 属性持久化:</span><div class="flex items-center gap-2"><label class="flex items-center gap-0.5 text-orange-300 cursor-pointer"><input type="checkbox" id="edit-persist-atk" ${defendSettings.persistAtk ? 'checked' : ''} class="accent-orange-500"> 攻</label><label class="flex items-center gap-0.5 text-blue-300 cursor-pointer"><input type="checkbox" id="edit-persist-def" ${defendSettings.persistDef ? 'checked' : ''} class="accent-blue-500"> 防</label><label class="flex items-center gap-0.5 text-yellow-300 cursor-pointer"><input type="checkbox" id="edit-persist-spd" ${defendSettings.persistSpd ? 'checked' : ''} class="accent-yellow-500"> 速</label></div></div><div class="bg-slate-900/90 px-2.5 py-1.5 rounded border border-slate-700/60 flex items-center justify-between gap-2"><label class="flex items-center gap-1 text-lime-300 font-semibold cursor-pointer"><input type="checkbox" id="edit-mutation-enabled" ${defendSettings.mutationEnabled ? 'checked' : ''} class="accent-lime-500" onchange="syncGlobalEditorSummary()"> 🧬 敌方随机变异</label><div class="flex items-center gap-1"><span class="text-slate-400 text-[10px]">概率:</span><input type="number" min="0" max="100" value="${defendSettings.mutationPercent}" id="edit-mutation-percent" class="edit-input-game w-12 font-mono-num text-right text-lime-200" oninput="syncGlobalEditorSummary()"><span class="text-slate-500 text-[10px]">%</span></div></div></div></div></div>`;
+
+  // 原生阵营 Tab 栏
+  var _curTab = window.__editorFactionTab; if (!_curTab) _curTab = 'hero';
+  html += `<div class="flex items-center justify-between gap-2 border-b border-slate-700/50 pb-1.5"><div class="flex items-center gap-1 p-0.5 bg-slate-900/90 rounded-lg border border-slate-700/70"><button id="tab-btn-heroes" onclick="switchPartyTab('hero')" class="px-2.5 py-1 rounded text-xs font-bold transition-all ${_curTab === 'hero' ? 'bg-cyan-950 text-cyan-300 border border-cyan-600/50 shadow' : 'text-slate-400 hover:text-cyan-300 hover:bg-cyan-950/40'} flex items-center gap-1"><span>🛡️</span> 我方英雄 <span id="hero-count-badge" class="px-1 py-0.2 rounded-full bg-cyan-500/20 text-[9px] font-mono-num">${heroesData.length}</span></button><button id="tab-btn-enemies" onclick="switchPartyTab('enemy')" class="px-2.5 py-1 rounded text-xs font-bold transition-all ${_curTab === 'enemy' ? 'bg-rose-950 text-rose-300 border border-rose-600/50 shadow' : 'text-slate-400 hover:text-rose-300 hover:bg-rose-950/40'} flex items-center gap-1"><span>👾</span> 敌方单位 <span id="enemy-count-badge" class="px-1 py-0.2 rounded-full bg-rose-500/20 text-[9px] font-mono-num text-rose-300">${enemiesData.length}</span></button></div><button id="add-entity-btn" onclick="addNewEntityFromTab()" class="px-2.5 py-1 ${_curTab === 'enemy' ? 'bg-rose-900/60 hover:bg-rose-800 text-rose-200 border-rose-500/40' : 'bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 border-cyan-500/40'} text-xs font-bold rounded border transition-all flex items-center gap-1 shadow-sm"><span>+</span> ${_curTab === 'enemy' ? '添加敌方怪物' : '添加我方角色'}</button></div>`;
+
+  // 我方英雄列表
+  html += `<div id="heroes-list-container" class="space-y-2.5 ${_curTab === 'hero' ? '' : 'hidden'}">`;
   heroesData.forEach((h, i) => {
-    html += `<div class="bg-black/30 p-3 sm:p-4 rounded-xl border border-gray-800 relative group hover:border-cyan-900/50 transition-colors flex flex-col"><button onclick="removeHero(${i})" class="absolute right-1 top-1 sm:right-2 sm:top-2 w-6 h-6 flex items-center justify-center rounded-full bg-red-900/30 text-red-500/50 hover:bg-red-600 hover:text-white transition-all z-10 border border-transparent hover:border-red-400 opacity-0 group-hover:opacity-100" title="移除此角色">✕</button><div class="flex gap-2 mb-3 sm:mb-4 items-center border-b border-gray-800 pb-2"><span class="text-[10px] sm:text-xs text-gray-500">名称</span><input type="text" id="edit-h-${i}-name" value="${h.name}" class="edit-input w-16 sm:w-24 text-xs sm:text-sm font-bold text-yellow-200"><span class="text-[10px] sm:text-xs text-gray-500 ml-2">职业</span><select id="edit-h-${i}-class" class="edit-input w-16 sm:w-24 text-[10px] sm:text-xs text-cyan-300 font-bold"><option value="" ${!h.classType ? 'selected' : ''}>无</option><option value="防守者" ${h.classType === '防守者' ? 'selected' : ''}>防守者</option><option value="隐匿者" ${h.classType === '隐匿者' ? 'selected' : ''}>隐匿者</option><option value="施法者" ${h.classType === '施法者' ? 'selected' : ''}>施法者</option><option value="狂战士" ${h.classType === '狂战士' ? 'selected' : ''}>狂战士</option><option value="风行者" ${h.classType === '风行者' ? 'selected' : ''}>风行者</option><option value="圣职者" ${h.classType === '圣职者' ? 'selected' : ''}>圣职者</option><option value="灾厄使" ${h.classType === '灾厄使' ? 'selected' : ''}>灾厄使</option></select><span class="text-[10px] sm:text-xs text-gray-500 ml-auto">头像</span><input type="text" id="edit-h-${i}-img" value="${h.img}" class="edit-input flex-1 min-w-[80px] text-[10px] sm:text-xs text-gray-400" placeholder="链接"></div><div class="grid grid-cols-4 lg:grid-cols-8 gap-x-1.5 gap-y-2 sm:gap-x-2 sm:gap-y-3 text-[9px] sm:text-[10px] mb-3 sm:mb-4"><div class="flex flex-col"><label class="text-rose-400 mb-1">HP</label><input type="number" id="edit-h-${i}-hp" value="${h.hp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-gray-500 mb-1">MaxHP</label><input type="number" id="edit-h-${i}-maxHp" value="${h.maxHp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-cyan-400 mb-1">MP</label><input type="number" id="edit-h-${i}-mp" value="${h.mp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-gray-500 mb-1">MaxMP</label><input type="number" id="edit-h-${i}-maxMp" value="${h.maxMp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-orange-400 mb-1">攻击</label><input type="number" id="edit-h-${i}-atk" value="${h.atk}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-blue-400 mb-1">防御</label><input type="number" id="edit-h-${i}-def" value="${h.def}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-yellow-400 mb-1 font-bold">速度</label><input type="number" id="edit-h-${i}-spd" value="${h.spd}" class="edit-input w-full font-mono text-yellow-200"></div><div class="flex flex-col"><label class="text-amber-400 mb-1 font-bold" title="一回合行动次数，每次行动速度依次 -10 衰减">行动</label><input type="number" min="1" id="edit-h-${i}-act" value="${h.actCount || 1}" class="edit-input w-full font-mono text-amber-200"></div></div><div class="bg-black/40 p-2 sm:p-3 rounded border border-gray-800/50 flex-1"><div class="text-[9px] sm:text-[11px] text-gray-400 mb-2 sm:mb-3 font-bold tracking-wider flex justify-between items-center"><span>技能配置 (支持3重标签)</span><button onclick="addHeroSkill(${i})" class="text-[9px] sm:text-[10px] text-cyan-400 hover:text-cyan-300 border border-cyan-900/50 rounded px-1.5 py-0.5 sm:px-2 sm:py-1 transition-colors">+ 添加</button></div><div class="space-y-2 sm:space-y-3">`;
-    h.skills.forEach((s, si) => { html += `<div class="bg-black/50 p-1.5 sm:p-2 rounded border border-gray-700/50 relative pr-6 sm:pr-8"><button onclick="removeHeroSkill(${i}, ${si})" class="absolute right-1 sm:right-2 top-1 sm:top-2 text-gray-600 hover:text-red-500 font-bold transition-colors" title="移除此技能">✕</button><div class="flex gap-1.5 sm:gap-2 items-center mb-1.5 sm:mb-2 flex-wrap"><input type="text" id="edit-h-${i}-s-${si}-name" value="${s.name}" class="edit-input w-24 sm:w-32 text-[10px] sm:text-xs text-gray-100 font-bold" placeholder="技能名"><select id="edit-h-${i}-s-${si}-reaction" class="edit-input w-20 sm:w-24 text-[9px] sm:text-[10px] text-indigo-300 font-bold"><option value="none" ${!s.isReaction ? 'selected' : ''}>非反应</option><option value="all" ${s.isReaction && s.reactionTarget === 'all' ? 'selected' : ''}>反应(全能)</option><option value="近战" ${s.isReaction && s.reactionTarget === '近战' ? 'selected' : ''}>反应(近战)</option><option value="远程" ${s.isReaction && s.reactionTarget === '远程' ? 'selected' : ''}>反应(远程)</option><option value="法术" ${s.isReaction && s.reactionTarget === '法术' ? 'selected' : ''}>反应(法术)</option></select><select id="edit-h-${i}-s-${si}-kanpo" class="edit-input w-20 sm:w-24 text-[9px] sm:text-[10px] text-amber-300 font-bold"><option value="none" ${!s.kanpoTarget ? 'selected' : ''}>无看破</option><option value="all" ${s.kanpoTarget === 'all' ? 'selected' : ''}>看破(全能)</option><option value="近战" ${s.kanpoTarget === '近战' ? 'selected' : ''}>看破(近战)</option><option value="远程" ${s.kanpoTarget === '远程' ? 'selected' : ''}>看破(远程)</option><option value="法术" ${s.kanpoTarget === '法术' ? 'selected' : ''}>看破(法术)</option></select><select id="edit-h-${i}-s-${si}-sheshen" class="edit-input w-20 sm:w-24 text-[9px] sm:text-[10px] text-sky-300 font-bold"><option value="none" ${!s.sheshenTarget ? 'selected' : ''}>无舍身</option><option value="all" ${s.sheshenTarget === 'all' ? 'selected' : ''}>舍身(全能)</option><option value="近战" ${s.sheshenTarget === '近战' ? 'selected' : ''}>舍身(近战)</option><option value="远程" ${s.sheshenTarget === '远程' ? 'selected' : ''}>舍身(远程)</option><option value="法术" ${s.sheshenTarget === '法术' ? 'selected' : ''}>舍身(法术)</option></select><label class="flex items-center gap-1 text-[9px] sm:text-[10px] text-emerald-300 cursor-pointer whitespace-nowrap" title="带此标签的技能可对任意我方角色施放"><input type="checkbox" id="edit-h-${i}-s-${si}-others" ${s.isOthers ? 'checked' : ''} class="accent-emerald-500">他人</label><label class="flex items-center gap-1 text-[9px] sm:text-[10px] text-rose-300 cursor-pointer whitespace-nowrap" title="带此标签的技能跳过命中判定，伤害与妨害效果必中"><input type="checkbox" id="edit-h-${i}-s-${si}-guaranteed" ${s.guaranteedHit ? 'checked' : ''} class="accent-rose-500">必中</label><label class="flex items-center gap-1 text-[9px] sm:text-[10px] text-violet-300 cursor-pointer whitespace-nowrap" title="高阶技能（无战斗效果，触发敌方忌惮旁白）"><input type="checkbox" id="edit-h-${i}-s-${si}-highTier" ${s.isHighTier ? 'checked' : ''} class="accent-violet-500">高阶</label><label class="flex items-center gap-1 text-[9px] sm:text-[10px] text-amber-300 cursor-pointer whitespace-nowrap" title="传奇/神术技能（无战斗效果，触发敌方震撼旁白；神术为传奇别名）"><input type="checkbox" id="edit-h-${i}-s-${si}-legendary" ${s.isLegendary ? 'checked' : ''} class="accent-amber-500">传奇</label><select id="edit-h-${i}-s-${si}-dmgType" class="edit-input w-16 sm:w-20 text-[9px] sm:text-[10px] text-orange-200 font-bold"><option value="" ${!s.damageType ? 'selected' : ''}>无(近战)</option><option value="近战" ${s.damageType === '近战' ? 'selected' : ''}>近战</option><option value="远程" ${s.damageType === '远程' ? 'selected' : ''}>远程</option><option value="法术" ${s.damageType === '法术' ? 'selected' : ''}>法术</option></select><select id="edit-h-${i}-s-${si}-fxTag" class="edit-input w-16 sm:w-20 text-[9px] sm:text-[10px] text-yellow-300 font-bold">${['特效:无', ...Object.keys(WEBM_FX_REGISTRY)].map(f => { const val = f === '特效:无' ? '' : f; const isSel = (s.fxTag || '') === val; const label = f === '特效:无' ? '无特效' : f; return `<option value="${val}" ${isSel ? 'selected' : ''}>${label}</option>`; }).join('')}</select><span class="text-[9px] sm:text-[10px] text-sky-400 ml-auto">MP</span><input type="number" id="edit-h-${i}-s-${si}-cost" value="${s.cost}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-sky-200"><span class="text-[9px] sm:text-[10px] text-red-400">HP</span><input type="number" id="edit-h-${i}-s-${si}-hpCost" value="${s.hpCost || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-red-200"><span class="text-[9px] sm:text-[10px] text-green-400">TP</span><input type="number" id="edit-h-${i}-s-${si}-tpCost" value="${s.tpCost || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-green-200"><span class="text-[9px] sm:text-[10px] text-gray-500">准%(Aim)</span><input type="number" id="edit-h-${i}-s-${si}-hit" value="${s.hit}" class="edit-input w-10 sm:w-12 text-[9px] sm:text-[10px] font-mono text-yellow-200"><span class="text-[9px] sm:text-[10px] text-gray-500">回数</span><input type="number" id="edit-h-${i}-s-${si}-turns" value="${s.turns || ''}" class="edit-input w-10 sm:w-12 text-[9px] sm:text-[10px] font-mono text-purple-200" placeholder="默认"><span class="text-[9px] sm:text-[10px] text-yellow-300">延迟(蓄力)</span><input type="number" id="edit-h-${i}-s-${si}-delay" value="${s.delay || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-yellow-200" placeholder="0"><span class="text-[9px] sm:text-[10px] text-cyan-300">加速</span><input type="number" id="edit-h-${i}-s-${si}-haste" value="${s.haste || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-cyan-200" placeholder="0"><span class="text-[9px] sm:text-[10px] text-fuchsia-300">限次</span><input type="number" id="edit-h-${i}-s-${si}-limit" value="${s.maxUses || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-fuchsia-200" placeholder="0"></div><div class="flex flex-wrap gap-1.5 sm:gap-2"><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-cyan-200 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power" value="${s.power}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type2" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-gray-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power2" value="${s.power2}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-h-${i}-s-${si}-type3" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-gray-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-h-${i}-s-${si}-power3" value="${s.power3}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div></div><div class="flex gap-2 mt-1.5 flex-wrap items-center text-[9px]"><span class="text-cyan-400 whitespace-nowrap">🛡️护甲(肃正)</span><input type="number" id="edit-h-${i}-s-${si}-armor" value="${s.barrierArmor||0}" class="edit-input w-14 font-mono text-cyan-200" min="0" title="肃正屏障护甲，仅肃正技能生效"><span class="text-emerald-400 whitespace-nowrap">驱散量</span><input type="number" id="edit-h-${i}-s-${si}-dispel" value="${(() => { if ((s.type||'').includes('驱散')) return s.power; if ((s.type2||'').includes('驱散')) return s.power2; if ((s.type3||'').includes('驱散')) return s.power3; return 0; })()}" class="edit-input w-14 font-mono text-emerald-200" min="0" title="单次可驱散单个目标多少debuff"><span class="text-gray-500">(*仅对应驱散/群驱散标签生效)</span></div></div>`; });
-    html += `</div></div></div>`;
-  });
-  html += `<div><h3 class="text-sm sm:text-lg font-bold text-rose-500 mb-3 sm:mb-4 mt-4 sm:mt-6 flex items-center gap-2 w-full"><span>❖</span> 敌方单位 <button onclick="addEnemy()" class="text-[10px] sm:text-[11px] bg-rose-900/50 hover:bg-rose-800 text-rose-200 px-2 sm:px-3 py-1 sm:py-1.5 rounded ml-auto transition-colors border border-rose-700/50">+ 添加</button></h3><div class="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">`;
-  enemiesData.forEach((e, i) => {
-    html += `<div class="bg-black/30 p-3 sm:p-4 rounded-xl border border-gray-800 relative group hover:border-rose-900/50 transition-colors flex flex-col"><button onclick="removeEnemy(${i})" class="absolute right-1 top-1 sm:right-2 sm:top-2 w-6 h-6 flex items-center justify-center rounded-full bg-red-900/30 text-red-500/50 hover:bg-red-600 hover:text-white transition-all z-10 border border-transparent hover:border-red-400 opacity-0 group-hover:opacity-100" title="移除此怪物">✕</button><div class="flex gap-2 mb-2 sm:mb-3 items-center"><input type="text" id="edit-e-${i}-emoji" value="${e.emoji}" class="edit-input w-8 sm:w-12 text-center text-sm sm:text-lg" placeholder="图标"><input type="text" id="edit-e-${i}-name" value="${e.name}" class="edit-input w-16 sm:w-24 text-xs sm:text-sm font-bold text-rose-200" placeholder="名称"><span class="text-[10px] sm:text-xs text-gray-500 ml-2">职业</span><select id="edit-e-${i}-class" class="edit-input w-16 sm:w-24 text-[10px] sm:text-xs text-rose-300 font-bold"><option value="" ${!e.classType ? 'selected' : ''}>无</option><option value="防守者" ${e.classType === '防守者' ? 'selected' : ''}>防守者</option><option value="隐匿者" ${e.classType === '隐匿者' ? 'selected' : ''}>隐匿者</option><option value="施法者" ${e.classType === '施法者' ? 'selected' : ''}>施法者</option><option value="狂战士" ${e.classType === '狂战士' ? 'selected' : ''}>狂战士</option><option value="风行者" ${e.classType === '风行者' ? 'selected' : ''}>风行者</option><option value="圣职者" ${e.classType === '圣职者' ? 'selected' : ''}>圣职者</option><option value="灾厄使" ${e.classType === '灾厄使' ? 'selected' : ''}>灾厄使</option></select><input type="text" id="edit-e-${i}-img" value="${e.img || ''}" class="edit-input flex-1 min-w-[80px] text-[10px] sm:text-xs text-gray-400" placeholder="图片链接(可选)"><label class="flex items-center gap-1 text-[9px] sm:text-[10px] text-rose-400 cursor-pointer whitespace-nowrap"><input type="checkbox" id="edit-e-${i}-isWise" ${e.isWise ? 'checked' : ''} class="accent-rose-500">智慧</label></div><div class="grid grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] mb-2 sm:mb-3"><div class="flex flex-col"><label class="text-rose-400 mb-1">HP</label><input type="number" id="edit-e-${i}-hp" value="${e.hp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-gray-500 mb-1">MaxHP</label><input type="number" id="edit-e-${i}-maxHp" value="${e.maxHp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-cyan-400 mb-1">MP</label><input type="number" id="edit-e-${i}-mp" value="${e.mp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-gray-500 mb-1">MaxMP</label><input type="number" id="edit-e-${i}-maxMp" value="${e.maxMp}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-orange-400 mb-1">攻击</label><input type="number" id="edit-e-${i}-atk" value="${e.atk}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-blue-400 mb-1">防御</label><input type="number" id="edit-e-${i}-def" value="${e.def}" class="edit-input w-full font-mono"></div><div class="flex flex-col"><label class="text-yellow-400 mb-1 font-bold">速度</label><input type="number" id="edit-e-${i}-spd" value="${e.spd}" class="edit-input w-full font-mono text-yellow-200"></div></div><div class="bg-black/40 p-2 sm:p-3 rounded border border-gray-800/50 flex-1"><div class="text-[9px] sm:text-[11px] text-gray-400 mb-2 sm:mb-3 font-bold tracking-wider flex justify-between items-center"><span>技能配置</span><button onclick="addEnemySkill(${i})" class="text-[9px] sm:text-[10px] text-rose-400 hover:text-rose-300 border border-rose-900/50 rounded px-1.5 py-0.5 sm:px-2 sm:py-1 transition-colors">+ 添加</button></div><div class="space-y-2 sm:space-y-3">`;
-    e.skills.forEach((s, si) => { html += `<div class="bg-black/50 p-1.5 sm:p-2 rounded border border-gray-700/50 relative pr-6 sm:pr-8"><button onclick="removeEnemySkill(${i}, ${si})" class="absolute right-1 sm:right-2 top-1 sm:top-2 text-gray-600 hover:text-red-500 font-bold transition-colors" title="移除此技能">✕</button><div class="flex gap-1.5 sm:gap-2 items-center mb-1.5 sm:mb-2 flex-wrap"><input type="text" id="edit-e-${i}-s-${si}-name" value="${s.name}" class="edit-input w-24 sm:w-32 text-[10px] sm:text-xs text-gray-100 font-bold" placeholder="技能名称"><select id="edit-e-${i}-s-${si}-dmgType" class="edit-input w-16 sm:w-20 text-[9px] sm:text-[10px] text-orange-200 font-bold"><option value="" ${!s.damageType ? 'selected' : ''}>无(近战)</option><option value="近战" ${s.damageType === '近战' ? 'selected' : ''}>近战</option><option value="远程" ${s.damageType === '远程' ? 'selected' : ''}>远程</option><option value="法术" ${s.damageType === '法术' ? 'selected' : ''}>法术</option></select><label class="flex items-center gap-1 text-[9px] sm:text-[10px] text-emerald-300 cursor-pointer whitespace-nowrap" title="带此标签的技能可对任意己方角色施放"><input type="checkbox" id="edit-e-${i}-s-${si}-others" ${s.isOthers ? 'checked' : ''} class="accent-emerald-500">他人</label><label class="flex items-center gap-1 text-[9px] sm:text-[10px] text-rose-300 cursor-pointer whitespace-nowrap" title="带此标签的技能跳过命中判定，伤害与妨害效果必中"><input type="checkbox" id="edit-e-${i}-s-${si}-guaranteed" ${s.guaranteedHit ? 'checked' : ''} class="accent-rose-500">必中</label><select id="edit-e-${i}-s-${si}-fxTag" class="edit-input w-16 sm:w-20 text-[9px] sm:text-[10px] text-yellow-300 font-bold">${['特效:无', ...Object.keys(WEBM_FX_REGISTRY)].map(f => { const val = f === '特效:无' ? '' : f; const isSel = (s.fxTag || '') === val; const label = f === '特效:无' ? '无特效' : f; return `<option value="${val}" ${isSel ? 'selected' : ''}>${label}</option>`; }).join('')}</select><span class="text-[9px] sm:text-[10px] text-sky-400 ml-auto">MP</span><input type="number" id="edit-e-${i}-s-${si}-cost" value="${s.cost}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-sky-200"><span class="text-[9px] sm:text-[10px] text-red-400">HP</span><input type="number" id="edit-e-${i}-s-${si}-hpCost" value="${s.hpCost || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-red-200"><span class="text-[9px] sm:text-[10px] text-green-400">TP</span><input type="number" id="edit-e-${i}-s-${si}-tpCost" value="${s.tpCost || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-green-200"><span class="text-[9px] sm:text-[10px] text-gray-500">准%(Aim)</span><input type="number" id="edit-e-${i}-s-${si}-hit" value="${s.hit}" class="edit-input w-10 sm:w-12 text-[9px] sm:text-[10px] font-mono text-yellow-200"><span class="text-[9px] sm:text-[10px] text-rose-400 font-bold">充能(大招)</span><input type="number" id="edit-e-${i}-s-${si}-charge" value="${s.charge || 0}" class="edit-input w-8 sm:w-10 text-[9px] sm:text-[10px] font-mono text-rose-200" placeholder="0"><span class="text-[9px] sm:text-[10px] text-gray-500">回数</span><input type="number" id="edit-e-${i}-s-${si}-turns" value="${s.turns || ''}" class="edit-input w-10 sm:w-12 text-[9px] sm:text-[10px] font-mono text-purple-200" placeholder="默认"></div><div class="flex flex-wrap gap-1.5 sm:gap-2"><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-e-${i}-s-${si}-type" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-rose-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-e-${i}-s-${si}-power" value="${s.power}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-e-${i}-s-${si}-type2" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-gray-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-e-${i}-s-${si}-power2" value="${s.power2}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div><div class="flex items-center gap-1 bg-black/40 p-1 rounded border border-gray-800 flex-1 min-w-[100px] sm:min-w-[120px]"><select id="edit-e-${i}-s-${si}-type3" class="edit-input w-full text-[9px] sm:text-[10px] font-bold text-gray-300 px-1 py-0.5 sm:py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[9px] sm:text-[10px] text-gray-600">威</span><input type="number" id="edit-e-${i}-s-${si}-power3" value="${s.power3}" class="edit-input w-12 sm:w-16 text-[9px] sm:text-[10px] font-mono text-emerald-200 px-1 py-0.5 sm:py-1"></div></div></div>`; });
-    html += `</div></div></div>`;
-  });
-  html += `</div>`; // close #main-scroll-area
-  html += `<div class="mt-1.5 pt-1.5 border-t border-slate-700/40 flex items-center justify-between text-[10px] text-slate-400 shrink-0"><div class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span><span>竖屏抗挤压已就绪</span></div><div class="font-mono text-slate-500">READY</div></div>`;
-  html += `</div>`; // close #editor-scroll-container
-  modal.innerHTML = html;
-  bindEditorSectionTabs(modal);
-  bindCharacterFoldControls(modal, '我方角色', false);
-  bindCharacterFoldControls(modal, '敌方单位', true);
-  if (savedScrollTop > 0) {
-    const nc=document.getElementById('editor-scroll-container'); if(nc) nc.scrollTop=savedScrollTop;
-    const ms=document.getElementById('main-scroll-area'); if(ms) ms.scrollTop=savedScrollTop;
-  }
-}
-
-function bindEditorSectionTabs(modal) {
-  var headings = Array.prototype.slice.call(modal.querySelectorAll('h3'));
-  var heroTitle = headings.filter(function (el) { return (el.textContent || '').indexOf('我方角色') >= 0; })[0];
-  var enemyTitle = headings.filter(function (el) { return (el.textContent || '').indexOf('敌方单位') >= 0; })[0];
-  if (!heroTitle || !enemyTitle) return;
-  var heroSection = heroTitle.parentElement;
-  var enemySection = enemyTitle.parentElement;
-  var tabBar = document.createElement('div');
-  tabBar.className = 'flex items-center justify-between gap-2 border-b border-slate-700/50 pb-1.5 mb-2';
-  var tabGroup = document.createElement('div');
-  tabGroup.className = 'flex items-center gap-1 p-0.5 bg-slate-900/90 rounded-lg border border-slate-700/70';
-  var heroTab = document.createElement('button');
-  var enemyTab = document.createElement('button');
-  var addButton = document.createElement('button');
-  heroTab.type = 'button'; enemyTab.type = 'button';
-  addButton.type = 'button';
-  function setTab(active) {
-    var heroOn = active === 'hero';
-    window.__editorFactionTab = heroOn ? 'hero' : 'enemy';
-    heroSection.classList.toggle('hidden', !heroOn);
-    enemySection.classList.toggle('hidden', heroOn);
-    heroTab.className = heroOn ? 'px-2.5 py-1 rounded text-xs font-bold transition-all bg-cyan-950 text-cyan-300 border border-cyan-600/50 shadow flex items-center gap-1' : 'px-2.5 py-1 rounded text-xs font-bold transition-all text-slate-400 hover:text-cyan-300 hover:bg-cyan-950/40 flex items-center gap-1';
-    enemyTab.className = heroOn ? 'px-2.5 py-1 rounded text-xs font-bold transition-all text-slate-400 hover:text-rose-300 hover:bg-rose-950/40 flex items-center gap-1' : 'px-2.5 py-1 rounded text-xs font-bold transition-all bg-rose-950 text-rose-300 border border-rose-600/50 shadow flex items-center gap-1';
-    addButton.className = heroOn ? 'px-2.5 py-1 bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 text-xs font-bold rounded border border-cyan-500/40 transition-all flex items-center gap-1 shadow-sm' : 'px-2.5 py-1 bg-rose-900/60 hover:bg-rose-800 text-rose-200 text-xs font-bold rounded border border-rose-500/40 transition-all flex items-center gap-1 shadow-sm';
-    addButton.textContent = heroOn ? '+ 添加我方角色' : '+ 添加敌方怪物';
-    addButton.onclick = heroOn ? function () { addHero(); } : function () { addEnemy(); };
-  }
-  heroTab.innerHTML = '<span>🛡️</span> 我方英雄 <span class="px-1 py-0.2 rounded-full bg-cyan-500/20 text-[9px] font-mono-num">' + heroesData.length + '</span>';
-  enemyTab.innerHTML = '<span>👾</span> 敌方单位 <span class="px-1 py-0.2 rounded-full bg-rose-500/20 text-[9px] font-mono-num text-rose-300">' + enemiesData.length + '</span>';
-  heroTab.onclick = function () { setTab('hero'); };
-  enemyTab.onclick = function () { setTab('enemy'); };
-  tabGroup.appendChild(heroTab); tabGroup.appendChild(enemyTab);
-  tabBar.appendChild(tabGroup); tabBar.appendChild(addButton);
-  var originalParent = heroSection.parentElement;
-  if (!originalParent) return;
-  originalParent.insertBefore(tabBar, heroSection);
-  var sectionHost = document.createElement('div');
-  sectionHost.className = 'editor-faction-tabs-content';
-  originalParent.insertBefore(sectionHost, heroSection);
-  sectionHost.appendChild(heroSection);
-  if (enemySection !== heroSection) sectionHost.appendChild(enemySection);
-  heroTitle.classList.add('hidden');
-  enemyTitle.classList.add('hidden');
-  setTab(window.__editorFactionTab === 'enemy' ? 'enemy' : 'hero');
-}
-
-function bindCharacterFoldControls(modal, titleText, isEnemy) {
-  var headings = Array.prototype.slice.call(modal.querySelectorAll('h3'));
-  var title = headings.filter(function (el) { return (el.textContent || '').indexOf(titleText) >= 0; })[0];
-  var grid = title && title.nextElementSibling;
-  if (!grid) return;
-  var makeMetric = function (label, value, tone) {
-    var wrap = document.createElement('span');
-    wrap.className = 'px-1.5 py-0.5 rounded font-mono-num text-[10px] border ' + tone;
-    var labelNode = document.createElement('span');
-    labelNode.className = 'text-[9px] font-bold mr-0.5';
-    labelNode.textContent = label;
-    var valueNode = document.createElement('span');
-    valueNode.className = 'font-bold';
-    valueNode.textContent = value;
-    wrap.appendChild(labelNode);
-    wrap.appendChild(valueNode);
-    return { wrap: wrap, value: valueNode };
-  };
-  Array.prototype.slice.call(grid.children).forEach(function (card, cardIndex) {
-    var entity = (isEnemy ? enemiesData : heroesData)[cardIndex] || {};
-    var cardKind = isEnemy ? 'char-card-enemy' : 'char-card-hero';
-    card.classList.remove('bg-black/30', 'p-3', 'sm:p-4', 'rounded-xl', 'border-gray-800', 'hover:border-cyan-900/50', 'hover:border-rose-900/50', 'transition-colors');
-    card.classList.add(cardKind, 'rounded-lg', 'overflow-hidden');
-    var parts = Array.prototype.slice.call(card.children);
-    var header = parts[1];
-    var foldParts = parts.slice(2);
-    if (!header || !foldParts.length) return;
-    header.classList.remove('mb-2', 'mb-3', 'sm:mb-3', 'sm:mb-4', 'border-b', 'border-gray-800', 'pb-2');
-    header.classList.add('px-2.5', 'sm:px-3', 'py-2', 'pr-14', 'bg-slate-900/80', 'hover:bg-slate-800/90', 'transition-colors', 'flex', 'items-center', 'justify-between', 'gap-2', 'min-w-0', 'cursor-pointer');
-    var nameInput = card.querySelector('#' + (isEnemy ? 'edit-e-' : 'edit-h-') + cardIndex + '-name');
-    var classInput = card.querySelector('#' + (isEnemy ? 'edit-e-' : 'edit-h-') + cardIndex + '-class');
-    var imageInput = card.querySelector('#' + (isEnemy ? 'edit-e-' : 'edit-h-') + cardIndex + '-img');
-    var fieldsPanel = document.createElement('div');
-    fieldsPanel.className = 'flex gap-2 mb-3 sm:mb-4 items-center flex-wrap';
-    while (header.firstChild) fieldsPanel.appendChild(header.firstChild);
-    foldParts[0].insertBefore(fieldsPanel, foldParts[0].firstChild);
-    header.innerHTML = '';
-    var avatar = document.createElement('div');
-    avatar.className = isEnemy ? 'w-6 h-6 rounded overflow-hidden border border-rose-500/40 bg-black/40 shrink-0 flex items-center justify-center text-xs' : 'w-6 h-6 rounded overflow-hidden border border-cyan-500/40 bg-black/40 shrink-0 flex items-center justify-center text-xs';
-    var imageUrl = imageInput && imageInput.value ? imageInput.value : (entity.img || '');
-    if (imageUrl) {
-      var avatarImg = document.createElement('img');
-      avatarImg.src = imageUrl;
-      avatarImg.className = 'w-full h-full object-cover';
-      avatarImg.onerror = function () { avatar.textContent = isEnemy ? (entity.emoji || '👾') : '👤'; };
-      avatar.appendChild(avatarImg);
+    var isExp = !!h.isExpanded;
+    var _hName = h.name || '未命名';
+    var _hClass = h.classType || '无职业';
+    var _hImg = h.img || '';
+    html += `<div class="char-card-hero rounded-lg overflow-hidden ${isExp ? 'is-expanded' : ''}" id="hero-card-${i}">`;
+    
+    // 一级折叠栏头部
+    html += `<div onclick="toggleCharFold('hero', ${i})" class="px-2.5 sm:px-3 py-2 cursor-pointer bg-slate-900/80 hover:bg-slate-800/90 transition-colors flex flex-col gap-1.5">`;
+    html += `<div class="flex items-center justify-between gap-2">`;
+    html += `<div class="flex items-center gap-2 min-w-0">`;
+    html += `<div class="w-6 h-6 rounded overflow-hidden border border-cyan-500/40 bg-black/40 shrink-0 flex items-center justify-center text-xs">`;
+    if (_hImg) {
+      html += `<img src="${_hImg}" class="w-full h-full object-cover" onerror="this.src='';this.parentElement.innerHTML='👤'"/>`;
     } else {
-      avatar.textContent = isEnemy ? (entity.emoji || '👾') : '👤';
+      html += `👤`;
     }
-    var summaryLeft = document.createElement('div');
-    summaryLeft.className = 'flex items-center gap-2 min-w-0';
-    summaryLeft.appendChild(avatar);
-    var summaryName = document.createElement('span');
-    summaryName.className = isEnemy ? 'font-bold text-xs sm:text-sm text-rose-200 tracking-wide' : 'font-bold text-xs sm:text-sm text-yellow-200 tracking-wide';
-    summaryLeft.appendChild(summaryName);
-    var summaryClass = document.createElement('span');
-    summaryClass.className = isEnemy ? 'px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-700/60 shrink-0' : 'px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/60 shrink-0';
-    summaryLeft.appendChild(summaryClass);
-    var summaryMetrics = document.createElement('div');
-    summaryMetrics.className = 'flex items-center gap-1.5 ml-auto mr-1 flex-wrap justify-end';
-    var hpMetric = makeMetric('HP', '', 'bg-rose-950/70 border-rose-800/60 text-rose-300');
-    var maxHpMetric = makeMetric('MaxHP', '', 'bg-slate-800 border-slate-700 text-slate-300');
-    var mpMetric = makeMetric('MP', '', 'bg-cyan-950/70 border-cyan-800/60 text-cyan-300');
-    var maxMpMetric = makeMetric('MaxMP', '', 'bg-slate-800 border-slate-700 text-slate-300');
-    summaryMetrics.appendChild(hpMetric.wrap);
-    summaryMetrics.appendChild(maxHpMetric.wrap);
-    summaryMetrics.appendChild(mpMetric.wrap);
-    summaryMetrics.appendChild(maxMpMetric.wrap);
-    header.appendChild(summaryLeft);
-    header.appendChild(summaryMetrics);
-    var refreshRoleSummary = function () {
-      var val = function (id) { var el = card.querySelector(id); return el ? el.value : ''; };
-      summaryName.textContent = val('#' + (isEnemy ? 'edit-e-' : 'edit-h-') + cardIndex + '-name') || (isEnemy ? '未命名怪物' : '未命名');
-      var classValue = val('#' + (isEnemy ? 'edit-e-' : 'edit-h-') + cardIndex + '-class');
-      summaryClass.textContent = classValue || '无职业';
-      hpMetric.value.textContent = val('#' + (isEnemy ? 'edit-e-' : 'edit-h-') + cardIndex + '-hp');
-      maxHpMetric.value.textContent = val('#' + (isEnemy ? 'edit-e-' : 'edit-h-') + cardIndex + '-maxHp');
-      mpMetric.value.textContent = val('#' + (isEnemy ? 'edit-e-' : 'edit-h-') + cardIndex + '-mp');
-      maxMpMetric.value.textContent = val('#' + (isEnemy ? 'edit-e-' : 'edit-h-') + cardIndex + '-maxMp');
-    };
-    refreshRoleSummary();
-    [nameInput, classInput, imageInput].forEach(function (el) { if (el) { el.addEventListener('input', refreshRoleSummary); el.addEventListener('change', refreshRoleSummary); } });
-    ['hp', 'maxHp', 'mp', 'maxMp'].forEach(function (field) { var el = card.querySelector('#' + (isEnemy ? 'edit-e-' : 'edit-h-') + cardIndex + '-' + field); if (el) el.addEventListener('input', refreshRoleSummary); });
-    if (foldParts[0]) {
-      foldParts[0].classList.add('px-2.5', 'sm:px-3', 'pt-2.5', 'sm:pt-3', 'bg-black/40');
+    html += `</div>`;
+    html += `<span id="hero-header-name-${i}" class="font-bold text-xs sm:text-sm text-yellow-200 tracking-wide">${_hName}</span>`;
+    html += `<span id="hero-header-class-${i}" class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/60 shrink-0">${_hClass}</span>`;
+    html += `</div>`;
+    
+    // 桌面端紧凑看板
+    html += `<div class="desktop-single-row items-center gap-2 ml-auto mr-1 font-mono-num text-[11px]">`;
+    html += `<span class="px-2 py-0.5 rounded bg-rose-950/70 border border-rose-800/60 text-rose-300"><span class="text-[9px] text-rose-400 font-bold">HP</span> <span id="hero-header-hp-${i}" class="font-bold">${h.hp}</span><span class="text-rose-500/60">/</span><span id="hero-header-maxhp-${i}">${h.maxHp}</span></span>`;
+    html += `<span class="px-2 py-0.5 rounded bg-cyan-950/70 border border-cyan-800/60 text-cyan-300"><span class="text-[9px] text-cyan-400 font-bold">MP</span> <span id="hero-header-mp-${i}" class="font-bold">${h.mp}</span><span class="text-cyan-500/60">/</span><span id="hero-header-maxmp-${i}">${h.maxMp}</span></span>`;
+    html += `<span id="hero-header-skills-${i}" class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px]">技能: ${h.skills ? h.skills.length : 0}</span>`;
+    html += `</div>`;
+    
+    // 控制按钮
+    html += `<div class="flex items-center gap-1.5 shrink-0">`;
+    html += `<button onclick="event.stopPropagation(); removeHero(${i})" class="w-5 h-5 rounded hover:bg-rose-900/70 text-slate-500 hover:text-rose-300 flex items-center justify-center text-xs transition-colors" title="删除角色">✕</button>`;
+    html += `<span id="hero-arrow-${i}" class="text-cyan-400 text-xs transition-transform duration-200 ${isExp ? 'rotate-180' : ''}">▼</span>`;
+    html += `</div>`;
+    html += `</div>`;
+    
+    // 移动端多行指标
+    html += `<div class="mobile-multi-row items-center gap-1.5 font-mono-num text-[10px] pt-0.5 border-t border-slate-800/50">`;
+    html += `<span class="px-2 py-0.5 rounded bg-rose-950/70 border border-rose-800/60 text-rose-300"><span class="text-[9px] text-rose-400 font-bold">HP</span> <span class="font-bold">${h.hp}</span>/${h.maxHp}</span>`;
+    html += `<span class="px-2 py-0.5 rounded bg-cyan-950/70 border border-cyan-800/60 text-cyan-300"><span class="text-[9px] text-cyan-400 font-bold">MP</span> <span class="font-bold">${h.mp}</span>/${h.maxMp}</span>`;
+    html += `<span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[9px] ml-auto">技能数: ${h.skills ? h.skills.length : 0}</span>`;
+    html += `</div>`;
+    html += `</div>`;
+
+    // 一级展开内容区
+    html += `<div id="hero-body-${i}" class="${isExp ? '' : 'hidden'} p-2.5 sm:p-3 space-y-3 bg-black/40 border-t border-cyan-950/60">`;
+    
+    // 角色核心属性
+    html += `<div class="space-y-2">`;
+    html += `<div class="flex items-center gap-1 text-[11px] font-bold text-cyan-400 border-l-2 border-cyan-500 pl-1.5">角色核心属性</div>`;
+    
+    // 基本信息行
+    html += `<div class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 text-xs">`;
+    html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">名称</span><input type="text" id="edit-h-${i}-name" value="${h.name}" oninput="updateHeroHeaderSummary(${i})" class="edit-input-game w-full font-bold text-yellow-200 py-1 text-xs"></div>`;
+    html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">职业</span><select id="edit-h-${i}-class" onchange="updateHeroHeaderSummary(${i})" class="edit-input-game w-full text-cyan-300 font-bold py-1 text-xs"><option value="" ${!h.classType ? 'selected' : ''}>无</option><option value="防守者" ${h.classType === '防守者' ? 'selected' : ''}>防守者</option><option value="隐匿者" ${h.classType === '隐匿者' ? 'selected' : ''}>隐匿者</option><option value="施法者" ${h.classType === '施法者' ? 'selected' : ''}>施法者</option><option value="狂战士" ${h.classType === '狂战士' ? 'selected' : ''}>狂战士</option><option value="风行者" ${h.classType === '风行者' ? 'selected' : ''}>风行者</option><option value="圣职者" ${h.classType === '圣职者' ? 'selected' : ''}>圣职者</option><option value="灾厄使" ${h.classType === '灾厄使' ? 'selected' : ''}>灾厄使</option></select></div>`;
+    html += `<div class="sm:col-span-6 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">头像URL</span><input type="text" id="edit-h-${i}-img" value="${h.img || ''}" class="edit-input-game w-full text-slate-400 font-mono-num text-[10px] py-1" placeholder="https://..."></div>`;
+    html += `</div>`;
+    
+    // 8 项数值矩阵
+    html += `<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 text-[10px] grid-stats-responsive">`;
+    html += `<div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col"><span class="text-rose-400 font-semibold text-[9px]">❤️ HP 当前</span><input type="number" id="edit-h-${i}-hp" value="${h.hp}" oninput="updateHeroHeaderSummary(${i})" class="edit-input-game w-full font-mono-num text-rose-200 mt-0.5 text-[11px] py-0.5"></div>`;
+    html += `<div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col"><span class="text-slate-400 text-[9px]">MaxHP 上限</span><input type="number" id="edit-h-${i}-maxHp" value="${h.maxHp}" oninput="updateHeroHeaderSummary(${i})" class="edit-input-game w-full font-mono-num text-slate-300 mt-0.5 text-[11px] py-0.5"></div>`;
+    html += `<div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col"><span class="text-cyan-400 font-semibold text-[9px]">💧 MP 当前</span><input type="number" id="edit-h-${i}-mp" value="${h.mp}" oninput="updateHeroHeaderSummary(${i})" class="edit-input-game w-full font-mono-num text-cyan-200 mt-0.5 text-[11px] py-0.5"></div>`;
+    html += `<div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col"><span class="text-slate-400 text-[9px]">MaxMP 上限</span><input type="number" id="edit-h-${i}-maxMp" value="${h.maxMp}" oninput="updateHeroHeaderSummary(${i})" class="edit-input-game w-full font-mono-num text-slate-300 mt-0.5 text-[11px] py-0.5"></div>`;
+    html += `<div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col"><span class="text-orange-400 font-semibold text-[9px]">⚔️ 攻击(Atk)</span><input type="number" id="edit-h-${i}-atk" value="${h.atk}" class="edit-input-game w-full font-mono-num text-orange-200 mt-0.5 text-[11px] py-0.5"></div>`;
+    html += `<div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col"><span class="text-blue-400 font-semibold text-[9px]">🛡️ 防御(Def)</span><input type="number" id="edit-h-${i}-def" value="${h.def}" class="edit-input-game w-full font-mono-num text-blue-200 mt-0.5 text-[11px] py-0.5"></div>`;
+    html += `<div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col"><span class="text-yellow-400 font-semibold text-[9px]">⚡ 速度(Spd)</span><input type="number" id="edit-h-${i}-spd" value="${h.spd}" class="edit-input-game w-full font-mono-num text-yellow-200 mt-0.5 text-[11px] py-0.5"></div>`;
+    html += `<div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col"><span class="text-amber-400 font-semibold text-[9px]">⏩ 行动次数</span><input type="number" min="1" id="edit-h-${i}-act" value="${h.actCount || 1}" class="edit-input-game w-full font-mono-num text-amber-200 mt-0.5 text-[11px] py-0.5"></div>`;
+    html += `</div></div>`;
+
+    // 技能列表 (二级折叠)
+    html += `<div class="space-y-1.5 pt-1">`;
+    html += `<div class="flex items-center justify-between border-b border-cyan-900/40 pb-1">`;
+    html += `<div class="flex items-center gap-1.5"><span class="text-cyan-400 text-xs font-bold">⚡ 技能列表</span><span class="text-[10px] text-slate-500">(${h.skills ? h.skills.length : 0}项)</span></div>`;
+    html += `<div class="flex items-center gap-2"><button onclick="toggleAllEntitySkills('hero', ${i}, true)" class="text-[10px] text-slate-400 hover:text-cyan-300">展开全部</button><span class="text-slate-600 text-[10px]">|</span><button onclick="toggleAllEntitySkills('hero', ${i}, false)" class="text-[10px] text-slate-400 hover:text-cyan-300">收起全部</button><button onclick="addHeroSkill(${i})" class="px-2 py-0.5 bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 text-[10px] font-bold rounded border border-cyan-600/50 flex items-center gap-0.5"><span>+</span> 新增技能</button></div>`;
+    html += `</div>`;
+    
+    html += `<div class="space-y-1.5">`;
+    if (h.skills) {
+      h.skills.forEach((s, si) => {
+        var sExp = !!s.isExpanded;
+        var dmgBadge = s.damageType === '近战' ? '🗡️' : s.damageType === '远程' ? '🎯' : s.damageType === '法术' ? '⚡' : '🌀';
+        html += `<div class="skill-card-item rounded overflow-hidden ${sExp ? 'is-expanded' : ''}" id="hero-${i}-skill-${si}">`;
+        
+        // 技能头部
+        html += `<div onclick="toggleSkillFold('hero', ${i}, ${si})" class="px-2.5 py-1.5 cursor-pointer bg-slate-900/90 hover:bg-slate-800/90 transition-colors flex flex-col gap-1">`;
+        html += `<div class="flex items-center justify-between gap-1.5">`;
+        html += `<div class="flex items-center gap-1.5 flex-wrap min-w-0">`;
+        html += `<span class="text-xs shrink-0">${dmgBadge}</span>`;
+        html += `<span id="hero-${i}-s-${si}-name-preview" class="text-xs font-bold text-slate-100 tracking-wide">${s.name || '新技能'}</span>`;
+        html += `<span class="px-1.5 py-0.2 rounded text-[9px] font-mono-num font-semibold bg-slate-800 text-cyan-300 border border-slate-700 shrink-0">${s.type || '[单体]'} ${s.power || 0}</span>`;
+        if (s.isOthers) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-emerald-950 text-emerald-300 border border-emerald-700 shrink-0">他人</span>`;
+        if (s.guaranteedHit) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-rose-950 text-rose-300 border border-rose-700 shrink-0">必中</span>`;
+        if (s.isHighTier) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-violet-950 text-violet-300 border border-violet-700 shrink-0">高阶</span>`;
+        if (s.isLegendary) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-amber-950 text-amber-300 border border-amber-700 shrink-0">传奇</span>`;
+        html += `</div>`;
+        
+        // 桌面端紧凑消耗
+        html += `<div class="desktop-single-row items-center gap-1 ml-auto mr-1 font-mono-num text-[10px]">`;
+        html += `<span class="px-1.5 py-0.2 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">💧MP:<span id="hero-${i}-s-${si}-mp-preview">${s.cost || 0}</span></span>`;
+        html += `<span class="px-1.5 py-0.2 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">🔥TP:<span id="hero-${i}-s-${si}-tp-preview">${s.tpCost || 0}</span></span>`;
+        html += `<span class="px-1.5 py-0.2 rounded bg-rose-950/80 text-rose-300 border border-rose-800/60">🩸HP:<span id="hero-${i}-s-${si}-hp-preview">${s.hpCost || 0}</span></span>`;
+        html += `<span class="px-1.5 py-0.2 rounded bg-amber-950/80 text-amber-300 border border-amber-800/60">⏳延迟:<span id="hero-${i}-s-${si}-delay-preview">${s.delay || 0}</span></span>`;
+        html += `</div>`;
+        
+        // 技能控制
+        html += `<div class="flex items-center gap-1 shrink-0">`;
+        html += `<button onclick="event.stopPropagation(); removeHeroSkill(${i}, ${si})" class="w-4 h-4 rounded hover:bg-red-900/60 text-slate-500 hover:text-red-300 flex items-center justify-center text-[10px] transition-colors" title="删除技能">✕</button>`;
+        html += `<span id="hero-${i}-skill-arrow-${si}" class="text-slate-400 text-[10px] transition-transform duration-200 ${sExp ? 'rotate-180' : ''}">▼</span>`;
+        html += `</div>`;
+        html += `</div>`;
+        
+        // 移动端专属消耗栏
+        html += `<div class="mobile-multi-row items-center gap-1 font-mono-num text-[9px] flex-wrap pt-0.5 border-t border-slate-800/40">`;
+        html += `<span class="px-1.5 py-0.2 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">💧MP:${s.cost || 0}</span>`;
+        html += `<span class="px-1.5 py-0.2 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">🔥TP:${s.tpCost || 0}</span>`;
+        html += `<span class="px-1.5 py-0.2 rounded bg-rose-950/80 text-rose-300 border border-rose-800/60">🩸HP:${s.hpCost || 0}</span>`;
+        html += `<span class="px-1.5 py-0.2 rounded bg-amber-950/80 text-amber-300 border border-amber-800/60">⏳延迟:${s.delay || 0}</span>`;
+        html += `</div>`;
+        html += `</div>`;
+
+        // 技能表单展开体
+        html += `<div id="hero-${i}-skill-body-${si}" class="${sExp ? '' : 'hidden'} p-2 sm:p-2.5 space-y-2 bg-black/50 border-t border-slate-800 text-[11px]">`;
+        
+        // 模块 A：基础设定与修饰开关
+        html += `<div class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 text-xs items-center">`;
+        html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">名称</span><input type="text" id="edit-h-${i}-s-${si}-name" value="${s.name}" oninput="updateHeroSkillHeaderSummary(${i}, ${si})" class="edit-input-game w-full font-bold text-slate-100 py-1 text-xs" placeholder="技能名"></div>`;
+        html += `<div class="sm:col-span-2 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">属性</span><select id="edit-h-${i}-s-${si}-dmgType" onchange="updateHeroSkillHeaderSummary(${i}, ${si})" class="edit-input-game w-full text-orange-300 font-bold py-1 text-xs"><option value="" ${!s.damageType ? 'selected' : ''}>无(近战)</option><option value="近战" ${s.damageType === '近战' ? 'selected' : ''}>🗡️ 近战</option><option value="远程" ${s.damageType === '远程' ? 'selected' : ''}>🎯 远程</option><option value="法术" ${s.damageType === '法术' ? 'selected' : ''}>⚡ 法术</option></select></div>`;
+        html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">特效</span><select id="edit-h-${i}-s-${si}-fxTag" class="edit-input-game w-full text-yellow-300 font-bold py-1 text-xs">${['特效:无', ...Object.keys(WEBM_FX_REGISTRY)].map(f => { const val = f === '特效:无' ? '' : f; const isSel = (s.fxTag || '') === val; return `<option value="${val}" ${isSel ? 'selected' : ''}>${f}</option>`; }).join('')}</select></div>`;
+        
+        // 药丸修饰开关
+        html += `<div class="sm:col-span-4 flex items-center gap-1.5 flex-wrap">`;
+        html += `<label id="pill-h-${i}-s-${si}-others" class="tag-toggle-pill border-emerald-500 text-emerald-300 bg-emerald-950/70 ${s.isOthers ? 'active' : 'inactive'}"><input type="checkbox" id="edit-h-${i}-s-${si}-others" ${s.isOthers ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-h-${i}-s-${si}-others')"><span>👥</span> 他人</label>`;
+        html += `<label id="pill-h-${i}-s-${si}-guaranteed" class="tag-toggle-pill border-rose-500 text-rose-300 bg-rose-950/70 ${s.guaranteedHit ? 'active' : 'inactive'}"><input type="checkbox" id="edit-h-${i}-s-${si}-guaranteed" ${s.guaranteedHit ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-h-${i}-s-${si}-guaranteed')"><span>🎯</span> 必中</label>`;
+        html += `<label id="pill-h-${i}-s-${si}-highTier" class="tag-toggle-pill border-violet-500 text-violet-300 bg-violet-950/70 ${s.isHighTier ? 'active' : 'inactive'}"><input type="checkbox" id="edit-h-${i}-s-${si}-highTier" ${s.isHighTier ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-h-${i}-s-${si}-highTier')"><span>⬥</span> 高阶</label>`;
+        html += `<label id="pill-h-${i}-s-${si}-legendary" class="tag-toggle-pill border-amber-500 text-amber-300 bg-amber-950/70 ${s.isLegendary ? 'active' : 'inactive'}"><input type="checkbox" id="edit-h-${i}-s-${si}-legendary" ${s.isLegendary ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-h-${i}-s-${si}-legendary')"><span>✦</span> 传奇</label>`;
+        html += `</div></div>`;
+
+        // 模块 B：反制策略
+        html += `<div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-xs bg-slate-900/70 p-1.5 rounded border border-slate-800 grid-reactions-responsive">`;
+        html += `<div class="flex items-center gap-1"><span class="text-indigo-400 text-[10px] whitespace-nowrap font-bold">反应</span><select id="edit-h-${i}-s-${si}-reaction" class="edit-input-game w-full text-indigo-300 text-[10px] py-1 font-semibold"><option value="none" ${!s.isReaction ? 'selected' : ''}>非反应</option><option value="all" ${s.isReaction && s.reactionTarget === 'all' ? 'selected' : ''}>反应(全能)</option><option value="近战" ${s.isReaction && s.reactionTarget === '近战' ? 'selected' : ''}>反应(近战)</option><option value="远程" ${s.isReaction && s.reactionTarget === '远程' ? 'selected' : ''}>反应(远程)</option><option value="法术" ${s.isReaction && s.reactionTarget === '法术' ? 'selected' : ''}>反应(法术)</option></select></div>`;
+        html += `<div class="flex items-center gap-1"><span class="text-amber-400 text-[10px] whitespace-nowrap font-bold">看破</span><select id="edit-h-${i}-s-${si}-kanpo" class="edit-input-game w-full text-amber-300 text-[10px] py-1 font-semibold"><option value="none" ${!s.kanpoTarget ? 'selected' : ''}>无看破</option><option value="all" ${s.kanpoTarget === 'all' ? 'selected' : ''}>看破(全能)</option><option value="近战" ${s.kanpoTarget === '近战' ? 'selected' : ''}>看破(近战)</option><option value="远程" ${s.kanpoTarget === '远程' ? 'selected' : ''}>看破(远程)</option><option value="法术" ${s.kanpoTarget === '法术' ? 'selected' : ''}>看破(法术)</option></select></div>`;
+        html += `<div class="flex items-center gap-1"><span class="text-sky-400 text-[10px] whitespace-nowrap font-bold">舍身</span><select id="edit-h-${i}-s-${si}-sheshen" class="edit-input-game w-full text-sky-300 text-[10px] py-1 font-semibold"><option value="none" ${!s.sheshenTarget ? 'selected' : ''}>无舍身</option><option value="all" ${s.sheshenTarget === 'all' ? 'selected' : ''}>舍身(全能)</option><option value="近战" ${s.sheshenTarget === '近战' ? 'selected' : ''}>舍身(近战)</option><option value="远程" ${s.sheshenTarget === '远程' ? 'selected' : ''}>舍身(远程)</option><option value="法术" ${s.sheshenTarget === '法术' ? 'selected' : ''}>舍身(法术)</option></select></div>`;
+        html += `</div>`;
+
+        // 模块 C：消耗与节奏数值矩阵
+        html += `<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 text-[10px] grid-costs-responsive">`;
+        html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-sky-400 whitespace-nowrap text-[9px] font-semibold shrink-0">💧 MP耗</span><input type="number" id="edit-h-${i}-s-${si}-cost" value="${s.cost || 0}" oninput="updateHeroSkillHeaderSummary(${i}, ${si})" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-sky-200 text-[10px] py-0.5 px-1"></div>`;
+        html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-rose-400 whitespace-nowrap text-[9px] font-semibold shrink-0">🩸 HP耗</span><input type="number" id="edit-h-${i}-s-${si}-hpCost" value="${s.hpCost || 0}" oninput="updateHeroSkillHeaderSummary(${i}, ${si})" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-rose-200 text-[10px] py-0.5 px-1"></div>`;
+        html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-emerald-400 whitespace-nowrap text-[9px] font-semibold shrink-0">🔥 TP耗</span><input type="number" id="edit-h-${i}-s-${si}-tpCost" value="${s.tpCost || 0}" oninput="updateHeroSkillHeaderSummary(${i}, ${si})" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-emerald-200 text-[10px] py-0.5 px-1"></div>`;
+        html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-yellow-400 whitespace-nowrap text-[9px] font-semibold shrink-0">🎯 Aim</span><input type="number" id="edit-h-${i}-s-${si}-hit" value="${s.hit != null ? s.hit : 100}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-yellow-200 text-[10px] py-0.5 px-1"></div>`;
+        html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-purple-400 whitespace-nowrap text-[9px] font-semibold shrink-0">⏱️ 持续</span><input type="number" id="edit-h-${i}-s-${si}-turns" value="${s.turns || ''}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-purple-200 text-[10px] py-0.5 px-1" placeholder="默认"></div>`;
+        html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-yellow-300 whitespace-nowrap text-[9px] font-semibold shrink-0">⏳ 延迟</span><input type="number" id="edit-h-${i}-s-${si}-delay" value="${s.delay || 0}" oninput="updateHeroSkillHeaderSummary(${i}, ${si})" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-yellow-200 text-[10px] py-0.5 px-1"></div>`;
+        html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-cyan-300 whitespace-nowrap text-[9px] font-semibold shrink-0">⚡ 加速</span><input type="number" id="edit-h-${i}-s-${si}-haste" value="${s.haste || 0}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-cyan-200 text-[10px] py-0.5 px-1"></div>`;
+        html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-fuchsia-300 whitespace-nowrap text-[9px] font-semibold shrink-0">🚫 限次</span><input type="number" id="edit-h-${i}-s-${si}-limit" value="${s.maxUses || 0}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-fuchsia-200 text-[10px] py-0.5 px-1" placeholder="0"></div>`;
+        html += `</div>`;
+
+        // 模块 D：三重复合标签槽位与威力配置（带屏障护甲与驱散量并排）
+        var _dispVal = (() => { if ((s.type||'').includes('驱散')) return s.power; if ((s.type2||'').includes('驱散')) return s.power2; if ((s.type3||'').includes('驱散')) return s.power3; return 0; })();
+        html += `<div class="space-y-1">`;
+        html += `<div class="text-[10px] text-slate-400 font-bold flex items-center justify-between flex-wrap gap-1">`;
+        html += `<span>三重复合标签槽位:</span>`;
+        html += `<div class="flex items-center gap-3 text-[10px]">`;
+        html += `<span class="text-cyan-400 font-semibold flex items-center gap-1">🛡️ 屏障护甲: <input type="number" id="edit-h-${i}-s-${si}-armor" value="${s.barrierArmor||0}" class="edit-input-game w-12 font-mono-num text-right text-cyan-200 py-0.5 text-[10px]" min="0"> 点</span>`;
+        html += `<span class="text-emerald-400 font-semibold flex items-center gap-1">✨ 驱散量: <input type="number" id="edit-h-${i}-s-${si}-dispel" value="${_dispVal}" class="edit-input-game w-12 font-mono-num text-right text-emerald-200 py-0.5 text-[10px]" min="0"> 层</span>`;
+        html += `</div>`;
+        html += `</div>`;
+
+        html += `<div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 grid-tags-responsive">`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-h-${i}-s-${si}-type" class="edit-input-game w-full text-cyan-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-s-${si}-power" value="${s.power}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-h-${i}-s-${si}-type2" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-s-${si}-power2" value="${s.power2}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-h-${i}-s-${si}-type3" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-s-${si}-power3" value="${s.power3}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
+        html += `</div>`;
+        html += `</div>`; // close module D space-y-1
+
+        html += `</div>`; // close skill body
+        html += `</div>`; // close skill card
+      });
     }
-    var arrow = document.createElement('span');
-    arrow.className = isEnemy ? 'absolute right-8 top-2.5 text-rose-400 text-xs transition-transform duration-200 pointer-events-none' : 'absolute right-8 top-2.5 text-cyan-400 text-xs transition-transform duration-200 pointer-events-none';
-    arrow.textContent = '▼';
-    card.appendChild(arrow);
-    header.onclick = function (event) {
-      if (event.target && event.target.closest && event.target.closest('input,select,label,button')) return;
-      var collapsed = foldParts[0].classList.contains('hidden');
-      foldParts.forEach(function (part) { part.classList.toggle('hidden', !collapsed); });
-      card.classList.toggle('is-expanded', collapsed);
-      arrow.classList.toggle('rotate-180', collapsed);
-      header.setAttribute('aria-expanded', collapsed ? 'true' : 'false');
-    };
-    foldParts.forEach(function (part) { part.classList.add('hidden'); });
-    card.classList.remove('is-expanded');
-    header.setAttribute('aria-expanded', 'false');
-    var skillPanel = parts[3];
-    var skillList = skillPanel && skillPanel.querySelector('.space-y-2, .space-y-3');
-    if (!skillList) return;
-    Array.prototype.slice.call(skillList.children).forEach(function (skillCard) {
-      skillCard.classList.remove('bg-black/50', 'p-1.5', 'sm:p-2', 'pr-6', 'sm:pr-8', 'border', 'border-gray-700/50');
-      skillCard.classList.add('skill-card-item', 'rounded', 'overflow-hidden', 'relative');
-      var skillParts = Array.prototype.slice.call(skillCard.children);
-      var skillHeader = skillParts[1];
-      var skillBody = skillParts.slice(2);
-      if (!skillHeader || !skillBody.length) return;
-      skillHeader.classList.remove('mb-1.5', 'sm:mb-2');
-      skillHeader.classList.add('px-2', 'py-1.5', 'pr-12', 'cursor-pointer', 'bg-slate-900/50', 'hover:bg-slate-800/80', 'transition-colors', 'flex', 'items-center', 'gap-2', 'min-w-0');
-      var skillControls = document.createElement('div');
-      skillControls.className = 'space-y-1.5 sm:space-y-2';
-      while (skillHeader.firstChild) skillControls.appendChild(skillHeader.firstChild);
-      skillBody[0].insertBefore(skillControls, skillBody[0].firstChild);
-      skillHeader.innerHTML = '';
-      var skillName = document.createElement('span');
-      skillName.className = 'font-bold text-xs sm:text-sm text-slate-100 truncate min-w-0';
-      var skillSummary = document.createElement('div');
-      skillSummary.className = 'flex items-center gap-1.5 ml-auto mr-1 shrink-0';
-      var skillMp = makeMetric('MP', '', 'bg-cyan-950/70 border-cyan-800/60 text-cyan-300');
-      var skillTp = makeMetric('TP', '', 'bg-emerald-950/70 border-emerald-800/60 text-emerald-300');
-      var skillHp = makeMetric('HP', '', 'bg-rose-950/70 border-rose-800/60 text-rose-300');
-      var skillDelay = makeMetric(isEnemy ? '蓄力' : '延迟', '', isEnemy ? 'bg-rose-950/50 border-rose-800/60 text-rose-300' : 'bg-amber-950/70 border-amber-800/60 text-amber-300');
-      skillSummary.appendChild(skillMp.wrap);
-      skillSummary.appendChild(skillTp.wrap);
-      skillSummary.appendChild(skillHp.wrap);
-      skillSummary.appendChild(skillDelay.wrap);
-      skillHeader.appendChild(skillName);
-      skillHeader.appendChild(skillSummary);
-      var skillPrefix = isEnemy ? 'edit-e-' : 'edit-h-';
-      var skillIdPrefix = skillPrefix + cardIndex + '-s-' + Array.prototype.indexOf.call(skillList.children, skillCard) + '-';
-      var skillValue = function (field) { var el = skillCard.querySelector('#' + skillIdPrefix + field); return el ? el.value : ''; };
-      var refreshSkillSummary = function () {
-        skillName.textContent = skillValue('name') || '未命名技能';
-        skillMp.value.textContent = skillValue('cost') || '0';
-        skillTp.value.textContent = skillValue('tpCost') || '0';
-        skillHp.value.textContent = skillValue('hpCost') || '0';
-        skillDelay.value.textContent = skillValue(isEnemy ? 'charge' : 'delay') || '0';
-      };
-      refreshSkillSummary();
-      ['name', 'cost', 'tpCost', 'hpCost', isEnemy ? 'charge' : 'delay'].forEach(function (field) { var el = skillCard.querySelector('#' + skillIdPrefix + field); if (el) { el.addEventListener('input', refreshSkillSummary); el.addEventListener('change', refreshSkillSummary); } });
-      var skillArrow = document.createElement('span');
-      skillArrow.className = isEnemy ? 'absolute right-7 top-2 text-rose-400 text-[10px] transition-transform duration-200 pointer-events-none' : 'absolute right-7 top-2 text-cyan-400 text-[10px] transition-transform duration-200 pointer-events-none';
-      skillArrow.textContent = '▼';
-      skillCard.appendChild(skillArrow);
-      skillHeader.onclick = function (event) {
-        if (event.target && event.target.closest && event.target.closest('input,select,label,button')) return;
-        var skillCollapsed = skillBody[0].classList.contains('hidden');
-        skillBody.forEach(function (part) { part.classList.toggle('hidden', !skillCollapsed); });
-        skillCard.classList.toggle('is-expanded', skillCollapsed);
-        skillArrow.classList.toggle('rotate-180', skillCollapsed);
-        skillHeader.setAttribute('aria-expanded', skillCollapsed ? 'true' : 'false');
-      };
-      skillBody.forEach(function (part, bodyIndex) { part.classList.add('hidden', 'px-2', 'pb-2'); if (bodyIndex === 0) part.classList.add('pt-2'); });
-      skillCard.classList.remove('is-expanded');
-      skillHeader.setAttribute('aria-expanded', 'false');
-    });
+    html += `</div></div>`; // close skill list
+    
+    html += `</div></div>`; // close hero body & hero card
   });
+  html += `</div>`; // close #heroes-list-container
+
+  // 敌方单位列表
+  html += `<div id="enemies-list-container" class="space-y-2.5 ${_curTab === 'enemy' ? '' : 'hidden'}">`;
+  enemiesData.forEach((e, i) => {
+    var isExp = !!e.isExpanded;
+    var _eName = e.name || '未命名怪物';
+    var _eEmoji = e.emoji || '👾';
+    var _eClass = e.classType || '普通怪';
+    var _eImg = e.img || '';
+    html += `<div class="char-card-enemy rounded-lg overflow-hidden ${isExp ? 'is-expanded' : ''}" id="enemy-card-${i}">`;
+    
+    // 一级折叠栏头部
+    html += `<div onclick="toggleCharFold('enemy', ${i})" class="px-2.5 sm:px-3 py-2 cursor-pointer bg-slate-900/80 hover:bg-slate-800/90 transition-colors flex flex-col gap-1.5">`;
+    html += `<div class="flex items-center justify-between gap-2">`;
+    html += `<div class="flex items-center gap-2 min-w-0">`;
+    html += `<div class="w-6 h-6 rounded overflow-hidden border border-rose-500/40 bg-black/40 shrink-0 flex items-center justify-center text-xs">`;
+    if (_eImg) {
+      html += `<img src="${_eImg}" class="w-full h-full object-cover" onerror="this.src='';this.parentElement.innerHTML='${_eEmoji}'"/>`;
+    } else {
+      html += _eEmoji;
+    }
+    html += `</div>`;
+    html += `<span id="enemy-header-name-${i}" class="font-bold text-xs sm:text-sm text-rose-200 tracking-wide">${_eName}</span>`;
+    html += `<span id="enemy-header-class-${i}" class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-700/60 shrink-0">${_eClass}</span>`;
+    if (e.isWise) {
+      html += `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-700/60 shrink-0">🧠 智慧</span>`;
+    }
+    html += `</div>`;
+    
+    // 桌面端紧凑看板
+    html += `<div class="desktop-single-row items-center gap-2 ml-auto mr-1 font-mono-num text-[11px]">`;
+    html += `<span class="px-2 py-0.5 rounded bg-rose-950/70 border border-rose-800/60 text-rose-300"><span class="text-[9px] text-rose-400 font-bold">HP</span> <span id="enemy-header-hp-${i}" class="font-bold">${e.hp}</span><span class="text-rose-500/60">/</span><span id="enemy-header-maxhp-${i}">${e.maxHp}</span></span>`;
+    html += `<span class="px-2 py-0.5 rounded bg-cyan-950/70 border border-cyan-800/60 text-cyan-300"><span class="text-[9px] text-cyan-400 font-bold">MP</span> <span id="enemy-header-mp-${i}" class="font-bold">${e.mp}</span><span class="text-cyan-500/60">/</span><span id="enemy-header-maxmp-${i}">${e.maxMp}</span></span>`;
+    html += `<span id="enemy-header-skills-${i}" class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px]">技能: ${e.skills ? e.skills.length : 0}</span>`;
+    html += `</div>`;
+    
+    // 控制按钮
+    html += `<div class="flex items-center gap-1.5 shrink-0">`;
+    html += `<button onclick="event.stopPropagation(); removeEnemy(${i})" class="w-5 h-5 rounded hover:bg-rose-900/70 text-slate-500 hover:text-rose-300 flex items-center justify-center text-xs transition-colors" title="删除怪物">✕</button>`;
+    html += `<span id="enemy-arrow-${i}" class="text-rose-400 text-xs transition-transform duration-200 ${isExp ? 'rotate-180' : ''}">▼</span>`;
+    html += `</div>`;
+    html += `</div>`;
+    
+    // 移动端多行指标
+    html += `<div class="mobile-multi-row items-center gap-1.5 font-mono-num text-[10px] pt-0.5 border-t border-slate-800/50">`;
+    html += `<span class="px-2 py-0.5 rounded bg-rose-950/70 border border-rose-800/60 text-rose-300"><span class="text-[9px] text-rose-400 font-bold">HP</span> <span class="font-bold">${e.hp}</span>/${e.maxHp}</span>`;
+    html += `<span class="px-2 py-0.5 rounded bg-cyan-950/70 border border-cyan-800/60 text-cyan-300"><span class="text-[9px] text-cyan-400 font-bold">MP</span> <span class="font-bold">${e.mp}</span>/${e.maxMp}</span>`;
+    html += `<span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[9px] ml-auto">技能数: ${e.skills ? e.skills.length : 0}</span>`;
+    html += `</div>`;
+    html += `</div>`;
+
+    // 一级展开内容区
+    html += `<div id="enemy-body-${i}" class="${isExp ? '' : 'hidden'} p-2.5 sm:p-3 space-y-3 bg-black/40 border-t border-rose-950/60">`;
+    
+    // 怪物核心属性
+    html += `<div class="space-y-2">`;
+    html += `<div class="flex items-center gap-1 text-[11px] font-bold text-rose-400 border-l-2 border-rose-500 pl-1.5">怪物核心属性</div>`;
+    
+    // 基本信息行
+    html += `<div class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 text-xs">`;
+    html += `<div class="sm:col-span-2 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">图标</span><input type="text" id="edit-e-${i}-emoji" value="${e.emoji}" class="edit-input-game w-full text-center text-sm font-bold py-1"></div>`;
+    html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">名称</span><input type="text" id="edit-e-${i}-name" value="${e.name}" oninput="updateEnemyHeaderSummary(${i})" class="edit-input-game w-full font-bold text-rose-200 py-1 text-xs"></div>`;
+    html += `<div class="sm:col-span-2 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">职业</span><select id="edit-e-${i}-class" onchange="updateEnemyHeaderSummary(${i})" class="edit-input-game w-full text-rose-300 font-bold py-1 text-xs"><option value="" ${!e.classType ? 'selected' : ''}>无</option><option value="防守者" ${e.classType === '防守者' ? 'selected' : ''}>防守者</option><option value="隐匿者" ${e.classType === '隐匿者' ? 'selected' : ''}>隐匿者</option><option value="施法者" ${e.classType === '施法者' ? 'selected' : ''}>施法者</option><option value="狂战士" ${e.classType === '狂战士' ? 'selected' : ''}>狂战士</option><option value="风行者" ${e.classType === '风行者' ? 'selected' : ''}>风行者</option><option value="圣职者" ${e.classType === '圣职者' ? 'selected' : ''}>圣职者</option><option value="灾厄使" ${e.classType === '灾厄使' ? 'selected' : ''}>灾厄使</option></select></div>`;
+    html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">图片URL</span><input type="text" id="edit-e-${i}-img" value="${e.img || ''}" class="edit-input-game w-full text-slate-400 font-mono-num text-[10px] py-1" placeholder="https://..."></div>`;
+    html += `<div class="sm:col-span-2 flex items-center gap-2 bg-slate-900/90 px-2 py-1 rounded border border-slate-700/60"><label class="flex items-center gap-1 text-rose-300 cursor-pointer text-[10px]"><input type="checkbox" id="edit-e-${i}-isWise" ${e.isWise ? 'checked' : ''} class="accent-rose-500">🧠 智慧</label></div>`;
+    html += `</div>`;
+    
+    // 7 项数值矩阵
+    html += `<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 text-[10px] grid-stats-responsive">`;
+    html += `<div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col"><span class="text-rose-400 font-semibold text-[9px]">❤️ HP 当前</span><input type="number" id="edit-e-${i}-hp" value="${e.hp}" oninput="updateEnemyHeaderSummary(${i})" class="edit-input-game w-full font-mono-num text-rose-200 mt-0.5 text-[11px] py-0.5"></div>`;
+    html += `<div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col"><span class="text-slate-400 text-[9px]">MaxHP 上限</span><input type="number" id="edit-e-${i}-maxHp" value="${e.maxHp}" oninput="updateEnemyHeaderSummary(${i})" class="edit-input-game w-full font-mono-num text-slate-300 mt-0.5 text-[11px] py-0.5"></div>`;
+    html += `<div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col"><span class="text-cyan-400 font-semibold text-[9px]">💧 MP 当前</span><input type="number" id="edit-e-${i}-mp" value="${e.mp}" oninput="updateEnemyHeaderSummary(${i})" class="edit-input-game w-full font-mono-num text-cyan-200 mt-0.5 text-[11px] py-0.5"></div>`;
+    html += `<div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col"><span class="text-slate-400 text-[9px]">MaxMP 上限</span><input type="number" id="edit-e-${i}-maxMp" value="${e.maxMp}" oninput="updateEnemyHeaderSummary(${i})" class="edit-input-game w-full font-mono-num text-slate-300 mt-0.5 text-[11px] py-0.5"></div>`;
+    html += `<div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col"><span class="text-orange-400 font-semibold text-[9px]">⚔️ 攻击(Atk)</span><input type="number" id="edit-e-${i}-atk" value="${e.atk}" class="edit-input-game w-full font-mono-num text-orange-200 mt-0.5 text-[11px] py-0.5"></div>`;
+    html += `<div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col"><span class="text-blue-400 font-semibold text-[9px]">🛡️ 防御(Def)</span><input type="number" id="edit-e-${i}-def" value="${e.def}" class="edit-input-game w-full font-mono-num text-blue-200 mt-0.5 text-[11px] py-0.5"></div>`;
+    html += `<div class="bg-slate-900/90 px-2 py-1 rounded border border-slate-700/50 flex flex-col"><span class="text-yellow-400 font-semibold text-[9px]">⚡ 速度(Spd)</span><input type="number" id="edit-e-${i}-spd" value="${e.spd}" class="edit-input-game w-full font-mono-num text-yellow-200 mt-0.5 text-[11px] py-0.5"></div>`;
+    html += `</div></div>`;
+
+    // 技能列表 (二级折叠)
+    html += `<div class="space-y-1.5 pt-1">`;
+    html += `<div class="flex items-center justify-between border-b border-rose-900/40 pb-1">`;
+    html += `<div class="flex items-center gap-1.5"><span class="text-rose-400 text-xs font-bold">⚡ 技能列表</span><span class="text-[10px] text-slate-500">(${e.skills ? e.skills.length : 0}项)</span></div>`;
+    html += `<div class="flex items-center gap-2"><button onclick="toggleAllEntitySkills('enemy', ${i}, true)" class="text-[10px] text-slate-400 hover:text-rose-300">展开全部</button><span class="text-slate-600 text-[10px]">|</span><button onclick="toggleAllEntitySkills('enemy', ${i}, false)" class="text-[10px] text-slate-400 hover:text-rose-300">收起全部</button><button onclick="addEnemySkill(${i})" class="px-2 py-0.5 bg-rose-900/60 hover:bg-rose-800 text-rose-200 text-[10px] font-bold rounded border border-rose-600/50 flex items-center gap-0.5"><span>+</span> 新增技能</button></div>`;
+    html += `</div>`;
+    
+    html += `<div class="space-y-1.5">`;
+    if (e.skills) {
+      e.skills.forEach((s, si) => {
+        var sExp = !!s.isExpanded;
+        var dmgBadge = s.damageType === '近战' ? '🗡️' : s.damageType === '远程' ? '🎯' : s.damageType === '法术' ? '⚡' : '🌀';
+        html += `<div class="skill-card-item rounded overflow-hidden ${sExp ? 'is-expanded' : ''}" id="enemy-${i}-skill-${si}">`;
+        
+        // 技能头部
+        html += `<div onclick="toggleSkillFold('enemy', ${i}, ${si})" class="px-2.5 py-1.5 cursor-pointer bg-slate-900/90 hover:bg-slate-800/90 transition-colors flex flex-col gap-1">`;
+        html += `<div class="flex items-center justify-between gap-1.5">`;
+        html += `<div class="flex items-center gap-1.5 flex-wrap min-w-0">`;
+        html += `<span class="text-xs shrink-0">${dmgBadge}</span>`;
+        html += `<span id="enemy-${i}-s-${si}-name-preview" class="text-xs font-bold text-slate-100 tracking-wide">${s.name || '新技能'}</span>`;
+        html += `<span class="px-1.5 py-0.2 rounded text-[9px] font-mono-num font-semibold bg-slate-800 text-rose-300 border border-slate-700 shrink-0">${s.type || '[单体]'} ${s.power || 0}</span>`;
+        if (s.isOthers) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-emerald-950 text-emerald-300 border border-emerald-700 shrink-0">他人</span>`;
+        if (s.guaranteedHit) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-rose-950 text-rose-300 border border-rose-700 shrink-0">必中</span>`;
+        html += `</div>`;
+        
+        // 桌面端紧凑消耗
+        html += `<div class="desktop-single-row items-center gap-1 ml-auto mr-1 font-mono-num text-[10px]">`;
+        html += `<span class="px-1.5 py-0.2 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">💧MP:<span id="enemy-${i}-s-${si}-mp-preview">${s.cost || 0}</span></span>`;
+        html += `<span class="px-1.5 py-0.2 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">🔥TP:<span id="enemy-${i}-s-${si}-tp-preview">${s.tpCost || 0}</span></span>`;
+        html += `<span class="px-1.5 py-0.2 rounded bg-rose-950/80 text-rose-300 border border-rose-800/60">🩸HP:<span id="enemy-${i}-s-${si}-hp-preview">${s.hpCost || 0}</span></span>`;
+        html += `<span class="px-1.5 py-0.2 rounded bg-purple-950/80 text-purple-300 border border-purple-800/60">⏳充能:<span id="enemy-${i}-s-${si}-charge-preview">${s.charge || 0}</span></span>`;
+        html += `</div>`;
+        
+        // 技能控制
+        html += `<div class="flex items-center gap-1 shrink-0">`;
+        html += `<button onclick="event.stopPropagation(); removeEnemySkill(${i}, ${si})" class="w-4 h-4 rounded hover:bg-red-900/60 text-slate-500 hover:text-red-300 flex items-center justify-center text-[10px] transition-colors" title="删除技能">✕</button>`;
+        html += `<span id="enemy-${i}-skill-arrow-${si}" class="text-slate-400 text-[10px] transition-transform duration-200 ${sExp ? 'rotate-180' : ''}">▼</span>`;
+        html += `</div>`;
+        html += `</div>`;
+        
+        // 移动端专属消耗栏
+        html += `<div class="mobile-multi-row items-center gap-1 font-mono-num text-[9px] flex-wrap pt-0.5 border-t border-slate-800/40">`;
+        html += `<span class="px-1.5 py-0.2 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">💧MP:${s.cost || 0}</span>`;
+        html += `<span class="px-1.5 py-0.2 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">🔥TP:${s.tpCost || 0}</span>`;
+        html += `<span class="px-1.5 py-0.2 rounded bg-rose-950/80 text-rose-300 border border-rose-800/60">🩸HP:${s.hpCost || 0}</span>`;
+        html += `<span class="px-1.5 py-0.2 rounded bg-purple-950/80 text-purple-300 border border-purple-800/60">⏳充能:${s.charge || 0}</span>`;
+        html += `</div>`;
+        html += `</div>`;
+
+        // 技能表单展开体
+        html += `<div id="enemy-${i}-skill-body-${si}" class="${sExp ? '' : 'hidden'} p-2 sm:p-2.5 space-y-2 bg-black/50 border-t border-slate-800 text-[11px]">`;
+        
+        // 模块 A：基础设定与修饰开关
+        html += `<div class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 text-xs items-center">`;
+        html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">名称</span><input type="text" id="edit-e-${i}-s-${si}-name" value="${s.name}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-full font-bold text-slate-100 py-1 text-xs" placeholder="技能名称"></div>`;
+        html += `<div class="sm:col-span-2 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">属性</span><select id="edit-e-${i}-s-${si}-dmgType" onchange="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-full text-orange-300 font-bold py-1 text-xs"><option value="" ${!s.damageType ? 'selected' : ''}>无(近战)</option><option value="近战" ${s.damageType === '近战' ? 'selected' : ''}>🗡️ 近战</option><option value="远程" ${s.damageType === '远程' ? 'selected' : ''}>🎯 远程</option><option value="法术" ${s.damageType === '法术' ? 'selected' : ''}>⚡ 法术</option></select></div>`;
+        html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">特效</span><select id="edit-e-${i}-s-${si}-fxTag" class="edit-input-game w-full text-yellow-300 font-bold py-1 text-xs">${['特效:无', ...Object.keys(WEBM_FX_REGISTRY)].map(f => { const val = f === '特效:无' ? '' : f; const isSel = (s.fxTag || '') === val; return `<option value="${val}" ${isSel ? 'selected' : ''}>${f}</option>`; }).join('')}</select></div>`;
+        
+        // 药丸修饰开关
+        html += `<div class="sm:col-span-4 flex items-center gap-1.5 flex-wrap">`;
+        html += `<label id="pill-e-${i}-s-${si}-others" class="tag-toggle-pill border-emerald-500 text-emerald-300 bg-emerald-950/70 ${s.isOthers ? 'active' : 'inactive'}"><input type="checkbox" id="edit-e-${i}-s-${si}-others" ${s.isOthers ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-e-${i}-s-${si}-others')"><span>👥</span> 他人</label>`;
+        html += `<label id="pill-e-${i}-s-${si}-guaranteed" class="tag-toggle-pill border-rose-500 text-rose-300 bg-rose-950/70 ${s.guaranteedHit ? 'active' : 'inactive'}"><input type="checkbox" id="edit-e-${i}-s-${si}-guaranteed" ${s.guaranteedHit ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-e-${i}-s-${si}-guaranteed')"><span>🎯</span> 必中</label>`;
+        html += `</div></div>`;
+
+        // 模块 C：消耗与节奏数值矩阵
+        html += `<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-1.5 text-[10px] grid-costs-responsive">`;
+        html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-sky-400 whitespace-nowrap text-[9px] font-semibold shrink-0">💧 MP耗</span><input type="number" id="edit-e-${i}-s-${si}-cost" value="${s.cost || 0}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-sky-200 text-[10px] py-0.5 px-1"></div>`;
+        html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-rose-400 whitespace-nowrap text-[9px] font-semibold shrink-0">🩸 HP耗</span><input type="number" id="edit-e-${i}-s-${si}-hpCost" value="${s.hpCost || 0}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-rose-200 text-[10px] py-0.5 px-1"></div>`;
+        html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-emerald-400 whitespace-nowrap text-[9px] font-semibold shrink-0">🔥 TP耗</span><input type="number" id="edit-e-${i}-s-${si}-tpCost" value="${s.tpCost || 0}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-emerald-200 text-[10px] py-0.5 px-1"></div>`;
+        html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-yellow-400 whitespace-nowrap text-[9px] font-semibold shrink-0">🎯 Aim</span><input type="number" id="edit-e-${i}-s-${si}-hit" value="${s.hit != null ? s.hit : 100}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-yellow-200 text-[10px] py-0.5 px-1"></div>`;
+        html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-purple-400 whitespace-nowrap text-[9px] font-semibold shrink-0">⏱️ 持续</span><input type="number" id="edit-e-${i}-s-${si}-turns" value="${s.turns || ''}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-purple-200 text-[10px] py-0.5 px-1" placeholder="默认"></div>`;
+        html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-rose-400 whitespace-nowrap text-[9px] font-bold shrink-0">⏳ 充能</span><input type="number" id="edit-e-${i}-s-${si}-charge" value="${s.charge || 0}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-rose-200 text-[10px] py-0.5 px-1" placeholder="0"></div>`;
+        html += `</div>`;
+
+        // 模块 D：三重复合标签槽位与威力配置
+        html += `<div class="space-y-1">`;
+        html += `<div class="text-[10px] text-slate-400 font-bold">三重复合标签槽位:</div>`;
+        html += `<div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 grid-tags-responsive">`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-e-${i}-s-${si}-type" class="edit-input-game w-full text-rose-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power" value="${s.power}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-e-${i}-s-${si}-type2" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power2" value="${s.power2}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-e-${i}-s-${si}-type3" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power3" value="${s.power3}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
+        html += `</div>`;
+        html += `</div>`; // close module D space-y-1
+
+        html += `</div>`; // close skill body
+        html += `</div>`; // close skill card
+      });
+    }
+    html += `</div></div>`; // close skill list
+    
+    html += `</div></div>`; // close enemy body & enemy card
+  });
+  html += `</div>`; // close #enemies-list-container
+  
+  html += `</div>`; // close #main-scroll-area
+  html += `<div class="mt-1.5 pt-1.5 border-t border-slate-700/40 flex items-center justify-between text-[10px] text-slate-400 shrink-0"><div class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span><span>竖屏抗挤压已就绪：折叠栏与数值矩阵智能分层，彻底杜绝文字截断与同行动挤压。</span></div><div class="font-mono text-slate-500">READY</div></div>`;
+  html += `</div>`; // close #editor-scroll-container
+  
+  modal.innerHTML = html;
+  if (savedScrollTop > 0) {
+    const nc = document.getElementById('editor-scroll-container'); if(nc) nc.scrollTop = savedScrollTop;
+    const ms = document.getElementById('main-scroll-area'); if(ms) ms.scrollTop = savedScrollTop;
+  }
+}
+
+function switchPartyTab(tab) {
+  window.__editorFactionTab = tab;
+  var heroCont = document.getElementById('heroes-list-container');
+  var enemyCont = document.getElementById('enemies-list-container');
+  var btnHero = document.getElementById('tab-btn-heroes');
+  var btnEnemy = document.getElementById('tab-btn-enemies');
+  var btnAdd = document.getElementById('add-entity-btn');
+  var isHero = tab === 'hero';
+
+  if (heroCont) {
+    if (isHero) { heroCont.classList.remove('hidden'); } else { heroCont.classList.add('hidden'); }
+  }
+  if (enemyCont) {
+    if (isHero) { enemyCont.classList.add('hidden'); } else { enemyCont.classList.remove('hidden'); }
+  }
+  if (btnHero) {
+    btnHero.className = isHero ?
+      'px-2.5 py-1 rounded text-xs font-bold transition-all bg-cyan-950 text-cyan-300 border border-cyan-600/50 shadow flex items-center gap-1' :
+      'px-2.5 py-1 rounded text-xs font-bold transition-all text-slate-400 hover:text-cyan-300 hover:bg-cyan-950/40 flex items-center gap-1';
+  }
+  if (btnEnemy) {
+    btnEnemy.className = isHero ?
+      'px-2.5 py-1 rounded text-xs font-bold transition-all text-slate-400 hover:text-rose-300 hover:bg-rose-950/40 flex items-center gap-1' :
+      'px-2.5 py-1 rounded text-xs font-bold transition-all bg-rose-950 text-rose-300 border border-rose-600/50 shadow flex items-center gap-1';
+  }
+  if (btnAdd) {
+    btnAdd.className = isHero ?
+      'px-2.5 py-1 bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 text-xs font-bold rounded border border-cyan-500/40 transition-all flex items-center gap-1 shadow-sm' :
+      'px-2.5 py-1 bg-rose-900/60 hover:bg-rose-800 text-rose-200 text-xs font-bold rounded border border-rose-500/40 transition-all flex items-center gap-1 shadow-sm';
+    btnAdd.innerHTML = isHero ? '<span>+</span> 添加我方角色' : '<span>+</span> 添加敌方怪物';
+  }
+}
+
+function addNewEntityFromTab() {
+  if (window.__editorFactionTab === 'enemy') {
+    addEnemy();
+  } else {
+    addHero();
+  }
+}
+
+function toggleCharFold(kind, idx) {
+  var isHero = kind === 'hero';
+  var dataList = isHero ? heroesData : enemiesData;
+  if (!dataList || !dataList[idx]) return;
+  var ent = dataList[idx];
+  ent.isExpanded = !ent.isExpanded;
+
+  var card = document.getElementById((isHero ? 'hero-card-' : 'enemy-card-') + idx);
+  var body = document.getElementById((isHero ? 'hero-body-' : 'enemy-body-') + idx);
+  var arrow = document.getElementById((isHero ? 'hero-arrow-' : 'enemy-arrow-') + idx);
+
+  if (card) {
+    if (ent.isExpanded) { card.classList.add('is-expanded'); } else { card.classList.remove('is-expanded'); }
+  }
+  if (body) {
+    if (ent.isExpanded) { body.classList.remove('hidden'); } else { body.classList.add('hidden'); }
+  }
+  if (arrow) {
+    if (ent.isExpanded) { arrow.classList.add('rotate-180'); } else { arrow.classList.remove('rotate-180'); }
+  }
+}
+
+function toggleSkillFold(partyType, entityIdx, skillIdx) {
+  var isHero = partyType === 'hero';
+  var dataList = isHero ? heroesData : enemiesData;
+  if (!dataList || !dataList[entityIdx]) return;
+  var ent = dataList[entityIdx];
+  if (!ent.skills || !ent.skills[skillIdx]) return;
+  var sk = ent.skills[skillIdx];
+  sk.isExpanded = !sk.isExpanded;
+
+  var card = document.getElementById((isHero ? 'hero-' : 'enemy-') + entityIdx + '-skill-' + skillIdx);
+  var body = document.getElementById((isHero ? 'hero-' : 'enemy-') + entityIdx + '-skill-body-' + skillIdx);
+  var arrow = document.getElementById((isHero ? 'hero-' : 'enemy-') + entityIdx + '-skill-arrow-' + skillIdx);
+
+  if (card) {
+    if (sk.isExpanded) { card.classList.add('is-expanded'); } else { card.classList.remove('is-expanded'); }
+  }
+  if (body) {
+    if (sk.isExpanded) { body.classList.remove('hidden'); } else { body.classList.add('hidden'); }
+  }
+  if (arrow) {
+    if (sk.isExpanded) { arrow.classList.add('rotate-180'); } else { arrow.classList.remove('rotate-180'); }
+  }
+}
+
+function toggleAllEntitySkills(partyType, entityIdx, expand) {
+  var isHero = partyType === 'hero';
+  var dataList = isHero ? heroesData : enemiesData;
+  if (!dataList || !dataList[entityIdx]) return;
+  var ent = dataList[entityIdx];
+  if (!ent.skills) return;
+
+  for (var si = 0; si < ent.skills.length; si++) {
+    ent.skills[si].isExpanded = !!expand;
+    var card = document.getElementById((isHero ? 'hero-' : 'enemy-') + entityIdx + '-skill-' + si);
+    var body = document.getElementById((isHero ? 'hero-' : 'enemy-') + entityIdx + '-skill-body-' + si);
+    var arrow = document.getElementById((isHero ? 'hero-' : 'enemy-') + entityIdx + '-skill-arrow-' + si);
+
+    if (card) {
+      if (expand) { card.classList.add('is-expanded'); } else { card.classList.remove('is-expanded'); }
+    }
+    if (body) {
+      if (expand) { body.classList.remove('hidden'); } else { body.classList.add('hidden'); }
+    }
+    if (arrow) {
+      if (expand) { arrow.classList.add('rotate-180'); } else { arrow.classList.remove('rotate-180'); }
+    }
+  }
+}
+
+function togglePillClass(inputEl, pillId) {
+  var pill = document.getElementById(pillId);
+  if (pill && inputEl) {
+    if (inputEl.checked) {
+      pill.classList.add('active');
+      pill.classList.remove('inactive');
+    } else {
+      pill.classList.remove('active');
+      pill.classList.add('inactive');
+    }
+  }
+}
+
+function updateHeroHeaderSummary(i) {
+  var nameEl = document.getElementById('edit-h-' + i + '-name');
+  var classEl = document.getElementById('edit-h-' + i + '-class');
+  var hpEl = document.getElementById('edit-h-' + i + '-hp');
+  var maxHpEl = document.getElementById('edit-h-' + i + '-maxHp');
+  var mpEl = document.getElementById('edit-h-' + i + '-mp');
+  var maxMpEl = document.getElementById('edit-h-' + i + '-maxMp');
+
+  var hName = document.getElementById('hero-header-name-' + i); if (hName && nameEl) hName.textContent = nameEl.value || '未命名';
+  var hClass = document.getElementById('hero-header-class-' + i); if (hClass && classEl) hClass.textContent = classEl.value || '无职业';
+  var hHp = document.getElementById('hero-header-hp-' + i); if (hHp && hpEl) hHp.textContent = hpEl.value;
+  var hMaxHp = document.getElementById('hero-header-maxhp-' + i); if (hMaxHp && maxHpEl) hMaxHp.textContent = maxHpEl.value;
+  var hMp = document.getElementById('hero-header-mp-' + i); if (hMp && mpEl) hMp.textContent = mpEl.value;
+  var hMaxMp = document.getElementById('hero-header-maxmp-' + i); if (hMaxMp && maxMpEl) hMaxMp.textContent = maxMpEl.value;
+}
+
+function updateEnemyHeaderSummary(i) {
+  var nameEl = document.getElementById('edit-e-' + i + '-name');
+  var classEl = document.getElementById('edit-e-' + i + '-class');
+  var hpEl = document.getElementById('edit-e-' + i + '-hp');
+  var maxHpEl = document.getElementById('edit-e-' + i + '-maxHp');
+  var mpEl = document.getElementById('edit-e-' + i + '-mp');
+  var maxMpEl = document.getElementById('edit-e-' + i + '-maxMp');
+
+  var eName = document.getElementById('enemy-header-name-' + i); if (eName && nameEl) eName.textContent = nameEl.value || '未命名怪物';
+  var eClass = document.getElementById('enemy-header-class-' + i); if (eClass && classEl) eClass.textContent = classEl.value || '普通怪';
+  var eHp = document.getElementById('enemy-header-hp-' + i); if (eHp && hpEl) eHp.textContent = hpEl.value;
+  var eMaxHp = document.getElementById('enemy-header-maxhp-' + i); if (eMaxHp && maxHpEl) eMaxHp.textContent = maxHpEl.value;
+  var eMp = document.getElementById('enemy-header-mp-' + i); if (eMp && mpEl) eMp.textContent = mpEl.value;
+  var eMaxMp = document.getElementById('enemy-header-maxmp-' + i); if (eMaxMp && maxMpEl) eMaxMp.textContent = maxMpEl.value;
+}
+
+function updateHeroSkillHeaderSummary(i, si) {
+  var nameEl = document.getElementById('edit-h-' + i + '-s-' + si + '-name');
+  var costEl = document.getElementById('edit-h-' + i + '-s-' + si + '-cost');
+  var tpCostEl = document.getElementById('edit-h-' + i + '-s-' + si + '-tpCost');
+  var hpCostEl = document.getElementById('edit-h-' + i + '-s-' + si + '-hpCost');
+  var delayEl = document.getElementById('edit-h-' + i + '-s-' + si + '-delay');
+
+  var sName = document.getElementById('hero-' + i + '-s-' + si + '-name-preview'); if (sName && nameEl) sName.textContent = nameEl.value || '新技能';
+  var sMp = document.getElementById('hero-' + i + '-s-' + si + '-mp-preview'); if (sMp && costEl) sMp.textContent = costEl.value || '0';
+  var sTp = document.getElementById('hero-' + i + '-s-' + si + '-tp-preview'); if (sTp && tpCostEl) sTp.textContent = tpCostEl.value || '0';
+  var sHp = document.getElementById('hero-' + i + '-s-' + si + '-hp-preview'); if (sHp && hpCostEl) sHp.textContent = hpCostEl.value || '0';
+  var sDelay = document.getElementById('hero-' + i + '-s-' + si + '-delay-preview'); if (sDelay && delayEl) sDelay.textContent = delayEl.value || '0';
+}
+
+function updateEnemySkillHeaderSummary(i, si) {
+  var nameEl = document.getElementById('edit-e-' + i + '-s-' + si + '-name');
+  var costEl = document.getElementById('edit-e-' + i + '-s-' + si + '-cost');
+  var tpCostEl = document.getElementById('edit-e-' + i + '-s-' + si + '-tpCost');
+  var hpCostEl = document.getElementById('edit-e-' + i + '-s-' + si + '-hpCost');
+  var chargeEl = document.getElementById('edit-e-' + i + '-s-' + si + '-charge');
+
+  var sName = document.getElementById('enemy-' + i + '-s-' + si + '-name-preview'); if (sName && nameEl) sName.textContent = nameEl.value || '新技能';
+  var sMp = document.getElementById('enemy-' + i + '-s-' + si + '-mp-preview'); if (sMp && costEl) sMp.textContent = costEl.value || '0';
+  var sTp = document.getElementById('enemy-' + i + '-s-' + si + '-tp-preview'); if (sTp && tpCostEl) sTp.textContent = tpCostEl.value || '0';
+  var sHp = document.getElementById('enemy-' + i + '-s-' + si + '-hp-preview'); if (sHp && hpCostEl) sHp.textContent = hpCostEl.value || '0';
+  var sCharge = document.getElementById('enemy-' + i + '-s-' + si + '-charge-preview'); if (sCharge && chargeEl) sCharge.textContent = chargeEl.value || '0';
 }
 
 function closeEditor() { document.getElementById('editor-modal').classList.add('hidden'); document.getElementById('editor-modal').classList.remove('flex'); }
-function toggleGlobalEditor(){try{syncEditorDataToMemory();}catch(e){}window.__editorGlobalExpanded=!window.__editorGlobalExpanded;openEditor();}
+
+function toggleGlobalEditor() {
+  window.__editorGlobalExpanded = !window.__editorGlobalExpanded;
+  var body = document.getElementById('global-settings-body');
+  var icon = document.getElementById('global-settings-icon');
+  if (body) {
+    if (window.__editorGlobalExpanded) {
+      body.classList.remove('hidden');
+    } else {
+      body.classList.add('hidden');
+    }
+  }
+  if (icon) {
+    if (window.__editorGlobalExpanded) {
+      icon.classList.add('rotate-180');
+    } else {
+      icon.classList.remove('rotate-180');
+    }
+  }
+}
+
+function syncGlobalEditorSummary() {
+  var getVal = function(id) { var el = document.getElementById(id); return el ? el.value : ''; };
+  var mpPct = document.getElementById('summary-mp-pct'); if (mpPct) mpPct.textContent = getVal('edit-defend-mp-pct');
+  var tpPct = document.getElementById('summary-tp-pct'); if (tpPct) tpPct.textContent = getVal('edit-defend-tp-pct');
+  var atkTp = document.getElementById('summary-atk-tp'); if (atkTp) atkTp.textContent = getVal('edit-attack-tp');
+  var kpTh = document.getElementById('summary-kanpo-th'); if (kpTh) kpTh.textContent = getVal('edit-kanpo-threshold');
+  var mutPct = document.getElementById('summary-mutation'); if (mutPct) mutPct.textContent = getVal('edit-mutation-percent');
+}
+
 function syncEditorDataToMemory() {
   heroesData.forEach((h, i) => {
     h.name = document.getElementById(`edit-h-${i}-name`).value;
