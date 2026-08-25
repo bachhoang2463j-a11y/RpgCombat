@@ -2051,3 +2051,14 @@
   4. **战斗重置状态与扫射残余全面清理（`index.html:11809`）**：`resetBattle` 补充对 `_strafeTimer`、`_strafeLock`、`_strafeBloodOverlay` 的安全解绑与清理，并在 `initUI` 重置时锁定 `_isSaving` 防护，杜绝重置触发非预期数据保存。
 - **涉及文件**：`index.html`、`demo-melee-heavy-hit.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：配合独立静态资源仓库及 8766 端口专用跨域服务器上线，将 RpgCombat 全部外链统一为可配置的动态 Base；同时修复抗性判定与战斗重置清理边界，保障系统稳定性。
+
+## [LOG-168] 2026-08-26 — 新增 [特效:近战重击] 盾击推撞·破防重击（Demo 方案1 移植）
+
+- **变更行为**：
+  1. **特效注册（`index.html:4426`）**：`WEBM_FX_REGISTRY` 新增 `'近战重击': { url: '', particles: 'melee_heavy', audioUrl: `${ASSET_BASE}/parry_Weapon_GuardBreak.wav` }` 纯 SVG/粒子方案，复用 `ASSET_BASE` 本地化路径，`preloadBattleAssets()` 自动预热音频，无视频 Blob 成本；`parseSkill` 正则与编辑器下拉 `Object.keys(WEBM_FX_REGISTRY)` 零改动即生效。
+  2. **CSS 关键帧移植（`index.html:258`）**：1:1 移植 `demo-melee-heavy-hit.html:46-133` 方案1 的 8 个关键帧与工具类：`melee-heavy-shake-anim 0.44s`、`blunt-burst-core 0.48s`、`push-wave-crescent 0.42s`、`impact-fracture-lines 0.5s`、`blunt-shock-ring 0.38s`、`blunt-spark-jet 0.38s 8向`、`stun-halo-spin 0.9s delay0.1s`、`enemy-ram-knockback 0.55s` 及 `melee-heavy-screen-flash 0.30s`，全量仅 `transform/opacity/filter drop-shadow`，无方块裁剪。
+  3. **JS 视觉函数（`index.html:3600`）**：新增 `MELEE_HEAVY_GUARDBREAK_URL`、`_meleeHeavyAudioCtx`、`playMeleeHeavySubBass()`（triangle 160Hz->36Hz 0.30s）、`createMeleeHeavyHtml()`（240px 容器六层：震波双环/半月气浪/崩裂纹/8向火星/爆破核心/头顶星环）与 `spawnMeleeHeavyParticles(x,y,targetDom)`（三重音效 SubBass+GuardBreak+80ms hitDown、重震 440ms、击退 0.55s、全屏琥珀闪 0.30s、锚点挂载 1.0s 自回收）。
+  4. **分发挂载（`index.html:5447/5875/10290/9657`）**：`spawnCanvasParticles` 新增 `melee_heavy` 分支；`playAOEEffect` 新增 `pType==='melee_heavy'`；`executeSkillAction` 新增 `近战重击` 独占分支（单体锚 `primaryTarget`、群攻锚首个存活精灵，`_fxPlayed` 去重，支持 `delay`）；`applySingleTagEffect` 命中/闪避两处将重击纳入豁免（`近战重击||远程重击`），避免与 `slash/gunshot` 双播。
+  5. **边界清理（`index.html:11815/12050`）**：`resetBattle` 与 `saveEditor` 同步清理 `melee-heavy-flash/wrap` 残留并移除 `melee-heavy-shake`，复用 `LOG-163` 扫射清理与 `_isSaving` 守卫，杜绝全屏遮罩残留。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：按 `demo-melee-heavy-hit.html` 方案1（推荐：盾击推撞·破防重击）为近战强力技能补齐重型演出，六层 SVG 同步驱动强化打击感与眩晕反馈；沿用既有 `[特效:xxx]→WEBM_FX_REGISTRY→preload→executeSkillAction/playAOEEffect/spawnCanvasParticles` 链路与前后排/保存闪烁修复约束，手术式最小改动。
