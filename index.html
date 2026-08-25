@@ -254,6 +254,67 @@
       100% { opacity: 0; }
     }
 
+    /* ==== [特效:近战重击] 盾击推撞·破防重击（移植自 demo-melee-heavy-hit.html 方案1） ==== */
+    .melee-heavy-shake { animation: melee-heavy-shake-anim 0.44s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+    @keyframes melee-heavy-shake-anim {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+      12% { transform: translate3d(-16px, 14px, 0) scale(1.035) rotate(-2deg); }
+      25% { transform: translate3d(18px, -12px, 0) scale(1.045) rotate(2.2deg); }
+      40% { transform: translate3d(-14px, 8px, 0) scale(1.025) rotate(-1.5deg); }
+      55% { transform: translate3d(10px, -6px, 0) scale(1.015) rotate(1deg); }
+      70% { transform: translate3d(-6px, 4px, 0) scale(1.008) rotate(-0.5deg); }
+      85% { transform: translate3d(3px, -2px, 0) scale(1.003) rotate(0.2deg); }
+    }
+    @keyframes blunt-burst-core {
+      0% { transform: translate(-50%, -50%) scale(0.1) rotate(0deg); opacity: 0; filter: brightness(3); }
+      15% { transform: translate(-50%, -50%) scale(1.3) rotate(10deg); opacity: 1; filter: brightness(2.2); }
+      35% { transform: translate(-50%, -50%) scale(1.1) rotate(18deg); opacity: 0.95; filter: brightness(1.5); }
+      70% { transform: translate(-50%, -50%) scale(1.22) rotate(25deg); opacity: 0.6; }
+      100% { transform: translate(-50%, -50%) scale(1.45) rotate(35deg); opacity: 0; }
+    }
+    @keyframes push-wave-crescent {
+      0% { transform: translate(-50%, -50%) scaleX(0.2) scaleY(0.5); opacity: 0; }
+      20% { transform: translate(-10%, -50%) scaleX(1.4) scaleY(1.3); opacity: 1; filter: drop-shadow(0 0 20px #f59e0b); }
+      50% { transform: translate(25%, -50%) scaleX(1.8) scaleY(1.5); opacity: 0.75; }
+      100% { transform: translate(65%, -50%) scaleX(2.3) scaleY(1.7); opacity: 0; }
+    }
+    @keyframes impact-fracture-lines {
+      0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+      22% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; filter: drop-shadow(0 0 15px #fbbf24); }
+      60% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.8; }
+      100% { transform: translate(-50%, -50%) scale(1.3); opacity: 0; }
+    }
+    @keyframes blunt-shock-ring {
+      0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; stroke-width: 9; }
+      40% { transform: translate(-50%, -50%) scale(1.8); opacity: 0.85; stroke-width: 4; }
+      100% { transform: translate(-50%, -50%) scale(2.8); opacity: 0; stroke-width: 1; }
+    }
+    @keyframes blunt-spark-jet {
+      0% { transform: translate(-50%, -50%) scale(0.2) rotate(var(--jet-rot, 0deg)); opacity: 1; }
+      35% { transform: translate(-50%, -50%) scale(1.2) translateY(-28px) rotate(var(--jet-rot, 0deg)); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1.5) translateY(-58px) rotate(var(--jet-rot, 0deg)); opacity: 0; }
+    }
+    @keyframes stun-halo-spin {
+      0% { transform: translate(-50%, -85%) scale(0.2) rotate(0deg); opacity: 0; }
+      25% { transform: translate(-50%, -105%) scale(1.1) rotate(90deg); opacity: 1; }
+      50% { transform: translate(-50%, -110%) scale(1) rotate(180deg); opacity: 0.95; }
+      75% { transform: translate(-50%, -115%) scale(1.05) rotate(270deg); opacity: 0.9; }
+      100% { transform: translate(-50%, -125%) scale(1.15) rotate(360deg); opacity: 0; }
+    }
+    @keyframes enemy-ram-knockback {
+      0% { transform: scale(1) translate(0, 0) rotate(0deg); filter: brightness(1); }
+      12% { transform: scale(0.88) translate(38px, -12px) rotate(9deg); filter: brightness(3) contrast(1.5) drop-shadow(0 0 35px #f59e0b); }
+      30% { transform: scale(1.08) translate(20px, 8px) rotate(-5deg); filter: brightness(1.8) drop-shadow(0 0 20px #fbbf24); }
+      55% { transform: scale(0.96) translate(8px, -4px) rotate(2deg); filter: brightness(1.2); }
+      80% { transform: scale(1.02) translate(-2px, 1px) rotate(-1deg); filter: brightness(1); }
+      100% { transform: scale(1) translate(0, 0) rotate(0deg); filter: brightness(1); }
+    }
+    @keyframes melee-heavy-screen-flash {
+      0% { opacity: 0; }
+      12% { opacity: 0.22; }
+      100% { opacity: 0; }
+    }
+
     /* ==== [单体(枪击)] 中小口径枪击重构 + [特效:枪击穿透] 弱点贯穿（移植自 demo-gunshot-vfx.html） ==== */
     .gunshot-shake { animation: gunshot-shake-anim 0.18s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
     @keyframes gunshot-shake-anim {
@@ -3535,6 +3596,89 @@ function createRangedHeavyBloodHtml() {
     const vignette=`<div class="absolute inset-0 pointer-events-none opacity-0" style="background:radial-gradient(circle, transparent 35%, rgba(136,8,8,0.45) 70%, rgba(55,0,0,0.92) 100%);animation:ranged-heavy-blood-vignette-pulse 1.1s cubic-bezier(0.1,0.8,0.2,1) both;"></div>`;
     return vignette+splats+drips;
 }
+// ===== [特效:近战重击] 盾击推撞·破防重击 == 复刻 demo-melee-heavy-hit.html 方案1 =====
+const MELEE_HEAVY_GUARDBREAK_URL = `${ASSET_BASE}/parry_Weapon_GuardBreak.wav`;
+let _meleeHeavyAudioCtx = null;
+function getMeleeHeavyAudioContext() { if (!_meleeHeavyAudioCtx) { const Ctx = window.AudioContext || window.webkitAudioContext; if (Ctx) _meleeHeavyAudioCtx = new Ctx(); } if (_meleeHeavyAudioCtx && _meleeHeavyAudioCtx.state === 'suspended') _meleeHeavyAudioCtx.resume(); return _meleeHeavyAudioCtx; }
+function playMeleeHeavySubBass() {
+    try {
+        const ctx = getMeleeHeavyAudioContext();
+        if (!ctx) return;
+        const osc = ctx.createOscillator(); const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(160, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(36, ctx.currentTime + 0.30);
+        gain.gain.setValueAtTime(0.75, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.30);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(); osc.stop(ctx.currentTime + 0.30);
+    } catch(e) {}
+}
+function createMeleeHeavyHtml() {
+    const size = '240px';
+    return `
+        <div class="absolute left-1/2 top-1/2 pointer-events-none" style="width:${size};height:${size};">
+          <svg viewBox="0 0 200 200" class="absolute inset-0 w-full h-full text-amber-400 stroke-current fill-none pointer-events-none" style="animation:blunt-shock-ring 0.38s cubic-bezier(0.1,0.8,0.2,1) both;filter:drop-shadow(0 0 15px #f59e0b);">
+            <circle cx="100" cy="100" r="48" stroke="#fef08a" stroke-width="6" />
+            <circle cx="100" cy="100" r="38" stroke="#f97316" stroke-width="3.5" stroke-dasharray="10 5" opacity="0.85"/>
+          </svg>
+          <div class="absolute left-1/2 top-1/2 w-full h-full pointer-events-none" style="animation:push-wave-crescent 0.42s cubic-bezier(0.15,0.9,0.25,1) both;">
+            <svg viewBox="0 0 200 200" class="w-full h-full fill-none">
+              <path d="M60,20 Q140,100 60,180 Q100,100 60,20 Z" fill="url(#melee-push-wave-grad)" style="filter:drop-shadow(0 0 18px #f59e0b);" />
+              <path d="M75,40 Q135,100 75,160 Q105,100 75,40 Z" fill="#ffffff" opacity="0.8" />
+            </svg>
+          </div>
+          <div class="absolute left-1/2 top-1/2 w-full h-full pointer-events-none" style="animation:impact-fracture-lines 0.5s cubic-bezier(0.12,0.9,0.25,1) both;will-change:transform,opacity;">
+            <svg viewBox="0 0 200 200" class="w-full h-full stroke-current text-amber-300 fill-none" style="filter:drop-shadow(0 0 10px #f59e0b);">
+              <path d="M100,100 L40,60 M100,100 L60,150 M100,100 L160,50 M100,100 L150,160 M100,100 L170,105 M100,100 L30,110 M100,100 L100,30 M100,100 L95,175" stroke-width="3" stroke-linecap="round"/>
+              <circle cx="100" cy="100" r="12" fill="#ffffff" stroke="none" />
+            </svg>
+          </div>
+          <div class="absolute inset-0 flex items-center justify-center">
+            ${[0,45,90,135,180,225,270,315].map(deg => `<div class="absolute w-2 h-14 bg-gradient-to-t from-transparent via-yellow-300 to-white rounded-full opacity-0" style="--jet-rot:${deg}deg;animation:blunt-spark-jet 0.38s cubic-bezier(0.15,0.85,0.35,1) both;filter:drop-shadow(0 0 8px #f59e0b);"></div>`).join('')}
+          </div>
+          <div class="absolute left-1/2 top-1/2 w-full h-full pointer-events-none" style="animation:blunt-burst-core 0.48s cubic-bezier(0.12,0.9,0.25,1) both;will-change:transform,opacity;">
+            <svg viewBox="0 0 200 200" class="w-full h-full" style="filter:drop-shadow(0 0 20px #f59e0b) drop-shadow(0 0 40px #d97706);">
+              <defs>
+                <radialGradient id="melee-blunt-core-grad" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#ffffff" /><stop offset="35%" stop-color="#fef08a" /><stop offset="70%" stop-color="#f59e0b" /><stop offset="100%" stop-color="#b45309" stop-opacity="0" /></radialGradient>
+                <linearGradient id="melee-push-wave-grad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#fef08a" stop-opacity="0.9" /><stop offset="50%" stop-color="#f59e0b" stop-opacity="0.7" /><stop offset="100%" stop-color="#ea580c" stop-opacity="0" /></linearGradient>
+              </defs>
+              <polygon points="100,15 118,72 175,55 130,98 180,140 122,128 110,185 88,132 25,155 70,108 20,70 78,72" fill="url(#melee-blunt-core-grad)" />
+              <circle cx="100" cy="100" r="30" fill="#ffffff" style="filter:drop-shadow(0 0 12px #fff);" />
+              <circle cx="100" cy="100" r="44" fill="#fde047" opacity="0.65" />
+            </svg>
+          </div>
+          <div class="absolute left-1/2 top-0 pointer-events-none" style="width:140px;height:60px;animation:stun-halo-spin 0.9s 0.1s cubic-bezier(0.12,0.85,0.25,1) both;will-change:transform,opacity;">
+            <svg viewBox="0 0 140 60" class="w-full h-full fill-yellow-400 stroke-yellow-200" style="filter:drop-shadow(0 0 10px #f59e0b);">
+              <ellipse cx="70" cy="30" rx="55" ry="18" fill="none" stroke="#fef08a" stroke-width="2.5" stroke-dasharray="8 6" opacity="0.85"/>
+              <polygon points="20,25 24,30 20,35 16,30" fill="#fff" />
+              <polygon points="120,25 124,30 120,35 116,30" fill="#fff" />
+              <polygon points="70,10 75,15 70,20 65,15" fill="#fef08a" />
+              <polygon points="70,42 75,47 70,52 65,47" fill="#fef08a" />
+            </svg>
+          </div>
+        </div>`;
+}
+function spawnMeleeHeavyParticles(x, y, targetDom) {
+    try { playMeleeHeavySubBass(); } catch(e) {}
+    playCustomAudio(MELEE_HEAVY_GUARDBREAK_URL);
+    setTimeout(()=>playCustomAudio(RANGED_HEAVY_HITDOWN_URL), 80);
+    const sceneEl = document.getElementById('battle-scene');
+    if (sceneEl) { sceneEl.classList.remove('ranged-heavy-shake','gunshot-shake','pierce-shake'); void sceneEl.offsetWidth; sceneEl.classList.add('melee-heavy-shake'); setTimeout(()=>sceneEl.classList.remove('melee-heavy-shake'), 440); } else { window.triggerScreenShake(8, 350); }
+    if (targetDom) { targetDom.style.animation='none'; void targetDom.offsetWidth; targetDom.style.animation='enemy-ram-knockback 0.55s cubic-bezier(0.15,0.85,0.35,1) both'; }
+    const tx = Math.round(x), ty = Math.round(y);
+    const fxRoot = document.getElementById('fx-layer') || document.body;
+    const flash = document.createElement('div');
+    flash.className='fixed inset-0 pointer-events-none melee-heavy-flash';
+    flash.style.cssText='background:rgba(251,191,36,0.20);animation:melee-heavy-screen-flash 0.30s ease-out both;z-index:150;';
+    fxRoot.appendChild(flash); setTimeout(()=>flash.remove(), 350);
+    const wrap = document.createElement('div');
+    wrap.className='melee-heavy-wrap';
+    wrap.style.cssText=`position:fixed;left:${tx}px;top:${ty}px;pointer-events:none;z-index:145;`;
+    wrap.innerHTML = createMeleeHeavyHtml();
+    fxRoot.appendChild(wrap); setTimeout(()=>wrap.remove(), 1000);
+}
+
 function spawnRangedHeavyParticles(x, y, targetDom) {
     // 音效：subBass + 强力反击枪声（shot01）+ 60ms后 hitDown—— 与 Demo 方案1完全一致
     try { playRangedHeavySubBass(); } catch(e) {}
@@ -4421,6 +4565,7 @@ const WEBM_FX_REGISTRY = {
     '克虏伯重狙': { url: `${ASSET_BASE}/snipe-ezremove.mp4`,  scale: 1.5, particles: 'gunshot',    audioUrl: 'none' },
     '异种坏死雾': { url: `${ASSET_BASE}/fog.mp4`, scale: 0.8, particles: 'poison',     audioUrl: 'none', delay: 0.2 },
     '生体流转': { url: `${ASSET_BASE}/heart.mp4`, scale: 0.4, particles: 'fire_aoe',     audioUrl: 'none' },
+    '近战重击': { url: '', scale: 1.0, particles: 'melee_heavy', audioUrl: `${ASSET_BASE}/parry_Weapon_GuardBreak.wav` },
     '远程重击': { url: '', scale: 1.0, particles: 'ranged_heavy', audioUrl: 'none' },
     '枪击穿透': { url: '', scale: 1.0, particles: 'gunshot_pierce', audioUrl: `${ASSET_BASE}/gunshot_pierce.mp3` },
     '连续扫射': { url: '', scale: 1.0, particles: 'strafe_burst', audioUrl: 'none' },
@@ -5299,6 +5444,7 @@ window.spawnCanvasParticles = function(type, x, y) {
     else if (type === 'thunder_single') spawnThunderParticles(x, y, false);
     else if (type === 'gunshot') spawnGunshotParticles(x, y);
     else if (type === 'gunshot_pierce') spawnGunshotPierceParticles(x, y);
+    else if (type === 'melee_heavy') { const _mhDom = document.elementFromPoint(x,y)?.closest('[id$="-sprite"],[id^="hero-card-"]') || null; spawnMeleeHeavyParticles(x, y, _mhDom); }
     else if (type === 'ranged_heavy') { const _rhDom = document.elementFromPoint(x,y)?.closest('[id$="-sprite"],[id^="hero-card-"]') || null; spawnRangedHeavyParticles(x, y, _rhDom); }
     else if (type === 'light') spawnLightParticles(x, y);
     else if (type === 'poison') spawnPoisonParticles(x, y);
@@ -5726,6 +5872,7 @@ function playAOEEffect(containerId, type, fxTag) {
     else if (pType === 'light')       { spawnLightParticles(x, y); }
     else if (pType === 'gunshot')     { spawnGunshotParticles(x, y); }
     else if (pType === 'gunshot_pierce'){ spawnGunshotPierceParticles(x, y); }
+    else if (pType === 'melee_heavy'){ spawnMeleeHeavyParticles(x, y, null); }
     else if (pType === 'ranged_heavy'){ spawnRangedHeavyParticles(x, y, null); }
 
     // 2. WebM 视频层（url 为 null 则跳过）
@@ -9403,7 +9550,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     //     连续扫射装饰已覆盖全场弹道，闪避不再叠加单点枪火
     const _isStrafeFx = skill && skill.fxTag === '连续扫射';
     const _isPierceFxDodge = skill && skill.fxTag === '枪击穿透';
-    const _isGunshotTagDodge = !_isStrafeFx && tag.includes('枪击') && !(skill && skill.fxTag === '远程重击');
+    const _isGunshotTagDodge = !_isStrafeFx && tag.includes('枪击') && !(skill && (skill.fxTag === '近战重击' || skill.fxTag === '远程重击'));
     const _shouldGunshotOnDodge = !_isStrafeFx && (_isPierceFxDodge || _isGunshotTagDodge);
     if (isDodged) {
       consumeOneTimeDamageGuard();
@@ -9506,8 +9653,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         // 连续扫射装饰已覆盖全场 N 线并发+火花+微震，本发不再叠加单点枪火（避免装饰与命中双播）
     } else {
     // 音效+视觉：枪击类逐发独立开火（_gunshotFiredThisHit 仅本发内互斥，跨发不共享，避免三连发"1响2哑"）
-    // ★ 重击豁免：[特效:远程重击] 由 executeSkillAction 独占已播全套重击演出，此处不再叠加中小口径枪声
-    const _isHeavyFx = skill && skill.fxTag === '远程重击';
+    // ★ 重击豁免：[特效:近战重击]/[特效:远程重击] 由 executeSkillAction 独占已播全套重击演出，此处不再叠加
+    const _isHeavyFx = skill && (skill.fxTag === '近战重击' || skill.fxTag === '远程重击');
     const _isGunshotFxSkill = skill && skill.fxTag === '枪击穿透';
     const _isGunshotTagHit = tag.includes('枪击') && !_isHeavyFx;
     if (_isHeavyFx) {
@@ -10141,6 +10288,25 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                 return null;
             }).filter(Boolean);
             if (_strafeCoords.length) { try { startStrafeBurst(caster.id, _strafeCoords); } catch(e) { console.warn('[Strafe] start failed', e); } }
+        } else if (skill && skill.fxTag === '近战重击' && !skill._fxPlayed) {
+            skill._fxPlayed = true;
+            if (isAoe) {
+                const _mHC = casterIsHero ? 'enemies-container' : 'heroes-container';
+                const _mEl = document.getElementById(_mHC);
+                if (_mEl) {
+                    const _tryDom = (_mEl.querySelector('[id$="-sprite"]:not(.opacity-40):not(.hidden)') || _mEl.querySelector('[id$="-sprite"]'));
+                    if (_tryDom) { const _cr = _tryDom.getBoundingClientRect(); spawnMeleeHeavyParticles(_cr.left+_cr.width/2, _cr.top+_cr.height/2, _tryDom); }
+                    else { const _cr = _mEl.getBoundingClientRect(); spawnMeleeHeavyParticles(_cr.left+_cr.width/2, _cr.top+_cr.height/2, null); }
+                }
+            } else {
+                const _mHT = targets[0];
+                if (_mHT) {
+                    const _mId = _mHT.id;
+                    const _mDom = _mId.startsWith('h') ? document.getElementById(`hero-card-${_mId}`) : document.getElementById(`${_mId}-sprite`);
+                    if (_mDom) { const _mTr = _mDom.getBoundingClientRect(); spawnMeleeHeavyParticles(_mTr.left + _mTr.width/2, _mTr.top + _mTr.height/2, _mDom); }
+                }
+            }
+            if (WEBM_FX_REGISTRY[skill.fxTag] && WEBM_FX_REGISTRY[skill.fxTag].delay) { await sleep(Math.round(WEBM_FX_REGISTRY[skill.fxTag].delay * 1000)); }
         } else if (skill && skill.fxTag === '远程重击' && !skill._fxPlayed) {
             skill._fxPlayed = true;
             if (isAoe) {
@@ -11812,6 +11978,7 @@ function resetBattle(btn) {
     try { if (typeof _strafeTimer !== 'undefined' && _strafeTimer) { clearInterval(_strafeTimer); _strafeTimer = null; } } catch(e) {}
     try { if (typeof _strafeLock !== 'undefined') _strafeLock = false; } catch(e) {}
     try { const _ov = document.querySelector('.strafe-blood-overlay'); if (_ov) _ov.remove(); if (typeof _strafeBloodOverlay !== 'undefined' && _strafeBloodOverlay) { try { _strafeBloodOverlay.remove(); } catch(e2) {} _strafeBloodOverlay = null; } } catch(e) {}
+    try { document.querySelectorAll('.melee-heavy-flash,.melee-heavy-wrap').forEach(el=>el.remove()); document.getElementById('battle-scene')?.classList.remove('melee-heavy-shake'); } catch(e) {}
     // 清理可能残留的连续扫射临时状态（重置后技能对象为全新拷贝，但仍幂等清理以防旧引用）
     heroesData.forEach(h => h.skills && h.skills.forEach(s => { delete s._fxPlayed; delete s._strafeBurstStart; }));
     enemiesData.forEach(e => e.skills && e.skills.forEach(s => { delete s._fxPlayed; delete s._strafeBurstStart; }));
@@ -11981,11 +12148,12 @@ function syncEditorDataToMemory() {
   });
 }
 function saveEditor() {
-  // 保存前清扫射演出残留：避免 z-index:138 血渍/抖动锁遮挡“消失”错觉
+  // 保存前清扫射/重击演出残留：避免全屏遮罩/抖动锁遮挡“消失”错觉
   try { if (typeof stopStrafeBurst === 'function') stopStrafeBurst(); } catch(e) {}
   try { if (typeof _strafeTimer !== 'undefined' && _strafeTimer) { clearInterval(_strafeTimer); _strafeTimer = null; } } catch(e) {}
   try { if (typeof _strafeLock !== 'undefined') _strafeLock = false; } catch(e) {}
   try { const _ov = document.querySelector('.strafe-blood-overlay'); if (_ov) _ov.remove(); if (typeof _strafeBloodOverlay !== 'undefined' && _strafeBloodOverlay) { try { _strafeBloodOverlay.remove(); } catch(e2) {} _strafeBloodOverlay = null; } } catch(e) {}
+  try { document.querySelectorAll('.melee-heavy-flash,.melee-heavy-wrap').forEach(el=>el.remove()); document.getElementById('battle-scene')?.classList.remove('melee-heavy-shake'); } catch(e) {}
   try { heroesData.forEach(h => h.skills && h.skills.forEach(s => { delete s._fxPlayed; delete s._strafeBurstStart; })); } catch(e) {}
   try { enemiesData.forEach(e2 => e2.skills && e2.skills.forEach(s => { delete s._fxPlayed; delete s._strafeBurstStart; })); } catch(e) {}
   syncEditorDataToMemory();
