@@ -2032,3 +2032,14 @@
   3. **数据读取与保存双向回写（`index.html:11908`）**：`syncEditorDataToMemory` 同步回写 `barrierArmor` 与对应驱散槽位 `power` 数值。
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：完善技能修改器可视化编辑能力，使测试人员与创作者可直接在 UI 界面精确调节肃正屏障护甲与驱散技能威力，无需手写复杂标签语法。
+
+## [LOG-166] 2026-08-25 — 音效与大招视频资源全量迁移至本地 my_assets 服务
+
+- **变更行为**：
+  1. **英雄语音 Base 本地化（`index.html:1752`）**：`HERO_VOICE_BASE` 由 jsdelivr 远程地址替换为 `http://192.168.110.83:8000/my_assets`，支持本地 28 个英雄台词音频零延迟读取与 Blob 预载。
+  2. **全局基础音效本地化（`index.html:1904`）**：`audioUrls` 中 24 项音效全量替换为本地 `http://192.168.110.83:8000/my_assets/{name}.ext`；其中 `kanpo` 按用户要求指向 `defDown.mp3`。
+  3. **大招视频与特效音效本地化（`index.html:4411`）**：`WEBM_FX_REGISTRY` 中火焰01、冰霜01、雷击01、圣光01、双枪扫射、克虏伯重狙、异种坏死雾、生体流转、枪击穿透等 WebM/MP4 视频与专属音频全量迁移至本地 my_assets。
+  4. **独立音频常量与 Demo 页本地化（`index.html:8856`、`demo-melee-heavy-hit.html:316`）**：`POWER_COUNTER_SOUND_URL`、`RANGED_HEAVY_HITDOWN_URL` 及演练 Demo 音效统一接入本地服务。
+- **涉及文件**：`index.html`、`demo-melee-heavy-hit.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：告别云端及 Catbox/CDN 不稳定托管与网络波动导致的加载延迟，将所有音频和视频资产彻底迁移至本地 SillyTavern 静态资源服务，实现局域网内纯本地秒级零延迟极速加载。
+
