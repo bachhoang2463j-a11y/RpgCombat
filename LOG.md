@@ -2086,3 +2086,13 @@
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`、`备份（无需阅读）/demo-editor-modal.html`。
 - **决策原因**：将 `demo-editor-modal.html` 的现代 RPG 编辑器前端样式、HTML 结构与交互细节完整移植至源文件，在零修改底层数据读写与战斗逻辑的前提下，实现 1:1 的视觉对齐、紧凑排版与极速折叠体验。
 
+## [LOG-171] 2026-08-26 — 修复技能编辑器三重复合标签预览联动与敌方阶位动态判定
+
+- **变更行为**：
+  1. **技能三重复合标签槽位预览渲染（`index.html:12116`）**：新增 `buildEditorSkillTagPreview` 统一函数，支持我方英雄（青蓝主题）与敌方单位（玫红主题）技能折叠头部完整渲染三重复合标签槽位（主标签/副标签2/副标签3）与独立威力数值，自动过滤 `[无]` 槽位与隐藏零威力冗余展示。
+  2. **技能标签与威力毫秒级双向联动（`index.html:12330/12504/12710/12734`）**：为全部 3 个类型选择器（`type/type2/type3`）与威力输入框（`power/power2/power3`）绑定 `onchange`/`oninput` 事件，输入时实时调用 `updateHeroSkillHeaderSummary` 与 `updateEnemySkillHeaderSummary` 重新生成标签徽章预览，解决此前仅显示主标签且修改副标签不刷新的缺陷。
+  3. **怪物卡片折叠头部阶位胶囊与动态重算（`index.html:12123/12352/12371/12674`）**：新增 `getEnemyTierLabel` 映射函数；怪物折叠头部废除写死的 `普通怪` 标签，改为根据真实阶位动态显示首领/精英/杂兵徽章及专属主题色；怪物属性（血量/攻防/行动次数）输入变化时通过 `updateEnemyHeaderSummary` 动态重算阶位并即时切换头部徽章。
+  4. **世界书等级解析优先级与排位阶位加固（`index.html:6684/6725/6757`）**：修复 `getEnemyTier` 中 `wbSource.desc` 误覆盖 `_worldbookRawContent` 的隐患，保障等级直判优先级；在 `assignEnemyRows` 中加固全量单位 `tier` 刷新，确保带有旧存档排位的怪物也能正确获得阶位。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：修复现代全效编辑器在多复合标签技能下的折叠头部预览缺失与双向联动不同步问题，同时完善怪物阶位动态判别与指示胶囊，提升编辑与调试体验。
+
