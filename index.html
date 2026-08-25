@@ -6684,7 +6684,8 @@ function parseWorldbookLevel(content) {
 function getEnemyTier(enemy) {
     if (!enemy) return 'fodder';
     // 1) 等级直判：优先用世界书来源
-    const wbContent = (enemy.wbSource && (enemy.wbSource.desc || '')) || enemy._worldbookRawContent || '';
+    // _worldbookRawContent 含完整“等级”字段；wbSource.desc 仅是详情摘要，不能反向覆盖完整原文。
+    const wbContent = enemy._worldbookRawContent || (enemy.wbSource && (enemy.wbSource.desc || '')) || '';
     // 若 parse 时已缓存 worldbook 原文则直接用；否则尝试从 worldbookCache 反查
     let rawForLevel = wbContent;
     if (!rawForLevel && enemy.name && typeof worldbookCache !== 'undefined' && worldbookCache.length) {
@@ -6725,6 +6726,8 @@ function getEnemyTier(enemy) {
 // ---- 敌方前后排棋盘：最高阶锚后排 + 均衡分半（幂等/无随机，避免保存后闪排）----
 function assignEnemyRows() {
     if (!enemiesData || !enemiesData.length) return;
+    // 阶位与排位是两个独立字段：即使旧存档已有 row，也要补算/刷新 tier。
+    enemiesData.forEach(e => { e.tier = getEnemyTier(e); });
     // 幂等：已全量分配则不重排，避免保存后 Fisher-Yates 随机导致闪动
     if (enemiesData.every(e => e.row === 'front' || e.row === 'back')) return;
     const rankOf = t => t === 'legend' ? 2 : t === 'elite' ? 1 : 0;
@@ -6754,7 +6757,7 @@ function assignEnemyRows() {
         else s.e.row = 'front';
     });
     // 补 tier（已有 row 但 tier 缺失的旧存档）
-    enemiesData.forEach((e, i) => { if (!e.tier) e.tier = ['fodder','elite','legend'][rankOf(getEnemyTier(e))]; });
+    enemiesData.forEach(e => { if (!e.tier) e.tier = getEnemyTier(e); });
 }
 function hasAliveFront() { return enemiesData.some(e => e.isAlive && e.row === 'front'); }
 function hasAliveBack() { return enemiesData.some(e => e.isAlive && e.row === 'back'); }
@@ -12113,6 +12116,19 @@ function resetBattle(btn) {
 // ==========================================
 // 编辑器系统
 // ==========================================
+function buildEditorSkillTagPreview(type, power, type2, power2, type3, power3, tone) {
+  var slots = [[type, power], [type2, power2], [type3, power3]];
+  var colorClass = tone === 'enemy' ? 'text-rose-300' : 'text-cyan-300';
+  return slots.filter(function(slot) { return slot[0] && slot[0] !== '[无]'; }).map(function(slot) {
+    var powerText = Number(slot[1]) ? ' ' + slot[1] : '';
+    return `<span class="px-1.5 py-0.2 rounded text-[9px] font-mono-num font-semibold bg-slate-800 ${colorClass} border border-slate-700 shrink-0 whitespace-nowrap">${slot[0]}${powerText}</span>`;
+  }).join('');
+}
+
+function getEnemyTierLabel(tier) {
+  return tier === 'legend' ? '首领' : tier === 'elite' ? '精英' : '杂兵';
+}
+
 function openEditor(keepScroll) {
   const modal = document.getElementById('editor-modal');
   modal.classList.remove('hidden');
@@ -12232,10 +12248,10 @@ function openEditor(keepScroll) {
         // 技能头部
         html += `<div onclick="toggleSkillFold('hero', ${i}, ${si})" class="px-2.5 py-1.5 cursor-pointer bg-slate-900/90 hover:bg-slate-800/90 transition-colors flex flex-col gap-1">`;
         html += `<div class="flex items-center justify-between gap-1.5">`;
-        html += `<div class="flex items-center gap-1.5 flex-wrap min-w-0">`;
+        html += `<div class="flex items-center gap-1.5 flex-wrap min-w-0 flex-1">`;
         html += `<span class="text-xs shrink-0">${dmgBadge}</span>`;
         html += `<span id="hero-${i}-s-${si}-name-preview" class="text-xs font-bold text-slate-100 tracking-wide">${s.name || '新技能'}</span>`;
-        html += `<span class="px-1.5 py-0.2 rounded text-[9px] font-mono-num font-semibold bg-slate-800 text-cyan-300 border border-slate-700 shrink-0">${s.type || '[单体]'} ${s.power || 0}</span>`;
+        html += `<div id="hero-${i}-s-${si}-tags-preview" class="flex items-center gap-1 flex-wrap">${buildEditorSkillTagPreview(s.type, s.power, s.type2, s.power2, s.type3, s.power3, 'hero')}</div>`;
         if (s.isOthers) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-emerald-950 text-emerald-300 border border-emerald-700 shrink-0">他人</span>`;
         if (s.guaranteedHit) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-rose-950 text-rose-300 border border-rose-700 shrink-0">必中</span>`;
         if (s.isHighTier) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-violet-950 text-violet-300 border border-violet-700 shrink-0">高阶</span>`;
@@ -12314,9 +12330,9 @@ function openEditor(keepScroll) {
         html += `</div>`;
 
         html += `<div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 grid-tags-responsive">`;
-        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-h-${i}-s-${si}-type" class="edit-input-game w-full text-cyan-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-s-${si}-power" value="${s.power}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
-        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-h-${i}-s-${si}-type2" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-s-${si}-power2" value="${s.power2}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
-        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-h-${i}-s-${si}-type3" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-s-${si}-power3" value="${s.power3}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-h-${i}-s-${si}-type" onchange="updateHeroSkillHeaderSummary(${i}, ${si})" class="edit-input-game w-full text-cyan-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-s-${si}-power" value="${s.power}" oninput="updateHeroSkillHeaderSummary(${i}, ${si})" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-h-${i}-s-${si}-type2" onchange="updateHeroSkillHeaderSummary(${i}, ${si})" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-s-${si}-power2" value="${s.power2}" oninput="updateHeroSkillHeaderSummary(${i}, ${si})" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-h-${i}-s-${si}-type3" onchange="updateHeroSkillHeaderSummary(${i}, ${si})" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-s-${si}-power3" value="${s.power3}" oninput="updateHeroSkillHeaderSummary(${i}, ${si})" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
         html += `</div>`;
         html += `</div>`; // close module D space-y-1
 
@@ -12336,7 +12352,10 @@ function openEditor(keepScroll) {
     var isExp = !!e.isExpanded;
     var _eName = e.name || '未命名怪物';
     var _eEmoji = e.emoji || '👾';
-    var _eClass = e.classType || '普通怪';
+    var _eTier = getEnemyTier(e);
+    e.tier = _eTier;
+    var _eTierLabel = getEnemyTierLabel(_eTier);
+    var _eTierClass = _eTier === 'legend' ? 'bg-amber-950 text-amber-300 border-amber-700/60' : _eTier === 'elite' ? 'bg-violet-950 text-violet-300 border-violet-700/60' : 'bg-slate-800 text-slate-300 border-slate-600/60';
     var _eImg = e.img || '';
     html += `<div class="char-card-enemy rounded-lg overflow-hidden ${isExp ? 'is-expanded' : ''}" id="enemy-card-${i}">`;
     
@@ -12352,7 +12371,7 @@ function openEditor(keepScroll) {
     }
     html += `</div>`;
     html += `<span id="enemy-header-name-${i}" class="font-bold text-xs sm:text-sm text-rose-200 tracking-wide">${_eName}</span>`;
-    html += `<span id="enemy-header-class-${i}" class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-700/60 shrink-0">${_eClass}</span>`;
+    html += `<span id="enemy-header-tier-${i}" class="px-1.5 py-0.2 rounded text-[10px] font-bold border shrink-0 ${_eTierClass}">${_eTierLabel}</span>`;
     if (e.isWise) {
       html += `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-700/60 shrink-0">🧠 智慧</span>`;
     }
@@ -12424,10 +12443,10 @@ function openEditor(keepScroll) {
         // 技能头部
         html += `<div onclick="toggleSkillFold('enemy', ${i}, ${si})" class="px-2.5 py-1.5 cursor-pointer bg-slate-900/90 hover:bg-slate-800/90 transition-colors flex flex-col gap-1">`;
         html += `<div class="flex items-center justify-between gap-1.5">`;
-        html += `<div class="flex items-center gap-1.5 flex-wrap min-w-0">`;
+        html += `<div class="flex items-center gap-1.5 flex-wrap min-w-0 flex-1">`;
         html += `<span class="text-xs shrink-0">${dmgBadge}</span>`;
         html += `<span id="enemy-${i}-s-${si}-name-preview" class="text-xs font-bold text-slate-100 tracking-wide">${s.name || '新技能'}</span>`;
-        html += `<span class="px-1.5 py-0.2 rounded text-[9px] font-mono-num font-semibold bg-slate-800 text-rose-300 border border-slate-700 shrink-0">${s.type || '[单体]'} ${s.power || 0}</span>`;
+        html += `<div id="enemy-${i}-s-${si}-tags-preview" class="flex items-center gap-1 flex-wrap">${buildEditorSkillTagPreview(s.type, s.power, s.type2, s.power2, s.type3, s.power3, 'enemy')}</div>`;
         if (s.isOthers) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-emerald-950 text-emerald-300 border border-emerald-700 shrink-0">他人</span>`;
         if (s.guaranteedHit) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-rose-950 text-rose-300 border border-rose-700 shrink-0">必中</span>`;
         html += `</div>`;
@@ -12485,9 +12504,9 @@ function openEditor(keepScroll) {
         html += `<div class="space-y-1">`;
         html += `<div class="text-[10px] text-slate-400 font-bold">三重复合标签槽位:</div>`;
         html += `<div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 grid-tags-responsive">`;
-        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-e-${i}-s-${si}-type" class="edit-input-game w-full text-rose-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power" value="${s.power}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
-        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-e-${i}-s-${si}-type2" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power2" value="${s.power2}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
-        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-e-${i}-s-${si}-type3" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power3" value="${s.power3}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-e-${i}-s-${si}-type" onchange="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-full text-rose-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power" value="${s.power}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-e-${i}-s-${si}-type2" onchange="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power2" value="${s.power2}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-e-${i}-s-${si}-type3" onchange="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power3" value="${s.power3}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
         html += `</div>`;
         html += `</div>`; // close module D space-y-1
 
@@ -12655,14 +12674,24 @@ function updateHeroHeaderSummary(i) {
 
 function updateEnemyHeaderSummary(i) {
   var nameEl = document.getElementById('edit-e-' + i + '-name');
-  var classEl = document.getElementById('edit-e-' + i + '-class');
   var hpEl = document.getElementById('edit-e-' + i + '-hp');
   var maxHpEl = document.getElementById('edit-e-' + i + '-maxHp');
   var mpEl = document.getElementById('edit-e-' + i + '-mp');
   var maxMpEl = document.getElementById('edit-e-' + i + '-maxMp');
 
   var eName = document.getElementById('enemy-header-name-' + i); if (eName && nameEl) eName.textContent = nameEl.value || '未命名怪物';
-  var eClass = document.getElementById('enemy-header-class-' + i); if (eClass && classEl) eClass.textContent = classEl.value || '普通怪';
+  var eTier = document.getElementById('enemy-header-tier-' + i);
+  if (eTier) {
+    var tierTarget = Object.assign({}, enemiesData[i], {
+      maxHp: Number(maxHpEl && maxHpEl.value) || enemiesData[i].maxHp,
+      atk: Number(document.getElementById('edit-e-' + i + '-atk').value) || enemiesData[i].atk,
+      def: Number(document.getElementById('edit-e-' + i + '-def').value) || enemiesData[i].def,
+      actCount: Number(document.getElementById('edit-e-' + i + '-act') && document.getElementById('edit-e-' + i + '-act').value) || enemiesData[i].actCount
+    });
+    var tier = getEnemyTier(tierTarget);
+    eTier.textContent = getEnemyTierLabel(tier);
+    eTier.className = 'px-1.5 py-0.2 rounded text-[10px] font-bold border shrink-0 ' + (tier === 'legend' ? 'bg-amber-950 text-amber-300 border-amber-700/60' : tier === 'elite' ? 'bg-violet-950 text-violet-300 border-violet-700/60' : 'bg-slate-800 text-slate-300 border-slate-600/60');
+  }
   var eHp = document.getElementById('enemy-header-hp-' + i); if (eHp && hpEl) eHp.textContent = hpEl.value;
   var eMaxHp = document.getElementById('enemy-header-maxhp-' + i); if (eMaxHp && maxHpEl) eMaxHp.textContent = maxHpEl.value;
   var eMp = document.getElementById('enemy-header-mp-' + i); if (eMp && mpEl) eMp.textContent = mpEl.value;
@@ -12681,6 +12710,16 @@ function updateHeroSkillHeaderSummary(i, si) {
   var sTp = document.getElementById('hero-' + i + '-s-' + si + '-tp-preview'); if (sTp && tpCostEl) sTp.textContent = tpCostEl.value || '0';
   var sHp = document.getElementById('hero-' + i + '-s-' + si + '-hp-preview'); if (sHp && hpCostEl) sHp.textContent = hpCostEl.value || '0';
   var sDelay = document.getElementById('hero-' + i + '-s-' + si + '-delay-preview'); if (sDelay && delayEl) sDelay.textContent = delayEl.value || '0';
+  var tagPreview = document.getElementById('hero-' + i + '-s-' + si + '-tags-preview');
+  if (tagPreview) tagPreview.innerHTML = buildEditorSkillTagPreview(
+    document.getElementById('edit-h-' + i + '-s-' + si + '-type').value,
+    document.getElementById('edit-h-' + i + '-s-' + si + '-power').value,
+    document.getElementById('edit-h-' + i + '-s-' + si + '-type2').value,
+    document.getElementById('edit-h-' + i + '-s-' + si + '-power2').value,
+    document.getElementById('edit-h-' + i + '-s-' + si + '-type3').value,
+    document.getElementById('edit-h-' + i + '-s-' + si + '-power3').value,
+    'hero'
+  );
 }
 
 function updateEnemySkillHeaderSummary(i, si) {
@@ -12695,6 +12734,16 @@ function updateEnemySkillHeaderSummary(i, si) {
   var sTp = document.getElementById('enemy-' + i + '-s-' + si + '-tp-preview'); if (sTp && tpCostEl) sTp.textContent = tpCostEl.value || '0';
   var sHp = document.getElementById('enemy-' + i + '-s-' + si + '-hp-preview'); if (sHp && hpCostEl) sHp.textContent = hpCostEl.value || '0';
   var sCharge = document.getElementById('enemy-' + i + '-s-' + si + '-charge-preview'); if (sCharge && chargeEl) sCharge.textContent = chargeEl.value || '0';
+  var tagPreview = document.getElementById('enemy-' + i + '-s-' + si + '-tags-preview');
+  if (tagPreview) tagPreview.innerHTML = buildEditorSkillTagPreview(
+    document.getElementById('edit-e-' + i + '-s-' + si + '-type').value,
+    document.getElementById('edit-e-' + i + '-s-' + si + '-power').value,
+    document.getElementById('edit-e-' + i + '-s-' + si + '-type2').value,
+    document.getElementById('edit-e-' + i + '-s-' + si + '-power2').value,
+    document.getElementById('edit-e-' + i + '-s-' + si + '-type3').value,
+    document.getElementById('edit-e-' + i + '-s-' + si + '-power3').value,
+    'enemy'
+  );
 }
 
 function closeEditor() { document.getElementById('editor-modal').classList.add('hidden'); document.getElementById('editor-modal').classList.remove('flex'); }
