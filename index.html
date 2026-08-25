@@ -1749,7 +1749,7 @@ const DEFAULT_HERO_IMG = 'https://imgur.la/images/2026/08/13/9adb95d5df1b99ebe2f
 // 规则：第一回合固定 first；后续回合 HP>50% 从 turn 随机、HP<=50% 从 low 随机。
 // 文件名经 GitHub API 逐文件核实（命名/格式不完全统一，故逐条显式列出）。
 // ==========================================
-const HERO_VOICE_BASE = 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main';
+const HERO_VOICE_BASE = 'http://192.168.110.83:8000/my_assets';
 const HERO_VOICE_LINES = {
   "索恩": {
     first: '索恩/索恩_第一回合.mp3',
@@ -1902,26 +1902,35 @@ function playCustomAudio(url, volume) {
 }
 
 const audioUrls = {
-    'hitUp': 'https://files.catbox.moe/7ef8mk.mp3', 'mpHeal': 'https://files.catbox.moe/vo2w0z.mp3',
-    'defDown': 'https://files.catbox.moe/oa0q52.mp3', 'atk2': 'https://files.catbox.moe/7w223l.mp3',
-    'atk1': 'https://files.catbox.moe/x30qlh.mp3', 'atkUp': 'https://files.catbox.moe/zhbczm.mp3',
-    'hpHeal': 'https://files.catbox.moe/cvmhl5.mp3', 'taunt': 'https://files.catbox.moe/5urptr.mp3', 'hide': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/hide.mp3',
-    'hitDown': 'https://files.catbox.moe/t2uvw3.mp3', 'shieldUp': 'https://files.catbox.moe/ws8i9g.mp3',
-    'defUp': 'https://files.catbox.moe/mhpzv8.mp3', 'miss': 'https://files.catbox.moe/bl7mbw.mp3', 
-    'burst': 'https://files.catbox.moe/042wyg.mp3', 'avatarClick': 'https://files.catbox.moe/6jg11a.mp3', 
-    'heroTurn': 'https://files.catbox.moe/fgyv0y.mp3', 'kill': 'https://files.catbox.moe/20yjkp.mp3',
-    'shot': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/shot01.mp3',
-    'monsterAttack': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/monsterattack2.mp3',
-    'herocharge': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/herocharge.mp3',
-    'herochargedone': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/herochargedone.mp3',
-    'combatKill': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/combat_kill.mp3',
-    'magicKill': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/magic_kill.wav',
-    'kanpo': 'https://files.catbox.moe/oa0q52.mp3',
-    // [单体(枪击)] 中小口径随机 + [特效:枪击穿透] 专属（移植自 demo-gunshot-vfx.html，test1 仓库）
-    'gunshot1': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/gunshot1.mp3',
-    'gunshot2': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/gunshot2.mp3',
-    'gunshot3': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/gunshot3.mp3',
-    'gunshot_pierce': 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/gunshot_pierce.mp3'
+    'hitUp': 'http://192.168.110.83:8000/my_assets/hitUp.mp3',
+    'mpHeal': 'http://192.168.110.83:8000/my_assets/mpHeal.mp3',
+    'defDown': 'http://192.168.110.83:8000/my_assets/defDown.mp3',
+    'atk2': 'http://192.168.110.83:8000/my_assets/atk2.mp3',
+    'atk1': 'http://192.168.110.83:8000/my_assets/atk1.mp3',
+    'atkUp': 'http://192.168.110.83:8000/my_assets/atkUp.mp3',
+    'hpHeal': 'http://192.168.110.83:8000/my_assets/hpHeal.mp3',
+    'taunt': 'http://192.168.110.83:8000/my_assets/taunt.mp3',
+    'hide': 'http://192.168.110.83:8000/my_assets/hide.mp3',
+    'hitDown': 'http://192.168.110.83:8000/my_assets/hitDown.mp3',
+    'shieldUp': 'http://192.168.110.83:8000/my_assets/shieldUp.mp3',
+    'defUp': 'http://192.168.110.83:8000/my_assets/defUp.mp3',
+    'miss': 'http://192.168.110.83:8000/my_assets/miss.mp3',
+    'burst': 'http://192.168.110.83:8000/my_assets/burst.mp3',
+    'avatarClick': 'http://192.168.110.83:8000/my_assets/avatarClick.mp3',
+    'heroTurn': 'http://192.168.110.83:8000/my_assets/heroTurn.mp3',
+    'kill': 'http://192.168.110.83:8000/my_assets/kill.mp3',
+    'shot': 'http://192.168.110.83:8000/my_assets/shot01.mp3',
+    'monsterAttack': 'http://192.168.110.83:8000/my_assets/monsterattack2.mp3',
+    'herocharge': 'http://192.168.110.83:8000/my_assets/herocharge.mp3',
+    'herochargedone': 'http://192.168.110.83:8000/my_assets/herochargedone.mp3',
+    'combatKill': 'http://192.168.110.83:8000/my_assets/combat_kill.mp3',
+    'magicKill': 'http://192.168.110.83:8000/my_assets/magic_kill.wav',
+    'kanpo': 'http://192.168.110.83:8000/my_assets/defDown.mp3',
+    // [单体(枪击)] 中小口径随机 + [特效:枪击穿透] 专属
+    'gunshot1': 'http://192.168.110.83:8000/my_assets/gunshot1.mp3',
+    'gunshot2': 'http://192.168.110.83:8000/my_assets/gunshot2.mp3',
+    'gunshot3': 'http://192.168.110.83:8000/my_assets/gunshot3.mp3',
+    'gunshot_pierce': 'http://192.168.110.83:8000/my_assets/gunshot_pierce.mp3'
 };
 
 // 预热全量基础音效为 Blob URL，确保零延迟与 Web Audio API 无跨域限制
@@ -4400,16 +4409,16 @@ window.stopStrafeBurst = stopStrafeBurst;
 // audioUrl:  独立的音效文件地址（覆盖默认的攻击音效）
 // ==========================================
 const WEBM_FX_REGISTRY = {
-    '火焰01': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/fire.webm',                                              scale: 1.4, particles: 'fire_aoe',    audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/fire01.mp3' },
-    '冰霜01': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/ice.webm',                                              scale: 1.4, particles: 'frost',       audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/freeze01.mp3' },
-    '雷击01': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/450.webm',               scale: 1.4, particles: 'thunder_aoe', audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/thunder01.mp3' },
-    '圣光01': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/414.webm',               scale: 1.4, particles: 'holy_light',  audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/light01.mp3' },
-    '双枪扫射': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/strafe-ezremove05.mp4', scale: 0.9, particles: 'gunshot',    audioUrl: 'none', delay: 0.5 },
-    '克虏伯重狙': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/snipe-ezremove.mp4',  scale: 1.5, particles: 'gunshot',    audioUrl: 'none' },
-    '异种坏死雾': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/fog.mp4', scale: 0.8, particles: 'poison',     audioUrl: 'none', delay: 0.2 },
-    '生体流转': { url: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/heart.mp4', scale: 0.4, particles: 'fire_aoe',     audioUrl: 'none' },
+    '火焰01': { url: 'http://192.168.110.83:8000/my_assets/fire.webm',                                              scale: 1.4, particles: 'fire_aoe',    audioUrl: 'http://192.168.110.83:8000/my_assets/fire01.mp3' },
+    '冰霜01': { url: 'http://192.168.110.83:8000/my_assets/ice.webm',                                              scale: 1.4, particles: 'frost',       audioUrl: 'http://192.168.110.83:8000/my_assets/freeze01.mp3' },
+    '雷击01': { url: 'http://192.168.110.83:8000/my_assets/450.webm',               scale: 1.4, particles: 'thunder_aoe', audioUrl: 'http://192.168.110.83:8000/my_assets/thunder01.mp3' },
+    '圣光01': { url: 'http://192.168.110.83:8000/my_assets/414.webm',               scale: 1.4, particles: 'holy_light',  audioUrl: 'http://192.168.110.83:8000/my_assets/light01.mp3' },
+    '双枪扫射': { url: 'http://192.168.110.83:8000/my_assets/strafe-ezremove05.mp4', scale: 0.9, particles: 'gunshot',    audioUrl: 'none', delay: 0.5 },
+    '克虏伯重狙': { url: 'http://192.168.110.83:8000/my_assets/snipe-ezremove.mp4',  scale: 1.5, particles: 'gunshot',    audioUrl: 'none' },
+    '异种坏死雾': { url: 'http://192.168.110.83:8000/my_assets/fog.mp4', scale: 0.8, particles: 'poison',     audioUrl: 'none', delay: 0.2 },
+    '生体流转': { url: 'http://192.168.110.83:8000/my_assets/heart.mp4', scale: 0.4, particles: 'fire_aoe',     audioUrl: 'none' },
     '远程重击': { url: '', scale: 1.0, particles: 'ranged_heavy', audioUrl: 'none' },
-    '枪击穿透': { url: '', scale: 1.0, particles: 'gunshot_pierce', audioUrl: 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/gunshot_pierce.mp3' },
+    '枪击穿透': { url: '', scale: 1.0, particles: 'gunshot_pierce', audioUrl: 'http://192.168.110.83:8000/my_assets/gunshot_pierce.mp3' },
     '连续扫射': { url: '', scale: 1.0, particles: 'strafe_burst', audioUrl: 'none' },
     // 在此继续添加：
     // delay 可选（单位：秒）：特效播放后、伤害结算前的等待时长，用于长特效演出与伤害数字同步；未配置则立即结算
@@ -8844,8 +8853,8 @@ async function playKanpoEffect(caster, enemy, skill) {
 }
 
 // 强力反击专属音效（冲击波射出瞬间播放）—— 远程重击复用同一枪声
-const POWER_COUNTER_SOUND_URL = 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/shot01.mp3';
-const RANGED_HEAVY_HITDOWN_URL = 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main/hitDown.mp3';
+const POWER_COUNTER_SOUND_URL = 'http://192.168.110.83:8000/my_assets/shot01.mp3';
+const RANGED_HEAVY_HITDOWN_URL = 'http://192.168.110.83:8000/my_assets/hitDown.mp3';
 let _rangedHeavyAudioCtx = null;
 function getRangedHeavyAudioContext() {
     if (!_rangedHeavyAudioCtx) {
