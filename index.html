@@ -1520,6 +1520,42 @@
     #editor-modal details.skill-fold > summary::-webkit-details-marker { display: none; }
     #editor-modal details.skill-fold > summary .fold-arrow { transition: transform 0.2s; display: inline-block; }
     #editor-modal details.skill-fold[open] > summary .fold-arrow { transform: rotate(180deg); }
+
+    /* ==== 战局记录/结算高透战术目镜（与 .cyber-modal-enemy 同源，紫调区分） ==== */
+    .cyber-modal-history {
+      background: radial-gradient(130% 120% at 20% 0%, rgba(30, 41, 59, 0.20) 0%, rgba(15, 23, 42, 0.28) 100%);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(139, 92, 246, 0.35);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.65), 0 0 30px rgba(139, 92, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+    .history-round-pill {
+      display: inline-flex; align-items: center;
+      padding: 2px 10px; border-radius: 9999px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(6, 182, 212, 0.4);
+      color: #67e8f9; font-family: 'Cinzel', serif; font-size: 10px; font-weight: 700;
+      letter-spacing: 0.15em; box-shadow: 0 0 8px rgba(6, 182, 212, 0.25);
+    }
+    .history-field-bar {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 10px; border-radius: 8px;
+      background: rgba(120, 53, 15, 0.30); border: 1px solid rgba(245, 158, 11, 0.35);
+      color: #fcd34d; font-size: 11px; line-height: 1.4;
+    }
+    .history-action-card {
+      padding: 10px; border-radius: 12px;
+      border: 1px solid rgba(51, 65, 85, 0.60);
+      background: rgba(15, 23, 42, 0.60);
+      backdrop-filter: blur(6px);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+    }
+    .history-sub-hit { color: #fb7185; font-weight: 700; }
+    .history-sub-heal { color: #34d399; font-weight: 700; }
+    .history-sub-shield { color: #22d3ee; }
+    .history-sub-kanpo { color: #e879f9; font-weight: 700; }
+    #visual-filter-bar { background: rgba(0, 0, 0, 0.40); border-bottom: 1px solid rgba(51, 65, 85, 0.60); }
+    #result-visual-view .history-action-card { border-color: rgba(71, 85, 105, 0.55); }
   </style>
 </head>
 <body class="w-full h-[100dvh] min-h-[600px] bg-black text-gray-100 overflow-hidden relative select-none">
@@ -1670,21 +1706,24 @@
   <!-- 编辑器模态框容器 -->
   <div id="editor-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] hidden items-center justify-center p-2 sm:p-4 overflow-y-auto"></div>
 
-  <!-- 战局结算模态框 -->
+  <!-- 战局结算模态框（高透战术目镜 · 富化战报 + 小队状态） -->
   <div id="battle-result-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] hidden flex-col items-center justify-center p-2 sm:p-4 transition-opacity duration-500 opacity-0">
-    <div class="w-full max-w-3xl bg-slate-900/80 border border-gray-700/50 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[90vh]">
+    <div class="w-full max-w-3xl cyber-modal-history rounded-2xl overflow-hidden flex flex-col max-h-[88vh] sm:max-h-[88vh] relative">
+        <div class="cyber-corner cyber-corner-tl"></div>
+        <div class="cyber-corner cyber-corner-tr"></div>
+        <div class="cyber-corner cyber-corner-bl"></div>
+        <div class="cyber-corner cyber-corner-br"></div>
         <div id="result-header" class="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-700/50 text-center relative bg-gradient-to-r">
             <h2 id="result-title" class="text-xl sm:text-3xl font-black tracking-widest text-transparent bg-clip-text drop-shadow-md">战局结算</h2>
             <div id="result-subtitle" class="text-[10px] sm:text-sm text-gray-400 mt-1 sm:mt-2 tracking-widest">请校验并修改用于续写的 Prompt</div>
         </div>
-        <div class="p-4 sm:p-6 flex-1 flex flex-col gap-3 sm:gap-4 overflow-y-auto custom-scrollbar">
-            <div class="text-xs sm:text-sm text-cyan-300 mb-1 font-bold flex items-center gap-2"><span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-cyan-400"></span> 故事转化提示词 基于真实战局记录</div>
-            <textarea id="result-prompt" class="w-full flex-1 min-h-[150px] sm:min-h-[250px] bg-black/50 border border-gray-600 rounded-xl p-3 sm:p-4 text-[10px] sm:text-sm text-gray-300 leading-relaxed font-mono focus:border-cyan-500 outline-none shadow-inner custom-scrollbar" spellcheck="false"></textarea>
-            <div class="text-[9px] sm:text-xs text-gray-500 bg-white/5 p-2 sm:p-3 rounded-lg border border-white/10 mt-1 sm:mt-2">
-                * 提示：已去除多余的 Combat_block，仅提供纯粹的小队战后属性结算，方便 AI 平滑更新文本和状态栏。
-            </div>
+        <div class="flex-1 overflow-hidden flex flex-col min-h-0">
+            <div id="result-visual-view" class="flex-1 overflow-y-auto custom-scrollbar p-3.5 space-y-3"></div>
+            <div id="result-summary-card" class="mx-3 mb-2 p-2.5 rounded-xl border border-slate-700/60 bg-slate-900/60 text-[11px] leading-relaxed"></div>
+            <!-- 隐藏：保留原 textarea 供 sendResultToTavern 读取 promptTemplate -->
+            <textarea id="result-prompt" class="hidden" spellcheck="false"></textarea>
         </div>
-        <div class="px-4 sm:px-6 py-3 sm:py-4 bg-black/40 border-t border-gray-700/50 flex justify-end gap-2 sm:gap-4 items-center">
+        <div class="px-4 sm:px-6 py-3 sm:py-4 bg-black/40 border-t border-gray-700/50 flex justify-end gap-2 sm:gap-4 items-center shrink-0">
             <button onclick="closeBattleResult()" class="px-3 sm:px-6 py-1.5 sm:py-2.5 rounded-lg text-[10px] sm:text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors border border-transparent hover:border-gray-600">返回查看残局</button>
             <button onclick="sendResultToTavern()" class="px-4 sm:px-8 py-1.5 sm:py-2.5 rounded-lg text-[10px] sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.4)] transform hover:-translate-y-0.5 flex items-center gap-1.5 sm:gap-2">
                 <svg class="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
@@ -1694,20 +1733,45 @@
     </div>
   </div>
 
-  <!-- 战局记录预览模态框（只读，不发送酒馆） -->
+  <!-- 战局记录预览模态框（高透战术目镜 · 方案A 富化） -->
   <div id="battle-history-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] hidden flex-col items-center justify-center p-2 sm:p-4 transition-opacity duration-500 opacity-0">
-    <div class="w-full max-w-3xl bg-slate-900/80 border border-gray-700/50 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[90vh]">
-        <div class="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-700/50 text-center relative bg-gradient-to-r from-slate-800/60 via-slate-700/30 to-slate-800/60">
-            <h2 class="text-xl sm:text-3xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-slate-200 to-slate-500 drop-shadow-md">战局记录</h2>
-            <div class="text-[10px] sm:text-sm text-gray-400 mt-1 sm:mt-2 tracking-widest">查看本次战斗历史 · 可随时结束战斗并将过程发送至酒馆</div>
+    <div class="w-full max-w-3xl cyber-modal-history rounded-2xl overflow-hidden flex flex-col max-h-[88vh] sm:max-h-[88vh] relative">
+        <div class="cyber-corner cyber-corner-tl"></div>
+        <div class="cyber-corner cyber-corner-tr"></div>
+        <div class="cyber-corner cyber-corner-bl"></div>
+        <div class="cyber-corner cyber-corner-br"></div>
+        <!-- 头部：COMBAT LOG + 解锁编辑 -->
+        <div class="px-4 py-2.5 border-b border-slate-700/60 bg-gradient-to-r from-slate-900/90 via-slate-800/60 to-slate-900/90 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0"></span>
+                <h2 class="text-sm sm:text-base font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-slate-100 to-slate-400 font-cinzel">COMBAT LOG</h2>
+                <span class="hidden sm:inline text-[10px] font-bold text-cyan-300 px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-800/60">战局记录</span>
+            </div>
+            <button id="history-edit-toggle" onclick="toggleHistoryEdit()" class="px-2.5 py-1 rounded-lg text-xs font-bold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-600/70 transition-all flex items-center gap-1 shrink-0">🔓 解锁编辑</button>
         </div>
-        <div class="p-4 sm:p-6 flex-1 flex flex-col gap-3 sm:gap-4 overflow-y-auto custom-scrollbar">
-            <textarea id="history-preview" readonly class="w-full flex-1 min-h-[250px] bg-black/50 border border-gray-600 rounded-xl p-3 sm:p-4 text-[10px] sm:text-sm text-gray-300 leading-relaxed font-mono focus:border-cyan-500 outline-none shadow-inner custom-scrollbar" spellcheck="false"></textarea>
+        <!-- 筛选条 -->
+        <div id="visual-filter-bar" class="px-3 py-1.5 flex items-center justify-between gap-2 text-[11px]">
+            <div class="flex items-center gap-1">
+                <button onclick="setHistoryFilter('all')" id="flt-all" class="px-2 py-0.5 rounded bg-cyan-700 text-white font-bold">全部</button>
+                <button onclick="setHistoryFilter('dialogue')" id="flt-dialogue" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">💬 对话</button>
+                <button onclick="setHistoryFilter('action')" id="flt-action" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">⚔️ 攻防</button>
+                <button onclick="setHistoryFilter('critical')" id="flt-critical" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">⚠️ 要闻</button>
+            </div>
+            <span class="hidden sm:inline text-[10px] text-slate-500 font-mono-num">实时解析 · 纯净导出</span>
         </div>
-        <div class="px-4 sm:px-6 py-3 sm:py-4 bg-black/40 border-t border-gray-700/50 flex justify-end gap-2 sm:gap-4 items-center">
-            <button id="history-edit-toggle" onclick="toggleHistoryEdit()" class="px-3 sm:px-6 py-1.5 sm:py-2.5 rounded-lg text-[10px] sm:text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors border border-transparent hover:border-gray-600">🔓 解锁编辑</button>
-            <button onclick="closeHistoryOnly()" class="px-3 sm:px-6 py-1.5 sm:py-2.5 rounded-lg text-[10px] sm:text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors border border-transparent hover:border-gray-600">关闭</button>
-            <button onclick="endBattleAndSendToTavern()" class="px-4 sm:px-8 py-1.5 sm:py-2.5 rounded-lg text-[10px] sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.4)] transform hover:-translate-y-0.5 flex items-center gap-1.5 sm:gap-2">📤 结束当前战斗，将过程发送到酒馆</button>
+        <!-- 中部双视口 -->
+        <div class="flex-1 overflow-hidden flex flex-col min-h-0">
+            <div id="history-visual-view" class="flex-1 overflow-y-auto custom-scrollbar p-3.5 space-y-3"></div>
+            <div id="history-raw-view" class="hidden flex-1 flex-col p-3 bg-black/80 overflow-hidden">
+                <div class="text-[11px] text-emerald-300 font-bold mb-1.5 flex items-center justify-between"><span>✏️ 纯文本编辑（微调后发送到酒馆）</span><span class="text-[10px] text-slate-500">锁定后自动同步</span></div>
+                <textarea id="history-raw-textarea" spellcheck="false" class="w-full flex-1 bg-slate-950/90 border border-slate-700/90 rounded-xl p-3 text-xs text-slate-200 font-mono leading-relaxed focus:border-cyan-500 outline-none resize-none custom-scrollbar shadow-inner" style="min-height:220px"></textarea>
+                <textarea id="history-preview" readonly class="hidden" spellcheck="false"></textarea>
+            </div>
+        </div>
+        <!-- 底部 -->
+        <div class="px-4 py-2.5 bg-black/70 border-t border-slate-700/60 flex items-center justify-between gap-2">
+            <button onclick="closeHistoryOnly()" class="px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700">关闭</button>
+            <button onclick="endBattleAndSendToTavern()" class="px-4 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 transition-all shadow-[0_0_15px_rgba(79,70,229,0.4)] flex items-center gap-1.5">📤 结束当前战斗，将过程发送到酒馆</button>
         </div>
     </div>
   </div>
@@ -2019,6 +2083,266 @@ void 0;
 // ==========================================
 let battleHistory = [];
 function addHistory(msg) { battleHistory.push(msg); }
+
+// ==== 战局记录富化（方案A 现代战术流线，仅参战头像 + 纯文本隔离） ====
+let currentHistoryFilter = 'all';
+let isHistoryEditMode = false;
+let _historyRawCache = '';
+let _lastResultSummaryText = '';
+
+function buildLiveAvatarMap() {
+  const map = new Map();
+  // 仅英雄：提供真实头像；无头像英雄才用 DEFAULT_HERO_IMG 兜底
+  const heroPools = [];
+  if (Array.isArray(heroesData)) heroPools.push(...heroesData);
+  if (Array.isArray(initialHeroesCache)) heroPools.push(...initialHeroesCache);
+  heroPools.forEach(p => {
+    if (!p || !p.name) return;
+    const clean = normalizeCombatName(p.name);
+    if (!clean || map.has(clean)) return;
+    map.set(clean, { url: p.img || DEFAULT_HERO_IMG, isHero: true });
+  });
+  // 敌人：仅记录 emoji/icon，不提供头像 URL（强制走 emoji 通道）
+  const enemyPools = [];
+  if (Array.isArray(enemiesData)) enemyPools.push(...enemiesData);
+  if (Array.isArray(initialEnemiesCache)) enemyPools.push(...initialEnemiesCache);
+  enemyPools.forEach(p => {
+    if (!p || !p.name) return;
+    const clean = normalizeCombatName(p.name);
+    if (!clean || map.has(clean)) return;
+    map.set(clean, { url: null, isHero: false, emoji: p.emoji || null });
+  });
+  return map;
+}
+function normalizeCombatName(name) {
+  return String(name ?? '')
+    .replace(/[\[\]【】《》<>「」『』“”"'（）()]/g, '')
+    .replace(/[＊*×xX]\s*\d+$/g, '')
+    .replace(/\d+$/g, '')
+    .replace(/\s+/g, '')
+    .trim();
+}
+function isLiveEnemy(name) {
+  const clean = normalizeCombatName(name);
+  const pools = [];
+  if (Array.isArray(enemiesData)) pools.push(...enemiesData);
+  if (Array.isArray(initialEnemiesCache)) pools.push(...initialEnemiesCache);
+  return pools.some(e => {
+    if (!e || !e.name) return false;
+    const ec = normalizeCombatName(e.name);
+    return ec && (ec === clean || ec.includes(clean) || clean.includes(ec));
+  });
+}
+function isLiveHero(name) {
+  const clean = normalizeCombatName(name);
+  if (!clean || isLiveEnemy(clean)) return false;
+  if (Array.isArray(heroesData)) {
+    for (const h of heroesData) {
+      const hc = normalizeCombatName(h.name);
+      if (hc === clean || String(h.name).includes(clean) || clean.includes(hc)) return true;
+    }
+  }
+  return ["烈阳剑尊","李长风","玛德琳","索恩","埃利奥特","弗兰克","玩家","我方"].some(k => String(name).includes(k));
+}
+function getLiveAvatar(name) {
+  const clean = normalizeCombatName(name);
+  // 关键修复：敌人永远走 emoji 通道，不借用 DEFAULT_HERO_IMG
+  const enemyFlag = isLiveEnemy(clean);
+  const heroFlag = !enemyFlag && isLiveHero(clean);
+  if (!heroFlag) {
+    // 敌人：优先取 enemiesData 的真实 emoji
+    const map = buildLiveAvatarMap();
+    if (map.has(clean)) {
+      const v = map.get(clean);
+      if (!v.isHero) return { type: 'emoji', emoji: v.emoji || '👾', isHero: false };
+    }
+    for (const [k, v] of map.entries()) {
+      if (!v.isHero && (clean.includes(k) || k.includes(clean))) return { type: 'emoji', emoji: v.emoji || '👾', isHero: false };
+    }
+    if (clean.includes('潜者') || clean.includes('深潜')) return { type: 'emoji', emoji: '🦑', isHero: false };
+    if (clean.includes('狼')) return { type: 'emoji', emoji: '🐺', isHero: false };
+    if (clean.includes('尸') || clean.includes('鬼')) return { type: 'emoji', emoji: '🧟', isHero: false };
+    return { type: 'emoji', emoji: '👾', isHero: false };
+  }
+  const map2 = buildLiveAvatarMap();
+  if (map2.has(clean)) {
+    const v = map2.get(clean);
+    if (v.isHero) return { type: 'img', src: v.url, isHero: true };
+  }
+  for (const [k, v] of map2.entries()) {
+    if (v.isHero && (clean.includes(k) || k.includes(clean))) return { type: 'img', src: v.url, isHero: true };
+  }
+  return { type: 'img', src: DEFAULT_HERO_IMG, isHero: true };
+}
+function renderLiveAvatar(av, size, isH) {
+  const heroFlag = typeof isH === 'boolean' ? isH : !!av.isHero;
+  const border = heroFlag ? "border-cyan-500/50 bg-cyan-950" : "border-rose-500/50 bg-rose-950";
+  if (av.type === 'img') {
+    const safe = String(av.src).replace(/'/g, '%27');
+    const fallback = String(DEFAULT_HERO_IMG).replace(/'/g, '%27');
+    return '<div class="' + size + ' rounded-full overflow-hidden border ' + border + ' shrink-0 shadow flex items-center justify-center"><img src=\'' + safe + '\' class="w-full h-full object-cover" onerror="this.src=\'' + fallback + '\'"></div>';
+  }
+  return '<div class="' + size + ' rounded-full border ' + border + ' shrink-0 shadow flex items-center justify-center text-xs">' + av.emoji + '</div>';
+}
+function escapeHistoryHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function parseCombatLog(raw) {
+  const lines = String(raw || '').split('\n');
+  const list = [];
+  let round = 0;
+  let curAction = null;
+  for (let line of lines) {
+    line = line.trim();
+    if (!line) continue;
+    const rMatch = line.match(/^---\s*第\s*(\d+)\s*回合\s*---/);
+    if (rMatch) { round = parseInt(rMatch[1], 10); curAction = null; list.push({ type: 'round', round, raw: line }); continue; }
+    const r2 = line.match(/^===\s*第\s*(\d+)\s*回合\s*===/);
+    if (r2) { round = parseInt(r2[1], 10); curAction = null; list.push({ type: 'round', round, raw: line }); continue; }
+    if (line.startsWith('🏟️') || line.startsWith('【场地】') || line.startsWith('场地')) {
+      list.push({ type: 'field', text: line.replace(/^[🏟️【场地】\s:：]+/, ''), raw: line }); continue;
+    }
+    // 对话必须先于 action 判定：实际记录是 [对话] 弗兰克:「...」，冒号前不应再限制引号。
+    const dialogueBody = line.replace(/^💬\s*/, '').replace(/^\[对话\]\s*/, '');
+    const isDialogueLine = dialogueBody !== line || line.startsWith('💬');
+    const dMatch = isDialogueLine ? dialogueBody.match(/^([^：:]+?)\s*[：:]\s*(.*)$/) : null;
+    if (dMatch) {
+      const speaker = dMatch[1].trim();
+      const speech = dMatch[2].trim().replace(/^[「“"『]/, '').replace(/[」”"』」]$/, '').trim();
+      const av = getLiveAvatar(speaker);
+      list.push({ type: 'dialogue', round, speaker, speech, isHero: !!av.isHero || isLiveHero(speaker), avatar: av, raw: line });
+      continue;
+    }
+    if (isDialogueLine) {
+      // 兜底：带 [对话] 但缺少冒号时仍保留为对话，不要落入 other。
+      list.push({ type: 'dialogue', round, speaker: '对话', speech: dialogueBody.trim(), isHero: false, avatar: { type: 'emoji', emoji: '💬', isHero: false }, raw: line });
+      continue;
+    }
+    if (line.startsWith('[战况]') || line.includes('重伤倒下') || line.includes('被击溃') || line.includes('死里逃生') || line.includes('绝命反扑')) {
+      list.push({ type: 'critical', round, text: line.replace(/^\[战况\]\s*/, ''), isDeath: line.includes('重伤倒下') || line.includes('被击溃'), isRevive: line.includes('死里逃生') || line.includes('站了起来'), raw: line });
+      continue;
+    }
+    if (line.startsWith('↳')) {
+      const subText = line.replace(/^↳\s*/, '');
+      if (curAction) curAction.subs.push(subText);
+      else list.push({ type: 'sub', text: subText, raw: line });
+      continue;
+    }
+    const aMatch = line.match(/^(?:⚔️|🛡️|👁️|⚡|💨)?\s*([^\s]+?)\s*(?:对\s*([^\s]+?))?\s*(使用了|采取了|发动了|展开了|看破了|尝试)\s*(?:【(.*?)】|([^\n！!]+))?/);
+    if (aMatch) {
+      const caster = aMatch[1];
+      const target = aMatch[2] || null;
+      const verb = aMatch[3];
+      const skill = aMatch[4] || aMatch[5] || verb;
+      const casterAv = getLiveAvatar(caster);
+      const targetAv = target ? getLiveAvatar(target) : null;
+      const actObj = { type: 'action', round, caster, target, skill, isHero: !!casterAv.isHero, casterAvatar: casterAv, targetAvatar: targetAv, subs: [], raw: line };
+      curAction = actObj;
+      list.push(actObj);
+      continue;
+    }
+    if (line.startsWith('>')) {
+      const t = line.replace(/^>\s*/, '');
+      const am = t.match(/^([^\s]+?)\s*(?:对\s*([^\s]+?))?\s*(发动了|使用了)\s*【(.*?)】/);
+      if (am) {
+        const caster = am[1]; const target = am[2] || null; const skill = am[4];
+        const casterAv = getLiveAvatar(caster);
+        const targetAv = target ? getLiveAvatar(target) : null;
+        const actObj = { type: 'action', round, caster, target, skill, isHero: !!casterAv.isHero, casterAvatar: casterAv, targetAvatar: targetAv, subs: [], raw: line };
+        curAction = actObj; list.push(actObj); continue;
+      }
+    }
+    list.push({ type: 'other', text: line, raw: line });
+  }
+  return list;
+}
+function renderHistorySchemeA(list, container) {
+  if (!container) return;
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="text-center text-sm text-slate-500 py-10">（暂无战局记录）</div>';
+    return;
+  }
+  let h = '<div class="space-y-3">';
+  for (const item of list) {
+    if (currentHistoryFilter === 'dialogue' && item.type !== 'dialogue' && item.type !== 'round') continue;
+    if (currentHistoryFilter === 'action' && item.type !== 'action' && item.type !== 'round' && item.type !== 'sub') continue;
+    if (currentHistoryFilter === 'critical' && item.type !== 'critical' && item.type !== 'round') continue;
+    if (item.type === 'round') {
+      h += '<div class="flex items-center gap-2 my-2.5"><div class="h-[1px] flex-1 bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent"></div><span class="history-round-pill">ROUND ' + String(item.round).padStart(2,'0') + '</span><div class="h-[1px] flex-1 bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent"></div></div>';
+    } else if (item.type === 'field') {
+      h += '<div class="history-field-bar"><span>🏟️</span><span class="font-bold">场地：</span><span>' + escapeHistoryHtml(item.text) + '</span></div>';
+    } else if (item.type === 'dialogue') {
+      const isH = !!item.isHero;
+      const align = isH ? "justify-start" : "justify-end";
+      const bubble = isH ? "bg-slate-900/90 border-cyan-500/35 text-slate-100 rounded-tl-none shadow-[0_0_12px_rgba(6,182,212,0.15)]" : "bg-rose-950/50 border-rose-500/35 text-rose-100 rounded-tr-none shadow-[0_0_12px_rgba(244,63,94,0.15)]";
+      const badge = isH ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40" : "bg-rose-500/20 text-rose-300 border-rose-500/40";
+      h += '<div class="flex items-start gap-2 ' + align + '">' + (isH ? renderLiveAvatar(item.avatar, "w-8 h-8", true) : '') + '<div class="max-w-[82%] flex flex-col ' + (isH ? 'items-start' : 'items-end') + '"><span class="text-[9px] font-bold px-1.5 py-0.5 rounded border ' + badge + ' mb-0.5">' + escapeHistoryHtml(item.speaker) + '</span><div class="px-3 py-2 rounded-xl border backdrop-blur-md text-[11px] sm:text-xs leading-relaxed ' + bubble + '">' + escapeHistoryHtml(item.speech) + '</div></div>' + (!isH ? renderLiveAvatar(item.avatar, "w-8 h-8", false) : '') + '</div>';
+    } else if (item.type === 'critical') {
+      const bd = item.isDeath ? "border-rose-600/60 bg-rose-950/40 text-rose-200" : (item.isRevive ? "border-emerald-500/60 bg-emerald-950/40 text-emerald-200" : "border-amber-500/60 bg-amber-950/40 text-amber-200");
+      h += '<div class="px-3 py-1.5 rounded-lg border ' + bd + ' flex items-center justify-between text-[11px] font-semibold gap-2"><div class="flex items-center gap-1.5 min-w-0"><span>' + (item.isDeath ? '💀' : (item.isRevive ? '🌟' : '⚠️')) + '</span><span class="truncate">' + escapeHistoryHtml(item.text) + '</span></div><span class="text-[9px] uppercase font-cinzel opacity-70 shrink-0">STATUS</span></div>';
+    } else if (item.type === 'action') {
+      const isH = !!item.isHero;
+      const bg = isH ? "bg-slate-900/60 border-slate-700/60" : "bg-slate-950/70 border-slate-800";
+      let subHtml = '';
+      if (item.subs && item.subs.length > 0) {
+        subHtml = '<div class="mt-1.5 pt-1.5 border-t border-slate-800/80 space-y-0.5 text-[10px]">' + item.subs.map(s => {
+          const t = String(s);
+          let cls = 'text-slate-300';
+          if (t.includes('伤害') || t.includes('暴击')) cls = 'history-sub-hit';
+          else if (t.includes('恢复') || t.includes('治愈') || t.includes('回血')) cls = 'history-sub-heal';
+          else if (t.includes('护盾') || t.includes('圣域') || t.includes('屏障')) cls = 'history-sub-shield';
+          else if (t.includes('看破') || t.includes('无效化') || t.includes('无效')) cls = 'history-sub-kanpo';
+          return '<div class="flex items-center gap-1 ' + cls + '"><span class="text-slate-500">↳</span><span>' + escapeHistoryHtml(t) + '</span></div>';
+        }).join('') + '</div>';
+      }
+      const targetPart = item.target ? '<span class="text-[9px] text-slate-500">▶</span>' + renderLiveAvatar(item.targetAvatar, "w-5 h-5", !isH) + '<span class="text-[11px] text-slate-300">' + escapeHistoryHtml(item.target) + '</span>' : '';
+      h += '<div class="history-action-card ' + bg + '"><div class="flex items-center justify-between flex-wrap gap-1.5"><div class="flex items-center gap-1.5 min-w-0">' + renderLiveAvatar(item.casterAvatar, "w-6 h-6", isH) + '<span class="text-xs font-bold ' + (isH ? 'text-cyan-300' : 'text-rose-300') + '">' + escapeHistoryHtml(item.caster) + '</span>' + targetPart + '</div><span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-700/60 shrink-0">【' + escapeHistoryHtml(item.skill) + '】</span></div>' + subHtml + '</div>';
+    } else if (item.type === 'sub') {
+      h += '<div class="history-action-card bg-slate-900/40 border-slate-700/40"><div class="flex items-center gap-1 text-[10px] text-slate-300"><span class="text-slate-500">↳</span><span>' + escapeHistoryHtml(item.text) + '</span></div></div>';
+    } else if (item.type === 'other') {
+      h += '<div class="text-[11px] text-slate-400 leading-relaxed px-1">' + escapeHistoryHtml(item.text) + '</div>';
+    }
+  }
+  h += '</div>';
+  container.innerHTML = h;
+}
+function refreshHistoryView() {
+  const container = document.getElementById('history-visual-view');
+  if (!container) return;
+  const raw = battleHistory.length ? battleHistory.join('\n') : _historyRawCache;
+  const list = parseCombatLog(raw);
+  renderHistorySchemeA(list, container);
+}
+function refreshResultView() {
+  const container = document.getElementById('result-visual-view');
+  const card = document.getElementById('result-summary-card');
+  if (!container) return;
+  const raw = battleHistory.length ? battleHistory.join('\n') : _historyRawCache;
+  const list = parseCombatLog(raw);
+  const saved = currentHistoryFilter;
+  currentHistoryFilter = 'all';
+  renderHistorySchemeA(list, container);
+  currentHistoryFilter = saved;
+  if (card) {
+    const txt = _lastResultSummaryText || '';
+    if (!txt) { card.classList.add('hidden'); }
+    else {
+      card.classList.remove('hidden');
+      const lines = String(txt).split('\n').filter(l => l.trim());
+      card.innerHTML = '<div class="text-[10px] font-bold text-cyan-300 mb-1 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> 小队战后状态</div>' + lines.map(l => '<div class="text-slate-300">' + escapeHistoryHtml(l) + '</div>').join('');
+    }
+  }
+}
+function setHistoryFilter(f) {
+  currentHistoryFilter = f;
+  ['all','dialogue','action','critical'].forEach(k => {
+    const btn = document.getElementById('flt-' + k);
+    if (!btn) return;
+    if (k === f) btn.className = "px-2 py-0.5 rounded bg-cyan-700 text-white font-bold";
+    else btn.className = "px-2 py-0.5 rounded text-slate-400 hover:text-white";
+  });
+  refreshHistoryView();
+}
 
 // ==========================================
 // 音效与特效引擎
@@ -10875,16 +11199,31 @@ async function attemptRetreat() {
     showBattleResult('retreat');
 }
 
-// 右上角【记录】：只读展示本次战局记录，不写撤离文案、不发送酒馆（发送入口见 endBattleAndSendToTavern）
+// 右上角【记录】：富化展示本次战局记录，双视口隔离（视觉/原始），筛选与编辑互斥
 function showHistoryOnly() {
     const modal = document.getElementById('battle-history-modal');
-    const preview = document.getElementById('history-preview');
-    if (!modal || !preview) return;
-    preview.value = battleHistory.length ? battleHistory.join('\n') : '（暂无战局记录）';
-    // 默认锁定：每次打开重置为只读 + 解锁按钮恢复初始文案（编辑产物仅用于本次发送，不写回 battleHistory）
-    preview.readOnly = true;
+    if (!modal) return;
+    const visual = document.getElementById('history-visual-view');
+    const rawView = document.getElementById('history-raw-view');
+    const rawTa = document.getElementById('history-raw-textarea');
+    const legacy = document.getElementById('history-preview');
+    _historyRawCache = battleHistory.length ? battleHistory.join('\n') : '';
+    isHistoryEditMode = false;
+    if (visual) visual.classList.remove('hidden');
+    if (rawView) { rawView.classList.add('hidden'); rawView.classList.remove('flex'); }
+    if (rawTa) rawTa.value = _historyRawCache;
+    if (legacy) { legacy.value = _historyRawCache; legacy.readOnly = true; }
     const toggleBtn = document.getElementById('history-edit-toggle');
-    if (toggleBtn) { toggleBtn.innerHTML = '🔓 解锁编辑'; toggleBtn.classList.remove('from-emerald-600', 'to-emerald-500', 'text-white'); toggleBtn.classList.add('text-gray-400'); }
+    if (toggleBtn) { toggleBtn.innerHTML = '🔓 解锁编辑'; toggleBtn.classList.remove('from-emerald-600','to-emerald-500','text-white','bg-gradient-to-r'); }
+    const filterBar = document.getElementById('visual-filter-bar');
+    if (filterBar) filterBar.classList.remove('opacity-30','pointer-events-none');
+    currentHistoryFilter = 'all';
+    ['all','dialogue','action','critical'].forEach(k => {
+      const b = document.getElementById('flt-' + k);
+      if (!b) return;
+      b.className = k === 'all' ? "px-2 py-0.5 rounded bg-cyan-700 text-white font-bold" : "px-2 py-0.5 rounded text-slate-400 hover:text-white";
+    });
+    refreshHistoryView();
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     setTimeout(() => { modal.classList.remove('opacity-0'); }, 50);
@@ -10892,37 +11231,68 @@ function showHistoryOnly() {
 
 function closeHistoryOnly() {
     const modal = document.getElementById('battle-history-modal');
+    if (!modal) return;
+    // 若处于编辑态，先回写缓存（不自动丢失编辑）
+    if (isHistoryEditMode) {
+      const rawTa = document.getElementById('history-raw-textarea');
+      if (rawTa) _historyRawCache = rawTa.value;
+    }
     modal.classList.add('opacity-0');
     setTimeout(() => { modal.classList.add('hidden'); modal.classList.remove('flex'); }, 500);
 }
 
-// 【解锁编辑】：记录默认锁定（只读），点击解锁后可自由编辑，便于发送前微调战局文案
+// 【解锁编辑】：双视口切换，锁定回写并刷新富化视图（编辑产物仅用于本次发送，回写 _historyRawCache/battleHistory）
 function toggleHistoryEdit() {
-    const preview = document.getElementById('history-preview');
+    const visual = document.getElementById('history-visual-view');
+    const rawView = document.getElementById('history-raw-view');
+    const rawTa = document.getElementById('history-raw-textarea');
+    const legacy = document.getElementById('history-preview');
     const toggleBtn = document.getElementById('history-edit-toggle');
-    if (!preview || !toggleBtn) return;
-    const unlocked = preview.readOnly; // true=当前锁定 → 本次解锁
-    preview.readOnly = !unlocked;
-    if (unlocked) {
+    const filterBar = document.getElementById('visual-filter-bar');
+    if (!visual || !rawView || !rawTa || !toggleBtn) return;
+    isHistoryEditMode = !isHistoryEditMode;
+    if (isHistoryEditMode) {
+        rawTa.value = battleHistory.length ? battleHistory.join('\n') : _historyRawCache;
+        visual.classList.add('hidden');
+        rawView.classList.remove('hidden');
+        rawView.classList.add('flex');
+        if (filterBar) filterBar.classList.add('opacity-30','pointer-events-none');
         toggleBtn.innerHTML = '🔒 已解锁 · 点击锁定';
-        toggleBtn.classList.remove('text-gray-400');
-        toggleBtn.classList.add('from-emerald-600', 'to-emerald-500', 'text-white', 'bg-gradient-to-r');
+        toggleBtn.classList.add('from-emerald-600','to-emerald-500','text-white','bg-gradient-to-r');
+        if (legacy) legacy.readOnly = false;
     } else {
+        _historyRawCache = rawTa.value;
+        // 回写 battleHistory 以便后续发送与结算感知编辑产物（按行分割，保留空行语义由解析器 trim 容错）
+        battleHistory = _historyRawCache.split('\n');
+        // 去除末尾因 split 产生的多余空串（保留中间空行已被 trim 跳过，无影响）
+        while (battleHistory.length > 0 && battleHistory[battleHistory.length - 1] === '' && _historyRawCache.endsWith('\n')) break;
+        if (legacy) { legacy.value = _historyRawCache; legacy.readOnly = true; }
+        rawView.classList.add('hidden');
+        rawView.classList.remove('flex');
+        visual.classList.remove('hidden');
+        if (filterBar) filterBar.classList.remove('opacity-30','pointer-events-none');
         toggleBtn.innerHTML = '🔓 解锁编辑';
-        toggleBtn.classList.add('text-gray-400');
-        toggleBtn.classList.remove('from-emerald-600', 'to-emerald-500', 'text-white', 'bg-gradient-to-r');
+        toggleBtn.classList.remove('from-emerald-600','to-emerald-500','text-white','bg-gradient-to-r');
+        refreshHistoryView();
     }
 }
 
 // 记录弹窗【结束当前战斗，将过程发送到酒馆】：玩家自由决定何时结束战斗，
-// 只把战局记录（默认；解锁编辑后为玩家微调内容）原样注入酒馆输入框——不生成任何旁白/续写文案，默认由玩家手写发展。
+// 只把战局记录（编辑态取 rawTextarea，否则 battleHistory）原样注入酒馆输入框——100% 纯文本，不含任何 HTML/头像标签
 // 不终止战斗循环：玩家后悔可随时关闭/返回，继续战斗。
 function endBattleAndSendToTavern() {
-    const preview = document.getElementById('history-preview');
-    const text = preview ? preview.value : (battleHistory.length ? battleHistory.join('\n') : '');
-    if (!text || text.trim() === '') { showLog("暂无战局记录，无法发送"); return; }
+    let text = '';
+    if (isHistoryEditMode) {
+        const rawTa = document.getElementById('history-raw-textarea');
+        text = rawTa ? rawTa.value : _historyRawCache;
+        _historyRawCache = text;
+        battleHistory = String(text).split('\n');
+    } else {
+        text = battleHistory.length ? battleHistory.join('\n') : _historyRawCache;
+    }
+    if (!text || String(text).trim() === '') { showLog("暂无战局记录，无法发送"); return; }
     closeHistoryOnly();
-    if (injectTextToTavern(text)) showLog("✅ 战局记录已发送至酒馆输入框");
+    if (injectTextToTavern(String(text))) showLog("✅ 战局记录已发送至酒馆输入框");
     else showLog("❌ 战局记录发送失败，请检查酒馆连接");
 }
 
@@ -10946,15 +11316,17 @@ function showBattleResult(type) {
         title.className = "text-xl sm:text-3xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-purple-300 to-purple-600 drop-shadow-md";
     }
 
-    const historyText = battleHistory.join('\n');
-    
+    const historyText = battleHistory.length ? battleHistory.join('\n') : _historyRawCache;
+    _historyRawCache = historyText;
+
     let summaryText = "\n\n[小队战后状态结算：]\n";
     if (type === 'retreat') summaryText = "\n\n[小队撤离时状态结算：]\n";
-    
+
     heroesData.forEach(h => {
         let status = h.isAlive ? "存活" : "重伤濒死";
         summaryText += `- ${h.name} 状态${status}：[HP:${Math.floor(Math.max(0, h.hp))}/${h.maxHp}][MP:${Math.floor(Math.max(0, h.mp))}/${h.maxMp}][Atk:${h.atk}][Armor:${h.def}][Speed:${h.spd}]\n`;
     });
+    _lastResultSummaryText = summaryText.trim();
 
     let promptTemplate = "";
     if (type === 'retreat') {
@@ -10964,7 +11336,10 @@ function showBattleResult(type) {
     }
 
     promptArea.value = promptTemplate;
-    
+
+    // 富化视口：与记录共用方案A渲染
+    refreshResultView();
+
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     setTimeout(() => { modal.classList.remove('opacity-0'); }, 50);
@@ -10974,8 +11349,6 @@ function closeBattleResult() {
     const modal = document.getElementById('battle-result-modal');
     modal.classList.add('opacity-0');
     setTimeout(() => { modal.classList.add('hidden'); modal.classList.remove('flex'); }, 500);
-    // 收起而非完全消失：底部生成悬浮「重新打开结算」按钮，玩家可随时恢复弹窗重新发送战局记录到酒馆
-    // （复用 shelvePrompt 同款恢复按钮机制，标签与按钮主体样式保持一致）
     let btn = document.getElementById('battle-result-reopen');
     if (!btn) {
         btn = document.createElement('button');
@@ -10989,6 +11362,7 @@ function closeBattleResult() {
         modal.classList.remove('hidden');
         modal.classList.add('flex');
         setTimeout(() => { modal.classList.remove('opacity-0'); }, 50);
+        refreshResultView();
     };
 }
 

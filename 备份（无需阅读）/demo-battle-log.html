@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>RPG Combat - 1:1 战斗前端实景与战局记录现代化 UI 演示</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Cinzel:wght@700;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+    body {
+      font-family: 'Noto Sans SC', sans-serif;
+      background-color: #030712;
+      color: #e2e8f0;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    .font-cinzel { font-family: 'Cinzel', serif; }
+    .font-mono-num { font-family: 'JetBrains Mono', monospace; font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
+
+    /* 毛玻璃面板 */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* 滚动条 */
+    .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.25); }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.45); border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(6, 182, 212, 0.7); }
+
+    /* 时间轴光轨 */
+    .timeline-rail {
+      position: absolute; left: 50%; top: 0; bottom: 0; width: 2px;
+      transform: translateX(-50%);
+      background: linear-gradient(180deg, rgba(6,182,212,0.6) 0%, rgba(251,191,36,0.5) 50%, rgba(244,63,94,0.6) 100%);
+      box-shadow: 0 0 8px rgba(6,182,212,0.4);
+    }
+    .rail-pulse-beam {
+      position: absolute; width: 100%; height: 40px;
+      background: linear-gradient(180deg, transparent, #38bdf8, transparent);
+      animation: railPulse 2.8s linear infinite;
+    }
+    @keyframes railPulse {
+      0% { top: -40px; opacity: 0; }
+      20% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    /* 战术弹窗：宽度缩减 30%，高透光玻璃与科技边框 */
+    .cyber-modal-history {
+      background: radial-gradient(135% 120% at 15% 0%, rgba(18, 26, 43, 0.78) 0%, rgba(10, 15, 28, 0.88) 100%);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 30px rgba(6, 182, 212, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+
+    /* 科技边角 */
+    .cyber-corner { position: absolute; width: 8px; height: 8px; border-color: rgba(6, 182, 212, 0.85); pointer-events: none; }
+    .cyber-corner-tl { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
+    .cyber-corner-tr { top: -1px; right: -1px; border-top: 2px solid; border-right: 2px solid; }
+    .cyber-corner-bl { bottom: -1px; left: -1px; border-bottom: 2px solid; border-left: 2px solid; }
+    .cyber-corner-br { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
+
+    /* 底部对话栏 */
+    #chat-input-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 50px;
+      background: rgba(10, 15, 29, 0.95);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      z-index: 45; display: flex; align-items: center; padding: 0 16px; gap: 10px;
+    }
+  </style>
+</head>
+<body class="w-screen h-screen overflow-hidden relative select-none">
+
+  <!-- ========================================================= -->
+  <!-- 1:1 复刻全屏战场背景 (Battle Scene Background) -->
+  <!-- ========================================================= -->
+  <div id="battle-scene" class="absolute inset-0 bg-gradient-to-br from-indigo-950 via-slate-900 to-emerald-950 overflow-hidden z-0">
+    <div class="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+    <div class="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-black/85 via-black/30 to-transparent z-0"></div>
+
+    <!-- 顶部中央飘字战报 -->
+    <div class="absolute top-4 sm:top-6 w-full flex justify-center z-30 pointer-events-none">
+      <div class="glass-panel px-4 py-1.5 rounded-full text-xs font-light text-cyan-200/90 shadow-md">
+        ⚔️ 战局进行中 · 回合 2
+      </div>
+    </div>
+
+    <!-- 左侧：1:1 行动顺序时间轴 -->
+    <div class="absolute left-2 sm:left-6 top-16 bottom-24 w-12 sm:w-14 z-20 flex flex-col items-center">
+      <div class="relative w-full h-full flex flex-col items-center">
+        <div class="timeline-rail"><div class="rail-pulse-beam"></div></div>
+        <div class="relative w-full h-full flex flex-col gap-2.5 items-center overflow-y-auto custom-scrollbar py-2">
+          <!-- 1. 当前行动者 -->
+          <div class="w-10 h-10 rounded-full border-2 border-amber-400 p-0.5 relative shadow-[0_0_12px_rgba(251,191,36,0.6)] bg-slate-900">
+            <img src="https://www.imgur.la/images/2026/03/06/lyt.jpg" class="w-full h-full object-cover rounded-full">
+            <span class="absolute -top-1 -right-1 text-[8px] font-bold bg-amber-500 text-black px-1 rounded-full">#1</span>
+          </div>
+          <!-- 2. 敌方 -->
+          <div class="w-9 h-9 rounded-full border-2 border-rose-500/70 p-0.5 relative bg-slate-900 shadow">
+            <div class="w-full h-full rounded-full bg-rose-950 flex items-center justify-center text-xs">🐺</div>
+            <span class="absolute -top-1 -right-1 text-[8px] font-bold bg-rose-600 text-white px-1 rounded-full">#2</span>
+          </div>
+          <!-- 3. 队友 -->
+          <div class="w-9 h-9 rounded-full border-2 border-cyan-500/70 p-0.5 relative bg-slate-900 shadow">
+            <img src="https://www.imgur.la/images/2026/03/06/lcft.jpg" class="w-full h-full object-cover rounded-full">
+            <span class="absolute -top-1 -right-1 text-[8px] font-bold bg-cyan-600 text-white px-1 rounded-full">#3</span>
+          </div>
+          <!-- 4. 队友 -->
+          <div class="w-9 h-9 rounded-full border-2 border-cyan-500/70 p-0.5 relative bg-slate-900 shadow">
+            <img src="https://imgur.la/images/2026/06/25/585bf7f2f1559168b419b8be56da36a6.png" class="w-full h-full object-cover rounded-full">
+            <span class="absolute -top-1 -right-1 text-[8px] font-bold bg-cyan-600 text-white px-1 rounded-full">#4</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中部：1:1 敌人阵型展示区 -->
+    <div class="absolute left-20 right-6 top-16 bottom-56 z-10 flex items-center justify-center gap-8 sm:gap-16">
+      <!-- 敌人 1：青眼苍狼 -->
+      <div class="flex flex-col items-center cursor-pointer transition-transform hover:scale-105">
+        <div class="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-rose-500/60 bg-rose-950/40 backdrop-blur-md flex items-center justify-center shadow-[0_0_20px_rgba(244,63,94,0.25)]">
+          <span class="text-4xl sm:text-5xl">🐺</span>
+          <span class="absolute -top-2 left-2 text-[9px] font-bold px-1.5 py-0.2 bg-rose-900 text-rose-200 border border-rose-600 rounded">⬇ 前排</span>
+          <span class="absolute -bottom-2 text-[10px] font-bold px-2 py-0.5 bg-black/80 text-rose-300 border border-rose-700/60 rounded-full">青眼苍狼</span>
+        </div>
+        <div class="w-24 mt-3 space-y-1">
+          <div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+            <div class="h-full bg-rose-500 rounded-full" style="width: 45%;"></div>
+          </div>
+          <div class="flex justify-between text-[9px] text-slate-400 font-mono-num">
+            <span>HP</span><span>54/120</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 敌人 2：食尸鬼 -->
+      <div class="flex flex-col items-center cursor-pointer transition-transform hover:scale-105">
+        <div class="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-rose-500/60 bg-rose-950/40 backdrop-blur-md flex items-center justify-center shadow-[0_0_20px_rgba(244,63,94,0.25)]">
+          <span class="text-4xl sm:text-5xl">🧟</span>
+          <span class="absolute -top-2 left-2 text-[9px] font-bold px-1.5 py-0.2 bg-sky-900 text-sky-200 border border-sky-600 rounded">⬆ 后排</span>
+          <span class="absolute -bottom-2 text-[10px] font-bold px-2 py-0.5 bg-black/80 text-rose-300 border border-rose-700/60 rounded-full">食尸鬼[复活]</span>
+        </div>
+        <div class="w-24 mt-3 space-y-1">
+          <div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+            <div class="h-full bg-rose-500 rounded-full" style="width: 30%;"></div>
+          </div>
+          <div class="flex justify-between text-[9px] text-slate-400 font-mono-num">
+            <span>HP</span><span>36/120</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部悬浮 UI 层：英雄卡片 + 右侧技能指令面板 -->
+    <div class="absolute bottom-14 left-16 right-4 sm:right-6 flex flex-col sm:flex-row items-end justify-between gap-3 z-20 pointer-events-auto">
+      <!-- 4 英雄状态卡片 -->
+      <div class="grid grid-cols-4 gap-2 flex-1 max-w-2xl">
+        <!-- 烈阳剑尊 (主控) -->
+        <div class="bg-slate-950/80 rounded-lg p-1.5 border-2 border-cyan-500/80 shadow-lg relative">
+          <div class="w-full aspect-[4/3] rounded overflow-hidden mb-1 relative bg-slate-900">
+            <img src="https://www.imgur.la/images/2026/03/06/lyt.jpg" class="w-full h-full object-cover">
+            <span class="absolute top-0.5 left-1 text-[9px] font-bold text-white bg-black/60 px-1 rounded">烈阳剑尊</span>
+          </div>
+          <div class="h-1 bg-yellow-400 rounded-full mb-0.5" style="width: 100%;"></div>
+          <div class="h-1 bg-cyan-400 rounded-full mb-0.5" style="width: 80%;"></div>
+          <div class="h-1 bg-emerald-500 rounded-full" style="width: 65%;"></div>
+        </div>
+
+        <!-- 李长风 -->
+        <div class="bg-slate-950/80 rounded-lg p-1.5 border border-slate-700/80 shadow relative">
+          <div class="w-full aspect-[4/3] rounded overflow-hidden mb-1 relative bg-slate-900">
+            <img src="https://www.imgur.la/images/2026/03/06/lcft.jpg" class="w-full h-full object-cover">
+            <span class="absolute top-0.5 left-1 text-[9px] font-bold text-white bg-black/60 px-1 rounded">李长风</span>
+          </div>
+          <div class="h-1 bg-yellow-400 rounded-full mb-0.5" style="width: 70%;"></div>
+          <div class="h-1 bg-cyan-400 rounded-full mb-0.5" style="width: 50%;"></div>
+          <div class="h-1 bg-emerald-500 rounded-full" style="width: 40%;"></div>
+        </div>
+
+        <!-- 玛德琳 -->
+        <div class="bg-slate-950/80 rounded-lg p-1.5 border border-slate-700/80 shadow relative">
+          <div class="w-full aspect-[4/3] rounded overflow-hidden mb-1 relative bg-slate-900">
+            <img src="https://imgur.la/images/2026/06/25/585bf7f2f1559168b419b8be56da36a6.png" class="w-full h-full object-cover">
+            <span class="absolute top-0.5 left-1 text-[9px] font-bold text-white bg-black/60 px-1 rounded">玛德琳</span>
+          </div>
+          <div class="h-1 bg-yellow-400 rounded-full mb-0.5" style="width: 90%;"></div>
+          <div class="h-1 bg-cyan-400 rounded-full mb-0.5" style="width: 75%;"></div>
+          <div class="h-1 bg-emerald-500 rounded-full" style="width: 20%;"></div>
+        </div>
+
+        <!-- 索恩 -->
+        <div class="bg-slate-950/80 rounded-lg p-1.5 border border-slate-700/80 shadow relative">
+          <div class="w-full aspect-[4/3] rounded overflow-hidden mb-1 relative bg-slate-900">
+            <img src="https://imgur.la/images/2026/08/13/77fcdf0fd006c4ff1ccae30774322270.png" class="w-full h-full object-cover">
+            <span class="absolute top-0.5 left-1 text-[9px] font-bold text-white bg-black/60 px-1 rounded">索恩</span>
+          </div>
+          <div class="h-1 bg-yellow-400 rounded-full mb-0.5" style="width: 100%;"></div>
+          <div class="h-1 bg-cyan-400 rounded-full mb-0.5" style="width: 60%;"></div>
+          <div class="h-1 bg-emerald-500 rounded-full" style="width: 85%;"></div>
+        </div>
+      </div>
+
+      <!-- 右侧：行动指令面板 (260px x 172px 1:1 精准尺寸) -->
+      <div class="w-[240px] sm:w-[260px] h-[155px] sm:h-[172px] bg-slate-950/95 backdrop-blur-xl rounded-xl border border-slate-700/80 border-t-2 border-t-cyan-500 flex flex-col overflow-hidden shadow-2xl">
+        <div class="text-center text-[10px] sm:text-xs py-1 text-cyan-300 bg-white/5 tracking-widest uppercase font-bold border-b border-white/10">烈阳剑尊 · 行动回合</div>
+        <div class="flex-1 flex flex-col p-1.5 gap-1 justify-center bg-slate-900/50">
+          <button class="w-full py-1.5 px-3 bg-slate-900/80 hover:bg-cyan-950/60 border border-slate-700 rounded-lg text-xs font-bold text-slate-200 flex items-center gap-2 shadow-sm"><span class="text-rose-400">⚔️</span> 普攻攻击</button>
+          <button class="w-full py-1.5 px-3 bg-gradient-to-r from-cyan-950 to-slate-900 border border-cyan-500/60 rounded-lg text-xs font-bold text-white flex items-center gap-2"><span class="text-cyan-400">⚡</span> 释放技能</button>
+          <button class="w-full py-1.5 px-3 bg-slate-900/80 hover:bg-emerald-950/60 border border-slate-700 rounded-lg text-xs font-bold text-slate-200 flex items-center gap-2"><span class="text-emerald-400">🛡️</span> 防御姿态</button>
+          <button class="w-full py-1.5 px-3 bg-slate-900/80 hover:bg-purple-950/60 border border-slate-700 rounded-lg text-xs font-bold text-slate-200 flex items-center gap-2"><span class="text-purple-400">💨</span> 尝试撤离</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- 顶部控制条 (Top Control Bar) -->
+  <!-- ========================================================= -->
+  <div class="absolute top-3 right-3 sm:right-6 z-50 flex items-center gap-1.5 sm:gap-2">
+    <!-- 场地 -->
+    <div class="glass-panel px-3 py-1.5 rounded-full text-[11px] font-bold text-amber-400 flex items-center gap-1 shadow-md">
+      <span>🏟️</span> <span>有备而来</span>
+    </div>
+    <!-- 世界书 -->
+    <button class="glass-panel px-3 py-1.5 rounded-full text-[11px] font-bold text-violet-400 flex items-center gap-1 shadow-md">
+      <span>📚</span> <span class="hidden sm:inline">世界书</span>
+    </button>
+    <!-- 【📜 记录】高亮呼吸触发按钮 -->
+    <button onclick="toggleBattleHistoryModal()" class="px-3.5 py-1.5 rounded-full text-[11px] font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 transition-all flex items-center gap-1.5 shadow-[0_0_15px_rgba(168,85,247,0.5)] animate-pulse">
+      <span>📜</span> <span>记录 (点击打开)</span>
+    </button>
+    <!-- 设置 -->
+    <button class="glass-panel px-3 py-1.5 rounded-full text-[11px] font-bold text-yellow-500 flex items-center gap-1 shadow-md">
+      <span>⚙️</span> <span class="hidden sm:inline">设置</span>
+    </button>
+  </div>
+
+  <!-- 底部对白输入条 -->
+  <div id="chat-input-bar">
+    <img src="https://www.imgur.la/images/2026/03/06/lyt.jpg" class="w-7 h-7 rounded-full border border-cyan-400/80 object-cover">
+    <input type="text" placeholder="输入发言内容，触发队友及智慧敌人实时台词..." class="flex-1 bg-black/50 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500">
+    <button class="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-lg transition-colors">发送</button>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- 核心弹窗：战局记录现代化 UI 模态框 (30% 紧凑宽度 + 固定高度窗口滚动) -->
+  <!-- ========================================================= -->
+  <div id="battle-history-modal" class="fixed inset-0 bg-black/75 backdrop-blur-md z-[120] flex items-center justify-center p-2 sm:p-4 transition-opacity duration-300">
+    
+    <!-- 模态框主体卡片：宽度由 max-w-4xl 压缩 30% 至 max-w-[560px]，高度锁定 80vh / 560px 内独立滚动 -->
+    <div class="w-full max-w-[560px] h-[560px] max-h-[82vh] cyber-modal-history rounded-2xl flex flex-col overflow-hidden relative shadow-[0_0_50px_rgba(0,0,0,0.85)] border border-cyan-500/35">
+      <!-- 科技四边角 -->
+      <div class="cyber-corner cyber-corner-tl"></div>
+      <div class="cyber-corner cyber-corner-tr"></div>
+      <div class="cyber-corner cyber-corner-bl"></div>
+      <div class="cyber-corner cyber-corner-br"></div>
+
+      <!-- 头部：标题 + 方案切换器 + 模式切换 -->
+      <div class="px-4 py-2.5 border-b border-slate-700/60 bg-gradient-to-r from-slate-900/90 via-slate-800/60 to-slate-900/90 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+          <h2 class="text-sm sm:text-base font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-slate-100 to-slate-400 font-cinzel">COMBAT LOG</h2>
+          <span class="text-[10px] font-bold text-cyan-300 px-1.5 py-0.2 rounded bg-cyan-950/80 border border-cyan-800/60">战局记录</span>
+        </div>
+
+        <!-- 方案快速切换 (A / B / C) -->
+        <div class="flex items-center gap-1 bg-black/60 p-0.5 rounded-lg border border-slate-700 text-[10px]">
+          <button onclick="switchScheme('A')" id="btn-sch-A" class="px-2 py-0.5 rounded font-bold transition-all bg-cyan-600 text-white">方案A</button>
+          <button onclick="switchScheme('B')" id="btn-sch-B" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">方案B</button>
+          <button onclick="switchScheme('C')" id="btn-sch-C" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">方案C</button>
+        </div>
+
+        <!-- 🔓 解锁编辑 按钮 -->
+        <button id="history-edit-toggle" onclick="toggleEditMode()" class="px-2.5 py-1 rounded-lg text-xs font-bold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-600/70 transition-all flex items-center gap-1 shadow-sm">
+          <span id="edit-toggle-icon">🔓</span>
+          <span id="edit-toggle-text">解锁编辑</span>
+        </button>
+      </div>
+
+      <!-- 次级筛选导航条（仅视觉模式显示） -->
+      <div id="visual-filter-bar" class="px-4 py-1.5 bg-black/40 border-b border-slate-800/60 flex items-center justify-between text-[11px]">
+        <div class="flex items-center gap-1">
+          <button onclick="setFilter('all')" id="flt-all" class="px-2 py-0.5 rounded bg-cyan-700 text-white font-bold">全部</button>
+          <button onclick="setFilter('dialogue')" id="flt-dialogue" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">💬 对话</button>
+          <button onclick="setFilter('action')" id="flt-action" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">⚔️ 攻防</button>
+          <button onclick="setFilter('critical')" id="flt-critical" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">⚠️ 要闻</button>
+        </div>
+        <span class="text-[10px] text-slate-500 font-mono-num">实时解析 · 纯净导出</span>
+      </div>
+
+      <!-- ======================================================= -->
+      <!-- 中部内容滚动区 (Fixed Window Scrollable Area) -->
+      <!-- ======================================================= -->
+      <div class="flex-1 overflow-hidden relative flex flex-col">
+        
+        <!-- 视口 1：现代图文视觉呈现流 -->
+        <div id="history-visual-view" class="flex-1 overflow-y-auto custom-scrollbar p-3.5 space-y-3.5">
+          <!-- 动态渲染内容 -->
+        </div>
+
+        <!-- 视口 2：纯文本编辑模式 -->
+        <div id="history-raw-view" class="hidden flex-1 flex-col p-3 bg-black/80 overflow-hidden">
+          <div class="text-[11px] text-emerald-300 font-bold mb-1.5 flex items-center justify-between">
+            <span>✏️ 纯文本编辑（微调将发送到酒馆的战报）</span>
+            <span class="text-[10px] text-slate-500">锁定后自动同步</span>
+          </div>
+          <textarea id="history-raw-textarea" spellcheck="false" class="w-full flex-1 bg-slate-950/90 border border-slate-700/90 rounded-xl p-3 text-xs text-slate-200 font-mono leading-relaxed focus:border-cyan-500 outline-none resize-none custom-scrollbar shadow-inner"></textarea>
+        </div>
+
+      </div>
+
+      <!-- 底部操作区 -->
+      <div class="px-4 py-2.5 bg-black/70 border-t border-slate-700/60 flex items-center justify-between gap-2">
+        <button onclick="toggleBattleHistoryModal()" class="px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700">
+          关闭
+        </button>
+        <button onclick="sendToTavernDemo()" class="px-4 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 transition-all shadow-[0_0_15px_rgba(79,70,229,0.4)] flex items-center gap-1.5">
+          <span>📤</span>
+          <span>结束当前战斗，将过程发送到酒馆</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 纯净文本检验弹窗 -->
+  <div id="prompt-verify-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-[130] hidden items-center justify-center p-4">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-700 rounded-xl p-4 flex flex-col max-h-[75vh] shadow-2xl">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
+        <h3 class="text-xs font-bold text-amber-300 flex items-center gap-1.5"><span>🔍</span> 注入酒馆提示词校验</h3>
+        <button onclick="closeVerifyModal()" class="text-slate-400 hover:text-white text-xs">✕</button>
+      </div>
+      <div class="text-[10px] text-emerald-400 bg-emerald-950/40 p-2 rounded border border-emerald-800/40 mb-2">
+        ✅ 验证通过：发送内容 100% 为纯文本，绝不包含任何 HTML 或头像样式标签！
+      </div>
+      <textarea id="verify-text-area" readonly class="w-full flex-1 bg-black/70 border border-slate-700 rounded p-2 text-[11px] text-slate-300 font-mono leading-relaxed resize-none custom-scrollbar" rows="10"></textarea>
+      <div class="mt-3 flex justify-end">
+        <button onclick="closeVerifyModal()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded text-xs font-semibold">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 头像与图标映射表
+    const AVATAR_MAP = {
+      "烈阳剑尊": "https://www.imgur.la/images/2026/03/06/lyt.jpg",
+      "李长风": "https://www.imgur.la/images/2026/03/06/lcft.jpg",
+      "玛德琳": "https://imgur.la/images/2026/06/25/585bf7f2f1559168b419b8be56da36a6.png",
+      "索恩": "https://imgur.la/images/2026/08/13/77fcdf0fd006c4ff1ccae30774322270.png",
+      "青眼苍狼": "https://images.unsplash.com/photo-1564865878688-9a244444042a?w=120&auto=format&fit=crop&q=60",
+      "食尸鬼": "https://images.unsplash.com/photo-1509248961158-e54f6934749c?w=120&auto=format&fit=crop&q=60"
+    };
+
+    const DEFAULT_HERO_IMG = 'https://imgur.la/images/2026/08/13/9adb95d5df1b99ebe2f6670acd47a5b5.png';
+
+    // 战局日志纯文本数据
+    let rawBattleLog = `🏟️ 场地：有备而来 — 命中率提升30%
+--- 第 1 回合 ---
+⚔️ 烈阳剑尊 对 青眼苍狼 使用了 【赤阳剑气】！
+   ↳ 造成了 68 点伤害！(暴击)
+   ↳ 附加了【灼烧】效果，持续 3 回合！
+💬 烈阳剑尊：「孽畜，尝尝烈阳焚天之威！」
+⚔️ 李长风 对 青眼苍狼 使用了 【风卷残云】！
+   ↳ 造成了 42 点伤害！
+   ↳ 🐌 青眼苍狼 受到迟滞，行动顺序延后（速度-15）。
+💬 青眼苍狼：「吼嗷嗷嗷——！（眼中凶光暴涨，誓死不退）」
+⚔️ 青眼苍狼 对 李长风 发动了 【狂暴撕咬】！
+   ↳ 造成了 35 点伤害！
+   ↳ 李长风 成功格挡，护甲抵消 15 点伤害！
+💬 玛德琳：「长风小心！我来为你治愈伤势！」
+⚡ 玛德琳 对 李长风 使用了 【圣光抚慰】！
+   ↳ 治愈了 李长风，恢复 55 点生命。
+   ↳ 为 李长风 附加了一层能吸收 40 点伤害的圣域护盾。
+--- 第 2 回合 ---
+💬 索恩：「它的破绽在右翼，封锁它的退路！」
+⚔️ 索恩 对 食尸鬼 使用了 【穿甲狙击】！
+   ↳ 🎯 贯穿护甲！造成了 110 点穿透伤害！
+   ↳ 💀 [食尸鬼] 遭受致命一击倒地……却强行撑住一口气猛地站起（死里逃生）！恢复了 36/120 点生命重返战场！
+💬 食尸鬼：「嗬……嗬……死者……不知痛苦！」
+[战况] ⚠️ 食尸鬼 濒死之际体内残存力量狂暴失控——绝命反扑前兆！
+👁️ 索恩 看破了 食尸鬼 的 【绝命自爆】！
+   ↳ ⛔ 食尸鬼 的绝命反扑被看破破局，完全无效化！
+💬 索恩：「早就料到你会垂死挣扎。」
+⚔️ 烈阳剑尊 对 食尸鬼 发动了 【普攻·挥斩】！
+   ↳ 造成了 45 点伤害！
+[战况] 💀 食尸鬼 被击溃了！
+💬 烈阳剑尊：「邪祟已诛，乘胜追击！」`;
+
+    let currentScheme = 'A';
+    let isEditMode = false;
+    let currentFilter = 'all';
+
+    // 模态框显隐切换
+    function toggleBattleHistoryModal() {
+      const modal = document.getElementById('battle-history-modal');
+      modal.classList.toggle('hidden');
+    }
+
+    // 文本解析器
+    function parseCombatLog(raw) {
+      const lines = raw.split('\n');
+      const list = [];
+      let round = 0;
+      let curAction = null;
+
+      for (let line of lines) {
+        line = line.trim();
+        if (!line) continue;
+
+        // 回合头
+        const rMatch = line.match(/^---\s*第\s*(\d+)\s*回合\s*---/);
+        if (rMatch) {
+          round = parseInt(rMatch[1]);
+          curAction = null;
+          list.push({ type: 'round', round, raw: line });
+          continue;
+        }
+
+        // 场地
+        if (line.startsWith('🏟️') || line.startsWith('【场地】') || line.startsWith('场地')) {
+          list.push({ type: 'field', text: line.replace(/^[🏟️【场地】\s:：]+/, ''), raw: line });
+          continue;
+        }
+
+        // 对白
+        const dMatch = line.match(/^💬?\s*(?:\[对话\])?\s*([^：:「]+)[：:]\s*[「“"]?(.*?)[」”"]?$/);
+        if (dMatch) {
+          const speaker = dMatch[1].trim();
+          const speech = dMatch[2].trim();
+          list.push({
+            type: 'dialogue',
+            round,
+            speaker,
+            speech,
+            isHero: isHero(speaker),
+            avatar: getAvatar(speaker),
+            raw: line
+          });
+          continue;
+        }
+
+        // 关键战报
+        if (line.startsWith('[战况]') || line.includes('重伤倒下了') || line.includes('被击溃了') || line.includes('死里逃生') || line.includes('绝命反扑')) {
+          list.push({
+            type: 'critical',
+            round,
+            text: line.replace(/^\[战况\]\s*/, ''),
+            isDeath: line.includes('重伤倒下') || line.includes('被击溃'),
+            isRevive: line.includes('死里逃生') || line.includes('站了起来'),
+            raw: line
+          });
+          continue;
+        }
+
+        // 行动子项
+        if (line.startsWith('↳')) {
+          const subText = line.replace(/^↳\s*/, '');
+          if (curAction) curAction.subs.push(subText);
+          else list.push({ type: 'sub', text: subText, raw: line });
+          continue;
+        }
+
+        // 动作
+        const aMatch = line.match(/^(?:⚔️|🛡️|👁️|⚡|💨)?\s*([^\s]+?)\s*(?:对\s*([^\s]+?))?\s*(使用了|采取了|发动了|展开了|看破了|尝试)\s*(?:【(.*?)】|([^\n！!]+))?/);
+        if (aMatch) {
+          const caster = aMatch[1];
+          const target = aMatch[2] || null;
+          const verb = aMatch[3];
+          const skill = aMatch[4] || aMatch[5] || verb;
+          const actObj = {
+            type: 'action',
+            round,
+            caster,
+            target,
+            skill,
+            isHero: isHero(caster),
+            casterAvatar: getAvatar(caster),
+            targetAvatar: target ? getAvatar(target) : null,
+            subs: [],
+            raw: line
+          };
+          curAction = actObj;
+          list.push(actObj);
+          continue;
+        }
+
+        list.push({ type: 'other', text: line, raw: line });
+      }
+      return list;
+    }
+
+    function isHero(name) {
+      return ["烈阳剑尊", "李长风", "玛德琳", "索恩", "埃利奥特", "弗兰克", "玩家", "我方"].some(k => name.includes(k));
+    }
+
+    function getAvatar(name) {
+      const clean = name.replace(/[\[\]*0-9\s]/g, '');
+      if (AVATAR_MAP[clean]) return { type: 'img', src: AVATAR_MAP[clean] };
+      for (let k in AVATAR_MAP) if (clean.includes(k)) return { type: 'img', src: AVATAR_MAP[k] };
+      if (isHero(clean)) return { type: 'img', src: DEFAULT_HERO_IMG };
+      if (clean.includes('狼')) return { type: 'emoji', emoji: '🐺' };
+      if (clean.includes('尸') || clean.includes('鬼')) return { type: 'emoji', emoji: '🧟' };
+      return { type: 'emoji', emoji: '👾' };
+    }
+
+    function renderAvatar(av, size = "w-7 h-7", isH = true) {
+      const border = isH ? "border-cyan-500/50 bg-cyan-950" : "border-rose-500/50 bg-rose-950";
+      if (av.type === 'img') {
+        return `<div class="${size} rounded-full overflow-hidden border ${border} shrink-0 shadow"><img src="${av.src}" class="w-full h-full object-cover" onerror="this.src='${DEFAULT_HERO_IMG}'"></div>`;
+      }
+      return `<div class="${size} rounded-full border ${border} shrink-0 shadow flex items-center justify-center text-xs">${av.emoji}</div>`;
+    }
+
+    // 渲染方案 A：现代战术流线战报 (紧凑 30% 优化版)
+    function renderSchemeA(list) {
+      let h = `<div class="space-y-3">`;
+      for (let item of list) {
+        if (currentFilter === 'dialogue' && item.type !== 'dialogue' && item.type !== 'round') continue;
+        if (currentFilter === 'action' && item.type !== 'action' && item.type !== 'round') continue;
+        if (currentFilter === 'critical' && item.type !== 'critical' && item.type !== 'round') continue;
+
+        if (item.type === 'round') {
+          h += `
+            <div class="flex items-center gap-2 my-2.5">
+              <div class="h-[1px] flex-1 bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent"></div>
+              <span class="px-3 py-0.5 rounded-full bg-slate-900 border border-cyan-500/40 text-cyan-300 font-cinzel text-[10px] font-bold tracking-widest shadow-[0_0_8px_rgba(6,182,212,0.2)]">
+                ROUND ${item.round.toString().padStart(2, '0')}
+              </span>
+              <div class="h-[1px] flex-1 bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent"></div>
+            </div>`;
+        } else if (item.type === 'field') {
+          h += `
+            <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-950/30 border border-amber-500/30 text-amber-300 text-[11px]">
+              <span>🏟️</span><span class="font-bold">场地：</span><span>${item.text}</span>
+            </div>`;
+        } else if (item.type === 'dialogue') {
+          const isH = item.isHero;
+          const align = isH ? "justify-start" : "justify-end";
+          const bubble = isH ? "bg-slate-900/90 border-cyan-500/35 text-slate-100 rounded-tl-none shadow-[0_0_12px_rgba(6,182,212,0.15)]" : "bg-rose-950/50 border-rose-500/35 text-rose-100 rounded-tr-none shadow-[0_0_12px_rgba(244,63,94,0.15)]";
+          const badge = isH ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40" : "bg-rose-500/20 text-rose-300 border-rose-500/40";
+          h += `
+            <div class="flex items-start gap-2 ${align}">
+              ${isH ? renderAvatar(item.avatar, "w-8 h-8", true) : ''}
+              <div class="max-w-[82%] flex flex-col ${isH ? 'items-start' : 'items-end'}">
+                <span class="text-[9px] font-bold px-1.5 py-0.2 rounded border ${badge} mb-0.5">${item.speaker}</span>
+                <div class="px-3 py-2 rounded-xl border backdrop-blur-md text-[11px] sm:text-xs leading-relaxed ${bubble}">
+                  ${item.speech}
+                </div>
+              </div>
+              ${!isH ? renderAvatar(item.avatar, "w-8 h-8", false) : ''}
+            </div>`;
+        } else if (item.type === 'critical') {
+          const bd = item.isDeath ? "border-rose-600/60 bg-rose-950/40 text-rose-200" : (item.isRevive ? "border-emerald-500/60 bg-emerald-950/40 text-emerald-200" : "border-amber-500/60 bg-amber-950/40 text-amber-200");
+          h += `
+            <div class="px-3 py-1.5 rounded-lg border ${bd} flex items-center justify-between text-[11px] font-semibold">
+              <div class="flex items-center gap-1.5">
+                <span>${item.isDeath ? '💀' : (item.isRevive ? '🌟' : '⚠️')}</span>
+                <span>${item.text}</span>
+              </div>
+              <span class="text-[9px] uppercase font-cinzel opacity-70">STATUS</span>
+            </div>`;
+        } else if (item.type === 'action') {
+          const isH = item.isHero;
+          const bg = isH ? "bg-slate-900/60 border-slate-700/60" : "bg-slate-950/70 border-slate-800";
+          let subHtml = '';
+          if (item.subs && item.subs.length > 0) {
+            subHtml = `<div class="mt-1.5 pt-1.5 border-t border-slate-800/80 space-y-0.5 text-[10px]">
+              ${item.subs.map(s => {
+                let color = 'text-slate-300';
+                if (s.includes('伤害') || s.includes('暴击')) color = 'text-rose-400 font-bold';
+                if (s.includes('恢复') || s.includes('治愈')) color = 'text-emerald-400 font-bold';
+                if (s.includes('护盾') || s.includes('圣域')) color = 'text-cyan-400';
+                if (s.includes('看破') || s.includes('无效化')) color = 'text-fuchsia-400 font-bold';
+                return `<div class="flex items-center gap-1 ${color}"><span class="text-slate-500">↳</span><span>${s}</span></div>`;
+              }).join('')}
+            </div>`;
+          }
+          h += `
+            <div class="p-2.5 rounded-xl border ${bg} shadow-sm">
+              <div class="flex items-center justify-between flex-wrap gap-1.5">
+                <div class="flex items-center gap-1.5">
+                  ${renderAvatar(item.casterAvatar, "w-6 h-6", isH)}
+                  <span class="text-xs font-bold ${isH ? 'text-cyan-300' : 'text-rose-300'}">${item.caster}</span>
+                  ${item.target ? `
+                    <span class="text-[9px] text-slate-500">▶</span>
+                    ${renderAvatar(item.targetAvatar, "w-5 h-5", !isH)}
+                    <span class="text-[11px] text-slate-300">${item.target}</span>
+                  ` : ''}
+                </div>
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-700/60">
+                  【${item.skill}】
+                </span>
+              </div>
+              ${subHtml}
+            </div>`;
+        }
+      }
+      h += `</div>`;
+      return h;
+    }
+
+    // 渲染方案 B：日系 RPG 对白优先
+    function renderSchemeB(list) {
+      let h = `<div class="space-y-3">`;
+      for (let item of list) {
+        if (currentFilter === 'dialogue' && item.type !== 'dialogue' && item.type !== 'round') continue;
+        if (currentFilter === 'action' && item.type !== 'action' && item.type !== 'round') continue;
+        if (currentFilter === 'critical' && item.type !== 'critical' && item.type !== 'round') continue;
+
+        if (item.type === 'round') {
+          h += `<div class="text-center my-2 text-[10px] font-black text-indigo-300 uppercase tracking-widest border-b border-indigo-900/60 pb-1">✦ PHASE ${item.round} ✦</div>`;
+        } else if (item.type === 'dialogue') {
+          const isH = item.isHero;
+          const frame = isH ? "border-l-2 border-l-cyan-400 bg-cyan-950/20" : "border-r-2 border-r-rose-400 bg-rose-950/20";
+          h += `
+            <div class="p-2 rounded-lg border border-slate-700/40 ${frame} flex items-start gap-2.5">
+              ${renderAvatar(item.avatar, "w-9 h-9", isH)}
+              <div class="flex-1">
+                <div class="text-[10px] font-bold ${isH ? 'text-cyan-300' : 'text-rose-300'} mb-0.5">${item.speaker}</div>
+                <div class="text-[11px] text-slate-200 leading-relaxed bg-black/40 p-2 rounded border border-white/5">“${item.speech}”</div>
+              </div>
+            </div>`;
+        } else if (item.type === 'action') {
+          let subs = item.subs.length > 0 ? item.subs.join('; ') : '';
+          h += `
+            <div class="text-[10px] py-1 px-2.5 rounded bg-slate-900/50 border border-slate-800 text-slate-400 flex items-center justify-between">
+              <span>⚔️ <b class="text-slate-300">${item.caster}</b> 发动 【${item.skill}】</span>
+              ${subs ? `<span class="text-slate-400">${subs}</span>` : ''}
+            </div>`;
+        }
+      }
+      h += `</div>`;
+      return h;
+    }
+
+    // 渲染方案 C：双栏极简分流
+    function renderSchemeC(list) {
+      const dials = list.filter(l => l.type === 'dialogue');
+      const acts = list.filter(l => l.type === 'action' || l.type === 'critical');
+      let h = `
+        <div class="grid grid-cols-2 gap-2 text-[10px]">
+          <div class="space-y-1.5">
+            <div class="text-[11px] font-bold text-cyan-400 pb-1 border-b border-slate-800">⚔️ 动作流 (${acts.length})</div>
+            ${acts.map(a => `<div class="p-1.5 rounded bg-slate-900 border border-slate-800 text-slate-300"><b>${a.caster || '战况'}</b> 【${a.skill || a.text}】</div>`).join('')}
+          </div>
+          <div class="space-y-1.5">
+            <div class="text-[11px] font-bold text-indigo-300 pb-1 border-b border-slate-800">💬 对话流 (${dials.length})</div>
+            ${dials.map(d => `<div class="p-1.5 rounded bg-black/40 border border-slate-800 text-slate-200"><b>${d.speaker}:</b> ${d.speech}</div>`).join('')}
+          </div>
+        </div>`;
+      return h;
+    }
+
+    // 刷新视图
+    function refreshView() {
+      const container = document.getElementById('history-visual-view');
+      const list = parseCombatLog(rawBattleLog);
+      if (currentScheme === 'A') container.innerHTML = renderSchemeA(list);
+      else if (currentScheme === 'B') container.innerHTML = renderSchemeB(list);
+      else if (currentScheme === 'C') container.innerHTML = renderSchemeC(list);
+    }
+
+    // 方案切换
+    function switchScheme(s) {
+      currentScheme = s;
+      ['A', 'B', 'C'].forEach(k => {
+        const btn = document.getElementById(`btn-sch-${k}`);
+        if (k === s) btn.className = "px-2 py-0.5 rounded font-bold transition-all bg-cyan-600 text-white";
+        else btn.className = "px-2 py-0.5 rounded text-slate-400 hover:text-white";
+      });
+      refreshView();
+    }
+
+    // 筛选
+    function setFilter(f) {
+      currentFilter = f;
+      ['all', 'dialogue', 'action', 'critical'].forEach(k => {
+        const btn = document.getElementById(`flt-${k}`);
+        if (k === f) btn.className = "px-2 py-0.5 rounded bg-cyan-700 text-white font-bold";
+        else btn.className = "px-2 py-0.5 rounded text-slate-400 hover:text-white";
+      });
+      refreshView();
+    }
+
+    // 编辑模式切换 (🔓 解锁编辑 / 🔒 锁定更新)
+    function toggleEditMode() {
+      isEditMode = !isEditMode;
+      const visualView = document.getElementById('history-visual-view');
+      const rawView = document.getElementById('history-raw-view');
+      const textarea = document.getElementById('history-raw-textarea');
+      const filterBar = document.getElementById('visual-filter-bar');
+      const icon = document.getElementById('edit-toggle-icon');
+      const text = document.getElementById('edit-toggle-text');
+      const btn = document.getElementById('history-edit-toggle');
+
+      if (isEditMode) {
+        visualView.classList.add('hidden');
+        rawView.classList.remove('hidden');
+        rawView.classList.add('flex');
+        textarea.value = rawBattleLog;
+        filterBar.classList.add('opacity-30', 'pointer-events-none');
+        icon.innerText = "🔒";
+        text.innerText = "锁定更新";
+        btn.classList.add('bg-emerald-700', 'text-white');
+      } else {
+        rawBattleLog = textarea.value;
+        rawView.classList.add('hidden');
+        rawView.classList.remove('flex');
+        visualView.classList.remove('hidden');
+        filterBar.classList.remove('opacity-30', 'pointer-events-none');
+        icon.innerText = "🔓";
+        text.innerText = "解锁编辑";
+        btn.classList.remove('bg-emerald-700', 'text-white');
+        refreshView();
+      }
+    }
+
+    // 发送酒馆提示词验证
+    function sendToTavernDemo() {
+      const text = isEditMode ? document.getElementById('history-raw-textarea').value : rawBattleLog;
+      document.getElementById('verify-text-area').value = text;
+      document.getElementById('prompt-verify-modal').classList.remove('hidden');
+      document.getElementById('prompt-verify-modal').classList.add('flex');
+    }
+
+    function closeVerifyModal() {
+      document.getElementById('prompt-verify-modal').classList.add('hidden');
+      document.getElementById('prompt-verify-modal').classList.remove('flex');
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      refreshView();
+    });
+  </script>
+</body>
+</html>
