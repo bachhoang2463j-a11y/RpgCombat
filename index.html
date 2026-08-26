@@ -6796,7 +6796,8 @@ function parseEnemyItem(data, index, tags) {
     const rawName = data["名字"] || `怪物${index}`;
     const { emoji, name: cleanName } = getCleanNameAndEmoji(rawName);
     const attrs = parseAttributes(data["属性"] || "");
-    const img = AVATAR_MAP[cleanName] || AVATAR_MAP[rawName] || DEFAULT_HERO_IMG;
+    // 敌方/召唤按敌方通道：有 AVATAR_MAP 才用图，否则一律 emoji（绝不回退英雄默认头像）
+    const img = AVATAR_MAP[cleanName] || AVATAR_MAP[rawName] || null;
     let skills = []; if (data["技能"] && Array.isArray(data["技能"])) skills = data["技能"].map(parseSkill);
     const nameTags = Array.isArray(tags) ? tags : [];
     const attrTags = Array.isArray(attrs.attrTags) ? attrs.attrTags : [];
@@ -7141,16 +7142,9 @@ async function summonFromWorldbook(caster, summonName) {
     const base = parseEnemyItem(cbData, 0, []);
     base._worldbookRawContent = entry.content || '';
     base.wbSource = { wbName: worldbookSettings.boundName, entryName: entry.name, desc: extractWorldbookDescription(entry.content) };
-    // 【召唤】头像回退链：AVATAR_MAP → 原文提图 → 解析结果(非默认) → emoji/默认图
-    let _resolvedSummonImg = AVATAR_MAP[summonName] || AVATAR_MAP[base.name] || null;
-    if (!_resolvedSummonImg) {
-        const _rawForImg = String(entry.content || '');
-        let _mImg = _rawForImg.match(/!\[.*?\]\(https?:\/\/[^)]+\)/);
-        if (_mImg) { const _u = _mImg[0].match(/\(https?:\/\/[^)]+\)/); if (_u) _resolvedSummonImg = _u[0].slice(1, -1); }
-        if (!_resolvedSummonImg) { const _m2 = _rawForImg.match(/img\s*[:：]\s*(https?:\/\/[^\s<]+)/i); if (_m2) _resolvedSummonImg = _m2[1]; }
-    }
-    if (!_resolvedSummonImg && base.img && base.img !== DEFAULT_HERO_IMG) _resolvedSummonImg = base.img;
-    if (!_resolvedSummonImg) _resolvedSummonImg = base.emoji ? null : DEFAULT_HERO_IMG;
+    // 【召唤】头像：与敌方一致——有配置图才用图，否则一律 emoji/默认图标
+    let _resolvedSummonImg = AVATAR_MAP[summonName] || AVATAR_MAP[base.name] || base.img || null;
+    if (_resolvedSummonImg === DEFAULT_HERO_IMG) _resolvedSummonImg = null;
     const summonId = 's_' + Date.now() + '_' + (summonSeq++);
     const summonEntity = Object.assign({}, base, {
         id: summonId,
@@ -7166,11 +7160,11 @@ async function summonFromWorldbook(caster, summonName) {
     // 注入固定全能舍身（仅替 owner 挡单体致死）
     const guardSkill = { name: '舍身守护', isReaction:false, reactionTarget:'all', kanpoTarget:null, sheshenTarget:'all', _ownerOnly:true, isOthers:false, guaranteedHit:false, isHighTier:false, isLegendary:false, damageType:null, fxTag:null, cost:0, hpCost:0, tpCost:0, hit:100, turns:null, type:'[无]', power:0, type2:'[无]', power2:0, type3:'[无]', power3:0, barrierSub:null, barrierArmor:0, maxUses:0, usesRemaining:0, summonTarget:null, delay:0, haste:0, charge:0 };
     summonEntity.skills = Array.isArray(summonEntity.skills) ? [guardSkill].concat(summonEntity.skills) : [guardSkill];
-    // 【修复①】即时入队：直接推入阵营并插入行动队列（下回合入队改为即时参战，pending 仅作兜底）
+    // 【修复①】即时入队：直接推入阵营并插入行动队列（下回合入队改为即时参战）
     const _isBattle = !!(state && state.isGameStarted);
+    if (side === 'hero') heroesData.push(summonEntity);
+    else enemiesData.push(summonEntity);
     if (_isBattle) {
-        if (side === 'hero') heroesData.push(summonEntity);
-        else enemiesData.push(summonEntity);
         try {
             if (state.actionQueue && state.actionQueue.length) {
                 const t = side === 'hero' ? 'hero' : 'enemy';
@@ -7182,11 +7176,12 @@ async function summonFromWorldbook(caster, summonName) {
                 if (typeof renderTurnQueue === 'function') renderTurnQueue();
             }
         } catch(e) {}
-        try { initUI(); } catch(e) {}
-        try { if (side === 'enemy' && typeof window.renderEnemyFormation === 'function') window.renderEnemyFormation(); } catch(e) {}
+        if (side === 'hero') {
+            try { initUIIncrementalSummon(summonEntity); } catch(e) { try { initUI(); } catch(e2) {} }
+        } else {
+            try { if (typeof window.renderEnemyFormation === 'function') window.renderEnemyFormation(); } catch(e) { try { initUI(); } catch(e2) {} }
+        }
     } else {
-        if (side === 'hero') heroesData.push(summonEntity);
-        else enemiesData.push(summonEntity);
         try { initUI(); } catch(e) {}
     }
     const casterDom = caster && caster.id ? (document.getElementById(`hero-card-${caster.id}`) || document.getElementById(`${caster.id}-sprite`)) : null;
@@ -7559,10 +7554,46 @@ function initUI() {
   updateWorldbookBtnVisibility();
   // 【肃正】横幅占满整行（grid 子项需跨列，否则仅占 1 列挤压后续卡片）
   { const _bw = document.getElementById('team-barrier-wrapper'); if (_bw) { _bw.style.gridColumn = '1 / -1'; _bw.classList.add('col-span-4', 'w-full'); } }
-  // 【召唤】我方召唤物与普通英雄共用 heroesData，但视觉分为召唤行与英雄行（一字排开在头像正前方）
+  // 【召唤】增量入队：仅追加一个召唤物，不重建我方/敌方全场（避免敌方短暂消失与全量闪烁）
+  function initUIIncrementalSummon(summonEntity) {
+    const heroesContainer2 = document.getElementById('heroes-container');
+    if (!heroesContainer2 || !summonEntity) { initUI(); return; }
+    if (summonEntity.side === 'enemy') { if (typeof window.renderEnemyFormation === 'function') window.renderEnemyFormation(); return; }
+    let row = document.getElementById('ally-summon-row');
+    if (!row) {
+      row = document.createElement('div');
+      row.id = 'ally-summon-row';
+      row.className = 'w-full flex justify-center gap-1 sm:gap-2 mb-1 pointer-events-auto col-span-4';
+      row.style.gridColumn = '1 / -1';
+      row.style.flexWrap = 'wrap';
+      const barrier = document.getElementById('team-barrier-wrapper');
+      if (barrier && barrier.parentNode === heroesContainer2) barrier.insertAdjacentElement('afterend', row);
+      else heroesContainer2.prepend(row);
+    }
+    if (document.getElementById(`hero-wrap-${summonEntity.id}`)) return;
+    const sd = document.createElement('div');
+    sd.className = 'relative shrink-0';
+    sd.id = `hero-wrap-${summonEntity.id}`;
+    const icon = summonEntity.img
+      ? `<img src="${summonEntity.img}" class="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.8)]" />`
+      : `<div class="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center text-3xl sm:text-4xl drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]">${summonEntity.emoji || '👻'}</div>`;
+    sd.innerHTML = `
+      <div class="flex flex-col items-center group relative cursor-pointer pointer-events-auto">
+        <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 text-white/70 text-[9px] bg-black/40 px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none">${summonEntity.name}</div>
+        <div id="${summonEntity.id}-buffs" class="absolute top-0 flex gap-1 justify-center w-full z-20 pointer-events-none flex-wrap"></div>
+        <div id="${summonEntity.id}-stunFx" class="stun-fx hidden absolute -top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none"><span class="stun-star">★</span><span class="stun-star">★</span><span class="stun-star">★</span></div>
+        <div id="hero-card-${summonEntity.id}" class="enemy-sprite breathe flex justify-center items-center">${icon}</div>
+        <div class="w-10 sm:w-16 h-1 sm:h-1.5 bg-black/50 mt-2 rounded-full overflow-hidden pointer-events-none"><div id="${summonEntity.id}-hp-bar" class="h-full bg-rose-500 transition-all duration-300" style="width:${Math.max(0, Math.min(100, (summonEntity.hp/summonEntity.maxHp)*100))}%"></div></div>
+      </div>`;
+    sd.onclick = () => handleTargetClick(summonEntity, 'hero');
+    row.appendChild(sd); summonEntity.dom = sd;
+    if (typeof updateBuffUI === 'function') updateBuffUI(summonEntity);
+    if (typeof updateHeroUI === 'function') try { updateHeroUI(summonEntity); } catch(e) {}
+  }
+  window.initUIIncrementalSummon = initUIIncrementalSummon;
+  // 【召唤】我方召唤物与普通英雄共用 heroesData，但视觉分召唤行与英雄行；召唤物用敌方同款极简图标（无方框）
   const _summonHeroes = heroesData.filter(h => h.isSummon && h.isAlive);
   const _normalHeroes = heroesData.filter(h => !h.isSummon);
-  // 若存在召唤物，先渲染一行召唤物（紧贴头像区上方，横向一字排开；需占满 grid 整行避免挤压）
   if (_summonHeroes.length) {
     const summonRow = document.createElement('div');
     summonRow.id = 'ally-summon-row';
@@ -7571,27 +7602,24 @@ function initUI() {
     summonRow.style.flexWrap = 'wrap';
     _summonHeroes.forEach(sh => {
       const sd = document.createElement('div');
-      sd.className = 'relative shrink-0 min-w-[70px] max-w-[96px] flex-1';
+      sd.className = 'relative shrink-0';
       sd.id = `hero-wrap-${sh.id}`;
-      const _summonAvatar = sh.img ? `<img src="${sh.img}" class="w-full h-full object-cover" onerror="this.src='${DEFAULT_HERO_IMG}'">` : `<div class="w-full h-full flex items-center justify-center text-2xl bg-slate-800">${sh.emoji || '✨'}</div>`;
-      // 召唤物卡：复用 hero-card 结构，尺寸与主卡一致（min-w 70px + aspect），移除 scale 缩小与固定 72px 避免错位
+      const icon2 = sh.img
+        ? `<img src="${sh.img}" class="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.8)]" />`
+        : `<div class="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center text-3xl sm:text-4xl drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]">${sh.emoji || '👻'}</div>`;
       sd.innerHTML = `
-        <div id="hero-card-${sh.id}" class="hero-card-inner bg-[#1b2336] rounded overflow-hidden relative border border-sky-500/50 shadow-lg">
-          <div id="${sh.id}-buffs" class="absolute top-0.5 right-0.5 flex flex-col gap-0.5 items-end z-20 pointer-events-none"></div>
-          <div class="absolute top-0 left-0 z-20 text-[8px] font-bold text-white bg-sky-600/90 px-1 py-0 rounded-br">召唤</div>
-          <div class="w-full h-12 sm:h-auto sm:aspect-[4/3] relative bg-gray-900 border-b border-gray-700">
-            <div class="absolute top-0 left-0 w-full bg-gradient-to-b from-black/60 to-transparent px-1 py-0.5 text-[8px] font-bold text-white z-10 flex justify-between"><span class="truncate">${sh.name}</span></div>
-            ${_summonAvatar}
-          </div>
-          <div class="px-1 py-0.5 flex flex-col gap-0.5">
-            ${createCompactBarHTML(sh.id, 'hp', 'HP', sh.hp, sh.maxHp, 'bg-yellow-400', false, sh.shield)}
-          </div>
+        <div class="flex flex-col items-center group relative cursor-pointer pointer-events-auto">
+          <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 text-white/70 text-[9px] bg-black/40 px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none">${sh.name}</div>
+          <div id="${sh.id}-buffs" class="absolute top-0 flex gap-1 justify-center w-full z-20 pointer-events-none flex-wrap"></div>
+          <div id="${sh.id}-stunFx" class="stun-fx hidden absolute -top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none"><span class="stun-star">★</span><span class="stun-star">★</span><span class="stun-star">★</span></div>
+          <div id="hero-card-${sh.id}" class="enemy-sprite breathe flex justify-center items-center">${icon2}</div>
+          <div class="w-10 sm:w-16 h-1 sm:h-1.5 bg-black/50 mt-2 rounded-full overflow-hidden pointer-events-none"><div id="${sh.id}-hp-bar" class="h-full bg-rose-500 transition-all duration-300" style="width:${Math.max(0, Math.min(100, (sh.hp/sh.maxHp)*100))}%"></div></div>
         </div>`;
       sd.onclick = () => handleTargetClick(sh, 'hero');
       summonRow.appendChild(sd); sh.dom = sd;
     });
     heroesContainer.appendChild(summonRow);
-    _summonHeroes.forEach(sh => updateBuffUI(sh));
+    _summonHeroes.forEach(sh => { try { updateBuffUI(sh); updateHeroUI(sh); } catch(e) {} });
   }
   _normalHeroes.forEach((hero, index) => {
     hero.dom = document.createElement('div'); hero.dom.className = `relative transition-all duration-300 min-w-[70px] ${!hero.isAlive ? 'opacity-40 grayscale' : ''}`; hero.dom.id = `hero-wrap-${hero.id}`;
