@@ -6796,7 +6796,7 @@ function parseEnemyItem(data, index, tags) {
     const rawName = data["名字"] || `怪物${index}`;
     const { emoji, name: cleanName } = getCleanNameAndEmoji(rawName);
     const attrs = parseAttributes(data["属性"] || "");
-    const img = AVATAR_MAP[cleanName] || AVATAR_MAP[rawName]; 
+    const img = AVATAR_MAP[cleanName] || AVATAR_MAP[rawName] || DEFAULT_HERO_IMG;
     let skills = []; if (data["技能"] && Array.isArray(data["技能"])) skills = data["技能"].map(parseSkill);
     const nameTags = Array.isArray(tags) ? tags : [];
     const attrTags = Array.isArray(attrs.attrTags) ? attrs.attrTags : [];
@@ -7141,6 +7141,16 @@ async function summonFromWorldbook(caster, summonName) {
     const base = parseEnemyItem(cbData, 0, []);
     base._worldbookRawContent = entry.content || '';
     base.wbSource = { wbName: worldbookSettings.boundName, entryName: entry.name, desc: extractWorldbookDescription(entry.content) };
+    // 【召唤】头像回退链：AVATAR_MAP → 原文提图 → 解析结果(非默认) → emoji/默认图
+    let _resolvedSummonImg = AVATAR_MAP[summonName] || AVATAR_MAP[base.name] || null;
+    if (!_resolvedSummonImg) {
+        const _rawForImg = String(entry.content || '');
+        let _mImg = _rawForImg.match(/!\[.*?\]\(https?:\/\/[^)]+\)/);
+        if (_mImg) { const _u = _mImg[0].match(/\(https?:\/\/[^)]+\)/); if (_u) _resolvedSummonImg = _u[0].slice(1, -1); }
+        if (!_resolvedSummonImg) { const _m2 = _rawForImg.match(/img\s*[:：]\s*(https?:\/\/[^\s<]+)/i); if (_m2) _resolvedSummonImg = _m2[1]; }
+    }
+    if (!_resolvedSummonImg && base.img && base.img !== DEFAULT_HERO_IMG) _resolvedSummonImg = base.img;
+    if (!_resolvedSummonImg) _resolvedSummonImg = base.emoji ? null : DEFAULT_HERO_IMG;
     const summonId = 's_' + Date.now() + '_' + (summonSeq++);
     const summonEntity = Object.assign({}, base, {
         id: summonId,
@@ -7149,16 +7159,40 @@ async function summonFromWorldbook(caster, summonName) {
         side: side,
         baseTauntBonus: 100,
         row: side === 'enemy' ? 'front' : null,
-        tier: base.tier || 'fodder'
+        tier: base.tier || 'fodder',
+        img: _resolvedSummonImg,
+        emoji: base.emoji || '✨'
     });
     // 注入固定全能舍身（仅替 owner 挡单体致死）
     const guardSkill = { name: '舍身守护', isReaction:false, reactionTarget:'all', kanpoTarget:null, sheshenTarget:'all', _ownerOnly:true, isOthers:false, guaranteedHit:false, isHighTier:false, isLegendary:false, damageType:null, fxTag:null, cost:0, hpCost:0, tpCost:0, hit:100, turns:null, type:'[无]', power:0, type2:'[无]', power2:0, type3:'[无]', power3:0, barrierSub:null, barrierArmor:0, maxUses:0, usesRemaining:0, summonTarget:null, delay:0, haste:0, charge:0 };
     summonEntity.skills = Array.isArray(summonEntity.skills) ? [guardSkill].concat(summonEntity.skills) : [guardSkill];
-    pendingSummons.push({ side: side, entity: summonEntity });
+    // 【修复①】即时入队：直接推入阵营并插入行动队列（下回合入队改为即时参战，pending 仅作兜底）
+    const _isBattle = !!(state && state.isGameStarted);
+    if (_isBattle) {
+        if (side === 'hero') heroesData.push(summonEntity);
+        else enemiesData.push(summonEntity);
+        try {
+            if (state.actionQueue && state.actionQueue.length) {
+                const t = side === 'hero' ? 'hero' : 'enemy';
+                const cnt = summonEntity.actCount || 1;
+                const entries = [];
+                for (let i = 0; i < cnt; i++) entries.push({ type: t, ref: summonEntity, isExtraTurn: false });
+                state.actionQueue.splice(state.queueIndex + 1, 0, ...entries);
+                if (typeof reorderRemainingQueue === 'function') reorderRemainingQueue();
+                if (typeof renderTurnQueue === 'function') renderTurnQueue();
+            }
+        } catch(e) {}
+        try { initUI(); } catch(e) {}
+        try { if (side === 'enemy' && typeof window.renderEnemyFormation === 'function') window.renderEnemyFormation(); } catch(e) {}
+    } else {
+        if (side === 'hero') heroesData.push(summonEntity);
+        else enemiesData.push(summonEntity);
+        try { initUI(); } catch(e) {}
+    }
     const casterDom = caster && caster.id ? (document.getElementById(`hero-card-${caster.id}`) || document.getElementById(`${caster.id}-sprite`)) : null;
     if (casterDom) { createFloatingText(casterDom, `召唤阵：${summonName}`, 'text-sky-300'); if (window.spawnBurstAura) spawnBurstAura(casterDom); }
-    addHistory(`   ✨ [${caster.name}] 召唤「${summonName}」—— 召唤阵已展开，下回合参战`);
-    showLog(`召唤成功：${summonName} 下回合参战`);
+    addHistory(`   ✨ [${caster.name}] 召唤「${summonName}」—— 已即时参战！`);
+    showLog(`召唤成功：${summonName} 已参战`);
     return true;
 }
 
@@ -7523,28 +7557,31 @@ function initUI() {
   updateFieldBadgeUI();
   // 【世界书】非酒馆助手环境隐藏右上角管理入口
   updateWorldbookBtnVisibility();
+  // 【肃正】横幅占满整行（grid 子项需跨列，否则仅占 1 列挤压后续卡片）
+  { const _bw = document.getElementById('team-barrier-wrapper'); if (_bw) { _bw.style.gridColumn = '1 / -1'; _bw.classList.add('col-span-4', 'w-full'); } }
   // 【召唤】我方召唤物与普通英雄共用 heroesData，但视觉分为召唤行与英雄行（一字排开在头像正前方）
   const _summonHeroes = heroesData.filter(h => h.isSummon && h.isAlive);
   const _normalHeroes = heroesData.filter(h => !h.isSummon);
-  // 若存在召唤物，先渲染一行召唤物（紧贴头像区上方，横向一字排开）
+  // 若存在召唤物，先渲染一行召唤物（紧贴头像区上方，横向一字排开；需占满 grid 整行避免挤压）
   if (_summonHeroes.length) {
     const summonRow = document.createElement('div');
     summonRow.id = 'ally-summon-row';
-    summonRow.className = 'w-full flex justify-center gap-1 sm:gap-2 mb-1 pointer-events-auto';
-    summonRow.style.flexWrap = 'nowrap';
+    summonRow.className = 'w-full flex justify-center gap-1 sm:gap-2 mb-1 pointer-events-auto col-span-4';
+    summonRow.style.gridColumn = '1 / -1';
+    summonRow.style.flexWrap = 'wrap';
     _summonHeroes.forEach(sh => {
       const sd = document.createElement('div');
-      sd.className = 'relative shrink-0';
-      sd.style.width = '72px';
+      sd.className = 'relative shrink-0 min-w-[70px] max-w-[96px] flex-1';
       sd.id = `hero-wrap-${sh.id}`;
-      // 召唤物 mini 卡：复用 hero-card 结构但缩小，带召唤角标
+      const _summonAvatar = sh.img ? `<img src="${sh.img}" class="w-full h-full object-cover" onerror="this.src='${DEFAULT_HERO_IMG}'">` : `<div class="w-full h-full flex items-center justify-center text-2xl bg-slate-800">${sh.emoji || '✨'}</div>`;
+      // 召唤物卡：复用 hero-card 结构，尺寸与主卡一致（min-w 70px + aspect），移除 scale 缩小与固定 72px 避免错位
       sd.innerHTML = `
-        <div id="hero-card-${sh.id}" class="hero-card-inner bg-[#1b2336] rounded overflow-hidden relative border border-sky-500/50 shadow-lg scale-[0.95]">
+        <div id="hero-card-${sh.id}" class="hero-card-inner bg-[#1b2336] rounded overflow-hidden relative border border-sky-500/50 shadow-lg">
           <div id="${sh.id}-buffs" class="absolute top-0.5 right-0.5 flex flex-col gap-0.5 items-end z-20 pointer-events-none"></div>
           <div class="absolute top-0 left-0 z-20 text-[8px] font-bold text-white bg-sky-600/90 px-1 py-0 rounded-br">召唤</div>
-          <div class="w-full h-10 sm:h-12 relative bg-gray-900 border-b border-gray-700">
+          <div class="w-full h-12 sm:h-auto sm:aspect-[4/3] relative bg-gray-900 border-b border-gray-700">
             <div class="absolute top-0 left-0 w-full bg-gradient-to-b from-black/60 to-transparent px-1 py-0.5 text-[8px] font-bold text-white z-10 flex justify-between"><span class="truncate">${sh.name}</span></div>
-            <img src="${sh.img}" class="w-full h-full object-cover" onerror="this.src='${DEFAULT_HERO_IMG}'">
+            ${_summonAvatar}
           </div>
           <div class="px-1 py-0.5 flex flex-col gap-0.5">
             ${createCompactBarHTML(sh.id, 'hp', 'HP', sh.hp, sh.maxHp, 'bg-yellow-400', false, sh.shield)}
@@ -7558,7 +7595,7 @@ function initUI() {
   }
   _normalHeroes.forEach((hero, index) => {
     hero.dom = document.createElement('div'); hero.dom.className = `relative transition-all duration-300 min-w-[70px] ${!hero.isAlive ? 'opacity-40 grayscale' : ''}`; hero.dom.id = `hero-wrap-${hero.id}`;
-    if (state.isGameStarted && !_summonHeroes.length) { hero.dom.classList.add('anim-enter-hero'); hero.dom.style.animationDelay = `${index * 0.08}s`; setTimeout(() => { if (hero.dom) hero.dom.classList.remove('anim-enter-hero'); }, 800 + index * 80); } else if (!state.isGameStarted) { hero.dom.classList.add('opacity-0'); }
+    if (state.isGameStarted) { hero.dom.classList.add('anim-enter-hero'); hero.dom.style.animationDelay = `${index * 0.08}s`; setTimeout(() => { if (hero.dom) hero.dom.classList.remove('anim-enter-hero'); }, 800 + index * 80); } else { hero.dom.classList.add('opacity-0'); }
     let burstClass = 'border-gray-800'; if (hero.tp >= hero.maxTp) burstClass = hero.burstActivated ? 'burst-active' : 'burst-ready';
     hero.dom.innerHTML = `
       <div id="hero-card-${hero.id}" class="hero-card-inner bg-[#18181b] rounded overflow-hidden relative border shadow-2xl transition-all ${burstClass}">
@@ -10762,38 +10799,35 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     }
     
     if (caster.id.startsWith('h')) updateHeroUI(caster); else updateEnemyUI(caster);
-    // 【召唤】独立分支：不进常规 tagList 循环，世界书中途解析后下回合入队
+    // 【召唤】即时召唤：先做看破判定与召唤，再继续同技能其他标签（不再 early return 避免丢伤害/增益）
+    let _summonDone = false;
     if (skill.summonTarget && !isReactionTrigger) {
-        // 资源与次数已在上方扣除/递减，此处仅做召唤入 pending
         showLog(`${caster.name} 施展了【${skill.name}】！`);
-        // 看破窗口：敌方召唤同样可被看破
         if (!isReactionTrigger && caster.id.startsWith('e') && !(skill && skill.skipKanpoWindow)) {
             const kanpoCtx2 = { caster, skill, target: primaryTarget, cancelled: false };
             await CombatEvents.emitAsync(EVENTS.BEFORE_SKILL_RESOLVE, kanpoCtx2);
             if (kanpoCtx2.cancelled) { addHistory(`   ⛔ 召唤【${skill.name}】被看破破局，完全无效化！`); return; }
         }
+        // 召唤成功再发 TURN_END，避免看破取消时误触
         CombatEvents.emit(EVENTS.TURN_END, { entity: caster, skill, isReactionTrigger });
         addHistory(`> ${caster.name} 发动了【${skill.name}】`);
         await sleep(400);
         await summonFromWorldbook(caster, skill.summonTarget);
-        // 同技能其他标签（如附带增益）仍按常规继续？MVP 仅召唤，跳过 tagList 循环
-        return;
+        _summonDone = true;
+        const _onlySummon = (skill.type === '[无]' || !skill.type || skill.type === '[召唤]') && (!skill.type2 || skill.type2 === '[无]') && (!skill.type3 || skill.type3 === '[无]');
+        if (_onlySummon) return;
     }
-    showLog(`${caster.name} 施展了【${skill.name}】！`); 
-    
-    // === 技能解构与广播前：【看破】战略中断窗口 (BEFORE_SKILL_RESOLVE) ===
-    // skipKanpoWindow 标记：自爆合成技能已在 doEnemySelfDestruct 前摇后手动执行过看破判定（checkKanpoInterrupt），此处跳过避免二次弹窗
-    if (!isReactionTrigger && caster.id.startsWith('e') && !(skill && skill.skipKanpoWindow)) {
-        const kanpoCtx = { caster, skill, target: primaryTarget, cancelled: false };
-        await CombatEvents.emitAsync(EVENTS.BEFORE_SKILL_RESOLVE, kanpoCtx);
-        if (kanpoCtx.cancelled) {
-            addHistory(`   ⛔ 技能【${skill.name}】被看破破局，完全无效化！`);
-            return;
+    if (!_summonDone) {
+        // 看破窗口：已召唤过则跳过（避免二次看破弹窗），否则走常规敌方看破
+        if (!isReactionTrigger && caster.id.startsWith('e') && !(skill && skill.skipKanpoWindow)) {
+            const kanpoCtx = { caster, skill, target: primaryTarget, cancelled: false };
+            await CombatEvents.emitAsync(EVENTS.BEFORE_SKILL_RESOLVE, kanpoCtx);
+            if (kanpoCtx.cancelled) { addHistory(`   ⛔ 技能【${skill.name}】被看破破局，完全无效化！`); return; }
         }
+        CombatEvents.emit(EVENTS.TURN_END, { entity: caster, skill, isReactionTrigger });
+    } else {
+        // 召唤分支已在上方 emit 过 TURN_END，此处不再重复
     }
-    
-    // === 技能释放完毕 → 事件总线 (TURN_END 携带 skill 信息，供风行者多重施法等订阅) ===
-    CombatEvents.emit(EVENTS.TURN_END, { entity: caster, skill, isReactionTrigger });
     
     let targetStr = "";
     if (skill.type.includes('群')) targetStr = skill.type.includes('回') || skill.type.includes('冲') || skill.type.includes('增') || skill.type.includes('防') || skill.type.includes('盾') || skill.type.includes('避') || skill.type.includes('反击') ? "全体友方" : "全体敌方";
