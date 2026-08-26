@@ -2113,3 +2113,13 @@
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`、`备份（无需阅读）/demo-battle-log.html`。
 - **决策原因**：重构以往黑底白字简陋且冗长的纯文本战局记录与结算弹窗，采用高颜值赛博战术目镜与智能解析流线，在保证纯文本安全导出的同时，极大提升战斗过程回顾的沉浸感与可读性。
 
+## [LOG-173] 2026-08-27 — 召唤三缺陷修复：即时入队+错位+头像回退（V10.1）
+
+- **变更行为**：
+  1. **即时参战（`index.html:7141/7168`）**：`summonFromWorldbook` 由 `pendingSummons.push` 延迟队列改为战斗中直接 `heroesData/enemiesData.push` 并在 `state.actionQueue` 当前行动者之后插入对应条目（按 `actCount` 展开，`reorderRemainingQueue+renderTurnQueue` 重排），非战斗准备页仍直接入队；`pendingSummons` 保留作兜底，文案由“下回合参战”改为“已即时参战”。
+  2. **同技能标签不丢失（`index.html:10802`）**：`executeSkillAction` 召唤分支不再 `early return` 丢弃 `tagList`，改为 `_summonDone` 标记；仅当技能为纯召唤（`[无]` 三槽）才直接返回，否则继续走伤害/增益结算；看破与 `TURN_END` 事件去重，避免二次弹窗与重复 emit。
+  3. **错位修复（`index.html:7527`）**：`#ally-summon-row` 与肃正横幅补 `col-span-4/gridColumn:1/-1` 占满 `grid-cols-4` 整行，`wrap` 允许换行；召唤卡由固定 `72px+scale-0.95+nowrap` 改为 `min-w 70px` + `aspect-[4/3]` 与主卡一致，移除缩小；动画条件由 `!_summonHeroes.length` 改为战斗中统一触发。
+  4. **头像回退链（`index.html:6799/7144/7537`）**：`parseEnemyItem` 补 `|| DEFAULT_HERO_IMG`；召唤取图链 `AVATAR_MAP→原文 ![]/img: 正则→非默认解析结果→emoji/默认图`，并覆写 `summonEntity.img/emoji`；渲染层 `sh.img ? <img onerror> : <div emoji>`，`src="undefined"` 问题消除。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：`dbc00b0` 召唤功能三遗留（延迟一回合、grid/flex 混用错位、`parseEnemyItem` 无回退导致默认头像）需手术式最小改动闭环，保留 `SIDE_LIMIT` 与 `flushPendingSummons` 兜底语义。
+
