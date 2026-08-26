@@ -2132,3 +2132,12 @@
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：上轮修复引入敌方误回退英雄头像、全量重建闪场与方框美术缺陷，按反馈手术式回退与收敛为增量+极简方案。
 
+## [LOG-175] 2026-08-27 — 召唤复用开战管线与动画/图标收敛
+
+- **变更行为**：
+  1. **复用开战工厂（`index.html:7142`）**：`summonFromWorldbook` 改 `parseNameTagAndMultiplier(summonName)` 取标签后直调 `parseEnemyItem(cbData, idx, tags)`，与 `buildCombatDataFromYAML/startGameFromWorldbook` 同管线；被动/特性/变种/抗性完整继承，`tier=getEnemyTier`、`row=null+assignEnemyRows` 增量补齐，删 `Object.assign` 硬编码与 `baseTauntBonus:100/row:'front'/tier:fodder` 私有覆盖。
+  2. **图标一致（`index.html:2093/2164/7910`）**：战报 `buildLiveAvatarMap/getLiveAvatar` 对 `isSummon` 强制 emoji；时间轴 `renderTurnQueue` 召唤按 `ref.img` 真值判，裂图加 `onerror` 回落 emoji。
+  3. **动画 DOM 统一（`index.html:8066/10120/8765`）**：新增 `getEntitySpriteDom` 双通道解析 `s_*`，主受击链 `applySingleTagEffect` 与强反击抖动接入，召唤物受击/攻击 SVG 与飘字不再早退。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：按“复用战斗开始管线直接生成新目标”要求收敛召唤实现，根除图标/被动/动画三回归，剩余 `startsWith('h')` 分支后续批次接入。
+
