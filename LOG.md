@@ -2141,3 +2141,11 @@
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：按“复用战斗开始管线直接生成新目标”要求收敛召唤实现，根除图标/被动/动画三回归，剩余 `startsWith('h')` 分支后续批次接入。
 
+## [LOG-176] 2026-08-27 — 召唤敌我AI分流与动画全通道接入
+
+- **变更行为**：
+  1. **AI 侧别分流（`index.html:11405/11794/10946`）**：新增 `executeSummonTurn` 按 `side==='hero'` 决定敌我池，复用 `selectEnemySkillAndTarget` 权重并对 healing/buff 目标校正；`nextTurn` 对 `isSummon` 按侧分流，`executeSkillAction` 的 `casterIsHero/targetIsAlly` 改 `isSummon?side` 判定，英雄侧召唤不再攻击我方。
+  2. **全量动画接入（`index.html:8066/10908/10992/11014/11028/11060/11336/11394`）**：蓄力聚焦、连续扫射/近战/远程/WebM 快照、反击、DoT/眩晕抖动、风行/隐匿/回响/荆棘飘字等分散的 `startsWith('h')` 分支批量改 `getEntitySpriteDom(s_*)` 双通道，召唤物受击与攻击特效（SVG/WebM/粒子/抖动/飘字）回归。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：用户反馈召唤物仍无受击/攻击动画且 AI 敌我错杀，按既定计划收敛剩余动画链路与 AI 侧感，复用现有评分与特效管线不重复造函数。
+
