@@ -2123,3 +2123,12 @@
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：`dbc00b0` 召唤功能三遗留（延迟一回合、grid/flex 混用错位、`parseEnemyItem` 无回退导致默认头像）需手术式最小改动闭环，保留 `SIDE_LIMIT` 与 `flushPendingSummons` 兜底语义。
 
+## [LOG-174] 2026-08-27 — 召唤回归修复：敌方不借英雄头像+增量刷新+召唤极简图标
+
+- **变更行为**：
+  1. **敌方不借英雄头像（`index.html:6799/7142`）**：`parseEnemyItem` 去 `|| DEFAULT_HERO_IMG` 回退，改为 `|| null`；召唤头像仅 `AVATAR_MAP/已有 img`，`DEFAULT_HERO_IMG` 视为无图统一走 `emoji`，敌方不再显示英雄默认头像。
+  2. **增量刷新不闪场（`index.html:7160/7554`）**：召唤改为增量：我方 `initUIIncrementalSummon` 仅在 `heroes-container` 追加一个节点、敌方仅 `renderEnemyFormation`，不再 `initUI` 全量 `innerHTML=''` 重建+`enemies-container` 置空，避免召唤瞬间敌方消失/闪烁。
+  3. **召唤改敌方同款极简图标（`index.html:7554`）**：召唤卡由方框蓝框大卡改为与 `buildEnemyDom` 同款小圆图标/emoji + 悬浮名 + 血条，无方框，召唤行仍 `col-span-4` 占满整行。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：上轮修复引入敌方误回退英雄头像、全量重建闪场与方框美术缺陷，按反馈手术式回退与收敛为增量+极简方案。
+
