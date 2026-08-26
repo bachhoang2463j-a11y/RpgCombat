@@ -8828,9 +8828,10 @@ registerClassPassive('风行者', {
         if (skill.cost > 0 && !isReactionTrigger) {
             const multiCastChance = Math.min(0.3, (skill.cost / 100) * 2);
             if (Math.random() < multiCastChance) {
-                state.actionQueue.splice(state.queueIndex + 1, 0, { type: caster.id.startsWith('h') ? 'hero' : 'enemy', ref: caster, isExtraTurn: true });
+                const _mcIsHero = caster.isSummon ? (caster.side==='hero') : caster.id.startsWith('h');
+                state.actionQueue.splice(state.queueIndex + 1, 0, { type: _mcIsHero ? 'hero' : 'enemy', ref: caster, isExtraTurn: true });
                 addHistory(`   🌟 ${caster.name} 的法力产生共鸣，引发了多重施法(获得额外行动回合)！`);
-                const casterDom = caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`);
+                const casterDom = getEntitySpriteDom(caster) || (caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`));
                 if(casterDom) setTimeout(() => createFloatingText(casterDom, '多重施法!', 'text-fuchsia-400'), 500);
             }
         }
@@ -8906,7 +8907,7 @@ registerClassPassive('隐匿者', {
     },
     onKill(ctx) {
         if (ctx.caster.classType !== '隐匿者') return;
-        const casterDom = ctx.caster.id.startsWith('h') ? document.getElementById(`hero-card-${ctx.caster.id}`) : document.getElementById(`${ctx.caster.id}-sprite`);
+        const casterDom = getEntitySpriteDom(ctx.caster) || (ctx.caster.id.startsWith('h') ? document.getElementById(`hero-card-${ctx.caster.id}`) : document.getElementById(`${ctx.caster.id}-sprite`));
         this.gainStealth(ctx.caster, 30, casterDom);
     },
     onFatalDamage(ctx) {
@@ -8959,7 +8960,7 @@ registerClassPassive('施法者', {
         if (Math.random() * 100 >= chance) return;
         entity.hasteStore = (entity.hasteStore || 0) + 1;
         entity.tp = Math.min(entity.maxTp || 100, (entity.tp || 0) + 15);
-        const dom = entity.id.startsWith('h') ? document.getElementById(`hero-card-${entity.id}`) : document.getElementById(`${entity.id}-sprite`);
+        const dom = getEntitySpriteDom(entity) || (entity.id.startsWith('h') ? document.getElementById(`hero-card-${entity.id}`) : document.getElementById(`${entity.id}-sprite`));
         if (dom) {
             createFloatingText(dom, `⚡加速+1`, 'text-cyan-300');
             createFloatingText(dom, `✦TP+15`, 'text-amber-300');
@@ -9197,7 +9198,7 @@ CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
         let { hpDmg: reflectHp, shieldDmg: reflectShield } = calculateDamage(reflectRaw, attacker, false);
         // 反弹致命：先走 ON_FATAL_DAMAGE 让毅力留存/回避致命可救场（复用主伤害管线同款判定与旁白）
         if (attacker.hp - reflectHp <= 0) {
-            const fatalCtx = { target: attacker, targetDom: attacker.id && attacker.id.startsWith('h') ? document.getElementById(`hero-card-${attacker.id}`) : document.getElementById(`${attacker.id}-sprite`), hpDmg: reflectHp, shieldDmg: reflectShield, prevented: false, cancelled: false };
+            const fatalCtx = { target: attacker, targetDom: (attacker.id && getEntitySpriteDom(attacker)) || null, hpDmg: reflectHp, shieldDmg: reflectShield, prevented: false, cancelled: false };
             CombatEvents.emit(EVENTS.ON_FATAL_DAMAGE, fatalCtx);
             if (fatalCtx.prevented) {
                 reflectHp = fatalCtx.hpDmg;
@@ -9210,7 +9211,7 @@ CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
         }
         if (reflectHp > 0 || reflectShield > 0) {
             attacker.hp -= reflectHp;
-            const attackerDom = attacker.id && attacker.id.startsWith('h') ? document.getElementById(`hero-card-${attacker.id}`) : document.getElementById(`${attacker.id}-sprite`);
+            const attackerDom = (attacker.id && getEntitySpriteDom(attacker)) || null;
             if (attackerDom) { attackerDom.classList.add('shake'); setTimeout(() => attackerDom.classList.remove('shake'), 400); }
             const brokeShield = reflectShield > 0 && reflectHp === 0;
             if (attackerDom) createFloatingText(attackerDom, brokeShield ? `反震 -${reflectShield} 破盾` : `反震 -${reflectHp}`, brokeShield ? 'text-slate-300' : 'text-green-400');
@@ -9716,7 +9717,7 @@ function playRangedHeavySubBass() {
 }
 
 async function playPowerCounterEffect(counter, victim, counterDom) {
-    const victimDom = victim.id.startsWith('h') ? document.getElementById(`hero-card-${victim.id}`) : document.getElementById(`${victim.id}-sprite`);
+    const victimDom = getEntitySpriteDom(victim) || (victim.id.startsWith('h') ? document.getElementById(`hero-card-${victim.id}`) : document.getElementById(`${victim.id}-sprite`));
     const victimCenter = getDomCenter(victimDom);
 
     // ── 立即清除瞄准框（targeting-mode-enemy 会让敌方精灵上留有准星 CSS 动画）──
@@ -9735,7 +9736,7 @@ async function playPowerCounterEffect(counter, victim, counterDom) {
         heroCard.classList.add('power-glow');
     }
     // 在反击者位置生成红色聚气粒子，让蓄力阶段可见
-    const counterDomEl2 = counter.id.startsWith('h') ? document.getElementById(`hero-card-${counter.id}`) : document.getElementById(`${counter.id}-sprite`);
+    const counterDomEl2 = getEntitySpriteDom(counter) || (counter.id.startsWith('h') ? document.getElementById(`hero-card-${counter.id}`) : document.getElementById(`${counter.id}-sprite`));
     if (counterDomEl2 && window.spawnChargeUpParticles) {
         const cc = getDomCenter(counterDomEl2);
         window.spawnChargeUpParticles(cc.x, cc.y, '#ff4040', 320);
@@ -9795,7 +9796,7 @@ async function playPowerCounterEffect(counter, victim, counterDom) {
     fxEngine.hitStop = 80;
 
     // 2e. 三层爆发粒子：计算攻击方向角（counter → victim）
-    const counterDomEl = counter.id.startsWith('h') ? document.getElementById(`hero-card-${counter.id}`) : document.getElementById(`${counter.id}-sprite`);
+    const counterDomEl = getEntitySpriteDom(counter) || (counter.id.startsWith('h') ? document.getElementById(`hero-card-${counter.id}`) : document.getElementById(`${counter.id}-sprite`));
     const counterCenter = counterDomEl ? getDomCenter(counterDomEl) : { x: victimCenter.x - 100, y: victimCenter.y };
     const dirAngle = Math.atan2(victimCenter.y - counterCenter.y, victimCenter.x - counterCenter.x);
     spawnPowerBurst(victimCenter.x, victimCenter.y, dirAngle);
@@ -10299,11 +10300,11 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
               const tStatsForCounter = getEffectiveStats(target);
               const counterRawDmg = counterBuff.value + tStatsForCounter.atk;
               // 反击为近战伤害：若被反击者是带【虚形】的敌方，先套近战减伤
-              const counterDmgToCaster = (caster.id.startsWith('h')) ? counterRawDmg : applyEnemyTypeResist(counterRawDmg, '近战', caster, caster ? document.getElementById(`${caster.id}-sprite`) : null, false);
+              const counterDmgToCaster = (caster.isSummon ? (caster.side==='hero') : caster.id.startsWith('h')) ? counterRawDmg : applyEnemyTypeResist(counterRawDmg, '近战', caster, getEntitySpriteDom(caster), false);
               const { hpDmg: counterHpDmg, shieldDmg: counterShieldDmg } = calculateDamage(counterDmgToCaster, caster);
               
               await sleep(300); 
-              const casterDom = caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`);
+              const casterDom = getEntitySpriteDom(caster) || (caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`));
               
               playSound('atk2');
               playSVGEffect(casterDom, 'slash');
@@ -10905,9 +10906,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     {
         const isAttack = skill.type.includes('攻') || skill.type.includes('单体');
         const isHeavy = (typeof isHighYieldSkill === 'function' ? isHighYieldSkill(skill, caster) : skill.power > 60) || multiplier === 2;  // 动态高威力判定或爆发触发蓄力
-        const casterDomForFx = caster.id.startsWith('h')
-            ? document.getElementById(`hero-card-${caster.id}`)
-            : document.getElementById(`${caster.id}-sprite`);
+        const casterDomForFx = getEntitySpriteDom(caster) || (caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`));
         
         if (isHeavy && casterDomForFx) {
             // 聚焦暗化
@@ -10945,7 +10944,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     for (let item of tagList) {
         const tag = item.tag; const tagPower = item.power;
         const isBeneficial = tag.includes('回') || tag.includes('冲') || tag.includes('增') || tag.includes('防') || tag.includes('盾') || tag.includes('瞄') || tag.includes('嘲') || tag.includes('再动') || tag.includes('避') || tag.includes('免伤') || tag.includes('反击') || tag.includes('驱散') || tag.includes('肃正') || tag.includes('速');
-        const isAoe = tag.includes('群'); const casterIsHero = caster.id.startsWith('h');
+        const isAoe = tag.includes('群'); const casterIsHero = caster.isSummon ? (caster.side === 'hero') : caster.id.startsWith('h');
         const allies = casterIsHero ? heroesData.filter(h=>h.isAlive) : enemiesData.filter(e=>e.isAlive);
         const opponents = casterIsHero ? enemiesData.filter(e=>e.isAlive) : heroesData.filter(h=>h.isAlive);
         let targets = [];
@@ -10974,7 +10973,9 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                     targets = [casterIsHero ? pool[Math.floor(Math.random()*pool.length)] : getTauntTarget(pool, caster.isWise)];
                 }
             } else {
-                const targetIsAlly = (casterIsHero && primaryTarget.id.startsWith('h')) || (!casterIsHero && primaryTarget.id.startsWith('e'));
+                const _isHeroTarget = primaryTarget.isSummon ? (primaryTarget.side === 'hero') : (primaryTarget.id.startsWith('h') || primaryTarget.id.startsWith('s_') ? false : primaryTarget.id.startsWith('h'));
+                const _primaryIsAlly = primaryTarget.isSummon ? (primaryTarget.side === (casterIsHero ? 'hero' : 'enemy')) : ((casterIsHero && primaryTarget.id.startsWith('h')) || (!casterIsHero && primaryTarget.id.startsWith('e')));
+                const targetIsAlly = _primaryIsAlly;
                 if (isBeneficial) targets = targetIsAlly ? [primaryTarget] : [caster];
                 else targets = !targetIsAlly ? [primaryTarget] : [casterIsHero ? opponents[Math.floor(Math.random()*opponents.length)] : getTauntTarget(opponents, caster.isWise)];
             }
@@ -10987,10 +10988,11 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
             // 阻塞语义：记录起播时间，尾部 await 剩余时长至 2750ms（与 stop 兜底对齐），避免被伤害结算提前截断
             if (skill._strafeBurstStart == null) skill._strafeBurstStart = Date.now();
             // 快照：按本次技能的对手集合冻结坐标（群攻=全存活敌，单体=主目标），后续 tick 复用冻结坐标，死靶淡出不转火、新增不追入
-            const _strafeOpponents = (caster.id.startsWith('h') ? enemiesData.filter(e=>e.isAlive) : heroesData.filter(h=>h.isAlive));
+            const _casterIsHeroStrafe = caster.isSummon ? (caster.side==='hero') : caster.id.startsWith('h');
+            const _strafeOpponents = (_casterIsHeroStrafe ? enemiesData.filter(e=>e.isAlive) : heroesData.filter(h=>h.isAlive));
             const _strafeSnapshotTargets = tag.includes('群') ? _strafeOpponents.slice() : (targets[0] ? [targets[0]] : []);
             const _strafeCoords = _strafeSnapshotTargets.map(t => {
-                const _sd = t.id.startsWith('h') ? document.getElementById(`hero-card-${t.id}`) : document.getElementById(`${t.id}-sprite`);
+                const _sd = getEntitySpriteDom(t);
                 if (_sd) { const _sr = _sd.getBoundingClientRect(); return { x:_sr.left+_sr.width/2, y:_sr.top+_sr.height/2, dom:_sd }; }
                 return null;
             }).filter(Boolean);
@@ -11008,8 +11010,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
             } else {
                 const _mHT = targets[0];
                 if (_mHT) {
-                    const _mId = _mHT.id;
-                    const _mDom = _mId.startsWith('h') ? document.getElementById(`hero-card-${_mId}`) : document.getElementById(`${_mId}-sprite`);
+                    const _mDom = getEntitySpriteDom(_mHT);
                     if (_mDom) { const _mTr = _mDom.getBoundingClientRect(); spawnMeleeHeavyParticles(_mTr.left + _mTr.width/2, _mTr.top + _mTr.height/2, _mDom); }
                 }
             }
@@ -11024,8 +11025,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
             } else {
                 const _rHT = targets[0];
                 if (_rHT) {
-                    const _rId = _rHT.id;
-                    const _rDom = _rId.startsWith('h') ? document.getElementById(`hero-card-${_rId}`) : document.getElementById(`${_rId}-sprite`);
+                    const _rDom = getEntitySpriteDom(_rHT);
                     if (_rDom) {
                         const _rTr = _rDom.getBoundingClientRect();
                         spawnRangedHeavyParticles(_rTr.left + _rTr.width/2, _rTr.top + _rTr.height/2, _rDom);
@@ -11052,9 +11052,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                 if (fxEntry && fxEntry.url) {
                     const firstTarget = targets[0];
                     if (firstTarget) {
-                        const tDom = firstTarget.id.startsWith('h')
-                            ? document.getElementById(`hero-card-${firstTarget.id}`)
-                            : document.getElementById(`${firstTarget.id}-sprite`);
+                        const tDom = getEntitySpriteDom(firstTarget);
                         if (tDom) {
                             const tr = tDom.getBoundingClientRect();
                             playWebMFX(tr.left + tr.width / 2, tr.top + tr.height / 2, skill.fxTag);
@@ -11151,7 +11149,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     const isAttackSkill = tagList.some(t => t.tag.includes('攻') || t.tag.includes('单体') || t.tag.includes('穿透') || t.tag.includes('眩晕'));
     if (isAttackSkill && hadConcealAtkBefore && caster.buffs && caster.buffs.some(b => b.isConcealAtk)) {
         caster.buffs = caster.buffs.filter(b => !(b.isConcealAtk));
-        const casterDom = caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`);
+        const casterDom = getEntitySpriteDom(caster) || (caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`));
         if (casterDom) createFloatingText(casterDom, '隐匿攻势已释放', 'text-orange-400');
         addHistory(`   🎯 ${caster.name} 的隐匿急袭已释放，攻击力加成消失。`);
         if(caster.id.startsWith('h')) updateHeroUI(caster); else updateEnemyUI(caster);
@@ -11329,14 +11327,16 @@ async function nextTurn() {
                   const isBurn = b.type === 'burn';
                   currentEntity.ref.hp -= dotDmg;
                   // 敌方 DoT 扣血后触发智慧低血旁白判定（致死由下方死亡收口触发死亡旁白）
-                  if (!currentEntity.ref.id.startsWith('h')) {
+                  const _isSummonDot = !!currentEntity.ref.isSummon;
+                  const _isEnemyDot = _isSummonDot ? (currentEntity.ref.side !== 'hero') : !currentEntity.ref.id.startsWith('h');
+                  if (_isEnemyDot) {
                       tryTriggerEnemyLowHpSpeak(currentEntity.ref);
                       // 【蜕皮】首次跌破50%触发二阶段；【连动】≤30% 插队行动（DoT 致死不触发，与主伤害管线同规则）
                       tryTriggerEnemyMolt(currentEntity.ref);
                       tryTriggerEnemyRage(currentEntity.ref);
                       tryTriggerEnemyLink(currentEntity.ref);
                   }
-                  const targetDom = currentEntity.ref.id.startsWith('h') ? document.getElementById(`hero-card-${currentEntity.ref.id}`) : document.getElementById(`${currentEntity.ref.id}-sprite`);
+                  const targetDom = getEntitySpriteDom(currentEntity.ref) || (currentEntity.ref.id.startsWith('h') ? document.getElementById(`hero-card-${currentEntity.ref.id}`) : document.getElementById(`${currentEntity.ref.id}-sprite`));
                   if (targetDom) { createFloatingText(targetDom, `${isBurn ? '火' : '毒'} -${dotDmg}`, isBurn ? 'text-orange-400' : 'text-purple-400'); targetDom.classList.add('shake'); setTimeout(() => targetDom.classList.remove('shake'), 400); }
                   addHistory(`   ${isBurn ? '🔥' : '🦠'} [${currentEntity.ref.name}] ${isBurn ? '灼烧' : '毒性'}发作，受到了 ${dotDmg} 点真实伤害！`);
               }
@@ -11391,7 +11391,7 @@ async function nextTurn() {
       showLog(`[${currentEntity.ref.name}] 处于眩晕状态，无法行动！`);
       addHistory(`   🌀 [${currentEntity.ref.name}] 因眩晕无法行动！`);
       
-      const targetDom = currentEntity.ref.id.startsWith('h') ? document.getElementById(`hero-card-${currentEntity.ref.id}`) : document.getElementById(`${currentEntity.ref.id}-sprite`);
+      const targetDom = getEntitySpriteDom(currentEntity.ref) || (currentEntity.ref.id.startsWith('h') ? document.getElementById(`hero-card-${currentEntity.ref.id}`) : document.getElementById(`${currentEntity.ref.id}-sprite`));
       if (targetDom) {
           createFloatingText(targetDom, '眩晕跳过', 'text-yellow-300');
           targetDom.classList.add('shake'); setTimeout(() => targetDom.classList.remove('shake'), 400);
@@ -11402,10 +11402,12 @@ async function nextTurn() {
       return;
   }
 
-  // 【召唤】AI独立：召唤物虽复用 hero/enemy 队列类型，但由 AI 托管（不进玩家菜单）
+  // 【召唤】AI独立：按召唤侧别分流，避免英雄侧召唤误打我方
   if (currentEntity.ref.isSummon) {
     document.getElementById('enemy-turn-overlay').classList.remove('opacity-0', 'pointer-events-none');
-    updateActiveHeroDisplay(null); state.isAnimating = true; await executeEnemyTurn(currentEntity.ref);
+    updateActiveHeroDisplay(null); state.isAnimating = true;
+    if (currentEntity.ref.side === 'hero') await executeSummonTurn(currentEntity.ref);
+    else await executeEnemyTurn(currentEntity.ref);
   } else if (currentEntity.type === 'hero') {
     document.getElementById('enemy-turn-overlay').classList.add('opacity-0', 'pointer-events-none');
     updateActiveHeroDisplay(currentEntity.ref.id); renderHeroMenu(currentEntity.ref);
@@ -11792,6 +11794,69 @@ function selectEnemySkillAndTarget(enemy, validSkills, aliveEnemies, aliveHeroes
     return { selectedSkill: possibleSkills[0].skill, specificTarget: possibleSkills[0].target };
 }
 
+async function executeSummonTurn(summon) {
+  // 召唤物回合复用敌方 AI 决策，但按召唤侧别决定敌我（避免英雄侧召唤攻击我方）
+  const isHeroSide = summon.side === 'hero';
+  const allyPool = isHeroSide ? heroesData.filter(e => e.isAlive) : enemiesData.filter(e => e.isAlive);
+  const enemyPool = isHeroSide ? enemiesData.filter(e => e.isAlive) : heroesData.filter(e => e.isAlive);
+  // 直接复用同一套权重管线：把 allies/enemies 对调后调用现有评分器
+  const _origValid = summon.skills.filter(s =>
+      (!s.charge || s.charge === 0) &&
+      !s.isReaction &&
+      !s.sheshenTarget &&
+      summon.mp >= s.cost &&
+      summon.hp > (s.hpCost || 0) &&
+      (summon.tp || 0) >= (s.tpCost || 0) &&
+      !(summon.cooldowns && summon.cooldowns[s.name] > 0) &&
+      !(s.type.includes('单') && s.type.includes('回') && summon.hp >= summon.maxHp * 0.95)
+  );
+  const chargeSkillS = summon.skills.find(s => s.charge > 0);
+  const isChargeFullS = chargeSkillS && summon.currentCharge >= chargeSkillS.charge;
+  let selectedSkillS = null; let specificTargetS = null;
+  if (isChargeFullS) {
+      selectedSkillS = chargeSkillS;
+      specificTargetS = getTauntTarget(enemyPool, summon.isWise);
+  } else {
+      const decision = selectEnemySkillAndTarget(summon, _origValid,
+          isHeroSide ? enemyPool : allyPool,  // aliveEnemies 视角：对英雄侧召唤，敌人是 enemyPool
+          isHeroSide ? allyPool : enemyPool); // aliveHeroes 视角会被内部再包一层 getTauntTarget，这里做对称对调
+      // 修正：selectEnemySkillAndTarget 内部按 aliveHeroes=英雄池 选攻击目标，内部 heal/buff 仍基于 aliveEnemies；
+      // 召唤侧需要把两套池按敌我语义对齐，上行已对调，此处再把决策目标按 benefical 校正回 enemyPool/allyPool
+      selectedSkillS = decision.selectedSkill;
+      specificTargetS = decision.specificTarget;
+      if (selectedSkillS) {
+          const isHeal = selectedSkillS.type.includes('回');
+          const isBuff = selectedSkillS.type.includes('增') || selectedSkillS.type.includes('防') || selectedSkillS.type.includes('嘲') || selectedSkillS.type.includes('速');
+          if (isHeal || isBuff) {
+              if (specificTargetS && !allyPool.includes(specificTargetS)) specificTargetS = summon;
+          } else {
+              if (specificTargetS && !enemyPool.includes(specificTargetS)) specificTargetS = getTauntTarget(enemyPool, summon.isWise) || enemyPool[0] || null;
+          }
+      }
+  }
+  if (isChargeFullS && selectedSkillS) {
+      summon.currentCharge = 0; updateHeroUI(summon); if (summon.side === 'enemy') updateEnemyUI(summon);
+  } else if (selectedSkillS && isHighYieldSkill(selectedSkillS, summon)) {
+      summon.cooldowns = summon.cooldowns || {};
+      summon.cooldowns[selectedSkillS.name] = selectedSkillS.type.includes('再动') ? 3 : 2;
+  }
+  const summonMult = await triggerBurstIfNeeded(summon);
+  const summonSprite = getEntitySpriteDom(summon);
+  if (summonSprite && selectedSkillS) {
+      const isAtk = ['单体','群攻','穿透','眩晕'].some(t => [selectedSkillS.type, selectedSkillS.type2, selectedSkillS.type3].some(x => x && x.includes(t)));
+      if (isAtk) { summonSprite.classList.remove('breathe'); summonSprite.classList.add('enemy-omen'); setTimeout(()=>{ if(summonSprite){ summonSprite.classList.remove('enemy-omen'); if(!summonSprite.classList.contains('breathe') && summon.isAlive) summonSprite.classList.add('breathe'); } },600); }
+      await sleep(330);
+  }
+  if (selectedSkillS) await executeSkillAction(summon, specificTargetS, selectedSkillS, summonMult);
+  else {
+      const fb = getTauntTarget(enemyPool, summon.isWise);
+      const mock = { type: '[单体]', type2: '[无]', type3: '[无]', power: 0, power2: 0, power3: 0, hit: 130, cost: 0, name: '猛击', damageType: '近战', isReaction: false, reactionTarget: 'all' };
+      await executeSkillAction(summon, fb, mock, summonMult);
+  }
+  if (!isChargeFullS && chargeSkillS && summon.isAlive) { summon.currentCharge = Math.min((summon.currentCharge||0)+1, chargeSkillS.charge); if(summon.side==='hero') updateHeroUI(summon); else updateEnemyUI(summon); if(summon.currentCharge>=chargeSkillS.charge) await sleep(500); }
+  await endTurn();
+}
+
 async function executeEnemyTurn(enemy) {
   // 智慧敌方回合开始旁白：仅在该敌人本回合首次行动时触发
   if (enemy.isWise && llmState.enemyAutoSpeak && !state.enemiesSpokenThisRound.has(enemy.id)) {
@@ -11801,7 +11866,7 @@ async function executeEnemyTurn(enemy) {
   const chargeSkill = enemy.skills.find(s => s.charge > 0);
   const isChargeFull = chargeSkill && enemy.currentCharge >= chargeSkill.charge;
 
-  const sprite = document.getElementById(`${enemy.id}-sprite`);
+  const sprite = getEntitySpriteDom(enemy) || document.getElementById(`${enemy.id}-sprite`);
 
   // 提前选技能，以便在显示预兆光晕前判断技能类型
   const validSkills = enemy.skills.filter(s =>
