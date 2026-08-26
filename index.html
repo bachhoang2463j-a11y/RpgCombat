@@ -2090,24 +2090,41 @@ let isHistoryEditMode = false;
 let _historyRawCache = '';
 let _lastResultSummaryText = '';
 
+function isSummonEntityName(name){
+  const clean = normalizeCombatName(name);
+  const pools = [];
+  if (Array.isArray(heroesData)) pools.push(...heroesData);
+  if (Array.isArray(enemiesData)) pools.push(...enemiesData);
+  return pools.some(e => e && e.isSummon && normalizeCombatName(e.name) === clean);
+}
 function buildLiveAvatarMap() {
   const map = new Map();
-  // 仅英雄：提供真实头像；无头像英雄才用 DEFAULT_HERO_IMG 兜底
+  // 仅英雄（排除召唤物）：提供真实头像；无头像英雄才用 DEFAULT_HERO_IMG 兜底
   const heroPools = [];
   if (Array.isArray(heroesData)) heroPools.push(...heroesData);
   if (Array.isArray(initialHeroesCache)) heroPools.push(...initialHeroesCache);
   heroPools.forEach(p => {
-    if (!p || !p.name) return;
+    if (!p || !p.name || p.isSummon) return;
     const clean = normalizeCombatName(p.name);
     if (!clean || map.has(clean)) return;
     map.set(clean, { url: p.img || DEFAULT_HERO_IMG, isHero: true });
+  });
+  // 召唤物：与敌方一致，强制走 emoji 通道（不借英雄头像）
+  const summonPools = [];
+  if (Array.isArray(heroesData)) summonPools.push(...heroesData.filter(e=>e && e.isSummon));
+  if (Array.isArray(enemiesData)) summonPools.push(...enemiesData.filter(e=>e && e.isSummon));
+  summonPools.forEach(p => {
+    if (!p || !p.name) return;
+    const clean = normalizeCombatName(p.name);
+    if (!clean || map.has(clean)) return;
+    map.set(clean, { url: null, isHero: false, emoji: p.emoji || '👻' });
   });
   // 敌人：仅记录 emoji/icon，不提供头像 URL（强制走 emoji 通道）
   const enemyPools = [];
   if (Array.isArray(enemiesData)) enemyPools.push(...enemiesData);
   if (Array.isArray(initialEnemiesCache)) enemyPools.push(...initialEnemiesCache);
   enemyPools.forEach(p => {
-    if (!p || !p.name) return;
+    if (!p || !p.name || p.isSummon) return;
     const clean = normalizeCombatName(p.name);
     if (!clean || map.has(clean)) return;
     map.set(clean, { url: null, isHero: false, emoji: p.emoji || null });
@@ -2146,6 +2163,13 @@ function isLiveHero(name) {
 }
 function getLiveAvatar(name) {
   const clean = normalizeCombatName(name);
+  // 召唤物与敌人一样走 emoji 通道，不借英雄头像
+  if (isSummonEntityName(clean)) {
+    const mapS = buildLiveAvatarMap();
+    if (mapS.has(clean)) { const v = mapS.get(clean); if (!v.isHero) return { type: 'emoji', emoji: v.emoji || '👻', isHero: false }; }
+    for (const [k, v] of mapS.entries()) { if (!v.isHero && (clean.includes(k) || k.includes(clean))) return { type: 'emoji', emoji: v.emoji || '👻', isHero: false }; }
+    return { type: 'emoji', emoji: '👻', isHero: false };
+  }
   // 关键修复：敌人永远走 emoji 通道，不借用 DEFAULT_HERO_IMG
   const enemyFlag = isLiveEnemy(clean);
   const heroFlag = !enemyFlag && isLiveHero(clean);
@@ -7139,24 +7163,24 @@ async function summonFromWorldbook(caster, summonName) {
         addHistory(`   ⚠️ [${caster.name}] 召唤「${summonName}」失败：词条无 <Combat_block>`);
         return false;
     }
-    const base = parseEnemyItem(cbData, 0, []);
-    base._worldbookRawContent = entry.content || '';
-    base.wbSource = { wbName: worldbookSettings.boundName, entryName: entry.name, desc: extractWorldbookDescription(entry.content) };
-    // 【召唤】头像：与敌方一致——有配置图才用图，否则一律 emoji/默认图标
-    let _resolvedSummonImg = AVATAR_MAP[summonName] || AVATAR_MAP[base.name] || base.img || null;
-    if (_resolvedSummonImg === DEFAULT_HERO_IMG) _resolvedSummonImg = null;
-    const summonId = 's_' + Date.now() + '_' + (summonSeq++);
-    const summonEntity = Object.assign({}, base, {
-        id: summonId,
-        isSummon: true,
-        summonOwnerId: caster.id,
-        side: side,
-        baseTauntBonus: 100,
-        row: side === 'enemy' ? 'front' : null,
-        tier: base.tier || 'fodder',
-        img: _resolvedSummonImg,
-        emoji: base.emoji || '✨'
-    });
+    // 复用开战管线：用召唤名上的 [...]/ *N 标签与世界书块直接生成新目标（不再 Object.assign 浅拷与硬编码 tier/row/img 覆盖）
+    const _summonNameTag = typeof parseNameTagAndMultiplier === 'function' ? parseNameTagAndMultiplier(summonName) : { baseName: summonName, tags: [] };
+    // 传入召唤名剥离的 tags，使 [复活][自爆][智慧] 等世界书/名字特性与被动完整生效（*N 在召唤中不展开，仅透传特性）
+    const _idx = side === 'enemy' ? enemiesData.length : heroesData.length;
+    const summonEntity = parseEnemyItem(cbData, _idx, _summonNameTag.tags || []);
+    summonEntity._worldbookRawContent = entry.content || '';
+    summonEntity.wbSource = { wbName: worldbookSettings.boundName, entryName: entry.name, desc: extractWorldbookDescription(entry.content) };
+    summonEntity.id = 's_' + Date.now() + '_' + (summonSeq++);
+    summonEntity.isSummon = true;
+    summonEntity.summonOwnerId = caster.id;
+    summonEntity.side = side;
+    summonEntity.emoji = summonEntity.emoji || baseEmojiFallback(summonEntity) || '✨';
+    // 头像沿用敌方通道：有 AVATAR_MAP 才有图，否则 null 走 emoji（绝不回退英雄头像）；summonName 的映射在 parseEnemyItem 已处理，此处仅做 DEFAULT 归一
+    if (summonEntity.img === DEFAULT_HERO_IMG) summonEntity.img = null;
+    // 阶位走真实判定而非 fodder 硬编码；排位由 assignEnemyRows 增量补齐
+    summonEntity.tier = getEnemyTier(summonEntity);
+    summonEntity.row = null;
+    function baseEmojiFallback(e){ try{ const c=(e && e.name)||''; if(!c) return null; if(c.includes('幽')||c.includes('鬼')) return '👻'; if(c.includes('潜')||c.includes('深')) return '🦑'; if(c.includes('狼')) return '🐺'; return null; }catch(_){ return null; } }
     // 注入固定全能舍身（仅替 owner 挡单体致死）
     const guardSkill = { name: '舍身守护', isReaction:false, reactionTarget:'all', kanpoTarget:null, sheshenTarget:'all', _ownerOnly:true, isOthers:false, guaranteedHit:false, isHighTier:false, isLegendary:false, damageType:null, fxTag:null, cost:0, hpCost:0, tpCost:0, hit:100, turns:null, type:'[无]', power:0, type2:'[无]', power2:0, type3:'[无]', power3:0, barrierSub:null, barrierArmor:0, maxUses:0, usesRemaining:0, summonTarget:null, delay:0, haste:0, charge:0 };
     summonEntity.skills = Array.isArray(summonEntity.skills) ? [guardSkill].concat(summonEntity.skills) : [guardSkill];
@@ -7164,6 +7188,8 @@ async function summonFromWorldbook(caster, summonName) {
     const _isBattle = !!(state && state.isGameStarted);
     if (side === 'hero') heroesData.push(summonEntity);
     else enemiesData.push(summonEntity);
+    // 召唤物排位走开战同款：仅补缺失行，不全量重排闪动
+    try { if (side === 'enemy' && typeof assignEnemyRows === 'function') assignEnemyRows(); } catch(e) {}
     if (_isBattle) {
         try {
             if (state.actionQueue && state.actionQueue.length) {
@@ -7182,7 +7208,7 @@ async function summonFromWorldbook(caster, summonName) {
             try { if (typeof window.renderEnemyFormation === 'function') window.renderEnemyFormation(); } catch(e) { try { initUI(); } catch(e2) {} }
         }
     } else {
-        try { initUI(); } catch(e) {}
+        try { if (typeof window.renderEnemyFormation === 'function' && side === 'enemy') window.renderEnemyFormation(); else initUI(); } catch(e) { try { initUI(); } catch(e2) {} }
     }
     const casterDom = caster && caster.id ? (document.getElementById(`hero-card-${caster.id}`) || document.getElementById(`${caster.id}-sprite`)) : null;
     if (casterDom) { createFloatingText(casterDom, `召唤阵：${summonName}`, 'text-sky-300'); if (window.spawnBurstAura) spawnBurstAura(casterDom); }
@@ -7907,9 +7933,10 @@ function renderTurnQueue() {
                   (item.type === 'hero' ? 'bg-cyan-900/50' : 'bg-rose-900/50');
     const highlight = isCurrent ? 'scale-110 ring-2 ring-yellow-400 z-30' : 'opacity-70 scale-90 blur-[1px]';
 
-    const content = (item.type === 'hero' || item.ref.img)
-      ? `<img src="${item.ref.img}" class="w-full h-full object-cover rounded-full">`
-      : `<div class="w-full h-full flex items-center justify-center text-sm sm:text-2xl">${item.ref.emoji}</div>`;
+    const _isSummonQ = !!(item.ref && item.ref.isSummon);
+    const content = (_isSummonQ ? !!item.ref.img : (item.type === 'hero' || !!item.ref.img))
+      ? `<img src="${item.ref.img}" class="w-full h-full object-cover rounded-full" onerror="this.style.display='none';this.nextElementSibling&&this.nextElementSibling.classList.remove('hidden')"><div class="hidden w-full h-full flex items-center justify-center text-sm sm:text-2xl">${item.ref.emoji || '👻'}</div>`
+      : `<div class="w-full h-full flex items-center justify-center text-sm sm:text-2xl">${item.ref.emoji || '👻'}</div>`;
 
     // 序号徽章（左下角 #1, #2...）
     const rankPill = `
@@ -8035,6 +8062,13 @@ function renderTurnQueue() {
   _prevQueueCurrentUid = currentUid;
 }
 
+// 统一目标 DOM 解析：兼容 s_* 召唤物（hero-card-s_* / s_*-sprite 双通道），供受击/攻击动画复用
+function getEntitySpriteDom(entityOrId){
+  const id = entityOrId && typeof entityOrId === 'object' ? entityOrId.id : String(entityOrId||'');
+  if(!id) return null;
+  return document.getElementById(`hero-card-${id}`) || document.getElementById(`${id}-sprite`) || document.getElementById(`hero-wrap-${id}`) || null;
+}
+window.getEntitySpriteDom = getEntitySpriteDom;
 // ==========================================
 // 核心逻辑与精确 DOM 更新
 // ==========================================
@@ -8728,7 +8762,7 @@ registerClassPassive('防守者', {
         // 播放红色圆锥冲击波特效（音效在冲击波射出瞬间播放）
         await playPowerCounterEffect(target, caster, targetDom);
 
-        const casterDom = caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`);
+        const casterDom = getEntitySpriteDom(caster) || (caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`));
         caster.hp -= counterHpDmg;
         if (casterDom) casterDom.classList.add('shake'); setTimeout(() => { if (casterDom) casterDom.classList.remove('shake') }, 400);
 
@@ -9992,7 +10026,7 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill, sheshenCa
 // - 选择舍身 → 扣守护者资源并执行演出，返回 { usedSheshen: true, guardian }；
 // - 无候选或放弃 → 返回空结果，调用方继续走受击管线。
 async function runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, sheshenCandidates, isAttack = false, isPierce = false, multiplier = 1) {
-    const targetType = target.id.startsWith('h') ? 'hero' : 'enemy';
+    const targetType = target.isSummon ? (target.side === 'hero' ? 'hero' : 'enemy') : (target.id.startsWith('h') ? 'hero' : 'enemy');
     const reactionSkills = target.skills.filter(s => {
         if (!s.isReaction) return false;
         if (s.cost > target.mp) return false;
@@ -10085,8 +10119,8 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
 
 async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, multiplier, globalTurns, skill) {
   if (!target || !target.isAlive) return;
-  const actualPower = tagPower * multiplier; const targetType = target.id.startsWith('h') ? 'hero' : 'enemy';
-  let targetDom = targetType === 'enemy' ? document.getElementById(`${target.id}-sprite`) : document.getElementById(`hero-card-${target.id}`);
+  const actualPower = tagPower * multiplier; const targetType = target.isSummon ? (target.side === 'hero' ? 'hero' : 'enemy') : (target.id.startsWith('h') ? 'hero' : 'enemy');
+  let targetDom = getEntitySpriteDom(target) || (targetType === 'enemy' ? document.getElementById(`${target.id}-sprite`) : document.getElementById(`hero-card-${target.id}`));
   
   // 区分纯伤害和纯Debuff
   const isDamage = tag.includes('攻') || tag.includes('单体') || tag.includes('穿透') || tag.includes('眩晕');
