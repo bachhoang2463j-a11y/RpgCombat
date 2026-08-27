@@ -1803,7 +1803,7 @@
         <span class="panel-title">💬 对话 · AI扮演设置</span>
         <button onclick="closeLLMSettings()" style="background:transparent;border:none;color:#64748b;font-size:18px;cursor:pointer;line-height:1;">✕</button>
       </div>
-      <div class="panel-body">
+      <div class="panel-body custom-scrollbar">
         <div class="flex gap-2 mb-4 justify-center items-center">
             <span class="text-xs text-gray-500 font-bold mr-2">预设槽位</span>
             <button onclick="switchLLMPreset(0)" id="llm-preset-btn-0" class="w-8 h-8 rounded-full border border-indigo-400 bg-indigo-600 text-white shadow-[0_0_10px_rgba(79,70,229,0.5)] transition-colors flex items-center justify-center font-bold text-sm">1</button>
@@ -1839,9 +1839,11 @@
           <label>扮演要求提示词 <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#475569;">(发给LLM的角色扮演指引)</span></label>
           <textarea id="llm-system-prompt" placeholder="例如：你是一个武侠小说中的角色，请用文言文风格，简短有力地扮演各位角色回应玩家。每次只输出1-2句话。"></textarea>
         </div>
-        <!-- 角色人设提示词：仅出战角色增量载入，不封堵临时队友 -->
-        <details id="character-prompts-details" style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:0;overflow:hidden;">
-          <summary style="cursor:pointer;padding:10px 12px;font-size:13px;font-weight:700;color:#cbd5e1;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+        <!-- 角色人设提示词：仅出战角色增量载入，不封堵临时队友。注意：父容器 .panel-body 为纵向 flex 且内容溢出，
+             子项若带 overflow:hidden 会使 min-height 归零、被压缩成 2px 高（旧版"看不到"的真因），
+             故此处用 flex-shrink:0 代替 overflow:hidden 保证自身高度不被压缩。 -->
+        <details id="character-prompts-details" open style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:0;flex-shrink:0;margin-bottom:2px;">
+          <summary style="cursor:pointer;padding:10px 12px;font-size:13px;font-weight:700;color:#cbd5e1;list-style:none;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.06);">
             <span>🎭 角色人设提示词<span style="font-weight:400;color:#475569;margin-left:6px;">（仅出战时载入·不影响临时队友）</span></span>
             <span id="cp-count" style="font-size:11px;color:#64748b;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:999px;"></span>
           </summary>
@@ -14595,11 +14597,19 @@ async function callLLMAPI(playerText, targetAllies, isAutoSpeak) {
     `\n请扮演以下角色做出简短回应（每人1-2句），注意角色可能属于我方或敌方：${allyNames}`,
     `\n回应格式必须严格为：角色名：「台词」，每人单独一行。不要添加任何其他内容。`,
   ].join('\n');
-  // 角色独立人设：仅出战角色增量载入，不封堵临时队友
+  // 角色独立人设：仅出战角色增量载入，不封堵临时队友（读持久化 roster，避免内存 heroesData 为空时误判）
   try {
     const presetCPs = (llmState.presets && llmState.presets[llmState.activePreset] && Array.isArray(llmState.presets[llmState.activePreset].characterPrompts))
       ? llmState.presets[llmState.activePreset].characterPrompts : (Array.isArray(llmState.characterPrompts) ? llmState.characterPrompts : []);
-    const outNames = new Set((typeof heroesData !== 'undefined' ? heroesData : []).map(h => (h.name || '').trim()).filter(Boolean));
+    const persistedOutNames = (() => {
+      try {
+        const p = (typeof readRoster === 'function') ? readRoster() : null;
+        if (p && Array.isArray(p.heroes) && p.heroes.length) return p.heroes.map(h => (h.name || '').trim()).filter(Boolean);
+      } catch(e) {}
+      try { if (Array.isArray(heroesData) && heroesData.length) return heroesData.map(h => (h.name || '').trim()).filter(Boolean); } catch(e) {}
+      return [];
+    })();
+    const outNames = new Set(persistedOutNames);
     const matched = presetCPs.filter(cp => cp && typeof cp.name === 'string' && typeof cp.prompt === 'string' && cp.name.trim() && cp.prompt.trim() && outNames.has(cp.name.trim()));
     if (matched.length) {
       systemContent += '\n\n【出战角色补充人设】\n' + matched.map(cp => `· ${cp.name.trim()}：${cp.prompt.trim()}`).join('\n') + '\n（其他出战队友无补充人设，按全局扮演要求自由发挥即可）';
