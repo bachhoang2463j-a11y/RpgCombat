@@ -469,6 +469,10 @@
     .breathe { animation: breathe 4s ease-in-out infinite alternate; }
     @keyframes breathe { 0% { transform: translateY(0px); filter: drop-shadow(0 5px 15px rgba(255,255,255,0.1)); } 100% { transform: translateY(-10px); filter: drop-shadow(0 15px 25px rgba(255,255,255,0.2)); } }
 
+    /* 【召唤】召唤行不拦截敌方选取：父容器穿透、子卡接管（间隙直透敌区） */
+    #ally-summon-row { pointer-events: none; }
+    #ally-summon-row > div { pointer-events: auto; }
+
     .targeting-mode-enemy .enemy-sprite { cursor: crosshair; animation: pulse-target-enemy 1.5s infinite; }
     @keyframes pulse-target-enemy { 0%, 100% { filter: drop-shadow(0 0 10px rgba(244, 63, 94, 0.4)); transform: scale(1); } 50% { filter: drop-shadow(0 0 25px rgba(244, 63, 94, 1)); transform: scale(1.02); } }
     .targeting-mode-hero .hero-card-inner { cursor: pointer; animation: pulse-target-hero 1.5s infinite; }
@@ -7597,7 +7601,7 @@ function initUI() {
     if (!row) {
       row = document.createElement('div');
       row.id = 'ally-summon-row';
-      row.className = 'w-full flex justify-center gap-1.5 sm:gap-2.5 mb-1 pointer-events-auto col-span-4 relative z-10';
+      row.className = 'w-full flex justify-center gap-1.5 sm:gap-2.5 mb-1 col-span-4 relative z-10';
       row.style.gridColumn = '1 / -1';
       row.style.flexWrap = 'wrap';
       const barrier = document.getElementById('team-barrier-wrapper');
@@ -7631,7 +7635,7 @@ function initUI() {
   if (_summonHeroes.length) {
     const summonRow = document.createElement('div');
     summonRow.id = 'ally-summon-row';
-    summonRow.className = 'w-full flex justify-center gap-1.5 sm:gap-2.5 mb-1 pointer-events-auto col-span-4 relative z-10';
+    summonRow.className = 'w-full flex justify-center gap-1.5 sm:gap-2.5 mb-1 col-span-4 relative z-10';
     summonRow.style.gridColumn = '1 / -1';
     summonRow.style.flexWrap = 'wrap';
     _summonHeroes.forEach(sh => {
@@ -12479,6 +12483,11 @@ function showEnemyInfo(enemy) {
   const hpPercent = Math.max(0, Math.min(100, Math.floor((enemy.hp / enemy.maxHp) * 100)));
   const mpPercent = enemy.maxMp > 0 ? Math.max(0, Math.min(100, Math.floor((enemy.mp / enemy.maxMp) * 100))) : 0;
   const skillCount = (enemy.skills || []).length;
+  const _isSummonInspect = !!enemy.isSummon;
+  const _summonOwner = _isSummonInspect && enemy.summonOwnerId ? ((typeof heroesData !== 'undefined' ? heroesData.find(h => h.id === enemy.summonOwnerId) : null) || (typeof enemiesData !== 'undefined' ? enemiesData.find(e => e.id === enemy.summonOwnerId) : null) || null) : null;
+  const _summonBadge = _isSummonInspect ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold border bg-teal-950/70 text-teal-300 border-teal-500/60">召唤物</span>` : '';
+  const _ownerBadge = _isSummonInspect ? (_summonOwner ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold border bg-slate-800/80 text-slate-300 border-slate-600/60">归属: ${_summonOwner.name}</span>` : `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold border ${enemy.side==='hero' ? 'bg-emerald-950/70 text-emerald-300 border-emerald-500/60' : 'bg-rose-950/70 text-rose-300 border-rose-500/60'}">${enemy.side==='hero' ? '我方召唤' : '敌方召唤'}</span>`) : '';
+  const _rowBadge = enemy.row ? `<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${enemy.row==='front' ? 'bg-amber-950/80 text-amber-300 border-amber-500/70' : 'bg-sky-950/80 text-sky-300 border-sky-500/70'}">${enemy.row==='front' ? '⬇ 前排' : '⬆ 后排'}</span>` : '';
 
   modal.innerHTML = `
     <div class="cyber-modal-enemy w-full max-w-3xl rounded-2xl p-4 sm:p-5 relative text-white flex flex-col max-h-[88vh] sm:max-h-[84vh] overflow-hidden" onclick="event.stopPropagation()">
@@ -12494,8 +12503,10 @@ function showEnemyInfo(enemy) {
           <div class="min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
               <h2 class="text-base sm:text-lg font-black text-slate-100 tracking-wider truncate">${enemy.name}</h2>
+              ${_summonBadge}
+              ${_ownerBadge ? `${_ownerBadge}` : ''}
               ${enemy.isWise ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-950/80 text-rose-300 border border-rose-500/80 tag-fx-wise flex items-center gap-1"><span>🧠</span> 智慧单位</span>` : ''}
-              <span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${enemy.row==='front' ? 'bg-amber-950/80 text-amber-300 border-amber-500/70' : 'bg-sky-950/80 text-sky-300 border-sky-500/70'}">${enemy.row==='front' ? '⬇ 前排' : '⬆ 后排'}</span>
+              ${_rowBadge}
               ${enemy.tier ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold border ${enemy.tier==='legend' ? 'bg-amber-950/70 text-amber-300 border-amber-500/60' : enemy.tier==='elite' ? 'bg-violet-950/70 text-violet-300 border-violet-500/60' : 'bg-slate-800/80 text-slate-300 border-slate-600/60'}">${enemy.tier==='legend' ? '首领' : enemy.tier==='elite' ? '精英' : '杂兵'}</span>` : ''}
               <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-950/60 text-cyan-300 border border-cyan-700/50">TARGET INSPECT</span>
             </div>
@@ -12588,7 +12599,9 @@ function showEnemyInfo(enemy) {
 
 async function handleTargetClick(target, targetType) {
   if (!state.isTargeting) {
-     if (targetType === 'enemy' && !target.isAlive) return;
+     if (!target.isAlive) return;
+     // 【召唤】召唤物点击显示信息窗口（与敌人一致），优先于英雄爆发切换
+     if (target.isSummon) { showEnemyInfo(target); return; }
      if (targetType === 'hero' && state.isGameStarted && !state.isAnimating) {
         const currentActor = state.actionQueue[state.queueIndex]?.ref;
         if (currentActor && currentActor.id === target.id && target.tp >= target.maxTp) {
