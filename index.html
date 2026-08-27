@@ -1159,7 +1159,7 @@
       position: absolute;
       inset: -10px -12px -10px -12px;
       pointer-events: none;
-      z-index: 40;
+      z-index: 30;
       transition: opacity 0.4s ease, transform 0.2s ease;
     }
 
@@ -7130,6 +7130,14 @@ function hasAliveBack() { return enemiesData.some(e => e.isAlive && e.row === 'b
 async function summonFromWorldbook(caster, summonName) {
     const SIDE_LIMIT = 4;
     const side = caster && caster.id && caster.id.startsWith('h') ? 'hero' : 'enemy';
+    // 敌方总额 12 满员阻断（不影响我方与现有 SIDE_LIMIT=4 逻辑）
+    if (side === 'enemy' && Array.isArray(enemiesData) && enemiesData.filter(e => e.isAlive !== false).length >= 12) {
+        const dom0 = caster && caster.id ? (document.getElementById(`hero-card-${caster.id}`) || document.getElementById(`${caster.id}-sprite`)) : null;
+        if (dom0) createFloatingText(dom0, '敌方已满员', 'text-amber-300');
+        addHistory(`   ⚠️ [${caster.name}] 召唤失败：敌方已达上限(12)`);
+        showLog('召唤失败：敌方已满员');
+        return false;
+    }
     const aliveCount = (side === 'hero' ? heroesData : enemiesData).filter(e => e.isAlive && e.isSummon).length;
     const pendingCount = pendingSummons.filter(p => p.side === side).length;
     if (aliveCount + pendingCount >= SIDE_LIMIT) {
@@ -7177,9 +7185,9 @@ async function summonFromWorldbook(caster, summonName) {
     summonEntity.emoji = summonEntity.emoji || baseEmojiFallback(summonEntity) || '✨';
     // 头像沿用敌方通道：有 AVATAR_MAP 才有图，否则 null 走 emoji（绝不回退英雄头像）；summonName 的映射在 parseEnemyItem 已处理，此处仅做 DEFAULT 归一
     if (summonEntity.img === DEFAULT_HERO_IMG) summonEntity.img = null;
-    // 阶位走真实判定而非 fodder 硬编码；排位由 assignEnemyRows 增量补齐
+    // 阶位走真实判定而非 fodder 硬编码；敌方召唤默认前排，不触发全量重排闪动
     summonEntity.tier = getEnemyTier(summonEntity);
-    summonEntity.row = null;
+    summonEntity.row = side === 'enemy' ? 'front' : null;
     function baseEmojiFallback(e){ try{ const c=(e && e.name)||''; if(!c) return null; if(c.includes('幽')||c.includes('鬼')) return '👻'; if(c.includes('潜')||c.includes('深')) return '🦑'; if(c.includes('狼')) return '🐺'; return null; }catch(_){ return null; } }
     // 注入固定全能舍身（仅替 owner 挡单体致死）
     const guardSkill = { name: '舍身守护', isReaction:false, reactionTarget:'all', kanpoTarget:null, sheshenTarget:'all', _ownerOnly:true, isOthers:false, guaranteedHit:false, isHighTier:false, isLegendary:false, damageType:null, fxTag:null, cost:0, hpCost:0, tpCost:0, hit:100, turns:null, type:'[无]', power:0, type2:'[无]', power2:0, type3:'[无]', power3:0, barrierSub:null, barrierArmor:0, maxUses:0, usesRemaining:0, summonTarget:null, delay:0, haste:0, charge:0 };
@@ -7188,8 +7196,8 @@ async function summonFromWorldbook(caster, summonName) {
     const _isBattle = !!(state && state.isGameStarted);
     if (side === 'hero') heroesData.push(summonEntity);
     else enemiesData.push(summonEntity);
-    // 召唤物排位走开战同款：仅补缺失行，不全量重排闪动
-    try { if (side === 'enemy' && typeof assignEnemyRows === 'function') assignEnemyRows(); } catch(e) {}
+    // 召唤物排位：敌方默认 front 已赋值，避免 assignEnemyRows 全量重排闪动（已满 12 的情况在前已阻断）
+    try { if (side === 'enemy' && !summonEntity.row && typeof assignEnemyRows === 'function') assignEnemyRows(); } catch(e) {}
     if (_isBattle) {
         try {
             if (state.actionQueue && state.actionQueue.length) {
@@ -7589,7 +7597,7 @@ function initUI() {
     if (!row) {
       row = document.createElement('div');
       row.id = 'ally-summon-row';
-      row.className = 'w-full flex justify-center gap-1 sm:gap-2 mb-1 pointer-events-auto col-span-4';
+      row.className = 'w-full flex justify-center gap-1.5 sm:gap-2.5 mb-1 pointer-events-auto col-span-4 relative z-10';
       row.style.gridColumn = '1 / -1';
       row.style.flexWrap = 'wrap';
       const barrier = document.getElementById('team-barrier-wrapper');
@@ -7598,11 +7606,11 @@ function initUI() {
     }
     if (document.getElementById(`hero-wrap-${summonEntity.id}`)) return;
     const sd = document.createElement('div');
-    sd.className = 'relative shrink-0';
+    sd.className = 'relative shrink-0 z-10';
     sd.id = `hero-wrap-${summonEntity.id}`;
     const icon = summonEntity.img
-      ? `<img src="${summonEntity.img}" class="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.8)]" />`
-      : `<div class="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center text-3xl sm:text-4xl drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]">${summonEntity.emoji || '👻'}</div>`;
+      ? `<img src="${summonEntity.img}" class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 object-cover rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.8)]" />`
+      : `<div class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 flex items-center justify-center text-5xl sm:text-7xl drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]">${summonEntity.emoji || '👻'}</div>`;
     sd.innerHTML = `
       <div class="flex flex-col items-center group relative cursor-pointer pointer-events-auto">
         <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 text-white/70 text-[9px] bg-black/40 px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none">${summonEntity.name}</div>
@@ -7623,16 +7631,16 @@ function initUI() {
   if (_summonHeroes.length) {
     const summonRow = document.createElement('div');
     summonRow.id = 'ally-summon-row';
-    summonRow.className = 'w-full flex justify-center gap-1 sm:gap-2 mb-1 pointer-events-auto col-span-4';
+    summonRow.className = 'w-full flex justify-center gap-1.5 sm:gap-2.5 mb-1 pointer-events-auto col-span-4 relative z-10';
     summonRow.style.gridColumn = '1 / -1';
     summonRow.style.flexWrap = 'wrap';
     _summonHeroes.forEach(sh => {
       const sd = document.createElement('div');
-      sd.className = 'relative shrink-0';
+      sd.className = 'relative shrink-0 z-10';
       sd.id = `hero-wrap-${sh.id}`;
       const icon2 = sh.img
-        ? `<img src="${sh.img}" class="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.8)]" />`
-        : `<div class="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center text-3xl sm:text-4xl drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]">${sh.emoji || '👻'}</div>`;
+        ? `<img src="${sh.img}" class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 object-cover rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.8)]" />`
+        : `<div class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 flex items-center justify-center text-5xl sm:text-7xl drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]">${sh.emoji || '👻'}</div>`;
       sd.innerHTML = `
         <div class="flex flex-col items-center group relative cursor-pointer pointer-events-auto">
           <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 text-white/70 text-[9px] bg-black/40 px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none">${sh.name}</div>
@@ -7648,7 +7656,7 @@ function initUI() {
     _summonHeroes.forEach(sh => { try { updateBuffUI(sh); updateHeroUI(sh); } catch(e) {} });
   }
   _normalHeroes.forEach((hero, index) => {
-    hero.dom = document.createElement('div'); hero.dom.className = `relative transition-all duration-300 min-w-[70px] ${!hero.isAlive ? 'opacity-40 grayscale' : ''}`; hero.dom.id = `hero-wrap-${hero.id}`;
+    hero.dom = document.createElement('div'); hero.dom.className = `relative transition-all duration-300 min-w-[70px] z-20 ${!hero.isAlive ? 'opacity-40 grayscale' : ''}`; hero.dom.id = `hero-wrap-${hero.id}`;
     if (state.isGameStarted) { hero.dom.classList.add('anim-enter-hero'); hero.dom.style.animationDelay = `${index * 0.08}s`; setTimeout(() => { if (hero.dom) hero.dom.classList.remove('anim-enter-hero'); }, 800 + index * 80); } else { hero.dom.classList.add('opacity-0'); }
     let burstClass = 'border-gray-800'; if (hero.tp >= hero.maxTp) burstClass = hero.burstActivated ? 'burst-active' : 'burst-ready';
     hero.dom.innerHTML = `
@@ -7680,7 +7688,7 @@ function initUI() {
     const isMobile = window.innerWidth < 640;
     // 自适应：桌面与移动端均按 Demo 自收敛（保证宽屏不四行）
     const nBack = Math.max(1, backEnemies.length), nFront = Math.max(1, frontEnemies.length);
-    let gapBack = 28, gapFront = 36, frontY = 48, backScale = 0.68, frontScale = 1.0;
+    let gapBack = 22, gapFront = 26, frontY = 18, backScale = 0.72, frontScale = 1.0;
     // 可用宽以战场容器实测为准（酒馆侧栏挤压时 window.innerWidth ≠ 战场宽度）
     const battleSceneW = (document.getElementById('battle-scene')?.clientWidth || document.getElementById('enemies-container')?.clientWidth || window.innerWidth);
     const availW = Math.max(320, battleSceneW - 96);
@@ -7692,18 +7700,18 @@ function initUI() {
         const eff = Math.max(0.60, availW / needMax);
         gapBack = Math.max(10, Math.round(gapBack * eff));
         gapFront = Math.max(10, Math.round(gapFront * eff));
-        backScale = Math.max(0.55, 0.68 * eff);
+        backScale = Math.max(0.55, 0.72 * eff);
         frontScale = Math.max(0.62, 1.0 * eff);
       }
     } else {
-      gapBack = Math.min(28, nBack >= 4 ? 8 : 12);
-      gapFront = Math.min(36, nFront >= 4 ? 10 : 14);
+      gapBack = Math.min(22, nBack >= 4 ? 6 : 10);
+      gapFront = Math.min(26, nFront >= 4 ? 8 : 12);
       const effBack = Math.min(1.0, 320 / (nBack * 42 + (nBack - 1) * gapBack));
       const effFront = Math.min(1.0, 320 / (nFront * 42 + (nFront - 1) * gapFront));
       const eff = Math.min(effBack, effFront, 1.0);
-      backScale = 0.68 * Math.max(0.60, eff);
+      backScale = 0.72 * Math.max(0.60, eff);
       frontScale = 1.0 * Math.max(0.62, eff);
-      frontY = Math.min(frontY, 28);
+      frontY = Math.min(frontY, 14);
     }
     function buildEnemyDom(enemy, index, isBack){
       const el = document.createElement('div');
@@ -12793,10 +12801,10 @@ function updateActiveHeroDisplay(activeHeroId) {
     const domInner = document.getElementById(`hero-card-${h.id}`); if (!domInner) return;
     if (h.id === activeHeroId) {
       if(!domInner.classList.contains('burst-active') && !domInner.classList.contains('burst-ready')) domInner.classList.add('ring-2', 'ring-yellow-400');
-      h.dom.classList.add('z-40', 'scale-105', '-translate-y-1'); h.dom.classList.remove('z-10');
+      h.dom.classList.add('z-40', 'scale-105', '-translate-y-1'); h.dom.classList.remove('z-20');
     } else {
       domInner.classList.remove('ring-2', 'ring-yellow-400');
-      h.dom.classList.remove('z-40', 'scale-105', '-translate-y-1'); h.dom.classList.add('z-10');
+      h.dom.classList.remove('z-40', 'scale-105', '-translate-y-1'); h.dom.classList.add('z-20');
     }
   });
   const nameEl = document.getElementById('active-hero-name');

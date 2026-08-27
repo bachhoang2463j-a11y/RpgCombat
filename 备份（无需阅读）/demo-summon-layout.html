@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>【召唤物布局重构与高清展示】横屏响应式方案演练场 Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Cinzel:wght@700;900&family=Share+Tech+Mono&display=swap');
+    
+    body { 
+      font-family: 'Noto Sans SC', sans-serif; 
+      user-select: none;
+      background: #070a13;
+      color: #fff;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    
+    .font-cinzel { font-family: 'Cinzel', serif; }
+    .font-mono-tech { font-family: 'Share Tech Mono', monospace; }
+    
+    .glass-panel {
+      background: rgba(13, 20, 36, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.65);
+    }
+
+    .glass-card-summon {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.85) 100%);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 15px rgba(56, 189, 248, 0.2);
+    }
+
+    .glass-card-summon:hover {
+      border-color: rgba(56, 189, 248, 0.8);
+      box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.9), 0 0 22px rgba(56, 189, 248, 0.45);
+      transform: translateY(-2px);
+    }
+
+    .text-outline {
+      text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 6px rgba(0,0,0,0.9);
+    }
+    .text-outline-cyan {
+      text-shadow: -1px -1px 0 #083344, 1px -1px 0 #083344, -1px 1px 0 #083344, 1px 1px 0 #083344, 0 0 10px #06b6d4;
+    }
+
+    .breathe { animation: breathe 3.6s ease-in-out infinite alternate; }
+    @keyframes breathe { 
+      0% { transform: translateY(0px); } 
+      100% { transform: translateY(-4px); } 
+    }
+
+    .breathe-pulse { animation: breathePulse 2.8s ease-in-out infinite alternate; }
+    @keyframes breathePulse {
+      0% { transform: scale(1); filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.3)); }
+      100% { transform: scale(1.02); filter: drop-shadow(0 0 14px rgba(56, 189, 248, 0.7)); }
+    }
+
+    /* 契约共鸣光环 */
+    .covenant-glow {
+      position: relative;
+    }
+    .covenant-glow::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: inherit;
+      padding: 2px;
+      background: linear-gradient(45deg, #06b6d4, #3b82f6, #8b5cf6, #06b6d4);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      animation: rotateGradient 4s linear infinite;
+    }
+    @keyframes rotateGradient {
+      0% { filter: hue-rotate(0deg); }
+      100% { filter: hue-rotate(360deg); }
+    }
+
+    /* 契约光芒连线 */
+    .covenant-link-line {
+      stroke-dasharray: 4, 4;
+      animation: dashAnimation 1.5s linear infinite;
+    }
+    @keyframes dashAnimation {
+      from { stroke-dashoffset: 16; }
+      to { stroke-dashoffset: 0; }
+    }
+
+    /* 时间轴光轨 */
+    .timeline-rail {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 2px;
+      transform: translateX(-50%);
+      background: linear-gradient(to bottom, rgba(6,182,212,0.8), rgba(251,191,36,0.3), rgba(244,63,94,0.6));
+      box-shadow: 0 0 8px rgba(6,182,212,0.6);
+      z-index: 0;
+    }
+    .rail-pulse-beam {
+      position: absolute;
+      width: 100%;
+      height: 40px;
+      top: 0;
+      background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.9), transparent);
+      animation: railPulse 2.6s linear infinite;
+    }
+    @keyframes railPulse {
+      0% { top: -40px; opacity: 0; }
+      30% { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    /* 滚动条美化 */
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 2px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(6, 182, 212, 0.6); }
+
+    /* 设备外壳框阴影 */
+    .device-bezel {
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.15), 0 0 40px rgba(6, 182, 212, 0.2);
+    }
+  </style>
+</head>
+<body class="w-screen h-screen flex flex-col overflow-hidden bg-[#070a13] text-slate-100">
+
+  <!-- ========================================== -->
+  <!-- 顶部控制与调优面板 (Top Navigation Bar) -->
+  <!-- ========================================== -->
+  <header class="h-14 px-3 sm:px-6 bg-slate-950/95 border-b border-slate-800 flex items-center justify-between z-50 shrink-0 gap-2 backdrop-blur-md">
+    <div class="flex items-center gap-2 min-w-0">
+      <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_10px_#06b6d4]"></span>
+      <h1 class="text-xs sm:text-sm font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-200 to-amber-300 whitespace-nowrap">
+        RPG 战斗系统 · 召唤物高清与横屏抗拥挤布局演练场
+      </h1>
+      <span class="text-[10px] px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 font-mono hidden md:inline-block">V10.3 Architecture</span>
+    </div>
+
+    <!-- 方案切换 Tab -->
+    <div class="flex items-center gap-1 bg-black/60 p-1 rounded-xl border border-slate-800 text-xs overflow-x-auto max-w-[42vw] custom-scrollbar">
+      <button id="tab-scheme-1" onclick="setScheme(1)" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md border border-cyan-400 whitespace-nowrap flex items-center gap-1.5">
+        <span>⭐ 方案 1：左翼战术侍从阵 (Flank Dock)</span>
+      </button>
+      <button id="tab-scheme-2" onclick="setScheme(2)" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all text-slate-400 hover:text-white hover:bg-white/5 whitespace-nowrap flex items-center gap-1.5">
+        <span>🛡️ 方案 2：前哨错位浮岛列 (Escort Islands)</span>
+      </button>
+      <button id="tab-scheme-3" onclick="setScheme(3)" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all text-slate-400 hover:text-white hover:bg-white/5 whitespace-nowrap flex items-center gap-1.5">
+        <span>🔗 方案 3：契约从属插槽 (Master-Servant)</span>
+      </button>
+    </div>
+
+    <!-- 视口模拟器切换 -->
+    <div class="flex items-center gap-1.5 shrink-0">
+      <div class="hidden lg:flex items-center gap-1 bg-slate-900/80 px-2 py-1 rounded-lg border border-slate-800 text-[11px]">
+        <span class="text-slate-400">视口模拟：</span>
+        <button onclick="setViewport('pc-wide')" id="vp-pc-wide" class="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/50 font-mono font-bold">1080P横屏</button>
+        <button onclick="setViewport('laptop')" id="vp-laptop" class="px-1.5 py-0.5 rounded hover:bg-white/10 text-slate-300 font-mono">笔记本横屏</button>
+        <button onclick="setViewport('ipad-land')" id="vp-ipad-land" class="px-1.5 py-0.5 rounded hover:bg-white/10 text-slate-300 font-mono">平板横屏</button>
+        <button onclick="setViewport('mobile')" id="vp-mobile" class="px-1.5 py-0.5 rounded hover:bg-white/10 text-slate-300 font-mono">手机竖屏</button>
+        <button onclick="setViewport('fullscreen')" id="vp-fullscreen" class="px-1.5 py-0.5 rounded hover:bg-white/10 text-slate-300 font-mono">全屏自适</button>
+      </div>
+      <button onclick="toggleSidePanel()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700 flex items-center gap-1">
+        <span>⚙️</span> <span class="hidden sm:inline">调试控制台</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================== -->
+  <!-- 主工作区：左侧模拟视口 + 右侧配置面板 -->
+  <!-- ========================================== -->
+  <div class="flex-1 flex min-h-0 relative overflow-hidden">
+    
+    <!-- 左侧容器：承载居中渲染的模拟设备框架 -->
+    <div id="viewport-wrapper" class="flex-1 flex items-center justify-center p-2 sm:p-4 bg-[#05070d] overflow-hidden relative">
+      
+      <!-- 视口信息指示器 -->
+      <div class="absolute top-2 left-4 z-40 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-md border border-slate-800 text-[10px] font-mono text-slate-400 flex items-center gap-2">
+        <span id="vp-info-text">1080P 横屏 (1180 × 680 缩放基准)</span>
+        <span id="vp-fps" class="text-emerald-400 font-bold">60 FPS</span>
+      </div>
+
+      <!-- 模拟游戏舞台容器 (Game Stage Device) -->
+      <div id="game-stage" class="relative overflow-hidden device-bezel rounded-2xl bg-gradient-to-br from-indigo-950 via-slate-900 to-emerald-950 transition-all duration-300 flex flex-col" style="width: 1180px; height: 680px;">
+        
+        <!-- 背景星空光晕 -->
+        <div class="absolute inset-0 opacity-25 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-400 via-transparent to-transparent pointer-events-none"></div>
+        <div class="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none z-0"></div>
+
+        <!-- 顶部全景战报条 -->
+        <div class="absolute top-3 w-full flex justify-center z-30 pointer-events-none">
+          <div class="glass-panel px-4 sm:px-6 py-1 rounded-full text-[11px] sm:text-xs font-medium text-slate-200 shadow-lg flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+            <span id="stage-log-text">星界守卫发动【舍身守护】· 替狂战士抵挡了致死伤害！</span>
+          </div>
+        </div>
+
+        <!-- 左侧：行动顺序队列与能量导轨 -->
+        <div class="absolute left-2 sm:left-4 top-14 bottom-44 w-11 sm:w-13 z-30 pointer-events-auto flex flex-col items-center select-none">
+          <div class="relative w-full h-full flex flex-col items-center">
+            <div class="timeline-rail">
+              <div class="rail-pulse-beam"></div>
+            </div>
+            <div id="timeline-list" class="relative w-full h-full flex flex-col gap-2 items-center overflow-y-auto no-scrollbar py-2">
+              <!-- 动态时间轴头像项 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 上部：敌人阵型战场区域 (Enemies Area) -->
+        <!-- ========================================== -->
+        <div id="enemies-area" class="absolute left-16 right-4 top-10 bottom-[210px] sm:bottom-[230px] z-10 flex flex-col items-center justify-start gap-2 overflow-visible pointer-events-none transition-all duration-300">
+          
+          <!-- 敌方后排 -->
+          <div id="enemy-back-row" class="flex items-center justify-center gap-6 pointer-events-auto z-10 scale-[0.72] opacity-85">
+            <!-- 动态生成 -->
+          </div>
+          
+          <!-- 敌方前排 (含敌方召唤怪) -->
+          <div id="enemy-front-row" class="flex items-center justify-center gap-7 pointer-events-auto z-20 translate-y-3">
+            <!-- 动态生成 -->
+          </div>
+        </div>
+
+        <!-- 动态契约连线 SVG 画布层 -->
+        <svg id="covenant-svg-layer" class="absolute inset-0 w-full h-full pointer-events-none z-15" style="overflow: visible;">
+          <!-- 连线动态绘制 -->
+        </svg>
+
+        <!-- ========================================== -->
+        <!-- 底部：英雄 + 召唤物 + 指令菜单 核心布局容器 -->
+        <!-- ========================================== -->
+        <div id="bottom-hud-container" class="absolute bottom-2 left-2 sm:left-4 right-2 sm:right-4 z-20 pointer-events-none flex flex-col justify-end">
+          
+          <!-- 全队屏障横幅 (Team Barrier Banner) -->
+          <div id="barrier-banner" class="w-full max-w-4xl mx-auto mb-1.5 pointer-events-auto transition-all duration-300">
+            <div class="w-full bg-cyan-950/80 border border-cyan-500/50 rounded-lg px-3 py-1 flex items-center justify-between shadow-[0_0_15px_rgba(6,182,212,0.35)] backdrop-blur-md">
+              <div class="flex items-center gap-2">
+                <span class="text-cyan-300 text-xs animate-pulse">🛡️</span>
+                <span class="text-[11px] font-bold text-cyan-200 tracking-wide">全队共享屏障 · 肃正防御矩阵</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="w-32 sm:w-48 h-2 bg-slate-900/90 rounded-full overflow-hidden border border-cyan-500/40 p-[1px]">
+                  <div class="h-full bg-gradient-to-r from-cyan-500 via-sky-400 to-teal-300 rounded-full w-3/4 shadow-[0_0_10px_#06b6d4]"></div>
+                </div>
+                <span class="text-[11px] font-mono font-black text-cyan-300">1280 / 1600</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 核心战术卡片与菜单主栏 (三方案动态渲染锚点) -->
+          <div id="tactical-dock" class="w-full flex items-end justify-between gap-2 sm:gap-3 pointer-events-none">
+            <!-- 由 JS 依据当前选中的 Scheme 动态渲染 -->
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 右侧：方案控制与属性微调侧栏 (Control Sidebar) -->
+    <!-- ========================================== -->
+    <aside id="side-panel" class="w-80 bg-slate-950/95 border-l border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto custom-scrollbar z-40 shrink-0 backdrop-blur-xl transition-all duration-300">
+      
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-amber-400 font-bold">🎛️ 方案架构调优台</span>
+        </div>
+        <button onclick="resetSettings()" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">恢复默认</button>
+      </div>
+
+      <!-- 方案概览描述卡 -->
+      <div id="scheme-intro-card" class="bg-gradient-to-br from-slate-900 to-cyan-950/40 border border-cyan-500/30 rounded-xl p-3 text-xs leading-relaxed space-y-1.5">
+        <!-- 动态文本 -->
+      </div>
+
+      <!-- 情景模拟器设置 -->
+      <div class="space-y-2">
+        <label class="text-[11px] font-bold text-slate-300 tracking-wider flex items-center justify-between">
+          <span>👥 我方召唤物数量</span>
+          <span id="summon-count-badge" class="text-cyan-400 font-mono font-bold">2 只 (守卫+猎犬)</span>
+        </label>
+        <div class="grid grid-cols-5 gap-1">
+          <button onclick="setSummonCount(0)" class="btn-sc py-1 text-xs rounded border border-slate-700 hover:bg-slate-800">0</button>
+          <button onclick="setSummonCount(1)" class="btn-sc py-1 text-xs rounded border border-slate-700 hover:bg-slate-800">1</button>
+          <button onclick="setSummonCount(2)" class="btn-sc py-1 text-xs rounded bg-cyan-950 text-cyan-300 border border-cyan-500/60 font-bold">2</button>
+          <button onclick="setSummonCount(3)" class="btn-sc py-1 text-xs rounded border border-slate-700 hover:bg-slate-800">3</button>
+          <button onclick="setSummonCount(4)" class="btn-sc py-1 text-xs rounded border border-slate-700 hover:bg-slate-800">4(满)</button>
+        </div>
+      </div>
+
+      <!-- 敌方召唤怪开关 -->
+      <div class="flex items-center justify-between bg-slate-900/70 p-2.5 rounded-lg border border-slate-800 text-xs">
+        <span class="text-slate-300">⚔️ 敌方召唤物混战 (深潜触手+魔侍)</span>
+        <input type="checkbox" id="chk-enemy-summon" checked onchange="toggleEnemySummon()" class="w-4 h-4 accent-cyan-500 cursor-pointer">
+      </div>
+
+      <!-- 契约连线开关 -->
+      <div class="flex items-center justify-between bg-slate-900/70 p-2.5 rounded-lg border border-slate-800 text-xs">
+        <span class="text-slate-300">✨ 契约共鸣光流 (施法者连线)</span>
+        <input type="checkbox" id="chk-covenant-line" checked onchange="toggleCovenantLines()" class="w-4 h-4 accent-cyan-500 cursor-pointer">
+      </div>
+
+      <!-- 召唤物卡片尺寸滑块 -->
+      <div class="space-y-1.5 bg-slate-900/70 p-2.5 rounded-lg border border-slate-800 text-xs">
+        <div class="flex justify-between">
+          <span class="text-slate-300">📐 召唤卡图标尺寸</span>
+          <span id="scale-val-text" class="text-cyan-400 font-mono font-bold">88 px</span>
+        </div>
+        <input type="range" min="64" max="110" value="88" id="slider-card-scale" oninput="updateCardScale(this.value)" class="w-full accent-cyan-500 cursor-pointer">
+        <div class="flex justify-between text-[9px] text-slate-500 font-mono">
+          <span>64px(旧版微缩)</span>
+          <span>88px(推荐高清)</span>
+          <span>110px(超大)</span>
+        </div>
+      </div>
+
+      <!-- 属性卡信息深度开关 -->
+      <div class="space-y-1.5 bg-slate-900/70 p-2.5 rounded-lg border border-slate-800 text-xs">
+        <span class="text-slate-300 font-bold block mb-1">📊 信息展示级别 (Info Level)</span>
+        <div class="grid grid-cols-2 gap-1.5">
+          <button onclick="setInfoLevel('rich')" id="btn-info-rich" class="py-1 px-2 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/50 text-[11px] font-bold">高清战术卡(HP/盾/Buff)</button>
+          <button onclick="setInfoLevel('compact')" id="btn-info-compact" class="py-1 px-2 rounded hover:bg-slate-800 text-slate-400 border border-slate-700 text-[11px]">极简圆盾微标</button>
+        </div>
+      </div>
+
+      <!-- 交互与动作模拟 -->
+      <div class="space-y-2 border-t border-slate-800 pt-3">
+        <label class="text-[11px] font-bold text-slate-400">⚡ 实时动作与特效模拟</label>
+        <div class="grid grid-cols-2 gap-1.5">
+          <button onclick="simulateSkillCast()" class="py-1.5 px-2 rounded bg-cyan-600/80 hover:bg-cyan-500 text-white font-bold text-xs shadow-md transition-all">✨ 施放技能</button>
+          <button onclick="simulateHitDamage()" class="py-1.5 px-2 rounded bg-rose-600/80 hover:bg-rose-500 text-white font-bold text-xs shadow-md transition-all">💥 召唤物承伤</button>
+        </div>
+      </div>
+
+      <!-- 方案优缺点对比矩阵卡 -->
+      <div class="mt-auto border-t border-slate-800 pt-3 text-[10px] text-slate-400 space-y-1">
+        <div class="font-bold text-slate-200 flex items-center gap-1">
+          <span>💡 方案设计核心原则：</span>
+        </div>
+        <p class="leading-relaxed text-slate-400">
+          横屏下严禁“层层叠高”，必须利用宽屏两侧富余横向空间打造对偶阵列，确保敌人战场视野与纵深不受挤压。
+        </p>
+      </div>
+
+    </aside>
+
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 核心数据与交互驱动引擎 JavaScript -->
+  <!-- ========================================== -->
+  <script>
+    // 状态机
+    const state = {
+      currentScheme: 1, // 1: 侧翼对偶, 2: 前哨错位, 3: 契约从属
+      viewport: 'pc-wide',
+      summonCount: 2,
+      hasEnemySummon: true,
+      showCovenantLine: true,
+      cardScale: 88,
+      infoLevel: 'rich', // 'rich' | 'compact'
+      selectedEntityId: null
+    };
+
+    // 预设英雄数据 (4名主力)
+    const HEROES = [
+      { id: 'h1', name: '亚瑟·圣殿骑', class: '圣骑士', hp: 2840, maxHp: 3200, mp: 85, maxMp: 120, tp: 100, maxTp: 100, shield: 350, img: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=150&auto=format&fit=crop&q=80', emoji: '🛡️' },
+      { id: 'h2', name: '雷恩·狂战', class: '狂战士', hp: 1650, maxHp: 2800, mp: 40, maxMp: 80, tp: 75, maxTp: 100, shield: 0, img: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=150&auto=format&fit=crop&q=80', emoji: '🪓' },
+      { id: 'h3', name: '希尔·星咏者', class: '星术师', hp: 1420, maxHp: 1900, mp: 210, maxMp: 240, tp: 30, maxTp: 100, shield: 180, img: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=150&auto=format&fit=crop&q=80', emoji: '🔮' },
+      { id: 'h4', name: '影·风行刺客', class: '风行者', hp: 1890, maxHp: 2100, mp: 90, maxMp: 110, tp: 90, maxTp: 100, shield: 0, img: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=150&auto=format&fit=crop&q=80', emoji: '🗡️' },
+    ];
+
+    // 预设召唤物候选池 (上限4只)
+    const SUMMON_POOL = [
+      { id: 's1', name: '星界守卫', ownerId: 'h3', ownerName: '希尔·星咏者', hp: 1800, maxHp: 1800, shield: 400, type: '防御侍从', img: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80', emoji: '🌟', buffs: ['🛡️舍身守护', '⚡免伤+40'] },
+      { id: 's2', name: '幽魂猎犬', ownerId: 'h4', ownerName: '影·风行刺客', hp: 950, maxHp: 1100, shield: 0, type: '敏捷刺客', img: 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=150&auto=format&fit=crop&q=80', emoji: '🐺', buffs: ['💨避+25%', '⚔️连击'] },
+      { id: 's3', name: '极光小妖精', ownerId: 'h3', ownerName: '希尔·星咏者', hp: 680, maxHp: 800, shield: 150, type: '辅助精灵', img: null, emoji: '🧚', buffs: ['💖自愈', '⚡加速'] },
+      { id: 's4', name: '远古魔偶', ownerId: 'h1', ownerName: '亚瑟·圣殿骑', hp: 2200, maxHp: 2400, shield: 600, type: '重装构装', img: null, emoji: '🗿', buffs: ['💢嘲讽+50', '🛡️硬化'] }
+    ];
+
+    // 敌方单位数据 (含敌方召唤怪)
+    const ENEMIES = [
+      { id: 'e1', name: '深渊大主教·玛瑟尔', row: 'back', hp: 12500, maxHp: 14000, isSummon: false, emoji: '👑', img: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=150&auto=format&fit=crop&q=80', charge: 2, maxCharge: 3 },
+      { id: 'e2', name: '虚空织法者', row: 'back', hp: 4200, maxHp: 5000, isSummon: false, emoji: '🧙‍♂️', img: null, charge: 1, maxCharge: 2 },
+      { id: 'e3', name: '狂暴巨魔战将', row: 'front', hp: 6800, maxHp: 7500, isSummon: false, emoji: '👹', img: 'https://images.unsplash.com/photo-1589254065878-42c9da997008?w=150&auto=format&fit=crop&q=80' },
+      { id: 'e4', name: '暗影巡狩者', row: 'front', hp: 3600, maxHp: 4000, isSummon: false, emoji: '🥷', img: null },
+      { id: 'es1', name: '深潜触手(敌召唤)', row: 'front', hp: 1600, maxHp: 1600, isSummon: true, emoji: '🦑', img: null },
+      { id: 'es2', name: '虚空魔侍(敌召唤)', row: 'front', hp: 1200, maxHp: 1200, isSummon: true, emoji: '👁️', img: null }
+    ];
+
+    // 方案描述文案
+    const SCHEME_DESC = {
+      1: {
+        title: "方案 1：左翼战术侍从阵 (Flank Escort Dock)",
+        badge: "⭐ 推荐架构 · 横屏体验最佳",
+        summary: "将召唤物移至英雄队伍左侧（与右侧指令面板形成黄金对称），卡片尺寸大幅提升至 88~96px 高清卡，提供完整的血量/护盾/Buff 栏。横屏下 0 挤占战场垂直高度，敌人视野极度开阔。"
+      },
+      2: {
+        title: "方案 2：前哨错位浮岛列 (Tiered Escort Islands)",
+        badge: "🛡️ 层次感强 · 紧凑立体",
+        summary: "在英雄阵列前方上方采用错位交织浮岛排布（Staggered Escort），将召唤物卡片做成带弧形流光边框的半透明悬浮勋章，支持大图标与契约连线，兼顾空间与仪式感。"
+      },
+      3: {
+        title: "方案 3：契约从属插槽 (Master-Servant Bond)",
+        badge: "🔗 逻辑严密 · 连携清晰",
+        summary: "将召唤物作为施法者的‘灵体从属插槽’直接依附在主人卡片上方或侧上方，带有动态契约共鸣光流。直观呈现谁召唤了谁、谁在保护谁。"
+      }
+    };
+
+    // 初始化运行
+    window.addEventListener('DOMContentLoaded', () => {
+      renderAll();
+      window.addEventListener('resize', () => {
+        if (state.showCovenantLine) drawCovenantLines();
+      });
+    });
+
+    // 渲染总调度
+    function renderAll() {
+      renderSchemeIntro();
+      renderEnemies();
+      renderTimeline();
+      renderTacticalHUD();
+      setTimeout(() => {
+        if (state.showCovenantLine) drawCovenantLines();
+      }, 50);
+    }
+
+    // 渲染方案说明
+    function renderSchemeIntro() {
+      const info = SCHEME_DESC[state.currentScheme];
+      const card = document.getElementById('scheme-intro-card');
+      card.innerHTML = `
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-cyan-300 text-xs">${info.title}</span>
+          <span class="text-[9px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-400 border border-cyan-500/40">${info.badge}</span>
+        </div>
+        <p class="text-slate-300 text-[11px] leading-relaxed">${info.summary}</p>
+      `;
+    }
+
+    // 渲染敌方战场
+    function renderEnemies() {
+      const backRow = document.getElementById('enemy-back-row');
+      const frontRow = document.getElementById('enemy-front-row');
+      backRow.innerHTML = '';
+      frontRow.innerHTML = '';
+
+      const activeEnemies = ENEMIES.filter(e => !e.isSummon || state.hasEnemySummon);
+
+      activeEnemies.forEach(enemy => {
+        const isBack = enemy.row === 'back';
+        const card = document.createElement('div');
+        card.className = `flex flex-col items-center group relative cursor-pointer breathe shrink-0 transition-transform duration-300`;
+        card.id = `enemy-box-${enemy.id}`;
+        
+        const avatar = enemy.img 
+          ? `<img src="${enemy.img}" class="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.8)] border border-rose-500/40" />`
+          : `<div class="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center text-4xl drop-shadow-[0_8px_12px_rgba(0,0,0,0.8)]">${enemy.emoji}</div>`;
+
+        const summonTag = enemy.isSummon 
+          ? `<span class="text-[8px] bg-purple-950/90 text-purple-300 border border-purple-500/50 px-1 rounded absolute -bottom-2">召唤物</span>` 
+          : '';
+
+        let chargeHtml = '';
+        if (enemy.maxCharge) {
+          chargeHtml = `<div class="flex gap-1 mt-1">${Array(enemy.maxCharge).fill(0).map((_, i) => `<span class="w-2 h-2 rounded-full ${i < enemy.charge ? 'bg-amber-400 shadow-[0_0_8px_#f59e0b]' : 'bg-slate-800'}"></span>`).join('')}</div>`;
+        }
+
+        card.innerHTML = `
+          <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 text-white/80 text-[10px] bg-black/60 px-2 py-0.5 rounded whitespace-nowrap z-30 pointer-events-none">${enemy.name}</div>
+          <div class="relative">${avatar}${summonTag}</div>
+          <div class="w-14 sm:w-16 h-1.5 bg-slate-950/80 mt-2 rounded-full overflow-hidden border border-slate-700">
+            <div class="h-full bg-rose-500 shadow-[0_0_8px_#f43f5e]" style="width: ${(enemy.hp/enemy.maxHp)*100}%"></div>
+          </div>
+          ${chargeHtml}
+        `;
+        
+        card.onclick = () => selectEntity(enemy);
+
+        if (isBack) backRow.appendChild(card);
+        else frontRow.appendChild(card);
+      });
+    }
+
+    // 渲染左侧时间轴
+    function renderTimeline() {
+      const container = document.getElementById('timeline-list');
+      container.innerHTML = '';
+
+      const queue = [
+        { type: 'summon', ref: SUMMON_POOL[0], label: '守卫' },
+        { type: 'hero', ref: HEROES[0], label: '亚瑟' },
+        { type: 'enemy', ref: ENEMIES[2], label: '战将' },
+        { type: 'summon', ref: SUMMON_POOL[1], label: '猎犬' },
+        { type: 'hero', ref: HEROES[1], label: '雷恩' },
+        { type: 'enemy', ref: ENEMIES[0], label: '玛瑟尔' },
+      ];
+
+      queue.forEach((item, index) => {
+        if (item.type === 'summon' && state.summonCount === 0) return;
+        const isCurrent = index === 0;
+        const div = document.createElement('div');
+        div.className = `relative w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+          isCurrent ? 'ring-2 ring-amber-400 scale-110 shadow-[0_0_15px_#f59e0b]' : 'opacity-70 scale-90'
+        } ${item.type === 'hero' ? 'border-2 border-cyan-400 bg-cyan-950/80' : item.type === 'summon' ? 'border-2 border-sky-400 bg-sky-950/90' : 'border-2 border-rose-500 bg-rose-950/80'}`;
+
+        const icon = item.ref.img 
+          ? `<img src="${item.ref.img}" class="w-full h-full object-cover rounded-full" />`
+          : `<span class="text-sm">${item.ref.emoji}</span>`;
+
+        div.innerHTML = `
+          ${icon}
+          <div class="absolute -bottom-1 -right-1 text-[8px] bg-black/90 px-1 rounded font-mono font-bold text-slate-300">#${index+1}</div>
+          ${item.type === 'summon' ? '<div class="absolute -top-1 -left-1 text-[7px] bg-sky-500 text-black px-1 rounded-full font-bold">召</div>' : ''}
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // ==========================================
+    // 核心：三方案动态渲染 HUD
+    // ==========================================
+    function renderTacticalHUD() {
+      const dock = document.getElementById('tactical-dock');
+      dock.innerHTML = '';
+
+      const activeSummons = SUMMON_POOL.slice(0, state.summonCount);
+
+      if (state.currentScheme === 1) {
+        // ==========================================
+        // 方案 1：左翼战术侍从阵 (Flank Dock) - 宽屏对偶
+        // ==========================================
+        dock.className = "w-full flex flex-col md:flex-row items-end justify-between gap-2.5 pointer-events-none";
+
+        // 1. 左侧：独立战术召唤翼
+        const summonWing = document.createElement('div');
+        summonWing.id = "summon-wing-container";
+        summonWing.className = "flex items-end gap-2 pointer-events-auto bg-slate-950/70 p-2 rounded-2xl border border-sky-500/30 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.8)]";
+        
+        if (activeSummons.length === 0) {
+          summonWing.innerHTML = `<div class="text-[10px] text-slate-500 px-3 py-2">✨ 尚无召唤侍从参战</div>`;
+        } else {
+          activeSummons.forEach(summon => {
+            summonWing.appendChild(buildSummonCard(summon, 'flank'));
+          });
+        }
+
+        // 2. 中间：4 名主力英雄阵列
+        const heroGroup = document.createElement('div');
+        heroGroup.id = "hero-group-container";
+        heroGroup.className = "flex-1 max-w-2xl grid grid-cols-4 gap-1.5 sm:gap-2.5 pointer-events-auto";
+        HEROES.forEach(hero => {
+          heroGroup.appendChild(buildHeroCard(hero));
+        });
+
+        // 3. 右侧：操作指令面板
+        const menuBox = buildMenuContainer();
+
+        dock.appendChild(summonWing);
+        dock.appendChild(heroGroup);
+        dock.appendChild(menuBox);
+
+      } else if (state.currentScheme === 2) {
+        // ==========================================
+        // 方案 2：前哨错位浮岛列 (Tiered Escort Islands)
+        // ==========================================
+        dock.className = "w-full flex items-end justify-between gap-2 sm:gap-3 pointer-events-none";
+
+        const centerCol = document.createElement('div');
+        centerCol.className = "flex-1 max-w-3xl flex flex-col gap-1.5 pointer-events-none";
+
+        // 浮岛召唤行 (错位居中)
+        const summonRow = document.createElement('div');
+        summonRow.id = "escort-summon-row";
+        summonRow.className = "w-full flex justify-center gap-3 sm:gap-4 pointer-events-auto px-4";
+        
+        activeSummons.forEach(summon => {
+          summonRow.appendChild(buildSummonCard(summon, 'island'));
+        });
+
+        // 英雄行
+        const heroGroup = document.createElement('div');
+        heroGroup.className = "w-full grid grid-cols-4 gap-1.5 sm:gap-2.5 pointer-events-auto";
+        HEROES.forEach(hero => {
+          heroGroup.appendChild(buildHeroCard(hero));
+        });
+
+        if (activeSummons.length > 0) centerCol.appendChild(summonRow);
+        centerCol.appendChild(heroGroup);
+
+        const menuBox = buildMenuContainer();
+        dock.appendChild(centerCol);
+        dock.appendChild(menuBox);
+
+      } else if (state.currentScheme === 3) {
+        // ==========================================
+        // 方案 3：契约从属插槽 (Master-Servant Bond)
+        // ==========================================
+        dock.className = "w-full flex items-end justify-between gap-2 sm:gap-3 pointer-events-none";
+
+        const heroGroup = document.createElement('div');
+        heroGroup.className = "flex-1 max-w-3xl grid grid-cols-4 gap-1.5 sm:gap-3 pointer-events-auto items-end";
+
+        HEROES.forEach(hero => {
+          const colWrap = document.createElement('div');
+          colWrap.className = "flex flex-col gap-1.5 items-center";
+
+          // 寻找属于该英雄的召唤物
+          const boundSummons = activeSummons.filter(s => s.ownerId === hero.id);
+          if (boundSummons.length > 0) {
+            boundSummons.forEach(bs => {
+              colWrap.appendChild(buildSummonCard(bs, 'attached'));
+            });
+          }
+
+          colWrap.appendChild(buildHeroCard(hero));
+          heroGroup.appendChild(colWrap);
+        });
+
+        const menuBox = buildMenuContainer();
+        dock.appendChild(heroGroup);
+        dock.appendChild(menuBox);
+      }
+    }
+
+    // ==========================================
+    // 核心组件工厂：生成高清召唤物卡片
+    // ==========================================
+    function buildSummonCard(summon, variant) {
+      const card = document.createElement('div');
+      card.id = `summon-card-${summon.id}`;
+      card.onclick = () => selectEntity(summon);
+
+      const isRich = state.infoLevel === 'rich';
+      const scale = state.cardScale;
+
+      if (variant === 'flank') {
+        // 方案 1 侧翼高清战术卡
+        card.className = `glass-card-summon rounded-xl p-1.5 cursor-pointer relative group transition-all duration-300 shrink-0 flex flex-col items-center breathe-pulse`;
+        card.style.width = isRich ? `${Math.max(88, scale)}px` : `${scale}px`;
+
+        const avatar = summon.img 
+          ? `<img src="${summon.img}" class="w-full h-16 sm:h-18 object-cover rounded-lg shadow-md" />`
+          : `<div class="w-full h-16 sm:h-18 flex items-center justify-center text-3xl bg-slate-900/60 rounded-lg">${summon.emoji}</div>`;
+
+        const shieldText = summon.shield > 0 ? `<span class="text-sky-300 font-mono text-[8px]">(盾${summon.shield})</span>` : '';
+
+        card.innerHTML = `
+          <!-- 头顶标签 -->
+          <div class="w-full flex items-center justify-between text-[9px] font-bold text-sky-300 mb-1 px-0.5">
+            <span class="truncate">${summon.name}</span>
+            <span class="text-[8px] px-1 bg-sky-950/80 rounded border border-sky-400/40 text-sky-200">侍从</span>
+          </div>
+
+          <!-- 立绘头像 -->
+          <div class="w-full relative overflow-hidden rounded-lg mb-1">
+            ${avatar}
+            <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 to-transparent p-0.5 text-[8px] text-slate-300 flex justify-between">
+              <span>${summon.type}</span>
+            </div>
+          </div>
+
+          <!-- 血条与盾条 -->
+          <div class="w-full space-y-0.5">
+            <div class="flex justify-between text-[8px] font-mono font-bold leading-none">
+              <span class="text-slate-400">HP</span>
+              <span class="text-white">${summon.hp} ${shieldText}</span>
+            </div>
+            <div class="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+              <div class="h-full bg-rose-500 shadow-[0_0_8px_#f43f5e]" style="width: ${(summon.hp/summon.maxHp)*100}%"></div>
+            </div>
+          </div>
+
+          <!-- Buff 徽章 -->
+          <div class="w-full flex gap-0.5 mt-1 overflow-x-auto no-scrollbar justify-center">
+            ${summon.buffs.map(b => `<span class="text-[7px] bg-slate-900/90 text-amber-300 px-1 rounded whitespace-nowrap border border-amber-500/30">${b}</span>`).join('')}
+          </div>
+        `;
+
+      } else if (variant === 'island') {
+        // 方案 2 错位前哨浮岛卡
+        card.className = `glass-card-summon rounded-2xl p-2 cursor-pointer relative group transition-all duration-300 shrink-0 flex items-center gap-2 breathe-pulse`;
+        card.style.minWidth = `${Math.max(120, scale * 1.3)}px`;
+
+        const avatar = summon.img 
+          ? `<img src="${summon.img}" class="w-10 h-10 object-cover rounded-xl shadow-md border border-sky-400/50" />`
+          : `<div class="w-10 h-10 flex items-center justify-center text-2xl bg-slate-900/80 rounded-xl border border-sky-400/50">${summon.emoji}</div>`;
+
+        card.innerHTML = `
+          <div class="relative shrink-0">${avatar}</div>
+          <div class="flex-1 min-w-0 flex flex-col justify-center">
+            <div class="flex items-center justify-between text-[9px] font-bold text-sky-300">
+              <span class="truncate">${summon.name}</span>
+              <span class="text-[7px] text-slate-400">${summon.ownerName.slice(0,2)}</span>
+            </div>
+            <div class="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 mt-1">
+              <div class="h-full bg-rose-500 shadow-[0_0_8px_#f43f5e]" style="width: ${(summon.hp/summon.maxHp)*100}%"></div>
+            </div>
+            <div class="text-[8px] font-mono text-slate-300 mt-0.5">${summon.hp}/${summon.maxHp}</div>
+          </div>
+        `;
+
+      } else if (variant === 'attached') {
+        // 方案 3 契约从属依附卡
+        card.className = `glass-card-summon rounded-xl p-1.5 cursor-pointer relative group transition-all duration-300 w-full flex flex-col items-center covenant-glow`;
+
+        const avatar = summon.img 
+          ? `<img src="${summon.img}" class="w-8 h-8 object-cover rounded-lg" />`
+          : `<span class="text-xl">${summon.emoji}</span>`;
+
+        card.innerHTML = `
+          <div class="w-full flex items-center justify-between text-[8px] font-bold text-sky-300">
+            <span class="truncate">${summon.name}</span>
+            <span class="text-[7px] bg-sky-950 px-1 rounded text-sky-200">契约护卫</span>
+          </div>
+          <div class="flex items-center gap-1.5 w-full mt-1">
+            <div class="shrink-0">${avatar}</div>
+            <div class="flex-1 min-w-0">
+              <div class="w-full h-1 bg-slate-950 rounded-full overflow-hidden">
+                <div class="h-full bg-rose-500" style="width: ${(summon.hp/summon.maxHp)*100}%"></div>
+              </div>
+              <div class="text-[7px] font-mono text-slate-400 mt-0.5">${summon.hp} HP</div>
+            </div>
+          </div>
+        `;
+      }
+
+      return card;
+    }
+
+    // ==========================================
+    // 英雄卡片组件
+    // ==========================================
+    function buildHeroCard(hero) {
+      const card = document.createElement('div');
+      card.id = `hero-card-${hero.id}`;
+      card.className = `bg-slate-950/95 border border-slate-700/80 rounded-xl overflow-hidden shadow-2xl relative transition-all duration-300 hover:border-cyan-500/70 hover:scale-[1.01] cursor-pointer`;
+      card.onclick = () => selectEntity(hero);
+
+      const shieldText = hero.shield > 0 ? `<span class="text-sky-300 text-[8px]">(盾${hero.shield})</span>` : '';
+
+      card.innerHTML = `
+        <div class="w-full h-14 sm:h-18 relative bg-slate-900 border-b border-slate-800 overflow-hidden">
+          <img src="${hero.img}" class="w-full h-full object-cover opacity-85" />
+          <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent"></div>
+          <div class="absolute top-1 left-1.5 right-1.5 flex justify-between items-center text-[10px] sm:text-xs font-bold text-white z-10 text-outline">
+            <span>${hero.name}</span>
+            <span class="text-[8px] px-1 py-0.2 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-500/40">${hero.class}</span>
+          </div>
+        </div>
+        <div class="p-1.5 space-y-1">
+          <!-- HP -->
+          <div class="space-y-0.5">
+            <div class="flex justify-between text-[8px] font-mono font-bold leading-none">
+              <span class="text-amber-400">HP</span>
+              <span class="text-slate-200">${hero.hp} ${shieldText}</span>
+            </div>
+            <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+              <div class="h-full bg-amber-400 shadow-[0_0_6px_#fbbf24]" style="width: ${(hero.hp/hero.maxHp)*100}%"></div>
+            </div>
+          </div>
+          <!-- MP / TP -->
+          <div class="grid grid-cols-2 gap-1 pt-0.5">
+            <div>
+              <div class="flex justify-between text-[7px] font-mono font-bold text-cyan-400 leading-none mb-0.5">
+                <span>MP</span><span>${hero.mp}</span>
+              </div>
+              <div class="w-full h-1 bg-slate-900 rounded-full overflow-hidden"><div class="h-full bg-cyan-400" style="width: ${(hero.mp/hero.maxMp)*100}%"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-[7px] font-mono font-bold text-emerald-400 leading-none mb-0.5">
+                <span>TP</span><span>${hero.tp}</span>
+              </div>
+              <div class="w-full h-1 bg-slate-900 rounded-full overflow-hidden"><div class="h-full bg-emerald-400" style="width: ${(hero.tp/hero.maxTp)*100}%"></div></div>
+            </div>
+          </div>
+        </div>
+      `;
+      return card;
+    }
+
+    // ==========================================
+    // 指令菜单组件
+    // ==========================================
+    function buildMenuContainer() {
+      const menu = document.createElement('div');
+      menu.id = "menu-box";
+      menu.className = "w-[200px] sm:w-[220px] h-[155px] bg-slate-950/95 backdrop-blur-xl rounded-xl border border-slate-700/80 border-t-2 border-t-cyan-500 flex flex-col overflow-hidden shadow-[0_15px_35px_rgba(0,0,0,0.9)] pointer-events-auto shrink-0";
+      menu.innerHTML = `
+        <div class="text-center text-[10px] py-1 text-cyan-300 bg-white/5 font-bold tracking-wider border-b border-white/10 uppercase">
+          ⚔️ 战术行动指令
+        </div>
+        <div class="flex-1 flex flex-col p-1.5 gap-1 justify-center bg-slate-900/50">
+          <button onclick="showActionLog('普攻攻击')" class="w-full py-1 px-2.5 bg-slate-900 hover:bg-cyan-950 border border-slate-700 hover:border-cyan-500/60 rounded text-xs font-bold text-slate-200 hover:text-cyan-300 transition-all flex items-center gap-1.5">
+            <span class="text-rose-400">⚔️</span> 普攻攻击
+          </button>
+          <button onclick="showActionLog('释放技能')" class="w-full py-1 px-2.5 bg-gradient-to-r from-cyan-950 to-slate-900 border border-cyan-500/60 rounded text-xs font-bold text-white shadow-sm hover:scale-[1.01] transition-all flex items-center gap-1.5">
+            <span class="text-cyan-400">⚡</span> 释放技能
+          </button>
+          <button onclick="showActionLog('防御姿态')" class="w-full py-1 px-2.5 bg-slate-900 hover:bg-emerald-950 border border-slate-700 hover:border-emerald-500/60 rounded text-xs font-bold text-slate-200 hover:text-emerald-300 transition-all flex items-center gap-1.5">
+            <span class="text-emerald-400">🛡️</span> 防御姿态
+          </button>
+        </div>
+      `;
+      return menu;
+    }
+
+    // ==========================================
+    // 动态绘制契约共鸣光流连线 (SVG)
+    // ==========================================
+    function drawCovenantLines() {
+      const svg = document.getElementById('covenant-svg-layer');
+      if (!svg) return;
+      svg.innerHTML = '';
+      if (!state.showCovenantLine || state.summonCount === 0) return;
+
+      const activeSummons = SUMMON_POOL.slice(0, state.summonCount);
+      const stageRect = document.getElementById('game-stage').getBoundingClientRect();
+
+      activeSummons.forEach(summon => {
+        const sCard = document.getElementById(`summon-card-${summon.id}`);
+        const hCard = document.getElementById(`hero-card-${summon.ownerId}`);
+        if (!sCard || !hCard) return;
+
+        const sRect = sCard.getBoundingClientRect();
+        const hRect = hCard.getBoundingClientRect();
+
+        const x1 = (sRect.left + sRect.width / 2) - stageRect.left;
+        const y1 = (sRect.top + sRect.height / 2) - stageRect.top;
+        const x2 = (hRect.left + hRect.width / 2) - stageRect.left;
+        const y2 = (hRect.top + hRect.height / 2) - stageRect.top;
+
+        // 贝塞尔曲线
+        const cx = (x1 + x2) / 2;
+        const cy = Math.min(y1, y2) - 30;
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', '#38bdf8');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('stroke-opacity', '0.65');
+        path.setAttribute('class', 'covenant-link-line');
+        svg.appendChild(path);
+      });
+    }
+
+    // ==========================================
+    // 交互与状态控制函数
+    // ==========================================
+    function setScheme(num) {
+      state.currentScheme = num;
+      for (let i = 1; i <= 3; i++) {
+        const btn = document.getElementById(`tab-scheme-${i}`);
+        if (i === num) {
+          btn.className = "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md border border-cyan-400 whitespace-nowrap flex items-center gap-1.5";
+        } else {
+          btn.className = "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all text-slate-400 hover:text-white hover:bg-white/5 whitespace-nowrap flex items-center gap-1.5";
+        }
+      }
+      renderAll();
+    }
+
+    function setViewport(vp) {
+      state.viewport = vp;
+      const stage = document.getElementById('game-stage');
+      const infoText = document.getElementById('vp-info-text');
+
+      const buttons = ['pc-wide', 'laptop', 'ipad-land', 'mobile', 'fullscreen'];
+      buttons.forEach(b => {
+        const el = document.getElementById(`vp-${b}`);
+        if (el) {
+          if (b === vp) el.className = "px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/50 font-mono font-bold";
+          else el.className = "px-1.5 py-0.5 rounded hover:bg-white/10 text-slate-300 font-mono";
+        }
+      });
+
+      if (vp === 'pc-wide') {
+        stage.style.width = '1180px'; stage.style.height = '680px';
+        infoText.innerText = '1080P 横屏 (1180 × 680 缩放标准)';
+      } else if (vp === 'laptop') {
+        stage.style.width = '960px'; stage.style.height = '580px';
+        infoText.innerText = '笔记本横屏 (960 × 580)';
+      } else if (vp === 'ipad-land') {
+        stage.style.width = '840px'; stage.style.height = '620px';
+        infoText.innerText = '平板横屏 (840 × 620)';
+      } else if (vp === 'mobile') {
+        stage.style.width = '390px'; stage.style.height = '740px';
+        infoText.innerText = '手机竖屏 (390 × 740)';
+      } else if (vp === 'fullscreen') {
+        stage.style.width = '100%'; stage.style.height = '100%';
+        infoText.innerText = '自由全屏自适应 (100% × 100%)';
+      }
+
+      setTimeout(renderAll, 100);
+    }
+
+    function setSummonCount(n) {
+      state.summonCount = n;
+      document.getElementById('summon-count-badge').innerText = `${n} 只 (${n===0?'无':n===1?'星界守卫':n===2?'守卫+猎犬':n===3?'守卫+猎犬+妖精':'4只满编'})`;
+      
+      const btns = document.querySelectorAll('.btn-sc');
+      btns.forEach((btn, idx) => {
+        if (idx === n) btn.className = "btn-sc py-1 text-xs rounded bg-cyan-950 text-cyan-300 border border-cyan-500/60 font-bold";
+        else btn.className = "btn-sc py-1 text-xs rounded border border-slate-700 hover:bg-slate-800 text-slate-400";
+      });
+
+      renderAll();
+    }
+
+    function toggleEnemySummon() {
+      state.hasEnemySummon = document.getElementById('chk-enemy-summon').checked;
+      renderEnemies();
+    }
+
+    function toggleCovenantLines() {
+      state.showCovenantLine = document.getElementById('chk-covenant-line').checked;
+      drawCovenantLines();
+    }
+
+    function updateCardScale(val) {
+      state.cardScale = parseInt(val);
+      document.getElementById('scale-val-text').innerText = `${val} px`;
+      renderTacticalHUD();
+      if (state.showCovenantLine) drawCovenantLines();
+    }
+
+    function setInfoLevel(lvl) {
+      state.infoLevel = lvl;
+      document.getElementById('btn-info-rich').className = lvl === 'rich' ? 'py-1 px-2 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/50 text-[11px] font-bold' : 'py-1 px-2 rounded hover:bg-slate-800 text-slate-400 border border-slate-700 text-[11px]';
+      document.getElementById('btn-info-compact').className = lvl === 'compact' ? 'py-1 px-2 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/50 text-[11px] font-bold' : 'py-1 px-2 rounded hover:bg-slate-800 text-slate-400 border border-slate-700 text-[11px]';
+      renderTacticalHUD();
+    }
+
+    function toggleSidePanel() {
+      const p = document.getElementById('side-panel');
+      p.classList.toggle('hidden');
+    }
+
+    function resetSettings() {
+      state.currentScheme = 1;
+      state.summonCount = 2;
+      state.cardScale = 88;
+      state.infoLevel = 'rich';
+      state.showCovenantLine = true;
+      document.getElementById('slider-card-scale').value = 88;
+      setScheme(1);
+    }
+
+    function selectEntity(entity) {
+      state.selectedEntityId = entity.id;
+      showActionLog(`选中目标：【${entity.name}】`);
+    }
+
+    function showActionLog(text) {
+      const log = document.getElementById('stage-log-text');
+      log.innerText = text;
+    }
+
+    function simulateSkillCast() {
+      showActionLog('🌟 星咏者·希尔 吟唱【星界召唤】· 唤醒远古魔偶！');
+      if (state.summonCount < 4) setSummonCount(state.summonCount + 1);
+    }
+
+    function simulateHitDamage() {
+      if (state.summonCount > 0) {
+        const s = SUMMON_POOL[0];
+        s.hp = Math.max(200, s.hp - 450);
+        showActionLog(`💥 星界守卫替主人承受 450 点重击伤害！(剩余 HP ${s.hp})`);
+        renderTacticalHUD();
+      }
+    }
+  </script>
+</body>
+</html>
