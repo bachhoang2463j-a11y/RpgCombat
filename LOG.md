@@ -2169,3 +2169,20 @@
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：降低召唤物在场时的交互负担，使契约召唤物的挡刀与受击反应完全自动化，大幅提升战斗流畅度与战斗沉浸感。
 
+## [LOG-179] 2026-08-28 — 右上角按钮与敌人死亡旁白
+
+- **变更行为**：
+  1. **右上角按钮层级（`index.html:1630`）**：`z-50` → `z-[115]`，高于 `z-[110]` 起始屏，确保环境数据读取完成前全屏/记录按钮仍可点击。
+  2. **敌人死亡旁白（`index.html:11422/14595`）**：保留死亡击杀特写与飘字不变，新增 `handleEnemyDeathSpeak` 守卫（`enemyAutoSpeak/on+isWise 双关、aliveWise 存在检查`），敌人被击杀后由同场存活智慧敌按 `getEnemyTier` 最高阶触发一句临别台词。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：补齐 `005a9ad..54c6c72` 未落盘的已上线行为；按钮遮挡为交互阻断回归，死亡旁白按主视角权威收敛叙事。
+
+## [LOG-180] 2026-08-28 — LLM 设置窗口角色人设可见性与仅出战载入修复
+
+- **变更行为**：
+  1. **可见性修复（`index.html:1803/1842`）**：`panel-body` 补 `custom-scrollbar`；`#character-prompts-details` 去 `overflow:hidden` 改 `flex-shrink:0` 并默认 `open`、补 `summary border-bottom`。真因：父容器纵向 `flex+overflow-y:auto` 且内容溢出时，带 `overflow:hidden` 的子项 `min-height` 归零被压缩为 2px，`open` 无法自救。
+  2. **仅出战载入（`index.html:13921/14598`）**：`callLLMAPI` 优先 `readRoster()` 的持久化 `rpg_combat_roster`（`chat` 变量），回退 `heroesData`，`Set` 精确匹配 `presets[activePreset].characterPrompts`，仅对出战名增量注入 `【出战角色补充人设】`，未出战/临时队友仅走全局 `systemPrompt`。
+  3. **预设与持久化（`index.html:13803/13984/14006`）**：`defaultPreset/llmState.presets` 补 `characterPrompts:[]`，`initLLMPresets` 迁移旧存档，`collect/render/add/removeCharacterPrompt` 与 `switchLLMPreset/saveLLMSettings` 全链路贯通，`persistLLMSettings` 经 `presets` 落盘。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`、`README.md`。
+- **决策原因**：用户反馈 LLM 设置中新增的 `🎭 角色人设提示词` 在线不显示且需按持久化出战名单精准载入；在 `http://127.0.0.1:8000` 真机测量定位到 flex 压缩真因并修复，补齐此轮与 `54c6c72` 遗漏的日志。
+
