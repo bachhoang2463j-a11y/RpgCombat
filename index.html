@@ -9247,6 +9247,38 @@ CombatEvents.on(EVENTS.TURN_END, (ctx) => {
 }, 5);
 
 // ==========================================
+// 召唤/阵营辅助（isSummon 统一判定）
+// ==========================================
+function isHeroSideEntity(e) { return e?.isSummon ? e.side === 'hero' : (e?.id || '').startsWith('h'); }
+function isSingleTargetSkill(skill) {
+    if (!skill) return true;
+    return ![skill.type, skill.type2, skill.type3].some(t => t && String(t).includes('群'));
+}
+async function tryAutoSummonGuard(sheshenCandidates, target) {
+    if (!sheshenCandidates || !sheshenCandidates.length || !target || target.isSummon) return null;
+    const pick = sheshenCandidates.find(c => c.skill && c.skill._ownerOnly && c.hero && c.hero.isSummon && c.hero.summonOwnerId === target.id);
+    if (!pick) return null;
+    const guardian = pick.hero;
+    const gSkill = pick.skill;
+    guardian.mp -= gSkill.cost || 0;
+    if (gSkill.hpCost) guardian.hp -= gSkill.hpCost;
+    if (gSkill.tpCost) guardian.tp -= gSkill.tpCost;
+    if ((gSkill.cost || 0) > 0 && typeof notifyManaSpent === 'function') notifyManaSpent(guardian, gSkill.cost);
+    const realSkill = guardian.skills.find(s => s.name === gSkill.name);
+    if (realSkill && realSkill.maxUses > 0) realSkill.usesRemaining = Math.max(0, (realSkill.usesRemaining ?? realSkill.maxUses) - 1);
+    if (typeof updateHeroUI === 'function') updateHeroUI(guardian);
+    if (typeof addHistory === 'function') addHistory(`   🛡️ ${guardian.name} 施展【${gSkill.name}】舍身护佑，替 ${target.name} 承受攻击！(自动)`);
+    const guardianDom = document.getElementById(`hero-card-${guardian.id}`);
+    if (guardianDom) {
+        if (window.spawnFocusOverlay) window.spawnFocusOverlay(guardianDom, 600);
+        const gRect = guardianDom.getBoundingClientRect();
+        if (window.spawnChargeUpParticles) window.spawnChargeUpParticles(gRect.left + gRect.width / 2, gRect.top + gRect.height / 2, '#38bdf8', 480);
+    }
+    await sleep(520);
+    return { guardian, skill: gSkill };
+}
+
+// ==========================================
 // 【看破】战略中断系统 (Kanpo Interrupt System)
 // ==========================================
 function shelvePrompt(overlay, reopenId, label) {
@@ -9819,6 +9851,8 @@ async function playPowerCounterEffect(counter, victim, counterDom) {
 }
 
 async function checkKanpoInterrupt(ctx) {
+    // 【召唤】0弹窗：敌单体打召唤物时跳过看破（群攻不跳过，避免 AOE 随机 primaryTarget 为召唤物时误屏蔽）
+    if (ctx.target && ctx.target.isSummon && isSingleTargetSkill(ctx.skill)) return;
     // 看破过滤（可开关，编辑器「战斗全局设置」配置，默认开启阈值 100）：
     // 敌方技能所有标签 power 最大值 ≤ 阈值时直接跳过看破，不弹窗（避免弹窗过于频繁）
     if (defendSettings.kanpoFilterEnabled) {
@@ -10057,6 +10091,30 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
         return { dodged: false, guardian: null, usedSheshen: false };
     }
 
+    // 【召唤】0弹窗：我方召唤物被攻击时自动执行首个可用反应，不弹窗
+    const isSummonTarget = !!target.isSummon && target.side === 'hero';
+    if (isSummonTarget) {
+        // 召唤物目标不接受舍身（本分支由调用方已置空），仅自动反应
+        if (reactionSkills.length > 0) {
+            const autoSkill = reactionSkills[0];
+            const buffsBefore = [...(target.buffs || [])];
+            await executeSkillAction(target, caster, autoSkill, 1, true);
+            await sleep(400);
+            const newlyAddedEvaBuff = (target.buffs || []).find(b => b.type === 'eva' && !buffsBefore.includes(b));
+            if (newlyAddedEvaBuff) {
+                const pureReactionEva = Math.max(1, newlyAddedEvaBuff.value);
+                const latestCStats = getEffectiveStats(caster);
+                const latestAttackerHitCap = Math.max(1, (hitChance !== undefined ? hitChance : 100) + latestCStats.hit);
+                const dodged = Math.floor(Math.random() * pureReactionEva) + 1 > Math.floor(Math.random() * latestAttackerHitCap) + 1;
+                if (newlyAddedEvaBuff.isConsumable) target.buffs = target.buffs.filter(b => b !== newlyAddedEvaBuff);
+                if (targetType === 'hero') updateHeroUI(target); else updateEnemyUI(target);
+                return { dodged, guardian: null, usedSheshen: false };
+            }
+            return { dodged: false, guardian: null, usedSheshen: false };
+        }
+        return { dodged: false, guardian: null, usedSheshen: false };
+    }
+
     let chosen = null;
     if (targetType === 'hero') {
         // 我方角色：弹出合并面板（反应 + 舍身）让玩家手动选择
@@ -10192,8 +10250,9 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         // 【舍身】候选收集：目标闪避失败后，我方其他存活角色可用舍身技能替其承受本次攻击。
         // 仅限单体攻击（群攻 v1 不触发）；屏障在场时攻击被屏障归集命中屏障伪目标、不会进入此处。
         // 【召唤】owner-only：_ownerOnly 的舍身仅在守护者为目标的 owner 时有效，且仅在单体致死场景下纳入
+        // 【召唤】0弹窗：召唤物被攻击时不收集舍身；英雄【舍身】不得以召唤物为对象
         let sheshenCandidates = [];
-        if (targetType === 'hero' && !tag.includes('群')) {
+        if (targetType === 'hero' && !tag.includes('群') && !target.isSummon) {
             heroesData.filter(h => h.isAlive && h.id !== target.id).forEach(guardian => {
                 (guardian.skills || []).forEach(s => {
                     const sheshenTarget = getSheshenTarget(s);
@@ -10206,28 +10265,41 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
                     if (s.maxUses > 0 && (s.usesRemaining ?? s.maxUses) <= 0) return;
                     // 类型匹配（同看破的 includes 双向匹配）
                     if (sheshenTarget !== 'all' && !incomingDamageType.includes(sheshenTarget) && !sheshenTarget.includes(incomingDamageType)) return;
-                    // 【召唤】替主挡死：仅在"单体且若命中则致死"的场景下纳入该 owner 召唤物
+                    // 【召唤】替主挡死：仅damage类才可能致死，非damage的驱散等无需挡
                     if (s._ownerOnly) {
-                        // 仅damage类才可能致死，非damage的驱散等无需挡
                         if (!isDamage) return;
-                        // 估算是否致死：用与当前伤害管线同口径的粗估（此处预估不含屏障泄漏，宁可少挡不少误挡）
-                        // 若目标当前HP为0以下已死则必挡；否则保守放行（让 intercept 决策）
                     }
                     sheshenCandidates.push({ hero: guardian, skill: s });
                 });
             });
         }
 
-        // 拦截判定：目标自身反应技能 +（可选）其他角色舍身候选 合并弹窗
-        const intercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, sheshenCandidates, isDamage, isPierce, multiplier);
-        if (intercept.usedSheshen && intercept.guardian) {
+        // 【召唤】自动舍身：owner 初次闪避失败后，owner 的召唤物自动插入挡刀（不弹窗），伤害直转召唤物
+        let autoGuardInfo = null;
+        if (targetType === 'hero' && !target.isSummon && sheshenCandidates.length > 0) {
+            autoGuardInfo = await tryAutoSummonGuard(sheshenCandidates, target);
+            if (autoGuardInfo && autoGuardInfo.guardian) {
+                target = autoGuardInfo.guardian;
+                targetDom = getEntitySpriteDom(target) || document.getElementById(`hero-card-${target.id}`);
+                const guardianIntercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, [], isDamage, isPierce, multiplier);
+                if (guardianIntercept.dodged) isDodged = true;
+            }
+        }
+        let intercept = null;
+        const skipOwnerIntercept = !!(autoGuardInfo && autoGuardInfo.guardian);
+        if (!skipOwnerIntercept) {
+            // 拦截判定：目标自身反应技能 + 其他角色舍身候选合并弹窗；_ownerOnly 的召唤守护已自动处理，不再进入弹窗
+            const filteredForPrompt = sheshenCandidates.filter(c => !c.skill._ownerOnly);
+            intercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, filteredForPrompt, isDamage, isPierce, multiplier);
+        }
+        if (intercept && intercept.usedSheshen && intercept.guardian) {
             // 【舍身】生效：受击目标切换为守护者（跳过闪避、必中），后续管线对守护者完整结算，原目标毫发无伤
             target = intercept.guardian;
             targetDom = document.getElementById(`hero-card-${target.id}`);
             // 守护者自身也可用反应技化解本次攻击（不再提供舍身候选，避免连锁舍身）
             const guardianIntercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, [], isDamage, isPierce, multiplier);
             if (guardianIntercept.dodged) isDodged = true;
-        } else if (intercept.dodged) {
+        } else if (intercept && intercept.dodged) {
             isDodged = true;
         }
     }
@@ -10874,10 +10946,14 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     let _summonDone = false;
     if (skill.summonTarget && !isReactionTrigger) {
         showLog(`${caster.name} 施展了【${skill.name}】！`);
-        if (!isReactionTrigger && caster.id.startsWith('e') && !(skill && skill.skipKanpoWindow)) {
-            const kanpoCtx2 = { caster, skill, target: primaryTarget, cancelled: false };
-            await CombatEvents.emitAsync(EVENTS.BEFORE_SKILL_RESOLVE, kanpoCtx2);
-            if (kanpoCtx2.cancelled) { addHistory(`   ⛔ 召唤【${skill.name}】被看破破局，完全无效化！`); return; }
+        if (!isReactionTrigger && !isHeroSideEntity(caster) && !(skill && skill.skipKanpoWindow)) {
+            // 【召唤】0弹窗：敌单体打召唤物时跳过看破
+            const _skipKanpoSummon = primaryTarget && primaryTarget.isSummon && isSingleTargetSkill(skill);
+            if (!_skipKanpoSummon) {
+                const kanpoCtx2 = { caster, skill, target: primaryTarget, cancelled: false };
+                await CombatEvents.emitAsync(EVENTS.BEFORE_SKILL_RESOLVE, kanpoCtx2);
+                if (kanpoCtx2.cancelled) { addHistory(`   ⛔ 召唤【${skill.name}】被看破破局，完全无效化！`); return; }
+            }
         }
         // 召唤成功再发 TURN_END，避免看破取消时误触
         CombatEvents.emit(EVENTS.TURN_END, { entity: caster, skill, isReactionTrigger });
@@ -10889,11 +10965,14 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         if (_onlySummon) return;
     }
     if (!_summonDone) {
-        // 看破窗口：已召唤过则跳过（避免二次看破弹窗），否则走常规敌方看破
-        if (!isReactionTrigger && caster.id.startsWith('e') && !(skill && skill.skipKanpoWindow)) {
-            const kanpoCtx = { caster, skill, target: primaryTarget, cancelled: false };
-            await CombatEvents.emitAsync(EVENTS.BEFORE_SKILL_RESOLVE, kanpoCtx);
-            if (kanpoCtx.cancelled) { addHistory(`   ⛔ 技能【${skill.name}】被看破破局，完全无效化！`); return; }
+        // 看破窗口：已召唤过则跳过（避免二次看破弹窗），否则走常规敌方看破；敌召唤物发技能仍可被看破
+        if (!isReactionTrigger && !isHeroSideEntity(caster) && !(skill && skill.skipKanpoWindow)) {
+            const _skipKanpo = primaryTarget && primaryTarget.isSummon && isSingleTargetSkill(skill);
+            if (!_skipKanpo) {
+                const kanpoCtx = { caster, skill, target: primaryTarget, cancelled: false };
+                await CombatEvents.emitAsync(EVENTS.BEFORE_SKILL_RESOLVE, kanpoCtx);
+                if (kanpoCtx.cancelled) { addHistory(`   ⛔ 技能【${skill.name}】被看破破局，完全无效化！`); return; }
+            }
         }
         CombatEvents.emit(EVENTS.TURN_END, { entity: caster, skill, isReactionTrigger });
     } else {
