@@ -2186,3 +2186,12 @@
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`、`README.md`。
 - **决策原因**：用户反馈 LLM 设置中新增的 `🎭 角色人设提示词` 在线不显示且需按持久化出战名单精准载入；在 `http://127.0.0.1:8000` 真机测量定位到 flex 压缩真因并修复，补齐此轮与 `54c6c72` 遗漏的日志。
 
+
+## [LOG-181] 2026-08-28 — 手动前后排 [前排]/[后排] 与 Hook 协定 AGENTS.md
+
+- **变更行为**：
+  1. **手动前后排双写入点（`index.html:6875/7109/7218/7266/7715`）**：`parseEnemyItem` 新增 `allTags` 扫描 `allTags.includes('[后排]') / '[前排]'` 识别手动标签（名字或属性栏均可，后排优先、同串命中后排优先），写入 `row/_manualRow`；`assignEnemyRows` 重构为“手动优先 + 最高阶锚后排居中 + 输入序”——先算 `tier`，已全量含 `_rowOrder` 则幂等跳过，仅从未指定池按 `rankOf` 挑锚点设 `back+_anchor`，剩余按输入序补齐至 `ceil(N/2)`，后排锚定首领移至 `ceil(nBack/2)` 居中位，其余后排/前排保持输入序并写入 `_rowOrder` 供渲染排序；严格尊重手动溢出不纠正。
+  2. **召唤与兜底尊重手动（`index.html:7218/7266/7715`）**：`summonFromWorldbook` 与 `flushPendingSummons` 对敌方召唤若未手动 `row` 则默认 `front+_rowOrder=999`，已手动则保留；`initUI`/`renderEnemyFormation` 兜底条件扩展为 `!row || _rowOrder===undefined`，渲染时 `back/front` 分别按 `_rowOrder` 排序，避免保存后闪排与召唤盖掉手动布局。
+  3. **Hook 协定 AGENTS.md（新增文件）**：新增 `AGENTS.md` 强制协定——禁止自行改 `matcher`、白名单仅工具名 `|` 拼接、落盘前 `new RegExp(matcher)` + 长度/换行/`<<|cat >|/tmp/|import re` 双重校验、命令与匹配分离（脚本走 `command/args`，精确过滤在 `$TOOL_INPUT` 内判断）、写入后严格 JSON 校验；并固化备份与一键回退路径，封堵 `cat > /tmp/step2_writer.py << 'PY' ...` 误填 `matcher` 致 `Invalid regular expression` 复发。
+- **涉及文件**：`index.html`、`AGENTS.md`、`LOG.md`、`LOG-INDEX.md`、`README.md`。
+- **决策原因**：用户要求前后排可在 YAML/属性栏手动指定且严格尊重手动，锚定与排序需确定性无随机；同时历史曾出现 `matcher` 被误填多行 shell 致校验阻塞，需以持久化协定封口并纳入两步提交闭环。
