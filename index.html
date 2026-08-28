@@ -92,7 +92,7 @@
 
     /* ==== Style 2 近战：居合一闪·残影定格 ==== */
     @keyframes s2-hero-blur-dash {
-      0% { transform: translate3d(-50%, -50%, 0) translateX(-60vw) scale(0.7); opacity: 0; filter: blur(25px); }
+      0% { transform: translate3d(-50%, -50%, 0) translateX(-60vw) scale(0.7); opacity: 0; filter: blur(15px); }
       15% { transform: translate3d(-50%, -50%, 0) translateX(-10vw) scale(1.1); opacity: 1; filter: blur(0); }
       35% { transform: translate3d(-50%, -50%, 0) translateX(25vw) scale(1); opacity: 1; }
       75% { transform: translate3d(-50%, -50%, 0) translateX(25vw) scale(1); opacity: 1; }
@@ -2568,7 +2568,7 @@ async function playExecutionAnimation(hero, killedEnemies, damageType) {
                 splatItems += `
                     <div class="absolute pointer-events-none opacity-0 z-40"
                          style="${p.top ? `top:${p.top};` : ''} ${p.left ? `left:${p.left};` : ''} ${p.right ? `right:${p.right};` : ''} width:140px; height:140px; --splat-rot:${p.rot}deg; animation: blood-splat-burst 1.1s ${p.delay} cubic-bezier(0.12, 0.85, 0.25, 1) both; will-change: transform, opacity;">
-                        <svg viewBox="0 0 100 100" class="w-full h-full fill-red-800 drop-shadow-[0_0_10px_#580c0c]" style="filter: drop-shadow(0 0 8px #3f0000);">
+                        <svg viewBox="0 0 100 100" class="w-full h-full fill-red-800" style="filter: drop-shadow(0 0 8px #3f0000);">
                             <path d="${path}" />
                             <circle cx="85" cy="20" r="4.5" class="fill-red-700"/>
                             <circle cx="15" cy="88" r="4" class="fill-red-900"/>
@@ -2819,6 +2819,8 @@ class CanvasFxEngine {
         this.particles = [];
         this.animationFrameId = null;
         this.hitStop = 0; // 定帧剩余毫秒：>0 时粒子冻结，制造重击顿挫感
+        this.lastFrameTime = 0; // 上一帧时间戳：用于计算真实帧间隔 dt
+        this.lastDt = 16.7;     // 最近一帧的真实间隔（毫秒），供雷电 overlay 等外部特效对齐
         this.init();
     }
 
@@ -2851,6 +2853,8 @@ class CanvasFxEngine {
 
     startLoop() {
         if (!this.animationFrameId) {
+            // 重置时间戳，避免空闲后重启的首帧因间隔过大而跳变（配合 update 内 33ms 上限钳制）
+            this.lastFrameTime = 0;
             const loop = () => {
                 this.update();
                 this.draw();
@@ -2865,25 +2869,34 @@ class CanvasFxEngine {
     }
 
     update() {
+        // Delta-time：按真实帧间隔推进动画，速度与 FPS 解耦（高刷屏不加速、掉帧不减速）
+        // dt 上限 33ms：标签页休眠/卡顿后恢复时防止粒子瞬移跳变
+        const now = performance.now();
+        const dt = this.lastFrameTime ? Math.min(now - this.lastFrameTime, 33) : 16.7;
+        this.lastDt = dt;
+        this.lastFrameTime = now;
+        const k = dt / 16.7; // 归一化时间系数：1 = 60fps 基准步长
+
         // Hit Stop 定帧：命中瞬间冻结粒子若干毫秒，制造"重击砸进肉里"的顿挫落差
         if (this.hitStop > 0) {
-            this.hitStop -= 16.7;
+            this.hitStop -= dt;
             return;
         }
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
-            p.age += 16.7; // 假设每帧约16.7毫秒
-            
-            p.x += p.vx;
-            p.y += p.vy;
-            
-            if (p.gravity) p.vy += p.gravity;
+            p.age += dt;
+
+            p.x += p.vx * k;
+            p.y += p.vy * k;
+
+            if (p.gravity) p.vy += p.gravity * k;
             if (p.drag) {
-                p.vx *= p.drag;
-                p.vy *= p.drag;
+                const d = Math.pow(p.drag, k); // 阻尼按时间比例复合衰减
+                p.vx *= d;
+                p.vy *= d;
             }
             if (p.update) p.update(p);
-            
+
             if (p.age >= p.life) {
                 this.particles.splice(i, 1);
             }
@@ -3041,6 +3054,8 @@ function drawHeroChargeLightningSegment(ctx, x1, y1, x2, y2, displace, intensity
 }
 
 function drawHeroChargeLightningOverlay(ctx) {
+    // 时间系数 k：与 fxEngine 的真实帧间隔对齐（1 = 60fps 基准），保证高刷屏/掉帧时过渡速度稳定
+    const k = ((typeof fxEngine !== 'undefined' && fxEngine && fxEngine.lastDt) ? fxEngine.lastDt : 16.7) / 16.7;
     heroChargeEffects.forEach((fx, heroId) => {
         if (fx.state === 'idle' && fx.intensity <= 0.01 && fx.sparks.length === 0) return;
         const cardEl = document.getElementById(`hero-card-${heroId}`);
@@ -3059,13 +3074,13 @@ function drawHeroChargeLightningOverlay(ctx) {
             cardEl.classList.remove('charge-glow-cyan', 'charge-glow-purple');
         }
 
-        fx.intensity += (fx.targetIntensity - fx.intensity) * 0.1;
-        fx.colorFactor += (fx.targetColorFactor - fx.colorFactor) * 0.08;
+        fx.intensity += (fx.targetIntensity - fx.intensity) * 0.1 * k;
+        fx.colorFactor += (fx.targetColorFactor - fx.colorFactor) * 0.08 * k;
         fx.frameCount++;
 
         if (fx.state === 'burst') {
-            fx.burstScale += 0.08;
-            fx.burstAlpha -= 0.06;
+            fx.burstScale += 0.08 * k;
+            fx.burstAlpha -= 0.06 * k;
             if (fx.burstAlpha <= 0) {
                 fx.state = 'idle';
                 fx.targetIntensity = 0;
@@ -3131,7 +3146,7 @@ function drawHeroChargeLightningOverlay(ctx) {
                 ctx.arc(cx, cy, (rect.width / 2) + fx.shockwaveRadius, 0, Math.PI * 2);
                 ctx.stroke();
                 ctx.restore();
-                fx.shockwaveRadius += 3.5;
+                fx.shockwaveRadius += 3.5 * k;
                 if (fx.shockwaveRadius > 60) fx.shockwaveRadius = 0;
             }
         }
@@ -3163,7 +3178,7 @@ function drawHeroChargeLightningOverlay(ctx) {
         // 更新并渲染 Sparks
         for (let i = fx.sparks.length - 1; i >= 0; i--) {
             const p = fx.sparks[i];
-            p.x += p.vx; p.y += p.vy; p.life -= p.decay;
+            p.x += p.vx * k; p.y += p.vy * k; p.life -= p.decay * k;
             if (p.life <= 0) { fx.sparks.splice(i, 1); continue; }
             ctx.fillStyle = p.color;
             ctx.globalAlpha = p.life * fx.burstAlpha;
@@ -5946,8 +5961,9 @@ window.spawnCanvasParticles = function(type, x, y) {
  * @param {string} color - 主色（依技能类型不同）
  * @param {number} duration - 蓄力持续毫秒
  */
-window.spawnChargeUpParticles = function(cx, cy, color = '#a78bfa', duration = 490) {
-    // duration 默认值已加快30%（700→490），调用方传入的700也在调用处同步改为490
+window.spawnChargeUpParticles = function(cx, cy, color = '#a78bfa', duration = 320) {
+    // duration 为真实毫秒（粒子引擎已 delta-time 化，动画速度与 FPS 解耦）
+    // 校准基准：高刷屏 165fps 下的历史观感 ≈ 320ms，故主调用点从 490 收敛到 320
     const count = 28;
     for (let i = 0; i < count; i++) {
         const spawnRadius = 90 + Math.random() * 60;
@@ -9310,7 +9326,7 @@ async function tryAutoSummonGuard(sheshenCandidates, target) {
     if (guardianDom) {
         if (window.spawnFocusOverlay) window.spawnFocusOverlay(guardianDom, 600);
         const gRect = guardianDom.getBoundingClientRect();
-        if (window.spawnChargeUpParticles) window.spawnChargeUpParticles(gRect.left + gRect.width / 2, gRect.top + gRect.height / 2, '#38bdf8', 480);
+        if (window.spawnChargeUpParticles) window.spawnChargeUpParticles(gRect.left + gRect.width / 2, gRect.top + gRect.height / 2, '#38bdf8', 310);
     }
     await sleep(520);
     return { guardian, skill: gSkill };
@@ -9817,7 +9833,7 @@ async function playPowerCounterEffect(counter, victim, counterDom) {
     const counterDomEl2 = getEntitySpriteDom(counter) || (counter.id.startsWith('h') ? document.getElementById(`hero-card-${counter.id}`) : document.getElementById(`${counter.id}-sprite`));
     if (counterDomEl2 && window.spawnChargeUpParticles) {
         const cc = getDomCenter(counterDomEl2);
-        window.spawnChargeUpParticles(cc.x, cc.y, '#ff4040', 320);
+        window.spawnChargeUpParticles(cc.x, cc.y, '#ff4040', 210);
     }
     await sleep(350);
 
@@ -10182,7 +10198,7 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
             if (window.spawnFocusOverlay) window.spawnFocusOverlay(guardianDom, 600);
             const gRect = guardianDom.getBoundingClientRect();
             if (window.spawnChargeUpParticles) window.spawnChargeUpParticles(
-                gRect.left + gRect.width / 2, gRect.top + gRect.height / 2, '#38bdf8', 480
+                gRect.left + gRect.width / 2, gRect.top + gRect.height / 2, '#38bdf8', 310
             );
         }
         await sleep(520); // 视觉停顿
@@ -11050,12 +11066,12 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                 casterRect.left + casterRect.width / 2,
                 casterRect.top + casterRect.height / 2,
                 chargeColor,
-                490
+                320
             );
         }
     }
 
-    await sleep(560);  // 与蓄力动画时长同步（490ms + 70ms缓冲）
+    await sleep(390);  // 与蓄力动画时长同步（320ms + 70ms缓冲）
     // 初始化本次技能结算的共享命中结论容器（跨标签共享：减益是否命中取决于同技能攻击的判定结果）
     if (skill) skill._bdg = { targetHit: {}, targetResolved: {} };
     let tagList = [{ tag: skill.type, power: skill.power }, { tag: skill.type2, power: skill.power2 || 0 }, { tag: skill.type3, power: skill.power3 || 0 }].filter(t => t.tag && t.tag !== '[无]');
@@ -12955,6 +12971,10 @@ function resetBattle(btn) {
     // 清理可能残留的连续扫射临时状态（重置后技能对象为全新拷贝，但仍幂等清理以防旧引用）
     heroesData.forEach(h => h.skills && h.skills.forEach(s => { delete s._fxPlayed; delete s._strafeBurstStart; }));
     enemiesData.forEach(e => e.skills && e.skills.forEach(s => { delete s._fxPlayed; delete s._strafeBurstStart; }));
+    // 清理蓄力雷电特效与残留粒子：防止重置瞬间有英雄蓄力中时 heroChargeEffects 残留，
+    // 导致 fxEngine 的 rAF 循环永久空转（hasActiveHeroChargeEffects 恒真）+ 新卡辉光残留
+    try { heroesData.forEach(h => { if (typeof resetHeroChargeEffect === 'function') resetHeroChargeEffect(h); }); } catch(e) {}
+    try { if (typeof fxEngine !== 'undefined' && fxEngine) fxEngine.particles.length = 0; } catch(e) {}
     heroesData = JSON.parse(JSON.stringify(initialHeroesCache)); enemiesData = JSON.parse(JSON.stringify(initialEnemiesCache));
     // 【召唤】重置清 pending
     if (typeof pendingSummons !== 'undefined' && Array.isArray(pendingSummons)) pendingSummons.length = 0;
