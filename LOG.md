@@ -2203,3 +2203,21 @@
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：修复圣域屏障视觉特效右侧溢出不足、无法完整笼罩小队右侧英雄的视觉缺陷。
 
+## [LOG-183] 2026-08-28 — 特效引擎 Delta-Time 帧率解耦、高刷屏适配与战斗重置 rAF 空转清理
+
+- **变更行为**：
+  1. **CanvasFxEngine 粒子物理演算 Delta-Time 解耦（`index.html:2821-2895`）**：
+     - 新增 `lastFrameTime`/`lastDt`，基于 `performance.now()` 计算真实帧间隔 `dt` 并设 33ms 软上限（防休眠切回瞬移跳帧），归一化时间系数 `k = dt / 16.7`；
+     - 粒子位移、重力、指数复合阻尼（`Math.pow(p.drag, k)`）、定帧倒计时（`hitStop -= dt`）全面真实物理时间化，动画速率与显示器刷新率（60Hz/120Hz/144Hz/165Hz+）及掉帧波动彻底解耦。
+  2. **蓄力雷电 Overlay 帧率自适应与高刷对齐（`index.html:3054-3185`）**：
+     - `drawHeroChargeLightningOverlay` 读取 `fxEngine.lastDt` 引入时间系数 `k`，使蓄力强度渐变 `intensity`、颜色过渡 `colorFactor`、爆发缩放/淡出 `burstScale/burstAlpha`、冲击波扩散及 Sparks 飞溅在不同刷新率屏幕下保持恒定平滑节奏。
+  3. **聚气粒子耗时收敛与时序优化（`index.html:5961/9326/9833/10198/11066`）**：
+     - `spawnChargeUpParticles` 默认时长由 490ms 收敛至真实物理 320ms（与高刷屏历史视觉节奏对齐）；
+     - 同步缩减主动施法蓄力等待（560ms→390ms）、舍身护佑与自动挡刀（480ms→310ms）、强力反击聚气（320ms→210ms），消除冗余等待并使战斗与反应流程更加紧凑流畅。
+  4. **战斗重置 rAF 循环空转防漏（`index.html:12971-12976`）**：
+     - `resetBattle` 中新增 `resetHeroChargeEffect(h)` 与 `fxEngine.particles.length = 0` 清理；
+     - 根治了在蓄力阶段重置战斗时 `heroChargeEffects` 遗留非 idle 状态导致 `hasActiveHeroChargeEffects()` 恒真、引发 `fxEngine` 的 `requestAnimationFrame` 循环永久空转消耗 CPU/GPU 资源的严重性能隐患。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：解决高刷新率屏幕下粒子与雷电特效速度过快、低帧率时拖沓延时的物理时钟依赖缺陷，优化战斗聚气时延节奏，并封堵战斗重置时 rAF 动画帧空转内存与算力泄漏。
+
+
