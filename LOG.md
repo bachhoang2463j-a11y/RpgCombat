@@ -2195,3 +2195,11 @@
   3. **Hook 协定 AGENTS.md（新增文件）**：新增 `AGENTS.md` 强制协定——禁止自行改 `matcher`、白名单仅工具名 `|` 拼接、落盘前 `new RegExp(matcher)` + 长度/换行/`<<|cat >|/tmp/|import re` 双重校验、命令与匹配分离（脚本走 `command/args`，精确过滤在 `$TOOL_INPUT` 内判断）、写入后严格 JSON 校验；并固化备份与一键回退路径，封堵 `cat > /tmp/step2_writer.py << 'PY' ...` 误填 `matcher` 致 `Invalid regular expression` 复发。
 - **涉及文件**：`index.html`、`AGENTS.md`、`LOG.md`、`LOG-INDEX.md`、`README.md`。
 - **决策原因**：用户要求前后排可在 YAML/属性栏手动指定且严格尊重手动，锚定与排序需确定性无随机；同时历史曾出现 `matcher` 被误填多行 shell 致校验阻塞，需以持久化协定封口并纳入两步提交闭环。
+
+## [LOG-182] 2026-08-28 — 修复【肃正】全队圣域屏障视觉未遮盖全队
+
+- **变更行为**：
+  1. **屏障容器宽度与定位修正（`index.html:1165-1168`）**：`.team-barrier-wrapper` 样式新增 `width: auto !important; left: -12px !important; right: -18px !important;`。覆盖 JS 动态注入的 `w-full` 类，解决当 `left`、`width`、`right` 同时存在导致布局过约束时浏览器忽略 `right` / `inset` 负边距、进而导致屏障结界未能完整延伸遮盖右侧友方角色的显示 Bug。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：修复圣域屏障视觉特效右侧溢出不足、无法完整笼罩小队右侧英雄的视觉缺陷。
+
