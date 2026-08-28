@@ -1162,6 +1162,10 @@
       --br-hit-shadow: 0 0 45px rgba(254, 240, 138, 0.8), inset 0 0 40px rgba(251, 191, 36, 0.7);
       position: absolute;
       inset: -10px -12px -10px -12px;
+      /* 覆盖 JS 注入的 w-full：否则 left+width+right 过约束时 right 被忽略，改 inset 右侧无效 */
+      width: auto !important;
+      left: -12px !important;
+      right: -18px !important;
       pointer-events: none;
       z-index: 30;
       transition: opacity 0.4s ease, transform 0.2s ease;
