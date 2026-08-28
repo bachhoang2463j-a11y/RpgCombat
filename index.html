@@ -7182,7 +7182,7 @@ function hasAliveBack() { return enemiesData.some(e => e.isAlive && e.row === 'b
 // ==========================================
 async function summonFromWorldbook(caster, summonName) {
     const SIDE_LIMIT = 4;
-    const side = caster && caster.id && caster.id.startsWith('h') ? 'hero' : 'enemy';
+    const side = isHeroSideEntity(caster) ? 'hero' : 'enemy'; // 召唤物 id 为 s_* 前缀，链式召唤需按 side 判定阵营
     // 敌方总额 12 满员阻断（不影响我方与现有 SIDE_LIMIT=4 逻辑）
     if (side === 'enemy' && Array.isArray(enemiesData) && enemiesData.filter(e => e.isAlive !== false).length >= 12) {
         const dom0 = caster && caster.id ? (document.getElementById(`hero-card-${caster.id}`) || document.getElementById(`${caster.id}-sprite`)) : null;
@@ -10573,7 +10573,9 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     // 单体/非群攻：每次按自身命中量吸收。群攻：批次首个目标结算一次吸收，泄漏量经 barrierAoELeak 共享给全员。
     // 屏障护甲/克制属性：伤害进入屏障前先经 applyBarrierResist 折算（克制减半 → 扣护甲），剩余量才被吸收。
     let barrierAbsorb = 0;
-    if (targetType === 'hero' && (teamBarrier > 0 || barrierAoELeak !== null) && rawDamage > 0) {
+    // 屏障仅吸收敌方来源的伤害（与 executeSkillAction AoE 批量分支的 !casterIsHero 守卫同口径）：
+    // 友方伤害（含友方召唤物误路由等）直击目标本体，不再扣减我方屏障。
+    if (targetType === 'hero' && !isHeroSideEntity(caster) && (teamBarrier > 0 || barrierAoELeak !== null) && rawDamage > 0) {
         let hitAmount;
         if (barrierAoEActive) {
             // 群攻批次：所有成员复用同一个泄漏量（屏障只吸收了一次命中量）
@@ -10926,7 +10928,9 @@ function getTauntTarget(heroArray, wiseFocus) {
     if (heroArray.length === 0) return null;
     // 【肃正】屏障作为"伪实体肉盾"：屏障存在期间，敌方攻击的目标选择直接命中屏障，
     // 我方角色完全不被选中。屏障 id 以 'barrier' 开头，特判走屏障拦截分支。
-    if (teamBarrier > 0) {
+    // 仅当传入的目标池是我方（hero 侧）时才由屏障代为承伤：
+    // 友方召唤物选敌时传入的是敌人池（executeSummonTurn 的 enemyPool），不得命中我方屏障。
+    if (teamBarrier > 0 && heroArray.some(e => isHeroSideEntity(e))) {
         barrierStandIn = {
             id: 'barrier', isAlive: true, isBarrierTarget: true, name: teamBarrierName,
             spd: 0, buffs: [], classType: null, skills: [],
