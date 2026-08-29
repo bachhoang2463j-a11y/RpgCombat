@@ -1741,9 +1741,6 @@
           <button onclick="closeItemMenu()" class="text-[9px] text-slate-400 hover:text-white transition-colors flex items-center gap-1 bg-slate-800/80 px-1.5 py-0.2 rounded border border-slate-700"><span>↩</span> 返回</button>
         </div>
         <div id="item-list" class="flex-1 flex flex-col gap-1 p-1 overflow-y-auto custom-scrollbar"></div>
-        <div class="px-2 py-0.5 border-t border-slate-800/80 shrink-0 text-center">
-          <span class="text-[8px] text-slate-500 leading-none">使用物品将消耗当前回合 · [再动] 物品除外</span>
-        </div>
       </div>
       <div id="skill-menu" class="absolute inset-0 bg-slate-950/95 hidden flex-col transform translate-x-full transition-transform duration-300 z-10 min-h-0">
         <div class="px-2.5 py-1 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 border-b border-slate-800 flex justify-between items-center shrink-0">
@@ -6950,12 +6947,13 @@ function parseItem(itemStr) {
     return { isItem: true, name: name, category: category, count: count, maxUses: maxUses, usesRemaining: maxUses, bindings: bindings, hit: hit, turns: turns, type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, fxTag: fxTag };
 }
 
-// ---- 弹药绑定辅助：渲染（技能卡徽章/灰显）与执行（扣减）共用同一张索引表 ----
-// 技能名 → [{ item, cost }]；一个技能被多种弹药绑定 = AND 语义（都需满足、都扣减）
-function getHeroAmmoBindings(hero) {
+// ---- 物品绑定辅助（弹药/道具/消耗品通用）：渲染（技能卡徽章/灰显）与执行（扣减）共用同一张索引表 ----
+// 技能名 → [{ item, cost }]；一个技能被多个物品绑定 = AND 语义（都需满足、都扣减）
+// 绑定即"施展材料"：弹药扣发数、道具扣次数、消耗品扣数量
+function getHeroItemBindings(hero) {
     const map = new Map();
     (hero.items || []).forEach(it => {
-        if (!it || it.category !== '弹药' || !Array.isArray(it.bindings)) return;
+        if (!it || !Array.isArray(it.bindings)) return;
         it.bindings.forEach(b => {
             if (!b.skillName) return;
             if (!map.has(b.skillName)) map.set(b.skillName, []);
@@ -6965,21 +6963,42 @@ function getHeroAmmoBindings(hero) {
     return map;
 }
 
-// 技能是否满足弹药条件（未绑定弹药的技能恒为 true）
-function hasEnoughAmmo(hero, skill) {
-    const list = getHeroAmmoBindings(hero).get(skill.name);
-    if (!list) return true;
-    return list.every(b => (b.item.count || 0) >= b.cost);
+// 单个绑定是否有存量：道具看剩余次数（maxUses=0 不限），消耗品/弹药看数量
+function bindingHasStock(b) {
+    const it = b.item;
+    if (it.category === '道具') return !(it.maxUses > 0 && (it.usesRemaining ?? it.maxUses) <= 0);
+    return (it.count || 0) >= b.cost;
 }
 
-// 技能使用时的弹药扣减（AND 语义），返回战报描述（如 ".45子弹×3（剩余20）"），无绑定返回 null
-function consumeAmmoForSkill(hero, skill) {
-    const list = getHeroAmmoBindings(hero).get(skill.name);
+// 技能是否满足全部绑定物品条件（未绑定任何物品的技能恒为 true）
+function hasEnoughBindings(hero, skill) {
+    const list = getHeroItemBindings(hero).get(skill.name);
+    if (!list) return true;
+    return list.every(bindingHasStock);
+}
+
+// 技能施展时的绑定物品扣减（AND 语义），返回战报描述（如 ".45子弹×3（剩42）"、"化尘者之瓶×1（剩0次）"），无绑定返回 null
+function consumeBindingsForSkill(hero, skill) {
+    const list = getHeroItemBindings(hero).get(skill.name);
     if (!list) return null;
     return list.map(b => {
-        b.item.count = Math.max(0, (b.item.count || 0) - b.cost);
-        return `${b.item.name}×${b.cost}（剩余${b.item.count}）`;
+        const it = b.item;
+        let remain;
+        if (it.category === '道具') {
+            if (it.maxUses > 0) it.usesRemaining = Math.max(0, (it.usesRemaining ?? it.maxUses) - b.cost);
+            remain = it.maxUses > 0 ? `剩${it.usesRemaining}次` : '不限';
+        } else {
+            it.count = Math.max(0, (it.count || 0) - b.cost);
+            remain = `剩${it.count}`;
+        }
+        return `${it.name}×${b.cost}（${remain}）`;
     }).join('、');
+}
+
+// 战报子行标签：全部为弹药绑定时用"消耗弹药"，混有道具/消耗品时用"消耗材料"
+function bindingsSpendLabel(hero, skill) {
+    const list = getHeroItemBindings(hero).get(skill.name) || [];
+    return list.length && list.every(b => b.item.category === '弹药') ? '消耗弹药' : '消耗材料';
 }
 
 // 解析"我方列表(场地:xx)"键：返回 { key, field }。无后缀场地时 field = null（key 为兼容读取的键名）。
@@ -11163,7 +11182,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
 
     // === [限N次] 本场战斗次数消耗（仅我方）===
     // 蓄力释放传入的是 currentDelay.skill 浅拷贝，故按技能名定位到真实技能对象再递减
-    let _ammoSpendDesc = null;
+    let _bindSpendDesc = null;
     if (caster.id.startsWith('h')) {
         if (skill.isItem) {
             // 物品使用消耗：道具扣次数（maxUses=0 不限），消耗品扣数量；弹药不可主动使用，不会进入此分支
@@ -11177,8 +11196,8 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
             if (heroSkill && heroSkill.maxUses > 0) {
                 heroSkill.usesRemaining = Math.max(0, (heroSkill.usesRemaining ?? heroSkill.maxUses) - 1);
             }
-            // === 弹药消耗（绑定技能的使用条件，AND 语义；蓄力押注已在 handleChargeSkill 扣减，释放时 skipCost 跳过）===
-            if (!skipCost) _ammoSpendDesc = consumeAmmoForSkill(caster, skill);
+            // === 绑定物品消耗（施展材料：弹药扣发数/道具扣次数/消耗品扣数量，AND 语义；蓄力押注已在 handleChargeSkill 扣减，释放时 skipCost 跳过）===
+            if (!skipCost) _bindSpendDesc = consumeBindingsForSkill(caster, skill);
         }
     }
     
@@ -11244,7 +11263,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     } else {
         addHistory(`> ${caster.name} 对 ${targetStr} 发动了【${skill.name}】${multiplier===2?' 极限爆发! ':''}`);
     }
-    if (_ammoSpendDesc) addHistory(`   ↳ 消耗弹药：${_ammoSpendDesc}`);
+    if (_bindSpendDesc) addHistory(`   ↳ ${bindingsSpendLabel(caster, skill)}：${_bindSpendDesc}`);
 
     // ===== 蓄力 + 聚焦特效（在 sleep 等待窗口中非阻塞播放）=====
     {
@@ -12343,15 +12362,15 @@ function prepareAttack() {
 async function handleChargeSkill(hero, skillIndex) {
   if (state.isAnimating) return;
   const skill = hero.skills[skillIndex];
-  // 蓄力即押注资源：实时扣除 MP/HP/TP 与弹药（蓄力完成释放时不再重复扣除，见 doReleaseCharge）
+  // 蓄力即押注资源：实时扣除 MP/HP/TP 与绑定物品（蓄力完成释放时不再重复扣除，见 doReleaseCharge）
   if (hero.mp < skill.cost || hero.hp <= (skill.hpCost || 0) || hero.tp < (skill.tpCost || 0)) {
       showLog("释放条件不足！"); return;
   }
-  if (!hasEnoughAmmo(hero, skill)) { showLog("弹药不足，无法开始蓄力！"); return; }
+  if (!hasEnoughBindings(hero, skill)) { showLog("绑定材料不足，无法开始蓄力！"); return; }
   hero.mp -= skill.cost;
   if (skill.hpCost) hero.hp -= skill.hpCost;
   if (skill.tpCost) hero.tp -= skill.tpCost;
-  const _chargeAmmoDesc = consumeAmmoForSkill(hero, skill);
+  const _chargeAmmoDesc = consumeBindingsForSkill(hero, skill);
   updateHeroUI(hero);
   const hasteStore = hero.hasteStore || 0;
   const effective = Math.max(0, skill.delay - hasteStore);
@@ -12368,7 +12387,7 @@ async function handleChargeSkill(hero, skillIndex) {
   if (effective <= 0) {
     // 加速足够，本回合即可释放：保持当前回合，展示释放/终止菜单
     addHistory(`   ⚡ [${hero.name}] 蓄力就绪，可立即释放【${skill.name}】！`);
-    if (_chargeAmmoDesc) addHistory(`   ↳ 消耗弹药：${_chargeAmmoDesc}`);
+    if (_chargeAmmoDesc) addHistory(`   ↳ ${bindingsSpendLabel(hero, skill)}：${_chargeAmmoDesc}`);
     state.isAnimating = false;
     renderHeroMenu(hero);
     showLog(`⚡ ${hero.name} 蓄力就绪，请选择操作`);
@@ -12376,7 +12395,7 @@ async function handleChargeSkill(hero, skillIndex) {
   }
   // 需要蓄力：消耗本回合
   addHistory(`   ⏳ [${hero.name}] 开始蓄力【${skill.name}】，还需 ${effective} 回合完成！`);
-  if (_chargeAmmoDesc) addHistory(`   ↳ 消耗弹药：${_chargeAmmoDesc}`);
+  if (_chargeAmmoDesc) addHistory(`   ↳ ${bindingsSpendLabel(hero, skill)}：${_chargeAmmoDesc}`);
   state.isAnimating = true;
   await endTurn();
 }
@@ -12950,7 +12969,8 @@ async function handleTargetClick(target, targetType) {
     }
     await executeSkillAction(hero, target, skill, multiplier);
   } else if (action.type === 'item') {
-    await executeItemAction(action.itemIndex, target);
+    const ok = await executeItemAction(action.itemIndex, target);
+    if (!ok) { state.isAnimating = false; return; }
   }
   await endTurn();
 }
@@ -12959,10 +12979,10 @@ async function executeHeroSkillAction(skillIndex, primaryTarget) {
   if (state.isAnimating) return; const hero = state.actionQueue[state.queueIndex].ref; const skill = hero.skills[skillIndex];
   const isExtraTurnSkill = skill.type.includes('再动') || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
   const isUsedExtraTurn = isExtraTurnSkill && state.usedExtraTurnSkillsThisRound && state.usedExtraTurnSkillsThisRound.has(skill.name);
-  const noAmmo = !hasEnoughAmmo(hero, skill);
+  const noAmmo = !hasEnoughBindings(hero, skill);
   if (hero.mp < skill.cost || hero.hp <= (skill.hpCost || 0) || hero.tp < (skill.tpCost || 0) || isUsedExtraTurn || noAmmo) { 
       if (isUsedExtraTurn) showLog("该再动技能每回合限用一次！"); 
-      else if (noAmmo) showLog("弹药不足，无法使用该技能！"); 
+      else if (noAmmo) showLog("绑定材料不足，无法使用该技能！"); 
       else showLog("释放条件不足！"); return; 
   }
   state.isAnimating = true; closeSkillMenu();
@@ -12989,21 +13009,24 @@ function itemToPseudoSkill(item) {
         guaranteedHit: item.guaranteedHit, fxTag: item.fxTag, isItem: true, itemRef: item };
 }
 
+// 物品使用核心：执行效果结算，不推进回合——回合结束由调用方负责
+//（prepareItemTarget 自施路径自行 endTurn；handleTargetClick 目标路径由外层统一 endTurn）
+// 严禁在此设 isAnimating 守卫：handleTargetClick 进入目标选择时已置位动画锁，守卫会导致"有物品效果的技能直接跳过回合"
 async function executeItemAction(itemIndex, primaryTarget) {
-  if (state.isAnimating) return;
   const hero = state.actionQueue[state.queueIndex].ref;
   const item = hero.items && hero.items[itemIndex];
-  if (!isItemUsable(item)) { showLog("该物品当前无法使用！"); return; }
+  if (!isItemUsable(item)) { showLog("该物品当前无法使用！"); return false; }
   // [再动] 物品与再动技能同级：每回合限用一次（防止免费行动无限刷）
   const isExtraTurnItem = [item.type, item.type2, item.type3].some(t => t && t.includes('再动'));
-  if (isExtraTurnItem && state.usedExtraTurnSkillsThisRound && state.usedExtraTurnSkillsThisRound.has(item.name)) { showLog("该再动物品每回合限用一次！"); return; }
+  if (isExtraTurnItem && state.usedExtraTurnSkillsThisRound && state.usedExtraTurnSkillsThisRound.has(item.name)) { showLog("该再动物品每回合限用一次！"); return false; }
   state.isAnimating = true; closeItemMenu();
   await executeSkillAction(hero, primaryTarget, itemToPseudoSkill(item), 1);
-  await endTurn();
+  return true;
 }
 
 // 物品目标取向：复用 classifySkill（伤害标签→选敌 / 单体增益+[他人]→选友 / 其余自施）
-function prepareItemTarget(itemIndex) {
+async function prepareItemTarget(itemIndex) {
+  if (state.isAnimating) return;
   const hero = state.actionQueue[state.queueIndex]?.ref;
   if (!hero) return;
   const item = hero.items && hero.items[itemIndex];
@@ -13026,7 +13049,8 @@ function prepareItemTarget(itemIndex) {
   // 自身使用（无 [他人] 的回复/增益，或纯群效果）→ 直接结算
   // 与技能自施一致：将使用者自身作为主目标传入（primaryTarget 为空时效果管线会随机挑友方）
   closeItemMenu();
-  executeItemAction(itemIndex, hero);
+  const ok = await executeItemAction(itemIndex, hero);
+  if (ok) await endTurn();
 }
 
 async function actionDefend() {
@@ -13083,8 +13107,8 @@ function createSkillCard(hero, skill, idx) {
     const isTpEnough = hero.tp >= (skill.tpCost || 0);
     const isBurstBlocked = hero.burstActivated && skill.tpCost > 0;
     const isBarrierBlocked = teamBarrier > 0 && skillHasBarrierTag(skill);
-    const isAmmoEnough = hasEnoughAmmo(hero, skill);
-    const isEnough = isMpEnough && isHpEnough && isTpEnough && !isBurstBlocked && !isUsedExtraTurn && !isUsesExhausted && !isBarrierBlocked && isAmmoEnough;
+    const isBindingEnough = hasEnoughBindings(hero, skill);
+    const isEnough = isMpEnough && isHpEnough && isTpEnough && !isBurstBlocked && !isUsedExtraTurn && !isUsesExhausted && !isBarrierBlocked && isBindingEnough;
     let themeClass = 'skill-card-default';
     let typeBadgeStyle = 'bg-slate-800 text-slate-300 border-slate-600/60';
     let typeIcon = '⚔️';
@@ -13144,12 +13168,17 @@ function createSkillCard(hero, skill, idx) {
       const errClass = (!isTpEnough || isBurstBlocked) ? 'text-rose-400 border-rose-500/80 bg-rose-950' : 'text-emerald-300 border-emerald-800/60 bg-emerald-950/60';
       costBadgesHtml += `<span class="text-[8px] font-mono-num font-bold px-1 py-0.2 rounded border ${errClass} leading-none">🔥 ${skill.tpCost} TP</span>`;
     }
-    // 弹药需求徽章（AND 语义逐项列出）：数量不足时红色告警，与 MP/HP/TP 不足同级的禁用条件
-    const _ammoBindings = getHeroAmmoBindings(hero).get(skill.name);
-    if (_ammoBindings) {
-      _ammoBindings.forEach(b => {
-        const errClass = (b.item.count || 0) < b.cost ? 'text-rose-400 border-rose-500/80 bg-rose-950' : 'text-amber-300 border-amber-800/60 bg-amber-950/60';
-        costBadgesHtml += `<span class="text-[8px] font-mono-num font-bold px-1 py-0.2 rounded border ${errClass} leading-none">🔹 ${b.item.name}×${b.cost}（剩${b.item.count || 0}）</span>`;
+    // 绑定物品需求徽章（弹药/道具/消耗品通用，AND 语义逐项列出）：存量不足时红色告警，与 MP/HP/TP 不足同级的禁用条件
+    const _itemBindings = getHeroItemBindings(hero).get(skill.name);
+    if (_itemBindings) {
+      _itemBindings.forEach(b => {
+        const it = b.item;
+        const isGear = it.category === '道具';
+        const remain = isGear ? `${(it.usesRemaining ?? it.maxUses) || 0}次` : `${it.count || 0}`;
+        const icon = it.category === '弹药' ? '🔹' : it.category === '消耗品' ? '🧪' : '🎒';
+        const insufficient = isGear ? (it.maxUses > 0 && (it.usesRemaining ?? it.maxUses) <= 0) : (it.count || 0) < b.cost;
+        const errClass = insufficient ? 'text-rose-400 border-rose-500/80 bg-rose-950' : 'text-amber-300 border-amber-800/60 bg-amber-950/60';
+        costBadgesHtml += `<span class="text-[8px] font-mono-num font-bold px-1 py-0.2 rounded border ${errClass} leading-none">${icon} ${it.name}×${b.cost}（剩${remain}）</span>`;
       });
     }
     if (!costBadgesHtml) costBadgesHtml = `<span class="text-[8px] text-slate-400 font-mono leading-none">⚡ 零消耗</span>`;
@@ -13167,7 +13196,7 @@ function createSkillCard(hero, skill, idx) {
       if (!isMpEnough) missingArr.push('MP不足');
       if (!isHpEnough) missingArr.push('HP不足');
       if (!isTpEnough) missingArr.push('TP不足');
-      if (!isAmmoEnough) missingArr.push('弹药不足');
+      if (!isBindingEnough) missingArr.push(_itemBindings && _itemBindings.some(b => b.item.category === '弹药') ? '弹药不足' : '材料不足');
       notEnoughNotice = `<span class="text-[8px] text-rose-400 font-bold leading-none">⚠️ ${missingArr.join(' ')}</span>`;
     }
     let row3Html = `
@@ -13299,8 +13328,6 @@ function createItemCard(hero, item, idx) {
     if (isAmmo) {
       const errClass = (item.count || 0) > 0 ? 'text-amber-300 border-amber-800/60 bg-amber-950/60' : 'text-rose-400 border-rose-500/80 bg-rose-950';
       stockBadgesHtml += `<span class="text-[8px] font-mono-num font-bold px-1 py-0.2 rounded border ${errClass} leading-none">📦 ${item.count || 0} 发</span>`;
-      const bindStr = (item.bindings || []).map(b => `${b.skillName}×${b.cost}`).join('、') || '未绑定技能';
-      stockBadgesHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-slate-900 text-slate-400 border-slate-700 leading-none truncate max-w-full">🔗 ${bindStr}</span>`;
     } else if (item.category === '道具') {
       stockBadgesHtml += item.maxUses > 0
         ? `<span class="text-[8px] font-mono-num font-bold px-1 py-0.2 rounded border ${isExhausted ? 'text-rose-400 border-rose-500/80 bg-rose-950' : 'text-sky-300 border-sky-800/60 bg-sky-950/60'} leading-none">📌 ${(item.usesRemaining ?? item.maxUses)}/${item.maxUses}次</span>`
@@ -13309,6 +13336,9 @@ function createItemCard(hero, item, idx) {
       const errClass = !isExhausted ? 'text-emerald-300 border-emerald-800/60 bg-emerald-950/60' : 'text-rose-400 border-rose-500/80 bg-rose-950';
       stockBadgesHtml += `<span class="text-[8px] font-mono-num font-bold px-1 py-0.2 rounded border ${errClass} leading-none">📦 剩余 ${item.count || 0}</span>`;
     }
+    // 绑定信息徽章（弹药/道具/消耗品通用：绑定物品即对应技能的施展材料）
+    const _bindStr = (item.bindings || []).map(b => `${b.skillName}×${b.cost}`).join('、');
+    if (_bindStr) stockBadgesHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-slate-900 text-slate-400 border-slate-700 leading-none truncate max-w-full">🔗 ${_bindStr}</span>`;
     let noticeHtml = '';
     if (isAmmo) noticeHtml = `<span class="text-[8px] text-slate-500 leading-none">技能弹药 · 不可主动使用</span>`;
     else if (isExhausted) noticeHtml = `<span class="text-[8px] text-rose-400 font-bold leading-none">🚫 已耗尽</span>`;
@@ -13622,7 +13652,7 @@ function openEditor(keepScroll) {
     // 物品列表 (二级折叠，与技能列表同构；弹药类隐藏效果槽、显示绑定行)
     html += `<div class="space-y-1.5 pt-1">`;
     html += `<div class="flex items-center justify-between border-b border-amber-900/40 pb-1">`;
-    html += `<div class="flex items-center gap-1.5"><span class="text-amber-400 text-xs font-bold">🎒 物品道具</span><span class="text-[10px] text-slate-500">(${h.items ? h.items.length : 0}项)</span><span class="text-[9px] text-slate-600">消耗品永久损耗 · 道具每场重置 · 弹药绑定技能</span></div>`;
+    html += `<div class="flex items-center gap-1.5"><span class="text-amber-400 text-xs font-bold">🎒 物品道具</span><span class="text-[10px] text-slate-500">(${h.items ? h.items.length : 0}项)</span><span class="text-[9px] text-slate-600">消耗品永久损耗 · 道具每场重置 · 绑定物品作技能施展材料</span></div>`;
     html += `<button onclick="addHeroItem(${i})" class="px-2 py-0.5 bg-amber-900/60 hover:bg-amber-800 text-amber-200 text-[10px] font-bold rounded border border-amber-600/50 flex items-center gap-0.5"><span>+</span> 新增物品</button>`;
     html += `</div>`;
     html += `<div class="space-y-1.5">`;
@@ -13672,9 +13702,9 @@ function openEditor(keepScroll) {
         html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-h-${i}-it-${ii}-type2" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${it.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-it-${ii}-power2" value="${it.power2}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
         html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-h-${i}-it-${ii}-type3" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${it.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-it-${ii}-power3" value="${it.power3}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"></div>`;
         html += `</div></div>`;
-        // 模块 C：弹药绑定行（仅弹药类显示）
-        html += `<div id="item-bindings-${i}-${ii}" class="${_itCat === '弹药' ? '' : 'hidden'} space-y-1">`;
-        html += `<div class="text-[10px] text-slate-400 font-bold flex items-center justify-between flex-wrap gap-1"><span>弹药绑定（对应技能每次使用消耗的弹药数量）:</span><button onclick="addItemBinding(${i}, ${ii})" class="px-2 py-0.5 bg-amber-900/60 hover:bg-amber-800 text-amber-200 text-[10px] font-bold rounded border border-amber-600/50"><span>+</span> 添加绑定</button></div>`;
+        // 模块 C：物品绑定行（弹药/道具/消耗品通用：绑定后对应技能每次施展消耗该物品）
+        html += `<div id="item-bindings-${i}-${ii}" class="space-y-1">`;
+        html += `<div class="text-[10px] text-slate-400 font-bold flex items-center justify-between flex-wrap gap-1"><span>物品绑定（对应技能每次施展消耗该物品）:</span><button onclick="addItemBinding(${i}, ${ii})" class="px-2 py-0.5 bg-amber-900/60 hover:bg-amber-800 text-amber-200 text-[10px] font-bold rounded border border-amber-600/50"><span>+</span> 添加绑定</button></div>`;
         html += `<div id="item-bindings-rows-${i}-${ii}" class="space-y-1">`;
         if (it.bindings && it.bindings.length) {
           it.bindings.forEach((b, bi) => {
@@ -13997,16 +14027,14 @@ function toggleItemFold(entityIdx, itemIdx) {
   }
 }
 
-// 物品类别切换：弹药隐藏效果槽/显示绑定行，道具与消耗品切换 库存字段标签（次数/数量）
+// 物品类别切换：弹药隐藏效果槽（弹药是技能资源，效果无意义），道具与消耗品切换 库存字段标签（次数/数量）
 function onItemCategoryChange(hi, ii) {
   const catEl = document.getElementById(`edit-h-${hi}-it-${ii}-category`);
   if (!catEl) return;
   const cat = catEl.value;
   const slotsEl = document.getElementById(`item-slots-${hi}-${ii}`);
-  const bindEl = document.getElementById(`item-bindings-${hi}-${ii}`);
   const labelEl = document.getElementById(`item-stock-label-${hi}-${ii}`);
   if (slotsEl) slotsEl.classList.toggle('hidden', cat === '弹药');
-  if (bindEl) bindEl.classList.toggle('hidden', cat !== '弹药');
   if (labelEl) labelEl.textContent = cat === '道具' ? '次数' : '数量';
 }
 
@@ -14259,22 +14287,21 @@ function syncEditorDataToMemory() {
         it.power2 = Number(document.getElementById(`edit-h-${i}-it-${ii}-power2`).value);
         it.type3 = document.getElementById(`edit-h-${i}-it-${ii}-type3`).value;
         it.power3 = Number(document.getElementById(`edit-h-${i}-it-${ii}-power3`).value);
-        if (it.category === '弹药') {
-            it.bindings = [];
-            const rowsWrap = document.getElementById(`item-bindings-rows-${i}-${ii}`);
-            if (rowsWrap) {
-                rowsWrap.querySelectorAll('[data-bi]').forEach(row => {
-                    const sel = row.querySelector('select');
-                    const costInp = row.querySelector('input[type="number"]');
-                    const skillName = sel ? (sel.value || '').trim() : '';
-                    if (skillName) it.bindings.push({ skillName: skillName, cost: Math.max(1, Number(costInp && costInp.value) || 1) });
-                });
-            }
-            // 绑定校验：技能名必须存在于本角色技能集（改名后失效的绑定在控制台告警，弹药不再约束任何技能）
-            it.bindings.forEach(b => {
-                if (!h.skills.some(s => s.name === b.skillName)) console.warn(`[物品绑定] 「${it.name}」绑定的技能「${b.skillName}」不存在于 ${h.name} 的技能集，该绑定已失效`);
+        // 绑定行收集（弹药/道具/消耗品通用）：技能下拉值即绑定名
+        it.bindings = [];
+        const rowsWrap = document.getElementById(`item-bindings-rows-${i}-${ii}`);
+        if (rowsWrap) {
+            rowsWrap.querySelectorAll('[data-bi]').forEach(row => {
+                const sel = row.querySelector('select');
+                const costInp = row.querySelector('input[type="number"]');
+                const skillName = sel ? (sel.value || '').trim() : '';
+                if (skillName) it.bindings.push({ skillName: skillName, cost: Math.max(1, Number(costInp && costInp.value) || 1) });
             });
         }
+        // 绑定校验：技能名必须存在于本角色技能集（改名后失效的绑定在控制台告警，该绑定不再约束任何技能）
+        it.bindings.forEach(b => {
+            if (!h.skills.some(s => s.name === b.skillName)) console.warn(`[物品绑定] 「${it.name}」绑定的技能「${b.skillName}」不存在于 ${h.name} 的技能集，该绑定已失效`);
+        });
         it.isItem = true;
         return it;
     });
