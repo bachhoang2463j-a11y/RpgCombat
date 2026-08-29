@@ -2229,5 +2229,15 @@
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：解决友方召唤物在全队屏障存在时出现自残攻击我方屏障、扣除我方屏障耐久的逻辑错乱，并完善召唤物链式召唤的阵营判定。
 
+## [LOG-185] 2026-08-29 — 对话设置新增自定义末尾注入模块（思考阻断/补充要求）
+
+- **变更行为**：
+  1. **请求末尾注入逻辑（`index.html:14799-14803`）**：`callLLMAPI` 在组装完 messages 后，若 `llmState.endInjectionEnabled` 开启且注入文本非空，则以「用户」角色把自定义内容追加为请求最末一条消息（可放 `<think>…</think>` 思考阻断块或额外补充要求）；对全部 LLM 请求统一生效（玩家对话、友方/敌方自动旁白、蓄力台词）。
+  2. **设置面板 UI（`index.html:1842-1853`）**：在【🧠 关闭思考】开关下方新增「🎯 末尾注入（思考阻断）」启用开关与「末尾注入内容」多行文本域，占位示例为 `<think>\nResponding budget exceeded.\n</think>`。
+  3. **状态与持久化（`index.html:13849/13876/13896/13938/14137/14182`）**：`defaultPreset`/`llmState` 新增 `endInjectionEnabled`/`endInjection` 字段；`persistLLMSettings` 纳入持久化；`initLLMPresets` 对旧存档补默认值迁移；`switchLLMPreset` 预设切换读写与 `saveLLMSettings` 保存链路对齐（随预设独立保存，5 套预设互不干扰）。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **决策原因**：用户要求在对话设置中增加自定义末尾注入模块，以用户角色在提示词最末端注入 `<think>Responding budget exceeded.</think>` 类内容阻断 AI 推理、加快回复速度，并可附带补充要求；参考酒馆 depth 注入惯例以独立 user 消息追加到最末端，随预设持久化以便不同 API/模型组合各自配置。
+
+
 
 
