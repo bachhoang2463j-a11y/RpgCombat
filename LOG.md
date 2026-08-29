@@ -2252,6 +2252,16 @@
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
 - **决策原因**：随技能池丰富，原单一技能面板承载过多，通过攻击与辅助拆分提升战斗选技效率；收敛基础行动整合面板空间，并预留物品道具交互入口。
 
+## [LOG-187] 2026-08-30 — 战局记录回合折叠（纯CSS details/summary，默认展开最新回合）
+
+- **变更行为**：
+  1. **回合分组折叠（`index.html:2371-2442`）**：`renderHistorySchemeA` 由扁平序列改为按回合分组——回合分隔行升级为 `<details class="history-round-fold">` 的 `<summary>` 头（渐变线 + `history-round-pill` 胶囊 + 条目数 + ▼ `fold-arrow`），本回合全部条目收入折叠体；`open` 属性仅在最新回合（list 内最大回合号，容忍手动编辑乱序）输出，之前的回合默认折叠；首个回合头之前的开场/场地条目（round 0）保持平铺在顶部。
+  2. **纯 CSS 折叠样式（`index.html:1548-1552`）**：新增 `details.history-round-fold` 四条规则（去 summary 默认三角、`fold-arrow` 随 `[open]` 旋转 180°），克隆自技能编辑器旁已铺设的 2b2 纯 CSS 折叠底座（`details.skill-fold` 写法），置于 `.history-round-pill` 旁与记录区段样式同源。
+  3. **零 JS 原则**：不新增任何全局函数、事件绑定、状态变量与 localStorage；点击展开/收起由浏览器原生 `<details>` 行为完成，展开状态不持久化（重开面板/切筛选回到默认态）。`parseCombatLog`/`refreshHistoryView`/`refreshResultView`/`setHistoryFilter`/轮询与初始化链路零改动；导出与 LLM 上下文读取的 `battleHistory` 原始字符串不经过 DOM，零影响。结算弹窗（`refreshResultView` 复用同一渲染器）自动获得同样折叠。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **经验证**：Node 提取 `<script>` 语法校验通过（724KB 单脚本零报错）；渲染逻辑 Node 模拟验证 15 项断言全通过（details 配平、open 唯一且落在最新回合、round 0 平铺、四种筛选模式分组不塌、乱序回合号容错、空记录边界、渲染不触碰原始数据）。
+- **决策原因**：用户要求记录按回合折叠、默认仅展开当前回合；鉴于 V6.17/V6.18 两次「折叠样式改动 → 卡死加载界面」事故，本次严格复用技能编辑器旁的纯 CSS `<details>/<summary>` 底座写法，渲染层模板内闭环、零新增 JS 与状态，从根源上规避 JS 折叠状态管理类风险。
+
 
 
 
