@@ -6932,6 +6932,9 @@ function parseItem(itemStr) {
 
     let isOthers = /\[他人\]/i.test(raw);
     let guaranteedHit = /\[必中\]/i.test(raw);
+    // 解析 [高阶]/[传奇]/[神术] 叙事标签（仅旁白，无战斗数值效果；[神术]为[传奇]别名，传奇优先级高于高阶；与 parseSkill 同语义）
+    let _isLegendary = /\[传奇\]|\[神术\]/i.test(raw);
+    let _isHighTier = !_isLegendary && /\[高阶\]/i.test(raw);
     let hitMatch = raw.match(/\[(?:Hit|Aim):(\d+)\]/i);
     let hit = hitMatch ? parseInt(hitMatch[1]) : 100;
     let turnsMatch = raw.match(/\[(?:Turns|Turn|持续):(\d+)\]/i);
@@ -6944,7 +6947,7 @@ function parseItem(itemStr) {
     // 弹药是技能资源而非主动道具：效果槽无意义，强制清空
     if (category === '弹药') { types = ['[无]', '[无]', '[无]']; powers = [0, 0, 0]; }
 
-    return { isItem: true, name: name, category: category, count: count, maxUses: maxUses, usesRemaining: maxUses, bindings: bindings, hit: hit, turns: turns, type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, fxTag: fxTag };
+    return { isItem: true, name: name, category: category, count: count, maxUses: maxUses, usesRemaining: maxUses, bindings: bindings, hit: hit, turns: turns, type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, fxTag: fxTag, isHighTier: _isHighTier, isLegendary: _isLegendary };
 }
 
 // ---- 物品绑定辅助（弹药/道具/消耗品通用）：渲染（技能卡徽章/灰显）与执行（扣减）共用同一张索引表 ----
@@ -13001,12 +13004,12 @@ function isItemUsable(item) {
     return (item.count || 0) > 0;
 }
 
-// 物品 → 伪技能对象：三效果槽/命中/必中/他人等字段与技能同构，直接喂给 executeSkillAction
+// 物品 → 伪技能对象：三效果槽/命中/必中/他人/高阶/传奇等字段与技能同构，直接喂给 executeSkillAction
 function itemToPseudoSkill(item) {
     return { name: item.name, cost: 0, hpCost: 0, tpCost: 0, charge: 0, delay: 0, haste: 0, maxUses: 0,
         hit: item.hit || 100, turns: item.turns, type: item.type, power: item.power, type2: item.type2, power2: item.power2,
         type3: item.type3, power3: item.power3, damageType: item.damageType || null, isOthers: item.isOthers,
-        guaranteedHit: item.guaranteedHit, fxTag: item.fxTag, isItem: true, itemRef: item };
+        guaranteedHit: item.guaranteedHit, fxTag: item.fxTag, isHighTier: !!item.isHighTier, isLegendary: !!item.isLegendary, isItem: true, itemRef: item };
 }
 
 // 物品使用核心：执行效果结算，不推进回合——回合结束由调用方负责
@@ -13306,6 +13309,8 @@ function createItemCard(hero, item, idx) {
             ${item.name}
           </span>
           ${item.isOthers ? `<span class="text-[8px] bg-teal-950/90 text-teal-300 border border-teal-600/60 px-1 py-0.2 rounded shrink-0 leading-tight">他人</span>` : ''}
+          ${item.isLegendary ? `<span class="text-[8px] bg-amber-950/90 text-amber-200 border border-amber-500/70 px-1 py-0.2 rounded shrink-0 leading-tight font-bold">✦传奇</span>` : ''}
+          ${(!item.isLegendary && item.isHighTier) ? `<span class="text-[8px] bg-violet-950/90 text-violet-200 border border-violet-500/70 px-1 py-0.2 rounded shrink-0 leading-tight font-bold">⬥高阶</span>` : ''}
         </div>
         <span class="text-[8px] font-bold px-1 py-0.2 rounded border shrink-0 flex items-center gap-0.5 ${meta.badgeClass} leading-tight">
           <span>${meta.icon}</span> ${item.category}
@@ -13673,6 +13678,8 @@ function openEditor(keepScroll) {
         html += `<div class="flex items-center gap-1 flex-wrap">${buildEditorSkillTagPreview(it.type, it.power, it.type2, it.power2, it.type3, it.power3, 'hero')}</div>`;
         if (it.isOthers) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-emerald-950 text-emerald-300 border border-emerald-700 shrink-0">他人</span>`;
         if (it.guaranteedHit) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-rose-950 text-rose-300 border border-rose-700 shrink-0">必中</span>`;
+        if (it.isLegendary) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-amber-950 text-amber-300 border border-amber-700 shrink-0">传奇</span>`;
+        if (!it.isLegendary && it.isHighTier) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-violet-950 text-violet-300 border border-violet-700 shrink-0">高阶</span>`;
         if (_itBindSummary) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-slate-800 text-slate-400 border border-slate-700 shrink-0 truncate max-w-full">🔗 ${_itBindSummary}</span>`;
         html += `</div>`;
         html += `<div class="flex items-center gap-1 shrink-0">`;
@@ -13691,6 +13698,8 @@ function openEditor(keepScroll) {
         html += `<div class="sm:col-span-12 flex items-center gap-1.5 flex-wrap">`;
         html += `<label id="pill-h-${i}-it-${ii}-others" class="tag-toggle-pill border-emerald-500 text-emerald-300 bg-emerald-950/70 ${it.isOthers ? 'active' : 'inactive'}"><input type="checkbox" id="edit-h-${i}-it-${ii}-others" ${it.isOthers ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-h-${i}-it-${ii}-others')"><span>👥</span> 他人（可选择队友为目标）</label>`;
         html += `<label id="pill-h-${i}-it-${ii}-guaranteed" class="tag-toggle-pill border-rose-500 text-rose-300 bg-rose-950/70 ${it.guaranteedHit ? 'active' : 'inactive'}"><input type="checkbox" id="edit-h-${i}-it-${ii}-guaranteed" ${it.guaranteedHit ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-h-${i}-it-${ii}-guaranteed')"><span>🎯</span> 必中</label>`;
+        html += `<label id="pill-h-${i}-it-${ii}-legendary" class="tag-toggle-pill border-amber-500 text-amber-300 bg-amber-950/70 ${it.isLegendary ? 'active' : 'inactive'}"><input type="checkbox" id="edit-h-${i}-it-${ii}-legendary" ${it.isLegendary ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-h-${i}-it-${ii}-legendary')"><span>✦</span> 传奇</label>`;
+        html += `<label id="pill-h-${i}-it-${ii}-highTier" class="tag-toggle-pill border-violet-500 text-violet-300 bg-violet-950/70 ${!it.isLegendary && it.isHighTier ? 'active' : 'inactive'}"><input type="checkbox" id="edit-h-${i}-it-${ii}-highTier" ${it.isHighTier ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-h-${i}-it-${ii}-highTier')"><span>⬥</span> 高阶</label>`;
         html += `<span class="text-[9px] text-slate-600">命中</span><input type="number" id="edit-h-${i}-it-${ii}-hit" value="${it.hit != null ? it.hit : 100}" class="edit-input-game w-14 font-mono-num text-right text-yellow-200 py-0.5 text-[10px]">`;
         html += `<span class="text-[9px] text-slate-600">持续</span><input type="number" id="edit-h-${i}-it-${ii}-turns" value="${it.turns || ''}" class="edit-input-game w-14 font-mono-num text-right text-purple-200 py-0.5 text-[10px]" placeholder="默认">`;
         html += `</div></div>`;
@@ -14279,6 +14288,10 @@ function syncEditorDataToMemory() {
         it.fxTag = document.getElementById(`edit-h-${i}-it-${ii}-fxTag`).value || null;
         it.isOthers = document.getElementById(`edit-h-${i}-it-${ii}-others`).checked;
         it.guaranteedHit = document.getElementById(`edit-h-${i}-it-${ii}-guaranteed`).checked;
+        // [传奇]为[神术]别名，传奇优先级高于高阶；互斥由 Legendary 覆盖（与技能同步同规则）
+        const _itLeg = document.getElementById(`edit-h-${i}-it-${ii}-legendary`).checked;
+        const _itHigh = document.getElementById(`edit-h-${i}-it-${ii}-highTier`).checked;
+        it.isLegendary = _itLeg; it.isHighTier = _itLeg ? false : _itHigh;
         it.hit = Number(document.getElementById(`edit-h-${i}-it-${ii}-hit`).value) || 100;
         it.turns = document.getElementById(`edit-h-${i}-it-${ii}-turns`).value !== '' ? Number(document.getElementById(`edit-h-${i}-it-${ii}-turns`).value) : null;
         it.type = document.getElementById(`edit-h-${i}-it-${ii}-type`).value;
@@ -14572,7 +14585,7 @@ function serializeHeroesForSave() {
       name: it.name, category: it.category, count: it.count || 0, maxUses: it.maxUses || 0,
       bindings: (it.bindings || []).map(b => ({ skillName: b.skillName, cost: b.cost })),
       type: it.type, power: it.power, type2: it.type2, power2: it.power2, type3: it.type3, power3: it.power3,
-      hit: it.hit, turns: it.turns, isOthers: !!it.isOthers, guaranteedHit: !!it.guaranteedHit, fxTag: it.fxTag, damageType: it.damageType || null
+      hit: it.hit, turns: it.turns, isOthers: !!it.isOthers, guaranteedHit: !!it.guaranteedHit, isHighTier: !!it.isHighTier, isLegendary: !!it.isLegendary, fxTag: it.fxTag, damageType: it.damageType || null
     }))
   }));
 }
@@ -15056,11 +15069,20 @@ async function triggerHighTierCombinedSpeak(caster, skill, healedTargets) {
   if (llmState.isRequesting) return;
   if (!skill || (!skill.isHighTier && !skill.isLegendary)) return;
   if (!caster || !caster.isAlive) return;
+  const isItemUse = !!skill.isItem; // 物品使用：旁白措辞从"施展技能"切换为"使用罕见物品"
   const dmgType = skill.damageType || '近战';
   const tierLabel = skill.isLegendary ? '传奇' : '高阶';
-  const rarityDesc = skill.isLegendary
-    ? '神话级技能，极少有人见过；若为魔法，可能是神明亲自赐予的神术'
-    : '高稀有度技能，小人物与精英的分水岭；若为魔法，施法者即为高阶巫师';
+  const rarityRef = isItemUse ? `${tierLabel}级罕见物品` : `${tierLabel}·${dmgType}`;
+  let rarityDesc = '';
+  if (isItemUse) {
+    rarityDesc = skill.isLegendary
+      ? '神话级稀有物品，世间罕有，识货者寥寥无几'
+      : '高稀有度物品，绝非凡品，来头极大';
+  } else {
+    rarityDesc = skill.isLegendary
+      ? '神话级技能，极少有人见过；若为魔法，可能是神明亲自赐予的神术'
+      : '高稀有度技能，小人物与精英的分水岭；若为魔法，施法者即为高阶巫师';
+  }
   let dmgDesc = '';
   if (dmgType === '法术') dmgDesc = '法术/咒文/魔力涌动/神术赐福';
   else if (dmgType === '远程') dmgDesc = '远程/枪火/弹道/狙击';
@@ -15094,12 +15116,12 @@ async function triggerHighTierCombinedSpeak(caster, skill, healedTargets) {
   if (!targets.length) return;
   let tierInstruction = '';
   let tierName = '';
-  if (enemyTier==='fodder') { tierName='杂兵/炮灰'; tierInstruction=`严格定位：你是${tierName}，面对该${tierLabel}·${dmgType}必须表现出恐慌、溃散、颤抖、后退半步、语无伦次，绝不可装作精英或首领的从容/审视/点评、无畏俯视。`; }
-  else if (enemyTier==='elite') { tierName='精英'; tierInstruction=`严格定位：你是久经沙场的${tierName}，对该${tierLabel}·${dmgType}感到忌惮、瞳孔骤缩但强行稳住阵脚、凝重审视，以术式/战技对撞口吻回应，绝不可恐慌溃散，也绝不可如首领般无畏俯视/点评。`; }
-  else if (enemyTier==='legend') { tierName='首领/传奇'; tierInstruction=`严格定位：你是${tierName}存在（区域威胁/法则级），面对该${tierLabel}·${dmgType}也只是收起漫不经心、转为审视、亢奋、点评、战意，语气无畏甚至欣赏，绝不可恐慌、颤抖或溃散。`; }
-  const allyPart = allySpeakers.length ? `释放者 ${allySpeakers.map(s=>s.name).join('、')} 基于刚才的行动说一句（体现${tierLabel}·${dmgType}的施术心境）；` : '';
+  if (enemyTier==='fodder') { tierName='杂兵/炮灰'; tierInstruction=`严格定位：你是${tierName}，面对该${rarityRef}必须表现出恐慌、溃散、颤抖、后退半步、语无伦次，绝不可装作精英或首领的从容/审视/点评、无畏俯视。`; }
+  else if (enemyTier==='elite') { tierName='精英'; tierInstruction=`严格定位：你是久经沙场的${tierName}，对该${rarityRef}感到忌惮、瞳孔骤缩但强行稳住阵脚、凝重审视，以术式/战技对撞口吻回应，绝不可恐慌溃散，也绝不可如首领般无畏俯视/点评。`; }
+  else if (enemyTier==='legend') { tierName='首领/传奇'; tierInstruction=`严格定位：你是${tierName}存在（区域威胁/法则级），面对该${rarityRef}也只是收起漫不经心、转为审视、亢奋、点评、战意，语气无畏甚至欣赏，绝不可恐慌、颤抖或溃散。`; }
+  const allyPart = allySpeakers.length ? `释放者 ${allySpeakers.map(s=>s.name).join('、')} 基于刚才的行动说一句（体现${rarityRef}的${isItemUse ? '使用心境与底气' : '施术心境'}）；` : '';
   const enemyPart = wiseTargets.length ? `最高阶位智慧敌方（${wiseTargets.map(e=>e.name).join('、')}，判定为${tierName}）各说一句：${tierInstruction}` : '';
-  const trigger = `[系统指令：我方角色 ${caster.name} 刚刚施展了【${skill.name}】（${tierLabel}·${dmgType}，${dmgDesc}）。${rarityDesc}。请让以下角色各说一句符合身份的简短台词：${allyPart}${enemyPart} 均需体现「${tierLabel}·${dmgType}」的稀有度与伤害类型差异。\n格式：角色名：「台词」，每人单独一行。严禁添加任何其他内容。]`;
+  const trigger = `[系统指令：我方角色 ${caster.name} 刚刚${isItemUse ? '使用了' : '施展了'}【${skill.name}】（${rarityRef}${isItemUse ? '' : '，' + dmgDesc}）。${rarityDesc}。请让以下角色各说一句符合身份的简短台词：${allyPart}${enemyPart} 均需体现「${rarityRef}」${isItemUse ? '的稀有度差异' : '的稀有度与伤害类型差异'}。\n格式：角色名：「台词」，每人单独一行。严禁添加任何其他内容。]`;
   await requestLLMResponse(trigger, targets, true);
 }
 
