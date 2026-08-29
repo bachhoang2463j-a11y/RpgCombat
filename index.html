@@ -1687,13 +1687,62 @@
     <div id="menu-container" class="w-[260px] h-[172px] bg-slate-950/95 backdrop-blur-xl rounded-xl border border-slate-700/80 border-t-2 border-t-cyan-500/80 flex flex-col overflow-hidden transition-all duration-300 relative shadow-[0_15px_35px_rgba(0,0,0,0.9)] pointer-events-auto self-end mb-1 sm:mb-0">
       <div id="active-hero-name" class="text-center text-[10px] sm:text-xs py-1 text-white/80 bg-white/5 tracking-widest uppercase border-b border-white/10 font-bold">等待指令</div>
       <div id="main-menu" class="flex-1 flex flex-col p-1.5 gap-1 justify-center relative bg-slate-900/50">
-        <button onclick="prepareAttack()" class="w-full py-1.5 px-3 bg-slate-900/80 hover:bg-cyan-950/60 border border-slate-700/80 hover:border-cyan-500/60 rounded-lg text-xs font-bold text-slate-200 hover:text-cyan-300 transition-all flex items-center gap-2 shadow-sm"><span class="text-rose-400">⚔️</span> 普攻攻击</button>
-        <button onclick="openSkillMenu()" class="w-full py-1.5 px-3 bg-gradient-to-r from-cyan-950/90 to-slate-900 border border-cyan-500/60 rounded-lg text-xs font-bold text-white shadow-[0_0_12px_rgba(6,182,212,0.2)] hover:scale-[1.01] transition-all flex items-center gap-2"><span class="text-cyan-400">⚡</span> 释放技能</button>
-        <button onclick="actionDefend()" class="w-full py-1.5 px-3 bg-slate-900/80 hover:bg-emerald-950/60 border border-slate-700/80 hover:border-emerald-500/60 rounded-lg text-xs font-bold text-slate-200 hover:text-emerald-300 transition-all flex items-center gap-2"><span class="text-emerald-400">🛡️</span> 防御姿态</button>
-        <button onclick="retreatBattle()" class="w-full py-1.5 px-3 bg-slate-900/80 hover:bg-purple-950/60 border border-slate-700/80 hover:border-purple-500/60 rounded-lg text-xs font-bold text-slate-200 hover:text-purple-300 transition-all flex items-center gap-2"><span class="text-purple-400">💨</span> 尝试撤离</button>
+        <button onclick="openBasicMenu()" class="w-full py-1.5 px-3 bg-slate-900/80 hover:bg-cyan-950/60 border border-slate-700/80 hover:border-cyan-500/60 rounded-lg text-xs font-bold text-slate-200 hover:text-cyan-300 transition-all flex items-center gap-2 shadow-sm"><span>📦</span> 基础行动</button>
+        <button onclick="openAttackSkillMenu()" class="w-full py-1.5 px-3 bg-gradient-to-r from-rose-950/90 to-slate-900 border border-rose-500/50 rounded-lg text-xs font-bold text-white shadow-[0_0_12px_rgba(244,63,94,0.18)] hover:scale-[1.01] transition-all flex items-center gap-2"><span class="text-rose-300">🗡️</span> 攻击技能</button>
+        <button onclick="openSupportSkillMenu()" class="w-full py-1.5 px-3 bg-gradient-to-r from-emerald-950/90 to-slate-900 border border-emerald-500/50 rounded-lg text-xs font-bold text-white shadow-[0_0_12px_rgba(16,185,129,0.18)] hover:scale-[1.01] transition-all flex items-center gap-2"><span class="text-emerald-300">✨</span> 辅助技能</button>
+        <button onclick="openItemMenu()" class="w-full py-1.5 px-3 bg-slate-900/80 hover:bg-amber-950/60 border border-slate-700/80 hover:border-amber-500/60 rounded-lg text-xs font-bold text-slate-200 hover:text-amber-300 transition-all flex items-center gap-2"><span>🎒</span> 物品道具</button>
       </div>
       <div id="charge-menu" class="flex-1 flex-col p-2 gap-1 justify-center relative" style="display:none"></div>
-      <div id="skill-menu" class="absolute inset-0 bg-slate-950/95 flex flex-col transform translate-x-full transition-transform duration-300 z-10 min-h-0">
+      <div id="basic-menu" class="absolute inset-0 bg-slate-950/95 flex flex-col transform translate-x-full transition-transform duration-300 z-10 min-h-0">
+        <div class="px-2.5 py-1 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 border-b border-slate-800 flex justify-between items-center shrink-0">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shrink-0"></span>
+            <span class="text-xs font-bold text-cyan-300">基础行动</span>
+          </div>
+          <button onclick="closeBasicMenu()" class="text-[9px] text-slate-400 hover:text-white transition-colors flex items-center gap-1 bg-slate-800/80 px-1.5 py-0.2 rounded border border-slate-700"><span>↩</span> 返回</button>
+        </div>
+        <div class="flex-1 flex flex-col gap-1 p-1.5 justify-center">
+          <button onclick="handleBasicAttack()" class="w-full py-2 px-3 bg-slate-900/80 hover:bg-cyan-950/60 border border-slate-700/80 hover:border-cyan-500/60 rounded-lg text-xs font-bold text-slate-200 hover:text-cyan-300 transition-all flex items-center gap-2"><span class="text-rose-400">⚔️</span> 普攻攻击</button>
+          <button onclick="handleBasicDefend()" class="w-full py-2 px-3 bg-slate-900/80 hover:bg-emerald-950/60 border border-slate-700/80 hover:border-emerald-500/60 rounded-lg text-xs font-bold text-slate-200 hover:text-emerald-300 transition-all flex items-center gap-2"><span class="text-emerald-400">🛡️</span> 防御姿态</button>
+          <button onclick="handleBasicRetreat()" class="w-full py-2 px-3 bg-slate-900/80 hover:bg-purple-950/60 border border-slate-700/80 hover:border-purple-500/60 rounded-lg text-xs font-bold text-slate-200 hover:text-purple-300 transition-all flex items-center gap-2"><span class="text-purple-400">💨</span> 尝试撤离</button>
+        </div>
+      </div>
+      <div id="attack-skill-menu" class="absolute inset-0 bg-slate-950/95 flex flex-col transform translate-x-full transition-transform duration-300 z-10 min-h-0">
+        <div class="px-2.5 py-1 bg-gradient-to-r from-rose-950/60 via-slate-900/90 to-slate-950 border-b border-rose-900/40 flex justify-between items-center shrink-0">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse shrink-0"></span>
+            <span class="text-xs font-bold text-rose-300">攻击技能</span>
+          </div>
+          <button onclick="closeAttackSkillMenu()" class="text-[9px] text-slate-400 hover:text-white transition-colors flex items-center gap-1 bg-slate-800/80 px-1.5 py-0.2 rounded border border-slate-700"><span>↩</span> 返回</button>
+        </div>
+        <div id="attack-skill-list" class="flex-1 flex flex-col gap-1 p-1 overflow-y-auto custom-scrollbar"></div>
+      </div>
+      <div id="support-skill-menu" class="absolute inset-0 bg-slate-950/95 flex flex-col transform translate-x-full transition-transform duration-300 z-10 min-h-0">
+        <div class="px-2.5 py-1 bg-gradient-to-r from-emerald-950/60 via-slate-900/90 to-slate-950 border-b border-emerald-900/40 flex justify-between items-center shrink-0">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+            <span class="text-xs font-bold text-emerald-300">辅助技能</span>
+          </div>
+          <button onclick="closeSupportSkillMenu()" class="text-[9px] text-slate-400 hover:text-white transition-colors flex items-center gap-1 bg-slate-800/80 px-1.5 py-0.2 rounded border border-slate-700"><span>↩</span> 返回</button>
+        </div>
+        <div id="support-skill-list" class="flex-1 flex flex-col gap-1 p-1 overflow-y-auto custom-scrollbar"></div>
+      </div>
+      <div id="item-menu" class="absolute inset-0 bg-slate-950/95 flex flex-col transform translate-x-full transition-transform duration-300 z-10 min-h-0">
+        <div class="px-2.5 py-1 bg-gradient-to-r from-amber-950/60 via-slate-900/90 to-slate-950 border-b border-amber-900/40 flex justify-between items-center shrink-0">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
+            <span class="text-xs font-bold text-amber-300">物品道具</span>
+          </div>
+          <button onclick="closeItemMenu()" class="text-[9px] text-slate-400 hover:text-white transition-colors flex items-center gap-1 bg-slate-800/80 px-1.5 py-0.2 rounded border border-slate-700"><span>↩</span> 返回</button>
+        </div>
+        <div class="flex-1 flex flex-col items-center justify-center gap-2 p-4 text-center">
+          <div class="text-2xl opacity-60">🎒</div>
+          <div class="text-xs font-bold text-amber-300 tracking-widest">物品系统开发中</div>
+          <div class="text-[10px] text-slate-400 leading-relaxed">敬请期待 · 下一轮开放背包与道具使用</div>
+          <div class="text-[9px] text-slate-500 border border-slate-700/60 rounded px-2 py-1 bg-slate-900/60">预留接口：不消耗回合</div>
+        </div>
+      </div>
+      <div id="skill-menu" class="absolute inset-0 bg-slate-950/95 hidden flex-col transform translate-x-full transition-transform duration-300 z-10 min-h-0">
         <div class="px-2.5 py-1 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 border-b border-slate-800 flex justify-between items-center shrink-0">
           <div class="flex items-center gap-1.5 min-w-0">
             <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shrink-0"></span>
@@ -12312,16 +12361,17 @@ function cancelCharge() {
   showLog(`⚠️ ${hero.name} 终止蓄力，可正常行动`);
 }
 
-// 根据英雄当前状态渲染右侧菜单：蓄力中 → 蓄力专用菜单；否则 → 正常 普攻/技能/防御 菜单
+// 根据英雄当前状态渲染右侧菜单：蓄力中 → 蓄力专用菜单；否则 → 正常 基础行动/双技能/物品 菜单
 function renderHeroMenu(hero) {
   if (hero.currentDelay) {
     const mm = document.getElementById('main-menu'); if (mm) mm.style.display = 'none';
     const cm = document.getElementById('charge-menu'); if (cm) cm.style.display = 'flex';
+    closeAllSubMenus();
     updateChargeMenu(hero);
   } else {
     const mm = document.getElementById('main-menu'); if (mm) mm.style.display = 'flex';
     const cm = document.getElementById('charge-menu'); if (cm) cm.style.display = 'none';
-    updateMenu(hero);
+    updateSkillMenus(hero);
   }
 }
 
@@ -12776,55 +12826,34 @@ async function actionDefend() {
 function skillHasBarrierTag(skill) {
   return [skill.type, skill.type2, skill.type3].some(t => t && t.includes('肃正'));
 }
+const MENU_DAMAGE_TAGS = ['单体','群攻','穿透','群穿透','眩晕','群眩晕'];
+function isAttackSkill(skill) {
+  const slots = [skill.type, skill.type2, skill.type3];
+  return MENU_DAMAGE_TAGS.some(t => slots.some(s => s && s.includes(t)));
+}
 
-function updateMenu(hero) {
-  if (!hero) return; const skillList = document.getElementById('skill-list'); skillList.innerHTML = '';
-  hero.skills.forEach((skill, idx) => {
-    // 反应/看破/舍身技能为被动触发，不列入主动技能面板（结算仍从完整 skills 数组扫描）
-    // 【召唤】虽带隐藏 sheshen 需排除，仅当 _ownerOnly 标记的召唤物守护技才排除；普通 sheshen 仍排除
-    if (skill.isReaction || skill.kanpoTarget || (skill.sheshenTarget && !skill._ownerOnly)) return;
-    // 【召唤】守护技（_ownerOnly）不进面板，但若本条是召唤技能本身（summonTarget）需放行
-    if (skill._ownerOnly && !skill.summonTarget) return;
+function createSkillCard(hero, skill, idx) {
     const isExtraTurnSkill = skill.type.includes('再动') || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
     const isUsedExtraTurn = isExtraTurnSkill && state.usedExtraTurnSkillsThisRound && state.usedExtraTurnSkillsThisRound.has(skill.name);
     const usesLeft = skill.maxUses > 0 ? (skill.usesRemaining ?? skill.maxUses) : 0;
     const isUsesExhausted = skill.maxUses > 0 && usesLeft <= 0;
-    
     const isMpEnough = hero.mp >= skill.cost;
     const isHpEnough = hero.hp > (skill.hpCost || 0);
     const isTpEnough = hero.tp >= (skill.tpCost || 0);
-    // 极限爆发激活时，施法会将 TP 清零（triggerBurstIfNeeded），TP 消耗技能必然释放失败 → 禁用不可选
     const isBurstBlocked = hero.burstActivated && skill.tpCost > 0;
-    // 【肃正】屏障存在时，所有肃正技能灰卡不可选（击破后才能重新施放）
     const isBarrierBlocked = teamBarrier > 0 && skillHasBarrierTag(skill);
     const isEnough = isMpEnough && isHpEnough && isTpEnough && !isBurstBlocked && !isUsedExtraTurn && !isUsesExhausted && !isBarrierBlocked;
-
     let themeClass = 'skill-card-default';
     let typeBadgeStyle = 'bg-slate-800 text-slate-300 border-slate-600/60';
     let typeIcon = '⚔️';
-
-    if (skill.damageType === '法术') {
-      themeClass = 'skill-card-magic';
-      typeBadgeStyle = 'bg-purple-950/90 text-purple-300 border-purple-500/60';
-      typeIcon = '⚡';
-    } else if (skill.damageType === '远程') {
-      themeClass = 'skill-card-ranged';
-      typeBadgeStyle = 'bg-amber-950/90 text-amber-300 border-amber-500/60';
-      typeIcon = '🎯';
-    } else if (skill.damageType === '近战') {
-      themeClass = 'skill-card-melee';
-      typeBadgeStyle = 'bg-rose-950/90 text-rose-300 border-rose-500/60';
-      typeIcon = '🗡️';
-    }
-
+    if (skill.damageType === '法术') { themeClass = 'skill-card-magic'; typeBadgeStyle = 'bg-purple-950/90 text-purple-300 border-purple-500/60'; typeIcon = '⚡'; }
+    else if (skill.damageType === '远程') { themeClass = 'skill-card-ranged'; typeBadgeStyle = 'bg-amber-950/90 text-amber-300 border-amber-500/60'; typeIcon = '🎯'; }
+    else if (skill.damageType === '近战') { themeClass = 'skill-card-melee'; typeBadgeStyle = 'bg-rose-950/90 text-rose-300 border-rose-500/60'; typeIcon = '🗡️'; }
     let cardStateClass = themeClass;
     if (isUsesExhausted) cardStateClass += ' exhausted-card';
     else if (!isEnough) cardStateClass += ' disabled-card';
-
     const btn = document.createElement('button');
     btn.className = `w-full p-1.5 rounded-lg border border-slate-800/80 text-left shrink-0 flex flex-col gap-1 relative overflow-hidden transition-all duration-200 group ${cardStateClass}`;
-
-    // 第一排：【技能名称】 + 【技能类型】
     let row1Html = `
       <div class="flex items-center justify-between gap-1.5 w-full shrink-0">
         <div class="flex items-center gap-1 min-w-0">
@@ -12846,14 +12875,11 @@ function updateMenu(hero) {
         `}
       </div>
     `;
-
-    // 第二排：[技能效果] (至多三个) + [蓄力/延迟/加速/命中]
     let tagsHtml = '';
     function formatTagPill(typeStr, powerNum) {
       if (!typeStr || typeStr === '[无]') return '';
       let cleanTag = typeStr.replace(/[\[\]]/g, '');
       let colorStyle = 'bg-slate-900/80 text-slate-300 border-slate-700';
-
       if (cleanTag.includes('攻') || cleanTag.includes('单体') || cleanTag.includes('穿透')) colorStyle = 'bg-rose-950/80 text-rose-300 border-rose-800/70';
       else if (cleanTag.includes('回') || cleanTag.includes('冲') || cleanTag.includes('驱散')) colorStyle = 'bg-emerald-950/80 text-emerald-300 border-emerald-800/70';
       else if (cleanTag.includes('盾') || cleanTag.includes('防')) colorStyle = 'bg-blue-950/80 text-blue-300 border-blue-800/70';
@@ -12867,36 +12893,22 @@ function updateMenu(hero) {
       else if (cleanTag.includes('高阶')) colorStyle = 'bg-violet-950/90 text-violet-200 border-violet-500/70 font-bold';
       else if (cleanTag.includes('肃正')) colorStyle = 'bg-cyan-950/80 text-cyan-300 border-cyan-700/70';
       else if (cleanTag.includes('召唤')) colorStyle = 'bg-sky-950/90 text-sky-300 border-sky-500/70 font-bold';
-
       let pText = powerNum !== undefined && powerNum !== 0 ? `<span class="opacity-90 font-mono-num ml-0.5">${powerNum}</span>` : '';
       return `<span class="text-[8px] px-1 py-0.2 rounded border ${colorStyle} shrink-0 flex items-center leading-none">${cleanTag}${pText}</span>`;
     }
-
     if (skill.summonTarget) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-sky-950/90 text-sky-300 border-sky-500/70 shrink-0 flex items-center leading-none font-bold">召唤:${skill.summonTarget}</span>`;
     tagsHtml += formatTagPill(skill.type, skill.power);
     if (skill.type2) tagsHtml += formatTagPill(skill.type2, skill.power2);
     if (skill.type3) tagsHtml += formatTagPill(skill.type3, skill.power3);
-
-    if (skill.delay) {
-      tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-amber-950/90 text-amber-300 border-amber-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">⏳ 蓄力:${skill.delay}</span>`;
-    }
-    if (skill.haste) {
-      tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-cyan-950/90 text-cyan-300 border-cyan-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">⚡ 加速:${skill.haste}</span>`;
-    }
-    if (skill.hit && skill.hit !== 100) {
-      tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-slate-900 text-slate-400 border-slate-700 font-mono-num shrink-0 leading-none">🎯${skill.hit}</span>`;
-    }
-    if (skill.guaranteedHit) {
-      tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-rose-950/90 text-rose-300 border-rose-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">🎯 必中</span>`;
-    }
-
+    if (skill.delay) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-amber-950/90 text-amber-300 border-amber-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">⏳ 蓄力:${skill.delay}</span>`;
+    if (skill.haste) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-cyan-950/90 text-cyan-300 border-cyan-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">⚡ 加速:${skill.haste}</span>`;
+    if (skill.hit && skill.hit !== 100) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-slate-900 text-slate-400 border-slate-700 font-mono-num shrink-0 leading-none">🎯${skill.hit}</span>`;
+    if (skill.guaranteedHit) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-rose-950/90 text-rose-300 border-rose-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">🎯 必中</span>`;
     let row2Html = `
       <div class="flex items-center gap-1 flex-wrap w-full shrink-0">
         ${tagsHtml || '<span class="text-[8px] text-slate-500">无附加效果</span>'}
       </div>
     `;
-
-    // 第三排：[消耗] + [限x次/状态]
     let costBadgesHtml = '';
     if (skill.cost > 0) {
       const errClass = !isMpEnough ? 'text-rose-400 border-rose-500/80 bg-rose-950' : 'text-cyan-300 border-cyan-800/60 bg-cyan-950/60';
@@ -12910,21 +12922,13 @@ function updateMenu(hero) {
       const errClass = (!isTpEnough || isBurstBlocked) ? 'text-rose-400 border-rose-500/80 bg-rose-950' : 'text-emerald-300 border-emerald-800/60 bg-emerald-950/60';
       costBadgesHtml += `<span class="text-[8px] font-mono-num font-bold px-1 py-0.2 rounded border ${errClass} leading-none">🔥 ${skill.tpCost} TP</span>`;
     }
-    if (!costBadgesHtml) {
-      costBadgesHtml = `<span class="text-[8px] text-slate-400 font-mono leading-none">⚡ 零消耗</span>`;
-    }
-
+    if (!costBadgesHtml) costBadgesHtml = `<span class="text-[8px] text-slate-400 font-mono leading-none">⚡ 零消耗</span>`;
     let limitBadgeHtml = '';
-    if (isUsedExtraTurn) {
-      limitBadgeHtml += `<span class="text-[8px] font-bold px-1 py-0.2 rounded border bg-rose-950 text-rose-400 border-rose-800 leading-none">🚫 本轮已用</span>`;
-    } else if (skill.maxUses > 0) {
-      if (isUsesExhausted) {
-        limitBadgeHtml += `<span class="text-[8px] font-bold px-1 py-0.2 rounded border bg-rose-950 text-rose-400 border-rose-800 leading-none">🚫 已用尽</span>`;
-      } else {
-        limitBadgeHtml += `<span class="text-[8px] font-bold px-1 py-0.2 rounded border bg-amber-950 text-amber-300 border-amber-600/70 leading-none">📌 限${usesLeft}/${skill.maxUses}次</span>`;
-      }
+    if (isUsedExtraTurn) limitBadgeHtml += `<span class="text-[8px] font-bold px-1 py-0.2 rounded border bg-rose-950 text-rose-400 border-rose-800 leading-none">🚫 本轮已用</span>`;
+    else if (skill.maxUses > 0) {
+      if (isUsesExhausted) limitBadgeHtml += `<span class="text-[8px] font-bold px-1 py-0.2 rounded border bg-rose-950 text-rose-400 border-rose-800 leading-none">🚫 已用尽</span>`;
+      else limitBadgeHtml += `<span class="text-[8px] font-bold px-1 py-0.2 rounded border bg-amber-950 text-amber-300 border-amber-600/70 leading-none">📌 限${usesLeft}/${skill.maxUses}次</span>`;
     }
-
     let notEnoughNotice = '';
     if (!isUsesExhausted && !isUsedExtraTurn && !isEnough) {
       let missingArr = [];
@@ -12935,7 +12939,6 @@ function updateMenu(hero) {
       if (!isTpEnough) missingArr.push('TP不足');
       notEnoughNotice = `<span class="text-[8px] text-rose-400 font-bold leading-none">⚠️ ${missingArr.join(' ')}</span>`;
     }
-
     let row3Html = `
       <div class="flex items-center justify-between gap-1 w-full shrink-0 pt-0.5 border-t border-slate-800/80">
         <div class="flex items-center gap-1 flex-wrap">
@@ -12947,11 +12950,38 @@ function updateMenu(hero) {
         </div>
       </div>
     `;
-
     btn.innerHTML = row1Html + row2Html + row3Html;
     if (isEnough) btn.onclick = () => prepareSkillTarget(idx);
-    skillList.appendChild(btn);
+    return btn;
+}
+function updateMenu(hero) {
+  updateSkillMenus(hero);
+}
+function updateSkillMenus(hero) {
+  if (!hero) return;
+  const atkList = document.getElementById('attack-skill-list');
+  const supList = document.getElementById('support-skill-list');
+  const legacyList = document.getElementById('skill-list');
+  if (atkList) atkList.innerHTML = '';
+  if (supList) supList.innerHTML = '';
+  if (legacyList) legacyList.innerHTML = '';
+  let atkCount = 0, supCount = 0;
+  hero.skills.forEach((skill, idx) => {
+    if (skill.isReaction || skill.kanpoTarget || (skill.sheshenTarget && !skill._ownerOnly)) return;
+    if (skill._ownerOnly && !skill.summonTarget) return;
+    const btn = createSkillCard(hero, skill, idx);
+    const atk = isAttackSkill(skill);
+    if (atk) { if (atkList) atkList.appendChild(btn); atkCount++; }
+    else { if (supList) supList.appendChild(btn); supCount++; }
   });
+  function emptyTip(text) {
+    const div = document.createElement('div');
+    div.className = 'text-[10px] text-slate-500 text-center py-6 leading-relaxed';
+    div.textContent = text;
+    return div;
+  }
+  if (atkList && atkCount === 0) atkList.appendChild(emptyTip('暂无攻击技能'));
+  if (supList && supCount === 0) supList.appendChild(emptyTip('暂无辅助技能'));
 }
 
 function updateActiveHeroDisplay(activeHeroId) {
@@ -12974,8 +13004,25 @@ function updateActiveHeroDisplay(activeHeroId) {
   }
 }
 
-function openSkillMenu() { if (!state.isAnimating) document.getElementById('skill-menu').classList.remove('translate-x-full'); }
-function closeSkillMenu() { document.getElementById('skill-menu').classList.add('translate-x-full'); }
+function closeAllSubMenus() {
+  ['basic-menu','attack-skill-menu','support-skill-menu','item-menu','skill-menu'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.classList.add('translate-x-full');
+  });
+}
+function openBasicMenu() { if (state.isAnimating) return; const el=document.getElementById('basic-menu'); if(el) el.classList.remove('translate-x-full'); }
+function closeBasicMenu() { const el=document.getElementById('basic-menu'); if(el) el.classList.add('translate-x-full'); }
+function openAttackSkillMenu() { if (state.isAnimating) return; const el=document.getElementById('attack-skill-menu'); if(el) el.classList.remove('translate-x-full'); }
+function closeAttackSkillMenu() { const el=document.getElementById('attack-skill-menu'); if(el) el.classList.add('translate-x-full'); }
+function openSupportSkillMenu() { if (state.isAnimating) return; const el=document.getElementById('support-skill-menu'); if(el) el.classList.remove('translate-x-full'); }
+function closeSupportSkillMenu() { const el=document.getElementById('support-skill-menu'); if(el) el.classList.add('translate-x-full'); }
+function openItemMenu() { if (state.isAnimating) return; const el=document.getElementById('item-menu'); if(el) el.classList.remove('translate-x-full'); }
+function closeItemMenu() { const el=document.getElementById('item-menu'); if(el) el.classList.add('translate-x-full'); }
+function handleBasicAttack() { closeBasicMenu(); prepareAttack(); }
+function handleBasicDefend() { closeBasicMenu(); actionDefend(); }
+function handleBasicRetreat() { closeBasicMenu(); retreatBattle(); }
+function closeAllSkillMenus() { closeAllSubMenus(); }
+function openSkillMenu() { openAttackSkillMenu(); }
+function closeSkillMenu() { closeAllSubMenus(); }
 
 function resetBattle(btn) {
   if (btn.innerText === "确认重置？") {
