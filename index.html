@@ -1545,6 +1545,11 @@
       color: #67e8f9; font-family: 'Cinzel', serif; font-size: 10px; font-weight: 700;
       letter-spacing: 0.15em; box-shadow: 0 0 8px rgba(6, 182, 212, 0.25);
     }
+    /* === 回合折叠（details/summary，零 JS，同 2b2 纯 CSS 折叠底座写法） === */
+    details.history-round-fold > summary { list-style: none; cursor: pointer; }
+    details.history-round-fold > summary::-webkit-details-marker { display: none; }
+    details.history-round-fold > summary .fold-arrow { transition: transform 0.2s; display: inline-block; }
+    details.history-round-fold[open] > summary .fold-arrow { transform: rotate(180deg); }
     .history-field-bar {
       display: flex; align-items: center; gap: 6px;
       padding: 6px 10px; border-radius: 8px;
@@ -2369,24 +2374,43 @@ function renderHistorySchemeA(list, container) {
     container.innerHTML = '<div class="text-center text-sm text-slate-500 py-10">（暂无战局记录）</div>';
     return;
   }
+  let latestRound = 0;
+  for (const it of list) { if (it.type === 'round' && it.round > latestRound) latestRound = it.round; }
   let h = '<div class="space-y-3">';
+  let grp = null; // 当前回合组缓冲 { round, body, count }：遇下一个回合头或循环末尾落盘
+  const flushGroup = () => {
+    if (!grp) return;
+    h += '<details class="history-round-fold my-2.5"' + (grp.round === latestRound ? ' open' : '') + '>'
+      + '<summary class="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-800/40 transition-colors">'
+      + '<div class="h-[1px] flex-1 bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent"></div>'
+      + '<span class="history-round-pill">ROUND ' + String(grp.round).padStart(2,'0') + '</span>'
+      + (grp.count ? '<span class="text-[10px] text-slate-500 font-mono-num">' + grp.count + ' 条</span>' : '')
+      + '<div class="h-[1px] flex-1 bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent"></div>'
+      + '<span class="fold-arrow text-[10px] text-cyan-300/70 shrink-0">▼</span>'
+      + '</summary><div class="space-y-3 pt-1">' + grp.body + '</div></details>';
+    grp = null;
+  };
   for (const item of list) {
     if (currentHistoryFilter === 'dialogue' && item.type !== 'dialogue' && item.type !== 'round') continue;
     if (currentHistoryFilter === 'action' && item.type !== 'action' && item.type !== 'round' && item.type !== 'sub') continue;
     if (currentHistoryFilter === 'critical' && item.type !== 'critical' && item.type !== 'round') continue;
     if (item.type === 'round') {
-      h += '<div class="flex items-center gap-2 my-2.5"><div class="h-[1px] flex-1 bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent"></div><span class="history-round-pill">ROUND ' + String(item.round).padStart(2,'0') + '</span><div class="h-[1px] flex-1 bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent"></div></div>';
-    } else if (item.type === 'field') {
-      h += '<div class="history-field-bar"><span>🏟️</span><span class="font-bold">场地：</span><span>' + escapeHistoryHtml(item.text) + '</span></div>';
+      flushGroup();
+      grp = { round: item.round, body: '', count: 0 };
+      continue;
+    }
+    let itemHtml = '';
+    if (item.type === 'field') {
+      itemHtml = '<div class="history-field-bar"><span>🏟️</span><span class="font-bold">场地：</span><span>' + escapeHistoryHtml(item.text) + '</span></div>';
     } else if (item.type === 'dialogue') {
       const isH = !!item.isHero;
       const align = isH ? "justify-start" : "justify-end";
       const bubble = isH ? "bg-slate-900/90 border-cyan-500/35 text-slate-100 rounded-tl-none shadow-[0_0_12px_rgba(6,182,212,0.15)]" : "bg-rose-950/50 border-rose-500/35 text-rose-100 rounded-tr-none shadow-[0_0_12px_rgba(244,63,94,0.15)]";
       const badge = isH ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40" : "bg-rose-500/20 text-rose-300 border-rose-500/40";
-      h += '<div class="flex items-start gap-2 ' + align + '">' + (isH ? renderLiveAvatar(item.avatar, "w-8 h-8", true) : '') + '<div class="max-w-[82%] flex flex-col ' + (isH ? 'items-start' : 'items-end') + '"><span class="text-[9px] font-bold px-1.5 py-0.5 rounded border ' + badge + ' mb-0.5">' + escapeHistoryHtml(item.speaker) + '</span><div class="px-3 py-2 rounded-xl border backdrop-blur-md text-[11px] sm:text-xs leading-relaxed ' + bubble + '">' + escapeHistoryHtml(item.speech) + '</div></div>' + (!isH ? renderLiveAvatar(item.avatar, "w-8 h-8", false) : '') + '</div>';
+      itemHtml = '<div class="flex items-start gap-2 ' + align + '">' + (isH ? renderLiveAvatar(item.avatar, "w-8 h-8", true) : '') + '<div class="max-w-[82%] flex flex-col ' + (isH ? 'items-start' : 'items-end') + '"><span class="text-[9px] font-bold px-1.5 py-0.5 rounded border ' + badge + ' mb-0.5">' + escapeHistoryHtml(item.speaker) + '</span><div class="px-3 py-2 rounded-xl border backdrop-blur-md text-[11px] sm:text-xs leading-relaxed ' + bubble + '">' + escapeHistoryHtml(item.speech) + '</div></div>' + (!isH ? renderLiveAvatar(item.avatar, "w-8 h-8", false) : '') + '</div>';
     } else if (item.type === 'critical') {
       const bd = item.isDeath ? "border-rose-600/60 bg-rose-950/40 text-rose-200" : (item.isRevive ? "border-emerald-500/60 bg-emerald-950/40 text-emerald-200" : "border-amber-500/60 bg-amber-950/40 text-amber-200");
-      h += '<div class="px-3 py-1.5 rounded-lg border ' + bd + ' flex items-center justify-between text-[11px] font-semibold gap-2"><div class="flex items-center gap-1.5 min-w-0"><span>' + (item.isDeath ? '💀' : (item.isRevive ? '🌟' : '⚠️')) + '</span><span class="truncate">' + escapeHistoryHtml(item.text) + '</span></div><span class="text-[9px] uppercase font-cinzel opacity-70 shrink-0">STATUS</span></div>';
+      itemHtml = '<div class="px-3 py-1.5 rounded-lg border ' + bd + ' flex items-center justify-between text-[11px] font-semibold gap-2"><div class="flex items-center gap-1.5 min-w-0"><span>' + (item.isDeath ? '💀' : (item.isRevive ? '🌟' : '⚠️')) + '</span><span class="truncate">' + escapeHistoryHtml(item.text) + '</span></div><span class="text-[9px] uppercase font-cinzel opacity-70 shrink-0">STATUS</span></div>';
     } else if (item.type === 'action') {
       const isH = !!item.isHero;
       const bg = isH ? "bg-slate-900/60 border-slate-700/60" : "bg-slate-950/70 border-slate-800";
@@ -2403,13 +2427,16 @@ function renderHistorySchemeA(list, container) {
         }).join('') + '</div>';
       }
       const targetPart = item.target ? '<span class="text-[9px] text-slate-500">▶</span>' + renderLiveAvatar(item.targetAvatar, "w-5 h-5", !isH) + '<span class="text-[11px] text-slate-300">' + escapeHistoryHtml(item.target) + '</span>' : '';
-      h += '<div class="history-action-card ' + bg + '"><div class="flex items-center justify-between flex-wrap gap-1.5"><div class="flex items-center gap-1.5 min-w-0">' + renderLiveAvatar(item.casterAvatar, "w-6 h-6", isH) + '<span class="text-xs font-bold ' + (isH ? 'text-cyan-300' : 'text-rose-300') + '">' + escapeHistoryHtml(item.caster) + '</span>' + targetPart + '</div><span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-700/60 shrink-0">【' + escapeHistoryHtml(item.skill) + '】</span></div>' + subHtml + '</div>';
+      itemHtml = '<div class="history-action-card ' + bg + '"><div class="flex items-center justify-between flex-wrap gap-1.5"><div class="flex items-center gap-1.5 min-w-0">' + renderLiveAvatar(item.casterAvatar, "w-6 h-6", isH) + '<span class="text-xs font-bold ' + (isH ? 'text-cyan-300' : 'text-rose-300') + '">' + escapeHistoryHtml(item.caster) + '</span>' + targetPart + '</div><span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-700/60 shrink-0">【' + escapeHistoryHtml(item.skill) + '】</span></div>' + subHtml + '</div>';
     } else if (item.type === 'sub') {
-      h += '<div class="history-action-card bg-slate-900/40 border-slate-700/40"><div class="flex items-center gap-1 text-[10px] text-slate-300"><span class="text-slate-500">↳</span><span>' + escapeHistoryHtml(item.text) + '</span></div></div>';
+      itemHtml = '<div class="history-action-card bg-slate-900/40 border-slate-700/40"><div class="flex items-center gap-1 text-[10px] text-slate-300"><span class="text-slate-500">↳</span><span>' + escapeHistoryHtml(item.text) + '</span></div></div>';
     } else if (item.type === 'other') {
-      h += '<div class="text-[11px] text-slate-400 leading-relaxed px-1">' + escapeHistoryHtml(item.text) + '</div>';
+      itemHtml = '<div class="text-[11px] text-slate-400 leading-relaxed px-1">' + escapeHistoryHtml(item.text) + '</div>';
     }
+    if (grp) { grp.body += itemHtml; grp.count++; }
+    else { h += itemHtml; }
   }
+  flushGroup();
   h += '</div>';
   container.innerHTML = h;
 }
