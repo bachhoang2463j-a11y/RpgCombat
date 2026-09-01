@@ -2001,7 +2001,7 @@ console.log('CRITICAL_LOG: 1. Script tag start');
 const SKILL_TYPES = [
   '[无]', '[群攻]', '[群攻(爆炸)]', '[群攻(雷)]', '[单体]', '[单体(枪击)]', '[单体(火焰)]', '[单体(光)]', '[群回]', '[单回]', '[群增]', 
   '[单增]', '[群防]', '[单防]', '[群盾]', '[单盾]',
-  '[群回蓝]', '[单回蓝]', '[群冲]', '[单冲]', '[群瞄]', '[单瞄]', '[群降]', '[单降]', '[群盲]', '[单盲]', '[群滞]', '[单滞]', '[群弱]', '[单弱]', '[嘲讽]', '[反击]', '[群反击]', '[再动]', '[回避]', '[群避]', '[单避]',
+  '[群回蓝]', '[单回蓝]', '[吸蓝]', '[群冲]', '[单冲]', '[群瞄]', '[单瞄]', '[群降]', '[单降]', '[群盲]', '[单盲]', '[群滞]', '[单滞]', '[群弱]', '[单弱]', '[嘲讽]', '[反击]', '[群反击]', '[再动]', '[回避]', '[群避]', '[单避]',
   '[眩晕]', '[群眩晕]', '[穿透]', '[群穿透]', '[免伤]',
   '[中毒]', '[群中毒]', '[燃烧]', '[群燃烧]',
   '[单速]', '[群速]', '[单缓]', '[群缓]',
@@ -6754,7 +6754,22 @@ function parseAttributes(attrStr) {
     return { hp: hp ? parseInt(hp[1]) : 100, maxHp: hp ? parseInt(hp[2]) : 100, mp: mp ? parseInt(mp[1]) : 50, maxMp: mp ? parseInt(mp[2]) : 50, atk: atk ? parseInt(atk[1]) : 10, def: armor ? parseInt(armor[1]) : 5, spd: speed ? parseInt(speed[1]) : 100, actCount: act ? parseInt(act[1]) : 1, classType: classType, isWise: !!wiseMatch, attrTags: attrTags };
 }
 
+// [标签:N] 冒号简写归一化为 [标签;power:N]（技能/物品共用）
+// 白名单严格取自 SKILL_TYPES，故 [MP:8]/[Aim:120]/[Turns:5]/[延迟:1]/[数量:6]/[特效:火焰01] 等非槽位标签天然不受影响；
+// [驱散]/[群驱散]/[肃正] 自带冒号语义（见 dispelMatch / barrierMatch）且会另行注入标签槽，必须排除否则占两个槽。
+// 未来若给某个同时存在于 SKILL_TYPES 的标签引入新的冒号语义，需同步加入 EXCLUDE。
+let _slotTagNamesCache = null;
+function normalizeColonPowerTags(str) {
+    if (!_slotTagNamesCache) {
+        const EXCLUDE = new Set(['驱散', '群驱散', '肃正']);
+        _slotTagNamesCache = new Set(SKILL_TYPES.map(t => t.replace(/[\[\]]/g, '')).filter(n => !EXCLUDE.has(n)));
+    }
+    return String(str || '').replace(/\[([^\[\]:;]+)[:：](-?\d+)\]/g,
+        (m, tag, n) => _slotTagNamesCache.has(tag.trim()) ? `[${tag.trim()};power:${n}]` : m);
+}
+
 function parseSkill(skillStr) {
+    skillStr = normalizeColonPowerTags(skillStr);
     let nameMatch = skillStr.match(/【(.*?)】/); let name = nameMatch ? nameMatch[1] : "普通攻击";
     
     let mpMatch = skillStr.match(/\[MP:(\d+)\]/i); let cost = mpMatch ? parseInt(mpMatch[1]) : 0;
@@ -6827,6 +6842,10 @@ function parseSkill(skillStr) {
     let isOthers = /\[他人\]/i.test(skillStr);
     // 解析 [必中] 标签 → skill.guaranteedHit（独立布尔标记：跳过命中/闪避判定，伤害与减益必中，模拟大范围妨害）
     let guaranteedHit = /\[必中\]/i.test(skillStr);
+    // 解析 [暴击:N%] 标签 → skill.critRate（独立数值标记，不占标签槽；N 为百分比整数，`%` 可省）
+    // 命中时按 N% 概率触发与【极限爆发】相同的效果翻倍（详见 executeSkillAction 的暴击掷骰），敌我/技能/物品通用
+    let critMatch = skillStr.match(/\[暴击[:：]\s*(\d+)\s*%?\]/i);
+    let critRate = critMatch ? Math.max(0, Math.min(100, parseInt(critMatch[1]))) : 0;
     // 解析 [高阶]/[传奇]/[神术] 叙事标签（仅旁白，无战斗数值效果；[神术]为[传奇]别名，传奇优先级高于高阶）
     let _isLegendary = /\[传奇\]|\[神术\]/i.test(skillStr);
     let _isHighTier = !_isLegendary && /\[高阶\]/i.test(skillStr);
@@ -6837,9 +6856,10 @@ function parseSkill(skillStr) {
     let turnsMatch = skillStr.match(/\[(?:Turns|Turn|回|持续):(\d+)\]/i);
     let turns = turnsMatch ? parseInt(turnsMatch[1]) : null; 
     
-    let typeMatches = [...skillStr.matchAll(/\[(.*?);power:(-?\d+)\]/gi)];
+    // 效果槽正则：标签名内禁止出现 `[` `]` `;`，避免惰性匹配跨括号把前一个无 power 的标签与后一个 `;power:N` 标签吞成同一个
+    let typeMatches = [...skillStr.matchAll(/\[([^\[\];]*?);power:(-?\d+)\]/gi)];
     let types = ['[无]', '[无]', '[无]']; let powers = [0, 0, 0];
-    let singleTagMatches = [...skillStr.matchAll(/\[(群攻.*?|单体.*?|群回|单回|单瞄|群防|单防|群盾|单盾|嘲讽|群降|群滞|单滞|群弱|单弱|中毒|群中毒|燃烧|群燃烧|再动|回避|群避|单避|免伤|反击|群反击|肃正|单速|群速|单缓|群缓|高阶|传奇|神术)\]/gi)];
+    let singleTagMatches = [...skillStr.matchAll(/\[(群攻.*?|单体.*?|群回|单回|单瞄|群防|单防|群盾|单盾|嘲讽|群降|群滞|单滞|群弱|单弱|中毒|群中毒|燃烧|群燃烧|再动|回避|群避|单避|免伤|反击|群反击|肃正|单速|群速|单缓|群缓|吸蓝|高阶|传奇|神术)\]/gi)];
     
     if (typeMatches.length > 0) { 
         for (let i = 0; i < Math.min(typeMatches.length, 3); i++) { 
@@ -6881,7 +6901,7 @@ function parseSkill(skillStr) {
     let fxTagMatch = skillStr.match(/\[特效:([^\]]+)\]/i);
     let fxTag = fxTagMatch ? fxTagMatch[1].trim() : null;
 
-    return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, hit: hit, turns: turns, type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, sheshenTarget: sheshenTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, isHighTier: _isHighTier, isLegendary: _isLegendary, summonTarget: summonTarget };
+    return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, hit: hit, turns: turns, type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, sheshenTarget: sheshenTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, critRate: critRate, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, isHighTier: _isHighTier, isLegendary: _isLegendary, summonTarget: summonTarget };
 }
 
 // ==========================================
@@ -6891,7 +6911,7 @@ function parseSkill(skillStr) {
 // 类别缺失按 [道具] 兜底并告警；道具缺 [次数:N] 视为不限次数（与技能限次语义一致）；弹药类忽略效果槽
 // ==========================================
 function parseItem(itemStr) {
-    const raw = String(itemStr || '');
+    let raw = normalizeColonPowerTags(itemStr);
     let nameMatch = raw.match(/【(.*?)】/); let name = nameMatch ? nameMatch[1] : "未知物品";
 
     // 类别标签：三选一，缺失兜底 [道具]（保守：每场重置、不会永久损耗）
@@ -6918,10 +6938,10 @@ function parseItem(itemStr) {
         });
     }
 
-    // 效果槽：与 parseSkill 完全同构（[xxx;power:N] 优先占槽，裸标签白名单兜底）
-    let typeMatches = [...raw.matchAll(/\[(.*?);power:(-?\d+)\]/gi)];
+    // 效果槽：与 parseSkill 完全同构（[xxx;power:N] 优先占槽，裸标签白名单兜底；标签名禁含 `[` `]` `;` 防跨括号吞并）
+    let typeMatches = [...raw.matchAll(/\[([^\[\];]*?);power:(-?\d+)\]/gi)];
     let types = ['[无]', '[无]', '[无]']; let powers = [0, 0, 0];
-    let singleTagMatches = [...raw.matchAll(/\[(群攻.*?|单体.*?|群回蓝|单回蓝|群回|单回|单瞄|群防|单防|群盾|单盾|嘲讽|群降|群滞|单滞|群弱|单弱|中毒|群中毒|燃烧|群燃烧|再动|回避|群避|单避|免伤|反击|群反击|肃正|单速|群速|单缓|群缓|高阶|传奇|神术)\]/gi)];
+    let singleTagMatches = [...raw.matchAll(/\[(群攻.*?|单体.*?|群回蓝|单回蓝|群回|单回|单瞄|群防|单防|群盾|单盾|嘲讽|群降|群滞|单滞|群弱|单弱|中毒|群中毒|燃烧|群燃烧|再动|回避|群避|单避|免伤|反击|群反击|肃正|单速|群速|单缓|群缓|吸蓝|高阶|传奇|神术)\]/gi)];
     if (typeMatches.length > 0) {
         for (let i = 0; i < Math.min(typeMatches.length, 3); i++) { types[i] = `[${typeMatches[i][1]}]`; powers[i] = parseInt(typeMatches[i][2]); }
     }
@@ -6932,6 +6952,9 @@ function parseItem(itemStr) {
 
     let isOthers = /\[他人\]/i.test(raw);
     let guaranteedHit = /\[必中\]/i.test(raw);
+    // [暴击:N%] 与技能同语义（不占效果槽）：物品使用时按 N% 概率触发效果翻倍
+    let critMatch = raw.match(/\[暴击[:：]\s*(\d+)\s*%?\]/i);
+    let critRate = critMatch ? Math.max(0, Math.min(100, parseInt(critMatch[1]))) : 0;
     // 解析 [高阶]/[传奇]/[神术] 叙事标签（仅旁白，无战斗数值效果；[神术]为[传奇]别名，传奇优先级高于高阶；与 parseSkill 同语义）
     let _isLegendary = /\[传奇\]|\[神术\]/i.test(raw);
     let _isHighTier = !_isLegendary && /\[高阶\]/i.test(raw);
@@ -6947,7 +6970,7 @@ function parseItem(itemStr) {
     // 弹药是技能资源而非主动道具：效果槽无意义，强制清空
     if (category === '弹药') { types = ['[无]', '[无]', '[无]']; powers = [0, 0, 0]; }
 
-    return { isItem: true, name: name, category: category, count: count, maxUses: maxUses, usesRemaining: maxUses, bindings: bindings, hit: hit, turns: turns, type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, fxTag: fxTag, isHighTier: _isHighTier, isLegendary: _isLegendary };
+    return { isItem: true, name: name, category: category, count: count, maxUses: maxUses, usesRemaining: maxUses, bindings: bindings, hit: hit, turns: turns, type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, critRate: critRate, fxTag: fxTag, isHighTier: _isHighTier, isLegendary: _isLegendary };
 }
 
 // ---- 物品绑定辅助（弹药/道具/消耗品通用）：渲染（技能卡徽章/灰显）与执行（扣减）共用同一张索引表 ----
@@ -7002,6 +7025,19 @@ function consumeBindingsForSkill(hero, skill) {
 function bindingsSpendLabel(hero, skill) {
     const list = getHeroItemBindings(hero).get(skill.name) || [];
     return list.length && list.every(b => b.item.category === '弹药') ? '消耗弹药' : '消耗材料';
+}
+
+// 反应/看破/舍身弹窗的绑定需求徽章（与技能卡 costBadges 同款口径；无绑定返回空串）
+// 弹窗候选已按 hasEnoughBindings 预筛，故此处只需展示需求与剩余量，不做不足态配色
+function bindingsBadgeHTML(hero, skill) {
+    const list = getHeroItemBindings(hero).get(skill.name) || [];
+    return list.map(b => {
+        const it = b.item;
+        const isGear = it.category === '道具';
+        const remain = isGear ? `${(it.usesRemaining ?? it.maxUses) || 0}次` : `${it.count || 0}`;
+        const icon = it.category === '弹药' ? '🔹' : it.category === '消耗品' ? '🧪' : '🎒';
+        return `<span class="text-[8px] px-1 py-0.2 rounded bg-amber-950/80 text-amber-300 border border-amber-600/50 font-mono-num shrink-0">${icon} ${it.name}×${b.cost}（剩${remain}）</span>`;
+    }).join('');
 }
 
 // 解析"我方列表(场地:xx)"键：返回 { key, field }。无后缀场地时 field = null（key 为兼容读取的键名）。
@@ -8871,6 +8907,26 @@ registerTagHandler('回蓝', (ctx) => {
     addHistory(`   ↳ 为 ${ctx.target.name} 恢复了 ${ctx.actualPower} 点法力值。`);
 });
 
+// 【吸蓝】单目标法力掠夺：命中后从目标身上抽走 power 点 MP 转给施法者（抽取量以目标当前 MP 为上限、施法者 maxMp 封顶）
+// 走减益命中管线（见 applySingleTagEffect 的 isDebuffTag）：闪避失败则整个抽取落空。
+// 收尾只会刷新"目标"UI，故施法者一侧的 MP 条需在此显式刷新。
+registerTagHandler('吸蓝', (ctx) => {
+    const drained = Math.max(0, Math.min(ctx.target.mp || 0, ctx.actualPower));
+    if (drained <= 0) {
+        createFloatingText(ctx.targetDom, '无法力可抽', 'text-slate-400');
+        addHistory(`   ↳ ${ctx.target.name} 已无法力可供抽取。`);
+        return;
+    }
+    playSound('mpHeal'); playSVGEffect(ctx.targetDom, 'debuff');
+    ctx.target.mp = Math.max(0, (ctx.target.mp || 0) - drained);
+    ctx.caster.mp = Math.min(ctx.caster.maxMp, (ctx.caster.mp || 0) + drained);
+    createFloatingText(ctx.targetDom, `-${drained}MP`, 'text-purple-400');
+    const casterDom = getEntitySpriteDom(ctx.caster) || (ctx.caster.id.startsWith('h') ? document.getElementById(`hero-card-${ctx.caster.id}`) : document.getElementById(`${ctx.caster.id}-sprite`));
+    createFloatingText(casterDom, `+${drained}MP`, 'text-cyan-400');
+    if (ctx.caster.id.startsWith('h')) updateHeroUI(ctx.caster); else updateEnemyUI(ctx.caster);
+    addHistory(`   ↳ 🔵 ${ctx.caster.name} 从 ${ctx.target.name} 身上抽取了 ${drained} 点法力值。`);
+});
+
 registerTagHandler('冲', (ctx) => {
     playSound('mpHeal'); playSVGEffect(ctx.targetDom, 'mpHeal');
     ctx.target.tp = Math.min(ctx.target.maxTp, ctx.target.tp + ctx.actualPower);
@@ -8965,13 +9021,14 @@ function reorderRemainingQueue() {
 
 /**
  * 标准化标签：找到注册的 key 中第一个包含在 tag 字符串内的匹配项
- * 精确匹配优先（如 [免伤]、[回避]），其次字符串包含匹配
+ * 精确匹配优先（如 [免伤]、[回避]），其次按 key 长度从长到短做包含匹配
+ * （长键优先保证 [单回蓝] 命中 '回蓝' 而非 '回'，不再依赖注册顺序）
  */
 function resolveTagHandler(tag) {
     // 1. 精确匹配优先
     if (TAG_HANDLERS[tag]) return TAG_HANDLERS[tag];
-    // 2. 遍历注册的 key，找第一个 tag 包含该 key 的处理器
-    for (const key of Object.keys(TAG_HANDLERS)) {
+    // 2. 按 key 长度降序遍历，找第一个 tag 包含该 key 的处理器
+    for (const key of Object.keys(TAG_HANDLERS).sort((a, b) => b.length - a.length)) {
         if (tag.includes(key)) return TAG_HANDLERS[key];
     }
     return null;
@@ -9611,6 +9668,7 @@ function buildSkillDetailHTML(skill, showTarget, target) {
         + `<div class="flex items-center gap-2">`
         + `<span class="text-slate-400">威力 <strong class="text-cyan-300">${(skill.power || 0) > 0 ? skill.power : '普攻'}</strong></span>`
         + `<span class="text-slate-400">命中 <strong class="text-indigo-300">${skill.hit ?? 100}</strong></span>`
+        + ((skill.critRate || 0) > 0 ? `<span class="text-orange-300 font-bold">💥${skill.critRate}%</span>` : '')
         + (targetText ? `<span class="text-emerald-300">${targetText}</span>` : '')
         + `</div>`
         + `</div>`;
@@ -9779,11 +9837,12 @@ function promptKanpo(candidates, attacker, incomingSkill, incomingTarget) {
                     <div class="flex items-center gap-2 min-w-0">
                         <img src="${hero.img}" class="w-6 h-6 rounded-full border border-amber-300 object-cover shrink-0">
                         <div class="text-left min-w-0">
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-1.5 flex-wrap">
                                 <span class="text-amber-300 font-black truncate">${hero.name}</span>
                                 <span class="text-white truncate">⚡ ${skill.name}</span>
                                 ${kanpoBadgeOf(skill)}
                                 ${limitOf(skill)}
+                                ${bindingsBadgeHTML(hero, skill)}
                             </div>
                         </div>
                     </div>
@@ -9824,6 +9883,7 @@ function promptKanpo(candidates, attacker, incomingSkill, incomingTarget) {
                     <div class="flex items-center gap-2">
                         <span class="text-slate-400">威力 <strong class="text-cyan-300">${(incomingSkill.power || 0) > 0 ? incomingSkill.power : '普攻'}</strong></span>
                         <span class="text-slate-400">命中 <strong class="text-indigo-300">${incomingSkill.hit ?? 100}</strong></span>
+                        ${(incomingSkill.critRate || 0) > 0 ? `<span class="text-orange-300 font-bold">💥${incomingSkill.critRate}%</span>` : ''}
                     </div>
                 </div>
                 <div class="mb-2.5 rounded-xl p-2 bg-black/40 border border-amber-500/30 text-[10px] font-mono">
@@ -10131,6 +10191,8 @@ async function checkKanpoInterrupt(ctx) {
             if ((s.tpCost || 0) > hero.tp) return;
             // [限N次] 用尽后静默失效（不再出现在看破弹窗候选）
             if (s.maxUses > 0 && (s.usesRemaining ?? s.maxUses) <= 0) return;
+            // 绑定物品（道具次数/消耗品数量/弹药发数）不足时同样静默失效，与主动技能灰卡同口径
+            if (!hasEnoughBindings(hero, s)) return;
 
             // 检测攻击类型匹配
             if (kanpoTarget === 'all' || incomingType.includes(kanpoTarget) || kanpoTarget.includes(incomingType)) {
@@ -10152,10 +10214,13 @@ async function checkKanpoInterrupt(ctx) {
         // [限N次] 看破成功使用时消耗真实技能剩余次数
         const realSkill = chosen.hero.skills.find(s => s.name === chosen.skill.name);
         if (realSkill && realSkill.maxUses > 0) realSkill.usesRemaining = Math.max(0, (realSkill.usesRemaining ?? realSkill.maxUses) - 1);
+        // 绑定物品消耗（看破走独立结算路径，不经 executeSkillAction，需自行扣减施展材料）
+        const _kanpoBindSpend = consumeBindingsForSkill(chosen.hero, chosen.skill);
         updateHeroUI(chosen.hero);
 
         await playKanpoEffect(chosen.hero, ctx.caster, ctx.skill);
         addHistory(`   ⛔ ${chosen.hero.name} 施展【${chosen.skill.name}】看穿了敌方气路，【${ctx.skill.name}】被彻底无效化！`);
+        if (_kanpoBindSpend) addHistory(`   ↳ ${bindingsSpendLabel(chosen.hero, chosen.skill)}：${_kanpoBindSpend}`);
         await triggerKanpoNarration(chosen.hero, chosen.skill, ctx.caster, ctx.skill);
         ctx.cancelled = true;
     }
@@ -10265,13 +10330,15 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill, sheshenCa
             return costHtml;
         };
         const limitOf = skill => skill.maxUses > 0 ? `<span class="text-rose-300 px-0.5">[限${skill.usesRemaining ?? skill.maxUses}次]</span>` : '';
+        // 绑定需求（道具/消耗品/弹药）：候选已按存量预筛，此处只展示需求与剩余量
+        const bindOf = (owner, skill) => bindingsBadgeHTML(owner, skill);
 
         let skillHtml = '';
         candidates.forEach((cand, index) => {
             if (cand.type === 'reaction') {
-                skillHtml += `<button class="group w-full px-3 py-2 bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900/80 hover:from-indigo-600 hover:to-purple-600 rounded-xl border border-indigo-500/40 hover:border-indigo-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md mb-1.5" onclick="resolveReaction(${index})"><div class="flex items-center gap-2"><span class="text-indigo-400 group-hover:text-white text-sm">⚡</span><div class="text-left"><div class="flex items-center gap-1.5"><span class="text-white font-black">${cand.skill.name}</span>${limitOf(cand.skill)}</div></div></div><div class="font-mono text-[11px] font-bold text-indigo-300 bg-black/40 px-2 py-0.5 rounded border border-indigo-500/30 group-hover:bg-indigo-900/60 flex gap-1">${costOf(cand.skill)}</div></button>`;
+                skillHtml += `<button class="group w-full px-3 py-2 bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900/80 hover:from-indigo-600 hover:to-purple-600 rounded-xl border border-indigo-500/40 hover:border-indigo-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md mb-1.5" onclick="resolveReaction(${index})"><div class="flex items-center gap-2 min-w-0"><span class="text-indigo-400 group-hover:text-white text-sm shrink-0">⚡</span><div class="text-left min-w-0"><div class="flex items-center gap-1.5 flex-wrap"><span class="text-white font-black">${cand.skill.name}</span>${limitOf(cand.skill)}${bindOf(cand.hero, cand.skill)}</div></div></div><div class="font-mono text-[11px] font-bold text-indigo-300 bg-black/40 px-2 py-0.5 rounded border border-indigo-500/30 group-hover:bg-indigo-900/60 flex gap-1 shrink-0">${costOf(cand.skill)}</div></button>`;
             } else {
-                skillHtml += `<button class="group w-full px-3 py-2 bg-gradient-to-r from-sky-950/80 via-blue-950/70 to-slate-900/80 hover:from-sky-600 hover:to-blue-600 rounded-xl border border-sky-500/50 hover:border-sky-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md mb-1.5" onclick="resolveReaction(${index})"><div class="flex items-center gap-2 min-w-0"><img src="${cand.hero.img}" class="w-5 h-5 rounded-full border border-sky-400 object-cover shrink-0"><div class="text-left min-w-0"><div class="flex items-center gap-1.5"><span class="text-sky-300 font-black truncate">${cand.hero.name}</span><span class="text-white truncate">🛡️ ${cand.skill.name}</span><span class="text-[8px] px-1 py-0.2 rounded bg-sky-400/20 text-sky-200 border border-sky-400/30 shrink-0">舍身</span>${limitOf(cand.skill)}</div></div></div><div class="font-mono text-[11px] font-bold text-sky-300 bg-black/40 px-2 py-0.5 rounded border border-sky-500/30 group-hover:bg-sky-900/60 flex gap-1 shrink-0">${costOf(cand.skill)}</div></button>`;
+                skillHtml += `<button class="group w-full px-3 py-2 bg-gradient-to-r from-sky-950/80 via-blue-950/70 to-slate-900/80 hover:from-sky-600 hover:to-blue-600 rounded-xl border border-sky-500/50 hover:border-sky-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md mb-1.5" onclick="resolveReaction(${index})"><div class="flex items-center gap-2 min-w-0"><img src="${cand.hero.img}" class="w-5 h-5 rounded-full border border-sky-400 object-cover shrink-0"><div class="text-left min-w-0"><div class="flex items-center gap-1.5 flex-wrap"><span class="text-sky-300 font-black truncate">${cand.hero.name}</span><span class="text-white truncate">🛡️ ${cand.skill.name}</span><span class="text-[8px] px-1 py-0.2 rounded bg-sky-400/20 text-sky-200 border border-sky-400/30 shrink-0">舍身</span>${limitOf(cand.skill)}${bindOf(cand.hero, cand.skill)}</div></div></div><div class="font-mono text-[11px] font-bold text-sky-300 bg-black/40 px-2 py-0.5 rounded border border-sky-500/30 group-hover:bg-sky-900/60 flex gap-1 shrink-0">${costOf(cand.skill)}</div></button>`;
             }
         });
         const skipText = onlySheshen ? '承受攻击' : '跳过 (不反应)';
@@ -10335,6 +10402,8 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
         if ((s.tpCost || 0) > target.tp) return false;
         // [限N次] 用尽后静默失效（不再出现在反应弹窗候选）
         if (s.maxUses > 0 && (s.usesRemaining ?? s.maxUses) <= 0) return false;
+        // 绑定物品（道具次数/消耗品数量/弹药发数）不足时同样静默失效，与主动技能灰卡同口径
+        if (!hasEnoughBindings(target, s)) return false;
         // 智能过滤反应条件
         if (s.reactionTarget !== 'all' && s.reactionTarget !== incomingDamageType) return false;
         // 【免伤】反应技只应对攻击类技能：非攻击类（纯 debuff/增益）不触发，避免白耗资源挂上无效免伤
@@ -10356,7 +10425,7 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
         if (reactionSkills.length > 0) {
             const autoSkill = reactionSkills[0];
             const buffsBefore = [...(target.buffs || [])];
-            await executeSkillAction(target, caster, autoSkill, 1, true);
+            await executeSkillAction(target, caster, autoSkill, 1, true, false, skill ? skill.name : null);
             await sleep(400);
             const newlyAddedEvaBuff = (target.buffs || []).find(b => b.type === 'eva' && !buffsBefore.includes(b));
             if (newlyAddedEvaBuff) {
@@ -10393,9 +10462,12 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
         // [限N次] 舍身成功使用时消耗真实技能剩余次数
         const realSkill = guardian.skills.find(s => s.name === chosen.skill.name);
         if (realSkill && realSkill.maxUses > 0) realSkill.usesRemaining = Math.max(0, (realSkill.usesRemaining ?? realSkill.maxUses) - 1);
+        // 绑定物品消耗（舍身走独立演出路径，不经 executeSkillAction，需自行扣减施展材料）
+        const _sheshenBindSpend = consumeBindingsForSkill(guardian, chosen.skill);
         updateHeroUI(guardian);
 
         addHistory(`   🛡️ ${guardian.name} 施展【${chosen.skill.name}】舍身护佑，替 ${target.name} 承受攻击！`);
+        if (_sheshenBindSpend) addHistory(`   ↳ ${bindingsSpendLabel(guardian, chosen.skill)}：${_sheshenBindSpend}`);
         // 轻量演出：聚焦暗化 + 钢蓝蓄力粒子
         const guardianDom = document.getElementById(`hero-card-${guardian.id}`);
         if (guardianDom) {
@@ -10416,7 +10488,7 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
         const buffsBefore = [...(target.buffs || [])];
 
         // 释放反应技能
-        await executeSkillAction(target, caster, chosenSkill, 1, true);
+        await executeSkillAction(target, caster, chosenSkill, 1, true, false, skill ? skill.name : null);
         await sleep(400); // 视觉停顿
 
         // 3. 检查刚刚的反应是否生成了回避Buff（只匹配本次反应中新添加的 buff，防止误伤已有持久型 buff）
@@ -10454,9 +10526,10 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
   const isHarmful = isDamage || tag.includes('降') || tag.includes('盲');
   const incomingDamageType = skill ? (skill.damageType || '近战') : '近战';
   // 极限爆发（仅我方消耗100TP激活）附加必中：本次伤害与减益恒命中（镜像 [必中] 语义，仍可被反应/看破主动化解）
-  const burstGuarantee = multiplier === 2 && caster.id.startsWith('h');
-  // 减益标签判断：作用于敌方的非伤害效果（降/盲/滞/弱/中毒/燃烧/缓）
-  const isDebuffTag = tag.includes('降') || tag.includes('盲') || tag.includes('滞') || tag.includes('弱') || tag.includes('中毒') || tag.includes('燃烧') || tag.includes('缓');
+  // [暴击:N%] 走同一条 multiplier=2 通路但只翻倍、不继承必中，故排除 _critDouble
+  const burstGuarantee = multiplier === 2 && caster.id.startsWith('h') && !(skill && skill._critDouble);
+  // 减益标签判断：作用于敌方的非伤害效果（降/盲/滞/弱/中毒/燃烧/缓/吸蓝）
+  const isDebuffTag = tag.includes('降') || tag.includes('盲') || tag.includes('滞') || tag.includes('弱') || tag.includes('中毒') || tag.includes('燃烧') || tag.includes('缓') || tag.includes('吸蓝');
 
   // 【肃正】屏障伪目标特判：屏障存在时我方角色不被选中，命中屏障。
   // 屏障只吸收伤害类攻击；非伤害的负面效果（降/盲等）无法命中屏障，被屏障格挡（我方不受益也不受害）。
@@ -10521,6 +10594,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
                     if ((s.tpCost || 0) > guardian.tp) return;
                     // [限N次] 用尽后静默失效
                     if (s.maxUses > 0 && (s.usesRemaining ?? s.maxUses) <= 0) return;
+                    // 绑定物品（道具次数/消耗品数量/弹药发数）不足时同样静默失效（召唤守护为内建技能，无绑定恒通过）
+                    if (!hasEnoughBindings(guardian, s)) return;
                     // 类型匹配（同看破的 includes 双向匹配）
                     if (sheshenTarget !== 'all' && !incomingDamageType.includes(sheshenTarget) && !sheshenTarget.includes(incomingDamageType)) return;
                     // 【召唤】替主挡死：仅damage类才可能致死，非damage的驱散等无需挡
@@ -11167,7 +11242,7 @@ function getTauntTarget(heroArray, wiseFocus) {
     return heroArray[heroArray.length - 1]; // Fallback
 }
 
-async function executeSkillAction(caster, primaryTarget, skill, multiplier, isReactionTrigger = false, skipCost = false) {
+async function executeSkillAction(caster, primaryTarget, skill, multiplier, isReactionTrigger = false, skipCost = false, incomingSkillName = null) {
     const _pendingKills = []; // 收集本次技能中所有被击杀的敌人，最后统一播放特写
     // 记录本次技能开始前是否已持有隐匿急袭 buff：
     // 若该 buff 是由本次技能自身（隐匿值累积跨100）刚刚授予的，则不应被本次技能消耗，留给下一次攻击
@@ -11214,6 +11289,22 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     if (multiplier === 1 && caster.id.startsWith('h') && !isReactionTrigger && !skill.isItem && !skill.tpCost && skill.name !== '普攻') {
         caster.tp = Math.min(caster.maxTp, caster.tp + 5);
     }
+
+    // === [暴击:N%] 掷骰（敌我 / 技能 / 物品 / 召唤 / 反应 / 蓄力释放共用此唯一汇聚点）===
+    // 命中即复用【极限爆发】的 multiplier=2 通路：伤害/治疗/护盾/DOT/buff 的 power 全部翻倍。
+    // 置于 TP 补充之后：暴击是白得的，不应吃掉常规 +5TP；multiplier===1 前置保证爆发回合不叠成四倍。
+    // _critDouble 仅在本次调用内有效（开头先清残留），供 applySingleTagEffect 区分"暴击翻倍"与"爆发翻倍"——
+    // 按设定暴击只翻倍、不继承爆发附带的必中。
+    if (skill) delete skill._critDouble;
+    if (multiplier === 1 && skill && (skill.critRate || 0) > 0 && Math.random() * 100 < skill.critRate) {
+        multiplier = 2;
+        skill._critDouble = true;
+        playSound('burst');
+        const critDom = getEntitySpriteDom(caster) || (caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`));
+        if (critDom) createFloatingText(critDom, "暴击!", "", true);
+        showLog(`【暴击】${caster.name} 效果翻倍！`);
+        await sleep(420);
+    }
     
     if (caster.id.startsWith('h')) updateHeroUI(caster); else updateEnemyUI(caster);
     // 【召唤】即时召唤：先做看破判定与召唤，再继续同技能其他标签（不再 early return 避免丢伤害/增益）
@@ -11258,13 +11349,15 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     else targetStr = primaryTarget ? primaryTarget.name : "目标";
     
     if(isReactionTrigger) {
-        addHistory(`> ⚡ 预判危机！${caster.name} 施展反应技【${skill.name}】`);
+        // 反应战报注明触发来源（谁的哪一招逼出了这次反应），绑定物品消耗由下方 _bindSpendDesc 子行体现
+        const _trigger = primaryTarget ? `（应对 ${primaryTarget.name}${incomingSkillName ? ` 的【${incomingSkillName}】` : ' 的攻击'}）` : '';
+        addHistory(`> ⚡ 预判危机！${caster.name} 施展反应技【${skill.name}】${_trigger}`);
     } else if (skill.isItem) {
         // 物品使用战报：自施物品读起来更自然（"对 自己 使用"），群效果沿用 targetStr（全体友方/敌方）
         const itemTargetStr = primaryTarget ? primaryTarget.name : (targetStr === '目标' ? '自己' : targetStr);
         addHistory(`> 🎒 ${caster.name} 对 ${itemTargetStr} 使用了【${skill.name}】`);
     } else {
-        addHistory(`> ${caster.name} 对 ${targetStr} 发动了【${skill.name}】${multiplier===2?' 极限爆发! ':''}`);
+        addHistory(`> ${caster.name} 对 ${targetStr} 发动了【${skill.name}】${multiplier===2?(skill._critDouble?' 暴击! ':' 极限爆发! '):''}`);
     }
     if (_bindSpendDesc) addHistory(`   ↳ ${bindingsSpendLabel(caster, skill)}：${_bindSpendDesc}`);
 
@@ -11304,7 +11397,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     const healedTargets = []; const healedIds = new Set();
     // 排序：攻击/控制标签优先于减益标签，保证每个目标先完成攻击命中判定，后续减益才能共享"至少一次命中"的结论
     const isDmgTag = t => t.tag.includes('攻') || t.tag.includes('单体') || t.tag.includes('穿透') || t.tag.includes('眩晕');
-    const isDebuffTag = t => t.tag.includes('降') || t.tag.includes('盲') || t.tag.includes('滞') || t.tag.includes('弱') || t.tag.includes('中毒') || t.tag.includes('燃烧') || t.tag.includes('缓');
+    const isDebuffTag = t => t.tag.includes('降') || t.tag.includes('盲') || t.tag.includes('滞') || t.tag.includes('弱') || t.tag.includes('中毒') || t.tag.includes('燃烧') || t.tag.includes('缓') || t.tag.includes('吸蓝');
     tagList.sort((a, b) => (isDmgTag(b) - isDmgTag(a)) || (isDebuffTag(b) - isDebuffTag(a)));
     
     for (let item of tagList) {
@@ -12580,7 +12673,7 @@ function classifySkill(skill) {
   // 【召唤】专属：独立于三槽，不进入敌/我选目标（自施放、下回合入队）
   if (skill.summonTarget) return { hasEnemyTargetTag: false, hasSingleBuff: false, hasOthers: false, hasSummon: true };
   // 敌方单体伤害/妨害标签：命中任一即需进入敌方选目标（即使第一个标签是群攻）
-  const hasEnemyTargetTag = tags.some(t => !t.includes('群') && (t.includes('单体') || t.includes('穿透') || t.includes('眩晕') || t.includes('降') || t.includes('盲') || t.includes('滞') || t.includes('弱') || t.includes('缓')));
+  const hasEnemyTargetTag = tags.some(t => !t.includes('群') && (t.includes('单体') || t.includes('穿透') || t.includes('眩晕') || t.includes('降') || t.includes('盲') || t.includes('滞') || t.includes('弱') || t.includes('缓') || t.includes('吸蓝')));
   // 纯有益单体标签：用于 [他人] 技能选我方目标（含 单X 前缀与 嘲讽/回避/免伤/反击 等单目标有益标签）
   const hasSingleBuff = tags.some(t => !t.includes('群') && (t.includes('单回') || t.includes('单增') || t.includes('单防') || t.includes('单盾') || t.includes('单瞄') || t.includes('单冲') || t.includes('嘲') || t.includes('避') || t.includes('免伤') || t.includes('反击') || t.includes('驱散') || t.includes('单速')));
   const hasOthers = !!skill.isOthers;
@@ -13009,7 +13102,7 @@ function itemToPseudoSkill(item) {
     return { name: item.name, cost: 0, hpCost: 0, tpCost: 0, charge: 0, delay: 0, haste: 0, maxUses: 0,
         hit: item.hit || 100, turns: item.turns, type: item.type, power: item.power, type2: item.type2, power2: item.power2,
         type3: item.type3, power3: item.power3, damageType: item.damageType || null, isOthers: item.isOthers,
-        guaranteedHit: item.guaranteedHit, fxTag: item.fxTag, isHighTier: !!item.isHighTier, isLegendary: !!item.isLegendary, isItem: true, itemRef: item };
+        guaranteedHit: item.guaranteedHit, critRate: item.critRate || 0, fxTag: item.fxTag, isHighTier: !!item.isHighTier, isLegendary: !!item.isLegendary, isItem: true, itemRef: item };
 }
 
 // 物品使用核心：执行效果结算，不推进回合——回合结束由调用方负责
@@ -13084,6 +13177,7 @@ function formatTagPill(typeStr, powerNum) {
   let cleanTag = typeStr.replace(/[\[\]]/g, '');
   let colorStyle = 'bg-slate-900/80 text-slate-300 border-slate-700';
   if (cleanTag.includes('攻') || cleanTag.includes('单体') || cleanTag.includes('穿透')) colorStyle = 'bg-rose-950/80 text-rose-300 border-rose-800/70';
+  else if (cleanTag.includes('吸蓝')) colorStyle = 'bg-cyan-950/80 text-cyan-300 border-cyan-700/70';
   else if (cleanTag.includes('回') || cleanTag.includes('冲') || cleanTag.includes('驱散')) colorStyle = 'bg-emerald-950/80 text-emerald-300 border-emerald-800/70';
   else if (cleanTag.includes('盾') || cleanTag.includes('防')) colorStyle = 'bg-blue-950/80 text-blue-300 border-blue-800/70';
   else if (cleanTag.includes('降') || cleanTag.includes('盲') || cleanTag.includes('滞') || cleanTag.includes('弱') || cleanTag.includes('眩晕') || cleanTag.includes('中毒') || cleanTag.includes('燃烧')) colorStyle = 'bg-purple-950/80 text-purple-300 border-purple-800/70';
@@ -13153,6 +13247,7 @@ function createSkillCard(hero, skill, idx) {
     if (skill.haste) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-cyan-950/90 text-cyan-300 border-cyan-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">⚡ 加速:${skill.haste}</span>`;
     if (skill.hit && skill.hit !== 100) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-slate-900 text-slate-400 border-slate-700 font-mono-num shrink-0 leading-none">🎯${skill.hit}</span>`;
     if (skill.guaranteedHit) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-rose-950/90 text-rose-300 border-rose-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">🎯 必中</span>`;
+    if (skill.critRate > 0) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-orange-950/90 text-orange-300 border-orange-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">💥 暴击${skill.critRate}%</span>`;
     let row2Html = `
       <div class="flex items-center gap-1 flex-wrap w-full shrink-0">
         ${tagsHtml || '<span class="text-[8px] text-slate-500">无附加效果</span>'}
@@ -13323,6 +13418,7 @@ function createItemCard(hero, item, idx) {
       if (item.type2) tagsHtml += formatTagPill(item.type2, item.power2);
       if (item.type3) tagsHtml += formatTagPill(item.type3, item.power3);
       if (item.guaranteedHit) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-rose-950/90 text-rose-300 border-rose-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">🎯 必中</span>`;
+      if (item.critRate > 0) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-orange-950/90 text-orange-300 border-orange-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">💥 暴击${item.critRate}%</span>`;
     }
     let row2Html = `
       <div class="flex items-center gap-1 flex-wrap w-full shrink-0">
@@ -13564,6 +13660,7 @@ function openEditor(keepScroll) {
         html += `<div id="hero-${i}-s-${si}-tags-preview" class="flex items-center gap-1 flex-wrap">${buildEditorSkillTagPreview(s.type, s.power, s.type2, s.power2, s.type3, s.power3, 'hero')}</div>`;
         if (s.isOthers) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-emerald-950 text-emerald-300 border border-emerald-700 shrink-0">他人</span>`;
         if (s.guaranteedHit) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-rose-950 text-rose-300 border border-rose-700 shrink-0">必中</span>`;
+        if (s.critRate > 0) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-orange-950 text-orange-300 border border-orange-700 shrink-0">暴击${s.critRate}%</span>`;
         if (s.isHighTier) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-violet-950 text-violet-300 border border-violet-700 shrink-0">高阶</span>`;
         if (s.isLegendary) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-amber-950 text-amber-300 border border-amber-700 shrink-0">传奇</span>`;
         html += `</div>`;
@@ -13626,6 +13723,7 @@ function openEditor(keepScroll) {
         html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-yellow-300 whitespace-nowrap text-[9px] font-semibold shrink-0">⏳ 延迟</span><input type="number" id="edit-h-${i}-s-${si}-delay" value="${s.delay || 0}" oninput="updateHeroSkillHeaderSummary(${i}, ${si})" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-yellow-200 text-[10px] py-0.5 px-1"></div>`;
         html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-cyan-300 whitespace-nowrap text-[9px] font-semibold shrink-0">⚡ 加速</span><input type="number" id="edit-h-${i}-s-${si}-haste" value="${s.haste || 0}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-cyan-200 text-[10px] py-0.5 px-1"></div>`;
         html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-fuchsia-300 whitespace-nowrap text-[9px] font-semibold shrink-0">🚫 限次</span><input type="number" id="edit-h-${i}-s-${si}-limit" value="${s.maxUses || 0}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-fuchsia-200 text-[10px] py-0.5 px-1" placeholder="0"></div>`;
+        html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-orange-300 whitespace-nowrap text-[9px] font-semibold shrink-0">💥 暴击%</span><input type="number" min="0" max="100" id="edit-h-${i}-s-${si}-crit" value="${s.critRate || 0}" oninput="updateHeroSkillHeaderSummary(${i}, ${si})" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-orange-200 text-[10px] py-0.5 px-1" placeholder="0"></div>`;
         html += `</div>`;
 
         // 模块 D：三重复合标签槽位与威力配置（带屏障护甲与驱散量并排）
@@ -13678,6 +13776,7 @@ function openEditor(keepScroll) {
         html += `<div class="flex items-center gap-1 flex-wrap">${buildEditorSkillTagPreview(it.type, it.power, it.type2, it.power2, it.type3, it.power3, 'hero')}</div>`;
         if (it.isOthers) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-emerald-950 text-emerald-300 border border-emerald-700 shrink-0">他人</span>`;
         if (it.guaranteedHit) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-rose-950 text-rose-300 border border-rose-700 shrink-0">必中</span>`;
+        if (it.critRate > 0) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-orange-950 text-orange-300 border border-orange-700 shrink-0">暴击${it.critRate}%</span>`;
         if (it.isLegendary) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-amber-950 text-amber-300 border border-amber-700 shrink-0">传奇</span>`;
         if (!it.isLegendary && it.isHighTier) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-violet-950 text-violet-300 border border-violet-700 shrink-0">高阶</span>`;
         if (_itBindSummary) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-slate-800 text-slate-400 border border-slate-700 shrink-0 truncate max-w-full">🔗 ${_itBindSummary}</span>`;
@@ -13702,6 +13801,7 @@ function openEditor(keepScroll) {
         html += `<label id="pill-h-${i}-it-${ii}-highTier" class="tag-toggle-pill border-violet-500 text-violet-300 bg-violet-950/70 ${!it.isLegendary && it.isHighTier ? 'active' : 'inactive'}"><input type="checkbox" id="edit-h-${i}-it-${ii}-highTier" ${it.isHighTier ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-h-${i}-it-${ii}-highTier')"><span>⬥</span> 高阶</label>`;
         html += `<span class="text-[9px] text-slate-600">命中</span><input type="number" id="edit-h-${i}-it-${ii}-hit" value="${it.hit != null ? it.hit : 100}" class="edit-input-game w-14 font-mono-num text-right text-yellow-200 py-0.5 text-[10px]">`;
         html += `<span class="text-[9px] text-slate-600">持续</span><input type="number" id="edit-h-${i}-it-${ii}-turns" value="${it.turns || ''}" class="edit-input-game w-14 font-mono-num text-right text-purple-200 py-0.5 text-[10px]" placeholder="默认">`;
+        html += `<span class="text-[9px] text-slate-600">暴击%</span><input type="number" min="0" max="100" id="edit-h-${i}-it-${ii}-crit" value="${it.critRate || 0}" class="edit-input-game w-14 font-mono-num text-right text-orange-200 py-0.5 text-[10px]" placeholder="0">`;
         html += `</div></div>`;
         // 模块 B：效果槽（弹药类隐藏：弹药是技能资源，效果无意义）
         html += `<div id="item-slots-${i}-${ii}" class="${_itCat === '弹药' ? 'hidden' : ''} space-y-1">`;
@@ -13844,6 +13944,7 @@ function openEditor(keepScroll) {
         html += `<div id="enemy-${i}-s-${si}-tags-preview" class="flex items-center gap-1 flex-wrap">${buildEditorSkillTagPreview(s.type, s.power, s.type2, s.power2, s.type3, s.power3, 'enemy')}</div>`;
         if (s.isOthers) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-emerald-950 text-emerald-300 border border-emerald-700 shrink-0">他人</span>`;
         if (s.guaranteedHit) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-rose-950 text-rose-300 border border-rose-700 shrink-0">必中</span>`;
+        if (s.critRate > 0) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-orange-950 text-orange-300 border border-orange-700 shrink-0">暴击${s.critRate}%</span>`;
         html += `</div>`;
         
         // 桌面端紧凑消耗
@@ -13893,6 +13994,7 @@ function openEditor(keepScroll) {
         html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-yellow-400 whitespace-nowrap text-[9px] font-semibold shrink-0">🎯 Aim</span><input type="number" id="edit-e-${i}-s-${si}-hit" value="${s.hit != null ? s.hit : 100}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-yellow-200 text-[10px] py-0.5 px-1"></div>`;
         html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-purple-400 whitespace-nowrap text-[9px] font-semibold shrink-0">⏱️ 持续</span><input type="number" id="edit-e-${i}-s-${si}-turns" value="${s.turns || ''}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-purple-200 text-[10px] py-0.5 px-1" placeholder="默认"></div>`;
         html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-rose-400 whitespace-nowrap text-[9px] font-bold shrink-0">⏳ 充能</span><input type="number" id="edit-e-${i}-s-${si}-charge" value="${s.charge || 0}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-rose-200 text-[10px] py-0.5 px-1" placeholder="0"></div>`;
+        html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-orange-300 whitespace-nowrap text-[9px] font-semibold shrink-0">💥 暴击%</span><input type="number" min="0" max="100" id="edit-e-${i}-s-${si}-crit" value="${s.critRate || 0}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-orange-200 text-[10px] py-0.5 px-1" placeholder="0"></div>`;
         html += `</div>`;
 
         // 模块 D：三重复合标签槽位与威力配置
@@ -14230,6 +14332,7 @@ function syncEditorDataToMemory() {
         s.sheshenTarget = sheshenVal === 'none' ? null : sheshenVal;
         s.isOthers = document.getElementById(`edit-h-${i}-s-${si}-others`).checked;
         s.guaranteedHit = document.getElementById(`edit-h-${i}-s-${si}-guaranteed`).checked;
+        s.critRate = Math.max(0, Math.min(100, Number(document.getElementById(`edit-h-${i}-s-${si}-crit`).value) || 0));
         // [传奇]为[神术]别名，传奇优先级高于高阶；互斥由 Legendary 覆盖
         const _leg = document.getElementById(`edit-h-${i}-s-${si}-legendary`).checked;
         const _hi = document.getElementById(`edit-h-${i}-s-${si}-highTier`).checked;
@@ -14288,6 +14391,7 @@ function syncEditorDataToMemory() {
         it.fxTag = document.getElementById(`edit-h-${i}-it-${ii}-fxTag`).value || null;
         it.isOthers = document.getElementById(`edit-h-${i}-it-${ii}-others`).checked;
         it.guaranteedHit = document.getElementById(`edit-h-${i}-it-${ii}-guaranteed`).checked;
+        it.critRate = Math.max(0, Math.min(100, Number(document.getElementById(`edit-h-${i}-it-${ii}-crit`).value) || 0));
         // [传奇]为[神术]别名，传奇优先级高于高阶；互斥由 Legendary 覆盖（与技能同步同规则）
         const _itLeg = document.getElementById(`edit-h-${i}-it-${ii}-legendary`).checked;
         const _itHigh = document.getElementById(`edit-h-${i}-it-${ii}-highTier`).checked;
@@ -14337,6 +14441,7 @@ function syncEditorDataToMemory() {
         s.damageType = document.getElementById(`edit-e-${i}-s-${si}-dmgType`).value;
         s.isOthers = document.getElementById(`edit-e-${i}-s-${si}-others`).checked;
         s.guaranteedHit = document.getElementById(`edit-e-${i}-s-${si}-guaranteed`).checked;
+        s.critRate = Math.max(0, Math.min(100, Number(document.getElementById(`edit-e-${i}-s-${si}-crit`).value) || 0));
         s.fxTag = document.getElementById(`edit-e-${i}-s-${si}-fxTag`).value || null;
         s.cost = Number(document.getElementById(`edit-e-${i}-s-${si}-cost`).value);
         s.hpCost = Number(document.getElementById(`edit-e-${i}-s-${si}-hpCost`).value);
@@ -14417,19 +14522,19 @@ function saveEditor() {
   initialHeroesCache = JSON.parse(JSON.stringify(heroesData)); initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData));
   closeEditor(); window._isSaving = true; initUI(); window._isSaving = false; requestAnimationFrame(() => { window._isSaving = false; }); if(state.isGameStarted) { showLog("设置已覆盖生效！"); setTimeout(() => startRound(), 1000); }
 }
-function addHeroSkill(hi) { syncEditorDataToMemory(); heroesData[hi].skills.push({ name: '新技能', isReaction: false, reactionTarget: 'all', kanpoTarget: null, sheshenTarget: null, isOthers: false, guaranteedHit: false, isHighTier: false, isLegendary: false, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, hit: 100, delay: 0, haste: 0, summonTarget: null }); openEditor(); }
+function addHeroSkill(hi) { syncEditorDataToMemory(); heroesData[hi].skills.push({ name: '新技能', isReaction: false, reactionTarget: 'all', kanpoTarget: null, sheshenTarget: null, isOthers: false, guaranteedHit: false, critRate: 0, isHighTier: false, isLegendary: false, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, hit: 100, delay: 0, haste: 0, summonTarget: null }); openEditor(); }
 function removeHeroSkill(hi, si) { syncEditorDataToMemory(); heroesData[hi].skills.splice(si, 1); openEditor(); }
 // 物品增删：默认新建一个 [单回] 道具（次数 1），与技能增删同样先同步再重建编辑器
-function addHeroItem(hi) { syncEditorDataToMemory(); if (!heroesData[hi].items) heroesData[hi].items = []; heroesData[hi].items.push({ isItem: true, name: '新物品', category: '道具', count: 1, maxUses: 1, usesRemaining: 1, bindings: [], type: '[单回]', power: 30, type2: '[无]', power2: 0, type3: '[无]', power3: 0, hit: 100, turns: null, isOthers: false, guaranteedHit: false, fxTag: null, damageType: null, isExpanded: true }); openEditor(); }
+function addHeroItem(hi) { syncEditorDataToMemory(); if (!heroesData[hi].items) heroesData[hi].items = []; heroesData[hi].items.push({ isItem: true, name: '新物品', category: '道具', count: 1, maxUses: 1, usesRemaining: 1, bindings: [], type: '[单回]', power: 30, type2: '[无]', power2: 0, type3: '[无]', power3: 0, hit: 100, turns: null, isOthers: false, guaranteedHit: false, critRate: 0, fxTag: null, damageType: null, isExpanded: true }); openEditor(); }
 function removeHeroItem(hi, ii) { syncEditorDataToMemory(); heroesData[hi].items.splice(ii, 1); openEditor(); }
 // 弹药绑定行增删：先同步当前表单到内存（保留已填绑定），再变更数量并重渲染
 function addItemBinding(hi, ii) { syncEditorDataToMemory(); heroesData[hi].items[ii].bindings.push({ skillName: (heroesData[hi].skills[0] && heroesData[hi].skills[0].name) || '', cost: 1 }); openEditor(); }
 function removeItemBinding(hi, ii, bi) { syncEditorDataToMemory(); heroesData[hi].items[ii].bindings.splice(bi, 1); openEditor(); }
-function addEnemySkill(ei) { syncEditorDataToMemory(); enemiesData[ei].skills.push({ name: '新技能', isOthers: false, guaranteedHit: false, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, charge: 0, hit: 100, summonTarget: null }); openEditor(); }
+function addEnemySkill(ei) { syncEditorDataToMemory(); enemiesData[ei].skills.push({ name: '新技能', isOthers: false, guaranteedHit: false, critRate: 0, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, charge: 0, hit: 100, summonTarget: null }); openEditor(); }
 function removeEnemySkill(ei, si) { syncEditorDataToMemory(); enemiesData[ei].skills.splice(si, 1); openEditor(); }
-function addHero() { syncEditorDataToMemory(); heroesData.push({ id: 'h' + Date.now(), name: '新角色', img: DEFAULT_HERO_IMG, classType: null, hp: 400, maxHp: 400, mp: 200, maxMp: 200, tp: 0, maxTp: 100, atk: 80, def: 30, spd: 100, shield: 0, actCount: 1, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, burstActivated: false, skills: [ { name: '攻击', isReaction: false, reactionTarget: 'all', damageType: null, fxTag: null, guaranteedHit: false, cost: 0, hpCost: 0, tpCost: 0, hit: 100, type: '[单体]', power: 60, type2: '[无]', power2: 0, type3: '[无]', power3: 0 } ], items: [] }); openEditor(); }
+function addHero() { syncEditorDataToMemory(); heroesData.push({ id: 'h' + Date.now(), name: '新角色', img: DEFAULT_HERO_IMG, classType: null, hp: 400, maxHp: 400, mp: 200, maxMp: 200, tp: 0, maxTp: 100, atk: 80, def: 30, spd: 100, shield: 0, actCount: 1, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, burstActivated: false, skills: [ { name: '攻击', isReaction: false, reactionTarget: 'all', damageType: null, fxTag: null, guaranteedHit: false, critRate: 0, cost: 0, hpCost: 0, tpCost: 0, hit: 100, type: '[单体]', power: 60, type2: '[无]', power2: 0, type3: '[无]', power3: 0 } ], items: [] }); openEditor(); }
 function removeHero(i) { if (heroesData.length <= 1) return alert("至少保留一名我方！"); if (confirm("删除角色？")) { syncEditorDataToMemory(); heroesData.splice(i, 1); openEditor(); } }
-function addEnemy() { syncEditorDataToMemory(); enemiesData.push({ id: 'e' + Date.now(), name: '新怪物', emoji: '👾', classType: null, hp: 500, maxHp: 500, mp: 200, maxMp: 200, size: 'text-5xl', atk: 90, def: 20, spd: 90, shield: 0, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, currentCharge: 0, isWise: false, row: 'front', tier: 'fodder', skills: [ { name: '撕咬', damageType: null, fxTag: null, guaranteedHit: false, cost: 0, hpCost: 0, tpCost: 0, charge: 0, hit: 100, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0 } ] }); openEditor(); }
+function addEnemy() { syncEditorDataToMemory(); enemiesData.push({ id: 'e' + Date.now(), name: '新怪物', emoji: '👾', classType: null, hp: 500, maxHp: 500, mp: 200, maxMp: 200, size: 'text-5xl', atk: 90, def: 20, spd: 90, shield: 0, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, currentCharge: 0, isWise: false, row: 'front', tier: 'fodder', skills: [ { name: '撕咬', damageType: null, fxTag: null, guaranteedHit: false, critRate: 0, cost: 0, hpCost: 0, tpCost: 0, charge: 0, hit: 100, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0 } ] }); openEditor(); }
 function removeEnemy(i) { if (enemiesData.length <= 1) return alert("至少保留一只怪物！"); if (confirm("删除怪物？")) { syncEditorDataToMemory(); enemiesData.splice(i, 1); openEditor(); } }
 
 // ==========================================
@@ -14577,7 +14682,7 @@ function serializeHeroesForSave() {
     },
     skills: h.skills.map(s => ({
       name: s.name, isReaction: s.isReaction, reactionTarget: s.reactionTarget, kanpoTarget: s.kanpoTarget, sheshenTarget: s.sheshenTarget || null,
-      isOthers: !!s.isOthers, guaranteedHit: !!s.guaranteedHit, isHighTier: !!s.isHighTier, isLegendary: !!s.isLegendary, damageType: s.damageType, fxTag: s.fxTag, cost: s.cost, hpCost: s.hpCost, tpCost: s.tpCost,
+      isOthers: !!s.isOthers, guaranteedHit: !!s.guaranteedHit, critRate: s.critRate || 0, isHighTier: !!s.isHighTier, isLegendary: !!s.isLegendary, damageType: s.damageType, fxTag: s.fxTag, cost: s.cost, hpCost: s.hpCost, tpCost: s.tpCost,
       hit: s.hit, turns: s.turns, delay: s.delay || 0, haste: s.haste || 0, maxUses: s.maxUses || 0, type: s.type, power: s.power, type2: s.type2, power2: s.power2, type3: s.type3, power3: s.power3, barrierSub: s.barrierSub || null, barrierArmor: s.barrierArmor || 0, summonTarget: s.summonTarget || null
     })),
     // 物品定义（名称/类别/效果/绑定）：数量会随战后结算经由 Combat_block 更新，此处仅作编辑器改动兜底
@@ -14585,7 +14690,7 @@ function serializeHeroesForSave() {
       name: it.name, category: it.category, count: it.count || 0, maxUses: it.maxUses || 0,
       bindings: (it.bindings || []).map(b => ({ skillName: b.skillName, cost: b.cost })),
       type: it.type, power: it.power, type2: it.type2, power2: it.power2, type3: it.type3, power3: it.power3,
-      hit: it.hit, turns: it.turns, isOthers: !!it.isOthers, guaranteedHit: !!it.guaranteedHit, isHighTier: !!it.isHighTier, isLegendary: !!it.isLegendary, fxTag: it.fxTag, damageType: it.damageType || null
+      hit: it.hit, turns: it.turns, isOthers: !!it.isOthers, guaranteedHit: !!it.guaranteedHit, critRate: it.critRate || 0, isHighTier: !!it.isHighTier, isLegendary: !!it.isLegendary, fxTag: it.fxTag, damageType: it.damageType || null
     }))
   }));
 }
