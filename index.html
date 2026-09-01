@@ -1777,6 +1777,7 @@
         </div>
         <div class="flex-1 overflow-hidden flex flex-col min-h-0">
             <div id="result-visual-view" class="flex-1 overflow-y-auto custom-scrollbar p-3.5 space-y-3"></div>
+            <div id="result-sync-badge" class="mx-3 mb-2 px-2.5 py-1.5 rounded-xl border text-[11px] leading-relaxed hidden"></div>
             <div id="result-summary-card" class="mx-3 mb-2 p-2.5 rounded-xl border border-slate-700/60 bg-slate-900/60 text-[11px] leading-relaxed"></div>
             <!-- 隐藏：保留原 textarea 供 sendResultToTavern 读取 promptTemplate -->
             <textarea id="result-prompt" class="hidden" spellcheck="false"></textarea>
@@ -2471,6 +2472,7 @@ function refreshResultView() {
   currentHistoryFilter = 'all';
   renderHistorySchemeA(list, container);
   currentHistoryFilter = saved;
+  renderCombatSyncBadge();
   if (card) {
     const txt = _lastResultSummaryText || '';
     if (!txt) { card.classList.add('hidden'); }
@@ -2480,6 +2482,41 @@ function refreshResultView() {
       card.innerHTML = '<div class="text-[10px] font-bold text-cyan-300 mb-1 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> 小队战后状态</div>' + lines.map(l => '<div class="text-slate-300">' + escapeHistoryHtml(l) + '</div>').join('');
     }
   }
+}
+// 状态栏同步徽标：pending 等待回执 / ok 已同步 / warn 有未匹配或上限不一致 / off 直连不可用
+function renderCombatSyncBadge() {
+  const el = document.getElementById('result-sync-badge');
+  if (!el) return;
+  const s = _combatSyncState;
+  if (!s) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  const styles = {
+    pending: 'border-amber-600/50 bg-amber-900/25 text-amber-200',
+    ok: 'border-emerald-600/50 bg-emerald-900/25 text-emerald-200',
+    warn: 'border-amber-600/50 bg-amber-900/25 text-amber-200',
+    off: 'border-slate-600/50 bg-slate-800/40 text-slate-400'
+  };
+  el.className = 'mx-3 mb-2 px-2.5 py-1.5 rounded-xl border text-[11px] leading-relaxed ' + (styles[s.phase] || styles.off);
+  if (s.phase === 'off') {
+    el.innerHTML = '⚪ 状态栏直连不可用（' + escapeHistoryHtml(s.reason || '未知原因') + '），已回退为让正文 LLM 转述数值';
+    return;
+  }
+  if (s.phase === 'pending') {
+    el.innerHTML = '⏳ 战后数值已推送，等待状态栏确认…';
+    return;
+  }
+  const r = s.report || {};
+  const chars = (r.applied || []).length;
+  const items = (r.applied || []).reduce((n, e) => n + (e.items || []).length, 0);
+  let html = (s.phase === 'ok' ? '✅' : '⚠️') + ' 状态栏已同步：' + chars + ' 名成员 · ' + items + ' 项物品';
+  const notes = [];
+  if ((r.unmatchedChars || []).length) notes.push('未匹配角色：' + r.unmatchedChars.map(escapeHistoryHtml).join('、'));
+  if ((r.unmatchedItems || []).length) notes.push('未匹配物品：' + r.unmatchedItems.map(escapeHistoryHtml).join('、'));
+  if ((r.maxMismatch || []).length) {
+    notes.push('上限不一致（已沿用状态栏上限）：' + r.maxMismatch.map(m => escapeHistoryHtml(m.name + '·' + m.key)).join('、'));
+  }
+  if (notes.length) html += '<div class="mt-1 text-[10px] opacity-90">' + notes.join('<br>') + '</div>';
+  el.innerHTML = html;
 }
 function setHistoryFilter(f) {
   currentHistoryFilter = f;
@@ -12105,11 +12142,26 @@ function showBattleResult(type) {
     });
     _lastResultSummaryText = summaryText.trim();
 
+    // 战后数值直连状态栏：推送成功则提示词不再要求 LLM 转述数值
+    const syncRes = exportCombatResultToStatus(type);
+    _combatSyncState = syncRes.ok
+        ? { phase: 'pending', id: syncRes.id, report: null }
+        : { phase: 'off', id: null, report: null, reason: syncRes.reason };
+
+    const injuryText = `\n\n[小队战后伤势：]\n${buildInjuryLines()}\n`;
+    const tailWin = `严禁使用任何游戏词汇！严格根据伤势标签描写单次攻击的效果！请开始你的描写。`;
+    const tailRetreat = `严禁使用任何游戏词汇！严格根据伤势标签描写当前的状态！请开始你的描写。`;
+    // 直连生效：结算数值已写入状态栏，正文只需描写；直连不可用时回退旧的转述指令
+    const syncNote = syncRes.ok
+        ? `\n\n[附加指令：上述伤势对应的具体数值（生命、法力、消耗品与弹药余量）已由系统直接写入状态栏，无需你确认或改写任何数值，也不要在正文中罗列数字，只依据伤势描写各成员的状态。]`
+        : `\n\n[附加指令：请在描写的最后，确认并应用上述小队成员的最新状态，包括各角色消耗品/弹药的剩余数量（按结算清单中的数量更新 状态栏 对应物品，未提到的原样保留）。]`;
+    const settleText = syncRes.ok ? injuryText : summaryText;
+
     let promptTemplate = "";
     if (type === 'retreat') {
-        promptTemplate = `[系统指令：请根据以下战局记录，以小说般充满画面感、具有张力的笔触，描写出这场战斗完整的详细过程。玩家小队选择了主动撤离战场（请根据战局记录自行判断局势，可能是觉得无需再做无谓的缠斗，不代表是被打败逃跑）。着重描写他们脱离战斗的过程、动作细节以及心理状态。]\n\n<战局记录>\n${historyText}\n</战局记录>\n${summaryText}\n\n[附加指令：请在描写的最后，确认并应用上述小队成员的最新状态，包括各角色消耗品/弹药的剩余数量（按结算清单中的数量更新 状态栏 对应物品，未提到的原样保留）。]\n\n严禁使用任何游戏词汇！严格根据伤势标签描写当前的状态！请开始你的描写。`;
+        promptTemplate = `[系统指令：请根据以下战局记录，以小说般充满画面感、具有张力的笔触，描写出这场战斗完整的详细过程。玩家小队选择了主动撤离战场（请根据战局记录自行判断局势，可能是觉得无需再做无谓的缠斗，不代表是被打败逃跑）。着重描写他们脱离战斗的过程、动作细节以及心理状态。]\n\n<战局记录>\n${historyText}\n</战局记录>\n${settleText}${syncNote}\n\n${tailRetreat}`;
     } else {
-        promptTemplate = `[系统指令：请根据以下战局记录，以小说般充满画面感、具有张力的笔触，描写出这场惊心动魄的战斗过程。注重动作细节、技能特效的光影、人物的心理状态，以及最终${type === 'win' ? '走向胜利的高光时刻' : '惨烈落败的绝望收场'}。]\n\n<战局记录>\n${historyText}\n</战局记录>\n${summaryText}\n\n[附加指令：请在描写的最后，确认并应用上述小队成员的最新状态，包括各角色消耗品/弹药的剩余数量（按结算清单中的数量更新 状态栏 对应物品，未提到的原样保留）。]\n\n严禁使用任何游戏词汇！严格根据伤势标签描写单次攻击的效果！请开始你的描写。`;
+        promptTemplate = `[系统指令：请根据以下战局记录，以小说般充满画面感、具有张力的笔触，描写出这场惊心动魄的战斗过程。注重动作细节、技能特效的光影、人物的心理状态，以及最终${type === 'win' ? '走向胜利的高光时刻' : '惨烈落败的绝望收场'}。]\n\n<战局记录>\n${historyText}\n</战局记录>\n${settleText}${syncNote}\n\n${tailWin}`;
     }
 
     promptArea.value = promptTemplate;
@@ -14760,6 +14812,126 @@ function readRoster() {
   } catch(e) { return null; }
 }
 
+// ==========================================
+// 战后数值直连状态栏（MiniMapStatus）
+// 结算数值不再让正文 LLM 转述：写 chat 变量 $rpg_combat_result 作真值，
+// 事件与 BroadcastChannel 只做即时通知（状态栏侧另有 boot 对账兜底）。
+// $ 前缀沿用状态栏侧"内部键不给 LLM 看"的约定。
+// ==========================================
+const COMBAT_RESULT_VAR_KEY = '$rpg_combat_result';
+const COMBAT_RESULT_EVENT = 'rpgcombat:battle-result';
+const COMBAT_APPLIED_EVENT = 'mms:combat-applied';
+const COMBAT_BRIDGE_CHANNEL = 'rpg-combat-bridge';
+// 同步状态：{ phase:'pending'|'ok'|'warn'|'off', id, report, reason }
+let _combatSyncState = null;
+let _combatBridgeChannel = null;
+
+// 结算载荷：召唤物不结算，道具每场重置故不跨场结算（与 summaryText 口径一致）
+function buildCombatResultPayload(type) {
+  const heroes = heroesData.filter(h => h && !h.isSummon).map(h => ({
+    name: h.name,
+    alive: !!h.isAlive,
+    hp: Math.floor(Math.max(0, h.hp)), maxHp: h.maxHp,
+    mp: Math.floor(Math.max(0, h.mp)), maxMp: h.maxMp,
+    atk: h.atk, armor: h.def, speed: h.spd,
+    items: (h.items || []).filter(it => it && it.category !== '道具').map(it => ({
+      name: it.name, count: it.count || 0, category: it.category
+    }))
+  }));
+  return {
+    v: 1,
+    id: 'rc-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+    ts: Date.now(),
+    outcome: type,
+    round: state.round,
+    heroes
+  };
+}
+
+// 战后伤势档位：按最终 HP 比例查表（零数字，供正文 LLM 描写伤势）
+function combatInjuryWord(h) {
+  if (!h.isAlive) return '重伤濒死';
+  const max = Number(h.maxHp) || 0;
+  const cur = Math.max(0, Number(h.hp) || 0);
+  if (!max) return '状态未知';
+  const r = cur / max;
+  if (r >= 1) return '无恙';
+  if (r >= 0.6) return '轻伤';
+  if (r >= 0.3) return '重伤';
+  return '濒死';
+}
+
+function buildInjuryLines() {
+  const lines = [];
+  heroesData.forEach(h => {
+    if (!h || h.isSummon) return;
+    let word = combatInjuryWord(h);
+    const maxMp = Number(h.maxMp) || 0;
+    if (h.isAlive && maxMp > 0 && Math.max(0, h.mp) / maxMp < 0.25) word += '·法力耗竭';
+    lines.push(`- ${h.name}：${word}`);
+  });
+  return lines.join('\n');
+}
+
+// 推送结算：三条通道全部特性检测 + 整体 try/catch，绝不抛出
+// （showBattleResult 里抛异常会导致结算弹窗都打不开）
+function exportCombatResultToStatus(type) {
+  try {
+    if (typeof insertOrAssignVariables !== 'function' || typeof getVariables !== 'function') {
+      return { ok: false, reason: '未检测到酒馆助手变量接口' };
+    }
+    // 状态栏侧关掉直连时，这里必须报告失败——否则提示词删了转述指令、状态栏又不写，数值就断供了
+    try {
+      const g = getVariables({ type: 'global' }) || {};
+      if (g.$mms_config && g.$mms_config.combatSync === false) {
+        return { ok: false, reason: '状态栏侧已关闭战斗结算直连' };
+      }
+    } catch(e) {}
+    const payload = buildCombatResultPayload(type);
+    insertOrAssignVariables({ [COMBAT_RESULT_VAR_KEY]: payload }, { type: 'chat' });
+    try {
+      if (typeof eventEmit === 'function') eventEmit(COMBAT_RESULT_EVENT, { id: payload.id, ts: payload.ts });
+    } catch(e) {}
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        if (!_combatBridgeChannel) _combatBridgeChannel = new BroadcastChannel(COMBAT_BRIDGE_CHANNEL);
+        _combatBridgeChannel.postMessage({ type: 'battle-result', id: payload.id, ts: payload.ts });
+      }
+    } catch(e) {}
+    return { ok: true, id: payload.id };
+  } catch(e) {
+    console.warn('[RpgCombat] 战后数值推送失败:', e);
+    return { ok: false, reason: (e && e.message) || '推送异常' };
+  }
+}
+
+// 状态栏侧回执：把徽标从"等待确认"翻成结果态
+function handleCombatApplied(payload) {
+  if (!payload || !_combatSyncState || payload.id !== _combatSyncState.id) return;
+  const report = payload.report || {};
+  const unmatched = (report.unmatchedChars || []).concat(report.unmatchedItems || []);
+  const mismatch = report.maxMismatch || [];
+  _combatSyncState.report = report;
+  _combatSyncState.phase = payload.ok && !unmatched.length && !mismatch.length ? 'ok' : 'warn';
+  if (!payload.ok && !unmatched.length) _combatSyncState.phase = 'warn';
+  refreshResultView();
+}
+
+function initCombatBridgeListeners() {
+  try {
+    if (typeof eventOn === 'function') eventOn(COMBAT_APPLIED_EVENT, handleCombatApplied);
+  } catch(e) {}
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      if (!_combatBridgeChannel) _combatBridgeChannel = new BroadcastChannel(COMBAT_BRIDGE_CHANNEL);
+      _combatBridgeChannel.addEventListener('message', ev => {
+        const d = ev && ev.data;
+        if (d && d.type === 'combat-applied') handleCombatApplied(d);
+      });
+    }
+  } catch(e) {}
+}
+
 // 合并：对 heroesData 中每个角色，按名匹配持久化角色
 //   - 同名角色：配置字段以持久化为准；技能集 = 持久化技能 + Combat_block 新增技能（追加）
 //   - 找不到同名：保留 Combat_block 原样
@@ -15628,6 +15800,8 @@ console.log('CRITICAL_LOG: 5.1 loadLLMSettings() before');
 loadLLMSettings();
 console.log('CRITICAL_LOG: 5.2 loadLLMSettings() done');
 loadDefendSettings();
+// 状态栏直连回执监听（结算徽标据此翻状态）
+initCombatBridgeListeners();
 console.log('CRITICAL_LOG: 5.3 loadWorldbookSettings() before');
 loadWorldbookSettings();
 console.log('CRITICAL_LOG: 5.4 loadWorldbookSettings() done -> boundName=' + worldbookSettings.boundName);

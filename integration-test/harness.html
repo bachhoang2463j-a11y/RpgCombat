@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>RpgCombat ⇄ MiniMapStatus 战后直连 · 集成测试</title>
+<style>
+  body { margin:0; font:13px/1.6 Consolas,Menlo,monospace; background:#0b1020; color:#dbe4ff; }
+  #bar { position:sticky; top:0; padding:10px 14px; background:#111936; border-bottom:1px solid #263056; display:flex; gap:12px; align-items:center; }
+  button { padding:6px 14px; border-radius:8px; border:1px solid #4c5db0; background:#1b2550; color:#dbe4ff; cursor:pointer; font:inherit; }
+  button:hover { background:#263569; }
+  #stat { font-weight:700; }
+  #log { margin:0; padding:12px 14px; white-space:pre-wrap; }
+  .pass { color:#4ade80; }
+  .fail { color:#f87171; }
+  .info { color:#93a4d4; }
+  .head { color:#fbbf24; font-weight:700; }
+  #frames { display:flex; gap:8px; padding:0 14px 14px; }
+  iframe { width:50%; height:340px; border:1px solid #263056; border-radius:8px; background:#000; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <button id="run">▶ 运行全部断言</button>
+  <span id="stat" class="info">等待挂载两个应用…</span>
+</div>
+<pre id="log"></pre>
+<div id="frames">
+  <iframe id="mms" title="MiniMapStatus"></iframe>
+  <iframe id="rpg" title="RpgCombat"></iframe>
+</div>
+<script>
+/* ==========================================================================
+   mock 酒馆助手环境
+   - 按 message / chat / global 三种作用域实现变量存储，insertOrAssign 深合并、
+     replaceVariables 整体替换（与真实语义一致，否则测不出"删不掉"类问题）
+   - eventOn/eventEmit 在父页面共享，天然跨 iframe 分发
+   - generateRaw 是带调用计数的桩：本特性的核心断言就是"计数为 0"
+   ========================================================================== */
+const MOCK = (function () {
+  const store = { global: {}, chat: {}, message: {} };
+  let chatMessages = [];
+  const listeners = [];
+  let genCount = 0;
+  let genResponder = null;
+  const worldbooks = { '测试角色卡': [] };
+
+  const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
+  const curId = () => chatMessages.length - 1;
+
+  function bucket(opt) {
+    const o = opt || {};
+    if (o.type === 'message') {
+      const id = o.message_id == null ? curId() : o.message_id;
+      if (!store.message[id]) store.message[id] = {};
+      return store.message[id];
+    }
+    if (o.type === 'chat') return store.chat;
+    if (o.type === 'character') return store.global;
+    return store.global;
+  }
+  function deepMerge(t, s) {
+    for (const k of Object.keys(s || {})) {
+      const v = s[k];
+      if (v && typeof v === 'object' && !Array.isArray(v) && t[k] && typeof t[k] === 'object' && !Array.isArray(t[k])) {
+        deepMerge(t[k], v);
+      } else {
+        t[k] = clone(v);
+      }
+    }
+    return t;
+  }
+  function parseRange(range) {
+    if (typeof range === 'number') return [range, range];
+    const s = String(range == null ? curId() : range);
+    const m = s.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (m) return [parseInt(m[1], 10), parseInt(m[2], 10)];
+    const n = parseInt(s, 10);
+    return isNaN(n) ? [curId(), curId()] : [n, n];
+  }
+
+  const api = {
+    tavern_events: { MESSAGE_RECEIVED: 'message_received', CHAT_CHANGED: 'chat_id_changed' },
+    getVariables: (opt) => clone(bucket(opt)) || {},
+    insertOrAssignVariables: (vars, opt) => { deepMerge(bucket(opt), vars); },
+    setVariables: (vars, opt) => { deepMerge(bucket(opt), vars); },
+    replaceVariables: (vars, opt) => {
+      const b = bucket(opt);
+      for (const k of Object.keys(b)) delete b[k];
+      deepMerge(b, vars);
+    },
+    getCurrentMessageId: () => curId(),
+    getLastMessageId: () => curId(),
+    getCurrentMessage: () => clone(chatMessages[curId()] || null),
+    getChatMessages: (range) => {
+      const [a, b] = parseRange(range);
+      const out = [];
+      for (let i = a; i <= b; i++) if (chatMessages[i]) out.push(clone(chatMessages[i]));
+      return out;
+    },
+    setChatMessages: (list) => {
+      (list || []).forEach((m) => {
+        if (m && m.message_id != null && chatMessages[m.message_id]) {
+          chatMessages[m.message_id].message = m.message;
+        }
+      });
+    },
+    eventOn: (event, fn) => { listeners.push({ event, fn }); },
+    eventOnce: (event, fn) => { listeners.push({ event, fn, once: true }); },
+    eventEmit: (event, ...args) => {
+      listeners.slice().forEach((l) => {
+        if (l.event !== event) return;
+        if (l.once) listeners.splice(listeners.indexOf(l), 1);
+        try { l.fn(...args); } catch (e) { console.error('[mock] listener error', e); }
+      });
+    },
+    generateRaw: async (cfg) => {
+      genCount++;
+      lastGenPrompt = ((cfg && cfg.ordered_prompts) || []).map((p) => p.content).join('\n---\n');
+      if (typeof genResponder === 'function') return genResponder(cfg);
+      throw new Error('mock generateRaw 未设置响应器');
+    },
+    triggerSlash: () => {},
+    getCurrentCharacterName: () => '测试角色卡',
+    getCharWorldbookNames: () => ({ primary: '测试角色卡', additional: [] }),
+    getWorldbookNames: () => Object.keys(worldbooks),
+    getWorldbook: (name) => clone(worldbooks[name] || []),
+    createWorldbook: (name) => { worldbooks[name] = worldbooks[name] || []; return true; },
+    rebindCharWorldbooks: () => true,
+    createWorldbookEntries: (name, entries) => {
+      worldbooks[name] = (worldbooks[name] || []).concat(clone(entries));
+      return true;
+    },
+    updateWorldbookWith: (name, fn) => {
+      worldbooks[name] = clone(fn(clone(worldbooks[name] || [])));
+      return true;
+    },
+  };
+  let lastGenPrompt = '';
+  return {
+    api,
+    store,
+    worldbooks,
+    setChat: (list) => { chatMessages = clone(list); },
+    reset: () => {
+      store.global = {}; store.chat = {}; store.message = {};
+      listeners.length = 0; genCount = 0; genResponder = null; lastGenPrompt = '';
+    },
+    resetVars: () => { store.chat = {}; store.message = {}; },
+    genCount: () => genCount,
+    resetGenCount: () => { genCount = 0; },
+    setGenResponder: (fn) => { genResponder = fn; },
+    lastGenPrompt: () => lastGenPrompt,
+  };
+})();
+window.__MOCK = MOCK;
+
+/* ---------------- 日志与断言 ---------------- */
+const logEl = document.getElementById('log');
+let passN = 0, failN = 0;
+function out(cls, text) {
+  const span = document.createElement('span');
+  span.className = cls;
+  span.textContent = text + '\n';
+  logEl.appendChild(span);
+}
+function head(t) { out('head', '\n== ' + t + ' =='); }
+function ok(name, extra) { passN++; out('pass', '  ✓ ' + name + (extra ? '  ' + extra : '')); }
+function bad(name, extra) { failN++; out('fail', '  ✗ ' + name + (extra ? '  ' + extra : '')); }
+function check(cond, name, extra) { cond ? ok(name) : bad(name, extra); }
+function eq(actual, expect, name) {
+  const a = JSON.stringify(actual), e = JSON.stringify(expect);
+  a === e ? ok(name) : bad(name, '期望 ' + e + '，实际 ' + a);
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/* ---------------- 挂载两个应用 ----------------
+   把 mock 接口注入到 iframe 的全局作用域：srcdoc 与父页同源，
+   引导脚本插在 <head> 之后，保证在应用自身脚本之前执行。
+   就绪判定用轮询而不是 load 事件：两侧都挂了 CDN 资源与音视频，
+   load 可能长时间不触发（interactive 阶段脚本其实已执行完） */
+async function mountFrame(frameId, url, baseHref, readyProbe) {
+  const html = await (await fetch(url)).text();
+  const boot =
+    '<base href="' + baseHref + '">' +
+    '<script>(function(){var M=parent.__MOCK.api;for(var k in M){window[k]=M[k];}})();\x3c/script>';
+  const patched = html.replace(/<head([^>]*)>/i, (m) => m + boot);
+  const f = document.getElementById(frameId);
+  f.srcdoc = patched;
+  const deadline = Date.now() + 20000;
+  while (Date.now() < deadline) {
+    await sleep(150);
+    try { if (readyProbe(f.contentWindow)) return f; } catch (e) { /* 未就绪 */ }
+  }
+  throw new Error(frameId + ' 未在 20 秒内就绪');
+}
+
+let mmsFrame = null, rpgFrame = null;
+const mmsWin = () => mmsFrame.contentWindow;
+const rpgWin = () => rpgFrame.contentWindow;
+
+/* 测试基线：一楼用户 + 二楼 AI（最新 AI 楼），状态含 4 名成员 */
+function baseState() {
+  return {
+    状态栏: {
+      日期和时间: '⏰ 1925年3月2日 深夜',
+      地点: '📍 冻土荒原',
+      角色列表: [
+        { 角色: { 名字: '🔮埃利奥特', 属性: '[❤️HP:100/100][💠MP:60/60][🛡️Armor:5]', 物品: '[💼][绷带x3][高级绷带x1]', 内心: '疲惫' } },
+        { 角色: { 名字: '🎩弗兰克', 属性: '[❤️HP:200/200][💠MP:20/20]', 武器: '[.577号子弹：5]', 内心: '警戒' } },
+        { 角色: { 名字: '🌂玛德琳', 属性: '[❤️HP:120/120][💠MP:40/40]', 物品: '[.45子弹：12]', 内心: '冷静' } },
+        { 角色: { 名字: '🦢索恩', 属性: '[❤️HP:150/150][💠MP:50/50]', 物品: '[砷弹：45]', 内心: '沉默' } },
+      ],
+    },
+  };
+}
+function seedChat() {
+  MOCK.setChat([
+    { message: '我们去清剿那只眷族。', role: 'user', is_user: true },
+    { message: '<maintext>风雪之中，四人踏入荒原。</maintext>\n【状态栏标记点】', role: 'assistant', is_user: false },
+  ]);
+}
+function seedState(state) {
+  MOCK.api.insertOrAssignVariables({ stat_data: state || baseState() }, { type: 'message', message_id: 1 });
+}
+function readState() {
+  return MOCK.api.getVariables({ type: 'message', message_id: 1 }).stat_data;
+}
+function charOf(state, nameFrag) {
+  const list = ((state || {})['状态栏'] || {})['角色列表'] || [];
+  for (const e of list) {
+    const c = e && (e['角色'] || e);
+    if (c && String(c['名字'] || '').includes(nameFrag)) return c;
+  }
+  return null;
+}
+/* 往战斗侧注入一份阵容（顶层 let 声明可被同 realm 的 eval 读写） */
+function injectHeroes(heroes) {
+  rpgWin().eval('heroesData = ' + JSON.stringify(heroes) + '; enemiesData = [];');
+}
+function heroSpec(o) {
+  return Object.assign({
+    id: 'h', name: '', img: '', hp: 0, maxHp: 0, mp: 0, maxMp: 0, tp: 0, maxTp: 100,
+    atk: 10, def: 5, spd: 100, shield: 0, actCount: 1, isAlive: true, buffs: [],
+    skills: [], items: [], classType: '', isSummon: false,
+  }, o);
+}
+function item(name, count, category) {
+  return { isItem: true, name, count, category: category || '消耗品', maxUses: 0, usesRemaining: 0, bindings: [] };
+}
+/* ================= 断言 1：端到端直连（0 次 LLM） ================= */
+async function test1() {
+  head('1 端到端直连：战斗结束即写入状态栏，且不调用 LLM');
+  MOCK.resetVars(); seedChat(); seedState();
+  mmsWin().MMS.floorId = 1;
+  mmsWin().MMS.isLastAssistantFloor = true;
+  MOCK.resetGenCount();
+
+  injectHeroes([
+    heroSpec({ name: '埃利奥特', hp: 62, maxHp: 100, mp: 5, maxMp: 60, atk: 10, def: 5, spd: 100,
+      items: [item('绷带', 1), item('化尘者之瓶', 0, '道具')] }),
+    heroSpec({ name: '弗兰克', hp: 200, maxHp: 200, mp: 20, maxMp: 20,
+      items: [item('.577号子弹', 2, '弹药')] }),
+    heroSpec({ name: '玛德琳', hp: 120, maxHp: 120, mp: 40, maxMp: 40,
+      items: [item('.45子弹', 0, '弹药')] }),
+    heroSpec({ name: '索恩', hp: 150, maxHp: 150, mp: 50, maxMp: 50,
+      items: [item('砷弹', 43, '弹药')] }),
+  ]);
+  rpgWin().eval("showBattleResult('win')");
+  await sleep(400);
+
+  const st = readState();
+  const eli = charOf(st, '埃利奥特');
+  eq(eli['属性'], '[❤️HP:62/100][💠MP:5/60][🛡️Armor:5]', 'HP/MP 写入且保留 emoji 键名与 Armor');
+  check(!/Atk|Speed/i.test(eli['属性']), '状态栏没有 Atk/Speed 键 → 不新增键');
+  eq(eli['物品'], '[💼][绷带x1][高级绷带x1]', '绷带按结算改数量、装饰前缀与同名近似物品不受影响');
+  eq(charOf(st, '玛德琳')['物品'], '[.45子弹：0]', '弹药打空保留零数量条目（中文冒号形态保持）');
+  eq(charOf(st, '索恩')['物品'], '[砷弹：43]', '索恩弹药数量对齐');
+  eq(charOf(st, '弗兰克')['武器'], '[.577号子弹：2]', '武器字段里的弹药也能改');
+  eq(eli['内心'], '疲惫', '自由字段不被结算触碰');
+  eq(MOCK.genCount(), 0, 'generateRaw 调用次数为 0（全程未经 LLM）');
+  const badge = rpgWin().document.getElementById('result-sync-badge');
+  check(/状态栏已同步/.test(badge.textContent), '战斗侧徽标收到回执并显示已同步', badge.textContent);
+  const prompt = rpgWin().document.getElementById('result-prompt').value;
+  check(!/\[HP:|\[MP:|\[Atk:|\[Armor:|\[Speed:/.test(prompt), '提示词已删除数值结算清单');
+  check(!/按结算清单中的数量更新/.test(prompt), '提示词已删除转述指令');
+  check(/小队战后伤势/.test(prompt) && /埃利奥特：轻伤/.test(prompt), '提示词含程序换算的伤势档位');
+  check(/<战局记录>/.test(prompt), '战局记录原样保留');
+}
+/* ================= 断言 2：幂等 ================= */
+async function test2() {
+  head('2 幂等：重复推送与 boot 对账都不会二次扣减');
+  const before = JSON.stringify(readState());
+  const histBefore = (MOCK.api.getVariables({ type: 'chat' }).$mms_history || {}).entries || [];
+  // (a) 直接重放同一份结算
+  const result = MOCK.api.getVariables({ type: 'chat' }).$rpg_combat_result;
+  await mmsWin().MMS.applyCombatResult(result);
+  // (b) 走 pending 判定（boot 对账/ 事件通道共用的入口）
+  const pending = mmsWin().MMS.pendingCombatResult();
+  check(pending === null, 'pendingCombatResult 已判定为"已应用"');
+  // (c) 再触发一次事件通道
+  MOCK.api.eventEmit('rpgcombat:battle-result', { id: result.id });
+  await sleep(200);
+  eq(readState(), JSON.parse(before), '状态与首次写入完全一致');
+  const histAfter = (MOCK.api.getVariables({ type: 'chat' }).$mms_history || {}).entries || [];
+  eq(histAfter.length, histBefore.length, '历史快照未重复追加');
+}
+
+/* ================= 断言 3-6：映射规则（直接测纯函数） ================= */
+function buildOn(state, result, roster) {
+  return mmsWin().eval(
+    'mmsBuildCombatResult(' + JSON.stringify(state) + ',' + JSON.stringify(result) + ',' + JSON.stringify(roster || { characters: [] }) + ')'
+  );
+}
+function oneChar(attrs, fields) {
+  return { 状态栏: { 角色列表: [{ 角色: Object.assign({ 名字: '🔮埃利奥特', 属性: attrs }, fields || {}) }] } };
+}
+function payload(heroes) {
+  return { v: 1, id: 'rc-test-' + Math.random().toString(36).slice(2), ts: Date.now(), outcome: 'win', round: 3, heroes };
+}
+async function test3() {
+  head('3 上限不一致：沿用状态栏上限并夹取，同时上报');
+  const r = buildOn(oneChar('[❤️HP:80/100]'), payload([
+    { name: '埃利奥特', alive: true, hp: 115, maxHp: 120, mp: null, maxMp: null, items: [] },
+  ]));
+  eq(charOf(r.state, '埃利奥特')['属性'], '[❤️HP:100/100]', '当前值夹到状态栏上限，上限不被改写');
+  eq(r.report.maxMismatch.length, 1, '上报 1 条上限不一致');
+  eq(r.report.maxMismatch[0].combatMax + '→' + r.report.maxMismatch[0].statusMax, '120→100', '上报内容正确');
+}
+
+async function test4() {
+  head('4 阵亡与零数量');
+  const r = buildOn(oneChar('[❤️HP:100/100][状态:清醒]', { 物品: '[绷带x2]' }), payload([
+    { name: '埃利奥特', alive: false, hp: 0, maxHp: 100, items: [{ name: '绷带', count: 0 }] },
+  ]));
+  const c = charOf(r.state, '埃利奥特');
+  check(/\[❤️HP:0\/100\]/.test(c['属性']), '阵亡写 HP:0');
+  check(/\[状态:重伤濒死\]/.test(c['属性']), '已有"状态"键时写入伤势词');
+  eq(c['物品'], '[绷带x0]', '消耗品归零后条目保留');
+}
+
+async function test5() {
+  head('5 未匹配：角色与物品都跳过并上报，不误写');
+  const r = buildOn(oneChar('[❤️HP:100/100]', { 物品: '[绷带x2]' }), payload([
+    { name: '埃利奥特', alive: true, hp: 90, maxHp: 100, items: [{ name: '神秘药水', count: 1 }] },
+    { name: '路人甲', alive: true, hp: 10, maxHp: 50, items: [] },
+  ]));
+  eq(r.report.unmatchedChars, ['路人甲'], '未匹配角色上报');
+  eq(r.report.unmatchedItems, ['埃利奥特·神秘药水'], '未匹配物品上报（不新增到清单）');
+  eq(charOf(r.state, '埃利奥特')['物品'], '[绷带x2]', '清单保持原样');
+  check(/\[❤️HP:90\/100\]/.test(charOf(r.state, '埃利奥特')['属性']), '同一角色的属性照常写入');
+}
+
+async function test6() {
+  head('6 歧义物品：全等优先，近似名不误伤');
+  const r = buildOn(oneChar('[❤️HP:100/100]', { 物品: '[高级绷带x1][绷带x3]' }), payload([
+    { name: '埃利奥特', alive: true, hp: 100, maxHp: 100, items: [{ name: '绷带', count: 1 }] },
+  ]));
+  eq(charOf(r.state, '埃利奥特')['物品'], '[高级绷带x1][绷带x1]', '只改"绷带"，"高级绷带"不动');
+}
+/* ================= 断言 7：合并层硬锁 ================= */
+async function test7() {
+  head('7 合并层硬锁：更新 AI 的数值命令被丢弃，非锁定内容照常合并');
+  MOCK.resetVars();
+  MOCK.setChat([
+    { message: '开打。', role: 'user', is_user: true },
+    { message: '<maintext>战前对峙。</maintext>\n【状态栏标记点】', role: 'assistant', is_user: false },
+  ]);
+  MOCK.api.insertOrAssignVariables({
+    $mms_roster: {
+      characters: [{ name: '🦢索恩', attrs: [{ key: '❤️HP', value: '150/150' }], fields: [{ key: '物品', initial: '', mode: 'check' }, { key: '内心', initial: '', mode: 'free' }] }],
+      modules: [], maps: { minimap: false, bigmap: false },
+    },
+  }, { type: 'chat' });
+  seedState({ 状态栏: { 日期和时间: '⏰ 深夜', 地点: '📍 荒原',
+    角色列表: [{ 角色: { 名字: '🦢索恩', 属性: '[❤️HP:150/150][💠MP:50/50]', 物品: '[砷弹：45][绷带x2]', 内心: '沉默' } }] } });
+  mmsWin().MMS.floorId = 1;
+  mmsWin().MMS.isLastAssistantFloor = true;
+
+  injectHeroes([heroSpec({ name: '索恩', hp: 90, maxHp: 150, mp: 20, maxMp: 50,
+    items: [item('砷弹', 43, '弹药'), item('绷带', 2)] })]);
+  rpgWin().eval("showBattleResult('win')");
+  await sleep(400);
+  eq(charOf(readState(), '索恩')['属性'], '[❤️HP:90/150][💠MP:20/50]', '结算已写入（锁的基线）');
+
+  // 新楼层：战斗叙事 → 更新 AI 试图再扣一次血与弹药
+  MOCK.setChat(MOCK.api.getChatMessages('0-1').concat([
+    { message: '我去追。', role: 'user', is_user: true },
+    { message: '<maintext>索恩连开数枪，肩头被寒风撕出血痕。</maintext>\n【状态栏标记点】', role: 'assistant', is_user: false },
+  ]));
+  MOCK.setGenResponder(() => JSON.stringify({ 状态栏: { 日期和时间: '⏰ 拂晓', 地点: '📍 冰河谷',
+    角色列表: [{ 角色: { 名字: '🦢索恩', 属性: '[❤️HP-30][💠MP-10]', 物品: '[砷弹-10][+止血钳x1]', 内心: '警觉' } }] } }));
+  MOCK.resetGenCount();
+  mmsWin().MMS.floorId = 3;
+  await mmsWin().MMS.runUpdate(3);
+  const s3 = MOCK.api.getVariables({ type: 'message', message_id: 3 }).stat_data;
+  const c3 = charOf(s3, '索恩');
+  eq(c3['属性'], '[❤️HP:90/150][💠MP:20/50]', '锁定的 HP/MP 数值命令被丢弃');
+  check(/砷弹：43/.test(c3['物品']), '锁定的弹药数量不被二次扣减', c3['物品']);
+  check(/止血钳/.test(c3['物品']), '非锁定的新物品照常获得', c3['物品']);
+  eq(c3['内心'], '警觉', '自由字段照常更新');
+  eq(s3['状态栏']['地点'], '📍 冰河谷', '非数值模块照常更新');
+  check(/禁止重复应用/.test(MOCK.lastGenPrompt()), '提示词含禁令块（纵深防御）');
+
+  // 锁窗口过期（contextFloors 默认 2）：同样的输出应重新生效
+  const sync = MOCK.api.getVariables({ type: 'chat' }).$mms_combat_sync;
+  check(mmsWin().MMS.combatLockFor(3) !== null, '窗口内锁有效');
+  check(mmsWin().MMS.combatLockFor(sync.appliedFloor + 3) === null, '超出 contextFloors 窗口后锁失效');
+}
+/* ================= 断言 8：开关关闭时回落 ================= */
+async function test8() {
+  head('8 关闭 combatSync：不写状态栏，提示词回落转述版');
+  MOCK.resetVars(); seedChat(); seedState();
+  MOCK.api.insertOrAssignVariables({ $mms_config: { combatSync: false } }, { type: 'global' });
+  mmsWin().MMS.floorId = 1;
+  mmsWin().MMS.isLastAssistantFloor = true;
+  const before = JSON.stringify(readState());
+  injectHeroes([heroSpec({ name: '埃利奥特', hp: 30, maxHp: 100, mp: 5, maxMp: 60, items: [item('绷带', 1)] })]);
+  rpgWin().eval("showBattleResult('win')");
+  await sleep(350);
+  eq(JSON.parse(JSON.stringify(readState())), JSON.parse(before), '状态栏未被写入');
+  check(mmsWin().MMS.pendingCombatResult() === null, '开关关闭时不产生待应用结算');
+  const p8 = rpgWin().document.getElementById('result-prompt').value;
+  check(/按结算清单中的数量更新/.test(p8), '提示词回落为转述版（转述指令回归）');
+  check(/\[HP:\d+\/\d+\]/.test(p8), '提示词回落为转述版（数值清单回归）');
+  const badge8 = rpgWin().document.getElementById('result-sync-badge');
+  check(/直连不可用/.test(badge8.textContent), '徽标提示直连不可用', badge8.textContent);
+  MOCK.api.insertOrAssignVariables({ $mms_config: { combatSync: true } }, { type: 'global' });
+}
+
+/* ---------------- 运行 ---------------- */
+async function runAll() {
+  logEl.textContent = '';
+  passN = failN = 0;
+  const statEl = document.getElementById('stat');
+  statEl.className = 'info';
+  statEl.textContent = '运行中…';
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8];
+  for (const t of tests) {
+    try { await t(); }
+    catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
+  }
+  out('head', '\n== 汇总 ==');
+  out(failN ? 'fail' : 'pass', '  通过 ' + passN + ' 项，失败 ' + failN + ' 项');
+  statEl.className = failN ? 'fail' : 'pass';
+  statEl.textContent = failN ? '✗ ' + failN + ' 项失败' : '✓ 全部 ' + passN + ' 项通过';
+}
+
+(async function boot() {
+  const statEl = document.getElementById('stat');
+  try {
+    seedChat();
+    mmsFrame = await mountFrame('mms', '../../MiniMapStatus/MiniMapStatus.html', '../../MiniMapStatus/',
+      (w) => w.MMS && typeof w.mmsBuildCombatResult === 'function');
+    rpgFrame = await mountFrame('rpg', '../index.html', '../',
+      (w) => typeof w.showBattleResult === 'function' && typeof w.exportCombatResultToStatus === 'function');
+    await sleep(600); // 等两侧 boot 的异步收尾
+    statEl.textContent = '两个应用已挂载，点「运行全部断言」';
+    document.getElementById('run').addEventListener('click', runAll);
+  } catch (e) {
+    statEl.className = 'fail';
+    statEl.textContent = '挂载失败：' + e.message + '（本页需通过 http 打开，不能用 file://）';
+  }
+})();
+</script>
+</body>
+</html>
