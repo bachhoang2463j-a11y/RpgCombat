@@ -4240,13 +4240,27 @@ function createMeleeHeavyHtml() {
           </div>
         </div>`;
 }
+// 敌人受击行内动画播放器：踉跄/后仰动画直接写 targetDom.style.animation（行内样式优先级高于 CSS 类动画）。
+// 播完必须清空行内 animation，否则 'xxx ... both' 会永久压过 .breathe 呼吸动画 → 敌人动效冻结
+// （枪击/重击受击后敌人不再呼吸的根因；keyframes 均止于恒等变换，清除瞬间无视觉跳变）。
+// 多发连击时后一次播放会重置前一次的恢复定时器，避免旧定时器中途掐断新动画。
+function playEnemyFlinchAnim(targetDom, animCss, durationMs) {
+    if (!targetDom) return;
+    targetDom.style.animation = 'none'; void targetDom.offsetWidth;
+    targetDom.style.animation = animCss;
+    clearTimeout(targetDom._flinchRestoreTimer);
+    targetDom._flinchRestoreTimer = setTimeout(() => {
+        targetDom.style.animation = '';
+        delete targetDom._flinchRestoreTimer;
+    }, durationMs);
+}
 function spawnMeleeHeavyParticles(x, y, targetDom) {
     try { playMeleeHeavySubBass(); } catch(e) {}
     playCustomAudio(MELEE_HEAVY_GUARDBREAK_URL);
     setTimeout(()=>playCustomAudio(RANGED_HEAVY_HITDOWN_URL), 80);
     const sceneEl = document.getElementById('battle-scene');
     if (sceneEl) { sceneEl.classList.remove('ranged-heavy-shake','gunshot-shake','pierce-shake'); void sceneEl.offsetWidth; sceneEl.classList.add('melee-heavy-shake'); setTimeout(()=>sceneEl.classList.remove('melee-heavy-shake'), 440); } else { window.triggerScreenShake(8, 350); }
-    if (targetDom) { targetDom.style.animation='none'; void targetDom.offsetWidth; targetDom.style.animation='enemy-ram-knockback 0.55s cubic-bezier(0.15,0.85,0.35,1) both'; }
+    if (targetDom) { playEnemyFlinchAnim(targetDom, 'enemy-ram-knockback 0.55s cubic-bezier(0.15,0.85,0.35,1) both', 570); }
     const tx = Math.round(x), ty = Math.round(y);
     const fxRoot = document.getElementById('fx-layer') || document.body;
     const flash = document.createElement('div');
@@ -4270,8 +4284,7 @@ function spawnRangedHeavyParticles(x, y, targetDom) {
     if (sceneEl) { sceneEl.classList.add('ranged-heavy-shake'); setTimeout(()=>sceneEl.classList.remove('ranged-heavy-shake'), 480); }
     // 敌人重击后仰
     if (targetDom) {
-        targetDom.style.animation='none'; void targetDom.offsetWidth;
-        targetDom.style.animation='ranged-heavy-enemy-recoil 0.55s cubic-bezier(0.15,0.85,0.35,1) both';
+        playEnemyFlinchAnim(targetDom, 'ranged-heavy-enemy-recoil 0.55s cubic-bezier(0.15,0.85,0.35,1) both', 570);
     }
     // 血块+枪口+白闪：固定层一次性挂载（复刻 demo fx-layer 定位）
     const tx = Math.round(x), ty = Math.round(y);
@@ -10668,8 +10681,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
               if (_pe && _pe.audioUrl) playCustomAudio(_pe.audioUrl);
               if (targetDom) {
                   playSVGEffect(targetDom, 'gunshot_pierce');
-                  targetDom.style.animation = 'none'; void targetDom.offsetWidth;
-                  targetDom.style.animation = 'enemy-pierce-stutter 0.45s cubic-bezier(0.15,0.85,0.35,1) both';
+                  playEnemyFlinchAnim(targetDom, 'enemy-pierce-stutter 0.45s cubic-bezier(0.15,0.85,0.35,1) both', 460);
               }
               const _ps = document.getElementById('battle-scene');
               if (_ps) { _ps.classList.remove('gunshot-shake','pierce-shake','ranged-heavy-shake'); void _ps.offsetWidth; _ps.classList.add('pierce-shake'); setTimeout(()=>_ps.classList.remove('pierce-shake'),260); }
@@ -10677,8 +10689,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
               if (typeof playRandomStandardGunshot === 'function') playRandomStandardGunshot();
               if (targetDom) {
                   playSVGEffect(targetDom, 'gunshot');
-                  targetDom.style.animation = 'none'; void targetDom.offsetWidth;
-                  targetDom.style.animation = 'enemy-gunshot-flinch 0.22s ease-out both';
+                  playEnemyFlinchAnim(targetDom, 'enemy-gunshot-flinch 0.22s ease-out both', 240);
               }
               const _gs = document.getElementById('battle-scene');
               if (_gs) { _gs.classList.remove('gunshot-shake','pierce-shake','ranged-heavy-shake'); void _gs.offsetWidth; _gs.classList.add('gunshot-shake'); setTimeout(()=>_gs.classList.remove('gunshot-shake'),180); }
@@ -10775,7 +10786,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
                 if (_fxEntry && _fxEntry.audioUrl) playCustomAudio(_fxEntry.audioUrl);
                 if (!tag.includes('群')) {
                     playSVGEffect(targetDom, 'gunshot_pierce');
-                    if (targetDom) { targetDom.style.animation = 'none'; void targetDom.offsetWidth; targetDom.style.animation = 'enemy-pierce-stutter 0.45s cubic-bezier(0.15,0.85,0.35,1) both'; }
+                    if (targetDom) { playSVGEffect(targetDom, 'gunshot_pierce'); playEnemyFlinchAnim(targetDom, 'enemy-pierce-stutter 0.45s cubic-bezier(0.15,0.85,0.35,1) both', 460); }
                 }
             } else if (_isGunshotTagHit) {
                 if (typeof playRandomStandardGunshot === 'function') playRandomStandardGunshot();
@@ -10788,7 +10799,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
                     else if (tag.includes('爆炸')) _eff = 'explosion_single';
                     else if (tag.includes('雷')) _eff = 'thunder_single';
                     playSVGEffect(targetDom, _eff);
-                    if (_eff === 'gunshot' && targetDom) { targetDom.style.animation = 'none'; void targetDom.offsetWidth; targetDom.style.animation = 'enemy-gunshot-flinch 0.22s ease-out both'; }
+                    if (_eff === 'gunshot' && targetDom) { playEnemyFlinchAnim(targetDom, 'enemy-gunshot-flinch 0.22s ease-out both', 240); }
                 }
             }
         }
@@ -13194,6 +13205,17 @@ function formatTagPill(typeStr, powerNum) {
   return `<span class="text-[8px] px-1 py-0.2 rounded border ${colorStyle} shrink-0 flex items-center leading-none">${cleanTag}${pText}</span>`;
 }
 
+// 技能当前是否可点（createSkillCard 禁用态与 updateSkillMenus 可用优先排序共用同一判定）
+function isSkillActionable(hero, skill) {
+    const isExtraTurnSkill = skill.type.includes('再动') || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
+    const isUsedExtraTurn = isExtraTurnSkill && state.usedExtraTurnSkillsThisRound && state.usedExtraTurnSkillsThisRound.has(skill.name);
+    const usesLeft = skill.maxUses > 0 ? (skill.usesRemaining ?? skill.maxUses) : 0;
+    const isUsesExhausted = skill.maxUses > 0 && usesLeft <= 0;
+    return hero.mp >= skill.cost && hero.hp > (skill.hpCost || 0) && hero.tp >= (skill.tpCost || 0)
+        && !(hero.burstActivated && skill.tpCost > 0) && !isUsedExtraTurn && !isUsesExhausted
+        && !(teamBarrier > 0 && skillHasBarrierTag(skill)) && hasEnoughBindings(hero, skill);
+}
+
 function createSkillCard(hero, skill, idx) {
     const isExtraTurnSkill = skill.type.includes('再动') || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
     const isUsedExtraTurn = isExtraTurnSkill && state.usedExtraTurnSkillsThisRound && state.usedExtraTurnSkillsThisRound.has(skill.name);
@@ -13205,7 +13227,7 @@ function createSkillCard(hero, skill, idx) {
     const isBurstBlocked = hero.burstActivated && skill.tpCost > 0;
     const isBarrierBlocked = teamBarrier > 0 && skillHasBarrierTag(skill);
     const isBindingEnough = hasEnoughBindings(hero, skill);
-    const isEnough = isMpEnough && isHpEnough && isTpEnough && !isBurstBlocked && !isUsedExtraTurn && !isUsesExhausted && !isBarrierBlocked && isBindingEnough;
+    const isEnough = isSkillActionable(hero, skill);
     let themeClass = 'skill-card-default';
     let typeBadgeStyle = 'bg-slate-800 text-slate-300 border-slate-600/60';
     let typeIcon = '⚔️';
@@ -13324,14 +13346,17 @@ function updateSkillMenus(hero) {
   if (supList) supList.innerHTML = '';
   if (legacyList) legacyList.innerHTML = '';
   let atkCount = 0, supCount = 0;
-  hero.skills.forEach((skill, idx) => {
-    if (skill.isReaction || skill.kanpoTarget || (skill.sheshenTarget && !skill._ownerOnly)) return;
-    if (skill._ownerOnly && !skill.summonTarget) return;
-    const btn = createSkillCard(hero, skill, idx);
-    const atk = isAttackSkill(skill);
-    if (atk) { if (atkList) atkList.appendChild(btn); atkCount++; }
-    else { if (supList) supList.appendChild(btn); supCount++; }
-  });
+  // 可用技能优先排列：按 isSkillActionable 稳定排序（同组内保持原有技能顺序），不可用（灰显）技能沉底
+  hero.skills.map((skill, idx) => ({ skill, idx, usable: isSkillActionable(hero, skill) }))
+    .filter(({ skill }) => !(skill.isReaction || skill.kanpoTarget || (skill.sheshenTarget && !skill._ownerOnly)))
+    .filter(({ skill }) => !(skill._ownerOnly && !skill.summonTarget))
+    .sort((a, b) => (b.usable ? 1 : 0) - (a.usable ? 1 : 0))
+    .forEach(({ skill, idx }) => {
+      const btn = createSkillCard(hero, skill, idx);
+      const atk = isAttackSkill(skill);
+      if (atk) { if (atkList) atkList.appendChild(btn); atkCount++; }
+      else { if (supList) supList.appendChild(btn); supCount++; }
+    });
   function emptyTip(text) {
     const div = document.createElement('div');
     div.className = 'text-[10px] text-slate-500 text-center py-6 leading-relaxed';
