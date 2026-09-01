@@ -2319,3 +2319,12 @@
 - **涉及文件**：`README.md`。
 - **经验证**：仅文档变更，无代码改动；全部条目与 LOG-191 已实测行为逐项对照。
 - **决策原因**：用户确认本轮工作有效无误后按 Coding rule §三 授权更新 README；爆发×暴击交互规则随用户提问一并写入 §3.4 与 §2.2（互斥防 ×4 是设计决策，须显式成文避免后续误判为 bug）。
+
+## [LOG-193] 2026-09-02 — 技能栏可用优先排序 + 敌人受击动效冻结修复
+
+- **变更行为**：
+  1. **技能栏可用优先排序（`index.html:13197/13342`）**：新增 `isSkillActionable(hero, skill)` 纯判定函数（MP/HP/TP/爆发禁TP/再动本轮已用/限次用尽/屏障占用/绑定材料八项与 `createSkillCard` 禁用态同源），`updateSkillMenus` 渲染前按此值稳定排序（`sort` 比较 usable 0/1，同组保持原有技能顺序）——可用技能排在灰显不可用技能之前，攻击/辅助两个子菜单各自独立分区。原 `createSkillCard` 内联 isEnough 表达式改调该函数消除双源漂移风险。
+  2. **敌人受击动效冻结修复（`index.html:4243` + 6 处调用点）**：新增 `playEnemyFlinchAnim(targetDom, animCss, durationMs)` 播放器——枪击踉跄（`enemy-gunshot-flinch 0.22s`）、穿透震颤（`enemy-pierce-stutter 0.45s`）、近战重击撞退（`enemy-ram-knockback 0.55s`）、远程重击后仰（`ranged-heavy-enemy-recoil 0.55s`）共 6 处行内 `style.animation` 写入（命中 4 + 闪避 2）全部改经此函数：播放后按动画时长 +10ms 定时清空行内 animation 并复位定时器句柄。根因：行内 `animation: 'xxx ... both'` 优先级永久高于 CSS 类的 `.breathe` 呼吸动画且从不被清除——枪击/重击命中后敌人 sprite 停留在受击终帧（恒等变换）不再呼吸，近战普攻/反击走默认刀光不写行内样式故无此问题。多发连击时后一次播放重置前一次的恢复定时器，避免旧定时器中途掐断新动画；keyframes 均止于恒等变换，清除瞬间无视觉跳变。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **经验证**：Node 抽取 `<script>` 语法校验通过；IAB 实测（手动 YAML 载入）——①技能栏排序：MP 5 的施法者带三技能（昂贵 20MP/普通 0MP/廉价 2MP），攻击菜单顺序变为 普通→廉价→昂贵（两个可用在前、灰显 20MP 不足沉底，onclick 仅可用卡绑定）；②动效修复：对敌施放 `[单体(枪击)]` 技能，采样 computedStyle 序列 `breathe → enemy-gunshot-flinch(命中中) → shake → breathe`，结算完成后行内 `style.animation` 为空串、计算动画回到 breathe（修复前将永久停留在 flinch 终帧）。
+- **决策原因**：用户提出两项——技能栏可用优先排列（可用技能常在列表顶部减少翻找；排序判定必须与卡片灰显同源否则会出现"排在前面的却点不动"的矛盾，故提取共用函数）；枪击后敌人动效冻结（用户反馈"不知从何开始出现"，经定位为行内动画残留的历史隐患——涉及 6 处写入点均为枪击/重击专属路径，与"近战命中无此问题"的观察吻合；统一收口到播放器函数一处修复，避免逐处补 setTimeout 的散弹式维护）。
