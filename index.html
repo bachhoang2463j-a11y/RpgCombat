@@ -1567,6 +1567,7 @@
     .history-sub-heal { color: #34d399; font-weight: 700; }
     .history-sub-shield { color: #22d3ee; }
     .history-sub-kanpo { color: #e879f9; font-weight: 700; }
+    .history-sub-item { color: #fbbf24; font-weight: 700; }
     #visual-filter-bar { background: rgba(0, 0, 0, 0.40); border-bottom: 1px solid rgba(51, 65, 85, 0.60); }
     #result-visual-view .history-action-card { border-color: rgba(71, 85, 105, 0.55); }
   </style>
@@ -2329,6 +2330,23 @@ function parseCombatLog(raw) {
       list.push({ type: 'critical', round, text: line.replace(/^\[战况\]\s*/, ''), isDeath: line.includes('重伤倒下') || line.includes('被击溃'), isRevive: line.includes('死里逃生') || line.includes('站了起来'), raw: line });
       continue;
     }
+    // 【看破】主行 → 独立行动卡：后续 ↳ 子行（使用道具/消耗弹药等）才能挂到正确卡片，
+    // 否则子行会漂到更早的行动卡里（常落在已折叠的旧回合组，表现为"要点开才看得见"）
+    const kpMatch = line.match(/^⛔\s*(.+?)\s*施展【(.*?)】看穿了敌方气路/);
+    if (kpMatch) {
+      const caster = kpMatch[1].trim();
+      const casterAv = getLiveAvatar(caster);
+      const actObj = { type: 'action', round, caster, target: null, skill: kpMatch[2], isHero: !!casterAv.isHero, casterAvatar: casterAv, targetAvatar: null, subs: [], raw: line };
+      const kpCancelled = line.match(/【([^【】]+)】被彻底无效化/);
+      if (kpCancelled) actObj.subs.push(`看穿了敌方气路，【${kpCancelled[1]}】被彻底无效化！`);
+      curAction = actObj;
+      list.push(actObj);
+      continue;
+    }
+    // 【看破破局】被取消的敌方技能/召唤行：挂为当前看破卡的子行（无卡片可挂时保持原文 other 兜底）
+    if (/^⛔\s*(?:技能|召唤)【.*?】被看破破局/.test(line)) {
+      if (curAction) { curAction.subs.push(line.replace(/^⛔\s*/, '')); continue; }
+    }
     if (line.startsWith('↳')) {
       const subText = line.replace(/^↳\s*/, '');
       if (curAction) curAction.subs.push(subText);
@@ -2418,6 +2436,7 @@ function renderHistorySchemeA(list, container) {
           else if (t.includes('恢复') || t.includes('治愈') || t.includes('回血')) cls = 'history-sub-heal';
           else if (t.includes('护盾') || t.includes('圣域') || t.includes('屏障')) cls = 'history-sub-shield';
           else if (t.includes('看破') || t.includes('无效化') || t.includes('无效')) cls = 'history-sub-kanpo';
+          else if (t.includes('使用道具') || t.includes('消耗弹药') || t.includes('施展材料') || t.includes('消耗材料')) cls = 'history-sub-item';
           return '<div class="flex items-center gap-1 ' + cls + '"><span class="text-slate-500">↳</span><span>' + escapeHistoryHtml(t) + '</span></div>';
         }).join('') + '</div>';
       }
@@ -7016,28 +7035,33 @@ function hasEnoughBindings(hero, skill) {
     return list.every(bindingHasStock);
 }
 
-// 技能施展时的绑定物品扣减（AND 语义），返回战报描述（如 ".45子弹×3（剩42）"、"化尘者之瓶×1（剩0次）"），无绑定返回 null
+// 技能施展时的绑定物品扣减（AND 语义），返回战报描述，无绑定返回 null。
+// 文案按类别区分并内嵌类别标签（战报供酒馆 LLM 续写下一份 Combat_block，必须杜绝歧义）：
+//   道具（可重复使用，每场重置次数）→ "逆咒归源镜（道具·使用1次，剩1次）"
+//   消耗品（跨场扣减数量）          → "铝热投剂（消耗品·消耗1个，剩2个）"
+//   弹药（跨场扣减发数）            → ".45子弹（弹药·消耗3发，剩42发）"
 function consumeBindingsForSkill(hero, skill) {
     const list = getHeroItemBindings(hero).get(skill.name);
     if (!list) return null;
     return list.map(b => {
         const it = b.item;
-        let remain;
         if (it.category === '道具') {
             if (it.maxUses > 0) it.usesRemaining = Math.max(0, (it.usesRemaining ?? it.maxUses) - b.cost);
-            remain = it.maxUses > 0 ? `剩${it.usesRemaining}次` : '不限';
-        } else {
-            it.count = Math.max(0, (it.count || 0) - b.cost);
-            remain = `剩${it.count}`;
+            const remain = it.maxUses > 0 ? `剩${it.usesRemaining}次` : '不限次数';
+            return `${it.name}（道具·使用${b.cost}次，${remain}）`;
         }
-        return `${it.name}×${b.cost}（${remain}）`;
+        it.count = Math.max(0, (it.count || 0) - b.cost);
+        if (it.category === '弹药') return `${it.name}（弹药·消耗${b.cost}发，剩${it.count}发）`;
+        return `${it.name}（消耗品·消耗${b.cost}个，剩${it.count}个）`;
     }).join('、');
 }
 
-// 战报子行标签：全部为弹药绑定时用"消耗弹药"，混有道具/消耗品时用"消耗材料"
+// 战报子行标签：按绑定类别区分——全弹药"消耗弹药"、全道具"使用道具"（强调可重复使用而非损耗）、其余（消耗品/混合）"施展材料"
 function bindingsSpendLabel(hero, skill) {
     const list = getHeroItemBindings(hero).get(skill.name) || [];
-    return list.length && list.every(b => b.item.category === '弹药') ? '消耗弹药' : '消耗材料';
+    if (list.length && list.every(b => b.item.category === '弹药')) return '消耗弹药';
+    if (list.length && list.every(b => b.item.category === '道具')) return '使用道具';
+    return '施展材料';
 }
 
 // 反应/看破/舍身弹窗的绑定需求徽章（与技能卡 costBadges 同款口径；无绑定返回空串）
