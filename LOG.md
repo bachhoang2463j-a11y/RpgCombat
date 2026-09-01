@@ -2345,3 +2345,14 @@
 - **涉及文件**：`README.md`。
 - **经验证**：仅文档变更，与 LOG-194 已实测文案逐项对照。
 - **决策原因**：用户确认 LOG-194 轮次有效无误后授权更新 README；旧示例 `消耗材料：xxx×N（剩M）` 与新代码输出不一致会误导使用者与 LLM。
+
+## [LOG-196] 2026-09-02 — 战后数值直连状态栏（MiniMapStatus 程序联通，不经正文 LLM 转述）
+
+- **变更行为**：
+  1. **结算载荷导出（`index.html:14763-14884`）**：新增 `COMBAT_RESULT_VAR_KEY = '$rpg_combat_result'`、`buildCombatResultPayload(type)`（从 `heroesData` 取战后 HP/MP/Atk/Armor/Speed/存活与非道具类物品数量，排除 `isSummon`；口径与 summaryText 一致）、`exportCombatResultToStatus(type)`（写 chat 变量作真值 + `eventEmit('rpgcombat:battle-result')` + `BroadcastChannel('rpg-combat-bridge')` 双通道通知）。三条通道全部特性检测并整体 try/catch，**绝不抛出**——`showBattleResult` 内抛异常会导致结算弹窗都打不开。另判定状态栏侧 `$mms_config.combatSync === false` 时主动报告失败，否则"提示词删了转述指令、状态栏又不写"会造成数值断供。
+  2. **提示词改造（`index.html:12106-12126`）**：推送成功时删去数值结算清单（`[HP:x/y][MP:...][Atk:...][物品:N]`）与「按结算清单中的数量更新 状态栏 对应物品」转述指令，替换为 `buildInjuryLines()` 生成的战后伤势档位清单（零数字：无恙/轻伤≥60%/重伤≥30%/濒死>0/重伤濒死=0，MP<25% 追加「法力耗竭」——纯查表换算），并追加「数值已由系统写入状态栏，勿罗列数字」的附加指令；`<战局记录>` 全量战报原样保留（其中每次攻击自带的【轻伤/受伤/重创】标签让「严格根据伤势标签描写」这条既有指令首次有了真实依据）。推送失败时整段回退旧转述版。
+  3. **同步徽标（`index.html:1780` + `2465/2494-2523`）**：结算弹窗新增 `#result-sync-badge`（置于 `#result-summary-card` 上方，`refreshResultView` 渲染）四态——⏳ 已推送等待确认（琥珀）/ ✅ 状态栏已同步 N 名成员·M 项物品（翠绿）/ ⚠️ 已同步但有未匹配（琥珀，展开未匹配角色/物品与上限不一致明细）/ ⚪ 直连不可用已回退转述（灰）。`initCombatBridgeListeners()` 在脚本初始化处监听状态栏侧 `mms:combat-applied` 回执。
+  4. **回归脚手架（`integration-test/harness.html`，新增）**：mock 酒馆助手父页面（按 message/chat/global 分作用域的变量存储与 `replaceVariables` 整体替换语义、跨 iframe `eventOn/eventEmit`、消息 API、世界书 API 桩、**带调用计数的 `generateRaw` 桩**），把两个应用以 srcdoc 挂进 iframe 并注入 mock 全局，`contentWindow.eval` 注入 `heroesData` 后调用真实 `showBattleResult`。
+- **涉及文件**：`index.html`、`integration-test/harness.html`（新增）、`LOG.md`、`LOG-INDEX.md`。配套改动在 MiniMapStatus 项目（`MiniMapStatus.html`：`mmsBuildCombatResult`/`mmsSetItemCounts`/`mmsMatchOne`/`MMS.applyCombatResult`/合并层硬锁 `combatLock`/`combatSync` 开关）。
+- **经验证**：Node 抽取 `<script>` 语法校验通过；IAB 跑脚手架 **41 项断言全部通过**——①端到端：战斗结束即写入状态栏（HP/MP/物品按结算值、`❤️` emoji 键名与 `：` 中文冒号形态保持、状态栏没有的 Atk/Speed 不新增、自由字段不被触碰），**`generateRaw` 调用次数 = 0**；②幂等：重复推送 + 事件重放 + boot 对账后状态与历史快照均无变化；③上限不一致（战斗 120 vs 状态栏 100）按状态栏上限夹取且上限不被改写并上报；④弹药打空保留 `[.45子弹：0]`；⑤未匹配角色/物品跳过并上报、不误写；⑥歧义物品「绷带 vs 高级绷带」全等优先不误伤；⑦硬锁：更新 AI 输出 `[HP-30][砷弹-10]` 被丢弃、新物品与自由字段照常合并、超出 contextFloors 窗口后锁失效；⑧关闭 `combatSync` 后不写状态栏且提示词回落转述版、徽标转灰。
+- **决策原因**：用户指出两点核心问题——①「大段的角色属性变化，完全会对冲掉独立 LLM 的规则约束」：提示词级禁令挡不住战斗叙事，故真正的防线放在状态栏侧合并层（丢弃更新 AI 对已结算键/物品的数值命令），提示词禁令降为纵深防御；②「大语言模型应该很难理解数字意味着什么」：结算数值对正文 LLM 是噪音且诱导转述，故删清单改伤势档位。原设想的「战报程序化压缩」经用户指出其示例含生成式改写（「远比先前厚重」「本战首次见血」需跨行推理与数值比较，规则表做不到），本轮不做，留待下一步单独设计规格（动作行须保留 施术者/技能/**目标**/结果 四元组）。反向直连（状态栏 → Combat_block 开局属性）仍是剩余的唯一 LLM 依赖，留作后续「开局校准」。
