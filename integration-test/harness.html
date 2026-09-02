@@ -697,6 +697,61 @@ async function test13() {
   check(bA && !bA.style.color, '无上限数值（无分母）不参与比例预警');
 }
 
+/* ================= 断言 14：人物模块长期追踪（名字键合并 + 无名过滤 + 红叉删除） ================= */
+async function test14() {
+  head('14 人物长期追踪登记簿：增量合并/无名过滤/[移除]标记/红叉删除');
+  const prevPeople = { 盟友: ['🎩【史密斯警探】[友善] 专注失踪案'], NPC: ['🧑【老约翰】[店主] 约好周五见面'], 敌人: ['💀【疤脸乔】[黑帮] 悬而未决的威胁'] };
+  const aiPeople = { 盟友: ['🎩【史密斯警探】[友善] 已还清人情，引荐了线人'], NPC: ['👋【新人薇拉】[记者] 追查同一桩案子'], 敌人: ['💀【疤脸乔】[移除]', '👥【邪教徒x3】[近战] 已确认接触'] };
+
+  const merged = mmsWin().eval('(function(){ return mmsMergePeople(' + JSON.stringify(prevPeople) + ',' + JSON.stringify(aiPeople) + '); })()');
+  check(merged['盟友'].some(l => l.includes('史密斯') && l.includes('已还清人情')) && merged['盟友'].filter(l => l.includes('史密斯')).length === 1, '同名条目=更新描述（不重复）');
+  check(!merged['敌人'].some(l => l.includes('疤脸乔')), '[移除] 标记删除既有条目');
+  check(merged['敌人'].some(l => l.includes('邪教徒x3')), '新名条目登记');
+  check(merged['NPC'].some(l => l.includes('老约翰')) && merged['NPC'].some(l => l.includes('薇拉')), '未提及条目保留 + 新 NPC 登记');
+
+  // 跨桶移动：老约翰被 AI 移到 盟友
+  const moved = mmsWin().eval('(function(){ return mmsMergePeople(' + JSON.stringify(prevPeople) + ', { 盟友: ["🤝【老约翰】[店主] 决定入伙"] }); })()');
+  check(moved['盟友'].some(l => l.includes('老约翰') && l.includes('入伙')) && !moved['NPC'].some(l => l.includes('老约翰')), '跨桶移动跟随 AI 输出分类');
+
+  // 无名条目过滤（AI 输出与历史遗留都滤）
+  const unnamed = mmsWin().eval('(function(){ return mmsMergePeople({ NPC: ["侍者 端茶", "路人甲"] }, { NPC: ["酒保 擦杯子"] }); })()');
+  eq(unnamed['NPC'], [], '无名条目（新输出与遗留）都不进人物');
+
+  // 端到端：runUpdate 走新合并路径（AI 输出含无名+更新，未提及者保留）
+  // 基线状态种在 0 楼（findPrevState 只往前找，不能种在被更新的楼层自己身上）
+  MOCK.resetVars();
+  MOCK.setChat([
+    { message: '开始调查。', role: 'user', is_user: true },
+    { message: '<maintext>酒吧里侍者端来酒，史密斯警探透露了线索。</maintext>\n【状态栏标记点】', role: 'assistant', is_user: false },
+  ]);
+  MOCK.api.insertOrAssignVariables({ stat_data: { 状态栏: { 日期和时间: '⏰ 深夜', 地点: '📍 酒吧',
+    人物: { 盟友: ['🎩【史密斯警探】[友善] 专注失踪案'], NPC: ['🧑【老约翰】[店主] 约好周五见面'] },
+    角色列表: [] } } }, { type: 'message', message_id: 0 });
+  mmsWin().MMS.floorId = 1;
+  mmsWin().MMS.isLastAssistantFloor = true;
+  MOCK.setGenResponder(() => JSON.stringify({ 状态栏: { 日期和时间: '⏰ 深夜', 地点: '📍 酒吧',
+    人物: { 盟友: ['🎩【史密斯警探】[友善] 提供了码头线索'], NPC: ['侍者 端酒'] } } }));
+  await mmsWin().MMS.runUpdate(1);
+  const s14 = MOCK.api.getVariables({ type: 'message', message_id: 1 }).stat_data;
+  const p14 = s14['状态栏']['人物'];
+  check(p14['盟友'].some(l => l.includes('码头线索')), '端到端：描述更新');
+  check(p14['NPC'].some(l => l.includes('老约翰')) && !p14['NPC'].some(l => l.includes('侍者')), '端到端：未提及保留、无名滤除');
+
+  // 红叉删除：渲染后点击某条目的叉 → 状态里该人物消失
+  for (let i = 0; i < 20; i++) {
+    await sleep(150);
+    if (mmsWin().document.querySelector('.character-entry .char-del-x')) break;
+  }
+  const x = mmsWin().document.querySelector('.character-entry .char-del-x');
+  check(x, '渲染层出现删除红叉');
+  if (x) {
+    x.click();
+    await sleep(400);
+    const after = MOCK.api.getVariables({ type: 'message', message_id: 1 }).stat_data;
+    check(!JSON.stringify(after['状态栏']['人物']).includes('史密斯'), '点击红叉后该人物从状态中移除');
+  }
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -704,7 +759,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
@@ -719,6 +774,9 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   try {
     seedChat();
+    // 关掉 MMS 的 boot 期自动更新：mock 里没挂 genResponder 时它的三次重试（退避 1s/2s）
+    // 可能跨进 test1 的计数窗口，造成 generateRaw 计数抖动；测试全部直调 runUpdate，不受影响
+    MOCK.api.insertOrAssignVariables({ $mms_config: { autoUpdate: false } }, { type: 'global' });
     mmsFrame = await mountFrame('mms', '../../MiniMapStatus/MiniMapStatus.html', '../../MiniMapStatus/',
       (w) => w.MMS && typeof w.mmsBuildCombatResult === 'function');
     rpgFrame = await mountFrame('rpg', '../index.html', '../',
