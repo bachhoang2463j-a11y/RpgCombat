@@ -808,6 +808,56 @@ async function test15() {
   MOCK.api.insertOrAssignVariables({ $mms_config: { peopleFilterWords: [] } }, { type: 'global' });
 }
 
+/* ================= 断言 16：自X 自身负面标签 + 槽位级轮数 ================= */
+async function test16() {
+  head('16 自X 自身负面：解析/目标分类/必中/固定威力/槽位级轮数');
+  const w = rpgWin();
+
+  // --- 解析：自X 入槽、槽位级 turns、冒号简写 ---
+  const sk = w.parseSkill('【狂化】[单增;power:30;turns:4][自盲;power:20;turns:2][MP:2]');
+  eq(sk.type2, '[自盲]', '自盲占用第二效果槽');
+  eq(sk.power2, 20, '自盲 power 解析');
+  eq(sk.slotTurns, 4, '槽位级 turns：第一槽 4 回合');
+  eq(sk.slotTurns2, 2, '槽位级 turns：自盲槽 2 回合');
+  eq(sk.slotTurns3, null, '空槽 turns 为 null');
+  eq(sk.turns, null, '无 [Turns:N] 时技能级轮数保持 null');
+
+  const skColon = w.parseSkill('【代价】[自盲:25]');
+  eq(skColon.type, '[自盲]', '冒号简写 [自盲:25] 归一入主槽');
+  eq(skColon.power, 25, '冒号简写 power 解析');
+
+  const skBare = w.parseSkill('【裸写】[自盲]');
+  eq(skBare.type, '[单体]', '裸 [自盲] 走 [单体] 兜底（与裸 单盲 一致：自X 必须写 power）');
+
+  // --- 目标分类：自X 不触发敌方选目标、不算有益单体 ---
+  const clsPure = w.classifySkill({ type: '[自盲]', type2: '[无]', type3: '[无]' });
+  check(clsPure.hasEnemyTargetTag === false, '纯自盲技能不进敌方选目标（走自施放）');
+  check(clsPure.hasSingleBuff === false, '自盲不算有益单体标签（不可经 [他人] 施加给队友）');
+  const clsMix = w.classifySkill({ type: '[单体]', type2: '[自盲]', type3: '[无]' });
+  check(clsMix.hasEnemyTargetTag === true, '单体+自盲混合：攻击部分仍进敌方选目标');
+
+  // --- 必中 + 轮数回落（直接驱动效果函数；spd 拉满 + hitChance=1 使任何掷骰几乎必然闪避）---
+  const mk = () => ({ id: 'h_t16', name: '测试勇者', isAlive: true, hp: 100, maxHp: 100, mp: 50, maxMp: 50,
+    tp: 0, maxTp: 100, atk: 10, def: 5, spd: 99999, eva: 0, shield: 0, buffs: [], skills: [], items: [], classType: '', tags: [] });
+
+  const m1 = mk();
+  await w.applySingleTagEffect(m1, m1, '[自盲]', 20, 1, 1, 2, null);
+  eq(m1.buffs, [{ type: 'hit', value: -20, duration: 2 }], '自盲必中落身：spd 99999 环境下仍施加 {hit:-20, 2回合}（若走掷骰必落空）');
+
+  const m2 = mk();
+  await w.applySingleTagEffect(m2, m2, '[自降]', 10, 1, 1, null, null);
+  eq(m2.buffs, [{ type: 'def', value: -10, duration: 3 }], '无槽位轮数时回落默认 3 回合');
+
+  // --- 固定代价：极限爆发/暴击 ×2 不放大自负面；普通标签照常翻倍 ---
+  const m3 = mk();
+  await w.applySingleTagEffect(m3, m3, '[自盲]', 20, 1, 2, 2, null);
+  eq(m3.buffs, [{ type: 'hit', value: -20, duration: 2 }], '倍率 ×2 下自盲仍 -20（固定代价，不受爆发/暴击放大）');
+
+  const m4 = mk();
+  await w.applySingleTagEffect(m4, m4, '[单瞄]', 20, 100, 2, 2, null);
+  eq(m4.buffs, [{ type: 'hit', value: 40, duration: 2 }], '对照：单瞄 ×2 照常 +40（倍率豁免仅限自X）');
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -815,7 +865,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
