@@ -555,6 +555,47 @@ async function test10() {
     '缺规则:' + missRule.join(',') + ' 错指向:' + missSrc.join(','));
 }
 
+/* ================= 断言 11：战斗中对话的战况摘要化（ongoing + 性能 + 缓存） ================= */
+async function test11() {
+  head('11 对话 LLM 战况摘要化：进行时模式 + 性能与缓存');
+  const log = await (await fetch('fixtures/real-battle-log.txt')).text();
+  seedDigestBattle();
+  rpgWin().eval('battleHistory = ' + JSON.stringify(log.split('\n')) + '; _historyRawCache = battleHistory.join("\\n");');
+
+  // 进行时模式：不带结算块（关键术式是战后概念），保留回合节拍与对话
+  const ongoing = rpgWin().eval('buildOngoingDigest()');
+  check(ongoing.length > 0, '进行时摘要非空');
+  check(!/【关键术式】/.test(ongoing), '进行时模式不含【关键术式】结算块');
+  check(/=== 第 1 回合 ===/.test(ongoing) && /=== 第 4 回合 ===/.test(ongoing), '保留全场回合结构（无限模式的完整脉络）');
+  check(ongoing.includes('弗兰克「该死的怪物'), '对话保留');
+  check(!/\d+ 点|当前状态: \d+/.test(ongoing), '进行时摘要无数值');
+
+  // 性能：全量解析（204 行 × 118 规则）50 次取均值
+  const perf = rpgWin().eval(`(function(){
+    const t0 = performance.now();
+    for (let i = 0; i < 50; i++) buildOngoingDigest();
+    const full = (performance.now() - t0) / 50;
+    // 缓存命中路径
+    getOngoingDigestCached();
+    const t1 = performance.now();
+    for (let i = 0; i < 1000; i++) getOngoingDigestCached();
+    const cached = (performance.now() - t1) / 1000;
+    return { fullMs: full, cachedMs: cached };
+  })()`);
+  out('info', '  全量摘要耗时 ' + perf.fullMs.toFixed(2) + 'ms/次（204行），缓存命中 ' + perf.cachedMs.toFixed(4) + 'ms/次');
+  check(perf.fullMs < 30, '全量摘要均值 < 30ms（对比对话 API 网络延迟数百 ms 可忽略）');
+  check(perf.cachedMs < 0.05, '缓存命中近零开销（连续触发的对话调用之间战报未变）');
+
+  // 缓存正确性：战报追加一行后缓存失效并重算（用能被规则解析的终局行）
+  rpgWin().eval("battleHistory.push('[战况] 💀 缓存测试目标 被击溃了！');");
+  const after = rpgWin().eval('getOngoingDigestCached()');
+  check(after.includes('缓存测试目标'), '战报变化后缓存失效重算');
+
+  // 开关默认开 + 关闭后回退原始日志路径
+  const useDigestDefault = rpgWin().eval('llmState.digestBattle !== false');
+  check(useDigestDefault, '战况摘要化默认开启（旧存档无字段时迁移为开）');
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -562,7 +603,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
