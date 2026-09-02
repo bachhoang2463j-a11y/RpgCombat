@@ -701,12 +701,12 @@ async function test13() {
 async function test14() {
   head('14 人物长期追踪登记簿：增量合并/无名过滤/[移除]标记/红叉删除');
   const prevPeople = { 盟友: ['🎩【史密斯警探】[友善] 专注失踪案'], NPC: ['🧑【老约翰】[店主] 约好周五见面'], 敌人: ['💀【疤脸乔】[黑帮] 悬而未决的威胁'] };
-  const aiPeople = { 盟友: ['🎩【史密斯警探】[友善] 已还清人情，引荐了线人'], NPC: ['👋【新人薇拉】[记者] 追查同一桩案子'], 敌人: ['💀【疤脸乔】[移除]', '👥【邪教徒x3】[近战] 已确认接触'] };
+  const aiPeople = { 盟友: ['🎩【史密斯警探】[友善] 已还清人情，引荐了线人'], NPC: ['👋【新人薇拉】[记者] 追查同一桩案子'], 敌人: ['💀【疤脸乔】[移除]', '🔪【独眼刀疤】[杀手] 已确认接触'] };
 
   const merged = mmsWin().eval('(function(){ return mmsMergePeople(' + JSON.stringify(prevPeople) + ',' + JSON.stringify(aiPeople) + '); })()');
   check(merged['盟友'].some(l => l.includes('史密斯') && l.includes('已还清人情')) && merged['盟友'].filter(l => l.includes('史密斯')).length === 1, '同名条目=更新描述（不重复）');
   check(!merged['敌人'].some(l => l.includes('疤脸乔')), '[移除] 标记删除既有条目');
-  check(merged['敌人'].some(l => l.includes('邪教徒x3')), '新名条目登记');
+  check(merged['敌人'].some(l => l.includes('独眼刀疤')), '新名条目登记');
   check(merged['NPC'].some(l => l.includes('老约翰')) && merged['NPC'].some(l => l.includes('薇拉')), '未提及条目保留 + 新 NPC 登记');
 
   // 跨桶移动：老约翰被 AI 移到 盟友
@@ -752,6 +752,62 @@ async function test14() {
   }
 }
 
+/* ================= 断言 15：泛用临时角色词过滤（整词精确匹配 + 自定义词表） ================= */
+async function test15() {
+  head('15 人物过滤：职业词冒名/数量形式/整词精确匹配/自定义词表');
+  const ev = (expr) => mmsWin().eval('(function(){ return ' + expr + '; })()');
+  // 泛用词与数量形式全滤
+  for (const n of ['侍者', '混混x2', '几名匪徒', '邪教徒x3', '酒保', '一群村民', '路甲']) {
+    check(ev('mmsIsGenericPeopleName(' + JSON.stringify(n) + ')'), `泛用名被过滤：${n}`);
+  }
+  // 整词精确匹配：多一字都放行（头衔组合/特征代称/词表外群体）
+  for (const n of ['疤脸酒保', '史密斯警探', '老约翰', '三个火枪手', '疤脸酒保x2', '店主', '管家']) {
+    check(!ev('mmsIsGenericPeopleName(' + JSON.stringify(n) + ')'), `非泛用名放行：${n}`);
+  }
+  // 自定义词表（修仙世界观自备词）：整词命中滤、加字放行
+  check(ev('mmsIsGenericPeopleName("散修", ["散修","杂役"])'), '自定义词命中被过滤');
+  check(!ev('mmsIsGenericPeopleName("老散修", ["散修"])'), '自定义词加字放行');
+
+  // 合并层：AI 用职业词冒名 + 数量群体 + 真名混合输出
+  const merged15 = ev('mmsMergePeople(' + JSON.stringify({ NPC: ['🧑【老约翰】[店主] 递上麦酒', '🧑【酒保】[服务员] 擦杯子'] }) + ', '
+    + JSON.stringify({ NPC: ['🧑【老约翰】[店主] 已回店主楼', '🧑【侍者】[服务员] 端酒', '👥【混混x2】[闹事] 推搡客人', '🎩【史密斯警探】[友善] 盯着门口'] }) + ')');
+  check(merged15['NPC'].some(l => l.includes('老约翰') && l.includes('店主楼')), '真名条目正常更新');
+  check(!JSON.stringify(merged15).includes('酒保') && !JSON.stringify(merged15).includes('侍者') && !JSON.stringify(merged15).includes('混混'), '职业词冒名/数量群体全滤（含基底遗留迁移）');
+  check(merged15['NPC'].some(l => l.includes('史密斯警探')), '头衔型真名放行');
+
+  // 端到端：runUpdate 后状态无泛用名条目
+  MOCK.resetVars();
+  MOCK.setChat([
+    { message: '开始调查。', role: 'user', is_user: true },
+    { message: '<maintext>酒馆里侍者端酒，混混闹事，史密斯警探进门。</maintext>\n【状态栏标记点】', role: 'assistant', is_user: false },
+  ]);
+  MOCK.api.insertOrAssignVariables({ stat_data: { 状态栏: { 日期和时间: '⏰ 深夜', 地点: '📍 酒馆',
+    人物: { NPC: [] }, 角色列表: [] } } }, { type: 'message', message_id: 0 });
+  mmsWin().MMS.floorId = 1;
+  mmsWin().MMS.isLastAssistantFloor = true;
+  MOCK.setGenResponder(() => JSON.stringify({ 状态栏: { 日期和时间: '⏰ 深夜', 地点: '📍 酒馆',
+    人物: { NPC: ['🧑【侍者】[服务员] 端酒', '👥【混混x2】[闹事] 推搡客人', '🎩【史密斯警探】[友善] 盯着门口'] } } }));
+  await mmsWin().MMS.runUpdate(1);
+  const p15 = MOCK.api.getVariables({ type: 'message', message_id: 1 }).stat_data['状态栏']['人物'];
+  check(!JSON.stringify(p15).includes('侍者') && !JSON.stringify(p15).includes('混混'), '端到端：泛用名不进状态');
+  check(p15['NPC'].some(l => l.includes('史密斯警探')), '端到端：真名登记');
+
+  // 提示词含名字约束与三条描述规则
+  const prompt15 = MOCK.lastGenPrompt();
+  check(/有名有姓的真实姓名/.test(prompt15), '提示词含真实姓名约束');
+  check(/在场：此刻的行为与反应/.test(prompt15) && /离场：简短去向/.test(prompt15) && /传闻/.test(prompt15), '提示词含在场/离场/传闻三态规则');
+
+  // 自定义词表配置端到端：设置 peopleFilterWords 后 runUpdate 过滤
+  MOCK.api.insertOrAssignVariables({ $mms_config: { peopleFilterWords: ['散修'] } }, { type: 'global' });
+  MOCK.setGenResponder(() => JSON.stringify({ 状态栏: { 日期和时间: '⏰ 深夜', 地点: '📍 酒馆',
+    人物: { NPC: ['🧑【散修】[游方] 打量团队', '🧑【老散修】[游方] 闭目养神'] } } }));
+  await mmsWin().MMS.runUpdate(1);
+  const p15b = MOCK.api.getVariables({ type: 'message', message_id: 1 }).stat_data['状态栏']['人物'];
+  check(!JSON.stringify(p15b).includes('【散修】'), '自定义词端到端：散修被滤');
+  check(p15b['NPC'].some(l => l.includes('老散修')), '自定义词端到端：老散修放行');
+  MOCK.api.insertOrAssignVariables({ $mms_config: { peopleFilterWords: [] } }, { type: 'global' });
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -759,7 +815,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
