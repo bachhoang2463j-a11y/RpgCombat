@@ -517,6 +517,8 @@ async function test9() {
   check(/蓄力就绪【归尘礼赞】/.test(digest), '蓄力三段式：蓄力就绪行保留');
   check(/【众人反应·承上 埃利奥特【归尘礼赞】\[传奇\]】/.test(digest), '众人反应承上指向其挂载的蓄力事件');
   check(!/→\s+»/.test(digest), '每条动作行都有目标（无空目标）');
+  check(!/→ 目标/.test(digest), '引擎的"目标"占位符不外泄（肃正类显示自身/全体友方）');
+  check(/【归尘礼赞】\[传奇\] → [^»]+» [^「\n]*⚡释放/.test(digest), '蓄力释放标记挂到对应技能的动作行（不错挂到前一个动作）');
 
   // 提示词：摘要替代全量战报
   rpgWin().eval("showBattleResult('win')");
