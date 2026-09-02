@@ -283,7 +283,7 @@ async function test1() {
   check(!/\[HP:|\[MP:|\[Atk:|\[Armor:|\[Speed:/.test(prompt), '提示词已删除数值结算清单');
   check(!/按结算清单中的数量更新/.test(prompt), '提示词已删除转述指令');
   check(/小队战后伤势/.test(prompt) && /埃利奥特：轻伤/.test(prompt), '提示词含程序换算的伤势档位');
-  check(/<战局记录>/.test(prompt), '战局记录原样保留');
+  check(/<战报摘要>/.test(prompt), '战报正文用摘要（第二步起替代全量战局记录）');
 }
 /* ================= 断言 2：幂等 ================= */
 async function test2() {
@@ -426,6 +426,122 @@ async function test8() {
   MOCK.api.insertOrAssignVariables({ $mms_config: { combatSync: true } }, { type: 'global' });
 }
 
+/* ================= 断言 9：战报摘要（真实战报 204 行 fixture） ================= */
+const TIER_SKILLS = {
+  '埃利奥特': [ { name: '归尘礼赞', isLegendary: true }, { name: '召雷术', isHighTier: true },
+    { name: '纳克提特障壁术', isHighTier: true }, { name: '圣域帷幕', isLegendary: true },
+    { name: '飞沙化甲' }, { name: '拉莱耶造雾术' }, { name: '净蚀反冲' }, { name: '巫师护盾' } ],
+  '弗兰克': [ { name: '双管猎象枪', isHighTier: true }, { name: '克虏伯1918型', isLegendary: true },
+    { name: '战壕格斗术' }, { name: '普攻' } ],
+  '玛德琳': [ { name: '寂静指令' }, { name: '无迹可寻' }, { name: '柯尔特三连发' }, { name: '普攻' } ],
+  '索恩': [ { name: '生体流转', isHighTier: true }, { name: '异种坏死雾', isHighTier: true },
+    { name: '砷弹射击' }, { name: '共生体质' }, { name: '战斗本能' }, { name: '普攻' } ],
+};
+function seedDigestBattle() {
+  const heroes = [
+    heroSpec({ name: '埃利奥特', hp: 62, maxHp: 100, mp: 5, maxMp: 110, skills: TIER_SKILLS['埃利奥特'],
+      items: [ { name: '化尘者之瓶', category: '道具', isItem: true }, { name: '逆咒归源镜', category: '道具', isItem: true, isLegendary: true } ] }),
+    heroSpec({ name: '弗兰克', hp: 180, maxHp: 180, mp: 17, maxMp: 17, skills: TIER_SKILLS['弗兰克'], items: [] }),
+    heroSpec({ name: '玛德琳', hp: 140, maxHp: 140, mp: 14, maxMp: 14, skills: TIER_SKILLS['玛德琳'], items: [] }),
+    heroSpec({ name: '索恩', hp: 150, maxHp: 140, mp: 20, maxMp: 20, skills: TIER_SKILLS['索恩'], items: [ { name: '战斗兴奋剂', category: '消耗品', isItem: true } ] }),
+  ];
+  rpgWin().eval('heroesData = ' + JSON.stringify(heroes) + '; enemiesData = ' + JSON.stringify([heroSpec({
+    name: '♱⸨伊塔库亚的眷族⸩♱', skills: [ { name: '极寒利爪撕裂' }, { name: '极地暴风雪' }, { name: '乘风隐没之影' }, { name: '风雪狂暴' } ],
+  })]) + ';');
+}
+async function test9() {
+  head('9 战报摘要：程序化压缩（真实战报 204 行）');
+  const log = await (await fetch('fixtures/real-battle-log.txt')).text();
+  seedDigestBattle();
+  rpgWin().eval('battleHistory = ' + JSON.stringify(log.split('\n')) + '; _historyRawCache = battleHistory.join("\\n");');
+
+  const tree = rpgWin().eval('(function(){ const t = parseBattleDigest(_historyRawCache); mergeDigest(t); return t; })()');
+  eq(tree.unmatched.length, 0, '全部行型都有规则覆盖（unmatched=0）');
+
+  // 事件无损：46 条 > 动作行 + 1 条看破主行 = 47；对话 35 条
+  let actionSum = 0, dlgSum = 0;
+  for (const r of tree.rounds) {
+    dlgSum += (r.openers || []).length;
+    for (const it of r.items) {
+      if (it.type === 'action') actionSum += it.count;
+      dlgSum += (it.dialogues || []).length;
+    }
+  }
+  eq(actionSum, 47, '动作节点 count 累加 == 46 条动作行 + 1 条看破主行');
+  eq(dlgSum, 35, '35 条对话全部在场');
+
+  const digest = rpgWin().eval('buildBattleDigest("win")');
+  out('info', '  压缩比：' + digest.split('\n').filter(l => l.trim()).length + ' 行（原文 ' + log.split('\n').filter(l => l.trim()).length + ' 行）');
+
+  // 无数值断言（允许 ×N / 回合号 / 蓄力剩余回合 / 物品名内数字）
+  const banned = [/\d+ 点/, /当前状态: \d+/, /剩\d+[次发个]/, /持续\d+回合/, /增加 \d+/, /下降 \d+/, /\d+%/, /（\d+\/\d+）/];
+  for (const re of banned) check(!re.test(digest), '无数值：' + re.source);
+  check(/\.45子弹（弹药）已打空/.test(digest), '物品名内数字保留（.45 子弹）');
+
+  // 合并正确性
+  check(/极寒利爪撕裂】 → 纳克提特障壁术 ×3 » 屏障挡下×3/.test(digest), '回合2：屏障连挡合并 ×3');
+  check(/极寒利爪撕裂】 → 圣域帷幕 ×3 » 屏障挡下×3/.test(digest), '回合4：屏障连挡合并 ×3');
+
+  // 档位换算：敌方 2 行（受创/重创；濒死由击溃终局行表达故抑制）+ 屏障 3 行（纳克提特磨损+削薄、圣域磨损）
+  const tierLines = digest.split('\n').filter(l => l.startsWith('⚠'));
+  eq(tierLines.length, 5, '跨档提示共 5 行（敌方2+屏障3）');
+  check(!/已陷入濒死/.test(digest), '濒死档被抑制（击溃终局行已表达）');
+  check(!/第 0 回合/.test(digest), '空回合0不渲染');
+  check(/已陷入重创/.test(digest), '敌方重创档位');
+  check(/【纳克提特障壁术】已削薄/.test(digest) || /【纳克提特障壁术】已有磨损/.test(digest), '纳克提特屏障档位');
+
+  // 高阶全量：四条关键术式 + 动作行标签
+  check(/【双管猎象枪】\[高阶\]（弗兰克）：3 次释放，1 次被闪避，命中【受伤】/.test(digest), '双管猎象枪[高阶] 聚合（3释放/1闪避/1命中；另一次闪避在敌方反应节点上）');
+  check(/【纳克提特障壁术】\[高阶\]（埃利奥特）：架起共享屏障\(克制近战\)，替全队挡下 3 次强攻后破碎/.test(digest), '纳克提特[高阶] 挡3次后破碎');
+  check(/【圣域帷幕】\[传奇\]（埃利奥特）：架起共享屏障\(克制法术\)，替全队挡下 5 次强攻，战斗结束时仍未破碎/.test(digest), '圣域帷幕[传奇] 挡5次未破');
+  check(/【归尘礼赞】\[传奇\]（埃利奥特）：2 次释放，命中【受伤】×2，终结了敌方/.test(digest), '归尘礼赞[传奇] 2释放终结');
+  check(/双管猎象枪】\[高阶\] →/.test(digest), '动作行附着 [高阶] 标签（含目标）');
+
+  // 类别措辞
+  check(/化尘者之瓶（道具）本场使用次数已用尽/.test(digest), '道具归零：本场次数已用尽（非整体损耗）');
+  check(/\.45子弹（弹药）已打空/.test(digest), '弹药归零：已打空');
+  check(!/化尘者之瓶已用尽/.test(digest), '禁止无类别裸措辞');
+
+  // 目标必写
+  check(/蓄力就绪【归尘礼赞】/.test(digest), '蓄力三段式：蓄力就绪行保留');
+  check(/【众人反应·承上 埃利奥特【归尘礼赞】\[传奇\]】/.test(digest), '众人反应承上指向其挂载的蓄力事件');
+  check(!/→\s+»/.test(digest), '每条动作行都有目标（无空目标）');
+
+  // 提示词：摘要替代全量战报
+  rpgWin().eval("showBattleResult('win')");
+  const prompt = rpgWin().document.getElementById('result-prompt').value;
+  check(/<战报摘要>/.test(prompt) && !/<战局记录>/.test(prompt), '提示词用 <战报摘要> 替代 <战局记录>');
+  check(/【关键术式】/.test(prompt), '提示词含关键术式块');
+  check(/\[小队战后伤势：\]/.test(prompt), '提示词含战后伤势清单');
+  check(!/按结算清单中的数量更新/.test(prompt), '直连生效：无转述指令');
+  const badge = rpgWin().document.getElementById('result-sync-badge');
+  check(badge && !badge.classList.contains('hidden'), '同步徽标在弹窗中显示');
+  const summaryCard = rpgWin().document.getElementById('result-summary-card');
+  check(summaryCard && summaryCard.tagName === 'DETAILS' && !summaryCard.open, '战后状态为折叠 details');
+}
+
+/* ================= 断言 10：规则覆盖率（自维护） ================= */
+async function test10() {
+  head('10 规则覆盖率：源码 addHistory 行号 == DIGEST_RULES srcLine');
+  const src = await (await fetch('../index.html')).text();
+  const lines = src.split('\n');
+  const srcCalls = new Set();
+  lines.forEach((l, i) => {
+    if (!/addHistory\(\s*(['`]|\s*removed)/.test(l)) return;
+    const t = (l.match(/addHistory\(\s*(?:removed\.length\s*\?\s*)?['`](.*)/) || [])[1] || '';
+    if (t.startsWith('[对话]')) return;
+    srcCalls.add(i + 1);
+  });
+  const bs = src.indexOf('const DIGEST_RULES = ['), be = src.indexOf('];', bs);
+  const ruleLines = new Set();
+  for (const m of src.slice(bs, be).matchAll(/srcLine: (\d+)/g)) ruleLines.add(parseInt(m[1], 10));
+  eq(ruleLines.size, srcCalls.size, '规则数 == addHistory 调用数（' + srcCalls.size + '）');
+  const missRule = [...srcCalls].filter(x => !ruleLines.has(x));
+  const missSrc = [...ruleLines].filter(x => !srcCalls.has(x));
+  check(!missRule.length && !missSrc.length, '行号集合完全对齐',
+    '缺规则:' + missRule.join(',') + ' 错指向:' + missSrc.join(','));
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -433,7 +549,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }

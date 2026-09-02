@@ -1776,11 +1776,12 @@
             <div id="result-subtitle" class="text-[10px] sm:text-sm text-gray-400 mt-1 sm:mt-2 tracking-widest">请校验并修改用于续写的 Prompt</div>
         </div>
         <div class="flex-1 overflow-hidden flex flex-col min-h-0">
-            <div id="result-visual-view" class="flex-1 overflow-y-auto custom-scrollbar p-3.5 space-y-3"></div>
-            <div id="result-sync-badge" class="mx-3 mb-2 px-2.5 py-1.5 rounded-xl border text-[11px] leading-relaxed hidden"></div>
-            <div id="result-summary-card" class="mx-3 mb-2 p-2.5 rounded-xl border border-slate-700/60 bg-slate-900/60 text-[11px] leading-relaxed"></div>
-            <!-- 隐藏：保留原 textarea 供 sendResultToTavern 读取 promptTemplate -->
-            <textarea id="result-prompt" class="hidden" spellcheck="false"></textarea>
+            <div id="result-sync-badge" class="mx-3 mt-2 mb-1 px-2.5 py-1.5 rounded-xl border text-[11px] leading-relaxed hidden"></div>
+            <textarea id="result-prompt" class="flex-1 mx-3 mb-2 p-3 rounded-xl border border-slate-700/60 bg-slate-950/80 text-[12px] leading-relaxed text-slate-200 font-mono custom-scrollbar resize-none outline-none focus:border-cyan-600/60" spellcheck="false" placeholder="将发送至酒馆输入框的完整提示词（可直接编辑）"></textarea>
+            <details id="result-summary-card" class="mx-3 mb-2 rounded-xl border border-slate-700/60 bg-slate-900/60 text-[11px] leading-relaxed">
+              <summary class="cursor-pointer select-none px-2.5 py-1.5 text-cyan-300 font-bold flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> 小队战后状态（精确数值 · 点击展开校对）</summary>
+              <div id="result-summary-body" class="px-2.5 pb-2 text-slate-300"></div>
+            </details>
         </div>
         <div class="px-4 sm:px-6 py-3 sm:py-4 bg-black/40 border-t border-gray-700/50 flex justify-end gap-2 sm:gap-4 items-center shrink-0">
             <button onclick="closeBattleResult()" class="px-3 sm:px-6 py-1.5 sm:py-2.5 rounded-lg text-[10px] sm:text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors border border-transparent hover:border-gray-600">返回查看残局</button>
@@ -2463,24 +2464,19 @@ function refreshHistoryView() {
   renderHistorySchemeA(list, container);
 }
 function refreshResultView() {
-  const container = document.getElementById('result-visual-view');
-  const card = document.getElementById('result-summary-card');
-  if (!container) return;
-  const raw = battleHistory.length ? battleHistory.join('\n') : _historyRawCache;
-  const list = parseCombatLog(raw);
-  const saved = currentHistoryFilter;
-  currentHistoryFilter = 'all';
-  renderHistorySchemeA(list, container);
-  currentHistoryFilter = saved;
+  // 结算弹窗：主区域为可编辑提示词（摘要+伤势+指令），战后精确数值折叠在 details 里供校对
   renderCombatSyncBadge();
+  const card = document.getElementById('result-summary-card');
   if (card) {
+    const body = document.getElementById('result-summary-body');
     const txt = _lastResultSummaryText || '';
-    if (!txt) { card.classList.add('hidden'); }
-    else {
-      card.classList.remove('hidden');
+    if (body) {
       const lines = String(txt).split('\n').filter(l => l.trim());
-      card.innerHTML = '<div class="text-[10px] font-bold text-cyan-300 mb-1 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> 小队战后状态</div>' + lines.map(l => '<div class="text-slate-300">' + escapeHistoryHtml(l) + '</div>').join('');
+      body.innerHTML = lines.map(l => '<div>' + escapeHistoryHtml(l) + '</div>').join('');
     }
+    if (!txt) card.style.display = 'none';
+    else card.style.display = '';
+    card.open = false;
   }
 }
 // 状态栏同步徽标：pending 等待回执 / ok 已同步 / warn 有未匹配或上限不一致 / off 直连不可用
@@ -2518,6 +2514,517 @@ function renderCombatSyncBadge() {
   if (notes.length) html += '<div class="mt-1 text-[10px] opacity-90">' + notes.join('<br>') + '</div>';
   el.innerHTML = html;
 }
+
+// ==========================================
+// 战报程序化压缩（摘要引擎）
+// 设计不变量：①事件无损（计数断言验证）②禁止生成式改写（只允许固定词表+计数+档位查表）
+// ③强度只用 [高阶]/[传奇] 标签与同场参照物百分比表达，绝不写死绝对阈值（战力膨胀世界观会失效）
+// 每条规则带 srcLine（它覆盖的 addHistory 模板行号），供测试做覆盖率断言：新增战报行忘写规则立刻红
+// ==========================================
+const DIGEST_RULES = [
+  // --- 结构 ---
+  { srcLine: 12281, kind: 'drop',   re: /^--- 战斗已拉开帷幕 ---$/ },
+  { srcLine: 12282, kind: 'field',  re: /^🏟️ 场地：(.+)$/, build: m => ({ text: '场地：' + m[1] }) },
+  { srcLine: 12330, kind: 'round',  re: /^={2,}\s*第 (\d+) 回合\s*={2,}$/ , build: m => ({ n: parseInt(m[1], 10) }) },
+  // --- 主行动 ---
+  { srcLine: 11939, kind: 'action', re: /^> (.+?) 对 (.+?) 发动了【(.+?)】\s*(暴击!|极限爆发!)?\s*$/, build: m => ({ caster: m[1], target: m[2], skill: m[3], crit: !!m[4], critErupt: m[4] === '极限爆发! ' }) },
+  { srcLine: 11904, kind: 'action', re: /^> (.+?) 发动了【(.+?)】$/, build: m => ({ caster: m[1], skill: m[2] }) },
+  { srcLine: 11933, kind: 'action', re: /^> ⚡ 预判危机！(.+?) 施展反应技【(.+?)】/, build: m => ({ caster: m[1], skill: m[2], reaction: true }) },
+  { srcLine: 11937, kind: 'action', re: /^> 🎒 (.+?) 对 (.+?) 使用了【(.+?)】$/, build: m => ({ caster: m[1], target: m[2], skill: m[3], item: true }) },
+  { srcLine: 13760, kind: 'action', re: /^> (.+?) 采取了防卫姿态，回防聚气！$/, build: m => ({ caster: m[1], skill: '防卫姿态', defend: true }) },
+  { srcLine: 10803, kind: 'action', re: /^ {0,4}⛔ (.+?) 施展【(.+?)】看穿了敌方气路，【(.+?)】被彻底无效化！$/, build: m => ({ caster: m[1], skill: m[2], kanpo: true, kanpoTarget: m[3] }) },
+  { srcLine: 11050, kind: 'event',  re: /^ {0,4}🛡️ (.+?) 施展【(.+?)】舍身护佑，替 (.+?) 承受攻击！$/, build: m => ({ text: `🛡️ ${m[1]}【${m[2]}】舍身护佑，替 ${m[3]} 承受攻击` }) },
+  { srcLine: 10166,  kind: 'event',  re: /^ {0,4}🛡️ (.+?) 施展【(.+?)】舍身护佑，替 (.+?) 承受攻击！\(自动\)$/, build: m => ({ text: `🛡️ ${m[1]}【${m[2]}】舍身护佑，替 ${m[3]} 承受攻击` }) },
+  { srcLine: 13085, kind: 'event',  re: /^ {0,4}⚡ \[(.+?)\] 蓄力就绪，可立即释放【(.+?)】！$/, build: m => ({ text: `⚡ ${m[1]} 蓄力就绪【${m[2]}】`, charge: { caster: m[1], skill: m[2] } }) },
+  { srcLine: 13093, kind: 'event',  re: /^ {0,4}⏳ \[(.+?)\] 开始蓄力【(.+?)】，还需 (\d+) 回合完成！$/, build: m => ({ text: `⚡ ${m[1]} 开始蓄力【${m[2]}】（还需 ${m[3]} 回合）`, charge: { caster: m[1], skill: m[2] } }) },
+  { srcLine: 13132, kind: 'token',  re: /^ {0,4}⚡ \[(.+?)\] 释放【(.+?)】！$/, build: m => ({ token: `⚡释放`, release: { caster: m[1], skill: m[2] } }) },
+  { srcLine: 13221, kind: 'token',  re: /^ {0,4}💨 \[(.+?)\] 终止了蓄力！$/, build: m => ({ token: '终止蓄力' }) },
+  { srcLine: 9539,  kind: 'token',  re: /^ {0,4}↳ ⚡ (.+?) 获得了连续行动机会，再动 (\d+) 次！$/, build: m => ({ token: '→连续行动' }) },
+  { srcLine: 9737,  kind: 'token',  re: /^ {0,4}🌟 (.+?) 的法力产生共鸣，引发了多重施法\(获得额外行动回合\)！$/, build: m => ({ token: '→多重施法' }) },
+  { srcLine: 13647, kind: 'token',  re: /^ {0,4}↳ 🌟 (.+?) 燃烧极限潜能发动祈愿！赋予了 (.+?) 连续行动的机会！$/, build: m => ({ token: `赋予${m[2]}连续行动` }) },
+  // --- 命中结果 ---
+  { srcLine: 11534, kind: 'token',  re: /^ {0,4}↳ 命中了 (.+?)，造成了 \d+ 点实质伤害(【轻伤】|【受伤】|【重创】)！(?: 并击碎了\d+点护盾 )? 当前状态: (\d+)\/(\d+)\s*$/, build: m => ({ token: `命中${m[2]}`, hp: { cur: parseInt(m[3], 10), max: parseInt(m[4], 10), who: m[1] } }) },
+  { srcLine: 11527, kind: 'token',  re: /^ {0,4}↳ 对 (.+?) 的护盾造成了 \d+ 点破坏。$/, build: m => ({ token: '击破护盾' }) },
+  { srcLine: 11559, kind: 'token',  re: /^ {0,4}💥 致命一击！彻底撕裂了 (.+?) 的身躯！$/, build: m => ({ token: '致命一击', killed: m[1] }) },
+  { srcLine: 11274, kind: 'token',  re: /^ {0,4}↳ 但被 (.+?) 敏捷地闪避了！$/, build: m => ({ token: '被闪避' }) },
+  { srcLine: 11314, kind: 'token',  re: /^ {0,4}⚔️ (.+?) 闪避并趁势反击！对 (.+?) 的护盾造成了 \d+ 点破坏。$/, build: m => ({ token: '反击命中(击盾)' }) },
+  { srcLine: 11318, kind: 'token',  re: /^ {0,4}⚔️ (.+?) 闪避并趁势反击！迅速一击命中了 (.+?)，造成了 \d+ 点伤害！.*$/, build: m => ({ token: '反击命中' }) },
+  { srcLine: 11324, kind: 'drop',   re: /虽处于反击架势，但无法触及并反击/ },
+  { srcLine: 9675,  kind: 'token',  re: /^ {0,4}⚔️ (.+?) 发动【强力反击】！对 (.+?) 的护盾造成了 \d+ 点破坏。$/, build: m => ({ token: '强力反击(击盾)' }) },
+  { srcLine: 9678,  kind: 'token',  re: /^ {0,4}⚔️ (.+?) 发动【强力反击】！以双倍力量重创 (.+?)，造成了 \d+ 点伤害！.*$/, build: m => ({ token: '强力反击' }) },
+  { srcLine: 10122,  kind: 'token',  re: /触发【受击反震\/护体反伤】/, build: m => ({ token: '反震伤害' }) },
+  { srcLine: 11576, kind: 'token',  re: /^ {0,4}↳ (.+?) 的【(.+?)】妨害随攻击一同落空，未能施加到 (.+?)。$/, build: m => ({ token: `附带【${m[2]}】落空`, missedTag: m[2] }) },
+  // --- 护盾与屏障 ---
+  { srcLine: 9375,  kind: 'token',  re: /^ {0,4}↳ 为 (.+?) 附加了一层能吸收 \d+ 点伤害的护盾。$/, build: m => ({ token: '附加护盾' }) },
+  { srcLine: 9395,  kind: 'token',  re: /^ {0,4}↳ (.+?) 展开【(.+?)】，为全队架起一层可吸收 \d+ 点伤害的共享屏障（(\d+)\/(\d+)）(.*)$/, build: m => { const km = /克制\s*(近战|远程|法术)/.exec(m[5] || ''); return { token: '架起共享屏障' + (km ? '(克制' + km[1] + ')' : ''), barrier: { name: m[2], cur: parseInt(m[3], 10), max: parseInt(m[4], 10), desc: m[5] } }; } },
+  { srcLine: 11458, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】替全队挡下了 \d+ 点伤害（剩余 (\d+)）。$/, build: m => ({ token: '屏障挡下', barrierLeft: { name: m[1], cur: parseInt(m[2], 10) } }) },
+  { srcLine: 11722, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】替全队挡下了 \d+ 点伤害（剩余 (\d+)）(.*)$/, build: m => ({ token: '屏障挡下', barrierLeft: { name: m[1], cur: parseInt(m[2], 10) } }) },
+  { srcLine: 11473, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】以护甲\/克制完全格挡了本次攻击（剩余 (\d+)）。$/, build: m => ({ token: '屏障完全格挡', barrierLeft: { name: m[1], cur: parseInt(m[2], 10) } }) },
+  { srcLine: 11759, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】以(?:护甲|克制)完全格挡了本次攻击（\d+→0\)(.*)$/, build: m => ({ token: '屏障完全格挡' }) },
+  { srcLine: 11770, kind: 'event',  re: /^ {0,4}💥 【(.+?)】轰然破碎！$/, build: m => ({ text: `💥 【${m[1]}】轰然破碎`, barrierBreak: m[1] }) },
+  { srcLine: 11122, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的负面效果被【(.+?)】圣域所格挡，无法触及我方角色。$/, build: m => ({ token: '负面被圣域格挡' }) },
+  { srcLine: 10884, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的【.+?】抗性使伤害减少了 \d+ 点。$/, build: m => ({ token: '抗性减免' }) },
+  { srcLine: 11486, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的【免伤】生效，本次攻击的防御额外提高 \d+ 点。$/, build: m => ({ token: '免伤生效' }) },
+  // --- 状态施加 ---
+  { srcLine: 9279,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) \d+% 的命中率 持续\d+回合。$/, build: m => ({ token: `${m[1]}命中提升`, buffTarget: m[1], buffKey: 'hit' }) },
+  { srcLine: 9287,  kind: 'token',  re: /^ {0,4}↳ 干扰了 (.+?) 的视线，命中率下降 \d+% 持续\d+回合。$/, build: m => ({ token: `${m[1]}视线受扰`, buffTarget: m[1], buffKey: 'blind' }) },
+  { srcLine: 9296,  kind: 'token',  re: /^ {0,4}↳ 削弱了 (.+?) 的防御力。$/, build: m => ({ token: `${m[1]}防御削弱`, buffTarget: m[1], buffKey: 'defDown' }) },
+  { srcLine: 9304,  kind: 'token',  re: /^ {0,4}↳ 迟滞了 (.+?) 的身形，闪避率下降 \d+ 点 持续\d+回合。$/, build: m => ({ token: `${m[1]}身形迟滞`, buffTarget: m[1], buffKey: 'evaDown' }) },
+  { srcLine: 9312,  kind: 'token',  re: /^ {0,4}↳ 削弱了 (.+?) 的攻击力。$/, build: m => ({ token: `${m[1]}攻击力削弱`, buffTarget: m[1], buffKey: 'atkDown' }) },
+  { srcLine: 9457,  kind: 'token',  re: /^ {0,4}↳ 强化了 (.+?) 的攻击力。$/, build: m => ({ token: `${m[1]}攻击力强化`, buffTarget: m[1], buffKey: 'atkUp' }) },
+  { srcLine: 9368,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) 的防御力。$/, build: m => ({ token: `${m[1]}防御提升`, buffTarget: m[1], buffKey: 'defUp' }) },
+  { srcLine: 9405,  kind: 'drop',   re: /提升了 .+? 的身法，下一次受击时回避几率增加/ },
+  { srcLine: 9412,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) 的身法，回避几率增加 \d+，持续 \d+ 回合。$/, build: m => ({ token: `${m[1]}身法提升`, buffTarget: m[1], buffKey: 'evaUp' }) },
+  { srcLine: 9419,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) 的身法，回避几率增加 \d+，持续 \d+ 回合。$/, build: m => ({ token: `${m[1]}身法提升`, buffTarget: m[1], buffKey: 'evaUp' }) },
+  { srcLine: 9427,  kind: 'drop',   re: /摆出了反击架势/ },
+  { srcLine: 9360,  kind: 'drop',   re: /获得【免伤】，下一次受击时防御增加/ },
+  { srcLine: 9480,  kind: 'token',  re: /^ {0,4}↳ (.+?) 净化了 \d+ 个负面状态！$/, build: m => ({ token: `${m[1]}净化负面` }) },
+  { srcLine: 9480,  kind: 'token',  re: /^ {0,4}↳ (.+?) 身上没有负面状态可驱散。$/, build: m => ({ token: '无负面可驱散' }) },
+  { srcLine: 9550,  kind: 'token',  re: /^ {0,4}↳ ⚡ (.+?) 获得疾风加持，行动顺序提前（速度\+\d+ 持续\d+回合）。$/, build: m => ({ token: `${m[1]}行动加速` }) },
+  { srcLine: 9562,  kind: 'token',  re: /^ {0,4}↳ 🐌 (.+?) 受到迟滞，行动顺序延后（速度-\d+ 持续\d+回合）。$/, build: m => ({ token: `${m[1]}行动迟滞` }) },
+  // --- 中毒/灼烧 ---
+  { srcLine: 9321,  kind: 'token',  re: /具备毒素抗性\/耐受体质，免疫了剧毒侵蚀！/, build: m => ({ token: '免疫剧毒' }) },
+  { srcLine: 9329,  kind: 'token',  re: /^ {0,4}↳ (.+?) 中了剧毒，每回合将承受 \d+ 点真实伤害 持续\d+回合！$/, build: m => ({ token: `${m[1]}中剧毒`, dotTarget: m[1] }) },
+  { srcLine: 9919,  kind: 'token',  re: /^ {0,4}↳ (.+?) 被施加了剧毒！$/, build: m => ({ token: `${m[1]}中剧毒`, dotTarget: m[1] }) },
+  { srcLine: 9337,  kind: 'token',  re: /耐火防护\/抗热体质阻绝了烈焰，免疫了灼烧！/, build: m => ({ token: '免疫灼烧' }) },
+  { srcLine: 9347,  kind: 'token',  re: /^ {0,4}↳ (.+?) 的灼烧加深，每回合真实伤害提升至 \d+ 点 持续\d+回合（燃烧期间治疗减半）！$/, build: m => ({ token: `${m[1]}灼烧加深`, dotTarget: m[1] }) },
+  { srcLine: 9351,  kind: 'token',  re: /^ {0,4}↳ (.+?) 被烈焰缠身，每回合将承受 \d+ 点真实伤害 持续\d+回合（燃烧期间治疗减半）！$/, build: m => ({ token: `${m[1]}中灼烧`, dotTarget: m[1] }) },
+  { srcLine: 12379, kind: 'event',  re: /^ {0,4}(🔥|🦠) \[(.+?)\] (?:灼烧|毒性)发作，受到了 \d+ 点真实伤害！$/, build: m => ({ text: `${m[1]} ${m[2]} ${m[1] === '🔥' ? '灼烧发作' : '毒性发作'}`, dotTick: m[2] }) },
+  // --- 眩晕 ---
+  { srcLine: 11549, kind: 'token',  re: /硬抗了冲击，免疫了眩晕！/, build: m => ({ token: '免疫眩晕' }) },
+  { srcLine: 11554, kind: 'token',  re: /^ {0,4}↳ (.+?) 被重重击晕，将跳过下一次行动！$/, build: m => ({ token: `${m[1]}被击晕` }) },
+  { srcLine: 12430, kind: 'event',  re: /^ {0,4}🌀 \[(.+?)\] 因眩晕无法行动！$/, build: m => ({ text: `${m[1]} 因眩晕无法行动` }) },
+  { srcLine: 9849,  kind: 'token',  re: /^ {0,4}↳ (.+?) 被隐匿者的奇袭命中弱点，眩晕了！.*$/, build: m => ({ token: `${m[1]}被奇袭眩晕` }) },
+  // --- 资源 ---
+  { srcLine: 9528,  kind: 'token',  re: /^ {0,4}↳ 治愈了 (.+?)，恢复 \d+ 点生命。.*$/, build: m => ({ token: `治愈${m[1]}` }) },
+  { srcLine: 10034,  kind: 'token',  re: /凭借【持续调息\/自愈本能】平复伤势/, build: m => ({ token: '自愈调息' }) },
+  { srcLine: 10086,  kind: 'token',  re: /触发【嗜血\/生机掠夺】，从凶狠的命中中汲取战意与生机/, build: m => ({ token: '嗜血回生' }) },
+  { srcLine: 9488,  kind: 'token',  re: /^ {0,4}↳ 为 (.+?) 恢复了 \d+ 点法力值。$/, build: m => ({ token: `${m[1]}法力恢复` }) },
+  { srcLine: 9498,  kind: 'token',  re: /^ {0,4}↳ (.+?) 已无法力可供抽取。$/, build: m => ({ token: `${m[1]}无法力可抽` }) },
+  { srcLine: 9508,  kind: 'token',  re: /^ {0,4}↳ 🔵 (.+?) 从 (.+?) 身上抽取了 \d+ 点法力值。$/, build: m => ({ token: `${m[2]}法力被抽取` }) },
+  { srcLine: 9515,  kind: 'drop',   re: /恢复了 \d+ 点潜能\(TP\)。/ },
+  { srcLine: 9872,  kind: 'drop',   re: /的法力产生回响，获得 \d+ 点永久加速与 \d+ 点潜能！/ },
+  { srcLine: 12986, kind: 'event',  re: /^ {0,4}↳ 🔋 (.+?) 魔力匮乏，消耗本次行动恢复 \d+ 点法力。$/, build: m => ({ text: `🔋 ${m[1]} 法力枯竭·原地回气` }) },
+  { srcLine: 12172, kind: 'drop',   re: /获得 \d+ 点永久加速库存！/ },
+  // --- 绑定消耗（V10.6 类别化文案；仅归零保留，措辞按类别三分） ---
+  { srcLine: 11941, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
+  { srcLine: 10804, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
+  { srcLine: 11051, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
+  { srcLine: 13086, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
+  { srcLine: 13094, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
+  // --- 仇恨与隐匿 ---
+  { srcLine: 9439,  kind: 'token',  re: /^ {0,4}↳ (.+?) 散发出强烈的气息，吸引敌方火力\(仇恨\+\d+\)，持续\d+回合！$/, build: m => ({ token: '吸引仇恨' }) },
+  { srcLine: 9442,  kind: 'token',  re: /^ {0,4}↳ (.+?) 隐蔽了身形，降低自身存在感\(仇恨-\d+\)，持续\d+回合！$/, build: m => ({ token: '隐蔽身形' }) },
+  { srcLine: 9686,  kind: 'drop',   re: /打出强力反击后气息收敛，仇恨回归/ },
+  { srcLine: 11309, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的防守反击吸引了更多仇恨 \(嘲讽值永久\+\d+\)！$/, build: m => ({ token: '吸引仇恨' }) },
+  { srcLine: 9788,  kind: 'token',  re: /^ {0,4}⚡ (.+?) 隐匿值突破 \d+，触发【再动】！$/, build: m => ({ token: '→连续行动' }) },
+  { srcLine: 9798,  kind: 'token',  re: /^ {0,4}🎯 (.+?) 隐匿值突破 \d+，下一次非反应攻击攻击力 \+\d+[!！]\(隐匿值回归 \d+\)$/, build: m => ({ token: '奇袭蓄势' }) },
+  { srcLine: 12192, kind: 'token',  re: /^ {0,4}🎯 (.+?) 的隐匿急袭已释放，攻击力加成消失。$/, build: m => ({ token: '奇袭加成已释放' }) },
+  // --- 生死与终局 ---
+  { srcLine: 9025,  kind: 'terminal', re: /^\[战况\] ⚠️ (.+?) 重伤倒下了！$/, build: m => ({ text: `⚠ ${m[1]} 重伤倒下了！`, death: m[1] }) },
+  { srcLine: 9033,  kind: 'terminal', re: /^\[战况\] 🌟 (.+?) 重新站了起来！$/, build: m => ({ text: `🌟 ${m[1]} 重新站了起来！`, revive: m[1] }) },
+  { srcLine: 9017,  kind: 'terminal', re: /^\[战况\] 💨 召唤物 (.+?) 消散了。$/, build: m => ({ text: `💨 召唤物 ${m[1]} 消散了。` }) },
+  { srcLine: 9225,  kind: 'terminal', re: /^\[战况\] 💨 召唤物 (.+?) 消散了。$/, build: m => ({ text: `💨 召唤物 ${m[1]} 消散了。` }) },
+  { srcLine: 9247,  kind: 'terminal', re: /^\[战况\] 💀 (.+?) 被击溃了！$/, build: m => ({ text: `💀 ${m[1]} 被击溃了！`, kill: m[1] }) },
+  { srcLine: 12418, kind: 'terminal', re: /^ {0,4}💀 \[(.+?)\] 重伤不治，倒下了！$/, build: m => ({ text: `💀 ${m[1]} 重伤不治倒下`, kill: m[1] }) },
+  { srcLine: 9648,  kind: 'token',  re: /触发被动【毅力】，强制保留了 1 点生命值避免死亡！/, build: m => ({ token: '毅力留存' }) },
+  { srcLine: 9718,  kind: 'token',  re: /触发被动【毅力】，强制保留了 1 点生命值避免死亡！/, build: m => ({ token: '毅力留存' }) },
+  { srcLine: 9754,  kind: 'token',  re: /触发被动【回避】，在致命伤害临身的一瞬闪避/, build: m => ({ token: '死里逃生' }) },
+  { srcLine: 9827,  kind: 'token',  re: /触发被动【回避】，在致命伤害临身的一瞬闪避/, build: m => ({ token: '死里逃生' }) },
+  { srcLine: 9054,  kind: 'event',  re: /^ {0,4}↳ 💀 \[(.+?)\] 遭受致命一击倒地……却强行撑住一口气猛地站起（死里逃生）！.*$/, build: m => ({ text: `💀 ${m[1]} 死里逃生重返战场`, revive: m[1] }) },
+  { srcLine: 9107,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 濒死之际体内残存力量狂暴失控——绝命反扑前兆！$/, build: m => ({ text: `⚠ ${m[1]} 绝命反扑前兆！` }) },
+  { srcLine: 9115,  kind: 'token',  re: /的绝命反扑（.+?）被看破破局，完全无效化！/, build: m => ({ token: '绝命反扑被看破' }) },
+  { srcLine: 9134,  kind: 'event',  re: /^ {0,4}🔥 \[(.+?)\] 倒地之际狂暴烈焰\/易燃物质爆燃，灼热火浪席卷全场！.*$/, build: m => ({ text: `🔥 ${m[1]} 倒地爆燃，灼热火浪席卷全场` }) },
+  { srcLine: 9136,  kind: 'event',  re: /^ {0,4}🧪 \[(.+?)\] 倒地之际毒素囊袋\/毒物爆裂，致命毒瘴弥漫全场！.*$/, build: m => ({ text: `🧪 ${m[1]} 倒地毒爆，致命毒瘴弥漫全场` }) },
+  { srcLine: 9138,  kind: 'event',  re: /^ {0,4}🗡️ \[(.+?)\] 临死触发残余锐芒\/绝命暗器，破甲狂澜贯穿全场！.*$/, build: m => ({ text: `🗡️ ${m[1]} 临死反扑，破甲贯穿全场` }) },
+  { srcLine: 9140,  kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 濒死引爆了潜藏能量\/发动绝命反扑，剧烈冲击波波及全体！.*$/, build: m => ({ text: `💥 ${m[1]} 濒死引爆，冲击波波及全体` }) },
+  { srcLine: 16052, kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 生命跌破极限，触发【绝境爆发】（二阶段觉醒）！.*$/, build: m => ({ text: `💥 ${m[1]} 绝境爆发（二阶段觉醒），进入狂怒强化` }) },
+  { srcLine: 16063, kind: 'token',  re: /^ {0,4}↳ 🩸 \[(.+?)\] 伤势沉重陷入【濒死狂怒】，凶暴之气大涨（攻击力提升 50%）！$/, build: m => ({ token: `${m[1]}濒死狂怒` }) },
+  { srcLine: 16077, kind: 'token',  re: /^ {0,4}↡ ⚡ \[(.+?)\] 濒死求生本能激发（绝境抢攻），不顾伤势立刻抢先反扑！$/, build: m => ({ token: `${m[1]}绝境抢攻` }) },
+  // --- 敌方战术 ---
+  { srcLine: 11997, kind: 'token',  re: /^ {0,4}↳ 前排掩护：近战群攻仅命中前排$/, build: m => ({ token: '前排掩护' }) },
+  { srcLine: 11151, kind: 'token',  re: /^ {0,4}↳ 后排掩护：.+? 远程\/法术命中 -\d+.*$/, build: m => ({ token: '后排掩护' }) },
+  // --- 召唤 ---
+  { srcLine: 8098,  kind: 'event',  re: /^ {0,4}✨ \[(.+?)\] 召唤「(.+?)」—— 已即时参战！$/, build: m => ({ text: `✨ ${m[1]} 召唤「${m[2]}」即时参战` }) },
+  { srcLine: 8011,  kind: 'drop',   re: /召唤失败：敌方已达上限/ },
+  { srcLine: 8020,  kind: 'drop',   re: /召唤失败：.+?召唤物已达上限/ },
+  { srcLine: 8027,  kind: 'drop',   re: /召唤失败：未指定召唤对象/ },
+  { srcLine: 8037,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 召唤「(.+?)」失败：未找到图鉴词条$/, build: m => ({ text: `⚠ ${m[1]} 召唤「${m[2]}」失败` }) },
+  { srcLine: 8045,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 召唤「(.+?)」失败：词条无 <Combat_block>$/, build: m => ({ text: `⚠ ${m[1]} 召唤「${m[2]}」失败` }) },
+  { srcLine: 11899, kind: 'drop',   re: /⛔ 召唤【.+?】被看破破局/ },
+  { srcLine: 11918, kind: 'drop',   re: /⛔ 技能【.+?】被看破破局/ },
+  // --- 撤离判定（保留结论丢骰值） ---
+  { srcLine: 12502, kind: 'terminal', re: /^\[战况\] 💨 (.+?) 尝试撤离（.*?）——(成功脱离战场|被敌方截住，撤离失败)！$/, build: m => ({ text: `💨 ${m[1]} 尝试撤离——${m[2].startsWith('成功') ? '成功脱离战场' : '被截住，失败'}` }) },
+];
+
+// 绑定消耗子行 → 归零提示 token（措辞按物品类别三分，防止"道具被整个损耗"的误读）
+function digestBuildSpend(desc) {
+  const out = { token: null };
+  const parts = String(desc).split('、');
+  const zeroed = [];
+  for (const p of parts) {
+    const m = p.match(/^(.+?)（(道具|弹药|消耗品)·(?:使用\d+次|消耗\d+[发个])，剩(\d+)[次发个]）$/);
+    if (!m) continue;
+    if (m[3] !== '0') continue; // 未归零一律不进摘要（数量由状态栏直连同步）
+    const cat = m[2];
+    zeroed.push(cat === '道具' ? `${m[1]}（道具）本场使用次数已用尽` : cat === '弹药' ? `${m[1]}（弹药）已打空` : `${m[1]}（消耗品）已用完`);
+  }
+  if (zeroed.length) out.token = zeroed.join('；');
+  return out;
+}
+
+// 动作行/蓄力行回查技能数据取 [高阶]/[传奇] 标签
+function digestTierOf(casterName, skillName) {
+  try {
+    const pool = (heroesData || []).concat(enemiesData || []);
+    const c = pool.find(x => x && x.name === casterName);
+    if (!c) return '';
+    const find = (arr) => (arr || []).find(s => s && s.name === skillName);
+    const s = find(c.skills) || find(c.items);
+    if (!s) return '';
+    if (s.isLegendary) return '[传奇]';
+    if (s.isHighTier) return '[高阶]';
+    return '';
+  } catch (e) { return ''; }
+}
+
+// ==========================================
+// 摘要解析 → 回合树
+// 节点类型：round{n, items[]}；items: action{caster,skill,target,tier,tokens[],count,dialogues[]}
+//           event{text,dialogues[]}；terminal{text,dialogues[]}
+// 对话归位（确定性、不搬移行）：每条对话挂到它前面最近的锚点（action/event/terminal）之下，
+// 回合内尚无锚点则挂到回合的开场旁白区。对话行位置本身不动语义，只是渲染归属。
+// ==========================================
+function parseBattleDigest(raw) {
+  const lines = String(raw || '').split('\n');
+  const rounds = [];
+  let curRound = null;
+  let curAnchor = null;   // 当前动作/事件节点（对话与 token 的挂载目标）
+  let unmatched = [];
+  const ensureRound = (n) => {
+    if (!curRound || curRound.n !== n) { curRound = { type: 'round', n, openers: [], items: [] }; rounds.push(curRound); }
+    return curRound;
+  };
+  ensureRound(0);
+  for (let line of lines) {
+    const t = line.trim();
+    if (!t) continue;
+    // 对话优先：插到哪里都不改变语义，但只挂"它前面最近的锚点"
+    if (/^\[对话\]/.test(t)) {
+      const dm = t.replace(/^\[对话\]\s*/, '').match(/^([^：:]+?)\s*[：:]\s*(.*)$/);
+      const dlg = dm ? { speaker: dm[1].trim(), speech: dm[2].trim().replace(/^[「『]/, '').replace(/[」』]$/, '') } : { speaker: '', speech: t };
+      if (curAnchor) curAnchor.dialogues.push(dlg);
+      else curRound.openers.push(dlg);
+      continue;
+    }
+    const rule = DIGEST_RULES.find(r => r.re.test(t));
+    if (!rule) { unmatched.push(t); continue; }
+    const m = t.match(rule.re);
+    const data = rule.build ? (rule.build(m) || {}) : {};
+    if (rule.kind === 'round') { ensureRound(data.n); curAnchor = null; continue; }
+    if (rule.kind === 'field') { curRound.field = data.text; continue; }
+    if (rule.kind === 'action') {
+      const tier = digestTierOf(data.caster, data.skill);
+      const node = { type: 'action', caster: data.caster, skill: data.skill, target: data.target || (data.reaction || data.kanpo ? null : ''), tier, reaction: !!data.reaction, kanpo: !!data.kanpo, kanpoTarget: data.kanpoTarget || '', item: !!data.item, defend: !!data.defend, crit: !!data.crit, tokens: [], dialogues: [], count: 1, rounds: [curRound.n] };
+      if (data.crit) node.tokens.push({ token: data.critErupt ? '极限爆发' : '暴击' });
+      if (data.kanpo) node.target = '敌方';
+      curAnchor = node;
+      curRound.items.push(node);
+      continue;
+    }
+    if (rule.kind === 'event' || rule.kind === 'terminal') {
+      const node = { type: rule.kind, text: data.text, tokens: [], dialogues: [], count: 1, rounds: [curRound.n], charge: data.charge, death: data.death, revive: data.revive, kill: data.kill };
+      if (data.charge) {
+        node.tier = digestTierOf(data.charge.caster, data.charge.skill);
+        node.caster = data.charge.caster;
+        node.skill = data.charge.skill;
+      }
+      curAnchor = node;
+      curRound.items.push(node);
+      continue;
+    }
+    if (rule.kind === 'drop') continue; // 纯机制播报：直接丢弃，不走无锚点兜底（否则会往回合0塞空事件行）
+    // token：挂到当前锚点；无锚点时（回合开头的毒发/魔力匮乏等）升级为独立事件行
+    if (curAnchor) {
+      curAnchor.tokens.push(data);
+      // 数值快照记为序列：后续同源动作合并时中间档位不丢失（挡下 127→73→0 各是一次跨档素材）
+      if (data.hp) curAnchor.hpSeq = (curAnchor.hpSeq || []).concat([data.hp]);
+      if (data.barrier) curAnchor.barrierUp = data.barrier;
+      if (data.barrierLeft) curAnchor.barrierSeq = (curAnchor.barrierSeq || []).concat([data.barrierLeft]);
+      if (data.release) curAnchor.release = data.release;
+    } else {
+      curRound.items.push({ type: 'event', text: data.token || (data.text || ''), tokens: [], dialogues: [], count: 1, rounds: [curRound.n] });
+    }
+  }
+  return { rounds, unmatched };
+}
+
+// 数值收集（档位换算的原料，用完即弃，不进输出）
+function digestCollectNumbers(tree) {
+  const enemyHp = [];   // 每个锚点捕获的 {who, cur, max}
+  const barriers = [];  // {name, cur, max}
+  const seenBarrierMax = {};
+  for (const r of tree.rounds) {
+    for (const it of r.items) {
+      for (const s of it.hpSeq || []) enemyHp.push({ round: r.n, who: s.who, cur: s.cur, max: s.max });
+      // 展开时刻即完好基线（否则首次挡伤会被当成静默基线、丢掉第一条跨档提示）
+      if (it.barrierUp) {
+        seenBarrierMax[it.barrierUp.name] = it.barrierUp.max;
+        barriers.push({ round: r.n, name: it.barrierUp.name, cur: it.barrierUp.cur, max: it.barrierUp.max });
+      }
+      for (const s of it.barrierSeq || []) barriers.push({ round: r.n, name: s.name, cur: s.cur, max: seenBarrierMax[s.name] });
+      if (it.type === 'event' && /轰然破碎/.test(it.text || '')) {
+        const nm = (it.text.match(/【(.+?)】/) || [])[1];
+        if (nm) barriers.push({ round: r.n, name: nm, cur: 0, max: seenBarrierMax[nm] });
+      }
+    }
+  }
+  return { enemyHp, barriers };
+}
+
+// 档位换算（相对参照：自身上限百分比，绝不写死绝对阈值）
+function digestHpTier(ratio) {
+  if (ratio >= 0.75) return '完好';
+  if (ratio >= 0.5) return '擦伤';
+  if (ratio >= 0.25) return '受创';
+  if (ratio > 0) return '重创';
+  return '濒死';
+}
+function digestBarrierTier(ratio) {
+  if (ratio <= 0) return '破碎';
+  if (ratio < 0.25) return '告急';
+  if (ratio < 0.4) return '削薄';
+  if (ratio < 0.75) return '有磨损';
+  return '完好';
+}
+
+// 在回合树中插入跨档提示行（只输出档位变化，不输出数值）
+function digestTrackTiers(tree) {
+  const nums = digestCollectNumbers(tree);
+  const out = [];
+  let lastEnemy = {};
+  let lastBarrier = {};
+  for (const e of nums.enemyHp) {
+    if (e.max <= 0) continue;
+    const tier = digestHpTier(e.cur / e.max);
+    // 濒死档不输出：死亡时刻的 HP=0 快照必然伴随 击溃/倒下/致命一击 终局行，再插"已濒死"会落在其后、时序倒挂
+    if (tier === '濒死') { lastEnemy[e.who] = tier; continue; }
+    if (lastEnemy[e.who] !== tier) {
+      const prev = lastEnemy[e.who];
+      if (prev != null && tier !== prev) out.push({ round: e.round, who: e.who, text: `⚠ ${e.who} 已${tier === '完好' ? '恢复完好' : '陷入' + tier}` });
+      lastEnemy[e.who] = tier;
+    }
+  }
+  for (const b of nums.barriers) {
+    if (b.max == null) continue;
+    const tier = digestBarrierTier(b.cur / b.max);
+    if (lastBarrier[b.name] !== tier) {
+      const prev = lastBarrier[b.name];
+      if (prev != null && tier !== prev) out.push({ round: b.round, name: b.name, text: tier === '破碎' ? null : `⚠ 【${b.name}】已${tier}` });
+      lastBarrier[b.name] = tier;
+    }
+  }
+  // 按回合回填到树中（破碎行已由 terminal event 表达，跳过 text=null）
+  for (const w of out) {
+    if (w.text == null) continue;
+    const r = tree.rounds.find(x => x.n === w.round);
+    if (r) r.items.push({ type: 'event', text: w.text, tokens: [], dialogues: [], count: 1, rounds: [w.round], tierLine: true });
+  }
+  return tree;
+}
+
+// 合并：token 计数去重、群体 buff 归并、连续同源动作合并（token 集合相等才合并；终局 token 例外允许并入）
+const DIGEST_TERMINAL_TOKENS = ['致命一击', '反震伤害'];
+function mergeDigest(tree) {
+  for (const r of tree.rounds) {
+    for (const it of r.items) {
+      if (it.type !== 'action') continue;
+      // token 计数（同 token 合并 ×N；群体 buff 归并：目标覆盖全体我方 → 全队）
+      const heroNames = (heroesData || []).filter(h => h && !h.isSummon).map(h => h.name);
+      const byKey = new Map();
+      const others = [];
+      for (const d of it.tokens) {
+        if (!d || !d.token) continue;
+        const bm = d.token.match(/^(.+)的?(命中提升|视线受扰|防御削弱|身形迟滞|攻击力削弱|攻击力强化|防御提升|身法提升|中剧毒|中灼烧|灼烧加深)$/);
+        if (bm) { byKey.set(bm[2], (byKey.get(bm[2]) || []).concat(bm[1])); continue; }
+        if (d.token === '被闪避' || d.token === '屏障挡下' || d.token === '屏障完全格挡' || d.token === '命中【轻伤】' || d.token === '命中【受伤】' || d.token === '命中【重创】' || d.token === '反击命中' || d.token === '→连续行动') { byKey.set(d.token, (byKey.get(d.token) || 0) + 1); continue; }
+        others.push(d);
+      }
+      const mergedTokens = [];
+      for (const [k, v] of byKey) {
+        if (Array.isArray(v)) {
+          const allHeroes = heroNames.length > 1 && heroNames.every(n => v.includes(n));
+          mergedTokens.push({ token: allHeroes ? '全队' + k : [...new Set(v)].map(n => n + k).join('·'), count: allHeroes ? 1 : 1 });
+        } else {
+          mergedTokens.push({ token: k, count: v });
+        }
+      }
+      for (const d of others) mergedTokens.push({ token: d.token, count: 1, missedTag: d.missedTag });
+      it.merged = mergedTokens;
+      // 妨害落空合并：【单滞】【中毒】落空 → 附带【单滞】【中毒】落空
+      const missed = it.merged.filter(x => /^附带【.+?】落空$/.test(x.token));
+      if (missed.length > 1) {
+        it.merged = it.merged.filter(x => !/^附带【.+?】落空$/.test(x.token));
+        it.merged.push({ token: '附带' + missed.map(x => x.token.match(/【(.+?)】/)[0]).join('') + '落空', count: 1 });
+      }
+    }
+    // 连续同源动作合并：同一施术者+技能+目标 且 token 集合相等（终局 token 例外）。
+    // 允许 prev 带对话合并——对话仍渲染在该同源动作组内，时间线不乱
+    const merged = [];
+    for (const it of r.items) {
+      const prev = merged[merged.length - 1];
+      const sameSource = prev && prev.type === 'action' && it.type === 'action' &&
+        prev.caster === it.caster && prev.skill === it.skill && prev.target === it.target;
+      // 只比 token 名称集合：prev 的计数已被此前的合并累加（如 屏障挡下×2），
+      // 若再比计数，第三个同源动作就永远合不进去了
+      const sameTokens = sameSource && prev.merged && it.merged &&
+        prev.merged.length === it.merged.length &&
+        prev.merged.every((a, i) => a.token === it.merged[i].token);
+      const hasTerminal = (it.merged || []).some(x => DIGEST_TERMINAL_TOKENS.includes(x.token));
+      if (sameTokens && !hasTerminal) {
+        // 并入时不丢任何信息：对话、数值快照序列、token 计数与终结标记都聚合到该同源动作组
+        prev.count++;
+        prev.dialogues.push(...it.dialogues);
+        prev.hpSeq = (prev.hpSeq || []).concat(it.hpSeq || []);
+        prev.barrierSeq = (prev.barrierSeq || []).concat(it.barrierSeq || []);
+        for (const d of it.merged) {
+          const hit = prev.merged.find(x => x.token === d.token);
+          if (hit) hit.count += d.count;
+          else prev.merged.push(d);
+        }
+        if ((it.tokens || []).some(x => x.killed)) prev.tokens.push({ token: '致命一击', killed: true });
+        continue;
+      }
+      merged.push(it);
+    }
+    r.items = merged;
+  }
+  return tree;
+}
+
+// 众人反应检测：同一锚点下 ≥3 位不同说话人
+function digestIsGroupDialogue(node) {
+  if (!node || !node.dialogues || node.dialogues.length < 3) return false;
+  return new Set(node.dialogues.map(d => d.speaker)).size >= 3;
+}
+
+// 关键术式聚合：本场出现过的每个 [高阶]/[传奇] 技能一条，纯计数（释放/闪避/命中/终结/屏障挡下）
+function collectKeySkills(tree) {
+  const map = new Map();
+  // 屏障挡下发生在"攻击方"的动作上（↳ 屏障挡伤挂在敌方攻击节点），须按屏障名全局归集
+  const blockedByName = {};
+  for (const r of tree.rounds) {
+    for (const it of r.items) {
+      if (it.type !== 'action') {
+        if (it.type === 'event' && /轰然破碎/.test(it.text || '')) {
+          const nm = (it.text.match(/【(.+?)】/) || [])[1];
+          if (nm) {
+            const owner = [...map.values()].find(e => e.barrier && e.barrier.name === nm);
+            if (owner) owner.barrier.broken = true;
+          }
+        }
+        continue;
+      }
+      if (it.barrierSeq && it.barrierSeq.length) {
+        const name = it.barrierSeq[it.barrierSeq.length - 1].name;
+        const tk = (it.merged || []).find(d => d.token === '屏障挡下' || d.token === '屏障完全格挡');
+        if (tk) blockedByName[name] = (blockedByName[name] || 0) + tk.count;
+      }
+      if (!it.tier) continue;
+      const key = it.caster + '【' + it.skill + '】';
+      if (!map.has(key)) map.set(key, { name: it.skill, caster: it.caster, tier: it.tier, releases: 0, dodged: 0, hits: [], kills: 0, barrier: null });
+      const e = map.get(key);
+      e.releases += it.count;
+      const tk = it.merged || [];
+      for (const d of tk) {
+        if (d.token === '被闪避') e.dodged += d.count;
+        if (/^命中【/.test(d.token)) e.hits.push(d.token);
+      }
+      if ((it.tokens || []).some(x => x.killed)) e.kills++;
+      const up = (it.tokens || []).find(x => x.barrier);
+      if (up && !e.barrier) e.barrier = { name: up.barrier.name, blocked: 0, broken: false, desc: up.token };
+    }
+  }
+  for (const e of map.values()) if (e.barrier) e.barrier.blocked = blockedByName[e.barrier.name] || 0;
+  return [...map.values()];
+}
+
+// 渲染回合树 → 摘要文本
+function renderDigest(tree, type) {
+  const L = [];
+  const enemyNames = (enemiesData || []).filter(e => e && !e.isSummon).map(e => e.name);
+  const heroNames = (heroesData || []).filter(h => h && !h.isSummon).map(h => h.name);
+  L.push(`【战报摘要】敌方：${enemyNames.join('、') || '未知'} ｜ 我方：${heroNames.join('、')}`);
+  for (const r of tree.rounds) {
+    if (r.n === 0 && !r.items.length && !r.openers.length) continue;
+    L.push('');
+    L.push(`=== 第 ${r.n} 回合 ===`);
+    if (r.field) L.push(r.field);
+    for (const dlg of r.openers) L.push(`  ${dlg.speaker}「${dlg.speech}」`);
+    let lastTierNode = null;
+    for (const it of r.items) {
+      if (it.type === 'action') {
+        let line = `${it.caster} → `;
+        if (it.reaction) line += `反应技【${it.skill}】(${it.caster})`;
+        else if (it.item) line += `🎒【${it.skill}】`;
+        else if (it.defend) line += `防卫姿态`;
+        else if (it.kanpo) line += `【${it.skill}】${it.tier || ''} 看破 → ${it.kanpoTarget}被无效化`;
+        else line += `【${it.skill}】${it.tier || ''}`;
+        if (!it.kanpo) line += ` → ${it.target || '自身'}`;
+        if (it.count > 1) line += ` ×${it.count}`;
+        const toks = (it.merged || []).map(d => d.count > 1 ? `${d.token}×${d.count}` : d.token);
+        if (toks.length) line += ` » ${toks.join(' · ')}`;
+        L.push(line);
+      } else if (it.type === 'event' || it.type === 'terminal') {
+        L.push(it.text);
+      }
+      // 对话：紧跟其锚点渲染；众人反应块加标注（不搬移行，只加因果标签）。
+      // 承上优先指向锚点自身（对话直接挂在蓄力事件上时，语境就是该蓄力），否则用本回合最近的高阶节点
+      if (it.dialogues && it.dialogues.length) {
+        const isGroup = digestIsGroupDialogue(it);
+        if (isGroup) {
+          const src = (it.tier && it.skill) ? it : (lastTierNode && lastTierNode.tier ? lastTierNode : null);
+          const prev = src ? `·承上 ${src.caster}【${src.skill}】${src.tier}` : '';
+          L.push(`【众人反应${prev}】`);
+        }
+        for (const d of it.dialogues) L.push(`  ${d.speaker}「${d.speech}」`);
+      }
+      if (it.tier) lastTierNode = it;
+    }
+  }
+  // 关键术式块
+  const keySkills = collectKeySkills(tree);
+  if (keySkills.length) {
+    L.push('');
+    L.push('【关键术式】');
+    for (const k of keySkills) {
+      const parts = [];
+      if (k.barrier) {
+        parts.push(`架起共享屏障${k.barrier.desc ? k.barrier.desc.replace('架起共享屏障', '') : ''}，替全队挡下 ${k.barrier.blocked} 次强攻${k.barrier.broken ? '后破碎' : '，战斗结束时仍未破碎'}`);
+      } else {
+        parts.push(`${k.releases} 次释放`);
+        if (k.dodged) parts.push(`${k.dodged} 次被闪避`);
+        if (k.hits.length) {
+          const h = {};
+          k.hits.forEach(x => h[x] = (h[x] || 0) + 1);
+          parts.push(Object.entries(h).map(([x, n]) => n > 1 ? `${x}×${n}` : x).join('、'));
+        }
+        if (k.kills) parts.push('终结了敌方');
+      }
+      L.push(`◆【${k.name}】${k.tier}（${k.caster}）：${parts.join('，')}`);
+    }
+  }
+  return L.join('\n');
+}
+
+// 总入口：战报原文 → 摘要文本（解析 → 合并 → 档位 → 渲染）
+function buildBattleDigest(type) {
+  const raw = battleHistory.length ? battleHistory.join('\n') : _historyRawCache;
+  const tree = digestTrackTiers(mergeDigest(parseBattleDigest(raw)));
+  return renderDigest(tree, type);
+}
+
+
 function setHistoryFilter(f) {
   currentHistoryFilter = f;
   ['all','dialogue','action','critical'].forEach(k => {
@@ -12125,6 +12632,8 @@ function showBattleResult(type) {
 
     const historyText = battleHistory.length ? battleHistory.join('\n') : _historyRawCache;
     _historyRawCache = historyText;
+    // 直连生效时提示词用程序化压缩的战报摘要替代全量日志（数字走变量通道，正文只拿定性信息）
+    const battleDigest = buildBattleDigest(type);
 
     let summaryText = "\n\n[小队战后状态与剩余消耗品结算：]\n";
     if (type === 'retreat') summaryText = "\n\n[小队撤离时状态与剩余消耗品结算：]\n";
@@ -12153,20 +12662,24 @@ function showBattleResult(type) {
     const tailRetreat = `严禁使用任何游戏词汇！严格根据伤势标签描写当前的状态！请开始你的描写。`;
     // 直连生效：结算数值已写入状态栏，正文只需描写；直连不可用时回退旧的转述指令
     const syncNote = syncRes.ok
-        ? `\n\n[附加指令：上述伤势对应的具体数值（生命、法力、消耗品与弹药余量）已由系统直接写入状态栏，无需你确认或改写任何数值，也不要在正文中罗列数字，只依据伤势描写各成员的状态。]`
+        ? `\n\n[附加指令：上述伤势对应的具体数值（生命、法力、消耗品与弹药余量）已由系统直接写入状态栏，无需你确认或改写任何数值，也不要在正文中罗列数字，只依据伤势描写各成员的状态。物品类别语义：道具每场战斗重置使用次数，"本场用尽"不代表物品损毁；弹药与消耗品才是真实消耗。]`
         : `\n\n[附加指令：请在描写的最后，确认并应用上述小队成员的最新状态，包括各角色消耗品/弹药的剩余数量（按结算清单中的数量更新 状态栏 对应物品，未提到的原样保留）。]`;
     const settleText = syncRes.ok ? injuryText : summaryText;
+    // 战报正文：直连生效发程序化摘要（无数值、含伤势标签与关键术式），回退时发全量战报
+    const bodyText = syncRes.ok
+        ? `<战报摘要>\n${battleDigest}\n</战报摘要>`
+        : `<战局记录>\n${historyText}\n</战局记录>`;
 
     let promptTemplate = "";
     if (type === 'retreat') {
-        promptTemplate = `[系统指令：请根据以下战局记录，以小说般充满画面感、具有张力的笔触，描写出这场战斗完整的详细过程。玩家小队选择了主动撤离战场（请根据战局记录自行判断局势，可能是觉得无需再做无谓的缠斗，不代表是被打败逃跑）。着重描写他们脱离战斗的过程、动作细节以及心理状态。]\n\n<战局记录>\n${historyText}\n</战局记录>\n${settleText}${syncNote}\n\n${tailRetreat}`;
+        promptTemplate = `[系统指令：请根据以下战报摘要，以小说般充满画面感、具有张力的笔触，描写出这场战斗完整的详细过程。玩家小队选择了主动撤离战场（请根据战报摘要自行判断局势，可能是觉得无需再做无谓的缠斗，不代表是被打败逃跑）。着重描写他们脱离战斗的过程、动作细节以及心理状态。]\n\n${bodyText}${settleText}${syncNote}\n\n${tailRetreat}`;
     } else {
-        promptTemplate = `[系统指令：请根据以下战局记录，以小说般充满画面感、具有张力的笔触，描写出这场惊心动魄的战斗过程。注重动作细节、技能特效的光影、人物的心理状态，以及最终${type === 'win' ? '走向胜利的高光时刻' : '惨烈落败的绝望收场'}。]\n\n<战局记录>\n${historyText}\n</战局记录>\n${settleText}${syncNote}\n\n${tailWin}`;
+        promptTemplate = `[系统指令：请根据以下战报摘要，以小说般充满画面感、具有张力的笔触，描写出这场惊心动魄的战斗过程。注重动作细节、技能特效的光影、人物的心理状态，以及最终${type === 'win' ? '走向胜利的高光时刻' : '惨烈落败的绝望收场'}。]\n\n${bodyText}${settleText}${syncNote}\n\n${tailWin}`;
     }
 
     promptArea.value = promptTemplate;
 
-    // 富化视口：与记录共用方案A渲染
+    // 战后状态折叠卡 + 同步徽标刷新
     refreshResultView();
 
     modal.classList.remove('hidden');
