@@ -596,6 +596,71 @@ async function test11() {
   check(useDigestDefault, '战况摘要化默认开启（旧存档无字段时迁移为开）');
 }
 
+/* ================= 断言 12：战斗结算楼层锁定 + 计数条目归零保留标红 ================= */
+async function test12() {
+  head('12 结算楼层锁定校验字段 + 弹药归零保留标红');
+  // 场景：直连关闭（回退转述模式），用户楼携带战报摘要 → 更新 AI 输出大量数值命令
+  MOCK.resetVars();
+  MOCK.setChat([
+    { message: '我们去清剿那只眷族。', role: 'user', is_user: true },
+    { message: '<maintext>风雪之中，四人踏入荒原。</maintext>\n【状态栏标记点】', role: 'assistant', is_user: false },
+    { message: '[系统指令：请根据以下战报摘要描写战斗…]\n\n<战报摘要>\n【战报摘要】敌方：眷族\n=== 第 1 回合 ===\n弗兰克 → 【双管猎象枪】[高阶] → 眷族 » 命中造成【中度伤】\n</战报摘要>\n\n[小队战后伤势：]\n- 弗兰克：轻伤', role: 'user', is_user: true },
+    { message: '<maintext>枪声撕裂风雪，眷族的利爪与钢铁碰撞出火花。</maintext>\n【状态栏标记点】', role: 'assistant', is_user: false },
+  ]);
+  MOCK.api.insertOrAssignVariables({
+    $mms_roster: {
+      characters: [{ name: '🎩弗兰克', attrs: [{ key: '❤️HP', value: '180/180' }], fields: [{ key: '物品', initial: '', mode: 'check' }, { key: '内心', initial: '', mode: 'free' }] }],
+      modules: [], maps: { minimap: false, bigmap: false },
+    },
+  }, { type: 'chat' });
+  MOCK.api.insertOrAssignVariables({
+    stat_data: { 状态栏: { 日期和时间: '⏰ 深夜', 地点: '📍 荒原',
+      角色列表: [{ 角色: { 名字: '🎩弗兰克', 属性: '[❤️HP:180/180]', 物品: '[.577号子弹：5][绷带x3]', 内心: '警戒' } }] } },
+  }, { type: 'message', message_id: 1 });
+  mmsWin().MMS.floorId = 3;
+  mmsWin().MMS.isLastAssistantFloor = true;
+
+  // 更新 AI 试图：扣血、扣子弹、把绷带打光、改内心与地点（后两项是合法更新）
+  MOCK.setGenResponder(() => JSON.stringify({ 状态栏: { 日期和时间: '⏰ 拂晓', 地点: '📍 冰河谷',
+    角色列表: [{ 角色: { 名字: '🎩弗兰克', 属性: '[❤️HP-50]', 物品: '[.577号子弹-2][绷带-3]', 内心: '杀意沸腾' } }] } }));
+  await mmsWin().MMS.runUpdate(3);
+  let s3 = MOCK.api.getVariables({ type: 'message', message_id: 3 }).stat_data;
+  let c3 = charOf(s3, '弗兰克');
+  eq(c3['属性'], '[❤️HP:180/180]', '楼层锁定：数值属性命令被丢弃');
+  check(/\.577号子弹：5/.test(c3['物品']) && /绷带x3/.test(c3['物品']), '楼层锁定：物品清单命令被丢弃', c3['物品']);
+  eq(c3['内心'], '杀意沸腾', '楼层锁定：自由字段照常更新');
+  eq(s3['状态栏']['地点'], '📍 冰河谷', '楼层锁定：叙事模块照常更新');
+  check(/战斗结算楼层/.test(MOCK.lastGenPrompt()), '提示词含楼层锁定禁令（纵深防御）');
+
+  // 开关关闭后：同样的命令恢复生效（回落旧行为）
+  MOCK.api.insertOrAssignVariables({ $mms_config: { combatFloorLock: false } }, { type: 'global' });
+  await mmsWin().MMS.runUpdate(3);
+  s3 = MOCK.api.getVariables({ type: 'message', message_id: 3 }).stat_data;
+  c3 = charOf(s3, '弗兰克');
+  eq(c3['属性'], '[❤️HP:130/180]', '开关关闭：数值命令恢复生效');
+  MOCK.api.insertOrAssignVariables({ $mms_config: { combatFloorLock: true } }, { type: 'global' });
+
+  // 计数条目归零保留（LLM 路径）：delta 扣到 0 与 set 0 都不删条目
+  const zero = mmsWin().eval('(function(){ return mmsApplyItemCommands("[.577号子弹：5][绷带x3]", "[绷带-3][.577号子弹:0]"); })()');
+  eq(zero, '[.577号子弹：0][绷带x0]', 'LLM 路径归零保留（delta 与 set 都不删条目）');
+
+  // 渲染层：数量 0 的条目标红（渲染是异步 DOM 管线，轮询等待）
+  MOCK.api.insertOrAssignVariables({
+    stat_data: { 状态栏: { 角色列表: [{ 角色: { 名字: '🎩弗兰克', 属性: '[❤️HP:180/180]', 物品: '[.577号子弹：0][绷带x3]' } }] } },
+  }, { type: 'message', message_id: 1 });
+  mmsWin().MMS.floorId = 1;
+  mmsWin().MMS.refreshFromVars();
+  let red = null;
+  for (let i = 0; i < 20 && !red; i++) {
+    await sleep(150);
+    for (const b of mmsWin().document.querySelectorAll('.item-badge')) {
+      if (b.textContent.includes('.577号子弹') && b.style.color) { red = { text: b.textContent, color: b.style.color }; break; }
+    }
+  }
+  check(red && /248,\s*113,\s*113|f87171/i.test(red.color), '归零条目渲染为红色', JSON.stringify(red));
+  check(red && red.text.includes('：0'), '归零条目显示数量 0', red && red.text);
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -603,7 +668,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
