@@ -2547,7 +2547,7 @@ const DIGEST_RULES = [
   { srcLine: 9814,  kind: 'token',  re: /^ {0,4}🌟 (.+?) 的法力产生共鸣，引发了多重施法\(获得额外行动回合\)！$/, build: m => ({ token: '→多重施法' }) },
   { srcLine: 13724, kind: 'token',  re: /^ {0,4}↳ 🌟 (.+?) 燃烧极限潜能发动祈愿！赋予了 (.+?) 连续行动的机会！$/, build: m => ({ token: `赋予${m[2]}连续行动` }) },
   // --- 命中结果 ---
-  { srcLine: 11611, kind: 'token',  re: /^ {0,4}↳ 命中了 (.+?)，造成了 \d+ 点实质伤害(【轻伤】|【受伤】|【重创】)！(?: 并击碎了\d+点护盾 )? 当前状态: (\d+)\/(\d+)\s*$/, build: m => ({ token: `命中${m[2]}`, hp: { cur: parseInt(m[3], 10), max: parseInt(m[4], 10), who: m[1] } }) },
+  { srcLine: 11611, kind: 'token',  re: /^ {0,4}↳ 命中了 (.+?)，造成了 \d+ 点实质伤害(【轻伤】|【受伤】|【重创】)！(?: 并击碎了\d+点护盾 )? 当前状态: (\d+)\/(\d+)\s*$/, build: m => ({ token: `命中造成${m[2] === '【受伤】' ? '【中度伤】' : m[2]}`, hp: { cur: parseInt(m[3], 10), max: parseInt(m[4], 10), who: m[1] } }) },
   { srcLine: 11604, kind: 'token',  re: /^ {0,4}↳ 对 (.+?) 的护盾造成了 \d+ 点破坏。$/, build: m => ({ token: '击破护盾' }) },
   { srcLine: 11636, kind: 'token',  re: /^ {0,4}💥 致命一击！彻底撕裂了 (.+?) 的身躯！$/, build: m => ({ token: '致命一击', killed: m[1] }) },
   { srcLine: 11351, kind: 'token',  re: /^ {0,4}↳ 但被 (.+?) 敏捷地闪避了！$/, build: m => ({ token: '被闪避' }) },
@@ -2881,7 +2881,7 @@ function mergeDigest(tree) {
         if (!d || !d.token) continue;
         const bm = d.token.match(/^(.+)的?(命中提升|视线受扰|防御削弱|身形迟滞|攻击力削弱|攻击力强化|防御提升|身法提升|中剧毒|中灼烧|灼烧加深)$/);
         if (bm) { byKey.set(bm[2], (byKey.get(bm[2]) || []).concat(bm[1])); continue; }
-        if (d.token === '被闪避' || d.token === '屏障挡下' || d.token === '屏障完全格挡' || d.token === '命中【轻伤】' || d.token === '命中【受伤】' || d.token === '命中【重创】' || d.token === '反击命中' || d.token === '→连续行动') { byKey.set(d.token, (byKey.get(d.token) || 0) + 1); continue; }
+        if (d.token === '被闪避' || d.token === '屏障挡下' || d.token === '屏障完全格挡' || d.token === '命中造成【轻伤】' || d.token === '命中造成【中度伤】' || d.token === '命中造成【重创】' || d.token === '反击命中' || d.token === '→连续行动') { byKey.set(d.token, (byKey.get(d.token) || 0) + 1); continue; }
         others.push(d);
       }
       const mergedTokens = [];
@@ -2971,7 +2971,7 @@ function collectKeySkills(tree) {
         if (trigEntry) {
           for (const d of it.merged || []) {
             if (d.token === '被闪避') trigEntry.dodged += d.count;
-            if (/^命中【/.test(d.token)) for (let i = 0; i < d.count; i++) trigEntry.hits.push(d.token);
+            if (/^命中造成【/.test(d.token)) for (let i = 0; i < d.count; i++) trigEntry.hits.push(d.token);
           }
           if ((it.tokens || []).some(x => x.killed)) trigEntry.kills++;
         }
@@ -2984,7 +2984,7 @@ function collectKeySkills(tree) {
       const tk = it.merged || [];
       for (const d of tk) {
         if (d.token === '被闪避') e.dodged += d.count;
-        if (/^命中【/.test(d.token)) e.hits.push(d.token);
+        if (/^命中造成【/.test(d.token)) e.hits.push(d.token);
       }
       if ((it.tokens || []).some(x => x.killed)) e.kills++;
       const up = (it.tokens || []).find(x => x.barrier);
@@ -3019,12 +3019,12 @@ function renderDigest(tree, type) {
         if (!it.kanpo) line += ` → ${it.target || '自身'}`;
         if (it.count > 1) line += ` ×${it.count}`;
         // 反应技是闪避/防御技能：挂它名下的命中/闪避结果是"被应对的那次攻击"的结局，
-        // 直译成"反应技 → 命中【受伤】"会读成它打中了自己——按反应成败改写
+        // 直译成"反应技 → 命中【中度伤】"会读成它打中了自己——按反应成败改写
         const toks = (it.merged || []).map(d => {
           let t = d.token;
           if (it.reaction) {
             if (t === '被闪避') t = '成功闪避';
-            else if (/^命中【/.test(t)) t = '未能闪避·' + t;
+            else if (/^命中造成【/.test(t)) t = '未能闪避·' + t;
           }
           return d.count > 1 ? `${t}×${d.count}` : t;
         });
