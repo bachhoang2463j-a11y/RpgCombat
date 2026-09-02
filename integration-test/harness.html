@@ -661,6 +661,42 @@ async function test12() {
   check(red && red.text.includes('：0'), '归零条目显示数量 0', red && red.text);
 }
 
+/* ================= 断言 13：属性下限保护 + cur/max ≤30% 红色预警 ================= */
+async function test13() {
+  head('13 属性下限保护（扣不到负数/不消失）+ ≤30% 红色预警');
+  // 纯函数：有上限型超扣 → 夹到 0/上限，条目保留；无上限型 → 夹到 0，条目保留
+  const clampCurMax = mmsWin().eval('(function(){ return mmsApplyAttrCommands("[❤️HP:30/100][💠MP:60/60]", "[HP-50]"); })()');
+  eq(clampCurMax, '[❤️HP:0/100][💠MP:60/60]', 'cur/max 型超扣夹到 0/上限（条目保留，上限不改写）');
+  const clampPlain = mmsWin().eval('(function(){ return mmsApplyAttrCommands("[🛡️Armor:5]", "[Armor-10]"); })()');
+  eq(clampPlain, '[🛡️Armor:0]', '无上限数值型超扣夹到 0（不出现负数，条目保留）');
+
+  // 渲染：25/100 与 30/100 红（≤30%），31/100 与 60/60 不红
+  MOCK.api.insertOrAssignVariables({
+    stat_data: { 状态栏: { 角色列表: [{ 角色: { 名字: '🎩弗兰克',
+      属性: '[❤️HP:25/100][❤️HP2:30/100][❤️HP3:31/100][💠MP:60/60][🛡️Armor:5]' } }] } },
+  }, { type: 'message', message_id: 1 });
+  mmsWin().MMS.refreshFromVars();
+  const pick = async (frag) => {
+    for (let i = 0; i < 20; i++) {
+      await sleep(150);
+      for (const b of mmsWin().document.querySelectorAll('.item-badge')) {
+        if (b.textContent.includes(frag)) return b;
+      }
+    }
+    return null;
+  };
+  const b25 = await pick('HP:25/100');
+  const b30 = await pick('HP2:30/100');
+  const b31 = await pick('HP3:31/100');
+  const b60 = await pick('MP:60/60');
+  check(b25 && b25.style.color, 'HP 25%（<30%）标红');
+  check(b30 && b30.style.color, 'HP 30%（边界，≤30%）标红');
+  check(b31 && !b31.style.color, 'HP 31%（>30%）不标红');
+  check(b60 && !b60.style.color, '满值 MP 不标红');
+  const bA = await pick('Armor:5');
+  check(bA && !bA.style.color, '无上限数值（无分母）不参与比例预警');
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -668,7 +704,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
