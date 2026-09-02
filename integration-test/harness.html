@@ -858,6 +858,70 @@ async function test16() {
   eq(m4.buffs, [{ type: 'hit', value: 40, duration: 2 }], '对照：单瞄 ×2 照常 +40（倍率豁免仅限自X）');
 }
 
+/* ================= 断言 17：开局直连（状态栏 → 战斗我方数值） ================= */
+async function test17() {
+  head('17 开局直连：状态栏快照读取/同名覆盖/勾选开关/物品精确匹配');
+  const w = rpgWin();
+  const ev = (expr) => w.eval('(function(){ return ' + expr + '; })()');
+
+  // 纯函数：属性/物品串解析（emoji 前缀、cur/max、三种数量形态、备注剥离）
+  const attrs = ev('(_sbParseAttrs("[❤️HP:62/100][💠MP:5/60][🛡️Armor:5]"))');
+  eq({ hp: attrs.hp, maxHp: attrs.maxHp, mp: attrs.mp, maxMp: attrs.maxMp, armor: attrs.armor },
+    { hp: 62, maxHp: 100, mp: 5, maxMp: 60, armor: 5 }, '属性串解析（剥 emoji 键名）');
+  const items = ev('(_sbParseItems("[💼][绷带x3][.45子弹：0][柯尔特(腰后)：2][手电筒]"))');
+  eq(items, [{ name: '绷带', count: 3 }, { name: '.45子弹', count: 0 }, { name: '柯尔特', count: 2 }],
+    '物品串解析（xN/：N/：N+后缀，emoji 与无数量条目跳过，备注剥离）');
+
+  // 快照读取 + 回溯：最新楼无 stat_data → 找到前面最近一楼
+  MOCK.resetVars();
+  MOCK.setChat([
+    { message: '开战。', role: 'user', is_user: true },
+    { message: '<Combat_block>\n战斗数据栏:\n  我方列表:\n    - 角色:\n        名字: "埃利奥特"\n        属性: "[HP:100/100][MP:60/60][Atk:20][Armor:40][Speed:50]"\n        技能:\n          - "【飞沙化甲】[单防;power:50][MP:8][法术]"\n        物品:\n          - "【绷带】[消耗品][数量:3]"\n          - "【.45子弹】[弹药][数量:40][绑定:柯尔特三连发*3]"\n</Combat_block>', role: 'user', is_user: true },
+    { message: '<maintext>战斗开始。</maintext>', role: 'assistant', is_user: false },
+  ]);
+  const battleYaml17 = MOCK.api.getChatMessages(1)[0].message.match(/<Combat_block>\s*([\s\S]*?)\s*<\/Combat_block>/)[1];
+  // 状态栏快照放在 1 楼（当前 2 楼没有）
+  MOCK.api.insertOrAssignVariables({ stat_data: { 状态栏: { 角色列表: [
+    { 角色: { 名字: '🔮埃利奥特', 属性: '[❤️HP:62/100][💠MP:5/60][🛡️Armor:5]', 物品: '[💼][绷带x1][.45子弹：12]' } },
+    { 角色: { 名字: '🎩弗兰克', 属性: '[❤️HP:180/180]', 物品: '' } },
+  ] } } }, { type: 'message', message_id: 1 });
+
+  w.eval('onCombatDataReceived(' + JSON.stringify(battleYaml17) + ')');
+  const snap = w.eval('_statusBarSnapshot');
+  check(snap && snap.source === 1, '快照回溯找到 1 楼的 stat_data');
+  const sbEliot = snap && snap.heroes.find(h => h.name === '埃利奥特');
+  check(sbEliot && sbEliot.hp === 62 && sbEliot.armor === 5, '快照含埃利奥特（emoji 名剥除、数值正确）');
+
+  // 不勾选：startGame 保持 YAML 原值
+  w.eval("document.getElementById('start-statusbar-import').checked = false; startGame();");
+  let h = w.eval('heroesData[0]');
+  check(h.hp === 100 && h.mp === 60 && h.def === 40, '不勾选：数值保持 YAML 原值');
+  check(w.eval('heroesData[0].items.find(i=>i.name==="绷带").count') === 3, '不勾选：物品数量保持 YAML');
+
+  // 重置战局后勾选：数值层覆盖（HP/MP/Armor/物品 count），Atk/Speed 不介入
+  w.eval("state.isGameStarted = false;");
+  w.eval("heroesData = JSON.parse(JSON.stringify(initialHeroesCache));");
+  w.eval("document.getElementById('start-statusbar-import').checked = true; startGame();");
+  h = w.eval('heroesData[0]');
+  check(h.hp === 62 && h.maxHp === 100 && h.mp === 5, '勾选：HP/MP 按状态栏覆盖');
+  check(h.def === 5, '勾选：Armor → def 覆盖');
+  check(h.atk === 20 && h.spd === 50, '勾选：Atk/Speed 保持 YAML（状态栏不介入）');
+  check(w.eval('heroesData[0].items.find(i=>i.name==="绷带").count') === 1, '勾选：绷带 3→1');
+  check(w.eval('heroesData[0].items.find(i=>i.name===".45子弹").count') === 12, '勾选：子弹 40→12（：N 中文冒号形态）');
+  // 弗兰克在状态栏但不在 YAML：不新增角色
+  check(!w.eval('heroesData.some(x=>x.name==="弗兰克")'), '快照多余角色不进战斗（YAML 名单为准）');
+
+  // 同名物品精确匹配：状态栏「绷带」不覆盖不存在的「高级绷带」（报未匹配，不新增）
+  const r17 = ev('applyStatusBarRoster({ heroes: [{ name: "埃利奥特", hp: null, mp: null, armor: null, items: [{ name: "绷带", count: 9 }, { name: "高级绷带", count: 9 }] }] })');
+  check(w.eval('heroesData[0].items.find(i=>i.name==="绷带").count') === 9, '同名物品精确覆盖');
+  check(r17.unmatched.includes('埃利奥特·高级绷带'), '快照中不存在的物品报未匹配（不新增）');
+
+  // 快照缺失：勾选但无数据 → YAML 保留
+  w.eval('_statusBarSnapshot = null; state.isGameStarted = false; heroesData = JSON.parse(JSON.stringify(initialHeroesCache)); startGame();');
+  check(w.eval('heroesData[0].hp') === 100, '快照缺失：勾选不生效，YAML 保留');
+  w.eval("document.getElementById('start-statusbar-import').checked = false;");
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -865,7 +929,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
