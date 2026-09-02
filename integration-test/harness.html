@@ -15,7 +15,7 @@
   .info { color:#93a4d4; }
   .head { color:#fbbf24; font-weight:700; }
   #frames { display:flex; gap:8px; padding:0 14px 14px; }
-  iframe { width:50%; height:340px; border:1px solid #263056; border-radius:8px; background:#000; }
+  iframe { width:50%; height:760px; border:1px solid #263056; border-radius:8px; background:#000; }
 </style>
 </head>
 <body>
@@ -490,8 +490,8 @@ async function test9() {
   check(/已陷入重创/.test(digest), '敌方重创档位');
   check(/【纳克提特障壁术】已削薄/.test(digest) || /【纳克提特障壁术】已有磨损/.test(digest), '纳克提特屏障档位');
 
-  // 高阶全量：四条关键术式 + 动作行标签
-  check(/【双管猎象枪】\[高阶\]（弗兰克）：3 次释放，1 次被闪避，命中【受伤】/.test(digest), '双管猎象枪[高阶] 聚合（3释放/1闪避/1命中；另一次闪避在敌方反应节点上）');
+  // 高阶全量：四条关键术式 + 动作行标签（闪避含反应节点按触发来源归因）
+  check(/【双管猎象枪】\[高阶\]（弗兰克）：3 次释放，2 次被闪避，命中【受伤】/.test(digest), '双管猎象枪[高阶] 聚合（3释放/2闪避含反应归因/1命中）');
   check(/【纳克提特障壁术】\[高阶\]（埃利奥特）：架起共享屏障\(克制近战\)，替全队挡下 3 次强攻后破碎/.test(digest), '纳克提特[高阶] 挡3次后破碎');
   check(/【圣域帷幕】\[传奇\]（埃利奥特）：架起共享屏障\(克制法术\)，替全队挡下 5 次强攻，战斗结束时仍未破碎/.test(digest), '圣域帷幕[传奇] 挡5次未破');
   check(/【归尘礼赞】\[传奇\]（埃利奥特）：2 次释放，命中【受伤】×2，终结了敌方/.test(digest), '归尘礼赞[传奇] 2释放终结');
@@ -501,6 +501,17 @@ async function test9() {
   check(/化尘者之瓶（道具）本场使用次数已用尽/.test(digest), '道具归零：本场次数已用尽（非整体损耗）');
   check(/\.45子弹（弹药）已打空/.test(digest), '弹药归零：已打空');
   check(!/化尘者之瓶已用尽/.test(digest), '禁止无类别裸措辞');
+
+  // 反应技措辞：闪避结果按反应成败改写，不再读成"反应技打中自己"
+  check(/反应技【战壕格斗术】\(弗兰克\) → 自身 » 成功闪避 · 反击命中 · 吸引仇恨/.test(digest), '反应技闪避成功措辞');
+  check(/负面被【圣域帷幕】格挡/.test(digest), '圣域格挡带实际屏障名');
+
+  // 档位行位置：紧跟产生它的锚点，先于击溃终局行
+  const L9 = digest.split('\n');
+  const iHit = L9.findIndex(l => /命中【轻伤】/.test(l) && l.includes('索恩'));
+  const iTier = L9.findIndex(l => /已陷入重创/.test(l));
+  const iKill = L9.findIndex(l => /被击溃了/.test(l));
+  check(iHit >= 0 && iTier > iHit && iKill > iTier, '重创档位行在命中之后、击溃之前（时序不倒挂）');
 
   // 目标必写
   check(/蓄力就绪【归尘礼赞】/.test(digest), '蓄力三段式：蓄力就绪行保留');
