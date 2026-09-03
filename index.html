@@ -15653,9 +15653,10 @@ function readStatusBarSnapshot() {
         if (!c || typeof c !== 'object') continue;
         const rawName = c['名字'] || c['姓名'] || c['名称'] || '';
         if (!rawName) continue;
-        const parsedName = typeof getCleanNameAndEmoji === 'function' ? getCleanNameAndEmoji(String(rawName)).name : String(rawName).trim();
+        // 状态栏原始名可能带前导空格（" 🔮埃利奥特"），getCleanNameAndEmoji 的 ^ 锚定会失效；
+        // 先 trim 再剥 emoji，复合 emoji（🕵️‍♀️ ZWJ 串）也要整体剥净，否则名字带残片匹配不上 YAML 干净名
         const heroes0 = {
-          name: parsedName,
+          name: String(rawName).trim().replace(/^[\u200D\uFE0F\u2640\u2642\u26A7\p{Extended_Pictographic}]+\s*/u, '').trim(),
           ..._sbParseAttrs(c['属性']),
           items: _sbParseItems(c['物品'] || c['弹药'] || c['道具'] || c['消耗'] || ''),
         };
