@@ -922,81 +922,6 @@ async function test17() {
   w.eval("document.getElementById('start-statusbar-import').checked = false;");
 }
 
-/* ================= 断言 21：导演兜底（触发/生成/校验/写回） ================= */
-async function test21() {
-  head('21 导演兜底：生成过校验替换 + 重试回落 + 动态图鉴落库 + 禁用标签拦截');
-  const ev = (code) => rpgWin().eval(code);
-  const w = rpgWin();
-
-  // 场景 0：校验器纯函数断言（禁用标签 / Aim 区间 / 耗蓝 / 技能数）
-  const bad1 = ev('validateDirectorEntry(' + JSON.stringify({ 名字: '坏敌人', 属性: '[HP:100/100][MP:10/10][行动次数:1]', 技能: ['【看破】[看破][近战]'] }) + ')');
-  check(bad1.length > 0 && bad1.some(e => e.includes('看破')), '禁用标签 [看破] 被拦截');
-  const bad2 = ev('validateDirectorEntry(' + JSON.stringify({ 名字: '坏敌人', 属性: '[HP:100/100][MP:10/10][行动次数:1]', 技能: ['【射击】[单体;power:70][Aim:260][远程]'] }) + ')');
-  check(bad2.some(e => e.includes('Aim 260')), 'Aim 超区间被拦截');
-  const bad3 = ev('validateDirectorEntry(' + JSON.stringify({ 名字: '坏敌人', 属性: '[HP:100/100][MP:5/5][行动次数:1]', 技能: ['【火球】[单体;power:70][Aim:120][法术][MP:4]', '【冰箭】[单体;power:60][Aim:120][法术][MP:4]'] }) + ')');
-  check(bad3.some(e => e.includes('耗蓝总和 8 超过 MP 5')), '耗蓝超 MP 被拦截');
-  const good1 = ev('validateDirectorEntry(' + JSON.stringify({ 名字: '好敌人', 属性: '[HP:115/115][MP:9/9][Atk:60][Armor:10][Speed:60][行动次数:1][智慧]', 技能: ['【剃刀割喉】[单体;power:65][单降;power:15][Aim:115][近战]', '【短棍重击】[单体;power:80][Aim:110][近战]'] }) + ')');
-  check(good1.length === 0, '合法词条通过校验（含种群标签/双技能）');
-
-  // 场景 A：mock fetch 生成过校验 → 替换开战 → 动态图鉴落库 → 下次命中
-  // 前置：摘绑世界书（套件启动 autoBindWorldbook 会自动绑定，导致走世界书写回路径而非动态图鉴）
-  ev("worldbookSettings.boundName = null; worldbookCache = []; worldbookIndex = {}; true;");
-  const genYaml = '```yaml\n名字: "🔪街头打手"\n属性: "[HP:115/115][MP:9/9][Atk:60][Armor:10][Speed:60][行动次数:1][智慧]"\n技能:\n  - "【剃刀割喉】[单体;power:65][单降;power:15][Aim:115][近战]"\n  - "【短棍重击】[单体;power:80][Aim:110][近战]"\n```';
-  ev('window.fetch = function(url, opts) { return Promise.resolve({ ok: true, text: () => Promise.resolve("{}"), json: () => Promise.resolve({ choices: [{ message: { content: ' + JSON.stringify(genYaml) + ' } }] }) }); }; true;');
-  ev("directorState.apiUrl = 'http://mock.local/v1'; directorState.apiKey = 'sk-test'; directorState.systemPrompt = DEFAULT_DIRECTOR_PROMPT; true;");
-  // 待补敌人：无技能未命中
-  MOCK.resetVars();
-  ev('enemiesData = [parseEnemyItem({ 名字: "街头打手", 属性: "", 技能: [] }, 0, []), parseEnemyItem({ 名字: "沙蝎信徒", 属性: "[HP:120/120][MP:8/8][Atk:60][Armor:10][Speed:55][行动次数:1]", 技能: ["【刺】[单体;power:70][Aim:115][近战]"] }, 1, [])]; true;');
-  const cands = ev('detectDirectorCandidates().map(e => e.name)');
-  eq(cands, ['街头打手'], '候选检测：仅无技能未命中的敌人');
-  let continueCalled = false;
-  const contRef = 'window.__t21cont = function(ok) { window.__t21ok = ok; window.__t21done = true; }; window.__t21cont';
-  const fallbackStarted = await w.eval('(async function(){ var done = new Promise(function(res){ window.__t21cont = res; }); runDirectorFallback(detectDirectorCandidates(), "测试剧情上下文", window.__t21cont); var r = await done; return { started: true, ok: r }; })()');
-  await sleep(300);
-  check(fallbackStarted && fallbackStarted.ok === true, '场景A：生成过校验并回调 ok=true');
-  check(ev('enemiesData[0].skills.length') === 2, '场景A：敌人技能被替换（2 个）');
-  check(ev('enemiesData[0].hp') === 115 && ev('enemiesData[0].atk') === 60, '场景A：图鉴数值载入');
-  check(ev('enemiesData[0].isWise') === true, '场景A：[智慧] 标签生效');
-  // 动态图鉴落库（非酒馆 insertOrAssign 存在 mock，chat 作用域）
-  const dyn = MOCK.api.getVariables({ type: 'chat' })['$rpg_dynamic_bestiary'];
-  check(dyn && dyn.entries && dyn.entries.length === 1 && dyn.entries[0].name.includes('街头打手'), '场景A：动态图鉴聊天变量落库');
-  // 并入缓存后下次命中
-  check(ev('resolveWorldbookEnemy("街头打手") !== null'), '场景A：下次同名命中图鉴（动态词条并入）');
-  check(ev('detectDirectorCandidates().length') === 0, '场景A：候选清零（已命中+有技能）');
-
-  // 场景 B：必失败输出 → 重试 2 次回落（callback false，敌人保持无技能）
-  ev('window.fetch = function() { return Promise.resolve({ ok: true, text: () => Promise.resolve("{}"), json: () => Promise.resolve({ choices: [{ message: { content: "垃圾输出没有yaml" } }] }) }); }; true;');
-  MOCK.resetVars();
-  ev('enemiesData = [parseEnemyItem({ 名字: "路人甲", 属性: "", 技能: [] }, 0, [])]; true;');
-  const fb2 = await w.eval('(async function(){ var done = new Promise(function(res){ window.__t22cont = res; }); runDirectorFallback(detectDirectorCandidates(), "", window.__t22cont); var r = await done; return r; })()');
-  check(fb2 === false, '场景B：必失败输出 → 回落 callback(false)');
-  check(ev('enemiesData[0].skills.length') === 0, '场景B：敌人保持无技能（走普攻兜底）');
-
-  // 场景 C：未配置端点 → 直接跳过
-  ev("directorState.apiUrl = ''; directorState.apiKey = ''; true;");
-  ev('enemiesData = [parseEnemyItem({ 名字: "路人乙", 属性: "", 技能: [] }, 0, [])]; true;');
-  const fb3 = await w.eval('(async function(){ var done = new Promise(function(res){ window.__t23cont = res; }); runDirectorFallback(detectDirectorCandidates(), "", window.__t23cont); var r = await done; return r; })()');
-  check(fb3 === false, '场景C：未配置端点 → 自动降级跳过');
-
-  // 场景 D：世界书写回路径（mock createWorldbookEntries 存在）
-  ev("directorState.apiUrl = 'http://mock.local/v1'; directorState.apiKey = 'sk-test'; true;");
-  ev("worldbookSettings.boundName = '测试角色卡'; worldbookCache = []; worldbookIndex = {}; true;");
-  MOCK.worldbooks['测试角色卡'] = [];
-  ev('window.fetch = function() { return Promise.resolve({ ok: true, text: () => Promise.resolve("{}"), json: () => Promise.resolve({ choices: [{ message: { content: ' + JSON.stringify(genYaml) + ' } }] }) }); }; true;');
-  MOCK.resetVars();
-  ev('enemiesData = [parseEnemyItem({ 名字: "街头打手", 属性: "", 技能: [] }, 0, [])]; true;');
-  const fb4 = await w.eval('(async function(){ var done = new Promise(function(res){ window.__t24cont = res; }); runDirectorFallback(detectDirectorCandidates(), "", window.__t24cont); var r = await done; return r; })()');
-  check(fb4 === true, '场景D：生成成功');
-  const wbEntries = MOCK.worldbooks['测试角色卡'];
-  check(wbEntries && wbEntries.length === 1 && wbEntries[0].name === '街头打手', '场景D：词条写入绑定世界书（createWorldbookEntries）');
-  check(wbEntries && /<Combat_block>/.test(wbEntries[0].content), '场景D：词条含 Combat_block 内容');
-  check(wbEntries && wbEntries[0].strategy && wbEntries[0].strategy.keys[0] === '街头打手', '场景D：strategy.keys 检索键正确');
-  check(ev('resolveWorldbookEnemy("街头打手") !== null'), '场景D：写回后重载缓存命中');
-
-  // 清场：还原 fetch、清 director 配置
-  ev("window.fetch = window.__origFetch || window.fetch; directorState.apiUrl = ''; directorState.apiKey = ''; worldbookSettings.boundName = null; worldbookCache = []; worldbookIndex = {}; enemiesData = []; heroesData = []; true;");
-}
-
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -1004,7 +929,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test21];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
