@@ -15336,22 +15336,10 @@ function initLLMPresets() {
     }
 }
 
-// ---- 持久化：优先用酒馆助手 character 变量，降级到 localStorage ----
+// ---- 持久化：纯 localStorage（原酒馆助手 character 变量主通道实测不生效，已移除） ----
 const LLM_VAR_KEY = 'rpg_combat_llm_settings';
 
 async function loadLLMSettings() {
-  try {
-    if (typeof getVariables === 'function') {
-      const vars = await getVariables({ type: 'character' });
-      const saved = vars[LLM_VAR_KEY];
-      if (saved && typeof saved === 'object') {
-        Object.assign(llmState, saved);
-        initLLMPresets();
-        return;
-      }
-    }
-  } catch(e) { /* 酒馆助手不可用，降级 */ }
-  // 降级：localStorage
   try {
     const raw = localStorage.getItem(LLM_VAR_KEY);
     if (raw) Object.assign(llmState, JSON.parse(raw));
@@ -15377,13 +15365,6 @@ async function persistLLMSettings() {
     activePreset: llmState.activePreset,
     presets: llmState.presets
   };
-  try {
-    if (typeof setVariables === 'function') {
-      await setVariables({ [LLM_VAR_KEY]: toSave }, { type: 'character' });
-      return;
-    }
-  } catch(e) {}
-  // 降级：localStorage
   try { localStorage.setItem(LLM_VAR_KEY, JSON.stringify(toSave)); } catch(e) {}
 }
 
