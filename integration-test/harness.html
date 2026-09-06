@@ -929,7 +929,7 @@ async function test18() {
   const p = (s) => ev('parseBattleMarker(' + JSON.stringify(s) + ')');
 
   // 完整语法
-  let r = p('{{战斗标记点丨我方:埃利奥特/弗兰克丨敌方:沙蝎信徒*3/看门狗*1[荆棘]丨场地:猝不及防}}');
+  let r = p('【战斗标记点丨我方:埃利奥特/弗兰克丨敌方:沙蝎信徒*3/看门狗*1[荆棘]丨场地:猝不及防】');
   check(r && r.heroes && r.heroes.join() === '埃利奥特,弗兰克', '我方段解析');
   eq(r.enemies[0].baseName, '沙蝎信徒', '敌方 baseName');
   eq(r.enemies[0].count, 3, '敌方 *N 数量');
@@ -938,49 +938,49 @@ async function test18() {
   eq(r.field, '猝不及防', '场地段解析');
 
   // 漏我方段 → null（组装时取状态栏全员）
-  r = p('{{战斗标记点丨敌方:沙蝎信徒*3丨场地:有备而来}}');
+  r = p('【战斗标记点丨敌方:沙蝎信徒*3丨场地:有备而来】');
   check(r && r.heroes === null, '漏我方段：heroes=null（状态栏全员语义）');
 
   // 漏场地段
-  r = p('{{战斗标记点丨敌方:食尸鬼}}');
+  r = p('【战斗标记点丨敌方:食尸鬼】');
   check(r && r.field === null, '漏场地段：field=null');
 
   // 全角竖线 + 全角冒号 + 头部后冒号 + 段间空格
-  r = p('{{战斗标记点：｜我方：埃利奥特｜敌方： 沙蝎信徒×2 ｜场地：雾霭弥漫}}');
+  r = p('【战斗标记点：｜我方：埃利奥特｜敌方： 沙蝎信徒×2 ｜场地：雾霭弥漫】');
   check(r && r.heroes[0] === '埃利奥特' && r.enemies[0].count === 2 && r.field === '雾霭弥漫', '全角分隔符/头部冒号/空格容错');
 
   // 半角竖线 + 半角冒号 + 全角斜杠
-  r = p('{{战斗标记点|我方:埃利奥特／弗兰克|敌方:打手|场地:背水一战}}');
+  r = p('【战斗标记点|我方:埃利奥特／弗兰克|敌方:打手|场地:背水一战】');
   check(r && r.heroes.length === 2 && r.enemies[0].baseName === '打手' && r.field === '背水一战', '半角分隔符/全角斜杠');
 
   // 混合数量/标签/多个敌方
-  r = p('{{战斗标记点丨敌方:狂信徒*2[复活]/首领[钢体][荆棘]*1丨场地:猝不及防}}');
+  r = p('【战斗标记点丨敌方:狂信徒*2[复活]/首领[钢体][荆棘]*1丨场地:猝不及防】');
   eq(r.enemies[0].tags, ['[复活]'], '多标签敌方：首个');
   eq(r.enemies[1].tags, ['[钢体]', '[荆棘]'], '多标签敌方：双标签');
   eq(r.enemies[1].count, 1, '标签在数量前后的解析');
 
   // 畸形：无【】包裹
-  check(p('战斗标记点丨敌方:沙蝎信徒') === null, '无{{}}包裹 → null');
+  check(p('战斗标记点丨敌方:沙蝎信徒') === null, '无【】包裹 → null');
   // 畸形：非标记头
   check(p('【战斗标记丨敌方:沙蝎信徒】') === null, '非标记头 → null');
   // 畸形：缺敌方段
-  check(p('{{战斗标记点丨我方:埃利奥特}}') === null, '缺敌方段 → null');
+  check(p('【战斗标记点丨我方:埃利奥特】') === null, '缺敌方段 → null');
   // 畸形：敌方段为空
-  check(p('{{战斗标记点丨敌方:}}') === null, '敌方段空值 → null');
+  check(p('【战斗标记点丨敌方:】') === null, '敌方段空值 → null');
   // 畸形：敌方全是标签无名字 → 过滤后空 → null
-  check(p('{{战斗标记点丨敌方:[荆棘]}}') === null, '敌方纯标签无名字 → null');
+  check(p('【战斗标记点丨敌方:[荆棘]】') === null, '敌方纯标签无名字 → null');
   // 畸形：无法识别段被忽略但敌方仍有效
-  r = p('{{战斗标记点丨什么鬼段丨敌方:打手}}');
+  r = p('【战斗标记点丨什么鬼段丨敌方:打手】');
   check(r && r.enemies.length === 1, '未知段忽略，敌方仍有效');
   // count=0 保留原值（组装层跳过）
-  r = p('{{战斗标记点丨敌方:幽灵*0}}');
+  r = p('【战斗标记点丨敌方:幽灵*0】');
   eq(r.enemies[0].count, 0, 'count=0 原样返回（组装层跳过）');
 
   // findBattleMarker：末块优先 / 无标记 / 含半角变种括号
-  const txt = '叙事前文。{{战斗标记点丨敌方:甲}}中段叙事{{战斗标记点丨敌方:乙*2}}结尾。';
-  eq(ev('findBattleMarker(' + JSON.stringify(txt) + ')'), '{{战斗标记点丨敌方:乙*2}}', 'findBattleMarker 取末块');
+  const txt = '叙事前文。【战斗标记点丨敌方:甲】中段叙事【战斗标记点丨敌方:乙*2】结尾。';
+  eq(ev('findBattleMarker(' + JSON.stringify(txt) + ')'), '【战斗标记点丨敌方:乙*2】', 'findBattleMarker 取末块');
   check(ev('findBattleMarker("没有任何标记")') === null, '无标记 → null');
-  const txt2 = '{{战斗标记点丨敌方:看门狗*1[荆棘]丨场地:猝不及防}}';
+  const txt2 = '【战斗标记点丨敌方:看门狗*1[荆棘]丨场地:猝不及防】';
   eq(ev('findBattleMarker(' + JSON.stringify(txt2) + ')'), txt2, '含半角变种括号不被截断');
 }
 
@@ -1001,7 +1001,7 @@ async function test19() {
   await sleep(100);
 
   // 组装：图鉴命中 + 未命中占位 + 状态栏我方（显式点名 2 人）+ 场地
-  const r = ev('assembleBattleFromMarker(parseBattleMarker(' + JSON.stringify('{{战斗标记点丨我方:埃利奥特/弗兰克丨敌方:沙蝎信徒*2/无名打手丨场地:猝不及防}}') + '))');
+  const r = ev('assembleBattleFromMarker(parseBattleMarker(' + JSON.stringify('【战斗标记点丨我方:埃利奥特/弗兰克丨敌方:沙蝎信徒*2/无名打手丨场地:猝不及防】') + '))');
   check(typeof r === 'string' && r.indexOf('战斗数据栏:') === 0, '组装产出 YAML 字符串');
   check(r.indexOf('我方列表(场地:猝不及防)') !== -1, '场地写入我方列表键后缀');
 
@@ -1023,15 +1023,15 @@ async function test19() {
   check(ev('heroesData.some(h => h.buffs.some(b => b.type === "闪避减" || b.type === "evaDown" || /闪避/.test(b.type || "")))') === false, '场地 buff 待开战注入（解析层已记录 activeField）');
 
   // 变种标签叠图鉴：[荆棘] 并入属性栏
-  const r2 = ev('assembleBattleFromMarker(parseBattleMarker(' + JSON.stringify('{{战斗标记点丨敌方:沙蝎信徒[荆棘]}}') + '))');
+  const r2 = ev('assembleBattleFromMarker(parseBattleMarker(' + JSON.stringify('【战斗标记点丨敌方:沙蝎信徒[荆棘]】') + '))');
   ev('buildCombatDataFromYAML(' + JSON.stringify(r2) + ')');
   check(ev('enemiesData[0].tags.includes("[荆棘]")'), '变种标签叠加到图鉴敌人');
 
   // 我方段省略 = 状态栏全员；点名不存在的人 → 黄标
-  const r3 = ev('assembleBattleFromMarker(parseBattleMarker(' + JSON.stringify('{{战斗标记点丨敌方:沙蝎信徒}}') + '))');
+  const r3 = ev('assembleBattleFromMarker(parseBattleMarker(' + JSON.stringify('【战斗标记点丨敌方:沙蝎信徒】') + '))');
   ev('buildCombatDataFromYAML(' + JSON.stringify(r3) + ')');
   check(ev('heroesData.length') === 4, '我方段省略 = 状态栏全员');
-  const r4 = ev('assembleBattleFromMarker(parseBattleMarker(' + JSON.stringify('{{战斗标记点丨我方:不存在的路人丨敌方:沙蝎信徒}}') + '))');
+  const r4 = ev('assembleBattleFromMarker(parseBattleMarker(' + JSON.stringify('【战斗标记点丨我方:不存在的路人丨敌方:沙蝎信徒】') + '))');
   ev('buildCombatDataFromYAML(' + JSON.stringify(r4) + ')');
   check(JSON.stringify(ev('markerMissHeroes')) === JSON.stringify(['不存在的路人']), '点名未匹配进黄标名单');
 
@@ -1063,7 +1063,7 @@ async function test20() {
   MOCK.resetVars();
   MOCK.setChat([
     { message: '我们去清剿眷族。', role: 'user', is_user: true },
-    { message: '叙事正文……\n{{战斗标记点丨我方:埃利奥特/弗兰克丨敌方:沙蝎信徒*2/路人甲丨场地:有备而来}}', role: 'assistant', is_user: false },
+    { message: '叙事正文……\n【战斗标记点丨我方:埃利奥特/弗兰克丨敌方:沙蝎信徒*2/路人甲丨场地:有备而来】', role: 'assistant', is_user: false },
   ]);
   seedState();
   ev("clearInterval(pollingInterval); heroesData = []; enemiesData = []; true;");
@@ -1080,7 +1080,7 @@ async function test20() {
 
   // 场景 B：同楼再贴手写 <Combat_block>（轮询已停 → 手写块不再覆盖，幂等保持现状）
   const manualBlock = '<Combat_block>\n战斗数据栏:\n  我方列表:\n    - 角色:\n        名字: "手写英雄"\n        属性: ""\n  敌方列表:\n    - 角色:\n        名字: "手写敌人"\n        属性: ""\n</Combat_block>';
-  MOCK.api.setChatMessages([{ message_id: 1, message: '叙事\n{{战斗标记点丨敌方:沙蝎信徒}}\n' + manualBlock }]);
+  MOCK.api.setChatMessages([{ message_id: 1, message: '叙事\n【战斗标记点丨敌方:沙蝎信徒】\n' + manualBlock }]);
   const tickB = tickOnce();
   await sleep(200);
   check(tickB === 'manual', '同楼补手写块：tick 走手写路径');
@@ -1092,7 +1092,7 @@ async function test20() {
   MOCK.resetVars();
   MOCK.setChat([
     { message: 'x', role: 'user', is_user: true },
-    { message: '正文\n{{战斗标记点丨敌方:沙蝎信徒*2}}\n' + manualBlock, role: 'assistant', is_user: false },
+    { message: '正文\n【战斗标记点丨敌方:沙蝎信徒*2】\n' + manualBlock, role: 'assistant', is_user: false },
   ]);
   seedState();
   const tickC = tickOnce();
