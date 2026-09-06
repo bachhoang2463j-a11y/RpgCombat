@@ -212,3 +212,8 @@
 | 2026-09-02 | 人物过滤：职业词冒名拦截（整词精确匹配+自定义词表）+ 在场/去向三态描述（MMS b16df61 + harness test15） | L2442 | b16df61 |
 | 2026-09-03 | 自X 自身负面标签族（使用后必中/固定代价/目标恒为施法者）+ 槽位级 ;turns:N 轮数 + harness test16 + DIGEST_RULES srcLine 重排 | L2453 | 2567768 |
 | 2026-09-03 | 开局直连：状态栏我方数值传入战斗（备战界面勾选，同名覆盖/物品精确匹配/Atk 不介入）+ srcLine 错位修复脚本 + harness test17 | L2464 | 990f218 |
+| 2026-09-07 | 战斗标记点：parseBattleMarker 解析器 + assembleBattleFromMarker 组装 + startSTPolling 接线（手写块优先/黄标） + harness test18-20 | L2476 | f190c9d |
+| 2026-09-07 | LLM 设置持久化简化纯 localStorage（删失效 character 变量通道） | L2479 | 9851889 |
+| 2026-09-07 | 导演兜底人格：LLM 弹窗新 Tab（独立端点/5预设/温度/精简版指南内嵌默认提示词） | L2483 | 86f6ccd |
+| 2026-09-07 | 兜底生成全链路：检测→confirm→callDirectorLLM→硬规则校验→重试回落→替换→写回（世界书 createWorldbookEntries/动态图鉴）+ harness test21 | L2484 | 5c05560 |
+| 2026-09-07 | README V10.12 成文：§10.7 战斗标记点与导演兜底人格（协议/伏击映射/AI提示词片段） | L2476 | f1a3323 |
