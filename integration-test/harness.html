@@ -922,6 +922,68 @@ async function test17() {
   w.eval("document.getElementById('start-statusbar-import').checked = false;");
 }
 
+/* ================= 断言 18：战斗标记点解析器（纯函数） ================= */
+async function test18() {
+  head('18 战斗标记点 parseBattleMarker 容错矩阵');
+  const ev = (code) => rpgWin().eval(code);
+  const p = (s) => ev('parseBattleMarker(' + JSON.stringify(s) + ')');
+
+  // 完整语法
+  let r = p('【战斗标记点丨我方:埃利奥特/弗兰克丨敌方:沙蝎信徒*3/看门狗*1[荆棘]丨场地:猝不及防】');
+  check(r && r.heroes && r.heroes.join() === '埃利奥特,弗兰克', '我方段解析');
+  eq(r.enemies[0].baseName, '沙蝎信徒', '敌方 baseName');
+  eq(r.enemies[0].count, 3, '敌方 *N 数量');
+  eq(r.enemies[1].tags, ['[荆棘]'], '敌方 [变种] 标签');
+  eq(r.enemies[1].count, 1, '敌方默认数量 1');
+  eq(r.field, '猝不及防', '场地段解析');
+
+  // 漏我方段 → null（组装时取状态栏全员）
+  r = p('【战斗标记点丨敌方:沙蝎信徒*3丨场地:有备而来】');
+  check(r && r.heroes === null, '漏我方段：heroes=null（状态栏全员语义）');
+
+  // 漏场地段
+  r = p('【战斗标记点丨敌方:食尸鬼】');
+  check(r && r.field === null, '漏场地段：field=null');
+
+  // 全角竖线 + 全角冒号 + 头部后冒号 + 段间空格
+  r = p('【战斗标记点：｜我方：埃利奥特｜敌方： 沙蝎信徒×2 ｜场地：雾霭弥漫】');
+  check(r && r.heroes[0] === '埃利奥特' && r.enemies[0].count === 2 && r.field === '雾霭弥漫', '全角分隔符/头部冒号/空格容错');
+
+  // 半角竖线 + 半角冒号 + 全角斜杠
+  r = p('【战斗标记点|我方:埃利奥特／弗兰克|敌方:打手|场地:背水一战】');
+  check(r && r.heroes.length === 2 && r.enemies[0].baseName === '打手' && r.field === '背水一战', '半角分隔符/全角斜杠');
+
+  // 混合数量/标签/多个敌方
+  r = p('【战斗标记点丨敌方:狂信徒*2[复活]/首领[钢体][荆棘]*1丨场地:猝不及防】');
+  eq(r.enemies[0].tags, ['[复活]'], '多标签敌方：首个');
+  eq(r.enemies[1].tags, ['[钢体]', '[荆棘]'], '多标签敌方：双标签');
+  eq(r.enemies[1].count, 1, '标签在数量前后的解析');
+
+  // 畸形：无【】包裹
+  check(p('战斗标记点丨敌方:沙蝎信徒') === null, '无【】包裹 → null');
+  // 畸形：非标记头
+  check(p('【战斗标记丨敌方:沙蝎信徒】') === null, '非标记头 → null');
+  // 畸形：缺敌方段
+  check(p('【战斗标记点丨我方:埃利奥特】') === null, '缺敌方段 → null');
+  // 畸形：敌方段为空
+  check(p('【战斗标记点丨敌方:】') === null, '敌方段空值 → null');
+  // 畸形：敌方全是标签无名字 → 过滤后空 → null
+  check(p('【战斗标记点丨敌方:[荆棘]】') === null, '敌方纯标签无名字 → null');
+  // 畸形：无法识别段被忽略但敌方仍有效
+  r = p('【战斗标记点丨什么鬼段丨敌方:打手】');
+  check(r && r.enemies.length === 1, '未知段忽略，敌方仍有效');
+  // count=0 保留原值（组装层跳过）
+  r = p('【战斗标记点丨敌方:幽灵*0】');
+  eq(r.enemies[0].count, 0, 'count=0 原样返回（组装层跳过）');
+
+  // findBattleMarker：末块优先 / 无标记 / 含半角变种括号
+  const txt = '叙事前文。【战斗标记点丨敌方:甲】中段叙事【战斗标记点丨敌方:乙*2】结尾。';
+  eq(ev('findBattleMarker(' + JSON.stringify(txt) + ')'), '【战斗标记点丨敌方:乙*2】', 'findBattleMarker 取末块');
+  check(ev('findBattleMarker("没有任何标记")') === null, '无标记 → null');
+  const txt2 = '【战斗标记点丨敌方:看门狗*1[荆棘]丨场地:猝不及防】';
+  eq(ev('findBattleMarker(' + JSON.stringify(txt2) + ')'), txt2, '含半角变种括号不被截断');
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -929,7 +991,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
