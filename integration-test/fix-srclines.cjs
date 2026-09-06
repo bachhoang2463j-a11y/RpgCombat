@@ -7,7 +7,7 @@ const { execSync } = require('child_process');
 const path = 'D:/Project/RpgCombat/index.html';
 
 const html = fs.readFileSync(path, 'utf8');
-const headHtml = execSync('git show HEAD:index.html').toString();
+const headHtml = execSync('git -C D:/Project/RpgCombat show HEAD:index.html', { maxBuffer: 32 * 1024 * 1024 }).toString();
 
 // 工作区与 HEAD 的规则块
 const bs = html.indexOf('const DIGEST_RULES = [');

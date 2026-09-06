@@ -1038,6 +1038,27 @@ async function test18() {
   delete w.confirm;
 }
 
+/* ================= 断言 19：反引号围栏纪律（酒馆引号美化管线兼容） ================= */
+async function test19() {
+  head('19 反引号围栏纪律：组件源码不得破坏酒馆 ``` 配对豁免链');
+  const src = await (await fetch('../index.html')).text();
+  // ① 廉价不变量：组件文件自带头尾围栏（```html ... ```）之外，内部不得再有三连反引号——
+  //    酒馆 script.js 的引号美化正则靠 ``` 两两配对豁免代码块，组件内部冒出奇数个围栏序列会把
+  //    配对链错位到同楼层其他组件（状态栏 <q> 污染事故：全篇引号被包 <q> → 脚本语法错误 → 渲染失败）
+  eq((src.match(/```/g) || []).length, 2, 'index.html 三连反引号序列数 == 2（仅头尾自围栏）');
+  // ② 仿真酒馆引号美化管线（script.js 同款正则）：战斗组件（自围栏全文）+ 同楼层模拟组件
+  const stQuoteRe = /<style>[\s\S]*?<\/style>|```[\s\S]*?```|~~~[\s\S]*?~~~|``[\s\S]*?``|`[\s\S]*?`|(".*?")|(\u201C.*?\u201D)|(\u00AB.*?\u00BB)|(\u300C.*?\u300D)|(\u300E.*?\u300F)|(\uFF02.*?\uFF02)/gim;
+  const applyStQuote = (text) => text.replace(stQuoteRe, function (match, p1) { return p1 ? '<q>' + p1 + '</q>' : match; });
+  const sample = '```html\n<!DOCTYPE html>\n<html>\n<script>\n  console.log("状态栏模拟组件启动");\n  const data = { "名字": "测试", "属性": "abc" };\n</' + 'script>\n</html>\n```';
+  const converted = applyStQuote(src + '\n' + sample);
+  const tail = converted.slice(converted.indexOf('状态栏模拟组件') - 300);
+  check(!/<q>/.test(tail), '管线处理后：同楼层后续组件零 <q> 污染');
+  // ③ 对照组（证明仿真有效）：战斗组件内部塞一个奇数围栏序列 → 模拟组件必被污染
+  const poisoned = src.replace('<!DOCTYPE html>', '<!DOCTYPE html>\n<!-- ```yaml 假围栏 -->');
+  const convertedPoisoned = applyStQuote(poisoned + '\n' + sample);
+  check(/<q>/.test(convertedPoisoned.slice(convertedPoisoned.indexOf('状态栏模拟组件') - 300)), '对照组：内部多一个围栏序列 → 污染复现（仿真有效）');
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -1045,7 +1066,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
