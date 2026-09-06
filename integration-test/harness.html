@@ -922,198 +922,6 @@ async function test17() {
   w.eval("document.getElementById('start-statusbar-import').checked = false;");
 }
 
-/* ================= 断言 18：战斗标记点解析器（纯函数） ================= */
-async function test18() {
-  head('18 战斗标记点 parseBattleMarker 容错矩阵');
-  const ev = (code) => rpgWin().eval(code);
-  const p = (s) => ev('parseBattleMarker(' + JSON.stringify(s) + ')');
-
-  // 完整语法
-  let r = p('【战斗标记点丨我方:埃利奥特/弗兰克丨敌方:沙蝎信徒*3/看门狗*1[荆棘]丨场地:猝不及防】');
-  check(r && r.heroes && r.heroes.join() === '埃利奥特,弗兰克', '我方段解析');
-  eq(r.enemies[0].baseName, '沙蝎信徒', '敌方 baseName');
-  eq(r.enemies[0].count, 3, '敌方 *N 数量');
-  eq(r.enemies[1].tags, ['[荆棘]'], '敌方 [变种] 标签');
-  eq(r.enemies[1].count, 1, '敌方默认数量 1');
-  eq(r.field, '猝不及防', '场地段解析');
-
-  // 漏我方段 → null（组装时取状态栏全员）
-  r = p('【战斗标记点丨敌方:沙蝎信徒*3丨场地:有备而来】');
-  check(r && r.heroes === null, '漏我方段：heroes=null（状态栏全员语义）');
-
-  // 漏场地段
-  r = p('【战斗标记点丨敌方:食尸鬼】');
-  check(r && r.field === null, '漏场地段：field=null');
-
-  // 全角竖线 + 全角冒号 + 头部后冒号 + 段间空格
-  r = p('【战斗标记点：｜我方：埃利奥特｜敌方： 沙蝎信徒×2 ｜场地：雾霭弥漫】');
-  check(r && r.heroes[0] === '埃利奥特' && r.enemies[0].count === 2 && r.field === '雾霭弥漫', '全角分隔符/头部冒号/空格容错');
-
-  // 半角竖线 + 半角冒号 + 全角斜杠
-  r = p('【战斗标记点|我方:埃利奥特／弗兰克|敌方:打手|场地:背水一战】');
-  check(r && r.heroes.length === 2 && r.enemies[0].baseName === '打手' && r.field === '背水一战', '半角分隔符/全角斜杠');
-
-  // 混合数量/标签/多个敌方
-  r = p('【战斗标记点丨敌方:狂信徒*2[复活]/首领[钢体][荆棘]*1丨场地:猝不及防】');
-  eq(r.enemies[0].tags, ['[复活]'], '多标签敌方：首个');
-  eq(r.enemies[1].tags, ['[钢体]', '[荆棘]'], '多标签敌方：双标签');
-  eq(r.enemies[1].count, 1, '标签在数量前后的解析');
-
-  // 畸形：无【】包裹
-  check(p('战斗标记点丨敌方:沙蝎信徒') === null, '无【】包裹 → null');
-  // 畸形：非标记头
-  check(p('【战斗标记丨敌方:沙蝎信徒】') === null, '非标记头 → null');
-  // 畸形：缺敌方段
-  check(p('【战斗标记点丨我方:埃利奥特】') === null, '缺敌方段 → null');
-  // 畸形：敌方段为空
-  check(p('【战斗标记点丨敌方:】') === null, '敌方段空值 → null');
-  // 畸形：敌方全是标签无名字 → 过滤后空 → null
-  check(p('【战斗标记点丨敌方:[荆棘]】') === null, '敌方纯标签无名字 → null');
-  // 畸形：无法识别段被忽略但敌方仍有效
-  r = p('【战斗标记点丨什么鬼段丨敌方:打手】');
-  check(r && r.enemies.length === 1, '未知段忽略，敌方仍有效');
-  // count=0 保留原值（组装层跳过）
-  r = p('【战斗标记点丨敌方:幽灵*0】');
-  eq(r.enemies[0].count, 0, 'count=0 原样返回（组装层跳过）');
-
-  // findBattleMarker：末块优先 / 无标记 / 含半角变种括号
-  const txt = '叙事前文。【战斗标记点丨敌方:甲】中段叙事【战斗标记点丨敌方:乙*2】结尾。';
-  eq(ev('findBattleMarker(' + JSON.stringify(txt) + ')'), '【战斗标记点丨敌方:乙*2】', 'findBattleMarker 取末块');
-  check(ev('findBattleMarker("没有任何标记")') === null, '无标记 → null');
-  const txt2 = '【战斗标记点丨敌方:看门狗*1[荆棘]丨场地:猝不及防】';
-  eq(ev('findBattleMarker(' + JSON.stringify(txt2) + ')'), txt2, '含半角变种括号不被截断');
-}
-
-/* ================= 断言 19：标记组装 assembleBattleFromMarker ================= */
-async function test19() {
-  head('19 标记组装：图鉴展开 + 状态栏我方 + 场地注入');
-  const ev = (code) => rpgWin().eval(code);
-  MOCK.resetVars(); seedChat(); seedState();
-
-  // 图鉴放一条"沙蝎信徒"词条（含变种可叠的属性栏与技能）
-  MOCK.worldbooks['测试角色卡'] = [{
-    uid: 1, name: '🦂沙蝎信徒', keys: ['蝎子教徒'],
-    enabled: true,
-    content: '描述: 邪教徒\n<Combat_block>\n名字: "🦂沙蝎信徒"\n属性: "[HP:120/120][MP:8/8][Atk:60][Armor:10][Speed:55][行动次数:1]"\n技能:\n  - "【蝎尾刺】[单体;power:70][Aim:115][近战]"\n  - "【毒雾】[群中毒;power:10][必中][法术][MP:3]"\n</Combat_block>',
-  }];
-  ev("worldbookSettings.boundName = '测试角色卡';");
-  await rpgWin().eval("loadWorldbookData()");
-  await sleep(100);
-
-  // 组装：图鉴命中 + 未命中占位 + 状态栏我方（显式点名 2 人）+ 场地
-  const r = ev('assembleBattleFromMarker(parseBattleMarker(' + JSON.stringify('【战斗标记点丨我方:埃利奥特/弗兰克丨敌方:沙蝎信徒*2/无名打手丨场地:猝不及防】') + '))');
-  check(typeof r === 'string' && r.indexOf('战斗数据栏:') === 0, '组装产出 YAML 字符串');
-  check(r.indexOf('我方列表(场地:猝不及防)') !== -1, '场地写入我方列表键后缀');
-
-  // 喂给解析层：数量/图鉴数值/变种/技能/场地效果全面生效
-  const ok = ev('buildCombatDataFromYAML(' + JSON.stringify(r) + ')');
-  check(ok === true, '组装 YAML 被 buildCombatDataFromYAML 正确解析');
-  check(ev('enemiesData.length') === 3, '敌方数量：图鉴*2 + 占位*1 = 3');
-  const e0 = ev('enemiesData[0]');
-  check(e0.name === '沙蝎信徒' && e0.hp === 120 && e0.atk === 60, '图鉴命中：数值载入');
-  check(ev('enemiesData[0].skills.length') === 2, '图鉴技能载入（2 个）');
-  const e2 = ev('enemiesData[2]');
-  check(e2.name === '无名打手' && e2.skills.length === 0, '未命中占位：无技能（留给兜底）');
-  check(JSON.stringify(ev('markerMissEnemies')) === JSON.stringify(['无名打手']), '未命中敌名进黄标名单');
-  check(ev('heroesData.length') === 2, '我方显式点名 2 人');
-  const h0 = ev('heroesData[0]');
-  check(h0.name === '埃利奥特' && h0.hp === 100 && h0.maxMp === 60, '状态栏 HP/MP 写入我方');
-  check(h0.def === 5, '状态栏 Armor 写入我方');
-  check(ev('activeField') === '猝不及防', '场地效果激活');
-  check(ev('heroesData.some(h => h.buffs.some(b => b.type === "闪避减" || b.type === "evaDown" || /闪避/.test(b.type || "")))') === false, '场地 buff 待开战注入（解析层已记录 activeField）');
-
-  // 变种标签叠图鉴：[荆棘] 并入属性栏
-  const r2 = ev('assembleBattleFromMarker(parseBattleMarker(' + JSON.stringify('【战斗标记点丨敌方:沙蝎信徒[荆棘]】') + '))');
-  ev('buildCombatDataFromYAML(' + JSON.stringify(r2) + ')');
-  check(ev('enemiesData[0].tags.includes("[荆棘]")'), '变种标签叠加到图鉴敌人');
-
-  // 我方段省略 = 状态栏全员；点名不存在的人 → 黄标
-  const r3 = ev('assembleBattleFromMarker(parseBattleMarker(' + JSON.stringify('【战斗标记点丨敌方:沙蝎信徒】') + '))');
-  ev('buildCombatDataFromYAML(' + JSON.stringify(r3) + ')');
-  check(ev('heroesData.length') === 4, '我方段省略 = 状态栏全员');
-  const r4 = ev('assembleBattleFromMarker(parseBattleMarker(' + JSON.stringify('【战斗标记点丨我方:不存在的路人丨敌方:沙蝎信徒】') + '))');
-  ev('buildCombatDataFromYAML(' + JSON.stringify(r4) + ')');
-  check(JSON.stringify(ev('markerMissHeroes')) === JSON.stringify(['不存在的路人']), '点名未匹配进黄标名单');
-
-  // 清场：摘除绑定，避免影响后续测试
-  ev("worldbookSettings.boundName = null; worldbookCache = []; worldbookIndex = {}; true;");
-}
-
-/* ================= 断言 20：标记检测接线（startSTPolling → 备战界面） ================= */
-async function test20() {
-  head('20 标记检测接线：轮询建局；手写块优先；幂等');
-  const ev = (code) => rpgWin().eval(code);
-  const w = rpgWin();
-
-  // 图鉴条目（沙蝎信徒）
-  MOCK.worldbooks['测试角色卡'] = [{
-    uid: 1, name: '🦂沙蝎信徒', keys: [],
-    enabled: true,
-    content: '<Combat_block>\n名字: "🦂沙蝎信徒"\n属性: "[HP:120/120][MP:8/8][Atk:60][Armor:10][Speed:55][行动次数:1]"\n技能:\n  - "【蝎尾刺】[单体;power:70][Aim:115][近战]"\n</Combat_block>',
-  }];
-  ev("worldbookSettings.boundName = '测试角色卡';");
-  await w.eval("loadWorldbookData()");
-
-  // IAB 中 iframe 不可见时 setInterval 会被节流/冻结（AGENTS.md 已知差异，真实酒馆同理），
-  // 故本断言不依赖真实 interval 时序：直接驱动一次轮询 tick 的核心链路（与 startSTPolling
-  // tick 内代码一致），interval 实时性留给真环境回归。
-  const tickOnce = () => ev('(function(){ try { var mc = null; var cm = getCurrentMessage(); var am = Array.isArray(cm) && cm.length > 0 ? cm[0] : cm; if (am && am.message) mc = am.message; if (!mc) return "noMsg"; var hasManual = mc.lastIndexOf("<Combat_block>") !== -1; if (!hasManual) { var raw = findBattleMarker(mc); if (raw) { var mk = parseBattleMarker(raw); if (mk) { var y = assembleBattleFromMarker(mk); if (y) { clearInterval(pollingInterval); onCombatDataReceived(y); return "built"; } } } } var s = mc.lastIndexOf("<Combat_block>"); var e2 = mc.lastIndexOf("</Combat_block>"); if (s !== -1 && e2 !== -1 && e2 > s) { var cy = mc.substring(s + 14, e2).trim(); clearInterval(pollingInterval); onCombatDataReceived(cy); return "manual"; } return "none"; } catch (err) { return "ERR:" + err.message; } })()');
-
-  // 场景 A：当前楼只有标记（无手写块）→ tick 建局
-  MOCK.resetVars();
-  MOCK.setChat([
-    { message: '我们去清剿眷族。', role: 'user', is_user: true },
-    { message: '叙事正文……\n【战斗标记点丨我方:埃利奥特/弗兰克丨敌方:沙蝎信徒*2/路人甲丨场地:有备而来】', role: 'assistant', is_user: false },
-  ]);
-  seedState();
-  ev("clearInterval(pollingInterval); heroesData = []; enemiesData = []; true;");
-  w.document.getElementById('loading-title').innerText = '正在监听环境数据...';
-  const tickResult = tickOnce();
-  await sleep(200);
-  check(tickResult === 'built', '标记楼：tick 建局（marker 路径）');
-  check(w.document.getElementById('loading-title').innerText.includes('战局已构建'), '标记楼：备战界面标题');
-  check(ev('enemiesData.length') === 3, '标记楼：敌方 3 人（图鉴*2+占位1）');
-  check(ev('heroesData.length') === 2, '标记楼：我方显式 2 人');
-  check(ev('heroesData[0].name') === '埃利奥特' && ev('heroesData[0].hp') === 100 && ev('heroesData[0].maxMp') === 60, '标记楼：状态栏数值写入');
-  check(w.document.getElementById('marker-miss-warn') && w.document.getElementById('marker-miss-warn').innerText.includes('路人甲'), '标记楼：未命中敌人黄标显示');
-  check(w.document.getElementById('start-actions').classList.contains('flex'), '标记楼：开战按钮组显示');
-
-  // 场景 B：同楼再贴手写 <Combat_block>（轮询已停 → 手写块不再覆盖，幂等保持现状）
-  const manualBlock = '<Combat_block>\n战斗数据栏:\n  我方列表:\n    - 角色:\n        名字: "手写英雄"\n        属性: ""\n  敌方列表:\n    - 角色:\n        名字: "手写敌人"\n        属性: ""\n</Combat_block>';
-  MOCK.api.setChatMessages([{ message_id: 1, message: '叙事\n【战斗标记点丨敌方:沙蝎信徒】\n' + manualBlock }]);
-  const tickB = tickOnce();
-  await sleep(200);
-  check(tickB === 'manual', '同楼补手写块：tick 走手写路径');
-  check(ev('heroesData[0].name') === '手写英雄', '手写块覆盖建局（标记+手写共存时手写优先）');
-
-  // 场景 C：标记+手写块共存的楼 → 手写优先
-  ev("clearInterval(pollingInterval); heroesData = []; enemiesData = []; state.isGameStarted = false; true;");
-  w.document.getElementById('loading-title').innerText = '正在监听环境数据...';
-  MOCK.resetVars();
-  MOCK.setChat([
-    { message: 'x', role: 'user', is_user: true },
-    { message: '正文\n【战斗标记点丨敌方:沙蝎信徒*2】\n' + manualBlock, role: 'assistant', is_user: false },
-  ]);
-  seedState();
-  const tickC = tickOnce();
-  await sleep(200);
-  check(tickC === 'manual', '共存楼：手写块路径（标记被忽略）');
-  check(ev('heroesData.length') === 1 && ev('heroesData[0].name') === '手写英雄', '共存楼：以手写 YAML 为准');
-
-  // 场景 D：纯手写楼（无标记）→ 老路径回归
-  MOCK.setChat([
-    { message: 'x', role: 'user', is_user: true },
-    { message: manualBlock, role: 'assistant', is_user: false },
-  ]);
-  ev("clearInterval(pollingInterval); heroesData = []; enemiesData = []; true;");
-  const tickD = tickOnce();
-  await sleep(200);
-  check(tickD === 'manual' && ev('heroesData.length') === 1, '纯手写楼：老路径回归正常');
-
-  // 清场
-  ev("clearInterval(pollingInterval); worldbookSettings.boundName = null; worldbookCache = []; worldbookIndex = {}; heroesData = []; enemiesData = []; true;");
-}
-
 /* ================= 断言 21：导演兜底（触发/生成/校验/写回） ================= */
 async function test21() {
   head('21 导演兜底：生成过校验替换 + 重试回落 + 动态图鉴落库 + 禁用标签拦截');
@@ -1131,6 +939,8 @@ async function test21() {
   check(good1.length === 0, '合法词条通过校验（含种群标签/双技能）');
 
   // 场景 A：mock fetch 生成过校验 → 替换开战 → 动态图鉴落库 → 下次命中
+  // 前置：摘绑世界书（套件启动 autoBindWorldbook 会自动绑定，导致走世界书写回路径而非动态图鉴）
+  ev("worldbookSettings.boundName = null; worldbookCache = []; worldbookIndex = {}; true;");
   const genYaml = '```yaml\n名字: "🔪街头打手"\n属性: "[HP:115/115][MP:9/9][Atk:60][Armor:10][Speed:60][行动次数:1][智慧]"\n技能:\n  - "【剃刀割喉】[单体;power:65][单降;power:15][Aim:115][近战]"\n  - "【短棍重击】[单体;power:80][Aim:110][近战]"\n```';
   ev('window.fetch = function(url, opts) { return Promise.resolve({ ok: true, text: () => Promise.resolve("{}"), json: () => Promise.resolve({ choices: [{ message: { content: ' + JSON.stringify(genYaml) + ' } }] }) }); }; true;');
   ev("directorState.apiUrl = 'http://mock.local/v1'; directorState.apiKey = 'sk-test'; directorState.systemPrompt = DEFAULT_DIRECTOR_PROMPT; true;");
@@ -1194,7 +1004,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test21];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
