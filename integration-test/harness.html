@@ -984,6 +984,61 @@ async function test18() {
   eq(ev('findBattleMarker(' + JSON.stringify(txt2) + ')'), txt2, '含半角变种括号不被截断');
 }
 
+/* ================= 断言 19：标记组装 assembleBattleFromMarker ================= */
+async function test19() {
+  head('19 标记组装：图鉴展开 + 状态栏我方 + 场地注入');
+  const ev = (code) => rpgWin().eval(code);
+  MOCK.resetVars(); seedChat(); seedState();
+
+  // 图鉴放一条"沙蝎信徒"词条（含变种可叠的属性栏与技能）
+  MOCK.worldbooks['测试角色卡'] = [{
+    uid: 1, name: '🦂沙蝎信徒', keys: ['蝎子教徒'],
+    enabled: true,
+    content: '描述: 邪教徒\n<Combat_block>\n名字: "🦂沙蝎信徒"\n属性: "[HP:120/120][MP:8/8][Atk:60][Armor:10][Speed:55][行动次数:1]"\n技能:\n  - "【蝎尾刺】[单体;power:70][Aim:115][近战]"\n  - "【毒雾】[群中毒;power:10][必中][法术][MP:3]"\n</Combat_block>',
+  }];
+  ev("worldbookSettings.boundName = '测试角色卡';");
+  await rpgWin().eval("loadWorldbookData()");
+  await sleep(100);
+
+  // 组装：图鉴命中 + 未命中占位 + 状态栏我方（显式点名 2 人）+ 场地
+  const r = ev('assembleBattleFromMarker(parseBattleMarker(' + JSON.stringify('【战斗标记点丨我方:埃利奥特/弗兰克丨敌方:沙蝎信徒*2/无名打手丨场地:猝不及防】') + '))');
+  check(typeof r === 'string' && r.indexOf('战斗数据栏:') === 0, '组装产出 YAML 字符串');
+  check(r.indexOf('我方列表(场地:猝不及防)') !== -1, '场地写入我方列表键后缀');
+
+  // 喂给解析层：数量/图鉴数值/变种/技能/场地效果全面生效
+  const ok = ev('buildCombatDataFromYAML(' + JSON.stringify(r) + ')');
+  check(ok === true, '组装 YAML 被 buildCombatDataFromYAML 正确解析');
+  check(ev('enemiesData.length') === 3, '敌方数量：图鉴*2 + 占位*1 = 3');
+  const e0 = ev('enemiesData[0]');
+  check(e0.name === '沙蝎信徒' && e0.hp === 120 && e0.atk === 60, '图鉴命中：数值载入');
+  check(ev('enemiesData[0].skills.length') === 2, '图鉴技能载入（2 个）');
+  const e2 = ev('enemiesData[2]');
+  check(e2.name === '无名打手' && e2.skills.length === 0, '未命中占位：无技能（留给兜底）');
+  check(JSON.stringify(ev('markerMissEnemies')) === JSON.stringify(['无名打手']), '未命中敌名进黄标名单');
+  check(ev('heroesData.length') === 2, '我方显式点名 2 人');
+  const h0 = ev('heroesData[0]');
+  check(h0.name === '埃利奥特' && h0.hp === 100 && h0.maxMp === 60, '状态栏 HP/MP 写入我方');
+  check(h0.def === 5, '状态栏 Armor 写入我方');
+  check(ev('activeField') === '猝不及防', '场地效果激活');
+  check(ev('heroesData.some(h => h.buffs.some(b => b.type === "闪避减" || b.type === "evaDown" || /闪避/.test(b.type || "")))') === false, '场地 buff 待开战注入（解析层已记录 activeField）');
+
+  // 变种标签叠图鉴：[荆棘] 并入属性栏
+  const r2 = ev('assembleBattleFromMarker(parseBattleMarker(' + JSON.stringify('【战斗标记点丨敌方:沙蝎信徒[荆棘]】') + '))');
+  ev('buildCombatDataFromYAML(' + JSON.stringify(r2) + ')');
+  check(ev('enemiesData[0].tags.includes("[荆棘]")'), '变种标签叠加到图鉴敌人');
+
+  // 我方段省略 = 状态栏全员；点名不存在的人 → 黄标
+  const r3 = ev('assembleBattleFromMarker(parseBattleMarker(' + JSON.stringify('【战斗标记点丨敌方:沙蝎信徒】') + '))');
+  ev('buildCombatDataFromYAML(' + JSON.stringify(r3) + ')');
+  check(ev('heroesData.length') === 4, '我方段省略 = 状态栏全员');
+  const r4 = ev('assembleBattleFromMarker(parseBattleMarker(' + JSON.stringify('【战斗标记点丨我方:不存在的路人丨敌方:沙蝎信徒】') + '))');
+  ev('buildCombatDataFromYAML(' + JSON.stringify(r4) + ')');
+  check(JSON.stringify(ev('markerMissHeroes')) === JSON.stringify(['不存在的路人']), '点名未匹配进黄标名单');
+
+  // 清场：摘除绑定，避免影响后续测试
+  ev("worldbookSettings.boundName = null; worldbookCache = []; worldbookIndex = {}; true;");
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -991,7 +1046,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
