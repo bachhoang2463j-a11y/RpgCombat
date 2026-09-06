@@ -1039,6 +1039,81 @@ async function test19() {
   ev("worldbookSettings.boundName = null; worldbookCache = []; worldbookIndex = {}; true;");
 }
 
+/* ================= 断言 20：标记检测接线（startSTPolling → 备战界面） ================= */
+async function test20() {
+  head('20 标记检测接线：轮询建局；手写块优先；幂等');
+  const ev = (code) => rpgWin().eval(code);
+  const w = rpgWin();
+
+  // 图鉴条目（沙蝎信徒）
+  MOCK.worldbooks['测试角色卡'] = [{
+    uid: 1, name: '🦂沙蝎信徒', keys: [],
+    enabled: true,
+    content: '<Combat_block>\n名字: "🦂沙蝎信徒"\n属性: "[HP:120/120][MP:8/8][Atk:60][Armor:10][Speed:55][行动次数:1]"\n技能:\n  - "【蝎尾刺】[单体;power:70][Aim:115][近战]"\n</Combat_block>',
+  }];
+  ev("worldbookSettings.boundName = '测试角色卡';");
+  await w.eval("loadWorldbookData()");
+
+  // IAB 中 iframe 不可见时 setInterval 会被节流/冻结（AGENTS.md 已知差异，真实酒馆同理），
+  // 故本断言不依赖真实 interval 时序：直接驱动一次轮询 tick 的核心链路（与 startSTPolling
+  // tick 内代码一致），interval 实时性留给真环境回归。
+  const tickOnce = () => ev('(function(){ try { var mc = null; var cm = getCurrentMessage(); var am = Array.isArray(cm) && cm.length > 0 ? cm[0] : cm; if (am && am.message) mc = am.message; if (!mc) return "noMsg"; var hasManual = mc.lastIndexOf("<Combat_block>") !== -1; if (!hasManual) { var raw = findBattleMarker(mc); if (raw) { var mk = parseBattleMarker(raw); if (mk) { var y = assembleBattleFromMarker(mk); if (y) { clearInterval(pollingInterval); onCombatDataReceived(y); return "built"; } } } } var s = mc.lastIndexOf("<Combat_block>"); var e2 = mc.lastIndexOf("</Combat_block>"); if (s !== -1 && e2 !== -1 && e2 > s) { var cy = mc.substring(s + 14, e2).trim(); clearInterval(pollingInterval); onCombatDataReceived(cy); return "manual"; } return "none"; } catch (err) { return "ERR:" + err.message; } })()');
+
+  // 场景 A：当前楼只有标记（无手写块）→ tick 建局
+  MOCK.resetVars();
+  MOCK.setChat([
+    { message: '我们去清剿眷族。', role: 'user', is_user: true },
+    { message: '叙事正文……\n【战斗标记点丨我方:埃利奥特/弗兰克丨敌方:沙蝎信徒*2/路人甲丨场地:有备而来】', role: 'assistant', is_user: false },
+  ]);
+  seedState();
+  ev("clearInterval(pollingInterval); heroesData = []; enemiesData = []; true;");
+  w.document.getElementById('loading-title').innerText = '正在监听环境数据...';
+  const tickResult = tickOnce();
+  await sleep(200);
+  check(tickResult === 'built', '标记楼：tick 建局（marker 路径）');
+  check(w.document.getElementById('loading-title').innerText.includes('战局已构建'), '标记楼：备战界面标题');
+  check(ev('enemiesData.length') === 3, '标记楼：敌方 3 人（图鉴*2+占位1）');
+  check(ev('heroesData.length') === 2, '标记楼：我方显式 2 人');
+  check(ev('heroesData[0].name') === '埃利奥特' && ev('heroesData[0].hp') === 100 && ev('heroesData[0].maxMp') === 60, '标记楼：状态栏数值写入');
+  check(w.document.getElementById('marker-miss-warn') && w.document.getElementById('marker-miss-warn').innerText.includes('路人甲'), '标记楼：未命中敌人黄标显示');
+  check(w.document.getElementById('start-actions').classList.contains('flex'), '标记楼：开战按钮组显示');
+
+  // 场景 B：同楼再贴手写 <Combat_block>（轮询已停 → 手写块不再覆盖，幂等保持现状）
+  const manualBlock = '<Combat_block>\n战斗数据栏:\n  我方列表:\n    - 角色:\n        名字: "手写英雄"\n        属性: ""\n  敌方列表:\n    - 角色:\n        名字: "手写敌人"\n        属性: ""\n</Combat_block>';
+  MOCK.api.setChatMessages([{ message_id: 1, message: '叙事\n【战斗标记点丨敌方:沙蝎信徒】\n' + manualBlock }]);
+  const tickB = tickOnce();
+  await sleep(200);
+  check(tickB === 'manual', '同楼补手写块：tick 走手写路径');
+  check(ev('heroesData[0].name') === '手写英雄', '手写块覆盖建局（标记+手写共存时手写优先）');
+
+  // 场景 C：标记+手写块共存的楼 → 手写优先
+  ev("clearInterval(pollingInterval); heroesData = []; enemiesData = []; state.isGameStarted = false; true;");
+  w.document.getElementById('loading-title').innerText = '正在监听环境数据...';
+  MOCK.resetVars();
+  MOCK.setChat([
+    { message: 'x', role: 'user', is_user: true },
+    { message: '正文\n【战斗标记点丨敌方:沙蝎信徒*2】\n' + manualBlock, role: 'assistant', is_user: false },
+  ]);
+  seedState();
+  const tickC = tickOnce();
+  await sleep(200);
+  check(tickC === 'manual', '共存楼：手写块路径（标记被忽略）');
+  check(ev('heroesData.length') === 1 && ev('heroesData[0].name') === '手写英雄', '共存楼：以手写 YAML 为准');
+
+  // 场景 D：纯手写楼（无标记）→ 老路径回归
+  MOCK.setChat([
+    { message: 'x', role: 'user', is_user: true },
+    { message: manualBlock, role: 'assistant', is_user: false },
+  ]);
+  ev("clearInterval(pollingInterval); heroesData = []; enemiesData = []; true;");
+  const tickD = tickOnce();
+  await sleep(200);
+  check(tickD === 'manual' && ev('heroesData.length') === 1, '纯手写楼：老路径回归正常');
+
+  // 清场
+  ev("clearInterval(pollingInterval); worldbookSettings.boundName = null; worldbookCache = []; worldbookIndex = {}; heroesData = []; enemiesData = []; true;");
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -1046,7 +1121,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }

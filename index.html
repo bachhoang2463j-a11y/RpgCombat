@@ -2541,138 +2541,138 @@ function renderCombatSyncBadge() {
 // ==========================================
 const DIGEST_RULES = [
   // --- 结构 ---
-  { srcLine: 12520, kind: 'drop',   re: /^--- 战斗已拉开帷幕 ---$/ },
-  { srcLine: 12521, kind: 'field',  re: /^🏟️ 场地：(.+)$/, build: m => ({ text: '场地：' + m[1] }) },
-  { srcLine: 12569, kind: 'round',  re: /^={2,}\s*第 (\d+) 回合\s*={2,}$/ , build: m => ({ n: parseInt(m[1], 10) }) },
+  { srcLine: 12556, kind: 'drop',   re: /^--- 战斗已拉开帷幕 ---$/ },
+  { srcLine: 12557, kind: 'field',  re: /^🏟️ 场地：(.+)$/, build: m => ({ text: '场地：' + m[1] }) },
+  { srcLine: 12605, kind: 'round',  re: /^={2,}\s*第 (\d+) 回合\s*={2,}$/ , build: m => ({ n: parseInt(m[1], 10) }) },
   // --- 主行动 ---
-  { srcLine: 12158, kind: 'action', re: /^> (.+?) 对 (.+?) 发动了【(.+?)】\s*(暴击!|极限爆发!)?\s*$/, build: m => ({ caster: m[1], target: m[2], skill: m[3], crit: !!m[4], critErupt: m[4] === '极限爆发! ' }) },
-  { srcLine: 12123, kind: 'action', re: /^> (.+?) 发动了【(.+?)】$/, build: m => ({ caster: m[1], skill: m[2] }) },
-  { srcLine: 12152, kind: 'action', re: /^> ⚡ 预判危机！(.+?) 施展反应技【(.+?)】(?:（应对 (.+?) 的【(.+?)】）)?/, build: m => ({ caster: m[1], skill: m[2], reaction: true, trigCaster: m[3] || '', trigSkill: m[4] || '' }) },
-  { srcLine: 12156, kind: 'action', re: /^> 🎒 (.+?) 对 (.+?) 使用了【(.+?)】$/, build: m => ({ caster: m[1], target: m[2], skill: m[3], item: true }) },
-  { srcLine: 14001, kind: 'action', re: /^> (.+?) 采取了防卫姿态，回防聚气！$/, build: m => ({ caster: m[1], skill: '防卫姿态', defend: true }) },
-  { srcLine: 11017, kind: 'action', re: /^ {0,4}⛔ (.+?) 施展【(.+?)】看穿了敌方气路，【(.+?)】被彻底无效化！$/, build: m => ({ caster: m[1], skill: m[2], kanpo: true, kanpoTarget: m[3] }) },
-  { srcLine: 11264, kind: 'event',  re: /^ {0,4}🛡️ (.+?) 施展【(.+?)】舍身护佑，替 (.+?) 承受攻击！$/, build: m => ({ text: `🛡️ ${m[1]}【${m[2]}】舍身护佑，替 ${m[3]} 承受攻击` }) },
-  { srcLine: 10380,  kind: 'event',  re: /^ {0,4}🛡️ (.+?) 施展【(.+?)】舍身护佑，替 (.+?) 承受攻击！\(自动\)$/, build: m => ({ text: `🛡️ ${m[1]}【${m[2]}】舍身护佑，替 ${m[3]} 承受攻击` }) },
-  { srcLine: 13324, kind: 'event',  re: /^ {0,4}⚡ \[(.+?)\] 蓄力就绪，可立即释放【(.+?)】！$/, build: m => ({ text: `⚡ ${m[1]} 蓄力就绪【${m[2]}】`, charge: { caster: m[1], skill: m[2] } }) },
-  { srcLine: 13332, kind: 'event',  re: /^ {0,4}⏳ \[(.+?)\] 开始蓄力【(.+?)】，还需 (\d+) 回合完成！$/, build: m => ({ text: `⚡ ${m[1]} 开始蓄力【${m[2]}】（还需 ${m[3]} 回合）`, charge: { caster: m[1], skill: m[2] } }) },
-  { srcLine: 13371, kind: 'token',  re: /^ {0,4}⚡ \[(.+?)\] 释放【(.+?)】！$/, build: m => ({ token: `⚡释放`, release: { caster: m[1], skill: m[2] } }) },
-  { srcLine: 13460, kind: 'token',  re: /^ {0,4}💨 \[(.+?)\] 终止了蓄力！$/, build: m => ({ token: '终止蓄力' }) },
-  { srcLine: 9753,  kind: 'token',  re: /^ {0,4}↳ ⚡ (.+?) 获得了连续行动机会，再动 (\d+) 次！$/, build: m => ({ token: '→连续行动' }) },
-  { srcLine: 9951,  kind: 'token',  re: /^ {0,4}🌟 (.+?) 的法力产生共鸣，引发了多重施法\(获得额外行动回合\)！$/, build: m => ({ token: '→多重施法' }) },
-  { srcLine: 13887, kind: 'token',  re: /^ {0,4}↳ 🌟 (.+?) 燃烧极限潜能发动祈愿！赋予了 (.+?) 连续行动的机会！$/, build: m => ({ token: `赋予${m[2]}连续行动` }) },
+  { srcLine: 12194, kind: 'action', re: /^> (.+?) 对 (.+?) 发动了【(.+?)】\s*(暴击!|极限爆发!)?\s*$/, build: m => ({ caster: m[1], target: m[2], skill: m[3], crit: !!m[4], critErupt: m[4] === '极限爆发! ' }) },
+  { srcLine: 12159, kind: 'action', re: /^> (.+?) 发动了【(.+?)】$/, build: m => ({ caster: m[1], skill: m[2] }) },
+  { srcLine: 12188, kind: 'action', re: /^> ⚡ 预判危机！(.+?) 施展反应技【(.+?)】(?:（应对 (.+?) 的【(.+?)】）)?/, build: m => ({ caster: m[1], skill: m[2], reaction: true, trigCaster: m[3] || '', trigSkill: m[4] || '' }) },
+  { srcLine: 12192, kind: 'action', re: /^> 🎒 (.+?) 对 (.+?) 使用了【(.+?)】$/, build: m => ({ caster: m[1], target: m[2], skill: m[3], item: true }) },
+  { srcLine: 14037, kind: 'action', re: /^> (.+?) 采取了防卫姿态，回防聚气！$/, build: m => ({ caster: m[1], skill: '防卫姿态', defend: true }) },
+  { srcLine: 11053, kind: 'action', re: /^ {0,4}⛔ (.+?) 施展【(.+?)】看穿了敌方气路，【(.+?)】被彻底无效化！$/, build: m => ({ caster: m[1], skill: m[2], kanpo: true, kanpoTarget: m[3] }) },
+  { srcLine: 11300, kind: 'event',  re: /^ {0,4}🛡️ (.+?) 施展【(.+?)】舍身护佑，替 (.+?) 承受攻击！$/, build: m => ({ text: `🛡️ ${m[1]}【${m[2]}】舍身护佑，替 ${m[3]} 承受攻击` }) },
+  { srcLine: 10416,  kind: 'event',  re: /^ {0,4}🛡️ (.+?) 施展【(.+?)】舍身护佑，替 (.+?) 承受攻击！\(自动\)$/, build: m => ({ text: `🛡️ ${m[1]}【${m[2]}】舍身护佑，替 ${m[3]} 承受攻击` }) },
+  { srcLine: 13360, kind: 'event',  re: /^ {0,4}⚡ \[(.+?)\] 蓄力就绪，可立即释放【(.+?)】！$/, build: m => ({ text: `⚡ ${m[1]} 蓄力就绪【${m[2]}】`, charge: { caster: m[1], skill: m[2] } }) },
+  { srcLine: 13368, kind: 'event',  re: /^ {0,4}⏳ \[(.+?)\] 开始蓄力【(.+?)】，还需 (\d+) 回合完成！$/, build: m => ({ text: `⚡ ${m[1]} 开始蓄力【${m[2]}】（还需 ${m[3]} 回合）`, charge: { caster: m[1], skill: m[2] } }) },
+  { srcLine: 13407, kind: 'token',  re: /^ {0,4}⚡ \[(.+?)\] 释放【(.+?)】！$/, build: m => ({ token: `⚡释放`, release: { caster: m[1], skill: m[2] } }) },
+  { srcLine: 13496, kind: 'token',  re: /^ {0,4}💨 \[(.+?)\] 终止了蓄力！$/, build: m => ({ token: '终止蓄力' }) },
+  { srcLine: 9789,  kind: 'token',  re: /^ {0,4}↳ ⚡ (.+?) 获得了连续行动机会，再动 (\d+) 次！$/, build: m => ({ token: '→连续行动' }) },
+  { srcLine: 9987,  kind: 'token',  re: /^ {0,4}🌟 (.+?) 的法力产生共鸣，引发了多重施法\(获得额外行动回合\)！$/, build: m => ({ token: '→多重施法' }) },
+  { srcLine: 13923, kind: 'token',  re: /^ {0,4}↳ 🌟 (.+?) 燃烧极限潜能发动祈愿！赋予了 (.+?) 连续行动的机会！$/, build: m => ({ token: `赋予${m[2]}连续行动` }) },
   // --- 命中结果 ---
-  { srcLine: 11752, kind: 'token',  re: /^ {0,4}↳ 命中了 (.+?)，造成了 \d+ 点实质伤害(【轻伤】|【受伤】|【重创】)！(?: 并击碎了\d+点护盾 )? 当前状态: (\d+)\/(\d+)\s*$/, build: m => ({ token: `命中造成${m[2] === '【受伤】' ? '【中度伤】' : m[2]}`, hp: { cur: parseInt(m[3], 10), max: parseInt(m[4], 10), who: m[1] } }) },
-  { srcLine: 11745, kind: 'token',  re: /^ {0,4}↳ 对 (.+?) 的护盾造成了 \d+ 点破坏。$/, build: m => ({ token: '击破护盾' }) },
-  { srcLine: 11777, kind: 'token',  re: /^ {0,4}💥 致命一击！彻底撕裂了 (.+?) 的身躯！$/, build: m => ({ token: '致命一击', killed: m[1] }) },
-  { srcLine: 11492, kind: 'token',  re: /^ {0,4}↳ 但被 (.+?) 敏捷地闪避了！$/, build: m => ({ token: '被闪避' }) },
-  { srcLine: 11532, kind: 'token',  re: /^ {0,4}⚔️ (.+?) 闪避并趁势反击！对 (.+?) 的护盾造成了 \d+ 点破坏。$/, build: m => ({ token: '反击命中(击盾)' }) },
-  { srcLine: 11536, kind: 'token',  re: /^ {0,4}⚔️ (.+?) 闪避并趁势反击！迅速一击命中了 (.+?)，造成了 \d+ 点伤害！.*$/, build: m => ({ token: '反击命中' }) },
-  { srcLine: 11542, kind: 'drop',   re: /虽处于反击架势，但无法触及并反击/ },
-  { srcLine: 9889,  kind: 'token',  re: /^ {0,4}⚔️ (.+?) 发动【强力反击】！对 (.+?) 的护盾造成了 \d+ 点破坏。$/, build: m => ({ token: '强力反击(击盾)' }) },
-  { srcLine: 9892,  kind: 'token',  re: /^ {0,4}⚔️ (.+?) 发动【强力反击】！以双倍力量重创 (.+?)，造成了 \d+ 点伤害！.*$/, build: m => ({ token: '强力反击' }) },
-  { srcLine: 10336,  kind: 'token',  re: /触发【受击反震\/护体反伤】/, build: m => ({ token: '反震伤害' }) },
-  { srcLine: 11795, kind: 'token',  re: /^ {0,4}↳ (.+?) 的【(.+?)】妨害随攻击一同落空，未能施加到 (.+?)。$/, build: m => ({ token: `附带【${m[2]}】落空`, missedTag: m[2] }) },
+  { srcLine: 11788, kind: 'token',  re: /^ {0,4}↳ 命中了 (.+?)，造成了 \d+ 点实质伤害(【轻伤】|【受伤】|【重创】)！(?: 并击碎了\d+点护盾 )? 当前状态: (\d+)\/(\d+)\s*$/, build: m => ({ token: `命中造成${m[2] === '【受伤】' ? '【中度伤】' : m[2]}`, hp: { cur: parseInt(m[3], 10), max: parseInt(m[4], 10), who: m[1] } }) },
+  { srcLine: 11781, kind: 'token',  re: /^ {0,4}↳ 对 (.+?) 的护盾造成了 \d+ 点破坏。$/, build: m => ({ token: '击破护盾' }) },
+  { srcLine: 11813, kind: 'token',  re: /^ {0,4}💥 致命一击！彻底撕裂了 (.+?) 的身躯！$/, build: m => ({ token: '致命一击', killed: m[1] }) },
+  { srcLine: 11528, kind: 'token',  re: /^ {0,4}↳ 但被 (.+?) 敏捷地闪避了！$/, build: m => ({ token: '被闪避' }) },
+  { srcLine: 11568, kind: 'token',  re: /^ {0,4}⚔️ (.+?) 闪避并趁势反击！对 (.+?) 的护盾造成了 \d+ 点破坏。$/, build: m => ({ token: '反击命中(击盾)' }) },
+  { srcLine: 11572, kind: 'token',  re: /^ {0,4}⚔️ (.+?) 闪避并趁势反击！迅速一击命中了 (.+?)，造成了 \d+ 点伤害！.*$/, build: m => ({ token: '反击命中' }) },
+  { srcLine: 11578, kind: 'drop',   re: /虽处于反击架势，但无法触及并反击/ },
+  { srcLine: 9925,  kind: 'token',  re: /^ {0,4}⚔️ (.+?) 发动【强力反击】！对 (.+?) 的护盾造成了 \d+ 点破坏。$/, build: m => ({ token: '强力反击(击盾)' }) },
+  { srcLine: 9928,  kind: 'token',  re: /^ {0,4}⚔️ (.+?) 发动【强力反击】！以双倍力量重创 (.+?)，造成了 \d+ 点伤害！.*$/, build: m => ({ token: '强力反击' }) },
+  { srcLine: 10372,  kind: 'token',  re: /触发【受击反震\/护体反伤】/, build: m => ({ token: '反震伤害' }) },
+  { srcLine: 11831, kind: 'token',  re: /^ {0,4}↳ (.+?) 的【(.+?)】妨害随攻击一同落空，未能施加到 (.+?)。$/, build: m => ({ token: `附带【${m[2]}】落空`, missedTag: m[2] }) },
   // --- 护盾与屏障 ---
-  { srcLine: 9589,  kind: 'token',  re: /^ {0,4}↳ 为 (.+?) 附加了一层能吸收 \d+ 点伤害的护盾。$/, build: m => ({ token: '附加护盾' }) },
-  { srcLine: 9609,  kind: 'token',  re: /^ {0,4}↳ (.+?) 展开【(.+?)】，为全队架起一层可吸收 \d+ 点伤害的共享屏障（(\d+)\/(\d+)）(.*)$/, build: m => { const km = /克制\s*(近战|远程|法术)/.exec(m[5] || ''); return { token: '架起共享屏障' + (km ? '(克制' + km[1] + ')' : ''), barrier: { name: m[2], cur: parseInt(m[3], 10), max: parseInt(m[4], 10), desc: m[5] } }; } },
-  { srcLine: 11676, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】替全队挡下了 \d+ 点伤害（剩余 (\d+)）。$/, build: m => ({ token: '屏障挡下', barrierLeft: { name: m[1], cur: parseInt(m[2], 10) } }) },
-  { srcLine: 11941, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】替全队挡下了 \d+ 点伤害（剩余 (\d+)）(.*)$/, build: m => ({ token: '屏障挡下', barrierLeft: { name: m[1], cur: parseInt(m[2], 10) } }) },
-  { srcLine: 11691, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】以护甲\/克制完全格挡了本次攻击（剩余 (\d+)）。$/, build: m => ({ token: '屏障完全格挡', barrierLeft: { name: m[1], cur: parseInt(m[2], 10) } }) },
-  { srcLine: 11978, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】以(?:护甲|克制)完全格挡了本次攻击（\d+→0\)(.*)$/, build: m => ({ token: '屏障完全格挡' }) },
-  { srcLine: 11989, kind: 'event',  re: /^ {0,4}💥 【(.+?)】轰然破碎！$/, build: m => ({ text: `💥 【${m[1]}】轰然破碎`, barrierBreak: m[1] }) },
-  { srcLine: 11339, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的负面效果被【(.+?)】圣域所格挡，无法触及我方角色。$/, build: m => ({ token: `负面被【${m[2]}】格挡` }) },
-  { srcLine: 11098, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的【.+?】抗性使伤害减少了 \d+ 点。$/, build: m => ({ token: '抗性减免' }) },
-  { srcLine: 11704, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的【免伤】生效，本次攻击的防御额外提高 \d+ 点。$/, build: m => ({ token: '免伤生效' }) },
+  { srcLine: 9625,  kind: 'token',  re: /^ {0,4}↳ 为 (.+?) 附加了一层能吸收 \d+ 点伤害的护盾。$/, build: m => ({ token: '附加护盾' }) },
+  { srcLine: 9645,  kind: 'token',  re: /^ {0,4}↳ (.+?) 展开【(.+?)】，为全队架起一层可吸收 \d+ 点伤害的共享屏障（(\d+)\/(\d+)）(.*)$/, build: m => { const km = /克制\s*(近战|远程|法术)/.exec(m[5] || ''); return { token: '架起共享屏障' + (km ? '(克制' + km[1] + ')' : ''), barrier: { name: m[2], cur: parseInt(m[3], 10), max: parseInt(m[4], 10), desc: m[5] } }; } },
+  { srcLine: 11712, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】替全队挡下了 \d+ 点伤害（剩余 (\d+)）。$/, build: m => ({ token: '屏障挡下', barrierLeft: { name: m[1], cur: parseInt(m[2], 10) } }) },
+  { srcLine: 11977, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】替全队挡下了 \d+ 点伤害（剩余 (\d+)）(.*)$/, build: m => ({ token: '屏障挡下', barrierLeft: { name: m[1], cur: parseInt(m[2], 10) } }) },
+  { srcLine: 11727, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】以护甲\/克制完全格挡了本次攻击（剩余 (\d+)）。$/, build: m => ({ token: '屏障完全格挡', barrierLeft: { name: m[1], cur: parseInt(m[2], 10) } }) },
+  { srcLine: 12014, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】以(?:护甲|克制)完全格挡了本次攻击（\d+→0\)(.*)$/, build: m => ({ token: '屏障完全格挡' }) },
+  { srcLine: 12025, kind: 'event',  re: /^ {0,4}💥 【(.+?)】轰然破碎！$/, build: m => ({ text: `💥 【${m[1]}】轰然破碎`, barrierBreak: m[1] }) },
+  { srcLine: 11375, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的负面效果被【(.+?)】圣域所格挡，无法触及我方角色。$/, build: m => ({ token: `负面被【${m[2]}】格挡` }) },
+  { srcLine: 11134, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的【.+?】抗性使伤害减少了 \d+ 点。$/, build: m => ({ token: '抗性减免' }) },
+  { srcLine: 11740, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的【免伤】生效，本次攻击的防御额外提高 \d+ 点。$/, build: m => ({ token: '免伤生效' }) },
   // --- 状态施加 ---
-  { srcLine: 9493,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) \d+% 的命中率 持续\d+回合。$/, build: m => ({ token: `${m[1]}命中提升`, buffTarget: m[1], buffKey: 'hit' }) },
-  { srcLine: 9501,  kind: 'token',  re: /^ {0,4}↳ 干扰了 (.+?) 的视线，命中率下降 \d+% 持续\d+回合。$/, build: m => ({ token: `${m[1]}视线受扰`, buffTarget: m[1], buffKey: 'blind' }) },
-  { srcLine: 9510,  kind: 'token',  re: /^ {0,4}↳ 削弱了 (.+?) 的防御力。$/, build: m => ({ token: `${m[1]}防御削弱`, buffTarget: m[1], buffKey: 'defDown' }) },
-  { srcLine: 9518,  kind: 'token',  re: /^ {0,4}↳ 迟滞了 (.+?) 的身形，闪避率下降 \d+ 点 持续\d+回合。$/, build: m => ({ token: `${m[1]}身形迟滞`, buffTarget: m[1], buffKey: 'evaDown' }) },
-  { srcLine: 9526,  kind: 'token',  re: /^ {0,4}↳ 削弱了 (.+?) 的攻击力。$/, build: m => ({ token: `${m[1]}攻击力削弱`, buffTarget: m[1], buffKey: 'atkDown' }) },
-  { srcLine: 9671,  kind: 'token',  re: /^ {0,4}↳ 强化了 (.+?) 的攻击力。$/, build: m => ({ token: `${m[1]}攻击力强化`, buffTarget: m[1], buffKey: 'atkUp' }) },
-  { srcLine: 9582,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) 的防御力。$/, build: m => ({ token: `${m[1]}防御提升`, buffTarget: m[1], buffKey: 'defUp' }) },
-  { srcLine: 9619,  kind: 'drop',   re: /提升了 .+? 的身法，下一次受击时回避几率增加/ },
-  { srcLine: 9626,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) 的身法，回避几率增加 \d+，持续 \d+ 回合。$/, build: m => ({ token: `${m[1]}身法提升`, buffTarget: m[1], buffKey: 'evaUp' }) },
-  { srcLine: 9633,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) 的身法，回避几率增加 \d+，持续 \d+ 回合。$/, build: m => ({ token: `${m[1]}身法提升`, buffTarget: m[1], buffKey: 'evaUp' }) },
-  { srcLine: 9641,  kind: 'drop',   re: /摆出了反击架势/ },
-  { srcLine: 9574,  kind: 'drop',   re: /获得【免伤】，下一次受击时防御增加/ },
-  { srcLine: 9694,  kind: 'token',  re: /^ {0,4}↳ (.+?) 净化了 \d+ 个负面状态！$/, build: m => ({ token: `${m[1]}净化负面` }) },
-  { srcLine: 9694,  kind: 'token',  re: /^ {0,4}↳ (.+?) 身上没有负面状态可驱散。$/, build: m => ({ token: '无负面可驱散' }) },
-  { srcLine: 9764,  kind: 'token',  re: /^ {0,4}↳ ⚡ (.+?) 获得疾风加持，行动顺序提前（速度\+\d+ 持续\d+回合）。$/, build: m => ({ token: `${m[1]}行动加速` }) },
-  { srcLine: 9776,  kind: 'token',  re: /^ {0,4}↳ 🐌 (.+?) 受到迟滞，行动顺序延后（速度-\d+ 持续\d+回合）。$/, build: m => ({ token: `${m[1]}行动迟滞` }) },
+  { srcLine: 9529,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) \d+% 的命中率 持续\d+回合。$/, build: m => ({ token: `${m[1]}命中提升`, buffTarget: m[1], buffKey: 'hit' }) },
+  { srcLine: 9537,  kind: 'token',  re: /^ {0,4}↳ 干扰了 (.+?) 的视线，命中率下降 \d+% 持续\d+回合。$/, build: m => ({ token: `${m[1]}视线受扰`, buffTarget: m[1], buffKey: 'blind' }) },
+  { srcLine: 9546,  kind: 'token',  re: /^ {0,4}↳ 削弱了 (.+?) 的防御力。$/, build: m => ({ token: `${m[1]}防御削弱`, buffTarget: m[1], buffKey: 'defDown' }) },
+  { srcLine: 9554,  kind: 'token',  re: /^ {0,4}↳ 迟滞了 (.+?) 的身形，闪避率下降 \d+ 点 持续\d+回合。$/, build: m => ({ token: `${m[1]}身形迟滞`, buffTarget: m[1], buffKey: 'evaDown' }) },
+  { srcLine: 9562,  kind: 'token',  re: /^ {0,4}↳ 削弱了 (.+?) 的攻击力。$/, build: m => ({ token: `${m[1]}攻击力削弱`, buffTarget: m[1], buffKey: 'atkDown' }) },
+  { srcLine: 9707,  kind: 'token',  re: /^ {0,4}↳ 强化了 (.+?) 的攻击力。$/, build: m => ({ token: `${m[1]}攻击力强化`, buffTarget: m[1], buffKey: 'atkUp' }) },
+  { srcLine: 9618,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) 的防御力。$/, build: m => ({ token: `${m[1]}防御提升`, buffTarget: m[1], buffKey: 'defUp' }) },
+  { srcLine: 9655,  kind: 'drop',   re: /提升了 .+? 的身法，下一次受击时回避几率增加/ },
+  { srcLine: 9662,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) 的身法，回避几率增加 \d+，持续 \d+ 回合。$/, build: m => ({ token: `${m[1]}身法提升`, buffTarget: m[1], buffKey: 'evaUp' }) },
+  { srcLine: 9669,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) 的身法，回避几率增加 \d+，持续 \d+ 回合。$/, build: m => ({ token: `${m[1]}身法提升`, buffTarget: m[1], buffKey: 'evaUp' }) },
+  { srcLine: 9677,  kind: 'drop',   re: /摆出了反击架势/ },
+  { srcLine: 9610,  kind: 'drop',   re: /获得【免伤】，下一次受击时防御增加/ },
+  { srcLine: 9730,  kind: 'token',  re: /^ {0,4}↳ (.+?) 净化了 \d+ 个负面状态！$/, build: m => ({ token: `${m[1]}净化负面` }) },
+  { srcLine: 9730,  kind: 'token',  re: /^ {0,4}↳ (.+?) 身上没有负面状态可驱散。$/, build: m => ({ token: '无负面可驱散' }) },
+  { srcLine: 9800,  kind: 'token',  re: /^ {0,4}↳ ⚡ (.+?) 获得疾风加持，行动顺序提前（速度\+\d+ 持续\d+回合）。$/, build: m => ({ token: `${m[1]}行动加速` }) },
+  { srcLine: 9812,  kind: 'token',  re: /^ {0,4}↳ 🐌 (.+?) 受到迟滞，行动顺序延后（速度-\d+ 持续\d+回合）。$/, build: m => ({ token: `${m[1]}行动迟滞` }) },
   // --- 中毒/灼烧 ---
-  { srcLine: 9535,  kind: 'token',  re: /具备毒素抗性\/耐受体质，免疫了剧毒侵蚀！/, build: m => ({ token: '免疫剧毒' }) },
-  { srcLine: 9543,  kind: 'token',  re: /^ {0,4}↳ (.+?) 中了剧毒，每回合将承受 \d+ 点真实伤害 持续\d+回合！$/, build: m => ({ token: `${m[1]}中剧毒`, dotTarget: m[1] }) },
-  { srcLine: 10133,  kind: 'token',  re: /^ {0,4}↳ (.+?) 被施加了剧毒！$/, build: m => ({ token: `${m[1]}中剧毒`, dotTarget: m[1] }) },
-  { srcLine: 9551,  kind: 'token',  re: /耐火防护\/抗热体质阻绝了烈焰，免疫了灼烧！/, build: m => ({ token: '免疫灼烧' }) },
-  { srcLine: 9561,  kind: 'token',  re: /^ {0,4}↳ (.+?) 的灼烧加深，每回合真实伤害提升至 \d+ 点 持续\d+回合（燃烧期间治疗减半）！$/, build: m => ({ token: `${m[1]}灼烧加深`, dotTarget: m[1] }) },
-  { srcLine: 9565,  kind: 'token',  re: /^ {0,4}↳ (.+?) 被烈焰缠身，每回合将承受 \d+ 点真实伤害 持续\d+回合（燃烧期间治疗减半）！$/, build: m => ({ token: `${m[1]}中灼烧`, dotTarget: m[1] }) },
-  { srcLine: 12618, kind: 'event',  re: /^ {0,4}(🔥|🦠) \[(.+?)\] (?:灼烧|毒性)发作，受到了 \d+ 点真实伤害！$/, build: m => ({ text: `${m[1]} ${m[2]} ${m[1] === '🔥' ? '灼烧发作' : '毒性发作'}`, dotTick: m[2] }) },
+  { srcLine: 9571,  kind: 'token',  re: /具备毒素抗性\/耐受体质，免疫了剧毒侵蚀！/, build: m => ({ token: '免疫剧毒' }) },
+  { srcLine: 9579,  kind: 'token',  re: /^ {0,4}↳ (.+?) 中了剧毒，每回合将承受 \d+ 点真实伤害 持续\d+回合！$/, build: m => ({ token: `${m[1]}中剧毒`, dotTarget: m[1] }) },
+  { srcLine: 10169,  kind: 'token',  re: /^ {0,4}↳ (.+?) 被施加了剧毒！$/, build: m => ({ token: `${m[1]}中剧毒`, dotTarget: m[1] }) },
+  { srcLine: 9587,  kind: 'token',  re: /耐火防护\/抗热体质阻绝了烈焰，免疫了灼烧！/, build: m => ({ token: '免疫灼烧' }) },
+  { srcLine: 9597,  kind: 'token',  re: /^ {0,4}↳ (.+?) 的灼烧加深，每回合真实伤害提升至 \d+ 点 持续\d+回合（燃烧期间治疗减半）！$/, build: m => ({ token: `${m[1]}灼烧加深`, dotTarget: m[1] }) },
+  { srcLine: 9601,  kind: 'token',  re: /^ {0,4}↳ (.+?) 被烈焰缠身，每回合将承受 \d+ 点真实伤害 持续\d+回合（燃烧期间治疗减半）！$/, build: m => ({ token: `${m[1]}中灼烧`, dotTarget: m[1] }) },
+  { srcLine: 12654, kind: 'event',  re: /^ {0,4}(🔥|🦠) \[(.+?)\] (?:灼烧|毒性)发作，受到了 \d+ 点真实伤害！$/, build: m => ({ text: `${m[1]} ${m[2]} ${m[1] === '🔥' ? '灼烧发作' : '毒性发作'}`, dotTick: m[2] }) },
   // --- 眩晕 ---
-  { srcLine: 11767, kind: 'token',  re: /硬抗了冲击，免疫了眩晕！/, build: m => ({ token: '免疫眩晕' }) },
-  { srcLine: 11772, kind: 'token',  re: /^ {0,4}↳ (.+?) 被重重击晕，将跳过下一次行动！$/, build: m => ({ token: `${m[1]}被击晕` }) },
-  { srcLine: 12669, kind: 'event',  re: /^ {0,4}🌀 \[(.+?)\] 因眩晕无法行动！$/, build: m => ({ text: `${m[1]} 因眩晕无法行动` }) },
-  { srcLine: 10063,  kind: 'token',  re: /^ {0,4}↳ (.+?) 被隐匿者的奇袭命中弱点，眩晕了！.*$/, build: m => ({ token: `${m[1]}被奇袭眩晕` }) },
+  { srcLine: 11803, kind: 'token',  re: /硬抗了冲击，免疫了眩晕！/, build: m => ({ token: '免疫眩晕' }) },
+  { srcLine: 11808, kind: 'token',  re: /^ {0,4}↳ (.+?) 被重重击晕，将跳过下一次行动！$/, build: m => ({ token: `${m[1]}被击晕` }) },
+  { srcLine: 12705, kind: 'event',  re: /^ {0,4}🌀 \[(.+?)\] 因眩晕无法行动！$/, build: m => ({ text: `${m[1]} 因眩晕无法行动` }) },
+  { srcLine: 10099,  kind: 'token',  re: /^ {0,4}↳ (.+?) 被隐匿者的奇袭命中弱点，眩晕了！.*$/, build: m => ({ token: `${m[1]}被奇袭眩晕` }) },
   // --- 资源 ---
-  { srcLine: 9742,  kind: 'token',  re: /^ {0,4}↳ 治愈了 (.+?)，恢复 \d+ 点生命。.*$/, build: m => ({ token: `治愈${m[1]}` }) },
-  { srcLine: 10248,  kind: 'token',  re: /凭借【持续调息\/自愈本能】平复伤势/, build: m => ({ token: '自愈调息' }) },
-  { srcLine: 10300,  kind: 'token',  re: /触发【嗜血\/生机掠夺】，从凶狠的命中中汲取战意与生机/, build: m => ({ token: '嗜血回生' }) },
-  { srcLine: 9702,  kind: 'token',  re: /^ {0,4}↳ 为 (.+?) 恢复了 \d+ 点法力值。$/, build: m => ({ token: `${m[1]}法力恢复` }) },
-  { srcLine: 9712,  kind: 'token',  re: /^ {0,4}↳ (.+?) 已无法力可供抽取。$/, build: m => ({ token: `${m[1]}无法力可抽` }) },
-  { srcLine: 9722,  kind: 'token',  re: /^ {0,4}↳ 🔵 (.+?) 从 (.+?) 身上抽取了 \d+ 点法力值。$/, build: m => ({ token: `${m[2]}法力被抽取` }) },
-  { srcLine: 9729,  kind: 'drop',   re: /恢复了 \d+ 点潜能\(TP\)。/ },
-  { srcLine: 10086,  kind: 'drop',   re: /的法力产生回响，获得 \d+ 点永久加速与 \d+ 点潜能！/ },
-  { srcLine: 13225, kind: 'event',  re: /^ {0,4}↳ 🔋 (.+?) 魔力匮乏，消耗本次行动恢复 \d+ 点法力。$/, build: m => ({ text: `🔋 ${m[1]} 法力枯竭·原地回气` }) },
-  { srcLine: 12394, kind: 'drop',   re: /获得 \d+ 点永久加速库存！/ },
+  { srcLine: 9778,  kind: 'token',  re: /^ {0,4}↳ 治愈了 (.+?)，恢复 \d+ 点生命。.*$/, build: m => ({ token: `治愈${m[1]}` }) },
+  { srcLine: 10284,  kind: 'token',  re: /凭借【持续调息\/自愈本能】平复伤势/, build: m => ({ token: '自愈调息' }) },
+  { srcLine: 10336,  kind: 'token',  re: /触发【嗜血\/生机掠夺】，从凶狠的命中中汲取战意与生机/, build: m => ({ token: '嗜血回生' }) },
+  { srcLine: 9738,  kind: 'token',  re: /^ {0,4}↳ 为 (.+?) 恢复了 \d+ 点法力值。$/, build: m => ({ token: `${m[1]}法力恢复` }) },
+  { srcLine: 9748,  kind: 'token',  re: /^ {0,4}↳ (.+?) 已无法力可供抽取。$/, build: m => ({ token: `${m[1]}无法力可抽` }) },
+  { srcLine: 9758,  kind: 'token',  re: /^ {0,4}↳ 🔵 (.+?) 从 (.+?) 身上抽取了 \d+ 点法力值。$/, build: m => ({ token: `${m[2]}法力被抽取` }) },
+  { srcLine: 9765,  kind: 'drop',   re: /恢复了 \d+ 点潜能\(TP\)。/ },
+  { srcLine: 10122,  kind: 'drop',   re: /的法力产生回响，获得 \d+ 点永久加速与 \d+ 点潜能！/ },
+  { srcLine: 13261, kind: 'event',  re: /^ {0,4}↳ 🔋 (.+?) 魔力匮乏，消耗本次行动恢复 \d+ 点法力。$/, build: m => ({ text: `🔋 ${m[1]} 法力枯竭·原地回气` }) },
+  { srcLine: 12430, kind: 'drop',   re: /获得 \d+ 点永久加速库存！/ },
   // --- 绑定消耗（V10.6 类别化文案；仅归零保留，措辞按类别三分） ---
-  { srcLine: 12160, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
-  { srcLine: 11018, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
-  { srcLine: 11265, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
-  { srcLine: 13325, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
-  { srcLine: 13333, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
+  { srcLine: 12196, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
+  { srcLine: 11054, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
+  { srcLine: 11301, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
+  { srcLine: 13361, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
+  { srcLine: 13369, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
   // --- 仇恨与隐匿 ---
-  { srcLine: 9653,  kind: 'token',  re: /^ {0,4}↳ (.+?) 散发出强烈的气息，吸引敌方火力\(仇恨\+\d+\)，持续\d+回合！$/, build: m => ({ token: '吸引仇恨' }) },
-  { srcLine: 9656,  kind: 'token',  re: /^ {0,4}↳ (.+?) 隐蔽了身形，降低自身存在感\(仇恨-\d+\)，持续\d+回合！$/, build: m => ({ token: '隐蔽身形' }) },
-  { srcLine: 9900,  kind: 'drop',   re: /打出强力反击后气息收敛，仇恨回归/ },
-  { srcLine: 11527, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的防守反击吸引了更多仇恨 \(嘲讽值永久\+\d+\)！$/, build: m => ({ token: '吸引仇恨' }) },
-  { srcLine: 10002,  kind: 'token',  re: /^ {0,4}⚡ (.+?) 隐匿值突破 \d+，触发【再动】！$/, build: m => ({ token: '→连续行动' }) },
-  { srcLine: 10012,  kind: 'token',  re: /^ {0,4}🎯 (.+?) 隐匿值突破 \d+，下一次非反应攻击攻击力 \+\d+[!！]\(隐匿值回归 \d+\)$/, build: m => ({ token: '奇袭蓄势' }) },
-  { srcLine: 12414, kind: 'token',  re: /^ {0,4}🎯 (.+?) 的隐匿急袭已释放，攻击力加成消失。$/, build: m => ({ token: '奇袭加成已释放' }) },
+  { srcLine: 9689,  kind: 'token',  re: /^ {0,4}↳ (.+?) 散发出强烈的气息，吸引敌方火力\(仇恨\+\d+\)，持续\d+回合！$/, build: m => ({ token: '吸引仇恨' }) },
+  { srcLine: 9692,  kind: 'token',  re: /^ {0,4}↳ (.+?) 隐蔽了身形，降低自身存在感\(仇恨-\d+\)，持续\d+回合！$/, build: m => ({ token: '隐蔽身形' }) },
+  { srcLine: 9936,  kind: 'drop',   re: /打出强力反击后气息收敛，仇恨回归/ },
+  { srcLine: 11563, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的防守反击吸引了更多仇恨 \(嘲讽值永久\+\d+\)！$/, build: m => ({ token: '吸引仇恨' }) },
+  { srcLine: 10038,  kind: 'token',  re: /^ {0,4}⚡ (.+?) 隐匿值突破 \d+，触发【再动】！$/, build: m => ({ token: '→连续行动' }) },
+  { srcLine: 10048,  kind: 'token',  re: /^ {0,4}🎯 (.+?) 隐匿值突破 \d+，下一次非反应攻击攻击力 \+\d+[!！]\(隐匿值回归 \d+\)$/, build: m => ({ token: '奇袭蓄势' }) },
+  { srcLine: 12450, kind: 'token',  re: /^ {0,4}🎯 (.+?) 的隐匿急袭已释放，攻击力加成消失。$/, build: m => ({ token: '奇袭加成已释放' }) },
   // --- 生死与终局 ---
-  { srcLine: 9239,  kind: 'terminal', re: /^\[战况\] ⚠️ (.+?) 重伤倒下了！$/, build: m => ({ text: `⚠ ${m[1]} 重伤倒下了！`, death: m[1] }) },
-  { srcLine: 9247,  kind: 'terminal', re: /^\[战况\] 🌟 (.+?) 重新站了起来！$/, build: m => ({ text: `🌟 ${m[1]} 重新站了起来！`, revive: m[1] }) },
-  { srcLine: 9231,  kind: 'terminal', re: /^\[战况\] 💨 召唤物 (.+?) 消散了。$/, build: m => ({ text: `💨 召唤物 ${m[1]} 消散了。` }) },
-  { srcLine: 9439,  kind: 'terminal', re: /^\[战况\] 💨 召唤物 (.+?) 消散了。$/, build: m => ({ text: `💨 召唤物 ${m[1]} 消散了。` }) },
-  { srcLine: 9461,  kind: 'terminal', re: /^\[战况\] 💀 (.+?) 被击溃了！$/, build: m => ({ text: `💀 ${m[1]} 被击溃了！`, kill: m[1] }) },
-  { srcLine: 12657, kind: 'terminal', re: /^ {0,4}💀 \[(.+?)\] 重伤不治，倒下了！$/, build: m => ({ text: `💀 ${m[1]} 重伤不治倒下`, kill: m[1] }) },
-  { srcLine: 9862,  kind: 'token',  re: /触发被动【毅力】，强制保留了 1 点生命值避免死亡！/, build: m => ({ token: '毅力留存' }) },
-  { srcLine: 9932,  kind: 'token',  re: /触发被动【毅力】，强制保留了 1 点生命值避免死亡！/, build: m => ({ token: '毅力留存' }) },
-  { srcLine: 9968,  kind: 'token',  re: /触发被动【回避】，在致命伤害临身的一瞬闪避/, build: m => ({ token: '死里逃生' }) },
-  { srcLine: 10041,  kind: 'token',  re: /触发被动【回避】，在致命伤害临身的一瞬闪避/, build: m => ({ token: '死里逃生' }) },
-  { srcLine: 9268,  kind: 'event',  re: /^ {0,4}↳ 💀 \[(.+?)\] 遭受致命一击倒地……却强行撑住一口气猛地站起（死里逃生）！.*$/, build: m => ({ text: `💀 ${m[1]} 死里逃生重返战场`, revive: m[1] }) },
-  { srcLine: 9321,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 濒死之际体内残存力量狂暴失控——绝命反扑前兆！$/, build: m => ({ text: `⚠ ${m[1]} 绝命反扑前兆！` }) },
-  { srcLine: 9329,  kind: 'token',  re: /的绝命反扑（.+?）被看破破局，完全无效化！/, build: m => ({ token: '绝命反扑被看破' }) },
-  { srcLine: 9348,  kind: 'event',  re: /^ {0,4}🔥 \[(.+?)\] 倒地之际狂暴烈焰\/易燃物质爆燃，灼热火浪席卷全场！.*$/, build: m => ({ text: `🔥 ${m[1]} 倒地爆燃，灼热火浪席卷全场` }) },
-  { srcLine: 9350,  kind: 'event',  re: /^ {0,4}🧪 \[(.+?)\] 倒地之际毒素囊袋\/毒物爆裂，致命毒瘴弥漫全场！.*$/, build: m => ({ text: `🧪 ${m[1]} 倒地毒爆，致命毒瘴弥漫全场` }) },
-  { srcLine: 9352,  kind: 'event',  re: /^ {0,4}🗡️ \[(.+?)\] 临死触发残余锐芒\/绝命暗器，破甲狂澜贯穿全场！.*$/, build: m => ({ text: `🗡️ ${m[1]} 临死反扑，破甲贯穿全场` }) },
-  { srcLine: 9354,  kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 濒死引爆了潜藏能量\/发动绝命反扑，剧烈冲击波波及全体！.*$/, build: m => ({ text: `💥 ${m[1]} 濒死引爆，冲击波波及全体` }) },
-  { srcLine: 16405, kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 生命跌破极限，触发【绝境爆发】（二阶段觉醒）！.*$/, build: m => ({ text: `💥 ${m[1]} 绝境爆发（二阶段觉醒），进入狂怒强化` }) },
-  { srcLine: 16416, kind: 'token',  re: /^ {0,4}↳ 🩸 \[(.+?)\] 伤势沉重陷入【濒死狂怒】，凶暴之气大涨（攻击力提升 50%）！$/, build: m => ({ token: `${m[1]}濒死狂怒` }) },
-  { srcLine: 16430, kind: 'token',  re: /^ {0,4}↡ ⚡ \[(.+?)\] 濒死求生本能激发（绝境抢攻），不顾伤势立刻抢先反扑！$/, build: m => ({ token: `${m[1]}绝境抢攻` }) },
+  { srcLine: 9275,  kind: 'terminal', re: /^\[战况\] ⚠️ (.+?) 重伤倒下了！$/, build: m => ({ text: `⚠ ${m[1]} 重伤倒下了！`, death: m[1] }) },
+  { srcLine: 9283,  kind: 'terminal', re: /^\[战况\] 🌟 (.+?) 重新站了起来！$/, build: m => ({ text: `🌟 ${m[1]} 重新站了起来！`, revive: m[1] }) },
+  { srcLine: 9267,  kind: 'terminal', re: /^\[战况\] 💨 召唤物 (.+?) 消散了。$/, build: m => ({ text: `💨 召唤物 ${m[1]} 消散了。` }) },
+  { srcLine: 9475,  kind: 'terminal', re: /^\[战况\] 💨 召唤物 (.+?) 消散了。$/, build: m => ({ text: `💨 召唤物 ${m[1]} 消散了。` }) },
+  { srcLine: 9497,  kind: 'terminal', re: /^\[战况\] 💀 (.+?) 被击溃了！$/, build: m => ({ text: `💀 ${m[1]} 被击溃了！`, kill: m[1] }) },
+  { srcLine: 12693, kind: 'terminal', re: /^ {0,4}💀 \[(.+?)\] 重伤不治，倒下了！$/, build: m => ({ text: `💀 ${m[1]} 重伤不治倒下`, kill: m[1] }) },
+  { srcLine: 9898,  kind: 'token',  re: /触发被动【毅力】，强制保留了 1 点生命值避免死亡！/, build: m => ({ token: '毅力留存' }) },
+  { srcLine: 9968,  kind: 'token',  re: /触发被动【毅力】，强制保留了 1 点生命值避免死亡！/, build: m => ({ token: '毅力留存' }) },
+  { srcLine: 10004,  kind: 'token',  re: /触发被动【回避】，在致命伤害临身的一瞬闪避/, build: m => ({ token: '死里逃生' }) },
+  { srcLine: 10077,  kind: 'token',  re: /触发被动【回避】，在致命伤害临身的一瞬闪避/, build: m => ({ token: '死里逃生' }) },
+  { srcLine: 9304,  kind: 'event',  re: /^ {0,4}↳ 💀 \[(.+?)\] 遭受致命一击倒地……却强行撑住一口气猛地站起（死里逃生）！.*$/, build: m => ({ text: `💀 ${m[1]} 死里逃生重返战场`, revive: m[1] }) },
+  { srcLine: 9357,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 濒死之际体内残存力量狂暴失控——绝命反扑前兆！$/, build: m => ({ text: `⚠ ${m[1]} 绝命反扑前兆！` }) },
+  { srcLine: 9365,  kind: 'token',  re: /的绝命反扑（.+?）被看破破局，完全无效化！/, build: m => ({ token: '绝命反扑被看破' }) },
+  { srcLine: 9384,  kind: 'event',  re: /^ {0,4}🔥 \[(.+?)\] 倒地之际狂暴烈焰\/易燃物质爆燃，灼热火浪席卷全场！.*$/, build: m => ({ text: `🔥 ${m[1]} 倒地爆燃，灼热火浪席卷全场` }) },
+  { srcLine: 9386,  kind: 'event',  re: /^ {0,4}🧪 \[(.+?)\] 倒地之际毒素囊袋\/毒物爆裂，致命毒瘴弥漫全场！.*$/, build: m => ({ text: `🧪 ${m[1]} 倒地毒爆，致命毒瘴弥漫全场` }) },
+  { srcLine: 9388,  kind: 'event',  re: /^ {0,4}🗡️ \[(.+?)\] 临死触发残余锐芒\/绝命暗器，破甲狂澜贯穿全场！.*$/, build: m => ({ text: `🗡️ ${m[1]} 临死反扑，破甲贯穿全场` }) },
+  { srcLine: 9390,  kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 濒死引爆了潜藏能量\/发动绝命反扑，剧烈冲击波波及全体！.*$/, build: m => ({ text: `💥 ${m[1]} 濒死引爆，冲击波波及全体` }) },
+  { srcLine: 16441, kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 生命跌破极限，触发【绝境爆发】（二阶段觉醒）！.*$/, build: m => ({ text: `💥 ${m[1]} 绝境爆发（二阶段觉醒），进入狂怒强化` }) },
+  { srcLine: 16452, kind: 'token',  re: /^ {0,4}↳ 🩸 \[(.+?)\] 伤势沉重陷入【濒死狂怒】，凶暴之气大涨（攻击力提升 50%）！$/, build: m => ({ token: `${m[1]}濒死狂怒` }) },
+  { srcLine: 16466, kind: 'token',  re: /^ {0,4}↡ ⚡ \[(.+?)\] 濒死求生本能激发（绝境抢攻），不顾伤势立刻抢先反扑！$/, build: m => ({ token: `${m[1]}绝境抢攻` }) },
   // --- 敌方战术 ---
-  { srcLine: 12219, kind: 'token',  re: /^ {0,4}↳ 前排掩护：近战群攻仅命中前排$/, build: m => ({ token: '前排掩护' }) },
-  { srcLine: 11369, kind: 'token',  re: /^ {0,4}↳ 后排掩护：.+? 远程\/法术命中 -\d+.*$/, build: m => ({ token: '后排掩护' }) },
+  { srcLine: 12255, kind: 'token',  re: /^ {0,4}↳ 前排掩护：近战群攻仅命中前排$/, build: m => ({ token: '前排掩护' }) },
+  { srcLine: 11405, kind: 'token',  re: /^ {0,4}↳ 后排掩护：.+? 远程\/法术命中 -\d+.*$/, build: m => ({ token: '后排掩护' }) },
   // --- 召唤 ---
-  { srcLine: 8310,  kind: 'event',  re: /^ {0,4}✨ \[(.+?)\] 召唤「(.+?)」—— 已即时参战！$/, build: m => ({ text: `✨ ${m[1]} 召唤「${m[2]}」即时参战` }) },
-  { srcLine: 8223,  kind: 'drop',   re: /召唤失败：敌方已达上限/ },
-  { srcLine: 8232,  kind: 'drop',   re: /召唤失败：.+?召唤物已达上限/ },
-  { srcLine: 8239,  kind: 'drop',   re: /召唤失败：未指定召唤对象/ },
-  { srcLine: 8249,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 召唤「(.+?)」失败：未找到图鉴词条$/, build: m => ({ text: `⚠ ${m[1]} 召唤「${m[2]}」失败` }) },
-  { srcLine: 8257,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 召唤「(.+?)」失败：词条无 <Combat_block>$/, build: m => ({ text: `⚠ ${m[1]} 召唤「${m[2]}」失败` }) },
-  { srcLine: 12118, kind: 'drop',   re: /⛔ 召唤【.+?】被看破破局/ },
-  { srcLine: 12137, kind: 'drop',   re: /⛔ 技能【.+?】被看破破局/ },
+  { srcLine: 8327,  kind: 'event',  re: /^ {0,4}✨ \[(.+?)\] 召唤「(.+?)」—— 已即时参战！$/, build: m => ({ text: `✨ ${m[1]} 召唤「${m[2]}」即时参战` }) },
+  { srcLine: 8240,  kind: 'drop',   re: /召唤失败：敌方已达上限/ },
+  { srcLine: 8249,  kind: 'drop',   re: /召唤失败：.+?召唤物已达上限/ },
+  { srcLine: 8256,  kind: 'drop',   re: /召唤失败：未指定召唤对象/ },
+  { srcLine: 8266,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 召唤「(.+?)」失败：未找到图鉴词条$/, build: m => ({ text: `⚠ ${m[1]} 召唤「${m[2]}」失败` }) },
+  { srcLine: 8274,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 召唤「(.+?)」失败：词条无 <Combat_block>$/, build: m => ({ text: `⚠ ${m[1]} 召唤「${m[2]}」失败` }) },
+  { srcLine: 12154, kind: 'drop',   re: /⛔ 召唤【.+?】被看破破局/ },
+  { srcLine: 12173, kind: 'drop',   re: /⛔ 技能【.+?】被看破破局/ },
   // --- 撤离判定（保留结论丢骰值） ---
-  { srcLine: 12741, kind: 'terminal', re: /^\[战况\] 💨 (.+?) 尝试撤离（.*?）——(成功脱离战场|被敌方截住，撤离失败)！$/, build: m => ({ text: `💨 ${m[1]} 尝试撤离——${m[2].startsWith('成功') ? '成功脱离战场' : '被截住，失败'}` }) },
+  { srcLine: 12777, kind: 'terminal', re: /^\[战况\] 💨 (.+?) 尝试撤离（.*?）——(成功脱离战场|被敌方截住，撤离失败)！$/, build: m => ({ text: `💨 ${m[1]} 尝试撤离——${m[2].startsWith('成功') ? '成功脱离战场' : '被截住，失败'}` }) },
 ];
 
 // 绑定消耗子行 → 归零提示 token（措辞按物品类别三分，防止"道具被整个损耗"的误读）
@@ -7520,6 +7520,23 @@ function _markerHeroAttrYaml(sb) {
     return parts.join('');
 }
 
+// 标记建局后的黄标：未命中图鉴的敌名 / 未匹配状态栏的我方名（仅提示，不阻塞开战；
+// 未命中敌人无技能走敌方普攻兜底，可在备战界面等待导演兜底生成（S5 接入后弹兜底确认）
+function renderMarkerMissWarnings() {
+    const old = document.getElementById('marker-miss-warn');
+    if (old) old.remove();
+    if (!markerMissEnemies.length && !markerMissHeroes.length) return;
+    const div = document.createElement('div');
+    div.id = 'marker-miss-warn';
+    div.className = 'text-amber-400/90 text-[10px] sm:text-xs tracking-wide max-w-md text-center leading-relaxed mb-4 px-4';
+    const parts = [];
+    if (markerMissEnemies.length) parts.push('⚠️ 图鉴未命中敌人：' + markerMissEnemies.join('、') + '（暂以默认数值入场，可在备战阶段补全）');
+    if (markerMissHeroes.length) parts.push('⚠️ 状态栏未找到我方：' + markerMissHeroes.join('、') + '（以默认数值入场，请核对名字）');
+    div.innerText = parts.join('\n');
+    const tip = document.getElementById('loading-tip');
+    if (tip && tip.parentNode) tip.parentNode.insertBefore(div, tip.nextSibling);
+}
+
 function parseAttributes(attrStr) {
     let hp = attrStr.match(/\[HP:(\d+)\/(\d+)\]/i); let mp = attrStr.match(/\[MP:(\d+)\/(\d+)\]/i);
     let atk = attrStr.match(/\[Atk:(\d+)\]/i); let armor = attrStr.match(/\[Armor:(\d+)\]/i); let speed = attrStr.match(/\[Speed:(\d+)\]/i);
@@ -8604,6 +8621,24 @@ function startSTPolling() {
             }
 
             if (messageContent) {
+                // 【战斗标记点】优先级低于手写 <Combat_block>：本楼有手写块时走现状路径（零修改）；
+                // 只有整楼无手写块时才尝试标记点建局（正文 AI ~30 token 宣告开战 → 程序组装 → 备战界面）
+                const hasManualBlock = messageContent.lastIndexOf("<Combat_block>") !== -1;
+                if (!hasManualBlock && typeof findBattleMarker === 'function') {
+                    const markerRaw = findBattleMarker(messageContent);
+                    if (markerRaw) {
+                        const marker = parseBattleMarker(markerRaw);
+                        if (marker) {
+                            const markerYaml = assembleBattleFromMarker(marker);
+                            if (markerYaml) {
+                                clearInterval(pollingInterval);
+                                onCombatDataReceived(markerYaml);
+                                return;
+                            }
+                            console.warn('[战斗标记点] 组装失败，继续等待手写块');
+                        }
+                    }
+                }
                 const startTag = "<Combat_block>";
 const endTag = "</Combat_block>";
 const lastStartIdx = messageContent.lastIndexOf(startTag);
@@ -8649,6 +8684,7 @@ function onCombatDataReceived(yamlStr) {
         document.getElementById('loading-title').innerText = "战局已构建";
         document.getElementById('loading-title').classList.add('text-emerald-400');
         document.getElementById('loading-tip').innerText = "环境数据读取完毕";
+        renderMarkerMissWarnings();
         document.getElementById('manual-input-box').classList.add('hidden');
         // 展示载入按钮组：Yaml 载入始终可用；世界书载入仅酒馆助手环境可用（含世界书选择下拉）
         document.getElementById('start-actions').classList.remove('hidden');
