@@ -2472,3 +2472,19 @@
 - **涉及文件**：`index.html`、`integration-test/harness.html`、`integration-test/fix-srclines.cjs`（新增，`990f218`）。README 待实机确认后更新。
 - **经验证**：Node 语法校验通过；IAB 跑脚手架 **175 项断言全部通过**（test1-16 无回归 + test17 新增 15 项）。
 - **决策原因**：用户需求——"战斗开始传入我方出战人员的属性和弹药、道具、消耗，可在初始化页面勾选是否状态栏传入，不勾选则保持现状用 yaml 数据"。方案确认：属性缺键（Atk/Speed/职业）沿用战斗前端现有"攻防速持久化"全局开关语义、状态栏不介入；物品走同名匹配（状态栏只有名称与数量，效果定义与绑定从 YAML/持久化补齐）；勾选框放开始界面（每次开局可选，弃全局设置）。此为"反向直连"第一步，链路中最后一块经 LLM 的数值（开局属性抄写）就此关闭。
+
+---
+
+## [LOG-208] 2026-09-07 — 导演兜底人格：图鉴未命中敌人的 LLM 生成补位（b44c45c）
+
+- **变更行为**（RpgCombat 本体特性；按 `导演兜底人格-技术规格.md` 交接文档在独立会话重做）：
+  1. **设置入口**：【💬 对话】设置弹窗改双 Tab（「💬 对话 | 🎬 导演兜底」，`.llm-tab-bar/.llm-tab-btn/.llm-tab-active` 新样式，仿 `switchPartyTab` 按钮组 + hidden 切换）；兜底 Tab 复制 5 预设槽位机制（`switchDirectorPreset/DEFAULT_DIRECTOR_PRESET/initDirectorPresets`，仿 `switchLLMPreset/defaultPreset/initLLMPresets`），字段独立 apiUrl/apiKey/model/**temperature（对话页没有）**/max_tokens/系统提示词；系统提示词默认值 = 《敌方生成规则精简版》全文以 `JSON.stringify(md)` 内嵌为 `DEFAULT_DIRECTOR_PROMPT` 常量（全文含 139 个反引号，不能模板字符串）+「↺ 恢复默认」按钮；持久化键 `rpg_combat_director_settings` **纯 localStorage**（规格明确：character 变量通道实测不生效，S0 已删）；保存按钮统一收集两 Tab（`saveLLMSettings` 追加 `await saveDirectorSettings()`）。
+  2. **生成链路**：`detectDirectorCandidates`（存活 + 无技能 + `resolveWorldbookEnemy` 三级匹配未命中，规格 4.1 原样）；`callDirectorLLM` 独立请求函数（OpenAI 兼容 `/chat/completions` 非流式，勿复用 `callLLMAPI`——那边温度硬编码 0.85 且系统提示词被战场快照包裹）；输入 = 敌名列表 + `getCurrentMessage()` 剥 `<Combat_block>` 与状态栏标记点后尾部 ~600 字符语境；`parseDirectorOutput` 提取全部 ```yaml 块逐块 `jsyaml.load`（无块时全文试一块）。
+  3. **程序校验**（精简版指南硬规则）：技能标签白名单 45 个 + 变种群标签白名单 17 个 + `[自爆:群伤/群火/群毒/群穿]` 子类型（提取法 `match(/\[([^\[\]]+)\]/g)` 后按 `[;:：（(]` 截头，`[单体(枪击)]`→`单体`）；Aim 落 100~200；技能耗蓝 MP 总和 ≤ 属性栏 MP（复用 `parseAttributes`）；技能数 ≤ 行动次数+1；属性栏裸标签白名单。失败把具体错误（≤10 条）拼进下一轮 user content 重试 **≤2 次**，仍失败回落跳过。
+  4. **替换与写回**：校验通过词条经 `parseEnemyItem` 全量重建（变种标签/免疫/自爆自动正确）、`fresh.id = slot.id` 保槽位并继承名字标签，`assignEnemyRows` + `initialEnemiesCache` 重建 + `initUI` 刷新；写回图鉴优先 `createWorldbookEntries`（纯追加，词条 schema：name/content/enabled/probability/strategy.keys[position/recursion]，keys 含原名与生成名双键）+ `loadWorldbookData` 重载使下次命中；无绑定/非酒馆环境回落聊天变量 `$rpg_dynamic_bestiary` + 手动并入 `worldbookCache`（`_dynamic` 标记）；【📚 世界书管理】弹窗新增「🎬 动态图鉴」区块（预览复用 `showWorldbookEntryDetail`、`deleteDynamicBestiaryEntry` 删除同步缓存与变量）；`loadWorldbookData` 每次重建缓存后 `loadDynamicBestiary` 幂等重放动态词条。
+  5. **触发接线**（规格方案 A）：Yaml 载入按钮 onclick 换 `maybeStartDirectorFallback(() => startGame())`；`startGameFromWorldbook` 在 hitCount 检查后、开战前插 `await runDirectorFallbackIfAny()`；候选存在且端点已配才弹原生 `confirm`，端点未配静默跳过；`maybeStartDirectorFallback` 保证任何异常下 `startFn` 恰好执行一次（**绝不死锁**——敌人回落普攻「猛击」现状）；检测前缓存为空时先 `loadWorldbookData` 防误判。
+  6. **harness test18**（16 项断言）：①生成过校验替换开战（槽位 id/技能/数值、系统提示词=内置全文、user 含敌名+正文片段、temperature 独立、世界书写回 schema/content 可消费、下次同名不再候选）②禁用标签拦截 + 携反馈重试恰 3 次后回落（敌人保持原样、startFn 照常）③动态图鉴回落（聊天变量落库、`_dynamic` 并入、重载幂等、管理弹窗区块显示/删除闭环）④端点未配零请求不弹窗 ⑤预设持久化（localStorage 含 temperature）+ Tab 切换 + 恢复默认。
+  7. **DIGEST_RULES srcLine 重映射**：本轮 HTML/CSS/模块插入使行号整体漂移，test10 失配；顺带发现**基线自带 3 条差一错位**（16305/16316/16330 应为 +1，上一轮 revert 后遗留）——`fix-srclines.cjs` 因假设表值全合法而卡死，写一次性脚本（备份目录 `fix-srclines-once.cjs`：先修 3 条陈旧值再按序映射，口径与 test10 完全一致）重写 119 条 srcLine，复验 118↔118 全等。
+- **涉及文件**：`index.html`、`integration-test/harness.html`、`README.md`（V10.12 + §10.7）、`敌方生成规则精简版.md`（默认提示词源文件，首次入库）（`b44c45c`）。
+- **经验证**：内联 script 块 `new Function` 语法通过；IAB 跑脚手架 **211 项断言全部通过**（test1-17 无回归 + test18 新增 16 项）；UI 冒烟：视觉子代理确认 Tab 栏高亮区分、预设槽位、全表单（端点/Key/模型/temperature/max_tokens/系统提示词 markdown 全文回填 + 恢复默认按钮）无破版，页脚按钮经 DOM 量测确认（IAB 截图管道对滚动画面持续输出旧帧，像素级页脚确认按协定留待真机/排障模式）。
+- **决策原因**：功能曾于上一轮整体回退（b2e4a3b，与战斗标记点 Feature 捆绑），本次按 d1a7935 交接规格在独立会话重做——规格含全部已验证实现细节（Tab/预设/指南内嵌/校验白名单/写回 API/教训），照抄落地；规格明确不做战斗标记点（与状态栏正则/酒馆 markdown 管线不兼容，其教训记录已随回退移除，仅存于规格文档第 6 节），开战宣告维持唯一 `<Combat_block>` 通道。
