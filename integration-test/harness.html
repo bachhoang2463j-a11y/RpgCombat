@@ -1204,6 +1204,64 @@ async function test21() {
   eq((src.match(/```/g) || []).length, 2, '三连反引号仍 == 2（编译产物无围栏污染）');
 }
 
+async function test22() {
+  head('22 LLM 路径性能两件套：聊天上下文深拷贝→浅拷贝 + 调试日志全量 gate');
+  const src = await (await fetch('../index.html')).text();
+  // ① 深拷贝移除（原实现先 JSON round-trip 整段聊天史、之后才截取最近 N 楼——长对话每次调用白付几十 MB）
+  check(!src.includes('JSON.parse(JSON.stringify(ctx.chat))'), '全量深拷贝聊天记录已移除');
+  check(src.includes('allMsgs = ctx.chat.slice();'), '改为数组浅拷贝 ctx.chat.slice()');
+  // ② 日志开关：LLM_DEBUG 常量（localStorage 可翻）+ 12 处 console.log 全路由 llmLog + 两处全量 stringify 惰性化
+  check(/const LLM_DEBUG = \(\(\) => \{ try \{ return localStorage\.getItem\('rpg_llm_debug'\) === '1';/.test(src), 'LLM_DEBUG 开关存在（localStorage 键 rpg_llm_debug，默认关）');
+  eq((src.match(/console\.log\('\[LLM Chat Debug\]/g) || []).length, 0, '[LLM Chat Debug] 的 console.log 全部路由到 llmLog（warn/error 冷路径保留）');
+  check(src.includes("if (LLM_DEBUG) llmLog('[LLM Chat Debug] Final Messages List sent to LLM:"), '全量 stringify 消息列表已 if(LLM_DEBUG) 惰性化');
+  check(src.includes("if (LLM_DEBUG) llmLog('[LLM Chat Debug] Raw JSON response data:'"), '全量 stringify 响应体已 if(LLM_DEBUG) 惰性化');
+  // ③ llmLog 开关功能对拍：关=零输出，开=透传
+  const llmLogSrc = (src.match(/const llmLog = [^\n]+;/) || [])[0];
+  check(!!llmLogSrc, '可提取 llmLog 定义');
+  if (llmLogSrc) {
+    let called = 0;
+    const fakeConsole = { log: () => called++ };
+    new Function('LLM_DEBUG', 'console', llmLogSrc + '\nllmLog("x","y");')(false, fakeConsole);
+    eq(called, 0, 'LLM_DEBUG=false：llmLog 零输出');
+    new Function('LLM_DEBUG', 'console', llmLogSrc + '\nllmLog("x","y");')(true, fakeConsole);
+    eq(called, 1, 'LLM_DEBUG=true：llmLog 透传 console.log');
+  }
+  // ④ 上下文组装段功能仿真（stub 假酒馆 window + 假聊天史）：锁死截断语义 + 浅拷贝零污染不变量
+  const start = src.indexOf('let contextPayload = [];');
+  const errIdx = src.indexOf("console.error('[LLM Chat Debug] Failed to fetch chat context:'");
+  const end = errIdx === -1 ? -1 : src.indexOf('\n  }', errIdx);
+  check(start !== -1 && errIdx !== -1 && end !== -1, '可提取「获取并组装聊天上下文」段');
+  if (start !== -1 && end !== -1) {
+    const section = src.slice(start, end + 4); // 含收尾 if 闭合（"\n  }" 共 4 字符），少切则段不平衡
+    const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor; // 段内备选路径含 await
+    const mkChat = () => [
+      { message_id: 0, mes: '远古楼层', is_user: true },
+      { message_id: 1, mes: '旧楼层B', is_user: false },
+      { message_id: 2, mes: '战斗<Combat_block>x</Combat_block>开幕', is_user: false },
+      { message_id: 3, mes: '最近楼层', is_user: false },
+    ];
+    const mkWin = (chat) => { const w = { SillyTavern: { getContext: () => ({ chat }) } }; w.parent = w; return w; };
+    const run = (chat, llmState_, curId, curMsg) =>
+      new AsyncFunction('llmState', 'window', 'getCurrentMessageId', 'getCurrentMessage', 'llmLog',
+        section + '\nreturn contextPayload;')(llmState_, mkWin(chat), curId, curMsg, () => {});
+    // 场景1：contextLimit=2（用户实际配置）——只取最近 2 楼、原数组逐字段零污染
+    let chat = mkChat();
+    const pristine = JSON.parse(JSON.stringify(chat));
+    let payload = await run(chat, { sendContext: true, contextLimit: 2 }, () => '{{lastMessageId}}', undefined);
+    eq(payload, [{ role: 'assistant', content: '战斗开幕' }, { role: 'assistant', content: '最近楼层' }], 'contextLimit=2：仅最近 2 楼入载荷（Combat_block 剥离）');
+    eq(chat, pristine, '浅拷贝零污染：原聊天数组逐字段未变（无 push 泄漏、无元素回写）');
+    // 场景2：contextLimit=0 自动模式——从最近 Combat_block 前一楼层起
+    chat = mkChat();
+    payload = await run(chat, { sendContext: true, contextLimit: 0 }, () => '{{lastMessageId}}', undefined);
+    eq(payload.length, 3, 'contextLimit=0：从最近战局楼前一层起（3 楼）');
+    // 场景3：未落盘的 generating 楼层追加进副本而非原数组（原「防污染」注释的防护意图由 slice 延续）
+    chat = mkChat();
+    payload = await run(chat, { sendContext: true, contextLimit: 2 }, () => 5, () => ({ message: '生成中楼层', name: 'AI' }));
+    eq(payload[payload.length - 1].content, '生成中楼层', '未落盘当前楼被追加进载荷');
+    eq(chat.length, 4, '追加发生在副本上：原数组长度不变');
+  }
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -1211,7 +1269,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }

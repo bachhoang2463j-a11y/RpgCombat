@@ -2742,9 +2742,9 @@ const DIGEST_RULES = [
   { srcLine: 9367,  kind: 'event',  re: /^ {0,4}🧪 \[(.+?)\] 倒地之际毒素囊袋\/毒物爆裂，致命毒瘴弥漫全场！.*$/, build: m => ({ text: `🧪 ${m[1]} 倒地毒爆，致命毒瘴弥漫全场` }) },
   { srcLine: 9369,  kind: 'event',  re: /^ {0,4}🗡️ \[(.+?)\] 临死触发残余锐芒\/绝命暗器，破甲狂澜贯穿全场！.*$/, build: m => ({ text: `🗡️ ${m[1]} 临死反扑，破甲贯穿全场` }) },
   { srcLine: 9371,  kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 濒死引爆了潜藏能量\/发动绝命反扑，剧烈冲击波波及全体！.*$/, build: m => ({ text: `💥 ${m[1]} 濒死引爆，冲击波波及全体` }) },
-  { srcLine: 16989, kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 生命跌破极限，触发【绝境爆发】（二阶段觉醒）！.*$/, build: m => ({ text: `💥 ${m[1]} 绝境爆发（二阶段觉醒），进入狂怒强化` }) },
-  { srcLine: 17000, kind: 'token',  re: /^ {0,4}↳ 🩸 \[(.+?)\] 伤势沉重陷入【濒死狂怒】，凶暴之气大涨（攻击力提升 50%）！$/, build: m => ({ token: `${m[1]}濒死狂怒` }) },
-  { srcLine: 17014, kind: 'token',  re: /^ {0,4}↡ ⚡ \[(.+?)\] 濒死求生本能激发（绝境抢攻），不顾伤势立刻抢先反扑！$/, build: m => ({ token: `${m[1]}绝境抢攻` }) },
+  { srcLine: 16996, kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 生命跌破极限，触发【绝境爆发】（二阶段觉醒）！.*$/, build: m => ({ text: `💥 ${m[1]} 绝境爆发（二阶段觉醒），进入狂怒强化` }) },
+  { srcLine: 17007, kind: 'token',  re: /^ {0,4}↳ 🩸 \[(.+?)\] 伤势沉重陷入【濒死狂怒】，凶暴之气大涨（攻击力提升 50%）！$/, build: m => ({ token: `${m[1]}濒死狂怒` }) },
+  { srcLine: 17021, kind: 'token',  re: /^ {0,4}↡ ⚡ \[(.+?)\] 濒死求生本能激发（绝境抢攻），不顾伤势立刻抢先反扑！$/, build: m => ({ token: `${m[1]}绝境抢攻` }) },
   // --- 敌方战术 ---
   { srcLine: 12236, kind: 'token',  re: /^ {0,4}↳ 前排掩护：近战群攻仅命中前排$/, build: m => ({ token: '前排掩护' }) },
   { srcLine: 11386, kind: 'token',  re: /^ {0,4}↳ 后排掩护：.+? 远程\/法术命中 -\d+.*$/, build: m => ({ token: '后排掩护' }) },
@@ -15456,6 +15456,13 @@ const llmState = {
   presets: []
 };
 
+/* LLM 调试日志开关（性能优化：原 12 处 [LLM Chat Debug] 日志完全 ungated，其中两处每次调用全量
+   JSON.stringify 消息列表/响应体）。默认关闭；需要排查时控制台执行
+   localStorage.setItem('rpg_llm_debug','1') 后刷新即可，免为翻日志重贴整个组件文件。
+   启动时读取一次存为常量，调用热路径零额外开销。 */
+const LLM_DEBUG = (() => { try { return localStorage.getItem('rpg_llm_debug') === '1'; } catch (e) { return false; } })();
+const llmLog = function () { if (LLM_DEBUG) console.log.apply(console, arguments); };
+
 function initLLMPresets() {
     if (!llmState.presets || !Array.isArray(llmState.presets) || llmState.presets.length < 5) {
         let p = Array(5).fill(null).map(() => JSON.parse(JSON.stringify(defaultPreset)));
@@ -16762,18 +16769,18 @@ async function triggerKanpoNarration(caster, kanpoSkill, enemy, blockedSkill) {
 async function requestLLMResponse(playerText, targetAllies, isAutoSpeak = false) {
   if (llmState.isRequesting) return;
   llmState.isRequesting = true;
-  console.log('[LLM Chat Debug] Starting request. Allies to speak:', targetAllies.map(h => h.name));
+  llmLog('[LLM Chat Debug] Starting request. Allies to speak:', targetAllies.map(h => h.name));
 
   // 显示loading气泡
   const loadingBubble = showThinkingBubble(targetAllies[0]);
 
   try {
     const result = await callLLMAPI(playerText, targetAllies, isAutoSpeak);
-    console.log('[LLM Chat Debug] Raw response received:\n', result);
+    llmLog('[LLM Chat Debug] Raw response received:\n', result);
     if (loadingBubble) loadingBubble.remove();
     if (result) {
       const lines = parseLLMResponse(result);
-      console.log('[LLM Chat Debug] Parsed response lines:', lines);
+      llmLog('[LLM Chat Debug] Parsed response lines:', lines);
       if (lines.length > 0) {
         // 按序显示各角色气泡，间隔500ms；同名实例（如 食尸鬼*2）按调用顺序分配到本次目标集中未用的实例，避免全部归属第一个
         const usedTargetIds = new Set();
@@ -17098,9 +17105,10 @@ async function callLLMAPI(playerText, targetAllies, isAutoSpeak) {
         try {
           const ctx = tavernWin.SillyTavern.getContext();
           if (ctx && Array.isArray(ctx.chat)) {
-            // 我们克隆一份，防止污染原数组
-            allMsgs = JSON.parse(JSON.stringify(ctx.chat));
-            console.log('[LLM Chat Debug] Successfully fetched native SillyTavern chat context. Length:', allMsgs.length);
+            // 浅拷贝数组即可：下游只读元素字段、仅向数组本身 push 新对象（零元素回写，已审计）。
+            // 原深拷贝先把整段聊天史 JSON round-trip 一遍、之后才截取最近 N 楼——长对话下每次调用白付几十 MB 分配
+            allMsgs = ctx.chat.slice();
+            llmLog('[LLM Chat Debug] Successfully fetched native SillyTavern chat context. Length:', allMsgs.length);
           }
         } catch(e) {
           console.warn('[LLM Chat Debug] Failed to parse native chat context', e);
@@ -17132,12 +17140,12 @@ async function callLLMAPI(playerText, targetAllies, isAutoSpeak) {
               is_user: false,
               mes: actualCurMsg.message || actualCurMsg.mes || actualCurMsg.content || actualCurMsg.raw_content || ''
             });
-            console.log('[LLM Chat Debug] Appended generating floor to allMsgs:', currentId);
+            llmLog('[LLM Chat Debug] Appended generating floor to allMsgs:', currentId);
           }
         }
       }
 
-      console.log('[LLM Chat Debug] Final combined allMsgs length:', allMsgs.length);
+      llmLog('[LLM Chat Debug] Final combined allMsgs length:', allMsgs.length);
 
       if (allMsgs.length > 0) {
         let sliceMsgs = [];
@@ -17181,10 +17189,10 @@ async function callLLMAPI(playerText, targetAllies, isAutoSpeak) {
     { role: 'system', content: systemContent }
   ];
   if (contextPayload.length > 0) {
-    console.log('[LLM Chat Debug] Context messages successfully added to payload:', contextPayload.length, contextPayload);
+    llmLog('[LLM Chat Debug] Context messages successfully added to payload:', contextPayload.length, contextPayload);
     messages.push(...contextPayload);
   } else {
-    console.log('[LLM Chat Debug] No context messages added to payload (or option disabled)');
+    llmLog('[LLM Chat Debug] No context messages added to payload (or option disabled)');
   }
   messages.push({ role: 'user', content: userContent });
 
@@ -17203,8 +17211,8 @@ async function callLLMAPI(playerText, targetAllies, isAutoSpeak) {
   // 关闭思考（best-effort：仅部分 OpenAI 兼容代理透传 thinking 字段，未知字段多数代理静默忽略）
   if (llmState.disableThinking) requestPayload.thinking = false;
 
-  console.log('[LLM Chat Debug] Fetching endpoint:', endpoint);
-  console.log('[LLM Chat Debug] Final Messages List sent to LLM:\n', JSON.stringify(messages, null, 2));
+  llmLog('[LLM Chat Debug] Fetching endpoint:', endpoint);
+  if (LLM_DEBUG) llmLog('[LLM Chat Debug] Final Messages List sent to LLM:\n', JSON.stringify(messages, null, 2));
 
   const resp = await fetch(endpoint, {
     method: 'POST',
@@ -17215,7 +17223,7 @@ async function callLLMAPI(playerText, targetAllies, isAutoSpeak) {
     body: JSON.stringify(requestPayload),
   });
 
-  console.log('[LLM Chat Debug] HTTP Response Status:', resp.status, resp.statusText);
+  llmLog('[LLM Chat Debug] HTTP Response Status:', resp.status, resp.statusText);
 
   if (!resp.ok) {
     const errText = await resp.text();
@@ -17223,7 +17231,7 @@ async function callLLMAPI(playerText, targetAllies, isAutoSpeak) {
     throw new Error(`API ${resp.status}: ${errText.slice(0, 200)}`);
   }
   const data = await resp.json();
-  console.log('[LLM Chat Debug] Raw JSON response data:', JSON.stringify(data, null, 2));
+  if (LLM_DEBUG) llmLog('[LLM Chat Debug] Raw JSON response data:', JSON.stringify(data, null, 2));
   const choice = data.choices?.[0] || {};
   const msg = choice.message || {};
   // 兜底解析（对齐参考脚本顺序）：正文优先，再回退 reasoning_content / reasoning / text / data.content 等
