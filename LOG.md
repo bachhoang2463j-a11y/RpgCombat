@@ -2623,3 +2623,16 @@
 - **涉及文件**：`build-regex.cjs`、`regex-前端战斗v11_11.json`（`87254c3`）。
 - **经验证**：构建断言全过（还原一致性/非 &amp; 禁绝/语法/围栏/哨兵）；解码模拟版主脚本语法通过、`&&notify` 5 处完好；源码版 vs 管线模拟产物版 **354 元素×22 属性计算样式指纹零差异**（combined hash 与免疫前一致，免疫层透明）。
 - **决策原因**：连续两起事故（&quot; 带分号 / &not 无分号）证明酒馆实体解码行为面超出预期且会随压缩器的空白/引号归一产生新序列；逐模式加固是打地鼠，全量 & 改写 + 逐字节还原断言是与解码器行为解耦的根治方案（唯一假设：单遍解码，已被两起事故的观测一致支持）。
+
+---
+
+## [LOG-219] 2026-09-08 — 新增全屏 SVG 特效 [特效:造雾术] / [特效:高阶召唤术]
+
+- **变更行为**：应用户需求移植两个 demo 页方案为正式特效标签：
+  1. **[特效:造雾术]**（demo-rlyeh-mist.html 方案2「黑曜沉潮·重水沉积冷雾」）：地表深蓝翻滚沉降厚雾（mist-obsidian-carpet）+ 垂直升腾双冷蒸气柱（mist-vertical-jet）+ fog-shake-std 震屏 + 对侧全体 sprite target-fog-shroud 缠绕虚化；音效用在线 **fog_cloud.ogg**（vol 0.75，经 playCustomAudio 享 Blob 预加载）。
+  2. **[特效:高阶召唤术]**（demo-rlyeh-mist2.html 方案4「旧日幻影·巨神凝视终局」）：暗红末日暗角 + 克苏鲁巨神剪影升起（titan-shadow-loom）+ 猩红巨瞳凝视（titan-baleful-glare，titan-eye-glow 辐射渐变+竖瞳）+ 同心精神海啸波（psychic-tsunami-surge，CSS 直接动画 SVG stroke-width）+ san-shake-dread 震屏 + target-enshrouded-wobble 缠绕；音效按用户指定移植「试听古神低语心智震颤」按钮的 **playEldritchWhisper Web Audio 本地合成**（不和谐三全音 440/622.25/880/1244.5Hz，无 URL）。
+  3. **接线**：注册表新增两标签（url 空=纯 SVG、delay 1.0 伤害结算延迟）；executeSkillAction 仿重击特判（单体/群体通用、全屏只播一次、音效自管）；playAOEEffect particles 链补 rlyeh_sediment/titan_gaze 兜底分支（skipAudio 防双播）；applySingleTagEffect 重击豁免名单扩围（不再叠加单点枪火）。SVG 渐变 id 加 fx- 前缀防与战场既有 SVG 冲突；挂载层 fixed z-180、1.5s 自动回收零残留。
+  4. srcLine 重映射 119 条（新 CSS/JS 插入导致行漂移，HEAD→工作区调用行升序一一映射，与 LOG-217 同口径）。
+- **涉及文件**：`index.html`、`integration-test/harness.html`（test27）。
+- **经验证**：harness test27 新增 23 项（注册表字段 / 10 组 keyframes / iframe 真触发挂载→1.5s 零残留清理 / 古神低语合成音可调用）。**344 项全绿**（含 test10 行号对齐复绿）。真机视觉待用户实测。
+- **决策原因**：两 demo 方案原样移植保持视觉一致；音效遵循用户指定（fog_cloud.ogg / 古神低语合成）；走重击特判模式而非 WebM 通道，因纯 SVG 全屏演出与 url:'' 空视频天然兼容且单体/群体系出同源。

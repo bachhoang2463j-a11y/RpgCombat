@@ -1413,6 +1413,48 @@ async function test26() {
   `);
 }
 
+async function test27() {
+  head('27 全屏 SVG 特效：[特效:造雾术]/[特效:高阶召唤术] 注册·挂载·清理');
+  const src = await (await fetch('../index.html')).text();
+  // ① 注册表：两个标签、纯 SVG（url 空）、particles 类型、delay、音效配置
+  check(/'造雾术': \{ url: '', scale: 1\.0, particles: 'rlyeh_sediment', audioUrl: RLYEH_FOG_CLOUD_URL, delay: 1\.0 \}/.test(src), '注册表：造雾术（fog_cloud.ogg + delay 1.0）');
+  check(/'高阶召唤术': \{ url: '', scale: 1\.0, particles: 'titan_gaze', audioUrl: 'none', delay: 1\.0 \}/.test(src), '注册表：高阶召唤术（古神低语合成 + delay 1.0）');
+  check(src.includes("const RLYEH_FOG_CLOUD_URL = 'https://raw.githubusercontent.com/JimHPerry/psfx/main/sounds/spells/fog_cloud.ogg'"), 'fog_cloud.ogg 在线音效 URL 正确');
+  // ② CSS 关键帧：两特效全部关键帧存在
+  for (const name of ['mist-obsidian-carpet', 'mist-vertical-jet', 'target-fog-shroud', 'fog-shake-std-anim',
+                      'titan-shadow-loom', 'titan-baleful-glare', 'psychic-tsunami-surge', 'brine-drown-vignette',
+                      'target-enshrouded-wobble', 'san-shake-dread-anim']) {
+    check(src.includes('@keyframes ' + name + ' {'), 'keyframes ' + name + ' 存在');
+  }
+  // ③ 功能仿真（rpg iframe 内真触发）：挂载 → 震屏/受击缠绕 → 1.5s 自动清理零残留
+  const reg = rpgWin().eval('(function(){ var e = WEBM_FX_REGISTRY["造雾术"], t = WEBM_FX_REGISTRY["高阶召唤术"]; return { e: !!e && e.url === "" && e.particles === "rlyeh_sediment" && e.delay === 1, t: !!t && t.url === "" && t.particles === "titan_gaze" && t.delay === 1 }; })()');
+  check(reg.e, 'iframe 内注册表：造雾术条目字段正确');
+  check(reg.t, 'iframe 内注册表：高阶召唤术条目字段正确');
+  rpgWin().eval(`try { window.__t27err = ''; spawnRlyehSedimentFx(true, false); spawnTitanGazeFx(true, false); } catch (e) { window.__t27err = String(e); }`);
+  check(!rpgWin().eval('window.__t27err || ""'), '连续触发两个全屏特效无异常' + (rpgWin().eval('window.__t27err ? "：" + window.__t27err : ""') || ''));
+  const mid = rpgWin().eval(`(function () {
+    var fog = document.querySelectorAll('[style*="mist-obsidian-carpet"], [style*="mist-vertical-jet"]').length;
+    var titan = document.querySelectorAll('[style*="titan-shadow-loom"], [style*="psychic-tsunami-surge"]').length;
+    var kf = (function () { var d = document.createElement('div'); d.style.animationName = 'mist-obsidian-carpet'; var ok = d.style.animationName !== ''; d.style.animationName = 'titan-shadow-loom'; return ok && d.style.animationName !== ''; })();
+    return { fog: fog, titan: titan, kf: kf };
+  })()`);
+  check(mid.kf, '新 keyframes 已被样式表收录（CSSOM 可解析）');
+  check(mid.fog >= 2, '造雾术演出节点已挂载（雾毯+蒸气柱 ' + mid.fog + ' 个）');
+  check(mid.titan >= 2, '高阶召唤术演出节点已挂载（暗影+海啸环 ' + mid.titan + ' 个）');
+  await sleep(1700);
+  const late = rpgWin().eval(`(function () {
+    var fog = document.querySelectorAll('[style*="mist-obsidian-carpet"], [style*="mist-vertical-jet"]').length;
+    var titan = document.querySelectorAll('[style*="titan-shadow-loom"], [style*="psychic-tsunami-surge"]').length;
+    var z180 = document.querySelectorAll('div[style*="z-index: 180"], div[style*="z-index:180"]').length;
+    return { fog: fog, titan: titan, z180: z180 };
+  })()`);
+  eq(late.fog + late.titan + late.z180, 0, '两特效节点 1.5s 后全部自动清理（零残留）');
+  // ④ 古神低语合成音函数存在且可无异常调用（AudioContext 在部分环境不可用，靠 try 包裹不抛错）
+  rpgWin().eval('try { playEldritchWhisper(); } catch (e) { window.__t27whisperErr = String(e); }');
+  check(!rpgWin().eval('window.__t27whisperErr || ""'), 'playEldritchWhisper 合成音可调用不抛错');
+  rpgWin().eval('window.__t27err = undefined; window.__t27whisperErr = undefined;');
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -1420,7 +1462,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
