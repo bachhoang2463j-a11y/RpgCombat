@@ -1262,6 +1262,47 @@ async function test22() {
   }
 }
 
+async function test23() {
+  head('23 重击特效降本：震屏提层 + filter 闪色 steps 化 + stroke-width/双层 drop-shadow 清理');
+  const src = await (await fetch('../index.html')).text();
+  // ① 四个震屏类带 will-change: transform（场景树提层缓存，震动改走合成器；类由 setTimeout 移除，层自动释放）
+  for (const cls of ['ranged-heavy-shake', 'melee-heavy-shake', 'gunshot-shake', 'pierce-shake']) {
+    check(new RegExp('\\.' + cls + ' \\{[^}]*will-change: transform').test(src), '.' + cls + ' 带 will-change: transform');
+  }
+  // ② 六组 keyframes 不再逐帧动画 filter（每帧重栅格化源头）；动画挂在容器、静态 drop-shadow 留在内层 svg
+  const kf = (name) => (src.match(new RegExp('@keyframes ' + name + ' \\{[\\s\\S]*?\\n    \\}')) || [])[0] || '';
+  for (const name of ['ranged-heavy-muzzle-burst-core', 'blunt-burst-core', 'ranged-heavy-enemy-recoil', 'enemy-ram-knockback', 'enemy-gunshot-flinch', 'enemy-pierce-stutter']) {
+    check(!!kf(name), '可提取 @keyframes ' + name);
+    check(!/filter:/.test(kf(name)), name + ' 不再逐帧动画 filter');
+  }
+  // ③ 冲击环不再逐帧动画 stroke-width（SVG 几何重绘 → 改由 scale 扩张 + 静态描边）
+  for (const name of ['ranged-heavy-muzzle-shockwave-ring', 'blunt-shock-ring']) {
+    const block = kf(name);
+    check(!!block && !/stroke-width/.test(block), name + ' 不再逐帧动画 stroke-width');
+  }
+  // ④ 四组 -flash steps(1) 闪色 keyframes 存在（受击颜色反馈保留，filter 只在关键帧边界跳变 ≈5 次重栅格化）
+  for (const name of ['ranged-heavy-enemy-recoil-flash', 'enemy-ram-knockback-flash', 'enemy-gunshot-flinch-flash', 'enemy-pierce-stutter-flash']) {
+    check(src.includes('@keyframes ' + name + ' {'), 'steps 闪色 keyframes ' + name + ' 存在');
+  }
+  eq((src.match(/-flash 0\.\d+s steps\(1\) both/g) || []).length, 6, '六个挂载点均携带 steps(1) 闪色（recoil/ram/pierce×2/gunshot×2）');
+  // ⑤ 三处模板双 drop-shadow 链已并单（远程核心/血溅×5/近战核心）
+  check(!src.includes('drop-shadow(0 0 25px #ea580c) drop-shadow(0 0 45px #dc2626)'), '远程重击核心双 drop-shadow 已并单');
+  check(!src.includes('drop-shadow(0 0 10px #450a0a) drop-shadow(0 0 4px #7f1d1d)'), '血溅双 drop-shadow 已并单');
+  check(!src.includes('drop-shadow(0 0 20px #f59e0b) drop-shadow(0 0 40px #d97706)'), '近战重击核心双 drop-shadow 已并单');
+  // ⑥ 功能仿真（rpg iframe 内真触发）：特效挂载→自动清理；受击动画行内含 steps 闪色且播完恢复
+  rpgWin().eval(`try { var __rt = document.createElement('div'); __rt.id = 't23-target'; document.body.appendChild(__rt); spawnRangedHeavyParticles(400, 300, __rt); } catch (e) { window.__t23err = String(e); }`);
+  check(!rpgWin().eval('window.__t23err || ""'), '触发远程重击特效无异常' + (rpgWin().eval('window.__t23err ? "：" + window.__t23err : ""') || ''));
+  const animEarly = rpgWin().eval("document.getElementById('t23-target').style.animation");
+  check((animEarly.match(/ranged-heavy-enemy-recoil(-flash)?/g) || []).length >= 2 && animEarly.includes('steps(1)'), '受击动画行内同时携带 transform 主体与 steps 闪色（CSSOM 序列化顺序无关）');
+  const fxEarly = rpgWin().eval('document.querySelectorAll(\'[style*="ranged-heavy"]\').length');
+  check(fxEarly > 0, '特效三件套已挂载（' + fxEarly + ' 个动画节点）');
+  await sleep(1700);
+  const animLate = rpgWin().eval("document.getElementById('t23-target').style.animation");
+  check(animLate === '', '受击动画播完恢复（行内 animation 清空，呼吸动画不被冻结）');
+  eq(rpgWin().eval('document.querySelectorAll(\'[style*="ranged-heavy"]\').length'), 0, '特效节点全部自动清理（零残留）');
+  rpgWin().eval("var __r = document.getElementById('t23-target'); if (__r) __r.remove(); window.__t23err = undefined;");
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -1269,7 +1310,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
