@@ -222,3 +222,4 @@
 | 2026-09-08 | 性能优化④（批次B）：敌人 sprite 常驻辉光逐帧 filter 改静态（.breathe 全体呼吸/.charge-full-danger 0.15s 警示抖动）待机零逐帧重绘 + test24 计算样式验证 | L2581 | 2c03a6b |
 | 2026-09-08 | 性能优化⑤（批次C1）：WebM 抠图 rVFC 节流（60Hz→按解码帧，CPU 减半视觉零变化）+ 画布封顶 960px 降采样 + FX_WEBM_SCREEN_MODE 低配开关；315 项全绿收官 | L2593 | e3a86d0 |
 | 2026-09-08 | 性能优化⑥（批次D）：正则产物压缩管线 build-regex.cjs（terser+实体/围栏双重加固+html-minifier，replaceString -26%）+ jQuery 原生化删 90KB 外链 + js-yaml 内联零外链 + build-tailwind 幂等自检修复；315 全绿 + 354 元素指纹零差异 | L2595 | da452a5 |
+| 2026-09-08 | 全量 & 实体免疫：V11.05 产物实机卡死事故（terser 删空格拼出 &&notify，管线无分号实体 &not→¬ 炸语法 5 处）——产物内所有 & 改写 &amp;+逐字节还原断言，根治任何实体解码行为；+16.7KB 仍 -29%，354 元素指纹零差异（MMS 同步） | L2601 | 87254c3 |
