@@ -1,7 +1,8 @@
 # 战斗前端系统测试说明文档 (完整版)
 
-**当前版本：V11.03**
+**当前版本：V11.04**
 
+> V11.04：**性能优化四批次（保观感的实现降本，无一删减特效）**：LLM 路径（聊天上下文深拷贝→浅拷贝，「传入上下文+N 楼」配置下每次对话调用不再克隆全史；调试日志默认关闭，控制台 `localStorage.setItem('rpg_llm_debug','1')` 后刷新可开）；重击/受击特效 CSS 降本（震屏 will-change 提层、四组受击闪色 steps 化保色反馈、冲击环 scale 化、多层辉光并单）；敌人 sprite 常驻辉光（呼吸/充能警示）改静态滤镜——战场静止时零逐帧重绘；WebM 抠图 rVFC 节流（按解码帧处理，CPU 减半视觉零变化）+ 画布封顶 960px 降采样 + `FX_WEBM_SCREEN_MODE` 低配开关。harness 315 项全绿（test22~25 新增 61 项）。详见 §12 与 LOG-213~216。
 > V11.03：**性能优化第一项：Tailwind Play CDN → 静态预编译**：移除运行时 JIT（MutationObserver 全文档监听 × 粒子/浮字/行动条高频 DOM 变动的持续编译税，卡顿最大嫌疑），改为构建期一次编译——`node build-tailwind.cjs` 把 87KB minify 产物内联回 index.html 标记块（位于 `</head>` 前，复刻 Play CDN 标准模式实测注入位，级联顺序零变化），单文件不再依赖 cdn.tailwindcss.com（断网不裸奔）、首帧自带样式无 FOUC。新纪律：改类名后必须重跑构建（harness test21 类名覆盖断言兜底，1038 token 零缺失）；禁止运行时拼接类名；enemy.size 通道 safelist text-4xl~9xl 及 sm: 变体。验证：374 个 CDN 实况类零缺失 + 344 元素×24 属性计算样式指纹改前后零差异 + 254 项断言全绿。详见 §11 与 LOG-212。
 > V11.02：**编辑器双 bug 修复**：①「数据覆写」编辑器点击输入栏自动退出——敌人信息面板在共用容器遗留无 target 判断的关闭处理器，输入框点击冒泡即误关且丢失未保存输入；改为仅点遮罩关闭 + openEditor 防御清除。②世界书载入后修改数据报 null value——载入即开战、召唤物即时入列使编辑器 DOM 快照与实时数组发散，保存时读 null.value 崩溃；syncEditorDataToMemory 加 4 处守卫跳过无表单项。harness test20 新增 10 项（241 项全绿）。详见 LOG-211。
 > V10.12：**导演兜底人格——图鉴未命中敌人的 LLM 生成补位**：开战载入时检测「图鉴未命中且无技能」的敌人 → confirm 询问 → 调用**独立 LLM 端点**按《敌方生成规则精简版》生成词条 → 程序校验（标签白名单/Aim 区间/耗蓝总和/技能数，带具体错误反馈重试 ≤2 次）→ 替换槽位开战 → 写回图鉴（`createWorldbookEntries` 入世界书优先、聊天变量 `$rpg_dynamic_bestiary` 回落，下次同名直接命中）。任何失败（端点未配/生成失败/校验不过）都回落跳过——敌人以普攻「猛击」战斗，**绝不死锁**。设置入口在【💬 对话】弹窗新增「🎬 导演兜底」Tab（5 预设槽位 + 独立 temperature + ↺ 恢复默认，纯 localStorage 持久化）。详见 §10.7 与 LOG-208。
@@ -582,4 +583,14 @@
 - **写法约束**：类名必须是源码可见的完整字面量（三元/查表取值均可，取值需写死在源码里）；**禁止运行时拼接类名**（如 `text-${tier}-400`）——静态扫描器看不到，需改为查表全名或 CSS 变量。唯一外部数据通道 `enemy.size`（LLM/世界书产出的字号档）已 safelist 兜底（`text-4xl`~`text-9xl` 及 `sm:` 变体全档）。
 - **构建三件套**：`tailwind-in.css`（@tailwind 指令入口）、`tailwind.config.cjs`（content 全文扫描 index.html + safelist）、`build-tailwind.cjs`（npx tailwindcss@3.4.17 --minify；首跑自动移除 CDN 标签并插入标记块，之后幂等替换块内容；写回前自检体积/哨兵类/围栏纪律/结构）。
 - **验证基线**：迁移三重验证——Play CDN 运行时实况 CSS 与编译产物选择器集合比对（374 个实况类零缺失，19 项规则体差异全为 minify 等价形态）；344 元素 × 24 计算样式属性指纹改前后零差异；harness 254 项断言全绿。
+
+## 12. 性能优化四批次（V11.04）
+
+LOG-212 Tailwind 静态预编译之后的四批实施（LOG-213~216），全部为「保观感的实现降本」：
+
+- **LLM 路径**（LOG-213）：聊天上下文全量深拷贝改数组浅拷贝——「传入酒馆聊天上下文 + N 楼」配置下原实现先克隆整段聊天史再截最近 N 楼，每次对话调用白付几十 MB 分配；调试日志默认关闭，排查 LLM 对话问题时在控制台执行 `localStorage.setItem('rpg_llm_debug','1')` 后刷新即开（免重贴组件文件）。
+- **重击/受击特效**（LOG-214）：远程/近战重击实为 DOM+SVG+CSS 动画，降本点：震屏类 `will-change: transform` 提层（整场景震动走合成器）；burst-core 亮度脉冲移除（静态辉光+transform/opacity 全合成器化）；四组受击闪色（重击后仰/近战推撞/枪击/贯穿）拆分为 transform 主体 + `steps(1)` 离散闪色——红/琥珀/天蓝颜色反馈保留，重栅格化从每帧降为约 5 次/动画；冲击环 stroke-width 逐帧改 scale 扩张；四处双 drop-shadow 链并单。
+- **常驻辉光**（LOG-215）：敌方 sprite 呼吸（`.breathe`）与充能满警示抖动（`.charge-full-danger`）的辉光从逐帧 filter 插值改为静态滤镜——战场静止时不再逐帧重绘全体敌人。
+- **WebM 抠图**（LOG-216）：`requestVideoFrameCallback` 节流（视频 24-30fps，原 rAF 60Hz 一半调用在重复处理同一帧；现新解码帧到达才处理，CPU 减半、视觉零变化）；抠图画布封顶 960px 降采样（CSS 尺寸钉原值）；`FX_WEBM_SCREEN_MODE` 低配降级开关（默认关；开启则跳过逐帧抠图走 CSS screen 混合，暗部雾气会泛白）。
+- **回归基线**：harness 315 项断言全绿（test22~25 新增 61 项，含 rpg iframe 真触发特效的功能仿真）；重击手感与视频特效帧率的最终验收以真机为准。经评估保留的有界小项：burst-ready/pip/tag-fx 小面积 infinite 动画、targeting 选取脉冲（瞬时交互态）。
 

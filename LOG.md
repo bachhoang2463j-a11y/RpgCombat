@@ -2550,3 +2550,52 @@
 - **涉及文件**：`index.html`、`tailwind-in.css`、`tailwind.config.cjs`、`build-tailwind.cjs`、`integration-test/harness.html`（test21 + 注册）、`integration-test/fix-srclines.cjs` 复跑（+4 行漂移重映射 119 条，118↔118 对齐）（`80f2e0d`）。
 - **经验证**：①**CDN 实况零缺失**——IAB 标准模式副本抓取 Play CDN 运行时生成 CSS（33.6KB，374 类）与编译产物选择器集合比对：零缺失，编译独有 720 类（战斗时 UI 全覆盖）；96 项规则体差异归一化后收敛至 19 项，逐条核对全为 minify 等价形态（`rgba(255,255,255,.1)`≡`hsla(0,0%,100%,.1)`、`rgba(0,0,0,0)`≡`transparent`、`150ms`≡`.15s`、嵌套 calc 展开、`-moz-` 前缀存在性、transition-property 双声明级联同果、规则分组差），零真差异。②**计算样式指纹零差异**——344 元素 × 24 属性（display/position/color/…/overflow，排除动画噪声 transform/opacity）改前后逐元素一致，DOM 结构零变化。③IAB 跑 harness **254 项断言全部通过**（test1-20 无回归 + test21 新增 13 项）。④内联 script `new Function` 语法通过；围栏纪律 ==2；srcLine 重映射后 test10 对齐。⑤FOUC 由构造消除（样式随 HTML 解析即生效）。真机帧率待用户重贴新版 index.html 后实测确认。**施工教训**：Tailwind 对任意值类选择器中的逗号用 `\2c `（十六进制+空格终止）转义而非 `\,`，类名覆盖比对须先反转义；Git Bash 对命令行参数里的反斜杠串有 MSYS 改写（grep/node -e 结果自相矛盾），含反斜杠的探针一律写临时 .cjs 文件执行。
 - **决策原因**：LOG-211 留档性能清单第①项（用户 1MB 单页卡顿反馈）。方案经利弊答疑后用户选定「静态编译+构建脚本」（否决保留 CDN 与 enemy.size 收敛枚举两案）；范围确认本轮只做此项。新增工作流纪律（改类名→跑 `node build-tailwind.cjs`；禁运行时拼类名）已写入 README §11（V11.03）。
+
+---
+
+## [LOG-213] 2026-09-08 — LLM 路径性能两件套（性能优化批次 C）
+
+- **变更行为**：用户确认「开工」后性能优化四批的第一批（最小风险先行）。
+  1. **callLLM 聊天上下文深拷贝改浅拷贝**：原 `JSON.parse(JSON.stringify(ctx.chat))` 先把整段聊天史 JSON round-trip 克隆一遍、之后才截取最近 N 楼——用户实际配置「传入酒馆聊天上下文 + 楼层数 2」下，每次对话调用（一场战斗数十次）都在克隆全史。改 `ctx.chat.slice()`（下游零元素回写已逐行审计，唯一变异是向副本 push 新对象；原「防污染原数组」的防护意图由数组浅拷贝延续）。
+  2. **LLM 调试日志全量 gate**：12 处 `[LLM Chat Debug]` console.log 完全 ungated（含每次调用 2 处全量 JSON.stringify 消息列表/响应体），全部路由到 llmLog 包装器——`LLM_DEBUG` 启动时读一次 localStorage 键 `rpg_llm_debug`（默认关；控制台 `localStorage.setItem('rpg_llm_debug','1')` 后刷新即开，免为翻日志重贴整个组件文件）；两处大 stringify 加 `if (LLM_DEBUG)` 惰性化；7 处 warn/error 冷路径保留。
+- **涉及文件**：`index.html`、`integration-test/harness.html`（test22 + 注册）（`1810687`）。
+- **经验证**：harness test22 新增 15 项——静态断言 + llmLog 开关对拍（false 零输出/true 透传）+ 上下文组装段 AsyncFunction 功能仿真（stub 假酒馆 window：contextLimit=2/0 截断语义、Combat_block 剥离、generating 楼追加进副本、原数组逐字段零污染）。**269 项全绿**。施工插曲：功能仿真首版两坑——段提取漏收尾 if 闭合（花括号余额+1）与段内备选路径含 `await` 需 AsyncFunction 构造器（普通 new Function 报 Unexpected identifier）。
+- **决策原因**：LOG-211 性能清单第③项落地。用户确认其实际开启了「传入酒馆聊天上下文（最近 2 轮）」——截断后置+全量深拷贝的组合对其每次调用都是整史克隆，修复直接生效。
+
+---
+
+## [LOG-214] 2026-09-08 — 重击/受击特效 CSS 降本（性能优化批次 A，用户感知卡顿主攻）
+
+- **变更行为**：用户新线索「主要是 svg 特效（如远程重击）卡顿」推翻原「粒子引擎嫌疑」假设——探查证实远程/近战重击**根本不走 canvas 粒子引擎**（0 粒子），是 innerHTML 注入的 DOM+SVG+CSS 动画（20+ 子元素、约 18 条并发动画），卡顿源为逐帧 filter 动画链与整场景重栅格化：
+  1. 四个震屏类（ranged/melee-heavy-shake、gunshot、pierce）加 `will-change: transform`——`#battle-scene` 整树提层缓存，震动从每帧全场景重栅格化变为合成器位移；类由 setTimeout 移除，层自动释放。
+  2. 两组 burst-core 的 `filter: brightness()` 逐帧动画移除（动画挂外层容器、静态 drop-shadow 在内层 svg——滤镜一次光栅化+GPU 变换的理想分工结构）。
+  3. 两组冲击环 stroke-width 逐帧动画移除，环扩张由既有 scale 动画承担 + 模板静态描边（观感：环稍变饱满，渐隐不变）。
+  4. 四组受击闪色（ranged-heavy-enemy-recoil / enemy-ram-knockback / enemy-gunshot-flinch（每次普通枪击触发，最高频）/ enemy-pierce-stutter）拆分为 transform 主体 + 独立 `steps(1)` 闪色动画——filter 值只在关键帧边界跳变（每动画约 5 次重栅格化 vs 原每帧），红/琥珀/天蓝受击颜色反馈完整保留；playEnemyFlinchAnim 行内双动画写法，播完清空行为不变。
+  5. 月牙/裂纹 keyframes 中段 drop-shadow 移除（模板已有同款静态滤镜）；四处双 drop-shadow 链并单（远程核心 / 血溅×5 / 近战核心 / 扫射血溅×5）。
+- **涉及文件**：`index.html`、`integration-test/harness.html`（test23）（`ecd5ed3`）。
+- **经验证**：harness test23 新增 31 项——静态（will-change×4 / 六组 keyframes 无 filter 逐帧 / 冲击环无 stroke-width / steps 挂载×6 / 并单×3）+ rpg iframe 真触发远程重击功能仿真（三件套挂载 → 受击行内含 steps 闪色 → 播完恢复呼吸 → 零残留清理）。**300 项全绿**；fix-srclines 复跑（本批 keyframes 区 +16 行致 srcLine 漂移，首跑漏掉曾致 test10 红）。视觉验收（环描边饱满度/闪色节奏）待用户真机。
+- **决策原因**：用户体感反馈定位到特效层并问「除了降低特效层还有别的方法吗」——本批全部为**保观感的实现降本**（合成器化/预烘焙/steps 化），无一删减特效。施工教训：CSSOM 读取 style.animation 简写会按规范序重排（name 排每层末尾），断言须顺序无关。
+
+---
+
+## [LOG-215] 2026-09-08 — 敌人 sprite 常驻辉光 filter 逐帧动画改静态（性能优化批次 B）
+
+- **变更行为**：战场静止时也在烧的底噪两处（「不动也有成本」项）：
+  1. `.breathe`（全体敌方 sprite 常驻 4s 呼吸动画）：keyframes 原逐帧插值 drop-shadow（0 5px 15px 0.1 → 0 15px 25px 0.2）——所有敌人每帧重绘；改 keyframes 纯 translateY + 类上静态中值辉光（一次光栅化+合成器位移），浮动观感不变、光晕不再微幅呼吸（原呼吸幅度本就极细微）。
+  2. `.charge-full-danger`（充能满敌人 0.15s 抖动，周期最短、重绘最频）：同型改造，纯 transform 抖动 + 静态红辉光（22px/0.9 中值），警示强度不减。
+  受击 flinch 期间行内动画 filter 覆盖行为与改造前一致（闪色期间静态辉光暂隐、播完恢复）。
+- **涉及文件**：`index.html`、`integration-test/harness.html`（test24）（`2c03a6b`）。
+- **经验证**：harness test24 新增 6 项（静态 + rpg iframe 计算样式功能验证：动画运行中且静态辉光生效）。**306 项全绿**。经评估**保留**的有界小面积 infinite 项：burst-ready/active（≤4 张卡、TP 满才出现；且 hero-card-inner 有 overflow-hidden，伪元素外辉光方案会被裁剪）、pip-breathe（9px 小点重绘面积可忽略）、tag-fx-*（小徽章）、targeting-mode 选取脉冲（瞬时交互态）。
+- **决策原因**：批次 A 清完重击尖峰后清待机底噪；「战场静止时全体敌人每帧重绘」是待机最大源，改造成本最低（两处 CSS）视觉差近无。
+
+---
+
+## [LOG-216] 2026-09-08 — WebM 特效抠图成本三控（性能优化批次 C1，四批收官）
+
+- **变更行为**：用户提示「当初似乎是抠图失败才换为的逐帧抠图」→ **收回原「默认换 screen 混合」方案**（避免重蹈视觉不达标覆辙），改为保留亮度键抠图、只砍执行成本：
+  1. **rVFC 节流**：原 rAF 按 60Hz 逐帧抠图，但视频仅 24-30fps——一半以上调用在重复处理同一帧；改 `requestVideoFrameCallback`（scheduleNextFrame 统一调度，不支持 rVFC 的环境回落 rAF），CPU 直接减半且抠的仍是每一帧、视觉零变化。
+  2. **抠图后备画布封顶 960px**：原按 min(屏宽,屏高)×1.4 建画布（1080p 屏 ≈128 万像素/帧/特效），成本∝面积；发光体降采样肉眼近无差。CSS 尺寸钉原 targetSize，视觉大小不变。
+  3. **`FX_WEBM_SCREEN_MODE` 低配降级开关**（默认 false）：true 时跳过逐帧抠图改 CSS screen 混合（暗部雾气泛白的已知代价）；跨域污染 catch fallback 与尾部 0.35s 渐隐语义原样保留。
+- **涉及文件**：`index.html`、`integration-test/harness.html`（test25）（`e3a86d0`）。
+- **经验证**：harness test25 新增 9 项（rVFC 调度与 rAF 回落 / 画布封顶+CSS 钉尺寸 / 亮度键 12/80 阈值守卫 / 污染 fallback 保留）。**315 项全绿**（四批累计 test22~25 新增 61 项）。真机视频特效帧率待用户实测。
+- **决策原因**：性能优化四批收官；WebM 方案据用户历史信息修正为「保视觉砍成本」路线（rVFC 节流+降采样），screen 降为显式开关而非默认路径。

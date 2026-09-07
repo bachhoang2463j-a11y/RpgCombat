@@ -217,3 +217,7 @@
 | 2026-09-07 | 导演兜底四项体验改进：生成中横幅+取消（AbortController）/词条位置 before_character_definition·order600·默认关闭（原落系统深度4 雷区）/必填「描述」lore 全链路/上下文楼层数（默认2只统计AI楼）+ test18 扩 15 项 | L2515 | cb41b1b |
 | 2026-09-07 | 编辑器双 bug：点输入栏自动退出（showEnemyInfo 残留 onclick 污染共用容器→target 判断式+openEditor 清除）+ 世界书载入即开战召唤物发散致保存 null value（syncEditorDataToMemory 4 处守卫）+ harness test20 + srcLine 重映射 | L2526 | 065af03 |
 | 2026-09-07 | 性能优化①：Tailwind Play CDN→静态预编译（运行时 JIT MutationObserver 编译税消除/87KB 产物内联回 </head> 前标记块·复刻 Play CDN 注入位/构建三件套/enemy.size safelist/harness test21 类名覆盖 1038 token 零缺失，254 全绿；344 元素指纹零差异） | L2543 | 80f2e0d |
+| 2026-09-08 | 性能优化②（批次C）：LLM 聊天上下文深拷贝→浅拷贝（截断后置白克隆全史）+ 12 处调试日志 gate（LLM_DEBUG·localStorage 键 rpg_llm_debug）+ 两处全量 stringify 惰性化 + test22 仿真 | L2556 | 1810687 |
+| 2026-09-08 | 性能优化③（批次A）：重击/受击特效 CSS 降本（震屏 will-change 提层/burst-core 亮度脉冲合成器化/四组受击闪色 steps(1) 化保色反馈/冲击环 stroke-width→scale/四处双 drop-shadow 并单）+ test23 真触发仿真 | L2567 | ecd5ed3 |
+| 2026-09-08 | 性能优化④（批次B）：敌人 sprite 常驻辉光逐帧 filter 改静态（.breathe 全体呼吸/.charge-full-danger 0.15s 警示抖动）待机零逐帧重绘 + test24 计算样式验证 | L2581 | 2c03a6b |
+| 2026-09-08 | 性能优化⑤（批次C1）：WebM 抠图 rVFC 节流（60Hz→按解码帧，CPU 减半视觉零变化）+ 画布封顶 960px 降采样 + FX_WEBM_SCREEN_MODE 低配开关；315 项全绿收官 | L2593 | e3a86d0 |
