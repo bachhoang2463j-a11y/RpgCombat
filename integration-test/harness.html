@@ -1347,6 +1347,72 @@ async function test25() {
   check(fx.includes("vCanvas.style.mixBlendMode = 'screen';"), 'canvas 被跨域污染时的 screen fallback 保留');
 }
 
+/* ================= 断言 26：召唤技能 [延迟:N] 蓄力 =================
+   回归锁：曾因 prepareSkillTarget 中召唤直通分支排在延迟检查之前，
+   召唤+[延迟:N] 组合的 delay 字段全程无人消费，召唤立即完成（V11.05 实机反馈）。 */
+async function test26() {
+  head('26 召唤技能 [延迟:N]：召唤+延迟走蓄力，纯召唤仍直通，蓄满释放保持自施放');
+  MOCK.resetVars(); seedChat(); seedState();
+
+  const SKILL_DELAY = '【召唤-古革巨人】[召唤:幻梦行军兽][单防;power:10][MP:20][法术][延迟:2]';
+  const SKILL_PURE = '【召唤-纯】[召唤:幻梦行军兽][MP:10][法术]';
+
+  // ① 解析层：summonTarget 与 delay 两字段共存（修复前提）
+  const s = rpgWin().parseSkill(SKILL_DELAY);
+  check(s.summonTarget === '幻梦行军兽' && s.delay === 2, '解析层：summonTarget 与 delay=2 共存');
+  check(s.cost === 20 && s.type === '[单防]', '解析层：MP:20 与主标签 [单防] 正常');
+
+  // ② 入口路由（根因锁）：桩掉两条入口分支，验证召唤+延迟走蓄力、纯召唤仍直通
+  injectHeroes([heroSpec({ name: '召唤师', hp: 100, maxHp: 100, mp: 100, maxMp: 100,
+    skills: [rpgWin().parseSkill(SKILL_DELAY), rpgWin().parseSkill(SKILL_PURE)] })]);
+  rpgWin().eval(`
+    window.__t26 = { path: null, releasedTo: null };
+    window.__t26Exec = window.executeHeroSkillAction;
+    window.__t26Charge = window.handleChargeSkill;
+    window.executeHeroSkillAction = async () => { window.__t26.path = 'direct'; };
+    window.handleChargeSkill = async () => { window.__t26.path = 'charge'; };
+    state.actionQueue = [{ ref: heroesData[0] }]; state.queueIndex = 0;
+  `);
+  await rpgWin().prepareSkillTarget(0);
+  check(rpgWin().__t26.path === 'charge', '召唤+延迟：走蓄力入口（不再被召唤直通短路）');
+  await rpgWin().prepareSkillTarget(1);
+  check(rpgWin().__t26.path === 'direct', '纯召唤（无延迟）：仍走召唤直通');
+
+  // ③ 释放路由（自施放锁）：蓄满释放时 primaryTarget=施法者，附带 [单防] 落自己而非随机友方
+  rpgWin().eval(`
+    window.__t26Release = window.doReleaseCharge;
+    window.doReleaseCharge = async (h, t) => { window.__t26.releasedTo = t ? t.name : null; };
+    heroesData[0].currentDelay = { skill: parseSkill(${JSON.stringify(SKILL_DELAY)}), remaining: 0 };
+  `);
+  await rpgWin().releaseCharge();
+  check(rpgWin().__t26.releasedTo === '召唤师', '蓄满释放：primaryTarget=施法者（自施放，[单防] 落自己）');
+
+  // ④ 真实蓄力押注：恢复原函数、桩掉 endTurn，验证进入蓄力 + MP 在蓄力开始时扣除
+  rpgWin().eval(`
+    window.executeHeroSkillAction = window.__t26Exec;
+    window.handleChargeSkill = window.__t26Charge;
+    window.doReleaseCharge = window.__t26Release;
+    window.__t26EndTurn = window.endTurn;
+    window.endTurn = async () => {};
+    heroesData[0].mp = 100; heroesData[0].currentDelay = null; heroesData[0].hasteStore = 0;
+    state.actionQueue = [{ ref: heroesData[0] }]; state.queueIndex = 0; state.isAnimating = false;
+  `);
+  await rpgWin().prepareSkillTarget(0);
+  // heroesData 是顶层 let（不挂 window 属性），跨 realm 读取须在 iframe 内 eval
+  const cd = rpgWin().eval('(function(){ var h = heroesData[0], c = h.currentDelay; return { remaining: c ? c.remaining : null, mp: h.mp, summon: c && c.skill ? c.skill.summonTarget : null }; })()');
+  check(cd.remaining === 2, '真实蓄力：currentDelay.remaining = 2（还需 2 回合）');
+  check(cd.mp === 80, '真实蓄力：MP 在蓄力开始时押注扣除（100-20）');
+  check(cd.summon === '幻梦行军兽', '真实蓄力：蓄力槽保留召唤目标');
+
+  // ⑤ 清理：恢复 endTurn 与入口函数，清空注入，避免污染其它测试
+  rpgWin().eval(`
+    window.endTurn = window.__t26EndTurn;
+    delete window.__t26; delete window.__t26Exec; delete window.__t26Charge;
+    delete window.__t26Release; delete window.__t26EndTurn;
+    heroesData = []; enemiesData = []; state.actionQueue = []; state.queueIndex = 0; state.isAnimating = false;
+  `);
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -1354,7 +1420,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
