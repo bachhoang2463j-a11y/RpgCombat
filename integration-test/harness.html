@@ -1105,6 +1105,46 @@ async function test19() {
   check(/<q>/.test(convertedPoisoned.slice(convertedPoisoned.indexOf('状态栏模拟组件') - 300)), '对照组：内部多一个围栏序列 → 污染复现（仿真有效）');
 }
 
+async function test20() {
+  head('20 编辑器双 bug 回归：弹窗 onclick 污染 + 召唤物发散守卫');
+  const src = await (await fetch('../index.html')).text();
+  // ① bug1 静态断言：源码不再有裸 modal.onclick = closeEditor 赋值（任何冒泡 click 都会关掉编辑器）
+  check(!src.includes('modal.onclick = closeEditor;'), '源码无裸 modal.onclick = closeEditor 赋值');
+  // ② bug1 静态断言：openEditor 防御性清除残留 handler
+  check(/function openEditor\(keepScroll\)[\s\S]{0,200}modal\.onclick = null/.test(src), 'openEditor 开头清除 modal.onclick 残留');
+  // ③ bug1 静态断言：showEnemyInfo 的关闭改为 target 判断式（只点遮罩本身才关）
+  check(src.includes("modal.onclick = function (e) { if (e.target === modal) closeEditor(); };"), 'showEnemyInfo 关闭为 target 判断式');
+  // ④ bug2 功能仿真：提取 syncEditorDataToMemory 源码，stub document 模拟「编辑器打开期间召唤物入列」的 DOM 发散
+  const fnMatch = src.match(/function syncEditorDataToMemory\(\) \{[\s\S]*?\n\}/);
+  check(!!fnMatch, '可提取 syncEditorDataToMemory 函数源码');
+  if (!fnMatch) return;
+  const fnSrc = fnMatch[0];
+  // DOM 快照：敌人0 与技能(0,0) 有表单；敌人1（召唤物）与技能(0,1)（即时入列新技能）无表单 → getElementById 返回 null
+  const missing = new Set(['edit-e-1-name', 'edit-e-0-s-1-name']);
+  const fakeEl = { value: '5', checked: false, querySelectorAll: () => [] };
+  const stubDoc = { getElementById: (id) => missing.has(id) ? null : fakeEl };
+  const heroesData = [{ name: 'H0', skills: [{ name: 's0' }], items: [] }];
+  const enemiesData = [
+    { name: 'E0', hp: 10, skills: [{ name: 'a' }, { name: 'b' }] },
+    { name: 'SUMMON', hp: 123, skills: [{ name: 'guard' }] }
+  ];
+  let threw = null;
+  try { new Function('heroesData', 'enemiesData', 'document', fnSrc + '\nsyncEditorDataToMemory();')(heroesData, enemiesData, stubDoc); }
+  catch (e) { threw = e; }
+  check(!threw, '发散场景不抛错（守卫生效）' + (threw ? '  实际: ' + threw.message : ''));
+  eq(enemiesData[1].hp, 123, '召唤物运行时数据未被表单覆盖（守卫跳过）');
+  eq(enemiesData[1].name, 'SUMMON', '召唤物名字未被表单覆盖');
+  eq(enemiesData[0].skills[1].name, 'b', '无表单的新技能数据原样保留');
+  // ⑤ 对照组：剥掉 4 处守卫后同场景必抛 TypeError（证明仿真有效、守卫是真防线）
+  const stripped = fnSrc.replace(/^.*if \(!document\.getElementById\(`edit-[he]-\$\{i\}(-s-\$\{si\})?-name`\)\) return.*$/gm, '');
+  check(stripped.length < fnSrc.length, '对照组成功剥除守卫行');
+  let threwCtrl = null;
+  try { new Function('heroesData', 'enemiesData', 'document', stripped + '\nsyncEditorDataToMemory();')(
+    JSON.parse(JSON.stringify(heroesData)), JSON.parse(JSON.stringify(enemiesData)), stubDoc); }
+  catch (e) { threwCtrl = e; }
+  check(threwCtrl instanceof TypeError && /null/.test(String(threwCtrl.message)), '对照组（无守卫）抛 null TypeError（仿真有效）' + (threwCtrl ? '' : '  实际未抛'));
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -1112,7 +1152,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }

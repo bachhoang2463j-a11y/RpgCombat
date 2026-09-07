@@ -215,3 +215,4 @@
 | 2026-09-07 | 导演兜底人格：图鉴未命中敌人的 LLM 生成补位（双 Tab 独立端点/程序校验重试≤2/世界书+动态图鉴双路写回）+ harness test18 + srcLine 重映射（含基线 3 条差一修正） | L2478 | b44c45c |
 | 2026-09-07 | 同楼层状态栏 <q> 污染事故修复：内嵌提示词 139 反引号破坏酒馆引号美化 ``` 配对豁免 → 全量 \u0060 转义（值不变）+ harness test19 管线仿真断言 | L2494 | c309098 |
 | 2026-09-07 | 导演兜底四项体验改进：生成中横幅+取消（AbortController）/词条位置 before_character_definition·order600·默认关闭（原落系统深度4 雷区）/必填「描述」lore 全链路/上下文楼层数（默认2只统计AI楼）+ test18 扩 15 项 | L2515 | cb41b1b |
+| 2026-09-07 | 编辑器双 bug：点输入栏自动退出（showEnemyInfo 残留 onclick 污染共用容器→target 判断式+openEditor 清除）+ 世界书载入即开战召唤物发散致保存 null value（syncEditorDataToMemory 4 处守卫）+ harness test20 + srcLine 重映射 | L2526 | 065af03 |

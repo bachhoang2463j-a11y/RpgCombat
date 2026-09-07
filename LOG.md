@@ -2522,3 +2522,18 @@
 - **涉及文件**：`index.html`、`integration-test/harness.html`、`README.md`（§10.7 同步）、`敌方生成规则精简版.md`（描述协议）（`cb41b1b`）。
 - **经验证**：内联 script `new Function` 语法通过；围栏纪律复查（全文件三连序列仍为 2）；IAB 跑脚手架 **229 项断言全部通过**（test1-17/19 无回归 + test18 扩至 31 项：双楼采集/用户楼过滤/描述必填与全链路/词条 schema（enabled:false + before_character_definition/600）/取消流（慢端点永不返回 + abort 触发 + 横幅出现消失 + 回落开战 + 不写回））。施工插曲：本地静态服务器进程中途退出导致 harness 挂载超时，重启服务器后恢复（非代码问题）。
 - **决策原因**：用户四条原文——①"生成时没有提醒，需要加入提醒按钮和取消生成，如果玩家觉得等得太久就取消自己开战"②"世界书位置在系统深度4，这个位置是AIRP的雷区……把插入位置固定为角色定义之前600，且默认为关闭状态避免影响正文（程序应该不在乎世界书词条是否开启？——答：正确，匹配链只看本地管理器开关）"③"让AI写回时给每个敌人加入简短介绍，lore地让玩家明白这个敌人为什么有这些特性"④"在导演人格加入上下文楼层，默认为2层（当前应该只统计AI楼层……2层给技能和介绍作参考最稳定）"。
+
+---
+
+## [LOG-211] 2026-09-07 — 编辑器双 bug：点击输入栏自动退出（弹窗 onclick 污染）+ 世界书载入后保存报 null value（召唤物数组发散）
+
+- **事故一：编辑器点击输入栏自动退出**（用户实机反馈）。
+  - **根因**：`#editor-modal` 是敌人信息面板（`showEnemyInfo`）与「数据覆写」编辑器（技能编辑所在）的共用容器；`showEnemyInfo` 结尾给容器挂 `modal.onclick = closeEditor;`（无 target 判断，任何冒泡 click 都会关弹窗），之后 `openEditor()` 只重写 innerHTML 从不清除该残留 handler；编辑器内输入框（技能名/HP 等全部 `edit-input-game`）无 stopPropagation，点击输入栏 → click 冒泡到容器 → `closeEditor` → 编辑器秒关、未保存输入全部丢失。删除按钮等元素因自带 stopPropagation 幸免，症状看起来只在输入框上。
+  - **修复**（两处一行级）：① `showEnemyInfo` 的赋值改 target 判断式 `modal.onclick = function (e) { if (e.target === modal) closeEditor(); };`——只点遮罩本身才关闭，敌人面板「点背景关闭」既有行为保留且比原来更健壮（面板内容冒泡不再误关）；② `openEditor()` 开头加 `modal.onclick = null` 防御性清除残留（双保险，与调用顺序无关）。
+- **事故二：世界书载入后修改数据报 `Cannot read properties of null (reading 'value')`（srcdoc:15344）**（用户实机反馈，同时刻两条）。
+  - **根因**：「世界书载入」会立即 `startGame()` 开战（用户以为还在开战前，实际回合已在自动推进）；战斗中召唤物**即时 push** 进 `enemiesData`/`heroesData`（【修复①】即时入队特性）。编辑器打开时渲染的是当时快照，战斗继续推进使数组变长；点「保存应用」时 `syncEditorDataToMemory()` 遍历**实时**数组，`getElementById('edit-e-N-...')` 对新增召唤物返回 null → 读 `.value` 崩溃，保存流程中断（编辑器卡住；再点一次再崩 = 同时刻两条报错）。
+  - **修复**（4 处守卫，手术式）：`syncEditorDataToMemory` 我方/敌方实体循环与技能子循环开头各加 `if (!document.getElementById(...name)) return;`——战斗中新增的召唤物/新技能无表单即跳过不覆盖，保留其实时战斗数据；保存继续走完 `initUI()` 刷新战场，用户未保存的编辑不再丢失。（物品循环已有同型守卫 `if (!catEl) return it;`，无需动。）
+- **harness test20**（10 项断言）：①静态——源码无裸 `modal.onclick = closeEditor` 赋值、`openEditor` 清除残留、showEnemyInfo 为 target 判断式；②功能仿真——正则提取 `syncEditorDataToMemory` 源码，stub document 模拟「敌人1（召唤物）与技能(0,1) 无表单」的发散场景，执行不抛错且召唤物运行时数据（hp/name/新技能名）未被覆盖；③对照组——剥掉守卫行后同场景必抛 null TypeError（证明仿真有效、守卫是真防线）。
+- **涉及文件**：`index.html`、`integration-test/harness.html`（test20 + 注册）、`integration-test/fix-srclines.cjs` 复跑（本轮 +7 行使 3 条 addHistory 行号漂移，test10 失配，脚本重映射 119 条后 118↔118 对齐）。
+- **经验证**：内联 script `new Function` 语法通过；IAB 跑脚手架 **241 项断言全部通过**（test1-19 无回归 + test20 新增 10 项）；IAB 行为验证（真实 index.html iframe 内）：openEditor 清除残留 handler、旧污染 handler 被 openEditor 清除、点击输入框编辑器保持打开、showEnemyInfo 实路径 onclick 为函数（非裸 closeEditor）、点面板内容不关闭、点遮罩本身正常关闭。
+- **决策原因**：用户两个实机反馈——"插件技能编辑器点击输入栏自动退出"与"开战前点进技能设置选择世界书载入，修改数据会弹 Uncaught TypeError: Cannot read properties of null (reading 'value') about:srcdoc:15344"。第二个经定位实为「世界书载入即开战 + 召唤物即时入队」两特性与编辑器快照语义的交叉冲突，非世界书载入本身问题。另：用户询问的 1MB 单页卡顿性能优化本轮**未做**（用户确认暂不动），排查结论留档：①Tailwind Play CDN 运行时 JIT（MutationObserver 持续重扫，最大嫌疑）②WebM 特效逐帧 CPU 抠图（processVideoFrame，~4MB/帧 getImageData+JS 循环）③callLLM 全量深拷贝聊天记录（JSON.parse(JSON.stringify(ctx.chat))）+ 全量 stringify debug 日志 ④41 个 infinite 动画 × 15 处 backdrop-filter 常驻合成；无 base64 内嵌大图，后续按此清单分批做。

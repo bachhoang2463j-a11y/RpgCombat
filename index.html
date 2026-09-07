@@ -2738,9 +2738,9 @@ const DIGEST_RULES = [
   { srcLine: 9363,  kind: 'event',  re: /^ {0,4}🧪 \[(.+?)\] 倒地之际毒素囊袋\/毒物爆裂，致命毒瘴弥漫全场！.*$/, build: m => ({ text: `🧪 ${m[1]} 倒地毒爆，致命毒瘴弥漫全场` }) },
   { srcLine: 9365,  kind: 'event',  re: /^ {0,4}🗡️ \[(.+?)\] 临死触发残余锐芒\/绝命暗器，破甲狂澜贯穿全场！.*$/, build: m => ({ text: `🗡️ ${m[1]} 临死反扑，破甲贯穿全场` }) },
   { srcLine: 9367,  kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 濒死引爆了潜藏能量\/发动绝命反扑，剧烈冲击波波及全体！.*$/, build: m => ({ text: `💥 ${m[1]} 濒死引爆，冲击波波及全体` }) },
-  { srcLine: 16978, kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 生命跌破极限，触发【绝境爆发】（二阶段觉醒）！.*$/, build: m => ({ text: `💥 ${m[1]} 绝境爆发（二阶段觉醒），进入狂怒强化` }) },
-  { srcLine: 16989, kind: 'token',  re: /^ {0,4}↳ 🩸 \[(.+?)\] 伤势沉重陷入【濒死狂怒】，凶暴之气大涨（攻击力提升 50%）！$/, build: m => ({ token: `${m[1]}濒死狂怒` }) },
-  { srcLine: 17003, kind: 'token',  re: /^ {0,4}↡ ⚡ \[(.+?)\] 濒死求生本能激发（绝境抢攻），不顾伤势立刻抢先反扑！$/, build: m => ({ token: `${m[1]}绝境抢攻` }) },
+  { srcLine: 16985, kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 生命跌破极限，触发【绝境爆发】（二阶段觉醒）！.*$/, build: m => ({ text: `💥 ${m[1]} 绝境爆发（二阶段觉醒），进入狂怒强化` }) },
+  { srcLine: 16996, kind: 'token',  re: /^ {0,4}↳ 🩸 \[(.+?)\] 伤势沉重陷入【濒死狂怒】，凶暴之气大涨（攻击力提升 50%）！$/, build: m => ({ token: `${m[1]}濒死狂怒` }) },
+  { srcLine: 17010, kind: 'token',  re: /^ {0,4}↡ ⚡ \[(.+?)\] 濒死求生本能激发（绝境抢攻），不顾伤势立刻抢先反扑！$/, build: m => ({ token: `${m[1]}绝境抢攻` }) },
   // --- 敌方战术 ---
   { srcLine: 12232, kind: 'token',  re: /^ {0,4}↳ 前排掩护：近战群攻仅命中前排$/, build: m => ({ token: '前排掩护' }) },
   { srcLine: 11382, kind: 'token',  re: /^ {0,4}↳ 后排掩护：.+? 远程\/法术命中 -\d+.*$/, build: m => ({ token: '后排掩护' }) },
@@ -13825,7 +13825,7 @@ function showEnemyInfo(enemy) {
       </div>
     </div>
   `;
-  modal.onclick = closeEditor;
+  modal.onclick = function (e) { if (e.target === modal) closeEditor(); };
   modal.classList.remove('hidden');
   modal.classList.add('flex');
 }
@@ -14405,6 +14405,7 @@ function getEnemyTierLabel(tier) {
 
 function openEditor(keepScroll) {
   const modal = document.getElementById('editor-modal');
+  modal.onclick = null; // 清除 showEnemyInfo 遗留的遮罩关闭处理器，防点击输入框冒泡误关编辑器
   modal.classList.remove('hidden');
   modal.classList.add('flex');
   let savedScrollTop = 0;
@@ -15178,6 +15179,8 @@ function syncGlobalEditorSummary() {
 
 function syncEditorDataToMemory() {
   heroesData.forEach((h, i) => {
+    // 守卫：编辑器打开期间战斗新增的召唤物无表单（DOM 与实时数组发散），跳过以免读 null.value 崩掉保存
+    if (!document.getElementById(`edit-h-${i}-name`)) return;
     h.name = document.getElementById(`edit-h-${i}-name`).value;
     h.img = document.getElementById(`edit-h-${i}-img`).value;
     h.classType = document.getElementById(`edit-h-${i}-class`).value || null;
@@ -15189,8 +15192,9 @@ function syncEditorDataToMemory() {
     h.def = Number(document.getElementById(`edit-h-${i}-def`).value);
     h.spd = Number(document.getElementById(`edit-h-${i}-spd`).value);
     h.actCount = Math.max(1, Number(document.getElementById(`edit-h-${i}-act`).value) || 1);
-    h.skills.forEach((s, si) => { 
-        s.name = document.getElementById(`edit-h-${i}-s-${si}-name`).value; 
+    h.skills.forEach((s, si) => {
+        if (!document.getElementById(`edit-h-${i}-s-${si}-name`)) return; // 技能级发散守卫（召唤物即时入列时新技能无表单）
+        s.name = document.getElementById(`edit-h-${i}-s-${si}-name`).value;
         let reactionVal = document.getElementById(`edit-h-${i}-s-${si}-reaction`).value;
         s.isReaction = reactionVal !== 'none';
         s.reactionTarget = reactionVal === 'none' ? 'all' : reactionVal;
@@ -15300,6 +15304,8 @@ function syncEditorDataToMemory() {
     });
   });
   enemiesData.forEach((e, i) => {
+    // 守卫：编辑器打开期间战斗新增的召唤物无表单（DOM 与实时数组发散），跳过以免读 null.value 崩掉保存
+    if (!document.getElementById(`edit-e-${i}-name`)) return;
     e.name = document.getElementById(`edit-e-${i}-name`).value;
     e.emoji = document.getElementById(`edit-e-${i}-emoji`).value;
     e.img = document.getElementById(`edit-e-${i}-img`).value;
@@ -15312,8 +15318,9 @@ function syncEditorDataToMemory() {
     e.def = Number(document.getElementById(`edit-e-${i}-def`).value);
     e.spd = Number(document.getElementById(`edit-e-${i}-spd`).value);
     e.isWise = document.getElementById(`edit-e-${i}-isWise`).checked;
-    e.skills.forEach((s, si) => { 
-        s.name = document.getElementById(`edit-e-${i}-s-${si}-name`).value; 
+    e.skills.forEach((s, si) => {
+        if (!document.getElementById(`edit-e-${i}-s-${si}-name`)) return; // 技能级发散守卫（召唤物即时入列时新技能无表单）
+        s.name = document.getElementById(`edit-e-${i}-s-${si}-name`).value;
         s.damageType = document.getElementById(`edit-e-${i}-s-${si}-dmgType`).value;
         s.isOthers = document.getElementById(`edit-e-${i}-s-${si}-others`).checked;
         s.guaranteedHit = document.getElementById(`edit-e-${i}-s-${si}-guaranteed`).checked;
