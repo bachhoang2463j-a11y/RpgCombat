@@ -221,3 +221,4 @@
 | 2026-09-08 | 性能优化③（批次A）：重击/受击特效 CSS 降本（震屏 will-change 提层/burst-core 亮度脉冲合成器化/四组受击闪色 steps(1) 化保色反馈/冲击环 stroke-width→scale/四处双 drop-shadow 并单）+ test23 真触发仿真 | L2567 | ecd5ed3 |
 | 2026-09-08 | 性能优化④（批次B）：敌人 sprite 常驻辉光逐帧 filter 改静态（.breathe 全体呼吸/.charge-full-danger 0.15s 警示抖动）待机零逐帧重绘 + test24 计算样式验证 | L2581 | 2c03a6b |
 | 2026-09-08 | 性能优化⑤（批次C1）：WebM 抠图 rVFC 节流（60Hz→按解码帧，CPU 减半视觉零变化）+ 画布封顶 960px 降采样 + FX_WEBM_SCREEN_MODE 低配开关；315 项全绿收官 | L2593 | e3a86d0 |
+| 2026-09-08 | 性能优化⑥（批次D）：正则产物压缩管线 build-regex.cjs（terser+实体/围栏双重加固+html-minifier，replaceString -26%）+ jQuery 原生化删 90KB 外链 + js-yaml 内联零外链 + build-tailwind 幂等自检修复；315 全绿 + 354 元素指纹零差异 | L2595 | da452a5 |

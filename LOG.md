@@ -2599,3 +2599,18 @@
 - **涉及文件**：`index.html`、`integration-test/harness.html`（test25）（`e3a86d0`）。
 - **经验证**：harness test25 新增 9 项（rVFC 调度与 rAF 回落 / 画布封顶+CSS 钉尺寸 / 亮度键 12/80 阈值守卫 / 污染 fallback 保留）。**315 项全绿**（四批累计 test22~25 新增 61 项）。真机视频特效帧率待用户实测。
 - **决策原因**：性能优化四批收官；WebM 方案据用户历史信息修正为「保视觉砍成本」路线（rVFC 节流+降采样），screen 降为显式开关而非默认路径。
+
+---
+
+## [LOG-217] 2026-09-08 — 正则产物压缩管线 + 零外链（性能优化批次 D）
+
+- **变更行为**：
+  1. **build-regex.cjs 产物压缩管线**：源码 index.html 保持可读，只压嵌入正则 JSON 的副本；自动前置 build-tailwind（类名产物永远最新）。管线四步：内联脚本过 terser（`--mangle` + `evaluate=false`——防常量折叠把拆分字符串合并）→ **实体加固**（实体模式 `&` 前缀改写 `\u0026`：酒馆消息管线会对代码块内容做 HTML 实体解码，双引号串里的 `"&quot;"` 解码成 `"""` 直接炸脚本语法——MiniMapStatus 压缩产物实测事故，本仓库源码 `replace(/"/g,'&quot;')` 同款 6 处全部命中加固）→ **围栏加固**（源码特意用 `\u0060` 转义的提示词反引号会被 terser 反转义回字面反引号，3+ 连形成裸 ``` 破坏围栏配对——test19 同款事故面；改回 `\u0060` 转义形式，字符串/正则语义等价）→ html-minifier-terser 压 HTML/CSS（minify-js 关闭，脚本已单独压）。产物断言：逐块 new Function 语法校验、解码模拟后语法校验、引号类实体（&quot;/&apos;）全产物禁绝（HTML 属性区被解码会截断属性值）、围栏纪律、结构哨兵。replaceString **1,073,506 → 791,621 字符（-26%）**。
+  2. **jQuery 原生化**：全项目仅 `injectTextToTavern` 一处 `$()`，换 `parent.document.querySelector` + `dispatchEvent(new Event('input',{bubbles:true}))`，删除 90KB CDN 外链。
+  3. **js-yaml 4.1.0 内联**（39KB，与 MiniMapStatus 同款同版本）：楼层 iframe 不再访问 jsdelivr。
+  4. **修复 build-tailwind 幂等替换路径自检误报**：替换既有标记块时 `<style>` 数不变，但 +1 断言无条件执行——V11.03 之后任何重跑必炸的既有 bug；改为分支断言（替换路径不变 / 插入路径 +1）。
+  5. **loading-tip 既有显示瑕疵修复**：`等待 LLM 输出 &lt;Combat_block&gt; 正则标签` 的文本节点实体被管线解码后，`<Combat_block>` 被浏览器当未知元素吞掉尖括号（新旧产物同病）；改全角 `＜Combat_block＞` 永续安全。placeholder 属性区的 `&lt;/&gt;/&#10;` 经评估为解码等价（引号内），保留。
+  6. fix-srclines 重映射 119 条 srcLine（js-yaml 内联 +3 行 / jQuery 标签 -1 行漂移）。
+- **涉及文件**：`index.html`、`build-regex.cjs`（新增）、`build-tailwind.cjs`、`regex-前端战斗v11_11.json`（`da452a5`）。
+- **经验证**：harness **315 项全绿**（含 test10 行号对齐 / test19 围栏 == 2 / test21 类名覆盖零缺失；IAB 内跑需前台聚焦，后台定时器钳制会使异步链爬行）；源码版/压缩产物版 **354 元素 × 22 属性计算样式指纹零差异**；产物引号实体 0、围栏 0、jsdelivr/jquery 引用 0。
+- **决策原因**：加特效前先立压缩管线——压缩是构建期幂等步骤，管线先行则每个新特效立即获得实体/围栏/语法断言保护与体积账（构建打印前后大小），变更归因也干净；MiniMapStatus 已实证 terser 引号归一 × 酒馆实体解码的组合雷，加固为必选项而非可选项。
