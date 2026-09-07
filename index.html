@@ -16179,7 +16179,7 @@ async function callDirectorLLM(userContent, abortSignal) {
     return String(content);
 }
 
-// ---- 输入构造：敌名列表 + 剧情语境（近 N 层 AI 楼，剥数据块，每楼取尾部 ~600 字符） ----
+// ---- 输入构造：敌名列表 + 剧情语境（近 N 层 AI 楼，剥数据块；开战楼全量，铺垫楼取尾部 1000 字符） ----
 function stripDirectorNoise(text) {
     return String(text || '')
         .replace(/<Combat_block>[\s\S]*?<\/Combat_block>/gi, '')
@@ -16193,12 +16193,12 @@ async function getDirectorStoryFragment() {
         if (typeof getCurrentMessage !== 'function') return '';
         const n = Math.max(1, Math.min(10, parseInt(directorState.contextFloors, 10) || 2));
         const parts = [];
-        // 当前楼（必发，无论角色）
+        // 开战楼（必发，无论角色）：全量正文——敌人在本楼出场，信号密度最高
         const cur = getCurrentMessage();
         const curActual = (Array.isArray(cur) && cur.length > 0) ? cur[0] : cur;
         const curText = stripDirectorNoise(curActual && (curActual.message || curActual.mes || curActual.content));
-        if (curText) parts.push(curText.slice(-600));
-        // 历史 AI 楼（不含当前，从最近往回补 n-1 层；只统计 AI 楼层——铺垫楼+开战楼是语境主体）
+        if (curText) parts.push(curText);
+        // 铺垫楼（不含当前，从最近往回补 n-1 层；只统计 AI 楼层——铺垫楼+开战楼是语境主体）：取尾部 1000 字符
         if (n > 1 && typeof getChatMessages === 'function' && typeof getCurrentMessageId === 'function') {
             const curIdRaw = getCurrentMessageId();
             const curId = Number(curIdRaw);
@@ -16210,7 +16210,7 @@ async function getDirectorStoryFragment() {
                         const m = msgs[i];
                         if (!m || m.is_user || m.is_system) continue;
                         const t = stripDirectorNoise(m.message || m.mes || m.content);
-                        if (t) parts.unshift(t.slice(-600)); // 时间正序
+                        if (t) parts.unshift(t.slice(-1000)); // 时间正序
                     }
                 }
             }

@@ -949,9 +949,9 @@ async function test18() {
   // 双 AI 楼语境（铺垫楼 + 开战楼），验证上下文楼层数=2 的多楼采集与用户楼过滤（无 Combat_block，防轮询误触发）
   MOCK.setChat([
     { message: '我们整队出发。', role: 'user', is_user: true },
-    { message: '<maintext>荒原深处传来狼嚎——据守山道的淬昀宗叛逃弟子身怀异宝，专修硬功。</maintext>', role: 'assistant', is_user: false },
+    { message: '<maintext>荒原深处传来狼嚎。' + '铺垫填充文本。'.repeat(300) + '据守山道的淬昀宗叛逃弟子身怀异宝，专修硬功。</maintext>', role: 'assistant', is_user: false },
     { message: '开始进攻。', role: 'user', is_user: true },
-    { message: '<maintext>风雪之中，四人踏入荒原，与叛逃弟子对峙。</maintext>\n【状态栏标记点】', role: 'assistant', is_user: false },
+    { message: '<maintext>楼首标记对峙开场。' + '开战楼正文填充。'.repeat(120) + '风雪之中，四人踏入荒原，与叛逃弟子对峙。</maintext>\n【状态栏标记点】', role: 'assistant', is_user: false },
   ]);
   MOCK.worldbooks['测试角色卡'] = [];
   w.eval('worldbookCache = []; worldbookIndex = {};');
@@ -970,6 +970,8 @@ async function test18() {
   check(/测试强盗/.test(userContentA) && /风雪之中/.test(userContentA), 'user 内容含敌名列表与开战楼正文');
   check(/叛逃弟子/.test(userContentA), '上下文楼层数=2：铺垫楼正文一并送入（多楼采集）');
   check(!/整队出发/.test(userContentA) && !/开始进攻/.test(userContentA), '只统计 AI 楼层：用户楼正文不进入语境');
+  check(/楼首标记对峙开场/.test(userContentA), '开战楼正文全量送入（>600 字时楼首内容不截）');
+  check(!/荒原深处传来狼嚎/.test(userContentA), '铺垫楼只取尾部 1000 字符（楼首超界内容被截）');
   check(bodies[0].messages[0].role === 'system' && /敌方生成规则/.test(bodies[0].messages[0].content) && /```yaml/.test(bodies[0].messages[0].content), '系统提示词 = 内置《敌方生成规则精简版》全文');
   eq(bodies[0].temperature, 0.5, 'temperature 独立可配（默认 0.5，非对话页硬编码）');
   const wbEntries = MOCK.worldbooks['测试角色卡'];
