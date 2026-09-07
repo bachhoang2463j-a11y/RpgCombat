@@ -2636,3 +2636,15 @@
 - **涉及文件**：`index.html`、`integration-test/harness.html`（test27）。
 - **经验证**：harness test27 新增 23 项（注册表字段 / 10 组 keyframes / iframe 真触发挂载→1.5s 零残留清理 / 古神低语合成音可调用）。**344 项全绿**（含 test10 行号对齐复绿）。真机视觉待用户实测。
 - **决策原因**：两 demo 方案原样移植保持视觉一致；音效遵循用户指定（fog_cloud.ogg / 古神低语合成）；走重击特判模式而非 WebM 通道，因纯 SVG 全屏演出与 url:'' 空视频天然兼容且单体/群体系出同源。
+
+---
+
+## [LOG-220] 2026-09-08 — 造雾术音效本地化 + 召唤附签技能战后 releases 双计修复
+
+- **变更行为**：
+  1. **[特效:造雾术] 音效本地化**：fog_cloud.ogg 在线 URL → `${ASSET_BASE}/fog.mp3`（用户提供的 D:\Project\my_assets\fog.mp3，经本地资产服务器托管，实测 200 audio/mpeg 40KB）。
+  2. **召唤+附签技能 releases 双计修复**（用户报告【召唤-古革巨人】[高阶] 实释 1 次统计"2 次释放"）：根因与蓄力无关——executeSkillAction 召唤分支先写 `> X 发动了【技能】` action 行，带附签（[单防] 等）不走 `_onlySummon` 提前返回，末尾又写 `> X 对 Y 发动了【技能】` 标准行；两条 action 节点同 caster+skill+tier，collectKeySkills 各计 1 → releases=2。直通释放的召唤+附签技能同样命中。修复：`_onlySummon` 判定提到 addHistory 之前，仅纯召唤在召唤分支写唯一 action 行，带附签只留末尾标准行。
+  3. srcLine 重映射 119 条（+2 行漂移，HEAD→工作区调用行升序映射）。
+- **涉及文件**：`index.html`、`integration-test/harness.html`（test27 断言更新 + test28 新增）。
+- **经验证**：harness test28 新增 4 项（蓄满释放全流程真触发：action 行 1 条 / releases=1 / tier 归档 / 纯召唤路径仍唯一 action 行）。**348 项全绿**。真机待用户实测。
+- **决策原因**：双写 action 行会让所有召唤+附签技能的战后统计虚高（蓄力只是用户观察到的触发场景）；纯召唤与附签召唤各自保留恰好一条 action 行，战报可读性与统计准确性兼得。

@@ -1419,7 +1419,7 @@ async function test27() {
   // ① 注册表：两个标签、纯 SVG（url 空）、particles 类型、delay、音效配置
   check(/'造雾术': \{ url: '', scale: 1\.0, particles: 'rlyeh_sediment', audioUrl: RLYEH_FOG_CLOUD_URL, delay: 1\.0 \}/.test(src), '注册表：造雾术（fog_cloud.ogg + delay 1.0）');
   check(/'高阶召唤术': \{ url: '', scale: 1\.0, particles: 'titan_gaze', audioUrl: 'none', delay: 1\.0 \}/.test(src), '注册表：高阶召唤术（古神低语合成 + delay 1.0）');
-  check(src.includes("const RLYEH_FOG_CLOUD_URL = 'https://raw.githubusercontent.com/JimHPerry/psfx/main/sounds/spells/fog_cloud.ogg'"), 'fog_cloud.ogg 在线音效 URL 正确');
+  check(src.includes('const RLYEH_FOG_CLOUD_URL = `${ASSET_BASE}/fog.mp3`;'), 'fog.mp3 本地资产音效（ASSET_BASE 托管 my_assets）');
   // ② CSS 关键帧：两特效全部关键帧存在
   for (const name of ['mist-obsidian-carpet', 'mist-vertical-jet', 'target-fog-shroud', 'fog-shake-std-anim',
                       'titan-shadow-loom', 'titan-baleful-glare', 'psychic-tsunami-surge', 'brine-drown-vignette',
@@ -1455,6 +1455,50 @@ async function test27() {
   rpgWin().eval('window.__t27err = undefined; window.__t27whisperErr = undefined;');
 }
 
+async function test28() {
+  head('28 召唤+附签技能释放计数：一次释放只写一条 action 行（战后 releases 不双计）');
+  MOCK.resetVars(); seedChat(); seedState();
+
+  const SKILL = '【召唤-古革巨人】[高阶][召唤:幻梦行军兽][单防;power:10][MP:20][法术][延迟:2]';
+  injectHeroes([heroSpec({ name: '埃利奥特', hp: 100, maxHp: 100, mp: 100, maxMp: 100,
+    skills: [rpgWin().parseSkill(SKILL)] })]);
+  rpgWin().eval(`
+    window.__t28Summon = window.summonFromWorldbook; window.summonFromWorldbook = async () => {};
+    window.__t28EndTurn = window.endTurn; window.endTurn = async () => {};
+    battleHistory = []; _historyRawCache = '';
+    heroesData[0].currentDelay = { skill: parseSkill(${JSON.stringify(SKILL)}), remaining: 0 };
+  `);
+  // 蓄满释放：doReleaseCharge（自施放语义）→ executeSkillAction 全流程（heroesData 是顶层 let，跨 realm 须在 iframe 内 eval）
+  await rpgWin().eval('doReleaseCharge(heroesData[0], heroesData[0])');
+  const r = rpgWin().eval(`(function () {
+    var acts = battleHistory.filter(l => /^> .*发动了【召唤-古革巨人】/.test(l));
+    var tree = digestTrackTiers(mergeDigest(parseBattleDigest(battleHistory.join('\\n'))));
+    var ks = collectKeySkills(tree);
+    var e = ks.find(x => x.caster === '埃利奥特' && x.name === '召唤-古革巨人');
+    return { actLines: acts.length, actDetail: acts, releases: e ? e.releases : null, tier: e ? e.tier : null };
+  })()`);
+  eq(r.actLines, 1, '一次释放只写一条 action 战报行（实测 ' + r.actLines + ' 条：' + r.actDetail.join(' | ') + '）');
+  eq(r.releases, 1, '战后统计 releases = 1（不双计）');
+  check(r.tier === '[高阶]', 'tier 归档为 [高阶]（' + r.tier + '）');
+  // 纯召唤（无附签）路径：唯一 action 行仍在召唤分支写下
+  const SKILL_PURE = '【召唤-纯】[召唤:幻梦行军兽][MP:10][法术]';
+  rpgWin().eval(`
+    heroesData = [Object.assign(${JSON.stringify(heroSpec({ name: '埃利奥特', hp: 100, maxHp: 100, mp: 100, maxMp: 100 }))}, { skills: [parseSkill(${JSON.stringify(SKILL_PURE)})] })];
+    battleHistory = []; _historyRawCache = '';
+  `);
+  await rpgWin().eval('executeSkillAction(heroesData[0], heroesData[0], heroesData[0].skills[0], 1, false, true)');
+  const pure = rpgWin().eval(`(function () {
+    return battleHistory.filter(l => /^> .*发动了【召唤-纯】/.test(l)).length;
+  })()`);
+  eq(pure, 1, '纯召唤（无附签）仍有唯一 action 行');
+  // 清理桩
+  rpgWin().eval(`
+    window.summonFromWorldbook = window.__t28Summon; window.endTurn = window.__t28EndTurn;
+    delete window.__t28Summon; delete window.__t28EndTurn;
+    heroesData = []; enemiesData = []; battleHistory = []; _historyRawCache = '';
+  `);
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -1462,7 +1506,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
