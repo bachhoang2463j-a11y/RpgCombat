@@ -1145,6 +1145,65 @@ async function test20() {
   check(threwCtrl instanceof TypeError && /null/.test(String(threwCtrl.message)), '对照组（无守卫）抛 null TypeError（仿真有效）' + (threwCtrl ? '' : '  实际未抛'));
 }
 
+async function test21() {
+  head('21 Tailwind 静态编译纪律：Play CDN 清零 + 编译块结构 + 类名覆盖零缺失');
+  const src = await (await fetch('../index.html')).text();
+  // ① Play CDN 引用清零（运行时 JIT 的 MutationObserver 全文档监听 × 高频 DOM 变动的持续编译税，改为构建期编译内联）
+  check(!src.includes('cdn.tailwindcss.com'), 'Play CDN 引用清零');
+  // ② 编译块结构：标记唯一、<style> 恰 2 块、位置在自定义 </style> 之后 </head> 之前
+  //（复刻 Play CDN 标准模式实测注入位：head 末尾——平级覆盖时工具类仍赢，级联顺序与迁移前一致）
+  eq((src.match(/<!-- TAILWIND-CSS-START/g) || []).length, 1, 'TAILWIND-CSS-START 标记唯一');
+  eq((src.match(/<style>/g) || []).length, 2, '<style> 块数 == 2（自定义 + 编译）');
+  check(src.indexOf('</style>') < src.indexOf('<!-- TAILWIND-CSS-START') && src.indexOf('<!-- TAILWIND-CSS-START') < src.indexOf('</head>'), '编译块位于自定义 </style> 之后、</head> 之前');
+  const cssBlock = (src.match(/<!-- TAILWIND-CSS-START[\s\S]*?-->\s*<style>([\s\S]*?)<\/style>/) || [])[1] || '';
+  // ③ 产物健全性：哨兵类 + enemy.size 通道 safelist（唯一外部数据直进 class 的口子，取值为 text-* 字号档）
+  check(cssBlock.includes('.flex{'), '编译产物含哨兵类 .flex');
+  for (const n of [4, 5, 6, 7, 8, 9]) {
+    check(cssBlock.includes('.text-' + n + 'xl{') && cssBlock.includes('.sm\\:text-' + n + 'xl{'), 'safelist：text-' + n + 'xl 裸类与 sm: 变体齐备');
+  }
+  // ④ 类名覆盖零缺失：提取源码全部 class="..." 字面量段（跳 ${} 插值段与单引号拼接式捕获）+ classList 字面量参数，
+  //    每个类名必须能在文档 CSS（自定义 ∪ 编译块，反转义 \2c  十六进制转义后）找到选择器——
+  //    把「改了类名忘跑 node build-tailwind.cjs → 新类名静默无样式」变成显性测试失败
+  const cssUnescaped = [...src.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(mm => mm[1]).join('\n')
+    .replace(/\\([0-9a-fA-F]{1,6})\s?/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/\\(.)/g, '$1');
+  const tokens = new Set();
+  let m;
+  const attrRe = /class="([^"]*)"/g;
+  while ((m = attrRe.exec(src))) {
+    if (m[1].includes("'") || m[1].includes('+')) continue; // '...' + var + '...' 拼接上下文的捕获是噪声
+    const lit = m[1].replace(/\$\{[^}]*\}/g, ' ');
+    for (const t of lit.split(/\s+/)) if (t) tokens.add(t);
+  }
+  const clRe = /classList\.(?:add|remove|toggle)\(([^)]*)\)/g;
+  while ((m = clRe.exec(src))) {
+    const argRe = /'([^']*)'|"([^"]*)"/g;
+    let a;
+    while ((a = argRe.exec(m[1]))) {
+      const val = a[1] !== undefined ? a[1] : a[2];
+      if (val.includes('${')) continue;
+      for (const t of val.split(/\s+/)) if (t) tokens.add(t);
+    }
+  }
+  const validToken = /^[A-Za-z0-9_\-\[\]()%,.\/:#%]+$/;
+  const KNOWN_DEAD = new Set(['py-0.2']); // 历史死类：0.2 不在 v3 默认 spacing 刻度，Play CDN 时代同样无样式（修复反而新增内边距，保留现状并备案）
+  const selectorExists = (t) => {
+    const sel = '.' + t;
+    let pos = cssUnescaped.indexOf(sel);
+    while (pos !== -1) {
+      const next = cssUnescaped[pos + sel.length];
+      if (next === undefined || /[\s,{:>.~+[]/.test(next)) return true;
+      pos = cssUnescaped.indexOf(sel, pos + 1);
+    }
+    return false;
+  };
+  const candidates = [...tokens].filter(t => validToken.test(t));
+  const missing = candidates.filter(t => !KNOWN_DEAD.has(t) && !selectorExists(t));
+  check(missing.length === 0, '类名覆盖零缺失（' + candidates.length + ' 个 token 全部有样式）' + (missing.length ? '，缺：' + missing.slice(0, 10).join(' ') : ''));
+  // ⑤ 编译产物不得引入三连反引号（test19 围栏纪律；build-tailwind.cjs 写回时同样拦截）
+  eq((src.match(/```/g) || []).length, 2, '三连反引号仍 == 2（编译产物无围栏污染）');
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -1152,7 +1211,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
