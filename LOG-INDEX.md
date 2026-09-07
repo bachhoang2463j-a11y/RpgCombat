@@ -216,3 +216,4 @@
 | 2026-09-07 | 同楼层状态栏 <q> 污染事故修复：内嵌提示词 139 反引号破坏酒馆引号美化 ``` 配对豁免 → 全量 \u0060 转义（值不变）+ harness test19 管线仿真断言 | L2494 | c309098 |
 | 2026-09-07 | 导演兜底四项体验改进：生成中横幅+取消（AbortController）/词条位置 before_character_definition·order600·默认关闭（原落系统深度4 雷区）/必填「描述」lore 全链路/上下文楼层数（默认2只统计AI楼）+ test18 扩 15 项 | L2515 | cb41b1b |
 | 2026-09-07 | 编辑器双 bug：点输入栏自动退出（showEnemyInfo 残留 onclick 污染共用容器→target 判断式+openEditor 清除）+ 世界书载入即开战召唤物发散致保存 null value（syncEditorDataToMemory 4 处守卫）+ harness test20 + srcLine 重映射 | L2526 | 065af03 |
+| 2026-09-07 | 性能优化①：Tailwind Play CDN→静态预编译（运行时 JIT MutationObserver 编译税消除/87KB 产物内联回 </head> 前标记块·复刻 Play CDN 注入位/构建三件套/enemy.size safelist/harness test21 类名覆盖 1038 token 零缺失，254 全绿；344 元素指纹零差异） | L2543 | 80f2e0d |
