@@ -5,11 +5,11 @@
  *        ② 产物压缩（源码 index.html 保持可读，只压嵌入正则的副本）：
  *           - 每个内联 <script> 过 terser（--mangle；evaluate=false 防常量折叠；
  *             --comments 保留 @license）
- *           - 实体加固：脚本内实体模式的 & 前缀改写为 \u0026（字符串/正则语义等价）——
- *             酒馆消息管线会对代码块内容做 HTML 实体解码（&quot;→" 等），双引号串里的
- *             "&quot;" 解码成 """ 直接炸语法（MiniMapStatus 实测事故）；加固后产物脚本
- *             零实体模式，解码变空操作，并附解码模拟语法校验
+ *           - 围栏加固：源码特意用 \u0060 转义的反引号会被 terser 反转义回字面反引号，
+ *             3+ 连破坏围栏配对；改回转义形式（字符串/正则语义等价）
  *           - html-minifier-terser 压 HTML 空白/注释与 CSS（不碰脚本内容）
+ *           - 全量 & 实体免疫：产物内所有 & 改写为 &amp;，酒馆管线的实体解码
+ *             （含 &&notify 的无分号 &not→¬ 实测雷）还原后逐字节一致
  *        ③ 更新 regex-前端战斗*.json 的 replaceString（其余字段 id/findRegex 等原样保留）
  *  依赖：npx（首次运行下载 terser@5 / html-minifier-terser@7）。
  *  注意：改 index.html 后重跑本脚本即可；改了 Tailwind 类名也无需单独跑 build-tailwind（本脚本会先跑）。 */
@@ -38,8 +38,7 @@ function buildMinifiedHtml(html) {
       }
     );
 
-    // 2) 逐块 terser + 实体加固（详见文件头注释）
-    const ENTITY = /&(?=(?:lt|gt|quot|amp|apos|#\d{1,5}|#x[0-9a-fA-F]{1,5});)/g;
+    // 2) 逐块 terser + 围栏加固（详见文件头注释）
     for (let i = 0; i < slots.length; i++) {
       const inFile = path.join(TMP, 'in-' + i + '.js');
       const outFile = path.join(TMP, 'out-' + i + '.js');
@@ -49,22 +48,12 @@ function buildMinifiedHtml(html) {
         { cwd: ROOT, stdio: 'pipe', maxBuffer: 64 * 1024 * 1024 }
       );
       const min = fs.readFileSync(outFile, 'utf8');
-      // 实体加固：酒馆管线对代码块内容做 HTML 实体解码，实体模式 & 前缀改写为 \u0026
-      const hardened = min.replace(ENTITY, '\\u0026');
       // 围栏加固：源码里特意用 \u0060 转义的反引号（提示词文本的 ```yaml 代码块示例等）
       // 会被 terser 反转义回字面反引号，3+ 连反引号会破坏组件围栏配对（harness test19）；
       // 改回转义形式（字符串/正则字面量里语义完全等价）
-      const fencedIn = hardened.replace(/`{3,}/g, (m) => '\\u0060'.repeat(m.length));
-      if (new RegExp('&(?:lt|gt|quot|amp|apos|#\\d{1,5}|#x[0-9a-fA-F]{1,5});').test(fencedIn)) {
-        fail('脚本块 #' + i + ' 实体加固后仍残留实体模式');
-      }
+      const fencedIn = min.replace(/`{3,}/g, (m) => '\\u0060'.repeat(m.length));
       if (/`{3,}/.test(fencedIn)) fail('脚本块 #' + i + ' 围栏加固后仍残留 3+ 连反引号');
       new Function(fencedIn); // 语法级断言
-      // 解码模拟：按酒馆管线已知行为做一次实体解码，解码后仍须语法完好
-      const decoded = fencedIn
-        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
-        .replace(/&apos;/g, "'").replace(/&amp;/g, '&');
-      try { new Function(decoded); } catch (e) { fail('脚本块 #' + i + ' 解码模拟后语法失败：' + e.message); }
       if (fencedIn.includes('</scr' + 'ipt')) fail('脚本块 #' + i + ' 含 </script，会截断内联脚本');
       out = out.replace('<!--__MINIFY_SLOT_' + i + '__-->', () => '<script>' + fencedIn.trim() + '</script>');
     }
@@ -80,14 +69,19 @@ function buildMinifiedHtml(html) {
     // 4) 产物断言
     if (!/<\/html>/i.test(minified)) fail('压缩产物缺少 </html>');
     if (minified.includes('```')) fail('压缩产物含裸三反引号，违反围栏纪律');
-    // 引号类实体全产物禁绝：脚本区已被加固清零，HTML 属性区的 &quot;/&apos; 会被
-    // 酒馆管线解码成裸引号、截断属性值（&lt;/&gt;/&#N; 在引号内解码显示等价，无害）
-    const badEntities = minified.match(/&(?:quot|apos);/g) || [];
-    if (badEntities.length) fail('压缩产物含引号类实体 ' + badEntities.length + ' 处（会被管线解码破坏属性），请改写源码对应位置');
     for (const sentinel of ['id="battle-result-modal"', '<canvas']) {
       if (!minified.includes(sentinel)) fail('压缩产物缺少结构哨兵 ' + sentinel);
     }
-    return minified;
+
+    // 5) 全量 & 实体免疫：酒馆管线对代码块内容做 HTML 实体解码，且包含无分号旧式
+    //    实体（实测 &&notify 的 &not → ¬ 炸语法）——代码位置的 & 无法用 JS 转义规避。
+    //    统一把产物中所有 & 改写为 &amp;：管线单遍解码后逐字符还原（代码/字符串/
+    //    HTML 文本/属性/CSS 皆然），解码结果与改写前逐字节一致（下方断言），
+    //    从根上免疫管线的任何实体解码行为（含分号/无分号/数字形式）。
+    const immune = minified.replace(/&/g, '&amp;');
+    if (/&(?!amp;)/.test(immune)) fail('全量 & 转义后仍存在非 &amp; 形式的 & 序列');
+    if (immune.replace(/&amp;/g, '&') !== minified) fail('&amp; 还原一致性校验失败');
+    return immune;
   } finally {
     fs.rmSync(TMP, { recursive: true, force: true });
   }
