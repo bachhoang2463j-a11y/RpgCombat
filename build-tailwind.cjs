@@ -47,8 +47,9 @@ let html = fs.readFileSync(HTML, 'utf8');
 const block = START_MARK + '\r\n<style>\r\n' + css + '\r\n</style>\r\n' + END_MARK;
 const blockRe = new RegExp(esc(START_MARK) + '[\\s\\S]*?' + esc(END_MARK));
 const styleCountBefore = (html.match(/<style>/g) || []).length;
+const isReplace = blockRe.test(html);
 
-if (blockRe.test(html)) {
+if (isReplace) {
   html = html.replace(blockRe, block);
   console.log('[build-tailwind] 替换既有标记块');
 } else {
@@ -60,14 +61,15 @@ if (blockRe.test(html)) {
 }
 fs.writeFileSync(HTML, html);
 
-// 4. 写回后结构自检
+// 4. 写回后结构自检（替换路径块数不变；首次插入路径 +1）
 const final = fs.readFileSync(HTML, 'utf8');
 const styleCountAfter = (final.match(/<style>/g) || []).length;
+const expectCount = isReplace ? styleCountBefore : styleCountBefore + 1;
 if (final.includes('cdn.tailwindcss.com')) fail('写回后仍残留 cdn.tailwindcss.com 引用');
 if (!blockRe.test(final) || final.match(new RegExp(esc(START_MARK), 'g')).length !== 1) {
   fail('标记块数量异常（应为 1）');
 }
-if (styleCountAfter !== styleCountBefore + 1) {
-  fail('写回后 <style> 块数 ' + styleCountAfter + ' ≠ 预期 ' + (styleCountBefore + 1));
+if (styleCountAfter !== expectCount) {
+  fail('写回后 <style> 块数 ' + styleCountAfter + ' ≠ 预期 ' + expectCount + '（' + (isReplace ? '替换路径应不变' : '插入路径应 +1') + '）');
 }
 console.log('[build-tailwind] 完成：产物 ' + css.length + ' 字节，index.html ' + final.split('\n').length + ' 行');
