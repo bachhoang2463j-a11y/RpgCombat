@@ -931,7 +931,7 @@ async function test18() {
   // —— 公共桩：导演端点 + confirm 放行 + fetch 拦截（记录请求体供反馈断言） ——
   // （localStorage 的导演设置会跨运行残留——上一轮 (e) 存的 temperature 会经启动平铺覆盖运行时，先清再设）
   w.localStorage.removeItem('rpg_combat_director_settings');
-  w.eval("directorState.activePreset = 0; directorState.temperature = 0.5; directorState.apiUrl='http://director-mock'; directorState.apiKey='sk-test'; directorState.model='mock-dir'; directorState.systemPrompt='';");
+  w.eval("directorState.activePreset = 0; directorState.temperature = 0.5; directorState.contextFloors = 2; directorState.apiUrl='http://director-mock'; directorState.apiKey='sk-test'; directorState.model='mock-dir'; directorState.systemPrompt='';");
   let confirmCalls = 0, fetchCalls = 0;
   const bodies = [];
   let responder = null;
@@ -946,11 +946,17 @@ async function test18() {
 
   // —— (a) 生成过校验替换开战 + 世界书写回 + 下次命中 ——
   MOCK.resetVars();
-  seedChat(); // 固定本楼正文语境（此前 test7/12/15 会改写 mock 聊天）
+  // 双 AI 楼语境（铺垫楼 + 开战楼），验证上下文楼层数=2 的多楼采集与用户楼过滤（无 Combat_block，防轮询误触发）
+  MOCK.setChat([
+    { message: '我们整队出发。', role: 'user', is_user: true },
+    { message: '<maintext>荒原深处传来狼嚎——据守山道的淬昀宗叛逃弟子身怀异宝，专修硬功。</maintext>', role: 'assistant', is_user: false },
+    { message: '开始进攻。', role: 'user', is_user: true },
+    { message: '<maintext>风雪之中，四人踏入荒原，与叛逃弟子对峙。</maintext>\n【状态栏标记点】', role: 'assistant', is_user: false },
+  ]);
   MOCK.worldbooks['测试角色卡'] = [];
   w.eval('worldbookCache = []; worldbookIndex = {};');
   w.eval("enemiesData = [{ id:'e1', name:'测试强盗', isAlive:true, skills:[], nameTags:[] }];");
-  responder = () => '```yaml\n名字: "🔪测试强盗"\n属性: "[HP:120/120][MP:8/8][Atk:60][Armor:10][Speed:55][行动次数:1]"\n技能:\n  - "【弯刀劈砍】[单体;power:70][Aim:115][近战]"\n  - "【土块投掷】[群攻;power:45][Aim:110][远程][MP:3]"\n```';
+  responder = () => '```yaml\n名字: "🔪测试强盗"\n描述: "占山为王的前镖师，落草后仍留一手弯刀绝活"\n属性: "[HP:120/120][MP:8/8][Atk:60][Armor:10][Speed:55][行动次数:1]"\n技能:\n  - "【弯刀劈砍】[单体;power:70][Aim:115][近战]"\n  - "【土块投掷】[群攻;power:45][Aim:110][远程][MP:3]"\n```';
   await w.eval('(async () => { await maybeStartDirectorFallback(() => { window.__t18a = (window.__t18a || 0) + 1; }); })()');
   eq(fetchCalls, 1, '候选存在且端点已配 → 恰好一次 LLM 请求');
   eq(confirmCalls, 1, '生成前弹 confirm 询问');
@@ -959,22 +965,29 @@ async function test18() {
   eq(w.eval('enemiesData[0].id'), 'e1', '替换保留原槽位 id');
   eq(w.eval('enemiesData[0].name'), '测试强盗', '名字剥 emoji 后保持可匹配');
   eq(w.eval('enemiesData[0].hp'), 120, '属性栏数值正确解析');
+  check(/镖师/.test(String(w.eval('enemiesData[0].wbSource.desc'))), '描述随槽位写入 wbSource（详情弹窗图鉴档案可展示）');
+  const userContentA = bodies[0].messages[1].content;
+  check(/测试强盗/.test(userContentA) && /风雪之中/.test(userContentA), 'user 内容含敌名列表与开战楼正文');
+  check(/叛逃弟子/.test(userContentA), '上下文楼层数=2：铺垫楼正文一并送入（多楼采集）');
+  check(!/整队出发/.test(userContentA) && !/开始进攻/.test(userContentA), '只统计 AI 楼层：用户楼正文不进入语境');
   check(bodies[0].messages[0].role === 'system' && /敌方生成规则/.test(bodies[0].messages[0].content) && /```yaml/.test(bodies[0].messages[0].content), '系统提示词 = 内置《敌方生成规则精简版》全文');
-  check(/测试强盗/.test(bodies[0].messages[1].content) && /风雪之中/.test(bodies[0].messages[1].content), 'user 内容含敌名列表与本楼正文片段');
   eq(bodies[0].temperature, 0.5, 'temperature 独立可配（默认 0.5，非对话页硬编码）');
   const wbEntries = MOCK.worldbooks['测试角色卡'];
   check(wbEntries.length === 1 && wbEntries[0].name === '测试强盗' && wbEntries[0].strategy.keys.includes('测试强盗'), '写回绑定世界书（createWorldbookEntries 纯追加，name/keys 齐全）');
-  check(/<Combat_block>/.test(wbEntries[0].content) && /弯刀劈砍/.test(wbEntries[0].content), '词条 content 为可消费的 Combat_block');
+  check(/^描述: /m.test(wbEntries[0].content) && /镖师/.test(wbEntries[0].content) && /<Combat_block>/.test(wbEntries[0].content) && /弯刀劈砍/.test(wbEntries[0].content), '词条 content 含描述行与可消费的 Combat_block');
+  check(wbEntries[0].enabled === false, '词条默认关闭（不注入 AI 上下文，避开 AIRP 雷区）');
+  check(wbEntries[0].position && wbEntries[0].position.type === 'before_character_definition' && wbEntries[0].position.order === 600, '词条位置固定为角色定义之前 order 600（不再落系统深度 4）');
   const parsedBack = ev('(function(){ const e = resolveWorldbookEnemy("测试强盗"); return e ? parseWorldbookEntryEnemy(e) : null; })()');
   check(parsedBack && parsedBack['技能'].length === 2, '写回词条可被 parseWorldbookEntryEnemy 消费');
+  check(ev('extractWorldbookDescription(resolveWorldbookEnemy("测试强盗").content)') === '描述: "占山为王的前镖师，落草后仍留一手弯刀绝活"', '描述行可被 extractWorldbookDescription 提取');
   w.eval("enemiesData = [{ id:'e1', name:'测试强盗', isAlive:true, skills:[], nameTags:[] }, { id:'e2', name:'有技能怪', isAlive:true, skills:[{name:'x'}], nameTags:[] }];");
-  eq(ev('detectDirectorCandidates().length'), 0, '下次同名（图鉴命中）或有技能者都不再是候选');
+  eq(ev('detectDirectorCandidates().length'), 0, '下次同名（图鉴命中，enabled:false 不影响匹配）或有技能者都不再是候选');
 
   // —— (b) 禁用标签被拦截 + 带反馈重试 2 次 + 回落不死锁 ——
   fetchCalls = 0; bodies.length = 0;
   w.eval("enemiesData = [{ id:'e9', name:'违规敌', isAlive:true, skills:[], nameTags:[] }];");
   w.eval('worldbookCache = []; worldbookIndex = {};');
-  responder = () => '```yaml\n名字: "违规敌"\n属性: "[HP:100/100][MP:10/10][Atk:50][Armor:5][Speed:50][行动次数:1]"\n技能:\n  - "【违规】[超级无敌;power:99][Aim:150][近战]"\n```';
+  responder = () => '```yaml\n名字: "违规敌"\n描述: "测试用违规敌人"\n属性: "[HP:100/100][MP:10/10][Atk:50][Armor:5][Speed:50][行动次数:1]"\n技能:\n  - "【违规】[超级无敌;power:99][Aim:150][近战]"\n```';
   await w.eval('(async () => { await maybeStartDirectorFallback(() => { window.__t18b = (window.__t18b || 0) + 1; }); })()');
   eq(fetchCalls, 3, '必失败输出：初始 1 次 + 携错误反馈重试 2 次');
   check(bodies[1] && /禁用标签/.test(bodies[1].messages[1].content), '重试请求携带具体校验错误反馈');
@@ -986,10 +999,11 @@ async function test18() {
   delete w.createWorldbookEntries;
   fetchCalls = 0;
   w.eval("enemiesData = [{ id:'e5', name:'回落敌', isAlive:true, skills:[], nameTags:[] }];");
-  responder = () => '```yaml\n名字: "🪓回落敌"\n属性: "[HP:130/130][MP:9/9][Atk:65][Armor:8][Speed:60][行动次数:1]"\n技能:\n  - "【伐木斧劈】[单体;power:75][Aim:118][近战]"\n```';
+  responder = () => '```yaml\n名字: "🪓回落敌"\n描述: "深山伐木工出身的佣兵，斧法沉稳"\n属性: "[HP:130/130][MP:9/9][Atk:65][Armor:8][Speed:60][行动次数:1]"\n技能:\n  - "【伐木斧劈】[单体;power:75][Aim:118][近战]"\n```';
   await w.eval('(async () => { await maybeStartDirectorFallback(() => {}); })()');
   const dynBook = MOCK.api.getVariables({ type: 'chat' }).$rpg_dynamic_bestiary;
   check(dynBook && dynBook.entries.length === 1 && dynBook.entries[0].name === '回落敌', '回落路径：动态图鉴落聊天变量');
+  check(/描述: "深山伐木工/.test(dynBook.entries[0].content), '回落路径：词条 content 含描述行');
   check(ev('worldbookCache.some(e => e._dynamic && e.name === "回落敌")'), '回落路径：词条手动并入 worldbookCache（_dynamic 标记）');
   check(ev('resolveWorldbookEnemy("回落敌") !== null'), '回落路径：下次同名直接命中');
   await w.eval('(async () => { await loadWorldbookData(); })()');
@@ -1016,15 +1030,45 @@ async function test18() {
   eq(confirmCalls, confirmBefore, '端点未配 → 不弹确认窗');
   eq(w.eval('window.__t18d'), 1, '端点未配 → 直接开战');
 
-  // —— (e) 设置 Tab 与预设持久化（纯 localStorage，含 temperature） ——
+  // —— (f) 生成中提醒横幅 + 取消回落（慢端点模拟：永不返回，靠 abort 触发） ——
   w.eval("directorState.apiUrl = 'http://director-mock';");
-  w.eval("document.getElementById('director-api-url').value = 'http://director-mock'; document.getElementById('director-model').value = 'mock-dir'; document.getElementById('director-temperature').value = '0.4';");
+  w.eval("enemiesData = [{ id:'e20', name:'慢速敌', isAlive:true, skills:[], nameTags:[] }];");
+  w.eval('worldbookCache = []; worldbookIndex = {};');
+  w.fetch = async (url, opts) => {
+    fetchCalls++;
+    return new Promise((resolve, reject) => {
+      const bail = () => reject(new Error('aborted'));
+      const timer = setTimeout(() => reject(new Error('mock timeout')), 6000); // 兜底：abort 失效时测试仍可恢复
+      const sig = opts && opts.signal;
+      if (sig) {
+        if (sig.aborted) { clearTimeout(timer); bail(); return; }
+        sig.addEventListener('abort', () => { clearTimeout(timer); bail(); });
+      }
+    });
+  };
+  const genPromise = w.eval('(async () => { await maybeStartDirectorFallback(() => { window.__t18f = (window.__t18f || 0) + 1; }); })()');
+  let bar = null;
+  for (let i = 0; i < 20 && !bar; i++) { await sleep(150); bar = w.document.getElementById('director-generating-bar'); }
+  check(!!bar, '生成中显示提醒横幅（含已等待秒数）');
+  check(!!(bar && w.document.getElementById('director-gen-cancel')), '横幅含「取消并直接开战」按钮');
+  w.eval('cancelDirectorGeneration()');
+  await genPromise;
+  check(!w.document.getElementById('director-generating-bar'), '取消后横幅消失');
+  eq(w.eval('window.__t18f'), 1, '取消后回落直接开战（startFn 照常执行）');
+  eq(w.eval('enemiesData[0].skills.length'), 0, '取消后敌人保持原样（不替换不写回）');
+  eq((MOCK.worldbooks['测试角色卡'] || []).length, 1, '取消路径不新增图鉴词条（仍只有 (a) 的 1 条）');
+
+  // —— (e) 设置 Tab 与预设持久化（纯 localStorage，含 temperature/上下文楼层数） ——
+  w.eval("directorState.apiUrl = 'http://director-mock';");
+  w.eval("document.getElementById('director-api-url').value = 'http://director-mock'; document.getElementById('director-model').value = 'mock-dir'; document.getElementById('director-temperature').value = '0.4'; document.getElementById('director-context-floors').value = '3';");
   w.eval('directorState.activePreset = 1;');
   await w.eval('(async () => { await saveDirectorSettings(); })()');
   const ds = JSON.parse(w.localStorage.getItem('rpg_combat_director_settings'));
   check(ds && ds.activePreset === 1 && ds.presets[1].apiUrl === 'http://director-mock' && ds.presets[1].temperature === 0.4, '导演设置独立持久化（rpg_combat_director_settings，含 temperature）');
+  check(ds && ds.presets[1].contextFloors === 3, '上下文楼层数随预设持久化');
   eq(ev('directorState.temperature'), 0.4, '保存后运行时平铺（temperature 生效）');
-  w.eval("directorState.activePreset = 0; directorState.temperature = 0.5;");
+  eq(ev('directorState.contextFloors'), 3, '保存后运行时平铺（contextFloors 生效）');
+  w.eval("directorState.activePreset = 0; directorState.temperature = 0.5; directorState.contextFloors = 2;");
   w.eval('openLLMSettings()');
   check(w.document.getElementById('llm-settings-modal').classList.contains('open'), '设置弹窗可打开');
   w.eval("switchLLMSettingsTab('director')");
