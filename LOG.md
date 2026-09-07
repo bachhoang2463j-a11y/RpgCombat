@@ -2509,3 +2509,16 @@
 - **涉及文件**：`index.html`、`integration-test/harness.html`、`integration-test/fix-srclines.cjs`（`c309098`）。
 - **经验证**：内联 script `new Function` 语法通过；提示词常量 JS 值与源 md 逐字节一致；IAB 跑脚手架 **214 项断言全部通过**（test1-18 无回归 + test19 新增 3 项）；IAB 实机酒馆刷新对照：基线渲染下 MMS 的 `MMS` 对象正常创建、srcdoc 零 `<q>`（旧渲染帧为污染态，佐证机制）。真机待用户重贴新版 index.html 后确认。
 - **决策原因**：用户实机反馈+基线 A/B 定位到导演版本独有；沿「IAB 实机取证 → 源码级根因 → 值不变的最小修复 → 仿真回归锁行为」闭环处理。**新纪律：组件源码（将被围栏嵌入酒馆楼层的 HTML）内部严禁出现裸三连反引号，需要时一律 `\u0060` 转义**——该纪律对今后任何内嵌长文本（指南/提示词/模板）同样适用。
+
+---
+
+## [LOG-210] 2026-09-07 — 导演兜底四项体验改进（cb41b1b）
+
+- **变更行为**（用户实机使用后提出的四条改进）：
+  1. **生成中提醒横幅 + 取消**：确认生成后战斗前端顶部出现固定横幅「🎬 正在生成敌方词条… 已等待 Ns」（秒级实时计时）+「✕ 取消并直接开战」按钮；取消经 `AbortController.abort()` 中断在途 fetch、置取消标记（重试循环每轮检查），随即回落按现状开战（不替换不写回，敌人以普攻「猛击」战斗）。`runDirectorFallbackIfAny` 加 `directorGenerating` 防重复触发（生成中再点开战按钮不二次弹窗）。横幅用内联样式注入 `document.body`（fixed 顶栏 z-index 16000），不依赖 Tailwind 类加载时机。
+  2. **写回词条位置/开关修复**：实测词条落在"系统深度 4"（AIRP 雷区）——读 JS-Slash-Runner 源码定位：`fromWorldbookEntry` 对 `position.type` 缺省默认 `'at_depth'`、`depth` 默认 4（worldbook.ts:300/303），原写回只传 `{order:100}` 踩中缺省。修复为 `position: { type: 'before_character_definition', role: 'system', depth: 4, order: 600 }` 且 `enabled: false`——词条只作图鉴数据存档不注入 AI 上下文；经核实匹配链（`resolveWorldbookEnemy`/`isWorldbookEntryEnabled`）只看本地管理器开关、不看词条自身 enabled，关闭不影响"下次同名直接命中"。
+  3. **「描述」lore 介绍全链路**：《敌方生成规则精简版》输出格式新增必填 `描述` 键（一句话，硬规则#6；三个实例模板同步补描述行；内嵌常量经 `\u0060` 转义重生成，值逐字节一致）；`parseDirectorOutput` 透传、校验必填（>200 字报错）、词条 content 首行写 `描述: "…"`（`extractWorldbookDescription` 可提取，世界书管理/详情预览可见）；替换槽位时随 `wbSource.desc` 写入（详情弹窗「📚 世界书图鉴档案」战斗中即可读到这条 lore）。
+  4. **上下文楼层数设置**：导演 Tab 新增字段（1~10，默认 **2 = 铺垫一层 + 开战一层**，随预设持久化含迁移夹取）；`getDirectorStoryFragment` 改 async 多楼采集——当前楼必发 + `getChatMessages` 回溯补 n-1 层 **AI 楼**（`is_user/is_system` 过滤，用户楼不入语境），每楼剥 `<Combat_block>`/`<Status_block>`/【状态栏标记点】后取尾部 ~600 字符，时间正序拼接。
+- **涉及文件**：`index.html`、`integration-test/harness.html`、`README.md`（§10.7 同步）、`敌方生成规则精简版.md`（描述协议）（`cb41b1b`）。
+- **经验证**：内联 script `new Function` 语法通过；围栏纪律复查（全文件三连序列仍为 2）；IAB 跑脚手架 **229 项断言全部通过**（test1-17/19 无回归 + test18 扩至 31 项：双楼采集/用户楼过滤/描述必填与全链路/词条 schema（enabled:false + before_character_definition/600）/取消流（慢端点永不返回 + abort 触发 + 横幅出现消失 + 回落开战 + 不写回））。施工插曲：本地静态服务器进程中途退出导致 harness 挂载超时，重启服务器后恢复（非代码问题）。
+- **决策原因**：用户四条原文——①"生成时没有提醒，需要加入提醒按钮和取消生成，如果玩家觉得等得太久就取消自己开战"②"世界书位置在系统深度4，这个位置是AIRP的雷区……把插入位置固定为角色定义之前600，且默认为关闭状态避免影响正文（程序应该不在乎世界书词条是否开启？——答：正确，匹配链只看本地管理器开关）"③"让AI写回时给每个敌人加入简短介绍，lore地让玩家明白这个敌人为什么有这些特性"④"在导演人格加入上下文楼层，默认为2层（当前应该只统计AI楼层……2层给技能和介绍作参考最稳定）"。
