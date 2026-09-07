@@ -1303,6 +1303,28 @@ async function test23() {
   rpgWin().eval("var __r = document.getElementById('t23-target'); if (__r) __r.remove(); window.__t23err = undefined;");
 }
 
+async function test24() {
+  head('24 常驻 infinite 底噪清零：敌人 sprite 辉光 filter 逐帧动画改静态');
+  const src = await (await fetch('../index.html')).text();
+  // ① breathe（全体敌方 sprite 常驻 4s 呼吸）：keyframes 不再逐帧插值 drop-shadow，辉光改类上静态中值
+  const breatheKf = (src.match(/@keyframes breathe \{[^\n]*\}/) || [])[0] || '';
+  check(!/filter:/.test(breatheKf), '@keyframes breathe 不再逐帧动画 filter');
+  check(/\.breathe \{[^}]*filter: drop-shadow/.test(src), '.breathe 类携带静态辉光（两帧中值）');
+  // ② danger-shake（充能满敌人 0.15s 抖动，周期最短、重绘最频）：同型改造
+  const dangerKf = (src.match(/@keyframes danger-shake \{[\s\S]*?\n    \}/) || [])[0] || '';
+  check(!/filter:/.test(dangerKf), '@keyframes danger-shake 不再逐帧动画 filter');
+  check(/\.charge-full-danger \{[^}]*filter: drop-shadow/.test(src), '.charge-full-danger 类携带静态红辉光');
+  // ③ 功能验证（rpg iframe 计算样式）：动画照常运行 + 静态辉光生效
+  const r = rpgWin().eval(`(function () {
+    var b = document.createElement('div'); b.className = 'breathe'; document.body.appendChild(b);
+    var d = document.createElement('div'); d.className = 'charge-full-danger'; document.body.appendChild(d);
+    var out = { breatheAnim: getComputedStyle(b).animationName, breatheFilter: getComputedStyle(b).filter,
+                dangerAnim: getComputedStyle(d).animationName, dangerFilter: getComputedStyle(d).filter };
+    b.remove(); d.remove(); return out; })()`);
+  check(r.breatheAnim === 'breathe' && r.breatheFilter !== 'none', '.breathe 呼吸动画运行中且静态辉光生效');
+  check(r.dangerAnim === 'danger-shake' && r.dangerFilter !== 'none', '.charge-full-danger 抖动运行中且静态红辉光生效');
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -1310,7 +1332,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
