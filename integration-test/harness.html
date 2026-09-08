@@ -1426,7 +1426,7 @@ async function test27() {
   head('27 全屏 SVG 特效：[特效:造雾术]/[特效:高阶召唤术] 注册·挂载·清理');
   const src = await (await fetch('../index.html', { cache: 'reload' })).text();
   // ① 注册表：两个标签、纯 SVG（url 空）、particles 类型、delay、音效配置
-  check(/'造雾术': \{ url: '', scale: 1\.0, particles: 'rlyeh_sediment', audioUrl: RLYEH_FOG_CLOUD_URL, delay: 1\.0 \}/.test(src), '注册表：造雾术（fog_cloud.ogg + delay 1.0）');
+  check(/'造雾术': \{ url: '', scale: 1\.0, particles: 'rlyeh_sediment', audioUrl: RLYEH_FOG_CLOUD_URL \}/.test(src), '注册表：造雾术（fog.mp3，无 delay 立即结算）');
   check(/'高阶召唤术': \{ url: '', scale: 1\.0, particles: 'titan_gaze', audioUrl: 'none', delay: 1\.0 \}/.test(src), '注册表：高阶召唤术（古神低语合成 + delay 1.0）');
   check(src.includes('const RLYEH_FOG_CLOUD_URL = `${ASSET_BASE}/fog.mp3`;'), 'fog.mp3 本地资产音效（ASSET_BASE 托管 my_assets）');
   // ② CSS 关键帧：两特效全部关键帧存在
@@ -1436,7 +1436,7 @@ async function test27() {
     check(src.includes('@keyframes ' + name + ' {'), 'keyframes ' + name + ' 存在');
   }
   // ③ 功能仿真（rpg iframe 内真触发）：挂载 → 震屏/受击缠绕 → 1.5s 自动清理零残留
-  const reg = rpgWin().eval('(function(){ var e = WEBM_FX_REGISTRY["造雾术"], t = WEBM_FX_REGISTRY["高阶召唤术"]; return { e: !!e && e.url === "" && e.particles === "rlyeh_sediment" && e.delay === 1, t: !!t && t.url === "" && t.particles === "titan_gaze" && t.delay === 1 }; })()');
+  const reg = rpgWin().eval('(function(){ var e = WEBM_FX_REGISTRY["造雾术"], t = WEBM_FX_REGISTRY["高阶召唤术"]; return { e: !!e && e.url === "" && e.particles === "rlyeh_sediment" && !e.delay, t: !!t && t.url === "" && t.particles === "titan_gaze" && t.delay === 1 }; })()');
   check(reg.e, 'iframe 内注册表：造雾术条目字段正确');
   check(reg.t, 'iframe 内注册表：高阶召唤术条目字段正确');
   rpgWin().eval(`try { window.__t27err = ''; spawnRlyehSedimentFx(true, false); spawnTitanGazeFx(true, false); } catch (e) { window.__t27err = String(e); }`);
@@ -2006,7 +2006,14 @@ async function test33() {
   check(src.includes("skill.fxTag === '造雾术' || skill.fxTag === '高阶召唤术' || skill.fxTag === '障壁术'"), 'executeSkillAction 全屏 SVG 特判含障壁术');
   check(src.includes("skill.fxTag === '高阶召唤术' || skill.fxTag === '障壁术'"), '枪击命中豁免 _isHeavyFx 含障壁术');
   check(w.eval('Object.keys(WEBM_FX_REGISTRY).indexOf("障壁术") >= 0'), '注册表键含障壁术（技能编辑器下拉自动纳入）');
-  check(src.includes('playCustomAudio(RLYEH_FOG_CLOUD_URL, 1.2)'), '造雾术音量增益 1.2（fog.mp3 源文件偏轻，GainNode 硬件级放大）');
+  check(src.includes('playCustomAudio(RLYEH_FOG_CLOUD_URL, 2)'), '造雾术音量增益 2（fog.mp3 源文件偏轻，GainNode 硬件级放大）');
+  check(/'造雾术': \{ url: '', scale: 1\.0, particles: 'rlyeh_sediment', audioUrl: RLYEH_FOG_CLOUD_URL \},/.test(src), '造雾术注册表无 delay（立即结算）');
+  // 新增三组 WebM 视频特效（my_assets 实测核名：miaozhun/ranshao = .mp3+.webm，weimu 音效 = .wav）
+  check(src.includes("'开镜瞄准': { url: `${ASSET_BASE}/miaozhun.webm`, scale: 1.4, audioUrl: `${ASSET_BASE}/miaozhun.mp3` }"), '注册表：开镜瞄准（miaozhun.webm + mp3，无粒子无延迟）');
+  check(src.includes("'燃烧弹': { url: `${ASSET_BASE}/ranshao.webm`, scale: 1.4, particles: 'fire_aoe', audioUrl: `${ASSET_BASE}/ranshao.mp3` }"), '注册表：燃烧弹（ranshao.webm + fire_aoe 粒子 + mp3）');
+  check(src.includes("'圣域帷幕': { url: `${ASSET_BASE}/weimu.webm`, scale: 1.4, particles: 'holy_light', audioUrl: `${ASSET_BASE}/weimu.wav` }"), '注册表：圣域帷幕（weimu.webm + holy_light 粒子 + wav）');
+  const wNew = w.eval('(function(){ return ["开镜瞄准","燃烧弹","圣域帷幕"].every(function(k){ var e = WEBM_FX_REGISTRY[k]; return !!e && !!e.url && !!e.audioUrl && e.audioUrl !== "none" && !e.delay; }); })()');
+  check(wNew, 'iframe 内注册表：三条目 url/audioUrl 齐备且无 delay（视频静音走独立音效、立即结算）');
 
   // --- ② CSS 关键帧：方案1 全套（主晶盾嵌合 + 六向碎片聚合 + 激波环 + 震屏） ---
   for (const name of ['aegis-shake-soft-anim', 'aegis-core-assemble', 'aegis-shock-ring',

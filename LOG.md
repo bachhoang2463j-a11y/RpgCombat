@@ -2741,3 +2741,14 @@
 - **涉及文件**：`index.html`、`integration-test/harness.html`（test33 扩 5 项）、`regex-前端战斗v11_11.json`（重建产物）。
 - **经验证**：test33 新增 5 项——音量增益 1.2 断言、激波环/主晶盾 margin 布局居中断言 ×2、障壁术 CSS 区段零 `translate(-50%)` 断言、Web Animations API 定格同心测量（`getAnimations().pause()` 同相位定格，激波环与主晶盾中心差 dx=0.000 dy=0.000 <1px）。**502 项全绿**（33 组；test10 srcLine 123 条重映射后集合对齐）；build-regex 产物 replaceString 869962 字符（-30%），围栏 2/2。150% 缩放修复效果待用户真机复测。
 - **决策原因**：错位修复选"margin 布局居中"而非统一 transform 居中精度——布局层对齐使两层共享同一布局盒原点，绘制阶段不再有独立的百分比换算与舍入，从机制上免疫 DPR 舍入，且 margin 为静态布局属性无合成层开销；碎片本就走 margin 定位，修复后全家族居中机制统一。音量走 GainNode 放大而非重制音频源——保留源文件、调整即生效，且 playCustomAudio 已内建 >1 增益通道（applyAudioVolume），零新增机制。
+
+---
+
+## [LOG-229] 2026-09-09 — 造雾术去延迟+音量增益2 + 新增三组 WebM 特效（开镜瞄准/燃烧弹/圣域帷幕）
+
+- **变更行为**（真机实测反馈两则）：
+  1. **造雾术**：注册表 `delay: 1.0` 移除（真机感知"明显延迟"——特效播完等 1 秒才结算，现为立即结算）；`spawnRlyehSedimentFx` 音量增益 1.2 → 2（fog.mp3 源文件轻，1.2 仍偏轻，GainNode 硬件级放大）。
+  2. **新增三组 WebM 视频特效**（用户提供 my_assets 资源，文件名经服务目录实测核验：miaozhun/ranshao 为 .mp3+.webm，**weimu 音效实为 .wav 非 .mp3**）：`'开镜瞄准': { url: miaozhun.webm, scale: 1.4, audioUrl: miaozhun.mp3 }`（瞄准类不配粒子）；`'燃烧弹': { url: ranshao.webm, scale: 1.4, particles: 'fire_aoe', audioUrl: ranshao.mp3 }`；`'圣域帷幕': { url: weimu.webm, scale: 1.4, particles: 'holy_light', audioUrl: weimu.wav }`。三条均不配 delay（用户要求无延迟立即结算）、不传音量增益（原始音量，Blob 预载路径默认 1.0）；带独立 audioUrl 时视频自动静音走独立音效（与火焰01 等既有视频特效同模式）；战斗开始 preloadBattleAssets 自动预载音视频 Blob。技能/敌人/物品组三处编辑器"特效"下拉经 Object.keys 自动纳入。
+- **涉及文件**：`index.html`、`integration-test\harness.html`（test27 断言同步 + test33 扩 5 项）、`regex-前端战斗v11_11.json`（重建产物）。
+- **经验证**：test27 两处同步（源码正则去 delay: 1.0、iframe 内 e.delay === 1 改 !e.delay）；test33 新增 5 项——音量增益 2 断言、造雾术注册表无 delay 断言、三条目源码文本断言（含 weimu.wav 核名）、iframe 内三条目 url/audioUrl 齐备且无 delay 断言。**507 项全绿**（33 组；test10 srcLine 123 条重映射后集合对齐）；build-regex 产物 replaceString 870260 字符（-30%），围栏 2/2。真机待用户实测。
+- **决策原因**：weimu 音效以服务目录实测为准注册 .wav（用户口述"mp3 / webm"但 weimu.mp3 实际 404，weimu.wav 存在——浏览器 Audio 原生支持 wav，magic_kill.wav 已有先例）；开镜瞄准不配 Canvas 粒子（瞄准非攻击，纯视频+音效，避免粒子喧宾夺主），燃烧弹/圣域帷幕按主题配 fire_aoe/holy_light（与火焰01/圣光01 同粒子的保守选择）；scale 统一 1.4 起步（与四大元素系视频特效一致），用户实测后可按视频内容调整。
