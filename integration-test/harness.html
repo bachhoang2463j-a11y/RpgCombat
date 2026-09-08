@@ -1919,6 +1919,82 @@ async function test31() {
   `);
 }
 
+/* ================= 断言 32：麻痹（雷电伴生减益：叠层降闪避 + 僵直跳行动） ================= */
+async function test32() {
+  head('32 麻痹：解析/叠层降闪避/僵直跳行动封顶20%/驱散/战报解析');
+  const w = rpgWin();
+  const ev = (expr) => w.eval('(function(){ return ' + expr + '; })()');
+  MOCK.resetVars(); seedChat(); seedState();
+
+  // --- ① 解析层 ---
+  const sk = ev('parseSkill("【雷霆轰击】[单体;power:80][麻痹;power:25][Aim:150][远程]")');
+  check(sk.type2 === '[麻痹]' && sk.power2 === 25, '[麻痹;power:25] 解析入第二槽');
+  const skG = ev('parseSkill("【天雷笼罩】[群麻痹;power:20][法术]")');
+  check(skG.type === '[群麻痹]' && skG.power === 20, '[群麻痹;power:20] 解析入主槽（纯减益）');
+  check(ev('classifySkill(parseSkill("【A】[麻痹;power:20]")).hasEnemyTargetTag') === true, 'classifySkill：[麻痹] 进敌方选目标');
+
+  // --- ② 施加层：叠层 + 闪避下降 + 僵直概率封顶 ---
+  const hero = heroSpec({ name: '雷霆法师', hp: 100, maxHp: 100, atk: 10, skills: [ev('parseSkill("【雷霆轰击】[单体;power:80][麻痹;power:25][必中]")')] });
+  const enemyJson = '{ id:"e1", name:"麻痹靶", isAlive:true, hp:500, maxHp:500, atk:5, def:0, spd:50, shield:0, buffs:[], evaBonus:0, hitBonus:0, skills:[], items:[], nameTags:[], tags:[] }';
+  injectHeroes([hero]);
+  w.eval('enemiesData = [' + enemyJson + '];');
+  await w.eval('executeSkillAction(heroesData[0], enemiesData[0], heroesData[0].skills[0], 1, false, true)');
+  let r = ev('(function(){ var e = enemiesData[0]; var ls = e.buffs.filter(function(b){ return b.type==="paralyze"; }); return { layers: ls.length, evaSum: ls.reduce(function(s,b){ return s+b.value; },0), dur: ls[0] ? ls[0].duration : 0, hist: battleHistory.join("|") }; })()');
+  eq(r.layers, 1, '首次命中：1 层麻痹');
+  eq(r.evaSum, -25, '1 层 → 闪避 -25');
+  check(/被电流侵蚀而麻痹（第1层）/.test(r.hist), '麻痹施加战报行（第1层）');
+
+  // 再命中两次 → 3 层；闪避合计 -75
+  await w.eval('executeSkillAction(heroesData[0], enemiesData[0], heroesData[0].skills[0], 1, false, true)');
+  await w.eval('executeSkillAction(heroesData[0], enemiesData[0], heroesData[0].skills[0], 1, false, true)');
+  r = ev('(function(){ var e = enemiesData[0]; var ls = e.buffs.filter(function(b){ return b.type==="paralyze"; }); return { layers: ls.length, evaSum: ls.reduce(function(s,b){ return s+b.value; },0), stats: getEffectiveStats(e).eva }; })()');
+  eq(r.layers, 3, '连中三次：3 层麻痹（叠层）');
+  eq(r.evaSum, -75, '3 层合计闪避 -75');
+  eq(r.stats, -75, 'getEffectiveStats 闪避结算含麻痹（-75）');
+
+  // --- ③ 封顶：6 层也只到 20%（用魔改 Math.random 稳定掷骰） ---
+  w.eval('enemiesData[0].buffs.push({ type:"paralyze", value:-25, duration:3 });'); // 4 层
+  check(ev('Math.min(20, enemiesData[0].buffs.filter(function(b){return b.type==="paralyze";}).length * 5)') === 20, '4 层即封顶 20%');
+
+  // --- ④ 僵直跳行动：掷骰命中 → 跳过 + 消耗一层（先到期先消耗） ---
+  w.eval('window.__origRandom = Math.random; Math.random = function(){ return 0; };'); // 0 < skipChance 恒真
+  w.eval('battleHistory = []; _historyRawCache = ""; state.actionQueue = [{ type:"enemy", ref: enemiesData[0] }]; state.queueIndex = 0; state.isGameStarted = true;');
+  await w.eval('nextTurn()');
+  r = ev('(function(){ var e = enemiesData[0]; return { layers: e.buffs.filter(function(b){ return b.type==="paralyze"; }).length, hist: battleHistory.join("|") }; })()');
+  check(/因麻痹僵直，无法行动/.test(r.hist), '僵直跳过战报行（🌀）');
+  eq(r.layers, 3, '跳过后消耗一层（4→3，先到期先消耗）');
+
+  // --- ⑤ 掷骰不中 → 正常行动不消耗 ---
+  w.eval('Math.random = function(){ return 1; };'); // 1 * 100 >= 20 恒假
+  w.eval('enemiesData[0].hp = 500; battleHistory = []; _historyRawCache = "";');
+  // 敌方无技能 → executeEnemyTurn 走普攻兜底；只断言层数与无僵直行
+  await w.eval('nextTurn()');
+  r = ev('(function(){ var e = enemiesData[0]; return { layers: e.buffs.filter(function(b){ return b.type==="paralyze"; }).length, hist: battleHistory.join("|") }; })()');
+  check(!/因麻痹僵直/.test(r.hist), '掷骰不中：无僵直行');
+  eq(r.layers, 3, '掷骰不中：层数不消耗');
+
+  // --- ⑥ 驱散：麻痹属负面，可被 [驱散] 清除（签名：caster, target, tag, tagPower, hitChance, multiplier, globalTurns, skill） ---
+  ev('(function(){ enemiesData[0].buffs = [{ type:"paralyze", value:-25, duration:2 }, { type:"atk", value:30, duration:2 }]; })()');
+  w.eval('battleHistory = []; _historyRawCache = "";');
+  await w.eval('applySingleTagEffect(heroesData[0], enemiesData[0], "[驱散]", 1, 100, 1, 3, parseSkill("【净化】[驱散:1]"))');
+  r = ev('(function(){ var e = enemiesData[0]; return { para: e.buffs.filter(function(b){ return b.type==="paralyze"; }).length, atk: e.buffs.filter(function(b){ return b.type==="atk"; }).length, hist: battleHistory.join("|") }; })()');
+  eq(r.para, 0, '驱散清除麻痹层');
+  eq(r.atk, 1, '驱散不动增益（atk+30 保留）');
+
+  // --- ⑦ 战报摘要解析：麻痹施加/僵直行被 DIGEST_RULES 吸收（token 挂在动作锚点或独立事件行） ---
+  const dig = ev('(function(){ var t = digestTrackTiers(mergeDigest(parseBattleDigest("> 雷霆法师 对 麻痹靶 发动了【雷霆轰击】\\n   ↳ 麻痹靶 被电流侵蚀而麻痹（第2层），闪避率下降 25 点 持续3回合，行动僵直概率 10%！\\n   ↳ 麻痹靶 被电流侵蚀而麻痹（第3层），闪避率下降 25 点 持续3回合，行动僵直概率 15%！"))); var f = []; t.rounds.forEach(function(r){ r.items.forEach(function(it){ (it.tokens || []).forEach(function(k){ if (k.token === "麻痹靶被麻痹") f.push(k.token); }); }); }); return f.length; })()');
+  eq(dig, 2, 'DIGEST_RULES：麻痹施加行 ×2 → token 麻痹靶被麻痹 ×2（挂动作锚点）');
+  const dig2 = ev('parseBattleDigest("   🌀 [麻痹靶] 因麻痹僵直，无法行动！").rounds.length');
+  check(dig2 >= 1, 'DIGEST_RULES：麻痹僵直行被吸收为事件（不抛错、进回合树）');
+
+  // --- ⑧ 清理（含恢复 Math.random：魔改前先存原值） ---
+  w.eval(`
+    if (window.__origRandom) { Math.random = window.__origRandom; delete window.__origRandom; }
+    heroesData = []; enemiesData = []; battleHistory = []; _historyRawCache = "";
+    state.actionQueue = []; state.queueIndex = 0; state.isGameStarted = false;
+  `);
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -1926,7 +2002,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
