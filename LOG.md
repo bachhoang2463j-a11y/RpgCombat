@@ -2719,3 +2719,14 @@
 - **涉及文件**：`README.md`。
 - **经验证**：文档纯描述性变更，无代码改动；内容与 LOG-225 实现及 harness test31 断言口径一致。
 - **决策原因**：Coding rule 规定 README 等用户真机确认有效后再更新；用户已确认真机通过并指示同步。本轮有并行任务进行中，仅动文档三件套（README/LOG/LOG-INDEX），不触碰任何代码文件。
+
+---
+
+## [LOG-227] 2026-09-09 — [特效:障壁术] 六边晶格特效 + 【肃正】屏障罩位只盖英雄行
+
+- **变更行为**：
+  1. **[特效:障壁术] 通用 SVG 特效**（demo-nak-tith-barrier.html 视觉方案1「六边晶格·空间嵌合障壁」+ 音效方案3「528Hz 奇迹音叉」全量移植）：CSS 9 组关键帧（aegis- 前缀防冲突：aegis-shake-soft-anim 微震 / aegis-core-assemble 主晶盾嵌合展开 / aegis-shock-ring 激波圆环 / aegis-shard-tl·tr·bl·br·top·bottom 六向碎片向心聚合）；`buildNakTithAegisFxHtml()` 纯 SVG（340px 激波环 + 240×260 六边主晶盾带纳克特印记与晶格棱线 + 6 枚白色几何碎片，1.4s 一次成型）；`playNakTithChime()` Web Audio 现场合成（528/1056/1584Hz 三度泛音列错峰淡入长尾衰减，零外部资源）；`spawnNakTithAegisFx()` 走 `_spawnFullscreenSvgFx` 通用起播（护盾类特效无对侧受击目标，targetContainerId 传哨兵 id 跳过对侧 sprite 缠绕）。接入链路四点：注册表条目（`{ url:'', particles:'nak_aegis', audioUrl:'none', delay:0.8 }`，0.8s 护盾演出后结算）、`playAOEEffect` particles 分派、`executeSkillAction` 全屏 SVG 特判分支（单体/群体通用只播一次、音效 spawn 自管）、枪击命中豁免 `_isHeavyFx`；技能/敌人/物品组三处编辑器"特效"下拉经 `Object.keys(WEBM_FX_REGISTRY)` 自动纳入。
+  2. **【肃正】屏障罩位钉定**（召唤物不再撑起障壁）：根因——`team-barrier-wrapper` 为 absolute + `inset:-10px -12px`，containing block 是 `heroes-container`（relative grid）的整个 padding box；召唤行 `ally-summon-row` 以 `grid-column:1/-1` 占首行，召唤物在场时容器被撑高 → 屏障随容器一起罩住召唤行。修复：新增 `syncBarrierCoverageToHeroRow()`——按英雄卡片实际范围（`heroes-container` 直接子级的 `hero-wrap-*`，召唤物 wrap 挂在 ally-summon-row 内、非直接子级，天然排除）把 wrapper 的 `top/height` 内联钉位（上下各留 10px 与原 inset 余量一致，水平仍走 CSS `left/right !important` 不动）；调用点三处：`updateTeamBarrierUI()` 尾部（屏障展开/受击/击破每次重钉）、`initUIIncrementalSummon()`（召唤入队把英雄行下推后立即重钉）、`window.resize` 监听（断点/卡片高度变化后重钉，仅屏障在场时）。无论召唤物是否在场，屏障视觉恒只覆盖我方英雄卡片行；机制层不变（仍守护全队）。
+- **涉及文件**：`index.html`、`integration-test/harness.html`（test33）、`regex-前端战斗v11_11.json`（重建产物）、`README.md`（§3.2 肃正条目罩位说明 + §8.2 内置特效清单）。
+- **经验证**：test33 新增 27 项——接入链路 5（注册表/particles 分派/executeSkillAction 特判/枪击豁免/编辑器下拉键）、keyframes 9 组存在、功能仿真 7（iframe 注册表字段/spawn 真触发无异常/CSSOM 收录/演出节点≥4 挂载/战场景微震/1.5s 零残留/528Hz 合成音不抛错）、罩位仿真 6（initUI 渲染英雄卡/屏障值>0 显示/top 钉位正值 84px/罩位上缘==首卡顶-10/下缘==末卡底+10/召唤行移除后重钉随英雄行上移 84→-10）。**497 项全绿**（33 组；test10 srcLine 123 条重映射后集合对齐）；build-regex 产物 replaceString 870036 字符（-30%），围栏 2/2。真机待用户实测。
+- **决策原因**：罩位修复选"按英雄卡片实际范围钉 top/height 内联"而非改 DOM 结构（把 wrapper 挪进英雄行专属包裹层需重构 grid 布局，动 8/28 已定稿的全队遮盖修复 5af4a9e，风险大）；召唤物 wrap 与英雄 wrap 的父级差异（ally-summon-row 内 vs 容器直接子级）即是筛选语义，不依赖 isSummon 数据标志，DOM 结构变化即自动适应。障壁术完全复用造雾术/高阶召唤术（LOG-225 之前 a90d0b0）的"注册表+特判+豁免"三点接入模式与 `_spawnFullscreenSvgFx` 通用起播，不新开特效管线；对侧缠绕经哨兵 targetContainerId 显式跳过而非改公共函数签名。音效走 Web Audio 现场合成（跟随项目每特效族独立 AudioContext getter 惯例），与 demo 方案3 完全同参数。

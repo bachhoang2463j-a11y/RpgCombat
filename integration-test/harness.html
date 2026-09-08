@@ -1995,6 +1995,89 @@ async function test32() {
   `);
 }
 
+async function test33() {
+  head('33 [特效:障壁术] 六边晶格特效（视觉方案1+音效方案3） + 屏障只罩英雄行');
+  const src = await (await fetch('../index.html')).text();
+  const w = rpgWin();
+
+  // --- ① 接入链路：注册表 / particles 分派 / executeSkillAction 特判 / 枪击豁免 ---
+  check(/'障壁术': \{ url: '', scale: 1\.0, particles: 'nak_aegis', audioUrl: 'none', delay: 0\.8 \},/.test(src), '注册表：障壁术（纯 SVG + Web Audio 合成音 + delay 0.8）');
+  check(src.includes("else if (pType === 'nak_aegis'){ spawnNakTithAegisFx(undefined, true); }"), 'playAOEEffect particles 分派：nak_aegis → spawnNakTithAegisFx');
+  check(src.includes("skill.fxTag === '造雾术' || skill.fxTag === '高阶召唤术' || skill.fxTag === '障壁术'"), 'executeSkillAction 全屏 SVG 特判含障壁术');
+  check(src.includes("skill.fxTag === '高阶召唤术' || skill.fxTag === '障壁术'"), '枪击命中豁免 _isHeavyFx 含障壁术');
+  check(w.eval('Object.keys(WEBM_FX_REGISTRY).indexOf("障壁术") >= 0'), '注册表键含障壁术（技能编辑器下拉自动纳入）');
+
+  // --- ② CSS 关键帧：方案1 全套（主晶盾嵌合 + 六向碎片聚合 + 激波环 + 震屏） ---
+  for (const name of ['aegis-shake-soft-anim', 'aegis-core-assemble', 'aegis-shock-ring',
+                      'aegis-shard-tl', 'aegis-shard-tr', 'aegis-shard-bl', 'aegis-shard-br', 'aegis-shard-top', 'aegis-shard-bottom']) {
+    check(src.includes('@keyframes ' + name + ' {'), 'keyframes ' + name + ' 存在');
+  }
+
+  // --- ③ 功能仿真：真触发挂载 → 震屏 → 1.5s 自动清理零残留；528Hz 合成音不抛错 ---
+  const reg = w.eval('(function(){ var e = WEBM_FX_REGISTRY["障壁术"]; return !!e && e.url === "" && e.particles === "nak_aegis" && e.delay === 0.8 && e.audioUrl === "none"; })()');
+  check(reg, 'iframe 内注册表：障壁术条目字段正确');
+  w.eval('try { window.__t33err = ""; spawnNakTithAegisFx(true, false); } catch (e) { window.__t33err = String(e); }');
+  check(!w.eval('window.__t33err || ""'), 'spawnNakTithAegisFx 触发无异常' + (w.eval('window.__t33err ? "：" + window.__t33err : ""') || ''));
+  const mid = w.eval(`(function () {
+    var nodes = document.querySelectorAll('[style*="aegis-core-assemble"], [style*="aegis-shock-ring"], [style*="aegis-shard-tl"], [style*="aegis-shard-bottom"]').length;
+    var kf = (function () { var d = document.createElement('div'); d.style.animationName = 'aegis-core-assemble'; var ok = d.style.animationName !== ''; d.style.animationName = 'aegis-shock-ring'; return ok && d.style.animationName !== ''; })();
+    var shake = document.getElementById('battle-scene');
+    return { nodes: nodes, kf: kf, shake: shake ? shake.className.indexOf('aegis-shake-soft') >= 0 : false };
+  })()`);
+  check(mid.kf, '新 keyframes 已被样式表收录（CSSOM 可解析）');
+  check(mid.nodes >= 4, '障壁术演出节点已挂载（主晶盾+激波环+碎片 ≥4 个，实挂 ' + mid.nodes + '）');
+  check(mid.shake, '战场景容器挂上 aegis-shake-soft 微震');
+  await sleep(1600);
+  const late = w.eval('(function(){ return document.querySelectorAll(\'[style*="aegis-core-assemble"], [style*="aegis-shock-ring"], [style*="aegis-shard-tl"], div[style*="z-index: 180"], div[style*="z-index:180"]\').length; })()');
+  eq(late, 0, '障壁术演出节点 1.5s 后自动清理（零残留）');
+  w.eval('try { playNakTithChime(); } catch (e) { window.__t33chimeErr = String(e); }');
+  check(!w.eval('window.__t33chimeErr || ""'), 'playNakTithChime 528Hz 奇迹音叉可调用不抛错');
+  w.eval('window.__t33err = undefined; window.__t33chimeErr = undefined;');
+
+  // --- ④ 屏障罩位：召唤行在场时屏障钉在英雄行范围（top/height 内联钉位，不随容器罩召唤行） ---
+  MOCK.resetVars(); seedChat(); seedState();
+  injectHeroes([
+    heroSpec({ id: 'hza', name: '罩位甲', hp: 100, maxHp: 100 }),
+    heroSpec({ id: 'hzb', name: '罩位乙', hp: 100, maxHp: 100 }),
+  ]);
+  w.eval('initUI()');
+  const cov = w.eval(`(function(){
+    var c = document.getElementById('heroes-container');
+    // 塞一个高 90px 的假召唤行（模拟召唤物在场把容器撑高），插在屏障横幅之后、英雄行之前；
+    // 必须跨满整行（grid-column:1/-1），否则只占一格不把英雄行推下，罩位断言失真
+    var row = document.createElement('div'); row.id = 'ally-summon-row'; row.style.cssText = 'height:90px;grid-column:1/-1;display:block;';
+    c.insertBefore(row, c.children[1] || null);
+    var wraps = [], i, el;
+    for (i = 0; i < c.children.length; i++) { el = c.children[i]; if (el.id && el.id.indexOf('hero-wrap-') === 0) wraps.push(el); }
+    var firstTop = Math.min.apply(null, wraps.map(function(x){ return x.offsetTop; }));
+    var lastBottom = Math.max.apply(null, wraps.map(function(x){ return x.offsetTop + x.offsetHeight; }));
+    teamBarrier = 100; teamBarrierMax = 100;
+    updateTeamBarrierUI();
+    var wEl = document.getElementById('team-barrier-wrapper');
+    var top = parseFloat(wEl.style.top), height = parseFloat(wEl.style.height);
+    var bottom = top + height;
+    var shown = wEl.style.display !== 'none';
+    // 复原：摘召唤行、清屏障
+    teamBarrier = 0; teamBarrierMax = 0; updateTeamBarrierUI();
+    row.remove();
+    // 召唤行移除后再展开一次：英雄行上移，屏障应随之上移（动态重钉）
+    teamBarrier = 100; teamBarrierMax = 100;
+    updateTeamBarrierUI();
+    var top2 = parseFloat(document.getElementById('team-barrier-wrapper').style.top);
+    teamBarrier = 0; teamBarrierMax = 0; updateTeamBarrierUI();
+    return { wraps: wraps.length, shown: shown, top: top, height: height, bottom: bottom, firstTop: firstTop, lastBottom: lastBottom, top2: top2 };
+  })()`);
+  check(cov.wraps >= 2, 'initUI 渲染出英雄卡片（hero-wrap ×' + cov.wraps + '）');
+  check(cov.shown, '屏障值 >0 时 wrapper 显示');
+  check(!isNaN(cov.top) && cov.top > 0, '屏障顶部已内联钉位且为正值（top=' + cov.top + '，修复前为容器顶 inset -10 罩住召唤行）');
+  check(Math.abs(cov.top - (cov.firstTop - 10)) <= 1, '罩位上缘 == 首英雄卡顶 -10px（' + cov.top + ' vs ' + (cov.firstTop - 10) + '）');
+  check(Math.abs(cov.bottom - (cov.lastBottom + 10)) <= 1, '罩位下缘 == 末英雄卡底 +10px（' + cov.bottom + ' vs ' + (cov.lastBottom + 10) + '）');
+  check(cov.top2 < cov.top, '召唤行移除后重钉：屏障随英雄行上移（' + cov.top + ' → ' + cov.top2 + '）');
+
+  // --- ⑤ 清理 ---
+  w.eval('heroesData = []; enemiesData = []; teamBarrier = 0; teamBarrierMax = 0; updateTeamBarrierUI();');
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -2002,7 +2085,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
