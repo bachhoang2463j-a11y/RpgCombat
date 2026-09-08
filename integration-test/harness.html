@@ -1787,6 +1787,138 @@ async function test30() {
   MOCK.api.insertOrAssignVariables({ rpg_combat_roster: { version: 0 } }, { type: 'chat' });
 }
 
+/* ================= 断言 31：散射/群散射（护甲×3）+ 转火 + 弹药按发消耗 + (霰弹)特效 =================
+   回归锁（V11.13）：[散射]/[群散射] 是全新伤害标签——此前"散射"不在任何 isDamage 关键词里，写入技能只扣
+   MP 零伤害；护甲×3 经 calculateDamage 第 4 参贯穿主管线与伤害预览；[转火] 修复多段攻击主目标死亡后
+   后置段空转（随机转向其他存活敌人，近战仍限前排）；[绑定:*N] 从释放时一次性扣除改为按伤害段逐发
+   配额（余数给前面的发；被闪避照扣；未开火的段不扣；无伤害段兜底维持一次性全额）。 */
+async function test31() {
+  head('31 散射/群散射护甲×3·转火·弹药按发消耗·霰弹特效冒烟');
+  const w = rpgWin();
+  const ev = (expr) => w.eval('(function(){ return ' + expr + '; })()');
+
+  // --- ① 解析层 ---
+  const sk = ev('parseSkill("【双管鹿弹】[散射(霰弹);power:140][散射(霰弹);power:140][Aim:150][转火][近战]")');
+  check(sk.type === '[散射(霰弹)]' && sk.power === 140 && sk.type2 === '[散射(霰弹)]' && sk.power2 === 140, '散射双槽解析：两段 [散射(霰弹)] power 140');
+  check(sk.switchTarget === true, '[转火] → skill.switchTarget');
+  check(sk.damageType === '近战' && sk.hit === 150, '[近战]/[Aim:150] 照常解析（不占槽）');
+  check(ev('parseSkill("【简写】[散射:160]").type') === '[散射]' && ev('parseSkill("【简写】[散射:160]").power') === 160, '冒号简写 [散射:160] 归一入主槽（SKILL_TYPES 白名单）');
+  const skG = ev('parseSkill("【扇面压制】[群散射(霰弹);power:90][远程]")');
+  check(skG.type === '[群散射(霰弹)]' && skG.power === 90, '[群散射(霰弹)] 槽位解析');
+  check(ev('classifySkill(parseSkill("【A】[散射;power:100]")).hasEnemyTargetTag') === true, 'classifySkill：[散射] 进敌方选目标');
+  check(ev('classifySkill(parseSkill("【B】[群散射;power:100]")).hasEnemyTargetTag') === false, 'classifySkill：[群散射] 不进选目标（AoE 免选）');
+  check(ev('parseItem("【战术霰弹枪】[道具][次数:3][散射(霰弹);power:100][转火]").switchTarget') === true, 'parseItem [转火] 镜像解析');
+  check(ev('itemToPseudoSkill(parseItem("【战术霰弹枪】[道具][次数:3][散射(霰弹);power:100][转火]")).switchTarget') === true, 'itemToPseudoSkill 透传 switchTarget');
+  const it31 = ev('parseItem("【12号鹿弹】[弹药][数量:12][绑定:双管鹿弹*2]")');
+  check(it31.category === '弹药' && it31.count === 12 && it31.bindings[0].skillName === '双管鹿弹' && it31.bindings[0].cost === 2, '弹药物品 [绑定:技能*2] 解析');
+
+  // --- ② 公式层（直调，确定性） ---
+  const tgt = JSON.stringify({ id: 'e_formula', name: '公式靶', isAlive: true, hp: 500, maxHp: 500, def: 40, spd: 50, buffs: [], shield: 0 });
+  eq(ev('calculateDamage(200, ' + tgt + ', false, 3).hpDmg'), 80, 'calculateDamage：200 威力 vs 40 护甲 ×3 → 80（200-120）');
+  eq(ev('calculateDamage(200, ' + tgt + ', false).hpDmg'), 160, 'calculateDamage 默认 ×1 回归不变（200-40）');
+  eq(ev('calculateDamage(200, ' + tgt + ', true, 3).hpDmg'), 200, '穿透不受护甲倍率影响');
+
+  // --- ③ 配额函数（纯函数） ---
+  eq(ev('ammoQuotaForShot(2,2,1)'), 1, '配额：*2 绑定 2 段 → 第1发 1');
+  eq(ev('ammoQuotaForShot(2,2,2)'), 1, '配额：*2 绑定 2 段 → 第2发 1');
+  eq(ev('ammoQuotaForShot(3,3,3)'), 1, '配额：*3 绑定 3 段 → 第3发 1');
+  eq(ev('ammoQuotaForShot(2,3,1)'), 1, '配额：*2 绑定 3 段 → 余数给前面（第1发 1）');
+  eq(ev('ammoQuotaForShot(2,3,3)'), 0, '配额：*2 绑定 3 段 → 第3发 0');
+
+  // --- ④ 战斗管线脚手架（击杀特写桩化提速；每场景重建战场） ---
+  w.eval(`
+    window.__t31Cutin = window.playExecutionAnimation; window.playExecutionAnimation = async function(){};
+    state.isGameStarted = true; state.isAnimating = false;
+  `);
+  const mkHero = (skillStr, items) => JSON.stringify({
+    id: 'h_t31', name: '温切斯特枪手', img: '', hp: 200, maxHp: 200, mp: 60, maxMp: 60, tp: 0, maxTp: 100,
+    atk: 10, def: 5, spd: 100, shield: 0, actCount: 1, isAlive: true, buffs: [], classType: '', isSummon: false,
+    skills: [w.parseSkill(skillStr)], items: items || []
+  });
+  const mkEnemy = (id, name, hp, def, spd) => JSON.stringify({
+    id: id, name: name, isAlive: true, hp: hp, maxHp: hp, mp: 20, maxMp: 20, tp: 0, maxTp: 100,
+    atk: 10, def: def, spd: spd, shield: 0, buffs: [], skills: [], items: [], classType: '', tags: [], nameTags: []
+  });
+  const resetRun = (heroJson, enemyJsons) => {
+    w.eval('heroesData = [' + heroJson + ']; enemiesData = [' + enemyJsons.join(',') + '];' +
+      'state.actionQueue = [{ type: "hero", ref: heroesData[0] }].concat(enemiesData.map(function(e){ return { type: "enemy", ref: e }; })); state.queueIndex = 0;' +
+      'battleHistory = []; _historyRawCache = "";');
+  };
+  const ammoItem = (name, skillName, cost, count) => ({ isItem: true, name: name, category: '弹药', count: count, maxUses: 0, usesRemaining: 0, bindings: [{ skillName: skillName, cost: cost }] });
+
+  // --- ⑤ 散射×2段 vs 坦克敌：×3 伤害管线 + 两段全开火全额扣弹 ---
+  resetRun(mkHero('【双管鹿弹】[散射(霰弹);power:200][散射(霰弹);power:200][必中]', [ammoItem('12号鹿弹', '双管鹿弹', 2, 12)]), [mkEnemy('e1', '重甲匪', 5000, 60, 50)]);
+  await w.eval('executeSkillAction(heroesData[0], enemiesData[0], heroesData[0].skills[0], 1)');
+  const r5 = ev('(function(){ var e = enemiesData[0], h = heroesData[0]; return { loss: 5000 - e.hp, ammo: h.items[0].count, hist: battleHistory.join("|") }; })()');
+  check(r5.loss >= 2 && r5.loss <= 120, '散射管线：两段合计伤害 ∈ [2,120]（200×0.8~1.2−60×3；×1 会是 200~360 → 证明护甲×3 贯穿）', 'loss=' + r5.loss);
+  check(r5.ammo === 10, '弹药按发：两段全开火 → 12−2=10（*2 绑定每段 1 发）');
+  check(/消耗弹药：12号鹿弹（弹药·消耗2发，剩10发）/.test(r5.hist), '弹药汇总战报：消耗2发剩10发');
+
+  // --- ⑥ 转火：首段击杀 → 后置段随机转向其他存活敌人 ---
+  resetRun(mkHero('【双管鹿弹】[散射(霰弹);power:999][散射(霰弹);power:999][必中][转火][近战]', [ammoItem('12号鹿弹', '双管鹿弹', 2, 12)]), [mkEnemy('eA', '残血匪', 10, 0, 50), mkEnemy('eB', '壮汉匪', 2000, 0, 50)]);
+  await w.eval('executeSkillAction(heroesData[0], enemiesData[0], heroesData[0].skills[0], 1)');
+  const r6 = ev('(function(){ var a = enemiesData[0], b = enemiesData[1], h = heroesData[0]; return { aDead: !a.isAlive, bLoss: 2000 - b.hp, bAlive: b.isAlive, ammo: h.items[0].count, hist: battleHistory.join("|") }; })()');
+  check(r6.aDead, '转火前置：首段 999 散射击杀残血敌（护甲0 → 799+ 必杀）');
+  check(r6.bAlive && r6.bLoss >= 799 && r6.bLoss <= 1198, '转火核心：后置段转向其他存活敌人并命中（B 掉 799~1198）', 'bLoss=' + r6.bLoss);
+  check(/🔥 转火：温切斯特枪手 将后续攻击转向 壮汉匪！/.test(r6.hist), '转火战报行');
+  check(r6.ammo === 10, '转火下弹药：两段都开火 → 全额扣 12→10');
+
+  // --- ⑦ 无转火对照：后置段不空放也不扣弹 ---
+  resetRun(mkHero('【双管鹿弹】[散射(霰弹);power:999][散射(霰弹);power:999][必中][近战]', [ammoItem('12号鹿弹', '双管鹿弹', 2, 12)]), [mkEnemy('eA', '残血匪', 10, 0, 50), mkEnemy('eB', '壮汉匪', 2000, 0, 50)]);
+  await w.eval('executeSkillAction(heroesData[0], enemiesData[0], heroesData[0].skills[0], 1)');
+  const r7 = ev('(function(){ var b = enemiesData[1], h = heroesData[0]; return { bLoss: 2000 - b.hp, ammo: h.items[0].count, hist: battleHistory.join("|") }; })()');
+  check(r7.bLoss === 0, '无转火对照：主目标死后后置段不再攻击其他敌人（维持原语义）');
+  check(r7.ammo === 11, '无转火对照：未开火的段不扣弹（一发击杀只耗 1 发，12→11）');
+  check(/消耗弹药：12号鹿弹（弹药·消耗1发，剩11发）/.test(r7.hist), '无转火弹药汇总：只报实际消耗 1 发');
+
+  // --- ⑧ 群散射：全体敌方各挨一发 ---
+  resetRun(mkHero('【扇面压制】[群散射(霰弹);power:90][必中]', []), [mkEnemy('e1', '匪甲', 1000, 0, 50), mkEnemy('e2', '匪乙', 1000, 0, 50)]);
+  await w.eval('executeSkillAction(heroesData[0], enemiesData[0], heroesData[0].skills[0], 1)');
+  const r8 = ev('(function(){ return { l1: 1000 - enemiesData[0].hp, l2: 1000 - enemiesData[1].hp }; })()');
+  check(r8.l1 >= 72 && r8.l1 <= 108 && r8.l2 >= 72 && r8.l2 <= 108, '群散射：全体敌方各掉 72~108（90×0.8~1.2，护甲0）', JSON.stringify(r8));
+
+  // --- ⑨ 被闪避照扣 + 单段全额 ---
+  resetRun(mkHero('【独头鹿弹】[散射(霰弹);power:150][Aim:1]', [ammoItem('12号鹿弹', '独头鹿弹', 2, 12)]), [mkEnemy('eD', '闪避妖', 500, 0, 1000000000)]);
+  await w.eval('executeSkillAction(heroesData[0], enemiesData[0], heroesData[0].skills[0], 1)');
+  const r9 = ev('(function(){ var h = heroesData[0]; return { ammo: h.items[0].count, hist: battleHistory.join("|"), loss: 500 - enemiesData[0].hp }; })()');
+  check(/闪避/.test(r9.hist), '闪避妖闪避了本次散射（spd 1e9 + Aim:1）');
+  check(r9.ammo === 10, '被闪避照扣：单段 *2 → 全额 2 发（开火即耗弹）');
+  check(r9.loss === 0, '闪避后零伤害');
+
+  // --- ⑩ 混合绑定：道具释放时扣 + 弹药按发扣（两条战报分列） ---
+  resetRun(mkHero('【混合射击】[散射;power:120][必中]', [
+    ammoItem('12号鹿弹', '混合射击', 2, 12),
+    { isItem: true, name: '逆咒归源镜', category: '道具', count: 1, maxUses: 2, usesRemaining: 2, bindings: [{ skillName: '混合射击', cost: 1 }] }
+  ]), [mkEnemy('e1', '靶匪', 800, 0, 50)]);
+  await w.eval('executeSkillAction(heroesData[0], enemiesData[0], heroesData[0].skills[0], 1)');
+  const r10 = ev('(function(){ var h = heroesData[0]; return { ammo: h.items[0].count, uses: h.items[1].usesRemaining, hist: battleHistory.join("|") }; })()');
+  check(r10.uses === 1, '混合绑定：道具次数仍在释放时扣（2→1，不受按发改造影响）');
+  check(r10.ammo === 10, '混合绑定：弹药单段全额扣（12→10）');
+  check(/施展材料：逆咒归源镜（道具·使用1次，剩1次）/.test(r10.hist), '道具消耗行：释放时输出（施展材料标签）');
+  check(/消耗弹药：12号鹿弹（弹药·消耗2发，剩10发）/.test(r10.hist), '弹药消耗行：段后输出（消耗弹药标签）');
+
+  // --- ⑪ 序列化透传 ---
+  check(ev('(function(){ heroesData[0].skills[0] = parseSkill("【双管鹿弹】[散射;power:140][转火]"); return serializeHeroesForSave()[0].skills[0].switchTarget === true; })()'), 'serializeHeroesForSave 透传 switchTarget（持久化字段）');
+
+  // --- ⑫ (霰弹) 特效冒烟 ---
+  check(ev('typeof playShotgunSound') === 'function' && /xiandan\.mp3$/.test(ev('audioUrls.xiandan')), '霰弹音效注册：playShotgunSound + audioUrls.xiandan');
+  check(ev('(function(){ for (var i=0;i<document.styleSheets.length;i++){ try { var rs=document.styleSheets[i].cssRules; for (var j=0;j<rs.length;j++){ var n=rs[j].name||""; if (n==="shotgun-pellet-tracer"||n==="shotgun-shake-anim"||n==="enemy-shotgun-recoil-flinch") return true; } } catch(e){} } return false; })()'), '霰弹 CSS 关键帧已注入（震屏/弹丸轨迹/后仰硬直）');
+  const fx1 = ev('(function(){ var d=document.createElement("div"); d.style.width="50px"; d.style.height="50px"; document.body.appendChild(d); playSVGEffect(d, "shotgun"); var hit = Array.prototype.slice.call(document.body.children).filter(function(el){ return el.style && el.style.zIndex === "95" && el.innerHTML && el.innerHTML.indexOf("shotgun-flare-grad")!==-1 && el.innerHTML.indexOf("pellet-trail-")!==-1; }); d.remove(); return hit.length; })()');
+  check(fx1 === 1, 'playSVGEffect shotgun 分支：挂载爆焰+8向弹丸轨迹 SVG wrapper');
+  await sleep(800);
+  check(ev('Array.prototype.slice.call(document.body.children).filter(function(el){ return el.style && el.style.zIndex === "95" && el.innerHTML && el.innerHTML.indexOf("shotgun-flare-grad")!==-1; }).length') === 0, 'shotgun 特效 650ms 后自动回收（无 DOM 泄漏）');
+  let fxNoThrow = true;
+  try { w.eval('window.spawnCanvasParticles("shotgun", 10, 10)'); } catch (e) { fxNoThrow = false; }
+  check(fxNoThrow && ev('typeof spawnShotgunParticles') === 'function', 'Canvas 粒子层：shotgun 映射不抛错（spawnShotgunParticles）');
+
+  // --- ⑬ 清理：恢复桩函数与全局态（防复跑影响早前测试） ---
+  w.eval(`
+    window.playExecutionAnimation = window.__t31Cutin; delete window.__t31Cutin;
+    heroesData = []; enemiesData = []; state.actionQueue = []; state.queueIndex = 0; state.isAnimating = false; state.isGameStarted = false;
+    battleHistory = []; _historyRawCache = '';
+  `);
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -1794,7 +1926,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
