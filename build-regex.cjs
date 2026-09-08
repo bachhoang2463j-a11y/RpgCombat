@@ -43,8 +43,10 @@ function buildMinifiedHtml(html) {
       const inFile = path.join(TMP, 'in-' + i + '.js');
       const outFile = path.join(TMP, 'out-' + i + '.js');
       fs.writeFileSync(inFile, slots[i]);
+      // mangle 禁用 $ 单字符名：压缩器生成的 $ 标识符与 &&/数字邻接会拼出 $&/$N 捕获组替换序列
+      // （酒馆正则引擎会把产物内 $N 顶替为捕获组内容；源码级扫描防不住 mangle 拼接，须产物级断言兜底）
       execSync(
-        'npx -y terser@5 "' + inFile + '" --compress evaluate=false --mangle --comments "/@license/" -o "' + outFile + '"',
+        'npx -y terser@5 "' + inFile + '" --compress evaluate=false --mangle reserved=[\'$\'] --comments "/@license/" -o "' + outFile + '"',
         { cwd: ROOT, stdio: 'pipe', maxBuffer: 64 * 1024 * 1024 }
       );
       const min = fs.readFileSync(outFile, 'utf8');
@@ -81,6 +83,13 @@ function buildMinifiedHtml(html) {
     const immune = minified.replace(/&/g, '&amp;');
     if (/&(?!amp;)/.test(immune)) fail('全量 & 转义后仍存在非 &amp; 形式的 & 序列');
     if (immune.replace(/&amp;/g, '&') !== minified) fail('&amp; 还原一致性校验失败');
+
+    // 6) 正则捕获组替换免疫：酒馆正则引擎以 String.replace 应用 replaceString，产物内任何
+    //    $1/$&/$`/$'/$$/$<name> 序列都会被捕获组内容顶替（实测 '$1' 字面量把用户 Combat_block
+    //    的 YAML 整段注入脚本 → 裸换行炸语法 → 组件零执行卡加载屏）。断言兜底，源码侧应避免此类序列。
+    const dollarHit = immune.match(/\$[$&`'\d<]/);
+    if (dollarHit) fail('产物含 $ 捕获组替换序列 ' + JSON.stringify(dollarHit[0]) +
+      '（酒馆正则会顶替为捕获组内容）：' + immune.slice(Math.max(0, dollarHit.index - 60), dollarHit.index + 20));
     return immune;
   } finally {
     fs.rmSync(TMP, { recursive: true, force: true });

@@ -1103,6 +1103,15 @@ async function test19() {
   const poisoned = src.replace('<!DOCTYPE html>', '<!DOCTYPE html>\n<!-- ```yaml 假围栏 -->');
   const convertedPoisoned = applyStQuote(poisoned + '\n' + sample);
   check(/<q>/.test(convertedPoisoned.slice(convertedPoisoned.indexOf('状态栏模拟组件') - 300)), '对照组：内部多一个围栏序列 → 污染复现（仿真有效）');
+  // ④ 正则捕获组替换免疫（事故：normalizeVariantGroupYaml 的 '$1' 字面量被酒馆正则引擎当作捕获组引用，
+  //    用户 Combat_block 的 YAML 整段注入脚本字符串字面量 → 裸换行炸语法 → 组件零执行卡加载屏）
+  check(!/\$[$&`'\d<]/.test(src), '源码无 $ 捕获组替换序列（$1/$&/$` 等，会被酒馆正则替换注入捕获组内容）');
+  const simMsg = '前置楼层文本\n<Combat_block>\n战斗数据栏:\n  敌方列表:\n    - 角色:\n        名字: "测试怪"\n</Combat_block>\n后置文本';
+  const applied = simMsg.replace(/<Combat_block>([\s\S]*?)<\/Combat_block>/, src);
+  const simScripts = [...applied.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]).filter(t => t.trim());
+  let dollarSyntaxErr = null;
+  for (const sc of simScripts) { try { new Function(sc); } catch (e) { dollarSyntaxErr = e.message; break; } }
+  check(!dollarSyntaxErr, '捕获组替换仿真：源码作为 replaceString 应用后脚本语法完好' + (dollarSyntaxErr ? '  实际: ' + dollarSyntaxErr : ''));
 }
 
 async function test20() {

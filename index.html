@@ -8346,7 +8346,7 @@ function buildCombatDataFromYAML(yamlContent) {
         assignEnemyRows();
         initialHeroesCache = JSON.parse(JSON.stringify(heroesData)); initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData));
         return true;
-    } catch (e) { return false; }
+    } catch (e) { console.error('Combat_block 构建失败:', e); return false; }
 }
 
 // ==========================================
@@ -9073,7 +9073,7 @@ function normalizeVariantGroupYaml(yamlStr) {
         if (!m) continue;
         const itemBody = m[2];
         // 剥引号后判定【名】开头（YAML 列表项常用双引号包裹中文名）
-        const bareBody = itemBody.replace(/^"(.*)"$/, '$1');
+        const bareBody = itemBody.replace(/^"(.*)"$/, (m, g) => g); // 函数替换器：捕获组引用字面量（美元符+序号）会被酒馆正则引擎顶替为捕获组内容（真机零执行事故）
         if (!/^【/.test(bareBody)) continue;
         const next = lines[i + 1].match(itemRe);
         if (!next || next[1].length <= m[1].length) continue;
