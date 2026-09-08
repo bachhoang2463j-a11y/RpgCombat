@@ -1293,7 +1293,7 @@ async function test23() {
   for (const name of ['ranged-heavy-enemy-recoil-flash', 'enemy-ram-knockback-flash', 'enemy-gunshot-flinch-flash', 'enemy-pierce-stutter-flash']) {
     check(src.includes('@keyframes ' + name + ' {'), 'steps 闪色 keyframes ' + name + ' 存在');
   }
-  eq((src.match(/-flash 0\.\d+s steps\(1\) both/g) || []).length, 6, '六个挂载点均携带 steps(1) 闪色（recoil/ram/pierce×2/gunshot×2）');
+  eq((src.match(/-flash 0\.\d+s steps\(1\) both/g) || []).length, 10, '十个挂载点均携带 steps(1) 闪色（recoil/ram/pierce×2/gunshot×2 + 霰弹 recoil×2/爆焰/弹丸）');
   // ⑤ 三处模板双 drop-shadow 链已并单（远程核心/血溅×5/近战核心）
   check(!src.includes('drop-shadow(0 0 25px #ea580c) drop-shadow(0 0 45px #dc2626)'), '远程重击核心双 drop-shadow 已并单');
   check(!src.includes('drop-shadow(0 0 10px #450a0a) drop-shadow(0 0 4px #7f1d1d)'), '血溅双 drop-shadow 已并单');
@@ -1911,6 +1911,24 @@ async function test31() {
   try { w.eval('window.spawnCanvasParticles("shotgun", 10, 10)'); } catch (e) { fxNoThrow = false; }
   check(fxNoThrow && ev('typeof spawnShotgunParticles') === 'function', 'Canvas 粒子层：shotgun 映射不抛错（spawnShotgunParticles）');
 
+  // --- ⑫b 霰弹 SVG 性能优化（真机卡顿反馈）：四组主关键帧零逐帧 filter/stroke-width，全部拆 steps(1) 子动画 ---
+  const kfSrc = await (await fetch('../index.html')).text();
+  const seg = (from, to) => kfSrc.slice(kfSrc.indexOf('@keyframes ' + from), kfSrc.indexOf('@keyframes ' + to));
+  const segFlare = seg('shotgun-muzzle-flare', 'shotgun-flare-flash');
+  const segShock = seg('shotgun-shockwave-fan', 'shotgun-shock-thinning');
+  const segPellet = seg('shotgun-pellet-tracer', 'shotgun-pellet-flash');
+  const segImpact = seg('shotgun-impact-puncture', 'shotgun-impact-flash');
+  check(!segFlare.includes('filter:') && !segShock.includes('stroke-width:') && !segPellet.includes('filter:') && !segImpact.includes('filter:'),
+    '四组主关键帧零逐帧 filter/stroke-width（爆焰亮度/激波描边/弹丸/弹孔全部拆出）');
+  for (const name of ['shotgun-flare-flash', 'shotgun-shock-thinning', 'shotgun-pellet-flash', 'shotgun-impact-flash']) {
+    check(kfSrc.includes('@keyframes ' + name + ' {'), 'steps(1) 子动画 ' + name + ' 存在');
+  }
+  check((kfSrc.match(/enemy-shotgun-recoil-flash 0\.38s steps\(1\) both/g) || []).length === 2, '敌人闪白两处调用均 steps(1) 播放（帧边界跳变）');
+  check(!kfSrc.includes('drop-shadow(0 0 20px #f59e0b) drop-shadow(0 0 35px #ea580c)'), '爆焰层双 drop-shadow 已并单');
+  check(!kfSrc.includes('background: #fde68a; animation: shotgun-shrapnel-spark 0.3s ${pt.delay + 0.02}s ease-out both; filter: drop-shadow'), '18 颗火星 drop-shadow 辉光已去除（6px 圆点肉眼不可辨）');
+  check(kfSrc.includes('style="opacity: 0.6; filter: blur(7px);"'), '硝烟 3×SVG blur 并为容器单次 blur');
+  check(kfSrc.includes("'开镜瞄准': { url: `${ASSET_BASE}/miaozhun.webm`, scale: 0.42,") && kfSrc.includes("'燃烧弹': { url: `${ASSET_BASE}/ranshao.webm`, scale: 0.42,"), '开镜瞄准/燃烧弹 scale 0.42（用户实测降至 30% 尺寸）');
+
   // --- ⑬ 清理：恢复桩函数与全局态（防复跑影响早前测试） ---
   w.eval(`
     window.playExecutionAnimation = window.__t31Cutin; delete window.__t31Cutin;
@@ -2009,8 +2027,8 @@ async function test33() {
   check(src.includes('playCustomAudio(RLYEH_FOG_CLOUD_URL, 2)'), '造雾术音量增益 2（fog.mp3 源文件偏轻，GainNode 硬件级放大）');
   check(/'造雾术': \{ url: '', scale: 1\.0, particles: 'rlyeh_sediment', audioUrl: RLYEH_FOG_CLOUD_URL \},/.test(src), '造雾术注册表无 delay（立即结算）');
   // 新增三组 WebM 视频特效（my_assets 实测核名：miaozhun/ranshao = .mp3+.webm，weimu 音效 = .wav）
-  check(src.includes("'开镜瞄准': { url: `${ASSET_BASE}/miaozhun.webm`, scale: 1.4, audioUrl: `${ASSET_BASE}/miaozhun.mp3` }"), '注册表：开镜瞄准（miaozhun.webm + mp3，无粒子无延迟）');
-  check(src.includes("'燃烧弹': { url: `${ASSET_BASE}/ranshao.webm`, scale: 1.4, particles: 'fire_aoe', audioUrl: `${ASSET_BASE}/ranshao.mp3` }"), '注册表：燃烧弹（ranshao.webm + fire_aoe 粒子 + mp3）');
+  check(src.includes("'开镜瞄准': { url: `${ASSET_BASE}/miaozhun.webm`, scale: 0.42, audioUrl: `${ASSET_BASE}/miaozhun.mp3` }"), '注册表：开镜瞄准（miaozhun.webm + mp3，无粒子无延迟，scale 0.42）');
+  check(src.includes("'燃烧弹': { url: `${ASSET_BASE}/ranshao.webm`, scale: 0.42, particles: 'fire_aoe', audioUrl: `${ASSET_BASE}/ranshao.mp3` }"), '注册表：燃烧弹（ranshao.webm + fire_aoe 粒子 + mp3，scale 0.42）');
   check(src.includes("'圣域帷幕': { url: `${ASSET_BASE}/weimu.webm`, scale: 1.4, particles: 'holy_light', audioUrl: `${ASSET_BASE}/weimu.wav` }"), '注册表：圣域帷幕（weimu.webm + holy_light 粒子 + wav）');
   const wNew = w.eval('(function(){ return ["开镜瞄准","燃烧弹","圣域帷幕"].every(function(k){ var e = WEBM_FX_REGISTRY[k]; return !!e && !!e.url && !!e.audioUrl && e.audioUrl !== "none" && !e.delay; }); })()');
   check(wNew, 'iframe 内注册表：三条目 url/audioUrl 齐备且无 delay（视频静音走独立音效、立即结算）');

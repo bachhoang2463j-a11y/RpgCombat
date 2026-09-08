@@ -2752,3 +2752,20 @@
 - **涉及文件**：`index.html`、`integration-test\harness.html`（test27 断言同步 + test33 扩 5 项）、`regex-前端战斗v11_11.json`（重建产物）。
 - **经验证**：test27 两处同步（源码正则去 delay: 1.0、iframe 内 e.delay === 1 改 !e.delay）；test33 新增 5 项——音量增益 2 断言、造雾术注册表无 delay 断言、三条目源码文本断言（含 weimu.wav 核名）、iframe 内三条目 url/audioUrl 齐备且无 delay 断言。**507 项全绿**（33 组；test10 srcLine 123 条重映射后集合对齐）；build-regex 产物 replaceString 870260 字符（-30%），围栏 2/2。真机待用户实测。
 - **决策原因**：weimu 音效以服务目录实测为准注册 .wav（用户口述"mp3 / webm"但 weimu.mp3 实际 404，weimu.wav 存在——浏览器 Audio 原生支持 wav，magic_kill.wav 已有先例）；开镜瞄准不配 Canvas 粒子（瞄准非攻击，纯视频+音效，避免粒子喧宾夺主），燃烧弹/圣域帷幕按主题配 fire_aoe/holy_light（与火焰01/圣光01 同粒子的保守选择）；scale 统一 1.4 起步（与四大元素系视频特效一致），用户实测后可按视频内容调整。
+
+---
+
+## [LOG-230] 2026-09-09 — 霰弹 SVG 性能优化（真机卡顿）+ 开镜瞄准/燃烧弹尺寸降至 30%
+
+- **变更行为**（真机实测反馈两则）：
+  1. **(霰弹) SVG 特效性能优化**（真机卡顿；沿用 LOG 性能优化批次③"filter 闪色 steps(1) 化 + 双 drop-shadow 并单 + stroke-width 拆出"的既定手法，视觉近无损）：四处逐帧插值热点全部拆解——
+     - 爆焰层（260px）`shotgun-muzzle-flare` 关键帧逐帧 brightness(3→2.2→1.4) 插值 + style 双 drop-shadow：关键帧剥 filter 只留 transform/opacity（走合成器），过曝亮感拆为独立 `shotgun-flare-flash 0.32s steps(1) both` 两档跳变（重栅格化 1 次）；双 drop-shadow 并单（20px+35px → 26px 单层中间色）。
+     - 激波环 `shotgun-shockwave-fan` 逐帧 stroke-width(8→3.5→1) 插值（每帧重光栅化 SVG 描边，且经 CSS 继承覆盖三弧各自属性）：拆为 `shotgun-shock-thinning 0.35s steps(1) both` 三档跳变，主关键帧只留 transform/opacity + will-change 提层。
+     - 8 颗弹丸 `shotgun-pellet-tracer` 18% 帧 filter(brightness+drop-shadow)→60% none 的逐帧插值：拆为 `shotgun-pellet-flash 0.26s steps(1) both`（出膛 0~30% 过曝一档）。
+     - 6 处弹孔 `shotgun-impact-puncture` brightness(2.5→1.6) 逐帧：拆为 `shotgun-impact-flash 0.38s steps(1) both`（保留 ${pt.delay} 逐孔错峰）。
+     - 敌人受击闪白 `enemy-shotgun-recoil-flash`：调用处 ease-out 改 steps(1)（×2 处：闪避开火感/命中硬直），帧内双 drop-shadow 并单——sprite 大元素每帧全尺寸 filter 重绘是最大热点，steps 化后重栅格化仅 3 次。
+     - 硝烟团：3 个 SVG circle 各自 filter="blur(6~8px)"（3 次模糊光栅化）并为容器单次 `filter: blur(7px)`；18 颗跳弹火星（6px 圆点）的 drop-shadow 辉光直接去除（肉眼不可辨）；激波环/硝烟层补 will-change 提层。
+  2. **开镜瞄准/燃烧弹特效尺寸降至 30%**：注册表 scale 1.4 → 0.42（真机实测视频占屏过大），圣域帷幕维持 1.4。
+- **涉及文件**：`index.html`、`integration-test/harness.html`（test31 扩 10 项 + test23 计数同步 6→10）、`regex-前端战斗v11_11.json`（重建产物）。
+- **经验证**：test31 新增 10 项——四组主关键帧零逐帧 filter/stroke-width（切片断言）、4 个 steps(1) 子动画存在、闪白两处调用 steps(1)、爆焰双 drop-shadow 并单、火星辉光去除、硝烟容器单 blur、scale 0.42；test23 steps 闪色挂载点计数 6→10 同步。**517 项全绿**（33 组；test10 srcLine 123 条重映射后集合对齐）；build-regex 产物 replaceString 870589 字符（-28%），围栏 2/2。卡顿改善与视觉损耗待用户真机复测。
+- **决策原因**：霰弹卡顿根因是一次演出内 17 个动画元素中 4 组关键帧携带 filter/stroke-width 逐帧插值（每帧强制重栅格化所在层），叠加敌人 sprite 全尺寸闪白逐帧 filter 与 21 个 drop-shadow 辉光层；steps(1) 跳变手法已被批次③在四组受击闪色上验证"颜色反馈保留、成本降约一个数量级"，本次为同一手法的霰弹侧补全。火星辉光（6px 点配 4px shadow）与硝烟三重模糊属肉眼不可辨的纯成本项，直接去除/合并；弹孔/弹丸/爆焰的过曝感保留为 steps 跳变档位（0.26~0.38s 的动画内 1~3 次跳变与平滑渐变不可分辨）。
