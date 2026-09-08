@@ -2006,12 +2006,18 @@ async function test33() {
   check(src.includes("skill.fxTag === '造雾术' || skill.fxTag === '高阶召唤术' || skill.fxTag === '障壁术'"), 'executeSkillAction 全屏 SVG 特判含障壁术');
   check(src.includes("skill.fxTag === '高阶召唤术' || skill.fxTag === '障壁术'"), '枪击命中豁免 _isHeavyFx 含障壁术');
   check(w.eval('Object.keys(WEBM_FX_REGISTRY).indexOf("障壁术") >= 0'), '注册表键含障壁术（技能编辑器下拉自动纳入）');
+  check(src.includes('playCustomAudio(RLYEH_FOG_CLOUD_URL, 1.2)'), '造雾术音量增益 1.2（fog.mp3 源文件偏轻，GainNode 硬件级放大）');
 
   // --- ② CSS 关键帧：方案1 全套（主晶盾嵌合 + 六向碎片聚合 + 激波环 + 震屏） ---
   for (const name of ['aegis-shake-soft-anim', 'aegis-core-assemble', 'aegis-shock-ring',
                       'aegis-shard-tl', 'aegis-shard-tr', 'aegis-shard-bl', 'aegis-shard-br', 'aegis-shard-top', 'aegis-shard-bottom']) {
     check(src.includes('@keyframes ' + name + ' {'), 'keyframes ' + name + ' 存在');
   }
+  // 居中机制：margin 布局居中（非整数 DPR 缩放下 transform 百分比与布局小数各自舍入会导致层间错位，150% 浏览器缩放实测）
+  check(src.includes('width:340px;height:340px;margin-left:-170px;margin-top:-170px;animation: aegis-shock-ring'), '激波环 margin 布局居中（-170px）');
+  check(src.includes('width:240px;height:260px;margin-left:-120px;margin-top:-130px;animation: aegis-core-assemble'), '主晶盾 margin 布局居中（-120/-130px）');
+  const aegisCss = src.slice(src.indexOf('[特效:障壁术]'), src.indexOf('敌方大招切入特效'));
+  check(aegisCss.indexOf('translate(-50%') < 0, '障壁术 CSS 区段无居中 translate(-50%)（居中职责全在布局层 margin）');
 
   // --- ③ 功能仿真：真触发挂载 → 震屏 → 1.5s 自动清理零残留；528Hz 合成音不抛错 ---
   const reg = w.eval('(function(){ var e = WEBM_FX_REGISTRY["障壁术"]; return !!e && e.url === "" && e.particles === "nak_aegis" && e.delay === 0.8 && e.audioUrl === "none"; })()');
@@ -2027,6 +2033,22 @@ async function test33() {
   check(mid.kf, '新 keyframes 已被样式表收录（CSSOM 可解析）');
   check(mid.nodes >= 4, '障壁术演出节点已挂载（主晶盾+激波环+碎片 ≥4 个，实挂 ' + mid.nodes + '）');
   check(mid.shake, '战场景容器挂上 aegis-shake-soft 微震');
+  // 同心性：Web Animations API 同时定格全部层，激波环与主晶盾中心差 <1px（margin 布局居中防缩放错位的直接验证）
+  const concentric = w.eval(`(function(){
+    var ring = null, core = null;
+    document.querySelectorAll('[style*="aegis-"]').forEach(function(el){
+      var s = el.getAttribute('style') || '';
+      if (s.indexOf('aegis-shock-ring') >= 0) ring = el;
+      if (s.indexOf('aegis-core-assemble') >= 0) core = el;
+    });
+    if (!ring || !core) return { ok: false, dx: -1, dy: -1 };
+    document.querySelectorAll('[style*="aegis-"]').forEach(function(el){
+      (el.getAnimations ? el.getAnimations() : []).forEach(function(a){ a.pause(); });
+    });
+    var r = ring.getBoundingClientRect(), c = core.getBoundingClientRect();
+    return { ok: true, dx: Math.abs((r.left + r.width/2) - (c.left + c.width/2)), dy: Math.abs((r.top + r.height/2) - (c.top + c.height/2)) };
+  })()`);
+  check(concentric.ok && concentric.dx < 1 && concentric.dy < 1, '激波环与主晶盾同心（定格测量 dx=' + concentric.dx.toFixed(3) + ' dy=' + concentric.dy.toFixed(3) + ' <1px）');
   await sleep(1600);
   const late = w.eval('(function(){ return document.querySelectorAll(\'[style*="aegis-core-assemble"], [style*="aegis-shock-ring"], [style*="aegis-shard-tl"], div[style*="z-index: 180"], div[style*="z-index:180"]\').length; })()');
   eq(late, 0, '障壁术演出节点 1.5s 后自动清理（零残留）');

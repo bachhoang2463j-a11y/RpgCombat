@@ -2730,3 +2730,14 @@
 - **涉及文件**：`index.html`、`integration-test/harness.html`（test33）、`regex-前端战斗v11_11.json`（重建产物）、`README.md`（§3.2 肃正条目罩位说明 + §8.2 内置特效清单）。
 - **经验证**：test33 新增 27 项——接入链路 5（注册表/particles 分派/executeSkillAction 特判/枪击豁免/编辑器下拉键）、keyframes 9 组存在、功能仿真 7（iframe 注册表字段/spawn 真触发无异常/CSSOM 收录/演出节点≥4 挂载/战场景微震/1.5s 零残留/528Hz 合成音不抛错）、罩位仿真 6（initUI 渲染英雄卡/屏障值>0 显示/top 钉位正值 84px/罩位上缘==首卡顶-10/下缘==末卡底+10/召唤行移除后重钉随英雄行上移 84→-10）。**497 项全绿**（33 组；test10 srcLine 123 条重映射后集合对齐）；build-regex 产物 replaceString 870036 字符（-30%），围栏 2/2。真机待用户实测。
 - **决策原因**：罩位修复选"按英雄卡片实际范围钉 top/height 内联"而非改 DOM 结构（把 wrapper 挪进英雄行专属包裹层需重构 grid 布局，动 8/28 已定稿的全队遮盖修复 5af4a9e，风险大）；召唤物 wrap 与英雄 wrap 的父级差异（ally-summon-row 内 vs 容器直接子级）即是筛选语义，不依赖 isSummon 数据标志，DOM 结构变化即自动适应。障壁术完全复用造雾术/高阶召唤术（LOG-225 之前 a90d0b0）的"注册表+特判+豁免"三点接入模式与 `_spawnFullscreenSvgFx` 通用起播，不新开特效管线；对侧缠绕经哨兵 targetContainerId 显式跳过而非改公共函数签名。音效走 Web Audio 现场合成（跟随项目每特效族独立 AudioContext getter 惯例），与 demo 方案3 完全同参数。
+
+---
+
+## [LOG-228] 2026-09-09 — 障壁术 150% 缩放层间错位修复 + 造雾术音量增益 1.2
+
+- **变更行为**（真机实测反馈两则）：
+  1. **障壁术非整数 DPR 缩放层间错位修复**：真机 150% 浏览器缩放下"内层几何形（六边主晶盾）与外层光圈（激波圆环）错位"。根因：两层均以 `left:50%/top:50%` + keyframes `transform: translate(-50%,-50%)` 居中——非整数 DPR（1.5x）下，不同尺寸兄弟层（340px 环 vs 240px 盾）的百分比布局值与百分比 transform 在光栅化时**逐层各自舍入**，层间错位（分数 DPR 经典症状；IAB 以 CSS zoom 模拟测 100%/150% 均同心 dx<0.0001px，错位仅现于真机分数 DPR 光栅化）。修复：居中职责全部移入布局层——激波环 `margin-left:-170px;margin-top:-170px`（340/2）、主晶盾 `margin-left:-120px;margin-top:-130px`（240/2、260/2），keyframes（`aegis-shock-ring`/`aegis-core-assemble`）剥掉居中 `translate(-50%,-50%)` 只留 `scale/rotate`（围绕元素中心=容器中心）；两层在布局阶段对齐同一点，绘制时无各自舍入，任意 DPR 下同心。碎片 keyframes 本就无居中 translate（margin 定位），不动。
+  2. **造雾术音量增益 0.75 → 1.2**：真机造雾术近无声——fog.mp3 源文件本身偏轻，叠加 0.75 增益进一步压低。`spawnRlyehSedimentFx` 主路径（executeSkillAction 特判自播）音量参数 0.75 → 1.2，经 `playCustomAudio` 的 Web Audio GainNode 硬件级放大（HTMLMediaElement.volume 上限 1 不可用，复用击杀特写 2 倍音量增益先例）；不动 fog.mp3 源文件。
+- **涉及文件**：`index.html`、`integration-test/harness.html`（test33 扩 5 项）、`regex-前端战斗v11_11.json`（重建产物）。
+- **经验证**：test33 新增 5 项——音量增益 1.2 断言、激波环/主晶盾 margin 布局居中断言 ×2、障壁术 CSS 区段零 `translate(-50%)` 断言、Web Animations API 定格同心测量（`getAnimations().pause()` 同相位定格，激波环与主晶盾中心差 dx=0.000 dy=0.000 <1px）。**502 项全绿**（33 组；test10 srcLine 123 条重映射后集合对齐）；build-regex 产物 replaceString 869962 字符（-30%），围栏 2/2。150% 缩放修复效果待用户真机复测。
+- **决策原因**：错位修复选"margin 布局居中"而非统一 transform 居中精度——布局层对齐使两层共享同一布局盒原点，绘制阶段不再有独立的百分比换算与舍入，从机制上免疫 DPR 舍入，且 margin 为静态布局属性无合成层开销；碎片本就走 margin 定位，修复后全家族居中机制统一。音量走 GainNode 放大而非重制音频源——保留源文件、调整即生效，且 playCustomAudio 已内建 >1 增益通道（applyAudioVolume），零新增机制。
