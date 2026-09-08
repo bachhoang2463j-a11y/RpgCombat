@@ -209,101 +209,104 @@
 
 | 标识符 | 行号 | 作用 |
 | :--- | :--- | :--- |
-| `SKILL_TYPES` | 768 | 技能伤害类型枚举（近战/远程/法术等），供编辑器下拉与判定使用。 |
-| `AVATAR_MAP` | 776 | 角色名 → 头像 URL 的映射表，用于自定义角色头像。 |
-| `DEFAULT_HERO_IMG` | 825 | 默认头像 URL，新角色兜底用。 |
-| `KANPO_SOUND_KEY` | 866 | 看破触发音效的音频缓存键名。 |
-| `WEBM_FX_REGISTRY` | 2127 | WebM 特效注册表：`特效名 → { url, scale, particles, audioUrl }`。 |
-| `POWER_COUNTER_SOUND_URL` | 4564 | 强力反击专属音效 URL。 |
-| `LLM_VAR_KEY` | 6182 | LLM 设置在酒馆 chat 变量中的存储键。 |
-| `DEFEND_VAR_KEY` | 6229 | 防御恢复设置在酒馆变量中的存储键。 |
-| `ROSTER_VAR_KEY` | 6250 | 我方角色配置持久化的酒馆变量键。 |
-| `ROSTER_VERSION` | 6656 | 角色配置序列化版本号。 |
-| `FIELD_EFFECTS` | 4053 | 场地效果注册表：`场地名 → { desc, buffs?, onApply? }`，10 个预置场地（详见 §4.1.1）。 |
-| `activeField` | 4095 | 当前战局场地名（null = 无场地效果）。 |
+| `SKILL_TYPES` | 2434 | 技能伤害类型枚举（近战/远程/法术等），供编辑器下拉与判定使用。 |
+| `AVATAR_MAP` | 2455 | 角色名 → 头像 URL 的映射表，用于自定义角色头像。 |
+| `DEFAULT_HERO_IMG` | 2505 | 默认头像 URL，新角色兜底用。 |
+| `KANPO_SOUND_KEY` | 3680 | 看破触发音效的音频缓存键名。 |
+| `WEBM_FX_REGISTRY` | 6539 | WebM 特效注册表：`特效名 → { url, scale, particles, audioUrl }`。 |
+| `POWER_COUNTER_SOUND_URL` | 12024 | 强力反击专属音效 URL。 |
+| `LLM_VAR_KEY` | 17251 | LLM 设置在酒馆 chat 变量中的存储键。 |
+| `DEFEND_VAR_KEY` | 17302 | 防御恢复设置在酒馆变量中的存储键。 |
+| `ROSTER_VAR_KEY` | 17334 | 我方角色配置持久化的酒馆变量键。 |
+| `ROSTER_VERSION` | 17335 | 角色配置序列化版本号。 |
+| `FIELD_EFFECTS` | 8308 | 场地效果注册表：`场地名 → { desc, buffs?, onApply? }`，10 个预置场地（详见 §4.1.1）。 |
+| `activeField` | 8350 | 当前战局场地名（null = 无场地效果）。 |
 
 ### 5.2 粒子/视觉特效引擎 (VFX)
 
 | 函数 | 行号 | 作用 |
 | :--- | :--- | :--- |
-| `CanvasFxEngine` 类 | ~960 | 全局粒子引擎：`addParticle`/`update`/`draw`，支持 `hitStop` 定帧、`screen` 混合、重力与阻力。实例挂载为全局 `fxEngine`。 |
-| `window.triggerScreenShake` | 1060 | 全局平滑震屏，`(intensity, duration)`。 |
-| `spawnDodgeSmokeParticles` | 1081 | 闪避成功时生成上浮扩散的环形灰烟粒子（20 粒）。 |
-| `spawnSlashParticles` | 1123 | -45° 对角线斩击火花（单体刀光底衬）。 |
-| `spawnFireParticles` | 1187 | 火焰粒子（单体火系）。 |
-| `spawnHealParticles` | 1231 | 治疗粒子（绿色或自定义主题）。 |
-| `getDomCenter` | 1297 | 取 DOM 中心坐标。 |
-| `spawnGoldStream` | 1303 | 金色流光（两点连线）。 |
-| `spawnGoldBurst` | 1353 | 金色爆裂。 |
-| `spawnPowerBurst` | 1407 | 强力能量爆发，可指定方向角。 |
-| `spawnExplosionParticles` | 1496 | 爆炸粒子（可缩放）。 |
-| `spawnThunderParticles` | 1583 | 雷电粒子（含 `makeLightningPath`/`drawPath` 子函数，可单/AOE）。 |
-| `spawnGunshotParticles` | 1853 | 枪击粒子。 |
-| `spawnLightParticles` | 1892 | 光系粒子（含 `spawnFeatherBatch` 羽翼批次）。 |
-| `playCustomAudio` | 2147 | 多通道音效播放（`cloneNode` 避免打断）。 |
-| `preloadBattleAssets` | 2169 | 预加载登场单位的 WebM 特效为 Blob URL，瞬间触发无白屏。 |
-| `playWebMFX` | 2217 | 播放 WebM 透明视频层。 |
-| `spawnFrostParticles` | 2252 | 冰霜粒子（雾/雪）。 |
-| `spawnThunderAOEParticles` | 2398 | 雷电 AOE 粒子。 |
-| `spawnHolyLightAOEParticles` | 2529 | 圣光 AOE 粒子。 |
-| `spawnDefaultAOEParticles` | 2680 | 默认 AOE 粒子。 |
-| `spawnFireAOEParticles` | 2761 | 火焰 AOE 粒子。 |
-| `window.spawnCanvasParticles` | 2910 | 粒子类型分发器：`(type, x, y)` 按类型派发到各 spawn 函数。 |
-| `window.spawnChargeUpParticles` | 2938 | 蓄力聚集粒子（大招前摇）。 |
-| `window.spawnFocusOverlay` | 3019 | 全屏径向渐变遮罩（压暗环境、聚焦施法者）。 |
-| `window.spawnHitFlash` | 3051 | 受击白色剪影闪烁（CSS brightness 闪烁）。 |
-| `window.spawnBurstAura` | 3117 | 爆发光环（极限爆发/大招）。 |
-| `playAOEEffect` | 3217 | AOE 五层模型总调度：`(containerId, type, fxTag)`。 |
-| `playSVGEffect` | 3343 | 轻量 SVG/CSS 特效派发：`(targetDom, type)`。 |
+| `CanvasFxEngine` 类 | 3984 | 全局粒子引擎：`addParticle`/`update`/`draw`，支持 `hitStop` 定帧、`screen` 混合、重力与阻力。实例挂载为全局 `fxEngine`。 |
+| `window.triggerScreenShake` | 4363 | 全局平滑震屏，`(intensity, duration)`。 |
+| `spawnDodgeSmokeParticles` | 4384 | 闪避成功时生成上浮扩散的环形灰烟粒子（20 粒）。 |
+| `spawnSlashParticles` | 4426 | -45° 对角线斩击火花（单体刀光底衬）。 |
+| `spawnFireParticles` | 4490 | 火焰粒子（单体火系）。 |
+| `spawnHealParticles` | 4534 | 治疗粒子（绿色或自定义主题）。 |
+| `getDomCenter` | 4600 | 取 DOM 中心坐标。 |
+| `spawnGoldStream` | 4606 | 金色流光（两点连线）。 |
+| `spawnGoldBurst` | 4656 | 金色爆裂。 |
+| `spawnPowerBurst` | 4710 | 强力能量爆发，可指定方向角。 |
+| `spawnExplosionParticles` | 4799 | 爆炸粒子（可缩放）。 |
+| `spawnThunderParticles` | 4886 | 雷电粒子（含 `makeLightningPath`/`drawPath` 子函数，可单/AOE）。 |
+| `spawnGunshotParticles` | 5156 | 枪击粒子。 |
+| `spawnLightParticles` | 5696 | 光系粒子（含 `spawnFeatherBatch` 羽翼批次）。 |
+| `playCustomAudio` | 3586 | 多通道音效播放（`cloneNode` 避免打断）。 |
+| `preloadBattleAssets` | 6577 | 预加载登场单位的 WebM 特效为 Blob URL，瞬间触发无白屏。 |
+| `playWebMFX` | 6642 | 播放 WebM 透明视频层。 |
+| `spawnFrostParticles` | 6788 | 冰霜粒子（雾/雪）。 |
+| `spawnThunderAOEParticles` | 6934 | 雷电 AOE 粒子。 |
+| `spawnHolyLightAOEParticles` | 7065 | 圣光 AOE 粒子。 |
+| `spawnDefaultAOEParticles` | 7216 | 默认 AOE 粒子。 |
+| `spawnFireAOEParticles` | 7297 | 火焰 AOE 粒子。 |
+| `window.spawnCanvasParticles` | 7446 | 粒子类型分发器：`(type, x, y)` 按类型派发到各 spawn 函数。 |
+| `window.spawnChargeUpParticles` | 7479 | 蓄力聚集粒子（大招前摇）。 |
+| `window.spawnFocusOverlay` | 7561 | 全屏径向渐变遮罩（压暗环境、聚焦施法者）。 |
+| `window.spawnHitFlash` | 7593 | 受击白色剪影闪烁（CSS brightness 闪烁）。 |
+| `window.spawnBurstAura` | 7668 | 爆发光环（极限爆发/大招）。 |
+| `playAOEEffect` | 7768 | AOE 五层模型总调度：`(containerId, type, fxTag)`。 |
+| `playDragonBreathFireSFX` | 7999 | [单体(火焰)] 龙息流火合成音链（Web Audio 纯程序化，零音频资源）：喷射怒吼即时起播，100ms 后叠加重锤爆破与 14 发噼啪火星；三子音效 `playDragonFireJetSFX`/`playDragonFireBoomSFX`/`playDragonFireCrackleSFX` + 惰性上下文 `getDragonFireAudioContext`。 |
+| `playSVGEffect` | 8004 | 轻量 SVG/CSS 特效派发：`(targetDom, type)`；`fire` 分支为炽核聚爆·十字裂变（demo 方案2 四层结构：塌缩 Hitstop 定格核心 + 十字光棱 + 四向破片，逐帧 filter 拆 steps(1) 子动画，容器 margin 居中防 DPR 错位）。 |
 
 ### 5.3 数据解析与构建
 
 | 函数 | 行号 | 作用 |
 | :--- | :--- | :--- |
-| `getCleanNameAndEmoji` | 3426 | 从名字中提取纯净名称与 emoji。 |
-| `parseAttributes` | 3433 | 解析角色属性串 `[HP:..][Atk:..]...` 为对象。 |
-| `parseSkill` | 3444 | 解析技能串 `【名】[标签]...` 为技能对象。 |
-| `buildCombatDataFromYAML` | 4306 | 将 `<Combat_block>` YAML 内容构建为战局数据（我方/敌方列表，含场地键解析与效果注入）。 |
-| `startSTPolling` | 3548 | 轮询侦测酒馆聊天记录中的 `<Combat_block>` 标签并自动建局。 |
-| `loadManualData` | 3593 | 手动加载战局数据入口。 |
-| `onCombatDataReceived` | 3603 | 收到战局数据后的统一入口处理。 |
-| `resolveHeroListKey` | 4282 | 扫描 `我方列表*` 键提取 `(场地:xx)` 场地名（兼容半/全角冒号），返回 `{ key, field }`。 |
-| `applyFieldEffects` | 4297 | 注入场地效果：回合型 buff（`fieldBuff` 标记防驱散）+ 开局一次性 `onApply`。 |
+| `getCleanNameAndEmoji` | 8396 | 从名字中提取纯净名称与 emoji。 |
+| `parseAttributes` | 8417 | 解析角色属性串 `[HP:..][Atk:..]...` 为对象。 |
+| `parseSkill` | 8450 | 解析技能串 `【名】[标签]...` 为技能对象。 |
+| `buildCombatDataFromYAML` | 8992 | 将 `<Combat_block>` YAML 内容构建为战局数据（我方/敌方列表，含场地键解析与效果注入）。 |
+| `startSTPolling` | 9687 | 轮询侦测酒馆聊天记录中的 `<Combat_block>` 标签并自动建局。 |
+| `loadManualData` | 9737 | 手动加载战局数据入口。 |
+| `onCombatDataReceived` | 9780 | 收到战局数据后的统一入口处理。 |
+| `resolveHeroListKey` | 8891 | 扫描 `我方列表*` 键提取 `(场地:xx)` 场地名（兼容半/全角冒号），返回 `{ key, field }`。 |
+| `applyFieldEffects` | 8906 | 注入场地效果：回合型 buff（`fieldBuff` 标记防驱散）+ 开局一次性 `onApply`。 |
 
 ### 5.4 UI 渲染与交互
 
 | 函数 | 行号 | 作用 |
 | :--- | :--- | :--- |
-| `toggleFullScreen` | 830 | 切换全屏。 |
-| `addHistory` | 846 | 追加一条战斗历史记录。 |
-| `initUI` | 3618 | 初始化界面绑定与事件。 |
-| `updateFieldBadgeUI` | 4099 | 刷新右上角场地徽章（显示/隐藏/名称/效果描述）。 |
-| `createCompactBarHTML` | 3664 | 生成紧凑血/蓝/盾条 HTML。 |
-| `updateBuffUI` | 3704 | 刷新角色的 Buff 图标悬停 UI。 |
-| `renderTurnQueue` | 3728 | 渲染时间轴（行动顺序图标）。 |
-| `showLog` | 3754 | 顶部临时提示条（2.5s 淡出）。 |
-| `createFloatingText` | 3755 | 飘字（可扩展为 burst 大字）。 |
-| `updateHeroUI` | 3757 | 刷新面板我方角色卡。 |
-| `updateEnemyUI` | 3819 | 刷新面板敌方角色卡。 |
-| `showEnemyInfo` | 5763 | 弹窗展示敌方详情。 |
-| `updateMenu` | 6277 | 更新角色菜单（含 `getDisplayType` 子函数）。 |
-| `updateActiveHeroDisplay` | 5962 | 更新当前行动者高亮显示。 |
-| `openSkillMenu` / `closeSkillMenu` | 5977/5978 | 打开/关闭技能菜单。 |
-| `cancelTargeting` | 5760 | 取消目标选择状态并复位 UI。 |
+| `toggleFullScreen` | 2590 | 切换全屏。 |
+| `addHistory` | 2608 | 追加一条战斗历史记录。 |
+| `initUI` | 9806 | 初始化界面绑定与事件。 |
+| `updateFieldBadgeUI` | 8354 | 刷新右上角场地徽章（显示/隐藏/名称/效果描述）。 |
+| `createCompactBarHTML` | 9998 | 生成紧凑血/蓝/盾条 HTML。 |
+| `updateBuffUI` | 10005 | 刷新角色的 Buff 图标悬停 UI。 |
+| `renderTurnQueue` | 10156 | 渲染时间轴（行动顺序图标）。 |
+| `showLog` | 10336 | 顶部临时提示条（2.5s 淡出）。 |
+| `createFloatingText` | 10337 | 飘字（可扩展为 burst 大字）。 |
+| `updateHeroUI` | 10339 | 刷新面板我方角色卡。 |
+| `updateEnemyUI` | 10529 | 刷新面板敌方角色卡。 |
+| `showEnemyInfo` | 14857 | 弹窗展示敌方详情。 |
+| `updateMenu` | 15602 | 更新角色菜单（含 `getDisplayType` 子函数）。 |
+| `createSkillGroupCard` | 15562 | 变体组组卡渲染：父卡 + 预渲染子技能容器，点击原地展开（纯 hidden class 切换，状态存 `isGroupExpanded`）。 |
+| `updateSkillMenus` | 15605 | 技能列表渲染（攻击/辅助双栏 + 组卡可用性排序）；渲染前统一重置 `isGroupExpanded` 收起——子技能栏默认收起，展开态不跨渲染/跨回合记忆。 |
+| `updateActiveHeroDisplay` | 15649 | 更新当前行动者高亮显示。 |
+| `openSkillMenu` / `closeSkillMenu` | 15842 / 15843 | 打开/关闭技能菜单；`openAttackSkillMenu`/`openSupportSkillMenu` 打开时照物品菜单范式全量刷新列表（确保每次点开默认收起）。 |
+| `cancelTargeting` | 14854 | 取消目标选择状态并复位 UI。 |
 
 ### 5.5 Effect System（标签处理器 / 事件总线 / 职业被动）
 
 | 标识符 | 行号 | 作用 |
 | :--- | :--- | :--- |
-| `TAG_HANDLERS` | 3931 | 标签策略注册表本体。 |
-| `registerTagHandler` | 3933 | 注册一个标签处理函数。 |
-| `resolveTagHandler` | 4101 | 按标签名查找并分发到对应处理器。 |
-| `CLASS_PASSIVES` | 4114 | 职业被动注册表本体。 |
-| `registerClassPassive` | 4052 | 注册一个职业被动定义。 |
-| `EVENTS` | 4306 | 事件总线事件名枚举（详见 §5.6）。 |
-| `CombatEvents` | 4321 | 发布/订阅事件总线（`on`/`emit`/`emitAsync`，支持优先级）。 |
-| `getEffectiveStats` | 4791 | 计算实体含 Buff 修正后的有效面板属性。 |
-| `calculateDamage` | 4822 | 结算最终伤害（含护盾吸收、穿透判定）。 |
+| `TAG_HANDLERS` | 10644 | 标签策略注册表本体。 |
+| `registerTagHandler` | 10646 | 注册一个标签处理函数。 |
+| `resolveTagHandler` | 10999 | 按标签名查找并分发到对应处理器。 |
+| `CLASS_PASSIVES` | 11012 | 职业被动注册表本体。 |
+| `registerClassPassive` | 11014 | 注册一个职业被动定义。 |
+| `EVENTS` | 11323 | 事件总线事件名枚举（详见 §5.6）。 |
+| `CombatEvents` | 11338 | 发布/订阅事件总线（`on`/`emit`/`emitAsync`，支持优先级）。 |
+| `getEffectiveStats` | 12208 | 计算实体含 Buff 修正后的有效面板属性。 |
+| `calculateDamage` | 12250 | 结算最终伤害（含护盾吸收、穿透判定）。 |
 
 ### 5.6 事件总线 `EVENTS` 键参考
 
@@ -335,71 +338,71 @@
 
 | 函数 | 行号 | 作用 |
 | :--- | :--- | :--- |
-| `startGame` | 5423 | 初始化战局并启动第一回合。 |
-| `startRound` | 5447 | 时间轴排轴、回合主循环（TURN_START/TURN_END、毒 tick、眩晕、充能）。 |
-| `getTauntTarget` | 5176 | 按仇恨轮盘概率选取敌方单体的目标。 |
-| `selectEnemySkillAndTarget` | 5682 | 敌方 AI 决策：选技能与目标（含 `isHighYieldSkill` 辅助）。 |
-| `isHighYieldSkill` | 5657 | 判断技能是否为高收益（用于敌方 AI 策略）。 |
-| `prepareAttack` | 5852 | 玩家普通攻击准备。 |
-| `handleChargeSkill` | 5902 | `[延迟]` 蓄力技能入口：按 `[加速]` 库存抵扣，进入蓄力状态（remaining<=0 则本回合即可释放）。 |
-| `releaseCharge` | 5928 | 蓄力释放：按目标取向进入敌方/我方选目标，或直接释放。 |
-| `doReleaseCharge` | 5952 | 实际释放蓄力技能：结算原技能并施加自身 `[加速]` 库存。 |
-| `continueCharge` | 5971 | 蓄力中"继续蓄力"：消耗本回合推进蓄力。 |
-| `cancelCharge` | 5979 | 终止蓄力：清除蓄力状态并消耗本回合。 |
-| `renderHeroMenu` / `updateChargeMenu` | 5990/6003 | 蓄力中渲染专用菜单（继续/释放/终止），否则渲染正常菜单。 |
-| `classifySkill` | 6095 | 技能目标取向分类：全标签扫描一次定好（敌方单体/他人/纯群/纯单体有益）。 |
-| `prepareSkillTarget` | 6106 | 玩家技能选目标准备（按 `classifySkill` 结果进入敌方/我方/直接施放）。 |
-| `promptReaction` | 4836 | 反应拦截弹窗（含 `window.resolveReaction` 回调）。 |
-| `promptKanpo` | 4468 | 看破弹窗（含 `window.resolveKanpo` 回调、`shelvePrompt`/`cleanupPrompt` 收起逻辑）。 |
-| `getKanpoTarget` | 4454 | 判断技能是否可被某角色看破。 |
-| `retreatBattle` | 5566 | 战术撤退入口。 |
-| `showBattleResult` / `closeBattleResult` | 5572/5616 | 战后结算面板显示/关闭。 |
-| `sendResultToTavern` | 5622 | 将战后小说文本注入酒馆对话框。 |
+| `startGame` | 13737 | 初始化战局并启动第一回合。 |
+| `startRound` | 13788 | 时间轴排轴、回合主循环（TURN_START/TURN_END、毒 tick、眩晕、充能）。 |
+| `getTauntTarget` | 13207 | 按仇恨轮盘概率选取敌方单体的目标。 |
+| `selectEnemySkillAndTarget` | 14312 | 敌方 AI 决策：选技能与目标（含 `isHighYieldSkill` 辅助）。 |
+| `isHighYieldSkill` | 14287 | 判断技能是否为高收益（用于敌方 AI 策略）。 |
+| `prepareAttack` | 14578 | 玩家普通攻击准备。 |
+| `handleChargeSkill` | 14631 | `[延迟]` 蓄力技能入口：按 `[加速]` 库存抵扣，进入蓄力状态（remaining<=0 则本回合即可释放）。 |
+| `releaseCharge` | 14636 | 蓄力释放：按目标取向进入敌方/我方选目标，或直接释放。 |
+| `doReleaseCharge` | 14663 | 实际释放蓄力技能：结算原技能并施加自身 `[加速]` 库存。 |
+| `continueCharge` | 14744 | 蓄力中"继续蓄力"：消耗本回合推进蓄力。 |
+| `cancelCharge` | 14754 | 终止蓄力：清除蓄力状态并消耗本回合。 |
+| `renderHeroMenu` / `updateChargeMenu` | 14768 / 14782 | 蓄力中渲染专用菜单（继续/释放/终止），否则渲染正常菜单。 |
+| `classifySkill` | 14810 | 技能目标取向分类：全标签扫描一次定好（敌方单体/他人/纯群/纯单体有益）。 |
+| `prepareSkillTarget` | 14824 | 玩家技能选目标准备（按 `classifySkill` 结果进入敌方/我方/直接施放）。 |
+| `promptReaction` | 12284 | 反应拦截弹窗（含 `window.resolveReaction` 回调）。 |
+| `promptKanpo` | 11765 | 看破弹窗（含 `window.resolveKanpo` 回调、`shelvePrompt`/`cleanupPrompt` 收起逻辑）。 |
+| `getKanpoTarget` | 11594 | 判断技能是否可被某角色看破。 |
+| `retreatBattle` | 14010 | 战术撤退入口。 |
+| `showBattleResult` / `closeBattleResult` | 14143 / 14220 | 战后结算面板显示/关闭。 |
+| `sendResultToTavern` | 14263 | 将战后小说文本注入酒馆对话框。 |
 
 ### 5.8 编辑器与持久化
 
 | 函数 | 行号 | 作用 |
 | :--- | :--- | :--- |
-| `resetBattle` | 6095 | 重置战斗（恢复初始缓存快照）。 |
-| `openEditor` / `closeEditor` | 6114/6146 | 全效编辑器打开/关闭。 |
-| `syncEditorDataToMemory` | 6147 | 将编辑器表单同步回内存数据。 |
-| `saveEditor` | 6213 | 保存编辑器改动并持久化。 |
-| `addHeroSkill` / `removeHeroSkill` | 6256/6257 | 我方技能增删。 |
-| `addEnemySkill` / `removeEnemySkill` | 6258/6259 | 敌方技能增删。 |
-| `addHero` / `removeHero` | 6260/6261 | 我方角色增删。 |
-| `addEnemy` / `removeEnemy` | 6262/6263 | 敌方角色增删。 |
-| `serializeHeroesForSave` | 6659 | 序列化我方角色配置用于持久化。 |
-| `persistHeroesRoster` | 6389 | 将我方角色配置写入酒馆 chat 变量。 |
-| `readRoster` | 6395 | 从酒馆 chat 变量读取角色配置。 |
-| `applyPersistedRoster` | 6407 | 合并持久化角色配置（同步缓存，供重置恢复）。 |
+| `resetBattle` | 15845 | 重置战斗（恢复初始缓存快照）。 |
+| `openEditor` / `closeEditor` | 15956 / 16815 | 全效编辑器打开/关闭。 |
+| `syncEditorDataToMemory` | 16846 | 将编辑器表单同步回内存数据。 |
+| `saveEditor` | 17120 | 保存编辑器改动并持久化。 |
+| `addHeroSkill` / `removeHeroSkill` | 17178 / 17179 | 我方技能增删。 |
+| `addEnemySkill` / `removeEnemySkill` | 17186 / 17187 | 敌方技能增删。 |
+| `addHero` / `removeHero` | 17188 / 17189 | 我方角色增删。 |
+| `addEnemy` / `removeEnemy` | 17190 / 17191 | 敌方角色增删。 |
+| `serializeHeroesForSave` | 17338 | 序列化我方角色配置用于持久化。 |
+| `persistHeroesRoster` | 17363 | 将我方角色配置写入酒馆 chat 变量。 |
+| `readRoster` | 17369 | 从酒馆 chat 变量读取角色配置。 |
+| `applyPersistedRoster` | 17614 | 合并持久化角色配置（同步缓存，供重置恢复）。 |
 
 ### 5.9 防御恢复与 LLM 设置（持久化）
 
 | 函数 | 行号 | 作用 |
 | :--- | :--- | :--- |
-| `clampPct` | 6349 | 将数值收敛到 0–100 百分比。 |
-| `loadDefendSettings` | 6351 | 读取防御恢复设置。 |
-| `persistDefendSettings` | 6363 | 持久化防御恢复设置。 |
-| `initLLMPresets` | 6287 | 初始化 LLM 预设列表。 |
-| `openLLMSettings` / `closeLLMSettings` | 6437/6443 | LLM 设置面板开关。 |
-| `switchLLMPreset` | 6447 | 切换 LLM 预设（可保存当前）。 |
+| `clampPct` | 17308 | 将数值收敛到 0–100 百分比。 |
+| `loadDefendSettings` | 17310 | 读取防御恢复设置。 |
+| `persistDefendSettings` | 17329 | 持久化防御恢复设置。 |
+| `initLLMPresets` | 17228 | 初始化 LLM 预设列表。 |
+| `openLLMSettings` / `closeLLMSettings` | 17683 / 17692 | LLM 设置面板开关。 |
+| `switchLLMPreset` | 17747 | 切换 LLM 预设（可保存当前）。 |
 
 ### 5.10 对话与 LLM 叙事系统
 
 | 函数 | 行号 | 作用 |
 | :--- | :--- | :--- |
-| `initChatInputArea` | 6500 | 初始化底部对话输入区。 |
-| `sendPlayerChat` | 6604 | 玩家发送对话。 |
-| `toggleAllyAutoSpeak` / `updateAllyToggleUI` | 6519/6525 | 友方自动旁白开关与 UI。 |
-| `toggleEnemyAutoSpeak` / `updateEnemyToggleUI` | 6537/6543 | 敌方自动旁白开关与 UI。 |
-| `triggerAllyAutoSpeak` | 6636 | 触发友方英雄主动性旁白。 |
-| `triggerEnemyAutoSpeak` | 6724 | 触发敌方智慧旁白。 |
-| `triggerKanpoNarration` | 6646 | 看破后触发震惊/反应旁白。 |
-| `requestLLMResponse` | 6660 | 请求 LLM 生成对话气泡（统一入口）。 |
-| `callLLMAPI` | 6732 | 调用 OpenAI 兼容 `/chat/completions` 接口（含酒馆上下文抓取）。 |
-| `showChatBubble` | 6556 | 显示对话气泡。 |
-| `showThinkingBubble` | 6704 | 显示"思考中"气泡。 |
-| `parseLLMResponse` | 6903 | 解析 LLM 返回文本为角色气泡数据。 |
+| `initChatInputArea` | 18356 | 初始化底部对话输入区。 |
+| `sendPlayerChat` | 18460 | 玩家发送对话。 |
+| `toggleAllyAutoSpeak` / `updateAllyToggleUI` | 18375 / 18381 | 友方自动旁白开关与 UI。 |
+| `toggleEnemyAutoSpeak` / `updateEnemyToggleUI` | 18393 / 18399 | 敌方自动旁白开关与 UI。 |
+| `triggerAllyAutoSpeak` | 18492 | 触发友方英雄主动性旁白。 |
+| `triggerEnemyAutoSpeak` | 18624 | 触发敌方智慧旁白。 |
+| `triggerKanpoNarration` | 18537 | 看破后触发震惊/反应旁白。 |
+| `requestLLMResponse` | 18551 | 请求 LLM 生成对话气泡（统一入口）。 |
+| `callLLMAPI` | 18817 | 调用 OpenAI 兼容 `/chat/completions` 接口（含酒馆上下文抓取）。 |
+| `showChatBubble` | 18412 | 显示对话气泡。 |
+| `showThinkingBubble` | 18604 | 显示"思考中"气泡。 |
+| `parseLLMResponse` | 19030 | 解析 LLM 返回文本为角色气泡数据。 |
 
 ---
 
