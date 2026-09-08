@@ -1293,7 +1293,15 @@ async function test23() {
   for (const name of ['ranged-heavy-enemy-recoil-flash', 'enemy-ram-knockback-flash', 'enemy-gunshot-flinch-flash', 'enemy-pierce-stutter-flash']) {
     check(src.includes('@keyframes ' + name + ' {'), 'steps 闪色 keyframes ' + name + ' 存在');
   }
-  eq((src.match(/-flash 0\.\d+s steps\(1\) both/g) || []).length, 10, '十个挂载点均携带 steps(1) 闪色（recoil/ram/pierce×2/gunshot×2 + 霰弹 recoil×2/爆焰/弹丸）');
+  eq((src.match(/-flash 0\.\d+s steps\(1\) both/g) || []).length, 13, '十三个挂载点均携带 steps(1) 闪色（recoil/ram/pierce×2/gunshot×2 + 霰弹 recoil×2/爆焰/弹丸 + 炽核聚爆 十字刃×2/核心）');
+  // ④b [单体(火焰)] 炽核聚爆·十字裂变：主关键帧纯 transform/opacity，filter 全部拆入 steps(1) 子动画（同霰弹纪律）
+  for (const name of ['fire-supernova-implode', 'fire-supernova-beam-h', 'fire-supernova-beam-v', 'fire-supernova-debris', 'fire-supernova-core-flash', 'fire-supernova-beam-flash', 'fire-supernova-debris-flash']) {
+    check(src.includes('@keyframes ' + name + ' {'), '炽核聚爆 keyframes ' + name + ' 存在');
+  }
+  for (const name of ['fire-supernova-implode', 'fire-supernova-beam-h', 'fire-supernova-beam-v', 'fire-supernova-debris']) {
+    check(!/filter:/.test(kf(name)), name + ' 主关键帧零逐帧 filter');
+  }
+  check((src.match(/fire-supernova-debris-flash 0\.8s 0\.\d+s steps\(1\) both/g) || []).length === 4, '四向破片携带带延迟的 steps(1) 过曝闪色');
   // ⑤ 三处模板双 drop-shadow 链已并单（远程核心/血溅×5/近战核心）
   check(!src.includes('drop-shadow(0 0 25px #ea580c) drop-shadow(0 0 45px #dc2626)'), '远程重击核心双 drop-shadow 已并单');
   check(!src.includes('drop-shadow(0 0 10px #450a0a) drop-shadow(0 0 4px #7f1d1d)'), '血溅双 drop-shadow 已并单');
@@ -1310,6 +1318,24 @@ async function test23() {
   check(animLate === '', '受击动画播完恢复（行内 animation 清空，呼吸动画不被冻结）');
   eq(rpgWin().eval('document.querySelectorAll(\'[style*="ranged-heavy"]\').length'), 0, '特效节点全部自动清理（零残留）');
   rpgWin().eval("var __r = document.getElementById('t23-target'); if (__r) __r.remove(); window.__t23err = undefined;");
+  // ⑦ [单体(火焰)] 炽核聚爆功能仿真：真触发 playSVGEffect('fire') → 四层挂载 + 1s 自动清理；龙息流火合成音可调用不抛错
+  rpgWin().eval(`try { var __ft = document.createElement('div'); __ft.id = 't23-fire-target'; document.body.appendChild(__ft); playSVGEffect(__ft, 'fire'); } catch (e) { window.__t23fireErr = String(e); }`);
+  check(!rpgWin().eval('window.__t23fireErr || ""'), '触发炽核聚爆特效无异常' + (rpgWin().eval('window.__t23fireErr ? "：" + window.__t23fireErr : ""') || ''));
+  const fireFx = rpgWin().eval(`(function(){
+    var beamH = document.querySelectorAll('[style*="fire-supernova-beam-h"]').length;
+    var beamV = document.querySelectorAll('[style*="fire-supernova-beam-v"]').length;
+    var core = document.querySelectorAll('[style*="fire-supernova-implode"]').length;
+    var debris = document.querySelectorAll('[style*="fire-supernova-debris 0.8s"]').length;
+    var grad = document.querySelectorAll('radialGradient[id^="fire-supernova-grad-"]').length;
+    return { beamH: beamH, beamV: beamV, core: core, debris: debris, grad: grad }; })()`);
+  check(fireFx.beamH === 1 && fireFx.beamV === 1 && fireFx.core === 1, '炽核聚爆层挂载（十字刃×2 + 塌缩核心）');
+  check(fireFx.debris === 4, '四向破片全部挂载');
+  check(fireFx.grad === 1, 'uid 渐变防冲突注册（单实例单份）');
+  rpgWin().eval('try { playDragonBreathFireSFX(); } catch (e) { window.__t23sfxErr = String(e); }');
+  check(!rpgWin().eval('window.__t23sfxErr || ""'), '龙息流火合成音可调度不抛错（喷射+爆破+噼啪 Web Audio 链）');
+  await sleep(1200);
+  eq(rpgWin().eval('document.querySelectorAll(\'[style*="fire-supernova"]\').length'), 0, '炽核聚爆节点 1s 后自动清理（零残留）');
+  rpgWin().eval("var __fr = document.getElementById('t23-fire-target'); if (__fr) __fr.remove(); window.__t23fireErr = undefined; window.__t23sfxErr = undefined;");
 }
 
 async function test24() {
@@ -1590,6 +1616,21 @@ async function test29() {
   check(parent.isGroupExpanded === true, '点击组卡：isGroupExpanded 状态翻转');
   check(!wrapEl.classList.contains('hidden'), '点击组卡：容器 hidden 移除（纯 class 切换）');
   check(groupCard === cardBefore, '展开不重建 DOM（同一节点引用）');
+
+  // —— 重开菜单默认收起：展开态不跨渲染记忆，updateSkillMenus 重渲染一律折叠（避免逐次打开愈发杂乱） ——
+  w.eval('updateSkillMenus(heroesData[0]);');
+  check(ev('heroesData[0].skills.find(s=>s.isGroup).isGroupExpanded') === false, '重渲染后 isGroupExpanded 复位（不跨渲染记忆）');
+  const groupCard2 = Array.from(w.document.getElementById('attack-skill-list').children).find(el => el.textContent.includes('温切斯特M1897'));
+  const wrap2 = groupCard2 && groupCard2.querySelector('.border-l');
+  check(wrap2 && wrap2.classList.contains('hidden'), '重渲染后子技能容器回到收起（hidden）');
+  // 用户路径：重新展开 → 关菜单 → 再点开（openAttackSkillMenu 照物品菜单每次打开全量刷新）→ 默认收起
+  groupCard2.querySelector('button').onclick();
+  check(ev('heroesData[0].skills.find(s=>s.isGroup).isGroupExpanded') === true, '重新展开成功（前置）');
+  w.eval('state.isAnimating = false; closeAttackSkillMenu(); openAttackSkillMenu();');
+  const groupCard3 = Array.from(w.document.getElementById('attack-skill-list').children).find(el => el.textContent.includes('温切斯特M1897'));
+  const wrap3 = groupCard3 && groupCard3.querySelector('.border-l');
+  check(ev('heroesData[0].skills.find(s=>s.isGroup).isGroupExpanded') === false, '点开技能菜单：组态重置收起');
+  check(wrap3 && wrap3.classList.contains('hidden'), '点开技能菜单：子技能容器默认 hidden');
 
   // 旧格式兼容：扁平 YAML 依旧可解析
   const flatOk = w.eval('buildCombatDataFromYAML(' + JSON.stringify([

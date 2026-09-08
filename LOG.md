@@ -2769,3 +2769,15 @@
 - **涉及文件**：`index.html`、`integration-test/harness.html`（test31 扩 10 项 + test23 计数同步 6→10）、`regex-前端战斗v11_11.json`（重建产物）。
 - **经验证**：test31 新增 10 项——四组主关键帧零逐帧 filter/stroke-width（切片断言）、4 个 steps(1) 子动画存在、闪白两处调用 steps(1)、爆焰双 drop-shadow 并单、火星辉光去除、硝烟容器单 blur、scale 0.42；test23 steps 闪色挂载点计数 6→10 同步。**517 项全绿**（33 组；test10 srcLine 123 条重映射后集合对齐）；build-regex 产物 replaceString 870589 字符（-28%），围栏 2/2。卡顿改善与视觉损耗待用户真机复测。
 - **决策原因**：霰弹卡顿根因是一次演出内 17 个动画元素中 4 组关键帧携带 filter/stroke-width 逐帧插值（每帧强制重栅格化所在层），叠加敌人 sprite 全尺寸闪白逐帧 filter 与 21 个 drop-shadow 辉光层；steps(1) 跳变手法已被批次③在四组受击闪色上验证"颜色反馈保留、成本降约一个数量级"，本次为同一手法的霰弹侧补全。火星辉光（6px 点配 4px shadow）与硝烟三重模糊属肉眼不可辨的纯成本项，直接去除/合并；弹孔/弹丸/爆焰的过曝感保留为 steps 跳变档位（0.26~0.38s 的动画内 1~3 次跳变与平滑渐变不可分辨）。
+
+---
+
+## [LOG-231] 2026-09-09 — 单体(火焰)特效重制：炽核聚爆·十字裂变（demo 方案2）+ 龙息流火合成音 + 子技能栏默认收起
+
+- **变更行为**（用户需求两则）：
+  1. **[单体(火焰)] 视觉重制**：playSVGEffect fire 分支从单层三路径火舌（100px + .anim-fire 上浮消散）重制为 demo-fire-svg-vfx.html 方案2「炽核聚爆·十字裂变」四层结构——①聚能塌缩核心（scale 2.2→0.18 急缩，25%~38% Hitstop 超临界定格后 3.6 倍超新星爆发）②横/纵十字能量光棱（scaleX/scaleY 围绕目标中心瞬扩）③白炽核心球（r45 渐变 + r18 纯白）④四向等离子破片（±45°/±135° 错峰 0.12~0.15s 飞射）。容器 260px 经 margin 负值居中锚定目标（照障壁术防 DPR 舍入错位范式；霰弹关键帧的 translate(-50%,-50%) 是向射手偏移半格的专属设计，不复用）；性能纪律照霰弹优化：主关键帧纯 transform/opacity 走合成器，塌缩离焦/过曝/消散 filter 全部拆 steps(1) 子动画（core/beam/debris-flash 三组，全程 2~3 次重栅格化），feGaussianBlur 辉光滤镜按移植惯例降级为常驻 drop-shadow；uid 防多实例渐变 id 冲突；duration 700→1000（破片尾延迟）。Canvas 余烬粒子（spawnFireParticles）保留作爆后补韵；旧 .anim-fire/advanced-fire-base 关键帧随替换移除。
+  2. **[单体(火焰)] 音效重制**：默认 atk 打击音升级为 demo 方案4「龙息流火」Web Audio 纯程序化合成链（零音频资源依赖）——高压气阀喷射怒吼（低通白噪声 1800→3200→400Hz，8ms 快起压 0.75s 泄压）即时起播，100ms 后叠加重锤爆破（150→32Hz 正弦亚低音 + 低通爆裂噪声）与密集噼啪火星（14 发随机延时三角波脉冲 1.8k~4.8kHz 急速下潜）；三子音效独立 master 增益（0.65/0.8/0.5 与 demo masterVolume 一致），惰性 AudioContext + try/catch 照障壁术 528Hz 音叉范式。接线于 applySingleTagEffect 非枪击分支两处 fallback（tag 含火焰且非群 → playDragonBreathFireSFX）；WebM 注册音效（如燃烧弹 ranshao.mp3）仍优先；群攻含火焰的自定义标签保持原 atk 逐目标音，防 N 重喷射叠加。
+  3. **子技能栏默认收起**（用户反馈"每次点击技能菜单默认关闭，避免杂乱"）：变体组展开态原挂数据对象 isGroupExpanded 跨渲染持久，逐次打开菜单愈发杂乱——现 updateSkillMenus/updateItemMenu 渲染前统一重置收起（展开仅当次菜单会话内有效），openAttackSkillMenu/openSupportSkillMenu 打开时照 openItemMenu 范式取当前行动 ref 全量刷新后滑入。
+- **涉及文件**：`index.html`、`integration-test\harness.html`（test23 扩 18 项 + test29 扩 5 项）、`regex-前端战斗v11_11.json`（重建产物）。
+- **经验证**：test23 新增 18 项——7 组炽核聚爆 keyframes 存在、4 主关键帧零逐帧 filter、破片带延迟 steps(1) 闪色 ×4、真触发 playSVGEffect('fire') 无异常 + 四层挂载（十字刃×2+塌缩核心+四破片）+ uid 渐变单份 + 1.2s 零残留 + playDragonBreathFireSFX 不抛错；steps 闪色挂载点计数 10→13 同步；test29 新增 5 项——重渲染后 isGroupExpanded 复位/容器回 hidden、重新展开前置、点开技能菜单默认收起 ×2。**540 项全绿**（33 组；test10 srcLine 123 条重映射后集合对齐）；build-regex 产物 replaceString 878217 字符（-29%），围栏 2/2。IAB 几何验证特效容器与目标中心 dx=0/dy=0 精确居中、主+steps 双动画 running；视觉子代理验收十字刃完整/渐变正确/无滤镜方块边界。真机听感待用户实测。
+- **决策原因**：视觉/音效分别取 demo 方案2/方案4 的用户指定组合——方案2 的 Hitstop 定格+十字裂变是"瞬发高爆"语义，方案4 的喷射怒吼+重锤爆破链为火焰提供比单发爆破更厚的声场层次，喷射前摇 100ms 恰好铺垫塌缩-定格的视觉节奏；filter steps(1) 化沿用霰弹批次验证过的"视觉近无损、成本降一个数量级"手法；子技能栏收起选"渲染时重置 + 打开时刷新"而非仅打开时重置——展开态挂数据对象会跨回合泄漏，渲染时重置一并覆盖爆发切换/回合切换等所有重渲染路径。
