@@ -178,7 +178,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
    就绪判定用轮询而不是 load 事件：两侧都挂了 CDN 资源与音视频，
    load 可能长时间不触发（interactive 阶段脚本其实已执行完） */
 async function mountFrame(frameId, url, baseHref, readyProbe) {
-  const html = await (await fetch(url)).text();
+  const html = await (await fetch(url, { cache: 'reload' })).text();
   const boot =
     '<base href="' + baseHref + '">' +
     '<script>(function(){var M=parent.__MOCK.api;for(var k in M){window[k]=M[k];}})();\x3c/script>';
@@ -536,7 +536,7 @@ async function test9() {
 /* ================= 断言 10：规则覆盖率（自维护） ================= */
 async function test10() {
   head('10 规则覆盖率：源码 addHistory 行号 == DIGEST_RULES srcLine');
-  const src = await (await fetch('../index.html')).text();
+  const src = await (await fetch('../index.html', { cache: 'reload' })).text();
   const lines = src.split('\n');
   const srcCalls = new Set();
   lines.forEach((l, i) => {
@@ -1087,7 +1087,7 @@ async function test18() {
 /* ================= 断言 19：反引号围栏纪律（酒馆引号美化管线兼容） ================= */
 async function test19() {
   head('19 反引号围栏纪律：组件源码不得破坏酒馆 ``` 配对豁免链');
-  const src = await (await fetch('../index.html')).text();
+  const src = await (await fetch('../index.html', { cache: 'reload' })).text();
   // ① 廉价不变量：组件文件自带头尾围栏（```html ... ```）之外，内部不得再有三连反引号——
   //    酒馆 script.js 的引号美化正则靠 ``` 两两配对豁免代码块，组件内部冒出奇数个围栏序列会把
   //    配对链错位到同楼层其他组件（状态栏 <q> 污染事故：全篇引号被包 <q> → 脚本语法错误 → 渲染失败）
@@ -1107,7 +1107,7 @@ async function test19() {
 
 async function test20() {
   head('20 编辑器双 bug 回归：弹窗 onclick 污染 + 召唤物发散守卫');
-  const src = await (await fetch('../index.html')).text();
+  const src = await (await fetch('../index.html', { cache: 'reload' })).text();
   // ① bug1 静态断言：源码不再有裸 modal.onclick = closeEditor 赋值（任何冒泡 click 都会关掉编辑器）
   check(!src.includes('modal.onclick = closeEditor;'), '源码无裸 modal.onclick = closeEditor 赋值');
   // ② bug1 静态断言：openEditor 防御性清除残留 handler
@@ -1147,7 +1147,7 @@ async function test20() {
 
 async function test21() {
   head('21 Tailwind 静态编译纪律：Play CDN 清零 + 编译块结构 + 类名覆盖零缺失');
-  const src = await (await fetch('../index.html')).text();
+  const src = await (await fetch('../index.html', { cache: 'reload' })).text();
   // ① Play CDN 引用清零（运行时 JIT 的 MutationObserver 全文档监听 × 高频 DOM 变动的持续编译税，改为构建期编译内联）
   check(!src.includes('cdn.tailwindcss.com'), 'Play CDN 引用清零');
   // ② 编译块结构：标记唯一、<style> 恰 2 块、位置在自定义 </style> 之后 </head> 之前
@@ -1206,7 +1206,7 @@ async function test21() {
 
 async function test22() {
   head('22 LLM 路径性能两件套：聊天上下文深拷贝→浅拷贝 + 调试日志全量 gate');
-  const src = await (await fetch('../index.html')).text();
+  const src = await (await fetch('../index.html', { cache: 'reload' })).text();
   // ① 深拷贝移除（原实现先 JSON round-trip 整段聊天史、之后才截取最近 N 楼——长对话每次调用白付几十 MB）
   check(!src.includes('JSON.parse(JSON.stringify(ctx.chat))'), '全量深拷贝聊天记录已移除');
   check(src.includes('allMsgs = ctx.chat.slice();'), '改为数组浅拷贝 ctx.chat.slice()');
@@ -1264,7 +1264,7 @@ async function test22() {
 
 async function test23() {
   head('23 重击特效降本：震屏提层 + filter 闪色 steps 化 + stroke-width/双层 drop-shadow 清理');
-  const src = await (await fetch('../index.html')).text();
+  const src = await (await fetch('../index.html', { cache: 'reload' })).text();
   // ① 四个震屏类带 will-change: transform（场景树提层缓存，震动改走合成器；类由 setTimeout 移除，层自动释放）
   for (const cls of ['ranged-heavy-shake', 'melee-heavy-shake', 'gunshot-shake', 'pierce-shake']) {
     check(new RegExp('\\.' + cls + ' \\{[^}]*will-change: transform').test(src), '.' + cls + ' 带 will-change: transform');
@@ -1305,7 +1305,7 @@ async function test23() {
 
 async function test24() {
   head('24 常驻 infinite 底噪清零：敌人 sprite 辉光 filter 逐帧动画改静态');
-  const src = await (await fetch('../index.html')).text();
+  const src = await (await fetch('../index.html', { cache: 'reload' })).text();
   // ① breathe（全体敌方 sprite 常驻 4s 呼吸）：keyframes 不再逐帧插值 drop-shadow，辉光改类上静态中值
   const breatheKf = (src.match(/@keyframes breathe \{[^\n]*\}/) || [])[0] || '';
   check(!/filter:/.test(breatheKf), '@keyframes breathe 不再逐帧动画 filter');
@@ -1327,7 +1327,7 @@ async function test24() {
 
 async function test25() {
   head('25 WebM 特效抠图成本控制：rVFC 节流 + 画布封顶降采样 + screen 降级开关');
-  const src = await (await fetch('../index.html')).text();
+  const src = await (await fetch('../index.html', { cache: 'reload' })).text();
   const start = src.indexOf('function playWebMFX(x, y, fxTag) {');
   const end = src.indexOf('function spawnFrostParticles');
   const fx = start !== -1 && end !== -1 ? src.slice(start, end) : '';
@@ -1415,7 +1415,7 @@ async function test26() {
 
 async function test27() {
   head('27 全屏 SVG 特效：[特效:造雾术]/[特效:高阶召唤术] 注册·挂载·清理');
-  const src = await (await fetch('../index.html')).text();
+  const src = await (await fetch('../index.html', { cache: 'reload' })).text();
   // ① 注册表：两个标签、纯 SVG（url 空）、particles 类型、delay、音效配置
   check(/'造雾术': \{ url: '', scale: 1\.0, particles: 'rlyeh_sediment', audioUrl: RLYEH_FOG_CLOUD_URL, delay: 1\.0 \}/.test(src), '注册表：造雾术（fog_cloud.ogg + delay 1.0）');
   check(/'高阶召唤术': \{ url: '', scale: 1\.0, particles: 'titan_gaze', audioUrl: 'none', delay: 1\.0 \}/.test(src), '注册表：高阶召唤术（古神低语合成 + delay 1.0）');
@@ -1499,6 +1499,159 @@ async function test28() {
   `);
 }
 
+/* ================= 断言 29：变体组二级菜单（嵌套技能/道具解析 + 组卡渲染 + 编辑器模板） ================= */
+async function test29() {
+  head('29 变体组：冒号/无冒号嵌套解析·roster 组保护·平铺标记·children·组卡渲染·模板函数');
+  const w = rpgWin();
+  const ev = (expr) => w.eval('(function(){ return ' + expr + '; })()');
+  // alert 桩：失败路径 onCombatDataReceived 会弹 alert，静默防阻塞（清理块恢复）
+  w.eval('window.__t29Alert = window.alert; window.alert = function(){}');
+
+  // 嵌套 YAML（标准写法=冒号形式：技能组【温切斯特M1897】纯名父 + 物品组【化尘者之瓶】带标签父），
+  // jsyaml 原生解析为 {"【父】": ["子行",...]} 对象形态（isNestedGroup 分支），零兜底
+  const nestedYaml = [
+    '战斗数据栏:',
+    '  我方列表:',
+    '    - 角色:',
+    '        名字: "埃利奥特"',
+    '        属性: "[HP:100/100][MP:110/110][Atk:20][Armor:40][Speed:50][职业:施法者]"',
+    '        技能:',
+    '          - "【温切斯特M1897】":',
+    '            - "【12号鹿弹】[散弹;power:140][Aim:150][近战]"',
+    '            - "【12号独头弹】[单体;power:115][Aim:120][远程]"',
+    '          - "【迅捷愈合法】[单回;power:30][MP:3][法术]"',
+    '        物品:',
+    '          - "【化尘者之瓶】[道具][次数:1]":',
+    '            - "【瓶中之物】[召唤:化尘者][MP:5][法术]"',
+    '            - "【飞沙化甲】[单防;power:50][MP:8][法术][他人]"',
+    '          - "【精华秘酿】[单回蓝;power:10][消耗品][数量:6]"',
+    '',
+  ].join('\n');
+  // seed 持久化 roster（旧版扁平档：同名组父以扁平技能形态存在）——锁 applyPersistedRoster 组保护与配置合并
+  MOCK.api.insertOrAssignVariables(
+    { rpg_combat_roster: { version: 1, heroes: [{ name: '埃利奥特', config: { maxHp: 120 }, skills: [{ name: '温切斯特M1897', type: '[单体]', power: 20 }], items: [] }] } },
+    { type: 'chat' }
+  );
+  check(w.eval('buildCombatDataFromYAML(' + JSON.stringify(nestedYaml) + ')') === true, '冒号形式 jsyaml 原生解析成功（标准写法，零兜底）');
+  w.eval('onCombatDataReceived(' + JSON.stringify(nestedYaml) + ')');
+  check(ev('heroesData[0].skills.some(s=>s.isGroup) && heroesData[0].items.some(i=>Array.isArray(i.children)&&i.children.length>0)'), 'onCombatDataReceived 构建出组结构');
+  check(ev('heroesData[0].maxHp') === 120, '持久化 roster 配置字段照常合并（maxHp 100→120）');
+
+  // —— 技能组：结构断言 ——
+  const g = ev('heroesData[0].skills.find(s=>s.isGroup)');
+  check(g && g.name === '温切斯特M1897', '组父对象存在且名字正确', g && g.name);
+  check(g && g.groupOnly === true, '纯名父标记 groupOnly（无标签父）');
+  check(g && g.type === '[无]' && g.power === 0, '纯名父兜底假槽已清空（[单体]20 → [无]0）');
+  check(g && Array.isArray(g.children) && g.children.length === 2, '组父 children 数 = 2（编辑器权威源）');
+  const flat = ev('heroesData[0].skills.filter(s=>s._inGroup && s.parentName==="温切斯特M1897")');
+  eq(flat.length, 2, '子技能平铺进 skills（_inGroup + parentName 标记）');
+  const buckshot = ev('heroesData[0].skills.find(s=>s.name==="12号鹿弹")');
+  check(buckshot && buckshot._inGroup === true && buckshot.power === 140, '子技能解析字段正常（散弹 140）');
+  const single = ev('heroesData[0].skills.find(s=>s.name==="迅捷愈合法")');
+  check(single && !single._inGroup && !single.isGroup, '普通技能不受嵌套解析影响');
+  eq(ev('heroesData[0].skills.length'), 4, 'skills 总数 = 父1 + 子2 + 普通1（无重复）');
+
+  // —— 物品组：结构断言 ——
+  const bottle = ev('heroesData[0].items.find(i=>i.name==="化尘者之瓶")');
+  check(bottle && bottle.category === '道具' && bottle.maxUses === 1, '物品组父类别/次数解析正常');
+  check(bottle && Array.isArray(bottle.children) && bottle.children.length === 2, '物品组父 children 数 = 2');
+  const elixir = ev('heroesData[0].items.find(i=>i.name==="精华秘酿")');
+  check(elixir && elixir.category === '消耗品' && elixir.count === 6, '普通物品不受嵌套解析影响');
+
+  // —— isNestedGroup 判定边界 ——
+  check(ev('isNestedGroup("普通字符串")') === false, 'isNestedGroup：字符串不判为组');
+  check(ev('isNestedGroup({a: 1})') === false, 'isNestedGroup：非数组值不判为组');
+  check(ev('isNestedGroup({"【X】": ["a"]})') === true, 'isNestedGroup：标准嵌套组');
+
+  // —— 组卡渲染（DOM 级）：updateSkillMenus 输出组卡 + 子卡，展开切换纯 class ——
+  w.eval("state.isGameStarted = true; state.actionQueue = [{ type: 'hero', ref: heroesData[0] }]; state.queueIndex = 0;");
+  w.eval('updateSkillMenus(heroesData[0]);');
+  const atkCards = w.document.getElementById('attack-skill-list').children;
+  const groupCard = Array.from(atkCards).find(el => el.textContent.includes('温切斯特M1897'));
+  check(!!groupCard, '攻击栏渲染出组卡（温切斯特M1897）');
+  check(groupCard && groupCard.textContent.includes('变体×2'), '组卡带变体徽章');
+  const wrapEl = groupCard && groupCard.querySelector('.border-l');
+  check(!!wrapEl, '组卡含子技能容器');
+  check(wrapEl && wrapEl.classList.contains('hidden'), '子技能容器初始收起（hidden）');
+  check(groupCard && groupCard.textContent.includes('12号鹿弹') && groupCard.textContent.includes('12号独头弹'), '子技能卡已预渲染');
+  // 点击展开：状态存数据对象 + 纯 class 切换（不重建 DOM）
+  const cardBefore = groupCard;
+  groupCard.querySelector('button').onclick();
+  const parent = w.eval('heroesData[0].skills.find(s=>s.isGroup)');
+  check(parent.isGroupExpanded === true, '点击组卡：isGroupExpanded 状态翻转');
+  check(!wrapEl.classList.contains('hidden'), '点击组卡：容器 hidden 移除（纯 class 切换）');
+  check(groupCard === cardBefore, '展开不重建 DOM（同一节点引用）');
+
+  // 旧格式兼容：扁平 YAML 依旧可解析
+  const flatOk = w.eval('buildCombatDataFromYAML(' + JSON.stringify([
+    '战斗数据栏:',
+    '  我方列表:',
+    '    - 角色:',
+    '        名字: "埃利奥特"',
+    '        属性: "[HP:100/100][MP:60/60][Atk:20][Armor:40][Speed:50]"',
+    '        技能:',
+    '          - "【飞沙化甲】[单防;power:50][MP:8][法术]"',
+    '        物品:',
+    '          - "【绷带】[消耗品][数量:3]"',
+    '',
+  ].join('\n')) + ')');
+  check(flatOk && w.eval('!heroesData[0].skills.some(s=>s.isGroup) && !heroesData[0].items.some(i=>i.children && i.children.length)'), '旧扁平格式完全兼容（无组无 children）');
+
+  // —— 写法A（无冒号，旧数据兼容）：上段扁平构建已清掉组，onCombatDataReceived 失败重试须走预归一化建组 ——
+  const noColonYaml = nestedYaml.split('\n').map(l => l.replace(/":$/, '"')).join('\n');
+  w.eval('onCombatDataReceived(' + JSON.stringify(noColonYaml) + ')');
+  check(ev('heroesData[0].skills.some(s=>s.isGroup && Array.isArray(s.children) && s.children.length===2) && heroesData[0].skills.filter(s=>s._inGroup).length===2'), '无冒号写法经预归一化重试同样建组（兜底路径，非残留数据）');
+
+  // —— 编辑器模板函数：参数化后渲染（主技能 id 前缀 / 子技能命名空间）——
+  const formHtml = ev('buildSkillFormFieldsHtml("h-0-s-0", parseSkill("【测试】[单体;power:30][MP:5]"), "void(0)")');
+  check(formHtml && formHtml.includes('edit-h-0-s-0-name') && formHtml.includes('edit-h-0-s-0-type') && formHtml.includes('edit-h-0-s-0-summon'), '模板函数产出 A-E 全模块控件');
+  check(formHtml.includes('pill-h-0-s-0-others') && formHtml.includes('pill-h-0-s-0-legendary'), '模板函数产出药丸开关 id');
+  const subFormHtml = ev('buildSkillFormFieldsHtml("h-0-s-0-c-1", parseSkill("【子】[穿透;power:20]"), "void(0)")');
+  check(subFormHtml.includes('edit-h-0-s-0-c-1-name') && subFormHtml.includes('edit-h-0-s-0-c-1-power'), '子技能命名空间前缀正确（-c-1）');
+
+  // —— syncSkillGroupFromChildren：children 重排平铺 ——
+  // （上一段扁平兼容测试已把 heroesData 覆盖为无组数据：先重建嵌套数据再测；停轮询防 mock 楼层覆盖）
+  w.eval('clearInterval(pollingInterval)');
+  w.eval('onCombatDataReceived(' + JSON.stringify(nestedYaml) + ')');
+  w.eval(`
+    var _p = heroesData[0].skills.find(s=>s.isGroup);
+    _p.children.splice(0, 1);
+    syncSkillGroupFromChildren(heroesData[0], _p);
+  `);
+  const afterRemove = ev('heroesData[0].skills.filter(s=>s._inGroup && s.parentName==="温切斯特M1897")');
+  eq(afterRemove.length, 1, 'children 删一个 → 平铺子技能同步减一');
+  check(afterRemove[0] && afterRemove[0].name === '12号独头弹', '剩余子技能正确（鹿弹已删）');
+  eq(ev('heroesData[0].skills.length'), 3, 'skills 总数 = 父1 + 子1 + 普通1');
+
+  // —— 物品组执行链（isItem 伪技能：父道具次数扣减走 executeSkillAction 物品消耗分支）——
+  // 注意：①走 onCombatDataReceived 重建（与生产路径一致，冒号形式原生解析+roster 合并）；②先停掉 1s 轮询（mock 当前楼是扁平 YAML，
+  // 会在 await 间隙覆盖 heroesData 导致下面 find 不到化尘者之瓶）
+  w.eval('clearInterval(pollingInterval)');
+  w.eval('onCombatDataReceived(' + JSON.stringify(nestedYaml) + ')');
+  w.eval(`
+    state.isGameStarted = true; state.actionQueue = [{ type: 'hero', ref: heroesData[0] }]; state.queueIndex = 0;
+    heroesData[0].mp = 100;
+    battleHistory = []; _historyRawCache = '';
+    window.__t29EndTurn = window.endTurn; window.endTurn = async () => {};
+  `);
+  const bottle2 = ev('heroesData[0].items.find(i=>i.name==="化尘者之瓶")');
+  check(bottle2 && bottle2.usesRemaining === 1, '执行前父道具次数 = 1');
+  await w.eval('executeGroupedItemSkill(heroesData[0], heroesData[0], heroesData[0].items.find(i=>i.name==="化尘者之瓶"), heroesData[0].items.find(i=>i.name==="化尘者之瓶").children[1])');
+  const bottle3 = ev('heroesData[0].items.find(i=>i.name==="化尘者之瓶")');
+  check(bottle3 && bottle3.usesRemaining === 0, '执行子技能后父道具次数扣 1（1→0）');
+  const itemLine = ev('battleHistory.filter(l => l.includes("化尘者之瓶·飞沙化甲")).join("|")');
+  check(/使用了【化尘者之瓶·飞沙化甲】/.test(itemLine), '战报行用「父名·子名」措辞', itemLine);
+  check(ev('heroesData[0].mp') === 92, '子技能 MP 8 由 executeSkillAction 照扣（100→92）');
+  // 清理：恢复 alert；roster 种子失效化（version 不匹配 → readRoster 返回 null，防复跑影响早前测试）
+  w.eval(`
+    window.endTurn = window.__t29EndTurn; delete window.__t29EndTurn;
+    if (window.__t29Alert) { window.alert = window.__t29Alert; delete window.__t29Alert; }
+    state.isGameStarted = false; state.actionQueue = []; state.queueIndex = 0;
+    heroesData = []; enemiesData = []; battleHistory = []; _historyRawCache = '';
+  `);
+  MOCK.api.insertOrAssignVariables({ rpg_combat_roster: { version: 0 } }, { type: 'chat' });
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -1506,7 +1659,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
