@@ -1661,6 +1661,132 @@ async function test29() {
   MOCK.api.insertOrAssignVariables({ rpg_combat_roster: { version: 0 } }, { type: 'chat' });
 }
 
+/* ================= 断言 30：物品/物品子技能 [召唤]+[延迟] =================
+   回归锁（物品版 test26）：parseItem 不解析 [召唤:]/[延迟:]/[MP:]，itemToPseudoSkill 硬编码
+   delay:0 且不透传 summonTarget → 物品绑定召唤对象时召唤与蓄力双失效；物品子技能伪技能虽
+   透传了召唤，但 prepareGroupedItemSkill 无延迟路由 → 蓄力限制失效（V11.12 实机反馈：蝎眼钥匙）。
+   连带锁：applyPersistedRoster 旧档物品合并以 sItem 为基座会清洗 YAML 新字段与 children。 */
+async function test30() {
+  head('30 物品召唤+延迟：直连物品蓄力押注·蓄满释放结算召唤扣次·子技能蓄力路由·roster 旧档不清洗新字段');
+  MOCK.resetVars(); seedChat(); seedState();
+
+  const ITEM_DELAY = '【蝎眼钥匙】[召唤:幻梦行军兽][单防;power:10][MP:20][高阶][延迟:2][特效:高阶召唤术][道具][次数:1]';
+  const ITEM_PURE = '【纯召壶】[召唤:化尘者][MP:5][道具]';
+
+  // ① 解析层：物品串的召唤/延迟/MP 与技能同构解析（修复前提）
+  const it = rpgWin().parseItem(ITEM_DELAY);
+  check(it.summonTarget === '幻梦行军兽' && it.delay === 2, '物品解析：summonTarget 与 delay=2 共存');
+  check(it.cost === 20 && it.type === '[单防]' && it.category === '道具' && it.maxUses === 1 && it.isHighTier === true, '物品解析：MP:20/[单防]/[高阶]/[道具][次数:1] 正常');
+  const ps = rpgWin().itemToPseudoSkill(it);
+  check(ps.summonTarget === '幻梦行军兽' && ps.delay === 2 && ps.cost === 20 && ps.isItem === true && ps.itemRef === it, '伪技能透传：召唤/延迟/MP/物品引用齐备');
+
+  // ② 入口路由（根因锁）：桩掉两条入口，验证 延迟物品走蓄力、纯召唤物品仍直连
+  injectHeroes([heroSpec({ name: '持钥人', hp: 100, maxHp: 100, mp: 100, maxMp: 100,
+    items: [rpgWin().parseItem(ITEM_DELAY), rpgWin().parseItem(ITEM_PURE)] })]);
+  rpgWin().eval(`
+    window.__t30 = { path: null };
+    window.__t30ChargeItem = window.handleChargeItem;
+    window.__t30ExecItem = window.executeItemAction;
+    window.handleChargeItem = async () => { window.__t30.path = 'charge'; };
+    window.executeItemAction = async () => { window.__t30.path = 'direct'; };
+    state.actionQueue = [{ ref: heroesData[0] }]; state.queueIndex = 0; state.isAnimating = false;
+  `);
+  await rpgWin().prepareItemTarget(0);
+  check(rpgWin().__t30.path === 'charge', '物品召唤+延迟：走蓄力入口（不再直连自施放短路）');
+  await rpgWin().prepareItemTarget(1);
+  check(rpgWin().__t30.path === 'direct', '纯召唤物品（无延迟）：仍直连自施放');
+
+  // ③ 真实蓄力押注（物品）：恢复原函数、桩掉 endTurn；MP 押注扣除、次数保留到释放
+  rpgWin().eval(`
+    window.handleChargeItem = window.__t30ChargeItem;
+    window.executeItemAction = window.__t30ExecItem;
+    window.__t30EndTurn = window.endTurn;
+    window.endTurn = async () => {};
+    heroesData[0].mp = 100; heroesData[0].hasteStore = 0; heroesData[0].currentDelay = null;
+    state.isAnimating = false;
+    battleHistory = []; _historyRawCache = '';
+  `);
+  await rpgWin().prepareItemTarget(0);
+  const cd = rpgWin().eval('(function(){ var h = heroesData[0], c = h.currentDelay; return { remaining: c ? c.remaining : null, mp: h.mp, summon: c && c.skill ? c.skill.summonTarget : null, isItem: c && c.skill ? !!c.skill.isItem : null, uses: h.items[0].usesRemaining, hist: battleHistory.join("|") }; })()');
+  check(cd.remaining === 2, '真实蓄力：currentDelay.remaining = 2（还需 2 回合）');
+  check(cd.mp === 80, '真实蓄力：MP 押注扣除（100-20）');
+  check(cd.summon === '幻梦行军兽' && cd.isItem === true, '真实蓄力：蓄力槽保留召唤目标与物品伪技能形态');
+  check(cd.uses === 1, '真实蓄力：道具次数不预扣（释放时才扣，终止蓄力不损耗）');
+  check(/⏳ \[持钥人\] 开始蓄力【蝎眼钥匙】，还需 2 回合完成！/.test(cd.hist), '真实蓄力：开始蓄力战报行（与技能同措辞，digest 规则可识别）');
+
+  // ④ 蓄满释放：召唤链真实执行（mock 无世界书 → 优雅失败行）+ 扣次 + skipCost 不重复扣 MP + 不烧爆发
+  rpgWin().eval(`
+    heroesData[0].currentDelay.remaining = 0;
+    heroesData[0].tp = 100; heroesData[0].burstActivated = true;
+    battleHistory = []; _historyRawCache = '';
+  `);
+  await rpgWin().releaseCharge();
+  const rel = rpgWin().eval('(function(){ var h = heroesData[0]; return { mp: h.mp, tp: h.tp, burst: h.burstActivated, uses: h.items[0].usesRemaining, hist: battleHistory.join("|") }; })()');
+  check(/召唤「幻梦行军兽」失败：未找到图鉴词条/.test(rel.hist), '蓄满释放：召唤分支真实执行（mock 无图鉴 → 优雅失败行，不再静默无召唤）');
+  check(/🎒 持钥人 对 持钥人 使用了【蝎眼钥匙】/.test(rel.hist), '蓄满释放：物品战报行（自施措辞）');
+  check(rel.uses === 0, '蓄满释放：道具次数经 executeSkillAction 扣减（1→0）');
+  check(rel.mp === 80, '蓄满释放：释放时 skipCost 不重复扣 MP');
+  check(rel.tp === 100 && rel.burst === true, '蓄满释放：物品不触发极限爆发（满 TP 与爆发态保留）');
+
+  // ⑤ 物品组子技能 [延迟]：路由走蓄力 + 押注 + 释放扣父库存（父名·子名战报）
+  rpgWin().eval(`
+    var _g = parseItem('【化尘者之瓶】[道具][次数:1]');
+    _g.children = [parseSkill('【瓶中之物】[召唤:化尘者][MP:5][延迟:2][法术]')];
+    heroesData[0].items = [_g];
+    heroesData[0].mp = 100; heroesData[0].currentDelay = null; state.isAnimating = false;
+    window.__t30.path = null;
+    window.__t30ChargeG = window.handleChargeGroupedItem;
+    window.handleChargeGroupedItem = async () => { window.__t30.path = 'charge'; };
+  `);
+  await rpgWin().prepareGroupedItemSkill(0, 0);
+  check(rpgWin().__t30.path === 'charge', '子技能召唤+延迟：走蓄力入口（不再直连执行）');
+  rpgWin().eval(`
+    window.handleChargeGroupedItem = window.__t30ChargeG;
+    heroesData[0].mp = 100; heroesData[0].currentDelay = null; state.isAnimating = false;
+    battleHistory = []; _historyRawCache = '';
+  `);
+  await rpgWin().prepareGroupedItemSkill(0, 0);
+  const gcd = rpgWin().eval('(function(){ var h = heroesData[0], c = h.currentDelay; return { remaining: c ? c.remaining : null, mp: h.mp, name: c && c.skill ? c.skill.name : null, summon: c && c.skill ? c.skill.summonTarget : null }; })()');
+  check(gcd.remaining === 2 && gcd.mp === 95, '子技能真实蓄力：remaining=2 且 MP 押注扣除（100-5）');
+  check(gcd.name === '化尘者之瓶·瓶中之物' && gcd.summon === '化尘者', '子技能蓄力槽：父名·子名 + 召唤目标保留');
+  rpgWin().eval('heroesData[0].currentDelay.remaining = 0;');
+  await rpgWin().releaseCharge();
+  const grel = rpgWin().eval('(function(){ var h = heroesData[0]; return { uses: h.items[0].usesRemaining, mp: h.mp, hist: battleHistory.join("|") }; })()');
+  check(grel.uses === 0 && grel.mp === 95, '子技能蓄满释放：父道具次数扣减（1→0）且不重复扣 MP');
+  check(/召唤「化尘者」失败：未找到图鉴词条/.test(grel.hist), '子技能蓄满释放：召唤分支执行');
+
+  // ⑥ roster 旧档合并保护：旧版持久化物品（无召唤/延迟/MP/children 键）不清洗 YAML 新字段与组结构
+  MOCK.api.insertOrAssignVariables(
+    { rpg_combat_roster: { version: 1, heroes: [{ name: '持钥人', config: {}, skills: [], items: [
+      { name: '蝎眼钥匙', category: '道具', count: 1, maxUses: 1, bindings: [], type: '[单防]', power: 10 },
+      { name: '化尘者之瓶', category: '道具', count: 1, maxUses: 1, bindings: [], type: '[无]', power: 0 }
+    ] }] } },
+    { type: 'chat' }
+  );
+  rpgWin().eval(`
+    state.isAnimating = false; heroesData[0].currentDelay = null;
+    heroesData[0].items = [parseItem(${JSON.stringify(ITEM_DELAY)})];
+    var _g2 = parseItem('【化尘者之瓶】[道具][次数:1]');
+    _g2.children = [parseSkill('【瓶中之物】[召唤:化尘者][MP:5][延迟:2][法术]')];
+    heroesData[0].items.push(_g2);
+    applyPersistedRoster();
+  `);
+  const mrg = rpgWin().eval('(function(){ var k = heroesData[0].items.find(i=>i.name==="蝎眼钥匙"); var b = heroesData[0].items.find(i=>i.name==="化尘者之瓶"); return { summon: k.summonTarget||null, delay: k.delay||0, cost: k.cost||0, maxUses: k.maxUses||0, children: b.children ? b.children.length : 0, childDelay: b.children && b.children[0] ? (b.children[0].delay||0) : null }; })()');
+  check(mrg.summon === '幻梦行军兽' && mrg.delay === 2 && mrg.cost === 20, 'roster 旧档合并：YAML 物品的召唤/延迟/MP 保留（旧档无键不覆盖）');
+  check(mrg.maxUses === 1, 'roster 合并：持久化次数定义照常生效');
+  check(mrg.children === 1 && mrg.childDelay === 2, 'roster 旧档合并：物品组 children 与子技能延迟不再被清洗丢失');
+
+  // ⑦ 清理：恢复桩函数与全局态，roster 种子失效化（防复跑影响早前测试）
+  rpgWin().eval(`
+    window.endTurn = window.__t30EndTurn;
+    delete window.__t30; delete window.__t30ChargeItem; delete window.__t30ExecItem;
+    delete window.__t30ChargeG; delete window.__t30EndTurn;
+    heroesData = []; enemiesData = []; state.actionQueue = []; state.queueIndex = 0; state.isAnimating = false;
+    battleHistory = []; _historyRawCache = '';
+  `);
+  MOCK.api.insertOrAssignVariables({ rpg_combat_roster: { version: 0 } }, { type: 'chat' });
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -1668,7 +1794,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
