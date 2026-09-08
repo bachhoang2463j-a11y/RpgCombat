@@ -234,4 +234,4 @@
 | 2026-09-09 | [特效:障壁术] 通用 SVG 特效（demo 方案1 六边晶格·空间嵌合障壁：激波环+六边主晶盾+六向碎片聚合，音效方案3 528Hz 奇迹音叉 Web Audio 合成；注册表+特判+豁免+particles 分派 delay 0.8）+ 【肃正】屏障罩位只盖英雄行（syncBarrierCoverageToHeroRow 钉 top/height，召唤行在场不撑障壁，入队/resize 重钉）；test33 新增 27 项，497 全绿 | L2725 | 9d55e89 |
 | 2026-09-09 | 障壁术 150% 缩放层间错位修复（激波环/主晶盾居中从 keyframes translate(-50%) 改 margin 布局居中，免疫分数 DPR 光栅化逐层舍入）+ 造雾术音量 0.75→1.2（fog.mp3 源文件偏轻，GainNode 放大）；test33 扩 5 项（定格同心 dx=0.000），502 全绿 | L2736 | b3a30c0 |
 | 2026-09-09 | 造雾术去延迟（注册表 delay 移除立即结算）+ 音量增益 1.2→2 + 新增三组 WebM 特效：开镜瞄准（miaozhun）/燃烧弹（ranshao, fire_aoe）/圣域帷幕（weimu, holy_light，音效实为 .wav 经服务目录核名）；均无延迟不放大；test33 扩 5 项，507 全绿 | L2747 | edda0c5 |
-| 2026-09-09 | 霰弹 SVG 性能优化（真机卡顿：爆焰/激波/弹丸/弹孔四组关键帧逐帧 filter·stroke-width 插值拆 steps(1) 子动画 + 敌人闪白 steps(1)×2 + 双 drop-shadow 并单 + 烟团 3×blur 容器化 + 18 火星辉光去除 + will-change 提层）+ 开镜瞄准/燃烧弹 scale 1.4→0.42（降至30%）；test31 扩 10 项，517 全绿 | L2758 | 待回填 |
+| 2026-09-09 | 霰弹 SVG 性能优化（真机卡顿：爆焰/激波/弹丸/弹孔四组关键帧逐帧 filter·stroke-width 插值拆 steps(1) 子动画 + 敌人闪白 steps(1)×2 + 双 drop-shadow 并单 + 烟团 3×blur 容器化 + 18 火星辉光去除 + will-change 提层）+ 开镜瞄准/燃烧弹 scale 1.4→0.42（降至30%）；test31 扩 10 项，517 全绿 | L2758 | 7ec0b8d |
