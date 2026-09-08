@@ -2683,3 +2683,16 @@
 - **涉及文件**：`README.md`。
 - **经验证**：文档纯描述性变更，无代码改动；内容与 LOG-221/222 实现及 harness 断言口径一致。
 - **决策原因**：Coding rule 规定 README 等用户真机确认有效后再更新；用户已确认真机通过并指示同步文档后推送远程。
+
+---
+
+## [LOG-224] 2026-09-08 — 物品/物品子技能 [召唤]+[延迟] 断链修复（物品版 test26）
+
+- **变更行为**：实机反馈【蝎眼钥匙】`[召唤:幻梦行军兽][单防;power:10][MP:20][高阶][延迟:2][特效:高阶召唤术][道具][次数:1]`——物品绑定召唤对象时召唤与延迟蓄力双失效；物品组子技能绑召唤有召唤但无蓄力限制。三层断链根因与修复：
+  1. **解析层**：`parseItem` 不解析 `[MP/HP/TP:N]`、`[延迟:N]`、`[加速:N]`、`[召唤:词条名]`（物品被设计为"零消耗伪技能"），补齐与 `parseSkill` 同构的字段解析；`itemToPseudoSkill` 原硬编码 `cost:0, delay:0, haste:0` 且不透传 `summonTarget`，改为透传（itemRef 引用原物品，扣次优先精确匹配）。
+  2. **执行层**：`handleChargeSkill` 抽取公共核心 `_beginCharge(hero, skill)`（押注 MP/HP/TP、加速库存抵扣、进入蓄力态），新增 `handleChargeItem`（直连物品）/`handleChargeGroupedItem`（物品组子技能，伪技能挂父 itemRef、战报「父名·子名」）两入口；`prepareItemTarget`/`prepareGroupedItemSkill` 在召唤直通分类之前先路由 `[延迟]`（与技能版 test26 修复同序）。物品语义细则：MP 押注在蓄力开始（法力回响照算），**道具次数在释放时经 executeSkillAction 物品消耗分支扣减**（终止蓄力/蓄力中阵亡不损耗次数，与绑定材料押注不退还是两套口径，取对玩家友好侧）；释放 skipCost 不重复扣 MP；`doReleaseCharge` 物品不触发极限爆发（与 executeItemAction 同口径，原会无条件烧满 TP 爆发）。`executeItemAction` 补 MP/HP/TP 释放校验。
+  3. **持久化层（连带发现）**：`applyPersistedRoster` 物品合并原以 sItem 为基座 `Object.assign({}, sItem, …)`——旧版持久化档无新字段键会把 YAML 新解析的召唤/延迟/MP 洗掉，且组物品 children 整个丢失（同名物品场景旧有数据损耗）；基座换 `Object.assign({}, yItem, sItem, …)`（sItem 无键不覆盖，编辑器保存过的新字段仍以持久化为准，与技能组"组结构以 YAML 为准"同原则）。`serializeHeroesForSave` 物品映射补 cost/hpCost/tpCost/delay/haste/summonTarget 六字段。
+  4. **UI**：物品卡补 召唤:词条 / ⏳蓄力:N 徽章（与技能卡同构）、💧 MP 消耗徽章与 MP 不足灰显+🚫提示（与技能卡 isSkillActionable 同口径）。
+- **涉及文件**：`index.html`、`integration-test/harness.html`（test30）、`regex-前端战斗v11_11.json`（`e54e75c`）。
+- **经验证**：test30 新增 23 项——解析/伪技能透传、双入口路由（延迟走蓄力、纯召唤仍直连）、真实押注（MP 100→80、次数不预扣、蓄力战报行措辞与技能一致）、蓄满释放（召唤分支真实执行——mock 无图鉴走优雅失败行证明链路、🎒自施战报、次数 1→0、skipCost 不重扣、不烧爆发）、子技能链（父名·子名蓄力槽、父次数扣减）、roster 旧档合并保护（新字段/children 保留+持久化次数照常）。**410 项全绿**（30 组；test10 srcLine 119 条重映射后 118↔118 对齐）；build-regex 产物 842989 字符（-30%），围栏 2/2。真机待用户实测。
+- **决策原因**：test26 已修技能版同款病（召唤直通短路延迟检查），物品版是同一设计债的物品侧复制——物品系统引入时按"零消耗简单伪技能"建模，未跟随技能侧字段扩展；修复取"物品与技能同构"而非给物品单开小灶通路，蓄力核心合并后三入口共用一套押注/加速/释放逻辑，防止下个字段再断链。次数扣减时机选释放侧而非押注侧：executeSkillAction 物品消耗分支是唯一扣次点（测试与战报口径统一），改押注侧需动共享代码且与既有物品直连路径分叉。
