@@ -8194,7 +8194,7 @@ function playSVGEffect(targetDom, type) {
         // 逐帧 filter 插值已拆 steps(1) 子动画（见 fire-supernova-* 关键帧组）。
         const uid = Date.now() + Math.floor(Math.random() * 100000);
         innerHTML = `
-          <div class="absolute pointer-events-none" style="left: 0; top: 0; width: 260px; height: 260px; margin-left: -130px; margin-top: -130px;">
+          <div class="absolute pointer-events-none" style="left: 0; top: 0; width: 130px; height: 130px; margin-left: -65px; margin-top: -65px;">
             <!-- 1. 十字横向能量刃 -->
             <div class="absolute inset-0 pointer-events-none" style="animation: fire-supernova-beam-h 0.8s cubic-bezier(0.12, 0.95, 0.2, 1) both, fire-supernova-beam-flash 0.8s steps(1) both; will-change: transform, opacity;">
               <svg viewBox="-160 -160 320 320" class="absolute inset-0 w-full h-full">

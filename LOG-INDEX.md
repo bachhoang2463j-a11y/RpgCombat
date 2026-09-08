@@ -236,3 +236,4 @@
 | 2026-09-09 | 造雾术去延迟（注册表 delay 移除立即结算）+ 音量增益 1.2→2 + 新增三组 WebM 特效：开镜瞄准（miaozhun）/燃烧弹（ranshao, fire_aoe）/圣域帷幕（weimu, holy_light，音效实为 .wav 经服务目录核名）；均无延迟不放大；test33 扩 5 项，507 全绿 | L2747 | edda0c5 |
 | 2026-09-09 | 霰弹 SVG 性能优化（真机卡顿：爆焰/激波/弹丸/弹孔四组关键帧逐帧 filter·stroke-width 插值拆 steps(1) 子动画 + 敌人闪白 steps(1)×2 + 双 drop-shadow 并单 + 烟团 3×blur 容器化 + 18 火星辉光去除 + will-change 提层）+ 开镜瞄准/燃烧弹 scale 1.4→0.42（降至30%）；test31 扩 10 项，517 全绿 | L2758 | 7ec0b8d |
 | 2026-09-09 | 单体(火焰)特效重制：视觉换 demo 方案2 炽核聚爆·十字裂变（塌缩 Hitstop 定格+十字光棱+四向破片，filter 拆 steps(1) 性能纪律，margin 居中防 DPR 错位）+ 音效换方案4 龙息流火 Web Audio 合成链（喷射怒吼+100ms 重锤爆破+噼啪火星，零资源依赖）+ 子技能栏/变体组道具默认收起（渲染重置 isGroupExpanded+打开时全量刷新）；test23 扩 18 项 test29 扩 5 项，540 全绿 | L2775 | f33675e |
+| 2026-09-09 | 炽核聚爆容器缩小 50%（260→130px，margin 同步 -65/-65，viewBox 等比整体减半，关键帧零改动）+ 版本号 v11.11→v11.2（regex 产物 git mv 重命名 v11_2 + scriptName 字段）；540 全绿 | L2787 | 待回填 |
