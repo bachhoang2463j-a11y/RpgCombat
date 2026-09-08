@@ -2648,3 +2648,17 @@
 - **涉及文件**：`index.html`、`integration-test/harness.html`（test27 断言更新 + test28 新增）。
 - **经验证**：harness test28 新增 4 项（蓄满释放全流程真触发：action 行 1 条 / releases=1 / tier 归档 / 纯召唤路径仍唯一 action 行）。**348 项全绿**。真机待用户实测。
 - **决策原因**：双写 action 行会让所有召唤+附签技能的战后统计虚高（蓄力只是用户观察到的触发场景）；纯召唤与附签召唤各自保留恰好一条 action 行，战报可读性与统计准确性兼得。
+
+---
+
+## [LOG-221] 2026-09-08 — 变体组二级菜单（玩家方嵌套子技能）+ onCombatDataReceived 兜底接线修复
+
+- **变更行为**：
+  1. **变体组二级菜单**（玩家方专属，解决技能过多排版凌乱）：技能/物品列表支持嵌套子技能——父卡（如【温切斯特M1897】、【化尘者之瓶】[道具][次数:1]）显示首名，点击原地展开子技能卡（isGroupExpanded 存数据对象 + hidden class 切换，不重建 DOM——v6.17 崩溃纪律）。**冒号形式为标准写法**：`- "【父】":`（冒号在引号外），jsyaml 4.1.0 原生解析为 {"【父】":[子行]} 对象形态（isNestedGroup 分支），零兜底；无冒号旧写法（jsyaml 报 bad indentation）经 normalizeVariantGroupYaml 预归一化（父行补冒号）失败重试兜底，两种写法均可用。
+  2. **解析层**：技能组子技能平铺进 hero.skills（_inGroup+parentName 标记，战斗/执行链走全局索引零改动），children 为编辑器权威源；物品组子技能只挂 item.children，走 prepareGroupedItemSkill 专用通路（施展扣父库存 [次数:N]/[数量:N]，子自身 MP/限次独立结算，战报「父名·子名」措辞）；父 [高阶]/[传奇] 稀有度向子传播；敌方列表 filter 掉 groupOnly 父（子技能为玩家方专属）。
+  3. **onCombatDataReceived 兜底接线反转修复**：归一化重试原被接在首次构建的成功分支内——无冒号嵌套 YAML 首次解析必失败（走 else alert），重试永不触发（真机轮询/手动粘贴同病，此前仅被 test29 的 `||` 显式兜底掩盖）。改为 `buildCombatDataFromYAML(raw) || buildCombatDataFromYAML(normalizeVariantGroupYaml(raw))` 短路重试（3 行换 3 行行数中性），成功路径零开销、失败才归一化、两次皆败才 alert。
+  4. **applyPersistedRoster 组保护**：旧版扁平持久化档（rpg_combat_roster）以 saved.skills 为基准会把组拆散；改组结构（isGroup/children/_inGroup/parentName）以本楼 YAML 解析为准，持久化只覆盖非组同名字段、独有技能补尾。
+  5. **技能编辑器**：buildSkillFormFieldsHtml 参数化（模块 A-E 字节等价验证 41/41），子技能命名空间 -c- 前缀（h-N-s-M-c-K / h-N-it-M-c-K），增删/折叠/读回同步，syncSkillGroupFromChildren 以 children 为权威源重排平铺。
+- **涉及文件**：`index.html`、`integration-test/harness.html`（test29）、`regex-前端战斗v11_11.json`（`ef6aed7`）。
+- **经验证**：harness test29 全覆盖 37 项（冒号形式原生解析 / 写法A 预归一化兜底[置于扁平覆盖段后杜绝残留假绿] / roster 种子组保护+配置合并 / 组卡渲染纯 class 切换不重建 DOM / 编辑器模板 -c- 前缀 / children 重排平铺 / 物品组执行链父次数 1→0·「父名·子名」战报·MP 照扣）。**385 项全绿**（29 组；test10 srcLine 118↔118 双向对齐，build-tailwind 标记块刷新后按 test10 口径复算仍 NONE-OK）；build-regex v11_11 打包（replaceString 840906 字符，-30%）。真机待用户实测。
+- **决策原因**：冒号形式是 YAML 原生键形态（内嵌 jsyaml 4.1.0 实测深缩进/浅缩进/多标签父全过），比依赖预归一化兜底的缩进写法稳；保留无冒号兜底兼容旧数据。子技能定位玩家方专属——敌人无需变体，目的是折叠多技能变体解决技能栏排版凌乱；将来写 LLM 产出格式定义时以冒号形式为准。
