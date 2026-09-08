@@ -1860,6 +1860,21 @@
       border-color: rgba(100, 116, 139, 0.4) !important;
       background: transparent !important; color: #94a3b8 !important;
     }
+    /* 【标签槽位可搜索下拉】触发按钮（.skill-type-combo）+ 全局搜索浮层；原生 select 隐藏保留 id/onchange 供保存同步 */
+    .skill-type-combo { text-align: left; cursor: pointer; }
+    .skill-type-combo-popup {
+      position: fixed; z-index: 99990; display: flex; flex-direction: column; gap: 3px;
+      background: rgba(2, 6, 23, 0.98); border: 1px solid rgba(6, 182, 212, 0.6);
+      border-radius: 6px; padding: 4px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7), 0 0 12px rgba(6, 182, 212, 0.25);
+    }
+    .skill-type-combo-list { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+    .skill-type-combo-opt {
+      text-align: left; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 700;
+      color: #67e8f9; cursor: pointer; white-space: nowrap; user-select: none;
+    }
+    .skill-type-combo-opt:hover, .skill-type-combo-opt.sel { background: rgba(8, 51, 68, 0.9); }
+    .skill-type-combo-empty { font-size: 10px; color: #64748b; padding: 4px 8px; }
     .viewport-mobile {
       max-width: 420px !important; max-height: 860px !important;
       border: 4px solid #334155 !important; border-radius: 32px !important;
@@ -2445,6 +2460,9 @@ const SKILL_TYPES = [
   '[高阶]', '[传奇]', '[神术]',
   '[近战]', '[远程]', '[法术]'
 ];
+// 编辑器标签槽位下拉专用选项：SKILL_TYPES 剔除非槽位标签（必中/转火走药丸开关，高阶/传奇/神术走药丸开关，近战/远程/法术走"属性"下拉）。
+// SKILL_TYPES 本体保持完整——normalizeColonPowerTags 解析白名单依赖它，勿删。
+const SKILL_TYPE_EDIT_OPTIONS = SKILL_TYPES.filter(t => !['[必中]', '[转火]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]'].includes(t));
 
 // 【自X】自身负面标签族：技能代价机制——对施法者自身施加属性减益（盲=命中/降=防御/弱=攻击/滞=闪避/缓=速度）。
 // 语义：使用后必中（跳过命中/闪避掷骰与反应/看破/舍身拦截，不随同技能攻击的命中结论落空）、
@@ -2960,144 +2978,144 @@ function renderCombatSyncBadge() {
 // ==========================================
 const DIGEST_RULES = [
   // --- 结构 ---
-  { srcLine: 13781, kind: 'drop',   re: /^--- 战斗已拉开帷幕 ---$/ },
-  { srcLine: 13829, kind: 'field',  re: /^🏟️ 场地：(.+)$/, build: m => ({ text: '场地：' + m[1] }) },
-  { srcLine: 13887, kind: 'round',  re: /^={2,}\s*第 (\d+) 回合\s*={2,}$/ , build: m => ({ n: parseInt(m[1], 10) }) },
+  { srcLine: 13799, kind: 'drop',   re: /^--- 战斗已拉开帷幕 ---$/ },
+  { srcLine: 13847, kind: 'field',  re: /^🏟️ 场地：(.+)$/, build: m => ({ text: '场地：' + m[1] }) },
+  { srcLine: 13905, kind: 'round',  re: /^={2,}\s*第 (\d+) 回合\s*={2,}$/ , build: m => ({ n: parseInt(m[1], 10) }) },
   // --- 主行动 ---
-  { srcLine: 13374, kind: 'action', re: /^> (.+?) 对 (.+?) 发动了【(.+?)】\s*(暴击!|极限爆发!)?\s*$/, build: m => ({ caster: m[1], target: m[2], skill: m[3], crit: !!m[4], critErupt: m[4] === '极限爆发! ' }) },
-  { srcLine: 13351, kind: 'action', re: /^> (.+?) 发动了【(.+?)】$/, build: m => ({ caster: m[1], skill: m[2] }) },
-  { srcLine: 13370, kind: 'action', re: /^> ⚡ 预判危机！(.+?) 施展反应技【(.+?)】(?:（应对 (.+?) 的【(.+?)】）)?/, build: m => ({ caster: m[1], skill: m[2], reaction: true, trigCaster: m[3] || '', trigSkill: m[4] || '' }) },
-  { srcLine: 13372, kind: 'action', re: /^> 🎒 (.+?) 对 (.+?) 使用了【(.+?)】$/, build: m => ({ caster: m[1], target: m[2], skill: m[3], item: true }) },
-  { srcLine: 15387, kind: 'action', re: /^> (.+?) 采取了防卫姿态，回防聚气！$/, build: m => ({ caster: m[1], skill: '防卫姿态', defend: true }) },
-  { srcLine: 12197, kind: 'action', re: /^ {0,4}⛔ (.+?) 施展【(.+?)】看穿了敌方气路，【(.+?)】被彻底无效化！$/, build: m => ({ caster: m[1], skill: m[2], kanpo: true, kanpoTarget: m[3] }) },
-  { srcLine: 12445, kind: 'event',  re: /^ {0,4}🛡️ (.+?) 施展【(.+?)】舍身护佑，替 (.+?) 承受攻击！$/, build: m => ({ text: `🛡️ ${m[1]}【${m[2]}】舍身护佑，替 ${m[3]} 承受攻击` }) },
-  { srcLine: 12196,  kind: 'event',  re: /^ {0,4}🛡️ (.+?) 施展【(.+?)】舍身护佑，替 (.+?) 承受攻击！\(自动\)$/, build: m => ({ text: `🛡️ ${m[1]}【${m[2]}】舍身护佑，替 ${m[3]} 承受攻击` }) },
-  { srcLine: 14617, kind: 'event',  re: /^ {0,4}⚡ \[(.+?)\] 蓄力就绪，可立即释放【(.+?)】！$/, build: m => ({ text: `⚡ ${m[1]} 蓄力就绪【${m[2]}】`, charge: { caster: m[1], skill: m[2] } }) },
-  { srcLine: 14625, kind: 'event',  re: /^ {0,4}⏳ \[(.+?)\] 开始蓄力【(.+?)】，还需 (\d+) 回合完成！$/, build: m => ({ text: `⚡ ${m[1]} 开始蓄力【${m[2]}】（还需 ${m[3]} 回合）`, charge: { caster: m[1], skill: m[2] } }) },
-  { srcLine: 14760, kind: 'token',  re: /^ {0,4}⚡ \[(.+?)\] 释放【(.+?)】！$/, build: m => ({ token: `⚡释放`, release: { caster: m[1], skill: m[2] } }) },
-  { srcLine: 15191, kind: 'token',  re: /^ {0,4}💨 \[(.+?)\] 终止了蓄力！$/, build: m => ({ token: '终止蓄力' }) },
-  { srcLine: 10941,  kind: 'token',  re: /^ {0,4}↳ ⚡ (.+?) 获得了连续行动机会，再动 (\d+) 次！$/, build: m => ({ token: '→连续行动' }) },
-  { srcLine: 11145,  kind: 'token',  re: /^ {0,4}🌟 (.+?) 的法力产生共鸣，引发了多重施法\(获得额外行动回合\)！$/, build: m => ({ token: '→多重施法' }) },
-  { srcLine: 15387, kind: 'token',  re: /^ {0,4}↳ 🌟 (.+?) 燃烧极限潜能发动祈愿！赋予了 (.+?) 连续行动的机会！$/, build: m => ({ token: `赋予${m[2]}连续行动` }) },
+  { srcLine: 13392, kind: 'action', re: /^> (.+?) 对 (.+?) 发动了【(.+?)】\s*(暴击!|极限爆发!)?\s*$/, build: m => ({ caster: m[1], target: m[2], skill: m[3], crit: !!m[4], critErupt: m[4] === '极限爆发! ' }) },
+  { srcLine: 13369, kind: 'action', re: /^> (.+?) 发动了【(.+?)】$/, build: m => ({ caster: m[1], skill: m[2] }) },
+  { srcLine: 13388, kind: 'action', re: /^> ⚡ 预判危机！(.+?) 施展反应技【(.+?)】(?:（应对 (.+?) 的【(.+?)】）)?/, build: m => ({ caster: m[1], skill: m[2], reaction: true, trigCaster: m[3] || '', trigSkill: m[4] || '' }) },
+  { srcLine: 13390, kind: 'action', re: /^> 🎒 (.+?) 对 (.+?) 使用了【(.+?)】$/, build: m => ({ caster: m[1], target: m[2], skill: m[3], item: true }) },
+  { srcLine: 15405, kind: 'action', re: /^> (.+?) 采取了防卫姿态，回防聚气！$/, build: m => ({ caster: m[1], skill: '防卫姿态', defend: true }) },
+  { srcLine: 12215, kind: 'action', re: /^ {0,4}⛔ (.+?) 施展【(.+?)】看穿了敌方气路，【(.+?)】被彻底无效化！$/, build: m => ({ caster: m[1], skill: m[2], kanpo: true, kanpoTarget: m[3] }) },
+  { srcLine: 12463, kind: 'event',  re: /^ {0,4}🛡️ (.+?) 施展【(.+?)】舍身护佑，替 (.+?) 承受攻击！$/, build: m => ({ text: `🛡️ ${m[1]}【${m[2]}】舍身护佑，替 ${m[3]} 承受攻击` }) },
+  { srcLine: 12214,  kind: 'event',  re: /^ {0,4}🛡️ (.+?) 施展【(.+?)】舍身护佑，替 (.+?) 承受攻击！\(自动\)$/, build: m => ({ text: `🛡️ ${m[1]}【${m[2]}】舍身护佑，替 ${m[3]} 承受攻击` }) },
+  { srcLine: 14635, kind: 'event',  re: /^ {0,4}⚡ \[(.+?)\] 蓄力就绪，可立即释放【(.+?)】！$/, build: m => ({ text: `⚡ ${m[1]} 蓄力就绪【${m[2]}】`, charge: { caster: m[1], skill: m[2] } }) },
+  { srcLine: 14643, kind: 'event',  re: /^ {0,4}⏳ \[(.+?)\] 开始蓄力【(.+?)】，还需 (\d+) 回合完成！$/, build: m => ({ text: `⚡ ${m[1]} 开始蓄力【${m[2]}】（还需 ${m[3]} 回合）`, charge: { caster: m[1], skill: m[2] } }) },
+  { srcLine: 14778, kind: 'token',  re: /^ {0,4}⚡ \[(.+?)\] 释放【(.+?)】！$/, build: m => ({ token: `⚡释放`, release: { caster: m[1], skill: m[2] } }) },
+  { srcLine: 15209, kind: 'token',  re: /^ {0,4}💨 \[(.+?)\] 终止了蓄力！$/, build: m => ({ token: '终止蓄力' }) },
+  { srcLine: 10959,  kind: 'token',  re: /^ {0,4}↳ ⚡ (.+?) 获得了连续行动机会，再动 (\d+) 次！$/, build: m => ({ token: '→连续行动' }) },
+  { srcLine: 11163,  kind: 'token',  re: /^ {0,4}🌟 (.+?) 的法力产生共鸣，引发了多重施法\(获得额外行动回合\)！$/, build: m => ({ token: '→多重施法' }) },
+  { srcLine: 15405, kind: 'token',  re: /^ {0,4}↳ 🌟 (.+?) 燃烧极限潜能发动祈愿！赋予了 (.+?) 连续行动的机会！$/, build: m => ({ token: `赋予${m[2]}连续行动` }) },
   // --- 命中结果 ---
-  { srcLine: 12970, kind: 'token',  re: /^ {0,4}↳ 命中了 (.+?)，造成了 \d+ 点实质伤害(【轻伤】|【受伤】|【重创】)！(?: 并击碎了\d+点护盾 )? 当前状态: (\d+)\/(\d+)\s*$/, build: m => ({ token: `命中造成${m[2] === '【受伤】' ? '【中度伤】' : m[2]}`, hp: { cur: parseInt(m[3], 10), max: parseInt(m[4], 10), who: m[1] } }) },
-  { srcLine: 12955, kind: 'token',  re: /^ {0,4}↳ 对 (.+?) 的护盾造成了 \d+ 点破坏。$/, build: m => ({ token: '击破护盾' }) },
-  { srcLine: 12998, kind: 'token',  re: /^ {0,4}💥 致命一击！彻底撕裂了 (.+?) 的身躯！$/, build: m => ({ token: '致命一击', killed: m[1] }) },
-  { srcLine: 12717, kind: 'token',  re: /^ {0,4}↳ 但被 (.+?) 敏捷地闪避了！$/, build: m => ({ token: '被闪避' }) },
-  { srcLine: 12726, kind: 'token',  re: /^ {0,4}⚔️ (.+?) 闪避并趁势反击！对 (.+?) 的护盾造成了 \d+ 点破坏。$/, build: m => ({ token: '反击命中(击盾)' }) },
-  { srcLine: 12732, kind: 'token',  re: /^ {0,4}⚔️ (.+?) 闪避并趁势反击！迅速一击命中了 (.+?)，造成了 \d+ 点伤害！.*$/, build: m => ({ token: '反击命中' }) },
-  { srcLine: 12879, kind: 'drop',   re: /虽处于反击架势，但无法触及并反击/ },
-  { srcLine: 11069,  kind: 'token',  re: /^ {0,4}⚔️ (.+?) 发动【强力反击】！对 (.+?) 的护盾造成了 \d+ 点破坏。$/, build: m => ({ token: '强力反击(击盾)' }) },
-  { srcLine: 11077,  kind: 'token',  re: /^ {0,4}⚔️ (.+?) 发动【强力反击】！以双倍力量重创 (.+?)，造成了 \d+ 点伤害！.*$/, build: m => ({ token: '强力反击' }) },
-  { srcLine: 11558,  kind: 'token',  re: /触发【受击反震\/护体反伤】/, build: m => ({ token: '反震伤害' }) },
-  { srcLine: 13144, kind: 'token',  re: /^ {0,4}↳ (.+?) 的【(.+?)】妨害随攻击一同落空，未能施加到 (.+?)。$/, build: m => ({ token: `附带【${m[2]}】落空`, missedTag: m[2] }) },
+  { srcLine: 12988, kind: 'token',  re: /^ {0,4}↳ 命中了 (.+?)，造成了 \d+ 点实质伤害(【轻伤】|【受伤】|【重创】)！(?: 并击碎了\d+点护盾 )? 当前状态: (\d+)\/(\d+)\s*$/, build: m => ({ token: `命中造成${m[2] === '【受伤】' ? '【中度伤】' : m[2]}`, hp: { cur: parseInt(m[3], 10), max: parseInt(m[4], 10), who: m[1] } }) },
+  { srcLine: 12973, kind: 'token',  re: /^ {0,4}↳ 对 (.+?) 的护盾造成了 \d+ 点破坏。$/, build: m => ({ token: '击破护盾' }) },
+  { srcLine: 13016, kind: 'token',  re: /^ {0,4}💥 致命一击！彻底撕裂了 (.+?) 的身躯！$/, build: m => ({ token: '致命一击', killed: m[1] }) },
+  { srcLine: 12735, kind: 'token',  re: /^ {0,4}↳ 但被 (.+?) 敏捷地闪避了！$/, build: m => ({ token: '被闪避' }) },
+  { srcLine: 12744, kind: 'token',  re: /^ {0,4}⚔️ (.+?) 闪避并趁势反击！对 (.+?) 的护盾造成了 \d+ 点破坏。$/, build: m => ({ token: '反击命中(击盾)' }) },
+  { srcLine: 12750, kind: 'token',  re: /^ {0,4}⚔️ (.+?) 闪避并趁势反击！迅速一击命中了 (.+?)，造成了 \d+ 点伤害！.*$/, build: m => ({ token: '反击命中' }) },
+  { srcLine: 12897, kind: 'drop',   re: /虽处于反击架势，但无法触及并反击/ },
+  { srcLine: 11087,  kind: 'token',  re: /^ {0,4}⚔️ (.+?) 发动【强力反击】！对 (.+?) 的护盾造成了 \d+ 点破坏。$/, build: m => ({ token: '强力反击(击盾)' }) },
+  { srcLine: 11095,  kind: 'token',  re: /^ {0,4}⚔️ (.+?) 发动【强力反击】！以双倍力量重创 (.+?)，造成了 \d+ 点伤害！.*$/, build: m => ({ token: '强力反击' }) },
+  { srcLine: 11576,  kind: 'token',  re: /触发【受击反震\/护体反伤】/, build: m => ({ token: '反震伤害' }) },
+  { srcLine: 13162, kind: 'token',  re: /^ {0,4}↳ (.+?) 的【(.+?)】妨害随攻击一同落空，未能施加到 (.+?)。$/, build: m => ({ token: `附带【${m[2]}】落空`, missedTag: m[2] }) },
   // --- 护盾与屏障 ---
-  { srcLine: 10765,  kind: 'token',  re: /^ {0,4}↳ 为 (.+?) 附加了一层能吸收 \d+ 点伤害的护盾。$/, build: m => ({ token: '附加护盾' }) },
-  { srcLine: 10785,  kind: 'token',  re: /^ {0,4}↳ (.+?) 展开【(.+?)】，为全队架起一层可吸收 \d+ 点伤害的共享屏障（(\d+)\/(\d+)）(.*)$/, build: m => { const km = /克制\s*(近战|远程|法术)/.exec(m[5] || ''); return { token: '架起共享屏障' + (km ? '(克制' + km[1] + ')' : ''), barrier: { name: m[2], cur: parseInt(m[3], 10), max: parseInt(m[4], 10), desc: m[5] } }; } },
-  { srcLine: 12894, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】替全队挡下了 \d+ 点伤害（剩余 (\d+)）。$/, build: m => ({ token: '屏障挡下', barrierLeft: { name: m[1], cur: parseInt(m[2], 10) } }) },
-  { srcLine: 13181, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】替全队挡下了 \d+ 点伤害（剩余 (\d+)）(.*)$/, build: m => ({ token: '屏障挡下', barrierLeft: { name: m[1], cur: parseInt(m[2], 10) } }) },
-  { srcLine: 12907, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】以护甲\/克制完全格挡了本次攻击（剩余 (\d+)）。$/, build: m => ({ token: '屏障完全格挡', barrierLeft: { name: m[1], cur: parseInt(m[2], 10) } }) },
-  { srcLine: 13192, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】以(?:护甲|克制)完全格挡了本次攻击（\d+→0\)(.*)$/, build: m => ({ token: '屏障完全格挡' }) },
-  { srcLine: 13330, kind: 'event',  re: /^ {0,4}💥 【(.+?)】轰然破碎！$/, build: m => ({ text: `💥 【${m[1]}】轰然破碎`, barrierBreak: m[1] }) },
-  { srcLine: 12549, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的负面效果被【(.+?)】圣域所格挡，无法触及我方角色。$/, build: m => ({ token: `负面被【${m[2]}】格挡` }) },
-  { srcLine: 12444, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的【.+?】抗性使伤害减少了 \d+ 点。$/, build: m => ({ token: '抗性减免' }) },
-  { srcLine: 12948, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的【免伤】生效，本次攻击的防御额外提高 \d+ 点。$/, build: m => ({ token: '免伤生效' }) },
+  { srcLine: 10783,  kind: 'token',  re: /^ {0,4}↳ 为 (.+?) 附加了一层能吸收 \d+ 点伤害的护盾。$/, build: m => ({ token: '附加护盾' }) },
+  { srcLine: 10803,  kind: 'token',  re: /^ {0,4}↳ (.+?) 展开【(.+?)】，为全队架起一层可吸收 \d+ 点伤害的共享屏障（(\d+)\/(\d+)）(.*)$/, build: m => { const km = /克制\s*(近战|远程|法术)/.exec(m[5] || ''); return { token: '架起共享屏障' + (km ? '(克制' + km[1] + ')' : ''), barrier: { name: m[2], cur: parseInt(m[3], 10), max: parseInt(m[4], 10), desc: m[5] } }; } },
+  { srcLine: 12912, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】替全队挡下了 \d+ 点伤害（剩余 (\d+)）。$/, build: m => ({ token: '屏障挡下', barrierLeft: { name: m[1], cur: parseInt(m[2], 10) } }) },
+  { srcLine: 13199, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】替全队挡下了 \d+ 点伤害（剩余 (\d+)）(.*)$/, build: m => ({ token: '屏障挡下', barrierLeft: { name: m[1], cur: parseInt(m[2], 10) } }) },
+  { srcLine: 12925, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】以护甲\/克制完全格挡了本次攻击（剩余 (\d+)）。$/, build: m => ({ token: '屏障完全格挡', barrierLeft: { name: m[1], cur: parseInt(m[2], 10) } }) },
+  { srcLine: 13210, kind: 'token',  re: /^ {0,4}↳ 🛡️ 【(.+?)】以(?:护甲|克制)完全格挡了本次攻击（\d+→0\)(.*)$/, build: m => ({ token: '屏障完全格挡' }) },
+  { srcLine: 13348, kind: 'event',  re: /^ {0,4}💥 【(.+?)】轰然破碎！$/, build: m => ({ text: `💥 【${m[1]}】轰然破碎`, barrierBreak: m[1] }) },
+  { srcLine: 12567, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的负面效果被【(.+?)】圣域所格挡，无法触及我方角色。$/, build: m => ({ token: `负面被【${m[2]}】格挡` }) },
+  { srcLine: 12462, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的【.+?】抗性使伤害减少了 \d+ 点。$/, build: m => ({ token: '抗性减免' }) },
+  { srcLine: 12966, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的【免伤】生效，本次攻击的防御额外提高 \d+ 点。$/, build: m => ({ token: '免伤生效' }) },
   // --- 状态施加 ---
-  { srcLine: 10656,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) \d+% 的命中率 持续\d+回合。$/, build: m => ({ token: `${m[1]}命中提升`, buffTarget: m[1], buffKey: 'hit' }) },
-  { srcLine: 10664,  kind: 'token',  re: /^ {0,4}↳ 干扰了 (.+?) 的视线，命中率下降 \d+% 持续\d+回合。$/, build: m => ({ token: `${m[1]}视线受扰`, buffTarget: m[1], buffKey: 'blind' }) },
-  { srcLine: 10673,  kind: 'token',  re: /^ {0,4}↳ 削弱了 (.+?) 的防御力。$/, build: m => ({ token: `${m[1]}防御削弱`, buffTarget: m[1], buffKey: 'defDown' }) },
-  { srcLine: 10681,  kind: 'token',  re: /^ {0,4}↳ 迟滞了 (.+?) 的身形，闪避率下降 \d+ 点 持续\d+回合。$/, build: m => ({ token: `${m[1]}身形迟滞`, buffTarget: m[1], buffKey: 'evaDown' }) },
-  { srcLine: 10689,  kind: 'token',  re: /^ {0,4}↳ 削弱了 (.+?) 的攻击力。$/, build: m => ({ token: `${m[1]}攻击力削弱`, buffTarget: m[1], buffKey: 'atkDown' }) },
-  { srcLine: 10847,  kind: 'token',  re: /^ {0,4}↳ 强化了 (.+?) 的攻击力。$/, build: m => ({ token: `${m[1]}攻击力强化`, buffTarget: m[1], buffKey: 'atkUp' }) },
-  { srcLine: 10758,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) 的防御力。$/, build: m => ({ token: `${m[1]}防御提升`, buffTarget: m[1], buffKey: 'defUp' }) },
-  { srcLine: 10795,  kind: 'drop',   re: /提升了 .+? 的身法，下一次受击时回避几率增加/ },
-  { srcLine: 10802,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) 的身法，回避几率增加 \d+，持续 \d+ 回合。$/, build: m => ({ token: `${m[1]}身法提升`, buffTarget: m[1], buffKey: 'evaUp' }) },
-  { srcLine: 10809,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) 的身法，回避几率增加 \d+，持续 \d+ 回合。$/, build: m => ({ token: `${m[1]}身法提升`, buffTarget: m[1], buffKey: 'evaUp' }) },
-  { srcLine: 10817,  kind: 'drop',   re: /摆出了反击架势/ },
-  { srcLine: 10750,  kind: 'drop',   re: /获得【免伤】，下一次受击时防御增加/ },
-  { srcLine: 10871,  kind: 'token',  re: /^ {0,4}↳ (.+?) 净化了 \d+ 个负面状态！$/, build: m => ({ token: `${m[1]}净化负面` }) },
-  { srcLine: 10879,  kind: 'token',  re: /^ {0,4}↳ (.+?) 身上没有负面状态可驱散。$/, build: m => ({ token: '无负面可驱散' }) },
-  { srcLine: 10953,  kind: 'token',  re: /^ {0,4}↳ ⚡ (.+?) 获得疾风加持，行动顺序提前（速度\+\d+ 持续\d+回合）。$/, build: m => ({ token: `${m[1]}行动加速` }) },
-  { srcLine: 11039,  kind: 'token',  re: /^ {0,4}↳ 🐌 (.+?) 受到迟滞，行动顺序延后（速度-\d+ 持续\d+回合）。$/, build: m => ({ token: `${m[1]}行动迟滞` }) },
+  { srcLine: 10674,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) \d+% 的命中率 持续\d+回合。$/, build: m => ({ token: `${m[1]}命中提升`, buffTarget: m[1], buffKey: 'hit' }) },
+  { srcLine: 10682,  kind: 'token',  re: /^ {0,4}↳ 干扰了 (.+?) 的视线，命中率下降 \d+% 持续\d+回合。$/, build: m => ({ token: `${m[1]}视线受扰`, buffTarget: m[1], buffKey: 'blind' }) },
+  { srcLine: 10691,  kind: 'token',  re: /^ {0,4}↳ 削弱了 (.+?) 的防御力。$/, build: m => ({ token: `${m[1]}防御削弱`, buffTarget: m[1], buffKey: 'defDown' }) },
+  { srcLine: 10699,  kind: 'token',  re: /^ {0,4}↳ 迟滞了 (.+?) 的身形，闪避率下降 \d+ 点 持续\d+回合。$/, build: m => ({ token: `${m[1]}身形迟滞`, buffTarget: m[1], buffKey: 'evaDown' }) },
+  { srcLine: 10707,  kind: 'token',  re: /^ {0,4}↳ 削弱了 (.+?) 的攻击力。$/, build: m => ({ token: `${m[1]}攻击力削弱`, buffTarget: m[1], buffKey: 'atkDown' }) },
+  { srcLine: 10865,  kind: 'token',  re: /^ {0,4}↳ 强化了 (.+?) 的攻击力。$/, build: m => ({ token: `${m[1]}攻击力强化`, buffTarget: m[1], buffKey: 'atkUp' }) },
+  { srcLine: 10776,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) 的防御力。$/, build: m => ({ token: `${m[1]}防御提升`, buffTarget: m[1], buffKey: 'defUp' }) },
+  { srcLine: 10813,  kind: 'drop',   re: /提升了 .+? 的身法，下一次受击时回避几率增加/ },
+  { srcLine: 10820,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) 的身法，回避几率增加 \d+，持续 \d+ 回合。$/, build: m => ({ token: `${m[1]}身法提升`, buffTarget: m[1], buffKey: 'evaUp' }) },
+  { srcLine: 10827,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) 的身法，回避几率增加 \d+，持续 \d+ 回合。$/, build: m => ({ token: `${m[1]}身法提升`, buffTarget: m[1], buffKey: 'evaUp' }) },
+  { srcLine: 10835,  kind: 'drop',   re: /摆出了反击架势/ },
+  { srcLine: 10768,  kind: 'drop',   re: /获得【免伤】，下一次受击时防御增加/ },
+  { srcLine: 10889,  kind: 'token',  re: /^ {0,4}↳ (.+?) 净化了 \d+ 个负面状态！$/, build: m => ({ token: `${m[1]}净化负面` }) },
+  { srcLine: 10897,  kind: 'token',  re: /^ {0,4}↳ (.+?) 身上没有负面状态可驱散。$/, build: m => ({ token: '无负面可驱散' }) },
+  { srcLine: 10971,  kind: 'token',  re: /^ {0,4}↳ ⚡ (.+?) 获得疾风加持，行动顺序提前（速度\+\d+ 持续\d+回合）。$/, build: m => ({ token: `${m[1]}行动加速` }) },
+  { srcLine: 11057,  kind: 'token',  re: /^ {0,4}↳ 🐌 (.+?) 受到迟滞，行动顺序延后（速度-\d+ 持续\d+回合）。$/, build: m => ({ token: `${m[1]}行动迟滞` }) },
   // --- 中毒/灼烧 ---
-  { srcLine: 10698,  kind: 'token',  re: /具备毒素抗性\/耐受体质，免疫了剧毒侵蚀！/, build: m => ({ token: '免疫剧毒' }) },
-  { srcLine: 10706,  kind: 'token',  re: /^ {0,4}↳ (.+?) 中了剧毒，每回合将承受 \d+ 点真实伤害 持续\d+回合！$/, build: m => ({ token: `${m[1]}中剧毒`, dotTarget: m[1] }) },
-  { srcLine: 11426,  kind: 'token',  re: /^ {0,4}↳ (.+?) 被施加了剧毒！$/, build: m => ({ token: `${m[1]}中剧毒`, dotTarget: m[1] }) },
-  { srcLine: 10714,  kind: 'token',  re: /耐火防护\/抗热体质阻绝了烈焰，免疫了灼烧！/, build: m => ({ token: '免疫灼烧' }) },
-  { srcLine: 10724,  kind: 'token',  re: /^ {0,4}↳ (.+?) 的灼烧加深，每回合真实伤害提升至 \d+ 点 持续\d+回合（燃烧期间治疗减半）！$/, build: m => ({ token: `${m[1]}灼烧加深`, dotTarget: m[1] }) },
-  { srcLine: 10728,  kind: 'token',  re: /^ {0,4}↳ (.+?) 被烈焰缠身，每回合将承受 \d+ 点真实伤害 持续\d+回合（燃烧期间治疗减半）！$/, build: m => ({ token: `${m[1]}中灼烧`, dotTarget: m[1] }) },
-  { srcLine: 13932, kind: 'event',  re: /^ {0,4}(🔥|🦠) \[(.+?)\] (?:灼烧|毒性)发作，受到了 \d+ 点真实伤害！$/, build: m => ({ text: `${m[1]} ${m[2]} ${m[1] === '🔥' ? '灼烧发作' : '毒性发作'}`, dotTick: m[2] }) },
+  { srcLine: 10716,  kind: 'token',  re: /具备毒素抗性\/耐受体质，免疫了剧毒侵蚀！/, build: m => ({ token: '免疫剧毒' }) },
+  { srcLine: 10724,  kind: 'token',  re: /^ {0,4}↳ (.+?) 中了剧毒，每回合将承受 \d+ 点真实伤害 持续\d+回合！$/, build: m => ({ token: `${m[1]}中剧毒`, dotTarget: m[1] }) },
+  { srcLine: 11444,  kind: 'token',  re: /^ {0,4}↳ (.+?) 被施加了剧毒！$/, build: m => ({ token: `${m[1]}中剧毒`, dotTarget: m[1] }) },
+  { srcLine: 10732,  kind: 'token',  re: /耐火防护\/抗热体质阻绝了烈焰，免疫了灼烧！/, build: m => ({ token: '免疫灼烧' }) },
+  { srcLine: 10742,  kind: 'token',  re: /^ {0,4}↳ (.+?) 的灼烧加深，每回合真实伤害提升至 \d+ 点 持续\d+回合（燃烧期间治疗减半）！$/, build: m => ({ token: `${m[1]}灼烧加深`, dotTarget: m[1] }) },
+  { srcLine: 10746,  kind: 'token',  re: /^ {0,4}↳ (.+?) 被烈焰缠身，每回合将承受 \d+ 点真实伤害 持续\d+回合（燃烧期间治疗减半）！$/, build: m => ({ token: `${m[1]}中灼烧`, dotTarget: m[1] }) },
+  { srcLine: 13950, kind: 'event',  re: /^ {0,4}(🔥|🦠) \[(.+?)\] (?:灼烧|毒性)发作，受到了 \d+ 点真实伤害！$/, build: m => ({ text: `${m[1]} ${m[2]} ${m[1] === '🔥' ? '灼烧发作' : '毒性发作'}`, dotTick: m[2] }) },
   // --- 眩晕 ---
-  { srcLine: 12975, kind: 'token',  re: /硬抗了冲击，免疫了眩晕！/, build: m => ({ token: '免疫眩晕' }) },
-  { srcLine: 12980, kind: 'token',  re: /^ {0,4}↳ (.+?) 被重重击晕，将跳过下一次行动！$/, build: m => ({ token: `${m[1]}被击晕` }) },
-  { srcLine: 14032, kind: 'event',  re: /^ {0,4}🌀 \[(.+?)\] 因眩晕无法行动！$/, build: m => ({ text: `${m[1]} 因眩晕无法行动` }) },
-  { srcLine: 11263,  kind: 'token',  re: /^ {0,4}↳ (.+?) 被隐匿者的奇袭命中弱点，眩晕了！.*$/, build: m => ({ token: `${m[1]}被奇袭眩晕` }) },
+  { srcLine: 12993, kind: 'token',  re: /硬抗了冲击，免疫了眩晕！/, build: m => ({ token: '免疫眩晕' }) },
+  { srcLine: 12998, kind: 'token',  re: /^ {0,4}↳ (.+?) 被重重击晕，将跳过下一次行动！$/, build: m => ({ token: `${m[1]}被击晕` }) },
+  { srcLine: 14050, kind: 'event',  re: /^ {0,4}🌀 \[(.+?)\] 因眩晕无法行动！$/, build: m => ({ text: `${m[1]} 因眩晕无法行动` }) },
+  { srcLine: 11281,  kind: 'token',  re: /^ {0,4}↳ (.+?) 被隐匿者的奇袭命中弱点，眩晕了！.*$/, build: m => ({ token: `${m[1]}被奇袭眩晕` }) },
   // --- 麻痹 ---
-  { srcLine: 10742,      kind: 'token',  re: /^ {0,4}↳ (.+?) 被电流侵蚀而麻痹（第\d+层），闪避率下降 \d+ 点 持续\d+回合，行动僵直概率 \d+%！$/, build: m => ({ token: `${m[1]}被麻痹`, buffTarget: m[1], buffKey: 'paralyze' }) },
-  { srcLine: 13960,      kind: 'event',  re: /^ {0,4}🌀 \[(.+?)\] 因麻痹僵直，无法行动！$/, build: m => ({ text: `${m[1]} 因麻痹僵直` }) },
+  { srcLine: 10760,      kind: 'token',  re: /^ {0,4}↳ (.+?) 被电流侵蚀而麻痹（第\d+层），闪避率下降 \d+ 点 持续\d+回合，行动僵直概率 \d+%！$/, build: m => ({ token: `${m[1]}被麻痹`, buffTarget: m[1], buffKey: 'paralyze' }) },
+  { srcLine: 13978,      kind: 'event',  re: /^ {0,4}🌀 \[(.+?)\] 因麻痹僵直，无法行动！$/, build: m => ({ text: `${m[1]} 因麻痹僵直` }) },
   // --- 资源 ---
-  { srcLine: 10930,  kind: 'token',  re: /^ {0,4}↳ 治愈了 (.+?)，恢复 \d+ 点生命。.*$/, build: m => ({ token: `治愈${m[1]}` }) },
-  { srcLine: 11478,  kind: 'token',  re: /凭借【持续调息\/自愈本能】平复伤势/, build: m => ({ token: '自愈调息' }) },
-  { srcLine: 11514,  kind: 'token',  re: /触发【嗜血\/生机掠夺】，从凶狠的命中中汲取战意与生机/, build: m => ({ token: '嗜血回生' }) },
-  { srcLine: 10889,  kind: 'token',  re: /^ {0,4}↳ 为 (.+?) 恢复了 \d+ 点法力值。$/, build: m => ({ token: `${m[1]}法力恢复` }) },
-  { srcLine: 10899,  kind: 'token',  re: /^ {0,4}↳ (.+?) 已无法力可供抽取。$/, build: m => ({ token: `${m[1]}无法力可抽` }) },
-  { srcLine: 10906,  kind: 'token',  re: /^ {0,4}↳ 🔵 (.+?) 从 (.+?) 身上抽取了 \d+ 点法力值。$/, build: m => ({ token: `${m[2]}法力被抽取` }) },
-  { srcLine: 10919,  kind: 'drop',   re: /恢复了 \d+ 点潜能\(TP\)。/ },
-  { srcLine: 11311,  kind: 'drop',   re: /的法力产生回响，获得 \d+ 点永久加速与 \d+ 点潜能！/ },
-  { srcLine: 14616, kind: 'event',  re: /^ {0,4}↳ 🔋 (.+?) 魔力匮乏，消耗本次行动恢复 \d+ 点法力。$/, build: m => ({ text: `🔋 ${m[1]} 法力枯竭·原地回气` }) },
-  { srcLine: 13674, kind: 'drop',   re: /获得 \d+ 点永久加速库存！/ },
+  { srcLine: 10948,  kind: 'token',  re: /^ {0,4}↳ 治愈了 (.+?)，恢复 \d+ 点生命。.*$/, build: m => ({ token: `治愈${m[1]}` }) },
+  { srcLine: 11496,  kind: 'token',  re: /凭借【持续调息\/自愈本能】平复伤势/, build: m => ({ token: '自愈调息' }) },
+  { srcLine: 11532,  kind: 'token',  re: /触发【嗜血\/生机掠夺】，从凶狠的命中中汲取战意与生机/, build: m => ({ token: '嗜血回生' }) },
+  { srcLine: 10907,  kind: 'token',  re: /^ {0,4}↳ 为 (.+?) 恢复了 \d+ 点法力值。$/, build: m => ({ token: `${m[1]}法力恢复` }) },
+  { srcLine: 10917,  kind: 'token',  re: /^ {0,4}↳ (.+?) 已无法力可供抽取。$/, build: m => ({ token: `${m[1]}无法力可抽` }) },
+  { srcLine: 10924,  kind: 'token',  re: /^ {0,4}↳ 🔵 (.+?) 从 (.+?) 身上抽取了 \d+ 点法力值。$/, build: m => ({ token: `${m[2]}法力被抽取` }) },
+  { srcLine: 10937,  kind: 'drop',   re: /恢复了 \d+ 点潜能\(TP\)。/ },
+  { srcLine: 11329,  kind: 'drop',   re: /的法力产生回响，获得 \d+ 点永久加速与 \d+ 点潜能！/ },
+  { srcLine: 14634, kind: 'event',  re: /^ {0,4}↳ 🔋 (.+?) 魔力匮乏，消耗本次行动恢复 \d+ 点法力。$/, build: m => ({ text: `🔋 ${m[1]} 法力枯竭·原地回气` }) },
+  { srcLine: 13692, kind: 'drop',   re: /获得 \d+ 点永久加速库存！/ },
   // --- 绑定消耗（V10.6 类别化文案；仅归零保留，措辞按类别三分） ---
-  { srcLine: 13434, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
-  { srcLine: 12278, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
-  { srcLine: 12519, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
-  { srcLine: 14624, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
-  { srcLine: 14670, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
+  { srcLine: 13452, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
+  { srcLine: 12296, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
+  { srcLine: 12537, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
+  { srcLine: 14642, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
+  { srcLine: 14688, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
   // --- 散射/转火/弹药按发消耗（V11.13：鹿弹逐发扣减汇总 + 多段击杀转火） ---
-  { srcLine: 13626, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
-  { srcLine: 13464, kind: 'event',  re: /^ {0,4}↳ 🔥 (.+?) 将后续攻击转向 (.+?)！$/, build: m => ({ text: `🔥 ${m[1]} 转火 → ${m[2]}` }) },
+  { srcLine: 13644, kind: 'token',  re: /^ {0,4}↳ (消耗弹药|使用道具|施展材料)：(.+)$/, build: m => digestBuildSpend(m[2]) },
+  { srcLine: 13482, kind: 'event',  re: /^ {0,4}↳ 🔥 (.+?) 将后续攻击转向 (.+?)！$/, build: m => ({ text: `🔥 ${m[1]} 转火 → ${m[2]}` }) },
   // --- 仇恨与隐匿 ---
-  { srcLine: 10829,  kind: 'token',  re: /^ {0,4}↳ (.+?) 散发出强烈的气息，吸引敌方火力\(仇恨\+\d+\)，持续\d+回合！$/, build: m => ({ token: '吸引仇恨' }) },
-  { srcLine: 10832,  kind: 'token',  re: /^ {0,4}↳ (.+?) 隐蔽了身形，降低自身存在感\(仇恨-\d+\)，持续\d+回合！$/, build: m => ({ token: '隐蔽身形' }) },
-  { srcLine: 11109,  kind: 'drop',   re: /打出强力反击后气息收敛，仇恨回归/ },
-  { srcLine: 12722, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的防守反击吸引了更多仇恨 \(嘲讽值永久\+\d+\)！$/, build: m => ({ token: '吸引仇恨' }) },
-  { srcLine: 11189,  kind: 'token',  re: /^ {0,4}⚡ (.+?) 隐匿值突破 \d+，触发【再动】！$/, build: m => ({ token: '→连续行动' }) },
-  { srcLine: 11218,  kind: 'token',  re: /^ {0,4}🎯 (.+?) 隐匿值突破 \d+，下一次非反应攻击攻击力 \+\d+[!！]\(隐匿值回归 \d+\)$/, build: m => ({ token: '奇袭蓄势' }) },
-  { srcLine: 13780, kind: 'token',  re: /^ {0,4}🎯 (.+?) 的隐匿急袭已释放，攻击力加成消失。$/, build: m => ({ token: '奇袭加成已释放' }) },
+  { srcLine: 10847,  kind: 'token',  re: /^ {0,4}↳ (.+?) 散发出强烈的气息，吸引敌方火力\(仇恨\+\d+\)，持续\d+回合！$/, build: m => ({ token: '吸引仇恨' }) },
+  { srcLine: 10850,  kind: 'token',  re: /^ {0,4}↳ (.+?) 隐蔽了身形，降低自身存在感\(仇恨-\d+\)，持续\d+回合！$/, build: m => ({ token: '隐蔽身形' }) },
+  { srcLine: 11127,  kind: 'drop',   re: /打出强力反击后气息收敛，仇恨回归/ },
+  { srcLine: 12740, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的防守反击吸引了更多仇恨 \(嘲讽值永久\+\d+\)！$/, build: m => ({ token: '吸引仇恨' }) },
+  { srcLine: 11207,  kind: 'token',  re: /^ {0,4}⚡ (.+?) 隐匿值突破 \d+，触发【再动】！$/, build: m => ({ token: '→连续行动' }) },
+  { srcLine: 11236,  kind: 'token',  re: /^ {0,4}🎯 (.+?) 隐匿值突破 \d+，下一次非反应攻击攻击力 \+\d+[!！]\(隐匿值回归 \d+\)$/, build: m => ({ token: '奇袭蓄势' }) },
+  { srcLine: 13798, kind: 'token',  re: /^ {0,4}🎯 (.+?) 的隐匿急袭已释放，攻击力加成消失。$/, build: m => ({ token: '奇袭加成已释放' }) },
   // --- 生死与终局 ---
-  { srcLine: 10402,  kind: 'terminal', re: /^\[战况\] ⚠️ (.+?) 重伤倒下了！$/, build: m => ({ text: `⚠ ${m[1]} 重伤倒下了！`, death: m[1] }) },
-  { srcLine: 10410,  kind: 'terminal', re: /^\[战况\] 🌟 (.+?) 重新站了起来！$/, build: m => ({ text: `🌟 ${m[1]} 重新站了起来！`, revive: m[1] }) },
-  { srcLine: 10394,  kind: 'terminal', re: /^\[战况\] 💨 召唤物 (.+?) 消散了。$/, build: m => ({ text: `💨 召唤物 ${m[1]} 消散了。` }) },
-  { srcLine: 10602,  kind: 'terminal', re: /^\[战况\] 💨 召唤物 (.+?) 消散了。$/, build: m => ({ text: `💨 召唤物 ${m[1]} 消散了。` }) },
-  { srcLine: 10624,  kind: 'terminal', re: /^\[战况\] 💀 (.+?) 被击溃了！$/, build: m => ({ text: `💀 ${m[1]} 被击溃了！`, kill: m[1] }) },
-  { srcLine: 13944, kind: 'terminal', re: /^ {0,4}💀 \[(.+?)\] 重伤不治，倒下了！$/, build: m => ({ text: `💀 ${m[1]} 重伤不治倒下`, kill: m[1] }) },
-  { srcLine: 11066,  kind: 'token',  re: /触发被动【毅力】，强制保留了 1 点生命值避免死亡！/, build: m => ({ token: '毅力留存' }) },
-  { srcLine: 11128,  kind: 'token',  re: /触发被动【毅力】，强制保留了 1 点生命值避免死亡！/, build: m => ({ token: '毅力留存' }) },
-  { srcLine: 11179,  kind: 'token',  re: /触发被动【回避】，在致命伤害临身的一瞬闪避/, build: m => ({ token: '死里逃生' }) },
-  { srcLine: 11240,  kind: 'token',  re: /触发被动【回避】，在致命伤害临身的一瞬闪避/, build: m => ({ token: '死里逃生' }) },
-  { srcLine: 10431,  kind: 'event',  re: /^ {0,4}↳ 💀 \[(.+?)\] 遭受致命一击倒地……却强行撑住一口气猛地站起（死里逃生）！.*$/, build: m => ({ text: `💀 ${m[1]} 死里逃生重返战场`, revive: m[1] }) },
-  { srcLine: 10484,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 濒死之际体内残存力量狂暴失控——绝命反扑前兆！$/, build: m => ({ text: `⚠ ${m[1]} 绝命反扑前兆！` }) },
-  { srcLine: 10492,  kind: 'token',  re: /的绝命反扑（.+?）被看破破局，完全无效化！/, build: m => ({ token: '绝命反扑被看破' }) },
-  { srcLine: 10511,  kind: 'event',  re: /^ {0,4}🔥 \[(.+?)\] 倒地之际狂暴烈焰\/易燃物质爆燃，灼热火浪席卷全场！.*$/, build: m => ({ text: `🔥 ${m[1]} 倒地爆燃，灼热火浪席卷全场` }) },
-  { srcLine: 10513,  kind: 'event',  re: /^ {0,4}🧪 \[(.+?)\] 倒地之际毒素囊袋\/毒物爆裂，致命毒瘴弥漫全场！.*$/, build: m => ({ text: `🧪 ${m[1]} 倒地毒爆，致命毒瘴弥漫全场` }) },
-  { srcLine: 10515,  kind: 'event',  re: /^ {0,4}🗡️ \[(.+?)\] 临死触发残余锐芒\/绝命暗器，破甲狂澜贯穿全场！.*$/, build: m => ({ text: `🗡️ ${m[1]} 临死反扑，破甲贯穿全场` }) },
-  { srcLine: 10517,  kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 濒死引爆了潜藏能量\/发动绝命反扑，剧烈冲击波波及全体！.*$/, build: m => ({ text: `💥 ${m[1]} 濒死引爆，冲击波波及全体` }) },
-  { srcLine: 18778, kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 生命跌破极限，触发【绝境爆发】（二阶段觉醒）！.*$/, build: m => ({ text: `💥 ${m[1]} 绝境爆发（二阶段觉醒），进入狂怒强化` }) },
-  { srcLine: 18789, kind: 'token',  re: /^ {0,4}↳ 🩸 \[(.+?)\] 伤势沉重陷入【濒死狂怒】，凶暴之气大涨（攻击力提升 50%）！$/, build: m => ({ token: `${m[1]}濒死狂怒` }) },
-  { srcLine: 18803, kind: 'token',  re: /^ {0,4}↡ ⚡ \[(.+?)\] 濒死求生本能激发（绝境抢攻），不顾伤势立刻抢先反扑！$/, build: m => ({ token: `${m[1]}绝境抢攻` }) },
+  { srcLine: 10420,  kind: 'terminal', re: /^\[战况\] ⚠️ (.+?) 重伤倒下了！$/, build: m => ({ text: `⚠ ${m[1]} 重伤倒下了！`, death: m[1] }) },
+  { srcLine: 10428,  kind: 'terminal', re: /^\[战况\] 🌟 (.+?) 重新站了起来！$/, build: m => ({ text: `🌟 ${m[1]} 重新站了起来！`, revive: m[1] }) },
+  { srcLine: 10412,  kind: 'terminal', re: /^\[战况\] 💨 召唤物 (.+?) 消散了。$/, build: m => ({ text: `💨 召唤物 ${m[1]} 消散了。` }) },
+  { srcLine: 10620,  kind: 'terminal', re: /^\[战况\] 💨 召唤物 (.+?) 消散了。$/, build: m => ({ text: `💨 召唤物 ${m[1]} 消散了。` }) },
+  { srcLine: 10642,  kind: 'terminal', re: /^\[战况\] 💀 (.+?) 被击溃了！$/, build: m => ({ text: `💀 ${m[1]} 被击溃了！`, kill: m[1] }) },
+  { srcLine: 13962, kind: 'terminal', re: /^ {0,4}💀 \[(.+?)\] 重伤不治，倒下了！$/, build: m => ({ text: `💀 ${m[1]} 重伤不治倒下`, kill: m[1] }) },
+  { srcLine: 11084,  kind: 'token',  re: /触发被动【毅力】，强制保留了 1 点生命值避免死亡！/, build: m => ({ token: '毅力留存' }) },
+  { srcLine: 11146,  kind: 'token',  re: /触发被动【毅力】，强制保留了 1 点生命值避免死亡！/, build: m => ({ token: '毅力留存' }) },
+  { srcLine: 11197,  kind: 'token',  re: /触发被动【回避】，在致命伤害临身的一瞬闪避/, build: m => ({ token: '死里逃生' }) },
+  { srcLine: 11258,  kind: 'token',  re: /触发被动【回避】，在致命伤害临身的一瞬闪避/, build: m => ({ token: '死里逃生' }) },
+  { srcLine: 10449,  kind: 'event',  re: /^ {0,4}↳ 💀 \[(.+?)\] 遭受致命一击倒地……却强行撑住一口气猛地站起（死里逃生）！.*$/, build: m => ({ text: `💀 ${m[1]} 死里逃生重返战场`, revive: m[1] }) },
+  { srcLine: 10502,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 濒死之际体内残存力量狂暴失控——绝命反扑前兆！$/, build: m => ({ text: `⚠ ${m[1]} 绝命反扑前兆！` }) },
+  { srcLine: 10510,  kind: 'token',  re: /的绝命反扑（.+?）被看破破局，完全无效化！/, build: m => ({ token: '绝命反扑被看破' }) },
+  { srcLine: 10529,  kind: 'event',  re: /^ {0,4}🔥 \[(.+?)\] 倒地之际狂暴烈焰\/易燃物质爆燃，灼热火浪席卷全场！.*$/, build: m => ({ text: `🔥 ${m[1]} 倒地爆燃，灼热火浪席卷全场` }) },
+  { srcLine: 10531,  kind: 'event',  re: /^ {0,4}🧪 \[(.+?)\] 倒地之际毒素囊袋\/毒物爆裂，致命毒瘴弥漫全场！.*$/, build: m => ({ text: `🧪 ${m[1]} 倒地毒爆，致命毒瘴弥漫全场` }) },
+  { srcLine: 10533,  kind: 'event',  re: /^ {0,4}🗡️ \[(.+?)\] 临死触发残余锐芒\/绝命暗器，破甲狂澜贯穿全场！.*$/, build: m => ({ text: `🗡️ ${m[1]} 临死反扑，破甲贯穿全场` }) },
+  { srcLine: 10535,  kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 濒死引爆了潜藏能量\/发动绝命反扑，剧烈冲击波波及全体！.*$/, build: m => ({ text: `💥 ${m[1]} 濒死引爆，冲击波波及全体` }) },
+  { srcLine: 18874, kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 生命跌破极限，触发【绝境爆发】（二阶段觉醒）！.*$/, build: m => ({ text: `💥 ${m[1]} 绝境爆发（二阶段觉醒），进入狂怒强化` }) },
+  { srcLine: 18885, kind: 'token',  re: /^ {0,4}↳ 🩸 \[(.+?)\] 伤势沉重陷入【濒死狂怒】，凶暴之气大涨（攻击力提升 50%）！$/, build: m => ({ token: `${m[1]}濒死狂怒` }) },
+  { srcLine: 18899, kind: 'token',  re: /^ {0,4}↡ ⚡ \[(.+?)\] 濒死求生本能激发（绝境抢攻），不顾伤势立刻抢先反扑！$/, build: m => ({ token: `${m[1]}绝境抢攻` }) },
   // --- 敌方战术 ---
-  { srcLine: 13654, kind: 'token',  re: /^ {0,4}↳ 前排掩护：近战群攻仅命中前排$/, build: m => ({ token: '前排掩护' }) },
-  { srcLine: 12682, kind: 'token',  re: /^ {0,4}↳ 后排掩护：.+? 远程\/法术命中 -\d+.*$/, build: m => ({ token: '后排掩护' }) },
+  { srcLine: 13672, kind: 'token',  re: /^ {0,4}↳ 前排掩护：近战群攻仅命中前排$/, build: m => ({ token: '前排掩护' }) },
+  { srcLine: 12700, kind: 'token',  re: /^ {0,4}↳ 后排掩护：.+? 远程\/法术命中 -\d+.*$/, build: m => ({ token: '后排掩护' }) },
   // --- 召唤 ---
-  { srcLine: 9367,  kind: 'event',  re: /^ {0,4}✨ \[(.+?)\] 召唤「(.+?)」—— 已即时参战！$/, build: m => ({ text: `✨ ${m[1]} 召唤「${m[2]}」即时参战` }) },
-  { srcLine: 9280,  kind: 'drop',   re: /召唤失败：敌方已达上限/ },
-  { srcLine: 9289,  kind: 'drop',   re: /召唤失败：.+?召唤物已达上限/ },
-  { srcLine: 9296,  kind: 'drop',   re: /召唤失败：未指定召唤对象/ },
-  { srcLine: 9306,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 召唤「(.+?)」失败：未找到图鉴词条$/, build: m => ({ text: `⚠ ${m[1]} 召唤「${m[2]}」失败` }) },
-  { srcLine: 9314,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 召唤「(.+?)」失败：词条无 <Combat_block>$/, build: m => ({ text: `⚠ ${m[1]} 召唤「${m[2]}」失败` }) },
-  { srcLine: 13338, kind: 'drop',   re: /⛔ 召唤【.+?】被看破破局/ },
-  { srcLine: 13366, kind: 'drop',   re: /⛔ 技能【.+?】被看破破局/ },
+  { srcLine: 9385,  kind: 'event',  re: /^ {0,4}✨ \[(.+?)\] 召唤「(.+?)」—— 已即时参战！$/, build: m => ({ text: `✨ ${m[1]} 召唤「${m[2]}」即时参战` }) },
+  { srcLine: 9298,  kind: 'drop',   re: /召唤失败：敌方已达上限/ },
+  { srcLine: 9307,  kind: 'drop',   re: /召唤失败：.+?召唤物已达上限/ },
+  { srcLine: 9314,  kind: 'drop',   re: /召唤失败：未指定召唤对象/ },
+  { srcLine: 9324,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 召唤「(.+?)」失败：未找到图鉴词条$/, build: m => ({ text: `⚠ ${m[1]} 召唤「${m[2]}」失败` }) },
+  { srcLine: 9332,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 召唤「(.+?)」失败：词条无 <Combat_block>$/, build: m => ({ text: `⚠ ${m[1]} 召唤「${m[2]}」失败` }) },
+  { srcLine: 13356, kind: 'drop',   re: /⛔ 召唤【.+?】被看破破局/ },
+  { srcLine: 13384, kind: 'drop',   re: /⛔ 技能【.+?】被看破破局/ },
   // --- 撤离判定（保留结论丢骰值） ---
-  { srcLine: 14516, kind: 'terminal', re: /^\[战况\] 💨 (.+?) 尝试撤离（.*?）——(成功脱离战场|被敌方截住，撤离失败)！$/, build: m => ({ text: `💨 ${m[1]} 尝试撤离——${m[2].startsWith('成功') ? '成功脱离战场' : '被截住，失败'}` }) },
+  { srcLine: 14534, kind: 'terminal', re: /^\[战况\] 💨 (.+?) 尝试撤离（.*?）——(成功脱离战场|被敌方截住，撤离失败)！$/, build: m => ({ text: `💨 ${m[1]} 尝试撤离——${m[2].startsWith('成功') ? '成功脱离战场' : '被截住，失败'}` }) },
 ];
 
 // 绑定消耗子行 → 归零提示 token（措辞按物品类别三分，防止"道具被整个损耗"的误读）
@@ -15485,6 +15503,7 @@ function createSkillCard(hero, skill, idx) {
     if (skill.haste) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-cyan-950/90 text-cyan-300 border-cyan-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">⚡ 加速:${skill.haste}</span>`;
     if (skill.hit && skill.hit !== 100) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-slate-900 text-slate-400 border-slate-700 font-mono-num shrink-0 leading-none">🎯${skill.hit}</span>`;
     if (skill.guaranteedHit) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-rose-950/90 text-rose-300 border-rose-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">🎯 必中</span>`;
+    if (skill.switchTarget) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-orange-950/90 text-orange-300 border-orange-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">🔥 转火</span>`;
     if (skill.critRate > 0) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-orange-950/90 text-orange-300 border-orange-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">💥 暴击${skill.critRate}%</span>`;
     let row2Html = `
       <div class="flex items-center gap-1 flex-wrap w-full shrink-0">
@@ -15729,6 +15748,7 @@ function createItemCard(hero, item, idx) {
       if (item.type3) tagsHtml += formatTagPill(item.type3, item.power3);
       if (item.delay) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-amber-950/90 text-amber-300 border-amber-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">⏳ 蓄力:${item.delay}</span>`;
       if (item.guaranteedHit) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-rose-950/90 text-rose-300 border-rose-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">🎯 必中</span>`;
+      if (item.switchTarget) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-orange-950/90 text-orange-300 border-orange-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">🔥 转火</span>`;
       if (item.critRate > 0) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-orange-950/90 text-orange-300 border-orange-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">💥 暴击${item.critRate}%</span>`;
     }
     let row2Html = `
@@ -15907,6 +15927,7 @@ function buildSkillFormFieldsHtml(idNS, s, onInputJs) {
   html += `<div class="sm:col-span-4 flex items-center gap-1.5 flex-wrap">`;
   html += `<label id="pill-${idNS}-others" class="tag-toggle-pill border-emerald-500 text-emerald-300 bg-emerald-950/70 ${s.isOthers ? 'active' : 'inactive'}"><input type="checkbox" id="edit-${idNS}-others" ${s.isOthers ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-${idNS}-others')"><span>👥</span> 他人</label>`;
   html += `<label id="pill-${idNS}-guaranteed" class="tag-toggle-pill border-rose-500 text-rose-300 bg-rose-950/70 ${s.guaranteedHit ? 'active' : 'inactive'}"><input type="checkbox" id="edit-${idNS}-guaranteed" ${s.guaranteedHit ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-${idNS}-guaranteed')"><span>🎯</span> 必中</label>`;
+  html += `<label id="pill-${idNS}-switch" class="tag-toggle-pill border-orange-500 text-orange-300 bg-orange-950/70 ${s.switchTarget ? 'active' : 'inactive'}"><input type="checkbox" id="edit-${idNS}-switch" ${s.switchTarget ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-${idNS}-switch')"><span>🔥</span> 转火</label>`;
   html += `<label id="pill-${idNS}-highTier" class="tag-toggle-pill border-violet-500 text-violet-300 bg-violet-950/70 ${s.isHighTier ? 'active' : 'inactive'}"><input type="checkbox" id="edit-${idNS}-highTier" ${s.isHighTier ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-${idNS}-highTier')"><span>⬥</span> 高阶</label>`;
   html += `<label id="pill-${idNS}-legendary" class="tag-toggle-pill border-amber-500 text-amber-300 bg-amber-950/70 ${s.isLegendary ? 'active' : 'inactive'}"><input type="checkbox" id="edit-${idNS}-legendary" ${s.isLegendary ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-${idNS}-legendary')"><span>✦</span> 传奇</label>`;
   html += `</div></div>`;
@@ -15943,15 +15964,80 @@ function buildSkillFormFieldsHtml(idNS, s, onInputJs) {
   html += `</div>`;
 
   html += `<div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 grid-tags-responsive">`;
-  html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-${idNS}-type" onchange="${onInputJs}" class="edit-input-game w-full text-cyan-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-${idNS}-power" value="${s.power}" oninput="${onInputJs}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-${idNS}-slot-turns" value="${s.slotTurns ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
-  html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-${idNS}-type2" onchange="${onInputJs}" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-${idNS}-power2" value="${s.power2}" oninput="${onInputJs}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-${idNS}-slot-turns2" value="${s.slotTurns2 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
-  html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-${idNS}-type3" onchange="${onInputJs}" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-${idNS}-power3" value="${s.power3}" oninput="${onInputJs}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-${idNS}-slot-turns3" value="${s.slotTurns3 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
+  html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-${idNS}-type', this)" class="edit-input-game skill-type-combo w-full text-cyan-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${s.type || '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-${idNS}-type" onchange="${onInputJs}" class="hidden">${renderSkillTypeOptions(s.type)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-${idNS}-power" value="${s.power}" oninput="${onInputJs}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-${idNS}-slot-turns" value="${s.slotTurns ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
+  html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-${idNS}-type2', this)" class="edit-input-game skill-type-combo w-full text-slate-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${s.type2 || '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-${idNS}-type2" onchange="${onInputJs}" class="hidden">${renderSkillTypeOptions(s.type2)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-${idNS}-power2" value="${s.power2}" oninput="${onInputJs}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-${idNS}-slot-turns2" value="${s.slotTurns2 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
+  html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-${idNS}-type3', this)" class="edit-input-game skill-type-combo w-full text-slate-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${s.type3 || '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-${idNS}-type3" onchange="${onInputJs}" class="hidden">${renderSkillTypeOptions(s.type3)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-${idNS}-power3" value="${s.power3}" oninput="${onInputJs}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-${idNS}-slot-turns3" value="${s.slotTurns3 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
   html += `</div>`;
   // 模块 E：召唤对象（世界书词条名，留空=无召唤）
   html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-sky-700/40"><span class="text-[10px] text-sky-300 font-bold whitespace-nowrap">召唤对象</span><input type="text" id="edit-${idNS}-summon" value="${(s.summonTarget||'').replace(/"/g,'&quot;')}" class="edit-input-game w-full text-sky-200 font-mono-num text-[10px] py-1" placeholder="世界书词条名，留空=无召唤"></div>`;
   html += `</div>`; // close module D space-y-1
   return html;
 }
+
+// ==========================================
+// 【标签槽位下拉选项】编辑器专用：SKILL_TYPE_EDIT_OPTIONS（非槽位标签已剔除，浮层可搜索）。
+// 旧数据槽位若残留非槽位标签（如 [必中]），动态注入该值保显示/保存不劣化（不主动出现在可选列表）。
+// ==========================================
+function renderSkillTypeOptions(curVal) {
+  const _nonSlot = new Set(['[必中]', '[转火]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]']);
+  const opts = (curVal && _nonSlot.has(curVal)) ? [curVal, ...SKILL_TYPE_EDIT_OPTIONS] : SKILL_TYPE_EDIT_OPTIONS;
+  return opts.map(t => `<option value="${t}" ${curVal === t ? 'selected' : ''}>${t}</option>`).join('');
+}
+
+// ==========================================
+// 【标签槽位可搜索下拉】触发按钮 + 全局搜索浮层（浮层挂 body，openEditor 重建 DOM 后无需重挂监听）。
+// 原生 select 隐藏保留（id/onchange 不变）：浮层选中后回写 select.value 并派发 change，
+// syncEditorDataToMemory 保存同步与头部摘要回调（onInputJs / updateEnemySkillHeaderSummary）零改动。
+// ==========================================
+function closeSkillTypeCombo() {
+  const pop = document.getElementById('skill-type-combo-popup');
+  if (pop) pop.remove();
+}
+function openSkillTypeCombo(selectId, btn) {
+  const existing = document.getElementById('skill-type-combo-popup');
+  if (existing && existing.__comboBtn === btn) { existing.remove(); return; } // 同一按钮再点 = 收起
+  if (existing) existing.remove();
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const pop = document.createElement('div');
+  pop.id = 'skill-type-combo-popup';
+  pop.className = 'skill-type-combo-popup';
+  pop.innerHTML = `<input type="text" class="edit-input-game w-full text-cyan-200 text-[10px] py-1" placeholder="🔍 搜索标签…" oninput="filterSkillTypeCombo(this.value)" onkeydown="if(event.key==='Enter'){const _f=document.querySelectorAll('#skill-type-combo-popup .skill-type-combo-opt');if(_f.length)_f[0].click();}else if(event.key==='Escape'){closeSkillTypeCombo();}"><div class="skill-type-combo-list"></div>`;
+  pop.__comboSelect = sel; pop.__comboBtn = btn;
+  document.body.appendChild(pop);
+  const rect = btn.getBoundingClientRect();
+  pop.style.minWidth = Math.max(rect.width, 160) + 'px';
+  pop.style.left = Math.max(4, Math.min(rect.left, window.innerWidth - 270)) + 'px';
+  pop.style.top = Math.max(4, Math.min(rect.bottom + 4, window.innerHeight - 300)) + 'px';
+  filterSkillTypeCombo('');
+  pop.querySelector('input').focus();
+}
+function filterSkillTypeCombo(q) {
+  const pop = document.getElementById('skill-type-combo-popup');
+  if (!pop) return;
+  const sel = pop.__comboSelect;
+  const kw = String(q || '').trim().toLowerCase().replace(/[\[\]]/g, '');
+  const list = pop.querySelector('.skill-type-combo-list');
+  const opts = [...sel.options].map(o => o.value).filter(v => !kw || v.toLowerCase().replace(/[\[\]]/g, '').includes(kw));
+  list.innerHTML = opts.length
+    ? opts.map(v => `<div class="skill-type-combo-opt ${v === sel.value ? 'sel' : ''}" data-val="${v}" onclick="applySkillTypeCombo(this.dataset.val)">${v}</div>`).join('')
+    : `<div class="skill-type-combo-empty">无匹配标签</div>`;
+}
+function applySkillTypeCombo(val) {
+  const pop = document.getElementById('skill-type-combo-popup');
+  if (!pop) return;
+  const sel = pop.__comboSelect, btn = pop.__comboBtn;
+  if (sel) { sel.value = val; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+  if (btn) { const label = btn.querySelector('span'); if (label) label.textContent = val; }
+  closeSkillTypeCombo();
+}
+// 浮层外按下鼠标即关闭（mousedown 先于其他控件的 click，避免开合竞争）
+document.addEventListener('mousedown', function (e) {
+  const pop = document.getElementById('skill-type-combo-popup');
+  if (!pop || pop.contains(e.target)) return;
+  if (e.target.closest && e.target.closest('.skill-type-combo') === pop.__comboBtn) return; // 触发按钮自身交给 openSkillTypeCombo 切换
+  closeSkillTypeCombo();
+});
 
 function openEditor(keepScroll) {
   const modal = document.getElementById('editor-modal');
@@ -16079,6 +16165,7 @@ function openEditor(keepScroll) {
         html += `<div id="hero-${i}-s-${si}-tags-preview" class="flex items-center gap-1 flex-wrap">${buildEditorSkillTagPreview(s.type, s.power, s.type2, s.power2, s.type3, s.power3, 'hero')}</div>`;
         if (s.isOthers) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-emerald-950 text-emerald-300 border border-emerald-700 shrink-0">他人</span>`;
         if (s.guaranteedHit) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-rose-950 text-rose-300 border border-rose-700 shrink-0">必中</span>`;
+        if (s.switchTarget) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-orange-950 text-orange-300 border border-orange-700 shrink-0">转火</span>`;
         if (s.critRate > 0) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-orange-950 text-orange-300 border border-orange-700 shrink-0">暴击${s.critRate}%</span>`;
         if (s.isHighTier) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-violet-950 text-violet-300 border border-violet-700 shrink-0">高阶</span>`;
         if (s.isLegendary) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-amber-950 text-amber-300 border border-amber-700 shrink-0">传奇</span>`;
@@ -16172,6 +16259,7 @@ function openEditor(keepScroll) {
         html += `<div class="flex items-center gap-1 flex-wrap">${buildEditorSkillTagPreview(it.type, it.power, it.type2, it.power2, it.type3, it.power3, 'hero')}</div>`;
         if (it.isOthers) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-emerald-950 text-emerald-300 border border-emerald-700 shrink-0">他人</span>`;
         if (it.guaranteedHit) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-rose-950 text-rose-300 border border-rose-700 shrink-0">必中</span>`;
+        if (it.switchTarget) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-orange-950 text-orange-300 border border-orange-700 shrink-0">转火</span>`;
         if (it.critRate > 0) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-orange-950 text-orange-300 border border-orange-700 shrink-0">暴击${it.critRate}%</span>`;
         if (it.isLegendary) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-amber-950 text-amber-300 border border-amber-700 shrink-0">传奇</span>`;
         if (!it.isLegendary && it.isHighTier) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-violet-950 text-violet-300 border border-violet-700 shrink-0">高阶</span>`;
@@ -16193,6 +16281,7 @@ function openEditor(keepScroll) {
         html += `<div class="sm:col-span-12 flex items-center gap-1.5 flex-wrap">`;
         html += `<label id="pill-h-${i}-it-${ii}-others" class="tag-toggle-pill border-emerald-500 text-emerald-300 bg-emerald-950/70 ${it.isOthers ? 'active' : 'inactive'}"><input type="checkbox" id="edit-h-${i}-it-${ii}-others" ${it.isOthers ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-h-${i}-it-${ii}-others')"><span>👥</span> 他人（可选择队友为目标）</label>`;
         html += `<label id="pill-h-${i}-it-${ii}-guaranteed" class="tag-toggle-pill border-rose-500 text-rose-300 bg-rose-950/70 ${it.guaranteedHit ? 'active' : 'inactive'}"><input type="checkbox" id="edit-h-${i}-it-${ii}-guaranteed" ${it.guaranteedHit ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-h-${i}-it-${ii}-guaranteed')"><span>🎯</span> 必中</label>`;
+        html += `<label id="pill-h-${i}-it-${ii}-switch" class="tag-toggle-pill border-orange-500 text-orange-300 bg-orange-950/70 ${it.switchTarget ? 'active' : 'inactive'}"><input type="checkbox" id="edit-h-${i}-it-${ii}-switch" ${it.switchTarget ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-h-${i}-it-${ii}-switch')"><span>🔥</span> 转火</label>`;
         html += `<label id="pill-h-${i}-it-${ii}-legendary" class="tag-toggle-pill border-amber-500 text-amber-300 bg-amber-950/70 ${it.isLegendary ? 'active' : 'inactive'}"><input type="checkbox" id="edit-h-${i}-it-${ii}-legendary" ${it.isLegendary ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-h-${i}-it-${ii}-legendary')"><span>✦</span> 传奇</label>`;
         html += `<label id="pill-h-${i}-it-${ii}-highTier" class="tag-toggle-pill border-violet-500 text-violet-300 bg-violet-950/70 ${!it.isLegendary && it.isHighTier ? 'active' : 'inactive'}"><input type="checkbox" id="edit-h-${i}-it-${ii}-highTier" ${it.isHighTier ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-h-${i}-it-${ii}-highTier')"><span>⬥</span> 高阶</label>`;
         html += `<span class="text-[9px] text-slate-600">命中</span><input type="number" id="edit-h-${i}-it-${ii}-hit" value="${it.hit != null ? it.hit : 100}" class="edit-input-game w-14 font-mono-num text-right text-yellow-200 py-0.5 text-[10px]">`;
@@ -16203,9 +16292,9 @@ function openEditor(keepScroll) {
         html += `<div id="item-slots-${i}-${ii}" class="${_itCat === '弹药' ? 'hidden' : ''} space-y-1">`;
         html += `<div class="text-[10px] text-slate-400 font-bold">效果槽位:</div>`;
         html += `<div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 grid-tags-responsive">`;
-        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-h-${i}-it-${ii}-type" class="edit-input-game w-full text-cyan-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${it.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-it-${ii}-power" value="${it.power}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-h-${i}-it-${ii}-slot-turns" value="${it.slotTurns ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
-        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-h-${i}-it-${ii}-type2" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${it.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-it-${ii}-power2" value="${it.power2}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-h-${i}-it-${ii}-slot-turns2" value="${it.slotTurns2 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
-        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-h-${i}-it-${ii}-type3" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${it.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-it-${ii}-power3" value="${it.power3}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-h-${i}-it-${ii}-slot-turns3" value="${it.slotTurns3 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-h-${i}-it-${ii}-type', this)" class="edit-input-game skill-type-combo w-full text-cyan-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${it.type || '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-h-${i}-it-${ii}-type" class="hidden">${renderSkillTypeOptions(it.type)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-it-${ii}-power" value="${it.power}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-h-${i}-it-${ii}-slot-turns" value="${it.slotTurns ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-h-${i}-it-${ii}-type2', this)" class="edit-input-game skill-type-combo w-full text-slate-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${it.type2 || '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-h-${i}-it-${ii}-type2" class="hidden">${renderSkillTypeOptions(it.type2)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-it-${ii}-power2" value="${it.power2}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-h-${i}-it-${ii}-slot-turns2" value="${it.slotTurns2 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-h-${i}-it-${ii}-type3', this)" class="edit-input-game skill-type-combo w-full text-slate-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${it.type3 || '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-h-${i}-it-${ii}-type3" class="hidden">${renderSkillTypeOptions(it.type3)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-it-${ii}-power3" value="${it.power3}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-h-${i}-it-${ii}-slot-turns3" value="${it.slotTurns3 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
         html += `</div></div>`;
         // 模块 C：物品绑定行（弹药/道具/消耗品通用：绑定后对应技能每次施展消耗该物品）
         html += `<div id="item-bindings-${i}-${ii}" class="space-y-1">`;
@@ -16366,6 +16455,7 @@ function openEditor(keepScroll) {
         html += `<div id="enemy-${i}-s-${si}-tags-preview" class="flex items-center gap-1 flex-wrap">${buildEditorSkillTagPreview(s.type, s.power, s.type2, s.power2, s.type3, s.power3, 'enemy')}</div>`;
         if (s.isOthers) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-emerald-950 text-emerald-300 border border-emerald-700 shrink-0">他人</span>`;
         if (s.guaranteedHit) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-rose-950 text-rose-300 border border-rose-700 shrink-0">必中</span>`;
+        if (s.switchTarget) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-orange-950 text-orange-300 border border-orange-700 shrink-0">转火</span>`;
         if (s.critRate > 0) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-orange-950 text-orange-300 border border-orange-700 shrink-0">暴击${s.critRate}%</span>`;
         html += `</div>`;
         
@@ -16406,6 +16496,7 @@ function openEditor(keepScroll) {
         html += `<div class="sm:col-span-4 flex items-center gap-1.5 flex-wrap">`;
         html += `<label id="pill-e-${i}-s-${si}-others" class="tag-toggle-pill border-emerald-500 text-emerald-300 bg-emerald-950/70 ${s.isOthers ? 'active' : 'inactive'}"><input type="checkbox" id="edit-e-${i}-s-${si}-others" ${s.isOthers ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-e-${i}-s-${si}-others')"><span>👥</span> 他人</label>`;
         html += `<label id="pill-e-${i}-s-${si}-guaranteed" class="tag-toggle-pill border-rose-500 text-rose-300 bg-rose-950/70 ${s.guaranteedHit ? 'active' : 'inactive'}"><input type="checkbox" id="edit-e-${i}-s-${si}-guaranteed" ${s.guaranteedHit ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-e-${i}-s-${si}-guaranteed')"><span>🎯</span> 必中</label>`;
+        html += `<label id="pill-e-${i}-s-${si}-switch" class="tag-toggle-pill border-orange-500 text-orange-300 bg-orange-950/70 ${s.switchTarget ? 'active' : 'inactive'}"><input type="checkbox" id="edit-e-${i}-s-${si}-switch" ${s.switchTarget ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-e-${i}-s-${si}-switch')"><span>🔥</span> 转火</label>`;
         html += `</div></div>`;
 
         // 模块 C：消耗与节奏数值矩阵
@@ -16423,9 +16514,9 @@ function openEditor(keepScroll) {
         html += `<div class="space-y-1">`;
         html += `<div class="text-[10px] text-slate-400 font-bold">三重复合标签槽位:</div>`;
         html += `<div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 grid-tags-responsive">`;
-        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-e-${i}-s-${si}-type" onchange="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-full text-rose-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power" value="${s.power}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-e-${i}-s-${si}-slot-turns" value="${s.slotTurns ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
-        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-e-${i}-s-${si}-type2" onchange="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type2 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power2" value="${s.power2}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-e-${i}-s-${si}-slot-turns2" value="${s.slotTurns2 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
-        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><select id="edit-e-${i}-s-${si}-type3" onchange="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-full text-slate-300 font-bold text-[10px] py-1">${SKILL_TYPES.map(t => `<option value="${t}" ${s.type3 === t ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power3" value="${s.power3}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-e-${i}-s-${si}-slot-turns3" value="${s.slotTurns3 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-e-${i}-s-${si}-type', this)" class="edit-input-game skill-type-combo w-full text-rose-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${s.type || '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-e-${i}-s-${si}-type" onchange="updateEnemySkillHeaderSummary(${i}, ${si})" class="hidden">${renderSkillTypeOptions(s.type)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power" value="${s.power}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-e-${i}-s-${si}-slot-turns" value="${s.slotTurns ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-e-${i}-s-${si}-type2', this)" class="edit-input-game skill-type-combo w-full text-slate-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${s.type2 || '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-e-${i}-s-${si}-type2" onchange="updateEnemySkillHeaderSummary(${i}, ${si})" class="hidden">${renderSkillTypeOptions(s.type2)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power2" value="${s.power2}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-e-${i}-s-${si}-slot-turns2" value="${s.slotTurns2 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-e-${i}-s-${si}-type3', this)" class="edit-input-game skill-type-combo w-full text-slate-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${s.type3 || '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-e-${i}-s-${si}-type3" onchange="updateEnemySkillHeaderSummary(${i}, ${si})" class="hidden">${renderSkillTypeOptions(s.type3)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power3" value="${s.power3}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-e-${i}-s-${si}-slot-turns3" value="${s.slotTurns3 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
         html += `</div>`;
         html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-sky-700/40"><span class="text-[10px] text-sky-300 font-bold whitespace-nowrap">召唤对象</span><input type="text" id="edit-e-${i}-s-${si}-summon" value="${(s.summonTarget||'').replace(/"/g,'&quot;')}" class="edit-input-game w-full text-sky-200 font-mono-num text-[10px] py-1" placeholder="世界书词条名，留空=无召唤"></div>`;
         html += `</div>`; // close module D space-y-1
@@ -16593,7 +16684,7 @@ function toggleHeroItemSubSkillFold(hi, ii, ci) {
 
 // 新技能对象工厂（与 addHeroSkill 字段集一致，供主技能/子技能两处复用）
 function _newSkillObj(displayName) {
-  return { name: displayName || '新技能', isReaction: false, reactionTarget: 'all', kanpoTarget: null, sheshenTarget: null, isOthers: false, guaranteedHit: false, critRate: 0, isHighTier: false, isLegendary: false, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, hit: 100, delay: 0, haste: 0, maxUses: 0, summonTarget: null };
+  return { name: displayName || '新技能', isReaction: false, reactionTarget: 'all', kanpoTarget: null, sheshenTarget: null, isOthers: false, guaranteedHit: false, switchTarget: false, critRate: 0, isHighTier: false, isLegendary: false, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, hit: 100, delay: 0, haste: 0, maxUses: 0, summonTarget: null };
 }
 
 function addHeroSubSkill(hi, si) {
@@ -16870,6 +16961,7 @@ function syncEditorDataToMemory() {
         s.sheshenTarget = sheshenVal === 'none' ? null : sheshenVal;
         s.isOthers = document.getElementById(`edit-h-${i}-s-${si}-others`).checked;
         s.guaranteedHit = document.getElementById(`edit-h-${i}-s-${si}-guaranteed`).checked;
+        s.switchTarget = document.getElementById(`edit-h-${i}-s-${si}-switch`).checked;
         s.critRate = Math.max(0, Math.min(100, Number(document.getElementById(`edit-h-${i}-s-${si}-crit`).value) || 0));
         // [传奇]为[神术]别名，传奇优先级高于高阶；互斥由 Legendary 覆盖
         const _leg = document.getElementById(`edit-h-${i}-s-${si}-legendary`).checked;
@@ -16938,6 +17030,7 @@ function syncEditorDataToMemory() {
                 c.sheshenTarget = _sheshenVal === 'none' ? null : _sheshenVal;
                 c.isOthers = document.getElementById(`${_cid}-others`).checked;
                 c.guaranteedHit = document.getElementById(`${_cid}-guaranteed`).checked;
+                c.switchTarget = document.getElementById(`${_cid}-switch`).checked;
                 c.critRate = Math.max(0, Math.min(100, Number(document.getElementById(`${_cid}-crit`).value) || 0));
                 const _cLeg = document.getElementById(`${_cid}-legendary`).checked;
                 const _cHi = document.getElementById(`${_cid}-highTier`).checked;
@@ -16992,6 +17085,7 @@ function syncEditorDataToMemory() {
         it.fxTag = document.getElementById(`edit-h-${i}-it-${ii}-fxTag`).value || null;
         it.isOthers = document.getElementById(`edit-h-${i}-it-${ii}-others`).checked;
         it.guaranteedHit = document.getElementById(`edit-h-${i}-it-${ii}-guaranteed`).checked;
+        it.switchTarget = document.getElementById(`edit-h-${i}-it-${ii}-switch`).checked;
         it.critRate = Math.max(0, Math.min(100, Number(document.getElementById(`edit-h-${i}-it-${ii}-crit`).value) || 0));
         // [传奇]为[神术]别名，传奇优先级高于高阶；互斥由 Legendary 覆盖（与技能同步同规则）
         const _itLeg = document.getElementById(`edit-h-${i}-it-${ii}-legendary`).checked;
@@ -17039,6 +17133,7 @@ function syncEditorDataToMemory() {
                 c.sheshenTarget = _sheshenVal === 'none' ? null : _sheshenVal;
                 c.isOthers = document.getElementById(`${_cid}-others`).checked;
                 c.guaranteedHit = document.getElementById(`${_cid}-guaranteed`).checked;
+                c.switchTarget = document.getElementById(`${_cid}-switch`).checked;
                 c.critRate = Math.max(0, Math.min(100, Number(document.getElementById(`${_cid}-crit`).value) || 0));
                 const _cLeg = document.getElementById(`${_cid}-legendary`).checked;
                 const _cHi = document.getElementById(`${_cid}-highTier`).checked;
@@ -17090,6 +17185,7 @@ function syncEditorDataToMemory() {
         s.damageType = document.getElementById(`edit-e-${i}-s-${si}-dmgType`).value;
         s.isOthers = document.getElementById(`edit-e-${i}-s-${si}-others`).checked;
         s.guaranteedHit = document.getElementById(`edit-e-${i}-s-${si}-guaranteed`).checked;
+        s.switchTarget = document.getElementById(`edit-e-${i}-s-${si}-switch`).checked;
         s.critRate = Math.max(0, Math.min(100, Number(document.getElementById(`edit-e-${i}-s-${si}-crit`).value) || 0));
         s.fxTag = document.getElementById(`edit-e-${i}-s-${si}-fxTag`).value || null;
         s.cost = Number(document.getElementById(`edit-e-${i}-s-${si}-cost`).value);
@@ -17175,19 +17271,19 @@ function saveEditor() {
   initialHeroesCache = JSON.parse(JSON.stringify(heroesData)); initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData));
   closeEditor(); window._isSaving = true; initUI(); window._isSaving = false; requestAnimationFrame(() => { window._isSaving = false; }); if(state.isGameStarted) { showLog("设置已覆盖生效！"); setTimeout(() => startRound(), 1000); }
 }
-function addHeroSkill(hi) { syncEditorDataToMemory(); heroesData[hi].skills.push({ name: '新技能', isReaction: false, reactionTarget: 'all', kanpoTarget: null, sheshenTarget: null, isOthers: false, guaranteedHit: false, critRate: 0, isHighTier: false, isLegendary: false, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, hit: 100, delay: 0, haste: 0, summonTarget: null }); openEditor(); }
+function addHeroSkill(hi) { syncEditorDataToMemory(); heroesData[hi].skills.push({ name: '新技能', isReaction: false, reactionTarget: 'all', kanpoTarget: null, sheshenTarget: null, isOthers: false, guaranteedHit: false, switchTarget: false, critRate: 0, isHighTier: false, isLegendary: false, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, hit: 100, delay: 0, haste: 0, summonTarget: null }); openEditor(); }
 function removeHeroSkill(hi, si) { syncEditorDataToMemory(); heroesData[hi].skills.splice(si, 1); openEditor(); }
 // 物品增删：默认新建一个 [单回] 道具（次数 1），与技能增删同样先同步再重建编辑器
-function addHeroItem(hi) { syncEditorDataToMemory(); if (!heroesData[hi].items) heroesData[hi].items = []; heroesData[hi].items.push({ isItem: true, name: '新物品', category: '道具', count: 1, maxUses: 1, usesRemaining: 1, bindings: [], type: '[单回]', power: 30, type2: '[无]', power2: 0, type3: '[无]', power3: 0, hit: 100, turns: null, isOthers: false, guaranteedHit: false, critRate: 0, fxTag: null, damageType: null, isExpanded: true }); openEditor(); }
+function addHeroItem(hi) { syncEditorDataToMemory(); if (!heroesData[hi].items) heroesData[hi].items = []; heroesData[hi].items.push({ isItem: true, name: '新物品', category: '道具', count: 1, maxUses: 1, usesRemaining: 1, bindings: [], type: '[单回]', power: 30, type2: '[无]', power2: 0, type3: '[无]', power3: 0, hit: 100, turns: null, isOthers: false, guaranteedHit: false, switchTarget: false, critRate: 0, fxTag: null, damageType: null, isExpanded: true }); openEditor(); }
 function removeHeroItem(hi, ii) { syncEditorDataToMemory(); heroesData[hi].items.splice(ii, 1); openEditor(); }
 // 弹药绑定行增删：先同步当前表单到内存（保留已填绑定），再变更数量并重渲染
 function addItemBinding(hi, ii) { syncEditorDataToMemory(); heroesData[hi].items[ii].bindings.push({ skillName: (heroesData[hi].skills[0] && heroesData[hi].skills[0].name) || '', cost: 1 }); openEditor(); }
 function removeItemBinding(hi, ii, bi) { syncEditorDataToMemory(); heroesData[hi].items[ii].bindings.splice(bi, 1); openEditor(); }
-function addEnemySkill(ei) { syncEditorDataToMemory(); enemiesData[ei].skills.push({ name: '新技能', isOthers: false, guaranteedHit: false, critRate: 0, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, charge: 0, hit: 100, summonTarget: null }); openEditor(); }
+function addEnemySkill(ei) { syncEditorDataToMemory(); enemiesData[ei].skills.push({ name: '新技能', isOthers: false, guaranteedHit: false, switchTarget: false, critRate: 0, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, charge: 0, hit: 100, summonTarget: null }); openEditor(); }
 function removeEnemySkill(ei, si) { syncEditorDataToMemory(); enemiesData[ei].skills.splice(si, 1); openEditor(); }
-function addHero() { syncEditorDataToMemory(); heroesData.push({ id: 'h' + Date.now(), name: '新角色', img: DEFAULT_HERO_IMG, classType: null, hp: 400, maxHp: 400, mp: 200, maxMp: 200, tp: 0, maxTp: 100, atk: 80, def: 30, spd: 100, shield: 0, actCount: 1, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, burstActivated: false, skills: [ { name: '攻击', isReaction: false, reactionTarget: 'all', damageType: null, fxTag: null, guaranteedHit: false, critRate: 0, cost: 0, hpCost: 0, tpCost: 0, hit: 100, type: '[单体]', power: 60, type2: '[无]', power2: 0, type3: '[无]', power3: 0 } ], items: [] }); openEditor(); }
+function addHero() { syncEditorDataToMemory(); heroesData.push({ id: 'h' + Date.now(), name: '新角色', img: DEFAULT_HERO_IMG, classType: null, hp: 400, maxHp: 400, mp: 200, maxMp: 200, tp: 0, maxTp: 100, atk: 80, def: 30, spd: 100, shield: 0, actCount: 1, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, burstActivated: false, skills: [ { name: '攻击', isReaction: false, reactionTarget: 'all', damageType: null, fxTag: null, guaranteedHit: false, switchTarget: false, critRate: 0, cost: 0, hpCost: 0, tpCost: 0, hit: 100, type: '[单体]', power: 60, type2: '[无]', power2: 0, type3: '[无]', power3: 0 } ], items: [] }); openEditor(); }
 function removeHero(i) { if (heroesData.length <= 1) return alert("至少保留一名我方！"); if (confirm("删除角色？")) { syncEditorDataToMemory(); heroesData.splice(i, 1); openEditor(); } }
-function addEnemy() { syncEditorDataToMemory(); enemiesData.push({ id: 'e' + Date.now(), name: '新怪物', emoji: '👾', classType: null, hp: 500, maxHp: 500, mp: 200, maxMp: 200, size: 'text-5xl', atk: 90, def: 20, spd: 90, shield: 0, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, currentCharge: 0, isWise: false, row: 'front', tier: 'fodder', skills: [ { name: '撕咬', damageType: null, fxTag: null, guaranteedHit: false, critRate: 0, cost: 0, hpCost: 0, tpCost: 0, charge: 0, hit: 100, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0 } ] }); openEditor(); }
+function addEnemy() { syncEditorDataToMemory(); enemiesData.push({ id: 'e' + Date.now(), name: '新怪物', emoji: '👾', classType: null, hp: 500, maxHp: 500, mp: 200, maxMp: 200, size: 'text-5xl', atk: 90, def: 20, spd: 90, shield: 0, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, currentCharge: 0, isWise: false, row: 'front', tier: 'fodder', skills: [ { name: '撕咬', damageType: null, fxTag: null, guaranteedHit: false, switchTarget: false, critRate: 0, cost: 0, hpCost: 0, tpCost: 0, charge: 0, hit: 100, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0 } ] }); openEditor(); }
 function removeEnemy(i) { if (enemiesData.length <= 1) return alert("至少保留一只怪物！"); if (confirm("删除怪物？")) { syncEditorDataToMemory(); enemiesData.splice(i, 1); openEditor(); } }
 
 // ==========================================
