@@ -2828,3 +2828,13 @@
 - **涉及文件**：`index.html`、`integration-test/harness.html`、`README.md`、`LOG-INDEX.md`、`regex-前端战斗v11_2.json`（重建产物）。
 - **经验证**：harness 全绿（test33 圣域帷幕 delay 断言 0.6→1 + test34 扩 5 项回归锁：门控计数 2 处/阶段一取矩形/退化兜底/反应弹窗 0.5s 避让/_barrierShatterAt）；srcLine 重映射对齐（124 条）；node --check 双 script 块通过；build-regex 重建产物。
 - **决策原因**：test34 此前直调 triggerBarrierShatter 未走 applyBarrierHit 完整链路，故同步隐藏 bug 未被旧断言捕获——本次把「门控存在性」锁进源码文本断言；矩形兜底取英雄行容器中心而非视口中心，保证 wrapper 异常隐藏时爆散位置仍贴战场。
+
+---
+
+## [LOG-236] 2026-09-10 — 屏障击碎演出性能优化：glitch 关键帧 filter 轨拆 steps(1)（批次五纪律补课）
+
+- **变更行为**（用户确认执行性能评估的方案②）：
+  1. **`barrier-vibrate-glitch` 双轨拆分**：原关键帧 transform 与 filter 混排连续插值——brightness(1→8)/drop-shadow(30~45px)/blur(5px) 每帧重栅格化整个穹顶子树（大面积 + 内含 blend-mode SVG 网格，150% DPI 像素量 ×1.8）。现拆为：`barrier-vibrate-glitch`（transform/opacity 轨，平滑插值，纯合成器层不触发重绘）+ 新增 `barrier-vibrate-glitch-flash`（filter 轨，steps(1) 帧边界跳变——重栅格化从 ~12-24 次降到 8 次，drop-shadow 仅 2 帧出现）。挂载改为双动画逗号并联（同 enemy-ram-knockback + *-flash 先例）。色差闪断的离散亮度跳变即 glitch 题材原生观感，视觉等价。
+- **涉及文件**：`index.html`、`integration-test/harness.html`、`README.md`、`LOG-INDEX.md`、`regex-前端战斗v11_2.json`（重建产物）。
+- **经验证**：harness 全绿（test34 扩 3 项性能纪律回归锁：flash 关键帧存在/基座零 filter 残留/双轨挂载字符串）；srcLine 重映射对齐（124 条）；node --check 通过；build-regex 重建产物。
+- **决策原因**：粒子层（80 颗 Canvas 晶片 ≈ 1400 操作/帧 ×1.4s）与圣光01（111 颗同复杂度）同量级无需优化；filter 混排是项目批次五已系统性消灭的模式（霰弹四组/炽核聚爆/受击闪色），本次移植 demo 方案5 时原样带入，属纪律补课。

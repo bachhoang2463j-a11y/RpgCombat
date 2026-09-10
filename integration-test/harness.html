@@ -2173,6 +2173,11 @@ async function test34() {
 
   // --- ① 接入链路：关键帧 / 演出函数 / 两条归零路径挂载 / atk1 音效 ---
   check(src.includes('@keyframes barrier-vibrate-glitch {'), 'CSS：barrier-vibrate-glitch 色差闪断关键帧存在');
+  // 性能纪律（批次五同款）：filter 拆出为独立 steps(1) 动画，基座关键帧不得残留 filter（混排即每帧重栅格化整个穹顶子树）
+  check(src.includes('@keyframes barrier-vibrate-glitch-flash {'), 'CSS：filter 轨拆出为独立 barrier-vibrate-glitch-flash 关键帧');
+  const glitchBase = src.slice(src.indexOf('@keyframes barrier-vibrate-glitch {'), src.indexOf('@keyframes barrier-vibrate-glitch-flash'));
+  check(!/filter\s*:/.test(glitchBase), '基座关键帧（transform/opacity 轨）零 filter 残留');
+  check(src.includes("'barrier-vibrate-glitch 0.2s cubic-bezier(0.1, 0.9, 0.2, 1) forwards, barrier-vibrate-glitch-flash 0.2s steps(1) forwards'"), '挂载为双轨动画：transform 平滑插值 + filter steps(1) 帧边界跳变');
   check(src.includes('let _barrierShattering = false;'), '防重入标志 _barrierShattering 存在');
   check(src.includes('let _barrierShatterAt = 0;'), '击碎时间戳 _barrierShatterAt 存在（反应弹窗延迟避让依据）');
   const shatterCalls = (src.match(/triggerBarrierShatter\(\)/g) || []).length;
