@@ -2804,3 +2804,15 @@
 - **经验证**：SPEC 多行号单元格（11 组 A/B 对）改后逐对人工核验对应正确；行号重提取与 index.html 实际定义位一致（抽查 releaseCharge=14636、prepareSkillTarget=14824、callLLMAPI=18817）。文档改动不触代码，无 harness 影响。
 - **决策原因**：SPEC 行号自 V6.14 起未维护、漂移已达数千行，定版推送是全量重同步的合适时点（此后行号基线与 v11.2 源码对齐）；README 版本头停在 V11.05 而内联功能标签已到 V11.15，借用户定版 v11.2 之机以一条 changelog 收口 V11.05 后全部累积功能，避免逐版补记的冗长。
 
+
+---
+
+## [LOG-234] 2026-09-10 — 屏障击碎演出（demo 方案5：色差闪断+微晶爆散，音效 atk1）+ 圣域帷幕 delay 0.6
+
+- **变更行为**（用户需求两则）：
+  1. **屏障被击碎专属演出**（移植 demo-barrier-shatter.html 方案5「色差闪断·极速辐射微晶」）：新增 `triggerBarrierShatter()` 统一编排——阶段一穹顶挂 `barrier-vibrate-glitch` 关键帧（skewX/skewY 斜切+位移+brightness 阶梯跳变，0.2s forwards，主题色 `var(--br-fill-shadow)`）+ 顶部血条徽标直接消失 + `playSound('atk1')`；阶段二（184ms）强震屏 `triggerScreenShake(14,420)` + fxEngine 全屏主题色闪光粒子（0.32s）+ ~80 颗微型六边晶片高速爆散（omni_high_speed 参数：速度 8~24×1.2、尺寸 4~14px、gravity 0.16/drag 0.955、rotY 3D 翻转压扁 `cos(rotY)` + rotZ 自转 + 内部晶格棱线高光，draw 内逐帧推进姿态）；阶段三（850ms）清除穹顶/徽标内联样式并经 `updateTeamBarrierUI()` 隐藏 wrapper。`_barrierShattering` 标志防重入。主题取色优先读 wrapper 已渲染的 `data-theme`（调用时 barrierSub 已重置）。
+  2. **两条归零路径全覆盖**：主路径 `applyBarrierHit` 归零块（原红闪+kill 音效三行删除，`teamBarrierMax > 0` 门控防 AoE 批内重复触发）；AoE 泄漏路径 `applySingleTagEffect` 归零块（此前零演出零音效的缺口，同款门控+战报）。归零瞬间不再立即 `updateTeamBarrierUI()`（穹顶 display:none 会吞掉动画），隐藏延迟到演出收尾。
+  3. **圣域帷幕特效 delay 0.6**：`WEBM_FX_REGISTRY['圣域帷幕']` 追加 `delay: 0.6`（通用分支 `await sleep(delay*1000)` 自动生效，演出后结算）；注册表上方注释同步。
+- **涉及文件**：`index.html`、`integration-test/harness.html`、`README.md`、`LOG-INDEX.md`、`regex-前端战斗v11_2.json`（重建产物）。
+- **经验证**：harness 全绿（test33 圣域帷幕 delay 断言改写 2 项 + 新增 test34 共 14 项回归锁：关键帧/防重入/挂载点计数 3 处/atk1/旧演出移除/功能仿真——穹顶动画挂载、徽标隐藏、wrapper 演出期间可见、连击防重入、0.85s 收尾零残留与标志复位）；node --check 双 script 块语法通过；build-regex 重建产物。
+- **决策原因**：用户在 demo-barrier-shatter.html 五方案中指定方案5（色差闪断·极速辐射微晶）与 atk1 音效；粒子层复用项目 fxEngine（任意字段+自定义 draw），不移植 demo 独立 Canvas 引擎；demo 的 Web Audio 合成音不移植（音效指定 atk1）；圣域帷幕 delay 沿用注册表现成 delay 机制（障壁术 0.8 同款）。
