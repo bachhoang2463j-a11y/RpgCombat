@@ -240,3 +240,4 @@
 | 2026-09-09 | README/SPEC 定版同步（V11.2）：README 六处（版本头+changelog/变体组默认收起/火焰专属演出/三组WebM/造雾去延迟/性能批次五）+ SPEC §5 函数表 125 行行号全量重同步（V6.14 快照漂移数千行）+ 龙息流火/组卡渲染条目增补；推送远程 | L2798 | 97b0baa |
 | 2026-09-10 | 屏障被击碎演出：demo 方案5 色差闪断+微晶爆散（barrier-vibrate-glitch 穹顶震颤 + fxEngine 80 颗六边晶片 + 全屏主题色闪光，音效 atk1）覆盖主路径/AoE 泄漏两条归零路径 + 圣域帷幕特效 delay 0.6；test33 改 2 项+新增 test34（14 项回归锁） | L2812 | 1d430c0 |
 | 2026-09-10 | 圣域帷幕 delay 0.6→1 + 击碎特效左上角错位修复（absorb 分支同步隐藏 wrapper 致矩形全零：门控+阶段一取矩形+退化兜底）+ 破碎攻击反应弹窗 0.5s 避让（_barrierShatterAt）；test34 扩 5 项回归锁 | L2832 | 734c440 |
+| 2026-09-10 | 击碎演出性能优化：glitch 关键帧 filter 轨拆独立 barrier-vibrate-glitch-flash steps(1) 动画（transform 平滑插值保留，重栅格化 12-24→8 次，批次五纪律补课）；test34 扩 3 项回归锁 | L2843 | 3f267f2 |
