@@ -2191,6 +2191,8 @@ async function test34() {
   eq(gatedUiCount, 2, '归零隐藏门控共2处（applyBarrierHit absorb 分支 + AoE 泄漏路径，均 teamBarrier>0 才立即刷新 UI）');
   check(src.includes('const rect = dome.getBoundingClientRect();'), '爆散中心在阶段一同步取矩形（防中途被隐藏后取到全零矩形）');
   check(src.includes('if (!rect.width || !rect.height) {'), '矩形退化兜底存在（英雄行容器中心 → 视口中心）');
+  // 整体闪屏已移除：阶段二仅晶片飞溅（screen 混合 + 描边/高光）
+  check(!src.includes("tc.flash + ((1 - pct) * 0.38)"), '整体闪屏已移除（仅保留晶片飞溅，无全屏 fillRect 闪屏）');
   // 反应弹窗 0.5s 避让：runReactionIntercept 入口按 _barrierShatterAt 延迟
   check(src.includes('if (_barrierShatterAt > 0) {') && src.includes('if (elapsed < 500) await sleep(500 - elapsed);'), '反应弹窗在屏障击碎后 0.5s 内延迟避让（runReactionIntercept 入口）');
 

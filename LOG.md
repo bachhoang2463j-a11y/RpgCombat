@@ -2838,3 +2838,13 @@
 - **涉及文件**：`index.html`、`integration-test/harness.html`、`README.md`、`LOG-INDEX.md`、`regex-前端战斗v11_2.json`（重建产物）。
 - **经验证**：harness 全绿（test34 扩 3 项性能纪律回归锁：flash 关键帧存在/基座零 filter 残留/双轨挂载字符串）；srcLine 重映射对齐（124 条）；node --check 通过；build-regex 重建产物。
 - **决策原因**：粒子层（80 颗 Canvas 晶片 ≈ 1400 操作/帧 ×1.4s）与圣光01（111 颗同复杂度）同量级无需优化；filter 混排是项目批次五已系统性消灭的模式（霰弹四组/炽核聚爆/受击闪色），本次移植 demo 方案5 时原样带入，属纪律补课。
+
+---
+
+## [LOG-237] 2026-09-10 — 击碎演出移除整体闪屏（仅保留晶片飞溅）
+
+- **变更行为**（用户需求：屏障破碎的整体闪屏去掉，只留碎片飞溅）：
+  1. **triggerBarrierShatter 阶段二移除全屏 flash 粒子**（`tc.flash` fillRect 粒子，0.32s）：仅保留强震屏 + 80 颗微型六边晶片高速爆散；穹顶 glitch 双轨动画与音效 atk1 保留。
+- **涉及文件**：`index.html`、`integration-test/harness.html`、`LOG-INDEX.md`、`regex-前端战斗v11_2.json`（重建产物）。
+- **经验证**：harness 全绿（test34 增 1 项回归锁：闪屏粒子串已移除）；srcLine 重映射对齐（124 条）；node --check 通过；build-regex 重建产物。
+- **决策原因**：闪屏与晶片共处同一阶段二时段，闪屏遮盖晶片飞溅观感；移除后晶片在 screen 混合下的描边/高光更清晰，视觉更聚焦。
