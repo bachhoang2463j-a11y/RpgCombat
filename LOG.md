@@ -2816,3 +2816,15 @@
 - **涉及文件**：`index.html`、`integration-test/harness.html`、`README.md`、`LOG-INDEX.md`、`regex-前端战斗v11_2.json`（重建产物）。
 - **经验证**：harness 全绿（test33 圣域帷幕 delay 断言改写 2 项 + 新增 test34 共 14 项回归锁：关键帧/防重入/挂载点计数 3 处/atk1/旧演出移除/功能仿真——穹顶动画挂载、徽标隐藏、wrapper 演出期间可见、连击防重入、0.85s 收尾零残留与标志复位）；node --check 双 script 块语法通过；build-regex 重建产物。
 - **决策原因**：用户在 demo-barrier-shatter.html 五方案中指定方案5（色差闪断·极速辐射微晶）与 atk1 音效；粒子层复用项目 fxEngine（任意字段+自定义 draw），不移植 demo 独立 Canvas 引擎；demo 的 Web Audio 合成音不移植（音效指定 atk1）；圣域帷幕 delay 沿用注册表现成 delay 机制（障壁术 0.8 同款）。
+
+---
+
+## [LOG-235] 2026-09-10 — 圣域帷幕 delay 0.6→1 + 击碎特效左上角错位修复（破碎瞬间同步隐藏 wrapper）+ 破碎攻击反应弹窗 0.5s 避让
+
+- **变更行为**（用户真机实测反馈三则）：
+  1. **圣域帷幕特效 delay 0.6 → 1**：注册表条目改 `delay: 1`（演出后结算等待加长）。
+  2. **击碎特效错位到屏幕左上角修复**：根因不在缩放——`applyBarrierHit` absorb 分支在破碎那一击同步调用 `updateTeamBarrierUI()`（teamBarrier=0 → wrapper 立即 display:none），击碎演出 184ms 后才取穹顶矩形，拿到的全零矩形把爆散中心钉在 (0,0)。修复：①该调用改为 `teamBarrier > 0` 门控（与 AoE 泄漏路径同款，隐藏延迟到演出收尾）；②`triggerBarrierShatter` 爆散中心改为阶段一同步取矩形，并加矩形退化兜底（英雄行容器中心 → 视口中心）。
+  3. **破碎攻击的反应弹窗延迟 0.5s**：`runReactionIntercept` 入口按 `_barrierShatterAt`（击碎开始时刻）计算避让——击碎后 500ms 内到达的反应弹窗（破碎溢出伤害打代理目标/全员的闪避判定）延迟到 500ms 再弹，让色差闪断+微晶爆散先完整呈现。
+- **涉及文件**：`index.html`、`integration-test/harness.html`、`README.md`、`LOG-INDEX.md`、`regex-前端战斗v11_2.json`（重建产物）。
+- **经验证**：harness 全绿（test33 圣域帷幕 delay 断言 0.6→1 + test34 扩 5 项回归锁：门控计数 2 处/阶段一取矩形/退化兜底/反应弹窗 0.5s 避让/_barrierShatterAt）；srcLine 重映射对齐（124 条）；node --check 双 script 块通过；build-regex 重建产物。
+- **决策原因**：test34 此前直调 triggerBarrierShatter 未走 applyBarrierHit 完整链路，故同步隐藏 bug 未被旧断言捕获——本次把「门控存在性」锁进源码文本断言；矩形兜底取英雄行容器中心而非视口中心，保证 wrapper 异常隐藏时爆散位置仍贴战场。

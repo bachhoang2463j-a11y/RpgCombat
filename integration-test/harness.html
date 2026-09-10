@@ -2070,9 +2070,9 @@ async function test33() {
   // 新增三组 WebM 视频特效（my_assets 实测核名：miaozhun/ranshao = .mp3+.webm，weimu 音效 = .wav）
   check(src.includes("'开镜瞄准': { url: `${ASSET_BASE}/miaozhun.webm`, scale: 0.42, audioUrl: `${ASSET_BASE}/miaozhun.mp3` }"), '注册表：开镜瞄准（miaozhun.webm + mp3，无粒子无延迟，scale 0.42）');
   check(src.includes("'燃烧弹': { url: `${ASSET_BASE}/ranshao.webm`, scale: 0.42, particles: 'fire_aoe', audioUrl: `${ASSET_BASE}/ranshao.mp3` }"), '注册表：燃烧弹（ranshao.webm + fire_aoe 粒子 + mp3，scale 0.42）');
-  check(src.includes("'圣域帷幕': { url: `${ASSET_BASE}/weimu.webm`, scale: 1.4, particles: 'holy_light', audioUrl: `${ASSET_BASE}/weimu.wav`, delay: 0.6 }"), '注册表：圣域帷幕（weimu.webm + holy_light 粒子 + wav + delay 0.6）');
-  const wNew = w.eval('(function(){ return ["开镜瞄准","燃烧弹"].every(function(k){ var e = WEBM_FX_REGISTRY[k]; return !!e && !!e.url && !!e.audioUrl && e.audioUrl !== "none" && !e.delay; }) && WEBM_FX_REGISTRY["圣域帷幕"] && WEBM_FX_REGISTRY["圣域帷幕"].delay === 0.6; })()');
-  check(wNew, 'iframe 内注册表：开镜瞄准/燃烧弹无 delay（立即结算）；圣域帷幕 delay 0.6（特效演出后结算）');
+  check(src.includes("'圣域帷幕': { url: `${ASSET_BASE}/weimu.webm`, scale: 1.4, particles: 'holy_light', audioUrl: `${ASSET_BASE}/weimu.wav`, delay: 1 }"), '注册表：圣域帷幕（weimu.webm + holy_light 粒子 + wav + delay 1）');
+  const wNew = w.eval('(function(){ return ["开镜瞄准","燃烧弹"].every(function(k){ var e = WEBM_FX_REGISTRY[k]; return !!e && !!e.url && !!e.audioUrl && e.audioUrl !== "none" && !e.delay; }) && WEBM_FX_REGISTRY["圣域帷幕"] && WEBM_FX_REGISTRY["圣域帷幕"].delay === 1; })()');
+  check(wNew, 'iframe 内注册表：开镜瞄准/燃烧弹无 delay（立即结算）；圣域帷幕 delay 1（特效演出后结算）');
 
   // --- ② CSS 关键帧：方案1 全套（主晶盾嵌合 + 六向碎片聚合 + 激波环 + 震屏） ---
   for (const name of ['aegis-shake-soft-anim', 'aegis-core-assemble', 'aegis-shock-ring',
@@ -2174,11 +2174,20 @@ async function test34() {
   // --- ① 接入链路：关键帧 / 演出函数 / 两条归零路径挂载 / atk1 音效 ---
   check(src.includes('@keyframes barrier-vibrate-glitch {'), 'CSS：barrier-vibrate-glitch 色差闪断关键帧存在');
   check(src.includes('let _barrierShattering = false;'), '防重入标志 _barrierShattering 存在');
+  check(src.includes('let _barrierShatterAt = 0;'), '击碎时间戳 _barrierShatterAt 存在（反应弹窗延迟避让依据）');
   const shatterCalls = (src.match(/triggerBarrierShatter\(\)/g) || []).length;
   eq(shatterCalls, 3, 'triggerBarrierShatter 共3处（1定义 + 主路径/AoE泄漏路径2调用）');
   check(src.includes("try { playSound('atk1'); } catch(e) {}"), '击碎音效为 atk1（try/catch 包裹）');
   const oldKillFx = src.includes("spawnHitFlash(barrierDom, 0.9)");
   check(!oldKillFx, '旧击碎演出（红闪 + kill 音效）已移除，由方案5演出替代');
+
+  // --- ①b 偏移修复回归锁：破碎瞬间 wrapper 不得被同步隐藏（否则 184ms 后矩形全零 → 粒子错位左上角） ---
+  const gatedUiCount = (src.match(/if \(teamBarrier > 0\) updateTeamBarrierUI\(\);/g) || []).length;
+  eq(gatedUiCount, 2, '归零隐藏门控共2处（applyBarrierHit absorb 分支 + AoE 泄漏路径，均 teamBarrier>0 才立即刷新 UI）');
+  check(src.includes('const rect = dome.getBoundingClientRect();'), '爆散中心在阶段一同步取矩形（防中途被隐藏后取到全零矩形）');
+  check(src.includes('if (!rect.width || !rect.height) {'), '矩形退化兜底存在（英雄行容器中心 → 视口中心）');
+  // 反应弹窗 0.5s 避让：runReactionIntercept 入口按 _barrierShatterAt 延迟
+  check(src.includes('if (_barrierShatterAt > 0) {') && src.includes('if (elapsed < 500) await sleep(500 - elapsed);'), '反应弹窗在屏障击碎后 0.5s 内延迟避让（runReactionIntercept 入口）');
 
   // --- ② 功能仿真：立屏障 → 击碎 → 动画挂载/徽标隐藏/穹顶延迟隐藏 → 1.1s 收尾零残留 ---
   MOCK.resetVars(); seedChat(); seedState();
