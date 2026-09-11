@@ -242,3 +242,4 @@
 | 2026-09-10 | 圣域帷幕 delay 0.6→1 + 击碎特效左上角错位修复（absorb 分支同步隐藏 wrapper 致矩形全零：门控+阶段一取矩形+退化兜底）+ 破碎攻击反应弹窗 0.5s 避让（_barrierShatterAt）；test34 扩 5 项回归锁 | L2832 | 734c440 |
 | 2026-09-10 | 击碎演出性能优化：glitch 关键帧 filter 轨拆独立 barrier-vibrate-glitch-flash steps(1) 动画（transform 平滑插值保留，重栅格化 12-24→8 次，批次五纪律补课）；test34 扩 3 项回归锁 | L2843 | 3f267f2 |
 | 2026-09-10 | 击碎演出移除整体闪屏：阶段二仅留晶片飞溅（删除 tc.flash 全屏 fillRect 粒子），视觉更聚焦；test34 增闪屏已移除回归锁 | L2856 | 214a757 |
+| 2026-09-11 | 持久化职业覆盖不触发职业被动初始化修复：YAML 省略属性栏时 applyPersistedRoster 覆盖 classType 后补跑 onBattleInit（隐匿者开局隐匿值 0→50；防守者/施法者等同类静默丢失一并修复；显式写职业不重复跑防叠加）；专项验证 8 项 | L2850 | (hash回填) |

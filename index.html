@@ -3125,9 +3125,9 @@ const DIGEST_RULES = [
   { srcLine: 10558,  kind: 'event',  re: /^ {0,4}🧪 \[(.+?)\] 倒地之际毒素囊袋\/毒物爆裂，致命毒瘴弥漫全场！.*$/, build: m => ({ text: `🧪 ${m[1]} 倒地毒爆，致命毒瘴弥漫全场` }) },
   { srcLine: 10560,  kind: 'event',  re: /^ {0,4}🗡️ \[(.+?)\] 临死触发残余锐芒\/绝命暗器，破甲狂澜贯穿全场！.*$/, build: m => ({ text: `🗡️ ${m[1]} 临死反扑，破甲贯穿全场` }) },
   { srcLine: 10562,  kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 濒死引爆了潜藏能量\/发动绝命反扑，剧烈冲击波波及全体！.*$/, build: m => ({ text: `💥 ${m[1]} 濒死引爆，冲击波波及全体` }) },
-  { srcLine: 19023, kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 生命跌破极限，触发【绝境爆发】（二阶段觉醒）！.*$/, build: m => ({ text: `💥 ${m[1]} 绝境爆发（二阶段觉醒），进入狂怒强化` }) },
-  { srcLine: 19034, kind: 'token',  re: /^ {0,4}↳ 🩸 \[(.+?)\] 伤势沉重陷入【濒死狂怒】，凶暴之气大涨（攻击力提升 50%）！$/, build: m => ({ token: `${m[1]}濒死狂怒` }) },
-  { srcLine: 19048, kind: 'token',  re: /^ {0,4}↡ ⚡ \[(.+?)\] 濒死求生本能激发（绝境抢攻），不顾伤势立刻抢先反扑！$/, build: m => ({ token: `${m[1]}绝境抢攻` }) },
+  { srcLine: 19031, kind: 'event',  re: /^ {0,4}💥 \[(.+?)\] 生命跌破极限，触发【绝境爆发】（二阶段觉醒）！.*$/, build: m => ({ text: `💥 ${m[1]} 绝境爆发（二阶段觉醒），进入狂怒强化` }) },
+  { srcLine: 19042, kind: 'token',  re: /^ {0,4}↳ 🩸 \[(.+?)\] 伤势沉重陷入【濒死狂怒】，凶暴之气大涨（攻击力提升 50%）！$/, build: m => ({ token: `${m[1]}濒死狂怒` }) },
+  { srcLine: 19056, kind: 'token',  re: /^ {0,4}↡ ⚡ \[(.+?)\] 濒死求生本能激发（绝境抢攻），不顾伤势立刻抢先反扑！$/, build: m => ({ token: `${m[1]}绝境抢攻` }) },
   // --- 敌方战术 ---
   { srcLine: 13821, kind: 'token',  re: /^ {0,4}↳ 前排掩护：近战群攻仅命中前排$/, build: m => ({ token: '前排掩护' }) },
   { srcLine: 12732, kind: 'token',  re: /^ {0,4}↳ 后排掩护：.+? 远程\/法术命中 -\d+.*$/, build: m => ({ token: '后排掩护' }) },
@@ -17866,7 +17866,15 @@ function applyPersistedRoster() {
     // 覆盖配置字段（保留 id / 当前 hp/mp/tp 等战斗态字段）
     const cfg = saved.config || {};
     if (cfg.img != null) h.img = cfg.img;
-    if (cfg.classType != null) h.classType = cfg.classType;
+    // 职业由持久化覆盖时（YAML 常省略属性栏），构建阶段的 onBattleInit 未跑，
+    // 此处补跑一次职业被动初始化（隐匿者 baseTauntBonus=-50 / stealthValue=50 等），否则隐匿值开局为 0
+    if (cfg.classType != null) {
+        const yamlClassType = h.classType;
+        h.classType = cfg.classType;
+        if (yamlClassType !== cfg.classType && window.CLASS_PASSIVES && CLASS_PASSIVES[cfg.classType]?.onBattleInit) {
+            CLASS_PASSIVES[cfg.classType].onBattleInit(h);
+        }
+    }
     if (cfg.isWise != null) h.isWise = cfg.isWise;
     if (cfg.maxHp != null) h.maxHp = cfg.maxHp;
     if (cfg.maxMp != null) h.maxMp = cfg.maxMp;

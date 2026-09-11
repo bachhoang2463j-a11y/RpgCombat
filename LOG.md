@@ -2848,3 +2848,14 @@
 - **涉及文件**：`index.html`、`integration-test/harness.html`、`LOG-INDEX.md`、`regex-前端战斗v11_2.json`（重建产物）。
 - **经验证**：harness 全绿（test34 增 1 项回归锁：闪屏粒子串已移除）；srcLine 重映射对齐（124 条）；node --check 通过；build-regex 重建产物。
 - **决策原因**：闪屏与晶片共处同一阶段二时段，闪屏遮盖晶片飞溅观感；移除后晶片在 screen 混合下的描边/高光更清晰，视觉更聚焦。
+
+---
+
+## [LOG-238] 2026-09-11 — 持久化职业覆盖不触发职业被动初始化修复（隐匿者开局隐匿值 0/10 事故）
+
+- **变更行为**（用户需求：隐匿者开战隐匿值只有 10，排查根因）：
+  1. **根因**：`<Combat_block>` YAML 省略「属性」栏（职业）时，`buildCombatDataFromYAML` 构建的 heroObj `classType=undefined`，`onBattleInit` 不跑；随后 `onCombatDataReceived → applyPersistedRoster` 用持久化名单覆盖 `classType`（如隐匿者），但**不补跑职业被动初始化**——`baseTauntBonus` 保持 0 → 开局隐匿值 0（应为 50），第一回合未受击 +10 后 UI 显示「🌫️隐匿-10」。防守者/施法者等其他职业同样静默丢失被动。
+  2. **修复**：`applyPersistedRoster` 中 `cfg.classType` 覆盖后，若职业相对 YAML 构建值发生变化且被动有 `onBattleInit`，补跑一次（隐匿者 -50/50、防守者 +100 嘲讽与永久反击 buff 等幂等初始化）。YAML 已显式写职业时（前后一致）不重复跑，防叠加。
+- **涉及文件**：`index.html`、`regex-前端战斗v11_2.json`（重建产物）。
+- **经验证**：harness 31 组全绿（srcLine 经 fix-srclines.cjs 重映射对齐）；专项验证 8 项通过（无职业 YAML+持久化隐匿者 → baseTauntBonus=-50/stealthValue=50/有效嘲讽=50/开局隐匿值=50；YAML 显式职业不叠加；防守者补跑 +100 与反击 buff）；node 语法校验通过；build-regex 重建产物。
+- **决策原因**：实机排查确认（酒馆 IAB 读 heroesData：baseTauntBonus=-10、有效嘲讽 90 → computeStealthValue=10）；onBattleInit 各职业均为幂等初始化，职业变更补跑是对「YAML 省属性、职业靠持久化」写法的正确兜底。
