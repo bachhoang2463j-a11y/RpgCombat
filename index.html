@@ -18055,78 +18055,44 @@ function applyPersistedRoster() {
     if (cfg.def != null && (defendSettings.persistDef || !(h.statSource || {}).def)) h.def = cfg.def;
     if (cfg.spd != null && (defendSettings.persistSpd || !(h.statSource || {}).spd)) h.spd = cfg.spd;
     if (cfg.actCount != null) h.actCount = cfg.actCount;
-    // 技能集：以持久化技能为基准，Combat_block 新增技能放置于列表最顶部
+    // 技能集合并【YAML 无条件优先】：我方 YAML 由用户自维护（非 LLM 输出），同名技能（含组父/子技能）
+    // 一律以本楼 YAML 解析结果为准，持久化字段不再覆盖（含空父 groupOnly：持久化旧档压不到 YAML 上）。
+    // 持久化只作补充：①同名组的持久化独有子技能（编辑器加进组并保存过）并入组；
+    // ②持久化独有的技能/组（编辑器新增）整条追加队尾。YAML 顺序即最终顺序（不再把新增技能置顶）。
+    // 编辑器改动未点保存只在本场内存生效；点保存 → persistHeroesRoster 整档替换（下次载入仍 YAML 优先）。
     const savedSkills = Array.isArray(saved.skills) ? saved.skills : [];
     // 【肃正】自愈：污染档 type="[无]" 但 barrierSub 残留，下次载入即重建
     savedSkills.forEach(s => { if (s.barrierSub && !((s.type||'')+(s.type2||'')+(s.type3||'')).includes('肃正')) { const _has=false; if (!_has) s.type = `[肃正:${s.barrierSub}]`; } });
-    // 变体组持久化合并（新档：组父带 children、子技能不再平铺入档；旧档：全扁平无组结构，走平铺兜底）。
-    // 组以持久化为权威源：同名 YAML 组父保留对象基座（继承战斗链路字段），children 按名合并——
-    // YAML 子技能为基座、持久化字段覆盖，双方独有的子技能均保留（与平铺技能"新增双向保留"语义一致）；
-    // 平铺关系（_inGroup + parentName）重建不走对象引用（heroesData 深拷贝安全）。
-    const savedGroups = savedSkills.filter(s => s && s.isGroup && Array.isArray(s.children));
-    const savedFlatList = savedSkills.filter(s => s && !(s.isGroup && Array.isArray(s.children)));
-    const savedFlatByName = new Map(savedFlatList.map(s => [s.name, s]));
-    const rebuiltGroupByName = new Map();
-    savedGroups.forEach(g => {
-      const yamlParent = h.skills.find(s => s && s.isGroup && !s._inGroup && s.name === g.name);
-      const parent = yamlParent || Object.assign({}, g);
-      Object.keys(g).forEach(k => { if (['name','isGroup','groupOnly','children','_inGroup','parentName','isExpanded'].indexOf(k) === -1) parent[k] = g[k]; });
-      parent.isGroup = true;
-      if (g.groupOnly) parent.groupOnly = true;
-      const yamlChildren = yamlParent && Array.isArray(yamlParent.children) ? yamlParent.children : [];
-      const yamlChildByName = new Map(yamlChildren.map(c => [c.name, c]));
-      const mergedChildNames = new Set();
-      parent.children = (g.children || []).map(sc => {
-        mergedChildNames.add(sc.name);
-        const c = Object.assign({}, (yamlChildByName.get(sc.name) || sc), { _inGroup: true, parentName: parent.name });
-        Object.keys(sc).forEach(k => { if (k !== 'name') c[k] = sc[k]; });
-        return c;
-      });
-      yamlChildren.forEach(yc => { if (!mergedChildNames.has(yc.name)) parent.children.push(Object.assign({}, yc, { _inGroup: true, parentName: parent.name })); });
-      rebuiltGroupByName.set(parent.name, parent);
+    const savedGroupByName = new Map(savedSkills.filter(sv => sv && sv.isGroup && Array.isArray(sv.children) && sv.children.length).map(g => [g.name, g]));
+    const yamlAllNames = new Set(h.skills.map(s => s && s.name).filter(Boolean));
+    // ①同名并入：仅补持久化独有的子技能；父字段与同名子技能一律 YAML 为准。
+    //   YAML 平铺技能被编辑器转组（持久化为组）时，追加子技能即自然成组，父字段仍取 YAML。
+    h.skills.slice().forEach(s => {
+      if (!s || s._inGroup) return;
+      const sv = savedGroupByName.get(s.name);
+      if (!sv) return;
+      const yamlChildNames = new Set((Array.isArray(s.children) ? s.children : []).map(c => c && c.name).filter(Boolean));
+      const extra = sv.children.filter(c => c && c.name && !yamlChildNames.has(c.name) && !yamlAllNames.has(c.name))
+        .map(c => Object.assign({}, c, { _inGroup: true, parentName: s.name }));
+      if (!extra.length) return;
+      s.isGroup = true;
+      s.children = (Array.isArray(s.children) ? s.children : []).concat(extra);
+      extra.forEach(c => yamlAllNames.add(c.name));
+      syncSkillGroupFromChildren(h, s); // 平铺子行按 children 权威源重排
     });
-    // 终列表组装：Combat_block 新增技能（YAML 有、持久化无）置顶；其余按 YAML 原序——
-    // 同名组父/平铺技能被重建组原位顶替（含编辑器把平铺技能转组的场景），重建组子技能平铺紧随父后；
-    // 持久化独有的组与平铺技能（编辑器新增）追加队尾。
-    const cbNewSkills = [];
-    const finalSkills = [];
-    const placedGroupNames = new Set();
-    h.skills.forEach(s => {
-      if (!s) return;
-      if (s._inGroup) {
-        if (!rebuiltGroupByName.has(s.parentName)) finalSkills.push(s); // YAML 新组（持久化未含）的子行随组原样保留
-        return; // 重建组的子行：数据已并入重建组 children，随父平铺重插
+    // ②持久化独有追加：YAML（含组子技能名）无同名的技能/组整条保留（编辑器新增；旧版扁平档散行同此兜底）
+    savedSkills.forEach(sv => {
+      if (!sv || !sv.name || yamlAllNames.has(sv.name)) return;
+      if (sv.isGroup && Array.isArray(sv.children) && sv.children.length) {
+        const parent = Object.assign({}, sv, { isGroup: true });
+        parent.children = sv.children.map(c => Object.assign({}, c, { _inGroup: true, parentName: sv.name }));
+        h.skills.push(parent);
+        parent.children.forEach(c => h.skills.push(c));
+      } else {
+        h.skills.push(Object.assign({}, sv));
       }
-      if (s.isGroup) {
-        const rebuilt = rebuiltGroupByName.get(s.name);
-        if (rebuilt) {
-          finalSkills.push(rebuilt); rebuilt.children.forEach(c => finalSkills.push(c)); placedGroupNames.add(rebuilt.name);
-        } else finalSkills.push(s); // YAML 新组原样保留
-        return;
-      }
-      const rebuilt = rebuiltGroupByName.get(s.name);
-      if (rebuilt) { // 编辑器把该平铺技能转组：平铺形态剔除，重建组原位顶替
-        finalSkills.push(rebuilt); rebuilt.children.forEach(c => finalSkills.push(c)); placedGroupNames.add(rebuilt.name);
-        return;
-      }
-      const sv = savedFlatByName.get(s.name);
-      if (sv) {
-        Object.keys(sv).forEach(k => { if (['name','isGroup','children','_inGroup','parentName','isExpanded'].indexOf(k) === -1) s[k] = sv[k]; });
-        finalSkills.push(s);
-        return;
-      }
-      cbNewSkills.push(s);
+      yamlAllNames.add(sv.name);
     });
-    // 持久化独有的组（编辑器建组，YAML 无同名组父/技能）追加队尾
-    savedGroups.forEach(g => {
-      if (placedGroupNames.has(g.name)) return;
-      const rebuilt = rebuiltGroupByName.get(g.name);
-      finalSkills.push(rebuilt); rebuilt.children.forEach(c => finalSkills.push(c));
-    });
-    // 持久化独有的平铺技能（编辑器新增；旧档含被拆组的散行，名字未入终列表时兜底追加）追加队尾
-    const finalNames = new Set(finalSkills.map(s => s.name));
-    const savedExtra = savedFlatList.filter(s => !finalNames.has(s.name));
-    h.skills = [...cbNewSkills, ...finalSkills, ...savedExtra];
     // [限N次] 持久化加载后初始化本场剩余次数（新战局从满值重新开始）
     h.skills.forEach(sk => { if (sk.maxUses > 0 && sk.usesRemaining == null) sk.usesRemaining = sk.maxUses; });
     // 合并后自愈当前英雄（覆盖污染）
