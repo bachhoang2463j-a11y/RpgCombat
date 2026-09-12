@@ -16471,15 +16471,17 @@ function openEditor(keepScroll) {
         // 模块 A-E：参数化模板（与变体组子技能卡共用）
         html += buildSkillFormFieldsHtml(`h-${i}-s-${si}`, s, `updateHeroSkillHeaderSummary(${i}, ${si})`);
 
-        // 模块 F：变体子技能（嵌套组）：仅组父技能渲染；每子技能一张折叠卡（头 + 参数化表单）
+        // 模块 F：变体子技能（嵌套组）：区块始终渲染（普通技能点「新增变体」即转组，删空子技能后入口不消失）；
+        // 平铺子技能行（_inGroup）不渲染——子技能只经组父卡管理，避免空区块噪音与二层嵌套。
         // 折叠范式照抄 toggleSkillFold：状态存数据对象 isExpanded + hidden class 切换，不重建 DOM
-        if (s.isGroup && s.children && s.children.length) {
+        if (!s._inGroup) {
+          var _skChildren = Array.isArray(s.children) ? s.children : [];
           html += `<div class="space-y-1.5 border-t border-cyan-900/40 pt-1.5">`;
           html += `<div class="flex items-center justify-between flex-wrap gap-1">`;
-          html += `<span class="text-cyan-400 text-[10px] font-bold">⇅ 变体子技能（${s.children.length}）</span>`;
+          html += `<span class="text-cyan-400 text-[10px] font-bold">⇅ 变体子技能（${_skChildren.length}）</span>`;
           html += `<button onclick="addHeroSubSkill(${i}, ${si})" class="px-2 py-0.5 bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 text-[10px] font-bold rounded border border-cyan-600/50"><span>+</span> 新增变体</button>`;
           html += `</div>`;
-          s.children.forEach((c, ci) => {
+          _skChildren.forEach((c, ci) => {
             var cExp = !!c.isExpanded;
             html += `<div class="skill-card-item rounded overflow-hidden" id="hero-${i}-s-${si}-sub-${ci}">`;
             html += `<div onclick="toggleHeroSubSkillFold(${i}, ${si}, ${ci})" class="px-2 py-1 cursor-pointer bg-slate-900/80 hover:bg-slate-800/90 transition-colors flex items-center justify-between gap-1.5">`;
@@ -16584,14 +16586,15 @@ function openEditor(keepScroll) {
           html += `<div class="text-[10px] text-slate-500 py-1">暂无绑定，点击「添加绑定」将此弹药关联到技能</div>`;
         }
         html += `</div></div>`;
-        // 模块 D：变体子技能（嵌套组道具，如化尘者之瓶）：与技能组同构的折叠卡 + 参数化表单
-        if (it.children && it.children.length) {
+        // 模块 D：变体子技能（嵌套组道具，如化尘者之瓶）：区块始终渲染（普通道具可加首个用法，删空后入口不消失）
+        {
+          var _itChildren = Array.isArray(it.children) ? it.children : [];
           html += `<div class="space-y-1.5 border-t border-amber-900/40 pt-1.5">`;
           html += `<div class="flex items-center justify-between flex-wrap gap-1">`;
-          html += `<span class="text-amber-400 text-[10px] font-bold">⇅ 变体用法（${it.children.length}）</span>`;
+          html += `<span class="text-amber-400 text-[10px] font-bold">⇅ 变体用法（${_itChildren.length}）</span>`;
           html += `<button onclick="addHeroItemSubSkill(${i}, ${ii})" class="px-2 py-0.5 bg-amber-900/60 hover:bg-amber-800 text-amber-200 text-[10px] font-bold rounded border border-amber-600/50"><span>+</span> 新增用法</button>`;
           html += `</div>`;
-          it.children.forEach((c, ci) => {
+          _itChildren.forEach((c, ci) => {
             var cExp = !!c.isExpanded;
             html += `<div class="skill-card-item rounded overflow-hidden" id="hero-${i}-it-${ii}-sub-${ci}">`;
             html += `<div onclick="toggleHeroItemSubSkillFold(${i}, ${ii}, ${ci})" class="px-2 py-1 cursor-pointer bg-slate-900/80 hover:bg-slate-800/90 transition-colors flex items-center justify-between gap-1.5">`;
@@ -17220,6 +17223,7 @@ function syncEditorDataToMemory() {
     h.spd = Number(document.getElementById(`edit-h-${i}-spd`).value);
     h.actCount = Math.max(1, Number(document.getElementById(`edit-h-${i}-act`).value) || 1);
     h.skills.forEach((s, si) => {
+        if (s._inGroup) return; // 平铺子技能行不读回：数据由组父卡 c-${ci} 子表单管（同对象引用，此处读回会用渲染快照旧值覆盖组父卡内的修改）
         if (!document.getElementById(`edit-h-${i}-s-${si}-name`)) return; // 技能级发散守卫（召唤物即时入列时新技能无表单）
         s.name = document.getElementById(`edit-h-${i}-s-${si}-name`).value;
         let reactionVal = document.getElementById(`edit-h-${i}-s-${si}-reaction`).value;
