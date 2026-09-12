@@ -18097,29 +18097,32 @@ function applyPersistedRoster() {
     h.skills.forEach(sk => { if (sk.maxUses > 0 && sk.usesRemaining == null) sk.usesRemaining = sk.maxUses; });
     // 合并后自愈当前英雄（覆盖污染）
     h.skills.forEach(sk => { if (sk.barrierSub && !((sk.type||'')+(sk.type2||'')+(sk.type3||'')).includes('肃正')) sk.type = `[肃正:${sk.barrierSub}]`; });
-    // 物品合并：同名物品定义（类别/效果/绑定）以持久化为准、数量以 Combat_block 为准（YAML 是战后结算的唯一真值）；
-    // 持久化独有的物品（编辑器新增）追加保留，Combat_block 独有的物品原样保留。旧版无物品档跳过合并。
+    // 物品合并【效果 YAML 无条件优先】（与技能合并同构）：同名物品定义（类别/效果/绑定/变体用法）
+    // 以本楼 YAML 为准，持久化字段不覆盖；持久化只补充：①同名物品的持久化独有用法（children）与
+    // 独有绑定（bindings）并入（编辑器加的）；②持久化独有的物品（编辑器新增）追加。
+    // 数量（count）以 Combat_block/YAML 为准；勾选「状态栏传入」开始时数量无条件以状态栏快照为准
+    //（applyStatusBarRoster 数值层覆盖，晚于本函数执行）。旧版无物品档跳过合并。
     const savedItems = Array.isArray(saved.items) ? saved.items : [];
     if (savedItems.length > 0) {
         const savedItemByName = new Map(savedItems.map(it => [it.name, it]));
         const mergedYamlItems = (h.items || []).map(yItem => {
             const sItem = savedItemByName.get(yItem.name);
             if (!sItem) return yItem;
-            // 基座换 yItem：旧版持久化档不含召唤/延迟/MP 等新字段与 children（组结构）时，
-            // 以本楼 YAML 解析结果兜底保留（sItem 无该键即不覆盖；编辑器保存过的新字段仍以持久化为准）
-            const merged = Object.assign({}, yItem, sItem, { isItem: true, count: yItem.count, usesRemaining: sItem.maxUses || 0 });
-            // 变体用法（children）按名合并：YAML 用法为基座、持久化字段覆盖，双方独有用法均保留
-            //（与技能组子技能合并语义一致；旧档无 children 键时保持 Object.assign 的 YAML 兜底）
-            if (Array.isArray(sItem.children) && Array.isArray(yItem.children)) {
-              const yChildByName = new Map(yItem.children.map(c => [c.name, c]));
-              const names = new Set();
-              merged.children = sItem.children.map(sc => {
-                names.add(sc.name);
-                const c = Object.assign({}, (yChildByName.get(sc.name) || sc));
-                Object.keys(sc).forEach(k => { if (k !== 'name') c[k] = sc[k]; });
-                return c;
-              });
-              yItem.children.forEach(yc => { if (!names.has(yc.name)) merged.children.push(yc); });
+            // 基座 yItem（效果字段一律 YAML），sItem 在前仅兜底保留 YAML 缺失的键（旧档字段演进）
+            const merged = Object.assign({}, sItem, yItem, { isItem: true, count: yItem.count, usesRemaining: yItem.maxUses || 0 });
+            // 变体用法（children）：同名用法 YAML 为准，持久化独有用法并入（含 YAML 物品无 children 的场景）
+            if (Array.isArray(sItem.children) && sItem.children.length) {
+              const yChildren = Array.isArray(yItem.children) ? yItem.children : [];
+              const yChildNames = new Set(yChildren.map(c => c && c.name).filter(Boolean));
+              const extraChildren = sItem.children.filter(sc => sc && sc.name && !yChildNames.has(sc.name)).map(sc => Object.assign({}, sc));
+              merged.children = yChildren.concat(extraChildren);
+            }
+            // 绑定（bindings）：同 skillName 以 YAML 为准，持久化独有绑定并入
+            if (Array.isArray(sItem.bindings) && sItem.bindings.length) {
+              const yBindings = Array.isArray(yItem.bindings) ? yItem.bindings : [];
+              const yBindSkills = new Set(yBindings.map(b => b && b.skillName).filter(Boolean));
+              const extraBindings = sItem.bindings.filter(sb2 => sb2 && sb2.skillName && !yBindSkills.has(sb2.skillName)).map(sb2 => Object.assign({}, sb2));
+              merged.bindings = yBindings.concat(extraBindings);
             }
             return merged;
         });
