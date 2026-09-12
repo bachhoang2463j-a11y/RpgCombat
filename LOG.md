@@ -2873,3 +2873,15 @@
 - **涉及文件**：`index.html`、`integration-test/harness.html`。
 - **经验证**：harness 全绿（新增 test35 共 23 项：isWounded 边界/撤离均速折算双向/半线播报与回血解除再跌破/保底1HP+制服+不重复施加/跳过文案区分+永久眩晕不清除/全员制服自动胜利+结算标题+提示词/开关关闭恢复致死/开关UI与localStorage 持久化；**592 全绿**）；srcLine 重映射对齐（127 条，升序配对法）；node 语法校验通过；build-tailwind 重编译（py-1/pb-7/pt-1.5 入产物）；IAB 布局几何验证（按钮间距 5px 无重叠、点击切换 ON 样式与持久化读写正常）。
 - **决策原因**：重伤只作用于撤离不动战斗数值——敌方已有 30% 狂暴/连动、蜕皮 50% 二阶段，再叠攻防惩罚会互相拖长残局（用户确认）；非致命覆盖一切致死来源——否则敌人可能在轮到回合前被 DoT 毒死，破坏"开着非致命却把人打死"的语义（用户确认）；制服用 duration:9999+permanent 沿用项目永久惯例，permanent 标记解决"跳过行动即清眩晕"的既有清除逻辑冲突。
+
+---
+
+## [LOG-240] 2026-09-13 — 【非致命】开关移出技能栏（面板左侧外·底边齐平·敌方回合可点）+ 主菜单布局还原
+
+- **变更行为**（用户截图反馈：开关应放面板外左侧绿框位置；放面板内平白撑高技能栏，且敌方行动时被覆盖层挡住点不到）：
+  1. **开关移出 `menu-container`**：原位置在面板内部——面板 `overflow-hidden` + `enemy-turn-overlay`（z-30，inset-0 罩满面板）导致敌方回合不可点。改为包一层 `relative` wrapper，按钮 `absolute bottom-1 right-full mr-1.5 pointer-events-auto` 悬于面板左侧外（间距 6px）、底边与面板齐平；覆盖层只罩面板本身，面板外不受影响。
+  2. **主菜单布局完全还原**（`p-1.5` / 四按钮 `py-1.5`），撤掉 LOG-239 的腾位改动（`pt-1.5 px-1.5 pb-7` / `py-1`）——不再需要在面板内留位。
+  3. wrapper 处于 `pointer-events-none` 悬浮层内，按钮显式 `pointer-events-auto`。
+- **涉及文件**：`index.html`、`regex-前端战斗v11_2.json`（重建产物）。
+- **经验证**：harness 592 全绿（srcLine 因 HTML +2 行偏移升序重映射 128 处，复验对齐）；IAB 几何验证（toggleLeftOfPanel=true / gap=6 / bottomAligned=0 / overlayCoversToggle=false / 主菜单 padBottom 复原 6px / 按钮 29px / 面板 172px 未撑高）；node 语法校验通过；build-regex 重建产物。
+- **决策原因**：用户需要敌方回合也能切换非致命（比如看到敌方残血想留活口），覆盖层只覆盖面板矩形，面板外放置天然规避；DOM 上按钮仍是 wrapper 子元素而非 menu-container 子元素，避免 overflow-hidden 裁剪。
