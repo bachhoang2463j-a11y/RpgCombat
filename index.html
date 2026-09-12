@@ -17740,6 +17740,14 @@ const ROSTER_VAR_KEY = 'rpg_combat_roster';
 const ROSTER_VERSION = 1;
 
 // 序列化：heroesData → 可存对象数组（仅角色配置字段 + 技能集，不含 DOM/战斗态字段）
+// 技能/子技能字段集（组父与 children 共用；不含 isGroup/children/_inGroup/parentName 等结构键，由外层按需附加）
+function _serializeSkillForRoster(s) {
+  return {
+    name: s.name, isReaction: s.isReaction, reactionTarget: s.reactionTarget, kanpoTarget: s.kanpoTarget, sheshenTarget: s.sheshenTarget || null,
+    isOthers: !!s.isOthers, guaranteedHit: !!s.guaranteedHit, switchTarget: !!s.switchTarget, critRate: s.critRate || 0, isHighTier: !!s.isHighTier, isLegendary: !!s.isLegendary, damageType: s.damageType, fxTag: s.fxTag, cost: s.cost, hpCost: s.hpCost, tpCost: s.tpCost,
+    hit: s.hit, turns: s.turns, delay: s.delay || 0, haste: s.haste || 0, maxUses: s.maxUses || 0, type: s.type, power: s.power, type2: s.type2, power2: s.power2, type3: s.type3, power3: s.power3, barrierSub: s.barrierSub || null, barrierArmor: s.barrierArmor || 0, summonTarget: s.summonTarget || null
+  };
+}
 function serializeHeroesForSave() {
   return heroesData.map(h => ({
     name: h.name,
@@ -17748,18 +17756,22 @@ function serializeHeroesForSave() {
       maxHp: h.maxHp, maxMp: h.maxMp, maxTp: h.maxTp,
       atk: h.atk, def: h.def, spd: h.spd, actCount: h.actCount
     },
-    skills: h.skills.map(s => ({
-      name: s.name, isReaction: s.isReaction, reactionTarget: s.reactionTarget, kanpoTarget: s.kanpoTarget, sheshenTarget: s.sheshenTarget || null,
-      isOthers: !!s.isOthers, guaranteedHit: !!s.guaranteedHit, switchTarget: !!s.switchTarget, critRate: s.critRate || 0, isHighTier: !!s.isHighTier, isLegendary: !!s.isLegendary, damageType: s.damageType, fxTag: s.fxTag, cost: s.cost, hpCost: s.hpCost, tpCost: s.tpCost,
-      hit: s.hit, turns: s.turns, delay: s.delay || 0, haste: s.haste || 0, maxUses: s.maxUses || 0, type: s.type, power: s.power, type2: s.type2, power2: s.power2, type3: s.type3, power3: s.power3, barrierSub: s.barrierSub || null, barrierArmor: s.barrierArmor || 0, summonTarget: s.summonTarget || null
-    })),
+    // 技能：平铺子技能行（_inGroup）不单列，随组父 children 走（编辑器权威源），防组结构在持久化中丢失
+    skills: h.skills.filter(s => !s._inGroup).map(s => {
+      if (!s.isGroup) return _serializeSkillForRoster(s);
+      const o = Object.assign(_serializeSkillForRoster(s), { isGroup: true });
+      if (s.groupOnly) o.groupOnly = true;
+      o.children = (Array.isArray(s.children) ? s.children : []).map(c => _serializeSkillForRoster(c));
+      return o;
+    }),
     // 物品定义（名称/类别/效果/绑定）：数量会随战后结算经由 Combat_block 更新，此处仅作编辑器改动兜底
     items: (h.items || []).map(it => ({
       name: it.name, category: it.category, count: it.count || 0, maxUses: it.maxUses || 0,
       bindings: (it.bindings || []).map(b => ({ skillName: b.skillName, cost: b.cost })),
       type: it.type, power: it.power, type2: it.type2, power2: it.power2, type3: it.type3, power3: it.power3,
       hit: it.hit, turns: it.turns, isOthers: !!it.isOthers, guaranteedHit: !!it.guaranteedHit, critRate: it.critRate || 0, isHighTier: !!it.isHighTier, isLegendary: !!it.isLegendary, fxTag: it.fxTag, damageType: it.damageType || null,
-      cost: it.cost || 0, hpCost: it.hpCost || 0, tpCost: it.tpCost || 0, delay: it.delay || 0, haste: it.haste || 0, summonTarget: it.summonTarget || null
+      cost: it.cost || 0, hpCost: it.hpCost || 0, tpCost: it.tpCost || 0, delay: it.delay || 0, haste: it.haste || 0, summonTarget: it.summonTarget || null,
+      children: (Array.isArray(it.children) ? it.children : []).map(c => _serializeSkillForRoster(c))
     }))
   }));
 }
@@ -18047,25 +18059,74 @@ function applyPersistedRoster() {
     const savedSkills = Array.isArray(saved.skills) ? saved.skills : [];
     // 【肃正】自愈：污染档 type="[无]" 但 barrierSub 残留，下次载入即重建
     savedSkills.forEach(s => { if (s.barrierSub && !((s.type||'')+(s.type2||'')+(s.type3||'')).includes('肃正')) { const _has=false; if (!_has) s.type = `[肃正:${s.barrierSub}]`; } });
-    // 变体组保护：持久化档是旧版扁平序列化（children 嵌套 + 平铺子技能 _inGroup 同时存在）。
-    // 直接以 saved.skills 为基准会把组拆散（组父被当作独立技能、子技能失去组关系），故：
-    // ①组结构（isGroup/children/_inGroup）以本楼 YAML 解析结果为准；②持久化只覆盖"同名字段集"。
-    const yamlGroupParents = h.skills.filter(s => s && s.isGroup);
-    const yamlChildNames = new Set();
-    h.skills.forEach(s => { if (s && s._inGroup) yamlChildNames.add(s.name); });
-    const cbNewSkills = h.skills.filter(cbSkill => !savedSkills.some(s => s.name === cbSkill.name));
-    // 基准：YAML 顺序 + 持久化里"非子技能且 YAML 中不存在对应组父"的补充技能（编辑器新增）
-    const yamlNames = new Set(h.skills.map(s => s.name));
-    const flatSaved = savedSkills.filter(s => !s._inGroup && !s.isGroup);
-    const savedExtra = flatSaved.filter(s => !yamlNames.has(s.name));
-    h.skills = [...cbNewSkills, ...h.skills.filter(s => !cbNewSkills.includes(s)), ...savedExtra];
-    // 持久化字段覆盖（同名才覆盖；组父/子技能跳过——它们的 children 结构与平铺关系不来自持久化）
-    const savedByName2 = new Map(flatSaved.map(s => [s.name, s]));
-    h.skills.forEach(sk => {
-      const sv = savedByName2.get(sk.name);
-      if (!sv || sk.isGroup || sk._inGroup) return;
-      Object.keys(sv).forEach(k => { if (['name','isGroup','children','_inGroup','parentName','isExpanded'].indexOf(k) === -1) sk[k] = sv[k]; });
+    // 变体组持久化合并（新档：组父带 children、子技能不再平铺入档；旧档：全扁平无组结构，走平铺兜底）。
+    // 组以持久化为权威源：同名 YAML 组父保留对象基座（继承战斗链路字段），children 按名合并——
+    // YAML 子技能为基座、持久化字段覆盖，双方独有的子技能均保留（与平铺技能"新增双向保留"语义一致）；
+    // 平铺关系（_inGroup + parentName）重建不走对象引用（heroesData 深拷贝安全）。
+    const savedGroups = savedSkills.filter(s => s && s.isGroup && Array.isArray(s.children));
+    const savedFlatList = savedSkills.filter(s => s && !(s.isGroup && Array.isArray(s.children)));
+    const savedFlatByName = new Map(savedFlatList.map(s => [s.name, s]));
+    const rebuiltGroupByName = new Map();
+    savedGroups.forEach(g => {
+      const yamlParent = h.skills.find(s => s && s.isGroup && !s._inGroup && s.name === g.name);
+      const parent = yamlParent || Object.assign({}, g);
+      Object.keys(g).forEach(k => { if (['name','isGroup','groupOnly','children','_inGroup','parentName','isExpanded'].indexOf(k) === -1) parent[k] = g[k]; });
+      parent.isGroup = true;
+      if (g.groupOnly) parent.groupOnly = true;
+      const yamlChildren = yamlParent && Array.isArray(yamlParent.children) ? yamlParent.children : [];
+      const yamlChildByName = new Map(yamlChildren.map(c => [c.name, c]));
+      const mergedChildNames = new Set();
+      parent.children = (g.children || []).map(sc => {
+        mergedChildNames.add(sc.name);
+        const c = Object.assign({}, (yamlChildByName.get(sc.name) || sc), { _inGroup: true, parentName: parent.name });
+        Object.keys(sc).forEach(k => { if (k !== 'name') c[k] = sc[k]; });
+        return c;
+      });
+      yamlChildren.forEach(yc => { if (!mergedChildNames.has(yc.name)) parent.children.push(Object.assign({}, yc, { _inGroup: true, parentName: parent.name })); });
+      rebuiltGroupByName.set(parent.name, parent);
     });
+    // 终列表组装：Combat_block 新增技能（YAML 有、持久化无）置顶；其余按 YAML 原序——
+    // 同名组父/平铺技能被重建组原位顶替（含编辑器把平铺技能转组的场景），重建组子技能平铺紧随父后；
+    // 持久化独有的组与平铺技能（编辑器新增）追加队尾。
+    const cbNewSkills = [];
+    const finalSkills = [];
+    const placedGroupNames = new Set();
+    h.skills.forEach(s => {
+      if (!s) return;
+      if (s._inGroup) {
+        if (!rebuiltGroupByName.has(s.parentName)) finalSkills.push(s); // YAML 新组（持久化未含）的子行随组原样保留
+        return; // 重建组的子行：数据已并入重建组 children，随父平铺重插
+      }
+      if (s.isGroup) {
+        const rebuilt = rebuiltGroupByName.get(s.name);
+        if (rebuilt) {
+          finalSkills.push(rebuilt); rebuilt.children.forEach(c => finalSkills.push(c)); placedGroupNames.add(rebuilt.name);
+        } else finalSkills.push(s); // YAML 新组原样保留
+        return;
+      }
+      const rebuilt = rebuiltGroupByName.get(s.name);
+      if (rebuilt) { // 编辑器把该平铺技能转组：平铺形态剔除，重建组原位顶替
+        finalSkills.push(rebuilt); rebuilt.children.forEach(c => finalSkills.push(c)); placedGroupNames.add(rebuilt.name);
+        return;
+      }
+      const sv = savedFlatByName.get(s.name);
+      if (sv) {
+        Object.keys(sv).forEach(k => { if (['name','isGroup','children','_inGroup','parentName','isExpanded'].indexOf(k) === -1) s[k] = sv[k]; });
+        finalSkills.push(s);
+        return;
+      }
+      cbNewSkills.push(s);
+    });
+    // 持久化独有的组（编辑器建组，YAML 无同名组父/技能）追加队尾
+    savedGroups.forEach(g => {
+      if (placedGroupNames.has(g.name)) return;
+      const rebuilt = rebuiltGroupByName.get(g.name);
+      finalSkills.push(rebuilt); rebuilt.children.forEach(c => finalSkills.push(c));
+    });
+    // 持久化独有的平铺技能（编辑器新增；旧档含被拆组的散行，名字未入终列表时兜底追加）追加队尾
+    const finalNames = new Set(finalSkills.map(s => s.name));
+    const savedExtra = savedFlatList.filter(s => !finalNames.has(s.name));
+    h.skills = [...cbNewSkills, ...finalSkills, ...savedExtra];
     // [限N次] 持久化加载后初始化本场剩余次数（新战局从满值重新开始）
     h.skills.forEach(sk => { if (sk.maxUses > 0 && sk.usesRemaining == null) sk.usesRemaining = sk.maxUses; });
     // 合并后自愈当前英雄（覆盖污染）
@@ -18080,7 +18141,21 @@ function applyPersistedRoster() {
             if (!sItem) return yItem;
             // 基座换 yItem：旧版持久化档不含召唤/延迟/MP 等新字段与 children（组结构）时，
             // 以本楼 YAML 解析结果兜底保留（sItem 无该键即不覆盖；编辑器保存过的新字段仍以持久化为准）
-            return Object.assign({}, yItem, sItem, { isItem: true, count: yItem.count, usesRemaining: sItem.maxUses || 0 });
+            const merged = Object.assign({}, yItem, sItem, { isItem: true, count: yItem.count, usesRemaining: sItem.maxUses || 0 });
+            // 变体用法（children）按名合并：YAML 用法为基座、持久化字段覆盖，双方独有用法均保留
+            //（与技能组子技能合并语义一致；旧档无 children 键时保持 Object.assign 的 YAML 兜底）
+            if (Array.isArray(sItem.children) && Array.isArray(yItem.children)) {
+              const yChildByName = new Map(yItem.children.map(c => [c.name, c]));
+              const names = new Set();
+              merged.children = sItem.children.map(sc => {
+                names.add(sc.name);
+                const c = Object.assign({}, (yChildByName.get(sc.name) || sc));
+                Object.keys(sc).forEach(k => { if (k !== 'name') c[k] = sc[k]; });
+                return c;
+              });
+              yItem.children.forEach(yc => { if (!names.has(yc.name)) merged.children.push(yc); });
+            }
+            return merged;
         });
         const yamlItemNames = new Set(mergedYamlItems.map(it => it.name));
         const extraSavedItems = savedItems.filter(it => !yamlItemNames.has(it.name)).map(it => Object.assign({ isItem: true, usesRemaining: it.maxUses || 0 }, it));
