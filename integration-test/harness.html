@@ -2245,6 +2245,111 @@ async function test34() {
   w.eval('heroesData = []; enemiesData = []; teamBarrier = 0; teamBarrierMax = 0; updateTeamBarrierUI();');
 }
 
+/* ================= 断言 35：【重伤】撤离减速 + 【非致命】制服 ================= */
+async function test35() {
+  head('35 重伤：撤离均速折算/半线播报 · 非致命：保底1HP制服/永久眩晕跳过/全员制服胜利');
+  const w = rpgWin();
+  const ev = (expr) => w.eval('(function(){ return ' + expr + '; })()');
+  MOCK.resetVars(); seedChat(); seedState();
+
+  // --- ① 重伤判定与撤离均速折算 ---
+  check(ev('isWounded({ isAlive:true, maxHp:100, hp:50 })') === true, 'isWounded：hp=50%（含）判重伤');
+  check(ev('isWounded({ isAlive:true, maxHp:100, hp:51 })') === false, 'isWounded：hp=51% 未重伤');
+  check(ev('isWounded({ isAlive:false, maxHp:100, hp:10 })') === false, 'isWounded：阵亡不算（不拖撤离均速）');
+  // 敌方半血 → 我方撤离 roll 上限变大：hero 1v1 均速 100 vs 100，重伤后敌方均速 50
+  const hero = heroSpec({ name: '疾行者', hp: 100, maxHp: 100, spd: 100, skills: [] });
+  injectHeroes([hero]);
+  w.eval('enemiesData = [{ id:"e1", name:"重伤靶", isAlive:true, hp:40, maxHp:100, atk:5, def:0, spd:100, shield:0, buffs:[], evaBonus:0, hitBonus:0, skills:[], items:[], nameTags:[], tags:[] }];');
+  w.eval('window.__origRandom = Math.random; Math.random = function(){ return 0.9999; }; state.actionQueue = [{ type:"hero", ref: heroesData[0] }]; state.queueIndex = 0; state.isGameStarted = true; state.isAnimating = false; battleHistory = []; _historyRawCache = "";');
+  await w.eval('attemptRetreat()');
+  let r = ev('battleHistory.join("|")');
+  check(/敌方均速 50·重伤减速/.test(r), '敌方重伤 → 撤离日志敌方均速 50 且标注·重伤减速');
+  check(/我方均速 100(?!·)/.test(r), '我方无重伤 → 均速 100 无标注');
+  // 我方重伤 → 敌方均速满值、我方均速减半（attemptRetreat 结束时 isAnimating 可能仍为 true，须复位才能再跑；敌方靶子同时回满血避免重伤污染均速断言）
+  w.eval('state.isAnimating = false; heroesData[0].hp = 50; enemiesData[0].hp = 100; battleHistory = []; _historyRawCache = "";');
+  await w.eval('attemptRetreat()');
+  r = ev('battleHistory.join("|")');
+  check(/我方均速 50·重伤减速/.test(r), '我方重伤 → 撤离日志我方均速 50 且标注·重伤减速');
+  check(/敌方均速 100(?!·)/.test(r), '敌方无重伤 → 均速 100 无标注');
+
+  // --- ② 首次跌破半线播报（updateEnemyUI 汇聚点）+ 回血解除 ---
+  // 撤离判定两次成功弹出 retreat 结算面板：先收掉，避免遮断后续断言
+  w.eval('(function(){ var m = document.getElementById("battle-result-modal"); if (m) { m.classList.add("hidden"); m.classList.remove("flex"); } state.isAnimating = false; })()');
+  // 敌方靶子从满血跌破半线（_lastHpRatio 先置满血基线，避免被撤离段的旧比例干扰）
+  w.eval('enemiesData[0].hp = 100; enemiesData[0]._lastHpRatio = 1; battleHistory = [];');
+  w.eval('enemiesData[0].hp = 45;');
+  ev('updateEnemyUI(enemiesData[0])');
+  check(/🩸 重伤靶 伤势恶化，身负重伤/.test(ev('battleHistory.join("|")')), '首次跌破半线 → 🩸重伤播报');
+  w.eval('battleHistory = []; enemiesData[0].hp = 90;');
+  ev('updateEnemyUI(enemiesData[0])');
+  check(!/身负重伤/.test(ev('battleHistory.join("|")')), '半线之上变化 → 不播报');
+  w.eval('enemiesData[0].hp = 45;');
+  ev('updateEnemyUI(enemiesData[0])');
+  check(/🩸 重伤靶 伤势恶化，身负重伤/.test(ev('battleHistory.join("|")')), '回血解除后再跌破 → 重新播报（动态判定）');
+
+  // --- ③ 非致命：保底 1 HP + 制服（主伤害管线 executeSkillAction） ---
+  w.eval('nonLethalSettings.enabled = true; heroesData[0].hp = 100; heroesData[0].atk = 500; heroesData[0].skills = [parseSkill("【处决】[单体;power:400][必中]")]; enemiesData[0].hp = 100; enemiesData[0].buffs = [];');
+  await w.eval('executeSkillAction(heroesData[0], enemiesData[0], heroesData[0].skills[0], 1, false, true)');
+  r = ev('(function(){ var e = enemiesData[0]; return { hp: e.hp, isAlive: e.isAlive, subdued: !!e.isSubdued, stun: e.buffs.filter(function(b){ return b.type==="stun" && b.permanent; }).length, hist: battleHistory.join("|") }; })()');
+  eq(r.hp, 1, '致命一击（400 vs 100HP）保底 1 HP');
+  check(r.isAlive && r.subdued, '敌方存活且被标记 isSubdued');
+  eq(r.stun, 1, '写入 1 条 permanent 永久眩晕');
+  check(/⛓️ 重伤靶 被彻底制服/.test(r.hist), '制服播报战报行');
+  check(!/致命一击！彻底撕裂/.test(r.hist), '不走击杀分支（无"彻底撕裂"播报）');
+  // 制服后再打：仍保底 1 HP，不重复施加眩晕
+  w.eval('battleHistory = [];');
+  await w.eval('executeSkillAction(heroesData[0], enemiesData[0], heroesData[0].skills[0], 1, false, true)');
+  r = ev('(function(){ var e = enemiesData[0]; return { hp: e.hp, stun: e.buffs.filter(function(b){ return b.type==="stun" && b.permanent; }).length, subdued: e.buffs.filter(function(b){ return b.type==="stun"; }).length, hist: battleHistory.join("|") }; })()');
+  eq(r.hp, 1, '已制服再被打：HP 仍保底 1');
+  eq(r.stun, 1, '不重复施加永久眩晕（仍 1 条）');
+  check(!/⛓️ 重伤靶 被彻底制服/.test(r.hist), '不重复播报制服');
+
+  // --- ④ 永久眩晕跳过行动（不清除、区分文案）：需 2 个敌方——仅剩被制服者时 nextTurn 头部会先触发全员制服胜利 ---
+  w.eval('enemiesData.push({ id:"e2", name:"未制服靶", isAlive:true, hp:100, maxHp:100, atk:5, def:0, spd:100, shield:0, buffs:[], evaBonus:0, hitBonus:0, skills:[], items:[], nameTags:[], tags:[] });');
+  w.eval('battleHistory = []; _historyRawCache = ""; state.actionQueue = [{ type:"enemy", ref: enemiesData[0] }]; state.queueIndex = 0; state.isGameStarted = true;');
+  await w.eval('nextTurn()');
+  r = ev('(function(){ var e = enemiesData[0]; return { stun: e.buffs.filter(function(b){ return b.type==="stun" && b.permanent; }).length, hist: battleHistory.join("|") }; })()');
+  check(/⛓️ \[重伤靶\] 已被彻底制服，瘫倒在地无法行动/.test(r.hist), '跳过行动文案区分（⛓️ 已被制服）');
+  eq(r.stun, 1, '跳过后永久眩晕不被清除（仍 1 条）');
+
+  // --- ⑤ 全员被制服 → nextTurn 自动胜利（win 结算 + 制服标题） ---
+  w.eval('enemiesData[1].isSubdued = true; battleHistory = []; _historyRawCache = ""; state.actionQueue = [{ type:"enemy", ref: enemiesData[1] }]; state.queueIndex = 0;');
+  await w.eval('nextTurn()');
+  check(/敌方全员被彻底制服，失去了战斗能力，战斗结束/.test(ev('battleHistory.join("|")')), '全员制服 → 战报行（⛓️ 敌方全员被制服）');
+  check(ev('_subdueVictory') === true, '全员制服 → _subdueVictory 标志置位');
+  const title = w.document.getElementById('result-title').innerText;
+  check(title === '战斗胜利·全员制服', '结算标题"战斗胜利·全员制服"');
+  const prompt = w.document.getElementById('result-prompt').value;
+  check(/全员被制服/.test(prompt) && /未被杀死/.test(prompt), 'LLM 提示词强调"被制服而非杀戮"');
+  w.eval('document.getElementById("battle-result-modal").classList.add("hidden"); document.getElementById("battle-result-modal").classList.remove("flex");');
+
+  // --- ⑥ 开关关闭 → 恢复致死（回退验证） ---
+  w.eval('nonLethalSettings.enabled = false; _subdueVictory = false; state.isGameStarted = true; enemiesData = [{ id:"e2", name:"致命靶", isAlive:true, hp:100, maxHp:100, atk:5, def:0, spd:100, shield:0, buffs:[], evaBonus:0, hitBonus:0, skills:[], items:[], nameTags:[], tags:[] }]; battleHistory = []; _historyRawCache = "";');
+  await w.eval('executeSkillAction(heroesData[0], enemiesData[0], heroesData[0].skills[0], 1, false, true)');
+  r = ev('(function(){ var e = enemiesData[0]; return { hp: e.hp, isAlive: e.isAlive, subdued: !!e.isSubdued, hist: battleHistory.join("|") }; })()');
+  check(r.hp <= 0 && !r.isAlive && !r.subdued, '开关关闭 → 恢复正常致死（不制服）');
+  check(/致命一击！彻底撕裂/.test(r.hist), '开关关闭 → 击杀播报恢复');
+
+  // --- ⑦ 开关 UI 与持久化 ---
+  w.eval('localStorage.clear(); nonLethalSettings.enabled = false;');
+  ev('toggleNonLethal()');
+  const ui1 = ev('(function(){ var b = document.getElementById("nonlethal-toggle"); return b.textContent + "|" + b.className; })()');
+  check(/非致命 ON/.test(ui1) && /active/.test(ui1), 'toggleNonLethal：按钮翻为 ON + active 样式');
+  check(JSON.parse(w.eval('localStorage.getItem("rpg_combat_nonlethal_settings")')).enabled === true, '开关状态已持久化 localStorage');
+  ev('toggleNonLethal()');
+  const ui2 = ev('(function(){ var b = document.getElementById("nonlethal-toggle"); return b.textContent + "|" + b.className; })()');
+  check(!/ON/.test(ui2) && !/active/.test(ui2), '再次切换：按钮回落默认');
+
+  // --- ⑧ 清理 ---
+  w.eval(`
+    if (window.__origRandom) { Math.random = window.__origRandom; delete window.__origRandom; }
+    heroesData = []; enemiesData = []; battleHistory = []; _historyRawCache = "";
+    state.actionQueue = []; state.queueIndex = 0; state.isGameStarted = false;
+    nonLethalSettings.enabled = false; _subdueVictory = false; localStorage.removeItem('rpg_combat_nonlethal_settings');
+    updateNonLethalToggleUI();
+  `);
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -2252,7 +2357,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
