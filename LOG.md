@@ -2900,3 +2900,16 @@
 - **涉及文件**：`index.html`、`LOG-INDEX.md`。
 - **经验证**：harness **592 全绿**（含 srcLine 对齐断言）；IAB 逻辑冒烟 19+8 项通过（复活优先不钳制/普通敌人制服/自爆对抗成功钳制+失败放行 `_sdContestFailed`/兜底钳制放行对照/重置换令牌+冻结+蓄力清零+数值回滚+充能清零+弹窗清除+startRound 解冻/编辑器工作副本切换与取消恢复/保存后 cache=编辑器值且战斗残血被隔离/冻结层弹出-点击-移除-队列重建/队友反应串行链存在）；node 语法校验通过。
 - **决策原因**：非致命跳过复活的根因是钳制先于避死判定（注释明言），复活优先只需在钳制入口让路；自爆对抗范围经用户确认为"仅非致命 vs 自爆，不关看破的事"，DoT 致死拦截方经确认为"敏捷最高存活队友"；重置跳首发的根因是无代际作废机制——旧链 endTurn 无条件 queueIndex++ 消费新队列，令牌贯穿是根治而非加延时补丁；保存基线污染根因是编辑器表单从战斗实时数据构建（战斗变动混入表单值原样存档），工作副本从源头隔离；队友反应与本人台词分两次调用是为规避 requestLLMResponse 的存活回配逻辑错配。
+
+---
+
+## [LOG-242] 2026-09-14 — 修复：弹窗期重置后旧链苏醒结算残留攻击伤害（弹窗孤儿化）
+
+- **变更行为**（用户反馈：反应弹窗收起期间点重置，重置后会自动结算上一次残留攻击的伤害）：
+  1. **根因**：LOG-241 的重置管线用 `resolveKanpo(-1)/resolveReaction(-1)` 强制唤醒挂起的弹窗 Promise，想让旧链"走到代际令牌守卫处终止"——但守卫在 `endTurn`，旧链醒来后**先走完 `applySingleTagEffect` 的伤害/飘字/战报，才轮到守卫**；伤害落在旧对象上，但 `updateHeroUI/updateEnemyUI` 按 id 写到重建后的新 DOM（id 相同）——表现为重置后自动结算残留攻击。
+  2. **修复：弹窗孤儿化**——`runResetPipeline` 不再 resolve 挂起的看破/反应弹窗：Promise 永不 resolve，旧链永久停在 `await` 处（不醒来、不结算、不弹新窗），同时移除弹窗 DOM/悬浮重开钮并置空 `window.resolveKanpo/resolveReaction` 防残留引用误触。
+  3. **resolver 代际校验**（封两个竞态窗）：弹窗创建时捕获 `combatToken`；resolver 入口与 200ms 淡出回调内各校验一次——玩家点完弹窗按钮后的 200ms 淡出窗内发生重置时，迟到的 `resolve(candidates[i])` 被吞掉，旧链依旧挂起。
+  4. **冻结窗口守卫**：`promptKanpo/promptReaction` 入口检测 `_pipelineFrozen`（重置完成→`startRound` 重启之间）时返回永不 resolve 的 Promise——旧链从短 sleep（如屏障破碎 0.5s 避让）醒来后在冻结窗口内新开弹窗的场景同样孤儿化；`addHistory` 在冻结窗口丢弃写入，旧链残留战报不再污染刚清空的战斗记录（`_pipelineFrozen` 改 `var` 声明：`addHistory` 定义在声明行之前，TDZ 安全）。
+- **涉及文件**：`index.html`、`regex-前端战斗v11_2.json`（重建产物）。
+- **经验证**：harness **592 全绿**（srcLine 因插行升序配对重映射 131 处，复验对齐）；IAB 专项冒烟 6 项全过（场景1 收起弹窗重置：旧链未醒/伤害未结算/战报无污染/弹窗悬浮钮 resolver 全清；场景2 点击候选后 200ms 竞态窗重置：resolve 回调被吞；场景3 冻结窗口内反应/看破弹窗调用均孤儿化；场景4 addHistory 冻结丢弃+解冻恢复）；node 语法校验通过。
+- **决策原因**：resolve 唤醒方案的初衷是让旧链"自然死亡"，但技能结算管线（applySingleTagEffect 全链）没有令牌守卫，醒来即结算；孤儿化让旧链停在挂起点反而是最安全的终态（引擎可回收无引用的 pending promise），代价仅是每次"弹窗期重置"泄漏一个挂起链（有界）。
