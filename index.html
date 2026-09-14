@@ -16714,7 +16714,10 @@ function openEditor(keepScroll) {
           it.bindings.forEach((b, bi) => {
             html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60" data-bi="${bi}">`;
             html += `<span class="text-[10px] text-amber-300 font-bold whitespace-nowrap">🔗 绑定</span>`;
-            html += `<select class="edit-input-game flex-1 min-w-0 text-slate-200 font-bold text-[10px] py-1">${(h.skills || []).map(sk => `<option value="${(sk.name || '').replace(/"/g,'&quot;')}" ${sk.name === b.skillName ? 'selected' : ''}>${sk.name || '未命名'}</option>`).join('')}</select>`;
+            // 绑定目标兜底选项：skillName 不在本角色技能集时仍以原名渲染为选中项（标注不存在）。
+            // 否则浏览器自动选中第一个 option → 保存读回时静默改绑到列表首个技能（无绑定技能"挂满弹药"事故根源）
+            var _bNoMatch = b.skillName && !(h.skills || []).some(sk => sk.name === b.skillName);
+            html += `<select class="edit-input-game flex-1 min-w-0 text-slate-200 font-bold text-[10px] py-1">${_bNoMatch ? `<option value="${b.skillName.replace(/"/g,'&quot;')}" selected>${b.skillName}（技能不存在）</option>` : ''}${(h.skills || []).map(sk => `<option value="${(sk.name || '').replace(/"/g,'&quot;')}" ${sk.name === b.skillName ? 'selected' : ''}>${sk.name || '未命名'}</option>`).join('')}</select>`;
             html += `<span class="text-[10px] text-slate-500 whitespace-nowrap">每次消耗</span>`;
             html += `<input type="number" min="1" value="${b.cost || 1}" class="edit-input-game w-12 font-mono-num text-right text-amber-200 text-[10px] py-1">`;
             html += `<button onclick="removeItemBinding(${i}, ${ii}, ${bi})" class="w-4 h-4 rounded hover:bg-red-900/60 text-slate-500 hover:text-red-300 flex items-center justify-center text-[10px]" title="移除绑定">✕</button>`;
@@ -18302,11 +18305,17 @@ function applyPersistedRoster() {
               const extraChildren = sItem.children.filter(sc => sc && sc.name && !yChildNames.has(sc.name)).map(sc => Object.assign({}, sc));
               merged.children = yChildren.concat(extraChildren);
             }
-            // 绑定（bindings）：同 skillName 以 YAML 为准，持久化独有绑定并入
+            // 绑定（bindings）：同 skillName 以 YAML 为准，持久化独有绑定并入；
+            // 并入时按 skillName 去重——清洗旧档被编辑器误绑污染的重复行（同一物品对同一技能重复绑定无意义）
             if (Array.isArray(sItem.bindings) && sItem.bindings.length) {
               const yBindings = Array.isArray(yItem.bindings) ? yItem.bindings : [];
               const yBindSkills = new Set(yBindings.map(b => b && b.skillName).filter(Boolean));
-              const extraBindings = sItem.bindings.filter(sb2 => sb2 && sb2.skillName && !yBindSkills.has(sb2.skillName)).map(sb2 => Object.assign({}, sb2));
+              const extraBindings = [];
+              sItem.bindings.forEach(sb2 => {
+                if (!sb2 || !sb2.skillName || yBindSkills.has(sb2.skillName)) return;
+                if (extraBindings.some(eb => eb.skillName === sb2.skillName)) return;
+                extraBindings.push(Object.assign({}, sb2));
+              });
               merged.bindings = yBindings.concat(extraBindings);
             }
             return merged;
