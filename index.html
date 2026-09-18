@@ -8875,6 +8875,16 @@ function getSkillGroupChildren(hero, parent) {
     return hero.skills.filter(s => s && s._inGroup && s.parentName === parent.name);
 }
 
+// 组子技能有效集合：优先现查平铺行（编辑器同对象引用）；断链（旧档恢复无 _inGroup、parentName 未同步等）
+// 时回退父对象自带的 children（解析 index:8789 与持久化合并均会挂载）——保证组卡渲染与攻击/辅助分栏
+// 不因断链退化（子技能独立显示、父组误入辅助栏）。children 元素需在 hero.skills 中存在才渲染子卡
+//（createSkillGroupCard 按 indexOf 取全局执行索引），标记丢失但同引用时依然可执行。
+function getEffectiveGroupChildren(hero, parent) {
+    const paired = getSkillGroupChildren(hero, parent);
+    if (paired.length) return paired;
+    return Array.isArray(parent.children) ? parent.children : [];
+}
+
 // ---- 物品绑定辅助（弹药/道具/消耗品通用）：渲染（技能卡徽章/灰显）与执行（扣减）共用同一张索引表 ----
 // 技能名 → [{ item, cost }]；一个技能被多个物品绑定 = AND 语义（都需满足、都扣减）
 // 绑定即"施展材料"：弹药扣发数、道具扣次数、消耗品扣数量
@@ -8891,18 +8901,45 @@ function getHeroItemBindings(hero) {
     return map;
 }
 
-// 单个绑定是否有存量：道具看剩余次数（maxUses=0 不限），消耗品/弹药看数量
+// 单个绑定是否有存量：道具看剩余次数（maxUses=0 不限），消耗品/弹药看数量；状态栏道具栏已消失的道具视为无存量
 function bindingHasStock(b) {
     const it = b.item;
+    if (it._sbMissing) return false;
     if (it.category === '道具') return !(it.maxUses > 0 && (it.usesRemaining ?? it.maxUses) <= 0);
     return (it.count || 0) >= b.cost;
 }
 
-// 技能是否满足全部绑定物品条件（未绑定任何物品的技能恒为 true）
+// 【材料严格模式】绑定知识注册表：从全部我方英雄（本楼 YAML ∪ 持久化合并后的 items）聚合"技能名 → 所需材料"。
+// 判定兜底：英雄未携带该技能的任何绑定物品时，只要知识表登记过该技能需要材料（任一英雄身上出现过），
+// 即视为不满足——杜绝"绑定物品缺席 = 无约束 = 免费释放"的静默退化。召唤物（isSummon）不入表：
+// 其 items 恒空且技能候选不经绑定判定，天然豁免。由 applyPersistedRoster / applyStatusBarRoster 末尾重建。
+let itemBindingKnowledge = new Map();
+function rebuildItemBindingKnowledge() {
+    const m = new Map();
+    heroesData.forEach(h => {
+        if (!h || h.isSummon || !Array.isArray(h.items)) return;
+        h.items.forEach(it => {
+            if (!it || !Array.isArray(it.bindings)) return;
+            it.bindings.forEach(b => {
+                if (!b || !b.skillName) return;
+                if (!m.has(b.skillName)) m.set(b.skillName, []);
+                if (!m.get(b.skillName).some(e => e.cost === b.cost)) m.get(b.skillName).push({ skillName: b.skillName, cost: b.cost });
+            });
+        });
+    });
+    itemBindingKnowledge = m;
+}
+
+// 技能是否满足全部绑定物品条件：
+//   ① 英雄携带绑定物品 → 按存量 AND 判定（原语义）；
+//   ② 未携带但注册表登记过该技能需要材料 → 不满足（材料严格模式兜底）；
+//   ③ 从无绑定记录的技能恒为 true。
 function hasEnoughBindings(hero, skill) {
     const list = getHeroItemBindings(hero).get(skill.name);
-    if (!list) return true;
-    return list.every(bindingHasStock);
+    if (list) return list.every(bindingHasStock);
+    const known = itemBindingKnowledge.get(skill.name);
+    if (known && known.length) return false;
+    return true;
 }
 
 // 技能施展时的绑定物品扣减（AND 语义），返回战报描述，无绑定返回 null。
@@ -15604,9 +15641,10 @@ async function executeHeroSkillAction(skillIndex, primaryTarget) {
 // 使用物品消耗回合（与技能一致）；带 [再动] 标签的物品经由再动机制天然实现"不消耗回合"变体
 // 物品不触发极限爆发（爆发留给攻击/技能，避免嗑药烧掉满 TP）
 // ==========================================
-// 物品是否可主动使用：弹药是技能资源永不可点；耗尽的消耗品/道具灰显
+// 物品是否可主动使用：弹药是技能资源永不可点；状态栏道具栏已消失的道具暂时禁用；耗尽的消耗品/道具灰显
 function isItemUsable(item) {
     if (!item || item.category === '弹药') return false;
+    if (item._sbMissing) return false;
     if (item.category === '道具') return !(item.maxUses > 0 && (item.usesRemaining ?? item.maxUses) <= 0);
     return (item.count || 0) > 0;
 }
@@ -15884,6 +15922,10 @@ function createSkillCard(hero, skill, idx) {
         const errClass = insufficient ? 'text-rose-400 border-rose-500/80 bg-rose-950' : 'text-amber-300 border-amber-800/60 bg-amber-950/60';
         costBadgesHtml += `<span class="text-[8px] font-mono-num font-bold px-1 py-0.2 rounded border ${errClass} leading-none">${icon} ${it.name}×${b.cost}（剩${remain}）</span>`;
       });
+    } else {
+      // 材料严格模式：英雄未携带该技能的绑定物品，但注册表登记过它需要材料 → 禁用态整体提示（无物品列表可列）
+      const _knownNeed = itemBindingKnowledge.get(skill.name);
+      if (_knownNeed && _knownNeed.length) costBadgesHtml += `<span class="text-[8px] font-mono-num font-bold px-1 py-0.2 rounded border text-rose-400 border-rose-500/80 bg-rose-950 leading-none">🎒 缺少施展材料</span>`;
     }
     if (!costBadgesHtml) costBadgesHtml = `<span class="text-[8px] text-slate-400 font-mono leading-none">⚡ 零消耗</span>`;
     let limitBadgeHtml = '';
@@ -15989,7 +16031,7 @@ function updateSkillMenus(hero) {
     .filter(({ skill }) => !skill._inGroup)
     .sort((a, b) => (b.usable ? 1 : 0) - (a.usable ? 1 : 0))
     .forEach(({ skill, idx }) => {
-      const children = getSkillGroupChildren(hero, skill);
+      const children = getEffectiveGroupChildren(hero, skill);
       if (children.length) {
         // 组卡可用性 = 任一子技能可用；分栏 = 子技能中含攻击标签 → 攻击栏，否则辅助栏（组父自身无行动语义）
         const groupUsable = children.some(c => isSkillActionable(hero, c));
@@ -16553,13 +16595,14 @@ function openEditor(keepScroll) {
     // 技能列表 (二级折叠)
     html += `<div class="space-y-1.5 pt-1">`;
     html += `<div class="flex items-center justify-between border-b border-cyan-900/40 pb-1">`;
-    html += `<div class="flex items-center gap-1.5"><span class="text-cyan-400 text-xs font-bold">⚡ 技能列表</span><span class="text-[10px] text-slate-500">(${h.skills ? h.skills.length : 0}项)</span></div>`;
+    html += `<div class="flex items-center gap-1.5"><span class="text-cyan-400 text-xs font-bold">⚡ 技能列表</span><span class="text-[10px] text-slate-500">(${h.skills ? h.skills.filter(x => !x._inGroup).length : 0}项)</span></div>`;
     html += `<div class="flex items-center gap-2"><button onclick="toggleAllEntitySkills('hero', ${i}, true)" class="text-[10px] text-slate-400 hover:text-cyan-300">展开全部</button><span class="text-slate-600 text-[10px]">|</span><button onclick="toggleAllEntitySkills('hero', ${i}, false)" class="text-[10px] text-slate-400 hover:text-cyan-300">收起全部</button><button onclick="addHeroSkill(${i})" class="px-2 py-0.5 bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 text-[10px] font-bold rounded border border-cyan-600/50 flex items-center gap-0.5"><span>+</span> 新增技能</button></div>`;
     html += `</div>`;
     
     html += `<div class="space-y-1.5">`;
     if (h.skills) {
       h.skills.forEach((s, si) => {
+        if (s._inGroup) return; // 组内子技能只经组父卡"变体子技能"区块管理，平铺行不重复显示
         var sExp = !!s.isExpanded;
         var dmgBadge = s.damageType === '近战' ? '🗡️' : s.damageType === '远程' ? '🎯' : s.damageType === '法术' ? '⚡' : '🌀';
         html += `<div class="skill-card-item rounded overflow-hidden ${sExp ? 'is-expanded' : ''}" id="hero-${i}-skill-${si}">`;
@@ -18153,6 +18196,24 @@ function _sbParseItems(str) {
   return out;
 }
 
+// 提取物品串的全部名字段（跳过 emoji 装饰段，含变体选择符/ZWJ 组合）——道具在场名单用：
+// 与 _sbParseItems 同构剥三种数量形态（[名xN]/[名：N]/[名：N+后缀]）取名字部分，无数量则整段即名
+function _sbParseItemNames(str) {
+    const segs = String(str || '').match(/\[([^\[\]]+)\]/g) || [];
+    const out = [];
+    for (const seg of segs) {
+        const content = seg.slice(1, -1).trim();
+        if (!content) continue;
+        if (/^[\u{1F000}-\u{1FAFF}\u{2600}-\u27BF\u2B50\uFE0F\u200D💼🎒]+$/u.test(content)) continue;
+        const xm = content.match(/^(.*?)\s*x\s*(\d+)\s*$/);
+        const colonM = xm ? null : (content.match(/^(.+?)\s*[:：]\s*(\d+)(?:\s+\S.*)?$/) || content.match(/^(.+?)\s*[:：]\s*(\d+)(\S.*)?$/));
+        const raw = xm ? xm[1] : (colonM ? colonM[1] : content);
+        const name = raw.replace(/[(（][^)）]*[)）]/g, '').trim();
+        if (name) out.push(name);
+    }
+    return out;
+}
+
 // 读取状态栏快照：从最新楼往前回溯 ≤50 楼找 stat_data（照 MMS findPrevState 思路）
 function readStatusBarSnapshot() {
   try {
@@ -18177,6 +18238,8 @@ function readStatusBarSnapshot() {
           ..._sbParseAttrs(c['属性']),
           // 物品行承载叙事物品（无数量段，解析为空）；战斗物品走【弹药】【消耗品】【道具】词条——多键合并读取
           items: ['物品', '弹药', '消耗品', '消耗', '道具'].flatMap(k => _sbParseItems(c[k])),
+          // 道具在场名单（道具行全部名字段）：字段缺失为 undefined（旧状态栏不介入），"无"为空数组（全部道具禁用）
+          props: c['道具'] === undefined ? undefined : _sbParseItemNames(c['道具']),
         };
         heroes.push(heroes0);
       }
@@ -18209,8 +18272,18 @@ function applyStatusBarRoster(snapshot) {
       if (target) target.count = it.count;
       else unmatched.push(sb.name + '·' + it.name);
     }
+    // 道具在场性同步：状态栏道具行存在时，未列出的道具打 _sbMissing（暂时禁用：物品菜单灰显 + 绑定判定不通过）。
+    // 字段缺失（undefined，旧状态栏）不介入；"无"→名单为空→全部道具禁用。标记不入持久化，下场战斗按新快照重估
+    if (Array.isArray(sb.props)) {
+      const propNames = new Set(sb.props.map(normName));
+      (hero.items || []).forEach(it => {
+        if (!it || it.category !== '道具') return;
+        it._sbMissing = !propNames.has(normName(String(it.name).replace(/[(（][^)）]*[)）]/g, '')));
+      });
+    }
     applied++;
   }
+  rebuildItemBindingKnowledge();
   return { applied, unmatched };
 }
 
@@ -18329,6 +18402,8 @@ function applyPersistedRoster() {
   // 合并完成后同步初始缓存，使"重置"恢复的也是持久化合并后的版本（而非 Combat_block 原始快照）
   initialHeroesCache = JSON.parse(JSON.stringify(heroesData));
   initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData));
+  // 物品绑定知识注册表重建（材料严格模式判定基线，覆盖本楼 YAML ∪ 持久化全量）
+  rebuildItemBindingKnowledge();
 }
 
 // ---- 设置面板 UI ----
