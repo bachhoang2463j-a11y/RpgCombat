@@ -18175,7 +18175,8 @@ function readStatusBarSnapshot() {
         const heroes0 = {
           name: String(rawName).trim().replace(/^[\u200D\uFE0F\u2640\u2642\u26A7\p{Extended_Pictographic}]+\s*/u, '').trim(),
           ..._sbParseAttrs(c['属性']),
-          items: _sbParseItems(c['物品'] || c['弹药'] || c['道具'] || c['消耗'] || ''),
+          // 物品行承载叙事物品（无数量段，解析为空）；战斗物品走【弹药】【消耗品】【道具】词条——多键合并读取
+          items: ['物品', '弹药', '消耗品', '消耗', '道具'].flatMap(k => _sbParseItems(c[k])),
         };
         heroes.push(heroes0);
       }
