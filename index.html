@@ -8845,15 +8845,18 @@ function parseItemList(arr) {
         return el; // 字符串先原样保留（组头配对在第二阶段做）
     });
     // 第二阶段：组头字符串 + 紧随的非组头字符串行（jsyaml 7+ 空父/纯名父尾随块形态）
+    // isItemLine：普通物品行（含类别/数量/次数/绑定标签）——裸组头（无子行的组头形态物品）后跟的普通物品
+    // 不得被吞成伪子技能（真实剧本：连排道具行中夹一个组头形态物品，后续物品曾被整段吞掉）
+    const isItemLine = (s) => typeof s === 'string' && /\[(?:道具|消耗品|弹药|数量\s*[:：]|次数\s*[:：]|绑定\s*[:：]|[高阶]|[传奇]|[神术])/.test(s);
     const paired = [];
     for (let k = 0; k < out.length; k++) {
         const cur = out[k];
-        if (typeof cur === 'string' && (isItemGroupHead(cur) || isFlatGroupHead(cur)) && k + 1 < out.length && typeof out[k + 1] === 'string' && !(isItemGroupHead(out[k + 1]) || isFlatGroupHead(out[k + 1]))) {
+        if (typeof cur === 'string' && (isItemGroupHead(cur) || isFlatGroupHead(cur)) && k + 1 < out.length && typeof out[k + 1] === 'string' && !(isItemGroupHead(out[k + 1]) || isFlatGroupHead(out[k + 1]) || isItemLine(out[k + 1]))) {
             const item = parseItem(cur);
             if (!item.category) item.category = '道具';
             let j = k + 1;
             const childStrs = [];
-            while (j < out.length && typeof out[j] === 'string' && !(isItemGroupHead(out[j]) || isFlatGroupHead(out[j]))) { childStrs.push(out[j]); j++; }
+            while (j < out.length && typeof out[j] === 'string' && !(isItemGroupHead(out[j]) || isFlatGroupHead(out[j]) || isItemLine(out[j]))) { childStrs.push(out[j]); j++; }
             item.children = childStrs.map(childStr => {
                 const c = parseSkill(childStr);
                 if (!c.isHighTier) c.isHighTier = item.isHighTier;
@@ -16024,11 +16027,15 @@ function updateSkillMenus(hero) {
   if (legacyList) legacyList.innerHTML = '';
   let atkCount = 0, supCount = 0;
   // 可用技能优先排列：按 isSkillActionable 稳定排序（同组内保持原有技能顺序），不可用（灰显）技能沉底
-  // 变体组：组父卡单发（children 非空）；组内子技能（_inGroup）不单发，只在组卡展开时呈现
+  // 变体组：组父卡单发（children 非空）；组内子技能（_inGroup）不单发，只在组卡展开时呈现。
+  // 断链兜底：标记丢失的子行按"组父 children 引用集合"二次排除（与 getEffectiveGroupChildren 回退口径一致），
+  // 防止断链时子技能脱离组卡在面板额外显示
+  const groupedRefs = new Set();
+  hero.skills.forEach(s => { if (s && s.isGroup && Array.isArray(s.children)) s.children.forEach(c => groupedRefs.add(c)); });
   hero.skills.map((skill, idx) => ({ skill, idx, usable: isSkillActionable(hero, skill) }))
     .filter(({ skill }) => !(skill.isReaction || skill.kanpoTarget || (skill.sheshenTarget && !skill._ownerOnly)))
     .filter(({ skill }) => !(skill._ownerOnly && !skill.summonTarget))
-    .filter(({ skill }) => !skill._inGroup)
+    .filter(({ skill }) => !skill._inGroup && !groupedRefs.has(skill))
     .sort((a, b) => (b.usable ? 1 : 0) - (a.usable ? 1 : 0))
     .forEach(({ skill, idx }) => {
       const children = getEffectiveGroupChildren(hero, skill);

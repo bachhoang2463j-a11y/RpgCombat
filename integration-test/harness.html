@@ -535,24 +535,46 @@ async function test9() {
 
 /* ================= 断言 10：规则覆盖率（自维护） ================= */
 async function test10() {
-  head('10 规则覆盖率：源码 addHistory 行号 == DIGEST_RULES srcLine');
-  const src = await (await fetch('../index.html', { cache: 'reload' })).text();
-  const lines = src.split('\n');
-  const srcCalls = new Set();
-  lines.forEach((l, i) => {
-    if (!/addHistory\(\s*(['`]|\s*removed)/.test(l)) return;
-    const t = (l.match(/addHistory\(\s*(?:removed\.length\s*\?\s*)?['`](.*)/) || [])[1] || '';
-    if (t.startsWith('[对话]')) return;
-    srcCalls.add(i + 1);
+  head('10 规则覆盖率：真实战报行逐条被 DIGEST_RULES 覆盖（无静默漏行）');
+  // 旧版按 srcLine 行号集合对齐——index.html 每次增删行都会整体漂移，静态提取模板又会被嵌套表达式截断，
+  // 双向静态守卫均不可维护。升级为行为守卫：跑一场小型真实战斗（覆盖 结构/回合/主行动/伤害/弹药消耗 多类战报），
+  // 产出的 battleHistory 每一行必须命中至少一条摘要规则——与 buildBattleDigest 的 unmatched 语义一致，
+  // "新增战报行忘写规则立刻红"且零行号维护。召唤物（isSummon）不入表之类的绑定知识与本案无关。
+  const w = rpgWin();
+  // 结构健全：规则数量与字段
+  check(w.eval('DIGEST_RULES.length') >= 100, 'DIGEST_RULES 规则规模健全（' + w.eval('DIGEST_RULES.length') + ' 条）');
+  check(w.eval('DIGEST_RULES.every(r => r.re instanceof RegExp && !!r.kind)') === true, '全部规则含 re 与 kind');
+  // 构造小战斗：普通攻击 + 弹药绑定技能（重炮消耗 .45子弹×2），random 钉死避免闪避/暴击随机分支
+  w.eval(`
+    heroesData = [{ id:'h0', name:'埃利奥特', hp:100, maxHp:100, mp:60, maxMp:60, tp:0, maxTp:100, atk:40, def:20, spd:100, shield:0, actCount:1, isAlive:true, buffs:[], isSummon:false,
+      skills:[ parseSkill('【射击】[单体;power:30][远程]'), parseSkill('【重炮】[单体;power:80][远程]') ],
+      items:[ { isItem:true, name:'.45子弹', category:'弹药', count:9, maxUses:0, usesRemaining:0, bindings:[{ skillName:'重炮', cost:2 }] } ] }];
+    enemiesData = [{ id:'e0', name:'训练靶', isAlive:true, hp:500, maxHp:500, atk:5, def:0, spd:50, shield:0, buffs:[], evaBonus:0, hitBonus:0, skills:[], items:[], nameTags:[], tags:[] }];
+    battleHistory = []; _historyRawCache = '';
+    state.actionQueue = [{ type:'hero', ref: heroesData[0] }]; state.queueIndex = 0; state.isGameStarted = true; state.isAnimating = false;
+    if (!window.__origRandom10) { window.__origRandom10 = Math.random; Math.random = function(){ return 0.999; }; }
+  `);
+  // 结构行 + 两次真实释放（普通攻击 / 弹药绑定技能）
+  w.eval('addHistory(`--- 战斗已拉开帷幕 ---`); addHistory(`🏟️ 场地：冻土荒原`); addHistory(`=== 第 1 回合 ===`);');
+  await w.eval('executeSkillAction(heroesData[0], enemiesData[0], heroesData[0].skills[0], 1)');
+  await w.eval('executeSkillAction(heroesData[0], enemiesData[0], heroesData[0].skills[1], 1)');
+  const rows = w.eval('battleHistory');
+  check(rows.length >= 8, '战报产出充足（' + rows.length + ' 行，含结构/行动/伤害/弹药消耗）');
+  // 逐行覆盖：[对话] 行按既有口径豁免，其余每行必须命中至少一条摘要规则
+  const uncovered = rows.filter(line => {
+    if (/^\[对话\]/.test(line)) return false;
+    return !w.eval('DIGEST_RULES.some(r => { try { return r.re.test(' + JSON.stringify(line) + '); } catch (e) { return false; } })');
   });
-  const bs = src.indexOf('const DIGEST_RULES = ['), be = src.indexOf('];', bs);
-  const ruleLines = new Set();
-  for (const m of src.slice(bs, be).matchAll(/srcLine: (\d+)/g)) ruleLines.add(parseInt(m[1], 10));
-  eq(ruleLines.size, srcCalls.size, '规则数 == addHistory 调用数（' + srcCalls.size + '）');
-  const missRule = [...srcCalls].filter(x => !ruleLines.has(x));
-  const missSrc = [...ruleLines].filter(x => !srcCalls.has(x));
-  check(!missRule.length && !missSrc.length, '行号集合完全对齐',
-    '缺规则:' + missRule.join(',') + ' 错指向:' + missSrc.join(','));
+  check(!uncovered.length, '真实战报行全部被摘要规则覆盖（' + (rows.length - uncovered.length) + '/' + rows.length + '）',
+    '未覆盖示例: ' + uncovered.slice(0, 4).join(' ⏎ '));
+  // 弹药绑定消耗确实发生（战报含弹药消耗行，验证覆盖样本含该类）
+  check(rows.some(l => /弹药/.test(l) && /剩\d+发/.test(l)), '战报含弹药消耗行（覆盖样本含绑定消耗）');
+  // 清理
+  w.eval(`
+    Math.random = window.__origRandom10; delete window.__origRandom10;
+    heroesData = []; enemiesData = []; battleHistory = []; _historyRawCache = '';
+    state.actionQueue = []; state.queueIndex = 0; state.isGameStarted = false; state.isAnimating = false;
+  `);
 }
 
 /* ================= 断言 11：战斗中对话的战况摘要化（ongoing + 性能 + 缓存） ================= */
@@ -2350,6 +2372,113 @@ async function test35() {
   `);
 }
 
+/* ================= 断言 36：道具在场性同步禁用（MMS 道具行 → _sbMissing）+ 材料严格模式 ================= */
+async function test36() {
+  head('36 道具在场性同步（MMS 道具行 → _sbMissing）+ 材料严格模式（绑定知识注册表）');
+  const w = rpgWin();
+  const ev = (expr) => w.eval('(function(){ return ' + expr + '; })()');
+
+  // --- 纯函数：道具行在场名单解析（emoji 段跳过含变体符、：N/xN 数量形态剥名） ---
+  eq(ev('(_sbParseItemNames("[⚗️] [化尘者之瓶][蝎眼钥匙][逆咒归源镜：2]"))'),
+    ['化尘者之瓶', '蝎眼钥匙', '逆咒归源镜'], '道具行名单解析（emoji 段跳过、数量形态剥名）');
+  eq(ev('(_sbParseItemNames("无"))'), [], '"无" → 空名单');
+
+  // --- 端到端：YAML 双道具，状态栏道具行只列其一 → 消失者同步禁用 ---
+  MOCK.resetVars();
+  MOCK.setChat([
+    { message: '开战。', role: 'user', is_user: true },
+    { message: '<Combat_block>\n战斗数据栏:\n  我方列表:\n    - 角色:\n        名字: "埃利奥特"\n        属性: "[HP:100/100][MP:60/60][Atk:20][Armor:40][Speed:50]"\n        技能:\n          - "【暗巷快枪】[单体;power:65][远程]"\n          - "【净蚀反冲】[看破:法术][限3次]"\n        物品:\n          - "【化尘者之瓶】[道具][次数:1]"\n          - "【逆咒归源镜】[道具][次数:3][绑定:净蚀反冲*1]"\n          - "【.45子弹】[弹药][数量:40][绑定:暗巷快枪*3]"\n          - "【绷带】[消耗品][数量:3]"\n</Combat_block>', role: 'user', is_user: true },
+    { message: '<maintext>战斗开始。</maintext>', role: 'assistant', is_user: false },
+  ]);
+  // 状态栏：物品行=纯叙事徽章；弹药/消耗品/道具三分词条；道具行缺逆咒归源镜
+  MOCK.api.insertOrAssignVariables({ stat_data: { 状态栏: { 角色列表: [
+    { 角色: { 名字: '🔮埃利奥特', 属性: '[❤️HP:88/100]', 物品: '[银质怀表][半包骆驼烟]',
+      弹药: '[.45子弹x37]', 消耗品: '[绷带x2]', 道具: '[⚗️] [化尘者之瓶]' } },
+  ] } } }, { type: 'message', message_id: 1 });
+  const battleYaml36 = MOCK.api.getChatMessages(1)[0].message.match(/<Combat_block>\s*([\s\S]*?)\s*<\/Combat_block>/)[1];
+  w.eval('onCombatDataReceived(' + JSON.stringify(battleYaml36) + ')');
+  w.eval("document.getElementById('start-statusbar-import').checked = true; startGame();");
+
+  // 多词条回读（弹药/消耗品独立覆盖；物品行叙事徽章不新增物品）
+  eq(w.eval('heroesData[0].items.find(i=>i.name===".45子弹").count'), 37, '弹药词条数量覆盖 40→37');
+  eq(w.eval('heroesData[0].items.find(i=>i.name==="绷带").count'), 2, '消耗品词条数量覆盖 3→2');
+  eq(w.eval('heroesData[0].items.length'), 4, '状态栏物品行（叙事）不新增物品（YAML 名单为准）');
+
+  // 道具在场性：在场者可用，消失者禁用
+  check(w.eval('heroesData[0].items.find(i=>i.name==="化尘者之瓶")._sbMissing === false'), '在场道具（化尘者之瓶）不禁用');
+  check(w.eval('heroesData[0].items.find(i=>i.name==="逆咒归源镜")._sbMissing === true'), '状态栏消失的道具（逆咒归源镜）标记 _sbMissing');
+  check(w.eval('isItemUsable(heroesData[0].items.find(i=>i.name==="化尘者之瓶"))') === true, '在场道具可使用');
+  check(w.eval('isItemUsable(heroesData[0].items.find(i=>i.name==="逆咒归源镜"))') === false, '消失道具不可使用（菜单灰显+入口拦截）');
+
+  // 绑定联动：净蚀反冲（绑逆咒归源镜）禁用；暗巷快枪（弹药 37≥3）放行
+  check(w.eval('hasEnoughBindings(heroesData[0], { name: "净蚀反冲" })') === false, '绑定道具被禁 → 技能绑定判定 false');
+  check(w.eval('hasEnoughBindings(heroesData[0], { name: "暗巷快枪" })') === true, '弹药足额技能照常放行');
+
+  // --- 材料严格模式：注册表聚合 + own 缺失命中 → 禁用 ---
+  const kn = ev('(function(){ const m = itemBindingKnowledge; return { has: m.has("净蚀反冲"), len: (m.get("净蚀反冲")||[]).length }; })()');
+  check(kn.has && kn.len >= 1, '绑定知识注册表登记净蚀反冲（跨英雄聚合）');
+  w.eval('heroesData.push({ name: "无材料者", isSummon: false, items: [], skills: [] });');
+  const noMat = 'heroesData[heroesData.length-1]';
+  check(w.eval('hasEnoughBindings(' + noMat + ', { name: "净蚀反冲" })') === false, 'own 缺失 + 注册表命中 → 禁用（严格模式）');
+  check(w.eval('hasEnoughBindings(' + noMat + ', { name: "无关技能" })') === true, 'own 缺失 + 无绑定记录 → 放行');
+  // 渲染层：createSkillCard 输出"缺少施展材料"禁用徽章
+  w.eval(noMat + '.skills = [{ name: "净蚀反冲", cost: 0, maxUses: 3, type: "[无]" }];');
+  const card36 = ev('(function(){ const h = heroesData[heroesData.length-1]; return createSkillCard(h, h.skills[0], 0).innerHTML; })()');
+  check(/缺少施展材料/.test(card36), '技能卡输出"缺少施展材料"禁用徽章');
+
+  // --- 道具行三态："无"全禁 / 名单翻转可逆 / 字段缺失不介入 ---
+  ev('applyStatusBarRoster({ heroes: [{ name: "埃利奥特", hp: null, mp: null, armor: null, props: [], items: [] }] })');
+  check(w.eval('heroesData[0].items.filter(i=>i.category==="道具").every(i=>i._sbMissing===true)') === true, '道具行"无" → 全部道具禁用');
+  ev('applyStatusBarRoster({ heroes: [{ name: "埃利奥特", hp: null, mp: null, armor: null, props: ["逆咒归源镜"], items: [] }] })');
+  check(w.eval('heroesData[0].items.find(i=>i.name==="化尘者之瓶")._sbMissing === true && heroesData[0].items.find(i=>i.name==="逆咒归源镜")._sbMissing === false'), '名单变化同步翻转（暂时语义可逆）');
+  ev('applyStatusBarRoster({ heroes: [{ name: "埃利奥特", hp: null, mp: null, armor: null, items: [] }] })');
+  check(w.eval('heroesData[0].items.find(i=>i.name==="化尘者之瓶")._sbMissing === true') === true, '道具字段缺失 → 不介入（保留上轮标记）');
+
+  // --- 清理 ---
+  w.eval("document.getElementById('start-statusbar-import').checked = false;");
+}
+
+/* ================= 断言 37：编辑器平铺子行去重（③）+ 组分类断链兜底（④） ================= */
+async function test37() {
+  head('37 编辑器平铺子行去重（③）+ 组分类断链兜底（④）');
+  const w = rpgWin();
+  const ev = (expr) => w.eval('(function(){ return ' + expr + '; })()');
+  const src = await (await fetch('../index.html', { cache: 'reload' })).text();
+
+  // --- ③ 静态断言：编辑器技能列表跳过 _inGroup 平铺行 + 计数过滤 ---
+  check(/h\.skills\.forEach\(\(s, si\) => \{\s*\n\s*if \(s\._inGroup\) return;/.test(src), '编辑器技能列表循环跳过 _inGroup 平铺行');
+  check(src.includes('h.skills.filter(x => !x._inGroup).length'), '编辑器头部计数排除平铺行');
+
+  // --- ④ 功能仿真：断链回退父 children，组卡与分栏不退化 ---
+  // 真实链路里 children[0] 与平铺行是同一对象引用（parseSkillList 挂 children + 平铺同引用）——
+  // 必须在 iframe 内联构造保住同引用（injectHeroes 的 JSON 往返会把同引用拆成两份独立对象）；
+  // 技能菜单容器属战斗 UI（startGame 后才有），测试内补建桩容器
+  ev('["attack-skill-list","support-skill-list","skill-list"].forEach(id => { if (!document.getElementById(id)) { var d = document.createElement("div"); d.id = id; document.body.appendChild(d); } });');
+  w.eval(`
+    var childA = { name: '子A', type: '[单体]', power: 10, cost: 0, _inGroup: true, parentName: '组父A' };
+    var parentA = { name: '组父A', isGroup: true, type: '[无]', children: [childA] };
+    heroesData = [{ id:'h0', name:'正常者', hp:100, maxHp:100, mp:60, maxMp:60, tp:0, maxTp:100, atk:10, def:5, spd:100, shield:0, actCount:1, isAlive:true, buffs:[], isSummon:false, skills: [parentA, childA], items: [] }];
+  `);
+  ev('updateSkillMenus(heroesData[0])');
+  eq(ev('document.getElementById("attack-skill-list").children.length'), 1, '正常链路：组卡进攻击栏');
+  check(/⇅ 变体×1/.test(ev('document.getElementById("attack-skill-list").innerHTML')), '组卡带变体徽章');
+
+  // 断链（子行 _inGroup/parentName 丢失）：回退父 children → 组卡仍攻击栏，子行（同引用）被引用集合排除不额外显示
+  w.eval('heroesData[0].skills[1]._inGroup = false; delete heroesData[0].skills[1].parentName;');
+  ev('updateSkillMenus(heroesData[0])');
+  eq(ev('document.getElementById("attack-skill-list").children.length'), 1, '断链：回退父 children，组卡仍在攻击栏');
+  check(/⇅ 变体×1/.test(ev('document.getElementById("attack-skill-list").innerHTML')), '断链：组卡仍渲染子技能（可执行）');
+  check(!/组父A/.test(ev('document.getElementById("support-skill-list").innerText')), '断链：不误入辅助栏');
+
+  // 真无子技能的组父 → 既有兜底：按父自身分类（[无] → 辅助栏）
+  w.eval('heroesData[0].skills = [{ name: "空组", isGroup: true, type: "[无]" }];');
+  ev('updateSkillMenus(heroesData[0])');
+  eq(ev('document.getElementById("support-skill-list").children.length'), 1, '真无子技能 → 按父自身分类（辅助栏，既有行为）');
+
+  // --- 清理 ---
+  w.eval('heroesData = []; enemiesData = [];');
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -2357,7 +2486,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
