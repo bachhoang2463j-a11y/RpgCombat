@@ -17989,11 +17989,13 @@ function _serializeSkillForRoster(s) {
 function serializeHeroesForSave() {
   return heroesData.map(h => ({
     name: h.name,
-    config: {
+    // extraConfig：applyPersistedRoster 收下的白名单外 config 键（外部写方如 OpeningSetup
+    // 的扩展字段）原样带回；白名单键以运行时扁平字段为准（覆盖同名旧值）
+    config: Object.assign({}, h.extraConfig, {
       img: h.img, classType: h.classType, isWise: h.isWise,
       maxHp: h.maxHp, maxMp: h.maxMp, maxTp: h.maxTp,
       atk: h.atk, def: h.def, spd: h.spd, actCount: h.actCount
-    },
+    }),
     // 技能：平铺子技能行（_inGroup）不单列，随组父 children 走（编辑器权威源），防组结构在持久化中丢失
     skills: h.skills.filter(s => !s._inGroup).map(s => {
       if (!s.isGroup) return _serializeSkillForRoster(s);
@@ -18324,6 +18326,13 @@ function applyPersistedRoster() {
     if (cfg.def != null && (defendSettings.persistDef || !(h.statSource || {}).def)) h.def = cfg.def;
     if (cfg.spd != null && (defendSettings.persistSpd || !(h.statSource || {}).spd)) h.spd = cfg.spd;
     if (cfg.actCount != null) h.actCount = cfg.actCount;
+    // 白名单外的 config 键收入 extraConfig 原样保留（OpeningSetup 等外部写方的扩展字段
+    // 不因读取合并+下次序列化而丢失）；白名单键仍以上方逐字段覆盖为准
+    const hExtraCfg = {};
+    Object.keys(cfg).forEach(k => {
+      if (!['img', 'classType', 'isWise', 'maxHp', 'maxMp', 'maxTp', 'atk', 'def', 'spd', 'actCount'].includes(k)) hExtraCfg[k] = cfg[k];
+    });
+    if (Object.keys(hExtraCfg).length) h.extraConfig = Object.assign({}, h.extraConfig, hExtraCfg);
     // 技能集合并【YAML 无条件优先】：我方 YAML 由用户自维护（非 LLM 输出），同名技能（含组父/子技能）
     // 一律以本楼 YAML 解析结果为准，持久化字段不再覆盖（含空父 groupOnly：持久化旧档压不到 YAML 上）。
     // 持久化只作补充：①同名组的持久化独有子技能（编辑器加进组并保存过）并入组；
