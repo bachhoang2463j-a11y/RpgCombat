@@ -2718,6 +2718,10 @@ const AVATAR_MAP = {
         "图鲁": "https://www.imgur.la/images/2026/03/24/tulut.jpg",
         "阿维": "https://www.imgur.la/images/2026/03/24/avit.jpg",
         "索恩": "https://imgur.la/images/2026/08/13/77fcdf0fd006c4ff1ccae30774322270.png",
+        "冯·霍恩海姆": "https://files.catbox.moe/e9aruv.png",
+        "冯": "https://files.catbox.moe/e9aruv.png",
+        "威廉·退尔": "https://files.catbox.moe/71km12.png",
+        "威廉": "https://files.catbox.moe/71km12.png",
 };
 const DEFAULT_HERO_IMG = 'https://imgur.la/images/2026/08/13/9adb95d5df1b99ebe2f6670acd47a5b5.png';
 
@@ -2743,8 +2747,36 @@ const HERO_VOICE_LINES = {
       'https://files.catbox.moe/3zivcf.mp3',
       'https://files.catbox.moe/n5o5ys.mp3'
     ]
+  },
+  "冯·霍恩海姆": {
+    first: 'https://files.catbox.moe/5y5c8f.mp3',
+    turn: [
+      'https://files.catbox.moe/nxnp96.mp3',
+      'https://files.catbox.moe/ng57pf.mp3',
+      'https://files.catbox.moe/khiaw6.mp3'
+    ],
+    low: [
+      'https://files.catbox.moe/z2vqrj.mp3',
+      'https://files.catbox.moe/fcf4zv.mp3',
+      'https://files.catbox.moe/ok9wti.mp3'
+    ]
+  },
+  "威廉·退尔": {
+    first: 'https://files.catbox.moe/n2tmgo.mp3',
+    turn: [
+      'https://files.catbox.moe/n2tmgo.mp3',
+      'https://files.catbox.moe/osbdqb.mp3',
+      'https://files.catbox.moe/5ooxg9.mp3'
+    ],
+    low: [
+      'https://files.catbox.moe/xlvb4d.mp3',
+      'https://files.catbox.moe/pp4ohk.mp3',
+      'https://files.catbox.moe/q675fe.mp3'
+    ]
   }
 };
+HERO_VOICE_LINES["冯"] = HERO_VOICE_LINES["冯·霍恩海姆"];
+HERO_VOICE_LINES["威廉"] = HERO_VOICE_LINES["威廉·退尔"];
 
 /** 从台词池中随机选一句，排除上回合已播过的台词（若池子只剩一句则允许重复） */
 function pickHeroVoice(pool, exclude) {

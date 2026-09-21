@@ -113,7 +113,7 @@ console.log('[build-regex] 产物压缩：' + srcLen + ' -> ' + minified.length 
   Math.round((1 - minified.length / srcLen) * 100) + '%）');
 
 // ③ 更新正则 JSON（只替换 replaceString，其余字段原样保留）
-const files = fs.readdirSync(ROOT).filter((f) => /^regex-前端战斗.*\.json$/.test(f));
+const files = fs.readdirSync(ROOT).filter((f) => /^regex-前端战斗(?!.*-公开版).*\.json$/.test(f));
 if (files.length !== 1) fail('根目录应有且仅有一个 regex-前端战斗*.json，实际：' + files.join(', '));
 const jsonPath = path.join(ROOT, files[0]);
 const script = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
