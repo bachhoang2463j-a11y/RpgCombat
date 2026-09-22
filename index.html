@@ -14269,6 +14269,17 @@ function startGame() {
     }
   } catch (e) { console.warn('[RpgCombat] 状态栏传入失败:', e); }
 
+  // 商店受管物品同步（$shop_catalog）：必须在 applyPersistedRoster 与 applyStatusBarRoster 都跑完之后，
+  // 使「购买后下一场战斗自动可用、卖掉后不被旧 YAML/持久档复活」在构建链末尾一次性生效。
+  // 目录读不到时静默跳过（不提示、不阻塞开战）；数量取 stat_data 现值
+  try {
+    const shopReport = syncShopCatalogHeroItems();
+    if (shopReport.applied || shopReport.removed) {
+      showLog(`🛒 商店物品同步：入队 ${shopReport.applied} 项、剔除 ${shopReport.removed} 项`);
+      if (typeof updateHeroUI === 'function') heroesData.forEach(h => updateHeroUI(h));
+    }
+  } catch (e) { console.warn('[RpgCombat] 商店物品同步失败:', e); }
+
   // 【肃正】新战局重置全队共享屏障（含名字/护甲/克制属性）
   teamBarrier = 0; teamBarrierMax = 0; barrierStandIn = null; teamBarrierName = '圣域帷幕'; barrierArmor = 0; barrierSub = null; updateTeamBarrierUI();
   
@@ -18409,6 +18420,8 @@ function readStatusBarSnapshot() {
           ..._sbParseAttrs(c['属性']),
           // 物品行承载叙事物品（无数量段，解析为空）；战斗物品走【弹药】【消耗品】【道具】词条——多键合并读取
           items: ['物品', '弹药', '消耗品', '消耗', '道具'].flatMap(k => _sbParseItems(c[k])),
+          // 同键全部名字段（含裸名 [名]）：仅 $shop_catalog 受管物品的持有量容错使用（裸名按 1 件计）
+          itemNames: ['物品', '弹药', '消耗品', '消耗', '道具'].flatMap(k => _sbParseItemNames(c[k])),
           // 道具在场名单（道具行全部名字段）：字段缺失为 undefined（旧状态栏不介入），"无"为空数组（全部道具禁用）
           props: c['道具'] === undefined ? undefined : _sbParseItemNames(c['道具']),
         };
@@ -18456,6 +18469,199 @@ function applyStatusBarRoster(snapshot) {
   }
   rebuildItemBindingKnowledge();
   return { applied, unmatched };
+}
+
+// ==========================================
+// 开局直连（ShopBlock 商店）：$shop_catalog 受管「奇物」→ 本场我方物品栏
+// 目录（chat 变量）只存定义与归属，数量真值仍在 stat_data 状态栏物品串（_sbParseItems 口径）。
+// 读不到目录（非酒馆环境 / 本聊天无商店档案）一律静默降级，绝不报错、不阻塞开战。
+// 全程只处理「受管物品」（目录认得名字的物品），未受管物品的合并/注入语义一字不变；hero.skills 不触碰。
+// ==========================================
+const SHOP_CATALOG_VAR_KEY = '$shop_catalog';
+let _shopCatalogCache = null;   // 本场内存缓存（读到才缓存；读不到留空，下场战局可重试）
+let _shopIndexCache = null;     // 目录索引（随缓存一次构建，供注入与防复活共用）
+
+// 名字比较键：口径与 ShopBlock speakerKey 完全一致——剥除全部非中文/字母数字字符后小写。
+// （RpgCombat 既有 normName 只去空格+小写，处理不了 emoji / 间隔号前缀，故按契约另写一个）
+function shopNameKey(name) {
+  return String(name == null ? '' : name).replace(/[^\u4e00-\u9fa5A-Za-z0-9]+/g, '').toLowerCase();
+}
+
+// 物品名比较键：先剥括号备注（与状态栏物品串剥离口径一致）再走同一归一
+function shopItemKey(name) {
+  return shopNameKey(String(name == null ? '' : name).replace(/[(（][^)）]*[)）]/g, ''));
+}
+
+// 读 $shop_catalog（chat 变量）：能力位检测 + try/catch 兜底，取不到返回 null。
+// 只复制需要的三个字典，不持有酒馆返回对象本体（杜绝任何写回风险）
+function readShopCatalog() {
+  if (_shopCatalogCache) return _shopCatalogCache;
+  try {
+    if (typeof getVariables !== 'function') return null;
+    const vars = getVariables({ type: 'chat' });
+    const raw = (vars && typeof vars === 'object') ? vars[SHOP_CATALOG_VAR_KEY] : null;
+    if (!raw || typeof raw !== 'object') return null;
+    if (!raw.items || typeof raw.items !== 'object') return null;
+    _shopCatalogCache = {
+      items: raw.items,
+      holds: (raw.holds && typeof raw.holds === 'object') ? raw.holds : {},
+      sold: (raw.sold && typeof raw.sold === 'object') ? raw.sold : {},
+    };
+  } catch (e) { return null; }
+  return _shopCatalogCache;
+}
+
+// 目录索引：byId（itemId → 定义）/ byNameKey（物品名键 → {id,def}）/ holdsByOwner（ownerKey → 持有列表，
+// 仅 char；载具库存只作储存不参与战斗注入）/ soldById（售出墓碑）
+function buildShopIndex() {
+  if (_shopIndexCache) return _shopIndexCache;
+  const cat = readShopCatalog();
+  if (!cat) return null;
+  const byId = new Map();
+  const byNameKey = new Map();
+  const holdsByOwner = new Map();
+  const soldById = new Map();
+  Object.keys(cat.items).forEach(id => {
+    const def = cat.items[id];
+    if (!def || typeof def !== 'object') return;
+    byId.set(String(id), def);
+    const k = shopItemKey(def.name);
+    if (k && !byNameKey.has(k)) byNameKey.set(k, { id: String(id), def: def });
+  });
+  Object.keys(cat.holds).forEach(hk => {
+    const h = cat.holds[hk];
+    if (!h || !h.itemId) return;
+    if ((h.ownerKind === 'vehicle' ? 'vehicle' : 'char') !== 'char') return;
+    const ok = shopNameKey(h.owner) || shopNameKey(String(hk).split('|')[0]);
+    if (!ok) return;
+    if (!holdsByOwner.has(ok)) holdsByOwner.set(ok, []);
+    holdsByOwner.get(ok).push({ itemId: String(h.itemId), name: String(h.name || ''), field: String(h.field || '') });
+  });
+  Object.keys(cat.sold).forEach(id => {
+    const rec = cat.sold[id];
+    if (rec && typeof rec === 'object') soldById.set(String(id), rec);
+  });
+  _shopIndexCache = { byId: byId, byNameKey: byNameKey, holdsByOwner: holdsByOwner, soldById: soldById };
+  return _shopIndexCache;
+}
+
+// 该受管物品对该英雄是否「已售出」（防复活判据，收紧版）：必须同时满足
+//   ① items[id].status === 'sold'（目录墓碑：售出路径 catalogMarkSold 写入）；
+//   ② 墓碑 owner 名单键与该英雄相等，且 ownerKind 相等（英雄恒为 char，载具售出不算在该英雄头上）；
+//   ③ 该英雄此刻并未持有它（holds 里没有）——买回后墓碑未清的旧档由 catalogLink 重新登记，
+//      此时不压制、走正常注入。
+// 不再按「不在 holds 就压制」：目录按名字索引，同名副本可能由剧情发给别的角色，
+// 一件被人卖出的同名物品不得牵连持有者的既有条目。
+function shopItemSoldForHero(idx, id, def, heroKey) {
+  if (!def || def.status !== 'sold') return false;
+  if (!heroKey) return false;
+  const held = idx.holdsByOwner.get(heroKey) || [];
+  if (held.some(h => h.itemId === String(id))) return false;
+  const tomb = (id == null || id === '') ? null : idx.soldById.get(String(id));
+  if (!tomb) return false;
+  if ((tomb.ownerKind === 'vehicle' ? 'vehicle' : 'char') !== 'char') return false;
+  return shopNameKey(tomb.owner) === heroKey;
+}
+
+// 目录定义 → 物品对象（走现有物品解析路径：对象形式 = 父键行 + 子行数组，与 Combat_block YAML 同构）
+function parseShopBattleItem(def) {
+  const battle = (def && def.battle && typeof def.battle === 'object') ? def.battle : null;
+  const line = (battle && typeof battle.line === 'string') ? battle.line.trim() : '';
+  if (!line) return null;
+  const children = (battle && Array.isArray(battle.children)) ? battle.children.filter(s => typeof s === 'string' && s.trim()) : [];
+  let item = null;
+  try {
+    item = children.length ? parseItemList([{ [line]: children }])[0] : parseItem(line);
+  } catch (e) { return null; }
+  if (!item || !item.name) return null;
+  // 道具按「每场重置」语义：次数以 line 为准，line 未声明时取 battle.slots 里的同标签
+  if (item.category === '道具') {
+    const slots = (battle && Array.isArray(battle.slots)) ? battle.slots : [];
+    const meta = [line].concat(slots.map(s => (typeof s === 'string' ? s : ''))).join(' ');
+    const m = meta.match(/\[次数[:：](\d+)\]/i);
+    if (m) item.maxUses = parseInt(m[1], 10) || 0;
+    item.usesRemaining = item.maxUses;
+  }
+  return item;
+}
+
+// stat_data 持有量（数量真值）：状态栏物品串按名解析（与 _sbParseItems 同口径），查不到返回 null。
+// 计数形态（[名xN] / [名:N]，含明确归零的 x0/:0）取 N；裸形态（[名]，无数量段）按 1 件计——
+// 裸条目在状态栏语义里就是"拥有这件东西"，读成 0 会让刚获得、却被写成裸名的受管物品永不进战斗。
+// 该容错只作用于本函数：调用点仅在 holds 命中的受管物品循环内，未受管物品不走这条路径。
+function shopHeldCount(heroName, itemName) {
+  const snap = _statusBarSnapshot;
+  if (!snap || !Array.isArray(snap.heroes)) return null;
+  const hk = shopNameKey(heroName), ik = shopItemKey(itemName);
+  if (!hk || !ik) return null;
+  const sb = snap.heroes.find(x => x && shopNameKey(x.name) === hk);
+  if (!sb) return null;
+  const hit = (sb.items || []).find(x => x && shopItemKey(x.name) === ik);
+  if (hit) return (+hit.count || 0);   // 计数形态（x0/:0 → 0，不翻成 1）
+  const bare = (sb.itemNames || []).some(n => shopItemKey(n) === ik);
+  return bare ? 1 : null;              // 裸形态 → 按 1 件计；名字完全不在 → 视为没有
+}
+
+// 受管物品同步（开战构建链末尾调用：applyPersistedRoster 与 applyStatusBarRoster 都跑完之后；幂等）
+// ①防复活：该英雄已售出的受管物品，从 hero.items 里剔除旧 YAML/持久化带回来的同名项；
+// ②注入/覆盖：英雄 holds 命中的受管物品——已有同名项以 battle.line 效果覆盖（受管物品效果以存档为准，
+//   防旧 YAML 漂移），没有则走现有物品解析路径新建；数量一律取 stat_data 现值，
+//   持有量为 0 或状态栏里找不到该名字 → 视为没有（不注入）。
+// 返回 { applied, removed } 供 UI 反馈
+function syncShopCatalogHeroItems() {
+  const idx = buildShopIndex();
+  if (!idx) return { applied: 0, removed: 0 };
+  let applied = 0, removed = 0;
+  heroesData.forEach(hero => {
+    if (!hero || hero.isSummon) return;
+    const heroKey = shopNameKey(hero.name);
+    if (!heroKey) return;
+    // ① 防复活剔除（只判受管物品名：目录不认得的物品一律跳过，语义一字不变）
+    if (Array.isArray(hero.items) && hero.items.length) {
+      const before = hero.items.length;
+      hero.items = hero.items.filter(it => {
+        if (!it || !it.name) return true;
+        const rec = idx.byNameKey.get(shopItemKey(it.name));
+        if (!rec) return true;
+        return !shopItemSoldForHero(idx, rec.id, rec.def, heroKey);
+      });
+      removed += before - hero.items.length;
+    }
+    // ② 注入/覆盖：遍历该英雄持有的受管物品（载具持有不在索引内）
+    const held = idx.holdsByOwner.get(heroKey) || [];
+    held.forEach(h => {
+      let def = idx.byId.get(h.itemId) || null;
+      if (!def && h.name) { const rec = idx.byNameKey.get(shopItemKey(h.name)); if (rec) def = rec.def; }
+      if (!def) return;
+      const id = h.itemId || def.id || '';
+      if (shopItemSoldForHero(idx, id, def, heroKey)) return;   // 已售出 → 不注入（同名项已由①剔除）
+      let cnt = shopHeldCount(hero.name, def.name);
+      if (cnt == null && h.name) cnt = shopHeldCount(hero.name, h.name);
+      if (!(cnt > 0)) return;   // 持有量为 0 / 找不到该名字 → 视为没有
+      const item = parseShopBattleItem(def);
+      if (!item) return;
+      const keys = [shopItemKey(def.name), shopItemKey(h.name)].filter(Boolean);
+      if (!Array.isArray(hero.items)) hero.items = [];
+      const cur = hero.items.find(it => it && it.name && keys.indexOf(shopItemKey(it.name)) >= 0);
+      if (cur) Object.assign(cur, item, { isItem: true, count: cnt });
+      else { item.count = cnt; hero.items.push(item); }
+      applied++;
+    });
+  });
+  if (applied || removed) rebuildItemBindingKnowledge();
+  return { applied, removed };
+}
+
+// 受管物品的持久化合并豁免：仅当该受管物品「已售出且墓碑命中该英雄」时才跳过
+// 「YAML 优先合并」与「持久化独有项整条追加」两条复活路径。
+// 目录读不到、名字未被受管、或该英雄仍在 holds 里持有它时返回 false
+// → 未受管物品、以及他人持有/剧情发给本人的同名副本，合并语义一字不变。
+function shopSuppressPersistedItem(hero, itemName) {
+  const idx = buildShopIndex();
+  if (!idx) return false;
+  const rec = idx.byNameKey.get(shopItemKey(itemName));
+  if (!rec) return false;   // 未受管 → 不介入
+  return shopItemSoldForHero(idx, rec.id, rec.def, shopNameKey(hero && hero.name));
 }
 
 // 合并：对 heroesData 中每个角色，按名匹配持久化角色
@@ -18548,6 +18754,9 @@ function applyPersistedRoster() {
         const mergedYamlItems = (h.items || []).map(yItem => {
             const sItem = savedItemByName.get(yItem.name);
             if (!sItem) return yItem;
+            // 受管物品防复活：已售出 / 已不在该英雄 holds 里的受管物品跳过「YAML 优先合并」
+            //（未受管物品不受影响；目录读不到时 shopSuppressPersistedItem 恒为 false）
+            if (shopSuppressPersistedItem(h, yItem.name)) return yItem;
             // 基座 yItem（效果字段一律 YAML），sItem 在前仅兜底保留 YAML 缺失的键（旧档字段演进）
             const merged = Object.assign({}, sItem, yItem, { isItem: true, count: yItem.count, usesRemaining: yItem.maxUses || 0 });
             // 变体用法（children）：同名用法 YAML 为准，持久化独有用法并入（含 YAML 物品无 children 的场景）
@@ -18573,7 +18782,8 @@ function applyPersistedRoster() {
             return merged;
         });
         const yamlItemNames = new Set(mergedYamlItems.map(it => it.name));
-        const extraSavedItems = savedItems.filter(it => !yamlItemNames.has(it.name)).map(it => Object.assign({ isItem: true, usesRemaining: it.maxUses || 0 }, it));
+        // 受管且已售出/已不在 holds 的持久化独有物品整条追加豁免（同样只对受管物品生效）
+        const extraSavedItems = savedItems.filter(it => !yamlItemNames.has(it.name) && !shopSuppressPersistedItem(h, it.name)).map(it => Object.assign({ isItem: true, usesRemaining: it.maxUses || 0 }, it));
         h.items = [...mergedYamlItems, ...extraSavedItems];
     }
   });
