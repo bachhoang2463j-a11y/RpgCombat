@@ -2531,13 +2531,13 @@ const SKILL_TYPES = [
   '[自盲]', '[自降]', '[自弱]', '[自滞]', '[自缓]',
   '[驱散]', '[群驱散]',
   '[肃正]', '[肃正:近战]', '[肃正:远程]', '[肃正:法术]',
-  '[必中]', '[转火]', '[突进]',
+  '[必中]', '[转火]', '[突进]', '[众召]',
   '[高阶]', '[传奇]', '[神术]',
   '[近战]', '[远程]', '[法术]'
 ];
-// 编辑器标签槽位下拉专用选项：SKILL_TYPES 剔除非槽位标签（必中/转火/突进走药丸开关，高阶/传奇/神术走药丸开关，近战/远程/法术走"属性"下拉）。
+// 编辑器标签槽位下拉专用选项：SKILL_TYPES 剔除非槽位标签（必中/转火/突进/众召走药丸开关，高阶/传奇/神术走药丸开关，近战/远程/法术走"属性"下拉）。
 // SKILL_TYPES 本体保持完整——normalizeColonPowerTags 解析白名单依赖它，勿删。
-const SKILL_TYPE_EDIT_OPTIONS = SKILL_TYPES.filter(t => !['[必中]', '[转火]', '[突进]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]'].includes(t));
+const SKILL_TYPE_EDIT_OPTIONS = SKILL_TYPES.filter(t => !['[必中]', '[转火]', '[突进]', '[众召]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]'].includes(t));
 
 // 【自X】自身负面标签族：技能代价机制——对施法者自身施加属性减益（盲=命中/降=防御/弱=攻击/滞=闪避/缓=速度）。
 // 语义：使用后必中（跳过命中/闪避掷骰与反应/看破/舍身拦截，不随同技能攻击的命中结论落空）、
@@ -2560,7 +2560,7 @@ const TAG_EXPAND_MAP = {
   '单避': '目标闪避', '群避': '群体闪避', '自盲': '自身致盲',
   '自降': '自身降防', '自弱': '自身降攻', '自滞': '自身降避', '自缓': '自身缓速',
   '嘲讽': '目标嘲讽', '隐匿': '战术隐匿', '反击': '受击反击', '群反击': '全体反击',
-  '再动': '额外行动', '回避': '紧急回避', '免伤': '绝对免伤', '必中': '锁定必中', '转火': '转火追击', '突进': '突进越阵',
+  '再动': '额外行动', '回避': '紧急回避', '免伤': '绝对免伤', '必中': '锁定必中', '转火': '转火追击', '突进': '突进越阵', '众召': '众召破限',
   '中毒': '毒素侵蚀', '群中毒': '群体中毒', '燃烧': '火焰灼烧', '群燃烧': '群体灼烧',
   '麻痹': '雷电麻痹', '群麻痹': '群体麻痹', '驱散': '净化', '群驱散': '群体净化',
   '肃正': '绝对肃正', '高阶': '高阶战技', '传奇': '传奇秘术'
@@ -2640,6 +2640,7 @@ const TAG_EFFECT_TIPS = {
   '必中': '该技能跳过闪避判定必定命中（仍可被敌方反应或看破化解）。',
   '转火': '多段连续攻击中，前置攻击段击杀当前目标后，后续攻击段自动转向其他存活敌人。',
   '突进': '近战攻击不受前排掩护限制，可直接攻击敌方后排（与职业【征伐者·破阵贯穿】同效）。',
+  '众召': '群体召唤：本技能一次可召唤多只（清单用 ；/， 分隔，每只可带 *N，如 幻影*4；暗影），且其召唤物不占阵营召唤名额上限（默认 4 只），可超出上限入场。',
   '自盲': '施展代价：降低自身命中率 {N} 点。固定值生效，不受极限爆发与暴击放大。',
   '自降': '施展代价：降低自身防御力 {N} 点。',
   '自弱': '施展代价：降低自身攻击力 {N} 点。',
@@ -3320,6 +3321,8 @@ const DIGEST_RULES = [
   { srcLine: 9386,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 召唤「(.+?)」失败：未找到图鉴词条$/, build: m => ({ text: `⚠ ${m[1]} 召唤「${m[2]}」失败` }) },
   { srcLine: 9394,  kind: 'event',  re: /^ {0,4}⚠️ \[(.+?)\] 召唤「(.+?)」失败：词条无 <Combat_block>$/, build: m => ({ text: `⚠ ${m[1]} 召唤「${m[2]}」失败` }) },
   { srcLine: 13655, kind: 'drop',   re: /⛔ 召唤【.+?】被看破破局/ },
+  // V11.16 多召：名额不足的截断告警不回灌给 LLM（信息量低，且召唤成功行已在上方登记）
+  { srcLine: 0, kind: 'drop',   re: /召唤名额不足，仅召唤 \d+ 只/ },
   { srcLine: 13683, kind: 'drop',   re: /⛔ 技能【.+?】被看破破局/ },
   // --- 撤离判定（保留结论丢骰值） ---
   { srcLine: 14875, kind: 'terminal', re: /^\[战况\] 💨 (.+?) 尝试撤离（.*?）——(成功脱离战场|被敌方截住，撤离失败)！$/, build: m => ({ text: `💨 ${m[1]} 尝试撤离——${m[2].startsWith('成功') ? '成功脱离战场' : '被截住，失败'}` }) },
@@ -8533,6 +8536,25 @@ let barrierStandIn = null;
 let pendingSummons = [];
 let summonSeq = 0;
 
+// 【召唤】名额与硬闸（调参点集中在这里）
+const SUMMON_SIDE_LIMIT = 4;    // 每阵营（我方/敌方各自）存活召唤物名额；带 [众召] 的技能不受此限
+const SUMMON_CAST_MAX = 12;     // 单次释放（一个技能/物品）的召唤总数硬闸，防 *N 手滑把界面冻住
+const ENEMY_TOTAL_HARD_CAP = 12; // 敌方阵营总数硬闸（含非召唤物）；[众召] 不绕过它（性能/UI 安全阀）
+
+// 占用名额的召唤物数：[众召] 召唤出来的（summonNoLimit）不计入
+function countLimitedSummons(side) {
+    const arr = side === 'hero' ? heroesData : enemiesData;
+    return (arr || []).filter(e => e.isAlive && e.isSummon && !e.summonNoLimit).length;
+}
+
+// 【召唤】名额已满判定：非 [众召] 的召唤类技能/物品，我方名额用尽时不可用（卡片置灰 + 点击拦截）。
+// 还剩 1~3 个名额时不置灰——按"部分成功"照常可用，能召几只召几只。
+function isSummonBlockedByLimit(skillOrItem) {
+    if (!skillOrItem || !skillOrItem.summonTarget) return false;
+    if (skillOrItem.summonNoLimit) return false;
+    return countLimitedSummons('hero') >= SUMMON_SIDE_LIMIT;
+}
+
 // ==========================================
 // 【场地】战前准备效果系统（V6.14）
 // YAML 我方列表行支持后缀 (场地:xx)，战斗开始时为我方全体注入战前准备状态的 buff/debuff。
@@ -8651,6 +8673,25 @@ function parseNameTagAndMultiplier(rawName) {
     return { baseName, count, tags };
 }
 
+// 【召唤】召唤清单解析：`A*4；B` / `A×3, C` / 单个 `A` → [{name,count,tags}]
+// 分隔符：；;，,、 与换行；每条走 parseNameTagAndMultiplier 取 *N/×N 与名字里的 [...] 变种标签。
+// count 钳制 1..SUMMON_CAST_MAX；单目标旧写法（无分隔符、无 *N）天然得到 [{name:'A',count:1}]，向后兼容。
+function parseSummonList(text) {
+    return String(text || '')
+        .split(/[；;，,、\n]/)
+        .map(seg => seg.trim())
+        .filter(Boolean)
+        .map(seg => {
+            const { baseName, count, tags } = parseNameTagAndMultiplier(seg);
+            return {
+                name: (baseName || seg).trim(),
+                count: Math.min(SUMMON_CAST_MAX, Math.max(1, count || 1)),
+                tags: tags || []
+            };
+        })
+        .filter(item => !!item.name);
+}
+
 function parseAttributes(attrStr) {
     let hp = attrStr.match(/\[HP:(\d+)\/(\d+)\]/i); let mp = attrStr.match(/\[MP:(\d+)\/(\d+)\]/i);
     let atk = attrStr.match(/\[Atk:(\d+)\]/i); let armor = attrStr.match(/\[Armor:(\d+)\]/i); let speed = attrStr.match(/\[Speed:(\d+)\]/i);
@@ -8750,9 +8791,17 @@ function parseSkill(skillStr) {
     if (sheshenMatch) sheshenTarget = sheshenMatch[1] ? sheshenMatch[1].trim() : 'all';
 
     // 解析 [召唤:词条名] → skill.summonTarget（独立字段，不占 type/power 三槽；编辑器输入框同步写入此字段）
+    // 【多召 V11.16】一个技能可写多个召唤标签，也可在单个标签内用 ；/，/、 分隔多只：
+    //   [召唤:幻影*4][召唤:暗影]  ≡  [召唤:幻影*4；暗影]  → 统一存成 `幻影*4；暗影` 字符串（字段仍是字符串，卡片/编辑器/透传零改动）
+    // 名字内允许一层 [...] 变种标签（如 [召唤:食尸鬼[复活]*2]），与既有"召唤名剥离 tags 透传"口径一致。
     let summonTarget = null;
-    let summonMatch = skillStr.match(/\[\s*召唤\s*[:：]\s*([^\]]+)\]/i);
-    if (summonMatch) { summonTarget = summonMatch[1].trim() || null; skillStr = skillStr.replace(summonMatch[0], ''); }
+    const _summonMatches = [...skillStr.matchAll(/\[\s*召唤\s*[:：]\s*((?:[^\[\]]|\[[^\[\]]*\])+)\]/gi)];
+    if (_summonMatches.length) {
+        summonTarget = _summonMatches.map(m => m[1].trim()).filter(Boolean).join('；') || null;
+        _summonMatches.forEach(m => { skillStr = skillStr.replace(m[0], ''); });
+    }
+    // 解析 [众召] 标签 → skill.summonNoLimit（独立布尔标记：本次召唤不占我方召唤名额上限，可超 4 只；不占标签槽）
+    let summonNoLimit = /\[众召\]/i.test(skillStr);
     
     // 解析 [他人] 标签 → skill.isOthers（独立布尔标记，允许该技能对"其他角色"施放）
     let isOthers = /\[他人\]/i.test(skillStr);
@@ -8824,7 +8873,7 @@ function parseSkill(skillStr) {
     let fxTagMatch = skillStr.match(/\[特效:([^\]]+)\]/i);
     let fxTag = fxTagMatch ? fxTagMatch[1].trim() : null;
 
-    return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, sheshenTarget: sheshenTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, isHighTier: _isHighTier, isLegendary: _isLegendary, summonTarget: summonTarget };
+    return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, sheshenTarget: sheshenTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, isHighTier: _isHighTier, isLegendary: _isLegendary, summonTarget: summonTarget, summonNoLimit: summonNoLimit };
 }
 
 // ==========================================
@@ -8903,13 +8952,15 @@ function parseItem(itemStr) {
     // [延迟:N] 蓄力 / [加速:N] 永久加速库存 / [召唤:词条名]：物品与技能同语义（蓄力押注、蓄满释放结算召唤）
     let delayMatch = raw.match(/\[延迟:(\d+)\]/i); let delay = delayMatch ? parseInt(delayMatch[1]) : 0;
     let hasteMatch = raw.match(/\[加速:(\d+)\]/i); let haste = hasteMatch ? parseInt(hasteMatch[1]) : 0;
-    let summonMatch = raw.match(/\[\s*召唤\s*[:：]\s*([^\]]+)\]/i);
-    let summonTarget = summonMatch ? (summonMatch[1].trim() || null) : null;
+    // [召唤] 与技能同语义：多标签/标签内分隔均支持，统一存 `A*4；B` 字符串；[众召] 破限标记同技能
+    const _summonMatches = [...raw.matchAll(/\[\s*召唤\s*[:：]\s*((?:[^\[\]]|\[[^\[\]]*\])+)\]/gi)];
+    let summonTarget = _summonMatches.length ? (_summonMatches.map(m => m[1].trim()).filter(Boolean).join('；') || null) : null;
+    let summonNoLimit = /\[众召\]/i.test(raw);
 
     // 弹药是技能资源而非主动道具：效果槽无意义，强制清空
     if (category === '弹药') { types = ['[无]', '[无]', '[无]']; powers = [0, 0, 0]; }
 
-    return { isItem: true, name: name, category: category, count: count, maxUses: maxUses, usesRemaining: maxUses, bindings: bindings, cost: cost, hpCost: hpCost, tpCost: tpCost, delay: delay, haste: haste, summonTarget: summonTarget, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, isHighTier: _isHighTier, isLegendary: _isLegendary };
+    return { isItem: true, name: name, category: category, count: count, maxUses: maxUses, usesRemaining: maxUses, bindings: bindings, cost: cost, hpCost: hpCost, tpCost: tpCost, delay: delay, haste: haste, summonTarget: summonTarget, summonNoLimit: summonNoLimit, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, isHighTier: _isHighTier, isLegendary: _isLegendary };
 }
 
 // ==========================================
@@ -9550,34 +9601,13 @@ function hasAliveFront() { return enemiesData.some(e => e.isAlive && e.row === '
 function hasAliveBack() { return enemiesData.some(e => e.isAlive && e.row === 'back'); }
 
 // ==========================================
-// 【召唤】世界书中途解析 + 下回合入队（pending → flush）
+// 【召唤】世界书解析 + 即时参战（批量入口支持 `A*4；B` 清单与 [众召] 破限）
 // ==========================================
-async function summonFromWorldbook(caster, summonName) {
-    const SIDE_LIMIT = 4;
-    const side = isHeroSideEntity(caster) ? 'hero' : 'enemy'; // 召唤物 id 为 s_* 前缀，链式召唤需按 side 判定阵营
-    // 敌方总额 12 满员阻断（不影响我方与现有 SIDE_LIMIT=4 逻辑）
-    if (side === 'enemy' && Array.isArray(enemiesData) && enemiesData.filter(e => e.isAlive !== false).length >= 12) {
-        const dom0 = caster && caster.id ? (document.getElementById(`hero-card-${caster.id}`) || document.getElementById(`${caster.id}-sprite`)) : null;
-        if (dom0) createFloatingText(dom0, '敌方已满员', 'text-amber-300');
-        addHistory(`   ⚠️ [${caster.name}] 召唤失败：敌方已达上限(12)`);
-        showLog('召唤失败：敌方已满员');
-        return false;
-    }
-    const aliveCount = (side === 'hero' ? heroesData : enemiesData).filter(e => e.isAlive && e.isSummon).length;
-    const pendingCount = pendingSummons.filter(p => p.side === side).length;
-    if (aliveCount + pendingCount >= SIDE_LIMIT) {
-        const dom = caster && caster.id ? (document.getElementById(`hero-card-${caster.id}`) || document.getElementById(`${caster.id}-sprite`)) : null;
-        if (dom) createFloatingText(dom, '召唤已达上限', 'text-amber-300');
-        addHistory(`   ⚠️ [${caster.name}] 召唤失败：${side === 'hero' ? '我方' : '敌方'}召唤物已达上限(${SIDE_LIMIT})`);
-        showLog('召唤失败：已达上限');
-        return false;
-    }
-    if (!summonName) {
-        const dom2 = caster && caster.id ? (document.getElementById(`hero-card-${caster.id}`) || document.getElementById(`${caster.id}-sprite`)) : null;
-        if (dom2) createFloatingText(dom2, '召唤失败：未指定对象', 'text-amber-300');
-        addHistory(`   ⚠️ [${caster.name}] 召唤失败：未指定召唤对象`);
-        return false;
-    }
+// 造一只召唤物实体并即时入队（只管"单只"：解析词条 → 建实体 → 入队 → 飘字）。
+// 名额判定与批量收尾（重排 / 渲染 / 汇总战报）由 summonFromWorldbook 统一负责。
+// spec: { name, tags? }；失败时自行播报告警并返回 null（不中断同批次的其它名字）。
+async function createSummonEntity(caster, spec, side, opts) {
+    const summonName = (spec && spec.name) ? String(spec.name).trim() : '';
     if (!worldbookCache.length) {
         try { await loadWorldbookData(); } catch(e) {}
     }
@@ -9596,11 +9626,10 @@ async function summonFromWorldbook(caster, summonName) {
         addHistory(`   ⚠️ [${caster.name}] 召唤「${summonName}」失败：词条无 <Combat_block>`);
         return false;
     }
-    // 复用开战管线：用召唤名上的 [...]/ *N 标签与世界书块直接生成新目标（不再 Object.assign 浅拷与硬编码 tier/row/img 覆盖）
-    const _summonNameTag = typeof parseNameTagAndMultiplier === 'function' ? parseNameTagAndMultiplier(summonName) : { baseName: summonName, tags: [] };
-    // 传入召唤名剥离的 tags，使 [复活][自爆][智慧] 等世界书/名字特性与被动完整生效（*N 在召唤中不展开，仅透传特性）
+    // 复用开战管线：用召唤清单里的 [...] 变种标签与世界书块直接生成新目标（不再 Object.assign 浅拷与硬编码 tier/row/img 覆盖）
+    // 传入剥离出的 tags，使 [复活][自爆][智慧] 等世界书/名字特性与被动完整生效（*N 只作数量，由批量入口循环展开，不在此展开）
     const _idx = side === 'enemy' ? enemiesData.length : heroesData.length;
-    const summonEntity = parseEnemyItem(cbData, _idx, _summonNameTag.tags || []);
+    const summonEntity = parseEnemyItem(cbData, _idx, (spec && spec.tags) || []);
     summonEntity._worldbookRawContent = entry.content || '';
     summonEntity.wbSource = { wbName: worldbookSettings.boundName, entryName: entry.name, desc: extractWorldbookDescription(entry.content) };
     summonEntity.id = 's_' + Date.now() + '_' + (summonSeq++);
@@ -9614,40 +9643,106 @@ async function summonFromWorldbook(caster, summonName) {
     summonEntity.tier = getEnemyTier(summonEntity);
     if (side === 'enemy' && !summonEntity.row) { summonEntity.row = 'front'; summonEntity._rowOrder = 999; }
     else if (side === 'enemy' && summonEntity._rowOrder === undefined) summonEntity._rowOrder = 999;
+    // [众召] 破限标记：该实体不占用阵营召唤名额（countLimitedSummons 不计它，也不阻断其它召唤）
+    if (opts && opts.noLimit) summonEntity.summonNoLimit = true;
     function baseEmojiFallback(e){ try{ const c=(e && e.name)||''; if(!c) return null; if(c.includes('幽')||c.includes('鬼')) return '👻'; if(c.includes('潜')||c.includes('深')) return '🦑'; if(c.includes('狼')) return '🐺'; return null; }catch(_){ return null; } }
     // 注入固定全能舍身（仅替 owner 挡单体致死）
     const guardSkill = { name: '舍身守护', isReaction:false, reactionTarget:'all', kanpoTarget:null, sheshenTarget:'all', _ownerOnly:true, isOthers:false, guaranteedHit:false, isHighTier:false, isLegendary:false, damageType:null, fxTag:null, cost:0, hpCost:0, tpCost:0, hit:100, turns:null, type:'[无]', power:0, type2:'[无]', power2:0, type3:'[无]', power3:0, barrierSub:null, barrierArmor:0, maxUses:0, usesRemaining:0, summonTarget:null, delay:0, haste:0, charge:0 };
     summonEntity.skills = Array.isArray(summonEntity.skills) ? [guardSkill].concat(summonEntity.skills) : [guardSkill];
     // 【修复①】即时入队：直接推入阵营并插入行动队列（下回合入队改为即时参战）
-    const _isBattle = !!(state && state.isGameStarted);
+    // 队列插入在这里做，重排/渲染交由批量入口收尾统一执行一次（多召时逐只重排会重复 N 次全量开销）
     if (side === 'hero') heroesData.push(summonEntity);
     else enemiesData.push(summonEntity);
-    // 召唤物排位：敌方默认 front 已赋值，避免 assignEnemyRows 全量重排闪动（已满 12 的情况在前已阻断）
+    // 召唤物排位：敌方默认 front 已赋值，避免 assignEnemyRows 全量重排闪动（已满 12 的情况在批量入口已阻断）
     try { if (side === 'enemy' && !summonEntity.row && typeof assignEnemyRows === 'function') assignEnemyRows(); } catch(e) {}
-    if (_isBattle) {
+    if (state && state.isGameStarted && state.actionQueue && state.actionQueue.length) {
         try {
-            if (state.actionQueue && state.actionQueue.length) {
-                const t = side === 'hero' ? 'hero' : 'enemy';
-                const cnt = summonEntity.actCount || 1;
-                const entries = [];
-                for (let i = 0; i < cnt; i++) entries.push({ type: t, ref: summonEntity, isExtraTurn: false });
-                state.actionQueue.splice(state.queueIndex + 1, 0, ...entries);
-                if (typeof reorderRemainingQueue === 'function') reorderRemainingQueue();
-                if (typeof renderTurnQueue === 'function') renderTurnQueue();
+            const t = side === 'hero' ? 'hero' : 'enemy';
+            const entries = [];
+            for (let i = 0; i < (summonEntity.actCount || 1); i++) entries.push({ type: t, ref: summonEntity, isExtraTurn: false });
+            state.actionQueue.splice(state.queueIndex + 1, 0, ...entries);
+        } catch(e) {}
+    }
+    // 每只都给即时反馈（多召时逐只飘字 + 爆闪光环，反馈密度与单只一致）
+    const casterDom = caster && caster.id ? (document.getElementById(`hero-card-${caster.id}`) || document.getElementById(`${caster.id}-sprite`)) : null;
+    if (casterDom) { createFloatingText(casterDom, `召唤阵：${summonName}`, 'text-sky-300'); if (window.spawnBurstAura) spawnBurstAura(casterDom); }
+    return summonEntity;
+}
+
+// 【召唤】批量入口：接受单个名字、`A*4；B` 清单，或多个 [召唤:] 合并后的同一串（字段口径见 parseSkill）。
+// opts.noLimit = [众召] 破限（本次召唤不占名额）；返回是否至少召出 1 只。
+// 语义要点：①逐只扣名额，用尽即止（部分成功）；②某个名字解析失败只跳过它，同批其它照常；③敌方 12 总数硬闸不被 [众召] 绕过。
+async function summonFromWorldbook(caster, summonText, opts) {
+    const side = isHeroSideEntity(caster) ? 'hero' : 'enemy'; // 召唤物 id 为 s_* 前缀，链式召唤需按 side 判定阵营
+    const noLimit = !!(opts && opts.noLimit);
+    const specs = parseSummonList(summonText);
+    const _casterDom = caster && caster.id ? (document.getElementById(`hero-card-${caster.id}`) || document.getElementById(`${caster.id}-sprite`)) : null;
+    if (!specs.length) {
+        if (_casterDom) createFloatingText(_casterDom, '召唤失败：未指定对象', 'text-amber-300');
+        addHistory(`   ⚠️ [${caster.name}] 召唤失败：未指定召唤对象`);
+        return false;
+    }
+    // 名额账本：[众召] 不记账；否则扣掉"当前占用名额的召唤物 + 遗留挂起项"
+    let quota = noLimit ? Infinity : Math.max(0, SUMMON_SIDE_LIMIT - countLimitedSummons(side) - pendingSummons.filter(p => p.side === side).length);
+    const created = [];
+    const bySpec = [];              // [{ spec, made }] 供收尾按名字汇总战报
+    let stopReason = null;          // 'sideLimit' | 'enemyTotal' | 'castMax'
+    outer:
+    for (const spec of specs) {
+        let made = 0;
+        for (let i = 0; i < spec.count; i++) {
+            if (quota <= 0) { stopReason = 'sideLimit'; break outer; }
+            if (created.length >= SUMMON_CAST_MAX) { stopReason = 'castMax'; break outer; }   // 单次硬闸（防 *N 手滑冻界面），[众召] 同样受限
+            if (side === 'enemy' && Array.isArray(enemiesData) && enemiesData.filter(e => e.isAlive !== false).length >= ENEMY_TOTAL_HARD_CAP) {
+                stopReason = 'enemyTotal'; break outer;
             }
+            const ent = await createSummonEntity(caster, spec, side, opts);
+            if (!ent) break;            // 该名字失败（已自行告警）：跳到下一个名字，不影响同批其它召唤
+            created.push(ent);
+            made++;
+            if (!noLimit) quota--;
+        }
+        if (made > 0) bySpec.push({ spec, made });
+    }
+    if (!created.length) {
+        // 一只都没召出：名额类阻断沿用既有文案（战报摘要表已按这些句式做 drop 规则）
+        if (stopReason === 'enemyTotal') {
+            if (_casterDom) createFloatingText(_casterDom, '敌方已满员', 'text-amber-300');
+            addHistory(`   ⚠️ [${caster.name}] 召唤失败：敌方已达上限(${ENEMY_TOTAL_HARD_CAP})`);
+            showLog('召唤失败：敌方已满员');
+        } else if (stopReason === 'sideLimit') {
+            if (_casterDom) createFloatingText(_casterDom, '召唤已达上限', 'text-amber-300');
+            addHistory(`   ⚠️ [${caster.name}] 召唤失败：${side === 'hero' ? '我方' : '敌方'}召唤物已达上限(${SUMMON_SIDE_LIMIT})`);
+            showLog('召唤失败：已达上限');
+        }
+        return false;
+    }
+    // ---- 批量收尾：一次重排 + 一次渲染 ----
+    if (state && state.isGameStarted) {
+        try {
+            if (typeof reorderRemainingQueue === 'function') reorderRemainingQueue();
+            if (typeof renderTurnQueue === 'function') renderTurnQueue();
         } catch(e) {}
         if (side === 'hero') {
-            try { initUIIncrementalSummon(summonEntity); } catch(e) { try { initUI(); } catch(e2) {} }
+            // 我方召唤行走增量追加（每只一次），不重建全场
+            created.forEach(ent => { try { window.initUIIncrementalSummon(ent); } catch(e) { try { initUI(); } catch(e2) {} } });
         } else {
             try { if (typeof window.renderEnemyFormation === 'function') window.renderEnemyFormation(); } catch(e) { try { initUI(); } catch(e2) {} }
         }
     } else {
         try { if (typeof window.renderEnemyFormation === 'function' && side === 'enemy') window.renderEnemyFormation(); else initUI(); } catch(e) { try { initUI(); } catch(e2) {} }
     }
-    const casterDom = caster && caster.id ? (document.getElementById(`hero-card-${caster.id}`) || document.getElementById(`${caster.id}-sprite`)) : null;
-    if (casterDom) { createFloatingText(casterDom, `召唤阵：${summonName}`, 'text-sky-300'); if (window.spawnBurstAura) spawnBurstAura(casterDom); }
-    addHistory(`   ✨ [${caster.name}] 召唤「${summonName}」—— 已即时参战！`);
-    showLog(`召唤成功：${summonName} 已参战`);
+    // ---- 战报：每个名字一行（多只带 ×N）。行格式与既有单只完全一致 → 战报摘要正则零改动 ----
+    bySpec.forEach(({ spec, made }) => {
+        const label = made > 1 ? `${spec.name}×${made}` : spec.name;
+        addHistory(`   ✨ [${caster.name}] 召唤「${label}」—— 已即时参战！`);
+    });
+    // 部分成功（名额/硬闸用尽，未召满清单）
+    if (stopReason && created.length) {
+        const why = stopReason === 'enemyTotal' ? `敌方总数上限 ${ENEMY_TOTAL_HARD_CAP}` : stopReason === 'castMax' ? `单次上限 ${SUMMON_CAST_MAX}` : `上限 ${SUMMON_SIDE_LIMIT}`;
+        addHistory(`   ⚠️ [${caster.name}] 召唤名额不足，仅召唤 ${created.length} 只（${why}）`);
+    }
+    showLog(`召唤成功：${created.length} 只已参战`);
     return true;
 }
 
@@ -13912,7 +14007,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         // 否则同一次释放产生两条 action 节点，战后统计 releases 双计（【召唤-古革巨人】"2 次释放"事故）
         if (_onlySummon) addHistory(`> ${caster.name} 发动了【${skill.name}】`);
         await sleep(400);
-        await summonFromWorldbook(caster, skill.summonTarget);
+        await summonFromWorldbook(caster, skill.summonTarget, { noLimit: !!skill.summonNoLimit });
         _summonDone = true;
         if (_onlySummon) return;
     }
@@ -15886,6 +15981,7 @@ async function executeHeroSkillAction(skillIndex, primaryTarget) {
 function isItemUsable(item) {
     if (!item || item.category === '弹药') return false;
     if (item._sbMissing) return false;
+    if (isSummonBlockedByLimit(item)) return false;   // 召唤类道具与召唤技能同规则：名额满则不可用
     if (item.category === '道具') return !(item.maxUses > 0 && (item.usesRemaining ?? item.maxUses) <= 0);
     return (item.count || 0) > 0;
 }
@@ -15898,7 +15994,7 @@ function itemToPseudoSkill(item) {
         hit: item.hit || 100, turns: item.turns, slotTurns: item.slotTurns, slotTurns2: item.slotTurns2, slotTurns3: item.slotTurns3,
         type: item.type, power: item.power, type2: item.type2, power2: item.power2,
         type3: item.type3, power3: item.power3, damageType: item.damageType || null, isOthers: item.isOthers,
-        guaranteedHit: item.guaranteedHit, switchTarget: item.switchTarget, critRate: item.critRate || 0, fxTag: item.fxTag, isHighTier: !!item.isHighTier, isLegendary: !!item.isLegendary, summonTarget: item.summonTarget || null, isItem: true, itemRef: item };
+        guaranteedHit: item.guaranteedHit, switchTarget: item.switchTarget, critRate: item.critRate || 0, fxTag: item.fxTag, isHighTier: !!item.isHighTier, isLegendary: !!item.isLegendary, summonTarget: item.summonTarget || null, summonNoLimit: !!item.summonNoLimit, isItem: true, itemRef: item };
 }
 
 // 物品使用核心：执行效果结算，不推进回合——回合结束由调用方负责
@@ -16075,7 +16171,8 @@ function isSkillActionable(hero, skill) {
     const isUsesExhausted = skill.maxUses > 0 && usesLeft <= 0;
     return hero.mp >= skill.cost && hero.hp > (skill.hpCost || 0) && hero.tp >= (skill.tpCost || 0)
         && !(hero.burstActivated && skill.tpCost > 0) && !isUsedExtraTurn && !isUsesExhausted
-        && !(teamBarrier > 0 && skillHasBarrierTag(skill)) && hasEnoughBindings(hero, skill);
+        && !(teamBarrier > 0 && skillHasBarrierTag(skill)) && hasEnoughBindings(hero, skill)
+        && !isSummonBlockedByLimit(skill);   // 召唤名额已满（且本技能无 [众召]）→ 灰显不可用，点击入口随之失效
 }
 
 function createSkillCard(hero, skill, idx) {
@@ -16124,6 +16221,8 @@ function createSkillCard(hero, skill, idx) {
     `;
     let tagsHtml = '';
     if (skill.summonTarget) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-sky-950/90 text-sky-300 border-sky-500/70 shrink-0 flex items-center leading-none font-bold">召唤:${skill.summonTarget}</span>`;
+    if (skill.summonNoLimit) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-indigo-950/90 text-indigo-300 border-indigo-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">🐾 众召·破限</span>`;
+    else if (isSummonBlockedByLimit(skill)) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border text-rose-400 border-rose-500/80 bg-rose-950 shrink-0 font-bold flex items-center gap-0.5 leading-none">🐾 召唤名额已满</span>`;
     tagsHtml += formatTagPill(skill.type, skill.power);
     if (skill.type2) tagsHtml += formatTagPill(skill.type2, skill.power2);
     if (skill.type3) tagsHtml += formatTagPill(skill.type3, skill.power3);
@@ -16185,6 +16284,7 @@ function createSkillCard(hero, skill, idx) {
       if (!isHpEnough) missingArr.push('HP不足');
       if (!isTpEnough) missingArr.push('TP不足');
       if (!isBindingEnough) missingArr.push(_itemBindings && _itemBindings.some(b => b.item.category === '弹药') ? '弹药不足' : '材料不足');
+      if (isSummonBlockedByLimit(skill)) missingArr.push('召唤名额已满');
       notEnoughNotice = `<span class="text-[8px] text-rose-400 font-bold leading-none">⚠️ ${missingArr.join(' ')}</span>`;
     }
     let row3Html = `
@@ -16380,6 +16480,8 @@ function createItemCard(hero, item, idx) {
     if (!isAmmo) {
       // 召唤/蓄力徽章与技能卡同构（[召唤:X]/[延迟:N] 物品已是可执行行为，卡片须可发现）
       if (item.summonTarget) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-sky-950/90 text-sky-300 border-sky-500/70 shrink-0 flex items-center leading-none font-bold">召唤:${item.summonTarget}</span>`;
+      if (item.summonNoLimit) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-indigo-950/90 text-indigo-300 border-indigo-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">🐾 众召·破限</span>`;
+      else if (isSummonBlockedByLimit(item)) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border text-rose-400 border-rose-500/80 bg-rose-950 shrink-0 font-bold flex items-center gap-0.5 leading-none">🐾 召唤名额已满</span>`;
       tagsHtml += formatTagPill(item.type, item.power);
       if (item.type2) tagsHtml += formatTagPill(item.type2, item.power2);
       if (item.type3) tagsHtml += formatTagPill(item.type3, item.power3);
@@ -16654,8 +16756,8 @@ function buildSkillFormFieldsHtml(idNS, s, onInputJs) {
   html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-${idNS}-type2', this)" class="edit-input-game skill-type-combo w-full text-slate-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${s.type2 && s.type2 !== '[无]' ? tagDisplayLabel(String(s.type2).replace(/[\[\]]/g, ''), s.power2) : '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-${idNS}-type2" onchange="${onInputJs}" class="hidden">${renderSkillTypeOptions(s.type2)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-${idNS}-power2" value="${s.power2}" oninput="${onInputJs}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-${idNS}-slot-turns2" value="${s.slotTurns2 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
   html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-${idNS}-type3', this)" class="edit-input-game skill-type-combo w-full text-slate-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${s.type3 && s.type3 !== '[无]' ? tagDisplayLabel(String(s.type3).replace(/[\[\]]/g, ''), s.power3) : '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-${idNS}-type3" onchange="${onInputJs}" class="hidden">${renderSkillTypeOptions(s.type3)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-${idNS}-power3" value="${s.power3}" oninput="${onInputJs}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-${idNS}-slot-turns3" value="${s.slotTurns3 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
   html += `</div>`;
-  // 模块 E：召唤对象（世界书词条名，留空=无召唤）
-  html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-sky-700/40"><span class="text-[10px] text-sky-300 font-bold whitespace-nowrap">召唤对象</span><input type="text" id="edit-${idNS}-summon" value="${(s.summonTarget||'').replace(/"/g,'&quot;')}" class="edit-input-game w-full text-sky-200 font-mono-num text-[10px] py-1" placeholder="世界书词条名，留空=无召唤"></div>`;
+  // 模块 E：召唤对象（世界书词条名；支持 `A*4；B` 多只清单与 *N 数量，留空=无召唤）
+  html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-sky-700/40"><span class="text-[10px] text-sky-300 font-bold whitespace-nowrap">召唤对象</span><input type="text" id="edit-${idNS}-summon" value="${(s.summonTarget||'').replace(/"/g,'&quot;')}" class="edit-input-game w-full text-sky-200 font-mono-num text-[10px] py-1" placeholder="词条名[*N]；词条名…（如 幻影*4；暗影），留空=无召唤"></div>`;
   html += `</div>`; // close module D space-y-1
   return html;
 }
@@ -16665,7 +16767,7 @@ function buildSkillFormFieldsHtml(idNS, s, onInputJs) {
 // 旧数据槽位若残留非槽位标签（如 [必中]），动态注入该值保显示/保存不劣化（不主动出现在可选列表）。
 // ==========================================
 function renderSkillTypeOptions(curVal) {
-  const _nonSlot = new Set(['[必中]', '[转火]', '[突进]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]']);
+  const _nonSlot = new Set(['[必中]', '[转火]', '[突进]', '[众召]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]']);
   const opts = (curVal && _nonSlot.has(curVal)) ? [curVal, ...SKILL_TYPE_EDIT_OPTIONS] : SKILL_TYPE_EDIT_OPTIONS;
   // option 文本「可读名 [原标签]」，value 保持原始标签不变（保存同步零影响）
   return opts.map(t => `<option value="${t}" ${curVal === t ? 'selected' : ''}>${t === '[无]' ? t : tagDisplayLabel(t.replace(/[\[\]]/g, '')) + ' ' + t}</option>`).join('');
@@ -17228,7 +17330,7 @@ function openEditor(keepScroll) {
         html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-e-${i}-s-${si}-type2', this)" class="edit-input-game skill-type-combo w-full text-slate-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${s.type2 && s.type2 !== '[无]' ? tagDisplayLabel(String(s.type2).replace(/[\[\]]/g, ''), s.power2) : '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-e-${i}-s-${si}-type2" onchange="updateEnemySkillHeaderSummary(${i}, ${si})" class="hidden">${renderSkillTypeOptions(s.type2)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power2" value="${s.power2}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-e-${i}-s-${si}-slot-turns2" value="${s.slotTurns2 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
         html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-e-${i}-s-${si}-type3', this)" class="edit-input-game skill-type-combo w-full text-slate-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${s.type3 && s.type3 !== '[无]' ? tagDisplayLabel(String(s.type3).replace(/[\[\]]/g, ''), s.power3) : '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-e-${i}-s-${si}-type3" onchange="updateEnemySkillHeaderSummary(${i}, ${si})" class="hidden">${renderSkillTypeOptions(s.type3)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power3" value="${s.power3}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-e-${i}-s-${si}-slot-turns3" value="${s.slotTurns3 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
         html += `</div>`;
-        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-sky-700/40"><span class="text-[10px] text-sky-300 font-bold whitespace-nowrap">召唤对象</span><input type="text" id="edit-e-${i}-s-${si}-summon" value="${(s.summonTarget||'').replace(/"/g,'&quot;')}" class="edit-input-game w-full text-sky-200 font-mono-num text-[10px] py-1" placeholder="世界书词条名，留空=无召唤"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-sky-700/40"><span class="text-[10px] text-sky-300 font-bold whitespace-nowrap">召唤对象</span><input type="text" id="edit-e-${i}-s-${si}-summon" value="${(s.summonTarget||'').replace(/"/g,'&quot;')}" class="edit-input-game w-full text-sky-200 font-mono-num text-[10px] py-1" placeholder="词条名[*N]；词条名…（如 幻影*4；暗影），留空=无召唤"></div>`;
         html += `</div>`; // close module D space-y-1
 
         html += `</div>`; // close skill body
@@ -19244,7 +19346,7 @@ function parseDirectorOutput(rawText) {
 
 // ---- 程序校验（精简版指南硬规则，返回错误列表，空 = 通过） ----
 // 技能标签白名单（不在此列 = 禁用）
-const DIRECTOR_SKILL_TAG_WHITELIST = new Set(['单体', '群攻', '穿透', '群穿透', '散射', '群散射', '眩晕', '群眩晕', '单降', '群降', '单盲', '群盲', '单滞', '群滞', '单弱', '群弱', '中毒', '群中毒', '燃烧', '群燃烧', '麻痹', '群麻痹', '吸蓝', '必中', '单增', '群增', '单防', '群防', '单速', '群速', '单回', '群回', '单盾', '群盾', '单回蓝', '群回蓝', '反击', '群反击', 'Charge', 'Turns', '回避', '免伤', '近战', '远程', '法术', 'Aim', 'MP', '反应', '枪击', '转火', '突进']);
+const DIRECTOR_SKILL_TAG_WHITELIST = new Set(['单体', '群攻', '穿透', '群穿透', '散射', '群散射', '眩晕', '群眩晕', '单降', '群降', '单盲', '群盲', '单滞', '群滞', '单弱', '群弱', '中毒', '群中毒', '燃烧', '群燃烧', '麻痹', '群麻痹', '吸蓝', '必中', '单增', '群增', '单防', '群防', '单速', '群速', '单回', '群回', '单盾', '群盾', '单回蓝', '群回蓝', '反击', '群反击', 'Charge', 'Turns', '回避', '免伤', '近战', '远程', '法术', 'Aim', 'MP', '反应', '枪击', '转火', '突进', '众召']);
 // 变种群标签白名单（属性栏裸标签；[自爆:群伤/群火/群毒/群穿] 带子类型另行校验）
 const DIRECTOR_VARIANT_TAG_WHITELIST = new Set(['智慧', '复活', '流体', '虚形', '破法', '要害', '钢体', '防火', '耐毒', '再生', '狂暴', '吸血', '荆棘', '连动', '蜕皮', '前排', '后排']);
 const DIRECTOR_EXPLODE_SUBTYPES = ['群伤', '群火', '群毒', '群穿'];

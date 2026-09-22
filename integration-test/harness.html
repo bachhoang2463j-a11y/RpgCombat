@@ -2586,6 +2586,89 @@ async function test39() {
   })()`);
 }
 
+/* ================= 断言 40：多召与 [众召]（*N 展开 / 清单与多标签 / 名额截断 / 破限 / 容错 / 置灰） ================= */
+async function test40() {
+  head('40 多召与 [众召]：*N 展开 / 清单与多标签 / 名额截断 / 破限 / 容错 / 置灰');
+  const w = rpgWin();
+  const ev = (expr) => w.eval('(function(){ return ' + expr + '; })()');
+  const asy = (body) => w.eval('(async function(){ ' + body + ' })()');
+
+  // --- ① 解析层：多标签 / 标签内分隔 / *N / [众召] / 向后兼容 ---
+  eq(ev('parseSkill("[召唤:幻影*4][召唤:暗影][MP:10][法术]").summonTarget'), '幻影*4；暗影', '多标签合并为 `A*4；B` 清单串');
+  eq(ev('parseSkill("[召唤:幻影*4；暗影][MP:10][法术]").summonTarget'), '幻影*4；暗影', '标签内分隔写法与多标签等价');
+  eq(ev('parseSkill("[召唤:食尸鬼[复活]*2][MP:5]").summonTarget'), '食尸鬼[复活]*2', '名字内允许一层变种标签（不被首个人]截断）');
+  eq(ev('parseSkill("[召唤:幻影*4][众召][MP:10][法术]").summonNoLimit'), true, '解析 [众召] → summonNoLimit');
+  eq(ev('parseSkill("[召唤:幻影*4][MP:10][法术]").summonNoLimit'), false, '无 [众召] → false');
+  eq(ev('parseSkill("[召唤:幻影][MP:10][法术]").summonTarget'), '幻影', '单只旧写法字段不变（向后兼容）');
+  check(ev('parseSkill("[召唤:幻影*4][群攻;power:50][众召][MP:10][法术]").type') === '[群攻]'
+     && ev('parseSkill("[召唤:幻影*4][群攻;power:50][众召][MP:10][法术]").power') === 50, '[众召] 不占标签槽');
+  eq(ev('JSON.stringify(parseSummonList("幻影*4；暗影"))'), JSON.stringify([{ name: '幻影', count: 4, tags: [] }, { name: '暗影', count: 1, tags: [] }]), '清单解析：*N 与默认 1 只');
+  eq(ev('parseSummonList("食尸鬼*2[复活]")[0].count'), 2, '名字带变种标签时 *N 仍正确');
+  eq(ev('parseSummonList("食尸鬼*2[复活]")[0].tags[0]'), '[复活]', '变种标签被剥离并透传');
+  eq(ev('parseSummonList("潮虫*999")[0].count'), 12, '*N 钳制到单次上限 12（防手滑）');
+
+  // --- ② 引擎层：准备图鉴缓存与施法者 ---
+  w.eval(`
+    worldbookCache = [
+      { uid: 9001, name: '幻影', keys: ['幻影'], content: '描述：测试用召唤物\\n<Combat_block>\\n名字: "👻幻影"\\n属性: "[HP:50/50][MP:0/0][Atk:20][Armor:5][Speed:60]"\\n技能:\\n  - "【突袭】[单体;power:30][近战]"\\n</Combat_block>' },
+      { uid: 9002, name: '暗影', keys: ['暗影'], content: '描述：测试用召唤物\\n<Combat_block>\\n名字: "🌑暗影"\\n属性: "[HP:40/40][MP:0/0][Atk:15][Armor:5][Speed:70]"\\n技能:\\n  - "【撕咬】[单体;power:25][近战]"\\n</Combat_block>' }
+    ];
+    worldbookIndex = { '幻影': worldbookCache[0], '暗影': worldbookCache[1] };
+    heroesData = [{ id:'h0', name:'召唤师', hp:100, maxHp:100, mp:100, maxMp:100, tp:0, maxTp:100, atk:20, def:10, spd:100, shield:0, actCount:1, isAlive:true, buffs:[], skills:[], items:[], classType:null, isSummon:false }];
+    enemiesData = [];
+    state.isGameStarted = false; state.actionQueue = []; state.queueIndex = 0;
+    battleHistory = [];
+    window.__t40 = { fill: function(n){ for (var i=0;i<n;i++) heroesData.push({ id:'fill'+i+'_'+Date.now(), name:'填'+i, isSummon:true, side:'hero', isAlive:true, hp:10, maxHp:10, buffs:[], skills:[], items:[], spd:50, atk:1, def:0, actCount:1 }); } };
+  `);
+
+  // --- ③ *N 展开：一次召 4 只同名 ---
+  const r1 = await asy('await summonFromWorldbook(heroesData[0], "幻影*4", {}); var s = heroesData.filter(function(e){ return e.isSummon; }); return { n: s.length, uniq: new Set(s.map(function(e){ return e.id; })).size };');
+  eq(r1.n, 4, '*N=4 → 一次召出 4 只同名召唤物');
+  eq(r1.uniq, 4, '4 只 id 互不相同');
+
+  // --- ④ 名额截断（部分成功）：已占 3 名额时召 6 只 → 只放行 1 只 ---
+  w.eval('heroesData = heroesData.filter(function(e){ return !e.isSummon; }); window.__t40.fill(3); battleHistory = [];');
+  const r2 = await asy('await summonFromWorldbook(heroesData[0], "幻影*6", {}); return { limited: countLimitedSummons("hero"), total: heroesData.filter(function(e){ return e.isSummon; }).length };');
+  eq(r2.limited, 4, '已占 3 时召 6 只 → 只放行 1 只，名额恰好填满 4（部分成功）');
+  eq(r2.total, 4, '多召不会突破名额上限');
+  check(ev('battleHistory.some(function(l){ return /召唤名额不足，仅召唤 1 只/.test(l); })'), '截断时写入「名额不足」告警行');
+
+  // --- ⑤ 名额满：单只召唤沿用既有"已达上限"文案（战报摘要 drop 规则命中） ---
+  w.eval('battleHistory = [];');
+  const r3 = await asy('var ok = await summonFromWorldbook(heroesData[0], "幻影", {}); return { ok: ok, limited: countLimitedSummons("hero") };');
+  eq(r3.ok, false, '名额满 → 一只也召不出（返回 false）');
+  check(ev('battleHistory.some(function(l){ return /我方召唤物已达上限\\(4\\)/.test(l); })'), '沿用既有「已达上限(4)」文案');
+  eq(ev('battleHistory.filter(function(l){ return /已即时参战/.test(l); }).length'), 0, '名额满时不产生"已参战"行');
+
+  // --- ⑥ [众召] 破限：两种生物 4+2 全部入场，且不占名额 ---
+  const r4 = await asy('await summonFromWorldbook(heroesData[0], "幻影*4；暗影*2", { noLimit: true }); return { noLimit: heroesData.filter(function(e){ return e.isSummon && e.summonNoLimit; }).length, limited: countLimitedSummons("hero"), names: heroesData.filter(function(e){ return e.isSummon && e.summonNoLimit; }).map(function(e){ return e.name; }) };');
+  eq(r4.noLimit, 6, '[众召] 一次召出 6 只（幻影×4 + 暗影×2）');
+  eq(r4.limited, 4, '破限召唤物不占名额（账上仍是既有 4 只普通召唤物）');
+  eq(r4.names.filter(n => /暗影/.test(n)).length, 2, '两种生物都按数量入场');
+
+  // --- ⑦ 容错：批次里一个词条缺失 → 其余照常召唤 ---
+  w.eval('battleHistory = [];');
+  const r5 = await asy('var before = heroesData.length; await summonFromWorldbook(heroesData[0], "不存在词条；暗影", { noLimit: true }); return { added: heroesData.length - before };');
+  eq(r5.added, 1, '一个词条缺失只跳过它，同批其它照常');
+  check(ev('battleHistory.some(function(l){ return /召唤「不存在词条」失败：未找到图鉴词条/.test(l); })'), '缺失词条仍写既有告警行');
+
+  // --- ⑧ 置灰：名额满 + 无 [众召] → 不可用；带 [众召] 或名额有余 → 可用 ---
+  w.eval('heroesData = heroesData.filter(function(e){ return !e.isSummon; }); window.__t40.fill(4);');
+  const plainSummonSkill = '{ name:"普召", type:"[无]", type2:"[无]", type3:"[无]", cost:0, hpCost:0, tpCost:0, maxUses:0, summonTarget:"幻影", hit:100, power:0 }';
+  const massSummonSkill  = '{ name:"众召", type:"[无]", type2:"[无]", type3:"[无]", cost:0, hpCost:0, tpCost:0, maxUses:0, summonTarget:"幻影*4", summonNoLimit:true, hit:100, power:0 }';
+  eq(ev('isSkillActionable(heroesData[0], ' + plainSummonSkill + ')'), false, '名额满 + 无 [众召] → 技能不可用（置灰 + 点击入口失效）');
+  eq(ev('isSkillActionable(heroesData[0], ' + massSummonSkill + ')'), true, '带 [众召] → 名额满仍可用');
+  w.eval('heroesData = heroesData.filter(function(e){ return !(e.isSummon && !e.summonNoLimit); });');   // 腾出名额
+  eq(ev('isSkillActionable(heroesData[0], ' + plainSummonSkill + ')'), true, '名额有余 → 不置灰（部分成功语义，能召几只召几只）');
+  // 卡片徽章与灰显类名
+  w.eval('window.__t40.fill(4); heroesData[0].skills = [{ name:"普召", type:"[无]", type2:"[无]", type3:"[无]", cost:0, hpCost:0, tpCost:0, maxUses:0, summonTarget:"幻影", hit:100, power:0, damageType:"法术" }]; heroesData[0].mp = 100;');
+  const card40 = ev('(function(){ var c = createSkillCard(heroesData[0], heroesData[0].skills[0], 0); return { html: c.innerHTML, cls: c.className }; })()');
+  check(/召唤名额已满/.test(card40.html) && /disabled-card/.test(card40.cls), '卡片输出「召唤名额已满」徽章 + disabled-card 灰显（类名在按钮本身）');
+
+  // --- 清理 ---
+  w.eval('heroesData = []; enemiesData = []; worldbookCache = []; worldbookIndex = {}; battleHistory = []; state.isGameStarted = false; state.actionQueue = []; state.queueIndex = 0; delete window.__t40;');
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -2593,7 +2676,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }
