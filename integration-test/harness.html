@@ -955,6 +955,8 @@ async function test18() {
   w.localStorage.removeItem('rpg_combat_director_settings');
   w.eval("directorState.activePreset = 0; directorState.temperature = 0.5; directorState.contextFloors = 2; directorState.apiUrl='http://director-mock'; directorState.apiKey='sk-test'; directorState.model='mock-dir'; directorState.systemPrompt='';");
   let confirmCalls = 0, fetchCalls = 0;
+  const originalFetchDescriptor = Object.getOwnPropertyDescriptor(w, 'fetch');
+  const originalConfirmDescriptor = Object.getOwnPropertyDescriptor(w, 'confirm');
   const bodies = [];
   let responder = null;
   w.confirm = () => { confirmCalls++; return true; };
@@ -1101,9 +1103,11 @@ async function test18() {
   check(/敌方生成规则/.test(w.document.getElementById('director-system-prompt').value), '恢复默认按钮回填内置全文');
   w.eval('closeLLMSettings()');
 
-  // 清理：还原 fetch/confirm，避免影响后续（当前为最后一项，防御性保留）
-  delete w.fetch;
-  delete w.confirm;
+  // 清理：还原 fetch/confirm，不能直接 delete，否则会删掉 srcdoc iframe 的原生 API
+  if (originalFetchDescriptor) Object.defineProperty(w, 'fetch', originalFetchDescriptor);
+  else delete w.fetch;
+  if (originalConfirmDescriptor) Object.defineProperty(w, 'confirm', originalConfirmDescriptor);
+  else delete w.confirm;
 }
 
 /* ================= 断言 19：反引号围栏纪律（酒馆引号美化管线兼容） ================= */
@@ -2479,6 +2483,61 @@ async function test37() {
   w.eval('heroesData = []; enemiesData = [];');
 }
 
+/* ================= 断言 38：征伐者职业被动（速度差增伤 / 带速 buff 暴击 / 越前排双通道 / 首回合加速 / 速度差闪避） ================= */
+async function test38() {
+  head('38 征伐者职业被动（速度差增伤 / 带速 buff 暴击 / 越前排双通道 / 首回合加速 / 速度差闪避）');
+  const w = rpgWin();
+  const ev = (expr) => w.eval('(function(){ return ' + expr + '; })()');
+  const src = await (await fetch('../index.html', { cache: 'reload' })).text();
+  const P = 'CLASS_PASSIVES["征伐者"]';
+
+  // --- ① 动能冲踏·速度差增伤（返回加法系数，每超 10 点 +5%） ---
+  const r2 = (x) => Math.round(x * 100) / 100; // 3×0.05 存在浮点尾数，按两位小数比对（与灾厄使同款乘法写法）
+  eq(r2(ev(P + '.modifyDamageMultiplier({ spd:130, buffs:[] }, { spd:100, buffs:[] })')), 0.15, '速度差 30 → 增伤 +15%');
+  eq(ev(P + '.modifyDamageMultiplier({ spd:109, buffs:[] }, { spd:100, buffs:[] })'), 0, '速度差不足 10 → 无增伤');
+  eq(ev(P + '.modifyDamageMultiplier({ spd:100, buffs:[] }, { spd:130, buffs:[] })'), 0, '自身更慢 → 无增伤');
+  eq(ev(P + '.modifyDamageMultiplier({ spd:130, buffs:[] }, { spd:0, isBarrierTarget:true, buffs:[] })'), 0, '屏障伪目标不吃速度压制');
+  eq(r2(ev(P + '.modifyDamageMultiplier({ spd:100, buffs:[{type:"spd",value:30,duration:3}] }, { spd:100, buffs:[] })')), 0.15, '临时加速计入速度差（基础同速 + 速度 buff 30 → +15%）');
+
+  // --- ② 动能冲踏·带正向速度 buff 附加 10% 暴击率 ---
+  eq(ev(P + '.modifyCritRate({ buffs:[{type:"spd",value:20,duration:1}] })'), 10, '带正向速度 buff → +10% 暴击率');
+  eq(ev(P + '.modifyCritRate({ buffs:[{type:"spd",value:-20,duration:1}] })'), 0, '缓速（负值）不给暴击加成');
+  eq(ev(P + '.modifyCritRate({ buffs:[] })'), 0, '无速度 buff → 无暴击加成');
+
+  // --- ③ 先手优势·闪避分母追加双方有效速度差 ---
+  eq(ev(P + '.modifyDodgeCap({ spd:150, buffs:[] }, { spd:100, buffs:[] })'), 50, '被更慢者攻击 → 闪避分母 +50');
+  eq(ev(P + '.modifyDodgeCap({ spd:100, buffs:[] }, { spd:150, buffs:[] })'), 0, '被更快者攻击 → 无额外闪避');
+
+  // --- ④ 破阵贯穿·首回合速度 +20（onBattleInit 幂等，重复调用不叠加） ---
+  const dash = ev('(function(){ var e = { spd:100, buffs:[], classType:"征伐者" }; ' + P + '.onBattleInit(e); ' + P + '.onBattleInit(e); return { n: e.buffs.length, v: e.buffs[0].value, d: e.buffs[0].duration, eff: getEffectiveSpeed(e) }; })()');
+  eq(dash.n, 1, '首回合加速幂等（重复 onBattleInit 不叠加）');
+  eq(dash.v, 20, '首回合加速值 = 20（复用 [单速] 的 spd buff 机制）');
+  eq(dash.d, 1, '首回合加速仅持续 1 回合（自身首次行动时到期）');
+  eq(dash.eff, 120, '有效速度 = 基础 100 + 20');
+
+  // --- ⑤ 越前排双通道：职业级（征伐者任意技能）+ 标签级（任意职业 [突进]） ---
+  check(ev('canBypassRow({ classType:"征伐者" }, { damageType:"近战" })') === true, '职业级通道：征伐者近战越前排');
+  check(ev('canBypassRow({ classType:"狂战士" }, { ignoreRow:true })') === true, '标签级通道：[突进] 技能跨职业越前排');
+  check(ev('canBypassRow({ classType:"狂战士" }, { damageType:"近战" })') === false, '普通职业无标签 → 仍受前排掩护');
+
+  // --- ⑥ [突进] 标签解析（技能 + 物品） ---
+  check(ev('parseSkill("[单体;power:50][近战][突进]").ignoreRow') === true, 'parseSkill 解析 [突进] → ignoreRow');
+  check(ev('parseSkill("[单体;power:50][近战][无视站位]").ignoreRow') === true, '[无视站位] 别名同样生效');
+  check(ev('parseSkill("[单体;power:50][近战]").ignoreRow') === false, '无标签 → ignoreRow false');
+  check(ev('parseItem("【突进刺刀】[道具][单体;power:50][近战][突进][次数:1]").ignoreRow') === true, '物品解析 [突进] → ignoreRow');
+  check(ev('parseSkill("[单体;power:50][近战][突进]").type') === '[单体]' && ev('parseSkill("[单体;power:50][近战][突进]").power') === 50, '[突进] 不占标签槽（主槽/威力不受影响）');
+
+  // --- ⑦ 静态接线断言：引擎判定点读到新钩子（防后续重构漏接） ---
+  eq((src.match(/!canBypassRow\(caster, skill\)/g) || []).length, 4, '三处目标路由判定点 + 越前排战报自足前置均接入 canBypassRow（群攻截断/保底随机池/转火池/日志守卫）');
+  check(/canBypassRow\(_actor, _curSkill\)/.test(src), '点击拦截接入 canBypassRow（越前排可点后排）');
+  check(/CLASS_PASSIVES\[target\.classType\]\?\.modifyDodgeCap/.test(src), '闪避分母接入 modifyDodgeCap');
+  check(/modifyCritRate\?\.\(caster, skill\)/.test(src), '暴击掷骰接入 modifyCritRate（含 critChance>0 门槛放宽）');
+  check(/CLASS_PASSIVES\[caster\.classType\]\?\.modifyCritRate/.test(src), '暴击加成按施法者职业取用');
+
+  // --- 清理 ---
+  w.eval('heroesData = []; enemiesData = [];');
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -2486,7 +2545,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }

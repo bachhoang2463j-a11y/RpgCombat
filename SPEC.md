@@ -26,7 +26,7 @@
 4. **完整 Effect System 架构 (Tag-based, Strategy Handlers & Event Bus)**：
    - **标签策略注册表 (`TAG_HANDLERS`)**：将全部技能标签逻辑（瞄、盲、降、防、盾、免伤、回避、反击、嘲、增、回蓝、冲、回、再动等）独立注册，分发函数降至单行查找，实现彻底解耦。
    - **轻量事件总线 (`CombatEvents`)**：通过发布/订阅模式处理生命周期事件（`TURN_START`, `TURN_END`, `BEFORE_DAMAGE`, `AFTER_DAMAGE`, `BEFORE_HEAL`, `AFTER_HEAL`, `ON_KILL`, `ON_FATAL_DAMAGE`, `BUFF_APPLIED`, `BUFF_EXPIRED`）。
-   - **模块化职业被动 (`CLASS_PASSIVES`)**：7 大职业被动挂载于事件总线与面板汇总管道，无任何硬编码条件判断。
+   - **模块化职业被动 (`CLASS_PASSIVES`)**：8 大职业被动挂载于事件总线与面板汇总管道，无任何硬编码条件判断。值修改型钩子除既有 `modifyStats`/`modifyDamageMultiplier`/`modifyDamageDealt`/`checkPierce`/`modifyTrueDamage`/`onManaSpent` 外，V11.16 起新增 `modifyCritRate(caster, skill)`（暴击率加成，与技能自带 `[暴击:N%]` 相加）与 `modifyDodgeCap(target, caster)`（闪避分母加成）；职业级布尔标记 `ignoreRow` 由 `canBypassRow(caster, skill)` 与技能级 `[突进]` 标签共用。
 
 ---
 
@@ -40,7 +40,7 @@
 - **完整 Effect System 架构**：
   - `TAG_HANDLERS` 策略处理器注册表（支持动态扩充自定义标签）。
   - `CombatEvents` 发布/订阅事件总线（11 个标准生命周期事件点）。
-  - `CLASS_PASSIVES` 模块化职业被动注册表（7 大职业）。
+  - `CLASS_PASSIVES` 模块化职业被动注册表（8 大职业）。
 - 全效编辑器（实时编辑角色属性、技能标签、智慧标记与多动次数）。
 - 粒子 Canvas 与 WebM 高清透明特效渲染引擎。
 - LLM API 对话气泡与战后小说模板生成器。
