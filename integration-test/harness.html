@@ -2538,6 +2538,54 @@ async function test38() {
   w.eval('heroesData = []; enemiesData = [];');
 }
 
+/* ================= 断言 39：编辑器头像兜底 onerror 加固（断自触发循环 + 游离节点空值保护） ================= */
+async function test39() {
+  head('39 编辑器头像兜底 onerror 加固（断自触发循环 + 游离节点空值保护）');
+  const w = rpgWin();
+  const ev = (expr) => w.eval('(function(){ return ' + expr + '; })()');
+  const src = await (await fetch('../index.html', { cache: 'reload' })).text();
+
+  // 静态：英雄（👤）/敌人（emoji）两处头像兜底均已加固
+  eq((src.match(/onerror="this\.onerror=null;this\.src='';if\(this\.parentElement\)this\.parentElement\.innerHTML=/g) || []).length, 2,
+    '英雄/敌人编辑器头像兜底 onerror 均为「断循环 + 空值保护」写法');
+  check(!/onerror="this\.src='';this\.parentElement\.innerHTML=/.test(src), '旧的裸兜底写法已全部替换（防回归）');
+
+  // 功能：按处理器文本构造游离 img（parentElement=null），派发 error。
+  // 注意：监听器内抛出的异常不会回传给 dispatchEvent 调用方，而是走 window.onerror —— 故用诊断探头计数判定。
+  ev(`(function(){
+    window.__dbgErrors = [];
+    var img = document.createElement('img');
+    img.setAttribute('onerror', "this.onerror=null;this.src='';if(this.parentElement)this.parentElement.innerHTML='👤'");
+    img.dispatchEvent(new Event('error'));
+    window.__guardedBound = !!img.onerror;
+    return 1;
+  })()`);
+  await sleep(120);
+  eq(ev('(window.__dbgErrors||[]).length'), 0, '加固版：游离头像 img 触发 error 不产生任何运行时异常');
+  eq(ev('window.__guardedBound'), false, '加固版：兜底为一次性（onerror 已解绑，不再自触发循环）');
+
+  // 对照：旧写法在同一场景确实抛错（被诊断探头记录，证明断言能捕获该缺陷）
+  // 对照组创建的就是"会自触发循环"的那个处理器，派发后必须立刻解绑，否则它会异步刷满探头、把红条留在页面上
+  ev(`(function(){
+    window.__dbgErrors = [];
+    var img = document.createElement('img');
+    img.setAttribute('onerror', "this.src='';this.parentElement.innerHTML='👤'");
+    img.dispatchEvent(new Event('error'));
+    img.onerror = null;
+    return 1;
+  })()`);
+  await sleep(120);
+  check(ev('(window.__dbgErrors||[]).length') > 0, '对照：旧裸写法在游离场景抛 innerHTML null（探头记录，自证断言有效）');
+
+  // 清理：清空探头记录并移除红条，避免把自造异常留在页面上
+  ev(`(function(){
+    window.__dbgErrors = [];
+    var bar = document.getElementById('__dbg_error_bar'); if (bar) bar.remove();
+    delete window.__guardedBound;
+    return 1;
+  })()`);
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -2545,7 +2593,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }

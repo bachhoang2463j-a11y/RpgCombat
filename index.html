@@ -16788,7 +16788,7 @@ function openEditor(keepScroll) {
     html += `<div class="flex items-center gap-2 min-w-0">`;
     html += `<div class="w-6 h-6 rounded overflow-hidden border border-cyan-500/40 bg-black/40 shrink-0 flex items-center justify-center text-xs">`;
     if (_hImg) {
-      html += `<img src="${_hImg}" class="w-full h-full object-cover" onerror="this.src='';this.parentElement.innerHTML='👤'"/>`;
+      html += `<img src="${_hImg}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='';if(this.parentElement)this.parentElement.innerHTML='👤'"/>`;
     } else {
       html += `👤`;
     }
@@ -17081,7 +17081,7 @@ function openEditor(keepScroll) {
     html += `<div class="flex items-center gap-2 min-w-0">`;
     html += `<div class="w-6 h-6 rounded overflow-hidden border border-rose-500/40 bg-black/40 shrink-0 flex items-center justify-center text-xs">`;
     if (_eImg) {
-      html += `<img src="${_eImg}" class="w-full h-full object-cover" onerror="this.src='';this.parentElement.innerHTML='${_eEmoji}'"/>`;
+      html += `<img src="${_eImg}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='';if(this.parentElement)this.parentElement.innerHTML='${_eEmoji}'"/>`;
     } else {
       html += _eEmoji;
     }
