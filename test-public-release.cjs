@@ -15,7 +15,7 @@ const assert = require('assert');
 const ROOT = path.resolve(__dirname);
 const HTML_PATH = path.join(ROOT, 'index-公开版.html');
 const JSON_PATH = path.join(ROOT, 'regex-前端战斗v11_2-公开版.json');
-const MAPPING_TXT_PATH = path.join(ROOT, 'catbox', '已有Catbox资源链接对应表.txt');
+const MAPPING_TXT_PATH = path.join(ROOT, '资源', '已有Catbox资源链接对应表.txt');
 
 console.log('====================================================');
 console.log('       RpgCombat 公开版产物自动化专项断言套件       ');

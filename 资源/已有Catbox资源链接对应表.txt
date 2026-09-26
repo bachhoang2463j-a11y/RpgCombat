@@ -1,0 +1,137 @@
+====================================================================================================
+  全量 Catbox 资源链接总表（含历史已有 16 项 + 本次上传 38 项 + 待补传 1 项）
+====================================================================================================
+
+【说明】
+1. 历史已有 16 项基础音效已自带有效 Catbox 链接。
+2. 从您上传的截图中共成功提取 38 项 Catbox 链接（含 31 项特效/音效 + 索恩 7 项专属语音）。
+3. 经比对发现缺少 1 项：snipe-ezremove.mp4（克虏伯重狙，612 KB），需补传。
+4. 埃利奥特、玛德琳、弗兰克非公开版，已按指示排除。
+
+====================================================================================================
+一、 基础全局音效（16 项，早期已有链接，直接复用）
+====================================================================================================
+键名 (Key)          文件名 (File)           Catbox URL                                说明
+----------------------------------------------------------------------------------------------------
+hitUp             hitUp.mp3             https://files.catbox.moe/7ef8mk.mp3       命中/增益音效
+mpHeal            mpHeal.mp3            https://files.catbox.moe/vo2w0z.mp3       MP恢复音效
+defDown           defDown.mp3           https://files.catbox.moe/oa0q52.mp3       降防音效
+kanpo             defDown.mp3           https://files.catbox.moe/oa0q52.mp3       看破音效 (复用defDown)
+atk2              atk2.mp3              https://files.catbox.moe/7w223l.mp3       攻击音效2
+atk1              atk1.mp3              https://files.catbox.moe/x30qlh.mp3       攻击音效1
+atkUp             atkUp.mp3             https://files.catbox.moe/zhbczm.mp3       攻击提升音效
+hpHeal            hpHeal.mp3            https://files.catbox.moe/cvmhl5.mp3       HP治疗音效
+taunt             taunt.mp3             https://files.catbox.moe/5urptr.mp3       嘲讽音效
+hitDown           hitDown.mp3           https://files.catbox.moe/t2uvw3.mp3       受击音效 / 远程重击受击
+shieldUp          shieldUp.mp3          https://files.catbox.moe/ws8i9g.mp3       护盾/屏障生成音效
+defUp             defUp.mp3             https://files.catbox.moe/mhpzv8.mp3       防御提升音效
+miss              miss.mp3              https://files.catbox.moe/bl7mbw.mp3       闪避/未命中音效
+burst             burst.mp3             https://files.catbox.moe/042wyg.mp3       爆发/暴击音效
+avatarClick       avatarClick.mp3       https://files.catbox.moe/6jg11a.mp3       点击头像音效
+heroTurn          heroTurn.mp3          https://files.catbox.moe/fgyv0y.mp3       英雄回合轮到音效
+kill              kill.mp3              https://files.catbox.moe/20yjkp.mp3       斩杀/击杀通用音效
+
+====================================================================================================
+二、 枪械与战斗独立音效（11 项，本次上传提取）
+====================================================================================================
+键名 (Key)          文件名 (File)           Catbox URL                                说明
+----------------------------------------------------------------------------------------------------
+hide              hide.mp3              https://files.catbox.moe/b11s5d.mp3       潜行/隐匿音效
+shot              shot01.mp3            https://files.catbox.moe/zbnxod.mp3       基础枪声 / 强力反击音效
+monsterAttack     monsterattack2.mp3    https://files.catbox.moe/2vxjx0.mp3       怪物攻击音效
+herocharge        herocharge.mp3        https://files.catbox.moe/0bxx42.mp3       英雄开始蓄力音效
+herochargedone    herochargedone.mp3    https://files.catbox.moe/dgbpfk.mp3       英雄蓄力完成音效
+combatKill        combat_kill.mp3       https://files.catbox.moe/tjib58.mp3       物理/近战击杀特写音效
+magicKill         magic_kill.wav        https://files.catbox.moe/3fkljn.wav       魔法击杀特写音效
+gunshot1          gunshot1.mp3          https://files.catbox.moe/pneiwp.mp3       中小口径随机枪声1
+gunshot2          gunshot2.mp3          https://files.catbox.moe/dhuvtz.mp3       中小口径随机枪声2
+gunshot3          gunshot3.mp3          https://files.catbox.moe/iysdul.mp3       中小口径随机枪声3
+gunshot_pierce    gunshot_pierce.mp3    https://files.catbox.moe/c3wb0s.mp3       [特效:枪击穿透] 专属音效
+
+====================================================================================================
+三、 本地新增技能/特效音视频（9 项，本次上传提取）
+====================================================================================================
+键名 / 配置项       文件名 (File)           Catbox URL                                说明
+----------------------------------------------------------------------------------------------------
+xiandan           xiandan.mp3           https://files.catbox.moe/tog5gk.mp3       [散射(霰弹)] 12-Gauge 击发音效
+近战重击 audioUrl  parry_Weapon_...wav   https://files.catbox.moe/fxvgh6.wav       [特效:近战重击] 盾击破防音效
+造雾术 audioUrl    fog.mp3               https://files.catbox.moe/v6qgry.mp3       [特效:造雾术] 背景冷雾音效
+开镜瞄准 url      miaozhun.webm         https://files.catbox.moe/qoxzu3.webm      [特效:开镜瞄准] WebM 特效动画
+开镜瞄准 audioUrl  miaozhun.mp3          https://files.catbox.moe/7ixbhd.mp3       [特效:开镜瞄准] 射击音效
+燃烧弹 url        ranshao.webm          https://files.catbox.moe/bzc3u1.webm      [特效:燃烧弹] WebM 特效动画
+燃烧弹 audioUrl    ranshao.mp3           https://files.catbox.moe/2li8ex.mp3       [特效:燃烧弹] 爆燃音效
+圣域帷幕 url      weimu.webm            https://files.catbox.moe/b9e8no.webm      [特效:圣域帷幕] WebM 特效动画
+圣域帷幕 audioUrl  weimu.wav             https://files.catbox.moe/vk7bhq.wav       [特效:圣域帷幕] 展开音效
+
+====================================================================================================
+四、 WebM/MP4 特效动画与专属音效（12 项，已提取 11 项，缺 1 项）
+====================================================================================================
+特效名 (注册表键)   资源字段                Catbox URL                                对应原文件名
+----------------------------------------------------------------------------------------------------
+火焰01            url                   https://files.catbox.moe/eyfwd9.webm      fire.webm
+火焰01            audioUrl              https://files.catbox.moe/hy44xz.mp3       fire01.mp3
+冰霜01            url                   https://files.catbox.moe/tr9n9i.webm      ice.webm
+冰霜01            audioUrl              https://files.catbox.moe/jvs1hx.mp3       freeze01.mp3
+雷击01            url                   https://files.catbox.moe/b0iicg.webm      450.webm
+雷击01            audioUrl              https://files.catbox.moe/5n7gk9.mp3       thunder01.mp3
+圣光01            url                   https://files.catbox.moe/kglk47.webm      414.webm
+圣光01            audioUrl              https://files.catbox.moe/ecgnph.mp3       light01.mp3
+双枪扫射          url                   https://files.catbox.moe/i6ktee.mp4       strafe-ezremove05.mp4
+异种坏死雾        url                   https://files.catbox.moe/6y0j2j.mp4       fog.mp4
+生体流转          url                   https://files.catbox.moe/817bkp.mp4       heart.mp4
+克虏伯重狙        url                   https://files.catbox.moe/cxcl7f.mp4       snipe-ezremove.mp4 (612 KB)
+
+====================================================================================================
+五、 公开版角色“索恩”专属回合语音（7 项，本次上传提取）
+====================================================================================================
+语音时机 / 槽位    文件名 (File)           Catbox URL                                说明
+----------------------------------------------------------------------------------------------------
+first (第一回合)   索恩_第一回合.mp3     https://files.catbox.moe/eottvp.mp3       首回合入场行动台词
+turn[0] (回合开始1)索恩_开始回合1.mp3    https://files.catbox.moe/f6wc3b.mp3       后续回合随机台词1 (HP>50%)
+turn[1] (回合开始2)索恩_开始回合2.mp3    https://files.catbox.moe/izd4v8.mp3       后续回合随机台词2 (HP>50%)
+turn[2] (回合开始3)索恩_开始回合3.mp3    https://files.catbox.moe/j579sd.mp3       后续回合随机台词3 (HP>50%)
+low[0] (半血台词1) 索恩_半血1.mp3        https://files.catbox.moe/kccey3.mp3       半血绝境台词1 (HP<=50%)
+low[1] (半血台词2) 索恩_半血2.mp3        https://files.catbox.moe/3zivcf.mp3       半血绝境台词2 (HP<=50%)
+low[2] (半血台词3) 索恩_半血3.mp3        https://files.catbox.moe/n5o5ys.mp3       半血绝境台词3 (HP<=50%)
+
+====================================================================================================
+六、 公开版新角色“冯·霍恩海姆”专属头像与回合语音（1 头像 + 7 语音）
+====================================================================================================
+资源类型 / 槽位    文件名 (File)           Catbox URL                                说明
+----------------------------------------------------------------------------------------------------
+avatar (角色头像)  feng_avater.png       https://imgur.la/images/2026/09/26/feng_avater.png  角色头像映射 (HERO_AVATAR_MAP)
+first (第一回合)   冯第一回合.mp3        https://files.catbox.moe/5y5c8f.mp3       首回合入场行动台词
+turn[0] (回合开始1)冯开始回合 (1).mp3    https://files.catbox.moe/nxnp96.mp3       后续回合随机台词1 (HP>50%)
+turn[1] (回合开始2)冯开始回合 (2).mp3    https://files.catbox.moe/ng57pf.mp3       后续回合随机台词2 (HP>50%)
+turn[2] (回合开始3)冯开始回合 (3).mp3    https://files.catbox.moe/khiaw6.mp3       后续回合随机台词3 (HP>50%)
+low[0] (半血台词1) 冯半血 (1).mp3        https://files.catbox.moe/z2vqrj.mp3       半血绝境台词1 (HP<=50%)
+low[1] (半血台词2) 冯半血 (2).mp3        https://files.catbox.moe/fcf4zv.mp3       半血绝境台词2 (HP<=50%)
+low[2] (半血台词3) 冯半血 (3).mp3        https://files.catbox.moe/ok9wti.mp3       半血绝境台词3 (HP<=50%)
+
+====================================================================================================
+七、 公开版新角色“威廉·退尔”专属头像与回合语音（1 头像 + 7 语音）
+====================================================================================================
+资源类型 / 槽位    文件名 (File)           Catbox URL / 外部 URL                     说明
+----------------------------------------------------------------------------------------------------
+avatar (角色头像)  weilan_avatar.png     https://imgur.la/images/2026/09/26/weilan_avatar.png 角色头像映射 (HERO_AVATAR_MAP)
+first (第一回合)   威廉第一回合.mp3      https://files.catbox.moe/n2tmgo.mp3       首回合入场行动台词
+turn[0] (回合开始1)威廉开始回合 (1).mp3  https://files.catbox.moe/n2tmgo.mp3       后续回合随机台词1 (HP>50%)
+turn[1] (回合开始2)威廉开始回合 (2).mp3  https://files.catbox.moe/osbdqb.mp3       后续回合随机台词2 (HP>50%)
+turn[2] (回合开始3)威廉开始回合 (3).mp3  https://files.catbox.moe/5ooxg9.mp3       后续回合随机台词3 (HP>50%)
+low[0] (半血台词1) 威廉半血 (1).mp3      https://files.catbox.moe/xlvb4d.mp3       半血绝境台词1 (HP<=50%)
+low[1] (半血台词2) 威廉半血 (2).mp3      https://files.catbox.moe/pp4ohk.mp3       半血绝境台词2 (HP<=50%)
+low[2] (半血台词3) 威廉半血 (3).mp3      https://files.catbox.moe/q675fe.mp3       半血绝境台词3 (HP<=50%)
+
+====================================================================================================
+八、 公开版新增/替换外部图床（imgur.la）头像映射（3 角色共 7 项映射）
+====================================================================================================
+键名 / 别名             文件名 (File)           imgur.la URL                                说明
+----------------------------------------------------------------------------------------------------
+威廉·退尔             weilan_avatar.png     https://imgur.la/images/2026/09/26/weilan_avatar.png  公开版角色头像映射
+威廉                 weilan_avatar.png     https://imgur.la/images/2026/09/26/weilan_avatar.png  简写别名映射
+冯·霍恩海姆           feng_avater.png       https://imgur.la/images/2026/09/26/feng_avater.png    公开版角色头像映射
+冯                   feng_avater.png       https://imgur.la/images/2026/09/26/feng_avater.png    简写别名映射
+伊斯坎达尔           dadi_avatar.png       https://imgur.la/images/2026/09/26/dadi_avatar.png    公开版角色头像映射 (征伐者/大帝)
+大帝                 dadi_avatar.png       https://imgur.la/images/2026/09/26/dadi_avatar.png    别名映射
+征服王               dadi_avatar.png       https://imgur.la/images/2026/09/26/dadi_avatar.png    别名映射
+

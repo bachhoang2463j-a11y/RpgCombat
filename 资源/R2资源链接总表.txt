@@ -1,0 +1,126 @@
+====================================================================================================
+  RpgCombat 全量 R2 资源链接总表
+====================================================================================================
+
+公开域名   https://pub-28508adcb2484e98a7a7965b78878723.r2.dev
+key 前缀   rpgcombat/
+结构       7 个子文件夹 / 76 个文件 / 共 26.79 MB
+上传方式   node upload-to-r2.cjs   （项目根目录；运行前先填账户 ID 与 R2 密钥）
+
+【说明】
+1. 本表为 R2 迁移版，取代《已有Catbox资源链接对应表.txt》；旧表保留仅供历史对照。
+2. 所有文件名已改为 R2 友好英文名（无中文、无空格、无括号），原名与旧 Catbox 对照见"旧 Catbox"列。
+3. 上传脚本自动为每个对象设置：
+     Cache-Control: public, max-age=31536000, immutable
+     Content-Type:  按扩展名推断（mp3→audio/mpeg，wav→audio/wav，webm→video/webm，mp4→video/mp4）
+4. 重命名对应关系：first=第一回合 / turn-N=开始回合N / low-N=半血N。
+5. 大帝（伊斯坎达尔/征服王）的 7 条语音为本次新增，此前未上传过 Catbox。
+
+====================================================================================================
+一、基础音效（basic-sfx/，16 项）
+====================================================================================================
+文件名                   R2 URL                                                                     旧 Catbox    说明
+----------------------------------------------------------------------------------------------------
+atk1.mp3                 https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/atk1.mp3          x30qlh       攻击音效1
+atk2.mp3                 https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/atk2.mp3          7w223l       攻击音效2
+atkUp.mp3                https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/atkUp.mp3         zhbczm       攻击提升音效
+avatarClick.mp3          https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/avatarClick.mp3   6jg11a       点击头像音效
+burst.mp3                https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/burst.mp3         042wyg       爆发/暴击音效
+defDown.mp3              https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/defDown.mp3       oa0q52       降防音效（看破 kanpo 复用同一 URL）
+defUp.mp3                https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/defUp.mp3         mhpzv8       防御提升音效
+heroTurn.mp3             https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/heroTurn.mp3      fgyv0y       英雄回合轮到音效
+hitDown.mp3              https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/hitDown.mp3       t2uvw3       受击音效 / 远程重击受击
+hitUp.mp3                https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/hitUp.mp3         7ef8mk       命中/增益音效
+hpHeal.mp3               https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/hpHeal.mp3         cvmhl5       HP治疗音效
+kill.mp3                 https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/kill.mp3           20yjkp       斩杀/击杀通用音效
+miss.mp3                 https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/miss.mp3           bl7mbw       闪避/未命中音效
+mpHeal.mp3               https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/mpHeal.mp3         vo2w0z       MP恢复音效
+shieldUp.mp3             https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/shieldUp.mp3       ws8i9g       护盾/屏障生成音效
+taunt.mp3                https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/taunt.mp3          5urptr       嘲讽音效
+
+====================================================================================================
+二、其余音效（misc-sfx/，21 项）
+====================================================================================================
+文件名                         R2 URL                                                                           旧 Catbox    说明
+----------------------------------------------------------------------------------------------------
+combat_kill.mp3                https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/combat_kill.mp3          tjib58       物理/近战击杀特写音效
+fire01.mp3                     https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/fire01.mp3               hy44xz       火焰01 特效音效
+fog.mp3                        https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/fog.mp3                  v6qgry       造雾术 背景冷雾音效
+freeze01.mp3                   https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/freeze01.mp3             jvs1hx       冰霜01 特效音效
+gunshot1.mp3                   https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/gunshot1.mp3             pneiwp       中小口径随机枪声1
+gunshot2.mp3                   https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/gunshot2.mp3             dhuvtz       中小口径随机枪声2
+gunshot3.mp3                   https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/gunshot3.mp3             iysdul       中小口径随机枪声3
+gunshot_pierce.mp3             https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/gunshot_pierce.mp3       c3wb0s       枪击穿透 特效专属音效
+herocharge.mp3                 https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/herocharge.mp3           0bxx42       英雄开始蓄力音效
+herochargedone.mp3             https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/herochargedone.mp3       dgbpfk       英雄蓄力完成音效
+hide.mp3                       https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/hide.mp3                 b11s5d       潜行/隐匿音效
+light01.mp3                    https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/light01.mp3              ecgnph       圣光01 特效音效
+magic_kill.wav                 https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/magic_kill.wav           3fkljn       魔法击杀特写音效
+miaozhun.mp3                   https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/miaozhun.mp3             7ixbhd       开镜瞄准 射击音效
+monsterattack2.mp3             https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/monsterattack2.mp3       2vxjx0       怪物攻击音效
+parry_weapon_guardbreak.wav    https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/parry_weapon_guardbreak.wav  fxvgh6       近战重击 盾击破防音效（原 parry_Weapon_GuardBreak.wav）
+ranshao.mp3                    https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/ranshao.mp3               2li8ex       燃烧弹 爆燃音效
+shot01.mp3                     https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/shot01.mp3                zbnxod       基础枪声 / 强力反击音效
+thunder01.mp3                  https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/thunder01.mp3             5n7gk9       雷击01 特效音效
+weimu.wav                      https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/weimu.wav                 vk7bhq       圣域帷幕 展开音效
+xiandan.mp3                    https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/xiandan.mp3               tog5gk       散射(霰弹) 12-Gauge 击发音效
+
+====================================================================================================
+三、特效动画（vfx/，11 项）
+====================================================================================================
+文件名                         R2 URL                                                                    旧 Catbox    说明
+----------------------------------------------------------------------------------------------------
+414.webm                       https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/414.webm                 kglk47       圣光01 动画
+450.webm                       https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/450.webm                 b0iicg       雷击01 动画
+fire.webm                      https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/fire.webm                eyfwd9       火焰01 动画
+fog.mp4                        https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/fog.mp4                  6y0j2j       异种坏死雾 动画
+heart.mp4                      https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/heart.mp4                817bkp       生体流转 动画
+ice.webm                       https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/ice.webm                 tr9n9i       冰霜01 动画
+miaozhun.webm                  https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/miaozhun.webm            qoxzu3       开镜瞄准 动画
+ranshao.webm                   https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/ranshao.webm             bzc3u1       燃烧弹 动画
+snipe-ezremove.mp4             https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/snipe-ezremove.mp4        cxcl7f       克虏伯重狙 动画
+strafe-ezremove05.mp4          https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/strafe-ezremove05.mp4     i6ktee       双枪扫射 动画
+weimu.webm                     https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/weimu.webm                b9e8no       圣域帷幕 动画
+
+====================================================================================================
+四、角色语音（suoen / feng / weilan / dadi，各 7 项，共 28 项）
+====================================================================================================
+文件名                         R2 URL                                                                            旧 Catbox    槽位说明
+----------------------------------------------------------------------------------------------------
+suoen-first.mp3                https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/suoen/suoen-first.mp3             eottvp       first：第一回合入场
+suoen-turn-1.mp3               https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/suoen/suoen-turn-1.mp3            f6wc3b       turn[0]：回合开始1
+suoen-turn-2.mp3               https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/suoen/suoen-turn-2.mp3            izd4v8       turn[1]：回合开始2
+suoen-turn-3.mp3               https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/suoen/suoen-turn-3.mp3            j579sd       turn[2]：回合开始3
+suoen-low-1.mp3                https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/suoen/suoen-low-1.mp3             kccey3       low[0]：半血台词1
+suoen-low-2.mp3                https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/suoen/suoen-low-2.mp3             3zivcf       low[1]：半血台词2
+suoen-low-3.mp3                https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/suoen/suoen-low-3.mp3             n5o5ys       low[2]：半血台词3
+feng-first.mp3                 https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/feng/feng-first.mp3               5y5c8f       first：第一回合入场
+feng-turn-1.mp3                https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/feng/feng-turn-1.mp3               nxnp96       turn[0]：开始回合1
+feng-turn-2.mp3                https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/feng/feng-turn-2.mp3               ng57pf       turn[1]：开始回合2
+feng-turn-3.mp3                https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/feng/feng-turn-3.mp3               khiaw6       turn[2]：开始回合3
+feng-low-1.mp3                 https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/feng/feng-low-1.mp3                z2vqrj       low[0]：半血台词1
+feng-low-2.mp3                 https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/feng/feng-low-2.mp3                fcf4zv       low[1]：半血台词2
+feng-low-3.mp3                 https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/feng/feng-low-3.mp3                ok9wti       low[2]：半血台词3
+weilan-first.mp3               https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/weilan/weilan-first.mp3            n2tmgo       first：第一回合入场
+weilan-turn-1.mp3              https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/weilan/weilan-turn-1.mp3           n2tmgo       turn[0]：开始回合1（与 first 同一文件）
+weilan-turn-2.mp3              https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/weilan/weilan-turn-2.mp3           osbdqb       turn[1]：开始回合2
+weilan-turn-3.mp3              https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/weilan/weilan-turn-3.mp3           5ooxg9       turn[2]：开始回合3
+weilan-low-1.mp3               https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/weilan/weilan-low-1.mp3            xlvb4d       low[0]：半血台词1
+weilan-low-2.mp3               https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/weilan/weilan-low-2.mp3            pp4ohk       low[1]：半血台词2
+weilan-low-3.mp3               https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/weilan/weilan-low-3.mp3            q675fe       low[2]：半血台词3
+dadi-first.mp3                 https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-first.mp3               （新增）       first：第一回合入场
+dadi-turn-1.mp3                https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-turn-1.mp3              （新增）       turn[0]：开始回合1
+dadi-turn-2.mp3                https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-turn-2.mp3              （新增）       turn[1]：开始回合2
+dadi-turn-3.mp3                https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-turn-3.mp3              （新增）       turn[2]：开始回合3
+dadi-low-1.mp3                 https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-low-1.mp3               （新增）       low[0]：半血台词1
+dadi-low-2.mp3                 https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-low-2.mp3               （新增）       low[1]：半血台词2
+dadi-low-3.mp3                 https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-low-3.mp3               （新增）       low[2]：半血台词3
+
+====================================================================================================
+五、未上传项（留在本地，不在 R2）
+====================================================================================================
+dadi_avatar.png          角色头像    代码中走 imgur.la，本次未上传
+feng_avater.png          角色头像    代码中走 imgur.la，本次未上传
+weilan_avatar.png        角色头像    代码中走 imgur.la，本次未上传
+已有Catbox资源链接对应表.txt   历史文档    旧 catbox 对照表，仅供追溯
+====================================================================================================
