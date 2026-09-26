@@ -115,7 +115,11 @@ assert(avatarBlock.includes('"征服王": "https://imgur.la/images/2026/09/26/da
 assert(!avatarBlock.includes('"埃利奥特"'), '私有角色埃利奥特头像必须移除');
 assert(!avatarBlock.includes('"玛德琳"'), '私有角色玛德琳头像必须移除');
 assert(!avatarBlock.includes('"弗兰克"'), '私有角色弗兰克头像必须移除');
-pass('AVATAR_MAP 索恩/冯/威廉/伊斯坎达尔及其简写别名头像映射准确，私有角色已排除');
+
+// 历史旧角色（修仙篇遗留等）不得残留在公开版头像表内
+const avatarEntryCount = (avatarBlock.match(/https:\/\//g) || []).length;
+assert.strictEqual(avatarEntryCount, 8, `AVATAR_MAP 应仅保留公开版四角色共 8 条映射（索恩1 + 冯2 + 威廉2 + 伊斯坎达尔3），实际 ${avatarEntryCount} 条`);
+pass('AVATAR_MAP 索恩/冯/威廉/伊斯坎达尔及其简写别名头像映射准确，私有角色与历史旧角色均已排除');
 
 // ---------------------------------------------------------
 // 5. 角色专属语音配置与别名断言

@@ -2673,50 +2673,7 @@ function tagTipAttrs(cleanTag, powerNum, rawType) {
 }
 
 const AVATAR_MAP = {
-      "烈阳剑尊": "https://www.imgur.la/images/2026/03/06/lyt.jpg",
-        "李长风": "https://www.imgur.la/images/2026/03/06/lcft.jpg",
-        "青木真人": "https://www.imgur.la/images/2026/03/06/qmt.jpg",
-        "卢青鹤": "https://www.imgur.la/images/2026/03/06/lut.jpg",
-        "墨云生": "https://www.imgur.la/images/2026/03/06/myst.jpg",
-        "刘玺": "https://www.imgur.la/images/2026/03/06/liut.jpg",
-        "铁无山": "https://www.imgur.la/images/2026/03/06/tyst.jpg",
-        "明河剑祖": "https://www.imgur.la/images/2026/03/06/minhet.jpg",
-        "上官玉": "https://www.imgur.la/images/2026/03/06/sgyt.jpg",
-        "欧阳冶": "https://www.imgur.la/images/2026/03/06/oyyt.jpg",
-        "林沐雪": "https://www.imgur.la/images/2026/03/06/lmxt.jpg",
-        "司徒南": "https://www.imgur.la/images/2026/03/06/sitnt.jpg",
-        "李玄青": "https://www.imgur.la/images/2026/03/06/lxqt.jpg",
-        "玄机子": "https://www.imgur.la/images/2026/03/06/xjzt.jpg",
-        "云中子": "https://www.imgur.la/images/2026/03/06/yzzt.jpg",
-        "赵无极": "https://www.imgur.la/images/2026/03/06/zhaowujit.jpg",
-        "星瞳": "https://www.imgur.la/images/2026/03/06/xingtt.jpg",
-        "段木痕": "https://www.imgur.la/images/2026/03/06/duant.jpg",
-        "陈风": "https://www.imgur.la/images/2026/03/06/chent.jpg",
-        "古剑心": "https://www.imgur.la/images/2026/03/06/gut.jpg",
-        "韩枫": "https://www.imgur.la/images/2026/03/06/hanft.jpg",
-        "方无恨": "https://www.imgur.la/images/2026/03/06/fangt.jpg",
-        "红娘子": "https://www.imgur.la/images/2026/03/06/hongt.jpg",
-        "百花仙子": "https://www.imgur.la/images/2026/03/06/bait.jpg",
-        "韩立": "https://www.imgur.la/images/2026/03/06/hanlt.jpg",
-        "金玉娘": "https://www.imgur.la/images/2026/03/06/jyt.jpg",
-        "赤魁": "https://www.imgur.la/images/2026/03/06/chit.jpg",
-        "石大嘴": "https://www.imgur.la/images/2026/03/06/dazuit.jpg",
-        "莫贝贝": "https://www.imgur.la/images/2026/03/06/mbbt.jpg",
-        "祝无霜": "https://www.imgur.la/images/2026/03/06/zhuwushuangt.jpg",
-        "赵刚": "https://www.imgur.la/images/2026/03/06/zhaogangt.jpg",
-        "吕金元": "https://www.imgur.la/images/2026/03/06/lvjinyuant.jpg",
-        "白羽生": "https://www.imgur.la/images/2026/03/06/baiyut.jpg",
-        "阮青": "https://www.imgur.la/images/2026/03/06/ruanqint.jpg",
-        "瑟维": "https://www.imgur.la/images/2026/03/24/servit.jpg",
-        "伯兰": "https://www.imgur.la/images/2026/03/24/bolant.jpg",
-        "老加": "https://www.imgur.la/images/2026/03/24/garyt.jpg",
-        "Ghost": "https://www.imgur.la/images/2026/03/24/ghostt.jpg",
-        "幽灵": "https://www.imgur.la/images/2026/03/24/ghostt.jpg",
-        "伊诺": "https://www.imgur.la/images/2026/03/24/inot.jpg",
-        "库恩": "https://www.imgur.la/images/2026/03/24/kunt.jpg",
-        "列夫": "https://www.imgur.la/images/2026/03/24/levt.jpg",
-        "图鲁": "https://www.imgur.la/images/2026/03/24/tulut.jpg",
-        "阿维": "https://www.imgur.la/images/2026/03/24/avit.jpg",
+
         "索恩": "https://imgur.la/images/2026/08/13/77fcdf0fd006c4ff1ccae30774322270.png",
         "冯·霍恩海姆": "https://imgur.la/images/2026/09/26/feng_avater.png",
         "冯": "https://imgur.la/images/2026/09/26/feng_avater.png",
@@ -2944,7 +2901,7 @@ function isLiveHero(name) {
       if (hc === clean || String(h.name).includes(clean) || clean.includes(hc)) return true;
     }
   }
-  return ["烈阳剑尊","李长风","玛德琳","索恩","埃利奥特","弗兰克","玩家","我方"].some(k => String(name).includes(k));
+  return ["索恩","冯·霍恩海姆","冯","威廉·退尔","威廉","伊斯坎达尔","大帝","征服王","玩家","我方"].some(k => String(name).includes(k));
 }
 function getLiveAvatar(name) {
   const clean = normalizeCombatName(name);
@@ -3011,7 +2968,7 @@ function parseCombatLog(raw) {
     if (line.startsWith('🏟️') || line.startsWith('【场地】') || line.startsWith('场地')) {
       list.push({ type: 'field', text: line.replace(/^[🏟️【场地】\s:：]+/, ''), raw: line }); continue;
     }
-    // 对话必须先于 action 判定：实际记录是 [对话] 弗兰克:「...」，冒号前不应再限制引号。
+    // 对话必须先于 action 判定：实际记录是 [对话] 索恩:「...」，冒号前不应再限制引号。
     const dialogueBody = line.replace(/^💬\s*/, '').replace(/^\[对话\]\s*/, '');
     const isDialogueLine = dialogueBody !== line || line.startsWith('💬');
     const dMatch = isDialogueLine ? dialogueBody.match(/^([^：:]+?)\s*[：:]\s*(.*)$/) : null;
@@ -18424,7 +18381,7 @@ function readStatusBarSnapshot() {
         if (!c || typeof c !== 'object') continue;
         const rawName = c['名字'] || c['姓名'] || c['名称'] || '';
         if (!rawName) continue;
-        // 状态栏原始名可能带前导空格（" 🔮埃利奥特"），getCleanNameAndEmoji 的 ^ 锚定会失效；
+        // 状态栏原始名可能带前导空格（" 🔮索恩"），getCleanNameAndEmoji 的 ^ 锚定会失效；
         // 先 trim 再剥 emoji，复合 emoji（🕵️‍♀️ ZWJ 串）也要整体剥净，否则名字带残片匹配不上 YAML 干净名
         const heroes0 = {
           name: String(rawName).trim().replace(/^[\u200D\uFE0F\u2640\u2642\u26A7\p{Extended_Pictographic}]+\s*/u, '').trim(),
