@@ -3822,6 +3822,9 @@ const _fxAudioBlobCache = new Map();
 // 用 Web Audio GainNode 放大音量（支持 Blob URL 本地音量硬件级放大；HTMLAudioElement.volume 上限为 1，无法直接 >1；复用 playWebMFX 增益先例）
 function applyAudioVolume(audio, volume) {
     if (!volume || volume === 1) return;
+    // 小于 1 的衰减用元素自身 volume 即可：GainNode 路径每次都会新建 AudioContext，
+    // 高频音效会耗尽浏览器 AudioContext 配额导致音量静默失效
+    if (volume < 1) { audio.volume = volume; return; }
     try {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (!AudioContextClass) return;
@@ -3916,23 +3919,11 @@ for (let key in audioUrls) {
     }
 }
 
-const audioCache = {};
-for (let key in audioUrls) { audioCache[key] = new Audio(audioUrls[key]); audioCache[key].preload = 'auto'; }
-
 window.playSound = (key, volume = 1) => {
     const url = audioUrls[key];
-    if (url && volume && volume !== 1) {
-        // 音量放大直接复用引擎统一的 playCustomAudio 与 Web Audio GainNode
-        playCustomAudio(url, volume);
-    } else if (audioCache[key]) {
-        try {
-            let sound = audioCache[key].cloneNode();
-            sound.volume = 0.5;
-            sound.play().catch(e => {});
-        } catch(e) {
-            console.warn('playSound error:', e);
-        }
-    }
+    if (!url) return;
+    // 统一走 Blob 预载路径；volume 取默认值 1 时沿用历史的 0.5 播放音量
+    playCustomAudio(url, volume === 1 ? 0.5 : volume);
 };
 
 // 看破音效独立接口：使用 test1 仓库专属 kanpo.wav 音效
