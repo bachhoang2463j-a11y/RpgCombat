@@ -2776,10 +2776,25 @@ const HERO_VOICE_LINES = {
       'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/weilan/weilan-low-2.mp3',
       'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/weilan/weilan-low-3.mp3'
     ]
+  },
+  "伊斯坎达尔": {
+    first: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-first.mp3',
+    turn: [
+      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-turn-1.mp3',
+      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-turn-2.mp3',
+      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-turn-3.mp3'
+    ],
+    low: [
+      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-low-1.mp3',
+      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-low-2.mp3',
+      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-low-3.mp3'
+    ]
   }
 };
 HERO_VOICE_LINES["冯"] = HERO_VOICE_LINES["冯·霍恩海姆"];
 HERO_VOICE_LINES["威廉"] = HERO_VOICE_LINES["威廉·退尔"];
+HERO_VOICE_LINES["大帝"] = HERO_VOICE_LINES["伊斯坎达尔"];
+HERO_VOICE_LINES["征服王"] = HERO_VOICE_LINES["伊斯坎达尔"];
 
 /** 从台词池中随机选一句，排除上回合已播过的台词（若池子只剩一句则允许重复） */
 function pickHeroVoice(pool, exclude) {

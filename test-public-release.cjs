@@ -75,10 +75,8 @@ while ((m = urlRegex.exec(mappingTxt)) !== null) {
   }
 }
 
-// 已上传但源码暂未接入的资源：大帝语音尚未进入 HERO_VOICE_LINES；威廉 turn[0] 与 first 同源复用前者链接
+// 已上传但源码暂未接入的资源：威廉 turn[0] 与 first 同源，复用前者链接
 const NOT_WIRED_IN_HTML = [
-  '/dadi/dadi-first.mp3', '/dadi/dadi-turn-1.mp3', '/dadi/dadi-turn-2.mp3', '/dadi/dadi-turn-3.mp3',
-  '/dadi/dadi-low-1.mp3', '/dadi/dadi-low-2.mp3', '/dadi/dadi-low-3.mp3',
   '/weilan/weilan-turn-1.mp3',
 ];
 const expectedUrls = r2Urls.filter(u => !NOT_WIRED_IN_HTML.some(s => u.endsWith(s)));
