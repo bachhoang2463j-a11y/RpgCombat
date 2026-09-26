@@ -15,7 +15,7 @@ const assert = require('assert');
 const ROOT = path.resolve(__dirname);
 const HTML_PATH = path.join(ROOT, 'index-公开版.html');
 const JSON_PATH = path.join(ROOT, 'regex-前端战斗v11_2-公开版.json');
-const MAPPING_TXT_PATH = path.join(ROOT, '资源', '已有Catbox资源链接对应表.txt');
+const MAPPING_TXT_PATH = path.join(ROOT, '资源', 'R2资源链接总表.txt');
 
 console.log('====================================================');
 console.log('       RpgCombat 公开版产物自动化专项断言套件       ');
@@ -61,22 +61,27 @@ assert(!html.includes('弗兰克_第一回合'), '私有角色弗兰克语音必
 pass('公开版源码内网隔离、私有角色（埃利奥特/玛德琳/弗兰克）音频完全隔离');
 
 // ---------------------------------------------------------
-// 3. Catbox 资源对应表映射完整性断言
+// 3. R2 资源对应表映射完整性断言
 // ---------------------------------------------------------
 assert(fs.existsSync(MAPPING_TXT_PATH), `对应表文件不存在: ${MAPPING_TXT_PATH}`);
 const mappingTxt = fs.readFileSync(MAPPING_TXT_PATH, 'utf8');
 
-const catboxUrls = [];
-const urlRegex = /https:\/\/files\.catbox\.moe\/[a-z0-9]+\.[a-z0-9]+/gi;
+const r2Urls = [];
+const urlRegex = /https:\/\/pub-28508adcb2484e98a7a7965b78878723\.r2\.dev\/rpgcombat\/[a-z0-9-]+\/[A-Za-z0-9._-]+/g;
 let m;
 while ((m = urlRegex.exec(mappingTxt)) !== null) {
-  if (!catboxUrls.includes(m[0])) {
-    catboxUrls.push(m[0]);
+  if (!r2Urls.includes(m[0])) {
+    r2Urls.push(m[0]);
   }
 }
 
-// 排除误上传的壮汉.mp3
-const expectedUrls = catboxUrls.filter(u => u !== 'https://files.catbox.moe/k6w71i.mp3');
+// 已上传但源码暂未接入的资源：大帝语音尚未进入 HERO_VOICE_LINES；威廉 turn[0] 与 first 同源复用前者链接
+const NOT_WIRED_IN_HTML = [
+  '/dadi/dadi-first.mp3', '/dadi/dadi-turn-1.mp3', '/dadi/dadi-turn-2.mp3', '/dadi/dadi-turn-3.mp3',
+  '/dadi/dadi-low-1.mp3', '/dadi/dadi-low-2.mp3', '/dadi/dadi-low-3.mp3',
+  '/weilan/weilan-turn-1.mp3',
+];
+const expectedUrls = r2Urls.filter(u => !NOT_WIRED_IN_HTML.some(s => u.endsWith(s)));
 let missingInHtml = 0;
 for (const url of expectedUrls) {
   if (!html.includes(url)) {
@@ -84,8 +89,13 @@ for (const url of expectedUrls) {
     console.error(`  [MISSING] 资源表中的链接未在公开版源码中找到: ${url}`);
   }
 }
-assert.strictEqual(missingInHtml, 0, `共有 ${missingInHtml} 个 Catbox 资源链接未正确注入 index-公开版.html`);
-pass(`全量 Catbox 资源映射核对：已注入全部 ${expectedUrls.length} 项有效云端音视频与头像链接`);
+assert.strictEqual(missingInHtml, 0, `共有 ${missingInHtml} 个 R2 资源链接未正确注入 index-公开版.html`);
+
+// 反向核对：源码里出现的 R2 链接必须都在资源表内（防止拼写错误或漏记）
+const htmlR2Urls = [...new Set(html.match(/https:\/\/pub-28508adcb2484e98a7a7965b78878723\.r2\.dev\/rpgcombat\/[a-z0-9-]+\/[A-Za-z0-9._-]+/g) || [])];
+const notInTable = htmlR2Urls.filter(u => !r2Urls.includes(u));
+assert.strictEqual(notInTable.length, 0, `源码中存在资源表未记录的 R2 链接：${notInTable.join(', ')}`);
+pass(`全量 R2 资源映射核对：源码 ${htmlR2Urls.length} 项链接与资源表 ${r2Urls.length} 项双向核对一致`);
 
 // ---------------------------------------------------------
 // 4. 新角色头像与别名映射断言
@@ -155,7 +165,7 @@ global.playCustomAudio = function(url, vol) {
 // 6.1 首回合播放 first 台词
 const thorne = { name: '索恩', hp: 100, maxHp: 100 };
 playHeroTurnVoice(thorne);
-assert.strictEqual(lastPlayedUrl, 'https://files.catbox.moe/eottvp.mp3', '索恩首回合应播放 first 台词');
+assert.strictEqual(lastPlayedUrl, HERO_VOICE_LINES['索恩'].first, '索恩首回合应播放 first 台词');
 assert.strictEqual(lastPlayedVolume, 2, '语音播放增益应为 2 倍');
 
 // 6.2 第二回合正常血量（>50%）从 turn 列表随机
