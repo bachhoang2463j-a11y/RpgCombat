@@ -96,15 +96,18 @@ assert(avatarBlockMatch, '未找到 AVATAR_MAP 定义');
 const avatarBlock = avatarBlockMatch[1];
 
 assert(avatarBlock.includes('"索恩"'), '必须包含索恩头像');
-assert(avatarBlock.includes('"冯·霍恩海姆": "https://files.catbox.moe/e9aruv.png"'), '冯·霍恩海姆头像 URL 错误');
-assert(avatarBlock.includes('"冯": "https://files.catbox.moe/e9aruv.png"'), '冯 简写别名头像 URL 错误');
-assert(avatarBlock.includes('"威廉·退尔": "https://files.catbox.moe/71km12.png"'), '威廉·退尔头像 URL 错误');
-assert(avatarBlock.includes('"威廉": "https://files.catbox.moe/71km12.png"'), '威廉 简写别名头像 URL 错误');
+assert(avatarBlock.includes('"冯·霍恩海姆": "https://imgur.la/images/2026/09/26/feng_avater.png"'), '冯·霍恩海姆头像 URL 错误');
+assert(avatarBlock.includes('"冯": "https://imgur.la/images/2026/09/26/feng_avater.png"'), '冯 简写别名头像 URL 错误');
+assert(avatarBlock.includes('"威廉·退尔": "https://imgur.la/images/2026/09/26/weilan_avatar.png"'), '威廉·退尔头像 URL 错误');
+assert(avatarBlock.includes('"威廉": "https://imgur.la/images/2026/09/26/weilan_avatar.png"'), '威廉 简写别名头像 URL 错误');
+assert(avatarBlock.includes('"伊斯坎达尔": "https://imgur.la/images/2026/09/26/dadi_avatar.png"'), '伊斯坎达尔头像 URL 错误');
+assert(avatarBlock.includes('"大帝": "https://imgur.la/images/2026/09/26/dadi_avatar.png"'), '大帝 别名头像 URL 错误');
+assert(avatarBlock.includes('"征服王": "https://imgur.la/images/2026/09/26/dadi_avatar.png"'), '征服王 别名头像 URL 错误');
 
 assert(!avatarBlock.includes('"埃利奥特"'), '私有角色埃利奥特头像必须移除');
 assert(!avatarBlock.includes('"玛德琳"'), '私有角色玛德琳头像必须移除');
 assert(!avatarBlock.includes('"弗兰克"'), '私有角色弗兰克头像必须移除');
-pass('AVATAR_MAP 索恩/冯·霍恩海姆/威廉·退尔及其简写别名头像映射准确，私有角色已排除');
+pass('AVATAR_MAP 索恩/冯/威廉/伊斯坎达尔及其简写别名头像映射准确，私有角色已排除');
 
 // ---------------------------------------------------------
 // 5. 角色专属语音配置与别名断言

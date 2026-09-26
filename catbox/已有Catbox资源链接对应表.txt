@@ -99,7 +99,7 @@ low[2] (半血台词3) 索恩_半血3.mp3        https://files.catbox.moe/n5o5ys
 ====================================================================================================
 资源类型 / 槽位    文件名 (File)           Catbox URL                                说明
 ----------------------------------------------------------------------------------------------------
-avatar (角色头像)  冯·霍恩海姆头像.png   https://files.catbox.moe/e9aruv.png       角色头像映射 (HERO_AVATAR_MAP)
+avatar (角色头像)  feng_avater.png       https://imgur.la/images/2026/09/26/feng_avater.png  角色头像映射 (HERO_AVATAR_MAP)
 first (第一回合)   冯第一回合.mp3        https://files.catbox.moe/5y5c8f.mp3       首回合入场行动台词
 turn[0] (回合开始1)冯开始回合 (1).mp3    https://files.catbox.moe/nxnp96.mp3       后续回合随机台词1 (HP>50%)
 turn[1] (回合开始2)冯开始回合 (2).mp3    https://files.catbox.moe/ng57pf.mp3       后续回合随机台词2 (HP>50%)
@@ -111,9 +111,9 @@ low[2] (半血台词3) 冯半血 (3).mp3        https://files.catbox.moe/ok9wti.
 ====================================================================================================
 七、 公开版新角色“威廉·退尔”专属头像与回合语音（1 头像 + 7 语音）
 ====================================================================================================
-资源类型 / 槽位    文件名 (File)           Catbox URL                                说明
+资源类型 / 槽位    文件名 (File)           Catbox URL / 外部 URL                     说明
 ----------------------------------------------------------------------------------------------------
-avatar (角色头像)  威廉·退尔头像.png     https://files.catbox.moe/71km12.png       角色头像映射 (HERO_AVATAR_MAP)
+avatar (角色头像)  weilan_avatar.png     https://imgur.la/images/2026/09/26/weilan_avatar.png 角色头像映射 (HERO_AVATAR_MAP)
 first (第一回合)   威廉第一回合.mp3      https://files.catbox.moe/n2tmgo.mp3       首回合入场行动台词
 turn[0] (回合开始1)威廉开始回合 (1).mp3  https://files.catbox.moe/n2tmgo.mp3       后续回合随机台词1 (HP>50%)
 turn[1] (回合开始2)威廉开始回合 (2).mp3  https://files.catbox.moe/osbdqb.mp3       后续回合随机台词2 (HP>50%)
@@ -121,3 +121,17 @@ turn[2] (回合开始3)威廉开始回合 (3).mp3  https://files.catbox.moe/5oox
 low[0] (半血台词1) 威廉半血 (1).mp3      https://files.catbox.moe/xlvb4d.mp3       半血绝境台词1 (HP<=50%)
 low[1] (半血台词2) 威廉半血 (2).mp3      https://files.catbox.moe/pp4ohk.mp3       半血绝境台词2 (HP<=50%)
 low[2] (半血台词3) 威廉半血 (3).mp3      https://files.catbox.moe/q675fe.mp3       半血绝境台词3 (HP<=50%)
+
+====================================================================================================
+八、 公开版新增/替换外部图床（imgur.la）头像映射（3 角色共 7 项映射）
+====================================================================================================
+键名 / 别名             文件名 (File)           imgur.la URL                                说明
+----------------------------------------------------------------------------------------------------
+威廉·退尔             weilan_avatar.png     https://imgur.la/images/2026/09/26/weilan_avatar.png  公开版角色头像映射
+威廉                 weilan_avatar.png     https://imgur.la/images/2026/09/26/weilan_avatar.png  简写别名映射
+冯·霍恩海姆           feng_avater.png       https://imgur.la/images/2026/09/26/feng_avater.png    公开版角色头像映射
+冯                   feng_avater.png       https://imgur.la/images/2026/09/26/feng_avater.png    简写别名映射
+伊斯坎达尔           dadi_avatar.png       https://imgur.la/images/2026/09/26/dadi_avatar.png    公开版角色头像映射 (征伐者/大帝)
+大帝                 dadi_avatar.png       https://imgur.la/images/2026/09/26/dadi_avatar.png    别名映射
+征服王               dadi_avatar.png       https://imgur.la/images/2026/09/26/dadi_avatar.png    别名映射
+
