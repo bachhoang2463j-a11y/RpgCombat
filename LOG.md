@@ -2926,3 +2926,18 @@
 - **涉及文件**：`index.html`、`regex-前端战斗v11_2.json`（重建产物）。
 - **经验证**：21 项纯函数单测（映射/剥括号/肃正间隔号/负嘲讽隐匿/{N} 插值/无威力省略/attrs 组装）；harness **621 项全绿**；IAB 端到端悬浮链路（iframe 内真实 `mouseover` 委托→悬浮窗可见+标题【目标致盲】+正文数值插值+raw 对照+视口内定位坐标→`mouseout` 收起）；编辑器真实 UI 中标签胶囊悬浮触发成功；node 内联脚本语法校验通过；`build-regex` 重建（含 tailwind 前置）。备注：harness 环境诊断探头出现的 20 条「Cannot set properties of null (setting 'innerHTML')」为**既有**编辑器头像 `onerror` 兜底在本地资源服务器（127.0.0.1:8766）不可达时的环境噪音（img 脱离后 `parentElement` 为 null），与本次改动无关。
 - **决策原因**：抽象助记符（单增/单滞/单瞄）对玩家不可读，OS demo 已沉淀一套经过验证的可读映射与悬浮窗交互，直接移植保持两项目文案一致；效果文案取本项目引擎语义而非 demo 原文（两项目细则有差异：麻痹/燃烧/散射），防止文档性文案误导玩家；悬浮窗用 `data-tagtip-*` 通用属性而非按技能挂接，敌人变种标签/技能胶囊/编辑器预览三类触发点零成本共用同一引擎。
+
+---
+
+## [LOG-244] 2026-10-09 — 修复：公开版征伐者保存变无职业 + 两版技能字段级持久化补齐（roster gap-fill）
+
+- **变更行为**（用户反馈：①公开版保存后征伐者会变为无职业；②标签独有回合数无持久化——`【战意激增】[单增;power:50;turns:3][自盲;power:10;turns:2]` 保存后 turns 变回「默认」；并要求排查两版技能编辑器还有哪些字段没持久化）：
+  1. **bug① 根因**：公开版编辑器职业下拉漏 `<option value="征伐者">`（英雄/敌人两处；非公开版两处都有）。select 内找不到匹配项时浏览器把 `select.value` 回落成第一个空选项，`syncEditorDataToMemory` 的 `.value || null` 于是把 `classType` 写成 `null`，再经 `_serializeSkillForRoster` → `persistHeroesRoster` 持久化——表现为"保存后征伐者变无职业"、职业被动（破阵贯穿/速度压制增伤）静默失效。修复：两处下拉补齐该 option。
+  2. **bug② 根因**：写入侧没问题（公开版 `_serializeSkillForRoster` 早已含 slotTurns×3）；丢值在**读取侧的合并策略**——`applyPersistedRoster` 对「与 YAML 同名的技能」一律 YAML 优先、**完全跳过持久化字段**（非公开版同构），存档里的 slotTurns 被丢弃，编辑器回填读到 null 即显示「默认」。故 bug 只在"编辑一条已存在于 YAML 的技能"时复现，与用户观察（威力保留、只有 turns 变默认）完全吻合。
+  3. **字段级补齐（层 B）**：新增 `ROSTER_GAP_FILL` 哨兵表（字段 → YAML 视为"未提供"的值：null 类 `turns/slotTurns×3/summonTarget/fxTag/damageType/kanpoTarget/sheshenTarget`；0 类 `barrierArmor/charge/delay/haste/maxUses/critRate/cost/hpCost/tpCost`；false 类药丸开关/`summonNoLimit`/`ignoreRow`/`isReaction`；`'[无]'`+0 类 `type2/type3/power2/power3`；100 类 `hit`）与 `_gapFillSkill(target, saved)`（**双向判空**：仅当 YAML 侧为哨兵值、存档侧非空非哨兵才覆盖，避免把 undefined 注入 YAML 技能）。应用于同名非组技能、同名组父、组内同名子技能、同名物品及其同名用法。**不纳入**：主槽 `type/power`（YAML 必然提供，且 groupOnly 假槽靠 `'[无]'` 做结构标记，harness 既有断言锁定该行为）、`reactionTarget`（'all' 与"未提供"不可分，由 isReaction 带着走）、`barrierSub`（沿用既有肃正自愈分支）、物品 `name/category/count`（YAML 权威）。既有组子并入 / 存档独有追加 / 物品 `Object.assign` 基座顺序一律未动。
+  4. **非公开版白名单补齐（层 A）**：`_serializeSkillForRoster` 补 `slotTurns/slotTurns2/slotTurns3/summonNoLimit/ignoreRow/charge`；物品白名单补 `switchTarget/slotTurns×3/summonNoLimit/ignoreRow`——此前这些字段连写都写不进 roster（非公开版是真正"白名单缺失"的一侧）。
+  5. **公开版 SKILL_TYPES 对齐**：`SKILL_TYPES` 与 `renderSkillTypeOptions` 的 `_nonSlot` 补 `[突进]/[众召]`（非公开版已有）。与 bug① 同因：下拉无法表达当前槽位值 → 保存时被静默改写成首个选项。可选列表仍不含这两者（与两版现状一致），零行为变化。
+  6. **审计结论**：两版都不存在「编辑器有 UI 却连写入白名单都没有」的漏字段（非公开版缺的 4 组已补齐）；**敌人编辑器全部字段无持久化路径**属设计如此（`serializeHeroesForSave` 只遍历 `heroesData`），只报告不改。
+- **涉及文件**：`index-公开版.html`、`index.html`、`integration-test/harness.html`（新增断言 41）、`regex-前端战斗v11_2.json` 与 `regex-前端战斗v11_2-公开版.json`（重建产物）。
+- **经验证**：harness **695 项全绿**（含新增断言 41 的 14 项：YAML 缺 `;turns:N` → 取存档 3/2、存档也没有 → 保持 null 不注入、屏障护甲 40 与召唤对象回落、YAML 写了槽2 标签/威力 → YAML 优先、主槽不参与补齐、YAML 写 `;turns:5` → 存档 9 不覆盖、`serializeHeroesForSave` 透传 slotTurns×2 与 summonTarget）；`test-public-release.cjs` 7 大类全过；两版内联脚本 `new Function` 语法校验 0 错；IAB 真实公开版页面实测（YAML 写 `[职业:征伐者]` → 职业下拉含该 option 且 `syncEditorDataToMemory` 后 classType 仍为征伐者；注入 roster 后 `applyPersistedRoster` 得 slotTurns 3 / slotTurns2 2 / slotTurns3 null / barrierArmor 40 / summonTarget 正常回落；敌人下拉同样含征伐者且存读回不置空）。
+- **决策原因**：用户确认的语义是「YAML 显式提供就用 YAML，YAML 未提供才回落到编辑器存档」，故采用哨兵表 + 双向判空的最小侵入实现，而非把合并策略整体翻成持久化优先（项目原设计「我方 YAML 由用户自维护（非 LLM 输出）」需保留）。已知固有副作用：YAML 里把 0/false 字段显式改回默认（删 `[他人]`、消耗清零、删掉第 2 槽）时，若存档里是非零/true/非空会被补回——「写了 0」与「没写」在解析结果上无法区分，要清掉需在编辑器改并保存（存档随之更新）。
