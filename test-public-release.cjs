@@ -66,34 +66,46 @@ pass('公开版源码内网隔离、私有角色（埃利奥特/玛德琳/弗兰
 assert(fs.existsSync(MAPPING_TXT_PATH), `对应表文件不存在: ${MAPPING_TXT_PATH}`);
 const mappingTxt = fs.readFileSync(MAPPING_TXT_PATH, 'utf8');
 
-const r2Urls = [];
-const urlRegex = /https:\/\/pub-28508adcb2484e98a7a7965b78878723\.r2\.dev\/rpgcombat\/[a-z0-9-]+\/[A-Za-z0-9._-]+/g;
+// 源码侧：R2 基址必须集中在单一常量（换域名 / 换存储桶只改一处）
+const baseMatch = html.match(/const\s+R2_BASE\s*=\s*'([^']+)'/);
+assert(baseMatch, '未找到 R2_BASE 常量定义，资源基址必须集中于单一常量');
+const r2Base = baseMatch[1];
+assert(/^https:\/\/[\w.-]+\/rpgcombat$/.test(r2Base), `R2_BASE 形态异常: ${r2Base}`);
+pass(`R2 基址集中定义于一处：${r2Base}`);
+
+// 资源表侧：抽出路径（去基址，故不绑定具体域名）
+const tablePaths = [];
+const tableUrlRegex = /https:\/\/[\w.-]+\/rpgcombat(\/[a-z0-9-]+\/[A-Za-z0-9._-]+)/g;
 let m;
-while ((m = urlRegex.exec(mappingTxt)) !== null) {
-  if (!r2Urls.includes(m[0])) {
-    r2Urls.push(m[0]);
+while ((m = tableUrlRegex.exec(mappingTxt)) !== null) {
+  if (!tablePaths.includes(m[1])) {
+    tablePaths.push(m[1]);
   }
 }
+
+// 源码侧：抽出 `${R2_BASE}/...` 引用的路径
+const htmlPaths = [...new Set(
+  [...html.matchAll(/\$\{R2_BASE\}(\/[a-z0-9-]+\/[A-Za-z0-9._-]+)/g)].map(x => x[1])
+)];
 
 // 已上传但源码暂未接入的资源：威廉 turn[0] 与 first 同源，复用前者链接
 const NOT_WIRED_IN_HTML = [
   '/weilan/weilan-turn-1.mp3',
 ];
-const expectedUrls = r2Urls.filter(u => !NOT_WIRED_IN_HTML.some(s => u.endsWith(s)));
+const expectedPaths = tablePaths.filter(p => !NOT_WIRED_IN_HTML.includes(p));
 let missingInHtml = 0;
-for (const url of expectedUrls) {
-  if (!html.includes(url)) {
+for (const p of expectedPaths) {
+  if (!htmlPaths.includes(p)) {
     missingInHtml++;
-    console.error(`  [MISSING] 资源表中的链接未在公开版源码中找到: ${url}`);
+    console.error(`  [MISSING] 资源表中的路径未在公开版源码中找到: ${p}`);
   }
 }
-assert.strictEqual(missingInHtml, 0, `共有 ${missingInHtml} 个 R2 资源链接未正确注入 index-公开版.html`);
+assert.strictEqual(missingInHtml, 0, `共有 ${missingInHtml} 个 R2 资源路径未正确注入 index-公开版.html`);
 
-// 反向核对：源码里出现的 R2 链接必须都在资源表内（防止拼写错误或漏记）
-const htmlR2Urls = [...new Set(html.match(/https:\/\/pub-28508adcb2484e98a7a7965b78878723\.r2\.dev\/rpgcombat\/[a-z0-9-]+\/[A-Za-z0-9._-]+/g) || [])];
-const notInTable = htmlR2Urls.filter(u => !r2Urls.includes(u));
-assert.strictEqual(notInTable.length, 0, `源码中存在资源表未记录的 R2 链接：${notInTable.join(', ')}`);
-pass(`全量 R2 资源映射核对：源码 ${htmlR2Urls.length} 项链接与资源表 ${r2Urls.length} 项双向核对一致`);
+// 反向核对：源码里出现的 R2 路径必须都在资源表内（防止拼写错误或漏记）
+const notInTable = htmlPaths.filter(p => !tablePaths.includes(p));
+assert.strictEqual(notInTable.length, 0, `源码中存在资源表未记录的 R2 路径：${notInTable.join(', ')}`);
+pass(`全量 R2 资源映射核对：源码 ${htmlPaths.length} 项路径与资源表 ${tablePaths.length} 项双向核对一致`);
 
 // ---------------------------------------------------------
 // 4. 新角色头像与别名映射断言
@@ -145,6 +157,7 @@ pass('HERO_VOICE_LINES 索恩/冯/威廉专属语音配置完整，别名自动�
 // 提取 HERO_VOICE_LINES 对象与相关调度函数
 const evalScope = {};
 const heroVoiceScript = `
+const R2_BASE = '${r2Base}';
 ${html.slice(html.indexOf('const HERO_VOICE_LINES'), html.indexOf('function preloadHeroVoices()'))}
 return { HERO_VOICE_LINES, pickHeroVoice, playHeroTurnVoice };
 `;

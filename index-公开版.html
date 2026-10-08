@@ -2692,59 +2692,64 @@ const DEFAULT_HERO_IMG = 'https://imgur.la/images/2026/08/13/9adb95d5df1b99ebe2f
 // 文件名经 GitHub API 逐文件核实（命名/格式不完全统一，故逐条显式列出）。
 // ==========================================
 // ==========================================
+// R2 资源基址（换域名 / 换存储桶只改这一处）
+// ==========================================
+const R2_BASE = 'https://assets.elevin11.dpdns.org/rpgcombat';
+
+// ==========================================
 // 我方英雄回合语音（按名字绑定）- 公开版（仅保留索恩）
 // ==========================================
 const HERO_VOICE_LINES = {
   "索恩": {
-    first: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/suoen/suoen-first.mp3',
+    first: `${R2_BASE}/suoen/suoen-first.mp3`,
     turn: [
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/suoen/suoen-turn-1.mp3',
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/suoen/suoen-turn-2.mp3',
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/suoen/suoen-turn-3.mp3'
+      `${R2_BASE}/suoen/suoen-turn-1.mp3`,
+      `${R2_BASE}/suoen/suoen-turn-2.mp3`,
+      `${R2_BASE}/suoen/suoen-turn-3.mp3`
     ],
     low: [
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/suoen/suoen-low-1.mp3',
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/suoen/suoen-low-2.mp3',
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/suoen/suoen-low-3.mp3'
+      `${R2_BASE}/suoen/suoen-low-1.mp3`,
+      `${R2_BASE}/suoen/suoen-low-2.mp3`,
+      `${R2_BASE}/suoen/suoen-low-3.mp3`
     ]
   },
   "冯·霍恩海姆": {
-    first: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/feng/feng-first.mp3',
+    first: `${R2_BASE}/feng/feng-first.mp3`,
     turn: [
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/feng/feng-turn-1.mp3',
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/feng/feng-turn-2.mp3',
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/feng/feng-turn-3.mp3'
+      `${R2_BASE}/feng/feng-turn-1.mp3`,
+      `${R2_BASE}/feng/feng-turn-2.mp3`,
+      `${R2_BASE}/feng/feng-turn-3.mp3`
     ],
     low: [
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/feng/feng-low-1.mp3',
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/feng/feng-low-2.mp3',
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/feng/feng-low-3.mp3'
+      `${R2_BASE}/feng/feng-low-1.mp3`,
+      `${R2_BASE}/feng/feng-low-2.mp3`,
+      `${R2_BASE}/feng/feng-low-3.mp3`
     ]
   },
   "威廉·退尔": {
-    first: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/weilan/weilan-first.mp3',
+    first: `${R2_BASE}/weilan/weilan-first.mp3`,
     turn: [
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/weilan/weilan-first.mp3',
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/weilan/weilan-turn-2.mp3',
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/weilan/weilan-turn-3.mp3'
+      `${R2_BASE}/weilan/weilan-first.mp3`,
+      `${R2_BASE}/weilan/weilan-turn-2.mp3`,
+      `${R2_BASE}/weilan/weilan-turn-3.mp3`
     ],
     low: [
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/weilan/weilan-low-1.mp3',
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/weilan/weilan-low-2.mp3',
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/weilan/weilan-low-3.mp3'
+      `${R2_BASE}/weilan/weilan-low-1.mp3`,
+      `${R2_BASE}/weilan/weilan-low-2.mp3`,
+      `${R2_BASE}/weilan/weilan-low-3.mp3`
     ]
   },
   "伊斯坎达尔": {
-    first: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-first.mp3',
+    first: `${R2_BASE}/dadi/dadi-first.mp3`,
     turn: [
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-turn-1.mp3',
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-turn-2.mp3',
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-turn-3.mp3'
+      `${R2_BASE}/dadi/dadi-turn-1.mp3`,
+      `${R2_BASE}/dadi/dadi-turn-2.mp3`,
+      `${R2_BASE}/dadi/dadi-turn-3.mp3`
     ],
     low: [
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-low-1.mp3',
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-low-2.mp3',
-      'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/dadi/dadi-low-3.mp3'
+      `${R2_BASE}/dadi/dadi-low-1.mp3`,
+      `${R2_BASE}/dadi/dadi-low-2.mp3`,
+      `${R2_BASE}/dadi/dadi-low-3.mp3`
     ]
   }
 };
@@ -3846,37 +3851,37 @@ function playCustomAudio(url, volume) {
 }
 
 const audioUrls = {
-    'hitUp': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/hitUp.mp3',
-    'mpHeal': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/mpHeal.mp3',
-    'defDown': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/defDown.mp3',
-    'atk2': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/atk2.mp3',
-    'atk1': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/atk1.mp3',
-    'atkUp': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/atkUp.mp3',
-    'hpHeal': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/hpHeal.mp3',
-    'taunt': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/taunt.mp3',
-    'hide': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/hide.mp3',
-    'hitDown': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/hitDown.mp3',
-    'shieldUp': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/shieldUp.mp3',
-    'defUp': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/defUp.mp3',
-    'miss': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/miss.mp3',
-    'burst': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/burst.mp3',
-    'avatarClick': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/avatarClick.mp3',
-    'heroTurn': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/heroTurn.mp3',
-    'kill': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/kill.mp3',
-    'shot': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/shot01.mp3',
-    'monsterAttack': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/monsterattack2.mp3',
-    'herocharge': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/herocharge.mp3',
-    'herochargedone': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/herochargedone.mp3',
-    'combatKill': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/combat_kill.mp3',
-    'magicKill': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/magic_kill.wav',
-    'kanpo': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/defDown.mp3',
+    'hitUp': `${R2_BASE}/basic-sfx/hitUp.mp3`,
+    'mpHeal': `${R2_BASE}/basic-sfx/mpHeal.mp3`,
+    'defDown': `${R2_BASE}/basic-sfx/defDown.mp3`,
+    'atk2': `${R2_BASE}/basic-sfx/atk2.mp3`,
+    'atk1': `${R2_BASE}/basic-sfx/atk1.mp3`,
+    'atkUp': `${R2_BASE}/basic-sfx/atkUp.mp3`,
+    'hpHeal': `${R2_BASE}/basic-sfx/hpHeal.mp3`,
+    'taunt': `${R2_BASE}/basic-sfx/taunt.mp3`,
+    'hide': `${R2_BASE}/misc-sfx/hide.mp3`,
+    'hitDown': `${R2_BASE}/basic-sfx/hitDown.mp3`,
+    'shieldUp': `${R2_BASE}/basic-sfx/shieldUp.mp3`,
+    'defUp': `${R2_BASE}/basic-sfx/defUp.mp3`,
+    'miss': `${R2_BASE}/basic-sfx/miss.mp3`,
+    'burst': `${R2_BASE}/basic-sfx/burst.mp3`,
+    'avatarClick': `${R2_BASE}/basic-sfx/avatarClick.mp3`,
+    'heroTurn': `${R2_BASE}/basic-sfx/heroTurn.mp3`,
+    'kill': `${R2_BASE}/basic-sfx/kill.mp3`,
+    'shot': `${R2_BASE}/misc-sfx/shot01.mp3`,
+    'monsterAttack': `${R2_BASE}/misc-sfx/monsterattack2.mp3`,
+    'herocharge': `${R2_BASE}/misc-sfx/herocharge.mp3`,
+    'herochargedone': `${R2_BASE}/misc-sfx/herochargedone.mp3`,
+    'combatKill': `${R2_BASE}/misc-sfx/combat_kill.mp3`,
+    'magicKill': `${R2_BASE}/misc-sfx/magic_kill.wav`,
+    'kanpo': `${R2_BASE}/basic-sfx/defDown.mp3`,
     // [单体(枪击)] 中小口径随机 + [特效:枪击穿透] 专属
-    'gunshot1': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/gunshot1.mp3',
-    'gunshot2': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/gunshot2.mp3',
-    'gunshot3': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/gunshot3.mp3',
-    'gunshot_pierce': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/gunshot_pierce.mp3',
+    'gunshot1': `${R2_BASE}/misc-sfx/gunshot1.mp3`,
+    'gunshot2': `${R2_BASE}/misc-sfx/gunshot2.mp3`,
+    'gunshot3': `${R2_BASE}/misc-sfx/gunshot3.mp3`,
+    'gunshot_pierce': `${R2_BASE}/misc-sfx/gunshot_pierce.mp3`,
     // [散射(霰弹)] 12-Gauge 鹿弹击发（demo-shotgun-vfx.html 方案1）
-    'xiandan': 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/xiandan.mp3'
+    'xiandan': `${R2_BASE}/misc-sfx/xiandan.mp3`
 };
 
 // 预热全量基础音效为 Blob URL，确保零延迟与 Web Audio API 无跨域限制
@@ -5519,7 +5524,7 @@ function createRangedHeavyBloodHtml() {
     return vignette+splats+drips;
 }
 // ===== [特效:近战重击] 盾击推撞·破防重击 == 复刻 demo-melee-heavy-hit.html 方案1 =====
-const MELEE_HEAVY_GUARDBREAK_URL = 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/parry_weapon_guardbreak.wav';
+const MELEE_HEAVY_GUARDBREAK_URL = `${R2_BASE}/misc-sfx/parry_weapon_guardbreak.wav`;
 let _meleeHeavyAudioCtx = null;
 function getMeleeHeavyAudioContext() { if (!_meleeHeavyAudioCtx) { const Ctx = window.AudioContext || window.webkitAudioContext; if (Ctx) _meleeHeavyAudioCtx = new Ctx(); } if (_meleeHeavyAudioCtx && _meleeHeavyAudioCtx.state === 'suspended') _meleeHeavyAudioCtx.resume(); return _meleeHeavyAudioCtx; }
 function playMeleeHeavySubBass() {
@@ -5650,7 +5655,7 @@ function spawnRangedHeavyParticles(x, y, targetDom) {
 
 // ===== [特效:造雾术] 黑曜沉潮·重水沉积冷雾 == 复刻 demo-rlyeh-mist.html 方案2 =====
 // ===== [特效:高阶召唤术] 旧日幻影·巨神凝视终局 == 复刻 demo-rlyeh-mist2.html 方案4 =====
-const RLYEH_FOG_CLOUD_URL = 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/fog.mp3';
+const RLYEH_FOG_CLOUD_URL = `${R2_BASE}/misc-sfx/fog.mp3`;
 let _eldritchAudioCtx = null;
 function getEldritchAudioContext() { if (!_eldritchAudioCtx) { const Ctx = window.AudioContext || window.webkitAudioContext; if (Ctx) _eldritchAudioCtx = new Ctx(); } if (_eldritchAudioCtx && _eldritchAudioCtx.state === 'suspended') _eldritchAudioCtx.resume(); return _eldritchAudioCtx; }
 // 古神呓语与心智震颤：不和谐三全音 (Tritone) 双耳泛音，触发 SAN Check 幻听（移植自 demo-rlyeh-mist2 的"试听古神低语心智震颤"）
@@ -6759,26 +6764,26 @@ window.stopStrafeBurst = stopStrafeBurst;
 // audioUrl:  独立的音效文件地址（覆盖默认的攻击音效）
 // ==========================================
 const WEBM_FX_REGISTRY = {
-    '火焰01': { url: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/fire.webm', scale: 1.4, particles: 'fire_aoe', audioUrl: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/fire01.mp3' },
-    '冰霜01': { url: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/ice.webm', scale: 1.4, particles: 'frost', audioUrl: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/freeze01.mp3' },
-    '雷击01': { url: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/450.webm', scale: 1.4, particles: 'thunder_aoe', audioUrl: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/thunder01.mp3' },
-    '圣光01': { url: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/414.webm', scale: 1.4, particles: 'holy_light', audioUrl: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/light01.mp3' },
-    '双枪扫射': { url: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/strafe-ezremove05.mp4', scale: 0.9, particles: 'gunshot', audioUrl: 'none', delay: 0.5 },
-    '克虏伯重狙': { url: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/snipe-ezremove.mp4', scale: 1.5, particles: 'gunshot', audioUrl: 'none' },
-    '异种坏死雾': { url: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/fog.mp4', scale: 0.8, particles: 'poison', audioUrl: 'none', delay: 0.2 },
-    '生体流转': { url: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/heart.mp4', scale: 0.4, particles: 'fire_aoe', audioUrl: 'none' },
+    '火焰01': { url: `${R2_BASE}/vfx/fire.webm`, scale: 1.4, particles: 'fire_aoe', audioUrl: `${R2_BASE}/misc-sfx/fire01.mp3` },
+    '冰霜01': { url: `${R2_BASE}/vfx/ice.webm`, scale: 1.4, particles: 'frost', audioUrl: `${R2_BASE}/misc-sfx/freeze01.mp3` },
+    '雷击01': { url: `${R2_BASE}/vfx/450.webm`, scale: 1.4, particles: 'thunder_aoe', audioUrl: `${R2_BASE}/misc-sfx/thunder01.mp3` },
+    '圣光01': { url: `${R2_BASE}/vfx/414.webm`, scale: 1.4, particles: 'holy_light', audioUrl: `${R2_BASE}/misc-sfx/light01.mp3` },
+    '双枪扫射': { url: `${R2_BASE}/vfx/strafe-ezremove05.mp4`, scale: 0.9, particles: 'gunshot', audioUrl: 'none', delay: 0.5 },
+    '克虏伯重狙': { url: `${R2_BASE}/vfx/snipe-ezremove.mp4`, scale: 1.5, particles: 'gunshot', audioUrl: 'none' },
+    '异种坏死雾': { url: `${R2_BASE}/vfx/fog.mp4`, scale: 0.8, particles: 'poison', audioUrl: 'none', delay: 0.2 },
+    '生体流转': { url: `${R2_BASE}/vfx/heart.mp4`, scale: 0.4, particles: 'fire_aoe', audioUrl: 'none' },
     '近战重击': { url: '', scale: 1.0, particles: 'melee_heavy', audioUrl: MELEE_HEAVY_GUARDBREAK_URL },
     '远程重击': { url: '', scale: 1.0, particles: 'ranged_heavy', audioUrl: 'none' },
-    '枪击穿透': { url: '', scale: 1.0, particles: 'gunshot_pierce', audioUrl: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/gunshot_pierce.mp3' },
+    '枪击穿透': { url: '', scale: 1.0, particles: 'gunshot_pierce', audioUrl: `${R2_BASE}/misc-sfx/gunshot_pierce.mp3` },
     '连续扫射': { url: '', scale: 1.0, particles: 'strafe_burst', audioUrl: 'none' },
     '造雾术': { url: '', scale: 1.0, particles: 'rlyeh_sediment', audioUrl: RLYEH_FOG_CLOUD_URL },
     '高阶召唤术': { url: '', scale: 1.0, particles: 'titan_gaze', audioUrl: 'none', delay: 1.0 },
     '障壁术': { url: '', scale: 1.0, particles: 'nak_aegis', audioUrl: 'none', delay: 0.8 },
     // 用户新增三组（Catbox 云端外链）；开镜瞄准/燃烧弹无 delay（立即结算），圣域帷幕 delay 1（演出后结算）、均不放大音量
     // 开镜瞄准/燃烧弹 scale 0.42：用户实测原 1.4 过大，降至 30%（1.4×0.3）
-    '开镜瞄准': { url: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/miaozhun.webm', scale: 0.42, audioUrl: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/miaozhun.mp3' },
-    '燃烧弹': { url: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/ranshao.webm', scale: 0.42, particles: 'fire_aoe', audioUrl: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/ranshao.mp3' },
-    '圣域帷幕': { url: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/vfx/weimu.webm', scale: 1.4, particles: 'holy_light', audioUrl: 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/weimu.wav', delay: 1 },
+    '开镜瞄准': { url: `${R2_BASE}/vfx/miaozhun.webm`, scale: 0.42, audioUrl: `${R2_BASE}/misc-sfx/miaozhun.mp3` },
+    '燃烧弹': { url: `${R2_BASE}/vfx/ranshao.webm`, scale: 0.42, particles: 'fire_aoe', audioUrl: `${R2_BASE}/misc-sfx/ranshao.mp3` },
+    '圣域帷幕': { url: `${R2_BASE}/vfx/weimu.webm`, scale: 1.4, particles: 'holy_light', audioUrl: `${R2_BASE}/misc-sfx/weimu.wav`, delay: 1 },
 };
 
 
@@ -12381,8 +12386,8 @@ async function playKanpoEffect(caster, enemy, skill) {
 }
 
 // 强力反击专属音效（冲击波射出瞬间播放）—— 远程重击复用同一枪声
-const POWER_COUNTER_SOUND_URL = 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/misc-sfx/shot01.mp3';
-const RANGED_HEAVY_HITDOWN_URL = 'https://pub-28508adcb2484e98a7a7965b78878723.r2.dev/rpgcombat/basic-sfx/hitDown.mp3';
+const POWER_COUNTER_SOUND_URL = `${R2_BASE}/misc-sfx/shot01.mp3`;
+const RANGED_HEAVY_HITDOWN_URL = `${R2_BASE}/basic-sfx/hitDown.mp3`;
 let _rangedHeavyAudioCtx = null;
 function getRangedHeavyAudioContext() {
     if (!_rangedHeavyAudioCtx) {
