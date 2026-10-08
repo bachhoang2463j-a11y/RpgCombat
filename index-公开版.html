@@ -11394,6 +11394,7 @@ function reorderRemainingQueue() {
  * （长键优先保证 [单回蓝] 命中 '回蓝' 而非 '回'，不再依赖注册顺序）
  */
 function resolveTagHandler(tag) {
+    if (!tag) return null;   // 空槽容错：外部写方（OpeningSetup roster）历史上会写入 null 槽
     // 1. 精确匹配优先
     if (TAG_HANDLERS[tag]) return TAG_HANDLERS[tag];
     // 2. 按 key 长度降序遍历，找第一个 tag 包含该 key 的处理器
@@ -11626,7 +11627,7 @@ registerClassPassive('隐匿者', {
         return 0;
     },
     onAfterDamageDealt(caster, target, targetDom, incomingDamageType) {
-        if ((incomingDamageType === '近战' || incomingDamageType.includes('近战') || incomingDamageType.includes('剑') || incomingDamageType.includes('刺')) && target.isAlive) {
+        if (incomingDamageType && (incomingDamageType === '近战' || incomingDamageType.includes('近战') || incomingDamageType.includes('剑') || incomingDamageType.includes('刺')) && target.isAlive) {
             const effectiveTaunt = getEffectiveStats(caster).taunt;
             const stealthVal = Math.max(0, 100 - effectiveTaunt);
             const stunChance = stealthVal / 10;
@@ -13863,7 +13864,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         }
     }
     
-    if (caster.id.startsWith('h') && (skill.type.includes('再动') || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动')))) {
+    if (caster.id.startsWith('h') && ((skill.type && skill.type.includes('再动')) || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动')))) {
         if (!state.usedExtraTurnSkillsThisRound) state.usedExtraTurnSkillsThisRound = new Set();
         state.usedExtraTurnSkillsThisRound.add(skill.name);
     }
@@ -13986,7 +13987,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     // 收集本次技能中实际回血的我方被治疗者（供治疗旁白合并使用：一次 LLM 调用让治疗者与被治疗者各说一句）
     const healedTargets = []; const healedIds = new Set();
     // 排序：攻击/控制标签优先于减益标签，保证每个目标先完成攻击命中判定，后续减益才能共享"至少一次命中"的结论
-    const isDmgTag = t => t.tag.includes('攻') || t.tag.includes('单体') || t.tag.includes('穿透') || t.tag.includes('眩晕') || t.tag.includes('散射');
+    const isDmgTag = t => !!(t && t.tag) && (t.tag.includes('攻') || t.tag.includes('单体') || t.tag.includes('穿透') || t.tag.includes('眩晕') || t.tag.includes('散射'));
     const isDebuffTag = t => t.tag.includes('降') || t.tag.includes('盲') || t.tag.includes('滞') || t.tag.includes('弱') || t.tag.includes('中毒') || t.tag.includes('燃烧') || t.tag.includes('麻痹') || t.tag.includes('缓') || t.tag.includes('吸蓝');
     tagList.sort((a, b) => (isDmgTag(b) - isDmgTag(a)) || (isDebuffTag(b) - isDebuffTag(a)));
     
@@ -15828,7 +15829,7 @@ async function handleTargetClick(target, targetType) {
     await executeSkillAction(hero, target, mockAttackSkill, multiplier);
   } else if (action.type === 'skill') {
     const skill = hero.skills[action.skillIndex];
-    const isExtraTurnSkill = skill.type.includes('再动') || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
+    const isExtraTurnSkill = (skill.type && skill.type.includes('再动')) || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
     const isUsedExtraTurn = isExtraTurnSkill && state.usedExtraTurnSkillsThisRound && state.usedExtraTurnSkillsThisRound.has(skill.name);
     if (hero.mp < skill.cost || hero.hp <= (skill.hpCost || 0) || hero.tp < (skill.tpCost || 0) || isUsedExtraTurn) { 
         if (isUsedExtraTurn) showLog("该再动技能每回合限用一次！"); else showLog("释放条件不足！"); state.isAnimating = false; return; 
@@ -15849,7 +15850,7 @@ async function handleTargetClick(target, targetType) {
 
 async function executeHeroSkillAction(skillIndex, primaryTarget) {
   if (state.isAnimating) return; const hero = state.actionQueue[state.queueIndex].ref; const skill = hero.skills[skillIndex];
-  const isExtraTurnSkill = skill.type.includes('再动') || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
+  const isExtraTurnSkill = (skill.type && skill.type.includes('再动')) || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
   const isUsedExtraTurn = isExtraTurnSkill && state.usedExtraTurnSkillsThisRound && state.usedExtraTurnSkillsThisRound.has(skill.name);
   const noAmmo = !hasEnoughBindings(hero, skill);
   if (hero.mp < skill.cost || hero.hp <= (skill.hpCost || 0) || hero.tp < (skill.tpCost || 0) || isUsedExtraTurn || noAmmo) { 
@@ -16054,7 +16055,7 @@ function formatTagPill(typeStr, powerNum) {
 
 // 技能当前是否可点（createSkillCard 禁用态与 updateSkillMenus 可用优先排序共用同一判定）
 function isSkillActionable(hero, skill) {
-    const isExtraTurnSkill = skill.type.includes('再动') || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
+    const isExtraTurnSkill = (skill.type && skill.type.includes('再动')) || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
     const isUsedExtraTurn = isExtraTurnSkill && state.usedExtraTurnSkillsThisRound && state.usedExtraTurnSkillsThisRound.has(skill.name);
     const usesLeft = skill.maxUses > 0 ? (skill.usesRemaining ?? skill.maxUses) : 0;
     const isUsesExhausted = skill.maxUses > 0 && usesLeft <= 0;
@@ -16064,7 +16065,7 @@ function isSkillActionable(hero, skill) {
 }
 
 function createSkillCard(hero, skill, idx) {
-    const isExtraTurnSkill = skill.type.includes('再动') || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
+    const isExtraTurnSkill = (skill.type && skill.type.includes('再动')) || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
     const isUsedExtraTurn = isExtraTurnSkill && state.usedExtraTurnSkillsThisRound && state.usedExtraTurnSkillsThisRound.has(skill.name);
     const usesLeft = skill.maxUses > 0 ? (skill.usesRemaining ?? skill.maxUses) : 0;
     const isUsesExhausted = skill.maxUses > 0 && usesLeft <= 0;
@@ -18650,6 +18651,14 @@ function applyPersistedRoster() {
         const extraSavedItems = savedItems.filter(it => !yamlItemNames.has(it.name)).map(it => Object.assign({ isItem: true, usesRemaining: it.maxUses || 0 }, it));
         h.items = [...mergedYamlItems, ...extraSavedItems];
     }
+  });
+  // 空槽归一化：外部写方（OpeningSetup roster）历史上会把空效果槽写成 null，而本文件空槽契约是 '[无]'。
+  // 未归一化时 tag/type 上的 .includes 会抛 Cannot read properties of null——表现为回合交接时
+  // renderHeroMenu → updateSkillMenus → isSkillActionable 的 Promise rejection（看破/反应技也参与求值）。
+  const _normSlots = o => { ['type', 'type2', 'type3'].forEach(k => { if (o[k] == null) o[k] = '[无]'; }); };
+  heroesData.forEach(h => {
+    h.skills.forEach(_normSlots);
+    (h.items || []).forEach(it => { _normSlots(it); (it.children || []).forEach(_normSlots); });
   });
   // 合并完成后同步初始缓存，使"重置"恢复的也是持久化合并后的版本（而非 Combat_block 原始快照）
   initialHeroesCache = JSON.parse(JSON.stringify(heroesData));
