@@ -18269,6 +18269,22 @@ function readRoster() {
   } catch(e) { return null; }
 }
 
+// 开局引导的阵容职业记录（$opening_setup_done.chars，键为角色名）→ name→classType 映射。
+// 用途：职业的唯一来源是 roster 档（状态栏快照按设计不介入职业），而 roster 档由外部写方整档覆盖，
+// 历史上出现过某角色被漏写、或 config.classType 写成 null（hero_iskandar 槽位）的情况——
+// 该角色职业随之失去来源、职业被动静默失效（如征伐者破阵贯穿/速度压制增伤全灭）。
+// 此处作为 roster 之外的兜底来源，按名回补。
+function readOpeningSetupClasses() {
+  const map = new Map();
+  try {
+    const vars = getVariables({ type: 'chat' });
+    const done = vars && vars.$opening_setup_done;
+    const chars = done && Array.isArray(done.chars) ? done.chars : [];
+    chars.forEach(c => { if (c && c.name && c.classType) map.set(c.name, c.classType); });
+  } catch(e) { /* 无记录时静默跳过，不阻断载入 */ }
+  return map;
+}
+
 // ==========================================
 // 战后数值直连状态栏（MiniMapStatus）
 // 结算数值不再让正文 LLM 转述：写 chat 变量 $rpg_combat_result 作真值，
@@ -18659,6 +18675,14 @@ function applyPersistedRoster() {
   heroesData.forEach(h => {
     h.skills.forEach(_normSlots);
     (h.items || []).forEach(it => { _normSlots(it); (it.children || []).forEach(_normSlots); });
+  });
+  // 职业兜底：roster 未提供（无同名档，或 config.classType 为 null）时按名回补开局引导记录的职业，
+  // 避免职业被动因外部写方整档覆盖而静默失效（补跑 onBattleInit 与上方持久化覆盖同款）
+  const openingClasses = readOpeningSetupClasses();
+  heroesData.forEach(h => {
+    if (h.classType || !openingClasses.has(h.name)) return;
+    h.classType = openingClasses.get(h.name);
+    if (window.CLASS_PASSIVES && CLASS_PASSIVES[h.classType]?.onBattleInit) CLASS_PASSIVES[h.classType].onBattleInit(h);
   });
   // 合并完成后同步初始缓存，使"重置"恢复的也是持久化合并后的版本（而非 Combat_block 原始快照）
   initialHeroesCache = JSON.parse(JSON.stringify(heroesData));
