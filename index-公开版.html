@@ -11712,9 +11712,12 @@ const corruptorPassive = {
 registerClassPassive('灾厄使', corruptorPassive);
 registerClassPassive('施毒者', corruptorPassive);
 
-// 征伐者（公开版补齐）：破阵贯穿越前排 + 动能冲踏速度压制增伤 + 开战首回合极速。
-// 注：非公开版的 modifyCritRate（带速度 buff 时 +10% 暴击）与 modifyDodgeCap（先手优势：速度差转闪避分母）
-// 依赖公开版尚未提供的两个扩展点，本次未移植（只保留前三条）。
+// 征伐者（公开版补齐，与非公开版同构）：
+// 【被动①动能冲踏】速度压制：有效速度每超出目标 10 点伤害 +5%（走 modifyDamageMultiplier）；
+//   自身带正向速度 buff 时攻击附加 10% 暴击率（走 modifyCritRate，与技能自带 [暴击:N%] 相加）。
+// 【被动②破阵贯穿】ignoreRow：近战可越前排打后排（与技能级 [突进] 标签共用 canBypassRow）；
+//   开战首回合自身行动速度临时 +20（duration:1，自身首次行动时扣减）。
+// 【被动③先手优势】被攻击时闪避分母按"自身有效速度 - 攻击者有效速度"额外提升（modifyDodgeCap）。
 registerClassPassive('征伐者', {
     // 忽略前排掩护（职业级通道，供 canBypassRow 读取）
     ignoreRow: true,
@@ -11730,6 +11733,15 @@ registerClassPassive('征伐者', {
         if (!target || target.isBarrierTarget) return 0;
         const diff = getEffectiveSpeed(caster) - getEffectiveSpeed(target);
         return diff >= 10 ? Math.floor(diff / 10) * 0.05 : 0;
+    },
+    modifyCritRate(caster) {
+        return (caster.buffs || []).some(b => b.type === 'spd' && b.value > 0) ? 10 : 0;
+    },
+    modifyDodgeCap(target, caster) {
+        if (!caster) return 0;
+        // 速度差折算点：当前 1:1 无封顶，需调参时改这一行
+        const diff = getEffectiveSpeed(target) - getEffectiveSpeed(caster);
+        return diff > 0 ? diff : 0;
     }
 });
 
@@ -12986,7 +12998,9 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
       attackerHitCap = Math.max(1, attackerHitCap - penalty);
       if (!skill._rowPenaltyLogged) { addHistory(`   ↳ 后排掩护：${caster.name} 远程/法术命中 -${penalty}（${target.name}敏捷${getEffectiveSpeed(target)}×30%）`); skill._rowPenaltyLogged = true; }
     }
-    const defenderSpdCap = Math.max(1, (target.spd || 0) + initialTStats.eva);
+    // 职业被动闪避加成（征伐者【先手优势】：被速度低于自己的攻击者命中时，闪避分母追加双方有效速度差）
+    const _dodgeCapBonus = (window.CLASS_PASSIVES?.[target.classType]?.modifyDodgeCap?.(target, caster)) || 0;
+    const defenderSpdCap = Math.max(1, (target.spd || 0) + initialTStats.eva + _dodgeCapBonus);
 
     // 初次闪避判定 (基于基础速度和当前面板)；【必中】跳过命中判定恒命中；极限爆发附加必中同样跳过
     isDodged = (skill && (skill.guaranteedHit || burstGuarantee)) ? false
@@ -13866,7 +13880,10 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     // _critDouble 仅在本次调用内有效（开头先清残留），供 applySingleTagEffect 区分"暴击翻倍"与"爆发翻倍"——
     // 按设定暴击只翻倍、不继承爆发附带的必中。
     if (skill) delete skill._critDouble;
-    if (multiplier === 1 && skill && (skill.critRate || 0) > 0 && Math.random() * 100 < skill.critRate) {
+    // 暴击率 = 自带 [暴击:N%] + 职业被动加成（征伐者带正向速度 buff 时 +10%）；
+    // 判定门槛随之放宽为 _critChance > 0——否则没有 [暴击] 的技能永远不掷骰，被动加成无从生效。
+    const _critChance = skill ? (skill.critRate || 0) + ((window.CLASS_PASSIVES?.[caster.classType]?.modifyCritRate?.(caster, skill)) || 0) : 0;
+    if (multiplier === 1 && skill && _critChance > 0 && Math.random() * 100 < _critChance) {
         multiplier = 2;
         skill._critDouble = true;
         playSound('burst');
