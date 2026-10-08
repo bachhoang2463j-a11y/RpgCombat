@@ -18129,7 +18129,11 @@ function _serializeSkillForRoster(s) {
   return {
     name: s.name, isReaction: s.isReaction, reactionTarget: s.reactionTarget, kanpoTarget: s.kanpoTarget, sheshenTarget: s.sheshenTarget || null,
     isOthers: !!s.isOthers, guaranteedHit: !!s.guaranteedHit, switchTarget: !!s.switchTarget, critRate: s.critRate || 0, isHighTier: !!s.isHighTier, isLegendary: !!s.isLegendary, damageType: s.damageType, fxTag: s.fxTag, cost: s.cost, hpCost: s.hpCost, tpCost: s.tpCost,
-    hit: s.hit, turns: s.turns, delay: s.delay || 0, haste: s.haste || 0, maxUses: s.maxUses || 0, type: s.type, power: s.power, type2: s.type2, power2: s.power2, type3: s.type3, power3: s.power3, barrierSub: s.barrierSub || null, barrierArmor: s.barrierArmor || 0, summonTarget: s.summonTarget || null
+    hit: s.hit, turns: s.turns, delay: s.delay || 0, haste: s.haste || 0, maxUses: s.maxUses || 0, type: s.type, power: s.power, type2: s.type2, power2: s.power2, type3: s.type3, power3: s.power3, barrierSub: s.barrierSub || null, barrierArmor: s.barrierArmor || 0, summonTarget: s.summonTarget || null,
+    // 槽位级轮数 / 众召破限 / 突进越阵 / 蓄力充能：外部写方（OpeningSetup 我方技能经 roster 传递）需要，
+    // 缺这三类字段会让 `;turns:N`、[众召]、[突进] 在 roster 路径下静默失效（YAML 路径由 parseSkill 直接提供）
+    slotTurns: s.slotTurns ?? null, slotTurns2: s.slotTurns2 ?? null, slotTurns3: s.slotTurns3 ?? null,
+    summonNoLimit: !!s.summonNoLimit, ignoreRow: !!s.ignoreRow, charge: s.charge || 0
   };
 }
 function serializeHeroesForSave() {
@@ -18157,6 +18161,9 @@ function serializeHeroesForSave() {
       type: it.type, power: it.power, type2: it.type2, power2: it.power2, type3: it.type3, power3: it.power3,
       hit: it.hit, turns: it.turns, isOthers: !!it.isOthers, guaranteedHit: !!it.guaranteedHit, critRate: it.critRate || 0, isHighTier: !!it.isHighTier, isLegendary: !!it.isLegendary, fxTag: it.fxTag, damageType: it.damageType || null,
       cost: it.cost || 0, hpCost: it.hpCost || 0, tpCost: it.tpCost || 0, delay: it.delay || 0, haste: it.haste || 0, summonTarget: it.summonTarget || null,
+      // 与技能同：物品侧的槽位轮数 / 转火 / 众召 / 突进也要能被 roster 承载
+      switchTarget: !!it.switchTarget, slotTurns: it.slotTurns ?? null, slotTurns2: it.slotTurns2 ?? null, slotTurns3: it.slotTurns3 ?? null,
+      summonNoLimit: !!it.summonNoLimit, ignoreRow: !!it.ignoreRow,
       children: (Array.isArray(it.children) ? it.children : []).map(c => _serializeSkillForRoster(c))
     }))
   }));
