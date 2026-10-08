@@ -2941,3 +2941,16 @@
 - **涉及文件**：`index-公开版.html`、`index.html`、`integration-test/harness.html`（新增断言 41）、`regex-前端战斗v11_2.json` 与 `regex-前端战斗v11_2-公开版.json`（重建产物）。
 - **经验证**：harness **695 项全绿**（含新增断言 41 的 14 项：YAML 缺 `;turns:N` → 取存档 3/2、存档也没有 → 保持 null 不注入、屏障护甲 40 与召唤对象回落、YAML 写了槽2 标签/威力 → YAML 优先、主槽不参与补齐、YAML 写 `;turns:5` → 存档 9 不覆盖、`serializeHeroesForSave` 透传 slotTurns×2 与 summonTarget）；`test-public-release.cjs` 7 大类全过；两版内联脚本 `new Function` 语法校验 0 错；IAB 真实公开版页面实测（YAML 写 `[职业:征伐者]` → 职业下拉含该 option 且 `syncEditorDataToMemory` 后 classType 仍为征伐者；注入 roster 后 `applyPersistedRoster` 得 slotTurns 3 / slotTurns2 2 / slotTurns3 null / barrierArmor 40 / summonTarget 正常回落；敌人下拉同样含征伐者且存读回不置空）。
 - **决策原因**：用户确认的语义是「YAML 显式提供就用 YAML，YAML 未提供才回落到编辑器存档」，故采用哨兵表 + 双向判空的最小侵入实现，而非把合并策略整体翻成持久化优先（项目原设计「我方 YAML 由用户自维护（非 LLM 输出）」需保留）。已知固有副作用：YAML 里把 0/false 字段显式改回默认（删 `[他人]`、消耗清零、删掉第 2 槽）时，若存档里是非零/true/非空会被补回——「写了 0」与「没写」在解析结果上无法区分，要清掉需在编辑器改并保存（存档随之更新）。
+
+---
+
+## [LOG-245] 2026-10-09 — 修复：公开版编辑器头像兜底 onerror 自触发循环（对齐非公开版加固写法）
+
+- **变更行为**（用户反馈：公开版页面顶部红条「⚠️ 运行异常 20 条（诊断探头）」，条目均为 `Uncaught TypeError: Cannot set properties of null (setting 'innerHTML')`）：
+  1. **根因**：编辑器英雄/敌人头像兜底原为裸写法 `onerror="this.src='';this.parentElement.innerHTML='👤'"`。图片不可达时 `this.src=''` 会**重启加载**（再报一次 error），而同一 handler 已把父节点 innerHTML 换成兜底图标、**img 自身被摘除**——从第二趟起 `parentElement` 为 null，赋值 `.innerHTML` 每轮抛 TypeError；又因每趟开头都重设 `src=''`，handler 被反复调用形成**自触发循环**，把探头（`window.__dbgErrors`，上限 20 条）刷满。
+  2. **报错行号是假的**：探头记录的 line 为 `20210`，而公开版文件仅 20209 行——内联 handler 由 innerHTML 注入，浏览器拿不到它在文档中的源码位置，行号越界，不可照此定位（截图里看着像 `:2210`）。
+  3. **修复**：公开版 `16775`（英雄）/`17068`（敌人）对齐**非公开版早已存在的加固写法** `onerror="this.onerror=null;this.src='';if(this.parentElement)this.parentElement.innerHTML='👤'"`——`onerror=null` 一次性自锁断掉重入，`if(this.parentElement)` 守住游离节点。公开版为手工分叉维护，此前只加固了非公开版（harness 断言 39 也只锁 `index.html`），故本次把断言 39 一并扩到公开版防再次漂移。
+  4. **同款隐患一并收口**：两版 `2469` 的 `#chat-player-avatar` 原为 `onerror="this.src='https://files.catbox.moe/6vzywv.jpg'"`——`src` 已是该 URL 时重设仍会重启加载，兜底图也不可达时反复重试失败请求（不抛错故不进探头）。补 `this.onerror=null` 一次性自锁，兜底行为不变、只多一次重试上限。
+- **涉及文件**：`index-公开版.html`、`index.html`、`integration-test/harness.html`（断言 39 扩公开版）、`regex-前端战斗v11_2.json` 与 `regex-前端战斗v11_2-公开版.json`（重建产物）。
+- **经验证**：harness **697 项全绿**（断言 39 新增公开版 2 项：公开版两处加固写法 + 裸写法已清除；原「对照：旧裸写法在游离场景抛 innerHTML null」对照组仍通过，证明该断言确实能捕获此缺陷）；`test-public-release.cjs` 7 大类全过；两版内联脚本 `new Function` 语法校验 0 错；IAB 真实公开版页面复现验证——重载后清空探头，构建 2 英雄 + 1 敌人的 YAML 并 `openEditor()`（外链图床在本机不可达，实测 catbox 4 秒超时），6 秒后 `window.__dbgErrors` 仍为 0、`#__dbg_error_bar` 不存在，兜底图标正常显示（👤/👤/👾）。
+- **决策原因**：非公开版已有一套经断言锁定的加固写法，公开版对齐既有写法比自创改法更稳（两版 handler 文本自此一致，便于后续对比维护）；保留 `this.src=''` 是因为 `onerror=null` 已断掉重入，清 src 可避免残留破图语义且不影响兜底图标（父节点内容已被替换）。`#chat-player-avatar` 未加 `if(parentElement)` 守卫，是因为它不替换父节点、无游离风险，只缺「一次性」。
