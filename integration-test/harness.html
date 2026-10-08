@@ -2669,6 +2669,66 @@ async function test40() {
   w.eval('heroesData = []; enemiesData = []; worldbookCache = []; worldbookIndex = {}; battleHistory = []; state.isGameStarted = false; state.actionQueue = []; state.queueIndex = 0; delete window.__t40;');
 }
 
+/* ================= 断言 41：roster 字段级补齐（YAML 未提供的字段回落到存档） =================
+   回归锁：applyPersistedRoster 原为「同名技能一律 YAML 优先」——编辑器里设的槽位级轮数（;turns:N）、
+   屏障护甲、召唤对象在下一楼 YAML 到达后被静默丢弃，表现为编辑器「回」输入框变回「默认」。
+   现改为字段级补齐：YAML 显式提供就以 YAML 为准，YAML 未提供（值为该字段哨兵）才回落到持久化档。
+   连带锁：非公开版 _serializeSkillForRoster 白名单此前缺 slotTurns×3，编辑器设的槽位轮数连写都写不进 roster。 */
+async function test41() {
+  head('41 roster 字段级补齐：同名技能 YAML 未提供的字段回落存档（slotTurns/屏障护甲/召唤对象）');
+  MOCK.resetVars(); seedChat(); seedState();
+  const w = rpgWin();
+  const ev = (expr) => w.eval('(function(){ return ' + expr + '; })()');
+
+  const gapYaml = [
+    '战斗数据栏:',
+    '  我方列表:',
+    '    - 角色:',
+    '        名字: "补齐测试者"',
+    '        属性: "[HP:100/100][MP:100/100][Atk:10][Armor:5][Speed:10]"',
+    '        技能:',
+    '          - "【战意激增】[单增;power:50][自盲;power:10]"',
+    '          - "【有回合】[单增;power:20;turns:5]"',
+    '',
+  ].join('\n');
+
+  // 存档：同名技能带槽位轮数 / 屏障护甲 / 召唤对象；【有回合】的 slotTurns 与 YAML 的 ;turns:5 冲突（存档 9）
+  MOCK.api.insertOrAssignVariables({
+    rpg_combat_roster: { version: 1, heroes: [{ name: '补齐测试者', config: {}, items: [], skills: [
+      { name: '战意激增', type: '[单增]', power: 50, type2: '[自盲]', power2: 10, slotTurns: 3, slotTurns2: 2, barrierArmor: 40, summonTarget: '测试召唤物' },
+      { name: '有回合', type: '[单增]', power: 20, slotTurns: 9 }
+    ] }] }
+  }, { type: 'chat' });
+
+  w.eval('onCombatDataReceived(' + JSON.stringify(gapYaml) + ')');
+  const a = ev('(function(){ var s = heroesData[0].skills.find(function(x){ return x.name === "战意激增"; }); return { st: s.slotTurns, st2: s.slotTurns2, st3: s.slotTurns3, armor: s.barrierArmor, sum: s.summonTarget, t2: s.type2, p2: s.power2, t1: s.type, p1: s.power }; })()');
+  eq(a.st, 3, 'YAML 未写槽1 ;turns:N → 槽1 轮数取存档 3');
+  eq(a.st2, 2, 'YAML 未写槽2 ;turns:N → 槽2 轮数取存档 2');
+  eq(a.st3, null, '存档同样没有槽3 轮数 → 保持 null（不注入 undefined）');
+  eq(a.armor, 40, 'YAML 未写 ;Armor:N → 屏障护甲取存档 40');
+  eq(a.sum, '测试召唤物', 'YAML 未写 [召唤:] → 召唤对象取存档');
+  eq(a.t2, '[自盲]', 'YAML 写了槽2 标签 → 以 YAML 为准（存档不覆盖）');
+  eq(a.p2, 10, 'YAML 写了槽2 威力 → 以 YAML 为准');
+  eq(a.t1, '[单增]', '主槽 type 不参与补齐，保持 YAML 解析值');
+  eq(a.p1, 50, '主槽 power 不参与补齐，保持 YAML 解析值');
+  const b = ev('(function(){ var s = heroesData[0].skills.find(function(x){ return x.name === "有回合"; }); return { st: s.slotTurns, turns: s.turns }; })()');
+  eq(b.st, 5, 'YAML 写了槽1 ;turns:5 → 以 YAML 为准（存档 9 不覆盖）');
+  eq(b.turns, null, '技能级 [Turns:N] 双方都没有 → 保持 null');
+
+  // 序列化侧：非公开版白名单此前缺 slotTurns×3，编辑器设的槽位轮数写不进 roster
+  const ser = ev('(function(){ var s = serializeHeroesForSave()[0].skills.find(function(x){ return x.name === "战意激增"; }); return { st: s.slotTurns, st2: s.slotTurns2, sum: s.summonTarget }; })()');
+  eq(ser.st, 3, 'serializeHeroesForSave 透传 slotTurns（此前非公开版白名单缺失）');
+  eq(ser.st2, 2, 'serializeHeroesForSave 透传 slotTurns2');
+  eq(ser.sum, '测试召唤物', 'serializeHeroesForSave 透传 summonTarget');
+
+  // 清理：roster 种子失效化（version 不匹配 → readRoster 返回 null）+ 清场
+  MOCK.api.insertOrAssignVariables({ rpg_combat_roster: { version: 0 } }, { type: 'chat' });
+  w.eval(`
+    heroesData = []; enemiesData = []; battleHistory = []; _historyRawCache = '';
+    state.isGameStarted = false; state.actionQueue = []; state.queueIndex = 0; state.isAnimating = false;
+  `);
+}
+
 /* ---------------- 运行 ---------------- */
 async function runAll() {
   logEl.textContent = '';
@@ -2676,7 +2736,7 @@ async function runAll() {
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41];
   for (const t of tests) {
     try { await t(); }
     catch (e) { bad(t.name + ' 抛出异常', String((e && e.stack) || e)); }

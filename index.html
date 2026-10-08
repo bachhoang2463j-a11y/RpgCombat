@@ -18331,7 +18331,11 @@ function _serializeSkillForRoster(s) {
   return {
     name: s.name, isReaction: s.isReaction, reactionTarget: s.reactionTarget, kanpoTarget: s.kanpoTarget, sheshenTarget: s.sheshenTarget || null,
     isOthers: !!s.isOthers, guaranteedHit: !!s.guaranteedHit, switchTarget: !!s.switchTarget, critRate: s.critRate || 0, isHighTier: !!s.isHighTier, isLegendary: !!s.isLegendary, damageType: s.damageType, fxTag: s.fxTag, cost: s.cost, hpCost: s.hpCost, tpCost: s.tpCost,
-    hit: s.hit, turns: s.turns, delay: s.delay || 0, haste: s.haste || 0, maxUses: s.maxUses || 0, type: s.type, power: s.power, type2: s.type2, power2: s.power2, type3: s.type3, power3: s.power3, barrierSub: s.barrierSub || null, barrierArmor: s.barrierArmor || 0, summonTarget: s.summonTarget || null
+    hit: s.hit, turns: s.turns, delay: s.delay || 0, haste: s.haste || 0, maxUses: s.maxUses || 0, type: s.type, power: s.power, type2: s.type2, power2: s.power2, type3: s.type3, power3: s.power3, barrierSub: s.barrierSub || null, barrierArmor: s.barrierArmor || 0, summonTarget: s.summonTarget || null,
+    // 槽位级轮数 / 众召破限 / 突进越阵 / 蓄力充能：外部写方（OpeningSetup 我方技能经 roster 传递）需要，
+    // 缺这三类字段会让 `;turns:N`、[众召]、[突进] 在 roster 路径下静默失效（YAML 路径由 parseSkill 直接提供）
+    slotTurns: s.slotTurns ?? null, slotTurns2: s.slotTurns2 ?? null, slotTurns3: s.slotTurns3 ?? null,
+    summonNoLimit: !!s.summonNoLimit, ignoreRow: !!s.ignoreRow, charge: s.charge || 0
   };
 }
 function serializeHeroesForSave() {
@@ -18359,6 +18363,9 @@ function serializeHeroesForSave() {
       type: it.type, power: it.power, type2: it.type2, power2: it.power2, type3: it.type3, power3: it.power3,
       hit: it.hit, turns: it.turns, isOthers: !!it.isOthers, guaranteedHit: !!it.guaranteedHit, critRate: it.critRate || 0, isHighTier: !!it.isHighTier, isLegendary: !!it.isLegendary, fxTag: it.fxTag, damageType: it.damageType || null,
       cost: it.cost || 0, hpCost: it.hpCost || 0, tpCost: it.tpCost || 0, delay: it.delay || 0, haste: it.haste || 0, summonTarget: it.summonTarget || null,
+      // 与技能同：物品侧的槽位轮数 / 转火 / 众召 / 突进也要能被 roster 承载
+      switchTarget: !!it.switchTarget, slotTurns: it.slotTurns ?? null, slotTurns2: it.slotTurns2 ?? null, slotTurns3: it.slotTurns3 ?? null,
+      summonNoLimit: !!it.summonNoLimit, ignoreRow: !!it.ignoreRow,
       children: (Array.isArray(it.children) ? it.children : []).map(c => _serializeSkillForRoster(c))
     }))
   }));
@@ -18839,6 +18846,34 @@ function shopSuppressPersistedItem(hero, itemName) {
   return shopItemSoldForHero(idx, rec.id, rec.def, shopNameKey(hero && hero.name));
 }
 
+// 同名技能的字段级补齐表：键为技能/物品字段，值为「YAML 视为未提供」的哨兵（null 表示 null/undefined 皆算未提供）。
+// 语义：YAML 由用户自维护，显式写了就以 YAML 为准；YAML 未写时用持久化档补齐，避免编辑器里设的槽位级轮数 /
+// 召唤对象 / 屏障护甲等在下一楼 YAML 到达后静默回落到默认。
+// 不纳入：type/power（主槽由 YAML 必然提供，且 groupOnly 假槽靠 '[无]' 做结构标记）、reactionTarget
+//（'all' 与"未提供"无法区分，由 isReaction 带着走）、barrierSub（已有肃正自愈分支）、物品的 name/category/count
+//（数量与类别以 Combat_block/YAML 为准）。
+const ROSTER_GAP_FILL = {
+  turns: null, slotTurns: null, slotTurns2: null, slotTurns3: null,
+  summonTarget: null, fxTag: null, damageType: null, kanpoTarget: null, sheshenTarget: null,
+  type2: '[无]', type3: '[无]', power2: 0, power3: 0,
+  barrierArmor: 0, charge: 0, delay: 0, haste: 0, maxUses: 0, critRate: 0, cost: 0, hpCost: 0, tpCost: 0, hit: 100,
+  isReaction: false, isOthers: false, guaranteedHit: false, switchTarget: false,
+  isHighTier: false, isLegendary: false, summonNoLimit: false, ignoreRow: false
+};
+// 字段是否「未提供」：null/undefined 一律算未提供；其余按哨兵等值判定
+function _rosterFieldEmpty(v, empty) {
+  if (v == null) return true;
+  return empty === null ? false : v === empty;
+}
+// 双向判空：仅当 YAML 侧未提供、存档侧确有值时覆盖（避免把 undefined 注入 YAML 技能）
+function _gapFillSkill(target, saved) {
+  if (!target || !saved) return;
+  Object.keys(ROSTER_GAP_FILL).forEach(k => {
+    const empty = ROSTER_GAP_FILL[k];
+    if (_rosterFieldEmpty(target[k], empty) && !_rosterFieldEmpty(saved[k], empty)) target[k] = saved[k];
+  });
+}
+
 // 合并：对 heroesData 中每个角色，按名匹配持久化角色
 //   - 同名角色：配置字段以持久化为准；技能集 = 持久化技能 + Combat_block 新增技能（追加）
 //   - 找不到同名：保留 Combat_block 原样
@@ -18884,6 +18919,19 @@ function applyPersistedRoster() {
     const savedSkills = Array.isArray(saved.skills) ? saved.skills : [];
     // 【肃正】自愈：污染档 type="[无]" 但 barrierSub 残留，下次载入即重建
     savedSkills.forEach(s => { if (s.barrierSub && !((s.type||'')+(s.type2||'')+(s.type3||'')).includes('肃正')) { const _has=false; if (!_has) s.type = `[肃正:${s.barrierSub}]`; } });
+    // 字段级补齐索引：存档全量技能（含组父与组子）按名索引，供 _gapFillSkill 查
+    const savedSkillByName = new Map();
+    savedSkills.forEach(sv => {
+      if (!sv || !sv.name) return;
+      savedSkillByName.set(sv.name, sv);
+      (Array.isArray(sv.children) ? sv.children : []).forEach(c => { if (c && c.name) savedSkillByName.set(c.name, c); });
+    });
+    // 字段级补齐：同名技能 YAML 未提供的字段回落到存档（组父与组子各查一次；平铺子行与 children 同对象引用，重复补齐幂等）
+    h.skills.forEach(s => {
+      if (!s || !s.name) return;
+      _gapFillSkill(s, savedSkillByName.get(s.name));
+      (Array.isArray(s.children) ? s.children : []).forEach(c => { if (c && c.name) _gapFillSkill(c, savedSkillByName.get(c.name)); });
+    });
     const savedGroupByName = new Map(savedSkills.filter(sv => sv && sv.isGroup && Array.isArray(sv.children) && sv.children.length).map(g => [g.name, g]));
     const yamlAllNames = new Set(h.skills.map(s => s && s.name).filter(Boolean));
     // ①同名并入：仅补持久化独有的子技能；父字段与同名子技能一律 YAML 为准。
@@ -18934,12 +18982,17 @@ function applyPersistedRoster() {
             if (shopSuppressPersistedItem(h, yItem.name)) return yItem;
             // 基座 yItem（效果字段一律 YAML），sItem 在前仅兜底保留 YAML 缺失的键（旧档字段演进）
             const merged = Object.assign({}, sItem, yItem, { isItem: true, count: yItem.count, usesRemaining: yItem.maxUses || 0 });
+            // 字段级补齐：物品同名时 YAML 未提供的字段回落到存档（与技能同表）
+            _gapFillSkill(merged, sItem);
             // 变体用法（children）：同名用法 YAML 为准，持久化独有用法并入（含 YAML 物品无 children 的场景）
             if (Array.isArray(sItem.children) && sItem.children.length) {
               const yChildren = Array.isArray(yItem.children) ? yItem.children : [];
               const yChildNames = new Set(yChildren.map(c => c && c.name).filter(Boolean));
               const extraChildren = sItem.children.filter(sc => sc && sc.name && !yChildNames.has(sc.name)).map(sc => Object.assign({}, sc));
               merged.children = yChildren.concat(extraChildren);
+              // 同名用法（子技能）字段级补齐：YAML 未提供的字段回落到存档
+              const sChildByName = new Map(sItem.children.filter(sc => sc && sc.name).map(sc => [sc.name, sc]));
+              merged.children.forEach(c => { if (c && c.name) _gapFillSkill(c, sChildByName.get(c.name)); });
             }
             // 绑定（bindings）：同 skillName 以 YAML 为准，持久化独有绑定并入；
             // 并入时按 skillName 去重——清洗旧档被编辑器误绑污染的重复行（同一物品对同一技能重复绑定无意义）
