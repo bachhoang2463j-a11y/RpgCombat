@@ -8749,6 +8749,8 @@ function parseSkill(skillStr) {
     let guaranteedHit = /\[必中\]/i.test(skillStr);
     // 解析 [转火] 标签 → skill.switchTarget（独立布尔标记：多段攻击前置段击杀目标后，后续攻击段随机转向其他存活敌人）
     let switchTarget = /\[转火\]/i.test(skillStr);
+    // [突进]/[无视站位]：近战不受前排掩护限制，可直取后排（与征伐者破阵贯穿共用 canBypassRow）
+    let ignoreRow = /\[(突进|无视站位)\]/i.test(skillStr);
     // 解析 [暴击:N%] 标签 → skill.critRate（独立数值标记，不占标签槽；N 为百分比整数，`%` 可省）
     // 命中时按 N% 概率触发与【极限爆发】相同的效果翻倍（详见 executeSkillAction 的暴击掷骰），敌我/技能/物品通用
     let critMatch = skillStr.match(/\[暴击[:：]\s*(\d+)\s*%?\]/i);
@@ -8810,7 +8812,7 @@ function parseSkill(skillStr) {
     let fxTagMatch = skillStr.match(/\[特效:([^\]]+)\]/i);
     let fxTag = fxTagMatch ? fxTagMatch[1].trim() : null;
 
-    return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, sheshenTarget: sheshenTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, critRate: critRate, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, isHighTier: _isHighTier, isLegendary: _isLegendary, summonTarget: summonTarget, summonNoLimit: summonNoLimit };
+    return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, sheshenTarget: sheshenTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, isHighTier: _isHighTier, isLegendary: _isLegendary, summonTarget: summonTarget, summonNoLimit: summonNoLimit };
 }
 
 // ==========================================
@@ -8865,6 +8867,7 @@ function parseItem(itemStr) {
     let guaranteedHit = /\[必中\]/i.test(raw);
     // [转火] 与技能同语义（不占效果槽）：多段攻击击杀后随机转向其他存活敌人
     let switchTarget = /\[转火\]/i.test(raw);
+    let ignoreRow = /\[(突进|无视站位)\]/i.test(raw);
     // [暴击:N%] 与技能同语义（不占效果槽）：物品使用时按 N% 概率触发效果翻倍
     let critMatch = raw.match(/\[暴击[:：]\s*(\d+)\s*%?\]/i);
     let critRate = critMatch ? Math.max(0, Math.min(100, parseInt(critMatch[1]))) : 0;
@@ -8894,7 +8897,7 @@ function parseItem(itemStr) {
     // 弹药是技能资源而非主动道具：效果槽无意义，强制清空
     if (category === '弹药') { types = ['[无]', '[无]', '[无]']; powers = [0, 0, 0]; }
 
-    return { isItem: true, name: name, category: category, count: count, maxUses: maxUses, usesRemaining: maxUses, bindings: bindings, cost: cost, hpCost: hpCost, tpCost: tpCost, delay: delay, haste: haste, summonTarget: summonTarget, summonNoLimit: summonNoLimit, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, critRate: critRate, fxTag: fxTag, isHighTier: _isHighTier, isLegendary: _isLegendary };
+    return { isItem: true, name: name, category: category, count: count, maxUses: maxUses, usesRemaining: maxUses, bindings: bindings, cost: cost, hpCost: hpCost, tpCost: tpCost, delay: delay, haste: haste, summonTarget: summonTarget, summonNoLimit: summonNoLimit, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, isHighTier: _isHighTier, isLegendary: _isLegendary };
 }
 
 // ==========================================
@@ -9533,6 +9536,22 @@ function assignEnemyRows() {
 }
 function hasAliveFront() { return enemiesData.some(e => e.isAlive && e.row === 'front'); }
 function hasAliveBack() { return enemiesData.some(e => e.isAlive && e.row === 'back'); }
+// 【前后排】越前排统一判定：技能级 [突进]/[无视站位] 标签优先，其次职业级（征伐者 ignoreRow）。
+// 前排掩护的 4 个判定点（群攻截断/保底随机池/转火池/点击拦截）共用此函数，避免各处条件漂移。
+function canBypassRow(caster, skill) {
+    if (skill && skill.ignoreRow) return true;
+    const reg = window.CLASS_PASSIVES || (typeof CLASS_PASSIVES !== 'undefined' ? CLASS_PASSIVES : null);
+    const p = reg && reg[caster && caster.classType];
+    return !!(p && p.ignoreRow);
+}
+// 【前后排】越前排生效时的一次性战报（同一技能每场只播一条，仿前排掩护的 _frontOnlyLogged 去重）。
+function logRowBypass(caster, skill) {
+    if (!skill || skill._rowBypassLogged) return;
+    if (!hasAliveFront() || !hasAliveBack()) return;
+    if (!canBypassRow(caster, skill)) return;
+    skill._rowBypassLogged = true;
+    addHistory(`   ↳ 🗡️ 破阵贯穿：${caster.name} 无视前排掩护，直取后排！`);
+}
 
 // ==========================================
 // 【召唤】世界书中途解析 + 下回合入队（pending → flush）
@@ -11692,6 +11711,27 @@ const corruptorPassive = {
 };
 registerClassPassive('灾厄使', corruptorPassive);
 registerClassPassive('施毒者', corruptorPassive);
+
+// 征伐者（公开版补齐）：破阵贯穿越前排 + 动能冲踏速度压制增伤 + 开战首回合极速。
+// 注：非公开版的 modifyCritRate（带速度 buff 时 +10% 暴击）与 modifyDodgeCap（先手优势：速度差转闪避分母）
+// 依赖公开版尚未提供的两个扩展点，本次未移植（只保留前三条）。
+registerClassPassive('征伐者', {
+    // 忽略前排掩护（职业级通道，供 canBypassRow 读取）
+    ignoreRow: true,
+    onBattleInit(entity) {
+        entity.buffs = entity.buffs || [];
+        // 幂等：编辑器提交与角色名单覆盖会重复调用 onBattleInit，避免叠加多层首回合加速
+        if (!entity.buffs.some(b => b._vanguardFirstStrike)) {
+            entity.buffs.push({ type: 'spd', value: 20, duration: 1, _vanguardFirstStrike: true });
+        }
+    },
+    modifyDamageMultiplier(caster, target) {
+        // 屏障伪目标 spd=0，不参与速度压制判定（否则对屏障会被算成极高速度差）
+        if (!target || target.isBarrierTarget) return 0;
+        const diff = getEffectiveSpeed(caster) - getEffectiveSpeed(target);
+        return diff >= 10 ? Math.floor(diff / 10) * 0.05 : 0;
+    }
+});
 
 window.CLASS_PASSIVES = CLASS_PASSIVES;
 
@@ -13947,12 +13987,13 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         if (tag.includes('再动') || tag.includes('肃正') || isSelfDebuffTag(tag)) {
             targets = [caster];
         } else if (isAoe) {
-            if (!isBeneficial && casterIsHero && skill && skill.damageType === '近战' && hasAliveFront()) {
-              // 群攻近战有前排时仅命中前排（后排被掩护）
+            if (!isBeneficial && casterIsHero && skill && skill.damageType === '近战' && hasAliveFront() && !canBypassRow(caster, skill)) {
+              // 群攻近战有前排时仅命中前排（后排被掩护；[突进]/征伐者破阵贯穿可越过）
               const frontOnly = opponents.filter(e => e.row !== 'back');
               targets = frontOnly.length ? frontOnly : opponents;
               if (frontOnly.length < opponents.length && !skill._frontOnlyLogged) { addHistory('   ↳ 前排掩护：近战群攻仅命中前排'); skill._frontOnlyLogged = true; }
             } else {
+              if (!isBeneficial && casterIsHero && skill && skill.damageType === '近战') logRowBypass(caster, skill);
               targets = isBeneficial ? allies : opponents;
             }
         } else {
@@ -13962,9 +14003,9 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                 } else {
                     // 保底随机：近战在有前排时随机不到后排
                     let pool = opponents;
-                    if (casterIsHero && skill && skill.damageType === '近战' && hasAliveFront()) {
+                    if (casterIsHero && skill && skill.damageType === '近战' && hasAliveFront() && !canBypassRow(caster, skill)) {
                       const f = opponents.filter(e => e.row !== 'back'); if (f.length) pool = f;
-                    }
+                    } else if (casterIsHero && skill && skill.damageType === '近战') { logRowBypass(caster, skill); }
                     targets = [casterIsHero ? pool[Math.floor(Math.random()*pool.length)] : getTauntTarget(pool, caster.isWise)];
                 }
             } else {
@@ -13975,7 +14016,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                 else if (!targetIsAlly && skill && skill.switchTarget && !primaryTarget.isAlive) {
                     // 【转火】：主目标已被前置攻击段击杀 → 本段随机转向其他存活敌人（近战仍受前排掩护限制）；无可转目标则本段静默跳过（不消耗弹药）
                     let _pool = opponents;
-                    if (casterIsHero && skill.damageType === '近战' && hasAliveFront()) {
+                    if (casterIsHero && skill.damageType === '近战' && hasAliveFront() && !canBypassRow(caster, skill)) {
                         const _f = opponents.filter(e => e.row !== 'back'); if (_f.length) _pool = _f;
                     }
                     if (_pool.length) {
@@ -15715,8 +15756,10 @@ async function handleTargetClick(target, targetType) {
       else if (_pa.type === 'grouped_item') { const _gc = state.actionQueue[state.queueIndex]?.ref?.items?.[_pa.itemIndex]?.children?.[_pa.childIndex]; if (_gc) _curDmg = _gc.damageType || null; }
       else if (_pa.type === 'attack') _curDmg = '近战';
     }
-    if (_curDmg === '近战' && targetType === 'enemy' && target.row === 'back' && hasAliveFront()) {
-      showLog('前排未清，近战无法突进后排'); cancelTargeting(); const _h = state.actionQueue[state.queueIndex]?.ref; if (_h) updateMenu(_h); return;
+    const _bypassHero = state.actionQueue[state.queueIndex]?.ref;
+    const _bypassSkill = _pa.type === 'skill' ? (_bypassHero && _bypassHero.skills && _bypassHero.skills[_pa.skillIndex]) : null;
+    if (_curDmg === '近战' && targetType === 'enemy' && target.row === 'back' && hasAliveFront() && !canBypassRow(_bypassHero, _bypassSkill)) {
+      showLog('前排未清，近战无法突进后排'); cancelTargeting(); const _h = _bypassHero; if (_h) updateMenu(_h); return;
     }
   }
   const action = state.pendingAction; const hero = state.actionQueue[state.queueIndex].ref;
