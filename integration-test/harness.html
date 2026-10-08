@@ -2550,6 +2550,13 @@ async function test39() {
     '英雄/敌人编辑器头像兜底 onerror 均为「断循环 + 空值保护」写法');
   check(!/onerror="this\.src='';this\.parentElement\.innerHTML=/.test(src), '旧的裸兜底写法已全部替换（防回归）');
 
+  // 公开版同款加固：公开版为手工分叉维护，曾漏掉本次加固（裸写法在头像不可达时自触发循环、
+  // 每轮 parentElement 为 null 抛 TypeError 刷满诊断探头）——加公开版静态锁防再次漂移
+  const pubSrc = await (await fetch('../index-公开版.html', { cache: 'reload' })).text();
+  eq((pubSrc.match(/onerror="this\.onerror=null;this\.src='';if\(this\.parentElement\)this\.parentElement\.innerHTML=/g) || []).length, 2,
+    '公开版：英雄/敌人编辑器头像兜底 onerror 同为「断循环 + 空值保护」写法');
+  check(!/onerror="this\.src='';this\.parentElement\.innerHTML=/.test(pubSrc), '公开版：旧的裸兜底写法已全部替换（防回归）');
+
   // 功能：按处理器文本构造游离 img（parentElement=null），派发 error。
   // 注意：监听器内抛出的异常不会回传给 dispatchEvent 调用方，而是走 window.onerror —— 故用诊断探头计数判定。
   ev(`(function(){

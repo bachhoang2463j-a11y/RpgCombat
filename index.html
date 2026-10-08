@@ -2466,7 +2466,7 @@
   <!-- 底部聊天输入区（游戏开始后显示）-->
   <div id="chat-input-area" style="display:none;">
     <div id="chat-input-bar">
-      <img id="chat-player-avatar" class="chat-avatar" src="" onerror="this.src='https://files.catbox.moe/6vzywv.jpg'" alt="玩家">
+      <img id="chat-player-avatar" class="chat-avatar" src="" onerror="this.onerror=null;this.src='https://files.catbox.moe/6vzywv.jpg'" alt="玩家">
       <input type="text" id="chat-text-input" placeholder="说点什么... (Enter发送)" maxlength="200" autocomplete="off">
       <button id="chat-ally-toggle" onclick="toggleAllyAutoSpeak()" title="开关：友方角色自动发言">友方旁白</button>
       <button id="chat-enemy-toggle" onclick="toggleEnemyAutoSpeak()" title="开关：智慧敌方自动发言">敌方旁白</button>
