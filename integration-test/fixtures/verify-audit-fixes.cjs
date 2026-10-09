@@ -267,6 +267,22 @@ function buildTests(source) {
     expr: `(()=>{var x=parseItem('【护符】[道具][肃正:法术;power:500;Armor:40]');var a=parseItem('【净符】[消耗品][驱散:2]');var b=parseItem('【群净】[消耗品][群驱散]');return {type:x.type,power:x.power,sub:x.barrierSub==null?null:x.barrierSub,armor:x.barrierArmor==null?null:x.barrierArmor,disp:a.type,group:b.type}})()`,
   });
 
+  add({
+    stage: 'parsing', id: '裸穿透散射及混合裸槽不丢失', needs: ['parseSkill', 'parseItem'],
+    expected: ['[穿透]', '[群散射(霰弹)]', '[单防]', '[群盲]', '[单防]', '[群盲]'],
+    expr: `(()=>{var a=parseSkill('【混合】[单体;power:20][单防][群盲]');var b=parseItem('【混合】[道具][单体;power:20][单防][群盲]');return [parseSkill('【穿】[穿透]').type,parseSkill('【散】[群散射(霰弹)]').type,a.type2,a.type3,b.type2,b.type3]})()`,
+  });
+  add({
+    stage: 'parsing', id: '显式法术反应与零威力保留', needs: ['parseSkill', '_gapFillSkill'],
+    expected: { reaction: '法术', power: 0, power2: 0 },
+    expr: `(()=>{var x=parseSkill('【应对】[反应:法术][单体;power:0][单防;power:0]');_gapFillSkill(x,{isReaction:true,reactionTarget:'近战',power:99,type2:'[单防]',power2:80});return {reaction:x.reactionTarget,power:x.power,power2:x.power2}})()`,
+  });
+  add({
+    stage: 'parsing', id: '显式单体20不被驱散或肃正挤掉', needs: ['parseSkill','parseItem'],
+    expected: ['[单体]', '[驱散]', '[单体]', '[肃正:法术]'],
+    expr: `(()=>{var a=parseSkill('【混合】[单体;power:20][驱散:2]');var b=parseItem('【护符】[道具][单体;power:20][肃正:法术]');return [a.type,a.type2,b.type,b.type2]})()`,
+  });
+
   /* ===== baseline (R03) ===== */
   add({
     stage: 'baseline', id: 'startGame权威覆盖后freeze再reset', needs: ['startGame', 'applyStatusBarRoster', 'runResetPipeline'],
@@ -384,23 +400,23 @@ function buildTests(source) {
     expr: `(async()=>{initLLMPresets();llmState.digestBattle=false;llmState.presets[0].digestBattle=false;await persistLLMSettings();llmState.digestBattle=true;llmState.presets=[];await loadLLMSettings();return llmState.digestBattle})()`,
   });
   add({
-    stage: 'settings', id: '职业初始化应使用合并后的MP上限', needs: ['applyPersistedRoster'],
+    stage: 'baseline', id: '职业初始化应使用合并后的MP上限', needs: ['applyPersistedRoster'],
     expected: 50,
     expr: `(()=>{__roster={heroes:[{name:'施法者',config:{classType:'施法者',maxMp:100},skills:[]}]};heroesData=[unit('h1','施法者',{mp:50,maxMp:50,shield:0})];applyPersistedRoster();return heroesData[0].shield})()`,
   });
   add({
-    stage: 'settings', id: '钢体应免疫职业暗袭眩晕', needs: ['CLASS_PASSIVES'],
+    stage: 'damage', id: '钢体应免疫职业暗袭眩晕', needs: ['CLASS_PASSIVES'],
     expected: false,
     setup: `__rng=Math.random;Math.random=function(){return 0};`,
     expr: `(()=>{var t=unit('e1','钢体',{tags:['[钢体]']});var c=unit('h1','隐匿者',{classType:'隐匿者',baseTauntBonus:-50});try{CLASS_PASSIVES['隐匿者'].onAfterDamageDealt(c,t,null,'近战')}finally{Math.random=__rng}return t.buffs.some(b=>b.type==='stun')})()`,
   });
   add({
-    stage: 'settings', id: '耐毒应免疫职业淬毒', needs: ['CLASS_PASSIVES'],
+    stage: 'damage', id: '耐毒应免疫职业淬毒', needs: ['CLASS_PASSIVES'],
     expected: false,
     expr: `(()=>{var t=unit('e1','耐毒',{immunePoison:true,tags:['[耐毒]']});CLASS_PASSIVES['灾厄使'].onAfterDamageDealt(unit('h1','毒师',{atk:20}),t,null);return t.buffs.some(b=>b.type==='poison')})()`,
   });
   add({
-    stage: 'settings', id: '自缓代价应能被驱散', needs: ['TAG_HANDLERS'],
+    stage: 'damage', id: '自缓代价应能被驱散', needs: ['TAG_HANDLERS'],
     expected: 0,
     hostSetup: (ctx, src) => {
       const s = src.indexOf('const TAG_HANDLERS = {}');

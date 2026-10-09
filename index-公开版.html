@@ -8767,27 +8767,23 @@ function parseSkill(skillStr) {
     
     // 效果槽正则：标签名内禁止出现 `[` `]` `;`，避免惰性匹配跨括号把前一个无 power 的标签与后一个 `;power:N` 标签吞成同一个
     // 槽位级 `;turns:N`（可选）：该槽位自己的持续轮数，覆盖技能级 [Turns:N]（主要服务自X 代价标签与正负持续不同的混合技能），缺省回落技能级 → 默认3
-    let typeMatches = [...skillStr.matchAll(/\[([^\[\];]*?);power:(-?\d+)(?:;turns:(\d+))?\]/gi)];
+    const nonSlots = new Set(['[无]', '[必中]', '[转火]', '[突进]', '[众召]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]', '[自盲]', '[自降]', '[自弱]', '[自滞]', '[自缓]']);
+    let typeMatches = [...skillStr.matchAll(/\[([^\[\];]+?)(?:;power:(-?\d+))?(?:;turns:(\d+))?\]/gi)].filter(m => {
+        if (m[2] !== undefined) return true;
+        return !nonSlots.has('[' + m[1] + ']') && (SKILL_TYPES.includes('[' + m[1] + ']') || /^(?:群攻|单体)[(（]/.test(m[1]));
+    });
     let types = ['[无]', '[无]', '[无]']; let powers = [0, 0, 0]; let slotTurnsArr = [null, null, null];
-    let singleTagMatches = [...skillStr.matchAll(/\[(群攻.*?|单体.*?|群回|单回|单瞄|群防|单防|群盾|单盾|嘲讽|群降|群滞|单滞|群弱|单弱|中毒|群中毒|燃烧|群燃烧|麻痹|群麻痹|再动|回避|群避|单避|免伤|反击|群反击|肃正|单速|群速|单缓|群缓|吸蓝|高阶|传奇|神术)\]/gi)];
-
-    if (typeMatches.length > 0) {
-        for (let i = 0; i < Math.min(typeMatches.length, 3); i++) {
-            types[i] = `[${typeMatches[i][1]}]`;
-            powers[i] = parseInt(typeMatches[i][2]);
-            if (typeMatches[i][3]) slotTurnsArr[i] = parseInt(typeMatches[i][3]);
-        }
+    for (let i = 0; i < Math.min(typeMatches.length, 3); i++) {
+        types[i] = '[' + typeMatches[i][1] + ']';
+        powers[i] = typeMatches[i][2] !== undefined ? parseInt(typeMatches[i][2]) : (types[i] === '[再动]' || types[i].includes('驱散') ? 1 : 50);
+        if (typeMatches[i][3] !== undefined) slotTurnsArr[i] = parseInt(typeMatches[i][3]);
     }
-    else if (singleTagMatches.length > 0) { 
-        types[0] = `[${singleTagMatches[0][1]}]`; 
-        powers[0] = types[0] === '[再动]' ? 1 : 50; 
-    } 
-    else { types[0] = '[单体]'; powers[0] = 20; }
+    if (!typeMatches.length) { types[0] = '[单体]'; powers[0] = 20; }
 
     // [驱散]/[群驱散] 填入标签槽：若主槽是纯兜底即占用主槽，否则填入第一个空闲槽（计数存于 power）
-    if (dispelRaw) {
+    if (dispelRaw && !types.some(t => t.includes('驱散'))) {
         const dispelTag = dispelRaw === '群驱散' ? '[群驱散]' : '[驱散]';
-        if (types[0] === '[单体]' && powers[0] === 20) {
+        if (!typeMatches.length) {
             types[0] = dispelTag; powers[0] = dispelCount;
         } else {
             for (let i = 1; i < 3; i++) {
@@ -8799,7 +8795,7 @@ function parseSkill(skillStr) {
     // [肃正:子类型] 无 power 写法（如 `[肃正:法术]`）不入主正则/裸标签白名单，需手动填入标签槽（power 默认 50）
     if (barrierMatch && !types.some(t => t.includes('肃正'))) {
         const szTag = barrierSub ? `[肃正:${barrierSub}]` : '[肃正]';
-        if (types[0] === '[单体]' && powers[0] === 20) {
+        if (!typeMatches.length) {
             types[0] = szTag; powers[0] = 50;
         } else {
             for (let i = 1; i < 3; i++) {
@@ -8812,7 +8808,28 @@ function parseSkill(skillStr) {
     let fxTagMatch = skillStr.match(/\[特效:([^\]]+)\]/i);
     let fxTag = fxTagMatch ? fxTagMatch[1].trim() : null;
 
-    return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, sheshenTarget: sheshenTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, isHighTier: _isHighTier, isLegendary: _isLegendary, summonTarget: summonTarget, summonNoLimit: summonNoLimit };
+    // P01：记录 YAML 显式提供的字段（显式 0 / 100 亦算提供），供 roster 字段补齐区分「未提供」与「显式默认值」。
+    // 仅「哨兵值与显式值可能同值」的字段需要记录（null 哨兵字段的显式值必非 null，无需标记）。
+    const _explicit = [];
+    if (mpMatch) _explicit.push('cost');
+    if (hpMatch) _explicit.push('hpCost');
+    if (tpMatch) _explicit.push('tpCost');
+    if (chargeMatch) _explicit.push('charge');
+    if (delayMatch) _explicit.push('delay');
+    if (hasteMatch) _explicit.push('haste');
+    if (limitMatch) _explicit.push('maxUses');
+    if (critMatch) _explicit.push('critRate');
+    if (hitMatch) _explicit.push('hit');
+    if (barrierArmorMatch) _explicit.push('barrierArmor');
+    typeMatches.slice(0, 3).forEach((m, i) => {
+        const suffix = i === 0 ? '' : String(i + 1);
+        _explicit.push('type' + suffix);
+        if (m[2] !== undefined) _explicit.push('power' + suffix);
+        if (m[3] !== undefined) _explicit.push('slotTurns' + suffix);
+    });
+    if (turnsMatch) _explicit.push('turns');
+
+    return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, sheshenTarget: sheshenTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, isHighTier: _isHighTier, isLegendary: _isLegendary, summonTarget: summonTarget, summonNoLimit: summonNoLimit, _explicit: _explicit };
 }
 
 // ==========================================
@@ -8850,19 +8867,43 @@ function parseItem(itemStr) {
         });
     }
 
+    // P08：【肃正】屏障参数与 [驱散] 简写（与 parseSkill 同契约）：先摘除 ;Armor:N 防其阻断主标签正则，再取子类型
+    let barrierArmor = 0;
+    let barrierArmorMatch = raw.match(/;Armor:(\d+)/i);
+    if (barrierArmorMatch) barrierArmor = parseInt(barrierArmorMatch[1]);
+    raw = raw.replace(/;Armor:\d+/gi, '');
+    let barrierSub = null;
+    let barrierMatch = raw.match(/\[肃正(?::([^;\]\[]+))?(?:;power:(-?\d+))?\]/i);
+    if (barrierMatch && barrierMatch[1] && ['近战', '远程', '法术'].includes(barrierMatch[1].trim())) barrierSub = barrierMatch[1].trim();
+    // [驱散:N]/[群驱散:N] 与技能同语义：N 可选，无数字默认 1（计数存于槽 power）
+    let dispelMatch = raw.match(/\[(群驱散|驱散)(?::(\d+))?\]/i);
+    let dispelRaw = dispelMatch ? dispelMatch[1] : null;
+    let dispelCount = dispelRaw ? (dispelMatch[2] ? parseInt(dispelMatch[2]) : 1) : 0;
     // 效果槽：与 parseSkill 完全同构（[xxx;power:N] 优先占槽，裸标签白名单兜底；标签名禁含 `[` `]` `;` 防跨括号吞并）
     // 槽位级 `;turns:N`（可选）与技能同语义：覆盖物品级 [Turns:N]，缺省回落物品级 → 默认3
-    let typeMatches = [...raw.matchAll(/\[([^\[\];]*?);power:(-?\d+)(?:;turns:(\d+))?\]/gi)];
+    const nonSlots = new Set(['[无]', '[必中]', '[转火]', '[突进]', '[众召]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]', '[自盲]', '[自降]', '[自弱]', '[自滞]', '[自缓]']);
+    let typeMatches = [...raw.matchAll(/\[([^\[\];]+?)(?:;power:(-?\d+))?(?:;turns:(\d+))?\]/gi)].filter(m => {
+        if (m[2] !== undefined) return true;
+        return !nonSlots.has('[' + m[1] + ']') && (SKILL_TYPES.includes('[' + m[1] + ']') || /^(?:群攻|单体)[(（]/.test(m[1]));
+    });
     let types = ['[无]', '[无]', '[无]']; let powers = [0, 0, 0]; let slotTurnsArr = [null, null, null];
-    let singleTagMatches = [...raw.matchAll(/\[(群攻.*?|单体.*?|群回蓝|单回蓝|群回|单回|单瞄|群防|单防|群盾|单盾|嘲讽|群降|群滞|单滞|群弱|单弱|中毒|群中毒|燃烧|群燃烧|麻痹|群麻痹|再动|回避|群避|单避|免伤|反击|群反击|肃正|单速|群速|单缓|群缓|吸蓝|高阶|传奇|神术)\]/gi)];
-    if (typeMatches.length > 0) {
-        for (let i = 0; i < Math.min(typeMatches.length, 3); i++) { types[i] = `[${typeMatches[i][1]}]`; powers[i] = parseInt(typeMatches[i][2]); if (typeMatches[i][3]) slotTurnsArr[i] = parseInt(typeMatches[i][3]); }
-    }
-    else if (singleTagMatches.length > 0) {
-        types[0] = `[${singleTagMatches[0][1]}]`;
-        powers[0] = types[0] === '[再动]' ? 1 : 50;
+    for (let i = 0; i < Math.min(typeMatches.length, 3); i++) {
+        types[i] = '[' + typeMatches[i][1] + ']';
+        powers[i] = typeMatches[i][2] !== undefined ? parseInt(typeMatches[i][2]) : (types[i] === '[再动]' || types[i].includes('驱散') ? 1 : 50);
+        if (typeMatches[i][3] !== undefined) slotTurnsArr[i] = parseInt(typeMatches[i][3]);
     }
 
+    // P08：[驱散:N]/[群驱散:N] 与 [肃正:子类型] 填入标签槽（与技能同规则）：主槽空闲即占主槽，否则填第一个空槽
+    if (dispelRaw && !types.some(t => t.includes('驱散'))) {
+        const dispelTag = dispelRaw === '群驱散' ? '[群驱散]' : '[驱散]';
+        if ((types[0] === '[无]' && powers[0] === 0) || (!typeMatches.length)) { types[0] = dispelTag; powers[0] = dispelCount; }
+        else { for (let i = 1; i < 3; i++) { if (types[i] === '[无]') { types[i] = dispelTag; powers[i] = dispelCount; break; } } }
+    }
+    if (barrierMatch && !types.some(t => t.includes('肃正'))) {
+        const szTag = barrierSub ? `[肃正:${barrierSub}]` : '[肃正]';
+        if ((types[0] === '[无]' && powers[0] === 0) || (!typeMatches.length)) { types[0] = szTag; powers[0] = 50; }
+        else { for (let i = 1; i < 3; i++) { if (types[i] === '[无]') { types[i] = szTag; powers[i] = 50; break; } } }
+    }
     let isOthers = /\[他人\]/i.test(raw);
     let guaranteedHit = /\[必中\]/i.test(raw);
     // [转火] 与技能同语义（不占效果槽）：多段攻击击杀后随机转向其他存活敌人
@@ -8895,9 +8936,28 @@ function parseItem(itemStr) {
     let summonNoLimit = /\[众召\]/i.test(raw);
 
     // 弹药是技能资源而非主动道具：效果槽无意义，强制清空
-    if (category === '弹药') { types = ['[无]', '[无]', '[无]']; powers = [0, 0, 0]; }
+    if (category === '弹药') { types = ['[无]', '[无]', '[无]']; powers = [0, 0, 0]; barrierSub = null; barrierArmor = 0; }
 
-    return { isItem: true, name: name, category: category, count: count, maxUses: maxUses, usesRemaining: maxUses, bindings: bindings, cost: cost, hpCost: hpCost, tpCost: tpCost, delay: delay, haste: haste, summonTarget: summonTarget, summonNoLimit: summonNoLimit, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, isHighTier: _isHighTier, isLegendary: _isLegendary };
+    // P01：记录 YAML 显式提供的字段（显式 0 / 100 亦算提供），供 roster 字段补齐区分「未提供」与「显式默认值」
+    const _explicit = [];
+    if (mpMatch) _explicit.push('cost');
+    if (hpMatch) _explicit.push('hpCost');
+    if (tpMatch) _explicit.push('tpCost');
+    if (delayMatch) _explicit.push('delay');
+    if (hasteMatch) _explicit.push('haste');
+    if (usesMatch) _explicit.push('maxUses');
+    if (critMatch) _explicit.push('critRate');
+    if (hitMatch) _explicit.push('hit');
+    if (barrierArmorMatch) _explicit.push('barrierArmor');
+    typeMatches.slice(0, 3).forEach((m, i) => {
+        const suffix = i === 0 ? '' : String(i + 1);
+        _explicit.push('type' + suffix);
+        if (m[2] !== undefined) _explicit.push('power' + suffix);
+        if (m[3] !== undefined) _explicit.push('slotTurns' + suffix);
+    });
+    if (turnsMatch) _explicit.push('turns');
+
+    return { isItem: true, name: name, category: category, count: count, maxUses: maxUses, usesRemaining: maxUses, bindings: bindings, cost: cost, hpCost: hpCost, tpCost: tpCost, delay: delay, haste: haste, summonTarget: summonTarget, summonNoLimit: summonNoLimit, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, isHighTier: _isHighTier, isLegendary: _isLegendary, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, _explicit: _explicit };
 }
 
 // ==========================================
@@ -15923,7 +15983,7 @@ function itemToPseudoSkill(item) {
         hit: item.hit || 100, turns: item.turns, slotTurns: item.slotTurns, slotTurns2: item.slotTurns2, slotTurns3: item.slotTurns3,
         type: item.type, power: item.power, type2: item.type2, power2: item.power2,
         type3: item.type3, power3: item.power3, damageType: item.damageType || null, isOthers: item.isOthers,
-        guaranteedHit: item.guaranteedHit, switchTarget: item.switchTarget, critRate: item.critRate || 0, fxTag: item.fxTag, isHighTier: !!item.isHighTier, isLegendary: !!item.isLegendary, summonTarget: item.summonTarget || null, summonNoLimit: !!item.summonNoLimit, ignoreRow: !!item.ignoreRow, isItem: true, itemRef: item };
+        guaranteedHit: item.guaranteedHit, switchTarget: item.switchTarget, critRate: item.critRate || 0, fxTag: item.fxTag, isHighTier: !!item.isHighTier, isLegendary: !!item.isLegendary, summonTarget: item.summonTarget || null, summonNoLimit: !!item.summonNoLimit, ignoreRow: !!item.ignoreRow, barrierSub: item.barrierSub || null, barrierArmor: item.barrierArmor || 0, isItem: true, itemRef: item };
 }
 
 // 物品使用核心：执行效果结算，不推进回合——回合结束由调用方负责
@@ -17025,7 +17085,8 @@ function openEditor(keepScroll) {
         html += `</div></div>`;
         // 模块 B：效果槽（弹药类隐藏：弹药是技能资源，效果无意义）
         html += `<div id="item-slots-${i}-${ii}" class="${_itCat === '弹药' ? 'hidden' : ''} space-y-1">`;
-        html += `<div class="text-[10px] text-slate-400 font-bold">效果槽位:</div>`;
+        var _itDispVal = (() => { if ((it.type||'').includes('驱散')) return it.power; if ((it.type2||'').includes('驱散')) return it.power2; if ((it.type3||'').includes('驱散')) return it.power3; return 0; })();
+        html += `<div class="text-[10px] text-slate-400 font-bold flex items-center justify-between flex-wrap gap-1"><span>效果槽位:</span><span class="flex items-center gap-3"><span class="text-cyan-400 font-semibold flex items-center gap-1">🛡️ 屏障护甲: <input type="number" id="edit-h-${i}-it-${ii}-armor" value="${it.barrierArmor||0}" class="edit-input-game w-12 font-mono-num text-right text-cyan-200 py-0.5 text-[10px]" min="0"> 点</span><span class="text-emerald-400 font-semibold flex items-center gap-1">✨ 驱散量: <input type="number" id="edit-h-${i}-it-${ii}-dispel" value="${_itDispVal}" class="edit-input-game w-12 font-mono-num text-right text-emerald-200 py-0.5 text-[10px]" min="0"> 层</span></span></div>`;
         html += `<div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 grid-tags-responsive">`;
         html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-h-${i}-it-${ii}-type', this)" class="edit-input-game skill-type-combo w-full text-cyan-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${it.type || '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-h-${i}-it-${ii}-type" class="hidden">${renderSkillTypeOptions(it.type)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-it-${ii}-power" value="${it.power}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-h-${i}-it-${ii}-slot-turns" value="${it.slotTurns ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
         html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-h-${i}-it-${ii}-type2', this)" class="edit-input-game skill-type-combo w-full text-slate-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${it.type2 || '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-h-${i}-it-${ii}-type2" class="hidden">${renderSkillTypeOptions(it.type2)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-h-${i}-it-${ii}-power2" value="${it.power2}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-h-${i}-it-${ii}-slot-turns2" value="${it.slotTurns2 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
@@ -17851,6 +17912,18 @@ function syncEditorDataToMemory() {
         it.slotTurns = document.getElementById(`edit-h-${i}-it-${ii}-slot-turns`).value !== '' ? Number(document.getElementById(`edit-h-${i}-it-${ii}-slot-turns`).value) : null;
         it.slotTurns2 = document.getElementById(`edit-h-${i}-it-${ii}-slot-turns2`).value !== '' ? Number(document.getElementById(`edit-h-${i}-it-${ii}-slot-turns2`).value) : null;
         it.slotTurns3 = document.getElementById(`edit-h-${i}-it-${ii}-slot-turns3`).value !== '' ? Number(document.getElementById(`edit-h-${i}-it-${ii}-slot-turns3`).value) : null;
+        // P08：物品屏障护甲 / 驱散量 / 屏障子类型回写（与技能编辑同规则：物品屏障与驱散走同一解析契约）
+        const _itArmorEl = document.getElementById(`edit-h-${i}-it-${ii}-armor`);
+        if (_itArmorEl) it.barrierArmor = Math.max(0, Number(_itArmorEl.value) || 0);
+        const _itDispEl = document.getElementById(`edit-h-${i}-it-${ii}-dispel`);
+        if (_itDispEl) {
+            const _itDVal = Math.max(0, Number(_itDispEl.value) || 0);
+            if ((it.type||'').includes('驱散')) it.power = _itDVal;
+            else if ((it.type2||'').includes('驱散')) it.power2 = _itDVal;
+            else if ((it.type3||'').includes('驱散')) it.power3 = _itDVal;
+        }
+        const _itSzType = [it.type, it.type2, it.type3].find(t => t && t.includes('肃正'));
+        it.barrierSub = _itSzType ? (_itSzType.match(/\[肃正:(近战|远程|法术)/)?.[1] || null) : null;
         // 绑定行收集（弹药/道具/消耗品通用）：技能下拉值即绑定名
         it.bindings = [];
         const rowsWrap = document.getElementById(`item-bindings-rows-${i}-${ii}`);
@@ -17902,6 +17975,18 @@ function syncEditorDataToMemory() {
                 c.slotTurns = document.getElementById(`${_cid}-slot-turns`).value !== '' ? Number(document.getElementById(`${_cid}-slot-turns`).value) : null;
                 c.slotTurns2 = document.getElementById(`${_cid}-slot-turns2`).value !== '' ? Number(document.getElementById(`${_cid}-slot-turns2`).value) : null;
                 c.slotTurns3 = document.getElementById(`${_cid}-slot-turns3`).value !== '' ? Number(document.getElementById(`${_cid}-slot-turns3`).value) : null;
+                // P08：物品用法（子技能）屏障护甲 / 驱散量 / 屏障子类型读回（与技能子技能读回同款）
+                const _icArmorEl = document.getElementById(`${_cid}-armor`);
+                if (_icArmorEl) c.barrierArmor = Math.max(0, Number(_icArmorEl.value) || 0);
+                const _icDispEl = document.getElementById(`${_cid}-dispel`);
+                if (_icDispEl) {
+                    const _icDVal = Math.max(0, Number(_icDispEl.value) || 0);
+                    if ((c.type||'').includes('驱散')) c.power = _icDVal;
+                    else if ((c.type2||'').includes('驱散')) c.power2 = _icDVal;
+                    else if ((c.type3||'').includes('驱散')) c.power3 = _icDVal;
+                }
+                const _icSzType = [c.type, c.type2, c.type3].find(t => t && t.includes('肃正'));
+                c.barrierSub = _icSzType ? (_icSzType.match(/\[肃正:(近战|远程|法术)/)?.[1] || null) : null;
                 const _cSumEl = document.getElementById(`${_cid}-summon`);
                 if (_cSumEl) c.summonTarget = (_cSumEl.value || '').trim() || null;
             });
@@ -18289,7 +18374,7 @@ function serializeHeroesForSave() {
       bindings: (it.bindings || []).map(b => ({ skillName: b.skillName, cost: b.cost })),
       type: it.type, power: it.power, type2: it.type2, power2: it.power2, type3: it.type3, power3: it.power3,
       hit: it.hit, turns: it.turns, isOthers: !!it.isOthers, guaranteedHit: !!it.guaranteedHit, critRate: it.critRate || 0, isHighTier: !!it.isHighTier, isLegendary: !!it.isLegendary, fxTag: it.fxTag, damageType: it.damageType || null,
-      cost: it.cost || 0, hpCost: it.hpCost || 0, tpCost: it.tpCost || 0, delay: it.delay || 0, haste: it.haste || 0, summonTarget: it.summonTarget || null,
+      cost: it.cost || 0, hpCost: it.hpCost || 0, tpCost: it.tpCost || 0, delay: it.delay || 0, haste: it.haste || 0, summonTarget: it.summonTarget || null, barrierSub: it.barrierSub || null, barrierArmor: it.barrierArmor || 0,
       // 与技能同：物品侧的槽位轮数 / 转火 / 众召 / 突进也要能被 roster 承载
       switchTarget: !!it.switchTarget, slotTurns: it.slotTurns ?? null, slotTurns2: it.slotTurns2 ?? null, slotTurns3: it.slotTurns3 ?? null,
       summonNoLimit: !!it.summonNoLimit, ignoreRow: !!it.ignoreRow,
@@ -18598,7 +18683,7 @@ function applyStatusBarRoster(snapshot) {
 // 语义：YAML 由用户自维护，显式写了就以 YAML 为准；YAML 未写时用持久化档补齐，避免编辑器里设的槽位级轮数 /
 // 召唤对象 / 屏障护甲等在下一楼 YAML 到达后静默回落到默认。
 // 不纳入：type/power（主槽由 YAML 必然提供，且 groupOnly 假槽靠 '[无]' 做结构标记）、reactionTarget
-//（'all' 与"未提供"无法区分，由 isReaction 带着走）、barrierSub（已有肃正自愈分支）、物品的 name/category/count
+//（'all' 与"未提供"无法区分，改由 _gapFillSkill 在 isReaction 来自存档时连带恢复）、barrierSub（已有肃正自愈分支）、物品的 name/category/count
 //（数量与类别以 Combat_block/YAML 为准）。
 const ROSTER_GAP_FILL = {
   turns: null, slotTurns: null, slotTurns2: null, slotTurns3: null,
@@ -18616,10 +18701,22 @@ function _rosterFieldEmpty(v, empty) {
 // 双向判空：仅当 YAML 侧未提供、存档侧确有值时覆盖（避免把 undefined 注入 YAML 技能）
 function _gapFillSkill(target, saved) {
   if (!target || !saved) return;
+  // P02：槽位参数（字段 → 槽号，1 基）只在 YAML 与存档「同槽类型」时才继承，换类型不继承旧槽参数。
+  // 「未声明」判定：槽类型缺失或为 '[无]' 都视为无身份；仅当双方都明确声明且不同才拒绝继承（保持旧档补齐契约）。
+  const _slotOf = { slotTurns: 1, type2: 2, power2: 2, slotTurns2: 2, type3: 3, power3: 3, slotTurns3: 3 };
+  const _slotTag = (o, n) => { const v = (n === 1 ? o.type : o['type' + n]); return (v && v !== '[无]') ? String(v) : ''; };
+  // P01：解析侧记录的「YAML 显式字段」存在性（显式 0 / 100 也算提供，不得被存档覆盖）
+  const _exp = Array.isArray(target._explicit) ? target._explicit : null;
+  const hadYamlReaction = target.isReaction === true;
   Object.keys(ROSTER_GAP_FILL).forEach(k => {
+    if (_exp && _exp.indexOf(k) >= 0) return;
+    const sn = _slotOf[k];
+    if (sn) { const st = _slotTag(target, sn), ss = _slotTag(saved, sn); if (st && ss && st !== ss) return; }
     const empty = ROSTER_GAP_FILL[k];
     if (_rosterFieldEmpty(target[k], empty) && !_rosterFieldEmpty(saved[k], empty)) target[k] = saved[k];
   });
+  // P04：isReaction 由存档补回时连带恢复 reactionTarget；YAML 显式 [反应]（含全能 all）仍以 YAML 为准
+  if (!hadYamlReaction && target.isReaction && saved.reactionTarget) target.reactionTarget = saved.reactionTarget;
 }
 
 // roster 旧写方用 null 表示空槽、0 表示默认回合；进入引擎前统一为运行时契约。
@@ -18644,11 +18741,19 @@ function applyPersistedRoster() {
     if (cfg.img != null) h.img = cfg.img;
     // 职业由持久化覆盖时（YAML 常省略属性栏），构建阶段的 onBattleInit 未跑，
     // 此处补跑一次职业被动初始化（隐匿者 baseTauntBonus=-50 / stealthValue=50 等），否则隐匿值开局为 0
-    if (cfg.classType != null) {
-        const yamlClassType = h.classType;
-        h.classType = cfg.classType;
-        if (yamlClassType !== cfg.classType && window.CLASS_PASSIVES && CLASS_PASSIVES[cfg.classType]?.onBattleInit) {
-            CLASS_PASSIVES[cfg.classType].onBattleInit(h);
+    // P07：区分「外部档未提供 classType」与「玩家在编辑器主动清除职业（显式 null）」。
+    // 显式 null → 清空职业（不回退 YAML，且不被 $opening_setup_done 回补）；键缺失 → 保留 YAML 职业。
+    if (Object.prototype.hasOwnProperty.call(cfg, 'classType')) {
+        if (cfg.classType == null) {
+            h.classType = null;
+            h._classTypeCleared = true;
+        } else {
+            h._classTypeCleared = false;
+            const yamlClassType = h.classType;
+            h.classType = cfg.classType;
+            if (yamlClassType !== cfg.classType && window.CLASS_PASSIVES && CLASS_PASSIVES[cfg.classType]?.onBattleInit) {
+                CLASS_PASSIVES[cfg.classType].onBattleInit(h);
+            }
         }
     }
     if (cfg.isWise != null) h.isWise = cfg.isWise;
@@ -18675,18 +18780,22 @@ function applyPersistedRoster() {
     savedSkills.forEach(normalizeRosterSkill);
     // 【肃正】自愈：污染档 type="[无]" 但 barrierSub 残留，下次载入即重建
     savedSkills.forEach(s => { if (s.barrierSub && !((s.type||'')+(s.type2||'')+(s.type3||'')).includes('肃正')) { const _has=false; if (!_has) s.type = `[肃正:${s.barrierSub}]`; } });
-    // 字段级补齐索引：存档全量技能（含组父与组子）按名索引，供 _gapFillSkill 查
+    // 字段级补齐索引：顶层技能与组内子技能各自独立命名空间（P03：同名顶层技能与组内子技能互不串档）。
+    // 键：顶层=技能名；组内=父组名 + '\u0000' + 子技能名。旧扁平档散行（无 parentName）按顶层处理。
+    const _childKey = (parent, name) => parent + '\u0000' + name;
     const savedSkillByName = new Map();
+    const savedSkillChildByName = new Map();
     savedSkills.forEach(sv => {
       if (!sv || !sv.name) return;
-      savedSkillByName.set(sv.name, sv);
-      (Array.isArray(sv.children) ? sv.children : []).forEach(c => { if (c && c.name) savedSkillByName.set(c.name, c); });
+      if (sv.parentName) savedSkillChildByName.set(_childKey(sv.parentName, sv.name), sv);
+      else savedSkillByName.set(sv.name, sv);
+      (Array.isArray(sv.children) ? sv.children : []).forEach(c => { if (c && c.name) savedSkillChildByName.set(_childKey(sv.name, c.name), c); });
     });
     // 字段级补齐：同名技能 YAML 未提供的字段回落到存档（组父与组子各查一次；平铺子行与 children 同对象引用，重复补齐幂等）
     h.skills.forEach(s => {
       if (!s || !s.name) return;
-      _gapFillSkill(s, savedSkillByName.get(s.name));
-      (Array.isArray(s.children) ? s.children : []).forEach(c => { if (c && c.name) _gapFillSkill(c, savedSkillByName.get(c.name)); });
+      _gapFillSkill(s, s._inGroup && s.parentName ? savedSkillChildByName.get(_childKey(s.parentName, s.name)) : savedSkillByName.get(s.name));
+      (Array.isArray(s.children) ? s.children : []).forEach(c => { if (c && c.name) _gapFillSkill(c, savedSkillChildByName.get(_childKey(s.name, c.name))); });
     });
     const savedGroupByName = new Map(savedSkills.filter(sv => sv && sv.isGroup && Array.isArray(sv.children) && sv.children.length).map(g => [g.name, g]));
     const yamlAllNames = new Set(h.skills.map(s => s && s.name).filter(Boolean));
@@ -18772,7 +18881,7 @@ function applyPersistedRoster() {
   // 避免职业被动因外部写方整档覆盖而静默失效（补跑 onBattleInit 与上方持久化覆盖同款）
   const openingClasses = readOpeningSetupClasses();
   heroesData.forEach(h => {
-    if (h.classType || !openingClasses.has(h.name)) return;
+    if (h._classTypeCleared || h.classType || !openingClasses.has(h.name)) return;
     h.classType = openingClasses.get(h.name);
     if (window.CLASS_PASSIVES && CLASS_PASSIVES[h.classType]?.onBattleInit) CLASS_PASSIVES[h.classType].onBattleInit(h);
   });
