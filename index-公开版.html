@@ -11259,7 +11259,8 @@ registerTagHandler('驱散', (ctx) => {
         (b.type === 'hit' && b.value < 0) ||
         (b.type === 'paralyze') ||
         (b.type === 'eva' && b.value < 0) ||
-        (b.type === 'atk' && b.value < 0)
+        (b.type === 'atk' && b.value < 0) ||
+        (b.type === 'spd' && b.value < 0)
     );
     const removed = []; const keep = [];
     for (const b of ctx.target.buffs) { if (isDebuff(b) && removed.length < count) removed.push(b); else keep.push(b); }
@@ -11727,6 +11728,12 @@ registerClassPassive('隐匿者', {
             const stealthVal = Math.max(0, 100 - effectiveTaunt);
             const stunChance = stealthVal / 10;
             if (Math.random() * 100 < stunChance) {
+                // 【钢体】目标免疫眩晕：与标签 handler 同口径，职业暗袭不得绕过
+                if (target.tags && target.tags.includes('[钢体]')) {
+                    if (targetDom) createFloatingText(targetDom, '免疫·眩晕', 'text-yellow-300');
+                    addHistory(`   ↳ ⛓️ [${target.name}] 强韧意志/抗震结构硬抗了暗袭，免疫了眩晕！`);
+                    return;
+                }
                 target.buffs = target.buffs || [];
                 target.buffs.push({ type: 'stun', value: 1, duration: 1 });
                 if (targetDom) createFloatingText(targetDom, `暗袭眩晕!`, 'text-yellow-300');
@@ -11801,6 +11808,12 @@ const corruptorPassive = {
     },
     onAfterDamageDealt(caster, target, targetDom) {
         if (target.isAlive) {
+            // 【耐毒】目标免疫中毒：与标签 handler 同口径，职业淬毒不得绕过
+            if (target.immunePoison || (target.tags && target.tags.includes('[耐毒]'))) {
+                if (targetDom) createFloatingText(targetDom, '免疫·毒', 'text-lime-300');
+                addHistory(`   ↳ 🧪 [${target.name}] 具备毒素抗性/耐受体质，免疫了淬毒！`);
+                return;
+            }
             const cStats = getEffectiveStats(caster);
             target.buffs = target.buffs || [];
             target.buffs.push({ type: 'poison', value: Math.floor(cStats.atk * 0.3), duration: 3 });
@@ -12801,6 +12814,7 @@ function getEffectiveStats(entity) {
 }
 
 function calculateDamage(rawDmg, target, isPierce = false, armorMult = 1) { 
+    if (rawDmg <= 0) return { hpDmg: 0, shieldDmg: 0 };
     const tStats = getEffectiveStats(target); 
     // 【免伤】允许防御值将本次伤害降为 0；普通防御仍保留至少 1 点伤害的规则。
     // armorMult：护甲减免倍率——[散射]/[群散射] 鹿弹多弹丸各自吃全额护甲 = 3（200power 打 40 甲 = 200-120=80），其余标签默认 1。
@@ -12815,11 +12829,44 @@ function calculateDamage(rawDmg, target, isPierce = false, armorMult = 1) {
     return { hpDmg: dmg, shieldDmg: shieldDmg }; 
 }
 
+
+// === 伤害阶段纯计算 helper（只读；供屏障溢出与召唤致死守护复用伤害公式）===
+// 单段原始伤害（屏障/抗性/护甲之前）：含随机值与职业倍率，与主管线同式。
+// roll 由调用方提供，保证"判定与结算复用同一次随机值"。
+function computeSegmentRawDamage(caster, tagPower, multiplier, skill, target, roll) {
+    const cStats = getEffectiveStats(caster);
+    const buffAtkBonus = cStats.atk - (caster.atk || 0);
+    const baseDmg = tagPower === 0 ? (cStats.atk * multiplier) : ((tagPower * multiplier) + (buffAtkBonus * multiplier));
+    let rawDamage = Math.max(1, Math.floor(baseDmg * roll));
+    let dmgMultiplier = 1;
+    const casterPassive = CLASS_PASSIVES[caster.classType];
+    if (casterPassive && casterPassive.modifyDamageMultiplier) dmgMultiplier += casterPassive.modifyDamageMultiplier(caster, target);
+    if (casterPassive && casterPassive.modifyDamageDealt) rawDamage += casterPassive.modifyDamageDealt(caster, skill);
+    return Math.floor(rawDamage * dmgMultiplier);
+}
+
+// 召唤自动守护致死判定（只读）：本段伤害是否足以清空目标 HP。
+// 顺序与主伤害管线一致：全队屏障（克制→护甲→吸收）→ 变种抗性 → 护甲/普通盾/免伤 → 既有真伤。
+function wouldSegmentClearHp(caster, target, targetType, rawDamage, tag, skill, incomingDamageType) {
+    let dmg = rawDamage;
+    if (targetType === 'hero' && !isHeroSideEntity(caster) && teamBarrier > 0 && dmg > 0) {
+        const dmgToBarrier = applyBarrierResist(dmg, incomingDamageType);
+        dmg = dmgToBarrier - Math.min(teamBarrier, dmgToBarrier);
+    }
+    dmg = applyEnemyTypeResist(dmg, incomingDamageType, target, null, tag.includes('群'), true);
+    const isPierce = tag.includes('穿透') || (CLASS_PASSIVES[caster.classType]?.checkPierce?.(caster) || false);
+    const armorMult = tag.includes('散射') ? 3 : 1;
+    let { hpDmg } = calculateDamage(dmg, { ...target }, isPierce, armorMult);
+    const casterPassive = CLASS_PASSIVES[caster.classType];
+    if (casterPassive && casterPassive.modifyTrueDamage) hpDmg += casterPassive.modifyTrueDamage(caster);
+    return target.hp - hpDmg <= 0;
+}
+
 // 敌方变种标签类型减伤：【流体】远程-50% / 【虚形】近战-50% / 【破法】法术-50% / 【要害】群攻-50%（类型与 AoE 独立判定、可叠加至 25%）。
 // 作用于折算前的原始伤害（与屏障克制同型独立减伤系数）；【穿透】无视的是护甲、仍吃此属性减伤。
 // target 无 resistMap（英雄/无标签敌人）时原样返回。dom 用于减伤飘字（可省略）。
 // damageType 与 isAoE 分别命中对应抗性并顺序相乘；反击等单体场景传 isAoE=false。
-function applyEnemyTypeResist(rawDmg, damageType, target, dom, isAoE = false) {
+function applyEnemyTypeResist(rawDmg, damageType, target, dom, isAoE = false, silent = false) {
     if (!target || !target.resistMap || !(rawDmg > 0)) return rawDmg;
     let dmg = rawDmg;
     const hits = [];
@@ -12827,8 +12874,8 @@ function applyEnemyTypeResist(rawDmg, damageType, target, dom, isAoE = false) {
     if (typeResist) { dmg = Math.max(1, Math.floor(dmg * typeResist)); hits.push(damageType); }
     if (isAoE && target.resistMap['AoE']) { dmg = Math.max(1, Math.floor(dmg * target.resistMap['AoE'])); hits.push('要害'); }
     if (hits.length && dmg < rawDmg) {
-        if (dom) createFloatingText(dom, `-${rawDmg - dmg} 抗性`, 'text-sky-300');
-        addHistory(`   ↳ 🛡️ ${target.name} 的【${hits.join('】【')}】抗性使伤害减少了 ${rawDmg - dmg} 点。`);
+        if (dom && !silent) createFloatingText(dom, `-${rawDmg - dmg} 抗性`, 'text-sky-300');
+        if (!silent) addHistory(`   ↳ 🛡️ ${target.name} 的【${hits.join('】【')}】抗性使伤害减少了 ${rawDmg - dmg} 点。`);
         return dmg;
     }
     return dmg;
@@ -13054,7 +13101,7 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
     return { dodged: false, guardian: null, usedSheshen: false };
 }
 
-async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, multiplier, globalTurns, skill) {
+async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, multiplier, globalTurns, skill, fixedRawDamage = null) {
     const _actionToken = combatToken;
     if (_pipelineFrozen) return;
   if (!target || !target.isAlive || isIgnoredSummonTarget(caster, target)) return;
@@ -13101,6 +13148,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     return guards.reduce((sum, guard) => sum + guard.value, 0);
   };
 
+  let _segRoll = null; // 本段伤害随机值：召唤致死守护判定与结算复用同一次
   if (isDamage || (isDebuffTag && !isSelfDebuff && !(skill && skill._bdg && skill._bdg.targetResolved[target.id]))) {
     // 初始化本次技能结算的共享命中结论容器（供多个攻击 / 减益标签跨标签共享）
     // 自X 自身负面不进入此分支：自身代价无"被打方"，不掷骰、不写 _bdg、不触发反应/看破/舍身拦截
@@ -13146,10 +13194,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
                     if (!hasEnoughBindings(guardian, s)) return;
                     // 类型匹配（同看破的 includes 双向匹配）
                     if (sheshenTarget !== 'all' && !incomingDamageType.includes(sheshenTarget) && !sheshenTarget.includes(incomingDamageType)) return;
-                    // 【召唤】替主挡死：仅damage类才可能致死，非damage的驱散等无需挡
-                    if (s._ownerOnly) {
-                        if (!isDamage) return;
-                    }
+                    // 【舍身】仅接攻击类技能：纯减益（降/盲/驱散等）不收集普通舍身
+                    if (!isDamage) return;
                     sheshenCandidates.push({ hero: guardian, skill: s });
                 });
             });
@@ -13157,8 +13203,15 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
 
         // 【召唤】自动舍身：owner 初次闪避失败后，owner 的召唤物自动插入挡刀（不弹窗），伤害直转召唤物
         let autoGuardInfo = null;
-        if (targetType === 'hero' && !target.isSummon && sheshenCandidates.length > 0) {
-            autoGuardInfo = await tryAutoSummonGuard(sheshenCandidates, target); if (_actionToken !== combatToken || _pipelineFrozen) return;
+        if (targetType === 'hero' && !target.isSummon && sheshenCandidates.some(c => c.skill._ownerOnly)) {
+            // 【召唤守护】仅当本次实际单段伤害足以清空 owner HP 时才自动触发（只读判定，不扣资源/不改被动）；
+            // 判定与结算复用同一次随机值 _segRoll，逐段判断，优先于致死保命/复活。
+            if (fixedRawDamage == null && _segRoll == null) _segRoll = 0.8 + Math.random() * 0.4;
+            const _guardRaw = fixedRawDamage != null ? fixedRawDamage : computeSegmentRawDamage(caster, tagPower, multiplier, skill, target, _segRoll);
+            const _guardLethal = isDamage && wouldSegmentClearHp(caster, target, targetType, _guardRaw, tag, skill, incomingDamageType);
+            if (_guardLethal) {
+                autoGuardInfo = await tryAutoSummonGuard(sheshenCandidates, target); if (_actionToken !== combatToken || _pipelineFrozen) return;
+            }
             if (autoGuardInfo && autoGuardInfo.guardian) {
                 target = autoGuardInfo.guardian;
                 targetDom = getEntitySpriteDom(target) || document.getElementById(`hero-card-${target.id}`);
@@ -13381,38 +13434,12 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     }
     } // end _isStrafeFxHit guard
     
-    // 剥离出纯粹由 Buff 带来的攻击力增益
-    let buffAtkBonus = cStats.atk - (caster.atk || 0); 
-    
-    let baseDmg = 0;
-    if (tagPower === 0) {
-        // 【普通攻击】：系统默认普攻/猛击的威力为 0。
-        // 伤害 = (角色基础攻击 + Buff攻击) * 爆发倍率
-        baseDmg = cStats.atk * multiplier;
-    } else {
-        // 【技能攻击】：威力大于 0。
-        // 伤害 = 技能实际威力 + (Buff攻击 * 爆发倍率)
-        // 彻底剔除角色基础攻击力 (caster.atk) 对技能的影响
-        baseDmg = actualPower + (buffAtkBonus * multiplier);
-    }
-    
-    let rawDamage = Math.max(1, Math.floor(baseDmg * (0.8 + Math.random() * 0.4)));
-    
+    if (fixedRawDamage == null && _segRoll == null) _segRoll = 0.8 + Math.random() * 0.4;
+    let rawDamage = fixedRawDamage != null ? fixedRawDamage : computeSegmentRawDamage(caster, tagPower, multiplier, skill, target, _segRoll);
     const isPierce = tag.includes('穿透') || (CLASS_PASSIVES[caster.classType]?.checkPierce?.(caster) || false);
-    // [散射]/[群散射] 鹿弹：护甲减免 ×3（多弹丸各自吃护甲，模拟针对无甲敌人的高威力）；穿透仍全额无视
     const armorMult = tag.includes('散射') ? 3 : 1;
-    
-    // === 职业被动增伤 (模块化调用) ===
-    let dmgMultiplier = 1;
     const casterPassive = CLASS_PASSIVES[caster.classType];
-    if (casterPassive && casterPassive.modifyDamageMultiplier) {
-        dmgMultiplier += casterPassive.modifyDamageMultiplier(caster, target);
-    }
-    if (casterPassive && casterPassive.modifyDamageDealt) {
-        rawDamage += casterPassive.modifyDamageDealt(caster, skill);
-    }
-    rawDamage = Math.floor(rawDamage * dmgMultiplier);
-    
+
     const wasAlive = target.hp > 0; 
     
     // === 【肃正】全队共享屏障拦截 ===
@@ -13434,10 +13461,12 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
                 const dmgToBarrier = applyBarrierResist(rawDamage, incomingDamageType);
                 hitAmount = Math.min(teamBarrier, dmgToBarrier);
                 barrierAoELeak = dmgToBarrier - hitAmount || 0; // 记录共享泄漏量（折算后）
+                rawDamage = dmgToBarrier;
             }
         } else {
             const dmgToBarrier = applyBarrierResist(rawDamage, incomingDamageType);
             hitAmount = Math.min(teamBarrier, dmgToBarrier);   // 单体：按自身命中量吸收
+            rawDamage = dmgToBarrier;
         }
         barrierAbsorb = hitAmount;
         teamBarrier -= hitAmount;
@@ -13763,18 +13792,7 @@ function triggerBarrierShatter() {
 async function applyBarrierHit(caster, barrierTarget, tag, tagPower, skill, multiplier, globalTurns) {
     const _actionToken = combatToken;
     if (_pipelineFrozen) return;
-  const cStats = getEffectiveStats(caster);
-  // 与主伤害管线一致的伤害计算
-  let buffAtkBonus = cStats.atk - (caster.atk || 0);
-  let baseDmg = 0;
-  if (tagPower === 0) baseDmg = cStats.atk * multiplier;
-  else baseDmg = (tagPower * multiplier) + (buffAtkBonus * multiplier);
-  let rawDamage = Math.max(1, Math.floor(baseDmg * (0.8 + Math.random() * 0.4)));
-  let dmgMultiplier = 1;
-  const casterPassive = CLASS_PASSIVES[caster.classType];
-  if (casterPassive && casterPassive.modifyDamageMultiplier) dmgMultiplier += casterPassive.modifyDamageMultiplier(caster, barrierTarget);
-  if (casterPassive && casterPassive.modifyDamageDealt) rawDamage += casterPassive.modifyDamageDealt(caster, skill);
-  rawDamage = Math.floor(rawDamage * dmgMultiplier);
+  const rawDamage = computeSegmentRawDamage(caster, tagPower, multiplier, skill, barrierTarget, 0.8 + Math.random() * 0.4);
 
   // 屏障护甲与属性克制减免：先对克制属性伤害减半，再扣屏障护甲，剩余量才进屏障吸收
   const incomingDamageType = skill ? (skill.damageType || '近战') : '近战';
@@ -13891,7 +13909,7 @@ async function applyBarrierHit(caster, barrierTarget, tag, tagPower, skill, mult
     const targets = isAoe ? heroesData.filter(h => h.isAlive) : (barrierTarget.proxyHero ? [barrierTarget.proxyHero] : []);
     for (const t of targets) {
       if (!t || !t.isAlive) continue;
-      await applySingleTagEffect(caster, t, tag, tagPower, skill.hit, multiplier, globalTurns, skill); if (_actionToken !== combatToken || _pipelineFrozen) return;
+      await applySingleTagEffect(caster, t, tag, overflow, skill.hit, multiplier, globalTurns, skill, overflow); if (_actionToken !== combatToken || _pipelineFrozen) return;
     }
   }
 }
@@ -14364,11 +14382,13 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         } 
     }
 
-    // 隐匿者：隐匿急袭（下一次非反应攻击 +80）— 仅由真正的攻击技能结算后消耗移除
+    // 隐匿者：开场已持有的急袭仅在本次攻击实际命中后消耗
     // 条件：① 本技能为攻击技能（攻/单体/穿透/眩晕标签）；② 急袭 buff 在本技能开始前已存在
     //       （若急袭 buff 是由本技能自身累积隐匿值跨100刚授予的，则留给下一次攻击，避免纯buff/带隐匿攻击技能瞬间吞噬）
-    const isAttackSkill = tagList.some(t => t.tag.includes('攻') || t.tag.includes('单体') || t.tag.includes('穿透') || t.tag.includes('眩晕'));
-    if (isAttackSkill && hadConcealAtkBefore && caster.buffs && caster.buffs.some(b => b.isConcealAtk)) {
+    // 散射/群体/多段同属攻击段；是否消耗以本次实际命中结论 skill._bdg.targetHit 为准（未命中不消耗）
+    const isAttackSkill = tagList.some(t => t.tag.includes('攻') || t.tag.includes('单体') || t.tag.includes('穿透') || t.tag.includes('眩晕') || t.tag.includes('散射'));
+    const _concealLanded = !!(skill && skill._bdg && Object.values(skill._bdg.targetHit).some(hit => hit === true));
+    if (isAttackSkill && _concealLanded && hadConcealAtkBefore && caster.buffs && caster.buffs.some(b => b.isConcealAtk)) {
         caster.buffs = caster.buffs.filter(b => !(b.isConcealAtk));
         const casterDom = getEntitySpriteDom(caster) || (caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`));
         if (casterDom) createFloatingText(casterDom, '隐匿攻势已释放', 'text-orange-400');
@@ -20026,7 +20046,7 @@ function tryTriggerEnemyMolt(enemy) {
   const isDebuff = b => !b.fieldBuff && b.duration > 0 && (
     b.type === 'poison' || b.type === 'burn' || b.type === 'stun' || b.type === 'paralyze' ||
     (b.type === 'def' && b.value < 0) || (b.type === 'hit' && b.value < 0) ||
-    (b.type === 'eva' && b.value < 0) || (b.type === 'atk' && b.value < 0)
+    (b.type === 'eva' && b.value < 0) || (b.type === 'atk' && b.value < 0) || (b.type === 'spd' && b.value < 0)
   );
   const cleared = (enemy.buffs || []).filter(isDebuff).length;
   enemy.buffs = (enemy.buffs || []).filter(b => !isDebuff(b));

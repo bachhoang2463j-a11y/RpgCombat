@@ -139,7 +139,8 @@ function loadCore(ctx, source) {
     'applySingleTagEffect', 'executeSkillAction', 'executeSummonTurn', 'runReactionIntercept', 'promptReaction', 'nextTurn',
     'startRound', 'handleTargetClick', 'canBypassRow', 'classifySkill', 'showBattleResult',
     'triggerEnemySelfDestruct', 'doEnemySelfDestruct', 'initLLMPresets', 'persistLLMSettings', 'loadLLMSettings',
-    'startGame', 'applyStatusBarRoster', 'runResetPipeline', 'freezeInitialCaches', 'initHeroClassBaseline');
+    'startGame', 'applyStatusBarRoster', 'runResetPipeline', 'freezeInitialCaches', 'initHeroClassBaseline',
+    'computeSegmentRawDamage', 'wouldSegmentClearHp', 'tryAutoSummonGuard', 'getSheshenTarget');
   ['defaultPreset', 'llmState', 'LLM_VAR_KEY'].forEach((n) => { try { run(constantSource(source, n)); } catch (e) {} });
   try {
     const s = source.indexOf('const CLASS_PASSIVES = {}');
@@ -332,7 +333,7 @@ function buildTests(source) {
   add({
     stage: 'damage', id: '屏障破碎仅把溢出伤害传给角色', needs: ['applyBarrierHit'],
     expected: 50,
-    setup: `__overflowPower=null;applySingleTagEffect=async function(c,t,tag,p,hit,m){__overflowPower=p*m};document.getElementById=function(){return null};`,
+    setup: `__overflowPower=null;applySingleTagEffect=async function(c,t,tag,p,hit,m,g,sk,fixed){__overflowPower=fixed};document.getElementById=function(){return null};`,
     expr: `(async()=>{teamBarrier=50;teamBarrierMax=50;barrierArmor=0;barrierSub=null;var h=unit('h1','甲');heroesData=[h];__overflowPower=null;await applyBarrierHit(unit('e1','敌'),{proxyHero:h},'[单体]',100,{hit:100,damageType:'近战'},1,3);return __overflowPower})()`,
   });
   add({
@@ -353,6 +354,38 @@ function buildTests(source) {
     mocks: { applySingleTagEffect: async (c, t, tag, p, hit, m, d, s) => { if (s && s._bdg) s._bdg.targetHit[t.id] = true; } },
     expr: `(async()=>{var h=unit('h1','隐匿者',{classType:'隐匿者',buffs:[{type:'atk',value:50,duration:3,isConcealAtk:true}]});var t=unit('e1','敌');heroesData=[h];enemiesData=[t];await executeSkillAction(h,t,parseSkill('【霰弹】[散射;power:20]'),1);return h.buffs.some(b=>b.isConcealAtk)})()`,
   });
+
+
+  const guardSetup = `
+    document.getElementById=()=>null;
+    runReactionIntercept=async()=>({dodged:false,guardian:null,usedSheshen:false});
+    var __rolls=0;Math.random=()=>{__rolls++;return 0.25};
+    var __owner=unit('h1','主人',{hp:100,maxHp:1000});
+    var __guard=unit('s1','守护',{isSummon:true,side:'hero',summonOwnerId:'h1',hp:500,maxHp:500,skills:[{name:'守护',_ownerOnly:true,sheshenTarget:'all',cost:2,type:'[无]'}]});
+    var __caster=unit('e1','敌人');heroesData=[__owner,__guard];enemiesData=[__caster];
+    var __skill=parseSkill('【攻击】[单体;power:100][必中]');
+  `;
+  add({stage:'damage',id:'守护按实际90点而非120上限判定且只掷一次',needs:['applySingleTagEffect'],setup:guardSetup,
+    expected:{owner:10,guard:500,mp:20,rolls:1},
+    expr:`(async()=>{await applySingleTagEffect(__caster,__owner,'[单体]',100,100,1,null,__skill);return {owner:__owner.hp,guard:__guard.hp,mp:__guard.mp,rolls:__rolls}})()`});
+  add({stage:'damage',id:'实际致死先守护不消耗主人保命',needs:['applySingleTagEffect'],setup:guardSetup,
+    expected:{owner:80,guard:410,mp:18,fatal:false,rolls:1},
+    expr:`(async()=>{__owner.hp=80;__owner.classType='防守者';await applySingleTagEffect(__caster,__owner,'[单体]',100,100,1,null,__skill);return {owner:__owner.hp,guard:__guard.hp,mp:__guard.mp,fatal:!!__owner.hasTriggeredGrit,rolls:__rolls}})()`});
+  add({stage:'damage',id:'守护逐段判断第一段不致死第二段才挡',needs:['applySingleTagEffect'],setup:guardSetup,
+    expected:{owner:10,guard:410,mp:18,rolls:2},
+    expr:`(async()=>{await applySingleTagEffect(__caster,__owner,'[单体]',100,100,1,null,__skill);await applySingleTagEffect(__caster,__owner,'[单体]',100,100,1,null,__skill);return {owner:__owner.hp,guard:__guard.hp,mp:__guard.mp,rolls:__rolls}})()`});
+  add({stage:'damage',id:'普通护盾足够时不守护且只实际扣盾一次',needs:['applySingleTagEffect'],setup:guardSetup,
+    expected:{owner:20,guard:500,shield:10,mp:20},
+    expr:`(async()=>{__owner.hp=20;__owner.shield=100;await applySingleTagEffect(__caster,__owner,'[单体]',100,100,1,null,__skill);return {owner:__owner.hp,guard:__guard.hp,shield:__owner.shield,mp:__guard.mp}})()`});
+  add({stage:'damage',id:'屏障溢出守护不重新掷伤害骰或放大溢出',needs:['applySingleTagEffect'],setup:guardSetup,
+    expected:{owner:80,guard:420,rolls:1,barrier:0},
+    expr:`(async()=>{__owner.hp=80;teamBarrier=100;teamBarrierMax=100;await applyBarrierHit(__caster,{isBarrierTarget:true,proxyHero:__owner},'[单体]',100,__skill,2,null);return {owner:__owner.hp,guard:__guard.hp,rolls:__rolls,barrier:teamBarrier}})()`});
+  add({stage:'damage',id:'守护预估不写战报不扣盾',needs:['wouldSegmentClearHp'],setup:guardSetup,
+    expected:{lethal:false,shield:30,history:0},
+    expr:`(()=>{__owner.resistMap={'近战':0.5};__owner.shield=30;var result=wouldSegmentClearHp(__caster,__owner,'hero',100,'[单体]',__skill,'近战');return {lethal:result,shield:__owner.shield,history:battleHistory.length}})()`});
+  add({stage:'damage',id:'纯减益不提供舍身但保留普通反应入口',needs:['applySingleTagEffect'],setup:guardSetup,
+    expected:0,
+    expr:`(async()=>{var offered=-1;runReactionIntercept=async(c,t,s,h,d,list)=>{offered=list.length;return {dodged:true}};__guard.isSummon=false;__guard.id='h2';delete __guard.skills[0]._ownerOnly;await applySingleTagEffect(__caster,__owner,'[单盲]',30,100,1,null,__skill);return offered})()`});
 
   /* ===== summon ===== */
   add({
