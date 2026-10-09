@@ -2949,14 +2949,14 @@ function renderLiveAvatar(av, size, isH) {
   const heroFlag = typeof isH === 'boolean' ? isH : !!av.isHero;
   const border = heroFlag ? "border-cyan-500/50 bg-cyan-950" : "border-rose-500/50 bg-rose-950";
   if (av.type === 'img') {
-    const safe = String(av.src).replace(/'/g, '%27');
-    const fallback = String(DEFAULT_HERO_IMG).replace(/'/g, '%27');
-    return '<div class="' + size + ' rounded-full overflow-hidden border ' + border + ' shrink-0 shadow flex items-center justify-center"><img src=\'' + safe + '\' class="w-full h-full object-cover" onerror="this.src=\'' + fallback + '\'"></div>';
+    const safe = escapeHistoryHtml(av.src);
+    const fallback = escapeHistoryHtml(DEFAULT_HERO_IMG);
+    return '<div class="' + size + ' rounded-full overflow-hidden border ' + border + ' shrink-0 shadow flex items-center justify-center"><img src=\'' + safe + '\' class="w-full h-full object-cover" data-fallback=\'' + fallback + '\' onerror="this.onerror=null;this.src=this.dataset.fallback"></div>';
   }
-  return '<div class="' + size + ' rounded-full border ' + border + ' shrink-0 shadow flex items-center justify-center text-xs">' + av.emoji + '</div>';
+  return '<div class="' + size + ' rounded-full border ' + border + ' shrink-0 shadow flex items-center justify-center text-xs">' + escapeHistoryHtml(av.emoji) + '</div>';
 }
 function escapeHistoryHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 function parseCombatLog(raw) {
   const lines = String(raw || '').split('\n');
@@ -9417,7 +9417,7 @@ function initWorldbookStartPicker() {
     if (!sel || !isWorldbookAvailable()) return;
     const names = worldbookNamesList();
     const opts = ['<option value="">（选择要载入的图鉴世界书）</option>'].concat(
-        names.map(n => `<option value="${n}" ${n === worldbookSettings.boundName ? 'selected' : ''}>${n}</option>`)
+        names.map(n => `<option value="${escapeHistoryHtml(n)}" ${n === worldbookSettings.boundName ? 'selected' : ''}>${escapeHistoryHtml(n)}</option>`)
     );
     sel.innerHTML = opts;
 }
@@ -9958,8 +9958,8 @@ function renderWorldbookNameList() {
     if (!names.length) { box.innerHTML = '<div class="text-[9px] sm:text-[10px] text-gray-500 p-1">无匹配世界书</div>'; return; }
     box.innerHTML = names.map(n => {
         const active = n === worldbookSettings.boundName;
-        return `<div class="flex items-center gap-1.5 text-[10px] sm:text-xs cursor-pointer py-0.5 px-1 rounded hover:bg-white/5 ${active ? 'text-violet-300 font-bold bg-white/5' : 'text-gray-400 hover:text-white'}" onclick="bindWorldbook('${n}')">
-          <span>${active ? '●' : '○'}</span><span class="truncate">${n}</span>
+        return `<div class="flex items-center gap-1.5 text-[10px] sm:text-xs cursor-pointer py-0.5 px-1 rounded hover:bg-white/5 ${active ? 'text-violet-300 font-bold bg-white/5' : 'text-gray-400 hover:text-white'}" data-wbname="${escapeHistoryHtml(n)}" onclick="bindWorldbook(this.dataset.wbname)">
+          <span>${active ? '●' : '○'}</span><span class="truncate">${escapeHistoryHtml(n)}</span>
         </div>`;
     }).join('');
 }
@@ -9989,8 +9989,8 @@ function renderWorldbookEntryList() {
         const enabled = isWorldbookEntryEnabled(entry);
         return `<div class="flex items-center gap-2 text-[10px] sm:text-xs text-gray-300 py-0.5">
           <input type="checkbox" ${enabled ? 'checked' : ''} data-uid="${entry.uid}" onchange="toggleWorldbookEntry(this.dataset.uid, this.checked)" class="accent-violet-500">
-          <span class="flex-1 truncate ${enabled ? '' : 'line-through text-gray-500'}">${entry.name || '(未命名)'}</span>
-          <button onclick="showWorldbookEntryDetail('${entry.uid}')" class="text-violet-300 hover:text-white border border-violet-500/30 rounded px-1.5 py-0.5 text-[9px] transition-colors">查看</button>
+          <span class="flex-1 truncate ${enabled ? '' : 'line-through text-gray-500'}">${escapeHistoryHtml(entry.name || '(未命名)')}</span>
+          <button data-uid="${escapeHistoryHtml(String(entry.uid))}" onclick="showWorldbookEntryDetail(this.dataset.uid)" class="text-violet-300 hover:text-white border border-violet-500/30 rounded px-1.5 py-0.5 text-[9px] transition-colors">查看</button>
         </div>`;
     }).join('');
 }
@@ -9999,7 +9999,7 @@ function renderWorldbookLoadedEnemies() {
     const box = document.getElementById('worldbook-loaded-enemies');
     if (!box) return;
     if (!enemiesData.length) { box.innerHTML = '<div class="text-[10px] text-gray-500 p-2">暂无载入敌人 —— 构建战局后展示</div>'; return; }
-    box.innerHTML = enemiesData.map(e => `<div class="text-[10px] sm:text-xs text-gray-300 py-0.5 truncate">${e.name} <span class="text-gray-500">· HP ${e.hp}/${e.maxHp} · ${e.skills.length} 技能</span></div>`).join('');
+    box.innerHTML = enemiesData.map(e => `<div class="text-[10px] sm:text-xs text-gray-300 py-0.5 truncate">${escapeHistoryHtml(e.name)} <span class="text-gray-500">· HP ${e.hp}/${e.maxHp} · ${e.skills.length} 技能</span></div>`).join('');
 }
 
 // 动态图鉴列表（导演兜底生成的词条；数据源为 worldbookCache 中 _dynamic 标记项，loadWorldbookData 重载时幂等重建）
@@ -10013,9 +10013,9 @@ function renderWorldbookDynamicList() {
     block.classList.remove('hidden');
     if (count) count.textContent = `（${entries.length}）`;
     list.innerHTML = entries.map(entry => `<div class="flex items-center gap-2 text-[10px] sm:text-xs text-amber-200/90 py-0.5">
-          <span class="flex-1 truncate">${entry.name || '(未命名)'}</span>
-          <button onclick="showWorldbookEntryDetail('${entry.uid}')" class="text-amber-300 hover:text-white border border-amber-500/30 rounded px-1.5 py-0.5 text-[9px] transition-colors">查看</button>
-          <button onclick="deleteDynamicBestiaryEntry('${(entry.name || '').replace(/'/g, "\\'")}')" class="text-rose-300 hover:text-white border border-rose-500/30 rounded px-1.5 py-0.5 text-[9px] transition-colors">删除</button>
+          <span class="flex-1 truncate">${escapeHistoryHtml(entry.name || '(未命名)')}</span>
+          <button data-uid="${escapeHistoryHtml(String(entry.uid))}" onclick="showWorldbookEntryDetail(this.dataset.uid)" class="text-amber-300 hover:text-white border border-amber-500/30 rounded px-1.5 py-0.5 text-[9px] transition-colors">查看</button>
+          <button data-dynname="${escapeHistoryHtml(entry.name || '')}" onclick="deleteDynamicBestiaryEntry(this.dataset.dynname)" class="text-rose-300 hover:text-white border border-rose-500/30 rounded px-1.5 py-0.5 text-[9px] transition-colors">删除</button>
         </div>`).join('');
 }
 
@@ -10239,11 +10239,11 @@ function initUI() {
     sd.className = 'relative shrink-0 z-10';
     sd.id = `hero-wrap-${summonEntity.id}`;
     const icon = summonEntity.img
-      ? `<img src="${summonEntity.img}" class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 object-cover rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.8)]" />`
-      : `<div class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 flex items-center justify-center text-5xl sm:text-7xl drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]">${summonEntity.emoji || '👻'}</div>`;
+      ? `<img src="${escapeHistoryHtml(summonEntity.img)}" class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 object-cover rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.8)]" />`
+      : `<div class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 flex items-center justify-center text-5xl sm:text-7xl drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]">${escapeHistoryHtml(summonEntity.emoji || '👻')}</div>`;
     sd.innerHTML = `
       <div class="flex flex-col items-center group relative cursor-pointer pointer-events-auto">
-        <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 text-white/70 text-[9px] bg-black/40 px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none">${summonEntity.name}</div>
+        <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 text-white/70 text-[9px] bg-black/40 px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none">${escapeHistoryHtml(summonEntity.name)}</div>
         <div id="${summonEntity.id}-buffs" class="absolute top-0 flex gap-1 justify-center w-full z-20 pointer-events-none flex-wrap"></div>
         <div id="${summonEntity.id}-stunFx" class="stun-fx hidden absolute -top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none"><span class="stun-star">★</span><span class="stun-star">★</span><span class="stun-star">★</span></div>
         <div id="hero-card-${summonEntity.id}" class="enemy-sprite breathe flex justify-center items-center">${icon}</div>
@@ -10271,11 +10271,11 @@ function initUI() {
       sd.className = 'relative shrink-0 z-10';
       sd.id = `hero-wrap-${sh.id}`;
       const icon2 = sh.img
-        ? `<img src="${sh.img}" class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 object-cover rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.8)]" />`
-        : `<div class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 flex items-center justify-center text-5xl sm:text-7xl drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]">${sh.emoji || '👻'}</div>`;
+        ? `<img src="${escapeHistoryHtml(sh.img)}" class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 object-cover rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.8)]" />`
+        : `<div class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 flex items-center justify-center text-5xl sm:text-7xl drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]">${escapeHistoryHtml(sh.emoji || '👻')}</div>`;
       sd.innerHTML = `
         <div class="flex flex-col items-center group relative cursor-pointer pointer-events-auto">
-          <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 text-white/70 text-[9px] bg-black/40 px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none">${sh.name}</div>
+          <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 text-white/70 text-[9px] bg-black/40 px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none">${escapeHistoryHtml(sh.name)}</div>
           <div id="${sh.id}-buffs" class="absolute top-0 flex gap-1 justify-center w-full z-20 pointer-events-none flex-wrap"></div>
           <div id="${sh.id}-stunFx" class="stun-fx hidden absolute -top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none"><span class="stun-star">★</span><span class="stun-star">★</span><span class="stun-star">★</span></div>
           <div id="hero-card-${sh.id}" class="enemy-sprite breathe flex justify-center items-center">${icon2}</div>
@@ -10295,8 +10295,8 @@ function initUI() {
       <div id="hero-card-${hero.id}" class="hero-card-inner bg-[#18181b] rounded overflow-hidden relative border shadow-2xl transition-all ${burstClass}">
         <div id="${hero.id}-buffs" class="absolute top-1 right-1 flex flex-col gap-1 items-end z-20 pointer-events-none"></div>
         <div class="w-full h-12 sm:h-auto sm:aspect-[4/3] relative bg-gray-900 border-b border-gray-700">
-          <div class="absolute top-0 left-0 w-full bg-gradient-to-b from-black/80 to-transparent px-1.5 py-1 text-[9px] sm:text-xs font-bold text-white z-10 flex justify-between"><span>${hero.name}</span><span id="${hero.id}-status" class="text-rose-500 text-outline ${hero.isAlive ? 'hidden' : ''}">重伤</span></div>
-          <img src="${hero.img}" class="w-full h-full object-cover" onerror="this.src='${DEFAULT_HERO_IMG}'">
+          <div class="absolute top-0 left-0 w-full bg-gradient-to-b from-black/80 to-transparent px-1.5 py-1 text-[9px] sm:text-xs font-bold text-white z-10 flex justify-between"><span>${escapeHistoryHtml(hero.name)}</span><span id="${hero.id}-status" class="text-rose-500 text-outline ${hero.isAlive ? 'hidden' : ''}">重伤</span></div>
+          <img src="${escapeHistoryHtml(hero.img)}" class="w-full h-full object-cover" data-fallback="${escapeHistoryHtml(DEFAULT_HERO_IMG)}" onerror="this.onerror=null;this.src=this.dataset.fallback">
         </div>
         <div class="px-1 py-1 sm:px-2 sm:py-1.5 flex flex-col gap-[1px] sm:gap-0.5">
           ${createCompactBarHTML(hero.id, 'hp', 'HP', hero.hp, hero.maxHp, 'bg-yellow-400', false, hero.shield)}
@@ -10363,7 +10363,7 @@ function initUI() {
       const maxCharge = Math.max(0, ...enemy.skills.map(s => s.charge || 0));
       if (maxCharge > 0) chargeHtml = `<div id="${enemy.id}-charge-pips" class="flex justify-center mt-2 pointer-events-none h-3 items-center"></div>`;
       el.innerHTML = `
-        <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 sm:-top-8 text-white/70 text-[9px] sm:text-xs bg-black/40 px-2 py-1 rounded backdrop-blur-md whitespace-nowrap z-50 pointer-events-none">${enemy.name}</div>
+        <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 sm:-top-8 text-white/70 text-[9px] sm:text-xs bg-black/40 px-2 py-1 rounded backdrop-blur-md whitespace-nowrap z-50 pointer-events-none">${escapeHistoryHtml(enemy.name)}</div>
         <div id="${enemy.id}-buffs" class="absolute top-0 flex gap-1 justify-center w-full z-20 pointer-events-none flex-wrap"></div>
         <div id="${enemy.id}-stunFx" class="stun-fx hidden absolute -top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none"><span class="stun-star">★</span><span class="stun-star">★</span><span class="stun-star">★</span></div>
         <div id="${enemy.id}-sprite" class="enemy-sprite ${visualClass} drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] breathe transition-all duration-300 mt-2 sm:mt-4 flex justify-center items-center">${enemyVisual}</div>
@@ -12241,7 +12241,7 @@ function buildSkillDetailHTML(skill, showTarget, target) {
     let targetText = '';
     if (showTarget) {
         if (isAoe) targetText = '目标 全体敌方';
-        else if (target) targetText = target.isBarrierTarget ? `目标 屏障·${target.name}` : `目标 ${target.name}`;
+        else if (target) targetText = target.isBarrierTarget ? `目标 屏障·${escapeHistoryHtml(target.name)}` : `目标 ${escapeHistoryHtml(target.name)}`;
     }
     const dmgIcon = dmgType === '远程' ? '🎯 远程' : (dmgType === '法术' ? '🔮 法术' : '🗡️ 近战');
     return `<div class="flex items-center justify-between text-[10px] font-mono px-2.5 py-1 bg-black/40 rounded-lg border border-white/10 mb-2">`
@@ -12427,8 +12427,8 @@ function promptKanpo(candidates, attacker, incomingSkill, incomingTarget) {
                         <img src="${hero.img}" class="w-6 h-6 rounded-full border border-amber-300 object-cover shrink-0">
                         <div class="text-left min-w-0">
                             <div class="flex items-center gap-1.5 flex-wrap">
-                                <span class="text-amber-300 font-black truncate">${hero.name}</span>
-                                <span class="text-white truncate">⚡ ${skill.name}</span>
+                                <span class="text-amber-300 font-black truncate">${escapeHistoryHtml(hero.name)}</span>
+                                <span class="text-white truncate">⚡ ${escapeHistoryHtml(skill.name)}</span>
                                 ${kanpoBadgeOf(skill)}
                                 ${limitOf(skill)}
                                 ${bindingsBadgeHTML(hero, skill)}
@@ -12456,8 +12456,8 @@ function promptKanpo(candidates, attacker, incomingSkill, incomingTarget) {
                                 <span class="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono border border-amber-500/40">INTERRUPT</span>
                             </div>
                             <div class="text-[10px] text-slate-300 truncate flex items-center gap-1 mt-0.5">
-                                <span class="text-slate-400 truncate">面临 ${attacker.name} 的</span>
-                                <span class="text-rose-400 font-bold shrink-0">【${incomingSkill ? incomingSkill.name : '攻击'}】</span>
+                                <span class="text-slate-400 truncate">面临 ${escapeHistoryHtml(attacker.name)} 的</span>
+                                <span class="text-rose-400 font-bold shrink-0">【${escapeHistoryHtml(incomingSkill ? incomingSkill.name : '攻击')}】</span>
                             </div>
                         </div>
                     </div>
@@ -12971,9 +12971,9 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill, sheshenCa
         let skillHtml = '';
         candidates.forEach((cand, index) => {
             if (cand.type === 'reaction') {
-                skillHtml += `<button class="group w-full px-3 py-2 bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900/80 hover:from-indigo-600 hover:to-purple-600 rounded-xl border border-indigo-500/40 hover:border-indigo-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md mb-1.5" onclick="resolveReaction(${index})"><div class="flex items-center gap-2 min-w-0"><span class="text-indigo-400 group-hover:text-white text-sm shrink-0">⚡</span><div class="text-left min-w-0"><div class="flex items-center gap-1.5 flex-wrap"><span class="text-white font-black">${cand.skill.name}</span>${limitOf(cand.skill)}${bindOf(cand.hero, cand.skill)}</div></div></div><div class="font-mono text-[11px] font-bold text-indigo-300 bg-black/40 px-2 py-0.5 rounded border border-indigo-500/30 group-hover:bg-indigo-900/60 flex gap-1 shrink-0">${costOf(cand.skill)}</div></button>`;
+                skillHtml += `<button class="group w-full px-3 py-2 bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900/80 hover:from-indigo-600 hover:to-purple-600 rounded-xl border border-indigo-500/40 hover:border-indigo-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md mb-1.5" onclick="resolveReaction(${index})"><div class="flex items-center gap-2 min-w-0"><span class="text-indigo-400 group-hover:text-white text-sm shrink-0">⚡</span><div class="text-left min-w-0"><div class="flex items-center gap-1.5 flex-wrap"><span class="text-white font-black">${escapeHistoryHtml(cand.skill.name)}</span>${limitOf(cand.skill)}${bindOf(cand.hero, cand.skill)}</div></div></div><div class="font-mono text-[11px] font-bold text-indigo-300 bg-black/40 px-2 py-0.5 rounded border border-indigo-500/30 group-hover:bg-indigo-900/60 flex gap-1 shrink-0">${costOf(cand.skill)}</div></button>`;
             } else {
-                skillHtml += `<button class="group w-full px-3 py-2 bg-gradient-to-r from-sky-950/80 via-blue-950/70 to-slate-900/80 hover:from-sky-600 hover:to-blue-600 rounded-xl border border-sky-500/50 hover:border-sky-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md mb-1.5" onclick="resolveReaction(${index})"><div class="flex items-center gap-2 min-w-0"><img src="${cand.hero.img}" class="w-5 h-5 rounded-full border border-sky-400 object-cover shrink-0"><div class="text-left min-w-0"><div class="flex items-center gap-1.5 flex-wrap"><span class="text-sky-300 font-black truncate">${cand.hero.name}</span><span class="text-white truncate">🛡️ ${cand.skill.name}</span><span class="text-[8px] px-1 py-0.2 rounded bg-sky-400/20 text-sky-200 border border-sky-400/30 shrink-0">舍身</span>${limitOf(cand.skill)}${bindOf(cand.hero, cand.skill)}</div></div></div><div class="font-mono text-[11px] font-bold text-sky-300 bg-black/40 px-2 py-0.5 rounded border border-sky-500/30 group-hover:bg-sky-900/60 flex gap-1 shrink-0">${costOf(cand.skill)}</div></button>`;
+                skillHtml += `<button class="group w-full px-3 py-2 bg-gradient-to-r from-sky-950/80 via-blue-950/70 to-slate-900/80 hover:from-sky-600 hover:to-blue-600 rounded-xl border border-sky-500/50 hover:border-sky-300 text-white font-bold transition-all flex items-center justify-between text-xs shadow-md mb-1.5" onclick="resolveReaction(${index})"><div class="flex items-center gap-2 min-w-0"><img src="${escapeHistoryHtml(cand.hero.img)}" class="w-5 h-5 rounded-full border border-sky-400 object-cover shrink-0"><div class="text-left min-w-0"><div class="flex items-center gap-1.5 flex-wrap"><span class="text-sky-300 font-black truncate">${escapeHistoryHtml(cand.hero.name)}</span><span class="text-white truncate">🛡️ ${escapeHistoryHtml(cand.skill.name)}</span><span class="text-[8px] px-1 py-0.2 rounded bg-sky-400/20 text-sky-200 border border-sky-400/30 shrink-0">舍身</span>${limitOf(cand.skill)}${bindOf(cand.hero, cand.skill)}</div></div></div><div class="font-mono text-[11px] font-bold text-sky-300 bg-black/40 px-2 py-0.5 rounded border border-sky-500/30 group-hover:bg-sky-900/60 flex gap-1 shrink-0">${costOf(cand.skill)}</div></button>`;
             }
         });
         const skipText = onlySheshen ? '承受攻击' : '跳过 (不反应)';
@@ -12988,15 +12988,15 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill, sheshenCa
                 <div class="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-400 to-transparent opacity-80"></div>
                 <div class="flex items-center justify-between gap-2.5 pb-2.5 mb-2 border-b border-white/10 relative">
                     <div class="flex items-center gap-2.5 min-w-0">
-                        <img src="${hero.img}" class="w-9 h-9 rounded-full ${onlySheshen ? 'border-2 border-sky-400' : 'border-2 border-indigo-400'} object-cover shrink-0 shadow-[0_0_10px_rgba(99,102,241,0.5)]">
+                        <img src="${escapeHistoryHtml(hero.img)}" class="w-9 h-9 rounded-full ${onlySheshen ? 'border-2 border-sky-400' : 'border-2 border-indigo-400'} object-cover shrink-0 shadow-[0_0_10px_rgba(99,102,241,0.5)]">
                         <div class="min-w-0">
                             <div class="flex items-center gap-1.5">
                                 <h3 class="${onlySheshen ? 'text-sky-300' : 'text-indigo-300'} font-bold text-xs sm:text-sm tracking-wider">即将遭受攻击</h3>
                                 <span class="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-mono border border-indigo-500/30">REACTION</span>
                             </div>
                             <div class="text-[10px] text-slate-300 truncate flex items-center gap-1 mt-0.5">
-                                <span class="text-slate-400 truncate">面临 ${attacker.name} 的</span>
-                                <span class="text-amber-300 font-bold shrink-0">【${incomingSkill ? incomingSkill.name : '攻击'}】</span>
+                                <span class="text-slate-400 truncate">面临 ${escapeHistoryHtml(attacker.name)} 的</span>
+                                <span class="text-amber-300 font-bold shrink-0">【${escapeHistoryHtml(incomingSkill ? incomingSkill.name : '攻击')}】</span>
                             </div>
                         </div>
                     </div>
@@ -15058,12 +15058,15 @@ function showBattleResult(type) {
     let promptTemplate = "";
     if (type === 'retreat') {
         promptTemplate = `[系统指令：请根据以下战报摘要，以小说般充满画面感、具有张力的笔触，描写出这场战斗完整的详细过程。玩家小队选择了主动撤离战场（请根据战报摘要自行判断局势，可能是觉得无需再做无谓的缠斗，不代表是被打败逃跑）。着重描写他们脱离战斗的过程、动作细节以及心理状态。]\n\n${bodyText}${settleText}${syncNote}\n\n${tailRetreat}`;
-    } else {
+    } else if (type === 'win') {
         // 【非致命】全员制服获胜：提示词强调敌方被制服失去战斗能力、未被杀死
         const _winClimax = _subdueVictory
             ? '最终敌方全员被制服、瘫倒在地彻底失去战斗能力（注意：他们未被杀死，仍然活着，只是失去了意识与行动能力）的高光时刻'
             : '走向胜利的高光时刻';
         promptTemplate = `[系统指令：请根据以下战报摘要，以小说般充满画面感、具有张力的笔触，描写这场惊心动魄的战斗过程。注重动作细节、技能特效的光影、人物的心理状态，以及最终${_winClimax}。]\n\n${bodyText}${settleText}${syncNote}\n\n${tailWin}`;
+    } else {
+        // 败北：全军覆没基调，不使用胜利／制服／高光措辞
+        promptTemplate = `[系统指令：请根据以下战报摘要，以小说般充满画面感、具有张力的笔触，描写这场战斗最终的落败过程。玩家小队全军覆没，请着重描写他们战败的经过、动作细节、伤势与心理状态，以及最终落败的结局。]\n\n${bodyText}${settleText}${syncNote}\n\n${tailWin}`;
     }
 
     promptArea.value = promptTemplate;
@@ -16379,7 +16382,7 @@ function createSkillCard(hero, skill, idx) {
       </div>
     `;
     let tagsHtml = '';
-    if (skill.summonTarget) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-sky-950/90 text-sky-300 border-sky-500/70 shrink-0 flex items-center leading-none font-bold">召唤:${skill.summonTarget}</span>`;
+    if (skill.summonTarget) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-sky-950/90 text-sky-300 border-sky-500/70 shrink-0 flex items-center leading-none font-bold">召唤:${escapeHistoryHtml(skill.summonTarget)}</span>`;
     if (skill.summonNoLimit) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-indigo-950/90 text-indigo-300 border-indigo-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">🐾 众召·破限</span>`;
     else if (isSummonBlockedByLimit(skill)) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border text-rose-400 border-rose-500/80 bg-rose-950 shrink-0 font-bold flex items-center gap-0.5 leading-none">🐾 召唤名额已满</span>`;
     tagsHtml += formatTagPill(skill.type, skill.power);
@@ -16575,7 +16578,7 @@ function updateActiveHeroDisplay(activeHeroId) {
     const hero = heroesData.find(h=>h.id === activeHeroId); 
     // 剩余行动次数提示：统计行动队列中当前及之后属于该英雄的条目数（覆盖 actCount 多动与 [再动]/祈愿插队），>1 时显示徽章
     const remainingActs = state.actionQueue.slice(state.queueIndex).filter(e => e.type === 'hero' && e.ref.id === activeHeroId).length;
-    nameEl.innerHTML = `${hero.name} 的回合` + (remainingActs > 1 ? ` <span class="text-cyan-300">⏩ 剩余 ${remainingActs} 次行动</span>` : '');
+    nameEl.innerHTML = `${escapeHistoryHtml(hero.name)} 的回合` + (remainingActs > 1 ? ` <span class="text-cyan-300">⏩ 剩余 ${remainingActs} 次行动</span>` : '');
   }
 }
 
@@ -16622,7 +16625,7 @@ function createItemCard(hero, item, idx) {
       <div class="flex items-center justify-between gap-1.5 w-full shrink-0">
         <div class="flex items-center gap-1 min-w-0">
           <span class="text-xs font-bold text-slate-100 group-hover:text-amber-300 transition-colors tracking-wide truncate leading-tight">
-            ${item.name}
+            ${escapeHistoryHtml(item.name)}
           </span>
           ${item.isOthers ? `<span class="text-[8px] bg-teal-950/90 text-teal-300 border border-teal-600/60 px-1 py-0.2 rounded shrink-0 leading-tight">他人</span>` : ''}
           ${item.isLegendary ? `<span class="text-[8px] bg-amber-950/90 text-amber-200 border border-amber-500/70 px-1 py-0.2 rounded shrink-0 leading-tight font-bold">✦传奇</span>` : ''}
@@ -16636,7 +16639,7 @@ function createItemCard(hero, item, idx) {
     let tagsHtml = '';
     if (!isAmmo) {
       // 召唤/蓄力徽章与技能卡同构（[召唤:X]/[延迟:N] 物品已是可执行行为，卡片须可发现）
-      if (item.summonTarget) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-sky-950/90 text-sky-300 border-sky-500/70 shrink-0 flex items-center leading-none font-bold">召唤:${item.summonTarget}</span>`;
+      if (item.summonTarget) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-sky-950/90 text-sky-300 border-sky-500/70 shrink-0 flex items-center leading-none font-bold">召唤:${escapeHistoryHtml(item.summonTarget)}</span>`;
       if (item.summonNoLimit) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-indigo-950/90 text-indigo-300 border-indigo-500/70 shrink-0 font-bold flex items-center gap-0.5 leading-none">🐾 众召·破限</span>`;
       else if (isSummonBlockedByLimit(item)) tagsHtml += `<span class="text-[8px] px-1 py-0.2 rounded border text-rose-400 border-rose-500/80 bg-rose-950 shrink-0 font-bold flex items-center gap-0.5 leading-none">🐾 召唤名额已满</span>`;
       tagsHtml += formatTagPill(item.type, item.power);
@@ -16865,7 +16868,7 @@ function buildSkillFormFieldsHtml(idNS, s, onInputJs) {
   let html = '';
   // 模块 A：基础设定与修饰开关
   html += `<div class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 text-xs items-center">`;
-  html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">名称</span><input type="text" id="edit-${idNS}-name" value="${s.name}" oninput="${onInputJs}" class="edit-input-game w-full font-bold text-slate-100 py-1 text-xs" placeholder="技能名"></div>`;
+  html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">名称</span><input type="text" id="edit-${idNS}-name" value="${escapeHistoryHtml(s.name)}" oninput="${onInputJs}" class="edit-input-game w-full font-bold text-slate-100 py-1 text-xs" placeholder="技能名"></div>`;
   html += `<div class="sm:col-span-2 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">属性</span><select id="edit-${idNS}-dmgType" onchange="${onInputJs}" class="edit-input-game w-full text-orange-300 font-bold py-1 text-xs"><option value="" ${!s.damageType ? 'selected' : ''}>无(近战)</option><option value="近战" ${s.damageType === '近战' ? 'selected' : ''}>🗡️ 近战</option><option value="远程" ${s.damageType === '远程' ? 'selected' : ''}>🎯 远程</option><option value="法术" ${s.damageType === '法术' ? 'selected' : ''}>⚡ 法术</option></select></div>`;
   html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">特效</span><select id="edit-${idNS}-fxTag" class="edit-input-game w-full text-yellow-300 font-bold py-1 text-xs">${['特效:无', ...Object.keys(WEBM_FX_REGISTRY)].map(f => { const val = f === '特效:无' ? '' : f; const isSel = (s.fxTag || '') === val; return `<option value="${val}" ${isSel ? 'selected' : ''}>${f}</option>`; }).join('')}</select></div>`;
 
@@ -16915,7 +16918,7 @@ function buildSkillFormFieldsHtml(idNS, s, onInputJs) {
   html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-${idNS}-type3', this)" class="edit-input-game skill-type-combo w-full text-slate-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${s.type3 && s.type3 !== '[无]' ? tagDisplayLabel(String(s.type3).replace(/[\[\]]/g, ''), s.power3) : '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-${idNS}-type3" onchange="${onInputJs}" class="hidden">${renderSkillTypeOptions(s.type3)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-${idNS}-power3" value="${s.power3}" oninput="${onInputJs}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-${idNS}-slot-turns3" value="${s.slotTurns3 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
   html += `</div>`;
   // 模块 E：召唤对象（世界书词条名，留空=无召唤）
-  html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-sky-700/40"><span class="text-[10px] text-sky-300 font-bold whitespace-nowrap">召唤对象</span><input type="text" id="edit-${idNS}-summon" value="${(s.summonTarget||'').replace(/"/g,'&quot;')}" class="edit-input-game w-full text-sky-200 font-mono-num text-[10px] py-1" placeholder="世界书词条名，留空=无召唤"></div>`;
+  html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-sky-700/40"><span class="text-[10px] text-sky-300 font-bold whitespace-nowrap">召唤对象</span><input type="text" id="edit-${idNS}-summon" value="${escapeHistoryHtml(s.summonTarget||'')}" class="edit-input-game w-full text-sky-200 font-mono-num text-[10px] py-1" placeholder="世界书词条名，留空=无召唤"></div>`;
   html += `</div>`; // close module D space-y-1
   return html;
 }
@@ -17048,12 +17051,12 @@ function openEditor(keepScroll) {
     html += `<div class="flex items-center gap-2 min-w-0">`;
     html += `<div class="w-6 h-6 rounded overflow-hidden border border-cyan-500/40 bg-black/40 shrink-0 flex items-center justify-center text-xs">`;
     if (_hImg) {
-      html += `<img src="${_hImg}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='';if(this.parentElement)this.parentElement.innerHTML='👤'"/>`;
+      html += `<img src="${escapeHistoryHtml(_hImg)}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='';if(this.parentElement)this.parentElement.innerHTML='👤'"/>`;
     } else {
       html += `👤`;
     }
     html += `</div>`;
-    html += `<span id="hero-header-name-${i}" class="font-bold text-xs sm:text-sm text-yellow-200 tracking-wide">${_hName}</span>`;
+    html += `<span id="hero-header-name-${i}" class="font-bold text-xs sm:text-sm text-yellow-200 tracking-wide">${escapeHistoryHtml(_hName)}</span>`;
     html += `<span id="hero-header-class-${i}" class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/60 shrink-0">${_hClass}</span>`;
     html += `</div>`;
     
@@ -17088,9 +17091,9 @@ function openEditor(keepScroll) {
     
     // 基本信息行
     html += `<div class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 text-xs">`;
-    html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">名称</span><input type="text" id="edit-h-${i}-name" value="${h.name}" oninput="updateHeroHeaderSummary(${i})" class="edit-input-game w-full font-bold text-yellow-200 py-1 text-xs"></div>`;
+    html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">名称</span><input type="text" id="edit-h-${i}-name" value="${escapeHistoryHtml(h.name)}" oninput="updateHeroHeaderSummary(${i})" class="edit-input-game w-full font-bold text-yellow-200 py-1 text-xs"></div>`;
     html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">职业</span><select id="edit-h-${i}-class" onchange="updateHeroHeaderSummary(${i})" class="edit-input-game w-full text-cyan-300 font-bold py-1 text-xs"><option value="" ${!h.classType ? 'selected' : ''}>无</option><option value="防守者" ${h.classType === '防守者' ? 'selected' : ''}>防守者</option><option value="隐匿者" ${h.classType === '隐匿者' ? 'selected' : ''}>隐匿者</option><option value="施法者" ${h.classType === '施法者' ? 'selected' : ''}>施法者</option><option value="狂战士" ${h.classType === '狂战士' ? 'selected' : ''}>狂战士</option><option value="风行者" ${h.classType === '风行者' ? 'selected' : ''}>风行者</option><option value="圣职者" ${h.classType === '圣职者' ? 'selected' : ''}>圣职者</option><option value="灾厄使" ${h.classType === '灾厄使' ? 'selected' : ''}>灾厄使</option><option value="征伐者" ${h.classType === '征伐者' ? 'selected' : ''}>征伐者</option></select></div>`;
-    html += `<div class="sm:col-span-6 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">头像URL</span><input type="text" id="edit-h-${i}-img" value="${h.img || ''}" class="edit-input-game w-full text-slate-400 font-mono-num text-[10px] py-1" placeholder="https://..."></div>`;
+    html += `<div class="sm:col-span-6 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">头像URL</span><input type="text" id="edit-h-${i}-img" value="${escapeHistoryHtml(h.img || '')}" class="edit-input-game w-full text-slate-400 font-mono-num text-[10px] py-1" placeholder="https://..."></div>`;
     html += `</div>`;
     
     // 8 项数值矩阵
@@ -17125,7 +17128,7 @@ function openEditor(keepScroll) {
         html += `<div class="flex items-center justify-between gap-1.5">`;
         html += `<div class="flex items-center gap-1.5 flex-wrap min-w-0 flex-1">`;
         html += `<span class="text-xs shrink-0">${dmgBadge}</span>`;
-        html += `<span id="hero-${i}-s-${si}-name-preview" class="text-xs font-bold text-slate-100 tracking-wide">${s.name || '新技能'}</span>`;
+        html += `<span id="hero-${i}-s-${si}-name-preview" class="text-xs font-bold text-slate-100 tracking-wide">${escapeHistoryHtml(s.name || '新技能')}</span>`;
         html += `<div id="hero-${i}-s-${si}-tags-preview" class="flex items-center gap-1 flex-wrap">${buildEditorSkillTagPreview(s.type, s.power, s.type2, s.power2, s.type3, s.power3, 'hero')}</div>`;
         if (s.isOthers) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-emerald-950 text-emerald-300 border border-emerald-700 shrink-0">他人</span>`;
         if (s.guaranteedHit) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-rose-950 text-rose-300 border border-rose-700 shrink-0">必中</span>`;
@@ -17220,7 +17223,7 @@ function openEditor(keepScroll) {
         html += `<div onclick="toggleItemFold(${i}, ${ii})" class="px-2.5 py-1.5 cursor-pointer bg-slate-900/90 hover:bg-slate-800/90 transition-colors flex items-center justify-between gap-1.5">`;
         html += `<div class="flex items-center gap-1.5 flex-wrap min-w-0 flex-1">`;
         html += `<span class="text-xs shrink-0">🎒</span>`;
-        html += `<span class="text-xs font-bold text-slate-100 tracking-wide">${(it.name || '新物品').replace(/</g,'&lt;')}</span>`;
+        html += `<span class="text-xs font-bold text-slate-100 tracking-wide">${escapeHistoryHtml(it.name || '新物品')}</span>`;
         html += _itCatBadge;
         html += `<div class="flex items-center gap-1 flex-wrap">${buildEditorSkillTagPreview(it.type, it.power, it.type2, it.power2, it.type3, it.power3, 'hero')}</div>`;
         if (it.isOthers) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-emerald-950 text-emerald-300 border border-emerald-700 shrink-0">他人</span>`;
@@ -17239,7 +17242,7 @@ function openEditor(keepScroll) {
         html += `<div id="hero-${i}-item-body-${ii}" class="${itExp ? '' : 'hidden'} p-2 sm:p-2.5 space-y-2 bg-black/50 border-t border-slate-800 text-[11px]">`;
         // 模块 A：基础设定（名称/类别/库存/属性/特效 + 修饰开关）
         html += `<div class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 text-xs items-center">`;
-        html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">名称</span><input type="text" id="edit-h-${i}-it-${ii}-name" value="${(it.name || '').replace(/"/g,'&quot;')}" class="edit-input-game w-full font-bold text-slate-100 py-1 text-xs" placeholder="物品名"></div>`;
+        html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">名称</span><input type="text" id="edit-h-${i}-it-${ii}-name" value="${escapeHistoryHtml(it.name || '')}" class="edit-input-game w-full font-bold text-slate-100 py-1 text-xs" placeholder="物品名"></div>`;
         html += `<div class="sm:col-span-2 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">类别</span><select id="edit-h-${i}-it-${ii}-category" onchange="onItemCategoryChange(${i}, ${ii})" class="edit-input-game w-full text-amber-300 font-bold py-1 text-xs"><option value="消耗品" ${_itCat === '消耗品' ? 'selected' : ''}>🧪 消耗品</option><option value="道具" ${_itCat === '道具' ? 'selected' : ''}>🎒 道具</option><option value="弹药" ${_itCat === '弹药' ? 'selected' : ''}>🔹 弹药</option></select></div>`;
         html += `<div class="sm:col-span-2 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap" id="item-stock-label-${i}-${ii}">${_itStockLabel}</span><input type="number" min="0" id="edit-h-${i}-it-${ii}-stock" value="${_itStockVal}" class="edit-input-game w-full font-mono-num text-right text-amber-200 py-1 text-[11px]" placeholder="0"></div>`;
         html += `<div class="sm:col-span-2 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">属性</span><select id="edit-h-${i}-it-${ii}-dmgType" class="edit-input-game w-full text-orange-300 font-bold py-1 text-xs"><option value="" ${!it.damageType ? 'selected' : ''}>无(近战)</option><option value="近战" ${it.damageType === '近战' ? 'selected' : ''}>🗡️ 近战</option><option value="远程" ${it.damageType === '远程' ? 'selected' : ''}>🎯 远程</option><option value="法术" ${it.damageType === '法术' ? 'selected' : ''}>⚡ 法术</option></select></div>`;
@@ -17342,12 +17345,12 @@ function openEditor(keepScroll) {
     html += `<div class="flex items-center gap-2 min-w-0">`;
     html += `<div class="w-6 h-6 rounded overflow-hidden border border-rose-500/40 bg-black/40 shrink-0 flex items-center justify-center text-xs">`;
     if (_eImg) {
-      html += `<img src="${_eImg}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='';if(this.parentElement)this.parentElement.innerHTML='${_eEmoji}'"/>`;
+      html += `<img src="${escapeHistoryHtml(_eImg)}" data-emoji="${escapeHistoryHtml(_eEmoji)}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='';if(this.parentElement)this.parentElement.textContent=this.dataset.emoji"/>`;
     } else {
-      html += _eEmoji;
+      html += escapeHistoryHtml(_eEmoji);
     }
     html += `</div>`;
-    html += `<span id="enemy-header-name-${i}" class="font-bold text-xs sm:text-sm text-rose-200 tracking-wide">${_eName}</span>`;
+    html += `<span id="enemy-header-name-${i}" class="font-bold text-xs sm:text-sm text-rose-200 tracking-wide">${escapeHistoryHtml(_eName)}</span>`;
     html += `<span id="enemy-header-tier-${i}" class="px-1.5 py-0.2 rounded text-[10px] font-bold border shrink-0 ${_eTierClass}">${_eTierLabel}</span>`;
     if (e.isWise) {
       html += `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-700/60 shrink-0">🧠 智慧</span>`;
@@ -17386,9 +17389,9 @@ function openEditor(keepScroll) {
     // 基本信息行
     html += `<div class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 text-xs">`;
     html += `<div class="sm:col-span-2 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">图标</span><input type="text" id="edit-e-${i}-emoji" value="${e.emoji}" class="edit-input-game w-full text-center text-sm font-bold py-1"></div>`;
-    html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">名称</span><input type="text" id="edit-e-${i}-name" value="${e.name}" oninput="updateEnemyHeaderSummary(${i})" class="edit-input-game w-full font-bold text-rose-200 py-1 text-xs"></div>`;
+    html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">名称</span><input type="text" id="edit-e-${i}-name" value="${escapeHistoryHtml(e.name)}" oninput="updateEnemyHeaderSummary(${i})" class="edit-input-game w-full font-bold text-rose-200 py-1 text-xs"></div>`;
     html += `<div class="sm:col-span-2 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">职业</span><select id="edit-e-${i}-class" onchange="updateEnemyHeaderSummary(${i})" class="edit-input-game w-full text-rose-300 font-bold py-1 text-xs"><option value="" ${!e.classType ? 'selected' : ''}>无</option><option value="防守者" ${e.classType === '防守者' ? 'selected' : ''}>防守者</option><option value="隐匿者" ${e.classType === '隐匿者' ? 'selected' : ''}>隐匿者</option><option value="施法者" ${e.classType === '施法者' ? 'selected' : ''}>施法者</option><option value="狂战士" ${e.classType === '狂战士' ? 'selected' : ''}>狂战士</option><option value="风行者" ${e.classType === '风行者' ? 'selected' : ''}>风行者</option><option value="圣职者" ${e.classType === '圣职者' ? 'selected' : ''}>圣职者</option><option value="灾厄使" ${e.classType === '灾厄使' ? 'selected' : ''}>灾厄使</option><option value="征伐者" ${e.classType === '征伐者' ? 'selected' : ''}>征伐者</option></select></div>`;
-    html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">图片URL</span><input type="text" id="edit-e-${i}-img" value="${e.img || ''}" class="edit-input-game w-full text-slate-400 font-mono-num text-[10px] py-1" placeholder="https://..."></div>`;
+    html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">图片URL</span><input type="text" id="edit-e-${i}-img" value="${escapeHistoryHtml(e.img || '')}" class="edit-input-game w-full text-slate-400 font-mono-num text-[10px] py-1" placeholder="https://..."></div>`;
     html += `<div class="sm:col-span-2 flex items-center gap-2 bg-slate-900/90 px-2 py-1 rounded border border-slate-700/60"><label class="flex items-center gap-1 text-rose-300 cursor-pointer text-[10px]"><input type="checkbox" id="edit-e-${i}-isWise" ${e.isWise ? 'checked' : ''} class="accent-rose-500">🧠 智慧</label></div>`;
     html += `</div>`;
     
@@ -17422,7 +17425,7 @@ function openEditor(keepScroll) {
         html += `<div class="flex items-center justify-between gap-1.5">`;
         html += `<div class="flex items-center gap-1.5 flex-wrap min-w-0 flex-1">`;
         html += `<span class="text-xs shrink-0">${dmgBadge}</span>`;
-        html += `<span id="enemy-${i}-s-${si}-name-preview" class="text-xs font-bold text-slate-100 tracking-wide">${s.name || '新技能'}</span>`;
+        html += `<span id="enemy-${i}-s-${si}-name-preview" class="text-xs font-bold text-slate-100 tracking-wide">${escapeHistoryHtml(s.name || '新技能')}</span>`;
         html += `<div id="enemy-${i}-s-${si}-tags-preview" class="flex items-center gap-1 flex-wrap">${buildEditorSkillTagPreview(s.type, s.power, s.type2, s.power2, s.type3, s.power3, 'enemy')}</div>`;
         if (s.isOthers) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-emerald-950 text-emerald-300 border border-emerald-700 shrink-0">他人</span>`;
         if (s.guaranteedHit) html += `<span class="px-1 py-0.2 rounded text-[8px] bg-rose-950 text-rose-300 border border-rose-700 shrink-0">必中</span>`;
@@ -17459,7 +17462,7 @@ function openEditor(keepScroll) {
         
         // 模块 A：基础设定与修饰开关
         html += `<div class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 text-xs items-center">`;
-        html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">名称</span><input type="text" id="edit-e-${i}-s-${si}-name" value="${s.name}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-full font-bold text-slate-100 py-1 text-xs" placeholder="技能名称"></div>`;
+        html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">名称</span><input type="text" id="edit-e-${i}-s-${si}-name" value="${escapeHistoryHtml(s.name)}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-full font-bold text-slate-100 py-1 text-xs" placeholder="技能名称"></div>`;
         html += `<div class="sm:col-span-2 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">属性</span><select id="edit-e-${i}-s-${si}-dmgType" onchange="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-full text-orange-300 font-bold py-1 text-xs"><option value="" ${!s.damageType ? 'selected' : ''}>无(近战)</option><option value="近战" ${s.damageType === '近战' ? 'selected' : ''}>🗡️ 近战</option><option value="远程" ${s.damageType === '远程' ? 'selected' : ''}>🎯 远程</option><option value="法术" ${s.damageType === '法术' ? 'selected' : ''}>⚡ 法术</option></select></div>`;
         html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">特效</span><select id="edit-e-${i}-s-${si}-fxTag" class="edit-input-game w-full text-yellow-300 font-bold py-1 text-xs">${['特效:无', ...Object.keys(WEBM_FX_REGISTRY)].map(f => { const val = f === '特效:无' ? '' : f; const isSel = (s.fxTag || '') === val; return `<option value="${val}" ${isSel ? 'selected' : ''}>${f}</option>`; }).join('')}</select></div>`;
         
@@ -17489,7 +17492,7 @@ function openEditor(keepScroll) {
         html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-e-${i}-s-${si}-type2', this)" class="edit-input-game skill-type-combo w-full text-slate-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${s.type2 && s.type2 !== '[无]' ? tagDisplayLabel(String(s.type2).replace(/[\[\]]/g, ''), s.power2) : '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-e-${i}-s-${si}-type2" onchange="updateEnemySkillHeaderSummary(${i}, ${si})" class="hidden">${renderSkillTypeOptions(s.type2)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power2" value="${s.power2}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-e-${i}-s-${si}-slot-turns2" value="${s.slotTurns2 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
         html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-e-${i}-s-${si}-type3', this)" class="edit-input-game skill-type-combo w-full text-slate-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${s.type3 && s.type3 !== '[无]' ? tagDisplayLabel(String(s.type3).replace(/[\[\]]/g, ''), s.power3) : '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-e-${i}-s-${si}-type3" onchange="updateEnemySkillHeaderSummary(${i}, ${si})" class="hidden">${renderSkillTypeOptions(s.type3)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-e-${i}-s-${si}-power3" value="${s.power3}" oninput="updateEnemySkillHeaderSummary(${i}, ${si})" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-e-${i}-s-${si}-slot-turns3" value="${s.slotTurns3 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
         html += `</div>`;
-        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-sky-700/40"><span class="text-[10px] text-sky-300 font-bold whitespace-nowrap">召唤对象</span><input type="text" id="edit-e-${i}-s-${si}-summon" value="${(s.summonTarget||'').replace(/"/g,'&quot;')}" class="edit-input-game w-full text-sky-200 font-mono-num text-[10px] py-1" placeholder="世界书词条名，留空=无召唤"></div>`;
+        html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-sky-700/40"><span class="text-[10px] text-sky-300 font-bold whitespace-nowrap">召唤对象</span><input type="text" id="edit-e-${i}-s-${si}-summon" value="${escapeHistoryHtml(s.summonTarget||'')}" class="edit-input-game w-full text-sky-200 font-mono-num text-[10px] py-1" placeholder="世界书词条名，留空=无召唤"></div>`;
         html += `</div>`; // close module D space-y-1
 
         html += `</div>`; // close skill body
@@ -18397,6 +18400,7 @@ async function loadLLMSettings() {
       if (saved && typeof saved === 'object') {
         Object.assign(llmState, saved);
         initLLMPresets();
+        llmState.digestBattle = (llmState.presets[llmState.activePreset] || {}).digestBattle !== false;
         return;
       }
     }
@@ -18407,6 +18411,7 @@ async function loadLLMSettings() {
     if (raw) Object.assign(llmState, JSON.parse(raw));
   } catch(e) {}
   initLLMPresets();
+  llmState.digestBattle = (llmState.presets[llmState.activePreset] || {}).digestBattle !== false;
 }
 
 async function persistLLMSettings() {
@@ -20000,7 +20005,7 @@ function showThinkingBubble(entityRef) {
   bubble.className = entityRef.id.startsWith('h') ? 'chat-bubble ally' : 'chat-bubble enemy';
   bubble.style.left = Math.max(8, rect.left) + 'px';
   bubble.style.top = Math.max(8, rect.top - 60) + 'px';
-  bubble.innerHTML = `<div class="bubble-name">${entityRef.name}</div>
+  bubble.innerHTML = `<div class="bubble-name">${escapeHistoryHtml(entityRef.name)}</div>
     <div style="display:flex;gap:4px;align-items:center;padding:2px 0;">
       <span class="llm-thinking-dot"></span>
       <span class="llm-thinking-dot"></span>
