@@ -658,4 +658,5 @@ LOG-212 Tailwind 静态预编译之后的四批实施（LOG-213~216），全部�
 - **公开版分发约束** `node test-public-release.cjs`：**7 大类全过**（含 R2 资源映射双向核对、内网隔离、头像与语音）。
 - **双版本 IAB 完整 harness**（`integration-test/harness.html`，默认非公开版；`?version=public` 公开版）：**非公开版 747 项全部通过；公开版 743 项全部通过**（含 test42/43 与 `artifact=1` 真实正则产物往返）。公开版此前 6 条既有召唤名额/众召标记/满额禁用红项已在本轮转绿。
 - **构建**：`node build-regex.cjs`（非公开）与 `node build-regex-public.cjs`（公开）分别生成对应正则 JSON；样式块由 `node build-tailwind.cjs [index-公开版.html]` 分别编译，两版各自维护、不互相覆盖。
+- **真实压缩产物往返**：harness `?artifact=1`（直接装载正则 JSON 的压缩产物）**两版各 12 项全部通过**，确认产物与源码一致。
 - **未验证范围**：未导入真实酒馆、未调用外部 LLM、未做安卓/真机与外网资源可用性、动画帧率验收；测试在隔离 mock 环境中进行。
