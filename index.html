@@ -14744,7 +14744,7 @@ async function nextTurn(token = combatToken) {
   }
   if (heroesData.filter(h => h.isAlive && !h.isSummon).length === 0) { showLog("全军覆没，战斗失败..."); showBattleResult('lose'); return; }
 
-  while(state.queueIndex < state.actionQueue.length && !isCombatActive(state.actionQueue[state.queueIndex].ref)) state.queueIndex++;
+  while(state.queueIndex < state.actionQueue.length && !state.actionQueue[state.queueIndex].ref.isAlive) state.queueIndex++;
   if (state.queueIndex >= state.actionQueue.length) { showLog(`—— 第 ${state.round} 回合 ——`); await sleep(800); if (token !== combatToken || _pipelineFrozen) return; startRound(); return; }
 
   renderTurnQueue(); const currentEntity = state.actionQueue[state.queueIndex];
@@ -17427,7 +17427,7 @@ function openEditor(keepScroll) {
     html += `<div class="flex items-center gap-2 min-w-0">`;
     html += `<div class="w-6 h-6 rounded overflow-hidden border border-rose-500/40 bg-black/40 shrink-0 flex items-center justify-center text-xs">`;
     if (_eImg) {
-      html += `<img src="${escapeHistoryHtml(_eImg)}" data-emoji="${escapeHistoryHtml(_eEmoji)}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='';if(this.parentElement)this.parentElement.textContent=this.dataset.emoji"/>`;
+      html += `<img src="${escapeHistoryHtml(_eImg)}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='';if(this.parentElement)this.parentElement.innerHTML='${escapeHistoryHtml(_eEmoji)}'"/>`;
     } else {
       html += escapeHistoryHtml(_eEmoji);
     }

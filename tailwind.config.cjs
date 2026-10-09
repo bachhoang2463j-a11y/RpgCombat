@@ -2,7 +2,7 @@
  *  content 扫描 index.html 全文（含 JS 模板字符串里的字面量类名）；
  *  safelist 兜住「运行时才知道的类名」（静态扫描器看不到的取值）。 */
 module.exports = {
-  content: ['./index.html'],
+  content: [process.env.TW_CONTENT || './index.html'],
   safelist: [
     // enemy.size 通道（index.html 敌人 sprite visualClass）：类名来自 LLM/世界书产出的战斗数据，
     // 实际取值是 text-* 字号档；safelist 全档 + sm: 变体，防外部数据给出未预编译变体

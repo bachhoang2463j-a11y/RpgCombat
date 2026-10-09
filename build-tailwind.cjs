@@ -12,7 +12,9 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const ROOT = __dirname;
-const HTML = path.join(ROOT, 'index.html');
+// 目标文件可传参（两版各自维护编译块）：node build-tailwind.cjs [index-公开版.html]
+const TARGET = process.argv[2] || 'index.html';
+const HTML = path.join(ROOT, TARGET);
 const OUT = path.join(ROOT, '.tmp-tw-out.css');
 const TW_VERSION = '3.4.17'; // v3 末版，与 Play CDN 同大版本（dvh/任意值语法一致）
 
@@ -26,7 +28,7 @@ function fail(msg) { console.error('[build-tailwind] 失败：' + msg); process.
 console.log('[build-tailwind] 编译 tailwindcss@' + TW_VERSION + ' …');
 try {
   execSync(`npx -y tailwindcss@${TW_VERSION} -c tailwind.config.cjs -i tailwind-in.css -o "${OUT}" --minify`,
-    { cwd: ROOT, stdio: 'pipe', maxBuffer: 32 * 1024 * 1024 });
+    { cwd: ROOT, stdio: 'pipe', maxBuffer: 32 * 1024 * 1024, env: Object.assign({}, process.env, { TW_CONTENT: './' + TARGET }) });
 } catch (e) {
   fail('Tailwind CLI 执行失败：' + (e.stderr ? e.stderr.toString().slice(0, 500) : e.message));
 }

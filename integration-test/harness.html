@@ -947,9 +947,18 @@ async function test17() {
   check(w.eval('heroesData[0].items.find(i=>i.name==="绷带").count') === 9, '同名物品精确覆盖');
   check(r17.unmatched.includes('埃利奥特·高级绷带'), '快照中不存在的物品报未匹配（不新增）');
 
-  // 快照缺失：勾选但无数据 → YAML 保留
-  w.eval('_statusBarSnapshot = null; state.isGameStarted = false; heroesData = JSON.parse(JSON.stringify(initialHeroesCache)); startGame();');
+  // 快照缺失：勾选但外部无 stat_data → YAML 保留（用 YAML 原值重建工作数组，隔离基线已被前次开战冻结的影响）
+  MOCK.resetVars();
+  w.eval("state.isGameStarted = false; heroesData = JSON.parse(JSON.stringify(initialHeroesCache)); heroesData[0].hp = 100; heroesData[0].maxHp = 100; startGame();");
   check(w.eval('heroesData[0].hp') === 100, '快照缺失：勾选不生效，YAML 保留');
+
+  // 开战重读：外部 stat_data 在准备页期间更新 → 开战时重读一次并以新值为准（不依赖构建期暂存快照）
+  MOCK.resetVars();
+  MOCK.api.insertOrAssignVariables({ stat_data: { 状态栏: { 角色列表: [
+    { 角色: { 名字: '🔮埃利奥特', 属性: '[❤️HP:33/100][💠MP:5/60][🛡️Armor:5]', 物品: '[💼][绷带x1][.45子弹：12]' } },
+  ] } } }, { type: 'message', message_id: 1 });
+  w.eval("state.isGameStarted = false; heroesData = JSON.parse(JSON.stringify(initialHeroesCache)); document.getElementById('start-statusbar-import').checked = true; startGame();");
+  check(w.eval('heroesData[0].hp') === 33, '开战重读：准备页期间状态栏变化被重新读取并覆盖');
   w.eval("document.getElementById('start-statusbar-import').checked = false;");
 }
 
