@@ -9729,7 +9729,7 @@ async function createSummonEntity(caster, spec, side, opts) {
         try {
             const t = side === 'hero' ? 'hero' : 'enemy';
             const entries = [];
-            for (let i = 0; i < (summonEntity.actCount || 1); i++) entries.push({ type: t, ref: summonEntity, isExtraTurn: false });
+            for (let i = 0; i < (summonEntity.actCount || 1); i++) entries.push({ type: t, ref: summonEntity, isExtraTurn: i > 0 });
             state.actionQueue.splice(state.queueIndex + 1, 0, ...entries);
         } catch(e) {}
     }
@@ -10834,16 +10834,8 @@ function updateHeroUI(hero) {
 
   // 【召唤】不触发常规倒下流程：死亡后自动从阵营移除（不计入胜负），由调用方 splice
   if (hero.hp <= 0 && hero.isAlive) {
-      if (hero.isSummon) {
-          hero.isAlive = false; hero.shield = 0; hero.buffs = [];
-          const idx = heroesData.indexOf(hero);
-          if (idx !== -1) heroesData.splice(idx, 1);
-          if (hero.dom && hero.dom.parentNode) hero.dom.remove();
-          else { const wrap = document.getElementById(`hero-wrap-${hero.id}`); if (wrap) wrap.remove(); }
-          renderTurnQueue();
-          addHistory(`[战况] 💨 召唤物 ${hero.name} 消散了。`);
-          return;
-      }
+      // 召唤物：先按既有机制结算 [复活]/[自爆]，真正死亡才消散（与 updateEnemyUI / DoT 路径同一收口）
+      if (hero.isSummon) { resolveSummonDeath(hero, getEntitySpriteDom(hero)); return; }
       hero.isAlive = false; hero.shield = 0; hero.buffs = []; hero.isDefending = false; hero.hitBonus = 0; hero.evaBonus = 0; hero.burstActivated = false; 
       hero.dom.classList.add('opacity-40', 'grayscale'); 
       if(cardInner) cardInner.classList.remove('ring-2', 'ring-yellow-400', 'scale-105'); 
@@ -10872,13 +10864,38 @@ function updateHeroUI(hero) {
 // 【复活】敌方死亡复活：带 [复活] 名字标签的敌人第一次被击杀时以 30% 最大血量原地复活（仅敌方、仅一次）。
 // 供 updateEnemyUI 死亡收口 / ON_FATAL_DAMAGE / DoT 回合起始致死三处调用；复活成功返回 true（跳过死亡处理）。
 function tryReviveEnemy(enemy, dom) {
-    if (!enemy || enemy.id.startsWith('h') || !enemy.reviveCount || enemy.reviveCount <= 0) return false;
+    if (!enemy || !enemy.reviveCount || enemy.reviveCount <= 0) return false;
     enemy.reviveCount--;
     enemy.hp = Math.floor(enemy.maxHp * 0.3);
     enemy.shield = 0; enemy.buffs = []; enemy.isDefending = false;
     if (dom) createFloatingText(dom, '死里逃生!', 'text-emerald-300');
     if (window.playSound) playSound('hpHeal');
     addHistory(`   ↳ 💀 [${enemy.name}] 遭受致命一击倒地……却强行撑住一口气猛地站起（死里逃生）！恢复了 ${Math.floor(enemy.maxHp * 0.3)}/${enemy.maxHp} 点生命重返战场！`);
+    return true;
+}
+
+// 【召唤】死亡收口（updateHeroUI / updateEnemyUI / DoT 致死路径共用，去重）：先按既有机制结算 [复活]/[自爆]，
+// 真正死亡才从阵营消散（不计入胜负）。返回 true = 已处理（复活成功或已消散），调用方直接 return。
+// skipRevive=true 时调用方已尝试过复活（DoT 路径），不再重复。
+function resolveSummonDeath(entity, spriteDom, skipRevive) {
+    if (!entity || !entity.isSummon) return false;
+    if (!skipRevive && tryReviveEnemy(entity, spriteDom)) return true;   // [复活] 继承：第一次致死以 30% 血站起
+    const isHeroSide = entity.side === 'hero';
+    entity.isAlive = false; entity.shield = 0; entity.buffs = [];
+    triggerEnemySelfDestruct(entity);                                    // [自爆] 继承：真正死亡后结算（自带 .explode 守卫，异步排队）
+    const arr = isHeroSide ? heroesData : enemiesData;
+    const idx = arr.indexOf(entity);
+    if (idx !== -1) arr.splice(idx, 1);
+    if (isHeroSide) {
+        if (entity.dom && entity.dom.parentNode) entity.dom.remove();
+        else { const wrap = document.getElementById(`hero-wrap-${entity.id}`); if (wrap) wrap.remove(); }
+    } else {
+        if (spriteDom) { spriteDom.classList.remove('breathe', 'enemy-sprite'); spriteDom.classList.add('opacity-0', 'scale-50'); }
+        const box = document.getElementById(`enemy-box-${entity.id}`) || entity.dom;
+        if (box) setTimeout(() => { if (box.parentNode) box.remove(); }, 500);
+    }
+    renderTurnQueue();
+    addHistory(`[战况] 💨 召唤物 ${entity.name} 消散了。`);
     return true;
 }
 
@@ -10901,7 +10918,7 @@ let selfDestructCount = 0; // 排队中/执行中的自爆任务数：endTurn �
 let combatToken = {};
 var _pipelineFrozen = false; // var（非 let）：addHistory 定义在本文之前，TDZ 安全
 function triggerEnemySelfDestruct(enemy) {
-    if (!enemy || enemy.id.startsWith('h') || !enemy.explode) return;
+    if (!enemy || !enemy.explode) return;
     const _sdToken = combatToken; // 触发时刻的代际令牌：排队期间发生重置则任务作废
     selfDestructCount++;
     selfDestructChain = selfDestructChain.then(async () => {
@@ -10997,7 +11014,7 @@ function updateEnemyUI(enemy) {
   enemy.mp = Math.max(0, Math.min(enemy.mp, enemy.maxMp));
   // 【非致命】兜底钳制：保险路径（正常已在伤害源头钳制），确保制服状态下敌方 HP 恒 ≥1 不被意外致死；
   // _sdContestFailed（自爆敏捷对抗失败）的敌人放行死亡，让其走真实死亡→自爆管线
-  if (nonLethalSettings.enabled && !enemy.id.startsWith('h') && enemy.isAlive && enemy.hp <= 0 && !enemy._sdContestFailed) {
+  if (nonLethalSettings.enabled && !isHeroSideEntity(enemy) && enemy.isAlive && enemy.hp <= 0 && !enemy._sdContestFailed) {
       const _dom = document.getElementById(`${enemy.id}-sprite`);
       if (enemy.hp <= 0) enemy.hp = 1;
       if (!enemy.isSubdued) subdueEnemy(enemy, _dom);
@@ -11064,18 +11081,8 @@ function updateEnemyUI(enemy) {
   }
 
   if (enemy.hp <= 0 && enemy.isAlive) {
-      // 【召唤】敌方召唤物：消散，不触发复活/自爆，按普通消失处理
-      if (enemy.isSummon) {
-          enemy.isAlive = false; enemy.shield = 0; enemy.buffs = [];
-          const idx = enemiesData.indexOf(enemy);
-          if (idx !== -1) enemiesData.splice(idx, 1);
-          if (sprite) { sprite.classList.remove('breathe', 'enemy-sprite'); sprite.classList.add('opacity-0', 'scale-50'); }
-          const box = document.getElementById(`enemy-box-${enemy.id}`) || enemy.dom;
-          if (box) setTimeout(() => { if(box.parentNode) box.remove(); }, 500);
-          renderTurnQueue();
-          addHistory(`[战况] 💨 召唤物 ${enemy.name} 消散了。`);
-          return;
-      }
+      // 【召唤】召唤物：先按既有机制结算 [复活]/[自爆]，真正死亡才消散（与 updateHeroUI / DoT 路径同一收口）
+      if (enemy.isSummon) { resolveSummonDeath(enemy, sprite); return; }
       // 【复活】敌人带 [复活] 标签：第一次被击杀时以 30% 血原地复活（覆盖普攻/反击/强力反击/直接减血击杀收口）
       if (tryReviveEnemy(enemy, sprite)) {
           updateBuffUI(enemy);
@@ -11472,7 +11479,7 @@ function subdueEnemy(target, targetDom) {
 
 // 【非致命】致命伤保底钳制：开关开启且目标为敌方时，把致死伤害压到恰好保留 1 HP 并施加制服；返回 true 表示已钳制
 function clampNonLethalDamage(target, hpDmg) {
-    if (!nonLethalSettings.enabled || !target || target.id.startsWith('h')) return hpDmg;
+    if (!nonLethalSettings.enabled || !target || isHeroSideEntity(target)) return hpDmg;
     if (hpDmg < target.hp) return hpDmg;
     // 无论当前血量多少（含已 1 HP 未制服的边缘态），致命伤一律制服（subdueEnemy 幂等）
     subdueEnemy(target, getEntitySpriteDom(target));
@@ -11485,7 +11492,7 @@ function clampNonLethalDamage(target, hpDmg) {
 //    成功→钳制 1 HP+制服；失败→不钳制并打 _sdContestFailed 标记，放行真实死亡走现有自爆管线（updateEnemyUI 兜底钳制据此放行）；
 //  - 其余敌人维持无条件制服（clampNonLethalDamage）。
 function resolveNonLethalLethal(target, hpDmg, interceptor) {
-    if (!nonLethalSettings.enabled || !target || target.id.startsWith('h')) return hpDmg;
+    if (!nonLethalSettings.enabled || !target || isHeroSideEntity(target)) return hpDmg;
     if (hpDmg < target.hp) return hpDmg;
     if ((target.reviveCount || 0) > 0) return hpDmg; // 复活优先：不钳制，照常走死亡→复活
     if (target.explode) {
@@ -12048,7 +12055,7 @@ CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
 CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
     if (ctx.prevented) return; // 已被毅力留存等被动阻止，不再复活
     const t = ctx.target;
-    if (t.id.startsWith('h') || !t.reviveCount || t.reviveCount <= 0) return;
+    if (!t.reviveCount || t.reviveCount <= 0) return;
     ctx.hpDmg = 0;                     // 先归零本次伤害，复活回血后才不会被随后扣减再次带走
     if (tryReviveEnemy(t, ctx.targetDom)) ctx.prevented = true; // 复活成功 → 本次不致死、不判假击杀
 }, 8);
@@ -12107,15 +12114,15 @@ CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
     if (p && p.onAfterDamageDealt) {
         p.onAfterDamageDealt(ctx.caster, ctx.target, ctx.targetDom, ctx.incomingDamageType);
     }
-    // 敌人【吸血】：对英雄造成实际伤害时，吸取其 30% 转化为自身回复（仅敌方施法者、存活时）
+    // 【吸血】：造成实际伤害时吸取其 30% 转为自身回复（按真实阵营判定归属与 UI，友方召唤物同样继承该变种；存活时）
     const caster = ctx.caster;
-    if (caster && !caster.id.startsWith('h') && caster.tags && caster.tags.includes('[吸血]') && caster.isAlive && (ctx.hpDmg > 0)) {
+    if (caster && caster.tags && caster.tags.includes('[吸血]') && caster.isAlive && (ctx.hpDmg > 0)) {
         const drain = Math.max(1, Math.floor(ctx.hpDmg * 0.3));
         caster.hp = Math.min(caster.maxHp, caster.hp + drain);
-        const casterDom = caster.id ? document.getElementById(`${caster.id}-sprite`) : null;
+        const casterDom = getEntitySpriteDom(caster);
         if (casterDom) createFloatingText(casterDom, `嗜血 +${drain}`, 'text-red-300');
         addHistory(`   ↳ 🩸 [${caster.name}] 触发【嗜血/生机掠夺】，从凶狠的命中中汲取战意与生机，恢复了 ${drain} 点生命（${Math.floor(caster.hp)}/${caster.maxHp}）。`);
-        updateEnemyUI(caster);
+        if (isHeroSideEntity(caster)) updateHeroUI(caster); else updateEnemyUI(caster);
     }
     // 敌人【荆棘】：被近战命中时反弹 50% 实际伤害（下限 10 点）——走正常减伤管线（受攻击者护甲/护盾/防御姿态减免）；
     // 反弹致命伤害经 ON_FATAL_DAMAGE 可被保命被动救场；与【吸血】同管道，致死一击早退不触发 → 斩杀可规避反伤）
@@ -13682,7 +13689,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         }
     }
 
-    if (targetType === 'enemy' && caster.id.startsWith('h') && wasAlive && target.hp <= 0) {
+    if (targetType === 'enemy' && isHeroSideEntity(caster) && wasAlive && target.hp <= 0) {
         addHistory(`   💥 致命一击！彻底撕裂了 ${target.name} 的身躯！`);
         updateEnemyUI(target); // 立即更新UI：触发isAlive=false、灰化、从行动队列中剔除
         // === 击杀事件 → 事件总线 (ON_KILL)：供隐匿者击杀累积隐匿值等被动订阅 ===
@@ -14641,6 +14648,12 @@ function startRound() {
           // 用有效速度（基础 spd + 临时速度 buff）排轴，使速度增减在下一回合仍生效
           const effSpd = getEffectiveSpeed(h);
           for(let i=0; i<actCount; i++) allEntities.push({type: 'hero', ref: h, isExtraTurn: i > 0, queueSpd: effSpd - (i * 10)});
+          // 统一削减技能 CD（友方召唤物等英雄侧 AI 单位与敌方同规则，避免大招冷却永不递减）
+          if (h.cooldowns) {
+              for (let skillName in h.cooldowns) {
+                  if (h.cooldowns[skillName] > 0) h.cooldowns[skillName]--;
+              }
+          }
       }
   });
   enemiesData.forEach(e => {
@@ -14721,7 +14734,7 @@ async function nextTurn(token = combatToken) {
               if (b.type === 'poison' || b.type === 'burn') {
                   let dotDmg = b.value;
                   // 【非致命】敌方 DoT 致死同样走总入口（复活优先→自爆敏捷对抗→普通制服；自爆拦截方=我方当前敏捷最高的存活者，否则敌人可能在轮到回合前被毒死，破坏非致命语义）
-                  if (nonLethalSettings.enabled && !currentEntity.ref.id.startsWith('h') && currentEntity.ref.hp - dotDmg <= 0) {
+                  if (nonLethalSettings.enabled && !isHeroSideEntity(currentEntity.ref) && currentEntity.ref.hp - dotDmg <= 0) {
                       const _dotInterceptor = heroesData.filter(h => h.isAlive).sort((a, b) => getEffectiveSpeed(b) - getEffectiveSpeed(a))[0] || null;
                       dotDmg = resolveNonLethalLethal(currentEntity.ref, dotDmg, _dotInterceptor);
                   }
@@ -14773,14 +14786,19 @@ async function nextTurn(token = combatToken) {
   
   if (currentEntity.ref.hp <= 0) {
       // 【复活】DoT（中毒/燃烧）在回合起始致死时先尝试原地复活——复活成功则不判死、沿用下方正常行动流程
-      const revived = currentEntity.type !== 'hero' && tryReviveEnemy(currentEntity.ref,
-          document.getElementById(`${currentEntity.ref.id}-sprite`));
+      const revived = tryReviveEnemy(currentEntity.ref, getEntitySpriteDom(currentEntity.ref));
       if (!revived) {
+          // 【召唤】DoT 致死：走统一死亡收口（[自爆] 结算 + 从阵营消散），复活已在上方尝试
+          if (currentEntity.ref.isSummon) {
+              resolveSummonDeath(currentEntity.ref, getEntitySpriteDom(currentEntity.ref), true);
+              endTurn(token);
+              return;
+          }
           // 敌方 DoT 致死：触发智慧死亡旁白（此路径手动置死、不经过 updateEnemyUI 致死分支，故单独判定）
           if (currentEntity.type !== 'hero') tryTriggerEnemyDeathSpeak(currentEntity.ref);
           currentEntity.ref.isAlive = false;
           // 【自爆】DoT 致死路径单独接线（此路径已手动置死，随后 updateEnemyUI 的死亡分支守卫失效，不会重复触发）
-          if (currentEntity.type !== 'hero') triggerEnemySelfDestruct(currentEntity.ref);
+          triggerEnemySelfDestruct(currentEntity.ref);
           if (currentEntity.ref.currentDelay) {
               resetHeroChargeEffect(currentEntity.ref);
               currentEntity.ref.currentDelay = null; // 蓄力中死亡：清空蓄力
@@ -15296,11 +15314,8 @@ async function executeSummonTurn(summon, token = combatToken) {
       selectedSkillS = chargeSkillS;
       specificTargetS = getTauntTarget(enemyPool, summon.isWise);
   } else {
-      const decision = selectEnemySkillAndTarget(summon, _origValid,
-          isHeroSide ? enemyPool : allyPool,  // aliveEnemies 视角：对英雄侧召唤，敌人是 enemyPool
-          isHeroSide ? allyPool : enemyPool); // aliveHeroes 视角会被内部再包一层 getTauntTarget，这里做对称对调
-      // 修正：selectEnemySkillAndTarget 内部按 aliveHeroes=英雄池 选攻击目标，内部 heal/buff 仍基于 aliveEnemies；
-      // 召唤侧需要把两套池按敌我语义对齐，上行已对调，此处再把决策目标按 benefical 校正回 enemyPool/allyPool
+      // 池语义：aliveEnemies(第3参)=己方池（内部挑受伤队友 / 自身增益），aliveHeroes(第4参)=对方池（攻击/减益默认目标）
+      const decision = selectEnemySkillAndTarget(summon, _origValid, allyPool, enemyPool);
       selectedSkillS = decision.selectedSkill;
       specificTargetS = decision.specificTarget;
       if (selectedSkillS) {
@@ -16156,7 +16171,7 @@ function itemToPseudoSkill(item) {
         hit: item.hit || 100, turns: item.turns, slotTurns: item.slotTurns, slotTurns2: item.slotTurns2, slotTurns3: item.slotTurns3,
         type: item.type, power: item.power, type2: item.type2, power2: item.power2,
         type3: item.type3, power3: item.power3, damageType: item.damageType || null, isOthers: item.isOthers,
-        guaranteedHit: item.guaranteedHit, switchTarget: item.switchTarget, critRate: item.critRate || 0, fxTag: item.fxTag, isHighTier: !!item.isHighTier, isLegendary: !!item.isLegendary, summonTarget: item.summonTarget || null, summonNoLimit: !!item.summonNoLimit, barrierSub: item.barrierSub || null, barrierArmor: item.barrierArmor || 0, isItem: true, itemRef: item };
+        guaranteedHit: item.guaranteedHit, switchTarget: item.switchTarget, critRate: item.critRate || 0, fxTag: item.fxTag, isHighTier: !!item.isHighTier, isLegendary: !!item.isLegendary, summonTarget: item.summonTarget || null, summonNoLimit: !!item.summonNoLimit, ignoreRow: !!item.ignoreRow, barrierSub: item.barrierSub || null, barrierArmor: item.barrierArmor || 0, isItem: true, itemRef: item };
 }
 
 // 物品使用核心：执行效果结算，不推进回合——回合结束由调用方负责

@@ -269,7 +269,7 @@ async function runEngine(enginePath, openSrc) {
         enemies: [mkEnemy('e_x1', '敌甲', { isSubdued: true, buffs: [{ type: 'stun', permanent: true }] }),
                   mkEnemy('e_x2', '敌乙', {})],
         summon, rec: recD,
-        select: (caster, valid, a3, a4) => { recD.cap = { enemyPool: a3, allyPool: a4 }; return { selectedSkill: null, specificTarget: null }; },
+        select: (caster, valid, a3, a4) => { recD.cap = { enemyPool: a4, allyPool: a3 }; return { selectedSkill: null, specificTarget: null }; },
       });
       await runD(summon);
       R.real(!!recD.cap && recD.cap.enemyPool.length === 1 && recD.cap.enemyPool[0].name === '敌乙',

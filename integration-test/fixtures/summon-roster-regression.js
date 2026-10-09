@@ -146,7 +146,7 @@
         // D：异侧过滤只作用于对手池；同侧被制服友军保留（友方增益不被过滤）
         rec.skill = 0; rec.end = 0; rec.targets.length = 0;
         const cap = { enemyPool: null, allyPool: null };
-        selectImpl = function (caster, valid, a3, a4) { cap.enemyPool = a3; cap.allyPool = a4; return { selectedSkill: null, specificTarget: null }; };
+        selectImpl = function (caster, valid, a3, a4) { cap.enemyPool = a4; cap.allyPool = a3; return { selectedSkill: null, specificTarget: null }; };
         setData([summon, mkE('h_ally', '被制服友军', { isSubdued: true, buffs: [{ type: 'stun', permanent: true }] })],
                 [mkE('e_x1', '敌甲', { isSubdued: true, buffs: [{ type: 'stun', permanent: true }] }), mkE('e_x2', '敌乙')]);
         await w.executeSummonTurn(summon);
