@@ -1,0 +1,555 @@
+{
+  "kind": "审查证据，不是修复验收；已复现不符为待处理问题",
+  "results": [
+    {
+      "version": "index.html",
+      "id": "穿透应仍由普通护盾吸收",
+      "expected": {
+        "hpDmg": 0,
+        "shieldDmg": 40,
+        "shield": 60
+      },
+      "actual": {
+        "hpDmg": 40,
+        "shieldDmg": 0,
+        "shield": 100
+      },
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "散射护甲三倍",
+      "expected": {
+        "hpDmg": 80,
+        "shieldDmg": 0
+      },
+      "actual": {
+        "hpDmg": 80,
+        "shieldDmg": 0
+      },
+      "status": "符合"
+    },
+    {
+      "version": "index.html",
+      "id": "物品肃正护甲解析",
+      "expected": {
+        "type": "[肃正:法术]",
+        "power": 500,
+        "sub": "法术",
+        "armor": 40
+      },
+      "actual": {
+        "type": "[无]",
+        "power": 0,
+        "sub": null,
+        "armor": null
+      },
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "物品驱散简写",
+      "expected": "[驱散]",
+      "actual": "[无]",
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "裸群眩晕标签",
+      "expected": "[群眩晕]",
+      "actual": "[单体]",
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "YAML显式零消耗",
+      "expected": {
+        "cost": 0,
+        "hit": 100
+      },
+      "actual": {
+        "cost": 10,
+        "hit": 180
+      },
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "反应子类型补档",
+      "expected": {
+        "reaction": true,
+        "target": "近战"
+      },
+      "actual": {
+        "reaction": true,
+        "target": "all"
+      },
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "更换槽类型不混入旧威力",
+      "expected": {
+        "type": "[单防]",
+        "power": 0,
+        "turns": null
+      },
+      "actual": {
+        "type": "[单防]",
+        "power": 40,
+        "turns": 2
+      },
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "同名组子技能与顶层技能隔离",
+      "expected": 2,
+      "actual": 9,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "物品突进执行透传",
+      "expected": true,
+      "actual": false,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "友方召唤物每回合冷却递减",
+      "expected": 1,
+      "actual": 2,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "摘要开关刷新恢复",
+      "expected": false,
+      "actual": true,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "无buff也派发回合开始事件",
+      "expected": true,
+      "actual": false,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "职业初始化应使用合并后的MP上限",
+      "expected": 50,
+      "actual": 25,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "取消职业应跨场保留",
+      "expected": null,
+      "actual": "狂战士",
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "钢体应免疫职业暗袭眩晕",
+      "expected": false,
+      "actual": true,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "耐毒应免疫职业淬毒",
+      "expected": false,
+      "actual": true,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "自缓代价应能被驱散",
+      "expected": 0,
+      "actual": 1,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "开局状态栏真值应进入重置基线",
+      "expected": 25,
+      "actual": 100,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "众召实体不占后续普通召唤名额",
+      "expected": {
+        "flag": true,
+        "normalAdded": 1
+      },
+      "actual": {
+        "flag": true,
+        "normalAdded": 1
+      },
+      "status": "符合"
+    },
+    {
+      "version": "index.html",
+      "id": "敌方多召总数不超过12",
+      "expected": 12,
+      "actual": 12,
+      "status": "符合"
+    },
+    {
+      "version": "index.html",
+      "id": "名额满的召唤技能不可点击",
+      "expected": false,
+      "actual": false,
+      "status": "符合"
+    },
+    {
+      "version": "index.html",
+      "id": "友方召唤治疗应选择受伤友军",
+      "expected": "受伤队友",
+      "actual": "治疗召唤",
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "重置后过期自爆任务不应产生负计数",
+      "expected": 0,
+      "actual": -1,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "未命中不消耗隐匿急袭",
+      "expected": true,
+      "actual": false,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "散射命中会消耗隐匿急袭",
+      "expected": false,
+      "actual": true,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "带突进的蓄力技能可点击后排",
+      "expected": true,
+      "actual": true,
+      "status": "符合"
+    },
+    {
+      "version": "index.html",
+      "id": "屏障破碎应仅把溢出伤害传给角色",
+      "expected": 50,
+      "actual": 100,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "重置后的旧群攻不应结算到新阵容",
+      "expected": false,
+      "actual": true,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index.html",
+      "id": "败北结算不应要求续写胜利",
+      "expected": false,
+      "actual": true,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "穿透应仍由普通护盾吸收",
+      "expected": {
+        "hpDmg": 0,
+        "shieldDmg": 40,
+        "shield": 60
+      },
+      "actual": {
+        "hpDmg": 40,
+        "shieldDmg": 0,
+        "shield": 100
+      },
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "散射护甲三倍",
+      "expected": {
+        "hpDmg": 80,
+        "shieldDmg": 0
+      },
+      "actual": {
+        "hpDmg": 80,
+        "shieldDmg": 0
+      },
+      "status": "符合"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "物品肃正护甲解析",
+      "expected": {
+        "type": "[肃正:法术]",
+        "power": 500,
+        "sub": "法术",
+        "armor": 40
+      },
+      "actual": {
+        "type": "[无]",
+        "power": 0,
+        "sub": null,
+        "armor": null
+      },
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "物品驱散简写",
+      "expected": "[驱散]",
+      "actual": "[无]",
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "裸群眩晕标签",
+      "expected": "[群眩晕]",
+      "actual": "[单体]",
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "YAML显式零消耗",
+      "expected": {
+        "cost": 0,
+        "hit": 100
+      },
+      "actual": {
+        "cost": 10,
+        "hit": 180
+      },
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "反应子类型补档",
+      "expected": {
+        "reaction": true,
+        "target": "近战"
+      },
+      "actual": {
+        "reaction": true,
+        "target": "all"
+      },
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "更换槽类型不混入旧威力",
+      "expected": {
+        "type": "[单防]",
+        "power": 0,
+        "turns": null
+      },
+      "actual": {
+        "type": "[单防]",
+        "power": 40,
+        "turns": 2
+      },
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "同名组子技能与顶层技能隔离",
+      "expected": 2,
+      "actual": 9,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "物品突进执行透传",
+      "expected": true,
+      "actual": true,
+      "status": "符合"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "友方召唤物每回合冷却递减",
+      "expected": 1,
+      "actual": 2,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "摘要开关刷新恢复",
+      "expected": false,
+      "actual": true,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "无buff也派发回合开始事件",
+      "expected": true,
+      "actual": false,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "职业初始化应使用合并后的MP上限",
+      "expected": 50,
+      "actual": 25,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "取消职业应跨场保留",
+      "expected": null,
+      "actual": "狂战士",
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "钢体应免疫职业暗袭眩晕",
+      "expected": false,
+      "actual": true,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "耐毒应免疫职业淬毒",
+      "expected": false,
+      "actual": true,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "自缓代价应能被驱散",
+      "expected": 0,
+      "actual": 1,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "开局状态栏真值应进入重置基线",
+      "expected": 25,
+      "actual": 100,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "众召实体不占后续普通召唤名额",
+      "expected": {
+        "flag": true,
+        "normalAdded": 1
+      },
+      "actual": {
+        "flag": false,
+        "normalAdded": 0
+      },
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "敌方多召总数不超过12",
+      "expected": 12,
+      "actual": 15,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "名额满的召唤技能不可点击",
+      "expected": false,
+      "actual": true,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "友方召唤治疗应选择受伤友军",
+      "expected": "受伤队友",
+      "actual": "治疗召唤",
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "重置后过期自爆任务不应产生负计数",
+      "expected": 0,
+      "actual": -1,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "未命中不消耗隐匿急袭",
+      "expected": true,
+      "actual": false,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "散射命中会消耗隐匿急袭",
+      "expected": false,
+      "actual": true,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "带突进的蓄力技能可点击后排",
+      "expected": true,
+      "actual": false,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "屏障破碎应仅把溢出伤害传给角色",
+      "expected": 50,
+      "actual": 100,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "重置后的旧群攻不应结算到新阵容",
+      "expected": false,
+      "actual": true,
+      "status": "已复现不符"
+    },
+    {
+      "version": "index-公开版.html",
+      "id": "败北结算不应要求续写胜利",
+      "expected": false,
+      "actual": true,
+      "status": "已复现不符"
+    }
+  ],
+  "functionComparison": [
+    {
+      "function": "applySingleTagEffect",
+      "identical": false
+    },
+    {
+      "function": "applyBarrierHit",
+      "identical": true
+    },
+    {
+      "function": "executeSkillAction",
+      "identical": false
+    },
+    {
+      "function": "runReactionIntercept",
+      "identical": true
+    },
+    {
+      "function": "checkKanpoInterrupt",
+      "identical": true
+    },
+    {
+      "function": "nextTurn",
+      "identical": true
+    },
+    {
+      "function": "startRound",
+      "identical": true
+    }
+  ]
+}

@@ -19,7 +19,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-const LINES = SRC.split('\n');
+const LINES = SRC.split(/\r?\n/);
 
 // 抽取顶层函数：起于行首 "function NAME("，止于下一行恰好为 "}" 的行
 // （顶层声明一律 0 缩进收尾，比括号匹配稳——不会被正则/字符串里的花括号带偏）
@@ -43,7 +43,7 @@ const FNS = [
   '_sbAttrKey', '_sbParseAttrs', '_sbParseItems', '_sbParseItemNames', 'readStatusBarSnapshot',
   'shopNameKey', 'shopItemKey', 'readShopCatalog', 'buildShopIndex', 'shopItemSoldForHero',
   'parseShopBattleItem', 'shopHeldCount', 'syncShopCatalogHeroItems', 'shopSuppressPersistedItem',
-  'applyPersistedRoster',
+  'normalizeRosterSkill', '_rosterFieldEmpty', '_gapFillSkill', 'applyPersistedRoster',
 ];
 const fnSources = FNS.map(extractFn);
 const skillTypesSrc = extractArr('SKILL_TYPES');
@@ -85,6 +85,7 @@ const sandboxSrc = [
   'function readRoster() { return rosterPayload; }',
   'function syncSkillGroupFromChildren() {}',
   constLine('SHOP_CATALOG_VAR_KEY'),
+  SRC.match(/const ROSTER_GAP_FILL = \{[\s\S]*?\n\};/)[0],
   skillTypesSrc,
   fnSources.join('\n\n'),
   'return {',

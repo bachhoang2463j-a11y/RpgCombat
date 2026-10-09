@@ -1,0 +1,170 @@
+
+===== 引擎：D:/Project/RpgCombat/index.html =====
+
+-- G1 召唤物忽略非致命制服（isIgnoredSummonTarget）--
+   ✓ [真实] 英雄侧召唤物 × 被制服敌方 → 忽略(true)
+   ✓ [真实] 敌方召唤物 × 被制服英雄 → 忽略(true)
+   ✓ [真实] 同侧（召唤物 × 被制服英雄）→ 不忽略(false)
+   ✓ [真实] 目标未制服 → 不忽略(false)
+   ✓ [真实] 非召唤物施法者 → 不忽略(false)
+   ✓ [真实] 仅普通眩晕（非制服）→ 不忽略(false)：普通眩晕保留
+
+-- G2 技能/物品/children 缺省回合与空槽归一（normalizeRosterSkill）--
+   ✓ [真实] type:null → '[无]'
+   ✓ [真实] type2:undefined → '[无]'
+   ✓ [真实] type3:null → '[无]'
+   ✓ [真实] turns 缺失 → null
+   ✓ [真实] turns:null → null
+   ✓ [真实] turns:0 → null
+   ✓ [真实] 显式正数 turns:5 保留
+   ✓ [真实] children 递归归一（子槽空 → '[无]'、turns 0 → null）
+   ✓ [真实] children 递归不改显式正数回合
+   ✓ [真实] 物品同构对象（含 children）归一不抛错且空槽 → '[无]'
+
+-- G3 executeSummonTurn 筛敌 / 空敌池安全结束（静态源码）--
+   ✓ [静态] executeSummonTurn 用 isIgnoredSummonTarget 筛敌
+   ✓ [静态] 空敌池 → 直接 endTurn（安全结束）
+
+-- G3b executeSummonTurn 空敌池安全结束 / 普通眩晕保留（真实执行）--
+   ✓ [真实] 敌方全员被制服 → endTurn 收尾（安全结束）
+   ✓ [真实] 召唤物不向被制服目标出手（executeSkillAction 0 次）
+   ✓ [真实] 仅普通眩晕目标未被忽略，召唤物仍对其出手
+   ✓ [真实] 异侧（敌方）召唤物 × 我方全员被制服 → 同样 endTurn 安全结束
+   ✓ [真实] 异侧过滤只作用于对手池（被制服敌方已剔除）
+   ✓ [真实] 友方池不被过滤（同侧被制服友军仍在，友方增益对象保留）
+
+-- G3e executeEnemyTurn 敌方召唤 侧别过滤 / 空敌池（真实执行 + 静态）--
+   ✓ [静态] executeEnemyTurn 按侧别过滤我方池
+   ✓ [静态] executeEnemyTurn 敌方召唤空池 → endTurn
+   ✓ [真实] 真实：executeEnemyTurn 敌方召唤 × 我方全员被制服 → endTurn 安全结束
+   ✓ [真实] 真实：executeEnemyTurn 我方池按侧别过滤（被制服我方已剔除）
+   ✓ [真实] 真实：executeEnemyTurn 己方池不被过滤（友方增益对象保留）
+
+-- G4 executeSkillAction 对手/目标/转火/特效快照过滤（静态源码）--
+   ✓ [静态] opponents / targets / 转火 / 特效快照 四处均过滤（当前引用 4 处）
+   ✓ [静态] executeSkillAction 保留 opponents 构建点（AOE/random 同源）
+   ✓ [静态] executeSkillAction 保留 AOE 分支
+   ✓ [静态] executeSkillAction 过滤不只在注释里
+
+-- G4b executeSkillAction 真实路由（AOE/random/转火/跳过/自盲）--
+   ✓ [真实] AOE：命中集剔除被制服敌方（实际 敌乙）
+   ✓ [真实] random：主目标为空时随机池已过滤（实际 敌乙）
+   ✓ [真实] 同技能制服后无转火 → 后续段跳过（仅 1 段命中）
+   ✓ [真实] 同技能制服后带转火 → 后续段转向其他存活敌（实际 敌乙,敌丙）
+   ✓ [真实] 转火战报已写入战斗历史
+   ✓ [真实] self-debuff（自盲）目标恒为施法者，不受过滤影响
+
+-- G5b applySingleTagEffect 直连保护（真实执行）--
+   ✓ [真实] applySingleTagEffect 对忽略目标直连保护（直接返回，无伤害/无状态）
+
+-- G5 applySingleTagEffect 直连保护（静态源码）--
+   ✓ [静态] applySingleTagEffect 直连保护（忽略目标直接返回）
+
+-- G6 普通眩晕保留：nextTurn 跳过判定（静态源码）--
+   ✓ [静态] nextTurn 仍按 buff.type==='stun' 判定跳过（普通眩晕保留）
+   ✓ [静态] nextTurn 制服分支仍存在
+
+-- G7 战意激增保存重载：字段补齐不改显式正数回合 --
+   ✓ [真实] 存档 slotTurns=3（增攻3）→ YAML 空则补齐
+   ✓ [真实] 存档 slotTurns2=2（自盲2）→ YAML 空则补齐
+   ✓ [真实] YAML 显式正数回合 turns:5 不被存档 3 覆盖
+   ✓ [真实] 存档 turns:0 先归一为 null → 不覆盖 YAML 空回合
+
+-- G8 OpeningSetup 模板与机制回合（getMechTurns / empty*Data）--
+   ✓ [静态] 战意激增模板含 [单增;power:50;turns:3][自盲;power:10;turns:2]
+   ✓ [真实] getMechTurns(目标增攻) = 3（取槽位 ;turns:3）
+   ✓ [真实] getMechTurns(自身致盲) = 2（取槽位 ;turns:2）
+   ✓ [真实] getMechTurns 不再硬编码自盲=2（无显式 turns 时回落默认 3）
+   ✓ [真实] getMechTurns(眩晕) = 1（既有默认保留）
+   ✓ [真实] emptySkillData().turns === null
+   ✓ [真实] emptyItemData().turns === null
+   ✓ [真实] emptyItemData().children 为数组（空槽兼容）
+   ✓ [真实] emptySkillData().type 空槽归一为 '[无]'
+   ✓ [真实] emptySkillData 经归一后空槽 → '[无]' 且 turns null
+
+===== 引擎：D:/Project/RpgCombat/index-公开版.html =====
+
+-- G1 召唤物忽略非致命制服（isIgnoredSummonTarget）--
+   ✓ [真实] 英雄侧召唤物 × 被制服敌方 → 忽略(true)
+   ✓ [真实] 敌方召唤物 × 被制服英雄 → 忽略(true)
+   ✓ [真实] 同侧（召唤物 × 被制服英雄）→ 不忽略(false)
+   ✓ [真实] 目标未制服 → 不忽略(false)
+   ✓ [真实] 非召唤物施法者 → 不忽略(false)
+   ✓ [真实] 仅普通眩晕（非制服）→ 不忽略(false)：普通眩晕保留
+
+-- G2 技能/物品/children 缺省回合与空槽归一（normalizeRosterSkill）--
+   ✓ [真实] type:null → '[无]'
+   ✓ [真实] type2:undefined → '[无]'
+   ✓ [真实] type3:null → '[无]'
+   ✓ [真实] turns 缺失 → null
+   ✓ [真实] turns:null → null
+   ✓ [真实] turns:0 → null
+   ✓ [真实] 显式正数 turns:5 保留
+   ✓ [真实] children 递归归一（子槽空 → '[无]'、turns 0 → null）
+   ✓ [真实] children 递归不改显式正数回合
+   ✓ [真实] 物品同构对象（含 children）归一不抛错且空槽 → '[无]'
+
+-- G3 executeSummonTurn 筛敌 / 空敌池安全结束（静态源码）--
+   ✓ [静态] executeSummonTurn 用 isIgnoredSummonTarget 筛敌
+   ✓ [静态] 空敌池 → 直接 endTurn（安全结束）
+
+-- G3b executeSummonTurn 空敌池安全结束 / 普通眩晕保留（真实执行）--
+   ✓ [真实] 敌方全员被制服 → endTurn 收尾（安全结束）
+   ✓ [真实] 召唤物不向被制服目标出手（executeSkillAction 0 次）
+   ✓ [真实] 仅普通眩晕目标未被忽略，召唤物仍对其出手
+   ✓ [真实] 异侧（敌方）召唤物 × 我方全员被制服 → 同样 endTurn 安全结束
+   ✓ [真实] 异侧过滤只作用于对手池（被制服敌方已剔除）
+   ✓ [真实] 友方池不被过滤（同侧被制服友军仍在，友方增益对象保留）
+
+-- G3e executeEnemyTurn 敌方召唤 侧别过滤 / 空敌池（真实执行 + 静态）--
+   ✓ [静态] executeEnemyTurn 按侧别过滤我方池
+   ✓ [静态] executeEnemyTurn 敌方召唤空池 → endTurn
+   ✓ [真实] 真实：executeEnemyTurn 敌方召唤 × 我方全员被制服 → endTurn 安全结束
+   ✓ [真实] 真实：executeEnemyTurn 我方池按侧别过滤（被制服我方已剔除）
+   ✓ [真实] 真实：executeEnemyTurn 己方池不被过滤（友方增益对象保留）
+
+-- G4 executeSkillAction 对手/目标/转火/特效快照过滤（静态源码）--
+   ✓ [静态] opponents / targets / 转火 / 特效快照 四处均过滤（当前引用 4 处）
+   ✓ [静态] executeSkillAction 保留 opponents 构建点（AOE/random 同源）
+   ✓ [静态] executeSkillAction 保留 AOE 分支
+   ✓ [静态] executeSkillAction 过滤不只在注释里
+
+-- G4b executeSkillAction 真实路由（AOE/random/转火/跳过/自盲）--
+   ✓ [真实] AOE：命中集剔除被制服敌方（实际 敌乙）
+   ✓ [真实] random：主目标为空时随机池已过滤（实际 敌乙）
+   ✓ [真实] 同技能制服后无转火 → 后续段跳过（仅 1 段命中）
+   ✓ [真实] 同技能制服后带转火 → 后续段转向其他存活敌（实际 敌乙,敌丙）
+   ✓ [真实] 转火战报已写入战斗历史
+   ✓ [真实] self-debuff（自盲）目标恒为施法者，不受过滤影响
+
+-- G5b applySingleTagEffect 直连保护（真实执行）--
+   ✓ [真实] applySingleTagEffect 对忽略目标直连保护（直接返回，无伤害/无状态）
+
+-- G5 applySingleTagEffect 直连保护（静态源码）--
+   ✓ [静态] applySingleTagEffect 直连保护（忽略目标直接返回）
+
+-- G6 普通眩晕保留：nextTurn 跳过判定（静态源码）--
+   ✓ [静态] nextTurn 仍按 buff.type==='stun' 判定跳过（普通眩晕保留）
+   ✓ [静态] nextTurn 制服分支仍存在
+
+-- G7 战意激增保存重载：字段补齐不改显式正数回合 --
+   ✓ [真实] 存档 slotTurns=3（增攻3）→ YAML 空则补齐
+   ✓ [真实] 存档 slotTurns2=2（自盲2）→ YAML 空则补齐
+   ✓ [真实] YAML 显式正数回合 turns:5 不被存档 3 覆盖
+   ✓ [真实] 存档 turns:0 先归一为 null → 不覆盖 YAML 空回合
+
+-- G8 OpeningSetup 模板与机制回合（getMechTurns / empty*Data）--
+   ✓ [静态] 战意激增模板含 [单增;power:50;turns:3][自盲;power:10;turns:2]
+   ✓ [真实] getMechTurns(目标增攻) = 3（取槽位 ;turns:3）
+   ✓ [真实] getMechTurns(自身致盲) = 2（取槽位 ;turns:2）
+   ✓ [真实] getMechTurns 不再硬编码自盲=2（无显式 turns 时回落默认 3）
+   ✓ [真实] getMechTurns(眩晕) = 1（既有默认保留）
+   ✓ [真实] emptySkillData().turns === null
+   ✓ [真实] emptyItemData().turns === null
+   ✓ [真实] emptyItemData().children 为数组（空槽兼容）
+   ✓ [真实] emptySkillData().type 空槽归一为 '[无]'
+   ✓ [真实] emptySkillData 经归一后空槽 → '[无]' 且 turns null
+
+==================== 汇总 ====================
+通过（真实/静态）：114    失败：0    待对齐：0
+结论：无真实断言失败。

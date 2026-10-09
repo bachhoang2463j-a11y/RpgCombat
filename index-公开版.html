@@ -11973,6 +11973,9 @@ CombatEvents.on(EVENTS.TURN_END, (ctx) => {
 // 召唤/阵营辅助（isSummon 统一判定）
 // ==========================================
 function isHeroSideEntity(e) { return e?.isSummon ? e.side === 'hero' : (e?.id || '').startsWith('h'); }
+function isIgnoredSummonTarget(caster, target) {
+    return !!(caster.isSummon && target?.isSubdued && isHeroSideEntity(caster) !== isHeroSideEntity(target));
+}
 function isSingleTargetSkill(skill) {
     if (!skill) return true;
     return ![skill.type, skill.type2, skill.type3].some(t => t && String(t).includes('群'));
@@ -12941,7 +12944,7 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
 }
 
 async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, multiplier, globalTurns, skill) {
-  if (!target || !target.isAlive) return;
+  if (!target || !target.isAlive || isIgnoredSummonTarget(caster, target)) return;
   // 【自X】自身负面 = 固定代价：威力不受极限爆发/暴击倍率放大（其余标签维持 power × multiplier）；
   // 且使用后必中——下方掷骰分支与减益落空检查对其整体豁免
   const isSelfDebuff = isSelfDebuffTag(tag);
@@ -13998,7 +14001,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         const isBeneficial = tag.includes('回') || tag.includes('冲') || tag.includes('增') || tag.includes('防') || tag.includes('盾') || tag.includes('瞄') || tag.includes('嘲') || tag.includes('再动') || tag.includes('避') || tag.includes('免伤') || tag.includes('反击') || tag.includes('驱散') || tag.includes('肃正') || tag.includes('速');
         const isAoe = tag.includes('群'); const casterIsHero = caster.isSummon ? (caster.side === 'hero') : caster.id.startsWith('h');
         const allies = casterIsHero ? heroesData.filter(h=>h.isAlive) : enemiesData.filter(e=>e.isAlive);
-        const opponents = casterIsHero ? enemiesData.filter(e=>e.isAlive) : heroesData.filter(h=>h.isAlive);
+        const opponents = (casterIsHero ? enemiesData : heroesData).filter(e => e.isAlive && !isIgnoredSummonTarget(caster, e));
         let targets = [];
         
         // 再动/肃正 恒打自身；自X 自身负面代价标签同理：目标恒为施法者（不随主目标/随机对手路由）
@@ -14031,7 +14034,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                 const _primaryIsAlly = primaryTarget.isSummon ? (primaryTarget.side === (casterIsHero ? 'hero' : 'enemy')) : ((casterIsHero && primaryTarget.id.startsWith('h')) || (!casterIsHero && primaryTarget.id.startsWith('e')));
                 const targetIsAlly = _primaryIsAlly;
                 if (isBeneficial) targets = targetIsAlly ? [primaryTarget] : [caster];
-                else if (!targetIsAlly && skill && skill.switchTarget && !primaryTarget.isAlive) {
+                else if (!targetIsAlly && skill && skill.switchTarget && (!primaryTarget.isAlive || isIgnoredSummonTarget(caster, primaryTarget))) {
                     // 【转火】：主目标已被前置攻击段击杀 → 本段随机转向其他存活敌人（近战仍受前排掩护限制）；无可转目标则本段静默跳过（不消耗弹药）
                     let _pool = opponents;
                     if (casterIsHero && skill.damageType === '近战' && hasAliveFront() && !canBypassRow(caster, skill)) {
@@ -14049,6 +14052,8 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
             }
         }
 
+        if (caster.isSummon) targets = targets.filter(t => t && !isIgnoredSummonTarget(caster, t));
+
         // === 视觉效果由 [特效:xxx] 标签独立决定，与 tag 文字内容完全无关 ===
         // [特效:连续扫射] N敌=N线并发·快照·装饰性连发：fire-and-forget 起播（setInterval 50ms×52=2.6s），伤害并行结算，尾部阻塞至演出完结
         if (skill && skill.fxTag === '连续扫射' && !skill._fxPlayed) {
@@ -14057,7 +14062,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
             if (skill._strafeBurstStart == null) skill._strafeBurstStart = Date.now();
             // 快照：按本次技能的对手集合冻结坐标（群攻=全存活敌，单体=主目标），后续 tick 复用冻结坐标，死靶淡出不转火、新增不追入
             const _casterIsHeroStrafe = caster.isSummon ? (caster.side==='hero') : caster.id.startsWith('h');
-            const _strafeOpponents = (_casterIsHeroStrafe ? enemiesData.filter(e=>e.isAlive) : heroesData.filter(h=>h.isAlive));
+            const _strafeOpponents = (_casterIsHeroStrafe ? enemiesData : heroesData).filter(e => e.isAlive && !isIgnoredSummonTarget(caster, e));
             const _strafeSnapshotTargets = tag.includes('群') ? _strafeOpponents.slice() : (targets[0] ? [targets[0]] : []);
             const _strafeCoords = _strafeSnapshotTargets.map(t => {
                 const _sd = getEntitySpriteDom(t);
@@ -15015,7 +15020,8 @@ async function executeSummonTurn(summon, token = combatToken) {
   // 召唤物回合复用敌方 AI 决策，但按召唤侧别决定敌我（避免英雄侧召唤攻击我方）
   const isHeroSide = summon.side === 'hero';
   const allyPool = isHeroSide ? heroesData.filter(e => e.isAlive) : enemiesData.filter(e => e.isAlive);
-  const enemyPool = isHeroSide ? enemiesData.filter(e => e.isAlive) : heroesData.filter(e => e.isAlive);
+  const enemyPool = (isHeroSide ? enemiesData : heroesData).filter(e => e.isAlive && !isIgnoredSummonTarget(summon, e));
+  if (!enemyPool.length) { await endTurn(token); return; }
   // 直接复用同一套权重管线：把 allies/enemies 对调后调用现有评分器
   const _origValid = summon.skills.filter(s =>
       (!s.charge || s.charge === 0) &&
@@ -15097,7 +15103,8 @@ async function executeEnemyTurn(enemy, token = combatToken) {
       !(s.type.includes('单') && s.type.includes('回') && enemy.hp >= enemy.maxHp * 0.95)
   );
   const aliveEnemies = enemiesData.filter(e => e.isAlive);
-  const aliveHeroes = heroesData.filter(h => h.isAlive);
+  const aliveHeroes = heroesData.filter(h => h.isAlive && !isIgnoredSummonTarget(enemy, h));
+  if (enemy.isSummon && !aliveHeroes.length) { await endTurn(token); return; }
 
   let selectedSkill = null; let specificTarget = null;
   if (isChargeFull) {
@@ -18577,6 +18584,13 @@ function _gapFillSkill(target, saved) {
   });
 }
 
+// roster 旧写方用 null 表示空槽、0 表示默认回合；进入引擎前统一为运行时契约。
+function normalizeRosterSkill(s) {
+  ['type', 'type2', 'type3'].forEach(k => { if (s[k] == null) s[k] = '[无]'; });
+  if (s.turns == null || s.turns === 0) s.turns = null;
+  (s.children || []).forEach(normalizeRosterSkill);
+}
+
 // 合并：对 heroesData 中每个角色，按名匹配持久化角色
 //   - 同名角色：配置字段以持久化为准；技能集 = 持久化技能 + Combat_block 新增技能（追加）
 //   - 找不到同名：保留 Combat_block 原样
@@ -18620,6 +18634,7 @@ function applyPersistedRoster() {
     // ②持久化独有的技能/组（编辑器新增）整条追加队尾。YAML 顺序即最终顺序（不再把新增技能置顶）。
     // 编辑器改动未点保存只在本场内存生效；点保存 → persistHeroesRoster 整档替换（下次载入仍 YAML 优先）。
     const savedSkills = Array.isArray(saved.skills) ? saved.skills : [];
+    savedSkills.forEach(normalizeRosterSkill);
     // 【肃正】自愈：污染档 type="[无]" 但 barrierSub 残留，下次载入即重建
     savedSkills.forEach(s => { if (s.barrierSub && !((s.type||'')+(s.type2||'')+(s.type3||'')).includes('肃正')) { const _has=false; if (!_has) s.type = `[肃正:${s.barrierSub}]`; } });
     // 字段级补齐索引：存档全量技能（含组父与组子）按名索引，供 _gapFillSkill 查
@@ -18675,6 +18690,7 @@ function applyPersistedRoster() {
     // 数量（count）以 Combat_block/YAML 为准；勾选「状态栏传入」开始时数量无条件以状态栏快照为准
     //（applyStatusBarRoster 数值层覆盖，晚于本函数执行）。旧版无物品档跳过合并。
     const savedItems = Array.isArray(saved.items) ? saved.items : [];
+    savedItems.forEach(normalizeRosterSkill);
     if (savedItems.length > 0) {
         const savedItemByName = new Map(savedItems.map(it => [it.name, it]));
         const mergedYamlItems = (h.items || []).map(yItem => {
@@ -18713,14 +18729,6 @@ function applyPersistedRoster() {
         const extraSavedItems = savedItems.filter(it => !yamlItemNames.has(it.name)).map(it => Object.assign({ isItem: true, usesRemaining: it.maxUses || 0 }, it));
         h.items = [...mergedYamlItems, ...extraSavedItems];
     }
-  });
-  // 空槽归一化：外部写方（OpeningSetup roster）历史上会把空效果槽写成 null，而本文件空槽契约是 '[无]'。
-  // 未归一化时 tag/type 上的 .includes 会抛 Cannot read properties of null——表现为回合交接时
-  // renderHeroMenu → updateSkillMenus → isSkillActionable 的 Promise rejection（看破/反应技也参与求值）。
-  const _normSlots = o => { ['type', 'type2', 'type3'].forEach(k => { if (o[k] == null) o[k] = '[无]'; }); };
-  heroesData.forEach(h => {
-    h.skills.forEach(_normSlots);
-    (h.items || []).forEach(it => { _normSlots(it); (it.children || []).forEach(_normSlots); });
   });
   // 职业兜底：roster 未提供（无同名档，或 config.classType 为 null）时按名回补开局引导记录的职业，
   // 避免职业被动因外部写方整档覆盖而静默失效（补跑 onBattleInit 与上方持久化覆盖同款）
