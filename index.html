@@ -9607,9 +9607,11 @@ function hasAliveBack() { return enemiesData.some(e => e.isAlive && e.row === 'b
 // 名额判定与批量收尾（重排 / 渲染 / 汇总战报）由 summonFromWorldbook 统一负责。
 // spec: { name, tags? }；失败时自行播报告警并返回 null（不中断同批次的其它名字）。
 async function createSummonEntity(caster, spec, side, opts) {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
     const summonName = (spec && spec.name) ? String(spec.name).trim() : '';
     if (!worldbookCache.length) {
-        try { await loadWorldbookData(); } catch(e) {}
+        try { await loadWorldbookData(); if (_actionToken !== combatToken || _pipelineFrozen) return; } catch(e) {}
     }
     const entry = resolveWorldbookEnemy(summonName);
     if (!entry || !isWorldbookEntryEnabled(entry)) {
@@ -9673,6 +9675,8 @@ async function createSummonEntity(caster, spec, side, opts) {
 // opts.noLimit = [众召] 破限（本次召唤不占名额）；返回是否至少召出 1 只。
 // 语义要点：①逐只扣名额，用尽即止（部分成功）；②某个名字解析失败只跳过它，同批其它照常；③敌方 12 总数硬闸不被 [众召] 绕过。
 async function summonFromWorldbook(caster, summonText, opts) {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
     const side = isHeroSideEntity(caster) ? 'hero' : 'enemy'; // 召唤物 id 为 s_* 前缀，链式召唤需按 side 判定阵营
     const noLimit = !!(opts && opts.noLimit);
     const specs = parseSummonList(summonText);
@@ -9696,7 +9700,7 @@ async function summonFromWorldbook(caster, summonText, opts) {
             if (side === 'enemy' && Array.isArray(enemiesData) && enemiesData.filter(e => e.isAlive !== false).length >= ENEMY_TOTAL_HARD_CAP) {
                 stopReason = 'enemyTotal'; break outer;
             }
-            const ent = await createSummonEntity(caster, spec, side, opts);
+            const ent = await createSummonEntity(caster, spec, side, opts); if (_actionToken !== combatToken || _pipelineFrozen) return;
             if (!ent) break;            // 该名字失败（已自行告警）：跳到下一个名字，不影响同批其它召唤
             created.push(ent);
             made++;
@@ -10833,17 +10837,19 @@ function triggerEnemySelfDestruct(enemy) {
     const _sdToken = combatToken; // 触发时刻的代际令牌：排队期间发生重置则任务作废
     selfDestructCount++;
     selfDestructChain = selfDestructChain.then(async () => {
-        if (_sdToken !== combatToken) { selfDestructCount--; return; } // 代际已换：丢弃过期自爆任务
+        if (_sdToken !== combatToken) return; // 代际已换：丢弃过期自爆任务
         try {
             await doEnemySelfDestruct(enemy);
         } catch (e) {
             console.error('自爆结算异常:', e);
         } finally {
-            selfDestructCount--; // 无论成败都复位计数，防止 endTurn 轮询卡死
+            if (_sdToken === combatToken) selfDestructCount--;
         }
     });
 }
 async function doEnemySelfDestruct(enemy) {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
     const boom = enemy.explode;
     if (!boom) return;
     const _sdToken = combatToken; // 本任务所属代际：前摇/看破等待期间发生重置则终止
@@ -10872,13 +10878,13 @@ async function doEnemySelfDestruct(enemy) {
         createFloatingText(spriteDom, '💥 绝命反扑!', 'text-red-400');
     }
     addHistory(`   ⚠️ [${enemy.name}] 濒死之际体内残存力量狂暴失控——绝命反扑前兆！`);
-    await sleep(600); // 前摇时长与 enemy-omen 动画（600ms）对齐
+    await sleep(600); if (_actionToken !== combatToken || _pipelineFrozen) return; // 前摇时长与 enemy-omen 动画（600ms）对齐
     if (_sdToken !== combatToken) return; // 前摇期间被重置：终止过期自爆
 
     // === 看破判定前置于爆炸演出之前：被看破则本次自爆被彻底无效化（无爆炸、无伤害），避免"先爆炸再看破"的演出矛盾 ===
     // 复用现役 checkKanpoInterrupt（index.html:6455，BEFORE_SKILL_RESOLVE 订阅的同一函数）——扣费/[限N次]/旁白/演出全复用
     const kanpoCtx = { caster: enemy, skill: boomSkill, target: null, cancelled: false };
-    await checkKanpoInterrupt(kanpoCtx);
+    await checkKanpoInterrupt(kanpoCtx); if (_actionToken !== combatToken || _pipelineFrozen) return;
     if (_sdToken !== combatToken) return; // 看破弹窗等待期间被重置：终止过期自爆
     if (kanpoCtx.cancelled) {
         addHistory(`   ⛔ [${enemy.name}] 的绝命反扑（${subLabel}）被看破破局，完全无效化！`);
@@ -10886,7 +10892,7 @@ async function doEnemySelfDestruct(enemy) {
         if (spriteDom) {
             spriteDom.classList.remove('enemy-omen');
             spriteDom.classList.add('opacity-0', 'scale-50');
-            setTimeout(() => { if (spriteDom) spriteDom.style.display = 'none'; if (enemy.dom) enemy.dom.style.display = 'none'; }, 500);
+            setTimeout(() => { if (_actionToken !== combatToken) return;  if (spriteDom) spriteDom.style.display = 'none'; if (enemy.dom) enemy.dom.style.display = 'none'; }, 500);
         }
         return;
     }
@@ -10909,12 +10915,12 @@ async function doEnemySelfDestruct(enemy) {
         addHistory(`   💥 [${enemy.name}] 濒死引爆了潜藏能量/发动绝命反扑，剧烈冲击波波及全体！（${boom.power} 威力，波及全体我方）`);
     }
 
-    await executeSkillAction(enemy, null, boomSkill, 1);
+    await executeSkillAction(enemy, null, boomSkill, 1); if (_actionToken !== combatToken || _pipelineFrozen) return;
     // 收尾：自爆结算完成后隐藏尸体（前摇期间保留可见）
     if (spriteDom) {
         spriteDom.classList.remove('enemy-omen');
         spriteDom.classList.add('opacity-0', 'scale-50');
-        setTimeout(() => { if (spriteDom) spriteDom.style.display = 'none'; if (enemy.dom) enemy.dom.style.display = 'none'; }, 500);
+        setTimeout(() => { if (_actionToken !== combatToken) return;  if (spriteDom) spriteDom.style.display = 'none'; if (enemy.dom) enemy.dom.style.display = 'none'; }, 500);
     }
 }
 
@@ -11515,6 +11521,8 @@ registerClassPassive('防守者', {
     },
     // 【强力反击】被动：闪避成功时按概率触发，无视伤害类型限制，以双倍攻击力反击（独立于常规反击，可同时触发）
     async onDodge(ctx) {
+        const _actionToken = combatToken;
+        if (_pipelineFrozen) return;
         const { target, caster, targetDom } = ctx;
         if (!target.isAlive) return;
         // 强力反击几率随仇恨提升：基础 10%，每超出防守者天生仇恨(200) 1 点 +0.2%，无上限
@@ -11527,11 +11535,11 @@ registerClassPassive('防守者', {
         const { hpDmg: counterHpDmg, shieldDmg: counterShieldDmg } = calculateDamage(counterRawDmg, caster);
 
         // 播放红色圆锥冲击波特效（音效在冲击波射出瞬间播放）
-        await playPowerCounterEffect(target, caster, targetDom);
+        await playPowerCounterEffect(target, caster, targetDom); if (_actionToken !== combatToken || _pipelineFrozen) return;
 
         const casterDom = getEntitySpriteDom(caster) || (caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`));
         caster.hp -= counterHpDmg;
-        if (casterDom) casterDom.classList.add('shake'); setTimeout(() => { if (casterDom) casterDom.classList.remove('shake') }, 400);
+        if (casterDom) casterDom.classList.add('shake'); setTimeout(() => { if (_actionToken !== combatToken) return;  if (casterDom) casterDom.classList.remove('shake') }, 400);
 
         if (counterShieldDmg > 0 && counterHpDmg === 0) {
             createFloatingText(casterDom, `强力反击 -${counterShieldDmg} 破盾`, 'text-red-300');
@@ -11883,10 +11891,12 @@ const CombatEvents = {
     },
 
     async emitAsync(event, ctx = {}) {
+        const _actionToken = combatToken;
+        if (_pipelineFrozen) return;
         const listeners = this._listeners[event];
         if (!listeners || listeners.length === 0) return;
         for (const l of listeners) {
-            await l.fn(ctx);
+            await l.fn(ctx); if (_actionToken !== combatToken || _pipelineFrozen) return;
             if (ctx.cancelled) break; // 支持拦截中断
         }
     }
@@ -12073,6 +12083,8 @@ function isSingleTargetSkill(skill) {
     return ![skill.type, skill.type2, skill.type3].some(t => t && String(t).includes('群'));
 }
 async function tryAutoSummonGuard(sheshenCandidates, target) {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
     if (!sheshenCandidates || !sheshenCandidates.length || !target || target.isSummon) return null;
     const pick = sheshenCandidates.find(c => c.skill && c.skill._ownerOnly && c.hero && c.hero.isSummon && c.hero.summonOwnerId === target.id);
     if (!pick) return null;
@@ -12092,7 +12104,7 @@ async function tryAutoSummonGuard(sheshenCandidates, target) {
         const gRect = guardianDom.getBoundingClientRect();
         if (window.spawnChargeUpParticles) window.spawnChargeUpParticles(gRect.left + gRect.width / 2, gRect.top + gRect.height / 2, '#38bdf8', 310);
     }
-    await sleep(520);
+    await sleep(520); if (_actionToken !== combatToken || _pipelineFrozen) return;
     return { guardian, skill: gSkill };
 }
 
@@ -12433,6 +12445,8 @@ function promptKanpo(candidates, attacker, incomingSkill, incomingTarget) {
 }
 
 async function playKanpoEffect(caster, enemy, skill) {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
     const heroDom = document.getElementById(`hero-card-${caster.id}`);
     const enemyDom = document.getElementById(`${enemy.id}-sprite`);
     const heroCenter = getDomCenter(heroDom);
@@ -12491,7 +12505,7 @@ async function playKanpoEffect(caster, enemy, skill) {
     spawnGoldStream(heroCenter.x, heroCenter.y, enemyCenter.x, enemyCenter.y);
     if (heroDom) createFloatingText(heroDom, '看破识破！', 'text-amber-300');
 
-    await sleep(430);
+    await sleep(430); if (_actionToken !== combatToken || _pipelineFrozen) return;
 
     // 3. 金色粒子汇聚命中敌方
     const ring = document.createElement('div');
@@ -12509,7 +12523,7 @@ async function playKanpoEffect(caster, enemy, skill) {
     elements.push(ring);
 
     spawnGoldBurst(enemyCenter.x, enemyCenter.y);
-    await sleep(260);
+    await sleep(260); if (_actionToken !== combatToken || _pipelineFrozen) return;
 
     // 4. 斜斩 + 无效化印章 + 全屏脉冲
     playKanpoSound();
@@ -12552,7 +12566,7 @@ async function playKanpoEffect(caster, enemy, skill) {
     if (enemyDom) createFloatingText(enemyDom, '技能无效化！', 'text-amber-300');
     if (window.triggerScreenShake) window.triggerScreenShake(5, 320);
 
-    await sleep(720);
+    await sleep(720); if (_actionToken !== combatToken || _pipelineFrozen) return;
     cleanup();
 }
 
@@ -12585,6 +12599,8 @@ function playRangedHeavySubBass() {
 }
 
 async function playPowerCounterEffect(counter, victim, counterDom) {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
     const victimDom = getEntitySpriteDom(victim) || (victim.id.startsWith('h') ? document.getElementById(`hero-card-${victim.id}`) : document.getElementById(`${victim.id}-sprite`));
     const victimCenter = getDomCenter(victimDom);
 
@@ -12594,7 +12610,7 @@ async function playPowerCounterEffect(counter, victim, counterDom) {
 
     // ── 观感缓冲：先让"闪避"特效（烟雾 + 抖动，约 500ms）完整呈现，再开始聚气 ──
     // 避免强力反击的聚气红光/粒子立刻盖过闪避演出，导致角色看起来"径直打了敌人一下"
-    await sleep(500);
+    await sleep(500); if (_actionToken !== combatToken || _pipelineFrozen) return;
 
     // ── 阶段1：蓄力前摇（350ms）── 聚气光效 + 蓄力音效 + 聚气粒子
     playSound('atkUp');
@@ -12609,7 +12625,7 @@ async function playPowerCounterEffect(counter, victim, counterDom) {
         const cc = getDomCenter(counterDomEl2);
         window.spawnChargeUpParticles(cc.x, cc.y, '#ff4040', 210);
     }
-    await sleep(350);
+    await sleep(350); if (_actionToken !== combatToken || _pipelineFrozen) return;
 
     // ── 阶段2：命中瞬间 ──
     // 2a. 径向白闪（以受击者为圆心）
@@ -12670,15 +12686,17 @@ async function playPowerCounterEffect(counter, victim, counterDom) {
     spawnPowerBurst(victimCenter.x, victimCenter.y, dirAngle);
 
     // 2f. 受击方抖动 + 屏幕震动（短促高强度）
-    if (victimDom) { victimDom.classList.add('shake'); setTimeout(() => { if (victimDom) victimDom.classList.remove('shake'); }, 300); }
+    if (victimDom) { victimDom.classList.add('shake'); setTimeout(() => { if (_actionToken !== combatToken) return;  if (victimDom) victimDom.classList.remove('shake'); }, 300); }
     if (window.triggerScreenShake) window.triggerScreenShake(20, 180);
 
     // ── 阶段3：余波等待 ──
-    await sleep(220);
+    await sleep(220); if (_actionToken !== combatToken || _pipelineFrozen) return;
     if (heroCard) heroCard.classList.remove('power-glow');
 }
 
 async function checkKanpoInterrupt(ctx) {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
     // 【召唤】0弹窗：敌单体打召唤物时跳过看破（群攻不跳过，避免 AOE 随机 primaryTarget 为召唤物时误屏蔽）
     if (ctx.target && ctx.target.isSummon && isSingleTargetSkill(ctx.skill)) return;
     // 看破过滤（可开关，编辑器「战斗全局设置」配置，默认开启阈值 100）：
@@ -12713,7 +12731,7 @@ async function checkKanpoInterrupt(ctx) {
 
     if (kanpoCandidates.length === 0) return;
 
-    const chosen = await promptKanpo(kanpoCandidates, ctx.caster, ctx.skill, ctx.target);
+    const chosen = await promptKanpo(kanpoCandidates, ctx.caster, ctx.skill, ctx.target); if (_actionToken !== combatToken || _pipelineFrozen) return;
     if (chosen) {
         // 扣除代价
         chosen.hero.mp -= chosen.skill.cost || 0;
@@ -12728,10 +12746,10 @@ async function checkKanpoInterrupt(ctx) {
         const _kanpoBindSpend = consumeBindingsForSkill(chosen.hero, chosen.skill);
         updateHeroUI(chosen.hero);
 
-        await playKanpoEffect(chosen.hero, ctx.caster, ctx.skill);
+        await playKanpoEffect(chosen.hero, ctx.caster, ctx.skill); if (_actionToken !== combatToken || _pipelineFrozen) return;
         addHistory(`   ⛔ ${chosen.hero.name} 施展【${chosen.skill.name}】看穿了敌方气路，【${ctx.skill.name}】被彻底无效化！`);
         if (_kanpoBindSpend) addHistory(`   ↳ ${bindingsSpendLabel(chosen.hero, chosen.skill)}：${_kanpoBindSpend}`);
-        await triggerKanpoNarration(chosen.hero, chosen.skill, ctx.caster, ctx.skill);
+        await triggerKanpoNarration(chosen.hero, chosen.skill, ctx.caster, ctx.skill); if (_actionToken !== combatToken || _pipelineFrozen) return;
         ctx.cancelled = true;
     }
 }
@@ -12910,10 +12928,12 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill, sheshenCa
 // - 选择舍身 → 扣守护者资源并执行演出，返回 { usedSheshen: true, guardian }；
 // - 无候选或放弃 → 返回空结果，调用方继续走受击管线。
 async function runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, sheshenCandidates, isAttack = false, isPierce = false, multiplier = 1) {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
     // 屏障刚被击碎（本次攻击内）：反应弹窗延迟 0.5s，让破碎演出（色差闪断+微晶爆散）先完整呈现再弹窗
     if (_barrierShatterAt > 0) {
         const elapsed = performance.now() - _barrierShatterAt;
-        if (elapsed < 500) await sleep(500 - elapsed);
+        if (elapsed < 500) { await sleep(500 - elapsed); if (_actionToken !== combatToken || _pipelineFrozen) return; }
     }
     const targetType = target.isSummon ? (target.side === 'hero' ? 'hero' : 'enemy') : (target.id.startsWith('h') ? 'hero' : 'enemy');
     const reactionSkills = target.skills.filter(s => {
@@ -12946,8 +12966,8 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
         if (reactionSkills.length > 0) {
             const autoSkill = reactionSkills[0];
             const buffsBefore = [...(target.buffs || [])];
-            await executeSkillAction(target, caster, autoSkill, 1, true, false, skill ? skill.name : null);
-            await sleep(400);
+            await executeSkillAction(target, caster, autoSkill, 1, true, false, skill ? skill.name : null); if (_actionToken !== combatToken || _pipelineFrozen) return;
+            await sleep(400); if (_actionToken !== combatToken || _pipelineFrozen) return;
             const newlyAddedEvaBuff = (target.buffs || []).find(b => b.type === 'eva' && !buffsBefore.includes(b));
             if (newlyAddedEvaBuff) {
                 const pureReactionEva = Math.max(1, newlyAddedEvaBuff.value);
@@ -12966,7 +12986,7 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
     let chosen = null;
     if (targetType === 'hero') {
         // 我方角色：弹出合并面板（反应 + 舍身）让玩家手动选择
-        chosen = await promptReaction(target, reactionSkills, caster, skill, sheshenCandidates || [], multiplier);
+        chosen = await promptReaction(target, reactionSkills, caster, skill, sheshenCandidates || [], multiplier); if (_actionToken !== combatToken || _pipelineFrozen) return;
     } else {
         // 敌方角色：AI 自动从满足条件的反应技中随机挑选一个释放（舍身为我方专属，敌方不触发）
         chosen = reactionSkills.length > 0 ? { type: 'reaction', hero: target, skill: reactionSkills[Math.floor(Math.random() * reactionSkills.length)] } : null;
@@ -12998,7 +13018,7 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
                 gRect.left + gRect.width / 2, gRect.top + gRect.height / 2, '#38bdf8', 310
             );
         }
-        await sleep(520); // 视觉停顿
+        await sleep(520); if (_actionToken !== combatToken || _pipelineFrozen) return; // 视觉停顿
         return { dodged: false, guardian, usedSheshen: true };
     }
 
@@ -13009,8 +13029,8 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
         const buffsBefore = [...(target.buffs || [])];
 
         // 释放反应技能
-        await executeSkillAction(target, caster, chosenSkill, 1, true, false, skill ? skill.name : null);
-        await sleep(400); // 视觉停顿
+        await executeSkillAction(target, caster, chosenSkill, 1, true, false, skill ? skill.name : null); if (_actionToken !== combatToken || _pipelineFrozen) return;
+        await sleep(400); if (_actionToken !== combatToken || _pipelineFrozen) return; // 视觉停顿
 
         // 3. 检查刚刚的反应是否生成了回避Buff（只匹配本次反应中新添加的 buff，防止误伤已有持久型 buff）
         const newlyAddedEvaBuff = (target.buffs || []).find(b => b.type === 'eva' && !buffsBefore.includes(b));
@@ -13036,6 +13056,8 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
 }
 
 async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, multiplier, globalTurns, skill) {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
   if (!target || !target.isAlive || isIgnoredSummonTarget(caster, target)) return;
   // 【自X】自身负面 = 固定代价：威力不受极限爆发/暴击倍率放大（其余标签维持 power × multiplier）；
   // 且使用后必中——下方掷骰分支与减益落空检查对其整体豁免
@@ -13137,11 +13159,11 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         // 【召唤】自动舍身：owner 初次闪避失败后，owner 的召唤物自动插入挡刀（不弹窗），伤害直转召唤物
         let autoGuardInfo = null;
         if (targetType === 'hero' && !target.isSummon && sheshenCandidates.length > 0) {
-            autoGuardInfo = await tryAutoSummonGuard(sheshenCandidates, target);
+            autoGuardInfo = await tryAutoSummonGuard(sheshenCandidates, target); if (_actionToken !== combatToken || _pipelineFrozen) return;
             if (autoGuardInfo && autoGuardInfo.guardian) {
                 target = autoGuardInfo.guardian;
                 targetDom = getEntitySpriteDom(target) || document.getElementById(`hero-card-${target.id}`);
-                const guardianIntercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, [], isDamage, isPierce, multiplier);
+                const guardianIntercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, [], isDamage, isPierce, multiplier); if (_actionToken !== combatToken || _pipelineFrozen) return;
                 if (guardianIntercept.dodged) isDodged = true;
             }
         }
@@ -13150,14 +13172,14 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         if (!skipOwnerIntercept) {
             // 拦截判定：目标自身反应技能 + 其他角色舍身候选合并弹窗；_ownerOnly 的召唤守护已自动处理，不再进入弹窗
             const filteredForPrompt = sheshenCandidates.filter(c => !c.skill._ownerOnly);
-            intercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, filteredForPrompt, isDamage, isPierce, multiplier);
+            intercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, filteredForPrompt, isDamage, isPierce, multiplier); if (_actionToken !== combatToken || _pipelineFrozen) return;
         }
         if (intercept && intercept.usedSheshen && intercept.guardian) {
             // 【舍身】生效：受击目标切换为守护者（跳过闪避、必中），后续管线对守护者完整结算，原目标毫发无伤
             target = intercept.guardian;
             targetDom = document.getElementById(`hero-card-${target.id}`);
             // 守护者自身也可用反应技化解本次攻击（不再提供舍身候选，避免连锁舍身）
-            const guardianIntercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, [], isDamage, isPierce, multiplier);
+            const guardianIntercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, [], isDamage, isPierce, multiplier); if (_actionToken !== combatToken || _pipelineFrozen) return;
             if (guardianIntercept.dodged) isDodged = true;
         } else if (intercept && intercept.dodged) {
             isDodged = true;
@@ -13222,7 +13244,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
       playSound('miss'); 
       if(targetDom) {
           targetDom.classList.add('dodge-shake'); 
-          setTimeout(() => { if(targetDom) targetDom.classList.remove('dodge-shake') }, 500); 
+          setTimeout(() => { if (_actionToken !== combatToken) return;  if(targetDom) targetDom.classList.remove('dodge-shake') }, 500);
           const rect = targetDom.getBoundingClientRect();
           spawnDodgeSmokeParticles(rect.left + rect.width / 2, rect.top + rect.height - 10);
       }
@@ -13238,7 +13260,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
       target.powerCounterFired = false; // 复位本次闪避的强力反击标记，仅反映当前这一击
 
       // 强力反击被动：闪避成功时按概率触发（独立于常规反击，无视伤害类型限制）
-      await CombatEvents.emitAsync(EVENTS.ON_DODGE, { target, caster, targetDom, incomingDamageType, skill });
+      await CombatEvents.emitAsync(EVENTS.ON_DODGE, { target, caster, targetDom, incomingDamageType, skill }); if (_actionToken !== combatToken || _pipelineFrozen) return;
 
       // 反击判定 (仅针对近战)；若本次闪避已触发强力反击，则不再同时触发普通反击。
       // 守卫：自爆（isSelfDestruct）不可被反击——攻击者（施法者）已死亡，反击会打到不存在的目标上
@@ -13251,14 +13273,14 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
               const counterDmgToCaster = (caster.isSummon ? (caster.side==='hero') : caster.id.startsWith('h')) ? counterRawDmg : applyEnemyTypeResist(counterRawDmg, '近战', caster, getEntitySpriteDom(caster), false);
               const { hpDmg: counterHpDmg, shieldDmg: counterShieldDmg } = calculateDamage(counterDmgToCaster, caster);
               
-              await sleep(300); 
+              await sleep(300); if (_actionToken !== combatToken || _pipelineFrozen) return;
               const casterDom = getEntitySpriteDom(caster) || (caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`));
               
               playSound('atk2');
               playSVGEffect(casterDom, 'slash');
               
               caster.hp -= counterHpDmg;
-              if(casterDom) casterDom.classList.add('shake'); setTimeout(() => { if(casterDom) casterDom.classList.remove('shake') }, 400);
+              if(casterDom) casterDom.classList.add('shake'); setTimeout(() => { if (_actionToken !== combatToken) return;  if(casterDom) casterDom.classList.remove('shake') }, 400);
               
               if (target.classType === '防守者' && (counterHpDmg > 0 || counterShieldDmg > 0)) {
                   target.baseTauntBonus = (target.baseTauntBonus || 0) + 20;
@@ -13430,7 +13452,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
             const _bd = document.getElementById('team-barrier-dome') || document.getElementById('team-barrier-wrapper');
             if (_bd) {
                 _bd.classList.remove('barrier-hit-impact'); void _bd.offsetWidth; _bd.classList.add('barrier-hit-impact');
-                setTimeout(() => { if (_bd) _bd.classList.remove('barrier-hit-impact'); }, 350);
+                setTimeout(() => { if (_actionToken !== combatToken) return;  if (_bd) _bd.classList.remove('barrier-hit-impact'); }, 350);
                 const _r = _bd.getBoundingClientRect(); const _x = _r.width/2; const _y = _r.height/2;
                 const _rp = document.createElement('div'); _rp.className = 'barrier-hit-ripple'; _rp.style.left = _x+'px'; _rp.style.top = _y+'px'; _rp.style.width='120px'; _rp.style.height='120px'; _bd.appendChild(_rp); setTimeout(()=>_rp.remove(),600);
                 const _hx = document.createElement('div'); _hx.className = 'barrier-hex-spotlight'; _hx.style.left = _x+'px'; _hx.style.top = _y+'px'; _bd.appendChild(_hx); setTimeout(()=>_hx.remove(),650);
@@ -13495,7 +13517,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     // 连续扫射期间抑制单次受击 shake，避免与 target-bullet-stutter 的 transform 互斥（高频硬直已足够）
     const _inStrafe = (typeof _strafeLock !== 'undefined' && _strafeLock) || (targetDom && targetDom.classList.contains('target-bullet-stutter'));
     if(targetDom && !_inStrafe) targetDom.classList.add('shake'); 
-    if(targetDom && !_inStrafe) setTimeout(() => { if(targetDom) targetDom.classList.remove('shake') }, 400);
+    if(targetDom && !_inStrafe) setTimeout(() => { if (_actionToken !== combatToken) return;  if(targetDom) targetDom.classList.remove('shake') }, 400);
     
     let severityStr = "";
     if (hpDmg > 0) {
@@ -13740,6 +13762,8 @@ function triggerBarrierShatter() {
 // 屏障作为"单个目标"被攻击命中：无闪避（spd=0 不 roll）、无反应弹窗、穿透也撞屏障。
 // 屏障全挡到被打破为止；破碎那一击的溢出部分：单体→打代理目标，群攻→打全员（均走正常闪避+减伤管线）。
 async function applyBarrierHit(caster, barrierTarget, tag, tagPower, skill, multiplier, globalTurns) {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
   const cStats = getEffectiveStats(caster);
   // 与主伤害管线一致的伤害计算
   let buffAtkBonus = cStats.atk - (caster.atk || 0);
@@ -13770,7 +13794,7 @@ async function applyBarrierHit(caster, barrierTarget, tag, tagPower, skill, mult
       barrierDom.classList.remove('barrier-hit-impact');
       void barrierDom.offsetWidth;
       barrierDom.classList.add('barrier-hit-impact');
-      setTimeout(() => { if (barrierDom) barrierDom.classList.remove('barrier-hit-impact'); }, 350);
+      setTimeout(() => { if (_actionToken !== combatToken) return;  if (barrierDom) barrierDom.classList.remove('barrier-hit-impact'); }, 350);
 
       const bRect = barrierDom.getBoundingClientRect();
       const impactX = bRect.width / 2;
@@ -13820,7 +13844,7 @@ async function applyBarrierHit(caster, barrierTarget, tag, tagPower, skill, mult
       barrierDom.classList.remove('barrier-hit-impact');
       void barrierDom.offsetWidth;
       barrierDom.classList.add('barrier-hit-impact');
-      setTimeout(() => { if (barrierDom) barrierDom.classList.remove('barrier-hit-impact'); }, 350);
+      setTimeout(() => { if (_actionToken !== combatToken) return;  if (barrierDom) barrierDom.classList.remove('barrier-hit-impact'); }, 350);
       const bRect = barrierDom.getBoundingClientRect();
       const impactX = bRect.width / 2;
       const impactY = bRect.height / 2;
@@ -13868,7 +13892,7 @@ async function applyBarrierHit(caster, barrierTarget, tag, tagPower, skill, mult
     const targets = isAoe ? heroesData.filter(h => h.isAlive) : (barrierTarget.proxyHero ? [barrierTarget.proxyHero] : []);
     for (const t of targets) {
       if (!t || !t.isAlive) continue;
-      await applySingleTagEffect(caster, t, tag, tagPower, skill.hit, multiplier, globalTurns, skill);
+      await applySingleTagEffect(caster, t, tag, tagPower, skill.hit, multiplier, globalTurns, skill); if (_actionToken !== combatToken || _pipelineFrozen) return;
     }
   }
 }
@@ -13914,6 +13938,8 @@ function getTauntTarget(heroArray, wiseFocus) {
 }
 
 async function executeSkillAction(caster, primaryTarget, skill, multiplier, isReactionTrigger = false, skipCost = false, incomingSkillName = null) {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
     const _pendingKills = []; // 收集本次技能中所有被击杀的敌人，最后统一播放特写
     // 记录本次技能开始前是否已持有隐匿急袭 buff：
     // 若该 buff 是由本次技能自身（隐匿值累积跨100）刚刚授予的，则不应被本次技能消耗，留给下一次攻击
@@ -13986,7 +14012,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         const critDom = getEntitySpriteDom(caster) || (caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`));
         if (critDom) createFloatingText(critDom, "暴击!", "", true);
         showLog(`【暴击】${caster.name} 效果翻倍！`);
-        await sleep(420);
+        await sleep(420); if (_actionToken !== combatToken || _pipelineFrozen) return;
     }
     
     if (caster.id.startsWith('h')) updateHeroUI(caster); else updateEnemyUI(caster);
@@ -13999,7 +14025,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
             const _skipKanpoSummon = primaryTarget && primaryTarget.isSummon && isSingleTargetSkill(skill);
             if (!_skipKanpoSummon) {
                 const kanpoCtx2 = { caster, skill, target: primaryTarget, cancelled: false };
-                await CombatEvents.emitAsync(EVENTS.BEFORE_SKILL_RESOLVE, kanpoCtx2);
+                await CombatEvents.emitAsync(EVENTS.BEFORE_SKILL_RESOLVE, kanpoCtx2); if (_actionToken !== combatToken || _pipelineFrozen) return;
                 if (kanpoCtx2.cancelled) { addHistory(`   ⛔ 召唤【${skill.name}】被看破破局，完全无效化！`); return; }
             }
         }
@@ -14009,8 +14035,8 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         // 纯召唤：唯一 action 行在此写下；带附签（[单防] 等）不写，由末尾标准 action 行统一呈现——
         // 否则同一次释放产生两条 action 节点，战后统计 releases 双计（【召唤-古革巨人】"2 次释放"事故）
         if (_onlySummon) addHistory(`> ${caster.name} 发动了【${skill.name}】`);
-        await sleep(400);
-        await summonFromWorldbook(caster, skill.summonTarget, { noLimit: !!skill.summonNoLimit });
+        await sleep(400); if (_actionToken !== combatToken || _pipelineFrozen) return;
+        await summonFromWorldbook(caster, skill.summonTarget, { noLimit: !!skill.summonNoLimit }); if (_actionToken !== combatToken || _pipelineFrozen) return;
         _summonDone = true;
         if (_onlySummon) return;
     }
@@ -14020,7 +14046,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
             const _skipKanpo = primaryTarget && primaryTarget.isSummon && isSingleTargetSkill(skill);
             if (!_skipKanpo) {
                 const kanpoCtx = { caster, skill, target: primaryTarget, cancelled: false };
-                await CombatEvents.emitAsync(EVENTS.BEFORE_SKILL_RESOLVE, kanpoCtx);
+                await CombatEvents.emitAsync(EVENTS.BEFORE_SKILL_RESOLVE, kanpoCtx); if (_actionToken !== combatToken || _pipelineFrozen) return;
                 if (kanpoCtx.cancelled) { addHistory(`   ⛔ 技能【${skill.name}】被看破破局，完全无效化！`); return; }
             }
         }
@@ -14075,7 +14101,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         }
     }
 
-    await sleep(390);  // 与蓄力动画时长同步（320ms + 70ms缓冲）
+    await sleep(390); if (_actionToken !== combatToken || _pipelineFrozen) return;  // 与蓄力动画时长同步（320ms + 70ms缓冲）
     // 初始化本次技能结算的共享命中结论容器（跨标签共享：减益是否命中取决于同技能攻击的判定结果）
     if (skill) skill._bdg = { targetHit: {}, targetResolved: {} };
     let tagList = [{ tag: skill.type, power: skill.power, slotTurns: skill.slotTurns }, { tag: skill.type2, power: skill.power2 || 0, slotTurns: skill.slotTurns2 }, { tag: skill.type3, power: skill.power3 || 0, slotTurns: skill.slotTurns3 }].filter(t => t.tag && t.tag !== '[无]');
@@ -14184,7 +14210,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                     if (_mDom) { const _mTr = _mDom.getBoundingClientRect(); spawnMeleeHeavyParticles(_mTr.left + _mTr.width/2, _mTr.top + _mTr.height/2, _mDom); }
                 }
             }
-            if (WEBM_FX_REGISTRY[skill.fxTag] && WEBM_FX_REGISTRY[skill.fxTag].delay) { await sleep(Math.round(WEBM_FX_REGISTRY[skill.fxTag].delay * 1000)); }
+            if (WEBM_FX_REGISTRY[skill.fxTag] && WEBM_FX_REGISTRY[skill.fxTag].delay) { await sleep(Math.round(WEBM_FX_REGISTRY[skill.fxTag].delay * 1000)); if (_actionToken !== combatToken || _pipelineFrozen) return; }
         } else if (skill && skill.fxTag === '远程重击' && !skill._fxPlayed) {
             skill._fxPlayed = true;
             if (isAoe) {
@@ -14203,7 +14229,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                 }
             }
             if (WEBM_FX_REGISTRY[skill.fxTag] && WEBM_FX_REGISTRY[skill.fxTag].delay) {
-                await sleep(Math.round(WEBM_FX_REGISTRY[skill.fxTag].delay * 1000));
+                await sleep(Math.round(WEBM_FX_REGISTRY[skill.fxTag].delay * 1000)); if (_actionToken !== combatToken || _pipelineFrozen) return;
             }
         } else if (skill && (skill.fxTag === '造雾术' || skill.fxTag === '高阶召唤术' || skill.fxTag === '障壁术') && !skill._fxPlayed) {
             // 全屏 SVG 大招：单体/群体通用，只播一次；音效由 spawn 函数自管（造雾术=fog_cloud.ogg，高阶召唤术=古神低语，障壁术=528Hz 圣音叉 Web Audio 合成）
@@ -14212,7 +14238,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
             else if (skill.fxTag === '障壁术') { spawnNakTithAegisFx(casterIsHero, false); }
             else { spawnTitanGazeFx(casterIsHero, false); }
             if (WEBM_FX_REGISTRY[skill.fxTag] && WEBM_FX_REGISTRY[skill.fxTag].delay) {
-                await sleep(Math.round(WEBM_FX_REGISTRY[skill.fxTag].delay * 1000));
+                await sleep(Math.round(WEBM_FX_REGISTRY[skill.fxTag].delay * 1000)); if (_actionToken !== combatToken || _pipelineFrozen) return;
             }
         } else if (skill && skill.fxTag && !skill._fxPlayed) {
             skill._fxPlayed = true;
@@ -14242,7 +14268,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
 
             // 特效演出与伤害结算同步：注册表配置 delay（秒）时，等待该时长让特效演出先行播放到打击点，再结算伤害
             if (WEBM_FX_REGISTRY[skill.fxTag] && WEBM_FX_REGISTRY[skill.fxTag].delay) {
-                await sleep(Math.round(WEBM_FX_REGISTRY[skill.fxTag].delay * 1000));
+                await sleep(Math.round(WEBM_FX_REGISTRY[skill.fxTag].delay * 1000)); if (_actionToken !== combatToken || _pipelineFrozen) return;
             }
         } else if (!skill || !skill.fxTag) {
             // 没有配置自定义特效标签时，根据群攻子类型播放对应的默认 Canvas 全局特效
@@ -14278,24 +14304,24 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         if (isAoe && !casterIsHero && !isBeneficial && teamBarrier > 0) {
             const proxy = (targets[0] && !targets[0].isBarrierTarget) ? targets[0] : heroesData.find(h => h.isAlive);
             barrierStandIn = { id: 'barrier2', isAlive: true, isBarrierTarget: true, name: teamBarrierName, spd: 0, buffs: [], classType: null, skills: [], dom: null, proxyHero: proxy };
-            await applySingleTagEffect(caster, barrierStandIn, tag, tagPower, skill.hit, multiplier, effTurns, skill);
+            await applySingleTagEffect(caster, barrierStandIn, tag, tagPower, skill.hit, multiplier, effTurns, skill); if (_actionToken !== combatToken || _pipelineFrozen) return;
         } else {
             for (let t of targets) {
                 // 治疗旁白收集：记录治疗前 HP，结算后实际回血（排除满血/禁疗 0 回复）且非施法者自身的我方目标计入被治疗者
                 const isHpHealTag = tag === '[单回]' || tag === '[群回]';
                 const hpBefore = (isHpHealTag && t.id.startsWith('h')) ? t.hp : undefined;
-                const killResult = await applySingleTagEffect(caster, t, tag, tagPower, skill.hit, multiplier, effTurns, skill);
+                const killResult = await applySingleTagEffect(caster, t, tag, tagPower, skill.hit, multiplier, effTurns, skill); if (_actionToken !== combatToken || _pipelineFrozen) return;
                 if (killResult === '__killed__') _pendingKills.push(t);
                 if (isHpHealTag && hpBefore !== undefined && t.id !== caster.id && t.hp > hpBefore && !healedIds.has(t.id)) {
                     healedIds.add(t.id);
                     healedTargets.push(t);
                 }
-                if (isAoe && targets.length > 1) await sleep(200); // 为群攻添加视觉节奏感
+                if (isAoe && targets.length > 1) { await sleep(200); if (_actionToken !== combatToken || _pipelineFrozen) return; } // 为群攻添加视觉节奏感
             }
         }
         barrierAoEActive = prevAoEActive;  // 恢复语境（避免跨批次串扰）
         if (!isAoe || barrierAoELeak === null) barrierAoELeak = prevAoELeak;
-        await sleep(500); 
+        await sleep(500); if (_actionToken !== combatToken || _pipelineFrozen) return;
     }
     
     // 【弹药按发消耗】汇总战报：按物品聚合实际开火的总消耗（只统计真实扣掉的量；文案与释放时绑定消耗行同格式，供酒馆 LLM 续写 Combat_block）
@@ -14311,12 +14337,12 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     if (_pendingKills.length > 0 && caster.id.startsWith('h')) {
         // 击杀特写严格在死亡自爆演出（前摇/看破/爆炸/尸体完全消失）全部完成后播放，避免与自爆演出交错；
         // 无自爆时 selfDestructCount 为 0，while 立即跳过
-        while (selfDestructCount > 0) await sleep(50);
-        while (window.isExecutingCutin) await sleep(100);
+        while (selfDestructCount > 0) { await sleep(50); if (_actionToken !== combatToken || _pipelineFrozen) return; }
+        while (window.isExecutingCutin) { await sleep(100); if (_actionToken !== combatToken || _pipelineFrozen) return; }
         // 带 [特效:] WebM 大招的技能：击杀演出延迟约 1s，让技能特效演出先行播放完毕，避免两者重叠
-        if (skill.fxTag) await sleep(1000);
+        if (skill.fxTag) { await sleep(1000); if (_actionToken !== combatToken || _pipelineFrozen) return; }
         window.isExecutingCutin = true;
-        await playExecutionAnimation(caster, _pendingKills, skill.damageType || '近战');
+        await playExecutionAnimation(caster, _pendingKills, skill.damageType || '近战'); if (_actionToken !== combatToken || _pipelineFrozen) return;
         window.isExecutingCutin = false;
     }
 
@@ -14360,7 +14386,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     if (skill && skill.fxTag === '连续扫射' && skill._strafeBurstStart != null) {
         const _elapsed = Date.now() - skill._strafeBurstStart;
         const _remain = 2750 - _elapsed; // 与 startStrafeBurst 兜底 2750ms 对齐（含 150ms 缓冲）
-        if (_remain > 0) await sleep(_remain);
+        if (_remain > 0) { await sleep(_remain); if (_actionToken !== combatToken || _pipelineFrozen) return; }
         try { stopStrafeBurst(); } catch(e) {}
         delete skill._strafeBurstStart;
     }
@@ -14552,6 +14578,7 @@ async function nextTurn(token = combatToken) {
   
   if (currentEntity.ref.isDefending) currentEntity.ref.isDefending = false;
   
+  if (!currentEntity.isExtraTurn) CombatEvents.emit(EVENTS.TURN_START, { entity: currentEntity.ref });
   let isStunned = false;
   let paraSkipped = false; let paraLayers = 0;
   if (currentEntity.ref.buffs && currentEntity.ref.buffs.length > 0) {
@@ -14568,9 +14595,6 @@ async function nextTurn(token = combatToken) {
       
       // 常规 Buff 计时 / 毒 tick / 事件仅在本回合首次（非额外）行动时执行一次
       if (!currentEntity.isExtraTurn) { 
-          // === 回合开始事件 → 事件总线 (TURN_START) ===
-          CombatEvents.emit(EVENTS.TURN_START, { entity: currentEntity.ref });
-          
           currentEntity.ref.buffs.forEach(b => {
               b.duration--;
               if (b.type === 'poison' || b.type === 'burn') {
@@ -14717,7 +14741,7 @@ async function endTurn(token = combatToken) {
     // 自爆跑在脱离主链的 selfDestructChain 上（triggerEnemySelfDestruct fire-and-forget），若不等待，
     // 弹窗挂起期间后台回合会照常推进（下一个行动者/操作菜单/时间轴刷新），造成"怪异延迟"。
     // 无自爆时 selfDestructCount 为 0，while 立即跳过，零开销。
-    while (selfDestructCount > 0) await sleep(50);
+    while (selfDestructCount > 0 && token === combatToken && !_pipelineFrozen) await sleep(50);
     if (token !== combatToken || _pipelineFrozen) return; // 等待期间被重置：终止旧链
     const current = state.actionQueue[state.queueIndex];
     // === 回合结束事件 → 事件总线 (TURN_END) — 无载利时仅通知实体，技能信息由 executeSkillAction 单独 emit ===
@@ -14733,6 +14757,8 @@ function retreatBattle() {
 
 // 我方回合的"尝试撤离"：基于敌我双方实时平均速度做 roll 判定（参照攻击闪避公式，我方更大才成功）
 async function attemptRetreat() {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
   if (state.isAnimating) return;
   const hero = state.actionQueue[state.queueIndex]?.ref;
   if (!hero) return;
@@ -14757,12 +14783,12 @@ async function attemptRetreat() {
 
     if (!success) {
         // 失败：消耗当前行动角色的回合（不弹发送面板），战斗继续
-        await sleep(1000);
-        await endTurn(token);
+        await sleep(1000); if (_actionToken !== combatToken || _pipelineFrozen) return;
+        await endTurn(token); if (_actionToken !== combatToken || _pipelineFrozen) return;
         return;
     }
     // 成功：弹出发送到酒馆的战局结算面板
-    await sleep(1000);
+    await sleep(1000); if (_actionToken !== combatToken || _pipelineFrozen) return;
     showBattleResult('retreat');
 }
 
@@ -15125,11 +15151,12 @@ function selectEnemySkillAndTarget(enemy, validSkills, aliveEnemies, aliveHeroes
 }
 
 async function executeSummonTurn(summon, token = combatToken) {
+    if (token !== combatToken || _pipelineFrozen) return;
   // 召唤物回合复用敌方 AI 决策，但按召唤侧别决定敌我（避免英雄侧召唤攻击我方）
   const isHeroSide = summon.side === 'hero';
   const allyPool = isHeroSide ? heroesData.filter(e => e.isAlive) : enemiesData.filter(e => e.isAlive);
   const enemyPool = (isHeroSide ? enemiesData : heroesData).filter(e => e.isAlive && !isIgnoredSummonTarget(summon, e));
-  if (!enemyPool.length) { await endTurn(token); return; }
+  if (!enemyPool.length) { await endTurn(token); if (token !== combatToken || _pipelineFrozen) return; return; }
   // 直接复用同一套权重管线：把 allies/enemies 对调后调用现有评分器
   const _origValid = summon.skills.filter(s =>
       (!s.charge || s.charge === 0) &&
@@ -15171,24 +15198,25 @@ async function executeSummonTurn(summon, token = combatToken) {
       summon.cooldowns = summon.cooldowns || {};
       summon.cooldowns[selectedSkillS.name] = selectedSkillS.type.includes('再动') ? 3 : 2;
   }
-  const summonMult = await triggerBurstIfNeeded(summon);
+  const summonMult = await triggerBurstIfNeeded(summon); if (token !== combatToken || _pipelineFrozen) return;
   const summonSprite = getEntitySpriteDom(summon);
   if (summonSprite && selectedSkillS) {
       const isAtk = ['单体','群攻','穿透','眩晕'].some(t => [selectedSkillS.type, selectedSkillS.type2, selectedSkillS.type3].some(x => x && x.includes(t)));
-      if (isAtk) { summonSprite.classList.remove('breathe'); summonSprite.classList.add('enemy-omen'); setTimeout(()=>{ if(summonSprite){ summonSprite.classList.remove('enemy-omen'); if(!summonSprite.classList.contains('breathe') && summon.isAlive) summonSprite.classList.add('breathe'); } },600); }
-      await sleep(330);
+      if (isAtk) { summonSprite.classList.remove('breathe'); summonSprite.classList.add('enemy-omen'); setTimeout(()=>{ if (token !== combatToken) return;  if(summonSprite){ summonSprite.classList.remove('enemy-omen'); if(!summonSprite.classList.contains('breathe') && summon.isAlive) summonSprite.classList.add('breathe'); } },600); }
+      await sleep(330); if (token !== combatToken || _pipelineFrozen) return;
   }
-  if (selectedSkillS) await executeSkillAction(summon, specificTargetS, selectedSkillS, summonMult);
+  if (selectedSkillS) { await executeSkillAction(summon, specificTargetS, selectedSkillS, summonMult); if (token !== combatToken || _pipelineFrozen) return; }
   else {
       const fb = getTauntTarget(enemyPool, summon.isWise);
       const mock = { type: '[单体]', type2: '[无]', type3: '[无]', power: 0, power2: 0, power3: 0, hit: 130, cost: 0, name: '猛击', damageType: '近战', isReaction: false, reactionTarget: 'all' };
-      await executeSkillAction(summon, fb, mock, summonMult);
+      await executeSkillAction(summon, fb, mock, summonMult); if (token !== combatToken || _pipelineFrozen) return;
   }
-  if (!isChargeFullS && chargeSkillS && summon.isAlive) { summon.currentCharge = Math.min((summon.currentCharge||0)+1, chargeSkillS.charge); if(summon.side==='hero') updateHeroUI(summon); else updateEnemyUI(summon); if(summon.currentCharge>=chargeSkillS.charge) await sleep(500); }
-  await endTurn(token);
+  if (!isChargeFullS && chargeSkillS && summon.isAlive) { summon.currentCharge = Math.min((summon.currentCharge||0)+1, chargeSkillS.charge); if(summon.side==='hero') updateHeroUI(summon); else updateEnemyUI(summon); if(summon.currentCharge>=chargeSkillS.charge) { await sleep(500); if (token !== combatToken || _pipelineFrozen) return; } }
+  await endTurn(token); if (token !== combatToken || _pipelineFrozen) return;
 }
 
 async function executeEnemyTurn(enemy, token = combatToken) {
+    if (token !== combatToken || _pipelineFrozen) return;
   // 智慧敌方回合开始旁白：仅在该敌人本回合首次行动时触发
   if (enemy.isWise && llmState.enemyAutoSpeak && !state.enemiesSpokenThisRound.has(enemy.id)) {
     state.enemiesSpokenThisRound.add(enemy.id);
@@ -15212,7 +15240,7 @@ async function executeEnemyTurn(enemy, token = combatToken) {
   );
   const aliveEnemies = enemiesData.filter(e => e.isAlive);
   const aliveHeroes = heroesData.filter(h => h.isAlive && !isIgnoredSummonTarget(enemy, h));
-  if (enemy.isSummon && !aliveHeroes.length) { await endTurn(token); return; }
+  if (enemy.isSummon && !aliveHeroes.length) { await endTurn(token); if (token !== combatToken || _pipelineFrozen) return; return; }
 
   let selectedSkill = null; let specificTarget = null;
   if (isChargeFull) {
@@ -15229,13 +15257,13 @@ async function executeEnemyTurn(enemy, token = combatToken) {
       
       // 触发大招切入动画，等待动画播放完毕，使用 try-catch-finally 保护防止卡死
       try {
-          while (window.isExecutingCutin) await sleep(100);
+          while (window.isExecutingCutin) { await sleep(100); if (token !== combatToken || _pipelineFrozen) return; }
           window.isExecutingCutin = true;
-          await playEnemyUltimateCutin(enemy, chargeSkill.name);
+          await playEnemyUltimateCutin(enemy, chargeSkill.name); if (token !== combatToken || _pipelineFrozen) return;
       } catch (err) {
           console.error("播放敌方大招动画出错:", err);
       } finally {
-          window.isExecutingCutin = false;
+          if (token === combatToken) window.isExecutingCutin = false;
       }
       
   } else {
@@ -15250,8 +15278,8 @@ async function executeEnemyTurn(enemy, token = combatToken) {
           if (_manaDom) { playSVGEffect(_manaDom, 'mpHeal'); createFloatingText(_manaDom, `+${regenAmount}MP`, 'text-cyan-400'); }
           showLog(`🔋 ${enemy.name} 魔力匮乏，消耗本次行动恢复法力！`);
           addHistory(`   ↳ 🔋 ${enemy.name} 魔力匮乏，消耗本次行动恢复 ${regenAmount} 点法力。`);
-          await sleep(500); // 让回蓝演出可见
-          await endTurn(token);
+          await sleep(500); if (token !== combatToken || _pipelineFrozen) return; // 让回蓝演出可见
+          await endTurn(token); if (token !== combatToken || _pipelineFrozen) return;
           return;
       }
 
@@ -15265,7 +15293,7 @@ async function executeEnemyTurn(enemy, token = combatToken) {
           sprite.classList.remove('breathe'); // 移除呼吸动画防冲突
           sprite.classList.add('enemy-omen');
           playSound('monsterAttack'); // 播放攻击预警音效
-          setTimeout(() => {
+          setTimeout(() => { if (token !== combatToken) return;
               if (sprite) {
                   sprite.classList.remove('enemy-omen');
                   if (!sprite.classList.contains('breathe') && enemy.isAlive) {
@@ -15274,10 +15302,10 @@ async function executeEnemyTurn(enemy, token = combatToken) {
               }
           }, 600);
       }
-      await sleep(330);
+      await sleep(330); if (token !== combatToken || _pipelineFrozen) return;
   }
   
-  const multiplier = await triggerBurstIfNeeded(enemy);
+  const multiplier = await triggerBurstIfNeeded(enemy); if (token !== combatToken || _pipelineFrozen) return;
   
   if (selectedSkill) { 
       if (isChargeFull) {
@@ -15290,11 +15318,11 @@ async function executeEnemyTurn(enemy, token = combatToken) {
               enemy.cooldowns[selectedSkill.name] = selectedSkill.type.includes('再动') ? 3 : 2;
           }
       }
-      await executeSkillAction(enemy, specificTarget, selectedSkill, multiplier); 
+      await executeSkillAction(enemy, specificTarget, selectedSkill, multiplier); if (token !== combatToken || _pipelineFrozen) return;
   } else {
       const target = getTauntTarget(aliveHeroes, enemy.isWise);
       const mockAttackSkill = { type: '[单体]', type2: '[无]', type3: '[无]', power: 0, power2: 0, power3: 0, hit: 130, cost: 0, name: '猛击', damageType: '近战', isReaction: false, reactionTarget: 'all' };
-      await executeSkillAction(enemy, target, mockAttackSkill, multiplier);
+      await executeSkillAction(enemy, target, mockAttackSkill, multiplier); if (token !== combatToken || _pipelineFrozen) return;
   }
 
   // --- 回合末结算充能增加 ---
@@ -15304,11 +15332,11 @@ async function executeEnemyTurn(enemy, token = combatToken) {
       
       if (enemy.currentCharge >= chargeSkill.charge) {
           // 如果刚充满，追加额外的视觉停顿体现威压感
-          await sleep(500); 
+          await sleep(500); if (token !== combatToken || _pipelineFrozen) return;
       }
   }
 
-  await endTurn(token);
+  await endTurn(token); if (token !== combatToken || _pipelineFrozen) return;
 }
 
 function prepareAttack() {
@@ -15398,6 +15426,8 @@ async function releaseCharge() {
 // 实际释放蓄力技能：结算原技能效果（含自身[加速]，由 executeSkillAction 统一施加）
 // 注意：MP/HP/TP 已在蓄力开始时实时扣除（handleChargeSkill），此处传 skipCost 避免重复扣除
 async function doReleaseCharge(hero, target) {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
   const entry = hero.currentDelay; if (!entry) { state.isAnimating = false; return; }
   const token = combatToken; // 玩家动作所属代际：释放期间被重置则 endTurn 静默终止
   triggerHeroChargeRelease(hero);
@@ -15408,9 +15438,9 @@ async function doReleaseCharge(hero, target) {
   addHistory(`   ⚡ [${hero.name}] 释放【${skill.name}】！`);
   updateHeroUI(hero);
   // 物品释放不触发极限爆发（与 executeItemAction 同口径：爆发留给攻击/技能，避免嗑药/道具烧掉满 TP）
-  const multiplier = skill.isItem ? 1 : await triggerBurstIfNeeded(hero);
-  await executeSkillAction(hero, target, skill, multiplier, false, true);
-  await endTurn(token);
+  const multiplier = skill.isItem ? 1 : await triggerBurstIfNeeded(hero); if (_actionToken !== combatToken || _pipelineFrozen) return;
+  await executeSkillAction(hero, target, skill, multiplier, false, true); if (_actionToken !== combatToken || _pipelineFrozen) return;
+  await endTurn(token); if (_actionToken !== combatToken || _pipelineFrozen) return;
 }
 
 // 蓄力阶段旁白辅助：蓄力仅释放者本人说话（非1号位），高阶变体合并智慧敌方
@@ -15857,6 +15887,8 @@ function showEnemyInfo(enemy) {
 }
 
 async function handleTargetClick(target, targetType) {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
   const token = combatToken; // 玩家动作所属代际：动作期间被重置则 endTurn 静默终止
   if (!state.isTargeting) {
      if (!target.isAlive) return;
@@ -15905,7 +15937,7 @@ async function handleTargetClick(target, targetType) {
       if (!hasEnemyTargetTag && hasOthers && hasSingleBuff && targetType !== 'hero') return;
       const chosen = target;
       cancelTargeting(); state.isAnimating = true;
-      await doReleaseCharge(hero, chosen);
+      await doReleaseCharge(hero, chosen); if (_actionToken !== combatToken || _pipelineFrozen) return;
       return;
   }
   if (action.type === 'supporter_burst') {
@@ -15932,17 +15964,17 @@ async function handleTargetClick(target, targetType) {
       state.actionQueue.splice(state.queueIndex + 1, 0, { type: 'hero', ref: target, isExtraTurn: true });
       createFloatingText(document.getElementById(`hero-card-${target.id}`), `祈愿再动!`, 'text-fuchsia-400'); 
       addHistory(`   ↳ 🌟 ${hero.name} 燃烧极限潜能发动祈愿！赋予了 ${target.name} 连续行动的机会！`);
-      await endTurn(token);
+      await endTurn(token); if (_actionToken !== combatToken || _pipelineFrozen) return;
       return;
   }
   
   // 物品使用不触发极限爆发（爆发留给攻击/技能，避免嗑药烧掉满 TP）
-  const multiplier = (action.type === 'item') ? 1 : await triggerBurstIfNeeded(hero);
+  const multiplier = (action.type === 'item') ? 1 : await triggerBurstIfNeeded(hero); if (_actionToken !== combatToken || _pipelineFrozen) return;
   if (action.type === 'attack') {
     // 普攻TP恢复：编辑器"普攻恢复TP"配置（默认20点），不再写死
     if(multiplier === 1) hero.tp = Math.min(hero.maxTp, hero.tp + (defendSettings.basicAttackTp || 0));
     const mockAttackSkill = { type: '[单体]', type2: '[无]', type3: '[无]', power: 0, power2: 0, power3: 0, hit: action.hit, cost: 0, hpCost: 0, tpCost: 0, name: '普攻', damageType: '近战', isReaction: false, reactionTarget: 'all' };
-    await executeSkillAction(hero, target, mockAttackSkill, multiplier);
+    await executeSkillAction(hero, target, mockAttackSkill, multiplier); if (_actionToken !== combatToken || _pipelineFrozen) return;
   } else if (action.type === 'skill') {
     const skill = hero.skills[action.skillIndex];
     const isExtraTurnSkill = skill.type.includes('再动') || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
@@ -15950,21 +15982,23 @@ async function handleTargetClick(target, targetType) {
     if (hero.mp < skill.cost || hero.hp <= (skill.hpCost || 0) || hero.tp < (skill.tpCost || 0) || isUsedExtraTurn) { 
         if (isUsedExtraTurn) showLog("该再动技能每回合限用一次！"); else showLog("释放条件不足！"); state.isAnimating = false; return; 
     }
-    await executeSkillAction(hero, target, skill, multiplier);
+    await executeSkillAction(hero, target, skill, multiplier); if (_actionToken !== combatToken || _pipelineFrozen) return;
   } else if (action.type === 'item') {
-    const ok = await executeItemAction(action.itemIndex, target);
+    const ok = await executeItemAction(action.itemIndex, target); if (_actionToken !== combatToken || _pipelineFrozen) return;
     if (!ok) { state.isAnimating = false; return; }
   } else if (action.type === 'grouped_item') {
     // 变体组道具子技能：目标已选定，直接结算（父库存/MP 已在 prepare 校验，此处再兜底一次道具可用性）
     const _gIt = hero.items && hero.items[action.itemIndex];
     const _gChild = _gIt && _gIt.children && _gIt.children[action.childIndex];
     if (!_gIt || !_gChild || !isItemUsable(_gIt)) { showLog("该道具当前无法使用！"); state.isAnimating = false; return; }
-    await executeGroupedItemSkill(hero, target, _gIt, _gChild);
+    await executeGroupedItemSkill(hero, target, _gIt, _gChild); if (_actionToken !== combatToken || _pipelineFrozen) return;
   }
-  await endTurn(token);
+  await endTurn(token); if (_actionToken !== combatToken || _pipelineFrozen) return;
 }
 
 async function executeHeroSkillAction(skillIndex, primaryTarget) {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
   if (state.isAnimating) return; const hero = state.actionQueue[state.queueIndex].ref; const skill = hero.skills[skillIndex];
   const isExtraTurnSkill = skill.type.includes('再动') || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
   const isUsedExtraTurn = isExtraTurnSkill && state.usedExtraTurnSkillsThisRound && state.usedExtraTurnSkillsThisRound.has(skill.name);
@@ -15976,7 +16010,7 @@ async function executeHeroSkillAction(skillIndex, primaryTarget) {
   }
   state.isAnimating = true; closeSkillMenu();
   const token = combatToken; // 玩家动作所属代际
-  const multiplier = await triggerBurstIfNeeded(hero); await executeSkillAction(hero, primaryTarget, skill, multiplier); await endTurn(token);
+  const multiplier = await triggerBurstIfNeeded(hero); if (_actionToken !== combatToken || _pipelineFrozen) return; await executeSkillAction(hero, primaryTarget, skill, multiplier); if (_actionToken !== combatToken || _pipelineFrozen) return; await endTurn(token); if (_actionToken !== combatToken || _pipelineFrozen) return;
 }
 
 // ==========================================
@@ -16008,6 +16042,8 @@ function itemToPseudoSkill(item) {
 //（prepareItemTarget 自施路径自行 endTurn；handleTargetClick 目标路径由外层统一 endTurn）
 // 严禁在此设 isAnimating 守卫：handleTargetClick 进入目标选择时已置位动画锁，守卫会导致"有物品效果的技能直接跳过回合"
 async function executeItemAction(itemIndex, primaryTarget) {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
   const hero = state.actionQueue[state.queueIndex].ref;
   const item = hero.items && hero.items[itemIndex];
   if (!isItemUsable(item)) { showLog("该物品当前无法使用！"); return false; }
@@ -16017,7 +16053,7 @@ async function executeItemAction(itemIndex, primaryTarget) {
   const isExtraTurnItem = [item.type, item.type2, item.type3].some(t => t && t.includes('再动'));
   if (isExtraTurnItem && state.usedExtraTurnSkillsThisRound && state.usedExtraTurnSkillsThisRound.has(item.name)) { showLog("该再动物品每回合限用一次！"); return false; }
   state.isAnimating = true; closeItemMenu();
-  await executeSkillAction(hero, primaryTarget, itemToPseudoSkill(item), 1);
+  await executeSkillAction(hero, primaryTarget, itemToPseudoSkill(item), 1); if (_actionToken !== combatToken || _pipelineFrozen) return;
   return true;
 }
 
@@ -16120,8 +16156,10 @@ async function prepareGroupedItemSkill(itemIndex, childIndex) {
 }
 
 async function executeGroupedItemSkill(hero, primaryTarget, item, child) {
+    const _actionToken = combatToken;
+    if (_pipelineFrozen) return;
   const pseudo = groupedItemChildToPseudoSkill(item, child);
-  await executeSkillAction(hero, primaryTarget, pseudo, 1);
+  await executeSkillAction(hero, primaryTarget, pseudo, 1); if (_actionToken !== combatToken || _pipelineFrozen) return;
 }
 
 async function actionDefend() {
@@ -16652,6 +16690,8 @@ function runResetPipeline() {
   try { if (typeof fxEngine !== 'undefined' && fxEngine) fxEngine.particles.length = 0; } catch(e) {}
   // 4) 自爆链复位（排队中的自爆任务因令牌过期在链上被丢弃）
   selfDestructCount = 0; selfDestructChain = Promise.resolve();
+  barrierAoEActive = false; barrierAoELeak = null;
+  window.isExecutingCutin = false;
   // 5) 数据回滚：本场开场基线深拷贝 + 显式清零蓄力与自爆对抗标记
   heroesData = JSON.parse(JSON.stringify(initialHeroesCache)); enemiesData = JSON.parse(JSON.stringify(initialEnemiesCache));
   heroesData.concat(enemiesData).forEach(u => { u.currentDelay = null; u.currentCharge = 0; delete u._sdContestFailed; });

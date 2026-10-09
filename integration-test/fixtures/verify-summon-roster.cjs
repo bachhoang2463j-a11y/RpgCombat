@@ -209,7 +209,7 @@ async function runEngine(enginePath, openSrc) {
       iitDecl(src),
       sumSrc,
       'let heroesData = ctx.heroes, enemiesData = ctx.enemies;',
-      'const combatToken = {};',
+      'const combatToken = {}; const _pipelineFrozen = false;',
       'const sleep = () => Promise.resolve();',
       'const endTurn = async () => { ctx.rec.end++; };',
       'const executeSkillAction = async (c, t) => { ctx.rec.skill++; ctx.rec.targets.push(t && t.name); };',
@@ -238,7 +238,7 @@ async function runEngine(enginePath, openSrc) {
         enemies: [mkEnemy('e_t1', '敌甲', { isSubdued: true, buffs: [{ type: 'stun', permanent: true }] }),
                   mkEnemy('e_t2', '敌乙', { isSubdued: true, buffs: [{ type: 'stun', permanent: true }] })],
       });
-      await runA(summon, {});
+      await runA(summon);
       R.real(recA.end >= 1, '敌方全员被制服 → endTurn 收尾（安全结束）');
       R.real(recA.skill === 0, '召唤物不向被制服目标出手（executeSkillAction 0 次）');
 
@@ -247,7 +247,7 @@ async function runEngine(enginePath, openSrc) {
         heroes: [summon], summon, rec: recB,
         enemies: [mkEnemy('e_t3', '敌丙', { buffs: [{ type: 'stun' }] })],
       });
-      await runB(summon, {});
+      await runB(summon);
       R.real(recB.skill === 1 && recB.targets[0] === '敌丙', '仅普通眩晕目标未被忽略，召唤物仍对其出手');
 
       // 场景 C：异侧（敌方）召唤物，我方全员被制服 → 同样空池安全结束
@@ -259,7 +259,7 @@ async function runEngine(enginePath, openSrc) {
         enemies: [Object.assign({}, enemySummon, { id: 'e_ally1' })],
         summon: enemySummon, rec: recC,
       });
-      await runC(enemySummon, {});
+      await runC(enemySummon);
       R.real(recC.end >= 1 && recC.skill === 0, '异侧（敌方）召唤物 × 我方全员被制服 → 同样 endTurn 安全结束');
 
       // 场景 D：异侧过滤只作用于对手池；同侧被制服友军保留（友方增益不被过滤）
@@ -271,7 +271,7 @@ async function runEngine(enginePath, openSrc) {
         summon, rec: recD,
         select: (caster, valid, a3, a4) => { recD.cap = { enemyPool: a3, allyPool: a4 }; return { selectedSkill: null, specificTarget: null }; },
       });
-      await runD(summon, {});
+      await runD(summon);
       R.real(!!recD.cap && recD.cap.enemyPool.length === 1 && recD.cap.enemyPool[0].name === '敌乙',
         '异侧过滤只作用于对手池（被制服敌方已剔除）');
       R.real(!!recD.cap && recD.cap.allyPool.some((e) => e.name === '被制服友军'),
@@ -297,7 +297,7 @@ async function runEngine(enginePath, openSrc) {
       iitDecl(src),
       etSrc,
       'let heroesData = ctx.heroes, enemiesData = ctx.enemies;',
-      'const combatToken = {};',
+      'const combatToken = {}; const _pipelineFrozen = false;',
       'const sleep = () => Promise.resolve();',
       'const endTurn = async () => { ctx.rec.end++; };',
       'const executeSkillAction = async (c, t) => { ctx.rec.skill++; ctx.rec.targets.push(t && t.name); };',
@@ -316,7 +316,7 @@ async function runEngine(enginePath, openSrc) {
         enemies: [Object.assign({}, enemySummon, { id: 'e_ally9' })],
         rec: recE1,
       });
-      await runE1(enemySummon, {});
+      await runE1(enemySummon);
       R.real(recE1.end >= 1 && recE1.skill === 0, '真实：executeEnemyTurn 敌方召唤 × 我方全员被制服 → endTurn 安全结束');
 
       const recE2 = { skill: 0, end: 0, targets: [], cap: null };
@@ -328,7 +328,7 @@ async function runEngine(enginePath, openSrc) {
         rec: recE2,
         select: (caster, valid, a3, a4) => { recE2.cap = { ally: a3, targets: a4 }; throw STOP; },
       });
-      try { await runE2(enemySummon, {}); } catch (e) { if (e !== STOP) throw e; }
+      try { await runE2(enemySummon); } catch (e) { if (e !== STOP) throw e; }
       R.real(!!recE2.cap && recE2.cap.targets.length === 1 && recE2.cap.targets[0].name === '勇丁',
         '真实：executeEnemyTurn 我方池按侧别过滤（被制服我方已剔除）');
       R.real(!!recE2.cap && recE2.cap.ally.some((e) => e.name === '敌方召唤物'),
@@ -365,6 +365,7 @@ async function runEngine(enginePath, openSrc) {
       extractDecl(src, 'isSelfDebuffTag') || 'function isSelfDebuffTag(){ return false; }',
       skSrc,
       'let heroesData = ctx.heroes, enemiesData = ctx.enemies;',
+      'const combatToken = {}; const _pipelineFrozen = false;',
       'let barrierAoEActive = false, barrierAoELeak = null;',
       'const teamBarrier = 0;',
       'const state = { usedExtraTurnSkillsThisRound: new Set(), highTierNarrated: new Set() };',
@@ -434,7 +435,7 @@ async function runEngine(enginePath, openSrc) {
     R.pendingStat(false, 'applySingleTagEffect 直连保护（真实执行）', '函数或 helper 未落地');
   } else {
     try {
-      const astFn = buildSandbox([extractDecl(src, 'isHeroSideEntity'), iitDecl(src), astDecl],
+      const astFn = buildSandbox(['const combatToken = {}; const _pipelineFrozen = false;', extractDecl(src, 'isHeroSideEntity'), iitDecl(src), astDecl],
         ['applySingleTagEffect']).applySingleTagEffect;
       const caster = { id: 's_p', name: '测试召唤物', isSummon: true, side: 'hero', isAlive: true };
       const victim = { id: 'e_p', name: '被制服敌', isAlive: true, hp: 7, maxHp: 100, buffs: [], isSubdued: true };
