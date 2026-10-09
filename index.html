@@ -8510,6 +8510,14 @@ function playSVGEffect(targetDom, type) {
 // ==========================================
 let heroesData = []; let enemiesData = [];
 let initialHeroesCache = []; let initialEnemiesCache = [];
+
+// R03 开场真值：冻结本场重置基线。权威覆盖（状态栏数值 / 商店受管物品 / 战斗态清零）全部完成后调用。
+// 深拷贝时剥除 DOM 引用（h.dom / e.dom，避免 JSON 循环），其余字段照旧进入基线供 resetBattle 恢复。
+function freezeInitialCaches() {
+  const _stripDom = (k, v) => (k === 'dom' ? undefined : v);
+  initialHeroesCache = JSON.parse(JSON.stringify(heroesData, _stripDom));
+  initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData, _stripDom));
+}
 console.log('CRITICAL_LOG: 2. Before state initialization');
 const state = { round: 1, actionQueue: [], queueIndex: 0, isGameStarted: false, isAnimating: false, isTargeting: false, pendingAction: null, usedExtraTurnSkillsThisRound: new Set(), highTierNarrated: new Set() };
 
@@ -11553,6 +11561,27 @@ function registerClassPassive(className, passiveDef) {
     CLASS_PASSIVES[className] = passiveDef;
 }
 
+// 职业基线收敛（幂等、单层小 helper）：先剥离上一职业遗留的派生状态，再按当前 classType 重跑 onBattleInit。
+// 只触碰职业自有标记——永久反击 counter / 先锋首击 spd / 隐匿字段 / 职业盾贡献；不动场地 fieldBuff 与其他来源护盾。
+function initHeroClassBaseline(entity) {
+    if (!entity) return;
+    // 1) 剥离旧职业派生 buff（征伐者先锋首击、防守者永久反击）
+    if (Array.isArray(entity.buffs)) {
+        entity.buffs = entity.buffs.filter(b => !(b && (b._vanguardFirstStrike || (b.type === 'counter' && b.permanent))));
+    }
+    // 2) 清旧职业数值标记（隐匿者 baseTauntBonus / stealthValue 等）
+    entity.baseTauntBonus = 0;
+    delete entity.stealthValue;
+    delete entity.stealthCycleProcessed;
+    delete entity.stealthHitThisRound;
+    // 3) 收回本职业此前贡献的护盾（只减自己那一份，不清其他来源护盾），再由 onBattleInit 按当前 maxMp 重算
+    if (entity._classShieldContribution) entity.shield = Math.max(0, (entity.shield || 0) - entity._classShieldContribution);
+    delete entity._classShieldContribution;
+    // 4) 按当前职业重跑开场被动（classType 为空时仅完成清除，不再初始化）
+    const _p = window.CLASS_PASSIVES && CLASS_PASSIVES[entity.classType];
+    if (_p && _p.onBattleInit) _p.onBattleInit(entity);
+}
+
 // 1. 防守者
 registerClassPassive('防守者', {
     onBattleInit(entity) {
@@ -11786,7 +11815,11 @@ registerClassPassive('隐匿者', {
 // 5. 施法者
 registerClassPassive('施法者', {
     onBattleInit(entity) {
-        entity.shield = (entity.shield || 0) + Math.floor(entity.maxMp * 0.5);
+        // 幂等：追踪本职业护盾贡献，重复初始化只替换自己那一份（不叠加、不清其他来源护盾）；
+        // 配合 initHeroClassBaseline 的收回步骤，保证按「合并后 maxMp」重算时不重复叠盾。
+        if (entity._classShieldContribution) entity.shield = Math.max(0, (entity.shield || 0) - entity._classShieldContribution);
+        entity._classShieldContribution = Math.floor((entity.maxMp || 0) * 0.5);
+        entity.shield = (entity.shield || 0) + entity._classShieldContribution;
     },
     // 【被动 - 法力回响】每次消耗 MP 单次判定：概率 = 消耗MP × 2%（上限 100%），成功获得 1 点永久加速库存与 15 点 TP。
     // 加速永久存在（仅被蓄力[延迟]抵扣消耗，不随回合过期），TP 按上限封顶叠加。
@@ -14511,6 +14544,7 @@ function startGame() {
   try {
     const sbChk = document.getElementById('start-statusbar-import');
     if (sbChk && sbChk.checked) {
+      _statusBarSnapshot = readStatusBarSnapshot();
       if (_statusBarSnapshot && _statusBarSnapshot.heroes.length) {
         const report = applyStatusBarRoster(_statusBarSnapshot);
         const extra = report.unmatched.length ? `（未匹配：${report.unmatched.join('、')}，已保留 YAML 值）` : '';
@@ -14547,6 +14581,11 @@ function startGame() {
   // 高阶/传奇特色旁白：每技能本场仅首次触发，后续走正常我方旁白
   if (!state.highTierNarrated) state.highTierNarrated = new Set(); else state.highTierNarrated.clear();
   
+  // R03：所有开局权威覆盖（状态栏数值 + 商店受管物品 + 战斗态清零）完成后，统一冻结本场重置基线；
+  // resetBattle 只从这份本场基线恢复，不再重读外部资源（非公开版商店同步已在冻结前完成）。
+  heroesData.forEach(initHeroClassBaseline);
+  freezeInitialCaches();
+
   // 利用开场动画的时间窗口，在后台静默预加载所有技能特效资源
   preloadBattleAssets();
   // 同时预载参战英雄的回合语音
@@ -14556,13 +14595,15 @@ function startGame() {
   initChatInputArea();
   
   document.getElementById('start-screen').classList.add('opacity-0', 'pointer-events-none');
+  const _openToken = combatToken; // 开场定时回调代际隔离：窗口期内重置/新战局不得被旧回调重启
   setTimeout(() => {
+    if (_openToken !== combatToken) return;
     document.getElementById('start-screen').classList.add('hidden');
     showLog("战斗正式开始！"); addHistory(`--- 战斗已拉开帷幕 ---`);
     if (activeField && FIELD_EFFECTS[activeField]) addHistory(`🏟️ 场地：${activeField} — ${FIELD_EFFECTS[activeField].desc}`);
     heroesData.forEach((h, index) => { if(h.dom) { h.dom.classList.remove('opacity-0'); h.dom.classList.add('anim-enter-hero'); h.dom.style.animationDelay = `${index * 0.08}s`; setTimeout(() => h.dom.classList.remove('anim-enter-hero'), 800 + index * 80); } });
     enemiesData.forEach((e, index) => { if(e.dom) { e.dom.classList.remove('opacity-0'); e.dom.classList.add('anim-enter-enemy'); e.dom.style.animationDelay = `${index * 0.08}s`; setTimeout(() => e.dom.classList.remove('anim-enter-enemy'), 800 + index * 80); } if (e.mutatedFrom && e.mutatedFrom.length) { setTimeout(() => { const spriteDom = document.getElementById(`${e.id}-sprite`); if (!spriteDom) return; spriteDom.classList.add('mutation-transform'); setTimeout(() => spriteDom.classList.remove('mutation-transform'), 1000); if (window.spawnBurstAura) spawnBurstAura(spriteDom); createFloatingText(spriteDom, '变异', 'text-amber-300'); }, 850 + index * 80); } });
-    setTimeout(() => startRound(), 800);
+    setTimeout(() => { if (_openToken === combatToken) startRound(); }, 800);
   }, 1000);
 }
 
@@ -18218,16 +18259,16 @@ function saveEditor() {
     if(h.hp > h.maxHp) h.hp = h.maxHp;
     if(h.mp > h.maxMp) h.mp = h.maxMp;
     h.isAlive = h.hp > 0;
-    h.buffs = [];
+    h.buffs = (h.buffs || []).filter(b => b.fieldBuff);
     h.isDefending = false;
     h.hitBonus = 0;
     h.evaBonus = 0;
     h.burstActivated = false;
     h.baseTauntBonus = 0;
-    h.shield = 0;
-    if (window.CLASS_PASSIVES && CLASS_PASSIVES[h.classType]?.onBattleInit) {
-      CLASS_PASSIVES[h.classType].onBattleInit(h);
-    }
+    h.shield = (h.shield || 0) - (h._classShieldContribution || 0);
+    delete h._classShieldContribution;
+    // 职业派生状态统一收敛：清旧职业标记后按当前 classType 重跑（清空职业时不留 counter/stealth/先锋/职业盾）
+    initHeroClassBaseline(h);
     delete h.hasTriggeredGrit;
     delete h.hasTriggeredAvoidFatal;
     h.currentDelay = null; // 蓄力中状态不得进入新基线
@@ -18237,22 +18278,22 @@ function saveEditor() {
     if(e.hp > e.maxHp) e.hp = e.maxHp;
     if(e.mp > e.maxMp) e.mp = e.maxMp;
     e.isAlive = e.hp > 0;
-    e.buffs = [];
+    e.buffs = (e.buffs || []).filter(b => b.fieldBuff);
     e.isDefending = false;
     e.hitBonus = 0;
     e.evaBonus = 0;
     e.baseTauntBonus = 0;
-    e.shield = 0;
-    if (window.CLASS_PASSIVES && CLASS_PASSIVES[e.classType]?.onBattleInit) {
-      CLASS_PASSIVES[e.classType].onBattleInit(e);
-    }
+    e.shield = (e.shield || 0) - (e._classShieldContribution || 0);
+    delete e._classShieldContribution;
+    // 职业派生状态统一收敛（与英雄同款）
+    initHeroClassBaseline(e);
     delete e.hasTriggeredGrit;
     delete e.hasTriggeredAvoidFatal;
     e.currentDelay = null; e.currentCharge = 0;
     delete e.molted; delete e.linked; delete e.hasRageNarrated;
     delete e._sdContestFailed;
   });
-  initialHeroesCache = JSON.parse(JSON.stringify(heroesData)); initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData));
+  freezeInitialCaches();
   const _wasStarted = state.isGameStarted;
   closeEditor(); // 战斗中：丢弃工作副本恢复实时数组（随后由重置管线从新基线重建）
   runResetPipeline(); // 保存 = 刷新技能/数据 + 完整重置（清弹窗/蓄力/道具变动/屏障，冻结回合管线）
@@ -19046,11 +19087,7 @@ function applyPersistedRoster() {
         if (cfg.classType == null) {
             h.classType = null;
         } else {
-            const yamlClassType = h.classType;
             h.classType = cfg.classType;
-            if (yamlClassType !== cfg.classType && window.CLASS_PASSIVES && CLASS_PASSIVES[cfg.classType]?.onBattleInit) {
-                CLASS_PASSIVES[cfg.classType].onBattleInit(h);
-            }
         }
     }
     if (cfg.isWise != null) h.isWise = cfg.isWise;
@@ -19061,6 +19098,9 @@ function applyPersistedRoster() {
     if (cfg.def != null && (defendSettings.persistDef || !(h.statSource || {}).def)) h.def = cfg.def;
     if (cfg.spd != null && (defendSettings.persistSpd || !(h.statSource || {}).spd)) h.spd = cfg.spd;
     if (cfg.actCount != null) h.actCount = cfg.actCount;
+    // P06：职业被动初始化必须在 maxHp/maxMp 等权威配置合并之后（法能护罩按合并后 maxMp 计算）。
+    // 幂等收敛：清旧职业派生状态后用合并后属性重跑本职业 onBattleInit（避免重复叠盾与旧职业残留）。
+    initHeroClassBaseline(h);
     // 白名单外的 config 键收入 extraConfig 原样保留（OpeningSetup 等外部写方的扩展字段
     // 不因读取合并+下次序列化而丢失）；白名单键仍以上方逐字段覆盖为准
     const hExtraCfg = {};
@@ -19179,8 +19219,7 @@ function applyPersistedRoster() {
     }
   });
   // 合并完成后同步初始缓存，使"重置"恢复的也是持久化合并后的版本（而非 Combat_block 原始快照）
-  initialHeroesCache = JSON.parse(JSON.stringify(heroesData));
-  initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData));
+  freezeInitialCaches();
   // 物品绑定知识注册表重建（材料严格模式判定基线，覆盖本楼 YAML ∪ 持久化全量）
   rebuildItemBindingKnowledge();
 }

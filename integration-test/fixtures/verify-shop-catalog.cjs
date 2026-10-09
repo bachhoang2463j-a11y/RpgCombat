@@ -44,6 +44,7 @@ const FNS = [
   'shopNameKey', 'shopItemKey', 'readShopCatalog', 'buildShopIndex', 'shopItemSoldForHero',
   'parseShopBattleItem', 'shopHeldCount', 'syncShopCatalogHeroItems', 'shopSuppressPersistedItem',
   'normalizeRosterSkill', '_rosterFieldEmpty', '_gapFillSkill', 'applyPersistedRoster',
+  'freezeInitialCaches', 'initHeroClassBaseline',
 ];
 const fnSources = FNS.map(extractFn);
 const skillTypesSrc = extractArr('SKILL_TYPES');

@@ -107,6 +107,7 @@ function makeSandbox() {
     'function playExecutionAnimation(){return Promise.resolve()} function stopStrafeBurst(){} function startStrafeBurst(){}',
     'function updateTeamBarrierUI(){} function cancelTargeting(){} function updateMenu(){}',
     'function syncShopCatalogHeroItems(){return {applied:0,removed:0}}',
+    'function readStatusBarSnapshot(){return _statusBarSnapshot}',
     'function preloadBattleAssets(){} function preloadHeroVoices(){} function initChatInputArea(){}',
     'function resolveNonLethalLethal(enemy,dmg){return dmg} function tryReviveEnemy(){return false}',
     'function showEnemyInfo(){} function closeEditor(){} function refreshResultView(){}',
@@ -138,11 +139,11 @@ function loadCore(ctx, source) {
     'applySingleTagEffect', 'executeSkillAction', 'executeSummonTurn', 'runReactionIntercept', 'promptReaction', 'nextTurn',
     'startRound', 'handleTargetClick', 'canBypassRow', 'classifySkill', 'showBattleResult',
     'triggerEnemySelfDestruct', 'doEnemySelfDestruct', 'initLLMPresets', 'persistLLMSettings', 'loadLLMSettings',
-    'startGame', 'applyStatusBarRoster', 'runResetPipeline');
+    'startGame', 'applyStatusBarRoster', 'runResetPipeline', 'freezeInitialCaches', 'initHeroClassBaseline');
   ['defaultPreset', 'llmState', 'LLM_VAR_KEY'].forEach((n) => { try { run(constantSource(source, n)); } catch (e) {} });
   try {
     const s = source.indexOf('const CLASS_PASSIVES = {}');
-    const e = source.indexOf('window.CLASS_PASSIVES', s);
+    const e = source.indexOf('\nwindow.CLASS_PASSIVES = CLASS_PASSIVES;', s);
     if (s >= 0 && e > s) run(source.slice(s, e).replace('const CLASS_PASSIVES = {}', 'CLASS_PASSIVES = {}'));
   } catch (e) {}
 }
@@ -293,6 +294,18 @@ function buildTests(source) {
       'document.querySelectorAll=function(){return []};',
     ].join('\n'),
     expr: `(async()=>{_statusBarSnapshot={heroes:[{name:'甲',hp:25,maxHp:100,mp:8,maxMp:20,items:[]}]};heroesData=[unit('h1','甲')];initialHeroesCache=JSON.parse(JSON.stringify(heroesData));initialEnemiesCache=[];state.isGameStarted=false;startGame();var frozen=initialHeroesCache[0].hp;heroesData[0].hp=10;runResetPipeline();return {frozen:frozen,afterReset:heroesData[0].hp}})()`,
+  });
+
+  add({
+    stage:'baseline', id:'开战重读一次且重置不重读外部', needs:['startGame','freezeInitialCaches'],
+    expected:{reads:1,hp:25,shield:80,resetHp:25},
+    setup:`var __reads=0;readStatusBarSnapshot=()=>{__reads++;return {heroes:[{name:'甲',hp:25,maxHp:100,mp:10,maxMp:160,items:[]}]}};document.getElementById=id=>({checked:id==='start-statusbar-import',style:{},classList:{add(){},remove(){}},remove(){}});`,
+    expr:`(()=>{_statusBarSnapshot={heroes:[{name:'甲',hp:80,maxHp:100,mp:10,maxMp:50,items:[]}]};heroesData=[unit('h1','甲',{classType:'施法者',maxMp:50})];enemiesData=[];CLASS_PASSIVES['施法者'].onBattleInit(heroesData[0]);startGame();var hp=heroesData[0].hp,shield=heroesData[0].shield;heroesData[0].hp=1;runResetPipeline();return {reads:__reads,hp,shield,resetHp:heroesData[0].hp}})()`,
+  });
+  add({
+    stage:'baseline',id:'反复职业初始化保留场地盾且清除旧职业',needs:['initHeroClassBaseline'],
+    expected:{first:80,again:80,cleared:30,field:1,counter:0,stealth:false},
+    expr:`(()=>{var h=unit('h1','甲',{classType:'施法者',maxMp:100,shield:30,buffs:[{type:'spd',value:10,fieldBuff:true,duration:3}]});initHeroClassBaseline(h);var first=h.shield;initHeroClassBaseline(h);var again=h.shield;h.classType='防守者';initHeroClassBaseline(h);h.classType='隐匿者';initHeroClassBaseline(h);h.classType=null;initHeroClassBaseline(h);return {first,again,cleared:h.shield,field:h.buffs.filter(b=>b.fieldBuff).length,counter:h.buffs.filter(b=>b.type==='counter').length,stealth:'stealthValue' in h}})()`,
   });
 
   /* ===== damage ===== */
