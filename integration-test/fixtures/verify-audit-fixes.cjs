@@ -18,7 +18,7 @@ const VERSIONS = [
   { label: 'index.html', file: 'index.html' },
   { label: 'index-公开版.html', file: 'index-公开版.html' },
 ];
-const ALL_STAGES = ['lifecycle', 'parsing', 'baseline', 'damage', 'summon', 'settings'];
+const ALL_STAGES = ['lifecycle', 'parsing', 'baseline', 'damage', 'summon', 'tactics', 'settings'];
 
 /* ---------------- 源码提取（与原探针一致） ---------------- */
 function functionSource(source, name) {
@@ -140,7 +140,8 @@ function loadCore(ctx, source) {
     'startRound', 'handleTargetClick', 'canBypassRow', 'classifySkill', 'showBattleResult',
     'triggerEnemySelfDestruct', 'doEnemySelfDestruct', 'initLLMPresets', 'persistLLMSettings', 'loadLLMSettings',
     'startGame', 'applyStatusBarRoster', 'runResetPipeline', 'freezeInitialCaches', 'initHeroClassBaseline',
-    'computeSegmentRawDamage', 'wouldSegmentClearHp', 'tryAutoSummonGuard', 'getSheshenTarget');
+    'computeSegmentRawDamage', 'wouldSegmentClearHp', 'tryAutoSummonGuard', 'getSheshenTarget',
+    'isCombatActive', 'isManualSubduedExempt', 'hasAliveFront', 'hasAliveBack');
   ['defaultPreset', 'llmState', 'LLM_VAR_KEY'].forEach((n) => { try { run(constantSource(source, n)); } catch (e) {} });
   try {
     const s = source.indexOf('const CLASS_PASSIVES = {}');
@@ -438,6 +439,31 @@ function buildTests(source) {
       return src.slice(Math.max(0, i - 500), i).includes('isHeroSideEntity(caster)');
     }, expected: true,
   });
+
+
+  const tacticalSetup = `
+    document.getElementById=()=>null;
+    runReactionIntercept=async()=>({dodged:false,guardian:null,usedSheshen:false});
+    var hero=unit('h1','玩家',{atk:100,skills:[parseSkill('【攻击】[单体;power:100][必中]')]});
+    var subdued=unit('e1','制服',{hp:1,isSubdued:true,classType:'防守者',buffs:[{type:'stun',permanent:true,duration:9999}],row:'front'});
+    var active=unit('e2','敌人',{hp:500,maxHp:500,row:'back'});heroesData=[hero];enemiesData=[subdued,active];
+  `;
+  add({stage:'tactics',id:'制服不提供前排掩护或嘲讽',setup:tacticalSetup,expected:{front:false,target:'敌人'},
+    expr:`(()=>({front:hasAliveFront(),target:getTauntTarget(enemiesData,false).name}))()`});
+  add({stage:'tactics',id:'非致命开时手动攻击制服者不伤害',setup:tacticalSetup,expected:1,
+    expr:`(async()=>{nonLethalSettings.enabled=true;await executeSkillAction(hero,subdued,hero.skills[0],1,false,false,null,subdued);return subdued.hp})()`});
+  add({stage:'tactics',id:'非致命关时玩家手动补刀无保命反应',setup:tacticalSetup,expected:{hp:-99,fatal:false,active:500},
+    expr:`(async()=>{await executeSkillAction(hero,subdued,hero.skills[0],1,false,false,null,subdued);return {hp:subdued.hp,fatal:!!subdued.hasTriggeredGrit,active:active.hp}})()`});
+  add({stage:'tactics',id:'自动攻击与群体不补刀制服者',setup:tacticalSetup,expected:{hp:1,active:400},
+    expr:`(async()=>{await executeSkillAction(hero,subdued,hero.skills[0],1);await executeSkillAction(hero,null,parseSkill('【群】[群攻;power:100][远程][必中]'),1);return {hp:subdued.hp,active:active.hp}})()`});
+  add({stage:'tactics',id:'制服者免疫治疗驱散且不参与名额',setup:tacticalSetup,expected:{hp:1,buffs:1,quota:0},
+    expr:`(async()=>{subdued.isSummon=true;subdued.side='enemy';await applySingleTagEffect(active,subdued,'[单回]',100,100,1,null,{});await applySingleTagEffect(active,subdued,'[驱散]',5,100,1,null,{});return {hp:subdued.hp,buffs:subdued.buffs.length,quota:countLimitedSummons('enemy')}})()`});
+  add({stage:'tactics',id:'智慧25%血量必先自保而非加权碰运气',setup:tacticalSetup,expected:['治疗','治疗','治疗'],
+    expr:`(()=>{var e=unit('e3','智',{isWise:true,hp:25});var skills=[parseSkill('【伤害】[单体;power:100]'),parseSkill('【治疗】[单回;power:40]')];return [0,0.5,0.999].map(r=>{Math.random=()=>r;return selectEnemySkillAndTarget(e,skills,[e],[hero]).selectedSkill.name})})()`});
+  add({stage:'tactics',id:'智慧干扰已开启爆发者而非随机目标',setup:tacticalSetup,expected:{skill:'盲',target:'爆发'},
+    expr:`(()=>{var e=unit('e3','智',{isWise:true});var burst=unit('h2','爆发',{burstActivated:true});var d=selectEnemySkillAndTarget(e,[parseSkill('【攻】[单体;power:100]'),parseSkill('【盲】[单盲;power:10]')],[e],[hero,burst]);return {skill:d.selectedSkill.name,target:d.specificTarget.name}})()`});
+  add({stage:'tactics',id:'默认近战群攻仍受活跃前排掩护',setup:tacticalSetup,expected:{front:400,back:500},
+    expr:`(async()=>{subdued.isSubdued=false;subdued.hp=500;subdued.classType=null;subdued.buffs=[];await executeSkillAction(hero,null,parseSkill('【群】[群攻;power:100][必中]'),1);return {front:subdued.hp,back:active.hp}})()`});
 
   /* ===== settings ===== */
   add({

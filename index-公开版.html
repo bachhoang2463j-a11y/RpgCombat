@@ -8531,7 +8531,7 @@ const ENEMY_TOTAL_HARD_CAP = 12; // 敌方阵营总数硬闸（含非召唤物�
 // 占用名额的召唤物数：[众召] 召唤出来的（summonNoLimit）不计入
 function countLimitedSummons(side) {
     const arr = side === 'hero' ? heroesData : enemiesData;
-    return (arr || []).filter(e => e.isAlive && e.isSummon && !e.summonNoLimit).length;
+    return (arr || []).filter(e => e.isAlive && !e.isSubdued && e.isSummon && !e.summonNoLimit).length;
 }
 
 // 【召唤】名额已满判定：非 [众召] 的召唤类技能/物品，我方名额用尽时不可用（卡片置灰 + 点击拦截）。
@@ -9619,8 +9619,8 @@ function assignEnemyRows() {
     }
     enemiesData.forEach(e => { if (!e.tier) e.tier = getEnemyTier(e); });
 }
-function hasAliveFront() { return enemiesData.some(e => e.isAlive && e.row === 'front'); }
-function hasAliveBack() { return enemiesData.some(e => e.isAlive && e.row === 'back'); }
+function hasAliveFront() { return enemiesData.some(e => e.isAlive && !e.isSubdued && e.row === 'front'); }
+function hasAliveBack() { return enemiesData.some(e => e.isAlive && !e.isSubdued && e.row === 'back'); }
 // 【前后排】越前排统一判定：技能级 [突进]/[无视站位] 标签优先，其次职业级（征伐者 ignoreRow）。
 // 前排掩护的 4 个判定点（群攻截断/保底随机池/转火池/点击拦截）共用此函数，避免各处条件漂移。
 function canBypassRow(caster, skill) {
@@ -10818,6 +10818,7 @@ function updateHeroUI(hero) {
 // 【复活】敌方死亡复活：带 [复活] 名字标签的敌人第一次被击杀时以 30% 最大血量原地复活（仅敌方、仅一次）。
 // 供 updateEnemyUI 死亡收口 / ON_FATAL_DAMAGE / DoT 回合起始致死三处调用；复活成功返回 true（跳过死亡处理）。
 function tryReviveEnemy(enemy, dom) {
+    if (!enemy || enemy.isSubdued) return false;   // 【制服】被制服单位本场退出：不复活、不再参战
     if (!enemy || !enemy.reviveCount || enemy.reviveCount <= 0) return false;
     enemy.reviveCount--;
     enemy.hp = Math.floor(enemy.maxHp * 0.3);
@@ -10870,8 +10871,10 @@ let selfDestructCount = 0; // 排队中/执行中的自爆任务数：endTurn �
 // _pipelineFrozen：重置完成 → startRound 重启之间的窗口期冻结一切回合推进（startRound 解冻）。
 // ==========================================
 let combatToken = {};
+
 var _pipelineFrozen = false; // var（非 let）：addHistory 定义在本文之前，TDZ 安全
 function triggerEnemySelfDestruct(enemy) {
+    if (!enemy || enemy.isSubdued) return;   // 【制服】被制服单位本场退出：不结算自爆
     if (!enemy || !enemy.explode) return;
     const _sdToken = combatToken; // 触发时刻的代际令牌：排队期间发生重置则任务作废
     selfDestructCount++;
@@ -11962,6 +11965,7 @@ window.EVENTS = EVENTS;
 
 // 防守者：毅力留存 (priority=10，高于隐匿者，先触发)
 CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
+    if (ctx.target.isSubdued) return;
     if (ctx.target.classType !== '防守者') return;
     const p = CLASS_PASSIVES['防守者'];
     if (p && p.onFatalDamage) p.onFatalDamage(ctx);
@@ -11969,6 +11973,7 @@ CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
 
 // 狂战士：毅力留存 (priority=10，与防守者同档)
 CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
+    if (ctx.target.isSubdued) return;
     if (ctx.target.classType !== '狂战士') return;
     const p = CLASS_PASSIVES['狂战士'];
     if (p && p.onFatalDamage) p.onFatalDamage(ctx);
@@ -11976,6 +11981,7 @@ CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
 
 // 隐匿者：回避致命 (priority=5，防守者毅力失效后才触发)
 CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
+    if (ctx.target.isSubdued) return;
     if (ctx.target.classType !== '隐匿者') return;
     const p = CLASS_PASSIVES['隐匿者'];
     if (p && p.onFatalDamage) p.onFatalDamage(ctx);
@@ -11983,6 +11989,7 @@ CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
 
 // 风行者：回避致命 (priority=5，与隐匿者同档)
 CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
+    if (ctx.target.isSubdued) return;
     if (ctx.target.classType !== '风行者') return;
     const p = CLASS_PASSIVES['风行者'];
     if (p && p.onFatalDamage) p.onFatalDamage(ctx);
@@ -11992,6 +11999,7 @@ CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
 CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
     if (ctx.prevented) return; // 已被毅力留存等被动阻止，不再复活
     const t = ctx.target;
+    if (t.isSubdued) return;   // 【制服】被制服单位本场退出：不触发复活
     if (!t.reviveCount || t.reviveCount <= 0) return;
     ctx.hpDmg = 0;                     // 先归零本次伤害，复活回血后才不会被随后扣减再次带走
     if (tryReviveEnemy(t, ctx.targetDom)) ctx.prevented = true; // 复活成功 → 本次不致死、不判假击杀
@@ -12000,7 +12008,7 @@ CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
 // 敌人：【再生】每回合开始回复最大 HP 10%（仅敌方、存活时；上限不超过 maxHp）
 CombatEvents.on(EVENTS.TURN_START, (ctx) => {
     const e = ctx.entity;
-    if (!e || e.id.startsWith('h') || !e.isAlive || !e.tags || !e.tags.includes('[再生]')) return;
+    if (!e || e.id.startsWith('h') || !e.isAlive || e.isSubdued || !e.tags || !e.tags.includes('[再生]')) return;
     const healAmt = Math.max(1, Math.floor(e.maxHp * 0.1));
     if (e.hp >= e.maxHp) return;
     e.hp = Math.min(e.maxHp, e.hp + healAmt);
@@ -12026,6 +12034,7 @@ CombatEvents.on(EVENTS.TURN_START, (ctx) => {
 // 守卫：自爆（isSelfDestruct）触发闪避时不反击——攻击者（施法者）已死亡，反击会打到不存在的目标上
 CombatEvents.on(EVENTS.ON_DODGE, async (ctx) => {
     if (ctx.skill && ctx.skill.isSelfDestruct) return;
+    if (ctx.target.isSubdued) return;
     if (ctx.target.classType !== '防守者') return;
     const p = CLASS_PASSIVES['防守者'];
     if (p && p.onDodge) await p.onDodge(ctx);
@@ -12033,6 +12042,7 @@ CombatEvents.on(EVENTS.ON_DODGE, async (ctx) => {
 
 // 隐匿者：击杀累积隐匿值 +30 (ON_KILL：被我方击杀敌方时触发)
 CombatEvents.on(EVENTS.ON_KILL, (ctx) => {
+    if (ctx.target?.isSubdued || ctx.caster?.isSubdued) return;   // 【制服】被制服单位免疫击杀被动
     const p = CLASS_PASSIVES[ctx.caster.classType];
     if (p && p.onKill) p.onKill(ctx);
 });
@@ -12047,6 +12057,7 @@ CombatEvents.on(EVENTS.BUFF_EXPIRED, (ctx) => {
 
 // 灾厄使/施毒者：伤害后淬毒 (priority=5)
 CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
+    if (ctx.target?.isSubdued || ctx.caster?.isSubdued) return;   // 【制服】被制服单位免疫职业被动/吸血/荆棘
     const p = CLASS_PASSIVES[ctx.caster.classType];
     if (p && p.onAfterDamageDealt) {
         p.onAfterDamageDealt(ctx.caster, ctx.target, ctx.targetDom, ctx.incomingDamageType);
@@ -12114,7 +12125,7 @@ CombatEvents.on(EVENTS.AFTER_HEAL, (ctx) => {
 
 // 风行者：多重施法 (priority=5，技能释放后触发，原施法者被动转交)
 CombatEvents.on(EVENTS.TURN_END, (ctx) => {
-    if (!ctx.skill) return;
+    if (!ctx.skill || ctx.entity?.isSubdued) return;
     const p = CLASS_PASSIVES[ctx.entity.classType];
     if (p && p.onSkillExecuted) {
         p.onSkillExecuted(ctx.entity, ctx.skill, ctx.isReactionTrigger || false);
@@ -12127,6 +12138,14 @@ CombatEvents.on(EVENTS.TURN_END, (ctx) => {
 function isHeroSideEntity(e) { return e?.isSummon ? e.side === 'hero' : (e?.id || '').startsWith('h'); }
 function isIgnoredSummonTarget(caster, target) {
     return !!(caster.isSummon && target?.isSubdued && isHeroSideEntity(caster) !== isHeroSideEntity(target));
+}
+
+// 【制服】本场退出：被制服单位保留 isAlive/展示/战报，但不参与任何自动选敌、治疗、驱散、DoT、回合事件、
+// 反应/看破、嘲讽掩护、追击均速、被动与战术召唤名额统计；既有硬实体上限（ENEMY_TOTAL_HARD_CAP 等）不放宽。
+function isCombatActive(e) { return !!(e && e.isAlive && !e.isSubdued); }
+// 手动补刀豁免：仅 handleTargetClick 手动选中的那个目标在本次施法内可结算伤害（携带于 skill._bdg，随调用重建，不残留）。
+function isManualSubduedExempt(skill, target) {
+    return !!(skill && skill._bdg && skill._bdg.manualSubduedTargetId && target && target.id === skill._bdg.manualSubduedTargetId);
 }
 function isSingleTargetSkill(skill) {
     if (!skill) return true;
@@ -12758,7 +12777,7 @@ async function checkKanpoInterrupt(ctx) {
     const incomingType = ctx.skill.damageType || '近战';
 
     const kanpoCandidates = [];
-    heroesData.filter(h => h.isAlive).forEach(hero => {
+    heroesData.filter(h => h.isAlive && !h.isSubdued).forEach(hero => {
         (hero.skills || []).forEach(s => {
             const kanpoTarget = getKanpoTarget(s);
             if (!kanpoTarget) return;
@@ -13014,6 +13033,7 @@ function promptReaction(hero, reactionSkills, attacker, incomingSkill, sheshenCa
 async function runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, sheshenCandidates, isAttack = false, isPierce = false, multiplier = 1) {
     const _actionToken = combatToken;
     if (_pipelineFrozen) return;
+    if (target && target.isSubdued) return { dodged: false, guardian: null, usedSheshen: false };   // 【制服】被制服单位不参与反应/舍身
     // 屏障刚被击碎（本次攻击内）：反应弹窗延迟 0.5s，让破碎演出（色差闪断+微晶爆散）先完整呈现再弹窗
     if (_barrierShatterAt > 0) {
         const elapsed = performance.now() - _barrierShatterAt;
@@ -13142,7 +13162,15 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
 async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, multiplier, globalTurns, skill, fixedRawDamage = null) {
     const _actionToken = combatToken;
     if (_pipelineFrozen) return;
-  if (!target || !target.isAlive || isIgnoredSummonTarget(caster, target)) return;
+  if (caster.isSubdued || !target || !target.isAlive || isIgnoredSummonTarget(caster, target)) return;
+  // 【制服】本场退出：被制服单位免疫一切自动/附带效果（伤害/治疗/驱散/DoT/减益/被动）。
+  // 唯一例外＝玩家角色手动选中（skill._bdg.manualSubduedTargetId）且非致命关闭时的纯伤害标签补刀；
+  // 非致命开启时不造成伤害，非伤害附签（降/盲/毒/灼烧/驱散/回…）一律免疫。
+  if (target.isSubdued) {
+      const _subdueManualFinish = !nonLethalSettings.enabled && isManualSubduedExempt(skill, target)
+          && (tag.includes('攻') || tag.includes('单体') || tag.includes('穿透') || tag.includes('眩晕') || tag.includes('散射'));
+      if (!_subdueManualFinish) return;
+  }
   // 【自X】自身负面 = 固定代价：威力不受极限爆发/暴击倍率放大（其余标签维持 power × multiplier）；
   // 且使用后必中——下方掷骰分支与减益落空检查对其整体豁免
   const isSelfDebuff = isSelfDebuffTag(tag);
@@ -13206,7 +13234,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     const defenderSpdCap = Math.max(1, (target.spd || 0) + initialTStats.eva + _dodgeCapBonus);
 
     // 初次闪避判定 (基于基础速度和当前面板)；【必中】跳过命中判定恒命中；极限爆发附加必中同样跳过
-    isDodged = (skill && (skill.guaranteedHit || burstGuarantee)) ? false
+    isDodged = target.isSubdued || (skill && (skill.guaranteedHit || burstGuarantee)) ? false
       : Math.floor(Math.random() * defenderSpdCap) + 1 > Math.floor(Math.random() * attackerHitCap) + 1;
 
 // 2. 如果初次判定失败 (即将挨打)，触发敌我双方的反应拦截！
@@ -13217,8 +13245,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         // 【召唤】owner-only：_ownerOnly 的舍身仅在守护者为目标的 owner 时有效，且仅在单体致死场景下纳入
         // 【召唤】0弹窗：召唤物被攻击时不收集舍身；英雄【舍身】不得以召唤物为对象
         let sheshenCandidates = [];
-        if (targetType === 'hero' && !tag.includes('群') && !target.isSummon) {
-            heroesData.filter(h => h.isAlive && h.id !== target.id).forEach(guardian => {
+        if (targetType === 'hero' && !target.isSubdued && !tag.includes('群') && !target.isSummon) {
+            heroesData.filter(h => h.isAlive && !h.isSubdued && h.id !== target.id).forEach(guardian => {
                 (guardian.skills || []).forEach(s => {
                     const sheshenTarget = getSheshenTarget(s);
                     if (!sheshenTarget) return;
@@ -13354,7 +13382,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
 
       // 反击判定 (仅针对近战)；若本次闪避已触发强力反击，则不再同时触发普通反击。
       // 守卫：自爆（isSelfDestruct）不可被反击——攻击者（施法者）已死亡，反击会打到不存在的目标上
-      if (!(skill && skill.isSelfDestruct) && caster.isAlive && target.isAlive && target.buffs && !target.powerCounterFired && target.buffs.some(b => b.type === 'counter')) {
+      if (!(skill && skill.isSelfDestruct) && caster.isAlive && target.isAlive && !target.isSubdued && target.buffs && !target.powerCounterFired && target.buffs.some(b => b.type === 'counter')) {
           if (incomingDamageType === '近战' || incomingDamageType === '[近战]' || (!incomingDamageType.includes('远程') && !incomingDamageType.includes('法术'))) {
               const counterBuff = target.buffs.find(b => b.type === 'counter');
               const tStatsForCounter = getEffectiveStats(target);
@@ -13563,7 +13591,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     }
 
     // === 致命伤害避死判定 → 事件总线 (ON_FATAL_DAMAGE) ===
-    if (wasAlive && target.hp - hpDmg <= 0) {
+    if (wasAlive && !target.isSubdued && target.hp - hpDmg <= 0) {
         const fatalCtx = { target, targetDom, hpDmg, shieldDmg, prevented: false, cancelled: false };
         CombatEvents.emit(EVENTS.ON_FATAL_DAMAGE, fatalCtx);
         if (fatalCtx.prevented) {
@@ -13613,7 +13641,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         }
     }
 
-    if (tag.includes('眩晕') && target.isAlive) {
+    if (tag.includes('眩晕') && target.isAlive && !target.isSubdued) {
         // 【钢体】敌方免疫眩晕：跳过施加
         if (target.tags && target.tags.includes('[钢体]')) {
             if (targetDom) createFloatingText(targetDom, '免疫·眩晕', 'text-yellow-300');
@@ -13944,7 +13972,7 @@ async function applyBarrierHit(caster, barrierTarget, tag, tagPower, skill, mult
   // 溢出部分：屏障已破，单体→打代理目标，群攻→打全员
   if (overflow > 0) {
     const isAoe = tag.includes('群');
-    const targets = isAoe ? heroesData.filter(h => h.isAlive) : (barrierTarget.proxyHero ? [barrierTarget.proxyHero] : []);
+    const targets = isAoe ? heroesData.filter(h => isCombatActive(h)) : (barrierTarget.proxyHero ? [barrierTarget.proxyHero] : []);
     for (const t of targets) {
       if (!t || !t.isAlive) continue;
       await applySingleTagEffect(caster, t, tag, overflow, skill.hit, multiplier, globalTurns, skill, overflow); if (_actionToken !== combatToken || _pipelineFrozen) return;
@@ -13954,6 +13982,8 @@ async function applyBarrierHit(caster, barrierTarget, tag, tagPower, skill, mult
 
 // 基于嘲讽值的轮盘赌算法选择目标
 function getTauntTarget(heroArray, wiseFocus) {
+    // 【制服】被制服单位不再提供嘲讽/掩护，也不会被任何自动选敌（含智慧威胁感知）选中
+    heroArray = (heroArray || []).filter(h => h && !h.isSubdued);
     if (heroArray.length === 0) return null;
     // 【肃正】屏障作为"伪实体肉盾"：屏障存在期间，敌方攻击的目标选择直接命中屏障，
     // 我方角色完全不被选中。屏障 id 以 'barrier' 开头，特判走屏障拦截分支。
@@ -13992,9 +14022,12 @@ function getTauntTarget(heroArray, wiseFocus) {
     return heroArray[heroArray.length - 1]; // Fallback
 }
 
-async function executeSkillAction(caster, primaryTarget, skill, multiplier, isReactionTrigger = false, skipCost = false, incomingSkillName = null) {
+async function executeSkillAction(caster, primaryTarget, skill, multiplier, isReactionTrigger = false, skipCost = false, incomingSkillName = null, manualTarget = null) {
     const _actionToken = combatToken;
     if (_pipelineFrozen) return;
+    // 【制服】手动补刀豁免：只消费一次（顶层玩家动作），嵌套反应/多段调用读到 null，不会继承补刀权
+    if (caster.isSubdued) return;
+    const _manualSubId = !isReactionTrigger && !caster.isSummon && (caster.id || '').startsWith('h') && manualTarget?.isSubdued ? manualTarget.id : null;
     const _pendingKills = []; // 收集本次技能中所有被击杀的敌人，最后统一播放特写
     // 记录本次技能开始前是否已持有隐匿急袭 buff：
     // 若该 buff 是由本次技能自身（隐匿值累积跨100）刚刚授予的，则不应被本次技能消耗，留给下一次攻击
@@ -14158,7 +14191,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
 
     await sleep(390); if (_actionToken !== combatToken || _pipelineFrozen) return;  // 与蓄力动画时长同步（320ms + 70ms缓冲）
     // 初始化本次技能结算的共享命中结论容器（跨标签共享：减益是否命中取决于同技能攻击的判定结果）
-    if (skill) skill._bdg = { targetHit: {}, targetResolved: {} };
+    if (skill) skill._bdg = { targetHit: {}, targetResolved: {}, manualSubduedTargetId: _manualSubId };
     let tagList = [{ tag: skill.type, power: skill.power, slotTurns: skill.slotTurns }, { tag: skill.type2, power: skill.power2 || 0, slotTurns: skill.slotTurns2 }, { tag: skill.type3, power: skill.power3 || 0, slotTurns: skill.slotTurns3 }].filter(t => t.tag && t.tag !== '[无]');
     // 收集本次技能中实际回血的我方被治疗者（供治疗旁白合并使用：一次 LLM 调用让治疗者与被治疗者各说一句）
     const healedTargets = []; const healedIds = new Set();
@@ -14173,21 +14206,25 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         const effTurns = item.slotTurns != null ? item.slotTurns : skill.turns;
         const isBeneficial = tag.includes('回') || tag.includes('冲') || tag.includes('增') || tag.includes('防') || tag.includes('盾') || tag.includes('瞄') || tag.includes('嘲') || tag.includes('再动') || tag.includes('避') || tag.includes('免伤') || tag.includes('反击') || tag.includes('驱散') || tag.includes('肃正') || tag.includes('速');
         const isAoe = tag.includes('群'); const casterIsHero = caster.isSummon ? (caster.side === 'hero') : caster.id.startsWith('h');
-        const allies = casterIsHero ? heroesData.filter(h=>h.isAlive) : enemiesData.filter(e=>e.isAlive);
-        const opponents = (casterIsHero ? enemiesData : heroesData).filter(e => e.isAlive && !isIgnoredSummonTarget(caster, e));
+        const allies = casterIsHero ? heroesData.filter(h=>h.isAlive && !h.isSubdued) : enemiesData.filter(e=>e.isAlive && !e.isSubdued);
+        const opponents = (casterIsHero ? enemiesData : heroesData).filter(e => e.isAlive && !e.isSubdued && !isIgnoredSummonTarget(caster, e));
+        // 【默认近战】无显式 damageType 一律视为近战，群体/随机/转火/手动各路径共用同一口径
+        const _dmgType = (skill && skill.damageType) || '近战';
         let targets = [];
         
         // 再动/肃正 恒打自身；自X 自身负面代价标签同理：目标恒为施法者（不随主目标/随机对手路由）
         if (tag.includes('再动') || tag.includes('肃正') || isSelfDebuffTag(tag)) {
             targets = [caster];
+        } else if (isManualSubduedExempt(skill, primaryTarget) && !isBeneficial && !isAoe) {
+            targets = [primaryTarget];
         } else if (isAoe) {
-            if (!isBeneficial && casterIsHero && skill && skill.damageType === '近战' && hasAliveFront() && !canBypassRow(caster, skill)) {
+            if (!isBeneficial && casterIsHero && skill && _dmgType === '近战' && hasAliveFront() && !canBypassRow(caster, skill)) {
               // 群攻近战有前排时仅命中前排（后排被掩护；[突进]/征伐者破阵贯穿可越过）
               const frontOnly = opponents.filter(e => e.row !== 'back');
               targets = frontOnly.length ? frontOnly : opponents;
               if (frontOnly.length < opponents.length && !skill._frontOnlyLogged) { addHistory('   ↳ 前排掩护：近战群攻仅命中前排'); skill._frontOnlyLogged = true; }
             } else {
-              if (!isBeneficial && casterIsHero && skill && skill.damageType === '近战') logRowBypass(caster, skill);
+              if (!isBeneficial && casterIsHero && skill && _dmgType === '近战') logRowBypass(caster, skill);
               targets = isBeneficial ? allies : opponents;
             }
         } else {
@@ -14197,9 +14234,9 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                 } else {
                     // 保底随机：近战在有前排时随机不到后排
                     let pool = opponents;
-                    if (casterIsHero && skill && skill.damageType === '近战' && hasAliveFront() && !canBypassRow(caster, skill)) {
+                    if (casterIsHero && skill && _dmgType === '近战' && hasAliveFront() && !canBypassRow(caster, skill)) {
                       const f = opponents.filter(e => e.row !== 'back'); if (f.length) pool = f;
-                    } else if (casterIsHero && skill && skill.damageType === '近战') { logRowBypass(caster, skill); }
+                    } else if (casterIsHero && skill && _dmgType === '近战') { logRowBypass(caster, skill); }
                     targets = [casterIsHero ? pool[Math.floor(Math.random()*pool.length)] : getTauntTarget(pool, caster.isWise)];
                 }
             } else {
@@ -14207,10 +14244,10 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                 const _primaryIsAlly = primaryTarget.isSummon ? (primaryTarget.side === (casterIsHero ? 'hero' : 'enemy')) : ((casterIsHero && primaryTarget.id.startsWith('h')) || (!casterIsHero && primaryTarget.id.startsWith('e')));
                 const targetIsAlly = _primaryIsAlly;
                 if (isBeneficial) targets = targetIsAlly ? [primaryTarget] : [caster];
-                else if (!targetIsAlly && skill && skill.switchTarget && (!primaryTarget.isAlive || isIgnoredSummonTarget(caster, primaryTarget))) {
+                else if (!targetIsAlly && skill && skill.switchTarget && (!primaryTarget.isAlive || primaryTarget.isSubdued || isIgnoredSummonTarget(caster, primaryTarget))) {
                     // 【转火】：主目标已被前置攻击段击杀 → 本段随机转向其他存活敌人（近战仍受前排掩护限制）；无可转目标则本段静默跳过（不消耗弹药）
                     let _pool = opponents;
-                    if (casterIsHero && skill.damageType === '近战' && hasAliveFront() && !canBypassRow(caster, skill)) {
+                    if (casterIsHero && _dmgType === '近战' && hasAliveFront() && !canBypassRow(caster, skill)) {
                         const _f = opponents.filter(e => e.row !== 'back'); if (_f.length) _pool = _f;
                     }
                     if (_pool.length) {
@@ -14226,6 +14263,8 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         }
 
         if (caster.isSummon) targets = targets.filter(t => t && !isIgnoredSummonTarget(caster, t));
+        // 【制服】自动群体/随机/转火/召唤/普通反应一律不得补刀被制服目标；仅玩家手动选中的豁免目标可结算
+        targets = targets.filter(t => t && (!t.isSubdued || isManualSubduedExempt(skill, t)));
 
         // === 视觉效果由 [特效:xxx] 标签独立决定，与 tag 文字内容完全无关 ===
         // [特效:连续扫射] N敌=N线并发·快照·装饰性连发：fire-and-forget 起播（setInterval 50ms×52=2.6s），伤害并行结算，尾部阻塞至演出完结
@@ -14564,7 +14603,7 @@ function startRound() {
   if (!state.enemiesSpokenThisRound) state.enemiesSpokenThisRound = new Set(); else state.enemiesSpokenThisRound.clear();
   const allEntities = [];
   heroesData.forEach(h => {
-      if(h.isAlive) {
+      if(isCombatActive(h)) {
           const actCount = h.actCount || 1;
           // 用有效速度（基础 spd + 临时速度 buff）排轴，使速度增减在下一回合仍生效
           const effSpd = getEffectiveSpeed(h);
@@ -14578,7 +14617,7 @@ function startRound() {
       }
   });
   enemiesData.forEach(e => {
-      if(e.isAlive) {
+      if(isCombatActive(e)) {
           const actCount = e.actCount || 1;
           const effSpd = getEffectiveSpeed(e);
           for(let i=0; i<actCount; i++) allEntities.push({type: 'enemy', ref: e, isExtraTurn: i > 0, queueSpd: effSpd - (i * 10)});
@@ -14597,7 +14636,7 @@ function startRound() {
   // 隐匿者被动：一回合内未被敌方攻击命中 → 隐匿值 +10（每回合结束统一结算，被命中过的隐匿者不累积）
   // 置于排轴之后：gainStealth 触发的【再动】splice 不会因重建 actionQueue 而被丢弃
   heroesData.forEach(h => {
-    if (h.isAlive && h.classType === '隐匿者' && !h.stealthHitThisRound) {
+    if (isCombatActive(h) && h.classType === '隐匿者' && !h.stealthHitThisRound) {
       const p = CLASS_PASSIVES['隐匿者'];
       if (p && p.gainStealth) p.gainStealth(h, 10, document.getElementById(`hero-card-${h.id}`));
     }
@@ -14626,14 +14665,14 @@ async function nextTurn(token = combatToken) {
   }
   if (heroesData.filter(h => h.isAlive && !h.isSummon).length === 0) { showLog("全军覆没，战斗失败..."); showBattleResult('lose'); return; }
 
-  while(state.queueIndex < state.actionQueue.length && !state.actionQueue[state.queueIndex].ref.isAlive) state.queueIndex++;
+  while(state.queueIndex < state.actionQueue.length && !isCombatActive(state.actionQueue[state.queueIndex].ref)) state.queueIndex++;
   if (state.queueIndex >= state.actionQueue.length) { showLog(`—— 第 ${state.round} 回合 ——`); await sleep(800); if (token !== combatToken || _pipelineFrozen) return; startRound(); return; }
 
   renderTurnQueue(); const currentEntity = state.actionQueue[state.queueIndex];
   
   if (currentEntity.ref.isDefending) currentEntity.ref.isDefending = false;
   
-  if (!currentEntity.isExtraTurn) CombatEvents.emit(EVENTS.TURN_START, { entity: currentEntity.ref });
+  if (!currentEntity.isExtraTurn && !currentEntity.ref.isSubdued) CombatEvents.emit(EVENTS.TURN_START, { entity: currentEntity.ref });
   let isStunned = false;
   let paraSkipped = false; let paraLayers = 0;
   if (currentEntity.ref.buffs && currentEntity.ref.buffs.length > 0) {
@@ -14652,11 +14691,11 @@ async function nextTurn(token = combatToken) {
       if (!currentEntity.isExtraTurn) { 
           currentEntity.ref.buffs.forEach(b => {
               b.duration--;
-              if (b.type === 'poison' || b.type === 'burn') {
+              if (!currentEntity.ref.isSubdued && (b.type === 'poison' || b.type === 'burn')) {
                   let dotDmg = b.value;
                   // 【非致命】敌方 DoT 致死同样走总入口（复活优先→自爆敏捷对抗→普通制服；自爆拦截方=我方当前敏捷最高的存活者，否则敌人可能在轮到回合前被毒死，破坏非致命语义）
                   if (nonLethalSettings.enabled && !isHeroSideEntity(currentEntity.ref) && currentEntity.ref.hp - dotDmg <= 0) {
-                      const _dotInterceptor = heroesData.filter(h => h.isAlive).sort((a, b) => getEffectiveSpeed(b) - getEffectiveSpeed(a))[0] || null;
+                      const _dotInterceptor = heroesData.filter(h => h.isAlive && !h.isSubdued).sort((a, b) => getEffectiveSpeed(b) - getEffectiveSpeed(a))[0] || null;
                       dotDmg = resolveNonLethalLethal(currentEntity.ref, dotDmg, _dotInterceptor);
                   }
                   const isBurn = b.type === 'burn';
@@ -14734,7 +14773,7 @@ async function nextTurn(token = combatToken) {
   }
   if(currentEntity.type === 'hero') updateHeroUI(currentEntity.ref); else updateEnemyUI(currentEntity.ref);
 
-  if (isStunned) {
+  if (isStunned || currentEntity.ref.isSubdued) {
       const _subdued = currentEntity.ref.isSubdued;
       if (_subdued) {
           showLog(`[${currentEntity.ref.name}] 已被制服，无法行动！`);
@@ -14805,7 +14844,7 @@ async function endTurn(token = combatToken) {
     if (token !== combatToken || _pipelineFrozen) return; // 等待期间被重置：终止旧链
     const current = state.actionQueue[state.queueIndex];
     // === 回合结束事件 → 事件总线 (TURN_END) — 无载利时仅通知实体，技能信息由 executeSkillAction 单独 emit ===
-    if (current) CombatEvents.emit(EVENTS.TURN_END, { entity: current.ref, skill: null, isReactionTrigger: false });
+    if (current && isCombatActive(current.ref)) CombatEvents.emit(EVENTS.TURN_END, { entity: current.ref, skill: null, isReactionTrigger: false });
     state.queueIndex++;
     await nextTurn(token);
 }
@@ -14826,8 +14865,8 @@ async function attemptRetreat() {
   if (hero.currentDelay) { showLog(`⏳ ${hero.name} 正在蓄力，无法撤离！`); return; }
 
     // 【重伤】(hp≤50%) 成员速度按 50% 计入均速：我方重伤员拖慢撤离，敌方重伤员拖慢追击
-    const allyAvgs = heroesData.filter(h => h.isAlive).map(h => isWounded(h) ? getEffectiveSpeed(h) * 0.5 : getEffectiveSpeed(h));
-    const enemyAvgs = enemiesData.filter(e => e.isAlive).map(e => isWounded(e) ? getEffectiveSpeed(e) * 0.5 : getEffectiveSpeed(e));
+    const allyAvgs = heroesData.filter(h => h.isAlive && !h.isSubdued).map(h => isWounded(h) ? getEffectiveSpeed(h) * 0.5 : getEffectiveSpeed(h));
+    const enemyAvgs = enemiesData.filter(e => e.isAlive && !e.isSubdued).map(e => isWounded(e) ? getEffectiveSpeed(e) * 0.5 : getEffectiveSpeed(e));
     const allyAvg = allyAvgs.length ? allyAvgs.reduce((a, b) => a + b, 0) / allyAvgs.length : 0;
     const enemyAvg = enemyAvgs.length ? enemyAvgs.reduce((a, b) => a + b, 0) / enemyAvgs.length : 0;
     const allyWounded = heroesData.some(h => isWounded(h));
@@ -15132,6 +15171,20 @@ function isHighYieldSkill(skill, entity) {
 function selectEnemySkillAndTarget(enemy, validSkills, aliveEnemies, aliveHeroes) {
     if (validSkills.length === 0) return { selectedSkill: null, specificTarget: null };
 
+    if (enemy.isWise) {
+        const tags = skill => [skill.type, skill.type2, skill.type3].filter(Boolean).join('');
+        const selfGuard = validSkills.filter(skill => {
+            const t = tags(skill);
+            return !skill.isOthers && !/攻|单体|穿透|散射|眩晕/.test(t) && /单回]|群回]|防|盾|避|免伤/.test(t);
+        });
+        if (enemy.hp / enemy.maxHp <= 0.25 && selfGuard.length) {
+            return { selectedSkill: selfGuard[Math.floor(Math.random() * selfGuard.length)], specificTarget: enemy };
+        }
+        const burstTarget = aliveHeroes.find(h => isCombatActive(h) && h.burstActivated);
+        const disrupt = validSkills.filter(skill => /降|盲|滞|弱|中毒|燃烧|麻痹|缓|吸蓝|眩晕/.test(tags(skill)));
+        if (burstTarget && disrupt.length) return { selectedSkill: disrupt[Math.floor(Math.random() * disrupt.length)], specificTarget: burstTarget };
+    }
+
     // 基础信息
     const selfHpRatio = enemy.hp / enemy.maxHp;
     const injuredAlly = aliveEnemies.filter(e => e.hp / e.maxHp <= 0.4).sort((a,b) => a.hp/a.maxHp - b.hp/b.maxHp)[0];
@@ -15214,8 +15267,8 @@ async function executeSummonTurn(summon, token = combatToken) {
     if (token !== combatToken || _pipelineFrozen) return;
   // 召唤物回合复用敌方 AI 决策，但按召唤侧别决定敌我（避免英雄侧召唤攻击我方）
   const isHeroSide = summon.side === 'hero';
-  const allyPool = isHeroSide ? heroesData.filter(e => e.isAlive) : enemiesData.filter(e => e.isAlive);
-  const enemyPool = (isHeroSide ? enemiesData : heroesData).filter(e => e.isAlive && !isIgnoredSummonTarget(summon, e));
+  const allyPool = isHeroSide ? heroesData.filter(e => e.isAlive && !e.isSubdued) : enemiesData.filter(e => e.isAlive && !e.isSubdued);
+  const enemyPool = (isHeroSide ? enemiesData : heroesData).filter(e => e.isAlive && !e.isSubdued && !isIgnoredSummonTarget(summon, e));
   if (!enemyPool.length) { await endTurn(token); if (token !== combatToken || _pipelineFrozen) return; return; }
   // 直接复用同一套权重管线：把 allies/enemies 对调后调用现有评分器
   const _origValid = summon.skills.filter(s =>
@@ -15295,8 +15348,8 @@ async function executeEnemyTurn(enemy, token = combatToken) {
       !(enemy.cooldowns && enemy.cooldowns[s.name] > 0) &&
       !(s.type.includes('单') && s.type.includes('回') && enemy.hp >= enemy.maxHp * 0.95)
   );
-  const aliveEnemies = enemiesData.filter(e => e.isAlive);
-  const aliveHeroes = heroesData.filter(h => h.isAlive && !isIgnoredSummonTarget(enemy, h));
+  const aliveEnemies = enemiesData.filter(e => e.isAlive && !e.isSubdued);
+  const aliveHeroes = heroesData.filter(h => h.isAlive && !h.isSubdued && !isIgnoredSummonTarget(enemy, h));
   if (enemy.isSummon && !aliveHeroes.length) { await endTurn(token); if (token !== combatToken || _pipelineFrozen) return; return; }
 
   let selectedSkill = null; let specificTarget = null;
@@ -15482,7 +15535,7 @@ async function releaseCharge() {
 
 // 实际释放蓄力技能：结算原技能效果（含自身[加速]，由 executeSkillAction 统一施加）
 // 注意：MP/HP/TP 已在蓄力开始时实时扣除（handleChargeSkill），此处传 skipCost 避免重复扣除
-async function doReleaseCharge(hero, target) {
+async function doReleaseCharge(hero, target, manualTarget = null) {
     const _actionToken = combatToken;
     if (_pipelineFrozen) return;
   const entry = hero.currentDelay; if (!entry) { state.isAnimating = false; return; }
@@ -15496,7 +15549,7 @@ async function doReleaseCharge(hero, target) {
   updateHeroUI(hero);
   // 物品释放不触发极限爆发（与 executeItemAction 同口径：爆发留给攻击/技能，避免嗑药/道具烧掉满 TP）
   const multiplier = skill.isItem ? 1 : await triggerBurstIfNeeded(hero); if (_actionToken !== combatToken || _pipelineFrozen) return;
-  await executeSkillAction(hero, target, skill, multiplier, false, true); if (_actionToken !== combatToken || _pipelineFrozen) return;
+  await executeSkillAction(hero, target, skill, multiplier, false, true, null, manualTarget); if (_actionToken !== combatToken || _pipelineFrozen) return;
   await endTurn(token); if (_actionToken !== combatToken || _pipelineFrozen) return;
 }
 
@@ -15967,6 +16020,7 @@ async function handleTargetClick(target, targetType) {
      return;
   }
   if (state.isAnimating || !target.isAlive) return;
+  if (target.isSubdued && (targetType !== 'enemy' || state.pendingAction?.isBeneficial)) return;
   // ---- 前后排：单体近战点后排拦截（有前排时近战不可突进后排，顶部提示后回退不耗回合）；越前排（征伐者被动 / [突进]）放行 ----
   {
     const _pa = state.pendingAction;
@@ -15974,13 +16028,13 @@ async function handleTargetClick(target, targetType) {
     let _curDmg = null; let _curSkill = null;
     if (_pa) {
       if (_pa.type === 'release_charge') { const _e = _actor?.currentDelay?.skill; if (_e) { _curSkill = _e; _curDmg = _e.damageType || '近战'; } }
-      else if (_pa.type === 'skill') { const _s = _actor?.skills?.[_pa.skillIndex]; if (_s) { _curSkill = _s; _curDmg = _s.damageType || null; } }
-      else if (_pa.type === 'item') { const _it = _actor?.items?.[_pa.itemIndex]; if (_it) { _curSkill = _it; _curDmg = _it.damageType || null; } }
-      else if (_pa.type === 'grouped_item') { const _gc = _actor?.items?.[_pa.itemIndex]?.children?.[_pa.childIndex]; if (_gc) { _curSkill = _gc; _curDmg = _gc.damageType || null; } }
+      else if (_pa.type === 'skill') { const _s = _actor?.skills?.[_pa.skillIndex]; if (_s) { _curSkill = _s; _curDmg = _s.damageType || '近战'; } }
+      else if (_pa.type === 'item') { const _it = _actor?.items?.[_pa.itemIndex]; if (_it) { _curSkill = _it; _curDmg = _it.damageType || '近战'; } }
+      else if (_pa.type === 'grouped_item') { const _gc = _actor?.items?.[_pa.itemIndex]?.children?.[_pa.childIndex]; if (_gc) { _curSkill = _gc; _curDmg = _gc.damageType || '近战'; } }
       else if (_pa.type === 'attack') _curDmg = '近战';
     }
     const _rowBypass = canBypassRow(_actor, _curSkill);
-    if (_curDmg === '近战' && targetType === 'enemy' && target.row === 'back' && hasAliveFront() && !_rowBypass) {
+    if (_curDmg === '近战' && targetType === 'enemy' && target.row === 'back' && !target.isSubdued && hasAliveFront() && !_rowBypass) {
       showLog('前排未清，近战无法突进后排'); cancelTargeting(); const _h = _actor; if (_h) updateMenu(_h); return;
     }
     if (_curDmg === '近战' && targetType === 'enemy' && target.row === 'back' && _rowBypass) logRowBypass(_actor, _curSkill);
@@ -15994,7 +16048,7 @@ async function handleTargetClick(target, targetType) {
       if (!hasEnemyTargetTag && hasOthers && hasSingleBuff && targetType !== 'hero') return;
       const chosen = target;
       cancelTargeting(); state.isAnimating = true;
-      await doReleaseCharge(hero, chosen); if (_actionToken !== combatToken || _pipelineFrozen) return;
+      await doReleaseCharge(hero, chosen, chosen); if (_actionToken !== combatToken || _pipelineFrozen) return;
       return;
   }
   if (action.type === 'supporter_burst') {
@@ -16027,11 +16081,14 @@ async function handleTargetClick(target, targetType) {
   
   // 物品使用不触发极限爆发（爆发留给攻击/技能，避免嗑药烧掉满 TP）
   const multiplier = (action.type === 'item') ? 1 : await triggerBurstIfNeeded(hero); if (_actionToken !== combatToken || _pipelineFrozen) return;
+  // 【制服】玩家角色（非召唤）手动选中已被制服的敌人 → 本次动作允许伤害补刀（非致命关闭时才真正结算）；
+  // 自动群体/随机/转火/召唤/普通反应不经过此路径，故不会补刀。
+
   if (action.type === 'attack') {
     // 普攻TP恢复：编辑器"普攻恢复TP"配置（默认20点），不再写死
     if(multiplier === 1) hero.tp = Math.min(hero.maxTp, hero.tp + (defendSettings.basicAttackTp || 0));
     const mockAttackSkill = { type: '[单体]', type2: '[无]', type3: '[无]', power: 0, power2: 0, power3: 0, hit: action.hit, cost: 0, hpCost: 0, tpCost: 0, name: '普攻', damageType: '近战', isReaction: false, reactionTarget: 'all' };
-    await executeSkillAction(hero, target, mockAttackSkill, multiplier); if (_actionToken !== combatToken || _pipelineFrozen) return;
+    await executeSkillAction(hero, target, mockAttackSkill, multiplier, false, false, null, target); if (_actionToken !== combatToken || _pipelineFrozen) return;
   } else if (action.type === 'skill') {
     const skill = hero.skills[action.skillIndex];
     const isExtraTurnSkill = (skill.type && skill.type.includes('再动')) || (skill.type2 && skill.type2.includes('再动')) || (skill.type3 && skill.type3.includes('再动'));
@@ -16039,16 +16096,16 @@ async function handleTargetClick(target, targetType) {
     if (hero.mp < skill.cost || hero.hp <= (skill.hpCost || 0) || hero.tp < (skill.tpCost || 0) || isUsedExtraTurn) { 
         if (isUsedExtraTurn) showLog("该再动技能每回合限用一次！"); else showLog("释放条件不足！"); state.isAnimating = false; return; 
     }
-    await executeSkillAction(hero, target, skill, multiplier); if (_actionToken !== combatToken || _pipelineFrozen) return;
+    await executeSkillAction(hero, target, skill, multiplier, false, false, null, target); if (_actionToken !== combatToken || _pipelineFrozen) return;
   } else if (action.type === 'item') {
-    const ok = await executeItemAction(action.itemIndex, target); if (_actionToken !== combatToken || _pipelineFrozen) return;
+    const ok = await executeItemAction(action.itemIndex, target, target); if (_actionToken !== combatToken || _pipelineFrozen) return;
     if (!ok) { state.isAnimating = false; return; }
   } else if (action.type === 'grouped_item') {
     // 变体组道具子技能：目标已选定，直接结算（父库存/MP 已在 prepare 校验，此处再兜底一次道具可用性）
     const _gIt = hero.items && hero.items[action.itemIndex];
     const _gChild = _gIt && _gIt.children && _gIt.children[action.childIndex];
     if (!_gIt || !_gChild || !isItemUsable(_gIt)) { showLog("该道具当前无法使用！"); state.isAnimating = false; return; }
-    await executeGroupedItemSkill(hero, target, _gIt, _gChild); if (_actionToken !== combatToken || _pipelineFrozen) return;
+    await executeGroupedItemSkill(hero, target, _gIt, _gChild, target); if (_actionToken !== combatToken || _pipelineFrozen) return;
   }
   await endTurn(token); if (_actionToken !== combatToken || _pipelineFrozen) return;
 }
@@ -16098,7 +16155,7 @@ function itemToPseudoSkill(item) {
 // 物品使用核心：执行效果结算，不推进回合——回合结束由调用方负责
 //（prepareItemTarget 自施路径自行 endTurn；handleTargetClick 目标路径由外层统一 endTurn）
 // 严禁在此设 isAnimating 守卫：handleTargetClick 进入目标选择时已置位动画锁，守卫会导致"有物品效果的技能直接跳过回合"
-async function executeItemAction(itemIndex, primaryTarget) {
+async function executeItemAction(itemIndex, primaryTarget, manualTarget = null) {
     const _actionToken = combatToken;
     if (_pipelineFrozen) return;
   const hero = state.actionQueue[state.queueIndex].ref;
@@ -16110,7 +16167,7 @@ async function executeItemAction(itemIndex, primaryTarget) {
   const isExtraTurnItem = [item.type, item.type2, item.type3].some(t => t && t.includes('再动'));
   if (isExtraTurnItem && state.usedExtraTurnSkillsThisRound && state.usedExtraTurnSkillsThisRound.has(item.name)) { showLog("该再动物品每回合限用一次！"); return false; }
   state.isAnimating = true; closeItemMenu();
-  await executeSkillAction(hero, primaryTarget, itemToPseudoSkill(item), 1); if (_actionToken !== combatToken || _pipelineFrozen) return;
+  await executeSkillAction(hero, primaryTarget, itemToPseudoSkill(item), 1, false, false, null, manualTarget); if (_actionToken !== combatToken || _pipelineFrozen) return;
   return true;
 }
 
@@ -16212,11 +16269,11 @@ async function prepareGroupedItemSkill(itemIndex, childIndex) {
   await endTurn(token);
 }
 
-async function executeGroupedItemSkill(hero, primaryTarget, item, child) {
+async function executeGroupedItemSkill(hero, primaryTarget, item, child, manualTarget = null) {
     const _actionToken = combatToken;
     if (_pipelineFrozen) return;
   const pseudo = groupedItemChildToPseudoSkill(item, child);
-  await executeSkillAction(hero, primaryTarget, pseudo, 1); if (_actionToken !== combatToken || _pipelineFrozen) return;
+  await executeSkillAction(hero, primaryTarget, pseudo, 1, false, false, null, manualTarget); if (_actionToken !== combatToken || _pipelineFrozen) return;
 }
 
 async function actionDefend() {

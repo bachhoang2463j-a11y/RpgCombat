@@ -152,8 +152,8 @@
         await w.executeSummonTurn(summon);
         check(!!cap.enemyPool && cap.enemyPool.length === 1 && cap.enemyPool[0].name === '敌乙',
           '真实：异侧过滤只作用于对手池（被制服敌方已剔除）');
-        check(!!cap.allyPool && cap.allyPool.some((e) => e.name === '被制服友军'),
-          '真实：友方池不被过滤（同侧被制服友军仍在，友方增益对象保留）');
+        check(!!cap.allyPool && !cap.allyPool.some((e) => e.name === '被制服友军'),
+          '真实：友方池排除制服友军（治疗与增益不再作用）');
       } catch (e) {
         check(false, '真实：executeSummonTurn 场景异常', String((e && e.message) || e));
       } finally {

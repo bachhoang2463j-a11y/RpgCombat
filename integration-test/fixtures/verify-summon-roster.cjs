@@ -207,6 +207,8 @@ async function runEngine(enginePath, openSrc) {
     const turnFactory = (ctx) => new Function('ctx', [
       extractDecl(src, 'isHeroSideEntity'),
       iitDecl(src),
+      extractDecl(src, 'isCombatActive'),
+      extractDecl(src, 'isManualSubduedExempt'),
       sumSrc,
       'let heroesData = ctx.heroes, enemiesData = ctx.enemies;',
       'const combatToken = {}; const _pipelineFrozen = false;',
@@ -274,8 +276,8 @@ async function runEngine(enginePath, openSrc) {
       await runD(summon);
       R.real(!!recD.cap && recD.cap.enemyPool.length === 1 && recD.cap.enemyPool[0].name === '敌乙',
         '异侧过滤只作用于对手池（被制服敌方已剔除）');
-      R.real(!!recD.cap && recD.cap.allyPool.some((e) => e.name === '被制服友军'),
-        '友方池不被过滤（同侧被制服友军仍在，友方增益对象保留）');
+      R.real(!!recD.cap && !recD.cap.allyPool.some((e) => e.name === '被制服友军'),
+        '友方池排除制服友军（治疗与增益不再作用）');
     } catch (e) {
       R.real(false, 'executeSummonTurn 真实执行异常：' + e.message);
     }
@@ -295,6 +297,8 @@ async function runEngine(enginePath, openSrc) {
     const enemyTurnFactory = (ctx) => new Function('ctx', [
       extractDecl(src, 'isHeroSideEntity'),
       iitDecl(src),
+      extractDecl(src, 'isCombatActive'),
+      extractDecl(src, 'isManualSubduedExempt'),
       etSrc,
       'let heroesData = ctx.heroes, enemiesData = ctx.enemies;',
       'const combatToken = {}; const _pipelineFrozen = false;',
@@ -361,6 +365,8 @@ async function runEngine(enginePath, openSrc) {
     const skillFactory = (ctx) => new Function('ctx', [
       extractDecl(src, 'isHeroSideEntity'),
       iitDecl(src),
+      extractDecl(src, 'isCombatActive'),
+      extractDecl(src, 'isManualSubduedExempt'),
       extractDecl(src, 'SELF_DEBUFF_KEYS'),
       extractDecl(src, 'isSelfDebuffTag') || 'function isSelfDebuffTag(){ return false; }',
       skSrc,
@@ -435,7 +441,7 @@ async function runEngine(enginePath, openSrc) {
     R.pendingStat(false, 'applySingleTagEffect 直连保护（真实执行）', '函数或 helper 未落地');
   } else {
     try {
-      const astFn = buildSandbox(['const combatToken = {}; const _pipelineFrozen = false;', extractDecl(src, 'isHeroSideEntity'), iitDecl(src), astDecl],
+      const astFn = buildSandbox(['const combatToken = {}; const _pipelineFrozen = false;', extractDecl(src, 'isHeroSideEntity'), iitDecl(src), extractDecl(src, 'isCombatActive'), extractDecl(src, 'isManualSubduedExempt'), astDecl],
         ['applySingleTagEffect']).applySingleTagEffect;
       const caster = { id: 's_p', name: '测试召唤物', isSummon: true, side: 'hero', isAlive: true };
       const victim = { id: 'e_p', name: '被制服敌', isAlive: true, hp: 7, maxHp: 100, buffs: [], isSubdued: true };
