@@ -124,14 +124,14 @@
         // A：敌方全员被制服 → 直接 endTurn，不出手
         setData([summon], [mkE('e_t1', '敌甲', { isSubdued: true, buffs: [{ type: 'stun', permanent: true }] }),
                            mkE('e_t2', '敌乙', { isSubdued: true, buffs: [{ type: 'stun', permanent: true }] })]);
-        await w.executeSummonTurn(summon, {});
+        await w.executeSummonTurn(summon);
         check(rec.end >= 1, '真实：召唤物遇全员被制服敌池 → 调用 endTurn 安全收尾');
         check(rec.skill === 0, '真实：召唤物不向被制服目标出手（executeSkillAction 0 次）');
 
         // B：仅普通眩晕（非制服）→ 不被忽略，仍出手
         rec.skill = 0; rec.end = 0; rec.targets.length = 0;
         setData([summon], [mkE('e_t3', '敌丙', { buffs: [{ type: 'stun' }] })]);
-        await w.executeSummonTurn(summon, {});
+        await w.executeSummonTurn(summon);
         check(rec.skill === 1 && rec.targets[0] === '敌丙', '真实：仅普通眩晕的目标未被忽略，召唤物仍对其出手');
 
         // C：异侧（敌方）召唤物，我方全员被制服 → 同样空池安全结束
@@ -140,7 +140,7 @@
         setData([mkE('h_t1', '勇甲', { isSubdued: true, buffs: [{ type: 'stun', permanent: true }] }),
                  mkE('h_t2', '勇乙', { isSubdued: true, buffs: [{ type: 'stun', permanent: true }] })],
                 [mkE('e_ally1', '敌援')]);
-        await w.executeSummonTurn(enemySummon, {});
+        await w.executeSummonTurn(enemySummon);
         check(rec.end >= 1 && rec.skill === 0, '真实：异侧（敌方）召唤物 × 我方全员被制服 → 同样 endTurn 安全结束');
 
         // D：异侧过滤只作用于对手池；同侧被制服友军保留（友方增益不被过滤）
@@ -149,7 +149,7 @@
         selectImpl = function (caster, valid, a3, a4) { cap.enemyPool = a3; cap.allyPool = a4; return { selectedSkill: null, specificTarget: null }; };
         setData([summon, mkE('h_ally', '被制服友军', { isSubdued: true, buffs: [{ type: 'stun', permanent: true }] })],
                 [mkE('e_x1', '敌甲', { isSubdued: true, buffs: [{ type: 'stun', permanent: true }] }), mkE('e_x2', '敌乙')]);
-        await w.executeSummonTurn(summon, {});
+        await w.executeSummonTurn(summon);
         check(!!cap.enemyPool && cap.enemyPool.length === 1 && cap.enemyPool[0].name === '敌乙',
           '真实：异侧过滤只作用于对手池（被制服敌方已剔除）');
         check(!!cap.allyPool && cap.allyPool.some((e) => e.name === '被制服友军'),
@@ -188,7 +188,7 @@
         setData([mkE('h_s1', '勇甲', { isSubdued: true, buffs: [{ type: 'stun', permanent: true }] }),
                  mkE('h_s2', '勇乙', { isSubdued: true, buffs: [{ type: 'stun', permanent: true }] })],
                 [mkE('e_ally9', '敌援')]);
-        await w.executeEnemyTurn(enemySummon, {});
+        await w.executeEnemyTurn(enemySummon);
         check(rec.end >= 1 && rec.skill === 0, '真实：executeEnemyTurn 敌方召唤 × 我方全员被制服 → endTurn 安全结束');
 
         rec.skill = 0; rec.end = 0; rec.targets.length = 0;
@@ -197,7 +197,7 @@
         etSelect = function (caster, valid, a3, a4) { cap.ally = a3; cap.targets = a4; throw STOP; };
         setData([mkE('h_s3', '勇丙', { isSubdued: true, buffs: [{ type: 'stun', permanent: true }] }), mkE('h_s4', '勇丁')],
                 [mkE('e_ally10', '敌援')]);
-        try { await w.executeEnemyTurn(enemySummon, {}); } catch (e) { if (e !== STOP) throw e; }
+        try { await w.executeEnemyTurn(enemySummon); } catch (e) { if (e !== STOP) throw e; }
         check(!!cap.targets && cap.targets.length === 1 && cap.targets[0].name === '勇丁',
           '真实：executeEnemyTurn 我方池按侧别过滤（被制服我方已剔除）');
         check(!!cap.ally && cap.ally.some((e) => e.name === '敌援'),
