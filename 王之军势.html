@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>王之军势 (Ionian Hetairoi) - 2D 靶向技能 VFX 预览</title>
+<style>
+  :root {
+    --vfx-speed: 1;
+    --bg-dark: #100c08;
+    --gold-bright: #fff3b0;
+    --gold-main: #ffbe2e;
+    --gold-deep: #c96f08;
+    --sand-light: #e7b56b;
+    --sand-dark: #7d4918;
+    --crimson-accent: #d92b2b;
+  }
+
+  * {
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 50% 42%, #2b1d11 0%, #150e08 55%, #090604 100%);
+    color: #f6e7c8;
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* 顶部標題与阶段指示器 */
+  .hud-header {
+    position: fixed;
+    top: 22px;
+    text-align: center;
+    z-index: 20;
+    pointer-events: none;
+  }
+
+  .hud-title {
+    margin: 0;
+    font-size: 22px;
+    letter-spacing: 3px;
+    font-weight: 900;
+    color: var(--gold-bright);
+    text-shadow: 0 2px 0 #572800, 0 0 18px rgba(255, 180, 35, 0.55);
+  }
+
+  .hud-subtitle {
+    margin-top: 4px;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    color: #c8a675;
+    opacity: 0.85;
+  }
+
+  .phase-banner {
+    margin-top: 8px;
+    display: inline-block;
+    padding: 3px 14px;
+    border-radius: 999px;
+    background: rgba(36, 22, 10, 0.85);
+    border: 1px solid rgba(255, 190, 46, 0.45);
+    color: var(--gold-main);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    min-height: 24px;
+    line-height: 18px;
+  }
+
+  /* 战斗舞台容器（带全局创伤震屏） */
+  .battle-stage {
+    position: relative;
+    width: 640px;
+    height: 460px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 16px;
+    background:
+      radial-gradient(ellipse at 50% 78%, rgba(190, 112, 28, 0.16) 0%, rgba(0, 0, 0, 0) 68%),
+      linear-gradient(180deg, rgba(28, 18, 10, 0.5) 0%, rgba(15, 9, 5, 0.85) 100%);
+    border: 1px solid rgba(255, 195, 77, 0.18);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), inset 0 0 50px rgba(0, 0, 0, 0.65);
+    overflow: hidden;
+  }
+
+  /* 地面网格透视装饰线 */
+  .stage-floor {
+    position: absolute;
+    bottom: 54px;
+    width: 480px;
+    height: 86px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(231, 165, 68, 0.22) 0%, rgba(125, 73, 24, 0.08) 52%, transparent 75%);
+    border: 2px solid rgba(255, 190, 46, 0.16);
+    transform: scaleY(0.42);
+    pointer-events: none;
+  }
+
+  /* 敌方受击靶卡 */
+  .target-card {
+    position: relative;
+    width: 196px;
+    height: 268px;
+    border-radius: 12px;
+    background: linear-gradient(165deg, #2a211b 0%, #17120e 60%, #0d0a08 100%);
+    border: 3px solid #6f5638;
+    box-shadow:
+      0 14px 32px rgba(0, 0, 0, 0.8),
+      inset 0 0 0 2px #1c140e,
+      inset 0 0 24px rgba(0, 0, 0, 0.85);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 12px;
+    z-index: 5;
+    transform-origin: 50% 82%;
+    transition: border-color 0.15s ease;
+  }
+
+  .target-card.is-hit {
+    border-color: var(--gold-bright);
+  }
+
+  /* 受击白闪/金闪遮罩 */
+  .target-flash {
+    position: absolute;
+    inset: 0;
+    border-radius: 9px;
+    background: linear-gradient(135deg, #ffffff 0%, #ffe07d 55%, #ff8800 100%);
+    opacity: 0;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    z-index: 6;
+  }
+
+  .target-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 800;
+    color: #d8c29d;
+    letter-spacing: 0.5px;
+    z-index: 2;
+  }
+
+  .target-class-badge {
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: #471818;
+    border: 1px solid #a8383b;
+    color: #ff9d9d;
+    font-size: 10px;
+  }
+
+  .target-art {
+    position: relative;
+    flex: 1;
+    margin: 8px 0;
+    border-radius: 8px;
+    background:
+      radial-gradient(circle at 50% 38%, rgba(217, 43, 43, 0.25), transparent 68%),
+      #120e0b;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .target-art svg {
+    width: 118px;
+    height: 138px;
+    filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.75));
+  }
+
+  .target-footer {
+    z-index: 2;
+  }
+
+  .hp-bar-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #e2cca8;
+    margin-bottom: 4px;
+    font-weight: 700;
+  }
+
+  .hp-track {
+    width: 100%;
+    height: 9px;
+    background: #0b0806;
+    border-radius: 99px;
+    border: 1px solid #4d3924;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .hp-fill {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, #b82323 0%, #f24e29 60%, #ff9b42 100%);
+    transition: width 0.08s linear;
+  }
+
+  /* 锚定在靶卡正上方的透明 2D VFX 图层 */
+  .vfx-overlay-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .vfx-svg-root {
+    width: 640px;
+    height: 460px;
+    overflow: visible;
+  }
+
+  /* 浮动暴击伤害数字容器 */
+  .damage-popup-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 15;
+  }
+
+  .dmg-num {
+    position: absolute;
+    font-family: "Impact", "Arial Black", sans-serif;
+    font-weight: 900;
+    font-style: italic;
+    color: #fff6c5;
+    -webkit-text-stroke: 2px #4a1c00;
+    text-shadow:
+      0 3px 0 #2b0d00,
+      0 0 14px rgba(255, 174, 0, 0.9);
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0;
+    white-space: nowrap;
+    animation: dmgPop calc(520ms / var(--vfx-speed)) cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+  }
+
+  .dmg-num.is-final {
+    font-size: 46px !important;
+    color: #ffffff;
+    -webkit-text-stroke: 2.5px #7a1200;
+    text-shadow:
+      0 4px 0 #380400,
+      0 0 24px #ffae00,
+      0 0 42px #ff3c00;
+    animation: dmgFinalPop calc(880ms / var(--vfx-speed)) cubic-bezier(0.15, 0.9, 0.25, 1.2) forwards;
+  }
+
+  /* 控制面板 */
+  .control-bar {
+    margin-top: 20px;
+    display: flex;
+    gap: 12px;
+    z-index: 20;
+    background: rgba(24, 16, 10, 0.9);
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 190, 46, 0.3);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65);
+  }
+
+  .ctrl-btn {
+    appearance: none;
+    border: 2px solid #8c5c20;
+    background: linear-gradient(180deg, #3c2610 0%, #221407 100%);
+    color: #f9e3b4;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.8px;
+    padding: 9px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.14s ease;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    box-shadow: inset 0 1px 0 rgba(255, 232, 175, 0.25), 0 4px 10px rgba(0, 0, 0, 0.45);
+  }
+
+  .ctrl-btn:hover {
+    border-color: var(--gold-main);
+    color: #ffffff;
+    transform: translateY(-1px);
+  }
+
+  .ctrl-btn:active {
+    transform: translateY(1px);
+  }
+
+  .ctrl-btn.primary {
+    background: linear-gradient(180deg, #d47b14 0%, #8f4305 100%);
+    border-color: #ffd369;
+    color: #fffdf5;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  }
+
+  .ctrl-btn.active {
+    background: linear-gradient(180deg, #9c2418 0%, #5c1009 100%);
+    border-color: #ff9c7d;
+    color: #fff;
+    box-shadow: 0 0 14px rgba(255, 94, 58, 0.55);
+  }
+
+  .key-hint {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+  }
+
+  /* =========================================================
+     [CSS Keyframes]
+     ========================================================= */
+
+  /* 命中顿帧 (Hitstop 40~60ms)：冻结全部动画与过渡 */
+  .is-hitstop,
+  .is-hitstop *,
+  .is-hitstop *::before,
+  .is-hitstop *::after {
+    animation-play-state: paused !important;
+    transition: none !important;
+  }
+
+  @keyframes dmgPop {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -10%) scale(0.25) rotate(-8deg);
+    }
+    22% {
+      opacity: 1;
+      transform: translate(-50%, -65%) scale(1.22) rotate(3deg);
+    }
+    45% {
+      transform: translate(-50%, -80%) scale(0.95) rotate(0deg);
+    }
+    80% {
+      opacity: 1;
+      transform: translate(-50%, -105%) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translate(-50%, -135%) scale(0.75);
+    }
+  }
+
+  @keyframes dmgFinalPop {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, 0%) scale(0.2);
+    }
+    18% {
+      opacity: 1;
+      transform: translate(-50%, -70%) scale(1.48) rotate(-4deg);
+    }
+    36% {
+      transform: translate(-50%, -62%) scale(1.08) rotate(2deg);
+    }
+    78% {
+      opacity: 1;
+      transform: translate(-50%, -88%) scale(1.12);
+    }
+    100% {
+      opacity: 0;
+      transform: translate(-50%, -125%) scale(0.85);
+    }
+  }
+
+  /* 靶卡高频穿刺受击抖动 */
+  @keyframes targetPierceJitter {
+    0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+    20% { transform: translate(11px, -7px) rotate(3.2deg) scale(0.95, 1.04); }
+    45% { transform: translate(-9px, 5px) rotate(-2.5deg) scale(1.04, 0.96); }
+    70% { transform: translate(6px, -4px) rotate(1.5deg) scale(0.98, 1.02); }
+    100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  }
+
+  /* 靶卡终结重创击退 */
+  @keyframes targetFinalCrush {
+    0% { transform: translate(0, 0) scale(1); }
+    12% { transform: translate(22px, -16px) rotate(7deg) scale(0.84, 1.14); }
+    26% { transform: translate(-18px, 12px) rotate(-5.5deg) scale(1.12, 0.88); }
+    42% { transform: translate(14px, -8px) rotate(3.8deg) scale(0.93, 1.06); }
+    60% { transform: translate(-9px, 5px) rotate(-2.2deg) scale(1.03, 0.97); }
+    80% { transform: translate(4px, -2px) rotate(1deg) scale(1); }
+    100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  }
+
+  /* 舞台级创伤屏幕震颤 (Trauma Screen Shake) */
+  @keyframes stageTraumaShake {
+    0% { transform: translate(0, 0) rotate(0deg); }
+    8% { transform: translate(-16px, 11px) rotate(-1.4deg); }
+    16% { transform: translate(15px, -13px) rotate(1.3deg); }
+    24% { transform: translate(-13px, -9px) rotate(-1.1deg); }
+    32% { transform: translate(12px, 10px) rotate(0.95deg); }
+    42% { transform: translate(-10px, 7px) rotate(-0.75deg); }
+    54% { transform: translate(8px, -6px) rotate(0.55deg); }
+    68% { transform: translate(-6px, 4px) rotate(-0.35deg); }
+    84% { transform: translate(3px, -2px) rotate(0.2deg); }
+    100% { transform: translate(0, 0) rotate(0deg); }
+  }
+
+  /* 结界热浪地板扩散 */
+  @keyframes desertMiragePulse {
+    0% { opacity: 0; transform: scale(0.35); }
+    25% { opacity: 0.95; transform: scale(1.03); }
+    80% { opacity: 0.9; transform: scale(1.08); }
+    100% { opacity: 0; transform: scale(1.25); }
+  }
+
+  /* 黄沙风暴卷动 */
+  @keyframes sandVortexSweep {
+    0% {
+      stroke-dashoffset: 520;
+      opacity: 0;
+      transform: translateX(-80px) scaleY(0.7);
+    }
+    25% {
+      opacity: 0.92;
+    }
+    75% {
+      opacity: 0.85;
+    }
+    100% {
+      stroke-dashoffset: 0;
+      opacity: 0;
+      transform: translateX(70px) scaleY(1.15);
+    }
+  }
+</style>
+</head>
+<body>
+
+  <header class="hud-header">
+    <h1 class="hud-title">王之军势 · IONIAN HETAIROI</h1>
+    <div class="hud-subtitle">Epic Toon FX (2D Flat Cel-Shaded) · Target Battle Animation</div>
+    <div id="phaseBanner" class="phase-banner">待命 · 按 [Space] 召唤固有结界</div>
+  </header>
+
+  <main id="battleStage" class="battle-stage">
+    <div class="stage-floor"></div>
+
+    <!-- 敌方受击靶卡 -->
+    <div id="targetCard" class="target-card">
+      <div id="targetFlash" class="target-flash"></div>
+      <div class="target-header">
+        <span>ASSASSIN SHADOW</span>
+        <span class="target-class-badge">LV.90 敌阵</span>
+      </div>
+      <div class="target-art">
+        <!-- 纯 SVG 赛璐珞敌方剪影立绘 -->
+        <svg viewBox="0 0 120 140" aria-hidden="true">
+          <defs>
+            <linearGradient id="enemyCloak" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#3c2f47" />
+              <stop offset="100%" stop-color="#140d1c" />
+            </linearGradient>
+          </defs>
+          <!-- 背部暗影光环 -->
+          <circle cx="60" cy="64" r="44" fill="none" stroke="#852727" stroke-width="2.5" stroke-dasharray="8 5" opacity="0.65" />
+          <!-- 披风与肩甲 -->
+          <path d="M18 134 L30 58 L46 46 L74 46 L90 58 L102 134 Z" fill="url(#enemyCloak)" stroke="#6d5682" stroke-width="2.5" />
+          <path d="M24 66 L45 52 L39 82 Z" fill="#271d30" stroke="#8a6fa3" stroke-width="2" />
+          <path d="M96 66 L75 52 L81 82 Z" fill="#271d30" stroke="#8a6fa3" stroke-width="2" />
+          <!-- 骷髅假面兜帽 -->
+          <path d="M40 50 C40 24, 80 24, 80 50 L74 68 L46 68 Z" fill="#1d1624" stroke="#9b84b3" stroke-width="2.5" />
+          <path d="M47 46 L56 51 L48 55 Z" fill="#ff3b3b" />
+          <path d="M73 46 L64 51 L72 55 Z" fill="#ff3b3b" />
+          <!-- 胸口核心 -->
+          <polygon points="60,72 68,85 60,98 52,85" fill="#d92b2b" stroke="#ff9e7d" stroke-width="2" />
+        </svg>
+      </div>
+      <div class="target-footer">
+        <div class="hp-bar-row">
+          <span>HP</span>
+          <span id="hpText">24,800 / 24,800</span>
+        </div>
+        <div class="hp-track">
+          <div id="hpFill" class="hp-fill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 透明叠加 2D 技能特效容器（直接锚定在靶卡正上方） -->
+    <div id="vfxContainer" class="vfx-overlay-layer"></div>
+    <!-- 浮动暴击跳字层 -->
+    <div id="damageLayer" class="damage-popup-layer"></div>
+  </main>
+
+  <nav class="control-bar">
+    <button id="btnCast" class="ctrl-btn primary" type="button">
+      <span>⚔️ 释放技能</span>
+      <span class="key-hint">Space</span>
+    </button>
+    <button id="btnLoop" class="ctrl-btn" type="button">
+      <span>🔁 自动循环: 关</span>
+    </button>
+    <button id="btnSlow" class="ctrl-btn" type="button">
+      <span>⏱️ 0.2x 慢放审视: 关</span>
+    </button>
+  </nav>
+
+<script>
+/* =========================================================
+   [SVG Defs & Filters]
+   纯 2D 扁平赛璐珞矢量资源、大漠热浪折射滤镜 (<feTurbulence> + <feDisplacementMap>)、
+   王之军势骑兵锋芒剪影与黄金长枪预设
+   ========================================================= */
+function buildSkillSVGMarkup() {
+  return `
+  <svg class="vfx-svg-root" viewBox="0 0 640 460" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <!-- 阶段1：炙热大漠热浪 2D 空气折射滤镜 -->
+      <filter id="heatHazeFilter" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+        <feTurbulence id="heatTurbulence" type="fractalNoise" baseFrequency="0.018 0.065" numOctaves="2" seed="7" result="noise">
+          <animate attributeName="baseFrequency" values="0.016 0.055;0.028 0.095;0.016 0.055" dur="0.75s" repeatCount="indefinite" />
+        </feTurbulence>
+        <feDisplacementMap id="heatDisplace" in="SourceGraphic" in2="noise" scale="26" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+
+      <!-- 赛璐珞硬边高光发光滤镜 -->
+      <filter id="celGoldGlow" x="-30%" y="-30%" width="160%" height="160%">
+        <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#ffae00" flood-opacity="0.95" />
+        <feDropShadow dx="0" dy="0" stdDeviation="11" flood-color="#ff5100" flood-opacity="0.65" />
+      </filter>
+
+      <!-- 大漠结界炽阳渐变 -->
+      <radialGradient id="ionianSunGrad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#fff8d6" stop-opacity="0.95" />
+        <stop offset="32%" stop-color="#ffbe2e" stop-opacity="0.78" />
+        <stop offset="68%" stop-color="#d95b00" stop-opacity="0.38" />
+        <stop offset="100%" stop-color="#591c00" stop-opacity="0" />
+      </radialGradient>
+
+      <!-- 黄金枪芒线性渐变 -->
+      <linearGradient id="spearGoldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#6e2b00" stop-opacity="0" />
+        <stop offset="35%" stop-color="#ff9d14" stop-opacity="0.92" />
+        <stop offset="78%" stop-color="#ffef9e" stop-opacity="1" />
+        <stop offset="100%" stop-color="#ffffff" stop-opacity="1" />
+      </linearGradient>
+
+      <!-- 绯红征服王披风与战意渐变 -->
+      <linearGradient id="crimsonCapeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#ff4b2b" />
+        <stop offset="60%" stop-color="#b81414" />
+        <stop offset="100%" stop-color="#4d0303" />
+      </linearGradient>
+
+      <!-- 2D 扁平手绘风格：黄金骑枪标准件 (朝右，原点在枪尖) -->
+      <g id="celGoldenSpear">
+        <!-- 拖尾破空光带 -->
+        <polygon points="-240,-5 -42,-11 0,0 -42,11 -240,5" fill="url(#spearGoldGrad)" />
+        <!-- 赛璐珞深色硬边外框与枪刃 -->
+        <polygon points="-58,-13 18,0 -58,13 -44,0" fill="#fff7c2" stroke="#471a00" stroke-width="2.5" />
+        <!-- 枪缨红绸 -->
+        <path d="M-56,-5 Q-78,-22 -106,-14 L-92,-3 Z" fill="url(#crimsonCapeGrad)" stroke="#3b0707" stroke-width="1.8" />
+        <path d="M-56,5 Q-82,21 -112,12 L-95,3 Z" fill="url(#crimsonCapeGrad)" stroke="#3b0707" stroke-width="1.8" />
+        <!-- 核心纯白高光脊线 -->
+        <line x1="-175" y1="0" x2="12" y2="0" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" />
+      </g>
+
+      <!-- 2D 赛璐珞剪影：王之军势铁骑冲锋侧影 -->
+      <g id="celCavalrySilhouette">
+        <!-- 翻飞红披风 -->
+        <path d="M-64,-26 C-92,-38 -118,-18 -132,-4 C-102,4 -78,2 -54,-8 Z" fill="url(#crimsonCapeGrad)" stroke="#3d0800" stroke-width="2.2" />
+        <!-- 战马与骑士刚毅剪影（外层金边 + 暗褐赛璐珞色块） -->
+        <path d="M-88,24 L-58,4 L-44,-24 L-24,-34 L-12,-20 L-22,-4 L8,-14 L32,-28 L46,-12 L34,6 L58,18 L24,22 L4,14 L-24,18 L-48,32 Z"
+              fill="#2c1506" stroke="#ffcf54" stroke-width="2.6" stroke-linejoin="round" />
+        <!-- 骑士头盔冠羽 -->
+        <path d="M-28,-34 Q-52,-48 -78,-40 Q-54,-30 -32,-28 Z" fill="#ff3b2f" stroke="#ffd25a" stroke-width="1.6" />
+        <!-- 战马怒目高光 -->
+        <polygon points="30,-18 39,-21 35,-13" fill="#fff4a3" />
+        <!-- 骑士前刺长枪 -->
+        <polygon points="-18,-6 92,-6 126,0 92,6 -18,6" fill="#ffea96" stroke="#4d1e00" stroke-width="2" />
+      </g>
+
+      <!-- 2D 赛璐珞命中十字星爆 -->
+      <g id="celHitSpark">
+        <polygon points="0,-46 10,-10 46,0 10,10 0,46 -10,10 -46,0 -10,-10" fill="#ffffff" stroke="#ff9900" stroke-width="3" />
+        <polygon points="-26,-26 -5,-8 26,-26 8,-5 26,26 5,8 -26,26 -8,5" fill="#ffd042" />
+        <circle cx="0" cy="0" r="9" fill="#ffffff" />
+      </g>
+    </defs>
+
+    <!-- 阶段1图层：大漠热浪折射与黄沙风暴 -->
+    <g id="layerPhase1" opacity="0">
+      <!-- 热浪折射背景光盘 -->
+      <g filter="url(#heatHazeFilter)">
+        <ellipse cx="320" cy="238" rx="235" ry="155" fill="url(#ionianSunGrad)" />
+        <!-- 炙热大漠地平线锯齿沙丘剪影 -->
+        <path d="M85,295 Q165,255 245,282 T415,270 T555,295 L555,345 L85,345 Z"
+              fill="#b86814" opacity="0.55" />
+        <!-- 灼热上升气流条带 -->
+        <path d="M190,320 Q175,240 205,165 Q225,115 195,70" fill="none" stroke="#ffcf5c" stroke-width="8" stroke-linecap="round" opacity="0.5" />
+        <path d="M320,335 Q345,245 305,160 Q285,110 325,55" fill="none" stroke="#ffe799" stroke-width="10" stroke-linecap="round" opacity="0.6" />
+        <path d="M445,320 Q425,235 455,170 Q475,115 440,75" fill="none" stroke="#ffae2b" stroke-width="8" stroke-linecap="round" opacity="0.5" />
+      </g>
+      <!-- 漫天黄沙风暴赛璐珞卷云线 -->
+      <g id="sandStormLines"></g>
+    </g>
+
+    <!-- 阶段2图层：铁骑剪影群与黄金长枪多段穿刺 -->
+    <g id="layerPhase2"></g>
+
+    <!-- 阶段3图层：终结沙暴冲击波环与金色霸气光爆 -->
+    <g id="layerPhase3"></g>
+  </svg>`;
+}
+
+/* =========================================================
+   [SFX Engine]
+   纯 Web Audio API 双振荡器 + 滤波噪声合成器：
+   1. 结界热浪呼啸与战鼓号角起手
+   2. 狂暴铁骑马蹄踏地轰鸣 (Hoofbeats) + 金戈撕裂破空声 (Spear Slash)
+   3. 终结重击爆破声 (Final Cataclysm Impact)
+   ========================================================= */
+const SFXEngine = (() => {
+  let ctx = null;
+
+  function ensureContext() {
+    if (!ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      ctx = new AudioCtx();
+    }
+    if (ctx.state === "suspended") {
+      ctx.resume();
+    }
+    return ctx;
+  }
+
+  function createNoiseBuffer(audioCtx, durationSec) {
+    const sampleRate = audioCtx.sampleRate;
+    const length = Math.max(1, Math.floor(sampleRate * durationSec));
+    const buffer = audioCtx.createBuffer(1, length, sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    return buffer;
+  }
+
+  // 阶段1：大漠热浪风沙席卷 + 苍凉霸王号角双振荡器共鸣
+  function playDesertWindAndHorn(speedScale = 1) {
+    const audioCtx = ensureContext();
+    const now = audioCtx.currentTime;
+    const dur = 0.72 / speedScale;
+
+    // 1. 风沙噪声 + 带通滤波器扫频
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = createNoiseBuffer(audioCtx, dur);
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(240, now);
+    filter.frequency.exponentialRampToValueAtTime(980, now + dur * 0.65);
+    filter.frequency.exponentialRampToValueAtTime(360, now + dur);
+    filter.Q.value = 2.4;
+
+    const windGain = audioCtx.createGain();
+    windGain.gain.setValueAtTime(0.01, now);
+    windGain.gain.linearRampToValueAtTime(0.28, now + dur * 0.35);
+    windGain.gain.exponentialRampToValueAtTime(0.008, now + dur);
+
+    noise.connect(filter);
+    filter.connect(windGain);
+    windGain.connect(audioCtx.destination);
+    noise.start(now);
+    noise.stop(now + dur);
+
+    // 2. 双振荡器铜管战角共鸣
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    osc1.type = "sawtooth";
+    osc2.type = "triangle";
+    osc1.frequency.setValueAtTime(110, now);
+    osc1.frequency.exponentialRampToValueAtTime(146.8, now + dur * 0.45);
+    osc2.frequency.setValueAtTime(220.5, now);
+    osc2.frequency.exponentialRampToValueAtTime(293.6, now + dur * 0.45);
+
+    const hornFilter = audioCtx.createBiquadFilter();
+    hornFilter.type = "lowpass";
+    hornFilter.frequency.setValueAtTime(680, now);
+    hornFilter.frequency.linearRampToValueAtTime(1450, now + dur * 0.6);
+
+    const hornGain = audioCtx.createGain();
+    hornGain.gain.setValueAtTime(0.001, now);
+    hornGain.gain.linearRampToValueAtTime(0.16, now + dur * 0.25);
+    hornGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+    osc1.connect(hornFilter);
+    osc2.connect(hornFilter);
+    hornFilter.connect(hornGain);
+    hornGain.connect(audioCtx.destination);
+
+    osc1.start(now);
+    osc2.start(now);
+    osc1.stop(now + dur);
+    osc2.stop(now + dur);
+  }
+
+  // 阶段2A：单次铁骑马蹄踏地轰鸣（双低频振荡器 + 短促砂石噪声）
+  function playHoofbeat(speedScale = 1, pitchJitter = 1) {
+    const audioCtx = ensureContext();
+    const now = audioCtx.currentTime;
+    const dur = 0.11 / speedScale;
+
+    const oscA = audioCtx.createOscillator();
+    const oscB = audioCtx.createOscillator();
+    oscA.type = "sine";
+    oscB.type = "triangle";
+
+    const baseFreq = 95 * pitchJitter;
+    oscA.frequency.setValueAtTime(baseFreq * 1.4, now);
+    oscA.frequency.exponentialRampToValueAtTime(34, now + dur);
+    oscB.frequency.setValueAtTime(baseFreq * 2.1, now);
+    oscB.frequency.exponentialRampToValueAtTime(48, now + dur);
+
+    const thudGain = audioCtx.createGain();
+    thudGain.gain.setValueAtTime(0.24, now);
+    thudGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+    oscA.connect(thudGain);
+    oscB.connect(thudGain);
+    thudGain.connect(audioCtx.destination);
+    oscA.start(now);
+    oscB.start(now);
+    oscA.stop(now + dur);
+    oscB.stop(now + dur);
+  }
+
+  // 阶段2B：金戈长枪呼啸穿刺声（双高频振荡器金属泛音 + 高通撕裂噪声）
+  function playSpearPierce(speedScale = 1, hitIndex = 0) {
+    const audioCtx = ensureContext();
+    const now = audioCtx.currentTime;
+    const dur = 0.16 / speedScale;
+    const detuneFactor = 1 + (hitIndex % 5) * 0.07;
+
+    // 金属双振荡器
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    osc1.type = "sawtooth";
+    osc2.type = "square";
+
+    osc1.frequency.setValueAtTime(920 * detuneFactor, now);
+    osc1.frequency.exponentialRampToValueAtTime(260 * detuneFactor, now + dur);
+    osc2.frequency.setValueAtTime(1480 * detuneFactor, now);
+    osc2.frequency.exponentialRampToValueAtTime(410 * detuneFactor, now + dur);
+
+    const metalGain = audioCtx.createGain();
+    metalGain.gain.setValueAtTime(0.14, now);
+    metalGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+    // 破空撕裂噪声
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = createNoiseBuffer(audioCtx, dur);
+    const hpFilter = audioCtx.createBiquadFilter();
+    hpFilter.type = "highpass";
+    hpFilter.frequency.setValueAtTime(1600, now);
+
+    const noiseGain = audioCtx.createGain();
+    noiseGain.gain.setValueAtTime(0.22, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+    osc1.connect(metalGain);
+    osc2.connect(metalGain);
+    metalGain.connect(audioCtx.destination);
+
+    noise.connect(hpFilter);
+    hpFilter.connect(noiseGain);
+    noiseGain.connect(audioCtx.destination);
+
+    osc1.start(now);
+    osc2.start(now);
+    noise.start(now);
+    osc1.stop(now + dur);
+    osc2.stop(now + dur);
+    noise.stop(now + dur);
+  }
+
+  // 阶段3：终结王之军势全军重击爆破（超低频双振荡器震地 + 宽频沙暴轰鸣）
+  function playFinalCataclysm(speedScale = 1) {
+    const audioCtx = ensureContext();
+    const now = audioCtx.currentTime;
+    const dur = 0.95 / speedScale;
+
+    // 1. 双振荡器霸王重击低音炮
+    const subOsc1 = audioCtx.createOscillator();
+    const subOsc2 = audioCtx.createOscillator();
+    subOsc1.type = "sine";
+    subOsc2.type = "sawtooth";
+
+    subOsc1.frequency.setValueAtTime(150, now);
+    subOsc1.frequency.exponentialRampToValueAtTime(24, now + dur * 0.85);
+    subOsc2.frequency.setValueAtTime(92, now);
+    subOsc2.frequency.exponentialRampToValueAtTime(18, now + dur * 0.85);
+
+    const lowPass = audioCtx.createBiquadFilter();
+    lowPass.type = "lowpass";
+    lowPass.frequency.setValueAtTime(420, now);
+    lowPass.frequency.exponentialRampToValueAtTime(65, now + dur);
+
+    const subGain = audioCtx.createGain();
+    subGain.gain.setValueAtTime(0.55, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+    subOsc1.connect(lowPass);
+    subOsc2.connect(lowPass);
+    lowPass.connect(subGain);
+    subGain.connect(audioCtx.destination);
+
+    // 2. 爆炸冲击波噪声
+    const blastNoise = audioCtx.createBufferSource();
+    blastNoise.buffer = createNoiseBuffer(audioCtx, dur);
+    const bandFilter = audioCtx.createBiquadFilter();
+    bandFilter.type = "lowpass";
+    bandFilter.frequency.setValueAtTime(2800, now);
+    bandFilter.frequency.exponentialRampToValueAtTime(160, now + dur);
+
+    const blastGain = audioCtx.createGain();
+    blastGain.gain.setValueAtTime(0.48, now);
+    blastGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+    blastNoise.connect(bandFilter);
+    bandFilter.connect(blastGain);
+    blastGain.connect(audioCtx.destination);
+
+    subOsc1.start(now);
+    subOsc2.start(now);
+    blastNoise.start(now);
+    subOsc1.stop(now + dur);
+    subOsc2.stop(now + dur);
+    blastNoise.stop(now + dur);
+  }
+
+  return {
+    playDesertWindAndHorn,
+    playHoofbeat,
+    playSpearPierce,
+    playFinalCataclysm
+  };
+})();
+
+/* =========================================================
+   核心纯函数入口：playSkillVFX(container, targetEl)
+   可被任意外部宿主直接调用移植，返回 Promise 在完整动画结束时 resolve
+   ========================================================= */
+let activeTimers = [];
+let isPlayingVFX = false;
+let currentSpeedScale = 1; // 1 为正常速度, 0.2 为慢放审视
+
+function clearActiveTimers() {
+  while (activeTimers.length > 0) {
+    clearTimeout(activeTimers.pop());
+  }
+}
+
+function scheduleTask(fn, delayMs) {
+  const scaledDelay = delayMs / currentSpeedScale;
+  const id = setTimeout(fn, scaledDelay);
+  activeTimers.push(id);
+  return id;
+}
+
+function playSkillVFX(container, targetEl) {
+  return new Promise((resolve) => {
+    clearActiveTimers();
+    isPlayingVFX = true;
+
+    const stageEl = targetEl.closest(".battle-stage") || document.body;
+    const flashEl = targetEl.querySelector("#targetFlash");
+    const hpFillEl = targetEl.querySelector("#hpFill");
+    const hpTextEl = targetEl.querySelector("#hpText");
+    const damageLayer = stageEl.querySelector("#damageLayer");
+    const bannerEl = document.getElementById("phaseBanner");
+
+    const maxHP = 24800;
+    let currentHP = maxHP;
+    if (hpFillEl) hpFillEl.style.width = "100%";
+    if (hpTextEl) hpTextEl.textContent = "24,800 / 24,800";
+    if (damageLayer) damageLayer.innerHTML = "";
+
+    // 注入 SVG 根节点
+    container.innerHTML = buildSkillSVGMarkup();
+    const svgRoot = container.querySelector(".vfx-svg-root");
+    const layerPhase1 = svgRoot.querySelector("#layerPhase1");
+    const sandStormLines = svgRoot.querySelector("#sandStormLines");
+    const layerPhase2 = svgRoot.querySelector("#layerPhase2");
+    const layerPhase3 = svgRoot.querySelector("#layerPhase3");
+
+    // 中心锚点（对应敌方靶卡中心）
+    const cx = 320;
+    const cy = 230;
+
+    // 辅助：创建 SVG 元素
+    const createSVG = (tag, attrs = {}) => {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        el.setAttribute(k, v);
+      }
+      return el;
+    };
+
+    // 辅助：浮动伤害数字与 HP 扣减
+    const spawnDamagePopup = (dmg, offsetX, offsetY, isFinal = false) => {
+      currentHP = Math.max(0, currentHP - dmg);
+      if (hpFillEl) {
+        hpFillEl.style.width = `${(currentHP / maxHP) * 100}%`;
+      }
+      if (hpTextEl) {
+        hpTextEl.textContent = `${currentHP.toLocaleString()} / ${maxHP.toLocaleString()}`;
+      }
+      if (!damageLayer) return;
+      const numEl = document.createElement("div");
+      numEl.className = "dmg-num" + (isFinal ? " is-final" : "");
+      numEl.style.left = `${cx + offsetX}px`;
+      numEl.style.top = `${cy + offsetY}px`;
+      numEl.style.fontSize = isFinal ? "46px" : `${24 + (dmg % 7)}px`;
+      numEl.textContent = isFinal ? `💥 ${dmg.toLocaleString()}!!` : `${dmg.toLocaleString()}!`;
+      damageLayer.appendChild(numEl);
+    };
+
+    // 辅助：靶卡受击高亮闪白
+    const triggerTargetFlash = (durationMs = 75) => {
+      targetEl.classList.add("is-hit");
+      if (flashEl) {
+        flashEl.style.opacity = "0.88";
+      }
+      scheduleTask(() => {
+        targetEl.classList.remove("is-hit");
+        if (flashEl) flashEl.style.opacity = "0";
+      }, durationMs);
+    };
+
+    /* ---------------------------------------------------------
+       阶段 1 [0ms ~ 680ms]：前摇/结界起手
+       炙热大漠热浪翻涌 (<feTurbulence> + <feDisplacementMap>) 与漫天黄沙风暴席卷
+       --------------------------------------------------------- */
+    if (bannerEl) {
+      bannerEl.textContent = "阶段 1 / 3 · 【固有结界展开】炙热大漠热浪折射与黄沙风暴";
+    }
+    SFXEngine.playDesertWindAndHorn(currentSpeedScale);
+
+    layerPhase1.setAttribute("opacity", "1");
+    layerPhase1.style.animation = `desertMiragePulse ${2100 / currentSpeedScale}ms ease-out forwards`;
+
+    // 对敌方靶卡本身施加轻微空气热浪扭曲感
+    targetEl.style.filter = "url(#heatHazeFilter)";
+    scheduleTask(() => {
+      targetEl.style.filter = "none";
+    }, 680);
+
+    // 生成 12 条扁平赛璐珞黄沙风暴流线 + 旋转沙砾碎片
+    for (let i = 0; i < 12; i++) {
+      const yPos = 95 + i * 24 + (i % 3) * 7;
+      const curveAmp = (i % 2 === 0 ? 1 : -1) * (18 + (i % 4) * 6);
+      const pathData = `M 60 ${yPos} Q 210 ${yPos + curveAmp} 320 ${yPos} T 580 ${yPos - curveAmp}`;
+      const sandArc = createSVG("path", {
+        d: pathData,
+        fill: "none",
+        stroke: i % 3 === 0 ? "#ffe394" : i % 2 === 0 ? "#e8a54b" : "#b36718",
+        "stroke-width": i % 3 === 0 ? "6" : "3.5",
+        "stroke-linecap": "round",
+        "stroke-dasharray": "140 380"
+      });
+      sandArc.style.animation = `sandVortexSweep ${(620 + (i % 4) * 90) / currentSpeedScale}ms cubic-bezier(0.22, 0.61, 0.36, 1) ${(i * 28) / currentSpeedScale}ms forwards`;
+      sandStormLines.appendChild(sandArc);
+    }
+
+    /* ---------------------------------------------------------
+       阶段 2 [620ms ~ 1620ms]：铁骑枪阵冲锋
+       漫天金色长枪与骑兵锋芒 2D 矢量剪影群高速穿刺（10 段高频连击 Multi-hit + 金色撕裂轨迹线）
+       --------------------------------------------------------- */
+    scheduleTask(() => {
+      if (bannerEl) {
+        bannerEl.textContent = "阶段 2 / 3 · 【百骑齐发】金色骑枪群高速穿刺 Multi-Hit";
+      }
+    }, 600);
+
+    // 连续马蹄轰鸣声序列
+    for (let h = 0; h < 14; h++) {
+      scheduleTask(() => {
+        SFXEngine.playHoofbeat(currentSpeedScale, 0.88 + (h % 4) * 0.08);
+      }, 540 + h * 72);
+    }
+
+    // 5 骑王之军势骑兵剪影从靶卡两侧呈扇形疾驰掠过
+    const cavalryConfigs = [
+      { startX: 70, startY: 285, endX: 560, endY: 225, delay: 580, scale: 0.92 },
+      { startX: 570, startY: 270, endX: 80, endY: 205, delay: 730, scale: -0.88 },
+      { startX: 65, startY: 195, endX: 565, endY: 250, delay: 880, scale: 0.96 },
+      { startX: 575, startY: 185, endX: 75, endY: 255, delay: 1040, scale: -0.92 },
+      { startX: 75, startY: 245, endX: 575, endY: 215, delay: 1200, scale: 1.08 }
+    ];
+
+    cavalryConfigs.forEach((cfg) => {
+      scheduleTask(() => {
+        const cavGroup = createSVG("g", { filter: "url(#celGoldGlow)" });
+        const useCav = createSVG("use", { href: "#celCavalrySilhouette" });
+        cavGroup.appendChild(useCav);
+        layerPhase2.appendChild(cavGroup);
+
+        const flipX = cfg.scale < 0 ? -1 : 1;
+        const absScale = Math.abs(cfg.scale);
+        const anim = cavGroup.animate(
+          [
+            {
+              transform: `translate(${cfg.startX}px, ${cfg.startY}px) scale(${flipX * absScale}, ${absScale})`,
+              opacity: 0
+            },
+            {
+              transform: `translate(${(cfg.startX + cfg.endX) * 0.5}px, ${(cfg.startY + cfg.endY) * 0.5}px) scale(${flipX * absScale * 1.12}, ${absScale * 1.12})`,
+              opacity: 0.96,
+              offset: 0.45
+            },
+            {
+              transform: `translate(${cfg.endX}px, ${cfg.endY}px) scale(${flipX * absScale}, ${absScale})`,
+              opacity: 0
+            }
+          ],
+          {
+            duration: 390 / currentSpeedScale,
+            easing: "cubic-bezier(0.16, 0.84, 0.44, 1)",
+            fill: "forwards"
+          }
+        );
+        anim.onfinish = () => cavGroup.remove();
+      }, cfg.delay);
+    });
+
+    // 10 段黄金长枪多角度高速穿刺 + 金色撕裂轨迹线 + 火花爆点
+    const spearAngles = [-34, 152, -16, 168, 24, -148, -8, 138, 36, -162];
+    spearAngles.forEach((angleDeg, idx) => {
+      const hitDelay = 640 + idx * 88;
+      scheduleTask(() => {
+        SFXEngine.playSpearPierce(currentSpeedScale, idx);
+
+        const rad = (angleDeg * Math.PI) / 180;
+        const offsetX = ((idx % 3) - 1) * 32;
+        const offsetY = ((idx % 4) - 1.5) * 28;
+        const hitX = cx + offsetX;
+        const hitY = cy + offsetY;
+
+        const startDist = 260;
+        const endDist = 135;
+        const sx = hitX - Math.cos(rad) * startDist;
+        const sy = hitY - Math.sin(rad) * startDist;
+        const ex = hitX + Math.cos(rad) * endDist;
+        const ey = hitY + Math.sin(rad) * endDist;
+
+        // 1. 金色撕裂轨迹线 (Slash Trail)
+        const slashLine = createSVG("line", {
+          x1: sx,
+          y1: sy,
+          x2: ex,
+          y2: ey,
+          stroke: idx % 2 === 0 ? "#fff6b3" : "#ffae19",
+          "stroke-width": "7",
+          "stroke-linecap": "round",
+          filter: "url(#celGoldGlow)"
+        });
+        layerPhase2.appendChild(slashLine);
+        slashLine.animate(
+          [
+            { opacity: 1, strokeWidth: "10px" },
+            { opacity: 0, strokeWidth: "0.5px" }
+          ],
+          { duration: 240 / currentSpeedScale, easing: "ease-out", fill: "forwards" }
+        ).onfinish = () => slashLine.remove();
+
+        // 2. 黄金骑枪本体高速突刺
+        const spearWrap = createSVG("g", { filter: "url(#celGoldGlow)" });
+        const spearUse = createSVG("use", { href: "#celGoldenSpear" });
+        spearWrap.appendChild(spearUse);
+        layerPhase2.appendChild(spearWrap);
+
+        spearWrap.animate(
+          [
+            {
+              transform: `translate(${sx}px, ${sy}px) rotate(${angleDeg}deg) scale(0.75, 1.25)`,
+              opacity: 0.2
+            },
+            {
+              transform: `translate(${hitX}px, ${hitY}px) rotate(${angleDeg}deg) scale(1.18, 1)`,
+              opacity: 1,
+              offset: 0.42
+            },
+            {
+              transform: `translate(${ex}px, ${ey}px) rotate(${angleDeg}deg) scale(0.9, 0.7)`,
+              opacity: 0
+            }
+          ],
+          {
+            duration: 210 / currentSpeedScale,
+            easing: "cubic-bezier(0.12, 0.88, 0.32, 1)",
+            fill: "forwards"
+          }
+        ).onfinish = () => spearWrap.remove();
+
+        // 3. 靶卡命中星爆火花 + 靶卡抖动 + 伤害数字
+        const spark = createSVG("use", {
+          href: "#celHitSpark",
+          filter: "url(#celGoldGlow)"
+        });
+        layerPhase2.appendChild(spark);
+        spark.animate(
+          [
+            { transform: `translate(${hitX}px, ${hitY}px) scale(0.25) rotate(0deg)`, opacity: 1 },
+            { transform: `translate(${hitX}px, ${hitY}px) scale(1.25) rotate(35deg)`, opacity: 1, offset: 0.4 },
+            { transform: `translate(${hitX}px, ${hitY}px) scale(0.1) rotate(70deg)`, opacity: 0 }
+          ],
+          { duration: 190 / currentSpeedScale, easing: "ease-out", fill: "forwards" }
+        ).onfinish = () => spark.remove();
+
+        triggerTargetFlash(65);
+        targetEl.style.animation = "none";
+        void targetEl.offsetWidth;
+        targetEl.style.animation = `targetPierceJitter ${160 / currentSpeedScale}ms ease-out`;
+
+        const hitDmg = 1380 + idx * 145 + (idx % 3) * 90;
+        spawnDamagePopup(hitDmg, offsetX, offsetY - 12, false);
+      }, hitDelay);
+    });
+
+    /* ---------------------------------------------------------
+       阶段 3 [1620ms ~ 2450ms]：终结爆破
+       天降巨型黄金霸王主枪 + 52ms 命中顿帧 (Hitstop) +
+       狂暴沙暴冲击波环、金色霸气光爆与剧烈屏幕创伤震颤 (Trauma Screen Shake)
+       --------------------------------------------------------- */
+    scheduleTask(() => {
+      if (bannerEl) {
+        bannerEl.textContent = "阶段 3 / 3 · 【王之军势·终结蹂躏】Hitstop 顿帧 & 霸气光爆！";
+      }
+
+      // 巨型征服王黄金主枪自正上方轰然贯入靶心
+      const megaSpear = createSVG("g", { filter: "url(#celGoldGlow)" });
+      const megaUse = createSVG("use", { href: "#celGoldenSpear" });
+      megaSpear.appendChild(megaUse);
+      layerPhase3.appendChild(megaSpear);
+
+      megaSpear.animate(
+        [
+          { transform: `translate(${cx}px, -120px) rotate(90deg) scale(2.3, 2.3)`, opacity: 0.4 },
+          { transform: `translate(${cx}px, ${cy + 15}px) rotate(90deg) scale(2.6, 2.2)`, opacity: 1, offset: 0.35 },
+          { transform: `translate(${cx}px, ${cy + 85}px) rotate(90deg) scale(1.8, 1.4)`, opacity: 0 }
+        ],
+        {
+          duration: 380 / currentSpeedScale,
+          easing: "cubic-bezier(0.15, 0.92, 0.28, 1)",
+          fill: "forwards"
+        }
+      );
+    }, 1560);
+
+    // 终结命中瞬间 (1650ms)：构建冲击波环 + 触发 52ms 真实命中顿帧 (Hitstop)
+    scheduleTask(() => {
+      SFXEngine.playFinalCataclysm(currentSpeedScale);
+      triggerTargetFlash(220);
+
+      // 1. 核心纯白/烈金霸气十字光柱与爆破球
+      const pillar = createSVG("rect", {
+        x: cx - 56,
+        y: -20,
+        width: 112,
+        height: 500,
+        fill: "#fff9d2",
+        filter: "url(#celGoldGlow)"
+      });
+      layerPhase3.appendChild(pillar);
+
+      const coreSun = createSVG("circle", {
+        cx: cx,
+        cy: cy,
+        r: 28,
+        fill: "#ffffff",
+        stroke: "#ffae00",
+        "stroke-width": "12",
+        filter: "url(#celGoldGlow)"
+      });
+      layerPhase3.appendChild(coreSun);
+
+      // 2. 双层狂暴沙暴冲击波环（赛璐珞锯齿外环 + 高速扩张金环）
+      const shockRingOuter = createSVG("circle", {
+        cx: cx,
+        cy: cy,
+        r: 24,
+        fill: "none",
+        stroke: "#ffda66",
+        "stroke-width": "22",
+        "stroke-dasharray": "28 14",
+        filter: "url(#celGoldGlow)"
+      });
+      const shockRingInner = createSVG("circle", {
+        cx: cx,
+        cy: cy,
+        r: 18,
+        fill: "none",
+        stroke: "#ffffff",
+        "stroke-width": "12"
+      });
+      layerPhase3.appendChild(shockRingOuter);
+      layerPhase3.appendChild(shockRingInner);
+
+      // 3. 16 枚放射状飞溅黄金碎岩与霸气闪电矛尖
+      const raysGroup = createSVG("g", { filter: "url(#celGoldGlow)" });
+      layerPhase3.appendChild(raysGroup);
+
+      for (let r = 0; r < 16; r++) {
+        const deg = r * 22.5;
+        const ray = createSVG("polygon", {
+          points: "0,-7 68,0 0,7 -14,0",
+          fill: r % 2 === 0 ? "#fff7bd" : "#ff8c1a",
+          stroke: "#4a1700",
+          "stroke-width": "2"
+        });
+        raysGroup.appendChild(ray);
+        const dist = 175 + (r % 3) * 45;
+        const rad = (deg * Math.PI) / 180;
+        const tx = cx + Math.cos(rad) * dist;
+        const ty = cy + Math.sin(rad) * dist;
+
+        ray.animate(
+          [
+            { transform: `translate(${cx}px, ${cy}px) rotate(${deg}deg) scale(0.4)`, opacity: 1 },
+            { transform: `translate(${tx}px, ${ty}px) rotate(${deg}deg) scale(1.25, 0.5)`, opacity: 0 }
+          ],
+          {
+            duration: 540 / currentSpeedScale,
+            easing: "cubic-bezier(0.12, 0.9, 0.25, 1)",
+            fill: "forwards"
+          }
+        );
+      }
+
+      const pillarAnim = pillar.animate(
+        [
+          { transform: "scaleX(1.35)", opacity: 1 },
+          { transform: "scaleX(0.05)", opacity: 0 }
+        ],
+        { duration: 460 / currentSpeedScale, easing: " cubic-bezier(0.16, 1, 0.3, 1)", fill: "forwards" }
+      );
+      pillar.style.transformOrigin = `${cx}px ${cy}px`;
+
+      coreSun.animate(
+        [
+          { transform: `translate(${cx}px, ${cy}px) scale(0.3)`, opacity: 1 },
+          { transform: `translate(${cx}px, ${cy}px) scale(5.4)`, opacity: 0 }
+        ],
+        { duration: 520 / currentSpeedScale, easing: "cubic-bezier(0.16, 1, 0.3, 1)", fill: "forwards" }
+      );
+      coreSun.setAttribute("cx", "0");
+      coreSun.setAttribute("cy", "0");
+
+      shockRingOuter.setAttribute("cx", "0");
+      shockRingOuter.setAttribute("cy", "0");
+      shockRingOuter.animate(
+        [
+          { transform: `translate(${cx}px, ${cy}px) scale(0.4) rotate(0deg)`, opacity: 1, strokeWidth: "26px" },
+          { transform: `translate(${cx}px, ${cy}px) scale(8.8) rotate(65deg)`, opacity: 0, strokeWidth: "1px" }
+        ],
+        { duration: 620 / currentSpeedScale, easing: "cubic-bezier(0.12, 0.88, 0.24, 1)", fill: "forwards" }
+      );
+
+      shockRingInner.setAttribute("cx", "0");
+      shockRingInner.setAttribute("cy", "0");
+      shockRingInner.animate(
+        [
+          { transform: `translate(${cx}px, ${cy}px) scale(0.3)`, opacity: 1, strokeWidth: "16px" },
+          { transform: `translate(${cx}px, ${cy}px) scale(7.2)`, opacity: 0, strokeWidth: "0.5px" }
+        ],
+        { duration: 480 / currentSpeedScale, easing: "ease-out", fill: "forwards" }
+      );
+
+      // 触发 52ms 命中顿帧 (Hitstop)：短暂冻结舞台与 SVG Web Animations
+      const hitstopMs = 52;
+      stageEl.classList.add("is-hitstop");
+      const runningAnims = svgRoot.getAnimations({ subtree: true });
+      runningAnims.forEach((a) => a.pause());
+
+      setTimeout(() => {
+        stageEl.classList.remove("is-hitstop");
+        runningAnims.forEach((a) => a.play());
+
+        // 顿帧释放瞬间：触发剧烈创伤屏幕震颤 (Trauma Screen Shake) 与终结重创数字
+        stageEl.style.animation = "none";
+        void stageEl.offsetWidth;
+        stageEl.style.animation = `stageTraumaShake ${620 / currentSpeedScale}ms cubic-bezier(0.22, 0.61, 0.36, 1)`;
+
+        targetEl.style.animation = "none";
+        void targetEl.offsetWidth;
+        targetEl.style.animation = `targetFinalCrush ${580 / currentSpeedScale}ms cubic-bezier(0.18, 0.89, 0.32, 1.2)`;
+
+        spawnDamagePopup(9999, 0, -24, true);
+      }, hitstopMs);
+    }, 1650);
+
+    // 收尾清理与状态复位
+    scheduleTask(() => {
+      container.innerHTML = "";
+      stageEl.style.animation = "";
+      targetEl.style.animation = "";
+      isPlayingVFX = false;
+      if (bannerEl) {
+        bannerEl.textContent = "宝具演出完毕 · 按 [Space] 再次号令王之军势";
+      }
+      resolve();
+    }, 2550);
+  });
+}
+
+/* =========================================================
+   交互控制绑定（Space 释放、自动循环、0.2x 慢放审视）
+   ========================================================= */
+(() => {
+  const vfxContainer = document.getElementById("vfxContainer");
+  const targetCard = document.getElementById("targetCard");
+  const btnCast = document.getElementById("btnCast");
+  const btnLoop = document.getElementById("btnLoop");
+  const btnSlow = document.getElementById("btnSlow");
+
+  let autoLoopEnabled = false;
+  let slowMoEnabled = false;
+  let loopWaitTimer = null;
+
+  async function triggerSkill() {
+    if (loopWaitTimer) {
+      clearTimeout(loopWaitTimer);
+      loopWaitTimer = null;
+    }
+    await playSkillVFX(vfxContainer, targetCard);
+    if (autoLoopEnabled) {
+      loopWaitTimer = setTimeout(() => {
+        if (autoLoopEnabled && !isPlayingVFX) {
+          triggerSkill();
+        }
+      }, 450);
+    }
+  }
+
+  btnCast.addEventListener("click", () => {
+    triggerSkill();
+  });
+
+  btnLoop.addEventListener("click", () => {
+    autoLoopEnabled = !autoLoopEnabled;
+    btnLoop.classList.toggle("active", autoLoopEnabled);
+    btnLoop.querySelector("span").textContent = `🔁 自动循环: ${autoLoopEnabled ? "开" : "关"}`;
+    if (autoLoopEnabled && !isPlayingVFX) {
+      triggerSkill();
+    }
+  });
+
+  btnSlow.addEventListener("click", () => {
+    slowMoEnabled = !slowMoEnabled;
+    currentSpeedScale = slowMoEnabled ? 0.2 : 1;
+    document.documentElement.style.setProperty("--vfx-speed", String(currentSpeedScale));
+    btnSlow.classList.toggle("active", slowMoEnabled);
+    btnSlow.querySelector("span").textContent = `⏱️ 0.2x 慢放审视: ${slowMoEnabled ? "开" : "关"}`;
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Space") {
+      e.preventDefault();
+      triggerSkill();
+    }
+  });
+
+  // 首次加载后自动演示一次（音效将在用户首次按键或点击后激活）
+  window.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => triggerSkill(), 260);
+  });
+})();
+</script>
+</body>
+</html>

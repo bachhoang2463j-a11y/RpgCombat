@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>王之军势 (Ionian Hetairoi) - 2D 技能视觉特效</title>
+  <style>
+    /* ==========================================================================
+       [Base & UI Stage Layout]
+       ========================================================================== */
+    :root {
+      --time-scale: 1;
+      --gold-core: #fff9db;
+      --gold-bright: #ffd43b;
+      --gold-deep: #f08c00;
+      --sand-light: #ffe8cc;
+      --sand-mid: #d9a05b;
+      --sand-dark: #7c4d25;
+      --crimson-cape: #c92a2a;
+      --crimson-glow: #ff6b6b;
+      --ink-outline: #1a0f0a;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 45%, #2b1d16 0%, #120c09 65%, #070504 100%);
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: #f8f0e5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stage-bg-grid {
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 212, 59, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 212, 59, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    #battle-stage {
+      position: relative;
+      width: 820px;
+      height: 540px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1;
+      transform-origin: center center;
+      will-change: transform, filter;
+    }
+
+    .target-card {
+      position: relative;
+      width: 240px;
+      height: 330px;
+      background: linear-gradient(165deg, #2b211c 0%, #17110e 100%);
+      border: 3px solid #6b5138;
+      border-radius: 14px;
+      box-shadow:
+        0 18px 40px rgba(0, 0, 0, 0.8),
+        inset 0 0 24px rgba(255, 180, 60, 0.08);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      z-index: 2;
+      transition: transform 0.08s ease-out, filter 0.08s ease-out, border-color 0.15s ease;
+    }
+
+    .target-card::before {
+      content: "";
+      position: absolute;
+      inset: 5px;
+      border: 1px solid rgba(255, 212, 59, 0.22);
+      border-radius: 9px;
+      pointer-events: none;
+    }
+
+    .target-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #d9b382;
+      text-transform: uppercase;
+    }
+
+    .target-class-badge {
+      background: #42291b;
+      border: 1px solid #a67c52;
+      padding: 2px 8px;
+      border-radius: 4px;
+      color: #ffd43b;
+    }
+
+    .target-avatar-wrap {
+      position: relative;
+      width: 150px;
+      height: 175px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .target-avatar-svg {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.75));
+    }
+
+    .target-footer {
+      width: 100%;
+    }
+
+    .target-name {
+      text-align: center;
+      font-size: 15px;
+      font-weight: 800;
+      color: #fff3db;
+      margin-bottom: 8px;
+      letter-spacing: 1.5px;
+      text-shadow: 0 2px 4px #000;
+    }
+
+    .hp-bar-outer {
+      width: 100%;
+      height: 12px;
+      background: #0d0907;
+      border: 2px solid #59412c;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .hp-bar-delay {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+      background: #fff3bf;
+      transition: width calc(0.45s / var(--time-scale, 1)) cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .hp-bar-inner {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+      background: linear-gradient(90deg, #c92a2a, #ff6b6b);
+      transition: width calc(0.1s / var(--time-scale, 1)) ease-out;
+    }
+
+    .hp-text {
+      margin-top: 5px;
+      font-size: 11px;
+      font-family: Consolas, Monaco, monospace;
+      color: #b89b78;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    #vfx-overlay-container {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      overflow: visible;
+    }
+
+    .np-banner {
+      position: absolute;
+      top: 32px;
+      left: 50%;
+      transform: translateX(-50%) scaleY(0);
+      padding: 8px 46px;
+      background: linear-gradient(90deg, transparent 0%, rgba(26, 12, 6, 0.92) 20%, rgba(115, 22, 22, 0.95) 50%, rgba(26, 12, 6, 0.92) 80%, transparent 100%);
+      border-top: 2px solid #ffd43b;
+      border-bottom: 2px solid #ffd43b;
+      text-align: center;
+      pointer-events: none;
+      z-index: 25;
+      opacity: 0;
+    }
+
+    .np-banner.active {
+      animation: npBannerAnim calc(1.75s / var(--time-scale, 1)) cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .np-sub {
+      font-size: 11px;
+      letter-spacing: 5px;
+      color: #ffd43b;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .np-title {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 8px;
+      color: #ffffff;
+      text-shadow:
+        0 0 10px #f08c00,
+        2px 2px 0 #1a0f0a,
+        -2px -2px 0 #1a0f0a;
+    }
+
+    .control-bar {
+      position: relative;
+      z-index: 30;
+      margin-top: 18px;
+      display: flex;
+      gap: 14px;
+      background: rgba(20, 14, 10, 0.88);
+      border: 2px solid #59412c;
+      padding: 10px 20px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
+      align-items: center;
+    }
+
+    .ctrl-btn {
+      appearance: none;
+      border: 2px solid #a67c52;
+      background: linear-gradient(180deg, #3b281c 0%, #21150e 100%);
+      color: #ffe8cc;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 9px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+
+    .ctrl-btn:hover {
+      border-color: #ffd43b;
+      color: #fff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(240, 140, 0, 0.3);
+    }
+
+    .ctrl-btn:active {
+      transform: translateY(1px);
+    }
+
+    .ctrl-btn.primary {
+      background: linear-gradient(180deg, #c92a2a 0%, #7d1515 100%);
+      border-color: #ffd43b;
+      color: #fff9db;
+    }
+
+    .ctrl-btn.active-toggle {
+      background: linear-gradient(180deg, #e67700 0%, #9c4a00 100%);
+      border-color: #fff3bf;
+      color: #fff;
+      box-shadow: 0 0 15px rgba(255, 212, 59, 0.45);
+    }
+
+    .kbd-hint {
+      font-size: 11px;
+      background: rgba(0, 0, 0, 0.45);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      font-family: monospace;
+    }
+
+    .phase-indicator {
+      font-size: 12px;
+      color: #d9a05b;
+      min-width: 195px;
+      text-align: right;
+      font-family: Consolas, Monaco, monospace;
+    }
+
+    /* ==========================================================================
+       [CSS Keyframes]
+       ========================================================================== */
+    @keyframes npBannerAnim {
+      0% {
+        opacity: 0;
+        transform: translateX(-50%) scaleY(0);
+      }
+      12% {
+        opacity: 1;
+        transform: translateX(-50%) scaleY(1.1);
+      }
+      18% {
+        transform: translateX(-50%) scaleY(1);
+      }
+      82% {
+        opacity: 1;
+        transform: translateX(-50%) scaleY(1);
+      }
+      100% {
+        opacity: 0;
+        transform: translateX(-50%) scaleY(0);
+      }
+    }
+
+    .target-hit-flash {
+      filter: brightness(2.8) contrast(1.6) drop-shadow(0 0 18px #ffd43b) !important;
+      border-color: #fff9db !important;
+    }
+
+    .stage-hitstop {
+      filter: contrast(2.4) brightness(1.35) saturate(1.4);
+    }
+
+    .stage-hitstop * {
+      animation-play-state: paused !important;
+    }
+
+    @keyframes horizonExpand {
+      0% {
+        opacity: 0;
+        transform: scale(0.4, 0.05);
+      }
+      25% {
+        opacity: 1;
+        transform: scale(1.06, 1.02);
+      }
+      80% {
+        opacity: 0.95;
+        transform: scale(1, 1);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(1.15, 0.85);
+      }
+    }
+
+    @keyframes sunCrestSpin {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.3) rotate(-45deg);
+      }
+      20% {
+        opacity: 0.95;
+        transform: translate(-50%, -50%) scale(1.08) rotate(0deg);
+      }
+      75% {
+        opacity: 0.85;
+        transform: translate(-50%, -50%) scale(1) rotate(35deg);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.4) rotate(60deg);
+      }
+    }
+
+    @keyframes sandRibbonSweep {
+      0% {
+        stroke-dashoffset: 900;
+        opacity: 0;
+      }
+      20% {
+        opacity: 0.9;
+      }
+      70% {
+        opacity: 0.85;
+      }
+      100% {
+        stroke-dashoffset: -900;
+        opacity: 0;
+      }
+    }
+
+    @keyframes cavalryCharge {
+      0% {
+        opacity: 0;
+        transform: translate(var(--start-x), var(--start-y)) scale(var(--scale, 1)) rotate(var(--rot, -8deg));
+      }
+      18% {
+        opacity: 1;
+      }
+      65% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+        transform: translate(var(--end-x), var(--end-y)) scale(calc(var(--scale, 1) * 1.15)) rotate(var(--rot, -8deg));
+      }
+    }
+
+    @keyframes spearPierce {
+      0% {
+        opacity: 0;
+        transform: translate(var(--sx), var(--sy)) rotate(var(--angle)) scale(0.5, 1.4);
+      }
+      15% {
+        opacity: 1;
+        transform: translate(var(--mx), var(--my)) rotate(var(--angle)) scale(1.25, 0.85);
+      }
+      35% {
+        opacity: 1;
+        transform: translate(var(--ex), var(--ey)) rotate(var(--angle)) scale(1, 1);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(var(--ox), var(--oy)) rotate(var(--angle)) scale(0.7, 0.3);
+      }
+    }
+
+    @keyframes impactSparkPop {
+      0% {
+        opacity: 1;
+        transform: translate(var(--hx), var(--hy)) scale(0.15) rotate(var(--r));
+      }
+      45% {
+        opacity: 1;
+        transform: translate(var(--hx), var(--hy)) scale(1.25) rotate(calc(var(--r) + 15deg));
+      }
+      100% {
+        opacity: 0;
+        transform: translate(var(--hx), var(--hy)) scale(0.05) rotate(calc(var(--r) + 30deg));
+      }
+    }
+
+    @keyframes sovereignSpearDrop {
+      0% {
+        opacity: 0;
+        transform: translate(410px, -260px) rotate(68deg) scale(1.6, 0.6);
+      }
+      30% {
+        opacity: 1;
+        transform: translate(410px, 270px) rotate(68deg) scale(1.1, 1.2);
+      }
+      55% {
+        opacity: 1;
+        transform: translate(410px, 270px) rotate(68deg) scale(1, 1);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(410px, 310px) rotate(68deg) scale(1.8, 0.1);
+      }
+    }
+
+    @keyframes shockwaveRingExpand {
+      0% {
+        opacity: 1;
+        transform: translate(410px, 270px) scale(0.08);
+        stroke-width: 28px;
+      }
+      60% {
+        opacity: 0.95;
+      }
+      100% {
+        opacity: 0;
+        transform: translate(410px, 270px) scale(var(--max-scale, 2.3));
+        stroke-width: 1px;
+      }
+    }
+
+    @keyframes dustPuffBlast {
+      0% {
+        opacity: 1;
+        transform: translate(410px, 270px) scale(0.2) rotate(0deg);
+      }
+      35% {
+        opacity: 1;
+        transform: translate(var(--dx), var(--dy)) scale(var(--ds, 1.2)) rotate(var(--dr, 25deg));
+      }
+      100% {
+        opacity: 0;
+        transform: translate(var(--dx2), var(--dy2)) scale(calc(var(--ds, 1.2) * 1.35)) rotate(calc(var(--dr, 25deg) * 1.6));
+      }
+    }
+
+    @keyframes dmgFloatPop {
+      0% {
+        opacity: 0;
+        transform: translate(var(--x), var(--y)) scale(0.3);
+      }
+      22% {
+        opacity: 1;
+        transform: translate(var(--x), calc(var(--y) - 18px)) scale(1.25);
+      }
+      45% {
+        transform: translate(var(--x), calc(var(--y) - 24px)) scale(1);
+      }
+      85% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+        transform: translate(var(--x), calc(var(--y) - 52px)) scale(0.85);
+      }
+    }
+
+    .dmg-popup {
+      position: absolute;
+      left: 0;
+      top: 0;
+      font-family: "Impact", "Arial Black", sans-serif;
+      font-size: 26px;
+      font-weight: 900;
+      color: #fff9db;
+      -webkit-text-stroke: 2px #1a0f0a;
+      text-shadow:
+        0 3px 0 #c92a2a,
+        0 0 12px #ffd43b;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    .dmg-popup.final-crit {
+      font-size: 46px;
+      color: #ffd43b;
+      -webkit-text-stroke: 2.5px #1a0f0a;
+      text-shadow:
+        0 4px 0 #7d1515,
+        0 0 24px #ff922b;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage-bg-grid"></div>
+
+  <!-- 战斗主舞台 -->
+  <div id="battle-stage">
+    <!-- 宝具真名解放顶栏 -->
+    <div id="np-banner" class="np-banner">
+      <div class="np-sub">IONIAN HETAIROI · 固有结界</div>
+      <div class="np-title">王 之 军 势</div>
+    </div>
+
+    <!-- 敌方受击靶卡（居中放置） -->
+    <div id="enemy-target" class="target-card">
+      <div class="target-header">
+        <span>LV.90 ASSASSIN</span>
+        <span class="target-class-badge">TARGET</span>
+      </div>
+
+      <div class="target-avatar-wrap">
+        <svg class="target-avatar-svg" viewBox="0 0 160 180">
+          <defs>
+            <linearGradient id="enemyCloakGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#3b2d4a" />
+              <stop offset="100%" stop-color="#181122" />
+            </linearGradient>
+            <linearGradient id="enemyMaskGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#f1f3f5" />
+              <stop offset="100%" stop-color="#adb5bd" />
+            </linearGradient>
+          </defs>
+          <circle cx="80" cy="88" r="62" fill="none" stroke="#5f3dc4" stroke-width="2" stroke-dasharray="8 6" opacity="0.45" />
+          <path d="M25,168 L42,78 L58,34 L80,20 L102,34 L118,78 L135,168 Z" fill="url(#enemyCloakGrad)" stroke="#120b18" stroke-width="4" stroke-linejoin="round" />
+          <path d="M32,106 Q80,126 128,106 L120,132 Q80,148 40,132 Z" fill="#495057" stroke="#120b18" stroke-width="3.5" />
+          <path d="M56,52 C56,34 104,34 104,52 L100,88 L80,104 L60,88 Z" fill="url(#enemyMaskGrad)" stroke="#120b18" stroke-width="4" stroke-linejoin="round" />
+          <polygon points="63,66 76,70 66,76" fill="#ff3b3b" />
+          <polygon points="97,66 84,70 94,76" fill="#ff3b3b" />
+          <path d="M72,88 L72,97 M80,90 L80,100 M88,88 L88,97" stroke="#120b18" stroke-width="3" stroke-linecap="round" />
+          <path d="M22,145 L138,65 M138,145 L22,65" stroke="#ced4da" stroke-width="4" stroke-linecap="round" opacity="0.65" />
+        </svg>
+      </div>
+
+      <div class="target-footer">
+        <div class="target-name">暗匿者·影之从者</div>
+        <div class="hp-bar-outer">
+          <div id="hp-bar-delay" class="hp-bar-delay"></div>
+          <div id="hp-bar-inner" class="hp-bar-inner"></div>
+        </div>
+        <div class="hp-text">
+          <span>HP</span>
+          <span id="hp-val-text">24,500 / 24,500</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2D 技能打击图层（透明背景、直接锚定叠加在敌方靶卡正上方） -->
+    <div id="vfx-overlay-container"></div>
+  </div>
+
+  <!-- 底部交互控制栏 -->
+  <div class="control-bar">
+    <button id="btn-cast" class="ctrl-btn primary">
+      <span>⚔️ 释放技能</span>
+      <span class="kbd-hint">Space</span>
+    </button>
+    <button id="btn-loop" class="ctrl-btn">
+      <span>🔁 自动循环: 关</span>
+    </button>
+    <button id="btn-slow" class="ctrl-btn">
+      <span>🔍 0.2x 慢放审视: 关</span>
+    </button>
+    <div id="phase-status" class="phase-indicator">READY // 待命</div>
+  </div>
+
+  <!-- ==========================================================================
+       /* [SVG Defs & Filters] */
+       全局复用 SVG 滤镜、渐变与 2D 赛璐珞矢量图元库
+       ========================================================================== -->
+  <svg width="0" height="0" style="position:absolute; pointer-events:none;" aria-hidden="true">
+    <defs>
+      <!-- 阶段1：炙热大漠热浪折射滤镜 (<feTurbulence> + <feDisplacementMap>) -->
+      <filter id="heat-haze-filter" x="-20%" y="-20%" width="140%" height="140%">
+        <feTurbulence
+          id="heat-turbulence"
+          type="fractalNoise"
+          baseFrequency="0.018 0.065"
+          numOctaves="2"
+          seed="7"
+          result="noise"
+        >
+          <animate
+            attributeName="baseFrequency"
+            values="0.018 0.065; 0.026 0.095; 0.018 0.065"
+            dur="0.6s"
+            repeatCount="indefinite"
+          />
+        </feTurbulence>
+        <feDisplacementMap
+          in="SourceGraphic"
+          in2="noise"
+          scale="18"
+          xChannelSelector="R"
+          yChannelSelector="G"
+        />
+      </filter>
+
+      <!-- 金色王权辉光滤镜 -->
+      <filter id="toon-gold-glow" x="-30%" y="-30%" width="160%" height="160%">
+        <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#ff922b" flood-opacity="0.95" />
+      </filter>
+
+      <!-- 赛璐珞黄金渐变 -->
+      <linearGradient id="gold-spear-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#f08c00" stop-opacity="0" />
+        <stop offset="25%" stop-color="#fab005" stop-opacity="0.9" />
+        <stop offset="75%" stop-color="#fff3bf" stop-opacity="1" />
+        <stop offset="100%" stop-color="#ffffff" stop-opacity="1" />
+      </linearGradient>
+
+      <!-- 炽热沙漠天空结界渐变 -->
+      <radialGradient id="desert-reality-grad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#ffec99" stop-opacity="0.72" />
+        <stop offset="45%" stop-color="#f08c00" stop-opacity="0.45" />
+        <stop offset="78%" stop-color="#a63e14" stop-opacity="0.22" />
+        <stop offset="100%" stop-color="#2b1207" stop-opacity="0" />
+      </radialGradient>
+
+      <!-- 征服王猩红披风渐变 -->
+      <linearGradient id="crimson-cape-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#ff6b6b" />
+        <stop offset="50%" stop-color="#c92a2a" />
+        <stop offset="100%" stop-color="#660e0e" />
+      </linearGradient>
+
+      <!-- 赛璐珞沙暴团块渐变 -->
+      <radialGradient id="toon-sand-puff" cx="35%" cy="35%" r="65%">
+        <stop offset="0%" stop-color="#fff3bf" />
+        <stop offset="50%" stop-color="#f08c00" />
+        <stop offset="85%" stop-color="#8c4616" />
+        <stop offset="100%" stop-color="#2b1207" />
+      </radialGradient>
+
+      <!-- 图元 1：马其顿十六芒太阳王权徽记 (Vergina Sun) -->
+      <g id="symbol-macedon-sun">
+        <circle cx="0" cy="0" r="128" fill="none" stroke="#ffd43b" stroke-width="3.5" stroke-dasharray="14 8" />
+        <circle cx="0" cy="0" r="98" fill="none" stroke="#ff922b" stroke-width="2.5" />
+        <g fill="#fff3bf" stroke="#1a0f0a" stroke-width="2" stroke-linejoin="round">
+          <polygon points="0,-118 8,-36 -8,-36" />
+          <polygon points="0,118 8,36 -8,36" />
+          <polygon points="-118,0 -36,8 -36,-8" />
+          <polygon points="118,0 36,8 36,-8" />
+          <polygon points="83,-83 31,-20 20,-31" />
+          <polygon points="-83,83 -31,20 -20,31" />
+          <polygon points="-83,-83 -20,-31 -31,-20" />
+          <polygon points="83,83 20,31 31,20" />
+          <polygon points="42,-102 22,-34 10,-39" />
+          <polygon points="-42,102 -22,34 -10,39" />
+          <polygon points="-102,-42 -34,-22 -39,-10" />
+          <polygon points="102,42 34,22 39,10" />
+          <polygon points="-42,-102 -10,-39 -22,-34" />
+          <polygon points="42,102 10,39 22,34" />
+          <polygon points="102,-42 39,-10 34,-22" />
+          <polygon points="-102,42 -39,10 -34,22" />
+        </g>
+        <circle cx="0" cy="0" r="28" fill="#ffd43b" stroke="#1a0f0a" stroke-width="4" />
+        <circle cx="0" cy="0" r="12" fill="#fff9db" />
+      </g>
+
+      <!-- 图元 2：2D 赛璐珞重装铁骑冲锋剪影 (Cavalry Silhouette) -->
+      <g id="symbol-cavalry-rider">
+        <path
+          d="M-38,-22 Q-85,-42 -118,-12 Q-88,2 -65,8 Q-95,22 -112,35 Q-72,30 -32,12 Z"
+          fill="url(#crimson-cape-grad)"
+          stroke="#1a0f0a"
+          stroke-width="3"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M-55,32 L-28,8 L-34,-18 L-14,-38 L6,-36 L14,-18 L34,-26 L58,-38 L72,-22 L56,-2 L84,12 L62,18 L42,8 L18,22 L44,44 L26,46 L2,26 L-24,28 L-44,48 Z"
+          fill="#26130a"
+          stroke="#ffd43b"
+          stroke-width="2.5"
+          stroke-linejoin="round"
+        />
+        <polygon points="-10,-42 12,-52 2,-32" fill="#ffd43b" />
+        <polygon points="56,-28 66,-26 59,-21" fill="#ffec99" />
+        <polygon points="-70,-6 145,-6 195,0 145,6 -70,6" fill="url(#gold-spear-grad)" stroke="#1a0f0a" stroke-width="2" />
+      </g>
+
+      <!-- 图元 3：高速穿刺金色长枪与撕裂轨迹 (Golden Spear) -->
+      <g id="symbol-golden-spear">
+        <path d="M-220,0 L10,-16 L95,0 L10,16 Z" fill="#f08c00" opacity="0.65" />
+        <polygon
+          points="-260,-4 -15,-5 0,-15 125,0 0,15 -15,5 -260,4"
+          fill="url(#gold-spear-grad)"
+          stroke="#1a0f0a"
+          stroke-width="2.5"
+          stroke-linejoin="round"
+        />
+        <polygon points="-40,0 5,-6 115,0 5,6" fill="#ffffff" />
+      </g>
+
+      <!-- 图元 4：终结霸王神威巨枪 (Sovereign Finale Spear) -->
+      <g id="symbol-sovereign-spear">
+        <polygon
+          points="-480,-18 -40,-22 0,-54 240,0 0,54 -40,22 -480,18"
+          fill="url(#gold-spear-grad)"
+          stroke="#1a0f0a"
+          stroke-width="4"
+          stroke-linejoin="round"
+        />
+        <polyline
+          points="-320,-12 -210,16 -120,-18 -20,14 90,-8 190,0"
+          fill="none"
+          stroke="#fff9db"
+          stroke-width="5"
+          stroke-linecap="round"
+        />
+        <polygon points="-120,0 10,-20 220,0 10,20" fill="#ffffff" />
+      </g>
+
+      <!-- 图元 5：Epic Toon FX 赛璐珞受击十字闪光 (Hit Spark) -->
+      <g id="symbol-hit-spark">
+        <path
+          d="M0,-58 C6,-14 14,-6 58,0 C14,6 6,14 0,58 C-6,14 -14,6 -58,0 C-14,-6 -6,-14 0,-58 Z"
+          fill="#fff9db"
+          stroke="#1a0f0a"
+          stroke-width="3"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M-32,-32 C-6,-10 -10,-6 0,0 C10,-6 6,-10 32,-32 C10,-6 6,-10 0,0 C6,10 10,6 32,32 C6,10 10,6 0,0 C-10,6 -6,10 -32,32 C-10,6 -6,10 0,0 Z"
+          fill="#ffd43b"
+        />
+        <circle cx="0" cy="0" r="10" fill="#ffffff" />
+      </g>
+
+      <!-- 图元 6：赛璐珞沙暴烟尘团块 (Cel-shaded Sand Cloud Puff) -->
+      <g id="symbol-sand-puff">
+        <path
+          d="M-38,12 C-46,-10 -24,-32 -4,-26 C10,-42 38,-30 36,-8 C54,2 44,28 22,28 C6,38 -26,34 -38,12 Z"
+          fill="url(#toon-sand-puff)"
+          stroke="#1a0f0a"
+          stroke-width="3.5"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M-20,-8 C-10,-20 12,-18 18,-4"
+          fill="none"
+          stroke="#fff9db"
+          stroke-width="3"
+          stroke-linecap="round"
+        />
+      </g>
+    </defs>
+  </svg>
+
+  <script>
+    /* ==========================================================================
+       [SFX Engine]
+       原生 Web Audio API 程序化音效合成器（双振荡器 + 滤波噪声合成）
+       ========================================================================== */
+    const SFXEngine = (() => {
+      let ctx = null;
+      let noiseBuffer = null;
+
+      function ensureContext() {
+        if (!ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          ctx = new AudioCtx();
+        }
+        if (ctx.state === "suspended") {
+          ctx.resume();
+        }
+        if (!noiseBuffer) {
+          const sampleRate = ctx.sampleRate;
+          noiseBuffer = ctx.createBuffer(1, sampleRate * 2.5, sampleRate);
+          const output = noiseBuffer.getChannelData(0);
+          for (let i = 0; i < output.length; i++) {
+            output[i] = Math.random() * 2 - 1;
+          }
+        }
+        return ctx;
+      }
+
+      // 1. 阶段1：狂暴大漠黄沙风暴席卷 + 远古战争号角共鸣（双振荡器 + 带通噪声）
+      function playSandstormAndHorn(timeScale = 1) {
+        const audio = ensureContext();
+        const now = audio.currentTime;
+        const dur = 1.65 / timeScale;
+
+        const noise = audio.createBufferSource();
+        noise.buffer = noiseBuffer;
+        noise.loop = true;
+
+        const bandpass = audio.createBiquadFilter();
+        bandpass.type = "bandpass";
+        bandpass.frequency.setValueAtTime(280, now);
+        bandpass.frequency.exponentialRampToValueAtTime(1150, now + dur * 0.65);
+        bandpass.frequency.exponentialRampToValueAtTime(420, now + dur);
+        bandpass.Q.value = 2.4;
+
+        const noiseGain = audio.createGain();
+        noiseGain.gain.setValueAtTime(0.01, now);
+        noiseGain.gain.linearRampToValueAtTime(0.32, now + dur * 0.25);
+        noiseGain.gain.exponentialRampToValueAtTime(0.008, now + dur);
+
+        noise.connect(bandpass);
+        bandpass.connect(noiseGain);
+        noiseGain.connect(audio.destination);
+        noise.start(now);
+        noise.stop(now + dur);
+
+        const osc1 = audio.createOscillator();
+        const osc2 = audio.createOscillator();
+        osc1.type = "sawtooth";
+        osc2.type = "triangle";
+
+        osc1.frequency.setValueAtTime(110, now);
+        osc1.frequency.exponentialRampToValueAtTime(146.8, now + dur * 0.45);
+        osc2.frequency.setValueAtTime(164.8, now);
+        osc2.frequency.exponentialRampToValueAtTime(220, now + dur * 0.45);
+
+        const hornFilter = audio.createBiquadFilter();
+        hornFilter.type = "lowpass";
+        hornFilter.frequency.setValueAtTime(620, now);
+        hornFilter.frequency.linearRampToValueAtTime(1400, now + dur * 0.5);
+
+        const hornGain = audio.createGain();
+        hornGain.gain.setValueAtTime(0.001, now);
+        hornGain.gain.linearRampToValueAtTime(0.18, now + dur * 0.2);
+        hornGain.gain.exponentialRampToValueAtTime(0.001, now + dur * 0.95);
+
+        osc1.connect(hornFilter);
+        osc2.connect(hornFilter);
+        hornFilter.connect(hornGain);
+        hornGain.connect(audio.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + dur);
+        osc2.stop(now + dur);
+      }
+
+      // 2. 阶段2：铁骑马蹄踏地轰鸣（双低频振荡器瞬态下潜）
+      function playHoofbeat(timeScale = 1, pitchSpread = 1) {
+        const audio = ensureContext();
+        const now = audio.currentTime;
+        const dur = 0.14 / timeScale;
+
+        const osc1 = audio.createOscillator();
+        const osc2 = audio.createOscillator();
+        osc1.type = "sine";
+        osc2.type = "triangle";
+
+        const baseFreq = 95 * pitchSpread;
+        osc1.frequency.setValueAtTime(baseFreq, now);
+        osc1.frequency.exponentialRampToValueAtTime(28, now + dur);
+        osc2.frequency.setValueAtTime(baseFreq * 1.45, now);
+        osc2.frequency.exponentialRampToValueAtTime(38, now + dur);
+
+        const thudGain = audio.createGain();
+        thudGain.gain.setValueAtTime(0.32, now);
+        thudGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+        osc1.connect(thudGain);
+        osc2.connect(thudGain);
+        thudGain.connect(audio.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + dur);
+        osc2.stop(now + dur);
+      }
+
+      // 3. 阶段2：金戈长枪呼啸撕裂穿刺声（双振荡器金属泛音 + 高通空气撕裂噪声）
+      function playSpearSlash(timeScale = 1, hitIndex = 0) {
+        const audio = ensureContext();
+        const now = audio.currentTime;
+        const dur = 0.18 / timeScale;
+
+        const osc1 = audio.createOscillator();
+        const osc2 = audio.createOscillator();
+        osc1.type = "sawtooth";
+        osc2.type = "square";
+
+        const startFreq = 920 + (hitIndex % 5) * 140;
+        osc1.frequency.setValueAtTime(startFreq, now);
+        osc1.frequency.exponentialRampToValueAtTime(210, now + dur);
+        osc2.frequency.setValueAtTime(startFreq * 1.414, now);
+        osc2.frequency.exponentialRampToValueAtTime(310, now + dur);
+
+        const metalGain = audio.createGain();
+        metalGain.gain.setValueAtTime(0.15, now);
+        metalGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+        osc1.connect(metalGain);
+        osc2.connect(metalGain);
+        metalGain.connect(audio.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + dur);
+        osc2.stop(now + dur);
+
+        const noise = audio.createBufferSource();
+        noise.buffer = noiseBuffer;
+        const hp = audio.createBiquadFilter();
+        hp.type = "highpass";
+        hp.frequency.setValueAtTime(1800, now);
+
+        const nGain = audio.createGain();
+        nGain.gain.setValueAtTime(0.24, now);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + dur * 0.85);
+
+        noise.connect(hp);
+        hp.connect(nGain);
+        nGain.connect(audio.destination);
+        noise.start(now);
+        noise.stop(now + dur);
+      }
+
+      // 4. 阶段3：终结重击爆破声（超低频双振荡器震地轰鸣 + 宽频沙暴爆裂噪声）
+      function playFinaleExplosion(timeScale = 1) {
+        const audio = ensureContext();
+        const now = audio.currentTime;
+        const dur = 1.05 / timeScale;
+
+        const subOsc1 = audio.createOscillator();
+        const subOsc2 = audio.createOscillator();
+        subOsc1.type = "sawtooth";
+        subOsc2.type = "sine";
+
+        subOsc1.frequency.setValueAtTime(150, now);
+        subOsc1.frequency.exponentialRampToValueAtTime(22, now + dur * 0.85);
+        subOsc2.frequency.setValueAtTime(85, now);
+        subOsc2.frequency.exponentialRampToValueAtTime(18, now + dur);
+
+        const subGain = audio.createGain();
+        subGain.gain.setValueAtTime(0.55, now);
+        subGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+        subOsc1.connect(subGain);
+        subOsc2.connect(subGain);
+        subGain.connect(audio.destination);
+
+        subOsc1.start(now);
+        subOsc2.start(now);
+        subOsc1.stop(now + dur);
+        subOsc2.stop(now + dur);
+
+        const noise = audio.createBufferSource();
+        noise.buffer = noiseBuffer;
+
+        const lp = audio.createBiquadFilter();
+        lp.type = "lowpass";
+        lp.frequency.setValueAtTime(3400, now);
+        lp.frequency.exponentialRampToValueAtTime(160, now + dur);
+
+        const nGain = audio.createGain();
+        nGain.gain.setValueAtTime(0.65, now);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+        noise.connect(lp);
+        lp.connect(nGain);
+        nGain.connect(audio.destination);
+
+        noise.start(now);
+        noise.stop(now + dur);
+      }
+
+      return {
+        playSandstormAndHorn,
+        playHoofbeat,
+        playSpearSlash,
+        playFinaleExplosion
+      };
+    })();
+
+    /* ==========================================================================
+       [Skill VFX Core Function]
+       纯函数入口：function playSkillVFX(container, targetEl)
+       ========================================================================== */
+    let activeTimers = [];
+    let shakeRafId = null;
+    let isLooping = false;
+    let isSlowMo = false;
+    let currentHP = 24500;
+    const maxHP = 24500;
+
+    function clearAllVFXTimers() {
+      activeTimers.forEach((id) => clearTimeout(id));
+      activeTimers = [];
+      if (shakeRafId) {
+        cancelAnimationFrame(shakeRafId);
+        shakeRafId = null;
+      }
+    }
+
+    function scheduleTask(fn, delayMs, timeScale) {
+      const id = setTimeout(fn, delayMs / timeScale);
+      activeTimers.push(id);
+      return id;
+    }
+
+    function triggerTraumaShake(stageEl, traumaAmount, durationMs, timeScale) {
+      if (shakeRafId) cancelAnimationFrame(shakeRafId);
+      const startTime = performance.now();
+      const scaledDuration = durationMs / timeScale;
+
+      function step(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(1, elapsed / scaledDuration);
+        const decay = 1 - progress;
+        const shake = traumaAmount * decay * decay;
+
+        const offsetX = (Math.random() * 2 - 1) * shake * 26;
+        const offsetY = (Math.random() * 2 - 1) * shake * 22;
+        const rot = (Math.random() * 2 - 1) * shake * 2.2;
+
+        stageEl.style.transform = `translate(${offsetX.toFixed(1)}px, ${offsetY.toFixed(1)}px) rotate(${rot.toFixed(2)}deg)`;
+
+        if (progress < 1) {
+          shakeRafId = requestAnimationFrame(step);
+        } else {
+          stageEl.style.transform = "";
+          shakeRafId = null;
+        }
+      }
+      shakeRafId = requestAnimationFrame(step);
+    }
+
+    function applyDamageAndPopup(container, targetEl, dmg, x, y, isCrit = false) {
+      currentHP = Math.max(0, currentHP - dmg);
+      const pct = (currentHP / maxHP) * 100;
+      const hpInner = document.getElementById("hp-bar-inner");
+      const hpDelay = document.getElementById("hp-bar-delay");
+      const hpText = document.getElementById("hp-val-text");
+
+      if (hpInner) hpInner.style.width = `${pct}%`;
+      if (hpDelay) hpDelay.style.width = `${pct}%`;
+      if (hpText) hpText.textContent = `${currentHP.toLocaleString()} / ${maxHP.toLocaleString()}`;
+
+      targetEl.classList.add("target-hit-flash");
+      const tilt = (Math.random() * 2 - 1) * (isCrit ? 9 : 4.5);
+      const scaleX = isCrit ? 1.12 : 1.05;
+      const scaleY = isCrit ? 0.88 : 0.95;
+      targetEl.style.transform = `scale(${scaleX}, ${scaleY}) rotate(${tilt}deg)`;
+
+      setTimeout(() => {
+        targetEl.classList.remove("target-hit-flash");
+        targetEl.style.transform = "";
+      }, 65);
+
+      const pop = document.createElement("div");
+      pop.className = `dmg-popup${isCrit ? " final-crit" : ""}`;
+      pop.textContent = isCrit ? `💥 ${dmg.toLocaleString()}!` : dmg.toLocaleString();
+      pop.style.setProperty("--x", `${x}px`);
+      pop.style.setProperty("--y", `${y}px`);
+      const timeScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--time-scale")) || 1;
+      pop.style.animation = `dmgFloatPop ${0.65 / timeScale}s cubic-bezier(0.16, 1, 0.3, 1) forwards`;
+      container.appendChild(pop);
+    }
+
+    /**
+     * 纯函数入口：在指定容器与目标靶卡上播放【王之军势】2D 技能特效
+     * @param {HTMLElement} container - 叠加在靶卡上方的透明 VFX 容器
+     * @param {HTMLElement} targetEl - 敌方受击靶卡 DOM 元素
+     */
+    function playSkillVFX(container, targetEl) {
+      clearAllVFXTimers();
+
+      const stageEl = document.getElementById("battle-stage");
+      const bannerEl = document.getElementById("np-banner");
+      const phaseStatusEl = document.getElementById("phase-status");
+      const timeScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--time-scale")) || 1;
+
+      if (currentHP <= 0) {
+        currentHP = maxHP;
+        document.getElementById("hp-bar-inner").style.width = "100%";
+        document.getElementById("hp-bar-delay").style.width = "100%";
+        document.getElementById("hp-val-text").textContent = "24,500 / 24,500";
+      }
+
+      container.innerHTML = "";
+      const svgNS = "http://www.w3.org/2000/svg";
+      const vfxSvg = document.createElementNS(svgNS, "svg");
+      vfxSvg.setAttribute("viewBox", "0 0 820 540");
+      vfxSvg.style.width = "100%";
+      vfxSvg.style.height = "100%";
+      vfxSvg.style.overflow = "visible";
+
+      const layerHorizon = document.createElementNS(svgNS, "g");
+      const layerSandstorm = document.createElementNS(svgNS, "g");
+      const layerCavalry = document.createElementNS(svgNS, "g");
+      const layerFinale = document.createElementNS(svgNS, "g");
+
+      vfxSvg.appendChild(layerHorizon);
+      vfxSvg.appendChild(layerSandstorm);
+      vfxSvg.appendChild(layerCavalry);
+      vfxSvg.appendChild(layerFinale);
+      container.appendChild(vfxSvg);
+
+      if (bannerEl) {
+        bannerEl.classList.remove("active");
+        void bannerEl.offsetWidth;
+        bannerEl.classList.add("active");
+      }
+
+      /* ========================================================================
+         阶段 1 [前摇/结界起手] (0ms ~ 650ms)
+         炙热大漠热浪翻涌 (<feTurbulence> + <feDisplacementMap>) 与漫天黄沙风暴席卷
+         ======================================================================== */
+      if (phaseStatusEl) phaseStatusEl.textContent = "STAGE 1 // 固有结界·热浪黄沙";
+      SFXEngine.playSandstormAndHorn(timeScale);
+
+      const heatGroup = document.createElementNS(svgNS, "g");
+      heatGroup.setAttribute("filter", "url(#heat-haze-filter)");
+      heatGroup.style.transformOrigin = "410px 270px";
+      heatGroup.style.animation = `horizonExpand ${1.75 / timeScale}s ease-out forwards`;
+
+      const desertAura = document.createElementNS(svgNS, "ellipse");
+      desertAura.setAttribute("cx", "410");
+      desertAura.setAttribute("cy", "270");
+      desertAura.setAttribute("rx", "350");
+      desertAura.setAttribute("ry", "220");
+      desertAura.setAttribute("fill", "url(#desert-reality-grad)");
+      heatGroup.appendChild(desertAura);
+
+      const dunePath = document.createElementNS(svgNS, "path");
+      dunePath.setAttribute("d", "M110,360 Q250,310 410,345 T710,350 L680,395 L140,395 Z");
+      dunePath.setAttribute("fill", "#8c4616");
+      dunePath.setAttribute("opacity", "0.45");
+      heatGroup.appendChild(dunePath);
+      layerHorizon.appendChild(heatGroup);
+
+      const sunUse = document.createElementNS(svgNS, "use");
+      sunUse.setAttribute("href", "#symbol-macedon-sun");
+      sunUse.setAttribute("x", "410");
+      sunUse.setAttribute("y", "270");
+      sunUse.style.transformOrigin = "410px 270px";
+      sunUse.style.animation = `sunCrestSpin ${1.6 / timeScale}s cubic-bezier(0.22, 1, 0.36, 1) forwards`;
+      layerHorizon.appendChild(sunUse);
+
+      const ribbonConfigs = [
+        { d: "M40,150 Q260,90 430,180 T780,130", width: 14, color: "#ffd43b", delay: 0 },
+        { d: "M20,230 Q280,310 460,210 T800,250", width: 22, color: "#f08c00", delay: 60 },
+        { d: "M60,330 Q240,260 440,340 T770,290", width: 18, color: "#ffe8cc", delay: 110 },
+        { d: "M30,190 Q310,140 490,260 T790,190", width: 10, color: "#fff9db", delay: 160 },
+        { d: "M50,380 Q290,320 470,390 T760,340", width: 16, color: "#d9a05b", delay: 210 }
+      ];
+
+      ribbonConfigs.forEach((rc) => {
+        scheduleTask(() => {
+          const path = document.createElementNS(svgNS, "path");
+          path.setAttribute("d", rc.d);
+          path.setAttribute("fill", "none");
+          path.setAttribute("stroke", rc.color);
+          path.setAttribute("stroke-width", rc.width);
+          path.setAttribute("stroke-linecap", "round");
+          path.setAttribute("stroke-dasharray", "260 680");
+          path.style.animation = `sandRibbonSweep ${0.95 / timeScale}s ease-in-out forwards`;
+          layerSandstorm.appendChild(path);
+        }, rc.delay, timeScale);
+      });
+
+      /* ========================================================================
+         阶段 2 [铁骑枪阵冲锋] (520ms ~ 1420ms)
+         漫天金色长枪与骑兵锋芒 2D 矢量剪影群高速穿刺（10段高频 Multi-hit）
+         ======================================================================== */
+      scheduleTask(() => {
+        if (phaseStatusEl) phaseStatusEl.textContent = "STAGE 2 // 王之军势·铁骑枪阵冲锋";
+      }, 520, timeScale);
+
+      const cavalryRiders = [
+        { sx: "-260px", sy: "170px", ex: "680px", ey: "220px", scale: 0.85, rot: "5deg", delay: 480 },
+        { sx: "-280px", sy: "290px", ex: "700px", ey: "270px", scale: 1.05, rot: "-2deg", delay: 610 },
+        { sx: "-250px", sy: "130px", ex: "690px", ey: "195px", scale: 0.75, rot: "7deg", delay: 740 },
+        { sx: "-290px", sy: "340px", ex: "710px", ey: "305px", scale: 0.95, rot: "-4deg", delay: 870 },
+        { sx: "-270px", sy: "230px", ex: "720px", ey: "250px", scale: 1.15, rot: "2deg", delay: 1000 },
+        { sx: "-260px", sy: "190px", ex: "700px", ey: "235px", scale: 0.9, rot: "4deg", delay: 1120 }
+      ];
+
+      cavalryRiders.forEach((rider, idx) => {
+        scheduleTask(() => {
+          SFXEngine.playHoofbeat(timeScale, 0.9 + (idx % 3) * 0.12);
+          const g = document.createElementNS(svgNS, "use");
+          g.setAttribute("href", "#symbol-cavalry-rider");
+          g.style.setProperty("--start-x", rider.sx);
+          g.style.setProperty("--start-y", rider.sy);
+          g.style.setProperty("--end-x", rider.ex);
+          g.style.setProperty("--end-y", rider.ey);
+          g.style.setProperty("--scale", rider.scale);
+          g.style.setProperty("--rot", rider.rot);
+          g.style.animation = `cavalryCharge ${0.46 / timeScale}s cubic-bezier(0.25, 0.8, 0.25, 1) forwards`;
+          layerCavalry.appendChild(g);
+        }, rider.delay, timeScale);
+      });
+
+      const spearStrikes = [
+        { angle: 18, hx: 385, hy: 215, dmg: 1420, delay: 540 },
+        { angle: -14, hx: 435, hy: 285, dmg: 1580, delay: 625 },
+        { angle: 28, hx: 405, hy: 195, dmg: 1390, delay: 710 },
+        { angle: -22, hx: 375, hy: 310, dmg: 1640, delay: 790 },
+        { angle: 8, hx: 445, hy: 245, dmg: 1710, delay: 870 },
+        { angle: 35, hx: 395, hy: 260, dmg: 1530, delay: 950 },
+        { angle: -18, hx: 425, hy: 210, dmg: 1820, delay: 1030 },
+        { angle: 12, hx: 380, hy: 275, dmg: 1690, delay: 1110 },
+        { angle: -26, hx: 430, hy: 315, dmg: 1940, delay: 1190 },
+        { angle: 22, hx: 410, hy: 240, dmg: 2150, delay: 1270 }
+      ];
+
+      spearStrikes.forEach((strike, idx) => {
+        scheduleTask(() => {
+          SFXEngine.playSpearSlash(timeScale, idx);
+          SFXEngine.playHoofbeat(timeScale, 1.05);
+
+          const rad = (strike.angle * Math.PI) / 180;
+          const cos = Math.cos(rad);
+          const sin = Math.sin(rad);
+
+          const sx = strike.hx - cos * 380;
+          const sy = strike.hy - sin * 380;
+          const mx = strike.hx - cos * 40;
+          const my = strike.hy - sin * 40;
+          const ex = strike.hx + cos * 60;
+          const ey = strike.hy + sin * 60;
+          const ox = strike.hx + cos * 290;
+          const oy = strike.hy + sin * 290;
+
+          const slashLine = document.createElementNS(svgNS, "line");
+          slashLine.setAttribute("x1", sx);
+          slashLine.setAttribute("y1", sy);
+          slashLine.setAttribute("x2", ox);
+          slashLine.setAttribute("y2", oy);
+          slashLine.setAttribute("stroke", "#fff3bf");
+          slashLine.setAttribute("stroke-width", "4");
+          slashLine.setAttribute("opacity", "0.85");
+          layerCavalry.appendChild(slashLine);
+          scheduleTask(() => slashLine.remove(), 140, timeScale);
+
+          const spear = document.createElementNS(svgNS, "use");
+          spear.setAttribute("href", "#symbol-golden-spear");
+          spear.setAttribute("filter", "url(#toon-gold-glow)");
+          spear.style.setProperty("--sx", `${sx}px`);
+          spear.style.setProperty("--sy", `${sy}px`);
+          spear.style.setProperty("--mx", `${mx}px`);
+          spear.style.setProperty("--my", `${my}px`);
+          spear.style.setProperty("--ex", `${ex}px`);
+          spear.style.setProperty("--ey", `${ey}px`);
+          spear.style.setProperty("--ox", `${ox}px`);
+          spear.style.setProperty("--oy", `${oy}px`);
+          spear.style.setProperty("--angle", `${strike.angle}deg`);
+          spear.style.animation = `spearPierce ${0.24 / timeScale}s cubic-bezier(0.16, 1, 0.3, 1) forwards`;
+          layerCavalry.appendChild(spear);
+
+          const spark = document.createElementNS(svgNS, "use");
+          spark.setAttribute("href", "#symbol-hit-spark");
+          spark.style.setProperty("--hx", `${strike.hx}px`);
+          spark.style.setProperty("--hy", `${strike.hy}px`);
+          spark.style.setProperty("--r", `${idx * 36}deg`);
+          spark.style.animation = `impactSparkPop ${0.22 / timeScale}s ease-out forwards`;
+          layerCavalry.appendChild(spark);
+
+          triggerTraumaShake(stageEl, 0.28, 90, timeScale);
+          applyDamageAndPopup(container, targetEl, strike.dmg, strike.hx - 20, strike.hy - 30, false);
+        }, strike.delay, timeScale);
+      });
+
+      /* ========================================================================
+         阶段 3 [终结爆破] (1420ms ~ 2500ms)
+         霸王神威巨枪贯击 + 52ms 命中顿帧 (Hitstop) + 剧烈屏幕创伤震颤 + 沙暴冲击波环
+         ======================================================================== */
+      scheduleTask(() => {
+        if (phaseStatusEl) phaseStatusEl.textContent = "STAGE 3 // 终结一击·霸王沙暴轰爆";
+
+        const sovSpear = document.createElementNS(svgNS, "use");
+        sovSpear.setAttribute("href", "#symbol-sovereign-spear");
+        sovSpear.setAttribute("filter", "url(#toon-gold-glow)");
+        sovSpear.style.animation = `sovereignSpearDrop ${0.42 / timeScale}s cubic-bezier(0.16, 1, 0.3, 1) forwards`;
+        layerFinale.appendChild(sovSpear);
+      }, 1420, timeScale);
+
+      scheduleTask(() => {
+        SFXEngine.playFinaleExplosion(timeScale);
+
+        // 52ms 命中顿帧 (Hitstop)
+        stageEl.classList.add("stage-hitstop");
+
+        setTimeout(() => {
+          stageEl.classList.remove("stage-hitstop");
+
+          // 剧烈屏幕创伤震颤 (Trauma Screen Shake)
+          triggerTraumaShake(stageEl, 1.0, 580, timeScale);
+
+          // 终结暴击扣血与跳字
+          applyDamageAndPopup(container, targetEl, 7630, 345, 195, true);
+
+          // 双重金色与赤红冲击波环
+          const ringSpecs = [
+            { r: 95, color: "#fff9db", maxScale: 2.5, dur: 0.52 },
+            { r: 80, color: "#ffd43b", maxScale: 2.1, dur: 0.64 },
+            { r: 65, color: "#c92a2a", maxScale: 1.75, dur: 0.72 }
+          ];
+
+          ringSpecs.forEach((rs) => {
+            const ring = document.createElementNS(svgNS, "circle");
+            ring.setAttribute("cx", "0");
+            ring.setAttribute("cy", "0");
+            ring.setAttribute("r", rs.r);
+            ring.setAttribute("fill", "none");
+            ring.setAttribute("stroke", rs.color);
+            ring.style.setProperty("--max-scale", rs.maxScale);
+            ring.style.animation = `shockwaveRingExpand ${rs.dur / timeScale}s cubic-bezier(0.16, 1, 0.3, 1) forwards`;
+            layerFinale.appendChild(ring);
+          });
+
+          // 赛璐珞霸王金色太阳芒刺光爆
+          const burstPoly = document.createElementNS(svgNS, "polygon");
+          const pts = [];
+          const spikes = 16;
+          for (let i = 0; i < spikes * 2; i++) {
+            const r = i % 2 === 0 ? 250 : 58;
+            const ang = (i * Math.PI) / spikes;
+            pts.push(`${(Math.cos(ang) * r).toFixed(1)},${(Math.sin(ang) * r).toFixed(1)}`);
+          }
+          burstPoly.setAttribute("points", pts.join(" "));
+          burstPoly.setAttribute("fill", "#fff3bf");
+          burstPoly.setAttribute("stroke", "#f08c00");
+          burstPoly.setAttribute("stroke-width", "4");
+          burstPoly.style.setProperty("--hx", "410px");
+          burstPoly.style.setProperty("--hy", "270px");
+          burstPoly.style.setProperty("--r", "0deg");
+          burstPoly.style.animation = `impactSparkPop ${0.48 / timeScale}s cubic-bezier(0.16, 1, 0.3, 1) forwards`;
+          layerFinale.appendChild(burstPoly);
+
+          // 狂暴赛璐珞沙暴烟尘团四散炸裂
+          const dustAngles = [0, 45, 90, 135, 180, 225, 270, 315];
+          dustAngles.forEach((deg, i) => {
+            const rad = (deg * Math.PI) / 180;
+            const dist = 135 + (i % 2) * 45;
+            const dx = 410 + Math.cos(rad) * dist;
+            const dy = 270 + Math.sin(rad) * dist;
+            const dx2 = 410 + Math.cos(rad) * (dist * 1.35);
+            const dy2 = 270 + Math.sin(rad) * (dist * 1.35);
+
+            const puff = document.createElementNS(svgNS, "use");
+            puff.setAttribute("href", "#symbol-sand-puff");
+            puff.style.setProperty("--dx", `${dx.toFixed(1)}px`);
+            puff.style.setProperty("--dy", `${dy.toFixed(1)}px`);
+            puff.style.setProperty("--dx2", `${dx2.toFixed(1)}px`);
+            puff.style.setProperty("--dy2", `${dy2.toFixed(1)}px`);
+            puff.style.setProperty("--ds", (1.1 + (i % 3) * 0.25).toFixed(2));
+            puff.style.setProperty("--dr", `${(i % 2 === 0 ? 1 : -1) * 35}deg`);
+            puff.style.animation = `dustPuffBlast ${0.68 / timeScale}s cubic-bezier(0.16, 1, 0.3, 1) forwards`;
+            layerFinale.appendChild(puff);
+          });
+        }, 52);
+      }, 1540, timeScale);
+
+      // 收尾清理与自动循环调度
+      scheduleTask(() => {
+        if (phaseStatusEl) phaseStatusEl.textContent = "COMPLETE // 固有结界消散";
+        container.innerHTML = "";
+        if (isLooping) {
+          scheduleTask(() => {
+            if (isLooping) playSkillVFX(container, targetEl);
+          }, 350, timeScale);
+        }
+      }, 2550, timeScale);
+    }
+
+    /* ==========================================================================
+       [UI Controls & Event Bindings]
+       ========================================================================== */
+    const vfxContainer = document.getElementById("vfx-overlay-container");
+    const targetCard = document.getElementById("enemy-target");
+    const btnCast = document.getElementById("btn-cast");
+    const btnLoop = document.getElementById("btn-loop");
+    const btnSlow = document.getElementById("btn-slow");
+
+    btnCast.addEventListener("click", () => {
+      playSkillVFX(vfxContainer, targetCard);
+    });
+
+    btnLoop.addEventListener("click", () => {
+      isLooping = !isLooping;
+      btnLoop.classList.toggle("active-toggle", isLooping);
+      btnLoop.innerHTML = `<span>🔁 自动循环: ${isLooping ? "开" : "关"}</span>`;
+      if (isLooping) {
+        playSkillVFX(vfxContainer, targetCard);
+      }
+    });
+
+    btnSlow.addEventListener("click", () => {
+      isSlowMo = !isSlowMo;
+      const scale = isSlowMo ? 0.2 : 1;
+      document.documentElement.style.setProperty("--time-scale", scale);
+      btnSlow.classList.toggle("active-toggle", isSlowMo);
+      btnSlow.innerHTML = `<span>🔍 0.2x 慢放审视: ${isSlowMo ? "开" : "关"}</span>`;
+
+      const turbAnim = document.querySelector("#heat-turbulence animate");
+      if (turbAnim) {
+        turbAnim.setAttribute("dur", isSlowMo ? "3.0s" : "0.6s");
+      }
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        playSkillVFX(vfxContainer, targetCard);
+      }
+    });
+  </script>
+</body>
+</html>
