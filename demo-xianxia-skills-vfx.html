@@ -206,9 +206,80 @@
       0%, 55% { filter: brightness(3.0) drop-shadow(0 0 16px #06b6d4); }
       56%, 100% { filter: drop-shadow(0 0 8px #10b981); }
     }
+    /* ===== 水墨山水氛围层 ===== */
+    .ink-bg { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+    .ink-mountain { position: absolute; left: -10%; width: 120%; bottom: 0; }
+    .ink-fog { position: absolute; width: 200%; height: 40%; left: 0; background:
+      radial-gradient(ellipse at 20% 50%, rgba(167,243,208,0.07) 0%, transparent 45%),
+      radial-gradient(ellipse at 60% 40%, rgba(110,231,183,0.06) 0%, transparent 40%),
+      radial-gradient(ellipse at 85% 60%, rgba(167,243,208,0.05) 0%, transparent 45%);
+      animation: fog-drift 38s linear infinite; will-change: transform; }
+    @keyframes fog-drift { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    .moon { position: absolute; top: 7%; right: 12%; width: 120px; height: 120px; border-radius: 50%;
+      background: radial-gradient(circle at 40% 40%, #f0fdf4 0%, #bbf7d0 35%, rgba(16,185,129,0.15) 70%, transparent 72%);
+      box-shadow: 0 0 80px 20px rgba(110,231,183,0.12); opacity: 0.55; }
+    #fx-canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 45; mix-blend-mode: screen; }
+    .vignette { position: fixed; inset: 0; pointer-events: none; z-index: 1;
+      background: radial-gradient(ellipse at 50% 45%, transparent 40%, rgba(0,0,0,0.75) 100%); }
+
+    /* ===== 书法技能名横幅 ===== */
+    #skill-banner { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 60; pointer-events: none; opacity: 0; }
+    #skill-banner.show { animation: banner-in 1.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    #skill-banner .brush { position: absolute; left: 50%; top: 50%; width: 140%; height: 70%; transform: translate(-50%, -50%);
+      background: linear-gradient(90deg, transparent, rgba(2,44,34,0.85) 15%, rgba(4,47,46,0.92) 50%, rgba(2,44,34,0.85) 85%, transparent);
+      filter: blur(2px); clip-path: polygon(2% 30%, 10% 10%, 50% 4%, 92% 12%, 99% 45%, 90% 88%, 50% 96%, 8% 86%); }
+    #skill-banner .txt { position: relative; font-family: 'Ma Shan Zheng', serif; font-size: 56px; letter-spacing: 0.3em; white-space: nowrap;
+      background: linear-gradient(180deg, #f0fdf4 10%, #6ee7b7 55%, #0d9488 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+      filter: drop-shadow(0 0 18px rgba(52,211,153,0.6)); padding: 0 0.4em; }
+    #skill-banner .seal { position: absolute; right: -36px; bottom: -6px; width: 34px; height: 34px; border: 2px solid #dc2626; color: #dc2626;
+      font-family: 'Ma Shan Zheng', serif; font-size: 13px; line-height: 14px; display: flex; align-items: center; justify-content: center;
+      text-align: center; transform: rotate(-8deg); background: rgba(127,29,29,0.15); }
+    @keyframes banner-in {
+      0% { opacity: 0; transform: translateX(-50%) scale(1.6); letter-spacing: 0.8em; }
+      18% { opacity: 1; transform: translateX(-50%) scale(0.96); }
+      28%, 72% { opacity: 1; transform: translateX(-50%) scale(1); }
+      100% { opacity: 0; transform: translateX(-50%) scale(1.04) translateY(-14px); }
+    }
+
+    /* ===== 技能卡升级 ===== */
+    .skill-card { position: relative; isolation: isolate; }
+    .skill-card::before { content: ''; position: absolute; inset: -1px; border-radius: inherit; z-index: -1; opacity: 0; transition: opacity .3s;
+      background: conic-gradient(from var(--ang, 0deg), transparent 0 70%, rgba(110,231,183,0.7) 85%, transparent 100%);
+      animation: card-spin 3s linear infinite; }
+    .skill-card:hover::before { opacity: 1; }
+    @property --ang { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+    @keyframes card-spin { to { --ang: 360deg; } }
+    .skill-card.cooldown { pointer-events: none; filter: grayscale(0.7) brightness(0.6); }
+    .skill-card .glyph { position: absolute; right: 8px; bottom: -6px; font-family: 'Ma Shan Zheng', serif; font-size: 44px; opacity: 0.08; pointer-events: none; }
+
+    /* 傀儡灵符悬浮 */
+    .talisman { position: absolute; width: 18px; height: 46px; background: linear-gradient(180deg, #fde68a, #f59e0b); border: 1px solid #b45309;
+      font-family: 'Ma Shan Zheng', serif; font-size: 11px; color: #991b1b; writing-mode: vertical-rl; display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 10px rgba(245,158,11,0.4); animation: tal-float 3.2s ease-in-out infinite alternate; }
+    @keyframes tal-float { from { transform: translateY(0) rotate(var(--r, -6deg)); } to { transform: translateY(-10px) rotate(calc(var(--r, -6deg) * -1)); } }
+    .breathe { animation: br 4s ease-in-out infinite alternate; }
+    @keyframes br { from { transform: translateY(0); } to { transform: translateY(-6px); } }
   </style>
 </head>
 <body class="bg-[#030907] text-[#ecfdf5] min-h-screen flex flex-col items-center justify-between overflow-x-hidden selection:bg-emerald-900 selection:text-emerald-100">
+
+  <!-- 水墨山水氛围 -->
+  <div class="ink-bg">
+    <div class="moon"></div>
+    <div class="ink-fog" style="top: 30%;"></div>
+    <svg class="ink-mountain" viewBox="0 0 1200 400" preserveAspectRatio="none" style="height: 55%; opacity: 0.35;">
+      <defs><linearGradient id="mt1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#134e4a"/><stop offset="1" stop-color="#020807" stop-opacity="0"/></linearGradient></defs>
+      <path d="M0,400 L0,250 Q80,170 160,220 T320,150 Q380,90 450,170 T620,120 Q700,60 780,160 T960,130 Q1050,80 1120,180 L1200,200 L1200,400 Z" fill="url(#mt1)"/>
+    </svg>
+    <div class="ink-fog" style="top: 55%; animation-duration: 26s; opacity: 0.8;"></div>
+    <svg class="ink-mountain" viewBox="0 0 1200 400" preserveAspectRatio="none" style="height: 38%; opacity: 0.7;">
+      <defs><linearGradient id="mt2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#042f2e"/><stop offset="1" stop-color="#010403"/></linearGradient></defs>
+      <path d="M0,400 L0,300 Q120,210 240,280 T480,240 Q560,180 660,260 T880,230 Q980,170 1080,260 L1200,250 L1200,400 Z" fill="url(#mt2)"/>
+    </svg>
+  </div>
+  <div class="vignette"></div>
+  <canvas id="fx-canvas"></canvas>
+  <div id="skill-banner"><div class="brush"></div><div class="txt" id="skill-banner-txt"></div><div class="seal">道<br>法</div></div>
 
   <!-- 全屏暗场压栈层 (大招聚焦) -->
   <div id="ultimate-overlay" class="fixed inset-0 bg-[#010403] pointer-events-none opacity-0 z-40 transition-opacity duration-300" style="background: radial-gradient(circle at 50% 45%, rgba(6,31,24,0.4) 0%, rgba(1,4,3,0.92) 80%);"></div>
@@ -242,7 +313,9 @@
     <div id="vfx-stage" class="absolute inset-0 pointer-events-none z-50"></div>
 
     <!-- 受击目标：试道玄铁傀儡 -->
-    <div id="target-puppet" class="relative flex flex-col items-center justify-center cursor-pointer group">
+    <div id="target-puppet" class="relative flex flex-col items-center justify-center cursor-pointer group breathe">
+      <div class="talisman" style="left: -34px; top: 90px; --r: -8deg;">镇</div>
+      <div class="talisman" style="right: -34px; top: 110px; --r: 7deg; animation-delay: -1.4s;">敕</div>
       <!-- 傀儡血量与名札 -->
       <div class="mb-3 text-center">
         <div class="flex items-center justify-center space-x-2">
@@ -287,7 +360,7 @@
       </div>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <!-- 技能1: 青莲火弹 (普通) -->
-        <button id="skill-btn-huodan" class="p-3 rounded-xl glass-card hover:border-teal-400/60 active:scale-95 transition text-left relative overflow-hidden group">
+        <button data-glyph="火" id="skill-btn-huodan" class="p-3 rounded-xl glass-card hover:border-teal-400/60 active:scale-95 transition text-left relative overflow-hidden group skill-card">
           <div class="flex items-center justify-between text-xs mb-1">
             <span class="px-1.5 py-0.5 rounded text-[10px] bg-teal-950/80 text-teal-300 border border-teal-500/30">单体 · 普攻</span>
             <span class="font-mono-code text-[11px] text-teal-400">10 MP</span>
@@ -297,7 +370,7 @@
         </button>
 
         <!-- 技能2: 青藤缚 (控制) -->
-        <button id="skill-btn-tengfu" class="p-3 rounded-xl glass-card hover:border-emerald-400/60 active:scale-95 transition text-left relative overflow-hidden group">
+        <button data-glyph="缚" id="skill-btn-tengfu" class="p-3 rounded-xl glass-card hover:border-emerald-400/60 active:scale-95 transition text-left relative overflow-hidden group skill-card">
           <div class="flex items-center justify-between text-xs mb-1">
             <span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">地煞 · 控制</span>
             <span class="font-mono-code text-[11px] text-emerald-400">20 MP</span>
@@ -307,7 +380,7 @@
         </button>
 
         <!-- 技能3: 碧影千叶杀 (群攻) -->
-        <button id="skill-btn-qianye" class="p-3 rounded-xl glass-card hover:border-green-400/60 active:scale-95 transition text-left relative overflow-hidden group">
+        <button data-glyph="叶" id="skill-btn-qianye" class="p-3 rounded-xl glass-card hover:border-green-400/60 active:scale-95 transition text-left relative overflow-hidden group skill-card">
           <div class="flex items-center justify-between text-xs mb-1">
             <span class="px-1.5 py-0.5 rounded text-[10px] bg-green-950/80 text-green-300 border border-green-500/30">穿云 · 群攻</span>
             <span class="font-mono-code text-[11px] text-green-400">25 MP</span>
@@ -317,7 +390,7 @@
         </button>
 
         <!-- 技能4: 青莲离火变 (大招) -->
-        <button id="skill-btn-lihuo" class="p-3 rounded-xl glass-card hover:border-cyan-400 active:scale-95 transition text-left relative overflow-hidden group border-cyan-500/40 bg-gradient-to-br from-emerald-950/40 via-teal-950/20 to-cyan-950/40">
+        <button data-glyph="莲" id="skill-btn-lihuo" class="p-3 rounded-xl glass-card hover:border-cyan-400 active:scale-95 transition text-left relative overflow-hidden group skill-card border-cyan-500/40 bg-gradient-to-br from-emerald-950/40 via-teal-950/20 to-cyan-950/40">
           <div class="flex items-center justify-between text-xs mb-1">
             <span class="px-1.5 py-0.5 rounded text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-400/50 font-bold">造化 · 大招</span>
             <span class="font-mono-code text-[11px] text-cyan-300 font-bold">50 MP</span>
@@ -853,6 +926,88 @@
     }
 
     // ========================================================
+    // ========================================================
+    // Canvas 粒子引擎：环境萤火 + 技能爆发粒子
+    // ========================================================
+    const cvs = document.getElementById('fx-canvas');
+    const g2d = cvs.getContext('2d');
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+    function resizeCvs() { cvs.width = innerWidth * dpr; cvs.height = innerHeight * dpr; g2d.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    resizeCvs(); addEventListener('resize', resizeCvs);
+    const parts = [];
+    function addP(o) { parts.push(Object.assign({ vx: 0, vy: 0, life: 1, decay: 0.02, size: 3, color: '#6ee7b7', grav: 0, drag: 0.98, rot: 0, vr: 0, shape: 'dot' }, o)); }
+    function targetCenter() { const r = document.getElementById('puppet-sprite').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+    function drawPetal(s, c) { g2d.fillStyle = c; g2d.beginPath(); g2d.moveTo(0, 0); g2d.bezierCurveTo(-s * 0.6, -s * 0.5, -s * 0.5, -s * 1.4, 0, -s * 1.8); g2d.bezierCurveTo(s * 0.5, -s * 1.4, s * 0.6, -s * 0.5, 0, 0); g2d.fill(); }
+    function drawLeaf(s, c) { g2d.fillStyle = c; g2d.beginPath(); g2d.moveTo(-s, 0); g2d.quadraticCurveTo(0, -s * 0.45, s * 1.2, 0); g2d.quadraticCurveTo(0, s * 0.45, -s, 0); g2d.fill(); }
+    function tick() {
+      g2d.clearRect(0, 0, innerWidth, innerHeight);
+      if (Math.random() < 0.18) addP({ x: Math.random() * innerWidth, y: innerHeight + 10, vx: (Math.random() - 0.5) * 0.3, vy: -0.3 - Math.random() * 0.6, size: 1 + Math.random() * 2, decay: 0.002 + Math.random() * 0.002, color: Math.random() < 0.8 ? '#86efac' : '#67e8f9', drag: 1, ambient: true });
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const p = parts[i];
+        p.vx *= p.drag; p.vy = p.vy * p.drag + p.grav; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life -= p.decay;
+        if (p.ambient) p.x += Math.sin((p.y + p.size * 100) * 0.01) * 0.3;
+        if (p.life <= 0) { parts.splice(i, 1); continue; }
+        g2d.save(); g2d.globalAlpha = Math.max(0, Math.min(1, p.life * (p.ambient ? 0.7 : 1))); g2d.translate(p.x, p.y); g2d.rotate(p.rot);
+        if (p.shape === 'petal') drawPetal(p.size, p.color);
+        else if (p.shape === 'leaf') drawLeaf(p.size, p.color);
+        else if (p.shape === 'ring') { g2d.strokeStyle = p.color; g2d.lineWidth = 2 * p.life; g2d.beginPath(); g2d.arc(0, 0, p.size * (2 - p.life) * 20, 0, Math.PI * 2); g2d.stroke(); }
+        else if (p.shape === 'ink') { const gr = g2d.createRadialGradient(0, 0, 0, 0, 0, p.size); gr.addColorStop(0, p.color); gr.addColorStop(1, 'transparent'); g2d.fillStyle = gr; g2d.beginPath(); g2d.arc(0, 0, p.size, 0, Math.PI * 2); g2d.fill(); }
+        else { const gr = g2d.createRadialGradient(0, 0, 0, 0, 0, p.size * 3); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.3, p.color); gr.addColorStop(1, 'transparent'); g2d.fillStyle = gr; g2d.beginPath(); g2d.arc(0, 0, p.size * 3, 0, Math.PI * 2); g2d.fill(); }
+        g2d.restore();
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    function burst(n, fn) { for (let i = 0; i < n; i++) addP(fn(i)); }
+    function showBanner(text) {
+      const b = document.getElementById('skill-banner'); document.getElementById('skill-banner-txt').textContent = text;
+      b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+    }
+    function lockCards(ms) { document.querySelectorAll('.skill-card').forEach(c => c.classList.add('cooldown')); setTimeout(() => document.querySelectorAll('.skill-card').forEach(c => c.classList.remove('cooldown')), ms); }
+    document.querySelectorAll('.skill-card').forEach(c => { const gl = document.createElement('span'); gl.className = 'glyph text-emerald-300'; gl.textContent = c.dataset.glyph || ''; c.appendChild(gl); });
+
+    // —— 青莲离火变：聚灵向心 → 爆发莲瓣洪流 + 青火冲天
+    const _lihuo = castQingLianLiHuo;
+    castQingLianLiHuo = function () {
+      lockCards(1400); showBanner('青莲离火变'); _lihuo();
+      const c = targetCenter();
+      burst(70, () => { const a = Math.random() * Math.PI * 2, d = 220 + Math.random() * 160; return { x: c.x + Math.cos(a) * d, y: c.y + Math.sin(a) * d, vx: -Math.cos(a) * d / 26, vy: -Math.sin(a) * d / 26, drag: 0.93, decay: 0.035, size: 1.5 + Math.random() * 2, color: Math.random() < 0.5 ? '#6ee7b7' : '#67e8f9' }; });
+      setTimeout(() => {
+        burst(60, () => { const a = Math.random() * Math.PI * 2, s = 4 + Math.random() * 10; return { x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 2, grav: 0.06, drag: 0.95, decay: 0.008 + Math.random() * 0.008, size: 6 + Math.random() * 7, shape: 'petal', rot: a, vr: (Math.random() - 0.5) * 0.15, color: ['#a7f3d0', '#6ee7b7', '#ecfdf5', '#5eead4'][Math.floor(Math.random() * 4)] }; });
+        burst(90, () => { const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.2, s = 3 + Math.random() * 9; return { x: c.x + (Math.random() - 0.5) * 60, y: c.y + 40, vx: Math.cos(a) * s, vy: Math.sin(a) * s, drag: 0.96, decay: 0.015 + Math.random() * 0.02, size: 1.5 + Math.random() * 2.5, color: Math.random() < 0.6 ? '#22d3ee' : '#a7f3d0' }; });
+        burst(4, i => ({ x: c.x, y: c.y, shape: 'ring', size: 3 + i * 1.5, decay: 0.025 - i * 0.003, color: i % 2 ? '#67e8f9' : '#ecfdf5' }));
+        burst(14, () => ({ x: c.x + (Math.random() - 0.5) * 200, y: c.y + (Math.random() - 0.5) * 140, shape: 'ink', size: 30 + Math.random() * 50, decay: 0.012, color: 'rgba(16,185,129,0.35)' }));
+      }, 480);
+    };
+
+    // —— 碧影千叶杀：四周飞叶旋入 + 切裂碎叶
+    const _qianye = castBiYingQianYe;
+    castBiYingQianYe = function () {
+      lockCards(850); showBanner('碧影千叶杀'); _qianye();
+      const c = targetCenter();
+      burst(40, () => { const a = Math.random() * Math.PI * 2, d = 260 + Math.random() * 120; return { x: c.x + Math.cos(a) * d, y: c.y + Math.sin(a) * d, vx: -Math.cos(a + 0.4) * 15, vy: -Math.sin(a + 0.4) * 15, drag: 0.94, decay: 0.022, size: 7 + Math.random() * 5, shape: 'leaf', rot: a + Math.PI, vr: 0.08, color: Math.random() < 0.5 ? '#4ade80' : '#86efac' }; });
+      [120, 260].forEach(t => setTimeout(() => burst(26, () => { const a = Math.random() * Math.PI * 2, s = 3 + Math.random() * 7; return { x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, grav: 0.08, drag: 0.95, decay: 0.025, size: 3 + Math.random() * 3, shape: 'leaf', rot: a, vr: 0.3, color: '#bbf7d0' }; }), t));
+    };
+
+    // —— 青藤缚：地底尘土翻涌 + 毒绿汁液
+    const _tengfu = castQingTengFu;
+    castQingTengFu = function () {
+      lockCards(1000); showBanner('青藤缚'); _tengfu();
+      const c = targetCenter();
+      burst(40, () => ({ x: c.x + (Math.random() - 0.5) * 200, y: c.y + 110, vx: (Math.random() - 0.5) * 3, vy: -1 - Math.random() * 4, grav: 0.12, drag: 0.97, decay: 0.02, size: 2 + Math.random() * 3, color: '#365314' }));
+      setTimeout(() => burst(30, () => { const a = Math.random() * Math.PI * 2, s = 2 + Math.random() * 6; return { x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, grav: 0.15, drag: 0.96, decay: 0.022, size: 1.5 + Math.random() * 2, color: '#a3e635' }; }), 340);
+    };
+
+    // —— 青莲火弹：拖尾青焰 + 命中火星
+    const _huodan = castQingLianHuoDan;
+    castQingLianHuoDan = function () {
+      _huodan();
+      const c = targetCenter(), sx = c.x - 140, sy = c.y - 70;
+      for (let k = 0; k < 8; k++) setTimeout(() => { const t = k / 8; burst(5, () => ({ x: sx + 140 * t + (Math.random() - 0.5) * 8, y: sy + 70 * t + (Math.random() - 0.5) * 8, vx: (Math.random() - 0.5), vy: -0.5 - Math.random(), decay: 0.05, size: 1.5 + Math.random() * 2, color: '#22d3ee' })); }, k * 25);
+      setTimeout(() => { burst(28, () => { const a = Math.random() * Math.PI * 2, s = 2 + Math.random() * 6; return { x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, grav: 0.1, drag: 0.94, decay: 0.03, size: 1.2 + Math.random() * 2, color: Math.random() < 0.5 ? '#67e8f9' : '#6ee7b7' }; }); burst(3, () => ({ x: c.x, y: c.y, shape: 'petal', size: 8, vx: (Math.random() - 0.5) * 6, vy: -3 - Math.random() * 3, grav: 0.15, rot: Math.random() * 6, vr: 0.2, decay: 0.02, color: '#a7f3d0' })); }, 220);
+    };
+
     // 界面按钮事件绑定
     // ========================================================
     document.getElementById('skill-btn-lihuo').addEventListener('click', () => {
