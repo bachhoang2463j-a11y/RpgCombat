@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>修仙四式 · 水墨青莲道法演练场</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600;700;900&family=JetBrains+Mono:wght@500;700&display=swap');
+    
+    body {
+      font-family: 'Noto Serif SC', serif;
+      user-select: none;
+      background: radial-gradient(circle at 50% 40%, #061f18 0%, #030d0a 55%, #010403 100%);
+    }
+    .font-calligraphy { font-family: 'Ma Shan Zheng', cursive, 'STKaiti', serif; }
+    .font-mono-code { font-family: 'JetBrains Mono', monospace; }
+    
+    .glass-panel {
+      background: rgba(4, 18, 14, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(52, 211, 153, 0.2);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 25px rgba(16, 185, 129, 0.12);
+    }
+    .glass-card {
+      background: rgba(5, 23, 18, 0.65);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(52, 211, 153, 0.15);
+    }
+    
+    .glow-wood { filter: drop-shadow(0 0 12px rgba(52, 211, 153, 0.75)); }
+    .glow-fire { filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.85)); }
+    .glow-ink { filter: drop-shadow(0 0 14px rgba(6, 78, 59, 0.9)); }
+    
+    /* 硬件加速受击震屏基座 */
+    .shake-light { animation: s-light 0.18s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; will-change: transform; }
+    .shake-heavy { animation: s-heavy 0.32s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; will-change: transform; }
+    .shake-quake { animation: s-quake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; will-change: transform; }
+    @keyframes s-light {
+      0%, 100% { transform: translate3d(0, 0, 0); }
+      25% { transform: translate3d(-3px, 2px, 0); }
+      75% { transform: translate3d(3px, -2px, 0); }
+    }
+    @keyframes s-heavy {
+      0%, 100% { transform: translate3d(0, 0, 0); }
+      20% { transform: translate3d(-6px, 4px, 0) rotate(-0.5deg); }
+      40% { transform: translate3d(6px, -4px, 0) rotate(0.5deg); }
+      60% { transform: translate3d(-3px, 2px, 0); }
+      80% { transform: translate3d(3px, -1px, 0); }
+    }
+    @keyframes s-quake {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+      15% { transform: translate3d(-10px, 6px, 0) scale(1.02); }
+      30% { transform: translate3d(9px, -7px, 0) scale(0.99); }
+      50% { transform: translate3d(-6px, 4px, 0); }
+      75% { transform: translate3d(4px, -2px, 0); }
+    }
+
+    /* 目标受击硬直与 steps(1) 闪色 */
+    @keyframes target-flinch {
+      0% { transform: scale(1); }
+      25% { transform: scale(0.94) translateY(4px); }
+      60% { transform: scale(1.02) translateY(-2px); }
+      100% { transform: scale(1) translateY(0); }
+    }
+    @keyframes target-flash-wood {
+      0%, 40% { filter: brightness(2.5) drop-shadow(0 0 20px #34d399); }
+      41%, 100% { filter: none; }
+    }
+    @keyframes target-flash-cyanfire {
+      0%, 45% { filter: brightness(3.2) drop-shadow(0 0 26px #06b6d4) drop-shadow(0 0 40px #10b981); }
+      46%, 100% { filter: none; }
+    }
+
+    /* ========================================================
+       【青莲离火变】水墨青莲大招关键帧体系 (批次五 steps(1) 纪律)
+       ======================================================== */
+    /* 1. 暗场蓄能压栈 */
+    @keyframes lotus-vignette {
+      0% { opacity: 0; }
+      20%, 75% { opacity: 0.82; }
+      100% { opacity: 0; }
+    }
+    /* 2. 太极水墨青莲底阵展开与旋转 */
+    @keyframes lotus-taiji-spin {
+      0% { transform: scale(0.2) rotate(0deg); opacity: 0; }
+      25% { transform: scale(1.1) rotate(120deg); opacity: 0.95; }
+      40% { transform: scale(1) rotate(180deg); opacity: 1; }
+      75% { transform: scale(1.05) rotate(320deg); opacity: 0.9; }
+      100% { transform: scale(1.4) rotate(420deg); opacity: 0; }
+    }
+    /* 3. 九品通透翡翠水墨莲台舒展盛放 */
+    @keyframes lotus-bloom-main {
+      0% { transform: scale(0.15) rotate(-20deg); opacity: 0; }
+      28% { transform: scale(1.18) rotate(5deg); opacity: 1; }
+      40% { transform: scale(1.0) rotate(0deg); opacity: 1; }
+      72% { transform: scale(1.08) rotate(15deg); opacity: 0.9; }
+      100% { transform: scale(1.5) rotate(30deg); opacity: 0; }
+    }
+    /* 4. 莲心离火神核塌缩与 Hitstop 定格 */
+    @keyframes lotus-core-implode {
+      0% { transform: scale(2.4); opacity: 0; }
+      22% { transform: scale(0.18); opacity: 1; }
+      36% { transform: scale(0.22); opacity: 1; } /* 36%前为绝对定格帧 Hitstop */
+      45% { transform: scale(2.8); opacity: 1; }
+      75% { transform: scale(3.4); opacity: 0.6; }
+      100% { transform: scale(4.0); opacity: 0; }
+    }
+    @keyframes lotus-core-flash {
+      0% { filter: blur(8px); }
+      22%, 70% { filter: brightness(3.5) drop-shadow(0 0 20px #34d399) drop-shadow(0 0 35px #06b6d4); }
+      71%, 100% { filter: blur(6px) brightness(1.8) drop-shadow(0 0 15px #10b981); }
+    }
+    /* 5. 离火破劫十字光棱（横向与纵向） */
+    @keyframes lotus-beam-h {
+      0%, 34% { transform: scaleX(0) scaleY(0.2); opacity: 0; }
+      43% { transform: scaleX(1.5) scaleY(2.2); opacity: 1; }
+      65% { transform: scaleX(1.9) scaleY(0.8); opacity: 0.85; }
+      100% { transform: scaleX(2.3) scaleY(0); opacity: 0; }
+    }
+    @keyframes lotus-beam-v {
+      0%, 34% { transform: scaleX(0.2) scaleY(0); opacity: 0; }
+      43% { transform: scaleX(2.2) scaleY(1.5); opacity: 1; }
+      65% { transform: scaleX(0.8) scaleY(1.9); opacity: 0.85; }
+      100% { transform: scaleX(0) scaleY(2.3); opacity: 0; }
+    }
+    @keyframes lotus-beam-flash {
+      0%, 43% { filter: brightness(3.2) drop-shadow(0 0 16px #34d399); }
+      44%, 100% { filter: drop-shadow(0 0 12px #059669); }
+    }
+    /* 6. 飞舞水墨金翡莲瓣 */
+    @keyframes lotus-petal-burst {
+      0% { transform: translate(0, 0) rotate(var(--rot, 0deg)) scale(0.3); opacity: 0; }
+      38% { opacity: 1; }
+      60% { transform: translate(var(--tx, 80px), var(--ty, -80px)) rotate(calc(var(--rot, 0deg) + 70deg)) scale(1.15); opacity: 0.95; }
+      100% { transform: translate(calc(var(--tx, 80px) * 1.6), calc(var(--ty, -80px) * 1.6)) rotate(calc(var(--rot, 0deg) + 160deg)) scale(0.1); opacity: 0; }
+    }
+    @keyframes lotus-petal-flash {
+      0%, 42% { filter: brightness(2.2) drop-shadow(0 0 8px #6ee7b7); }
+      43%, 100% { filter: drop-shadow(0 0 6px #059669); }
+    }
+
+    /* ========================================================
+       【碧影千叶杀】木系群攻：双环风涡 + 千叶突刺 + 飞花爆散
+       ======================================================== */
+    @keyframes leaf-swirl-ring {
+      0% { transform: scale(0.2) rotate(0deg); opacity: 0; }
+      30% { transform: scale(1.1) rotate(180deg); opacity: 0.9; }
+      70% { transform: scale(1.0) rotate(380deg); opacity: 0.7; }
+      100% { transform: scale(1.3) rotate(540deg); opacity: 0; }
+    }
+    @keyframes leaf-blade-pierce {
+      0% { transform: translate(var(--lx, 0px), var(--ly, 0px)) rotate(var(--lr, 0deg)) scale(0.2); opacity: 0; }
+      20% { opacity: 1; }
+      45% { transform: translate(calc(var(--lx, 0px) * 0.2), calc(var(--ly, 0px) * 0.2)) rotate(calc(var(--lr, 0deg) + 30deg)) scale(1.2); opacity: 1; }
+      60% { transform: translate(0, 0) rotate(calc(var(--lr, 0deg) + 60deg)) scale(1.4); opacity: 1; }
+      100% { transform: translate(calc(var(--lx, 0px) * -0.6), calc(var(--ly, 0px) * -0.6)) rotate(calc(var(--lr, 0deg) + 120deg)) scale(0.2); opacity: 0; }
+    }
+    @keyframes leaf-flash-steps {
+      0%, 45% { filter: brightness(2.6) drop-shadow(0 0 10px #4ade80); }
+      46%, 100% { filter: drop-shadow(0 0 6px #15803d); }
+    }
+
+    /* ========================================================
+       【青藤缚】木系控制：地脉开裂 + 双龙合抱荆棘狂藤内勒
+       ======================================================== */
+    @keyframes vine-crack-expand {
+      0% { transform: scaleX(0.1) scaleY(0.2); opacity: 0; }
+      25% { transform: scaleX(1.1) scaleY(1); opacity: 0.95; }
+      75% { transform: scaleX(1.0) scaleY(1); opacity: 0.8; }
+      100% { transform: scaleX(1.2) scaleY(0.8); opacity: 0; }
+    }
+    @keyframes vine-clinch-left {
+      0% { transform: translate(-70px, 60px) rotate(-35deg) scale(0.3); opacity: 0; }
+      35% { transform: translate(0px, -5px) rotate(5deg) scale(1.15); opacity: 1; } /* 超调内勒 */
+      48%, 78% { transform: translate(-4px, 0px) rotate(0deg) scale(1.0); opacity: 1; } /* 锁死死死咬合态 */
+      100% { transform: translate(-30px, 40px) rotate(-20deg) scale(0.4); opacity: 0; }
+    }
+    @keyframes vine-clinch-right {
+      0% { transform: translate(70px, 60px) rotate(35deg) scale(0.3); opacity: 0; }
+      35% { transform: translate(0px, -5px) rotate(-5deg) scale(1.15); opacity: 1; }
+      48%, 78% { transform: translate(4px, 0px) rotate(0deg) scale(1.0); opacity: 1; }
+      100% { transform: translate(30px, 40px) rotate(20deg) scale(0.4); opacity: 0; }
+    }
+    @keyframes vine-flash-steps {
+      0%, 35% { filter: brightness(2.2) drop-shadow(0 0 14px #22c55e); }
+      36%, 100% { filter: drop-shadow(0 0 8px #14532d); }
+    }
+
+    /* ========================================================
+       【青莲火弹】木火普通：三瓣青莲裹炽焰 + 离火拖尾 + 接触爆鸣
+       ======================================================== */
+    @keyframes bullet-fly {
+      0% { transform: translate(-140px, -70px) scale(0.5); opacity: 0; }
+      25% { opacity: 1; transform: translate(-70px, -35px) scale(1.05); }
+      55% { transform: translate(0px, 0px) scale(1.2); opacity: 1; }
+      100% { transform: translate(0px, 0px) scale(1.8); opacity: 0; }
+    }
+    @keyframes bullet-blast-ring {
+      0% { transform: scale(0.2); opacity: 1; }
+      50% { transform: scale(1.5); opacity: 0.85; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+    @keyframes bullet-flash-steps {
+      0%, 55% { filter: brightness(3.0) drop-shadow(0 0 16px #06b6d4); }
+      56%, 100% { filter: drop-shadow(0 0 8px #10b981); }
+    }
+  </style>
+</head>
+<body class="bg-[#030907] text-[#ecfdf5] min-h-screen flex flex-col items-center justify-between overflow-x-hidden selection:bg-emerald-900 selection:text-emerald-100">
+
+  <!-- 全屏暗场压栈层 (大招聚焦) -->
+  <div id="ultimate-overlay" class="fixed inset-0 bg-[#010403] pointer-events-none opacity-0 z-40 transition-opacity duration-300" style="background: radial-gradient(circle at 50% 45%, rgba(6,31,24,0.4) 0%, rgba(1,4,3,0.92) 80%);"></div>
+
+  <!-- 顶部标题 -->
+  <header class="w-full max-w-4xl pt-6 px-6 flex justify-between items-center z-20">
+    <div class="flex items-center space-x-3">
+      <span class="text-2xl text-emerald-400">☯</span>
+      <div>
+        <h1 class="font-calligraphy text-2xl tracking-wider text-emerald-200 drop-shadow-[0_0_12px_rgba(52,211,153,0.5)]">修仙道法 · 水墨青莲演练场</h1>
+        <p class="text-xs text-emerald-500/70 font-mono-code">VFX Prototype · Dual-Track Performance</p>
+      </div>
+    </div>
+    <div class="flex items-center space-x-3 text-xs">
+      <button id="btn-reset-dummy" class="px-3 py-1.5 rounded glass-card text-emerald-300 hover:text-white hover:border-emerald-400 transition">重置傀儡</button>
+      <div id="sound-status-pill" class="px-2.5 py-1 rounded bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 flex items-center space-x-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>Web Audio 纯合成链</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 中部战场核心靶位 (Battle Scene) -->
+  <main id="battle-scene" class="relative w-full max-w-3xl h-[420px] flex items-center justify-center z-10">
+    <!-- 背景虚空阵图光圈 -->
+    <div class="absolute w-[360px] h-[360px] rounded-full border border-emerald-500/10 pointer-events-none animate-[spin_60s_linear_infinite]">
+      <div class="absolute inset-2 rounded-full border border-dashed border-emerald-500/10"></div>
+    </div>
+
+    <!-- 特效挂载根节点 (固定在目标中心) -->
+    <div id="vfx-stage" class="absolute inset-0 pointer-events-none z-50"></div>
+
+    <!-- 受击目标：试道玄铁傀儡 -->
+    <div id="target-puppet" class="relative flex flex-col items-center justify-center cursor-pointer group">
+      <!-- 傀儡血量与名札 -->
+      <div class="mb-3 text-center">
+        <div class="flex items-center justify-center space-x-2">
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-mono-code bg-emerald-950 border border-emerald-600/40 text-emerald-300">筑基后期</span>
+          <span class="font-calligraphy text-lg tracking-widest text-emerald-100 font-bold group-hover:text-emerald-300 transition">玄铁修罗傀儡</span>
+        </div>
+        <!-- 动态血条 -->
+        <div class="w-48 h-2 bg-emerald-950/90 rounded-full mt-2 border border-emerald-800/40 overflow-hidden relative">
+          <div id="target-hp-bar" class="h-full bg-gradient-to-r from-emerald-600 via-teal-400 to-emerald-300 transition-all duration-300" style="width: 100%;"></div>
+        </div>
+        <div class="flex justify-between text-[10px] font-mono-code text-emerald-400/70 mt-1 px-1">
+          <span>HP</span>
+          <span id="target-hp-text">8888 / 8888</span>
+        </div>
+      </div>
+
+      <!-- 傀儡 Sprite 身体 -->
+      <div id="puppet-sprite" class="relative w-36 h-48 rounded-2xl glass-card flex items-center justify-center transition duration-200 shadow-2xl border-emerald-500/30 overflow-hidden">
+        <!-- 内部太极纹路 -->
+        <svg viewBox="0 0 100 100" class="w-28 h-28 opacity-40 text-emerald-400 fill-current">
+          <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M50,5 A45,45 0 0,1 50,95 A22.5,22.5 0 0,1 50,50 A22.5,22.5 0 0,0 50,5 Z"/>
+          <circle cx="50" cy="27.5" r="5" fill="#030907"/>
+          <circle cx="50" cy="72.5" r="5" fill="currentColor"/>
+        </svg>
+        <span class="absolute bottom-2 text-[11px] font-mono-code text-emerald-400/50">受击靶位</span>
+      </div>
+
+      <!-- 动态飘字容器 -->
+      <div id="floating-text-container" class="absolute -top-12 pointer-events-none flex flex-col items-center"></div>
+      <!-- 异常状态指示 (如藤蔓束缚) -->
+      <div id="debuff-bar" class="mt-2 flex space-x-1.5 min-h-[22px]"></div>
+    </div>
+  </main>
+
+  <!-- 底部技能施放操纵台 -->
+  <footer class="w-full max-w-4xl pb-8 px-6 z-20">
+    <div class="glass-panel rounded-2xl p-4">
+      <div class="flex items-center justify-between mb-3 px-1 text-xs">
+        <span class="font-calligraphy text-base tracking-wider text-emerald-300">施法法诀 · 仙术联动</span>
+        <span class="text-emerald-500/70 text-[11px]">点击下方诀印即刻向傀儡施放对应道法</span>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <!-- 技能1: 青莲火弹 (普通) -->
+        <button id="skill-btn-huodan" class="p-3 rounded-xl glass-card hover:border-teal-400/60 active:scale-95 transition text-left relative overflow-hidden group">
+          <div class="flex items-center justify-between text-xs mb-1">
+            <span class="px-1.5 py-0.5 rounded text-[10px] bg-teal-950/80 text-teal-300 border border-teal-500/30">单体 · 普攻</span>
+            <span class="font-mono-code text-[11px] text-teal-400">10 MP</span>
+          </div>
+          <div class="font-calligraphy text-lg text-emerald-200 group-hover:text-teal-300 transition">【青莲火弹】</div>
+          <p class="text-[11px] text-emerald-400/60 mt-1 line-clamp-1">微型水墨青莲引信，瞬发青幽离火弹射</p>
+        </button>
+
+        <!-- 技能2: 青藤缚 (控制) -->
+        <button id="skill-btn-tengfu" class="p-3 rounded-xl glass-card hover:border-emerald-400/60 active:scale-95 transition text-left relative overflow-hidden group">
+          <div class="flex items-center justify-between text-xs mb-1">
+            <span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">地煞 · 控制</span>
+            <span class="font-mono-code text-[11px] text-emerald-400">20 MP</span>
+          </div>
+          <div class="font-calligraphy text-lg text-emerald-200 group-hover:text-emerald-300 transition">【青藤缚】</div>
+          <p class="text-[11px] text-emerald-400/60 mt-1 line-clamp-1">地脉开裂，双龙合抱荆棘狂藤缠绕锁死</p>
+        </button>
+
+        <!-- 技能3: 碧影千叶杀 (群攻) -->
+        <button id="skill-btn-qianye" class="p-3 rounded-xl glass-card hover:border-green-400/60 active:scale-95 transition text-left relative overflow-hidden group">
+          <div class="flex items-center justify-between text-xs mb-1">
+            <span class="px-1.5 py-0.5 rounded text-[10px] bg-green-950/80 text-green-300 border border-green-500/30">穿云 · 群攻</span>
+            <span class="font-mono-code text-[11px] text-green-400">25 MP</span>
+          </div>
+          <div class="font-calligraphy text-lg text-emerald-200 group-hover:text-green-300 transition">【碧影千叶杀】</div>
+          <p class="text-[11px] text-emerald-400/60 mt-1 line-clamp-1">双环风涡风刃对冲，16刃飞叶万刃穿心</p>
+        </button>
+
+        <!-- 技能4: 青莲离火变 (大招) -->
+        <button id="skill-btn-lihuo" class="p-3 rounded-xl glass-card hover:border-cyan-400 active:scale-95 transition text-left relative overflow-hidden group border-cyan-500/40 bg-gradient-to-br from-emerald-950/40 via-teal-950/20 to-cyan-950/40">
+          <div class="flex items-center justify-between text-xs mb-1">
+            <span class="px-1.5 py-0.5 rounded text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-400/50 font-bold">造化 · 大招</span>
+            <span class="font-mono-code text-[11px] text-cyan-300 font-bold">50 MP</span>
+          </div>
+          <div class="font-calligraphy text-lg text-cyan-200 group-hover:text-cyan-100 transition drop-shadow-[0_0_8px_rgba(6,182,212,0.6)]">【青莲离火变】</div>
+          <p class="text-[11px] text-cyan-300/70 mt-1 line-clamp-1">暗场压栈/九品青莲盛绽/Hitstop定格/破劫裂空</p>
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // ========================================================
+    // Web Audio 纯程序化音频合成引擎 (零外部音频文件依赖)
+    // ========================================================
+    let audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx) {
+        const AudioClass = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioClass();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    // 1. 青莲火弹音效：轻快啸叫 + 翠火爆鸣
+    function playHuoDanAudio() {
+      const ctx = getAudioContext();
+      const now = ctx.currentTime;
+      // 啸叫
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(260, now + 0.18);
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.18);
+
+      // 击中火星爆破
+      setTimeout(() => {
+        const bNow = ctx.currentTime;
+        const bOsc = ctx.createOscillator();
+        const bGain = ctx.createGain();
+        bOsc.type = 'triangle';
+        bOsc.frequency.setValueAtTime(220, bNow);
+        bOsc.frequency.exponentialRampToValueAtTime(50, bNow + 0.15);
+        bGain.gain.setValueAtTime(0.4, bNow);
+        bGain.gain.exponentialRampToValueAtTime(0.001, bNow + 0.15);
+        bOsc.connect(bGain);
+        bGain.connect(ctx.destination);
+        bOsc.start(bNow);
+        bOsc.stop(bNow + 0.15);
+      }, 100);
+    }
+
+    // 2. 青藤缚音效：地脉沉闷撕裂 + 倒钩木质绞锁勒紧
+    function playTengFuAudio() {
+      const ctx = getAudioContext();
+      const now = ctx.currentTime;
+      // 地裂低频隆隆
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(95, now);
+      osc.frequency.linearRampToValueAtTime(40, now + 0.35);
+      gain.gain.setValueAtTime(0.35, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.35);
+
+      // 绞杀勒紧脆响 (staggered crackles)
+      setTimeout(() => {
+        const sNow = ctx.currentTime;
+        const sOsc = ctx.createOscillator();
+        const sGain = ctx.createGain();
+        sOsc.type = 'square';
+        sOsc.frequency.setValueAtTime(320, sNow);
+        sOsc.frequency.exponentialRampToValueAtTime(110, sNow + 0.22);
+        sGain.gain.setValueAtTime(0.2, sNow);
+        sGain.gain.exponentialRampToValueAtTime(0.001, sNow + 0.22);
+        sOsc.connect(sGain);
+        sGain.connect(ctx.destination);
+        sOsc.start(sNow);
+        sOsc.stop(sNow + 0.22);
+      }, 120);
+    }
+
+    // 3. 碧影千叶杀音效：万叶破空狂飙 (4 段密集风刃交错呼啸)
+    function playQianYeAudio() {
+      const ctx = getAudioContext();
+      [0, 60, 120, 180].forEach((delayMs, idx) => {
+        setTimeout(() => {
+          const now = ctx.currentTime;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          const startFreq = 1400 + idx * 200;
+          osc.frequency.setValueAtTime(startFreq, now);
+          osc.frequency.exponentialRampToValueAtTime(350, now + 0.14);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.14);
+        }, delayMs);
+      });
+    }
+
+    // 4. 青莲离火变大招音效：道门钟鸣吸入 + Hitstop 定格寂静 + 重核轰鸣与仙音交响
+    function playLiHuoAudio() {
+      const ctx = getAudioContext();
+      const now = ctx.currentTime;
+
+      // 1. 道门清越仙钟吟咏 (528Hz 奇迹音叉 + 泛音)
+      const bell = ctx.createOscillator();
+      const bellGain = ctx.createGain();
+      bell.type = 'sine';
+      bell.frequency.setValueAtTime(528, now);
+      bellGain.gain.setValueAtTime(0.45, now);
+      bellGain.gain.exponentialRampToValueAtTime(0.02, now + 0.6);
+      bell.connect(bellGain);
+      bellGain.connect(ctx.destination);
+      bell.start(now);
+      bell.stop(now + 0.6);
+
+      // 2. 灵气倒卷向心吸入音 (Whoosh Inhale)
+      const inOsc = ctx.createOscillator();
+      const inGain = ctx.createGain();
+      inOsc.type = 'triangle';
+      inOsc.frequency.setValueAtTime(160, now + 0.1);
+      inOsc.frequency.exponentialRampToValueAtTime(680, now + 0.42);
+      inGain.gain.setValueAtTime(0.01, now + 0.1);
+      inGain.gain.linearRampToValueAtTime(0.35, now + 0.42);
+      inGain.gain.linearRampToValueAtTime(0.001, now + 0.45); // 0.45s 骤停 Hitstop 顿帧
+      inOsc.connect(inGain);
+      inGain.connect(ctx.destination);
+      inOsc.start(now + 0.1);
+      inOsc.stop(now + 0.45);
+
+      // 3. 0.5s 瞬爆：裂空破劫金丹重轰 (Sub-Bass Boom + 翡翠灵光激射)
+      setTimeout(() => {
+        const bNow = ctx.currentTime;
+        const sub = ctx.createOscillator();
+        const subGain = ctx.createGain();
+        sub.type = 'sine';
+        sub.frequency.setValueAtTime(130, bNow);
+        sub.frequency.exponentialRampToValueAtTime(35, bNow + 0.65);
+        subGain.gain.setValueAtTime(0.8, bNow);
+        subGain.gain.exponentialRampToValueAtTime(0.001, bNow + 0.65);
+        sub.connect(subGain);
+        subGain.connect(ctx.destination);
+        sub.start(bNow);
+        sub.stop(bNow + 0.65);
+
+        // 伴生高频金石撕裂
+        const rip = ctx.createOscillator();
+        const ripGain = ctx.createGain();
+        rip.type = 'sawtooth';
+        rip.frequency.setValueAtTime(480, bNow);
+        rip.frequency.exponentialRampToValueAtTime(90, bNow + 0.35);
+        ripGain.gain.setValueAtTime(0.28, bNow);
+        ripGain.gain.exponentialRampToValueAtTime(0.001, bNow + 0.35);
+        rip.connect(ripGain);
+        ripGain.connect(ctx.destination);
+        rip.start(bNow);
+        rip.stop(bNow + 0.35);
+      }, 480);
+    }
+
+    // ========================================================
+    // 战场打击感与目标状态仿真器
+    // ========================================================
+    let currentHp = 8888;
+    const maxHp = 8888;
+    const targetSprite = document.getElementById('puppet-sprite');
+    const battleScene = document.getElementById('battle-scene');
+    const hpBar = document.getElementById('target-hp-bar');
+    const hpText = document.getElementById('target-hp-text');
+    const floatContainer = document.getElementById('floating-text-container');
+    const debuffBar = document.getElementById('debuff-bar');
+    const vfxStage = document.getElementById('vfx-stage');
+    const overlay = document.getElementById('ultimate-overlay');
+
+    function triggerScreenShake(type = 'light') {
+      battleScene.classList.remove('shake-light', 'shake-heavy', 'shake-quake');
+      void battleScene.offsetWidth;
+      battleScene.classList.add(type === 'quake' ? 'shake-quake' : type === 'heavy' ? 'shake-heavy' : 'shake-light');
+      setTimeout(() => {
+        battleScene.classList.remove('shake-light', 'shake-heavy', 'shake-quake');
+      }, type === 'quake' ? 500 : type === 'heavy' ? 320 : 180);
+    }
+
+    function triggerTargetFlinch(flashType = 'wood') {
+      targetSprite.style.animation = 'target-flinch 0.28s ease-out both, ' +
+        (flashType === 'fire' ? 'target-flash-cyanfire 0.28s steps(1) both' : 'target-flash-wood 0.28s steps(1) both');
+      setTimeout(() => { targetSprite.style.animation = ''; }, 300);
+    }
+
+    function createFloatingText(text, colorClass = 'text-emerald-300') {
+      const el = document.createElement('div');
+      el.className = `font-calligraphy text-2xl font-bold tracking-wider ${colorClass} transition-all duration-700 pointer-events-none drop-shadow-[0_0_8px_currentColor]`;
+      el.textContent = text;
+      el.style.transform = 'translateY(10px) scale(0.8)';
+      el.style.opacity = '0';
+      floatContainer.appendChild(el);
+      requestAnimationFrame(() => {
+        el.style.transform = 'translateY(-24px) scale(1.15)';
+        el.style.opacity = '1';
+      });
+      setTimeout(() => {
+        el.style.transform = 'translateY(-48px) scale(0.9)';
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 400);
+      }, 550);
+    }
+
+    function damagePuppet(amount) {
+      currentHp = Math.max(0, currentHp - amount);
+      const pct = (currentHp / maxHp) * 100;
+      hpBar.style.width = pct + '%';
+      hpText.textContent = `${currentHp} / ${maxHp}`;
+    }
+
+    // ========================================================
+    // 技能 1：【青莲离火变】（全屏/重量级木火大招）
+    // ========================================================
+    function castQingLianLiHuo() {
+      playLiHuoAudio();
+      overlay.style.opacity = '1'; // 暗场压栈
+      setTimeout(() => { overlay.style.opacity = '0'; }, 1100);
+
+      const uid = Date.now();
+      const wrapper = document.createElement('div');
+      wrapper.className = 'absolute left-1/2 top-1/2 pointer-events-none';
+      wrapper.style.width = '380px';
+      wrapper.style.height = '380px';
+      wrapper.style.marginLeft = '-190px';
+      wrapper.style.marginTop = '-190px';
+
+      // 8 片破空飞散莲瓣配置
+      const petals = [0, 45, 90, 135, 180, 225, 270, 315].map(deg => {
+        const rad = deg * Math.PI / 180;
+        return { rot: deg, tx: Math.cos(rad) * 110, ty: Math.sin(rad) * 110 };
+      });
+
+      wrapper.innerHTML = `
+        <!-- 1. 太极水墨青莲道阵底盘 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: lotus-taiji-spin 1.25s cubic-bezier(0.12, 0.9, 0.2, 1) both; will-change: transform, opacity;">
+          <svg viewBox="0 0 200 200" class="w-full h-full text-emerald-400 opacity-80" style="filter: drop-shadow(0 0 16px rgba(52,211,153,0.6));">
+            <defs>
+              <radialGradient id="taiji-glow-${uid}" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#34d399" stop-opacity="0.8"/>
+                <stop offset="70%" stop-color="#065f46" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#022c22" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <circle cx="100" cy="100" r="92" fill="url(#taiji-glow-${uid})" stroke="#34d399" stroke-width="1.8" stroke-dasharray="6 4"/>
+            <circle cx="100" cy="100" r="70" fill="none" stroke="#6ee7b7" stroke-width="1"/>
+            <!-- 乾坤八卦符文节点 -->
+            ${[0, 45, 90, 135, 180, 225, 270, 315].map(d => `<line x1="100" y1="10" x2="100" y2="22" stroke="#a7f3d0" stroke-width="2" transform="rotate(${d} 100 100)"/>`).join('')}
+          </svg>
+        </div>
+
+        <!-- 2. 九品琉璃水墨青莲盛绽 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: lotus-bloom-main 1.25s cubic-bezier(0.14, 0.95, 0.25, 1) both; will-change: transform, opacity;">
+          <svg viewBox="0 0 200 200" class="w-full h-full" style="filter: drop-shadow(0 0 18px rgba(16,185,129,0.7));">
+            <g transform="translate(100, 100)">
+              <!-- 8瓣青莲主叶 -->
+              ${[0, 45, 90, 135, 180, 225, 270, 315].map(deg => `
+                <path d="M0,0 C-18,-35 -24,-75 0,-92 C24,-75 18,-35 0,0 Z" 
+                      fill="rgba(5, 150, 105, 0.55)" stroke="#6ee7b7" stroke-width="1.6"
+                      transform="rotate(${deg})" />
+              `).join('')}
+              <!-- 莲心金丹高台 -->
+              <circle cx="0" cy="0" r="22" fill="#064e3b" stroke="#34d399" stroke-width="2" />
+            </g>
+          </svg>
+        </div>
+
+        <!-- 3. 十字横向水墨青金离火光棱 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: lotus-beam-h 1.25s cubic-bezier(0.12, 0.95, 0.2, 1) both, lotus-beam-flash 1.25s steps(1) both; will-change: transform, opacity;">
+          <svg viewBox="-160 -160 320 320" class="w-full h-full">
+            <defs>
+              <linearGradient id="beam-grad-${uid}" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#022c22" stop-opacity="0"/>
+                <stop offset="30%" stop-color="#10b981"/>
+                <stop offset="50%" stop-color="#ffffff"/>
+                <stop offset="70%" stop-color="#06b6d4"/>
+                <stop offset="100%" stop-color="#083344" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <polygon points="-160,0 0,-18 160,0 0,18" fill="url(#beam-grad-${uid})" />
+            <line x1="-150" y1="0" x2="150" y2="0" stroke="#f0fdf4" stroke-width="4.5"/>
+          </svg>
+        </div>
+
+        <!-- 4. 十字纵向水墨青金离火光棱 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: lotus-beam-v 1.25s cubic-bezier(0.12, 0.95, 0.2, 1) both, lotus-beam-flash 1.25s steps(1) both; will-change: transform, opacity;">
+          <svg viewBox="-160 -160 320 320" class="w-full h-full">
+            <polygon points="0,-160 -18,0 0,160 18,0" fill="url(#beam-grad-${uid})" />
+            <line x1="0" y1="-150" x2="0" y2="150" stroke="#f0fdf4" stroke-width="4.5"/>
+          </svg>
+        </div>
+
+        <!-- 5. 莲心离火神核塌缩与 Hitstop 爆发核心 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: lotus-core-implode 1.25s cubic-bezier(0.1, 0.9, 0.2, 1) both, lotus-core-flash 1.25s steps(1) both; will-change: transform, opacity;">
+          <svg viewBox="-100 -100 200 200" class="w-full h-full">
+            <circle cx="0" cy="0" r="32" fill="#34d399" />
+            <circle cx="0" cy="0" r="14" fill="#ffffff" />
+          </svg>
+        </div>
+
+        <!-- 6. 飞舞水墨金翡莲瓣微粒 -->
+        <div class="absolute inset-0 pointer-events-none">
+          <svg viewBox="-150 -150 300 300" class="w-full h-full">
+            ${petals.map(p => `
+              <path d="M0,0 C-6,-15 -8,-32 0,-40 C8,-32 6,-15 0,0 Z" 
+                    fill="#a7f3d0" stroke="#059669" stroke-width="1.2"
+                    style="--rot:${p.rot}deg; --tx:${p.tx}px; --ty:${p.ty}px; animation: lotus-petal-burst 1.25s 0.25s cubic-bezier(0.1, 0.9, 0.2, 1) both, lotus-petal-flash 1.25s 0.25s steps(1) both;" />
+            `).join('')}
+          </svg>
+        </div>
+      `;
+
+      vfxStage.appendChild(wrapper);
+
+      // Hitstop 顿帧后瞬爆震颤与飘字
+      setTimeout(() => {
+        triggerScreenShake('quake');
+        triggerTargetFlinch('fire');
+        damagePuppet(2680);
+        createFloatingText('暴击 2680 · 离火焚神', 'text-cyan-300');
+      }, 480);
+
+      setTimeout(() => { wrapper.remove(); }, 1300);
+    }
+
+    // ========================================================
+    // 技能 2：【碧影千叶杀】（木系群攻）
+    // ========================================================
+    function castBiYingQianYe() {
+      playQianYeAudio();
+      const uid = Date.now();
+      const wrapper = document.createElement('div');
+      wrapper.className = 'absolute left-1/2 top-1/2 pointer-events-none';
+      wrapper.style.width = '320px';
+      wrapper.style.height = '320px';
+      wrapper.style.marginLeft = '-160px';
+      wrapper.style.marginTop = '-160px';
+
+      // 12 刃流光飞叶散布
+      const leaves = [
+        { x: -90, y: -80, r: -45, delay: 0 },
+        { x: 90, y: -70, r: 45, delay: 0.04 },
+        { x: -100, y: 30, r: -15, delay: 0.08 },
+        { x: 95, y: 40, r: 25, delay: 0.12 },
+        { x: -60, y: -100, r: -65, delay: 0.05 },
+        { x: 60, y: -90, r: 65, delay: 0.09 },
+        { x: -80, y: 80, r: 120, delay: 0.13 },
+        { x: 80, y: 85, r: -120, delay: 0.16 },
+        { x: -30, y: -110, r: -80, delay: 0.07 },
+        { x: 30, y: -105, r: 80, delay: 0.11 },
+        { x: -110, y: -20, r: -30, delay: 0.14 },
+        { x: 110, y: -15, r: 30, delay: 0.17 }
+      ];
+
+      wrapper.innerHTML = `
+        <!-- 双环对冲风涡轮盘 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: leaf-swirl-ring 0.75s cubic-bezier(0.15, 0.85, 0.25, 1) both; will-change: transform, opacity;">
+          <svg viewBox="0 0 160 160" class="w-full h-full text-emerald-400 opacity-75" style="filter: drop-shadow(0 0 12px #22c55e);">
+            <circle cx="80" cy="80" r="70" fill="none" stroke="#4ade80" stroke-width="2" stroke-dasharray="25 15"/>
+            <circle cx="80" cy="80" r="50" fill="none" stroke="#86efac" stroke-width="1.5" stroke-dasharray="12 8"/>
+          </svg>
+        </div>
+
+        <!-- 12 刃万叶穿云尖刃 -->
+        <div class="absolute inset-0 pointer-events-none">
+          <svg viewBox="-100 -100 200 200" class="w-full h-full">
+            <defs>
+              <linearGradient id="leaf-grad-${uid}" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#14532d"/>
+                <stop offset="50%" stop-color="#4ade80"/>
+                <stop offset="100%" stop-color="#f0fdf4"/>
+              </linearGradient>
+            </defs>
+            ${leaves.map(l => `
+              <g style="--lx:${l.x}px; --ly:${l.y}px; --lr:${l.r}deg; animation: leaf-blade-pierce 0.65s ${l.delay}s cubic-bezier(0.12, 0.9, 0.25, 1) both, leaf-flash-steps 0.65s ${l.delay}s steps(1) both;">
+                <path d="M0,0 C8,-6 20,-14 26,0 C20,14 8,6 0,0 Z" fill="url(#leaf-grad-${uid})" stroke="#bbf7d0" stroke-width="0.8"/>
+                <line x1="0" y1="0" x2="26" y2="0" stroke="#f0fdf4" stroke-width="0.6"/>
+              </g>
+            `).join('')}
+          </svg>
+        </div>
+      `;
+
+      vfxStage.appendChild(wrapper);
+
+      // 多段高频连击
+      setTimeout(() => { triggerScreenShake('light'); triggerTargetFlinch('wood'); damagePuppet(340); createFloatingText('340 · 穿云叶刃', 'text-emerald-300'); }, 120);
+      setTimeout(() => { triggerScreenShake('heavy'); triggerTargetFlinch('wood'); damagePuppet(520); createFloatingText('520 · 剑气裂空', 'text-emerald-300'); }, 260);
+
+      setTimeout(() => { wrapper.remove(); }, 800);
+    }
+
+    // ========================================================
+    // 技能 3：【青藤缚】（木系控制）
+    // ========================================================
+    function castQingTengFu() {
+      playTengFuAudio();
+      const uid = Date.now();
+      const wrapper = document.createElement('div');
+      wrapper.className = 'absolute left-1/2 top-1/2 pointer-events-none';
+      wrapper.style.width = '340px';
+      wrapper.style.height = '360px';
+      wrapper.style.marginLeft = '-170px';
+      wrapper.style.marginTop = '-180px';
+
+      wrapper.innerHTML = `
+        <!-- 地脉开裂黑金灵光 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: vine-crack-expand 0.95s cubic-bezier(0.12, 0.9, 0.2, 1) both; will-change: transform, opacity;">
+          <svg viewBox="-100 0 200 100" class="w-full h-full text-emerald-400 opacity-90" style="filter: drop-shadow(0 0 14px #15803d);">
+            <path d="M-80,95 Q-40,75 0,90 Q40,75 80,95" fill="none" stroke="#22c55e" stroke-width="3.5" stroke-linecap="round"/>
+            <path d="M-50,92 Q-20,82 0,90 Q20,82 50,92" fill="none" stroke="#86efac" stroke-width="1.8"/>
+          </svg>
+        </div>
+
+        <!-- 左侧破土倒钩狂藤 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: vine-clinch-left 0.95s cubic-bezier(0.12, 0.95, 0.25, 1) both, vine-flash-steps 0.95s steps(1) both; will-change: transform, opacity;">
+          <svg viewBox="-100 -100 200 200" class="w-full h-full">
+            <defs>
+              <linearGradient id="vine-grad-l-${uid}" x1="0%" y1="100%" x2="0%" y2="0%">
+                <stop offset="0%" stop-color="#022c22"/>
+                <stop offset="60%" stop-color="#15803d"/>
+                <stop offset="100%" stop-color="#4ade80"/>
+              </linearGradient>
+            </defs>
+            <path d="M-75,90 C-65,30 -40,-20 0,-10 C-15,-40 -50,-80 -15,-95 C-30,-75 -10,-30 -30,10 C-50,45 -65,75 -75,90 Z" 
+                  fill="url(#vine-grad-l-${uid})" stroke="#86efac" stroke-width="1.5"/>
+            <!-- 荆棘尖刺 -->
+            <polygon points="-40,15 -52,5 -36,25" fill="#86efac"/>
+            <polygon points="-25,-25 -42,-35 -20,-15" fill="#86efac"/>
+            <polygon points="-25,-70 -38,-78 -20,-60" fill="#86efac"/>
+          </svg>
+        </div>
+
+        <!-- 右侧破土倒钩狂藤 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: vine-clinch-right 0.95s cubic-bezier(0.12, 0.95, 0.25, 1) both, vine-flash-steps 0.95s steps(1) both; will-change: transform, opacity;">
+          <svg viewBox="-100 -100 200 200" class="w-full h-full">
+            <path d="M75,90 C65,30 40,-20 0,-10 C15,-40 50,-80 15,-95 C30,-75 10,-30 30,10 C50,45 65,75 75,90 Z" 
+                  fill="url(#vine-grad-l-${uid})" stroke="#86efac" stroke-width="1.5"/>
+            <!-- 荆棘尖刺 -->
+            <polygon points="40,15 52,5 36,25" fill="#86efac"/>
+            <polygon points="25,-25 42,-35 20,-15" fill="#86efac"/>
+            <polygon points="25,-70 38,-78 20,-60" fill="#86efac"/>
+          </svg>
+        </div>
+      `;
+
+      vfxStage.appendChild(wrapper);
+
+      setTimeout(() => {
+        triggerScreenShake('heavy');
+        triggerTargetFlinch('wood');
+        damagePuppet(420);
+        createFloatingText('【定身·青藤缚】', 'text-emerald-400');
+        
+        // 挂载束缚状态药丸
+        const badge = document.createElement('span');
+        badge.className = 'px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-400/50 flex items-center space-x-1 animate-pulse';
+        badge.innerHTML = '<span>🌿</span><span>束缚 (1回合)</span>';
+        debuffBar.appendChild(badge);
+        setTimeout(() => { badge.remove(); }, 2400);
+      }, 340);
+
+      setTimeout(() => { wrapper.remove(); }, 1000);
+    }
+
+    // ========================================================
+    // 技能 4：【青莲火弹】（木火普通单体）
+    // ========================================================
+    function castQingLianHuoDan() {
+      playHuoDanAudio();
+      const uid = Date.now();
+      const wrapper = document.createElement('div');
+      wrapper.className = 'absolute left-1/2 top-1/2 pointer-events-none';
+      wrapper.style.width = '140px';
+      wrapper.style.height = '140px';
+      wrapper.style.marginLeft = '-70px';
+      wrapper.style.marginTop = '-70px';
+
+      wrapper.innerHTML = `
+        <!-- 弹道飞驰青火莲核 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: bullet-fly 0.48s cubic-bezier(0.12, 0.85, 0.3, 1) both; will-change: transform, opacity;">
+          <svg viewBox="-40 -40 80 80" class="w-full h-full" style="filter: drop-shadow(0 0 14px #06b6d4);">
+            <!-- 三瓣微型青莲 -->
+            <path d="M0,0 C-10,-15 -8,-32 0,-38 C8,-32 10,-15 0,0 Z" fill="#34d399" />
+            <path d="M0,0 C-25,-8 -32,5 -28,16 C-15,18 -5,8 0,0 Z" fill="#059669" />
+            <path d="M0,0 C25,-8 32,5 28,16 C15,18 5,8 0,0 Z" fill="#059669" />
+            <!-- 核心炽白青火 -->
+            <circle cx="0" cy="0" r="10" fill="#f0fdf4" style="filter: drop-shadow(0 0 8px #fff);" />
+            <circle cx="0" cy="0" r="16" fill="#38bdf8" opacity="0.65" />
+          </svg>
+        </div>
+
+        <!-- 接触瞬间环形爆裂冲击环 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: bullet-blast-ring 0.42s 0.22s cubic-bezier(0.1, 0.9, 0.2, 1) both, bullet-flash-steps 0.42s 0.22s steps(1) both; will-change: transform, opacity;">
+          <svg viewBox="-50 -50 100 100" class="w-full h-full fill-none">
+            <circle cx="0" cy="0" r="28" stroke="#67e8f9" stroke-width="3"/>
+            <circle cx="0" cy="0" r="18" stroke="#34d399" stroke-width="2" stroke-dasharray="6 4"/>
+          </svg>
+        </div>
+      `;
+
+      vfxStage.appendChild(wrapper);
+
+      setTimeout(() => {
+        triggerScreenShake('light');
+        triggerTargetFlinch('fire');
+        damagePuppet(650);
+        createFloatingText('650 · 离火破', 'text-teal-300');
+      }, 220);
+
+      setTimeout(() => { wrapper.remove(); }, 500);
+    }
+
+    // ========================================================
+    // 界面按钮事件绑定
+    // ========================================================
+    document.getElementById('skill-btn-lihuo').addEventListener('click', () => {
+      castQingLianLiHuo();
+    });
+    document.getElementById('skill-btn-qianye').addEventListener('click', () => {
+      castBiYingQianYe();
+    });
+    document.getElementById('skill-btn-tengfu').addEventListener('click', () => {
+      castQingTengFu();
+    });
+    document.getElementById('skill-btn-huodan').addEventListener('click', () => {
+      castQingLianHuoDan();
+    });
+
+    // 傀儡受击点击
+    document.getElementById('target-puppet').addEventListener('click', () => {
+      castQingLianHuoDan();
+    });
+
+    // 重置木桩
+    document.getElementById('btn-reset-dummy').addEventListener('click', () => {
+      currentHp = maxHp;
+      hpBar.style.width = '100%';
+      hpText.textContent = `${currentHp} / ${maxHp}`;
+      debuffBar.innerHTML = '';
+      createFloatingText('傀儡灵气充沛，恢复全盛！', 'text-emerald-300');
+    });
+  </script>
+</body>
+</html>
