@@ -273,6 +273,17 @@
     @keyframes fs-slash { 0% { transform: translate(-60vw, 0) rotate(var(--a)) scaleX(0.2); opacity: 0; } 25% { opacity: 1; transform: translate(0, 0) rotate(var(--a)) scaleX(1); } 100% { transform: translate(60vw, 0) rotate(var(--a)) scaleX(0.4); opacity: 0; } }
     @keyframes fs-wind-band { 0% { transform: translate(-50%,-50%) scale(1.8) rotate(0); opacity: 0; } 30% { opacity: 0.7; } 100% { transform: translate(-50%,-50%) scale(0.5) rotate(-540deg); opacity: 0.9; } }
     @keyframes fs-tint { 0% { opacity: 0; } 30%, 80% { opacity: 1; } 100% { opacity: 0; } }
+    /* ===== 小技能自然生灭 ===== */
+    .grow-path { stroke-dasharray: 1; stroke-dashoffset: 1; }
+    @keyframes draw-on { to { stroke-dashoffset: 0; } }
+    @keyframes pop-in { 0% { transform: scale(0) rotate(-40deg); } 70% { transform: scale(1.3) rotate(8deg); } 100% { transform: scale(1) rotate(0); } }
+    .fb { transform-box: fill-box; transform-origin: center; }
+    @keyframes vine-squeeze { 0%, 100% { transform: scale(1, 1); } 40% { transform: scale(0.86, 0.96); } 70% { transform: scale(0.93, 0.98); } }
+    @keyframes dissolve { 0% { opacity: 1; filter: none; } 100% { opacity: 0; filter: blur(4px); transform: translateY(10px); } }
+    @keyframes ground-glow { 0% { transform: translate(-50%,-50%) scaleX(0); opacity: 0; } 25% { transform: translate(-50%,-50%) scaleX(1); opacity: 1; } 75% { opacity: 0.8; } 100% { transform: translate(-50%,-50%) scaleX(1.15); opacity: 0; } }
+    @keyframes bud-bloom { 0% { transform: translate(-50%,-50%) scale(0) rotate(-120deg); opacity: 0; } 65% { transform: translate(-50%,-50%) scale(1.2) rotate(8deg); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1) rotate(0); opacity: 1; } }
+    @keyframes bud-release { 0% { transform: translate(-50%,-50%) scale(1); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.8) rotate(40deg); opacity: 0; } }
+    @keyframes hit-flash { 0% { transform: translate(-50%,-50%) scale(0.2); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; } }
   </style>
 </head>
 <body class="bg-[#030907] text-[#ecfdf5] min-h-screen flex flex-col items-center justify-between overflow-x-hidden selection:bg-emerald-900 selection:text-emerald-100">
@@ -1144,6 +1155,93 @@
       }, 80 + i * 150);
       setTimeout(() => { overlay.style.opacity = '0'; }, 1300);
     }
+
+    // ========================================================
+    // 【青莲火弹】凝莲 → 吐火 → 弧线飞行 → 爆燃 → 烟烬渐隐
+    // ========================================================
+    castQingLianHuoDan = function () {
+      lockCards(900);
+      const c = targetCenter(); const sx = c.x - Math.min(320, innerWidth * 0.35), sy = c.y + 150; const uid = Date.now();
+      // ① 出现：灵气向心凝聚 + 青莲花苞绽开
+      burst(22, () => { const a = Math.random() * Math.PI * 2, d = 50 + Math.random() * 30; return { x: sx + Math.cos(a) * d, y: sy + Math.sin(a) * d, vx: -Math.cos(a) * d / 9, vy: -Math.sin(a) * d / 9, drag: 0.86, decay: 0.06, size: 1.2 + Math.random() * 1.5, color: '#6ee7b7' }; });
+      tone('sine', 520, 980, 0.2, 0.12);
+      const bud = fsLayer(`<div class="fs-anchor" style="left:${sx}px; top:${sy}px; width:76px; height:76px; animation: bud-bloom 0.22s cubic-bezier(0.2,0.9,0.3,1.3) both, bud-release 0.18s 0.24s ease-out forwards; filter: drop-shadow(0 0 12px #2dd4bf);">
+        <svg viewBox="-40 -40 80 80" class="w-full h-full"><defs><radialGradient id="bd-${uid}"><stop offset="0" stop-color="#ecfeff"/><stop offset="1" stop-color="#059669"/></radialGradient></defs>
+        ${[0, 72, 144, 216, 288].map(d => `<path d="M0,0 C-10,-12 -9,-28 0,-34 C9,-28 10,-12 0,0 Z" fill="url(#bd-${uid})" opacity="0.85" transform="rotate(${d})"/>`).join('')}
+        <circle r="8" fill="#ffffff"/></svg></div>`, 500);
+      // ② 飞行：二次贝塞尔弧线，加速，逐帧在 Canvas 绘制火核 + 焰尾 + 环绕莲瓣
+      const cx1 = (sx + c.x) / 2, cy1 = Math.min(sy, c.y) - 140, FLY = 300;
+      setTimeout(() => {
+        tone('sawtooth', 300, 900, 0.28, 0.08);
+        const t0 = performance.now();
+        (function step() {
+          const k = Math.min(1, (performance.now() - t0) / FLY), t = k * k; const u = 1 - t;
+          const x = u * u * sx + 2 * u * t * cx1 + t * t * c.x, y = u * u * sy + 2 * u * t * cy1 + t * t * c.y;
+          addP({ x, y, decay: 0.25, size: 5, color: '#a5f3fc' });
+          burst(4, () => ({ x: x + (Math.random() - 0.5) * 8, y: y + (Math.random() - 0.5) * 8, vx: (Math.random() - 0.5) * 1.2, vy: -0.6 - Math.random() * 1.2, drag: 0.94, decay: 0.045 + Math.random() * 0.03, size: 1.5 + Math.random() * 2.5, color: Math.random() < 0.6 ? '#22d3ee' : '#34d399' }));
+          for (let j = 0; j < 3; j++) { const a = performance.now() / 60 + j * 2.09; addP({ x: x + Math.cos(a) * 12, y: y + Math.sin(a) * 12, decay: 0.3, size: 5, shape: 'petal', rot: a + Math.PI / 2, color: '#6ee7b7' }); }
+          if (k < 1) requestAnimationFrame(step); else huodanImpact(c, uid);
+        })();
+      }, 240);
+    };
+    function huodanImpact(c, uid) {
+      // ③ 命中：白芯闪 + 双冲击环 + 火星 + 莲瓣崩散
+      tone('triangle', 260, 45, 0.3, 0.45); tone('sawtooth', 900, 120, 0.15, 0.12);
+      triggerScreenShake('light'); triggerTargetFlinch('fire'); damagePuppet(650); createFloatingText('650 · 离火破', 'text-teal-300');
+      fsLayer(`<div class="fs-anchor" style="left:${c.x}px; top:${c.y}px; width:120px; height:120px; border-radius:50%; background: radial-gradient(circle, #fff 0%, #67e8f9 30%, rgba(16,185,129,0.5) 60%, transparent 72%); animation: hit-flash 0.32s ease-out both;"></div>`, 400);
+      burst(2, i => ({ x: c.x, y: c.y, shape: 'ring', size: 1.6 + i, decay: 0.07 - i * 0.02, color: i ? '#34d399' : '#a5f3fc' }));
+      burst(36, () => { const a = Math.random() * Math.PI * 2, s = 2 + Math.random() * 7; return { x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, grav: 0.12, drag: 0.93, decay: 0.03 + Math.random() * 0.02, size: 1 + Math.random() * 2, color: Math.random() < 0.5 ? '#67e8f9' : '#fef08a' }; });
+      burst(5, i => { const a = i * 1.256 - 1.57; return { x: c.x, y: c.y, vx: Math.cos(a) * 4, vy: Math.sin(a) * 4 - 1.5, grav: 0.14, drag: 0.96, rot: a, vr: 0.12, decay: 0.022, size: 8, shape: 'petal', color: '#a7f3d0' }; });
+      // ④ 消失：青烟墨晕缓慢上浮渐隐
+      burst(8, () => ({ x: c.x + (Math.random() - 0.5) * 40, y: c.y + (Math.random() - 0.5) * 30, vx: (Math.random() - 0.5) * 0.4, vy: -0.4 - Math.random() * 0.4, drag: 0.99, decay: 0.012, size: 18 + Math.random() * 16, shape: 'ink', color: 'rgba(45,212,191,0.28)' }));
+    }
+
+    // ========================================================
+    // 【青藤缚】地脉发光 → 藤蔓生长缠绕 → 萌叶 → 收紧 → 枯散飘落
+    // ========================================================
+    castQingTengFu = function () {
+      lockCards(1700); const c = targetCenter(); const sp = document.getElementById('puppet-sprite').getBoundingClientRect();
+      const W = sp.width + 120, H = sp.height + 90; const uid = Date.now();
+      tone('sawtooth', 90, 38, 0.5, 0.28);
+      // 藤蔓路径：从脚下两侧破土，螺旋缠绕至头顶（坐标系：原点=目标中心，单位≈px）
+      const hw = sp.width / 2 + 14, hh = sp.height / 2;
+      const vA = `M${-hw - 30},${hh + 30} C${-hw - 50},${hh - 30} ${hw + 30},${hh * 0.5} ${hw},${hh * 0.15} C${hw - 20},${-hh * 0.15} ${-hw - 20},${-hh * 0.05} ${-hw},${-hh * 0.4} C${-hw + 10},${-hh * 0.75} ${hw * 0.6},${-hh * 0.8} ${hw * 0.3},${-hh - 15}`;
+      const vB = `M${hw + 30},${hh + 30} C${hw + 50},${hh - 40} ${-hw - 30},${hh * 0.35} ${-hw},${0} C${-hw + 20},${-hh * 0.3} ${hw + 20},${-hh * 0.25} ${hw},${-hh * 0.6} C${hw - 10},${-hh * 0.9} ${-hw * 0.5},${-hh * 0.85} ${-hw * 0.2},${-hh - 25}`;
+      const leaves = [[-hw - 8, hh * 0.55, 0.45], [hw + 4, hh * 0.15, 0.55], [-hw, -hh * 0.4, 0.7], [hw, -hh * 0.6, 0.75], [hw * 0.3, -hh - 10, 0.85], [-hw * 0.2, -hh - 20, 0.9], [0, hh * 0.35, 0.5]];
+      const vine = (d, delay) => `
+        <path d="${d}" pathLength="1" class="grow-path" fill="none" stroke="#052e16" stroke-width="13" stroke-linecap="round" style="animation: draw-on 0.55s ${delay}s cubic-bezier(0.3,0.7,0.3,1) forwards;"/>
+        <path d="${d}" pathLength="1" class="grow-path" fill="none" stroke="url(#vg-${uid})" stroke-width="8" stroke-linecap="round" style="animation: draw-on 0.55s ${delay}s cubic-bezier(0.3,0.7,0.3,1) forwards;"/>
+        <path d="${d}" pathLength="1" class="grow-path" fill="none" stroke="#bbf7d0" stroke-width="1.6" stroke-linecap="round" opacity="0.8" style="animation: draw-on 0.55s ${delay}s cubic-bezier(0.3,0.7,0.3,1) forwards;"/>`;
+      const layer = fsLayer(`
+        <div class="fs-anchor" style="left:${c.x}px; top:${c.y + hh + 20}px; width:${W + 60}px; height:40px; border-radius:50%; background: radial-gradient(ellipse, rgba(74,222,128,0.7) 0%, rgba(21,128,61,0.35) 45%, transparent 70%); animation: ground-glow 1.6s ease-out both;"></div>
+        <div class="fs-anchor" style="left:${c.x}px; top:${c.y}px; width:${W}px; height:${H}px;">
+          <svg viewBox="${-W / 2} ${-H / 2} ${W} ${H}" class="w-full h-full overflow-visible" style="filter: drop-shadow(0 0 8px rgba(34,197,94,0.55));">
+            <defs><linearGradient id="vg-${uid}" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#14532d"/><stop offset="0.6" stop-color="#16a34a"/><stop offset="1" stop-color="#4ade80"/></linearGradient></defs>
+            <g id="vines-${uid}" class="fb">
+              ${[-1, 1].map(s => `<path d="M${s * 20},${hh + 26} l${s * 30},-6 M${s * 40},${hh + 22} l${s * 22},6" stroke="#4ade80" stroke-width="2" pathLength="1" class="grow-path" style="animation: draw-on 0.2s forwards;"/>`).join('')}
+              ${vine(vA, 0.05)}${vine(vB, 0.15)}
+              ${leaves.map(([x, y, dl], i) => `<g transform="translate(${x},${y}) rotate(${i * 67})"><path class="fb" d="M0,0 C6,-6 16,-7 20,0 C16,7 6,6 0,0 Z" fill="#22c55e" stroke="#bbf7d0" stroke-width="0.8" style="transform: scale(0); animation: pop-in 0.3s ${dl}s cubic-bezier(0.2,0.9,0.3,1.4) forwards;"/></g>`).join('')}
+              ${leaves.slice(0, 5).map(([x, y, dl], i) => `<path class="fb" d="M${x},${y} l${i % 2 ? 7 : -7},-9 l${i % 2 ? -2 : 2},9 Z" fill="#d9f99d" style="transform: scale(0); animation: pop-in 0.2s ${dl + 0.05}s forwards;"/>`).join('')}
+            </g>
+          </svg>
+        </div>`, 1750);
+      // 破土尘屑
+      burst(30, () => ({ x: c.x + (Math.random() - 0.5) * W, y: c.y + hh + 24, vx: (Math.random() - 0.5) * 3, vy: -1.5 - Math.random() * 3.5, grav: 0.14, drag: 0.97, decay: 0.025, size: 1.5 + Math.random() * 2.5, color: Math.random() < 0.5 ? '#3f6212' : '#65a30d' }));
+      // 收紧：整体内勒 + 汁液 + 伤害 + 状态
+      setTimeout(() => {
+        const g = layer.querySelector(`#vines-${uid}`); g.style.animation = 'vine-squeeze 0.45s cubic-bezier(0.3,1.6,0.5,1) both';
+        tone('square', 340, 110, 0.18, 0.14); tone('square', 280, 90, 0.18, 0.12, 0.12);
+        triggerScreenShake('heavy'); triggerTargetFlinch('wood'); damagePuppet(420); createFloatingText('【定身·青藤缚】', 'text-emerald-400');
+        burst(24, () => { const a = Math.random() * Math.PI * 2, s = 2 + Math.random() * 5; return { x: c.x + (Math.random() - 0.5) * 60, y: c.y + (Math.random() - 0.5) * 80, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, grav: 0.15, drag: 0.95, decay: 0.03, size: 1.5 + Math.random() * 2, color: '#bef264' }; });
+        const badge = document.createElement('span'); badge.className = 'px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-400/50 flex items-center space-x-1 animate-pulse';
+        badge.innerHTML = '<span>🌿</span><span>束缚 (1回合)</span>'; debuffBar.appendChild(badge); setTimeout(() => badge.remove(), 2400);
+      }, 820);
+      // 消失：藤蔓模糊下沉渐隐，叶片脱落飘散
+      setTimeout(() => {
+        layer.querySelector('svg').style.animation = 'dissolve 0.45s ease-in forwards';
+        burst(18, () => ({ x: c.x + (Math.random() - 0.5) * W * 0.8, y: c.y + (Math.random() - 0.5) * H * 0.8, vx: (Math.random() - 0.5) * 1.5, vy: 0.5 + Math.random(), grav: 0.03, drag: 0.99, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.1, decay: 0.012, size: 6 + Math.random() * 4, shape: 'leaf', color: Math.random() < 0.5 ? '#4d7c0f' : '#65a30d' }));
+      }, 1300);
+    };
 
     // 界面按钮事件绑定
     // ========================================================
