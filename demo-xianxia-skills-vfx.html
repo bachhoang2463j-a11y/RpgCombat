@@ -259,6 +259,20 @@
     @keyframes tal-float { from { transform: translateY(0) rotate(var(--r, -6deg)); } to { transform: translateY(-10px) rotate(calc(var(--r, -6deg) * -1)); } }
     .breathe { animation: br 4s ease-in-out infinite alternate; }
     @keyframes br { from { transform: translateY(0); } to { transform: translateY(-6px); } }
+    /* ===== 全屏大招层 ===== */
+    .fs-layer { position: fixed; inset: 0; pointer-events: none; z-index: 52; overflow: hidden; }
+    .fs-anchor { position: absolute; transform: translate(-50%, -50%); }
+    @keyframes fs-formation { 0% { transform: translate(-50%,-50%) scale(0.25) rotate(0deg); opacity: 0; } 35% { opacity: 0.85; } 100% { transform: translate(-50%,-50%) scale(1) rotate(160deg); opacity: 0.95; } }
+    @keyframes fs-formation-out { 0% { transform: translate(-50%,-50%) scale(1) rotate(160deg); opacity: 0.95; } 100% { transform: translate(-50%,-50%) scale(1.6) rotate(220deg); opacity: 0; } }
+    @keyframes fs-flash { 0% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes fs-lotus { 0% { transform: translate(-50%,-50%) scale(0.08) rotate(-40deg); opacity: 0; } 22% { transform: translate(-50%,-50%) scale(1.06) rotate(4deg); opacity: 1; } 34% { transform: translate(-50%,-50%) scale(1) rotate(0); } 75% { opacity: 0.85; } 100% { transform: translate(-50%,-50%) scale(1.4) rotate(18deg); opacity: 0; } }
+    @keyframes fs-pillar { 0% { transform: translateX(-50%) scaleX(0); opacity: 0; } 10% { transform: translateX(-50%) scaleX(1.6); opacity: 1; } 55% { transform: translateX(-50%) scaleX(1); opacity: 0.95; } 100% { transform: translateX(-50%) scaleX(0); opacity: 0; } }
+    @keyframes fs-beam-h { 0% { transform: translateY(-50%) scaleY(0) scaleX(0.1); opacity: 0; } 12% { transform: translateY(-50%) scaleY(1.5) scaleX(1); opacity: 1; } 100% { transform: translateY(-50%) scaleY(0) scaleX(1.1); opacity: 0; } }
+    @keyframes charge-ring { 0% { transform: translate(-50%,-50%) scale(3.2); opacity: 0; } 25% { opacity: 0.9; } 100% { transform: translate(-50%,-50%) scale(0.35); opacity: 1; } }
+    @keyframes charge-core { 0% { transform: translate(-50%,-50%) scale(0); opacity: 0; } 100% { transform: translate(-50%,-50%) scale(1); opacity: 1; } }
+    @keyframes fs-slash { 0% { transform: translate(-60vw, 0) rotate(var(--a)) scaleX(0.2); opacity: 0; } 25% { opacity: 1; transform: translate(0, 0) rotate(var(--a)) scaleX(1); } 100% { transform: translate(60vw, 0) rotate(var(--a)) scaleX(0.4); opacity: 0; } }
+    @keyframes fs-wind-band { 0% { transform: translate(-50%,-50%) scale(1.8) rotate(0); opacity: 0; } 30% { opacity: 0.7; } 100% { transform: translate(-50%,-50%) scale(0.5) rotate(-540deg); opacity: 0.9; } }
+    @keyframes fs-tint { 0% { opacity: 0; } 30%, 80% { opacity: 1; } 100% { opacity: 0; } }
   </style>
 </head>
 <body class="bg-[#030907] text-[#ecfdf5] min-h-screen flex flex-col items-center justify-between overflow-x-hidden selection:bg-emerald-900 selection:text-emerald-100">
@@ -1007,6 +1021,129 @@
       for (let k = 0; k < 8; k++) setTimeout(() => { const t = k / 8; burst(5, () => ({ x: sx + 140 * t + (Math.random() - 0.5) * 8, y: sy + 70 * t + (Math.random() - 0.5) * 8, vx: (Math.random() - 0.5), vy: -0.5 - Math.random(), decay: 0.05, size: 1.5 + Math.random() * 2, color: '#22d3ee' })); }, k * 25);
       setTimeout(() => { burst(28, () => { const a = Math.random() * Math.PI * 2, s = 2 + Math.random() * 6; return { x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, grav: 0.1, drag: 0.94, decay: 0.03, size: 1.2 + Math.random() * 2, color: Math.random() < 0.5 ? '#67e8f9' : '#6ee7b7' }; }); burst(3, () => ({ x: c.x, y: c.y, shape: 'petal', size: 8, vx: (Math.random() - 0.5) * 6, vy: -3 - Math.random() * 3, grav: 0.15, rot: Math.random() * 6, vr: 0.2, decay: 0.02, color: '#a7f3d0' })); }, 220);
     };
+
+    // ========================================================
+    // 全屏大招辅助
+    // ========================================================
+    function fsLayer(html, ms) { const d = document.createElement('div'); d.className = 'fs-layer'; d.innerHTML = html; document.body.appendChild(d); setTimeout(() => d.remove(), ms); return d; }
+    function tone(type, f0, f1, dur, vol, delay = 0) {
+      const ctx = getAudioContext(); const t = ctx.currentTime + delay; const o = ctx.createOscillator(); const gn = ctx.createGain();
+      o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+      gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.05, dur / 3)); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(gn); gn.connect(ctx.destination); o.start(t); o.stop(t + dur + 0.02);
+    }
+    function chargeSwell(dur) { tone('sawtooth', 55, 220, dur, 0.18); tone('sine', 264, 1056, dur, 0.12); tone('triangle', 110, 440, dur, 0.1); }
+    function grandBoom() { tone('sine', 140, 28, 1.4, 0.9); tone('sawtooth', 600, 60, 0.6, 0.3); tone('sine', 528, 528, 1.8, 0.25, 0.05); tone('sine', 792, 792, 1.6, 0.15, 0.1); }
+
+    // ========================================================
+    // 【青莲离火变】全屏版：蓄势 1.4s → 爆发
+    // ========================================================
+    const CHARGE_LH = 1400;
+    castQingLianLiHuo = function () {
+      lockCards(CHARGE_LH + 1900); showBanner('青莲离火变');
+      const c = targetCenter(); const vmax = Math.max(innerWidth, innerHeight); const uid = Date.now();
+      overlay.style.opacity = '1';
+      chargeSwell(CHARGE_LH / 1000);
+      // —— 蓄势：巨型太极法阵 + 收缩蓄力环 + 莲心光核
+      const ring = (r, w, dash, col) => `<circle cx="500" cy="500" r="${r}" fill="none" stroke="${col}" stroke-width="${w}" ${dash ? `stroke-dasharray="${dash}"` : ''}/>`;
+      const runes = '乾坤震巽坎离艮兑'.split('').map((ch, i) => `<text x="500" y="88" text-anchor="middle" font-size="46" fill="#a7f3d0" font-family="Ma Shan Zheng" transform="rotate(${i * 45} 500 500)">${ch}</text>`).join('');
+      const formation = fsLayer(`
+        <div class="fs-anchor" style="left:${c.x}px; top:${c.y}px; width:${vmax * 1.1}px; height:${vmax * 1.1}px; animation: fs-formation ${CHARGE_LH}ms cubic-bezier(0.2,0.8,0.2,1) both; filter: drop-shadow(0 0 18px rgba(52,211,153,0.7));">
+          <svg viewBox="0 0 1000 1000" class="w-full h-full">
+            ${ring(480, 3, '', '#34d399')}${ring(455, 1.5, '14 10', '#6ee7b7')}${ring(330, 2, '', '#5eead4')}${ring(300, 1, '4 8', '#a7f3d0')}
+            ${runes}
+            ${[0, 30, 60, 90, 120, 150].map(d => `<line x1="500" y1="170" x2="500" y2="830" stroke="#34d399" stroke-width="1" opacity="0.4" transform="rotate(${d} 500 500)"/>`).join('')}
+            <path d="M500,200 A300,300 0 0,1 500,800 A150,150 0 0,1 500,500 A150,150 0 0,0 500,200 Z" fill="rgba(16,185,129,0.12)" stroke="#6ee7b7" stroke-width="2"/>
+          </svg>
+        </div>
+        ${[0, 1, 2].map(i => `<div class="fs-anchor" style="left:${c.x}px; top:${c.y}px; width:260px; height:260px; border-radius:50%; border:3px solid ${i % 2 ? '#67e8f9' : '#6ee7b7'}; box-shadow:0 0 30px #10b981, inset 0 0 30px #10b981; animation: charge-ring ${CHARGE_LH / 2}ms ${i * CHARGE_LH / 4}ms cubic-bezier(0.5,0,0.8,0.4) infinite;"></div>`).join('')}
+        <div class="fs-anchor" style="left:${c.x}px; top:${c.y}px; width:90px; height:90px; border-radius:50%; background: radial-gradient(circle, #fff 0%, #67e8f9 35%, rgba(16,185,129,0.4) 65%, transparent 72%); animation: charge-core ${CHARGE_LH}ms cubic-bezier(0.6,0,0.9,0.5) both;"></div>
+      `, CHARGE_LH + 200);
+      // 天地灵气从屏幕四边持续汇聚
+      const suck = setInterval(() => burst(10, () => { const a = Math.random() * Math.PI * 2, d = vmax * (0.55 + Math.random() * 0.3); const sp = d / 34; return { x: c.x + Math.cos(a) * d, y: c.y + Math.sin(a) * d, vx: -Math.cos(a) * sp, vy: -Math.sin(a) * sp, drag: 0.965, decay: 0.022, size: 1.5 + Math.random() * 2.5, color: Math.random() < 0.5 ? '#6ee7b7' : '#67e8f9' }; }), 40);
+      const rumble = setInterval(() => triggerScreenShake('light'), 260);
+      setTimeout(() => { clearInterval(suck); clearInterval(rumble); formation.firstElementChild.style.animation = 'fs-formation-out 0.5s ease-out both'; }, CHARGE_LH);
+      setTimeout(() => lihuoRelease(c, vmax, uid), CHARGE_LH);
+    };
+
+    function lihuoRelease(c, vmax, uid) {
+      grandBoom(); triggerScreenShake('quake'); setTimeout(() => triggerScreenShake('heavy'), 500); setTimeout(() => triggerScreenShake('heavy'), 1000);
+      const petal = (deg, len, wid, fill) => `<path d="M0,0 C${-wid},${-len * 0.4} ${-wid * 0.8},${-len * 0.85} 0,${-len} C${wid * 0.8},${-len * 0.85} ${wid},${-len * 0.4} 0,0 Z" fill="${fill}" stroke="#a7f3d0" stroke-width="2" transform="rotate(${deg})"/>`;
+      const L = vmax * 1.3;
+      fsLayer(`
+        <div class="absolute inset-0" style="background: radial-gradient(circle at ${c.x}px ${c.y}px, #ffffff 0%, #a5f3fc 25%, rgba(16,185,129,0.6) 55%, rgba(2,44,34,0) 85%); animation: fs-flash 0.7s ease-out both;"></div>
+        <div class="fs-anchor" style="left:${c.x}px; top:${c.y}px; width:${L}px; height:${L}px; animation: fs-lotus 1.9s cubic-bezier(0.14,0.95,0.25,1) both; filter: drop-shadow(0 0 30px rgba(16,185,129,0.8));">
+          <svg viewBox="-500 -500 1000 1000" class="w-full h-full">
+            <defs><radialGradient id="fsl-${uid}" cx="0" cy="0" r="480" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ecfdf5" stop-opacity="0.9"/><stop offset="0.35" stop-color="#34d399" stop-opacity="0.55"/><stop offset="1" stop-color="#064e3b" stop-opacity="0.05"/></radialGradient></defs>
+            ${[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map(d => petal(d + 15, 470, 120, `url(#fsl-${uid})`)).join('')}
+            ${[0, 45, 90, 135, 180, 225, 270, 315].map(d => petal(d, 320, 95, 'rgba(110,231,183,0.45)')).join('')}
+            ${[0, 60, 120, 180, 240, 300].map(d => petal(d + 30, 180, 60, 'rgba(236,253,245,0.6)')).join('')}
+            <circle r="70" fill="#ffffff" opacity="0.9"/><circle r="110" fill="none" stroke="#67e8f9" stroke-width="6"/>
+          </svg>
+        </div>
+        <div class="absolute top-0 bottom-0" style="left:${c.x}px; width:180px; transform-origin:center; background: linear-gradient(90deg, transparent, rgba(34,211,238,0.6) 25%, #ecfeff 50%, rgba(34,211,238,0.6) 75%, transparent); filter: blur(2px) drop-shadow(0 0 40px #22d3ee); animation: fs-pillar 1.5s cubic-bezier(0.12,0.9,0.2,1) both;"></div>
+        <div class="absolute left-0 right-0" style="top:${c.y}px; height:90px; background: linear-gradient(180deg, transparent, rgba(52,211,153,0.6) 30%, #f0fdf4 50%, rgba(52,211,153,0.6) 70%, transparent); filter: drop-shadow(0 0 30px #10b981); animation: fs-beam-h 1.1s 0.05s cubic-bezier(0.12,0.9,0.2,1) both;"></div>
+      `, 2000);
+      burst(6, i => ({ x: c.x, y: c.y, shape: 'ring', size: 6 + i * 4, decay: 0.018 - i * 0.002, color: i % 2 ? '#67e8f9' : '#ecfdf5' }));
+      burst(120, () => { const a = Math.random() * Math.PI * 2, s = 6 + Math.random() * 16; return { x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, grav: 0.05, drag: 0.955, decay: 0.006 + Math.random() * 0.008, size: 8 + Math.random() * 12, shape: 'petal', rot: a, vr: (Math.random() - 0.5) * 0.15, color: ['#a7f3d0', '#6ee7b7', '#ecfdf5', '#5eead4'][Math.floor(Math.random() * 4)] }; });
+      burst(160, () => ({ x: c.x + (Math.random() - 0.5) * 160, y: innerHeight, vx: (Math.random() - 0.5) * 2, vy: -8 - Math.random() * 16, drag: 0.975, decay: 0.012 + Math.random() * 0.015, size: 2 + Math.random() * 3, color: Math.random() < 0.6 ? '#22d3ee' : '#a7f3d0' }));
+      // 全屏莲瓣雨
+      const rain = setInterval(() => burst(6, () => ({ x: Math.random() * innerWidth, y: -20, vx: (Math.random() - 0.5) * 1.5, vy: 2 + Math.random() * 3, drag: 1, decay: 0.006, size: 6 + Math.random() * 6, shape: 'petal', rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.08, color: Math.random() < 0.5 ? '#a7f3d0' : '#ecfdf5' })), 50);
+      setTimeout(() => clearInterval(rain), 1600);
+      [0, 380, 760].forEach((t, i) => setTimeout(() => { triggerTargetFlinch('fire'); const dmg = [1880, 1260, 2960][i]; damagePuppet(dmg); createFloatingText(i === 2 ? `暴击 ${dmg} · 离火焚神` : `${dmg}`, 'text-cyan-300'); }, t));
+      setTimeout(() => { overlay.style.opacity = '0'; }, 1700);
+    }
+
+    // ========================================================
+    // 【碧影千叶杀】全屏版：蓄势 1.1s → 叶刃狂潮
+    // ========================================================
+    const CHARGE_QY = 1100;
+    castBiYingQianYe = function () {
+      lockCards(CHARGE_QY + 1500); showBanner('碧影千叶杀');
+      const c = targetCenter(); const vmax = Math.max(innerWidth, innerHeight);
+      overlay.style.opacity = '0.7';
+      tone('sawtooth', 80, 160, CHARGE_QY / 1000, 0.12); tone('sine', 400, 1600, CHARGE_QY / 1000, 0.08);
+      // 蓄势：全屏青绿风带 + 万叶绕场旋涡收束
+      fsLayer(`
+        <div class="absolute inset-0" style="background: radial-gradient(circle at ${c.x}px ${c.y}px, rgba(22,101,52,0.0) 10%, rgba(20,83,45,0.45) 70%); animation: fs-tint ${CHARGE_QY + 1300}ms ease both;"></div>
+        ${[1, 0.75, 0.5].map((s, i) => `<div class="fs-anchor" style="left:${c.x}px; top:${c.y}px; width:${vmax * s}px; height:${vmax * s}px; border-radius:50%; border: ${3 - i}px dashed rgba(134,239,172,${0.5 - i * 0.1}); box-shadow: 0 0 40px rgba(74,222,128,0.25), inset 0 0 40px rgba(74,222,128,0.2); animation: fs-wind-band ${CHARGE_QY}ms ${i * 80}ms cubic-bezier(0.5,0,0.7,0.6) both;"></div>`).join('')}
+      `, CHARGE_QY + 1400);
+      const orbit = [];
+      for (let i = 0; i < 140; i++) orbit.push({ a: Math.random() * Math.PI * 2, r: vmax * (0.35 + Math.random() * 0.4), s: 0.03 + Math.random() * 0.03, size: 6 + Math.random() * 8 });
+      const t0 = performance.now();
+      const spin = setInterval(() => {
+        const k = Math.min(1, (performance.now() - t0) / CHARGE_QY);
+        orbit.forEach(o => { o.a += o.s * (1 + k * 3); const r = o.r * (1 - k * 0.75); addP({ x: c.x + Math.cos(o.a) * r, y: c.y + Math.sin(o.a) * r * 0.8, decay: 0.2, size: o.size, shape: 'leaf', rot: o.a + Math.PI / 2, color: Math.random() < 0.5 ? '#4ade80' : '#86efac' }); });
+      }, 33);
+      const rumble = setInterval(() => triggerScreenShake('light'), 300);
+      setTimeout(() => { clearInterval(spin); clearInterval(rumble); qianyeRelease(c, orbit); }, CHARGE_QY);
+    };
+
+    function qianyeRelease(c, orbit) {
+      tone('sine', 140, 40, 0.8, 0.6); triggerScreenShake('heavy');
+      // 旋涡叶片全部向目标爆射穿心
+      orbit.forEach(o => { const r = o.r * 0.25; const x = c.x + Math.cos(o.a) * r, y = c.y + Math.sin(o.a) * r * 0.8; addP({ x, y, vx: (c.x - x) / 6 + (Math.random() - 0.5) * 4, vy: (c.y - y) / 6, drag: 0.9, decay: 0.03, size: o.size, shape: 'leaf', rot: Math.atan2(c.y - y, c.x - x), color: '#bbf7d0' }); });
+      // 全屏剑痕：8 道斜向叶刃剑气横扫
+      const slashes = [-28, 18, -10, 32, -40, 6, 24, -18].map((a, i) => `
+        <div class="absolute" style="left:${c.x - innerWidth * 0.6}px; top:${c.y + (i - 3.5) * 46}px; width:${innerWidth * 1.2}px; height:${6 + (i % 3) * 3}px; --a:${a}deg;
+          background: linear-gradient(90deg, transparent, rgba(74,222,128,0.5) 30%, #f0fdf4 50%, rgba(74,222,128,0.5) 70%, transparent);
+          filter: drop-shadow(0 0 14px #22c55e); animation: fs-slash 0.45s ${i * 0.09}s cubic-bezier(0.2,0.9,0.3,1) both;"></div>`).join('');
+      fsLayer(`<div class="absolute inset-0" style="background: rgba(220,252,231,0.5); animation: fs-flash 0.35s ease-out both;"></div>${slashes}`, 1500);
+      // 全屏叶刃狂潮：从左到右万叶穿场
+      let n = 0;
+      const storm = setInterval(() => {
+        burst(18, () => ({ x: -30 - Math.random() * 100, y: Math.random() * innerHeight, vx: 22 + Math.random() * 18, vy: (Math.random() - 0.5) * 4, drag: 1, decay: 0.012, size: 8 + Math.random() * 10, shape: 'leaf', rot: 0, color: ['#4ade80', '#86efac', '#bbf7d0', '#22c55e'][Math.floor(Math.random() * 4)] }));
+        if (++n > 22) clearInterval(storm);
+      }, 40);
+      // 六段连击
+      for (let i = 0; i < 6; i++) setTimeout(() => {
+        triggerScreenShake(i === 5 ? 'quake' : 'light'); triggerTargetFlinch('wood'); tone('sine', 1800 - i * 120, 300, 0.12, 0.2);
+        const dmg = i === 5 ? 1280 : 260 + Math.floor(Math.random() * 120); damagePuppet(dmg);
+        createFloatingText(i === 5 ? `${dmg} · 万叶归宗` : `${dmg}`, 'text-emerald-300');
+        burst(18, () => { const a = Math.random() * Math.PI * 2, s = 3 + Math.random() * 8; return { x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, grav: 0.08, drag: 0.95, decay: 0.03, size: 3 + Math.random() * 4, shape: 'leaf', rot: a, vr: 0.3, color: '#dcfce7' }; });
+      }, 80 + i * 150);
+      setTimeout(() => { overlay.style.opacity = '0'; }, 1300);
+    }
 
     // 界面按钮事件绑定
     // ========================================================
