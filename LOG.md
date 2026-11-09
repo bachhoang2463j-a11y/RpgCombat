@@ -3066,3 +3066,13 @@
 - **涉及文件**：`index.html`、`integration-test/harness.html`、`integration-test/fixtures/arcane-vfx-regression.js`、`regex-前端战斗v11_2.json`。
 - **验证**：源码脚本语法与围栏检查通过；离线分流14项通过；IAB源码完整回归848/848通过；真实压缩导入包秘术专项101/101通过；独立只读检查无阻断问题。首轮护盾未定义变量、自然退场画布残留及两项旧静态断言均修复后复测通过。`build-regex.cjs` 构建成功，产物两脚本语法与双围栏检查通过。
 - **边界**：未修改公开版、README、SPEC、demo与用户既有未提交文件；未导入真实酒馆、未调用外部LLM、未做安卓或真Chrome排障验收。IAB已观察真实布局上的灵风蓄势，完整动态观感与原数字搭配待用户导入确认。
+
+---
+
+## [LOG-258] 2026-11-10 — 刀光闪避音与巫师护盾渐隐修复
+
+- **提交**：`d4cc351`。
+- **核心目的与变更**：成功闪避近战刀光时去掉 `atk2` 受击音，保留挥空刀光与原闪避音；命中及枪击闪避音效不变。巫师护盾退场从盾面改为外层600ms渐隐，避免 `arcane-shield-pop` 的 forwards 终态覆盖 opacity；同步尾韵完成时间与受击续期，不改护盾数值。
+- **音频核对**：只读对比 `F:/Download/regex-前端战斗v11_2.json` 与本轮新包，`ASSET_ORIGIN/ASSET_BASE/HERO_VOICE_BASE`、`audioUrls`、`HERO_VOICE_LINES` 三段完全一致，仍使用 `http://192.168.110.83:8766` 对应的既有 `my_assets` 资源服务。按用户要求，地址未变则不扩大首次无声排查；未改动下载文件与音频配置。
+- **涉及文件**：`index.html`、`integration-test/fixtures/arcane-vfx-regression.js`、`regex-前端战斗v11_2.json`。
+- **验证**：脚本语法、`git diff --check`、`build-regex.cjs` 构建通过；IAB真实压缩产物专项111/111通过，新增普通／反应刀光闪避音、命中音、枪击闪避音与渐隐实际中段透明度断言。本轮未重跑全部848项源码回归，未操作真实酒馆或Chrome排障；README保持不变。
