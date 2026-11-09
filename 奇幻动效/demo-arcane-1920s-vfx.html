@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Arcanum MCMXXIV · 奇幻秘术演练场</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Limelight&family=Cinzel:wght@500;700&family=Noto+Sans+SC:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap');
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    body { font-family: 'Noto Sans SC', sans-serif; user-select: none; }
+    /* —— 以下复刻主工程 index.html 主界面样式 —— */
+    .glass-panel { background: rgba(20, 25, 35, 0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); }
+    .text-outline { text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 1px 2px rgba(0,0,0,0.8); }
+    .mask-fade-y { -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .custom-scrollbar::-webkit-scrollbar { width: 3px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+    .timeline-rail { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: linear-gradient(180deg, rgba(250,204,21,0.85) 0%, rgba(6,182,212,0.65) 25%, rgba(99,102,241,0.45) 60%, rgba(255,255,255,0.05) 100%); box-shadow: 0 0 10px rgba(6,182,212,0.55); pointer-events: none; z-index: 0; }
+    @keyframes rail-pulse { 0% { transform: translateY(-100%); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(800%); opacity: 0; } }
+    .rail-pulse-beam { position: absolute; left: 0; top: 0; width: 2px; height: 40px; background: linear-gradient(180deg, transparent, #38bdf8, #fff); box-shadow: 0 0 12px #38bdf8; animation: rail-pulse 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+    .turn-dot { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; background: #111827; border: 2px solid; position: relative; z-index: 1; flex-shrink: 0; }
+    .turn-dot.cur { width: 52px; height: 52px; font-size: 26px; border-color: #facc15 !important; box-shadow: 0 0 20px rgba(250,204,21,0.9); }
+    .breathe { animation: breathe 3.2s ease-in-out infinite; } @keyframes breathe { 50% { transform: translateY(-4px) scale(1.02); } }
+    #chat-bar input { background: rgba(15,23,42,0.7); border: 1px solid rgba(255,255,255,0.12); color: #e2e8f0; }
+    .s-light { animation: s-light 0.18s ease-out; } .s-heavy { animation: s-heavy 0.32s ease-out; } .s-quake { animation: s-quake 0.55s ease-out; }
+    @keyframes s-light { 25% { transform: translate3d(-3px, 2px, 0); } 60% { transform: translate3d(3px, -2px, 0); } }
+    @keyframes s-heavy { 15% { transform: translate3d(-8px, 4px, 0); } 35% { transform: translate3d(7px, -5px, 0); } 60% { transform: translate3d(-4px, 3px, 0); } 85% { transform: translate3d(2px, -1px, 0); } }
+    @keyframes s-quake { 10% { transform: translate3d(-14px, 8px, 0); } 25% { transform: translate3d(12px, -10px, 0); } 40% { transform: translate3d(-9px, 6px, 0); } 60% { transform: translate3d(6px, -4px, 0); } 80% { transform: translate3d(-3px, 2px, 0); } }
+    /* 受击/治疗/冷闪：作用在 .fx-body（角色卡 / 敌方精灵） */
+    .flash-fire .fx-body { animation: f-fire 0.45s steps(1) both; } @keyframes f-fire { 0% { filter: brightness(2.6) sepia(1) saturate(6) hue-rotate(-20deg); } 30% { filter: brightness(1.4) sepia(1) saturate(4) hue-rotate(-25deg); } 70% { filter: none; } }
+    .flash-heal .fx-body { animation: f-heal 0.6s ease-out both; } @keyframes f-heal { 0% { filter: brightness(1.8) drop-shadow(0 0 18px #34d399); } 100% { filter: none; } }
+    .flash-cold .fx-body { animation: f-cold 0.5s steps(1) both; } @keyframes f-cold { 0% { filter: brightness(1.6) hue-rotate(180deg) saturate(2.5); } 60% { filter: none; } }
+    .flinch .fx-body { animation: flinch 0.28s ease-out; } @keyframes flinch { 30% { transform: translateX(10px) skewX(-6deg); } }
+    .debuff-chip { font-size: 10px; padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(168,85,247,0.6); color: #e9d5ff; background: rgba(59,7,100,0.75); font-family: 'JetBrains Mono', monospace; }
+    .portrait { background: radial-gradient(ellipse at 50% 30%, #3b3f5c, #14151f 75%); display: flex; align-items: flex-end; justify-content: center; font-size: 64px; }
+
+    #dark { position: fixed; inset: 0; pointer-events: none; z-index: 40; opacity: 0; transition: opacity 0.35s ease;
+      background: radial-gradient(ellipse at 40% 60%, rgba(5,6,20,0.55) 0%, rgba(2,3,10,0.92) 75%); }
+    #fx-canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 55; }
+    .fs-layer { position: fixed; inset: 0; pointer-events: none; z-index: 52; overflow: hidden; }
+    .fs-anchor { position: absolute; transform: translate(-50%, -50%); }
+    .float { position: fixed; z-index: 61; pointer-events: none; font-weight: 900; white-space: nowrap; transform: translate(-50%, 0); text-shadow: 0 2px 0 #000, 0 0 12px currentColor; animation: float-up 1.3s cubic-bezier(0.2, 0.8, 0.3, 1) forwards; }
+    @keyframes float-up { 0% { opacity: 0; transform: translate(-50%, 10px) scale(0.6); } 15% { opacity: 1; transform: translate(-50%, -8px) scale(1.15); } 30% { transform: translate(-50%, -14px) scale(1); } 100% { opacity: 0; transform: translate(-50%, -70px) scale(1); } }
+
+    /* 装饰艺术铭牌横幅（特效层，不属于主界面） */
+    #banner { position: fixed; left: 50%; top: 92px; transform: translateX(-50%); z-index: 60; pointer-events: none; opacity: 0; text-align: center; padding: 10px 46px 12px;
+      background: linear-gradient(180deg, rgba(20,22,52,0.92), rgba(10,12,30,0.92)); border-top: 2px solid #d4af37; border-bottom: 2px solid #d4af37;
+      clip-path: polygon(18px 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 18px 100%, 0 50%); }
+    #banner .en { font-family: 'Limelight', serif; font-size: 14px; letter-spacing: 6px; color: #b9a77a; }
+    #banner .cn { font-size: 30px; font-weight: 900; letter-spacing: 8px; background: linear-gradient(180deg, #fff6d5, #e9c46a 50%, #a8741a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    #banner.show { animation: banner-in 1.8s ease both; }
+    @keyframes banner-in { 0% { opacity: 0; transform: translateX(-50%) scaleX(0.3); } 14% { opacity: 1; transform: translateX(-50%) scaleX(1.04); } 22% { transform: translateX(-50%) scaleX(1); } 78% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-8px); } }
+    /* —— 主工程默认受击特效样式（复刻 index.html） —— */
+    @keyframes svg-slash { 0% { stroke-dasharray: 0 200; stroke-dashoffset: 0; opacity: 1; } 50% { stroke-dasharray: 200 200; stroke-dashoffset: 0; opacity: 1; transform: translate(-50%, -50%) scale(1.2); } 100% { stroke-dasharray: 200 200; stroke-dashoffset: -200; opacity: 0; transform: translate(-50%, -50%) scale(1.3); } }
+    .anim-slash path { animation: svg-slash 0.4s cubic-bezier(0.1, 0.8, 0.3, 1) forwards; }
+    @keyframes gunshot-core-flash { 0% { transform: translate(-50%, -50%) scale(0.15) rotate(0deg); opacity: 0; filter: brightness(2.5); } 18% { transform: translate(-50%, -50%) scale(1.18) rotate(12deg); opacity: 1; filter: brightness(1.8); } 40% { transform: translate(-50%, -50%) scale(1.02) rotate(20deg); opacity: 0.9; } 100% { transform: translate(-50%, -50%) scale(1.35) rotate(35deg); opacity: 0; } }
+    @keyframes gunshot-spark-ray { 0% { transform: translate(-50%, -50%) scale(0.1) rotate(var(--ray-rot, 0deg)); opacity: 1; } 35% { transform: translate(-50%, -50%) scale(1.15) translateY(-22px) rotate(var(--ray-rot, 0deg)); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.35) translateY(-42px) rotate(var(--ray-rot, 0deg)); opacity: 0; } }
+    @keyframes gunshot-shock-ring { 0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; stroke-width: 6; } 50% { transform: translate(-50%, -50%) scale(1.6); opacity: 0.75; stroke-width: 2.5; } 100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; stroke-width: 1; } }
+    @keyframes angel-flap { 0%, 100% { transform: rotate(0deg); } 40% { transform: rotate(-9deg); } 70% { transform: rotate(4deg); } }
+    .card.lock { pointer-events: none; opacity: 0.45; filter: grayscale(0.6); }
+
+    /* —— 通用动画 —— */
+    @keyframes fs-flash { 0% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes draw-on { to { stroke-dashoffset: 0; } }
+    .grow { stroke-dasharray: 1; stroke-dashoffset: 1; }
+    @keyframes seed-bloom { 0% { transform: translate(-50%,-50%) scale(0); opacity: 0; } 70% { transform: translate(-50%,-50%) scale(1.25); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(0.6); opacity: 0; } }
+    @keyframes hit-flash { 0% { transform: translate(-50%,-50%) scale(0.2); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.7); opacity: 0; } }
+    @keyframes ankh-drop { 0% { transform: translate(-50%,-50%) translateY(-160px) scale(0.6); opacity: 0; } 55% { transform: translate(-50%,-50%) translateY(6px) scale(1.05); opacity: 1; } 75% { transform: translate(-50%,-50%) scale(1); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; filter: brightness(3); } }
+    @keyframes clock-life { 0% { transform: translate(-50%,-50%) scale(0.4); opacity: 0; } 18% { transform: translate(-50%,-50%) scale(1.05); opacity: 1; } 80% { transform: translate(-50%,-50%) scale(1); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.35); opacity: 0; } }
+    @keyframes hand-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes ripple { 0% { transform: translate(-50%,-50%) scale(0.2); opacity: 0.9; } 100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; } }
+    @keyframes tint { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes ghost-shatter { 0% { opacity: 0.75; filter: blur(0); } 60% { opacity: 0.6; } 100% { opacity: 0; filter: blur(6px); transform: scale(1.12, 0.9) translateY(10px); } }
+    @keyframes shield-life { 0% { opacity: 0; transform: translate(-50%,-50%) scaleX(0.2); } 12% { opacity: 1; transform: translate(-50%,-50%) scaleX(1.04); } 20% { transform: translate(-50%,-50%) scaleX(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes shield-reveal { 0%, 100% { opacity: 0; } 10% { opacity: 1; } }
+    @keyframes ring-out { 0% { r: 4; opacity: 0.95; stroke-width: 3; } 100% { r: 150; opacity: 0; stroke-width: 0.5; } }
+    @keyframes lotus-bloom { 0% { transform: scale(0) rotate(-30deg); opacity: 0; } 60% { transform: scale(1.15) rotate(4deg); opacity: 1; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+    @keyframes curtain { 0% { transform: translate(-50%, 0) scaleY(0); opacity: 0; } 25% { transform: translate(-50%, 0) scaleY(1.05); opacity: 1; } 75% { opacity: 0.9; } 100% { transform: translate(-50%, 0) scaleY(1); opacity: 0; } }
+    @keyframes fade-life { 0% { opacity: 0; } 15% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes rose-in { 0% { transform: translate(-50%,-50%) scale(0.3) rotateX(68deg) rotate(0deg); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1) rotateX(68deg) rotate(200deg); opacity: 1; } }
+    @keyframes rose-out { 0% { transform: translate(-50%,-50%) scale(1) rotateX(68deg) rotate(200deg); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.8) rotateX(68deg) rotate(280deg); opacity: 0; } }
+    @keyframes twister { 0% { transform: translate(-50%,-50%) scale(0.2, 0.2) rotate(0); opacity: 0; } 15% { opacity: 1; transform: translate(-50%,-50%) scale(1.1, 1) rotate(180deg); } 100% { transform: translate(-50%,-50%) translateY(-120px) scale(1.6, 1.3) rotate(900deg); opacity: 0; } }
+    @keyframes streak { 0% { transform: translateX(-30vw) scaleX(0.3); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateX(130vw) scaleX(1); opacity: 0; } }
+    @keyframes wing-glyph { 0% { opacity: 0; transform: translate(-50%,-50%) scale(0.6); } 20% { opacity: 1; transform: translate(-50%,-50%) scale(1.08); } 30% { transform: translate(-50%,-50%) scale(1); } 75% { opacity: 0.9; } 100% { opacity: 0; transform: translate(-50%,-50%) translateY(-14px); } }
+    @keyframes slow-rot { to { transform: rotate(360deg); } }
+    @keyframes converge { 0% { transform: translate(var(--sx), var(--sy)) rotate(var(--r0)); opacity: 0; } 25% { opacity: 0.9; } 100% { transform: translate(0, 0) rotate(0deg) scale(0.2); opacity: 0.2; } }
+    @keyframes dome-in { 0% { transform: translateX(-50%) scale(0.15, 0.05); opacity: 0; filter: brightness(4); } 18% { transform: translateX(-50%) scale(1.08, 1.1); opacity: 1; filter: brightness(2.4); } 30% { transform: translateX(-50%) scale(0.97, 0.96); filter: brightness(1.4); } 40% { transform: translateX(-50%) scale(1); filter: brightness(1); } 82% { opacity: 1; } 100% { transform: translateX(-50%) scale(1.02); opacity: 0; } }
+    @keyframes hex-light { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0.4; } }
+    @keyframes sweep { 0% { transform: translateX(-120%) skewX(-20deg); } 100% { transform: translateX(220%) skewX(-20deg); } }
+    @keyframes shock-ell { 0% { transform: translate(-50%,-50%) scale(0.1); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.5); opacity: 0; } }
+    @keyframes wings-in { 0% { transform: translate(-50%,-50%) scale(0.35, 0.1); opacity: 0; } 40% { opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1); opacity: 1; } }
+    @keyframes wings-out { 0% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-50%) scale(0.92) translateY(30px); } }
+    @keyframes wing-fold { 0% { transform: rotate(0) scaleX(1); } 55% { transform: rotate(-34deg) scaleX(0.82); } 100% { transform: rotate(-30deg) scaleX(0.8); } }
+    @keyframes sun-grow { 0% { transform: scale(0.1); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  </style>
+</head>
+<body class="text-white">
+ <svg width="0" height="0" class="fixed z-0 pointer-events-none"><defs><filter id="bloom-red" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur1" /><feGaussianBlur in="SourceGraphic" stdDeviation="15" result="blur2" /><feMerge><feMergeNode in="blur2"/><feMergeNode in="blur1"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs></svg>
+ <div id="app" class="fixed inset-0 overflow-hidden">
+  <!-- 顶部控制按钮（复刻主界面） -->
+  <div class="absolute top-2 sm:top-4 right-2 sm:right-4 z-[115] flex gap-1.5 sm:gap-2">
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-violet-400 hover:text-violet-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>📚</span> <span class="hidden sm:inline">世界书</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-purple-400 hover:text-purple-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>📜</span> <span class="hidden sm:inline">记录</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-blue-400 hover:text-blue-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>🔲</span> <span class="hidden sm:inline">全屏</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-indigo-400 hover:text-indigo-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>💬</span> <span class="hidden sm:inline">对话</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-yellow-500 hover:text-yellow-400 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>⚙️</span> <span class="hidden sm:inline">设置</span></button>
+    <button id="btn-reset" class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-emerald-400 hover:text-emerald-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>🔄</span> <span class="hidden sm:inline">重置</span></button>
+  </div>
+
+  <!-- 全屏战场区域 -->
+  <div class="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-800 to-emerald-900 overflow-hidden z-0" id="battle-scene">
+    <div class="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+    <div class="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-0"></div>
+    <div class="absolute left-1 sm:left-4 md:left-6 top-16 sm:top-20 bottom-44 sm:bottom-48 w-12 sm:w-14 z-30 flex flex-col items-center select-none">
+      <div class="relative w-full h-full flex flex-col items-center">
+        <div class="timeline-rail"><div class="rail-pulse-beam"></div></div>
+        <div id="turn-order-container" class="relative w-full h-full flex flex-col gap-2 sm:gap-2.5 items-center overflow-y-auto no-scrollbar mask-fade-y py-3"></div>
+      </div>
+    </div>
+    <div id="enemies-container" class="absolute left-2 sm:left-6 right-2 sm:right-6 top-[10%] bottom-[190px] sm:bottom-[220px] z-10 flex flex-col items-center justify-start gap-6 overflow-visible pointer-events-none"></div>
+  </div>
+
+  <!-- 悬浮 UI 层 -->
+  <div class="absolute bottom-[52px] left-0 w-full p-1.5 sm:p-6 flex flex-col-reverse sm:flex-row items-end justify-between gap-1.5 sm:gap-4 z-20 pointer-events-none pb-2 sm:pb-6">
+    <div id="heroes-container" class="w-full sm:flex-1 grid grid-cols-4 gap-1 sm:gap-4 max-w-2xl pointer-events-auto relative"></div>
+    <div class="relative self-end">
+      <div id="menu-container" class="w-[260px] h-[172px] bg-slate-950/95 backdrop-blur-xl rounded-xl border border-slate-700/80 border-t-2 border-t-cyan-500/80 flex flex-col overflow-hidden relative shadow-[0_15px_35px_rgba(0,0,0,0.9)] pointer-events-auto self-end mb-1 sm:mb-0">
+        <div class="px-2.5 py-1 bg-gradient-to-r from-violet-950/60 via-slate-900/90 to-slate-950 border-b border-violet-900/40 flex justify-between items-center shrink-0">
+          <div class="flex items-center gap-1.5 min-w-0"><span class="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse shrink-0"></span><span class="text-xs font-bold text-violet-300">秘术演练 · 8 式 + 通用</span></div>
+          <span class="text-[9px] text-slate-500">点击释放</span>
+        </div>
+        <div id="skill-list" class="flex-1 flex flex-col gap-1 p-1 overflow-y-auto custom-scrollbar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部对话栏（复刻主界面，仅装饰） -->
+  <div id="chat-bar" class="absolute bottom-0 left-0 right-0 h-[52px] z-30 flex items-center gap-2 px-2 sm:px-3 bg-black/60 border-t border-white/5">
+    <div class="w-9 h-9 rounded-full bg-slate-700 border border-white/20 shrink-0 flex items-center justify-center">🕵️</div>
+    <input type="text" placeholder="说点什么... (Enter发送)" class="flex-1 h-9 rounded-full px-4 text-sm outline-none">
+    <span class="px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/60 text-emerald-300 bg-emerald-950/50">友方旁白 ON</span>
+    <span class="px-3 py-1 rounded-full text-xs font-bold border border-rose-500/60 text-rose-300 bg-rose-950/50">敌方旁白 ON</span>
+    <div class="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center shrink-0">➤</div>
+  </div>
+ </div>
+ <div id="dark"></div>
+ <canvas id="fx-canvas"></canvas>
+ <div id="banner"><div class="en"></div><div class="cn"></div></div>
+  <script>
+    // ========================================================
+    // 场景与通用工具
+    // ========================================================
+    const $ = s => document.querySelector(s);
+    // —— 按主工程 initUI / renderEnemyFormation / createCompactBarHTML 的 DOM 结构渲染（便于移植：特效只依赖 hero-wrap / enemy-box 的外接矩形）
+    function bar(id, type, label, val, max, color, isTp = false, shield = 0) {
+      const pct = Math.max(0, Math.min(100, val / max * 100)), sh = shield > 0 ? `<span class="text-slate-300 ml-0.5 text-[7px] sm:text-[9px]">(盾${shield})</span>` : '';
+      return `<div class="relative pt-1.5 sm:pt-2.5 mb-0 sm:mb-[2px]"><span id="${id}-${type}-text" class="absolute right-0 top-0 text-[8px] sm:text-xs font-mono font-bold text-white leading-none text-outline z-10 whitespace-nowrap">${val}${sh}</span><div class="flex items-center gap-1 sm:gap-1.5"><span class="text-[7px] sm:text-[10px] font-bold text-gray-200 leading-none text-outline w-3 sm:w-4">${label}</span><div class="flex-grow h-1 sm:h-1.5 bg-[#222] rounded-[1px] overflow-hidden border border-[#111]"><div class="${isTp ? 'w-1/3' : 'w-full'} h-full ${color}" style="width:${pct}%"></div></div></div></div>`;
+    }
+    const HERO_DATA = [['h1', '埃利奥特', '👨', 100, 55, 110, 5], ['h2', '弗兰克', '🧔', 180, 0, 17, 0], ['h3', '玛德琳', '👩', 140, 0, 14, 0], ['h4', '索恩', '🕵️', 140, 0, 20, 0]];
+    $('#heroes-container').innerHTML = HERO_DATA.map(([id, name, face, hp, sh, mp, tp]) => `
+      <div class="hero relative transition-all duration-300 min-w-[70px] z-20" id="hero-wrap-${id}">
+        <div id="hero-card-${id}" class="fx-body hero-card-inner bg-[#18181b] rounded overflow-hidden relative border shadow-2xl transition-all border-gray-800">
+          <div id="${id}-buffs" class="absolute top-1 right-1 flex flex-col gap-1 items-end z-20 pointer-events-none"><span class="debuff-chip chip">☠ 诅咒</span></div>
+          <div class="w-full h-12 sm:h-auto sm:aspect-[4/3] relative bg-gray-900 border-b border-gray-700">
+            <div class="absolute top-0 left-0 w-full bg-gradient-to-b from-black/80 to-transparent px-1.5 py-1 text-[9px] sm:text-xs font-bold text-white z-10 flex justify-between"><span>${name}</span></div>
+            <div class="portrait w-full h-full">${face}</div>
+          </div>
+          <div class="px-1 py-1 sm:px-2 sm:py-1.5 flex flex-col gap-[1px] sm:gap-0.5">${bar(id, 'hp', 'HP', hp, hp, 'bg-yellow-400', false, sh)}${bar(id, 'mp', 'MP', mp, mp, 'bg-cyan-400')}${bar(id, 'tp', 'TP', tp, 100, 'bg-green-500', true)}</div>
+        </div>
+      </div>`).join('');
+    const ENEMY_ROWS = [[['e1', '🐟'], ['e2', '❄️'], ['e3', '🐟']], [['e4', '👻'], ['e5', '👻'], ['e6', '🌀']]];
+    $('#enemies-container').innerHTML = ENEMY_ROWS.map((row, ri) => `<div class="flex items-end justify-center" style="gap:${ri ? 26 : 22}px; ${ri ? 'margin-top:18px' : ''}">${row.map(([id, em]) => `
+      <div class="flex flex-col items-center group relative shrink-0" id="enemy-box-${id}" style="transform:scale(${ri ? 1 : 0.72}); ${ri ? '' : 'filter:brightness(0.82) saturate(0.92)'}">
+        <div id="${id}-sprite" class="fx-body enemy-sprite text-7xl sm:text-8xl drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] breathe mt-2 sm:mt-4 flex justify-center items-center">${em}</div>
+        <div class="w-10 sm:w-16 h-1 sm:h-1.5 bg-black/50 mt-2 sm:mt-4 rounded-full overflow-hidden relative"><div class="h-full bg-rose-500 w-full shadow-[0_0_8px_rgba(244,63,94,0.8)]"></div></div>
+      </div>`).join('')}</div>`).join('');
+    $('#turn-order-container').innerHTML = ['👨', '❄️', '🧔', '👩', '🕵️', '👻', '👻'].map((e, i) => `<div class="turn-dot ${i ? '' : 'cur'}" style="border-color:${i === 1 || i > 4 ? '#e11d48' : '#06b6d4'}">${e}</div>`).join('');
+    const stage = $('#app'), dark = $('#dark'), dummy = $('#enemy-box-e5');
+    const heroes = [...document.querySelectorAll('.hero')], mainHero = heroes[1];
+
+    function ctr(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, top: r.top, bottom: r.bottom, left: r.left, right: r.right }; }
+    function party() { const rs = heroes.map(h => h.getBoundingClientRect()); const l = Math.min(...rs.map(r => r.left)), rr = Math.max(...rs.map(r => r.right)), t = Math.min(...rs.map(r => r.top)), b = Math.max(...rs.map(r => r.bottom)); return { x: (l + rr) / 2, y: (t + b) / 2, l, r: rr, t, b, w: rr - l, h: b - t }; }
+    function fsLayer(html, ms) { const d = document.createElement('div'); d.className = 'fs-layer'; d.innerHTML = html; document.body.appendChild(d); setTimeout(() => d.remove(), ms); return d; }
+    function shake(type) { stage.classList.remove('s-light', 's-heavy', 's-quake'); void stage.offsetWidth; stage.classList.add('s-' + type); }
+    function flash(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); setTimeout(() => el.classList.remove(cls), 700); }
+    function floatText(el, text, color, size = 24, dy = 0) { const c = ctr(el); const d = document.createElement('div'); d.className = 'float'; d.textContent = text; d.style.cssText = `left:${c.x}px; top:${c.top - 10 + dy}px; color:${color}; font-size:${size}px;`; document.body.appendChild(d); setTimeout(() => d.remove(), 1400); }
+    function lockCards(ms) { document.querySelectorAll('.card').forEach(c => c.classList.add('lock')); setTimeout(() => document.querySelectorAll('.card').forEach(c => c.classList.remove('lock')), ms); }
+    function showBanner(en, cn) { const b = $('#banner'); b.querySelector('.en').textContent = en; b.querySelector('.cn').textContent = cn; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show'); }
+    function darken(o) { dark.style.opacity = o; }
+    const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
+
+    // ========================================================
+    // Canvas 粒子：dot / ring / flame / smoke / feather / ankh / lotus / star / shard / streak
+    // ========================================================
+    const cvs = $('#fx-canvas'), g = cvs.getContext('2d'), dpr = Math.min(2, devicePixelRatio || 1); let P = [];
+    function resize() { cvs.width = innerWidth * dpr; cvs.height = innerHeight * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0); } resize(); addEventListener('resize', resize);
+    function addP(o) { P.push(Object.assign({ vx: 0, vy: 0, life: 1, decay: 0.02, size: 3, color: '#fde68a', grav: 0, drag: 0.98, rot: 0, vr: 0, shape: 'dot', blend: 'lighter' }, o)); }
+    function burst(n, fn) { for (let i = 0; i < n; i++) addP(fn(i)); }
+    const DRAW = {
+      dot(p) { g.fillStyle = p.color; g.beginPath(); g.arc(0, 0, p.size, 0, 6.283); g.fill(); },
+      ring(p) { g.strokeStyle = p.color; g.lineWidth = 3 * p.life; g.beginPath(); g.arc(0, 0, 4 + p.size * (1 - p.life) * 40, 0, 6.283); g.stroke(); },
+      flame(p) { const r = p.size * (0.4 + p.life * 0.8); const gr = g.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, '#fff7d6'); gr.addColorStop(0.35, p.color); gr.addColorStop(1, 'rgba(120,20,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill(); },
+      smoke(p) { const r = p.size * (1.6 - p.life); const gr = g.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, p.color); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill(); },
+      feather(p) { const s = p.size; g.fillStyle = p.color; g.beginPath(); g.moveTo(-s * 1.5, 0); g.quadraticCurveTo(0, -s * 0.55, s * 1.5, 0); g.quadraticCurveTo(0, s * 0.4, -s * 1.5, 0); g.fill(); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-s * 1.8, 0); g.lineTo(s * 1.5, 0); g.stroke(); },
+      ankh(p) { const s = p.size; g.strokeStyle = p.color; g.lineWidth = s * 0.28; g.beginPath(); g.ellipse(0, -s * 0.9, s * 0.42, s * 0.55, 0, 0, 6.283); g.moveTo(-s * 0.75, -s * 0.25); g.lineTo(s * 0.75, -s * 0.25); g.moveTo(0, -s * 0.35); g.lineTo(0, s * 1.1); g.stroke(); },
+      lotus(p) { const s = p.size; g.fillStyle = p.color; g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(-s * 0.6, -s * 0.5, -s * 0.4, -s * 1.4, 0, -s * 1.8); g.bezierCurveTo(s * 0.4, -s * 1.4, s * 0.6, -s * 0.5, 0, 0); g.fill(); },
+      star(p) { const s = p.size; g.fillStyle = p.color; g.beginPath(); for (let i = 0; i < 8; i++) { const r = i % 2 ? s * 0.22 : s, a = i * Math.PI / 4; g.lineTo(Math.cos(a) * r, Math.sin(a) * r); } g.closePath(); g.fill(); },
+      shard(p) { const s = p.size; g.fillStyle = p.fill || 'rgba(224,242,254,0.25)'; g.strokeStyle = p.color; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, -s); g.lineTo(s * 0.7, s * 0.3); g.lineTo(s * 0.1, s * 0.9); g.lineTo(-s * 0.6, s * 0.2); g.closePath(); g.fill(); g.stroke(); },
+      streak(p) { g.strokeStyle = p.color; g.lineWidth = p.size; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 0); g.lineTo(-p.vx * 4, -p.vy * 4); g.stroke(); }
+    };
+    (function tick() {
+      g.clearRect(0, 0, innerWidth, innerHeight);
+      for (let i = P.length - 1; i >= 0; i--) {
+        const p = P[i]; p.vx *= p.drag; p.vy *= p.drag; p.vy += p.grav; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life -= p.decay;
+        if (p.life <= 0) { P.splice(i, 1); continue; }
+        g.save(); g.globalAlpha = Math.min(1, p.life * 1.4); g.globalCompositeOperation = p.blend; g.translate(p.x, p.y); if (p.shape !== 'streak') g.rotate(p.rot); DRAW[p.shape](p); g.restore();
+      }
+      requestAnimationFrame(tick);
+    })();
+    // 绕场收束：粒子按椭圆轨道旋转、半径随进度收缩、角速度随进度加快
+    function orbitCharge(c, n, dur, mk, rx, ry, shrink = 0.8) {
+      const orb = []; for (let i = 0; i < n; i++) orb.push({ a: Math.random() * 6.283, r: rnd(0.45, 1), s: rnd(0.025, 0.05), k: Math.random() });
+      const t0 = performance.now();
+      const id = setInterval(() => { const k = Math.min(1, (performance.now() - t0) / dur); orb.forEach(o => { o.a += o.s * (1 + k * 3); const r = o.r * (1 - k * shrink); addP(Object.assign({ x: c.x + Math.cos(o.a) * rx * r, y: c.y + Math.sin(o.a) * ry * r, decay: 0.25 }, mk(o))); }); }, 33);
+      setTimeout(() => clearInterval(id), dur); return orb;
+    }
+    // 飞行物：二次贝塞尔，k 为进度；每帧回调 draw(x, y, k)，到达回调 done()
+    function fly(a, b, lift, dur, draw, done, ease = k => k * k) {
+      const cx = (a.x + b.x) / 2, cy = Math.min(a.y, b.y) - lift, t0 = performance.now();
+      (function step() { const k = Math.min(1, (performance.now() - t0) / dur), t = ease(k), u = 1 - t;
+        draw(u * u * a.x + 2 * u * t * cx + t * t * b.x, u * u * a.y + 2 * u * t * cy + t * t * b.y, k);
+        if (k < 1) requestAnimationFrame(step); else done && done(); })();
+    }
+
+    // ========================================================
+    // 打击感音效引擎（沿用修仙演练场）+ 西方秘术音色：harp / choir / chime / tick / crystal / cry
+    // ========================================================
+    let audioCtx = null, sfxBus, sfxVerb, sfxNoise;
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const ctx = audioCtx;
+        const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -10; comp.knee.value = 4; comp.ratio.value = 6; comp.attack.value = 0.001; comp.release.value = 0.12; comp.connect(ctx.destination);
+        const sat = sfxShaper(ctx, 1.6); sat.connect(comp);
+        sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9; sfxBus.connect(sat);
+        const len = ctx.sampleRate * 3, ir = ctx.createBuffer(2, len, ctx.sampleRate);
+        for (let ch = 0; ch < 2; ch++) { const dd = ir.getChannelData(ch); for (let i = 0; i < len; i++) dd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4); }
+        sfxVerb = ctx.createConvolver(); sfxVerb.buffer = ir; const vg = ctx.createGain(); vg.gain.value = 0.5; sfxVerb.connect(vg); vg.connect(comp);
+        sfxNoise = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate); const nd = sfxNoise.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+    function sfxShaper(ctx, drive) { const ws = ctx.createWaveShaper(), c = new Float32Array(2048); for (let i = 0; i < 2048; i++) c[i] = Math.tanh((i / 1024 - 1) * drive) / Math.tanh(drive); ws.curve = c; ws.oversample = '2x'; return ws; }
+    function sfxChain(ctx, src, t, o) {
+      const g = ctx.createGain(), pk = o.peak || 0.002;
+      g.gain.setValueAtTime(0.0001, t); g.gain[o.peak ? 'exponentialRampToValueAtTime' : 'linearRampToValueAtTime'](o.vol, t + pk);
+      if (o.cut) { g.gain.setValueAtTime(o.vol, t + o.dur - 0.012); g.gain.linearRampToValueAtTime(0.0001, t + o.dur); }
+      else g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
+      const p = ctx.createStereoPanner(); p.pan.setValueAtTime(o.pan || 0, t); if (o.pan1 !== undefined) p.pan.linearRampToValueAtTime(o.pan1, t + o.dur);
+      src.connect(g); g.connect(p); p.connect(sfxBus);
+      if (o.wet) { const w = ctx.createGain(); w.gain.value = o.wet; p.connect(w); w.connect(sfxVerb); }
+    }
+    function sfxNoiseSrc(ctx, t, dur, rate) { const s = ctx.createBufferSource(); s.buffer = sfxNoise; s.playbackRate.value = rate || 1; s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05); return s; }
+    function sfxBiquad(ctx, type, f0, f1, q, t, dur, fd) { const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t); if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + (fd || dur)); return f; }
+    function click(d, vol = 0.7, f = 3500, dur = 0.012, pan = 0) { const ctx = getAudioContext(), t = ctx.currentTime + d; const f1 = sfxBiquad(ctx, 'highpass', f, 0, 0.7, t, dur); sfxNoiseSrc(ctx, t, dur).connect(f1); sfxChain(ctx, f1, t, { vol, dur, pan }); }
+    function kick(d, o) {
+      const ctx = getAudioContext(), t = ctx.currentTime + d; const s = ctx.createOscillator();
+      s.frequency.setValueAtTime(o.hi, t); s.frequency.exponentialRampToValueAtTime(o.lo, t + o.pd); s.frequency.exponentialRampToValueAtTime(o.lo * 0.7, t + o.dur);
+      const sh = sfxShaper(ctx, o.drive || 3); s.connect(sh); s.start(t); s.stop(t + o.dur + 0.05); sfxChain(ctx, sh, t, { vol: o.vol, dur: o.dur, wet: o.wet || 0 });
+    }
+    function crunch(d, o) { const ctx = getAudioContext(), t = ctx.currentTime + d; const bp = sfxBiquad(ctx, 'bandpass', o.f, o.f1, o.q || 1, t, o.dur); const sh = sfxShaper(ctx, o.drive || 6); sfxNoiseSrc(ctx, t, o.dur).connect(bp); bp.connect(sh); sfxChain(ctx, sh, t, { vol: o.vol, dur: o.dur, pan: o.pan || 0, wet: o.wet || 0 }); }
+    function boom(d, o) { const ctx = getAudioContext(), t = ctx.currentTime + d; const lp = sfxBiquad(ctx, 'lowpass', o.f0, o.f1, 0.9, t, o.dur, o.fd || o.dur * 0.6); sfxNoiseSrc(ctx, t, o.dur, o.rate).connect(lp); sfxChain(ctx, lp, t, { vol: o.vol, dur: o.dur, peak: o.peak, wet: o.wet || 0, pan: o.pan || 0 }); }
+    function whoosh(d, o) {
+      const ctx = getAudioContext(), t = ctx.currentTime + d; const f = sfxBiquad(ctx, o.type || 'bandpass', o.f0, o.f1, o.q || 1.2, t, o.dur);
+      if (o.wob) o.wob.forEach(([dt, hz]) => f.frequency.linearRampToValueAtTime(hz, t + dt));
+      sfxNoiseSrc(ctx, t, o.dur, o.rate).connect(f); sfxChain(ctx, f, t, { vol: o.vol, dur: o.dur, peak: o.peak || o.dur * 0.5, cut: o.cut, pan: o.pan || 0, pan1: o.pan1, wet: o.wet || 0 });
+    }
+    function drone(d, o) {
+      const ctx = getAudioContext(), t = ctx.currentTime + d;
+      [-12, 0, 9].forEach(dt => { const s = ctx.createOscillator(); s.type = 'sawtooth'; s.detune.value = dt; s.frequency.setValueAtTime(o.f0, t); s.frequency.exponentialRampToValueAtTime(o.f1, t + o.dur);
+        const lp = sfxBiquad(ctx, 'lowpass', o.lp0, o.lp1, 3, t, o.dur); s.connect(lp); s.start(t); s.stop(t + o.dur + 0.05); sfxChain(ctx, lp, t, { vol: o.vol, dur: o.dur, peak: o.dur * 0.95, cut: true }); });
+    }
+    // 通用单振荡器
+    function tone(d, o) {
+      const ctx = getAudioContext(), t = ctx.currentTime + d; const s = ctx.createOscillator(); s.type = o.type || 'sine'; s.detune.value = o.detune || 0;
+      s.frequency.setValueAtTime(o.f0, t); if (o.f1) s.frequency.exponentialRampToValueAtTime(o.f1, t + (o.fd || o.dur));
+      let node = s; if (o.lp) { const f = sfxBiquad(ctx, 'lowpass', o.lp, o.lp1, o.q || 0.8, t, o.dur); s.connect(f); node = f; }
+      s.start(t); s.stop(t + o.dur + 0.05); sfxChain(ctx, node, t, o);
+    }
+    // 竖琴拨弦：三角波 + 二倍泛音，低通由亮转暗
+    function harp(d, f, vol = 0.22, pan = 0) { tone(d, { type: 'triangle', f0: f, dur: 1.6, vol, lp: 4000, lp1: 700, pan, wet: 0.5 }); tone(d, { f0: f * 2, dur: 0.6, vol: vol * 0.35, pan, wet: 0.4 }); click(d, vol * 0.4, 5000, 0.006, pan); }
+    // 和声：每个音三根失谐锯齿 + 颤音，低通柔化
+    function choir(d, freqs, dur, vol, peakFrac = 0.4, cut = false) {
+      const ctx = getAudioContext(), t = ctx.currentTime + d;
+      freqs.forEach((f, i) => [-9, 0, 8].forEach(dt => {
+        const s = ctx.createOscillator(); s.type = 'sawtooth'; s.frequency.value = f; s.detune.value = dt;
+        const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 5 + i * 0.4; lg.gain.value = f * 0.006; lfo.connect(lg); lg.connect(s.frequency);
+        const lp = sfxBiquad(ctx, 'lowpass', 900 + i * 200, 0, 0.6, t, dur); s.connect(lp); s.start(t); lfo.start(t); s.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+        sfxChain(ctx, lp, t, { vol: vol / 3, dur, peak: dur * peakFrac, cut, wet: 0.7, pan: (i - 1) * 0.3 });
+      }));
+    }
+    // 铃：纯正弦 + 两个钟型非谐泛音
+    function chime(d, f, dur = 1.2, vol = 0.1, pan = 0) { [[1, 1], [2.4, 0.4], [3.9, 0.18]].forEach(([m, v]) => tone(d, { f0: f * m, dur: dur / Math.sqrt(m), vol: vol * v, pan, wet: 0.7 })); }
+    // 钟表咔哒：窄带噪声 + 极短高频
+    function tick(d, vol = 0.35, pan = 0) { const ctx = getAudioContext(), t = ctx.currentTime + d; const bp = sfxBiquad(ctx, 'bandpass', 2600, 0, 9, t, 0.03); sfxNoiseSrc(ctx, t, 0.03).connect(bp); sfxChain(ctx, bp, t, { vol, dur: 0.03, pan }); tone(d, { f0: 4200, dur: 0.02, vol: vol * 0.15, pan }); }
+    // 晶格咬合：短促高频正弦对 + 瞬态
+    function crystal(d, f, vol = 0.12, pan = 0) { tone(d, { f0: f, dur: 0.16, vol, pan, wet: 0.5 }); tone(d, { f0: f * 1.5, dur: 0.09, vol: vol * 0.5, pan }); click(d, vol * 1.5, 6000, 0.005, pan); }
+    // 鹰啼：锯齿经带通，音高先扬后落带颤
+    function cry(d, vol = 0.12) {
+      const ctx = getAudioContext(), t = ctx.currentTime + d; const s = ctx.createOscillator(); s.type = 'sawtooth';
+      s.frequency.setValueAtTime(1500, t); s.frequency.exponentialRampToValueAtTime(2900, t + 0.12); s.frequency.exponentialRampToValueAtTime(2100, t + 0.6);
+      const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 22; lg.gain.value = 60; lfo.connect(lg); lg.connect(s.frequency);
+      const bp = sfxBiquad(ctx, 'bandpass', 2600, 0, 4, t, 0.6); s.connect(bp); s.start(t); lfo.start(t); s.stop(t + 0.65); lfo.stop(t + 0.65); sfxChain(ctx, bp, t, { vol, dur: 0.6, peak: 0.08, wet: 0.6, pan: 0.3 });
+    }
+
+    // ========================================================
+    // ① 通用标签特效 (火焰)：凝火种 → 弧线火球 → 爆燃 → 黑烟上浮
+    // ========================================================
+    function fireTag(onHit) {
+      const h = ctr(mainHero), t = ctr(dummy); const a = { x: h.x + 10, y: h.top - 16 }, b = { x: t.x, y: t.y };
+      // 凝聚
+      burst(22, () => { const ang = Math.random() * 6.283, d = rnd(40, 70); return { x: a.x + Math.cos(ang) * d, y: a.y + Math.sin(ang) * d, vx: -Math.cos(ang) * d / 9, vy: -Math.sin(ang) * d / 9, drag: 0.86, decay: 0.06, size: rnd(1.2, 2.4), color: pick(['#fdba74', '#f97316', '#fde68a']) }; });
+      fsLayer(`<div class="fs-anchor" style="left:${a.x}px; top:${a.y}px; width:64px; height:64px; border-radius:50%; background: radial-gradient(circle, #fff7d6 0%, #fb923c 35%, rgba(220,38,38,0.45) 60%, transparent 72%); animation: seed-bloom 0.26s ease-out both;"></div>`, 320);
+      whoosh(0, { f0: 400, f1: 1800, q: 1.2, dur: 0.22, vol: 0.3, peak: 0.18, pan: -0.5 }); boom(0.02, { f0: 900, f1: 300, dur: 0.25, vol: 0.25, peak: 0.08, pan: -0.5 });
+      for (let i = 0; i < 4; i++) click(0.04 + i * 0.04, 0.12, rnd(2500, 4500), 0.006, -0.5);
+      // 飞行
+      setTimeout(() => {
+        whoosh(0, { f0: 350, f1: 1500, q: 0.9, dur: 0.34, vol: 0.55, peak: 0.28, cut: true, pan: -0.6, pan1: 0.5 });
+        for (let i = 0; i < 6; i++) click(0.03 + i * 0.05, 0.1, rnd(2200, 4800), 0.006, -0.4 + i * 0.15);
+        fly(a, b, 90, 340, (x, y) => {
+          addP({ x, y, shape: 'flame', size: 16, decay: 0.2, color: '#fb923c' });
+          burst(5, () => ({ x: x + rnd(-6, 6), y: y + rnd(-6, 6), vx: rnd(-1, 1), vy: rnd(-1.6, -0.3), drag: 0.94, decay: rnd(0.04, 0.07), size: rnd(6, 11), shape: 'flame', color: pick(['#f97316', '#ef4444', '#fbbf24']) }));
+          for (let j = 0; j < 2; j++) { const an = performance.now() / 45 + j * 3.14; addP({ x: x + Math.cos(an) * 11, y: y + Math.sin(an) * 11, decay: 0.3, size: 2, color: '#fff7d6' }); }
+        }, () => {
+          // 命中
+          click(0, 0.8, 4000); kick(0, { hi: 240, lo: 55, pd: 0.035, dur: 0.26, vol: 0.9, drive: 3 }); crunch(0, { f: 1600, f1: 700, q: 1.2, dur: 0.12, vol: 0.5 });
+          boom(0.005, { f0: 5000, f1: 200, dur: 0.5, vol: 0.5, wet: 0.25 }); whoosh(0.05, { f0: 600, f1: 300, q: 0.8, dur: 0.6, vol: 0.15, peak: 0.05 });
+          for (let i = 0; i < 12; i++) click(rnd(0.06, 0.6), 0.15, rnd(2500, 6000), 0.006, rnd(0.1, 0.8));
+          shake('light'); flash(dummy, 'flash-fire'); flash(dummy, 'flinch');
+          fsLayer(`<div class="fs-anchor" style="left:${b.x}px; top:${b.y}px; width:140px; height:140px; border-radius:50%; background: radial-gradient(circle, #fff 0%, #fdba74 30%, rgba(239,68,68,0.5) 58%, transparent 72%); animation: hit-flash 0.34s ease-out both;"></div>`, 420);
+          burst(2, i => ({ x: b.x, y: b.y, shape: 'ring', size: 1.8 + i, decay: 0.07 - i * 0.02, color: i ? '#f97316' : '#fde68a' }));
+          burst(40, () => { const an = Math.random() * 6.283, s = rnd(2, 8); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s - 1, grav: 0.13, drag: 0.93, decay: rnd(0.025, 0.05), size: rnd(1, 2.2), color: pick(['#fde68a', '#fb923c', '#fff7d6']) }; });
+          burst(10, () => ({ x: b.x + rnd(-14, 14), y: b.y + rnd(-14, 14), vx: rnd(-1, 1), vy: rnd(-2, -0.5), drag: 0.95, decay: rnd(0.03, 0.05), size: rnd(12, 20), shape: 'flame', color: '#f97316' }));
+          burst(9, () => ({ x: b.x + rnd(-24, 24), y: b.y + rnd(-18, 18), vx: rnd(-0.3, 0.3), vy: rnd(-0.9, -0.4), drag: 0.99, decay: 0.011, size: rnd(16, 28), shape: 'smoke', blend: 'source-over', color: 'rgba(40,32,30,0.55)' }));
+          onHit && onHit(b);
+        });
+      }, 240);
+    }
+
+    // 精准流火：通用火焰 + 燃烧挂层
+    function castJingZhunLiuHuo() {
+      lockCards(2900);
+      fireTag(b => {
+        floatText(dummy, '30 · 穿透', '#fdba74', 26);
+        const burn = setInterval(() => { const t = ctr(dummy); burst(3, () => ({ x: t.x + rnd(-28, 28), y: t.y + rnd(0, 60), vx: rnd(-0.3, 0.3), vy: rnd(-2.2, -1), drag: 0.97, decay: rnd(0.04, 0.06), size: rnd(6, 11), shape: 'flame', color: pick(['#f97316', '#ef4444']) })); }, 60);
+        setTimeout(() => { floatText(dummy, '燃烧 · 10', '#f87171', 20, 20); flash(dummy, 'flash-fire'); for (let i = 0; i < 6; i++) click(i * 0.05, 0.14, rnd(2000, 4500), 0.006, 0.5); whoosh(0, { f0: 500, f1: 900, q: 1, dur: 0.4, vol: 0.18, peak: 0.1, pan: 0.5 }); }, 1100);
+        setTimeout(() => clearInterval(burn), 2300);
+      });
+    }
+
+    // ========================================================
+    // ② 迅捷愈合法：安卡降临 → 碎光渗入 → 钟表指针环转一圈（再动）
+    // ========================================================
+    function castXunJieYuHe() {
+      lockCards(1700); showBanner('SWIFT MENDING', '迅捷愈合法');
+      const tg = heroes[2], c = ctr(tg);
+      chime(0, 1568, 1.1, 0.12, -0.2); chime(0.07, 2093, 0.9, 0.07, 0.2);
+      fsLayer(`<div class="fs-anchor" style="left:${c.x}px; top:${c.top + 10}px; width:70px; height:100px; animation: ankh-drop 0.6s cubic-bezier(0.2,0.9,0.3,1) both; filter: drop-shadow(0 0 10px #fde68a) drop-shadow(0 0 22px #34d399);">
+        <svg viewBox="-30 -50 60 100" style="width:100%;height:100%"><g fill="none" stroke="#fff4c2" stroke-width="7" stroke-linecap="round"><ellipse cx="0" cy="-26" rx="13" ry="18"/><line x1="-24" y1="-4" x2="24" y2="-4"/><line x1="0" y1="-6" x2="0" y2="44"/></g>
+        <g fill="none" stroke="#d4af37" stroke-width="2"><ellipse cx="0" cy="-26" rx="13" ry="18"/><line x1="-24" y1="-4" x2="24" y2="-4"/><line x1="0" y1="-6" x2="0" y2="44"/></g></svg></div>`, 700);
+      setTimeout(() => {
+        burst(40, () => { const an = Math.random() * 6.283, d = rnd(50, 90); return { x: c.x + Math.cos(an) * d, y: c.top + 40 + Math.sin(an) * d * 0.6, vx: -Math.cos(an) * d / 14, vy: -Math.sin(an) * d * 0.6 / 14 + 0.6, drag: 0.92, decay: 0.035, size: rnd(1.4, 2.6), color: pick(['#fde68a', '#6ee7b7', '#a7f3d0']) }; });
+        burst(6, () => ({ x: c.x + rnd(-30, 30), y: c.top + rnd(20, 60), vx: rnd(-0.6, 0.6), vy: rnd(-1.6, -0.6), decay: 0.025, size: rnd(5, 8), shape: 'ankh', color: '#fde68a' }));
+        flash(tg, 'flash-heal'); floatText(tg, '+30', '#6ee7b7', 28);
+        [523, 659, 784, 1047].forEach((f, i) => tone(i * 0.05, { type: 'triangle', f0: f, dur: 0.9, vol: 0.07, wet: 0.6, peak: 0.02 }));
+      }, 420);
+      setTimeout(() => {
+        fsLayer(`<div class="fs-anchor" style="left:${c.x}px; top:${c.y}px; width:150px; height:150px; animation: clock-life 0.8s ease-out both; filter: drop-shadow(0 0 8px #fbbf24);">
+          <svg viewBox="-75 -75 150 150" style="width:100%;height:100%;overflow:visible">
+            <circle r="66" fill="none" stroke="#e9c46a" stroke-width="2"/><circle r="58" fill="none" stroke="#e9c46a" stroke-width="0.8" stroke-dasharray="2 4"/>
+            ${Array.from({ length: 12 }, (_, i) => `<text x="0" y="-48" font-family="Cinzel" font-size="9" fill="#fde68a" text-anchor="middle" transform="rotate(${i * 30})">${['XII', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'][i]}</text>`).join('')}
+            <g style="animation: hand-spin 0.45s cubic-bezier(0.5,0,0.3,1) both"><line x1="0" y1="8" x2="0" y2="-60" stroke="#fff4c2" stroke-width="3" stroke-linecap="round"/><circle r="5" fill="#d4af37"/></g>
+          </svg></div>`, 850);
+        for (let i = 0; i < 6; i++) tick(i * 0.065, 0.3 + i * 0.03, (i % 2 ? 0.2 : -0.2));
+        chime(0.46, 2637, 0.8, 0.09);
+        setTimeout(() => floatText(tg, '再动 +1', '#fde68a', 22, -24), 450);
+      }, 780);
+    }
+
+    // ========================================================
+    // ③ 折影步（通用反应）：冷色时停 → 本体错身 → 三道靛影碎裂 → 落位涟漪
+    // ========================================================
+    function castZheYingBu() {
+      lockCards(1900); showBanner('REFRACTED STEP', '折影步');
+      const h = mainHero, r = h.getBoundingClientRect(), c = ctr(h);
+      whoosh(0, { type: 'highpass', f0: 6000, f1: 700, q: 0.7, dur: 0.18, vol: 0.45, peak: 0.17, cut: true }); kick(0.16, { hi: 70, lo: 40, pd: 0.06, dur: 0.3, vol: 0.4, drive: 2 }); tone(0.16, { f0: 220, f1: 110, dur: 0.45, vol: 0.1, wet: 0.6 });
+      flash(h, 'flash-cold');
+      fsLayer(`<div class="absolute" style="position:absolute;inset:0;background:radial-gradient(circle at ${c.x}px ${c.y}px, rgba(99,102,241,0.0) 0%, rgba(30,27,75,0.35) 60%); animation: tint 0.9s ease both;"></div>
+        <div class="fs-anchor" style="left:${c.x}px; top:${c.y}px; width:180px; height:180px; border-radius:50%; border:2px solid #a5b4fc; box-shadow:0 0 20px #6366f1; animation: ripple 0.4s ease-out both;"></div>`, 950);
+      setTimeout(() => {
+        const ghosts = [0, 1, 2].map(i => `<div style="position:absolute; left:${r.left + i * 10}px; top:${r.top}px; width:${r.width}px; height:${r.height}px; opacity:${0.75 - i * 0.18}; filter: grayscale(1) brightness(1.4) sepia(1) hue-rotate(200deg) saturate(4) drop-shadow(0 0 10px #6366f1); animation: ghost-shatter 0.32s ${0.18 + i * 0.12}s ease-in both;">${mainHero.innerHTML.replace(/ id="[^"]*"/g, "")}</div>`).join('');
+        fsLayer(ghosts, 900);
+        h.style.transition = 'transform 0.12s cubic-bezier(0.2,0.9,0.3,1)'; h.style.transform = 'translateX(-90px) skewX(10deg)';
+        setTimeout(() => { h.style.transform = 'translateX(-90px)'; }, 120);
+        whoosh(0, { type: 'highpass', f0: 5000, f1: 2500, q: 0.8, dur: 0.14, vol: 0.45, peak: 0.03, pan: 0.2, pan1: -0.4 });
+        [0, 1, 2].forEach(i => setTimeout(() => {
+          const gx = r.left + r.width / 2 + i * 10, gy = r.top + r.height / 2;
+          burst(14, () => ({ x: gx + rnd(-30, 30), y: gy + rnd(-60, 60), vx: rnd(-2.5, 2.5), vy: rnd(-2, 1.5), grav: 0.06, drag: 0.96, rot: rnd(0, 6), vr: rnd(-0.2, 0.2), decay: rnd(0.025, 0.04), size: rnd(4, 8), shape: 'shard', color: '#a5b4fc', fill: 'rgba(99,102,241,0.35)' }));
+          whoosh(0, { type: 'highpass', f0: 4500, f1: 2000, q: 0.8, dur: 0.1, vol: 0.3, peak: 0.02, pan: 0.1 * i });
+          for (let k = 0; k < 4; k++) crystal(k * 0.025, rnd(3000, 6000), 0.05, rnd(-0.3, 0.3));
+        }, 180 + i * 120));
+        setTimeout(() => {
+          const nc = ctr(h);
+          fsLayer(`<div class="fs-anchor" style="left:${nc.x}px; top:${nc.bottom - 8}px; width:160px; height:40px; border-radius:50%; border:2px solid #c7d2fe; box-shadow:0 0 16px #818cf8; animation: ripple 0.6s ease-out both;"></div>`, 700);
+          tone(0, { f0: 880, dur: 0.5, vol: 0.06, wet: 0.7 }); floatText(h, 'MISS', '#c7d2fe', 26);
+        }, 280);
+        setTimeout(() => { h.style.transition = 'transform 0.45s cubic-bezier(0.3,0.7,0.3,1)'; h.style.transform = ''; }, 1300);
+      }, 160);
+    }
+
+    // ========================================================
+    // 通用：敌方单体法术弹（以后敌方单体法术攻击可直接复用）——紫色魔弹从敌方飞向目标，命中回调 onHit
+    // ========================================================
+    function enemySpellBolt(from, toEl, onHit) {
+      const t = ctr(from), h = ctr(toEl); const a = { x: t.x - 20, y: t.y - 10 }, b = { x: h.x, y: h.top + 30 };
+      whoosh(0, { f0: 300, f1: 900, q: 1.4, dur: 0.48, vol: 0.32, peak: 0.4, pan: 0.6, pan1: -0.3 }); tone(0, { type: 'triangle', f0: 110, f1: 90, dur: 0.48, vol: 0.08 });
+      fly(a, b, 30, 480, (x, y) => {
+        addP({ x, y, size: 9, decay: 0.22, color: '#c084fc' }); addP({ x, y, size: 4, decay: 0.3, color: '#fff' });
+        burst(3, () => ({ x: x + rnd(-5, 5), y: y + rnd(-5, 5), vx: rnd(0.5, 1.5), vy: rnd(-0.5, 0.5), drag: 0.94, decay: 0.06, size: rnd(1.5, 3), color: pick(['#7c3aed', '#a855f7']) }));
+      }, () => {
+        click(0, 0.6, 3500); kick(0, { hi: 180, lo: 55, pd: 0.03, dur: 0.25, vol: 0.7, drive: 3 }); boom(0, { f0: 3000, f1: 200, dur: 0.4, vol: 0.35, wet: 0.3 });
+        burst(24, () => { const an = Math.random() * 6.283, s = rnd(1.5, 5); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.93, decay: 0.04, size: rnd(1, 2.4), color: pick(['#e9d5ff', '#c084fc', '#7c3aed']) }; });
+        onHit && onHit(b);
+      }, k => k);
+    }
+    function castEnemyBolt() { lockCards(900); enemySpellBolt(dummy, mainHero, () => { shake('light'); flash(mainHero, 'flash-cold'); flash(mainHero, 'flinch'); floatText(mainHero, '-48', '#f87171', 26); }); }
+
+    // —— 主工程默认受击特效（原样复刻 index.html playSVGEffect 的 'slash' / 'gunshot'）
+    function engineFx(x, y, type) {
+      const w = document.createElement('div'); w.style.cssText = `position:fixed; left:${x}px; top:${y}px; z-index:95; pointer-events:none;`; let html = '', dur = 500;
+      if (type === 'slash') {
+        w.className = 'anim-slash'; dur = 400;
+        html = `<svg class="absolute" style="width: 100px; height: 100px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><path d="M10,90 L90,10" stroke="#f43f5e" stroke-width="6" stroke-linecap="round" fill="none" filter="url(#bloom-red)" /><path d="M20,90 L95,15" stroke="#ffffff" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.8" /></svg>`;
+      } else {
+        w.style.width = '140px'; w.style.height = '140px'; w.style.transform = 'translate(-50%, -50%)'; dur = 650; const gid = 'std-gun-grad-' + Date.now();
+        html = `<svg viewBox="0 0 100 100" class="absolute inset-0 w-full h-full" style="animation: gunshot-shock-ring 0.28s cubic-bezier(0.1,0.8,0.2,1) both; filter: drop-shadow(0 0 8px #f59e0b);"><circle cx="50" cy="50" r="22" stroke="#fef08a" stroke-width="3" fill="none" /><circle cx="50" cy="50" r="16" stroke="#f97316" stroke-width="2" fill="none" stroke-dasharray="4 3" opacity="0.8"/></svg>
+          <div class="absolute inset-0 flex items-center justify-center">${[0, 60, 120, 180, 240, 300].map(deg => `<div class="absolute w-1.5 h-8 bg-gradient-to-t from-transparent via-amber-300 to-white rounded-full opacity-0" style="--ray-rot:${deg}deg; animation: gunshot-spark-ray 0.26s cubic-bezier(0.15,0.85,0.35,1) both; filter: drop-shadow(0 0 6px #f59e0b);"></div>`).join('')}</div>
+          <div class="absolute left-1/2 top-1/2 w-full h-full pointer-events-none" style="animation: gunshot-core-flash 0.32s cubic-bezier(0.12,0.9,0.25,1) both;"><svg viewBox="0 0 100 100" class="w-full h-full" style="filter: drop-shadow(0 0 15px #f59e0b) drop-shadow(0 0 25px #ea580c);"><defs><radialGradient id="${gid}" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#ffffff" /><stop offset="35%" stop-color="#fef08a" /><stop offset="70%" stop-color="#f97316" /><stop offset="100%" stop-color="#dc2626" stop-opacity="0" /></radialGradient></defs><polygon points="50,15 56,40 85,50 56,60 50,85 44,60 15,50 44,40" fill="url(#${gid})" /><circle cx="50" cy="50" r="14" fill="#ffffff" /><circle cx="50" cy="50" r="22" fill="#fde047" opacity="0.6" /></svg></div>`;
+      }
+      w.innerHTML = html; document.body.appendChild(w); setTimeout(() => w.remove(), dur);
+    }
+
+    // ========================================================
+    // ④ 巫师护盾：近乎全透明的折射屏障，演示挡下主工程默认「刀光」与「枪击」
+    // ========================================================
+    function castWuShiHuDun() {
+      lockCards(2900); showBanner("WIZARD'S AEGIS", '巫师护盾');
+      const h = ctr(mainHero), sx = h.x, sy = h.top - 22, W = h.w + 50, H = 76, LIFE = 2700;
+      tone(0, { f0: 180, f1: 90, dur: 0.26, vol: 0.32 }); whoosh(0, { f0: 1200, f1: 300, q: 1, dur: 0.22, vol: 0.2, peak: 0.03 }); tone(0.02, { f0: 1320, dur: 0.6, vol: 0.03, wet: 0.7 });
+      const layer = fsLayer(`<div class="fs-anchor" style="left:${sx}px; top:${sy}px; width:${W}px; height:${H}px; animation: shield-life ${LIFE}ms ease both;">
+          <div style="position:absolute; inset:0; border-radius:50%; backdrop-filter: blur(1.6px) brightness(1.12) saturate(1.3); -webkit-backdrop-filter: blur(1.6px) brightness(1.12); background: radial-gradient(ellipse at 50% 30%, rgba(255,255,255,0.05), rgba(255,255,255,0.01) 60%);"></div>
+          <svg class="shv" viewBox="0 0 ${W} ${H}" style="position:absolute; inset:0; width:100%; height:100%; overflow:visible">
+            <defs><clipPath id="shc"><ellipse cx="${W / 2}" cy="${H / 2}" rx="${W / 2}" ry="${H / 2}"/></clipPath></defs>
+            <ellipse cx="${W / 2}" cy="${H / 2}" rx="${W / 2 - 1}" ry="${H / 2 - 1}" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+            <path d="M${W * 0.14},${H * 0.28} Q${W * 0.5},${H * -0.02} ${W * 0.86},${H * 0.28}" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.4" stroke-linecap="round"/>
+          </svg></div>`, LIFE + 50);
+      setTimeout(() => floatText(mainHero, '护盾 180', '#bae6fd', 22), 150);
+      // 受击：显形 + 涟漪（插进同一面盾，可连续多次）
+      const hitShield = (ix, iy, rings) => {
+        const svg = layer.querySelector('.shv'); const g = document.createElementNS('http://www.w3.org/2000/svg', 'g'); g.setAttribute('clip-path', 'url(#shc)'); g.style.cssText = 'opacity:0; animation: shield-reveal 0.6s ease-out both;';
+        g.innerHTML = `<ellipse cx="${W / 2}" cy="${H / 2}" rx="${W / 2}" ry="${H / 2}" fill="rgba(186,230,253,0.16)" stroke="#e0f2fe" stroke-width="2"/>` + rings.map(dl => `<circle cx="${ix}" cy="${iy}" r="4" fill="none" stroke="#fff" style="animation: ring-out 0.6s ${dl}s ease-out both;"/>`).join('');
+        svg.appendChild(g); setTimeout(() => g.remove(), 900);
+      };
+      // ① 刀光：斜劈在盾面被弹开——金属擦刮 + 火花沿刀路甩出
+      setTimeout(() => {
+        engineFx(sx - 10, sy - 6, 'slash'); hitShield(W * 0.42, H * 0.3, [0, 0.07, 0.14]);
+        whoosh(0, { type: 'highpass', f0: 6000, f1: 2000, q: 0.8, dur: 0.12, vol: 0.45, peak: 0.02, pan: 0.3, pan1: -0.3 }); click(0.03, 0.7, 4000);
+        kick(0.03, { hi: 160, lo: 70, pd: 0.03, dur: 0.18, vol: 0.55, drive: 3 }); [2600, 3900].forEach((f, i) => crystal(0.03 + i * 0.015, f, 0.08)); tone(0.04, { f0: 1760, dur: 1.0, vol: 0.045, wet: 0.8 });
+        shake('light'); floatText(mainHero, '吸收 62', '#e0f2fe', 20, -26);
+        burst(22, () => { const an = rnd(-2.6, -1.7), s = rnd(3, 8); return { x: sx - 10, y: sy - 18, vx: Math.cos(an) * s, vy: Math.sin(an) * s, grav: 0.15, drag: 0.94, decay: 0.045, size: rnd(1, 2), color: pick(['#ffffff', '#fecdd3', '#e0f2fe']) }; });
+      }, 450);
+      // ② 枪击：弹头撞盾——尖锐晶振 + 盾面小而密的涟漪，弹头压扁火星四溅
+      setTimeout(() => {
+        engineFx(sx + 18, sy - 10, 'gunshot'); hitShield(W * 0.6, H * 0.22, [0, 0.05, 0.1, 0.15]);
+        click(0, 0.9, 5000, 0.01); kick(0, { hi: 260, lo: 90, pd: 0.02, dur: 0.14, vol: 0.6, drive: 4 }); [3300, 4700, 6200].forEach((f, i) => crystal(i * 0.01, f, 0.07, 0.2));
+        tone(0.01, { f0: 2637, dur: 0.9, vol: 0.04, wet: 0.8, detune: 7 }); whoosh(0.01, { type: 'highpass', f0: 4000, dur: 0.3, vol: 0.1, peak: 0.01 });
+        shake('light'); floatText(mainHero, '吸收 45', '#e0f2fe', 20, -26);
+        burst(18, () => { const an = -1.57 + rnd(-1.2, 1.2), s = rnd(2, 6); return { x: sx + 18, y: sy - 18, vx: Math.cos(an) * s, vy: Math.sin(an) * s, grav: 0.12, drag: 0.93, decay: 0.05, size: rnd(1, 2), color: pick(['#fef08a', '#ffffff', '#fdba74']) }; });
+      }, 1350);
+    }
+
+    // ========================================================
+    // ⑤ 双莲祛煞（反应）：煞气来袭 → 双蓝睡莲绽放 → 光幕吞煞 → 净化升腾
+    // ========================================================
+    function castShuangLian() {
+      lockCards(2300);
+      const h = ctr(mainHero), t = ctr(dummy); const a = { x: t.x - 20, y: t.y - 20 }, b = { x: h.x, y: h.top - 30 };
+      whoosh(0, { f0: 200, f1: 500, q: 2, dur: 0.56, vol: 0.32, peak: 0.45, pan: 0.6, pan1: -0.3 }); boom(0, { f0: 600, f1: 200, dur: 0.56, vol: 0.22, peak: 0.4 });
+      fly(a, b, 50, 560, (x, y) => {
+        addP({ x, y, size: 22, decay: 0.12, shape: 'smoke', blend: 'source-over', color: 'rgba(10,5,20,0.9)' });
+        addP({ x, y, size: 5, decay: 0.3, color: '#7c3aed' });
+        burst(2, () => ({ x: x + rnd(-8, 8), y: y + rnd(-8, 8), vx: rnd(0.4, 1.4), vy: rnd(-0.6, 0.2), drag: 0.97, decay: 0.03, size: rnd(10, 16), shape: 'smoke', blend: 'source-over', color: 'rgba(30,10,40,0.6)' }));
+      }, null, k => k);
+      setTimeout(() => {
+        showBanner('TWIN LOTUS WARD', '双莲祛煞');
+        harp(0, 392, 0.2, -0.4); harp(0.04, 587, 0.12, -0.4); harp(0.12, 523, 0.2, 0.4); harp(0.16, 784, 0.12, 0.4);
+        const lotus = (x, dl) => `<div style="position:absolute; left:${x - 40}px; top:${h.top - 40}px; width:80px; height:56px; transform-origin:50% 90%; animation: lotus-bloom 0.35s ${dl}s cubic-bezier(0.2,0.9,0.3,1.3) both; filter: drop-shadow(0 0 12px #60a5fa);">
+          <svg viewBox="-40 -50 80 56" style="width:100%;height:100%;overflow:visible">
+            ${[-60, -32, 0, 32, 60].map((d, i) => `<path d="M0,0 C-9,-12 -8,-30 0,-${i === 2 ? 46 : 36} C8,-30 9,-12 0,0 Z" transform="rotate(${d})" fill="${i % 2 ? '#93c5fd' : '#3b82f6'}" stroke="#e0f2fe" stroke-width="1"/>`).join('')}
+            <ellipse cx="0" cy="0" rx="22" ry="5" fill="#1e3a8a" stroke="#d4af37" stroke-width="1"/><circle cx="0" cy="-6" r="4" fill="#fde68a"/></svg></div>`;
+        fsLayer(`${lotus(h.x - h.w / 2, 0)}${lotus(h.x + h.w / 2, 0.12)}
+          <div style="position:absolute; left:${h.x}px; top:${h.top - 150}px; width:${h.w}px; height:150px; transform-origin:50% 100%; background: linear-gradient(90deg, transparent, rgba(147,197,253,0.35) 20%, rgba(255,255,255,0.7) 50%, rgba(147,197,253,0.35) 80%, transparent); filter: blur(1px); animation: curtain 1.3s 0.18s ease both;"></div>`, 1700);
+      }, 180);
+      setTimeout(() => {
+        whoosh(0, { type: 'lowpass', f0: 2000, f1: 150, q: 1, dur: 0.32, vol: 0.5, peak: 0.02 }); kick(0, { hi: 90, lo: 40, pd: 0.06, dur: 0.3, vol: 0.55, drive: 2 });
+        burst(16, () => ({ x: b.x + rnd(-20, 20), y: b.y + rnd(-20, 20), vx: rnd(-1, 1), vy: rnd(-1, 1), drag: 0.9, decay: 0.05, size: rnd(14, 20), shape: 'smoke', blend: 'source-over', color: 'rgba(20,8,30,0.6)' }));
+        floatText(mainHero, '免伤 120', '#bfdbfe', 24);
+        setTimeout(() => {
+          choir(0, [523, 659, 784], 1.3, 0.06, 0.35);
+          burst(40, () => ({ x: h.x + rnd(-60, 60), y: h.y + rnd(-30, 60), vx: rnd(-0.3, 0.3), vy: rnd(-2.4, -0.8), drag: 0.98, decay: rnd(0.012, 0.02), size: rnd(1.4, 2.6), color: pick(['#ffffff', '#dbeafe', '#fde68a']) }));
+          burst(6, () => ({ x: h.x + rnd(-50, 50), y: h.bottom - 30, vx: rnd(-0.5, 0.5), vy: rnd(-1.4, -0.6), rot: rnd(-0.5, 0.5), decay: 0.015, size: rnd(6, 9), shape: 'lotus', color: '#93c5fd' }));
+        }, 120);
+      }, 560);
+    }
+
+    // ========================================================
+    // ⑥ 灵风术（L3）：赫尔墨斯风玫瑰阵 + 羽毛绕场（1.0s）→ 全屏疾风旋涡 → 翼纹加身
+    // ========================================================
+    const CHARGE_LF = 1000;
+    function castLingFeng() {
+      lockCards(CHARGE_LF + 1700); showBanner('ZEPHYR OF HERMES', '灵风术'); darken(0.75);
+      const h = mainHero, c = ctr(h), vmax = Math.max(innerWidth, innerHeight), S = vmax * 0.55;
+      const end = CHARGE_LF / 1000 - 0.1, wob = []; for (let i = 1; i <= 40; i++) { const k = i / 40; wob.push([end * k, 400 + k * 2000 + Math.sin(k * k * 24) * 380]); }
+      whoosh(0, { f0: 400, q: 2.6, dur: end, vol: 0.5, peak: end * 0.95, cut: true, wob, pan: -0.5, pan1: 0.5 });
+      tone(0, { f0: 700, f1: 2200, dur: end, vol: 0.035, peak: end * 0.9, cut: true, wet: 0.4 });
+      whoosh(0.2, { type: 'highpass', f0: 4000, f1: 7000, q: 0.7, dur: end - 0.2, vol: 0.1, peak: end - 0.25, cut: true });
+      const winds = ['BOREAS', 'EURUS', 'NOTUS', 'ZEPHYRUS'];
+      const rose = fsLayer(`<div style="position:absolute; inset:0; perspective:900px;">
+        <div class="fs-anchor" style="left:${c.x}px; top:${c.bottom - 6}px; width:${S}px; height:${S}px; animation: rose-in ${CHARGE_LF}ms cubic-bezier(0.2,0.8,0.2,1) both; filter: drop-shadow(0 0 12px rgba(52,211,153,0.8));">
+          <svg viewBox="-500 -500 1000 1000" style="width:100%;height:100%">
+            <circle r="480" fill="none" stroke="#d4af37" stroke-width="4"/><circle r="440" fill="none" stroke="#6ee7b7" stroke-width="2" stroke-dasharray="4 14"/><circle r="300" fill="none" stroke="#d4af37" stroke-width="2"/>
+            ${Array.from({ length: 72 }, (_, i) => `<line x1="0" y1="-480" x2="0" y2="${i % 6 ? -462 : -440}" stroke="#d4af37" stroke-width="2" transform="rotate(${i * 5})"/>`).join('')}
+            ${winds.map((w, i) => `<text x="0" y="-360" font-family="Cinzel" font-size="44" fill="#fde68a" text-anchor="middle" transform="rotate(${i * 90})">${w}</text>`).join('')}
+            ${[0, 45, 90, 135, 180, 225, 270, 315].map((d, i) => `<path d="M0,0 L${i % 2 ? 26 : 40},-${i % 2 ? 60 : 90} L0,-${i % 2 ? 210 : 290} L-${i % 2 ? 26 : 40},-${i % 2 ? 60 : 90} Z" fill="${i % 2 ? 'rgba(110,231,183,0.35)' : 'rgba(212,175,55,0.4)'}" stroke="#fde68a" stroke-width="2" transform="rotate(${d})"/>`).join('')}
+            <circle r="38" fill="none" stroke="#fde68a" stroke-width="3"/><circle r="10" fill="#fff4c2"/>
+          </svg></div></div>`, CHARGE_LF + 600);
+      orbitCharge({ x: c.x, y: c.y }, 70, CHARGE_LF, o => ({ size: 6 + o.k * 5, shape: 'feather', rot: o.a + 1.57, color: o.k < 0.5 ? '#fef3c7' : '#a7f3d0' }), vmax * 0.5, vmax * 0.3);
+      const rumble = setInterval(() => shake('light'), 320);
+      setTimeout(() => { clearInterval(rumble); rose.querySelector('.fs-anchor').style.animation = 'rose-out 0.5s ease-out both'; lingfengRelease(h); }, CHARGE_LF);
+    }
+    function lingfengRelease(h) {
+      const c = ctr(h);
+      whoosh(0, { f0: 200, f1: 1500, q: 0.6, dur: 1.4, vol: 0.8, peak: 0.1, wet: 0.3, pan: -0.8, pan1: 0.8 });
+      whoosh(0, { type: 'highpass', f0: 3000, f1: 8000, q: 0.7, dur: 0.8, vol: 0.25, peak: 0.05 });
+      kick(0, { hi: 150, lo: 50, pd: 0.05, dur: 0.4, vol: 0.7, drive: 2 }); cry(0.06, 0.13);
+      shake('heavy'); flash(h, 'flash-heal');
+      const streaks = Array.from({ length: 14 }, (_, i) => `<div style="position:absolute; left:0; top:${rnd(5, 95)}%; width:40vw; height:${rnd(2, 5)}px; background: linear-gradient(90deg, transparent, rgba(167,243,208,0.8), #fffbe8, transparent); filter: drop-shadow(0 0 8px #34d399); animation: streak ${rnd(0.45, 0.8)}s ${rnd(0, 0.45)}s cubic-bezier(0.2,0.7,0.3,1) both;"></div>`).join('');
+      const tw = [0, 1, 2, 3].map(i => `<div class="fs-anchor" style="left:${c.x}px; top:${c.y + 40 - i * 46}px; width:${140 + i * 70}px; height:${36 + i * 14}px; border-radius:50%; border:3px solid ${i % 2 ? '#a7f3d0' : '#fde68a'}; box-shadow:0 0 18px #10b981; animation: twister 1.1s ${i * 0.05}s cubic-bezier(0.2,0.8,0.3,1) both;"></div>`).join('');
+      fsLayer(`<div style="position:absolute;inset:0;background:radial-gradient(circle at ${c.x}px ${c.y}px, rgba(255,251,232,0.9), rgba(52,211,153,0.35) 35%, transparent 70%); animation: fs-flash 0.5s ease-out both;"></div>${streaks}${tw}`, 1400);
+      burst(90, () => { const an = Math.random() * 6.283, s = rnd(5, 16); return { x: c.x, y: c.y, vx: Math.cos(an) * s + 4, vy: Math.sin(an) * s * 0.6, drag: 0.965, decay: rnd(0.008, 0.016), size: rnd(6, 11), shape: 'feather', rot: an, vr: rnd(-0.15, 0.15), color: pick(['#fef3c7', '#a7f3d0', '#fde68a', '#ffffff']) }; });
+      const gust = setInterval(() => burst(6, () => ({ x: -20, y: rnd(0, innerHeight), vx: rnd(14, 24), vy: rnd(-1, 1), drag: 1, decay: 0.014, size: rnd(5, 9), shape: 'feather', rot: 0, vr: rnd(-0.1, 0.1), color: pick(['#fef3c7', '#a7f3d0']) })), 45);
+      setTimeout(() => clearInterval(gust), 700);
+      setTimeout(() => {
+        // 白色半透明天使双翼：三层羽列由根部向上外侧展开，轻扇两下后上浮淡出
+        const feather = (rx, ry, rot, L, wd, op) => `<path d="M0,0 Q${wd},${-L * 0.55} 0,${-L} Q${-wd},${-L * 0.55} 0,0 Z" transform="translate(${rx},${ry}) rotate(${rot})" fill="rgba(255,255,255,${op})" stroke="rgba(255,255,255,0.85)" stroke-width="1"/>`;
+        const side = [[0, 11, 135, 13, 0.22], [1, 9, 95, 12, 0.3], [2, 7, 60, 10, 0.42]].map(([row, n, Lmax, wd, op]) => Array.from({ length: n }, (_, i) => { const k = i / (n - 1); return feather(12 + k * (30 - row * 6), -row * 6 - k * 14, 8 + k * 72, Lmax * (1 - k * 0.38), wd, op); }).join('')).join('');
+        fsLayer(`<div class="fs-anchor" style="left:${c.x}px; top:${c.y - 6}px; width:330px; height:200px; animation: wing-glyph 1.7s ease both; filter: drop-shadow(0 0 10px rgba(255,255,255,0.9)) drop-shadow(0 0 22px rgba(186,230,253,0.6));">
+          <svg viewBox="-165 -150 330 200" style="width:100%;height:100%;overflow:visible">${[-1, 1].map(s => `<g transform="scale(${s},1)"><g style="transform-origin: 12px 0px; animation: angel-flap 0.8s 0.1s ease-in-out 2 both;">${side}</g></g>`).join('')}</svg></div>`, 1750);
+        floatText(h, '闪避+50 · 速度+30 · 10回合', '#a7f3d0', 20);
+        whoosh(0, { type: 'highpass', f0: 4000, dur: 1.0, vol: 0.08, peak: 0.3 }); for (let i = 0; i < 6; i++) click(rnd(0, 0.8), 0.06, rnd(3000, 6000), 0.01, rnd(-0.6, 0.6));
+        darken(0);
+      }, 350);
+    }
+
+    // ========================================================
+    // ⑦ 纳克提特障壁术（L3）：游离几何 + 逐笔绘成的符文环（1.2s，末 150ms 静默）→ 蜂窝晶格穹顶嵌合 → 符文流光 → 淡出
+    // ========================================================
+    const CHARGE_NK = 1200;
+    function castNakTith() {
+      lockCards(CHARGE_NK + 2600); showBanner('NAK-TITH BARRIER', '纳克提特障壁术'); darken(0.85);
+      const pc = party(), cx = pc.x, cy = pc.y - 20, vmax = Math.max(innerWidth, innerHeight), R = Math.min(vmax * 0.36, innerHeight * 0.55);
+      const end = CHARGE_NK / 1000 - 0.15;
+      drone(0, { f0: 66, f1: 99, lp0: 160, lp1: 1000, dur: end, vol: 0.07 });
+      tone(0, { f0: 264, dur: end, vol: 0.09, peak: end * 0.95, cut: true, wet: 0.5 });
+      whoosh(end - 0.5, { type: 'highpass', f0: 2000, f1: 9000, q: 0.7, dur: 0.5, vol: 0.18, peak: 0.48, cut: true });
+      [0, 0.22, 0.4, 0.55, 0.67, 0.77, 0.85, 0.92, 0.98].forEach((d, i) => d < end - 0.02 && crystal(d, 1056 + i * 264, 0.05 + i * 0.008, rnd(-0.6, 0.6)));
+      // 符文环：直线与圆弧拼成的抽象符号，逐笔 draw-on
+      let seed = 7; const sr = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+      const glyph = (i) => { const p = []; const n = 2 + Math.floor(sr() * 3); for (let k = 0; k < n; k++) { const tp = sr(); if (tp < 0.4) p.push(`M${-12 + sr() * 24},${-14 + sr() * 8} L${-12 + sr() * 24},${4 + sr() * 10}`); else if (tp < 0.75) p.push(`M-11,${-6 + sr() * 12} A11,11 0 0 ${sr() < 0.5 ? 1 : 0} 11,${-6 + sr() * 12}`); else p.push(`M-10,-10 L10,10 M10,-10 L-10,10`); } return p.join(' '); };
+      const G = 16, glyphs = Array.from({ length: G }, (_, i) => `<g transform="rotate(${i * 360 / G}) translate(0,-410)"><path d="${glyph(i)}" pathLength="1" class="grow" fill="none" stroke="#f8fafc" stroke-width="3" stroke-linecap="round" style="animation: draw-on 0.3s ${0.15 + i * 0.045}s ease-out forwards"/><circle cx="0" cy="22" r="3" fill="#bae6fd" style="opacity:0; animation: fade-life 1s ${0.2 + i * 0.045}s both"/></g>`).join('');
+      const lines = Array.from({ length: 34 }, () => { const sx = rnd(-0.5, 0.5) * innerWidth * 1.2, sy = rnd(-0.5, 0.5) * innerHeight * 1.2, L = rnd(30, 110); return `<div style="position:absolute; left:${cx}px; top:${cy}px; width:${L}px; height:1.5px; background: linear-gradient(90deg, transparent, #f8fafc, #7dd3fc, transparent); --sx:${sx}px; --sy:${sy}px; --r0:${rnd(0, 360)}deg; animation: converge ${CHARGE_NK}ms ${rnd(0, 200)}ms cubic-bezier(0.5,0,0.8,0.6) both;"></div>`; }).join('');
+      const grid = Array.from({ length: 60 }, () => `<circle cx="${rnd(-480, 480)}" cy="${rnd(-480, 480)}" r="1.6" fill="#e0f2fe" style="opacity:0; animation: fade-life ${CHARGE_NK}ms ${rnd(0, 300)}ms both"/>`).join('');
+      const formation = fsLayer(`${lines}
+        <div class="fs-anchor" style="left:${cx}px; top:${cy}px; width:${R * 2.3}px; height:${R * 2.3}px; filter: drop-shadow(0 0 10px rgba(255,255,255,0.8)) drop-shadow(0 0 20px rgba(125,211,252,0.6));">
+          <svg viewBox="-500 -500 1000 1000" style="width:100%;height:100%; animation: slow-rot 14s linear infinite;">
+            ${grid}
+            <circle r="470" pathLength="1" class="grow" fill="none" stroke="#f8fafc" stroke-width="2.5" style="animation: draw-on 0.7s ease-out forwards"/>
+            <circle r="455" fill="none" stroke="#7dd3fc" stroke-width="1" stroke-dasharray="2 10" style="opacity:0; animation: fade-life ${CHARGE_NK}ms 0.2s both"/>
+            <circle r="350" pathLength="1" class="grow" fill="none" stroke="#e0f2fe" stroke-width="1.5" style="animation: draw-on 0.6s 0.25s ease-out forwards"/>
+            ${glyphs}
+            <polygon points="0,-340 294,170 -294,170" pathLength="1" class="grow" fill="none" stroke="#f8fafc" stroke-width="2" style="animation: draw-on 0.5s 0.45s ease-out forwards"/>
+            <polygon points="0,340 294,-170 -294,-170" pathLength="1" class="grow" fill="none" stroke="#bae6fd" stroke-width="2" style="animation: draw-on 0.5s 0.6s ease-out forwards"/>
+            <polygon points="0,-200 173,-100 173,100 0,200 -173,100 -173,-100" pathLength="1" class="grow" fill="none" stroke="#f8fafc" stroke-width="2.5" style="animation: draw-on 0.4s 0.8s ease-out forwards"/>
+            <circle r="40" fill="none" stroke="#fff" stroke-width="3" pathLength="1" class="grow" style="animation: draw-on 0.3s 0.9s ease-out forwards"/>
+          </svg></div>`, CHARGE_NK + 300);
+      orbitCharge({ x: cx, y: cy }, 46, CHARGE_NK, o => ({ size: 5 + o.k * 7, shape: 'shard', rot: o.a * 2, color: o.k < 0.6 ? '#f8fafc' : '#7dd3fc', fill: 'rgba(224,242,254,0.18)' }), vmax * 0.55, vmax * 0.38, 0.85);
+      const rumble = setInterval(() => shake('light'), 300);
+      setTimeout(() => { clearInterval(rumble); formation.style.transition = 'opacity 0.25s'; formation.style.opacity = '0'; nakRelease(pc); }, CHARGE_NK);
+    }
+    function nakRelease(pc) {
+      click(0, 1, 6000, 0.015); kick(0, { hi: 280, lo: 32, pd: 0.08, dur: 1.4, vol: 1.1, drive: 5, wet: 0.15 }); boom(0.005, { f0: 8000, f1: 100, dur: 1.6, vol: 0.7, wet: 0.6 });
+      for (let i = 0; i < 14; i++) crystal(0.03 + i * 0.032, 1600 + i * 180, 0.07, (i % 2 ? 0.5 : -0.5));
+      [[528, 0.12], [1056, 0.06], [1584, 0.04]].forEach(([f, v], i) => tone(0.04 + i * 0.03, { f0: f, dur: 3, vol: v, wet: 0.8, peak: 0.03 }));
+      tone(0.3, { f0: 132, dur: 2.2, vol: 0.1, peak: 0.4 });
+      shake('quake');
+      const W = pc.w + 300, H = pc.h + 200, base = pc.b + 16, Rh = 30, cells = [];
+      for (let row = -1; row * Rh * 1.5 < H + Rh; row++) for (let col = -Math.ceil(W / (Rh * 1.732)); col * Rh * 1.732 < W / 2 + Rh * 2; col++) {
+        const x = col * Rh * 1.732 + (row % 2 ? Rh * 0.866 : 0), y = -row * Rh * 1.5; const e = (x / (W / 2)) ** 2 + (y / H) ** 2; if (e > 1.02 || y > 4) continue;
+        const pts = Array.from({ length: 6 }, (_, k) => { const a = Math.PI / 6 + k * Math.PI / 3; return `${(x + Math.cos(a) * Rh).toFixed(1)},${(y + Math.sin(a) * Rh).toFixed(1)}`; }).join(' ');
+        cells.push(`<polygon points="${pts}" fill="rgba(240,249,255,0.05)" stroke="${Math.random() < 0.15 ? '#7dd3fc' : '#f8fafc'}" stroke-width="1.6" style="opacity:0; animation: hex-light 0.7s ${(Math.sqrt(e) * 0.4).toFixed(2)}s ease-out forwards"/>`);
+      }
+      const dome = `M${-W / 2},0 A${W / 2},${H} 0 0 1 ${W / 2},0 Z`;
+      fsLayer(`<div style="position:absolute;inset:0;background:radial-gradient(circle at ${pc.x}px ${pc.y}px, #ffffff 0%, rgba(224,242,254,0.85) 25%, rgba(125,211,252,0.3) 55%, transparent 80%); animation: fs-flash 0.6s ease-out both;"></div>
+        <div class="fs-anchor" style="left:${pc.x}px; top:${base}px; width:${W * 1.4}px; height:80px; border-radius:50%; border:3px solid #f8fafc; box-shadow:0 0 30px #7dd3fc; animation: shock-ell 0.8s ease-out both;"></div>
+        <div style="position:absolute; left:${pc.x}px; top:${base - H}px; width:${W}px; height:${H + 6}px; transform-origin:50% 100%; animation: dome-in 2.6s cubic-bezier(0.16,1,0.3,1) both; filter: drop-shadow(0 0 12px rgba(255,255,255,0.9)) drop-shadow(0 0 28px rgba(125,211,252,0.6));">
+          <svg viewBox="${-W / 2} ${-H} ${W} ${H + 6}" style="width:100%;height:100%;overflow:visible">
+            <defs><clipPath id="dmc"><path d="${dome}"/></clipPath><radialGradient id="dmg" cx="0" cy="0" r="${H}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#f0f9ff" stop-opacity="0.05"/><stop offset="0.8" stop-color="#e0f2fe" stop-opacity="0.16"/><stop offset="1" stop-color="#ffffff" stop-opacity="0.35"/></radialGradient>
+              <linearGradient id="dms" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.5" stop-color="#fff" stop-opacity="0.75"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+            <path d="${dome}" fill="url(#dmg)"/>
+            <g clip-path="url(#dmc)">${cells.join('')}
+              <rect x="${-W / 2}" y="${-H}" width="${W * 0.25}" height="${H}" fill="url(#dms)" style="animation: sweep 1.1s 0.7s ease-in-out both; transform-box: fill-box;"/>
+              <rect x="${-W / 2}" y="${-H}" width="${W * 0.18}" height="${H}" fill="url(#dms)" style="animation: sweep 1.2s 1.5s ease-in-out both; transform-box: fill-box;"/></g>
+            <path d="${dome}" fill="none" stroke="#ffffff" stroke-width="3"/>
+            <line x1="${-W / 2}" y1="0" x2="${W / 2}" y2="0" stroke="#bae6fd" stroke-width="2"/>
+          </svg></div>`, 2700);
+      burst(5, i => ({ x: pc.x, y: pc.y, shape: 'ring', size: 6 + i * 4, decay: 0.018 - i * 0.002, color: i % 2 ? '#7dd3fc' : '#ffffff' }));
+      burst(60, () => { const an = Math.random() * 6.283, s = rnd(3, 11); return { x: pc.x, y: pc.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.94, rot: an, vr: rnd(-0.2, 0.2), decay: rnd(0.015, 0.03), size: rnd(4, 9), shape: 'shard', color: pick(['#ffffff', '#e0f2fe', '#7dd3fc']), fill: 'rgba(240,249,255,0.3)' }; });
+      setTimeout(() => { floatText(heroes[1], '屏障 200 · 护甲 40', '#e0f2fe', 22, -40); }, 300);
+      setTimeout(() => darken(0), 1800);
+    }
+
+    // ========================================================
+    // ⑧ 伊西斯之拥（L3）：金翼与日轮展开 + 和声上扬（1.1s）→ 双翼合抱 + 翡翠光雨 → 剥离诅咒
+    // ========================================================
+    const CHARGE_IS = 1100;
+    function castIsis() {
+      lockCards(CHARGE_IS + 2000); showBanner('EMBRACE OF ISIS', '伊西斯之拥'); darken(0.72);
+      const pc = party(), Wd = Math.min(innerWidth * 0.95, 1300), Hd = Wd * 0.42, ax = pc.x, ay = pc.t - Hd * 0.12;
+      const end = CHARGE_IS / 1000 - 0.12;
+      choir(0, [220, 277, 330], end, 0.09, 0.95, true); choir(0.4, [440, 554, 659], end - 0.4, 0.06, 0.95, true);
+      for (let i = 0; i < 8; i++) chime(rnd(0.1, end - 0.1), rnd(1800, 3200), 0.5, 0.025, rnd(-0.7, 0.7));
+      const feathers = [];
+      for (let r = 0; r < 4; r++) for (let i = 0; i <= 15; i++) {
+        const t = i / 15, bx = 30 + t * 520, by = -150 - Math.sin(t * Math.PI) * 50 + t * 70 + r * 36, L = 70 + t * 130 - r * 18, ang = -(12 + t * 55);
+        feathers.push(`<path d="M0,0 Q-14,${L * 0.5} 0,${L} Q14,${L * 0.5} 0,0 Z" transform="translate(${-bx},${by}) rotate(${-ang})" fill="url(#wf)" stroke="#fff4c2" stroke-width="1.2" opacity="${1 - r * 0.15}"/>`);
+      }
+      const wing = `<g style="transform-origin: -30px -150px; animation: wing-fold 0.6s ${CHARGE_IS}ms cubic-bezier(0.5,0,0.3,1) both;">${feathers.reverse().join('')}</g>`;
+      const layer = fsLayer(`
+        <div class="fs-anchor wings" style="left:${ax}px; top:${ay}px; width:${Wd}px; height:${Hd * 1.5}px; animation: wings-in ${CHARGE_IS}ms cubic-bezier(0.2,0.8,0.2,1) both; filter: drop-shadow(0 0 14px rgba(253,230,138,0.7));">
+          <svg viewBox="-600 -300 1200 520" style="width:100%;height:100%;overflow:visible">
+            <defs><linearGradient id="wf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fde68a"/><stop offset="0.6" stop-color="#d4af37"/><stop offset="1" stop-color="#059669"/></linearGradient>
+              <radialGradient id="sun"><stop offset="0" stop-color="#fff7d6"/><stop offset="0.6" stop-color="#f59e0b"/><stop offset="1" stop-color="#b45309"/></radialGradient></defs>
+            ${wing}<g transform="scale(-1,1)">${wing}</g>
+            <g style="transform-origin: 0px -200px; animation: sun-grow ${CHARGE_IS}ms ease-out both;">
+              ${Array.from({ length: 24 }, (_, i) => `<line x1="0" y1="-200" x2="0" y2="-310" stroke="#fde68a" stroke-width="2" opacity="0.6" transform="rotate(${i * 15} 0 -200)"/>`).join('')}
+              <circle cx="0" cy="-200" r="56" fill="url(#sun)" stroke="#fff4c2" stroke-width="3"/>
+              <path d="M-30,-130 Q-50,-150 -30,-160 M30,-130 Q50,-150 30,-160" fill="none" stroke="#d4af37" stroke-width="5" stroke-linecap="round"/>
+            </g>
+          </svg></div>`, CHARGE_IS + 1900);
+      const rise = setInterval(() => burst(4, () => ({ x: ax + rnd(-Wd / 2, Wd / 2), y: innerHeight + 10, vx: 0, vy: rnd(-9, -5), drag: 0.985, decay: 0.02, size: rnd(1.2, 2.4), color: pick(['#fde68a', '#6ee7b7']) })), 40);
+      setTimeout(() => { clearInterval(rise); isisRelease(pc, layer); }, CHARGE_IS);
+    }
+    function isisRelease(pc, layer) {
+      boom(0, { f0: 900, f1: 150, dur: 0.35, vol: 0.6, peak: 0.05 }); boom(0.18, { f0: 900, f1: 150, dur: 0.35, vol: 0.55, peak: 0.05 }); whoosh(0, { f0: 300, f1: 900, q: 0.7, dur: 0.5, vol: 0.4, peak: 0.15 });
+      kick(0.18, { hi: 140, lo: 45, pd: 0.06, dur: 0.6, vol: 0.8, drive: 2, wet: 0.2 });
+      chime(0.2, 392, 3, 0.15); chime(0.24, 588, 2.6, 0.09); choir(0.15, [523, 659, 784], 2.2, 0.07, 0.15);
+      for (let i = 0; i < 12; i++) chime(0.3 + rnd(0, 1.2), rnd(2600, 4200), 0.4, 0.02, rnd(-0.7, 0.7));
+      shake('heavy');
+      setTimeout(() => { const w = layer.querySelector('.wings'); w.style.animation = 'wings-out 0.9s ease-in both'; }, 700);
+      fsLayer(`<div style="position:absolute;inset:0;background:radial-gradient(ellipse at ${pc.x}px ${pc.y}px, rgba(255,247,214,0.9), rgba(52,211,153,0.4) 35%, transparent 70%); animation: fs-flash 0.7s 0.15s ease-out both;"></div>`, 1000);
+      const rain = setInterval(() => burst(7, () => ({ x: pc.x + rnd(-pc.w / 2 - 80, pc.w / 2 + 80), y: rnd(-20, pc.t - 40), vx: 0, vy: rnd(7, 11), drag: 1, decay: 0.022, size: 1.8, shape: 'streak', color: pick(['#6ee7b7', '#a7f3d0', '#fde68a']) })), 40);
+      setTimeout(() => clearInterval(rain), 1100);
+      setTimeout(() => heroes.forEach((h, i) => setTimeout(() => { flash(h, 'flash-heal'); floatText(h, '+100', '#6ee7b7', 28); const c = ctr(h); burst(14, () => ({ x: c.x + rnd(-24, 24), y: c.y + rnd(-50, 50), vx: rnd(-0.4, 0.4), vy: rnd(-1.6, -0.5), decay: 0.025, size: rnd(1.4, 2.4), color: '#a7f3d0' })); }, i * 90)), 260);
+      // 驱散：诅咒碎片剥离并燃尽
+      setTimeout(() => {
+        whoosh(0, { type: 'highpass', f0: 3000, f1: 6000, q: 0.7, dur: 0.5, vol: 0.3, peak: 0.02 }); for (let i = 0; i < 10; i++) click(rnd(0, 0.4), 0.12, rnd(2500, 5000), 0.006, rnd(-0.5, 0.5));
+        heroes.forEach(h => {
+          const chip = h.querySelector('.chip'); if (!chip || chip.style.display === 'none') return; chip.style.display = 'none';
+          const c = ctr(h);
+          burst(12, () => { const an = rnd(-2.6, -0.5), s = rnd(2, 5); return { x: c.x, y: c.top, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.95, rot: rnd(0, 6), vr: rnd(-0.3, 0.3), decay: 0.035, size: rnd(4, 7), shape: 'shard', blend: 'source-over', color: '#a855f7', fill: 'rgba(20,6,30,0.9)' }; });
+          burst(16, () => ({ x: c.x + rnd(-20, 20), y: c.top + rnd(-20, 10), vx: rnd(-1, 1), vy: rnd(-2, -0.6), drag: 0.96, decay: 0.03, size: rnd(1, 2), color: pick(['#fb923c', '#fde68a']) }));
+          floatText(h, '驱散', '#e9d5ff', 18, -30);
+        });
+      }, 650);
+      setTimeout(() => darken(0), 1500);
+    }
+
+    // ========================================================
+    // 技能卡
+    // ========================================================
+    const CARDS = [
+      ['L1', '精准流火', 'PRECISE FLAME', '[穿透(火焰);power:30][燃烧;power:10][Aim:160][MP:2][法术]', '通用 (火焰)：火球 + 燃烧挂层', castJingZhunLiuHuo],
+      ['L1', '迅捷愈合法', 'SWIFT MENDING', '[单回;power:30][再动;power:1][MP:3][法术][他人][限3次]', '安卡降临 · 钟环再动', castXunJieYuHe],
+      ['L2', '折影步', 'REFRACTED STEP', '[回避;power:900][MP:4][反应:近战][法术]', '通用反应：错身留影', castZheYingBu],
+      ['L2', '巫师护盾', "WIZARD'S AEGIS", '[单盾;power:180][MP:4][暴击:5%][反应][法术]', '透明屏障 · 挡刀光与枪击', castWuShiHuDun],
+      ['通用', '敌方法术弹', 'HOSTILE BOLT', '敌方单体法术攻击通用特效', '通用：紫色魔弹命中', castEnemyBolt],
+      ['L2', '双莲祛煞', 'TWIN LOTUS WARD', '[免伤;power:120][反应:法术][法术][限3次]', '双蓝睡莲 · 光幕吞煞', castShuangLian],
+      ['L3', '灵风术', 'ZEPHYR OF HERMES', '[单避;power:50][单速;power:30][Turns:10][MP:10][法术][限1次]', '风玫瑰法阵 · 全屏疾风', castLingFeng],
+      ['L3', '纳克提特障壁术', 'NAK-TITH BARRIER', '[肃正:近战;power:200;Armor:40][MP:10][TP:15][法术][高阶]', '无形几何 · 晶格穹顶', castNakTith],
+      ['L3', '伊西斯之拥', 'EMBRACE OF ISIS', '[群回;power:100][群驱散:1][MP:10][法术]', '金翼合抱 · 光雨驱散', castIsis]
+    ];
+    $('#skill-list').innerHTML = CARDS.map(([lv, t, e, tags, d], i) => `<button class="card w-full py-1.5 px-2 bg-slate-900/80 hover:bg-violet-950/60 border border-slate-700/80 hover:border-violet-500/60 rounded-lg text-left transition-all shadow-sm" data-i="${i}" title="${tags}"><div class="flex items-center justify-between gap-1"><span class="text-xs font-bold text-slate-100">${t}</span><span class="text-[9px] font-bold px-1 rounded border ${lv === '通用' ? 'border-rose-500/60 text-rose-300' : lv === 'L3' ? 'border-amber-500/60 text-amber-300' : lv === 'L2' ? 'border-cyan-500/60 text-cyan-300' : 'border-slate-500/60 text-slate-300'}">${lv}</span></div><div class="text-[9px] text-slate-400 truncate">${d}</div></button>`).join('');
+    document.querySelectorAll('.card').forEach(c => c.addEventListener('click', () => { getAudioContext(); CARDS[+c.dataset.i][5](); }));
+    $('#btn-reset').addEventListener('click', () => { heroes.forEach(h => { const ch = h.querySelector('.chip'); ch.style.display = ''; h.style.transform = ''; }); P = []; darken(0); });
+  </script>
+</body>
+</html>
