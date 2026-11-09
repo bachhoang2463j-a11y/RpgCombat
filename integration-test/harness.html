@@ -30,6 +30,7 @@
 </div>
 <script src="fixtures/summon-roster-regression.js"></script>
 <script src="fixtures/opening-roster-regression.js"></script>
+<script src="fixtures/arcane-vfx-regression.js"></script>
 <script>
 const TEST_PARAMS = new URLSearchParams(location.search);
 const RPG_SOURCE = TEST_PARAMS.get('artifact') === '1'
@@ -1337,7 +1338,8 @@ async function test23() {
   for (const name of ['ranged-heavy-enemy-recoil-flash', 'enemy-ram-knockback-flash', 'enemy-gunshot-flinch-flash', 'enemy-pierce-stutter-flash']) {
     check(src.includes('@keyframes ' + name + ' {'), 'steps 闪色 keyframes ' + name + ' 存在');
   }
-  eq((src.match(/-flash 0\.\d+s steps\(1\) both/g) || []).length, 13, '十三个挂载点均携带 steps(1) 闪色（recoil/ram/pierce×2/gunshot×2 + 霰弹 recoil×2/爆焰/弹丸 + 炽核聚爆 十字刃×2/核心）');
+  const stepFlashCount = src.includes('function playSingleAttackFx(') ? 15 : 13;
+  eq((src.match(/-flash 0\.\d+s steps\(1\) both/g) || []).length, stepFlashCount, '原十三个闪色挂载点及新增单点枪击／霰弹接点均携带 steps(1)');
   // ④b [单体(火焰)] 炽核聚爆·十字裂变：主关键帧纯 transform/opacity，filter 全部拆入 steps(1) 子动画（同霰弹纪律）
   for (const name of ['fire-supernova-implode', 'fire-supernova-beam-h', 'fire-supernova-beam-v', 'fire-supernova-debris', 'fire-supernova-core-flash', 'fire-supernova-beam-flash', 'fire-supernova-debris-flash']) {
     check(src.includes('@keyframes ' + name + ' {'), '炽核聚爆 keyframes ' + name + ' 存在');
@@ -2008,7 +2010,8 @@ async function test31() {
   for (const name of ['shotgun-flare-flash', 'shotgun-shock-thinning', 'shotgun-pellet-flash', 'shotgun-impact-flash']) {
     check(kfSrc.includes('@keyframes ' + name + ' {'), 'steps(1) 子动画 ' + name + ' 存在');
   }
-  check((kfSrc.match(/enemy-shotgun-recoil-flash 0\.38s steps\(1\) both/g) || []).length === 2, '敌人闪白两处调用均 steps(1) 播放（帧边界跳变）');
+  const shotgunFlashCount = kfSrc.includes('function playSingleAttackFx(') ? 3 : 2;
+  eq((kfSrc.match(/enemy-shotgun-recoil-flash 0\.38s steps\(1\) both/g) || []).length, shotgunFlashCount, '霰弹受击调用均按 steps(1) 播放（含单点统一接点）');
   check(!kfSrc.includes('drop-shadow(0 0 20px #f59e0b) drop-shadow(0 0 35px #ea580c)'), '爆焰层双 drop-shadow 已并单');
   check(!kfSrc.includes('background: #fde68a; animation: shotgun-shrapnel-spark 0.3s ${pt.delay + 0.02}s ease-out both; filter: drop-shadow'), '18 颗火星 drop-shadow 辉光已去除（6px 圆点肉眼不可辨）');
   check(kfSrc.includes('style="opacity: 0.6; filter: blur(7px);"'), '硝烟 3×SVG blur 并为容器单次 blur');
@@ -2767,13 +2770,19 @@ async function test43() {
   head('43 OpeningSetup真实提交、编辑器往返与标签回合实际执行');
   await window.runOpeningRosterRegression({ w: rpgWin(), check, eq, mock: MOCK, mountFrame });
 }
+async function test44() {
+  head('44 秘术特效：攻击分流、原数字与真实反应衔接');
+  if (TEST_PARAMS.get('version') === 'public') { out('info', '本轮未更新公开版，秘术专项仅验证 index.html 与其产物。'); return; }
+  const result = await window.runArcaneVfxRegression({ w: rpgWin(), check, eq, mock: MOCK });
+  eq(result.pending, [], '秘术专项接口全部落地，无待对齐项');
+}
 async function runAll() {
   logEl.textContent = '';
   passN = failN = 0;
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44];
   const selectedTests = TEST_PARAMS.has('tests') ? new Set(TEST_PARAMS.get('tests').split(',').map(n => 'test' + n)) : null;
   for (const t of tests) {
     if (selectedTests && !selectedTests.has(t.name)) continue;
