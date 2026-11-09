@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>修仙风格·三大击杀特效演练场</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@600;900&family=Cinzel:wght@700;900&display=swap');
+
+    body {
+      font-family: 'Noto Serif SC', serif;
+      user-select: none;
+      background: #050811;
+      color: #f1f5f9;
+      overflow: hidden;
+    }
+
+    .font-calligraphy { font-family: 'Ma Shan Zheng', cursive, 'STKaiti', 'KaiTi', serif; }
+    .font-cinzel { font-family: 'Cinzel', serif; }
+
+    .glass-panel {
+      background: rgba(10, 15, 26, 0.72);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 10px 35px 0 rgba(0, 0, 0, 0.65);
+    }
+
+    /* 仙门法阵浮动发光 */
+    .glow-sword { filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.8)) drop-shadow(0 0 24px rgba(5, 150, 105, 0.5)); }
+    .glow-gold { filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.85)) drop-shadow(0 0 28px rgba(217, 119, 6, 0.6)); }
+    .glow-thunder { filter: drop-shadow(0 0 14px rgba(168, 85, 247, 0.9)) drop-shadow(0 0 32px rgba(126, 34, 206, 0.65)); }
+
+    /* 角色轻度悬浮呼吸 */
+    .breathe-actor { animation: actor-breathe 4s ease-in-out infinite alternate; }
+    @keyframes actor-breathe {
+      0% { transform: translateY(0px); }
+      100% { transform: translateY(-6px); }
+    }
+
+    /* 屏幕震动系统 */
+    .shake-light { animation: shake-light-anim 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+    @keyframes shake-light-anim {
+      10%, 90% { transform: translate3d(-3px, 1px, 0); }
+      20%, 80% { transform: translate3d(4px, -2px, 0); }
+      30%, 50%, 70% { transform: translate3d(-4px, 2px, 0); }
+      40%, 60% { transform: translate3d(3px, 1px, 0); }
+    }
+
+    .shake-heavy { animation: shake-heavy-anim 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+    @keyframes shake-heavy-anim {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+      15% { transform: translate3d(-14px, -8px, 0) scale(1.025) rotate(-1.2deg); }
+      30% { transform: translate3d(16px, 9px, 0) scale(1.02) rotate(1.4deg); }
+      45% { transform: translate3d(-10px, 5px, 0) scale(1.01) rotate(-0.8deg); }
+      65% { transform: translate3d(7px, -4px, 0) scale(1.005) rotate(0.4deg); }
+      85% { transform: translate3d(-3px, 2px, 0) scale(1.0) rotate(-0.2deg); }
+    }
+
+    /* ========================================================
+       【近战 · 剑道一念】动画关键帧
+       ======================================================== */
+    /* 剑修疾速瞬步冲刺 */
+    @keyframes s-hero-dash {
+      0% { transform: translate3d(-50%, -50%, 0) translateX(-65vw) scale(0.7); opacity: 0; filter: blur(20px); }
+      16% { transform: translate3d(-50%, -50%, 0) translateX(-12vw) scale(1.08); opacity: 1; filter: blur(0px); }
+      36% { transform: translate3d(-50%, -50%, 0) translateX(24vw) scale(1); opacity: 1; }
+      75% { transform: translate3d(-50%, -50%, 0) translateX(24vw) scale(1); opacity: 1; }
+      100% { transform: translate3d(-50%, -50%, 0) translateX(60vw) scale(0.9); opacity: 0; filter: blur(12px); }
+    }
+
+    /* 凌霄飞剑化光破空横斩 */
+    @keyframes s-sword-slash {
+      0% { transform: translate3d(-50%, -50%, 0) rotate(-14deg) scaleX(0) scaleY(0.2); opacity: 0; }
+      14% { transform: translate3d(-50%, -50%, 0) rotate(-14deg) scaleX(1) scaleY(1); opacity: 1; }
+      30% { transform: translate3d(-50%, -50%, 0) rotate(-14deg) scaleX(1.02) scaleY(0.7); opacity: 0.95; }
+      100% { transform: translate3d(-50%, -50%, 0) rotate(-14deg) scaleX(1.15) scaleY(0); opacity: 0; }
+    }
+
+    /* 伴生水墨青莲破空盛放 */
+    @keyframes s-lotus-bloom {
+      0% { transform: translate(-50%, -50%) scale(0.2) rotate(-45deg); opacity: 0; filter: blur(10px); }
+      20% { transform: translate(-50%, -50%) scale(1.25) rotate(15deg); opacity: 1; filter: blur(0); }
+      35% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+      75% { transform: translate(-50%, -50%) scale(1.05) rotate(6deg); opacity: 0.9; }
+      100% { transform: translate(-50%, -50%) scale(1.4) rotate(25deg); opacity: 0; filter: blur(12px); }
+    }
+
+    /* 剑气平滑同轴斜切 - 上截 (上浮+右滑+剑光消散) */
+    @keyframes s-enemy-split-up {
+      0% { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 1; filter: brightness(1); }
+      15% { transform: translate3d(12px, -15px, 0) rotate(2deg); opacity: 1; filter: brightness(2) drop-shadow(0 0 15px #34d399); }
+      100% { transform: translate3d(85px, -85px, 0) rotate(16deg); opacity: 0; filter: brightness(1.6); }
+    }
+
+    /* 剑气平滑同轴斜切 - 下截 (下沉+左滑) */
+    @keyframes s-enemy-split-down {
+      0% { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 1; filter: brightness(1); }
+      15% { transform: translate3d(-12px, 15px, 0) rotate(-2deg); opacity: 1; filter: brightness(1.8) drop-shadow(0 0 15px #34d399); }
+      100% { transform: translate3d(-85px, 85px, 0) rotate(-16deg); opacity: 0; filter: brightness(0.2); }
+    }
+
+    /* 飞散青莲花瓣微粒 */
+    @keyframes s-petal-fly {
+      0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); opacity: 1; }
+      100% { transform: translate3d(var(--px, 40px), var(--py, -60px), 0) rotate(var(--pr, 120deg)) scale(0.2); opacity: 0; }
+    }
+
+    /* 剑道仙篆大字重压 */
+    @keyframes s-calligraphy-stamp {
+      0% { transform: translate(-50%, -50%) scale(4.2) rotate(-8deg); opacity: 0; filter: blur(18px); }
+      16% { transform: translate(-50%, -50%) scale(0.92) rotate(1deg); opacity: 1; filter: blur(0px); }
+      26% { transform: translate(-50%, -50%) scale(1.08) rotate(0deg); opacity: 1; }
+      75% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1.35) rotate(3deg); opacity: 0; filter: blur(10px); }
+    }
+
+    /* ========================================================
+       【远程 · 神识锁天】动画关键帧
+       ======================================================== */
+    /* 天罡八卦神识锁敌盘自转与收缩死锁 */
+    @keyframes r-scope-lock {
+      0% { transform: translate(-50%, -50%) scale3d(3.2, 3.2, 1) rotate(120deg); opacity: 0; }
+      18% { transform: translate(-50%, -50%) scale3d(0.94, 0.94, 1) rotate(-6deg); opacity: 1; }
+      28% { transform: translate(-50%, -50%) scale3d(1.06, 1.06, 1) rotate(3deg); opacity: 1; }
+      38% { transform: translate(-50%, -50%) scale3d(1, 1, 1) rotate(0deg); opacity: 1; }
+      75% { transform: translate(-50%, -50%) scale3d(1.02, 1.02, 1) rotate(0deg); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale3d(1.35, 1.35, 1) rotate(25deg); opacity: 0; }
+    }
+
+    /* 八卦外爻环持续极速顺时针转动 */
+    @keyframes r-bagua-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* 神识太极内丹逆向转动 */
+    @keyframes r-taiji-spin-rev {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(-360deg); }
+    }
+
+    /* 穿云落日飞星神芒贯穿火线 */
+    @keyframes r-arrow-beam {
+      0% { transform: translate(-50%, -50%) scaleX(0) scaleY(1.4); opacity: 0; }
+      14% { transform: translate(-50%, -50%) scaleX(1) scaleY(1); opacity: 1; }
+      35% { transform: translate(-50%, -50%) scaleX(1.02) scaleY(0.7); opacity: 0.95; }
+      100% { transform: translate(-50%, -50%) scaleX(1.18) scaleY(0); opacity: 0; }
+    }
+
+    /* 纯阳落日激波光环扩散 */
+    @keyframes r-shock-wave {
+      0% { transform: translate(-50%, -50%) scale(0.1); opacity: 1; border-width: 5px; }
+      50% { transform: translate(-50%, -50%) scale(2.4); opacity: 0.85; border-width: 2.5px; }
+      100% { transform: translate(-50%, -50%) scale(3.8); opacity: 0; border-width: 0px; }
+    }
+
+    /* 目标被神箭贯穿四象限爆散 */
+    @keyframes r-shatter-tl { 0% { transform: translate3d(0, 0, 0); opacity: 1; } 100% { transform: translate3d(-75px, -70px, 0) rotate(-30deg) scale(0.4); opacity: 0; filter: brightness(2) drop-shadow(0 0 15px #f59e0b); } }
+    @keyframes r-shatter-tr { 0% { transform: translate3d(0, 0, 0); opacity: 1; } 100% { transform: translate3d(75px, -65px, 0) rotate(35deg) scale(0.4); opacity: 0; filter: brightness(2) drop-shadow(0 0 15px #f59e0b); } }
+    @keyframes r-shatter-bl { 0% { transform: translate3d(0, 0, 0); opacity: 1; } 100% { transform: translate3d(-65px, 75px, 0) rotate(-40deg) scale(0.3); opacity: 0; filter: brightness(0.3); } }
+    @keyframes r-shatter-br { 0% { transform: translate3d(0, 0, 0); opacity: 1; } 100% { transform: translate3d(70px, 80px, 0) rotate(45deg) scale(0.3); opacity: 0; filter: brightness(0.3); } }
+
+    /* 金色朱砂道符飞散燃尽 */
+    @keyframes r-talisman-burn {
+      0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); opacity: 1; filter: brightness(1); }
+      40% { opacity: 1; filter: brightness(2.2); }
+      100% { transform: translate3d(var(--tx, 60px), var(--ty, -80px), 0) rotate(var(--tr, 90deg)) scale(0.1); opacity: 0; filter: brightness(3); }
+    }
+
+    /* ========================================================
+       【法术 · 紫霄神雷】动画关键帧
+       ======================================================== */
+    /* 混沌太极混元大阵全屏显现旋转 */
+    @keyframes m-taiji-array {
+      0% { transform: translate(-50%, -50%) scale(0.3) rotate(0deg); opacity: 0; }
+      20% { transform: translate(-50%, -50%) scale(1.1) rotate(45deg); opacity: 0.9; }
+      40% { transform: translate(-50%, -50%) scale(1) rotate(90deg); opacity: 0.8; }
+      75% { transform: translate(-50%, -50%) scale(1.05) rotate(160deg); opacity: 0.7; }
+      100% { transform: translate(-50%, -50%) scale(1.3) rotate(240deg); opacity: 0; }
+    }
+
+    /* 九天紫霄狂雷撕裂苍穹 */
+    @keyframes m-thunder-strike {
+      0% { opacity: 0; transform: scaleY(0); transform-origin: top; }
+      10% { opacity: 1; transform: scaleY(1.1); filter: drop-shadow(0 0 35px #e879f9) drop-shadow(0 0 70px #a855f7); }
+      25% { opacity: 0.8; transform: scaleY(1); }
+      40% { opacity: 1; transform: scaleY(1.02); }
+      65% { opacity: 0.7; }
+      100% { opacity: 0; transform: scaleY(1.05); }
+    }
+
+    /* 核心空间顿帧 (Hitstop) + 空间碎镜崩解 */
+    @keyframes m-shard-1 {
+      0% { transform: translate(0, 0) scale(1); opacity: 1; }
+      20% { transform: translate(-6px, -4px) scale(1.03); opacity: 1; filter: brightness(2); }
+      45% { transform: translate(-9px, -6px) scale(1.01); opacity: 1; filter: brightness(1.7); }
+      100% { transform: translate(-140px, -110px) rotate(-50deg) scale(0.12); opacity: 0; filter: brightness(1.4); }
+    }
+    @keyframes m-shard-2 {
+      0% { transform: translate(0, 0) scale(1); opacity: 1; }
+      20% { transform: translate(6px, -4px) scale(1.03); opacity: 1; filter: brightness(2); }
+      45% { transform: translate(9px, -6px) scale(1.01); opacity: 1; filter: brightness(1.7); }
+      100% { transform: translate(145px, -100px) rotate(55deg) scale(0.12); opacity: 0; filter: brightness(1.4); }
+    }
+    @keyframes m-shard-3 {
+      0% { transform: translate(0, 0) scale(1); opacity: 1; }
+      20% { transform: translate(-4px, 6px) scale(1.03); opacity: 1; filter: brightness(2); }
+      45% { transform: translate(-7px, 8px) scale(1.01); opacity: 1; filter: brightness(1.7); }
+      100% { transform: translate(-120px, 130px) rotate(-60deg) scale(0.12); opacity: 0; filter: brightness(1.4); }
+    }
+    @keyframes m-shard-4 {
+      0% { transform: translate(0, 0) scale(1); opacity: 1; }
+      20% { transform: translate(5px, 5px) scale(1.03); opacity: 1; filter: brightness(2); }
+      45% { transform: translate(8px, 8px) scale(1.01); opacity: 1; filter: brightness(1.7); }
+      100% { transform: translate(135px, 125px) rotate(48deg) scale(0.12); opacity: 0; filter: brightness(1.4); }
+    }
+
+    /* 归墟太虚暗角吞噬脉冲 */
+    @keyframes xian-vignette-pulse {
+      0% { opacity: 0; transform: scale(0.92); }
+      22% { opacity: 1; transform: scale(1); }
+      75% { opacity: 0.85; transform: scale(1.02); }
+      100% { opacity: 0; transform: scale(1.05); }
+    }
+
+    /* 英雄头像滑入 (仙道云纹相框) */
+    @keyframes hero-cloud-in {
+      0% { transform: translateX(-65vw) scale(0.85); opacity: 0; }
+      70% { transform: translateX(12px) scale(1.02); opacity: 1; }
+      100% { transform: translateX(0) scale(1); opacity: 1; }
+    }
+  </style>
+</head>
+<body class="w-full h-[100dvh] bg-[#03060f] text-slate-100 overflow-hidden relative select-none">
+
+  <!-- ========================================================
+       顶部修仙控制栏（纯净高阶交互，无多余解释文字）
+       ======================================================== -->
+  <div class="fixed top-3 left-1/2 -translate-x-1/2 z-[100] flex flex-wrap items-center justify-center gap-2 px-3 py-2 glass-panel rounded-full border border-emerald-500/30 shadow-2xl">
+    
+    <!-- 神通流派切换 -->
+    <div class="flex items-center gap-1 bg-black/60 p-1 rounded-full border border-white/10">
+      <button onclick="setScheme(1)" id="btn-sch-1" class="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all bg-emerald-700 text-white shadow-[0_0_12px_rgba(16,185,129,0.5)] flex items-center gap-1.5">
+        <span>🗡️</span><span>剑道一念 (近战)</span>
+      </button>
+      <button onclick="setScheme(2)" id="btn-sch-2" class="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all text-amber-200/80 hover:text-white flex items-center gap-1.5">
+        <span>🏹</span><span>神识锁天 (远程)</span>
+      </button>
+      <button onclick="setScheme(3)" id="btn-sch-3" class="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all text-purple-200/80 hover:text-white flex items-center gap-1.5">
+        <span>⚡</span><span>紫霄神雷 (法术)</span>
+      </button>
+    </div>
+
+    <div class="h-4 w-[1px] bg-white/20 hidden sm:block"></div>
+
+    <!-- 敌方目标数 -->
+    <div class="flex items-center gap-1 bg-black/60 p-1 rounded-full border border-white/10">
+      <button onclick="setTargetCount(1)" id="btn-tgt-1" class="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">1 目标</button>
+      <button onclick="setTargetCount(2)" id="btn-tgt-2" class="px-2.5 py-1 rounded-full text-xs font-mono text-gray-400 hover:text-white">2 目标</button>
+      <button onclick="setTargetCount(3)" id="btn-tgt-3" class="px-2.5 py-1 rounded-full text-xs font-mono text-gray-400 hover:text-white">3 目标</button>
+    </div>
+
+    <!-- 音效开关 -->
+    <button onclick="toggleAudio()" id="btn-sound" class="px-3 py-1.5 bg-black/60 hover:bg-white/10 text-slate-300 rounded-full text-xs font-medium border border-white/10 flex items-center gap-1 transition-all">
+      <span id="sound-icon">🔊</span><span id="sound-text">灵音</span>
+    </button>
+
+    <!-- 触发神通击杀大按钮 -->
+    <button onclick="triggerExecution()" class="px-5 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-500 to-amber-600 hover:from-emerald-500 hover:to-amber-500 text-white rounded-full text-xs font-black tracking-widest shadow-[0_0_20px_rgba(16,185,129,0.7)] transform hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5">
+      <span>✨</span><span>祭出神通</span>
+    </button>
+  </div>
+
+  <!-- 战场核心背景（水墨仙山与星云底蕴） -->
+  <div class="absolute inset-0 bg-gradient-to-b from-[#03060e] via-[#08101e] to-[#040711] overflow-hidden z-0" id="battle-scene">
+    <!-- 远景微光天幕 -->
+    <div class="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-600/20 via-purple-950/20 to-black"></div>
+    <div class="absolute -top-32 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+    <!-- 战场中心敌方阵位 -->
+    <div id="enemies-area" class="absolute inset-0 z-10 flex flex-wrap items-center justify-center gap-12 sm:gap-24 pb-44 px-8 transition-all duration-300">
+      <!-- 动态注入敌人 -->
+    </div>
+  </div>
+
+  <!-- 底部修仙同门卡牌栏 -->
+  <div class="absolute bottom-6 left-0 w-full px-6 sm:px-12 flex items-end justify-between gap-4 z-20 pointer-events-none">
+    <div class="w-full max-w-2xl grid grid-cols-4 gap-3 pointer-events-auto">
+      <!-- 1号位：剑修 李长生 -->
+      <div id="card-hero-1" class="glass-panel p-2.5 rounded-2xl border border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.25)] bg-gradient-to-b from-emerald-950/40 to-slate-950/90 transition-all">
+        <div class="flex items-center gap-2 mb-1.5">
+          <div class="w-9 h-9 rounded-full overflow-hidden border border-emerald-400 shadow shrink-0">
+            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120" class="w-full h-full object-cover">
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-black text-emerald-200 truncate">李长生</div>
+            <div class="text-[9px] text-emerald-400/80 font-mono">凌霄剑修 / 化神</div>
+          </div>
+        </div>
+        <div class="space-y-1">
+          <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden"><div class="h-full bg-emerald-400 w-[95%]"></div></div>
+          <div class="h-1 bg-gray-800 rounded-full overflow-hidden"><div class="h-full bg-cyan-400 w-[80%]"></div></div>
+        </div>
+      </div>
+      <!-- 2号位：神射 苏灵儿 -->
+      <div id="card-hero-2" class="glass-panel p-2.5 rounded-2xl border border-white/10 bg-slate-950/70 transition-all">
+        <div class="flex items-center gap-2 mb-1.5">
+          <div class="w-9 h-9 rounded-full overflow-hidden border border-amber-400/60 shadow shrink-0">
+            <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=120" class="w-full h-full object-cover">
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-black text-amber-200 truncate">苏灵儿</div>
+            <div class="text-[9px] text-amber-400/80 font-mono">太清神射 / 元婴</div>
+          </div>
+        </div>
+        <div class="space-y-1">
+          <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden"><div class="h-full bg-emerald-400 w-[85%]"></div></div>
+          <div class="h-1 bg-gray-800 rounded-full overflow-hidden"><div class="h-full bg-cyan-400 w-[90%]"></div></div>
+        </div>
+      </div>
+      <!-- 3号位：法尊 白凝冰 -->
+      <div id="card-hero-3" class="glass-panel p-2.5 rounded-2xl border border-white/10 bg-slate-950/70 transition-all">
+        <div class="flex items-center gap-2 mb-1.5">
+          <div class="w-9 h-9 rounded-full overflow-hidden border border-purple-400/60 shadow shrink-0">
+            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120" class="w-full h-full object-cover">
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-black text-purple-200 truncate">白凝冰</div>
+            <div class="text-[9px] text-purple-400/80 font-mono">玄天法尊 / 返虚</div>
+          </div>
+        </div>
+        <div class="space-y-1">
+          <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden"><div class="h-full bg-emerald-400 w-[78%]"></div></div>
+          <div class="h-1 bg-gray-800 rounded-full overflow-hidden"><div class="h-full bg-cyan-400 w-[100%]"></div></div>
+        </div>
+      </div>
+      <!-- 4号位：医圣 叶清玄 -->
+      <div id="card-hero-4" class="glass-panel p-2.5 rounded-2xl border border-white/10 bg-slate-950/70 transition-all">
+        <div class="flex items-center gap-2 mb-1.5">
+          <div class="w-9 h-9 rounded-full overflow-hidden border border-teal-400/60 shadow shrink-0">
+            <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120" class="w-full h-full object-cover">
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-black text-teal-200 truncate">叶清玄</div>
+            <div class="text-[9px] text-teal-400/80 font-mono">妙手医圣 / 洞虚</div>
+          </div>
+        </div>
+        <div class="space-y-1">
+          <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden"><div class="h-full bg-emerald-400 w-[100%]"></div></div>
+          <div class="h-1 bg-gray-800 rounded-full overflow-hidden"><div class="h-full bg-cyan-400 w-[60%]"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ========================================================
+    // 数据模型配置
+    // ========================================================
+    let currentScheme = 1;      // 1: 剑道一念 (近战), 2: 神识锁天 (远程), 3: 紫霄神雷 (法术)
+    let currentTargetCount = 1; // 1, 2, 3
+    let soundEnabled = true;
+    let isAnimating = false;
+
+    // 敌方角色池
+    const allEnemies = [
+      {
+        id: 'e1',
+        name: '幽冥尸皇',
+        rank: '万载魔躯',
+        emoji: '🧟',
+        maxHp: 8000,
+        hp: 8000,
+        themeBorder: 'border-emerald-600/70',
+        glowColor: '#059669'
+      },
+      {
+        id: 'e2',
+        name: '九尾妖后',
+        rank: '赤炼天妖',
+        emoji: '🦊',
+        maxHp: 6500,
+        hp: 6500,
+        themeBorder: 'border-amber-600/70',
+        glowColor: '#d97706'
+      },
+      {
+        id: 'e3',
+        name: '嗜血魔尊',
+        rank: '九幽修罗',
+        emoji: '👹',
+        maxHp: 9500,
+        hp: 9500,
+        themeBorder: 'border-purple-600/70',
+        glowColor: '#7c3aed'
+      }
+    ];
+
+    // 主角阵容
+    const heroes = [
+      { name: '李长生', title: '凌霄剑修', img: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300' },
+      { name: '苏灵儿', title: '太清神射', img: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300' },
+      { name: '白凝冰', title: '玄天法尊', img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300' }
+    ];
+
+    // ========================================================
+    // 音频管理系统（在线音源 + Web Audio API 纯合成双保险）
+    // ========================================================
+    const ASSET_BASE = 'https://cdn.jsdelivr.net/gh/bachhoang2463j-a11y/test1@main';
+    const audioUrls = {
+      'kill': `${ASSET_BASE}/kill.mp3`,
+      'combatKill': `${ASSET_BASE}/combat_kill.mp3`,
+      'magicKill': `${ASSET_BASE}/magic_kill.wav`,
+      'slash': `${ASSET_BASE}/atk1.mp3`,
+      'burst': `${ASSET_BASE}/burst.mp3`,
+      'taunt': `${ASSET_BASE}/taunt.mp3`,
+      'shot': `${ASSET_BASE}/shot01.mp3`
+    };
+
+    const audioCache = {};
+    for (let k in audioUrls) {
+      audioCache[k] = new Audio(audioUrls[k]);
+      audioCache[k].preload = 'auto';
+    }
+
+    let audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+
+    // 仙侠专属合成音（零延迟保障）
+    function synthXianxiaSound(type) {
+      if (!soundEnabled) return;
+      try {
+        const ctx = getAudioContext();
+        const now = ctx.currentTime;
+
+        if (type === 'swordResonance') {
+          // 飞剑出鞘高亢清吟
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(1480, now);
+          osc.frequency.exponentialRampToValueAtTime(740, now + 0.35);
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.5);
+        } else if (type === 'bowRelease') {
+          // 神识落日弓破空疾鸣
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.exponentialRampToValueAtTime(1860, now + 0.15);
+          gain.gain.setValueAtTime(0.35, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        } else if (type === 'thunderClap') {
+          // 九霄神雷轰天震地
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(130, now);
+          osc.frequency.exponentialRampToValueAtTime(32, now + 0.6);
+          gain.gain.setValueAtTime(0.6, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.7);
+        }
+      } catch (e) {}
+    }
+
+    function playSound(key, vol = 0.8) {
+      if (!soundEnabled) return;
+      if (audioCache[key]) {
+        try {
+          const snd = audioCache[key].cloneNode();
+          snd.volume = vol;
+          snd.play().catch(() => {});
+        } catch(e) {}
+      }
+    }
+
+    function toggleAudio() {
+      soundEnabled = !soundEnabled;
+      document.getElementById('sound-icon').textContent = soundEnabled ? '🔊' : '🔇';
+      document.getElementById('sound-text').textContent = soundEnabled ? '灵音' : '静音';
+    }
+
+    // ========================================================
+    // 渲染敌方战场卡牌
+    // ========================================================
+    function renderEnemies() {
+      const area = document.getElementById('enemies-area');
+      area.innerHTML = '';
+      const list = allEnemies.slice(0, currentTargetCount);
+
+      list.forEach(enemy => {
+        const card = document.createElement('div');
+        card.id = `enemy-card-${enemy.id}`;
+        card.className = `flex flex-col items-center gap-3 transition-all duration-300 breathe-actor`;
+        card.innerHTML = `
+          <div class="relative w-28 h-36 sm:w-36 sm:h-44 rounded-2xl glass-panel p-2 border-2 ${enemy.themeBorder} flex flex-col items-center justify-between shadow-[0_0_25px_rgba(0,0,0,0.8)]">
+            <!-- 境界角标 -->
+            <div class="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-black/60 border border-white/20 text-slate-300">
+              ${enemy.rank}
+            </div>
+            
+            <!-- 角色形象 -->
+            <div class="text-5xl sm:text-6xl my-1 filter drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">
+              ${enemy.emoji}
+            </div>
+
+            <!-- 名称与血条 -->
+            <div class="w-full space-y-1 text-center">
+              <div class="text-xs sm:text-sm font-black tracking-wider text-slate-100">${enemy.name}</div>
+              <div class="w-full h-1.5 bg-gray-900 rounded-full overflow-hidden border border-white/10">
+                <div class="h-full bg-gradient-to-r from-red-600 to-rose-500 w-full rounded-full"></div>
+              </div>
+              <div class="text-[9px] font-mono text-slate-400">气血: ${enemy.hp} / ${enemy.maxHp}</div>
+            </div>
+          </div>
+        `;
+        area.appendChild(card);
+      });
+    }
+
+    // ========================================================
+    // 控制面板切换响应
+    // ========================================================
+    function setScheme(sch) {
+      currentScheme = sch;
+      [1, 2, 3].forEach(i => {
+        const btn = document.getElementById(`btn-sch-${i}`);
+        const card = document.getElementById(`card-hero-${i}`);
+        if (i === sch) {
+          if (sch === 1) {
+            btn.className = 'px-3.5 py-1.5 rounded-full text-xs font-bold transition-all bg-emerald-700 text-white shadow-[0_0_12px_rgba(16,185,129,0.5)] flex items-center gap-1.5';
+            card.className = 'glass-panel p-2.5 rounded-2xl border border-emerald-500/60 shadow-[0_0_20px_rgba(16,185,129,0.25)] bg-gradient-to-b from-emerald-950/40 to-slate-950/90 transition-all';
+          } else if (sch === 2) {
+            btn.className = 'px-3.5 py-1.5 rounded-full text-xs font-bold transition-all bg-amber-700 text-white shadow-[0_0_12px_rgba(245,158,11,0.5)] flex items-center gap-1.5';
+            card.className = 'glass-panel p-2.5 rounded-2xl border border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.25)] bg-gradient-to-b from-amber-950/40 to-slate-950/90 transition-all';
+          } else {
+            btn.className = 'px-3.5 py-1.5 rounded-full text-xs font-bold transition-all bg-purple-700 text-white shadow-[0_0_12px_rgba(168,85,247,0.5)] flex items-center gap-1.5';
+            card.className = 'glass-panel p-2.5 rounded-2xl border border-purple-500/60 shadow-[0_0_20px_rgba(168,85,247,0.25)] bg-gradient-to-b from-purple-950/40 to-slate-950/90 transition-all';
+          }
+        } else {
+          btn.className = 'px-3.5 py-1.5 rounded-full text-xs font-bold transition-all text-slate-400 hover:text-white flex items-center gap-1.5';
+          card.className = 'glass-panel p-2.5 rounded-2xl border border-white/10 bg-slate-950/70 transition-all';
+        }
+      });
+    }
+
+    function setTargetCount(n) {
+      currentTargetCount = n;
+      [1, 2, 3].forEach(i => {
+        const btn = document.getElementById(`btn-tgt-${i}`);
+        if (i === n) {
+          btn.className = 'px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        } else {
+          btn.className = 'px-2.5 py-1 rounded-full text-xs font-mono text-gray-400 hover:text-white';
+        }
+      });
+      renderEnemies();
+    }
+
+    // ========================================================
+    // 震屏控制
+    // ========================================================
+    function triggerShake(type = 'heavy') {
+      const scene = document.getElementById('battle-scene');
+      const cls = type === 'heavy' ? 'shake-heavy' : 'shake-light';
+      scene.classList.add(cls);
+      setTimeout(() => scene.classList.remove(cls), 600);
+    }
+
+    // ========================================================
+    // 触发修仙击杀动效
+    // ========================================================
+    async function triggerExecution() {
+      if (isAnimating) return;
+      isAnimating = true;
+
+      const overlay = document.createElement('div');
+      overlay.className = 'fixed inset-0 z-[200] flex items-center justify-center overflow-hidden transition-opacity duration-300 pointer-events-none';
+
+      const killedEnemies = allEnemies.slice(0, currentTargetCount);
+      const n = killedEnemies.length;
+      const hero = heroes[currentScheme - 1];
+
+      // 敌方单位渲染
+      const unitSize = n > 2 ? 'clamp(42px,11vh,115px)' : n > 1 ? 'clamp(62px,16vh,155px)' : 'clamp(85px,20vh,185px)';
+      const enemyVisual = enemy => `
+        <div class="text-[clamp(3rem,8vw,7rem)] filter drop-shadow-[0_0_20px_rgba(255,255,255,0.4)]">
+          ${enemy.emoji}
+        </div>`;
+
+      let html = '';
+      let killDelay = 280;
+
+      // ========================================================
+      // 方案 1：【近战 · 剑道一念】(青莲剑歌 · 诛仙斜切)
+      // ========================================================
+      if (currentScheme === 1) {
+        overlay.className += ' bg-[#020d09]/85';
+        killDelay = 270;
+        playSound('slash', 1.0);
+        synthXianxiaSound('swordResonance');
+
+        const enemiesHtml = killedEnemies.map(enemy => `
+          <div class="flex flex-col items-center gap-1 shrink-0">
+            <div style="width:${unitSize};height:${unitSize};" class="relative flex items-center justify-center">
+              <!-- 剑气倾斜断切：上半截 (同轴顺切 14deg) -->
+              <div class="absolute inset-0 flex items-center justify-center opacity-0"
+                   style="clip-path: polygon(0 0, 100% 0, 100% 42%, 0 58%); animation: s-enemy-split-up 0.85s 0.27s cubic-bezier(0.12, 0.85, 0.25, 1) both; will-change: transform, opacity;">
+                ${enemyVisual(enemy)}
+              </div>
+              <!-- 下半截 -->
+              <div class="absolute inset-0 flex items-center justify-center opacity-0"
+                   style="clip-path: polygon(0 58%, 100% 42%, 100% 100%, 0 100%); animation: s-enemy-split-down 0.85s 0.27s cubic-bezier(0.12, 0.85, 0.25, 1) both; will-change: transform, opacity;">
+                ${enemyVisual(enemy)}
+              </div>
+
+              <!-- 剑意斩开处绽放的青莲花瓣微粒 -->
+              <div class="absolute w-4 h-4 text-emerald-400 opacity-0 pointer-events-none"
+                   style="--px:45px; --py:-65px; --pr:130deg; animation: s-petal-fly 0.75s 0.28s ease-out both;">
+                <svg viewBox="0 0 20 20" class="w-full h-full fill-current"><path d="M10,0 C12,5 18,10 10,20 C2,10 8,5 10,0 Z"/></svg>
+              </div>
+              <div class="absolute w-3.5 h-3.5 text-teal-300 opacity-0 pointer-events-none"
+                   style="--px:-50px; --py:55px; --pr:-110deg; animation: s-petal-fly 0.75s 0.3s ease-out both;">
+                <svg viewBox="0 0 20 20" class="w-full h-full fill-current"><path d="M10,0 C12,5 18,10 10,20 C2,10 8,5 10,0 Z"/></svg>
+              </div>
+              <div class="absolute w-3 h-3 text-emerald-200 opacity-0 pointer-events-none"
+                   style="--px:60px; --py:45px; --pr:70deg; animation: s-petal-fly 0.75s 0.29s ease-out both;">
+                <svg viewBox="0 0 20 20" class="w-full h-full fill-current"><path d="M10,0 C12,5 18,10 10,20 C2,10 8,5 10,0 Z"/></svg>
+              </div>
+            </div>
+            <div class="text-emerald-300 text-xs font-black tracking-widest whitespace-nowrap drop-shadow-[0_0_8px_#059669]">${enemy.name}</div>
+          </div>
+        `).join('');
+
+        html = `
+          <!-- 1. 碧墨幽水暗角 -->
+          <div class="absolute inset-0 pointer-events-none z-10 opacity-0"
+               style="background: radial-gradient(circle, transparent 28%, rgba(6,78,59,0.45) 65%, rgba(1,36,25,0.92) 100%); animation: xian-vignette-pulse 1.15s cubic-bezier(0.1, 0.8, 0.2, 1) both;"></div>
+
+          <!-- 2. 全屏剑意横贯光带与翡翠道芒 (GPU scaleY 驱动) -->
+          <div class="absolute h-28 w-[190vw] bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent left-1/2 top-1/2 opacity-0 z-10"
+               style="animation: s-sword-slash 0.95s 0.22s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;"></div>
+          <div class="absolute h-2 bg-gradient-to-r from-transparent via-emerald-200 to-transparent w-[190vw] left-1/2 top-1/2 opacity-0 z-20 shadow-[0_0_35px_#34d399,0_0_70px_#10b981]"
+               style="animation: s-sword-slash 0.95s 0.22s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;"></div>
+
+          <!-- 3. 水墨青莲虚空盛放 (SVG) -->
+          <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] opacity-0 z-15 pointer-events-none glow-sword"
+               style="animation: s-lotus-bloom 1.25s 0.18s cubic-bezier(0.14, 1, 0.28, 1) both; will-change: transform, opacity;">
+            <svg viewBox="0 0 200 200" class="w-full h-full fill-none stroke-current text-emerald-400">
+              <defs>
+                <linearGradient id="lotus-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#a7f3d0" stop-opacity="0.9"/>
+                  <stop offset="60%" stop-color="#059669" stop-opacity="0.4"/>
+                  <stop offset="100%" stop-color="#022c22" stop-opacity="0.1"/>
+                </linearGradient>
+              </defs>
+              <!-- 8瓣青莲舒展 -->
+              <g transform="translate(100,100)">
+                ${[0, 45, 90, 135, 180, 225, 270, 315].map(deg => `
+                  <path d="M0,0 C-18,-40 -25,-75 0,-95 C25,-75 18,-40 0,0" fill="url(#lotus-grad)" stroke="#34d399" stroke-width="1.8" transform="rotate(${deg})"/>
+                `).join('')}
+                <!-- 莲心金芒与太极轮廓 -->
+                <circle cx="0" cy="0" r="18" fill="#ecfdf5" stroke="#fbbf24" stroke-width="2.5" class="glow-gold"/>
+                <circle cx="0" cy="0" r="9" fill="#047857"/>
+              </g>
+            </svg>
+          </div>
+
+          <!-- 4. 凌霄剑仙残影极速瞬步穿刺 -->
+          <div class="absolute left-1/2 top-1/2 opacity-0 z-30"
+               style="animation: s-hero-dash 1.2s cubic-bezier(0.14, 1, 0.28, 1) both; will-change: transform, opacity, filter;">
+            <div class="w-36 h-36 sm:w-44 sm:h-44 rounded-full border-4 border-emerald-400 overflow-hidden shadow-[0_0_45px_#10b981] bg-black p-1">
+              <img src="${hero.img}" class="w-full h-full object-cover rounded-full filter contrast-125">
+            </div>
+          </div>
+
+          <!-- 5. 居中修仙大篆墨印「 誅 」/「 斬 仙 」 -->
+          <div class="absolute left-1/2 top-1/2 opacity-0 z-30 flex flex-col items-center pointer-events-none"
+               style="animation: s-calligraphy-stamp 1.25s 0.26s cubic-bezier(0.14, 1, 0.28, 1) both; will-change: transform, opacity;">
+            <div class="font-calligraphy text-[clamp(5.5rem,14vw,13rem)] font-black text-emerald-400 drop-shadow-[0_0_45px_#10b981] text-outline tracking-wider">
+              ${n > 1 ? '斬 仙' : '誅'}
+            </div>
+            <!-- 朱砂方印 -->
+            <div class="px-4 py-0.5 bg-red-900/90 border border-red-500/80 rounded shadow-[0_0_15px_rgba(239,68,68,0.7)] text-red-100 text-[10px] sm:text-xs font-bold tracking-[0.6em] uppercase -mt-4 sm:-mt-6">
+              一 劍 破 萬 法
+            </div>
+          </div>
+
+          <!-- 6. 右侧受击敌人碎裂区 -->
+          <div class="absolute right-[12vw] top-1/2 -translate-y-1/2 z-20 flex items-center gap-3 sm:gap-6">
+            ${enemiesHtml}
+          </div>
+        `;
+      }
+
+      // ========================================================
+      // 方案 2：【远程 · 神识锁天】(八卦神盘 · 穿云贯日)
+      // ========================================================
+      else if (currentScheme === 2) {
+        overlay.className += ' bg-[#0f0904]/85';
+        killDelay = 250;
+        playSound('shot', 1.0);
+        synthXianxiaSound('bowRelease');
+
+        const enemiesHtml = killedEnemies.map(enemy => `
+          <div class="flex flex-col items-center gap-1.5 shrink-0">
+            <div style="width:${unitSize};height:${unitSize};" class="relative flex items-center justify-center">
+              
+              <!-- 天罡八卦神识锁敌罗盘 (Bespoke Xianxia Scope SVG) -->
+              <div class="absolute left-1/2 top-1/2 opacity-0 z-30 pointer-events-none"
+                   style="width:130%; height:130%; animation: r-scope-lock 1.1s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;">
+                <svg viewBox="0 0 100 100" class="w-full h-full text-amber-400 fill-none stroke-current glow-gold">
+                  <!-- 外周天卦象环（顺时针极速自转） -->
+                  <g style="transform-origin: 50% 50%; animation: r-bagua-spin 10s linear infinite;">
+                    <circle cx="50" cy="50" r="46" stroke-width="1.8" stroke="#f59e0b" stroke-dasharray="10 3 3 3"/>
+                    <circle cx="50" cy="50" r="41" stroke-width="1" stroke="#d97706" opacity="0.6"/>
+                    <!-- 乾 ☰ (top) -->
+                    <line x1="46" y1="9" x2="54" y2="9" stroke-width="1.8" stroke="#fef08a"/>
+                    <line x1="46" y1="12" x2="54" y2="12" stroke-width="1.8" stroke="#fef08a"/>
+                    <line x1="46" y1="15" x2="54" y2="15" stroke-width="1.8" stroke="#fef08a"/>
+                    <!-- 坤 ☷ (bottom) -->
+                    <line x1="46" y1="85" x2="49" y2="85" stroke-width="1.8" stroke="#fef08a"/>
+                    <line x1="51" y1="85" x2="54" y2="85" stroke-width="1.8" stroke="#fef08a"/>
+                    <line x1="46" y1="88" x2="49" y2="88" stroke-width="1.8" stroke="#fef08a"/>
+                    <line x1="51" y1="88" x2="54" y2="88" stroke-width="1.8" stroke="#fef08a"/>
+                    <line x1="46" y1="91" x2="49" y2="91" stroke-width="1.8" stroke="#fef08a"/>
+                    <line x1="51" y1="91" x2="54" y2="91" stroke-width="1.8" stroke="#fef08a"/>
+                    <!-- 离 ☲ (right) -->
+                    <line x1="86" y1="46" x2="92" y2="46" stroke-width="1.8" stroke="#fef08a"/>
+                    <line x1="86" y1="49" x2="88.5" y2="49" stroke-width="1.8" stroke="#fef08a"/>
+                    <line x1="89.5" y1="49" x2="92" y2="49" stroke-width="1.8" stroke="#fef08a"/>
+                    <line x1="86" y1="52" x2="92" y2="52" stroke-width="1.8" stroke="#fef08a"/>
+                    <!-- 坎 ☵ (left) -->
+                    <line x1="8" y1="46" x2="10.5" y2="46" stroke-width="1.8" stroke="#fef08a"/>
+                    <line x1="11.5" y1="46" x2="14" y2="46" stroke-width="1.8" stroke="#fef08a"/>
+                    <line x1="8" y1="49" x2="14" y2="49" stroke-width="1.8" stroke="#fef08a"/>
+                    <line x1="8" y1="52" x2="10.5" y2="52" stroke-width="1.8" stroke="#fef08a"/>
+                    <line x1="11.5" y1="52" x2="14" y2="52" stroke-width="1.8" stroke="#fef08a"/>
+                  </g>
+
+                  <!-- 核心太极阴阳游鱼自转 -->
+                  <g style="transform-origin: 50% 50%; animation: r-taiji-spin-rev 4s linear infinite;">
+                    <circle cx="50" cy="50" r="16" stroke-width="1.5" stroke="#f59e0b" fill="rgba(245,158,11,0.1)"/>
+                    <path d="M50,34 A8,8 0 0,1 50,50 A8,8 0 0,0 50,66 A16,16 0 0,0 50,34 Z" fill="#fbbf24"/>
+                    <circle cx="50" cy="42" r="2.5" fill="#1c1917"/>
+                    <circle cx="50" cy="58" r="2.5" fill="#fef3c7"/>
+                  </g>
+
+                  <!-- 神识四象准心卡尺 (向内急停锁死) -->
+                  <line x1="50" y1="20" x2="50" y2="31" stroke-width="2.5" stroke="#ef4444"/>
+                  <line x1="50" y1="69" x2="50" y2="80" stroke-width="2.5" stroke="#ef4444"/>
+                  <line x1="20" y1="50" x2="31" y2="50" stroke-width="2.5" stroke="#ef4444"/>
+                  <line x1="69" y1="50" x2="80" y2="50" stroke-width="2.5" stroke="#ef4444"/>
+                  <!-- 锁魂四方小符印 -->
+                  <text x="50" y="27" font-size="6" fill="#f87171" font-weight="bold" text-anchor="middle">定</text>
+                  <text x="50" y="78" font-size="6" fill="#f87171" font-weight="bold" text-anchor="middle">封</text>
+                  <text x="25" y="52" font-size="6" fill="#f87171" font-weight="bold" text-anchor="middle">滅</text>
+                  <text x="75" y="52" font-size="6" fill="#f87171" font-weight="bold" text-anchor="middle">破</text>
+                </svg>
+              </div>
+
+              <!-- 纯阳激波扩散环 -->
+              <div class="absolute left-1/2 top-1/2 rounded-full border-2 border-amber-400 opacity-0 z-20 pointer-events-none"
+                   style="width:75%; height:75%; animation: r-shock-wave 0.65s 0.22s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;"></div>
+
+              <!-- 敌人被神箭正中命门，四象限激射崩碎 -->
+              <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(0 0, 50% 0, 50% 50%, 0 50%); animation: r-shatter-tl 0.8s 0.22s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+              <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(50% 0, 100% 0, 100% 50%, 50% 50%); animation: r-shatter-tr 0.8s 0.22s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+              <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(0 50%, 50% 50%, 50% 100%, 0 100%); animation: r-shatter-bl 0.8s 0.22s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+              <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(50% 50%, 100% 50%, 100% 100%, 50% 100%); animation: r-shatter-br 0.8s 0.22s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+
+              <!-- 飞散燃烧的金色道家符箓 -->
+              <div class="absolute w-5 h-7 bg-amber-400 border border-red-600 rounded-sm opacity-0 flex items-center justify-center pointer-events-none"
+                   style="--tx:-70px; --ty:-60px; --tr:-120deg; animation: r-talisman-burn 0.8s 0.24s ease-out both;">
+                <span class="text-[7px] font-black text-red-700">敕令</span>
+              </div>
+              <div class="absolute w-5 h-7 bg-amber-400 border border-red-600 rounded-sm opacity-0 flex items-center justify-center pointer-events-none"
+                   style="--tx:75px; --ty:-50px; --tr:140deg; animation: r-talisman-burn 0.8s 0.26s ease-out both;">
+                <span class="text-[7px] font-black text-red-700">誅邪</span>
+              </div>
+              <div class="absolute w-4 h-6 bg-amber-300 border border-red-600 rounded-sm opacity-0 flex items-center justify-center pointer-events-none"
+                   style="--tx:55px; --ty:65px; --tr:-80deg; animation: r-talisman-burn 0.8s 0.25s ease-out both;">
+                <span class="text-[6px] font-black text-red-700">神行</span>
+              </div>
+            </div>
+            <div class="text-amber-300 text-xs font-black tracking-widest whitespace-nowrap drop-shadow-[0_0_8px_#d97706]">${enemy.name}</div>
+          </div>
+        `).join('');
+
+        html = `
+          <!-- 1. 苍茫赤金星宿晕影 -->
+          <div class="absolute inset-0 pointer-events-none z-10 opacity-0"
+               style="background: radial-gradient(circle, transparent 25%, rgba(180,83,9,0.4) 65%, rgba(69,26,3,0.92) 100%); animation: xian-vignette-pulse 1.1s cubic-bezier(0.1, 0.8, 0.2, 1) both;"></div>
+
+          <!-- 2. 左侧太清神射手相框 -->
+          <div class="absolute left-[8vw] top-1/2 -translate-y-1/2 opacity-0 z-20"
+               style="animation: hero-cloud-in 0.28s cubic-bezier(0.12, 0.8, 0.3, 1) both; will-change: transform, opacity;">
+            <div class="w-32 h-32 sm:w-40 sm:h-40 rounded-2xl border-2 border-amber-400 bg-stone-900 shadow-[0_0_35px_rgba(245,158,11,0.6)] p-1.5 relative overflow-hidden">
+              <div class="absolute top-1 left-2 text-[9px] font-bold text-amber-300 tracking-wider">道号: ${hero.name}</div>
+              <img src="${hero.img}" class="w-full h-full object-cover rounded-xl filter contrast-125">
+            </div>
+          </div>
+
+          <!-- 3. 居中落日仙印大字「 破 」/「 誅 邪 」 -->
+          <div class="absolute left-1/2 top-1/2 opacity-0 z-30 flex flex-col items-center pointer-events-none"
+               style="animation: s-calligraphy-stamp 1.15s 0.2s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;">
+            <div class="font-calligraphy text-[clamp(5.5rem,14vw,13rem)] font-black text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-400 to-rose-600 drop-shadow-[0_0_50px_#f59e0b] tracking-wider whitespace-nowrap">
+              ${n > 1 ? '誅 邪' : '破'}
+            </div>
+            <!-- 朱砂方印 -->
+            <div class="px-4 py-0.5 bg-amber-950/90 border border-amber-500/80 rounded shadow-[0_0_15px_rgba(245,158,11,0.7)] text-amber-100 text-[10px] sm:text-xs font-bold tracking-[0.6em] uppercase -mt-4 sm:-mt-6">
+              乾 坤 定 敕 令
+            </div>
+          </div>
+
+          <!-- 4. 纯阳飞星落日神箭贯穿火线 -->
+          <div class="absolute left-1/2 top-1/2 w-[180vw] h-2.5 bg-gradient-to-r from-transparent via-amber-200 to-rose-600 opacity-0 z-30 shadow-[0_0_30px_#f59e0b,0_0_60px_#ea580c]"
+               style="animation: r-arrow-beam 0.65s 0.2s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;"></div>
+
+          <!-- 5. 右侧目标区 -->
+          <div class="absolute right-[10vw] top-1/2 -translate-y-1/2 z-20 flex items-center gap-3 sm:gap-6">
+            ${enemiesHtml}
+          </div>
+        `;
+      }
+
+      // ========================================================
+      // 方案 3：【法术 · 紫霄神雷】(混沌归墟 · 天劫崩解)
+      // ========================================================
+      else {
+        overlay.className += ' bg-[#090214]/85';
+        killDelay = 260;
+        playSound('burst', 1.0);
+        synthXianxiaSound('thunderClap');
+
+        const enemiesHtml = killedEnemies.map(enemy => `
+          <div class="flex flex-col items-center gap-1 shrink-0">
+            <div style="width:${unitSize};height:${unitSize};" class="relative flex items-center justify-center">
+              <!-- 空间碎镜 4 象限两段式顿帧崩解 (Hitstop 150ms) -->
+              <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(0 0, 50% 0, 50% 50%, 0 50%); animation: m-shard-1 0.9s 0.24s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+              <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(50% 0, 100% 0, 100% 50%, 50% 50%); animation: m-shard-2 0.9s 0.24s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+              <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(0 50%, 50% 50%, 50% 100%, 0 100%); animation: m-shard-3 0.9s 0.24s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+              <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(50% 50%, 100% 50%, 100% 100%, 50% 100%); animation: m-shard-4 0.9s 0.24s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+            </div>
+            <div class="text-purple-300 text-xs font-black tracking-widest whitespace-nowrap drop-shadow-[0_0_8px_#9333ea]">${enemy.name}</div>
+          </div>
+        `).join('');
+
+        html = `
+          <!-- 1. 紫极幽冥虚空暗角 -->
+          <div class="absolute inset-0 pointer-events-none z-10 opacity-0"
+               style="background: radial-gradient(circle, transparent 20%, rgba(88,28,135,0.45) 60%, rgba(15,3,25,0.95) 100%); animation: xian-vignette-pulse 1.2s cubic-bezier(0.1, 0.8, 0.2, 1) both;"></div>
+
+          <!-- 2. 全屏混沌太极混元大阵 (SVG 巨型法阵显现) -->
+          <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[520px] opacity-0 z-10 pointer-events-none glow-thunder"
+               style="animation: m-taiji-array 1.35s 0.1s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;">
+            <svg viewBox="0 0 200 200" class="w-full h-full fill-none stroke-current text-purple-400">
+              <!-- 外圈雷符刻印 -->
+              <circle cx="100" cy="100" r="92" stroke-width="2" stroke="#c084fc" stroke-dasharray="8 4 2 4"/>
+              <circle cx="100" cy="100" r="82" stroke-width="1.2" stroke="#9333ea" opacity="0.6"/>
+              <!-- 太极双鱼 -->
+              <g transform="translate(100,100)">
+                <circle cx="0" cy="0" r="60" stroke-width="2" stroke="#a855f7" fill="rgba(88,28,135,0.2)"/>
+                <path d="M0,-60 A30,30 0 0,1 0,0 A30,30 0 0,0 0,60 A60,60 0 0,0 0,-60 Z" fill="#9333ea" opacity="0.4"/>
+                <circle cx="0" cy="-30" r="8" fill="#fdf4ff"/>
+                <circle cx="0" cy="30" r="8" fill="#581c87"/>
+              </g>
+            </svg>
+          </div>
+
+          <!-- 3. 九天狂暴紫霄雷霆直落苍穹 (SVG 分支狂雷) -->
+          <div class="absolute inset-x-0 top-0 h-full opacity-0 z-25 pointer-events-none glow-thunder"
+               style="animation: m-thunder-strike 0.75s 0.22s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;">
+            <svg viewBox="0 0 1000 800" preserveAspectRatio="none" class="w-full h-full stroke-current fill-none">
+              <!-- 紫色雷浆外焰 -->
+              <path d="M500,0 L530,180 L480,290 L560,420 L510,540 L620,680 L590,800" stroke="#a855f7" stroke-width="18" opacity="0.6"/>
+              <path d="M480,290 L410,380 L430,460 L380,550" stroke="#9333ea" stroke-width="10" opacity="0.5"/>
+              <path d="M560,420 L660,500 L640,610 L720,720" stroke="#9333ea" stroke-width="12" opacity="0.5"/>
+              
+              <!-- 纯白炽烈雷芯 -->
+              <path d="M500,0 L530,180 L480,290 L560,420 L510,540 L620,680 L590,800" stroke="#ffffff" stroke-width="4"/>
+              <path d="M480,290 L410,380 L430,460 L380,550" stroke="#ffffff" stroke-width="2.5"/>
+              <path d="M560,420 L660,500 L640,610 L720,720" stroke="#ffffff" stroke-width="3"/>
+            </svg>
+          </div>
+
+          <!-- 4. 左侧玄天法尊入场 -->
+          <div class="absolute left-[8vw] top-1/2 -translate-y-1/2 opacity-0 z-20"
+               style="animation: hero-cloud-in 0.28s cubic-bezier(0.12, 0.8, 0.3, 1) both; will-change: transform, opacity;">
+            <div class="w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-purple-400 overflow-hidden shadow-[0_0_40px_#a855f7] bg-gray-950 p-1">
+              <img src="${hero.img}" class="w-full h-full object-cover rounded-full filter contrast-125">
+            </div>
+          </div>
+
+          <!-- 5. 居中雷劫湮灭大篆「 劫 」/「 寂 滅 」 -->
+          <div class="absolute left-1/2 top-1/2 opacity-0 z-30 flex flex-col items-center pointer-events-none"
+               style="animation: s-calligraphy-stamp 1.2s 0.24s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;">
+            <div class="font-calligraphy text-[clamp(5.5rem,14vw,13rem)] font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-fuchsia-200 to-rose-400 drop-shadow-[0_0_55px_#a855f7] tracking-wider whitespace-nowrap">
+              ${n > 1 ? '寂 滅' : '劫'}
+            </div>
+            <!-- 紫金方印 -->
+            <div class="px-4 py-0.5 bg-purple-950/90 border border-purple-400/80 rounded shadow-[0_0_15px_rgba(168,85,247,0.7)] text-purple-100 text-[10px] sm:text-xs font-bold tracking-[0.6em] uppercase -mt-4 sm:-mt-6">
+              萬 象 歸 太 虛
+            </div>
+          </div>
+
+          <!-- 6. 右侧被雷劫湮灭的目标区 -->
+          <div class="absolute right-[10vw] top-1/2 -translate-y-1/2 z-20 flex items-center gap-3 sm:gap-6">
+            ${enemiesHtml}
+          </div>
+        `;
+      }
+
+      overlay.innerHTML = html;
+      document.body.appendChild(overlay);
+
+      // 定时触发击杀音效与强震屏
+      setTimeout(() => {
+        playSound('kill', 1.0);
+        if (currentScheme === 1) playSound('combatKill', 1.0);
+        else if (currentScheme === 3) playSound('magicKill', 1.0);
+        triggerShake('heavy');
+      }, killDelay);
+
+      // 动画完成清理
+      setTimeout(() => {
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+          overlay.remove();
+          isAnimating = false;
+        }, 320);
+      }, 1500);
+    }
+
+    // 初始化渲染
+    window.addEventListener('DOMContentLoaded', () => {
+      renderEnemies();
+    });
+  </script>
+</body>
+</html>

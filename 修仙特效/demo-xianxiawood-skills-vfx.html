@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>修仙四式 · 水墨青莲道法演练场</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600;700;900&family=JetBrains+Mono:wght@500;700&display=swap');
+    
+    body {
+      font-family: 'Noto Serif SC', serif;
+      user-select: none;
+      background: radial-gradient(circle at 50% 40%, #061f18 0%, #030d0a 55%, #010403 100%);
+    }
+    .font-calligraphy { font-family: 'Ma Shan Zheng', cursive, 'STKaiti', serif; }
+    .font-mono-code { font-family: 'JetBrains Mono', monospace; }
+    
+    .glass-panel {
+      background: rgba(4, 18, 14, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(52, 211, 153, 0.2);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 25px rgba(16, 185, 129, 0.12);
+    }
+    .glass-card {
+      background: rgba(5, 23, 18, 0.65);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(52, 211, 153, 0.15);
+    }
+    
+    .glow-wood { filter: drop-shadow(0 0 12px rgba(52, 211, 153, 0.75)); }
+    .glow-fire { filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.85)); }
+    .glow-ink { filter: drop-shadow(0 0 14px rgba(6, 78, 59, 0.9)); }
+    
+    /* 硬件加速受击震屏基座 */
+    .shake-light { animation: s-light 0.18s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; will-change: transform; }
+    .shake-heavy { animation: s-heavy 0.32s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; will-change: transform; }
+    .shake-quake { animation: s-quake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; will-change: transform; }
+    @keyframes s-light {
+      0%, 100% { transform: translate3d(0, 0, 0); }
+      25% { transform: translate3d(-3px, 2px, 0); }
+      75% { transform: translate3d(3px, -2px, 0); }
+    }
+    @keyframes s-heavy {
+      0%, 100% { transform: translate3d(0, 0, 0); }
+      20% { transform: translate3d(-6px, 4px, 0) rotate(-0.5deg); }
+      40% { transform: translate3d(6px, -4px, 0) rotate(0.5deg); }
+      60% { transform: translate3d(-3px, 2px, 0); }
+      80% { transform: translate3d(3px, -1px, 0); }
+    }
+    @keyframes s-quake {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+      15% { transform: translate3d(-10px, 6px, 0) scale(1.02); }
+      30% { transform: translate3d(9px, -7px, 0) scale(0.99); }
+      50% { transform: translate3d(-6px, 4px, 0); }
+      75% { transform: translate3d(4px, -2px, 0); }
+    }
+
+    /* 目标受击硬直与 steps(1) 闪色 */
+    @keyframes target-flinch {
+      0% { transform: scale(1); }
+      25% { transform: scale(0.94) translateY(4px); }
+      60% { transform: scale(1.02) translateY(-2px); }
+      100% { transform: scale(1) translateY(0); }
+    }
+    @keyframes target-flash-wood {
+      0%, 40% { filter: brightness(2.5) drop-shadow(0 0 20px #34d399); }
+      41%, 100% { filter: none; }
+    }
+    @keyframes target-flash-cyanfire {
+      0%, 45% { filter: brightness(3.2) drop-shadow(0 0 26px #06b6d4) drop-shadow(0 0 40px #10b981); }
+      46%, 100% { filter: none; }
+    }
+
+    /* ========================================================
+       【青莲离火变】水墨青莲大招关键帧体系 (批次五 steps(1) 纪律)
+       ======================================================== */
+    /* 1. 暗场蓄能压栈 */
+    @keyframes lotus-vignette {
+      0% { opacity: 0; }
+      20%, 75% { opacity: 0.82; }
+      100% { opacity: 0; }
+    }
+    /* 2. 太极水墨青莲底阵展开与旋转 */
+    @keyframes lotus-taiji-spin {
+      0% { transform: scale(0.2) rotate(0deg); opacity: 0; }
+      25% { transform: scale(1.1) rotate(120deg); opacity: 0.95; }
+      40% { transform: scale(1) rotate(180deg); opacity: 1; }
+      75% { transform: scale(1.05) rotate(320deg); opacity: 0.9; }
+      100% { transform: scale(1.4) rotate(420deg); opacity: 0; }
+    }
+    /* 3. 九品通透翡翠水墨莲台舒展盛放 */
+    @keyframes lotus-bloom-main {
+      0% { transform: scale(0.15) rotate(-20deg); opacity: 0; }
+      28% { transform: scale(1.18) rotate(5deg); opacity: 1; }
+      40% { transform: scale(1.0) rotate(0deg); opacity: 1; }
+      72% { transform: scale(1.08) rotate(15deg); opacity: 0.9; }
+      100% { transform: scale(1.5) rotate(30deg); opacity: 0; }
+    }
+    /* 4. 莲心离火神核塌缩与 Hitstop 定格 */
+    @keyframes lotus-core-implode {
+      0% { transform: scale(2.4); opacity: 0; }
+      22% { transform: scale(0.18); opacity: 1; }
+      36% { transform: scale(0.22); opacity: 1; } /* 36%前为绝对定格帧 Hitstop */
+      45% { transform: scale(2.8); opacity: 1; }
+      75% { transform: scale(3.4); opacity: 0.6; }
+      100% { transform: scale(4.0); opacity: 0; }
+    }
+    @keyframes lotus-core-flash {
+      0% { filter: blur(8px); }
+      22%, 70% { filter: brightness(3.5) drop-shadow(0 0 20px #34d399) drop-shadow(0 0 35px #06b6d4); }
+      71%, 100% { filter: blur(6px) brightness(1.8) drop-shadow(0 0 15px #10b981); }
+    }
+    /* 5. 离火破劫十字光棱（横向与纵向） */
+    @keyframes lotus-beam-h {
+      0%, 34% { transform: scaleX(0) scaleY(0.2); opacity: 0; }
+      43% { transform: scaleX(1.5) scaleY(2.2); opacity: 1; }
+      65% { transform: scaleX(1.9) scaleY(0.8); opacity: 0.85; }
+      100% { transform: scaleX(2.3) scaleY(0); opacity: 0; }
+    }
+    @keyframes lotus-beam-v {
+      0%, 34% { transform: scaleX(0.2) scaleY(0); opacity: 0; }
+      43% { transform: scaleX(2.2) scaleY(1.5); opacity: 1; }
+      65% { transform: scaleX(0.8) scaleY(1.9); opacity: 0.85; }
+      100% { transform: scaleX(0) scaleY(2.3); opacity: 0; }
+    }
+    @keyframes lotus-beam-flash {
+      0%, 43% { filter: brightness(3.2) drop-shadow(0 0 16px #34d399); }
+      44%, 100% { filter: drop-shadow(0 0 12px #059669); }
+    }
+    /* 6. 飞舞水墨金翡莲瓣 */
+    @keyframes lotus-petal-burst {
+      0% { transform: translate(0, 0) rotate(var(--rot, 0deg)) scale(0.3); opacity: 0; }
+      38% { opacity: 1; }
+      60% { transform: translate(var(--tx, 80px), var(--ty, -80px)) rotate(calc(var(--rot, 0deg) + 70deg)) scale(1.15); opacity: 0.95; }
+      100% { transform: translate(calc(var(--tx, 80px) * 1.6), calc(var(--ty, -80px) * 1.6)) rotate(calc(var(--rot, 0deg) + 160deg)) scale(0.1); opacity: 0; }
+    }
+    @keyframes lotus-petal-flash {
+      0%, 42% { filter: brightness(2.2) drop-shadow(0 0 8px #6ee7b7); }
+      43%, 100% { filter: drop-shadow(0 0 6px #059669); }
+    }
+
+    /* ========================================================
+       【碧影千叶杀】木系群攻：双环风涡 + 千叶突刺 + 飞花爆散
+       ======================================================== */
+    @keyframes leaf-swirl-ring {
+      0% { transform: scale(0.2) rotate(0deg); opacity: 0; }
+      30% { transform: scale(1.1) rotate(180deg); opacity: 0.9; }
+      70% { transform: scale(1.0) rotate(380deg); opacity: 0.7; }
+      100% { transform: scale(1.3) rotate(540deg); opacity: 0; }
+    }
+    @keyframes leaf-blade-pierce {
+      0% { transform: translate(var(--lx, 0px), var(--ly, 0px)) rotate(var(--lr, 0deg)) scale(0.2); opacity: 0; }
+      20% { opacity: 1; }
+      45% { transform: translate(calc(var(--lx, 0px) * 0.2), calc(var(--ly, 0px) * 0.2)) rotate(calc(var(--lr, 0deg) + 30deg)) scale(1.2); opacity: 1; }
+      60% { transform: translate(0, 0) rotate(calc(var(--lr, 0deg) + 60deg)) scale(1.4); opacity: 1; }
+      100% { transform: translate(calc(var(--lx, 0px) * -0.6), calc(var(--ly, 0px) * -0.6)) rotate(calc(var(--lr, 0deg) + 120deg)) scale(0.2); opacity: 0; }
+    }
+    @keyframes leaf-flash-steps {
+      0%, 45% { filter: brightness(2.6) drop-shadow(0 0 10px #4ade80); }
+      46%, 100% { filter: drop-shadow(0 0 6px #15803d); }
+    }
+
+    /* ========================================================
+       【青藤缚】木系控制：地脉开裂 + 双龙合抱荆棘狂藤内勒
+       ======================================================== */
+    @keyframes vine-crack-expand {
+      0% { transform: scaleX(0.1) scaleY(0.2); opacity: 0; }
+      25% { transform: scaleX(1.1) scaleY(1); opacity: 0.95; }
+      75% { transform: scaleX(1.0) scaleY(1); opacity: 0.8; }
+      100% { transform: scaleX(1.2) scaleY(0.8); opacity: 0; }
+    }
+    @keyframes vine-clinch-left {
+      0% { transform: translate(-70px, 60px) rotate(-35deg) scale(0.3); opacity: 0; }
+      35% { transform: translate(0px, -5px) rotate(5deg) scale(1.15); opacity: 1; } /* 超调内勒 */
+      48%, 78% { transform: translate(-4px, 0px) rotate(0deg) scale(1.0); opacity: 1; } /* 锁死死死咬合态 */
+      100% { transform: translate(-30px, 40px) rotate(-20deg) scale(0.4); opacity: 0; }
+    }
+    @keyframes vine-clinch-right {
+      0% { transform: translate(70px, 60px) rotate(35deg) scale(0.3); opacity: 0; }
+      35% { transform: translate(0px, -5px) rotate(-5deg) scale(1.15); opacity: 1; }
+      48%, 78% { transform: translate(4px, 0px) rotate(0deg) scale(1.0); opacity: 1; }
+      100% { transform: translate(30px, 40px) rotate(20deg) scale(0.4); opacity: 0; }
+    }
+    @keyframes vine-flash-steps {
+      0%, 35% { filter: brightness(2.2) drop-shadow(0 0 14px #22c55e); }
+      36%, 100% { filter: drop-shadow(0 0 8px #14532d); }
+    }
+
+    /* ========================================================
+       【青莲火弹】木火普通：三瓣青莲裹炽焰 + 离火拖尾 + 接触爆鸣
+       ======================================================== */
+    @keyframes bullet-fly {
+      0% { transform: translate(-140px, -70px) scale(0.5); opacity: 0; }
+      25% { opacity: 1; transform: translate(-70px, -35px) scale(1.05); }
+      55% { transform: translate(0px, 0px) scale(1.2); opacity: 1; }
+      100% { transform: translate(0px, 0px) scale(1.8); opacity: 0; }
+    }
+    @keyframes bullet-blast-ring {
+      0% { transform: scale(0.2); opacity: 1; }
+      50% { transform: scale(1.5); opacity: 0.85; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+    @keyframes bullet-flash-steps {
+      0%, 55% { filter: brightness(3.0) drop-shadow(0 0 16px #06b6d4); }
+      56%, 100% { filter: drop-shadow(0 0 8px #10b981); }
+    }
+    /* ===== 水墨山水氛围层 ===== */
+    .ink-bg { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+    .ink-mountain { position: absolute; left: -10%; width: 120%; bottom: 0; }
+    .ink-fog { position: absolute; width: 200%; height: 40%; left: 0; background:
+      radial-gradient(ellipse at 20% 50%, rgba(167,243,208,0.07) 0%, transparent 45%),
+      radial-gradient(ellipse at 60% 40%, rgba(110,231,183,0.06) 0%, transparent 40%),
+      radial-gradient(ellipse at 85% 60%, rgba(167,243,208,0.05) 0%, transparent 45%);
+      animation: fog-drift 38s linear infinite; will-change: transform; }
+    @keyframes fog-drift { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    .moon { position: absolute; top: 7%; right: 12%; width: 120px; height: 120px; border-radius: 50%;
+      background: radial-gradient(circle at 40% 40%, #f0fdf4 0%, #bbf7d0 35%, rgba(16,185,129,0.15) 70%, transparent 72%);
+      box-shadow: 0 0 80px 20px rgba(110,231,183,0.12); opacity: 0.55; }
+    #fx-canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 45; mix-blend-mode: screen; }
+    .vignette { position: fixed; inset: 0; pointer-events: none; z-index: 1;
+      background: radial-gradient(ellipse at 50% 45%, transparent 40%, rgba(0,0,0,0.75) 100%); }
+
+    /* ===== 书法技能名横幅 ===== */
+    #skill-banner { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 60; pointer-events: none; opacity: 0; }
+    #skill-banner.show { animation: banner-in 1.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    #skill-banner .brush { position: absolute; left: 50%; top: 50%; width: 140%; height: 70%; transform: translate(-50%, -50%);
+      background: linear-gradient(90deg, transparent, rgba(2,44,34,0.85) 15%, rgba(4,47,46,0.92) 50%, rgba(2,44,34,0.85) 85%, transparent);
+      filter: blur(2px); clip-path: polygon(2% 30%, 10% 10%, 50% 4%, 92% 12%, 99% 45%, 90% 88%, 50% 96%, 8% 86%); }
+    #skill-banner .txt { position: relative; font-family: 'Ma Shan Zheng', serif; font-size: 56px; letter-spacing: 0.3em; white-space: nowrap;
+      background: linear-gradient(180deg, #f0fdf4 10%, #6ee7b7 55%, #0d9488 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+      filter: drop-shadow(0 0 18px rgba(52,211,153,0.6)); padding: 0 0.4em; }
+    #skill-banner .seal { position: absolute; right: -36px; bottom: -6px; width: 34px; height: 34px; border: 2px solid #dc2626; color: #dc2626;
+      font-family: 'Ma Shan Zheng', serif; font-size: 13px; line-height: 14px; display: flex; align-items: center; justify-content: center;
+      text-align: center; transform: rotate(-8deg); background: rgba(127,29,29,0.15); }
+    @keyframes banner-in {
+      0% { opacity: 0; transform: translateX(-50%) scale(1.6); letter-spacing: 0.8em; }
+      18% { opacity: 1; transform: translateX(-50%) scale(0.96); }
+      28%, 72% { opacity: 1; transform: translateX(-50%) scale(1); }
+      100% { opacity: 0; transform: translateX(-50%) scale(1.04) translateY(-14px); }
+    }
+
+    /* ===== 技能卡升级 ===== */
+    .skill-card { position: relative; isolation: isolate; }
+    .skill-card::before { content: ''; position: absolute; inset: -1px; border-radius: inherit; z-index: -1; opacity: 0; transition: opacity .3s;
+      background: conic-gradient(from var(--ang, 0deg), transparent 0 70%, rgba(110,231,183,0.7) 85%, transparent 100%);
+      animation: card-spin 3s linear infinite; }
+    .skill-card:hover::before { opacity: 1; }
+    @property --ang { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+    @keyframes card-spin { to { --ang: 360deg; } }
+    .skill-card.cooldown { pointer-events: none; filter: grayscale(0.7) brightness(0.6); }
+    .skill-card .glyph { position: absolute; right: 8px; bottom: -6px; font-family: 'Ma Shan Zheng', serif; font-size: 44px; opacity: 0.08; pointer-events: none; }
+
+    /* 傀儡灵符悬浮 */
+    .talisman { position: absolute; width: 18px; height: 46px; background: linear-gradient(180deg, #fde68a, #f59e0b); border: 1px solid #b45309;
+      font-family: 'Ma Shan Zheng', serif; font-size: 11px; color: #991b1b; writing-mode: vertical-rl; display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 10px rgba(245,158,11,0.4); animation: tal-float 3.2s ease-in-out infinite alternate; }
+    @keyframes tal-float { from { transform: translateY(0) rotate(var(--r, -6deg)); } to { transform: translateY(-10px) rotate(calc(var(--r, -6deg) * -1)); } }
+    .breathe { animation: br 4s ease-in-out infinite alternate; }
+    @keyframes br { from { transform: translateY(0); } to { transform: translateY(-6px); } }
+    /* ===== 全屏大招层 ===== */
+    .fs-layer { position: fixed; inset: 0; pointer-events: none; z-index: 52; overflow: hidden; }
+    .fs-anchor { position: absolute; transform: translate(-50%, -50%); }
+    @keyframes fs-formation { 0% { transform: translate(-50%,-50%) scale(0.25) rotate(0deg); opacity: 0; } 35% { opacity: 0.85; } 100% { transform: translate(-50%,-50%) scale(1) rotate(160deg); opacity: 0.95; } }
+    @keyframes fs-formation-out { 0% { transform: translate(-50%,-50%) scale(1) rotate(160deg); opacity: 0.95; } 100% { transform: translate(-50%,-50%) scale(1.6) rotate(220deg); opacity: 0; } }
+    @keyframes fs-flash { 0% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes fs-lotus { 0% { transform: translate(-50%,-50%) scale(0.08) rotate(-40deg); opacity: 0; } 22% { transform: translate(-50%,-50%) scale(1.06) rotate(4deg); opacity: 1; } 34% { transform: translate(-50%,-50%) scale(1) rotate(0); } 75% { opacity: 0.85; } 100% { transform: translate(-50%,-50%) scale(1.4) rotate(18deg); opacity: 0; } }
+    @keyframes fs-pillar { 0% { transform: translateX(-50%) scaleX(0); opacity: 0; } 10% { transform: translateX(-50%) scaleX(1.6); opacity: 1; } 55% { transform: translateX(-50%) scaleX(1); opacity: 0.95; } 100% { transform: translateX(-50%) scaleX(0); opacity: 0; } }
+    @keyframes fs-beam-h { 0% { transform: translateY(-50%) scaleY(0) scaleX(0.1); opacity: 0; } 12% { transform: translateY(-50%) scaleY(1.5) scaleX(1); opacity: 1; } 100% { transform: translateY(-50%) scaleY(0) scaleX(1.1); opacity: 0; } }
+    @keyframes charge-ring { 0% { transform: translate(-50%,-50%) scale(3.2); opacity: 0; } 25% { opacity: 0.9; } 100% { transform: translate(-50%,-50%) scale(0.35); opacity: 1; } }
+    @keyframes charge-core { 0% { transform: translate(-50%,-50%) scale(0); opacity: 0; } 100% { transform: translate(-50%,-50%) scale(1); opacity: 1; } }
+    @keyframes fs-slash { 0% { transform: translate(-60vw, 0) rotate(var(--a)) scaleX(0.2); opacity: 0; } 25% { opacity: 1; transform: translate(0, 0) rotate(var(--a)) scaleX(1); } 100% { transform: translate(60vw, 0) rotate(var(--a)) scaleX(0.4); opacity: 0; } }
+    @keyframes fs-wind-band { 0% { transform: translate(-50%,-50%) scale(1.8) rotate(0); opacity: 0; } 30% { opacity: 0.7; } 100% { transform: translate(-50%,-50%) scale(0.5) rotate(-540deg); opacity: 0.9; } }
+    @keyframes fs-tint { 0% { opacity: 0; } 30%, 80% { opacity: 1; } 100% { opacity: 0; } }
+    /* ===== 小技能自然生灭 ===== */
+    .grow-path { stroke-dasharray: 1; stroke-dashoffset: 1; }
+    @keyframes draw-on { to { stroke-dashoffset: 0; } }
+    @keyframes pop-in { 0% { transform: scale(0) rotate(-40deg); } 70% { transform: scale(1.3) rotate(8deg); } 100% { transform: scale(1) rotate(0); } }
+    .fb { transform-box: fill-box; transform-origin: center; }
+    @keyframes vine-squeeze { 0%, 100% { transform: scale(1, 1); } 40% { transform: scale(0.86, 0.96); } 70% { transform: scale(0.93, 0.98); } }
+    @keyframes dissolve { 0% { opacity: 1; filter: none; } 100% { opacity: 0; filter: blur(4px); transform: translateY(10px); } }
+    @keyframes ground-glow { 0% { transform: translate(-50%,-50%) scaleX(0); opacity: 0; } 25% { transform: translate(-50%,-50%) scaleX(1); opacity: 1; } 75% { opacity: 0.8; } 100% { transform: translate(-50%,-50%) scaleX(1.15); opacity: 0; } }
+    @keyframes bud-bloom { 0% { transform: translate(-50%,-50%) scale(0) rotate(-120deg); opacity: 0; } 65% { transform: translate(-50%,-50%) scale(1.2) rotate(8deg); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1) rotate(0); opacity: 1; } }
+    @keyframes bud-release { 0% { transform: translate(-50%,-50%) scale(1); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.8) rotate(40deg); opacity: 0; } }
+    @keyframes hit-flash { 0% { transform: translate(-50%,-50%) scale(0.2); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; } }
+  </style>
+</head>
+<body class="bg-[#030907] text-[#ecfdf5] min-h-screen flex flex-col items-center justify-between overflow-x-hidden selection:bg-emerald-900 selection:text-emerald-100">
+
+  <!-- 水墨山水氛围 -->
+  <div class="ink-bg">
+    <div class="moon"></div>
+    <div class="ink-fog" style="top: 30%;"></div>
+    <svg class="ink-mountain" viewBox="0 0 1200 400" preserveAspectRatio="none" style="height: 55%; opacity: 0.35;">
+      <defs><linearGradient id="mt1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#134e4a"/><stop offset="1" stop-color="#020807" stop-opacity="0"/></linearGradient></defs>
+      <path d="M0,400 L0,250 Q80,170 160,220 T320,150 Q380,90 450,170 T620,120 Q700,60 780,160 T960,130 Q1050,80 1120,180 L1200,200 L1200,400 Z" fill="url(#mt1)"/>
+    </svg>
+    <div class="ink-fog" style="top: 55%; animation-duration: 26s; opacity: 0.8;"></div>
+    <svg class="ink-mountain" viewBox="0 0 1200 400" preserveAspectRatio="none" style="height: 38%; opacity: 0.7;">
+      <defs><linearGradient id="mt2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#042f2e"/><stop offset="1" stop-color="#010403"/></linearGradient></defs>
+      <path d="M0,400 L0,300 Q120,210 240,280 T480,240 Q560,180 660,260 T880,230 Q980,170 1080,260 L1200,250 L1200,400 Z" fill="url(#mt2)"/>
+    </svg>
+  </div>
+  <div class="vignette"></div>
+  <canvas id="fx-canvas"></canvas>
+  <div id="skill-banner"><div class="brush"></div><div class="txt" id="skill-banner-txt"></div><div class="seal">道<br>法</div></div>
+
+  <!-- 全屏暗场压栈层 (大招聚焦) -->
+  <div id="ultimate-overlay" class="fixed inset-0 bg-[#010403] pointer-events-none opacity-0 z-40 transition-opacity duration-300" style="background: radial-gradient(circle at 50% 45%, rgba(6,31,24,0.4) 0%, rgba(1,4,3,0.92) 80%);"></div>
+
+  <!-- 顶部标题 -->
+  <header class="w-full max-w-4xl pt-6 px-6 flex justify-between items-center z-20">
+    <div class="flex items-center space-x-3">
+      <span class="text-2xl text-emerald-400">☯</span>
+      <div>
+        <h1 class="font-calligraphy text-2xl tracking-wider text-emerald-200 drop-shadow-[0_0_12px_rgba(52,211,153,0.5)]">修仙道法 · 水墨青莲演练场</h1>
+        <p class="text-xs text-emerald-500/70 font-mono-code">VFX Prototype · Dual-Track Performance</p>
+      </div>
+    </div>
+    <div class="flex items-center space-x-3 text-xs">
+      <button id="btn-reset-dummy" class="px-3 py-1.5 rounded glass-card text-emerald-300 hover:text-white hover:border-emerald-400 transition">重置傀儡</button>
+      <div id="sound-status-pill" class="px-2.5 py-1 rounded bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 flex items-center space-x-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>Web Audio 纯合成链</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 中部战场核心靶位 (Battle Scene) -->
+  <main id="battle-scene" class="relative w-full max-w-3xl h-[420px] flex items-center justify-center z-10">
+    <!-- 背景虚空阵图光圈 -->
+    <div class="absolute w-[360px] h-[360px] rounded-full border border-emerald-500/10 pointer-events-none animate-[spin_60s_linear_infinite]">
+      <div class="absolute inset-2 rounded-full border border-dashed border-emerald-500/10"></div>
+    </div>
+
+    <!-- 特效挂载根节点 (固定在目标中心) -->
+    <div id="vfx-stage" class="absolute inset-0 pointer-events-none z-50"></div>
+
+    <!-- 受击目标：试道玄铁傀儡 -->
+    <div id="target-puppet" class="relative flex flex-col items-center justify-center cursor-pointer group breathe">
+      <div class="talisman" style="left: -34px; top: 90px; --r: -8deg;">镇</div>
+      <div class="talisman" style="right: -34px; top: 110px; --r: 7deg; animation-delay: -1.4s;">敕</div>
+      <!-- 傀儡血量与名札 -->
+      <div class="mb-3 text-center">
+        <div class="flex items-center justify-center space-x-2">
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-mono-code bg-emerald-950 border border-emerald-600/40 text-emerald-300">筑基后期</span>
+          <span class="font-calligraphy text-lg tracking-widest text-emerald-100 font-bold group-hover:text-emerald-300 transition">玄铁修罗傀儡</span>
+        </div>
+        <!-- 动态血条 -->
+        <div class="w-48 h-2 bg-emerald-950/90 rounded-full mt-2 border border-emerald-800/40 overflow-hidden relative">
+          <div id="target-hp-bar" class="h-full bg-gradient-to-r from-emerald-600 via-teal-400 to-emerald-300 transition-all duration-300" style="width: 100%;"></div>
+        </div>
+        <div class="flex justify-between text-[10px] font-mono-code text-emerald-400/70 mt-1 px-1">
+          <span>HP</span>
+          <span id="target-hp-text">8888 / 8888</span>
+        </div>
+      </div>
+
+      <!-- 傀儡 Sprite 身体 -->
+      <div id="puppet-sprite" class="relative w-36 h-48 rounded-2xl glass-card flex items-center justify-center transition duration-200 shadow-2xl border-emerald-500/30 overflow-hidden">
+        <!-- 内部太极纹路 -->
+        <svg viewBox="0 0 100 100" class="w-28 h-28 opacity-40 text-emerald-400 fill-current">
+          <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M50,5 A45,45 0 0,1 50,95 A22.5,22.5 0 0,1 50,50 A22.5,22.5 0 0,0 50,5 Z"/>
+          <circle cx="50" cy="27.5" r="5" fill="#030907"/>
+          <circle cx="50" cy="72.5" r="5" fill="currentColor"/>
+        </svg>
+        <span class="absolute bottom-2 text-[11px] font-mono-code text-emerald-400/50">受击靶位</span>
+      </div>
+
+      <!-- 动态飘字容器 -->
+      <div id="floating-text-container" class="absolute -top-12 pointer-events-none flex flex-col items-center"></div>
+      <!-- 异常状态指示 (如藤蔓束缚) -->
+      <div id="debuff-bar" class="mt-2 flex space-x-1.5 min-h-[22px]"></div>
+    </div>
+  </main>
+
+  <!-- 底部技能施放操纵台 -->
+  <footer class="w-full max-w-4xl pb-8 px-6 z-20">
+    <div class="glass-panel rounded-2xl p-4">
+      <div class="flex items-center justify-between mb-3 px-1 text-xs">
+        <span class="font-calligraphy text-base tracking-wider text-emerald-300">施法法诀 · 仙术联动</span>
+        <span class="text-emerald-500/70 text-[11px]">点击下方诀印即刻向傀儡施放对应道法</span>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <!-- 技能1: 青莲火弹 (普通) -->
+        <button data-glyph="火" id="skill-btn-huodan" class="p-3 rounded-xl glass-card hover:border-teal-400/60 active:scale-95 transition text-left relative overflow-hidden group skill-card">
+          <div class="flex items-center justify-between text-xs mb-1">
+            <span class="px-1.5 py-0.5 rounded text-[10px] bg-teal-950/80 text-teal-300 border border-teal-500/30">单体 · 普攻</span>
+            <span class="font-mono-code text-[11px] text-teal-400">10 MP</span>
+          </div>
+          <div class="font-calligraphy text-lg text-emerald-200 group-hover:text-teal-300 transition">【青莲火弹】</div>
+          <p class="text-[11px] text-emerald-400/60 mt-1 line-clamp-1">微型水墨青莲引信，瞬发青幽离火弹射</p>
+        </button>
+
+        <!-- 技能2: 青藤缚 (控制) -->
+        <button data-glyph="缚" id="skill-btn-tengfu" class="p-3 rounded-xl glass-card hover:border-emerald-400/60 active:scale-95 transition text-left relative overflow-hidden group skill-card">
+          <div class="flex items-center justify-between text-xs mb-1">
+            <span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">地煞 · 控制</span>
+            <span class="font-mono-code text-[11px] text-emerald-400">20 MP</span>
+          </div>
+          <div class="font-calligraphy text-lg text-emerald-200 group-hover:text-emerald-300 transition">【青藤缚】</div>
+          <p class="text-[11px] text-emerald-400/60 mt-1 line-clamp-1">地脉开裂，双龙合抱荆棘狂藤缠绕锁死</p>
+        </button>
+
+        <!-- 技能3: 碧影千叶杀 (群攻) -->
+        <button data-glyph="叶" id="skill-btn-qianye" class="p-3 rounded-xl glass-card hover:border-green-400/60 active:scale-95 transition text-left relative overflow-hidden group skill-card">
+          <div class="flex items-center justify-between text-xs mb-1">
+            <span class="px-1.5 py-0.5 rounded text-[10px] bg-green-950/80 text-green-300 border border-green-500/30">穿云 · 群攻</span>
+            <span class="font-mono-code text-[11px] text-green-400">25 MP</span>
+          </div>
+          <div class="font-calligraphy text-lg text-emerald-200 group-hover:text-green-300 transition">【碧影千叶杀】</div>
+          <p class="text-[11px] text-emerald-400/60 mt-1 line-clamp-1">双环风涡风刃对冲，16刃飞叶万刃穿心</p>
+        </button>
+
+        <!-- 技能4: 青莲离火变 (大招) -->
+        <button data-glyph="莲" id="skill-btn-lihuo" class="p-3 rounded-xl glass-card hover:border-cyan-400 active:scale-95 transition text-left relative overflow-hidden group skill-card border-cyan-500/40 bg-gradient-to-br from-emerald-950/40 via-teal-950/20 to-cyan-950/40">
+          <div class="flex items-center justify-between text-xs mb-1">
+            <span class="px-1.5 py-0.5 rounded text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-400/50 font-bold">造化 · 大招</span>
+            <span class="font-mono-code text-[11px] text-cyan-300 font-bold">50 MP</span>
+          </div>
+          <div class="font-calligraphy text-lg text-cyan-200 group-hover:text-cyan-100 transition drop-shadow-[0_0_8px_rgba(6,182,212,0.6)]">【青莲离火变】</div>
+          <p class="text-[11px] text-cyan-300/70 mt-1 line-clamp-1">暗场压栈/九品青莲盛绽/Hitstop定格/破劫裂空</p>
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+
+    // ========================================================
+    // 战场打击感与目标状态仿真器
+    // ========================================================
+    let currentHp = 8888;
+    const maxHp = 8888;
+    const targetSprite = document.getElementById('puppet-sprite');
+    const battleScene = document.getElementById('battle-scene');
+    const hpBar = document.getElementById('target-hp-bar');
+    const hpText = document.getElementById('target-hp-text');
+    const floatContainer = document.getElementById('floating-text-container');
+    const debuffBar = document.getElementById('debuff-bar');
+    const vfxStage = document.getElementById('vfx-stage');
+    const overlay = document.getElementById('ultimate-overlay');
+
+    function triggerScreenShake(type = 'light') {
+      battleScene.classList.remove('shake-light', 'shake-heavy', 'shake-quake');
+      void battleScene.offsetWidth;
+      battleScene.classList.add(type === 'quake' ? 'shake-quake' : type === 'heavy' ? 'shake-heavy' : 'shake-light');
+      setTimeout(() => {
+        battleScene.classList.remove('shake-light', 'shake-heavy', 'shake-quake');
+      }, type === 'quake' ? 500 : type === 'heavy' ? 320 : 180);
+    }
+
+    function triggerTargetFlinch(flashType = 'wood') {
+      targetSprite.style.animation = 'target-flinch 0.28s ease-out both, ' +
+        (flashType === 'fire' ? 'target-flash-cyanfire 0.28s steps(1) both' : 'target-flash-wood 0.28s steps(1) both');
+      setTimeout(() => { targetSprite.style.animation = ''; }, 300);
+    }
+
+    function createFloatingText(text, colorClass = 'text-emerald-300') {
+      const el = document.createElement('div');
+      el.className = `font-calligraphy text-2xl font-bold tracking-wider ${colorClass} transition-all duration-700 pointer-events-none drop-shadow-[0_0_8px_currentColor]`;
+      el.textContent = text;
+      el.style.transform = 'translateY(10px) scale(0.8)';
+      el.style.opacity = '0';
+      floatContainer.appendChild(el);
+      requestAnimationFrame(() => {
+        el.style.transform = 'translateY(-24px) scale(1.15)';
+        el.style.opacity = '1';
+      });
+      setTimeout(() => {
+        el.style.transform = 'translateY(-48px) scale(0.9)';
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 400);
+      }, 550);
+    }
+
+    function damagePuppet(amount) {
+      currentHp = Math.max(0, currentHp - amount);
+      const pct = (currentHp / maxHp) * 100;
+      hpBar.style.width = pct + '%';
+      hpText.textContent = `${currentHp} / ${maxHp}`;
+    }
+
+    // ========================================================
+    // 技能 1：【青莲离火变】（全屏/重量级木火大招）
+    // ========================================================
+    function castQingLianLiHuo() {
+      overlay.style.opacity = '1'; // 暗场压栈
+      setTimeout(() => { overlay.style.opacity = '0'; }, 1100);
+
+      const uid = Date.now();
+      const wrapper = document.createElement('div');
+      wrapper.className = 'absolute left-1/2 top-1/2 pointer-events-none';
+      wrapper.style.width = '380px';
+      wrapper.style.height = '380px';
+      wrapper.style.marginLeft = '-190px';
+      wrapper.style.marginTop = '-190px';
+
+      // 8 片破空飞散莲瓣配置
+      const petals = [0, 45, 90, 135, 180, 225, 270, 315].map(deg => {
+        const rad = deg * Math.PI / 180;
+        return { rot: deg, tx: Math.cos(rad) * 110, ty: Math.sin(rad) * 110 };
+      });
+
+      wrapper.innerHTML = `
+        <!-- 1. 太极水墨青莲道阵底盘 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: lotus-taiji-spin 1.25s cubic-bezier(0.12, 0.9, 0.2, 1) both; will-change: transform, opacity;">
+          <svg viewBox="0 0 200 200" class="w-full h-full text-emerald-400 opacity-80" style="filter: drop-shadow(0 0 16px rgba(52,211,153,0.6));">
+            <defs>
+              <radialGradient id="taiji-glow-${uid}" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#34d399" stop-opacity="0.8"/>
+                <stop offset="70%" stop-color="#065f46" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#022c22" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <circle cx="100" cy="100" r="92" fill="url(#taiji-glow-${uid})" stroke="#34d399" stroke-width="1.8" stroke-dasharray="6 4"/>
+            <circle cx="100" cy="100" r="70" fill="none" stroke="#6ee7b7" stroke-width="1"/>
+            <!-- 乾坤八卦符文节点 -->
+            ${[0, 45, 90, 135, 180, 225, 270, 315].map(d => `<line x1="100" y1="10" x2="100" y2="22" stroke="#a7f3d0" stroke-width="2" transform="rotate(${d} 100 100)"/>`).join('')}
+          </svg>
+        </div>
+
+        <!-- 2. 九品琉璃水墨青莲盛绽 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: lotus-bloom-main 1.25s cubic-bezier(0.14, 0.95, 0.25, 1) both; will-change: transform, opacity;">
+          <svg viewBox="0 0 200 200" class="w-full h-full" style="filter: drop-shadow(0 0 18px rgba(16,185,129,0.7));">
+            <g transform="translate(100, 100)">
+              <!-- 8瓣青莲主叶 -->
+              ${[0, 45, 90, 135, 180, 225, 270, 315].map(deg => `
+                <path d="M0,0 C-18,-35 -24,-75 0,-92 C24,-75 18,-35 0,0 Z" 
+                      fill="rgba(5, 150, 105, 0.55)" stroke="#6ee7b7" stroke-width="1.6"
+                      transform="rotate(${deg})" />
+              `).join('')}
+              <!-- 莲心金丹高台 -->
+              <circle cx="0" cy="0" r="22" fill="#064e3b" stroke="#34d399" stroke-width="2" />
+            </g>
+          </svg>
+        </div>
+
+        <!-- 3. 十字横向水墨青金离火光棱 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: lotus-beam-h 1.25s cubic-bezier(0.12, 0.95, 0.2, 1) both, lotus-beam-flash 1.25s steps(1) both; will-change: transform, opacity;">
+          <svg viewBox="-160 -160 320 320" class="w-full h-full">
+            <defs>
+              <linearGradient id="beam-grad-${uid}" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#022c22" stop-opacity="0"/>
+                <stop offset="30%" stop-color="#10b981"/>
+                <stop offset="50%" stop-color="#ffffff"/>
+                <stop offset="70%" stop-color="#06b6d4"/>
+                <stop offset="100%" stop-color="#083344" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <polygon points="-160,0 0,-18 160,0 0,18" fill="url(#beam-grad-${uid})" />
+            <line x1="-150" y1="0" x2="150" y2="0" stroke="#f0fdf4" stroke-width="4.5"/>
+          </svg>
+        </div>
+
+        <!-- 4. 十字纵向水墨青金离火光棱 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: lotus-beam-v 1.25s cubic-bezier(0.12, 0.95, 0.2, 1) both, lotus-beam-flash 1.25s steps(1) both; will-change: transform, opacity;">
+          <svg viewBox="-160 -160 320 320" class="w-full h-full">
+            <polygon points="0,-160 -18,0 0,160 18,0" fill="url(#beam-grad-${uid})" />
+            <line x1="0" y1="-150" x2="0" y2="150" stroke="#f0fdf4" stroke-width="4.5"/>
+          </svg>
+        </div>
+
+        <!-- 5. 莲心离火神核塌缩与 Hitstop 爆发核心 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: lotus-core-implode 1.25s cubic-bezier(0.1, 0.9, 0.2, 1) both, lotus-core-flash 1.25s steps(1) both; will-change: transform, opacity;">
+          <svg viewBox="-100 -100 200 200" class="w-full h-full">
+            <circle cx="0" cy="0" r="32" fill="#34d399" />
+            <circle cx="0" cy="0" r="14" fill="#ffffff" />
+          </svg>
+        </div>
+
+        <!-- 6. 飞舞水墨金翡莲瓣微粒 -->
+        <div class="absolute inset-0 pointer-events-none">
+          <svg viewBox="-150 -150 300 300" class="w-full h-full">
+            ${petals.map(p => `
+              <path d="M0,0 C-6,-15 -8,-32 0,-40 C8,-32 6,-15 0,0 Z" 
+                    fill="#a7f3d0" stroke="#059669" stroke-width="1.2"
+                    style="--rot:${p.rot}deg; --tx:${p.tx}px; --ty:${p.ty}px; animation: lotus-petal-burst 1.25s 0.25s cubic-bezier(0.1, 0.9, 0.2, 1) both, lotus-petal-flash 1.25s 0.25s steps(1) both;" />
+            `).join('')}
+          </svg>
+        </div>
+      `;
+
+      vfxStage.appendChild(wrapper);
+
+      // Hitstop 顿帧后瞬爆震颤与飘字
+      setTimeout(() => {
+        triggerScreenShake('quake');
+        triggerTargetFlinch('fire');
+        damagePuppet(2680);
+        createFloatingText('暴击 2680 · 离火焚神', 'text-cyan-300');
+      }, 480);
+
+      setTimeout(() => { wrapper.remove(); }, 1300);
+    }
+
+    // ========================================================
+    // 技能 2：【碧影千叶杀】（木系群攻）
+    // ========================================================
+    function castBiYingQianYe() {
+      const uid = Date.now();
+      const wrapper = document.createElement('div');
+      wrapper.className = 'absolute left-1/2 top-1/2 pointer-events-none';
+      wrapper.style.width = '320px';
+      wrapper.style.height = '320px';
+      wrapper.style.marginLeft = '-160px';
+      wrapper.style.marginTop = '-160px';
+
+      // 12 刃流光飞叶散布
+      const leaves = [
+        { x: -90, y: -80, r: -45, delay: 0 },
+        { x: 90, y: -70, r: 45, delay: 0.04 },
+        { x: -100, y: 30, r: -15, delay: 0.08 },
+        { x: 95, y: 40, r: 25, delay: 0.12 },
+        { x: -60, y: -100, r: -65, delay: 0.05 },
+        { x: 60, y: -90, r: 65, delay: 0.09 },
+        { x: -80, y: 80, r: 120, delay: 0.13 },
+        { x: 80, y: 85, r: -120, delay: 0.16 },
+        { x: -30, y: -110, r: -80, delay: 0.07 },
+        { x: 30, y: -105, r: 80, delay: 0.11 },
+        { x: -110, y: -20, r: -30, delay: 0.14 },
+        { x: 110, y: -15, r: 30, delay: 0.17 }
+      ];
+
+      wrapper.innerHTML = `
+        <!-- 双环对冲风涡轮盘 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: leaf-swirl-ring 0.75s cubic-bezier(0.15, 0.85, 0.25, 1) both; will-change: transform, opacity;">
+          <svg viewBox="0 0 160 160" class="w-full h-full text-emerald-400 opacity-75" style="filter: drop-shadow(0 0 12px #22c55e);">
+            <circle cx="80" cy="80" r="70" fill="none" stroke="#4ade80" stroke-width="2" stroke-dasharray="25 15"/>
+            <circle cx="80" cy="80" r="50" fill="none" stroke="#86efac" stroke-width="1.5" stroke-dasharray="12 8"/>
+          </svg>
+        </div>
+
+        <!-- 12 刃万叶穿云尖刃 -->
+        <div class="absolute inset-0 pointer-events-none">
+          <svg viewBox="-100 -100 200 200" class="w-full h-full">
+            <defs>
+              <linearGradient id="leaf-grad-${uid}" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#14532d"/>
+                <stop offset="50%" stop-color="#4ade80"/>
+                <stop offset="100%" stop-color="#f0fdf4"/>
+              </linearGradient>
+            </defs>
+            ${leaves.map(l => `
+              <g style="--lx:${l.x}px; --ly:${l.y}px; --lr:${l.r}deg; animation: leaf-blade-pierce 0.65s ${l.delay}s cubic-bezier(0.12, 0.9, 0.25, 1) both, leaf-flash-steps 0.65s ${l.delay}s steps(1) both;">
+                <path d="M0,0 C8,-6 20,-14 26,0 C20,14 8,6 0,0 Z" fill="url(#leaf-grad-${uid})" stroke="#bbf7d0" stroke-width="0.8"/>
+                <line x1="0" y1="0" x2="26" y2="0" stroke="#f0fdf4" stroke-width="0.6"/>
+              </g>
+            `).join('')}
+          </svg>
+        </div>
+      `;
+
+      vfxStage.appendChild(wrapper);
+
+      // 多段高频连击
+      setTimeout(() => { triggerScreenShake('light'); triggerTargetFlinch('wood'); damagePuppet(340); createFloatingText('340 · 穿云叶刃', 'text-emerald-300'); }, 120);
+      setTimeout(() => { triggerScreenShake('heavy'); triggerTargetFlinch('wood'); damagePuppet(520); createFloatingText('520 · 剑气裂空', 'text-emerald-300'); }, 260);
+
+      setTimeout(() => { wrapper.remove(); }, 800);
+    }
+
+    // ========================================================
+    // 技能 3：【青藤缚】（木系控制）
+    // ========================================================
+    function castQingTengFu() {
+      const uid = Date.now();
+      const wrapper = document.createElement('div');
+      wrapper.className = 'absolute left-1/2 top-1/2 pointer-events-none';
+      wrapper.style.width = '340px';
+      wrapper.style.height = '360px';
+      wrapper.style.marginLeft = '-170px';
+      wrapper.style.marginTop = '-180px';
+
+      wrapper.innerHTML = `
+        <!-- 地脉开裂黑金灵光 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: vine-crack-expand 0.95s cubic-bezier(0.12, 0.9, 0.2, 1) both; will-change: transform, opacity;">
+          <svg viewBox="-100 0 200 100" class="w-full h-full text-emerald-400 opacity-90" style="filter: drop-shadow(0 0 14px #15803d);">
+            <path d="M-80,95 Q-40,75 0,90 Q40,75 80,95" fill="none" stroke="#22c55e" stroke-width="3.5" stroke-linecap="round"/>
+            <path d="M-50,92 Q-20,82 0,90 Q20,82 50,92" fill="none" stroke="#86efac" stroke-width="1.8"/>
+          </svg>
+        </div>
+
+        <!-- 左侧破土倒钩狂藤 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: vine-clinch-left 0.95s cubic-bezier(0.12, 0.95, 0.25, 1) both, vine-flash-steps 0.95s steps(1) both; will-change: transform, opacity;">
+          <svg viewBox="-100 -100 200 200" class="w-full h-full">
+            <defs>
+              <linearGradient id="vine-grad-l-${uid}" x1="0%" y1="100%" x2="0%" y2="0%">
+                <stop offset="0%" stop-color="#022c22"/>
+                <stop offset="60%" stop-color="#15803d"/>
+                <stop offset="100%" stop-color="#4ade80"/>
+              </linearGradient>
+            </defs>
+            <path d="M-75,90 C-65,30 -40,-20 0,-10 C-15,-40 -50,-80 -15,-95 C-30,-75 -10,-30 -30,10 C-50,45 -65,75 -75,90 Z" 
+                  fill="url(#vine-grad-l-${uid})" stroke="#86efac" stroke-width="1.5"/>
+            <!-- 荆棘尖刺 -->
+            <polygon points="-40,15 -52,5 -36,25" fill="#86efac"/>
+            <polygon points="-25,-25 -42,-35 -20,-15" fill="#86efac"/>
+            <polygon points="-25,-70 -38,-78 -20,-60" fill="#86efac"/>
+          </svg>
+        </div>
+
+        <!-- 右侧破土倒钩狂藤 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: vine-clinch-right 0.95s cubic-bezier(0.12, 0.95, 0.25, 1) both, vine-flash-steps 0.95s steps(1) both; will-change: transform, opacity;">
+          <svg viewBox="-100 -100 200 200" class="w-full h-full">
+            <path d="M75,90 C65,30 40,-20 0,-10 C15,-40 50,-80 15,-95 C30,-75 10,-30 30,10 C50,45 65,75 75,90 Z" 
+                  fill="url(#vine-grad-l-${uid})" stroke="#86efac" stroke-width="1.5"/>
+            <!-- 荆棘尖刺 -->
+            <polygon points="40,15 52,5 36,25" fill="#86efac"/>
+            <polygon points="25,-25 42,-35 20,-15" fill="#86efac"/>
+            <polygon points="25,-70 38,-78 20,-60" fill="#86efac"/>
+          </svg>
+        </div>
+      `;
+
+      vfxStage.appendChild(wrapper);
+
+      setTimeout(() => {
+        triggerScreenShake('heavy');
+        triggerTargetFlinch('wood');
+        damagePuppet(420);
+        createFloatingText('【定身·青藤缚】', 'text-emerald-400');
+        
+        // 挂载束缚状态药丸
+        const badge = document.createElement('span');
+        badge.className = 'px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-400/50 flex items-center space-x-1 animate-pulse';
+        badge.innerHTML = '<span>🌿</span><span>束缚 (1回合)</span>';
+        debuffBar.appendChild(badge);
+        setTimeout(() => { badge.remove(); }, 2400);
+      }, 340);
+
+      setTimeout(() => { wrapper.remove(); }, 1000);
+    }
+
+    // ========================================================
+    // 技能 4：【青莲火弹】（木火普通单体）
+    // ========================================================
+    function castQingLianHuoDan() {
+      const uid = Date.now();
+      const wrapper = document.createElement('div');
+      wrapper.className = 'absolute left-1/2 top-1/2 pointer-events-none';
+      wrapper.style.width = '140px';
+      wrapper.style.height = '140px';
+      wrapper.style.marginLeft = '-70px';
+      wrapper.style.marginTop = '-70px';
+
+      wrapper.innerHTML = `
+        <!-- 弹道飞驰青火莲核 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: bullet-fly 0.48s cubic-bezier(0.12, 0.85, 0.3, 1) both; will-change: transform, opacity;">
+          <svg viewBox="-40 -40 80 80" class="w-full h-full" style="filter: drop-shadow(0 0 14px #06b6d4);">
+            <!-- 三瓣微型青莲 -->
+            <path d="M0,0 C-10,-15 -8,-32 0,-38 C8,-32 10,-15 0,0 Z" fill="#34d399" />
+            <path d="M0,0 C-25,-8 -32,5 -28,16 C-15,18 -5,8 0,0 Z" fill="#059669" />
+            <path d="M0,0 C25,-8 32,5 28,16 C15,18 5,8 0,0 Z" fill="#059669" />
+            <!-- 核心炽白青火 -->
+            <circle cx="0" cy="0" r="10" fill="#f0fdf4" style="filter: drop-shadow(0 0 8px #fff);" />
+            <circle cx="0" cy="0" r="16" fill="#38bdf8" opacity="0.65" />
+          </svg>
+        </div>
+
+        <!-- 接触瞬间环形爆裂冲击环 -->
+        <div class="absolute inset-0 pointer-events-none" style="animation: bullet-blast-ring 0.42s 0.22s cubic-bezier(0.1, 0.9, 0.2, 1) both, bullet-flash-steps 0.42s 0.22s steps(1) both; will-change: transform, opacity;">
+          <svg viewBox="-50 -50 100 100" class="w-full h-full fill-none">
+            <circle cx="0" cy="0" r="28" stroke="#67e8f9" stroke-width="3"/>
+            <circle cx="0" cy="0" r="18" stroke="#34d399" stroke-width="2" stroke-dasharray="6 4"/>
+          </svg>
+        </div>
+      `;
+
+      vfxStage.appendChild(wrapper);
+
+      setTimeout(() => {
+        triggerScreenShake('light');
+        triggerTargetFlinch('fire');
+        damagePuppet(650);
+        createFloatingText('650 · 离火破', 'text-teal-300');
+      }, 220);
+
+      setTimeout(() => { wrapper.remove(); }, 500);
+    }
+
+    // ========================================================
+    // ========================================================
+    // Canvas 粒子引擎：环境萤火 + 技能爆发粒子
+    // ========================================================
+    const cvs = document.getElementById('fx-canvas');
+    const g2d = cvs.getContext('2d');
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+    function resizeCvs() { cvs.width = innerWidth * dpr; cvs.height = innerHeight * dpr; g2d.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    resizeCvs(); addEventListener('resize', resizeCvs);
+    const parts = [];
+    function addP(o) { parts.push(Object.assign({ vx: 0, vy: 0, life: 1, decay: 0.02, size: 3, color: '#6ee7b7', grav: 0, drag: 0.98, rot: 0, vr: 0, shape: 'dot' }, o)); }
+    function targetCenter() { const r = document.getElementById('puppet-sprite').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+    function drawPetal(s, c) { g2d.fillStyle = c; g2d.beginPath(); g2d.moveTo(0, 0); g2d.bezierCurveTo(-s * 0.6, -s * 0.5, -s * 0.5, -s * 1.4, 0, -s * 1.8); g2d.bezierCurveTo(s * 0.5, -s * 1.4, s * 0.6, -s * 0.5, 0, 0); g2d.fill(); }
+    function drawLeaf(s, c) { g2d.fillStyle = c; g2d.beginPath(); g2d.moveTo(-s, 0); g2d.quadraticCurveTo(0, -s * 0.45, s * 1.2, 0); g2d.quadraticCurveTo(0, s * 0.45, -s, 0); g2d.fill(); }
+    function tick() {
+      g2d.clearRect(0, 0, innerWidth, innerHeight);
+      if (Math.random() < 0.18) addP({ x: Math.random() * innerWidth, y: innerHeight + 10, vx: (Math.random() - 0.5) * 0.3, vy: -0.3 - Math.random() * 0.6, size: 1 + Math.random() * 2, decay: 0.002 + Math.random() * 0.002, color: Math.random() < 0.8 ? '#86efac' : '#67e8f9', drag: 1, ambient: true });
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const p = parts[i];
+        p.vx *= p.drag; p.vy = p.vy * p.drag + p.grav; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life -= p.decay;
+        if (p.ambient) p.x += Math.sin((p.y + p.size * 100) * 0.01) * 0.3;
+        if (p.life <= 0) { parts.splice(i, 1); continue; }
+        g2d.save(); g2d.globalAlpha = Math.max(0, Math.min(1, p.life * (p.ambient ? 0.7 : 1))); g2d.translate(p.x, p.y); g2d.rotate(p.rot);
+        if (p.shape === 'petal') drawPetal(p.size, p.color);
+        else if (p.shape === 'leaf') drawLeaf(p.size, p.color);
+        else if (p.shape === 'ring') { g2d.strokeStyle = p.color; g2d.lineWidth = 2 * p.life; g2d.beginPath(); g2d.arc(0, 0, p.size * (2 - p.life) * 20, 0, Math.PI * 2); g2d.stroke(); }
+        else if (p.shape === 'ink') { const gr = g2d.createRadialGradient(0, 0, 0, 0, 0, p.size); gr.addColorStop(0, p.color); gr.addColorStop(1, 'transparent'); g2d.fillStyle = gr; g2d.beginPath(); g2d.arc(0, 0, p.size, 0, Math.PI * 2); g2d.fill(); }
+        else { const gr = g2d.createRadialGradient(0, 0, 0, 0, 0, p.size * 3); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.3, p.color); gr.addColorStop(1, 'transparent'); g2d.fillStyle = gr; g2d.beginPath(); g2d.arc(0, 0, p.size * 3, 0, Math.PI * 2); g2d.fill(); }
+        g2d.restore();
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    function burst(n, fn) { for (let i = 0; i < n; i++) addP(fn(i)); }
+    function showBanner(text) {
+      const b = document.getElementById('skill-banner'); document.getElementById('skill-banner-txt').textContent = text;
+      b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+    }
+    function lockCards(ms) { document.querySelectorAll('.skill-card').forEach(c => c.classList.add('cooldown')); setTimeout(() => document.querySelectorAll('.skill-card').forEach(c => c.classList.remove('cooldown')), ms); }
+    document.querySelectorAll('.skill-card').forEach(c => { const gl = document.createElement('span'); gl.className = 'glyph text-emerald-300'; gl.textContent = c.dataset.glyph || ''; c.appendChild(gl); });
+
+    // —— 青莲离火变：聚灵向心 → 爆发莲瓣洪流 + 青火冲天
+    const _lihuo = castQingLianLiHuo;
+    castQingLianLiHuo = function () {
+      lockCards(1400); showBanner('青莲离火变'); _lihuo();
+      const c = targetCenter();
+      burst(70, () => { const a = Math.random() * Math.PI * 2, d = 220 + Math.random() * 160; return { x: c.x + Math.cos(a) * d, y: c.y + Math.sin(a) * d, vx: -Math.cos(a) * d / 26, vy: -Math.sin(a) * d / 26, drag: 0.93, decay: 0.035, size: 1.5 + Math.random() * 2, color: Math.random() < 0.5 ? '#6ee7b7' : '#67e8f9' }; });
+      setTimeout(() => {
+        burst(60, () => { const a = Math.random() * Math.PI * 2, s = 4 + Math.random() * 10; return { x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 2, grav: 0.06, drag: 0.95, decay: 0.008 + Math.random() * 0.008, size: 6 + Math.random() * 7, shape: 'petal', rot: a, vr: (Math.random() - 0.5) * 0.15, color: ['#a7f3d0', '#6ee7b7', '#ecfdf5', '#5eead4'][Math.floor(Math.random() * 4)] }; });
+        burst(90, () => { const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.2, s = 3 + Math.random() * 9; return { x: c.x + (Math.random() - 0.5) * 60, y: c.y + 40, vx: Math.cos(a) * s, vy: Math.sin(a) * s, drag: 0.96, decay: 0.015 + Math.random() * 0.02, size: 1.5 + Math.random() * 2.5, color: Math.random() < 0.6 ? '#22d3ee' : '#a7f3d0' }; });
+        burst(4, i => ({ x: c.x, y: c.y, shape: 'ring', size: 3 + i * 1.5, decay: 0.025 - i * 0.003, color: i % 2 ? '#67e8f9' : '#ecfdf5' }));
+        burst(14, () => ({ x: c.x + (Math.random() - 0.5) * 200, y: c.y + (Math.random() - 0.5) * 140, shape: 'ink', size: 30 + Math.random() * 50, decay: 0.012, color: 'rgba(16,185,129,0.35)' }));
+      }, 480);
+    };
+
+    // —— 碧影千叶杀：四周飞叶旋入 + 切裂碎叶
+    const _qianye = castBiYingQianYe;
+    castBiYingQianYe = function () {
+      lockCards(850); showBanner('碧影千叶杀'); _qianye();
+      const c = targetCenter();
+      burst(40, () => { const a = Math.random() * Math.PI * 2, d = 260 + Math.random() * 120; return { x: c.x + Math.cos(a) * d, y: c.y + Math.sin(a) * d, vx: -Math.cos(a + 0.4) * 15, vy: -Math.sin(a + 0.4) * 15, drag: 0.94, decay: 0.022, size: 7 + Math.random() * 5, shape: 'leaf', rot: a + Math.PI, vr: 0.08, color: Math.random() < 0.5 ? '#4ade80' : '#86efac' }; });
+      [120, 260].forEach(t => setTimeout(() => burst(26, () => { const a = Math.random() * Math.PI * 2, s = 3 + Math.random() * 7; return { x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, grav: 0.08, drag: 0.95, decay: 0.025, size: 3 + Math.random() * 3, shape: 'leaf', rot: a, vr: 0.3, color: '#bbf7d0' }; }), t));
+    };
+
+    // —— 青藤缚：地底尘土翻涌 + 毒绿汁液
+    const _tengfu = castQingTengFu;
+    castQingTengFu = function () {
+      lockCards(1000); showBanner('青藤缚'); _tengfu();
+      const c = targetCenter();
+      burst(40, () => ({ x: c.x + (Math.random() - 0.5) * 200, y: c.y + 110, vx: (Math.random() - 0.5) * 3, vy: -1 - Math.random() * 4, grav: 0.12, drag: 0.97, decay: 0.02, size: 2 + Math.random() * 3, color: '#365314' }));
+      setTimeout(() => burst(30, () => { const a = Math.random() * Math.PI * 2, s = 2 + Math.random() * 6; return { x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, grav: 0.15, drag: 0.96, decay: 0.022, size: 1.5 + Math.random() * 2, color: '#a3e635' }; }), 340);
+    };
+
+    // —— 青莲火弹：拖尾青焰 + 命中火星
+    const _huodan = castQingLianHuoDan;
+    castQingLianHuoDan = function () {
+      _huodan();
+      const c = targetCenter(), sx = c.x - 140, sy = c.y - 70;
+      for (let k = 0; k < 8; k++) setTimeout(() => { const t = k / 8; burst(5, () => ({ x: sx + 140 * t + (Math.random() - 0.5) * 8, y: sy + 70 * t + (Math.random() - 0.5) * 8, vx: (Math.random() - 0.5), vy: -0.5 - Math.random(), decay: 0.05, size: 1.5 + Math.random() * 2, color: '#22d3ee' })); }, k * 25);
+      setTimeout(() => { burst(28, () => { const a = Math.random() * Math.PI * 2, s = 2 + Math.random() * 6; return { x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, grav: 0.1, drag: 0.94, decay: 0.03, size: 1.2 + Math.random() * 2, color: Math.random() < 0.5 ? '#67e8f9' : '#6ee7b7' }; }); burst(3, () => ({ x: c.x, y: c.y, shape: 'petal', size: 8, vx: (Math.random() - 0.5) * 6, vy: -3 - Math.random() * 3, grav: 0.15, rot: Math.random() * 6, vr: 0.2, decay: 0.02, color: '#a7f3d0' })); }, 220);
+    };
+
+    // ========================================================
+    // 全屏大招辅助
+    // ========================================================
+    function fsLayer(html, ms) { const d = document.createElement('div'); d.className = 'fs-layer'; d.innerHTML = html; document.body.appendChild(d); setTimeout(() => d.remove(), ms); return d; }
+    // ========================================================
+    // 打击感音效引擎：瞬态 click + 快速下坠 kick + 失真 crunch + 气浪 boom + 混响尾音
+    // 总线：饱和 → 快速压缩 → 输出；所有时间参数 d = 相对当前时刻的秒数
+    // ========================================================
+    let audioCtx = null, sfxBus, sfxVerb, sfxNoise;
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const ctx = audioCtx;
+        const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -10; comp.knee.value = 4; comp.ratio.value = 6; comp.attack.value = 0.001; comp.release.value = 0.12; comp.connect(ctx.destination);
+        const sat = sfxShaper(ctx, 1.6); sat.connect(comp);
+        sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9; sfxBus.connect(sat);
+        const len = ctx.sampleRate * 3, ir = ctx.createBuffer(2, len, ctx.sampleRate);
+        for (let ch = 0; ch < 2; ch++) { const dd = ir.getChannelData(ch); for (let i = 0; i < len; i++) dd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4); }
+        sfxVerb = ctx.createConvolver(); sfxVerb.buffer = ir; const vg = ctx.createGain(); vg.gain.value = 0.5; sfxVerb.connect(vg); vg.connect(comp);
+        sfxNoise = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate); const nd = sfxNoise.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+    function sfxShaper(ctx, drive) { const ws = ctx.createWaveShaper(), c = new Float32Array(2048); for (let i = 0; i < 2048; i++) c[i] = Math.tanh((i / 1024 - 1) * drive) / Math.tanh(drive); ws.curve = c; ws.oversample = '2x'; return ws; }
+    // 输出链：增益包络 → 声像 → 总线 (+混响发送)。a=起音, peak=达峰时刻(秒), 之后指数衰减到 dur
+    function sfxChain(ctx, src, t, o) {
+      const g = ctx.createGain(), pk = o.peak || 0.002;
+      g.gain.setValueAtTime(0.0001, t); g.gain[o.peak ? 'exponentialRampToValueAtTime' : 'linearRampToValueAtTime'](o.vol, t + pk);
+      if (o.cut) { g.gain.setValueAtTime(o.vol, t + o.dur - 0.012); g.gain.linearRampToValueAtTime(0.0001, t + o.dur); }
+      else g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
+      const p = ctx.createStereoPanner(); p.pan.setValueAtTime(o.pan || 0, t); if (o.pan1 !== undefined) p.pan.linearRampToValueAtTime(o.pan1, t + o.dur);
+      src.connect(g); g.connect(p); p.connect(sfxBus);
+      if (o.wet) { const w = ctx.createGain(); w.gain.value = o.wet; p.connect(w); w.connect(sfxVerb); }
+    }
+    function sfxNoiseSrc(ctx, t, dur, rate) { const s = ctx.createBufferSource(); s.buffer = sfxNoise; s.playbackRate.value = rate || 1; s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05); return s; }
+    function sfxBiquad(ctx, type, f0, f1, q, t, dur, fd) { const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t); if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + (fd || dur)); return f; }
+
+    // 瞬态：几毫秒的高频噪声，决定"脆"
+    function click(d, vol = 0.7, f = 3500, dur = 0.012, pan = 0) {
+      const ctx = getAudioContext(), t = ctx.currentTime + d; const f1 = sfxBiquad(ctx, 'highpass', f, 0, 0.7, t, dur);
+      sfxNoiseSrc(ctx, t, dur).connect(f1); sfxChain(ctx, f1, t, { vol, dur, pan });
+    }
+    // 冲击：正弦音高在 pd 秒内从 hi 砸到 lo，再失真，决定"重"
+    function kick(d, o) {
+      const ctx = getAudioContext(), t = ctx.currentTime + d; const s = ctx.createOscillator();
+      s.frequency.setValueAtTime(o.hi, t); s.frequency.exponentialRampToValueAtTime(o.lo, t + o.pd); s.frequency.exponentialRampToValueAtTime(o.lo * 0.7, t + o.dur);
+      const sh = sfxShaper(ctx, o.drive || 3); s.connect(sh); s.start(t); s.stop(t + o.dur + 0.05);
+      sfxChain(ctx, sh, t, { vol: o.vol, dur: o.dur, wet: o.wet || 0 });
+    }
+    // 碎裂：带通噪声重度失真，决定"碎/裂"
+    function crunch(d, o) {
+      const ctx = getAudioContext(), t = ctx.currentTime + d; const bp = sfxBiquad(ctx, 'bandpass', o.f, o.f1, o.q || 1, t, o.dur); const sh = sfxShaper(ctx, o.drive || 6);
+      sfxNoiseSrc(ctx, t, o.dur).connect(bp); bp.connect(sh); sfxChain(ctx, sh, t, { vol: o.vol, dur: o.dur, pan: o.pan || 0, wet: o.wet || 0 });
+    }
+    // 气浪：低通噪声截止频率急坠，决定"炸开后的轰"
+    function boom(d, o) {
+      const ctx = getAudioContext(), t = ctx.currentTime + d; const lp = sfxBiquad(ctx, 'lowpass', o.f0, o.f1, 0.9, t, o.dur, o.fd || o.dur * 0.6);
+      sfxNoiseSrc(ctx, t, o.dur, o.rate).connect(lp); sfxChain(ctx, lp, t, { vol: o.vol, dur: o.dur, peak: o.peak, wet: o.wet || 0, pan: o.pan || 0 });
+    }
+    // 风切：带通/高通噪声扫频 + 渐强再衰减，决定"嗖/唰"
+    function whoosh(d, o) {
+      const ctx = getAudioContext(), t = ctx.currentTime + d; const f = sfxBiquad(ctx, o.type || 'bandpass', o.f0, o.f1, o.q || 1.2, t, o.dur);
+      if (o.wob) o.wob.forEach(([dt, hz]) => f.frequency.linearRampToValueAtTime(hz, t + dt));
+      sfxNoiseSrc(ctx, t, o.dur, o.rate).connect(f); sfxChain(ctx, f, t, { vol: o.vol, dur: o.dur, peak: o.peak || o.dur * 0.5, cut: o.cut, pan: o.pan || 0, pan1: o.pan1, wet: o.wet || 0 });
+    }
+    // 金属铮鸣：三个非谐泛音，决定"刃"
+    function ring(d, f, dur, vol, pan = 0, wet = 0.4) {
+      const ctx = getAudioContext(), t = ctx.currentTime + d;
+      [[1, 1], [2.76, 0.5], [5.4, 0.25]].forEach(([m, v]) => { const s = ctx.createOscillator(); s.type = 'triangle'; s.frequency.value = f * m; s.start(t); s.stop(t + dur + 0.05); sfxChain(ctx, s, t, { vol: vol * v, dur: dur / m ** 0.3, pan, wet }); });
+    }
+    // 蓄势嗡鸣：多根失谐锯齿 + 低通渐开，末尾硬切（为爆发前的静默让位）
+    function drone(d, o) {
+      const ctx = getAudioContext(), t = ctx.currentTime + d;
+      [-12, 0, 9].forEach(dt => { const s = ctx.createOscillator(); s.type = 'sawtooth'; s.detune.value = dt; s.frequency.setValueAtTime(o.f0, t); s.frequency.exponentialRampToValueAtTime(o.f1, t + o.dur);
+        const lp = sfxBiquad(ctx, 'lowpass', o.lp0, o.lp1, 3, t, o.dur); s.connect(lp); s.start(t); s.stop(t + o.dur + 0.05); sfxChain(ctx, lp, t, { vol: o.vol, dur: o.dur, peak: o.dur * 0.95, cut: true }); });
+    }
+    // 木质吱嘎：低频方波脉冲列 + 高 Q 共振，决定"藤/木"
+    function creak(d, o) {
+      const ctx = getAudioContext(), t = ctx.currentTime + d; const s = ctx.createOscillator(); s.type = 'square';
+      s.frequency.setValueAtTime(o.r0, t); s.frequency.linearRampToValueAtTime(o.r1, t + o.dur);
+      const bp = sfxBiquad(ctx, 'bandpass', o.f0, o.f1, 14, t, o.dur); s.connect(bp); s.start(t); s.stop(t + o.dur + 0.05);
+      sfxChain(ctx, bp, t, { vol: o.vol, dur: o.dur, peak: o.dur * 0.3, pan: o.pan || 0, pan1: o.pan1 });
+    }
+
+    // ———————— 青莲火弹（L1）：吸气 → 火焰呼啸飞行 → 脆爆 + 火星
+    function sfxHuoDanCharge() {
+      whoosh(0, { f0: 1200, f1: 5000, q: 2, dur: 0.22, vol: 0.3, peak: 0.19, pan: -0.5 });
+      ring(0.16, 1900, 0.18, 0.05, -0.5);
+    }
+    function sfxHuoDanFly() {
+      whoosh(0, { f0: 500, f1: 2400, q: 1.1, dur: 0.32, vol: 0.55, peak: 0.27, cut: true, pan: -0.6, pan1: 0.15 });
+      for (let i = 0; i < 6; i++) click(0.04 + i * 0.045, 0.12, 2500 + Math.random() * 2000, 0.008, -0.5 + i * 0.12);
+    }
+    function sfxHuoDanImpact() {
+      click(0, 0.8, 4000);
+      kick(0, { hi: 260, lo: 58, pd: 0.035, dur: 0.24, vol: 0.9, drive: 3 });
+      crunch(0, { f: 2200, f1: 900, q: 1.2, dur: 0.11, vol: 0.5 });
+      boom(0.005, { f0: 4500, f1: 220, dur: 0.38, vol: 0.45, wet: 0.2 });
+      for (let i = 0; i < 9; i++) click(0.07 + Math.random() * 0.4, 0.16, 2500 + Math.random() * 3500, 0.006, (Math.random() - 0.5) * 0.9);
+    }
+
+    // ———————— 青藤缚（L2）：地底闷震 → 藤木吱嘎生长 → 勒紧断裂 → 叶落沙沙
+    function sfxTengFu() {
+      kick(0, { hi: 95, lo: 38, pd: 0.12, dur: 0.55, vol: 0.7, drive: 2 });
+      boom(0, { f0: 380, f1: 120, dur: 0.85, vol: 0.55, peak: 0.12 });
+      creak(0.08, { r0: 28, r1: 55, f0: 700, f1: 1100, dur: 0.6, vol: 0.22, pan: -0.4, pan1: 0.1 });
+      creak(0.2, { r0: 34, r1: 62, f0: 950, f1: 1400, dur: 0.5, vol: 0.18, pan: 0.4, pan1: -0.1 });
+      whoosh(0.1, { type: 'highpass', f0: 3500, f1: 5000, q: 0.7, dur: 0.6, vol: 0.09, peak: 0.35 });
+      for (let i = 0; i < 10; i++) click(0.12 + Math.random() * 0.6, 0.2, 1200 + Math.random() * 1200, 0.01, (Math.random() - 0.5) * 1.2);
+      whoosh(1.3, { f0: 3000, f1: 800, q: 0.9, dur: 0.7, vol: 0.12, peak: 0.2, wet: 0.3 });
+    }
+    function sfxTengFuSqueeze() {
+      click(0, 0.9, 2500, 0.015);
+      kick(0, { hi: 170, lo: 48, pd: 0.04, dur: 0.32, vol: 1, drive: 4 });
+      crunch(0, { f: 1300, f1: 700, q: 2, dur: 0.17, vol: 0.65, drive: 8, pan: -0.3 });
+      creak(0.02, { r0: 70, r1: 30, f0: 1400, f1: 600, dur: 0.32, vol: 0.3 });
+      click(0.12, 0.6, 3000, 0.012, 0.35); crunch(0.12, { f: 2600, q: 2, dur: 0.08, vol: 0.4, pan: 0.35 });
+    }
+
+    // ———————— 碧影千叶杀（L3）：风涡加速旋转（末 100ms 静默）→ 一刀全屏风刃 → 六连斩
+    function sfxQianYeCharge(dur) {
+      const end = dur - 0.1, wob = [];
+      for (let i = 1; i <= 48; i++) { const k = i / 48; wob.push([end * k, 450 + k * 2400 + Math.sin(k * k * 30) * 500]); }
+      whoosh(0, { f0: 450, q: 3, dur: end, vol: 0.55, peak: end * 0.95, cut: true, wob });
+      [0, 0.3, 0.52, 0.68, 0.8, 0.9].forEach((t0, i) => t0 < end - 0.05 && whoosh(t0, { f0: 800 + i * 300, f1: 2500 + i * 500, q: 1.5, dur: 0.16, vol: 0.2 + i * 0.05, peak: 0.1, pan: i % 2 ? 0.7 : -0.7, pan1: i % 2 ? -0.7 : 0.7 }));
+      drone(0, { f0: 110, f1: 220, lp0: 300, lp1: 2200, dur: end, vol: 0.05 });
+    }
+    function sfxQianYeRelease() {
+      click(0, 1, 5000);
+      whoosh(0, { type: 'highpass', f0: 9000, f1: 1500, q: 0.7, dur: 0.3, vol: 0.9, peak: 0.02, pan: -0.8, pan1: 0.8, wet: 0.35 });
+      kick(0, { hi: 210, lo: 38, pd: 0.05, dur: 0.55, vol: 1, drive: 4 });
+      boom(0.01, { f0: 6000, f1: 160, dur: 0.75, vol: 0.55, wet: 0.45 });
+      ring(0.01, 1500, 0.8, 0.07, 0, 0.6);
+    }
+    function sfxQianYeHit(i) {
+      const p = i % 2 ? 0.6 : -0.6;
+      click(0, 0.7, 5500, 0.008, p);
+      whoosh(0, { type: 'highpass', f0: 7000, f1: 2200, q: 0.8, dur: 0.1, vol: 0.6, peak: 0.012, pan: p, pan1: -p });
+      ring(0.004, 2300 + i * 190, 0.22, 0.09, p);
+      kick(0, { hi: 240, lo: 85, pd: 0.02, dur: 0.09, vol: 0.55, drive: 3 });
+      if (i === 5) {
+        kick(0.01, { hi: 300, lo: 30, pd: 0.07, dur: 0.9, vol: 1.1, drive: 5, wet: 0.2 });
+        crunch(0, { f: 1800, q: 0.8, dur: 0.22, vol: 0.6 });
+        boom(0.01, { f0: 7000, f1: 120, dur: 1.0, vol: 0.7, wet: 0.6 });
+        ring(0.02, 880, 1.4, 0.1, 0, 0.8);
+      }
+    }
+
+    // ———————— 青莲离火变（L4）：嗡鸣渐开 + 气流 riser + 加速心跳（末 150ms 静默）→ 毁灭级爆炸 + 烈焰咆哮 → 两段追爆
+    function sfxLiHuoCharge(dur) {
+      const end = dur - 0.15;
+      drone(0, { f0: 41, f1: 82, lp0: 120, lp1: 1800, dur: end, vol: 0.14 });
+      whoosh(0, { f0: 200, f1: 6000, q: 0.9, dur: end, vol: 0.45, peak: end * 0.97, cut: true });
+      whoosh(end - 0.45, { type: 'highpass', f0: 1500, f1: 9000, q: 0.7, dur: 0.45, vol: 0.25, peak: 0.43, cut: true, pan: 0.6, pan1: -0.6 });
+      [0, 0.38, 0.66, 0.87, 1.0, 1.1, 1.18].forEach((t0, i) => t0 < end - 0.04 && kick(t0, { hi: 110, lo: 42, pd: 0.05, dur: 0.2, vol: 0.45 + i * 0.07, drive: 2 }));
+    }
+    function sfxLiHuoRelease() {
+      click(0, 1, 3500, 0.02);
+      kick(0, { hi: 320, lo: 30, pd: 0.09, dur: 1.7, vol: 1.2, drive: 6, wet: 0.15 });
+      crunch(0, { f: 1400, f1: 500, q: 0.6, dur: 0.35, vol: 0.85, drive: 9 });
+      boom(0.005, { f0: 10000, f1: 90, dur: 2.2, vol: 1, fd: 1.1, wet: 0.7 });
+      whoosh(0.08, { f0: 550, f1: 280, q: 0.7, dur: 2.4, vol: 0.4, peak: 0.25, rate: 0.5, wet: 0.4 });
+      [[528, 0.07], [792, 0.04]].forEach(([f, v]) => ring(0.06, f, 2.4, v, 0, 0.9));
+      // 第二段（+0.38s）
+      click(0.38, 0.7, 3000, 0.015, 0.3);
+      kick(0.38, { hi: 230, lo: 44, pd: 0.05, dur: 0.5, vol: 0.9, drive: 4 });
+      boom(0.385, { f0: 4500, f1: 150, dur: 0.6, vol: 0.55, pan: 0.3, wet: 0.4 });
+      // 第三段暴击（+0.76s）
+      click(0.76, 1, 4000, 0.02);
+      kick(0.76, { hi: 300, lo: 28, pd: 0.08, dur: 1.3, vol: 1.15, drive: 6, wet: 0.15 });
+      crunch(0.76, { f: 1800, f1: 600, q: 0.7, dur: 0.3, vol: 0.75, drive: 9 });
+      boom(0.765, { f0: 8000, f1: 100, dur: 1.5, vol: 0.85, wet: 0.7 });
+    }
+
+    // ========================================================
+    // 【青莲离火变】全屏版：蓄势 1.4s → 爆发
+    // ========================================================
+    const CHARGE_LH = 1400;
+    castQingLianLiHuo = function () {
+      lockCards(CHARGE_LH + 1900); showBanner('青莲离火变');
+      const c = targetCenter(); const vmax = Math.max(innerWidth, innerHeight); const uid = Date.now();
+      overlay.style.opacity = '1';
+      sfxLiHuoCharge(CHARGE_LH / 1000);
+      // —— 蓄势：巨型太极法阵 + 收缩蓄力环 + 莲心光核
+      const ring = (r, w, dash, col) => `<circle cx="500" cy="500" r="${r}" fill="none" stroke="${col}" stroke-width="${w}" ${dash ? `stroke-dasharray="${dash}"` : ''}/>`;
+      const runes = '乾坤震巽坎离艮兑'.split('').map((ch, i) => `<text x="500" y="88" text-anchor="middle" font-size="46" fill="#a7f3d0" font-family="Ma Shan Zheng" transform="rotate(${i * 45} 500 500)">${ch}</text>`).join('');
+      const formation = fsLayer(`
+        <div class="fs-anchor" style="left:${c.x}px; top:${c.y}px; width:${vmax * 1.1}px; height:${vmax * 1.1}px; animation: fs-formation ${CHARGE_LH}ms cubic-bezier(0.2,0.8,0.2,1) both; filter: drop-shadow(0 0 18px rgba(52,211,153,0.7));">
+          <svg viewBox="0 0 1000 1000" class="w-full h-full">
+            ${ring(480, 3, '', '#34d399')}${ring(455, 1.5, '14 10', '#6ee7b7')}${ring(330, 2, '', '#5eead4')}${ring(300, 1, '4 8', '#a7f3d0')}
+            ${runes}
+            ${[0, 30, 60, 90, 120, 150].map(d => `<line x1="500" y1="170" x2="500" y2="830" stroke="#34d399" stroke-width="1" opacity="0.4" transform="rotate(${d} 500 500)"/>`).join('')}
+            <path d="M500,200 A300,300 0 0,1 500,800 A150,150 0 0,1 500,500 A150,150 0 0,0 500,200 Z" fill="rgba(16,185,129,0.12)" stroke="#6ee7b7" stroke-width="2"/>
+          </svg>
+        </div>
+        ${[0, 1, 2].map(i => `<div class="fs-anchor" style="left:${c.x}px; top:${c.y}px; width:260px; height:260px; border-radius:50%; border:3px solid ${i % 2 ? '#67e8f9' : '#6ee7b7'}; box-shadow:0 0 30px #10b981, inset 0 0 30px #10b981; animation: charge-ring ${CHARGE_LH / 2}ms ${i * CHARGE_LH / 4}ms cubic-bezier(0.5,0,0.8,0.4) infinite;"></div>`).join('')}
+        <div class="fs-anchor" style="left:${c.x}px; top:${c.y}px; width:90px; height:90px; border-radius:50%; background: radial-gradient(circle, #fff 0%, #67e8f9 35%, rgba(16,185,129,0.4) 65%, transparent 72%); animation: charge-core ${CHARGE_LH}ms cubic-bezier(0.6,0,0.9,0.5) both;"></div>
+      `, CHARGE_LH + 200);
+      // 天地灵气从屏幕四边持续汇聚
+      const suck = setInterval(() => burst(10, () => { const a = Math.random() * Math.PI * 2, d = vmax * (0.55 + Math.random() * 0.3); const sp = d / 34; return { x: c.x + Math.cos(a) * d, y: c.y + Math.sin(a) * d, vx: -Math.cos(a) * sp, vy: -Math.sin(a) * sp, drag: 0.965, decay: 0.022, size: 1.5 + Math.random() * 2.5, color: Math.random() < 0.5 ? '#6ee7b7' : '#67e8f9' }; }), 40);
+      const rumble = setInterval(() => triggerScreenShake('light'), 260);
+      setTimeout(() => { clearInterval(suck); clearInterval(rumble); formation.firstElementChild.style.animation = 'fs-formation-out 0.5s ease-out both'; }, CHARGE_LH);
+      setTimeout(() => lihuoRelease(c, vmax, uid), CHARGE_LH);
+    };
+
+    function lihuoRelease(c, vmax, uid) {
+      sfxLiHuoRelease(); triggerScreenShake('quake'); setTimeout(() => triggerScreenShake('heavy'), 500); setTimeout(() => triggerScreenShake('heavy'), 1000);
+      const petal = (deg, len, wid, fill) => `<path d="M0,0 C${-wid},${-len * 0.4} ${-wid * 0.8},${-len * 0.85} 0,${-len} C${wid * 0.8},${-len * 0.85} ${wid},${-len * 0.4} 0,0 Z" fill="${fill}" stroke="#a7f3d0" stroke-width="2" transform="rotate(${deg})"/>`;
+      const L = vmax * 1.3;
+      fsLayer(`
+        <div class="absolute inset-0" style="background: radial-gradient(circle at ${c.x}px ${c.y}px, #ffffff 0%, #a5f3fc 25%, rgba(16,185,129,0.6) 55%, rgba(2,44,34,0) 85%); animation: fs-flash 0.7s ease-out both;"></div>
+        <div class="fs-anchor" style="left:${c.x}px; top:${c.y}px; width:${L}px; height:${L}px; animation: fs-lotus 1.9s cubic-bezier(0.14,0.95,0.25,1) both; filter: drop-shadow(0 0 30px rgba(16,185,129,0.8));">
+          <svg viewBox="-500 -500 1000 1000" class="w-full h-full">
+            <defs><radialGradient id="fsl-${uid}" cx="0" cy="0" r="480" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ecfdf5" stop-opacity="0.9"/><stop offset="0.35" stop-color="#34d399" stop-opacity="0.55"/><stop offset="1" stop-color="#064e3b" stop-opacity="0.05"/></radialGradient></defs>
+            ${[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map(d => petal(d + 15, 470, 120, `url(#fsl-${uid})`)).join('')}
+            ${[0, 45, 90, 135, 180, 225, 270, 315].map(d => petal(d, 320, 95, 'rgba(110,231,183,0.45)')).join('')}
+            ${[0, 60, 120, 180, 240, 300].map(d => petal(d + 30, 180, 60, 'rgba(236,253,245,0.6)')).join('')}
+            <circle r="70" fill="#ffffff" opacity="0.9"/><circle r="110" fill="none" stroke="#67e8f9" stroke-width="6"/>
+          </svg>
+        </div>
+        <div class="absolute top-0 bottom-0" style="left:${c.x}px; width:180px; transform-origin:center; background: linear-gradient(90deg, transparent, rgba(34,211,238,0.6) 25%, #ecfeff 50%, rgba(34,211,238,0.6) 75%, transparent); filter: blur(2px) drop-shadow(0 0 40px #22d3ee); animation: fs-pillar 1.5s cubic-bezier(0.12,0.9,0.2,1) both;"></div>
+        <div class="absolute left-0 right-0" style="top:${c.y}px; height:90px; background: linear-gradient(180deg, transparent, rgba(52,211,153,0.6) 30%, #f0fdf4 50%, rgba(52,211,153,0.6) 70%, transparent); filter: drop-shadow(0 0 30px #10b981); animation: fs-beam-h 1.1s 0.05s cubic-bezier(0.12,0.9,0.2,1) both;"></div>
+      `, 2000);
+      burst(6, i => ({ x: c.x, y: c.y, shape: 'ring', size: 6 + i * 4, decay: 0.018 - i * 0.002, color: i % 2 ? '#67e8f9' : '#ecfdf5' }));
+      burst(120, () => { const a = Math.random() * Math.PI * 2, s = 6 + Math.random() * 16; return { x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, grav: 0.05, drag: 0.955, decay: 0.006 + Math.random() * 0.008, size: 8 + Math.random() * 12, shape: 'petal', rot: a, vr: (Math.random() - 0.5) * 0.15, color: ['#a7f3d0', '#6ee7b7', '#ecfdf5', '#5eead4'][Math.floor(Math.random() * 4)] }; });
+      burst(160, () => ({ x: c.x + (Math.random() - 0.5) * 160, y: innerHeight, vx: (Math.random() - 0.5) * 2, vy: -8 - Math.random() * 16, drag: 0.975, decay: 0.012 + Math.random() * 0.015, size: 2 + Math.random() * 3, color: Math.random() < 0.6 ? '#22d3ee' : '#a7f3d0' }));
+      // 全屏莲瓣雨
+      const rain = setInterval(() => burst(6, () => ({ x: Math.random() * innerWidth, y: -20, vx: (Math.random() - 0.5) * 1.5, vy: 2 + Math.random() * 3, drag: 1, decay: 0.006, size: 6 + Math.random() * 6, shape: 'petal', rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.08, color: Math.random() < 0.5 ? '#a7f3d0' : '#ecfdf5' })), 50);
+      setTimeout(() => clearInterval(rain), 1600);
+      [0, 380, 760].forEach((t, i) => setTimeout(() => { triggerTargetFlinch('fire'); const dmg = [1880, 1260, 2960][i]; damagePuppet(dmg); createFloatingText(i === 2 ? `暴击 ${dmg} · 离火焚神` : `${dmg}`, 'text-cyan-300'); }, t));
+      setTimeout(() => { overlay.style.opacity = '0'; }, 1700);
+    }
+
+    // ========================================================
+    // 【碧影千叶杀】全屏版：蓄势 1.1s → 叶刃狂潮
+    // ========================================================
+    const CHARGE_QY = 1100;
+    castBiYingQianYe = function () {
+      lockCards(CHARGE_QY + 1500); showBanner('碧影千叶杀');
+      const c = targetCenter(); const vmax = Math.max(innerWidth, innerHeight);
+      overlay.style.opacity = '0.7';
+      sfxQianYeCharge(CHARGE_QY / 1000);
+      // 蓄势：全屏青绿风带 + 万叶绕场旋涡收束
+      fsLayer(`
+        <div class="absolute inset-0" style="background: radial-gradient(circle at ${c.x}px ${c.y}px, rgba(22,101,52,0.0) 10%, rgba(20,83,45,0.45) 70%); animation: fs-tint ${CHARGE_QY + 1300}ms ease both;"></div>
+        ${[1, 0.75, 0.5].map((s, i) => `<div class="fs-anchor" style="left:${c.x}px; top:${c.y}px; width:${vmax * s}px; height:${vmax * s}px; border-radius:50%; border: ${3 - i}px dashed rgba(134,239,172,${0.5 - i * 0.1}); box-shadow: 0 0 40px rgba(74,222,128,0.25), inset 0 0 40px rgba(74,222,128,0.2); animation: fs-wind-band ${CHARGE_QY}ms ${i * 80}ms cubic-bezier(0.5,0,0.7,0.6) both;"></div>`).join('')}
+      `, CHARGE_QY + 1400);
+      const orbit = [];
+      for (let i = 0; i < 140; i++) orbit.push({ a: Math.random() * Math.PI * 2, r: vmax * (0.35 + Math.random() * 0.4), s: 0.03 + Math.random() * 0.03, size: 6 + Math.random() * 8 });
+      const t0 = performance.now();
+      const spin = setInterval(() => {
+        const k = Math.min(1, (performance.now() - t0) / CHARGE_QY);
+        orbit.forEach(o => { o.a += o.s * (1 + k * 3); const r = o.r * (1 - k * 0.75); addP({ x: c.x + Math.cos(o.a) * r, y: c.y + Math.sin(o.a) * r * 0.8, decay: 0.2, size: o.size, shape: 'leaf', rot: o.a + Math.PI / 2, color: Math.random() < 0.5 ? '#4ade80' : '#86efac' }); });
+      }, 33);
+      const rumble = setInterval(() => triggerScreenShake('light'), 300);
+      setTimeout(() => { clearInterval(spin); clearInterval(rumble); qianyeRelease(c, orbit); }, CHARGE_QY);
+    };
+
+    function qianyeRelease(c, orbit) {
+      sfxQianYeRelease(); triggerScreenShake('heavy');
+      // 旋涡叶片全部向目标爆射穿心
+      orbit.forEach(o => { const r = o.r * 0.25; const x = c.x + Math.cos(o.a) * r, y = c.y + Math.sin(o.a) * r * 0.8; addP({ x, y, vx: (c.x - x) / 6 + (Math.random() - 0.5) * 4, vy: (c.y - y) / 6, drag: 0.9, decay: 0.03, size: o.size, shape: 'leaf', rot: Math.atan2(c.y - y, c.x - x), color: '#bbf7d0' }); });
+      // 全屏剑痕：8 道斜向叶刃剑气横扫
+      const slashes = [-28, 18, -10, 32, -40, 6, 24, -18].map((a, i) => `
+        <div class="absolute" style="left:${c.x - innerWidth * 0.6}px; top:${c.y + (i - 3.5) * 46}px; width:${innerWidth * 1.2}px; height:${6 + (i % 3) * 3}px; --a:${a}deg;
+          background: linear-gradient(90deg, transparent, rgba(74,222,128,0.5) 30%, #f0fdf4 50%, rgba(74,222,128,0.5) 70%, transparent);
+          filter: drop-shadow(0 0 14px #22c55e); animation: fs-slash 0.45s ${i * 0.09}s cubic-bezier(0.2,0.9,0.3,1) both;"></div>`).join('');
+      fsLayer(`<div class="absolute inset-0" style="background: rgba(220,252,231,0.5); animation: fs-flash 0.35s ease-out both;"></div>${slashes}`, 1500);
+      // 全屏叶刃狂潮：从左到右万叶穿场
+      let n = 0;
+      const storm = setInterval(() => {
+        burst(18, () => ({ x: -30 - Math.random() * 100, y: Math.random() * innerHeight, vx: 22 + Math.random() * 18, vy: (Math.random() - 0.5) * 4, drag: 1, decay: 0.012, size: 8 + Math.random() * 10, shape: 'leaf', rot: 0, color: ['#4ade80', '#86efac', '#bbf7d0', '#22c55e'][Math.floor(Math.random() * 4)] }));
+        if (++n > 22) clearInterval(storm);
+      }, 40);
+      // 六段连击
+      for (let i = 0; i < 6; i++) setTimeout(() => {
+        triggerScreenShake(i === 5 ? 'quake' : 'light'); triggerTargetFlinch('wood'); sfxQianYeHit(i);
+        const dmg = i === 5 ? 1280 : 260 + Math.floor(Math.random() * 120); damagePuppet(dmg);
+        createFloatingText(i === 5 ? `${dmg} · 万叶归宗` : `${dmg}`, 'text-emerald-300');
+        burst(18, () => { const a = Math.random() * Math.PI * 2, s = 3 + Math.random() * 8; return { x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, grav: 0.08, drag: 0.95, decay: 0.03, size: 3 + Math.random() * 4, shape: 'leaf', rot: a, vr: 0.3, color: '#dcfce7' }; });
+      }, 80 + i * 150);
+      setTimeout(() => { overlay.style.opacity = '0'; }, 1300);
+    }
+
+    // ========================================================
+    // 【青莲火弹】凝莲 → 吐火 → 弧线飞行 → 爆燃 → 烟烬渐隐
+    // ========================================================
+    castQingLianHuoDan = function () {
+      lockCards(900);
+      const c = targetCenter(); const sx = c.x - Math.min(320, innerWidth * 0.35), sy = c.y + 150; const uid = Date.now();
+      // ① 出现：灵气向心凝聚 + 青莲花苞绽开
+      burst(22, () => { const a = Math.random() * Math.PI * 2, d = 50 + Math.random() * 30; return { x: sx + Math.cos(a) * d, y: sy + Math.sin(a) * d, vx: -Math.cos(a) * d / 9, vy: -Math.sin(a) * d / 9, drag: 0.86, decay: 0.06, size: 1.2 + Math.random() * 1.5, color: '#6ee7b7' }; });
+      sfxHuoDanCharge();
+      const bud = fsLayer(`<div class="fs-anchor" style="left:${sx}px; top:${sy}px; width:76px; height:76px; animation: bud-bloom 0.22s cubic-bezier(0.2,0.9,0.3,1.3) both, bud-release 0.18s 0.24s ease-out forwards; filter: drop-shadow(0 0 12px #2dd4bf);">
+        <svg viewBox="-40 -40 80 80" class="w-full h-full"><defs><radialGradient id="bd-${uid}"><stop offset="0" stop-color="#ecfeff"/><stop offset="1" stop-color="#059669"/></radialGradient></defs>
+        ${[0, 72, 144, 216, 288].map(d => `<path d="M0,0 C-10,-12 -9,-28 0,-34 C9,-28 10,-12 0,0 Z" fill="url(#bd-${uid})" opacity="0.85" transform="rotate(${d})"/>`).join('')}
+        <circle r="8" fill="#ffffff"/></svg></div>`, 500);
+      // ② 飞行：二次贝塞尔弧线，加速，逐帧在 Canvas 绘制火核 + 焰尾 + 环绕莲瓣
+      const cx1 = (sx + c.x) / 2, cy1 = Math.min(sy, c.y) - 140, FLY = 300;
+      setTimeout(() => {
+        sfxHuoDanFly();
+        const t0 = performance.now();
+        (function step() {
+          const k = Math.min(1, (performance.now() - t0) / FLY), t = k * k; const u = 1 - t;
+          const x = u * u * sx + 2 * u * t * cx1 + t * t * c.x, y = u * u * sy + 2 * u * t * cy1 + t * t * c.y;
+          addP({ x, y, decay: 0.25, size: 5, color: '#a5f3fc' });
+          burst(4, () => ({ x: x + (Math.random() - 0.5) * 8, y: y + (Math.random() - 0.5) * 8, vx: (Math.random() - 0.5) * 1.2, vy: -0.6 - Math.random() * 1.2, drag: 0.94, decay: 0.045 + Math.random() * 0.03, size: 1.5 + Math.random() * 2.5, color: Math.random() < 0.6 ? '#22d3ee' : '#34d399' }));
+          for (let j = 0; j < 3; j++) { const a = performance.now() / 60 + j * 2.09; addP({ x: x + Math.cos(a) * 12, y: y + Math.sin(a) * 12, decay: 0.3, size: 5, shape: 'petal', rot: a + Math.PI / 2, color: '#6ee7b7' }); }
+          if (k < 1) requestAnimationFrame(step); else huodanImpact(c, uid);
+        })();
+      }, 240);
+    };
+    function huodanImpact(c, uid) {
+      // ③ 命中：白芯闪 + 双冲击环 + 火星 + 莲瓣崩散
+      sfxHuoDanImpact();
+      triggerScreenShake('light'); triggerTargetFlinch('fire'); damagePuppet(650); createFloatingText('650 · 离火破', 'text-teal-300');
+      fsLayer(`<div class="fs-anchor" style="left:${c.x}px; top:${c.y}px; width:120px; height:120px; border-radius:50%; background: radial-gradient(circle, #fff 0%, #67e8f9 30%, rgba(16,185,129,0.5) 60%, transparent 72%); animation: hit-flash 0.32s ease-out both;"></div>`, 400);
+      burst(2, i => ({ x: c.x, y: c.y, shape: 'ring', size: 1.6 + i, decay: 0.07 - i * 0.02, color: i ? '#34d399' : '#a5f3fc' }));
+      burst(36, () => { const a = Math.random() * Math.PI * 2, s = 2 + Math.random() * 7; return { x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, grav: 0.12, drag: 0.93, decay: 0.03 + Math.random() * 0.02, size: 1 + Math.random() * 2, color: Math.random() < 0.5 ? '#67e8f9' : '#fef08a' }; });
+      burst(5, i => { const a = i * 1.256 - 1.57; return { x: c.x, y: c.y, vx: Math.cos(a) * 4, vy: Math.sin(a) * 4 - 1.5, grav: 0.14, drag: 0.96, rot: a, vr: 0.12, decay: 0.022, size: 8, shape: 'petal', color: '#a7f3d0' }; });
+      // ④ 消失：青烟墨晕缓慢上浮渐隐
+      burst(8, () => ({ x: c.x + (Math.random() - 0.5) * 40, y: c.y + (Math.random() - 0.5) * 30, vx: (Math.random() - 0.5) * 0.4, vy: -0.4 - Math.random() * 0.4, drag: 0.99, decay: 0.012, size: 18 + Math.random() * 16, shape: 'ink', color: 'rgba(45,212,191,0.28)' }));
+    }
+
+    // ========================================================
+    // 【青藤缚】地脉发光 → 藤蔓生长缠绕 → 萌叶 → 收紧 → 枯散飘落
+    // ========================================================
+    castQingTengFu = function () {
+      lockCards(1700); const c = targetCenter(); const sp = document.getElementById('puppet-sprite').getBoundingClientRect();
+      const W = sp.width + 120, H = sp.height + 90; const uid = Date.now();
+      sfxTengFu();
+      // 藤蔓路径：从脚下两侧破土，螺旋缠绕至头顶（坐标系：原点=目标中心，单位≈px）
+      const hw = sp.width / 2 + 14, hh = sp.height / 2;
+      const vA = `M${-hw - 30},${hh + 30} C${-hw - 50},${hh - 30} ${hw + 30},${hh * 0.5} ${hw},${hh * 0.15} C${hw - 20},${-hh * 0.15} ${-hw - 20},${-hh * 0.05} ${-hw},${-hh * 0.4} C${-hw + 10},${-hh * 0.75} ${hw * 0.6},${-hh * 0.8} ${hw * 0.3},${-hh - 15}`;
+      const vB = `M${hw + 30},${hh + 30} C${hw + 50},${hh - 40} ${-hw - 30},${hh * 0.35} ${-hw},${0} C${-hw + 20},${-hh * 0.3} ${hw + 20},${-hh * 0.25} ${hw},${-hh * 0.6} C${hw - 10},${-hh * 0.9} ${-hw * 0.5},${-hh * 0.85} ${-hw * 0.2},${-hh - 25}`;
+      const leaves = [[-hw - 8, hh * 0.55, 0.45], [hw + 4, hh * 0.15, 0.55], [-hw, -hh * 0.4, 0.7], [hw, -hh * 0.6, 0.75], [hw * 0.3, -hh - 10, 0.85], [-hw * 0.2, -hh - 20, 0.9], [0, hh * 0.35, 0.5]];
+      const vine = (d, delay) => `
+        <path d="${d}" pathLength="1" class="grow-path" fill="none" stroke="#052e16" stroke-width="13" stroke-linecap="round" style="animation: draw-on 0.55s ${delay}s cubic-bezier(0.3,0.7,0.3,1) forwards;"/>
+        <path d="${d}" pathLength="1" class="grow-path" fill="none" stroke="url(#vg-${uid})" stroke-width="8" stroke-linecap="round" style="animation: draw-on 0.55s ${delay}s cubic-bezier(0.3,0.7,0.3,1) forwards;"/>
+        <path d="${d}" pathLength="1" class="grow-path" fill="none" stroke="#bbf7d0" stroke-width="1.6" stroke-linecap="round" opacity="0.8" style="animation: draw-on 0.55s ${delay}s cubic-bezier(0.3,0.7,0.3,1) forwards;"/>`;
+      const layer = fsLayer(`
+        <div class="fs-anchor" style="left:${c.x}px; top:${c.y + hh + 20}px; width:${W + 60}px; height:40px; border-radius:50%; background: radial-gradient(ellipse, rgba(74,222,128,0.7) 0%, rgba(21,128,61,0.35) 45%, transparent 70%); animation: ground-glow 1.6s ease-out both;"></div>
+        <div class="fs-anchor" style="left:${c.x}px; top:${c.y}px; width:${W}px; height:${H}px;">
+          <svg viewBox="${-W / 2} ${-H / 2} ${W} ${H}" class="w-full h-full overflow-visible" style="filter: drop-shadow(0 0 8px rgba(34,197,94,0.55));">
+            <defs><linearGradient id="vg-${uid}" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#14532d"/><stop offset="0.6" stop-color="#16a34a"/><stop offset="1" stop-color="#4ade80"/></linearGradient></defs>
+            <g id="vines-${uid}" class="fb">
+              ${[-1, 1].map(s => `<path d="M${s * 20},${hh + 26} l${s * 30},-6 M${s * 40},${hh + 22} l${s * 22},6" stroke="#4ade80" stroke-width="2" pathLength="1" class="grow-path" style="animation: draw-on 0.2s forwards;"/>`).join('')}
+              ${vine(vA, 0.05)}${vine(vB, 0.15)}
+              ${leaves.map(([x, y, dl], i) => `<g transform="translate(${x},${y}) rotate(${i * 67})"><path class="fb" d="M0,0 C6,-6 16,-7 20,0 C16,7 6,6 0,0 Z" fill="#22c55e" stroke="#bbf7d0" stroke-width="0.8" style="transform: scale(0); animation: pop-in 0.3s ${dl}s cubic-bezier(0.2,0.9,0.3,1.4) forwards;"/></g>`).join('')}
+              ${leaves.slice(0, 5).map(([x, y, dl], i) => `<path class="fb" d="M${x},${y} l${i % 2 ? 7 : -7},-9 l${i % 2 ? -2 : 2},9 Z" fill="#d9f99d" style="transform: scale(0); animation: pop-in 0.2s ${dl + 0.05}s forwards;"/>`).join('')}
+            </g>
+          </svg>
+        </div>`, 1750);
+      // 破土尘屑
+      burst(30, () => ({ x: c.x + (Math.random() - 0.5) * W, y: c.y + hh + 24, vx: (Math.random() - 0.5) * 3, vy: -1.5 - Math.random() * 3.5, grav: 0.14, drag: 0.97, decay: 0.025, size: 1.5 + Math.random() * 2.5, color: Math.random() < 0.5 ? '#3f6212' : '#65a30d' }));
+      // 收紧：整体内勒 + 汁液 + 伤害 + 状态
+      setTimeout(() => {
+        const g = layer.querySelector(`#vines-${uid}`); g.style.animation = 'vine-squeeze 0.45s cubic-bezier(0.3,1.6,0.5,1) both';
+        sfxTengFuSqueeze();
+        triggerScreenShake('heavy'); triggerTargetFlinch('wood'); damagePuppet(420); createFloatingText('【定身·青藤缚】', 'text-emerald-400');
+        burst(24, () => { const a = Math.random() * Math.PI * 2, s = 2 + Math.random() * 5; return { x: c.x + (Math.random() - 0.5) * 60, y: c.y + (Math.random() - 0.5) * 80, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, grav: 0.15, drag: 0.95, decay: 0.03, size: 1.5 + Math.random() * 2, color: '#bef264' }; });
+        const badge = document.createElement('span'); badge.className = 'px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-400/50 flex items-center space-x-1 animate-pulse';
+        badge.innerHTML = '<span>🌿</span><span>束缚 (1回合)</span>'; debuffBar.appendChild(badge); setTimeout(() => badge.remove(), 2400);
+      }, 820);
+      // 消失：藤蔓模糊下沉渐隐，叶片脱落飘散
+      setTimeout(() => {
+        layer.querySelector('svg').style.animation = 'dissolve 0.45s ease-in forwards';
+        burst(18, () => ({ x: c.x + (Math.random() - 0.5) * W * 0.8, y: c.y + (Math.random() - 0.5) * H * 0.8, vx: (Math.random() - 0.5) * 1.5, vy: 0.5 + Math.random(), grav: 0.03, drag: 0.99, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.1, decay: 0.012, size: 6 + Math.random() * 4, shape: 'leaf', color: Math.random() < 0.5 ? '#4d7c0f' : '#65a30d' }));
+      }, 1300);
+    };
+
+    // 界面按钮事件绑定
+    // ========================================================
+    document.getElementById('skill-btn-lihuo').addEventListener('click', () => {
+      castQingLianLiHuo();
+    });
+    document.getElementById('skill-btn-qianye').addEventListener('click', () => {
+      castBiYingQianYe();
+    });
+    document.getElementById('skill-btn-tengfu').addEventListener('click', () => {
+      castQingTengFu();
+    });
+    document.getElementById('skill-btn-huodan').addEventListener('click', () => {
+      castQingLianHuoDan();
+    });
+
+    // 傀儡受击点击
+    document.getElementById('target-puppet').addEventListener('click', () => {
+      castQingLianHuoDan();
+    });
+
+    // 重置木桩
+    document.getElementById('btn-reset-dummy').addEventListener('click', () => {
+      currentHp = maxHp;
+      hpBar.style.width = '100%';
+      hpText.textContent = `${currentHp} / ${maxHp}`;
+      debuffBar.innerHTML = '';
+      createFloatingText('傀儡灵气充沛，恢复全盛！', 'text-emerald-300');
+    });
+  </script>
+</body>
+</html>
