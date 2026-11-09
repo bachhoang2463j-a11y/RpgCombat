@@ -4796,7 +4796,7 @@ const arcaneVfxModule = (function () {
         ensureCanvas(); ensureDriver();
         const uid = ++S.uid;
         const r = el.getBoundingClientRect(), h = ctr(el);
-        const sx = h.x, sy = h.top - 22, W = r.width + 50, H = 76, LIFE = 2700;
+        const sx = h.x, sy = h.top - 22, W = r.width + 50, H = 76, LIFE = 2700, FADE = 600;
         tone(0, { f0: 180, f1: 90, dur: 0.26, vol: 0.32 }); whoosh(0, { f0: 1200, f1: 300, q: 1, dur: 0.22, vol: 0.2, peak: 0.03 }); tone(0.02, { f0: 1320, dur: 0.6, vol: 0.03, wet: 0.7 });
         const clipId = 'arcane-shc-' + uid;
         const layer = fsLayer(`<div class="arcane-fs-anchor" style="left:${sx}px; top:${sy}px; width:${W}px; height:${H}px; animation: arcane-shield-pop 0.54s ease both;">
@@ -4807,15 +4807,16 @@ const arcaneVfxModule = (function () {
             <path d="M${W * 0.14},${H * 0.28} Q${W * 0.5},${H * -0.02} ${W * 0.86},${H * 0.28}" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.4" stroke-linecap="round"/>
           </svg></div>`, 0);
         const anchor = mkAnchor(sx, sy); // 真实盾面中心，弹道与受击涟漪共用落点
-        const handle = { doneAt: Date.now() + LIFE + 100, impactDom: anchor, dodge: null, hit: null, cancel: null };
+        const handle = { doneAt: Date.now() + LIFE + FADE, impactDom: anchor, dodge: null, hit: null, cancel: null };
         S.handles.add(handle);
         let dead = false, expireTimer = null;
+        layer.style.transition = `opacity ${FADE}ms ease-out`;
         function fadeOut() {
             if (dead) return; dead = true;
             S.handles.delete(handle);
-            const face = layer.firstElementChild;
-            if (face) { face.style.transition = 'opacity 0.3s ease'; face.style.opacity = '0'; }
-            setTimeout(() => { S.layers.delete(layer); layer.remove(); dropAnchor(anchor); releaseIdleCanvas(); }, 340);
+            // 淡出外层，避免盾面入场动画的 forwards 终态锁住 opacity。
+            layer.style.opacity = '0';
+            setTimeout(() => { S.layers.delete(layer); layer.remove(); dropAnchor(anchor); releaseIdleCanvas(); }, FADE);
         }
         expireTimer = after(LIFE, fadeOut);
         function hitShield(ix, iy, rings) {
@@ -4831,9 +4832,9 @@ const arcaneVfxModule = (function () {
             if (dead || token !== combatToken) return;
             ensureCanvas(); ensureDriver();
             clearTimeout(expireTimer); S.timers.delete(expireTimer);
-            const remaining = Math.max(1000, handle.doneAt - Date.now());
+            const remaining = Math.max(1000, handle.doneAt - FADE - Date.now());
             expireTimer = after(remaining, fadeOut);
-            handle.doneAt = Date.now() + remaining + 340;
+            handle.doneAt = Date.now() + remaining + FADE;
             if (attackType === 'slash') {
                 hitShield(W * 0.42, H * 0.3, [0, 0.07, 0.14]);
                 whoosh(0, { type: 'highpass', f0: 6000, f1: 2000, q: 0.8, dur: 0.12, vol: 0.45, peak: 0.02, pan: 0.3, pan1: -0.3 }); click(0.03, 0.7, 4000);
@@ -14035,7 +14036,7 @@ async function playSingleAttackFx(type, caster, targetDom, dodged, flinch = true
     }
     if (type === 'gunshot') playRandomStandardGunshot();
     else if (type === 'shotgun') playShotgunSound();
-    else playSound('atk2');
+    else if (!(type === 'slash' && dodged)) playSound('atk2');
     playSVGEffect(targetDom, type);
     if (!dodged && flinch && targetDom) {
         if (type === 'gunshot') playEnemyFlinchAnim(targetDom, 'enemy-gunshot-flinch 0.22s ease-out both, enemy-gunshot-flinch-flash 0.22s steps(1) both', 240);

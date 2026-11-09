@@ -164,6 +164,16 @@
         eq(calls.svg.map(c => c.type),['shield'],'未配置新特效的技能保留默认盾牌');
       });
 
+      await group('刀光闪避音效', async () => {
+        for (const [type, speed, expected] of [['近战',1000,['miss']],['近战',1,['atk2']],['远程',1000,['gunshot','miss']]]) {
+          const d = installData([entity('h_arcane0',{spd:speed})],[entity('e_arcane')]);
+          clearCalls();
+          await w.applySingleTagEffect(d.e[0],d.h[0],'[单体]',50,100,1,null,attack(type));
+          eq(calls.sounds,expected,'攻击音效：'+type+'／'+(speed > 1 ? '闪避成功' : '命中'));
+          if (type === '近战' && speed > 1) eq(calls.svg.map(c => c.type),['slash'],'闪避刀光保留挥空视觉，不响受击音');
+        }
+      });
+
       await group('真实反应', async () => {
         let d = installData([entity('h_arcane0',{skills:[skill(3)]})],[entity('e_arcane')]);
         clearCalls();
@@ -171,6 +181,7 @@
         eq(calls.dodge,[true],'真实反应判定成功后才调用错身回调');
         eq(d.h[0].hp,500,'折影步成功保持HP不变');
         check(calls.sounds.includes('miss') && calls.floats.includes('闪避'),'原闪避音和浮字保留');
+        check(!calls.sounds.includes('atk2'),'折影步成功不叠加刀光受击音');
         check(calls.skills[0].reaction === true,'反应技沿共用专属入口启动');
         d = installData([entity('h_arcane0',{skills:[skill(3)]})],[entity('e_arcane')]);
         w.Math.random = () => 0;
@@ -220,6 +231,29 @@
           eq(hDom.style.cssText,styleBefore,'清理恢复角色原样式：'+name);
         }
         eq(realSkill('障壁术',d.h[0],[d.h[0]],false),null,'新绘制模块不接管旧障壁术');
+        let expireShield, expireId;
+        w.setTimeout = (fn, ms, ...args) => {
+          const id = nativeSetTimeout.call(w,fn,ms,...args);
+          if (ms === 2700) { expireShield = fn; expireId = id; }
+          return id;
+        };
+        try { realSkill('巫师护盾',d.h[0],[d.h[0]],true); }
+        finally { w.setTimeout = nativeSetTimeout; }
+        const shieldLayer = w.document.querySelector('[data-arcane-part="shield"]').closest('[data-arcane-fx="layer"]');
+        eq(w.getComputedStyle(shieldLayer).opacity,'1','护盾外层退场前完整可见');
+        nativeClearTimeout.call(w,expireId);
+        expireShield();
+        const fadeStyle = w.getComputedStyle(shieldLayer);
+        check(shieldLayer.isConnected && shieldLayer.style.opacity === '0','护盾先渐隐，退场开始时不直接删除');
+        eq([fadeStyle.transitionProperty,fadeStyle.transitionDuration],['opacity','0.6s'],'护盾在独立外层执行600ms渐隐');
+        const fade = shieldLayer.getAnimations().find(a => a.transitionProperty === 'opacity');
+        check(!!fade,'护盾渐隐过渡真实启动，不受入场动画终态覆盖');
+        if (fade) {
+          fade.pause(); fade.currentTime = 300;
+          const midOpacity = Number(w.getComputedStyle(shieldLayer).opacity);
+          check(midOpacity > 0 && midOpacity < 1,'护盾渐隐中段透明度连续下降');
+        }
+        w.clearArcaneFx();
         for (const [type,ms] of [['fire',580],['enemy_spell',480]]) {
           const t = Date.now();
           const p = realProjectile(type,eDom,hDom,false);
