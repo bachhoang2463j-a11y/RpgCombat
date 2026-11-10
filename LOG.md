@@ -3076,3 +3076,14 @@
 - **音频核对**：只读对比 `F:/Download/regex-前端战斗v11_2.json` 与本轮新包，`ASSET_ORIGIN/ASSET_BASE/HERO_VOICE_BASE`、`audioUrls`、`HERO_VOICE_LINES` 三段完全一致，仍使用 `http://192.168.110.83:8766` 对应的既有 `my_assets` 资源服务。按用户要求，地址未变则不扩大首次无声排查；未改动下载文件与音频配置。
 - **涉及文件**：`index.html`、`integration-test/fixtures/arcane-vfx-regression.js`、`regex-前端战斗v11_2.json`。
 - **验证**：脚本语法、`git diff --check`、`build-regex.cjs` 构建通过；IAB真实压缩产物专项111/111通过，新增普通／反应刀光闪避音、命中音、枪击闪避音与渐隐实际中段透明度断言。本轮未重跑全部848项源码回归，未操作真实酒馆或Chrome排障；README保持不变。
+
+---
+
+## [LOG-259] 2026-11-10 — 空白 SVG 技能演练框架模板
+
+- **提交**：`229641c`。
+- **核心目的**：以 `奇幻动效/demo-arcane-1920s-vfx.html` 为界面基准，提供一份可反复复制的空白技能演练模板，保留与正式版基本一致的主界面、清掉既有技能内容，使后续新技能能按正式版接口与层序直接移植，不必每次重建演示环境。
+- **变更**：根目录新增 `demo-skill-vfx-template.html`。顶部按钮、行动条、两排敌人、四张角色卡、右下技能面板与底部对话栏沿用原布局；占位角色/敌人改由 `heroesData`/`enemiesData` 初始化并可被重置恢复。移除精准流火、迅捷愈合法、折影步、巫师护盾、双莲祛煞、灵风术、纳克提特障壁术、伊西斯之拥与敌方法术弹卡片及其专属演出、音效编排、专属动画；技能栏默认只有「暂无技能」，`ARCANE_TAGS` 与 `CARDS` 均为空。底座按 `index.html` 的 arcane 模块移植：`S` 共享状态、`after/every` 的 combatToken 守卫、临时层/锚点/震屏/暗场、`ensureCanvas/DRAW/addP/burst/orbitCharge/fly/ensureDriver/step/render`、私有合成音色库、`fireProjectile`/`enemySpellProjectile` 通用弹道，以及 `isArcaneSkillFx`/`playArcaneSkillFx`/`playArcaneProjectile`/`clearArcaneFx` 四接口与 `window` 挂载；样式改用正式版 `arcane-` 前缀与 z40/52/55/60 层序。文件内以「演示宿主 / 可移植特效模块 / 新技能实现 / 演示控制」四段标注四个接入点，重置统一清理特效、画布、粒子、帧循环与卡片锁。
+- **涉及文件**：`demo-skill-vfx-template.html`。
+- **验证**：内联脚本 `vm.Script` 与 `node --check` 通过；结构断言 10 项全过（旧八技能标签/函数/专属动画零残留、注册表与卡片为空、四接口签名与器件原样复用、DOM 锚点与 `hero-wrap/hero-card/enemy-box`、资源条更新锚点齐全、重置覆盖清理、无内联事件）。IAB 实机：标题与界面结构正常（面板260×172、四列英雄、六敌、对话栏52px），通用火焰弹命中拍点648ms，`clearArcaneFx` 后临时节点与画布零残留，自然收尾后节点/粒子/画布归零，重置恢复占位场景。另在临时副本注入一条测试技能验证扩展点：卡片渲染正确、点击演出并锁定、handle 到期解锁、收尾零残留、无运行时报错；副本与校验脚本位于系统临时目录，未入库。
+- **边界**：未修改 `index.html`、公开版、原 demo、README/SPEC 及工作区其它既有改动；沿用原 demo 的 Tailwind CDN 与 Google Fonts 外链；未导入酒馆、未调用外部 LLM、未做安卓或真 Chrome 排障验收。IAB 中重置按钮的 Playwright 点击超时，改用页面内点击完成验证，属该环境已知现象。
