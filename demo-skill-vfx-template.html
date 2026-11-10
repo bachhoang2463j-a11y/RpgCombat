@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SVG 技能演练 · 空白模板</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap');
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    body { font-family: 'Noto Sans SC', sans-serif; user-select: none; }
+    /* —— 以下复刻主工程 index.html 主界面样式 —— */
+    .glass-panel { background: rgba(20, 25, 35, 0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); }
+    .text-outline { text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 1px 2px rgba(0,0,0,0.8); }
+    .mask-fade-y { -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .custom-scrollbar::-webkit-scrollbar { width: 3px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+    .timeline-rail { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: linear-gradient(180deg, rgba(250,204,21,0.85) 0%, rgba(6,182,212,0.65) 25%, rgba(99,102,241,0.45) 60%, rgba(255,255,255,0.05) 100%); box-shadow: 0 0 10px rgba(6,182,212,0.55); pointer-events: none; z-index: 0; }
+    @keyframes rail-pulse { 0% { transform: translateY(-100%); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(800%); opacity: 0; } }
+    .rail-pulse-beam { position: absolute; left: 0; top: 0; width: 2px; height: 40px; background: linear-gradient(180deg, transparent, #38bdf8, #fff); box-shadow: 0 0 12px #38bdf8; animation: rail-pulse 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+    .turn-dot { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; background: #111827; border: 2px solid; position: relative; z-index: 1; flex-shrink: 0; }
+    .turn-dot.cur { width: 52px; height: 52px; font-size: 26px; border-color: #facc15 !important; box-shadow: 0 0 20px rgba(250,204,21,0.9); }
+    .breathe { animation: breathe 3.2s ease-in-out infinite; } @keyframes breathe { 50% { transform: translateY(-4px) scale(1.02); } }
+    #chat-bar input { background: rgba(15,23,42,0.7); border: 1px solid rgba(255,255,255,0.12); color: #e2e8f0; }
+    .portrait { background: radial-gradient(ellipse at 50% 30%, #3b3f5c, #14151f 75%); display: flex; align-items: flex-end; justify-content: center; font-size: 64px; }
+    .card:disabled { pointer-events: none; opacity: 0.45; filter: grayscale(0.6); }
+
+    /* ===== 可移植特效样式 BEGIN：与 index.html 的 arcane- 命名及层序一致 ===== */
+    .arcane-fs-layer { position: fixed; inset: 0; pointer-events: none; z-index: 52; overflow: hidden; }
+    .arcane-fs-anchor { position: absolute; transform: translate(-50%, -50%); }
+    #arcane-fx-canvas { position: fixed; inset: 0; width: 100vw; height: 100dvh; pointer-events: none; z-index: 55; }
+    #arcane-dark { position: fixed; inset: 0; pointer-events: none; z-index: 40; opacity: 0; transition: opacity 0.35s ease; background: radial-gradient(ellipse at 40% 60%, rgba(5,6,20,0.55) 0%, rgba(2,3,10,0.92) 75%); }
+    @keyframes arcane-seed-bloom { 0% { transform: translate(-50%,-50%) scale(0); opacity: 0; } 70% { transform: translate(-50%,-50%) scale(1.25); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(0.6); opacity: 0; } }
+    @keyframes arcane-hit-flash { 0% { transform: translate(-50%,-50%) scale(0.2); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.7); opacity: 0; } }
+    @keyframes arcane-f-cold { 0% { filter: brightness(1.6) hue-rotate(180deg) saturate(2.5); } 60% { filter: none; } }
+    @keyframes arcane-f-heal { 0% { filter: brightness(1.8) drop-shadow(0 0 18px #34d399); } 100% { filter: none; } }
+    .arcane-flash-cold { animation: arcane-f-cold 0.5s steps(1) both !important; }
+    .arcane-flash-heal { animation: arcane-f-heal 0.6s ease-out both !important; }
+    @keyframes arcane-tint { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes arcane-ripple { 0% { transform: translate(-50%,-50%) scale(0.2); opacity: 0.9; } 100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; } }
+    @keyframes arcane-ring-out { 0% { r: 4; opacity: 0.95; stroke-width: 3; } 100% { r: 150; opacity: 0; stroke-width: 0.5; } }
+    @keyframes arcane-fs-flash { 0% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes arcane-draw-on { to { stroke-dashoffset: 0; } }
+    .arcane-grow { stroke-dasharray: 1; stroke-dashoffset: 1; }
+    @keyframes arcane-fade-life { 0% { opacity: 0; } 15% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes arcane-slow-rot { to { transform: rotate(360deg); } }
+    @keyframes arcane-s-light { 25% { transform: translate3d(-3px, 2px, 0); } 60% { transform: translate3d(3px, -2px, 0); } }
+    @keyframes arcane-s-heavy { 15% { transform: translate3d(-8px, 4px, 0); } 35% { transform: translate3d(7px, -5px, 0); } 60% { transform: translate3d(-4px, 3px, 0); } 85% { transform: translate3d(2px, -1px, 0); } }
+    @keyframes arcane-s-quake { 10% { transform: translate3d(-14px, 8px, 0); } 25% { transform: translate3d(12px, -10px, 0); } 40% { transform: translate3d(-9px, 6px, 0); } 60% { transform: translate3d(6px, -4px, 0); } 80% { transform: translate3d(-3px, 2px, 0); } }
+    .arcane-shake-light { animation: arcane-s-light 0.18s ease-out; }
+    .arcane-shake-heavy { animation: arcane-s-heavy 0.32s ease-out; }
+    .arcane-shake-quake { animation: arcane-s-quake 0.55s ease-out; }
+    /* 新技能的 arcane- 样式写在这里；移植时只追加新样式，不覆盖正式版的已有样式。 */
+    /* ===== 可移植特效样式 END ===== */
+  </style>
+</head>
+<body class="text-white">
+ <div id="app" class="fixed inset-0 overflow-hidden">
+  <!-- 顶部控制按钮（复刻主界面） -->
+  <div class="absolute top-2 sm:top-4 right-2 sm:right-4 z-[115] flex gap-1.5 sm:gap-2">
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-violet-400 hover:text-violet-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>📚</span> <span class="hidden sm:inline">世界书</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-purple-400 hover:text-purple-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>📜</span> <span class="hidden sm:inline">记录</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-blue-400 hover:text-blue-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>🔲</span> <span class="hidden sm:inline">全屏</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-indigo-400 hover:text-indigo-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>💬</span> <span class="hidden sm:inline">对话</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-yellow-500 hover:text-yellow-400 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>⚙️</span> <span class="hidden sm:inline">设置</span></button>
+    <button id="btn-reset" class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-emerald-400 hover:text-emerald-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>🔄</span> <span class="hidden sm:inline">重置</span></button>
+  </div>
+
+  <!-- 全屏战场区域 -->
+  <div class="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-800 to-emerald-900 overflow-hidden z-0" id="battle-scene">
+    <div class="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+    <div class="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-0"></div>
+    <div class="absolute left-1 sm:left-4 md:left-6 top-16 sm:top-20 bottom-44 sm:bottom-48 w-12 sm:w-14 z-30 flex flex-col items-center select-none">
+      <div class="relative w-full h-full flex flex-col items-center">
+        <div class="timeline-rail"><div class="rail-pulse-beam"></div></div>
+        <div id="turn-order-container" class="relative w-full h-full flex flex-col gap-2 sm:gap-2.5 items-center overflow-y-auto no-scrollbar mask-fade-y py-3"></div>
+      </div>
+    </div>
+    <div id="enemies-container" class="absolute left-2 sm:left-6 right-2 sm:right-6 top-[10%] bottom-[190px] sm:bottom-[220px] z-10 flex flex-col items-center justify-start gap-6 overflow-visible pointer-events-none"></div>
+  </div>
+
+  <!-- 悬浮 UI 层 -->
+  <div class="absolute bottom-[52px] left-0 w-full p-1.5 sm:p-6 flex flex-col-reverse sm:flex-row items-end justify-between gap-1.5 sm:gap-4 z-20 pointer-events-none pb-2 sm:pb-6">
+    <div id="heroes-container" class="w-full sm:flex-1 grid grid-cols-4 gap-1 sm:gap-4 max-w-2xl pointer-events-auto relative"></div>
+    <div class="relative self-end">
+      <div id="menu-container" class="w-[260px] h-[172px] bg-slate-950/95 backdrop-blur-xl rounded-xl border border-slate-700/80 border-t-2 border-t-cyan-500/80 flex flex-col overflow-hidden relative shadow-[0_15px_35px_rgba(0,0,0,0.9)] pointer-events-auto self-end mb-1 sm:mb-0">
+        <div class="px-2.5 py-1 bg-gradient-to-r from-violet-950/60 via-slate-900/90 to-slate-950 border-b border-violet-900/40 flex justify-between items-center shrink-0">
+          <div class="flex items-center gap-1.5 min-w-0"><span class="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse shrink-0"></span><span class="text-xs font-bold text-violet-300">技能演练 · 空白模板</span></div>
+          <span class="text-[9px] text-slate-500">尚未配置</span>
+        </div>
+        <div id="skill-list" class="flex-1 flex flex-col gap-1 p-1 overflow-y-auto custom-scrollbar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部对话栏（复刻主界面，仅装饰） -->
+  <div id="chat-bar" class="absolute bottom-0 left-0 right-0 h-[52px] z-30 flex items-center gap-2 px-2 sm:px-3 bg-black/60 border-t border-white/5">
+    <div class="w-9 h-9 rounded-full bg-slate-700 border border-white/20 shrink-0 flex items-center justify-center">🕵️</div>
+    <input type="text" placeholder="说点什么... (Enter发送)" class="flex-1 h-9 rounded-full px-4 text-sm outline-none">
+    <span class="px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/60 text-emerald-300 bg-emerald-950/50">友方旁白 ON</span>
+    <span class="px-3 py-1 rounded-full text-xs font-bold border border-rose-500/60 text-rose-300 bg-rose-950/50">敌方旁白 ON</span>
+    <div class="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center shrink-0">➤</div>
+  </div>
+ </div>
+  <script>
+    // ===== 演示宿主 BEGIN：占位数据、渲染、fxEngine；不移植到正式版 =====
+    const $ = s => document.querySelector(s);
+    let combatToken = 0;
+    let heroesData = [], enemiesData = [];
+    const HERO_DATA = [['h1', '埃利奥特', '👨', 100, 55, 110, 5], ['h2', '弗兰克', '🧔', 180, 0, 17, 0], ['h3', '玛德琳', '👩', 140, 0, 14, 0], ['h4', '索恩', '🕵️', 140, 0, 20, 0]];
+    const ENEMY_ROWS = [[['e1', '🐟'], ['e2', '❄️'], ['e3', '🐟']], [['e4', '👻'], ['e5', '👻'], ['e6', '🌀']]];
+
+function createCompactBarHTML(id, type, label, val, max, colorClass, isTp = false, shield = 0) {
+  const pct = Math.max(0, Math.min(100, (val / max) * 100)); const barWidthClass = isTp ? 'w-1/3' : 'w-full';
+  const shieldText = shield > 0 && type === 'hp' ? `<span class="text-slate-300 ml-0.5 text-[7px] sm:text-[9px]">(盾${shield})</span>` : '';
+  let finalColor = colorClass; let extraClass = ''; if (isTp && val >= max) { finalColor = 'bg-amber-400'; extraClass = 'shadow-[0_0_10px_rgba(251,191,36,0.8)] animate-pulse'; }
+  return `<div class="relative pt-1.5 sm:pt-2.5 mb-0 sm:mb-[2px]"><span id="${id}-${type}-text" class="absolute right-0 top-0 text-[8px] sm:text-xs font-mono font-bold text-white leading-none text-outline z-10 whitespace-nowrap">${Math.floor(val)}${shieldText}</span><div class="flex items-center gap-1 sm:gap-1.5"><span class="text-[7px] sm:text-[10px] font-bold text-gray-200 leading-none text-outline w-3 sm:w-4">${label}</span><div class="flex-grow h-1 sm:h-1.5 bg-[#222] rounded-[1px] overflow-hidden border border-[#111]"><div id="${id}-${type}-bar" class="${barWidthClass} h-full ${finalColor} ${extraClass} transition-all duration-300 ease-out" style="width: ${pct}%"></div></div></div></div>`;
+}
+
+function getEntitySpriteDom(entityOrId){
+  const id = entityOrId && typeof entityOrId === 'object' ? entityOrId.id : String(entityOrId||'');
+  if(!id) return null;
+  return document.getElementById(`hero-card-${id}`) || document.getElementById(`${id}-sprite`) || document.getElementById(`hero-wrap-${id}`) || null;
+}
+window.getEntitySpriteDom = getEntitySpriteDom;
+
+    function initUI() {
+        heroesData = HERO_DATA.map(([id, name, face, hp, shield, mp, tp]) => ({ id, name, face, hp, maxHp: hp, shield, mp, maxMp: mp, tp, maxTp: 100, isAlive: true, buffs: [] }));
+        enemiesData = ENEMY_ROWS.flat().map(([id, face]) => ({ id, name: id, face, hp: 100, maxHp: 100, isAlive: true, buffs: [] }));
+    $('#heroes-container').innerHTML = heroesData.map(({ id, name, face, hp, maxHp, shield, mp, maxMp, tp, maxTp }) => `
+      <div class="hero relative transition-all duration-300 min-w-[70px] z-20" id="hero-wrap-${id}">
+        <div id="hero-card-${id}" class="fx-body hero-card-inner bg-[#18181b] rounded overflow-hidden relative border shadow-2xl transition-all border-gray-800">
+          <div id="${id}-buffs" class="absolute top-1 right-1 flex flex-col gap-1 items-end z-20 pointer-events-none"></div>
+          <div class="w-full h-12 sm:h-auto sm:aspect-[4/3] relative bg-gray-900 border-b border-gray-700">
+            <div class="absolute top-0 left-0 w-full bg-gradient-to-b from-black/80 to-transparent px-1.5 py-1 text-[9px] sm:text-xs font-bold text-white z-10 flex justify-between"><span>${name}</span></div>
+            <div class="portrait w-full h-full">${face}</div>
+          </div>
+          <div class="px-1 py-1 sm:px-2 sm:py-1.5 flex flex-col gap-[1px] sm:gap-0.5">${createCompactBarHTML(id, 'hp', 'HP', hp, maxHp, 'bg-yellow-400', false, shield)}${createCompactBarHTML(id, 'mp', 'MP', mp, maxMp, 'bg-cyan-400')}${createCompactBarHTML(id, 'tp', 'TP', tp, maxTp, 'bg-green-500', true)}</div>
+        </div>
+      </div>`).join('');
+    $('#enemies-container').innerHTML = ENEMY_ROWS.map((row, ri) => `<div class="flex items-end justify-center" style="gap:${ri ? 26 : 22}px; ${ri ? 'margin-top:18px' : ''}">${row.map(([id, em]) => `
+      <div class="flex flex-col items-center group relative shrink-0" id="enemy-box-${id}" style="transform:scale(${ri ? 1 : 0.72}); ${ri ? '' : 'filter:brightness(0.82) saturate(0.92)'}">
+        <div id="${id}-sprite" class="fx-body enemy-sprite text-7xl sm:text-8xl drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] breathe mt-2 sm:mt-4 flex justify-center items-center">${em}</div>
+        <div class="w-10 sm:w-16 h-1 sm:h-1.5 bg-black/50 mt-2 sm:mt-4 rounded-full overflow-hidden relative"><div class="h-full bg-rose-500 w-full shadow-[0_0_8px_rgba(244,63,94,0.8)]"></div></div>
+      </div>`).join('')}</div>`).join('');
+    $('#turn-order-container').innerHTML = ['👨', '❄️', '🧔', '👩', '🕵️', '👻', '👻'].map((e, i) => `<div class="turn-dot ${i ? '' : 'cur'}" style="border-color:${i === 1 || i > 4 ? '#e11d48' : '#06b6d4'}">${e}</div>`).join('');
+    }
+    initUI();
+
+class CanvasFxEngine {
+    constructor() {
+        this.canvas = null;
+        this.ctx = null;
+        this.particles = [];
+        this.animationFrameId = null;
+        this.hitStop = 0; // 定帧剩余毫秒：>0 时粒子冻结，制造重击顿挫感
+        this.lastFrameTime = 0; // 上一帧时间戳：用于计算真实帧间隔 dt
+        this.lastDt = 16.7;     // 最近一帧的真实间隔（毫秒），供雷电 overlay 等外部特效对齐
+        this.init();
+    }
+
+    init() {
+        this.canvas = document.getElementById('fx-canvas');
+        if (!this.canvas) {
+            this.canvas = document.createElement('canvas');
+            this.canvas.id = 'fx-canvas';
+            this.canvas.className = 'fixed inset-0 pointer-events-none z-[99]';
+            document.body.appendChild(this.canvas);
+        }
+        this.ctx = this.canvas.getContext('2d');
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+    }
+
+    resize() {
+        if (this.canvas) {
+            this.canvas.width = window.innerWidth;
+            this.canvas.height = window.innerHeight;
+        }
+    }
+
+    addParticle(p) {
+        this.particles.push(p);
+        if (this.particles.length === 1) {
+            this.startLoop();
+        }
+    }
+
+    startLoop() {
+        if (!this.animationFrameId) {
+            // 重置时间戳，避免空闲后重启的首帧因间隔过大而跳变（配合 update 内 33ms 上限钳制）
+            this.lastFrameTime = 0;
+            const loop = () => {
+                this.update();
+                this.draw();
+                if (this.particles.length > 0) {
+                    this.animationFrameId = requestAnimationFrame(loop);
+                } else {
+                    this.animationFrameId = null;
+                }
+            };
+            this.animationFrameId = requestAnimationFrame(loop);
+        }
+    }
+
+    update() {
+        // Delta-time：按真实帧间隔推进动画，速度与 FPS 解耦（高刷屏不加速、掉帧不减速）
+        // dt 上限 33ms：标签页休眠/卡顿后恢复时防止粒子瞬移跳变
+        const now = performance.now();
+        const dt = this.lastFrameTime ? Math.min(now - this.lastFrameTime, 33) : 16.7;
+        this.lastDt = dt;
+        this.lastFrameTime = now;
+        const k = dt / 16.7; // 归一化时间系数：1 = 60fps 基准步长
+
+        // Hit Stop 定帧：命中瞬间冻结粒子若干毫秒，制造"重击砸进肉里"的顿挫落差
+        if (this.hitStop > 0) {
+            this.hitStop -= dt;
+            return;
+        }
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const p = this.particles[i];
+            p.age += dt;
+
+            p.x += p.vx * k;
+            p.y += p.vy * k;
+
+            if (p.gravity) p.vy += p.gravity * k;
+            if (p.drag) {
+                const d = Math.pow(p.drag, k); // 阻尼按时间比例复合衰减
+                p.vx *= d;
+                p.vy *= d;
+            }
+            if (p.update) p.update(p);
+
+            if (p.age >= p.life) {
+                this.particles.splice(i, 1);
+            }
+        }
+    }
+
+    draw() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // 使用 'screen' 混合模式实现极具发光感的爆燃、辉光效果
+        this.ctx.globalCompositeOperation = 'screen';
+        
+        for (let i = 0; i < this.particles.length; i++) {
+            const p = this.particles[i];
+            const pct = p.age / p.life;
+            this.ctx.save();
+            p.draw(this.ctx, pct);
+            this.ctx.restore();
+        }
+        
+        this.ctx.globalCompositeOperation = 'source-over';
+    }
+}
+
+// 实例化全局特效引擎
+const fxEngine = new CanvasFxEngine();
+window.fxEngine = fxEngine;
+    // ===== 演示宿主 END =====
+
+    // ===== 可移植特效模块 BEGIN：底座取自 index.html；无战斗、LLM 或酒馆依赖 =====
+const arcaneVfxModule = (function () {
+    'use strict';
+    // 接入点 1：填写新技能的精确 fxTag，与下方分派和 CARDS 保持一致。
+    const ARCANE_TAGS = [];
+    const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
+
+    // —— 共享状态（clearArcaneFx 同步清空） ——
+    const S = {
+        uid: 0,
+        particles: [],
+        particleTimer: null,
+        particleUntil: 0,
+        flights: [],    // 贝塞尔弹道飞行物
+        timers: new Set(),     // combatToken 守卫的延时/收尾定时
+        rawTimers: new Map(),  // 弹道拍点及其完成回调，清理时同步解除等待
+        intervals: new Set(),  // 周期任务（蓄力抖动/羽流/光雨），回调内自守 token
+        layers: new Set(),     // data-arcane-fx 临时 DOM 层
+        anchors: new Set(),    // impactDom 无视觉锚点
+        handles: new Set(),    // 活动技能 handle
+        flashes: new Set(),    // 被加 arcane-flash-* 类的精灵
+        shakeEls: new Set(),   // 被加 arcane-shake-* 类的舞台
+        driver: null,          // 挂在 fxEngine.particles 里的驱动粒子
+        canvas: null, ctx: null,
+        dark: null,
+    };
+    let audioCtx = null, sfxBus = null, sfxVerb = null, sfxNoise = null;
+
+    // ===== combatToken 守卫定时 =====
+    function after(ms, fn) {
+        const token = combatToken;
+        const id = setTimeout(() => { S.timers.delete(id); if (token !== combatToken) return; fn(); }, ms);
+        S.timers.add(id);
+        return id;
+    }
+    function every(ms, fn) {
+        const token = combatToken;
+        const id = setInterval(() => { if (token !== combatToken) { clearInterval(id); S.intervals.delete(id); return; } fn(); }, ms);
+        S.intervals.add(id);
+        return id;
+    }
+    function stopEvery(id) { if (id != null) { clearInterval(id); S.intervals.delete(id); } }
+
+    // ===== 临时层 / 锚点 / 舞台效果 =====
+    function fsLayer(html, ms) {
+        const d = document.createElement('div');
+        d.className = 'arcane-fs-layer';
+        d.setAttribute('data-arcane-fx', 'layer');
+        d.innerHTML = html;
+        document.body.appendChild(d);
+        S.layers.add(d);
+        if (ms) setTimeout(() => { S.layers.delete(d); d.remove(); }, ms); // 纯清理回调，恒执行
+        return d;
+    }
+    function mkAnchor(x, y) {
+        const d = document.createElement('div');
+        d.style.cssText = 'position:fixed; left:' + (x - 1) + 'px; top:' + (y - 1) + 'px; width:2px; height:2px; pointer-events:none; z-index:56; opacity:0;';
+        d.setAttribute('data-arcane-fx', 'anchor');
+        document.body.appendChild(d);
+        S.anchors.add(d);
+        return d;
+    }
+    function dropAnchor(d) { if (d && d.isConnected) { S.anchors.delete(d); d.remove(); } }
+    function flash(el, cls) {
+        if (!el) return;
+        el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+        S.flashes.add(el);
+        after(700, () => { el.classList.remove(cls); S.flashes.delete(el); });
+    }
+    function shake(type) {
+        const scene = document.getElementById('battle-scene');
+        if (!scene) return;
+        const cls = 'arcane-shake-' + type;
+        scene.classList.remove('arcane-shake-light', 'arcane-shake-heavy', 'arcane-shake-quake');
+        void scene.offsetWidth;
+        scene.classList.add(cls);
+        S.shakeEls.add(scene);
+        after(type === 'quake' ? 560 : (type === 'heavy' ? 330 : 190), () => { scene.classList.remove(cls); S.shakeEls.delete(scene); });
+    }
+    function darken(o) {
+        if (!o && !S.dark) return;
+        if (!S.dark || !S.dark.isConnected) {
+            S.dark = document.createElement('div');
+            S.dark.id = 'arcane-dark';
+            S.dark.setAttribute('data-arcane-fx', 'dark');
+            document.body.appendChild(S.dark);
+        }
+        if (S.dark) S.dark.style.opacity = o;
+        if (!o && S.dark) {
+            const layer = S.dark;
+            after(360, () => { if (layer === S.dark && layer.style.opacity === '0') { layer.remove(); S.dark = null; } });
+        }
+    }
+
+    // ===== 几何 =====
+    function ctr(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, top: r.top, bottom: r.bottom, left: r.left, right: r.right }; }
+    function domOf(e) { return getEntitySpriteDom(e); }
+    function unionRect(doms) {
+        const rs = doms.map(d => d.getBoundingClientRect()).filter(r => r.width || r.height);
+        if (!rs.length) return null;
+        const l = Math.min(...rs.map(r => r.left)), rr = Math.max(...rs.map(r => r.right));
+        const t = Math.min(...rs.map(r => r.top)), b = Math.max(...rs.map(r => r.bottom));
+        return { x: (l + rr) / 2, y: (t + b) / 2, l, r: rr, t, b, w: rr - l, h: b - t };
+    }
+    // 施法者所属全队存活对象（含召唤物，isAlive 过滤）
+    function teamSprites(caster) {
+        const isHero = caster && (caster.isSummon ? caster.side === 'hero' : String(caster.id || '').startsWith('h'));
+        const arr = isHero ? heroesData : enemiesData;
+        return arr.filter(e => e.isAlive).map(e => domOf(e)).filter(Boolean);
+    }
+
+    // ===== 私有合成音色（demo 原样移植，局部隔离） =====
+    function audio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const ctx = audioCtx;
+            const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -10; comp.knee.value = 4; comp.ratio.value = 6; comp.attack.value = 0.001; comp.release.value = 0.12; comp.connect(ctx.destination);
+            const sat = shaper(ctx, 1.6); sat.connect(comp);
+            sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9; sfxBus.connect(sat);
+            const len = ctx.sampleRate * 3, ir = ctx.createBuffer(2, len, ctx.sampleRate);
+            for (let ch = 0; ch < 2; ch++) { const dd = ir.getChannelData(ch); for (let i = 0; i < len; i++) dd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4); }
+            sfxVerb = ctx.createConvolver(); sfxVerb.buffer = ir; const vg = ctx.createGain(); vg.gain.value = 0.5; sfxVerb.connect(vg); vg.connect(comp);
+            sfxNoise = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate); const nd = sfxNoise.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        return audioCtx;
+    }
+    function shaper(ctx, drive) { const ws = ctx.createWaveShaper(), c = new Float32Array(2048); for (let i = 0; i < 2048; i++) c[i] = Math.tanh((i / 1024 - 1) * drive) / Math.tanh(drive); ws.curve = c; ws.oversample = '2x'; return ws; }
+    function chain(ctx, src, t, o) {
+        const gn = ctx.createGain(), pk = o.peak || 0.002;
+        gn.gain.setValueAtTime(0.0001, t); gn.gain[o.peak ? 'exponentialRampToValueAtTime' : 'linearRampToValueAtTime'](o.vol, t + pk);
+        if (o.cut) { gn.gain.setValueAtTime(o.vol, t + o.dur - 0.012); gn.gain.linearRampToValueAtTime(0.0001, t + o.dur); }
+        else gn.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
+        const p = ctx.createStereoPanner(); p.pan.setValueAtTime(o.pan || 0, t); if (o.pan1 !== undefined) p.pan.linearRampToValueAtTime(o.pan1, t + o.dur);
+        src.connect(gn); gn.connect(p); p.connect(sfxBus);
+        if (o.wet) { const w = ctx.createGain(); w.gain.value = o.wet; p.connect(w); w.connect(sfxVerb); }
+    }
+    function noiseSrc(ctx, t, dur, rate) { const s = ctx.createBufferSource(); s.buffer = sfxNoise; s.playbackRate.value = rate || 1; s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05); return s; }
+    function biquad(ctx, type, f0, f1, q, t, dur, fd) { const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t); if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + (fd || dur)); return f; }
+    function click(d, vol = 0.7, f = 3500, dur = 0.012, pan = 0) { const ctx = audio(), t = ctx.currentTime + d; const f1 = biquad(ctx, 'highpass', f, 0, 0.7, t, dur); noiseSrc(ctx, t, dur).connect(f1); chain(ctx, f1, t, { vol, dur, pan }); }
+    function kick(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d; const s = ctx.createOscillator();
+        s.frequency.setValueAtTime(o.hi, t); s.frequency.exponentialRampToValueAtTime(o.lo, t + o.pd); s.frequency.exponentialRampToValueAtTime(o.lo * 0.7, t + o.dur);
+        const sh = shaper(ctx, o.drive || 3); s.connect(sh); s.start(t); s.stop(t + o.dur + 0.05); chain(ctx, sh, t, { vol: o.vol, dur: o.dur, wet: o.wet || 0 });
+    }
+    function crunch(d, o) { const ctx = audio(), t = ctx.currentTime + d; const bp = biquad(ctx, 'bandpass', o.f, o.f1, o.q || 1, t, o.dur); const sh = shaper(ctx, o.drive || 6); noiseSrc(ctx, t, o.dur).connect(bp); bp.connect(sh); chain(ctx, sh, t, { vol: o.vol, dur: o.dur, pan: o.pan || 0, wet: o.wet || 0 }); }
+    function boom(d, o) { const ctx = audio(), t = ctx.currentTime + d; const lp = biquad(ctx, 'lowpass', o.f0, o.f1, 0.9, t, o.dur, o.fd || o.dur * 0.6); noiseSrc(ctx, t, o.dur, o.rate).connect(lp); chain(ctx, lp, t, { vol: o.vol, dur: o.dur, peak: o.peak, wet: o.wet || 0, pan: o.pan || 0 }); }
+    function whoosh(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d; const f = biquad(ctx, o.type || 'bandpass', o.f0, o.f1, o.q || 1.2, t, o.dur);
+        if (o.wob) o.wob.forEach(([dt, hz]) => f.frequency.linearRampToValueAtTime(hz, t + dt));
+        noiseSrc(ctx, t, o.dur, o.rate).connect(f); chain(ctx, f, t, { vol: o.vol, dur: o.dur, peak: o.peak || o.dur * 0.5, cut: o.cut, pan: o.pan || 0, pan1: o.pan1, wet: o.wet || 0 });
+    }
+    function drone(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d;
+        [-12, 0, 9].forEach(dt => { const s = ctx.createOscillator(); s.type = 'sawtooth'; s.detune.value = dt; s.frequency.setValueAtTime(o.f0, t); s.frequency.exponentialRampToValueAtTime(o.f1, t + o.dur);
+            const lp = biquad(ctx, 'lowpass', o.lp0, o.lp1, 3, t, o.dur); s.connect(lp); s.start(t); s.stop(t + o.dur + 0.05); chain(ctx, lp, t, { vol: o.vol, dur: o.dur, peak: o.dur * 0.95, cut: true }); });
+    }
+    function tone(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d; const s = ctx.createOscillator(); s.type = o.type || 'sine'; s.detune.value = o.detune || 0;
+        s.frequency.setValueAtTime(o.f0, t); if (o.f1) s.frequency.exponentialRampToValueAtTime(o.f1, t + (o.fd || o.dur));
+        let node = s; if (o.lp) { const f = biquad(ctx, 'lowpass', o.lp, o.lp1, o.q || 0.8, t, o.dur); s.connect(f); node = f; }
+        s.start(t); s.stop(t + o.dur + 0.05); chain(ctx, node, t, o);
+    }
+    function choir(d, freqs, dur, vol, peakFrac = 0.4, cut = false) {
+        const ctx = audio(), t = ctx.currentTime + d;
+        freqs.forEach((f, i) => [-9, 0, 8].forEach(dt => {
+            const s = ctx.createOscillator(); s.type = 'sawtooth'; s.frequency.value = f; s.detune.value = dt;
+            const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 5 + i * 0.4; lg.gain.value = f * 0.006; lfo.connect(lg); lg.connect(s.frequency);
+            const lp = biquad(ctx, 'lowpass', 900 + i * 200, 0, 0.6, t, dur); s.connect(lp); s.start(t); lfo.start(t); s.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+            chain(ctx, lp, t, { vol: vol / 3, dur, peak: dur * peakFrac, cut, wet: 0.7, pan: (i - 1) * 0.3 });
+        }));
+    }
+    function chime(d, f, dur = 1.2, vol = 0.1, pan = 0) { [[1, 1], [2.4, 0.4], [3.9, 0.18]].forEach(([m, v]) => tone(d, { f0: f * m, dur: dur / Math.sqrt(m), vol: vol * v, pan, wet: 0.7 })); }
+    function crystal(d, f, vol = 0.12, pan = 0) { tone(d, { f0: f, dur: 0.16, vol, pan, wet: 0.5 }); tone(d, { f0: f * 1.5, dur: 0.09, vol: vol * 0.5, pan }); click(d, vol * 1.5, 6000, 0.005, pan); }
+    function cry(d, vol = 0.12) {
+        const ctx = audio(), t = ctx.currentTime + d; const s = ctx.createOscillator(); s.type = 'sawtooth';
+        s.frequency.setValueAtTime(1500, t); s.frequency.exponentialRampToValueAtTime(2900, t + 0.12); s.frequency.exponentialRampToValueAtTime(2100, t + 0.6);
+        const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 22; lg.gain.value = 60; lfo.connect(lg); lg.connect(s.frequency);
+        const bp = biquad(ctx, 'bandpass', 2600, 0, 4, t, 0.6); s.connect(bp); s.start(t); lfo.start(t); s.stop(t + 0.65); lfo.stop(t + 0.65); chain(ctx, bp, t, { vol, dur: 0.6, peak: 0.08, wet: 0.6, pan: 0.3 });
+    }
+
+    // ===== arcane canvas 粒子层（绘制在 z55，低于浮字；调度复用 fxEngine 循环） =====
+    function ensureCanvas() {
+        if (S.canvas && S.canvas.isConnected) return;
+        const c = document.createElement('canvas');
+        c.id = 'arcane-fx-canvas';
+        c.setAttribute('data-arcane-fx', 'canvas');
+        document.body.appendChild(c);
+        S.canvas = c; S.ctx = c.getContext('2d');
+        resizeCanvas();
+    }
+    function resizeCanvas() { if (S.canvas) { S.canvas.width = window.innerWidth; S.canvas.height = window.innerHeight; } }
+    window.addEventListener('resize', resizeCanvas);
+    const DRAW = {
+        dot(g, p) { g.fillStyle = p.color; g.beginPath(); g.arc(0, 0, p.size, 0, 6.283); g.fill(); },
+        ring(g, p) { g.strokeStyle = p.color; g.lineWidth = 3 * p.life; g.beginPath(); g.arc(0, 0, 4 + p.size * (1 - p.life) * 40, 0, 6.283); g.stroke(); },
+        flame(g, p) { const r = p.size * (0.4 + p.life * 0.8); const gr = g.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, '#fff7d6'); gr.addColorStop(0.35, p.color); gr.addColorStop(1, 'rgba(120,20,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill(); },
+        smoke(g, p) { const r = p.size * (1.6 - p.life); const gr = g.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, p.color); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill(); },
+        feather(g, p) { const s = p.size; g.fillStyle = p.color; g.beginPath(); g.moveTo(-s * 1.5, 0); g.quadraticCurveTo(0, -s * 0.55, s * 1.5, 0); g.quadraticCurveTo(0, s * 0.4, -s * 1.5, 0); g.fill(); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-s * 1.8, 0); g.lineTo(s * 1.5, 0); g.stroke(); },
+        shard(g, p) { const s = p.size; g.fillStyle = p.fill || 'rgba(224,242,254,0.25)'; g.strokeStyle = p.color; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, -s); g.lineTo(s * 0.7, s * 0.3); g.lineTo(s * 0.1, s * 0.9); g.lineTo(-s * 0.6, s * 0.2); g.closePath(); g.fill(); g.stroke(); },
+        streak(g, p) { g.strokeStyle = p.color; g.lineWidth = p.size; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 0); g.lineTo(-p.vx * 4, -p.vy * 4); g.stroke(); }
+    };
+    function releaseIdleCanvas() {
+        if (S.driver || S.handles.size || S.particles.length || S.flights.length || !S.canvas) return;
+        S.canvas.remove(); S.canvas = null; S.ctx = null;
+    }
+    function scheduleParticleCleanup() {
+        if (S.particleTimer !== null) return;
+        S.particleTimer = after(Math.max(0, S.particleUntil - performance.now()), () => {
+            S.particleTimer = null;
+            const now = performance.now();
+            S.particles = S.particles.filter(p => p.expiresAt > now);
+            if (S.particles.length) { scheduleParticleCleanup(); return; }
+            if (!S.flights.length && S.driver) {
+                const index = fxEngine.particles.indexOf(S.driver);
+                if (index >= 0) fxEngine.particles.splice(index, 1);
+                S.driver = null;
+            }
+            if (S.ctx) S.ctx.clearRect(0, 0, S.canvas.width, S.canvas.height);
+            releaseIdleCanvas();
+        });
+    }
+    function addP(o) {
+        const p = Object.assign({ vx: 0, vy: 0, life: 1, decay: 0.02, size: 3, color: '#fde68a', grav: 0, drag: 0.98, rot: 0, vr: 0, shape: 'dot', blend: 'lighter' }, o);
+        p.expiresAt = performance.now() + p.life / p.decay * 16.7;
+        S.particleUntil = Math.max(S.particleUntil, p.expiresAt);
+        S.particles.push(p);
+        ensureCanvas(); ensureDriver(); scheduleParticleCleanup();
+    }
+    function burst(n, fn) { for (let i = 0; i < n; i++) addP(fn(i)); }
+    // 绕场收束（demo orbitCharge 原样）
+    function orbitCharge(c, n, dur, mk, rx, ry, shrink = 0.8) {
+        const orb = []; for (let i = 0; i < n; i++) orb.push({ a: Math.random() * 6.283, r: rnd(0.45, 1), s: rnd(0.025, 0.05), k: Math.random() });
+        const t0 = performance.now();
+        const id = every(33, () => { const k = Math.min(1, (performance.now() - t0) / dur); orb.forEach(o => { o.a += o.s * (1 + k * 3); const r = o.r * (1 - k * shrink); addP(Object.assign({ x: c.x + Math.cos(o.a) * rx * r, y: c.y + Math.sin(o.a) * ry * r, decay: 0.25 }, mk(o))); }); });
+        after(dur, () => stopEvery(id));
+    }
+    // 贝塞尔弹道（demo fly 原样；由驱动粒子步进，不另启 rAF）
+    function fly(a, b, lift, dur, draw, done, ease) {
+        ease = ease || (k => k * k);
+        const cx = (a.x + b.x) / 2, cy = Math.min(a.y, b.y) - lift;
+        const startedAt = performance.now();
+        const f = {
+            age: 0, dur, timer: null,
+            step(pr) { const t = ease(pr), u = 1 - t; draw(u * u * a.x + 2 * u * t * cx + t * t * b.x, u * u * a.y + 2 * u * t * cy + t * t * b.y, pr); },
+            progress() { return Math.min(1, (performance.now() - startedAt) / dur); }
+        };
+        S.flights.push(f);
+        ensureCanvas(); ensureDriver();
+        f.timer = after(dur, () => {
+            const index = S.flights.indexOf(f);
+            if (index >= 0) S.flights.splice(index, 1);
+            f.step(1);
+            if (done) done();
+        });
+        return f;
+    }
+    function ensureDriver() {
+        if (S.driver) return;
+        const driver = {
+            age: 0, life: 1e9, x: 0, y: 0, vx: 0, vy: 0,
+            update(p) {
+                step(fxEngine.lastDt || 16.7);
+                if (!S.particles.length && !S.flights.length) {
+                    p.age = p.life; S.driver = null;
+                    if (S.ctx) S.ctx.clearRect(0, 0, S.canvas.width, S.canvas.height);
+                    releaseIdleCanvas();
+                }
+            },
+            draw() { render(); }
+        };
+        S.driver = driver;
+        fxEngine.addParticle(driver);
+    }
+    function step(dt) {
+        const k = dt / 16.7;
+        for (const f of S.flights) f.step(f.progress());
+        for (let i = S.particles.length - 1; i >= 0; i--) {
+            const p = S.particles[i];
+            p.vx *= Math.pow(p.drag, k); p.vy *= Math.pow(p.drag, k);
+            p.vy += p.grav * k;
+            p.x += p.vx * k; p.y += p.vy * k;
+            p.rot += p.vr * k;
+            p.life = Math.min(p.life - p.decay * k, Math.max(0, (p.expiresAt - performance.now()) * p.decay / 16.7));
+            if (p.life <= 0) S.particles.splice(i, 1);
+        }
+    }
+    function render() {
+        const g = S.ctx; if (!g || !S.canvas) return;
+        g.clearRect(0, 0, S.canvas.width, S.canvas.height);
+        for (let i = 0; i < S.particles.length; i++) {
+            const p = S.particles[i];
+            g.save();
+            g.globalAlpha = Math.min(1, p.life * 1.4);
+            g.globalCompositeOperation = p.blend;
+            g.translate(p.x, p.y);
+            if (p.shape !== 'streak') g.rotate(p.rot);
+            DRAW[p.shape](g, p);
+            g.restore();
+        }
+    }
+
+    // ===== ① 通用火焰弹（240 蓄 + 340 飞 = 580ms 命中拍点） =====
+    function fireProjectile(fromDom, toDom, dodged, token) {
+        const h = ctr(fromDom), t = ctr(toDom);
+        const a = { x: h.x + 10, y: h.top - 16 }, b = { x: t.x, y: t.y };
+        burst(22, () => { const ang = Math.random() * 6.283, d = rnd(40, 70); return { x: a.x + Math.cos(ang) * d, y: a.y + Math.sin(ang) * d, vx: -Math.cos(ang) * d / 9, vy: -Math.sin(ang) * d / 9, drag: 0.86, decay: 0.06, size: rnd(1.2, 2.4), color: pick(['#fdba74', '#f97316', '#fde68a']) }; });
+        fsLayer(`<div class="arcane-fs-anchor" style="left:${a.x}px; top:${a.y}px; width:64px; height:64px; border-radius:50%; background: radial-gradient(circle, #fff7d6 0%, #fb923c 35%, rgba(220,38,38,0.45) 60%, transparent 72%); animation: arcane-seed-bloom 0.26s ease-out both;"></div>`, 320);
+        whoosh(0, { f0: 400, f1: 1800, q: 1.2, dur: 0.22, vol: 0.3, peak: 0.18, pan: -0.5 }); boom(0.02, { f0: 900, f1: 300, dur: 0.25, vol: 0.25, peak: 0.08, pan: -0.5 });
+        for (let i = 0; i < 4; i++) click(0.04 + i * 0.04, 0.12, rnd(2500, 4500), 0.006, -0.5);
+        after(240, () => {
+            if (token !== combatToken) return; // 重置后停止绘制/音效启动
+            whoosh(0, { f0: 350, f1: 1500, q: 0.9, dur: 0.34, vol: 0.55, peak: 0.28, cut: true, pan: -0.6, pan1: 0.5 });
+            for (let i = 0; i < 6; i++) click(0.03 + i * 0.05, 0.1, rnd(2200, 4800), 0.006, -0.4 + i * 0.15);
+            fly(a, b, 90, 340, (x, y) => {
+                if (token !== combatToken) return;
+                addP({ x, y, shape: 'flame', size: 16, decay: 0.2, color: '#fb923c' });
+                burst(5, () => ({ x: x + rnd(-6, 6), y: y + rnd(-6, 6), vx: rnd(-1, 1), vy: rnd(-1.6, -0.3), drag: 0.94, decay: rnd(0.04, 0.07), size: rnd(6, 11), shape: 'flame', color: pick(['#f97316', '#ef4444', '#fbbf24']) }));
+                for (let j = 0; j < 2; j++) { const an = performance.now() / 45 + j * 3.14; addP({ x: x + Math.cos(an) * 11, y: y + Math.sin(an) * 11, decay: 0.3, size: 2, color: '#fff7d6' }); }
+            }, () => {
+                if (token !== combatToken || dodged) return; // 闪避：弹达原位，不爆散不响，不 flash/flinch
+                click(0, 0.8, 4000); kick(0, { hi: 240, lo: 55, pd: 0.035, dur: 0.26, vol: 0.9, drive: 3 }); crunch(0, { f: 1600, f1: 700, q: 1.2, dur: 0.12, vol: 0.5 });
+                boom(0.005, { f0: 5000, f1: 200, dur: 0.5, vol: 0.5, wet: 0.25 }); whoosh(0.05, { f0: 600, f1: 300, q: 0.8, dur: 0.6, vol: 0.15, peak: 0.05 });
+                for (let i = 0; i < 12; i++) click(rnd(0.06, 0.6), 0.15, rnd(2500, 6000), 0.006, rnd(0.1, 0.8));
+                fsLayer(`<div class="arcane-fs-anchor" style="left:${b.x}px; top:${b.y}px; width:140px; height:140px; border-radius:50%; background: radial-gradient(circle, #fff 0%, #fdba74 30%, rgba(239,68,68,0.5) 58%, transparent 72%); animation: arcane-hit-flash 0.34s ease-out both;"></div>`, 420);
+                burst(2, i => ({ x: b.x, y: b.y, shape: 'ring', size: 1.8 + i, decay: 0.07 - i * 0.02, color: i ? '#f97316' : '#fde68a' }));
+                burst(40, () => { const an = Math.random() * 6.283, s = rnd(2, 8); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s - 1, grav: 0.13, drag: 0.93, decay: rnd(0.025, 0.05), size: rnd(1, 2.2), color: pick(['#fde68a', '#fb923c', '#fff7d6']) }; });
+                burst(10, () => ({ x: b.x + rnd(-14, 14), y: b.y + rnd(-14, 14), vx: rnd(-1, 1), vy: rnd(-2, -0.5), drag: 0.95, decay: rnd(0.03, 0.05), size: rnd(12, 20), shape: 'flame', color: '#f97316' }));
+                burst(9, () => ({ x: b.x + rnd(-24, 24), y: b.y + rnd(-18, 18), vx: rnd(-0.3, 0.3), vy: rnd(-0.9, -0.4), drag: 0.99, decay: 0.011, size: rnd(16, 28), shape: 'smoke', blend: 'source-over', color: 'rgba(40,32,30,0.55)' }));
+            });
+        });
+    }
+
+    // ===== ② 敌方紫色法术弹（480ms 命中拍点） =====
+    function enemySpellProjectile(fromDom, toDom, dodged, token) {
+        const t = ctr(fromDom), h = ctr(toDom);
+        const a = { x: t.x - 20, y: t.y - 10 }, b = { x: h.x, y: toDom.hasAttribute('data-arcane-fx') ? h.y : h.top + 30 };
+        whoosh(0, { f0: 300, f1: 900, q: 1.4, dur: 0.48, vol: 0.32, peak: 0.4, pan: 0.6, pan1: -0.3 }); tone(0, { type: 'triangle', f0: 110, f1: 90, dur: 0.48, vol: 0.08 });
+        fly(a, b, 30, 480, (x, y) => {
+            if (token !== combatToken) return;
+            addP({ x, y, size: 9, decay: 0.22, color: '#c084fc' }); addP({ x, y, size: 4, decay: 0.3, color: '#fff' });
+            burst(3, () => ({ x: x + rnd(-5, 5), y: y + rnd(-5, 5), vx: rnd(0.5, 1.5), vy: rnd(-0.5, 0.5), drag: 0.94, decay: 0.06, size: rnd(1.5, 3), color: pick(['#7c3aed', '#a855f7']) }));
+        }, () => {
+            if (token !== combatToken || dodged) return;
+            click(0, 0.6, 3500); kick(0, { hi: 180, lo: 55, pd: 0.03, dur: 0.25, vol: 0.7, drive: 3 }); boom(0, { f0: 3000, f1: 200, dur: 0.4, vol: 0.35, wet: 0.3 });
+            burst(24, () => { const an = Math.random() * 6.283, s = rnd(1.5, 5); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.93, decay: 0.04, size: rnd(1, 2.4), color: pick(['#e9d5ff', '#c084fc', '#7c3aed']) }; });
+        }, k => k);
+    }
+
+    // ===== 新技能实现 BEGIN =====
+    // 接入点 2：在这里写 playXxx(caster, targets, isReaction)，使用 domOf / ctr / unionRect 定位。
+    // 延时用 after / every；SVG 用 fsLayer；粒子用 addP / burst / fly；不要另起永久 rAF。
+    // 保持纯演出：不改 HP/状态，不负责浮字或战斗结算；测试反馈放在下方演示控制区。
+    // 持续演出返回 handle：doneAt 为 Date.now() 时间戳，cancel() 负责终止自身动画。
+    // 按需提供 dodge(success) / hit(type) / dispel(dom) / impactDom，与正式版反应接口一致。
+    // handle 加入 S.handles；结束时删除并调用 releaseIdleCanvas()；WAAPI 动画由 cancel() 取消。
+    // ===== 新技能实现 END =====
+
+    // ===== 对外接口（与正式版同名同参；不将演示卡片或占位数据带入模块） =====
+    function isArcaneSkillFx(fxTag) { return ARCANE_TAGS.indexOf(fxTag) !== -1; }
+    function playArcaneSkillFx(fxTag, caster, targets, isReaction = false) {
+        if (!isArcaneSkillFx(fxTag)) return null;
+        // 接入点 3：按 fxTag 分派到上方新技能函数，返回它的 handle。
+        return null;
+    }
+    function playArcaneProjectile(type, fromDom, toDom, dodged = false) {
+        if (!fromDom || !toDom || !fromDom.getBoundingClientRect || !toDom.getBoundingClientRect) return Promise.resolve();
+        const token = combatToken;
+        ensureCanvas(); ensureDriver();
+        if (type === 'fire') fireProjectile(fromDom, toDom, !!dodged, token);
+        else if (type === 'enemy_spell') enemySpellProjectile(fromDom, toDom, !!dodged, token);
+        const beat = type === 'fire' ? 580 : 480;
+        return new Promise(res => {
+            const id = setTimeout(() => { S.rawTimers.delete(id); res(); }, beat);
+            S.rawTimers.set(id, res);
+        });
+    }
+    function clearArcaneFx() {
+        S.timers.forEach(id => clearTimeout(id)); S.timers.clear();
+        S.rawTimers.forEach((resolve, id) => { clearTimeout(id); resolve(); }); S.rawTimers.clear();
+        S.intervals.forEach(id => clearInterval(id)); S.intervals.clear();
+        S.flights.length = 0; S.particles.length = 0;
+        S.particleTimer = null; S.particleUntil = 0;
+        if (S.driver) { const idx = fxEngine.particles.indexOf(S.driver); if (idx >= 0) fxEngine.particles.splice(idx, 1); S.driver = null; }
+        S.handles.forEach(h => { if (h && h.cancel) h.cancel(); }); S.handles.clear();
+        S.layers.forEach(d => d.remove()); S.layers.clear();
+        S.anchors.forEach(d => d.remove()); S.anchors.clear();
+        S.flashes.forEach(el => el.classList.remove('arcane-flash-cold', 'arcane-flash-heal')); S.flashes.clear();
+        S.shakeEls.forEach(el => el.classList.remove('arcane-shake-light', 'arcane-shake-heavy', 'arcane-shake-quake')); S.shakeEls.clear();
+        if (S.dark) { S.dark.remove(); S.dark = null; }
+        if (S.canvas) { S.canvas.remove(); S.canvas = null; S.ctx = null; }
+        if (audioCtx) { audioCtx.close(); audioCtx = null; sfxBus = null; sfxVerb = null; sfxNoise = null; }
+    }
+    window.isArcaneSkillFx = isArcaneSkillFx;
+    window.playArcaneSkillFx = playArcaneSkillFx;
+    window.playArcaneProjectile = playArcaneProjectile;
+    window.clearArcaneFx = clearArcaneFx;
+    return { isArcaneSkillFx, playArcaneSkillFx, playArcaneProjectile, clearArcaneFx };
+})();
+    // ===== 可移植特效模块 END =====
+
+    // ===== 演示控制 BEGIN：仅驱动上述正式版接口，不参与移植 =====
+    // 接入点 4：CARDS 每项为 { name, level, description, fxTag, casterId, targetIds, isReaction }。
+    // casterId / targetIds 使用上方 h1-h4、e1-e6；level 使用 L1-L4，默认列表为空。
+    // 反应演练可在 playDemoSkill 中调用返回的 handle.dodge / hit，不把模拟攻击写进技能实现。
+    const CARDS = [];
+    let unlockTimer = null;
+
+    function lockCards(locked) {
+        document.querySelectorAll('#skill-list .card').forEach(card => { card.disabled = locked; });
+    }
+    function playDemoSkill(card) {
+        combatToken++;
+        clearArcaneFx();
+        clearTimeout(unlockTimer);
+        const entities = heroesData.concat(enemiesData);
+        const caster = entities.find(e => e.id === card.casterId);
+        const targets = card.targetIds.map(id => entities.find(e => e.id === id));
+        const handle = playArcaneSkillFx(card.fxTag, caster, targets, !!card.isReaction);
+        if (handle && handle.doneAt > Date.now()) {
+            lockCards(true);
+            unlockTimer = setTimeout(() => { unlockTimer = null; lockCards(false); }, handle.doneAt - Date.now());
+        }
+        return handle;
+    }
+    function renderSkillCards() {
+        const list = $('#skill-list');
+        list.replaceChildren();
+        if (!CARDS.length) {
+            list.innerHTML = '<div class="flex-1 flex items-center justify-center text-xs text-slate-500">暂无技能</div>';
+            return;
+        }
+        CARDS.forEach(card => {
+            const button = document.createElement('button');
+            button.className = 'card w-full py-1.5 px-2 bg-slate-900/80 hover:bg-violet-950/60 border border-slate-700/80 hover:border-violet-500/60 rounded-lg text-left transition-all shadow-sm';
+            button.title = card.fxTag;
+            button.innerHTML = '<div class="flex items-center justify-between gap-1"><span class="text-xs font-bold text-slate-100"></span><span class="text-[9px] font-bold px-1 rounded border border-cyan-500/60 text-cyan-300"></span></div><div class="text-[9px] text-slate-400 truncate"></div>';
+            const labels = button.querySelectorAll('span');
+            labels[0].textContent = card.name;
+            labels[1].textContent = card.level;
+            button.lastElementChild.textContent = card.description;
+            button.addEventListener('click', () => playDemoSkill(card));
+            list.appendChild(button);
+        });
+    }
+    function resetDemo() {
+        combatToken++;
+        clearTimeout(unlockTimer); unlockTimer = null;
+        clearArcaneFx();
+        cancelAnimationFrame(fxEngine.animationFrameId); fxEngine.animationFrameId = null;
+        fxEngine.particles.length = 0; fxEngine.hitStop = 0; fxEngine.lastFrameTime = 0;
+        fxEngine.ctx.clearRect(0, 0, fxEngine.canvas.width, fxEngine.canvas.height);
+        initUI();
+        renderSkillCards();
+    }
+    $('#btn-reset').addEventListener('click', resetDemo);
+    renderSkillCards();
+    // ===== 演示控制 END =====
+    // 移植：只将新增 arcane- CSS、技能函数、标签与分派合并到正式版已有模块。
+    // 正式版已提供 fxEngine / combatToken / getEntitySpriteDom / heroesData / enemiesData，勿重复复制演示宿主。
+  </script>
+</body>
+</html>
