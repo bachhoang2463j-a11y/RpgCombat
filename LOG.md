@@ -3252,3 +3252,19 @@
 - **涉及文件**：`demo-attack-identity2.html`、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：内联 JS 经 Node `vm`/Syntax `node --check` 校验通过（1 个内联脚本）；遵循 Demo 免测免审规则未跑自动化测试与代码审查，待用户实机观感确认。
 - **边界**：未修改 `demo-skill-vfx-template.html`、`demo-attack-identity.html`、`demo-hit-feedback.html`、`index.html`、正则包与 `README.md`。
+
+---
+
+## [LOG-271] 2026-11-12 — Demo v2 3A 右上角无描边伤害字效重设计与模板/Demo 头像直链同步
+
+- **提交**：`8a29767`。
+- **核心目的**：针对用户"原伤害数字过于抢眼"的反馈，重设计为 3A 写实战术风格（右上角内沿定位、无粗描边、靠字体切换与克制缩放动效体现量级）；并将空白模板与 Demo v2 中的我方人物头像及左侧行动条同步替换为正式版真实头像直链，方便实机对比。
+- **变更**：
+  1. **`demo-attack-identity2.html`（3A 伤害数字重设计）**：
+     - 移除 `::before` `attr(data-text)`、`background-clip: text` 与 `-webkit-text-stroke` 粗黑描边，改用干净暗部软投影；引入 `Cinzel` 与 `Inter`。
+     - 字体与动效按量级/修饰切换：轻伤 `Inter` 600（15px 素白），受伤 `Chakra Petch` italic 700（19px 淡绯），重创 `Cinzel` 800（25px 绯红微光+干脆落位），暴击切换 `Chakra Petch` italic 800 琥珀金（保留量级字号，入场微放大约 `1.14x`）与轻量切光，爆发切换 `Cinzel` 800 香槟白金；`hitAnchor` 锚定目标视觉框右上角内沿并避让顶部菜单与右下操作区，同时修正 `hitDodgeGhost` 克隆含 `<img>` 英雄卡时的容器布局。
+  2. **`demo-skill-vfx-template.html` & `demo-attack-identity2.html`（正式版头像直链同步）**：
+     - 从 `index.html` `AVATAR_MAP` 同步埃利奥特、弗兰克、玛德琳、索恩四条 `imgur.la` PNG 直链至 `HERO_AVATARS`，替换四张英雄卡片 `.portrait` 与左侧行动条 `#turn-order-container` 我方圆标（`.turn-dot`、`.portrait` 增补 `overflow: hidden`，均附 `onerror` emoji 兜底；敌方与正式版一致保留 emoji）；完整保留空白模板 6 项接入锚点不变。
+- **涉及文件**：`demo-attack-identity2.html`、`demo-skill-vfx-template.html`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：Node `node --check` 校验两份文件内联 `<script>` 全部通过；模板 6 项接入锚点唯一性脚本校验通过；遵循 Demo 免测免审规则未跑自动化测试与审查，待用户实机观感确认。
+- **边界**：未修改 `index.html`、`demo-attack-identity.html`、`demo-hit-feedback.html`、正则包与 `README.md`。
