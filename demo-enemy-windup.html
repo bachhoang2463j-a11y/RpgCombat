@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>SVG 技能演练 · 空白模板</title>
+  <title>敌方前摇演练 · 近身粒子</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap');
@@ -66,96 +66,83 @@
     }
     .omen-red-single { animation: omenBase 600ms cubic-bezier(0.25, 1, 0.5, 1) forwards; }
 
-    /* 红·近战群攻：侧倾收身 → 横向甩身 → 回正（横向甩出，不向前冲） */
+    /* 红·近战群攻：侧倾蓄势 → 横向甩身；柔光范围对齐红色单体基线 */
     @keyframes omenRedWide {
-      0% { transform: scale(1) translate(0, 0) rotate(0deg); filter: drop-shadow(0 0 0 rgba(248, 113, 113, 0)); }
-      16% { transform: scale(0.95) translate(-7px, 3px) rotate(-7deg); filter: drop-shadow(0 0 14px rgba(248, 113, 113, 0.7)); }
-      30% { transform: scale(0.94) translate(-9px, 3px) rotate(-8deg); filter: drop-shadow(0 0 20px rgba(248, 113, 113, 0.85)); }
-      42% { transform: scale(0.97) translate(-4px, 1px) rotate(-4deg); filter: drop-shadow(0 0 26px rgba(248, 113, 113, 0.9)); }
-      55% { transform: scale(1.12) translate(12px, 4px) rotate(7deg); filter: drop-shadow(0 0 34px rgba(248, 113, 113, 1)) drop-shadow(0 0 58px rgba(248, 113, 113, 0.5)); }
-      75% { transform: scale(1.04) translate(5px, 2px) rotate(3deg); filter: drop-shadow(0 0 22px rgba(248, 113, 113, 0.4)); }
-      100% { transform: scale(1) translate(0, 0) rotate(0deg); filter: drop-shadow(0 0 0 rgba(248, 113, 113, 0)); }
+      0% { transform: scale(1) translateX(0) rotate(0deg); filter: drop-shadow(0 0 0 rgba(248,113,113,0)); }
+      24% { transform: scale(0.97,1.02) translateX(-0.045em) rotate(-6deg); filter: drop-shadow(0 0 18px rgba(248,113,113,0.95)); }
+      43%, 50% { transform: scale(0.96,1.02) translateX(-0.04em) rotate(-5deg); filter: drop-shadow(0 0 10px rgba(239,68,68,0.8)); }
+      55% { transform: scale(1.08,0.98) translateX(0.05em) rotate(7deg); filter: drop-shadow(0 0 30px rgba(248,113,113,1)) drop-shadow(0 0 50px rgba(248,113,113,0.9)); }
+      76% { transform: scale(1.02,1) translateX(0.015em) rotate(2deg); filter: drop-shadow(0 0 50px rgba(239,68,68,0.5)) drop-shadow(0 0 80px rgba(239,68,68,0.25)); }
+      100% { transform: scale(1) translateX(0) rotate(0deg); filter: drop-shadow(0 0 0 rgba(248,113,113,0)); }
     }
-    .omen-red-wide { animation: omenRedWide 600ms cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+    .omen-red-wide { animation: omenRedWide 600ms cubic-bezier(0.25,1,0.5,1) forwards; }
 
-    /* 黄·远程单体：向后压身 → 短促后坐 → 回正 */
+    /* 黄·远程单体：纵向压紧 → 单次干脆后坐 */
     @keyframes omenAmberSingle {
-      0% { transform: scale(1) translate(0, 0); filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0)); }
-      18% { transform: scale(1.03) translate(0, -4px); filter: drop-shadow(0 0 12px rgba(250, 204, 21, 0.55)); }
-      38% { transform: scale(0.93) translate(0, -2px); filter: drop-shadow(0 0 18px rgba(250, 204, 21, 0.8)); }
-      48% { transform: scale(0.93) translate(0, -3px); filter: drop-shadow(0 0 22px rgba(250, 204, 21, 0.95)); }
-      55% { transform: scale(1.1) translate(0, -11px); filter: drop-shadow(0 0 30px rgba(250, 204, 21, 1)) drop-shadow(0 0 52px rgba(250, 204, 21, 0.45)); }
-      72% { transform: scale(1.04) translate(0, -6px); filter: drop-shadow(0 0 18px rgba(250, 204, 21, 0.45)); }
-      100% { transform: scale(1) translate(0, 0); filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0)); }
+      0% { transform: scale(1) translateY(0); filter: drop-shadow(0 0 0 rgba(250,204,21,0)); }
+      22% { transform: scale(1,0.98) translateY(-0.015em); filter: drop-shadow(0 0 18px rgba(250,204,21,0.95)); }
+      43%, 50% { transform: scale(0.98,0.92) translateY(-0.02em); filter: drop-shadow(0 0 10px rgba(250,204,21,0.8)); }
+      55% { transform: scale(1.02,1.04) translateY(-0.075em); filter: drop-shadow(0 0 30px rgba(253,224,71,1)) drop-shadow(0 0 50px rgba(253,224,71,0.9)); }
+      72% { transform: scale(1,1.01) translateY(-0.025em); filter: drop-shadow(0 0 50px rgba(250,204,21,0.5)) drop-shadow(0 0 80px rgba(250,204,21,0.25)); }
+      100% { transform: scale(1) translateY(0); filter: drop-shadow(0 0 0 rgba(250,204,21,0)); }
     }
-    .omen-amber-single { animation: omenAmberSingle 600ms cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+    .omen-amber-single { animation: omenAmberSingle 600ms cubic-bezier(0.25,1,0.5,1) forwards; }
 
-    /* 黄·远程群攻：后缩蓄势 → 一次较宽的后坐 → 回正 */
+    /* 黄·远程群攻：横向压紧 → 单次横展后坐，不增加攻击拍数 */
     @keyframes omenAmberWide {
-      0% { transform: scale(1, 1) translate(0, 0); filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0)); }
-      20% { transform: scale(0.9, 0.96) translate(0, -3px); filter: drop-shadow(0 0 14px rgba(250, 204, 21, 0.6)); }
-      42% { transform: scale(0.92, 0.94) translate(0, -5px); filter: drop-shadow(0 0 20px rgba(250, 204, 21, 0.85)); }
-      55% { transform: scale(1.16, 1.1) translate(0, -13px); filter: drop-shadow(0 0 32px rgba(250, 204, 21, 1)) drop-shadow(0 0 56px rgba(250, 204, 21, 0.45)); }
-      76% { transform: scale(1.05, 1.02) translate(0, -6px); filter: drop-shadow(0 0 20px rgba(250, 204, 21, 0.45)); }
-      100% { transform: scale(1, 1) translate(0, 0); filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0)); }
+      0% { transform: scale(1) translateY(0); filter: drop-shadow(0 0 0 rgba(250,204,21,0)); }
+      24% { transform: scale(0.94,0.98) translateY(-0.015em); filter: drop-shadow(0 0 18px rgba(250,204,21,0.95)); }
+      43%, 50% { transform: scale(0.89,0.96) translateY(-0.02em); filter: drop-shadow(0 0 10px rgba(250,204,21,0.8)); }
+      55% { transform: scale(1.1,1.01) translateY(-0.065em); filter: drop-shadow(0 0 30px rgba(253,224,71,1)) drop-shadow(0 0 50px rgba(253,224,71,0.9)); }
+      76% { transform: scale(1.03,1) translateY(-0.02em); filter: drop-shadow(0 0 50px rgba(250,204,21,0.5)) drop-shadow(0 0 80px rgba(250,204,21,0.25)); }
+      100% { transform: scale(1) translateY(0); filter: drop-shadow(0 0 0 rgba(250,204,21,0)); }
     }
-    .omen-amber-wide { animation: omenAmberWide 600ms cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+    .omen-amber-wide { animation: omenAmberWide 600ms cubic-bezier(0.25,1,0.5,1) forwards; }
 
-    /* 紫·法术单体：轻浮起 → 向中心收束 → 点亮释放 */
+    /* 紫·法术单体：缓浮 → 向心收束 → 紧凑释放 */
     @keyframes omenVioletSingle {
-      0% { transform: scale(1) translate(0, 0); filter: drop-shadow(0 0 0 rgba(192, 132, 252, 0)); }
-      20% { transform: scale(1.03) translate(0, -6px); filter: drop-shadow(0 0 14px rgba(192, 132, 252, 0.6)); }
-      38% { transform: scale(0.94) translate(0, -4px); filter: drop-shadow(0 0 20px rgba(192, 132, 252, 0.85)); }
-      50% { transform: scale(0.93) translate(0, -5px); filter: drop-shadow(0 0 24px rgba(192, 132, 252, 0.95)); }
-      55% { transform: scale(1.06) translate(0, -9px); filter: brightness(1.22) drop-shadow(0 0 30px rgba(192, 132, 252, 1)) drop-shadow(0 0 54px rgba(168, 85, 247, 0.5)); }
-      75% { transform: scale(1.02) translate(0, -5px); filter: drop-shadow(0 0 18px rgba(192, 132, 252, 0.45)); }
-      100% { transform: scale(1) translate(0, 0); filter: drop-shadow(0 0 0 rgba(192, 132, 252, 0)); }
+      0% { transform: scale(1) translateY(0); filter: drop-shadow(0 0 0 rgba(192,132,252,0)); }
+      25% { transform: scale(1.02) translateY(-0.045em); filter: drop-shadow(0 0 18px rgba(168,85,247,0.95)); }
+      43%, 50% { transform: scale(0.95,0.99) translateY(-0.055em); filter: drop-shadow(0 0 10px rgba(192,132,252,0.8)); }
+      55% { transform: scale(1.02,1.04) translateY(-0.07em); filter: drop-shadow(0 0 30px rgba(216,180,254,1)) drop-shadow(0 0 50px rgba(216,180,254,0.9)); }
+      80% { transform: scale(1.01) translateY(-0.035em); filter: drop-shadow(0 0 50px rgba(192,132,252,0.5)) drop-shadow(0 0 80px rgba(192,132,252,0.25)); }
+      100% { transform: scale(1) translateY(0); filter: drop-shadow(0 0 0 rgba(192,132,252,0)); }
     }
-    .omen-violet-single { animation: omenVioletSingle 600ms cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+    .omen-violet-single { animation: omenVioletSingle 600ms cubic-bezier(0.25,1,0.5,1) forwards; }
 
-    /* 紫·法术群攻：轻浮起 → 向外舒展 → 回落 */
+    /* 紫·法术群攻：缓浮 → 同拍外展；不靠扩大法阵表示群攻 */
     @keyframes omenVioletWide {
-      0% { transform: scale(1) translate(0, 0); filter: drop-shadow(0 0 0 rgba(192, 132, 252, 0)); }
-      20% { transform: scale(0.96) translate(0, -7px); filter: drop-shadow(0 0 14px rgba(192, 132, 252, 0.55)); }
-      42% { transform: scale(1.02) translate(0, -10px); filter: drop-shadow(0 0 20px rgba(192, 132, 252, 0.8)); }
-      55% { transform: scale(1.14) translate(0, -9px); filter: brightness(1.18) drop-shadow(0 0 32px rgba(192, 132, 252, 1)) drop-shadow(0 0 58px rgba(168, 85, 247, 0.45)); }
-      80% { transform: scale(1.03) translate(0, -2px); filter: drop-shadow(0 0 18px rgba(192, 132, 252, 0.4)); }
-      100% { transform: scale(1) translate(0, 0); filter: drop-shadow(0 0 0 rgba(192, 132, 252, 0)); }
+      0% { transform: scale(1) translateY(0); filter: drop-shadow(0 0 0 rgba(192,132,252,0)); }
+      25% { transform: scale(0.98,1) translateY(-0.05em); filter: drop-shadow(0 0 18px rgba(168,85,247,0.95)); }
+      43%, 50% { transform: scale(0.97,1.01) translateY(-0.055em); filter: drop-shadow(0 0 10px rgba(192,132,252,0.8)); }
+      55% { transform: scale(1.11,1.04) translateY(-0.05em); filter: drop-shadow(0 0 30px rgba(216,180,254,1)) drop-shadow(0 0 50px rgba(216,180,254,0.9)); }
+      78% { transform: scale(1.03,1.01) translateY(-0.025em); filter: drop-shadow(0 0 50px rgba(192,132,252,0.5)) drop-shadow(0 0 80px rgba(192,132,252,0.25)); }
+      100% { transform: scale(1) translateY(0); filter: drop-shadow(0 0 0 rgba(192,132,252,0)); }
     }
-    .omen-violet-wide { animation: omenVioletWide 600ms cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+    .omen-violet-wide { animation: omenVioletWide 600ms cubic-bezier(0.25,1,0.5,1) forwards; }
 
-    /* 粉·自身增益：纵向收身 → 向上舒展 → 落稳 */
+    /* 粉·自身增益：收身 → 纵向上提，保留五官与血条 */
     @keyframes omenRoseSelf {
-      0% { transform: scale(1) translate(0, 0); filter: drop-shadow(0 0 0 rgba(249, 168, 212, 0)); }
-      22% { transform: scale(0.92) translate(0, 3px); filter: drop-shadow(0 0 12px rgba(249, 168, 212, 0.55)); }
-      40% { transform: scale(0.93) translate(0, 3px); filter: drop-shadow(0 0 16px rgba(249, 168, 212, 0.75)); }
-      55% { transform: scale(1.08) translate(0, -9px); filter: brightness(1.16) drop-shadow(0 0 26px rgba(249, 168, 212, 1)) drop-shadow(0 0 48px rgba(244, 114, 182, 0.4)); }
-      80% { transform: scale(1.02) translate(0, -1px); filter: drop-shadow(0 0 16px rgba(249, 168, 212, 0.4)); }
-      100% { transform: scale(1) translate(0, 0); filter: drop-shadow(0 0 0 rgba(249, 168, 212, 0)); }
+      0% { transform: scale(1) translateY(0); filter: drop-shadow(0 0 0 rgba(249,168,212,0)); }
+      25% { transform: scale(1,0.95) translateY(0.02em); filter: drop-shadow(0 0 18px rgba(244,114,182,0.95)); }
+      43%, 50% { transform: scale(0.97,0.92) translateY(0.02em); filter: drop-shadow(0 0 10px rgba(249,168,212,0.8)); }
+      55% { transform: scale(0.99,1.07) translateY(-0.05em); filter: drop-shadow(0 0 30px rgba(251,207,232,1)) drop-shadow(0 0 50px rgba(251,207,232,0.9)); }
+      80% { transform: scale(1,1.02) translateY(-0.015em); filter: drop-shadow(0 0 50px rgba(244,114,182,0.5)) drop-shadow(0 0 80px rgba(244,114,182,0.25)); }
+      100% { transform: scale(1) translateY(0); filter: drop-shadow(0 0 0 rgba(249,168,212,0)); }
     }
-    .omen-rose-self { animation: omenRoseSelf 600ms cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+    .omen-rose-self { animation: omenRoseSelf 600ms cubic-bezier(0.25,1,0.5,1) forwards; }
 
-    /* 黑·施加减益：短暂停稳 → 微前倾下压 → 回正（图标褪色下压，不铺黑罩遮挡） */
+    /* 黑·施加减益：停稳 → 前倾下压，轻褪色而非将图标整块压黑 */
     @keyframes omenGloomFoe {
-      0% { transform: scale(1, 1) translate(0, 0); filter: grayscale(0) brightness(1) drop-shadow(0 0 0 rgba(15, 23, 42, 0)); }
-      20% { transform: scale(0.99, 0.99) translate(0, 0); filter: grayscale(0.4) brightness(0.86) drop-shadow(0 0 14px rgba(15, 23, 42, 0.9)); }
-      40% { transform: scale(0.99, 0.98) translate(0, 1px); filter: grayscale(0.62) brightness(0.74) drop-shadow(0 0 20px rgba(15, 23, 42, 1)); }
-      55% { transform: scale(1.03, 0.94) translate(0, 7px); filter: grayscale(1) brightness(0.6) drop-shadow(0 0 26px rgba(15, 23, 42, 1)) drop-shadow(0 0 44px rgba(51, 65, 85, 0.75)); }
-      78% { transform: scale(1.01, 0.99) translate(0, 2px); filter: grayscale(0.5) brightness(0.8) drop-shadow(0 0 16px rgba(15, 23, 42, 0.6)); }
-      100% { transform: scale(1, 1) translate(0, 0); filter: grayscale(0) brightness(1) drop-shadow(0 0 0 rgba(15, 23, 42, 0)); }
+      0% { transform: scale(1) translateY(0) rotate(0deg); filter: grayscale(0) brightness(1) drop-shadow(0 0 0 rgba(30,41,59,0)); }
+      25% { transform: scale(0.99) translateY(0) rotate(0deg); filter: grayscale(0.08) brightness(0.98) drop-shadow(0 0 18px rgba(30,41,59,0.95)); }
+      43%, 50% { transform: scale(0.99,0.97) translateY(0.01em) rotate(1deg); filter: grayscale(0.16) brightness(0.96) drop-shadow(0 0 10px rgba(30,41,59,0.8)); }
+      55% { transform: scale(1.02,0.96) translateY(0.035em) rotate(2deg); filter: grayscale(0.22) brightness(0.92) drop-shadow(0 0 30px rgba(15,23,42,1)) drop-shadow(0 0 50px rgba(71,85,105,0.9)); }
+      80% { transform: scale(1.01,0.99) translateY(0.01em) rotate(0.5deg); filter: grayscale(0.1) brightness(0.98) drop-shadow(0 0 50px rgba(30,41,59,0.5)) drop-shadow(0 0 80px rgba(71,85,105,0.25)); }
+      100% { transform: scale(1) translateY(0) rotate(0deg); filter: grayscale(0) brightness(1) drop-shadow(0 0 0 rgba(30,41,59,0)); }
     }
-    .omen-gloom-foe { animation: omenGloomFoe 600ms cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+    .omen-gloom-foe { animation: omenGloomFoe 600ms cubic-bezier(0.25,1,0.5,1) forwards; }
 
-    /* 周边轮廓：只用空心细线，不遮挡图标本体、血条与相邻单位 */
-    .omen-aura { pointer-events: none; }
-    .omen-aura svg { position: absolute; overflow: visible; }
-    .omen-svg-anim { transform-box: view-box; transform-origin: 50% 50%; }
-    @keyframes omenFade { 0% { opacity: 0; } 14% { opacity: 1; } 66% { opacity: 1; } 100% { opacity: 0; } }
-    @keyframes omenDraw { 0% { stroke-dashoffset: 1; opacity: 0; } 12% { opacity: 0.95; } 55% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
-    @keyframes omenRingIn { 0% { opacity: 0; transform: scale(1.5); } 14% { opacity: 0.85; } 46% { transform: scale(0.82); opacity: 1; } 56% { opacity: 0.5; } 100% { opacity: 0; transform: scale(0.74); } }
-    @keyframes omenRingOut { 0% { opacity: 0; transform: scale(0.72); } 16% { opacity: 0.9; } 55% { transform: scale(1.06); opacity: 1; } 100% { opacity: 0; transform: scale(1.4); } }
-    @keyframes omenRise { 0% { opacity: 0; transform: translateY(18px); } 20% { opacity: 0.9; } 55% { transform: translateY(-10px); opacity: 1; } 100% { opacity: 0; transform: translateY(-38px); } }
-    @keyframes omenPeel { 0% { opacity: 0; transform: rotate(0deg) scale(0.86); } 18% { opacity: 0.55; } 55% { transform: rotate(13deg) scale(1.1); opacity: 0.8; } 100% { opacity: 0; transform: rotate(25deg) scale(1.32); } }
     /* ===== 可移植特效样式 END ===== */
   </style>
 </head>
@@ -567,7 +554,8 @@ const arcaneVfxModule = (function () {
         smoke(g, p) { const r = p.size * (1.6 - p.life); const gr = g.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, p.color); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill(); },
         feather(g, p) { const s = p.size; g.fillStyle = p.color; g.beginPath(); g.moveTo(-s * 1.5, 0); g.quadraticCurveTo(0, -s * 0.55, s * 1.5, 0); g.quadraticCurveTo(0, s * 0.4, -s * 1.5, 0); g.fill(); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-s * 1.8, 0); g.lineTo(s * 1.5, 0); g.stroke(); },
         shard(g, p) { const s = p.size; g.fillStyle = p.fill || 'rgba(224,242,254,0.25)'; g.strokeStyle = p.color; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, -s); g.lineTo(s * 0.7, s * 0.3); g.lineTo(s * 0.1, s * 0.9); g.lineTo(-s * 0.6, s * 0.2); g.closePath(); g.fill(); g.stroke(); },
-        streak(g, p) { g.strokeStyle = p.color; g.lineWidth = p.size; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 0); g.lineTo(-p.vx * 4, -p.vy * 4); g.stroke(); }
+        streak(g, p) { g.strokeStyle = p.color; g.lineWidth = p.size; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 0); g.lineTo(-p.vx * 4, -p.vy * 4); g.stroke(); },
+        omen(g, p) { drawOmenParticle(g, p); }
     };
     function releaseIdleCanvas() {
         if (S.driver || S.handles.size || S.particles.length || S.flights.length || !S.canvas) return;
@@ -657,6 +645,10 @@ const arcaneVfxModule = (function () {
     function render() {
         const g = S.ctx; if (!g || !S.canvas) return;
         g.clearRect(0, 0, S.canvas.width, S.canvas.height);
+        for (const owner of new Set(S.particles.filter(p => p.owner).map(p => p.owner))) {
+            const r = ctr(owner.dom);
+            owner.frame = Object.assign(r, { left: r.left, clipBottom: Math.min(r.bottom, owner.barTop - 2), now: performance.now() });
+        }
         for (let i = 0; i < S.particles.length; i++) {
             const p = S.particles[i];
             g.save();
@@ -730,7 +722,7 @@ const arcaneVfxModule = (function () {
 
     // ===== 敌方攻击前摇：一级（普通行动起手） =====
     // 统一节奏：0–330ms 预备蓄势，330ms 为出手拍点（正式版以此为结算起点），600ms 完全回位。
-    // 表现范围限定在图标及紧邻周边：只用空心细线轮廓，不铺暗场、不震屏、不画弹道与命中爆炸。
+    // 七类新增前摇使用贴身渐变粒子；红色单体基线不添加粒子。
     const OMEN_MS = 600, OMEN_BEAT = 330;
     let OMEN_SFX = true;
 
@@ -742,133 +734,216 @@ const arcaneVfxModule = (function () {
         return id;
     }
 
-    // 周边轮廓：按行为语义给出不同形状（横扫弧 / 收尖楔形 / 展开扇面 / 内收环 / 外展环 / 上升弧 / 剥离断弧）
-    function omenAura(kind, x, y) {
-        const wrap = inner => `<div class="arcane-fs-anchor omen-aura" style="left:${x}px; top:${y}px;">${inner}</div>`;
-        const draw = (d, color, w, delay) => `<path class="omen-svg-anim" pathLength="1" d="${d}" fill="none" stroke="${color}" stroke-width="${w}" stroke-linecap="round" style="stroke-dasharray:1; stroke-dashoffset:1; animation:omenDraw 600ms ${delay}ms cubic-bezier(.3,.9,.3,1) forwards;"/>`;
-        if (kind === 'red-wide') {
-            return wrap(`<svg width="260" height="160" viewBox="0 0 260 160" style="left:-130px; top:-80px;">
-                ${draw('M14 104 Q130 26 246 104', '#f87171', 3, 0)}
-                ${draw('M36 120 Q130 54 224 120', 'rgba(252,165,165,0.75)', 1.6, 50)}
-            </svg>`);
+    const OMEN_COLORS = {
+        'red-wide': ['#fff1dc', '#ff916d', '#e53532'],
+        'amber-single': ['#fff9e0', '#ffe075', '#d99b15'],
+        'amber-wide': ['#fff9e0', '#ffe075', '#d99b15'],
+        'violet-single': ['#fbf0ff', '#cc9bff', '#733bed'],
+        'violet-wide': ['#fbf0ff', '#cc9bff', '#733bed'],
+        'rose-self': ['#fff4f0', '#ffc6dd', '#eb72a2'],
+        'gloom-foe': ['#b6c2d0', '#536174', '#080d16']
+    };
+
+    // 粒子在图标局部坐标中运动；亮芯、彩色过渡与透明边缘均由渐变绘制，不画轮廓线。
+    function drawOmenParticle(g, p) {
+        const frame = p.owner.frame, k = frame.h / 96;
+        const t = Math.max(0, Math.min(1, (frame.now - p.born) / p.dur));
+        const sample = u => {
+            const q = 1 - u;
+            return { x: (q * q * p.from[0] + 2 * q * u * p.via[0] + u * u * p.to[0]) * frame.w,
+                     y: (q * q * p.from[1] + 2 * q * u * p.via[1] + u * u * p.to[1]) * frame.h };
+        };
+        const pos = sample(t), prev = sample(Math.max(0, t - 0.02));
+        const angle = Math.atan2(pos.y - prev.y, pos.x - prev.x);
+        const [core, color, edge] = p.colors;
+        const alpha = g.globalAlpha * Math.min(1, t / 0.1) * Math.pow(1 - t, 0.35);
+        const radius = p.size * k * (0.5 + 0.6 * Math.sin(Math.PI * t));
+        g.save();
+        g.beginPath();
+        g.rect(frame.left - 6 * k, frame.top - 6 * k, frame.w + 12 * k, frame.clipBottom - frame.top + 6 * k);
+        g.clip();
+        g.translate(frame.x, frame.y);
+
+        // 拖尾是一串渐变微粒，不是等宽实线；各粒的尺寸、透明度沿轨迹衰减。
+        for (let i = 5; i > 0; i--) {
+            const u = t - i * p.tail / 5;
+            if (u < 0) continue;
+            const s = sample(u), r = radius * (0.9 - i * 0.11);
+            const gr = g.createRadialGradient(s.x, s.y, 0, s.x, s.y, r * 2);
+            gr.addColorStop(0, color + 'c0'); gr.addColorStop(0.35, color + '60'); gr.addColorStop(1, edge + '00');
+            g.globalAlpha = alpha * (0.4 - i * 0.05);
+            g.fillStyle = gr; g.beginPath(); g.arc(s.x, s.y, r * 2, 0, 6.283); g.fill();
         }
-        if (kind === 'amber-single') {
-            return wrap(`<svg width="220" height="240" viewBox="0 0 220 240" style="left:-110px; top:-60px;">
-                ${draw('M110 60 L62 208', '#facc15', 2.4, 0)}
-                ${draw('M110 60 L158 208', '#facc15', 2.4, 0)}
-                ${draw('M110 60 L110 216', 'rgba(254,249,195,0.85)', 1.4, 60)}
-                ${draw('M70 196 Q110 216 150 196', 'rgba(250,204,21,0.8)', 1.6, 90)}
-            </svg>`);
+        g.translate(pos.x, pos.y); g.rotate(angle);
+        g.globalAlpha = alpha;
+        if (p.texture === 'mist') {
+            const gr = g.createRadialGradient(-radius * 0.2, 0, 0, 0, 0, radius * 2.2);
+            gr.addColorStop(0, edge + 'e0'); gr.addColorStop(0.35, color + 'b0'); gr.addColorStop(0.7, color + '45'); gr.addColorStop(1, edge + '00');
+            g.scale(1.3, 0.8); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, radius * 2.2, 0, 6.283); g.fill();
+            g.globalAlpha = alpha * 0.5;
+            const rim = g.createRadialGradient(0, -radius * 0.55, 0, 0, -radius * 0.55, radius * 0.8);
+            rim.addColorStop(0, core + 'b0'); rim.addColorStop(1, color + '00');
+            g.fillStyle = rim; g.beginPath(); g.arc(0, -radius * 0.55, radius * 0.8, 0, 6.283); g.fill();
+        } else {
+            const halo = g.createRadialGradient(0, 0, 0, 0, 0, radius * 2.4);
+            halo.addColorStop(0, color + '85'); halo.addColorStop(0.35, color + '35'); halo.addColorStop(1, edge + '00');
+            g.fillStyle = halo; g.beginPath(); g.arc(0, 0, radius * 2.4, 0, 6.283); g.fill();
+            const gr = g.createRadialGradient(radius * 0.22, 0, 0, 0, 0, radius);
+            gr.addColorStop(0, core); gr.addColorStop(0.2, core + 'e0'); gr.addColorStop(0.5, color + 'c0'); gr.addColorStop(1, edge + '00');
+            g.fillStyle = gr;
+            if (p.texture === 'crystal') {
+                g.beginPath(); g.moveTo(radius * 1.5, 0); g.lineTo(0, radius * 0.65); g.lineTo(-radius * 1.2, 0); g.lineTo(0, -radius * 0.65); g.closePath(); g.fill();
+            } else {
+                g.scale(p.texture === 'spark' ? 1.7 : 1, p.texture === 'spark' ? 0.6 : 1);
+                g.beginPath(); g.arc(0, 0, radius, 0, 6.283); g.fill();
+            }
         }
-        if (kind === 'amber-wide') {
-            return wrap(`<svg width="300" height="240" viewBox="0 0 300 240" style="left:-150px; top:-60px;">
-                ${draw('M150 60 L20 135', '#facc15', 2, 0)}
-                ${draw('M150 60 L75 190', 'rgba(250,204,21,0.85)', 2, 20)}
-                ${draw('M150 60 L150 210', '#fef08a', 2.4, 40)}
-                ${draw('M150 60 L225 190', 'rgba(250,204,21,0.85)', 2, 20)}
-                ${draw('M150 60 L280 135', '#facc15', 2, 0)}
-                ${draw('M20 135 Q150 250 280 135', 'rgba(250,204,21,0.7)', 1.6, 90)}
-            </svg>`);
-        }
-        if (kind === 'violet-single') {
-            return wrap(`<svg width="200" height="200" viewBox="0 0 200 200" style="left:-100px; top:-100px;">
-                <circle class="omen-svg-anim" cx="100" cy="100" r="78" fill="none" stroke="#c084fc" stroke-width="2.6" style="animation:omenRingIn 600ms linear forwards;"/>
-                <circle class="omen-svg-anim" cx="100" cy="100" r="58" fill="none" stroke="rgba(233,213,255,0.85)" stroke-width="1.4" stroke-dasharray="8 10" style="animation:omenRingIn 600ms 60ms linear forwards;"/>
-            </svg>`);
-        }
-        if (kind === 'violet-wide') {
-            return wrap(`<svg width="220" height="220" viewBox="0 0 220 220" style="left:-110px; top:-110px;">
-                <circle class="omen-svg-anim" cx="110" cy="110" r="54" fill="none" stroke="#c084fc" stroke-width="2.6" style="animation:omenRingOut 600ms cubic-bezier(.2,.9,.3,1) forwards;"/>
-                <circle class="omen-svg-anim" cx="110" cy="110" r="64" fill="none" stroke="rgba(216,180,254,0.8)" stroke-width="1.4" stroke-dasharray="10 12" style="animation:omenRingOut 600ms 70ms cubic-bezier(.2,.9,.3,1) forwards;"/>
-                <circle class="omen-svg-anim" cx="110" cy="110" r="44" fill="none" stroke="rgba(233,213,255,0.6)" stroke-width="1" style="animation:omenRingOut 600ms 130ms cubic-bezier(.2,.9,.3,1) forwards;"/>
-            </svg>`);
-        }
-        if (kind === 'rose-self') {
-            const arc = (d, delay) => `<path class="omen-svg-anim" d="${d}" fill="none" stroke="rgba(249,168,212,0.95)" stroke-width="2.6" stroke-linecap="round" style="animation:omenRise 600ms ${delay}ms ease-out both;"/>`;
-            const dot = (cx, cy, r, delay) => `<circle class="omen-svg-anim" cx="${cx}" cy="${cy}" r="${r}" fill="#fbcfe8" style="animation:omenRise 600ms ${delay}ms ease-out both;"/>`;
-            return wrap(`<svg width="300" height="280" viewBox="0 0 300 280" style="left:-150px; top:-200px;">
-                ${arc('M96 236 Q60 172 100 104', 0)}
-                ${arc('M204 236 Q240 172 200 104', 0)}
-                ${dot(126, 150, 3, 40)}${dot(174, 146, 2.6, 90)}${dot(138, 112, 2.4, 20)}${dot(166, 108, 2.8, 110)}
-            </svg>`);
-        }
-        if (kind === 'gloom-foe') {
-            return wrap(`<svg width="260" height="260" viewBox="0 0 260 260" style="left:-130px; top:-130px;">
-                <circle class="omen-svg-anim" cx="130" cy="130" r="88" fill="none" stroke="rgba(15,23,42,0.92)" stroke-width="9" style="animation:omenFade 600ms linear forwards;"/>
-                <circle class="omen-svg-anim" cx="130" cy="130" r="80" fill="none" stroke="rgba(148,163,184,0.9)" stroke-width="1.6" stroke-dasharray="16 22" style="animation:omenPeel 600ms linear forwards;"/>
-                <circle class="omen-svg-anim" cx="130" cy="130" r="96" fill="none" stroke="rgba(100,116,139,0.8)" stroke-width="1" stroke-dasharray="6 30" style="animation:omenPeel 600ms 60ms linear forwards;"/>
-            </svg>`);
-        }
-        return '';
+        g.restore();
     }
 
-    // 抽象行为音：近战风切 / 远程干脆释压 / 法术轻谐振 / 增益柔和上行 / 减益低频下滑。
-    // 单体和群攻只靠音色宽度（pan 展宽、尾音长度）区分，不加拍数，避免误示多段攻击。
+    function omenParticle(owner, dur, from, via, to, size, texture = 'spark', tail = 0.2) {
+        addP({ shape: 'omen', owner, born: performance.now(), dur, decay: 16.7 / dur,
+               from, via, to, size, texture, tail, colors: OMEN_COLORS[owner.kind], x: 0, y: 0,
+               blend: texture === 'mist' ? 'source-over' : 'screen' });
+    }
+
+    // 八次微粒凝聚 → 短停 → 330ms 同拍释放；所有轨迹只在身体侧缘及下缘活动。
+    function omenAura(kind, owner, bag) {
+        if (kind === 'red-single') return;
+        for (let wave = 0; wave < 8; wave++) {
+            const at = wave * 36, dur = Math.min(190, 308 - at);
+            localAfter(at, () => {
+                for (let i = 0; i < 5; i++) {
+                    const side = i % 2 ? 1 : -1, jitter = rnd(-0.025, 0.025);
+                    if (kind === 'red-wide') {
+                        omenParticle(owner, dur, [-0.39 + jitter, rnd(-0.18, 0.24)], [-0.46, 0.15], [-0.32, 0.23], rnd(1.4, 2.5));
+                    } else if (kind === 'amber-single') {
+                        omenParticle(owner, dur, [side * 0.34, rnd(0.02, 0.25)], [side * 0.22, 0.34], [jitter, 0.29], rnd(1.1, 2));
+                    } else if (kind === 'amber-wide') {
+                        omenParticle(owner, dur, [side * 0.43, rnd(0.04, 0.28)], [side * 0.25, 0.33], [side * 0.17, 0.28], rnd(1.2, 2.2));
+                    } else if (kind === 'violet-single') {
+                        omenParticle(owner, dur, [side * 0.43, rnd(-0.35, 0.18)], [side * 0.36, 0.27], [side * 0.1, 0.27], rnd(1.5, 2.5), 'crystal', 0.16);
+                    } else if (kind === 'violet-wide') {
+                        omenParticle(owner, dur, [side * 0.19, rnd(0.13, 0.29)], [side * 0.33, 0.12], [side * 0.4, rnd(-0.21, 0.22)], rnd(1.4, 2.5), 'crystal', 0.14);
+                    } else if (kind === 'rose-self') {
+                        omenParticle(owner, dur, [side * 0.37, rnd(0.2, 0.32)], [side * 0.45, -0.1], [side * 0.3, -0.32 + jitter], rnd(1.4, 2.2), 'glow', 0.22);
+                    } else if (kind === 'gloom-foe') {
+                        omenParticle(owner, dur, [side * 0.37, rnd(-0.32, 0.12)], [side * 0.43, 0.16], [side * 0.34, 0.27], rnd(2.2, 3.5), 'mist', 0.1);
+                    }
+                }
+            }, bag);
+        }
+        localAfter(OMEN_BEAT, () => {
+            for (let i = 0; i < 22; i++) {
+                const side = i % 2 ? 1 : -1, jitter = rnd(-0.035, 0.035), dur = rnd(135, 230);
+                if (kind === 'red-wide') {
+                    const y = rnd(0.17, 0.31);
+                    omenParticle(owner, dur, [-0.38, y], [0.04, y + 0.03], [0.42, y - 0.05], rnd(1.5, 2.8), 'spark', 0.24);
+                } else if (kind === 'amber-single') {
+                    omenParticle(owner, dur, [jitter, 0.27], [jitter * 1.5, 0.31], [jitter * 2, 0.39], rnd(1.4, 2.5), 'spark', 0.25);
+                } else if (kind === 'amber-wide') {
+                    const lane = i % 3 - 1;
+                    omenParticle(owner, dur, [lane * 0.16, 0.25], [lane * 0.27, 0.31], [lane * 0.41 + jitter, 0.37], rnd(1.3, 2.6), 'spark', 0.23);
+                } else if (kind === 'violet-single') {
+                    omenParticle(owner, dur, [side * 0.08, 0.26], [side * 0.2, 0.28], [side * rnd(0.28, 0.42), rnd(0.02, 0.26)], rnd(1.5, 2.8), 'crystal', 0.12);
+                } else if (kind === 'violet-wide') {
+                    const y = rnd(-0.3, 0.29);
+                    omenParticle(owner, dur, [side * 0.27, y * 0.6], [side * 0.37, y], [side * 0.46, y + jitter], rnd(1.6, 2.7), 'crystal', 0.18);
+                } else if (kind === 'rose-self') {
+                    omenParticle(owner, dur, [side * 0.4, rnd(0.05, 0.28)], [side * 0.38, -0.23], [side * 0.26, -0.38 + jitter], rnd(1.4, 2.4), 'glow', 0.25);
+                } else if (kind === 'gloom-foe') {
+                    omenParticle(owner, dur, [side * 0.35, rnd(-0.14, 0.22)], [side * 0.45, 0.24], [side * 0.41, 0.33 + jitter], rnd(2.5, 4), i % 3 ? 'mist' : 'crystal', 0.15);
+                }
+            }
+            if (kind === 'amber-single' || kind === 'amber-wide' || kind === 'violet-single') {
+                const xs = kind === 'amber-wide' ? [-0.17, 0, 0.17] : [0];
+                xs.forEach(x => omenParticle(owner, 120, [x, 0.28], [x, 0.29], [x, 0.3], 3.8, 'glow', 0));
+            }
+        }, bag);
+    }
+
+
+    // 七类新音色在285ms收紧停声，330ms释放；不送入长卷积混响。红色单体分支原样保留。
     function omenSound(kind, bag) {
         if (!OMEN_SFX) return;
-        const beat = fn => localAfter(OMEN_BEAT, fn, bag);
+        const beat = fn => localAfter(OMEN_BEAT, () => { if (kind === 'red-single' || OMEN_SFX) fn(); }, bag);
         if (kind === 'red-single') {
             whoosh(0, { f0: 520, f1: 1700, q: 1.5, dur: 0.28, vol: 0.26, peak: 0.12 });
             beat(() => click(0, 0.22, 3600, 0.008));
         } else if (kind === 'red-wide') {
-            whoosh(0, { f0: 360, f1: 1300, q: 0.9, dur: 0.32, vol: 0.28, peak: 0.14, pan: -0.55, pan1: 0.55 });
-            beat(() => whoosh(0, { f0: 700, f1: 2200, q: 0.7, dur: 0.16, vol: 0.22, cut: true, pan: -0.7, pan1: 0.7 }));
+            whoosh(0, { f0: 260, f1: 1100, q: 0.8, dur: 0.285, vol: 0.2, peak: 0.24, cut: true, pan: -0.25, pan1: 0.1 });
+            tone(0, { type: 'triangle', f0: 140, f1: 92, dur: 0.27, vol: 0.055, peak: 0.18 });
+            beat(() => { whoosh(0, { f0: 1700, f1: 360, q: 0.7, dur: 0.2, vol: 0.28, peak: 0.018, pan: -0.45, pan1: 0.45 }); crunch(0, { f: 900, f1: 280, q: 0.6, dur: 0.11, vol: 0.09, drive: 1.5 }); });
         } else if (kind === 'amber-single') {
-            click(0, 0.26, 2400, 0.01); tone(0, { type: 'square', f0: 260, f1: 170, dur: 0.12, vol: 0.045, lp: 1200 });
-            beat(() => { click(0, 0.42, 5200, 0.008); boom(0, { f0: 1400, f1: 320, dur: 0.16, vol: 0.14, peak: 0.04 }); });
+            whoosh(0, { f0: 640, f1: 1550, q: 1.6, dur: 0.285, vol: 0.13, peak: 0.24, cut: true });
+            tone(0, { type: 'triangle', f0: 110, f1: 185, dur: 0.285, vol: 0.065, peak: 0.22, cut: true });
+            beat(() => { crunch(0, { f: 1600, f1: 460, q: 0.75, dur: 0.12, vol: 0.22, drive: 1.6 }); tone(0, { type: 'triangle', f0: 250, f1: 85, fd: 0.045, dur: 0.16, vol: 0.085 }); });
         } else if (kind === 'amber-wide') {
-            click(0, 0.24, 2100, 0.012); boom(0, { f0: 1800, f1: 420, dur: 0.18, vol: 0.12, peak: 0.03, pan: -0.4, pan1: 0.4 });
-            beat(() => { click(0, 0.36, 4600, 0.01); boom(0, { f0: 1600, f1: 300, dur: 0.24, vol: 0.16, pan: -0.7, pan1: 0.7 }); });
+            whoosh(0, { f0: 480, f1: 1380, q: 1.1, dur: 0.285, vol: 0.15, peak: 0.24, cut: true });
+            tone(0, { type: 'triangle', f0: 95, f1: 165, dur: 0.285, vol: 0.065, peak: 0.22, cut: true });
+            beat(() => { whoosh(0, { f0: 1900, f1: 400, q: 0.6, dur: 0.18, vol: 0.22, peak: 0.012, pan: -0.4, pan1: 0.4 }); crunch(0, { f: 1100, f1: 340, q: 0.8, dur: 0.145, vol: 0.16, drive: 1.5 }); tone(0, { type: 'triangle', f0: 215, f1: 72, fd: 0.04, dur: 0.18, vol: 0.07 }); });
         } else if (kind === 'violet-single') {
-            tone(0, { type: 'triangle', f0: 210, f1: 320, dur: 0.3, vol: 0.09, wet: 0.3 });
-            beat(() => chime(0, 880, 0.4, 0.055));
+            tone(0, { type: 'sine', f0: 180, f1: 350, dur: 0.285, vol: 0.075, peak: 0.24, cut: true });
+            tone(0, { type: 'triangle', f0: 370, f1: 760, dur: 0.285, vol: 0.035, peak: 0.24, cut: true, lp: 1800 });
+            whoosh(0, { f0: 350, f1: 1350, q: 2.2, dur: 0.285, vol: 0.09, peak: 0.25, cut: true });
+            beat(() => { tone(0, { f0: 880, f1: 610, dur: 0.16, vol: 0.055 }); tone(0, { f0: 1420, f1: 1080, dur: 0.105, vol: 0.026 }); whoosh(0, { f0: 1450, f1: 390, q: 1.4, dur: 0.17, vol: 0.095, peak: 0.018 }); });
         } else if (kind === 'violet-wide') {
-            tone(0, { type: 'triangle', f0: 190, f1: 280, dur: 0.3, vol: 0.075, pan: -0.5, wet: 0.3 });
-            tone(0, { type: 'triangle', f0: 245, f1: 355, dur: 0.3, vol: 0.07, pan: 0.5, wet: 0.3 });
-            beat(() => { chime(0, 660, 0.5, 0.045, -0.6); chime(0, 990, 0.5, 0.04, 0.6); });
+            [-1, 1].forEach(side => tone(0, { type: 'triangle', f0: 195 + side * 11, f1: 365 + side * 15, dur: 0.285, vol: 0.038, peak: 0.24, cut: true, pan: side * 0.32, lp: 1800 }));
+            whoosh(0, { f0: 300, f1: 1200, q: 1.6, dur: 0.285, vol: 0.11, peak: 0.25, cut: true });
+            beat(() => { [-1, 1].forEach(side => tone(0, { f0: 760 + side * 110, f1: 500 + side * 75, dur: 0.19, vol: 0.036, pan: side * 0.4 })); tone(0, { f0: 1210, f1: 970, dur: 0.13, vol: 0.025 }); whoosh(0, { f0: 1350, f1: 320, q: 0.9, dur: 0.19, vol: 0.12, peak: 0.02, pan: -0.35, pan1: 0.35 }); });
         } else if (kind === 'rose-self') {
-            tone(0, { type: 'sine', f0: 330, f1: 520, dur: 0.34, vol: 0.08, wet: 0.4 });
-            beat(() => chime(0, 660, 0.6, 0.06));
+            tone(0, { f0: 230, f1: 460, dur: 0.285, vol: 0.065, peak: 0.22, cut: true });
+            tone(0, { type: 'triangle', f0: 345, f1: 690, dur: 0.285, vol: 0.025, peak: 0.24, cut: true, lp: 1500 });
+            whoosh(0, { f0: 600, f1: 1600, q: 0.8, dur: 0.285, vol: 0.075, peak: 0.24, cut: true });
+            beat(() => { tone(0, { f0: 520, f1: 640, dur: 0.19, vol: 0.055, peak: 0.025 }); tone(0, { f0: 780, f1: 960, dur: 0.16, vol: 0.026, peak: 0.022 }); whoosh(0, { f0: 1600, f1: 700, q: 0.65, dur: 0.19, vol: 0.065, peak: 0.025 }); });
         } else if (kind === 'gloom-foe') {
-            tone(0, { type: 'sine', f0: 150, f1: 88, dur: 0.4, vol: 0.14, lp: 600 });
-            beat(() => { crunch(0, { f: 420, f1: 200, q: 1.4, dur: 0.22, vol: 0.12, drive: 2 }); tone(0, { type: 'sawtooth', f0: 74, f1: 46, dur: 0.42, vol: 0.05, lp: 380, wet: 0.4 }); });
+            tone(0, { type: 'triangle', f0: 190, f1: 92, dur: 0.285, vol: 0.075, peak: 0.22, cut: true, lp: 700 });
+            whoosh(0, { f0: 950, f1: 260, q: 1.8, dur: 0.285, vol: 0.13, peak: 0.24, cut: true });
+            beat(() => { crunch(0, { f: 570, f1: 145, q: 1.2, dur: 0.2, vol: 0.16, drive: 1.8 }); tone(0, { type: 'triangle', f0: 125, f1: 52, dur: 0.19, vol: 0.075, lp: 460 }); whoosh(0, { f0: 700, f1: 190, q: 0.9, dur: 0.18, vol: 0.08, peak: 0.015 }); });
         }
     }
 
-    // 单次前摇：图标动作 + 周边轮廓 + 短音色；作用于传入实体，不改任何数值或状态。
+    // 红色单体基线沿用现有路径；其余七类才登记贴身粒子及自己的收尾。
     function playEnemyWindup(caster, kind) {
         const dom = domOf(caster);
         if (!dom) return null;
+        if (kind !== 'red-single' && OMEN_SFX) audio();
         const cls = 'omen-' + kind;
-        const c = ctr(dom);
-        const bag = new Set();          // 本 handle 的定时器
-        const layers = [];              // 本 handle 的临时层
+        const bag = new Set();
         const hadBreathe = dom.classList.contains('breathe');
+        const r = ctr(dom);
+        const owner = { kind, dom, barTop: dom.nextElementSibling.getBoundingClientRect().top,
+                        frame: Object.assign(r, { clipBottom: r.bottom, now: performance.now() }) };
 
-        dom.classList.remove('breathe'); // 呼吸动画与起手动画同占 transform，必须先让位
+        dom.classList.remove('breathe');
         void dom.offsetWidth;
         dom.classList.add(cls);
-
-        const aura = omenAura(kind, c.x, c.y);
-        if (aura) layers.push(fsLayer(aura, OMEN_MS + 120));
+        omenAura(kind, owner, bag);
         omenSound(kind, bag);
 
         const restore = () => {
             dom.classList.remove(cls);
             if (hadBreathe && caster.isAlive && !dom.classList.contains('breathe')) dom.classList.add('breathe');
         };
-        const dropLayers = () => layers.forEach(d => { S.layers.delete(d); if (d.isConnected) d.remove(); });
-        const handle = {
-            doneAt: Date.now() + OMEN_MS,
-            impactDom: dom,
-            cancel() {
-                bag.forEach(id => { clearTimeout(id); S.timers.delete(id); }); bag.clear();
-                restore(); dropLayers();
-                S.handles.delete(handle);
+        const dropParticles = () => {
+            S.particles = S.particles.filter(p => p.owner !== owner);
+            if (S.particles.length || S.flights.length) return;
+            if (S.particleTimer !== null) { clearTimeout(S.particleTimer); S.timers.delete(S.particleTimer); S.particleTimer = null; }
+            S.particleUntil = 0;
+            if (S.driver) {
+                const idx = fxEngine.particles.indexOf(S.driver);
+                if (idx >= 0) fxEngine.particles.splice(idx, 1);
+                S.driver = null;
             }
+            if (S.ctx) S.ctx.clearRect(0, 0, S.canvas.width, S.canvas.height);
         };
+        const finish = () => {
+            bag.forEach(id => { clearTimeout(id); S.timers.delete(id); }); bag.clear();
+            restore(); dropParticles(); S.handles.delete(handle); releaseIdleCanvas();
+        };
+        const handle = { doneAt: Date.now() + OMEN_MS, impactDom: dom, cancel: finish };
         S.handles.add(handle);
-        localAfter(OMEN_MS, () => { restore(); dropLayers(); S.handles.delete(handle); releaseIdleCanvas(); }, bag);
+        localAfter(OMEN_MS, finish, bag);
         return handle;
     }
 
@@ -926,13 +1001,13 @@ const arcaneVfxModule = (function () {
     // 敌方前摇演练：八项全部固定在 e5，排除图标图案与体型差异，只比较动作。
     const CARDS = [
         { name: '红 · 单体近战', level: '基准', description: '前冲红光晕（正式版原动作对照）', fxTag: 'omen:red-single', casterId: 'e5', targetIds: [] },
-        { name: '红 · 近战群攻', level: '群攻', description: '侧倾收身 → 横向甩身 + 横扫弧', fxTag: 'omen:red-wide', casterId: 'e5', targetIds: [] },
-        { name: '黄 · 远程单体', level: '单体', description: '后压蓄势 → 短促后坐 + 收尖楔形', fxTag: 'omen:amber-single', casterId: 'e5', targetIds: [] },
-        { name: '黄 · 远程群攻', level: '群攻', description: '后缩蓄势 → 宽后坐 + 展开扇面', fxTag: 'omen:amber-wide', casterId: 'e5', targetIds: [] },
-        { name: '紫 · 法术单体', level: '单体', description: '浮起 → 向心收束 + 内收环', fxTag: 'omen:violet-single', casterId: 'e5', targetIds: [] },
-        { name: '紫 · 法术群攻', level: '群攻', description: '浮起 → 向外舒展 + 外展环', fxTag: 'omen:violet-wide', casterId: 'e5', targetIds: [] },
-        { name: '粉 · 自身增益', level: '自身', description: '收身 → 向上舒展 + 上升短弧', fxTag: 'omen:rose-self', casterId: 'e5', targetIds: [] },
-        { name: '黑 · 施加减益', level: '施加', description: '停稳 → 前倾下压 + 剥离断弧（给敌对方上负面）', fxTag: 'omen:gloom-foe', casterId: 'e5', targetIds: [] }
+        { name: '红 · 近战群攻', level: '群攻', description: '侧倾 → 横甩，近身火星带短热尾', fxTag: 'omen:red-wide', casterId: 'e5', targetIds: [] },
+        { name: '黄 · 远程单体', level: '单体', description: '压紧 → 后坐，金色微粒窄束释散', fxTag: 'omen:amber-single', casterId: 'e5', targetIds: [] },
+        { name: '黄 · 远程群攻', level: '群攻', description: '横缩 → 宽后坐，三束金色粒子同步分叉', fxTag: 'omen:amber-wide', casterId: 'e5', targetIds: [] },
+        { name: '紫 · 法术单体', level: '单体', description: '缓浮 → 内收，晶粒凝聚后短促释放', fxTag: 'omen:violet-single', casterId: 'e5', targetIds: [] },
+        { name: '紫 · 法术群攻', level: '群攻', description: '缓浮 → 外展，侧缘晶粒同拍散开', fxTag: 'omen:violet-wide', casterId: 'e5', targetIds: [] },
+        { name: '粉 · 自身增益', level: '自身', description: '收身 → 上提，柔光微粒沿身体汇入', fxTag: 'omen:rose-self', casterId: 'e5', targetIds: [] },
+        { name: '黑 · 施加减益', level: '施加', description: '停稳 → 下压，黑灰雾粒剥落并消散', fxTag: 'omen:gloom-foe', casterId: 'e5', targetIds: [] }
     ];
     let unlockTimer = null;
 
