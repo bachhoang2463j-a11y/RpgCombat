@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>命中结果与伤害量级分层 · demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap');
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    body { font-family: 'Noto Sans SC', sans-serif; user-select: none; }
+    /* —— 以下复刻主工程 index.html 主界面样式 —— */
+    .glass-panel { background: rgba(20, 25, 35, 0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); }
+    .text-outline { text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 1px 2px rgba(0,0,0,0.8); }
+    .mask-fade-y { -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .custom-scrollbar::-webkit-scrollbar { width: 3px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+    .timeline-rail { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: linear-gradient(180deg, rgba(250,204,21,0.85) 0%, rgba(6,182,212,0.65) 25%, rgba(99,102,241,0.45) 60%, rgba(255,255,255,0.05) 100%); box-shadow: 0 0 10px rgba(6,182,212,0.55); pointer-events: none; z-index: 0; }
+    @keyframes rail-pulse { 0% { transform: translateY(-100%); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(800%); opacity: 0; } }
+    .rail-pulse-beam { position: absolute; left: 0; top: 0; width: 2px; height: 40px; background: linear-gradient(180deg, transparent, #38bdf8, #fff); box-shadow: 0 0 12px #38bdf8; animation: rail-pulse 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+    .turn-dot { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; background: #111827; border: 2px solid; position: relative; z-index: 1; flex-shrink: 0; }
+    .turn-dot.cur { width: 52px; height: 52px; font-size: 26px; border-color: #facc15 !important; box-shadow: 0 0 20px rgba(250,204,21,0.9); }
+    .breathe { animation: breathe 3.2s ease-in-out infinite; } @keyframes breathe { 50% { transform: translateY(-4px) scale(1.02); } }
+    #chat-bar input { background: rgba(15,23,42,0.7); border: 1px solid rgba(255,255,255,0.12); color: #e2e8f0; }
+    .portrait { background: radial-gradient(ellipse at 50% 30%, #3b3f5c, #14151f 75%); display: flex; align-items: flex-end; justify-content: center; font-size: 64px; }
+    .card:disabled { pointer-events: none; opacity: 0.45; filter: grayscale(0.6); }
+
+    /* ===== 可移植特效样式 BEGIN：与 index.html 的 arcane- 命名及层序一致 ===== */
+    .arcane-fs-layer { position: fixed; inset: 0; pointer-events: none; z-index: 52; overflow: hidden; }
+    .arcane-fs-anchor { position: absolute; transform: translate(-50%, -50%); }
+    #arcane-fx-canvas { position: fixed; inset: 0; width: 100vw; height: 100dvh; pointer-events: none; z-index: 55; }
+    #arcane-dark { position: fixed; inset: 0; pointer-events: none; z-index: 40; opacity: 0; transition: opacity 0.35s ease; background: radial-gradient(ellipse at 40% 60%, rgba(5,6,20,0.55) 0%, rgba(2,3,10,0.92) 75%); }
+    @keyframes arcane-seed-bloom { 0% { transform: translate(-50%,-50%) scale(0); opacity: 0; } 70% { transform: translate(-50%,-50%) scale(1.25); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(0.6); opacity: 0; } }
+    @keyframes arcane-hit-flash { 0% { transform: translate(-50%,-50%) scale(0.2); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.7); opacity: 0; } }
+    @keyframes arcane-f-cold { 0% { filter: brightness(1.6) hue-rotate(180deg) saturate(2.5); } 60% { filter: none; } }
+    @keyframes arcane-f-heal { 0% { filter: brightness(1.8) drop-shadow(0 0 18px #34d399); } 100% { filter: none; } }
+    .arcane-flash-cold { animation: arcane-f-cold 0.5s steps(1) both !important; }
+    .arcane-flash-heal { animation: arcane-f-heal 0.6s ease-out both !important; }
+    @keyframes arcane-tint { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes arcane-ripple { 0% { transform: translate(-50%,-50%) scale(0.2); opacity: 0.9; } 100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; } }
+    @keyframes arcane-ring-out { 0% { r: 4; opacity: 0.95; stroke-width: 3; } 100% { r: 150; opacity: 0; stroke-width: 0.5; } }
+    @keyframes arcane-fs-flash { 0% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes arcane-draw-on { to { stroke-dashoffset: 0; } }
+    .arcane-grow { stroke-dasharray: 1; stroke-dashoffset: 1; }
+    @keyframes arcane-fade-life { 0% { opacity: 0; } 15% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes arcane-slow-rot { to { transform: rotate(360deg); } }
+    @keyframes arcane-s-light { 25% { transform: translate3d(-3px, 2px, 0); } 60% { transform: translate3d(3px, -2px, 0); } }
+    @keyframes arcane-s-heavy { 15% { transform: translate3d(-8px, 4px, 0); } 35% { transform: translate3d(7px, -5px, 0); } 60% { transform: translate3d(-4px, 3px, 0); } 85% { transform: translate3d(2px, -1px, 0); } }
+    @keyframes arcane-s-quake { 10% { transform: translate3d(-14px, 8px, 0); } 25% { transform: translate3d(12px, -10px, 0); } 40% { transform: translate3d(-9px, 6px, 0); } 60% { transform: translate3d(6px, -4px, 0); } 80% { transform: translate3d(-3px, 2px, 0); } }
+    .arcane-shake-light { animation: arcane-s-light 0.18s ease-out; }
+    .arcane-shake-heavy { animation: arcane-s-heavy 0.32s ease-out; }
+    .arcane-shake-quake { animation: arcane-s-quake 0.55s ease-out; }
+    /* ===== 命中结果反馈 arcane-hit-（可移植） ===== */
+    /* 双层血条：残影在后、前景在前；前景瞬时到位，残影由 JS 控制停留后收拢 */
+    .arcane-hit-ghost { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #fecaca, #fff1f2); box-shadow: 0 0 6px rgba(254,202,202,0.9); z-index: 0; }
+    .arcane-hit-fill { z-index: 1; transition: none; }
+    @keyframes arcane-hit-fill-blink { 0% { filter: brightness(2.2); } 100% { filter: none; } }
+    .arcane-hit-fill-blink { animation: arcane-hit-fill-blink 0.22s ease-out; }
+    /* 数字层：高于粒子 canvas(55)，与正式版浮字 60/70 同级 */
+    .arcane-hit-num-layer { position: fixed; inset: 0; pointer-events: none; z-index: 62; overflow: hidden; }
+    .arcane-hit-num { position: absolute; transform: translate(-50%, -50%); font-family: 'JetBrains Mono', monospace; font-weight: 700; white-space: nowrap; line-height: 1; letter-spacing: -0.02em;
+        paint-order: stroke fill; -webkit-text-stroke: 3px rgba(8,6,12,0.92); text-shadow: 0 2px 4px rgba(0,0,0,0.7); will-change: transform, opacity; }
+    .arcane-hit-num.l1 { font-size: 18px; color: #fecdd3; }
+    .arcane-hit-num.l2 { font-size: 26px; color: #fb7185; }
+    .arcane-hit-num.l3 { font-size: 36px; color: #f43f5e; -webkit-text-stroke-width: 4px; }
+    .arcane-hit-num.crit { color: #fdba74; text-shadow: 0 0 10px rgba(251,146,60,0.75), 0 2px 4px rgba(0,0,0,0.7); }
+    .arcane-hit-num.burst { color: #fffbeb; text-shadow: 0 0 12px rgba(253,224,71,0.95), 0 0 24px rgba(250,204,21,0.55), 0 2px 4px rgba(0,0,0,0.7); }
+    .arcane-hit-num.shield { font-size: 17px; color: #e0f2fe; text-shadow: 0 0 8px rgba(125,211,252,0.7); }
+    .arcane-hit-num.shield.sub { font-size: 13px; }
+    .arcane-hit-num.word { font-family: 'Noto Sans SC', sans-serif; font-weight: 900; font-size: 17px; letter-spacing: 0.08em; }
+    .arcane-hit-num.dodge { color: #cbd5e1; font-style: italic; }
+    .arcane-hit-num.block { color: #e2e8f0; }
+    .arcane-hit-num.break { color: #bae6fd; font-size: 14px; }
+    .arcane-hit-tag { position: absolute; transform: translate(-50%, -50%); font-family: 'Noto Sans SC', sans-serif; font-weight: 900; font-size: 11px; letter-spacing: 0.12em; padding: 1px 5px; border-radius: 3px; white-space: nowrap; }
+    .arcane-hit-tag.crit { color: #1c0a00; background: linear-gradient(90deg, #fb923c, #fde047); box-shadow: 0 0 10px rgba(251,146,60,0.8); }
+    .arcane-hit-tag.burst { color: #422006; background: linear-gradient(90deg, #fef9c3, #fde047, #fff); box-shadow: 0 0 14px rgba(253,224,71,0.9); }
+    .arcane-hit-core { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
+    /* 被硬直的元素：只用独立 translate/rotate 属性，不覆盖其原有 animation（breathe 等） */
+    .arcane-hit-recoil { will-change: translate, rotate; }
+    /* ===== 命中结果反馈 END ===== */
+    /* 新技能的 arcane- 样式写在这里；移植时只追加新样式，不覆盖正式版的已有样式。 */
+    /* ===== 可移植特效样式 END ===== */
+  </style>
+</head>
+<body class="text-white">
+ <div id="app" class="fixed inset-0 overflow-hidden">
+  <!-- 顶部控制按钮（复刻主界面） -->
+  <div class="absolute top-2 sm:top-4 right-2 sm:right-4 z-[115] flex gap-1.5 sm:gap-2">
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-violet-400 hover:text-violet-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>📚</span> <span class="hidden sm:inline">世界书</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-purple-400 hover:text-purple-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>📜</span> <span class="hidden sm:inline">记录</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-blue-400 hover:text-blue-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>🔲</span> <span class="hidden sm:inline">全屏</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-indigo-400 hover:text-indigo-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>💬</span> <span class="hidden sm:inline">对话</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-yellow-500 hover:text-yellow-400 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>⚙️</span> <span class="hidden sm:inline">设置</span></button>
+    <button id="btn-reset" class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-emerald-400 hover:text-emerald-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>🔄</span> <span class="hidden sm:inline">重置</span></button>
+  </div>
+
+  <!-- 全屏战场区域 -->
+  <div class="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-800 to-emerald-900 overflow-hidden z-0" id="battle-scene">
+    <div class="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+    <div class="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-0"></div>
+    <div class="absolute left-1 sm:left-4 md:left-6 top-16 sm:top-20 bottom-44 sm:bottom-48 w-12 sm:w-14 z-30 flex flex-col items-center select-none">
+      <div class="relative w-full h-full flex flex-col items-center">
+        <div class="timeline-rail"><div class="rail-pulse-beam"></div></div>
+        <div id="turn-order-container" class="relative w-full h-full flex flex-col gap-2 sm:gap-2.5 items-center overflow-y-auto no-scrollbar mask-fade-y py-3"></div>
+      </div>
+    </div>
+    <div id="enemies-container" class="absolute left-2 sm:left-6 right-2 sm:right-6 top-[10%] bottom-[190px] sm:bottom-[220px] z-10 flex flex-col items-center justify-start gap-6 overflow-visible pointer-events-none"></div>
+  </div>
+
+  <!-- 悬浮 UI 层 -->
+  <div class="absolute bottom-[52px] left-0 w-full p-1.5 sm:p-6 flex flex-col-reverse sm:flex-row items-end justify-between gap-1.5 sm:gap-4 z-20 pointer-events-none pb-2 sm:pb-6">
+    <div id="heroes-container" class="w-full sm:flex-1 grid grid-cols-4 gap-1 sm:gap-4 max-w-2xl pointer-events-auto relative"></div>
+    <div class="relative self-end">
+      <div id="menu-container" class="w-[260px] h-[172px] bg-slate-950/95 backdrop-blur-xl rounded-xl border border-slate-700/80 border-t-2 border-t-cyan-500/80 flex flex-col overflow-hidden relative shadow-[0_15px_35px_rgba(0,0,0,0.9)] pointer-events-auto self-end mb-1 sm:mb-0">
+        <div class="px-2.5 py-1 bg-gradient-to-r from-violet-950/60 via-slate-900/90 to-slate-950 border-b border-violet-900/40 flex justify-between items-center shrink-0">
+          <div class="flex items-center gap-1.5 min-w-0"><span class="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse shrink-0"></span><span class="text-xs font-bold text-violet-300">命中反馈 · 场景</span></div>
+          <span class="text-[9px] text-slate-500" id="hit-status">点击场景</span>
+        </div>
+        <div id="skill-list" class="flex-1 flex flex-col gap-1 p-1 overflow-y-auto custom-scrollbar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部对话栏（复刻主界面，仅装饰） -->
+  <div id="chat-bar" class="absolute bottom-0 left-0 right-0 h-[52px] z-30 flex items-center gap-2 px-2 sm:px-3 bg-black/60 border-t border-white/5">
+    <div class="w-9 h-9 rounded-full bg-slate-700 border border-white/20 shrink-0 flex items-center justify-center">🕵️</div>
+    <input type="text" placeholder="说点什么... (Enter发送)" class="flex-1 h-9 rounded-full px-4 text-sm outline-none">
+    <span class="px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/60 text-emerald-300 bg-emerald-950/50">友方旁白 ON</span>
+    <span class="px-3 py-1 rounded-full text-xs font-bold border border-rose-500/60 text-rose-300 bg-rose-950/50">敌方旁白 ON</span>
+    <div class="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center shrink-0">➤</div>
+  </div>
+ </div>
+  <script>
+    // ===== 演示宿主 BEGIN：占位数据、渲染、fxEngine；不移植到正式版 =====
+    const $ = s => document.querySelector(s);
+    let combatToken = 0;
+    let heroesData = [], enemiesData = [];
+    const HERO_DATA = [['h1', '埃利奥特', '👨', 100, 55, 110, 5], ['h2', '弗兰克', '🧔', 180, 0, 17, 0], ['h3', '玛德琳', '👩', 140, 0, 14, 0], ['h4', '索恩', '🕵️', 140, 0, 20, 0]];
+    const ENEMY_ROWS = [[['e1', '🐟'], ['e2', '❄️'], ['e3', '🐟']], [['e4', '👻'], ['e5', '👻'], ['e6', '🌀']]];
+
+function createCompactBarHTML(id, type, label, val, max, colorClass, isTp = false, shield = 0) {
+  const pct = Math.max(0, Math.min(100, (val / max) * 100)); const barWidthClass = isTp ? 'w-1/3' : 'w-full';
+  const shieldText = shield > 0 && type === 'hp' ? `<span class="text-slate-300 ml-0.5 text-[7px] sm:text-[9px]">(盾${shield})</span>` : '';
+  let finalColor = colorClass; let extraClass = ''; if (isTp && val >= max) { finalColor = 'bg-amber-400'; extraClass = 'shadow-[0_0_10px_rgba(251,191,36,0.8)] animate-pulse'; }
+  return `<div class="relative pt-1.5 sm:pt-2.5 mb-0 sm:mb-[2px]"><span id="${id}-${type}-text" class="absolute right-0 top-0 text-[8px] sm:text-xs font-mono font-bold text-white leading-none text-outline z-10 whitespace-nowrap">${Math.floor(val)}${shieldText}</span><div class="flex items-center gap-1 sm:gap-1.5"><span class="text-[7px] sm:text-[10px] font-bold text-gray-200 leading-none text-outline w-3 sm:w-4">${label}</span><div class="arcane-hit-track flex-grow h-1 sm:h-1.5 bg-[#222] rounded-[1px] overflow-hidden border border-[#111] relative">${type === 'hp' ? `<div id="${id}-hp-ghost" class="arcane-hit-ghost" style="width: ${pct}%"></div>` : ''}<div id="${id}-${type}-bar" class="${barWidthClass} h-full ${finalColor} ${extraClass} relative ${type === 'hp' ? 'arcane-hit-fill' : 'transition-all duration-300 ease-out'}" style="width: ${pct}%"></div></div></div></div>`;
+}
+
+function getEntitySpriteDom(entityOrId){
+  const id = entityOrId && typeof entityOrId === 'object' ? entityOrId.id : String(entityOrId||'');
+  if(!id) return null;
+  return document.getElementById(`hero-card-${id}`) || document.getElementById(`${id}-sprite`) || document.getElementById(`hero-wrap-${id}`) || null;
+}
+window.getEntitySpriteDom = getEntitySpriteDom;
+
+    // 敌方血条初值（initUI 内 enemiesData 赋值后调用）
+    const enemyOf = id => enemiesData.find(e => e.id === id);
+    const enemyPct = id => { const e = enemyOf(id); return Math.max(0, Math.min(100, e.hp / e.maxHp * 100)); };
+    const enemyLabel = id => { const e = enemyOf(id); return Math.floor(e.hp) + '/' + e.maxHp + (e.shield > 0 ? ' 盾' + e.shield : ''); };
+    // init：场景初值 { id: { hp, maxHp, shield } }，未列出的实体用默认值
+    function initUI(init = {}) {
+        heroesData = HERO_DATA.map(([id, name, face, hp, shield, mp, tp]) => Object.assign({ id, name, face, hp, maxHp: hp, shield, mp, maxMp: mp, tp, maxTp: 100, isAlive: true, buffs: [] }, init[id]));
+        enemiesData = ENEMY_ROWS.flat().map(([id, face]) => Object.assign({ id, name: id, face, hp: 100, maxHp: 100, shield: 0, isAlive: true, buffs: [] }, init[id]));
+    $('#heroes-container').innerHTML = heroesData.map(({ id, name, face, hp, maxHp, shield, mp, maxMp, tp, maxTp }) => `
+      <div class="hero relative transition-all duration-300 min-w-[70px] z-20" id="hero-wrap-${id}">
+        <div id="hero-card-${id}" class="fx-body hero-card-inner bg-[#18181b] rounded overflow-hidden relative border shadow-2xl transition-all border-gray-800">
+          <div id="${id}-buffs" class="absolute top-1 right-1 flex flex-col gap-1 items-end z-20 pointer-events-none"></div>
+          <div class="w-full h-12 sm:h-auto sm:aspect-[4/3] relative bg-gray-900 border-b border-gray-700">
+            <div class="absolute top-0 left-0 w-full bg-gradient-to-b from-black/80 to-transparent px-1.5 py-1 text-[9px] sm:text-xs font-bold text-white z-10 flex justify-between"><span>${name}</span></div>
+            <div class="portrait w-full h-full">${face}</div>
+          </div>
+          <div class="px-1 py-1 sm:px-2 sm:py-1.5 flex flex-col gap-[1px] sm:gap-0.5">${createCompactBarHTML(id, 'hp', 'HP', hp, maxHp, 'bg-yellow-400', false, shield)}${createCompactBarHTML(id, 'mp', 'MP', mp, maxMp, 'bg-cyan-400')}${createCompactBarHTML(id, 'tp', 'TP', tp, maxTp, 'bg-green-500', true)}</div>
+        </div>
+      </div>`).join('');
+    $('#enemies-container').innerHTML = ENEMY_ROWS.map((row, ri) => `<div class="flex items-end justify-center" style="gap:${ri ? 26 : 22}px; ${ri ? 'margin-top:18px' : ''}">${row.map(([id, em]) => `
+      <div class="flex flex-col items-center group relative shrink-0" id="enemy-box-${id}" style="transform:scale(${ri ? 1 : 0.72}); ${ri ? '' : 'filter:brightness(0.82) saturate(0.92)'}">
+        <div id="${id}-sprite" class="fx-body enemy-sprite text-7xl sm:text-8xl drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] breathe mt-2 sm:mt-4 flex justify-center items-center">${em}</div>
+        <div class="arcane-hit-track w-10 sm:w-16 h-1 sm:h-1.5 bg-black/50 mt-2 sm:mt-4 rounded-full overflow-hidden relative"><div id="${id}-hp-ghost" class="arcane-hit-ghost" style="width:${enemyPct(id)}%"></div><div id="${id}-hp-bar" class="arcane-hit-fill h-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)] relative" style="width:${enemyPct(id)}%"></div></div>
+        <div id="${id}-hp-text" class="mt-0.5 text-[9px] sm:text-[10px] font-mono font-bold text-white/80 text-outline leading-none">${enemyLabel(id)}</div>
+      </div>`).join('')}</div>`).join('');
+    $('#turn-order-container').innerHTML = ['👨', '❄️', '🧔', '👩', '🕵️', '👻', '👻'].map((e, i) => `<div class="turn-dot ${i ? '' : 'cur'}" style="border-color:${i === 1 || i > 4 ? '#e11d48' : '#06b6d4'}">${e}</div>`).join('');
+    }
+    initUI();
+
+class CanvasFxEngine {
+    constructor() {
+        this.canvas = null;
+        this.ctx = null;
+        this.particles = [];
+        this.animationFrameId = null;
+        this.hitStop = 0; // 定帧剩余毫秒：>0 时粒子冻结，制造重击顿挫感
+        this.lastFrameTime = 0; // 上一帧时间戳：用于计算真实帧间隔 dt
+        this.lastDt = 16.7;     // 最近一帧的真实间隔（毫秒），供雷电 overlay 等外部特效对齐
+        this.init();
+    }
+
+    init() {
+        this.canvas = document.getElementById('fx-canvas');
+        if (!this.canvas) {
+            this.canvas = document.createElement('canvas');
+            this.canvas.id = 'fx-canvas';
+            this.canvas.className = 'fixed inset-0 pointer-events-none z-[99]';
+            document.body.appendChild(this.canvas);
+        }
+        this.ctx = this.canvas.getContext('2d');
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+    }
+
+    resize() {
+        if (this.canvas) {
+            this.canvas.width = window.innerWidth;
+            this.canvas.height = window.innerHeight;
+        }
+    }
+
+    addParticle(p) {
+        this.particles.push(p);
+        if (this.particles.length === 1) {
+            this.startLoop();
+        }
+    }
+
+    startLoop() {
+        if (!this.animationFrameId) {
+            // 重置时间戳，避免空闲后重启的首帧因间隔过大而跳变（配合 update 内 33ms 上限钳制）
+            this.lastFrameTime = 0;
+            const loop = () => {
+                this.update();
+                this.draw();
+                if (this.particles.length > 0) {
+                    this.animationFrameId = requestAnimationFrame(loop);
+                } else {
+                    this.animationFrameId = null;
+                }
+            };
+            this.animationFrameId = requestAnimationFrame(loop);
+        }
+    }
+
+    update() {
+        // Delta-time：按真实帧间隔推进动画，速度与 FPS 解耦（高刷屏不加速、掉帧不减速）
+        // dt 上限 33ms：标签页休眠/卡顿后恢复时防止粒子瞬移跳变
+        const now = performance.now();
+        const dt = this.lastFrameTime ? Math.min(now - this.lastFrameTime, 33) : 16.7;
+        this.lastDt = dt;
+        this.lastFrameTime = now;
+        const k = dt / 16.7; // 归一化时间系数：1 = 60fps 基准步长
+
+        // Hit Stop 定帧：命中瞬间冻结粒子若干毫秒，制造"重击砸进肉里"的顿挫落差
+        if (this.hitStop > 0) {
+            this.hitStop -= dt;
+            return;
+        }
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const p = this.particles[i];
+            p.age += dt;
+
+            p.x += p.vx * k;
+            p.y += p.vy * k;
+
+            if (p.gravity) p.vy += p.gravity * k;
+            if (p.drag) {
+                const d = Math.pow(p.drag, k); // 阻尼按时间比例复合衰减
+                p.vx *= d;
+                p.vy *= d;
+            }
+            if (p.update) p.update(p);
+
+            if (p.age >= p.life) {
+                this.particles.splice(i, 1);
+            }
+        }
+    }
+
+    draw() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // 使用 'screen' 混合模式实现极具发光感的爆燃、辉光效果
+        this.ctx.globalCompositeOperation = 'screen';
+        
+        for (let i = 0; i < this.particles.length; i++) {
+            const p = this.particles[i];
+            const pct = p.age / p.life;
+            this.ctx.save();
+            p.draw(this.ctx, pct);
+            this.ctx.restore();
+        }
+        
+        this.ctx.globalCompositeOperation = 'source-over';
+    }
+}
+
+// 实例化全局特效引擎
+const fxEngine = new CanvasFxEngine();
+window.fxEngine = fxEngine;
+    // ===== 演示宿主 END =====
+
+    // ===== 可移植特效模块 BEGIN：底座取自 index.html；无战斗、LLM 或酒馆依赖 =====
+const arcaneVfxModule = (function () {
+    'use strict';
+    // 接入点 1：填写新技能的精确 fxTag，与下方分派和 CARDS 保持一致。
+    const ARCANE_TAGS = [];
+    const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
+
+    // —— 共享状态（clearArcaneFx 同步清空） ——
+    const S = {
+        uid: 0,
+        particles: [],
+        particleTimer: null,
+        particleUntil: 0,
+        flights: [],    // 贝塞尔弹道飞行物
+        timers: new Set(),     // combatToken 守卫的延时/收尾定时
+        rawTimers: new Map(),  // 弹道拍点及其完成回调，清理时同步解除等待
+        intervals: new Set(),  // 周期任务（蓄力抖动/羽流/光雨），回调内自守 token
+        layers: new Set(),     // data-arcane-fx 临时 DOM 层
+        anchors: new Set(),    // impactDom 无视觉锚点
+        handles: new Set(),    // 活动技能 handle
+        flashes: new Set(),    // 被加 arcane-flash-* 类的精灵
+        shakeEls: new Set(),   // 被加 arcane-shake-* 类的舞台
+        driver: null,          // 挂在 fxEngine.particles 里的驱动粒子
+        canvas: null, ctx: null,
+        dark: null,
+    };
+    let audioCtx = null, sfxBus = null, sfxVerb = null, sfxNoise = null;
+
+    // ===== combatToken 守卫定时 =====
+    function after(ms, fn) {
+        const token = combatToken;
+        const id = setTimeout(() => { S.timers.delete(id); if (token !== combatToken) return; fn(); }, ms);
+        S.timers.add(id);
+        return id;
+    }
+    function every(ms, fn) {
+        const token = combatToken;
+        const id = setInterval(() => { if (token !== combatToken) { clearInterval(id); S.intervals.delete(id); return; } fn(); }, ms);
+        S.intervals.add(id);
+        return id;
+    }
+    function stopEvery(id) { if (id != null) { clearInterval(id); S.intervals.delete(id); } }
+
+    // ===== 临时层 / 锚点 / 舞台效果 =====
+    function fsLayer(html, ms) {
+        const d = document.createElement('div');
+        d.className = 'arcane-fs-layer';
+        d.setAttribute('data-arcane-fx', 'layer');
+        d.innerHTML = html;
+        document.body.appendChild(d);
+        S.layers.add(d);
+        if (ms) setTimeout(() => { S.layers.delete(d); d.remove(); }, ms); // 纯清理回调，恒执行
+        return d;
+    }
+    function mkAnchor(x, y) {
+        const d = document.createElement('div');
+        d.style.cssText = 'position:fixed; left:' + (x - 1) + 'px; top:' + (y - 1) + 'px; width:2px; height:2px; pointer-events:none; z-index:56; opacity:0;';
+        d.setAttribute('data-arcane-fx', 'anchor');
+        document.body.appendChild(d);
+        S.anchors.add(d);
+        return d;
+    }
+    function dropAnchor(d) { if (d && d.isConnected) { S.anchors.delete(d); d.remove(); } }
+    function flash(el, cls) {
+        if (!el) return;
+        el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+        S.flashes.add(el);
+        after(700, () => { el.classList.remove(cls); S.flashes.delete(el); });
+    }
+    function shake(type) {
+        const scene = document.getElementById('battle-scene');
+        if (!scene) return;
+        const cls = 'arcane-shake-' + type;
+        scene.classList.remove('arcane-shake-light', 'arcane-shake-heavy', 'arcane-shake-quake');
+        void scene.offsetWidth;
+        scene.classList.add(cls);
+        S.shakeEls.add(scene);
+        after(type === 'quake' ? 560 : (type === 'heavy' ? 330 : 190), () => { scene.classList.remove(cls); S.shakeEls.delete(scene); });
+    }
+    function darken(o) {
+        if (!o && !S.dark) return;
+        if (!S.dark || !S.dark.isConnected) {
+            S.dark = document.createElement('div');
+            S.dark.id = 'arcane-dark';
+            S.dark.setAttribute('data-arcane-fx', 'dark');
+            document.body.appendChild(S.dark);
+        }
+        if (S.dark) S.dark.style.opacity = o;
+        if (!o && S.dark) {
+            const layer = S.dark;
+            after(360, () => { if (layer === S.dark && layer.style.opacity === '0') { layer.remove(); S.dark = null; } });
+        }
+    }
+
+    // ===== 几何 =====
+    function ctr(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, top: r.top, bottom: r.bottom, left: r.left, right: r.right }; }
+    function domOf(e) { return getEntitySpriteDom(e); }
+    function unionRect(doms) {
+        const rs = doms.map(d => d.getBoundingClientRect()).filter(r => r.width || r.height);
+        if (!rs.length) return null;
+        const l = Math.min(...rs.map(r => r.left)), rr = Math.max(...rs.map(r => r.right));
+        const t = Math.min(...rs.map(r => r.top)), b = Math.max(...rs.map(r => r.bottom));
+        return { x: (l + rr) / 2, y: (t + b) / 2, l, r: rr, t, b, w: rr - l, h: b - t };
+    }
+    // 施法者所属全队存活对象（含召唤物，isAlive 过滤）
+    function teamSprites(caster) {
+        const isHero = caster && (caster.isSummon ? caster.side === 'hero' : String(caster.id || '').startsWith('h'));
+        const arr = isHero ? heroesData : enemiesData;
+        return arr.filter(e => e.isAlive).map(e => domOf(e)).filter(Boolean);
+    }
+
+    // ===== 私有合成音色（demo 原样移植，局部隔离） =====
+    function audio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const ctx = audioCtx;
+            const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -10; comp.knee.value = 4; comp.ratio.value = 6; comp.attack.value = 0.001; comp.release.value = 0.12; comp.connect(ctx.destination);
+            const sat = shaper(ctx, 1.6); sat.connect(comp);
+            sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9; sfxBus.connect(sat);
+            const len = ctx.sampleRate * 3, ir = ctx.createBuffer(2, len, ctx.sampleRate);
+            for (let ch = 0; ch < 2; ch++) { const dd = ir.getChannelData(ch); for (let i = 0; i < len; i++) dd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4); }
+            sfxVerb = ctx.createConvolver(); sfxVerb.buffer = ir; const vg = ctx.createGain(); vg.gain.value = 0.5; sfxVerb.connect(vg); vg.connect(comp);
+            sfxNoise = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate); const nd = sfxNoise.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        return audioCtx;
+    }
+    function shaper(ctx, drive) { const ws = ctx.createWaveShaper(), c = new Float32Array(2048); for (let i = 0; i < 2048; i++) c[i] = Math.tanh((i / 1024 - 1) * drive) / Math.tanh(drive); ws.curve = c; ws.oversample = '2x'; return ws; }
+    function chain(ctx, src, t, o) {
+        const gn = ctx.createGain(), pk = o.peak || 0.002;
+        gn.gain.setValueAtTime(0.0001, t); gn.gain[o.peak ? 'exponentialRampToValueAtTime' : 'linearRampToValueAtTime'](o.vol, t + pk);
+        if (o.cut) { gn.gain.setValueAtTime(o.vol, t + o.dur - 0.012); gn.gain.linearRampToValueAtTime(0.0001, t + o.dur); }
+        else gn.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
+        const p = ctx.createStereoPanner(); p.pan.setValueAtTime(o.pan || 0, t); if (o.pan1 !== undefined) p.pan.linearRampToValueAtTime(o.pan1, t + o.dur);
+        src.connect(gn); gn.connect(p); p.connect(sfxBus);
+        if (o.wet) { const w = ctx.createGain(); w.gain.value = o.wet; p.connect(w); w.connect(sfxVerb); }
+    }
+    function noiseSrc(ctx, t, dur, rate) { const s = ctx.createBufferSource(); s.buffer = sfxNoise; s.playbackRate.value = rate || 1; s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05); return s; }
+    function biquad(ctx, type, f0, f1, q, t, dur, fd) { const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t); if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + (fd || dur)); return f; }
+    function click(d, vol = 0.7, f = 3500, dur = 0.012, pan = 0) { const ctx = audio(), t = ctx.currentTime + d; const f1 = biquad(ctx, 'highpass', f, 0, 0.7, t, dur); noiseSrc(ctx, t, dur).connect(f1); chain(ctx, f1, t, { vol, dur, pan }); }
+    function kick(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d; const s = ctx.createOscillator();
+        s.frequency.setValueAtTime(o.hi, t); s.frequency.exponentialRampToValueAtTime(o.lo, t + o.pd); s.frequency.exponentialRampToValueAtTime(o.lo * 0.7, t + o.dur);
+        const sh = shaper(ctx, o.drive || 3); s.connect(sh); s.start(t); s.stop(t + o.dur + 0.05); chain(ctx, sh, t, { vol: o.vol, dur: o.dur, wet: o.wet || 0 });
+    }
+    function crunch(d, o) { const ctx = audio(), t = ctx.currentTime + d; const bp = biquad(ctx, 'bandpass', o.f, o.f1, o.q || 1, t, o.dur); const sh = shaper(ctx, o.drive || 6); noiseSrc(ctx, t, o.dur).connect(bp); bp.connect(sh); chain(ctx, sh, t, { vol: o.vol, dur: o.dur, pan: o.pan || 0, wet: o.wet || 0 }); }
+    function boom(d, o) { const ctx = audio(), t = ctx.currentTime + d; const lp = biquad(ctx, 'lowpass', o.f0, o.f1, 0.9, t, o.dur, o.fd || o.dur * 0.6); noiseSrc(ctx, t, o.dur, o.rate).connect(lp); chain(ctx, lp, t, { vol: o.vol, dur: o.dur, peak: o.peak, wet: o.wet || 0, pan: o.pan || 0 }); }
+    function whoosh(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d; const f = biquad(ctx, o.type || 'bandpass', o.f0, o.f1, o.q || 1.2, t, o.dur);
+        if (o.wob) o.wob.forEach(([dt, hz]) => f.frequency.linearRampToValueAtTime(hz, t + dt));
+        noiseSrc(ctx, t, o.dur, o.rate).connect(f); chain(ctx, f, t, { vol: o.vol, dur: o.dur, peak: o.peak || o.dur * 0.5, cut: o.cut, pan: o.pan || 0, pan1: o.pan1, wet: o.wet || 0 });
+    }
+    function drone(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d;
+        [-12, 0, 9].forEach(dt => { const s = ctx.createOscillator(); s.type = 'sawtooth'; s.detune.value = dt; s.frequency.setValueAtTime(o.f0, t); s.frequency.exponentialRampToValueAtTime(o.f1, t + o.dur);
+            const lp = biquad(ctx, 'lowpass', o.lp0, o.lp1, 3, t, o.dur); s.connect(lp); s.start(t); s.stop(t + o.dur + 0.05); chain(ctx, lp, t, { vol: o.vol, dur: o.dur, peak: o.dur * 0.95, cut: true }); });
+    }
+    function tone(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d; const s = ctx.createOscillator(); s.type = o.type || 'sine'; s.detune.value = o.detune || 0;
+        s.frequency.setValueAtTime(o.f0, t); if (o.f1) s.frequency.exponentialRampToValueAtTime(o.f1, t + (o.fd || o.dur));
+        let node = s; if (o.lp) { const f = biquad(ctx, 'lowpass', o.lp, o.lp1, o.q || 0.8, t, o.dur); s.connect(f); node = f; }
+        s.start(t); s.stop(t + o.dur + 0.05); chain(ctx, node, t, o);
+    }
+    function choir(d, freqs, dur, vol, peakFrac = 0.4, cut = false) {
+        const ctx = audio(), t = ctx.currentTime + d;
+        freqs.forEach((f, i) => [-9, 0, 8].forEach(dt => {
+            const s = ctx.createOscillator(); s.type = 'sawtooth'; s.frequency.value = f; s.detune.value = dt;
+            const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 5 + i * 0.4; lg.gain.value = f * 0.006; lfo.connect(lg); lg.connect(s.frequency);
+            const lp = biquad(ctx, 'lowpass', 900 + i * 200, 0, 0.6, t, dur); s.connect(lp); s.start(t); lfo.start(t); s.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+            chain(ctx, lp, t, { vol: vol / 3, dur, peak: dur * peakFrac, cut, wet: 0.7, pan: (i - 1) * 0.3 });
+        }));
+    }
+    function chime(d, f, dur = 1.2, vol = 0.1, pan = 0) { [[1, 1], [2.4, 0.4], [3.9, 0.18]].forEach(([m, v]) => tone(d, { f0: f * m, dur: dur / Math.sqrt(m), vol: vol * v, pan, wet: 0.7 })); }
+    function crystal(d, f, vol = 0.12, pan = 0) { tone(d, { f0: f, dur: 0.16, vol, pan, wet: 0.5 }); tone(d, { f0: f * 1.5, dur: 0.09, vol: vol * 0.5, pan }); click(d, vol * 1.5, 6000, 0.005, pan); }
+    function cry(d, vol = 0.12) {
+        const ctx = audio(), t = ctx.currentTime + d; const s = ctx.createOscillator(); s.type = 'sawtooth';
+        s.frequency.setValueAtTime(1500, t); s.frequency.exponentialRampToValueAtTime(2900, t + 0.12); s.frequency.exponentialRampToValueAtTime(2100, t + 0.6);
+        const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 22; lg.gain.value = 60; lfo.connect(lg); lg.connect(s.frequency);
+        const bp = biquad(ctx, 'bandpass', 2600, 0, 4, t, 0.6); s.connect(bp); s.start(t); lfo.start(t); s.stop(t + 0.65); lfo.stop(t + 0.65); chain(ctx, bp, t, { vol, dur: 0.6, peak: 0.08, wet: 0.6, pan: 0.3 });
+    }
+
+    // ===== arcane canvas 粒子层（绘制在 z55，低于浮字；调度复用 fxEngine 循环） =====
+    function ensureCanvas() {
+        if (S.canvas && S.canvas.isConnected) return;
+        const c = document.createElement('canvas');
+        c.id = 'arcane-fx-canvas';
+        c.setAttribute('data-arcane-fx', 'canvas');
+        document.body.appendChild(c);
+        S.canvas = c; S.ctx = c.getContext('2d');
+        resizeCanvas();
+    }
+    function resizeCanvas() { if (S.canvas) { S.canvas.width = window.innerWidth; S.canvas.height = window.innerHeight; } }
+    window.addEventListener('resize', resizeCanvas);
+    const DRAW = {
+        dot(g, p) { g.fillStyle = p.color; g.beginPath(); g.arc(0, 0, p.size, 0, 6.283); g.fill(); },
+        ring(g, p) { g.strokeStyle = p.color; g.lineWidth = 3 * p.life; g.beginPath(); g.arc(0, 0, 4 + p.size * (1 - p.life) * 40, 0, 6.283); g.stroke(); },
+        flame(g, p) { const r = p.size * (0.4 + p.life * 0.8); const gr = g.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, '#fff7d6'); gr.addColorStop(0.35, p.color); gr.addColorStop(1, 'rgba(120,20,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill(); },
+        smoke(g, p) { const r = p.size * (1.6 - p.life); const gr = g.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, p.color); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill(); },
+        feather(g, p) { const s = p.size; g.fillStyle = p.color; g.beginPath(); g.moveTo(-s * 1.5, 0); g.quadraticCurveTo(0, -s * 0.55, s * 1.5, 0); g.quadraticCurveTo(0, s * 0.4, -s * 1.5, 0); g.fill(); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-s * 1.8, 0); g.lineTo(s * 1.5, 0); g.stroke(); },
+        shard(g, p) { const s = p.size; g.fillStyle = p.fill || 'rgba(224,242,254,0.25)'; g.strokeStyle = p.color; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, -s); g.lineTo(s * 0.7, s * 0.3); g.lineTo(s * 0.1, s * 0.9); g.lineTo(-s * 0.6, s * 0.2); g.closePath(); g.fill(); g.stroke(); },
+        streak(g, p) { g.strokeStyle = p.color; g.lineWidth = p.size; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 0); g.lineTo(-p.vx * 4, -p.vy * 4); g.stroke(); }
+    };
+    function releaseIdleCanvas() {
+        if (S.driver || S.handles.size || S.particles.length || S.flights.length || !S.canvas) return;
+        S.canvas.remove(); S.canvas = null; S.ctx = null;
+    }
+    function scheduleParticleCleanup() {
+        if (S.particleTimer !== null) return;
+        S.particleTimer = after(Math.max(0, S.particleUntil - performance.now()), () => {
+            S.particleTimer = null;
+            const now = performance.now();
+            S.particles = S.particles.filter(p => p.expiresAt > now);
+            if (S.particles.length) { scheduleParticleCleanup(); return; }
+            if (!S.flights.length && S.driver) {
+                const index = fxEngine.particles.indexOf(S.driver);
+                if (index >= 0) fxEngine.particles.splice(index, 1);
+                S.driver = null;
+            }
+            if (S.ctx) S.ctx.clearRect(0, 0, S.canvas.width, S.canvas.height);
+            releaseIdleCanvas();
+        });
+    }
+    function addP(o) {
+        const p = Object.assign({ vx: 0, vy: 0, life: 1, decay: 0.02, size: 3, color: '#fde68a', grav: 0, drag: 0.98, rot: 0, vr: 0, shape: 'dot', blend: 'lighter' }, o);
+        p.expiresAt = performance.now() + p.life / p.decay * 16.7;
+        S.particleUntil = Math.max(S.particleUntil, p.expiresAt);
+        S.particles.push(p);
+        ensureCanvas(); ensureDriver(); scheduleParticleCleanup();
+    }
+    function burst(n, fn) { for (let i = 0; i < n; i++) addP(fn(i)); }
+    // 绕场收束（demo orbitCharge 原样）
+    function orbitCharge(c, n, dur, mk, rx, ry, shrink = 0.8) {
+        const orb = []; for (let i = 0; i < n; i++) orb.push({ a: Math.random() * 6.283, r: rnd(0.45, 1), s: rnd(0.025, 0.05), k: Math.random() });
+        const t0 = performance.now();
+        const id = every(33, () => { const k = Math.min(1, (performance.now() - t0) / dur); orb.forEach(o => { o.a += o.s * (1 + k * 3); const r = o.r * (1 - k * shrink); addP(Object.assign({ x: c.x + Math.cos(o.a) * rx * r, y: c.y + Math.sin(o.a) * ry * r, decay: 0.25 }, mk(o))); }); });
+        after(dur, () => stopEvery(id));
+    }
+    // 贝塞尔弹道（demo fly 原样；由驱动粒子步进，不另启 rAF）
+    function fly(a, b, lift, dur, draw, done, ease) {
+        ease = ease || (k => k * k);
+        const cx = (a.x + b.x) / 2, cy = Math.min(a.y, b.y) - lift;
+        const startedAt = performance.now();
+        const f = {
+            age: 0, dur, timer: null,
+            step(pr) { const t = ease(pr), u = 1 - t; draw(u * u * a.x + 2 * u * t * cx + t * t * b.x, u * u * a.y + 2 * u * t * cy + t * t * b.y, pr); },
+            progress() { return Math.min(1, (performance.now() - startedAt) / dur); }
+        };
+        S.flights.push(f);
+        ensureCanvas(); ensureDriver();
+        f.timer = after(dur, () => {
+            const index = S.flights.indexOf(f);
+            if (index >= 0) S.flights.splice(index, 1);
+            f.step(1);
+            if (done) done();
+        });
+        return f;
+    }
+    function ensureDriver() {
+        if (S.driver) return;
+        const driver = {
+            age: 0, life: 1e9, x: 0, y: 0, vx: 0, vy: 0,
+            update(p) {
+                step(fxEngine.lastDt || 16.7);
+                if (!S.particles.length && !S.flights.length) {
+                    p.age = p.life; S.driver = null;
+                    if (S.ctx) S.ctx.clearRect(0, 0, S.canvas.width, S.canvas.height);
+                    releaseIdleCanvas();
+                }
+            },
+            draw() { render(); }
+        };
+        S.driver = driver;
+        fxEngine.addParticle(driver);
+    }
+    function step(dt) {
+        const k = dt / 16.7;
+        for (const f of S.flights) f.step(f.progress());
+        for (let i = S.particles.length - 1; i >= 0; i--) {
+            const p = S.particles[i];
+            p.vx *= Math.pow(p.drag, k); p.vy *= Math.pow(p.drag, k);
+            p.vy += p.grav * k;
+            p.x += p.vx * k; p.y += p.vy * k;
+            p.rot += p.vr * k;
+            p.life = Math.min(p.life - p.decay * k, Math.max(0, (p.expiresAt - performance.now()) * p.decay / 16.7));
+            if (p.life <= 0) S.particles.splice(i, 1);
+        }
+    }
+    function render() {
+        const g = S.ctx; if (!g || !S.canvas) return;
+        g.clearRect(0, 0, S.canvas.width, S.canvas.height);
+        for (let i = 0; i < S.particles.length; i++) {
+            const p = S.particles[i];
+            g.save();
+            g.globalAlpha = Math.min(1, p.life * 1.4);
+            g.globalCompositeOperation = p.blend;
+            g.translate(p.x, p.y);
+            if (p.shape !== 'streak') g.rotate(p.rot);
+            DRAW[p.shape](g, p);
+            g.restore();
+        }
+    }
+
+    // ===== ① 通用火焰弹（240 蓄 + 340 飞 = 580ms 命中拍点） =====
+    function fireProjectile(fromDom, toDom, dodged, token) {
+        const h = ctr(fromDom), t = ctr(toDom);
+        const a = { x: h.x + 10, y: h.top - 16 }, b = { x: t.x, y: t.y };
+        burst(22, () => { const ang = Math.random() * 6.283, d = rnd(40, 70); return { x: a.x + Math.cos(ang) * d, y: a.y + Math.sin(ang) * d, vx: -Math.cos(ang) * d / 9, vy: -Math.sin(ang) * d / 9, drag: 0.86, decay: 0.06, size: rnd(1.2, 2.4), color: pick(['#fdba74', '#f97316', '#fde68a']) }; });
+        fsLayer(`<div class="arcane-fs-anchor" style="left:${a.x}px; top:${a.y}px; width:64px; height:64px; border-radius:50%; background: radial-gradient(circle, #fff7d6 0%, #fb923c 35%, rgba(220,38,38,0.45) 60%, transparent 72%); animation: arcane-seed-bloom 0.26s ease-out both;"></div>`, 320);
+        whoosh(0, { f0: 400, f1: 1800, q: 1.2, dur: 0.22, vol: 0.3, peak: 0.18, pan: -0.5 }); boom(0.02, { f0: 900, f1: 300, dur: 0.25, vol: 0.25, peak: 0.08, pan: -0.5 });
+        for (let i = 0; i < 4; i++) click(0.04 + i * 0.04, 0.12, rnd(2500, 4500), 0.006, -0.5);
+        after(240, () => {
+            if (token !== combatToken) return; // 重置后停止绘制/音效启动
+            whoosh(0, { f0: 350, f1: 1500, q: 0.9, dur: 0.34, vol: 0.55, peak: 0.28, cut: true, pan: -0.6, pan1: 0.5 });
+            for (let i = 0; i < 6; i++) click(0.03 + i * 0.05, 0.1, rnd(2200, 4800), 0.006, -0.4 + i * 0.15);
+            fly(a, b, 90, 340, (x, y) => {
+                if (token !== combatToken) return;
+                addP({ x, y, shape: 'flame', size: 16, decay: 0.2, color: '#fb923c' });
+                burst(5, () => ({ x: x + rnd(-6, 6), y: y + rnd(-6, 6), vx: rnd(-1, 1), vy: rnd(-1.6, -0.3), drag: 0.94, decay: rnd(0.04, 0.07), size: rnd(6, 11), shape: 'flame', color: pick(['#f97316', '#ef4444', '#fbbf24']) }));
+                for (let j = 0; j < 2; j++) { const an = performance.now() / 45 + j * 3.14; addP({ x: x + Math.cos(an) * 11, y: y + Math.sin(an) * 11, decay: 0.3, size: 2, color: '#fff7d6' }); }
+            }, () => {
+                if (token !== combatToken || dodged) return; // 闪避：弹达原位，不爆散不响，不 flash/flinch
+                click(0, 0.8, 4000); kick(0, { hi: 240, lo: 55, pd: 0.035, dur: 0.26, vol: 0.9, drive: 3 }); crunch(0, { f: 1600, f1: 700, q: 1.2, dur: 0.12, vol: 0.5 });
+                boom(0.005, { f0: 5000, f1: 200, dur: 0.5, vol: 0.5, wet: 0.25 }); whoosh(0.05, { f0: 600, f1: 300, q: 0.8, dur: 0.6, vol: 0.15, peak: 0.05 });
+                for (let i = 0; i < 12; i++) click(rnd(0.06, 0.6), 0.15, rnd(2500, 6000), 0.006, rnd(0.1, 0.8));
+                fsLayer(`<div class="arcane-fs-anchor" style="left:${b.x}px; top:${b.y}px; width:140px; height:140px; border-radius:50%; background: radial-gradient(circle, #fff 0%, #fdba74 30%, rgba(239,68,68,0.5) 58%, transparent 72%); animation: arcane-hit-flash 0.34s ease-out both;"></div>`, 420);
+                burst(2, i => ({ x: b.x, y: b.y, shape: 'ring', size: 1.8 + i, decay: 0.07 - i * 0.02, color: i ? '#f97316' : '#fde68a' }));
+                burst(40, () => { const an = Math.random() * 6.283, s = rnd(2, 8); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s - 1, grav: 0.13, drag: 0.93, decay: rnd(0.025, 0.05), size: rnd(1, 2.2), color: pick(['#fde68a', '#fb923c', '#fff7d6']) }; });
+                burst(10, () => ({ x: b.x + rnd(-14, 14), y: b.y + rnd(-14, 14), vx: rnd(-1, 1), vy: rnd(-2, -0.5), drag: 0.95, decay: rnd(0.03, 0.05), size: rnd(12, 20), shape: 'flame', color: '#f97316' }));
+                burst(9, () => ({ x: b.x + rnd(-24, 24), y: b.y + rnd(-18, 18), vx: rnd(-0.3, 0.3), vy: rnd(-0.9, -0.4), drag: 0.99, decay: 0.011, size: rnd(16, 28), shape: 'smoke', blend: 'source-over', color: 'rgba(40,32,30,0.55)' }));
+            });
+        });
+    }
+
+    // ===== ② 敌方紫色法术弹（480ms 命中拍点） =====
+    function enemySpellProjectile(fromDom, toDom, dodged, token) {
+        const t = ctr(fromDom), h = ctr(toDom);
+        const a = { x: t.x - 20, y: t.y - 10 }, b = { x: h.x, y: toDom.hasAttribute('data-arcane-fx') ? h.y : h.top + 30 };
+        whoosh(0, { f0: 300, f1: 900, q: 1.4, dur: 0.48, vol: 0.32, peak: 0.4, pan: 0.6, pan1: -0.3 }); tone(0, { type: 'triangle', f0: 110, f1: 90, dur: 0.48, vol: 0.08 });
+        fly(a, b, 30, 480, (x, y) => {
+            if (token !== combatToken) return;
+            addP({ x, y, size: 9, decay: 0.22, color: '#c084fc' }); addP({ x, y, size: 4, decay: 0.3, color: '#fff' });
+            burst(3, () => ({ x: x + rnd(-5, 5), y: y + rnd(-5, 5), vx: rnd(0.5, 1.5), vy: rnd(-0.5, 0.5), drag: 0.94, decay: 0.06, size: rnd(1.5, 3), color: pick(['#7c3aed', '#a855f7']) }));
+        }, () => {
+            if (token !== combatToken || dodged) return;
+            click(0, 0.6, 3500); kick(0, { hi: 180, lo: 55, pd: 0.03, dur: 0.25, vol: 0.7, drive: 3 }); boom(0, { f0: 3000, f1: 200, dur: 0.4, vol: 0.35, wet: 0.3 });
+            burst(24, () => { const an = Math.random() * 6.283, s = rnd(1.5, 5); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.93, decay: 0.04, size: rnd(1, 2.4), color: pick(['#e9d5ff', '#c084fc', '#7c3aed']) }; });
+        }, k => k);
+    }
+
+    // ===== 新技能实现 BEGIN =====
+    // 接入点 2：在这里写 playXxx(caster, targets, isReaction)，使用 domOf / ctr / unionRect 定位。
+    // 延时用 after / every；SVG 用 fsLayer(html, 生命周期毫秒)；粒子用 addP / burst / fly；不要另起永久 rAF。
+    // 无固定寿命的图层由 handle.cancel() 和自然收尾显式移除；darken(o) 收尾必须调用 darken(0)。
+    // 保持纯演出：不改 HP/状态，不负责浮字或战斗结算；测试反馈放在下方演示控制区。
+    // 持续演出返回 handle：doneAt: Date.now() + 总演出毫秒（含尾韵），不能用 performance.now()。
+    // cancel() 只清理自身图层、计时和 WAAPI 动画，不在技能内部调用全局 clearArcaneFx()。
+    // 按需提供 dodge(success) / hit(type) / dispel(dom) / impactDom，与正式版反应接口一致。
+    // impactDom 可指向实体或 mkAnchor() 自建落点；dropAnchor() 只用于后者，不能删除真实角色 DOM。
+    // handle 加入 S.handles；结束时删除并调用 releaseIdleCanvas()；WAAPI 动画由 cancel() 取消。
+    // 普通/反应演练及完整可运行接入示例见根目录《技能SVG模板使用与快速移植.md》。
+    // ===== 命中结果反馈 BEGIN（可移植）=====
+    // 输入：已结算结果 { targetId, outcome:'hit'|'dodge'|'block', maxHp, hpBefore, hpAfter, hpDmg,
+    //        shieldBefore, shieldAfter, shieldDmg, isCrit, isBurst }；组件不乘倍率、不改数据。
+    // playHitFeedback(results, { onBeat }) —— results 可为单个或数组（同一命中拍点的群体）。
+    // onBeat(results) 在拍点同步回调，供宿主刷新 HP/盾数值文本（正式版即 updateUI）。
+    const HIT_HOLD_MS = 450, HIT_COLLAPSE_MS = 500, HIT_STOP_MS = 60, HIT_LIFE_MS = 1300;
+    const H = { ghosts: new Map(), stacks: new Map(), handles: new Set() };
+
+    // 结果 / 量级 / 修饰 三维独立判定；量级只看 hpDmg/maxHp，与主线 severityStr 同口径
+    function classifyHit(r) {
+        const hpDmg = Math.max(0, r.hpDmg || 0), shieldDmg = Math.max(0, r.shieldDmg || 0);
+        let kind;
+        if (r.outcome === 'dodge') kind = 'dodge';
+        else if (r.outcome === 'block' || (hpDmg === 0 && shieldDmg === 0)) kind = 'block';
+        else if (hpDmg > 0) kind = 'hp';
+        else kind = 'shield';
+        const ratio = r.maxHp > 0 ? hpDmg / r.maxHp : 0;
+        const tier = kind !== 'hp' ? 0 : ratio < 0.10 ? 1 : ratio <= 0.50 ? 2 : 3;
+        const shieldBroken = shieldDmg > 0 && (r.shieldBefore || 0) > 0 && (r.shieldAfter || 0) === 0;
+        const landed = kind === 'hp' || kind === 'shield';
+        return { kind, tier, hpDmg, shieldDmg, shieldBroken, crit: landed && !!r.isCrit, burst: landed && !!r.isBurst };
+    }
+
+    // ---- 双层血条：前景瞬时到位；残影停留后收拢；连续受击残影不回跳 ----
+    function hitBar(id, hpBefore, hpAfter, maxHp) {
+        const fill = document.getElementById(id + '-hp-bar'), ghost = document.getElementById(id + '-hp-ghost');
+        if (!fill) return;
+        const pct = v => Math.max(0, Math.min(100, v / maxHp * 100));
+        fill.style.width = pct(hpAfter) + '%';
+        fill.classList.remove('arcane-hit-fill-blink'); void fill.offsetWidth; fill.classList.add('arcane-hit-fill-blink');
+        if (!ghost) return;
+        const st = H.ghosts.get(id);
+        if (st && st.el === ghost) {
+            // 收拢中被再次命中：冻结在当前视觉宽度（只会 ≥ 新血量），重新计时
+            clearTimeout(st.timer);
+            const track = ghost.parentElement.getBoundingClientRect().width || 1;
+            ghost.style.transition = 'none';
+            ghost.style.width = Math.max(pct(hpAfter), ghost.getBoundingClientRect().width / track * 100) + '%';
+        } else {
+            ghost.style.transition = 'none';
+            ghost.style.width = Math.max(pct(hpBefore), pct(hpAfter)) + '%';
+        }
+        const next = { el: ghost, timer: null };
+        next.timer = setTimeout(() => {
+            if (!ghost.isConnected) { H.ghosts.delete(id); return; }
+            ghost.style.transition = 'width ' + HIT_COLLAPSE_MS + 'ms cubic-bezier(0.3,0,0.2,1)';
+            ghost.style.width = pct(hpAfter) + '%';
+            next.timer = setTimeout(() => { if (H.ghosts.get(id) === next) H.ghosts.delete(id); }, HIT_COLLAPSE_MS);
+        }, HIT_HOLD_MS);
+        H.ghosts.set(id, next);
+    }
+
+    // 同一目标短时间内多段：数字错位
+    function stackSlot(id) {
+        const now = Date.now(), s = H.stacks.get(id);
+        const k = s && now - s.at < 700 ? s.k + 1 : 0;
+        H.stacks.set(id, { k, at: now });
+        return { dx: [0, -20, 20, -10, 12][k % 5], dy: -Math.min(k, 4) * 15 };
+    }
+
+    // ===== 命中结果反馈 PART-2 =====
+    function hitNumLayer() {
+        const d = document.createElement('div');
+        d.className = 'arcane-hit-num-layer';
+        d.setAttribute('data-arcane-fx', 'hit-num');
+        document.body.appendChild(d);
+        S.layers.add(d);
+        return d;
+    }
+    // 数字落点：目标上部；避开右下操作区、视口边缘
+    function hitAnchor(dom, slot) {
+        const c = ctr(dom);
+        let x = c.x + slot.dx, y = c.top + c.h * 0.32 + slot.dy;
+        const menu = document.getElementById('menu-container');
+        if (menu) { const m = menu.getBoundingClientRect(); if (y > m.top - 30 && x > m.left - 50) x = m.left - 50; }
+        return { x: Math.max(40, Math.min(window.innerWidth - 40, x)), y: Math.max(36, y), c };
+    }
+    function hitEl(layer, cls, text, x, y) {
+        const el = document.createElement('div');
+        el.className = cls; el.textContent = text;
+        el.style.left = x + 'px'; el.style.top = y + 'px';
+        layer.appendChild(el);
+        return el;
+    }
+    const T = 'translate(-50%,-50%) ';
+    const NUM_KF = {
+        1: [{ transform: T + 'translateY(4px) scale(0.6)', opacity: 0 }, { transform: T + 'translateY(-4px) scale(1.08)', opacity: 1, offset: 0.12 }, { transform: T + 'translateY(-8px) scale(1)', opacity: 1, offset: 0.7 }, { transform: T + 'translateY(-16px) scale(0.95)', opacity: 0 }],
+        2: [{ transform: T + 'scale(0.4)', opacity: 0 }, { transform: T + 'translateY(-6px) scale(1.4)', opacity: 1, offset: 0.1 }, { transform: T + 'translateY(-10px) scale(0.92)', offset: 0.2 }, { transform: T + 'translateY(-12px) scale(1.04)', offset: 0.3 }, { transform: T + 'translateY(-14px) scale(1)', opacity: 1, offset: 0.75 }, { transform: T + 'translateY(-26px) scale(0.95)', opacity: 0 }],
+        3: [{ transform: T + 'scale(2.1)', opacity: 0 }, { transform: T + 'scale(0.86)', opacity: 1, offset: 0.08 }, { transform: T + 'translate(-3px,-4px) scale(1.14)', offset: 0.16 }, { transform: T + 'translate(2px,-6px) scale(0.98)', offset: 0.24 }, { transform: T + 'translateY(-8px) scale(1.02)', offset: 0.32 }, { transform: T + 'translateY(-10px) scale(1)', opacity: 1, offset: 0.78 }, { transform: T + 'translateY(-30px) scale(0.96)', opacity: 0 }],
+        shield: [{ transform: T + 'scale(0.75)', opacity: 0 }, { transform: T + 'translateY(-4px) scale(1.06)', opacity: 1, offset: 0.14 }, { transform: T + 'translateY(-8px) scale(1)', opacity: 1, offset: 0.7 }, { transform: T + 'translateY(-18px) scale(0.96)', opacity: 0 }],
+        block: [{ transform: T + 'scale(1.5)', opacity: 0 }, { transform: T + 'scale(0.95)', opacity: 1, offset: 0.1 }, { transform: T + 'scale(1)', opacity: 1, offset: 0.7 }, { transform: T + 'translateY(-10px)', opacity: 0 }],
+        dodge: [{ transform: T + 'translateX(-14px)', opacity: 0 }, { transform: T + 'translateX(4px)', opacity: 1, offset: 0.16 }, { transform: T + 'translateX(10px)', opacity: 1, offset: 0.7 }, { transform: T + 'translate(22px,-8px)', opacity: 0 }],
+        tag: [{ transform: T + 'scale(0.3)', opacity: 0 }, { transform: T + 'scale(1.15)', opacity: 1, offset: 0.12 }, { transform: T + 'scale(1)', opacity: 1, offset: 0.7 }, { transform: T + 'translateY(-8px) scale(1)', opacity: 0 }],
+    };
+    const NUM_MS = { 1: 760, 2: 960, 3: 1180, shield: 820, block: 760, dodge: 820, tag: 900 };
+
+    // 接触闪芯 + 冲击环（SVG）；c = 目标中心
+    function hitCore(layer, x, y, size, inner, outer, ring, ms, anims) {
+        const uid = 'arcane-hit-g' + (++S.uid);
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'arcane-hit-core'); svg.setAttribute('viewBox', '0 0 100 100');
+        svg.style.cssText = 'left:' + x + 'px; top:' + y + 'px; width:' + size + 'px; height:' + size + 'px;';
+        svg.innerHTML = '<defs><radialGradient id="' + uid + '"><stop offset="0" stop-color="#fff"/><stop offset="0.3" stop-color="' + inner + '"/><stop offset="1" stop-color="' + outer + '" stop-opacity="0"/></radialGradient></defs>'
+            + '<circle cx="50" cy="50" r="30" fill="url(#' + uid + ')"/>' + (ring ? '<circle cx="50" cy="50" r="46" fill="none" stroke="' + ring + '" stroke-width="2.4"/>' : '');
+        layer.appendChild(svg);
+        anims.push(svg.animate([{ transform: T + 'scale(0.3)', opacity: 1 }, { transform: T + 'scale(1)', opacity: 1, offset: 0.35 }, { transform: T + 'scale(1.2)', opacity: 0 }], { duration: ms, easing: 'cubic-bezier(0.2,0.8,0.3,1)', fill: 'forwards' }));
+    }
+    function hitShieldArc(layer, x, y, w, broken, anims) {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'arcane-hit-core'); svg.setAttribute('viewBox', '0 0 120 60');
+        svg.style.cssText = 'left:' + x + 'px; top:' + y + 'px; width:' + w + 'px; height:' + (w / 2) + 'px;';
+        svg.innerHTML = '<path d="M8 54 Q60 -10 112 54" fill="none" stroke="#e0f2fe" stroke-width="3" stroke-linecap="round"/><path d="M18 54 Q60 4 102 54" fill="none" stroke="#7dd3fc" stroke-opacity="0.6" stroke-width="1.5"/>'
+            + (broken ? '<path d="M52 14 L58 28 L50 34 L60 50 M66 16 L62 30 L72 38" fill="none" stroke="#fff" stroke-width="2"/>' : '');
+        layer.appendChild(svg);
+        anims.push(svg.animate(broken
+            ? [{ transform: T + 'scale(0.9)', opacity: 0 }, { transform: T + 'scale(1)', opacity: 1, offset: 0.2 }, { transform: T + 'scale(1.02)', opacity: 1, offset: 0.4 }, { transform: T + 'scale(1.25,0.8) translateY(14px)', opacity: 0 }]
+            : [{ transform: T + 'scale(0.85)', opacity: 0 }, { transform: T + 'scale(1)', opacity: 1, offset: 0.25 }, { transform: T + 'scale(1.06)', opacity: 0 }],
+            { duration: broken ? 520 : 420, easing: 'ease-out', fill: 'forwards' }));
+    }
+    function hitBlockSpark(layer, x, y, anims) {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'arcane-hit-core'); svg.setAttribute('viewBox', '0 0 100 100');
+        svg.style.cssText = 'left:' + x + 'px; top:' + y + 'px; width:70px; height:70px;';
+        svg.innerHTML = '<g stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M50 14V36M50 64V86M14 50H36M64 50H86"/></g><g stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"><path d="M26 26L38 38M62 62L74 74M74 26L62 38M26 74L38 62"/></g>';
+        layer.appendChild(svg);
+        anims.push(svg.animate([{ transform: T + 'scale(0.5) rotate(0deg)', opacity: 1 }, { transform: T + 'scale(1.1) rotate(25deg)', opacity: 0 }], { duration: 260, easing: 'ease-out', fill: 'forwards' }));
+    }
+
+    // 目标硬直：只动独立 translate/rotate 属性，不覆盖 breathe/前摇等 transform animation
+    function hitRecoil(dom, isHero, kind, tier, anims) {
+        const dir = isHero ? 1 : -1; // 敌方向上（远离我方）、英雄向下
+        let kf, ms;
+        if (kind === 'dodge') {
+            const dx = (Math.random() < 0.5 ? -1 : 1) * 30;
+            kf = [{ translate: '0 0' }, { translate: dx + 'px 0', offset: 0.2 }, { translate: dx + 'px 0', offset: 0.55 }, { translate: '0 0' }]; ms = 520;
+        } else if (kind === 'block') { kf = [{ translate: '0 0' }, { translate: '0 ' + (dir * 3) + 'px', offset: 0.2 }, { translate: '0 0' }]; ms = 160; }
+        else if (kind === 'shield') { kf = [{ translate: '0 0' }, { translate: '0 ' + (dir * 2) + 'px', offset: 0.25 }, { translate: '0 0' }]; ms = 180; }
+        else if (tier === 1) { kf = [{ translate: '0 0' }, { translate: '2px ' + (dir * 3) + 'px', offset: 0.2 }, { translate: '-1px 0' , offset: 0.5 }, { translate: '0 0' }]; ms = 200; }
+        else if (tier === 2) { kf = [{ translate: '0 0', rotate: '0deg' }, { translate: '4px ' + (dir * 9) + 'px', rotate: (dir * -3) + 'deg', offset: 0.18 }, { translate: '-2px ' + (dir * 2) + 'px', rotate: (dir * 1) + 'deg', offset: 0.5 }, { translate: '0 0', rotate: '0deg' }]; ms = 360; }
+        else { kf = [{ translate: '0 0', rotate: '0deg' }, { translate: '7px ' + (dir * 18) + 'px', rotate: (dir * -6) + 'deg', offset: 0.14 }, { translate: '6px ' + (dir * 16) + 'px', rotate: (dir * -5) + 'deg', offset: 0.36 }, { translate: '-3px ' + (dir * 3) + 'px', rotate: (dir * 1.5) + 'deg', offset: 0.66 }, { translate: '0 0', rotate: '0deg' }]; ms = 560; }
+        dom.classList.add('arcane-hit-recoil');
+        const a = dom.animate(kf, { duration: ms, easing: 'cubic-bezier(0.2,0.7,0.3,1)', composite: 'replace' });
+        anims.push(a);
+        after(ms + 20, () => dom.classList.remove('arcane-hit-recoil'));
+        // 白闪：受伤以上一次短闪，重创两次；轻伤不闪
+        if (kind === 'hp' && tier >= 2) {
+            anims.push(dom.animate([{ filter: 'brightness(2.2) saturate(0)' }, { filter: 'brightness(2.2) saturate(0)', offset: 0.45 }, { filter: 'none', offset: 0.5 }, tier === 3 ? { filter: 'brightness(1.8) saturate(0.3)', offset: 0.75 } : { filter: 'none', offset: 0.75 }, { filter: 'none' }], { duration: tier === 3 ? 230 : 110 }));
+        }
+    }
+    function hitDodgeGhost(layer, dom, anims) {
+        const r = dom.getBoundingClientRect();
+        const g = document.createElement('div');
+        g.style.cssText = 'position:absolute; left:' + r.left + 'px; top:' + r.top + 'px; width:' + r.width + 'px; height:' + r.height + 'px; opacity:0.45; filter:grayscale(1) brightness(1.5); display:flex; align-items:center; justify-content:center; font-size:' + getComputedStyle(dom).fontSize + ';';
+        g.innerHTML = dom.innerHTML.replace(/ id="[^"]*"/g, '');
+        layer.appendChild(g);
+        anims.push(g.animate([{ opacity: 0.45, transform: 'none' }, { opacity: 0, transform: 'scale(1.06)' }], { duration: 380, easing: 'ease-out', fill: 'forwards' }));
+    }
+
+    // 每个目标独立视觉（不含音效与震屏）
+    function hitVisual(layer, r, h, anims, timers) {
+        const dom = domOf(r.targetId); if (!dom) return;
+        const isHero = String(r.targetId).startsWith('h');
+        const slot = stackSlot(r.targetId), p = hitAnchor(dom, slot), c = p.c;
+        const cy = c.top + c.h * 0.45;
+        if (h.kind === 'dodge') {
+            hitDodgeGhost(layer, dom, anims);
+            burst(8, () => ({ x: c.x + rnd(-20, 20), y: c.bottom - 10, vx: rnd(-1.2, 1.2), vy: rnd(-0.8, -0.2), drag: 0.96, decay: 0.03, size: rnd(10, 18), shape: 'smoke', blend: 'source-over', color: 'rgba(148,163,184,0.35)' }));
+            hitRecoil(dom, isHero, 'dodge', 0, anims);
+            const el = hitEl(layer, 'arcane-hit-num word dodge', '闪避', p.x, p.y);
+            anims.push(el.animate(NUM_KF.dodge, { duration: NUM_MS.dodge, easing: 'ease-out', fill: 'forwards' }));
+            return;
+        }
+        if (h.kind === 'block') {
+            hitBlockSpark(layer, c.x, cy, anims);
+            burst(6, () => { const a = rnd(0, 6.283), s = rnd(3, 6); return { x: c.x, y: cy, vx: Math.cos(a) * s, vy: Math.sin(a) * s, drag: 0.86, decay: 0.09, size: 1.6, shape: 'streak', color: '#f1f5f9' }; });
+            hitRecoil(dom, isHero, 'block', 0, anims);
+            const el = hitEl(layer, 'arcane-hit-num word block', '格挡', p.x, p.y);
+            anims.push(el.animate(NUM_KF.block, { duration: NUM_MS.block, easing: 'ease-out', fill: 'forwards' }));
+            return;
+        }
+        // 护盾层反馈（只扣盾 / 盾+血 共用）
+        if (h.shieldDmg > 0) {
+            hitShieldArc(layer, c.x, c.top + c.h * 0.35, Math.max(70, c.w * 1.1), h.shieldBroken, anims);
+            if (h.shieldBroken) burst(14, () => { const a = rnd(-2.8, -0.3), s = rnd(2, 5); return { x: c.x + rnd(-24, 24), y: c.top + c.h * 0.3, vx: Math.cos(a) * s, vy: Math.sin(a) * s, grav: 0.18, drag: 0.95, decay: 0.03, size: rnd(4, 7), vr: rnd(-0.2, 0.2), shape: 'shard', color: '#e0f2fe' }; });
+            else burst(5, () => ({ x: c.x + rnd(-18, 18), y: c.top + c.h * 0.3, vx: rnd(-1, 1), vy: rnd(-1.5, -0.5), drag: 0.93, decay: 0.06, size: rnd(1, 2), color: '#bae6fd' }));
+        }
+        if (h.kind === 'shield') {
+            hitRecoil(dom, isHero, 'shield', 0, anims);
+            const el = hitEl(layer, 'arcane-hit-num shield', '-' + h.shieldDmg, p.x, p.y);
+            anims.push(el.animate(NUM_KF.shield, { duration: NUM_MS.shield, easing: 'ease-out', fill: 'forwards' }));
+            if (h.shieldBroken) { const b = hitEl(layer, 'arcane-hit-num word break', '破盾', p.x, p.y - 20); anims.push(b.animate(NUM_KF.tag, { duration: NUM_MS.tag, easing: 'ease-out', fill: 'forwards' })); }
+            return;
+        }
+        // 实际扣血：闪芯/冲击环/粒子按量级；修饰改色
+        const col = h.burst ? ['#fef08a', '#facc15', '#fffbeb'] : h.crit ? ['#fdba74', '#f97316', '#fed7aa'] : ['#fecdd3', '#e11d48', '#fda4af'];
+        const size = [0, 56, 96, 140][h.tier];
+        hitCore(layer, c.x, cy, size, col[0], col[1], h.tier >= 2 ? col[2] : null, [0, 200, 300, 420][h.tier], anims);
+        if (h.tier >= 2) burst(h.tier === 3 ? 16 : 7, () => { const a = rnd(0, 6.283), s = rnd(3, h.tier === 3 ? 9 : 6); return { x: c.x, y: cy, vx: Math.cos(a) * s, vy: Math.sin(a) * s, drag: 0.88, decay: rnd(0.05, 0.08), size: rnd(1.2, 2.2), shape: 'streak', color: pick(col) }; });
+        if (h.tier === 3) burst(4, () => ({ x: c.x + rnd(-16, 16), y: cy + rnd(-10, 10), vx: rnd(-0.4, 0.4), vy: rnd(-0.8, -0.3), drag: 0.98, decay: 0.014, size: rnd(14, 22), shape: 'smoke', blend: 'source-over', color: 'rgba(30,20,24,0.5)' }));
+        if (h.burst) burst(10, () => { const a = rnd(0, 6.283), s = rnd(1, 3); return { x: c.x, y: cy, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, drag: 0.95, decay: 0.03, size: rnd(1.5, 2.5), color: pick(['#fffbeb', '#fde047']) }; });
+        // 重创：闪芯先亮，数字与硬直在 60ms 定帧后弹出
+        const stopMs = h.tier === 3 ? HIT_STOP_MS : 0;
+        const pop = () => {
+            hitRecoil(dom, isHero, 'hp', h.tier, anims);
+            const cls = 'arcane-hit-num l' + h.tier + (h.burst ? ' burst' : h.crit ? ' crit' : '');
+            const el = hitEl(layer, cls, '-' + h.hpDmg, p.x, p.y);
+            let kf = NUM_KF[h.tier];
+            if (h.crit && !h.burst) kf = kf.map(f => Object.assign({}, f, { transform: f.transform + ' rotate(-5deg)' }));
+            anims.push(el.animate(kf, { duration: NUM_MS[h.tier], easing: 'cubic-bezier(0.2,0.8,0.3,1)', fill: 'forwards' }));
+            const fs = [0, 18, 26, 36][h.tier];
+            if (h.crit || h.burst) {
+                const t = hitEl(layer, 'arcane-hit-tag ' + (h.burst ? 'burst' : 'crit'), h.burst ? '爆发' : '暴击', p.x, p.y - fs * 0.5 - 22);
+                anims.push(t.animate(NUM_KF.tag, { duration: NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }));
+            }
+            if (h.shieldDmg > 0) {
+                const s = hitEl(layer, 'arcane-hit-num shield sub', '盾-' + h.shieldDmg, p.x + fs * 1.1 + 18, p.y + fs * 0.45 + 4);
+                anims.push(s.animate(NUM_KF.shield, { duration: NUM_MS.shield, easing: 'ease-out', fill: 'forwards' }));
+            }
+        };
+        if (stopMs) timers.push(after(stopMs, pop)); else pop();
+    }
+
+    // 群体同一拍点：只出一次主音与一次震动，取最重结果
+    function hitAudio(list) {
+        const score = h => h.kind === 'hp' ? 10 + h.tier * 10 : h.kind === 'shield' ? (h.shieldBroken ? 15 : 5) : h.kind === 'block' ? 3 : 1;
+        const top = list.reduce((a, b) => score(b) > score(a) ? b : a);
+        const anyBreak = list.some(h => h.shieldBroken), anyCrit = list.some(h => h.crit), anyBurst = list.some(h => h.burst);
+        if (top.kind === 'dodge') { whoosh(0, { f0: 900, f1: 2600, q: 1.1, dur: 0.2, vol: 0.28, peak: 0.08, pan: -0.3, pan1: 0.3 }); return; }
+        if (top.kind === 'block') { click(0, 0.9, 2500, 0.02); tone(0, { type: 'square', f0: 900, dur: 0.05, vol: 0.06, cut: true }); tone(0.005, { type: 'triangle', f0: 1800, f1: 1650, dur: 0.14, vol: 0.05, wet: 0.3 }); return; }
+        if (top.kind === 'shield' && !anyBreak) { crystal(0, 1900, 0.1); tone(0, { f0: 1200, f1: 900, dur: 0.16, vol: 0.05, wet: 0.5 }); }
+        if (top.kind === 'hp') {
+            if (top.tier === 1) { click(0, 0.5, 3800, 0.012); kick(0, { hi: 190, lo: 95, pd: 0.02, dur: 0.08, vol: 0.32, drive: 2 }); }
+            else if (top.tier === 2) { click(0, 0.7, 3400); kick(0, { hi: 220, lo: 58, pd: 0.03, dur: 0.2, vol: 0.65, drive: 3 }); crunch(0, { f: 1400, f1: 600, q: 1.2, dur: 0.09, vol: 0.32 }); }
+            else { click(0, 0.85, 3000); kick(0, { hi: 170, lo: 36, pd: 0.05, dur: 0.44, vol: 1, drive: 4 }); boom(0.004, { f0: 1800, f1: 110, dur: 0.48, vol: 0.5, wet: 0.2 }); crunch(0, { f: 900, f1: 300, q: 1, dur: 0.15, vol: 0.45 }); }
+        }
+        if (anyBreak) { crunch(0, { f: 3500, f1: 1200, q: 2, dur: 0.18, vol: 0.4, drive: 8 }); [2600, 1900, 1300].forEach((f, i) => crystal(0.03 + i * 0.04, f, 0.07)); }
+        if (anyBurst) { chime(0, 1320, 0.6, 0.07); tone(0, { f0: 660, f1: 990, dur: 0.25, vol: 0.05, wet: 0.6 }); }
+        else if (anyCrit) { tone(0, { type: 'square', f0: 2400, f1: 1500, dur: 0.07, vol: 0.05 }); click(0, 0.6, 7000, 0.006); crystal(0.012, 3200, 0.07); }
+    }
+
+    function playHitFeedback(results, opts = {}) {
+        const list = (Array.isArray(results) ? results : [results]).filter(Boolean);
+        const anims = [], timers = [];
+        const layer = hitNumLayer();
+        const hs = list.map(classifyHit);
+        // 拍点：数值文本、血条、闪芯、硬直、主音 同一帧
+        if (opts.onBeat) opts.onBeat(list);
+        list.forEach((r, i) => { if (hs[i].hpDmg > 0) hitBar(r.targetId, r.hpBefore, r.hpAfter, r.maxHp); });
+        if (hs.some(h => h.tier === 3)) { shake('light'); fxEngine.hitStop = Math.max(fxEngine.hitStop || 0, HIT_STOP_MS); }
+        list.forEach((r, i) => hitVisual(layer, r, hs[i], anims, timers));
+        if (list.length) hitAudio(hs);
+        const handle = {
+            doneAt: Date.now() + HIT_LIFE_MS,
+            cancel() {
+                timers.forEach(id => { clearTimeout(id); S.timers.delete(id); });
+                anims.forEach(a => a.cancel());
+                layer.remove(); S.layers.delete(layer);
+                H.handles.delete(handle); S.handles.delete(handle);
+                releaseIdleCanvas();
+            }
+        };
+        H.handles.add(handle); S.handles.add(handle);
+        timers.push(after(HIT_LIFE_MS, () => handle.cancel()));
+        return handle;
+    }
+    // 全局清理：残影计时立即停止（重置不补播旧伤害）
+    function clearHitFeedback() {
+        H.ghosts.forEach(st => { clearTimeout(st.timer); if (st.el.isConnected) { st.el.style.transition = 'none'; } });
+        H.ghosts.clear(); H.stacks.clear();
+        H.handles.forEach(h => h.cancel()); H.handles.clear();
+        document.querySelectorAll('.arcane-hit-recoil').forEach(el => el.classList.remove('arcane-hit-recoil'));
+    }
+    // ===== 命中结果反馈 END =====
+    // ===== 新技能实现 END =====
+
+    // ===== 对外接口（与正式版同名同参；不将演示卡片或占位数据带入模块） =====
+    function isArcaneSkillFx(fxTag) { return ARCANE_TAGS.indexOf(fxTag) !== -1; }
+    function playArcaneSkillFx(fxTag, caster, targets, isReaction = false) {
+        if (!isArcaneSkillFx(fxTag)) return null;
+        // 接入点 3：按 fxTag 分派到上方新技能函数，返回它的 handle。
+        return null;
+    }
+    function playArcaneProjectile(type, fromDom, toDom, dodged = false) {
+        if (!fromDom || !toDom || !fromDom.getBoundingClientRect || !toDom.getBoundingClientRect) return Promise.resolve();
+        const token = combatToken;
+        ensureCanvas(); ensureDriver();
+        if (type === 'fire') fireProjectile(fromDom, toDom, !!dodged, token);
+        else if (type === 'enemy_spell') enemySpellProjectile(fromDom, toDom, !!dodged, token);
+        const beat = type === 'fire' ? 580 : 480;
+        return new Promise(res => {
+            const id = setTimeout(() => { S.rawTimers.delete(id); res(); }, beat);
+            S.rawTimers.set(id, res);
+        });
+    }
+    function clearArcaneFx() {
+        clearHitFeedback();
+        S.timers.forEach(id => clearTimeout(id)); S.timers.clear();
+        S.rawTimers.forEach((resolve, id) => { clearTimeout(id); resolve(); }); S.rawTimers.clear();
+        S.intervals.forEach(id => clearInterval(id)); S.intervals.clear();
+        S.flights.length = 0; S.particles.length = 0;
+        S.particleTimer = null; S.particleUntil = 0;
+        if (S.driver) { const idx = fxEngine.particles.indexOf(S.driver); if (idx >= 0) fxEngine.particles.splice(idx, 1); S.driver = null; }
+        S.handles.forEach(h => { if (h && h.cancel) h.cancel(); }); S.handles.clear();
+        S.layers.forEach(d => d.remove()); S.layers.clear();
+        S.anchors.forEach(d => d.remove()); S.anchors.clear();
+        S.flashes.forEach(el => el.classList.remove('arcane-flash-cold', 'arcane-flash-heal')); S.flashes.clear();
+        S.shakeEls.forEach(el => el.classList.remove('arcane-shake-light', 'arcane-shake-heavy', 'arcane-shake-quake')); S.shakeEls.clear();
+        if (S.dark) { S.dark.remove(); S.dark = null; }
+        if (S.canvas) { S.canvas.remove(); S.canvas = null; S.ctx = null; }
+        if (audioCtx) { audioCtx.close(); audioCtx = null; sfxBus = null; sfxVerb = null; sfxNoise = null; }
+    }
+    window.isArcaneSkillFx = isArcaneSkillFx;
+    window.playArcaneSkillFx = playArcaneSkillFx;
+    window.playArcaneProjectile = playArcaneProjectile;
+    window.clearArcaneFx = clearArcaneFx;
+    window.playHitFeedback = playHitFeedback;
+    window.classifyHit = classifyHit;
+    // 演示控制区的旧版基线复刻需要模块内工具（不移植）
+    window.__hitDemoTools = { shake, click, kick, after };
+    return { isArcaneSkillFx, playArcaneSkillFx, playArcaneProjectile, clearArcaneFx, playHitFeedback, classifyHit };
+})();
+    // ===== 可移植特效模块 END =====
+
+    // ===== 演示控制 BEGIN：模拟结算数据、场景按钮、来袭轨迹、旧版基线；不参与移植 =====
+    // 每个场景：init 为点击前恢复的初值；beats 为命中拍点序列，每拍一组已结算结果。
+    // 结果字段由 settle() 按主线 calculateDamage 口径（先扣盾再扣血）从"最终伤害"推出——
+    // 暴击/爆发翻倍已体现在 dmg 中，反馈组件不再乘倍率。
+    const ATK = 'e5';                       // 默认来袭者（敌方攻击英雄时）
+    const HERO_ATK = 'h2';                  // 默认来袭者（我方攻击敌方时）
+    const SCENES = [
+        { name: '旧版基线', level: '对照', desc: '统一红字 + .shake + 单层血条', legacy: true, init: { e5: { hp: 1000, maxHp: 1000 } }, beats: [[{ t: 'e5', dmg: 250 }]] },
+        { name: '新版 · 轻伤', level: 'L1', desc: '5% maxHp：小弹字、短接触', init: { e5: { hp: 1000, maxHp: 1000 } }, beats: [[{ t: 'e5', dmg: 50 }]] },
+        { name: '新版 · 受伤', level: 'L1+', desc: '25%：闪芯+冲击环+后仰', init: { e5: { hp: 1000, maxHp: 1000 } }, beats: [[{ t: 'e5', dmg: 250 }]] },
+        { name: '新版 · 重创', level: 'L2', desc: '60%：重字回弹+定帧+低频', init: { e5: { hp: 1000, maxHp: 1000 } }, beats: [[{ t: 'e5', dmg: 600 }]] },
+        { name: '同伤 · 普通', level: '修饰', desc: '250 / 1000，无修饰', init: { e5: { hp: 1000, maxHp: 1000 } }, beats: [[{ t: 'e5', dmg: 250 }]] },
+        { name: '同伤 · 暴击', level: '修饰', desc: '250 / 1000，橙金+暴击标', init: { e5: { hp: 1000, maxHp: 1000 } }, beats: [[{ t: 'e5', dmg: 250, crit: true }]] },
+        { name: '同伤 · 爆发', level: '修饰', desc: '250 / 1000，金白能量', init: { e5: { hp: 1000, maxHp: 1000 } }, beats: [[{ t: 'e5', dmg: 250, burst: true }]] },
+        { name: '小额暴击', level: '修饰', desc: '30 / 1000 暴击：仍是轻伤字号', init: { e5: { hp: 1000, maxHp: 1000 } }, beats: [[{ t: 'e5', dmg: 30, crit: true }]] },
+        { name: '闪避', level: '结果', desc: '来袭落空、残影烟尘、不扣血', init: { e5: { hp: 1000, maxHp: 1000 } }, beats: [[{ t: 'e5', dodge: true }]] },
+        { name: '完全格挡', level: '结果', desc: 'hp/盾均 0，硬质接触', init: { e5: { hp: 1000, maxHp: 1000 } }, beats: [[{ t: 'e5', block: true }]] },
+        { name: '护盾受损未破', level: '结果', desc: '盾 200 → 120', init: { e5: { hp: 1000, maxHp: 1000, shield: 200 } }, beats: [[{ t: 'e5', dmg: 80 }]] },
+        { name: '破盾 · 无扣血', level: '结果', desc: '盾 100 → 0，恰好打穿', init: { e5: { hp: 1000, maxHp: 1000, shield: 100 } }, beats: [[{ t: 'e5', dmg: 100 }]] },
+        { name: '破盾 · 并扣血', level: '结果', desc: '契约示例：盾100+血250 暴击', init: { e5: { hp: 800, maxHp: 1000, shield: 100 } }, beats: [[{ t: 'e5', dmg: 350, crit: true }]] },
+        { name: '同伤 · 不同 maxHp', level: '量级', desc: '120 打 2000 / 600 / 200', init: { e4: { hp: 2000, maxHp: 2000 }, e5: { hp: 600, maxHp: 600 }, e6: { hp: 200, maxHp: 200 } }, beats: [[{ t: 'e4', dmg: 120 }, { t: 'e5', dmg: 120 }, { t: 'e6', dmg: 120 }]] },
+        { name: '边界 10/50/51%', level: '量级', desc: '100=受伤 500=受伤 510=重创', init: { e4: { hp: 1000, maxHp: 1000 }, e5: { hp: 1000, maxHp: 1000 }, e6: { hp: 1000, maxHp: 1000 } }, beats: [[{ t: 'e4', dmg: 100 }, { t: 'e5', dmg: 500 }, { t: 'e6', dmg: 510 }]] },
+        { name: '边界 9.9%', level: '量级', desc: '99 / 1000 = 轻伤', init: { e5: { hp: 1000, maxHp: 1000 } }, beats: [[{ t: 'e5', dmg: 99 }]] },
+        { name: '连续三段', level: '多段', desc: '盾吸收→受伤→重创，残影衔接', gap: 260, init: { e5: { hp: 1000, maxHp: 1000, shield: 60 } }, beats: [[{ t: 'e5', dmg: 60 }], [{ t: 'e5', dmg: 150 }], [{ t: 'e5', dmg: 520 }]] },
+        { name: '连续轻击 ×5', level: '多段', desc: '数字错位、残影不回跳', gap: 160, init: { e5: { hp: 1000, maxHp: 1000 } }, beats: [[{ t: 'e5', dmg: 42 }], [{ t: 'e5', dmg: 55 }], [{ t: 'e5', dmg: 38 }], [{ t: 'e5', dmg: 61 }], [{ t: 'e5', dmg: 47 }]] },
+        { name: '群体混合结果', level: '群体', desc: '闪避/扣盾/轻伤/重创 同一拍点', init: { e1: { hp: 300, maxHp: 300 }, e2: { hp: 300, maxHp: 300, shield: 120 }, e4: { hp: 1000, maxHp: 1000 }, e6: { hp: 300, maxHp: 300 } }, beats: [[{ t: 'e1', dodge: true }, { t: 'e2', dmg: 80 }, { t: 'e4', dmg: 60 }, { t: 'e6', dmg: 200 }]] },
+        { name: '英雄受击 · 混合', level: '英雄', desc: '扣盾/轻伤/受伤/重创 四卡', from: 'e5', init: { h1: { hp: 100, maxHp: 100, shield: 55 }, h2: { hp: 180, maxHp: 180, shield: 0 }, h3: { hp: 140, maxHp: 140 }, h4: { hp: 140, maxHp: 140 } }, beats: [[{ t: 'h1', dmg: 30 }, { t: 'h2', dmg: 12 }, { t: 'h3', dmg: 40 }, { t: 'h4', dmg: 90 }]] },
+        { name: '英雄 · 破盾并扣血', level: '英雄', desc: '埃利奥特 盾55 → 0，血 -25', from: 'e5', init: { h1: { hp: 100, maxHp: 100, shield: 55 } }, beats: [[{ t: 'h1', dmg: 80 }]] },
+        { name: '英雄 · 闪避/格挡', level: '英雄', desc: '两卡零伤害但结果不同', from: 'e5', init: {}, beats: [[{ t: 'h3', dodge: true }, { t: 'h4', block: true }]] },
+    ];
+
+    const entityOf = id => heroesData.concat(enemiesData).find(e => e.id === id);
+    // 按主线 calculateDamage 口径：先扣盾、余量扣血；hp 下限 0
+    function settle(spec) {
+        const e = entityOf(spec.t);
+        const base = { targetId: e.id, maxHp: e.maxHp, hpBefore: e.hp, hpAfter: e.hp, hpDmg: 0, shieldBefore: e.shield || 0, shieldAfter: e.shield || 0, shieldDmg: 0, isCrit: !!spec.crit, isBurst: !!spec.burst };
+        if (spec.dodge) return Object.assign(base, { outcome: 'dodge' });
+        if (spec.block) return Object.assign(base, { outcome: 'block' });
+        let dmg = spec.dmg;
+        const shieldDmg = Math.min(e.shield || 0, dmg); dmg -= shieldDmg;
+        const hpDmg = Math.min(e.hp, dmg);
+        e.shield = (e.shield || 0) - shieldDmg; e.hp -= hpDmg;
+        return Object.assign(base, { outcome: 'hit', hpAfter: e.hp, hpDmg, shieldAfter: e.shield, shieldDmg });
+    }
+    // 宿主数值文本刷新（正式版对应 updateUI；这里只刷 HP 文本，血条由组件处理）
+    function refreshText(list) {
+        list.forEach(r => {
+            const e = entityOf(r.targetId), el = document.getElementById(e.id + '-hp-text');
+            if (!el) return;
+            if (e.id.startsWith('h')) el.innerHTML = Math.floor(e.hp) + (e.shield > 0 ? '<span class="text-slate-300 ml-0.5 text-[7px] sm:text-[9px]">(盾' + e.shield + ')</span>' : '');
+            else el.textContent = Math.floor(e.hp) + '/' + e.maxHp + (e.shield > 0 ? ' 盾' + e.shield : '');
+        });
+    }
+
+    // 来袭轨迹：所有场景（含旧版）共用同一条 180ms 短弹道，保证比较只差在"结果反馈"
+    const INCOMING_MS = 180;
+    let demoTimers = [], unlockTimer = null, activeHandles = [];
+    function demoAfter(ms, fn) { const token = combatToken; const id = setTimeout(() => { if (token === combatToken) fn(); }, ms); demoTimers.push(id); return id; }
+    function incoming(fromId, targetIds) {
+        const from = getEntitySpriteDom(fromId); if (!from) return;
+        const fr = from.getBoundingClientRect();
+        targetIds.forEach(id => {
+            const to = getEntitySpriteDom(id); if (!to) return;
+            const tr = to.getBoundingClientRect();
+            const line = document.createElement('div');
+            const ax = fr.left + fr.width / 2, ay = fr.top + fr.height / 2, bx = tr.left + tr.width / 2, by = tr.top + tr.height * 0.45;
+            const len = Math.hypot(bx - ax, by - ay), ang = Math.atan2(by - ay, bx - ax) * 180 / Math.PI;
+            line.setAttribute('data-arcane-fx', 'demo-incoming');
+            line.style.cssText = 'position:fixed; left:' + ax + 'px; top:' + ay + 'px; width:46px; height:3px; margin-top:-1.5px; border-radius:2px; pointer-events:none; z-index:56; transform-origin:0 50%; background:linear-gradient(90deg, transparent, #e2e8f0); box-shadow:0 0 8px #e2e8f0;';
+            document.body.appendChild(line);
+            line.animate([{ transform: 'rotate(' + ang + 'deg) translateX(0)', opacity: 0.2 }, { transform: 'rotate(' + ang + 'deg) translateX(' + (len - 46) + 'px)', opacity: 1 }], { duration: INCOMING_MS, easing: 'cubic-bezier(0.5,0,0.9,0.6)', fill: 'forwards' });
+            demoAfter(INCOMING_MS + 20, () => line.remove());
+        });
+    }
+    // 旧版基线：复刻正式版 createFloatingText(-N, text-rose-500) + .shake 0.4s + 单层血条 300/500ms 过渡 + atk2 近似音
+    function legacyFeedback(list) {
+        const tools = window.__hitDemoTools;
+        list.forEach(r => {
+            const dom = getEntitySpriteDom(r.targetId); if (!dom) return;
+            const rect = dom.getBoundingClientRect();
+            const f = document.createElement('div');
+            f.setAttribute('data-arcane-fx', 'demo-legacy');
+            f.className = 'text-sm sm:text-2xl font-bold text-rose-500';
+            f.style.cssText = 'position:fixed; pointer-events:none; z-index:60; white-space:nowrap; text-shadow:0 2px 4px rgba(0,0,0,0.8); left:' + (rect.left + rect.width / 2 + (Math.random() - 0.5) * 40) + 'px; top:' + rect.top + 'px;';
+            f.textContent = r.hpDmg > 0 ? '-' + r.hpDmg : (r.shieldDmg > 0 ? '-' + r.shieldDmg + ' 破盾' : '-0');
+            document.body.appendChild(f);
+            f.animate([{ opacity: 0, transform: 'translateY(5px) scale(0.8)' }, { opacity: 1, transform: 'translateY(-10px) scale(1.2)', offset: 0.2 }, { opacity: 1, transform: 'translateY(-20px) scale(1)', offset: 0.8 }, { opacity: 0, transform: 'translateY(-30px) scale(0.8)' }], { duration: 1000, easing: 'ease-out', fill: 'forwards' });
+            demoAfter(1200, () => f.remove());
+            dom.animate([{ translate: '0 0' }, { translate: '-3px 0', rotate: '-1deg', offset: 0.25 }, { translate: '3px 0', rotate: '1deg', offset: 0.5 }, { translate: '-3px 0', rotate: '-0.5deg', offset: 0.75 }, { translate: '0 0' }], { duration: 400, easing: 'ease-in-out' });
+            const bar = document.getElementById(r.targetId + '-hp-bar'), ghost = document.getElementById(r.targetId + '-hp-ghost');
+            if (ghost) ghost.style.display = 'none';   // 旧版无残影
+            if (bar) { bar.style.transition = 'width ' + (r.targetId.startsWith('h') ? 300 : 500) + 'ms ease-out'; bar.style.width = Math.max(0, r.hpAfter / r.maxHp * 100) + '%'; }
+        });
+        tools.click(0, 0.6, 3200); tools.kick(0, { hi: 200, lo: 70, pd: 0.03, dur: 0.16, vol: 0.55, drive: 3 });
+    }
+
+    function lockCards(locked) { document.querySelectorAll('#skill-list .card').forEach(card => { card.disabled = locked; }); }
+    function clearDemo() {
+        combatToken++;
+        demoTimers.forEach(clearTimeout); demoTimers = [];
+        clearTimeout(unlockTimer); unlockTimer = null;
+        activeHandles = [];
+        clearArcaneFx();
+        document.querySelectorAll('[data-arcane-fx^="demo-"]').forEach(el => el.remove());
+        cancelAnimationFrame(fxEngine.animationFrameId); fxEngine.animationFrameId = null;
+        fxEngine.particles.length = 0; fxEngine.hitStop = 0; fxEngine.lastFrameTime = 0;
+        fxEngine.ctx.clearRect(0, 0, fxEngine.canvas.width, fxEngine.canvas.height);
+    }
+    function setStatus(text) { const s = document.getElementById('hit-status'); if (s) s.textContent = text; }
+    function playScene(scene) {
+        clearDemo();
+        initUI(scene.init);                     // 点击前恢复该场景初值，血条立即到位
+        setStatus(scene.name);
+        const gap = scene.gap || 0;
+        let t = 0;
+        scene.beats.forEach((beat, i) => {
+            const targets = beat.map(s => s.t);
+            const from = scene.from || (targets[0].startsWith('h') ? ATK : HERO_ATK);
+            const start = i === 0 ? 0 : t;
+            demoAfter(start, () => incoming(from, targets));
+            demoAfter(start + INCOMING_MS, () => {
+                const list = beat.map(settle);
+                if (scene.legacy) { refreshText(list); legacyFeedback(list); }
+                else activeHandles.push(playHitFeedback(list, { onBeat: refreshText }));
+            });
+            t = start + INCOMING_MS + gap;
+        });
+        const total = t + 1300;
+        lockCards(true);
+        unlockTimer = setTimeout(() => { unlockTimer = null; lockCards(false); }, total);
+    }
+    function renderSkillCards() {
+        const list = $('#skill-list');
+        list.replaceChildren();
+        SCENES.forEach(scene => {
+            const button = document.createElement('button');
+            button.className = 'card w-full py-1.5 px-2 bg-slate-900/80 hover:bg-violet-950/60 border border-slate-700/80 hover:border-violet-500/60 rounded-lg text-left transition-all shadow-sm';
+            button.innerHTML = '<div class="flex items-center justify-between gap-1"><span class="text-xs font-bold text-slate-100"></span><span class="text-[9px] font-bold px-1 rounded border border-cyan-500/60 text-cyan-300"></span></div><div class="text-[9px] text-slate-400 truncate"></div>';
+            const labels = button.querySelectorAll('span');
+            labels[0].textContent = scene.name;
+            labels[1].textContent = scene.level;
+            button.lastElementChild.textContent = scene.desc;
+            button.addEventListener('click', () => playScene(scene));
+            list.appendChild(button);
+        });
+    }
+    function resetDemo() {
+        clearDemo();
+        initUI();
+        setStatus('已重置');
+        renderSkillCards();
+    }
+    $('#btn-reset').addEventListener('click', resetDemo);
+    renderSkillCards();
+    window.__hitDemo = { SCENES, playScene, resetDemo };
+    // ===== 演示控制 END =====
+    // 移植：只将新增 arcane- CSS、技能函数、标签与分派合并到正式版已有模块。
+    // 必须同时追加 WEBM_FX_REGISTRY 的 { url: '', scale: 1.0, particles: 'arcane', delay: 蓄势秒数 }。
+    // 技能数据追加 [特效:精确标签]；按技能类型核对默认光效去重与真实反应回调，不改数值规则。
+    // 详细接线、测试与打包步骤见《技能SVG模板使用与快速移植.md》，不是复制整页即可上线。
+    // 正式版已提供 fxEngine / combatToken / getEntitySpriteDom / heroesData / enemiesData，勿重复复制演示宿主。
+  </script>
+</body>
+</html>
