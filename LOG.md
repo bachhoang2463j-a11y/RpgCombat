@@ -3143,3 +3143,17 @@
 - **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：`vm.Script` 全部内联脚本块语法通过；废弃曲线标识（omen-aura/omenDraw/omenRingIn/omenRingOut/omenRise/omenPeel）grep 命中 0；`git diff` 确认 enemyOmenCombo 关键帧、cutin、自爆区域零触碰。IAB（本地静态服务加载）：`classifyEnemyWindup` 19 断言全过（含咆哮＝rose-self、自盲＝null、自X骑签不降档、DoT/麻痹归攻击档）；八类逐项演出——类名/动画名正确、呼吸让位、330ms 冻结 computed filter 均为 30px+50px 双层光晕（八色各自正确）、七类有驱动粒子而红单体零粒子；480ms 冻结余韵 50px+80px；cancel/600ms 自然收尾/中途 `clearArcaneFx` 三路径类名摘除、呼吸恢复、canvas 释放全部通过；`window.setWindupSfx===undefined` 确认无开关。IAB Playwright 原生点击超时为已知现象，本轮全部以页面内 evaluate 驱动，未冒充真实用户输入。
 - **边界**：未动技能数值/AI 选技/结算排序/charge 大招/自爆/我方召唤物路径；图鉴 87 个攻击技能 damageType 全部显式（攻击档零缺失），31 条 dt=null 均为增益档、对前摇无影响；二期（怪物岛 charge 技能特效六变体）不在本轮；README 未改，待用户酒馆实测确认后再更新。
+
+---
+
+## [LOG-264] 2026-11-12 — 打包 v11.3 正则产物 + 工作协定新增版本号递增规则
+
+- **提交**：`1812817`。
+- **核心目的**：用户指出缺打包产物——LOG-263 只改了 `index.html` 未重打包正则 JSON；补打 `regex-前端战斗v11_3.json`（v11_2→v11_3），并把「每次更新版本号提升一位」写入项目工作协定，杜绝后续遗漏。
+- **变更**：
+  - `git mv regex-前端战斗v11_2.json → regex-前端战斗v11_3.json` + `scriptName: 前端战斗v11.2 → 前端战斗v11.3`（id/findRegex 等字段原样保留）。
+  - 重跑 `node build-regex.cjs`（前置 build-tailwind 幂等，index.html 字节未变）：产物压缩 1,453,912 → 1,005,520 字符（-31%），replaceString 更新，敌方前摇七类全部入包。
+  - `AGENTS.md` 新增「五、版本号与打包产物」：每次更新 index.html 必须重跑 build-regex.cjs 且版本号提升一位（文件名 vN_M + scriptName vN.M 同步，禁止同版本号重复打包）、打包后跑产物专项断言再提交、公开版已归档停维护。该文件本次连同用户此前未提交的协定重写（旧 Hook 协定→现行三件套）一并入库。
+- **涉及文件**：`regex-前端战斗v11_3.json`（由 v11_2 重命名并更新）、`AGENTS.md`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：产物专项断言 14/15 直接通过＋1 项经上下文逐字查实：唯一未命中项「红单体三短路」中的 `!==n&&v()` 子串在产物中已实体化为 `!==n&amp;&amp;v()`（管线「所有 & → &amp;」设计所致，实体免疫断言本身通过），三个子串（`"red-single"!==n&&v()`、`"red-single"===`、`"enemy-omen"`）均在压缩体中逐字确认；其余 14 项含围栏加固（裸 ``` 恰 2 个）、实体免疫、内网隔离、七类 kind 字面量、分类判据、monsterAttack 恰好 2 处（资产表+自爆「绝命反扑」上下文）、普通前摇 mp3 注释移除、findRegex 未变全部通过。断言前两轮误报均为单双引号规范化与 mangle 改名（windupKind 为局部变量被压缩改名，属预期）。
+- **边界**：公开版 JSON 与 `test-public-release.cjs`（硬编码公开版路径）未触碰，仅归档留用；Harness 621 项浏览器回归本轮未跑（源码侧已有 IAB 八类验证，产物侧以上述专项断言覆盖）；未动酒馆导入流程，等用户实测。
