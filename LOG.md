@@ -3237,3 +3237,18 @@
 - **设计确认**：仅重创定帧 60ms；残影 450/500ms；数字 JetBrains Mono 粗体描边。
 - **验证**：内联脚本 vm 语法通过；子代理 IAB 冒烟 a–f（classifyHit 8/8、22 场景数值、连击残影单调、中途重置零残留、数字不撞菜单）通过；发现 recoil 类 onfinish 未触发残留、暴击徽标压数字，已改为 after 定时移除并上移徽标（修后仅复验语法）。
 - **未验证**：音色听感、真 Chrome 动画时序；未触碰 index.html（工作区中 index.html 的未提交改动非本轮产生，未纳入提交）、正则产物与 README。
+
+---
+
+## [LOG-270] 2026-11-12 — 攻击身份 × 命中结果分层升级版 Demo v2（现代字效与血雾）
+
+- **提交**：`65014f4`（基于初版 `c4d9e2f` 修正徽标计数）。
+- **核心目的**：在保留 `demo-attack-identity.html` 七类攻击弹道与真实枪声的基础上，针对"现代游戏伤害字体变化 + 血雾 + 命中结果/量级分层"诉求新建 `demo-attack-identity2.html`，让玩家无需读战报即可直观辨识命中结果、伤势轻重、暴击/极限爆发修饰与护盾吸收/破盾状态。
+- **变更**：新建 `demo-attack-identity2.html`——
+  1. **现代斜切渐变字效**：引入 `Barlow Condensed` + `Chakra Petch` 斜体粗窄字体，双层结构（`::before` `attr(data-text)` 硬黑描边投影 + `.arcane-hit-num-fill` 线性渐变填充），按 L1（轻伤 24px）/ L1+（受伤 36px）/ L2（重创 52px）分级配置 Squash & Stretch 挤压回弹动效与错位槽 `stackSlot`；暴击保留量级字号并叠加橙金渐变+斜切斩痕+`暴击`角标，爆发以白金流光+六芒星光晕+`爆发`角标区分。
+  2. **克制战术血雾（`source-over`）**：在 `DRAW` 新增 `bloodMist`（暗红多层渐变雾团）与 `bloodDrop`（随速度/重力弧线旋转的水滴状血花），在 `#arcane-fx-canvas` 上以 `source-over` 混合绘制防止发白；严格限定仅实际扣血（`kind === 'hp'`）随轻/中/重分级喷溅，闪避/格挡/纯护盾吸收绝不出红血。
+  3. **三维度分层与双层血条**：`classifyHit` + `playHitFeedback` 独立解耦结果（`dodge/block/shield/hp`）、量级（`<10% / 10%~50% / >50% maxHp`）与修饰；重构英雄卡与敌方通用双层残影血条（`.arcane-hit-track > .arcane-hit-ghost + .arcane-hit-fill`，停 450ms 收 500ms，连击冻结不回跳）；重创独占 60ms 定帧；群体同拍点通过 `wave` 去重保证只震屏/定帧/主响一次；命中端用 Web Audio 合成 9 类受击/防反/盾裂音色并与发射端枪声样本协同受 `🔊 音开` 开关控制。
+  4. **场景矩阵**：右下 `#skill-list` 分 5 组共 40 项场景（基线对照、修饰与防御结果、口径边界/连击/英雄受击、我→敌七类、敌→我与闪避/跨行/并发压测），点击前自动按场景 `init` 复位。
+- **涉及文件**：`demo-attack-identity2.html`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：内联 JS 经 Node `vm`/Syntax `node --check` 校验通过（1 个内联脚本）；遵循 Demo 免测免审规则未跑自动化测试与代码审查，待用户实机观感确认。
+- **边界**：未修改 `demo-skill-vfx-template.html`、`demo-attack-identity.html`、`demo-hit-feedback.html`、`index.html`、正则包与 `README.md`。
