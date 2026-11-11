@@ -3268,3 +3268,16 @@
 - **涉及文件**：`demo-attack-identity2.html`、`demo-skill-vfx-template.html`、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：Node `node --check` 校验两份文件内联 `<script>` 全部通过；模板 6 项接入锚点唯一性脚本校验通过；遵循 Demo 免测免审规则未跑自动化测试与审查，待用户实机观感确认。
 - **边界**：未修改 `index.html`、`demo-attack-identity.html`、`demo-hit-feedback.html`、正则包与 `README.md`。
+
+---
+
+## [LOG-272] 2026-11-12 — Demo v2 放大低伤害/护盾/闪避/格挡与破盾字号
+
+- **提交**：`8a6e9ae`。
+- **核心目的**：根据实机反馈，放大偏小的轻伤、护盾吸收、闪避/格挡与破盾字号，使其视觉可读性接近受伤/重创与暴击。
+- **变更**：仅 `demo-attack-identity2.html`——
+  - 调整 CSS 字号与字重：`.l1` `15px→20px`（`700`）、`.l2` `19px→23px`、`.l3` `25px→27px`、`.shield` `14px→21px`（`700`）、`.shield.sub` `12px→15px`、`.word`（闪避/格挡）`13px→20px`（`800`）、`.break` `12px→15px`、`.arcane-hit-tag` `10px→12px`。
+  - 同步调整 `stackSlot` 纵向错位步长（`18px→22px`）及 `hitVisual` 内护盾/破盾/暴击角标的竖向间距，保持多段与共存状态不重叠。
+- **涉及文件**：`demo-attack-identity2.html`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：最终编辑后 Node `node --check` 校验内联 `<script>` 通过；未跑自动化测试与审查，待用户实机确认观感。
+- **边界**：未触碰 `demo-skill-vfx-template.html`、`index.html`、正则产物与 `README.md`。
