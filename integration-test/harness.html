@@ -31,10 +31,11 @@
 <script src="fixtures/summon-roster-regression.js"></script>
 <script src="fixtures/opening-roster-regression.js"></script>
 <script src="fixtures/arcane-vfx-regression.js"></script>
+<script src="fixtures/enemy-group-attack-regression.js"></script>
 <script>
 const TEST_PARAMS = new URLSearchParams(location.search);
 const RPG_SOURCE = TEST_PARAMS.get('artifact') === '1'
-  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v11_2.json')
+  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v11_5.json')
   : (TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html');
 /* ==========================================================================
    mock 酒馆助手环境
@@ -2571,12 +2572,13 @@ async function test39() {
     '英雄/敌人编辑器头像兜底 onerror 均为「断循环 + 空值保护」写法');
   check(!/onerror="this\.src='';this\.parentElement\.innerHTML=/.test(src), '旧的裸兜底写法已全部替换（防回归）');
 
-  // 公开版同款加固：公开版为手工分叉维护，曾漏掉本次加固（裸写法在头像不可达时自触发循环、
-  // 每轮 parentElement 为 null 抛 TypeError 刷满诊断探头）——加公开版静态锁防再次漂移
-  const pubSrc = await (await fetch('../index-公开版.html', { cache: 'reload' })).text();
-  eq((pubSrc.match(/onerror="this\.onerror=null;this\.src='';if\(this\.parentElement\)this\.parentElement\.innerHTML=/g) || []).length, 2,
-    '公开版：英雄/敌人编辑器头像兜底 onerror 同为「断循环 + 空值保护」写法');
-  check(!/onerror="this\.src='';this\.parentElement\.innerHTML=/.test(pubSrc), '公开版：旧的裸兜底写法已全部替换（防回归）');
+  // 公开版已归档；仅显式公开版验证时保留原跨版静态锁，非公开版不依赖归档文件。
+  if (TEST_PARAMS.get('version') === 'public') {
+    const pubSrc = await (await fetch('../index-公开版.html', { cache: 'reload' })).text();
+    eq((pubSrc.match(/onerror="this\.onerror=null;this\.src='';if\(this\.parentElement\)this\.parentElement\.innerHTML=/g) || []).length, 2,
+      '公开版：英雄/敌人编辑器头像兜底 onerror 同为「断循环 + 空值保护」写法');
+    check(!/onerror="this\.src='';this\.parentElement\.innerHTML=/.test(pubSrc), '公开版：旧的裸兜底写法已全部替换（防回归）');
+  }
 
   // 功能：按处理器文本构造游离 img（parentElement=null），派发 error。
   // 注意：监听器内抛出的异常不会回传给 dispatchEvent 调用方，而是走 window.onerror —— 故用诊断探头计数判定。
@@ -2776,13 +2778,19 @@ async function test44() {
   const result = await window.runArcaneVfxRegression({ w: rpgWin(), check, eq, mock: MOCK });
   eq(result.pending, [], '秘术专项接口全部落地，无待对齐项');
 }
+async function test45() {
+  head('45 敌方群攻L2+：三级优先级、350ms单次采样与动态目标');
+  if (TEST_PARAMS.get('version') === 'public') { out('info', '公开版已归档，本专项仅验证 index.html 与非公开版产物。'); return; }
+  const result = await window.runEnemyGroupAttackRegression({ w: rpgWin(), check, eq, mock: MOCK });
+  eq(result.pending, [], '敌方群攻专项全部落地，无待对齐项');
+}
 async function runAll() {
   logEl.textContent = '';
   passN = failN = 0;
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45];
   const selectedTests = TEST_PARAMS.has('tests') ? new Set(TEST_PARAMS.get('tests').split(',').map(n => 'test' + n)) : null;
   for (const t of tests) {
     if (selectedTests && !selectedTests.has(t.name)) continue;

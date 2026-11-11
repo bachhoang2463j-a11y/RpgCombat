@@ -818,6 +818,27 @@
     .arcane-shake-light { animation: arcane-s-light 0.18s ease-out; }
     .arcane-shake-heavy { animation: arcane-s-heavy 0.32s ease-out; }
     .arcane-shake-quake { animation: arcane-s-quake 0.55s ease-out; }
+    /* L2+：敌方群攻跨排破框与受击闪色 */
+    @keyframes arcane-f-melee { 0%, 45% { filter: brightness(2.4) saturate(1.9) drop-shadow(0 0 18px #ff2938); } 46%, 100% { filter: none; } }
+    @keyframes arcane-f-ranged { 0%, 45% { filter: brightness(2.6) saturate(1.6) drop-shadow(0 0 20px #facc15); } 46%, 100% { filter: none; } }
+    @keyframes arcane-f-spell { 0%, 45% { filter: brightness(2.7) saturate(1.4) drop-shadow(0 0 20px #e0f2fe) drop-shadow(0 0 34px #38bdf8); } 46%, 100% { filter: none; } }
+    .arcane-flash-melee { animation: arcane-f-melee 0.34s steps(1) both !important; }
+    .arcane-flash-ranged { animation: arcane-f-ranged 0.34s steps(1) both !important; }
+    .arcane-flash-spell { animation: arcane-f-spell 0.38s steps(1) both !important; }
+    .arcane-group-stage { position: absolute; overflow: visible; pointer-events: none; }
+    .arcane-group-charge { position: absolute; transform: translate(-50%, -50%); }
+    .arcane-group-charge svg, .arcane-group-stage > svg { width: 100%; height: 100%; overflow: visible; }
+    .arcane-group-sweep-core { filter: drop-shadow(0 0 8px #ff3b2f) drop-shadow(0 0 18px #e11d48); }
+    .arcane-group-sweep-glow { filter: blur(4px) drop-shadow(0 0 14px #ff1e27); }
+    .arcane-group-missile { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform; }
+    .arcane-group-missile svg { position: absolute; overflow: visible; filter: drop-shadow(0 0 6px #facc15) drop-shadow(0 0 14px #d97706); }
+    .arcane-group-missile-body { transform-origin: 75% 50%; will-change: transform, opacity; }
+    .arcane-group-flight { position: absolute; inset: 0; overflow: visible; }
+    .arcane-group-impact { position: absolute; inset: 0; overflow: visible; }
+    .arcane-fs-flash { position: absolute; inset: 0; pointer-events: none; }
+    .arcane-charge-ring, .arcane-charge-ring2, .arcane-charge-core, .arcane-slash-cut, .arcane-slash-body, .arcane-slash-core, .arcane-slash-tip, .arcane-crystal-flash, .arcane-crystal-cluster, .arcane-crystal-ring, .arcane-crystal-cracks, .arcane-spell-formation, .arcane-spell-prism { will-change: transform, opacity; }
+    .arcane-portrait-fragments { position: absolute; overflow: hidden; pointer-events: none; }
+    .arcane-portrait-fragment { position: absolute; inset: 0; will-change: transform, opacity; }
 
     .floating-text { position: absolute; animation: float-up 1s ease-out forwards; pointer-events: none; z-index: 60; text-shadow: 0 2px 4px rgba(0,0,0,0.8); white-space: nowrap; }
     
@@ -4014,7 +4035,10 @@ const audioUrls = {
     'enemyMagic': `${ASSET_BASE}/enemyMagic.mp3`,
     'enemyMagicGroup': `${ASSET_BASE}/enemyMagicGroup.mp3`,
     'enemyBuff': `${ASSET_BASE}/enemyBuff.mp3`,
-    'enemyDebuff': `${ASSET_BASE}/enemyDebuff.mp3`
+    'enemyDebuff': `${ASSET_BASE}/enemyDebuff.mp3`,
+    // 敌方兜底群攻 L2+ 命中（350ms 爆发，前摇音频保持独立）
+    'enemyMeleeGroupHit': `${ASSET_BASE}/enemyMeleeGroupHit.mp3`,
+    'enemyRangedGroupHit': `${ASSET_BASE}/enemyRangedGroupHit.mp3`
 };
 
 // 预热全量基础音效为 Blob URL，确保零延迟与 Web Audio API 无跨域限制
@@ -4481,9 +4505,14 @@ window.fxEngine = fxEngine;
 // ==========================================
 const arcaneVfxModule = (function () {
     'use strict';
-    // 五个新标签精确名；旧「障壁术」「伊西斯之拥」不识别
-    const ARCANE_TAGS = ['灵风术', '纳克提特障壁术', '伊西丝之拥', '折影步', '巫师护盾'];
+    // 精确特效名；group:* 为敌方兜底群攻的内部演出键
+    const ARCANE_TAGS = ['灵风术', '纳克提特障壁术', '伊西丝之拥', '折影步', '巫师护盾', 'group:melee', 'group:ranged', 'group:spell'];
     const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
+    const GROUP_COLORS = {
+        melee: ['#fff1dc', '#ff916d', '#e53532'],
+        ranged: ['#fff9e0', '#ffe075', '#d99b15'],
+        spell: ['#ffffff', '#e0f2fe', '#38bdf8']
+    };
 
     // —— 共享状态（clearArcaneFx 同步清空） ——
     const S = {
@@ -4505,6 +4534,7 @@ const arcaneVfxModule = (function () {
         dark: null,
     };
     let audioCtx = null, sfxBus = null, sfxVerb = null, sfxNoise = null;
+    let groupChargeOutput = null;
 
     // ===== combatToken 守卫定时 =====
     function after(ms, fn) {
@@ -4612,8 +4642,8 @@ const arcaneVfxModule = (function () {
         if (o.cut) { gn.gain.setValueAtTime(o.vol, t + o.dur - 0.012); gn.gain.linearRampToValueAtTime(0.0001, t + o.dur); }
         else gn.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
         const p = ctx.createStereoPanner(); p.pan.setValueAtTime(o.pan || 0, t); if (o.pan1 !== undefined) p.pan.linearRampToValueAtTime(o.pan1, t + o.dur);
-        src.connect(gn); gn.connect(p); p.connect(sfxBus);
-        if (o.wet) { const w = ctx.createGain(); w.gain.value = o.wet; p.connect(w); w.connect(sfxVerb); }
+        src.connect(gn); gn.connect(p); p.connect(groupChargeOutput || sfxBus);
+        if (o.wet && !groupChargeOutput) { const w = ctx.createGain(); w.gain.value = o.wet; p.connect(w); w.connect(sfxVerb); }
     }
     function noiseSrc(ctx, t, dur, rate) { const s = ctx.createBufferSource(); s.buffer = sfxNoise; s.playbackRate.value = rate || 1; s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05); return s; }
     function biquad(ctx, type, f0, f1, q, t, dur, fd) { const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t); if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + (fd || dur)); return f; }
@@ -4769,7 +4799,7 @@ const arcaneVfxModule = (function () {
     function render() {
         const g = S.ctx; if (!g || !S.canvas) return;
         g.clearRect(0, 0, S.canvas.width, S.canvas.height);
-        for (const owner of new Set(S.particles.filter(p => p.owner).map(p => p.owner))) {
+        for (const owner of new Set(S.particles.filter(p => p.owner && p.owner.dom).map(p => p.owner))) {
             const r = ctr(owner.dom);
             owner.frame = Object.assign(r, { left: r.left, clipBottom: Math.min(r.bottom, owner.barTop - 2), now: performance.now() });
         }
@@ -5378,6 +5408,499 @@ const arcaneVfxModule = (function () {
         return handle;
     }
 
+    // ===== 敌方兜底群攻 L2+（350ms 蓄势，纯演出） =====
+    function portraitFrame(target) {
+        if (target.isBarrierTarget) {
+            const frames = heroesData.filter(h => isCombatActive(h) && !h.isSummon).map(portraitFrame).filter(Boolean);
+            const proxy = target.proxyHero && portraitFrame(target.proxyHero);
+            if (!frames.length && !proxy) return null;
+            const bounds = groupBounds(frames.length ? frames : [proxy]);
+            const dom = document.getElementById('team-barrier-dome') || document.getElementById('team-barrier-wrapper') || (proxy && proxy.dom);
+            if (!dom) return null;
+            return Object.assign({ card: null, dom, isBarrier: true, imageTop: bounds.top, imageH: bounds.h }, bounds);
+        }
+        const card = domOf(target);
+        if (!card) return null;
+        const image = card.querySelector('img'), normal = card.classList.contains('hero-card-inner');
+        const dom = image || (normal ? card : (card.firstElementChild || card)), r = ctr(dom);
+        const label = normal && image && image.previousElementSibling;
+        const top = label ? Math.max(r.top, label.getBoundingClientRect().bottom) : r.top;
+        if (!r.w || r.bottom <= top) return null;
+        return { card, dom, x: r.x, y: (top + r.bottom) / 2, left: r.left, right: r.right,
+            top, bottom: r.bottom, w: r.w, h: r.bottom - top, imageTop: r.top, imageH: r.h };
+    }
+    function groupBounds(frames) {
+        const left = Math.min(...frames.map(f => f.left)), right = Math.max(...frames.map(f => f.right));
+        const top = Math.min(...frames.map(f => f.top)), bottom = Math.max(...frames.map(f => f.bottom));
+        return { left, right, top, bottom, x: (left + right) / 2, y: (top + bottom) / 2, w: right - left, h: bottom - top };
+    }
+    function groupRun(ms) {
+        const owner = { timers: new Set(), layers: new Set(), animations: new Set(), flights: new Set(), hostParticles: new Set(), flashes: new Map(), soundGates: new Set() };
+        owner.at = (delay, fn) => {
+            const id = after(delay, () => { owner.timers.delete(id); fn(); });
+            owner.timers.add(id); return id;
+        };
+        const finish = () => {
+            owner.timers.forEach(id => { clearTimeout(id); S.timers.delete(id); }); owner.timers.clear();
+            owner.animations.forEach(a => a.cancel()); owner.animations.clear();
+            owner.layers.forEach(d => { S.layers.delete(d); d.remove(); }); owner.layers.clear();
+            owner.flights.forEach(f => { clearTimeout(f.timer); S.timers.delete(f.timer); });
+            S.flights = S.flights.filter(f => !owner.flights.has(f)); owner.flights.clear();
+            owner.flashes.forEach((classes, el) => {
+                classes.forEach((record, cls) => { if (!record.wasPresent) el.classList.remove(cls); });
+                if (!Array.from(el.classList).some(cls => cls.startsWith('arcane-flash-'))) S.flashes.delete(el);
+            }); owner.flashes.clear();
+            owner.soundGates.forEach(g => { g.gain.value = 0; g.disconnect(); }); owner.soundGates.clear();
+            S.particles = S.particles.filter(p => p.owner !== owner);
+            fxEngine.particles = fxEngine.particles.filter(p => !owner.hostParticles.has(p)); owner.hostParticles.clear();
+            if (!S.particles.length && !S.flights.length) {
+                clearTimeout(S.particleTimer); S.timers.delete(S.particleTimer); S.particleTimer = null; S.particleUntil = 0;
+                if (S.driver) { fxEngine.particles = fxEngine.particles.filter(p => p !== S.driver); S.driver = null; }
+                if (S.ctx) S.ctx.clearRect(0, 0, S.canvas.width, S.canvas.height);
+            }
+            S.handles.delete(handle); releaseIdleCanvas();
+        };
+        const handle = { doneAt: Date.now() + ms, cancel: finish };
+        S.handles.add(handle); owner.at(ms, finish); owner.handle = handle;
+        return owner;
+    }
+    function groupLayer(owner, html) {
+        const layer = fsLayer(html); owner.layers.add(layer); return layer;
+    }
+    function groupAnimate(owner, el, frames, duration, easing = 'cubic-bezier(0.16,0.8,0.3,1)') {
+        const animation = el.animate(frames, { duration, easing, fill: 'forwards' });
+        owner.animations.add(animation); return animation;
+    }
+    function groupShake(owner, intensity, duration) {
+        const scene = document.getElementById('battle-scene');
+        if (!scene) return;
+        const base = getComputedStyle(scene).transform;
+        const frames = Array.from({ length: 10 }, (_, i) => {
+            const k = 1 - i / 9, dx = i && i < 9 ? rnd(-intensity / 2, intensity / 2) * k : 0, dy = i && i < 9 ? rnd(-intensity / 2, intensity / 2) * k : 0;
+            return { transform: `translate3d(${dx}px,${dy}px,0)${base === 'none' ? '' : ' ' + base}`, offset: i / 9 };
+        });
+        groupAnimate(owner, scene, frames, duration, 'linear');
+    }
+    function groupFlash(owner, el, cls) {
+        let classes = owner.flashes.get(el);
+        if (!classes) { classes = new Map(); owner.flashes.set(el, classes); }
+        const record = classes.get(cls) || { wasPresent: el.classList.contains(cls), timer: null };
+        if (record.timer !== null) { clearTimeout(record.timer); S.timers.delete(record.timer); owner.timers.delete(record.timer); }
+        classes.set(cls, record);
+        el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); S.flashes.add(el);
+        record.timer = owner.at(owner.kind === 'spell' ? 380 : 340, () => {
+            if (!record.wasPresent) el.classList.remove(cls);
+            classes.delete(cls); if (!classes.size) owner.flashes.delete(el);
+            if (!Array.from(el.classList).some(name => name.startsWith('arcane-flash-'))) S.flashes.delete(el);
+        });
+    }
+    function groupCharge(owner, source) {
+        const red = owner.kind === 'melee', spell = owner.kind === 'spell';
+        const color = red ? '#ff2938' : (spell ? '#38bdf8' : '#facc15'), sub = red ? '#ff916d' : (spell ? '#e0f2fe' : '#fef08a');
+        const darkStop = red ? '#7f0924' : (spell ? '#0c4a6e' : '#92400e');
+        const uid = ++S.uid, size = source.h * (spell ? 2.05 : 1.85);
+        const claws = [-22, 0, 22].map((y, i) => `<path d="M-54,${y + 20} Q-14,${y - 24} 48,${y - 14} Q-4,${y - 6} -34,${y + 28} Z" fill="url(#group-charge-${uid})" opacity="${0.95 - i * 0.08}"/><path d="M-42,${y + 16} Q-6,${y - 14} 44,${y - 14}" fill="none" stroke="#fff1dc" stroke-width="1.8"/>`).join('');
+        const stars = [0, 45, 90, 135, 180, 225, 270, 315].map(d => `<path d="M0,0 L-6,-22 L0,-54 L6,-22 Z" fill="url(#group-charge-${uid})" transform="rotate(${d})"/>`).join('');
+        const hexagram = `<polygon points="0,-58 50,29 -50,29" fill="none" stroke="#ffffff" stroke-width="2.2"/><polygon points="0,58 50,-29 -50,-29" fill="none" stroke="${sub}" stroke-width="2.2"/>` + stars;
+        const layer = groupLayer(owner, `<div class="arcane-group-charge" style="left:${source.x}px;top:${source.y}px;width:${size}px;height:${size}px;">
+            <svg viewBox="-80 -80 160 160"><defs><linearGradient id="group-charge-${uid}" x1="0" x2="1"><stop stop-color="${darkStop}"/><stop offset=".55" stop-color="${color}"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs>
+                <g class="arcane-charge-ring" style="transform-box:fill-box;transform-origin:center;" fill="none" stroke="${color}" stroke-width="2"><circle r="66" stroke-dasharray="18 10" opacity=".85"/><circle r="50" stroke="${sub}" stroke-width="1.4" stroke-dasharray="8 8" opacity=".75"/></g>
+                <g class="arcane-charge-ring2" style="transform-box:fill-box;transform-origin:center;" fill="none" stroke="${sub}" stroke-width="1.6"><path d="M-60,-20 A64,50 0 0 1 54,-28 M60,20 A64,50 0 0 1 -54,28"/><circle r="34" stroke="#fff" stroke-width="1.2" opacity=".6"/></g>
+                <g class="arcane-charge-core" style="transform-box:fill-box;transform-origin:center;filter:drop-shadow(0 0 10px ${color}) drop-shadow(0 0 20px ${color});">${red ? claws : (spell ? hexagram : stars)}<circle r="14" fill="#ffffff" opacity=".95"/></g>
+            </svg></div>`);
+        const core = layer.querySelector('.arcane-charge-core');
+        for (let i = 0; i < 32; i++) {
+            const ang = Math.random() * 6.283, dist = rnd(80, 165), spd = dist / 11;
+            groupParticle(owner, null, { x: source.x + Math.cos(ang) * dist, y: source.y + Math.sin(ang) * dist,
+                vx: -Math.cos(ang) * spd, vy: -Math.sin(ang) * spd, rot: ang + 3.1416,
+                size: rnd(2.4, 4.5), texture: red ? 'spark' : 'crystal', tail: 12, decay: 16.7 / 280 });
+        }
+        groupAnimate(owner, core, [
+            { transform: 'scale(.15) rotate(-35deg)', opacity: 0 },
+            { transform: 'scale(.95) rotate(-8deg)', opacity: 1, offset: .55 },
+            { transform: 'scale(1.18) rotate(6deg)', opacity: 1, offset: .82 },
+            { transform: 'scale(.24) rotate(18deg)', opacity: 1 }
+        ], 350, 'cubic-bezier(0.22,0.8,0.25,1)');
+        groupAnimate(owner, layer.querySelector('.arcane-charge-ring'), [
+            { transform: 'scale(1.55) rotate(0deg)', opacity: 0 },
+            { transform: 'scale(1.05) rotate(110deg)', opacity: .95, offset: .45 },
+            { transform: 'scale(.28) rotate(240deg)', opacity: 1 }
+        ], 350);
+        groupAnimate(owner, layer.querySelector('.arcane-charge-ring2'), [
+            { transform: 'scale(1.35) rotate(0deg)', opacity: 0 },
+            { transform: 'scale(.9) rotate(-140deg)', opacity: .9, offset: .5 },
+            { transform: 'scale(.22) rotate(-260deg)', opacity: 0 }
+        ], 350);
+        owner.at(350, () => {
+            addP({ x: source.x, y: source.y, shape: 'ring', size: 2.2, decay: 0.065, color: sub, owner });
+            groupAnimate(owner, core, [{ opacity: 1, transform: 'scale(.28)' }, { opacity: 0, transform: 'scale(1.75)' }], 110);
+        });
+        owner.at(470, () => { layer.remove(); owner.layers.delete(layer); S.layers.delete(layer); });
+        // 前摇复用同一音色库；本组干声门在350ms截断，不让晶鸣/混响叠进命中采样。
+        const ctx = audio(), gate = ctx.createGain(), previous = groupChargeOutput;
+        gate.gain.setValueAtTime(1, ctx.currentTime); gate.gain.setValueAtTime(0, ctx.currentTime + .35);
+        gate.connect(sfxBus); owner.soundGates.add(gate); groupChargeOutput = gate;
+        try {
+            drone(0, { f0: red ? 85 : (spell ? 130 : 140), f1: red ? 195 : (spell ? 260 : 330), lp0: 280, lp1: 2600, dur: .29, vol: .15 });
+            whoosh(0, { f0: red ? 380 : (spell ? 600 : 900), f1: red ? 2600 : (spell ? 4200 : 4800), q: 1.8, dur: .29, vol: .46, peak: .26, cut: true });
+            tone(0, { type: spell ? 'sine' : 'triangle', f0: red ? 160 : (spell ? 528 : 520), f1: red ? 340 : (spell ? 1056 : 1240), dur: .29, vol: .15, peak: .25, cut: true });
+            if (spell) crystal(.3, 2400, .14, 0);
+            else click(.3, .55, red ? 3200 : 5400, .01);
+        } finally { groupChargeOutput = previous; }
+        owner.at(350, () => { gate.disconnect(); owner.soundGates.delete(gate); });
+    }
+    function groupFlinch(owner, frame, direction) {
+        const k = frame.h / 96, dx = direction * k * 1.45, dy = Math.abs(direction) * k * .65;
+        const flashCls = owner.kind === 'melee' ? 'arcane-flash-melee' : (owner.kind === 'spell' ? 'arcane-flash-spell' : 'arcane-flash-ranged');
+        groupFlash(owner, frame.card || frame.dom, flashCls);
+        const base = getComputedStyle(frame.dom).transform, suffix = base === 'none' ? '' : ' ' + base;
+        groupAnimate(owner, frame.dom, [
+            { transform: 'translate3d(0,0,0) scale(1)' + suffix },
+            { transform: `translate3d(${dx}px,${dy}px,0) scale(.91,.94)${suffix}`, offset: .18 },
+            { transform: `translate3d(${-dx * .45}px,${-dy * .3}px,0) scale(1.03,1.02)${suffix}`, offset: .52 },
+            { transform: 'translate3d(0,0,0) scale(1)' + suffix }
+        ], 280);
+        if (frame.card && frame.card !== frame.dom) {
+            groupAnimate(owner, frame.card, [
+                { transform: 'translate3d(0,0,0)' },
+                { transform: `translate3d(${dx * .65}px,${dy * .7}px,0) scale(.96)`, offset: .2 },
+                { transform: `translate3d(${-dx * .25}px,0,0)`, offset: .55 },
+                { transform: 'translate3d(0,0,0)' }
+            ], 280);
+        }
+    }
+    DRAW.group = function(g, p) {
+        const [core, color, edge] = GROUP_COLORS[p.kind], r = p.size;
+        const alpha = g.globalAlpha;
+        for (let i = 4; i > 0; i--) {
+            const x = -i * (p.tail || 0) / 4, rr = r * (0.65 - i * .1);
+            const gr = g.createRadialGradient(x, 0, 0, x, 0, rr * 2);
+            gr.addColorStop(0, color + '90'); gr.addColorStop(1, edge + '00');
+            g.globalAlpha = alpha * (.28 - i * .045);
+            g.fillStyle = gr; g.beginPath(); g.arc(x, 0, rr * 2, 0, 6.283); g.fill();
+        }
+        g.globalAlpha = alpha;
+        if (p.texture === 'crystal') {
+            const gr = g.createLinearGradient(-r, -r, r, r);
+            gr.addColorStop(0, core); gr.addColorStop(.35, color); gr.addColorStop(1, edge + '20');
+            g.fillStyle = gr; g.beginPath(); g.moveTo(r * 1.8, 0); g.lineTo(-r * .5, r * .9); g.lineTo(-r, -r * .65); g.closePath(); g.fill();
+            g.fillStyle = core + 'b0'; g.beginPath(); g.moveTo(r * 1.8, 0); g.lineTo(-r * .4, 0); g.lineTo(-r, -r * .65); g.closePath(); g.fill();
+        } else {
+            const gr = g.createRadialGradient(r * .22, 0, 0, 0, 0, r);
+            gr.addColorStop(0, core); gr.addColorStop(.22, core + 'e0'); gr.addColorStop(.55, color + 'c0'); gr.addColorStop(1, edge + '00');
+            g.fillStyle = gr; g.scale(2, .55); g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill();
+        }
+    };
+    function groupParticle(owner, _frame, o) {
+        addP(Object.assign({ shape: 'group', kind: owner.kind, owner, blend: 'screen', clip: null, drag: .95 }, o));
+    }
+
+    function playMeleeGroup(caster, targets) {
+        const frames = targets.map(portraitFrame).filter(Boolean).sort((a, b) => a.left - b.left), casterDom = domOf(caster);
+        if (!frames.length || !casterDom) return null;
+        const bounds = groupBounds(frames), rTop = bounds.top, rBottom = bounds.bottom;
+        const padX = 58, padY = 44;
+        const row = { left: bounds.left - padX, top: rTop - padY, w: bounds.w + padX * 2, h: bounds.h + padY * 2 };
+        row.cx = row.left + row.w / 2; row.cy = row.top + row.h / 2;
+        const owner = groupRun(1220); owner.kind = 'melee';
+        const uid = ++S.uid, w = row.w, h = row.h, k = (rBottom - rTop) / 96;
+        groupCharge(owner, ctr(casterDom));
+        const blades = [0, 1, 2].map(i => {
+            const y = h * (.25 + i * .24), thick = (22 - i * 2.2) * k, lift = (28 + i * 6) * k;
+            const center = `M-18,${y + 10 * k} C${w * .26},${y + 18 * k} ${w * .62},${y - lift * .45} ${w + 18},${y - lift}`;
+            const ribbon = `M-18,${y + 10 * k - thick * .12} C${w * .25},${y - thick * .58 + 18 * k} ${w * .62},${y - lift * .45 - thick * .48} ${w + 18},${y - lift} C${w * .62},${y - lift * .45 + thick * .52} ${w * .25},${y + thick * .95 + 18 * k} -18,${y + 10 * k + thick * .18} Z`;
+            const core = `M-18,${y + 10 * k} C${w * .26},${y + 15 * k} ${w * .62},${y - lift * .45 - 3 * k} ${w + 18},${y - lift} C${w * .62},${y - lift * .45 + 3 * k} ${w * .26},${y + 21 * k} -18,${y + 10 * k + .4 * k} Z`;
+            const barbs = [0.22, 0.48, 0.74].map(t => {
+                const bx = w * t, by = y + (1 - t) * 10 * k - t * lift;
+                return `M${bx},${by} L${bx - 18 * k},${by - (i % 2 ? 16 : -16) * k} L${bx - 6 * k},${by}`;
+            }).join(' ');
+            return { y, lift, center, ribbon, core, barbs, thick };
+        });
+        const layer = groupLayer(owner, `<div class="arcane-group-stage" style="left:${row.left}px;top:${row.top}px;width:${w}px;height:${h}px;">
+            <svg viewBox="0 0 ${w} ${h}" style="opacity:0;"><defs>
+                <linearGradient id="group-slash-${uid}"><stop stop-color="#7f0924" stop-opacity=".25"/><stop offset=".15" stop-color="#e11d48"/><stop offset=".65" stop-color="#ff2938"/><stop offset="1" stop-color="#ffe4d6"/></linearGradient>
+                <clipPath id="group-reveal-${uid}"><rect x="-24" y="-40" width="0" height="${h + 80}"/></clipPath>
+            </defs><g clip-path="url(#group-reveal-${uid})">
+                <g class="arcane-slash-cut">${blades.map(b => `<path d="${b.center}" fill="none" stroke="#2a040d" stroke-width="${b.thick * 2.05}" stroke-linecap="round"/><path d="${b.barbs}" fill="none" stroke="#ff2938" stroke-width="${1.8 * k}" opacity=".85"/>`).join('')}</g>
+                <g class="arcane-slash-body">${blades.map(b => `<path class="arcane-group-sweep-glow" d="${b.center}" fill="none" stroke="#ff1e27" stroke-width="${b.thick * 1.45}" opacity=".75"/><path d="${b.ribbon}" fill="url(#group-slash-${uid})"/>`).join('')}</g>
+                <g class="arcane-slash-core arcane-group-sweep-core">${blades.map(b => `<path d="${b.core}" fill="#fff5eb"/>`).join('')}</g>
+            </g><g class="arcane-slash-tip arcane-group-sweep-core" opacity="0">${blades.map(b => `<path d="M-64,${b.y + 12 * k} Q-16,${b.y - 22 * k} 14,${b.y - 18 * k} Q-4,${b.y - 2 * k} -44,${b.y + 14 * k} Z" fill="#ff9e7d"/><path d="M-42,${b.y + 4 * k} Q-6,${b.y - 19 * k} 14,${b.y - 18 * k}" fill="none" stroke="#ffffff" stroke-width="${3 * k}"/>`).join('')}</g>
+            </svg></div>`);
+        const svg = layer.querySelector('svg'), reveal = svg.querySelector('clipPath rect'), tip = svg.querySelector('.arcane-slash-tip');
+        owner.at(350, () => {
+            svg.style.opacity = '1'; tip.setAttribute('opacity', '1');
+            groupShake(owner, 16, 340);
+            groupLayer(owner, `<div class="absolute inset-0" style="background:radial-gradient(ellipse at ${row.cx}px ${row.cy}px, rgba(255,41,56,0.45) 0%, rgba(153,27,27,0.22) 48%, transparent 76%);animation:arcane-fs-flash 0.44s ease-out both;"></div>
+                <div class="arcane-fs-anchor" style="left:${row.cx}px;top:${row.cy}px;width:${w * 1.18}px;height:${42 * k}px;background:linear-gradient(90deg,transparent,rgba(255,41,56,0.75) 20%,#fff1f2 50%,rgba(255,41,56,0.75) 80%,transparent);filter:drop-shadow(0 0 24px #ff2938);animation:arcane-fs-flash 0.36s ease-out both;"></div>`);
+            playSound('enemyMeleeGroupHit', 0.72);
+            const struck = new Set();
+            const flight = fly({ x: 0, y: 0 }, { x: w + 36, y: 0 }, 0, 175, x => {
+                reveal.setAttribute('width', x + 24);
+                tip.setAttribute('transform', `translate(${x},0)`);
+                blades.forEach(b => {
+                    const px = row.left + x, py = row.top + b.y + 10 * k - (x / w) * b.lift;
+                    groupParticle(owner, null, { x: px, y: py, vx: rnd(3, 7) * k, vy: rnd(-1.8, 1.4) * k, rot: -.18, size: rnd(2.8, 4.8) * k, texture: 'spark', tail: 16 * k, decay: 16.7 / 220 });
+                    addP({ x: px + rnd(-6, 6), y: py + rnd(-6, 6), vx: rnd(1, 3), vy: rnd(-2.2, -.4), size: rnd(8, 14) * k, shape: 'flame', color: '#ff2938', decay: 0.06, owner });
+                });
+                frames.forEach(f => {
+                    if (struck.has(f) || row.left + x < f.x) return;
+                    struck.add(f); groupFlinch(owner, f, 8);
+                    const cutLayer = groupLayer(owner, `<div class="arcane-fs-anchor" style="left:${f.x}px;top:${f.y}px;width:${f.w * 1.45}px;height:${f.h * 1.45}px;">
+                        <svg viewBox="-60 -60 120 120" class="w-full h-full arcane-group-sweep-core"><path d="M-52,-38 L52,38 M-44,44 L44,-44" stroke="#fff1f2" stroke-width="4.5" stroke-linecap="round"/><path d="M-56,-41 L56,41 M-48,48 L48,-48" stroke="#ff2938" stroke-width="2.2"/></svg></div>`);
+                    groupAnimate(owner, cutLayer.firstElementChild, [{ transform: 'translate(-50%,-50%) scale(.35)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1.35)', opacity: 0 }], 240);
+                    burst(2, rIdx => ({ x: f.x, y: f.y, shape: 'ring', size: (1.5 + rIdx * .9) * k, decay: 0.065 - rIdx * 0.015, color: rIdx ? '#ff2938' : '#ffe4d6', owner }));
+                    for (let j = 0; j < 18; j++) groupParticle(owner, null, { x: f.x + rnd(-12, 12), y: f.y + rnd(-f.h * .3, f.h * .3),
+                        vx: rnd(3.5, 11) * k * (j % 3 ? 1 : -.5), vy: rnd(-6.5, 5.5) * k, grav: .12 * k, rot: rnd(-1.2, 1.2), size: rnd(2.8, 5.6) * k,
+                        texture: j % 3 ? 'spark' : 'crystal', tail: 12 * k, decay: 16.7 / rnd(280, 440) });
+                    burst(6, () => ({ x: f.x + rnd(-16, 16), y: f.y + rnd(-12, 12), vx: rnd(-1.5, 2.5), vy: rnd(-3.2, -.8), size: rnd(12, 20) * k, shape: 'flame', color: pick(['#ff2938', '#f97316', '#fde68a']), decay: rnd(0.035, 0.055), owner }));
+                    burst(4, () => ({ x: f.x + rnd(-20, 20), y: f.y + rnd(-14, 14), vx: rnd(-.5, .5), vy: rnd(-1.2, -.4), drag: .99, size: rnd(16, 26) * k, shape: 'smoke', blend: 'source-over', color: 'rgba(45,10,18,0.6)', decay: 0.016, owner }));
+                });
+            }, () => {
+                tip.setAttribute('opacity', '0'); reveal.setAttribute('width', w + 48);
+                groupShake(owner, 6, 180);
+                groupAnimate(owner, svg.querySelector('.arcane-slash-core'), [{ opacity: 1 }, { opacity: 1, offset: .35 }, { opacity: 0 }], 260);
+                groupAnimate(owner, svg.querySelector('.arcane-slash-body'), [{ opacity: 1 }, { opacity: .88, offset: .4 }, { opacity: 0 }], 560);
+                groupAnimate(owner, svg.querySelector('.arcane-slash-cut'), [{ opacity: .95 }, { opacity: .75, offset: .5 }, { opacity: 0 }], 660);
+            }, t => 1 - Math.pow(1 - t, 1.6));
+            owner.flights.add(flight);
+        });
+        return owner.handle;
+    }
+    function shatterPortrait(frame, owner) {
+        if (frame.isBarrier) return;
+        const layer = groupLayer(owner, ''), box = document.createElement('div'); box.className = 'arcane-portrait-fragments';
+        box.style.cssText = `left:${frame.left}px;top:${frame.top}px;width:${frame.w}px;height:${frame.h}px;`;
+        layer.appendChild(box);
+        const rim = [[0, 0], [32, 0], [68, 0], [100, 0], [100, 48], [100, 100], [66, 100], [34, 100], [0, 100], [0, 50]];
+        rim.forEach((point, i) => {
+            const next = rim[(i + 1) % rim.length], fragment = document.createElement('div');
+            fragment.className = 'arcane-portrait-fragment';
+            fragment.style.clipPath = `polygon(50% 55%, ${point[0]}% ${point[1]}%, ${next[0]}% ${next[1]}%)`;
+            const image = frame.dom.cloneNode(true); image.removeAttribute('id');
+            image.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+            image.style.cssText = `position:absolute;left:0;top:${frame.imageTop - frame.top}px;width:100%;height:${frame.imageH}px;`;
+            fragment.appendChild(image); box.appendChild(fragment);
+            const k = frame.h / 96, dx = ((point[0] + next[0]) / 2 - 50) * 0.7 * k, dy = ((point[1] + next[1]) / 2 - 55) * 0.65 * k;
+            groupAnimate(owner, fragment, [
+                { transform: 'translate(0,0) rotate(0)', opacity: 1 },
+                { transform: `translate(${dx}px,${dy}px) rotate(${rnd(-18, 18)}deg)`, opacity: 0 }
+            ], 340 + i * 7, 'cubic-bezier(0.12,0.75,0.3,1)');
+        });
+        const opacity = getComputedStyle(frame.dom).opacity;
+        groupAnimate(owner, frame.dom, [
+            { opacity, offset: 0 }, { opacity: 0, offset: .035 }, { opacity: 0, offset: .42 }, { opacity, offset: 1 }
+        ], 460, 'ease-out');
+        owner.at(480, () => { layer.remove(); S.layers.delete(layer); owner.layers.delete(layer); });
+    }
+    function rangedHit(frame, point, owner, direction, isMain = true, isFinale = false) {
+        const k = frame.h / 96, uid = ++S.uid, stageR = (isMain ? 72 : 44) * k;
+        if (isMain) {
+            shatterPortrait(frame, owner); groupFlinch(owner, frame, 7);
+            groupShake(owner, isFinale ? 16 : 6, isFinale ? 320 : 180);
+        }
+        const spikes = (isMain ? [-52, -24, 4, 30, 56] : [-30, 25]).map((deg, i) => {
+            const a = direction + (deg - 8) * .0174, len = (isMain ? (i % 2 ? 46 : 62) : 34) * k, w = (isMain ? 9 : 6) * k;
+            return `<g transform="rotate(${a * 57.3})"><polygon points="0,${-w} ${len},0 0,${w} ${-w * .8},0" fill="url(#group-spk-${uid})"/><polygon points="0,${-w} ${len},0 0,0" fill="#fffbeb" opacity=".88"/></g>`;
+        }).join('');
+        const cracks = Array.from({ length: isMain ? 8 : 5 }, (_, i) => {
+            const angle = i / (isMain ? 8 : 5) * 6.283 + .25, r = (i % 2 ? 44 : 60) * (isMain ? 1 : .65) * k;
+            const x = Math.cos(angle), y = Math.sin(angle);
+            return `<path d="M0,0 L${x * r * .42},${y * r * .38} L${x * r * .65 - y * 5 * k},${y * r * .65 + x * 5 * k} L${x * r},${y * r}"/>`;
+        }).join('');
+        const layer = groupLayer(owner, `<div class="arcane-group-stage" style="left:${point.x - stageR}px;top:${point.y - stageR}px;width:${stageR * 2}px;height:${stageR * 2}px;">
+            <svg class="arcane-group-impact" viewBox="${-stageR} ${-stageR} ${stageR * 2} ${stageR * 2}"><defs>
+                <radialGradient id="group-hit-${uid}"><stop stop-color="#ffffff"/><stop offset=".28" stop-color="#fef08a"/><stop offset=".6" stop-color="#facc15" stop-opacity=".65"/><stop offset="1" stop-color="#b45309" stop-opacity="0"/></radialGradient>
+                <linearGradient id="group-spk-${uid}" x1="0" x2="1"><stop stop-color="#b45309"/><stop offset=".45" stop-color="#facc15"/><stop offset="1" stop-color="#ffffff"/></linearGradient>
+            </defs><g>
+                <circle class="arcane-crystal-flash" r="${(isMain ? 48 : 28) * k}" fill="url(#group-hit-${uid})"/>
+                <g class="arcane-crystal-cluster" style="transform-box:fill-box;transform-origin:center;filter:drop-shadow(0 0 8px #facc15);">${spikes}</g>
+                <g class="arcane-crystal-ring" fill="none" stroke="#fef08a" stroke-width="${(isMain ? 3 : 1.8) * k}" style="transform-box:fill-box;transform-origin:center;"><circle r="${(isMain ? 32 : 18) * k}"/></g>
+                <g class="arcane-crystal-cracks" fill="none" stroke="#fde047" stroke-width="${(isMain ? 1.8 : 1.2) * k}" stroke-linejoin="bevel">${cracks}</g>
+            </g></svg></div>`);
+        const svg = layer.querySelector('svg');
+        groupAnimate(owner, svg.querySelector('.arcane-crystal-flash'), [{ transform: 'scale(.4)', opacity: 1 }, { transform: 'scale(1.4)', opacity: 0 }], isMain ? 160 : 110);
+        groupAnimate(owner, svg.querySelector('.arcane-crystal-cluster'), [
+            { transform: 'scale(.15)', opacity: 0 }, { transform: 'scale(1.25)', opacity: 1, offset: .28 },
+            { transform: 'scale(1)', opacity: .95, offset: .65 }, { transform: 'scale(1.35)', opacity: 0 }
+        ], isMain ? 360 : 240);
+        groupAnimate(owner, svg.querySelector('.arcane-crystal-ring'), [{ transform: 'scale(.25)', opacity: 1 }, { transform: 'scale(2.1)', opacity: 0 }], isMain ? 260 : 180);
+        groupAnimate(owner, svg.querySelector('.arcane-crystal-cracks'), [{ opacity: 1 }, { opacity: .8, offset: .35 }, { opacity: 0 }], isMain ? 420 : 260);
+        if (isMain) addP({ x: point.x, y: point.y, shape: 'ring', size: 1.8 * k, decay: .06, color: '#fef08a', owner });
+        const pCount = isMain ? 16 : 7;
+        for (let i = 0; i < pCount; i++) {
+            const angle = direction + rnd(-2.2, 2.2), speed = rnd(3, isMain ? 9.5 : 6) * k;
+            groupParticle(owner, null, { x: point.x, y: point.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 1.2 * k,
+                grav: .14 * k, rot: angle, vr: rnd(-.22, .22), size: rnd(3.2, isMain ? 7.2 : 4.8) * k,
+                texture: i % 3 ? 'crystal' : 'spark', tail: 7 * k, decay: 16.7 / rnd(280, 450) });
+        }
+        if (isMain) burst(5, () => {
+            const a = Math.random() * 6.283, s = rnd(2.5, 6.5) * k;
+            return { x: point.x, y: point.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1.5, grav: .16 * k, rot: a, vr: rnd(-.25, .25), size: rnd(5, 8.5) * k, shape: 'shard', fill: 'rgba(254,240,138,0.45)', color: '#facc15', decay: .032, owner };
+        });
+    }
+    function playRangedGroup(caster, targets) {
+        const frames = targets.map(portraitFrame).filter(Boolean).sort((a, b) => a.left - b.left), casterDom = domOf(caster);
+        if (!frames.length || !casterDom) return null;
+        const source = ctr(casterDom), bounds = groupBounds(frames), rowCx = bounds.x, rowCy = bounds.y;
+        const owner = groupRun(1340); owner.kind = 'ranged';
+        groupCharge(owner, source);
+        const layer = groupLayer(owner, '<div class="arcane-group-flight"></div>'), stage = layer.firstElementChild;
+        // 14枚齐射不随人数膨胀；主晶按目标分组，超过14名时同一晶簇覆盖该组。
+        const mainCount = Math.min(frames.length, 14);
+        const mainIndices = new Set(Array.from({ length: mainCount }, (_, i) => Math.ceil((i + 1) * 14 / mainCount) - 1));
+        let mainTargetIdx = 0;
+        for (let idx = 0; idx < 14; idx++) {
+            const isMain = mainIndices.has(idx), first = Math.floor(mainTargetIdx * frames.length / mainCount);
+            const hitFrames = isMain ? frames.slice(first, Math.floor((mainTargetIdx + 1) * frames.length / mainCount)) : [frames[idx % frames.length]];
+            const frameIdx = isMain ? first : idx % frames.length;
+            if (isMain) mainTargetIdx++;
+            const frame = frames[frameIdx], uid = ++S.uid, k = frame.h / 96;
+            const length = frame.h * (isMain ? .82 : .54), fanT = idx / 13 - .5;
+            const a = { x: source.x + fanT * Math.max(source.w * 2.2, 220), y: source.y - source.h * .18 + Math.abs(fanT) * source.h * .55 + (idx % 2 ? -14 : 10) };
+            const b = isMain ? { x: frame.x, y: frame.y } : { x: frame.x + rnd(-frame.w * .36, frame.w * .36), y: frame.y + rnd(-frame.h * .3, frame.h * .3) };
+            const lift = (isMain ? 78 : 52) + (idx % 4) * 14;
+            const cx = (a.x + b.x) / 2, cy = Math.min(a.y, b.y) - lift;
+            const missile = document.createElement('div'); missile.className = 'arcane-group-missile';
+            missile.innerHTML = `<svg viewBox="-86 -24 94 48" style="left:${-length * 86 / 64}px;top:${-length * 24 / 64}px;width:${length * 94 / 64}px;height:${length * 48 / 64}px;"><defs>
+                <linearGradient id="group-crystal-${uid}" gradientUnits="userSpaceOnUse" x1="-72" y1="12" x2="4" y2="-4"><stop stop-color="#92400e"/><stop offset=".3" stop-color="#eab308"/><stop offset=".7" stop-color="#fef08a"/><stop offset="1" stop-color="#ffffff"/></linearGradient>
+                <linearGradient id="group-tail-${uid}"><stop stop-color="#d97706" stop-opacity="0"/><stop offset=".6" stop-color="#facc15" stop-opacity=".45"/><stop offset="1" stop-color="#fef9c3" stop-opacity=".9"/></linearGradient>
+            </defs><g class="arcane-group-missile-body" opacity="0">
+                <path d="M-165,-3 L-58,-6 L-58,6 L-165,3 Z" fill="url(#group-tail-${uid})"/>
+                <path d="M6,0 L-58,-15 L-72,0 L-58,15 Z" fill="url(#group-crystal-${uid})" stroke="#ffffff" stroke-width="1"/>
+                <path d="M6,0 L-58,-15 L-40,0 Z" fill="#fef9c3" opacity=".95"/>
+                <path d="M6,0 L-40,0 L-58,15 Z" fill="#b45309" opacity=".85"/>
+                <path d="M-58,-15 L-40,0 L-72,0 Z" fill="#facc15"/>
+                <circle cx="-12" cy="0" r="${isMain ? 4.5 : 3}" fill="#ffffff"/>
+            </g></svg>`;
+            stage.appendChild(missile);
+            const body = missile.querySelector('.arcane-group-missile-body'), angle = Math.atan2(b.y - a.y, b.x - a.x);
+            missile.style.transform = `translate(${a.x}px,${a.y}px) rotate(${angle}rad)`;
+            groupAnimate(owner, body, [
+                { transform: 'scale(.08)', opacity: 0 }, { transform: 'scale(1.22)', opacity: 1, offset: .65 },
+                { transform: 'scale(.92)', opacity: 1, offset: .85 }, { transform: 'scale(1.08)', opacity: 1 }
+            ], 340, 'cubic-bezier(0.2,0.85,0.25,1)');
+            const launchDelay = 350 + idx * 22, flyDur = isMain ? 235 : 205;
+            owner.at(launchDelay, () => {
+                if (idx === 0) {
+                    playSound('enemyRangedGroupHit', 0.75);
+                    groupLayer(owner, `<div class="absolute inset-0" style="background:radial-gradient(ellipse at ${rowCx}px ${rowCy}px, rgba(250,204,21,0.32) 0%, rgba(180,83,9,0.14) 50%, transparent 78%);animation:arcane-fs-flash 0.65s ease-out both;"></div>`);
+                }
+                const flight = fly(a, b, lift, flyDur, (x, y, progress) => {
+                    const t = progress * progress;
+                    const direction = Math.atan2((1 - t) * (cy - a.y) + t * (b.y - cy), (1 - t) * (cx - a.x) + t * (b.x - cx));
+                    missile.style.transform = `translate(${x}px,${y}px) rotate(${direction}rad)`;
+                    const tx = x - Math.cos(direction) * length * .75, ty = y - Math.sin(direction) * length * .75;
+                    groupParticle(owner, null, { x: tx + rnd(-3, 3), y: ty + rnd(-3, 3),
+                        vx: -Math.cos(direction) * (isMain ? 1.8 : 1.1) * k, vy: -Math.sin(direction) * (isMain ? 1.8 : 1.1) * k,
+                        rot: direction, size: (isMain ? 3 : 2) * k, texture: isMain ? 'crystal' : 'spark', tail: (isMain ? 14 : 9) * k, decay: 16.7 / 130 });
+                }, () => {
+                    missile.remove();
+                    const direction = Math.atan2(b.y - cy, b.x - cx);
+                    hitFrames.forEach(f => rangedHit(f, f === frame ? b : { x: f.x, y: f.y }, owner, direction, isMain, idx === 13));
+                });
+                owner.flights.add(flight);
+            });
+        }
+        return owner.handle;
+    }
+    function playSpellGroup(caster, targets) {
+        const frames = targets.map(portraitFrame).filter(Boolean).sort((a, b) => a.left - b.left), casterDom = domOf(caster);
+        if (!frames.length || !casterDom) return null;
+        const owner = groupRun(1280); owner.kind = 'spell';
+        const source = ctr(casterDom), bounds = groupBounds(frames), cx = bounds.x, cy = bounds.y, rowW = bounds.w, rowH = bounds.h;
+        function spawnSpellGroupParticles(x, y) {
+            const add = p => { owner.hostParticles.add(p); fxEngine.addParticle(p); };
+            add({ x, y, vx: 0, vy: 0, age: 0, life: 520,
+                draw(ctx, pct) {
+                    const maxR = Math.max(320, rowW * .55), r = pct * maxR, a = Math.max(0, (1 - pct) * .92);
+                    ctx.save(); ctx.globalAlpha = a; ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = Math.max(1.5, 8 * (1 - pct)); ctx.shadowBlur = 22; ctx.shadowColor = '#38bdf8';
+                    ctx.beginPath(); ctx.arc(this.x, this.y, r, 0, Math.PI * 2); ctx.stroke();
+                    if (pct > .08) {
+                        ctx.strokeStyle = '#7dd3fc'; ctx.lineWidth = Math.max(1, 4.5 * (1 - pct)); ctx.setLineDash([14, 10]);
+                        ctx.beginPath(); ctx.arc(this.x, this.y, (pct - .08) * maxR * .82, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+                    }
+                    if (pct > .16) {
+                        ctx.strokeStyle = '#e0f2fe'; ctx.lineWidth = Math.max(1, 3 * (1 - pct));
+                        ctx.beginPath(); ctx.arc(this.x, this.y, (pct - .16) * maxR * .58, 0, Math.PI * 2); ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+            });
+            const palette = ['#ffffff', '#ffffff', '#e0f2fe', '#bae6fd', '#7dd3fc'];
+            for (let i = 0; i < 90; i++) {
+                const angle = Math.random() * Math.PI * 2, speed = rnd(7, 22);
+                add({ x, y, vx: speed * Math.cos(angle), vy: speed * Math.sin(angle), drag: .92, gravity: 0,
+                    age: 0, life: rnd(440, 760), size: rnd(2.2, 6.4), color: palette[i % palette.length],
+                    draw(ctx, pct) {
+                        ctx.save(); ctx.globalAlpha = pct < .08 ? pct / .08 : Math.max(0, 1 - pct);
+                        ctx.beginPath(); ctx.moveTo(this.x, this.y); ctx.lineTo(this.x - this.vx * 4, this.y - this.vy * 4);
+                        ctx.strokeStyle = this.color; ctx.lineWidth = this.size; ctx.lineCap = 'round'; ctx.shadowBlur = 14; ctx.shadowColor = '#38bdf8'; ctx.stroke();
+                        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(this.x, this.y, this.size * .65, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+                    }
+                });
+            }
+            add({ x: 0, y: 0, vx: 0, vy: 0, age: 0, life: 280,
+                draw(ctx, pct) {
+                    if (pct > .45) return;
+                    ctx.fillStyle = '#f0f9ff'; ctx.globalAlpha = (1 - pct / .45) * .48;
+                    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                }
+            });
+        }
+        groupCharge(owner, source);
+        owner.at(350, () => {
+            playSound('atk1', 0.5); spawnSpellGroupParticles(cx, cy);
+            groupShake(owner, 28, 550); owner.at(220, () => groupShake(owner, 6, 180));
+            const flashLayer = groupLayer(owner, `<div class="arcane-fs-flash" style="background:radial-gradient(ellipse at ${cx}px ${cy}px, rgba(255,255,255,0.68) 0%, rgba(186,230,253,0.42) 38%, rgba(56,189,248,0.16) 65%, transparent 82%);opacity:0;"></div>`);
+            groupAnimate(owner, flashLayer.firstElementChild, [{ opacity: .98 }, { opacity: .45, offset: .3 }, { opacity: 0 }], 340);
+            const stageW = Math.max(rowW * 1.48, 520), stageH = Math.max(rowH * 2.8, 320), uid = ++S.uid;
+            const rays = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((d, i) => `<line x1="0" y1="${i % 2 ? -95 : -78}" x2="0" y2="${i % 2 ? -138 : -162}" stroke="${i % 2 ? '#bae6fd' : '#ffffff'}" stroke-width="${i % 2 ? 2 : 3.2}" stroke-linecap="round" transform="rotate(${d})"/>`).join('');
+            const stage = groupLayer(owner, `<div class="arcane-group-stage" style="left:${cx - stageW / 2}px;top:${cy - stageH / 2}px;width:${stageW}px;height:${stageH}px;">
+                <svg viewBox="${-stageW / 2} ${-stageH / 2} ${stageW} ${stageH}"><defs>
+                    <radialGradient id="spell-core-${uid}"><stop offset="0%" stop-color="#ffffff"/><stop offset="48%" stop-color="#e0f2fe" stop-opacity=".92"/><stop offset="82%" stop-color="#38bdf8" stop-opacity=".4"/><stop offset="100%" stop-color="#0284c7" stop-opacity="0"/></radialGradient>
+                </defs><g class="arcane-spell-formation" style="transform-box:fill-box;transform-origin:center;filter:drop-shadow(0 0 14px #38bdf8) drop-shadow(0 0 28px #0284c7);">
+                    <circle r="142" fill="url(#spell-core-${uid})"/><circle r="134" fill="none" stroke="#ffffff" stroke-width="3" opacity=".92"/>
+                    <circle r="118" fill="none" stroke="#7dd3fc" stroke-width="2" stroke-dasharray="18 10" opacity=".88"/>
+                    <polygon points="0,-126 109,63 -109,63" fill="rgba(224,242,254,0.12)" stroke="#ffffff" stroke-width="3.2"/>
+                    <polygon points="0,126 109,-63 -109,-63" fill="rgba(56,189,248,0.12)" stroke="#bae6fd" stroke-width="3.2"/>
+                    <circle r="68" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-dasharray="8 6"/>${rays}
+                </g><g class="arcane-spell-prism" style="transform-box:fill-box;transform-origin:center;filter:drop-shadow(0 0 16px #ffffff) drop-shadow(0 0 32px #38bdf8);">
+                    <path d="M${-stageW * .49},0 Q0,-28 ${stageW * .49},0 Q0,28 ${-stageW * .49},0 Z" fill="#e0f2fe" opacity=".92"/>
+                    <path d="M${-stageW * .46},0 Q0,-12 ${stageW * .46},0 Q0,12 ${-stageW * .46},0 Z" fill="#ffffff"/>
+                    <path d="M0,${-stageH * .48} Q-24,0 0,${stageH * .48} Q24,0 0,${-stageH * .48} Z" fill="#bae6fd" opacity=".9"/>
+                    <path d="M0,${-stageH * .44} Q-10,0 0,${stageH * .44} Q10,0 0,${-stageH * .44} Z" fill="#ffffff"/><circle r="44" fill="#ffffff"/>
+                </g></svg></div>`);
+            groupAnimate(owner, stage.querySelector('.arcane-spell-formation'), [
+                { transform: 'scale(.16) rotate(-35deg)', opacity: 0 }, { transform: 'scale(1.06) rotate(12deg)', opacity: 1, offset: .24 },
+                { transform: 'scale(1.24) rotate(32deg)', opacity: .82, offset: .62 }, { transform: 'scale(1.46) rotate(58deg)', opacity: 0 }
+            ], 760, 'cubic-bezier(0.16, 0.84, 0.26, 1)');
+            groupAnimate(owner, stage.querySelector('.arcane-spell-prism'), [
+                { transform: 'scaleX(.12) scaleY(1.8)', opacity: 0 }, { transform: 'scaleX(1.05) scaleY(1.1)', opacity: 1, offset: .18 },
+                { transform: 'scaleX(1.16) scaleY(.28)', opacity: .88, offset: .54 }, { transform: 'scaleX(1.28) scaleY(.04)', opacity: 0 }
+            ], 520, 'cubic-bezier(0.16, 0.84, 0.26, 1)');
+            [0, 1, 2, 3].forEach(k => addP({ x: cx, y: cy, shape: 'ring', size: 3.4 - k * .5, decay: .036 + k * .006, color: k % 2 ? '#7dd3fc' : '#ffffff', owner }));
+            for (let i = 0; i < 28; i++) {
+                const ang = i / 28 * 6.283 + rnd(-.08, .08), spd = rnd(6.5, 16.5);
+                groupParticle(owner, null, { x: cx, y: cy, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+                    rot: ang, vr: rnd(-.08, .08), size: rnd(3.2, 6.2), texture: i % 2 ? 'crystal' : 'spark', tail: rnd(14, 24), decay: 16.7 / rnd(380, 620) });
+            }
+            frames.forEach((f, idx) => {
+                const isInner = idx === Math.floor((frames.length - 1) / 2) || idx === Math.ceil((frames.length - 1) / 2);
+                owner.at(isInner ? 0 : 35, () => {
+                    groupFlinch(owner, f, f.x < cx ? -6.5 : 6.5);
+                    addP({ x: f.x, y: f.y, shape: 'ring', size: 2.2, decay: .055, color: '#e0f2fe', owner });
+                    for (let j = 0; j < 8; j++) {
+                        const a = j / 8 * 6.283 + rnd(-.2, .2), s = rnd(3.8, 9.2);
+                        groupParticle(owner, null, { x: f.x, y: f.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+                            rot: a, size: rnd(2.6, 4.8), texture: 'crystal', tail: 12, decay: 16.7 / rnd(280, 440) });
+                    }
+                });
+            });
+        });
+        return owner.handle;
+    }
+
     // ===== 对外接口 =====
     function isArcaneSkillFx(fxTag) { return ARCANE_TAGS.indexOf(fxTag) !== -1; }
     function playArcaneSkillFx(fxTag, caster, targets, isReaction = false) {
@@ -5387,6 +5910,9 @@ const arcaneVfxModule = (function () {
         if (fxTag === '灵风术') return playLingFeng((targets && targets[0]) || caster);
         if (fxTag === '纳克提特障壁术') return playNakTith(caster);
         if (fxTag === '伊西丝之拥') return playIsis(caster, targets);
+        if (fxTag === 'group:melee') return playMeleeGroup(caster, targets);
+        if (fxTag === 'group:ranged') return playRangedGroup(caster, targets);
+        if (fxTag === 'group:spell') return playSpellGroup(caster, targets);
         return null;
     }
     function playArcaneProjectile(type, fromDom, toDom, dodged = false) {
@@ -5411,7 +5937,7 @@ const arcaneVfxModule = (function () {
         S.handles.forEach(h => { if (h && h.cancel) h.cancel(); }); S.handles.clear();
         S.layers.forEach(d => d.remove()); S.layers.clear();
         S.anchors.forEach(d => d.remove()); S.anchors.clear();
-        S.flashes.forEach(el => el.classList.remove('arcane-flash-cold', 'arcane-flash-heal')); S.flashes.clear();
+        S.flashes.forEach(el => el.classList.remove('arcane-flash-cold', 'arcane-flash-heal', 'arcane-flash-melee', 'arcane-flash-ranged', 'arcane-flash-spell')); S.flashes.clear();
         S.shakeEls.forEach(el => el.classList.remove('arcane-shake-light', 'arcane-shake-heavy', 'arcane-shake-quake')); S.shakeEls.clear();
         if (S.dark) { S.dark.remove(); S.dark = null; }
         if (S.canvas) { S.canvas.remove(); S.canvas = null; S.ctx = null; }
@@ -7883,6 +8409,9 @@ const WEBM_FX_REGISTRY = {
     '伊西丝之拥': { url: '', scale: 1.0, particles: 'arcane', delay: 1.1 },
     '折影步': { url: '', scale: 1.0, particles: 'arcane', delay: 0 },
     '巫师护盾': { url: '', scale: 1.0, particles: 'arcane', delay: 0 },
+    'group:melee': { url: '', scale: 1.0, particles: 'arcane', delay: 0.35 },
+    'group:ranged': { url: '', scale: 1.0, particles: 'arcane', delay: 0.35 },
+    'group:spell': { url: '', scale: 1.0, particles: 'arcane', delay: 0.35 },
     // 用户新增三组（my_assets 实测核名：miaozhun/ranshao 为 .mp3+.webm，weimu 音效为 .wav）；开镜瞄准/燃烧弹无 delay（立即结算），圣域帷幕 delay 1（演出后结算）、均不放大音量
     // 开镜瞄准/燃烧弹 scale 0.42：用户实测原 1.4 过大，降至 30%（1.4×0.3）
     '开镜瞄准': { url: `${ASSET_BASE}/miaozhun.webm`, scale: 0.42, audioUrl: `${ASSET_BASE}/miaozhun.mp3` },
@@ -14315,6 +14844,20 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
     return { dodged: false, guardian: null, usedSheshen: false };
 }
 
+// 群体旧括号特效优先于通用伤害类型；新增子类型也集中在这一层。
+function resolveGroupAttackSubtypeFx(tag) {
+    if (tag.includes('霰弹')) return 'shotgun';
+    if (tag.includes('爆炸')) return 'explosion';
+    if (tag.includes('雷')) return 'thunder';
+    return null;
+}
+function resolveEnemyGroupAttackFx(caster, tag, skill) {
+    if ((skill && skill.fxTag) || isHeroSideEntity(caster) || !tag || !tag.includes('群')) return null;
+    if (!['攻', '单体', '穿透', '眩晕', '散射'].some(k => tag.includes(k)) || resolveGroupAttackSubtypeFx(tag)) return null;
+    const type = (skill && skill.damageType) || '近战';
+    return type === '法术' ? 'group:spell' : type === '远程' ? 'group:ranged' : 'group:melee';
+}
+
 // 单点默认动效：显式括号优先；只有敌方未指定动效时按伤害类型补齐。
 function resolveSingleAttackFx(caster, tag, skill) {
     if (!tag || tag.includes('群') || (skill && skill.fxTag)) return null;
@@ -14520,7 +15063,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     const _isPierceFxDodge = skill && skill.fxTag === '枪击穿透';
     const _isGunshotTagDodge = !_isStrafeFx && tag.includes('枪击') && !(skill && (skill.fxTag === '近战重击' || skill.fxTag === '远程重击'));
     const _isShotgunTagDodge = !_isStrafeFx && tag.includes('霰弹') && !(skill && (skill.fxTag === '近战重击' || skill.fxTag === '远程重击'));
-    const _shouldGunshotOnDodge = !attackFxPlayed && !singleAttackFx && !_isStrafeFx && (_isPierceFxDodge || _isGunshotTagDodge || _isShotgunTagDodge);
+    const _shouldGunshotOnDodge = !attackFxPlayed && !singleAttackFx && !_isStrafeFx && !resolveEnemyGroupAttackFx(caster, tag, skill) && (_isPierceFxDodge || _isGunshotTagDodge || _isShotgunTagDodge);
     if (isDodged) {
       consumeOneTimeDamageGuard();
       if (!attackFxPlayed && singleAttackFx && (!isHeroSideEntity(caster) || singleAttackFx === 'gunshot' || singleAttackFx === 'shotgun' || singleAttackFx === 'fire' || (reactionFx && reactionFx.dodge))) {
@@ -14638,11 +15181,12 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     // ★ 重击豁免：[特效:近战重击]/[特效:远程重击] 由 executeSkillAction 独占已播全套重击演出，此处不再叠加
     // ★ [特效:造雾术]/[特效:高阶召唤术]/[特效:障壁术] 同理：全屏 SVG 演出已由 executeSkillAction 独占，不再叠加单点枪火
     const _isHeavyFx = skill && (skill.fxTag === '近战重击' || skill.fxTag === '远程重击' || skill.fxTag === '造雾术' || skill.fxTag === '高阶召唤术' || skill.fxTag === '障壁术' || isArcaneSkillFx(skill.fxTag));
+    const _isEnemyGroupFx = resolveEnemyGroupAttackFx(caster, tag, skill);
     const _isGunshotFxSkill = skill && skill.fxTag === '枪击穿透';
     const _isGunshotTagHit = tag.includes('枪击') && !_isHeavyFx;
     const _isShotgunTagHit = tag.includes('霰弹') && !_isHeavyFx;
-    if (_isHeavyFx) {
-        // 重击专属：本函数不再播音效/视觉，executeSkillAction 已处理（spawnRangedHeavyParticles + 重震+血溅）
+    if (_isHeavyFx || _isEnemyGroupFx) {
+        // 专属或敌方兜底群攻已由 executeSkillAction 播演出，不逐目标叠加命中声。
     } else if (_isGunshotFxSkill || _isGunshotTagHit || _isShotgunTagHit) {
         if (_gunshotFiredThisHit) {
             // 本发闪避已呈现开火感，命中不再重复
@@ -15076,7 +15620,7 @@ async function applyBarrierHit(caster, barrierTarget, tag, tagPower, skill, mult
   // ===== 屏障受击反馈（复用角色受击的泛白/震屏/音效与结界光晕）=====
   if (absorb > 0) {
     // 单点来袭已播放对应音效，群攻等旧路径继续保留原打击音。
-    if (!singleAttackFx) { if (tag.includes('群攻')) playSound('atk1'); else playSound('atk2'); }
+    if (!singleAttackFx && !resolveEnemyGroupAttackFx(caster, tag, skill)) { if (tag.includes('群攻')) playSound('atk1'); else playSound('atk2'); }
     // 屏障金光护罩受击压缩震颤与击打光晕波纹
     if (barrierDom) {
       barrierDom.classList.remove('barrier-hit-impact');
@@ -15163,7 +15707,7 @@ async function applyBarrierHit(caster, barrierTarget, tag, tagPower, skill, mult
         resistLog = `（${rParts.join('+')}减免 ${resistAmt}）`;
     }
     addHistory(`   ↳ 🛡️ 【${teamBarrierName}】以${barrierArmor > 0 ? '护甲' : '克制'}完全格挡了本次攻击（${rawDamage}→0）${resistLog}。`);
-    if (!singleAttackFx) { try { playSound('atk2'); } catch(e) {} }
+    if (!singleAttackFx && !resolveEnemyGroupAttackFx(caster, tag, skill)) { try { playSound('atk2'); } catch(e) {} }
   }
   if (teamBarrier <= 0 && teamBarrierMax > 0) {
     teamBarrier = 0;
@@ -15367,12 +15911,14 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     if (_bindSpendDesc) addHistory(`   ↳ ${bindingsSpendLabel(caster, skill)}：${_bindSpendDesc}`);
 
     // ===== 蓄力 + 聚焦特效（在 sleep 等待窗口中非阻塞播放）=====
+    const hasEnemyGroupFx = [skill.type, skill.type2, skill.type3].some(tag => resolveEnemyGroupAttackFx(caster, tag, skill));
+    let groupFxPlayed = false;
     {
         const isAttack = skill.type.includes('攻') || skill.type.includes('单体') || skill.type.includes('散射');
         const isHeavy = (typeof isHighYieldSkill === 'function' ? isHighYieldSkill(skill, caster) : skill.power > 60) || multiplier === 2;  // 动态高威力判定或爆发触发蓄力
         const casterDomForFx = getEntitySpriteDom(caster) || (caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`));
         
-        if (isHeavy && casterDomForFx && !isArcaneSkillFx(skill.fxTag)) {
+        if (isHeavy && casterDomForFx && !isArcaneSkillFx(skill.fxTag) && !hasEnemyGroupFx) {
             // 聚焦暗化
             window.spawnFocusOverlay(casterDomForFx, 700);
             
@@ -15395,7 +15941,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         }
     }
 
-    await sleep(390); if (_actionToken !== combatToken || _pipelineFrozen) return;  // 与蓄力动画时长同步（320ms + 70ms缓冲）
+    if (!hasEnemyGroupFx) { await sleep(390); if (_actionToken !== combatToken || _pipelineFrozen) return; } // 新兜底群攻使用自身350ms蓄势，其余保持320ms+70ms缓冲
     // 初始化本次技能结算的共享命中结论容器（跨标签共享：减益是否命中取决于同技能攻击的判定结果）
     if (skill) skill._bdg = { targetHit: {}, targetResolved: {}, manualSubduedTargetId: _manualSubId };
     let tagList = [{ tag: skill.type, power: skill.power, slotTurns: skill.slotTurns }, { tag: skill.type2, power: skill.power2 || 0, slotTurns: skill.slotTurns2 }, { tag: skill.type3, power: skill.power3 || 0, slotTurns: skill.slotTurns3 }].filter(t => t.tag && t.tag !== '[无]');
@@ -15579,19 +16125,34 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                 await sleep(Math.round(WEBM_FX_REGISTRY[skill.fxTag].delay * 1000)); if (_actionToken !== combatToken || _pipelineFrozen) return;
             }
         } else if (!skill || !skill.fxTag) {
-            // 没有配置自定义特效标签时，根据群攻子类型播放对应的默认 Canvas 全局特效
+            // 专属特效 > 旧括号子类型 > 敌方按伤害类型兜底；我方普通群攻保持原版。
             const isAttackTag = tag.includes('攻') || tag.includes('单体') || tag.includes('穿透') || tag.includes('眩晕') || tag.includes('散射');
             if (isAoe && isAttackTag) {
-                if (tag.includes('霰弹')) {
-                    // [群散射(霰弹)]：鹿弹扇面特效锚定主目标播一次（demo 多目标模式；逐目标硬直+逐发霰弹枪声在 applySingleTagEffect 命中分支内）
+                const subtypeFx = resolveGroupAttackSubtypeFx(tag);
+                if (subtypeFx === 'shotgun') {
+                    // [群散射(霰弹)]：鹿弹扇面特效锚定主目标播一次，逐目标音效保持原行为。
                     const _sgT = targets[0];
                     if (_sgT) { const _sgDom = getEntitySpriteDom(_sgT); if (_sgDom) playSVGEffect(_sgDom, 'shotgun'); }
+                } else if (subtypeFx) {
+                    playAOEEffect(casterIsHero ? 'enemies-container' : 'heroes-container', subtypeFx);
                 } else {
-                    const containerId = casterIsHero ? 'enemies-container' : 'heroes-container';
-                    let aoeType = 'default_aoe_strike';
-                    if (tag.includes('爆炸')) aoeType = 'explosion';
-                    else if (tag.includes('雷')) aoeType = 'thunder';
-                    playAOEEffect(containerId, aoeType);
+                    const groupTag = resolveEnemyGroupAttackFx(caster, tag, skill);
+                    if (groupTag) {
+                        if (!groupFxPlayed && targets.length) {
+                            groupFxPlayed = true;
+                            let fxTargets = targets;
+                            if (teamBarrier > 0) {
+                                const proxy = targets.find(t => !t.isBarrierTarget && !t.isSummon) || heroesData.find(h => isCombatActive(h) && !h.isSummon);
+                                barrierStandIn = { id: 'barrier2', isAlive: true, isBarrierTarget: true, name: teamBarrierName, spd: 0, buffs: [], classType: null, skills: [], dom: null, proxyHero: proxy };
+                                fxTargets = [barrierStandIn];
+                            }
+                            arcaneFx = playArcaneSkillFx(groupTag, caster, fxTargets, isReactionTrigger);
+                            const fxDelay = WEBM_FX_REGISTRY[groupTag].delay;
+                            if (fxDelay) { await sleep(Math.round(fxDelay * 1000)); if (_actionToken !== combatToken || _pipelineFrozen) return; }
+                        }
+                    } else {
+                        playAOEEffect(casterIsHero ? 'enemies-container' : 'heroes-container', 'default_aoe_strike');
+                    }
                 }
             }
         }
@@ -15611,7 +16172,10 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         // 【肃正】敌方对我方的群攻：屏障存在时，整个群攻被屏障命中一次（伪实体肉盾），我方成员不闪避、不被选中
         if (isAoe && !casterIsHero && !isBeneficial && teamBarrier > 0) {
             const proxy = (targets[0] && !targets[0].isBarrierTarget) ? targets[0] : heroesData.find(h => h.isAlive);
-            barrierStandIn = { id: 'barrier2', isAlive: true, isBarrierTarget: true, name: teamBarrierName, spd: 0, buffs: [], classType: null, skills: [], dom: null, proxyHero: proxy };
+            const groupTag = resolveEnemyGroupAttackFx(caster, tag, skill);
+            if (!groupTag || !barrierStandIn || !barrierStandIn.isBarrierTarget) {
+                barrierStandIn = { id: 'barrier2', isAlive: true, isBarrierTarget: true, name: teamBarrierName, spd: 0, buffs: [], classType: null, skills: [], dom: null, proxyHero: proxy };
+            }
             await applySingleTagEffect(caster, barrierStandIn, tag, tagPower, skill.hit, multiplier, effTurns, skill); if (_actionToken !== combatToken || _pipelineFrozen) return;
         } else {
             for (let t of targets) {
@@ -15704,6 +16268,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     if (arcaneFx && !isReactionTrigger) {
         const remain = arcaneFx.doneAt - Date.now();
         if (remain > 0) { await sleep(remain); if (_actionToken !== combatToken || _pipelineFrozen) return; }
+        if (groupFxPlayed) arcaneFx.cancel(); // 到期定时与交棒同拍时，也同步摘除本组临时层。
     }
     delete skill._arcaneFx;
     // 本次技能特效已播标记复位（保证下次释放同一技能仍可触发）
