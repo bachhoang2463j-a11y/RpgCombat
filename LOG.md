@@ -3167,3 +3167,17 @@
 - **变更**：仅 `index.html` 的 `omenSound`——① red-single 分支改回 `if (window.playSound) playSound('monsterAttack')`（写法与自爆路径 ：12066 一致），移除合成风切/click，`playEnemyWindup` 对 red-single 本就不创建 AudioContext，恢复后走游戏原生音效体系；② 七类分支全部 35 处 `vol` ×3（0.075~0.84），仅动 `vol`，`peak`（起音时长）/`pan`/`drive` 等不变。
 - **验证**：内联脚本 vm.Script 语法通过；`git diff` 确认改动仅限 omenSound 区块（25+/26-）；vol 范围 0.075~0.84 恰为原值三倍；monsterAttack 全文仅资源映射（:3997）与自爆路径（:12066）两处，普通前摇无双播。
 - **边界**：LOG-264 打包的 v11.3 正则产物早于本修正，**包内仍是旧音效**——需在酒馆里听到本修正须重新打包递增版本号，本轮未动打包流程；demo-enemy-windup.html 未改（其合成基准音仍作为对照参照）。完整听感以用户实机确认为准。
+
+---
+
+## [LOG-266] 2026-11-12 — 敌方群攻命中 Demo（红爪/黄晶）L2+ 跨排破框与五层合成音效升级
+
+- **提交**：`5e7b82e`。
+- **核心目的**：针对 `demo-enemy-group-attack.html` 中近战红爪（`group:melee`）与远程黄晶（`group:ranged`）受限于窄框裁切、无震屏/闪白、音效单薄的问题，对比 `demo-xianxiawood-skills-vfx.html` 与 `group:spell` 法术基线进行升级；法术群攻（`group:spell`）保持原版基线一字不动。
+- **变更**：仅 `demo-enemy-group-attack.html`——
+  1. **解除裁切与受击高亮**：`.arcane-group-stage` 改为 `overflow: visible`，`groupParticle` 移除默认 `clip` 矩形限制；新增 `.arcane-flash-melee` / `.arcane-flash-ranged`（`steps(1)` 离散高亮闪白与辉光）及整卡+头像双层受击硬直。
+  2. **蓄势阶段（`groupCharge`）**：尺寸扩至 `1.85×`，加入 32 颗向心吸入粒子、双环逆向旋转收缩法阵，以及 `300~350ms` 爆发前 Hitstop 坍缩聚核与声音骤切。
+  3. **近战群攻（`playMeleeGroup`）**：舞台向整排外扩 `58×44px`，三道加粗带倒刺巨型弧形血爪破框横扫，叠加友方半屏血色闪光罩与横向刀光残影；爪锋掠过四名英雄时依次触发 X 型血十字切光、双层冲击环、无裁切血焰/赤晶/焦黑余烬飞溅、五层撕裂合成音与分级震屏。
+  4. **远程群攻（`playRangedGroup` & `rangedHit`）**：移除飞行层 polygon 挖空，改为高空扇形展开 14 枚大小金晶棱枪（10 枚副晶密集铺垫 + 4 枚重型主晶锁定四名英雄中心），按 22ms 错峰高弧攒射；命中绽放 3D 穿刺金晶簇、放射裂纹、双冲击环、切面金晶碎片飞溅与头像 10 片多边形崩裂，配齐五层晶石爆鸣合成音效与终结重震。
+- **涉及文件**：`demo-enemy-group-attack.html`、`LOG.md`、`LOG-INDEX.md`。
+- **边界**：遵循 Demo 免测铁律直接交付用户实机体验；未改 `index.html`、`group:spell` 基线及正则打包产物。
