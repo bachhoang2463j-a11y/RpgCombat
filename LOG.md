@@ -3281,3 +3281,20 @@
 - **涉及文件**：`demo-attack-identity2.html`、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：最终编辑后 Node `node --check` 校验内联 `<script>` 通过；未跑自动化测试与审查，待用户实机确认观感。
 - **边界**：未触碰 `demo-skill-vfx-template.html`、`index.html`、正则产物与 `README.md`。
+
+## [LOG-273] 2026-11-12 — 敌方兜底群攻L2+三类演出与350ms命中音频正式移植，打包v11.5
+
+- **提交**：`30fe16b`（代码、测试与产物；本记录另行单向提交，未 amend、未推送）。
+- **核心目的**：移植已确认的近战血爪、远程金晶、法术白爆及命中音频，仅替换敌方（含敌方召唤物）最低优先级群攻兜底，不覆盖专属、旧括号或我方普通群攻。
+- **具体变更**：
+  1. 共用 `resolveGroupAttackSubtypeFx` / `resolveEnemyGroupAttackFx`，严格按 `[特效:...]` > 旧霰弹/爆炸/雷 > `damageType || '近战'` 分派；`[群攻(爆炸)][法术]` 仍走原 explosion。我方及我方召唤物普通群攻与全局 `spawnDefaultAOEParticles` 未改。
+  2. 复用正式 `arcaneVfxModule`，合并CSS、动态图面/屏障定位、group生命周期、`DRAW.group` 与三套时间轴，内部group三键登记delay 0.35。14枚金晶按1～N分配主晶反馈；法术三层冲击环/90流光封装私有辅助粒子，不覆盖默认AOE。
+  3. `audioUrls` 新增 `enemyMeleeGroupHit.mp3` / `enemyRangedGroupHit.mp3`，沿用ASSET_BASE、Blob预热和playSound；350ms分别播0.72/0.75/atk1 0.5。合成前摇用本组干声门350ms截断，不搬Base64/开关/爆发混音；新兜底的逐目标命中、屏障吸收/格挡和枪击闪避不重复播通用命中声，旧分支、真实闪避及独立盾碎atk1保留。
+  4. 保留330ms敌方提示前摇，仅新兜底跳通用聚焦/蓄力与390ms缓冲；自身350ms后原样结算，保留逐目标反应/200ms间隔，doneAt交棒同步幂等cancel自身。clear清三个新增flash；取消/战局token重置回收WAAPI、图层、定时器、弹道和粒子，不延迟复活。
+  5. 新增独立群攻fixture接harness test45，非公开artifact路径改v11.5；归档公开版静态锁仅显式public执行。新增可复跑产物断言，检查清理、闪避守卫与SVG动画CSS入包，不绑定mangle局部名。
+- **涉及文件**：`index.html`、`integration-test/harness.html`、`integration-test/fixtures/enemy-group-attack-regression.js`、`integration-test/enemy-group-artifact-check.cjs`、`regex-前端战斗v11_5.json`、`LOG.md`、`LOG-INDEX.md`。
+- **构建与版本**：已执行git mv v11_4→v11_5并同步scriptName；最终build-regex成功，replaceString 1,035,841字符、压缩约31%。对比v11.4业务提交`64d76fb`，除scriptName/replaceString外正则字段零变更。并行文档提交`66cdfdc`已纳入本次暂存的纯文件重命名；业务内容及scriptName由本轮`30fe16b`提交，未改写并行历史。
+- **验证**：JS语法通过；IAB源码全量 **1060项通过、0失败**（含群攻test45 204项）；压缩包运行时test44+45 **315项通过、0失败**；Node产物专项 **50项通过、0失败**，覆盖围栏/实体/捕获组免疫、内网隔离、新音频/逻辑/CSS入包、无Demo代码、monsterAttack恰3处（资源表+红单体前摇+自爆）。独立只读审查确认无阻断问题。
+- **回归修正**：补SVG动画定位类及fs-flash样式；本机服务补OpeningSetup依赖路径；盾碎独立音与群攻重复音分开计数，交棒同步清本组，未通过更改真实数值或删除非公开功能断言掩盖失败。
+- **未测范围**：`192.168.110.83:8766`三音频HEAD均ECONNREFUSED，MP3文件存在但未实播；未启动/修改用户资源服务、未导入酒馆、未做真Chrome音画或安卓验证。IAB采用隔离合成节点及采样调用计数，实播和观感待用户导入确认；README等待确认有效再更新，SPEC、Demo、母版和公开版不动。
+- **目的 vs 现状**：仅敌方最低优先级群攻升级并通过源码/产物门禁，未扩大到我方、旧括号或数值规则，目的与现状一致。
