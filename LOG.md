@@ -3125,3 +3125,21 @@
 - **涉及文件**：`demo-enemy-windup.html`、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：`vm.Script` 语法通过；逐段字节比对确认 `omenBase` 关键帧、`red-single` 音效分支、基准卡片、共享 `audio` 工具与 HEAD 完全一致，旧曲线标识 grep 命中 0；七类 55% 帧 computed filter 均为 30px+50px 双层光晕、余韵 50px+80px。IAB：八项播放均上类并锁 8 卡，冻结 330ms 量测，七类粒子画布在图标区域实测非零像素（365~1183px），600ms 后 `breathe` 恢复、`data-arcane-fx`/驱动粒子/卡片锁全部归零；静音播放画面照常、中途重置立即清场、音效开关可复位；全程无 error/unhandledrejection。只读审查子代理结论「无阻断问题」，3 项低危（`nextElementSibling` 血条假设、`render` 对失效 dom 无保护、粒子密度）均为本流程不触发的假设性场景，按「不做防御性编程」约定保留现状。
 - **边界**：未移植正式版，未改 `index.html`、公开版、母版模板、README/SPEC 与战斗逻辑；红色单体基线零改动；IAB Playwright 原生点击超时，改用页面内 `click()` 派发（与按钮同一处理器），未冒充真实用户输入；完整观感与音色以用户实机试播为准。二期（远程/法术群攻本体演出＋三类型×单体/群攻共六种 charge 释放）未开始。
+
+---
+
+## [LOG-263] 2026-11-12 — 敌方前摇七类移植正式版（分类分派＋贴身粒子＋合成音）
+
+- **提交**：`7619860`。
+- **核心目的**：把 `demo-enemy-windup.html` 已确认的敌方攻击前摇（七类近身渐变粒子＋基线级柔光晕）移植进正式版 `index.html`，玩家能从起手动作分辨敌方行为；攻击类动效优先，增益/减益仅在技能完全无攻击效果时触发，增益优先级高于减益。
+- **变更**：仅 `index.html` 六处——
+  1. CSS：`.enemy-omen`（enemyOmenCombo）后追加七组关键帧与类（omenRedWide/omenAmberSingle/omenAmberWide/omenVioletSingle/omenVioletWide/omenRoseSelf/omenGloomFoe），不移植 demo 的 `omenBase/.omen-red-single`；红色单体基线 CSS 零改动。
+  2. arcane 模块 `DRAW` 新增 `omen` 绘制类型；`render()` 每帧刷新 omen 粒子 owner/frame（clipBottom 止于血条上缘）。
+  3. 模块内新增 `OMEN_MS/OMEN_BEAT`、`localAfter`（token 守卫且可被 handle 单独摘除）、`OMEN_COLORS`、`drawOmenParticle`、`omenParticle`、`omenAura`（red-single 直接 return＝零粒子）、`omenSound` 全分支（含红单体合成音）、`playEnemyWindup`；不移植 demo 的 `OMEN_SFX` 开关与 `setWindupSfx`（正式版无静音系统，与五技能合成音同格恒播放）。
+  4. 模块导出 `window.playEnemyWindup`；ARCANE_TAGS/WEBM 注册表/[特效:] 通道零改动（直调方案，不经注册表）。
+  5. `executeEnemyTurn` 上方新增顶层 `classifyEnemyWindup`（纯演出分类，不动结算排序与选技）：攻击档＝直伤族（攻/单体/穿透/眩晕/散射，同结算 14066 口径）∪ DoT（中毒/燃烧＝每回合真实扣HP）∪ 控制（麻痹＝概率跳行动），按 damageType×含群 映射红/黄/紫×单体/群，缺省近战兜底；增益档按 isBeneficial 原式→rose-self（增益优先于减益）；减益档＝降/盲/滞/弱/缓/吸蓝→gloom-foe（自X族排除，属自身代价非敌对减益）；自X族与无槽→无前摇；兜底普攻（无技能）→红单体。
+  6. `executeEnemyTurn` 前摇块：原 DAMAGE_TAGS 六标签 gate 替换为分类分派 `playEnemyWindup(enemy, kind)`；删除该路径 `playSound('monsterAttack')`（红单体改走 demo 合成音，mp3 资产与自爆路径 `12066` 保留）；sleep(330) 结算拍点、600/330 时序、cutin 路径、充能过滤（charge>0 不进普通候选，充能满仅走 cutin）、自爆路径、`executeSummonTurn`（仅 `side==='hero'` 的我方召唤物）全部不动；敌方召唤物走 executeEnemyTurn 自动继承。
+  - barTop 按 `${caster.id}-hp-bar` 取 rect.top（普通敌/召唤物统一成立），替代 demo 的 `nextElementSibling`；owner 仅非红单体创建。
+- **涉及文件**：`index.html`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：`vm.Script` 全部内联脚本块语法通过；废弃曲线标识（omen-aura/omenDraw/omenRingIn/omenRingOut/omenRise/omenPeel）grep 命中 0；`git diff` 确认 enemyOmenCombo 关键帧、cutin、自爆区域零触碰。IAB（本地静态服务加载）：`classifyEnemyWindup` 19 断言全过（含咆哮＝rose-self、自盲＝null、自X骑签不降档、DoT/麻痹归攻击档）；八类逐项演出——类名/动画名正确、呼吸让位、330ms 冻结 computed filter 均为 30px+50px 双层光晕（八色各自正确）、七类有驱动粒子而红单体零粒子；480ms 冻结余韵 50px+80px；cancel/600ms 自然收尾/中途 `clearArcaneFx` 三路径类名摘除、呼吸恢复、canvas 释放全部通过；`window.setWindupSfx===undefined` 确认无开关。IAB Playwright 原生点击超时为已知现象，本轮全部以页面内 evaluate 驱动，未冒充真实用户输入。
+- **边界**：未动技能数值/AI 选技/结算排序/charge 大招/自爆/我方召唤物路径；图鉴 87 个攻击技能 damageType 全部显式（攻击档零缺失），31 条 dt=null 均为增益档、对前摇无影响；二期（怪物岛 charge 技能特效六变体）不在本轮；README 未改，待用户酒馆实测确认后再更新。
