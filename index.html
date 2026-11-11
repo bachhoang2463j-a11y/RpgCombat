@@ -5302,42 +5302,41 @@ const arcaneVfxModule = (function () {
         }, bag);
     }
 
-    // 七类新音色在285ms收紧停声，330ms释放；不送入长卷积混响。红色单体分支原样保留。
+    // 七类新音色在285ms收紧停声，330ms释放；不送入长卷积混响。红色单体恢复原版 monsterAttack 预警音效。
     function omenSound(kind, bag) {
         const beat = fn => localAfter(OMEN_BEAT, fn, bag);
         if (kind === 'red-single') {
-            whoosh(0, { f0: 520, f1: 1700, q: 1.5, dur: 0.28, vol: 0.26, peak: 0.12 });
-            beat(() => click(0, 0.22, 3600, 0.008));
+            if (window.playSound) playSound('monsterAttack'); // 原·单体近战预警音效
         } else if (kind === 'red-wide') {
-            whoosh(0, { f0: 260, f1: 1100, q: 0.8, dur: 0.285, vol: 0.2, peak: 0.24, cut: true, pan: -0.25, pan1: 0.1 });
-            tone(0, { type: 'triangle', f0: 140, f1: 92, dur: 0.27, vol: 0.055, peak: 0.18 });
-            beat(() => { whoosh(0, { f0: 1700, f1: 360, q: 0.7, dur: 0.2, vol: 0.28, peak: 0.018, pan: -0.45, pan1: 0.45 }); crunch(0, { f: 900, f1: 280, q: 0.6, dur: 0.11, vol: 0.09, drive: 1.5 }); });
+            whoosh(0, { f0: 260, f1: 1100, q: 0.8, dur: 0.285, vol: 0.6, peak: 0.24, cut: true, pan: -0.25, pan1: 0.1 });
+            tone(0, { type: 'triangle', f0: 140, f1: 92, dur: 0.27, vol: 0.165, peak: 0.18 });
+            beat(() => { whoosh(0, { f0: 1700, f1: 360, q: 0.7, dur: 0.2, vol: 0.84, peak: 0.018, pan: -0.45, pan1: 0.45 }); crunch(0, { f: 900, f1: 280, q: 0.6, dur: 0.11, vol: 0.27, drive: 1.5 }); });
         } else if (kind === 'amber-single') {
-            whoosh(0, { f0: 640, f1: 1550, q: 1.6, dur: 0.285, vol: 0.13, peak: 0.24, cut: true });
-            tone(0, { type: 'triangle', f0: 110, f1: 185, dur: 0.285, vol: 0.065, peak: 0.22, cut: true });
-            beat(() => { crunch(0, { f: 1600, f1: 460, q: 0.75, dur: 0.12, vol: 0.22, drive: 1.6 }); tone(0, { type: 'triangle', f0: 250, f1: 85, fd: 0.045, dur: 0.16, vol: 0.085 }); });
+            whoosh(0, { f0: 640, f1: 1550, q: 1.6, dur: 0.285, vol: 0.39, peak: 0.24, cut: true });
+            tone(0, { type: 'triangle', f0: 110, f1: 185, dur: 0.285, vol: 0.195, peak: 0.22, cut: true });
+            beat(() => { crunch(0, { f: 1600, f1: 460, q: 0.75, dur: 0.12, vol: 0.66, drive: 1.6 }); tone(0, { type: 'triangle', f0: 250, f1: 85, fd: 0.045, dur: 0.16, vol: 0.255 }); });
         } else if (kind === 'amber-wide') {
-            whoosh(0, { f0: 480, f1: 1380, q: 1.1, dur: 0.285, vol: 0.15, peak: 0.24, cut: true });
-            tone(0, { type: 'triangle', f0: 95, f1: 165, dur: 0.285, vol: 0.065, peak: 0.22, cut: true });
-            beat(() => { whoosh(0, { f0: 1900, f1: 400, q: 0.6, dur: 0.18, vol: 0.22, peak: 0.012, pan: -0.4, pan1: 0.4 }); crunch(0, { f: 1100, f1: 340, q: 0.8, dur: 0.145, vol: 0.16, drive: 1.5 }); tone(0, { type: 'triangle', f0: 215, f1: 72, fd: 0.04, dur: 0.18, vol: 0.07 }); });
+            whoosh(0, { f0: 480, f1: 1380, q: 1.1, dur: 0.285, vol: 0.45, peak: 0.24, cut: true });
+            tone(0, { type: 'triangle', f0: 95, f1: 165, dur: 0.285, vol: 0.195, peak: 0.22, cut: true });
+            beat(() => { whoosh(0, { f0: 1900, f1: 400, q: 0.6, dur: 0.18, vol: 0.66, peak: 0.012, pan: -0.4, pan1: 0.4 }); crunch(0, { f: 1100, f1: 340, q: 0.8, dur: 0.145, vol: 0.48, drive: 1.5 }); tone(0, { type: 'triangle', f0: 215, f1: 72, fd: 0.04, dur: 0.18, vol: 0.21 }); });
         } else if (kind === 'violet-single') {
-            tone(0, { type: 'sine', f0: 180, f1: 350, dur: 0.285, vol: 0.075, peak: 0.24, cut: true });
-            tone(0, { type: 'triangle', f0: 370, f1: 760, dur: 0.285, vol: 0.035, peak: 0.24, cut: true, lp: 1800 });
-            whoosh(0, { f0: 350, f1: 1350, q: 2.2, dur: 0.285, vol: 0.09, peak: 0.25, cut: true });
-            beat(() => { tone(0, { f0: 880, f1: 610, dur: 0.16, vol: 0.055 }); tone(0, { f0: 1420, f1: 1080, dur: 0.105, vol: 0.026 }); whoosh(0, { f0: 1450, f1: 390, q: 1.4, dur: 0.17, vol: 0.095, peak: 0.018 }); });
+            tone(0, { type: 'sine', f0: 180, f1: 350, dur: 0.285, vol: 0.225, peak: 0.24, cut: true });
+            tone(0, { type: 'triangle', f0: 370, f1: 760, dur: 0.285, vol: 0.105, peak: 0.24, cut: true, lp: 1800 });
+            whoosh(0, { f0: 350, f1: 1350, q: 2.2, dur: 0.285, vol: 0.27, peak: 0.25, cut: true });
+            beat(() => { tone(0, { f0: 880, f1: 610, dur: 0.16, vol: 0.165 }); tone(0, { f0: 1420, f1: 1080, dur: 0.105, vol: 0.078 }); whoosh(0, { f0: 1450, f1: 390, q: 1.4, dur: 0.17, vol: 0.285, peak: 0.018 }); });
         } else if (kind === 'violet-wide') {
-            [-1, 1].forEach(side => tone(0, { type: 'triangle', f0: 195 + side * 11, f1: 365 + side * 15, dur: 0.285, vol: 0.038, peak: 0.24, cut: true, pan: side * 0.32, lp: 1800 }));
-            whoosh(0, { f0: 300, f1: 1200, q: 1.6, dur: 0.285, vol: 0.11, peak: 0.25, cut: true });
-            beat(() => { [-1, 1].forEach(side => tone(0, { f0: 760 + side * 110, f1: 500 + side * 75, dur: 0.19, vol: 0.036, pan: side * 0.4 })); tone(0, { f0: 1210, f1: 970, dur: 0.13, vol: 0.025 }); whoosh(0, { f0: 1350, f1: 320, q: 0.9, dur: 0.19, vol: 0.12, peak: 0.02, pan: -0.35, pan1: 0.35 }); });
+            [-1, 1].forEach(side => tone(0, { type: 'triangle', f0: 195 + side * 11, f1: 365 + side * 15, dur: 0.285, vol: 0.114, peak: 0.24, cut: true, pan: side * 0.32, lp: 1800 }));
+            whoosh(0, { f0: 300, f1: 1200, q: 1.6, dur: 0.285, vol: 0.33, peak: 0.25, cut: true });
+            beat(() => { [-1, 1].forEach(side => tone(0, { f0: 760 + side * 110, f1: 500 + side * 75, dur: 0.19, vol: 0.108, pan: side * 0.4 })); tone(0, { f0: 1210, f1: 970, dur: 0.13, vol: 0.075 }); whoosh(0, { f0: 1350, f1: 320, q: 0.9, dur: 0.19, vol: 0.36, peak: 0.02, pan: -0.35, pan1: 0.35 }); });
         } else if (kind === 'rose-self') {
-            tone(0, { f0: 230, f1: 460, dur: 0.285, vol: 0.065, peak: 0.22, cut: true });
-            tone(0, { type: 'triangle', f0: 345, f1: 690, dur: 0.285, vol: 0.025, peak: 0.24, cut: true, lp: 1500 });
-            whoosh(0, { f0: 600, f1: 1600, q: 0.8, dur: 0.285, vol: 0.075, peak: 0.24, cut: true });
-            beat(() => { tone(0, { f0: 520, f1: 640, dur: 0.19, vol: 0.055, peak: 0.025 }); tone(0, { f0: 780, f1: 960, dur: 0.16, vol: 0.026, peak: 0.022 }); whoosh(0, { f0: 1600, f1: 700, q: 0.65, dur: 0.19, vol: 0.065, peak: 0.025 }); });
+            tone(0, { f0: 230, f1: 460, dur: 0.285, vol: 0.195, peak: 0.22, cut: true });
+            tone(0, { type: 'triangle', f0: 345, f1: 690, dur: 0.285, vol: 0.075, peak: 0.24, cut: true, lp: 1500 });
+            whoosh(0, { f0: 600, f1: 1600, q: 0.8, dur: 0.285, vol: 0.225, peak: 0.24, cut: true });
+            beat(() => { tone(0, { f0: 520, f1: 640, dur: 0.19, vol: 0.165, peak: 0.025 }); tone(0, { f0: 780, f1: 960, dur: 0.16, vol: 0.078, peak: 0.022 }); whoosh(0, { f0: 1600, f1: 700, q: 0.65, dur: 0.19, vol: 0.195, peak: 0.025 }); });
         } else if (kind === 'gloom-foe') {
-            tone(0, { type: 'triangle', f0: 190, f1: 92, dur: 0.285, vol: 0.075, peak: 0.22, cut: true, lp: 700 });
-            whoosh(0, { f0: 950, f1: 260, q: 1.8, dur: 0.285, vol: 0.13, peak: 0.24, cut: true });
-            beat(() => { crunch(0, { f: 570, f1: 145, q: 1.2, dur: 0.2, vol: 0.16, drive: 1.8 }); tone(0, { type: 'triangle', f0: 125, f1: 52, dur: 0.19, vol: 0.075, lp: 460 }); whoosh(0, { f0: 700, f1: 190, q: 0.9, dur: 0.18, vol: 0.08, peak: 0.015 }); });
+            tone(0, { type: 'triangle', f0: 190, f1: 92, dur: 0.285, vol: 0.225, peak: 0.22, cut: true, lp: 700 });
+            whoosh(0, { f0: 950, f1: 260, q: 1.8, dur: 0.285, vol: 0.39, peak: 0.24, cut: true });
+            beat(() => { crunch(0, { f: 570, f1: 145, q: 1.2, dur: 0.2, vol: 0.48, drive: 1.8 }); tone(0, { type: 'triangle', f0: 125, f1: 52, dur: 0.19, vol: 0.225, lp: 460 }); whoosh(0, { f0: 700, f1: 190, q: 0.9, dur: 0.18, vol: 0.24, peak: 0.015 }); });
         }
     }
 
