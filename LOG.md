@@ -3213,3 +3213,16 @@
 - **打包**：按工作协定五版本号递增 `v11_3→v11_4`（git mv＋scriptName 前端战斗v11.4），`node build-regex.cjs` 重打包（replaceString 1,003,917 字符）。
 - **验证**：源码 vm.Script 语法通过；omenSound 无合成 vol 残留、无 bag 残留、调用点唯一。产物断言：7 键 url×1＋call×1、monsterAttack 恰 3（资产键＋红单体＋自爆）、产物 vol 计数 86→51（恰为移除的前摇 35 处合成 vol）、合成时长 .285 零残留、裸反引号恰 2、& 实体免疫通过。
 - **边界**：音量走 playSound 默认（audioCache 分支 volume=0.5，与 monsterAttack 同链路同响度；若需再调走第二参 volume）；音频可达性依赖 8766 内网资源服务（与既有音效同条件）；听感以用户在酒馆实测为准。
+
+---
+
+## [LOG-268] 2026-11-12 — 敌方群攻 Demo 接入 C3 / B1 / 原版 atk1 命中配音并统一 350ms 触发
+
+- **提交**：`70c6362`。
+- **核心目的**：按用户在试听后定稿的配音方案更新 `demo-enemy-group-attack.html`——保留 `0~350ms` 蓄力前摇合成音，移除爆发/受击后全部 Web Audio 合成混音，统一在 `350ms` 蓄力结束出招瞬间干净播放选定真实音频（不裁开头）；法术保留已升级的 L2+ 六芒法阵/十字白爆视觉，仅音频回到原版 `atk1`。
+- **变更**：仅 `demo-enemy-group-attack.html`——
+  1. **内嵌采样与统一播放管线**：在 `GROUP_ATK1_BASE64` 旁内嵌 `GROUP_MELEE_BASE64`（`C3_重刃劈砍冲击_mx2794_Heavy_sword_hit.mp3`，39KB）与 `GROUP_RANGED_BASE64`（`B1_连环晶簇崩裂碎响_fs541601_Shattering_Chandelier.mp3`，49KB），建立 `GROUP_AUDIO_SRC` + `groupAudioBuffers` 缓存；扩展 `prepareGroupAudio(fxTag)` 按技能类型预解码对应通道，新增 `playGroupSample(kind, volume)` 统一走 Web Audio `BufferSource` + `groupSoundNodes` 注册（`playDefaultHitSound()` 复用 `spell` 通道、`0.5` 音量）。
+  2. **三技能 350ms 触发与混音清理**：① `playMeleeGroup` 于 `350ms` 播放 `melee` (`0.72`)，移除爆发帧与四卡逐卡命中的 `click/whoosh/crunch/kick/boom/tone`；② `playRangedGroup` 于 `350ms`（`idx===0` 发射拍点）播放 `ranged` (`0.75`)，移除 14 枚晶弹发射 `whoosh/click` 与 `rangedHit` 内全部 Web Audio 合成音；③ `playSpellGroup` 于 `350ms` 仅保留 `playDefaultHitSound()`，移除 `kick/boom/chime` 叠加。
+- **涉及文件**：`demo-enemy-group-attack.html`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：内联两段 `<script>` 经 Node `vm.Script` 解析语法通过；遵循 Demo 免测免审铁律直接交付用户实机体验。
+- **边界**：`资源/group-attack-sfx-candidates/` 与 `资源/windup-sfx-candidates/` 同属未入库本地试听候选目录；未触碰 `index.html` 与正式版正则打包产物。
