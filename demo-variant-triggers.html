@@ -159,6 +159,32 @@
  </div>
   <script>
     // ===== 演示宿主 BEGIN：占位数据、渲染、fxEngine；不移植到正式版 =====
+    const $ = s => document.querySelector(s);
+    let combatToken = 0;
+    let heroesData = [], enemiesData = [];
+    const HERO_AVATARS = {
+        '埃利奥特': 'https://imgur.la/images/2026/06/25/31a4dd84a831e3f76082542bf12fcf19.png',
+        '弗兰克': 'https://imgur.la/images/2026/06/25/26f001dbe399876cd74978bbe12a265b.png',
+        '玛德琳': 'https://imgur.la/images/2026/06/25/585bf7f2f1559168b419b8be56da36a6.png',
+        '索恩': 'https://imgur.la/images/2026/08/13/77fcdf0fd006c4ff1ccae30774322270.png'
+    };
+    const HERO_DATA = [['h1', '埃利奥特', '👨', 100, 55, 110, 5], ['h2', '弗兰克', '🧔', 180, 0, 17, 0], ['h3', '玛德琳', '👩', 140, 0, 14, 0], ['h4', '索恩', '🕵️', 140, 0, 20, 0]];
+    const ENEMY_ROWS = [[['e1', '🐟'], ['e2', '❄️'], ['e3', '🐟']], [['e4', '👻'], ['e5', '👻'], ['e6', '🌀']]];
+
+function createCompactBarHTML(id, type, label, val, max, colorClass, isTp = false, shield = 0) {
+  const pct = Math.max(0, Math.min(100, (val / max) * 100)); const barWidthClass = isTp ? 'w-1/3' : 'w-full';
+  const shieldText = shield > 0 && type === 'hp' ? `<span class="text-slate-300 ml-0.5 text-[7px] sm:text-[9px]">(盾${shield})</span>` : '';
+  let finalColor = colorClass; let extraClass = ''; if (isTp && val >= max) { finalColor = 'bg-amber-400'; extraClass = 'shadow-[0_0_10px_rgba(251,191,36,0.8)] animate-pulse'; }
+  return `<div class="relative pt-1.5 sm:pt-2.5 mb-0 sm:mb-[2px]"><span id="${id}-${type}-text" class="absolute right-0 top-0 text-[8px] sm:text-xs font-mono font-bold text-white leading-none text-outline z-10 whitespace-nowrap">${Math.floor(val)}${shieldText}</span><div class="flex items-center gap-1 sm:gap-1.5"><span class="text-[7px] sm:text-[10px] font-bold text-gray-200 leading-none text-outline w-3 sm:w-4">${label}</span><div class="flex-grow h-1 sm:h-1.5 bg-[#222] rounded-[1px] overflow-hidden border border-[#111]"><div id="${id}-${type}-bar" class="${barWidthClass} h-full ${finalColor} ${extraClass} transition-all duration-300 ease-out" style="width: ${pct}%"></div></div></div></div>`;
+}
+
+function getEntitySpriteDom(entityOrId){
+  const id = entityOrId && typeof entityOrId === 'object' ? entityOrId.id : String(entityOrId||'');
+  if(!id) return null;
+  return document.getElementById(`hero-card-${id}`) || document.getElementById(`${id}-sprite`) || document.getElementById(`hero-wrap-${id}`) || null;
+}
+window.getEntitySpriteDom = getEntitySpriteDom;
+
     const DEFAULT_TURN_ITEMS = [
         { id: 'h1', e: '👨', name: '埃利奥特', hero: true },
         { id: 'e2', e: '❄️', name: 'e2', hero: false },
