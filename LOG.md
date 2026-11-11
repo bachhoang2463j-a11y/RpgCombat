@@ -3202,3 +3202,14 @@
   2. **爆发与受击（`350ms~`）**：在友方整排中心引爆——① 破框巨型六芒星奥术法阵（`arcane-spell-formation`）与贯通整排的十字破界白光棱柱（`arcane-spell-prism`）旋转盛放；② 底层 `spawnDefaultAOEParticles` 升级为半径 320px 的三层主副脉冲光环（炽白主环 + 冰蓝虚线环 + 银青余波环）、90 颗带 `#38bdf8` 辉光长尾的炽白/冰蓝流光粒子与 11px 强震屏；③ 四名我方角色由内向外错峰 35ms 触发 `.arcane-flash-spell`（`steps(1)` 神圣冰蓝强闪）、`groupFlinch` 双层受击震颤与单卡星芒晶簇迸射；④ 音效采用「原版 `atk1` 采样 + Web Audio 混音增强」，在 `playDefaultHitSound()` 基础上叠加超低频下潜 `kick`、宽频能量轰鸣 `boom` 与泛音列空灵余韵 `chime(528/792/1056Hz)`。
 - **涉及文件**：`demo-enemy-group-attack.html`、`LOG.md`、`LOG-INDEX.md`。
 - **边界**：遵循 Demo 免测铁律直接交付用户实机查看确认；未触碰 `index.html` 与正则打包产物。
+---
+
+## [LOG-267] 2026-11-12 — 前摇七类接入专属音频＋打包 v11.4
+
+- **提交**：`64d76fb`。
+- **核心目的**：用户提供的七个前摇音频（enemyBuff/enemyDebuff/enemyMagic/enemyMagicGroup/enemyRanged/enemyRangedGroup/enemySwingGroup.mp3）接入正式版前摇音效体系；单体近战维持原版 monsterAttack 不变。
+- **查证链路**：`ASSET_ORIGIN/ASSET_BASE`（:2861，内网 8766 资源服务）→ `audioUrls` 键值表（页面加载时 fetch 预热 Blob＋audioCache 预建 Audio）→ `window.playSound(key, volume=1)`（:4027），monsterAttack 即此链路；七个 mp3 已存在于 `D:\Project\my_assets\`（即 8766 服务目录），无需上传。
+- **变更**：① `audioUrls` 追加七键（xiandan 之后，注释标注前摇用途）；② `omenSound` 七分支由合成音改播对应 `playSound` 键，删除因本次改动不再使用的 beat 闭包与 bag 形参（调用点同步 `omenSound(kind)`）；③ whoosh/crunch/tone 等合成工具仍被其他官方技能使用，无死代码。
+- **打包**：按工作协定五版本号递增 `v11_3→v11_4`（git mv＋scriptName 前端战斗v11.4），`node build-regex.cjs` 重打包（replaceString 1,003,917 字符）。
+- **验证**：源码 vm.Script 语法通过；omenSound 无合成 vol 残留、无 bag 残留、调用点唯一。产物断言：7 键 url×1＋call×1、monsterAttack 恰 3（资产键＋红单体＋自爆）、产物 vol 计数 86→51（恰为移除的前摇 35 处合成 vol）、合成时长 .285 零残留、裸反引号恰 2、& 实体免疫通过。
+- **边界**：音量走 playSound 默认（audioCache 分支 volume=0.5，与 monsterAttack 同链路同响度；若需再调走第二参 volume）；音频可达性依赖 8766 内网资源服务（与既有音效同条件）；听感以用户在酒馆实测为准。
