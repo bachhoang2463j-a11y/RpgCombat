@@ -3226,3 +3226,14 @@
 - **涉及文件**：`demo-enemy-group-attack.html`、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：内联两段 `<script>` 经 Node `vm.Script` 解析语法通过；遵循 Demo 免测免审铁律直接交付用户实机体验。
 - **边界**：`资源/group-attack-sfx-candidates/` 与 `资源/windup-sfx-candidates/` 同属未入库本地试听候选目录；未触碰 `index.html` 与正式版正则打包产物。
+
+---
+
+## [LOG-269] 2026-11-12 — 命中结果与伤害量级分层 demo
+
+- **提交**：`070a2f5`。
+- **核心目的**：不读战报即可分辨闪避/格挡/盾吸收/扣血、伤害轻重与暴击/爆发修饰；提升高频受击反馈，不把普攻做成大招。
+- **变更**：新建 `demo-hit-feedback.html`（复制母版）。可移植部分：`arcane-hit-` CSS；`classifyHit`（结果×量级×修饰三维独立，量级按 hpDmg/maxHp 与主线 severityStr 同口径）、`playHitFeedback(results,{onBeat})`（只消费已结算字段，不乘倍率）、`hitBar` 双层血条（停 450ms 收 500ms，连续受击冻结当前宽度不回跳）、重创 60ms 定帧、群体单次震屏/主音；`clearHitFeedback` 接入 `clearArcaneFx`。宿主血条加 `-hp-ghost` 层、敌方 HP 文本；演示区 22 场景（旧版基线复刻、量级/边界/修饰/结果/多段/群体/英雄）。
+- **设计确认**：仅重创定帧 60ms；残影 450/500ms；数字 JetBrains Mono 粗体描边。
+- **验证**：内联脚本 vm 语法通过；子代理 IAB 冒烟 a–f（classifyHit 8/8、22 场景数值、连击残影单调、中途重置零残留、数字不撞菜单）通过；发现 recoil 类 onfinish 未触发残留、暴击徽标压数字，已改为 after 定时移除并上移徽标（修后仅复验语法）。
+- **未验证**：音色听感、真 Chrome 动画时序；未触碰 index.html（工作区中 index.html 的未提交改动非本轮产生，未纳入提交）、正则产物与 README。
