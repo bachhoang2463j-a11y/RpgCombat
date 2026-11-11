@@ -3298,3 +3298,17 @@
 - **回归修正**：补SVG动画定位类及fs-flash样式；本机服务补OpeningSetup依赖路径；盾碎独立音与群攻重复音分开计数，交棒同步清本组，未通过更改真实数值或删除非公开功能断言掩盖失败。
 - **未测范围**：`192.168.110.83:8766`三音频HEAD均ECONNREFUSED，MP3文件存在但未实播；未启动/修改用户资源服务、未导入酒馆、未做真Chrome音画或安卓验证。IAB采用隔离合成节点及采样调用计数，实播和观感待用户导入确认；README等待确认有效再更新，SPEC、Demo、母版和公开版不动。
 - **目的 vs 现状**：仅敌方最低优先级群攻升级并通过源码/产物门禁，未扩大到我方、旧括号或数值规则，目的与现状一致。
+
+---
+
+## [LOG-274] 2026-11-12 — Demo v2 最小字号与显示时长对齐原版基线
+
+- **提交**：`be23a04`。
+- **核心目的**：让最小主字号与飘字显示时长对齐正式版 `index.html`（桌面端 `sm:text-2xl` = `24px`，`float-up` `1s` / `burst-float-up` `1.2s`）。
+- **变更**：仅 `demo-attack-identity2.html`——
+  - 最小主字号对齐 `24px`：`.l1` `20px→24px`、`.shield` `21px→24px`、`.word`（闪避/格挡）`20px→24px`；配套递进调整 `.l2` `23px→27px`、`.l3` `27px→32px`、`.shield.sub` `15px→17px`、`.break` `15px→17px`、`.arcane-hit-tag` `12px→13px`。
+  - 显示时长对齐原版：`NUM_MS` 改为 `{ 1: 1000, 2: 1000, 3: 1200, shield: 1000, block: 1000, dodge: 1000, tag: 1050 }`，爆发（`isBurst`）数字与角标时长对齐 `1200ms`。
+  - 同步调整 `stackSlot` 纵向错位步长（`22px→24px`）、`hitAnchor` 左边界安全距（`88→100`）与 `hitVisual` 辅字偏移。
+- **涉及文件**：`demo-attack-identity2.html`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：最终编辑后 Node `node --check` 校验内联 `<script>` 通过；遵循 Demo 免测免审规则未跑自动化测试与审查，待用户实机观感确认。
+- **边界**：未触碰 `demo-skill-vfx-template.html`、`index.html`、正则产物与 `README.md`。
