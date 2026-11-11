@@ -53,8 +53,10 @@
     /* L2+：跨排破框舞台与 steps(1) 受击高亮闪白 */
     @keyframes arcane-f-melee { 0%, 45% { filter: brightness(2.4) saturate(1.9) drop-shadow(0 0 18px #ff2938); } 46%, 100% { filter: none; } }
     @keyframes arcane-f-ranged { 0%, 45% { filter: brightness(2.6) saturate(1.6) drop-shadow(0 0 20px #facc15); } 46%, 100% { filter: none; } }
+    @keyframes arcane-f-spell { 0%, 45% { filter: brightness(2.7) saturate(1.4) drop-shadow(0 0 20px #e0f2fe) drop-shadow(0 0 34px #38bdf8); } 46%, 100% { filter: none; } }
     .arcane-flash-melee { animation: arcane-f-melee 0.34s steps(1) both !important; }
     .arcane-flash-ranged { animation: arcane-f-ranged 0.34s steps(1) both !important; }
+    .arcane-flash-spell { animation: arcane-f-spell 0.38s steps(1) both !important; }
     .arcane-group-stage { position: absolute; overflow: visible; pointer-events: none; }
     .arcane-group-charge { position: absolute; transform: translate(-50%, -50%); }
     .arcane-group-charge svg, .arcane-group-stage > svg { width: 100%; height: 100%; overflow: visible; }
@@ -687,83 +689,79 @@ const arcaneVfxModule = (function () {
         after(duration, () => { cancelAnimationFrame(defaultShakeFrame); defaultShakeFrame = null; scene.style.transform = ''; });
     };
 
-    // 正式版 index.html 的 spawnDefaultAOEParticles 原样复制；不是橙红色 explosion 分支。
+    GROUP_COLORS.spell = ['#ffffff', '#e0f2fe', '#38bdf8'];
+    // 升级版法术群攻底层粒子：三层破界冲击环 + 90 颗炽白/冰蓝奥术流光 + 强屏震
     function spawnDefaultAOEParticles(x, y) {
-        // 中心圆形冲击波向外迅速扩散
         fxEngine.addParticle({
-            x: x, y: y, vx: 0, vy: 0, age: 0, life: 450,
+            x: x, y: y, vx: 0, vy: 0, age: 0, life: 520,
             draw: function(ctx, pct) {
-                var maxR = 250; // 覆盖所有角色的半径
-                var r = pct * maxR;
-                var a = Math.max(0, (1 - pct) * 0.8);
+                var maxR = 320, r = pct * maxR, a = Math.max(0, (1 - pct) * 0.92);
+                ctx.save();
                 ctx.globalAlpha = a;
                 ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = Math.max(1, 6 * (1 - pct));
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
-                ctx.stroke();
-
-                // 内层余波
-                if (pct > 0.1) {
-                    var r2 = (pct - 0.1) * maxR * 0.8;
-                    ctx.strokeStyle = '#e2e8f0';
-                    ctx.lineWidth = Math.max(1, 3 * (1 - pct));
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, r2, 0, Math.PI * 2);
-                    ctx.stroke();
+                ctx.lineWidth = Math.max(1.5, 8 * (1 - pct));
+                ctx.shadowBlur = 22; ctx.shadowColor = '#38bdf8';
+                ctx.beginPath(); ctx.arc(this.x, this.y, r, 0, Math.PI * 2); ctx.stroke();
+                if (pct > 0.08) {
+                    var r2 = (pct - 0.08) * maxR * 0.82;
+                    ctx.strokeStyle = '#7dd3fc';
+                    ctx.lineWidth = Math.max(1, 4.5 * (1 - pct));
+                    ctx.setLineDash([14, 10]);
+                    ctx.beginPath(); ctx.arc(this.x, this.y, r2, 0, Math.PI * 2); ctx.stroke();
+                    ctx.setLineDash([]);
                 }
+                if (pct > 0.16) {
+                    var r3 = (pct - 0.16) * maxR * 0.58;
+                    ctx.strokeStyle = '#e0f2fe';
+                    ctx.lineWidth = Math.max(1, 3 * (1 - pct));
+                    ctx.beginPath(); ctx.arc(this.x, this.y, r3, 0, Math.PI * 2); ctx.stroke();
+                }
+                ctx.restore();
             }
         });
 
-        // 80颗流星状粒子由中心向四周猛烈散开
-        for (var i = 0; i < 80; i++) {
+        var palette = ['#ffffff', '#ffffff', '#e0f2fe', '#bae6fd', '#7dd3fc'];
+        for (var i = 0; i < 90; i++) {
             var angle = Math.random() * Math.PI * 2;
-            var speed = 6 + Math.random() * 12; // 极快的初速
-            var sz = 2 + Math.random() * 4;
+            var speed = 7 + Math.random() * 15;
+            var sz = 2.2 + Math.random() * 4.2;
+            var col = palette[i % palette.length];
             fxEngine.addParticle({
                 x: x, y: y,
-                vx: speed * Math.cos(angle),
-                vy: speed * Math.sin(angle),
-                drag: 0.92, // 较强空气阻力，形成迅速减速的效果
-                gravity: 0,
-                age: 0, life: 400 + Math.random() * 300,
-                size: sz,
+                vx: speed * Math.cos(angle), vy: speed * Math.sin(angle),
+                drag: 0.92, gravity: 0,
+                age: 0, life: 440 + Math.random() * 320,
+                size: sz, color: col,
                 draw: function(ctx, pct) {
-                    var a = pct < 0.1 ? pct / 0.1 : Math.max(0, 1 - pct);
+                    var a = pct < 0.08 ? pct / 0.08 : Math.max(0, 1 - pct);
+                    ctx.save();
                     ctx.globalAlpha = a;
-                    ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#cbd5e1';
-
-                    // 绘制拖尾
                     ctx.beginPath();
                     ctx.moveTo(this.x, this.y);
-                    var trailX = this.x - this.vx * 3;
-                    var trailY = this.y - this.vy * 3;
-                    ctx.lineTo(trailX, trailY);
-                    ctx.strokeStyle = ctx.fillStyle;
+                    ctx.lineTo(this.x - this.vx * 4.0, this.y - this.vy * 4.0);
+                    ctx.strokeStyle = this.color;
                     ctx.lineWidth = this.size;
                     ctx.lineCap = 'round';
+                    ctx.shadowBlur = 14; ctx.shadowColor = '#38bdf8';
                     ctx.stroke();
-
-                    // 头部亮点
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                    ctx.fill();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath(); ctx.arc(this.x, this.y, this.size * 0.65, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
                 }
             });
         }
 
-        // 全屏中心亮闪
         fxEngine.addParticle({
-            x: 0, y: 0, vx: 0, vy: 0, age: 0, life: 250,
+            x: 0, y: 0, vx: 0, vy: 0, age: 0, life: 280,
             draw: function(ctx, pct) {
-                if (pct > 0.4) return;
-                ctx.fillStyle = '#ffffff';
-                ctx.globalAlpha = (1 - pct / 0.4) * 0.4;
+                if (pct > 0.45) return;
+                ctx.fillStyle = '#f0f9ff';
+                ctx.globalAlpha = (1 - pct / 0.45) * 0.48;
                 ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
             }
         });
 
-        window.triggerScreenShake(6, 300);
+        window.triggerScreenShake(11, 420);
     }
 
     // 头像安全图面：上缘从姓名条下方开始，下缘止于头像，不遮数值条。
@@ -802,15 +800,18 @@ const arcaneVfxModule = (function () {
         owner.animations.add(animation); return animation;
     }
     function groupCharge(owner, source) {
-        const red = owner.kind === 'melee', color = red ? '#ff2938' : '#facc15', sub = red ? '#ff916d' : '#fef08a';
-        const uid = ++S.uid, size = source.h * 1.85;
+        const red = owner.kind === 'melee', spell = owner.kind === 'spell';
+        const color = red ? '#ff2938' : (spell ? '#38bdf8' : '#facc15'), sub = red ? '#ff916d' : (spell ? '#e0f2fe' : '#fef08a');
+        const darkStop = red ? '#7f0924' : (spell ? '#0c4a6e' : '#92400e');
+        const uid = ++S.uid, size = source.h * (spell ? 2.05 : 1.85);
         const claws = [-22, 0, 22].map((y, i) => `<path d="M-54,${y + 20} Q-14,${y - 24} 48,${y - 14} Q-4,${y - 6} -34,${y + 28} Z" fill="url(#group-charge-${uid})" opacity="${0.95 - i * 0.08}"/><path d="M-42,${y + 16} Q-6,${y - 14} 44,${y - 14}" fill="none" stroke="#fff1dc" stroke-width="1.8"/>`).join('');
         const stars = [0, 45, 90, 135, 180, 225, 270, 315].map(d => `<path d="M0,0 L-6,-22 L0,-54 L6,-22 Z" fill="url(#group-charge-${uid})" transform="rotate(${d})"/>`).join('');
+        const hexagram = `<polygon points="0,-58 50,29 -50,29" fill="none" stroke="#ffffff" stroke-width="2.2"/><polygon points="0,58 50,-29 -50,-29" fill="none" stroke="${sub}" stroke-width="2.2"/>` + stars;
         const layer = groupLayer(owner, `<div class="arcane-group-charge" style="left:${source.x}px;top:${source.y}px;width:${size}px;height:${size}px;">
-            <svg viewBox="-80 -80 160 160"><defs><linearGradient id="group-charge-${uid}" x1="0" x2="1"><stop stop-color="${red ? '#7f0924' : '#92400e'}"/><stop offset=".55" stop-color="${color}"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs>
+            <svg viewBox="-80 -80 160 160"><defs><linearGradient id="group-charge-${uid}" x1="0" x2="1"><stop stop-color="${darkStop}"/><stop offset=".55" stop-color="${color}"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs>
                 <g class="arcane-charge-ring" style="transform-box:fill-box;transform-origin:center;" fill="none" stroke="${color}" stroke-width="2"><circle r="66" stroke-dasharray="18 10" opacity=".85"/><circle r="50" stroke="${sub}" stroke-width="1.4" stroke-dasharray="8 8" opacity=".75"/></g>
                 <g class="arcane-charge-ring2" style="transform-box:fill-box;transform-origin:center;" fill="none" stroke="${sub}" stroke-width="1.6"><path d="M-60,-20 A64,50 0 0 1 54,-28 M60,20 A64,50 0 0 1 -54,28"/><circle r="34" stroke="#fff" stroke-width="1.2" opacity=".6"/></g>
-                <g class="arcane-charge-core" style="transform-box:fill-box;transform-origin:center;filter:drop-shadow(0 0 10px ${color}) drop-shadow(0 0 20px ${color});">${red ? claws : stars}<circle r="14" fill="#ffffff" opacity=".95"/></g>
+                <g class="arcane-charge-core" style="transform-box:fill-box;transform-origin:center;filter:drop-shadow(0 0 10px ${color}) drop-shadow(0 0 20px ${color});">${red ? claws : (spell ? hexagram : stars)}<circle r="14" fill="#ffffff" opacity=".95"/></g>
             </svg></div>`);
         const core = layer.querySelector('.arcane-charge-core');
         // 0~300ms 向心粒子高速吸入
@@ -842,15 +843,17 @@ const arcaneVfxModule = (function () {
         });
         owner.at(470, () => { layer.remove(); owner.layers.delete(layer); S.layers.delete(layer); });
         if (groupSfx) {
-            drone(0, { f0: red ? 85 : 140, f1: red ? 195 : 330, lp0: 280, lp1: 2400, dur: .29, vol: .14 });
-            whoosh(0, { f0: red ? 380 : 900, f1: red ? 2600 : 4800, q: 1.6, dur: .29, vol: .48, peak: .26, cut: true });
-            tone(0, { type: 'triangle', f0: red ? 160 : 520, f1: red ? 340 : 1240, dur: .29, vol: .16, peak: .25, cut: true });
-            click(.3, .55, red ? 3200 : 5400, .01);
+            drone(0, { f0: red ? 85 : (spell ? 130 : 140), f1: red ? 195 : (spell ? 260 : 330), lp0: 280, lp1: 2600, dur: .29, vol: .15 });
+            whoosh(0, { f0: red ? 380 : (spell ? 600 : 900), f1: red ? 2600 : (spell ? 4200 : 4800), q: 1.8, dur: .29, vol: .46, peak: .26, cut: true });
+            tone(0, { type: spell ? 'sine' : 'triangle', f0: red ? 160 : (spell ? 528 : 520), f1: red ? 340 : (spell ? 1056 : 1240), dur: .29, vol: .15, peak: .25, cut: true });
+            if (spell) crystal(.3, 2400, .14, 0);
+            else click(.3, .55, red ? 3200 : 5400, .01);
         }
     }
     function groupFlinch(owner, frame, direction) {
         const k = frame.h / 96, dx = direction * k * 1.45, dy = Math.abs(direction) * k * .65;
-        flash(frame.card || frame.dom, owner.kind === 'melee' ? 'arcane-flash-melee' : 'arcane-flash-ranged');
+        const flashCls = owner.kind === 'melee' ? 'arcane-flash-melee' : (owner.kind === 'spell' ? 'arcane-flash-spell' : 'arcane-flash-ranged');
+        flash(frame.card || frame.dom, flashCls);
         groupAnimate(owner, frame.dom, [
             { transform: 'translate3d(0,0,0) scale(1)' },
             { transform: `translate3d(${dx}px,${dy}px,0) scale(.91,.94)`, offset: .18 },
@@ -1133,13 +1136,99 @@ const arcaneVfxModule = (function () {
         return owner.handle;
     }
 
-    function playSpellGroup() {
-        const owner = groupRun(800), container = document.getElementById('heroes-container');
-        const children = Array.from(container.children).filter(el => el.style.display !== 'none' && !el.classList.contains('hidden') && !el.classList.contains('opacity-0') && !el.classList.contains('opacity-40'));
-        const center = unionRect(children);
-        const previous = new Set(fxEngine.particles);
-        playDefaultHitSound(); spawnDefaultAOEParticles(center.x, center.y);
-        fxEngine.particles.forEach(p => { if (!previous.has(p)) owner.hostParticles.add(p); });
+    function playSpellGroup(caster, targets) {
+        const owner = groupRun(1280); owner.kind = 'spell';
+        const list = (targets && targets.length ? targets : heroesData);
+        const frames = list.map(portraitFrame).sort((a, b) => a.left - b.left);
+        const source = ctr(domOf(caster || enemiesData[4]));
+        const left = frames[0].left, right = frames[frames.length - 1].right;
+        const top = Math.min(...frames.map(f => f.top)), bottom = Math.max(...frames.map(f => f.bottom));
+        const cx = (left + right) / 2, cy = (top + bottom) / 2, rowW = right - left, rowH = bottom - top;
+
+        // 第一幕（0~350ms）：施法者奥术六芒星环聚能 + 50ms 坍缩留白
+        groupCharge(owner, source);
+
+        // 第二幕（350ms）：原版 atk1 采样 + Web Audio 混音超低频轰鸣 + 十字破界白爆与巨型六芒法阵盛放
+        owner.at(350, () => {
+            const previous = new Set(fxEngine.particles);
+            playDefaultHitSound();
+            spawnDefaultAOEParticles(cx, cy);
+            fxEngine.particles.forEach(p => { if (!previous.has(p)) owner.hostParticles.add(p); });
+            if (groupSfx) {
+                kick(0, { hi: 260, lo: 34, pd: .045, dur: .62, vol: .95, drive: 4.5, wet: .2 });
+                boom(.006, { f0: 7000, f1: 110, dur: .88, vol: .65, wet: .5 });
+                [[528, .08], [792, .05], [1056, .035]].forEach(([f, v]) => chime(.02, f, 1.1, v, 0));
+            }
+            shake('quake');
+            owner.at(220, () => shake('light'));
+
+            // 半屏圣白冰蓝曝光闪白
+            const flashLayer = groupLayer(owner, `<div class="arcane-fs-flash" style="background:radial-gradient(ellipse at ${cx}px ${cy}px, rgba(255,255,255,0.68) 0%, rgba(186,230,253,0.42) 38%, rgba(56,189,248,0.16) 65%, transparent 82%);opacity:0;"></div>`);
+            groupAnimate(owner, flashLayer.firstElementChild, [{ opacity: .98 }, { opacity: .45, offset: .3 }, { opacity: 0 }], 340);
+
+            // 破框十字贯穿光棱 + 巨型六芒星奥术法阵
+            const stageW = Math.max(rowW * 1.48, 520), stageH = Math.max(rowH * 2.8, 320);
+            const uid = ++S.uid;
+            const rays = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((d, i) => `<line x1="0" y1="${i % 2 ? -95 : -78}" x2="0" y2="${i % 2 ? -138 : -162}" stroke="${i % 2 ? '#bae6fd' : '#ffffff'}" stroke-width="${i % 2 ? 2 : 3.2}" stroke-linecap="round" transform="rotate(${d})"/>`).join('');
+            const stage = groupLayer(owner, `<div class="arcane-group-stage" style="left:${cx - stageW / 2}px;top:${cy - stageH / 2}px;width:${stageW}px;height:${stageH}px;">
+                <svg viewBox="${-stageW / 2} ${-stageH / 2} ${stageW} ${stageH}">
+                    <defs>
+                        <radialGradient id="spell-core-${uid}"><stop offset="0%" stop-color="#ffffff"/><stop offset="48%" stop-color="#e0f2fe" stop-opacity=".92"/><stop offset="82%" stop-color="#38bdf8" stop-opacity=".4"/><stop offset="100%" stop-color="#0284c7" stop-opacity="0"/></radialGradient>
+                    </defs>
+                    <g class="arcane-spell-formation" style="transform-box:fill-box;transform-origin:center;filter:drop-shadow(0 0 14px #38bdf8) drop-shadow(0 0 28px #0284c7);">
+                        <circle r="142" fill="url(#spell-core-${uid})"/>
+                        <circle r="134" fill="none" stroke="#ffffff" stroke-width="3" opacity=".92"/>
+                        <circle r="118" fill="none" stroke="#7dd3fc" stroke-width="2" stroke-dasharray="18 10" opacity=".88"/>
+                        <polygon points="0,-126 109,63 -109,63" fill="rgba(224,242,254,0.12)" stroke="#ffffff" stroke-width="3.2"/>
+                        <polygon points="0,126 109,-63 -109,-63" fill="rgba(56,189,248,0.12)" stroke="#bae6fd" stroke-width="3.2"/>
+                        <circle r="68" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-dasharray="8 6"/>
+                        ${rays}
+                    </g>
+                    <g class="arcane-spell-prism" style="transform-box:fill-box;transform-origin:center;filter:drop-shadow(0 0 16px #ffffff) drop-shadow(0 0 32px #38bdf8);">
+                        <path d="M${-stageW * 0.49},0 Q0,-28 ${stageW * 0.49},0 Q0,28 ${-stageW * 0.49},0 Z" fill="#e0f2fe" opacity=".92"/>
+                        <path d="M${-stageW * 0.46},0 Q0,-12 ${stageW * 0.46},0 Q0,12 ${-stageW * 0.46},0 Z" fill="#ffffff"/>
+                        <path d="M0,${-stageH * 0.48} Q-24,0 0,${stageH * 0.48} Q24,0 0,${-stageH * 0.48} Z" fill="#bae6fd" opacity=".9"/>
+                        <path d="M0,${-stageH * 0.44} Q-10,0 0,${stageH * 0.44} Q10,0 0,${-stageH * 0.44} Z" fill="#ffffff"/>
+                        <circle r="44" fill="#ffffff"/>
+                    </g>
+                </svg></div>`);
+
+            groupAnimate(owner, stage.querySelector('.arcane-spell-formation'), [
+                { transform: 'scale(.16) rotate(-35deg)', opacity: 0 },
+                { transform: 'scale(1.06) rotate(12deg)', opacity: 1, offset: .24 },
+                { transform: 'scale(1.24) rotate(32deg)', opacity: .82, offset: .62 },
+                { transform: 'scale(1.46) rotate(58deg)', opacity: 0 }
+            ], 760, 'cubic-bezier(0.16, 0.84, 0.26, 1)');
+
+            groupAnimate(owner, stage.querySelector('.arcane-spell-prism'), [
+                { transform: 'scaleX(.12) scaleY(1.8)', opacity: 0 },
+                { transform: 'scaleX(1.05) scaleY(1.1)', opacity: 1, offset: .18 },
+                { transform: 'scaleX(1.16) scaleY(.28)', opacity: .88, offset: .54 },
+                { transform: 'scaleX(1.28) scaleY(.04)', opacity: 0 }
+            ], 520, 'cubic-bezier(0.16, 0.84, 0.26, 1)');
+
+            // 额外多圈高速脉冲环与无裁剪冰蓝晶簇飞散
+            [0, 1, 2, 3].forEach(k => addP({ x: cx, y: cy, shape: 'ring', size: 3.4 - k * 0.5, decay: 0.036 + k * 0.006, color: k % 2 ? '#7dd3fc' : '#ffffff', owner }));
+            for (let i = 0; i < 28; i++) {
+                const ang = (i / 28) * 6.283 + rnd(-.08, .08), spd = rnd(6.5, 16.5);
+                groupParticle(owner, null, { x: cx, y: cy, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+                    rot: ang, vrot: rnd(-.08, .08), size: rnd(3.2, 6.2), texture: i % 2 ? 'crystal' : 'spark', tail: rnd(14, 24), decay: 16.7 / rnd(380, 620) });
+            }
+
+            // 四名我方卡片由内向外错峰 35ms 触发圣白强闪、受击震颤与星芒爆裂
+            frames.forEach((f, idx) => {
+                const isInner = idx === 1 || idx === 2;
+                owner.at(isInner ? 0 : 35, () => {
+                    groupFlinch(owner, f, idx < 2 ? -6.5 : 6.5);
+                    addP({ x: f.x, y: f.y, shape: 'ring', size: 2.2, decay: 0.055, color: '#e0f2fe', owner });
+                    for (let j = 0; j < 8; j++) {
+                        const a = (j / 8) * 6.283 + rnd(-.2, .2), s = rnd(3.8, 9.2);
+                        groupParticle(owner, null, { x: f.x, y: f.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+                            rot: a, size: rnd(2.6, 4.8), texture: 'crystal', tail: 12, decay: 16.7 / rnd(280, 440) });
+                    }
+                });
+            });
+        });
         return owner.handle;
     }
     // ===== 新技能实现 END =====
@@ -1151,7 +1240,7 @@ const arcaneVfxModule = (function () {
         // 接入点 3：本 demo 的三类命中分派，不修改正式版默认分派。
         if (fxTag === 'group:melee') return playMeleeGroup(caster, targets);
         if (fxTag === 'group:ranged') return playRangedGroup(caster, targets);
-        return playSpellGroup();
+        return playSpellGroup(caster, targets);
     }
     function playArcaneProjectile(type, fromDom, toDom, dodged = false) {
         if (!fromDom || !toDom || !fromDom.getBoundingClientRect || !toDom.getBoundingClientRect) return Promise.resolve();
@@ -1178,7 +1267,7 @@ const arcaneVfxModule = (function () {
         S.handles.forEach(h => { if (h && h.cancel) h.cancel(); }); S.handles.clear();
         S.layers.forEach(d => d.remove()); S.layers.clear();
         S.anchors.forEach(d => d.remove()); S.anchors.clear();
-        S.flashes.forEach(el => el.classList.remove('arcane-flash-cold', 'arcane-flash-heal', 'arcane-flash-melee', 'arcane-flash-ranged')); S.flashes.clear();
+        S.flashes.forEach(el => el.classList.remove('arcane-flash-cold', 'arcane-flash-heal', 'arcane-flash-melee', 'arcane-flash-ranged', 'arcane-flash-spell')); S.flashes.clear();
         S.shakeEls.forEach(el => el.classList.remove('arcane-shake-light', 'arcane-shake-heavy', 'arcane-shake-quake')); S.shakeEls.clear();
         if (S.dark) { S.dark.remove(); S.dark = null; }
         if (S.canvas) { S.canvas.remove(); S.canvas = null; S.ctx = null; }
@@ -1199,7 +1288,7 @@ const arcaneVfxModule = (function () {
     const CARDS = [
         { name: '近战群攻', level: 'L2+', description: '血煞向心凝爪 → 三道狂爪破框撕裂 → 血十字爆燃余烬', fxTag: 'group:melee', casterId: 'e5', targetIds: ['h1', 'h2', 'h3', 'h4'] },
         { name: '远程群攻', level: 'L2+', description: '十四枚金晶成阵 → 漫天剑雨攒射 → 晶簇穿刺崩裂', fxTag: 'group:ranged', casterId: 'e5', targetIds: ['h1', 'h2', 'h3', 'h4'] },
-        { name: '法术群攻', level: '默认', description: '正式版白色爆炸 · 原 atk1 音效', fxTag: 'group:spell', casterId: 'e5', targetIds: ['h1', 'h2', 'h3', 'h4'] }
+        { name: '法术群攻', level: 'L2+', description: '六芒星环坍缩 → 十字破界白爆与法阵 → 冰蓝星屑余韵', fxTag: 'group:spell', casterId: 'e5', targetIds: ['h1', 'h2', 'h3', 'h4'] }
     ];
     let unlockTimer = null;
 
