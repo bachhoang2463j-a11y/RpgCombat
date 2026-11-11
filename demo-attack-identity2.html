@@ -104,18 +104,18 @@
     .arcane-hit-fill-blink { animation: arcane-hit-fill-blink 0.22s ease-out; }
     .arcane-hit-num-layer { position: fixed; inset: 0; pointer-events: none; z-index: 62; overflow: hidden; }
     .arcane-hit-num { position: absolute; transform: translate(-100%, -18%); white-space: nowrap; line-height: 1; will-change: transform, opacity; pointer-events: none; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0,0,0,0.92), 0 3px 10px rgba(0,0,0,0.65); }
-    .arcane-hit-num.l1 { font-family: 'Inter', 'Noto Sans SC', sans-serif; font-weight: 700; font-size: 20px; color: #f1f5f9; letter-spacing: 0.01em; }
-    .arcane-hit-num.l2 { font-family: 'Chakra Petch', 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 700; font-size: 23px; color: #fda4af; letter-spacing: 0.02em; }
-    .arcane-hit-num.l3 { font-family: 'Cinzel', 'Noto Sans SC', serif; font-weight: 800; font-size: 27px; color: #fb7185; letter-spacing: 0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 14px rgba(244,63,94,0.45), 0 4px 12px rgba(0,0,0,0.75); }
+    .arcane-hit-num.l1 { font-family: 'Inter', 'Noto Sans SC', sans-serif; font-weight: 700; font-size: 24px; color: #f1f5f9; letter-spacing: 0.01em; }
+    .arcane-hit-num.l2 { font-family: 'Chakra Petch', 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 700; font-size: 27px; color: #fda4af; letter-spacing: 0.02em; }
+    .arcane-hit-num.l3 { font-family: 'Cinzel', 'Noto Sans SC', serif; font-weight: 800; font-size: 32px; color: #fb7185; letter-spacing: 0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 14px rgba(244,63,94,0.45), 0 4px 12px rgba(0,0,0,0.75); }
     .arcane-hit-num.crit { font-family: 'Chakra Petch', 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 800; color: #fde68a; text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 12px rgba(245,158,11,0.45); }
     .arcane-hit-num.burst { font-family: 'Cinzel', 'Noto Sans SC', serif; font-style: normal; font-weight: 800; color: #fffbeb; text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 14px rgba(253,224,71,0.52); }
-    .arcane-hit-num.shield { font-family: 'Inter', 'Noto Sans SC', sans-serif; font-weight: 700; font-size: 21px; color: #bae6fd; text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(56,189,248,0.35); }
-    .arcane-hit-num.shield.sub { font-size: 15px; color: #93c5fd; opacity: 0.94; }
-    .arcane-hit-num.word { font-family: 'Noto Sans SC', sans-serif; font-weight: 800; font-size: 20px; letter-spacing: 0.08em; }
+    .arcane-hit-num.shield { font-family: 'Inter', 'Noto Sans SC', sans-serif; font-weight: 700; font-size: 24px; color: #bae6fd; text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(56,189,248,0.35); }
+    .arcane-hit-num.shield.sub { font-size: 17px; color: #93c5fd; opacity: 0.94; }
+    .arcane-hit-num.word { font-family: 'Noto Sans SC', sans-serif; font-weight: 800; font-size: 24px; letter-spacing: 0.08em; }
     .arcane-hit-num.dodge { font-style: italic; color: #cbd5e1; opacity: 0.95; }
     .arcane-hit-num.block { color: #e2e8f0; letter-spacing: 0.1em; }
-    .arcane-hit-num.break { font-size: 15px; color: #7dd3fc; letter-spacing: 0.08em; }
-    .arcane-hit-tag { position: absolute; transform: translate(-100%, -50%); font-family: 'Chakra Petch', 'Noto Sans SC', sans-serif; font-weight: 700; font-size: 12px; letter-spacing: 0.12em; white-space: nowrap; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,0.95); }
+    .arcane-hit-num.break { font-size: 17px; color: #7dd3fc; letter-spacing: 0.08em; }
+    .arcane-hit-tag { position: absolute; transform: translate(-100%, -50%); font-family: 'Chakra Petch', 'Noto Sans SC', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 0.12em; white-space: nowrap; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,0.95); }
     .arcane-hit-tag.crit { color: #fbbf24; font-style: italic; }
     .arcane-hit-tag.burst { color: #fef08a; }
     .arcane-hit-core { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
@@ -1805,7 +1805,7 @@ const arcaneVfxModule = (function () {
         const now = Date.now(), s = H.stacks.get(id);
         const k = s && now - s.at < 750 ? s.k + 1 : 0;
         H.stacks.set(id, { k, at: now });
-        return { dx: [0, 8, -10, 12, -6][k % 5], dy: -Math.min(k, 4) * 22 };
+        return { dx: [0, 8, -10, 12, -6][k % 5], dy: -Math.min(k, 4) * 24 };
     }
     function hitNumLayer() {
         const d = document.createElement('div');
@@ -1821,7 +1821,7 @@ const arcaneVfxModule = (function () {
         const menu = document.getElementById('menu-container');
         if (menu) { const m = menu.getBoundingClientRect(); if (y > m.top - 28 && x > m.left - 14) x = m.left - 14; }
         const topSafe = x > window.innerWidth - 360 ? 58 : 34;
-        return { x: Math.max(88, Math.min(window.innerWidth - 18, x)), y: Math.max(topSafe, y), c };
+        return { x: Math.max(100, Math.min(window.innerWidth - 18, x)), y: Math.max(topSafe, y), c };
     }
     function hitNumEl(layer, cls, text, x, y) {
         const el = document.createElement('div');
@@ -1847,7 +1847,7 @@ const arcaneVfxModule = (function () {
         dodge: [{ transform: TN + 'translateX(-10px)', opacity: 0 }, { transform: TN + 'translateX(3px)', opacity: 1, offset: 0.18 }, { transform: TN + 'translateX(8px)', opacity: 1, offset: 0.7 }, { transform: TN + 'translate(18px,-6px)', opacity: 0 }],
         tag: [{ transform: TT + 'translateX(-6px) scale(0.88)', opacity: 0 }, { transform: TT + 'translateX(0) scale(1)', opacity: 1, offset: 0.15 }, { transform: TT + 'translateY(-3px) scale(1)', opacity: 1, offset: 0.72 }, { transform: TT + 'translateY(-10px)', opacity: 0 }]
     };
-    const NUM_MS = { 1: 760, 2: 980, 3: 1220, shield: 820, block: 760, dodge: 820, tag: 920 };
+    const NUM_MS = { 1: 1000, 2: 1000, 3: 1200, shield: 1000, block: 1000, dodge: 1000, tag: 1050 };
     function hitCore(layer, x, y, size, inner, outer, ring, ms, anims) {
         const uid = 'arcane-hit-g' + (++S.uid);
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -1981,7 +1981,7 @@ const arcaneVfxModule = (function () {
             const el = hitNumEl(layer, 'arcane-hit-num shield', '-' + h.shieldDmg, p.x, p.y);
             anims.push(el.animate(NUM_KF.shield, { duration: NUM_MS.shield, easing: 'ease-out', fill: 'forwards' }));
             if (h.shieldBroken) {
-                const b = hitTagEl(layer, 'arcane-hit-num word break', '破盾', p.x, p.y - 20);
+                const b = hitTagEl(layer, 'arcane-hit-num word break', '破盾', p.x, p.y - 22);
                 anims.push(b.animate(NUM_KF.tag, { duration: NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }));
             }
             return;
@@ -2003,18 +2003,18 @@ const arcaneVfxModule = (function () {
             const el = hitNumEl(layer, cls, '-' + h.hpDmg, p.x, p.y);
             let kf = NUM_KF[h.tier];
             if (h.crit && !h.burst) kf = kf.map((f, idx) => idx === 1 ? Object.assign({}, f, { transform: f.transform + ' scale(1.14)' }) : f);
-            anims.push(el.animate(kf, { duration: NUM_MS[h.tier], easing: 'cubic-bezier(0.2,0.8,0.3,1)', fill: 'forwards' }));
-            const fs = [0, 20, 23, 27][h.tier];
+            anims.push(el.animate(kf, { duration: h.burst ? 1200 : NUM_MS[h.tier], easing: 'cubic-bezier(0.2,0.8,0.3,1)', fill: 'forwards' }));
+            const fs = [0, 24, 27, 32][h.tier];
             if (h.crit || h.burst) {
-                const t = hitTagEl(layer, 'arcane-hit-tag ' + (h.burst ? 'burst' : 'crit'), h.burst ? '爆发' : '暴击', p.x, p.y - fs * 0.28 - 12);
-                anims.push(t.animate(NUM_KF.tag, { duration: NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }));
+                const t = hitTagEl(layer, 'arcane-hit-tag ' + (h.burst ? 'burst' : 'crit'), h.burst ? '爆发' : '暴击', p.x, p.y - fs * 0.25 - 12);
+                anims.push(t.animate(NUM_KF.tag, { duration: h.burst ? 1200 : NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }));
             }
             if (h.shieldDmg > 0) {
                 const sy = p.y + fs * 0.92 + 5;
                 const s = hitNumEl(layer, 'arcane-hit-num shield sub', '盾-' + h.shieldDmg, p.x, sy);
                 anims.push(s.animate(NUM_KF.shield, { duration: NUM_MS.shield, easing: 'ease-out', fill: 'forwards' }));
                 if (h.shieldBroken) {
-                    const b = hitTagEl(layer, 'arcane-hit-num word break', '破盾', p.x, sy + 18);
+                    const b = hitTagEl(layer, 'arcane-hit-num word break', '破盾', p.x, sy + 20);
                     anims.push(b.animate(NUM_KF.tag, { duration: NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }));
                 }
             }
