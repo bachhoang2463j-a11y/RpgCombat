@@ -3181,3 +3181,12 @@
   4. **远程群攻（`playRangedGroup` & `rangedHit`）**：移除飞行层 polygon 挖空，改为高空扇形展开 14 枚大小金晶棱枪（10 枚副晶密集铺垫 + 4 枚重型主晶锁定四名英雄中心），按 22ms 错峰高弧攒射；命中绽放 3D 穿刺金晶簇、放射裂纹、双冲击环、切面金晶碎片飞溅与头像 10 片多边形崩裂，配齐五层晶石爆鸣合成音效与终结重震。
 - **涉及文件**：`demo-enemy-group-attack.html`、`LOG.md`、`LOG-INDEX.md`。
 - **边界**：遵循 Demo 免测铁律直接交付用户实机体验；未改 `index.html`、`group:spell` 基线及正则打包产物。
+---
+
+## [LOG-266] 2026-11-12 — 重打包 v11.3 入音效修正（版本号经用户豁免沿用）
+
+- **提交**：`b2c5934`。
+- **核心目的**：用户指令「直接打包不用递增版本号」——把 `4aa3f53` 的音效修正（红单体恢复原版 monsterAttack＋七类合成音 vol×3）打进正则产物；工作协定五的「版本号必须递增、禁止同版本号重复打包」本次经用户明确豁免，仅此一次。
+- **变更**：`node build-regex.cjs` 原地重建 `regex-前端战斗v11_3.json`（replaceString 1,005,520→1,005,492 字符；id/scriptName/findRegex 原样未动）；前置 build-tailwind 幂等，`index.html` 字节未变。
+- **验证**（新旧产物逐段对比，适配 terser 数字规范化）：① monsterAttack 2→3 处，新增段为 `window.playSound&&playSound("monsterAttack")`（red-single 分支）；② 旧合成风切 `f0:520,f1:1700` 已随分支移除（f0:520 计数 2→1）；③ omenSound 七分支 35 处 vol 逐一对齐、恰为旧值×3（0.075~0.84，剔除已删除的 red-single vol:.26 后逐位验证）；④ 围栏加固（裸反引号序列恰 2 个）与 & 实体免疫（&amp;&amp; 存在）复检通过。
+- **边界**：同版本号重复打包仅本次、经用户豁免；`demo-enemy-group-attack.html`（另一会话产物）未触碰；完整听感以用户在酒馆实测为准。
