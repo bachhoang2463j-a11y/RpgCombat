@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>变种能力生效瞬间 · Demo v1</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap');
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    body { font-family: 'Noto Sans SC', sans-serif; user-select: none; }
+    /* —— 以下复刻主工程 index.html 主界面样式 —— */
+    .glass-panel { background: rgba(20, 25, 35, 0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); }
+    .text-outline { text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 1px 2px rgba(0,0,0,0.8); }
+    .mask-fade-y { -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .custom-scrollbar::-webkit-scrollbar { width: 3px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+    .timeline-rail { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: linear-gradient(180deg, rgba(250,204,21,0.85) 0%, rgba(6,182,212,0.65) 25%, rgba(99,102,241,0.45) 60%, rgba(255,255,255,0.05) 100%); box-shadow: 0 0 10px rgba(6,182,212,0.55); pointer-events: none; z-index: 0; }
+    @keyframes rail-pulse { 0% { transform: translateY(-100%); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(800%); opacity: 0; } }
+    .rail-pulse-beam { position: absolute; left: 0; top: 0; width: 2px; height: 40px; background: linear-gradient(180deg, transparent, #38bdf8, #fff); box-shadow: 0 0 12px #38bdf8; animation: rail-pulse 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+    .turn-dot { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; background: #111827; border: 2px solid; position: relative; z-index: 1; flex-shrink: 0; overflow: hidden; }
+    .turn-dot.cur { width: 52px; height: 52px; font-size: 26px; border-color: #facc15 !important; box-shadow: 0 0 20px rgba(250,204,21,0.9); }
+    .breathe { animation: breathe 3.2s ease-in-out infinite; } @keyframes breathe { 50% { transform: translateY(-4px) scale(1.02); } }
+    #chat-bar input { background: rgba(15,23,42,0.7); border: 1px solid rgba(255,255,255,0.12); color: #e2e8f0; }
+    .portrait { background: radial-gradient(ellipse at 50% 30%, #3b3f5c, #14151f 75%); display: flex; align-items: flex-end; justify-content: center; font-size: 64px; overflow: hidden; }
+    .card:disabled { pointer-events: none; opacity: 0.45; filter: grayscale(0.6); }
+
+    /* ===== 可移植特效样式 BEGIN：与 index.html 的 arcane- 命名及层序一致 ===== */
+    .arcane-fs-layer { position: fixed; inset: 0; pointer-events: none; z-index: 52; overflow: hidden; }
+    .arcane-fs-anchor { position: absolute; transform: translate(-50%, -50%); }
+    #arcane-fx-canvas { position: fixed; inset: 0; width: 100vw; height: 100dvh; pointer-events: none; z-index: 55; }
+    #arcane-dark { position: fixed; inset: 0; pointer-events: none; z-index: 40; opacity: 0; transition: opacity 0.35s ease; background: radial-gradient(ellipse at 40% 60%, rgba(5,6,20,0.55) 0%, rgba(2,3,10,0.92) 75%); }
+    @keyframes arcane-seed-bloom { 0% { transform: translate(-50%,-50%) scale(0); opacity: 0; } 70% { transform: translate(-50%,-50%) scale(1.25); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(0.6); opacity: 0; } }
+    @keyframes arcane-hit-flash { 0% { transform: translate(-50%,-50%) scale(0.2); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.7); opacity: 0; } }
+    @keyframes arcane-f-cold { 0% { filter: brightness(1.6) hue-rotate(180deg) saturate(2.5); } 60% { filter: none; } }
+    @keyframes arcane-f-heal { 0% { filter: brightness(1.8) drop-shadow(0 0 18px #34d399); } 100% { filter: none; } }
+    .arcane-flash-cold { animation: arcane-f-cold 0.5s steps(1) both !important; }
+    .arcane-flash-heal { animation: arcane-f-heal 0.6s ease-out both !important; }
+    @keyframes arcane-tint { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes arcane-ripple { 0% { transform: translate(-50%,-50%) scale(0.2); opacity: 0.9; } 100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; } }
+    @keyframes arcane-ring-out { 0% { r: 4; opacity: 0.95; stroke-width: 3; } 100% { r: 150; opacity: 0; stroke-width: 0.5; } }
+    @keyframes arcane-fs-flash { 0% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes arcane-draw-on { to { stroke-dashoffset: 0; } }
+    .arcane-grow { stroke-dasharray: 1; stroke-dashoffset: 1; }
+    @keyframes arcane-fade-life { 0% { opacity: 0; } 15% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes arcane-slow-rot { to { transform: rotate(360deg); } }
+    @keyframes arcane-s-light { 25% { transform: translate3d(-3px, 2px, 0); } 60% { transform: translate3d(3px, -2px, 0); } }
+    @keyframes arcane-s-heavy { 15% { transform: translate3d(-8px, 4px, 0); } 35% { transform: translate3d(7px, -5px, 0); } 60% { transform: translate3d(-4px, 3px, 0); } 85% { transform: translate3d(2px, -1px, 0); } }
+    @keyframes arcane-s-quake { 10% { transform: translate3d(-14px, 8px, 0); } 25% { transform: translate3d(12px, -10px, 0); } 40% { transform: translate3d(-9px, 6px, 0); } 60% { transform: translate3d(6px, -4px, 0); } 80% { transform: translate3d(-3px, 2px, 0); } }
+    .arcane-shake-light { animation: arcane-s-light 0.18s ease-out; }
+    .arcane-shake-heavy { animation: arcane-s-heavy 0.32s ease-out; }
+    .arcane-shake-quake { animation: arcane-s-quake 0.55s ease-out; }
+    /* 新技能的 arcane- 样式写在这里；移植时只追加新样式，不覆盖正式版的已有样式。 */
+    /* ===== 变种能力触发特效 arcane-variant-*（可移植） ===== */
+    .arcane-variant-anchor { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; }
+    .arcane-variant-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .arcane-variant-host-rel { position: relative !important; }
+    .arcane-variant-revive-desat { filter: grayscale(0.92) brightness(0.76) contrast(1.06) !important; transition: none !important; }
+    .arcane-variant-molted-fx {
+        position: absolute; inset: -4px; border-radius: 10px; pointer-events: none; z-index: 18;
+        border: 1.5px solid rgba(251, 191, 36, 0.55);
+        box-shadow: inset 0 0 12px rgba(245, 158, 11, 0.22), 0 0 10px rgba(251, 191, 36, 0.26);
+        animation: arcane-variant-molt-idle 3.4s ease-in-out infinite;
+    }
+    .arcane-variant-molted-fx::after {
+        content: '蜕'; position: absolute; left: 3px; bottom: 3px; padding: 0 3px;
+        font-size: 9px; font-weight: 900; line-height: 1.3; color: #fef3c7;
+        background: rgba(120, 53, 15, 0.85); border: 1px solid rgba(251, 191, 36, 0.65); border-radius: 3px;
+    }
+    @keyframes arcane-variant-molt-idle {
+        0%, 100% { opacity: 0.78; transform: scale(1); }
+        50% { opacity: 0.96; transform: scale(1.015); }
+    }
+    .arcane-variant-rage-fx {
+        position: absolute; inset: -6px; border-radius: 12px; pointer-events: none; z-index: 19; overflow: hidden;
+        border: 1.5px solid rgba(239, 68, 68, 0.62);
+        box-shadow: inset 0 0 16px rgba(185, 28, 28, 0.35), 0 0 14px rgba(220, 38, 38, 0.38);
+        transition: opacity 0.45s ease-out, transform 0.45s ease-out;
+    }
+    .arcane-variant-rage-fx::before {
+        content: ''; position: absolute; left: -10%; right: -10%; bottom: -35%; height: 85%;
+        background: radial-gradient(ellipse at 50% 90%, rgba(239, 68, 68, 0.32) 0%, rgba(127, 29, 29, 0.16) 45%, transparent 72%);
+        animation: arcane-variant-rage-heat 2.2s linear infinite;
+    }
+    @keyframes arcane-variant-rage-heat {
+        0% { transform: translateY(8%) scaleX(0.96); opacity: 0.65; }
+        50% { transform: translateY(-6%) scaleX(1.04); opacity: 0.9; }
+        100% { transform: translateY(8%) scaleX(0.96); opacity: 0.65; }
+    }
+    .arcane-variant-rage-fx.exiting { opacity: 0 !important; transform: scale(0.95); }
+    /* 演示控制区与时间轴衔接辅助样式 */
+    .arcane-variant-group-hd { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; color: #94a3b8; padding: 4px 6px 2px; border-bottom: 1px solid rgba(148,163,184,0.16); margin-top: 2px; display: flex; justify-content: space-between; align-items: center; }
+    @keyframes arcane-variant-extra-badge {
+        0%, 100% { transform: translateX(-50%) scale(1); filter: drop-shadow(0 0 5px rgba(251,191,36,0.85)); }
+        50% { transform: translateX(-50%) scale(1.12); filter: drop-shadow(0 0 11px rgba(251,191,36,1)); }
+    }
+    .arcane-variant-extra-badge { animation: arcane-variant-extra-badge 1.2s ease-in-out infinite; }
+    @keyframes arcane-variant-float-up {
+        0% { opacity: 0; transform: translate(-50%, 6px) scale(0.84); }
+        18% { opacity: 1; transform: translate(-50%, -8px) scale(1.14); }
+        78% { opacity: 1; transform: translate(-50%, -22px) scale(1); }
+        100% { opacity: 0; transform: translate(-50%, -34px) scale(0.92); }
+    }
+    .arcane-variant-float-text {
+        position: fixed; pointer-events: none; z-index: 66; white-space: nowrap; font-weight: 800;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7);
+        animation: arcane-variant-float-up 1.15s ease-out forwards;
+    }
+    /* ===== 可移植特效样式 END ===== */
+  </style>
+</head>
+<body class="text-white">
+ <div id="app" class="fixed inset-0 overflow-hidden">
+  <!-- 顶部控制按钮（复刻主界面） -->
+  <div class="absolute top-2 sm:top-4 right-2 sm:right-4 z-[115] flex gap-1.5 sm:gap-2">
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-violet-400 hover:text-violet-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>📚</span> <span class="hidden sm:inline">世界书</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-purple-400 hover:text-purple-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>📜</span> <span class="hidden sm:inline">记录</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-blue-400 hover:text-blue-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>🔲</span> <span class="hidden sm:inline">全屏</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-indigo-400 hover:text-indigo-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>💬</span> <span class="hidden sm:inline">对话</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-yellow-500 hover:text-yellow-400 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>⚙️</span> <span class="hidden sm:inline">设置</span></button>
+    <button id="btn-reset" class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-emerald-400 hover:text-emerald-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>🔄</span> <span class="hidden sm:inline">重置</span></button>
+  </div>
+
+  <!-- 全屏战场区域 -->
+  <div class="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-800 to-emerald-900 overflow-hidden z-0" id="battle-scene">
+    <div class="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+    <div class="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-0"></div>
+    <div class="absolute left-1 sm:left-4 md:left-6 top-16 sm:top-20 bottom-44 sm:bottom-48 w-12 sm:w-14 z-30 flex flex-col items-center select-none">
+      <div class="relative w-full h-full flex flex-col items-center">
+        <div class="timeline-rail"><div class="rail-pulse-beam"></div></div>
+        <div id="turn-order-container" class="relative w-full h-full flex flex-col gap-2 sm:gap-2.5 items-center overflow-y-auto no-scrollbar mask-fade-y py-3"></div>
+      </div>
+    </div>
+    <div id="enemies-container" class="absolute left-2 sm:left-6 right-2 sm:right-6 top-[10%] bottom-[190px] sm:bottom-[220px] z-10 flex flex-col items-center justify-start gap-6 overflow-visible pointer-events-none"></div>
+  </div>
+
+  <!-- 悬浮 UI 层 -->
+  <div class="absolute bottom-[52px] left-0 w-full p-1.5 sm:p-6 flex flex-col-reverse sm:flex-row items-end justify-between gap-1.5 sm:gap-4 z-20 pointer-events-none pb-2 sm:pb-6">
+    <div id="heroes-container" class="w-full sm:flex-1 grid grid-cols-4 gap-1 sm:gap-4 max-w-2xl pointer-events-auto relative"></div>
+    <div class="relative self-end">
+      <div id="menu-container" class="w-[260px] h-[172px] bg-slate-950/95 backdrop-blur-xl rounded-xl border border-slate-700/80 border-t-2 border-t-cyan-500/80 flex flex-col overflow-hidden relative shadow-[0_15px_35px_rgba(0,0,0,0.9)] pointer-events-auto self-end mb-1 sm:mb-0">
+        <div class="px-2.5 py-1 bg-gradient-to-r from-violet-950/60 via-slate-900/90 to-slate-950 border-b border-violet-900/40 flex justify-between items-center shrink-0">
+          <div class="flex items-center gap-1.5 min-w-0"><span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0"></span><span class="text-xs font-bold text-amber-200 truncate">变种能力 · 生效瞬间</span></div>
+          <div class="flex items-center gap-1 shrink-0"><span id="variant-beat-stat" class="text-[9px] font-mono text-amber-300/90 truncate max-w-[90px]" title="当前状态/拍点">待机</span><button id="btn-variant-sfx" class="text-[9px] font-bold px-1.5 rounded border border-emerald-500/60 text-emerald-300 hover:bg-white/10 transition-all shrink-0" aria-pressed="true">🔊 音开</button></div>
+        </div>
+        <div id="skill-list" class="flex-1 flex flex-col gap-1 p-1 overflow-y-auto custom-scrollbar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部对话栏（复刻主界面，仅装饰） -->
+  <div id="chat-bar" class="absolute bottom-0 left-0 right-0 h-[52px] z-30 flex items-center gap-2 px-2 sm:px-3 bg-black/60 border-t border-white/5">
+    <div class="w-9 h-9 rounded-full bg-slate-700 border border-white/20 shrink-0 flex items-center justify-center">🕵️</div>
+    <input type="text" placeholder="说点什么... (Enter发送)" class="flex-1 h-9 rounded-full px-4 text-sm outline-none">
+    <span class="px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/60 text-emerald-300 bg-emerald-950/50">友方旁白 ON</span>
+    <span class="px-3 py-1 rounded-full text-xs font-bold border border-rose-500/60 text-rose-300 bg-rose-950/50">敌方旁白 ON</span>
+    <div class="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center shrink-0">➤</div>
+  </div>
+ </div>
+  <script>
+    // ===== 演示宿主 BEGIN：占位数据、渲染、fxEngine；不移植到正式版 =====
+    const DEFAULT_TURN_ITEMS = [
+        { id: 'h1', e: '👨', name: '埃利奥特', hero: true },
+        { id: 'e2', e: '❄️', name: 'e2', hero: false },
+        { id: 'h2', e: '🧔', name: '弗兰克', hero: true },
+        { id: 'h3', e: '👩', name: '玛德琳', hero: true },
+        { id: 'h4', e: '🕵️', name: '索恩', hero: true },
+        { id: 'e4', e: '👻', name: 'e4', hero: false },
+        { id: 'e5', e: '👻', name: 'e5', hero: false }
+    ];
+    let demoTurnItems = DEFAULT_TURN_ITEMS.map(x => ({ ...x }));
+
+    function renderTurnTimeline(items) {
+        demoTurnItems = (items || DEFAULT_TURN_ITEMS).map(x => ({ ...x }));
+        $('#turn-order-container').innerHTML = demoTurnItems.map((it, i) => {
+            const av = it.hero && HERO_AVATARS[it.name];
+            const borderColor = it.isExtra ? '#fbbf24' : (it.hero ? '#06b6d4' : '#e11d48');
+            const extraShadow = it.isExtra ? 'box-shadow:0 0 12px rgba(251,191,36,0.9);' : '';
+            const extraBadge = it.isExtra ? `<div class="arcane-variant-extra-badge absolute -top-1.5 left-1/2 -translate-x-1/2 z-40 px-1 py-0.2 rounded-full bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-300 border border-amber-200 text-[7px] font-black text-slate-950 leading-none whitespace-nowrap pointer-events-none">⚡再动</div>` : '';
+            return `<div class="relative shrink-0" data-turn-slot="${i}" data-turn-entity="${it.id}">
+              <div class="turn-dot ${i ? '' : 'cur'}" style="border-color:${borderColor};${extraShadow}">${av ? `<img src="${av}" alt="${it.name}" class="w-full h-full object-cover rounded-full" onerror="this.style.display='none';this.nextElementSibling&&this.nextElementSibling.classList.remove('hidden')"><span class="hidden">${it.e}</span>` : it.e}</div>
+              ${extraBadge}
+            </div>`;
+        }).join('');
+    }
+    window.renderDemoTurnTimeline = renderTurnTimeline;
+
+    function renderEntityBuffs(entity) {
+        const box = document.getElementById(`${entity.id}-buffs`);
+        if (!box) return;
+        const buffs = entity.buffs || [];
+        box.innerHTML = buffs.map(b => `<span class="text-[8px] sm:text-[9px] font-bold px-1 rounded bg-black/75 border border-white/20 shadow" style="color:${b.color || '#f8fafc'}">${b.label}</span>`).join('');
+    }
+    window.renderDemoEntityBuffs = renderEntityBuffs;
+
+    function initUI(init = {}) {
+        heroesData = HERO_DATA.map(([id, name, face, hp, shield, mp, tp]) => Object.assign({ id, name, face, img: HERO_AVATARS[name] || '', hp, maxHp: hp, shield, mp, maxMp: mp, tp, maxTp: 100, isAlive: true, buffs: [] }, init[id]));
+        enemiesData = ENEMY_ROWS.flat().map(([id, face]) => Object.assign({ id, name: id, face, hp: 1000, maxHp: 1000, shield: 0, isAlive: true, buffs: [] }, init[id]));
+        $('#heroes-container').innerHTML = heroesData.map(({ id, name, face, img, hp, maxHp, shield, mp, maxMp, tp, maxTp }) => `
+      <div class="hero relative transition-all duration-300 min-w-[70px] z-20" id="hero-wrap-${id}">
+        <div id="hero-card-${id}" class="fx-body hero-card-inner bg-[#18181b] rounded overflow-hidden relative border shadow-2xl transition-all border-gray-800">
+          <div id="${id}-buffs" class="absolute top-1 right-1 flex flex-col gap-1 items-end z-20 pointer-events-none"></div>
+          <div class="w-full h-12 sm:h-auto sm:aspect-[4/3] relative bg-gray-900 border-b border-gray-700">
+            <div class="absolute top-0 left-0 w-full bg-gradient-to-b from-black/80 to-transparent px-1.5 py-1 text-[9px] sm:text-xs font-bold text-white z-10 flex justify-between"><span>${name}</span></div>
+            <div class="portrait w-full h-full">${img ? `<img src="${img}" alt="${name}" class="w-full h-full object-cover" onerror="this.style.display='none';this.nextElementSibling&&this.nextElementSibling.classList.remove('hidden')"><span class="hidden leading-none">${face}</span>` : face}</div>
+          </div>
+          <div class="px-1 py-1 sm:px-2 sm:py-1.5 flex flex-col gap-[1px] sm:gap-0.5">${createCompactBarHTML(id, 'hp', 'HP', hp, maxHp, 'bg-yellow-400', false, shield)}${createCompactBarHTML(id, 'mp', 'MP', mp, maxMp, 'bg-cyan-400')}${createCompactBarHTML(id, 'tp', 'TP', tp, maxTp, 'bg-green-500', true)}</div>
+        </div>
+      </div>`).join('');
+        $('#enemies-container').innerHTML = ENEMY_ROWS.map((row, ri) => `<div class="flex items-end justify-center" style="gap:${ri ? 26 : 22}px; ${ri ? 'margin-top:18px' : ''}">${row.map(([id, em]) => {
+            const e = enemiesData.find(x => x.id === id);
+            const pct = Math.max(0, Math.min(100, e.hp / e.maxHp * 100));
+            return `<div class="flex flex-col items-center group relative shrink-0" id="enemy-box-${id}" style="transform:scale(${ri ? 1 : 0.72}); ${ri ? '' : 'filter:brightness(0.82) saturate(0.92)'}">
+        <div id="${id}-buffs" class="absolute -top-2 right-0 flex flex-col gap-0.5 items-end z-20 pointer-events-none"></div>
+        <div id="${id}-sprite" class="fx-body enemy-sprite text-7xl sm:text-8xl drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] breathe mt-2 sm:mt-4 flex justify-center items-center">${em}</div>
+        <div class="w-10 sm:w-16 h-1 sm:h-1.5 bg-black/50 mt-2 sm:mt-4 rounded-full overflow-hidden relative"><div id="${id}-hp-bar" class="h-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)] transition-all duration-300 ease-out" style="width:${pct}%"></div></div>
+        <div id="${id}-hp-text" class="mt-0.5 text-[9px] sm:text-[10px] font-mono font-bold text-white/80 text-outline leading-none">${Math.floor(e.hp)}/${e.maxHp}</div>
+      </div>`;
+        }).join('')}</div>`).join('');
+        heroesData.concat(enemiesData).forEach(renderEntityBuffs);
+        renderTurnTimeline(init.__turnItems || DEFAULT_TURN_ITEMS);
+    }
+    initUI();
+
+class CanvasFxEngine {
+    constructor() {
+        this.canvas = null;
+        this.ctx = null;
+        this.particles = [];
+        this.animationFrameId = null;
+        this.hitStop = 0; // 定帧剩余毫秒：>0 时粒子冻结，制造重击顿挫感
+        this.lastFrameTime = 0; // 上一帧时间戳：用于计算真实帧间隔 dt
+        this.lastDt = 16.7;     // 最近一帧的真实间隔（毫秒），供雷电 overlay 等外部特效对齐
+        this.init();
+    }
+
+    init() {
+        this.canvas = document.getElementById('fx-canvas');
+        if (!this.canvas) {
+            this.canvas = document.createElement('canvas');
+            this.canvas.id = 'fx-canvas';
+            this.canvas.className = 'fixed inset-0 pointer-events-none z-[99]';
+            document.body.appendChild(this.canvas);
+        }
+        this.ctx = this.canvas.getContext('2d');
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+    }
+
+    resize() {
+        if (this.canvas) {
+            this.canvas.width = window.innerWidth;
+            this.canvas.height = window.innerHeight;
+        }
+    }
+
+    addParticle(p) {
+        this.particles.push(p);
+        if (this.particles.length === 1) {
+            this.startLoop();
+        }
+    }
+
+    startLoop() {
+        if (!this.animationFrameId) {
+            // 重置时间戳，避免空闲后重启的首帧因间隔过大而跳变（配合 update 内 33ms 上限钳制）
+            this.lastFrameTime = 0;
+            const loop = () => {
+                this.update();
+                this.draw();
+                if (this.particles.length > 0) {
+                    this.animationFrameId = requestAnimationFrame(loop);
+                } else {
+                    this.animationFrameId = null;
+                }
+            };
+            this.animationFrameId = requestAnimationFrame(loop);
+        }
+    }
+
+    update() {
+        // Delta-time：按真实帧间隔推进动画，速度与 FPS 解耦（高刷屏不加速、掉帧不减速）
+        // dt 上限 33ms：标签页休眠/卡顿后恢复时防止粒子瞬移跳变
+        const now = performance.now();
+        const dt = this.lastFrameTime ? Math.min(now - this.lastFrameTime, 33) : 16.7;
+        this.lastDt = dt;
+        this.lastFrameTime = now;
+        const k = dt / 16.7; // 归一化时间系数：1 = 60fps 基准步长
+
+        // Hit Stop 定帧：命中瞬间冻结粒子若干毫秒，制造"重击砸进肉里"的顿挫落差
+        if (this.hitStop > 0) {
+            this.hitStop -= dt;
+            return;
+        }
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const p = this.particles[i];
+            p.age += dt;
+
+            p.x += p.vx * k;
+            p.y += p.vy * k;
+
+            if (p.gravity) p.vy += p.gravity * k;
+            if (p.drag) {
+                const d = Math.pow(p.drag, k); // 阻尼按时间比例复合衰减
+                p.vx *= d;
+                p.vy *= d;
+            }
+            if (p.update) p.update(p);
+
+            if (p.age >= p.life) {
+                this.particles.splice(i, 1);
+            }
+        }
+    }
+
+    draw() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // 使用 'screen' 混合模式实现极具发光感的爆燃、辉光效果
+        this.ctx.globalCompositeOperation = 'screen';
+        
+        for (let i = 0; i < this.particles.length; i++) {
+            const p = this.particles[i];
+            const pct = p.age / p.life;
+            this.ctx.save();
+            p.draw(this.ctx, pct);
+            this.ctx.restore();
+        }
+        
+        this.ctx.globalCompositeOperation = 'source-over';
+    }
+}
+
+// 实例化全局特效引擎
+const fxEngine = new CanvasFxEngine();
+window.fxEngine = fxEngine;
+    // ===== 演示宿主 END =====
+
+    // ===== 可移植特效模块 BEGIN：底座取自 index.html；无战斗、LLM 或酒馆依赖 =====
+const arcaneVfxModule = (function () {
+    'use strict';
+    // 接入点 1：填写新技能的精确 fxTag，与下方分派和 CARDS 保持一致。
+    const ARCANE_TAGS = [];
+    const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
+
+    // —— 共享状态（clearArcaneFx 同步清空） ——
+    const S = {
+        uid: 0,
+        particles: [],
+        particleTimer: null,
+        particleUntil: 0,
+        flights: [],    // 贝塞尔弹道飞行物
+        timers: new Set(),     // combatToken 守卫的延时/收尾定时
+        rawTimers: new Map(),  // 弹道拍点及其完成回调，清理时同步解除等待
+        intervals: new Set(),  // 周期任务（蓄力抖动/羽流/光雨），回调内自守 token
+        layers: new Set(),     // data-arcane-fx 临时 DOM 层
+        anchors: new Set(),    // impactDom 无视觉锚点
+        handles: new Set(),    // 活动技能 handle
+        flashes: new Set(),    // 被加 arcane-flash-* 类的精灵
+        shakeEls: new Set(),   // 被加 arcane-shake-* 类的舞台
+        driver: null,          // 挂在 fxEngine.particles 里的驱动粒子
+        canvas: null, ctx: null,
+        dark: null,
+    };
+    let audioCtx = null, sfxBus = null, sfxVerb = null, sfxNoise = null;
+
+    // ===== combatToken 守卫定时 =====
+    function after(ms, fn) {
+        const token = combatToken;
+        const id = setTimeout(() => { S.timers.delete(id); if (token !== combatToken) return; fn(); }, ms);
+        S.timers.add(id);
+        return id;
+    }
+    function every(ms, fn) {
+        const token = combatToken;
+        const id = setInterval(() => { if (token !== combatToken) { clearInterval(id); S.intervals.delete(id); return; } fn(); }, ms);
+        S.intervals.add(id);
+        return id;
+    }
+    function stopEvery(id) { if (id != null) { clearInterval(id); S.intervals.delete(id); } }
+
+    // ===== 临时层 / 锚点 / 舞台效果 =====
+    function fsLayer(html, ms) {
+        const d = document.createElement('div');
+        d.className = 'arcane-fs-layer';
+        d.setAttribute('data-arcane-fx', 'layer');
+        d.innerHTML = html;
+        document.body.appendChild(d);
+        S.layers.add(d);
+        if (ms) setTimeout(() => { S.layers.delete(d); d.remove(); }, ms); // 纯清理回调，恒执行
+        return d;
+    }
+    function mkAnchor(x, y) {
+        const d = document.createElement('div');
+        d.style.cssText = 'position:fixed; left:' + (x - 1) + 'px; top:' + (y - 1) + 'px; width:2px; height:2px; pointer-events:none; z-index:56; opacity:0;';
+        d.setAttribute('data-arcane-fx', 'anchor');
+        document.body.appendChild(d);
+        S.anchors.add(d);
+        return d;
+    }
+    function dropAnchor(d) { if (d && d.isConnected) { S.anchors.delete(d); d.remove(); } }
+    function flash(el, cls) {
+        if (!el) return;
+        el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+        S.flashes.add(el);
+        after(700, () => { el.classList.remove(cls); S.flashes.delete(el); });
+    }
+    function shake(type) {
+        const scene = document.getElementById('battle-scene');
+        if (!scene) return;
+        const cls = 'arcane-shake-' + type;
+        scene.classList.remove('arcane-shake-light', 'arcane-shake-heavy', 'arcane-shake-quake');
+        void scene.offsetWidth;
+        scene.classList.add(cls);
+        S.shakeEls.add(scene);
+        after(type === 'quake' ? 560 : (type === 'heavy' ? 330 : 190), () => { scene.classList.remove(cls); S.shakeEls.delete(scene); });
+    }
+    function darken(o) {
+        if (!o && !S.dark) return;
+        if (!S.dark || !S.dark.isConnected) {
+            S.dark = document.createElement('div');
+            S.dark.id = 'arcane-dark';
+            S.dark.setAttribute('data-arcane-fx', 'dark');
+            document.body.appendChild(S.dark);
+        }
+        if (S.dark) S.dark.style.opacity = o;
+        if (!o && S.dark) {
+            const layer = S.dark;
+            after(360, () => { if (layer === S.dark && layer.style.opacity === '0') { layer.remove(); S.dark = null; } });
+        }
+    }
+
+    // ===== 几何 =====
+    function ctr(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, top: r.top, bottom: r.bottom, left: r.left, right: r.right }; }
+    function domOf(e) { return getEntitySpriteDom(e); }
+    function unionRect(doms) {
+        const rs = doms.map(d => d.getBoundingClientRect()).filter(r => r.width || r.height);
+        if (!rs.length) return null;
+        const l = Math.min(...rs.map(r => r.left)), rr = Math.max(...rs.map(r => r.right));
+        const t = Math.min(...rs.map(r => r.top)), b = Math.max(...rs.map(r => r.bottom));
+        return { x: (l + rr) / 2, y: (t + b) / 2, l, r: rr, t, b, w: rr - l, h: b - t };
+    }
+    // 施法者所属全队存活对象（含召唤物，isAlive 过滤）
+    function teamSprites(caster) {
+        const isHero = caster && (caster.isSummon ? caster.side === 'hero' : String(caster.id || '').startsWith('h'));
+        const arr = isHero ? heroesData : enemiesData;
+        return arr.filter(e => e.isAlive).map(e => domOf(e)).filter(Boolean);
+    }
+
+    // ===== 私有合成音色（demo 原样移植，局部隔离） =====
+    function audio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const ctx = audioCtx;
+            const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -10; comp.knee.value = 4; comp.ratio.value = 6; comp.attack.value = 0.001; comp.release.value = 0.12; comp.connect(ctx.destination);
+            const sat = shaper(ctx, 1.6); sat.connect(comp);
+            sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9; sfxBus.connect(sat);
+            const len = ctx.sampleRate * 3, ir = ctx.createBuffer(2, len, ctx.sampleRate);
+            for (let ch = 0; ch < 2; ch++) { const dd = ir.getChannelData(ch); for (let i = 0; i < len; i++) dd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4); }
+            sfxVerb = ctx.createConvolver(); sfxVerb.buffer = ir; const vg = ctx.createGain(); vg.gain.value = 0.5; sfxVerb.connect(vg); vg.connect(comp);
+            sfxNoise = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate); const nd = sfxNoise.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        return audioCtx;
+    }
+    function shaper(ctx, drive) { const ws = ctx.createWaveShaper(), c = new Float32Array(2048); for (let i = 0; i < 2048; i++) c[i] = Math.tanh((i / 1024 - 1) * drive) / Math.tanh(drive); ws.curve = c; ws.oversample = '2x'; return ws; }
+    function chain(ctx, src, t, o) {
+        const gn = ctx.createGain(), pk = o.peak || 0.002;
+        gn.gain.setValueAtTime(0.0001, t); gn.gain[o.peak ? 'exponentialRampToValueAtTime' : 'linearRampToValueAtTime'](o.vol, t + pk);
+        if (o.cut) { gn.gain.setValueAtTime(o.vol, t + o.dur - 0.012); gn.gain.linearRampToValueAtTime(0.0001, t + o.dur); }
+        else gn.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
+        const p = ctx.createStereoPanner(); p.pan.setValueAtTime(o.pan || 0, t); if (o.pan1 !== undefined) p.pan.linearRampToValueAtTime(o.pan1, t + o.dur);
+        src.connect(gn); gn.connect(p); p.connect(sfxBus);
+        if (o.wet) { const w = ctx.createGain(); w.gain.value = o.wet; p.connect(w); w.connect(sfxVerb); }
+    }
+    function noiseSrc(ctx, t, dur, rate) { const s = ctx.createBufferSource(); s.buffer = sfxNoise; s.playbackRate.value = rate || 1; s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05); return s; }
+    function biquad(ctx, type, f0, f1, q, t, dur, fd) { const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t); if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + (fd || dur)); return f; }
+    function click(d, vol = 0.7, f = 3500, dur = 0.012, pan = 0) { const ctx = audio(), t = ctx.currentTime + d; const f1 = biquad(ctx, 'highpass', f, 0, 0.7, t, dur); noiseSrc(ctx, t, dur).connect(f1); chain(ctx, f1, t, { vol, dur, pan }); }
+    function kick(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d; const s = ctx.createOscillator();
+        s.frequency.setValueAtTime(o.hi, t); s.frequency.exponentialRampToValueAtTime(o.lo, t + o.pd); s.frequency.exponentialRampToValueAtTime(o.lo * 0.7, t + o.dur);
+        const sh = shaper(ctx, o.drive || 3); s.connect(sh); s.start(t); s.stop(t + o.dur + 0.05); chain(ctx, sh, t, { vol: o.vol, dur: o.dur, wet: o.wet || 0 });
+    }
+    function crunch(d, o) { const ctx = audio(), t = ctx.currentTime + d; const bp = biquad(ctx, 'bandpass', o.f, o.f1, o.q || 1, t, o.dur); const sh = shaper(ctx, o.drive || 6); noiseSrc(ctx, t, o.dur).connect(bp); bp.connect(sh); chain(ctx, sh, t, { vol: o.vol, dur: o.dur, pan: o.pan || 0, wet: o.wet || 0 }); }
+    function boom(d, o) { const ctx = audio(), t = ctx.currentTime + d; const lp = biquad(ctx, 'lowpass', o.f0, o.f1, 0.9, t, o.dur, o.fd || o.dur * 0.6); noiseSrc(ctx, t, o.dur, o.rate).connect(lp); chain(ctx, lp, t, { vol: o.vol, dur: o.dur, peak: o.peak, wet: o.wet || 0, pan: o.pan || 0 }); }
+    function whoosh(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d; const f = biquad(ctx, o.type || 'bandpass', o.f0, o.f1, o.q || 1.2, t, o.dur);
+        if (o.wob) o.wob.forEach(([dt, hz]) => f.frequency.linearRampToValueAtTime(hz, t + dt));
+        noiseSrc(ctx, t, o.dur, o.rate).connect(f); chain(ctx, f, t, { vol: o.vol, dur: o.dur, peak: o.peak || o.dur * 0.5, cut: o.cut, pan: o.pan || 0, pan1: o.pan1, wet: o.wet || 0 });
+    }
+    function drone(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d;
+        [-12, 0, 9].forEach(dt => { const s = ctx.createOscillator(); s.type = 'sawtooth'; s.detune.value = dt; s.frequency.setValueAtTime(o.f0, t); s.frequency.exponentialRampToValueAtTime(o.f1, t + o.dur);
+            const lp = biquad(ctx, 'lowpass', o.lp0, o.lp1, 3, t, o.dur); s.connect(lp); s.start(t); s.stop(t + o.dur + 0.05); chain(ctx, lp, t, { vol: o.vol, dur: o.dur, peak: o.dur * 0.95, cut: true }); });
+    }
+    function tone(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d; const s = ctx.createOscillator(); s.type = o.type || 'sine'; s.detune.value = o.detune || 0;
+        s.frequency.setValueAtTime(o.f0, t); if (o.f1) s.frequency.exponentialRampToValueAtTime(o.f1, t + (o.fd || o.dur));
+        let node = s; if (o.lp) { const f = biquad(ctx, 'lowpass', o.lp, o.lp1, o.q || 0.8, t, o.dur); s.connect(f); node = f; }
+        s.start(t); s.stop(t + o.dur + 0.05); chain(ctx, node, t, o);
+    }
+    function choir(d, freqs, dur, vol, peakFrac = 0.4, cut = false) {
+        const ctx = audio(), t = ctx.currentTime + d;
+        freqs.forEach((f, i) => [-9, 0, 8].forEach(dt => {
+            const s = ctx.createOscillator(); s.type = 'sawtooth'; s.frequency.value = f; s.detune.value = dt;
+            const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 5 + i * 0.4; lg.gain.value = f * 0.006; lfo.connect(lg); lg.connect(s.frequency);
+            const lp = biquad(ctx, 'lowpass', 900 + i * 200, 0, 0.6, t, dur); s.connect(lp); s.start(t); lfo.start(t); s.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+            chain(ctx, lp, t, { vol: vol / 3, dur, peak: dur * peakFrac, cut, wet: 0.7, pan: (i - 1) * 0.3 });
+        }));
+    }
+    function chime(d, f, dur = 1.2, vol = 0.1, pan = 0) { [[1, 1], [2.4, 0.4], [3.9, 0.18]].forEach(([m, v]) => tone(d, { f0: f * m, dur: dur / Math.sqrt(m), vol: vol * v, pan, wet: 0.7 })); }
+    function crystal(d, f, vol = 0.12, pan = 0) { tone(d, { f0: f, dur: 0.16, vol, pan, wet: 0.5 }); tone(d, { f0: f * 1.5, dur: 0.09, vol: vol * 0.5, pan }); click(d, vol * 1.5, 6000, 0.005, pan); }
+    function cry(d, vol = 0.12) {
+        const ctx = audio(), t = ctx.currentTime + d; const s = ctx.createOscillator(); s.type = 'sawtooth';
+        s.frequency.setValueAtTime(1500, t); s.frequency.exponentialRampToValueAtTime(2900, t + 0.12); s.frequency.exponentialRampToValueAtTime(2100, t + 0.6);
+        const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 22; lg.gain.value = 60; lfo.connect(lg); lg.connect(s.frequency);
+        const bp = biquad(ctx, 'bandpass', 2600, 0, 4, t, 0.6); s.connect(bp); s.start(t); lfo.start(t); s.stop(t + 0.65); lfo.stop(t + 0.65); chain(ctx, bp, t, { vol, dur: 0.6, peak: 0.08, wet: 0.6, pan: 0.3 });
+    }
+
+    // ===== arcane canvas 粒子层（绘制在 z55，低于浮字；调度复用 fxEngine 循环） =====
+    function ensureCanvas() {
+        if (S.canvas && S.canvas.isConnected) return;
+        const c = document.createElement('canvas');
+        c.id = 'arcane-fx-canvas';
+        c.setAttribute('data-arcane-fx', 'canvas');
+        document.body.appendChild(c);
+        S.canvas = c; S.ctx = c.getContext('2d');
+        resizeCanvas();
+    }
+    function resizeCanvas() { if (S.canvas) { S.canvas.width = window.innerWidth; S.canvas.height = window.innerHeight; } }
+    window.addEventListener('resize', resizeCanvas);
+    const DRAW = {
+        dot(g, p) { g.fillStyle = p.color; g.beginPath(); g.arc(0, 0, p.size, 0, 6.283); g.fill(); },
+        ring(g, p) { g.strokeStyle = p.color; g.lineWidth = 3 * p.life; g.beginPath(); g.arc(0, 0, 4 + p.size * (1 - p.life) * 40, 0, 6.283); g.stroke(); },
+        flame(g, p) { const r = p.size * (0.4 + p.life * 0.8); const gr = g.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, '#fff7d6'); gr.addColorStop(0.35, p.color); gr.addColorStop(1, 'rgba(120,20,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill(); },
+        smoke(g, p) { const r = p.size * (1.6 - p.life); const gr = g.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, p.color); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill(); },
+        feather(g, p) { const s = p.size; g.fillStyle = p.color; g.beginPath(); g.moveTo(-s * 1.5, 0); g.quadraticCurveTo(0, -s * 0.55, s * 1.5, 0); g.quadraticCurveTo(0, s * 0.4, -s * 1.5, 0); g.fill(); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-s * 1.8, 0); g.lineTo(s * 1.5, 0); g.stroke(); },
+        shard(g, p) { const s = p.size; g.fillStyle = p.fill || 'rgba(224,242,254,0.25)'; g.strokeStyle = p.color; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, -s); g.lineTo(s * 0.7, s * 0.3); g.lineTo(s * 0.1, s * 0.9); g.lineTo(-s * 0.6, s * 0.2); g.closePath(); g.fill(); g.stroke(); },
+        streak(g, p) { g.strokeStyle = p.color; g.lineWidth = p.size; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 0); g.lineTo(-p.vx * 4, -p.vy * 4); g.stroke(); }
+    };
+    function releaseIdleCanvas() {
+        if (S.driver || S.handles.size || S.particles.length || S.flights.length || !S.canvas) return;
+        S.canvas.remove(); S.canvas = null; S.ctx = null;
+    }
+    function scheduleParticleCleanup() {
+        if (S.particleTimer !== null) return;
+        S.particleTimer = after(Math.max(0, S.particleUntil - performance.now()), () => {
+            S.particleTimer = null;
+            const now = performance.now();
+            S.particles = S.particles.filter(p => p.expiresAt > now);
+            if (S.particles.length) { scheduleParticleCleanup(); return; }
+            if (!S.flights.length && S.driver) {
+                const index = fxEngine.particles.indexOf(S.driver);
+                if (index >= 0) fxEngine.particles.splice(index, 1);
+                S.driver = null;
+            }
+            if (S.ctx) S.ctx.clearRect(0, 0, S.canvas.width, S.canvas.height);
+            releaseIdleCanvas();
+        });
+    }
+    function addP(o) {
+        const p = Object.assign({ vx: 0, vy: 0, life: 1, decay: 0.02, size: 3, color: '#fde68a', grav: 0, drag: 0.98, rot: 0, vr: 0, shape: 'dot', blend: 'lighter' }, o);
+        p.expiresAt = performance.now() + p.life / p.decay * 16.7;
+        S.particleUntil = Math.max(S.particleUntil, p.expiresAt);
+        S.particles.push(p);
+        ensureCanvas(); ensureDriver(); scheduleParticleCleanup();
+    }
+    function burst(n, fn) { for (let i = 0; i < n; i++) addP(fn(i)); }
+    // 绕场收束（demo orbitCharge 原样）
+    function orbitCharge(c, n, dur, mk, rx, ry, shrink = 0.8) {
+        const orb = []; for (let i = 0; i < n; i++) orb.push({ a: Math.random() * 6.283, r: rnd(0.45, 1), s: rnd(0.025, 0.05), k: Math.random() });
+        const t0 = performance.now();
+        const id = every(33, () => { const k = Math.min(1, (performance.now() - t0) / dur); orb.forEach(o => { o.a += o.s * (1 + k * 3); const r = o.r * (1 - k * shrink); addP(Object.assign({ x: c.x + Math.cos(o.a) * rx * r, y: c.y + Math.sin(o.a) * ry * r, decay: 0.25 }, mk(o))); }); });
+        after(dur, () => stopEvery(id));
+    }
+    // 贝塞尔弹道（demo fly 原样；由驱动粒子步进，不另启 rAF）
+    function fly(a, b, lift, dur, draw, done, ease) {
+        ease = ease || (k => k * k);
+        const cx = (a.x + b.x) / 2, cy = Math.min(a.y, b.y) - lift;
+        const startedAt = performance.now();
+        const f = {
+            age: 0, dur, timer: null,
+            step(pr) { const t = ease(pr), u = 1 - t; draw(u * u * a.x + 2 * u * t * cx + t * t * b.x, u * u * a.y + 2 * u * t * cy + t * t * b.y, pr); },
+            progress() { return Math.min(1, (performance.now() - startedAt) / dur); }
+        };
+        S.flights.push(f);
+        ensureCanvas(); ensureDriver();
+        f.timer = after(dur, () => {
+            const index = S.flights.indexOf(f);
+            if (index >= 0) S.flights.splice(index, 1);
+            f.step(1);
+            if (done) done();
+        });
+        return f;
+    }
+    function ensureDriver() {
+        if (S.driver) return;
+        const driver = {
+            age: 0, life: 1e9, x: 0, y: 0, vx: 0, vy: 0,
+            update(p) {
+                step(fxEngine.lastDt || 16.7);
+                if (!S.particles.length && !S.flights.length) {
+                    p.age = p.life; S.driver = null;
+                    if (S.ctx) S.ctx.clearRect(0, 0, S.canvas.width, S.canvas.height);
+                    releaseIdleCanvas();
+                }
+            },
+            draw() { render(); }
+        };
+        S.driver = driver;
+        fxEngine.addParticle(driver);
+    }
+    function step(dt) {
+        const k = dt / 16.7;
+        for (const f of S.flights) f.step(f.progress());
+        for (let i = S.particles.length - 1; i >= 0; i--) {
+            const p = S.particles[i];
+            p.vx *= Math.pow(p.drag, k); p.vy *= Math.pow(p.drag, k);
+            p.vy += p.grav * k;
+            p.x += p.vx * k; p.y += p.vy * k;
+            p.rot += p.vr * k;
+            p.life = Math.min(p.life - p.decay * k, Math.max(0, (p.expiresAt - performance.now()) * p.decay / 16.7));
+            if (p.life <= 0) S.particles.splice(i, 1);
+        }
+    }
+    function render() {
+        const g = S.ctx; if (!g || !S.canvas) return;
+        g.clearRect(0, 0, S.canvas.width, S.canvas.height);
+        for (let i = 0; i < S.particles.length; i++) {
+            const p = S.particles[i];
+            g.save();
+            g.globalAlpha = Math.min(1, p.life * 1.4);
+            g.globalCompositeOperation = p.blend;
+            g.translate(p.x, p.y);
+            if (p.shape !== 'streak') g.rotate(p.rot);
+            DRAW[p.shape](g, p);
+            g.restore();
+        }
+    }
+
+    // ===== ① 通用火焰弹（240 蓄 + 340 飞 = 580ms 命中拍点） =====
+    function fireProjectile(fromDom, toDom, dodged, token) {
+        const h = ctr(fromDom), t = ctr(toDom);
+        const a = { x: h.x + 10, y: h.top - 16 }, b = { x: t.x, y: t.y };
+        burst(22, () => { const ang = Math.random() * 6.283, d = rnd(40, 70); return { x: a.x + Math.cos(ang) * d, y: a.y + Math.sin(ang) * d, vx: -Math.cos(ang) * d / 9, vy: -Math.sin(ang) * d / 9, drag: 0.86, decay: 0.06, size: rnd(1.2, 2.4), color: pick(['#fdba74', '#f97316', '#fde68a']) }; });
+        fsLayer(`<div class="arcane-fs-anchor" style="left:${a.x}px; top:${a.y}px; width:64px; height:64px; border-radius:50%; background: radial-gradient(circle, #fff7d6 0%, #fb923c 35%, rgba(220,38,38,0.45) 60%, transparent 72%); animation: arcane-seed-bloom 0.26s ease-out both;"></div>`, 320);
+        whoosh(0, { f0: 400, f1: 1800, q: 1.2, dur: 0.22, vol: 0.3, peak: 0.18, pan: -0.5 }); boom(0.02, { f0: 900, f1: 300, dur: 0.25, vol: 0.25, peak: 0.08, pan: -0.5 });
+        for (let i = 0; i < 4; i++) click(0.04 + i * 0.04, 0.12, rnd(2500, 4500), 0.006, -0.5);
+        after(240, () => {
+            if (token !== combatToken) return; // 重置后停止绘制/音效启动
+            whoosh(0, { f0: 350, f1: 1500, q: 0.9, dur: 0.34, vol: 0.55, peak: 0.28, cut: true, pan: -0.6, pan1: 0.5 });
+            for (let i = 0; i < 6; i++) click(0.03 + i * 0.05, 0.1, rnd(2200, 4800), 0.006, -0.4 + i * 0.15);
+            fly(a, b, 90, 340, (x, y) => {
+                if (token !== combatToken) return;
+                addP({ x, y, shape: 'flame', size: 16, decay: 0.2, color: '#fb923c' });
+                burst(5, () => ({ x: x + rnd(-6, 6), y: y + rnd(-6, 6), vx: rnd(-1, 1), vy: rnd(-1.6, -0.3), drag: 0.94, decay: rnd(0.04, 0.07), size: rnd(6, 11), shape: 'flame', color: pick(['#f97316', '#ef4444', '#fbbf24']) }));
+                for (let j = 0; j < 2; j++) { const an = performance.now() / 45 + j * 3.14; addP({ x: x + Math.cos(an) * 11, y: y + Math.sin(an) * 11, decay: 0.3, size: 2, color: '#fff7d6' }); }
+            }, () => {
+                if (token !== combatToken || dodged) return; // 闪避：弹达原位，不爆散不响，不 flash/flinch
+                click(0, 0.8, 4000); kick(0, { hi: 240, lo: 55, pd: 0.035, dur: 0.26, vol: 0.9, drive: 3 }); crunch(0, { f: 1600, f1: 700, q: 1.2, dur: 0.12, vol: 0.5 });
+                boom(0.005, { f0: 5000, f1: 200, dur: 0.5, vol: 0.5, wet: 0.25 }); whoosh(0.05, { f0: 600, f1: 300, q: 0.8, dur: 0.6, vol: 0.15, peak: 0.05 });
+                for (let i = 0; i < 12; i++) click(rnd(0.06, 0.6), 0.15, rnd(2500, 6000), 0.006, rnd(0.1, 0.8));
+                fsLayer(`<div class="arcane-fs-anchor" style="left:${b.x}px; top:${b.y}px; width:140px; height:140px; border-radius:50%; background: radial-gradient(circle, #fff 0%, #fdba74 30%, rgba(239,68,68,0.5) 58%, transparent 72%); animation: arcane-hit-flash 0.34s ease-out both;"></div>`, 420);
+                burst(2, i => ({ x: b.x, y: b.y, shape: 'ring', size: 1.8 + i, decay: 0.07 - i * 0.02, color: i ? '#f97316' : '#fde68a' }));
+                burst(40, () => { const an = Math.random() * 6.283, s = rnd(2, 8); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s - 1, grav: 0.13, drag: 0.93, decay: rnd(0.025, 0.05), size: rnd(1, 2.2), color: pick(['#fde68a', '#fb923c', '#fff7d6']) }; });
+                burst(10, () => ({ x: b.x + rnd(-14, 14), y: b.y + rnd(-14, 14), vx: rnd(-1, 1), vy: rnd(-2, -0.5), drag: 0.95, decay: rnd(0.03, 0.05), size: rnd(12, 20), shape: 'flame', color: '#f97316' }));
+                burst(9, () => ({ x: b.x + rnd(-24, 24), y: b.y + rnd(-18, 18), vx: rnd(-0.3, 0.3), vy: rnd(-0.9, -0.4), drag: 0.99, decay: 0.011, size: rnd(16, 28), shape: 'smoke', blend: 'source-over', color: 'rgba(40,32,30,0.55)' }));
+            });
+        });
+    }
+
+    // ===== ② 敌方紫色法术弹（480ms 命中拍点） =====
+    function enemySpellProjectile(fromDom, toDom, dodged, token) {
+        const t = ctr(fromDom), h = ctr(toDom);
+        const a = { x: t.x - 20, y: t.y - 10 }, b = { x: h.x, y: toDom.hasAttribute('data-arcane-fx') ? h.y : h.top + 30 };
+        whoosh(0, { f0: 300, f1: 900, q: 1.4, dur: 0.48, vol: 0.32, peak: 0.4, pan: 0.6, pan1: -0.3 }); tone(0, { type: 'triangle', f0: 110, f1: 90, dur: 0.48, vol: 0.08 });
+        fly(a, b, 30, 480, (x, y) => {
+            if (token !== combatToken) return;
+            addP({ x, y, size: 9, decay: 0.22, color: '#c084fc' }); addP({ x, y, size: 4, decay: 0.3, color: '#fff' });
+            burst(3, () => ({ x: x + rnd(-5, 5), y: y + rnd(-5, 5), vx: rnd(0.5, 1.5), vy: rnd(-0.5, 0.5), drag: 0.94, decay: 0.06, size: rnd(1.5, 3), color: pick(['#7c3aed', '#a855f7']) }));
+        }, () => {
+            if (token !== combatToken || dodged) return;
+            click(0, 0.6, 3500); kick(0, { hi: 180, lo: 55, pd: 0.03, dur: 0.25, vol: 0.7, drive: 3 }); boom(0, { f0: 3000, f1: 200, dur: 0.4, vol: 0.35, wet: 0.3 });
+            burst(24, () => { const an = Math.random() * 6.283, s = rnd(1.5, 5); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.93, decay: 0.04, size: rnd(1, 2.4), color: pick(['#e9d5ff', '#c084fc', '#7c3aed']) }; });
+        }, k => k);
+    }
+
+    // ===== 新技能实现 BEGIN =====
+    // 接入点 2：在这里写 playXxx(caster, targets, isReaction)，使用 domOf / ctr / unionRect 定位。
+    // 延时用 after / every；SVG 用 fsLayer(html, 生命周期毫秒)；粒子用 addP / burst / fly；不要另起永久 rAF。
+    // 无固定寿命的图层由 handle.cancel() 和自然收尾显式移除；darken(o) 收尾必须调用 darken(0)。
+    // 保持纯演出：不改 HP/状态，不负责浮字或战斗结算；测试反馈放在下方演示控制区。
+    // 持续演出返回 handle：doneAt: Date.now() + 总演出毫秒（含尾韵），不能用 performance.now()。
+    // cancel() 只清理自身图层、计时和 WAAPI 动画，不在技能内部调用全局 clearArcaneFx()。
+    // 按需提供 dodge(success) / hit(type) / dispel(dom) / impactDom，与正式版反应接口一致。
+    // impactDom 可指向实体或 mkAnchor() 自建落点；dropAnchor() 只用于后者，不能删除真实角色 DOM。
+    // handle 加入 S.handles；结束时删除并调用 releaseIdleCanvas()；WAAPI 动画由 cancel() 取消。
+    // 普通/反应演练及完整可运行接入示例见根目录《技能SVG模板使用与快速移植.md》。
+    // ===== 变种触发特效核心基础设施（可移植，arcane-variant-*） =====
+    let variantSfxOn = true;
+    const V = { locks: new Map(), persists: new Map() };
+    function entityIdOf(e) { return e && typeof e === 'object' ? String(e.id || '') : String(e || ''); }
+    function isEntityVariantLocked(e) { return (V.locks.get(entityIdOf(e)) || 0) > 0; }
+    function lockVariantEntity(id) { if (id) V.locks.set(id, (V.locks.get(id) || 0) + 1); }
+    function unlockVariantEntity(id) {
+        if (!id) return;
+        const n = (V.locks.get(id) || 0) - 1;
+        if (n > 0) V.locks.set(id, n); else V.locks.delete(id);
+    }
+    function entityVisualRect(entityOrDom) {
+        const dom = entityOrDom && entityOrDom.nodeType === 1 ? entityOrDom : domOf(entityOrDom);
+        if (!dom) return null;
+        const portrait = dom.querySelector && dom.querySelector('.portrait');
+        if (portrait) {
+            const r = ctr(portrait);
+            const prev = portrait.previousElementSibling;
+            const top = prev ? Math.max(r.top, prev.getBoundingClientRect().bottom) : r.top;
+            const h = Math.max(24, r.bottom - top);
+            return { dom, x: r.x, y: (top + r.bottom) / 2, w: r.w, h, top, bottom: r.bottom, left: r.left, right: r.right, isHero: true };
+        }
+        return Object.assign({ dom, isHero: false }, ctr(dom));
+    }
+    function setPersistentFx(dom, kind, active) {
+        if (!dom || !dom.isConnected) return;
+        const attr = 'data-arcane-variant-persist';
+        let node = dom.querySelector('[' + attr + '="' + kind + '"]');
+        if (active) {
+            if (!dom.classList.contains('relative')) dom.classList.add('arcane-variant-host-rel');
+            if (!node) {
+                node = document.createElement('div');
+                node.setAttribute(attr, kind);
+                node.className = kind === 'molt' ? 'arcane-variant-molted-fx' : 'arcane-variant-rage-fx';
+                dom.appendChild(node);
+            } else {
+                node.classList.remove('exiting');
+            }
+            let set = V.persists.get(dom);
+            if (!set) { set = new Set(); V.persists.set(dom, set); }
+            set.add(node);
+        } else if (node) {
+            node.classList.add('exiting');
+            const token = combatToken;
+            after(460, () => {
+                if (token !== combatToken) return;
+                node.remove();
+                const set = V.persists.get(dom);
+                if (set) { set.delete(node); if (!set.size) V.persists.delete(dom); }
+                if (!dom.querySelector('[' + attr + ']')) dom.classList.remove('arcane-variant-host-rel');
+            });
+        }
+    }
+    function clearVariantState(entityOrId) {
+        if (entityOrId) {
+            const id = entityIdOf(entityOrId);
+            V.locks.delete(id);
+            const dom = domOf(id);
+            if (dom) {
+                dom.classList.remove('arcane-variant-revive-desat', 'arcane-variant-host-rel');
+                dom.querySelectorAll('[data-arcane-variant-persist]').forEach(n => n.remove());
+                V.persists.delete(dom);
+            }
+            return;
+        }
+        V.locks.clear();
+        V.persists.forEach((set, dom) => {
+            set.forEach(n => n.remove());
+            if (dom && dom.isConnected) dom.classList.remove('arcane-variant-revive-desat', 'arcane-variant-host-rel');
+        });
+        V.persists.clear();
+        document.querySelectorAll('.arcane-variant-revive-desat').forEach(el => el.classList.remove('arcane-variant-revive-desat'));
+        document.querySelectorAll('[data-arcane-variant-persist]').forEach(n => n.remove());
+    }
+    function vSfx(fn) { return (...args) => { if (variantSfxOn) fn(...args); }; }
+    const vTone = vSfx(tone), vClick = vSfx(click), vCrunch = vSfx(crunch), vWhoosh = vSfx(whoosh), vDrone = vSfx(drone), vChime = vSfx(chime), vCrystal = vSfx(crystal);
+
+    function variantRun(totalMs, lockId) {
+        const token = combatToken;
+        ensureCanvas(); ensureDriver();
+        if (lockId) lockVariantEntity(lockId);
+        const owner = {
+            cancelled: false, finished: false, token, lockId: lockId || '',
+            timers: new Set(), intervals: new Set(), animations: new Set(),
+            layers: new Set(), anchors: new Set(), flights: new Set(), restores: []
+        };
+        owner.at = (ms, fn) => {
+            const id = after(ms, () => {
+                owner.timers.delete(id);
+                if (owner.cancelled || owner.finished || token !== combatToken) return;
+                fn();
+            });
+            owner.timers.add(id); return id;
+        };
+        owner.every = (ms, fn) => {
+            const id = every(ms, () => {
+                if (owner.cancelled || owner.finished || token !== combatToken) { stopEvery(id); owner.intervals.delete(id); return; }
+                fn();
+            });
+            owner.intervals.add(id); return id;
+        };
+        owner.layer = html => { const d = fsLayer(html); owner.layers.add(d); return d; };
+        owner.anim = (el, kf, opts) => { const a = el.animate(kf, opts); owner.animations.add(a); return a; };
+        owner.addP = opts => addP(Object.assign({ owner }, opts));
+        owner.burst = (n, fn) => { for (let i = 0; i < n; i++) owner.addP(fn(i)); };
+        owner.fly = (a, b, lift, dur, draw, done, ease) => {
+            const f = fly(a, b, lift, dur, draw, () => {
+                owner.flights.delete(f);
+                if (!owner.cancelled && !owner.finished && token === combatToken && done) done();
+            }, ease);
+            owner.flights.add(f); return f;
+        };
+        owner.onRestore = fn => { owner.restores.push(fn); };
+        function cleanup() {
+            if (owner.finished) return;
+            owner.finished = true;
+            owner.timers.forEach(id => { clearTimeout(id); S.timers.delete(id); }); owner.timers.clear();
+            owner.intervals.forEach(id => { clearInterval(id); S.intervals.delete(id); }); owner.intervals.clear();
+            owner.animations.forEach(a => { try { a.cancel(); } catch {} }); owner.animations.clear();
+            owner.layers.forEach(d => { S.layers.delete(d); d.remove(); }); owner.layers.clear();
+            owner.anchors.forEach(d => dropAnchor(d)); owner.anchors.clear();
+            owner.flights.forEach(f => { clearTimeout(f.timer); S.timers.delete(f.timer); });
+            if (owner.flights.size) S.flights = S.flights.filter(f => !owner.flights.has(f));
+            owner.flights.clear();
+            S.particles = S.particles.filter(p => p.owner !== owner);
+            owner.restores.forEach(fn => { try { fn(); } catch {} }); owner.restores.length = 0;
+            if (owner.lockId) { unlockVariantEntity(owner.lockId); owner.lockId = ''; }
+            S.handles.delete(handle);
+            releaseIdleCanvas();
+        }
+        const handle = { doneAt: Date.now() + totalMs, cancel() { owner.cancelled = true; cleanup(); } };
+        S.handles.add(handle);
+        owner.at(totalMs, cleanup);
+        owner.handle = handle;
+        return owner;
+    }
+    // 1. 复活：残躯复聚 (L2 · 1450ms)
+    function playVariantRevive(entity, meta = {}, onBeat) {
+        const dom = domOf(entity); if (!dom) return null;
+        const r = entityVisualRect(dom), id = entityIdOf(entity);
+        const owner = variantRun(1450, id);
+        dom.classList.add('arcane-variant-revive-desat');
+        owner.onRestore(() => dom.classList.remove('arcane-variant-revive-desat'));
+
+        const uid = 'arcane-var-revive-' + (++S.uid);
+        const W = Math.max(120, r.w * 1.8), H = Math.max(120, r.h * 1.8);
+        const cx = W / 2, cy = H / 2;
+        const shardsHtml = Array.from({ length: 8 }, (_, i) => {
+            const a = (i / 8) * Math.PI * 2 + (i % 2 ? 0.14 : -0.1);
+            const sx = (Math.cos(a) * r.w * 0.48).toFixed(1), sy = (Math.sin(a) * r.h * 0.48).toFixed(1);
+            const mx = (Math.cos(a + 0.95) * r.w * 0.24).toFixed(1), my = (Math.sin(a + 0.95) * r.h * 0.24).toFixed(1);
+            return `<g class="v-shard" data-sx="${sx}" data-sy="${sy}" data-mx="${mx}" data-my="${my}" data-rot="${((i % 2 ? 1 : -1) * (35 + i * 9))}" style="transform-origin:${cx}px ${cy}px">`
+                + `<polygon points="${cx - 10},${cy - 7} ${cx + 9},${cy - 12} ${cx + 12},${cy + 6} ${cx - 4},${cy + 11}" fill="url(#${uid}-sg)" stroke="#e2e8f0" stroke-width="1.4" opacity="0.92"/></g>`;
+        }).join('');
+
+        const layer = owner.layer(
+            `<div class="arcane-variant-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
+            + `<svg class="arcane-variant-svg" viewBox="0 0 ${W} ${H}"><defs>`
+            + `<linearGradient id="${uid}-sg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f8fafc" stop-opacity="0.9"/><stop offset="1" stop-color="#64748b" stop-opacity="0.65"/></linearGradient>`
+            + `<radialGradient id="${uid}-cg"><stop offset="0" stop-color="#ffffff"/><stop offset="0.35" stop-color="#bae6fd"/><stop offset="0.7" stop-color="#fde68a" stop-opacity="0.45"/><stop offset="1" stop-color="#38bdf8" stop-opacity="0"/></radialGradient>`
+            + `</defs>`
+            + `<ellipse class="v-ground" cx="${cx}" cy="${cy + r.h * 0.42}" rx="${r.w * 0.48}" ry="${r.h * 0.16}" fill="none" stroke="#94a3b8" stroke-width="1.6" stroke-dasharray="6 4" opacity="0.5"/>`
+            + shardsHtml
+            + `<g class="v-core" style="transform-origin:${cx}px ${cy}px;opacity:0"><circle cx="${cx}" cy="${cy}" r="${Math.min(r.w, r.h) * 0.56}" fill="url(#${uid}-cg)"/>`
+            + `<polygon points="${cx},${cy - 32} ${cx + 6},${cy - 6} ${cx + 32},${cy} ${cx + 6},${cy + 6} ${cx},${cy + 32} ${cx - 6},${cy + 6} ${cx - 32},${cy} ${cx - 6},${cy - 6}" fill="#f8fafc" opacity="0.92"/></g>`
+            + `<rect class="v-outline" x="${cx - r.w * 0.46}" y="${cy - r.h * 0.46}" width="${r.w * 0.92}" height="${r.h * 0.92}" rx="10" fill="none" stroke="#e0f2fe" stroke-width="2.5" opacity="0"/>`
+            + `</svg></div>`
+        );
+
+        const shards = layer.querySelectorAll('.v-shard');
+        shards.forEach((g, idx) => {
+            const sx = g.dataset.sx, sy = g.dataset.sy, mx = g.dataset.mx, my = g.dataset.my, rot = g.dataset.rot;
+            owner.anim(g, [
+                { transform: 'translate(0px,0px) scale(0.35) rotate(0deg)', opacity: 0 },
+                { transform: `translate(${sx}px,${sy}px) scale(1) rotate(${rot}deg)`, opacity: 0.95, offset: 0.28 },
+                { transform: `translate(${sx}px,${sy}px) scale(0.96) rotate(${rot}deg)`, opacity: 0.95, offset: 0.44 },
+                { transform: `translate(${mx}px,${my}px) scale(0.85) rotate(${Number(rot) * 0.4}deg)`, opacity: 1, offset: 0.72 },
+                { transform: 'translate(0px,0px) scale(0.25) rotate(0deg)', opacity: 0 }
+            ], { duration: 790, easing: 'cubic-bezier(0.32,0,0.22,1)', fill: 'forwards', delay: idx * 10 });
+        });
+        owner.at(350, () => {
+            vTone(0, { type: 'triangle', f0: 210, f1: 420, dur: 0.4, vol: 0.11, wet: 0.5 });
+            const gatherId = owner.every(45, () => {
+                const a = rnd(0, 6.283), rad = rnd(r.w * 0.45, r.w * 0.78);
+                owner.addP({ x: r.x + Math.cos(a) * rad, y: r.y + Math.sin(a) * rad, vx: -Math.cos(a) * 2.4, vy: -Math.sin(a) * 2.4, drag: 0.94, decay: 0.08, size: rnd(1.5, 2.8), color: pick(['#f8fafc', '#bae6fd', '#fde68a']) });
+            });
+            owner.at(380, () => stopEvery(gatherId));
+        });
+        owner.at(760, () => {
+            dom.classList.remove('arcane-variant-revive-desat');
+            vTone(0, { type: 'sine', f0: 330, f1: 660, dur: 0.46, vol: 0.16, wet: 0.65 });
+            vChime(0.02, 587, 0.72, 0.08);
+            const core = layer.querySelector('.v-core'), ol = layer.querySelector('.v-outline');
+            if (core) owner.anim(core, [{ transform: 'scale(0.2)', opacity: 1 }, { transform: 'scale(1.18)', opacity: 1, offset: 0.35 }, { transform: 'scale(1.42)', opacity: 0 }], { duration: 480, easing: 'ease-out', fill: 'forwards' });
+            if (ol) owner.anim(ol, [{ opacity: 0.95, transform: 'scale(0.95)' }, { opacity: 0.85, transform: 'scale(1.06)', offset: 0.4 }, { opacity: 0, transform: 'scale(1.14)' }], { duration: 540, easing: 'ease-out', fill: 'forwards' });
+            owner.burst(18, () => {
+                const a = rnd(0, 6.283), spd = rnd(1.2, 3.6);
+                return { x: r.x, y: r.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd - 0.6, drag: 0.94, decay: 0.028, size: rnd(1.4, 3), color: pick(['#f8fafc', '#e0f2fe', '#fef08a']) };
+            });
+            if (onBeat) onBeat({ phase: 'revive', entity });
+        });
+        return owner.handle;
+    }
+
+    // 2. 蜕皮：裂壳觉醒 (L2 · 1350ms)
+    function playVariantMolt(entity, meta = {}, onBeat) {
+        const dom = domOf(entity); if (!dom) return null;
+        const r = entityVisualRect(dom), id = entityIdOf(entity);
+        const owner = variantRun(1350, id);
+        const uid = 'arcane-var-molt-' + (++S.uid);
+        const W = Math.max(140, r.w * 2.2), H = Math.max(140, r.h * 2.2);
+        const cx = W / 2, cy = H / 2, rw = r.w * 0.48, rh = r.h * 0.48;
+        const others = heroesData.concat(enemiesData).filter(x => x.isAlive && entityIdOf(x) !== id).map(x => domOf(x)).filter(Boolean).map(d => d.getBoundingClientRect());
+        let bestAng = r.x < window.innerWidth * 0.5 ? -Math.PI * 0.75 : -Math.PI * 0.25, bestScore = -1e9;
+        for (let k = 0; k < 12; k++) {
+            const ang = (k / 12) * Math.PI * 2;
+            const px = r.x + Math.cos(ang) * 72, py = r.y + Math.sin(ang) * 62;
+            if (px < 56 || px > window.innerWidth - 36 || py < 36 || py > window.innerHeight - 64) continue;
+            let minDist = 999;
+            others.forEach(b => {
+                const dx = Math.max(b.left - px, 0, px - b.right), dy = Math.max(b.top - py, 0, py - b.bottom);
+                minDist = Math.min(minDist, Math.hypot(dx, dy));
+            });
+            const score = minDist + (Math.sin(ang) < 0 ? 12 : -18);
+            if (score > bestScore) { bestScore = score; bestAng = ang; }
+        }
+        const sideX = Math.cos(bestAng), sideY = Math.sin(bestAng);
+        const fragCount = Math.max(6, Math.min(10, meta.shellFragments || 8));
+
+        const fragsHtml = Array.from({ length: fragCount }, (_, i) => {
+            const ang = (i / fragCount) * Math.PI * 2;
+            const px = (Math.cos(ang) * rw * 0.48).toFixed(1), py = (Math.sin(ang) * rh * 0.48).toFixed(1);
+            const spread = (i / (fragCount - 1) - 0.5) * 0.9, fa = bestAng + spread, dist = rnd(52, 82);
+            const fx = (Math.cos(fa) * dist).toFixed(1), fy = (Math.sin(fa) * dist).toFixed(1);
+            return `<g class="v-shell-frag" data-fx="${fx}" data-fy="${fy}" data-rot="${((sideX >= 0 ? 1 : -1) * rnd(35, 90)).toFixed(0)}" style="transform-origin:${cx}px ${cy}px;opacity:0">`
+                + `<polygon points="${cx + Number(px) - 10},${cy + Number(py) - 8} ${cx + Number(px) + 12},${cy + Number(py) - 6} ${cx + Number(px) + 8},${cy + Number(py) + 10} ${cx + Number(px) - 11},${cy + Number(py) + 7}" fill="url(#${uid}-sh)" stroke="#f59e0b" stroke-width="1.3"/></g>`;
+        }).join('');
+
+        const layer = owner.layer(
+            `<div class="arcane-variant-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
+            + `<svg class="arcane-variant-svg" viewBox="0 0 ${W} ${H}"><defs>`
+            + `<linearGradient id="${uid}-sh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#78716c" stop-opacity="0.82"/><stop offset="1" stop-color="#292524" stop-opacity="0.72"/></linearGradient>`
+            + `<linearGradient id="${uid}-au" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#fbbf24" stop-opacity="0"/><stop offset="0.5" stop-color="#fef3c7" stop-opacity="0.85"/><stop offset="1" stop-color="#f59e0b" stop-opacity="0"/></linearGradient>`
+            + `</defs>`
+            + `<g class="v-shell-whole" style="transform-origin:${cx}px ${cy}px">`
+            + `<polygon points="${cx},${cy - rh} ${cx + rw * 0.85},${cy - rh * 0.5} ${cx + rw},${cy + rh * 0.3} ${cx + rw * 0.45},${cy + rh} ${cx - rw * 0.45},${cy + rh} ${cx - rw},${cy + rh * 0.3} ${cx - rw * 0.85},${cy - rh * 0.5}" fill="rgba(41,37,36,0.48)" stroke="#d97706" stroke-width="2"/>`
+            + `<path d="M${cx - rw * 0.4},${cy - rh * 0.7} L${cx - 4},${cy - 8} L${cx + rw * 0.55},${cy - rh * 0.3} M${cx - 4},${cy - 8} L${cx + 8},${cy + rh * 0.72} M${cx - rw * 0.6},${cy + rh * 0.2} L${cx + 4},${cy + 12}" fill="none" stroke="#fde68a" stroke-width="2" stroke-linecap="round"/></g>`
+            + fragsHtml
+            + `<rect class="v-aura-sweep" x="${cx - rw}" y="${cy - rh}" width="${rw * 2}" height="${rh * 2}" rx="12" fill="url(#${uid}-au)" opacity="0"/>`
+            + `</svg></div>`
+        );
+
+        const whole = layer.querySelector('.v-shell-whole');
+        if (whole) owner.anim(whole, [{ transform: 'scale(0.88)', opacity: 0 }, { transform: 'scale(1.03)', opacity: 1, offset: 0.45 }, { transform: 'scale(1.06)', opacity: 0.95, offset: 0.92 }, { transform: 'scale(1.14)', opacity: 0 }], { duration: 360, easing: 'ease-out', fill: 'forwards' });
+
+        owner.at(320, () => {
+            vCrunch(0, { f: 1450, f1: 420, q: 1.1, dur: 0.16, vol: 0.2, drive: 4 });
+            vTone(0.05, { type: 'triangle', f0: 196, f1: 392, dur: 0.36, vol: 0.14, wet: 0.45 });
+            layer.querySelectorAll('.v-shell-frag').forEach((g, idx) => {
+                owner.anim(g, [
+                    { transform: 'translate(0px,0px) scale(1) rotate(0deg)', opacity: 0.95 },
+                    { transform: `translate(${Number(g.dataset.fx) * 0.55}px,${Number(g.dataset.fy) * 0.55}px) scale(0.95) rotate(${Number(g.dataset.rot) * 0.5}deg)`, opacity: 0.9, offset: 0.4 },
+                    { transform: `translate(${g.dataset.fx}px,${g.dataset.fy}px) scale(0.55) rotate(${g.dataset.rot}deg)`, opacity: 0 }
+                ], { duration: 480, easing: 'cubic-bezier(0.2,0.8,0.3,1)', fill: 'forwards', delay: idx * 14 });
+            });
+            const debuffPalette = meta.debuffColors ? Object.values(meta.debuffColors) : (Array.isArray(meta.clearedDebuffs) && meta.clearedDebuffs.length ? ['#a855f7', '#f97316', '#eab308'] : []);
+            if (debuffPalette.length) {
+                owner.burst(debuffPalette.length * 4, i => ({
+                    x: r.x + rnd(-10, 10), y: r.y + rnd(-10, 10),
+                    vx: sideX * rnd(2.2, 4.4), vy: sideY * rnd(1.5, 3.4) + rnd(-0.6, 0.6),
+                    grav: 0.08, drag: 0.95, decay: 0.032, size: rnd(2.2, 4), color: debuffPalette[i % debuffPalette.length]
+                }));
+            }
+            if (onBeat) onBeat({ phase: 'molt', entity });
+        });
+        owner.at(680, () => {
+            const sweep = layer.querySelector('.v-aura-sweep');
+            if (sweep) owner.anim(sweep, [{ transform: 'translateY(18px)', opacity: 0 }, { transform: 'translateY(0px)', opacity: 0.85, offset: 0.35 }, { transform: 'translateY(-14px)', opacity: 0 }], { duration: 520, easing: 'ease-out', fill: 'forwards' });
+            owner.anim(dom, [{ transform: 'scale(1)' }, { transform: 'scale(1.07)', offset: 0.35 }, { transform: 'scale(1)' }], { duration: 360, easing: 'ease-out' });
+            if (meta.permanentBuff !== false) setPersistentFx(dom, 'molt', true);
+            owner.burst(14, () => ({ x: r.x + rnd(-r.w * 0.4, r.w * 0.4), y: r.y + rnd(-8, 12), vx: rnd(-0.6, 0.6), vy: rnd(-2.2, -0.8), drag: 0.96, decay: 0.024, size: rnd(1.6, 3), color: pick(['#fef08a', '#fbbf24', '#f59e0b']) }));
+        });
+        return owner.handle;
+    }
+    // 3. 狂暴：血性沸腾 (L2 · 1250ms) & 退出狂暴 (450ms)
+    function playVariantRage(entity, meta = {}, onBeat) {
+        const dom = domOf(entity); if (!dom) return null;
+        const r = entityVisualRect(dom), id = entityIdOf(entity);
+        const owner = variantRun(1250, id);
+        const uid = 'arcane-var-rage-' + (++S.uid);
+        const W = Math.max(140, r.w * 2.1), H = Math.max(140, r.h * 2.1);
+        const cx = W / 2, cy = H / 2, baseR = Math.min(r.w, r.h) * 0.48;
+
+        const layer = owner.layer(
+            `<div class="arcane-variant-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
+            + `<svg class="arcane-variant-svg" viewBox="0 0 ${W} ${H}"><defs>`
+            + `<radialGradient id="${uid}-bg"><stop offset="0" stop-color="#ef4444" stop-opacity="0.55"/><stop offset="0.55" stop-color="#7f1d1d" stop-opacity="0.32"/><stop offset="1" stop-color="#09090b" stop-opacity="0"/></radialGradient>`
+            + `</defs>`
+            + `<circle class="v-pulse-1" cx="${cx}" cy="${cy}" r="${baseR * 0.85}" fill="none" stroke="#f87171" stroke-width="2.5" opacity="0" style="transform-origin:${cx}px ${cy}px"/>`
+            + `<circle class="v-pulse-2" cx="${cx}" cy="${cy}" r="${baseR * 0.95}" fill="none" stroke="#dc2626" stroke-width="3" opacity="0" style="transform-origin:${cx}px ${cy}px"/>`
+            + `<g class="v-blast" style="transform-origin:${cx}px ${cy}px;opacity:0">`
+            + `<circle cx="${cx}" cy="${cy}" r="${baseR * 1.45}" fill="url(#${uid}-bg)"/>`
+            + `<circle cx="${cx}" cy="${cy}" r="${baseR * 1.2}" fill="none" stroke="#ef4444" stroke-width="3.5" stroke-dasharray="14 6"/>`
+            + `<circle cx="${cx}" cy="${cy}" r="${baseR * 0.9}" fill="none" stroke="#18181b" stroke-width="6" opacity="0.55"/>`
+            + `</g></svg></div>`
+        );
+        const p1 = layer.querySelector('.v-pulse-1'), p2 = layer.querySelector('.v-pulse-2'), bl = layer.querySelector('.v-blast');
+        if (p1) owner.anim(p1, [{ transform: 'scale(0.5)', opacity: 0.9 }, { transform: 'scale(1.18)', opacity: 0 }], { duration: 150, easing: 'ease-out', fill: 'forwards' });
+        if (p2) owner.anim(p2, [{ transform: 'scale(0.55)', opacity: 0.95 }, { transform: 'scale(1.32)', opacity: 0 }], { duration: 170, delay: 130, easing: 'ease-out', fill: 'forwards' });
+
+        owner.at(280, () => {
+            vDrone(0, { f0: 96, f1: 58, lp0: 640, lp1: 240, dur: 0.56, vol: 0.22 });
+            vCrunch(0.02, { f: 340, f1: 140, q: 1.4, dur: 0.26, vol: 0.14, drive: 5 });
+            if (bl) owner.anim(bl, [{ transform: 'scale(0.35)', opacity: 1 }, { transform: 'scale(1.08)', opacity: 0.92, offset: 0.36 }, { transform: 'scale(1.35)', opacity: 0 }], { duration: 360, easing: 'cubic-bezier(0.15,0.8,0.25,1)', fill: 'forwards' });
+            owner.anim(dom, [{ transform: 'scale(1)' }, { transform: 'scale(1.08)', offset: 0.28 }, { transform: 'scale(1)' }], { duration: 320, easing: 'ease-out' });
+            owner.burst(18, i => {
+                const a = rnd(0, 6.283), spd = rnd(1.8, 4.8);
+                return { x: r.x + rnd(-10, 10), y: r.y + rnd(-8, 12), vx: Math.cos(a) * spd, vy: Math.sin(a) * spd - 0.8, drag: 0.92, decay: rnd(0.028, 0.048), size: i % 3 === 0 ? rnd(10, 16) : rnd(2, 4), shape: i % 3 === 0 ? 'smoke' : 'dot', blend: i % 3 === 0 ? 'source-over' : 'lighter', color: i % 3 === 0 ? 'rgba(24,24,27,0.65)' : pick(['#ef4444', '#fca5a5', '#b91c1c']) };
+            });
+            if (onBeat) onBeat({ phase: 'rage', entity });
+        });
+        owner.at(560, () => setPersistentFx(dom, 'rage', true));
+        return owner.handle;
+    }
+
+    function playVariantRageExit(entity, meta = {}, onBeat) {
+        const dom = domOf(entity); if (!dom) return null;
+        const r = entityVisualRect(dom);
+        const owner = variantRun(480, entityIdOf(entity));
+        setPersistentFx(dom, 'rage', false);
+        vWhoosh(0, { type: 'lowpass', f0: 420, f1: 150, q: 0.8, dur: 0.35, vol: 0.08 });
+        owner.burst(8, () => ({ x: r.x + rnd(-r.w * 0.38, r.w * 0.38), y: r.y + rnd(-r.h * 0.3, r.h * 0.3), vx: rnd(-0.4, 0.4), vy: rnd(0.4, 1.3), drag: 0.96, decay: 0.04, size: rnd(1.5, 2.8), color: '#f87171' }));
+        if (onBeat) onBeat({ phase: 'rageExit', entity });
+        return owner.handle;
+    }
+
+    // 4. 连动：绝境抢攻 (L2 · 1150ms)
+    function playVariantLink(entity, meta = {}, onBeat) {
+        const dom = domOf(entity); if (!dom) return null;
+        const r = entityVisualRect(dom), id = entityIdOf(entity);
+        const turnDotDom = meta.turnDotDom || document.querySelector('#turn-order-container [data-turn-slot="1"] .turn-dot') || document.querySelector('#turn-order-container .turn-queue-item:nth-child(2)') || document.querySelector('#turn-order-container .turn-dot');
+        if (!turnDotDom) return null;
+        const tb = ctr(turnDotDom), owner = variantRun(1150, id);
+        const uid = 'arcane-var-link-' + (++S.uid);
+
+        owner.anim(dom, [{ transform: 'translate3d(0,0,0) scale(1)' }, { transform: 'translate3d(7px,5px,0) scale(0.92)', offset: 0.7 }, { transform: 'translate3d(0,0,0) scale(1)' }], { duration: 250, easing: 'ease-out' });
+
+        owner.at(240, () => {
+            vWhoosh(0, { f0: 420, f1: 1700, q: 1.4, dur: 0.32, vol: 0.22, pan: 0.2, pan1: -0.7 });
+            const rawRect = dom.getBoundingClientRect();
+            const ghostLayer = owner.layer(`<div class="arcane-variant-anchor" style="left:${rawRect.left + rawRect.width / 2}px;top:${rawRect.top + rawRect.height / 2}px;width:${rawRect.width}px;height:${rawRect.height}px;opacity:0.5;filter:hue-rotate(30deg) brightness(1.4);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:${getComputedStyle(dom).fontSize}">${dom.innerHTML.replace(/ id="[^"]*"/g, '')}</div>`);
+            const ghostEl = ghostLayer.firstElementChild;
+            if (ghostEl) owner.anim(ghostEl, [{ transform: 'translate(-50%,-50%) scale(1)', opacity: 0.52 }, { transform: 'translate(-58%,-56%) scale(1.08)', opacity: 0 }], { duration: 360, easing: 'ease-out', fill: 'forwards' });
+            owner.anim(dom, [{ transform: 'translate3d(0,0,0) scale(1)' }, { transform: 'translate3d(-14px,-8px,0) scale(1.06)', offset: 0.35 }, { transform: 'translate3d(0,0,0) scale(1)' }], { duration: 260, easing: 'cubic-bezier(0.2,0.8,0.3,1)' });
+
+            const a = { x: r.x, y: r.y }, b = { x: tb.x, y: tb.y };
+            const cx = (a.x + b.x) / 2, cy = Math.min(a.y, b.y) - 42;
+            const pathD = `M${a.x.toFixed(1)},${a.y.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`;
+            const railLayer = owner.layer(`<svg class="arcane-variant-svg" viewBox="0 0 ${window.innerWidth} ${window.innerHeight}"><defs><linearGradient id="${uid}-lg" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#c026d3" stop-opacity="0.2"/><stop offset="60%" stop-color="#e879f9" stop-opacity="0.95"/><stop offset="100%" stop-color="#fde047"/></linearGradient></defs><path class="v-link-arc" d="${pathD}" fill="none" stroke="url(#${uid}-lg)" stroke-width="3.5" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/></svg>`);
+            const arcPath = railLayer.querySelector('.v-link-arc');
+            if (arcPath) owner.anim(arcPath, [{ strokeDashoffset: 1, opacity: 1 }, { strokeDashoffset: 0, opacity: 1, offset: 0.62 }, { strokeDashoffset: -1, opacity: 0 }], { duration: 640, easing: 'cubic-bezier(0.25,0.8,0.3,1)', fill: 'forwards' });
+
+            owner.fly(a, b, 42, 420, (x, y) => {
+                owner.addP({ x, y, size: 6, decay: 0.22, color: '#f0abfc' });
+                owner.burst(2, () => ({ x: x + rnd(-4, 4), y: y + rnd(-4, 4), vx: rnd(-0.8, 0.8), vy: rnd(-0.8, 0.8), drag: 0.92, decay: 0.08, size: rnd(1.5, 3), color: pick(['#e879f9', '#fde047', '#ffffff']) }));
+            }, () => {
+                vCrystal(0, 1180, 0.12, -0.7);
+                const spark = owner.layer(`<div class="arcane-variant-anchor" style="left:${b.x}px;top:${b.y}px;width:96px;height:96px;transform:translate(-50%,-50%)"><svg class="arcane-variant-svg" viewBox="0 0 96 96"><circle class="v-sp-r" cx="48" cy="48" r="26" fill="none" stroke="#fde047" stroke-width="2.6" style="transform-origin:48px 48px"/><polygon class="v-sp-s" points="48,10 53,43 86,48 53,53 48,86 43,53 10,48 43,43" fill="#fef08a" style="transform-origin:48px 48px"/></svg></div>`);
+                const sr = spark.querySelector('.v-sp-r'), ss = spark.querySelector('.v-sp-s');
+                if (sr) owner.anim(sr, [{ transform: 'scale(0.3)', opacity: 1 }, { transform: 'scale(1.45)', opacity: 0 }], { duration: 360, easing: 'ease-out', fill: 'forwards' });
+                if (ss) owner.anim(ss, [{ transform: 'scale(0.2) rotate(0deg)', opacity: 1 }, { transform: 'scale(1.15) rotate(25deg)', opacity: 0 }], { duration: 340, easing: 'ease-out', fill: 'forwards' });
+                if (onBeat) onBeat({ phase: 'link', entity });
+            }, k => k * 0.6 + k * k * 0.4);
+        });
+        return owner.handle;
+    }
+    // 5. 吸血：生命回流 (L1 · 720ms) — 严格由承受者(from)流向吸血者(to)
+    function playVariantLeech(fromEntity, toEntity, meta = {}, onBeat) {
+        const fromDom = domOf(fromEntity), toDom = domOf(toEntity);
+        if (!fromDom || !toDom) return null;
+        const aR = entityVisualRect(fromDom), bR = entityVisualRect(toDom);
+        const owner = variantRun(720);
+        const uid = 'arcane-var-leech-' + (++S.uid);
+        const a = { x: aR.x, y: aR.y }, b = { x: bR.x, y: bR.y };
+        const dx = b.x - a.x, dy = b.y - a.y, dist = Math.hypot(dx, dy) || 1;
+        const nx = -dy / dist, ny = dx / dist;
+
+        owner.burst(5, () => ({ x: a.x + rnd(-10, 10), y: a.y + rnd(-10, 10), vx: rnd(-0.6, 0.6), vy: rnd(-0.6, 0.6), drag: 0.9, decay: 0.08, size: rnd(2.2, 3.6), color: '#dc2626' }));
+        vWhoosh(0.05, { type: 'bandpass', f0: 260, f1: 540, q: 2.0, dur: 0.34, vol: 0.085, peak: 0.22 });
+
+        const offsets = [-34, -14, 16, 36];
+        const pathsHtml = offsets.map((off, i) => {
+            const cx = (a.x + b.x) / 2 + nx * off, cy = (a.y + b.y) / 2 + ny * off - 18;
+            return `<path class="v-leech-p" data-idx="${i}" d="M${a.x.toFixed(1)},${a.y.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}" fill="none" stroke="url(#${uid}-lg)" stroke-width="${i % 2 ? 2.4 : 1.7}" stroke-linecap="round" pathLength="1" stroke-dasharray="0.34 1" stroke-dashoffset="0.34"/>`;
+        }).join('');
+        const svgLayer = owner.layer(`<svg class="arcane-variant-svg" viewBox="0 0 ${window.innerWidth} ${window.innerHeight}"><defs><linearGradient id="${uid}-lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#991b1b" stop-opacity="0.35"/><stop offset="55%" stop-color="#ef4444" stop-opacity="0.95"/><stop offset="100%" stop-color="#fca5a5"/></linearGradient></defs>${pathsHtml}</svg>`);
+
+        svgLayer.querySelectorAll('.v-leech-p').forEach((pEl, i) => {
+            const delay = 50 + i * 38;
+            owner.anim(pEl, [
+                { strokeDashoffset: 0.34, opacity: 0.2 },
+                { strokeDashoffset: -0.2, opacity: 0.95, offset: 0.35 },
+                { strokeDashoffset: -1.0, opacity: 0 }
+            ], { duration: 380, delay, easing: 'cubic-bezier(0.25,0.6,0.3,1)', fill: 'forwards' });
+            owner.at(delay, () => {
+                const off = offsets[i];
+                owner.fly(a, { x: b.x + nx * (off * 0.15), y: b.y + ny * (off * 0.15) }, 18 - off * 0.4, 340, (x, y) => {
+                    owner.addP({ x, y, size: rnd(1.8, 3.2), decay: 0.2, color: pick(['#ef4444', '#f87171', '#991b1b']) });
+                }, i === offsets.length - 1 ? () => {
+                    const glow = owner.layer(`<div class="arcane-variant-anchor" style="left:${b.x}px;top:${b.y}px;width:${Math.max(84, bR.w * 1.1)}px;height:${Math.max(84, bR.h * 1.1)}px;border-radius:50%;background:radial-gradient(circle, rgba(248,113,113,0.45) 0%, rgba(185,28,28,0.18) 55%, transparent 74%);transform:translate(-50%,-50%) scale(0.4)"></div>`).firstElementChild;
+                    if (glow) owner.anim(glow, [{ transform: 'translate(-50%,-50%) scale(0.45)', opacity: 0.9 }, { transform: 'translate(-50%,-50%) scale(1.15)', opacity: 0 }], { duration: 240, easing: 'ease-out', fill: 'forwards' });
+                    if (onBeat) onBeat({ phase: 'leech', entity: toEntity });
+                } : null);
+            });
+        });
+        return owner.handle;
+    }
+
+    // 6. 再生：自我修复 (L1 · 650ms) — 纯自体修复纹理爬升，无外来源、无十字环
+    function playVariantRegen(entity, meta = {}, onBeat) {
+        const dom = domOf(entity); if (!dom) return null;
+        const r = entityVisualRect(dom);
+        const owner = variantRun(650);
+        const uid = 'arcane-var-regen-' + (++S.uid);
+        const W = Math.max(84, r.w * 1.15), H = Math.max(84, r.h * 1.15);
+        const rw = r.w * 0.44, rh = r.h * 0.44, cx = W / 2, cy = H / 2;
+
+        const layer = owner.layer(
+            `<div class="arcane-variant-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
+            + `<svg class="arcane-variant-svg" viewBox="0 0 ${W} ${H}"><defs>`
+            + `<linearGradient id="${uid}-rg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#34d399" stop-opacity="0"/><stop offset="0.5" stop-color="#a7f3d0" stop-opacity="0.72"/><stop offset="1" stop-color="#10b981" stop-opacity="0"/></linearGradient>`
+            + `</defs>`
+            + `<g class="v-regen-mesh" opacity="0">`
+            + `<path d="M${cx - rw * 0.6},${cy + rh * 0.5} Q${cx - 6},${cy} ${cx + rw * 0.55},${cy - rh * 0.55} M${cx + rw * 0.6},${cy + rh * 0.4} Q${cx + 4},${cy - 4} ${cx - rw * 0.5},${cy - rh * 0.5} M${cx - rw * 0.3},${cy + rh * 0.7} C${cx - rw * 0.5},${cy + 8} ${cx + rw * 0.4},${cy - 8} ${cx + rw * 0.25},${cy - rh * 0.7}" fill="none" stroke="#6ee7b7" stroke-width="1.6" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>`
+            + `</g>`
+            + `<rect class="v-regen-scan" x="${cx - rw}" y="${cy - rh}" width="${rw * 2}" height="${rh * 2}" rx="8" fill="url(#${uid}-rg)" opacity="0"/>`
+            + `</svg></div>`
+        );
+        vWhoosh(0.08, { type: 'bandpass', f0: 950, f1: 1650, q: 2.8, dur: 0.22, vol: 0.045 });
+        const mesh = layer.querySelector('.v-regen-mesh'), pathEl = mesh && mesh.querySelector('path'), scan = layer.querySelector('.v-regen-scan');
+        if (mesh) owner.anim(mesh, [{ opacity: 0 }, { opacity: 0.92, offset: 0.25 }, { opacity: 0.85, offset: 0.65 }, { opacity: 0 }], { duration: 600, fill: 'forwards' });
+        if (pathEl) owner.anim(pathEl, [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 360, easing: 'ease-out', fill: 'forwards' });
+        if (scan) owner.anim(scan, [{ transform: 'translateY(14px)', opacity: 0 }, { transform: 'translateY(0px)', opacity: 0.68, offset: 0.45 }, { transform: 'translateY(-14px)', opacity: 0 }], { duration: 480, delay: 90, easing: 'ease-out', fill: 'forwards' });
+
+        owner.at(260, () => {
+            owner.burst(10, () => ({ x: r.x + rnd(-rw * 0.7, rw * 0.7), y: r.y + rnd(-rh * 0.6, rh * 0.6), vx: 0, vy: rnd(-0.6, -0.15), drag: 0.94, decay: 0.045, size: rnd(1.5, 2.6), color: pick(['#a7f3d0', '#6ee7b7', '#34d399']) }));
+            if (onBeat) onBeat({ phase: 'regen', entity });
+        });
+        return owner.handle;
+    }
+
+    // 7. 荆棘：反伤碎芒 (L1 · 580ms) — 仅近战且反弹结算为真时触发
+    function playVariantThorn(holderEntity, attackerEntity, meta = {}, onBeat) {
+        if (!meta.isMelee || !meta.reflected) return null;
+        const fromDom = domOf(holderEntity), toDom = domOf(attackerEntity);
+        if (!fromDom || !toDom) return null;
+        const aR = entityVisualRect(fromDom), bR = entityVisualRect(toDom);
+        const owner = variantRun(580);
+        const dx = bR.x - aR.x, dy = bR.y - aR.y, dist = Math.hypot(dx, dy) || 1;
+        const ux = dx / dist, uy = dy / dist, deg = Math.atan2(dy, dx) * 180 / Math.PI;
+        const hitPt = { x: aR.x + ux * Math.min(aR.w, aR.h) * 0.34, y: aR.y + uy * Math.min(aR.w, aR.h) * 0.34 };
+        const endPt = { x: bR.x, y: bR.y };
+
+        const spikeLayer = owner.layer(
+            `<div class="arcane-variant-anchor" style="left:${hitPt.x}px;top:${hitPt.y}px;width:72px;height:72px;transform:translate(-50%,-50%) rotate(${deg}deg)">`
+            + `<svg class="arcane-variant-svg" viewBox="0 0 72 72">`
+            + `<polygon points="34,36 62,22 44,36 66,36 44,40 60,52" fill="#e2e8f0" stroke="#38bdf8" stroke-width="1.2"/>`
+            + `<polygon points="28,28 50,14 38,32" fill="#99f6e4"/><polygon points="28,44 50,58 38,40" fill="#99f6e4"/>`
+            + `</svg></div>`
+        ).firstElementChild;
+        if (spikeLayer) owner.anim(spikeLayer, [
+            { transform: `translate(-50%,-50%) rotate(${deg}deg) scale(0.35)`, opacity: 1 },
+            { transform: `translate(-50%,-50%) rotate(${deg}deg) scale(1.12)`, opacity: 1, offset: 0.25 },
+            { transform: `translate(-50%,-50%) rotate(${deg}deg) scale(0.95)`, opacity: 0 }
+        ], { duration: 240, easing: 'ease-out', fill: 'forwards' });
+
+        owner.at(60, () => {
+            vClick(0, 0.24, 4800, 0.01);
+            vCrystal(0.015, 1340, 0.065);
+            [-14, 0, 14].forEach((spread, idx) => {
+                const rad = (deg + spread) * Math.PI / 180;
+                const sPt = { x: hitPt.x + Math.cos(rad) * 14, y: hitPt.y + Math.sin(rad) * 14 };
+                owner.fly(sPt, endPt, spread * 0.5, 220 + idx * 20, (x, y) => {
+                    owner.addP({ x, y, vx: ux * 2.2, vy: uy * 2.2, shape: 'streak', size: 2.2, decay: 0.28, color: '#a7f3d0' });
+                    owner.addP({ x, y, shape: 'shard', size: 4.5, decay: 0.24, rot: rad, color: '#38bdf8', fill: 'rgba(224,242,254,0.65)' });
+                }, idx === 1 ? () => {
+                    const redFlash = owner.layer(`<div class="arcane-variant-anchor" style="left:${endPt.x}px;top:${endPt.y}px;width:82px;height:82px;border-radius:50%;background:radial-gradient(circle, rgba(254,202,202,0.85) 0%, rgba(239,68,68,0.45) 45%, transparent 72%);transform:translate(-50%,-50%)"></div>`).firstElementChild;
+                    if (redFlash) owner.anim(redFlash, [{ transform: 'translate(-50%,-50%) scale(0.4)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1.25)', opacity: 0 }], { duration: 220, easing: 'ease-out', fill: 'forwards' });
+                    owner.burst(8, () => { const a = rnd(0, 6.283), s = rnd(1.5, 4.2); return { x: endPt.x, y: endPt.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, drag: 0.92, decay: 0.06, size: rnd(1.5, 2.8), color: pick(['#f87171', '#fca5a5', '#e2e8f0']) }; });
+                    if (onBeat) onBeat({ phase: 'thorn', entity: attackerEntity });
+                } : null);
+            });
+        });
+        return owner.handle;
+    }
+
+    function playVariantTriggerFx(opts = {}) {
+        const { trigger, entity, sourceEntity, targetEntity, meta = {}, onBeat } = opts;
+        if (!trigger || meta.triggered === false) return null;
+        const primary = entity || targetEntity || sourceEntity;
+        if (trigger === 'revive') return playVariantRevive(primary, meta, onBeat);
+        if (trigger === 'molt') return playVariantMolt(primary, meta, onBeat);
+        if (trigger === 'rage') return playVariantRage(primary, meta, onBeat);
+        if (trigger === 'rageExit') return playVariantRageExit(primary, meta, onBeat);
+        if (trigger === 'link') return playVariantLink(primary, meta, onBeat);
+        if (trigger === 'leech') return playVariantLeech(sourceEntity || meta.sourceEntity, targetEntity || primary, meta, onBeat);
+        if (trigger === 'regen') return playVariantRegen(primary, meta, onBeat);
+        if (trigger === 'thorn') return playVariantThorn(sourceEntity || primary, targetEntity || meta.attackerEntity, meta, onBeat);
+        return null;
+    }
+    // ===== 新技能实现 END =====
+
+    // ===== 对外接口（与正式版同名同参；不将演示卡片或占位数据带入模块） =====
+    function isArcaneSkillFx(fxTag) { return ARCANE_TAGS.indexOf(fxTag) !== -1; }
+    function playArcaneSkillFx(fxTag, caster, targets, isReaction = false) {
+        if (!isArcaneSkillFx(fxTag)) return null;
+        // 接入点 3：按 fxTag 分派到上方新技能函数，返回它的 handle。
+        return null;
+    }
+    function playArcaneProjectile(type, fromDom, toDom, dodged = false) {
+        if (!fromDom || !toDom || !fromDom.getBoundingClientRect || !toDom.getBoundingClientRect) return Promise.resolve();
+        const token = combatToken;
+        ensureCanvas(); ensureDriver();
+        if (type === 'fire') fireProjectile(fromDom, toDom, !!dodged, token);
+        else if (type === 'enemy_spell') enemySpellProjectile(fromDom, toDom, !!dodged, token);
+        const beat = type === 'fire' ? 580 : 480;
+        return new Promise(res => {
+            const id = setTimeout(() => { S.rawTimers.delete(id); res(); }, beat);
+            S.rawTimers.set(id, res);
+        });
+    }
+    function clearArcaneFx() {
+        S.timers.forEach(id => clearTimeout(id)); S.timers.clear();
+        S.rawTimers.forEach((resolve, id) => { clearTimeout(id); resolve(); }); S.rawTimers.clear();
+        S.intervals.forEach(id => clearInterval(id)); S.intervals.clear();
+        S.flights.length = 0; S.particles.length = 0;
+        S.particleTimer = null; S.particleUntil = 0;
+        if (S.driver) { const idx = fxEngine.particles.indexOf(S.driver); if (idx >= 0) fxEngine.particles.splice(idx, 1); S.driver = null; }
+        S.handles.forEach(h => { if (h && h.cancel) h.cancel(); }); S.handles.clear();
+        S.layers.forEach(d => d.remove()); S.layers.clear();
+        S.anchors.forEach(d => d.remove()); S.anchors.clear();
+        S.flashes.forEach(el => el.classList.remove('arcane-flash-cold', 'arcane-flash-heal')); S.flashes.clear();
+        S.shakeEls.forEach(el => el.classList.remove('arcane-shake-light', 'arcane-shake-heavy', 'arcane-shake-quake')); S.shakeEls.clear();
+        clearVariantState();
+        if (S.dark) { S.dark.remove(); S.dark = null; }
+        if (S.canvas) { S.canvas.remove(); S.canvas = null; S.ctx = null; }
+        if (audioCtx) { audioCtx.close(); audioCtx = null; sfxBus = null; sfxVerb = null; sfxNoise = null; }
+    }
+    function setVariantSfx(on) { variantSfxOn = !!on; }
+    window.isArcaneSkillFx = isArcaneSkillFx;
+    window.playArcaneSkillFx = playArcaneSkillFx;
+    window.playArcaneProjectile = playArcaneProjectile;
+    window.playVariantTriggerFx = playVariantTriggerFx;
+    window.isEntityVariantLocked = isEntityVariantLocked;
+    window.clearVariantState = clearVariantState;
+    window.setVariantSfx = setVariantSfx;
+    window.clearArcaneFx = clearArcaneFx;
+    return { isArcaneSkillFx, playArcaneSkillFx, playArcaneProjectile, clearArcaneFx, playVariantTriggerFx, isEntityVariantLocked, clearVariantState, setVariantSfx };
+})();
+    // ===== 可移植特效模块 END =====
+
+    // ===== 演示控制 BEGIN：仅驱动上述正式版接口，不参与移植 =====
+    // 接入点 4：CARDS 每项为 { name, level, description, fxTag, casterId, targetIds, isReaction }。
+    // casterId / targetIds 使用上方 h1-h4、e1-e6；level 使用 L1-L4，默认列表为空。
+    // 反应演练可在 playDemoSkill 中调用返回的 handle.dodge / hit，不把模拟攻击写进技能实现。
+    const DEMO_GROUPS = [
+        {
+            title: '转折类 · 战斗关键逆转与衔接', badge: '5项',
+            items: [
+                { name: '复活 · 击杀衔接复聚', level: 'L2', description: '致命受击归零 → 降饱和碎片内旋复聚回30%', trigger: 'revive', enemyId: 'e5', init: { e5: { hp: 280, maxHp: 1000 } }, meta: { preFatalFrom: 'h2', fatalDmg: 320, healTo: 300 } },
+                { name: '蜕皮 · 壳裂清负同步回血', level: 'L2', description: '壳片向安全外侧剥落甩毒燃 + 同拍回血+300', trigger: 'molt', enemyId: 'e3', init: { e3: { hp: 420, maxHp: 1000, buffs: [{ label: '☠️毒25·2回', color: '#c084fc' }, { label: '🔥燃30·2回', color: '#fb923c' }] } }, meta: { hpBefore: 420, maxHp: 1000, healAmount: 300, clearedDebuffs: ['中毒', '燃烧'], debuffColors: { '中毒': '#a855f7', '燃烧': '#f97316' }, shellFragments: 8, permanentBuff: true } },
+                { name: '狂暴 · 血性沸腾 (进入)', level: 'L2', description: '两次脉动 → 短促红黑气浪 → 低强度热浪常驻', trigger: 'rage', enemyId: 'e4', init: { e4: { hp: 260, maxHp: 1000 } }, meta: { atkMul: 1.5 } },
+                { name: '狂暴 · 回血脱离 (淡出)', level: 'L2', description: '先处于狂暴 → 回血跨回30%线后危险外观平滑淡出', trigger: 'rageExit', enemyId: 'e4', init: { e4: { hp: 260, maxHp: 1000 } }, meta: { healAmount: 220 } },
+                { name: '连动 · 插队光轨与抢攻', level: 'L2', description: '紫金光轨命中时间轴⚡再动槽位 → 衔接普攻', trigger: 'link', enemyId: 'e2', init: { e2: { hp: 240, maxHp: 1000 } }, meta: { followAttackTarget: 'h2' } }
+            ]
+        },
+        {
+            title: '短反馈 · 高频克制三段式', badge: '5项',
+            items: [
+                { name: '吸血 · 敌→我 (生命回流)', level: 'L1', description: 'h2血丝弧线流向e5 + 嗜血+36回血', trigger: 'leech', sourceId: 'h2', targetId: 'e5', init: { e5: { hp: 620, maxHp: 1000 } }, meta: { drain: 36 } },
+                { name: '吸血 · 我→敌 (双向验证)', level: 'L1', description: 'e4血丝弧线流向h3 + 嗜血+42回血', trigger: 'leech', sourceId: 'e4', targetId: 'h3', init: { h3: { hp: 85, maxHp: 140 } }, meta: { drain: 42 } },
+                { name: '再生 · 自体纤维修复', level: 'L1', description: '无外粒子/无绿十字，纯自体修复纹路爬升+100', trigger: 'regen', enemyId: 'e1', init: { e1: { hp: 600, maxHp: 1000 } }, meta: { heal: 100 } },
+                { name: '荆棘 · 敌反我 (近战触发)', level: 'L1', description: 'h2近战击中e5 → 银青碎芒反向刺伤h2 (-45)', trigger: 'thorn', sourceId: 'e5', targetId: 'h2', meta: { isMelee: true, reflected: true, reflectDamage: 45 } },
+                { name: '荆棘 · 我反敌 (双向验证)', level: 'L1', description: 'e2近战击中h1 → 银青碎芒反向刺伤e2 (-52)', trigger: 'thorn', sourceId: 'h1', targetId: 'e2', meta: { isMelee: true, reflected: true, reflectDamage: 52 } }
+            ]
+        },
+        {
+            title: '对照组与连发并发压测', badge: '3项',
+            items: [
+                { name: '对照 · 错误时机无演出', level: '对照', description: '远程打荆棘 / 未达阈值 / 未反弹 → 全数拦截不播', trigger: 'noop', meta: {} },
+                { name: '连发 · 同实体连续触发', level: '压测', description: 'e5连续触发 吸血→再生→狂暴，验证不遮罩不覆盖', trigger: 'chain', enemyId: 'e5', init: { e5: { hp: 250, maxHp: 1000 } }, meta: {} },
+                { name: '并发 · 多实体同拍压测', level: '压测', description: 'e1复活 / e3蜕皮 / e6反伤 / h3吸血同拍并发+重置检', trigger: 'concurrent', init: { e1: { hp: 180, maxHp: 1000 }, e3: { hp: 420, maxHp: 1000, buffs: [{ label: '☠️毒', color: '#c084fc' }] }, h3: { hp: 85, maxHp: 140 } }, meta: {} }
+            ]
+        }
+    ];
+    const CARDS = DEMO_GROUPS.flatMap(g => g.items);
+    let unlockTimer = null, demoSfxOn = true;
+    const demoTimers = new Set(), demoLayers = new Set();
+    const beatStatEl = $('#variant-beat-stat'), sfxBtn = $('#btn-variant-sfx');
+    const entityOf = id => heroesData.concat(enemiesData).find(e => e.id === id);
+
+    function clearDemoExtras() {
+        demoTimers.forEach(id => clearTimeout(id)); demoTimers.clear();
+        demoLayers.forEach(el => el.remove()); demoLayers.clear();
+    }
+    function demoAt(ms, fn) {
+        const token = combatToken;
+        const id = setTimeout(() => { demoTimers.delete(id); if (token === combatToken) fn(); }, ms);
+        demoTimers.add(id);
+        return id;
+    }
+    function renderSfxBtn() {
+        sfxBtn.textContent = demoSfxOn ? '🔊 音开' : '🔇 音关';
+        sfxBtn.setAttribute('aria-pressed', String(demoSfxOn));
+        sfxBtn.className = 'text-[9px] font-bold px-1.5 rounded border transition-all hover:bg-white/10 shrink-0 ' + (demoSfxOn ? 'border-emerald-500/60 text-emerald-300' : 'border-slate-600 text-slate-400');
+    }
+    sfxBtn.addEventListener('click', () => { demoSfxOn = !demoSfxOn; arcaneVfxModule.setVariantSfx(demoSfxOn); renderSfxBtn(); });
+    renderSfxBtn();
+
+    function updateDemoHp(entity, hpVal) {
+        if (!entity) return;
+        entity.hp = Math.max(0, Math.min(entity.maxHp, hpVal));
+        const bar = document.getElementById(entity.id + '-hp-bar'), txt = document.getElementById(entity.id + '-hp-text');
+        if (bar) bar.style.width = (entity.hp / entity.maxHp * 100) + '%';
+        if (txt) txt.textContent = entity.id.startsWith('h') ? Math.floor(entity.hp) : Math.floor(entity.hp) + '/' + entity.maxHp;
+    }
+    function spawnDemoFloat(entityOrId, text, colorCls) {
+        const dom = getEntitySpriteDom(entityOrId); if (!dom) return;
+        const r = dom.getBoundingClientRect();
+        const el = document.createElement('div');
+        el.className = 'arcane-variant-float-text text-sm sm:text-xl ' + (colorCls || 'text-white');
+        el.style.left = (r.left + r.width / 2 + (Math.random() - 0.5) * 28) + 'px';
+        el.style.top = Math.max(24, r.top - 4) + 'px';
+        el.textContent = text;
+        document.body.appendChild(el);
+        demoLayers.add(el);
+        demoAt(1180, () => { demoLayers.delete(el); el.remove(); });
+    }
+    function lockCards(locked) {
+        document.querySelectorAll('#skill-list .card').forEach(card => { card.disabled = locked; });
+    }
+    function scheduleUnlock(ms) {
+        clearTimeout(unlockTimer);
+        lockCards(true);
+        unlockTimer = setTimeout(() => { unlockTimer = null; lockCards(false); }, ms);
+    }
+
+    function runSingleCard(card) {
+        const e = card.enemyId ? entityOf(card.enemyId) : null;
+        if (card.trigger === 'revive') {
+            const h2 = entityOf(card.meta.preFatalFrom || 'h2');
+            beatStatEl.textContent = '致命接触…';
+            arcaneVfxModule.playArcaneProjectile('fire', getEntitySpriteDom(h2), getEntitySpriteDom(e), false).then(() => {
+                if (!e) return;
+                updateDemoHp(e, 0);
+                spawnDemoFloat(e, '-' + (card.meta.fatalDmg || 320), 'text-rose-400');
+                beatStatEl.textContent = '致死拦截→复聚';
+                arcaneVfxModule.playVariantTriggerFx({ trigger: 'revive', entity: e, meta: card.meta, onBeat: () => { updateDemoHp(e, card.meta.healTo || 300); spawnDemoFloat(e, '死里逃生!', 'text-emerald-300'); } });
+            });
+            return 2060;
+        }
+        if (card.trigger === 'molt') {
+            beatStatEl.textContent = '裂壳觉醒';
+            arcaneVfxModule.playVariantTriggerFx({ trigger: 'molt', entity: e, meta: card.meta, onBeat: () => {
+                e.buffs = []; window.renderDemoEntityBuffs(e);
+                updateDemoHp(e, e.hp + (card.meta.healAmount || 300));
+                spawnDemoFloat(e, '绝境爆发! +' + (card.meta.healAmount || 300), 'text-amber-300');
+            } });
+            return 1380;
+        }
+        if (card.trigger === 'rage') {
+            beatStatEl.textContent = '血性沸腾';
+            arcaneVfxModule.playVariantTriggerFx({ trigger: 'rage', entity: e, meta: card.meta, onBeat: () => spawnDemoFloat(e, '狂暴!', 'text-red-400') });
+            return 1280;
+        }
+        if (card.trigger === 'rageExit') {
+            const dom = getEntitySpriteDom(e);
+            if (dom && !dom.querySelector('[data-arcane-variant-persist="rage"]')) {
+                if (!dom.classList.contains('relative')) dom.classList.add('arcane-variant-host-rel');
+                const n = document.createElement('div'); n.setAttribute('data-arcane-variant-persist', 'rage'); n.className = 'arcane-variant-rage-fx'; dom.appendChild(n);
+            }
+            beatStatEl.textContent = '狂暴中(26%)';
+            demoAt(380, () => {
+                updateDemoHp(e, e.hp + (card.meta.healAmount || 220));
+                spawnDemoFloat(e, '+' + (card.meta.healAmount || 220) + ' 脱离狂暴', 'text-emerald-300');
+                beatStatEl.textContent = '跨30%→淡出';
+                arcaneVfxModule.playVariantTriggerFx({ trigger: 'rageExit', entity: e, meta: card.meta });
+            });
+            return 920;
+        }
+        if (card.trigger === 'link') {
+            const queue = [{ id: 'h1', e: '👨', name: '埃利奥特', hero: true }, { id: 'e2', e: '❄️', name: 'e2', hero: false, isExtra: false }, { id: 'h2', e: '🧔', name: '弗兰克', hero: true }, { id: 'h3', e: '👩', name: '玛德琳', hero: true }, { id: 'e4', e: '👻', name: 'e4', hero: false }];
+            window.renderDemoTurnTimeline(queue);
+            const dot = document.querySelector('#turn-order-container [data-turn-slot="1"] .turn-dot');
+            beatStatEl.textContent = '绝境插队光轨';
+            arcaneVfxModule.playVariantTriggerFx({ trigger: 'link', entity: e, meta: { turnDotDom: dot }, onBeat: () => {
+                queue[1].isExtra = true; window.renderDemoTurnTimeline(queue);
+                spawnDemoFloat(e, '抢攻!', 'text-fuchsia-400');
+                beatStatEl.textContent = '⚡再动→普攻';
+                demoAt(280, () => {
+                    const h2 = entityOf(card.meta.followAttackTarget || 'h2');
+                    arcaneVfxModule.playArcaneProjectile('enemy_spell', getEntitySpriteDom(e), getEntitySpriteDom(h2), false).then(() => {
+                        updateDemoHp(h2, h2.hp - 22); spawnDemoFloat(h2, '-22', 'text-rose-400');
+                    });
+                });
+            } });
+            return 1750;
+        }
+        if (card.trigger === 'leech') {
+            const src = entityOf(card.sourceId), tgt = entityOf(card.targetId);
+            beatStatEl.textContent = src.id + '→' + tgt.id + ' 吸血';
+            arcaneVfxModule.playVariantTriggerFx({ trigger: 'leech', sourceEntity: src, targetEntity: tgt, meta: card.meta, onBeat: () => {
+                updateDemoHp(tgt, tgt.hp + (card.meta.drain || 36));
+                spawnDemoFloat(tgt, '嗜血 +' + (card.meta.drain || 36), 'text-red-300');
+            } });
+            return 750;
+        }
+        if (card.trigger === 'regen') {
+            beatStatEl.textContent = '自体修复';
+            arcaneVfxModule.playVariantTriggerFx({ trigger: 'regen', entity: e, meta: card.meta, onBeat: () => {
+                updateDemoHp(e, e.hp + (card.meta.heal || 100));
+                spawnDemoFloat(e, '调息 +' + (card.meta.heal || 100), 'text-green-300');
+            } });
+            return 680;
+        }
+        if (card.trigger === 'thorn') {
+            const src = entityOf(card.sourceId), tgt = entityOf(card.targetId);
+            beatStatEl.textContent = src.id + '→' + tgt.id + ' 反伤';
+            arcaneVfxModule.playVariantTriggerFx({ trigger: 'thorn', sourceEntity: src, targetEntity: tgt, meta: card.meta, onBeat: () => {
+                updateDemoHp(tgt, tgt.hp - (card.meta.reflectDamage || 45));
+                spawnDemoFloat(tgt, '反震 -' + (card.meta.reflectDamage || 45), 'text-emerald-300');
+            } });
+            return 620;
+        }
+        if (card.trigger === 'noop') {
+            const r1 = arcaneVfxModule.playVariantTriggerFx({ trigger: 'thorn', sourceEntity: entityOf('e5'), targetEntity: entityOf('h2'), meta: { isMelee: false, reflected: true } });
+            const r2 = arcaneVfxModule.playVariantTriggerFx({ trigger: 'molt', entity: entityOf('e3'), meta: { triggered: false } });
+            const r3 = arcaneVfxModule.playVariantTriggerFx({ trigger: 'thorn', sourceEntity: entityOf('e5'), targetEntity: entityOf('h2'), meta: { isMelee: true, reflected: false } });
+            beatStatEl.textContent = (!r1 && !r2 && !r3) ? '对照:3例均拦截' : '误触发!';
+            spawnDemoFloat('e5', '远程/未达线/无反弹：无演出', 'text-slate-300');
+            return 650;
+        }
+        if (card.trigger === 'chain') {
+            beatStatEl.textContent = '同体三连发';
+            arcaneVfxModule.playVariantTriggerFx({ trigger: 'leech', sourceEntity: entityOf('h2'), targetEntity: e, onBeat: () => { updateDemoHp(e, e.hp + 20); spawnDemoFloat(e, '嗜血 +20', 'text-red-300'); } });
+            demoAt(200, () => arcaneVfxModule.playVariantTriggerFx({ trigger: 'regen', entity: e, onBeat: () => { updateDemoHp(e, e.hp + 50); spawnDemoFloat(e, '调息 +50', 'text-green-300'); } }));
+            demoAt(420, () => arcaneVfxModule.playVariantTriggerFx({ trigger: 'rage', entity: e, onBeat: () => spawnDemoFloat(e, '狂暴!', 'text-red-400') }));
+            return 1700;
+        }
+        if (card.trigger === 'concurrent') {
+            beatStatEl.textContent = '四线并发压测';
+            const e1 = entityOf('e1'), e3 = entityOf('e3'), e6 = entityOf('e6'), h4 = entityOf('h4'), h3 = entityOf('h3'), e4 = entityOf('e4');
+            arcaneVfxModule.playVariantTriggerFx({ trigger: 'revive', entity: e1, onBeat: () => { updateDemoHp(e1, 300); spawnDemoFloat(e1, '死里逃生!', 'text-emerald-300'); } });
+            arcaneVfxModule.playVariantTriggerFx({ trigger: 'molt', entity: e3, meta: { clearedDebuffs: ['毒'], debuffColors: { '毒': '#a855f7' } }, onBeat: () => { e3.buffs = []; window.renderDemoEntityBuffs(e3); updateDemoHp(e3, 720); spawnDemoFloat(e3, '绝境爆发!', 'text-amber-300'); } });
+            arcaneVfxModule.playVariantTriggerFx({ trigger: 'thorn', sourceEntity: e6, targetEntity: h4, meta: { isMelee: true, reflected: true }, onBeat: () => { updateDemoHp(h4, h4.hp - 38); spawnDemoFloat(h4, '反震 -38', 'text-emerald-300'); } });
+            arcaneVfxModule.playVariantTriggerFx({ trigger: 'leech', sourceEntity: e4, targetEntity: h3, onBeat: () => { updateDemoHp(h3, h3.hp + 30); spawnDemoFloat(h3, '嗜血 +30', 'text-red-300'); } });
+            return 1500;
+        }
+        return 0;
+    }
+
+    function playDemoSkill(card) {
+        combatToken++;
+        clearDemoExtras();
+        clearArcaneFx();
+        clearTimeout(unlockTimer);
+        initUI(card.init || {});
+        const waitMs = runSingleCard(card);
+        if (waitMs > 0) scheduleUnlock(waitMs);
+    }
+    function renderSkillCards() {
+        const list = $('#skill-list');
+        list.replaceChildren();
+        const BADGE_CLS = { 'L2': 'border-amber-400/70 text-amber-300', 'L1': 'border-cyan-500/60 text-cyan-300', '对照': 'border-slate-500/60 text-slate-300', '压测': 'border-fuchsia-400/70 text-fuchsia-300' };
+        DEMO_GROUPS.forEach(group => {
+            const hd = document.createElement('div');
+            hd.className = 'arcane-variant-group-hd';
+            hd.innerHTML = `<span>${group.title}</span><span class="text-[8px] text-amber-400/80">${group.badge}</span>`;
+            list.appendChild(hd);
+            group.items.forEach(card => {
+                const button = document.createElement('button');
+                button.className = 'card w-full py-1.5 px-2 bg-slate-900/80 hover:bg-violet-950/60 border border-slate-700/80 hover:border-violet-500/60 rounded-lg text-left transition-all shadow-sm';
+                button.title = card.description;
+                button.innerHTML = '<div class="flex items-center justify-between gap-1"><span class="text-xs font-bold text-slate-100 truncate"></span><span class="text-[9px] font-bold px-1 rounded border shrink-0"></span></div><div class="text-[9px] text-slate-400 truncate"></div>';
+                const labels = button.querySelectorAll('span');
+                labels[0].textContent = card.name;
+                labels[1].textContent = card.level;
+                labels[1].className = 'text-[9px] font-bold px-1 rounded border shrink-0 ' + (BADGE_CLS[card.level] || 'border-cyan-500/60 text-cyan-300');
+                button.lastElementChild.textContent = card.description;
+                button.addEventListener('click', () => playDemoSkill(card));
+                list.appendChild(button);
+            });
+        });
+    }
+    function resetDemo() {
+        combatToken++;
+        clearDemoExtras();
+        clearTimeout(unlockTimer); unlockTimer = null;
+        lockCards(false);
+        clearArcaneFx();
+        cancelAnimationFrame(fxEngine.animationFrameId); fxEngine.animationFrameId = null;
+        fxEngine.particles.length = 0; fxEngine.hitStop = 0; fxEngine.lastFrameTime = 0;
+        fxEngine.ctx.clearRect(0, 0, fxEngine.canvas.width, fxEngine.canvas.height);
+        beatStatEl.textContent = '待机';
+        initUI();
+        renderSkillCards();
+    }
+    $('#btn-reset').addEventListener('click', resetDemo);
+    renderSkillCards();
+    // ===== 演示控制 END =====
+    // 移植：只将新增 arcane- CSS、技能函数、标签与分派合并到正式版已有模块。
+    // 必须同时追加 WEBM_FX_REGISTRY 的 { url: '', scale: 1.0, particles: 'arcane', delay: 蓄势秒数 }。
+    // 技能数据追加 [特效:精确标签]；按技能类型核对默认光效去重与真实反应回调，不改数值规则。
+    // 详细接线、测试与打包步骤见《技能SVG模板使用与快速移植.md》，不是复制整页即可上线。
+    // 正式版已提供 fxEngine / combatToken / getEntitySpriteDom / heroesData / enemiesData，勿重复复制演示宿主。
+  </script>
+</body>
+</html>
