@@ -3109,3 +3109,19 @@
 - **涉及文件**：`demo-enemy-windup.html`（新增）、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：内联脚本 `new Function` 语法检查通过；IAB 逐项点击八种前摇，均出现目标类、移除 `breathe`、生成 1 个轮廓层、八张卡片锁定，600ms 后类名、图层、画布与卡片锁全部归零且 `breathe` 恢复，无 error/unhandledrejection；播放中重置立即清理并恢复初始场景；关闭音效后画面照常。出手拍点帧核对：基准 transform `scale(1.148) translateY(23px)` 加两层红 drop-shadow，远程单体 `scale(1.1) translateY(-12.1px)` 加黄色光晕；轮廓几何为横扫弧 232×55、扇面 260×150、楔形 96×156、自身增益 151×136 且主体位于图标上方。期间按几何量测把远程单体楔形由 68px 加宽、自身增益上升弧外移并改用 `both` 填充模式，修正轮廓压在图标边缘看不清的问题。Playwright 点击与截图在 IAB 中分别出现可点性超时与约 740ms 延迟，改用页面内派发 click 与「克隆轮廓层并冻结到 330ms」取证，未冒充真实用户输入。
 - **边界**：未移植正式版，未改 `index.html`、公开版、母版模板、README/SPEC 与战斗逻辑；沿用母版 Tailwind CDN 与 Google Fonts 外链；未做真 Chrome 排障、酒馆导入或安卓验证。二期（远程/法术群攻本体演出，以及三类型×单体/群攻共六种 charge 释放）未开始，待一期实机反馈后再深化。
+---
+
+## [LOG-262] 2026-11-12 — 敌方前摇重制：七类近身渐变粒子与基线级光晕
+
+- **提交**：`f6826c9`。
+- **核心目的**：按用户两轮反馈纠正——上一版的横扫弧/扇面/圆环等曲线占地过大应整体移除，但柔光晕不应跟着缩小；七类新前摇改为**近身渐变粒子**（亮芯、彩色过渡、透明边缘、短拖尾），柔光晕范围**对齐红色单体基线**。红色单体基线（`omenBase`、`.omen-red-single`、`red-single` 音效分支、基准卡片）全程零改动。
+- **变更**：仅 `demo-enemy-windup.html`。
+  - 删除 `omenAura` 的全部 SVG 线框（横扫弧/收尖楔形/扇面/内外环/上升弧/剥离断弧）及 `omenDraw/omenRingIn/omenRingOut/omenRise/omenPeel` 关键帧与 `.omen-aura/.omen-svg-anim` 样式，前摇不再产生任何轮廓层 DOM。
+  - 新增 canvas 粒子类型 `omen`（`drawOmenParticle`）：径向渐变亮芯＋彩色过渡＋透明边缘，贝塞尔轨迹，拖尾为沿轨迹衰减的渐变微粒串（非等宽实线），`spark/crystal/glow/mist` 四种质感；按 `frame.h/96` 随图标缩放，轨迹与裁剪限制在图标框 ±6px、下缘止于血条上缘，不遮五官/血条/邻位。
+  - 七类编排：红群攻侧缘火星横掠、黄单体窄束压紧后释散、黄群攻三束同步分叉、紫单体晶粒内收凝聚、紫群攻侧缘晶粒同拍外展、粉增益柔光沿身体上行汇入、黑减益黑灰雾粒剥落下沉；凝聚 8 波（每 36ms）→ 330ms 同拍释放 → 约 600ms 消散。
+  - 七类本体动作关键帧重写：位移改 `em` 相对字号、幅度收紧；55% 峰值双层 `drop-shadow` 30px+50px、余韵 50px+80px，与 `omenBase` 量级一致（用户反馈「光晕太小」后由 3-6px 恢复至此）。
+  - `omenSound` 七分支重写：285ms 收紧停声、330ms 主释放，去掉高频 click 提示音与 `chime` 长卷积混响，改用 `whoosh` 摩擦、`crunch` 颗粒、`tone` 短谐波；`beat` 包装对 `red-single` 行为等价，基线音效不变。
+  - `playEnemyWindup`：七类按 `owner` 登记进 `S.particles`，`finish/cancel` 过滤自身粒子并回收驱动粒子与画布；红色单体不加粒子、走原路径。页面标题改「敌方前摇演练 · 近身粒子」，七张卡片描述同步为新动作语言。
+- **涉及文件**：`demo-enemy-windup.html`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：`vm.Script` 语法通过；逐段字节比对确认 `omenBase` 关键帧、`red-single` 音效分支、基准卡片、共享 `audio` 工具与 HEAD 完全一致，旧曲线标识 grep 命中 0；七类 55% 帧 computed filter 均为 30px+50px 双层光晕、余韵 50px+80px。IAB：八项播放均上类并锁 8 卡，冻结 330ms 量测，七类粒子画布在图标区域实测非零像素（365~1183px），600ms 后 `breathe` 恢复、`data-arcane-fx`/驱动粒子/卡片锁全部归零；静音播放画面照常、中途重置立即清场、音效开关可复位；全程无 error/unhandledrejection。只读审查子代理结论「无阻断问题」，3 项低危（`nextElementSibling` 血条假设、`render` 对失效 dom 无保护、粒子密度）均为本流程不触发的假设性场景，按「不做防御性编程」约定保留现状。
+- **边界**：未移植正式版，未改 `index.html`、公开版、母版模板、README/SPEC 与战斗逻辑；红色单体基线零改动；IAB Playwright 原生点击超时，改用页面内 `click()` 派发（与按钮同一处理器），未冒充真实用户输入；完整观感与音色以用户实机试播为准。二期（远程/法术群攻本体演出＋三类型×单体/群攻共六种 charge 释放）未开始。
