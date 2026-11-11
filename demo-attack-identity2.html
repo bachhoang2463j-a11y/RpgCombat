@@ -6,7 +6,7 @@
   <title>攻击身份 × 命中结果与伤害量级分层 · Demo v2</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;0,900;1,700;1,800;1,900&family=Chakra+Petch:ital,wght@0,700;1,700&family=Noto+Sans+SC:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800;900&family=Inter:wght@600;700;800&family=Barlow+Condensed:ital,wght@0,700;0,800;1,700;1,800&family=Chakra+Petch:ital,wght@0,600;0,700;1,700;1,800&family=Noto+Sans+SC:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap');
     html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
     body { font-family: 'Noto Sans SC', sans-serif; user-select: none; }
     /* —— 以下复刻主工程 index.html 主界面样式 —— */
@@ -18,11 +18,11 @@
     .timeline-rail { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: linear-gradient(180deg, rgba(250,204,21,0.85) 0%, rgba(6,182,212,0.65) 25%, rgba(99,102,241,0.45) 60%, rgba(255,255,255,0.05) 100%); box-shadow: 0 0 10px rgba(6,182,212,0.55); pointer-events: none; z-index: 0; }
     @keyframes rail-pulse { 0% { transform: translateY(-100%); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(800%); opacity: 0; } }
     .rail-pulse-beam { position: absolute; left: 0; top: 0; width: 2px; height: 40px; background: linear-gradient(180deg, transparent, #38bdf8, #fff); box-shadow: 0 0 12px #38bdf8; animation: rail-pulse 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
-    .turn-dot { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; background: #111827; border: 2px solid; position: relative; z-index: 1; flex-shrink: 0; }
+    .turn-dot { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; background: #111827; border: 2px solid; position: relative; z-index: 1; flex-shrink: 0; overflow: hidden; }
     .turn-dot.cur { width: 52px; height: 52px; font-size: 26px; border-color: #facc15 !important; box-shadow: 0 0 20px rgba(250,204,21,0.9); }
     .breathe { animation: breathe 3.2s ease-in-out infinite; } @keyframes breathe { 50% { transform: translateY(-4px) scale(1.02); } }
     #chat-bar input { background: rgba(15,23,42,0.7); border: 1px solid rgba(255,255,255,0.12); color: #e2e8f0; }
-    .portrait { background: radial-gradient(ellipse at 50% 30%, #3b3f5c, #14151f 75%); display: flex; align-items: flex-end; justify-content: center; font-size: 64px; }
+    .portrait { background: radial-gradient(ellipse at 50% 30%, #3b3f5c, #14151f 75%); display: flex; align-items: flex-end; justify-content: center; font-size: 64px; overflow: hidden; }
     .card:disabled { pointer-events: none; opacity: 0.45; filter: grayscale(0.6); }
 
     /* ===== 可移植特效样式 BEGIN：与 index.html 的 arcane- 命名及层序一致 ===== */
@@ -103,35 +103,21 @@
     @keyframes arcane-hit-fill-blink { 0% { filter: brightness(2.2); } 100% { filter: none; } }
     .arcane-hit-fill-blink { animation: arcane-hit-fill-blink 0.22s ease-out; }
     .arcane-hit-num-layer { position: fixed; inset: 0; pointer-events: none; z-index: 62; overflow: hidden; }
-    .arcane-hit-num { position: absolute; transform: translate(-50%, -50%); font-family: 'Barlow Condensed', 'Chakra Petch', 'Impact', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 900; white-space: nowrap; line-height: 0.96; letter-spacing: -0.02em; padding: 2px 7px; will-change: transform, opacity; }
-    .arcane-hit-num::before { content: attr(data-text); position: absolute; inset: 0; padding: inherit; color: #07050a; -webkit-text-stroke: 5px #07050a; text-shadow: 0 3px 0 #07050a, 0 5px 12px rgba(0,0,0,0.92); z-index: 0; pointer-events: none; }
-    .arcane-hit-num-fill { position: relative; z-index: 1; display: inline-block; background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .arcane-hit-num.l1 { font-size: 24px; }
-    .arcane-hit-num.l1::before { -webkit-text-stroke-width: 4px; }
-    .arcane-hit-num.l1 .arcane-hit-num-fill { background-image: linear-gradient(180deg, #ffffff 0%, #ffe4e6 42%, #fda4af 100%); }
-    .arcane-hit-num.l2 { font-size: 36px; }
-    .arcane-hit-num.l2::before { -webkit-text-stroke-width: 5.5px; }
-    .arcane-hit-num.l2 .arcane-hit-num-fill { background-image: linear-gradient(180deg, #ffffff 0%, #fecdd3 24%, #fb7185 62%, #e11d48 100%); }
-    .arcane-hit-num.l3 { font-size: 52px; letter-spacing: -0.03em; }
-    .arcane-hit-num.l3::before { -webkit-text-stroke-width: 7px; text-shadow: 0 4px 0 #07050a, 0 0 18px rgba(244,63,94,0.8), 0 6px 14px rgba(0,0,0,0.95); }
-    .arcane-hit-num.l3 .arcane-hit-num-fill { background-image: linear-gradient(180deg, #fffbeb 0%, #fda4af 22%, #f43f5e 58%, #9f1239 100%); }
-    .arcane-hit-num.crit::before { text-shadow: 0 3px 0 #07050a, 0 0 14px rgba(249,115,22,0.85), 0 5px 12px rgba(0,0,0,0.9); }
-    .arcane-hit-num.crit .arcane-hit-num-fill { background-image: linear-gradient(180deg, #ffffff 0%, #fef08a 28%, #fb923c 70%, #c2410c 100%); }
-    .arcane-hit-num.burst::before { text-shadow: 0 3px 0 #07050a, 0 0 16px rgba(253,224,71,0.95), 0 0 28px rgba(250,204,21,0.55), 0 5px 12px rgba(0,0,0,0.9); }
-    .arcane-hit-num.burst .arcane-hit-num-fill { background-image: linear-gradient(180deg, #ffffff 0%, #fef9c3 38%, #fde047 72%, #ca8a04 100%); }
-    .arcane-hit-num.shield { font-size: 22px; }
-    .arcane-hit-num.shield::before { -webkit-text-stroke-width: 4px; text-shadow: 0 2px 0 #06131f, 0 0 10px rgba(56,189,248,0.65); }
-    .arcane-hit-num.shield .arcane-hit-num-fill { background-image: linear-gradient(180deg, #ffffff 0%, #bae6fd 48%, #38bdf8 100%); }
-    .arcane-hit-num.shield.sub { font-size: 16px; }
-    .arcane-hit-num.word { font-family: 'Noto Sans SC', sans-serif; font-weight: 900; font-style: italic; font-size: 18px; letter-spacing: 0.08em; }
-    .arcane-hit-num.word::before { -webkit-text-stroke-width: 4.5px; }
-    .arcane-hit-num.dodge .arcane-hit-num-fill { background-image: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 60%, #64748b 100%); }
-    .arcane-hit-num.block .arcane-hit-num-fill { background-image: linear-gradient(180deg, #ffffff 0%, #e2e8f0 50%, #94a3b8 100%); }
-    .arcane-hit-num.break { font-size: 15px; }
-    .arcane-hit-num.break .arcane-hit-num-fill { background-image: linear-gradient(180deg, #ffffff 0%, #e0f2fe 50%, #38bdf8 100%); }
-    .arcane-hit-tag { position: absolute; transform: translate(-50%, -50%) skewX(-10deg); font-family: 'Chakra Petch', 'Noto Sans SC', sans-serif; font-weight: 900; font-size: 10px; letter-spacing: 0.12em; padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
-    .arcane-hit-tag.crit { color: #1c0a00; background: linear-gradient(90deg, #fb923c, #fde047); box-shadow: 0 0 12px rgba(251,146,60,0.85); border: 1px solid rgba(255,255,255,0.6); }
-    .arcane-hit-tag.burst { color: #422006; background: linear-gradient(90deg, #fef9c3, #fde047, #ffffff); box-shadow: 0 0 16px rgba(253,224,71,0.95); border: 1px solid #fff; }
+    .arcane-hit-num { position: absolute; transform: translate(-100%, -18%); white-space: nowrap; line-height: 1; will-change: transform, opacity; pointer-events: none; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0,0,0,0.92), 0 3px 10px rgba(0,0,0,0.65); }
+    .arcane-hit-num.l1 { font-family: 'Inter', 'Noto Sans SC', sans-serif; font-weight: 600; font-size: 15px; color: #f1f5f9; letter-spacing: 0.01em; }
+    .arcane-hit-num.l2 { font-family: 'Chakra Petch', 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 700; font-size: 19px; color: #fda4af; letter-spacing: 0.02em; }
+    .arcane-hit-num.l3 { font-family: 'Cinzel', 'Noto Sans SC', serif; font-weight: 800; font-size: 25px; color: #fb7185; letter-spacing: 0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 14px rgba(244,63,94,0.45), 0 4px 12px rgba(0,0,0,0.75); }
+    .arcane-hit-num.crit { font-family: 'Chakra Petch', 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 800; color: #fde68a; text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 12px rgba(245,158,11,0.45); }
+    .arcane-hit-num.burst { font-family: 'Cinzel', 'Noto Sans SC', serif; font-style: normal; font-weight: 800; color: #fffbeb; text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 14px rgba(253,224,71,0.52); }
+    .arcane-hit-num.shield { font-family: 'Inter', 'Noto Sans SC', sans-serif; font-weight: 600; font-size: 14px; color: #bae6fd; text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(56,189,248,0.35); }
+    .arcane-hit-num.shield.sub { font-size: 12px; color: #93c5fd; opacity: 0.94; }
+    .arcane-hit-num.word { font-family: 'Noto Sans SC', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 0.1em; }
+    .arcane-hit-num.dodge { font-style: italic; color: #cbd5e1; opacity: 0.92; }
+    .arcane-hit-num.block { color: #e2e8f0; letter-spacing: 0.12em; }
+    .arcane-hit-num.break { font-size: 12px; color: #7dd3fc; letter-spacing: 0.08em; }
+    .arcane-hit-tag { position: absolute; transform: translate(-100%, -50%); font-family: 'Chakra Petch', 'Noto Sans SC', sans-serif; font-weight: 700; font-size: 10px; letter-spacing: 0.12em; white-space: nowrap; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,0.95); }
+    .arcane-hit-tag.crit { color: #fbbf24; font-style: italic; }
+    .arcane-hit-tag.burst { color: #fef08a; }
     .arcane-hit-core { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
     .arcane-hit-recoil { will-change: translate, rotate; }
     /* ===== 命中结果反馈 END ===== */
@@ -191,6 +177,12 @@
     const $ = s => document.querySelector(s);
     let combatToken = 0;
     let heroesData = [], enemiesData = [];
+    const HERO_AVATARS = {
+        '埃利奥特': 'https://imgur.la/images/2026/06/25/31a4dd84a831e3f76082542bf12fcf19.png',
+        '弗兰克': 'https://imgur.la/images/2026/06/25/26f001dbe399876cd74978bbe12a265b.png',
+        '玛德琳': 'https://imgur.la/images/2026/06/25/585bf7f2f1559168b419b8be56da36a6.png',
+        '索恩': 'https://imgur.la/images/2026/08/13/77fcdf0fd006c4ff1ccae30774322270.png'
+    };
     const HERO_DATA = [['h1', '埃利奥特', '👨', 100, 55, 110, 5], ['h2', '弗兰克', '🧔', 180, 0, 17, 0], ['h3', '玛德琳', '👩', 140, 0, 14, 0], ['h4', '索恩', '🕵️', 140, 0, 20, 0]];
     const ENEMY_ROWS = [[['e1', '🐟'], ['e2', '❄️'], ['e3', '🐟']], [['e4', '👻'], ['e5', '👻'], ['e6', '🌀']]];
 
@@ -212,15 +204,15 @@ window.getEntitySpriteDom = getEntitySpriteDom;
     const enemyPct = id => { const e = enemyOf(id); return Math.max(0, Math.min(100, e.hp / e.maxHp * 100)); };
     const enemyLabel = id => { const e = enemyOf(id); return Math.floor(e.hp) + '/' + e.maxHp + (e.shield > 0 ? ' 盾' + e.shield : ''); };
     function initUI(init = {}) {
-        heroesData = HERO_DATA.map(([id, name, face, hp, shield, mp, tp]) => Object.assign({ id, name, face, hp, maxHp: hp, shield, mp, maxMp: mp, tp, maxTp: 100, isAlive: true, buffs: [] }, init[id]));
+        heroesData = HERO_DATA.map(([id, name, face, hp, shield, mp, tp]) => Object.assign({ id, name, face, img: HERO_AVATARS[name] || '', hp, maxHp: hp, shield, mp, maxMp: mp, tp, maxTp: 100, isAlive: true, buffs: [] }, init[id]));
         enemiesData = ENEMY_ROWS.flat().map(([id, face]) => Object.assign({ id, name: id, face, hp: 1000, maxHp: 1000, shield: 0, isAlive: true, buffs: [] }, init[id]));
-    $('#heroes-container').innerHTML = heroesData.map(({ id, name, face, hp, maxHp, shield, mp, maxMp, tp, maxTp }) => `
+    $('#heroes-container').innerHTML = heroesData.map(({ id, name, face, img, hp, maxHp, shield, mp, maxMp, tp, maxTp }) => `
       <div class="hero relative transition-all duration-300 min-w-[70px] z-20" id="hero-wrap-${id}">
         <div id="hero-card-${id}" class="fx-body hero-card-inner bg-[#18181b] rounded overflow-hidden relative border shadow-2xl transition-all border-gray-800">
           <div id="${id}-buffs" class="absolute top-1 right-1 flex flex-col gap-1 items-end z-20 pointer-events-none"></div>
           <div class="w-full h-12 sm:h-auto sm:aspect-[4/3] relative bg-gray-900 border-b border-gray-700">
             <div class="absolute top-0 left-0 w-full bg-gradient-to-b from-black/80 to-transparent px-1.5 py-1 text-[9px] sm:text-xs font-bold text-white z-10 flex justify-between"><span>${name}</span></div>
-            <div class="portrait w-full h-full">${face}</div>
+            <div class="portrait w-full h-full">${img ? `<img src="${img}" alt="${name}" class="w-full h-full object-cover" onerror="this.style.display='none';this.nextElementSibling&&this.nextElementSibling.classList.remove('hidden')"><span class="hidden leading-none">${face}</span>` : face}</div>
           </div>
           <div class="px-1 py-1 sm:px-2 sm:py-1.5 flex flex-col gap-[1px] sm:gap-0.5">${createCompactBarHTML(id, 'hp', 'HP', hp, maxHp, 'bg-yellow-400', false, shield)}${createCompactBarHTML(id, 'mp', 'MP', mp, maxMp, 'bg-cyan-400')}${createCompactBarHTML(id, 'tp', 'TP', tp, maxTp, 'bg-green-500', true)}</div>
         </div>
@@ -231,7 +223,11 @@ window.getEntitySpriteDom = getEntitySpriteDom;
         <div class="arcane-hit-track w-10 sm:w-16 h-1 sm:h-1.5 bg-black/50 mt-2 sm:mt-4 rounded-full overflow-hidden relative"><div id="${id}-hp-ghost" class="arcane-hit-ghost" style="width:${enemyPct(id)}%"></div><div id="${id}-hp-bar" class="arcane-hit-fill h-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)] relative" style="width:${enemyPct(id)}%"></div></div>
         <div id="${id}-hp-text" class="mt-0.5 text-[9px] sm:text-[10px] font-mono font-bold text-white/80 text-outline leading-none">${enemyLabel(id)}</div>
       </div>`).join('')}</div>`).join('');
-    $('#turn-order-container').innerHTML = ['👨', '❄️', '🧔', '👩', '🕵️', '👻', '👻'].map((e, i) => `<div class="turn-dot ${i ? '' : 'cur'}" style="border-color:${i === 1 || i > 4 ? '#e11d48' : '#06b6d4'}">${e}</div>`).join('');
+    const TURN_ITEMS = [{ e: '👨', name: '埃利奥特', hero: true }, { e: '❄️', hero: false }, { e: '🧔', name: '弗兰克', hero: true }, { e: '👩', name: '玛德琳', hero: true }, { e: '🕵️', name: '索恩', hero: true }, { e: '👻', hero: false }, { e: '👻', hero: false }];
+    $('#turn-order-container').innerHTML = TURN_ITEMS.map((it, i) => {
+        const av = it.hero && HERO_AVATARS[it.name];
+        return `<div class="turn-dot ${i ? '' : 'cur'}" style="border-color:${it.hero ? '#06b6d4' : '#e11d48'}">${av ? `<img src="${av}" alt="${it.name}" class="w-full h-full object-cover rounded-full" onerror="this.style.display='none';this.nextElementSibling&&this.nextElementSibling.classList.remove('hidden')"><span class="hidden">${it.e}</span>` : it.e}</div>`;
+    }).join('');
     }
     initUI();
 
@@ -1809,7 +1805,7 @@ const arcaneVfxModule = (function () {
         const now = Date.now(), s = H.stacks.get(id);
         const k = s && now - s.at < 750 ? s.k + 1 : 0;
         H.stacks.set(id, { k, at: now });
-        return { dx: [0, -24, 24, -12, 16][k % 5], dy: -Math.min(k, 4) * 18 };
+        return { dx: [0, 8, -10, 12, -6][k % 5], dy: -Math.min(k, 4) * 18 };
     }
     function hitNumLayer() {
         const d = document.createElement('div');
@@ -1820,18 +1816,16 @@ const arcaneVfxModule = (function () {
         return d;
     }
     function hitAnchor(dom, slot) {
-        const c = ctr(dom);
-        let x = c.x + slot.dx, y = c.top + c.h * 0.30 + slot.dy;
+        const r = entityVisualRect(dom) || ctr(dom), c = ctr(dom);
+        let x = r.right - 8 + slot.dx, y = r.top + 12 + slot.dy;
         const menu = document.getElementById('menu-container');
-        if (menu) { const m = menu.getBoundingClientRect(); if (y > m.top - 34 && x > m.left - 56) x = m.left - 56; }
-        return { x: Math.max(46, Math.min(window.innerWidth - 46, x)), y: Math.max(42, y), c };
+        if (menu) { const m = menu.getBoundingClientRect(); if (y > m.top - 28 && x > m.left - 14) x = m.left - 14; }
+        const topSafe = x > window.innerWidth - 360 ? 58 : 34;
+        return { x: Math.max(88, Math.min(window.innerWidth - 18, x)), y: Math.max(topSafe, y), c };
     }
     function hitNumEl(layer, cls, text, x, y) {
         const el = document.createElement('div');
-        el.className = cls; el.dataset.text = text;
-        const fill = document.createElement('span');
-        fill.className = 'arcane-hit-num-fill'; fill.textContent = text;
-        el.appendChild(fill);
+        el.className = cls; el.textContent = text;
         el.style.left = x + 'px'; el.style.top = y + 'px';
         layer.appendChild(el);
         return el;
@@ -1843,15 +1837,15 @@ const arcaneVfxModule = (function () {
         layer.appendChild(el);
         return el;
     }
-    const T = 'translate(-50%,-50%) ';
+    const T = 'translate(-50%,-50%) ', TN = 'translate(-100%,-18%) ', TT = 'translate(-100%,-50%) ';
     const NUM_KF = {
-        1: [{ transform: T + 'translateY(5px) scale(0.55,1.28)', opacity: 0 }, { transform: T + 'translateY(-5px) scale(1.12,0.92)', opacity: 1, offset: 0.14 }, { transform: T + 'translateY(-9px) scale(1,1)', opacity: 1, offset: 0.72 }, { transform: T + 'translateY(-19px) scale(0.95)', opacity: 0 }],
-        2: [{ transform: T + 'scale(0.32,1.52)', opacity: 0 }, { transform: T + 'translateY(-8px) scale(1.28,0.84)', opacity: 1, offset: 0.11 }, { transform: T + 'translateY(-13px) scale(0.94,1.06)', offset: 0.22 }, { transform: T + 'translateY(-15px) scale(1.03,0.98)', offset: 0.32 }, { transform: T + 'translateY(-17px) scale(1,1)', opacity: 1, offset: 0.76 }, { transform: T + 'translateY(-30px) scale(0.94)', opacity: 0 }],
-        3: [{ transform: T + 'scale(2.35,0.65)', opacity: 0 }, { transform: T + 'scale(0.84,1.20)', opacity: 1, offset: 0.08 }, { transform: T + 'translate(-3px,-5px) scale(1.16,0.90)', offset: 0.16 }, { transform: T + 'translate(2px,-7px) scale(0.97,1.03)', offset: 0.25 }, { transform: T + 'translateY(-9px) scale(1.02,0.99)', offset: 0.34 }, { transform: T + 'translateY(-11px) scale(1,1)', opacity: 1, offset: 0.79 }, { transform: T + 'translateY(-34px) scale(0.95)', opacity: 0 }],
-        shield: [{ transform: T + 'scale(0.7,1.15)', opacity: 0 }, { transform: T + 'translateY(-4px) scale(1.08,0.95)', opacity: 1, offset: 0.14 }, { transform: T + 'translateY(-8px) scale(1,1)', opacity: 1, offset: 0.7 }, { transform: T + 'translateY(-18px) scale(0.96)', opacity: 0 }],
-        block: [{ transform: T + 'scale(1.55,0.8)', opacity: 0 }, { transform: T + 'scale(0.94,1.06)', opacity: 1, offset: 0.11 }, { transform: T + 'scale(1,1)', opacity: 1, offset: 0.7 }, { transform: T + 'translateY(-10px)', opacity: 0 }],
-        dodge: [{ transform: T + 'translateX(-16px) skewX(-12deg)', opacity: 0 }, { transform: T + 'translateX(4px) skewX(-8deg)', opacity: 1, offset: 0.16 }, { transform: T + 'translateX(10px) skewX(-6deg)', opacity: 1, offset: 0.7 }, { transform: T + 'translate(24px,-8px)', opacity: 0 }],
-        tag: [{ transform: T + 'skewX(-10deg) scale(0.3)', opacity: 0 }, { transform: T + 'skewX(-10deg) scale(1.18)', opacity: 1, offset: 0.13 }, { transform: T + 'skewX(-10deg) scale(1)', opacity: 1, offset: 0.72 }, { transform: T + 'translateY(-8px) skewX(-10deg)', opacity: 0 }]
+        1: [{ transform: TN + 'translateY(4px) scale(0.92)', opacity: 0 }, { transform: TN + 'translateY(-3px) scale(1)', opacity: 1, offset: 0.16 }, { transform: TN + 'translateY(-6px) scale(1)', opacity: 1, offset: 0.72 }, { transform: TN + 'translateY(-14px) scale(0.96)', opacity: 0 }],
+        2: [{ transform: TN + 'translateY(6px) scale(0.84)', opacity: 0 }, { transform: TN + 'translateY(-4px) scale(1.10)', opacity: 1, offset: 0.14 }, { transform: TN + 'translateY(-6px) scale(1)', opacity: 1, offset: 0.28 }, { transform: TN + 'translateY(-8px) scale(1)', opacity: 1, offset: 0.76 }, { transform: TN + 'translateY(-18px) scale(0.96)', opacity: 0 }],
+        3: [{ transform: TN + 'scale(1.26)', opacity: 0 }, { transform: TN + 'translateY(-2px) scale(0.97)', opacity: 1, offset: 0.12 }, { transform: TN + 'translateY(-4px) scale(1.03)', opacity: 1, offset: 0.24 }, { transform: TN + 'translateY(-5px) scale(1)', opacity: 1, offset: 0.78 }, { transform: TN + 'translateY(-16px) scale(0.97)', opacity: 0 }],
+        shield: [{ transform: TN + 'scale(0.9)', opacity: 0 }, { transform: TN + 'translateY(-3px) scale(1)', opacity: 1, offset: 0.16 }, { transform: TN + 'translateY(-6px) scale(1)', opacity: 1, offset: 0.72 }, { transform: TN + 'translateY(-14px)', opacity: 0 }],
+        block: [{ transform: TN + 'scale(1.14)', opacity: 0 }, { transform: TN + 'scale(1)', opacity: 1, offset: 0.14 }, { transform: TN + 'scale(1)', opacity: 1, offset: 0.7 }, { transform: TN + 'translateY(-8px)', opacity: 0 }],
+        dodge: [{ transform: TN + 'translateX(-10px)', opacity: 0 }, { transform: TN + 'translateX(3px)', opacity: 1, offset: 0.18 }, { transform: TN + 'translateX(8px)', opacity: 1, offset: 0.7 }, { transform: TN + 'translate(18px,-6px)', opacity: 0 }],
+        tag: [{ transform: TT + 'translateX(-6px) scale(0.88)', opacity: 0 }, { transform: TT + 'translateX(0) scale(1)', opacity: 1, offset: 0.15 }, { transform: TT + 'translateY(-3px) scale(1)', opacity: 1, offset: 0.72 }, { transform: TT + 'translateY(-10px)', opacity: 0 }]
     };
     const NUM_MS = { 1: 760, 2: 980, 3: 1220, shield: 820, block: 760, dodge: 820, tag: 920 };
     function hitCore(layer, x, y, size, inner, outer, ring, ms, anims) {
@@ -1868,9 +1862,9 @@ const arcaneVfxModule = (function () {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.setAttribute('class', 'arcane-hit-core'); svg.setAttribute('viewBox', '0 0 120 120');
         svg.style.cssText = 'left:' + x + 'px; top:' + y + 'px; width:' + size + 'px; height:' + size + 'px;';
-        svg.innerHTML = '<path d="M16 104 L60 54 L104 16 L66 64 Z" fill="#fffbeb" opacity="0.95"/><path d="M22 28 L62 56 L98 92 L58 62 Z" fill="#fdba74" opacity="0.72"/>';
+        svg.innerHTML = '<path d="M18 102 L60 58 L102 18 L62 62 Z" fill="#fef3c7" opacity="0.82"/>';
         layer.appendChild(svg);
-        anims.push(svg.animate([{ transform: T + 'scale(0.35) rotate(-8deg)', opacity: 1 }, { transform: T + 'scale(1.18) rotate(2deg)', opacity: 0.9, offset: 0.3 }, { transform: T + 'scale(1.38) rotate(6deg)', opacity: 0 }], { duration: 240, easing: 'ease-out', fill: 'forwards' }));
+        anims.push(svg.animate([{ transform: T + 'scale(0.4) rotate(-6deg)', opacity: 1 }, { transform: T + 'scale(1.12) rotate(0deg)', opacity: 0.78, offset: 0.3 }, { transform: T + 'scale(1.28) rotate(3deg)', opacity: 0 }], { duration: 210, easing: 'ease-out', fill: 'forwards' }));
     }
     function hitBurstHalo(layer, x, y, size, anims) {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -1949,8 +1943,9 @@ const arcaneVfxModule = (function () {
     }
     function hitDodgeGhost(layer, dom, anims) {
         const r = dom.getBoundingClientRect();
+        const isCard = dom.id && dom.id.startsWith('hero-card-');
         const g = document.createElement('div');
-        g.style.cssText = 'position:absolute; left:' + r.left + 'px; top:' + r.top + 'px; width:' + r.width + 'px; height:' + r.height + 'px; opacity:0.45; filter:grayscale(1) brightness(1.5); display:flex; align-items:center; justify-content:center; font-size:' + getComputedStyle(dom).fontSize + ';';
+        g.style.cssText = 'position:absolute; left:' + r.left + 'px; top:' + r.top + 'px; width:' + r.width + 'px; height:' + r.height + 'px; opacity:0.45; filter:grayscale(1) brightness(1.5); overflow:hidden;' + (isCard ? 'display:block; border-radius:0.25rem;' : 'display:flex; align-items:center; justify-content:center; font-size:' + getComputedStyle(dom).fontSize + ';');
         g.innerHTML = dom.innerHTML.replace(/ id="[^"]*"/g, '');
         layer.appendChild(g);
         anims.push(g.animate([{ opacity: 0.45, transform: 'none' }, { opacity: 0, transform: 'scale(1.06)' }], { duration: 380, easing: 'ease-out', fill: 'forwards' }));
@@ -1986,7 +1981,7 @@ const arcaneVfxModule = (function () {
             const el = hitNumEl(layer, 'arcane-hit-num shield', '-' + h.shieldDmg, p.x, p.y);
             anims.push(el.animate(NUM_KF.shield, { duration: NUM_MS.shield, easing: 'ease-out', fill: 'forwards' }));
             if (h.shieldBroken) {
-                const b = hitNumEl(layer, 'arcane-hit-num word break', '破盾', p.x, p.y - 24);
+                const b = hitTagEl(layer, 'arcane-hit-num word break', '破盾', p.x, p.y - 16);
                 anims.push(b.animate(NUM_KF.tag, { duration: NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }));
             }
             return;
@@ -1994,7 +1989,7 @@ const arcaneVfxModule = (function () {
         const col = h.burst ? ['#fef08a', '#facc15', '#fffbeb'] : h.crit ? ['#fdba74', '#f97316', '#fed7aa'] : ['#fecdd3', '#e11d48', '#fda4af'];
         const size = [0, 58, 100, 146][h.tier];
         hitCore(layer, c.x, cy, size, col[0], col[1], h.tier >= 2 ? col[2] : null, [0, 200, 300, 420][h.tier], anims);
-        if (h.crit && !h.burst) hitCritSlash(layer, c.x, cy, h.tier === 3 ? 116 : 86, anims);
+        if (h.crit && !h.burst) hitCritSlash(layer, c.x, cy, h.tier === 3 ? 104 : 78, anims);
         if (h.burst) {
             hitBurstHalo(layer, c.x, cy, h.tier === 3 ? 132 : 98, anims);
             burst(10, () => { const a = rnd(0, 6.283), s = rnd(1.2, 3.2); return { x: c.x, y: cy, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, drag: 0.95, decay: 0.03, size: rnd(1.5, 2.5), color: pick(['#fffbeb', '#fde047']) }; });
@@ -2007,18 +2002,19 @@ const arcaneVfxModule = (function () {
             const cls = 'arcane-hit-num l' + h.tier + (h.burst ? ' burst' : h.crit ? ' crit' : '');
             const el = hitNumEl(layer, cls, '-' + h.hpDmg, p.x, p.y);
             let kf = NUM_KF[h.tier];
-            if (h.crit && !h.burst) kf = kf.map(f => Object.assign({}, f, { transform: f.transform + ' rotate(-4deg)' }));
+            if (h.crit && !h.burst) kf = kf.map((f, idx) => idx === 1 ? Object.assign({}, f, { transform: f.transform + ' scale(1.14)' }) : f);
             anims.push(el.animate(kf, { duration: NUM_MS[h.tier], easing: 'cubic-bezier(0.2,0.8,0.3,1)', fill: 'forwards' }));
-            const fs = [0, 24, 36, 52][h.tier];
+            const fs = [0, 15, 19, 25][h.tier];
             if (h.crit || h.burst) {
-                const t = hitTagEl(layer, 'arcane-hit-tag ' + (h.burst ? 'burst' : 'crit'), h.burst ? '爆发' : '暴击', p.x, p.y - fs * 0.62 - 12);
+                const t = hitTagEl(layer, 'arcane-hit-tag ' + (h.burst ? 'burst' : 'crit'), h.burst ? '爆发' : '暴击', p.x, p.y - fs * 0.25 - 10);
                 anims.push(t.animate(NUM_KF.tag, { duration: NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }));
             }
             if (h.shieldDmg > 0) {
-                const s = hitNumEl(layer, 'arcane-hit-num shield sub', '盾-' + h.shieldDmg, p.x + fs * 0.95 + 22, p.y + fs * 0.42 + 6);
+                const sy = p.y + fs * 0.88 + 4;
+                const s = hitNumEl(layer, 'arcane-hit-num shield sub', '盾-' + h.shieldDmg, p.x, sy);
                 anims.push(s.animate(NUM_KF.shield, { duration: NUM_MS.shield, easing: 'ease-out', fill: 'forwards' }));
                 if (h.shieldBroken) {
-                    const b = hitNumEl(layer, 'arcane-hit-num word break', '破盾', p.x + fs * 0.95 + 22, p.y + fs * 0.42 - 14);
+                    const b = hitTagEl(layer, 'arcane-hit-num word break', '破盾', p.x, sy + 16);
                     anims.push(b.animate(NUM_KF.tag, { duration: NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }));
                 }
             }
