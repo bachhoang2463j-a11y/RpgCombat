@@ -3190,3 +3190,15 @@
 - **变更**：`node build-regex.cjs` 原地重建 `regex-前端战斗v11_3.json`（replaceString 1,005,520→1,005,492 字符；id/scriptName/findRegex 原样未动）；前置 build-tailwind 幂等，`index.html` 字节未变。
 - **验证**（新旧产物逐段对比，适配 terser 数字规范化）：① monsterAttack 2→3 处，新增段为 `window.playSound&&playSound("monsterAttack")`（red-single 分支）；② 旧合成风切 `f0:520,f1:1700` 已随分支移除（f0:520 计数 2→1）；③ omenSound 七分支 35 处 vol 逐一对齐、恰为旧值×3（0.075~0.84，剔除已删除的 red-single vol:.26 后逐位验证）；④ 围栏加固（裸反引号序列恰 2 个）与 & 实体免疫（&amp;&amp; 存在）复检通过。
 - **边界**：同版本号重复打包仅本次、经用户豁免；`demo-enemy-group-attack.html`（另一会话产物）未触碰；完整听感以用户在酒馆实测为准。
+
+---
+
+## [LOG-267] 2026-11-12 — 敌方群攻命中 Demo 法术群攻（`group:spell`）升级为 L2+ 六芒星环坍缩与十字破界白爆
+
+- **提交**：`854c751`。
+- **核心目的**：应用户要求，将 `demo-enemy-group-attack.html` 中原本作为单幕平铺基线的法术群攻（`group:spell`）同步升级至与近战/远程一致的 L2+ 三幕七层视听规格。
+- **变更**：仅 `demo-enemy-group-attack.html`——
+  1. **蓄势阶段（`0~350ms`）**：`groupCharge` 新增 `spell` 分支，在施法者（`e5`）中心展开交错双三角六芒星环 + 八芒星针 + 32 颗冰蓝向心晶粒吸入，并在 `300~350ms` 急速坍缩聚核制造 50ms 视觉与听觉留白（同步搭配奥术嗡鸣 `drone`、高频聚气 `whoosh`、正弦扫频 `tone` 与锁点 `crystal` 清脆声）。
+  2. **爆发与受击（`350ms~`）**：在友方整排中心引爆——① 破框巨型六芒星奥术法阵（`arcane-spell-formation`）与贯通整排的十字破界白光棱柱（`arcane-spell-prism`）旋转盛放；② 底层 `spawnDefaultAOEParticles` 升级为半径 320px 的三层主副脉冲光环（炽白主环 + 冰蓝虚线环 + 银青余波环）、90 颗带 `#38bdf8` 辉光长尾的炽白/冰蓝流光粒子与 11px 强震屏；③ 四名我方角色由内向外错峰 35ms 触发 `.arcane-flash-spell`（`steps(1)` 神圣冰蓝强闪）、`groupFlinch` 双层受击震颤与单卡星芒晶簇迸射；④ 音效采用「原版 `atk1` 采样 + Web Audio 混音增强」，在 `playDefaultHitSound()` 基础上叠加超低频下潜 `kick`、宽频能量轰鸣 `boom` 与泛音列空灵余韵 `chime(528/792/1056Hz)`。
+- **涉及文件**：`demo-enemy-group-attack.html`、`LOG.md`、`LOG-INDEX.md`。
+- **边界**：遵循 Demo 免测铁律直接交付用户实机查看确认；未触碰 `index.html` 与正则打包产物。
