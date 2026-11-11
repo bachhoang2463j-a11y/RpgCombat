@@ -878,6 +878,9 @@ const arcaneVfxModule = (function () {
                 <path d="M-86,62 Q-6,-74 96,-14 Q14,-18 -64,68 Z" fill="url(#id-sl-${uid})"/>
                 <path d="M-54,48 Q-2,-52 94,-14" fill="none" stroke="${dodged ? '#e2e8f0' : '#ffffff'}" stroke-width="2.6" stroke-linecap="round"/>
               </g>
+              <g class="id-sl-trail" style="transform-origin:0 0;">
+                <path d="M-80,58 Q-10,-62 90,-10 Q10,-12 -60,62 Z" fill="url(#id-sl-${uid})" opacity="0.45"/>
+              </g>
             </svg>
           </div>`);
         owner.anim(arcLayer.querySelector('.id-sl-swing'), [
@@ -886,6 +889,11 @@ const arcaneVfxModule = (function () {
             { transform: 'rotate(46deg) scale(1.12)', opacity: dodged ? 0.5 : 0.92, offset: 0.72 },
             { transform: 'rotate(64deg) scale(1.18)', opacity: 0 }
         ], { duration: 300, delay: 40, easing: 'cubic-bezier(0.12,0.88,0.28,1)', fill: 'forwards' });
+        owner.anim(arcLayer.querySelector('.id-sl-trail'), [
+            { transform: 'rotate(-64deg) scale(0.7)', opacity: 0 },
+            { transform: 'rotate(-6deg) scale(1.0)', opacity: 0.6, offset: 0.5 },
+            { transform: 'rotate(40deg) scale(1.1)', opacity: 0 }
+        ], { duration: 340, delay: 95, easing: 'cubic-bezier(0.12,0.88,0.28,1)', fill: 'forwards' });
 
         owner.at(T.impactMs, () => {
             if (onImpact) onImpact(target, { subtype: '刀砍', scope: 'single', outcome, point: dest, beatMs: T.impactMs });
@@ -898,6 +906,9 @@ const arcaneVfxModule = (function () {
                   <line x1="-68" y1="0" x2="68" y2="0" stroke="#fb7185" stroke-width="3" stroke-linecap="round"/>
                 </svg>
               </div>`);
+            owner.addP({ x: dest.x, y: dest.y, shape: 'ring', size: 1.3, decay: 0.09, color: '#fecdd3' });
+            const scarL = owner.layer(`<div class="arcane-identity-anchor" style="left:${dest.x}px;top:${dest.y}px;width:120px;height:10px;transform:translate(-50%,-50%) rotate(${cutDeg.toFixed(1)}deg);"><div class="id-sl-scar" style="width:100%;height:100%;border-radius:6px;background:linear-gradient(90deg,transparent,#fb7185 30%,#fff 50%,#fb7185 70%,transparent);"></div></div>`);
+            owner.anim(scarL.querySelector('.id-sl-scar'), [{ transform: 'scaleX(0.1) scaleY(1.4)', opacity: 1 }, { transform: 'scaleX(1) scaleY(0.6)', opacity: 0.9, offset: 0.3 }, { transform: 'scaleX(1.05) scaleY(0.2)', opacity: 0 }], { duration: 420, easing: 'ease-out', fill: 'forwards' });
             const rad = cutDeg * Math.PI / 180;
             owner.burst(20, i => {
                 const dir = i % 2 ? rad : rad + Math.PI, an = dir + rnd(-0.34, 0.34), s = rnd(3.5, 9.5);
@@ -961,6 +972,9 @@ const arcaneVfxModule = (function () {
                 { transform: 'scaleX(1.38) scaleY(0.95)', opacity: 0 }
             ], { duration: 310, easing: 'cubic-bezier(0.14,0.88,0.28,1)', fill: 'forwards' });
             owner.addP({ x: dest.x, y: dest.y, shape: 'ring', size: 1.8, decay: 0.07, color: '#fef3c7' });
+            owner.at(50, () => owner.addP({ x: dest.x, y: dest.y, shape: 'ring', size: 2.6, decay: 0.06, color: '#fbbf24' }));
+            shake('light');
+            owner.burst(12, i => { const an = i / 12 * 6.283, s = rnd(6, 10); return { x: dest.x + Math.cos(an) * 14, y: dest.y + Math.sin(an) * 14, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.86, decay: 0.09, size: 2, shape: 'streak', color: '#fff7ed' }; });
             owner.burst(14, () => {
                 const an = Math.random() * 6.283, s = rnd(2.2, 6.2);
                 return { x: dest.x, y: dest.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.9, decay: 0.048, size: rnd(4, 8), shape: 'dust', color: pick(['#fef3c7', '#fde68a', '#ffffff']) };
@@ -992,7 +1006,7 @@ const arcaneVfxModule = (function () {
         const pathsHtml = offsets.map((off, idx) => {
             const len = 104 - Math.abs(off) * 0.6;
             const d = `M${-len * 0.52},${off - 6} Q0,${off + (idx % 2 ? -10 : -7)} ${len * 0.52},${off + 7}`;
-            return `<g class="id-cl-g" data-idx="${idx}"><path class="id-cl-outer" d="${d}" fill="none" stroke="${dodged ? '#94a3b8' : '#ef4444'}" stroke-width="${dodged ? 4 : 7.5}" stroke-linecap="round" pathLength="1" style="stroke-dasharray:1;stroke-dashoffset:1;opacity:${dodged ? 0.5 : 0.85};"/><path class="id-cl-core" d="${d}" fill="none" stroke="${dodged ? '#e2e8f0' : '#fff1f2'}" stroke-width="${dodged ? 1.8 : 2.8}" stroke-linecap="round" pathLength="1" style="stroke-dasharray:1;stroke-dashoffset:1;"/></g>`;
+            return `<g class="id-cl-g" data-idx="${idx}"><path class="id-cl-shadow" d="${d}" fill="none" stroke="rgba(69,10,10,0.65)" stroke-width="${dodged ? 0 : 12}" stroke-linecap="round" pathLength="1" style="stroke-dasharray:1;stroke-dashoffset:1;"/><path class="id-cl-outer" d="${d}" fill="none" stroke="${dodged ? '#94a3b8' : '#ef4444'}" stroke-width="${dodged ? 4 : 7.5}" stroke-linecap="round" pathLength="1" style="stroke-dasharray:1;stroke-dashoffset:1;opacity:${dodged ? 0.5 : 0.85};"/><path class="id-cl-core" d="${d}" fill="none" stroke="${dodged ? '#e2e8f0' : '#fff1f2'}" stroke-width="${dodged ? 1.8 : 2.8}" stroke-linecap="round" pathLength="1" style="stroke-dasharray:1;stroke-dashoffset:1;"/><circle class="id-cl-tip" cx="${len * 0.52}" cy="${off + 7}" r="${dodged ? 0 : 3.2}" fill="#ffffff" opacity="0"/></g>`;
         }).join('');
         const clawLayer = owner.layer(`
           <div class="arcane-identity-anchor" style="left:${dest.x}px;top:${dest.y}px;width:150px;height:130px;transform:translate(-50%,-50%) rotate(${slashDeg.toFixed(1)}deg);">
@@ -1001,11 +1015,13 @@ const arcaneVfxModule = (function () {
 
         clawLayer.querySelectorAll('.id-cl-g').forEach((grp, idx) => {
             const delay = 100 + idx * 36;
-            const outer = grp.querySelector('.id-cl-outer'), core = grp.querySelector('.id-cl-core');
+            const shd = grp.querySelector('.id-cl-shadow'), outer = grp.querySelector('.id-cl-outer'), core = grp.querySelector('.id-cl-core'), tip = grp.querySelector('.id-cl-tip');
             const lifeAnim = dodged ? [{ strokeDashoffset: 1, opacity: 0.6 }, { strokeDashoffset: 0, opacity: 0.75, offset: 0.45 }, { strokeDashoffset: -0.6, opacity: 0 }]
                 : [{ strokeDashoffset: 1, opacity: 0 }, { strokeDashoffset: 0, opacity: 1, offset: 0.24 }, { strokeDashoffset: 0, opacity: 0.88, offset: 0.62 }, { strokeDashoffset: 0, opacity: 0 }];
+            if (!dodged && shd) owner.anim(shd, [{ strokeDashoffset: 1, opacity: 0 }, { strokeDashoffset: 0, opacity: 0.85, offset: 0.25 }, { strokeDashoffset: 0, opacity: 0.65, offset: 0.72 }, { strokeDashoffset: 0, opacity: 0 }], { duration: 540, delay, easing: 'ease-out', fill: 'forwards' });
             owner.anim(outer, lifeAnim, { duration: dodged ? 230 : 480, delay, easing: 'ease-out', fill: 'forwards' });
             owner.anim(core, lifeAnim, { duration: dodged ? 220 : 450, delay, easing: 'ease-out', fill: 'forwards' });
+            if (!dodged && tip) owner.anim(tip, [{ opacity: 0, transform: 'scale(0.3)' }, { opacity: 1, transform: 'scale(1.6)', offset: 0.35 }, { opacity: 0, transform: 'scale(0.2)' }], { duration: 240, delay: delay + 25, fill: 'forwards' });
             if (!dodged) {
                 owner.at(delay + 28, () => {
                     owner.burst(5, () => {
@@ -1048,6 +1064,7 @@ const arcaneVfxModule = (function () {
         const jawLayer = owner.layer(`
           <div class="arcane-identity-anchor" style="left:${dest.x}px;top:${dest.y}px;width:150px;height:150px;transform:translate(-50%,-50%) rotate(${jawAngle}deg);">
             <svg viewBox="-75 -75 150 150" class="w-full h-full ${dodged ? '' : 'arcane-identity-glow-bite'}" style="overflow:visible;">
+              <ellipse class="id-bt-crush" cx="0" cy="2" rx="58" ry="36" fill="rgba(159,18,57,0.45)" opacity="0"/>
               <g class="id-bt-upper">
                 <path d="M-54,-8 Q0,-34 54,-8 L42,-4 L32,20 L22,-4 L10,24 L0,-4 L-10,24 L-22,-4 L-32,20 L-42,-4 Z" fill="${jawCol}" stroke="${rimCol}" stroke-width="2" stroke-linejoin="round"/>
               </g>
@@ -1055,9 +1072,10 @@ const arcaneVfxModule = (function () {
                 <path d="M-50,12 Q0,38 50,12 L38,6 L28,-16 L18,6 L6,-20 L0,6 L-6,-20 L-18,6 L-28,-16 L-38,6 Z" fill="${jawCol}" stroke="${rimCol}" stroke-width="2" stroke-linejoin="round"/>
               </g>
               <line class="id-bt-seam" x1="-46" y1="2" x2="46" y2="2" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0"/>
+              <polygon class="id-bt-glint" points="0,-16 3,-2 22,2 3,6 0,20 -3,6 -22,2 -3,-2" fill="#ffffff" opacity="0"/>
             </svg>
           </div>`);
-        const up = jawLayer.querySelector('.id-bt-upper'), lo = jawLayer.querySelector('.id-bt-lower'), seam = jawLayer.querySelector('.id-bt-seam');
+        const up = jawLayer.querySelector('.id-bt-upper'), lo = jawLayer.querySelector('.id-bt-lower'), seam = jawLayer.querySelector('.id-bt-seam'), crush = jawLayer.querySelector('.id-bt-crush'), glint = jawLayer.querySelector('.id-bt-glint');
         owner.anim(up, [
             { transform: 'translateY(-36px) scale(0.85)', opacity: 0 },
             { transform: 'translateY(-28px) scale(1)', opacity: 1, offset: 0.25 },
@@ -1080,6 +1098,8 @@ const arcaneVfxModule = (function () {
                 return;
             }
             owner.anim(seam, [{ opacity: 1, transform: 'scaleX(0.3)' }, { opacity: 1, transform: 'scaleX(1.1)', offset: 0.35 }, { opacity: 0, transform: 'scaleX(0.9)' }], { duration: 240, fill: 'forwards' });
+            owner.anim(crush, [{ opacity: 0, transform: 'scale(1.3)' }, { opacity: 0.9, transform: 'scale(0.85,0.6)', offset: 0.35 }, { opacity: 0, transform: 'scale(1.2)' }], { duration: 310, fill: 'forwards' });
+            owner.anim(glint, [{ opacity: 0, transform: 'scale(0.2) rotate(0deg)' }, { opacity: 1, transform: 'scale(1.3) rotate(25deg)', offset: 0.35 }, { opacity: 0, transform: 'scale(0.4) rotate(50deg)' }], { duration: 230, fill: 'forwards' });
             owner.at(90, () => {
                 owner.burst(18, i => {
                     const sideAng = (i % 2 ? 0 : Math.PI) + rnd(-0.55, 0.55), s = rnd(2.2, 6.4);
@@ -1139,9 +1159,11 @@ const arcaneVfxModule = (function () {
                 const splatLayer = owner.layer(`
                   <div class="arcane-identity-anchor id-vn-splat" style="left:${dest.x}px;top:${dest.y}px;width:130px;height:110px;transform:translate(-50%,-50%) scale(${splatScale});">
                     <svg viewBox="-65 -55 130 110" class="w-full h-full arcane-identity-glow-venom">
+                      <ellipse cx="0" cy="4" rx="52" ry="34" fill="none" stroke="#bef264" stroke-width="1.6" stroke-dasharray="10 6" opacity="0.65"/>
                       <path d="M-38,-8 Q-14,-28 14,-22 Q38,-14 42,6 Q28,28 -6,26 Q-36,24 -44,6 Z" fill="#65a30d" opacity="0.72"/>
                       <path d="M-24,-2 Q-6,-16 14,-10 Q24,2 10,14 Q-12,18 -24,-2 Z" fill="#a3e635" opacity="0.82"/>
-                      <circle cx="-18" cy="-28" r="5" fill="#bef264"/><circle cx="34" cy="-20" r="4" fill="#84cc16"/><circle cx="28" cy="24" r="5.5" fill="#65a30d"/>
+                      <circle cx="-8" cy="-4" r="4.5" fill="#1a2e05" opacity="0.55"/><circle cx="11" cy="5" r="3.5" fill="#1a2e05" opacity="0.55"/>
+                      <circle cx="-18" cy="-28" r="5" fill="#bef264"/><circle cx="34" cy="-20" r="4" fill="#84cc16"/><circle cx="28" cy="24" r="5.5" fill="#65a30d"/><circle cx="-36" cy="18" r="3.8" fill="#a3e635"/>
                     </svg>
                   </div>`);
                 owner.anim(splatLayer.querySelector('.id-vn-splat'), [{ transform: `translate(-50%,-50%) scale(0.35)`, opacity: 1 }, { transform: `translate(-50%,-50%) scale(${splatScale * 1.12})`, opacity: 0.9, offset: 0.28 }, { transform: `translate(-50%,-50%) scale(${splatScale * 1.25})`, opacity: 0 }], { duration: 420, fill: 'forwards' });
@@ -1201,6 +1223,8 @@ const arcaneVfxModule = (function () {
                     return;
                 }
                 idSfx(owner, () => { click(0, 0.7, 3600, 0.01); tone(0, { type: 'triangle', f0: 260, f1: 110, dur: 0.08, vol: 0.16 }); });
+                owner.addP({ x: dest.x, y: dest.y, shape: 'ring', size: 0.9, decay: 0.11, color: '#e0f2fe' });
+                owner.burst(6, () => { const an = Math.atan2(-g.uy, -g.ux) + rnd(-0.5, 0.5), s = rnd(3, 6); return { x: dest.x, y: dest.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.88, decay: 0.09, size: 1.4, shape: 'streak', color: '#bae6fd' }; });
                 arrEl.querySelector('polygon:last-of-type').setAttribute('opacity', '0.15');
                 owner.anim(arrEl, [
                     { transform: `translate(-50%,-50%) rotate(${flightDeg}deg) scaleX(1)`, opacity: 1 },
@@ -1263,10 +1287,12 @@ const arcaneVfxModule = (function () {
                 });
                 const clusterSize = dodged ? 84 : 136;
                 const spikes = [-75, -35, 10, 55, 115, 165].map((ang, idx) => `<polygon points="0,0 -7,-${dodged ? 18 : 26} 0,-${dodged ? 36 : 56 + (idx % 2) * 10} 7,-${dodged ? 18 : 26}" fill="${idx % 2 ? '#bae6fd' : '#e0f2fe'}" stroke="#ffffff" stroke-width="0.9" opacity="0.9" transform="rotate(${ang})"/>`).join('');
+                const hexLines = [0, 60, 120].map(a => `<line x1="-48" y1="0" x2="48" y2="0" stroke="#e0f2fe" stroke-width="1.3" opacity="0.7" transform="rotate(${a})"/>`).join('');
                 const crystalLayer = owner.layer(`
                   <div class="arcane-identity-anchor id-fr-bloom" style="left:${dest.x}px;top:${dest.y}px;width:${clusterSize}px;height:${clusterSize}px;transform:translate(-50%,-50%);">
-                    <svg viewBox="-68 -68 136 136" class="w-full h-full arcane-identity-glow-frost">${spikes}<circle r="14" fill="#ffffff" opacity="0.88"/></svg>
+                    <svg viewBox="-68 -68 136 136" class="w-full h-full arcane-identity-glow-frost"><polygon points="0,-44 38,-22 38,22 0,44 -38,22 -38,-22" fill="none" stroke="#7dd3fc" stroke-width="1.5" opacity="0.75"/>${hexLines}${spikes}<circle r="14" fill="#ffffff" opacity="0.88"/></svg>
                   </div>`);
+                owner.addP({ x: dest.x, y: dest.y, shape: 'ring', size: dodged ? 0.9 : 1.35, decay: 0.085, color: '#bae6fd' });
                 owner.anim(crystalLayer.querySelector('.id-fr-bloom'), [
                     { transform: 'translate(-50%,-50%) scale(0.18)', opacity: 1 },
                     { transform: 'translate(-50%,-50%) scale(1.06)', opacity: 1, offset: 0.24 },
@@ -1348,6 +1374,8 @@ const arcaneVfxModule = (function () {
                 { transform: 'translateX(0px) scaleX(1.06) scaleY(1.04)', opacity: 1, offset: 0.42 },
                 { transform: `translateX(${waveW * 0.28}px) scaleX(1.16) scaleY(0.65)`, opacity: 0 }
             ], { duration: 480, easing: 'cubic-bezier(0.16,0.85,0.28,1)', fill: 'forwards' });
+            const heatL = owner.layer(`<div class="arcane-identity-anchor" style="left:${area.x}px;top:${area.b - 6}px;width:${waveW}px;height:60px;transform:translate(-50%,-50%);"><div class="id-afw-heat" style="width:100%;height:100%;border-radius:50%;background:radial-gradient(ellipse at center,rgba(251,146,60,0.55),rgba(220,38,38,0.25) 45%,transparent 72%);"></div></div>`);
+            owner.anim(heatL.querySelector('.id-afw-heat'), [{ transform: 'scaleX(0.3)', opacity: 0 }, { transform: 'scaleX(1)', opacity: 1, offset: 0.3 }, { transform: 'scaleX(1.05)', opacity: 0.6, offset: 0.7 }, { transform: 'scaleX(1.08)', opacity: 0 }], { duration: 950, fill: 'forwards' });
 
             entries.forEach((e, idx) => {
                 const stag = 60 + Math.round(e.tFrac * 180);
@@ -1384,7 +1412,7 @@ const arcaneVfxModule = (function () {
 
         const muzzleLayer = owner.layer(`
           <div class="arcane-identity-anchor" style="left:${gBase.muzzle.x}px;top:${gBase.muzzle.y}px;width:96px;height:96px;transform:translate(-50%,-50%);animation:arcane-identity-gun-flash 0.24s ease-out both;">
-            <svg viewBox="0 0 100 100" class="w-full h-full arcane-identity-glow-gun"><polygon points="50,12 58,40 88,50 58,60 50,88 42,60 12,50 42,40" fill="#fde047"/><circle cx="50" cy="50" r="14" fill="#ffffff"/></svg>
+            <svg viewBox="0 0 100 100" class="w-full h-full arcane-identity-glow-gun"><circle cx="50" cy="50" r="38" fill="none" stroke="#fbbf24" stroke-width="2" stroke-dasharray="12 6" opacity="0.75"/><polygon points="50,12 58,40 88,50 58,60 50,88 42,60 12,50 42,40" fill="#fde047"/><circle cx="50" cy="50" r="14" fill="#ffffff"/></svg>
           </div>`);
         void muzzleLayer;
 
@@ -1400,6 +1428,7 @@ const arcaneVfxModule = (function () {
                   <div class="arcane-identity-anchor" style="left:${gBase.muzzle.x}px;top:${gBase.muzzle.y}px;width:${len}px;height:14px;transform:translate(0,-50%) rotate(${ang.toFixed(1)}deg);transform-origin:0 50%;">
                     <svg viewBox="0 0 ${len} 14" class="w-full h-full arcane-identity-glow-gun" style="overflow:visible;">
                       <defs><linearGradient id="id-agn-${uid}-${idx}"><stop offset="0%" stop-color="#f59e0b" stop-opacity="0"/><stop offset="60%" stop-color="#fde047"/><stop offset="100%" stop-color="#ffffff"/></linearGradient></defs>
+                      <line x1="0" y1="7" x2="${len}" y2="7" stroke="rgba(253,224,71,0.28)" stroke-width="1.2" stroke-dasharray="10 8"/>
                       <polygon class="id-agn-bolt" points="0,5.5 ${pkt * 0.7},3.5 ${pkt},7 ${pkt * 0.7},10.5 0,8.5" fill="url(#id-agn-${uid}-${idx})"/>
                     </svg>
                   </div>`);
@@ -1408,9 +1437,10 @@ const arcaneVfxModule = (function () {
                 owner.at(88, () => {
                     if (onImpact) onImpact(e.entity, { subtype: '枪击', scope: 'aoe', outcome: e.outcome, point: e.dest, beatMs: shotDelay + 88 });
                     if (e.dodged) return;
+                    owner.addP({ x: e.dest.x, y: e.dest.y, shape: 'ring', size: 0.95, decay: 0.1, color: '#fde047' });
                     owner.layer(`
                       <div class="arcane-identity-anchor" style="left:${e.dest.x}px;top:${e.dest.y}px;width:96px;height:96px;animation:arcane-identity-gun-flash 0.24s ease-out both;">
-                        <svg viewBox="0 0 100 100" class="w-full h-full arcane-identity-glow-gun"><polygon points="50,18 55,44 82,50 55,56 50,82 45,56 18,50 45,44" fill="#fde047"/><circle cx="50" cy="50" r="10" fill="#ffffff"/></svg>
+                        <svg viewBox="0 0 100 100" class="w-full h-full arcane-identity-glow-gun"><polygon points="50,18 55,44 82,50 55,56 50,82 45,56 18,50 45,44" fill="#fde047"/><polygon points="24,24 47,47 76,24 53,47 76,76 53,53 24,76 47,53" fill="#fb923c" opacity="0.8"/><circle cx="50" cy="50" r="10" fill="#ffffff"/></svg>
                       </div>`);
                     owner.burst(10, () => { const an = Math.random() * 6.283, s = rnd(2.2, 6.2); return { x: e.dest.x, y: e.dest.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.91, decay: 0.05, size: rnd(1.3, 2.2), shape: 'streak', color: pick(['#fef08a', '#ffffff', '#f59e0b']) }; });
                     owner.burst(4, () => ({ x: e.dest.x + rnd(-12, 12), y: e.dest.y + rnd(-10, 10), vx: rnd(-0.3, 0.3), vy: rnd(-1.1, -0.4), drag: 0.98, decay: 0.015, size: rnd(12, 18), shape: 'smoke', blend: 'source-over', color: 'rgba(100,116,139,0.42)' }));
@@ -1452,6 +1482,8 @@ const arcaneVfxModule = (function () {
                     <ellipse cx="${-rw * 0.18}" cy="-4" rx="${rw * 0.28}" ry="${rh * 0.38}" fill="url(#id-apg-${uid})"/>
                     <ellipse cx="${rw * 0.16}" cy="6" rx="${rw * 0.30}" ry="${rh * 0.40}" fill="url(#id-apg-${uid})"/>
                     <ellipse cx="0" cy="-12" rx="${rw * 0.36}" ry="${rh * 0.36}" fill="#84cc16" opacity="0.22"/>
+                    <path d="M${-rw * 0.32},${rh * 0.12} Q${-rw * 0.08},${-rh * 0.24} ${rw * 0.12},${rh * 0.08} T${rw * 0.34},${-rh * 0.1}" fill="none" stroke="#bef264" stroke-width="2.5" stroke-linecap="round" opacity="0.55"/>
+                    <path d="M${-rw * 0.24},${-rh * 0.08} Q0,${rh * 0.22} ${rw * 0.26},${-rh * 0.06}" fill="none" stroke="#ecfccb" stroke-width="1.6" stroke-linecap="round" opacity="0.45"/>
                   </g>
                 </svg>
               </div>`);
@@ -1502,7 +1534,7 @@ const arcaneVfxModule = (function () {
         const iconsHtml = [-48, -24, 0, 24, 48].map((dx, i) => `<polygon class="id-afr-c" points="${dx},${-8 - (i % 2) * 8} ${dx - 5},6 ${dx},22 ${dx + 5},6" fill="${i % 2 ? '#e0f2fe' : '#bae6fd'}" stroke="#ffffff" stroke-width="0.9"/>`).join('');
         const prepL = owner.layer(`
           <div class="arcane-identity-anchor" style="left:${arrayBase.x}px;top:${arrayBase.y}px;width:130px;height:68px;transform:translate(-50%,-50%);">
-            <svg viewBox="-65 -34 130 68" class="w-full h-full arcane-identity-glow-frost">${iconsHtml}</svg>
+            <svg viewBox="-65 -34 130 68" class="w-full h-full arcane-identity-glow-frost"><ellipse cx="0" cy="6" rx="58" ry="12" fill="none" stroke="#7dd3fc" stroke-width="1.4" stroke-dasharray="8 5" opacity="0.8"/>${iconsHtml}</svg>
           </div>`);
         owner.anim(prepL.firstElementChild, [{ transform: 'translate(-50%,-50%) scale(0.35)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1.06)', opacity: 1, offset: 0.72 }, { transform: 'translate(-50%,-50%) scale(0.82)', opacity: 0.9 }], { duration: T.chargeMs, fill: 'forwards' });
         owner.burst(20, () => { const an = Math.random() * 6.283, d = rnd(44, 98); return { x: arrayBase.x + Math.cos(an) * d, y: arrayBase.y + Math.sin(an) * d, vx: -Math.cos(an) * d / 10, vy: -Math.sin(an) * d / 10, decay: 0.075, size: rnd(2.2, 3.8), shape: 'frostShard', color: '#e0f2fe' }; });
@@ -1547,6 +1579,8 @@ const arcaneVfxModule = (function () {
                             e.rect.dom.classList.add('arcane-identity-frost-rim');
                             trackedFrostDoms.push(e.rect.dom);
                         }
+                        const spireL = owner.layer(`<div class="arcane-identity-anchor id-afr-sp" style="left:${dest.x}px;top:${dest.y + 10}px;width:76px;height:68px;transform:translate(-50%,-75%);"><svg viewBox="-38 -52 76 68" class="w-full h-full arcane-identity-glow-frost"><polygon points="-22,12 -14,-28 -4,12" fill="#bae6fd" stroke="#fff" stroke-width="0.8"/><polygon points="-8,14 0,-46 10,14" fill="#e0f2fe" stroke="#fff" stroke-width="1"/><polygon points="6,12 18,-24 24,12" fill="#7dd3fc" stroke="#fff" stroke-width="0.8"/></svg></div>`);
+                        owner.anim(spireL.querySelector('.id-afr-sp'), [{ transform: 'translate(-50%,-75%) scaleY(0.1)', opacity: 0 }, { transform: 'translate(-50%,-75%) scaleY(1.08)', opacity: 0.95, offset: 0.25 }, { transform: 'translate(-50%,-75%) scaleY(1)', opacity: 0.85, offset: 0.65 }, { transform: 'translate(-50%,-75%) scale(1.18,0.4)', opacity: 0 }], { duration: 420, fill: 'forwards' });
                         owner.burst(e.dodged ? 6 : 14, () => { const an = Math.random() * 6.283, s = rnd(1.8, 6.2); return { x: dest.x, y: dest.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s - 0.8, grav: 0.16, drag: 0.94, rot: rnd(0, 6), vr: rnd(-0.2, 0.2), decay: 0.032, size: rnd(2.4, 4.6), shape: 'frostShard', color: pick(['#ffffff', '#bae6fd', '#7dd3fc']) }; });
                     }, k => k * k);
                 });
@@ -1601,6 +1635,11 @@ const arcaneVfxModule = (function () {
                 </svg>
               </div>`);
             owner.anim(windLayer.querySelector('.id-aw-vortex'), [{ strokeDashoffset: 0.65, opacity: 0 }, { strokeDashoffset: 0.0, opacity: 0.85, offset: 0.4 }, { strokeDashoffset: -0.95, opacity: 0 }], { duration: 640, fill: 'forwards' });
+            const crescL = owner.layer([-0.22, 0.04, 0.26].map((yf, i) => `<div class="arcane-identity-anchor id-aw-cres" data-i="${i}" style="left:${area.x - stageW * 0.55}px;top:${area.y + stageH * yf}px;width:70px;height:70px;transform:translate(-50%,-50%);"><svg viewBox="-35 -35 70 70" class="w-full h-full arcane-identity-glow-wind"><path d="M-6,-30 Q30,0 -6,30 Q14,0 -6,-30 Z" fill="#ecfdf5" opacity="0.85"/></svg></div>`).join(''));
+            crescL.querySelectorAll('.id-aw-cres').forEach(el => {
+                const i = Number(el.dataset.i);
+                owner.anim(el, [{ transform: 'translate(-50%,-50%) rotate(0deg) scale(0.6)', opacity: 0 }, { transform: `translate(calc(-50% + ${stageW * 0.55}px),-50%) rotate(360deg) scale(1)`, opacity: 1, offset: 0.5 }, { transform: `translate(calc(-50% + ${stageW * 1.1}px),-50%) rotate(720deg) scale(0.7)`, opacity: 0 }], { duration: 520, delay: i * 70, easing: 'cubic-bezier(0.3,0.6,0.4,1)', fill: 'forwards' });
+            });
             windLayer.querySelectorAll('.id-aw-blade').forEach(el => {
                 const idx = Number(el.dataset.idx);
                 owner.anim(el, [
@@ -1654,6 +1693,7 @@ const arcaneVfxModule = (function () {
         owner.at(T.chargeMs, () => {
             arrayL.remove();
             idSfx(owner, () => whoosh(0, { type: 'highpass', f0: 1600, f1: 4200, dur: 0.22, vol: 0.16 }));
+            owner.at(320, () => owner.burst(26, () => ({ x: area.x + rnd(-area.w * 0.55, area.w * 0.55), y: area.t - rnd(10, 60), vx: rnd(-0.3, 0.3), vy: rnd(1.2, 2.4), drag: 0.99, decay: 0.016, size: rnd(1, 2), color: pick(['#ffffff', '#fef9c3', '#fde68a']) })));
             entries.forEach((e, idx) => {
                 const startPt = launchPts[idx], delay = idx * 32, lift = computeParabolaLift(startPt, e.dest, 46);
                 owner.at(delay, () => {
