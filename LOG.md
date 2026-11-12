@@ -3446,3 +3446,13 @@
   4. **真实专业音效（零合成振荡器）**：清理全部 Web Audio 振荡/噪声合成函数，自 Mixkit 下载并通过 `ffmpeg` 裁剪静音前导与峰值归一化（`peak=73%~93%`）落地 11 条 MP3 至 `D:\Project\my_assets\`（`vfx_armor_choir_mx633.mp3`、`vfx_beast_roar_mx1957.mp3`、`vfx_crystal_chime_mx2950.mp3`、`vfx_gear_lock_mx2160.mp3`、`vfx_golem_stomp_mx2150.mp3`、`vfx_rift_charge_mx2900.mp3`、`vfx_rift_tear_mx788.mp3`、`vfx_sand_unseal_mx2630.mp3`、`vfx_sand_wind_mx1461.mp3`、`vfx_stygian_whoosh_mx2918.mp3`、`vfx_void_tunnel_mx3057.mp3`）；引擎 `SFX_FILES`/`warmAllSfx`/`playSfxSample` 支持 `AudioBuffer` 与 `file://` 下 `new Audio` 自动降级，并保持 `audioCtx` 跨重置常驻以实现 0ms 重放。
 - **涉及文件**：`demo-skill-sand-marcher.html`、`D:\Project\my_assets\vfx_*.mp3`（11 个音效文件）、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：`node -e` 使用 `vm.Script` 校验内联 `<script>` 语法通过（`Inline script count: 1`、`Syntax check: OK`），审计 `createOscillator`/`stroke=`/`streak`/`shard`/`feather` 残留为 `[]`，Python `struct` 校验 11 个 MP3 非空且波形从首刻起振；遵循 Demo 免测免审协定直接交付实机查看。
+
+## [LOG-285] 2026-11-13 — 排障重做飞沙化甲哥特盾牌外框、幻梦行军兽零直边双轴渐隐与 4 档纯真音切换开关
+- **提交**：`d1cd928`。
+- **排障与根因定位**：
+  1. **矩形直角边外露**：`vfx_dream_marcher.jpg` 使用 `left:22%; top:20%` 后其左上角直边落入外部椭圆渐变半透区；改用贴合图片物理边界的 `.arcane-marcher-edge-y` / `.arcane-marcher-edge-x` 嵌套双向渐变消融层，确保物理四边恒为 `0.000` alpha，彻底阻断直边外露，并追加 `.arcane-marcher-violet-wash` 消融浅米背景、`.arcane-marcher-rift-rim` 强化暗紫裂隙边缘高光；
+  2. **白芯黑圈气泡伪影**：`playXieYanKey` 把 `core: '#ede9fe'` 误传给 `gradMist`，解耦 `DRAW.gradMist`（仅用 `mistCore || color`）并清除粒子参数混入，同时收细暖琥珀义眼十字星芒至 `2px`；
+  3. **飞沙化甲超宽铺张**：`.arcane-stygian-moon` 360px 跨越近三张英雄卡且漏出上下平切边；按受术卡牌宽度动态收束为约 `175×202px` 哥特尖底盾牌外框（`.arcane-stygian-shield-wrap` + `<clipPath>`/`<mask>`），外缘配冷钢/冰蓝双道渐变描边，面甲双眸精确移回眼缝 `(95.5, 43.8)` / `(104.5, 43.8)`；
+  4. **滑稽音效排查与 4 档纯真音对比**：经多模态 `read_file` 逐条亲耳试听，物理删除实听确认为滑稽铜管/动物怪叫/青蛙音的 `mx633`、`mx1461`、`mx1957`、`mx3057`、`mx2630` 5 轨；重寻并逐条听审验收 15 条 Mixkit 拟音（流沙/冥风/铁闸门闭甲/金属剑击/机械齿扣/真空抽吸/深渊裂响/巨龙巨蜥咆哮/重步踏击）落盘 `D:\Project\my_assets\`，复用本地战斗原声合共建成 4 档纯真音对比切换开关（`#sfx-pack-bar`：`战斗原声` / `重甲狂吼` / `裂隙撕鸣` / `严选特调`），零合成振荡器回退。
+- **涉及文件**：`demo-skill-sand-marcher.html`、`D:\Project\my_assets\vfx_*.mp3`（删 5 增 15，共 21 个实录音效）、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：`node -e` 校验 `vm.Script` 语法通过（`Syntax check: OK`）、`SFX_FILES` 33 条映射键与磁盘存在性 100% 通过、违和旧码审计 `Bad leftovers: []`；全 15 条新音效经 `read_file` 多模态亲耳试听验收无滑稽杂音；Demo 按规范免测免审交付实机对比。
