@@ -3346,3 +3346,15 @@
 - **涉及文件**：`demo-parry-dodge-counter.html`、`D:\Project\my_assets\dodge_candidates\*`（9 个 MP3 候选）、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：`node` `vm.Script` 校验内联 `<script>` 语法通过，9 个下载音频文件均核验 MPEG 头与非空字节；遵循 Demo 免测免审规则未跑自动化测试与审查，待用户实机观感与听感确认。
 - **边界**：未修改 `index.html`、`README.md`、`SPEC.md` 与正则产物。
+
+---
+
+## [LOG-277] 2026-11-12 — 锁定闪避三档选型（1B/2C/3C）并归档至 my_assets 根目录
+
+- **提交**：`cd29069`。
+- **变更行为**：
+  1. 按用户选定将 `dodge_t1_b_short_wind.mp3`（一档 B）、`dodge_t2_c_dagger_woosh.mp3`（二档 C）、`dodge_t3_c_cinematic_wind.mp3`（三档 C）分别复制为 `D:\Project\my_assets\dodge_1.mp3`、`dodge_2.mp3`、`dodge_3.mp3`，保留 `dodge_candidates\` 目录备选存档。
+  2. 更新 `demo-parry-dodge-counter.html` 的默认选中态 `selectedDodge = { 1: 1, 2: 2, 3: 2 }`（对应 1B / 2C / 3C）。
+  3. 同步确认后续移植口径：正式版只改造角色自身格挡（免伤/0伤）与普通护盾破盾瞬间，【肃正】全队屏障完全格挡保持原样。
+- **涉及文件**：`demo-parry-dodge-counter.html`、`D:\Project\my_assets\dodge_{1,2,3}.mp3`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：`node` `vm.Script` 语法检查通过，3 个归档 MP3 文件非空字节核验通过；Demo 免测免审，待用户后续手感/音量微调反馈后再行移植正式版。
