@@ -3358,3 +3358,18 @@
   3. 同步确认后续移植口径：正式版只改造角色自身格挡（免伤/0伤）与普通护盾破盾瞬间，【肃正】全队屏障完全格挡保持原样。
 - **涉及文件**：`demo-parry-dodge-counter.html`、`D:\Project\my_assets\dodge_{1,2,3}.mp3`、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：`node` `vm.Script` 语法检查通过，3 个归档 MP3 文件非空字节核验通过；Demo 免测免审，待用户后续手感/音量微调反馈后再行移植正式版。
+
+---
+
+## [LOG-278] 2026-11-12 — 修复回血 HP 条无过渡（直接跳变），打包 v12.01
+
+- **提交**：`58e15da`。
+- **变更行为**：
+  1. 根因：v12.0 统一命中反馈后 HP 填充条改用 `arcane-hit-fill`（类内 `transition: none`），伤害靠幽灵层拖尾表现；治疗/回复走 `updateHeroUI`/`updateEnemyUI` 直接改宽度，缺少上升过渡，故 110→140 瞬间跳变。MP/TP 仍用 `transition-all duration-300`，故表现正常。
+  2. 新增 `setHpBarPct(bar, pct)`：上升（治疗/回复/复活）时临时挂内联 `width 320ms cubic-bezier(0.2,0.8,0.2,1)` 过渡，结束后恢复 `none`；下降保持瞬时收缩，不干扰命中 ghost 拖尾。同值重复调用在过渡期内不打断动画。
+  3. `updateHeroUI`、`updateEnemyUI`（含 [复活] 分支）三处宽度赋值统一走 `setHpBarPct`；`hitBar` 受击路径显式清除过渡与计时器，保证掉血依旧瞬间收缩。
+  4. `syncHitBar` 幽灵层在回血时与填充条同参数同步过渡，避免浅粉幽灵层先跳到新值、露在红色填充条前方。
+  5. 版本号按用户指定定为 v12.01：产物 `regex-前端战斗v12_01.json`、`scriptName=前端战斗v12.01`，并同步更新 `integration-test/harness.html` 与两份产物专项断言中的版本引用。
+- **涉及文件**：`index.html`、`regex-前端战斗v12_01.json`、`integration-test/harness.html`、`integration-test/attack-identity-artifact-check.cjs`、`integration-test/enemy-group-artifact-check.cjs`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：内联脚本 `new Function` 语法检查 2/2 通过；`node build-regex.cjs` 重打包成功（replaceString 1,182,963 字符）；产物专项断言 64+50 项全绿；浏览器命中分层专项 109 项全绿；IAB 实测合成血条 50%→70%（100px→140px），120ms 时中间值 135.6px、400ms 到达 140px，过渡结束后 `transition` 复位为 `none`。
+- **边界**：产物重命名（v12_0→v12_01）此前因并发会话提交被并入 `7b82ecc`（当时内容仍为 v12.0），本轮 `58e15da` 补齐 `scriptName` 与重打包内容；实机回血观感以用户复测为准。
