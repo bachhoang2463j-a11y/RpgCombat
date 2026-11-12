@@ -106,7 +106,7 @@
           <div class="px-2.5 py-1 bg-gradient-to-r from-amber-950/50 via-slate-900/90 to-slate-950 border-b border-amber-900/40 flex justify-between items-center shrink-0">
             <div class="flex items-center gap-1.5 min-w-0">
               <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
-              <span class="text-xs font-bold text-amber-200 truncate">格挡·闪避·反击</span>
+              <span class="text-xs font-bold text-amber-200 truncate">受击·格挡·闪避·反击</span>
             </div>
             <div class="flex items-center gap-1 shrink-0">
               <span id="asset-status-pill" class="text-[9px] font-mono px-1 rounded border border-slate-600/70 text-slate-300" title="本地资源服务器连接状态">检测中</span>
@@ -201,6 +201,17 @@
         2: 'parry_Weapon_3.wav',
         3: 'parry_Weapon_GuardBreak.wav'
     };
+    const HIT_AUDIO_POOL = {
+        1: ['hit_1a.wav', 'hit_1b.wav', 'hit_1c.wav'],
+        2: ['hit_2a.wav', 'hit_2b.wav', 'hit_2c.wav'],
+        3: ['hit_3a.wav', 'hit_3b.wav', 'hit_3c.wav']
+    };
+    const HIT_AUDIO_LABELS = {
+        1: ['slash_light_01', 'slash_light_14', 'slash_light_15'],
+        2: ['blade_flesh_05', 'blade_flesh_02', 'blade_flesh_07'],
+        3: ['blunt_flesh_15', 'bladesmall_01', 'bladesmall_03']
+    };
+    const _lastHitAudioIdx = { 1: -1, 2: -1, 3: -1 };
     const DODGE_CANDIDATES = {
         1: [
             { id: 't1_a', label: 'A 轻掠', name: 'Quick swoosh accent', file: 'dodge_candidates/dodge_t1_a_quick_swoosh.mp3', src: 'Mixkit #1464' },
@@ -240,6 +251,7 @@
         }
         const files = [
             PARRY_KEYS[1], PARRY_KEYS[2], PARRY_KEYS[3], 'atk2.mp3',
+            ...Object.values(HIT_AUDIO_POOL).flat(),
             ...Object.values(DODGE_CANDIDATES).flat().map(c => c.file)
         ];
         files.forEach(rel => {
@@ -277,6 +289,19 @@
     function playParryTierAudio(tier) {
         const file = PARRY_KEYS[tier] || PARRY_KEYS[1];
         playAssetFile(file, tier === 3 ? 0.95 : 0.85);
+    }
+
+    function playHitTierAudio(tier) {
+        const t = tier >= 3 ? 3 : tier === 2 ? 2 : 1;
+        const list = HIT_AUDIO_POOL[t] || HIT_AUDIO_POOL[1];
+        let idx = Math.floor(Math.random() * list.length);
+        if (list.length > 1 && idx === _lastHitAudioIdx[t]) {
+            idx = (idx + 1 + Math.floor(Math.random() * (list.length - 1))) % list.length;
+        }
+        _lastHitAudioIdx[t] = idx;
+        const stat = document.getElementById('audition-now-playing');
+        if (stat) stat.textContent = `受击T${t}: ${HIT_AUDIO_LABELS[t][idx]}`;
+        playAssetFile(list[idx], t === 3 ? 0.94 : t === 2 ? 0.88 : 0.82);
     }
 
     probeAndWarmAssets();
@@ -523,8 +548,7 @@
             if (top.kind === 'block') { playParryTierAudio(top.blockTier); return; }
             if (top.kind === 'dodge') { playDodgeTierAudio(top.dodgeTier); return; }
             if (top.kind === 'shield') { synthTone(0, { type: 'triangle', f0: 1500, f1: 1050, dur: 0.14, vol: 0.14 }); return; }
-            if (top.isCounter) { playAssetFile('atk2.mp3', 0.9); return; }
-            if (top.kind === 'hp') { synthTone(0, { type: 'sine', f0: 190, f1: 55, dur: 0.18, vol: 0.25 }); }
+            if (top.kind === 'hp') { playHitTierAudio(top.tier || 1); }
         }
 
         function playHitFeedback(results, opts = {}) {
@@ -600,7 +624,7 @@
             if (!opts.suppressAudio) hitAudio(hs);
             after(HIT_LIFE_MS, () => { anims.forEach(a => a.cancel()); layer.remove(); S.layers.delete(layer); });
         }
-        // ===== 普通反击 L1 新版：琥珀金蓄势残影突进斩（总长 ~380ms，蓄势→轨迹→斩击） =====
+        // ===== 普通反击 L1 新版：实心明黄变化切割轨迹 + 末端火星（总长 ~370ms） =====
         function playCounterAttackL1(caster, target, onImpact) {
             const fromRect = entityVisualRect(caster), toRect = entityVisualRect(target);
             const fromDom = domOf(caster);
@@ -608,115 +632,204 @@
             const dx = toRect.x - fromRect.x, dy = toRect.y - fromRect.y;
             const dist = Math.hypot(dx, dy) || 1;
             const ux = dx / dist, uy = dy / dist;
-            const angleDeg = Math.atan2(dy, dx) * 180 / Math.PI;
             const uid = ++S.uid;
             const tokenNow = combatToken;
 
-            // 1. 蓄势起手 (0 ~ 110ms)：后撤收步 + 紧致琥珀蓄势环 + 内吸微粒
+            // 切割曲线锚定在敌方身体：每次微调斜角，沿轨迹快速滑过目标
+            const flip = (uid % 2 === 0) ? 1 : -1;
+            const slashAngle = Math.atan2(dy, dx) + flip * 0.62;
+            const sx = Math.cos(slashAngle), sy = Math.sin(slashAngle);
+            const nx = -sy, ny = sx;
+            const span = Math.max(96, Math.min(138, toRect.w * 1.42));
+            const P0 = { x: toRect.x - sx * span * 0.56, y: toRect.y - sy * span * 0.56 };
+            const P1 = { x: toRect.x + nx * span * 0.18 * flip, y: toRect.y + ny * span * 0.18 * flip };
+            const P2 = { x: toRect.x + sx * span * 0.60, y: toRect.y + sy * span * 0.60 };
+
+            // 1. 蓄势起手 (0 ~ 105ms)：后撤收步 + 紧致琥珀聚气环 + 内吸微粒
             if (fromDom) {
                 fromDom.animate([
                     { transform: 'translate3d(0,0,0) scale(1)' },
-                    { transform: `translate3d(${(-ux * 9).toFixed(1)}px,${(-uy * 9).toFixed(1)}px,0) scale(0.95)`, offset: 0.28 },
-                    { transform: `translate3d(${(-ux * 7).toFixed(1)}px,${(-uy * 7).toFixed(1)}px,0) scale(0.96)`, offset: 0.42 },
-                    { transform: `translate3d(${(ux * 30).toFixed(1)}px,${(uy * 30).toFixed(1)}px,0) scale(1.05)`, offset: 0.68 },
+                    { transform: `translate3d(${(-ux * 9).toFixed(1)}px,${(-uy * 9).toFixed(1)}px,0) scale(0.95)`, offset: 0.25 },
+                    { transform: `translate3d(${(ux * 32).toFixed(1)}px,${(uy * 32).toFixed(1)}px,0) scale(1.06)`, offset: 0.62 },
                     { transform: 'translate3d(0,0,0) scale(1)' }
-                ], { duration: 360, easing: 'cubic-bezier(0.22,0.85,0.32,1)' });
+                ], { duration: 340, easing: 'cubic-bezier(0.22,0.85,0.32,1)' });
             }
-            synthTone(0, { type: 'triangle', f0: 520, f1: 1240, dur: 0.105, vol: 0.09 });
+            synthTone(0, { type: 'triangle', f0: 540, f1: 1280, dur: 0.095, vol: 0.09 });
             fsLayer(`
-              <div class="arcane-fs-anchor" style="left:${fromRect.x}px;top:${fromRect.y}px;width:96px;height:96px;animation:arcane-counter-charge-ring 130ms ease-in forwards;">
+              <div class="arcane-fs-anchor" style="left:${fromRect.x}px;top:${fromRect.y}px;width:92px;height:92px;animation:arcane-counter-charge-ring 120ms ease-in forwards;">
                 <svg viewBox="0 0 100 100" class="w-full h-full arcane-identity-glow-amber">
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-dasharray="14 8"/>
-                  <circle cx="50" cy="50" r="24" fill="none" stroke="#fef08a" stroke-width="2"/>
-                  <circle cx="50" cy="50" r="7" fill="#fffbeb"/>
+                  <circle cx="50" cy="50" r="38" fill="none" stroke="#facc15" stroke-width="2.6" stroke-dasharray="14 8"/>
+                  <circle cx="50" cy="50" r="22" fill="none" stroke="#fef08a" stroke-width="2"/>
+                  <circle cx="50" cy="50" r="6" fill="#ffffff"/>
                 </svg>
-              </div>`, 150);
+              </div>`, 140);
             burst(6, i => {
-                const a = (i / 6) * Math.PI * 2 + rnd(-0.2, 0.2), r = 34;
-                return { x: fromRect.x + Math.cos(a) * r, y: fromRect.y + Math.sin(a) * r, vx: -Math.cos(a) * 3.2, vy: -Math.sin(a) * 3.2, drag: 0.92, decay: 0.095, size: 2.0, color: pick(['#fef08a', '#fbbf24', '#ffffff']) };
+                const a = (i / 6) * Math.PI * 2 + rnd(-0.2, 0.2), r = 32;
+                return { x: fromRect.x + Math.cos(a) * r, y: fromRect.y + Math.sin(a) * r, vx: -Math.cos(a) * 3.4, vy: -Math.sin(a) * 3.4, drag: 0.92, decay: 0.1, size: 2.0, color: pick(['#fef08a', '#facc15', '#ffffff']) };
             });
 
-            // 2. 高速轨迹突进 (105 ~ 230ms)：残影掠出 + 微弯弧线速度光带
-            after(105, () => {
+            // 2. 高速突进残影 & 实心导引线飞向切入起点 P0 (95 ~ 170ms)
+            after(95, () => {
                 if (tokenNow !== combatToken) return;
-                // 2 枚快速掠出的残影
-                [0, 38].forEach((delayMs, idx) => {
+                playAssetFile('atk2.mp3', 0.62, 1.15);
+                [0, 34].forEach((delayMs, idx) => {
                     after(delayMs, () => {
                         if (tokenNow !== combatToken || !fromDom) return;
                         const reach = Math.min(dist * (0.34 + idx * 0.24), 108);
-                        const gLayer = fsLayer('', 190);
+                        const gLayer = fsLayer('', 175);
                         const g = document.createElement('div');
                         g.className = 'arcane-identity-ghost';
-                        g.style.cssText = `left:${fromRect.left}px;top:${fromRect.top}px;width:${fromRect.w}px;height:${fromRect.h}px;border:1px solid rgba(251,191,36,0.5);box-shadow:0 0 12px rgba(251,191,36,0.45);filter:sepia(0.5) saturate(2) brightness(1.15);`;
+                        g.style.cssText = `left:${fromRect.left}px;top:${fromRect.top}px;width:${fromRect.w}px;height:${fromRect.h}px;border:1px solid rgba(250,204,21,0.65);box-shadow:0 0 12px rgba(250,204,21,0.5);filter:sepia(0.5) saturate(2.2) brightness(1.15);`;
                         g.innerHTML = fromDom.innerHTML.replace(/ id="[^"]*"/g, '');
                         gLayer.appendChild(g);
                         g.animate([
-                            { transform: `translate3d(${(ux * reach * 0.25).toFixed(1)}px,${(uy * reach * 0.25).toFixed(1)}px,0) scale(1)`, opacity: 0.52 },
+                            { transform: `translate3d(${(ux * reach * 0.25).toFixed(1)}px,${(uy * reach * 0.25).toFixed(1)}px,0) scale(1)`, opacity: 0.55 },
                             { transform: `translate3d(${(ux * reach).toFixed(1)}px,${(uy * reach).toFixed(1)}px,0) scale(0.97)`, opacity: 0 }
-                        ], { duration: 155, easing: 'cubic-bezier(0.16,0.9,0.28,1)', fill: 'forwards' });
+                        ], { duration: 145, easing: 'cubic-bezier(0.16,0.9,0.28,1)', fill: 'forwards' });
                     });
                 });
 
-                // 弧线突进轨迹 SVG（pathLength=1，高速从施法者射向目标）
-                const mx = (fromRect.x + toRect.x) / 2 - uy * Math.min(48, dist * 0.14);
-                const my = (fromRect.y + toRect.y) / 2 + ux * Math.min(48, dist * 0.14);
-                const dPath = `M ${fromRect.x.toFixed(1)} ${fromRect.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${toRect.x.toFixed(1)} ${toRect.y.toFixed(1)}`;
+                const mx = (fromRect.x + P0.x) / 2 - uy * Math.min(36, dist * 0.11);
+                const my = (fromRect.y + P0.y) / 2 + ux * Math.min(36, dist * 0.11);
+                const dPath = `M ${fromRect.x.toFixed(1)} ${fromRect.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${P0.x.toFixed(1)} ${P0.y.toFixed(1)}`;
                 const trLayer = fsLayer(`
                   <svg class="arcane-identity-svg-full arcane-identity-glow-amber">
-                    <defs>
-                      <linearGradient id="cnt-tr-${uid}" x1="${fromRect.x}" y1="${fromRect.y}" x2="${toRect.x}" y2="${toRect.y}" gradientUnits="userSpaceOnUse">
-                        <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.05"/>
-                        <stop offset="55%" stop-color="#fbbf24" stop-opacity="0.9"/>
-                        <stop offset="100%" stop-color="#fffbeb"/>
-                      </linearGradient>
-                    </defs>
-                    <path class="cnt-outer" d="${dPath}" fill="none" stroke="url(#cnt-tr-${uid})" stroke-width="10" stroke-linecap="round" pathLength="1" style="stroke-dasharray:0.42 1;stroke-dashoffset:0.42;"/>
-                    <path class="cnt-core" d="${dPath}" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" pathLength="1" style="stroke-dasharray:0.36 1;stroke-dashoffset:0.36;"/>
-                  </svg>`, 230);
-                trLayer.querySelector('.cnt-outer').animate([{ strokeDashoffset: 0.42, opacity: 0.9 }, { strokeDashoffset: -0.95, opacity: 0 }], { duration: 150, easing: 'cubic-bezier(0.14,0.86,0.28,1)', fill: 'forwards' });
-                trLayer.querySelector('.cnt-core').animate([{ strokeDashoffset: 0.36, opacity: 1 }, { strokeDashoffset: -0.98, opacity: 0 }], { duration: 140, easing: 'cubic-bezier(0.14,0.86,0.28,1)', fill: 'forwards' });
+                    <path class="cnt-lead" d="${dPath}" fill="none" stroke="#facc15" stroke-width="5" stroke-linecap="round" pathLength="1" style="stroke-dasharray:0.38 1;stroke-dashoffset:0.38;"/>
+                    <path class="cnt-lead-core" d="${dPath}" fill="none" stroke="#fffbeb" stroke-width="2.2" stroke-linecap="round" pathLength="1" style="stroke-dasharray:0.30 1;stroke-dashoffset:0.30;"/>
+                  </svg>`, 165);
+                trLayer.querySelector('.cnt-lead').animate([{ strokeDashoffset: 0.38, opacity: 1 }, { strokeDashoffset: -0.95, opacity: 0 }], { duration: 115, easing: 'cubic-bezier(0.14,0.86,0.28,1)', fill: 'forwards' });
+                trLayer.querySelector('.cnt-lead-core').animate([{ strokeDashoffset: 0.30, opacity: 1 }, { strokeDashoffset: -0.98, opacity: 0 }], { duration: 105, easing: 'cubic-bezier(0.14,0.86,0.28,1)', fill: 'forwards' });
             });
 
-            // 3. 弧斩命中爆发 (225ms)
-            after(225, () => {
+            // 3. 敌方身上快速变化的实心黄色切割轨迹 + 末端火星 (155 ~ 295ms)
+            after(155, () => {
                 if (tokenNow !== combatToken) return;
-                const arcLayer = fsLayer(`
-                  <div class="arcane-identity-anchor" style="left:${toRect.x}px;top:${toRect.y}px;width:190px;height:190px;transform:translate(-50%,-50%) rotate(${(angleDeg - 18).toFixed(1)}deg);">
-                    <svg viewBox="-95 -95 190 190" class="w-full h-full arcane-identity-glow-amber" style="overflow:visible;">
-                      <defs>
-                        <linearGradient id="cnt-sl-${uid}" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stop-color="#d97706" stop-opacity="0"/>
-                          <stop offset="50%" stop-color="#fbbf24" stop-opacity="0.95"/>
-                          <stop offset="100%" stop-color="#fffbeb"/>
-                        </linearGradient>
-                      </defs>
-                      <g class="cnt-swing" style="transform-origin:0 0;">
-                        <path d="M-74,50 Q-4,-62 82,-12 Q12,-14 -54,56 Z" fill="url(#cnt-sl-${uid})"/>
-                        <path d="M-48,40 Q-2,-44 80,-12" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
-                      </g>
-                    </svg>
-                  </div>`, 240);
-                arcLayer.querySelector('.cnt-swing').animate([
-                    { transform: 'rotate(-55deg) scale(0.76)', opacity: 0 },
-                    { transform: 'rotate(4deg) scale(1.08)', opacity: 1, offset: 0.42 },
-                    { transform: 'rotate(54deg) scale(1.16)', opacity: 0 }
-                ], { duration: 195, easing: 'cubic-bezier(0.12,0.88,0.28,1)', fill: 'forwards' });
-                fsLayer(`
-                  <div class="arcane-identity-anchor" style="left:${toRect.x}px;top:${toRect.y}px;width:128px;height:52px;transform:translate(-50%,-50%) rotate(${(angleDeg + 28).toFixed(1)}deg);animation:arcane-identity-slash-spark 0.24s ease-out both;">
-                    <svg viewBox="-64 -26 128 52" class="w-full h-full arcane-identity-glow-amber">
-                      <polygon points="-62,0 -10,-4 0,-15 10,-4 62,0 10,4 0,15 -10,4" fill="#fffbeb"/>
-                      <line x1="-58" y1="0" x2="58" y2="0" stroke="#fbbf24" stroke-width="2.6" stroke-linecap="round"/>
-                    </svg>
-                  </div>`, 260);
-                const rad = (angleDeg + 28) * Math.PI / 180;
-                burst(14, i => {
-                    const dir = i % 2 ? rad : rad + Math.PI, an = dir + rnd(-0.36, 0.36), s = rnd(3.5, 9.2);
-                    return { x: toRect.x, y: toRect.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.89, decay: rnd(0.055, 0.085), size: rnd(1.5, 2.4), shape: 'streak', color: pick(['#ffffff', '#fef08a', '#fbbf24', '#f59e0b']) };
+                let elapsed = 0;
+                const dur = 135;
+                let impacted = false;
+                let sparked = false;
+
+                const bezierPt = t => {
+                    const mt = 1 - t;
+                    return {
+                        x: mt * mt * P0.x + 2 * mt * t * P1.x + t * t * P2.x,
+                        y: mt * mt * P0.y + 2 * mt * t * P1.y + t * t * P2.y
+                    };
+                };
+                const bezierNormal = t => {
+                    const mt = 1 - t;
+                    const tx = 2 * mt * (P1.x - P0.x) + 2 * t * (P2.x - P1.x);
+                    const ty = 2 * mt * (P1.y - P0.y) + 2 * t * (P2.y - P1.y);
+                    const len = Math.hypot(tx, ty) || 1;
+                    return { nx: -ty / len, ny: tx / len, tx: tx / len, ty: ty / len };
+                };
+
+                fxEngine.particles.push({
+                    update(dt) {
+                        if (tokenNow !== combatToken) return false;
+                        elapsed += dt;
+                        const u = Math.min(1, elapsed / dur);
+                        const head = 1 - Math.pow(1 - Math.min(1, u * 1.48), 3);
+                        const tail = Math.pow(Math.max(0, (u - 0.14) / 0.86), 1.65);
+
+                        if (!impacted && head >= 0.54) {
+                            impacted = true;
+                            shake('light');
+                            if (onImpact) onImpact();
+                        }
+
+                        if (!sparked && head >= 0.96) {
+                            sparked = true;
+                            const endTan = bezierNormal(1);
+                            const baseAng = Math.atan2(endTan.ty, endTan.tx);
+                            // 轨迹终点瞬间闪星
+                            fsLayer(`
+                              <div class="arcane-identity-anchor" style="left:${P2.x}px;top:${P2.y}px;width:64px;height:64px;transform:translate(-50%,-50%) rotate(${(baseAng * 180 / Math.PI).toFixed(1)}deg);animation:arcane-identity-slash-spark 0.18s ease-out both;">
+                                <svg viewBox="-32 -32 64 64" class="w-full h-full arcane-identity-glow-amber">
+                                  <polygon points="-28,0 -5,-3 0,-22 5,-3 28,0 5,3 0,22 -5,3" fill="#fffbeb"/>
+                                </svg>
+                              </div>`, 200);
+                            // 结束时在轨迹末端炸裂高能火星
+                            burst(18, i => {
+                                const spread = rnd(-0.92, 0.92);
+                                const a = baseAng + spread;
+                                const spd = rnd(4.2, 10.6);
+                                return {
+                                    x: P2.x + rnd(-2, 2),
+                                    y: P2.y + rnd(-2, 2),
+                                    vx: Math.cos(a) * spd,
+                                    vy: Math.sin(a) * spd,
+                                    grav: 0.14,
+                                    drag: 0.90,
+                                    decay: rnd(0.052, 0.088),
+                                    size: rnd(1.6, 2.7),
+                                    shape: 'streak',
+                                    color: pick(['#ffffff', '#fef08a', '#facc15', '#fb923c'])
+                                };
+                            });
+                        }
+
+                        if (head > tail + 0.01) {
+                            const ctx = fxEngine.ctx;
+                            const N = 16;
+                            const leftPts = [], rightPts = [], innerL = [], innerR = [];
+                            const thickScale = 1 - u * 0.45;
+                            const maxHalfW = 10.5 * thickScale;
+
+                            for (let i = 0; i <= N; i++) {
+                                const k = i / N;
+                                const t = tail + (head - tail) * k;
+                                const p = bezierPt(t);
+                                const nm = bezierNormal(t);
+                                // 两端尖锐刺入/抽离，中前段呈强力切割厚度
+                                const envelope = Math.sin(Math.PI * Math.pow(k, 0.65));
+                                const hw = Math.max(0.2, maxHalfW * envelope);
+                                leftPts.push({ x: p.x + nm.nx * hw, y: p.y + nm.ny * hw });
+                                rightPts.push({ x: p.x - nm.nx * hw, y: p.y - nm.ny * hw });
+
+                                const ihw = Math.max(0.1, hw * 0.44);
+                                innerL.push({ x: p.x + nm.nx * ihw, y: p.y + nm.ny * ihw });
+                                innerR.push({ x: p.x - nm.nx * ihw, y: p.y - nm.ny * ihw });
+                            }
+
+                            ctx.save();
+                            ctx.globalCompositeOperation = 'source-over';
+                            ctx.globalAlpha = 1;
+                            ctx.shadowColor = '#f59e0b';
+                            ctx.shadowBlur = 10;
+
+                            // 实心亮黄切割轨迹主体
+                            ctx.beginPath();
+                            ctx.moveTo(leftPts[0].x, leftPts[0].y);
+                            for (let i = 1; i < leftPts.length; i++) ctx.lineTo(leftPts[i].x, leftPts[i].y);
+                            for (let i = rightPts.length - 1; i >= 0; i--) ctx.lineTo(rightPts[i].x, rightPts[i].y);
+                            ctx.closePath();
+                            ctx.fillStyle = '#facc15';
+                            ctx.fill();
+                            ctx.lineWidth = 1.4;
+                            ctx.strokeStyle = '#fbbf24';
+                            ctx.stroke();
+
+                            // 内层实心亮白金刃脊（增加锋锐穿刺感）
+                            ctx.shadowBlur = 0;
+                            ctx.beginPath();
+                            ctx.moveTo(innerL[0].x, innerL[0].y);
+                            for (let i = 1; i < innerL.length; i++) ctx.lineTo(innerL[i].x, innerL[i].y);
+                            for (let i = innerR.length - 1; i >= 0; i--) ctx.lineTo(innerR[i].x, innerR[i].y);
+                            ctx.closePath();
+                            ctx.fillStyle = '#fefce8';
+                            ctx.fill();
+
+                            ctx.restore();
+                        }
+
+                        return u < 1;
+                    }
                 });
-                shake('light');
-                if (onImpact) onImpact();
+                fxEngine.startLoop();
             });
-            return 390;
+
+            return 370;
         }
 
         // 旧版静态 slash 对照
@@ -846,6 +959,24 @@
 
     const DEMO_GROUPS = [
         {
+            title: '💥 受击三档随机（每档3音防连重）', badge: '3项',
+            items: [
+                { name: '受击一档 · <10% 轻伤 (3音随机)', level: '受击T1', description: 'slash_light_01 / 14 / 15 随机不连重', init: { h2: { hp: 180, maxHp: 180, shield: 0 } }, run: () => runIncomingHit('e4', 'h2', { outcome: 'hit', hpDmg: 12 }) },
+                { name: '受击二档 · 10%~50% 中伤 (3音随机)', level: '受击T2', description: 'blade_flesh_05 / 02 / 07 随机不连重', init: { h2: { hp: 180, maxHp: 180, shield: 0 } }, run: () => runIncomingHit('e5', 'h2', { outcome: 'hit', hpDmg: 48 }) },
+                { name: '受击三档 · ≥50% 重伤 (3音随机)', level: '受击T3', description: 'blunt_flesh_15 / bladesmall_01 / 03 随机', init: { h2: { hp: 180, maxHp: 180, shield: 0 } }, run: () => runIncomingHit('e5', 'h2', { outcome: 'hit', hpDmg: 105 }) }
+            ]
+        },
+        {
+            title: '⚔️ 普通反击 L1（实心黄切割+末端火星）', badge: '5项',
+            items: [
+                { name: '新版 L1 · 实心黄切割轨迹+火星', level: '新L1', description: '100ms蓄势→快速实心亮黄变化轨迹→末端爆火星', run: () => runNewCounter('h2', 'e5', 180) },
+                { name: '新版 L1 · 敌方反击 (敌→我)', level: '敌→我', description: '敌方闪避后下行实心亮黄切割反击', run: () => runNewCounter('e5', 'h2', 32) },
+                { name: '连招 · 二档闪避 → L1 反击', level: '连招', description: '敌来袭→二档闪避→顺势实心黄切割反击', run: () => runDodgeCounterCombo('e5', 'h2', 52, 185) },
+                { name: '连招 · 三档险避 → L1 反击', level: '连招', description: '重击来袭→三档险避→顺势实心黄切割反击', run: () => runDodgeCounterCombo('e4', 'h4', 92, 210) },
+                { name: '旧版对照 · 原静态 slash', level: '旧版', description: '无蓄势无轨迹，原地红斜线', run: () => runLegacyCounter('h2', 'e5', 145) }
+            ]
+        },
+        {
             title: '🛡️ 格挡三档 & 破盾音效', badge: '5项',
             items: [
                 { name: '格挡一档 · <10% 总HP', level: '格挡T1', description: '挡下 8 伤 (8%) → parry_Weapon_1.wav', run: () => runIncomingHit('e5', 'h2', { outcome: 'block', blockedDmg: 8 }) },
@@ -856,21 +987,11 @@
             ]
         },
         {
-            title: '💨 闪避三档（联动试听台）', badge: '3项',
+            title: '💨 闪避三档（已选定 1B / 2C / 3C）', badge: '3项',
             items: [
                 { name: '闪避一档 · <10% 轻威胁', level: '闪避T1', description: '来袭 8 伤 (8% HP) → 播一档所选音', run: () => runIncomingHit('e4', 'h1', { outcome: 'dodge', incomingDmg: 8 }) },
                 { name: '闪避二档 · 10%~50% 中威胁', level: '闪避T2', description: '来袭 45 伤 (32% HP) → 播二档所选音', run: () => runIncomingHit('e5', 'h3', { outcome: 'dodge', incomingDmg: 45 }) },
                 { name: '闪避三档 · ≥50% 重威胁', level: '闪避T3', description: '来袭 95 伤 (68% HP) → 播三档所选音', run: () => runIncomingHit('e5', 'h4', { outcome: 'dodge', incomingDmg: 95 }) }
-            ]
-        },
-        {
-            title: '⚔️ 普通反击 L1 对照 & 连招', badge: '5项',
-            items: [
-                { name: '旧版对照 · 原静态 slash', level: '旧版', description: '无蓄势无轨迹，原地红斜线 + atk2', run: () => runLegacyCounter('h2', 'e5', 145) },
-                { name: '新版 L1 · 琥珀蓄势突进斩', level: '新L1', description: '110ms 蓄势→残影轨迹→弯月斩 (~380ms)', run: () => runNewCounter('h2', 'e5', 180) },
-                { name: '新版 L1 · 敌方反击 (敌→我)', level: '敌→我', description: '敌方闪避后下行琥珀金突进反击', run: () => runNewCounter('e5', 'h2', 32) },
-                { name: '连招 · 二档闪避 → L1 反击', level: '连招', description: '敌来袭→二档闪避→220ms顺势 L1 反击', run: () => runDodgeCounterCombo('e5', 'h2', 52, 185) },
-                { name: '连招 · 三档险避 → L1 反击', level: '连招', description: '重击来袭→三档险避→220ms顺势 L1 反击', run: () => runDodgeCounterCombo('e4', 'h4', 92, 210) }
             ]
         }
     ];
@@ -924,6 +1045,9 @@
         const list = $('#skill-list');
         list.replaceChildren();
         const BADGE_CLS = {
+            '受击T1': 'border-emerald-400/70 text-emerald-200',
+            '受击T2': 'border-amber-400/80 text-amber-200',
+            '受击T3': 'border-rose-500/85 text-rose-300',
             '格挡T1': 'border-slate-400/70 text-slate-200',
             '格挡T2': 'border-cyan-400/70 text-cyan-200',
             '格挡T3': 'border-amber-400/80 text-amber-200',
