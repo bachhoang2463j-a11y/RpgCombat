@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>格挡/闪避三档音效 &amp; 普通反击 L1 动效 · 统合演练 Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800;900&family=Inter:wght@600;700;800&family=Barlow+Condensed:ital,wght@0,700;0,800;1,700;1,800&family=Chakra+Petch:ital,wght@0,600;0,700;1,700;1,800&family=Noto+Sans+SC:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap');
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    body { font-family: 'Noto Sans SC', sans-serif; user-select: none; }
+    .glass-panel { background: rgba(20, 25, 35, 0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); }
+    .text-outline { text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 1px 2px rgba(0,0,0,0.8); }
+    .mask-fade-y { -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .custom-scrollbar::-webkit-scrollbar { width: 3px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+    .timeline-rail { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: linear-gradient(180deg, rgba(250,204,21,0.85) 0%, rgba(6,182,212,0.65) 25%, rgba(99,102,241,0.45) 60%, rgba(255,255,255,0.05) 100%); box-shadow: 0 0 10px rgba(6,182,212,0.55); pointer-events: none; z-index: 0; }
+    @keyframes rail-pulse { 0% { transform: translateY(-100%); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(800%); opacity: 0; } }
+    .rail-pulse-beam { position: absolute; left: 0; top: 0; width: 2px; height: 40px; background: linear-gradient(180deg, transparent, #38bdf8, #fff); box-shadow: 0 0 12px #38bdf8; animation: rail-pulse 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+    .turn-dot { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; background: #111827; border: 2px solid; position: relative; z-index: 1; flex-shrink: 0; overflow: hidden; }
+    .turn-dot.cur { width: 52px; height: 52px; font-size: 26px; border-color: #facc15 !important; box-shadow: 0 0 20px rgba(250,204,21,0.9); }
+    .breathe { animation: breathe 3.2s ease-in-out infinite; } @keyframes breathe { 50% { transform: translateY(-4px) scale(1.02); } }
+    #chat-bar input { background: rgba(15,23,42,0.7); border: 1px solid rgba(255,255,255,0.12); color: #e2e8f0; }
+    .portrait { background: radial-gradient(ellipse at 50% 30%, #3b3f5c, #14151f 75%); display: flex; align-items: flex-end; justify-content: center; font-size: 64px; overflow: hidden; }
+    .card:disabled { pointer-events: none; opacity: 0.45; filter: grayscale(0.6); }
+
+    /* ===== 可移植特效样式 BEGIN ===== */
+    .arcane-fs-layer { position: fixed; inset: 0; pointer-events: none; z-index: 52; overflow: hidden; }
+    .arcane-fs-anchor { position: absolute; transform: translate(-50%, -50%); }
+    #arcane-fx-canvas { position: fixed; inset: 0; width: 100vw; height: 100dvh; pointer-events: none; z-index: 55; }
+    #arcane-dark { position: fixed; inset: 0; pointer-events: none; z-index: 40; opacity: 0; transition: opacity 0.35s ease; background: radial-gradient(ellipse at 40% 60%, rgba(5,6,20,0.55) 0%, rgba(2,3,10,0.92) 75%); }
+    .arcane-identity-anchor { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; }
+    .arcane-identity-svg-full { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .arcane-identity-glow-slash { filter: drop-shadow(0 0 8px #f87171) drop-shadow(0 0 18px #e11d48); }
+    .arcane-identity-glow-amber { filter: drop-shadow(0 0 8px #fbbf24) drop-shadow(0 0 18px #d97706); }
+    .arcane-identity-ghost { position: fixed; pointer-events: none; will-change: transform, opacity; overflow: hidden; border-radius: 6px; }
+    .arcane-identity-group-hd { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; color: #94a3b8; padding: 4px 6px 2px; border-bottom: 1px solid rgba(148,163,184,0.16); margin-top: 2px; display: flex; justify-content: space-between; align-items: center; }
+    @keyframes arcane-s-light { 25% { transform: translate3d(-3px, 2px, 0); } 60% { transform: translate3d(3px, -2px, 0); } }
+    @keyframes arcane-s-heavy { 15% { transform: translate3d(-8px, 4px, 0); } 35% { transform: translate3d(7px, -5px, 0); } 60% { transform: translate3d(-4px, 3px, 0); } 85% { transform: translate3d(2px, -1px, 0); } }
+    .arcane-shake-light { animation: arcane-s-light 0.18s ease-out; }
+    .arcane-shake-heavy { animation: arcane-s-heavy 0.32s ease-out; }
+    @keyframes arcane-identity-slash-spark { 0% { transform: translate(-50%,-50%) scale(0.25); opacity: 1; } 35% { transform: translate(-50%,-50%) scale(1.15); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.45); opacity: 0; } }
+    @keyframes arcane-counter-charge-ring { 0% { transform: translate(-50%,-50%) scale(1.35) rotate(0deg); opacity: 0; } 35% { opacity: 0.95; } 100% { transform: translate(-50%,-50%) scale(0.32) rotate(54deg); opacity: 0.25; } }
+    @keyframes arcane-counter-slash-bloom { 0% { transform: translate(-50%,-50%) scale(0.45); opacity: 0.9; } 30% { transform: translate(-50%,-50%) scale(1.15); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.45); opacity: 0; } }
+    .arcane-hit-ghost { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #fecaca, #fff1f2); box-shadow: 0 0 6px rgba(254,202,202,0.9); z-index: 0; }
+    .arcane-hit-fill { z-index: 1; transition: none; }
+    @keyframes arcane-hit-fill-blink { 0% { filter: brightness(2.2); } 100% { filter: none; } }
+    .arcane-hit-fill-blink { animation: arcane-hit-fill-blink 0.22s ease-out; }
+    .arcane-hit-num-layer { position: fixed; inset: 0; pointer-events: none; z-index: 62; overflow: hidden; }
+    .arcane-hit-num { position: absolute; transform: translate(-100%, -18%); white-space: nowrap; line-height: 1; will-change: transform, opacity; pointer-events: none; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0,0,0,0.92), 0 3px 10px rgba(0,0,0,0.65); }
+    .arcane-hit-num.l1 { font-family: 'Inter', 'Noto Sans SC', sans-serif; font-weight: 700; font-size: 24px; color: #f1f5f9; letter-spacing: 0.01em; }
+    .arcane-hit-num.l2 { font-family: 'Chakra Petch', 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 700; font-size: 27px; color: #fda4af; letter-spacing: 0.02em; }
+    .arcane-hit-num.l3 { font-family: 'Cinzel', 'Noto Sans SC', serif; font-weight: 800; font-size: 32px; color: #fb7185; letter-spacing: 0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 14px rgba(244,63,94,0.45), 0 4px 12px rgba(0,0,0,0.75); }
+    .arcane-hit-num.counter { font-family: 'Chakra Petch', 'Noto Sans SC', sans-serif; font-style: italic; font-weight: 800; font-size: 26px; color: #fcd34d; text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 12px rgba(245,158,11,0.55); }
+    .arcane-hit-num.shield { font-family: 'Inter', 'Noto Sans SC', sans-serif; font-weight: 700; font-size: 24px; color: #bae6fd; text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(56,189,248,0.35); }
+    .arcane-hit-num.shield.sub { font-size: 17px; color: #93c5fd; opacity: 0.94; }
+    .arcane-hit-num.word { font-family: 'Noto Sans SC', sans-serif; font-weight: 800; font-size: 24px; letter-spacing: 0.08em; }
+    .arcane-hit-num.dodge { font-style: italic; color: #cbd5e1; opacity: 0.95; }
+    .arcane-hit-num.block { color: #e2e8f0; letter-spacing: 0.1em; }
+    .arcane-hit-num.break { font-size: 17px; color: #7dd3fc; letter-spacing: 0.08em; }
+    .arcane-hit-tag { position: absolute; transform: translate(-100%, -50%); font-family: 'Chakra Petch', 'Noto Sans SC', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 0.12em; white-space: nowrap; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,0.95); }
+    .arcane-hit-core { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
+    .arcane-hit-recoil { will-change: translate, rotate; }
+    .dodge-chip.active { background: rgba(6,182,212,0.22); border-color: #22d3ee; color: #cffafe; box-shadow: 0 0 8px rgba(34,211,238,0.35); }
+    /* ===== 可移植特效样式 END ===== */
+  </style>
+</head>
+<body class="text-white">
+  <div id="app" class="fixed inset-0 overflow-hidden">
+    <!-- 顶部控制按钮（复刻主界面） -->
+    <div class="absolute top-2 sm:top-4 right-2 sm:right-4 z-[115] flex gap-1.5 sm:gap-2">
+      <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-violet-400 hover:text-violet-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>📚</span> <span class="hidden sm:inline">世界书</span></button>
+      <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-purple-400 hover:text-purple-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>📜</span> <span class="hidden sm:inline">记录</span></button>
+      <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-blue-400 hover:text-blue-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>🔲</span> <span class="hidden sm:inline">全屏</span></button>
+      <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-indigo-400 hover:text-indigo-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>💬</span> <span class="hidden sm:inline">对话</span></button>
+      <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-yellow-500 hover:text-yellow-400 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>⚙️</span> <span class="hidden sm:inline">设置</span></button>
+      <button id="btn-reset" class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-emerald-400 hover:text-emerald-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>🔄</span> <span class="hidden sm:inline">重置</span></button>
+    </div>
+
+    <!-- 全屏战场区域 -->
+    <div class="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-800 to-emerald-900 overflow-hidden z-0" id="battle-scene">
+      <div class="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+      <div class="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-0"></div>
+      <div class="absolute left-1 sm:left-4 md:left-6 top-16 sm:top-20 bottom-44 sm:bottom-48 w-12 sm:w-14 z-30 flex flex-col items-center select-none">
+        <div class="relative w-full h-full flex flex-col items-center">
+          <div class="timeline-rail"><div class="rail-pulse-beam"></div></div>
+          <div id="turn-order-container" class="relative w-full h-full flex flex-col gap-2 sm:gap-2.5 items-center overflow-y-auto no-scrollbar mask-fade-y py-3"></div>
+        </div>
+      </div>
+      <div id="enemies-container" class="absolute left-2 sm:left-6 right-2 sm:right-6 top-[10%] bottom-[190px] sm:bottom-[220px] z-10 flex flex-col items-center justify-start gap-6 overflow-visible pointer-events-none"></div>
+    </div>
+
+    <!-- 悬浮 UI 层 -->
+    <div class="absolute bottom-[52px] left-0 w-full p-1.5 sm:p-6 flex flex-col-reverse sm:flex-row items-end justify-between gap-1.5 sm:gap-4 z-20 pointer-events-none pb-2 sm:pb-6">
+      <div id="heroes-container" class="w-full sm:flex-1 grid grid-cols-4 gap-1 sm:gap-4 max-w-2xl pointer-events-auto relative"></div>
+      <div class="relative self-end flex flex-col items-end gap-1.5 pointer-events-auto">
+        <!-- 闪避三档候选试听面板（可收折） -->
+        <div id="dodge-audition-drawer" class="w-[290px] bg-slate-950/92 backdrop-blur-xl rounded-xl border border-cyan-500/35 px-2.5 py-2 shadow-[0_12px_30px_rgba(0,0,0,0.85)]">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-1 mb-1.5">
+            <span class="text-[10px] font-bold text-cyan-300">🎧 闪避三档候选试听（点即播+选用）</span>
+            <span id="audition-now-playing" class="text-[9px] font-mono text-slate-400 truncate max-w-[100px]">Mixkit 免版权</span>
+          </div>
+          <div id="dodge-audition-rows" class="flex flex-col gap-1.5"></div>
+        </div>
+        <div id="menu-container" class="w-[290px] h-[196px] bg-slate-950/95 backdrop-blur-xl rounded-xl border border-slate-700/80 border-t-2 border-t-amber-500/80 flex flex-col overflow-hidden relative shadow-[0_15px_35px_rgba(0,0,0,0.9)] self-end mb-1 sm:mb-0">
+          <div class="px-2.5 py-1 bg-gradient-to-r from-amber-950/50 via-slate-900/90 to-slate-950 border-b border-amber-900/40 flex justify-between items-center shrink-0">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
+              <span class="text-xs font-bold text-amber-200 truncate">格挡·闪避·反击</span>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <span id="asset-status-pill" class="text-[9px] font-mono px-1 rounded border border-slate-600/70 text-slate-300" title="本地资源服务器连接状态">检测中</span>
+              <button id="btn-toggle-audition" class="text-[9px] font-bold px-1.5 rounded border border-cyan-500/60 text-cyan-300 hover:bg-white/10 transition-all shrink-0" aria-expanded="true">🎧 试听台</button>
+              <button id="btn-identity-sfx" class="text-[9px] font-bold px-1.5 rounded border border-emerald-500/60 text-emerald-300 hover:bg-white/10 transition-all shrink-0" aria-pressed="true">🔊</button>
+            </div>
+          </div>
+          <div id="skill-list" class="flex-1 flex flex-col gap-1 p-1 overflow-y-auto custom-scrollbar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部对话栏（复刻主界面，仅装饰） -->
+    <div id="chat-bar" class="absolute bottom-0 left-0 right-0 h-[52px] z-30 flex items-center gap-2 px-2 sm:px-3 bg-black/60 border-t border-white/5">
+      <div class="w-9 h-9 rounded-full bg-slate-700 border border-white/20 shrink-0 flex items-center justify-center">🕵️</div>
+      <input type="text" placeholder="说点什么... (Enter发送)" class="flex-1 h-9 rounded-full px-4 text-sm outline-none">
+      <span class="px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/60 text-emerald-300 bg-emerald-950/50">友方旁白 ON</span>
+      <span class="px-3 py-1 rounded-full text-xs font-bold border border-rose-500/60 text-rose-300 bg-rose-950/50">敌方旁白 ON</span>
+      <div class="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center shrink-0">➤</div>
+    </div>
+  </div>
+  <script>
+    const $ = s => document.querySelector(s);
+    let combatToken = 0;
+    let heroesData = [], enemiesData = [];
+    const HERO_AVATARS = {
+        '埃利奥特': 'https://imgur.la/images/2026/06/25/31a4dd84a831e3f76082542bf12fcf19.png',
+        '弗兰克': 'https://imgur.la/images/2026/06/25/26f001dbe399876cd74978bbe12a265b.png',
+        '玛德琳': 'https://imgur.la/images/2026/06/25/585bf7f2f1559168b419b8be56da36a6.png',
+        '索恩': 'https://imgur.la/images/2026/08/13/77fcdf0fd006c4ff1ccae30774322270.png'
+    };
+    const HERO_DATA = [
+        ['h1', '埃利奥特', '👨', 100, 35, 110, 15],
+        ['h2', '弗兰克', '🧔', 180, 0, 17, 25],
+        ['h3', '玛德琳', '👩', 140, 20, 14, 10],
+        ['h4', '索恩', '🕵️', 140, 0, 20, 40]
+    ];
+    const ENEMY_ROWS = [[['e1', '🐟'], ['e2', '❄️'], ['e3', '🐟']], [['e4', '👻'], ['e5', '🐺'], ['e6', '🌀']]];
+
+    function createCompactBarHTML(id, type, label, val, max, colorClass, isTp = false, shield = 0) {
+        const pct = Math.max(0, Math.min(100, (val / max) * 100));
+        const barWidthClass = isTp ? 'w-1/3' : 'w-full';
+        const shieldText = shield > 0 && type === 'hp' ? `<span class="text-slate-300 ml-0.5 text-[7px] sm:text-[9px]">(盾${shield})</span>` : '';
+        let finalColor = colorClass; let extraClass = '';
+        if (isTp && val >= max) { finalColor = 'bg-amber-400'; extraClass = 'shadow-[0_0_10px_rgba(251,191,36,0.8)] animate-pulse'; }
+        return `<div class="relative pt-1.5 sm:pt-2.5 mb-0 sm:mb-[2px]"><span id="${id}-${type}-text" class="absolute right-0 top-0 text-[8px] sm:text-xs font-mono font-bold text-white leading-none text-outline z-10 whitespace-nowrap">${Math.floor(val)}${shieldText}</span><div class="flex items-center gap-1 sm:gap-1.5"><span class="text-[7px] sm:text-[10px] font-bold text-gray-200 leading-none text-outline w-3 sm:w-4">${label}</span><div class="arcane-hit-track flex-grow h-1 sm:h-1.5 bg-[#222] rounded-[1px] overflow-hidden border border-[#111] relative">${type === 'hp' ? `<div id="${id}-hp-ghost" class="arcane-hit-ghost" style="width: ${pct}%"></div>` : ''}<div id="${id}-${type}-bar" class="${barWidthClass} h-full ${finalColor} ${extraClass} relative ${type === 'hp' ? 'arcane-hit-fill' : 'transition-all duration-300 ease-out'}" style="width: ${pct}%"></div></div></div></div>`;
+    }
+
+    function getEntitySpriteDom(entityOrId) {
+        const id = entityOrId && typeof entityOrId === 'object' ? entityOrId.id : String(entityOrId || '');
+        if (!id) return null;
+        return document.getElementById(`hero-card-${id}`) || document.getElementById(`${id}-sprite`) || document.getElementById(`hero-wrap-${id}`) || null;
+    }
+    window.getEntitySpriteDom = getEntitySpriteDom;
+
+    const entityOf = id => [...heroesData, ...enemiesData].find(e => e.id === id);
+    const enemyPct = id => { const e = entityOf(id); return e ? Math.max(0, Math.min(100, e.hp / e.maxHp * 100)) : 100; };
+    const enemyLabel = id => { const e = entityOf(id); return e ? (Math.floor(e.hp) + '/' + e.maxHp + (e.shield > 0 ? ' 盾' + e.shield : '')) : ''; };
+
+    function initUI(init = {}) {
+        heroesData = HERO_DATA.map(([id, name, face, hp, shield, mp, tp]) => Object.assign({ id, name, face, img: HERO_AVATARS[name] || '', hp, maxHp: hp, shield, mp, maxMp: mp, tp, maxTp: 100, isAlive: true, buffs: [] }, init[id]));
+        enemiesData = ENEMY_ROWS.flat().map(([id, face]) => Object.assign({ id, name: id, face, hp: 1000, maxHp: 1000, shield: 0, isAlive: true, buffs: [] }, init[id]));
+        $('#heroes-container').innerHTML = heroesData.map(({ id, name, face, img, hp, maxHp, shield, mp, maxMp, tp, maxTp }) => `
+          <div class="hero relative transition-all duration-300 min-w-[70px] z-20" id="hero-wrap-${id}">
+            <div id="hero-card-${id}" class="fx-body hero-card-inner bg-[#18181b] rounded overflow-hidden relative border shadow-2xl transition-all border-gray-800">
+              <div id="${id}-buffs" class="absolute top-1 right-1 flex flex-col gap-1 items-end z-20 pointer-events-none"></div>
+              <div class="w-full h-12 sm:h-auto sm:aspect-[4/3] relative bg-gray-900 border-b border-gray-700">
+                <div class="absolute top-0 left-0 w-full bg-gradient-to-b from-black/80 to-transparent px-1.5 py-1 text-[9px] sm:text-xs font-bold text-white z-10 flex justify-between"><span>${name}</span></div>
+                <div class="portrait w-full h-full">${img ? `<img src="${img}" alt="${name}" class="w-full h-full object-cover" onerror="this.style.display='none';this.nextElementSibling&&this.nextElementSibling.classList.remove('hidden')"><span class="hidden leading-none">${face}</span>` : face}</div>
+              </div>
+              <div class="px-1 py-1 sm:px-2 sm:py-1.5 flex flex-col gap-[1px] sm:gap-0.5">${createCompactBarHTML(id, 'hp', 'HP', hp, maxHp, 'bg-yellow-400', false, shield)}${createCompactBarHTML(id, 'mp', 'MP', mp, maxMp, 'bg-cyan-400')}${createCompactBarHTML(id, 'tp', 'TP', tp, maxTp, 'bg-green-500', true)}</div>
+            </div>
+          </div>`).join('');
+        $('#enemies-container').innerHTML = ENEMY_ROWS.map((row, ri) => `<div class="flex items-end justify-center" style="gap:${ri ? 26 : 22}px; ${ri ? 'margin-top:18px' : ''}">${row.map(([id, em]) => `
+          <div class="flex flex-col items-center group relative shrink-0" id="enemy-box-${id}" style="transform:scale(${ri ? 1 : 0.72}); ${ri ? '' : 'filter:brightness(0.82) saturate(0.92)'}">
+            <div id="${id}-sprite" class="fx-body enemy-sprite text-7xl sm:text-8xl drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] breathe mt-2 sm:mt-4 flex justify-center items-center">${em}</div>
+            <div class="arcane-hit-track w-10 sm:w-16 h-1 sm:h-1.5 bg-black/50 mt-2 sm:mt-4 rounded-full overflow-hidden relative"><div id="${id}-hp-ghost" class="arcane-hit-ghost" style="width:${enemyPct(id)}%"></div><div id="${id}-hp-bar" class="arcane-hit-fill h-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)] relative" style="width:${enemyPct(id)}%"></div></div>
+            <div id="${id}-hp-text" class="mt-0.5 text-[9px] sm:text-[10px] font-mono font-bold text-white/80 text-outline leading-none">${enemyLabel(id)}</div>
+          </div>`).join('')}</div>`).join('');
+        const TURN_ITEMS = [{ e: '👨', name: '埃利奥特', hero: true }, { e: '🐺', name: 'e5', hero: false }, { e: '🧔', name: '弗兰克', hero: true }, { e: '👩', name: '玛德琳', hero: true }, { e: '🕵️', name: '索恩', hero: true }, { e: '👻', name: 'e4', hero: false }];
+        $('#turn-order-container').innerHTML = TURN_ITEMS.map((it, i) => {
+            const av = it.hero && HERO_AVATARS[it.name];
+            return `<div class="turn-dot ${i ? '' : 'cur'}" style="border-color:${it.hero ? '#06b6d4' : '#e11d48'}">${av ? `<img src="${av}" alt="${it.name}" class="w-full h-full object-cover rounded-full" onerror="this.style.display='none';this.nextElementSibling&&this.nextElementSibling.classList.remove('hidden')"><span class="hidden">${it.e}</span>` : it.e}</div>`;
+        }).join('');
+    }
+    initUI();
+    // ===== 音频资源与三档格挡/闪避配置 =====
+    let ASSET_BASE = window.__RPG_ASSET_BASE__ || 'http://127.0.0.1:8766';
+    const ASSET_CANDIDATE_BASES = [window.__RPG_ASSET_BASE__, 'http://127.0.0.1:8766', 'http://192.168.110.83:8766'].filter(Boolean);
+    const PARRY_KEYS = {
+        1: 'parry_Weapon_1.wav',
+        2: 'parry_Weapon_3.wav',
+        3: 'parry_Weapon_GuardBreak.wav'
+    };
+    const DODGE_CANDIDATES = {
+        1: [
+            { id: 't1_a', label: 'A 轻掠', name: 'Quick swoosh accent', file: 'dodge_candidates/dodge_t1_a_quick_swoosh.mp3', src: 'Mixkit #1464' },
+            { id: 't1_b', label: 'B 轻风', name: 'Short wind swoosh', file: 'dodge_candidates/dodge_t1_b_short_wind.mp3', src: 'Mixkit #1461' },
+            { id: 't1_c', label: 'C 滑步', name: 'Fast small sweep', file: 'dodge_candidates/dodge_t1_c_fast_small_sweep.mp3', src: 'Mixkit #166' }
+        ],
+        2: [
+            { id: 't2_a', label: 'A 疾闪', name: 'Fast whoosh transition', file: 'dodge_candidates/dodge_t2_a_fast_whoosh.mp3', src: 'Mixkit #1490' },
+            { id: 't2_b', label: 'B 瞬掠', name: 'Flying fast swoosh', file: 'dodge_candidates/dodge_t2_b_flying_fast.mp3', src: 'Mixkit #1469' },
+            { id: 't2_c', label: 'C 切风', name: 'Dagger woosh', file: 'dodge_candidates/dodge_t2_c_dagger_woosh.mp3', src: 'Mixkit #1487' }
+        ],
+        3: [
+            { id: 't3_a', label: 'A 重压', name: 'Cinematic whoosh fast', file: 'dodge_candidates/dodge_t3_a_cinematic_fast.mp3', src: 'Mixkit #1492' },
+            { id: 't3_b', label: 'B 真空', name: 'Vacuum swoosh', file: 'dodge_candidates/dodge_t3_b_vacuum_swoosh.mp3', src: 'Mixkit #1465' },
+            { id: 't3_c', label: 'C 狂风', name: 'Cinematic wind swoosh', file: 'dodge_candidates/dodge_t3_c_cinematic_wind.mp3', src: 'Mixkit #1468' }
+        ]
+    };
+    const selectedDodge = { 1: 0, 2: 0, 3: 0 };
+    const _blobCache = new Map();
+    const _audioTagCache = new Map();
+    let identitySfxOn = true;
+
+    async function probeAndWarmAssets() {
+        const pill = document.getElementById('asset-status-pill');
+        let okBase = null;
+        for (const base of ASSET_CANDIDATE_BASES) {
+            try {
+                const res = await fetch(`${base}/parry_Weapon_1.wav`, { method: 'HEAD' });
+                if (res.ok) { okBase = base; break; }
+            } catch {}
+        }
+        if (okBase) {
+            ASSET_BASE = okBase;
+            if (pill) { pill.textContent = '8766已连'; pill.className = 'text-[9px] font-mono px-1 rounded border border-emerald-500/60 text-emerald-300'; }
+        } else {
+            if (pill) { pill.textContent = '8766未连'; pill.className = 'text-[9px] font-mono px-1 rounded border border-rose-500/60 text-rose-300'; pill.title = '请先运行 D:\\Project\\my_assets\\启动my_assets服务器.bat'; }
+        }
+        const files = [
+            PARRY_KEYS[1], PARRY_KEYS[2], PARRY_KEYS[3], 'atk2.mp3',
+            ...Object.values(DODGE_CANDIDATES).flat().map(c => c.file)
+        ];
+        files.forEach(rel => {
+            const url = `${ASSET_BASE}/${rel}`;
+            if (_blobCache.has(url)) return;
+            _blobCache.set(url, null);
+            fetch(url).then(r => r.ok ? r.blob() : null).then(blob => {
+                if (blob) _blobCache.set(url, URL.createObjectURL(blob));
+                else _blobCache.delete(url);
+            }).catch(() => _blobCache.delete(url));
+        });
+    }
+
+    function playAssetFile(relPath, volume = 0.85, rate = 1) {
+        if (!identitySfxOn || !relPath) return;
+        const url = `${ASSET_BASE}/${relPath}`;
+        const blobUrl = _blobCache.get(url);
+        const cached = _audioTagCache.get(url);
+        const audio = blobUrl ? new Audio(blobUrl) : cached ? cached.cloneNode() : new Audio(url);
+        if (!blobUrl && !cached) { audio.preload = 'auto'; _audioTagCache.set(url, audio); }
+        audio.volume = Math.max(0, Math.min(1, volume));
+        if (rate && rate !== 1) audio.playbackRate = rate;
+        audio.play().catch(e => console.warn('[Audio] 播放失败:', url, e));
+    }
+
+    function playDodgeTierAudio(tier) {
+        const list = DODGE_CANDIDATES[tier] || DODGE_CANDIDATES[1];
+        const idx = selectedDodge[tier] || 0;
+        const cand = list[idx] || list[0];
+        const stat = document.getElementById('audition-now-playing');
+        if (stat) stat.textContent = `T${tier} ${cand.label}`;
+        playAssetFile(cand.file, tier === 3 ? 0.92 : 0.82);
+    }
+
+    function playParryTierAudio(tier) {
+        const file = PARRY_KEYS[tier] || PARRY_KEYS[1];
+        playAssetFile(file, tier === 3 ? 0.95 : 0.85);
+    }
+
+    probeAndWarmAssets();
+    class CanvasFxEngine {
+        constructor() {
+            this.canvas = document.getElementById('fx-canvas');
+            if (!this.canvas) {
+                this.canvas = document.createElement('canvas');
+                this.canvas.id = 'fx-canvas';
+                this.canvas.className = 'fixed inset-0 pointer-events-none z-[99]';
+                document.body.appendChild(this.canvas);
+            }
+            this.ctx = this.canvas.getContext('2d');
+            this.particles = [];
+            this.animationFrameId = null;
+            this.hitStop = 0;
+            this.lastFrameTime = 0;
+            this.resize();
+            window.addEventListener('resize', () => this.resize());
+        }
+        resize() {
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            this.canvas.width = Math.floor(window.innerWidth * dpr);
+            this.canvas.height = Math.floor(window.innerHeight * dpr);
+            this.canvas.style.width = window.innerWidth + 'px';
+            this.canvas.style.height = window.innerHeight + 'px';
+            this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+        startLoop() {
+            if (this.animationFrameId) return;
+            this.lastFrameTime = performance.now();
+            const loop = now => {
+                const dt = Math.min(now - this.lastFrameTime, 33);
+                this.lastFrameTime = now;
+                if (this.hitStop > 0) {
+                    this.hitStop = Math.max(0, this.hitStop - dt);
+                    this.animationFrameId = requestAnimationFrame(loop);
+                    return;
+                }
+                const ctx = this.ctx;
+                ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+                const k = dt / 16.667;
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    if (typeof p.update === 'function') {
+                        if (p.update(dt) === false) this.particles.splice(i, 1);
+                        continue;
+                    }
+                    p.x += (p.vx || 0) * k;
+                    p.y += (p.vy || 0) * k;
+                    if (p.grav) p.vy += p.grav * k;
+                    if (p.drag) { const d = Math.pow(p.drag, k); p.vx *= d; p.vy *= d; }
+                    p.life = (p.life ?? 1) - (p.decay || 0.03) * k;
+                    if (p.life <= 0) { this.particles.splice(i, 1); continue; }
+                    ctx.save();
+                    ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
+                    ctx.globalCompositeOperation = p.blend || 'lighter';
+                    ctx.fillStyle = p.color || '#fff';
+                    ctx.strokeStyle = p.color || '#fff';
+                    if (p.shape === 'streak') {
+                        ctx.lineWidth = Math.max(1, p.size || 2);
+                        ctx.lineCap = 'round';
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(p.x - (p.vx || 0) * 2.2, p.y - (p.vy || 0) * 2.2);
+                        ctx.stroke();
+                    } else if (p.shape === 'ring') {
+                        const r = (1 - p.life) * (p.maxR || 46) * (p.size || 1);
+                        ctx.lineWidth = 2.2 * p.life;
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, Math.max(2, r), 0, Math.PI * 2);
+                        ctx.stroke();
+                    } else {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, Math.max(0.8, (p.size || 2.5) * p.life), 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.restore();
+                }
+                if (this.particles.length > 0) this.animationFrameId = requestAnimationFrame(loop);
+                else this.animationFrameId = null;
+            };
+            this.animationFrameId = requestAnimationFrame(loop);
+        }
+    }
+    const fxEngine = new CanvasFxEngine();
+    const arcaneVfxModule = (() => {
+        const S = { uid: 0, timers: new Set(), layers: new Set(), particles: [], driver: null, canvas: null, ctx: null, handles: new Set() };
+        const rnd = (a, b) => a + Math.random() * (b - a);
+        const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+        const after = (ms, fn) => { const id = setTimeout(() => { S.timers.delete(id); fn(); }, ms); S.timers.add(id); return id; };
+        const domOf = e => getEntitySpriteDom(e);
+        function entityVisualRect(e) {
+            const dom = domOf(e); if (!dom) return null;
+            const r = dom.getBoundingClientRect();
+            return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height, x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height };
+        }
+        function fsLayer(html, ms = 900) {
+            const el = document.createElement('div');
+            el.className = 'arcane-fs-layer';
+            el.innerHTML = html;
+            document.body.appendChild(el);
+            S.layers.add(el);
+            if (ms > 0) after(ms, () => { el.remove(); S.layers.delete(el); });
+            return el;
+        }
+        function shake(level = 'light') {
+            const sc = document.getElementById('battle-scene'); if (!sc) return;
+            const cls = level === 'heavy' ? 'arcane-shake-heavy' : 'arcane-shake-light';
+            sc.classList.remove('arcane-shake-light', 'arcane-shake-heavy');
+            void sc.offsetWidth;
+            sc.classList.add(cls);
+            after(level === 'heavy' ? 340 : 200, () => sc.classList.remove(cls));
+        }
+        function ensureArcaneParticles() {
+            if (!S.driver) {
+                S.driver = {
+                    update: dt => {
+                        const ctx = fxEngine.ctx;
+                        const k = dt / 16.667;
+                        for (let i = S.particles.length - 1; i >= 0; i--) {
+                            const p = S.particles[i];
+                            p.x += (p.vx || 0) * k; p.y += (p.vy || 0) * k;
+                            if (p.grav) p.vy += p.grav * k;
+                            if (p.drag) { const d = Math.pow(p.drag, k); p.vx *= d; p.vy *= d; }
+                            p.life = (p.life ?? 1) - (p.decay || 0.04) * k;
+                            if (p.life <= 0) { S.particles.splice(i, 1); continue; }
+                            ctx.save();
+                            ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
+                            ctx.globalCompositeOperation = p.blend || 'lighter';
+                            ctx.fillStyle = p.color || '#fff';
+                            ctx.strokeStyle = p.color || '#fff';
+                            if (p.shape === 'streak') {
+                                ctx.lineWidth = Math.max(1, p.size || 2);
+                                ctx.lineCap = 'round';
+                                ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - (p.vx || 0) * 2.1, p.y - (p.vy || 0) * 2.1); ctx.stroke();
+                            } else if (p.shape === 'ring') {
+                                ctx.lineWidth = 2 * p.life;
+                                ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(2, (1 - p.life) * 44 * (p.size || 1)), 0, Math.PI * 2); ctx.stroke();
+                            } else if (p.shape === 'smoke') {
+                                ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(2, (p.size || 14) * (1.25 - p.life * 0.4)), 0, Math.PI * 2); ctx.fill();
+                            } else if (p.shape === 'shard') {
+                                ctx.translate(p.x, p.y); ctx.rotate((1 - p.life) * 5);
+                                const sz = p.size || 5; ctx.fillRect(-sz / 2, -sz / 3, sz, sz * 0.65);
+                            } else {
+                                ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(0.8, (p.size || 2) * p.life), 0, Math.PI * 2); ctx.fill();
+                            }
+                            ctx.restore();
+                        }
+                        if (S.particles.length === 0) { S.driver = null; return false; }
+                        return true;
+                    }
+                };
+                fxEngine.particles.push(S.driver);
+                fxEngine.startLoop();
+            }
+        }
+        function addP(p) { S.particles.push(p); ensureArcaneParticles(); }
+        function burst(n, mk) { for (let i = 0; i < n; i++) addP(mk(i)); }
+
+        // 轻量 Web Audio 辅助（仅用于非格挡/非闪避的常规命中兜底 & 反击蓄力微鸣）
+        let audioCtx = null;
+        function ensureAudio() {
+            if (!identitySfxOn) return null;
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            return audioCtx;
+        }
+        function synthTone(delaySec, { type = 'sine', f0 = 600, f1 = 900, dur = 0.12, vol = 0.12 } = {}) {
+            const ctx = ensureAudio(); if (!ctx) return;
+            const t = ctx.currentTime + delaySec;
+            const osc = ctx.createOscillator(), g = ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(f0, t);
+            osc.frequency.exponentialRampToValueAtTime(Math.max(40, f1), t + dur);
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.linearRampToValueAtTime(vol, t + Math.min(0.02, dur * 0.3));
+            g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+            osc.connect(g); g.connect(ctx.destination);
+            osc.start(t); osc.stop(t + dur + 0.02);
+        }
+
+        // ===== 命中结果反馈（格挡三档 / 破盾强制最大档 / 闪避三档） =====
+        const HIT_HOLD_MS = 450, HIT_COLLAPSE_MS = 500, HIT_LIFE_MS = 1280;
+        const H = { ghosts: new Map(), stacks: new Map(), handles: new Set() };
+        const T = 'translate(-50%,-50%) ', TN = 'translate(-100%,-18%) ', TT = 'translate(-100%,-50%) ';
+        const NUM_KF = {
+            1: [{ transform: TN + 'translateY(4px) scale(0.92)', opacity: 0 }, { transform: TN + 'translateY(-3px) scale(1)', opacity: 1, offset: 0.16 }, { transform: TN + 'translateY(-6px) scale(1)', opacity: 1, offset: 0.72 }, { transform: TN + 'translateY(-14px) scale(0.96)', opacity: 0 }],
+            2: [{ transform: TN + 'translateY(6px) scale(0.84)', opacity: 0 }, { transform: TN + 'translateY(-4px) scale(1.10)', opacity: 1, offset: 0.14 }, { transform: TN + 'translateY(-8px) scale(1)', opacity: 1, offset: 0.76 }, { transform: TN + 'translateY(-18px) scale(0.96)', opacity: 0 }],
+            3: [{ transform: TN + 'scale(1.26)', opacity: 0 }, { transform: TN + 'translateY(-3px) scale(1.03)', opacity: 1, offset: 0.24 }, { transform: TN + 'translateY(-5px) scale(1)', opacity: 1, offset: 0.78 }, { transform: TN + 'translateY(-16px) scale(0.97)', opacity: 0 }],
+            counter: [{ transform: TN + 'translateY(6px) scale(0.85)', opacity: 0 }, { transform: TN + 'translateY(-4px) scale(1.14)', opacity: 1, offset: 0.16 }, { transform: TN + 'translateY(-8px) scale(1)', opacity: 1, offset: 0.74 }, { transform: TN + 'translateY(-18px) scale(0.95)', opacity: 0 }],
+            shield: [{ transform: TN + 'scale(0.9)', opacity: 0 }, { transform: TN + 'translateY(-3px) scale(1)', opacity: 1, offset: 0.16 }, { transform: TN + 'translateY(-6px) scale(1)', opacity: 1, offset: 0.72 }, { transform: TN + 'translateY(-14px)', opacity: 0 }],
+            block: [{ transform: TN + 'scale(1.14)', opacity: 0 }, { transform: TN + 'scale(1)', opacity: 1, offset: 0.14 }, { transform: TN + 'scale(1)', opacity: 1, offset: 0.7 }, { transform: TN + 'translateY(-8px)', opacity: 0 }],
+            dodge: [{ transform: TN + 'translateX(-10px)', opacity: 0 }, { transform: TN + 'translateX(3px)', opacity: 1, offset: 0.18 }, { transform: TN + 'translateX(8px)', opacity: 1, offset: 0.7 }, { transform: TN + 'translate(18px,-6px)', opacity: 0 }],
+            tag: [{ transform: TT + 'translateX(-6px) scale(0.88)', opacity: 0 }, { transform: TT + 'translateX(0) scale(1)', opacity: 1, offset: 0.15 }, { transform: TT + 'translateY(-10px)', opacity: 0 }]
+        };
+        const NUM_MS = { 1: 1000, 2: 1000, 3: 1200, counter: 1050, shield: 1000, block: 1000, dodge: 1000, tag: 1050 };
+
+        function classifyHit(r) {
+            const hpDmg = Math.max(0, r.hpDmg || 0), shieldDmg = Math.max(0, r.shieldDmg || 0);
+            const incomingDmg = Math.max(0, r.blockedDmg ?? r.incomingDmg ?? 0);
+            let kind;
+            if (r.outcome === 'dodge') kind = 'dodge';
+            else if (r.outcome === 'block' || (hpDmg === 0 && shieldDmg === 0)) kind = 'block';
+            else if (hpDmg > 0) kind = 'hp';
+            else kind = 'shield';
+            const ratio = r.maxHp > 0 ? hpDmg / r.maxHp : 0;
+            const tier = kind !== 'hp' ? 0 : ratio < 0.10 ? 1 : ratio < 0.50 ? 2 : 3;
+            const inRatio = r.maxHp > 0 ? incomingDmg / r.maxHp : 0;
+            const blockTier = r.blockTier || (inRatio < 0.10 ? 1 : inRatio < 0.50 ? 2 : 3);
+            const dodgeTier = r.dodgeTier || (inRatio < 0.10 ? 1 : inRatio < 0.50 ? 2 : 3);
+            const shieldBroken = shieldDmg > 0 && (r.shieldBefore || 0) > 0 && (r.shieldAfter || 0) === 0;
+            return { kind, tier, blockTier, dodgeTier, incomingDmg, hpDmg, shieldDmg, shieldBroken, isCounter: !!r.isCounter };
+        }
+
+        function hitBar(id, hpBefore, hpAfter, maxHp) {
+            const fill = document.getElementById(id + '-hp-bar'), ghost = document.getElementById(id + '-hp-ghost');
+            if (!fill) return;
+            const pct = v => Math.max(0, Math.min(100, v / maxHp * 100));
+            fill.style.width = pct(hpAfter) + '%';
+            fill.classList.remove('arcane-hit-fill-blink'); void fill.offsetWidth; fill.classList.add('arcane-hit-fill-blink');
+            if (!ghost) return;
+            const st = H.ghosts.get(id);
+            if (st) clearTimeout(st.timer);
+            ghost.style.transition = 'none';
+            ghost.style.width = Math.max(pct(hpAfter), pct(hpBefore)) + '%';
+            const next = { el: ghost, timer: after(HIT_HOLD_MS, () => {
+                ghost.style.transition = `width ${HIT_COLLAPSE_MS}ms cubic-bezier(0.22,1,0.36,1)`;
+                ghost.style.width = pct(hpAfter) + '%';
+                next.timer = after(HIT_COLLAPSE_MS + 40, () => H.ghosts.delete(id));
+            }) };
+            H.ghosts.set(id, next);
+        }
+
+        function hitAudio(list) {
+            if (!identitySfxOn || !list.length) return;
+            const anyBreak = list.some(h => h.shieldBroken);
+            // 破盾瞬间无论多少伤害均播最大档 (GuardBreak)
+            if (anyBreak) {
+                playParryTierAudio(3);
+                return;
+            }
+            const top = list[0];
+            if (top.kind === 'block') { playParryTierAudio(top.blockTier); return; }
+            if (top.kind === 'dodge') { playDodgeTierAudio(top.dodgeTier); return; }
+            if (top.kind === 'shield') { synthTone(0, { type: 'triangle', f0: 1500, f1: 1050, dur: 0.14, vol: 0.14 }); return; }
+            if (top.isCounter) { playAssetFile('atk2.mp3', 0.9); return; }
+            if (top.kind === 'hp') { synthTone(0, { type: 'sine', f0: 190, f1: 55, dur: 0.18, vol: 0.25 }); }
+        }
+
+        function playHitFeedback(results, opts = {}) {
+            const list = (Array.isArray(results) ? results : [results]).filter(Boolean);
+            const anims = [], layer = document.createElement('div');
+            layer.className = 'arcane-hit-num-layer';
+            document.body.appendChild(layer); S.layers.add(layer);
+            const hs = list.map(classifyHit);
+            list.forEach((r, i) => {
+                if (hs[i].hpDmg > 0) hitBar(r.targetId, r.hpBefore, r.hpAfter, r.maxHp);
+                const dom = domOf(r.targetId); if (!dom) return;
+                const vr = entityVisualRect(dom); if (!vr) return;
+                const isHero = String(r.targetId).startsWith('h');
+                const px = vr.left + vr.w * 0.88, py = vr.top + vr.h * 0.28, cy = vr.top + vr.h * 0.45;
+                const h = hs[i];
+                if (h.kind === 'dodge') {
+                    const g = document.createElement('div');
+                    g.style.cssText = `position:absolute;left:${vr.left}px;top:${vr.top}px;width:${vr.w}px;height:${vr.h}px;opacity:0.45;filter:grayscale(1) brightness(1.5);overflow:hidden;border-radius:6px;`;
+                    g.innerHTML = dom.innerHTML.replace(/ id="[^"]*"/g, '');
+                    layer.appendChild(g);
+                    anims.push(g.animate([{ opacity: 0.45, transform: 'none' }, { opacity: 0, transform: 'scale(1.06)' }], { duration: 380, easing: 'ease-out', fill: 'forwards' }));
+                    burst(8, () => ({ x: vr.x + rnd(-18, 18), y: vr.bottom - 10, vx: rnd(-1.2, 1.2), vy: rnd(-0.8, -0.2), drag: 0.96, decay: 0.03, size: rnd(10, 17), shape: 'smoke', blend: 'source-over', color: 'rgba(148,163,184,0.35)' }));
+                    const dx = (Math.random() < 0.5 ? -1 : 1) * 28;
+                    dom.animate([{ translate: '0 0' }, { translate: dx + 'px 0', offset: 0.22 }, { translate: dx + 'px 0', offset: 0.54 }, { translate: '0 0' }], { duration: 460, easing: 'cubic-bezier(0.2,0.7,0.3,1)' });
+                    const el = document.createElement('div'); el.className = 'arcane-hit-num word dodge'; el.textContent = `闪避 T${h.dodgeTier}`; el.style.cssText = `left:${px}px;top:${py}px;`; layer.appendChild(el);
+                    anims.push(el.animate(NUM_KF.dodge, { duration: NUM_MS.dodge, easing: 'ease-out', fill: 'forwards' }));
+                    return;
+                }
+                if (h.kind === 'block') {
+                    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    svg.setAttribute('class', 'arcane-hit-core'); svg.setAttribute('viewBox', '0 0 100 100');
+                    const sz = h.blockTier === 3 ? 96 : h.blockTier === 2 ? 78 : 62;
+                    svg.style.cssText = `left:${vr.x}px;top:${cy}px;width:${sz}px;height:${sz}px;`;
+                    const col = h.blockTier === 3 ? '#fbbf24' : h.blockTier === 2 ? '#e2e8f0' : '#cbd5e1';
+                    svg.innerHTML = `<g stroke="#fff" stroke-width="3.2" stroke-linecap="round"><path d="M50 12V35M50 65V88M12 50H35M65 50H88"/></g><g stroke="${col}" stroke-width="2.2" stroke-linecap="round"><path d="M24 24L38 38M62 62L76 76M76 24L62 38M24 76L38 62"/></g>`;
+                    layer.appendChild(svg);
+                    anims.push(svg.animate([{ transform: T + 'scale(0.45) rotate(0deg)', opacity: 1 }, { transform: T + 'scale(1.18) rotate(28deg)', opacity: 0 }], { duration: 280, easing: 'ease-out', fill: 'forwards' }));
+                    burst(h.blockTier === 3 ? 14 : 8, () => { const a = rnd(0, 6.283), s = rnd(3, 6.8); return { x: vr.x, y: cy, vx: Math.cos(a) * s, vy: Math.sin(a) * s, drag: 0.86, decay: 0.08, size: h.blockTier === 3 ? 2.2 : 1.7, shape: 'streak', color: col }; });
+                    dom.animate([{ translate: '0 0' }, { translate: `0 ${(isHero ? 1 : -1) * (h.blockTier * 2 + 1)}px`, offset: 0.2 }, { translate: '0 0' }], { duration: 170 });
+                    const el = document.createElement('div'); el.className = 'arcane-hit-num word block'; el.textContent = `格挡 T${h.blockTier}`; el.style.cssText = `left:${px}px;top:${py}px;`; layer.appendChild(el);
+                    anims.push(el.animate(NUM_KF.block, { duration: NUM_MS.block, easing: 'ease-out', fill: 'forwards' }));
+                    return;
+                }
+                if (h.shieldDmg > 0) {
+                    const sw = Math.max(74, vr.w * 1.08), svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    svg.setAttribute('class', 'arcane-hit-core'); svg.setAttribute('viewBox', '0 0 120 60');
+                    svg.style.cssText = `left:${vr.x}px;top:${vr.top + vr.h * 0.35}px;width:${sw}px;height:${sw / 2}px;`;
+                    svg.innerHTML = '<path d="M8 54 Q60 -10 112 54" fill="none" stroke="#e0f2fe" stroke-width="3" stroke-linecap="round"/>' + (h.shieldBroken ? '<path d="M52 14 L58 28 L50 34 L60 50 M66 16 L62 30 L72 38" fill="none" stroke="#fff" stroke-width="2.4"/>' : '');
+                    layer.appendChild(svg);
+                    anims.push(svg.animate(h.shieldBroken ? [{ transform: T + 'scale(0.9)', opacity: 0 }, { transform: T + 'scale(1)', opacity: 1, offset: 0.25 }, { transform: T + 'scale(1.25,0.8) translateY(14px)', opacity: 0 }] : [{ transform: T + 'scale(0.85)', opacity: 0 }, { transform: T + 'scale(1)', opacity: 1, offset: 0.25 }, { transform: T + 'scale(1.06)', opacity: 0 }], { duration: h.shieldBroken ? 500 : 400, easing: 'ease-out', fill: 'forwards' }));
+                    if (h.shieldBroken) burst(16, () => { const a = rnd(-2.8, -0.3), s = rnd(2.2, 5.4); return { x: vr.x + rnd(-22, 22), y: vr.top + vr.h * 0.3, vx: Math.cos(a) * s, vy: Math.sin(a) * s, grav: 0.18, drag: 0.95, decay: 0.028, size: rnd(4, 7), shape: 'shard', color: '#e0f2fe' }; });
+                    if (h.kind === 'shield') {
+                        const el = document.createElement('div'); el.className = 'arcane-hit-num shield'; el.textContent = '-' + h.shieldDmg; el.style.cssText = `left:${px}px;top:${py}px;`; layer.appendChild(el);
+                        anims.push(el.animate(NUM_KF.shield, { duration: NUM_MS.shield, easing: 'ease-out', fill: 'forwards' }));
+                        if (h.shieldBroken) {
+                            const b = document.createElement('div'); b.className = 'arcane-hit-num word break'; b.textContent = '破盾'; b.style.cssText = `left:${px}px;top:${py - 22}px;`; layer.appendChild(b);
+                            anims.push(b.animate(NUM_KF.tag, { duration: NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }));
+                        }
+                        return;
+                    }
+                }
+                dom.animate([{ translate: '0 0' }, { translate: `2px ${(isHero ? 1 : -1) * (h.tier * 3 + 2)}px`, offset: 0.22 }, { translate: '0 0' }], { duration: 240 });
+                const el = document.createElement('div');
+                el.className = 'arcane-hit-num ' + (h.isCounter ? 'counter' : 'l' + h.tier);
+                el.textContent = (h.isCounter ? '反击 -' : '-') + h.hpDmg;
+                el.style.cssText = `left:${px}px;top:${py}px;`; layer.appendChild(el);
+                anims.push(el.animate(h.isCounter ? NUM_KF.counter : NUM_KF[h.tier], { duration: NUM_MS[h.isCounter ? 'counter' : h.tier], easing: 'cubic-bezier(0.2,0.8,0.3,1)', fill: 'forwards' }));
+                if (h.shieldBroken) {
+                    const b = document.createElement('div'); b.className = 'arcane-hit-num word break'; b.textContent = '破盾'; b.style.cssText = `left:${px}px;top:${py + 26}px;`; layer.appendChild(b);
+                    anims.push(b.animate(NUM_KF.tag, { duration: NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }));
+                }
+            });
+            if (!opts.suppressAudio) hitAudio(hs);
+            after(HIT_LIFE_MS, () => { anims.forEach(a => a.cancel()); layer.remove(); S.layers.delete(layer); });
+        }
+        // ===== 普通反击 L1 新版：琥珀金蓄势残影突进斩（总长 ~380ms，蓄势→轨迹→斩击） =====
+        function playCounterAttackL1(caster, target, onImpact) {
+            const fromRect = entityVisualRect(caster), toRect = entityVisualRect(target);
+            const fromDom = domOf(caster);
+            if (!fromRect || !toRect) return 0;
+            const dx = toRect.x - fromRect.x, dy = toRect.y - fromRect.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            const ux = dx / dist, uy = dy / dist;
+            const angleDeg = Math.atan2(dy, dx) * 180 / Math.PI;
+            const uid = ++S.uid;
+            const tokenNow = combatToken;
+
+            // 1. 蓄势起手 (0 ~ 110ms)：后撤收步 + 紧致琥珀蓄势环 + 内吸微粒
+            if (fromDom) {
+                fromDom.animate([
+                    { transform: 'translate3d(0,0,0) scale(1)' },
+                    { transform: `translate3d(${(-ux * 9).toFixed(1)}px,${(-uy * 9).toFixed(1)}px,0) scale(0.95)`, offset: 0.28 },
+                    { transform: `translate3d(${(-ux * 7).toFixed(1)}px,${(-uy * 7).toFixed(1)}px,0) scale(0.96)`, offset: 0.42 },
+                    { transform: `translate3d(${(ux * 30).toFixed(1)}px,${(uy * 30).toFixed(1)}px,0) scale(1.05)`, offset: 0.68 },
+                    { transform: 'translate3d(0,0,0) scale(1)' }
+                ], { duration: 360, easing: 'cubic-bezier(0.22,0.85,0.32,1)' });
+            }
+            synthTone(0, { type: 'triangle', f0: 520, f1: 1240, dur: 0.105, vol: 0.09 });
+            fsLayer(`
+              <div class="arcane-fs-anchor" style="left:${fromRect.x}px;top:${fromRect.y}px;width:96px;height:96px;animation:arcane-counter-charge-ring 130ms ease-in forwards;">
+                <svg viewBox="0 0 100 100" class="w-full h-full arcane-identity-glow-amber">
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-dasharray="14 8"/>
+                  <circle cx="50" cy="50" r="24" fill="none" stroke="#fef08a" stroke-width="2"/>
+                  <circle cx="50" cy="50" r="7" fill="#fffbeb"/>
+                </svg>
+              </div>`, 150);
+            burst(6, i => {
+                const a = (i / 6) * Math.PI * 2 + rnd(-0.2, 0.2), r = 34;
+                return { x: fromRect.x + Math.cos(a) * r, y: fromRect.y + Math.sin(a) * r, vx: -Math.cos(a) * 3.2, vy: -Math.sin(a) * 3.2, drag: 0.92, decay: 0.095, size: 2.0, color: pick(['#fef08a', '#fbbf24', '#ffffff']) };
+            });
+
+            // 2. 高速轨迹突进 (105 ~ 230ms)：残影掠出 + 微弯弧线速度光带
+            after(105, () => {
+                if (tokenNow !== combatToken) return;
+                // 2 枚快速掠出的残影
+                [0, 38].forEach((delayMs, idx) => {
+                    after(delayMs, () => {
+                        if (tokenNow !== combatToken || !fromDom) return;
+                        const reach = Math.min(dist * (0.34 + idx * 0.24), 108);
+                        const gLayer = fsLayer('', 190);
+                        const g = document.createElement('div');
+                        g.className = 'arcane-identity-ghost';
+                        g.style.cssText = `left:${fromRect.left}px;top:${fromRect.top}px;width:${fromRect.w}px;height:${fromRect.h}px;border:1px solid rgba(251,191,36,0.5);box-shadow:0 0 12px rgba(251,191,36,0.45);filter:sepia(0.5) saturate(2) brightness(1.15);`;
+                        g.innerHTML = fromDom.innerHTML.replace(/ id="[^"]*"/g, '');
+                        gLayer.appendChild(g);
+                        g.animate([
+                            { transform: `translate3d(${(ux * reach * 0.25).toFixed(1)}px,${(uy * reach * 0.25).toFixed(1)}px,0) scale(1)`, opacity: 0.52 },
+                            { transform: `translate3d(${(ux * reach).toFixed(1)}px,${(uy * reach).toFixed(1)}px,0) scale(0.97)`, opacity: 0 }
+                        ], { duration: 155, easing: 'cubic-bezier(0.16,0.9,0.28,1)', fill: 'forwards' });
+                    });
+                });
+
+                // 弧线突进轨迹 SVG（pathLength=1，高速从施法者射向目标）
+                const mx = (fromRect.x + toRect.x) / 2 - uy * Math.min(48, dist * 0.14);
+                const my = (fromRect.y + toRect.y) / 2 + ux * Math.min(48, dist * 0.14);
+                const dPath = `M ${fromRect.x.toFixed(1)} ${fromRect.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${toRect.x.toFixed(1)} ${toRect.y.toFixed(1)}`;
+                const trLayer = fsLayer(`
+                  <svg class="arcane-identity-svg-full arcane-identity-glow-amber">
+                    <defs>
+                      <linearGradient id="cnt-tr-${uid}" x1="${fromRect.x}" y1="${fromRect.y}" x2="${toRect.x}" y2="${toRect.y}" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.05"/>
+                        <stop offset="55%" stop-color="#fbbf24" stop-opacity="0.9"/>
+                        <stop offset="100%" stop-color="#fffbeb"/>
+                      </linearGradient>
+                    </defs>
+                    <path class="cnt-outer" d="${dPath}" fill="none" stroke="url(#cnt-tr-${uid})" stroke-width="10" stroke-linecap="round" pathLength="1" style="stroke-dasharray:0.42 1;stroke-dashoffset:0.42;"/>
+                    <path class="cnt-core" d="${dPath}" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" pathLength="1" style="stroke-dasharray:0.36 1;stroke-dashoffset:0.36;"/>
+                  </svg>`, 230);
+                trLayer.querySelector('.cnt-outer').animate([{ strokeDashoffset: 0.42, opacity: 0.9 }, { strokeDashoffset: -0.95, opacity: 0 }], { duration: 150, easing: 'cubic-bezier(0.14,0.86,0.28,1)', fill: 'forwards' });
+                trLayer.querySelector('.cnt-core').animate([{ strokeDashoffset: 0.36, opacity: 1 }, { strokeDashoffset: -0.98, opacity: 0 }], { duration: 140, easing: 'cubic-bezier(0.14,0.86,0.28,1)', fill: 'forwards' });
+            });
+
+            // 3. 弧斩命中爆发 (225ms)
+            after(225, () => {
+                if (tokenNow !== combatToken) return;
+                const arcLayer = fsLayer(`
+                  <div class="arcane-identity-anchor" style="left:${toRect.x}px;top:${toRect.y}px;width:190px;height:190px;transform:translate(-50%,-50%) rotate(${(angleDeg - 18).toFixed(1)}deg);">
+                    <svg viewBox="-95 -95 190 190" class="w-full h-full arcane-identity-glow-amber" style="overflow:visible;">
+                      <defs>
+                        <linearGradient id="cnt-sl-${uid}" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stop-color="#d97706" stop-opacity="0"/>
+                          <stop offset="50%" stop-color="#fbbf24" stop-opacity="0.95"/>
+                          <stop offset="100%" stop-color="#fffbeb"/>
+                        </linearGradient>
+                      </defs>
+                      <g class="cnt-swing" style="transform-origin:0 0;">
+                        <path d="M-74,50 Q-4,-62 82,-12 Q12,-14 -54,56 Z" fill="url(#cnt-sl-${uid})"/>
+                        <path d="M-48,40 Q-2,-44 80,-12" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+                      </g>
+                    </svg>
+                  </div>`, 240);
+                arcLayer.querySelector('.cnt-swing').animate([
+                    { transform: 'rotate(-55deg) scale(0.76)', opacity: 0 },
+                    { transform: 'rotate(4deg) scale(1.08)', opacity: 1, offset: 0.42 },
+                    { transform: 'rotate(54deg) scale(1.16)', opacity: 0 }
+                ], { duration: 195, easing: 'cubic-bezier(0.12,0.88,0.28,1)', fill: 'forwards' });
+                fsLayer(`
+                  <div class="arcane-identity-anchor" style="left:${toRect.x}px;top:${toRect.y}px;width:128px;height:52px;transform:translate(-50%,-50%) rotate(${(angleDeg + 28).toFixed(1)}deg);animation:arcane-identity-slash-spark 0.24s ease-out both;">
+                    <svg viewBox="-64 -26 128 52" class="w-full h-full arcane-identity-glow-amber">
+                      <polygon points="-62,0 -10,-4 0,-15 10,-4 62,0 10,4 0,15 -10,4" fill="#fffbeb"/>
+                      <line x1="-58" y1="0" x2="58" y2="0" stroke="#fbbf24" stroke-width="2.6" stroke-linecap="round"/>
+                    </svg>
+                  </div>`, 260);
+                const rad = (angleDeg + 28) * Math.PI / 180;
+                burst(14, i => {
+                    const dir = i % 2 ? rad : rad + Math.PI, an = dir + rnd(-0.36, 0.36), s = rnd(3.5, 9.2);
+                    return { x: toRect.x, y: toRect.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.89, decay: rnd(0.055, 0.085), size: rnd(1.5, 2.4), shape: 'streak', color: pick(['#ffffff', '#fef08a', '#fbbf24', '#f59e0b']) };
+                });
+                shake('light');
+                if (onImpact) onImpact();
+            });
+            return 390;
+        }
+
+        // 旧版静态 slash 对照
+        function playLegacyCounterSlash(target, onImpact) {
+            const toRect = entityVisualRect(target); if (!toRect) return 0;
+            fsLayer(`
+              <div class="arcane-fs-anchor" style="left:${toRect.x}px;top:${toRect.y}px;width:110px;height:110px;animation:arcane-identity-slash-spark 0.30s ease-out both;">
+                <svg viewBox="0 0 100 100" class="w-full h-full arcane-identity-glow-slash">
+                  <path d="M 15 85 L 50 48 L 85 15 L 54 54 Z" fill="#fff"/>
+                  <path d="M 15 85 L 85 15" stroke="#ef4444" stroke-width="5" stroke-linecap="round"/>
+                </svg>
+              </div>`, 320);
+            if (onImpact) onImpact();
+            return 340;
+        }
+
+        // 来袭攻击前导轨（用于格挡/闪避/连招演出，清晰展现攻击方向与偏折）
+        function playIncomingSlash(caster, target, outcome, onBeat) {
+            const fromRect = entityVisualRect(caster), toRect = entityVisualRect(target);
+            if (!fromRect || !toRect) return 0;
+            const dodged = outcome === 'dodge';
+            const dx = toRect.x - fromRect.x, dy = toRect.y - fromRect.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            const ux = dx / dist, uy = dy / dist;
+            const sx = -uy, sy = ux;
+            const dest = dodged ? { x: toRect.x + sx * 54, y: toRect.y + sy * 22 } : { x: toRect.x, y: toRect.y };
+            const angleDeg = Math.atan2(dest.y - fromRect.y, dest.x - fromRect.x) * 180 / Math.PI;
+            const fromDom = domOf(caster);
+            if (fromDom) {
+                fromDom.animate([
+                    { transform: 'translate3d(0,0,0)' },
+                    { transform: `translate3d(${(ux * 20).toFixed(1)}px,${(uy * 20).toFixed(1)}px,0)`, offset: 0.4 },
+                    { transform: 'translate3d(0,0,0)' }
+                ], { duration: 240, easing: 'ease-out' });
+            }
+            const uid = ++S.uid, tokenNow = combatToken;
+            const layer = fsLayer(`
+              <div class="arcane-identity-anchor" style="left:${dest.x}px;top:${dest.y}px;width:185px;height:185px;transform:translate(-50%,-50%) rotate(${angleDeg.toFixed(1)}deg);">
+                <svg viewBox="-92 -92 184 184" class="w-full h-full ${dodged ? '' : 'arcane-identity-glow-slash'}" style="overflow:visible;">
+                  <defs>
+                    <linearGradient id="inc-sl-${uid}" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="${dodged ? '#94a3b8' : '#9f1239'}" stop-opacity="0"/>
+                      <stop offset="55%" stop-color="${dodged ? '#cbd5e1' : '#fb7185'}" stop-opacity="${dodged ? 0.6 : 0.92}"/>
+                      <stop offset="100%" stop-color="${dodged ? '#f8fafc' : '#fff1f2'}"/>
+                    </linearGradient>
+                  </defs>
+                  <g class="inc-swing" style="transform-origin:0 0;">
+                    <path d="M-74,52 Q-4,-62 82,-12 Q12,-14 -54,56 Z" fill="url(#inc-sl-${uid})"/>
+                    <path d="M-48,40 Q-2,-44 80,-12" fill="none" stroke="${dodged ? '#e2e8f0' : '#ffffff'}" stroke-width="2.4" stroke-linecap="round"/>
+                  </g>
+                </svg>
+              </div>`, 320);
+            layer.querySelector('.inc-swing').animate([
+                { transform: 'rotate(-55deg) scale(0.75)', opacity: 0 },
+                { transform: 'rotate(2deg) scale(1.06)', opacity: 1, offset: 0.45 },
+                { transform: 'rotate(48deg) scale(1.12)', opacity: 0 }
+            ], { duration: 250, delay: 30, easing: 'cubic-bezier(0.12,0.88,0.28,1)', fill: 'forwards' });
+            after(110, () => { if (tokenNow === combatToken && onBeat) onBeat(); });
+            return 340;
+        }
+
+        function clearAll() {
+            S.timers.forEach(id => clearTimeout(id)); S.timers.clear();
+            S.layers.forEach(el => el.remove()); S.layers.clear();
+            S.particles.length = 0; S.driver = null;
+            H.ghosts.forEach(st => clearTimeout(st.timer)); H.ghosts.clear();
+        }
+        return { playHitFeedback, playCounterAttackL1, playLegacyCounterSlash, playIncomingSlash, clearAll };
+    })();
+    // ===== 试听台与演练卡片控制 =====
+    let unlockTimer = null;
+    const hostTimers = new Set();
+
+    function renderAuditionDrawer() {
+        const box = $('#dodge-audition-rows');
+        if (!box) return;
+        const TIER_META = [
+            { tier: 1, tag: '一档 <10%', cls: 'text-emerald-300' },
+            { tier: 2, tag: '二档 10~50%', cls: 'text-sky-300' },
+            { tier: 3, tag: '三档 ≥50%', cls: 'text-rose-300' }
+        ];
+        box.innerHTML = TIER_META.map(m => {
+            const list = DODGE_CANDIDATES[m.tier];
+            const cur = selectedDodge[m.tier] || 0;
+            const chips = list.map((c, idx) => `<button data-tier="${m.tier}" data-idx="${idx}" title="${c.name} (${c.src})" class="dodge-chip ${idx === cur ? 'active' : ''} flex-1 py-0.5 px-1 rounded text-[9px] font-bold border border-slate-700 bg-slate-900/90 text-slate-300 hover:border-cyan-400/60 transition-all truncate">${c.label}</button>`).join('');
+            return `<div class="flex items-center gap-1.5"><span class="w-[62px] shrink-0 text-[9px] font-bold ${m.cls}">${m.tag}</span><div class="flex-1 flex gap-1">${chips}</div></div>`;
+        }).join('');
+        box.querySelectorAll('.dodge-chip').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tier = Number(btn.dataset.tier), idx = Number(btn.dataset.idx);
+                selectedDodge[tier] = idx;
+                renderAuditionDrawer();
+                playDodgeTierAudio(tier);
+            });
+        });
+    }
+
+    function syncEntityBarUI(entity) {
+        if (!entity) return;
+        const hpBar = document.getElementById(`${entity.id}-hp-bar`);
+        const hpTxt = document.getElementById(`${entity.id}-hp-text`);
+        const pct = Math.max(0, Math.min(100, entity.hp / entity.maxHp * 100));
+        if (hpBar) hpBar.style.width = pct + '%';
+        if (hpTxt) {
+            if (String(entity.id).startsWith('h')) {
+                const sh = entity.shield > 0 ? `<span class="text-slate-300 ml-0.5 text-[7px] sm:text-[9px]">(盾${entity.shield})</span>` : '';
+                hpTxt.innerHTML = `${Math.floor(entity.hp)}${sh}`;
+            } else {
+                hpTxt.textContent = `${Math.floor(entity.hp)}/${entity.maxHp}${entity.shield > 0 ? ' 盾' + entity.shield : ''}`;
+            }
+        }
+    }
+
+    function applySimDamage(target, hpDmg, shieldDmg) {
+        const hpBefore = Math.max(0, target.hp), shieldBefore = target.shield || 0;
+        const actualShield = Math.min(shieldBefore, shieldDmg || 0);
+        target.shield = Math.max(0, shieldBefore - actualShield);
+        const actualHp = Math.min(hpBefore, hpDmg || 0);
+        target.hp = Math.max(0, hpBefore - actualHp);
+        syncEntityBarUI(target);
+        return { hpBefore, hpAfter: target.hp, hpDmg: actualHp, shieldBefore, shieldAfter: target.shield, shieldDmg: actualShield };
+    }
+
+    function lockCards(locked) {
+        document.querySelectorAll('#skill-list .card').forEach(b => b.disabled = locked);
+    }
+
+    const DEMO_GROUPS = [
+        {
+            title: '🛡️ 格挡三档 & 破盾音效', badge: '5项',
+            items: [
+                { name: '格挡一档 · <10% 总HP', level: '格挡T1', description: '挡下 8 伤 (8%) → parry_Weapon_1.wav', run: () => runIncomingHit('e5', 'h2', { outcome: 'block', blockedDmg: 8 }) },
+                { name: '格挡二档 · 10%~50% 总HP', level: '格挡T2', description: '挡下 45 伤 (25%) → parry_Weapon_3.wav', run: () => runIncomingHit('e4', 'h2', { outcome: 'block', blockedDmg: 45 }) },
+                { name: '格挡三档 · ≥50% 总HP', level: '格挡T3', description: '挡下 110 伤 (61%) → GuardBreak.wav', run: () => runIncomingHit('e5', 'h2', { outcome: 'block', blockedDmg: 110 }) },
+                { name: '破盾瞬间 · 低伤破盾 (8伤)', level: '破盾', description: '仅8点破盾仍播 GuardBreak.wav', init: { h1: { hp: 100, maxHp: 100, shield: 8 } }, run: () => runIncomingHit('e4', 'h1', { outcome: 'hit', shieldDmg: 8, hpDmg: 0 }) },
+                { name: '破盾溢出 · 破盾+扣血', level: '破盾', description: '35盾碎+32扣血 → GuardBreak.wav', init: { h1: { hp: 100, maxHp: 100, shield: 35 } }, run: () => runIncomingHit('e5', 'h1', { outcome: 'hit', shieldDmg: 35, hpDmg: 32 }) }
+            ]
+        },
+        {
+            title: '💨 闪避三档（联动试听台）', badge: '3项',
+            items: [
+                { name: '闪避一档 · <10% 轻威胁', level: '闪避T1', description: '来袭 8 伤 (8% HP) → 播一档所选音', run: () => runIncomingHit('e4', 'h1', { outcome: 'dodge', incomingDmg: 8 }) },
+                { name: '闪避二档 · 10%~50% 中威胁', level: '闪避T2', description: '来袭 45 伤 (32% HP) → 播二档所选音', run: () => runIncomingHit('e5', 'h3', { outcome: 'dodge', incomingDmg: 45 }) },
+                { name: '闪避三档 · ≥50% 重威胁', level: '闪避T3', description: '来袭 95 伤 (68% HP) → 播三档所选音', run: () => runIncomingHit('e5', 'h4', { outcome: 'dodge', incomingDmg: 95 }) }
+            ]
+        },
+        {
+            title: '⚔️ 普通反击 L1 对照 & 连招', badge: '5项',
+            items: [
+                { name: '旧版对照 · 原静态 slash', level: '旧版', description: '无蓄势无轨迹，原地红斜线 + atk2', run: () => runLegacyCounter('h2', 'e5', 145) },
+                { name: '新版 L1 · 琥珀蓄势突进斩', level: '新L1', description: '110ms 蓄势→残影轨迹→弯月斩 (~380ms)', run: () => runNewCounter('h2', 'e5', 180) },
+                { name: '新版 L1 · 敌方反击 (敌→我)', level: '敌→我', description: '敌方闪避后下行琥珀金突进反击', run: () => runNewCounter('e5', 'h2', 32) },
+                { name: '连招 · 二档闪避 → L1 反击', level: '连招', description: '敌来袭→二档闪避→220ms顺势 L1 反击', run: () => runDodgeCounterCombo('e5', 'h2', 52, 185) },
+                { name: '连招 · 三档险避 → L1 反击', level: '连招', description: '重击来袭→三档险避→220ms顺势 L1 反击', run: () => runDodgeCounterCombo('e4', 'h4', 92, 210) }
+            ]
+        }
+    ];
+
+    function runIncomingHit(casterId, targetId, spec) {
+        const caster = entityOf(casterId), target = entityOf(targetId);
+        if (!caster || !target) return 300;
+        const outcome = spec.outcome || 'hit';
+        return arcaneVfxModule.playIncomingSlash(caster, target, outcome, () => {
+            if (outcome === 'dodge') {
+                arcaneVfxModule.playHitFeedback({ targetId: target.id, outcome: 'dodge', maxHp: target.maxHp, incomingDmg: spec.incomingDmg || 0 });
+            } else if (outcome === 'block') {
+                arcaneVfxModule.playHitFeedback({ targetId: target.id, outcome: 'block', maxHp: target.maxHp, blockedDmg: spec.blockedDmg || 0 });
+            } else {
+                const d = applySimDamage(target, spec.hpDmg || 0, spec.shieldDmg || 0);
+                arcaneVfxModule.playHitFeedback(Object.assign({ targetId: target.id, outcome: 'hit', maxHp: target.maxHp }, d));
+            }
+        });
+    }
+
+    function runLegacyCounter(casterId, targetId, dmg) {
+        const target = entityOf(targetId); if (!target) return 300;
+        return arcaneVfxModule.playLegacyCounterSlash(target, () => {
+            const d = applySimDamage(target, dmg, 0);
+            arcaneVfxModule.playHitFeedback(Object.assign({ targetId: target.id, outcome: 'hit', maxHp: target.maxHp, isCounter: true }, d));
+        });
+    }
+
+    function runNewCounter(casterId, targetId, dmg) {
+        const caster = entityOf(casterId), target = entityOf(targetId);
+        if (!caster || !target) return 300;
+        return arcaneVfxModule.playCounterAttackL1(caster, target, () => {
+            const d = applySimDamage(target, dmg, 0);
+            arcaneVfxModule.playHitFeedback(Object.assign({ targetId: target.id, outcome: 'hit', maxHp: target.maxHp, isCounter: true }, d));
+        });
+    }
+
+    function runDodgeCounterCombo(enemyId, heroId, incomingDmg, counterDmg) {
+        const tokenNow = combatToken;
+        runIncomingHit(enemyId, heroId, { outcome: 'dodge', incomingDmg });
+        const t = setTimeout(() => {
+            hostTimers.delete(t);
+            if (tokenNow !== combatToken) return;
+            runNewCounter(heroId, enemyId, counterDmg);
+        }, 330);
+        hostTimers.add(t);
+        return 780;
+    }
+
+    function renderSkillCards() {
+        const list = $('#skill-list');
+        list.replaceChildren();
+        const BADGE_CLS = {
+            '格挡T1': 'border-slate-400/70 text-slate-200',
+            '格挡T2': 'border-cyan-400/70 text-cyan-200',
+            '格挡T3': 'border-amber-400/80 text-amber-200',
+            '破盾': 'border-sky-400/80 text-sky-200',
+            '闪避T1': 'border-emerald-400/70 text-emerald-200',
+            '闪避T2': 'border-teal-400/70 text-teal-200',
+            '闪避T3': 'border-rose-400/70 text-rose-200',
+            '旧版': 'border-slate-500/70 text-slate-300',
+            '新L1': 'border-amber-400/90 text-amber-300',
+            '敌→我': 'border-orange-400/80 text-orange-200',
+            '连招': 'border-yellow-400/90 text-yellow-200'
+        };
+        DEMO_GROUPS.forEach(group => {
+            const hd = document.createElement('div');
+            hd.className = 'arcane-identity-group-hd';
+            hd.innerHTML = `<span>${group.title}</span><span class="text-[8px] text-amber-400/85">${group.badge}</span>`;
+            list.appendChild(hd);
+            group.items.forEach(card => {
+                const button = document.createElement('button');
+                button.className = 'card w-full py-1.5 px-2 bg-slate-900/80 hover:bg-amber-950/40 border border-slate-700/80 hover:border-amber-500/60 rounded-lg text-left transition-all shadow-sm';
+                button.innerHTML = '<div class="flex items-center justify-between gap-1"><span class="text-xs font-bold text-slate-100 truncate"></span><span class="text-[9px] font-bold px-1 rounded border shrink-0"></span></div><div class="text-[9px] text-slate-400 truncate"></div>';
+                const spans = button.querySelectorAll('span');
+                spans[0].textContent = card.name;
+                spans[1].textContent = card.level;
+                spans[1].className = 'text-[9px] font-bold px-1 rounded border shrink-0 ' + (BADGE_CLS[card.level] || 'border-cyan-500/60 text-cyan-300');
+                button.lastElementChild.textContent = card.description;
+                button.addEventListener('click', () => {
+                    clearTimeout(unlockTimer);
+                    if (card.init) initUI(card.init);
+                    lockCards(true);
+                    const ms = card.run() || 500;
+                    unlockTimer = setTimeout(() => { unlockTimer = null; lockCards(false); }, Math.max(360, ms));
+                });
+                list.appendChild(button);
+            });
+        });
+    }
+
+    $('#btn-identity-sfx').addEventListener('click', () => {
+        identitySfxOn = !identitySfxOn;
+        const btn = $('#btn-identity-sfx');
+        btn.textContent = identitySfxOn ? '🔊' : '🔇';
+        btn.className = identitySfxOn
+            ? 'text-[9px] font-bold px-1.5 rounded border border-emerald-500/60 text-emerald-300 hover:bg-white/10 transition-all shrink-0'
+            : 'text-[9px] font-bold px-1.5 rounded border border-rose-500/60 text-rose-300 hover:bg-white/10 transition-all shrink-0';
+    });
+
+    $('#btn-toggle-audition').addEventListener('click', () => {
+        const drawer = $('#dodge-audition-drawer');
+        const btn = $('#btn-toggle-audition');
+        const hidden = drawer.classList.toggle('hidden');
+        btn.setAttribute('aria-expanded', String(!hidden));
+    });
+
+    $('#btn-reset').addEventListener('click', () => {
+        combatToken++;
+        clearTimeout(unlockTimer); unlockTimer = null;
+        hostTimers.forEach(t => clearTimeout(t)); hostTimers.clear();
+        arcaneVfxModule.clearAll();
+        fxEngine.particles.length = 0;
+        fxEngine.ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        lockCards(false);
+        initUI();
+    });
+
+    renderAuditionDrawer();
+    renderSkillCards();
+  </script>
+</body>
+</html>
