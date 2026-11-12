@@ -3456,3 +3456,12 @@
   4. **滑稽音效排查与 4 档纯真音对比**：经多模态 `read_file` 逐条亲耳试听，物理删除实听确认为滑稽铜管/动物怪叫/青蛙音的 `mx633`、`mx1461`、`mx1957`、`mx3057`、`mx2630` 5 轨；重寻并逐条听审验收 15 条 Mixkit 拟音（流沙/冥风/铁闸门闭甲/金属剑击/机械齿扣/真空抽吸/深渊裂响/巨龙巨蜥咆哮/重步踏击）落盘 `D:\Project\my_assets\`，复用本地战斗原声合共建成 4 档纯真音对比切换开关（`#sfx-pack-bar`：`战斗原声` / `重甲狂吼` / `裂隙撕鸣` / `严选特调`），零合成振荡器回退。
 - **涉及文件**：`demo-skill-sand-marcher.html`、`D:\Project\my_assets\vfx_*.mp3`（删 5 增 15，共 21 个实录音效）、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：`node -e` 校验 `vm.Script` 语法通过（`Syntax check: OK`）、`SFX_FILES` 33 条映射键与磁盘存在性 100% 通过、违和旧码审计 `Bad leftovers: []`；全 15 条新音效经 `read_file` 多模态亲耳试听验收无滑稽杂音；Demo 按规范免测免审交付实机对比。
+
+## [LOG-286] 2026-11-13 — 补填行军兽顶部米白对称过渡光晕并默认锁定「裂隙撕鸣 + 竖裂探身」终稿备忘
+- **提交**：`1219132`。
+- **变更行为**：
+  1. **顶部米白对称填充与消融柔化**：针对截图中头角上方残余平直深紫暗带问题，在 `.arcane-marcher-beast-wrap` 内背衬 `.arcane-marcher-cream-back` 对称椭圆米白光晕（`ellipse 38% 50% at 45% 47%`），自然衔接下半部沙漠天光并向外层垂直椭圆对称渐隐；同步将 `.arcane-marcher-edge-y` 上移至 `top: 16%`、顶部淡出扩宽至 `0%~18%`、`.arcane-marcher-eye-flare` 同步校至 `top: 36.6%` 并柔化 `.arcane-marcher-tint-glaze` / `.arcane-marcher-violet-wash`。
+  2. **清理兽首亮区暗雾斑**：将 `playXieYanKey` Act II 的大体积 `gradMist` 向裂隙外侧缘排布（`±120~210px`），避免暗色雾团遮污兽吻与对称米白核心区。
+  3. **定稿锁定与备忘注释**：依用户确认将 Demo 默认状态切至 `sfxPack: 'abyss'`（「裂隙撕鸣」）＋ `marcherScheme: 'vertical'`（「竖裂探身」），并在可移植模块首尾写入 `[移植定稿备忘]` 注释记录最终选型；本轮暂不修改主工程 `index.html`，交付 Demo 复验。
+- **涉及文件**：`demo-skill-sand-marcher.html`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：`vm.Script` 内联脚本语法校验通过（`Syntax check: OK`），默认值与定稿层断言全通过；Demo 免测免审交付实机预览。
