@@ -73,15 +73,16 @@
     .arcane-marcher-rift-stage.is-vertical .arcane-marcher-beast-clip { -webkit-mask-image:radial-gradient(ellipse 44% 60% at 47% 47%, #000 34%, rgba(0,0,0,0.62) 64%, transparent 92%); mask-image:radial-gradient(ellipse 44% 60% at 47% 47%, #000 34%, rgba(0,0,0,0.62) 64%, transparent 92%); }
     .arcane-marcher-rift-stage.is-ground .arcane-marcher-beast-clip { -webkit-mask-image:linear-gradient(to top, transparent 6%, rgba(0,0,0,0.88) 28%, #000 46%, #000 84%, transparent 100%); mask-image:linear-gradient(to top, transparent 6%, rgba(0,0,0,0.88) 28%, #000 46%, #000 84%, transparent 100%); }
     .arcane-marcher-beast-wrap { position:relative; width:100%; height:100%; pointer-events:none; will-change:transform,opacity; }
+    .arcane-marcher-cream-back { position:absolute; inset:0; pointer-events:none; background:radial-gradient(ellipse 38% 50% at 45% 47%, rgba(210,204,194,0.76) 0%, rgba(192,184,184,0.56) 36%, rgba(136,118,152,0.26) 66%, transparent 94%); }
     .arcane-marcher-rift-stage.is-vertical .arcane-marcher-beast-wrap { animation:arcane-marcher-emerge-v 1.65s cubic-bezier(0.14,0.9,0.26,1) both; }
     .arcane-marcher-rift-stage.is-diag .arcane-marcher-beast-wrap { animation:arcane-marcher-emerge-diag 1.65s cubic-bezier(0.14,0.9,0.26,1) both; }
     .arcane-marcher-rift-stage.is-ground .arcane-marcher-beast-wrap { animation:arcane-marcher-emerge-ground 1.65s cubic-bezier(0.14,0.9,0.26,1) both; }
-    .arcane-marcher-edge-y { position:absolute; width:136%; aspect-ratio:16/9; height:auto; left:22%; top:18%; max-width:none; pointer-events:none; -webkit-mask-image:linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.38) 5%, #000 13%, #000 76%, rgba(0,0,0,0.36) 89%, transparent 98%); mask-image:linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.38) 5%, #000 13%, #000 76%, rgba(0,0,0,0.36) 89%, transparent 98%); }
+    .arcane-marcher-edge-y { position:absolute; width:136%; aspect-ratio:16/9; height:auto; left:22%; top:16%; max-width:none; pointer-events:none; -webkit-mask-image:linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.34) 7%, #000 18%, #000 76%, rgba(0,0,0,0.36) 89%, transparent 98%); mask-image:linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.34) 7%, #000 18%, #000 76%, rgba(0,0,0,0.36) 89%, transparent 98%); }
     .arcane-marcher-edge-x { position:relative; width:100%; height:100%; -webkit-mask-image:linear-gradient(to right, transparent 0%, rgba(0,0,0,0.42) 5%, #000 11.5%, #000 58%, rgba(0,0,0,0.38) 76%, transparent 94%); mask-image:linear-gradient(to right, transparent 0%, rgba(0,0,0,0.42) 5%, #000 11.5%, #000 58%, rgba(0,0,0,0.38) 76%, transparent 94%); }
-    .arcane-marcher-edge-x img { width:100%; height:100%; object-fit:cover; display:block; filter:contrast(1.18) brightness(0.84) saturate(0.8); }
-    .arcane-marcher-tint-glaze { position:absolute; inset:0; pointer-events:none; background:radial-gradient(circle at 15% 20.2%, rgba(44,28,68,0.06) 0%, rgba(30,18,48,0.56) 34%, rgba(10,6,18,0.94) 70%); mix-blend-mode:multiply; }
-    .arcane-marcher-violet-wash { position:absolute; inset:0; pointer-events:none; background:radial-gradient(circle at 15% 20.2%, rgba(0,0,0,0) 7%, rgba(46,29,76,0.42) 32%, rgba(12,7,22,0.88) 72%); }
-    .arcane-marcher-eye-flare { position:absolute; left:42.4%; top:38.6%; width:72px; height:72px; margin-left:-36px; margin-top:-36px; pointer-events:none; will-change:transform,opacity; animation:arcane-marcher-eye-pulse 1.15s ease-out 0.12s both; }
+    .arcane-marcher-edge-x img { width:100%; height:100%; object-fit:cover; display:block; filter:contrast(1.16) brightness(0.86) saturate(0.8); }
+    .arcane-marcher-tint-glaze { position:absolute; inset:0; pointer-events:none; background:radial-gradient(ellipse 46% 54% at 22% 32%, rgba(44,28,68,0.06) 0%, rgba(32,20,52,0.42) 44%, rgba(10,6,18,0.88) 80%); mix-blend-mode:multiply; }
+    .arcane-marcher-violet-wash { position:absolute; inset:0; pointer-events:none; background:radial-gradient(ellipse 46% 52% at 22% 32%, rgba(0,0,0,0) 18%, rgba(46,29,76,0.34) 48%, rgba(12,7,22,0.82) 82%); }
+    .arcane-marcher-eye-flare { position:absolute; left:42.4%; top:36.6%; width:72px; height:72px; margin-left:-36px; margin-top:-36px; pointer-events:none; will-change:transform,opacity; animation:arcane-marcher-eye-pulse 1.15s ease-out 0.12s both; }
     .arcane-marcher-eye-core { position:absolute; inset:20px; border-radius:50%; background:radial-gradient(circle, #fffbeb 0%, #fbbf24 26%, rgba(217,119,6,0.42) 52%, transparent 82%); }
     .arcane-marcher-eye-beam-h { position:absolute; left:6px; right:6px; top:35px; height:2px; border-radius:50%; background:radial-gradient(ellipse, #fffbeb 0%, rgba(251,191,36,0.68) 38%, transparent 80%); }
     .arcane-marcher-eye-beam-v { position:absolute; top:16px; bottom:16px; left:35px; width:2px; border-radius:50%; background:radial-gradient(ellipse, #fffbeb 0%, rgba(251,191,36,0.52) 38%, transparent 80%); }
@@ -325,6 +326,10 @@ window.fxEngine = fxEngine;
     // ===== 演示宿主 END =====
 
     // ===== 可移植特效模块 BEGIN：底座取自 index.html；无战斗、LLM 或酒馆依赖 =====
+    // [移植定稿备忘] 用户已拍板最终方案（后续新任务若无追加要求，直接按此定稿向 index.html 实施移植）：
+    //   1. 双技能音效定稿：飞沙化甲(L2) 与 蝎眼钥匙·幻梦行军兽(L4) 统一采用 'abyss'（「裂隙撕鸣」）轨道组合
+    //      （仅需迁入 mx_sand_swish/mx_stygian_whoosh/mx_sword_metal/def_up/shield_up/mx_gear_lock/mx_tunnel/mx_rift_charge/mx_deep_impact/mx_giant_roar/mx_dino_roar/mx_golem_stomp，无需迁入其余对比开关）；
+    //   2. 行军兽构图定稿：仅采用 'vertical'（「竖裂探身」）出场动画及上下对称米白渐隐裂隙样式（无需迁入 diag/ground 分支）。
 const arcaneVfxModule = (function () {
     'use strict';
     // 接入点 1：填写新技能的精确 fxTag，与下方分派和 CARDS 保持一致。
@@ -348,7 +353,7 @@ const arcaneVfxModule = (function () {
         shakeEls: new Set(),   // 被加 arcane-shake-* 类的舞台
         sfxNodes: new Set(),   // 活动音频源（cancel/clear 时即停）
         marcherScheme: 'vertical',
-        sfxPack: 'battle',
+        sfxPack: 'abyss',
         driver: null,          // 挂在 fxEngine.particles 里的驱动粒子
         canvas: null, ctx: null,
         dark: null,
@@ -1079,6 +1084,7 @@ const arcaneVfxModule = (function () {
                 <div class="arcane-marcher-rift-rim"></div>
                 <div class="arcane-marcher-beast-clip">
                   <div class="arcane-marcher-beast-wrap">
+                    <div class="arcane-marcher-cream-back"></div>
                     <div class="arcane-marcher-edge-y">
                       <div class="arcane-marcher-edge-x">
                         <img src="${imgSrc}" alt="" onerror="this.style.display='none'"/>
@@ -1098,16 +1104,18 @@ const arcaneVfxModule = (function () {
             addP({ x: cX, y: cY, shape: 'ring', size: 5.5, decay: 0.026, color: 'rgba(139,112,184,0.44)' });
             addP({ x: cX, y: cY, shape: 'gradFlare', size: 64, decay: 0.052, core: '#f5f3ff', color: 'rgba(124,99,166,0.7)' });
 
-            // 前景暗紫浓雾塑形与遮挡穿插（0 硬边线）
-            burst(28, i => {
+            // 前景暗紫浓雾塑形（外推至裂隙两侧边缘，避开兽首与米白核心区）
+            burst(24, i => {
                 const dir = i % 2 === 0 ? -1 : 1;
-                const vx = mode === 'diag' ? -dir * rnd(5, 11) * 0.74 : (mode === 'ground' ? rnd(-5, 5) : dir * rnd(4.5, 11));
-                const vy = mode === 'diag' ? dir * rnd(5, 11) * 0.67 : (mode === 'ground' ? rnd(-8.5, -2.5) : rnd(-2.8, 2.4));
+                const vx = mode === 'diag' ? -dir * rnd(5, 11) * 0.74 : (mode === 'ground' ? rnd(-5, 5) : dir * rnd(4.5, 10));
+                const vy = mode === 'diag' ? dir * rnd(5, 11) * 0.67 : (mode === 'ground' ? rnd(-8.5, -2.5) : rnd(-2.4, 2.2));
+                const sx = mode === 'ground' ? cX + rnd(-150, 150) : cX + dir * rnd(120, 210);
+                const sy = mode === 'ground' ? cY + rnd(45, 130) : cY + rnd(-120, 115);
                 return {
-                    x: cX + rnd(-95, 95), y: cY + (mode === 'ground' ? rnd(30, 120) : rnd(-80, 95)),
-                    vx, vy, grav: mode === 'ground' ? 0.14 : 0.02, drag: 0.92, decay: rnd(0.016, 0.028),
-                    size: rnd(26, 48), sx: 1.55, sy: 0.85, shape: 'gradMist', blend: 'source-over',
-                    color: pick(['rgba(14,9,24,0.84)', 'rgba(34,22,52,0.72)', 'rgba(58,42,84,0.56)']),
+                    x: sx, y: sy,
+                    vx, vy, grav: mode === 'ground' ? 0.14 : 0.02, drag: 0.92, decay: rnd(0.018, 0.03),
+                    size: rnd(22, 40), sx: 1.45, sy: 0.85, shape: 'gradMist', blend: 'source-over',
+                    color: pick(['rgba(14,9,24,0.68)', 'rgba(34,22,52,0.56)', 'rgba(58,42,84,0.42)']),
                     fade: 'rgba(6,4,12,0)'
                 };
             });
@@ -1144,12 +1152,13 @@ const arcaneVfxModule = (function () {
                     const vy = mode === 'diag' ? 0.669 * rnd(7, 13) : (mode === 'ground' ? rnd(-7.5, -3) : rnd(-1.4, 1.4));
                     const isMist = i < 2;
                     return {
-                        x: cX + rnd(-110, 110), y: cY + (mode === 'ground' ? rnd(50, 120) : rnd(-100, 100)),
+                        x: isMist ? (cX + side * rnd(105, 175)) : (cX + rnd(-95, 95)),
+                        y: cY + (mode === 'ground' ? rnd(50, 120) : rnd(-100, 100)),
                         vx, vy, grav: mode === 'ground' ? 0.12 : 0, drag: 0.94, decay: isMist ? 0.024 : 0.036,
-                        size: isMist ? rnd(18, 30) : rnd(2, 3.6), shape: isMist ? 'gradMist' : 'gradOrb', trail: isMist ? 0 : 6,
+                        size: isMist ? rnd(18, 28) : rnd(2, 3.6), shape: isMist ? 'gradMist' : 'gradOrb', trail: isMist ? 0 : 6,
                         blend: isMist ? 'source-over' : 'lighter',
                         core: isMist ? undefined : '#ede9fe',
-                        color: isMist ? 'rgba(24,15,38,0.62)' : 'rgba(152,132,188,0.8)', edge: 'rgba(56,39,82,0.35)', fade: 'rgba(6,4,12,0)'
+                        color: isMist ? 'rgba(24,15,38,0.48)' : 'rgba(152,132,188,0.8)', edge: 'rgba(56,39,82,0.35)', fade: 'rgba(6,4,12,0)'
                     };
                 });
             });
@@ -1291,7 +1300,7 @@ const arcaneVfxModule = (function () {
         setSfxPack(window.__RPG_SFX_PACK__);
     }
     window.__RPG_MARCHER_SCHEME__ = window.__RPG_MARCHER_SCHEME__ || 'vertical';
-    window.__RPG_SFX_PACK__ = window.__RPG_SFX_PACK__ || 'battle';
+    window.__RPG_SFX_PACK__ = window.__RPG_SFX_PACK__ || 'abyss';
     const SCHEME_LABELS = { vertical: '竖裂深渊探身', diag: '42°斜裂飞扑', ground: '地裂深坑仰出' };
     function setMarcherScheme(scheme) {
         window.__RPG_MARCHER_SCHEME__ = scheme;
@@ -1355,6 +1364,7 @@ const arcaneVfxModule = (function () {
     setMarcherScheme(window.__RPG_MARCHER_SCHEME__);
     setSfxPack(window.__RPG_SFX_PACK__);
     // ===== 演示控制 END =====
+    // [移植定稿备忘] 用户已确认最终选择：双技能音效='abyss'(裂隙撕鸣)，幻梦行军兽构图='vertical'(竖裂探身)；新任务若无追加要求，直接按此定稿移植至 index.html。
     // 移植：只将新增 arcane- CSS、技能函数、标签与分派合并到正式版已有模块。
     // 必须同时追加 WEBM_FX_REGISTRY 的 { url: '', scale: 1.0, particles: 'arcane', delay: 蓄势秒数 }。
     // 技能数据追加 [特效:精确标签]；按技能类型核对默认光效去重与真实反应回调，不改数值规则。
