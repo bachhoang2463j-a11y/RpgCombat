@@ -3407,3 +3407,19 @@
   2. 前导突进激光引线线宽亦同步翻倍（外黄 `3.6 → 7.2`，白芯 `1.6 → 3.2`），直切演出周期调整为 `155ms`。
 - **涉及文件**：`demo-parry-dodge-counter.html`、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：`node` `new Function` 内联脚本语法检查通过；Demo 免测免审，交付用户刷新实机确认。
+
+## [LOG-282] 2026-11-12 — 受击/格挡/闪避三档音效＋普通反击L1居合动效正式移植主工程，打包v12.02
+
+- **提交**：`79321c5`。
+- **变更行为**：
+  1. **audioUrls 注册 15 个新音频**：`parry_1/2/3`（parry_Weapon_1/3/GuardBreak.wav）、`dodge_1/2/3.mp3`（Demo 选定 1B/2C/3C）、`hit_1a~3c` 九个受击 WAV；沿用既有 Blob 预载循环与 audioCache 自动预热。
+  2. **受击防连重随机池**：`arcaneVfxModule` 内新增 `HIT_AUDIO_POOL`（三档×3音）、`_lastHitAudioIdx` 与 `playHitTierAudio`（同档重抽换音，音量 0.94/0.88/0.82）。
+  3. **classifyHit 升级**：读取 `blockedDmg ?? incomingDmg` 计算 `blockTier/dodgeTier`（<10%→1、<50%→2、≥50%→3）；护盾归零识别 `shieldBroken`；受击 hp tier 上边界对齐新规格（50% 由二档改判三档，与 Demo 一致）。`hitAudio` 重写：任何破盾瞬间优先播 `parry_3`（GuardBreak）并 return；block→`parry_N`、dodge→`dodge_N`（替换合成 whoosh）、hp→`playHitTierAudio`（替换低频合成组）；暴击/爆发装饰音保留叠加。
+  4. **传参补全**：闪避结算点补掷同分布随机值传入 `incomingDmg`（口径与伤害结算段一致：fixedRawDamage 优先）；伤害全额被挡（feedbackHpDmg=0 且 feedbackShieldDmg=0）时传入 `blockedDmg: rawDamage`。【肃正】teamBarrier 屏障逻辑零改动。
+  5. **普通反击 L1 移植**：新增 `@keyframes arcane-counter-charge-ring`（`arcane-identity-slash-spark` 沿用既有定义）；`playCounterAttackL1`（加粗版：90px 聚气环→双残影+7.2/3.2 引线刺向 P0→158~215px 笔直针尖菱锥 `maxHalfW 7.4`，`#facc15`+白芯，155ms 直切，head≥0.52 触发 onImpact，末端星芒+18 火星）移植进 `arcaneVfxModule` 并挂 `window`。协议适配：`synthTone`→`tone`、`playAssetFile`→`playSound('atk2',0.62,1.15)`、demo `update(dt)` 自摘除粒子协议改为主工程 `age/life+draw` 驱动粒子（lead-line 挂钩由 class 改 `data-cnt-lead*`，符合类名覆盖纪律）。
+  6. **finishDodge 反击分支替换**：移除原地 `playSound('atk2')+playSVGEffect('slash')`，改为 `playCounterAttackL1(target, caster, applyCounterImpact)`；扣血/防守反击嘲讽/飘字/历史/UI 更新整体移入命中回调；动效返回 0（无锚点）时回落立即结算。反击命中音按资产约定复用 atk2（由动效突进段播放）。
+  7. **回归夹具同步**：`hit-feedback-regression.js` 阈值断言更新为 9.9%→1、10%→2、49.9%→2、50%→3（受击三档新规格：≥50% 重伤档，原 50%→2 断言随规格变更修订）；新增「格挡/闪避三档与破盾识别」组 5 断言（blockTier/dodgeTier 分档、破盾识别、`window.playCounterAttackL1` 挂载）。两份产物专项断言版本钉 v12.01→v12.02。
+  8. **打包 v12.02**：`git mv` 产物改名 + `scriptName=前端战斗v12.02` + `node build-regex.cjs`（replaceString 1,189,144 字符，-31%）。
+- **涉及文件**：`index.html`、`regex-前端战斗v12_02.json`（自 v12_01 重命名）、`integration-test/fixtures/hit-feedback-regression.js`、`integration-test/attack-identity-artifact-check.cjs`、`integration-test/enemy-group-artifact-check.cjs`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：内联脚本 `new Function` 语法检查 2/2 通过；harness 全量回归 **1471 项全部通过**（原 1466+新增 5，修复类名覆盖缺 `cnt-lead` 与阈值规格两项后全绿）；产物专项断言 64+50 项全绿；自建产物断言 41 项全绿（新代码入包、围栏无裸反引号、实体全量 &amp; 免疫、$ 捕获组免疫、8766 仅内网）；monsterAttack 计数 3 处与 v12.01 产物一致（资产表+自爆预警+红色单体前摇；AGENTS.md「恰好 2 处」描述相对现状少算红色单体前摇一处，非本轮引入，备案）。
+- **边界**：三档音效/反击动效实机观感（音频倍速、破盾即时性、居合拍点）以用户导入酒馆复测为准；IAB harness 覆盖逻辑正确性，动画 rAF 时序如需精调走排障模式。
