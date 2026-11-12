@@ -3436,3 +3436,13 @@
      - **卡片与接线边界**：`CARDS` 配置自施/他人/大招 3 张演示卡；本轮仅交付独立 Demo 供实机验收，零修改 `index.html`、`demo-skill-vfx-template.html` 与打包产物。
 - **涉及文件**：`demo-skill-sand-marcher.html`、`D:\Project\my_assets\vfx_stygian_armor.jpg`、`D:\Project\my_assets\vfx_dream_marcher.jpg`、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：`node --check` 检查提取的全部内联 `<script>` 块（63,999 字节）Syntax OK；两张图片在 `my_assets` 存在性校验通过；Demo 严格遵循工作协定免测免审，直接交付用户实机确认后再按模板 §6.1 清单移植主工程。
+
+## [LOG-284] 2026-11-13 — 重构飞沙化甲(L2)与幻梦行军兽(L4)Demo为纯渐变粒子、低饱和暗紫三方案裂隙构图及Mixkit实录音效
+- **提交**：`25a1f72`。
+- **变更行为**：
+  1. **零硬线纯渐变粒子重造**：彻底删除 SVG 线框、虚线圆环、交叉准星及硬直 `streak`/`shard`/`feather` 粒子；Canvas 绘制统一收口为带 `p.hist` 运动拖尾的多阶径向渐变 `gradOrb`、软雾 `gradMist`、光斑 `gradFlare` 与渐变环 `ring`（全特效 `0 stroke`）。
+  2. **色彩隔离与视觉焦点（L4【蝎眼钥匙·幻梦行军兽】）**：放弃与沙漠背景混色的土黄色，改为低饱和暗紫/靛紫深渊裂隙雾霭孤立黑色钨钢重甲剪影；通过 `.arcane-marcher-beast-wrap` 裁切缩放将头盔与唯一暖琥珀瞳光（原图 `15.0%, 20.2%`）锁定至屏幕视觉中心 `(42.4%, 40.6%)`，并以三层遮罩（`z55` 前景雾 > `z52` 巨兽）营造从裂隙钻出的纵深；同步在 `#menu-container` 顶部提供 `#rift-scheme-bar` 纯净 Tab 切换 3 套构图（`vertical` 竖裂探身 / `diag` 斜裂飞扑 / `ground` 地裂仰出）。
+  3. **L2【飞沙化甲】纯渐变精修**：玄武岩冷靛灰冥河尘雾 + `p.hist` 灵尘拖尾飞射（`他人`）+ 软羽化月夜夜影铠（`y≈23%` 双目微芒）+ `[单瞄]` 青色流光彗星 + `[再动]` 上升气羽。
+  4. **真实专业音效（零合成振荡器）**：清理全部 Web Audio 振荡/噪声合成函数，自 Mixkit 下载并通过 `ffmpeg` 裁剪静音前导与峰值归一化（`peak=73%~93%`）落地 11 条 MP3 至 `D:\Project\my_assets\`（`vfx_armor_choir_mx633.mp3`、`vfx_beast_roar_mx1957.mp3`、`vfx_crystal_chime_mx2950.mp3`、`vfx_gear_lock_mx2160.mp3`、`vfx_golem_stomp_mx2150.mp3`、`vfx_rift_charge_mx2900.mp3`、`vfx_rift_tear_mx788.mp3`、`vfx_sand_unseal_mx2630.mp3`、`vfx_sand_wind_mx1461.mp3`、`vfx_stygian_whoosh_mx2918.mp3`、`vfx_void_tunnel_mx3057.mp3`）；引擎 `SFX_FILES`/`warmAllSfx`/`playSfxSample` 支持 `AudioBuffer` 与 `file://` 下 `new Audio` 自动降级，并保持 `audioCtx` 跨重置常驻以实现 0ms 重放。
+- **涉及文件**：`demo-skill-sand-marcher.html`、`D:\Project\my_assets\vfx_*.mp3`（11 个音效文件）、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：`node -e` 使用 `vm.Script` 校验内联 `<script>` 语法通过（`Inline script count: 1`、`Syntax check: OK`），审计 `createOscillator`/`stroke=`/`streak`/`shard`/`feather` 残留为 `[]`，Python `struct` 校验 11 个 MP3 非空且波形从首刻起振；遵循 Demo 免测免审协定直接交付实机查看。
