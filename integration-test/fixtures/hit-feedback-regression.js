@@ -201,9 +201,9 @@
       /* ========== 一、classifyHit：三维阈值、小额暴击、护盾破盾、混合与修饰符 ========== */
       await group('分类三维', async () => {
         const base = { targetId: 'e_hfb', outcome: 'hit', maxHp: 1000, hpBefore: 1000, hpAfter: 901, shieldBefore: 0, shieldAfter: 0 };
-        const tiers = [99, 100, 500, 510].map(d => classify(Object.assign({}, base, { hpDmg: d, hpAfter: 1000 - d })));
+        const tiers = [99, 100, 499, 500].map(d => classify(Object.assign({}, base, { hpDmg: d, hpAfter: 1000 - d })));
         eq(tiers.map(h => h.kind), ['hp', 'hp', 'hp', 'hp'], '扣血结果均为 hp 类');
-        eq(tiers.map(h => h.tier), [1, 2, 2, 3], '9.9%→1、10%→2、50%→2、51%→3 阈值不变');
+        eq(tiers.map(h => h.tier), [1, 2, 2, 3], '9.9%→1、10%→2、49.9%→2、50%→3 阈值（受击三档新规格：≥50% 重伤档）');
         const small = classify(Object.assign({}, base, { hpDmg: 5, hpAfter: 995, isCrit: true, isBurst: true }));
         eq([small.kind, small.tier, small.crit, small.burst], ['hp', 1, true, true], '小额暴击/爆发仍按比例定级，不升档');
         const burst99 = classify(Object.assign({}, base, { hpDmg: 99, hpAfter: 901, isBurst: true }));
@@ -211,6 +211,18 @@
         const crit510 = classify(Object.assign({}, base, { hpDmg: 510, hpAfter: 490, isCrit: true }));
         eq(crit510.tier, 3, '暴击修饰符不改 tier');
         eq([tiers[0].hpDmg, tiers[0].shieldDmg, tiers[0].crit, tiers[0].burst], [99, 0, false, false], '普通命中不误报暴击/爆发');
+      });
+
+      await group('格挡/闪避三档与破盾识别（受击音效移植新字段）', async () => {
+        const fullBlockBase = { targetId: 'e_hfb', outcome: 'hit', maxHp: 1000, hpBefore: 1000, hpAfter: 1000, shieldBefore: 0, shieldAfter: 0 };
+        const blocks = [99, 100, 500].map(d => classify(Object.assign({}, fullBlockBase, { hpDmg: 0, shieldDmg: 0, blockedDmg: d })));
+        eq(blocks.map(h => h.kind), ['block', 'block', 'block'], '全额被挡均归为 block 类');
+        eq(blocks.map(h => h.blockTier), [1, 2, 3], '被挡比例 9.9%→1、10%→2、50%→3 分档');
+        const dodges = [99, 100, 500].map(d => classify(Object.assign({}, fullBlockBase, { outcome: 'dodge', incomingDmg: d })));
+        eq(dodges.map(h => h.dodgeTier), [1, 2, 3], '来袭比例 9.9%→1、10%→2、50%→3 分档');
+        const brk = classify(Object.assign({}, fullBlockBase, { hpDmg: 30, hpAfter: 970, shieldDmg: 50, shieldBefore: 50, shieldAfter: 0 }));
+        eq([brk.kind, brk.shieldBroken], ['hp', true], '护盾归零即识别破盾瞬间（无论伤害多少均播 GuardBreak）');
+        eq(typeof w.playCounterAttackL1, 'function', '普通反击 L1 动效已挂载 window.playCounterAttackL1');
       });
 
       await group('护盾与混合', async () => {

@@ -904,6 +904,7 @@
     .arcane-identity-frost-rim { animation: arcane-identity-frost-flash 0.52s steps(1) both; }
     @keyframes arcane-identity-frost-flash { 0% { filter: brightness(1.38) hue-rotate(-14deg) saturate(1.4); } 65% { filter: none; } }
     @keyframes arcane-identity-slash-spark { 0% { transform: translate(-50%,-50%) scale(0.25); opacity: 1; } 35% { transform: translate(-50%,-50%) scale(1.15); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.45); opacity: 0; } }
+    @keyframes arcane-counter-charge-ring { 0% { transform: translate(-50%,-50%) scale(1.35) rotate(0deg); opacity: 0; } 35% { opacity: 0.95; } 100% { transform: translate(-50%,-50%) scale(0.32) rotate(54deg); opacity: 0.25; } }
 
 
 
@@ -4141,7 +4142,23 @@ const audioUrls = {
     'freeze01': `${ASSET_BASE}/freeze01.mp3`,
     'wolfman': `${ASSET_BASE}/wolfman.wav`,
     'creature_slime_01': `${ASSET_BASE}/creature_slime_01.ogg`,
-    'swish_3': `${ASSET_BASE}/swish_3.wav`
+    'swish_3': `${ASSET_BASE}/swish_3.wav`,
+    // 格挡三档（破盾瞬间固定最大档 GuardBreak）+ 闪避三档（Demo 选定 1B/2C/3C）+ 受击三档×3音（防连重随机池）
+    'parry_1': `${ASSET_BASE}/parry_Weapon_1.wav`,
+    'parry_2': `${ASSET_BASE}/parry_Weapon_3.wav`,
+    'parry_3': `${ASSET_BASE}/parry_Weapon_GuardBreak.wav`,
+    'dodge_1': `${ASSET_BASE}/dodge_1.mp3`,
+    'dodge_2': `${ASSET_BASE}/dodge_2.mp3`,
+    'dodge_3': `${ASSET_BASE}/dodge_3.mp3`,
+    'hit_1a': `${ASSET_BASE}/hit_1a.wav`,
+    'hit_1b': `${ASSET_BASE}/hit_1b.wav`,
+    'hit_1c': `${ASSET_BASE}/hit_1c.wav`,
+    'hit_2a': `${ASSET_BASE}/hit_2a.wav`,
+    'hit_2b': `${ASSET_BASE}/hit_2b.wav`,
+    'hit_2c': `${ASSET_BASE}/hit_2c.wav`,
+    'hit_3a': `${ASSET_BASE}/hit_3a.wav`,
+    'hit_3b': `${ASSET_BASE}/hit_3b.wav`,
+    'hit_3c': `${ASSET_BASE}/hit_3c.wav`
 };
 
 // 预热全量基础音效为 Blob URL，确保零延迟与 Web Audio API 无跨域限制
@@ -8102,16 +8119,20 @@ const arcaneVfxModule = (function () {
 
     function classifyHit(r) {
         const hpDmg = Math.max(0, r.hpDmg || 0), shieldDmg = Math.max(0, r.shieldDmg || 0);
+        const incomingDmg = Math.max(0, r.blockedDmg ?? r.incomingDmg ?? 0);
         let kind;
         if (r.outcome === 'dodge') kind = 'dodge';
         else if (r.outcome === 'block' || (hpDmg === 0 && shieldDmg === 0)) kind = 'block';
         else if (hpDmg > 0) kind = 'hp';
         else kind = 'shield';
         const ratio = r.maxHp > 0 ? hpDmg / r.maxHp : 0;
-        const tier = kind !== 'hp' ? 0 : ratio < 0.10 ? 1 : ratio <= 0.50 ? 2 : 3;
+        const tier = kind !== 'hp' ? 0 : ratio < 0.10 ? 1 : ratio < 0.50 ? 2 : 3;
+        const inRatio = r.maxHp > 0 ? incomingDmg / r.maxHp : 0;
+        const blockTier = r.blockTier || (inRatio < 0.10 ? 1 : inRatio < 0.50 ? 2 : 3);
+        const dodgeTier = r.dodgeTier || (inRatio < 0.10 ? 1 : inRatio < 0.50 ? 2 : 3);
         const shieldBroken = shieldDmg > 0 && (r.shieldBefore || 0) > 0 && (r.shieldAfter || 0) === 0;
         const landed = kind === 'hp' || kind === 'shield';
-        return { kind, tier, hpDmg, shieldDmg, shieldBroken, crit: landed && !!r.isCrit, burst: landed && !!r.isBurst };
+        return { kind, tier, blockTier, dodgeTier, incomingDmg, hpDmg, shieldDmg, shieldBroken, crit: landed && !!r.isCrit, burst: landed && !!r.isBurst };
     }
 
     function syncHitBar(id, hp, maxHp, force = false) {
@@ -8379,20 +8400,35 @@ const arcaneVfxModule = (function () {
         };
         if (stopMs) timers.push(after(stopMs, pop)); else pop();
     }
+    // ===== 受击三档×3音随机防连重音频池（demo-parry-dodge-counter 原样移植） =====
+    const HIT_AUDIO_POOL = {
+        1: ['hit_1a', 'hit_1b', 'hit_1c'],
+        2: ['hit_2a', 'hit_2b', 'hit_2c'],
+        3: ['hit_3a', 'hit_3b', 'hit_3c']
+    };
+    const _lastHitAudioIdx = { 1: -1, 2: -1, 3: -1 };
+
+    function playHitTierAudio(tier) {
+        const t = tier >= 3 ? 3 : tier === 2 ? 2 : 1;
+        const list = HIT_AUDIO_POOL[t] || HIT_AUDIO_POOL[1];
+        let idx = Math.floor(Math.random() * list.length);
+        if (list.length > 1 && idx === _lastHitAudioIdx[t]) {
+            idx = (idx + 1 + Math.floor(Math.random() * (list.length - 1))) % list.length;
+        }
+        _lastHitAudioIdx[t] = idx;
+        playSound(list[idx], t === 3 ? 0.94 : t === 2 ? 0.88 : 0.82);
+    }
     function hitAudio(list) {
         if (!identitySfxOn) return;
+        const anyBreak = list.some(h => h.shieldBroken), anyCrit = list.some(h => h.crit), anyBurst = list.some(h => h.burst);
+        // 破盾瞬间无论多少伤害均播最大档 (GuardBreak)
+        if (anyBreak) { playSound('parry_3', 0.95); return; }
         const score = h => h.kind === 'hp' ? 10 + h.tier * 10 : h.kind === 'shield' ? (h.shieldBroken ? 15 : 5) : h.kind === 'block' ? 3 : 1;
         const top = list.reduce((a, b) => score(b) > score(a) ? b : a);
-        const anyBreak = list.some(h => h.shieldBroken), anyCrit = list.some(h => h.crit), anyBurst = list.some(h => h.burst);
-        if (top.kind === 'dodge') { whoosh(0, { f0: 900, f1: 2600, q: 1.1, dur: 0.2, vol: 0.28, peak: 0.08, pan: -0.3, pan1: 0.3 }); return; }
-        if (top.kind === 'block') { click(0, 0.9, 2500, 0.02); tone(0, { type: 'square', f0: 900, dur: 0.05, vol: 0.06, cut: true }); tone(0.005, { type: 'triangle', f0: 1800, f1: 1650, dur: 0.14, vol: 0.05, wet: 0.3 }); return; }
-        if (top.kind === 'shield' && !anyBreak) { crystal(0, 1900, 0.1); tone(0, { f0: 1200, f1: 900, dur: 0.16, vol: 0.05, wet: 0.5 }); }
-        if (top.kind === 'hp') {
-            if (top.tier === 1) { click(0, 0.5, 3800, 0.012); kick(0, { hi: 190, lo: 95, pd: 0.02, dur: 0.08, vol: 0.32, drive: 2 }); }
-            else if (top.tier === 2) { click(0, 0.7, 3400); kick(0, { hi: 220, lo: 58, pd: 0.03, dur: 0.2, vol: 0.65, drive: 3 }); crunch(0, { f: 1400, f1: 600, q: 1.2, dur: 0.09, vol: 0.32 }); }
-            else { click(0, 0.85, 3000); kick(0, { hi: 170, lo: 36, pd: 0.05, dur: 0.44, vol: 1, drive: 4 }); boom(0.004, { f0: 1800, f1: 110, dur: 0.48, vol: 0.5, wet: 0.2 }); crunch(0, { f: 900, f1: 300, q: 1, dur: 0.15, vol: 0.45 }); }
-        }
-        if (anyBreak) { crunch(0, { f: 3500, f1: 1200, q: 2, dur: 0.18, vol: 0.4, drive: 8 }); [2600, 1900, 1300].forEach((f, i) => crystal(0.03 + i * 0.04, f, 0.07)); }
+        if (top.kind === 'dodge') { playSound('dodge_' + (top.dodgeTier || 1), (top.dodgeTier || 1) === 3 ? 0.92 : 0.82); return; }
+        if (top.kind === 'block') { playSound('parry_' + (top.blockTier || 1), (top.blockTier || 1) === 3 ? 0.95 : 0.85); return; }
+        if (top.kind === 'shield') { crystal(0, 1900, 0.1); tone(0, { f0: 1200, f1: 900, dur: 0.16, vol: 0.05, wet: 0.5 }); }
+        if (top.kind === 'hp') playHitTierAudio(top.tier || 1);
         if (anyBurst) { chime(0, 1320, 0.6, 0.07); tone(0, { f0: 660, f1: 990, dur: 0.25, vol: 0.05, wet: 0.6 }); }
         else if (anyCrit) { tone(0, { type: 'square', f0: 2400, f1: 1500, dur: 0.07, vol: 0.05 }); click(0, 0.6, 7000, 0.006); crystal(0.012, 3200, 0.07); }
     }
@@ -8436,6 +8472,187 @@ const arcaneVfxModule = (function () {
         document.querySelectorAll('.arcane-hit-recoil').forEach(el => el.classList.remove('arcane-hit-recoil'));
     }
     // ===== 命中结果反馈 END =====
+    // ===== 普通反击 L1：实心明黄笔直锐利居合切割轨 + 末端火星（demo-parry-dodge-counter 最新加粗版移植，总长 ~355ms） =====
+    function playCounterAttackL1(caster, target, onImpact) {
+        const fromRect = entityVisualRect(caster), toRect = entityVisualRect(target);
+        const fromDom = domOf(caster);
+        if (!fromRect || !toRect) return 0;
+        const dx = toRect.x - fromRect.x, dy = toRect.y - fromRect.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        const ux = dx / dist, uy = dy / dist;
+        const uid = ++S.uid;
+        const tokenNow = combatToken;
+
+        // 笔直居合切割线锚定敌方中心并斜贯穿透目标框（不弯不软，刚直锐利）
+        const flip = (uid % 2 === 0) ? 1 : -1;
+        const slashAngle = Math.atan2(dy, dx) + flip * 0.68;
+        const sx = Math.cos(slashAngle), sy = Math.sin(slashAngle);
+        const nx = -sy, ny = sx;
+        const span = Math.max(158, Math.min(215, toRect.w * 2.2));
+        const P0 = { x: toRect.x - sx * span * 0.50, y: toRect.y - sy * span * 0.50 };
+        const P2 = { x: toRect.x + sx * span * 0.56, y: toRect.y + sy * span * 0.56 };
+
+        // 1. 蓄势起手 (0 ~ 95ms)：后撤收步 + 紧致金黄聚气环 + 内吸微粒
+        if (fromDom) {
+            fromDom.animate([
+                { transform: 'translate3d(0,0,0) scale(1)' },
+                { transform: `translate3d(${(-ux * 9).toFixed(1)}px,${(-uy * 9).toFixed(1)}px,0) scale(0.95)`, offset: 0.25 },
+                { transform: `translate3d(${(ux * 32).toFixed(1)}px,${(uy * 32).toFixed(1)}px,0) scale(1.06)`, offset: 0.62 },
+                { transform: 'translate3d(0,0,0) scale(1)' }
+            ], { duration: 330, easing: 'cubic-bezier(0.22,0.85,0.32,1)' });
+        }
+        tone(0, { type: 'triangle', f0: 540, f1: 1280, dur: 0.09, vol: 0.09 });
+        fsLayer(`
+          <div class="arcane-fs-anchor" style="left:${fromRect.x}px;top:${fromRect.y}px;width:90px;height:90px;animation:arcane-counter-charge-ring 115ms ease-in forwards;">
+            <svg viewBox="0 0 100 100" class="w-full h-full arcane-identity-glow-amber">
+              <circle cx="50" cy="50" r="38" fill="none" stroke="#facc15" stroke-width="2.6" stroke-dasharray="14 8"/>
+              <circle cx="50" cy="50" r="22" fill="none" stroke="#fef08a" stroke-width="2"/>
+              <circle cx="50" cy="50" r="6" fill="#ffffff"/>
+            </svg>
+          </div>`, 135);
+        burst(6, i => {
+            const a = (i / 6) * Math.PI * 2 + rnd(-0.2, 0.2), r = 32;
+            return { x: fromRect.x + Math.cos(a) * r, y: fromRect.y + Math.sin(a) * r, vx: -Math.cos(a) * 3.4, vy: -Math.sin(a) * 3.4, drag: 0.92, decay: 0.1, size: 2.0, color: pick(['#fef08a', '#facc15', '#ffffff']) };
+        });
+
+        // 2. 高速残影突进 & 直线刺向起斩点 (90 ~ 155ms)
+        after(90, () => {
+            if (tokenNow !== combatToken) return;
+            playSound('atk2', 0.62, 1.15);
+            [0, 32].forEach((delayMs, idx) => {
+                after(delayMs, () => {
+                    if (tokenNow !== combatToken || !fromDom) return;
+                    const reach = Math.min(dist * (0.34 + idx * 0.24), 108);
+                    const gLayer = fsLayer('', 165);
+                    const g = document.createElement('div');
+                    g.className = 'arcane-identity-ghost';
+                    g.style.cssText = `left:${fromRect.left}px;top:${fromRect.top}px;width:${fromRect.w}px;height:${fromRect.h}px;border:1px solid rgba(250,204,21,0.65);box-shadow:0 0 12px rgba(250,204,21,0.5);filter:sepia(0.5) saturate(2.2) brightness(1.15);`;
+                    g.innerHTML = fromDom.innerHTML.replace(/ id="[^"]*"/g, '');
+                    gLayer.appendChild(g);
+                    g.animate([
+                        { transform: `translate3d(${(ux * reach * 0.25).toFixed(1)}px,${(uy * reach * 0.25).toFixed(1)}px,0) scale(1)`, opacity: 0.55 },
+                        { transform: `translate3d(${(ux * reach).toFixed(1)}px,${(uy * reach).toFixed(1)}px,0) scale(0.97)`, opacity: 0 }
+                    ], { duration: 140, easing: 'cubic-bezier(0.16,0.9,0.28,1)', fill: 'forwards' });
+                });
+            });
+
+            const dPath = `M ${fromRect.x.toFixed(1)} ${fromRect.y.toFixed(1)} L ${P0.x.toFixed(1)} ${P0.y.toFixed(1)}`;
+            const trLayer = fsLayer(`
+              <svg class="arcane-identity-svg-full arcane-identity-glow-amber">
+                <path data-cnt-lead d="${dPath}" fill="none" stroke="#facc15" stroke-width="7.2" stroke-linecap="round" pathLength="1" style="stroke-dasharray:0.35 1;stroke-dashoffset:0.35;"/>
+                <path data-cnt-lead-core d="${dPath}" fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" pathLength="1" style="stroke-dasharray:0.28 1;stroke-dashoffset:0.28;"/>
+              </svg>`, 150);
+            trLayer.querySelector('[data-cnt-lead]').animate([{ strokeDashoffset: 0.35, opacity: 1 }, { strokeDashoffset: -0.95, opacity: 0 }], { duration: 100, easing: 'cubic-bezier(0.14,0.86,0.28,1)', fill: 'forwards' });
+            trLayer.querySelector('[data-cnt-lead-core]').animate([{ strokeDashoffset: 0.28, opacity: 1 }, { strokeDashoffset: -0.98, opacity: 0 }], { duration: 92, easing: 'cubic-bezier(0.14,0.86,0.28,1)', fill: 'forwards' });
+        });
+
+        // 3. 敌方身上快速变化的笔直实心黄色切割线 + 末端火星 (145 ~ 300ms)
+        after(145, () => {
+            if (tokenNow !== combatToken) return;
+            let elapsed = 0;
+            const dur = 155;
+            let impacted = false;
+            let sparked = false;
+
+            const linePt = t => ({
+                x: P0.x + (P2.x - P0.x) * t,
+                y: P0.y + (P2.y - P0.y) * t
+            });
+
+            // 主工程 fxEngine 粒子协议适配：age/life 驱动粒子 + draw 钩子（demo 为 update(dt) 自摘除协议）
+            fxEngine.addParticle({
+                age: 0, life: 1e9, x: 0, y: 0, vx: 0, vy: 0,
+                update(p) {
+                    if (tokenNow !== combatToken) { p.age = p.life; return; }
+                    elapsed += fxEngine.lastDt || 16.7;
+                    const u = Math.min(1, elapsed / dur);
+                    // 刀尖极速斜穿刺出，刀尾紧追收成细线消失于末端
+                    const head = 1 - Math.pow(1 - Math.min(1, u * 1.65), 3);
+                    const tail = Math.pow(Math.max(0, (u - 0.16) / 0.84), 1.55);
+
+                    if (!impacted && head >= 0.52) {
+                        impacted = true;
+                        shake('light');
+                        if (onImpact) onImpact();
+                    }
+
+                    if (!sparked && head >= 0.96) {
+                        sparked = true;
+                        const baseAng = slashAngle;
+                        // 轨迹终点锐利瞬闪星芒
+                        fsLayer(`
+                          <div class="arcane-identity-anchor" style="left:${P2.x}px;top:${P2.y}px;width:64px;height:64px;transform:translate(-50%,-50%) rotate(${(baseAng * 180 / Math.PI).toFixed(1)}deg);animation:arcane-identity-slash-spark 0.17s ease-out both;">
+                            <svg viewBox="-32 -32 64 64" class="w-full h-full arcane-identity-glow-amber">
+                              <polygon points="-28,0 -4,-2.5 0,-20 4,-2.5 28,0 4,2.5 0,20 -4,2.5" fill="#fffbeb"/>
+                            </svg>
+                          </div>`, 190);
+                        // 轨迹末端炸裂高能火星（沿切出方向飞溅）
+                        burst(18, () => {
+                            const a = baseAng + rnd(-0.88, 0.88);
+                            const spd = rnd(4.5, 11.2);
+                            return {
+                                x: P2.x + rnd(-2, 2),
+                                y: P2.y + rnd(-2, 2),
+                                vx: Math.cos(a) * spd,
+                                vy: Math.sin(a) * spd,
+                                grav: 0.14,
+                                drag: 0.90,
+                                decay: rnd(0.052, 0.088),
+                                size: rnd(1.5, 2.5),
+                                shape: 'streak',
+                                color: pick(['#ffffff', '#fef08a', '#facc15', '#fb923c'])
+                            };
+                        });
+                    }
+
+                    if (u >= 1) p.age = p.life; // 画完即摘除驱动粒子
+                },
+                draw(g) {
+                    const u = Math.min(1, elapsed / dur);
+                    const head = 1 - Math.pow(1 - Math.min(1, u * 1.65), 3);
+                    const tail = Math.pow(Math.max(0, (u - 0.16) / 0.84), 1.55);
+                    if (head <= tail + 0.008) return;
+                    const A = linePt(tail), B = linePt(head);
+                    // 中段偏前处放置最厚棱肩，形成刚硬尖刺长剑气菱锥（两头针尖、绝对笔直）
+                    const peakT = tail + (head - tail) * 0.72;
+                    const M = linePt(peakT);
+                    const maxHalfW = 7.4 * (1 - u * 0.45);
+                    const innerHalfW = maxHalfW * 0.48;
+
+                    g.save();
+                    g.globalCompositeOperation = 'source-over';
+                    g.globalAlpha = 1;
+                    g.shadowColor = '#f59e0b';
+                    g.shadowBlur = 14;
+
+                    // 实心亮黄笔直锐利剑气（细长菱形针锥）
+                    g.beginPath();
+                    g.moveTo(A.x, A.y);
+                    g.lineTo(M.x + nx * maxHalfW, M.y + ny * maxHalfW);
+                    g.lineTo(B.x, B.y);
+                    g.lineTo(M.x - nx * maxHalfW, M.y - ny * maxHalfW);
+                    g.closePath();
+                    g.fillStyle = '#facc15';
+                    g.fill();
+
+                    // 内层实心极亮白金核心光线
+                    g.shadowBlur = 0;
+                    g.beginPath();
+                    g.moveTo(A.x, A.y);
+                    g.lineTo(M.x + nx * innerHalfW, M.y + ny * innerHalfW);
+                    g.lineTo(B.x, B.y);
+                    g.lineTo(M.x - nx * innerHalfW, M.y - ny * innerHalfW);
+                    g.closePath();
+                    g.fillStyle = '#ffffff';
+                    g.fill();
+
+                    g.restore();
+                }
+            });
+        });
+
+        return 355;
+    }
     function playAttackIdentityFx({ scope = 'single', subtype, caster, targets = [], outcomes = null, onImpact = null } = {}) {
         const list = Array.isArray(targets) ? targets.filter(Boolean) : (targets ? [targets] : []);
         const first = list[0];
@@ -8519,10 +8736,11 @@ const arcaneVfxModule = (function () {
     window.playEnemyWindup = playEnemyWindup;
     window.playAttackIdentityFx = playAttackIdentityFx;
     window.playHitFeedback = playHitFeedback;
+    window.playCounterAttackL1 = playCounterAttackL1;
     window.classifyHit = classifyHit;
     window.clearHitFeedback = clearHitFeedback;
     window.preloadAttackIdentitySample = warmIdentitySample;
-    return { isArcaneSkillFx, playArcaneSkillFx, playArcaneProjectile, clearArcaneFx, playEnemyWindup, playAttackIdentityFx, playHitFeedback, classifyHit, clearHitFeedback, syncHitBar, playWoundedHint, setIdentitySfx };
+    return { isArcaneSkillFx, playArcaneSkillFx, playArcaneProjectile, clearArcaneFx, playEnemyWindup, playAttackIdentityFx, playHitFeedback, playCounterAttackL1, classifyHit, clearHitFeedback, syncHitBar, playWoundedHint, setIdentitySfx };
 
 })();
 
@@ -17837,7 +18055,10 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
           }
       }
       const dodgeOpts = attackFeedbackOptions(caster, target, tag, skill, singleAttackFx, attackContext, true);
-      playHitFeedback({ targetId:target.id, outcome:'dodge', maxHp:target.maxHp, suppressDodgeFx:!!(reactionFx && reactionFx.dodge), isHero:targetType === 'hero' }, dodgeOpts);
+      // 来袭伤害口径与下方结算段一致（fixedRawDamage 优先，否则补掷同分布随机值），供闪避三档音效分档
+      if (fixedRawDamage == null && _segRoll == null) _segRoll = 0.8 + Math.random() * 0.4;
+      const _dodgeIncomingDmg = fixedRawDamage != null ? fixedRawDamage : computeSegmentRawDamage(caster, tagPower, multiplier, skill, target, _segRoll);
+      playHitFeedback({ targetId:target.id, outcome:'dodge', maxHp:target.maxHp, incomingDmg:_dodgeIncomingDmg, suppressDodgeFx:!!(reactionFx && reactionFx.dodge), isHero:targetType === 'hero' }, dodgeOpts);
       addHistory(`   ↳ 但被 ${target.name} 敏捷地闪避了！`);
 
       // 闪避成功：我方英雄借身法走位积攒 +5 TP（与受击+10、施法+5 并列的潜能来源）
@@ -17866,29 +18087,30 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
               
               await sleep(300); if (_actionToken !== combatToken || _pipelineFrozen) return;
               const casterDom = getEntitySpriteDom(caster) || (caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`));
-              
-              playSound('atk2');
-              playSVGEffect(casterDom, 'slash');
-              
-              caster.hp -= counterHpDmg;
-              if(casterDom) casterDom.classList.add('shake'); setTimeout(() => { if (_actionToken !== combatToken) return;  if(casterDom) casterDom.classList.remove('shake') }, 400);
-              
-              if (target.classType === '防守者' && (counterHpDmg > 0 || counterShieldDmg > 0)) {
-                  target.baseTauntBonus = (target.baseTauntBonus || 0) + 20;
-                  addHistory(`   ↳ 🛡️ ${target.name} 的防守反击吸引了更多仇恨 (嘲讽值永久+20)！`);
-              }
 
-              if (counterShieldDmg > 0 && counterHpDmg === 0) { 
-                  createFloatingText(casterDom, `反击 -${counterShieldDmg} 破盾`, 'text-slate-300'); 
-                  addHistory(`   ⚔️ ${target.name} 闪避并趁势反击！对 ${caster.name} 的护盾造成了 ${counterShieldDmg} 点破坏。`); 
-              }
-              else { 
-                  createFloatingText(casterDom, `反击 -${counterHpDmg}`, 'text-amber-400'); 
-                  addHistory(`   ⚔️ ${target.name} 闪避并趁势反击！迅速一击命中了 ${caster.name}，造成了 ${counterHpDmg} 点伤害！${counterShieldDmg>0?` (附带破盾${counterShieldDmg})`:''}`); 
-              }
-              if (caster.id.startsWith('h')) updateHeroUI(caster);
-              else { tryTriggerEnemyLowHpSpeak(caster); tryTriggerEnemyMolt(caster); tryTriggerEnemyRage(caster); tryTriggerEnemyLink(caster); updateEnemyUI(caster); }
-              if (target.id.startsWith('h')) updateHeroUI(target); else updateEnemyUI(target);
+              // 普通反击 L1：蓄势→残影突进→居合直切（atk2 音效由动效突进段播放），命中拍点回调内结算扣血/飘字/UI
+              const applyCounterImpact = () => {
+                  caster.hp -= counterHpDmg;
+                  if(casterDom) casterDom.classList.add('shake'); setTimeout(() => { if (_actionToken !== combatToken) return;  if(casterDom) casterDom.classList.remove('shake') }, 400);
+
+                  if (target.classType === '防守者' && (counterHpDmg > 0 || counterShieldDmg > 0)) {
+                      target.baseTauntBonus = (target.baseTauntBonus || 0) + 20;
+                      addHistory(`   ↳ 🛡️ ${target.name} 的防守反击吸引了更多仇恨 (嘲讽值永久+20)！`);
+                  }
+
+                  if (counterShieldDmg > 0 && counterHpDmg === 0) {
+                      createFloatingText(casterDom, `反击 -${counterShieldDmg} 破盾`, 'text-slate-300');
+                      addHistory(`   ⚔️ ${target.name} 闪避并趁势反击！对 ${caster.name} 的护盾造成了 ${counterShieldDmg} 点破坏。`);
+                  }
+                  else {
+                      createFloatingText(casterDom, `反击 -${counterHpDmg}`, 'text-amber-400');
+                      addHistory(`   ⚔️ ${target.name} 闪避并趁势反击！迅速一击命中了 ${caster.name}，造成了 ${counterHpDmg} 点伤害！${counterShieldDmg>0?` (附带破盾${counterShieldDmg})`:''}`);
+                  }
+                  if (caster.id.startsWith('h')) updateHeroUI(caster);
+                  else { tryTriggerEnemyLowHpSpeak(caster); tryTriggerEnemyMolt(caster); tryTriggerEnemyRage(caster); tryTriggerEnemyLink(caster); updateEnemyUI(caster); }
+                  if (target.id.startsWith('h')) updateHeroUI(target); else updateEnemyUI(target);
+              };
+              if (!window.playCounterAttackL1(target, caster, applyCounterImpact)) applyCounterImpact();
           } else {
               addHistory(`   ↳ ${target.name} 虽处于反击架势，但无法触及并反击[${incomingDamageType}]攻击！`);
           }
@@ -18098,6 +18320,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         const from = getEntitySpriteDom(caster), a = from && from.getBoundingClientRect(), b = targetDom && targetDom.getBoundingClientRect();
         playHitFeedback({ targetId:target.id, outcome:'hit', maxHp:target.maxHp, hpBefore, hpAfter, hpDmg:feedbackHpDmg,
             shieldBefore, shieldAfter, shieldDmg:feedbackShieldDmg, isCrit:!!(skill && skill._critDouble), isBurst:burstGuarantee,
+            blockedDmg:(feedbackHpDmg === 0 && feedbackShieldDmg === 0) ? rawDamage : 0,
             isHero:targetType === 'hero', dirX:a && b ? b.left + b.width / 2 - a.left - a.width / 2 : 0.25,
             dirY:a && b ? b.top + b.height / 2 - a.top - a.height / 2 : -0.35 }, attackFeedbackOptions(caster, target, tag, skill, singleAttackFx, attackContext));
     }
