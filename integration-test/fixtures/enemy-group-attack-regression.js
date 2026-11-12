@@ -1,6 +1,9 @@
-/* 敌方群体攻击演出回归：三级优先级（专属fxTag > 旧括号subtype > 新group兜底）、防atk1双播、
+/* 敌方群体攻击演出回归：三级优先级（专属fxTag > 旧括号子类型 > 新group兜底）、防atk1双播、
    动态目标与屏障伪实体、350ms爆发拍点与取消清理。
-   逻辑组用微任务假时钟加速结算；真实绘制组恢复真实时钟、跑真实fxEngine帧，不用假时钟验证动画拍点。
+   现状对齐：显式群攻(爆炸/雷/火焰/枪击/毒雾/冰霜/风/光)走 playAttackIdentityFx 群体专属采样，
+   旧群霰弹仍保留扇形+逐目标击发；命中/闪避统一交 playHitFeedback，不再逐目标 playSound/atk1。
+   逻辑组用微任务假时钟加速结算，并对 identity/feedback 只做真实签名包装计数；
+   真实绘制组恢复真实 identity/feedback 模块、真实时钟与真实fxEngine帧。
    全部断言走运行时/宽容格式匹配，不依赖内部局部变量名与源码行号，兼容压缩产物。 */
 (function () {
   'use strict';
@@ -18,7 +21,8 @@
       'playSound', 'playCustomAudio', 'playSVGEffect', 'createFloatingText', 'promptReaction', 'addHistory',
       'updateHeroUI', 'updateEnemyUI', 'updateTeamBarrierUI', 'spawnFocusOverlay', 'spawnChargeUpParticles',
       'spawnDefaultAOEParticles', 'spawnExplosionParticles', 'spawnThunderAOEParticles', 'spawnFireAOEParticles',
-      'spawnHitFlash', 'triggerScreenShake', 'playEnemyFlinchAnim', 'spawnDodgeSmokeParticles', 'playWebMFX', 'playAOEEffect'];
+      'spawnHitFlash', 'triggerScreenShake', 'playEnemyFlinchAnim', 'spawnDodgeSmokeParticles', 'playWebMFX', 'playAOEEffect',
+      'playAttackIdentityFx', 'playSingleAttackFx', 'playHitFeedback'];
     api.forEach(name => { if (ev('typeof ' + name) !== 'function') pending.push('接口缺失:' + name); });
     const urls = ev('typeof audioUrls !== "undefined" ? audioUrls : null');
     ['enemyMeleeGroupHit', 'enemyRangedGroupHit'].forEach(key => {
@@ -46,7 +50,7 @@
     };
     const calls = { skills: [], projectiles: [], svg: [], sounds: [], floats: [], focus: [], charge: [],
       defaultAoe: [], explosion: [], thunderAoe: [], fireAoe: [], webm: [], customAudio: [], reactionPrompts: [],
-      shatter: 0, shake: 0, cancelled: [] };
+      identity: [], feedback: [], shatter: 0, shake: 0, cancelled: [] };
     const clearCalls = () => Object.keys(calls).forEach(k => { if (Array.isArray(calls[k])) calls[k].length = 0; else calls[k] = 0; });
     const realSkill = w.playArcaneSkillFx;
     const realShatter = w.triggerBarrierShatter;
@@ -88,6 +92,12 @@
     };
     const atkCount = key => calls.sounds.filter(s => s.key === key).length;
     const keyByGroup = { melee: 'group:melee', ranged: 'group:ranged', spell: 'group:spell' };
+    const outcomeOf = (outcomes, t) => {
+      if (typeof outcomes === 'function') return outcomes(t);
+      if (outcomes && typeof outcomes.get === 'function') return outcomes.get(t && t.id);
+      if (outcomes && typeof outcomes === 'object') return outcomes[t && t.id];
+      return 'hit';
+    };
     let restoreAudio = null, errQueue = [], onErr = null, onRej = null;
 
     try {
@@ -131,12 +141,28 @@
         calls.skills.push({ tag, caster, targets, reaction, handle });
         return handle;
       });
+      // 真实签名包装：记录身份演出并按目标同步触发 onImpact 元信息，不复制/乱序动画。
+      replace('playAttackIdentityFx', ({ scope = 'single', subtype, targets = [], outcomes = null, onImpact = null } = {}) => {
+        const list = (Array.isArray(targets) ? targets : [targets]).filter(Boolean);
+        calls.identity.push({ scope, subtype, targets: list, outcomes });
+        const handle = { doneAt: Date.now(), cancel() {}, onFinish: new Set() };
+        list.forEach(t => { if (onImpact) onImpact(t, { scope, subtype, outcome: outcomeOf(outcomes, t), beatMs: 0, point: { x: 0, y: 0 } }); });
+        return handle;
+      });
+      // 逻辑组只计数九合成结果与入口参数；真实行为由 hit-feedback-regression.js 专测。
+      replace('playHitFeedback', (results, opts = {}) => {
+        (Array.isArray(results) ? results : [results]).filter(Boolean)
+          .forEach(r => calls.feedback.push({ targetId: r.targetId, outcome: r.outcome, hpDmg: r.hpDmg, suppressDodgeFx: r.suppressDodgeFx, opts }));
+        return { doneAt: Date.now(), cancel() {} };
+      });
       replace('triggerBarrierShatter', () => { calls.shatter++; });
 
       /* ========== 一、子类型与兜底判定（纯函数矩阵：三级优先级） ========== */
       await group('子类型与兜底判定', async () => {
         eq(['[散射(霰弹)]', '[群攻(爆炸)]', '[眩晕(雷)]', '[群攻]', '[群回]', '[单体(火焰)]'].map(t => w.resolveGroupAttackSubtypeFx(t)),
-          ['shotgun', 'explosion', 'thunder', null, null, null], '旧括号三子类型精确识别，其余为null');
+          [null, 'explosion', null, null, null, null], '仅群攻标签的旧括号子类型被识别，单体/眩晕/散射不再误匹配');
+        eq(['[群散射(霰弹)]', '[群攻(爆炸)]', '[群攻(雷)]', '[群攻(火焰)]', '[群攻(毒雾)]', '[群攻(冰霜)]', '[群攻(风)]', '[群攻(光)]'].map(t => w.resolveGroupAttackSubtypeFx(t)),
+          ['shotgun', 'explosion', 'thunder', 'fire', 'poison', 'frost', 'wind', 'light'], '群攻八个子类型仍精确识别');
         const enemy = entity('e_grp');
         const esum = entity('s_eg', { isSummon: true, side: 'enemy' });
         const hsum = entity('s_hg', { isSummon: true, side: 'hero' });
@@ -194,8 +220,9 @@
         eq(calls.skills.length, 1, '含反应目标时group演出仍只一次');
         eq(d2.h[0].hp, 3000, '逐目标反应窗口仍开启：反应成功者免伤');
         check(calls.reactionPrompts.indexOf('h_grp0') !== -1, '反应弹窗仍按目标逐个询问');
-        check(calls.floats.some(t => String(t).indexOf('闪避') !== -1), '反应闪避原浮字保留');
-        check(calls.sounds.some(s => s.key === 'miss'), '闪避原音保留');
+        check(!calls.floats.some(t => String(t).indexOf('闪避') !== -1), '反应闪避不再走旧createFloatingText浮字');
+        check(calls.feedback.some(f => f.targetId === 'h_grp0' && f.outcome === 'dodge'), '群攻闪避改由playHitFeedback统一记录');
+        eq(atkCount('miss'), 0, '群攻闪避不再走旧playSound miss');
         check(d2.h[1].hp < 3000, '无反应技能者正常受伤');
 
         const d3 = installData([entity('h_grp0')], [entity('s_eg', { isSummon: true, side: 'enemy', skills: [skill('【群魔弹】[群攻;power:80][法术][MP:10]')] })]);
@@ -203,11 +230,13 @@
         await w.executeSkillAction(d3.e[0], null, d3.e[0].skills[0], 1);
         eq(calls.skills.length, 1, '敌方召唤物施放群攻同样走新兜底');
         check(d3.h[0].hp < 3000, '敌方召唤物群攻实际结算');
-        const dg = installData([entity('h_grp0', { spd: 1000 })], [entity('e_grp')]);
+        const dg = installData([entity('h_grp0', { spd: 1000 })], [entity('e_grp', { skills: [skill('【群枪】[群攻(枪击);power:80][远程][MP:10]')] })]);
         clearCalls();
-        await w.applySingleTagEffect(dg.e[0], dg.h[0], '[群攻(枪击)]', 80, 100, 1, null, attack('远程', '群攻(枪击)'));
-        eq(atkCount('gunshot1') + atkCount('gunshot2') + atkCount('gunshot3') + atkCount('atk1'), 0, '新版远程群攻闪避不逐目标叠加枪声');
-        eq(atkCount('miss'), 1, '新版群攻仍保留真实闪避声');
+        await w.executeSkillAction(dg.e[0], null, dg.e[0].skills[0], 1);
+        eq(calls.identity.map(c => [c.scope, c.subtype]), [['aoe', '枪击']], '显式群枪击改身份群体演出');
+        eq(atkCount('gunshot1') + atkCount('gunshot2') + atkCount('gunshot3') + atkCount('atk1'), 0, '群枪击不再逐目标叠加旧枪声');
+        check(calls.feedback.some(f => f.targetId === 'h_grp0' && f.outcome === 'dodge'), '群枪击闪避统一由playHitFeedback记录');
+        check(calls.feedback.every(f => f.opts.suppressAudio === true), '群身份主采样接管时抑制旧命中合成音');
       });
 
       /* ========== 三、多标签一次 / 旧括号与专属优先 / 英雄与英雄召唤旧路径保持 ========== */
@@ -223,18 +252,22 @@
             d = installData([entity('h_grp0'), entity('h_grp1')], [entity('e_grp', { skills: [skill('【旧括号群攻】[群攻(' + subtype + ');power:120][' + type + '][MP:10]')] })]);
             clearCalls();
             await w.executeSkillAction(d.e[0], null, d.e[0].skills[0], 1);
-            eq(calls.skills.length, 0, '括号优先，不启动新版：' + subtype + '/' + type);
-            if (subtype === '爆炸') check(calls.explosion.length >= 1, '爆炸+类型仍走原explosion：' + type);
-            else if (subtype === '雷') check(calls.thunderAoe.length >= 1, '雷+类型仍走原thunder：' + type);
-            else check(calls.svg.includes('shotgun') && calls.sounds.some(s => s.key === 'xiandan'), '霰弹+类型保留扇面和逐目标击发：' + type);
-            if (subtype !== '霰弹') eq(atkCount('atk1'), 2, '旧括号逐目标atk1保持：' + subtype + '/' + type);
+            eq(calls.skills.length, 0, '括号优先，不启动group兜底演出：' + subtype + '/' + type);
+            if (subtype === '霰弹') {
+              check(calls.svg.includes('shotgun') && calls.sounds.some(s => s.key === 'xiandan'), '霰弹+类型保留扇面和逐目标击发：' + type);
+            } else {
+              eq(calls.identity.map(c => [c.scope, c.subtype]), [['aoe', subtype]], '显式群' + subtype + '改身份群体演出：' + type);
+              eq(calls.explosion.length + calls.thunderAoe.length, 0, '不再走旧playAOEEffect粒子：' + subtype + '/' + type);
+              eq(atkCount('atk1') + atkCount('atk2'), 0, '身份专属采样接管，不逐目标atk1：' + subtype + '/' + type);
+              check(d.h.every(x => x.hp < 3000), '身份群体伤害实际结算：' + subtype + '/' + type);
+            }
           }
         }
 
         d = installData([entity('h_grp0')], [entity('e_grp', { skills: [skill('【燃烧群弹】[群攻(爆炸);power:120][特效:燃烧弹][MP:10]')] })]);
         clearCalls();
         await w.executeSkillAction(d.e[0], null, d.e[0].skills[0], 1);
-        eq(calls.skills.length, 0, '专属fxTag最高优先：不启动group演出');
+        eq(calls.skills.length, 0, '专属fxTag最高优先：不启动group兜底演出');
         check(calls.webm.indexOf('燃烧弹') !== -1, '燃烧弹WebM专属演出保留');
         check(calls.customAudio.some(u => u.indexOf('ranshao') !== -1), '燃烧弹专属独立音效保留');
         check(calls.fireAoe.length >= 1, '燃烧弹火焰粒子保留');
@@ -259,17 +292,23 @@
         await w.applySingleTagEffect(d.e[0], d.h[0], '[单体]', 80, 100, 1, null, attack('法术'));
         eq([calls.sounds.length, calls.svg.length], [0, 0], '敌方单点无括号不叠通用音画');
         eq(calls.projectiles, ['enemy_spell'], '敌方单点保留原版紫色弹道（非群标签不接管）');
+        eq(calls.feedback.map(f => f.outcome), ['hit'], '敌方法术命中记录统一反馈');
         clearCalls();
         await w.applySingleTagEffect(d.e[0], d.h[0], '[群攻]', 80, 100, 1, null, attack('法术'));
         eq(atkCount('atk1') + atkCount('atk2'), 0, '新兜底群攻tag命中不叠通用atk1/atk2');
+        check(calls.feedback.some(f => f.targetId === 'h_grp0' && f.outcome === 'hit' && f.opts.suppressAudio === true),
+          '群兜底命中交playHitFeedback并抑制旧合成音');
         clearCalls();
         await w.applySingleTagEffect(d.h[0], d.e[0], '[单体]', 80, 100, 1, null, attack());
         eq(calls.sounds.map(s => s.key), ['atk2'], '英雄单体原音保留');
         eq(calls.svg, ['slash'], '英雄单体原刀光保留');
+        eq(calls.feedback.map(f => f.outcome), ['hit'], '英雄单体命中记录统一反馈');
         clearCalls();
         await w.applySingleTagEffect(d.e[0], d.h[0], '[单体(爆炸)]', 80, 100, 1, null, attack('法术', '单体(爆炸)'));
-        eq(calls.sounds.map(s => s.key), ['atk2'], '旧括号爆炸原受击音保留');
-        check(calls.svg.indexOf('explosion_single') !== -1, '旧括号爆炸原视觉保留');
+        eq(calls.sounds, [], '旧括号单爆不再播旧atk2受击音');
+        eq(calls.svg, [], '旧括号单爆不再走旧SVG');
+        eq(calls.identity.map(c => [c.scope, c.subtype]), [['single', '爆炸']], '显式单体爆炸改身份演出');
+        eq(calls.feedback.map(f => f.outcome), ['hit'], '单爆命中记录统一反馈');
         clearCalls();
         clearCalls();
         await w.applySingleTagEffect(d.e[0], d.h[0], '[单体]', 80, 100, 1, null, attack('法术', '单体', 80, '火焰01'));
@@ -287,7 +326,8 @@
         ev('teamBarrier=99999;teamBarrierMax=99999;');
         clearCalls();
         await w.applySingleTagEffect(d.e[0], b, '[单体(爆炸)]', 80, 100, 1, null, attack('法术', '单体(爆炸)'));
-        eq(calls.sounds.map(s => s.key), ['atk2'], '旧括号屏障原音保留');
+        eq(calls.sounds, [], '单爆屏障命中不再旧atk2');
+        eq(calls.identity.map(c => [c.scope, c.subtype]), [['single', '爆炸']], '屏障受单爆走身份演出');
 
         ev('teamBarrier=10;teamBarrierMax=10;');
         clearCalls();
@@ -315,11 +355,11 @@
           w.applySingleTagEffect = async (...args) => { seen.push(args[1]); return hits(...args); };
           try { await w.executeSkillAction(d.e[0], null, d.e[0].skills[0], 1); }
           finally { w.applySingleTagEffect = hits; }
-          eq(calls.skills.length, 1, '屏障'+barrier+'群攻演出只一次');
+          eq(calls.skills.length, 1, '屏障' + barrier + '群攻演出只一次');
           const fxTarget = calls.skills[0].targets;
-          check(fxTarget.length === 1 && fxTarget[0].isBarrierTarget, '屏障'+barrier+'只传单个伪实体');
-          check(seen[0] === fxTarget[0] && fxTarget[0].proxyHero && !fxTarget[0].proxyHero.isSummon, '屏障'+barrier+'演出与结算共用真实普通英雄proxy');
-          eq(atkCount('atk1'), 0, '屏障'+barrier+'逻辑结算不重复atk1');
+          check(fxTarget.length === 1 && fxTarget[0].isBarrierTarget, '屏障' + barrier + '只传单个伪实体');
+          check(seen[0] === fxTarget[0] && fxTarget[0].proxyHero && !fxTarget[0].proxyHero.isSummon, '屏障' + barrier + '演出与结算共用真实普通英雄proxy');
+          eq(atkCount('atk1'), 0, '屏障' + barrier + '逻辑结算不重复atk1');
           if (barrier > 80) check(d.h.every(h => h.hp === 3000), '屏障全挡全员HP不变');
           else check(d.h.every(h => h.hp < 3000), '破盾泄漏依原规则伤及全员');
         } } finally { w.triggerBarrierShatter = trigger; }
@@ -330,6 +370,9 @@
       w.clearArcaneFx();
       ev('_barrierShattering=false;');
       w.playArcaneSkillFx = realSkill;
+      // 真实绘制组恢复真实身份与命中反馈模块，不用逻辑组计数桩掩盖真实残留。
+      w.playAttackIdentityFx = functions.get('playAttackIdentityFx');
+      w.playHitFeedback = functions.get('playHitFeedback');
       const makeParam = v => ({ value: v, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {},
         setTargetAtTime() {}, cancelScheduledValues() {}, setValueCurveAtTime() {} });
       const makeNode = () => {
@@ -484,6 +527,13 @@
       /* ========== 六、真实execute：三类型爆发音量、350ms拍点与防双播 ========== */
       await group('真实execute三类型拍点', async () => {
         const texts = { melee: '【敌群扫击】[群攻;power:80][MP:10]', ranged: '【敌群狙击】[群攻;power:80][远程][MP:10]', spell: '【敌群魔弹】[群攻;power:80][法术][MP:10]' };
+        const hitLayers = () => w.document.querySelectorAll('[data-arcane-fx="hit-num"]').length;
+        const groupLayers = () => w.document.querySelectorAll('[data-arcane-fx]:not([data-arcane-fx="hit-num"])').length;
+        const settle = async label => {
+          for (let i = 0; i < 30 && hitLayers(); i++) await wait(80);
+          eq(groupLayers(), 0, label + 'execute自然收尾无演出残留');
+          eq(hitLayers(), 0, label + '命中反馈层按寿命自然清理');
+        };
         for (const grp of ['melee', 'ranged', 'spell']) {
           const key = keyByGroup[grp];
           if (!key) { check(false, grp + '群键缺失，跳过真实execute拍点'); continue; }
@@ -502,7 +552,7 @@
           check(d.h[0].hp < 3000, grp + '群攻结算伤害落地');
           if (grp === 'spell') eq(atkCount('atk1'), 1, '法术群atk1恰一次（无逐目标双播）');
           else eq(atkCount('atk1'), 0, grp + '群攻无通用atk1双播');
-          eq(w.document.querySelectorAll('[data-arcane-fx]').length, 0, grp + 'execute自然收尾无演出残留');
+          await settle(grp);
         }
       });
       eq(errQueue, [], '真实绘制与fxEngine循环帧期间无未捕获异常（render兼容/坐标，error与rejection）');

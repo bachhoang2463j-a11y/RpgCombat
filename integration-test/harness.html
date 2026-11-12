@@ -32,11 +32,17 @@
 <script src="fixtures/opening-roster-regression.js"></script>
 <script src="fixtures/arcane-vfx-regression.js"></script>
 <script src="fixtures/enemy-group-attack-regression.js"></script>
+<script src="fixtures/attack-identity-regression.js"></script>
+<script src="fixtures/hit-feedback-regression.js"></script>
 <script>
 const TEST_PARAMS = new URLSearchParams(location.search);
 const RPG_SOURCE = TEST_PARAMS.get('artifact') === '1'
-  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v11_5.json')
+  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v12_0.json')
   : (TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html');
+const RPG_READABLE_SOURCE = TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html';
+// 结构断言读取可读源码；行为断言始终操作 RPG_SOURCE 挂载的真实源码或压缩产物。
+let readableSourcePromise;
+const readRpgSource = () => readableSourcePromise || (readableSourcePromise = fetch(RPG_READABLE_SOURCE, { cache:'reload' }).then(r => r.text()));
 /* ==========================================================================
    mock 酒馆助手环境
    - 按 message / chat / global 三种作用域实现变量存储，insertOrAssign 深合并、
@@ -193,6 +199,7 @@ async function mountFrame(frameId, url, baseHref, readyProbe) {
     '<script>(function(){var M=parent.__MOCK.api;for(var k in M){window[k]=M[k];}' +
     'var data=new Map();Object.defineProperty(window,"localStorage",{value:{getItem:k=>data.has(String(k))?data.get(String(k)):null,setItem:(k,v)=>data.set(String(k),String(v)),removeItem:k=>data.delete(String(k)),clear:()=>data.clear(),key:i=>Array.from(data.keys())[i]||null,get length(){return data.size;}}});' +
     '})()\x3c/script>';
+  if (frameId === 'rpg') rpgSourceHtml = html;
   const patched = html.replace(/<head([^>]*)>/i, (m) => m + boot);
   const f = document.getElementById(frameId);
   f.srcdoc = patched;
@@ -204,7 +211,7 @@ async function mountFrame(frameId, url, baseHref, readyProbe) {
   throw new Error(frameId + ' 未在 20 秒内就绪');
 }
 
-let mmsFrame = null, rpgFrame = null;
+let mmsFrame = null, rpgFrame = null, rpgSourceHtml = '';
 const mmsWin = () => mmsFrame.contentWindow;
 const rpgWin = () => rpgFrame.contentWindow;
 
@@ -1133,7 +1140,7 @@ async function test18() {
 /* ================= 断言 19：反引号围栏纪律（酒馆引号美化管线兼容） ================= */
 async function test19() {
   head('19 反引号围栏纪律：组件源码不得破坏酒馆 ``` 配对豁免链');
-  const src = await (await fetch(RPG_SOURCE, { cache: 'reload' })).text();
+  const src = await readRpgSource();
   // ① 廉价不变量：组件文件自带头尾围栏（```html ... ```）之外，内部不得再有三连反引号——
   //    酒馆 script.js 的引号美化正则靠 ``` 两两配对豁免代码块，组件内部冒出奇数个围栏序列会把
   //    配对链错位到同楼层其他组件（状态栏 <q> 污染事故：全篇引号被包 <q> → 脚本语法错误 → 渲染失败）
@@ -1162,7 +1169,7 @@ async function test19() {
 
 async function test20() {
   head('20 编辑器双 bug 回归：弹窗 onclick 污染 + 召唤物发散守卫');
-  const src = await (await fetch(RPG_SOURCE, { cache: 'reload' })).text();
+  const src = await readRpgSource();
   // ① bug1 静态断言：源码不再有裸 modal.onclick = closeEditor 赋值（任何冒泡 click 都会关掉编辑器）
   check(!src.includes('modal.onclick = closeEditor;'), '源码无裸 modal.onclick = closeEditor 赋值');
   // ② bug1 静态断言：openEditor 防御性清除残留 handler
@@ -1202,7 +1209,7 @@ async function test20() {
 
 async function test21() {
   head('21 Tailwind 静态编译纪律：Play CDN 清零 + 编译块结构 + 类名覆盖零缺失');
-  const src = await (await fetch(RPG_SOURCE, { cache: 'reload' })).text();
+  const src = await readRpgSource();
   // ① Play CDN 引用清零（运行时 JIT 的 MutationObserver 全文档监听 × 高频 DOM 变动的持续编译税，改为构建期编译内联）
   check(!src.includes('cdn.tailwindcss.com'), 'Play CDN 引用清零');
   // ② 编译块结构：标记唯一、<style> 恰 2 块、位置在自定义 </style> 之后 </head> 之前
@@ -1261,7 +1268,7 @@ async function test21() {
 
 async function test22() {
   head('22 LLM 路径性能两件套：聊天上下文深拷贝→浅拷贝 + 调试日志全量 gate');
-  const src = await (await fetch(RPG_SOURCE, { cache: 'reload' })).text();
+  const src = await readRpgSource();
   // ① 深拷贝移除（原实现先 JSON round-trip 整段聊天史、之后才截取最近 N 楼——长对话每次调用白付几十 MB）
   check(!src.includes('JSON.parse(JSON.stringify(ctx.chat))'), '全量深拷贝聊天记录已移除');
   check(src.includes('allMsgs = ctx.chat.slice();'), '改为数组浅拷贝 ctx.chat.slice()');
@@ -1319,7 +1326,7 @@ async function test22() {
 
 async function test23() {
   head('23 重击特效降本：震屏提层 + filter 闪色 steps 化 + stroke-width/双层 drop-shadow 清理');
-  const src = await (await fetch(RPG_SOURCE, { cache: 'reload' })).text();
+  const src = await readRpgSource();
   // ① 四个震屏类带 will-change: transform（场景树提层缓存，震动改走合成器；类由 setTimeout 移除，层自动释放）
   for (const cls of ['ranged-heavy-shake', 'melee-heavy-shake', 'gunshot-shake', 'pierce-shake']) {
     check(new RegExp('\\.' + cls + ' \\{[^}]*will-change: transform').test(src), '.' + cls + ' 带 will-change: transform');
@@ -1339,8 +1346,8 @@ async function test23() {
   for (const name of ['ranged-heavy-enemy-recoil-flash', 'enemy-ram-knockback-flash', 'enemy-gunshot-flinch-flash', 'enemy-pierce-stutter-flash']) {
     check(src.includes('@keyframes ' + name + ' {'), 'steps 闪色 keyframes ' + name + ' 存在');
   }
-  const stepFlashCount = src.includes('function playSingleAttackFx(') ? 15 : 13;
-  eq((src.match(/-flash 0\.\d+s steps\(1\) both/g) || []).length, stepFlashCount, '原十三个闪色挂载点及新增单点枪击／霰弹接点均携带 steps(1)');
+  const stepFlashCount = src.includes('SINGLE_IDENTITY_TYPES') ? 14 : src.includes('function playSingleAttackFx(') ? 15 : 13;
+  eq((src.match(/-flash 0\.\d+s steps\(1\) both/g) || []).length, stepFlashCount, '旧专属闪色仍携带 steps(1)，身份受击由统一命中层接管');
   // ④b [单体(火焰)] 炽核聚爆·十字裂变：主关键帧纯 transform/opacity，filter 全部拆入 steps(1) 子动画（同霰弹纪律）
   for (const name of ['fire-supernova-implode', 'fire-supernova-beam-h', 'fire-supernova-beam-v', 'fire-supernova-debris', 'fire-supernova-core-flash', 'fire-supernova-beam-flash', 'fire-supernova-debris-flash']) {
     check(src.includes('@keyframes ' + name + ' {'), '炽核聚爆 keyframes ' + name + ' 存在');
@@ -1387,7 +1394,7 @@ async function test23() {
 
 async function test24() {
   head('24 常驻 infinite 底噪清零：敌人 sprite 辉光 filter 逐帧动画改静态');
-  const src = await (await fetch(RPG_SOURCE, { cache: 'reload' })).text();
+  const src = await readRpgSource();
   // ① breathe（全体敌方 sprite 常驻 4s 呼吸）：keyframes 不再逐帧插值 drop-shadow，辉光改类上静态中值
   const breatheKf = (src.match(/@keyframes breathe \{[^\n]*\}/) || [])[0] || '';
   check(!/filter:/.test(breatheKf), '@keyframes breathe 不再逐帧动画 filter');
@@ -1409,7 +1416,7 @@ async function test24() {
 
 async function test25() {
   head('25 WebM 特效抠图成本控制：rVFC 节流 + 画布封顶降采样 + screen 降级开关');
-  const src = await (await fetch(RPG_SOURCE, { cache: 'reload' })).text();
+  const src = await readRpgSource();
   const start = src.indexOf('function playWebMFX(x, y, fxTag) {');
   const end = src.indexOf('function spawnFrostParticles');
   const fx = start !== -1 && end !== -1 ? src.slice(start, end) : '';
@@ -1497,7 +1504,7 @@ async function test26() {
 
 async function test27() {
   head('27 全屏 SVG 特效：[特效:造雾术]/[特效:高阶召唤术] 注册·挂载·清理');
-  const src = await (await fetch(RPG_SOURCE, { cache: 'reload' })).text();
+  const src = await readRpgSource();
   // ① 注册表：两个标签、纯 SVG（url 空）、particles 类型、delay、音效配置
   check(/'造雾术': \{ url: '', scale: 1\.0, particles: 'rlyeh_sediment', audioUrl: RLYEH_FOG_CLOUD_URL \}/.test(src), '注册表：造雾术（fog.mp3，无 delay 立即结算）');
   check(/'高阶召唤术': \{ url: '', scale: 1\.0, particles: 'titan_gaze', audioUrl: 'none', delay: 1\.0 \}/.test(src), '注册表：高阶召唤术（古神低语合成 + delay 1.0）');
@@ -2000,7 +2007,7 @@ async function test31() {
   check(fxNoThrow && ev('typeof spawnShotgunParticles') === 'function', 'Canvas 粒子层：shotgun 映射不抛错（spawnShotgunParticles）');
 
   // --- ⑫b 霰弹 SVG 性能优化（真机卡顿反馈）：四组主关键帧零逐帧 filter/stroke-width，全部拆 steps(1) 子动画 ---
-  const kfSrc = await (await fetch(RPG_SOURCE)).text();
+  const kfSrc = await readRpgSource();
   const seg = (from, to) => kfSrc.slice(kfSrc.indexOf('@keyframes ' + from), kfSrc.indexOf('@keyframes ' + to));
   const segFlare = seg('shotgun-muzzle-flare', 'shotgun-flare-flash');
   const segShock = seg('shotgun-shockwave-fan', 'shotgun-shock-thinning');
@@ -2011,8 +2018,8 @@ async function test31() {
   for (const name of ['shotgun-flare-flash', 'shotgun-shock-thinning', 'shotgun-pellet-flash', 'shotgun-impact-flash']) {
     check(kfSrc.includes('@keyframes ' + name + ' {'), 'steps(1) 子动画 ' + name + ' 存在');
   }
-  const shotgunFlashCount = kfSrc.includes('function playSingleAttackFx(') ? 3 : 2;
-  eq((kfSrc.match(/enemy-shotgun-recoil-flash 0\.38s steps\(1\) both/g) || []).length, shotgunFlashCount, '霰弹受击调用均按 steps(1) 播放（含单点统一接点）');
+  const shotgunFlashCount = kfSrc.includes('SINGLE_IDENTITY_TYPES') ? 2 : kfSrc.includes('function playSingleAttackFx(') ? 3 : 2;
+  eq((kfSrc.match(/enemy-shotgun-recoil-flash 0\.38s steps\(1\) both/g) || []).length, shotgunFlashCount, '旧霰弹专属接点保留steps闪色，身份受击不再叠旧flinch');
   check(!kfSrc.includes('drop-shadow(0 0 20px #f59e0b) drop-shadow(0 0 35px #ea580c)'), '爆焰层双 drop-shadow 已并单');
   check(!kfSrc.includes('background: #fde68a; animation: shotgun-shrapnel-spark 0.3s ${pt.delay + 0.02}s ease-out both; filter: drop-shadow'), '18 颗火星 drop-shadow 辉光已去除（6px 圆点肉眼不可辨）');
   check(kfSrc.includes('style="opacity: 0.6; filter: blur(7px);"'), '硝烟 3×SVG blur 并为容器单次 blur');
@@ -2104,7 +2111,7 @@ async function test32() {
 
 async function test33() {
   head('33 [特效:障壁术] 六边晶格特效（视觉方案1+音效方案3） + 屏障只罩英雄行');
-  const src = await (await fetch(RPG_SOURCE)).text();
+  const src = await readRpgSource();
   const w = rpgWin();
 
   // --- ① 接入链路：注册表 / particles 分派 / executeSkillAction 特判 / 枪击豁免 ---
@@ -2216,7 +2223,7 @@ async function test33() {
 
 async function test34() {
   head('34 屏障被击碎演出（demo 方案5：色差闪断 + 微晶爆散，音效 atk1）+ 圣域帷幕 delay 0.6');
-  const src = await (await fetch(RPG_SOURCE)).text();
+  const src = await readRpgSource();
   const w = rpgWin();
 
   // --- ① 接入链路：关键帧 / 演出函数 / 两条归零路径挂载 / atk1 音效 ---
@@ -2469,7 +2476,7 @@ async function test37() {
   head('37 编辑器平铺子行去重（③）+ 组分类断链兜底（④）');
   const w = rpgWin();
   const ev = (expr) => w.eval('(function(){ return ' + expr + '; })()');
-  const src = await (await fetch(RPG_SOURCE, { cache: 'reload' })).text();
+  const src = await readRpgSource();
 
   // --- ③ 静态断言：编辑器技能列表跳过 _inGroup 平铺行 + 计数过滤 ---
   check(/h\.skills\.forEach\(\(s, si\) => \{\s*\n\s*if \(s\._inGroup\) return;/.test(src), '编辑器技能列表循环跳过 _inGroup 平铺行');
@@ -2510,7 +2517,7 @@ async function test38() {
   head('38 征伐者职业被动（速度差增伤 / 带速 buff 暴击 / 越前排双通道 / 首回合加速 / 速度差闪避）');
   const w = rpgWin();
   const ev = (expr) => w.eval('(function(){ return ' + expr + '; })()');
-  const src = await (await fetch(RPG_SOURCE, { cache: 'reload' })).text();
+  const src = await readRpgSource();
   const P = 'CLASS_PASSIVES["征伐者"]';
 
   // --- ① 动能冲踏·速度差增伤（返回加法系数，每超 10 点 +5%） ---
@@ -2565,7 +2572,7 @@ async function test39() {
   head('39 编辑器头像兜底 onerror 加固（断自触发循环 + 游离节点空值保护）');
   const w = rpgWin();
   const ev = (expr) => w.eval('(function(){ return ' + expr + '; })()');
-  const src = await (await fetch(RPG_SOURCE, { cache: 'reload' })).text();
+  const src = await readRpgSource();
 
   // 静态：英雄（👤）/敌人（emoji）两处头像兜底均已加固
   eq((src.match(/onerror="this\.onerror=null;this\.src='';if\(this\.parentElement\)this\.parentElement\.innerHTML=/g) || []).length, 2,
@@ -2784,13 +2791,26 @@ async function test45() {
   const result = await window.runEnemyGroupAttackRegression({ w: rpgWin(), check, eq, mock: MOCK });
   eq(result.pending, [], '敌方群攻专项全部落地，无待对齐项');
 }
+async function test46() {
+  head('46 两期攻击身份统合：20类、拍点、闪避与取消');
+  if (TEST_PARAMS.get('version') === 'public') return;
+  if (TEST_PARAMS.get('artifact') === '1') out('info', '运行目标：真实压缩产物；只读源码结构另行检查，产物结构由专项断言验证。');
+  const result = await window.runAttackIdentityRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
+  eq(result.pending, [], '20类身份专项全部落地，无待对齐项');
+}
+async function test47() {
+  head('47 命中三维分层：血液、双层血条、波次与清理');
+  if (TEST_PARAMS.get('version') === 'public') return;
+  const result = await window.runHitFeedbackRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
+  eq(result.pending, [], '命中分层专项全部落地，无待对齐项');
+}
 async function runAll() {
   logEl.textContent = '';
   passN = failN = 0;
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47];
   const selectedTests = TEST_PARAMS.has('tests') ? new Set(TEST_PARAMS.get('tests').split(',').map(n => 'test' + n)) : null;
   for (const t of tests) {
     if (selectedTests && !selectedTests.has(t.name)) continue;

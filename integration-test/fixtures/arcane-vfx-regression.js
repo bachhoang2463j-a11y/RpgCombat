@@ -1,4 +1,7 @@
-/* 秘术动效回归：挂载真实引擎，逻辑计数与真实绘制分别验证，不复制战斗实现。 */
+/* 秘术动效回归：挂载真实引擎，逻辑计数与真实绘制分别验证，不复制战斗实现。
+   命中出口已统一：单点远程/召唤为 arrow 身份演出，伤害与闪避文字/音改走 playHitFeedback；
+   本文件对 playAttackIdentityFx 只做真实接口包装计数，playHitFeedback 只逻辑计数，
+   其真实 DOM/音频行为由 hit-feedback-regression.js 专项验证。 */
 (function () {
   'use strict';
   window.runArcaneVfxRegression = async function ({ w, check, eq, mock }) {
@@ -12,9 +15,10 @@
       '【折影步】[回避;power:900][MP:4][反应:近战][特效:折影步][法术]',
       '【巫师护盾】[单盾;power:180][MP:4][暴击:5%][反应][特效:巫师护盾][法术]'
     ];
-    const api = ['resolveSingleAttackFx', 'playSingleAttackFx', 'isArcaneSkillFx', 'playArcaneSkillFx', 'playArcaneProjectile', 'clearArcaneFx'];
+    const api = ['resolveSingleAttackFx', 'playSingleAttackFx', 'isArcaneSkillFx', 'playArcaneSkillFx', 'playArcaneProjectile',
+      'clearArcaneFx', 'playAttackIdentityFx', 'playHitFeedback'];
     const missing = api.filter(name => ev('typeof ' + name) !== 'function');
-    eq(missing, [], '秘术接口全部存在');
+    eq(missing, [], '秘术与命中出口接口全部存在');
     if (missing.length) return { pending: missing };
     const gen0 = mock.genCount();
     const saved = ev(`({ heroesData, enemiesData, initialHeroesCache, initialEnemiesCache, battleHistory, _historyRawCache,
@@ -27,7 +31,7 @@
       if (!functions.has(name)) functions.set(name, w[name]);
       w[name] = fn;
     };
-    const calls = { skills:[], projectiles:[], svg:[], sounds:[], floats:[], dodge:[], hit:[], dispel:[] };
+    const calls = { skills:[], projectiles:[], svg:[], sounds:[], floats:[], dodge:[], hit:[], dispel:[], identity:[], feedback:[], flinch:[] };
     const clearCalls = () => Object.values(calls).forEach(list => { list.length = 0; });
     const realSkill = w.playArcaneSkillFx, realProjectile = w.playArcaneProjectile;
     const timerIds = new Set();
@@ -59,6 +63,12 @@
       try { await fn(); }
       catch (e) { check(false, name + '执行异常', String(e.stack || e)); }
     };
+    const outcomeOf = (outcomes, t) => {
+      if (typeof outcomes === 'function') return outcomes(t);
+      if (outcomes && typeof outcomes.get === 'function') return outcomes.get(t && t.id);
+      if (outcomes && typeof outcomes === 'object') return outcomes[t && t.id];
+      return 'hit';
+    };
     try {
       w.setTimeout = (fn, ms, ...args) => {
         const id = {};
@@ -74,7 +84,8 @@
       for (const name of ['updateHeroUI','updateEnemyUI','updateTeamBarrierUI','renderTurnQueue','triggerBarrierShatter',
         'tryTriggerEnemyLowHpSpeak','tryTriggerEnemyMolt','tryTriggerEnemyRage','tryTriggerEnemyLink','notifyManaSpent',
         'triggerHighTierCombinedSpeak','triggerAllyHealSpeak','triggerAllyAutoSpeak','spawnFocusOverlay','spawnChargeUpParticles',
-        'spawnHitFlash','triggerScreenShake','spawnDodgeSmokeParticles','playEnemyFlinchAnim','playAOEEffect','playWebMFX','playCustomAudio']) replace(name, () => {});
+        'spawnHitFlash','triggerScreenShake','spawnDodgeSmokeParticles','playAOEEffect','playWebMFX','playCustomAudio']) replace(name, () => {});
+      replace('playEnemyFlinchAnim', dom => calls.flinch.push(dom && dom.id));
       replace('playSound', key => calls.sounds.push(key));
       replace('playRandomStandardGunshot', () => calls.sounds.push('gunshot'));
       replace('playShotgunSound', () => calls.sounds.push('shotgun'));
@@ -90,6 +101,20 @@
         return handle;
       });
       replace('playArcaneProjectile', async (type,from,to,dodged) => { calls.projectiles.push({type,from,to,dodged}); });
+      // 真实签名包装：只记录身份演出与逐目标 onImpact 元信息，不生成/复制动画。
+      replace('playAttackIdentityFx', ({ scope = 'single', subtype, targets = [], outcomes = null, onImpact = null } = {}) => {
+        const list = (Array.isArray(targets) ? targets : [targets]).filter(Boolean);
+        calls.identity.push({ scope, subtype, targets:list, outcomes });
+        const handle = { doneAt:Date.now(), cancel() {}, onFinish:new Set() };
+        list.forEach(t => { if (onImpact) onImpact(t, { scope, subtype, outcome:outcomeOf(outcomes, t), beatMs:0, point:{x:0,y:0} }); });
+        return handle;
+      });
+      // 命中反馈真实行为由专用 fixture 覆盖，此处只按引用记录九合成结果与入口参数。
+      replace('playHitFeedback', (results, opts = {}) => {
+        (Array.isArray(results) ? results : [results]).filter(Boolean)
+          .forEach(r => calls.feedback.push({ targetId:r.targetId, outcome:r.outcome, hpDmg:r.hpDmg, suppressDodgeFx:r.suppressDodgeFx, opts }));
+        return { doneAt:Date.now(), cancel() {} };
+      });
 
       await group('标签解析', async () => {
         const s = texts.map(t => w.parseSkill(t));
@@ -109,31 +134,46 @@
       await group('攻击分流', async () => {
         const h = entity('h_arcane0'), e = entity('e_arcane');
         const cases = [
-          [e,'[单体]',{damageType:'远程'},'gunshot'],[e,'[单体]',{damageType:'法术'},'enemy_spell'],
+          [e,'[单体]',{damageType:'远程'},'arrow'],[e,'[单体]',{damageType:'法术'},'enemy_spell'],
           [e,'[单体]',{},'slash'],[h,'[单体]',{damageType:'法术'},'slash'],
+          [h,'[单体]',{damageType:'远程'},'arrow'],
           [e,'[穿透(火焰)]',{damageType:'法术'},'fire'],[e,'[单体(枪击)]',{damageType:'法术'},'gunshot'],
           [e,'[散射(霰弹)]',{damageType:'法术'},'shotgun'],[e,'[单体(光)]',{},'light'],
           [e,'[单体(爆炸)]',{},'explosion_single'],[e,'[单体(雷)]',{},'thunder_single'],
           [e,'[单体(火焰)]',{fxTag:'火焰01'},null],[e,'[群攻]',{damageType:'法术'},null],
           [e,'[群攻(火焰)]',{damageType:'法术'},null],[e,'[单回]',{damageType:'法术'},null],
           [e,'[单避]',{damageType:'远程'},null],
+          [entity('s_arcane',{isSummon:true,side:'enemy'}),'[单体]',{damageType:'远程'},'arrow'],
           [entity('s_arcane',{isSummon:true,side:'enemy'}),'[单体]',{damageType:'法术'},'enemy_spell'],
+          [entity('s_arcane',{isSummon:true,side:'hero'}),'[单体]',{damageType:'远程'},'arrow'],
           [entity('s_arcane',{isSummon:true,side:'hero'}),'[单体]',{damageType:'法术'},'slash']
         ];
         cases.forEach(([caster,tag,s,expected],i) => eq(w.resolveSingleAttackFx(caster,tag,s),expected,'分流矩阵 ' + (i+1) + '：' + tag + ' / ' + (s.fxTag || s.damageType || '默认')));
         const d = installData([h],[e]);
         clearCalls();
         await w.applySingleTagEffect(d.e[0],d.h[0],'[单体]',50,100,1,null,attack('远程'));
-        eq(calls.svg.map(c => c.type),['gunshot'],'远程无枪击括号也实际播放枪击');
-        eq(calls.sounds.filter(s => s === 'gunshot').length,1,'远程来袭只响一次枪声');
+        eq(calls.identity.map(c => [c.scope,c.subtype]),[['single','箭矢']],'远程无括号双方统一走箭矢身份演出');
+        eq(calls.svg.length,0,'箭矢身份不再播放旧枪击SVG');
+        eq(calls.sounds, [], '箭矢身份不再走旧gunshot/miss音');
+        eq(calls.feedback.map(f => [f.targetId,f.outcome]),[['h_arcane0','hit']],'命中结果统一交由playHitFeedback');
+        eq(calls.feedback[0].opts.suppressAudio,false,'箭矢仅有发射采样，受击主音交给命中分层');
         clearCalls();
         await w.applySingleTagEffect(d.e[0],d.h[0],'[单体]',50,100,1,null,attack());
         eq(calls.projectiles.map(c => c.type),['enemy_spell'],'敌方法术实际播放紫色弹道');
         eq(calls.svg.length,0,'法术不叠默认刀光');
+        eq(calls.identity.length,0,'法术弹道不属于身份演出');
+        eq(calls.feedback.map(f => f.outcome),['hit'],'法术命中仍记录统一反馈');
         clearCalls();
         await w.applySingleTagEffect(d.h[0],d.e[0],'[穿透(火焰)]',50,100,1,null,attack('法术','穿透(火焰)'));
         eq(calls.projectiles.map(c => c.type),['fire'],'我方单点火焰实际进入新版弹道');
+        eq(calls.feedback.map(f => f.outcome),['hit'],'火焰弹道命中记录统一反馈');
         check(!d.e[0].buffs.some(b => b.type === 'burn'),'火焰视觉不自动附加燃烧');
+        clearCalls();
+        await w.applySingleTagEffect(d.e[0],d.h[0],'[单体(枪击)]',50,100,1,null,attack('法术','单体(枪击)'));
+        eq(calls.identity.map(c => c.subtype),['枪击'],'显式枪击改身份演出');
+        eq(calls.flinch.length,0,'枪击受击不再调用旧flinch函数');
+        eq(calls.svg.length,0,'身份枪击不叠旧gunshot SVG');
+        eq(calls.feedback.map(f => f.outcome),['hit'],'枪击命中由统一反馈承接');
       });
 
       await group('增益与主演出去重', async () => {
@@ -164,13 +204,23 @@
         eq(calls.svg.map(c => c.type),['shield'],'未配置新特效的技能保留默认盾牌');
       });
 
-      await group('刀光闪避音效', async () => {
-        for (const [type, speed, expected] of [['近战',1000,['miss']],['近战',1,['atk2']],['远程',1000,['gunshot','miss']]]) {
+      await group('刀光与命中反馈出口', async () => {
+        const cases = [
+          ['近战',1000,[],['slash'],'dodge'],
+          ['近战',1,['atk2'],['slash'],'hit'],
+          ['远程',1000,[],[],'dodge'],
+          ['远程',1,[],[],'hit']
+        ];
+        for (const [type, speed, expectedSounds, expectedSvg, expectedOutcome] of cases) {
           const d = installData([entity('h_arcane0',{spd:speed})],[entity('e_arcane')]);
+          const label = type + '／' + (speed > 1 ? '闪避' : '命中');
           clearCalls();
           await w.applySingleTagEffect(d.e[0],d.h[0],'[单体]',50,100,1,null,attack(type));
-          eq(calls.sounds,expected,'攻击音效：'+type+'／'+(speed > 1 ? '闪避成功' : '命中'));
-          if (type === '近战' && speed > 1) eq(calls.svg.map(c => c.type),['slash'],'闪避刀光保留挥空视觉，不响受击音');
+          eq(calls.sounds, expectedSounds, '攻击旧音效：' + label);
+          eq(calls.svg.map(c => c.type), expectedSvg, '攻击旧视觉：' + label);
+          eq(calls.feedback.map(f => f.outcome), [expectedOutcome], '命中结果统一由playHitFeedback承接：' + label);
+          if (type === '远程') eq(calls.identity.map(c => c.subtype), ['箭矢'], '远程无括号统一箭矢身份：' + label);
+          else eq(calls.identity.length, 0, '近战保留旧slash，不走身份演出：' + label);
         }
       });
 
@@ -180,15 +230,19 @@
         await w.applySingleTagEffect(d.e[0],d.h[0],'[单体]',50,100,1,null,attack('近战'));
         eq(calls.dodge,[true],'真实反应判定成功后才调用错身回调');
         eq(d.h[0].hp,500,'折影步成功保持HP不变');
-        check(calls.sounds.includes('miss') && calls.floats.includes('闪避'),'原闪避音和浮字保留');
+        eq(calls.svg.map(c => c.type),['slash'],'近战闪避保留挥空刀光');
         check(!calls.sounds.includes('atk2'),'折影步成功不叠加刀光受击音');
+        eq(calls.feedback.map(f => [f.targetId,f.outcome]),[['h_arcane0','dodge']],'闪避文字与音改由playHitFeedback统一');
+        check(!calls.floats.includes('闪避') && !calls.sounds.includes('miss'),'不再走旧createFloatingText闪避字与miss音');
+        check(calls.feedback[0] && calls.feedback[0].suppressDodgeFx === true,'反应闪避不重复烟尘演出');
         check(calls.skills[0].reaction === true,'反应技沿共用专属入口启动');
         d = installData([entity('h_arcane0',{skills:[skill(3)]})],[entity('e_arcane')]);
         w.Math.random = () => 0;
         clearCalls();
         await w.applySingleTagEffect(d.e[0],d.h[0],'[单体]',50,100,1,null,attack('近战'));
         eq(calls.dodge,[false],'二次判定失败不伪造成功闪避');
-        check(d.h[0].hp < 500 && !calls.floats.includes('闪避'),'失败仍按原规则受伤');
+        check(d.h[0].hp < 500 && !calls.feedback.some(f => f.outcome === 'dodge'),'失败仍按原规则受伤且不产生闪避反馈');
+        eq(calls.feedback.map(f => f.outcome),['hit'],'失败命中记录统一反馈');
         w.Math.random = () => 0.5;
         for (const [tag,expectedHit,expectedShield] of [['单体',1,130],['穿透',0,180]]) {
           d = installData([entity('h_arcane0',{skills:[skill(4)]})],[entity('e_arcane')]);

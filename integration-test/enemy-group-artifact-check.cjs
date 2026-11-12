@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ROOT = path.resolve(__dirname, '..');
-const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v11_5.json');
+const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_0.json');
 const pkg = JSON.parse(fs.readFileSync(artifact, 'utf8'));
 const src = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const fenced = pkg.replaceString;
@@ -48,8 +48,8 @@ function syntax(text, label) {
   } catch (e) { check(false, label + '脚本语法：' + e.message); }
 }
 
-console.log('== 敌方群攻 v11.5 产物专项 ==\n' + path.basename(artifact));
-check(pkg.scriptName === '前端战斗v11.5', 'scriptName 为前端战斗v11.5');
+console.log('== 敌方群攻 v12.0 产物专项 ==\n' + path.basename(artifact));
+check(pkg.scriptName === '前端战斗v12.0', 'scriptName 为前端战斗v12.0');
 check(count(src, '```') === 2 && /^```html\r?\n/.test(src) && /\r?\n```\s*$/.test(src), '源码围栏恰为头尾2处');
 check(count(fenced, '```') === 2 && /^```html\r?\n/.test(fenced) && /\r?\n```\s*$/.test(fenced), '产物围栏恰为头尾2处');
 check(!immune.includes('```'), '产物内部无裸三反引号');

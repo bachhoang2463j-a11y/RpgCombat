@@ -167,7 +167,7 @@
     /* ========= G3e executeEnemyTurn 敌方召唤：侧别过滤 + 空敌池（真实执行 + 静态） ========= */
     const etSrc = srcOf('executeEnemyTurn');
     if (etSrc && has('isIgnoredSummonTarget')) {
-      check(/enemy\.isSummon\s*&&\s*!\s*aliveHeroes\.length[\s\S]{0,200}?endTurn/.test(etSrc),
+      check(/[\w$]+\.isSummon\s*&&\s*!\s*[\w$]+\.length[\s\S]{0,200}?endTurn/.test(etSrc),
         '静态：executeEnemyTurn 敌方召唤空池 → endTurn');
       soft(etSrc.includes('isIgnoredSummonTarget'), '静态：executeEnemyTurn 按侧别过滤我方池', '侧别过滤未落地');
       const rec = { skill: 0, end: 0, targets: [] };
@@ -307,7 +307,7 @@
     /* ========= G6 普通眩晕保留：nextTurn 跳过判定（静态源码，硬断言） ========= */
     const ntSrc = srcOf('nextTurn');
     if (ntSrc) {
-      check(/\.type\s*===\s*'stun'/.test(ntSrc), '静态：nextTurn 仍按 buff.type===\'stun\' 判定跳过（普通眩晕保留）');
+      check(/\.type\s*===\s*['"]stun['"]|['"]stun['"]\s*===\s*[\w$]+\.type/.test(ntSrc), '静态：nextTurn 仍按 buff.type===\'stun\' 判定跳过（普通眩晕保留）');
       check(ntSrc.includes('isSubdued'), '静态：nextTurn 制服分支仍存在');
     } else {
       soft(false, 'nextTurn 跳过判定（静态源码）', '函数未落地');
