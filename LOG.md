@@ -3373,3 +3373,15 @@
 - **涉及文件**：`index.html`、`regex-前端战斗v12_01.json`、`integration-test/harness.html`、`integration-test/attack-identity-artifact-check.cjs`、`integration-test/enemy-group-artifact-check.cjs`、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：内联脚本 `new Function` 语法检查 2/2 通过；`node build-regex.cjs` 重打包成功（replaceString 1,182,963 字符）；产物专项断言 64+50 项全绿；浏览器命中分层专项 109 项全绿；IAB 实测合成血条 50%→70%（100px→140px），120ms 时中间值 135.6px、400ms 到达 140px，过渡结束后 `transition` 复位为 `none`。
 - **边界**：产物重命名（v12_0→v12_01）此前因并发会话提交被并入 `7b82ecc`（当时内容仍为 v12.0），本轮 `58e15da` 补齐 `scriptName` 与重打包内容；实机回血观感以用户复测为准。
+
+---
+
+## [LOG-279] 2026-11-12 — 更新 Demo：接入三档×3音随机防连重受击音效，重构普通反击 L1 为实心明黄变化切割轨迹+末端火星
+
+- **提交**：`a412da1`。
+- **变更行为**：
+  1. **三档×3音受击音效归档与不连重随机**：从 Skyrim SE Dynamic Impacts 模组复制 9 个选定受击 WAV 至 `D:\Project\my_assets\` 根目录（一档 `hit_1a~1c.wav` = `slash_light_01/14/15`；二档 `hit_2a~2c.wav` = `wpn_impact_blade_flesh_05/02/07`；三档 `hit_3a~3c.wav` = `wpn_impact_blunt_flesh_15` / `bladesmall_flesh_01/03`）。Demo 接入 `HIT_AUDIO_POOL` 与 `playHitTierAudio`，按档位随机抽取并过滤上一次索引防止连重。
+  2. **普通反击 L1 动效重做**：淘汰原有旋转半透明弯月刀片，改在 `fxEngine` 上基于二次贝塞尔法线轮廓逐帧绘制**在敌方身上快速推进收束的实心亮黄切割轨迹**（`#facc15` 实心主刃 + `#fefce8` 实心白金刃脊）；在轨迹结束瞬间于精确末端点（`P2`）爆出白金闪星与 18 颗高能溅射火星。
+  3. **演练面板更新**：在 `DEMO_GROUPS` 置顶新增【受击三档随机（每档3音防连重）】3 项卡片，并同步更新反击 L1 描述。
+- **涉及文件**：`demo-parry-dodge-counter.html`、`D:\Project\my_assets\hit_{1,2,3}{a,b,c}.wav`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：`node` `new Function` 内联脚本语法检查通过（2/2）；9 个 WAV 文件复制到 `my_assets` 字节核验非空；Demo 免测免审，交付用户实机体验确认。
