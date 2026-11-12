@@ -3423,3 +3423,16 @@
 - **涉及文件**：`index.html`、`regex-前端战斗v12_02.json`（自 v12_01 重命名）、`integration-test/fixtures/hit-feedback-regression.js`、`integration-test/attack-identity-artifact-check.cjs`、`integration-test/enemy-group-artifact-check.cjs`、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：内联脚本 `new Function` 语法检查 2/2 通过；harness 全量回归 **1471 项全部通过**（原 1466+新增 5，修复类名覆盖缺 `cnt-lead` 与阈值规格两项后全绿）；产物专项断言 64+50 项全绿；自建产物断言 41 项全绿（新代码入包、围栏无裸反引号、实体全量 &amp; 免疫、$ 捕获组免疫、8766 仅内网）；monsterAttack 计数 3 处与 v12.01 产物一致（资产表+自爆预警+红色单体前摇；AGENTS.md「恰好 2 处」描述相对现状少算红色单体前摇一处，非本轮引入，备案）。
 - **边界**：三档音效/反击动效实机观感（音频倍速、破盾即时性、居合拍点）以用户导入酒馆复测为准；IAB harness 覆盖逻辑正确性，动画 rAF 时序如需精调走排障模式。
+
+## [LOG-283] 2026-11-13 — 新增【飞沙化甲】与【蝎眼钥匙】嵌入式原画技能特效 Demo
+
+- **提交**：`bd19c96`。
+- **变更行为**：
+  1. **原画资产就位 `my_assets` 根目录**：将用户提供的冥河夜影与幻梦行军兽两张原画分别规范落盘至 `D:\Project\my_assets\vfx_stygian_armor.jpg`（111,311 B）与 `D:\Project\my_assets\vfx_dream_marcher.jpg`（129,102 B）。
+  2. **克隆空白演练模板并实现双技能嵌入式特效（`demo-skill-sand-marcher.html`）**：
+     - **资源解析器与双源预热**：`resolveVfxImg` 支持正式版 `ASSET_BASE` 与 Demo 态自动探测（`__RPG_ASSET_BASE__` → `127.0.0.1:8766` → `192.168.110.83:8766` → `../my_assets/` 相对路径直连兜底），并在启动时通过 `probeAndWarmVfxAssets()` 预热内存缓存；SVG `<image>` 保留暗色兜底轮廓与 `onerror` 容错。
+     - **① `【飞沙化甲】`（`playFeiShaHuaJia`，L2，蓄势 260ms / 总长 1150ms）**：玄武岩圣徽底阵碎裂＋冷砂螺旋升卷 → 260ms 爆发羽化椭圆裁切嵌合 `vfx_stygian_armor.jpg`（冷月夜影浮现＋头罩双眸蓝闪＋动态描边脉络＋十字冷蓝准星 `[单瞄]`）→ 620ms 明蓝八芒 `[再动]` 迅捷残影环；Web Audio 合成冰晶碎裂、升频沙风、重甲合拢铿锵与轻灵尾音。
+     - **② `【蝎眼钥匙】`（`playXieYanKey`，L4，蓄势 1420ms / 总长 3450ms）**：0.86 全屏暗幕＋齿轮蝎眼法阵＋6 枚深红结晶＋向心沙尘/火星坍缩→1290ms 触发 120ms 爆前顿帧（`hitStop`）→ 1420ms 全屏震动与十字破界光束撕开哥特菱形裂隙（内嵌 `vfx_dream_marcher.jpg` ＋角暗压晕影消融亮角＋`(133,91)` 义眼高光脉冲＋`「幻梦行军兽 · 构装降临」` 铭牌＋双侧 `source-over` 沙尘暴与赤金碎片）→ 2500ms 堡垒鞍钨钢金光飞流回落为目标赋予六边形 `[单防]` 护盾。
+     - **卡片与接线边界**：`CARDS` 配置自施/他人/大招 3 张演示卡；本轮仅交付独立 Demo 供实机验收，零修改 `index.html`、`demo-skill-vfx-template.html` 与打包产物。
+- **涉及文件**：`demo-skill-sand-marcher.html`、`D:\Project\my_assets\vfx_stygian_armor.jpg`、`D:\Project\my_assets\vfx_dream_marcher.jpg`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：`node --check` 检查提取的全部内联 `<script>` 块（63,999 字节）Syntax OK；两张图片在 `my_assets` 存在性校验通过；Demo 严格遵循工作协定免测免审，直接交付用户实机确认后再按模板 §6.1 清单移植主工程。
