@@ -98,7 +98,7 @@
         <div id="dodge-audition-drawer" class="w-[290px] bg-slate-950/92 backdrop-blur-xl rounded-xl border border-cyan-500/35 px-2.5 py-2 shadow-[0_12px_30px_rgba(0,0,0,0.85)]">
           <div class="flex items-center justify-between border-b border-slate-800 pb-1 mb-1.5">
             <span class="text-[10px] font-bold text-cyan-300">🎧 闪避三档候选试听（点即播+选用）</span>
-            <span id="audition-now-playing" class="text-[9px] font-mono text-slate-400 truncate max-w-[100px]">Mixkit 免版权</span>
+            <span id="audition-now-playing" class="text-[9px] font-mono text-cyan-300/90 truncate max-w-[110px]">默认: 1B · 2C · 3C</span>
           </div>
           <div id="dodge-audition-rows" class="flex flex-col gap-1.5"></div>
         </div>
@@ -218,7 +218,7 @@
             { id: 't3_c', label: 'C 狂风', name: 'Cinematic wind swoosh', file: 'dodge_candidates/dodge_t3_c_cinematic_wind.mp3', src: 'Mixkit #1468' }
         ]
     };
-    const selectedDodge = { 1: 0, 2: 0, 3: 0 };
+    const selectedDodge = { 1: 1, 2: 2, 3: 2 };
     const _blobCache = new Map();
     const _audioTagCache = new Map();
     let identitySfxOn = true;
