@@ -624,7 +624,7 @@
             if (!opts.suppressAudio) hitAudio(hs);
             after(HIT_LIFE_MS, () => { anims.forEach(a => a.cancel()); layer.remove(); S.layers.delete(layer); });
         }
-        // ===== 普通反击 L1 新版：实心明黄变化切割轨迹 + 末端火星（总长 ~370ms） =====
+        // ===== 普通反击 L1 新版：实心明黄笔直锐利切割轨 + 末端火星（总长 ~360ms） =====
         function playCounterAttackL1(caster, target, onImpact) {
             const fromRect = entityVisualRect(caster), toRect = entityVisualRect(target);
             const fromDom = domOf(caster);
@@ -635,48 +635,47 @@
             const uid = ++S.uid;
             const tokenNow = combatToken;
 
-            // 切割曲线锚定在敌方身体：每次微调斜角，沿轨迹快速滑过目标
+            // 笔直居合切割线锚定敌方中心并斜贯穿透目标框（不弯不软，刚直锐利）
             const flip = (uid % 2 === 0) ? 1 : -1;
-            const slashAngle = Math.atan2(dy, dx) + flip * 0.62;
+            const slashAngle = Math.atan2(dy, dx) + flip * 0.68;
             const sx = Math.cos(slashAngle), sy = Math.sin(slashAngle);
             const nx = -sy, ny = sx;
-            const span = Math.max(96, Math.min(138, toRect.w * 1.42));
-            const P0 = { x: toRect.x - sx * span * 0.56, y: toRect.y - sy * span * 0.56 };
-            const P1 = { x: toRect.x + nx * span * 0.18 * flip, y: toRect.y + ny * span * 0.18 * flip };
-            const P2 = { x: toRect.x + sx * span * 0.60, y: toRect.y + sy * span * 0.60 };
+            const span = Math.max(158, Math.min(215, toRect.w * 2.2));
+            const P0 = { x: toRect.x - sx * span * 0.50, y: toRect.y - sy * span * 0.50 };
+            const P2 = { x: toRect.x + sx * span * 0.56, y: toRect.y + sy * span * 0.56 };
 
-            // 1. 蓄势起手 (0 ~ 105ms)：后撤收步 + 紧致琥珀聚气环 + 内吸微粒
+            // 1. 蓄势起手 (0 ~ 95ms)：后撤收步 + 紧致金黄聚气环 + 内吸微粒
             if (fromDom) {
                 fromDom.animate([
                     { transform: 'translate3d(0,0,0) scale(1)' },
                     { transform: `translate3d(${(-ux * 9).toFixed(1)}px,${(-uy * 9).toFixed(1)}px,0) scale(0.95)`, offset: 0.25 },
                     { transform: `translate3d(${(ux * 32).toFixed(1)}px,${(uy * 32).toFixed(1)}px,0) scale(1.06)`, offset: 0.62 },
                     { transform: 'translate3d(0,0,0) scale(1)' }
-                ], { duration: 340, easing: 'cubic-bezier(0.22,0.85,0.32,1)' });
+                ], { duration: 330, easing: 'cubic-bezier(0.22,0.85,0.32,1)' });
             }
-            synthTone(0, { type: 'triangle', f0: 540, f1: 1280, dur: 0.095, vol: 0.09 });
+            synthTone(0, { type: 'triangle', f0: 540, f1: 1280, dur: 0.09, vol: 0.09 });
             fsLayer(`
-              <div class="arcane-fs-anchor" style="left:${fromRect.x}px;top:${fromRect.y}px;width:92px;height:92px;animation:arcane-counter-charge-ring 120ms ease-in forwards;">
+              <div class="arcane-fs-anchor" style="left:${fromRect.x}px;top:${fromRect.y}px;width:90px;height:90px;animation:arcane-counter-charge-ring 115ms ease-in forwards;">
                 <svg viewBox="0 0 100 100" class="w-full h-full arcane-identity-glow-amber">
                   <circle cx="50" cy="50" r="38" fill="none" stroke="#facc15" stroke-width="2.6" stroke-dasharray="14 8"/>
                   <circle cx="50" cy="50" r="22" fill="none" stroke="#fef08a" stroke-width="2"/>
                   <circle cx="50" cy="50" r="6" fill="#ffffff"/>
                 </svg>
-              </div>`, 140);
+              </div>`, 135);
             burst(6, i => {
                 const a = (i / 6) * Math.PI * 2 + rnd(-0.2, 0.2), r = 32;
                 return { x: fromRect.x + Math.cos(a) * r, y: fromRect.y + Math.sin(a) * r, vx: -Math.cos(a) * 3.4, vy: -Math.sin(a) * 3.4, drag: 0.92, decay: 0.1, size: 2.0, color: pick(['#fef08a', '#facc15', '#ffffff']) };
             });
 
-            // 2. 高速突进残影 & 实心导引线飞向切入起点 P0 (95 ~ 170ms)
-            after(95, () => {
+            // 2. 高速残影突进 & 直线刺向起斩点 (90 ~ 155ms)
+            after(90, () => {
                 if (tokenNow !== combatToken) return;
                 playAssetFile('atk2.mp3', 0.62, 1.15);
-                [0, 34].forEach((delayMs, idx) => {
+                [0, 32].forEach((delayMs, idx) => {
                     after(delayMs, () => {
                         if (tokenNow !== combatToken || !fromDom) return;
                         const reach = Math.min(dist * (0.34 + idx * 0.24), 108);
-                        const gLayer = fsLayer('', 175);
+                        const gLayer = fsLayer('', 165);
                         const g = document.createElement('div');
                         g.className = 'arcane-identity-ghost';
                         g.style.cssText = `left:${fromRect.left}px;top:${fromRect.top}px;width:${fromRect.w}px;height:${fromRect.h}px;border:1px solid rgba(250,204,21,0.65);box-shadow:0 0 12px rgba(250,204,21,0.5);filter:sepia(0.5) saturate(2.2) brightness(1.15);`;
@@ -685,54 +684,43 @@
                         g.animate([
                             { transform: `translate3d(${(ux * reach * 0.25).toFixed(1)}px,${(uy * reach * 0.25).toFixed(1)}px,0) scale(1)`, opacity: 0.55 },
                             { transform: `translate3d(${(ux * reach).toFixed(1)}px,${(uy * reach).toFixed(1)}px,0) scale(0.97)`, opacity: 0 }
-                        ], { duration: 145, easing: 'cubic-bezier(0.16,0.9,0.28,1)', fill: 'forwards' });
+                        ], { duration: 140, easing: 'cubic-bezier(0.16,0.9,0.28,1)', fill: 'forwards' });
                     });
                 });
 
-                const mx = (fromRect.x + P0.x) / 2 - uy * Math.min(36, dist * 0.11);
-                const my = (fromRect.y + P0.y) / 2 + ux * Math.min(36, dist * 0.11);
-                const dPath = `M ${fromRect.x.toFixed(1)} ${fromRect.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${P0.x.toFixed(1)} ${P0.y.toFixed(1)}`;
+                const dPath = `M ${fromRect.x.toFixed(1)} ${fromRect.y.toFixed(1)} L ${P0.x.toFixed(1)} ${P0.y.toFixed(1)}`;
                 const trLayer = fsLayer(`
                   <svg class="arcane-identity-svg-full arcane-identity-glow-amber">
-                    <path class="cnt-lead" d="${dPath}" fill="none" stroke="#facc15" stroke-width="5" stroke-linecap="round" pathLength="1" style="stroke-dasharray:0.38 1;stroke-dashoffset:0.38;"/>
-                    <path class="cnt-lead-core" d="${dPath}" fill="none" stroke="#fffbeb" stroke-width="2.2" stroke-linecap="round" pathLength="1" style="stroke-dasharray:0.30 1;stroke-dashoffset:0.30;"/>
-                  </svg>`, 165);
-                trLayer.querySelector('.cnt-lead').animate([{ strokeDashoffset: 0.38, opacity: 1 }, { strokeDashoffset: -0.95, opacity: 0 }], { duration: 115, easing: 'cubic-bezier(0.14,0.86,0.28,1)', fill: 'forwards' });
-                trLayer.querySelector('.cnt-lead-core').animate([{ strokeDashoffset: 0.30, opacity: 1 }, { strokeDashoffset: -0.98, opacity: 0 }], { duration: 105, easing: 'cubic-bezier(0.14,0.86,0.28,1)', fill: 'forwards' });
+                    <path class="cnt-lead" d="${dPath}" fill="none" stroke="#facc15" stroke-width="3.6" stroke-linecap="round" pathLength="1" style="stroke-dasharray:0.35 1;stroke-dashoffset:0.35;"/>
+                    <path class="cnt-lead-core" d="${dPath}" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" pathLength="1" style="stroke-dasharray:0.28 1;stroke-dashoffset:0.28;"/>
+                  </svg>`, 150);
+                trLayer.querySelector('.cnt-lead').animate([{ strokeDashoffset: 0.35, opacity: 1 }, { strokeDashoffset: -0.95, opacity: 0 }], { duration: 100, easing: 'cubic-bezier(0.14,0.86,0.28,1)', fill: 'forwards' });
+                trLayer.querySelector('.cnt-lead-core').animate([{ strokeDashoffset: 0.28, opacity: 1 }, { strokeDashoffset: -0.98, opacity: 0 }], { duration: 92, easing: 'cubic-bezier(0.14,0.86,0.28,1)', fill: 'forwards' });
             });
 
-            // 3. 敌方身上快速变化的实心黄色切割轨迹 + 末端火星 (155 ~ 295ms)
-            after(155, () => {
+            // 3. 敌方身上快速变化的笔直实心黄色切割线 + 末端火星 (145 ~ 285ms)
+            after(145, () => {
                 if (tokenNow !== combatToken) return;
                 let elapsed = 0;
-                const dur = 135;
+                const dur = 138;
                 let impacted = false;
                 let sparked = false;
 
-                const bezierPt = t => {
-                    const mt = 1 - t;
-                    return {
-                        x: mt * mt * P0.x + 2 * mt * t * P1.x + t * t * P2.x,
-                        y: mt * mt * P0.y + 2 * mt * t * P1.y + t * t * P2.y
-                    };
-                };
-                const bezierNormal = t => {
-                    const mt = 1 - t;
-                    const tx = 2 * mt * (P1.x - P0.x) + 2 * t * (P2.x - P1.x);
-                    const ty = 2 * mt * (P1.y - P0.y) + 2 * t * (P2.y - P1.y);
-                    const len = Math.hypot(tx, ty) || 1;
-                    return { nx: -ty / len, ny: tx / len, tx: tx / len, ty: ty / len };
-                };
+                const linePt = t => ({
+                    x: P0.x + (P2.x - P0.x) * t,
+                    y: P0.y + (P2.y - P0.y) * t
+                });
 
                 fxEngine.particles.push({
                     update(dt) {
                         if (tokenNow !== combatToken) return false;
                         elapsed += dt;
                         const u = Math.min(1, elapsed / dur);
-                        const head = 1 - Math.pow(1 - Math.min(1, u * 1.48), 3);
-                        const tail = Math.pow(Math.max(0, (u - 0.14) / 0.86), 1.65);
+                        // 刀尖极速斜穿刺出，刀尾紧追收成细线消失于末端
+                        const head = 1 - Math.pow(1 - Math.min(1, u * 1.65), 3);
+                        const tail = Math.pow(Math.max(0, (u - 0.16) / 0.84), 1.55);
 
-                        if (!impacted && head >= 0.54) {
+                        if (!impacted && head >= 0.52) {
                             impacted = true;
                             shake('light');
                             if (onImpact) onImpact();
@@ -740,20 +728,18 @@
 
                         if (!sparked && head >= 0.96) {
                             sparked = true;
-                            const endTan = bezierNormal(1);
-                            const baseAng = Math.atan2(endTan.ty, endTan.tx);
-                            // 轨迹终点瞬间闪星
+                            const baseAng = slashAngle;
+                            // 轨迹终点锐利瞬闪星芒
                             fsLayer(`
-                              <div class="arcane-identity-anchor" style="left:${P2.x}px;top:${P2.y}px;width:64px;height:64px;transform:translate(-50%,-50%) rotate(${(baseAng * 180 / Math.PI).toFixed(1)}deg);animation:arcane-identity-slash-spark 0.18s ease-out both;">
+                              <div class="arcane-identity-anchor" style="left:${P2.x}px;top:${P2.y}px;width:64px;height:64px;transform:translate(-50%,-50%) rotate(${(baseAng * 180 / Math.PI).toFixed(1)}deg);animation:arcane-identity-slash-spark 0.17s ease-out both;">
                                 <svg viewBox="-32 -32 64 64" class="w-full h-full arcane-identity-glow-amber">
-                                  <polygon points="-28,0 -5,-3 0,-22 5,-3 28,0 5,3 0,22 -5,3" fill="#fffbeb"/>
+                                  <polygon points="-28,0 -4,-2.5 0,-20 4,-2.5 28,0 4,2.5 0,20 -4,2.5" fill="#fffbeb"/>
                                 </svg>
-                              </div>`, 200);
-                            // 结束时在轨迹末端炸裂高能火星
-                            burst(18, i => {
-                                const spread = rnd(-0.92, 0.92);
-                                const a = baseAng + spread;
-                                const spd = rnd(4.2, 10.6);
+                              </div>`, 190);
+                            // 轨迹末端炸裂高能火星（沿切出方向飞溅）
+                            burst(18, () => {
+                                const a = baseAng + rnd(-0.88, 0.88);
+                                const spd = rnd(4.5, 11.2);
                                 return {
                                     x: P2.x + rnd(-2, 2),
                                     y: P2.y + rnd(-2, 2),
@@ -762,62 +748,48 @@
                                     grav: 0.14,
                                     drag: 0.90,
                                     decay: rnd(0.052, 0.088),
-                                    size: rnd(1.6, 2.7),
+                                    size: rnd(1.5, 2.5),
                                     shape: 'streak',
                                     color: pick(['#ffffff', '#fef08a', '#facc15', '#fb923c'])
                                 };
                             });
                         }
 
-                        if (head > tail + 0.01) {
+                        if (head > tail + 0.008) {
                             const ctx = fxEngine.ctx;
-                            const N = 16;
-                            const leftPts = [], rightPts = [], innerL = [], innerR = [];
-                            const thickScale = 1 - u * 0.45;
-                            const maxHalfW = 10.5 * thickScale;
-
-                            for (let i = 0; i <= N; i++) {
-                                const k = i / N;
-                                const t = tail + (head - tail) * k;
-                                const p = bezierPt(t);
-                                const nm = bezierNormal(t);
-                                // 两端尖锐刺入/抽离，中前段呈强力切割厚度
-                                const envelope = Math.sin(Math.PI * Math.pow(k, 0.65));
-                                const hw = Math.max(0.2, maxHalfW * envelope);
-                                leftPts.push({ x: p.x + nm.nx * hw, y: p.y + nm.ny * hw });
-                                rightPts.push({ x: p.x - nm.nx * hw, y: p.y - nm.ny * hw });
-
-                                const ihw = Math.max(0.1, hw * 0.44);
-                                innerL.push({ x: p.x + nm.nx * ihw, y: p.y + nm.ny * ihw });
-                                innerR.push({ x: p.x - nm.nx * ihw, y: p.y - nm.ny * ihw });
-                            }
+                            const A = linePt(tail);
+                            const B = linePt(head);
+                            // 中段偏前处放置最厚棱肩，形成刚硬尖刺长剑气菱锥（两头针尖、绝对笔直）
+                            const peakT = tail + (head - tail) * 0.72;
+                            const M = linePt(peakT);
+                            const maxHalfW = 3.6 * (1 - u * 0.58);
+                            const innerHalfW = maxHalfW * 0.48;
 
                             ctx.save();
                             ctx.globalCompositeOperation = 'source-over';
                             ctx.globalAlpha = 1;
                             ctx.shadowColor = '#f59e0b';
-                            ctx.shadowBlur = 10;
+                            ctx.shadowBlur = 11;
 
-                            // 实心亮黄切割轨迹主体
+                            // 实心亮黄笔直锐利剑气（细长菱形针锥）
                             ctx.beginPath();
-                            ctx.moveTo(leftPts[0].x, leftPts[0].y);
-                            for (let i = 1; i < leftPts.length; i++) ctx.lineTo(leftPts[i].x, leftPts[i].y);
-                            for (let i = rightPts.length - 1; i >= 0; i--) ctx.lineTo(rightPts[i].x, rightPts[i].y);
+                            ctx.moveTo(A.x, A.y);
+                            ctx.lineTo(M.x + nx * maxHalfW, M.y + ny * maxHalfW);
+                            ctx.lineTo(B.x, B.y);
+                            ctx.lineTo(M.x - nx * maxHalfW, M.y - ny * maxHalfW);
                             ctx.closePath();
                             ctx.fillStyle = '#facc15';
                             ctx.fill();
-                            ctx.lineWidth = 1.4;
-                            ctx.strokeStyle = '#fbbf24';
-                            ctx.stroke();
 
-                            // 内层实心亮白金刃脊（增加锋锐穿刺感）
+                            // 内层实心极亮白金核心光线
                             ctx.shadowBlur = 0;
                             ctx.beginPath();
-                            ctx.moveTo(innerL[0].x, innerL[0].y);
-                            for (let i = 1; i < innerL.length; i++) ctx.lineTo(innerL[i].x, innerL[i].y);
-                            for (let i = innerR.length - 1; i >= 0; i--) ctx.lineTo(innerR[i].x, innerR[i].y);
+                            ctx.moveTo(A.x, A.y);
+                            ctx.lineTo(M.x + nx * innerHalfW, M.y + ny * innerHalfW);
+                            ctx.lineTo(B.x, B.y);
+                            ctx.lineTo(M.x - nx * innerHalfW, M.y - ny * innerHalfW);
                             ctx.closePath();
-                            ctx.fillStyle = '#fefce8';
+                            ctx.fillStyle = '#ffffff';
                             ctx.fill();
 
                             ctx.restore();
@@ -829,7 +801,7 @@
                 fxEngine.startLoop();
             });
 
-            return 370;
+            return 355;
         }
 
         // 旧版静态 slash 对照
