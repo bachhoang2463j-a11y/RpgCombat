@@ -691,18 +691,18 @@
                 const dPath = `M ${fromRect.x.toFixed(1)} ${fromRect.y.toFixed(1)} L ${P0.x.toFixed(1)} ${P0.y.toFixed(1)}`;
                 const trLayer = fsLayer(`
                   <svg class="arcane-identity-svg-full arcane-identity-glow-amber">
-                    <path class="cnt-lead" d="${dPath}" fill="none" stroke="#facc15" stroke-width="3.6" stroke-linecap="round" pathLength="1" style="stroke-dasharray:0.35 1;stroke-dashoffset:0.35;"/>
-                    <path class="cnt-lead-core" d="${dPath}" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" pathLength="1" style="stroke-dasharray:0.28 1;stroke-dashoffset:0.28;"/>
+                    <path class="cnt-lead" d="${dPath}" fill="none" stroke="#facc15" stroke-width="7.2" stroke-linecap="round" pathLength="1" style="stroke-dasharray:0.35 1;stroke-dashoffset:0.35;"/>
+                    <path class="cnt-lead-core" d="${dPath}" fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" pathLength="1" style="stroke-dasharray:0.28 1;stroke-dashoffset:0.28;"/>
                   </svg>`, 150);
                 trLayer.querySelector('.cnt-lead').animate([{ strokeDashoffset: 0.35, opacity: 1 }, { strokeDashoffset: -0.95, opacity: 0 }], { duration: 100, easing: 'cubic-bezier(0.14,0.86,0.28,1)', fill: 'forwards' });
                 trLayer.querySelector('.cnt-lead-core').animate([{ strokeDashoffset: 0.28, opacity: 1 }, { strokeDashoffset: -0.98, opacity: 0 }], { duration: 92, easing: 'cubic-bezier(0.14,0.86,0.28,1)', fill: 'forwards' });
             });
 
-            // 3. 敌方身上快速变化的笔直实心黄色切割线 + 末端火星 (145 ~ 285ms)
+            // 3. 敌方身上快速变化的笔直实心黄色切割线 + 末端火星 (145 ~ 300ms)
             after(145, () => {
                 if (tokenNow !== combatToken) return;
                 let elapsed = 0;
-                const dur = 138;
+                const dur = 155;
                 let impacted = false;
                 let sparked = false;
 
@@ -762,14 +762,14 @@
                             // 中段偏前处放置最厚棱肩，形成刚硬尖刺长剑气菱锥（两头针尖、绝对笔直）
                             const peakT = tail + (head - tail) * 0.72;
                             const M = linePt(peakT);
-                            const maxHalfW = 3.6 * (1 - u * 0.58);
+                            const maxHalfW = 7.4 * (1 - u * 0.45);
                             const innerHalfW = maxHalfW * 0.48;
 
                             ctx.save();
                             ctx.globalCompositeOperation = 'source-over';
                             ctx.globalAlpha = 1;
                             ctx.shadowColor = '#f59e0b';
-                            ctx.shadowBlur = 11;
+                            ctx.shadowBlur = 14;
 
                             // 实心亮黄笔直锐利剑气（细长菱形针锥）
                             ctx.beginPath();
