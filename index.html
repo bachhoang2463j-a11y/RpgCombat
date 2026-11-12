@@ -8097,7 +8097,7 @@ const arcaneVfxModule = (function () {
     // ===== 命中结果反馈 BEGIN（可移植）=====
     // 输入：{ targetId, outcome:'hit'|'dodge'|'block', maxHp, hpBefore, hpAfter, hpDmg,
     //        shieldBefore, shieldAfter, shieldDmg, isCrit, isBurst, dirX?, dirY? }
-    const HIT_HOLD_MS = 450, HIT_COLLAPSE_MS = 500, HIT_STOP_MS = 60, HIT_LIFE_MS = 1320;
+    const HIT_HOLD_MS = 450, HIT_COLLAPSE_MS = 500, HIT_STOP_MS = 60, HIT_LIFE_MS = 1320, HIT_HEAL_MS = 320;
     const H = { ghosts: new Map(), stacks: new Map(), handles: new Set() };
 
     function classifyHit(r) {
@@ -8120,20 +8120,24 @@ const arcaneVfxModule = (function () {
         if (st && st.el !== ghost) { clearTimeout(st.timer); H.ghosts.delete(id); }
         if (force || !H.ghosts.has(id)) {
             if (force && st) { clearTimeout(st.timer); H.ghosts.delete(id); }
-            ghost.style.transition = 'none';
+            const fill = document.getElementById(id + '-hp-bar');
+            const healing = !force && fill && fill._hpHealTimer;
+            ghost.style.transition = healing ? 'width ' + HIT_HEAL_MS + 'ms cubic-bezier(0.2,0.8,0.2,1)' : 'none';
             ghost.style.width = Math.max(0, Math.min(100, hp / maxHp * 100)) + '%';
         } else if (st) {
             st.hpAfter = hp;
             const pct = Math.max(0, Math.min(100, hp / maxHp * 100));
             const width = ghost.getBoundingClientRect().width / (ghost.parentElement.getBoundingClientRect().width || 1) * 100;
-            if (pct > width) { ghost.style.transition = 'none'; ghost.style.width = pct + '%'; }
-            if (st.collapsing) ghost.style.width = pct + '%';
+            if (pct > width + 0.01) { ghost.style.transition = 'width ' + HIT_HEAL_MS + 'ms cubic-bezier(0.2,0.8,0.2,1)'; ghost.style.width = pct + '%'; }
+            else if (st.collapsing) { ghost.style.transition = 'none'; ghost.style.width = pct + '%'; }
         }
     }
     function hitBar(id, hpBefore, hpAfter, maxHp) {
         const fill = document.getElementById(id + '-hp-bar'), ghost = document.getElementById(id + '-hp-ghost');
         if (!fill) return;
         const pct = v => Math.max(0, Math.min(100, v / maxHp * 100));
+        clearTimeout(fill._hpHealTimer); fill._hpHealTimer = null;
+        fill.style.transition = 'none';
         fill.style.width = pct(hpAfter) + '%';
         fill.classList.remove('arcane-hit-fill-blink'); void fill.offsetWidth; fill.classList.add('arcane-hit-fill-blink');
         if (!ghost) return;
@@ -14979,6 +14983,28 @@ const sleep = ms => new Promise(res => setTimeout(res, ms));
 function showLog(msg) { const logEl = document.getElementById('battle-log'); logEl.innerText = msg; logEl.classList.remove('opacity-0', '-translate-y-4'); setTimeout(() => logEl.classList.add('opacity-0', '-translate-y-4'), 2500); }
 function createFloatingText(targetDom, text, colorClass, isBurst = false) { if (!targetDom) return; const rect = targetDom.getBoundingClientRect(); const floatDiv = document.createElement('div'); floatDiv.className = isBurst ? `burst-text text-xl sm:text-4xl` : `floating-text text-sm sm:text-2xl font-bold ${colorClass}`; floatDiv.innerText = text; if (isBurst) { floatDiv.style.left = `${rect.left + rect.width / 2}px`; floatDiv.style.top = `${rect.top - 20}px`; } else { const offsetX = (Math.random() - 0.5) * 40; floatDiv.style.left = `${rect.left + rect.width / 2 + offsetX}px`; floatDiv.style.top = `${rect.top}px`; } document.body.appendChild(floatDiv); setTimeout(() => floatDiv.remove(), isBurst ? 1500 : 1200); }
 
+// HP 条宽度：下降沿用命中系统瞬时收缩（ghost 拖尾），上升（治疗/回复/复活）补 320ms 过渡
+const HP_BAR_HEAL_MS = 320;
+function setHpBarPct(bar, pct) {
+  if (!bar) return;
+  const val = Math.max(0, Math.min(100, pct));
+  const prev = parseFloat(bar.style.width);
+  const diff = Number.isFinite(prev) ? val - prev : 0;
+  if (diff > 0.01) {
+    clearTimeout(bar._hpHealTimer);
+    bar.style.transition = `width ${HP_BAR_HEAL_MS}ms cubic-bezier(0.2,0.8,0.2,1)`;
+    bar._hpHealTimer = setTimeout(() => { bar._hpHealTimer = null; bar.style.transition = 'none'; }, HP_BAR_HEAL_MS + 40);
+    bar.style.width = val + '%';
+  } else if (diff < -0.01) {
+    clearTimeout(bar._hpHealTimer); bar._hpHealTimer = null;
+    bar.style.transition = 'none';
+    bar.style.width = val + '%';
+  } else if (!bar._hpHealTimer) {
+    bar.style.transition = 'none';
+    bar.style.width = val + '%';
+  }
+}
+
 function updateHeroUI(hero) {
   hero.hp = Math.max(0, Math.min(hero.hp, hero.maxHp));
   hero.mp = Math.max(0, Math.min(hero.mp, hero.maxMp));
@@ -15003,7 +15029,7 @@ function updateHeroUI(hero) {
       const shieldText = hero.shield > 0 ? `<span class="text-slate-300 ml-0.5 text-[7px] sm:text-[9px]">(盾${hero.shield})</span>` : '';
       hpText.innerHTML = `${Math.floor(hero.hp)}${shieldText}`;
   }
-  if (hpBar) hpBar.style.width = `${(hero.hp / hero.maxHp) * 100}%`;
+  setHpBarPct(hpBar, (hero.hp / hero.maxHp) * 100);
   arcaneVfxModule.syncHitBar(hero.id, hero.hp, hero.maxHp);
 
   const mpText = document.getElementById(`${hero.id}-mp-text`);
@@ -15225,7 +15251,7 @@ function updateEnemyUI(enemy) {
   const hpBar = document.getElementById(`${enemy.id}-hp-bar`); 
   const sprite = document.getElementById(`${enemy.id}-sprite`);
   
-  if(hpBar) hpBar.style.width = `${(enemy.hp / enemy.maxHp) * 100}%`;
+  if(hpBar) setHpBarPct(hpBar, (enemy.hp / enemy.maxHp) * 100);
   arcaneVfxModule.syncHitBar(enemy.id, enemy.hp, enemy.maxHp);
   updateBuffUI(enemy);
   
@@ -15286,7 +15312,7 @@ function updateEnemyUI(enemy) {
       // 【复活】敌人带 [复活] 标签：第一次被击杀时以 30% 血原地复活（覆盖普攻/反击/强力反击/直接减血击杀收口）
       if (tryReviveEnemy(enemy, sprite)) {
           updateBuffUI(enemy);
-          if(hpBar) hpBar.style.width = `${(enemy.hp / enemy.maxHp) * 100}%`;
+          if(hpBar) setHpBarPct(hpBar, (enemy.hp / enemy.maxHp) * 100);
           return;
       }
       // 真正死亡：触发智慧死亡旁白（[复活]敌人复活后再死同样走此分支再次触发）
