@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>状态发作、解除与到期 · Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap');
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    body { font-family: 'Noto Sans SC', sans-serif; user-select: none; }
+    /* —— 以下复刻主工程 index.html 主界面样式 —— */
+    .glass-panel { background: rgba(20, 25, 35, 0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); }
+    .text-outline { text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 1px 2px rgba(0,0,0,0.8); }
+    .mask-fade-y { -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .custom-scrollbar::-webkit-scrollbar { width: 3px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+    .timeline-rail { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: linear-gradient(180deg, rgba(250,204,21,0.85) 0%, rgba(6,182,212,0.65) 25%, rgba(99,102,241,0.45) 60%, rgba(255,255,255,0.05) 100%); box-shadow: 0 0 10px rgba(6,182,212,0.55); pointer-events: none; z-index: 0; }
+    @keyframes rail-pulse { 0% { transform: translateY(-100%); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(800%); opacity: 0; } }
+    .rail-pulse-beam { position: absolute; left: 0; top: 0; width: 2px; height: 40px; background: linear-gradient(180deg, transparent, #38bdf8, #fff); box-shadow: 0 0 12px #38bdf8; animation: rail-pulse 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+    .turn-dot { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; background: #111827; border: 2px solid; position: relative; z-index: 1; flex-shrink: 0; overflow: hidden; }
+    .turn-dot.cur { width: 52px; height: 52px; font-size: 26px; border-color: #facc15 !important; box-shadow: 0 0 20px rgba(250,204,21,0.9); }
+    .breathe { animation: breathe 3.2s ease-in-out infinite; } @keyframes breathe { 50% { transform: translateY(-4px) scale(1.02); } }
+    #chat-bar input { background: rgba(15,23,42,0.7); border: 1px solid rgba(255,255,255,0.12); color: #e2e8f0; }
+    .portrait { background: radial-gradient(ellipse at 50% 30%, #3b3f5c, #14151f 75%); display: flex; align-items: flex-end; justify-content: center; font-size: 64px; overflow: hidden; }
+    .card:disabled { pointer-events: none; opacity: 0.45; filter: grayscale(0.6); }
+
+    /* ===== 可移植特效样式 BEGIN：与 index.html 的 arcane- 命名及层序一致 ===== */
+    .arcane-fs-layer { position: fixed; inset: 0; pointer-events: none; z-index: 52; overflow: hidden; }
+    .arcane-fs-anchor { position: absolute; transform: translate(-50%, -50%); }
+    #arcane-fx-canvas { position: fixed; inset: 0; width: 100vw; height: 100dvh; pointer-events: none; z-index: 55; }
+    #arcane-dark { position: fixed; inset: 0; pointer-events: none; z-index: 40; opacity: 0; transition: opacity 0.35s ease; background: radial-gradient(ellipse at 40% 60%, rgba(5,6,20,0.55) 0%, rgba(2,3,10,0.92) 75%); }
+    @keyframes arcane-seed-bloom { 0% { transform: translate(-50%,-50%) scale(0); opacity: 0; } 70% { transform: translate(-50%,-50%) scale(1.25); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(0.6); opacity: 0; } }
+    @keyframes arcane-hit-flash { 0% { transform: translate(-50%,-50%) scale(0.2); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.7); opacity: 0; } }
+    @keyframes arcane-f-cold { 0% { filter: brightness(1.6) hue-rotate(180deg) saturate(2.5); } 60% { filter: none; } }
+    @keyframes arcane-f-heal { 0% { filter: brightness(1.8) drop-shadow(0 0 18px #34d399); } 100% { filter: none; } }
+    .arcane-flash-cold { animation: arcane-f-cold 0.5s steps(1) both !important; }
+    .arcane-flash-heal { animation: arcane-f-heal 0.6s ease-out both !important; }
+    @keyframes arcane-tint { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes arcane-ripple { 0% { transform: translate(-50%,-50%) scale(0.2); opacity: 0.9; } 100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; } }
+    @keyframes arcane-ring-out { 0% { r: 4; opacity: 0.95; stroke-width: 3; } 100% { r: 150; opacity: 0; stroke-width: 0.5; } }
+    @keyframes arcane-fs-flash { 0% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes arcane-draw-on { to { stroke-dashoffset: 0; } }
+    .arcane-grow { stroke-dasharray: 1; stroke-dashoffset: 1; }
+    @keyframes arcane-fade-life { 0% { opacity: 0; } 15% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes arcane-slow-rot { to { transform: rotate(360deg); } }
+    @keyframes arcane-s-light { 25% { transform: translate3d(-3px, 2px, 0); } 60% { transform: translate3d(3px, -2px, 0); } }
+    @keyframes arcane-s-heavy { 15% { transform: translate3d(-8px, 4px, 0); } 35% { transform: translate3d(7px, -5px, 0); } 60% { transform: translate3d(-4px, 3px, 0); } 85% { transform: translate3d(2px, -1px, 0); } }
+    @keyframes arcane-s-quake { 10% { transform: translate3d(-14px, 8px, 0); } 25% { transform: translate3d(12px, -10px, 0); } 40% { transform: translate3d(-9px, 6px, 0); } 60% { transform: translate3d(6px, -4px, 0); } 80% { transform: translate3d(-3px, 2px, 0); } }
+    .arcane-shake-light { animation: arcane-s-light 0.18s ease-out; }
+    .arcane-shake-heavy { animation: arcane-s-heavy 0.32s ease-out; }
+    .arcane-shake-quake { animation: arcane-s-quake 0.55s ease-out; }
+    /* 新技能的 arcane- 样式写在这里；移植时只追加新样式，不覆盖正式版的已有样式。 */
+    /* ===== 状态发作、解除与到期 arcane-status-*（可移植） ===== */
+    .arcane-status-anchor { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; }
+    .arcane-status-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .arcane-status-host-rel { position: relative !important; }
+    .arcane-status-persist-poison, .arcane-status-persist-burn {
+        position: absolute; inset: 0; border-radius: 6px; pointer-events: none;
+        transition: opacity 0.28s ease-out; will-change: opacity;
+    }
+    .arcane-status-persist-poison {
+        z-index: 16;
+        box-shadow: inset 0 0 12px rgba(147, 51, 234, 0.34), 0 0 8px rgba(168, 85, 247, 0.22);
+        background: radial-gradient(ellipse at 50% 45%, transparent 56%, rgba(88, 28, 135, 0.28) 88%, rgba(168, 85, 247, 0.42) 100%);
+        animation: arcane-status-poison-breathe 2.8s ease-in-out infinite;
+    }
+    .arcane-status-persist-burn {
+        z-index: 17;
+        border: 1.5px solid rgba(234, 88, 12, 0.56);
+        box-shadow: inset 0 0 14px rgba(124, 45, 18, 0.62), inset 0 0 6px rgba(249, 115, 22, 0.38), 0 0 9px rgba(234, 88, 12, 0.26);
+        background: radial-gradient(ellipse at 50% 45%, transparent 54%, rgba(67, 20, 7, 0.44) 86%, rgba(234, 88, 12, 0.48) 100%);
+        animation: arcane-status-burn-smolder 2.1s ease-in-out infinite;
+    }
+    .arcane-status-persist-poison.is-sprite, .arcane-status-persist-burn.is-sprite {
+        inset: -10px -12px; border-radius: 50%; z-index: 2; border: none;
+        -webkit-mask-image: radial-gradient(circle, transparent 36%, rgba(0,0,0,0.75) 68%, rgba(0,0,0,1) 92%, transparent 100%);
+        mask-image: radial-gradient(circle, transparent 36%, rgba(0,0,0,0.75) 68%, rgba(0,0,0,1) 92%, transparent 100%);
+    }
+    .arcane-status-persist-poison.is-sprite {
+        box-shadow: none;
+        background: radial-gradient(circle at 50% 52%, transparent 34%, rgba(147, 51, 234, 0.34) 68%, rgba(192, 132, 252, 0.52) 86%, transparent 100%);
+    }
+    .arcane-status-persist-burn.is-sprite {
+        box-shadow: none;
+        background: radial-gradient(circle at 50% 52%, transparent 32%, rgba(67, 20, 7, 0.55) 62%, rgba(234, 88, 12, 0.68) 84%, rgba(251, 146, 60, 0.16) 95%, transparent 100%);
+    }
+    .arcane-status-persist-poison.exiting, .arcane-status-persist-burn.exiting { opacity: 0 !important; animation: none; }
+    @keyframes arcane-status-poison-breathe { 0%, 100% { opacity: 0.72; } 50% { opacity: 0.96; } }
+    @keyframes arcane-status-burn-smolder { 0%, 100% { opacity: 0.78; } 50% { opacity: 1; } }
+    @keyframes arcane-status-badge-pulse {
+        0%, 100% { opacity: 1; box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35), 0 0 5px rgba(245, 158, 11, 0.25); }
+        50% { opacity: 0.54; box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.78), 0 0 9px rgba(245, 158, 11, 0.52); }
+    }
+    .arcane-status-badge-expiring {
+        color: #fde68a !important;
+        background: rgba(120, 53, 15, 0.88) !important;
+        border-color: rgba(245, 158, 11, 0.92) !important;
+        animation: arcane-status-badge-pulse 2s ease-in-out infinite;
+    }
+    .arcane-status-badge-fading { opacity: 0 !important; transform: translateY(-4px) scale(0.92); transition: opacity 0.22s ease-out, transform 0.22s ease-out; }
+    /* 演示对照辅助样式（狂暴/眩晕/分组/飘字：正式版已自带狂暴与眩晕，移植时只取 arcane-status-*） */
+    .arcane-status-group-hd { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; color: #94a3b8; padding: 4px 6px 2px; border-bottom: 1px solid rgba(148,163,184,0.16); margin-top: 2px; display: flex; justify-content: space-between; align-items: center; }
+    @keyframes arcane-status-float-up {
+        0% { opacity: 0; transform: translate(-50%, 6px) scale(0.84); }
+        18% { opacity: 1; transform: translate(-50%, -8px) scale(1.12); }
+        78% { opacity: 1; transform: translate(-50%, -22px) scale(1); }
+        100% { opacity: 0; transform: translate(-50%, -34px) scale(0.92); }
+    }
+    .arcane-status-float-text {
+        position: fixed; pointer-events-none; pointer-events: none; z-index: 66; white-space: nowrap; font-weight: 800;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7);
+        animation: arcane-status-float-up 1.1s ease-out forwards;
+    }
+    .stun-fx { display: flex; align-items: center; gap: 4px; filter: drop-shadow(0 0 6px rgba(251,191,36,0.85)); animation: arcane-status-stun-sway 1.1s ease-in-out infinite; }
+    .stun-fx.hidden { display: none !important; }
+    .stun-star { font-size: 11px; line-height: 1; color: #fde047; text-shadow: 0 0 8px rgba(251,191,36,0.95), 0 1px 2px rgba(0,0,0,0.8); }
+    @keyframes arcane-status-stun-sway { 0%, 100% { transform: translateX(-50%) rotate(-3deg); } 50% { transform: translateX(-50%) rotate(3deg); } }
+    @keyframes arcane-status-demo-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px) rotate(-1.5deg); } 50% { transform: translateX(4px) rotate(1.5deg); } 75% { transform: translateX(-3px) rotate(-0.8deg); } }
+    .demo-stun-shake { animation: arcane-status-demo-shake 0.4s ease-in-out; }
+    .arcane-variant-rage-sprite { filter: drop-shadow(0 0 7px rgba(239, 68, 68, 0.85)) drop-shadow(0 0 18px rgba(185, 28, 28, 0.58)) drop-shadow(0 10px 10px rgba(0, 0, 0, 0.5)); }
+    .arcane-variant-rage-fx { position: absolute; inset: -3px; border-radius: 8px; pointer-events: none; z-index: 19; overflow: hidden; box-shadow: inset 0 0 18px rgba(220, 38, 38, 0.42), 0 0 16px rgba(220, 38, 38, 0.4); }
+    .arcane-variant-rage-fx.is-sprite { inset: -26px -30px; box-shadow: none; border-radius: 50%; z-index: -1; overflow: visible; background: radial-gradient(ellipse closest-side at 50% 56%, rgba(220, 38, 38, 0.34) 0%, rgba(127, 29, 29, 0.14) 58%, transparent 100%); }
+    .arcane-variant-rage-fx::before { content: ''; position: absolute; left: 0; right: 0; top: 8%; bottom: -6%; background: radial-gradient(ellipse closest-side at 50% 62%, rgba(239, 68, 68, 0.34) 0%, rgba(127, 29, 29, 0.14) 55%, transparent 100%); animation: arcane-variant-rage-heat 2.2s linear infinite; }
+    @keyframes arcane-variant-rage-heat { 0% { transform: translateY(8%) scaleX(0.96); opacity: 0.65; } 50% { transform: translateY(-7%) scaleX(1.04); opacity: 0.9; } 100% { transform: translateY(8%) scaleX(0.96); opacity: 0.65; } }
+    /* ===== 可移植特效样式 END ===== */
+  </style>
+</head>
+<body class="text-white">
+ <div id="app" class="fixed inset-0 overflow-hidden">
+  <!-- 顶部控制按钮（复刻主界面） -->
+  <div class="absolute top-2 sm:top-4 right-2 sm:right-4 z-[115] flex gap-1.5 sm:gap-2">
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-violet-400 hover:text-violet-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>📚</span> <span class="hidden sm:inline">世界书</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-purple-400 hover:text-purple-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>📜</span> <span class="hidden sm:inline">记录</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-blue-400 hover:text-blue-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>🔲</span> <span class="hidden sm:inline">全屏</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-indigo-400 hover:text-indigo-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>💬</span> <span class="hidden sm:inline">对话</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-yellow-500 hover:text-yellow-400 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>⚙️</span> <span class="hidden sm:inline">设置</span></button>
+    <button id="btn-reset" class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-emerald-400 hover:text-emerald-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>🔄</span> <span class="hidden sm:inline">重置</span></button>
+  </div>
+
+  <!-- 全屏战场区域 -->
+  <div class="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-800 to-emerald-900 overflow-hidden z-0" id="battle-scene">
+    <div class="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+    <div class="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-0"></div>
+    <div class="absolute left-1 sm:left-4 md:left-6 top-16 sm:top-20 bottom-44 sm:bottom-48 w-12 sm:w-14 z-30 flex flex-col items-center select-none">
+      <div class="relative w-full h-full flex flex-col items-center">
+        <div class="timeline-rail"><div class="rail-pulse-beam"></div></div>
+        <div id="turn-order-container" class="relative w-full h-full flex flex-col gap-2 sm:gap-2.5 items-center overflow-y-auto no-scrollbar mask-fade-y py-3"></div>
+      </div>
+    </div>
+    <div id="enemies-container" class="absolute left-2 sm:left-6 right-2 sm:right-6 top-[10%] bottom-[190px] sm:bottom-[220px] z-10 flex flex-col items-center justify-start gap-6 overflow-visible pointer-events-none"></div>
+  </div>
+
+  <!-- 悬浮 UI 层 -->
+  <div class="absolute bottom-[52px] left-0 w-full p-1.5 sm:p-6 flex flex-col-reverse sm:flex-row items-end justify-between gap-1.5 sm:gap-4 z-20 pointer-events-none pb-2 sm:pb-6">
+    <div id="heroes-container" class="w-full sm:flex-1 grid grid-cols-4 gap-1 sm:gap-4 max-w-2xl pointer-events-auto relative"></div>
+    <div class="relative self-end">
+      <div id="menu-container" class="w-[260px] h-[172px] bg-slate-950/95 backdrop-blur-xl rounded-xl border border-slate-700/80 border-t-2 border-t-cyan-500/80 flex flex-col overflow-hidden relative shadow-[0_15px_35px_rgba(0,0,0,0.9)] pointer-events-auto self-end mb-1 sm:mb-0">
+        <div class="px-2.5 py-1 bg-gradient-to-r from-violet-950/60 via-slate-900/90 to-slate-950 border-b border-violet-900/40 flex justify-between items-center shrink-0">
+          <div class="flex items-center gap-1.5 min-w-0"><span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0"></span><span class="text-xs font-bold text-amber-200 truncate">状态 · 发作/解除/到期</span></div>
+          <div class="flex items-center gap-1 shrink-0"><span id="status-beat-stat" class="text-[9px] font-mono text-amber-300/90 truncate max-w-[92px]" title="当前状态/拍点">待机</span><button id="btn-status-sfx" class="text-[9px] font-bold px-1.5 rounded border border-emerald-500/60 text-emerald-300 hover:bg-white/10 transition-all shrink-0" aria-pressed="true">🔊 音开</button></div>
+        </div>
+        <div id="skill-list" class="flex-1 flex flex-col gap-1 p-1 overflow-y-auto custom-scrollbar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部对话栏（复刻主界面，仅装饰） -->
+  <div id="chat-bar" class="absolute bottom-0 left-0 right-0 h-[52px] z-30 flex items-center gap-2 px-2 sm:px-3 bg-black/60 border-t border-white/5">
+    <div class="w-9 h-9 rounded-full bg-slate-700 border border-white/20 shrink-0 flex items-center justify-center">🕵️</div>
+    <input type="text" placeholder="说点什么... (Enter发送)" class="flex-1 h-9 rounded-full px-4 text-sm outline-none">
+    <span class="px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/60 text-emerald-300 bg-emerald-950/50">友方旁白 ON</span>
+    <span class="px-3 py-1 rounded-full text-xs font-bold border border-rose-500/60 text-rose-300 bg-rose-950/50">敌方旁白 ON</span>
+    <div class="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center shrink-0">➤</div>
+  </div>
+ </div>
+  <script>
+    // ===== 演示宿主 BEGIN：占位数据、渲染、fxEngine；不移植到正式版 =====
+    const $ = s => document.querySelector(s);
+    let combatToken = 0;
+    let heroesData = [], enemiesData = [];
+    const HERO_AVATARS = {
+        '埃利奥特': 'https://imgur.la/images/2026/06/25/31a4dd84a831e3f76082542bf12fcf19.png',
+        '弗兰克': 'https://imgur.la/images/2026/06/25/26f001dbe399876cd74978bbe12a265b.png',
+        '玛德琳': 'https://imgur.la/images/2026/06/25/585bf7f2f1559168b419b8be56da36a6.png',
+        '索恩': 'https://imgur.la/images/2026/08/13/77fcdf0fd006c4ff1ccae30774322270.png'
+    };
+    const HERO_DATA = [['h1', '埃利奥特', '👨', 100, 55, 110, 5], ['h2', '弗兰克', '🧔', 180, 0, 17, 0], ['h3', '玛德琳', '👩', 140, 0, 14, 0], ['h4', '索恩', '🕵️', 140, 0, 20, 0]];
+    const ENEMY_ROWS = [[['e1', '🐟'], ['e2', '❄️'], ['e3', '🐟']], [['e4', '👻'], ['e5', '👻'], ['e6', '🌀']]];
+
+function createCompactBarHTML(id, type, label, val, max, colorClass, isTp = false, shield = 0) {
+  const pct = Math.max(0, Math.min(100, (val / max) * 100)); const barWidthClass = isTp ? 'w-1/3' : 'w-full';
+  const shieldText = shield > 0 && type === 'hp' ? `<span class="text-slate-300 ml-0.5 text-[7px] sm:text-[9px]">(盾${shield})</span>` : '';
+  let finalColor = colorClass; let extraClass = ''; if (isTp && val >= max) { finalColor = 'bg-amber-400'; extraClass = 'shadow-[0_0_10px_rgba(251,191,36,0.8)] animate-pulse'; }
+  return `<div class="relative pt-1.5 sm:pt-2.5 mb-0 sm:mb-[2px]"><span id="${id}-${type}-text" class="absolute right-0 top-0 text-[8px] sm:text-xs font-mono font-bold text-white leading-none text-outline z-10 whitespace-nowrap">${Math.floor(val)}${shieldText}</span><div class="flex items-center gap-1 sm:gap-1.5"><span class="text-[7px] sm:text-[10px] font-bold text-gray-200 leading-none text-outline w-3 sm:w-4">${label}</span><div class="flex-grow h-1 sm:h-1.5 bg-[#222] rounded-[1px] overflow-hidden border border-[#111]"><div id="${id}-${type}-bar" class="${barWidthClass} h-full ${finalColor} ${extraClass} transition-all duration-300 ease-out" style="width: ${pct}%"></div></div></div></div>`;
+}
+
+function getEntitySpriteDom(entityOrId){
+  const id = entityOrId && typeof entityOrId === 'object' ? entityOrId.id : String(entityOrId||'');
+  if(!id) return null;
+  return document.getElementById(`hero-card-${id}`) || document.getElementById(`${id}-sprite`) || document.getElementById(`hero-wrap-${id}`) || null;
+}
+window.getEntitySpriteDom = getEntitySpriteDom;
+
+    function renderEntityBuffs(entity) {
+        const box = document.getElementById(`${entity.id}-buffs`);
+        if (!box) return;
+        const buffs = (entity.buffs || []).filter(b => b.duration > 0 || b.permanent);
+        const byType = new Map();
+        buffs.forEach(b => {
+            const key = b.key || b.type;
+            const cur = byType.get(key) || { type: key, count: 0, totalVal: 0, maxDur: 0, label: b.label, colorCls: b.colorCls, permanent: !!b.permanent };
+            cur.count++;
+            cur.totalVal += (b.value || 0);
+            cur.maxDur = Math.max(cur.maxDur, b.duration || 0);
+            byType.set(key, cur);
+        });
+        let html = '';
+        byType.forEach(g => {
+            const isTimed = !g.permanent && g.maxDur > 0 && g.maxDur < 999;
+            const expiringCls = (isTimed && g.maxDur <= 1) ? ' arcane-status-badge-expiring' : '';
+            let text = g.label || g.type, cls = g.colorCls || 'text-slate-200 border-slate-500/50';
+            if (g.type === 'poison') { text = `☠️毒${g.totalVal}·${g.maxDur}回`; cls = 'text-purple-400 border-purple-900/50'; }
+            else if (g.type === 'burn') { text = `🔥燃${g.totalVal}·${g.maxDur}回`; cls = 'text-orange-400 border-orange-600/50'; }
+            else if (g.type === 'paralyze') { text = `⚡麻${g.count}层·${Math.min(20, g.count * 5)}%·${g.maxDur}回`; cls = 'text-yellow-300 border-yellow-500/50'; }
+            else if (g.type === 'atk-') { text = `⚔️${g.totalVal}·${g.maxDur}回`; cls = 'text-purple-400 border-purple-900/50'; }
+            else if (g.type === 'def+') { text = `🛡️+${g.totalVal}·${g.maxDur}回`; cls = 'text-blue-400 border-blue-800/60'; }
+            else if (g.type === 'stun') return;
+            html += `<div data-buff-type="${g.type}" class="${cls}${expiringCls} text-[8px] sm:text-[10px] bg-black/70 border px-1 rounded backdrop-blur font-mono shadow-md transition-all">${text}</div>`;
+        });
+        box.innerHTML = html;
+        const stunEl = document.getElementById(`${entity.id}-stunFx`);
+        if (stunEl) stunEl.classList.toggle('hidden', !buffs.some(b => b.type === 'stun') || entity.isAlive === false);
+        if (window.syncStatusLayers) window.syncStatusLayers(entity);
+    }
+    window.renderDemoEntityBuffs = renderEntityBuffs;
+
+    function initUI(init = {}) {
+        heroesData = HERO_DATA.map(([id, name, face, hp, shield, mp, tp]) => Object.assign({ id, name, face, img: HERO_AVATARS[name] || '', hp, maxHp: hp, shield, mp, maxMp: mp, tp, maxTp: 100, isAlive: true, buffs: [] }, init[id]));
+        enemiesData = ENEMY_ROWS.flat().map(([id, face]) => Object.assign({ id, name: id, face, hp: 1000, maxHp: 1000, isAlive: true, buffs: [] }, init[id]));
+    $('#heroes-container').innerHTML = heroesData.map(({ id, name, face, img, hp, maxHp, shield, mp, maxMp, tp, maxTp }) => `
+      <div class="hero relative transition-all duration-300 min-w-[70px] z-20" id="hero-wrap-${id}">
+        <div id="hero-card-${id}" class="fx-body hero-card-inner bg-[#18181b] rounded overflow-hidden relative border shadow-2xl transition-all border-gray-800">
+          <div id="${id}-buffs" class="absolute top-1 right-1 flex flex-col gap-1 items-end z-20 pointer-events-none"></div>
+          <div id="${id}-stunFx" class="stun-fx hidden absolute -top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none"><span class="stun-star">★</span><span class="stun-star">★</span><span class="stun-star">★</span></div>
+          <div class="w-full h-12 sm:h-auto sm:aspect-[4/3] relative bg-gray-900 border-b border-gray-700">
+            <div class="absolute top-0 left-0 w-full bg-gradient-to-b from-black/80 to-transparent px-1.5 py-1 text-[9px] sm:text-xs font-bold text-white z-10 flex justify-between"><span>${name}</span></div>
+            <div class="portrait w-full h-full">${img ? `<img src="${img}" alt="${name}" class="w-full h-full object-cover" onerror="this.style.display='none';this.nextElementSibling&&this.nextElementSibling.classList.remove('hidden')"><span class="hidden leading-none">${face}</span>` : face}</div>
+          </div>
+          <div class="px-1 py-1 sm:px-2 sm:py-1.5 flex flex-col gap-[1px] sm:gap-0.5">${createCompactBarHTML(id, 'hp', 'HP', hp, maxHp, 'bg-yellow-400', false, shield)}${createCompactBarHTML(id, 'mp', 'MP', mp, maxMp, 'bg-cyan-400')}${createCompactBarHTML(id, 'tp', 'TP', tp, maxTp, 'bg-green-500', true)}</div>
+        </div>
+      </div>`).join('');
+    $('#enemies-container').innerHTML = ENEMY_ROWS.map((row, ri) => `<div class="flex items-end justify-center" style="gap:${ri ? 26 : 22}px; ${ri ? 'margin-top:18px' : ''}">${row.map(([id, em]) => {
+        const e = enemiesData.find(x => x.id === id);
+        const pct = Math.max(0, Math.min(100, e.hp / e.maxHp * 100));
+        return `<div class="flex flex-col items-center group relative shrink-0" id="enemy-box-${id}" style="transform:scale(${ri ? 1 : 0.72}); ${ri ? '' : 'filter:brightness(0.82) saturate(0.92)'}">
+        <div id="${id}-buffs" class="absolute -top-2 right-0 flex flex-col gap-0.5 items-end z-20 pointer-events-none"></div>
+        <div id="${id}-stunFx" class="stun-fx hidden absolute -top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none"><span class="stun-star">★</span><span class="stun-star">★</span><span class="stun-star">★</span></div>
+        <div id="${id}-sprite" class="fx-body enemy-sprite text-7xl sm:text-8xl drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] breathe mt-2 sm:mt-4 flex justify-center items-center">${em}</div>
+        <div class="w-10 sm:w-16 h-1 sm:h-1.5 bg-black/50 mt-2 sm:mt-4 rounded-full overflow-hidden relative"><div id="${id}-hp-bar" class="h-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)] transition-all duration-300 ease-out" style="width:${pct}%"></div></div>
+        <div id="${id}-hp-text" class="mt-0.5 text-[9px] sm:text-[10px] font-mono font-bold text-white/80 text-outline leading-none">${Math.floor(e.hp)}/${e.maxHp}</div>
+      </div>`;
+    }).join('')}</div>`).join('');
+    const TURN_ITEMS = [{ e: '👨', name: '埃利奥特', hero: true }, { e: '❄️', hero: false }, { e: '🧔', name: '弗兰克', hero: true }, { e: '👩', name: '玛德琳', hero: true }, { e: '🕵️', name: '索恩', hero: true }, { e: '👻', hero: false }, { e: '👻', hero: false }];
+    $('#turn-order-container').innerHTML = TURN_ITEMS.map((it, i) => {
+        const av = it.hero && HERO_AVATARS[it.name];
+        return `<div class="turn-dot ${i ? '' : 'cur'}" style="border-color:${it.hero ? '#06b6d4' : '#e11d48'}">${av ? `<img src="${av}" alt="${it.name}" class="w-full h-full object-cover rounded-full" onerror="this.style.display='none';this.nextElementSibling&&this.nextElementSibling.classList.remove('hidden')"><span class="hidden">${it.e}</span>` : it.e}</div>`;
+    }).join('');
+    heroesData.concat(enemiesData).forEach(renderEntityBuffs);
+    }
+    initUI();
+
+class CanvasFxEngine {
+    constructor() {
+        this.canvas = null;
+        this.ctx = null;
+        this.particles = [];
+        this.animationFrameId = null;
+        this.hitStop = 0; // 定帧剩余毫秒：>0 时粒子冻结，制造重击顿挫感
+        this.lastFrameTime = 0; // 上一帧时间戳：用于计算真实帧间隔 dt
+        this.lastDt = 16.7;     // 最近一帧的真实间隔（毫秒），供雷电 overlay 等外部特效对齐
+        this.init();
+    }
+
+    init() {
+        this.canvas = document.getElementById('fx-canvas');
+        if (!this.canvas) {
+            this.canvas = document.createElement('canvas');
+            this.canvas.id = 'fx-canvas';
+            this.canvas.className = 'fixed inset-0 pointer-events-none z-[99]';
+            document.body.appendChild(this.canvas);
+        }
+        this.ctx = this.canvas.getContext('2d');
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+    }
+
+    resize() {
+        if (this.canvas) {
+            this.canvas.width = window.innerWidth;
+            this.canvas.height = window.innerHeight;
+        }
+    }
+
+    addParticle(p) {
+        this.particles.push(p);
+        if (this.particles.length === 1) {
+            this.startLoop();
+        }
+    }
+
+    startLoop() {
+        if (!this.animationFrameId) {
+            // 重置时间戳，避免空闲后重启的首帧因间隔过大而跳变（配合 update 内 33ms 上限钳制）
+            this.lastFrameTime = 0;
+            const loop = () => {
+                this.update();
+                this.draw();
+                if (this.particles.length > 0) {
+                    this.animationFrameId = requestAnimationFrame(loop);
+                } else {
+                    this.animationFrameId = null;
+                }
+            };
+            this.animationFrameId = requestAnimationFrame(loop);
+        }
+    }
+
+    update() {
+        // Delta-time：按真实帧间隔推进动画，速度与 FPS 解耦（高刷屏不加速、掉帧不减速）
+        // dt 上限 33ms：标签页休眠/卡顿后恢复时防止粒子瞬移跳变
+        const now = performance.now();
+        const dt = this.lastFrameTime ? Math.min(now - this.lastFrameTime, 33) : 16.7;
+        this.lastDt = dt;
+        this.lastFrameTime = now;
+        const k = dt / 16.7; // 归一化时间系数：1 = 60fps 基准步长
+
+        // Hit Stop 定帧：命中瞬间冻结粒子若干毫秒，制造"重击砸进肉里"的顿挫落差
+        if (this.hitStop > 0) {
+            this.hitStop -= dt;
+            return;
+        }
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const p = this.particles[i];
+            p.age += dt;
+
+            p.x += p.vx * k;
+            p.y += p.vy * k;
+
+            if (p.gravity) p.vy += p.gravity * k;
+            if (p.drag) {
+                const d = Math.pow(p.drag, k); // 阻尼按时间比例复合衰减
+                p.vx *= d;
+                p.vy *= d;
+            }
+            if (p.update) p.update(p);
+
+            if (p.age >= p.life) {
+                this.particles.splice(i, 1);
+            }
+        }
+    }
+
+    draw() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // 使用 'screen' 混合模式实现极具发光感的爆燃、辉光效果
+        this.ctx.globalCompositeOperation = 'screen';
+        
+        for (let i = 0; i < this.particles.length; i++) {
+            const p = this.particles[i];
+            const pct = p.age / p.life;
+            this.ctx.save();
+            p.draw(this.ctx, pct);
+            this.ctx.restore();
+        }
+        
+        this.ctx.globalCompositeOperation = 'source-over';
+    }
+}
+
+// 实例化全局特效引擎
+const fxEngine = new CanvasFxEngine();
+window.fxEngine = fxEngine;
+    // ===== 演示宿主 END =====
+
+    // ===== 可移植特效模块 BEGIN：底座取自 index.html；无战斗、LLM 或酒馆依赖 =====
+const arcaneVfxModule = (function () {
+    'use strict';
+    // 接入点 1：填写新技能的精确 fxTag，与下方分派和 CARDS 保持一致。
+    const ARCANE_TAGS = [];
+    const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
+
+    // —— 共享状态（clearArcaneFx 同步清空） ——
+    const S = {
+        uid: 0,
+        particles: [],
+        particleTimer: null,
+        particleUntil: 0,
+        flights: [],    // 贝塞尔弹道飞行物
+        timers: new Set(),     // combatToken 守卫的延时/收尾定时
+        rawTimers: new Map(),  // 弹道拍点及其完成回调，清理时同步解除等待
+        intervals: new Set(),  // 周期任务（蓄力抖动/羽流/光雨），回调内自守 token
+        layers: new Set(),     // data-arcane-fx 临时 DOM 层
+        anchors: new Set(),    // impactDom 无视觉锚点
+        handles: new Set(),    // 活动技能 handle
+        flashes: new Set(),    // 被加 arcane-flash-* 类的精灵
+        shakeEls: new Set(),   // 被加 arcane-shake-* 类的舞台
+        driver: null,          // 挂在 fxEngine.particles 里的驱动粒子
+        canvas: null, ctx: null,
+        dark: null,
+    };
+    let audioCtx = null, sfxBus = null, sfxVerb = null, sfxNoise = null;
+
+    // ===== combatToken 守卫定时 =====
+    function after(ms, fn) {
+        const token = combatToken;
+        const id = setTimeout(() => { S.timers.delete(id); if (token !== combatToken) return; fn(); }, ms);
+        S.timers.add(id);
+        return id;
+    }
+    function every(ms, fn) {
+        const token = combatToken;
+        const id = setInterval(() => { if (token !== combatToken) { clearInterval(id); S.intervals.delete(id); return; } fn(); }, ms);
+        S.intervals.add(id);
+        return id;
+    }
+    function stopEvery(id) { if (id != null) { clearInterval(id); S.intervals.delete(id); } }
+
+    // ===== 临时层 / 锚点 / 舞台效果 =====
+    function fsLayer(html, ms) {
+        const d = document.createElement('div');
+        d.className = 'arcane-fs-layer';
+        d.setAttribute('data-arcane-fx', 'layer');
+        d.innerHTML = html;
+        document.body.appendChild(d);
+        S.layers.add(d);
+        if (ms) setTimeout(() => { S.layers.delete(d); d.remove(); }, ms); // 纯清理回调，恒执行
+        return d;
+    }
+    function mkAnchor(x, y) {
+        const d = document.createElement('div');
+        d.style.cssText = 'position:fixed; left:' + (x - 1) + 'px; top:' + (y - 1) + 'px; width:2px; height:2px; pointer-events:none; z-index:56; opacity:0;';
+        d.setAttribute('data-arcane-fx', 'anchor');
+        document.body.appendChild(d);
+        S.anchors.add(d);
+        return d;
+    }
+    function dropAnchor(d) { if (d && d.isConnected) { S.anchors.delete(d); d.remove(); } }
+    function flash(el, cls) {
+        if (!el) return;
+        el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+        S.flashes.add(el);
+        after(700, () => { el.classList.remove(cls); S.flashes.delete(el); });
+    }
+    function shake(type) {
+        const scene = document.getElementById('battle-scene');
+        if (!scene) return;
+        const cls = 'arcane-shake-' + type;
+        scene.classList.remove('arcane-shake-light', 'arcane-shake-heavy', 'arcane-shake-quake');
+        void scene.offsetWidth;
+        scene.classList.add(cls);
+        S.shakeEls.add(scene);
+        after(type === 'quake' ? 560 : (type === 'heavy' ? 330 : 190), () => { scene.classList.remove(cls); S.shakeEls.delete(scene); });
+    }
+    function darken(o) {
+        if (!o && !S.dark) return;
+        if (!S.dark || !S.dark.isConnected) {
+            S.dark = document.createElement('div');
+            S.dark.id = 'arcane-dark';
+            S.dark.setAttribute('data-arcane-fx', 'dark');
+            document.body.appendChild(S.dark);
+        }
+        if (S.dark) S.dark.style.opacity = o;
+        if (!o && S.dark) {
+            const layer = S.dark;
+            after(360, () => { if (layer === S.dark && layer.style.opacity === '0') { layer.remove(); S.dark = null; } });
+        }
+    }
+
+    // ===== 几何 =====
+    function ctr(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, top: r.top, bottom: r.bottom, left: r.left, right: r.right }; }
+    function domOf(e) { return getEntitySpriteDom(e); }
+    function unionRect(doms) {
+        const rs = doms.map(d => d.getBoundingClientRect()).filter(r => r.width || r.height);
+        if (!rs.length) return null;
+        const l = Math.min(...rs.map(r => r.left)), rr = Math.max(...rs.map(r => r.right));
+        const t = Math.min(...rs.map(r => r.top)), b = Math.max(...rs.map(r => r.bottom));
+        return { x: (l + rr) / 2, y: (t + b) / 2, l, r: rr, t, b, w: rr - l, h: b - t };
+    }
+    // 施法者所属全队存活对象（含召唤物，isAlive 过滤）
+    function teamSprites(caster) {
+        const isHero = caster && (caster.isSummon ? caster.side === 'hero' : String(caster.id || '').startsWith('h'));
+        const arr = isHero ? heroesData : enemiesData;
+        return arr.filter(e => e.isAlive).map(e => domOf(e)).filter(Boolean);
+    }
+
+    // ===== 私有合成音色（demo 原样移植，局部隔离） =====
+    function audio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const ctx = audioCtx;
+            const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -10; comp.knee.value = 4; comp.ratio.value = 6; comp.attack.value = 0.001; comp.release.value = 0.12; comp.connect(ctx.destination);
+            const sat = shaper(ctx, 1.6); sat.connect(comp);
+            sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9; sfxBus.connect(sat);
+            const len = ctx.sampleRate * 3, ir = ctx.createBuffer(2, len, ctx.sampleRate);
+            for (let ch = 0; ch < 2; ch++) { const dd = ir.getChannelData(ch); for (let i = 0; i < len; i++) dd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4); }
+            sfxVerb = ctx.createConvolver(); sfxVerb.buffer = ir; const vg = ctx.createGain(); vg.gain.value = 0.5; sfxVerb.connect(vg); vg.connect(comp);
+            sfxNoise = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate); const nd = sfxNoise.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        return audioCtx;
+    }
+    function shaper(ctx, drive) { const ws = ctx.createWaveShaper(), c = new Float32Array(2048); for (let i = 0; i < 2048; i++) c[i] = Math.tanh((i / 1024 - 1) * drive) / Math.tanh(drive); ws.curve = c; ws.oversample = '2x'; return ws; }
+    function chain(ctx, src, t, o) {
+        const gn = ctx.createGain(), pk = o.peak || 0.002;
+        gn.gain.setValueAtTime(0.0001, t); gn.gain[o.peak ? 'exponentialRampToValueAtTime' : 'linearRampToValueAtTime'](o.vol, t + pk);
+        if (o.cut) { gn.gain.setValueAtTime(o.vol, t + o.dur - 0.012); gn.gain.linearRampToValueAtTime(0.0001, t + o.dur); }
+        else gn.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
+        const p = ctx.createStereoPanner(); p.pan.setValueAtTime(o.pan || 0, t); if (o.pan1 !== undefined) p.pan.linearRampToValueAtTime(o.pan1, t + o.dur);
+        src.connect(gn); gn.connect(p); p.connect(sfxBus);
+        if (o.wet) { const w = ctx.createGain(); w.gain.value = o.wet; p.connect(w); w.connect(sfxVerb); }
+    }
+    function noiseSrc(ctx, t, dur, rate) { const s = ctx.createBufferSource(); s.buffer = sfxNoise; s.playbackRate.value = rate || 1; s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05); return s; }
+    function biquad(ctx, type, f0, f1, q, t, dur, fd) { const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t); if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + (fd || dur)); return f; }
+    function click(d, vol = 0.7, f = 3500, dur = 0.012, pan = 0) { const ctx = audio(), t = ctx.currentTime + d; const f1 = biquad(ctx, 'highpass', f, 0, 0.7, t, dur); noiseSrc(ctx, t, dur).connect(f1); chain(ctx, f1, t, { vol, dur, pan }); }
+    function kick(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d; const s = ctx.createOscillator();
+        s.frequency.setValueAtTime(o.hi, t); s.frequency.exponentialRampToValueAtTime(o.lo, t + o.pd); s.frequency.exponentialRampToValueAtTime(o.lo * 0.7, t + o.dur);
+        const sh = shaper(ctx, o.drive || 3); s.connect(sh); s.start(t); s.stop(t + o.dur + 0.05); chain(ctx, sh, t, { vol: o.vol, dur: o.dur, wet: o.wet || 0 });
+    }
+    function crunch(d, o) { const ctx = audio(), t = ctx.currentTime + d; const bp = biquad(ctx, 'bandpass', o.f, o.f1, o.q || 1, t, o.dur); const sh = shaper(ctx, o.drive || 6); noiseSrc(ctx, t, o.dur).connect(bp); bp.connect(sh); chain(ctx, sh, t, { vol: o.vol, dur: o.dur, pan: o.pan || 0, wet: o.wet || 0 }); }
+    function boom(d, o) { const ctx = audio(), t = ctx.currentTime + d; const lp = biquad(ctx, 'lowpass', o.f0, o.f1, 0.9, t, o.dur, o.fd || o.dur * 0.6); noiseSrc(ctx, t, o.dur, o.rate).connect(lp); chain(ctx, lp, t, { vol: o.vol, dur: o.dur, peak: o.peak, wet: o.wet || 0, pan: o.pan || 0 }); }
+    function whoosh(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d; const f = biquad(ctx, o.type || 'bandpass', o.f0, o.f1, o.q || 1.2, t, o.dur);
+        if (o.wob) o.wob.forEach(([dt, hz]) => f.frequency.linearRampToValueAtTime(hz, t + dt));
+        noiseSrc(ctx, t, o.dur, o.rate).connect(f); chain(ctx, f, t, { vol: o.vol, dur: o.dur, peak: o.peak || o.dur * 0.5, cut: o.cut, pan: o.pan || 0, pan1: o.pan1, wet: o.wet || 0 });
+    }
+    function drone(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d;
+        [-12, 0, 9].forEach(dt => { const s = ctx.createOscillator(); s.type = 'sawtooth'; s.detune.value = dt; s.frequency.setValueAtTime(o.f0, t); s.frequency.exponentialRampToValueAtTime(o.f1, t + o.dur);
+            const lp = biquad(ctx, 'lowpass', o.lp0, o.lp1, 3, t, o.dur); s.connect(lp); s.start(t); s.stop(t + o.dur + 0.05); chain(ctx, lp, t, { vol: o.vol, dur: o.dur, peak: o.dur * 0.95, cut: true }); });
+    }
+    function tone(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d; const s = ctx.createOscillator(); s.type = o.type || 'sine'; s.detune.value = o.detune || 0;
+        s.frequency.setValueAtTime(o.f0, t); if (o.f1) s.frequency.exponentialRampToValueAtTime(o.f1, t + (o.fd || o.dur));
+        let node = s; if (o.lp) { const f = biquad(ctx, 'lowpass', o.lp, o.lp1, o.q || 0.8, t, o.dur); s.connect(f); node = f; }
+        s.start(t); s.stop(t + o.dur + 0.05); chain(ctx, node, t, o);
+    }
+    function choir(d, freqs, dur, vol, peakFrac = 0.4, cut = false) {
+        const ctx = audio(), t = ctx.currentTime + d;
+        freqs.forEach((f, i) => [-9, 0, 8].forEach(dt => {
+            const s = ctx.createOscillator(); s.type = 'sawtooth'; s.frequency.value = f; s.detune.value = dt;
+            const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 5 + i * 0.4; lg.gain.value = f * 0.006; lfo.connect(lg); lg.connect(s.frequency);
+            const lp = biquad(ctx, 'lowpass', 900 + i * 200, 0, 0.6, t, dur); s.connect(lp); s.start(t); lfo.start(t); s.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+            chain(ctx, lp, t, { vol: vol / 3, dur, peak: dur * peakFrac, cut, wet: 0.7, pan: (i - 1) * 0.3 });
+        }));
+    }
+    function chime(d, f, dur = 1.2, vol = 0.1, pan = 0) { [[1, 1], [2.4, 0.4], [3.9, 0.18]].forEach(([m, v]) => tone(d, { f0: f * m, dur: dur / Math.sqrt(m), vol: vol * v, pan, wet: 0.7 })); }
+    function crystal(d, f, vol = 0.12, pan = 0) { tone(d, { f0: f, dur: 0.16, vol, pan, wet: 0.5 }); tone(d, { f0: f * 1.5, dur: 0.09, vol: vol * 0.5, pan }); click(d, vol * 1.5, 6000, 0.005, pan); }
+    function cry(d, vol = 0.12) {
+        const ctx = audio(), t = ctx.currentTime + d; const s = ctx.createOscillator(); s.type = 'sawtooth';
+        s.frequency.setValueAtTime(1500, t); s.frequency.exponentialRampToValueAtTime(2900, t + 0.12); s.frequency.exponentialRampToValueAtTime(2100, t + 0.6);
+        const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 22; lg.gain.value = 60; lfo.connect(lg); lg.connect(s.frequency);
+        const bp = biquad(ctx, 'bandpass', 2600, 0, 4, t, 0.6); s.connect(bp); s.start(t); lfo.start(t); s.stop(t + 0.65); lfo.stop(t + 0.65); chain(ctx, bp, t, { vol, dur: 0.6, peak: 0.08, wet: 0.6, pan: 0.3 });
+    }
+
+    // ===== arcane canvas 粒子层（绘制在 z55，低于浮字；调度复用 fxEngine 循环） =====
+    function ensureCanvas() {
+        if (S.canvas && S.canvas.isConnected) return;
+        const c = document.createElement('canvas');
+        c.id = 'arcane-fx-canvas';
+        c.setAttribute('data-arcane-fx', 'canvas');
+        document.body.appendChild(c);
+        S.canvas = c; S.ctx = c.getContext('2d');
+        resizeCanvas();
+    }
+    function resizeCanvas() { if (S.canvas) { S.canvas.width = window.innerWidth; S.canvas.height = window.innerHeight; } }
+    window.addEventListener('resize', resizeCanvas);
+    const DRAW = {
+        dot(g, p) { g.fillStyle = p.color; g.beginPath(); g.arc(0, 0, p.size, 0, 6.283); g.fill(); },
+        ring(g, p) { g.strokeStyle = p.color; g.lineWidth = 3 * p.life; g.beginPath(); g.arc(0, 0, 4 + p.size * (1 - p.life) * 40, 0, 6.283); g.stroke(); },
+        flame(g, p) { const r = p.size * (0.4 + p.life * 0.8); const gr = g.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, '#fff7d6'); gr.addColorStop(0.35, p.color); gr.addColorStop(1, 'rgba(120,20,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill(); },
+        smoke(g, p) { const r = p.size * (1.6 - p.life); const gr = g.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, p.color); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill(); },
+        feather(g, p) { const s = p.size; g.fillStyle = p.color; g.beginPath(); g.moveTo(-s * 1.5, 0); g.quadraticCurveTo(0, -s * 0.55, s * 1.5, 0); g.quadraticCurveTo(0, s * 0.4, -s * 1.5, 0); g.fill(); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-s * 1.8, 0); g.lineTo(s * 1.5, 0); g.stroke(); },
+        shard(g, p) { const s = p.size; g.fillStyle = p.fill || 'rgba(224,242,254,0.25)'; g.strokeStyle = p.color; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, -s); g.lineTo(s * 0.7, s * 0.3); g.lineTo(s * 0.1, s * 0.9); g.lineTo(-s * 0.6, s * 0.2); g.closePath(); g.fill(); g.stroke(); },
+        streak(g, p) { g.strokeStyle = p.color; g.lineWidth = p.size; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 0); g.lineTo(-p.vx * 4, -p.vy * 4); g.stroke(); },
+        gradRing(g, p) {
+            const out = 10 + p.size * (1 - p.life) * 44, inn = Math.max(0.1, out * 0.58);
+            const gr = g.createRadialGradient(0, 0, inn, 0, 0, out);
+            gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.58, p.color); gr.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = gr; g.beginPath(); g.arc(0, 0, out, 0, 6.283); g.fill();
+        },
+        gradMist(g, p) {
+            const r = p.size * (1.72 - p.life * 0.62);
+            g.save(); g.scale(p.sx || 1.45, p.sy || 0.78);
+            const gr = g.createRadialGradient(-r * 0.14, 0, 0, 0, 0, r);
+            gr.addColorStop(0, p.mistCore || p.color); gr.addColorStop(0.46, p.color); gr.addColorStop(1, p.fade || 'rgba(18,12,28,0)');
+            g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill();
+            g.restore();
+        },
+        glowOrb(g, p) {
+            const r = Math.max(2, p.size * (0.7 + p.life * 0.55));
+            const gr = g.createRadialGradient(0, 0, 0, 0, 0, r);
+            gr.addColorStop(0, p.core || 'rgba(255,255,255,0.92)');
+            gr.addColorStop(0.28, p.color);
+            gr.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill();
+        },
+        bloom(g, p) {
+            const r = Math.max(4, p.size * (1.25 - p.life * 0.35));
+            const gr = g.createRadialGradient(0, 0, 0, 0, 0, r);
+            gr.addColorStop(0, p.color); gr.addColorStop(0.45, p.mid || p.color); gr.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill();
+        },
+        spark(g, p) {
+            const tx = -p.vx * (p.tail || 4.6), ty = -p.vy * (p.tail || 4.6);
+            const gr = g.createLinearGradient(0, 0, tx, ty);
+            gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.35, p.color); gr.addColorStop(1, 'rgba(0,0,0,0)');
+            g.strokeStyle = gr; g.lineWidth = p.size * 1.45; g.lineCap = 'round';
+            g.beginPath(); g.moveTo(0, 0); g.lineTo(tx, ty); g.stroke();
+            const r = p.size * 2.1, rg = g.createRadialGradient(0, 0, 0, 0, 0, r);
+            rg.addColorStop(0, '#ffffff'); rg.addColorStop(0.4, p.color); rg.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = rg; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill();
+        }
+    };
+    function releaseIdleCanvas() {
+        if (S.driver || S.handles.size || S.particles.length || S.flights.length || !S.canvas) return;
+        S.canvas.remove(); S.canvas = null; S.ctx = null;
+    }
+    function scheduleParticleCleanup() {
+        if (S.particleTimer !== null) return;
+        S.particleTimer = after(Math.max(0, S.particleUntil - performance.now()), () => {
+            S.particleTimer = null;
+            const now = performance.now();
+            S.particles = S.particles.filter(p => p.expiresAt > now);
+            if (S.particles.length) { scheduleParticleCleanup(); return; }
+            if (!S.flights.length && S.driver) {
+                const index = fxEngine.particles.indexOf(S.driver);
+                if (index >= 0) fxEngine.particles.splice(index, 1);
+                S.driver = null;
+            }
+            if (S.ctx) S.ctx.clearRect(0, 0, S.canvas.width, S.canvas.height);
+            releaseIdleCanvas();
+        });
+    }
+    function addP(o) {
+        const p = Object.assign({ vx: 0, vy: 0, life: 1, decay: 0.02, size: 3, color: '#fde68a', grav: 0, drag: 0.98, rot: 0, vr: 0, shape: 'dot', blend: 'lighter' }, o);
+        p.expiresAt = performance.now() + p.life / p.decay * 16.7;
+        S.particleUntil = Math.max(S.particleUntil, p.expiresAt);
+        S.particles.push(p);
+        ensureCanvas(); ensureDriver(); scheduleParticleCleanup();
+    }
+    function burst(n, fn) { for (let i = 0; i < n; i++) addP(fn(i)); }
+    // 绕场收束（demo orbitCharge 原样）
+    function orbitCharge(c, n, dur, mk, rx, ry, shrink = 0.8) {
+        const orb = []; for (let i = 0; i < n; i++) orb.push({ a: Math.random() * 6.283, r: rnd(0.45, 1), s: rnd(0.025, 0.05), k: Math.random() });
+        const t0 = performance.now();
+        const id = every(33, () => { const k = Math.min(1, (performance.now() - t0) / dur); orb.forEach(o => { o.a += o.s * (1 + k * 3); const r = o.r * (1 - k * shrink); addP(Object.assign({ x: c.x + Math.cos(o.a) * rx * r, y: c.y + Math.sin(o.a) * ry * r, decay: 0.25 }, mk(o))); }); });
+        after(dur, () => stopEvery(id));
+    }
+    // 贝塞尔弹道（demo fly 原样；由驱动粒子步进，不另启 rAF）
+    function fly(a, b, lift, dur, draw, done, ease) {
+        ease = ease || (k => k * k);
+        const cx = (a.x + b.x) / 2, cy = Math.min(a.y, b.y) - lift;
+        const startedAt = performance.now();
+        const f = {
+            age: 0, dur, timer: null,
+            step(pr) { const t = ease(pr), u = 1 - t; draw(u * u * a.x + 2 * u * t * cx + t * t * b.x, u * u * a.y + 2 * u * t * cy + t * t * b.y, pr); },
+            progress() { return Math.min(1, (performance.now() - startedAt) / dur); }
+        };
+        S.flights.push(f);
+        ensureCanvas(); ensureDriver();
+        f.timer = after(dur, () => {
+            const index = S.flights.indexOf(f);
+            if (index >= 0) S.flights.splice(index, 1);
+            f.step(1);
+            if (done) done();
+        });
+        return f;
+    }
+    function ensureDriver() {
+        if (S.driver) return;
+        const driver = {
+            age: 0, life: 1e9, x: 0, y: 0, vx: 0, vy: 0,
+            update(p) {
+                step(fxEngine.lastDt || 16.7);
+                if (!S.particles.length && !S.flights.length) {
+                    p.age = p.life; S.driver = null;
+                    if (S.ctx) S.ctx.clearRect(0, 0, S.canvas.width, S.canvas.height);
+                    releaseIdleCanvas();
+                }
+            },
+            draw() { render(); }
+        };
+        S.driver = driver;
+        fxEngine.addParticle(driver);
+    }
+    function step(dt) {
+        const k = dt / 16.7;
+        for (const f of S.flights) f.step(f.progress());
+        for (let i = S.particles.length - 1; i >= 0; i--) {
+            const p = S.particles[i];
+            p.vx *= Math.pow(p.drag, k); p.vy *= Math.pow(p.drag, k);
+            p.vy += p.grav * k;
+            p.x += p.vx * k; p.y += p.vy * k;
+            p.rot += p.vr * k;
+            p.life = Math.min(p.life - p.decay * k, Math.max(0, (p.expiresAt - performance.now()) * p.decay / 16.7));
+            if (p.life <= 0) S.particles.splice(i, 1);
+        }
+    }
+    function render() {
+        const g = S.ctx; if (!g || !S.canvas) return;
+        g.clearRect(0, 0, S.canvas.width, S.canvas.height);
+        for (let i = 0; i < S.particles.length; i++) {
+            const p = S.particles[i];
+            g.save();
+            g.globalAlpha = Math.min(1, p.life * 1.4);
+            g.globalCompositeOperation = p.blend;
+            g.translate(p.x, p.y);
+            if (p.shape !== 'streak') g.rotate(p.rot);
+            DRAW[p.shape](g, p);
+            g.restore();
+        }
+    }
+
+    // ===== ① 通用火焰弹（240 蓄 + 340 飞 = 580ms 命中拍点） =====
+    function fireProjectile(fromDom, toDom, dodged, token) {
+        const h = ctr(fromDom), t = ctr(toDom);
+        const a = { x: h.x + 10, y: h.top - 16 }, b = { x: t.x, y: t.y };
+        burst(22, () => { const ang = Math.random() * 6.283, d = rnd(40, 70); return { x: a.x + Math.cos(ang) * d, y: a.y + Math.sin(ang) * d, vx: -Math.cos(ang) * d / 9, vy: -Math.sin(ang) * d / 9, drag: 0.86, decay: 0.06, size: rnd(1.2, 2.4), color: pick(['#fdba74', '#f97316', '#fde68a']) }; });
+        fsLayer(`<div class="arcane-fs-anchor" style="left:${a.x}px; top:${a.y}px; width:64px; height:64px; border-radius:50%; background: radial-gradient(circle, #fff7d6 0%, #fb923c 35%, rgba(220,38,38,0.45) 60%, transparent 72%); animation: arcane-seed-bloom 0.26s ease-out both;"></div>`, 320);
+        whoosh(0, { f0: 400, f1: 1800, q: 1.2, dur: 0.22, vol: 0.3, peak: 0.18, pan: -0.5 }); boom(0.02, { f0: 900, f1: 300, dur: 0.25, vol: 0.25, peak: 0.08, pan: -0.5 });
+        for (let i = 0; i < 4; i++) click(0.04 + i * 0.04, 0.12, rnd(2500, 4500), 0.006, -0.5);
+        after(240, () => {
+            if (token !== combatToken) return; // 重置后停止绘制/音效启动
+            whoosh(0, { f0: 350, f1: 1500, q: 0.9, dur: 0.34, vol: 0.55, peak: 0.28, cut: true, pan: -0.6, pan1: 0.5 });
+            for (let i = 0; i < 6; i++) click(0.03 + i * 0.05, 0.1, rnd(2200, 4800), 0.006, -0.4 + i * 0.15);
+            fly(a, b, 90, 340, (x, y) => {
+                if (token !== combatToken) return;
+                addP({ x, y, shape: 'flame', size: 16, decay: 0.2, color: '#fb923c' });
+                burst(5, () => ({ x: x + rnd(-6, 6), y: y + rnd(-6, 6), vx: rnd(-1, 1), vy: rnd(-1.6, -0.3), drag: 0.94, decay: rnd(0.04, 0.07), size: rnd(6, 11), shape: 'flame', color: pick(['#f97316', '#ef4444', '#fbbf24']) }));
+                for (let j = 0; j < 2; j++) { const an = performance.now() / 45 + j * 3.14; addP({ x: x + Math.cos(an) * 11, y: y + Math.sin(an) * 11, decay: 0.3, size: 2, color: '#fff7d6' }); }
+            }, () => {
+                if (token !== combatToken || dodged) return; // 闪避：弹达原位，不爆散不响，不 flash/flinch
+                click(0, 0.8, 4000); kick(0, { hi: 240, lo: 55, pd: 0.035, dur: 0.26, vol: 0.9, drive: 3 }); crunch(0, { f: 1600, f1: 700, q: 1.2, dur: 0.12, vol: 0.5 });
+                boom(0.005, { f0: 5000, f1: 200, dur: 0.5, vol: 0.5, wet: 0.25 }); whoosh(0.05, { f0: 600, f1: 300, q: 0.8, dur: 0.6, vol: 0.15, peak: 0.05 });
+                for (let i = 0; i < 12; i++) click(rnd(0.06, 0.6), 0.15, rnd(2500, 6000), 0.006, rnd(0.1, 0.8));
+                fsLayer(`<div class="arcane-fs-anchor" style="left:${b.x}px; top:${b.y}px; width:140px; height:140px; border-radius:50%; background: radial-gradient(circle, #fff 0%, #fdba74 30%, rgba(239,68,68,0.5) 58%, transparent 72%); animation: arcane-hit-flash 0.34s ease-out both;"></div>`, 420);
+                burst(2, i => ({ x: b.x, y: b.y, shape: 'ring', size: 1.8 + i, decay: 0.07 - i * 0.02, color: i ? '#f97316' : '#fde68a' }));
+                burst(40, () => { const an = Math.random() * 6.283, s = rnd(2, 8); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s - 1, grav: 0.13, drag: 0.93, decay: rnd(0.025, 0.05), size: rnd(1, 2.2), color: pick(['#fde68a', '#fb923c', '#fff7d6']) }; });
+                burst(10, () => ({ x: b.x + rnd(-14, 14), y: b.y + rnd(-14, 14), vx: rnd(-1, 1), vy: rnd(-2, -0.5), drag: 0.95, decay: rnd(0.03, 0.05), size: rnd(12, 20), shape: 'flame', color: '#f97316' }));
+                burst(9, () => ({ x: b.x + rnd(-24, 24), y: b.y + rnd(-18, 18), vx: rnd(-0.3, 0.3), vy: rnd(-0.9, -0.4), drag: 0.99, decay: 0.011, size: rnd(16, 28), shape: 'smoke', blend: 'source-over', color: 'rgba(40,32,30,0.55)' }));
+            });
+        });
+    }
+
+    // ===== ② 敌方紫色法术弹（480ms 命中拍点） =====
+    function enemySpellProjectile(fromDom, toDom, dodged, token) {
+        const t = ctr(fromDom), h = ctr(toDom);
+        const a = { x: t.x - 20, y: t.y - 10 }, b = { x: h.x, y: toDom.hasAttribute('data-arcane-fx') ? h.y : h.top + 30 };
+        whoosh(0, { f0: 300, f1: 900, q: 1.4, dur: 0.48, vol: 0.32, peak: 0.4, pan: 0.6, pan1: -0.3 }); tone(0, { type: 'triangle', f0: 110, f1: 90, dur: 0.48, vol: 0.08 });
+        fly(a, b, 30, 480, (x, y) => {
+            if (token !== combatToken) return;
+            addP({ x, y, size: 9, decay: 0.22, color: '#c084fc' }); addP({ x, y, size: 4, decay: 0.3, color: '#fff' });
+            burst(3, () => ({ x: x + rnd(-5, 5), y: y + rnd(-5, 5), vx: rnd(0.5, 1.5), vy: rnd(-0.5, 0.5), drag: 0.94, decay: 0.06, size: rnd(1.5, 3), color: pick(['#7c3aed', '#a855f7']) }));
+        }, () => {
+            if (token !== combatToken || dodged) return;
+            click(0, 0.6, 3500); kick(0, { hi: 180, lo: 55, pd: 0.03, dur: 0.25, vol: 0.7, drive: 3 }); boom(0, { f0: 3000, f1: 200, dur: 0.4, vol: 0.35, wet: 0.3 });
+            burst(24, () => { const an = Math.random() * 6.283, s = rnd(1.5, 5); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.93, decay: 0.04, size: rnd(1, 2.4), color: pick(['#e9d5ff', '#c084fc', '#7c3aed']) }; });
+        }, k => k);
+    }
+
+    // ===== 新技能实现 BEGIN =====
+    // 接入点 2：在这里写 playXxx(caster, targets, isReaction)，使用 domOf / ctr / unionRect 定位。
+    // 延时用 after / every；SVG 用 fsLayer(html, 生命周期毫秒)；粒子用 addP / burst / fly；不要另起永久 rAF。
+    // 无固定寿命的图层由 handle.cancel() 和自然收尾显式移除；darken(o) 收尾必须调用 darken(0)。
+    // 保持纯演出：不改 HP/状态，不负责浮字或战斗结算；测试反馈放在下方演示控制区。
+    // 持续演出返回 handle：doneAt: Date.now() + 总演出毫秒（含尾韵），不能用 performance.now()。
+    // cancel() 只清理自身图层、计时和 WAAPI 动画，不在技能内部调用全局 clearArcaneFx()。
+    // 按需提供 dodge(success) / hit(type) / dispel(dom) / impactDom，与正式版反应接口一致。
+    // impactDom 可指向实体或 mkAnchor() 自建落点；dropAnchor() 只用于后者，不能删除真实角色 DOM。
+    // handle 加入 S.handles；结束时删除并调用 releaseIdleCanvas()；WAAPI 动画由 cancel() 取消。
+    // 普通/反应演练及完整可运行接入示例见根目录《技能SVG模板使用与快速移植.md》。
+    // ===== 状态发作、解除与到期演出（可移植至 index.html arcaneVfxModule） =====
+    const ST = { persists: new Map(), sfxAt: new Map() };
+    let statusSfxOn = true;
+    const STATUS_COLORS = { poison: '#a855f7', burn: '#f97316', paralyze: '#facc15', stun: '#fde047', 'atk-': '#c084fc', 'def-': '#c084fc', 'spd-': '#c084fc', 'hit-': '#c084fc', 'eva-': '#c084fc', debuff: '#c084fc' };
+    function statusEntityId(e) { return e && typeof e === 'object' ? String(e.id || '') : String(e || ''); }
+    function statusPanOf(x) { return Math.max(-0.75, Math.min(0.75, (x / Math.max(640, window.innerWidth) - 0.5) * 1.35)); }
+    function statusGlowDef(id, std = 3) {
+        return `<filter id="${id}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${std}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+    }
+    function statusVisualRect(entityOrDom) {
+        const dom = entityOrDom && entityOrDom.nodeType === 1 ? entityOrDom : domOf(entityOrDom);
+        if (!dom) return null;
+        const portrait = dom.querySelector && dom.querySelector('.portrait');
+        if (portrait) {
+            const r = ctr(portrait);
+            const prev = portrait.previousElementSibling;
+            const top = prev ? Math.max(r.top, prev.getBoundingClientRect().bottom) : r.top;
+            const h = Math.max(24, r.bottom - top);
+            return { dom, x: r.x, y: (top + r.bottom) / 2, w: r.w, h, top, bottom: r.bottom, left: r.left, right: r.right, isHero: true };
+        }
+        return Object.assign({ dom, isHero: false }, ctr(dom));
+    }
+    function statusSfxGate(key, minGapMs = 65) {
+        if (!statusSfxOn) return 0;
+        const now = performance.now(), prev = ST.sfxAt.get(key) || 0, gap = now - prev;
+        if (gap < 28) return 0;
+        ST.sfxAt.set(key, now);
+        return gap < minGapMs ? 0.45 : 1;
+    }
+    function statusHiss(delaySec, f0, f1, dur, vol, pan = 0, q = 2.4) {
+        if (!statusSfxOn || vol <= 0.002) return;
+        const ctx = audio(), t = ctx.currentTime + delaySec;
+        const bp = biquad(ctx, 'bandpass', f0, f1, q, t, dur);
+        const s = noiseSrc(ctx, t, dur, 1);
+        s.connect(bp);
+        chain(ctx, bp, t, { vol, dur, peak: 0.25, cut: true, pan, wet: 0.12 });
+    }
+    function statusRun(totalMs) {
+        const token = combatToken;
+        ensureCanvas(); ensureDriver();
+        const owner = { cancelled: false, finished: false, token, timers: new Set(), intervals: new Set(), animations: new Set(), layers: new Set(), restores: [] };
+        owner.at = (ms, fn) => {
+            const id = after(ms, () => { owner.timers.delete(id); if (!owner.cancelled && !owner.finished && token === combatToken) fn(); });
+            owner.timers.add(id); return id;
+        };
+        owner.layer = html => { const d = fsLayer(html); owner.layers.add(d); return d; };
+        owner.anim = (el, kf, opts) => { const a = el.animate(kf, opts); owner.animations.add(a); return a; };
+        owner.addP = opts => addP(Object.assign({ owner }, opts));
+        owner.burst = (n, fn) => { for (let i = 0; i < n; i++) owner.addP(fn(i)); };
+        owner.onRestore = fn => owner.restores.push(fn);
+        function cleanup() {
+            if (owner.finished) return;
+            owner.finished = true;
+            owner.timers.forEach(id => { clearTimeout(id); S.timers.delete(id); }); owner.timers.clear();
+            owner.intervals.forEach(id => { clearInterval(id); S.intervals.delete(id); }); owner.intervals.clear();
+            owner.animations.forEach(a => { try { a.cancel(); } catch {} }); owner.animations.clear();
+            owner.layers.forEach(d => { S.layers.delete(d); d.remove(); }); owner.layers.clear();
+            S.particles = S.particles.filter(p => p.owner !== owner);
+            owner.restores.forEach(fn => { try { fn(); } catch {} }); owner.restores.length = 0;
+            S.handles.delete(handle);
+            releaseIdleCanvas();
+        }
+        const handle = { doneAt: Date.now() + totalMs, cancel() { owner.cancelled = true; cleanup(); } };
+        S.handles.add(handle);
+        owner.at(totalMs, cleanup);
+        owner.handle = handle;
+        return owner;
+    }
+    function setStatusPersist(dom, kind, active) {
+        if (!dom || !dom.isConnected) return;
+        const isSprite = !(dom.querySelector && dom.querySelector('.portrait'));
+        const attr = 'data-arcane-status-persist';
+        let node = dom.querySelector('[' + attr + '="' + kind + '"]');
+        if (active) {
+            if (!dom.classList.contains('relative')) dom.classList.add('arcane-status-host-rel');
+            if (!node) {
+                node = document.createElement('div');
+                node.setAttribute(attr, kind);
+                node.className = (kind === 'burn' ? 'arcane-status-persist-burn' : 'arcane-status-persist-poison') + (isSprite ? ' is-sprite' : '');
+                dom.appendChild(node);
+            } else { node.classList.remove('exiting'); }
+            let set = ST.persists.get(dom);
+            if (!set) { set = new Set(); ST.persists.set(dom, set); }
+            set.add(node);
+        } else if (node) {
+            node.classList.add('exiting');
+            const token = combatToken;
+            after(290, () => {
+                if (token !== combatToken) return;
+                node.remove();
+                const set = ST.persists.get(dom);
+                if (set) { set.delete(node); if (!set.size) ST.persists.delete(dom); }
+                if (!dom.querySelector('[' + attr + ']')) dom.classList.remove('arcane-status-host-rel');
+            });
+        }
+    }
+    function syncStatusLayers(entity) {
+        if (!entity) return;
+        const dom = domOf(entity);
+        if (!dom) return;
+        if (!entity.isAlive || entity.hp <= 0 || entity.isSubdued) { clearStatusLayers(entity); return; }
+        const buffs = entity.buffs || [];
+        setStatusPersist(dom, 'poison', buffs.some(b => b.type === 'poison' && b.duration > 0));
+        setStatusPersist(dom, 'burn', buffs.some(b => b.type === 'burn' && b.duration > 0));
+    }
+    function clearStatusLayers(entityOrId) {
+        if (entityOrId) {
+            const dom = domOf(entityOrId);
+            if (dom) {
+                dom.querySelectorAll('[data-arcane-status-persist]').forEach(n => n.remove());
+                dom.classList.remove('arcane-status-host-rel');
+                ST.persists.delete(dom);
+            }
+            return;
+        }
+        ST.persists.forEach((set, dom) => {
+            set.forEach(n => n.remove());
+            if (dom && dom.isConnected) dom.classList.remove('arcane-status-host-rel');
+        });
+        ST.persists.clear();
+        ST.sfxAt.clear();
+        document.querySelectorAll('[data-arcane-status-persist]').forEach(n => n.remove());
+        document.querySelectorAll('.arcane-status-host-rel').forEach(el => el.classList.remove('arcane-status-host-rel'));
+    }
+    // 1. 中毒发作：紫色毒纹泛起 → 依层 2~4 毒泡破裂 → 细毒雾上浮 (L1 · 540ms)
+    function playStatusPoisonTick(entity, meta = {}, onBeat) {
+        const dom = domOf(entity); if (!dom) return null;
+        const r = statusVisualRect(dom); if (!r) return null;
+        const layers = Math.max(1, Math.min(5, Number(meta.layers) || 1));
+        const bubbleCount = layers >= 3 ? 4 : (layers === 2 ? 3 : 2);
+        const owner = statusRun(540), uid = 'arcane-status-poison-' + (++S.uid), pan = statusPanOf(r.x);
+        const W = Math.max(110, r.w * 1.45), H = Math.max(110, r.h * 1.45), cx = W / 2, cy = H / 2, rw = r.w * 0.44, rh = r.h * 0.44;
+        const veinSet = [
+            `M${cx - rw * 0.72},${cy + rh * 0.35} Q${cx - rw * 0.56},${cy - rh * 0.08} ${cx - rw * 0.25},${cy - rh * 0.46}`,
+            `M${cx + rw * 0.68},${cy + rh * 0.28} Q${cx + rw * 0.54},${cy - rh * 0.16} ${cx + rw * 0.22},${cy - rh * 0.52}`,
+            `M${cx - rw * 0.48},${cy + rh * 0.58} Q${cx},${cy + rh * 0.42} ${cx + rw * 0.46},${cy + rh * 0.52}`,
+            `M${cx - rw * 0.38},${cy - rh * 0.22} Q${cx},${cy - rh * 0.48} ${cx + rw * 0.34},${cy - rh * 0.26}`,
+            `M${cx - rw * 0.62},${cy - rh * 0.05} Q${cx - rw * 0.18},${cy + rh * 0.16} ${cx + rw * 0.56},${cy - rh * 0.04}`
+        ].slice(0, layers >= 3 ? 5 : (layers === 2 ? 4 : 3));
+        const bSlots = [[-0.36, -0.18], [0.34, -0.26], [-0.14, 0.22], [0.28, 0.18]].slice(0, bubbleCount);
+        const veinStrokeW = layers >= 3 ? 2.6 : 1.9, veinOp = layers >= 3 ? 0.88 : 0.68;
+        const bubblesHtml = bSlots.map(([ox, oy], idx) => {
+            const bx = (cx + ox * rw * 1.45).toFixed(1), by = (cy + oy * rh * 1.35).toFixed(1), br = (6.2 + (idx % 2) * 1.8 + (layers >= 3 ? 1.2 : 0)).toFixed(1);
+            return `<g class="s-bubble" data-bx="${(r.x + ox * r.w * 0.64).toFixed(1)}" data-by="${(r.y + oy * r.h * 0.6).toFixed(1)}" style="transform-origin:${bx}px ${by}px;opacity:0">`
+                + `<circle cx="${bx}" cy="${by}" r="${br}" fill="url(#${uid}-bub)"/>`
+                + `<circle cx="${(Number(bx) - Number(br) * 0.32).toFixed(1)}" cy="${(Number(by) - Number(br) * 0.32).toFixed(1)}" r="${(Number(br) * 0.26).toFixed(1)}" fill="#f3e8ff" opacity="0.72"/></g>`;
+        }).join('');
+        const layer = owner.layer(
+            `<div class="arcane-status-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
+            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.4)}`
+            + `<radialGradient id="${uid}-bub" cx="0.35" cy="0.32"><stop offset="0" stop-color="#f3e8ff" stop-opacity="0.35"/><stop offset="0.58" stop-color="#a855f7" stop-opacity="0.72"/><stop offset="0.88" stop-color="#7e22ce" stop-opacity="0.92"/><stop offset="1" stop-color="#581c87" stop-opacity="0"/></radialGradient>`
+            + `</defs><g class="s-veins" filter="url(#${uid}-gl)" style="transform-origin:${cx}px ${cy}px;opacity:0">`
+            + veinSet.map(d => `<path d="${d}" fill="none" stroke="#c084fc" stroke-width="${veinStrokeW}" stroke-linecap="round" opacity="${veinOp}"/>`).join('')
+            + `</g><g filter="url(#${uid}-gl)">${bubblesHtml}</g></svg></div>`
+        );
+        const veins = layer.querySelector('.s-veins');
+        if (veins) owner.anim(veins, [{ opacity: 0, transform: 'scale(0.92)' }, { opacity: 1, transform: 'scale(1.02)', offset: 0.32 }, { opacity: 0.72, transform: 'scale(1)', offset: 0.65 }, { opacity: 0, transform: 'scale(1.05)' }], { duration: 420, easing: 'ease-out', fill: 'forwards' });
+        const gSfx = statusSfxGate('poison', 70);
+        if (gSfx > 0) {
+            statusHiss(0, 2600, 1250, 0.14, (0.042 + layers * 0.005) * gSfx, pan, 2.2);
+            tone(0.01, { type: 'triangle', f0: 210, f1: 125, dur: 0.12, vol: 0.022 * gSfx, pan, wet: 0.18 });
+        }
+        owner.at(60, () => { if (onBeat) onBeat({ event: 'poisonTick', entity, layers }); });
+        layer.querySelectorAll('.s-bubble').forEach((bEl, idx) => {
+            const d0 = 40 + idx * 62;
+            owner.at(d0, () => {
+                owner.anim(bEl, [{ opacity: 0, transform: 'scale(0.28)' }, { opacity: 0.96, transform: 'scale(1.08)', offset: 0.58 }, { opacity: 0, transform: 'scale(1.42)' }], { duration: 155, easing: 'ease-out', fill: 'forwards' });
+            });
+            owner.at(d0 + 92, () => {
+                const bx = Number(bEl.dataset.bx), by = Number(bEl.dataset.by);
+                const gPop = statusSfxGate('poisonPop', 55);
+                if (gPop > 0) tone(0, { type: 'sine', f0: 480 + idx * 75, f1: 760, dur: 0.045, vol: 0.018 * gPop, pan, wet: 0.15 });
+                owner.burst(4 + (layers >= 3 ? 1 : 0), () => {
+                    const a = rnd(-Math.PI * 0.9, -Math.PI * 0.1), sp = rnd(0.7, 1.7);
+                    return { x: bx + rnd(-4, 4), y: by + rnd(-4, 4), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.35, drag: 0.94, decay: 0.046, size: rnd(2.2, 3.8), shape: 'glowOrb', core: '#e9d5ff', color: '#a855f7' };
+                });
+                owner.addP({ x: bx, y: by - 2, vx: rnd(-0.35, 0.35), vy: rnd(-1.1, -0.55), drag: 0.96, decay: 0.036, size: rnd(8, 12), shape: 'gradMist', blend: 'source-over', mistCore: '#7e22ce', color: 'rgba(126,34,206,0.34)', fade: 'rgba(59,7,100,0)' });
+            });
+        });
+        return owner.handle;
+    }
+
+    // 2. 燃烧发作：火舌沿轮廓窜起 → 单一小爆燃点 → 焦黑余烬上飘；不叠层强度恒定 (L1 · 540ms)
+    function playStatusBurnTick(entity, meta = {}, onBeat) {
+        const dom = domOf(entity); if (!dom) return null;
+        const r = statusVisualRect(dom); if (!r) return null;
+        const owner = statusRun(540), uid = 'arcane-status-burn-' + (++S.uid), pan = statusPanOf(r.x);
+        const W = Math.max(115, r.w * 1.5), H = Math.max(115, r.h * 1.5), cx = W / 2, cy = H / 2, rw = r.w * 0.46, rh = r.h * 0.46;
+        const fx = cx + rw * 0.24, fy = cy - rh * 0.18;
+        const layer = owner.layer(
+            `<div class="arcane-status-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
+            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.6)}`
+            + `<linearGradient id="${uid}-fl" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#9a3412" stop-opacity="0"/><stop offset="0.35" stop-color="#ea580c" stop-opacity="0.88"/><stop offset="0.72" stop-color="#fb923c" stop-opacity="0.92"/><stop offset="1" stop-color="#fef3c7" stop-opacity="0"/></linearGradient>`
+            + `<radialGradient id="${uid}-pop"><stop offset="0" stop-color="#fef9c3" stop-opacity="0.95"/><stop offset="0.36" stop-color="#fb923c" stop-opacity="0.82"/><stop offset="0.75" stop-color="#c2410c" stop-opacity="0.38"/><stop offset="1" stop-color="#431407" stop-opacity="0"/></radialGradient>`
+            + `</defs><g class="s-tongues" filter="url(#${uid}-gl)" style="transform-origin:${cx}px ${cy + rh * 0.4}px;opacity:0">`
+            + `<path d="M${cx - rw * 0.85},${cy + rh * 0.55} Q${cx - rw * 1.05},${cy} ${cx - rw * 0.62},${cy - rh * 0.62} Q${cx - rw * 0.48},${cy - rh * 0.1} ${cx - rw * 0.64},${cy + rh * 0.52} Z" fill="url(#${uid}-fl)"/>`
+            + `<path d="M${cx + rw * 0.82},${cy + rh * 0.52} Q${cx + rw * 1.02},${cy - rh * 0.05} ${cx + rw * 0.58},${cy - rh * 0.68} Q${cx + rw * 0.46},${cy - rh * 0.12} ${cx + rw * 0.62},${cy + rh * 0.5} Z" fill="url(#${uid}-fl)"/>`
+            + `<path d="M${cx - rw * 0.25},${cy - rh * 0.55} Q${cx + rw * 0.04},${cy - rh * 1.12} ${cx + rw * 0.34},${cy - rh * 0.58} Q${cx + rw * 0.04},${cy - rh * 0.72} ${cx - rw * 0.25},${cy - rh * 0.55} Z" fill="url(#${uid}-fl)"/>`
+            + `</g><circle class="s-flare" cx="${fx}" cy="${fy}" r="${Math.max(12, Math.min(rw, rh) * 0.46)}" fill="url(#${uid}-pop)" opacity="0" style="transform-origin:${fx}px ${fy}px"/></svg></div>`
+        );
+        const tongues = layer.querySelector('.s-tongues'), flare = layer.querySelector('.s-flare');
+        if (tongues) owner.anim(tongues, [{ opacity: 0, transform: 'translateY(8px) scaleY(0.55)' }, { opacity: 0.94, transform: 'translateY(-4px) scaleY(1.06)', offset: 0.35 }, { opacity: 0, transform: 'translateY(-14px) scaleY(0.75)' }], { duration: 360, easing: 'ease-out', fill: 'forwards' });
+        const gSfx = statusSfxGate('burn', 70);
+        if (gSfx > 0) {
+            click(0.02, 0.068 * gSfx, 2600, 0.011, pan);
+            click(0.08, 0.045 * gSfx, 3400, 0.009, pan);
+            tone(0.05, { type: 'triangle', f0: 190, f1: 92, dur: 0.12, vol: 0.028 * gSfx, pan, wet: 0.16 });
+        }
+        owner.at(60, () => { if (onBeat) onBeat({ event: 'burnTick', entity }); });
+        owner.at(80, () => {
+            if (flare) owner.anim(flare, [{ opacity: 0, transform: 'scale(0.32)' }, { opacity: 0.96, transform: 'scale(1.12)', offset: 0.35 }, { opacity: 0, transform: 'scale(0.75)' }], { duration: 210, easing: 'ease-out', fill: 'forwards' });
+            const bx = r.x + r.w * 0.11, by = r.y - r.h * 0.08;
+            owner.addP({ x: bx, y: by, shape: 'gradRing', size: 0.75, decay: 0.085, color: 'rgba(249,115,22,0.5)' });
+            owner.burst(5, () => { const a = rnd(-Math.PI, 0), sp = rnd(1.1, 2.4); return { x: bx, y: by, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.5, drag: 0.92, decay: 0.055, size: rnd(1.2, 1.9), shape: 'spark', color: pick(['#fb923c', '#fbbf24']) }; });
+            owner.burst(6, i => ({ x: r.x + rnd(-rw * 0.65, rw * 0.65), y: r.y + rnd(-rh * 0.25, rh * 0.45), vx: rnd(-0.35, 0.35), vy: rnd(-1.6, -0.8), drag: 0.97, decay: rnd(0.028, 0.042), size: i % 2 ? rnd(2.2, 3.6) : rnd(7, 11), shape: i % 2 ? 'glowOrb' : 'gradMist', blend: i % 2 ? 'lighter' : 'source-over', core: '#fed7aa', mistCore: 'rgba(67,20,7,0.68)', color: i % 2 ? '#ea580c' : 'rgba(28,25,23,0.45)', fade: 'rgba(12,10,9,0)' }));
+        });
+        return owner.handle;
+    }
+
+    // 2B. 燃烧禁疗轻提示：治疗光落于燃烧目标瞬间被暗橙火苗压低 ~200ms (L1 · 240ms)
+    function playStatusHealSuppressed(entity, meta = {}, onBeat) {
+        const dom = domOf(entity); if (!dom) return null;
+        const r = statusVisualRect(dom); if (!r) return null;
+        const owner = statusRun(240), uid = 'arcane-status-hsup-' + (++S.uid), pan = statusPanOf(r.x);
+        const W = Math.max(105, r.w * 1.38), H = Math.max(105, r.h * 1.38), cx = W / 2, cy = H / 2, rw = r.w * 0.48, rh = r.h * 0.48;
+        const layer = owner.layer(
+            `<div class="arcane-status-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
+            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.4)}`
+            + `<radialGradient id="${uid}-hl"><stop offset="0" stop-color="#6ee7b7" stop-opacity="0.55"/><stop offset="0.6" stop-color="#10b981" stop-opacity="0.22"/><stop offset="1" stop-color="#059669" stop-opacity="0"/></radialGradient>`
+            + `<linearGradient id="${uid}-cap" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c2d12" stop-opacity="0.88"/><stop offset="0.55" stop-color="#ea580c" stop-opacity="0.72"/><stop offset="1" stop-color="#fb923c" stop-opacity="0"/></linearGradient>`
+            + `</defs><circle class="s-heal" cx="${cx}" cy="${cy}" r="${Math.max(rw, rh) * 1.05}" fill="url(#${uid}-hl)" style="transform-origin:${cx}px ${cy}px"/>`
+            + `<path class="s-cap" d="M${cx - rw * 1.05},${cy - rh * 0.9} Q${cx},${cy - rh * 1.15} ${cx + rw * 1.05},${cy - rh * 0.9} L${cx + rw * 0.88},${cy + rh * 0.6} Q${cx},${cy + rh * 0.25} ${cx - rw * 0.88},${cy + rh * 0.6} Z" fill="url(#${uid}-cap)" filter="url(#${uid}-gl)" opacity="0" style="transform-origin:${cx}px ${cy - rh * 0.6}px"/></svg></div>`
+        );
+        const hl = layer.querySelector('.s-heal'), cap = layer.querySelector('.s-cap');
+        if (hl) owner.anim(hl, [{ opacity: 0.72, transform: 'scale(0.85)' }, { opacity: 0.16, transform: 'scale(0.68)', offset: 0.45 }, { opacity: 0, transform: 'scale(0.55)' }], { duration: 220, easing: 'ease-out', fill: 'forwards' });
+        if (cap) owner.anim(cap, [{ opacity: 0, transform: 'scaleY(0.35)' }, { opacity: 0.94, transform: 'scaleY(1.04)', offset: 0.35 }, { opacity: 0, transform: 'scaleY(0.88)' }], { duration: 210, easing: 'ease-out', delay: 20, fill: 'forwards' });
+        const gSfx = statusSfxGate('healSuppress', 80);
+        if (gSfx > 0) {
+            statusHiss(0.02, 1800, 680, 0.12, 0.038 * gSfx, pan, 2.0);
+            tone(0.02, { type: 'sine', f0: 360, f1: 165, dur: 0.11, vol: 0.022 * gSfx, pan });
+        }
+        owner.at(45, () => {
+            owner.burst(4, () => ({ x: r.x + rnd(-rw * 0.55, rw * 0.55), y: r.y + rnd(-rh * 0.3, rh * 0.2), vx: rnd(-0.9, 0.9), vy: rnd(-1.4, -0.4), drag: 0.93, decay: 0.06, size: rnd(2.2, 3.6), shape: 'glowOrb', core: '#fed7aa', color: '#ea580c' }));
+            if (onBeat) onBeat({ event: 'healSuppressed', entity });
+        });
+        return owner.handle;
+    }
+    // 3. 麻痹僵直触发（蓝电外弧 + 麻黄内芯/碎裂剥落 1 层）与未命中对照组
+    function playStatusParaProc(entity, meta = {}, onBeat) {
+        if (meta && meta.triggered === false) return null;
+        const dom = domOf(entity); if (!dom) return null;
+        const r = statusVisualRect(dom); if (!r) return null;
+        const owner = statusRun(440), uid = 'arcane-status-para-' + (++S.uid), pan = statusPanOf(r.x);
+        const W = Math.max(115, r.w * 1.45), H = Math.max(115, r.h * 1.45), cx = W / 2, cy = H / 2, rw = r.w * 0.46, rh = r.h * 0.46;
+        const arc1 = `M${cx - rw * 0.92},${cy - rh * 0.42} Q${cx - rw * 0.45},${cy - rh * 0.92} ${cx + rw * 0.08},${cy - rh * 0.56} Q${cx + rw * 0.55},${cy - rh * 0.9} ${cx + rw * 0.88},${cy - rh * 0.25}`;
+        const arc2 = `M${cx - rw * 0.82},${cy + rh * 0.32} Q${cx - rw * 0.3},${cy + rh * 0.85} ${cx + rw * 0.22},${cy + rh * 0.48} Q${cx + rw * 0.68},${cy + rh * 0.72} ${cx + rw * 0.9},${cy + rh * 0.14}`;
+        const sx = cx + rw * 0.52, sy = cy - rh * 0.44;
+        const layer = owner.layer(
+            `<div class="arcane-status-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
+            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.6)}</defs>`
+            + `<g class="s-arcs" filter="url(#${uid}-gl)" opacity="0">`
+            + `<path d="${arc1}" fill="none" stroke="#38bdf8" stroke-width="3.2" stroke-linecap="round" opacity="0.9"/>`
+            + `<path d="${arc1}" fill="none" stroke="#facc15" stroke-width="1.35" stroke-linecap="round" opacity="0.95"/>`
+            + `<path d="${arc2}" fill="none" stroke="#38bdf8" stroke-width="2.8" stroke-linecap="round" opacity="0.86"/>`
+            + `<path d="${arc2}" fill="none" stroke="#facc15" stroke-width="1.15" stroke-linecap="round" opacity="0.9"/></g>`
+            + `<g class="s-para-flake" filter="url(#${uid}-gl)" style="transform-origin:${sx}px ${sy}px;opacity:0">`
+            + `<path d="M${sx - 8},${sy - 3} Q${sx + 2},${sy - 11} ${sx + 10},${sy - 1} Q${sx + 4},${sy + 8} ${sx - 7},${sy + 5} Z" fill="#facc15" opacity="0.92"/>`
+            + `<path d="M${sx - 6},${sy - 2} Q${sx + 2},${sy - 8} ${sx + 8},${sy - 1}" fill="none" stroke="#38bdf8" stroke-width="1.6" stroke-linecap="round"/></g></svg></div>`
+        );
+        const arcs = layer.querySelector('.s-arcs'), flake = layer.querySelector('.s-para-flake');
+        if (arcs) owner.anim(arcs, [{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 0.28, offset: 0.32 }, { opacity: 0.95, offset: 0.55 }, { opacity: 0 }], { duration: 220, easing: 'steps(1)', fill: 'forwards' });
+        owner.anim(dom, [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(-2.5px,0,0)', offset: 0.16 }, { transform: 'translate3d(2.5px,1px,0)', offset: 0.34 }, { transform: 'translate3d(-2px,0,0)', offset: 0.56 }, { transform: 'translate3d(1.5px,-1px,0)', offset: 0.78 }, { transform: 'translate3d(0,0,0)' }], { duration: 330, easing: 'ease-out' });
+        const gSfx = statusSfxGate('para', 70);
+        if (gSfx > 0) {
+            click(0, 0.062 * gSfx, 4200, 0.013, pan);
+            tone(0.01, { type: 'sawtooth', f0: 960, f1: 420, dur: 0.085, lp: 2600, vol: 0.028 * gSfx, pan });
+        }
+        owner.at(80, () => { if (onBeat) onBeat({ event: 'paraProc', entity }); });
+        owner.at(110, () => {
+            if (flake) owner.anim(flake, [{ opacity: 0.98, transform: 'translate(0px,0px) scale(1) rotate(0deg)' }, { opacity: 0.85, transform: 'translate(14px,-10px) scale(0.8) rotate(14deg)', offset: 0.45 }, { opacity: 0, transform: 'translate(26px,-18px) scale(0.4) rotate(28deg)' }], { duration: 290, easing: 'ease-out', fill: 'forwards' });
+            const fx = r.x + r.w * 0.24, fy = r.y - r.h * 0.22;
+            owner.burst(5, i => ({ x: fx + rnd(-4, 4), y: fy + rnd(-4, 4), vx: rnd(0.8, 2.2), vy: rnd(-1.5, -0.3), drag: 0.92, decay: 0.055, size: rnd(1.5, 2.8), shape: i % 2 ? 'spark' : 'glowOrb', core: '#fef9c3', color: i % 2 ? '#38bdf8' : '#facc15' }));
+        });
+        return owner.handle;
+    }
+    function playStatusParaMiss() { return null; }
+
+    // 4. 净化消散：淡金/白波纹自上而下扫过 → 最多 3 束对应色碎屑剥离 → 清透收尾；无负面仅轻波纹 (L1~L2 · 740ms)
+    function playStatusDispel(entity, meta = {}, onBeat) {
+        const dom = domOf(entity); if (!dom) return null;
+        const r = statusVisualRect(dom); if (!r) return null;
+        const removed = Array.isArray(meta.removedTypes) ? meta.removedTypes : [];
+        const colMap = meta.removedColors || {};
+        const cOf = t => colMap[t] || STATUS_COLORS[t] || '#c084fc';
+        const hasDebuff = removed.length > 0;
+        const owner = statusRun(hasDebuff ? 740 : 420), uid = 'arcane-status-dispel-' + (++S.uid), pan = statusPanOf(r.x);
+        const W = Math.max(135, r.w * 1.85), H = Math.max(135, r.h * 1.85), cx = W / 2, cy = H / 2, rw = r.w * 0.48, rh = r.h * 0.48;
+        const streams = !hasDebuff ? [] : (removed.length <= 3
+            ? removed.map(t => ({ colors: [cOf(t)] }))
+            : [{ colors: [cOf(removed[0])] }, { colors: [cOf(removed[1])] }, { colors: removed.slice(2).map(cOf) }]);
+        const sideDir = r.x > window.innerWidth * 0.55 ? -1 : 1;
+        const fragsHtml = streams.map((st, sIdx) => {
+            const baseAng = sideDir > 0 ? (-Math.PI * 0.38 + (sIdx - (streams.length - 1) / 2) * 0.55) : (-Math.PI * 0.62 + (sIdx - (streams.length - 1) / 2) * 0.55);
+            return [0, 1, 2].map(j => {
+                const col = st.colors[j % st.colors.length];
+                const ang = baseAng + (j - 1) * 0.16, dist = 42 + j * 14;
+                const x0 = cx + Math.cos(ang) * rw * 0.35, y0 = cy + (sIdx - 1) * rh * 0.22;
+                const fx = (Math.cos(ang) * dist).toFixed(1), fy = (Math.sin(ang) * dist - 8).toFixed(1);
+                return `<g class="s-dispel-frag" data-fx="${fx}" data-fy="${fy}" data-rot="${((sideDir * (26 + j * 18))).toFixed(0)}" style="transform-origin:${x0.toFixed(1)}px ${y0.toFixed(1)}px;opacity:0">`
+                    + `<path d="M${(x0 - 7).toFixed(1)},${(y0 - 3).toFixed(1)} Q${x0.toFixed(1)},${(y0 - 9).toFixed(1)} ${(x0 + 8).toFixed(1)},${(y0 - 1).toFixed(1)} Q${(x0 + 4).toFixed(1)},${(y0 + 7).toFixed(1)} ${(x0 - 6).toFixed(1)},${(y0 + 4).toFixed(1)} Z" fill="${col}" opacity="0.88"/>`
+                    + `<path d="M${(x0 - 5).toFixed(1)},${(y0 - 2).toFixed(1)} Q${x0.toFixed(1)},${(y0 - 7).toFixed(1)} ${(x0 + 6).toFixed(1)},${(y0 - 1).toFixed(1)}" fill="none" stroke="#fef9c3" stroke-width="1.2" opacity="0.8"/></g>`;
+            }).join('');
+        }).join('');
+        const layer = owner.layer(
+            `<div class="arcane-status-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
+            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 3)}`
+            + `<linearGradient id="${uid}-wv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fef9c3" stop-opacity="0"/><stop offset="0.35" stop-color="#fef3c7" stop-opacity="0.65"/><stop offset="0.55" stop-color="#ffffff" stop-opacity="0.92"/><stop offset="0.82" stop-color="#fde68a" stop-opacity="0.35"/><stop offset="1" stop-color="#fde68a" stop-opacity="0"/></linearGradient>`
+            + `<radialGradient id="${uid}-cl"><stop offset="0" stop-color="#ffffff" stop-opacity="0.48"/><stop offset="0.6" stop-color="#fef3c7" stop-opacity="0.2"/><stop offset="1" stop-color="#fef3c7" stop-opacity="0"/></radialGradient>`
+            + `</defs><g class="s-wave" filter="url(#${uid}-gl)" opacity="0">`
+            + `<ellipse cx="${cx}" cy="${cy}" rx="${rw * 1.16}" ry="${rh * 0.28}" fill="url(#${uid}-wv)"/>`
+            + `<path d="M${cx - rw * 1.05},${cy} Q${cx},${cy + rh * 0.14} ${cx + rw * 1.05},${cy}" fill="none" stroke="#fffbeb" stroke-width="${hasDebuff ? 2.2 : 1.4}" stroke-linecap="round" opacity="0.88"/></g>`
+            + `<circle class="s-clean" cx="${cx}" cy="${cy}" r="${Math.max(rw, rh) * 1.15}" fill="url(#${uid}-cl)" opacity="0" style="transform-origin:${cx}px ${cy}px"/>`
+            + `<g filter="url(#${uid}-gl)">${fragsHtml}</g></svg></div>`
+        );
+        const wave = layer.querySelector('.s-wave'), clean = layer.querySelector('.s-clean');
+        if (wave) owner.anim(wave, [{ opacity: 0, transform: `translateY(${-rh * 0.78}px) scaleX(0.9)` }, { opacity: hasDebuff ? 0.95 : 0.48, transform: 'translateY(0px) scaleX(1.04)', offset: 0.48 }, { opacity: 0, transform: `translateY(${rh * 0.82}px) scaleX(0.92)` }], { duration: hasDebuff ? 380 : 340, easing: 'ease-in-out', fill: 'forwards' });
+        const gSfx = statusSfxGate('dispel', 75);
+        if (gSfx > 0) {
+            if (hasDebuff) {
+                chime(0, 784, 0.48, 0.042 * gSfx, pan);
+                chime(0.06, 1046.5, 0.42, 0.032 * gSfx, pan);
+                whoosh(0, { f0: 950, f1: 2100, q: 1.4, dur: 0.24, vol: 0.048 * gSfx, peak: 0.4, pan });
+            } else {
+                tone(0, { type: 'sine', f0: 660, f1: 880, dur: 0.16, vol: 0.022 * gSfx, pan, wet: 0.25 });
+            }
+        }
+        owner.at(160, () => {
+            if (onBeat) onBeat({ event: 'dispel', entity, removedTypes: removed });
+            if (!hasDebuff) return;
+            if (clean) owner.anim(clean, [{ opacity: 0, transform: 'scale(0.75)' }, { opacity: 0.72, transform: 'scale(1.05)', offset: 0.4 }, { opacity: 0, transform: 'scale(1.16)' }], { duration: 360, easing: 'ease-out', fill: 'forwards' });
+            layer.querySelectorAll('.s-dispel-frag').forEach((g, idx) => {
+                owner.anim(g, [{ opacity: 0.95, transform: 'translate(0px,0px) scale(0.95) rotate(0deg)' }, { opacity: 0.88, transform: `translate(${Number(g.dataset.fx) * 0.55}px,${Number(g.dataset.fy) * 0.55}px) scale(1) rotate(${Number(g.dataset.rot) * 0.5}deg)`, offset: 0.45 }, { opacity: 0, transform: `translate(${g.dataset.fx}px,${g.dataset.fy}px) scale(0.4) rotate(${g.dataset.rot}deg)` }], { duration: 480, easing: 'cubic-bezier(0.2,0.8,0.3,1)', delay: idx * 18, fill: 'forwards' });
+            });
+            streams.forEach((st, sIdx) => {
+                const ang = sideDir > 0 ? (-Math.PI * 0.38 + (sIdx - (streams.length - 1) / 2) * 0.55) : (-Math.PI * 0.62 + (sIdx - (streams.length - 1) / 2) * 0.55);
+                owner.burst(4, j => {
+                    const c = st.colors[j % st.colors.length], sp = rnd(1.4, 2.8), a = ang + rnd(-0.22, 0.22);
+                    return { x: r.x + rnd(-6, 6), y: r.y + rnd(-8, 8), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.35, drag: 0.94, decay: 0.036, size: rnd(2.8, 4.6), shape: 'glowOrb', core: '#fefce8', color: c };
+                });
+            });
+        });
+        return owner.handle;
+    }
+
+    // 5. 到期消散：对应色微粒被动轻蒸发 + 徽章淡出 (L1 · 420ms，显著轻于驱散)
+    function playStatusExpire(entity, meta = {}, onBeat) {
+        const dom = domOf(entity); if (!dom) return null;
+        const r = statusVisualRect(dom); if (!r) return null;
+        const id = statusEntityId(entity);
+        const types = Array.isArray(meta.expiredTypes) ? meta.expiredTypes : (meta.expiredType ? [meta.expiredType] : ['poison']);
+        const colMap = meta.expiredColors || {};
+        const colors = types.map(t => colMap[t] || STATUS_COLORS[t] || '#cbd5e1');
+        const owner = statusRun(420), pan = statusPanOf(r.x);
+        const gSfx = statusSfxGate('expire', 70);
+        if (gSfx > 0) {
+            whoosh(0, { f0: 1350, f1: 680, q: 1.2, dur: 0.2, vol: 0.026 * gSfx, peak: 0.3, pan });
+            tone(0.02, { type: 'sine', f0: 520, f1: 380, dur: 0.14, vol: 0.016 * gSfx, pan });
+        }
+        const badgeBox = id ? document.getElementById(`${id}-buffs`) : null;
+        if (badgeBox) types.forEach(t => {
+            const b = badgeBox.querySelector(`[data-buff-type="${t}"]`);
+            if (b) b.classList.add('arcane-status-badge-fading');
+        });
+        owner.burst(8, i => {
+            const c = colors[i % colors.length];
+            return { x: r.x + rnd(-r.w * 0.38, r.w * 0.38), y: r.y + rnd(-r.h * 0.25, r.h * 0.25), vx: rnd(-0.32, 0.32), vy: rnd(-1.35, -0.65), drag: 0.96, decay: rnd(0.036, 0.052), size: rnd(2.2, 3.8), shape: 'glowOrb', core: '#f8fafc', color: c };
+        });
+        owner.at(160, () => { if (onBeat) onBeat({ event: 'expire', entity, expiredTypes: types }); });
+        return owner.handle;
+    }
+
+    function playStatusTickFx(opts = {}) {
+        const { event, entity, meta = {}, onBeat } = opts;
+        if (event === 'poisonTick') return playStatusPoisonTick(entity, meta, onBeat);
+        if (event === 'burnTick') return playStatusBurnTick(entity, meta, onBeat);
+        if (event === 'healSuppressed') return playStatusHealSuppressed(entity, meta, onBeat);
+        if (event === 'paraProc') return playStatusParaProc(entity, meta, onBeat);
+        if (event === 'paraMiss') return playStatusParaMiss(entity, meta, onBeat);
+        if (event === 'dispel') return playStatusDispel(entity, meta, onBeat);
+        if (event === 'expire') return playStatusExpire(entity, meta, onBeat);
+        return null;
+    }
+    // ===== 新技能实现 END =====
+
+    // ===== 对外接口（与正式版同名同参；不将演示卡片或占位数据带入模块） =====
+    function isArcaneSkillFx(fxTag) { return ARCANE_TAGS.indexOf(fxTag) !== -1; }
+    function playArcaneSkillFx(fxTag, caster, targets, isReaction = false) {
+        if (!isArcaneSkillFx(fxTag)) return null;
+        // 接入点 3：按 fxTag 分派到上方新技能函数，返回它的 handle。
+        return null;
+    }
+    function playArcaneProjectile(type, fromDom, toDom, dodged = false) {
+        if (!fromDom || !toDom || !fromDom.getBoundingClientRect || !toDom.getBoundingClientRect) return Promise.resolve();
+        const token = combatToken;
+        ensureCanvas(); ensureDriver();
+        if (type === 'fire') fireProjectile(fromDom, toDom, !!dodged, token);
+        else if (type === 'enemy_spell') enemySpellProjectile(fromDom, toDom, !!dodged, token);
+        const beat = type === 'fire' ? 580 : 480;
+        return new Promise(res => {
+            const id = setTimeout(() => { S.rawTimers.delete(id); res(); }, beat);
+            S.rawTimers.set(id, res);
+        });
+    }
+    function clearArcaneFx() {
+        S.timers.forEach(id => clearTimeout(id)); S.timers.clear();
+        S.rawTimers.forEach((resolve, id) => { clearTimeout(id); resolve(); }); S.rawTimers.clear();
+        S.intervals.forEach(id => clearInterval(id)); S.intervals.clear();
+        S.flights.length = 0; S.particles.length = 0;
+        S.particleTimer = null; S.particleUntil = 0;
+        if (S.driver) { const idx = fxEngine.particles.indexOf(S.driver); if (idx >= 0) fxEngine.particles.splice(idx, 1); S.driver = null; }
+        S.handles.forEach(h => { if (h && h.cancel) h.cancel(); }); S.handles.clear();
+        S.layers.forEach(d => d.remove()); S.layers.clear();
+        S.anchors.forEach(d => d.remove()); S.anchors.clear();
+        S.flashes.forEach(el => el.classList.remove('arcane-flash-cold', 'arcane-flash-heal')); S.flashes.clear();
+        S.shakeEls.forEach(el => el.classList.remove('arcane-shake-light', 'arcane-shake-heavy', 'arcane-shake-quake')); S.shakeEls.clear();
+        if (S.dark) { S.dark.remove(); S.dark = null; }
+        clearStatusLayers();
+        if (S.canvas) { S.canvas.remove(); S.canvas = null; S.ctx = null; }
+        if (audioCtx) { audioCtx.close(); audioCtx = null; sfxBus = null; sfxVerb = null; sfxNoise = null; }
+    }
+    window.isArcaneSkillFx = isArcaneSkillFx;
+    window.playArcaneSkillFx = playArcaneSkillFx;
+    window.playArcaneProjectile = playArcaneProjectile;
+    function setStatusSfx(on) { statusSfxOn = !!on; }
+    window.playStatusTickFx = playStatusTickFx;
+    window.playStatusPoisonTick = playStatusPoisonTick;
+    window.playStatusBurnTick = playStatusBurnTick;
+    window.playStatusHealSuppressed = playStatusHealSuppressed;
+    window.playStatusParaProc = playStatusParaProc;
+    window.playStatusParaMiss = playStatusParaMiss;
+    window.playStatusDispel = playStatusDispel;
+    window.playStatusExpire = playStatusExpire;
+    window.syncStatusLayers = syncStatusLayers;
+    window.clearStatusLayers = clearStatusLayers;
+    window.setStatusSfx = setStatusSfx;
+    window.clearArcaneFx = clearArcaneFx;
+    return { isArcaneSkillFx, playArcaneSkillFx, playArcaneProjectile, clearArcaneFx, playStatusTickFx, playStatusPoisonTick, playStatusBurnTick, playStatusHealSuppressed, playStatusParaProc, playStatusParaMiss, playStatusDispel, playStatusExpire, syncStatusLayers, clearStatusLayers, setStatusSfx };
+})();
+    // ===== 可移植特效模块 END =====
+
+    // ===== 演示控制 BEGIN：仅驱动上述正式版接口，不参与移植 =====
+    // 接入点 4：CARDS 每项为 { name, level, description, fxTag, casterId, targetIds, isReaction }。
+    // casterId / targetIds 使用上方 h1-h4、e1-e6；level 使用 L1-L4，默认列表为空。
+    // 反应演练可在 playDemoSkill 中调用返回的 handle.dodge / hit，不把模拟攻击写进技能实现。
+    const DEMO_GROUPS = [
+        {
+            title: '一 · 持续伤害与禁疗', badge: '5项',
+            items: [
+                { name: '毒发 · 1层 (2泡轻纹)', level: 'L1', targetId: 'e5', event: 'poisonTick', description: '1层紫纹泛起 → 2个毒泡破裂 → 细毒雾飘散', init: { e5: { hp: 740, maxHp: 1000, buffs: [{ type: 'poison', value: 18, duration: 3 }] } }, meta: { layers: 1, dmg: 18 } },
+                { name: '毒发 · 3层对照 (4泡深纹)', level: 'L1', targetId: 'e5', event: 'poisonTick', description: '3层紫纹加重 → 4个毒泡依层破裂（不改结算）', init: { e5: { hp: 740, maxHp: 1000, buffs: [{ type: 'poison', value: 18, duration: 3 }, { type: 'poison', value: 18, duration: 2 }, { type: 'poison', value: 18, duration: 2 }] } }, meta: { layers: 3, dmg: 54 } },
+                { name: '燃烧 · 发作与常驻焦痕', level: 'L1', targetId: 'e4', event: 'burnTick', description: '火舌窜起 + 小爆燃 + 余烬；常驻暗橙焦痕薄层', init: { e4: { hp: 680, maxHp: 1000, buffs: [{ type: 'burn', value: 30, duration: 3 }] } }, meta: { dmg: 30 } },
+                { name: '燃烧+禁疗 · 治疗压盖', level: 'L1', targetId: 'h2', event: 'healSuppressed', description: '治疗光落于燃烧目标被0.2s暗橙火舌压低(+30减半)', init: { h2: { hp: 85, maxHp: 180, buffs: [{ type: 'burn', value: 24, duration: 2 }] } }, meta: { healSuppressed: true, baseHeal: 60, actualHeal: 30 } },
+                { name: '对照 · 正常治疗 (无压盖)', level: '对照', targetId: 'h2', event: 'healNormal', description: '无燃烧目标受治疗：完整绿光+60HP无火舌压盖', init: { h2: { hp: 85, maxHp: 180, buffs: [] } }, meta: { healSuppressed: false, baseHeal: 60, actualHeal: 60 } }
+            ]
+        },
+        {
+            title: '二 · 麻痹僵直与眩晕对比', badge: '3项',
+            items: [
+                { name: '麻痹 · 掷骰命中 (耗1层)', level: 'L1', targetId: 'e2', event: 'paraProc', description: '蓝电外弧+麻黄内芯闪过 → 短硬直 → 碎裂脱落1层', init: { e2: { hp: 760, maxHp: 1000, buffs: [{ type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: { triggered: true } },
+                { name: '对照 · 麻痹未命中 (无演出)', level: '对照', targetId: 'e2', event: 'paraMiss', description: '掷骰未命中返回null：零电纹、零抖动、不耗层', init: { e2: { hp: 760, maxHp: 1000, buffs: [{ type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: { triggered: false } },
+                { name: '对比 · 麻痹僵直 vs 眩晕星环', level: '对比', targetId: 'e2', event: 'compareParaStun', description: 'e2短暂蓝黄僵直 vs e3头顶星环+整回合重晃', init: { e2: { hp: 760, maxHp: 1000, buffs: [{ type: 'paralyze', value: -5, duration: 2 }] }, e3: { hp: 760, maxHp: 1000, buffs: [{ type: 'stun', value: 0, duration: 1 }] } }, meta: { stunTargetId: 'e3' } }
+            ]
+        },
+        {
+            title: '三 · 净化消散与蜕皮对照', badge: '4项',
+            items: [
+                { name: '净化 · 单负面 (清中毒)', level: 'L1', targetId: 'h1', event: 'dispel', description: '淡金白波纹自上而下扫过 → 紫毒碎屑脱离 → 撤毒纹', init: { h1: { hp: 72, maxHp: 100, shield: 55, buffs: [{ type: 'poison', value: 15, duration: 2 }] } }, meta: { removedTypes: ['poison'], removedColors: { poison: '#a855f7' }, keptTypes: [] } },
+                { name: '净化 · 多负面混合', level: 'L2', targetId: 'e3', event: 'dispel', description: '清除毒/燃/麻3色分束剥离，保留atk-减益徽章', init: { e3: { hp: 620, maxHp: 1000, buffs: [{ type: 'poison', value: 18, duration: 2 }, { type: 'burn', value: 25, duration: 2 }, { type: 'paralyze', value: -5, duration: 2 }, { key: 'atk-', type: 'atk-', value: -12, duration: 2 }] } }, meta: { removedTypes: ['poison', 'burn', 'paralyze'], removedColors: { poison: '#a855f7', burn: '#f97316', paralyze: '#facc15' }, keptTypes: ['atk-'] } },
+                { name: '净化 · 无负面轻反馈', level: '对照', targetId: 'h3', event: 'dispel', description: '仅留增益def+：轻白波纹扫过+无负面轻提示，不造碎屑', init: { h3: { hp: 140, maxHp: 140, buffs: [{ key: 'def+', type: 'def+', value: 12, duration: 2 }] } }, meta: { removedTypes: [], removedColors: {}, keptTypes: ['def+'] } },
+                { name: '对比 · 外部净化 vs 蜕皮剥离', level: '对比', targetId: 'e3', event: 'compareDispelMolt', description: 'e3白金外部净化波纹 vs e6琥珀自我裂壳甩毒燃', init: { e3: { hp: 620, maxHp: 1000, buffs: [{ type: 'poison', value: 16, duration: 2 }, { type: 'burn', value: 20, duration: 2 }] }, e6: { hp: 460, maxHp: 1000, buffs: [{ type: 'poison', value: 16, duration: 2 }, { type: 'burn', value: 20, duration: 2 }] } }, meta: { moltTargetId: 'e6' } }
+            ]
+        },
+        {
+            title: '四 · 到期消散与临期警示', badge: '2项',
+            items: [
+                { name: '对比 · 自然到期 vs 主动驱散', level: '对比', targetId: 'e1', event: 'compareExpireDispel', description: 'e1自然轻蒸发撤焦痕 vs e4波纹碎屑主动驱散', init: { e1: { hp: 640, maxHp: 1000, buffs: [{ type: 'burn', value: 22, duration: 1 }] }, e4: { hp: 640, maxHp: 1000, buffs: [{ type: 'burn', value: 22, duration: 2 }] } }, meta: { dispelTargetId: 'e4' } },
+                { name: '演进 · 临期警示 (2回→1回→到期)', level: 'L1', targetId: 'h4', event: 'expiringLifecycle', description: 'h4毒/麻2回→1回琥珀缓闪→到期止损；h1续回解除警示', init: { h4: { hp: 112, maxHp: 140, buffs: [{ type: 'poison', value: 14, duration: 2 }, { type: 'paralyze', value: -5, duration: 2 }] }, h1: { hp: 82, maxHp: 100, buffs: [{ type: 'burn', value: 15, duration: 1 }] } }, meta: { refreshTargetId: 'h1' } }
+            ]
+        },
+        {
+            title: '五 · 常驻共存与并发压测', badge: '3项',
+            items: [
+                { name: '共存 · 燃烧焦痕 + 狂暴气浪', level: '共存', targetId: 'e4', event: 'coexistBurnRage', description: '焦痕薄层+红黑狂暴气浪同体共存 → 燃发 → 到期留狂暴', init: { e4: { hp: 240, maxHp: 1000, buffs: [{ type: 'burn', value: 26, duration: 1 }] } }, meta: {} },
+                { name: '群发 · 多目标40ms错峰 (不叠音)', level: '压测', targetId: 'e1', event: 'multiTick', description: 'e1/e2/e3毒 + e4燃 每40ms错峰发作，门控防音压叠加', init: { e1: { hp: 780, maxHp: 1000, buffs: [{ type: 'poison', value: 15, duration: 2 }] }, e2: { hp: 780, maxHp: 1000, buffs: [{ type: 'poison', value: 15, duration: 2 }, { type: 'poison', value: 15, duration: 3 }] }, e3: { hp: 780, maxHp: 1000, buffs: [{ type: 'poison', value: 15, duration: 2 }] }, e4: { hp: 780, maxHp: 1000, buffs: [{ type: 'burn', value: 25, duration: 2 }] } }, meta: { targets: ['e1', 'e2', 'e3', 'e4'], staggerMs: 40 } },
+                { name: '压测 · 同体连发 + 中途重置检', level: '压测', targetId: 'e5', event: 'stressChain', description: 'e5连续触发 毒发→燃发→麻痹→驱散（可随时点右上重置）', init: { e5: { hp: 720, maxHp: 1000, buffs: [{ type: 'poison', value: 18, duration: 3 }, { type: 'poison', value: 18, duration: 3 }, { type: 'burn', value: 24, duration: 2 }, { type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: {} }
+            ]
+        }
+    ];
+    const CARDS = DEMO_GROUPS.flatMap(g => g.items);
+    let unlockTimer = null, demoSfxOn = true;
+    const demoTimers = new Set(), demoLayers = new Set();
+    const beatStatEl = $('#status-beat-stat'), sfxBtn = $('#btn-status-sfx');
+    const entityOf = id => heroesData.concat(enemiesData).find(e => e.id === id);
+    function clearDemoExtras() {
+        demoTimers.forEach(id => clearTimeout(id)); demoTimers.clear();
+        demoLayers.forEach(el => el.remove()); demoLayers.clear();
+        document.querySelectorAll('[data-demo-rage]').forEach(n => n.remove());
+        document.querySelectorAll('.arcane-variant-rage-sprite, .demo-stun-shake').forEach(el => el.classList.remove('arcane-variant-rage-sprite', 'demo-stun-shake'));
+    }
+    function demoAt(ms, fn) {
+        const token = combatToken;
+        const id = setTimeout(() => { demoTimers.delete(id); if (token === combatToken) fn(); }, ms);
+        demoTimers.add(id);
+        return id;
+    }
+    function renderSfxBtn() {
+        sfxBtn.textContent = demoSfxOn ? '🔊 音开' : '🔇 音关';
+        sfxBtn.setAttribute('aria-pressed', String(demoSfxOn));
+        sfxBtn.className = 'text-[9px] font-bold px-1.5 rounded border transition-all hover:bg-white/10 shrink-0 ' + (demoSfxOn ? 'border-emerald-500/60 text-emerald-300' : 'border-slate-600 text-slate-400');
+    }
+    sfxBtn.addEventListener('click', () => {
+        demoSfxOn = !demoSfxOn;
+        arcaneVfxModule.setStatusSfx(demoSfxOn);
+        renderSfxBtn();
+    });
+    renderSfxBtn();
+
+    function updateDemoHp(entity, hpVal) {
+        if (!entity) return;
+        entity.hp = Math.max(0, Math.min(entity.maxHp, hpVal));
+        const bar = document.getElementById(entity.id + '-hp-bar'), txt = document.getElementById(entity.id + '-hp-text');
+        if (bar) bar.style.width = (entity.hp / entity.maxHp * 100) + '%';
+        if (txt) txt.textContent = entity.id.startsWith('h') ? Math.floor(entity.hp) : Math.floor(entity.hp) + '/' + entity.maxHp;
+    }
+    function spawnDemoFloat(entityOrId, text, colorCls) {
+        const dom = getEntitySpriteDom(entityOrId); if (!dom) return;
+        const r = dom.getBoundingClientRect();
+        const el = document.createElement('div');
+        el.className = 'arcane-status-float-text text-sm sm:text-xl ' + (colorCls || 'text-white');
+        el.style.left = (r.left + r.width / 2 + (Math.random() - 0.5) * 24) + 'px';
+        el.style.top = Math.max(24, r.top - 4) + 'px';
+        el.textContent = text;
+        document.body.appendChild(el);
+        demoLayers.add(el);
+        demoAt(1120, () => { demoLayers.delete(el); el.remove(); });
+    }
+    function playDemoHealLight(entity, suppressed, onDone) {
+        const dom = getEntitySpriteDom(entity); if (!dom) return;
+        const r = dom.getBoundingClientRect();
+        const wrap = document.createElement('div');
+        wrap.className = 'arcane-fs-layer';
+        wrap.innerHTML = `<div class="arcane-fs-anchor" style="left:${r.left + r.width / 2}px;top:${r.top + r.height / 2}px;width:96px;height:96px;border-radius:50%;background:radial-gradient(circle,rgba(110,231,183,${suppressed ? 0.55 : 0.85}) 0%,rgba(16,185,129,0.35) 50%,transparent 74%);transition:opacity ${suppressed ? '0.12s' : '0.38s'} ease-out,transform 0.36s ease-out;"></div>`;
+        document.body.appendChild(wrap);
+        demoLayers.add(wrap);
+        if (suppressed) {
+            demoAt(25, () => { if (wrap.firstElementChild) { wrap.firstElementChild.style.opacity = '0.18'; wrap.firstElementChild.style.transform = 'translate(-50%,-50%) scale(0.75)'; } });
+            arcaneVfxModule.playStatusHealSuppressed(entity, { healSuppressed: true }, onDone);
+        } else {
+            demoAt(45, () => { if (onDone) onDone(); });
+            demoAt(180, () => { if (wrap.firstElementChild) { wrap.firstElementChild.style.opacity = '0'; wrap.firstElementChild.style.transform = 'translate(-50%,-50%) scale(1.22)'; } });
+        }
+        demoAt(440, () => { demoLayers.delete(wrap); wrap.remove(); });
+    }
+    function setDemoRageOverlay(entity, active) {
+        const dom = getEntitySpriteDom(entity); if (!dom) return;
+        const isSprite = !(dom.querySelector && dom.querySelector('.portrait'));
+        if (active) {
+            if (isSprite) dom.classList.add('arcane-variant-rage-sprite');
+            if (!dom.querySelector('[data-demo-rage]')) {
+                const n = document.createElement('div');
+                n.setAttribute('data-demo-rage', '1');
+                n.className = 'arcane-variant-rage-fx' + (isSprite ? ' is-sprite' : '');
+                dom.appendChild(n);
+            }
+        } else {
+            if (isSprite) dom.classList.remove('arcane-variant-rage-sprite');
+            dom.querySelectorAll('[data-demo-rage]').forEach(n => n.remove());
+        }
+    }
+    function playDemoMoltSideBySide(entity) {
+        const dom = getEntitySpriteDom(entity); if (!dom) return;
+        const r = dom.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        const wrap = document.createElement('div');
+        wrap.className = 'arcane-fs-layer';
+        const frags = Array.from({ length: 6 }, (_, i) => {
+            const ang = -Math.PI * 0.45 + (i - 2.5) * 0.28, dist = 54 + (i % 2) * 16;
+            const fx = (Math.cos(ang) * dist).toFixed(1), fy = (Math.sin(ang) * dist).toFixed(1);
+            return `<g class="dm-frag" data-fx="${fx}" data-fy="${fy}" style="transform-origin:70px 70px;opacity:0"><path d="M62,66 Q70,56 79,67 Q75,78 63,74 Z" fill="#b45309" stroke="#fde68a" stroke-width="1.4"/></g>`;
+        }).join('');
+        wrap.innerHTML = `<div class="arcane-fs-anchor" style="left:${cx}px;top:${cy}px;width:140px;height:140px"><svg viewBox="0 0 140 140" class="w-full h-full overflow-visible"><ellipse class="dm-shell" cx="70" cy="70" rx="44" ry="44" fill="rgba(245,158,11,0.22)" stroke="#fbbf24" stroke-width="2.2"/>${frags}</svg></div>`;
+        document.body.appendChild(wrap);
+        demoLayers.add(wrap);
+        const sh = wrap.querySelector('.dm-shell');
+        if (sh) sh.animate([{ opacity: 0.9, transform: 'scale(0.88)' }, { opacity: 0, transform: 'scale(1.16)' }], { duration: 320, fill: 'forwards' });
+        demoAt(140, () => {
+            entity.buffs = []; window.renderDemoEntityBuffs(entity);
+            updateDemoHp(entity, entity.hp + 240);
+            spawnDemoFloat(entity, '蜕皮清负 +240', 'text-amber-300');
+            wrap.querySelectorAll('.dm-frag').forEach((g, idx) => {
+                g.animate([{ opacity: 0.95, transform: 'translate(0,0) scale(1)' }, { opacity: 0, transform: `translate(${g.dataset.fx}px,${g.dataset.fy}px) scale(0.45) rotate(48deg)` }], { duration: 480, delay: idx * 18, fill: 'forwards' });
+            });
+        });
+        demoAt(760, () => { demoLayers.delete(wrap); wrap.remove(); });
+    }
+
+    function lockCards(locked) {
+        document.querySelectorAll('#skill-list .card').forEach(card => { card.disabled = locked; });
+    }
+    function scheduleUnlock(ms) {
+        clearTimeout(unlockTimer);
+        lockCards(true);
+        unlockTimer = setTimeout(() => { unlockTimer = null; lockCards(false); }, ms);
+    }
+    function runStatusCard(card) {
+        const e = card.targetId ? entityOf(card.targetId) : null;
+        if (card.event === 'poisonTick') {
+            beatStatEl.textContent = '毒发 ' + (card.meta.layers || 1) + '层';
+            arcaneVfxModule.playStatusPoisonTick(e, card.meta, () => {
+                updateDemoHp(e, e.hp - (card.meta.dmg || 18));
+                spawnDemoFloat(e, '毒 -' + (card.meta.dmg || 18), 'text-purple-400');
+            });
+            return 580;
+        }
+        if (card.event === 'burnTick') {
+            beatStatEl.textContent = '燃烧发作(焦痕)';
+            arcaneVfxModule.playStatusBurnTick(e, card.meta, () => {
+                updateDemoHp(e, e.hp - (card.meta.dmg || 30));
+                spawnDemoFloat(e, '火 -' + (card.meta.dmg || 30), 'text-orange-400');
+            });
+            return 580;
+        }
+        if (card.event === 'healSuppressed' || card.event === 'healNormal') {
+            const sup = !!card.meta.healSuppressed;
+            beatStatEl.textContent = sup ? '燃烧禁疗(减半)' : '正常治疗';
+            playDemoHealLight(e, sup, () => {
+                updateDemoHp(e, e.hp + (card.meta.actualHeal || 30));
+                spawnDemoFloat(e, '+' + (card.meta.actualHeal || 30) + 'HP', sup ? 'text-orange-400' : 'text-emerald-400');
+            });
+            return 480;
+        }
+        if (card.event === 'paraProc') {
+            beatStatEl.textContent = '麻痹命中→耗1层';
+            arcaneVfxModule.playStatusParaProc(e, card.meta, () => {
+                const idx = (e.buffs || []).findIndex(b => b.type === 'paralyze');
+                if (idx >= 0) e.buffs.splice(idx, 1);
+                window.renderDemoEntityBuffs(e);
+                spawnDemoFloat(e, '麻痹僵直', 'text-yellow-300');
+            });
+            return 480;
+        }
+        if (card.event === 'paraMiss') {
+            const h = arcaneVfxModule.playStatusParaMiss(e, card.meta);
+            beatStatEl.textContent = h === null ? '未命中(无演出)' : '异常!';
+            spawnDemoFloat(e, '掷骰未命中 · 正常行动', 'text-slate-300');
+            return 460;
+        }
+        if (card.event === 'compareParaStun') {
+            const stunE = entityOf(card.meta.stunTargetId || 'e3'), sDom = getEntitySpriteDom(stunE);
+            beatStatEl.textContent = '僵直 vs 眩晕';
+            arcaneVfxModule.playStatusParaProc(e, { triggered: true }, () => {
+                e.buffs = []; window.renderDemoEntityBuffs(e);
+                spawnDemoFloat(e, '麻痹僵直', 'text-yellow-300');
+            });
+            if (sDom) { sDom.classList.add('demo-stun-shake'); demoAt(410, () => sDom.classList.remove('demo-stun-shake')); }
+            spawnDemoFloat(stunE, '眩晕跳过', 'text-yellow-300');
+            demoAt(760, () => { stunE.buffs = []; window.renderDemoEntityBuffs(stunE); });
+            return 840;
+        }
+        if (card.event === 'dispel') {
+            const has = (card.meta.removedTypes || []).length > 0;
+            beatStatEl.textContent = has ? ('净化 ' + card.meta.removedTypes.length + '负面') : '净化(无负面)';
+            arcaneVfxModule.playStatusDispel(e, card.meta, () => {
+                if (has) {
+                    const rm = new Set(card.meta.removedTypes);
+                    e.buffs = (e.buffs || []).filter(b => !rm.has(b.key || b.type));
+                    window.renderDemoEntityBuffs(e);
+                    spawnDemoFloat(e, '驱散 ' + card.meta.removedTypes.length + ' 负面', 'text-emerald-300');
+                } else {
+                    spawnDemoFloat(e, '无负面', 'text-emerald-300');
+                }
+            });
+            return has ? 760 : 460;
+        }
+        if (card.event === 'compareDispelMolt') {
+            const moltE = entityOf(card.meta.moltTargetId || 'e6');
+            beatStatEl.textContent = '净化 vs 蜕皮';
+            arcaneVfxModule.playStatusDispel(e, { removedTypes: ['poison', 'burn'] }, () => {
+                e.buffs = []; window.renderDemoEntityBuffs(e);
+                spawnDemoFloat(e, '驱散 2 负面', 'text-emerald-300');
+            });
+            playDemoMoltSideBySide(moltE);
+            return 820;
+        }
+        if (card.event === 'compareExpireDispel') {
+            const dE = entityOf(card.meta.dispelTargetId || 'e4');
+            beatStatEl.textContent = '到期轻蒸发 vs 驱散';
+            arcaneVfxModule.playStatusExpire(e, { expiredTypes: ['burn'] }, () => {
+                e.buffs = []; window.renderDemoEntityBuffs(e);
+                spawnDemoFloat(e, '燃烧到期停止', 'text-slate-300');
+            });
+            arcaneVfxModule.playStatusDispel(dE, { removedTypes: ['burn'] }, () => {
+                dE.buffs = []; window.renderDemoEntityBuffs(dE);
+                spawnDemoFloat(dE, '驱散 1 负面', 'text-emerald-300');
+            });
+            return 760;
+        }
+        if (card.event === 'expiringLifecycle') {
+            const rE = entityOf(card.meta.refreshTargetId || 'h1');
+            beatStatEl.textContent = '1/3 2回正常→1回临期';
+            demoAt(750, () => {
+                (e.buffs || []).forEach(b => { b.duration = 1; });
+                window.renderDemoEntityBuffs(e);
+                spawnDemoFloat(e, '剩余1回·琥珀警示', 'text-amber-300');
+                (rE.buffs || []).forEach(b => { b.duration = 3; });
+                window.renderDemoEntityBuffs(rE);
+                spawnDemoFloat(rE, '续至3回·解除警示', 'text-orange-400');
+                beatStatEl.textContent = '2/3 临期缓闪中';
+            });
+            demoAt(2350, () => {
+                beatStatEl.textContent = '3/3 到期蒸发止损';
+                arcaneVfxModule.playStatusExpire(e, { expiredTypes: ['poison', 'paralyze'] }, () => {
+                    e.buffs = []; window.renderDemoEntityBuffs(e);
+                    spawnDemoFloat(e, '状态到期停止', 'text-slate-300');
+                });
+            });
+            return 2820;
+        }
+        if (card.event === 'coexistBurnRage') {
+            setDemoRageOverlay(e, true);
+            beatStatEl.textContent = '焦痕+狂暴共存';
+            demoAt(320, () => {
+                arcaneVfxModule.playStatusBurnTick(e, {}, () => {
+                    updateDemoHp(e, e.hp - 26);
+                    spawnDemoFloat(e, '火 -26', 'text-orange-400');
+                });
+            });
+            demoAt(1050, () => {
+                beatStatEl.textContent = '燃消散·狂暴留存';
+                arcaneVfxModule.playStatusExpire(e, { expiredTypes: ['burn'] }, () => {
+                    e.buffs = []; window.renderDemoEntityBuffs(e);
+                    spawnDemoFloat(e, '焦痕移除(狂暴保留)', 'text-amber-200');
+                });
+            });
+            return 1520;
+        }
+        if (card.event === 'multiTick') {
+            const ids = card.meta.targets || ['e1', 'e2', 'e3', 'e4'], stepMs = card.meta.staggerMs || 40;
+            beatStatEl.textContent = '多目标40ms错峰';
+            ids.forEach((id, idx) => demoAt(idx * stepMs, () => {
+                const t = entityOf(id); if (!t) return;
+                const isBurn = (t.buffs || []).some(b => b.type === 'burn');
+                if (isBurn) {
+                    arcaneVfxModule.playStatusBurnTick(t, {}, () => { updateDemoHp(t, t.hp - 25); spawnDemoFloat(t, '火 -25', 'text-orange-400'); });
+                } else {
+                    const layers = (t.buffs || []).filter(b => b.type === 'poison').length || 1;
+                    arcaneVfxModule.playStatusPoisonTick(t, { layers }, () => { updateDemoHp(t, t.hp - 15 * layers); spawnDemoFloat(t, '毒 -' + (15 * layers), 'text-purple-400'); });
+                }
+            }));
+            return 720;
+        }
+        if (card.event === 'stressChain') {
+            beatStatEl.textContent = '连发压测(可随时重置)';
+            arcaneVfxModule.playStatusPoisonTick(e, { layers: 2 }, () => { updateDemoHp(e, e.hp - 36); spawnDemoFloat(e, '毒 -36', 'text-purple-400'); });
+            demoAt(280, () => arcaneVfxModule.playStatusBurnTick(e, {}, () => { updateDemoHp(e, e.hp - 24); spawnDemoFloat(e, '火 -24', 'text-orange-400'); }));
+            demoAt(560, () => arcaneVfxModule.playStatusParaProc(e, { triggered: true }, () => {
+                const idx = (e.buffs || []).findIndex(b => b.type === 'paralyze');
+                if (idx >= 0) e.buffs.splice(idx, 1);
+                window.renderDemoEntityBuffs(e);
+                spawnDemoFloat(e, '麻痹僵直', 'text-yellow-300');
+            }));
+            demoAt(980, () => arcaneVfxModule.playStatusDispel(e, { removedTypes: ['poison', 'burn', 'paralyze'] }, () => {
+                e.buffs = []; window.renderDemoEntityBuffs(e);
+                spawnDemoFloat(e, '驱散 3 负面', 'text-emerald-300');
+            }));
+            return 1750;
+        }
+        return 0;
+    }
+    function playDemoSkill(card) {
+        combatToken++;
+        clearDemoExtras();
+        clearArcaneFx();
+        clearTimeout(unlockTimer);
+        initUI(card.init || {});
+        const waitMs = runStatusCard(card);
+        if (waitMs > 0) scheduleUnlock(waitMs);
+    }
+    function renderSkillCards() {
+        const list = $('#skill-list');
+        list.replaceChildren();
+        const BADGE_CLS = { L1: 'border-cyan-500/60 text-cyan-300', L2: 'border-amber-400/70 text-amber-300', 对照: 'border-slate-500/60 text-slate-300', 对比: 'border-violet-400/70 text-violet-300', 共存: 'border-rose-400/70 text-rose-300', 压测: 'border-fuchsia-400/70 text-fuchsia-300' };
+        DEMO_GROUPS.forEach(group => {
+            const hd = document.createElement('div');
+            hd.className = 'arcane-status-group-hd';
+            hd.innerHTML = `<span>${group.title}</span><span class="text-[8px] text-amber-400/80">${group.badge}</span>`;
+            list.appendChild(hd);
+            group.items.forEach(card => {
+                const button = document.createElement('button');
+                button.className = 'card w-full py-1.5 px-2 bg-slate-900/80 hover:bg-violet-950/60 border border-slate-700/80 hover:border-violet-500/60 rounded-lg text-left transition-all shadow-sm';
+                button.title = card.description;
+                button.innerHTML = '<div class="flex items-center justify-between gap-1"><span class="text-xs font-bold text-slate-100 truncate"></span><span class="text-[9px] font-bold px-1 rounded border shrink-0"></span></div><div class="text-[9px] text-slate-400 truncate"></div>';
+                const labels = button.querySelectorAll('span');
+                labels[0].textContent = card.name;
+                labels[1].textContent = card.level;
+                labels[1].className = 'text-[9px] font-bold px-1 rounded border shrink-0 ' + (BADGE_CLS[card.level] || 'border-cyan-500/60 text-cyan-300');
+                button.lastElementChild.textContent = card.description;
+                button.addEventListener('click', () => playDemoSkill(card));
+                list.appendChild(button);
+            });
+        });
+    }
+    function resetDemo() {
+        combatToken++;
+        clearDemoExtras();
+        clearTimeout(unlockTimer); unlockTimer = null;
+        lockCards(false);
+        clearArcaneFx();
+        cancelAnimationFrame(fxEngine.animationFrameId); fxEngine.animationFrameId = null;
+        fxEngine.particles.length = 0; fxEngine.hitStop = 0; fxEngine.lastFrameTime = 0;
+        fxEngine.ctx.clearRect(0, 0, fxEngine.canvas.width, fxEngine.canvas.height);
+        beatStatEl.textContent = '待机';
+        initUI();
+        renderSkillCards();
+    }
+    $('#btn-reset').addEventListener('click', resetDemo);
+    renderSkillCards();
+    // ===== 演示控制 END =====
+    // 移植：只将新增 arcane- CSS、技能函数、标签与分派合并到正式版已有模块。
+    // 必须同时追加 WEBM_FX_REGISTRY 的 { url: '', scale: 1.0, particles: 'arcane', delay: 蓄势秒数 }。
+    // 技能数据追加 [特效:精确标签]；按技能类型核对默认光效去重与真实反应回调，不改数值规则。
+    // 详细接线、测试与打包步骤见《技能SVG模板使用与快速移植.md》，不是复制整页即可上线。
+    // 正式版已提供 fxEngine / combatToken / getEntitySpriteDom / heroesData / enemiesData，勿重复复制演示宿主。
+  </script>
+</body>
+</html>
