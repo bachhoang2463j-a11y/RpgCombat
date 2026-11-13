@@ -1338,6 +1338,7 @@ const arcaneVfxModule = (function () {
         if (audioCtx) { audioCtx.close(); audioCtx = null; sfxBus = null; sfxVerb = null; sfxNoise = null; }
     }
     const sdApi = {
+        ensureSdSamples,
         setSelfDestructWarning, clearSelfDestructWarning, clearAllSelfDestructWarnings,
         setSelfDestructBadge, setSelfDestructSfx, getBadgeOn: () => sdBadgeOn, getSfxOn: () => sdSfxOn,
         playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt,
