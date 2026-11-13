@@ -156,7 +156,7 @@
         eq(calls.svg.length,0,'箭矢身份不再播放旧枪击SVG');
         eq(calls.sounds, [], '箭矢身份不再走旧gunshot/miss音');
         eq(calls.feedback.map(f => [f.targetId,f.outcome]),[['h_arcane0','hit']],'命中结果统一交由playHitFeedback');
-        eq(calls.feedback[0].opts.suppressAudio,false,'箭矢仅有发射采样，受击主音交给命中分层');
+        eq(calls.feedback[0].opts.audioWave, undefined, '视觉反馈不承担音频wave权限，单体结算事件独立路由');
         clearCalls();
         await w.applySingleTagEffect(d.e[0],d.h[0],'[单体]',50,100,1,null,attack());
         eq(calls.projectiles.map(c => c.type),['enemy_spell'],'敌方法术实际播放紫色弹道');

@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ROOT = path.resolve(__dirname, '..');
-const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_02.json');
+const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_05.json');
 const pkg = JSON.parse(fs.readFileSync(artifact, 'utf8'));
 const src = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const fenced = pkg.replaceString;
@@ -49,7 +49,7 @@ function syntax(text, label) {
 }
 
 console.log('== 敌方群攻 v12.0 产物专项 ==\n' + path.basename(artifact));
-check(pkg.scriptName === '前端战斗v12.02', 'scriptName 为前端战斗v12.02');
+check(pkg.scriptName === '前端战斗v12.05', 'scriptName 为前端战斗v12.05');
 check(count(src, '```') === 2 && /^```html\r?\n/.test(src) && /\r?\n```\s*$/.test(src), '源码围栏恰为头尾2处');
 check(count(fenced, '```') === 2 && /^```html\r?\n/.test(fenced) && /\r?\n```\s*$/.test(fenced), '产物围栏恰为头尾2处');
 check(!immune.includes('```'), '产物内部无裸三反引号');
@@ -108,5 +108,12 @@ check(chargeClasses.every(cls => animationRule.some(rule => rule.split(',').incl
 check(/\.doneAt-Date\.now\(\)[\s\S]{0,240}&&\w+\.cancel\(\)/.test(raw), '新版群攻doneAt交棒同步cancel入包（不绑定mangle局部名）');
 const dodgeGuard = raw.slice(raw.indexOf('function applySingleTagEffect('), raw.indexOf('function triggerBarrierShatter('));
 check(/!resolveEnemyGroupAttackFx\([^)]*\)&&\(/.test(dodgeGuard), '新版兜底群攻闪避开火抑制守卫入包');
+for (const key of ['CombatAudioDirector', 'waveId', 'actionId', 'completeTarget', 'closeWave', 'cancelWave']) check(raw.includes(key), '真实wave音频生命周期入包：' + key);
+check(src.includes('!wave.closed || wave.pending.size'), 'wave收口等待所有目标后续结算完成');
+check(!src.includes('audioTargets.map') && !src.includes('release(); impactWaves.delete'), '群攻无未定义目标列表与模块外波次表引用');
+const barrierRoute = src.slice(src.indexOf('async function applyBarrierHit('), src.indexOf('// 基于嘲讽值的轮盘赌算法'));
+check(!barrierRoute.includes('CombatAudioDirector.publish(') && barrierRoute.includes('audioWave'), '屏障不冒充角色受击，泄漏独立携带audioWave');
+check(barrierRoute.includes('CombatAudioDirector.replaceTargets(attackContext && attackContext.audioWave || skill && skill._impactAudioWave, [])'), '屏障无泄漏清空角色音频目标避免挂起波次');
+check(!raw.includes('suppressAudio') && raw.includes('DAMAGE_RESOLVED') && raw.includes('DODGE_RESOLVED'), '技能音与真实受击事件独立入包');
 console.log('\n统计：通过 ' + pass + ' 项，失败 ' + fail + ' 项');
 process.exitCode = fail ? 1 : 0;

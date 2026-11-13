@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ROOT = path.resolve(__dirname, '..');
-const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_02.json');
+const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_05.json');
 const pkg = JSON.parse(fs.readFileSync(artifact, 'utf8'));
 const src = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const fenced = pkg.replaceString;
@@ -34,7 +34,7 @@ function syntax(text, label) {
   catch (e) { check(false, label + '语法：' + e.message); }
 }
 console.log('== 攻击身份与命中分层 v12.0 产物专项 ==');
-check(path.basename(artifact) === 'regex-前端战斗v12_02.json' && pkg.scriptName === '前端战斗v12.02', '文件名与scriptName均为v12.02');
+check(path.basename(artifact) === 'regex-前端战斗v12_05.json' && pkg.scriptName === '前端战斗v12.05', '文件名与scriptName均为v12.05');
 check(count(src,'```') === 2 && count(fenced,'```') === 2, '源码与产物均只有头尾自围栏');
 check(!immune.includes('```') && !/&(?!amp;)/.test(immune), '内部围栏加固及全量实体免疫');
 check(raw.replace(/&/g,'&amp;') === immune, '单遍实体还原逐字符一致');
@@ -74,5 +74,15 @@ const stQuote = /<style>[\s\S]*?<\/style>|```[\s\S]*?```|~~~[\s\S]*?~~~|``[\s\S]
 const sample = '```html\n<script>const x = "后续组件";</script>\n```';
 const converted = (fenced + '\n' + sample).replace(stQuote,(m,q)=>q?'<q>'+q+'</q>':m);
 check(!converted.slice(converted.indexOf('后续组件')-60).includes('<q>'), '同楼层后续组件不受引号美化污染');
+for (const key of ['DAMAGE_RESOLVED', 'DODGE_RESOLVED']) check(raw.includes(key), '只读结果事件入包：' + key);
+for (const key of ['CombatAudioDirector', 'completeTarget', 'cancelWave', 'CounterHit', 'PeriodicDamage', 'ReflectDamage', 'ShieldBroken']) check(raw.includes(key), '音频结果路由入包：' + key);
+check(!raw.includes('IMPACT_AUDIO') && !raw.includes('suppressAudio'), '旧合并事件与宽泛静音标志已移除');
+const counterRoute = src.slice(src.indexOf('const counterRawDmg = counterBuff.value'), src.indexOf('// 闪避成功中止中招结算'));
+check(counterRoute.indexOf('const applyCounterImpact') < counterRoute.indexOf('calculateDamage(counterDmgToCaster'), '反击个人盾与HP只在命中回调提交');
+check(/await window\.playCounterAttackL1\(target, caster, applyCounterImpact\)\.done/.test(src), '普通反击完成Promise进入等待管线');
+check(src.includes('Object.freeze(Object.assign({}, classified'), '伤害/闪避通知载荷只读且无战斗对象引用');
+check(raw.includes('DamagePrevented') && raw.includes('prevented'), '复活与保命免伤独立结果入包');
+check(src.includes("else if (r.outcome === 'prevented') kind = 'prevented'") && src.includes("h.kind !== 'prevented'"), '复活免伤不误判格挡且不播放受击音');
+check(src.includes('if (result.isHero)') && src.includes('else wave.results.set(result.targetId, result)'), '英雄即时逐目标反馈，敌方仍按wave聚合');
 console.log('\n统计：通过 ' + pass + ' 项，失败 ' + fail + ' 项');
 process.exitCode = fail ? 1 : 0;

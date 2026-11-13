@@ -2,6 +2,11 @@
    血条 450ms 保持 + 500ms 坍缩 + 连击/治疗/强制同步、DOM 字号/时长矩阵、
    wave 单次主震与 60ms 定帧、音频不双播、血液粒子 source-over 与旋转豁免、
    重伤提示位置/时长/不挡数字，以及 clearHitFeedback / clearArcaneFx 清理。
+   音频路由回归：playHitFeedback 纯视觉不发布任何声音/结果事件；受击音一律经
+   真实 applySingleTagEffect/语义结果事件（DAMAGE_RESOLVED/DODGE_RESOLVED）→
+   CombatAudioDirector→playSound 检验三档、防连重随机池、格挡/闪避三档与破盾、
+   身份/技能 cue 独立叠加、close 等待 pending 才播/completeTarget/cancelWave 新语义、
+   identitySfxOn 关闭仅消费静默且语义事件仍通知。
    全部断言走真实 iframe 函数与真实 DOM/Canvas/AudioContext 调用；
    计时使用宿主真时钟，不用乱序微任务假 clock。 */
 (function () {
@@ -67,11 +72,35 @@
       token:combatToken, frozen:_pipelineFrozen })`);
     const functions = new Map();
     const replace = (name, fn) => { if (!functions.has(name)) functions.set(name, w[name]); w[name] = fn; };
+    const apiMissing = typeof w.CombatAudioDirector !== 'object';
+    if (apiMissing) pending.push('接口缺失:CombatAudioDirector');
+    const director = w.CombatAudioDirector;
+    const dirApiMissing = apiMissing ? [] : ['beginWave', 'completeTarget', 'closeWave', 'cancelWave', 'clear', 'publish', 'consume']
+      .filter(name => typeof director[name] !== 'function');
+    dirApiMissing.forEach(n => pending.push('接口缺失:CombatAudioDirector.' + n));
+    const evtApi = ev('typeof EVENTS === "object" ? EVENTS : null');
+    const evtDamage = evtApi && evtApi.DAMAGE_RESOLVED, evtDodge = evtApi && evtApi.DODGE_RESOLVED;
+    const soundKeys = [];
+    const resetDirector = () => { if (director) director.clear(); soundKeys.length = 0; };
+    replace('playSound', (key, volume, rate) => { soundKeys.push({ key, volume, rate }); return () => {}; });
+    // 语义结果事件放行与记录（新契约已落地，不保留 IMPACT_AUDIO 过渡兼容）：
+    const semanticEvents = [];
+    const impactKeyRe = /^(hit_[123][abc]|parry_[123]|dodge_[123])$/;
+    if (!apiMissing && evtDamage && evtDodge) {
+      const evtObj = ev('CombatEvents');
+      evtObj.emit = (event, ctx = {}) => {
+        if (event === evtDamage || event === evtDodge) {
+          semanticEvents.push({ event: event, ctx: ctx, frozen: Object.isFrozen(ctx) });
+          saved.emit.call(evtObj, event, ctx);
+        }
+      };
+    }
+    const semanticOnly = () => semanticEvents;
 
     /* ---------- 真实 DOM 舞台：英雄 / 敌方 / 双召唤 HP 轨道与 ghost ---------- */
     const root = doc.createElement('div');
     root.id = 'hit-feedback-regression-stage';
-    root.style.cssText = 'position:fixed;left:30px;top:110px;width:680px;height:380px;pointer-events:none;';
+    root.style.cssText = 'position:fixed;left:30px;top:110px;width:680px;height:400px;pointer-events:none;';
     // 真实结构：ghost 为 arcane-hit-ghost 且位于前景 arcane-hit-fill 之前（z-index 0 < 1）
     const track = (id, wpx) => '<div class="arcane-hit-track" style="position:relative;width:' + wpx + 'px;height:12px;background:#111">' +
       '<div id="' + id + '-hp-ghost" class="arcane-hit-ghost" style="width:100%;height:12px;background:#fff"></div>' +
@@ -79,7 +108,7 @@
     root.innerHTML = [
       '<div id="hero-card-h_hfb" class="hero-card-inner" style="position:absolute;left:0;top:0;width:180px;height:150px;background:#243047;border:1px solid #7dd3fc">',
       '<img alt="" style="width:180px;height:90px;display:block">', track('h_hfb', 200),
-      '<div id="h_hfb-mp-bar" style="width:55%"></div><div id="h_hfb-tp-bar" style="width:44%"></div></div>',
+      '<div id="h_hfb-status" style="display:none"></div><div id="h_hfb-mp-bar" style="width:55%"></div><div id="h_hfb-tp-bar" style="width:44%"></div></div>',
       '<div id="e_hfb-sprite" style="position:absolute;left:300px;top:0;width:110px;height:110px;background:#4c1d58">',
       '<img alt="" style="width:100px;height:100px;display:block"></div>',
       '<div style="position:absolute;left:300px;top:120px">', track('e_hfb', 200), '</div>',
@@ -87,7 +116,13 @@
       '<div style="width:160px;height:70px">🐉</div>', track('s_hsum', 180), '</div>',
       '<div id="s_esum-sprite" style="position:absolute;left:300px;top:210px;width:100px;height:100px;background:#3f1d2e">',
       '<div style="width:100px;height:60px">🐺</div></div>',
-      '<div style="position:absolute;left:300px;top:320px">', track('s_esum', 180), '</div>'
+      '<div style="position:absolute;left:300px;top:320px">', track('s_esum', 180), '</div>',
+      '<div id="hero-card-h_hfb2" class="hero-card-inner" style="position:absolute;left:520px;top:0;width:150px;height:120px;background:#243047;border:1px solid #7dd3fc">',
+      '<img alt="" style="width:150px;height:60px;display:block">', track('h_hfb2', 150),
+      '<div id="h_hfb2-status" style="display:none"></div></div>',
+      '<div id="hero-card-h_hfb3" class="hero-card-inner" style="position:absolute;left:520px;top:210px;width:150px;height:120px;background:#243047;border:1px solid #7dd3fc">',
+      '<img alt="" style="width:150px;height:60px;display:block">', track('h_hfb3', 150),
+      '<div id="h_hfb3-status" style="display:none"></div></div>'
     ].join('');
     doc.body.appendChild(root);
 
@@ -195,9 +230,260 @@
     const group = async (name, fn) => {
       try { await fn(); } catch (e) { check(false, name + '执行异常', String(e.stack || e)); }
     };
-    const optsQuiet = { suppressShake: true, suppressAudio: true, suppressRecoil: true, suppressDodgeFx: true };
+    const optsQuiet = { suppressShake: true, suppressRecoil: true, suppressDodgeFx: true };
 
     try {
+      await group('CombatAudioDirector 音效路由与wave聚合', async () => {
+        if (apiMissing) return;
+        resetDirector();
+        director.publish({ targetId:'e_hfb', sourceId:'h_hfb', source:'attack', outcome:'hit', maxHp:1000, hpDmg:99, hpBefore:1000, hpAfter:901 });
+        eq(soundKeys.length, 1, '单体结果只调度一个受击音');
+        check(/^hit_1[abc]$/.test(soundKeys[0]?.key || ''), '9.9%命中路由tier1');
+        resetDirector();
+        director.publish({ targetId:'e_hfb', sourceId:'h_hfb', source:'attack', outcome:'hit', maxHp:1000, hpDmg:499, hpBefore:1000, hpAfter:501 });
+        check(/^hit_2[abc]$/.test(soundKeys[0]?.key || ''), '49.9%命中路由tier2');
+        resetDirector();
+        director.publish({ targetId:'e_hfb', sourceId:'h_hfb', source:'attack', outcome:'hit', maxHp:1000, hpDmg:500, hpBefore:1000, hpAfter:500 });
+        check(/^hit_3[abc]$/.test(soundKeys[0]?.key || ''), '50%命中路由tier3');
+        resetDirector();
+        director.publish({ targetId:'h_hfb', sourceId:'e_hfb', source:'attack', outcome:'hit', maxHp:1000, hpDmg:100, shieldDmg:50, shieldBefore:50, shieldAfter:0, hpBefore:1000, hpAfter:900 });
+        eq(soundKeys.map(s=>s.key), ['parry_3'], '任意伤害破盾播放GuardBreak一次');
+        resetDirector();
+        director.publish({ targetId:'h_hfb', sourceId:'e_hfb', source:'attack', outcome:'dodge', maxHp:1000, incomingDmg:500 });
+        eq(soundKeys.map(s=>s.key), ['dodge_3'], '50%来袭闪避路由dodge_3');
+        resetDirector();
+        director.publish({ targetId:'h_hfb', sourceId:'e_hfb', source:'attack', outcome:'block', maxHp:1000, blockedDmg:100 });
+        eq(soundKeys.map(s=>s.key), ['parry_2'], '10%被挡路由parry_2');
+        resetDirector();
+        director.publish({ targetId:'h_hfb', sourceId:'e_counter', source:'counter', outcome:'hit', maxHp:1000, hpDmg:300, shieldDmg:20, shieldBefore:20, shieldAfter:0, hpBefore:1000, hpAfter:700 });
+        eq(soundKeys.map(s=>s.key), ['parry_3'], 'counter旁路携带护盾快照并能路由GuardBreak');
+        resetDirector();
+        const dotWave = director.beginWave(['h_hfb']);
+        director.publish({ targetId:'h_hfb', sourceId:'poison:e1', source:'dot', outcome:'hit', maxHp:1000, hpDmg:20, hpBefore:1000, hpAfter:980, wave:dotWave });
+        director.completeTarget(dotWave, 'h_hfb');
+        director.closeWave(dotWave);
+        eq(soundKeys.filter(s=>/^hit_[123][abc]$/.test(s.key)).length, 1, '同单位该回合累计DoT只路由一次');
+        resetDirector();
+        const wave = director.beginWave(['h_hfb','e_hfb']);
+        director.publish({ targetId:'h_hfb', sourceId:'e1', source:'attack', outcome:'hit', maxHp:1000, hpDmg:99, hpBefore:1000, hpAfter:901, wave });
+        director.publish({ targetId:'e_hfb', sourceId:'e1', source:'attack', outcome:'hit', maxHp:1000, hpDmg:500, hpBefore:1000, hpAfter:500, wave });
+        director.completeTarget(wave, 'h_hfb'); director.completeTarget(wave, 'e_hfb');
+        eq(soundKeys.length, 0, 'wave在close之前不播');
+        director.closeWave(wave);
+        eq(soundKeys.length, 1, '多目标wave只播一次');
+        check(/^hit_3[abc]$/.test(soundKeys[0]?.key || ''), 'wave取最高HP命中档位');
+        director.closeWave(wave);
+        eq(soundKeys.length, 1, '重复close不双播');
+        resetDirector();
+        const mixed = director.beginWave(['h_hfb','e_hfb']);
+        director.publish({ targetId:'h_hfb', sourceId:'e1', source:'attack', outcome:'dodge', maxHp:1000, incomingDmg:500, wave:mixed });
+        director.publish({ targetId:'e_hfb', sourceId:'e1', source:'attack', outcome:'hit', maxHp:1000, hpDmg:5, hpBefore:1000, hpAfter:995, wave:mixed });
+        director.completeTarget(mixed, 'h_hfb'); director.completeTarget(mixed, 'e_hfb');
+        director.closeWave(mixed);
+        check(/^hit_1[abc]$/.test(soundKeys[0]?.key || ''), 'wave中的实际命中优先于闪避结果');
+        resetDirector();
+        const broken = director.beginWave(['h_hfb','e_hfb']);
+        director.publish({ targetId:'h_hfb', sourceId:'e1', source:'attack', outcome:'hit', maxHp:1000, hpDmg:50, shieldDmg:50, shieldBefore:50, shieldAfter:0, hpBefore:1000, hpAfter:950, wave:broken });
+        director.publish({ targetId:'e_hfb', sourceId:'e1', source:'attack', outcome:'hit', maxHp:1000, hpDmg:500, hpBefore:1000, hpAfter:500, wave:broken });
+        director.completeTarget(broken, 'h_hfb'); director.completeTarget(broken, 'e_hfb');
+        director.closeWave(broken);
+        eq(soundKeys.map(s=>s.key), ['parry_3'], 'wave中任一目标破盾优先GuardBreak');
+        resetDirector();
+        const stale = director.beginWave(['h_hfb']);
+        director.publish({ targetId:'h_hfb', sourceId:'e1', source:'attack', outcome:'hit', maxHp:1000, hpDmg:1, hpBefore:1000, hpAfter:999, wave:stale });
+        director.clear(); director.closeWave(stale);
+        eq(soundKeys.length, 0, 'clear后旧wave不向新战局播音');
+        // 防连重随机池：同档连续两次必换变体（Math.random 固定 0.5 下 idx=1→重摇→2）
+        resetDirector();
+        director.publish({ targetId:'e_hfb', sourceId:'h_hfb', source:'attack', outcome:'hit', maxHp:1000, hpDmg:100, hpBefore:1000, hpAfter:900 });
+        director.publish({ targetId:'e_hfb', sourceId:'h_hfb', source:'attack', outcome:'hit', maxHp:1000, hpDmg:100, hpBefore:1000, hpAfter:900 });
+        eq(soundKeys.length, 2, '连续两次同档命中各调度一次');
+        check(soundKeys.every(s => /^hit_2[abc]$/.test(s.key)), '两次均落在tier2随机池内', soundKeys.map(s => s.key).join(','));
+        check(soundKeys[0].key !== soundKeys[1].key, '防连重池：同档连续不重播同一变体', soundKeys.map(s => s.key).join(','));
+        // 格挡/闪避三档补全（publish 单测口径）
+        resetDirector();
+        director.publish({ targetId:'h_hfb', sourceId:'e_hfb', source:'attack', outcome:'block', maxHp:1000, blockedDmg:99 });
+        director.publish({ targetId:'h_hfb', sourceId:'e_hfb', source:'attack', outcome:'block', maxHp:1000, blockedDmg:500 });
+        eq(soundKeys.map(s => s.key), ['parry_1', 'parry_3'], '9.9%/50%被挡路由parry_1/parry_3');
+        resetDirector();
+        director.publish({ targetId:'h_hfb', sourceId:'e_hfb', source:'attack', outcome:'dodge', maxHp:1000, incomingDmg:99 });
+        director.publish({ targetId:'h_hfb', sourceId:'e_hfb', source:'attack', outcome:'dodge', maxHp:1000, incomingDmg:100 });
+        eq(soundKeys.map(s => s.key), ['dodge_1', 'dodge_2'], '9.9%/10%来袭闪避路由dodge_1/dodge_2');
+        // wave聚合矩阵：格挡>闪避、全闪避取最高来袭档、无目标静默
+        resetDirector();
+        const bdWave = director.beginWave(['h_hfb','e_hfb']);
+        director.publish({ targetId:'h_hfb', sourceId:'e1', source:'attack', outcome:'dodge', maxHp:1000, incomingDmg:500, wave:bdWave });
+        director.publish({ targetId:'e_hfb', sourceId:'e1', source:'attack', outcome:'block', maxHp:1000, blockedDmg:500, wave:bdWave });
+        director.completeTarget(bdWave, 'h_hfb'); director.completeTarget(bdWave, 'e_hfb');
+        director.closeWave(bdWave);
+        eq(soundKeys.map(s => s.key), ['parry_3'], 'wave中格挡优先于闪避（格挡>闪避）');
+        resetDirector();
+        const allDodge = director.beginWave(['h_hfb','e_hfb']);
+        director.publish({ targetId:'h_hfb', sourceId:'e1', source:'attack', outcome:'dodge', maxHp:1000, incomingDmg:100, wave:allDodge });
+        director.publish({ targetId:'e_hfb', sourceId:'e1', source:'attack', outcome:'dodge', maxHp:1000, incomingDmg:500, wave:allDodge });
+        director.completeTarget(allDodge, 'h_hfb'); director.completeTarget(allDodge, 'e_hfb');
+        director.closeWave(allDodge);
+        eq(soundKeys.map(s => s.key), ['dodge_3'], '全闪避wave取最高来袭档dodge_3');
+        resetDirector();
+        director.closeWave(director.beginWave([]));
+        eq(soundKeys.length, 0, '无目标wave不播音');
+        // close等待pending新语义 / completeTarget / cancelWave（新契约已落地，pending为空是播出门槛）
+        resetDirector();
+        const pendWave = director.beginWave(['h_hfb','e_hfb']);
+        director.publish({ targetId:'h_hfb', sourceId:'e1', source:'attack', outcome:'hit', maxHp:1000, hpDmg:99, hpBefore:1000, hpAfter:901, wave:pendWave });
+        director.completeTarget(pendWave, 'h_hfb');
+        director.closeWave(pendWave);
+        eq(soundKeys.length, 0, 'close后pending未完成不播');
+        director.publish({ targetId:'e_hfb', sourceId:'e1', source:'attack', outcome:'hit', maxHp:1000, hpDmg:99, hpBefore:1000, hpAfter:901, wave:pendWave });
+        eq(soundKeys.length, 0, '迟到publish不清pending仍不播');
+        director.completeTarget(pendWave, 'e_hfb');
+        eq(soundKeys.length, 1, 'completeTarget清pending后wave播出');
+        resetDirector();
+        const ctWave = director.beginWave(['h_hfb','e_hfb']);
+        director.publish({ targetId:'h_hfb', sourceId:'e1', source:'attack', outcome:'hit', maxHp:1000, hpDmg:99, hpBefore:1000, hpAfter:901, wave:ctWave });
+        director.completeTarget(ctWave, 'h_hfb');
+        director.completeTarget(ctWave, 'e_hfb');
+        director.closeWave(ctWave);
+        eq(soundKeys.filter(s => impactKeyRe.test(s.key)).length, 1, 'completeTarget清pending后close聚合播出一次');
+        resetDirector();
+        const cxWave = director.beginWave(['h_hfb']);
+        director.publish({ targetId:'h_hfb', sourceId:'e1', source:'attack', outcome:'hit', maxHp:1000, hpDmg:1, hpBefore:1000, hpAfter:999, wave:cxWave });
+        director.cancelWave(cxWave);
+        director.publish({ targetId:'h_hfb', sourceId:'e1', source:'attack', outcome:'hit', maxHp:1000, hpDmg:1, hpBefore:1000, hpAfter:999, wave:cxWave });
+        director.closeWave(cxWave);
+        eq(soundKeys.length, 0, 'cancelWave丢弃已收与迟到结果均不播');
+        // 语义结果事件载荷契约（只读、freeze、字段齐全）
+        resetDirector();
+        director.publish({ targetId:'e_hfb', sourceId:'h_hfb', source:'attack', outcome:'hit', maxHp:1000, hpDmg:99, hpBefore:1000, hpAfter:901, damageType:'法术' });
+        const recs = semanticOnly();
+        const rec = recs[recs.length - 1];
+        check(!!rec, 'publish结果经语义事件发布');
+        if (rec) {
+          const ctx = rec.ctx || {};
+          check(rec.frozen === true, '语义结果事件载荷Object.freeze只读');
+          const CONTRACT_FIELDS = ['sourceId','targetId','source','resultType','kind','tier','blockTier','dodgeTier','crit','burst','hpBefore','hpAfter','hpDmg','shieldDmg','eventId'];
+          const missFields = CONTRACT_FIELDS.filter(k => !(k in ctx));
+          if (missFields.length) pending.push('待对齐:语义结果事件载荷缺字段:' + missFields.join(','));
+          if (!('waveId' in ctx)) pending.push('待对齐:语义结果事件载荷缺waveId字段');
+          if (!('actionId' in ctx)) pending.push('待对齐:语义结果事件载荷缺actionId字段');
+          check(ctx.kind === 'hp' && ctx.tier === 1, '载荷携带classify档位（kind/tier）');
+          eq(ctx.source, 'attack', '载荷source字段保留');
+        }
+      });
+
+      await group('技能与impact音独立叠加', async () => {
+        if (apiMissing) return;
+        resetDirector();
+        w.playSound('atk1', 0.5);
+        director.publish({ targetId:'h_hfb', sourceId:'e2', source:'attack', outcome:'hit', maxHp:1000, hpDmg:150, hpBefore:1000, hpAfter:850 });
+        eq(soundKeys.length, 2, '技能表现音与impact反馈各播一次');
+        eq(soundKeys[0].key, 'atk1', '技能表现音保留原调用');
+        check(/^hit_2[abc]$/.test(soundKeys[1]?.key || ''), '技能音后叠播tier2受击音');
+      });
+
+      await group('playHitFeedback纯视觉不发布', async () => {
+        resetDirector();
+        semanticEvents.length = 0;
+        const n0 = layers().length;
+        const h = play([{ targetId: 'h_hfb', outcome: 'hit', hpDmg: 100, hpBefore: 1000, hpAfter: 900, maxHp: 1000 }], optsQuiet);
+        eq(layers().length, n0 + 1, '真实playHitFeedback仍产生视觉浮字层');
+        eq(soundKeys.length, 0, '真实playHitFeedback不播受击音');
+        eq(semanticOnly().length, 0, '真实playHitFeedback不发布任何语义结果事件');
+        h.cancel();
+      });
+
+      await group('真实applySingleTagEffect结果事件路由', async () => {
+        if (typeof w.applySingleTagEffect !== 'function' || typeof w.parseSkill !== 'function') {
+          pending.push('待对齐:applySingleTagEffect/parseSkill不可直接调用，真实结果事件链路组跳过'); return;
+        }
+        ev('state.highTierNarrated=state.highTierNarrated||new Set();state.actionQueue=state.actionQueue||[];state.queueIndex=state.queueIndex||0;');
+        const mkHero = (id, maxHp, extra) => entity(id, Object.assign({ hp: maxHp, maxHp: maxHp }, extra));
+        const install = (maxHps, heroExtra) => {
+          ev('heroesData=' + JSON.stringify([
+            mkHero('h_hfb', maxHps[0], heroExtra && heroExtra[0]),
+            mkHero('h_hfb2', maxHps[1], heroExtra && heroExtra[1]),
+            mkHero('h_hfb3', maxHps[2], heroExtra && heroExtra[2])]) +
+            ';enemiesData=' + JSON.stringify([entity('e_hfb', { side: 'enemy' })]) + ';');
+          const heroes = ev('heroesData');
+          // 真实挂载：hero.dom 指向舞台卡（updateHeroUI 死亡分支读 dom.classList 与 ${id}-status），不 stub 业务结果
+          ['h_hfb', 'h_hfb2', 'h_hfb3'].forEach((id, i) => { if (heroes[i]) heroes[i].dom = doc.getElementById('hero-card-' + id); });
+          return { h: heroes, e: ev('enemiesData') };
+        };
+        const s = w.parseSkill('【回归击】[单体;power:80]');
+        const lastRec = () => semanticOnly()[semanticOnly().length - 1] || null;
+        const tierOf = ctx => ctx && ctx.kind === 'hp' ? (ctx.tier || 1) : 0;
+        const assertRouted = (hero, caster, agg, rec) => {
+          const ctx = rec && rec.ctx;
+          check(agg.length === 1, '真实命中经结果事件路由恰一档音：' + hero.id, JSON.stringify(agg.map(x => x.key)));
+          const want = tierOf(ctx);
+          check(want >= 1 && new RegExp('^hit_' + want + '[abc]$').test(agg[0] ? agg[0].key : ''),
+            '真实档位与结果事件classify一致：' + hero.id, 'want=' + want + ' got=' + (agg[0] && agg[0].key));
+          check(!!rec && rec.frozen === true, '结果事件载荷Object.freeze只读：' + hero.id);
+          check(!!ctx && ctx.targetId === hero.id && ctx.sourceId === caster.id && ctx.eventId != null, '结果事件身份字段齐全：' + hero.id);
+          return want;
+        };
+        // 探针：满血千血英雄单发实测伤害 D（t1档），再按 D 动态构造 t2/t3 英雄（maxHp=D+2 保证 hpAfter=2 不致死）
+        const d1 = install([1000, 1000, 1000]);
+        resetDirector();
+        const before0 = soundKeys.length;
+        await w.applySingleTagEffect(d1.e[0], d1.h[0], '[单体]', 80, 100, 1, null, s);
+        const probe = lastRec();
+        const D = probe && probe.ctx ? (probe.ctx.hpDmg || 0) : 0;
+        const gotTiers = [assertRouted(d1.h[0], d1.e[0], soundKeys.slice(before0).filter(x => impactKeyRe.test(x.key)), probe)];
+        if (D >= 2) {
+          const d2t = install([1000, 3 * D + 2, D + 2]);
+          resetDirector();
+          for (const hero of [d2t.h[1], d2t.h[2]]) {
+            const before = soundKeys.length;
+            await w.applySingleTagEffect(d2t.e[0], hero, '[单体]', 80, 100, 1, null, s);
+            gotTiers.push(assertRouted(hero, d2t.e[0], soundKeys.slice(before).filter(x => impactKeyRe.test(x.key)), lastRec()));
+          }
+          check(d2t.h[1].hp > 0 && d2t.h[2].hp > 0, '动态构造英雄跨档且不致死', d2t.h.map(h => h.hp).join('/'));
+        } else pending.push('待对齐:探针伤害D=' + D + ' 不足以构造跨档英雄，三档分布未验证（档位一致性已单独验证）');
+        if (gotTiers.join(',') !== '1,2,3') pending.push('待对齐:真实链路三档分布（同伤跨maxHp得 ' + gotTiers.join(',') + '），档位一致性已单独验证');
+        // 防连重真实链路：满血英雄连续两次命中
+        const d2 = install([1000, 1000, 1000]);
+        resetDirector();
+        await w.applySingleTagEffect(d2.e[0], d2.h[0], '[单体]', 80, 100, 1, null, s);
+        await w.applySingleTagEffect(d2.e[0], d2.h[0], '[单体]', 80, 100, 1, null, s);
+        const hitKeys = soundKeys.filter(x => /^hit_[123][abc]$/.test(x.key));
+        eq(hitKeys.length, 2, '真实链路连续两次命中各播音一次');
+        check(hitKeys.length === 2 && hitKeys[0].key !== hitKeys[1].key, '真实链路同档防连重不重播变体', hitKeys.map(x => x.key).join(','));
+        // 破盾真实链路：shield=D-2 < 单发伤害 → 破盾优先 GuardBreak 且英雄存活
+        const d3 = install([1000, 1000, 1000], [{ shield: Math.max(1, D - 2) }]);
+        resetDirector();
+        await w.applySingleTagEffect(d3.e[0], d3.h[0], '[单体]', 80, 100, 1, null, s);
+        check(soundKeys.some(x => x.key === 'parry_3'), '真实链路破盾播GuardBreak');
+        const brec = lastRec();
+        check(!!brec && brec.ctx && brec.ctx.shieldBroken === true, '破盾结果事件携带shieldBroken');
+        check(d3.h[0].hp > 0, '破盾链路英雄存活', String(d3.h[0].hp));
+        // 闪避真实链路：spd:1000 触发闪避（若攻击判定未触发则按待对齐上报）
+        const d4 = install([1000, 1000, 1000], [{ spd: 1000 }]);
+        resetDirector();
+        await w.applySingleTagEffect(d4.e[0], d4.h[0], '[单体]', 80, 100, 1, null, s);
+        if (soundKeys.some(x => /^dodge_[123]$/.test(x.key))) {
+          check(semanticOnly().some(x => x.event === evtDodge), '真实闪避发布DODGE_RESOLVED语义事件');
+          eq(soundKeys.filter(x => /^hit_[123][abc]$/.test(x.key)).length, 0, '真实闪避不播受击音');
+        } else pending.push('待对齐:spd:1000未触发单体闪避（闪避三档已由publish直测覆盖）');
+        clearHit();
+      });
+
+      await group('identitySfxOn关闭仅消费静默语义仍通知', async () => {
+        if (apiMissing) return;
+        const mod2 = ev('typeof arcaneVfxModule === "object" ? arcaneVfxModule : null');
+        if (!mod2 || typeof mod2.setIdentitySfx !== 'function') { pending.push('待对齐:arcaneVfxModule.setIdentitySfx不可调用'); return; }
+        if (!evtDamage || !evtDodge) { pending.push('待对齐:语义结果事件未落地，identitySfxOn静默组跳过'); return; }
+        resetDirector();
+        semanticEvents.length = 0;
+        mod2.setIdentitySfx(false);
+        director.publish({ targetId:'h_hfb', sourceId:'e2', source:'attack', outcome:'hit', maxHp:1000, hpDmg:150, hpBefore:1000, hpAfter:850 });
+        eq(soundKeys.length, 0, 'identitySfxOn关闭不播受击音');
+        eq(semanticOnly().length, 1, 'identitySfxOn关闭语义结果事件仍发布通知');
+        mod2.setIdentitySfx(true);
+        director.publish({ targetId:'h_hfb', sourceId:'e2', source:'attack', outcome:'hit', maxHp:1000, hpDmg:150, hpBefore:1000, hpAfter:850 });
+        eq(soundKeys.length, 1, '恢复identitySfxOn后受击音正常调度');
+      });
+
       /* ========== 一、classifyHit：三维阈值、小额暴击、护盾破盾、混合与修饰符 ========== */
       await group('分类三维', async () => {
         const base = { targetId: 'e_hfb', outcome: 'hit', maxHp: 1000, hpBefore: 1000, hpAfter: 901, shieldBefore: 0, shieldAfter: 0 };
@@ -312,7 +598,7 @@
         const n0 = layers().length;
         const h = play([{ targetId: 'h_hfb', outcome: 'hit', hpDmg: 30, hpBefore: 100, hpAfter: 70, maxHp: 100 }], optsQuiet);
         eq(layers().length, n0 + 1, '每次反馈创建独立浮字层');
-        eq(h.doneAt - Date.now() > 1200 && h.doneAt - Date.now() <= 1500, true, 'handle.doneAt 对齐 HIT_LIFE=1320ms');
+        eq(h.doneAt - Date.now() > 1200 && h.doneAt - Date.now() <= 1500, true, 'handle.doneAt 对齐 HIT_LIFE=1320ms（playHitFeedback 维持 doneAt 原视觉 API）');
         h.cancel();
         eq(layers().length, n0, 'handle.cancel 立即移除本层 DOM');
         await wait(520);
@@ -382,12 +668,12 @@
       await group('recoil 与闪避抑制', async () => {
         const dom = doc.getElementById('hero-card-h_hfb');
         clearHit();
-        play([{ targetId: 'h_hfb', outcome: 'hit', hpDmg: 100, hpBefore: 1000, hpAfter: 900, maxHp: 1000 }], { suppressShake: true, suppressAudio: true });
+        play([{ targetId: 'h_hfb', outcome: 'hit', hpDmg: 100, hpBefore: 1000, hpAfter: 900, maxHp: 1000 }], { suppressShake: true });
         check(dom.classList.contains('arcane-hit-recoil'), '扣血默认给受击者挂 recoil');
         clearHit();
         check(!dom.classList.contains('arcane-hit-recoil'), 'clearHitFeedback 清除残留 recoil 类');
         const n0 = layerEls('.arcane-hit-num-layer > *').length;
-        play([{ targetId: 'h_hfb', outcome: 'dodge', hpDmg: 0, maxHp: 1000 }], { suppressShake: true, suppressAudio: true, suppressRecoil: true, suppressDodgeFx: true });
+        play([{ targetId: 'h_hfb', outcome: 'dodge', hpDmg: 0, maxHp: 1000 }], { suppressShake: true, suppressRecoil: true, suppressDodgeFx: true });
         check(layerEls('.arcane-hit-num.word.dodge').some(el => el.textContent === '闪避'), '闪避仍显示文字');
         eq(layerEls('.arcane-hit-num-layer').length >= 1 && layerEls('.arcane-hit-num-layer > *').length >= n0, true, '抑制 recoil/残影时文字层仍保留');
         clearHit();
@@ -418,7 +704,6 @@
           { wave: wv2, suppressRecoil: true });
         eq([wv2.shook, wv2.hitStopped, wv2.hasHeavy], [undefined, undefined, undefined], '轻击不误触发主震/定帧/重击');
         eq(wv2.classified.length, 1, '轻击 wave 只登记实际一条结果');
-        check(wv2.audioPlayed === true, '轻击 wave 仍标记主音已播（一次）');
         clearHit();
       });
 
@@ -459,7 +744,7 @@
         await particleRun({ targetId: 'e_hfb', outcome: 'block', hpDmg: 0, shieldDmg: 0, maxHp: 1000 });
         eq(harvest(isBlood).length, 0, '格挡不喷血');
         await particleRun({ targetId: 'e_hfb', outcome: 'dodge', hpDmg: 0, maxHp: 1000 },
-          { suppressShake: true, suppressAudio: true, suppressRecoil: true });
+          { suppressShake: true, suppressRecoil: true });
         eq(harvest(isBlood).length, 0, '闪避烟尘不喷血');
         await particleRun({ targetId: 'e_hfb', outcome: 'hit', hpDmg: 40, hpBefore: 1000, hpAfter: 960, maxHp: 1000 });
         check(harvest(isBlood).length > 0, '轻击仍只按扣血喷血');
@@ -537,42 +822,17 @@
         const ghosts = (src.match(/-hp-ghost/g) || []).length;
         if (ghosts < 3) pending.push('待对齐:HP ghost DOM 未接入（来源计数 ' + ghosts + '，需英雄/敌方/双召唤）');
         else check(src.indexOf('.arcane-hit-track') >= 0 && src.indexOf('.arcane-hit-fill') >= 0, 'HP ghost 轨道/填充样式入包');
-        // 只取 playHitFeedback 的实参对象做按调用形态检查：命中需要 hpBefore，闪避不需要。
-        const callObjectText = at => {
-          const open = src.indexOf('{', at);
-          if (open < 0 || open - at > 160) return '';
-          let depth = 0;
-          for (let i = open; i < src.length; i++) {
-            const c = src[i];
-            if (c === "'" || c === '"' || c === '`') {
-              for (i++; i < src.length; i++) { if (src[i] === '\\') { i++; continue; } if (src[i] === c) break; }
-              continue;
-            }
-            if (c === '{') depth++;
-            else if (c === '}') { depth--; if (depth === 0) return src.slice(open, i + 1); }
-          }
-          return '';
-        };
-        const calls = [];
-        let at = src.indexOf('playHitFeedback(');
-        while (at >= 0) {
-          if (src.slice(Math.max(0, at - 24), at).indexOf('function') < 0) calls.push(at);
-          at = src.indexOf('playHitFeedback(', at + 1);
-        }
-        if (!calls.length) {
-          pending.push('待对齐:战斗结算尚未调用 playHitFeedback（真实 apply 采样/闪避/非致死钳制待接线）');
-        } else {
-          const objs = calls.map(callObjectText).filter(t => t);
-          const badCall = objs.filter(t => {
-            if (!/targetId\s*:/.test(t) || !/maxHp\s*:/.test(t)) return true;
-            if (/outcome\s*:\s*['"]dodge['"]/.test(t)) return false;
-            // hpBefore 在实战命中调用里是对象简写（hpBefore,），需同时兼容简写与键值写法
-            return !(/[{,]\s*hpBefore\s*(?:[,}:])/.test(t) && /outcome\s*:/.test(t));
-          });
-          check(objs.length === calls.length && badCall.length === 0,
-            '实战 playHitFeedback 按命中/闪避分别携带必要采样（命中含 hpBefore，闪避不强制）');
-          check(objs.some(t => /outcome\s*:\s*['"]dodge['"]/.test(t)), '闪避路径有独立反馈采样');
-        }
+        // 按已确认结果对象检查采样，不把对象变量误读成下一段 opts 的花括号。
+        const snapshots = ['_dodgeFeedback', 'hitResult', 'result'].map(name => {
+          const before = src.lastIndexOf('const ' + name + ' = {', src.indexOf('playHitFeedback(' + name + ','));
+          if (before < 0) return '';
+          const end = src.indexOf('};', before);
+          return end < 0 ? '' : src.slice(before, end + 2);
+        });
+        check(snapshots.every(t => /targetId\s*:/.test(t) && /maxHp\s*:/.test(t)
+            && /hpBefore\s*(?::|[,}])/.test(t) && /hpAfter\s*(?::|[,}])/.test(t) && /outcome\s*:/.test(t)),
+          '实战 playHitFeedback 命中与闪避均携带 HP 快照与 outcome');
+        check(snapshots.some(t => /outcome\s*:\s*['"]dodge['"]/.test(t)), '闪避路径有独立反馈采样（outcome=dodge）');
       });
 
       /* 自动清理：独立句柄等待 HIT_LIFE 到期，确认浮字层与粒子 canvas 自行收尾 */
@@ -593,6 +853,7 @@
       }
       try { clearFx(); } catch (e) {}
       try { clearHit(); } catch (e) {}
+      try { resetDirector(); } catch (e) {}
       for (const [name, fn] of functions) { try { w[name] = fn; } catch (e) {} }
       w.Math.random = saved.random;
       w.__hfrRestore = saved;

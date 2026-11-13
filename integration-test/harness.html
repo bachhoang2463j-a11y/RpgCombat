@@ -34,10 +34,11 @@
 <script src="fixtures/enemy-group-attack-regression.js"></script>
 <script src="fixtures/attack-identity-regression.js"></script>
 <script src="fixtures/hit-feedback-regression.js"></script>
+<script src="fixtures/combat-audio-regression.js"></script>
 <script>
 const TEST_PARAMS = new URLSearchParams(location.search);
-const RPG_SOURCE = TEST_PARAMS.get('artifact') === '1'
-  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v12_01.json')
+const RPG_SOURCE = TEST_PARAMS.get('artifact') !== '0'
+  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v12_05.json')
   : (TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html');
 const RPG_READABLE_SOURCE = TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html';
 // 结构断言读取可读源码；行为断言始终操作 RPG_SOURCE 挂载的真实源码或压缩产物。
@@ -2794,7 +2795,7 @@ async function test45() {
 async function test46() {
   head('46 两期攻击身份统合：20类、拍点、闪避与取消');
   if (TEST_PARAMS.get('version') === 'public') return;
-  if (TEST_PARAMS.get('artifact') === '1') out('info', '运行目标：真实压缩产物；只读源码结构另行检查，产物结构由专项断言验证。');
+  if (TEST_PARAMS.get('artifact') !== '0') out('info', '运行目标：真实压缩产物；只读源码结构另行检查，产物结构由专项断言验证。');
   const result = await window.runAttackIdentityRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
   eq(result.pending, [], '20类身份专项全部落地，无待对齐项');
 }
@@ -2804,13 +2805,19 @@ async function test47() {
   const result = await window.runHitFeedbackRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
   eq(result.pending, [], '命中分层专项全部落地，无待对齐项');
 }
+async function test48() {
+  head('48 战斗音频事件：反击等待、DoT、反伤与HP Cost隔离');
+  if (TEST_PARAMS.get('version') === 'public') return;
+  const result = await window.runCombatAudioRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
+  eq(result.pending, [], '音频事件专项全部落地，无待对齐项');
+}
 async function runAll() {
   logEl.textContent = '';
   passN = failN = 0;
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47, test48];
   const selectedTests = TEST_PARAMS.has('tests') ? new Set(TEST_PARAMS.get('tests').split(',').map(n => 'test' + n)) : null;
   for (const t of tests) {
     if (selectedTests && !selectedTests.has(t.name)) continue;
@@ -2821,6 +2828,11 @@ async function runAll() {
   out(failN ? 'fail' : 'pass', '  通过 ' + passN + ' 项，失败 ' + failN + ' 项');
   statEl.className = failN ? 'fail' : 'pass';
   statEl.textContent = failN ? '✗ ' + failN + ' 项失败' : '✓ 全部 ' + passN + ' 项通过';
+  window.__harnessResult = { source:RPG_SOURCE, passed:passN, failed:failN,
+    failures:Array.from(logEl.querySelectorAll('.fail')).map(el => el.textContent), log:logEl.textContent };
+  if (TEST_PARAMS.get('record') === '1') await fetch('/__rpg_regression_result', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(window.__harnessResult)
+  });
 }
 
 (async function boot() {
@@ -2837,6 +2849,7 @@ async function runAll() {
     await sleep(600); // 等两侧 boot 的异步收尾
     statEl.textContent = '两个应用已挂载，点「运行全部断言」';
     document.getElementById('run').addEventListener('click', runAll);
+    if (TEST_PARAMS.get('autorun') === '1') runAll();
   } catch (e) {
     statEl.className = 'fail';
     statEl.textContent = '挂载失败：' + e.message + '（本页需通过 http 打开，不能用 file://）';

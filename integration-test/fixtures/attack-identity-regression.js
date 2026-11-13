@@ -272,7 +272,7 @@
       }
       w[name] = fn;
     };
-    const calls = { sounds: [], customAudio: [], svg: [], projectiles: [], floats: [], flinch: [], gun: 0, shotgun: 0 };
+    const calls = { sounds: [], customAudio: [], svg: [], projectiles: [], floats: [], flinch: [], gun: 0, shotgun: 0, resultEvents: [] };
     const clearCalls = () => Object.keys(calls).forEach(k => { if (Array.isArray(calls[k])) calls[k].length = 0; else calls[k] = 0; });
     const realFloat = w.createFloatingText, realProjectile = w.playArcaneProjectile;
     const projectileMock = async type => { calls.projectiles.push(type); };
@@ -294,8 +294,19 @@
       replace('promptReaction', (target, skills) => skills && skills.length ? { type: 'reaction', hero: target, skill: skills[0] } : null);
       ev('combatToken={};_pipelineFrozen=false;nonLethalSettings.enabled=false;llmState.allyAutoSpeak=false;llmState.enemyAutoSpeak=false;state.isGameStarted=false;state.highTierNarrated=new Set();state.actionQueue=[];state.queueIndex=0;');
       w.Math.random = () => 0.5;
-      ev('CombatEvents').emit = () => {};
-      ev('CombatEvents').emitAsync = async () => {};
+      // 事件mock仅放行只读结果事件，转发真总线走CombatAudioDirector.consume→playSound。
+      const evtApi = ev('typeof EVENTS === "object" ? EVENTS : null');
+      const semanticOk = !!(evtApi && evtApi.DAMAGE_RESOLVED && evtApi.DODGE_RESOLVED);
+      const audioPassEvents = [semanticOk && evtApi.DAMAGE_RESOLVED, semanticOk && evtApi.DODGE_RESOLVED].filter(Boolean);
+      const realBus = ev('CombatEvents');
+      realBus.emit = (event, ctx = {}) => {
+        if (audioPassEvents.indexOf(event) >= 0) {
+          calls.resultEvents.push({ event, ctx, frozen: Object.isFrozen(ctx) });
+          saved.emit.call(realBus, event, ctx);
+        }
+      };
+      realBus.emitAsync = async () => {};
+      if (!semanticOk) pending.push('EVENTS.DAMAGE_RESOLVED/DODGE_RESOLVED缺失');
 
       /* ========== 一、单体12类：分派、演出产出、onImpact元数据（纯DOM目标） ========== */
       await group('单体12类分派与演出', async () => {
@@ -549,7 +560,7 @@
         if (typeof w.playHitFeedback === 'function' && typeof w.clearHitFeedback === 'function') {
           const heroDom = domOf('hero-card-h_atk0');
           const fb = w.playHitFeedback({ targetId: 'h_atk0', outcome: 'hit', hpDmg: 100, hpBefore: 1000, hpAfter: 900, maxHp: 1000 },
-            { suppressAudio: true, suppressShake: true });
+            { suppressShake: true });
           check(heroDom.classList.contains('arcane-hit-recoil'), '实战命中反馈主路径为受击者挂 recoil（受击表现唯一出口）');
           try { fb.cancel(); } catch (e) {}
           try { w.clearHitFeedback(); } catch (e) {}
@@ -595,9 +606,16 @@
         useRealClock();
         try { w.clearArcaneFx(); } catch (e) {}
         const realFeedback = w.playHitFeedback;
-        const results = [], impacts = [], preparations = [];
-        const realIdentity = w.playAttackIdentityFx, realPrepare = w.prepareSingleAttackHit;
-        const recordFeedback = (r, opts) => { results.push({ r, opts, at:Date.now() }); return { doneAt:Date.now(), cancel() {} }; };
+        const results = [], audioEvents = [], impacts = [], preparations = [];
+        // 双通道兼容：新契约走语义结果事件（calls.resultEvents），过渡期走 publish 记录（audioEvents）
+        const evtList = () => semanticOk ? calls.resultEvents : audioEvents;
+        const evtCount = () => evtList().length;
+        const evtCtxOf = x => semanticOk ? (x && x.ctx || {}) : (x && x.event || {});
+        const evtWaveIdOf = x => { const c = evtCtxOf(x); return semanticOk ? c.waveId : (c.wave && c.wave.id); };
+        const impactKeys = () => calls.sounds.filter(s2 => /^(hit_[123][abc]|parry_[123]|dodge_[123])$/.test(s2.key));
+        const resetEvt = () => { audioEvents.length = 0; calls.resultEvents.length = 0; calls.sounds.length = 0; };
+        const realIdentity = w.playAttackIdentityFx, realPrepare = w.prepareSingleAttackHit, realDirectorPublish = w.CombatAudioDirector.publish;
+        const recordFeedback = (r, opts) => { results.push({ r, opts, at:Date.now() }); return { doneAt:Date.now(), duration:1320, done:Promise.resolve(), cancel() {} }; };
         const recordIdentity = opts => realIdentity(Object.assign({}, opts, { onImpact:(t, meta) => {
           impacts.push({ id:t.id, meta, before:lookup(t.id)?.hp, at:Date.now() });
           opts.onImpact(t, meta);
@@ -607,8 +625,10 @@
         let fx;
         try {
           w.playHitFeedback = recordFeedback;
+          w.CombatAudioDirector.publish = event => { audioEvents.push({ event, at:Date.now() }); return realDirectorPublish.call(w.CombatAudioDirector, event); };
           w.playAttackIdentityFx = recordIdentity;
           w.prepareSingleAttackHit = async (...args) => { const p = await realPrepare(...args); preparations.push(p); return p; };
+          resetEvt();
           const d = installData([entity('h_atk0'),entity('h_atk1'),entity('s_atk0',{isSummon:true,side:'hero'})],[entity('e_atk')]);
           const s = w.parseSkill('【真实群光】[群攻(光);power:80][法术][必中]');
           s._bdg = { targetHit:{}, targetResolved:{} };
@@ -623,20 +643,34 @@
           check(impacts.every(i=>i.before===3000&&i.after===2920),'在onImpact回调栈内立即完成真实扣血（不等后续Promise）',JSON.stringify(impacts));
           check(impacts.every(i=>i.at-started>=i.meta.beatMs-35),'实际主接触不早于demo beatMs');
           eq(results.map(x=>[x.r.hpBefore,x.r.hpAfter,x.r.hpDmg,x.r.shieldDmg]),[[3000,2920,80,0],[3000,2920,80,0],[3000,2920,80,0]],'反馈采样为真实扣血前后值');
-          check(results.every(x=>x.opts.wave===results[0].opts.wave&&x.opts.suppressAudio),'同波共享wave且主体主音抑制额外主重击');
+          check(results.every(x=>x.opts.wave===results[0].opts.wave),'同波共享视觉wave并聚合震屏状态');
+          eq(evtCount(),3,'整波三个实际目标各发布一次只读结果事件');
+          check(evtList().length===3 && evtList().every(x=>evtWaveIdOf(x)===evtWaveIdOf(evtList()[0])),'整波结果事件共享同一音频waveId');
+          if (semanticOk) {
+            check(calls.resultEvents.every(x=>x.frozen),'语义结果事件载荷Object.freeze只读');
+            const ctx0 = evtCtxOf(calls.resultEvents[0]);
+            check(!!ctx0 && ctx0.targetId==='h_atk0' && ctx0.sourceId==='e_atk' && ctx0.eventId!=null,'语义结果事件身份字段齐全');
+            eq(impactKeys().length,3,'整波三名英雄经真实Director分别播音');
+          }
           eq(results[0].opts.suppressShake,false,'群光本体无震屏，重创震屏由命中层提供一次');
           eq(w.attackFeedbackOptions(d.e[0],d.h[0],'[群攻(雷)]',s,null,{identity:true,wave:{}}).suppressShake,true,'群雷本体已有震屏，命中层不重复追加');
-          eq(w.attackFeedbackOptions(d.e[0],d.h[0],'[单体]',s,'arrow',null).suppressAudio,false,'箭矢发射音与命中分层主音职责分离');
+          eq(w.attackFeedbackOptions(d.e[0],d.h[0],'[单体]',s,'arrow',null).audioWave,undefined,'单箭视觉反馈不承担audioWave权限');
           if(fx)fx.cancel();
-          impacts.length=0;results.length=0;preparations.length=0;
+          impacts.length=0;results.length=0;preparations.length=0;resetEvt();
           const mixed=installData([entity('h_atk0'),entity('h_atk1',{spd:1000}),entity('s_atk0',{isSummon:true,side:'hero'})],[entity('e_atk')]);
           const m=w.parseSkill('【真实群雷】[群攻(雷);power:80][法术]');m._bdg={targetHit:{},targetResolved:{}};
           const mixedResult=await w.playIdentityAttackWave(mixed.e[0],mixed.h,'雷','[群攻(雷)]',80,100,1,null,m);
           fx=mixedResult.handle;
           eq(mixed.h.map(t=>t.hp),[2920,3000,2920],'混合outcomes与实际闪避结算一致，召唤物正常受伤');
           eq(results.filter(x=>x.r.outcome==='dodge').map(x=>x.r.targetId),['h_atk1'],'真实闪避只显示一次dodge，不伪扣血');
+          eq(evtCount(),3,'identity整波对命中与闪避都发布只读结果事件');
+          check(evtList().length===3 && evtList().every(x=>evtWaveIdOf(x)===evtWaveIdOf(evtList()[0])),'混合outcome仍共享单一音频waveId');
+          if (semanticOk) {
+            eq(calls.resultEvents.filter(x=>x.event===evtApi.DODGE_RESOLVED).length,1,'真实闪避走DODGE_RESOLVED语义事件');
+            eq(impactKeys().length,3,'混合波两次受击与一次闪避分别反馈');
+          }
           if(fx)fx.cancel();
-          impacts.length=0;results.length=0;preparations.length=0;
+          impacts.length=0;results.length=0;preparations.length=0;resetEvt();
           const cancelled=installData([entity('h_atk0')],[entity('e_atk')]);
           const c=w.parseSkill('【取消群光】[群攻(光);power:80][必中]');c._bdg={targetHit:{},targetResolved:{}};
           const cp=w.playIdentityAttackWave(cancelled.e[0],cancelled.h,'光','[群攻(光)]',80,100,1,null,c);
@@ -644,6 +678,24 @@
           await cp;await wait(650);
           eq(cancelled.h[0].hp,3000,'同代clear解除整波等待但不残余扣血');
           eq(results.length,0,'取消前无主接触就不生成反馈或后续');
+          eq(evtCount(),0,'取消前无主接触不发布结果事件');
+          if (semanticOk) eq(impactKeys().length,0,'取消前无主接触不提前聚合播音');
+          // 部分完成即取消：不得未完成提前聚合
+          resetEvt();
+          const partial=installData([entity('h_atk0'),entity('h_atk1'),entity('s_atk0',{isSummon:true,side:'hero'})],[entity('e_atk')]);
+          const ps=w.parseSkill('【部分取消群光】[群攻(光);power:80][法术][必中]');ps._bdg={targetHit:{},targetResolved:{}};
+          const pp=w.playIdentityAttackWave(partial.e[0],partial.h,'光','[群攻(光)]',80,100,1,null,ps);
+          let gp=0; while(impacts.length<1&&gp++<60) await wait(15);
+          const gotPartial=impacts.length>0&&impacts.length<3;
+          w.clearArcaneFx();
+          await pp;await wait(650);
+          if (gotPartial) {
+            if (semanticOk) {
+              eq(impactKeys().length,evtCount(),'已接触英雄即时反馈一次，取消后不追加未接触目标音效');
+              check(evtCount()<3,'部分取消未凑齐整波结果事件');
+            }
+          } else note('待对齐:部分完成窗口未截到（beatMs过快或无接触），部分取消聚合断言未执行');
+          impacts.length=0;results.length=0;preparations.length=0;resetEvt();
           const single=installData([entity('h_atk0')],[entity('e_atk')]);
           const as=w.parseSkill('【取消单箭】[单体;power:80][远程][必中]');
           const ap=w.applySingleTagEffect(single.e[0],single.h[0],'[单体]',80,100,1,null,as);
@@ -654,15 +706,18 @@
           barrierDom.style.cssText = 'position:fixed;left:200px;top:220px;width:300px;height:90px;'; root.appendChild(barrierDom);
           ev('teamBarrier=99999;teamBarrierMax=99999;barrierArmor=0;barrierSub=null;');
           const bs=w.parseSkill('【屏障群光】[群攻(光);power:80][法术]');bs._bdg={targetHit:{},targetResolved:{}};
-          preparations.length=0;impacts.length=0;results.length=0;
+          preparations.length=0;impacts.length=0;results.length=0;resetEvt();
           const br=await w.playIdentityAttackWave(b.e[0],b.h,'光','[群攻(光)]',80,100,1,null,bs);fx=br.handle;
           eq(preparations.length,0,'全队屏障分支不触个人闪避或反应准备');
           eq(impacts.length,1,'屏障整队只发生一个主接触');
           eq(ev('teamBarrier'),99919,'屏障整波只扣一次80耐久');
           eq(b.h.map(h=>h.hp),[3000,3000],'屏障全挡不伪造个人伤害');
           eq(results.length,0,'屏障全挡不伪造个人血雾或格挡');
+          eq(evtCount(),0,'teamBarrier全挡不发布角色结果事件');
+          if (semanticOk) eq(impactKeys().length,0,'teamBarrier全挡不发布角色聚合音');
         } finally {
           if(fx)fx.cancel();w.clearArcaneFx();
+          w.CombatAudioDirector.publish=realDirectorPublish;w.CombatAudioDirector.clear();
           w.playHitFeedback=realFeedback;w.playAttackIdentityFx=realIdentity;w.prepareSingleAttackHit=realPrepare;
         }
       });
@@ -730,7 +785,18 @@
           check(media.length>0&&media.every(a=>a.paused),'霰弹采样由owner.cancel停止');
           const module=ev('arcaneVfxModule');module.setIdentitySfx(false);media.length=0;sources.length=0;
           const quiet=w.playAttackIdentityFx({scope:'single',subtype:'光',caster,targets});quiet.cancel();
-          eq(media.length+sources.length,0,'局部音效门控同时关闭短采样和合成，不新增UI');module.setIdentitySfx(true);
+          eq(media.length+sources.length,0,'局部音效门控同时关闭短采样和合成，不新增UI');
+          if (semanticOk && typeof w.CombatAudioDirector === 'object') {
+            const savedSound = w.playSound; w.playSound = (key,vol,rate) => { calls.sounds.push({key,vol,rate}); };
+            const revBefore = calls.resultEvents.length, sndBefore = calls.sounds.length;
+            w.CombatAudioDirector.publish({ targetId:'h_atk0', sourceId:'e_atk', source:'attack', outcome:'hit', maxHp:1000, hpDmg:100, hpBefore:1000, hpAfter:900 });
+            eq(calls.resultEvents.length - revBefore, 1, 'identitySfxOn关闭语义结果事件仍发布通知');
+            eq(calls.sounds.length - sndBefore, 0, 'identitySfxOn关闭仅消费静默不播音');
+            module.setIdentitySfx(true);
+            w.CombatAudioDirector.publish({ targetId:'h_atk0', sourceId:'e_atk', source:'attack', outcome:'hit', maxHp:1000, hpDmg:100, hpBefore:1000, hpAfter:900 });
+            eq(calls.sounds.length - sndBefore, 1, '恢复identitySfxOn后受击音正常调度');
+            w.playSound = savedSound;
+          } else module.setIdentitySfx(true);
         } finally {
           w.clearArcaneFx();ev('arcaneVfxModule').setIdentitySfx(true);
           w.Audio=realAudio;w.AudioContext=realContext;w.webkitAudioContext=realWebkitContext;w.fetch=realFetch;

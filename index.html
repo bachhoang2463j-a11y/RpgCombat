@@ -8122,6 +8122,7 @@ const arcaneVfxModule = (function () {
         const incomingDmg = Math.max(0, r.blockedDmg ?? r.incomingDmg ?? 0);
         let kind;
         if (r.outcome === 'dodge') kind = 'dodge';
+        else if (r.outcome === 'prevented') kind = 'prevented';
         else if (r.outcome === 'block' || (hpDmg === 0 && shieldDmg === 0)) kind = 'block';
         else if (hpDmg > 0) kind = 'hp';
         else kind = 'shield';
@@ -8334,6 +8335,7 @@ const arcaneVfxModule = (function () {
         const slot = stackSlot(r.targetId), p = hitAnchor(dom, slot), c = p.c;
         const vr = entityVisualRect(dom) || c;
         const cy = vr.top + vr.h * 0.45;
+        if (h.kind === 'prevented') return;
         if (h.kind === 'dodge') {
             if (!r.suppressDodgeFx) hitDodgeGhost(layer, dom, anims);
             if (!r.suppressDodgeFx) burst(8, () => ({ x: c.x + rnd(-20, 20), y: c.bottom - 10, vx: rnd(-1.2, 1.2), vy: rnd(-0.8, -0.2), drag: 0.96, decay: 0.03, size: rnd(10, 18), shape: 'smoke', blend: 'source-over', color: 'rgba(148,163,184,0.35)' }));
@@ -8407,6 +8409,107 @@ const arcaneVfxModule = (function () {
         3: ['hit_3a', 'hit_3b', 'hit_3c']
     };
     const _lastHitAudioIdx = { 1: -1, 2: -1, 3: -1 };
+    const impactWaves = new Map();
+    const impactAudioEvents = new Set();
+    let nextImpactWaveId = 0, nextImpactEventId = 0, nextAudioActionId = 0;
+
+    function impactAudioScore(hit) {
+        if (hit.shieldBroken) return 1000;
+        if (hit.kind === 'hp') return 700 + (hit.tier || 1);
+        if (hit.kind === 'shield') return 600;
+        if (hit.kind === 'block') return 400 + (hit.blockTier || 1);
+        if (hit.kind === 'dodge') return 200 + (hit.dodgeTier || 1);
+        return 0;
+    }
+
+    function publishImpactAudio(result) {
+        if (impactAudioEvents.has(result.eventId)) return;
+        impactAudioEvents.add(result.eventId);
+        if (result.waveId) {
+            const wave = impactWaves.get(result.waveId);
+            if (!wave) return;
+            if (result.isHero) { if (!_pipelineFrozen) hitAudio([result]); }
+            else wave.results.set(result.targetId, result);
+            return;
+        }
+        if (!_pipelineFrozen) hitAudio([result]);
+    }
+
+    function beginImpactWave(targetIds, actionId) {
+        const id = 'impact-' + (++nextImpactWaveId);
+        const wave = { id, actionId:actionId || ('audio-action-' + (++nextAudioActionId)), pending:new Set(targetIds), completed:new Set(), results:new Map(), closed:false };
+        impactWaves.set(id, wave);
+        return wave;
+    }
+
+    function flushImpactWave(wave) {
+        if (!wave || impactWaves.get(wave.id) !== wave || !wave.closed || wave.pending.size) return;
+        impactWaves.delete(wave.id);
+        const results = [...wave.results.values()];
+        if (!results.length || !identitySfxOn || _pipelineFrozen) return;
+        const score = Math.max(...results.map(impactAudioScore));
+        hitAudio(results.filter(result => impactAudioScore(result) === score));
+    }
+
+    function replaceImpactWaveTargets(wave, targetIds) {
+        if (!wave || wave.closed || impactWaves.get(wave.id) !== wave) return;
+        const targets = new Set(targetIds);
+        wave.pending = new Set(targetIds.filter(id => !wave.completed.has(id)));
+        for (const id of wave.results.keys()) if (!targets.has(id)) wave.results.delete(id);
+    }
+
+    function completeImpactWaveTarget(wave, targetId) {
+        if (!wave || impactWaves.get(wave.id) !== wave) return;
+        wave.pending.delete(targetId);
+        wave.completed.add(targetId);
+        flushImpactWave(wave);
+    }
+
+    function closeImpactWave(wave) {
+        if (!wave || impactWaves.get(wave.id) !== wave) return;
+        wave.closed = true;
+        flushImpactWave(wave);
+    }
+
+    function cancelImpactWave(wave) {
+        if (!wave) return;
+        impactWaves.delete(wave.id);
+        wave.closed = true;
+    }
+
+    function clearCombatAudio() {
+        impactWaves.clear();
+        impactAudioEvents.clear();
+    }
+
+    const CombatAudioDirector = {
+        beginAction() { return 'audio-action-' + (++nextAudioActionId); },
+        publish(result) {
+            const classified = classifyHit(result);
+            const source = result.source || 'attack';
+            const resultType = classified.kind === 'prevented' ? 'DamagePrevented' : classified.kind === 'dodge' ? 'Dodge' : classified.shieldBroken ? 'ShieldBroken'
+                : classified.kind === 'block' ? 'Block' : classified.kind === 'shield' ? 'ShieldHit'
+                : source === 'counter' ? 'CounterHit' : source === 'dot' ? 'PeriodicDamage' : source === 'reflect' ? 'ReflectDamage' : 'Hit';
+            const event = Object.freeze(Object.assign({}, classified, {
+                targetId:result.targetId, sourceId:result.sourceId || null, source, resultType, isHero:!!result.isHero,
+                maxHp:result.maxHp, hpBefore:result.hpBefore, hpAfter:result.hpAfter,
+                shieldBefore:result.shieldBefore || 0, shieldAfter:result.shieldAfter || 0,
+                damageType:result.damageType || '近战',
+                actionId:result.actionId || result.wave?.actionId || this.beginAction(),
+                waveId:result.waveId || result.wave?.id || null,
+                eventId:result.eventId || ('impact-event-' + (++nextImpactEventId))
+            }));
+            CombatEvents.emit(classified.kind === 'dodge' ? EVENTS.DODGE_RESOLVED : EVENTS.DAMAGE_RESOLVED, event);
+            return event;
+        },
+        consume: publishImpactAudio,
+        beginWave: beginImpactWave,
+        replaceTargets: replaceImpactWaveTargets,
+        completeTarget: completeImpactWaveTarget,
+        closeWave: closeImpactWave,
+        cancelWave: cancelImpactWave,
+        clear: clearCombatAudio
+    };
 
     function playHitTierAudio(tier) {
         const t = tier >= 3 ? 3 : tier === 2 ? 2 : 1;
@@ -8419,7 +8522,8 @@ const arcaneVfxModule = (function () {
         playSound(list[idx], t === 3 ? 0.94 : t === 2 ? 0.88 : 0.82);
     }
     function hitAudio(list) {
-        if (!identitySfxOn) return;
+        list = list.filter(h => h.kind !== 'prevented');
+        if (!identitySfxOn || !list.length) return;
         const anyBreak = list.some(h => h.shieldBroken), anyCrit = list.some(h => h.crit), anyBurst = list.some(h => h.burst);
         // 破盾瞬间无论多少伤害均播最大档 (GuardBreak)
         if (anyBreak) { playSound('parry_3', 0.95); return; }
@@ -8446,11 +8550,6 @@ const arcaneVfxModule = (function () {
             if (!w || !w.hitStopped) { fxEngine.hitStop = Math.max(fxEngine.hitStop || 0, HIT_STOP_MS); if (w) w.hitStopped = true; }
         }
         list.forEach((r, i) => hitVisual(layer, Object.assign({}, r, { suppressRecoil: opts.suppressRecoil || r.suppressRecoil, suppressDodgeFx: opts.suppressDodgeFx || r.suppressDodgeFx }), hs[i], anims, timers));
-        if (opts.suppressAudio && w) w.audioPlayed = true;
-        if (!opts.suppressAudio && list.length && (!w || !w.audioPlayed)) {
-            hitAudio(w && w.classified && w.classified.length ? w.classified : hs);
-            if (w) w.audioPlayed = true;
-        }
         const handle = {
             doneAt: Date.now() + HIT_LIFE_MS,
             cancel() {
@@ -8476,12 +8575,27 @@ const arcaneVfxModule = (function () {
     function playCounterAttackL1(caster, target, onImpact) {
         const fromRect = entityVisualRect(caster), toRect = entityVisualRect(target);
         const fromDom = domOf(caster);
-        if (!fromRect || !toRect) return 0;
+        const tokenNow = combatToken;
+        let resolveImpact, rejectImpact, settled = false, cancelled = false, fallbackTimer;
+        const done = new Promise((resolve, reject) => { resolveImpact = resolve; rejectImpact = reject; });
+        const handle = { duration:fromRect && toRect ? 355 : 0, done, cancel() { cancelled = true; finishImpact(); } };
+        const finishImpact = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(fallbackTimer); S.rawTimers.delete(fallbackTimer); S.handles.delete(handle);
+            if (tokenNow !== combatToken) { resolveImpact(false); return; }
+            try { if (onImpact) onImpact(); resolveImpact(true); }
+            catch (e) { rejectImpact(e); }
+        };
+        if (!handle.duration || _pipelineFrozen) { finishImpact(); return handle; }
+        // 355ms 演出收尾即回落结算；后台 rAF 暂停或视觉取消不丢失已触发的反击。
+        fallbackTimer = setTimeout(finishImpact, handle.duration);
+        S.rawTimers.set(fallbackTimer, finishImpact);
+        S.handles.add(handle);
         const dx = toRect.x - fromRect.x, dy = toRect.y - fromRect.y;
         const dist = Math.hypot(dx, dy) || 1;
         const ux = dx / dist, uy = dy / dist;
         const uid = ++S.uid;
-        const tokenNow = combatToken;
 
         // 笔直居合切割线锚定敌方中心并斜贯穿透目标框（不弯不软，刚直锐利）
         const flip = (uid % 2 === 0) ? 1 : -1;
@@ -8517,11 +8631,11 @@ const arcaneVfxModule = (function () {
 
         // 2. 高速残影突进 & 直线刺向起斩点 (90 ~ 155ms)
         after(90, () => {
-            if (tokenNow !== combatToken) return;
+            if (tokenNow !== combatToken || cancelled || _pipelineFrozen) { handle.cancel(); return; }
             playSound('atk2', 0.62, 1.15);
             [0, 32].forEach((delayMs, idx) => {
                 after(delayMs, () => {
-                    if (tokenNow !== combatToken || !fromDom) return;
+                    if (tokenNow !== combatToken || cancelled || _pipelineFrozen || !fromDom) return;
                     const reach = Math.min(dist * (0.34 + idx * 0.24), 108);
                     const gLayer = fsLayer('', 165);
                     const g = document.createElement('div');
@@ -8548,7 +8662,7 @@ const arcaneVfxModule = (function () {
 
         // 3. 敌方身上快速变化的笔直实心黄色切割线 + 末端火星 (145 ~ 300ms)
         after(145, () => {
-            if (tokenNow !== combatToken) return;
+            if (tokenNow !== combatToken || cancelled || _pipelineFrozen) { handle.cancel(); return; }
             let elapsed = 0;
             const dur = 155;
             let impacted = false;
@@ -8563,7 +8677,7 @@ const arcaneVfxModule = (function () {
             fxEngine.addParticle({
                 age: 0, life: 1e9, x: 0, y: 0, vx: 0, vy: 0,
                 update(p) {
-                    if (tokenNow !== combatToken) { p.age = p.life; return; }
+                    if (tokenNow !== combatToken || cancelled || _pipelineFrozen) { p.age = p.life; handle.cancel(); return; }
                     elapsed += fxEngine.lastDt || 16.7;
                     const u = Math.min(1, elapsed / dur);
                     // 刀尖极速斜穿刺出，刀尾紧追收成细线消失于末端
@@ -8573,7 +8687,7 @@ const arcaneVfxModule = (function () {
                     if (!impacted && head >= 0.52) {
                         impacted = true;
                         shake('light');
-                        if (onImpact) onImpact();
+                        finishImpact();
                     }
 
                     if (!sparked && head >= 0.96) {
@@ -8651,7 +8765,7 @@ const arcaneVfxModule = (function () {
             });
         });
 
-        return 355;
+        return handle;
     }
     function playAttackIdentityFx({ scope = 'single', subtype, caster, targets = [], outcomes = null, onImpact = null } = {}) {
         const list = Array.isArray(targets) ? targets.filter(Boolean) : (targets ? [targets] : []);
@@ -8727,6 +8841,7 @@ const arcaneVfxModule = (function () {
         if (S.dark) { S.dark.remove(); S.dark = null; }
         if (S.canvas) { S.canvas.remove(); S.canvas = null; S.ctx = null; }
         identityBuffers.clear(); identityDecodes.clear();
+        CombatAudioDirector.clear();
         if (audioCtx) { audioCtx.close(); audioCtx = null; sfxBus = null; sfxVerb = null; sfxNoise = null; }
     }
     window.isArcaneSkillFx = isArcaneSkillFx;
@@ -8735,12 +8850,13 @@ const arcaneVfxModule = (function () {
     window.clearArcaneFx = clearArcaneFx;
     window.playEnemyWindup = playEnemyWindup;
     window.playAttackIdentityFx = playAttackIdentityFx;
+    window.CombatAudioDirector = CombatAudioDirector;
     window.playHitFeedback = playHitFeedback;
     window.playCounterAttackL1 = playCounterAttackL1;
     window.classifyHit = classifyHit;
     window.clearHitFeedback = clearHitFeedback;
     window.preloadAttackIdentitySample = warmIdentitySample;
-    return { isArcaneSkillFx, playArcaneSkillFx, playArcaneProjectile, clearArcaneFx, playEnemyWindup, playAttackIdentityFx, playHitFeedback, playCounterAttackL1, classifyHit, clearHitFeedback, syncHitBar, playWoundedHint, setIdentitySfx };
+    return { isArcaneSkillFx, playArcaneSkillFx, playArcaneProjectile, clearArcaneFx, playEnemyWindup, playAttackIdentityFx, playHitFeedback, playCounterAttackL1, classifyHit, clearHitFeedback, syncHitBar, playWoundedHint, setIdentitySfx, CombatAudioDirector };
 
 })();
 
@@ -16077,7 +16193,10 @@ registerClassPassive('防守者', {
 
         const tStatsForCounter = getEffectiveStats(target);
         const counterRawDmg = tStatsForCounter.atk * 2; // 双倍攻击力
+        const counterHpBefore = Math.max(0, caster.hp);
+        const counterShieldBefore = caster.shield || 0;
         const { hpDmg: counterHpDmg, shieldDmg: counterShieldDmg } = calculateDamage(counterRawDmg, caster);
+        const counterShieldAfter = caster.shield || 0;
 
         // 播放红色圆锥冲击波特效（音效在冲击波射出瞬间播放）
         await playPowerCounterEffect(target, caster, targetDom); if (_actionToken !== combatToken || _pipelineFrozen) return;
@@ -16094,6 +16213,13 @@ registerClassPassive('防守者', {
             addHistory(`   ⚔️ ${target.name} 发动【强力反击】！以双倍力量重创 ${caster.name}，造成了 ${counterHpDmg} 点伤害！${counterShieldDmg>0?` (附带破盾${counterShieldDmg})`:''}`);
         }
         if (caster.id.startsWith('h')) updateHeroUI(caster); else updateEnemyUI(caster);
+        if (counterHpDmg > 0 || counterShieldDmg > 0) {
+            const counterHpAfter = Math.max(0, Math.min(caster.maxHp, caster.hp));
+            const counterHpDmgActual = Math.min(counterHpDmg, counterHpBefore, counterHpBefore - counterHpAfter);
+            CombatAudioDirector.publish({ targetId:caster.id, maxHp:caster.maxHp, hpBefore:Math.min(caster.maxHp, counterHpBefore),
+                hpAfter:counterHpAfter, hpDmg:Math.max(0, counterHpDmgActual), shieldBefore:counterShieldBefore, shieldAfter:counterShieldAfter,
+                shieldDmg:counterShieldDmg, incomingDmg:counterRawDmg, sourceId:target.id, source:'counter', damageType:'近战' });
+        }
         // 打出强力反击后，防守者仇恨回归"天生重装"档位（有效仇恨200），几率随之下一次反击重置
         target.buffs = (target.buffs || []).filter(b => b.type !== 'taunt'); // 清除临时嘲讽buff
         target.baseTauntBonus = 100;                                          // 回归防守者天生重装修正
@@ -16423,6 +16549,8 @@ const EVENTS = {
     ON_KILL:         'on_kill',         // 目标被击杀时
     ON_FATAL_DAMAGE: 'on_fatal_damage', // 致命伤害时（毅力留存、回避致命）
     ON_DODGE:        'on_dodge',        // 闪避成功时
+    DAMAGE_RESOLVED: 'damage_resolved', // 已提交的角色伤害结果，只读表现通知
+    DODGE_RESOLVED:  'dodge_resolved',  // 已确认的闪避结果，只读表现通知
     BUFF_APPLIED:    'buff_applied',    // Buff 施加时
     BUFF_EXPIRED:    'buff_expired',    // Buff 过期时
 };
@@ -16445,9 +16573,14 @@ const CombatEvents = {
     emit(event, ctx = {}) {
         const listeners = this._listeners[event];
         if (!listeners || listeners.length === 0) return;
+        const resolved = event === EVENTS.DAMAGE_RESOLVED || event === EVENTS.DODGE_RESOLVED;
         for (const l of listeners) {
-            l.fn(ctx);
-            if (ctx.cancelled) break; // 支持拦截中断
+            if (resolved) {
+                try { l.fn(ctx); } catch (e) { console.warn('战斗音频通知处理失败:', e); }
+            } else {
+                l.fn(ctx);
+                if (ctx.cancelled) break; // 支持拦截中断
+            }
         }
     },
 
@@ -16464,6 +16597,8 @@ const CombatEvents = {
 };
 window.CombatEvents = CombatEvents;
 window.EVENTS = EVENTS;
+CombatEvents.on(EVENTS.DAMAGE_RESOLVED, CombatAudioDirector.consume);
+CombatEvents.on(EVENTS.DODGE_RESOLVED, CombatAudioDirector.consume);
 
 // ==========================================
 // 职业被动 → 事件订阅（生命周期型钩子）
@@ -16593,7 +16728,9 @@ CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
         // 【荆棘】真实伤害下限：护甲减免后（护盾吸收前）不足 10 点则垫高原始反伤值（10 + 攻击者防御），
         // 使护甲结算后至少 10 点——避免 -1/-3 等无关痛痒的挠痒反伤；防御姿态/护盾等主动减伤仍照常生效
         const reflectRaw = Math.max(reflectRaw0, 10 + getEffectiveStats(attacker).def);
+        const reflectHpBefore = Math.max(0, attacker.hp), reflectShieldBefore = attacker.shield || 0;
         let { hpDmg: reflectHp, shieldDmg: reflectShield } = calculateDamage(reflectRaw, attacker, false);
+        const reflectShieldAfter = attacker.shield || 0;
         // 反弹致命：先走 ON_FATAL_DAMAGE 让毅力留存/回避致命可救场（复用主伤害管线同款判定与旁白）
         if (attacker.hp - reflectHp <= 0) {
             const fatalCtx = { target: attacker, targetDom: (attacker.id && getEntitySpriteDom(attacker)) || null, hpDmg: reflectHp, shieldDmg: reflectShield, prevented: false, cancelled: false };
@@ -16619,6 +16756,12 @@ CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
             if (attackerDom) createFloatingText(attackerDom, brokeShield ? `反震 -${reflectShield} 破盾` : `反震 -${reflectHp}`, brokeShield ? 'text-slate-300' : 'text-green-400');
             addHistory(`   ↳ ⚔️ [${thornTarget.name}] 触发【受击反震/护体反伤】，强烈的反冲力波及了近身攻击的 ${attacker.name}，造成了 ${reflectHp} 点伤害${reflectShield > 0 ? `（含破盾 ${reflectShield}）` : ''}！`);
             if (attacker.id.startsWith('h')) updateHeroUI(attacker); else updateEnemyUI(attacker);
+            if (reflectHp > 0 || reflectShield > 0) {
+                CombatAudioDirector.publish({ targetId:attacker.id, maxHp:attacker.maxHp, hpBefore:reflectHpBefore,
+                    hpAfter:Math.max(0, attacker.hp), hpDmg:Math.max(0, Math.min(reflectHp, reflectHpBefore - attacker.hp)),
+                    shieldBefore:reflectShieldBefore, shieldAfter:reflectShieldAfter, shieldDmg:reflectShield,
+                    incomingDmg:reflectRaw, sourceId:thornTarget.id, source:'reflect', damageType:'近战', actionId:ctx.actionId });
+            }
         }
     }
 }, 5);
@@ -17736,15 +17879,16 @@ function attackFeedbackOptions(caster, target, tag, skill, singleType, ctx, dodg
     const wave = ctx && ctx.wave || skill && skill._hitWave;
     const strafe = skill && skill.fxTag === '连续扫射' || typeof _strafeLock !== 'undefined' && _strafeLock || getEntitySpriteDom(target)?.classList.contains('target-bullet-stutter');
     const groupIdentity = !(skill && skill.fxTag) && tag.includes('群') ? AOE_IDENTITY_TYPES[resolveGroupAttackSubtypeFx(tag)] : null;
-    const primaryHit = !!groupIdentity || !!SINGLE_IDENTITY_TYPES[singleType] && !['gunshot','shotgun','arrow'].includes(singleType);
-    return { wave, suppressAudio:primaryHit || !!group || !!(skill && skill.fxTag) || !dodged && (singleType === 'fire' || singleType === 'enemy_spell' || singleType === 'slash'),
+    return { wave,
         suppressShake:!!group || !!strafe || !!(skill && skill.fxTag) || singleType === 'punch' || singleType === 'explosion_single' || groupIdentity === '爆炸' || groupIdentity === '雷',
         suppressRecoil:!!strafe || !!(skill && ['近战重击','远程重击','枪击穿透'].includes(skill.fxTag)) };
 }
 
 async function playIdentityAttackWave(caster, targets, subtype, tag, power, hitChance, multiplier, globalTurns, skill) {
-    const token = combatToken, prepared = [], posts = [], kills = [], wave = skill._hitWave || (skill._hitWave = { shook:false, hitStopped:false, audioPlayed:false, classified:[] });
+    const token = combatToken, prepared = [], posts = [], kills = [], wave = skill._hitWave || (skill._hitWave = { shook:false, hitStopped:false, classified:[] });
+    let audioWave = skill._impactAudioWave || null;
     const release = () => prepared.forEach(p => { if (p.reactionFx && p.reactionFx.releaseImpact) p.reactionFx.releaseImpact(); });
+    const cancelAudio = () => { CombatAudioDirector.cancelWave(audioWave); if (skill._impactAudioWave === audioWave) skill._impactAudioWave = null; };
     const barrier = !isHeroSideEntity(caster) && teamBarrier > 0;
     if (barrier) {
         const proxy = targets.find(t => !t.isBarrierTarget && !t.isSummon) || heroesData.find(h => isCombatActive(h) && !h.isSummon);
@@ -17755,7 +17899,7 @@ async function playIdentityAttackWave(caster, targets, subtype, tag, power, hitC
         for (const target of targets) {
             if (!target || !target.isAlive) continue;
             const p = await applySingleTagEffect(caster, target, tag, power, hitChance, multiplier, globalTurns, skill, null, true, { prepareOnly:true });
-            if (token !== combatToken || _pipelineFrozen) { release(); return { kills, handle:null }; }
+            if (token !== combatToken || _pipelineFrozen) { release(); cancelAudio(); return { kills, handle:null }; }
             if (p) prepared.push(p);
         }
         // 反应资源与Buff已真实生效；此处只驱动演出，不再掷骰或执行反应技。
@@ -17765,14 +17909,24 @@ async function playIdentityAttackWave(caster, targets, subtype, tag, power, hitC
             p.impactDom = p.reactionFx && p.reactionFx.impactDom && (p.isDodged || !p.reactionFx.hit || (!isPierce && p.target.shield > 0)) ? p.reactionFx.impactDom : p.targetDom;
         });
     }
+    const preparedAudioIds = !barrier ? [...new Set(prepared.filter(p => p.target && !p.target.isBarrierTarget).map(p => p.target.id))] : [];
+    if (!audioWave && preparedAudioIds.length) {
+        audioWave = CombatAudioDirector.beginWave(preparedAudioIds, skill._audioActionId);
+        skill._impactAudioWave = audioWave;
+    } else if (audioWave) {
+        CombatAudioDirector.replaceTargets(audioWave, preparedAudioIds);
+    }
     const numericOnly = prepared.filter(p => !p.targetDom);
     for (const p of numericOnly) {
-        const result = await applySingleTagEffect(caster, p.target, tag, power, hitChance, multiplier, globalTurns, skill, null, true, { prepared:p, identity:true, wave, postQueue:posts });
+        const result = await applySingleTagEffect(caster, p.target, tag, power, hitChance, multiplier, globalTurns, skill, null, true, { prepared:p, identity:true, wave, audioWave, postQueue:posts });
         if (result === '__killed__') kills.push(p.target);
     }
     const active = prepared.filter(p => p.targetDom);
     const fxTargets = active.map(p => Object.assign({}, p.target, { identityDom:p.impactDom || p.targetDom }));
-    if (!active.length) { for (const post of posts) { await post.run(); if (token !== combatToken || _pipelineFrozen) break; } release(); return { kills, handle:null }; }
+    if (!active.length) {
+        for (const post of posts) { await post.run(); if (token !== combatToken || _pipelineFrozen) { release(); cancelAudio(); return { kills, handle:null }; } }
+        release(); CombatAudioDirector.closeWave(audioWave); return { kills, handle:null };
+    }
     const lookup = new Map(active.map(p => [p.target.id, p])), outcome = new Map(active.map(p => [p.target.id, p.isDodged ? 'dodge' : 'hit']));
     let handle, completed = false;
     await new Promise((resolve,reject) => {
@@ -17789,7 +17943,7 @@ async function playIdentityAttackWave(caster, targets, subtype, tag, power, hitC
                 contacted.add(visual.id);
                 const p = lookup.get(visual.id);
                 // prepared参数绕开全部await判定；这次调用在主接触回调栈内同步扣血。
-                const ctx = { prepared:p, identity:true, wave, postQueue:posts, point:meta.point };
+                const ctx = { prepared:p, identity:true, wave, audioWave, postQueue:posts, point:meta.point };
                 const task = p.target.isBarrierTarget
                     ? applyBarrierHit(caster, p.target, tag, power, skill, multiplier, globalTurns, ctx)
                     : applySingleTagEffect(caster, p.target, tag, power, hitChance, multiplier, globalTurns, skill, null, true, ctx);
@@ -17798,26 +17952,30 @@ async function playIdentityAttackWave(caster, targets, subtype, tag, power, hitC
             }
         });
         if (!handle) {
-            for (const p of active) { contacted.add(p.target.id); tasks.push(applySingleTagEffect(caster, p.target, tag, power, hitChance, multiplier, globalTurns, skill, null, true, { prepared:p, identity:true, wave, postQueue:posts })); }
+            for (const p of active) { contacted.add(p.target.id); tasks.push(applySingleTagEffect(caster, p.target, tag, power, hitChance, multiplier, globalTurns, skill, null, true, { prepared:p, identity:true, wave, audioWave, postQueue:posts })); }
             complete(); return;
         }
         if (!skill._identityHandles) skill._identityHandles = [];
         skill._identityHandles.push(handle);
         if (handle.onFinish) handle.onFinish.add(complete);
     });
-    if (!completed || token !== combatToken || _pipelineFrozen) { release(); return { kills, handle }; }
+    if (!completed || token !== combatToken || _pipelineFrozen) {
+        release(); cancelAudio();
+        return { kills, handle };
+    }
     for (const p of prepared) {
         for (const post of posts.filter(post => post.target === p.target)) {
             await post.run();
-            if (token !== combatToken || _pipelineFrozen) { release(); return { kills, handle }; }
+            if (token !== combatToken || _pipelineFrozen) { release(); cancelAudio(); return { kills, handle }; }
         }
     }
     // 屏障泄漏的后续按泄漏英雄原顺序执行，不重播群攻或提前预测闪避。
     for (const post of posts.filter(post => !prepared.some(p => p.target === post.target))) {
         await post.run();
-        if (token !== combatToken || _pipelineFrozen) break;
+        if (token !== combatToken || _pipelineFrozen) { release(); cancelAudio(); return { kills, handle }; }
     }
     release();
+    CombatAudioDirector.closeWave(audioWave);
     return { kills, handle };
 }
 
@@ -17946,14 +18104,18 @@ async function prepareSingleAttackHit(caster, target, tag, tagPower, hitChance, 
 async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, multiplier, globalTurns, skill, fixedRawDamage = null, attackFxPlayed = false, attackContext = null) {
     const _actionToken = combatToken;
     if (_pipelineFrozen) return;
-  if (caster.isSubdued || !target || !target.isAlive || isIgnoredSummonTarget(caster, target)) return;
+    const audioWave = attackContext && attackContext.audioWave || skill && skill._impactAudioWave;
+    const audioTargetId = target && target.id;
+    const actionId = attackContext && attackContext.actionId || skill && skill._audioActionId;
+    const completeAudioTarget = () => CombatAudioDirector.completeTarget(audioWave, audioTargetId);
+  if (caster.isSubdued || !target || !target.isAlive || isIgnoredSummonTarget(caster, target)) { completeAudioTarget(); return; }
   // 【制服】本场退出：被制服单位免疫一切自动/附带效果（伤害/治疗/驱散/DoT/减益/被动）。
   // 唯一例外＝玩家角色手动选中（skill._bdg.manualSubduedTargetId）且非致命关闭时的纯伤害标签补刀；
   // 非致命开启时不造成伤害，非伤害附签（降/盲/毒/灼烧/驱散/回…）一律免疫。
   if (target.isSubdued) {
       const _subdueManualFinish = !nonLethalSettings.enabled && isManualSubduedExempt(skill, target)
           && (tag.includes('攻') || tag.includes('单体') || tag.includes('穿透') || tag.includes('眩晕') || tag.includes('散射'));
-      if (!_subdueManualFinish) return;
+      if (!_subdueManualFinish) { completeAudioTarget(); return; }
   }
   // 【自X】自身负面 = 固定代价：威力不受极限爆发/暴击倍率放大（其余标签维持 power × multiplier）；
   // 且使用后必中——下方掷骰分支与减益落空检查对其整体豁免
@@ -17978,7 +18140,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
   // 屏障只吸收伤害类攻击；非伤害的负面效果（降/盲等）无法命中屏障，被屏障格挡（我方不受益也不受害）。
   if (target.isBarrierTarget) {
     if (isDamage) {
-      return await applyBarrierHit(caster, target, tag, tagPower, skill, multiplier, globalTurns);
+      const barrierContext = Object.assign({}, attackContext || {}, { audioWave:(attackContext && attackContext.audioWave) || (skill && skill._impactAudioWave) || null });
+      return await applyBarrierHit(caster, target, tag, tagPower, skill, multiplier, globalTurns, barrierContext);
     }
     triggerBarrierDebuffBlock(caster, skill, target);
     addHistory(`   ↳ 🛡️ ${caster.name} 的负面效果被【${teamBarrierName}】圣域所格挡，无法触及我方角色。`);
@@ -18058,7 +18221,12 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
       // 来袭伤害口径与下方结算段一致（fixedRawDamage 优先，否则补掷同分布随机值），供闪避三档音效分档
       if (fixedRawDamage == null && _segRoll == null) _segRoll = 0.8 + Math.random() * 0.4;
       const _dodgeIncomingDmg = fixedRawDamage != null ? fixedRawDamage : computeSegmentRawDamage(caster, tagPower, multiplier, skill, target, _segRoll);
-      playHitFeedback({ targetId:target.id, outcome:'dodge', maxHp:target.maxHp, incomingDmg:_dodgeIncomingDmg, suppressDodgeFx:!!(reactionFx && reactionFx.dodge), isHero:targetType === 'hero' }, dodgeOpts);
+      const _dodgeFeedback = { targetId:target.id, outcome:'dodge', maxHp:target.maxHp, hpBefore:target.hp, hpAfter:target.hp,
+          hpDmg:0, shieldBefore:target.shield || 0, shieldAfter:target.shield || 0, shieldDmg:0,
+          incomingDmg:_dodgeIncomingDmg, suppressDodgeFx:!!(reactionFx && reactionFx.dodge), isHero:targetType === 'hero' };
+      playHitFeedback(_dodgeFeedback, dodgeOpts);
+      CombatAudioDirector.publish(Object.assign({}, _dodgeFeedback, { sourceId:caster.id, actionId, damageType:incomingDamageType,
+          eventId:attackContext && attackContext.eventId || null, wave:audioWave, source:'attack' }));
       addHistory(`   ↳ 但被 ${target.name} 敏捷地闪避了！`);
 
       // 闪避成功：我方英雄借身法走位积攒 +5 TP（与受击+10、施法+5 并列的潜能来源）
@@ -18081,44 +18249,49 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
               const counterBuff = target.buffs.find(b => b.type === 'counter');
               const tStatsForCounter = getEffectiveStats(target);
               const counterRawDmg = counterBuff.value + tStatsForCounter.atk;
-              // 反击为近战伤害：若被反击者是带【虚形】的敌方，先套近战减伤
-              const counterDmgToCaster = (caster.isSummon ? (caster.side==='hero') : caster.id.startsWith('h')) ? counterRawDmg : applyEnemyTypeResist(counterRawDmg, '近战', caster, getEntitySpriteDom(caster), false);
-              const { hpDmg: counterHpDmg, shieldDmg: counterShieldDmg } = calculateDamage(counterDmgToCaster, caster);
-              
-              await sleep(300); if (_actionToken !== combatToken || _pipelineFrozen) return;
               const casterDom = getEntitySpriteDom(caster) || (caster.id.startsWith('h') ? document.getElementById(`hero-card-${caster.id}`) : document.getElementById(`${caster.id}-sprite`));
-
-              // 普通反击 L1：蓄势→残影突进→居合直切（atk2 音效由动效突进段播放），命中拍点回调内结算扣血/飘字/UI
+              const counterActionId = CombatAudioDirector.beginAction();
+              let counterSettled = false;
               const applyCounterImpact = () => {
+                  if (counterSettled || _actionToken !== combatToken) return;
+                  counterSettled = true;
+                  // 只在命中拍点吸收个人盾并提交HP；视觉取消不取消同代际的结算权。
+                  const counterHpBefore = Math.max(0, caster.hp), counterShieldBefore = caster.shield || 0;
+                  const counterDmgToCaster = isHeroSideEntity(caster) ? counterRawDmg : applyEnemyTypeResist(counterRawDmg, '近战', caster, casterDom, false);
+                  const { hpDmg:counterHpDmg, shieldDmg:counterShieldDmg } = calculateDamage(counterDmgToCaster, caster);
+                  const counterShieldAfter = caster.shield || 0;
                   caster.hp -= counterHpDmg;
-                  if(casterDom) casterDom.classList.add('shake'); setTimeout(() => { if (_actionToken !== combatToken) return;  if(casterDom) casterDom.classList.remove('shake') }, 400);
-
                   if (target.classType === '防守者' && (counterHpDmg > 0 || counterShieldDmg > 0)) {
                       target.baseTauntBonus = (target.baseTauntBonus || 0) + 20;
                       addHistory(`   ↳ 🛡️ ${target.name} 的防守反击吸引了更多仇恨 (嘲讽值永久+20)！`);
                   }
-
                   if (counterShieldDmg > 0 && counterHpDmg === 0) {
-                      createFloatingText(casterDom, `反击 -${counterShieldDmg} 破盾`, 'text-slate-300');
                       addHistory(`   ⚔️ ${target.name} 闪避并趁势反击！对 ${caster.name} 的护盾造成了 ${counterShieldDmg} 点破坏。`);
-                  }
-                  else {
-                      createFloatingText(casterDom, `反击 -${counterHpDmg}`, 'text-amber-400');
+                  } else {
                       addHistory(`   ⚔️ ${target.name} 闪避并趁势反击！迅速一击命中了 ${caster.name}，造成了 ${counterHpDmg} 点伤害！${counterShieldDmg>0?` (附带破盾${counterShieldDmg})`:''}`);
                   }
-                  if (caster.id.startsWith('h')) updateHeroUI(caster);
+                  if (isHeroSideEntity(caster)) updateHeroUI(caster);
                   else { tryTriggerEnemyLowHpSpeak(caster); tryTriggerEnemyMolt(caster); tryTriggerEnemyRage(caster); tryTriggerEnemyLink(caster); updateEnemyUI(caster); }
-                  if (target.id.startsWith('h')) updateHeroUI(target); else updateEnemyUI(target);
+                  if (isHeroSideEntity(target)) updateHeroUI(target); else updateEnemyUI(target);
+                  const hpAfter = Math.max(0, caster.hp);
+                  const result = { targetId:caster.id, sourceId:target.id, source:'counter', damageType:'近战', actionId:counterActionId,
+                      outcome:'hit', maxHp:caster.maxHp, hpBefore:counterHpBefore, hpAfter,
+                      hpDmg:Math.max(0, Math.min(counterHpDmg, counterHpBefore - hpAfter)),
+                      shieldBefore:counterShieldBefore, shieldAfter:counterShieldAfter, shieldDmg:counterShieldDmg, incomingDmg:counterDmgToCaster };
+                  if (!_pipelineFrozen) playHitFeedback(result, { suppressShake:true });
+                  CombatAudioDirector.publish(result);
               };
-              if (!window.playCounterAttackL1(target, caster, applyCounterImpact)) applyCounterImpact();
+              await sleep(300);
+              if (_actionToken !== combatToken) return;
+              await window.playCounterAttackL1(target, caster, applyCounterImpact).done;
           } else {
               addHistory(`   ↳ ${target.name} 虽处于反击架势，但无法触及并反击[${incomingDamageType}]攻击！`);
           }
       }
       
       };
-      if (postQueue) postQueue.push({ target, run:finishDodge });
-      else await finishDodge();
+      if (postQueue) postQueue.push({ target, run:async () => { await finishDodge(); completeAudioTarget(); } });
+      else { await finishDodge(); completeAudioTarget(); }
       return; // 闪避成功中止中招结算
     }
   }
@@ -18144,8 +18317,9 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     const _isGunshotFxSkill = skill && skill.fxTag === '枪击穿透';
     const _isGunshotTagHit = tag.includes('枪击') && !_isHeavyFx;
     const _isShotgunTagHit = tag.includes('霰弹') && !_isHeavyFx;
-    if (_isHeavyFx || _isEnemyGroupFx || _isIdentityGroupFx) {
-        // 专属或敌方兜底群攻已由 executeSkillAction 播演出，不逐目标叠加命中声。
+    const suppressSkillCue = _isHeavyFx || _isEnemyGroupFx || _isIdentityGroupFx;
+    if (suppressSkillCue) {
+        // 只抑制重复的技能/旧合成表现音；受击结果事件独立发布。
     } else if (_isGunshotFxSkill || _isGunshotTagHit || _isShotgunTagHit) {
         if (_gunshotFiredThisHit) {
             // 本发闪避已呈现开火感，命中不再重复
@@ -18219,7 +18393,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     let barrierAbsorb = 0;
     // 屏障仅吸收敌方来源的伤害（与 executeSkillAction AoE 批量分支的 !casterIsHero 守卫同口径）：
     // 友方伤害（含友方召唤物误路由等）直击目标本体，不再扣减我方屏障。
-    if (targetType === 'hero' && !isHeroSideEntity(caster) && (teamBarrier > 0 || barrierAoELeak !== null) && rawDamage > 0) {
+    const barrierIntercepted = targetType === 'hero' && !isHeroSideEntity(caster) && (teamBarrier > 0 || barrierAoELeak !== null) && rawDamage > 0;
+    if (barrierIntercepted) {
         let hitAmount;
         if (barrierAoEActive) {
             // 群攻批次：所有成员复用同一个泄漏量（屏障只吸收了一次命中量）
@@ -18278,6 +18453,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     rawDamage = applyEnemyTypeResist(rawDamage, incomingDamageType, target, targetDom, tag.includes('群'));
     
     const hpBefore = Math.max(0, target.hp), shieldBefore = target.shield || 0;
+    let damagePrevented = false;
     let { hpDmg, shieldDmg } = calculateDamage(rawDamage, target, isPierce, armorMult);
     if (reactionFx && reactionFx.hit && shieldDmg > 0) reactionFx.hit(singleAttackFx || (incomingDamageType === '远程' ? 'arrow' : incomingDamageType === '法术' ? 'enemy_spell' : 'slash'));
     const consumedGuardValue = consumeOneTimeDamageGuard();
@@ -18302,6 +18478,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         if (fatalCtx.prevented) {
             hpDmg = fatalCtx.hpDmg;
             if (fatalCtx.shieldDmg !== undefined) shieldDmg = fatalCtx.shieldDmg;
+            damagePrevented = hpDmg === 0 && shieldDmg === 0;
             // 我方保命被动旁白：触发【毅力留存】/【回避致命】死里逃生时以本人口吻说话（含 1 号位玩家，受友方旁白开关控制）
             if (targetType === 'hero' && llmState.allyAutoSpeak) {
                 const passiveName = target.hasTriggeredGrit ? '毅力留存' : (target.hasTriggeredAvoidFatal ? '回避致命' : null);
@@ -18316,13 +18493,16 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     const hpAfter = Math.max(0, target.hp), shieldAfter = target.shield || 0;
     const feedbackHpDmg = Math.min(hpDmg, hpBefore);
     const feedbackShieldDmg = Math.min(shieldDmg, shieldBefore);
-    if (!(feedbackHpDmg === 0 && barrierAbsorb > 0)) {
+    if (!(feedbackHpDmg === 0 && feedbackShieldDmg === 0 && barrierIntercepted)) {
         const from = getEntitySpriteDom(caster), a = from && from.getBoundingClientRect(), b = targetDom && targetDom.getBoundingClientRect();
-        playHitFeedback({ targetId:target.id, outcome:'hit', maxHp:target.maxHp, hpBefore, hpAfter, hpDmg:feedbackHpDmg,
+        const hitResult = { targetId:target.id, outcome:damagePrevented ? 'prevented' : 'hit', maxHp:target.maxHp, hpBefore, hpAfter, hpDmg:feedbackHpDmg,
             shieldBefore, shieldAfter, shieldDmg:feedbackShieldDmg, isCrit:!!(skill && skill._critDouble), isBurst:burstGuarantee,
-            blockedDmg:(feedbackHpDmg === 0 && feedbackShieldDmg === 0) ? rawDamage : 0,
+            blockedDmg:!damagePrevented && feedbackHpDmg === 0 && feedbackShieldDmg === 0 ? rawDamage : 0,
             isHero:targetType === 'hero', dirX:a && b ? b.left + b.width / 2 - a.left - a.width / 2 : 0.25,
-            dirY:a && b ? b.top + b.height / 2 - a.top - a.height / 2 : -0.35 }, attackFeedbackOptions(caster, target, tag, skill, singleAttackFx, attackContext));
+            dirY:a && b ? b.top + b.height / 2 - a.top - a.height / 2 : -0.35 };
+        playHitFeedback(hitResult, attackFeedbackOptions(caster, target, tag, skill, singleAttackFx, attackContext));
+        CombatAudioDirector.publish(Object.assign({}, hitResult, { sourceId:caster.id, actionId, damageType:incomingDamageType,
+            eventId:attackContext && attackContext.eventId || null, wave:audioWave, source:'attack' }));
     }
     let severityStr = "";
     if (hpDmg > 0) {
@@ -18366,15 +18546,15 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
             CombatEvents.emit(EVENTS.ON_KILL, { caster, target, targetDom });
             return;
         }
-        CombatEvents.emit(EVENTS.AFTER_DAMAGE, { caster, target, targetDom, incomingDamageType, hpDmg, shieldDmg });
+        CombatEvents.emit(EVENTS.AFTER_DAMAGE, { caster, target, targetDom, incomingDamageType, hpDmg, shieldDmg, actionId });
         if (targetType === 'enemy') {
             tryTriggerEnemyLowHpSpeak(target); tryTriggerEnemyMolt(target); tryTriggerEnemyRage(target); tryTriggerEnemyLink(target); updateEnemyUI(target);
         } else updateHeroUI(target);
     };
     if (postQueue) {
         if (target.hp > 0) { if (targetType === 'hero') updateHeroUI(target); else updateEnemyUI(target); }
-        postQueue.push({ target, run:finishDamage });
-    } else finishDamage();
+        postQueue.push({ target, run:() => { finishDamage(); completeAudioTarget(); } });
+    } else { finishDamage(); completeAudioTarget(); }
     return killed ? '__killed__' : undefined;
   } else {
     // === 非伤害标签 → TAG_HANDLERS 注册表分发 ===
@@ -18689,12 +18869,21 @@ async function applyBarrierHit(caster, barrierTarget, tag, tagPower, skill, mult
   if (overflow > 0) {
     const isAoe = tag.includes('群');
     const targets = isAoe ? heroesData.filter(h => isCombatActive(h)) : (barrierTarget.proxyHero ? [barrierTarget.proxyHero] : []);
+    let audioWave = attackContext && attackContext.audioWave || skill && skill._impactAudioWave;
+    const ownsAudioWave = isAoe && !audioWave;
+    if (ownsAudioWave) audioWave = CombatAudioDirector.beginWave(targets.map(t => t.id), skill._audioActionId);
+    else if (audioWave) CombatAudioDirector.replaceTargets(audioWave, targets.map(t => t.id));
     for (const t of targets) {
       if (!t || !t.isAlive) continue;
-      const leak = () => applySingleTagEffect(caster, t, tag, overflow, skill.hit, multiplier, globalTurns, skill, overflow, !!singleAttackFx || !!(attackContext && attackContext.identity), attackContext && attackContext.identity ? { identity:true, wave:attackContext.wave } : null);
+      const leak = () => applySingleTagEffect(caster, t, tag, overflow, skill.hit, multiplier, globalTurns, skill, overflow,
+          !!singleAttackFx || !!(attackContext && attackContext.identity),
+          Object.assign({}, attackContext && attackContext.identity ? { identity:true, wave:attackContext.wave } : {}, { audioWave }));
       if (attackContext && attackContext.postQueue) attackContext.postQueue.push({ target:t, run:leak });
-      else { await leak(); if (_actionToken !== combatToken || _pipelineFrozen) return; }
+      else { await leak(); if (_actionToken !== combatToken || _pipelineFrozen) { CombatAudioDirector.cancelWave(audioWave); return; } }
     }
+    if (ownsAudioWave) CombatAudioDirector.closeWave(audioWave);
+  } else {
+    CombatAudioDirector.replaceTargets(attackContext && attackContext.audioWave || skill && skill._impactAudioWave, []);
   }
 }
 
@@ -18745,6 +18934,8 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     if (_pipelineFrozen) return;
     // 【制服】手动补刀豁免：只消费一次（顶层玩家动作），嵌套反应/多段调用读到 null，不会继承补刀权
     if (caster.isSubdued) return;
+    skill._audioActionId = CombatAudioDirector.beginAction();
+    try {
     const _manualSubId = !isReactionTrigger && !caster.isSummon && (caster.id || '').startsWith('h') && manualTarget?.isSubdued ? manualTarget.id : null;
     const _pendingKills = []; // 收集本次技能中所有被击杀的敌人，最后统一播放特写
     let arcaneFx = null;
@@ -18882,7 +19073,8 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     // ===== 蓄力 + 聚焦特效（在 sleep 等待窗口中非阻塞播放）=====
     const hasEnemyGroupFx = [skill.type, skill.type2, skill.type3].some(tag => resolveEnemyGroupAttackFx(caster, tag, skill));
     const hasIdentityFx = !skill.fxTag && [skill.type, skill.type2, skill.type3].some(tag => tag && (tag.includes('群') ? AOE_IDENTITY_TYPES[resolveGroupAttackSubtypeFx(tag)] : SINGLE_IDENTITY_TYPES[resolveSingleAttackFx(caster, tag, skill)]));
-    if ([skill.type, skill.type2, skill.type3].some(tag => tag && tag.includes('群') && ['攻','单体','穿透','眩晕','散射'].some(k => tag.includes(k))) || skill.fxTag === '连续扫射') skill._hitWave = { shook:false, hitStopped:false, audioPlayed:false, classified:[] };
+    if ([skill.type, skill.type2, skill.type3].some(tag => tag && tag.includes('群') && ['攻','单体','穿透','眩晕','散射'].some(k => tag.includes(k))) || skill.fxTag === '连续扫射') skill._hitWave = { shook:false, hitStopped:false, classified:[] };
+    skill._impactAudioWave = null;
     let groupFxPlayed = false;
     {
         const isAttack = skill.type.includes('攻') || skill.type.includes('单体') || skill.type.includes('散射');
@@ -18995,6 +19187,8 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         targets = targets.filter(t => t && (!t.isSubdued || isManualSubduedExempt(skill, t)));
 
         const identitySubtype = !skill.fxTag && isAoe && isDmgTag(item) ? AOE_IDENTITY_TYPES[resolveGroupAttackSubtypeFx(tag)] : null;
+        const isAudioDamageSegment = isDmgTag(item) && !isBeneficial;
+        skill._impactAudioWave = null;
 
         // === 视觉效果由 [特效:xxx] 标签独立决定，与 tag 文字内容完全无关 ===
         // [特效:连续扫射] N敌=N线并发·快照·装饰性连发：fire-and-forget 起播（setInterval 50ms×52=2.6s），伤害并行结算，尾部阻塞至演出完结
@@ -19139,12 +19333,23 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         }
 
         if (identitySubtype && targets.length) {
+            const identityAudioTargets = targets.filter(t => t && t.isAlive && !t.isBarrierTarget);
+            skill._impactAudioWave = identityAudioTargets.length
+                ? CombatAudioDirector.beginWave([...new Set(identityAudioTargets.map(t => t.id))], skill._audioActionId)
+                : null;
             const result = await playIdentityAttackWave(caster, targets, identitySubtype, tag, tagPower, skill.hit, multiplier, effTurns, skill);
             if (_actionToken !== combatToken || _pipelineFrozen) return;
             _pendingKills.push(...result.kills);
             arcaneFx = result.handle || arcaneFx;
+            skill._impactAudioWave = null;
             await sleep(500); if (_actionToken !== combatToken || _pipelineFrozen) return;
             continue;
+        }
+
+        // 普通逐目标结算：群体/多目标音效按该伤害槽的真实目标聚合；单目标直接发布。
+        if (isAudioDamageSegment && !skill._impactAudioWave && targets.length > 1) {
+            const waveTargetIds = [...new Set(targets.filter(t => t && t.isAlive && !t.isBarrierTarget).map(t => t.id))];
+            skill._impactAudioWave = CombatAudioDirector.beginWave(waveTargetIds, skill._audioActionId);
         }
 
         // 将并发的 Promise.all 改为顺序遍历，自然兼容多角色依次弹窗反应
@@ -19159,13 +19364,15 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
             if (!groupTag || !barrierStandIn || !barrierStandIn.isBarrierTarget) {
                 barrierStandIn = { id: 'barrier2', isAlive: true, isBarrierTarget: true, name: teamBarrierName, spd: 0, buffs: [], classType: null, skills: [], dom: null, proxyHero: proxy };
             }
-            await applySingleTagEffect(caster, barrierStandIn, tag, tagPower, skill.hit, multiplier, effTurns, skill); if (_actionToken !== combatToken || _pipelineFrozen) return;
+            await applySingleTagEffect(caster, barrierStandIn, tag, tagPower, skill.hit, multiplier, effTurns, skill, null, false,
+                { audioWave:skill._impactAudioWave }); if (_actionToken !== combatToken || _pipelineFrozen) return;
         } else {
             for (let t of targets) {
                 // 治疗旁白收集：记录治疗前 HP，结算后实际回血（排除满血/禁疗 0 回复）且非施法者自身的我方目标计入被治疗者
                 const isHpHealTag = tag === '[单回]' || tag === '[群回]';
                 const hpBefore = (isHpHealTag && t.id.startsWith('h')) ? t.hp : undefined;
-                const killResult = await applySingleTagEffect(caster, t, tag, tagPower, skill.hit, multiplier, effTurns, skill); if (_actionToken !== combatToken || _pipelineFrozen) return;
+                const killResult = await applySingleTagEffect(caster, t, tag, tagPower, skill.hit, multiplier, effTurns, skill, null, false,
+                    skill._impactAudioWave ? { audioWave:skill._impactAudioWave } : null); if (_actionToken !== combatToken || _pipelineFrozen) return;
                 if (killResult === '__killed__') _pendingKills.push(t);
                 if (isHpHealTag && hpBefore !== undefined && t.id !== caster.id && t.hp > hpBefore && !healedIds.has(t.id)) {
                     healedIds.add(t.id);
@@ -19176,6 +19383,10 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         }
         barrierAoEActive = prevAoEActive;  // 恢复语境（避免跨批次串扰）
         if (!isAoe || barrierAoELeak === null) barrierAoELeak = prevAoELeak;
+        if (skill._impactAudioWave) {
+            CombatAudioDirector.closeWave(skill._impactAudioWave);
+            skill._impactAudioWave = null;
+        }
         await sleep(500); if (_actionToken !== combatToken || _pipelineFrozen) return;
     }
     
@@ -19257,7 +19468,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         const remain = Math.max(0, ...skill._identityHandles.map(h => h.doneAt - Date.now()));
         if (remain > 0) { await sleep(remain); if (_actionToken !== combatToken || _pipelineFrozen) return; }
     }
-    delete skill._identityHandles; delete skill._hitWave;
+    delete skill._identityHandles; delete skill._hitWave; delete skill._impactAudioWave;
     delete skill._arcaneFx;
     // 本次技能特效已播标记复位（保证下次释放同一技能仍可触发）
     if (skill && skill._fxPlayed) delete skill._fxPlayed;
@@ -19282,6 +19493,10 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     // 速度类标签（单/群速、单/群缓）施放后：对剩余队列实时重排（施法者已行动，不再参与）
     if (skill && skill._speedChanged) { delete skill._speedChanged; reorderRemainingQueue(); }
     return arcaneFx;
+    } finally {
+        CombatAudioDirector.cancelWave(skill._impactAudioWave);
+        delete skill._impactAudioWave; delete skill._audioActionId;
+    }
 }
 
 async function triggerBurstIfNeeded(caster) {
@@ -19466,6 +19681,17 @@ async function nextTurn(token = combatToken) {
   if (!currentEntity.isExtraTurn && !currentEntity.ref.isSubdued) CombatEvents.emit(EVENTS.TURN_START, { entity: currentEntity.ref });
   let isStunned = false;
   let paraSkipped = false; let paraLayers = 0;
+  let dotSnapshot = null;
+  const publishDotResult = () => {
+      if (!dotSnapshot) return;
+      const hpAfter = Math.max(0, currentEntity.ref.hp);
+      const hpDmg = Math.max(0, Math.min(dotSnapshot.totalDmg, dotSnapshot.hpBefore - hpAfter));
+      if (hpDmg > 0) CombatAudioDirector.publish({ targetId:currentEntity.ref.id, maxHp:currentEntity.ref.maxHp,
+          hpBefore:dotSnapshot.hpBefore, hpAfter, hpDmg,
+          shieldBefore:dotSnapshot.shieldBefore, shieldAfter:currentEntity.ref.shield || 0, shieldDmg:0,
+          sourceId:'dot:' + currentEntity.ref.id, source:'dot', damageType:'真实' });
+      dotSnapshot = null;
+  };
   if (currentEntity.ref.buffs && currentEntity.ref.buffs.length > 0) {
       // 眩晕检测：每次行动（含多动单位的额外行动）都判定——被眩晕即跳过其"下一次行动"
       isStunned = currentEntity.ref.buffs.some(b => b.type === 'stun');
@@ -19479,7 +19705,9 @@ async function nextTurn(token = combatToken) {
       }
       
       // 常规 Buff 计时 / 毒 tick / 事件仅在本回合首次（非额外）行动时执行一次
-      if (!currentEntity.isExtraTurn) { 
+      if (!currentEntity.isExtraTurn) {
+          const dotHpBefore = Math.max(0, currentEntity.ref.hp), dotShieldBefore = currentEntity.ref.shield || 0;
+          let dotTotalDmg = 0;
           currentEntity.ref.buffs.forEach(b => {
               b.duration--;
               if (!currentEntity.ref.isSubdued && (b.type === 'poison' || b.type === 'burn')) {
@@ -19491,6 +19719,7 @@ async function nextTurn(token = combatToken) {
                   }
                   const isBurn = b.type === 'burn';
                   currentEntity.ref.hp -= dotDmg;
+                  dotTotalDmg += dotDmg;
                   // 敌方 DoT 扣血后触发智慧低血旁白判定（致死由下方死亡收口触发死亡旁白）
                   const _isSummonDot = !!currentEntity.ref.isSummon;
                   const _isEnemyDot = _isSummonDot ? (currentEntity.ref.side !== 'hero') : !currentEntity.ref.id.startsWith('h');
@@ -19505,8 +19734,8 @@ async function nextTurn(token = combatToken) {
                   if (targetDom) { createFloatingText(targetDom, `${isBurn ? '火' : '毒'} -${dotDmg}`, isBurn ? 'text-orange-400' : 'text-purple-400'); targetDom.classList.add('shake'); setTimeout(() => targetDom.classList.remove('shake'), 400); }
                   addHistory(`   ${isBurn ? '🔥' : '🦠'} [${currentEntity.ref.name}] ${isBurn ? '灼烧' : '毒性'}发作，受到了 ${dotDmg} 点真实伤害！`);
               }
-          }); 
-          
+          });
+          if (dotTotalDmg > 0) dotSnapshot = { hpBefore:dotHpBefore, shieldBefore:dotShieldBefore, totalDmg:dotTotalDmg };
           // === Buff 过期事件 → 事件总线 (BUFF_EXPIRED) ===
           const expiredBuffs = currentEntity.ref.buffs.filter(b => b.duration <= 0);
           expiredBuffs.forEach(b => CombatEvents.emit(EVENTS.BUFF_EXPIRED, { entity: currentEntity.ref, buff: b }));
@@ -19539,6 +19768,7 @@ async function nextTurn(token = combatToken) {
       // 【复活】DoT（中毒/燃烧）在回合起始致死时先尝试原地复活——复活成功则不判死、沿用下方正常行动流程
       const revived = tryReviveEnemy(currentEntity.ref, getEntitySpriteDom(currentEntity.ref));
       if (!revived) {
+          publishDotResult();
           // 【召唤】DoT 致死：走统一死亡收口（[自爆] 结算 + 从阵营消散），复活已在上方尝试
           if (currentEntity.ref.isSummon) {
               resolveSummonDeath(currentEntity.ref, getEntitySpriteDom(currentEntity.ref), true);
@@ -19563,6 +19793,7 @@ async function nextTurn(token = combatToken) {
       }
   }
   if(currentEntity.type === 'hero') updateHeroUI(currentEntity.ref); else updateEnemyUI(currentEntity.ref);
+  publishDotResult();
 
   if (isStunned || currentEntity.ref.isSubdued) {
       const _subdued = currentEntity.ref.isSubdued;

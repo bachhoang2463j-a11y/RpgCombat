@@ -42,6 +42,7 @@
       teamBarrier, teamBarrierMax, teamBarrierName, barrierArmor, barrierSub, barrierStandIn, barrierAoEActive, barrierAoELeak,
       combatToken, frozen:_pipelineFrozen, shatter:_barrierShatterAt, shattering:_barrierShattering, state:{...state}, llm:{...llmState}, nonLethal:nonLethalSettings.enabled,
       speeds:new Map(_recentSpeedChanges), emit:CombatEvents.emit, emitAsync:CombatEvents.emitAsync, random:Math.random,
+      impactAudio:window.CombatAudioDirector ? { beginWave:window.CombatAudioDirector.beginWave, closeWave:window.CombatAudioDirector.closeWave, publish:window.CombatAudioDirector.publish, clear:window.CombatAudioDirector.clear } : null,
       particles:fxEngine.particles.slice() })`);
     const functions = new Map();
     const replace = (name, fn) => {
@@ -51,10 +52,13 @@
     const calls = { skills: [], projectiles: [], svg: [], sounds: [], floats: [], focus: [], charge: [],
       defaultAoe: [], explosion: [], thunderAoe: [], fireAoe: [], webm: [], customAudio: [], reactionPrompts: [],
       identity: [], feedback: [], shatter: 0, shake: 0, cancelled: [] };
-    const clearCalls = () => Object.keys(calls).forEach(k => { if (Array.isArray(calls[k])) calls[k].length = 0; else calls[k] = 0; });
+    const clearCalls = () => { Object.keys(calls).forEach(k => { if (Array.isArray(calls[k])) calls[k].length = 0; else calls[k] = 0; }); if (audioDirector) audioDirector.clear(); };
     const realSkill = w.playArcaneSkillFx;
     const realShatter = w.triggerBarrierShatter;
     const realFloat = w.createFloatingText;
+    const realPlaySound = w.playSound;
+    const audioDirector = w.CombatAudioDirector;
+    const nativeEmit = saved.emit;
     const timerIds = new Set();
     const nativeSetTimeout = w.setTimeout, nativeClearTimeout = w.clearTimeout;
     const restoreTimers = () => { timerIds.clear(); w.setTimeout = nativeSetTimeout; w.clearTimeout = nativeClearTimeout; };
@@ -111,7 +115,12 @@
       w.clearTimeout = id => { timerIds.delete(id); };
       ev('combatToken={};_pipelineFrozen=false;nonLethalSettings.enabled=false;llmState.allyAutoSpeak=false;llmState.enemyAutoSpeak=false;state.isGameStarted=false;state.highTierNarrated=new Set();state.actionQueue=[];state.queueIndex=0;');
       w.Math.random = () => 0.5;
-      ev('CombatEvents').emit = () => {};
+      // 只放行新只读结果事件（新契约已落地，不保留 IMPACT_AUDIO 过渡兼容），记录后转发真总线走真 Director→playSound
+      const audioPass = [w.EVENTS && w.EVENTS.DAMAGE_RESOLVED, w.EVENTS && w.EVENTS.DODGE_RESOLVED].filter(Boolean);
+      if (!calls.resultEvents) calls.resultEvents = [];
+      ev('CombatEvents').emit = (event, ctx = {}) => {
+        if (audioPass.indexOf(event) >= 0) { calls.resultEvents.push({ event, ctx }); nativeEmit.call(ev('CombatEvents'), event, ctx); }
+      };
       ev('CombatEvents').emitAsync = async () => {};
       for (const name of ['updateHeroUI', 'updateEnemyUI', 'updateTeamBarrierUI', 'renderTurnQueue',
         'tryTriggerEnemyLowHpSpeak', 'tryTriggerEnemyMolt', 'tryTriggerEnemyRage', 'tryTriggerEnemyLink', 'notifyManaSpent',
@@ -128,7 +137,7 @@
       replace('spawnFireAOEParticles', () => { calls.fireAoe.push(1); });
       replace('playWebMFX', (x, y, tag) => { calls.webm.push(tag); });
       replace('playCustomAudio', url => { calls.customAudio.push(String(url)); });
-      replace('playSound', (key, vol) => { calls.sounds.push({ key, vol, t: Date.now() }); });
+      replace('playSound', (key, vol, rate) => { calls.sounds.push({ key, vol, rate, t:Date.now() }); return () => {}; });
       replace('playSVGEffect', (dom, type) => { calls.svg.push(type); });
       replace('createFloatingText', (dom, text, color, burst) => { calls.floats.push(text); realFloat(dom, text, color, burst); });
       replace('promptReaction', (target, skills) => {
@@ -153,7 +162,7 @@
       replace('playHitFeedback', (results, opts = {}) => {
         (Array.isArray(results) ? results : [results]).filter(Boolean)
           .forEach(r => calls.feedback.push({ targetId: r.targetId, outcome: r.outcome, hpDmg: r.hpDmg, suppressDodgeFx: r.suppressDodgeFx, opts }));
-        return { doneAt: Date.now(), cancel() {} };
+        return { doneAt: Date.now(), duration: 1320, done: Promise.resolve(), cancel() {} };
       });
       replace('triggerBarrierShatter', () => { calls.shatter++; });
 
@@ -207,7 +216,10 @@
         eq(calls.focus.length, 0, '新兜底不触通用聚焦暗化');
         eq(calls.charge.length, 0, '新兜底不触通用蓄力粒子');
         eq(calls.defaultAoe.length + calls.explosion.length + calls.thunderAoe.length, 0, '新兜底不触旧默认AOE粒子（不含spawnDefaultAOEParticles）');
-        eq(atkCount('atk1') + atkCount('atk2') + atkCount('burst'), 0, '新兜底结算期无通用命中音（防atk1双播）');
+        eq(atkCount('atk1') + atkCount('atk2') + atkCount('burst'), 0, '新兜底群攻不叠加通用atk1/atk2/爆发声');
+        // group演出内cue（enemyMeleeGroupHit/atk1等350ms拍点采样）由真实execute三类型拍点组与聚合矩阵组覆盖：
+        // 逻辑组 playArcaneSkillFx 为计数桩，演出内播音不触发，此处不断言cue次数
+        eq(calls.sounds.filter(s => /^hit_[123][abc]$/.test(s.key)).length, 3, '三名英雄group:melee各自即时播放受击音');
         const d0 = 3000 - d.h[0].hp, d1 = 3000 - d.h[1].hp, ds = 3000 - d.h[2].hp;
         check(d0 > 0 && d1 > 0 && ds > 0, '普通英雄与召唤物均实际受伤', d0 + '/' + d1 + '/' + ds);
         check(d0 === d1 && d1 === ds, '同防目标等额结算', d0 + '/' + d1 + '/' + ds);
@@ -222,6 +234,10 @@
         check(calls.reactionPrompts.indexOf('h_grp0') !== -1, '反应弹窗仍按目标逐个询问');
         check(!calls.floats.some(t => String(t).indexOf('闪避') !== -1), '反应闪避不再走旧createFloatingText浮字');
         check(calls.feedback.some(f => f.targetId === 'h_grp0' && f.outcome === 'dodge'), '群攻闪避改由playHitFeedback统一记录');
+        // 英雄混合wave：闪避与HP命中分别反馈，不互相覆盖。
+        check(calls.resultEvents.some(x => x.event === (w.EVENTS && w.EVENTS.DODGE_RESOLVED)), 'group:spell混合波闪避走DODGE_RESOLVED语义事件');
+        eq(calls.sounds.filter(s => /^hit_[123][abc]$/.test(s.key)).length, 1, 'group:spell混合波命中英雄独立播放受击档音');
+        eq(calls.sounds.filter(s => /^dodge_[123]$/.test(s.key)).length, 1, 'group:spell混合波闪避英雄独立播放闪避音');
         eq(atkCount('miss'), 0, '群攻闪避不再走旧playSound miss');
         check(d2.h[1].hp < 3000, '无反应技能者正常受伤');
 
@@ -236,7 +252,8 @@
         eq(calls.identity.map(c => [c.scope, c.subtype]), [['aoe', '枪击']], '显式群枪击改身份群体演出');
         eq(atkCount('gunshot1') + atkCount('gunshot2') + atkCount('gunshot3') + atkCount('atk1'), 0, '群枪击不再逐目标叠加旧枪声');
         check(calls.feedback.some(f => f.targetId === 'h_grp0' && f.outcome === 'dodge'), '群枪击闪避统一由playHitFeedback记录');
-        check(calls.feedback.every(f => f.opts.suppressAudio === true), '群身份主采样接管时抑制旧命中合成音');
+        check(calls.sounds.some(s => /^dodge_[123]$/.test(s.key)), 'group:gunshot全闪避播dodge主音');
+        eq(calls.sounds.filter(s => /^(hit_[123][abc]|parry_[123]|dodge_[123])$/.test(s.key)).length, 1, 'group:gunshot只聚合一次ImpactAudio（全闪避为dodge档）');
       });
 
       /* ========== 三、多标签一次 / 旧括号与专属优先 / 英雄与英雄召唤旧路径保持 ========== */
@@ -258,7 +275,8 @@
             } else {
               eq(calls.identity.map(c => [c.scope, c.subtype]), [['aoe', subtype]], '显式群' + subtype + '改身份群体演出：' + type);
               eq(calls.explosion.length + calls.thunderAoe.length, 0, '不再走旧playAOEEffect粒子：' + subtype + '/' + type);
-              eq(atkCount('atk1') + atkCount('atk2'), 0, '身份专属采样接管，不逐目标atk1：' + subtype + '/' + type);
+              eq(atkCount('atk1') + atkCount('atk2'), 0, '身份专属采样不叠通用atk1：' + subtype + '/' + type);
+              eq(calls.sounds.filter(s => /^hit_[123][abc]$/.test(s.key)).length, 2, 'identity群' + subtype + '两名英雄分别播放受击音：' + type);
               check(d.h.every(x => x.hp < 3000), '身份群体伤害实际结算：' + subtype + '/' + type);
             }
           }
@@ -290,22 +308,25 @@
         let d = installData([entity('h_grp0')], [entity('e_grp')]);
         clearCalls();
         await w.applySingleTagEffect(d.e[0], d.h[0], '[单体]', 80, 100, 1, null, attack('法术'));
-        eq([calls.sounds.length, calls.svg.length], [0, 0], '敌方单点无括号不叠通用音画');
+        eq([calls.sounds.filter(s => ['atk1','atk2','burst','gunshot1','gunshot2','gunshot3'].indexOf(s.key) >= 0).length, calls.svg.length], [0, 0], '敌方单点无括号不叠通用音画');
+        eq(calls.sounds.filter(s => /^(hit_[123][abc]|parry_[123]|dodge_[123])$/.test(s.key)).length, 1, '敌方单点结果经语义事件聚合恰一档音');
         eq(calls.projectiles, ['enemy_spell'], '敌方单点保留原版紫色弹道（非群标签不接管）');
         eq(calls.feedback.map(f => f.outcome), ['hit'], '敌方法术命中记录统一反馈');
         clearCalls();
         await w.applySingleTagEffect(d.e[0], d.h[0], '[群攻]', 80, 100, 1, null, attack('法术'));
         eq(atkCount('atk1') + atkCount('atk2'), 0, '新兜底群攻tag命中不叠通用atk1/atk2');
-        check(calls.feedback.some(f => f.targetId === 'h_grp0' && f.outcome === 'hit' && f.opts.suppressAudio === true),
-          '群兜底命中交playHitFeedback并抑制旧合成音');
+        check(calls.resultEvents.some(f => f.ctx.targetId === 'h_grp0' && f.event === w.EVENTS.DAMAGE_RESOLVED && f.ctx.waveId === null),
+          '单独调用单目标群标签按单体结果即时路由，不把视觉参数当音频权限');
         clearCalls();
         await w.applySingleTagEffect(d.h[0], d.e[0], '[单体]', 80, 100, 1, null, attack());
-        eq(calls.sounds.map(s => s.key), ['atk2'], '英雄单体原音保留');
+        eq(calls.sounds.filter(s => ['atk1','atk2','burst','gunshot1','gunshot2','gunshot3'].indexOf(s.key) >= 0).map(s => s.key), ['atk2'], '英雄单体原音保留');
+        eq(calls.sounds.filter(s => /^(hit_[123][abc]|parry_[123]|dodge_[123])$/.test(s.key)).length, 1, '英雄单体命中聚合恰一档音');
         eq(calls.svg, ['slash'], '英雄单体原刀光保留');
         eq(calls.feedback.map(f => f.outcome), ['hit'], '英雄单体命中记录统一反馈');
         clearCalls();
         await w.applySingleTagEffect(d.e[0], d.h[0], '[单体(爆炸)]', 80, 100, 1, null, attack('法术', '单体(爆炸)'));
-        eq(calls.sounds, [], '旧括号单爆不再播旧atk2受击音');
+        eq(calls.sounds.filter(s => ['atk1','atk2','burst','gunshot1','gunshot2','gunshot3'].indexOf(s.key) >= 0).length, 0, '旧括号单爆不再播旧atk2受击音');
+        eq(calls.sounds.filter(s => /^(hit_[123][abc]|parry_[123]|dodge_[123])$/.test(s.key)).length, 1, '单爆命中聚合恰一档音');
         eq(calls.svg, [], '旧括号单爆不再走旧SVG');
         eq(calls.identity.map(c => [c.scope, c.subtype]), [['single', '爆炸']], '显式单体爆炸改身份演出');
         eq(calls.feedback.map(f => f.outcome), ['hit'], '单爆命中记录统一反馈');
@@ -323,7 +344,14 @@
         eq(atkCount('atk1') + atkCount('atk2'), 0, '屏障群攻命中静默通用音');
         check(ev('teamBarrier') < 99999, '屏障正常吸收伤害');
         check(d.h[0].hp === 3000, '屏障全挡时代理英雄免伤');
-        ev('teamBarrier=99999;teamBarrierMax=99999;');
+        eq(calls.sounds.filter(s => /^hit_[123][abc]$/.test(s.key) || /^parry_[123]$/.test(s.key) || /^dodge_[123]$/.test(s.key)).length, 0, '纯屏障吸收不发布角色ImpactAudio');
+        ev('teamBarrier=99999;teamBarrierMax=99999;barrierArmor=500;');
+        clearCalls();
+        await w.applySingleTagEffect(d.e[0], b, '[群攻]', 80, 100, 1, null, attack('法术'));
+        eq(ev('teamBarrier'), 99999, '护甲全挡屏障耐久不掉');
+        check(d.h[0].hp === 3000, '护甲全挡英雄免伤');
+        eq(calls.sounds.filter(s => /^(hit_[123][abc]|parry_[123]|dodge_[123])$/.test(s.key)).length, 0, '护甲全挡不发布角色聚合音');
+        ev('teamBarrier=99999;teamBarrierMax=99999;barrierArmor=0;');
         clearCalls();
         await w.applySingleTagEffect(d.e[0], b, '[单体(爆炸)]', 80, 100, 1, null, attack('法术', '单体(爆炸)'));
         eq(calls.sounds, [], '单爆屏障命中不再旧atk2');
@@ -360,6 +388,8 @@
           check(fxTarget.length === 1 && fxTarget[0].isBarrierTarget, '屏障' + barrier + '只传单个伪实体');
           check(seen[0] === fxTarget[0] && fxTarget[0].proxyHero && !fxTarget[0].proxyHero.isSummon, '屏障' + barrier + '演出与结算共用真实普通英雄proxy');
           eq(atkCount('atk1'), 0, '屏障' + barrier + '逻辑结算不重复atk1');
+            eq(calls.sounds.filter(s => /^hit_[123][abc]$/.test(s.key)).length, barrier > 80 ? 0 : 3,
+              '屏障' + barrier + '吸收不伪造角色Impact，泄漏后英雄逐目标反馈');
           if (barrier > 80) check(d.h.every(h => h.hp === 3000), '屏障全挡全员HP不变');
           else check(d.h.every(h => h.hp < 3000), '破盾泄漏依原规则伤及全员');
         } } finally { w.triggerBarrierShatter = trigger; }
@@ -553,6 +583,73 @@
           if (grp === 'spell') eq(atkCount('atk1'), 1, '法术群atk1恰一次（无逐目标双播）');
           else eq(atkCount('atk1'), 0, grp + '群攻无通用atk1双播');
           await settle(grp);
+        }
+      });
+
+      /* ========== 七、真实execute音频聚合矩阵：每wave一次、cue保留、混合最高档、破盾、全闪避、无目标、armor全挡 ========== */
+      await group('真实execute音频聚合矩阵', async () => {
+        // 独立构造技能文本（真实绘制组的 texts 为该组局部变量，不在本作用域）
+        const texts = { melee: '【敌群扫击】[群攻;power:80][MP:10]', ranged: '【敌群狙击】[群攻;power:80][远程][MP:10]', spell: '【敌群魔弹】[群攻;power:80][法术][MP:10]' };
+        const impactKeyRe = /^(hit_[123][abc]|parry_[123]|dodge_[123])$/;
+        const aggSounds = () => calls.sounds.filter(s => impactKeyRe.test(s.key));
+        // 三类型各一 wave：结果聚合音每 wave 恰一次，技能 cue 采样保留
+        for (const grp of ['melee', 'ranged', 'spell']) {
+          const d = installData([entity('h_grp0')], [entity('e_grp', { skills: [skill(texts[grp])] })]);
+          clearCalls();
+          await w.executeSkillAction(d.e[0], null, d.e[0].skills[0], 1);
+          eq(aggSounds().length, 1, grp + '真实execute结果聚合音每wave恰一次', JSON.stringify(calls.sounds.map(s => s.key)));
+          check(calls.sounds.some(s => s.key === BURSTS[grp][0]), grp + '技能cue采样保留');
+        }
+        // 混合maxHp：同伤跨档取实际最高档
+        {
+          const d = installData([entity('h_grp0'), entity('h_grp1', { maxHp: 40, hp: 40 })], [entity('e_grp', { skills: [skill(texts.spell)] })]);
+          clearCalls();
+          await w.executeSkillAction(d.e[0], null, d.e[0].skills[0], 1);
+          const agg = aggSounds();
+          eq(agg.length, 2, '混合maxHp两名英雄各自播放一次');
+          const d0 = 3000 - d.h[0].hp, d1 = Math.min(40, 40 - d.h[1].hp);
+          const tier = r => r < 0.10 ? 1 : r < 0.50 ? 2 : 3;
+          check(agg.every((sound, i) => new RegExp('^hit_' + tier(i === 0 ? d0 / 3000 : d1 / 40) + '[abc]$').test(sound.key)),
+            '英雄各按自身真实损血档位播音，不被另一名目标覆盖');
+        }
+        // 破盾最高：任一目标破盾优先 GuardBreak
+        {
+          const d = installData([entity('h_grp0', { shield: 5 })], [entity('e_grp', { skills: [skill(texts.spell)] })]);
+          clearCalls();
+          await w.executeSkillAction(d.e[0], null, d.e[0].skills[0], 1);
+          check(calls.sounds.some(s => s.key === 'parry_3'), '真实execute任一目标破盾优先GuardBreak');
+          eq(aggSounds().length, 1, '破盾波聚合仍恰一次');
+        }
+        // 全闪避：双反应回避目标全免伤，wave 播 dodge 档音
+        {
+          const d = installData(
+            [entity('h_grp0', { skills: [skill('【影避】[回避;power:900][MP:4][反应:法术]')] }),
+             entity('h_grp1', { skills: [skill('【影避2】[回避;power:900][MP:4][反应:法术]')] })],
+            [entity('e_grp', { skills: [skill(texts.spell)] })]);
+          clearCalls();
+          await w.executeSkillAction(d.e[0], null, d.e[0].skills[0], 1);
+          const agg = aggSounds();
+          eq(agg.length, 2, '全闪避两名英雄分别反馈一次');
+          check(agg.every(s => /^dodge_[123]$/.test(s.key)), '全闪避逐目标播dodge档音', JSON.stringify(calls.sounds.map(s => s.key)));
+          eq(calls.sounds.filter(s => /^hit_[123][abc]$/.test(s.key)).length, 0, '全闪避波不播受击音');
+        }
+        // 无存活目标：不发布聚合音
+        {
+          const d = installData([], [entity('e_grp', { skills: [skill(texts.spell)] })]);
+          clearCalls();
+          await w.executeSkillAction(d.e[0], null, d.e[0].skills[0], 1);
+          eq(aggSounds().length, 0, '无存活目标不发布聚合音');
+        }
+        // armor 全挡：execute 级屏障耐久不掉且不发布角色音
+        {
+          const d = installData([entity('h_grp0')], [entity('e_grp', { skills: [skill(texts.spell)] })]);
+          ev('teamBarrier=99999;teamBarrierMax=99999;barrierArmor=500;');
+          clearCalls();
+          await w.executeSkillAction(d.e[0], null, d.e[0].skills[0], 1);
+          eq(ev('teamBarrier'), 99999, 'execute级armor全挡屏障耐久不掉');
+          check(d.h[0].hp === 3000, 'execute级armor全挡英雄免伤');
+          eq(aggSounds().length, 0, 'execute级armor全挡不发布角色聚合音');
+          ev('teamBarrier=0;teamBarrierMax=0;barrierArmor=0;');
         }
       });
       eq(errQueue, [], '真实绘制与fxEngine循环帧期间无未捕获异常（render兼容/坐标，error与rejection）');
