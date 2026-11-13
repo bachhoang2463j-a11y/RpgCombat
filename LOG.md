@@ -3475,3 +3475,19 @@
   3. 同步更新 `四、自检清单` 核对项。
 - **涉及文件**：`.agents/skills/svg-skill-vfx/SKILL.md`、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：通读 `SKILL.md` 全部 119 行核对无冗余冲突且保留既有实体锚定/音量分级条款；纯文档规范更新，未触碰源码与工作区其余会话暂存/未提交文件（通过 `git commit -o` 隔离提交）。
+
+## [LOG-288] 2026-11-13 — 战斗音频结果路由、反击等待与复活误格挡修复，交付 v12.05
+
+- **提交**：`20d1b93`。
+- **核心目的**：技能/身份音与真实受击反馈独立叠加；反击结算闭合后才推进回合；避免复活免伤误播最高档格挡。
+- **变更行为**：
+  1. 增加只读 `DAMAGE_RESOLVED` / `DODGE_RESOLVED` 通知与轻量 `CombatAudioDirector`，保留三档阈值、防连重随机池、音量与开关；不重写 `audioUrls`、Blob 预载或 `playSound`。视觉 `playHitFeedback` 不再承担音频权限，旧重复技能表现音抑制明确为 `suppressSkillCue`。
+  2. 真实结果按 `actionId` / `waveId` 分流并去重；目标后续反应/反击完成才释放 wave。依用户实机试听定稿：英雄侧受击/闪避/格挡按目标即时播放，敌方范围受击仍整波聚合一次；屏障自身音效完全隔离，泄漏才发布角色受击结果。
+  3. 普通反击 L1 返回 `{duration,done,cancel}`，HP/个人盾/UI/死亡收口移入命中回调，`finishDodge` 与 identity `postQueue` 等待 `done`。同代际视觉取消/冻结回落结算一次，换代际只清理不扣新战局。接入 DoT、荆棘反伤与反击的实际快照；HP Cost 不发布受击事件。
+  4. 真 Chrome 的真实酒馆战局确认【召雷术】对 [复活] 食尸鬼触发 `ON_FATAL_DAMAGE` 后 `hpDmg=0`，旧分类将其误判为 blockTier3 并播 `parry_3`。新增 `DamagePrevented` / `outcome:prevented`，不产生格挡浮字或受击音，保留复活自身 `hpHeal`；正常护甲格挡和真实破盾保持原档位。
+  5. 更新真实路由/敌方群攻/身份/反击时序回归，新增 `combat-audio-regression.js`；harness 默认挂载当前正则产物，源码验证可用 `artifact=0`。测试用例锁定英雄逐目标、敌方聚合、复活非格挡、HP Cost/DoT/反伤、cancel/token/freeze 与屏障边界。
+  6. 中间 v12.03/v12.04 仅用于检查，修复后的最终产物递增为 `regex-前端战斗v12_05.json` / `前端战斗v12.05`，根目录保留唯一维护版。用户明确确认旧 `monsterAttack` 保留资产表+红单体前摇+自爆共 3 处，未为旧协定计数擅改音效。
+- **涉及文件**：`index.html`、`integration-test/harness.html`、四份相关既有 fixture 与新增 `combat-audio-regression.js`、两份产物专项检查、`regex-前端战斗v12_05.json`（替代 v12_02）。
+- **验证**：源码/产物/相关夹具语法通过；最终真实产物 Chrome harness **1694 项全通过**；身份/群攻产物专项 **80 + 61 项全通过**（围栏/实体/捕获组/内网隔离与新代码入包）。真实酒馆【时空扭曲震荡】逐目标试听成功；正常重置后原【召雷术】实测复活结果为 `DamagePrevented`、仅 `hpHeal` 与一次聚合 `hit_3b`，无 `parry_3`。
+- **验证留存**：本地 `.audit-work/combat-audio-v12_05-harness-result.json`；产物 SHA256 `56f4eb61f8c4c96d98363acb5cabca736b9b266479571c4174b7059a12f66bcf`。IAB 回归曾被宿主重载，计数倒退，因此最终全量以真实 Chrome 完成记录为准。
+- **边界**：当前真实页面临时修复保留供试听，刷新后需导入新包；不改技能本身采样/HP 下降动效，不更新停维护公开版。用户明确“不是 APK，直接交付”，未做安卓/真机测试；未推送远端，README 等用户导入确认后再更新。工作区其他会话的删除、备份与资源改动未纳入本轮提交。
