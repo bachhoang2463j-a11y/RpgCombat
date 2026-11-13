@@ -1065,11 +1065,13 @@ const arcaneVfxModule = (function () {
         });
         return runH;
     }
+    // 最终确认音效方案：【急步+隐匿】（正式版移植固定使用：avoid_dash_fs521999.mp3 @ 0s vol:0.90 + hide.mp3 @ +0.15s vol:0.90）；
+    // 下方「锐刃+隐匿」仅在独立 Demo 内保留切换对照，移植进 index.html 时无需引入 avoid_swoosh_fs497714.mp3。
     const AVOID_SFX_PRESETS = [
-        { id: 'dash_hide',   label: '急步+隐匿', play(pan) { playSample('avoid_dash2', { vol: 0.90, pan }); playSample('hide', { delay: 0.15, vol: 0.90, pan }); } },
+        { id: 'dash_hide',   label: '急步+隐匿', play(pan) { playSample('avoid_dash2', { vol: 0.90, pan }); playSample('hide', { delay: 0.15, vol: 0.90, pan }); } }, // ★ 已确认为最终正式版音效
         { id: 'swoosh_hide', label: '锐刃+隐匿', play(pan) { playSample('avoid_swoosh', { vol: 0.86, pan }); playSample('hide', { delay: 0.165, vol: 0.90, pan }); } }
     ];
-    let avoidSfxId = 'dash_hide';
+    let avoidSfxId = 'dash_hide'; // 默认及最终定稿：【急步+隐匿】
     function getAvoidSfxPreset(id) { return AVOID_SFX_PRESETS.find(p => p.id === (id || avoidSfxId)) || AVOID_SFX_PRESETS[0]; }
     function setAvoidSfxPreset(id) { if (AVOID_SFX_PRESETS.some(p => p.id === id)) avoidSfxId = id; return avoidSfxId; }
     function playRescueAvoidFatal(entity, meta = {}, onBeat) {
