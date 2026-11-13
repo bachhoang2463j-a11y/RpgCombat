@@ -99,27 +99,35 @@
         90% { opacity: 0.9; transform: translate3d(-1px, -13px, 0) scale(1.24); }
         100% { opacity: 0; transform: translate3d(-1px, -15px, 0) scale(0.35); }
     }
-    .arcane-status-zap-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
-    .arcane-status-zap-bolt { opacity: 0; will-change: opacity, transform; transform-origin: 50% 50%; }
-    .arcane-status-zap-bolt.z1 { animation: arcane-status-zap-a 1.28s steps(1) infinite; }
-    .arcane-status-zap-bolt.z2 { animation: arcane-status-zap-b 1.44s steps(1) -0.46s infinite; }
-    .arcane-status-zap-bolt.z3 { animation: arcane-status-zap-c 1.16s steps(1) -0.78s infinite; }
-    @keyframes arcane-status-zap-a {
-        0%, 38%, 74%, 100% { opacity: 0.96; transform: translate3d(0, 0, 0); }
-        18%, 62%, 88% { opacity: 0.16; transform: translate3d(1px, -1px, 0); }
-        26%, 50%, 82% { opacity: 1; transform: translate3d(-1px, 1px, 0); }
-        68% { opacity: 0; }
+    .arcane-status-spark-star { position: absolute; pointer-events: none; transform-origin: 50% 50%; will-change: transform, opacity; }
+    .arcane-status-spark-star.s1 { left: 20%; top: 10%; width: 9px; height: 9px; animation: arcane-status-para-spark 1.24s ease-out infinite; }
+    .arcane-status-spark-star.s2 { left: 49%; top: 5%; width: 10px; height: 10px; animation: arcane-status-para-spark 1.46s ease-out -0.52s infinite; }
+    .arcane-status-spark-star.s3 { right: 17%; top: 14%; width: 8px; height: 8px; animation: arcane-status-para-spark 1.12s ease-out -0.84s infinite; }
+    .arcane-status-spark-dot {
+        position: absolute; border-radius: 50%; pointer-events: none;
+        background: #fef9c3; border: 0.8px solid rgba(180, 83, 9, 0.75);
+        box-shadow: 0 0 4px #facc15, 0 0 7px rgba(245, 158, 11, 0.7);
+        will-change: transform, opacity;
     }
-    @keyframes arcane-status-zap-b {
-        0%, 28%, 66% { opacity: 0.12; }
-        10%, 46%, 80%, 94% { opacity: 0.98; transform: translate3d(-1px, 0, 0); }
-        20%, 56%, 88% { opacity: 0.58; transform: translate3d(1px, 1px, 0); }
-        38%, 72% { opacity: 0; }
+    .arcane-status-spark-dot.d1 { left: 34%; top: 18%; width: 3.5px; height: 3.5px; animation: arcane-status-para-dot 1.32s ease-out -0.26s infinite; }
+    .arcane-status-spark-dot.d2 { right: 27%; top: 9%; width: 3px; height: 3px; animation: arcane-status-para-dot 1.54s ease-out -0.96s infinite; }
+    .arcane-status-persist-layer.is-hero .arcane-status-spark-star.s1 { left: 16%; top: 25%; }
+    .arcane-status-persist-layer.is-hero .arcane-status-spark-star.s2 { left: 32%; top: 20%; }
+    .arcane-status-persist-layer.is-hero .arcane-status-spark-star.s3 { left: 45%; right: auto; top: 32%; }
+    .arcane-status-persist-layer.is-hero .arcane-status-spark-dot.d1 { left: 23%; top: 34%; }
+    .arcane-status-persist-layer.is-hero .arcane-status-spark-dot.d2 { left: 52%; right: auto; top: 25%; }
+    @keyframes arcane-status-para-spark {
+        0%, 100% { opacity: 0.15; transform: translate3d(0, 1px, 0) scale(0.55) rotate(-8deg); }
+        22% { opacity: 0.98; transform: translate3d(0.5px, -2px, 0) scale(1.12) rotate(10deg); }
+        46% { opacity: 0.42; transform: translate3d(-0.5px, -3px, 0) scale(0.72) rotate(-4deg); }
+        68% { opacity: 0.92; transform: translate3d(1px, -4px, 0) scale(0.96) rotate(14deg); }
+        88% { opacity: 0; transform: translate3d(0, -6px, 0) scale(0.4) rotate(20deg); }
     }
-    @keyframes arcane-status-zap-c {
-        0%, 44%, 76% { opacity: 0; }
-        12%, 52%, 86% { opacity: 0.96; transform: translate3d(1px, -1px, 0); }
-        24%, 64%, 95% { opacity: 0.45; transform: translate3d(-1px, 0, 0); }
+    @keyframes arcane-status-para-dot {
+        0%, 100% { opacity: 0; transform: translate3d(0, 2px, 0) scale(0.5); }
+        28% { opacity: 0.95; transform: translate3d(-1px, -2px, 0) scale(1.15); }
+        70% { opacity: 0.75; transform: translate3d(1px, -6px, 0) scale(0.85); }
+        94% { opacity: 0; transform: translate3d(1.5px, -9px, 0) scale(0.35); }
     }
     @keyframes arcane-status-badge-pulse {
         0%, 100% { opacity: 1; box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35), 0 0 5px rgba(245, 158, 11, 0.25); }
@@ -900,18 +908,13 @@ const arcaneVfxModule = (function () {
             return '<span class="arcane-status-bubble-dot b1"></span><span class="arcane-status-bubble-dot b2"></span><span class="arcane-status-bubble-dot b3"></span>';
         }
         if (kind === 'paralyze') {
-            const arc = (cls, pts) => `<g class="arcane-status-zap-bolt ${cls}">`
-                + `<polyline points="${pts}" fill="none" stroke="#0f172a" stroke-width="6.8" stroke-linejoin="bevel" stroke-linecap="round" opacity="0.78"/>`
-                + `<polyline points="${pts}" fill="none" stroke="#0284c7" stroke-width="4.5" stroke-linejoin="bevel" stroke-linecap="round" opacity="0.96"/>`
-                + `<polyline points="${pts}" fill="none" stroke="#38bdf8" stroke-width="2.6" stroke-linejoin="bevel" stroke-linecap="miter"/>`
-                + `<polyline points="${pts}" fill="none" stroke="#f0f9ff" stroke-width="1.25" stroke-linejoin="bevel" stroke-linecap="butt"/>`
-                + `<polyline points="${pts}" fill="none" stroke="#fde047" stroke-width="0.7" stroke-dasharray="6 9" stroke-linejoin="bevel"/>`
-                + `</g>`;
-            return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" class="arcane-status-zap-svg">`
-                + arc('z1', '10,28 29,14 24,31 49,17 44,34 68,21')
-                + arc('z2', '32,79 51,62 46,77 72,56 66,73 91,54')
-                + arc('z3', '78,12 63,34 75,38 58,61 70,66 56,88')
-                + `</svg>`;
+            const starSvg = () => '<svg viewBox="0 0 20 20" class="w-full h-full overflow-visible">'
+                + '<path d="M10,1 L12.1,7.9 L19,10 L12.1,12.1 L10,19 L7.9,12.1 L1,10 L7.9,7.9 Z" fill="#facc15" stroke="#713f12" stroke-width="1.35" stroke-linejoin="round"/>'
+                + '<circle cx="10" cy="10" r="2.2" fill="#fef9c3"/></svg>';
+            return `<span class="arcane-status-spark-star s1">${starSvg()}</span>`
+                + `<span class="arcane-status-spark-star s2">${starSvg()}</span>`
+                + `<span class="arcane-status-spark-star s3">${starSvg()}</span>`
+                + '<span class="arcane-status-spark-dot d1"></span><span class="arcane-status-spark-dot d2"></span>';
         }
         return '';
     }
@@ -926,7 +929,7 @@ const arcaneVfxModule = (function () {
             if (!node) {
                 node = document.createElement('div');
                 node.setAttribute(attr, kind);
-                node.className = 'arcane-status-persist-layer arcane-status-persist-' + kind;
+                node.className = 'arcane-status-persist-layer arcane-status-persist-' + kind + ((dom.querySelector && dom.querySelector('.portrait')) ? ' is-hero' : '');
                 node.innerHTML = buildStatusPersistHtml(kind);
                 host.appendChild(node);
             } else {
@@ -1105,45 +1108,60 @@ const arcaneVfxModule = (function () {
         });
         return owner.handle;
     }
-    // 3. 麻痹僵直触发（高对比双边锐利蓝电裂过图标 + 耗层电晶飞溅）与未命中对照组
+    // 3. 麻痹僵直触发（头部黄色火星浓度骤增爆发 + 短促轻硬直 + 1 枚电星火脱落耗层）与未命中对照组
     function playStatusParaProc(entity, meta = {}, onBeat) {
         if (meta && meta.triggered === false) return null;
         const dom = domOf(entity); if (!dom) return null;
         const r = statusVisualRect(dom); if (!r) return null;
         const owner = statusRun(480), uid = 'arcane-status-para-' + (++S.uid), pan = statusPanOf(r.x);
-        const W = Math.max(108, r.w * 1.28), H = Math.max(108, r.h * 1.28), cx = W / 2, cy = H / 2, rw = r.w * 0.46, rh = r.h * 0.46;
-        const boltPts = [
-            `${(cx - rw * 0.84).toFixed(1)},${(cy - rh * 0.28).toFixed(1)} ${(cx - rw * 0.32).toFixed(1)},${(cy - rh * 0.62).toFixed(1)} ${(cx - rw * 0.38).toFixed(1)},${(cy - rh * 0.22).toFixed(1)} ${(cx + rw * 0.22).toFixed(1)},${(cy - rh * 0.58).toFixed(1)} ${(cx + rw * 0.12).toFixed(1)},${(cy - rh * 0.18).toFixed(1)} ${(cx + rw * 0.82).toFixed(1)},${(cy - rh * 0.44).toFixed(1)}`,
-            `${(cx - rw * 0.78).toFixed(1)},${(cy + rh * 0.42).toFixed(1)} ${(cx - rw * 0.16).toFixed(1)},${(cy + rh * 0.12).toFixed(1)} ${(cx - rw * 0.26).toFixed(1)},${(cy + rh * 0.48).toFixed(1)} ${(cx + rw * 0.34).toFixed(1)},${(cy + rh * 0.08).toFixed(1)} ${(cx + rw * 0.82).toFixed(1)},${(cy + rh * 0.34).toFixed(1)}`,
-            `${(cx - rw * 0.32).toFixed(1)},${(cy - rh * 0.78).toFixed(1)} ${(cx + rw * 0.08).toFixed(1)},${(cy - rh * 0.12).toFixed(1)} ${(cx - rw * 0.12).toFixed(1)},${(cy + rh * 0.04).toFixed(1)} ${(cx + rw * 0.28).toFixed(1)},${(cy + rh * 0.74).toFixed(1)}`,
-            `${(cx + rw * 0.56).toFixed(1)},${(cy - rh * 0.68).toFixed(1)} ${(cx + rw * 0.22).toFixed(1)},${(cy - rh * 0.08).toFixed(1)} ${(cx + rw * 0.44).toFixed(1)},${(cy + rh * 0.06).toFixed(1)} ${(cx + rw * 0.12).toFixed(1)},${(cy + rh * 0.62).toFixed(1)}`
+        const hy = r.top + r.h * 0.22;
+        const W = Math.max(118, r.w * 1.3), H = Math.max(96, r.h * 1.02), cx = W / 2, cy = H * 0.56, rw = r.w * 0.46, rh = r.h * 0.36;
+        const starSpots = [
+            [-0.72, -0.06, 1.05], [-0.48, -0.46, 0.95], [-0.22, -0.62, 1.22], [0.08, -0.58, 1.15],
+            [0.36, -0.46, 1.02], [0.64, -0.18, 1.1], [-0.56, 0.18, 0.88], [-0.14, -0.18, 1.08],
+            [0.24, -0.12, 0.96], [0.52, 0.16, 0.88], [-0.32, 0.08, 0.85], [0.02, -0.4, 0.9]
         ];
-        const sx = cx + rw * 0.5, sy = cy - rh * 0.42;
-        const boltsHtml = boltPts.map(pts =>
-            `<polyline points="${pts}" fill="none" stroke="#0f172a" stroke-width="5.2" stroke-linejoin="bevel" stroke-linecap="round" opacity="0.82"/>`
-            + `<polyline points="${pts}" fill="none" stroke="#0284c7" stroke-width="3.6" stroke-linejoin="bevel" stroke-linecap="round" opacity="0.98"/>`
-            + `<polyline points="${pts}" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linejoin="bevel" stroke-linecap="butt"/>`
-            + `<polyline points="${pts}" fill="none" stroke="#f0f9ff" stroke-width="1.15" stroke-linejoin="bevel" stroke-linecap="butt"/>`
-        ).join('');
+        const sparksHtml = starSpots.map(([ox, oy, sc], idx) => {
+            const x = cx + ox * rw, y = cy + oy * rh, rad = 6.8 * sc, inn = 1.75 * sc;
+            const d = `M${x.toFixed(1)},${(y - rad).toFixed(1)} L${(x + inn).toFixed(1)},${(y - inn).toFixed(1)} L${(x + rad).toFixed(1)},${y.toFixed(1)} L${(x + inn).toFixed(1)},${(y + inn).toFixed(1)} L${x.toFixed(1)},${(y + rad).toFixed(1)} L${(x - inn).toFixed(1)},${(y + inn).toFixed(1)} L${(x - rad).toFixed(1)},${y.toFixed(1)} L${(x - inn).toFixed(1)},${(y - inn).toFixed(1)} Z`;
+            return `<g class="s-para-spark" data-del="${(idx % 4) * 26}" style="transform-origin:${x.toFixed(1)}px ${y.toFixed(1)}px;opacity:0">`
+                + `<path d="${d}" fill="${idx % 2 ? '#fef08a' : '#facc15'}" stroke="#713f12" stroke-width="1.3" stroke-linejoin="round"/>`
+                + `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(inn * 1.18).toFixed(1)}" fill="#ffffff"/></g>`;
+        }).join('');
+        const sx = cx + rw * 0.56, sy = cy - rh * 0.4;
+        const flakeD = `M${sx.toFixed(1)},${(sy - 8.5).toFixed(1)} L${(sx + 2.5).toFixed(1)},${(sy - 2.5).toFixed(1)} L${(sx + 8.5).toFixed(1)},${sy.toFixed(1)} L${(sx + 2.5).toFixed(1)},${(sy + 2.5).toFixed(1)} L${sx.toFixed(1)},${(sy + 8.5).toFixed(1)} L${(sx - 2.5).toFixed(1)},${(sy + 2.5).toFixed(1)} L${(sx - 8.5).toFixed(1)},${sy.toFixed(1)} L${(sx - 2.5).toFixed(1)},${(sy - 2.5).toFixed(1)} Z`;
         const layer = owner.layer(
-            `<div class="arcane-status-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
-            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.2)}</defs>`
-            + `<g class="s-arcs" opacity="0">${boltsHtml}</g>`
+            `<div class="arcane-status-anchor" style="left:${r.x}px;top:${hy.toFixed(1)}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
+            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.0)}</defs>`
+            + `<g filter="url(#${uid}-gl)">${sparksHtml}</g>`
             + `<g class="s-para-flake" filter="url(#${uid}-gl)" style="transform-origin:${sx.toFixed(1)}px ${sy.toFixed(1)}px;opacity:0">`
-            + `<polygon points="${(sx - 8).toFixed(1)},${(sy + 3).toFixed(1)} ${(sx - 1).toFixed(1)},${(sy - 9).toFixed(1)} ${(sx + 8).toFixed(1)},${(sy - 4).toFixed(1)} ${(sx + 3).toFixed(1)},${(sy + 7).toFixed(1)}" fill="#fde047" stroke="#0f172a" stroke-width="2.2" stroke-linejoin="bevel"/>`
-            + `<polygon points="${(sx - 8).toFixed(1)},${(sy + 3).toFixed(1)} ${(sx - 1).toFixed(1)},${(sy - 9).toFixed(1)} ${(sx + 8).toFixed(1)},${(sy - 4).toFixed(1)} ${(sx + 3).toFixed(1)},${(sy + 7).toFixed(1)}" fill="none" stroke="#38bdf8" stroke-width="1.2" stroke-linejoin="bevel"/>`
+            + `<path d="${flakeD}" fill="#fde047" stroke="#713f12" stroke-width="1.6" stroke-linejoin="round"/>`
+            + `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="2.4" fill="#ffffff"/>`
             + `</g></svg></div>`
         );
-        const arcs = layer.querySelector('.s-arcs'), flake = layer.querySelector('.s-para-flake');
-        if (arcs) owner.anim(arcs, [{ opacity: 0 }, { opacity: 1, offset: 0.06 }, { opacity: 0.45, offset: 0.24 }, { opacity: 1, offset: 0.42 }, { opacity: 0.35, offset: 0.62 }, { opacity: 0.94, offset: 0.78 }, { opacity: 0 }], { duration: 340, easing: 'steps(1)', fill: 'forwards' });
+        layer.querySelectorAll('.s-para-spark').forEach(spEl => {
+            owner.anim(spEl, [
+                { opacity: 0.35, transform: 'scale(0.55) rotate(-14deg)' },
+                { opacity: 1, transform: 'translateY(-3px) scale(1.24) rotate(12deg)', offset: 0.24 },
+                { opacity: 0.82, transform: 'translateY(-6px) scale(0.96) rotate(24deg)', offset: 0.6 },
+                { opacity: 0, transform: 'translateY(-11px) scale(0.42) rotate(38deg)' }
+            ], { duration: 290, delay: Number(spEl.dataset.del) || 0, easing: 'ease-out', fill: 'forwards' });
+        });
+        const flake = layer.querySelector('.s-para-flake');
         owner.anim(dom, [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(-3px,0,0)', offset: 0.16 }, { transform: 'translate3d(3px,1px,0)', offset: 0.34 }, { transform: 'translate3d(-2px,0,0)', offset: 0.56 }, { transform: 'translate3d(1.5px,-1px,0)', offset: 0.78 }, { transform: 'translate3d(0,0,0)' }], { duration: 350, easing: 'ease-out' });
         const gSfx = statusSfxGate('para', 70);
         if (gSfx > 0) playStatusSample('para', { pan, vol: 0.24 * gSfx, rate: 1.04 });
-        owner.at(80, () => { if (onBeat) onBeat({ event: 'paraProc', entity }); });
-        owner.at(110, () => {
-            if (flake) owner.anim(flake, [{ opacity: 0.98, transform: 'translate(0px,0px) scale(1) rotate(0deg)' }, { opacity: 0.85, transform: 'translate(12px,-9px) scale(0.82) rotate(18deg)', offset: 0.45 }, { opacity: 0, transform: 'translate(22px,-16px) scale(0.4) rotate(36deg)' }], { duration: 280, easing: 'ease-out', fill: 'forwards' });
-            const fx = r.x + r.w * 0.18, fy = r.y - r.h * 0.16;
-            owner.burst(5, i => ({ x: fx + rnd(-3, 3), y: fy + rnd(-3, 3), vx: rnd(0.8, 2.0), vy: rnd(-1.4, -0.3), drag: 0.92, decay: 0.056, size: rnd(1.5, 2.6), shape: i % 2 ? 'spark' : 'glowOrb', core: '#fef9c3', color: i % 2 ? '#38bdf8' : '#facc15' }));
+        const sparkAt = (n, xSpan, yOff) => owner.burst(n, i => {
+            const up = rnd(-2.3, -0.45), side = rnd(-2.0, 2.0);
+            return { x: r.x + rnd(-xSpan, xSpan), y: hy + rnd(-r.h * 0.16, r.h * 0.12) + yOff, vx: side, vy: up, drag: 0.92, decay: rnd(0.042, 0.062), size: rnd(1.7, 2.8), shape: i % 3 ? 'spark' : 'glowOrb', tail: 3.6, core: '#ffffff', color: pick(['#fef9c3', '#fde047', '#facc15', '#f59e0b']) };
+        });
+        sparkAt(14, r.w * 0.42, 0);
+        owner.at(75, () => {
+            sparkAt(9, r.w * 0.45, -4);
+            if (onBeat) onBeat({ event: 'paraProc', entity });
+        });
+        owner.at(105, () => {
+            if (flake) owner.anim(flake, [{ opacity: 0.98, transform: 'translate(0px,0px) scale(1) rotate(0deg)' }, { opacity: 0.88, transform: 'translate(13px,-10px) scale(0.85) rotate(24deg)', offset: 0.45 }, { opacity: 0, transform: 'translate(22px,-17px) scale(0.4) rotate(48deg)' }], { duration: 280, easing: 'ease-out', fill: 'forwards' });
         });
         return owner.handle;
     }
@@ -1320,9 +1338,9 @@ const arcaneVfxModule = (function () {
         {
             title: '二 · 麻痹僵直与眩晕对比', badge: '3项',
             items: [
-                { name: '麻痹 · 掷骰命中 (耗1层)', level: 'L1', targetId: 'e2', event: 'paraProc', description: '蓝电折线划过图标 → 短硬直 → 碎裂脱落1层（常驻蓝电）', init: { e2: { hp: 760, maxHp: 1000, buffs: [{ type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: { triggered: true } },
-                { name: '对照 · 麻痹未命中 (无演出)', level: '对照', targetId: 'e2', event: 'paraMiss', description: '掷骰未命中返回null：无触发折线、零抖动、不耗层', init: { e2: { hp: 760, maxHp: 1000, buffs: [{ type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: { triggered: false } },
-                { name: '对比 · 麻痹僵直 vs 眩晕星环', level: '对比', targetId: 'e2', event: 'compareParaStun', description: 'e2蓝电折线短硬直 vs e3头顶星环+整回合重晃', init: { e2: { hp: 760, maxHp: 1000, buffs: [{ type: 'paralyze', value: -5, duration: 2 }] }, e3: { hp: 760, maxHp: 1000, buffs: [{ type: 'stun', value: 0, duration: 1 }] } }, meta: { stunTargetId: 'e3' } }
+                { name: '麻痹 · 掷骰命中 (耗1层)', level: 'L1', targetId: 'e2', event: 'paraProc', description: '头部黄火星骤增爆发 → 短硬直 → 星火脱落1层（常驻头顶黄火星）', init: { e2: { hp: 760, maxHp: 1000, buffs: [{ type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: { triggered: true } },
+                { name: '对照 · 麻痹未命中 (无演出)', level: '对照', targetId: 'e2', event: 'paraMiss', description: '掷骰未命中返回null：仅保留常驻头部黄火星，零抖动、不耗层', init: { e2: { hp: 760, maxHp: 1000, buffs: [{ type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: { triggered: false } },
+                { name: '对比 · 麻痹僵直 vs 眩晕星环', level: '对比', targetId: 'e2', event: 'compareParaStun', description: 'e2头部黄火星短硬直 vs e3头顶星环+整回合重晃', init: { e2: { hp: 760, maxHp: 1000, buffs: [{ type: 'paralyze', value: -5, duration: 2 }] }, e3: { hp: 760, maxHp: 1000, buffs: [{ type: 'stun', value: 0, duration: 1 }] } }, meta: { stunTargetId: 'e3' } }
             ]
         },
         {
@@ -1338,7 +1356,7 @@ const arcaneVfxModule = (function () {
             title: '四 · 到期消散与临期警示', badge: '2项',
             items: [
                 { name: '对比 · 自然到期 vs 主动驱散', level: '对比', targetId: 'e1', event: 'compareExpireDispel', description: 'e1自然轻蒸发撤火苗 vs e4波纹碎屑主动驱散', init: { e1: { hp: 640, maxHp: 1000, buffs: [{ type: 'burn', value: 22, duration: 1 }] }, e4: { hp: 640, maxHp: 1000, buffs: [{ type: 'burn', value: 22, duration: 2 }] } }, meta: { dispelTargetId: 'e4' } },
-                { name: '演进 · 临期警示 (2回→1回→到期)', level: 'L1', targetId: 'h4', event: 'expiringLifecycle', description: 'h4毒泡/麻电2回→1回琥珀缓闪→到期止损；h1火苗续回解警示', init: { h4: { hp: 112, maxHp: 140, buffs: [{ type: 'poison', value: 14, duration: 2 }, { type: 'paralyze', value: -5, duration: 2 }] }, h1: { hp: 82, maxHp: 100, buffs: [{ type: 'burn', value: 15, duration: 1 }] } }, meta: { refreshTargetId: 'h1' } }
+                { name: '演进 · 临期警示 (2回→1回→到期)', level: 'L1', targetId: 'h4', event: 'expiringLifecycle', description: 'h4毒泡/头顶黄火星2回→1回琥珀缓闪→到期止损；h1火苗续回解警示', init: { h4: { hp: 112, maxHp: 140, buffs: [{ type: 'poison', value: 14, duration: 2 }, { type: 'paralyze', value: -5, duration: 2 }] }, h1: { hp: 82, maxHp: 100, buffs: [{ type: 'burn', value: 15, duration: 1 }] } }, meta: { refreshTargetId: 'h1' } }
             ]
         },
         {
@@ -1346,7 +1364,7 @@ const arcaneVfxModule = (function () {
             items: [
                 { name: '共存 · 燃烧火苗 + 狂暴气浪', level: '共存', targetId: 'e4', event: 'coexistBurnRage', description: '底缘火苗+红黑狂暴气浪同体共存 → 燃发 → 到期留狂暴', init: { e4: { hp: 240, maxHp: 1000, buffs: [{ type: 'burn', value: 26, duration: 1 }] } }, meta: {} },
                 { name: '群发 · 多目标40ms错峰 (不叠音)', level: '压测', targetId: 'e1', event: 'multiTick', description: 'e1/e2/e3毒 + e4燃 每40ms错峰发作，门控防音压叠加', init: { e1: { hp: 780, maxHp: 1000, buffs: [{ type: 'poison', value: 15, duration: 2 }] }, e2: { hp: 780, maxHp: 1000, buffs: [{ type: 'poison', value: 15, duration: 2 }, { type: 'poison', value: 15, duration: 3 }] }, e3: { hp: 780, maxHp: 1000, buffs: [{ type: 'poison', value: 15, duration: 2 }] }, e4: { hp: 780, maxHp: 1000, buffs: [{ type: 'burn', value: 25, duration: 2 }] } }, meta: { targets: ['e1', 'e2', 'e3', 'e4'], staggerMs: 40 } },
-                { name: '压测 · 同体连发 + 中途重置检', level: '压测', targetId: 'e5', event: 'stressChain', description: 'e5同时挂毒泡/火苗/蓝电并连续发作→全部到期（可随时点重置）', init: { e5: { hp: 720, maxHp: 1000, buffs: [{ type: 'poison', value: 18, duration: 3 }, { type: 'poison', value: 18, duration: 3 }, { type: 'burn', value: 24, duration: 2 }, { type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: {} }
+                { name: '压测 · 同体连发 + 中途重置检', level: '压测', targetId: 'e5', event: 'stressChain', description: 'e5同时挂毒泡/火苗/头部黄火星并连续发作→全部到期（可随时点重置）', init: { e5: { hp: 720, maxHp: 1000, buffs: [{ type: 'poison', value: 18, duration: 3 }, { type: 'poison', value: 18, duration: 3 }, { type: 'burn', value: 24, duration: 2 }, { type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: {} }
             ]
         }
     ];
