@@ -122,10 +122,10 @@
     .arcane-atmo-vignette-mist { background: radial-gradient(ellipse 78% 74% at 50% 48%, transparent 54%, rgba(4,14,20,0.68) 100%); }
     /* 3. 废墟尘埃（ruins） */
     .arcane-atmo-tint-ruins { background: linear-gradient(168deg, rgba(38,29,20,0.92) 0%, rgba(26,21,15,0.87) 52%, rgba(13,10,8,0.95) 100%), radial-gradient(ellipse 64% 48% at 24% 8%, rgba(217,165,98,0.12), transparent 72%); }
-    .arcane-atmo-beam { position: absolute; top: -18%; height: 120%; transform-origin: top center; background: linear-gradient(90deg, transparent 0%, rgba(253,224,165,0.88) 48%, rgba(254,243,199,0.5) 54%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.48) 58%, transparent 90%); mask-image: linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.48) 58%, transparent 90%); will-change: opacity, transform; }
-    .arcane-atmo-beam-1 { left: 14%; width: clamp(68px, 13vw, 165px); transform: rotate(-23deg); animation: arcane-atmo-beam-breathe 7.5s ease-in-out infinite; }
-    .arcane-atmo-beam-2 { left: 36%; width: clamp(48px, 9vw, 115px); transform: rotate(-20deg); animation: arcane-atmo-beam-breathe 9.5s ease-in-out 2.2s infinite; }
-    @keyframes arcane-atmo-beam-breathe { 0%, 100% { opacity: 0.06; } 50% { opacity: 0.13; } }
+    .arcane-atmo-beam { position: absolute; top: -18%; height: 112%; opacity: 0.05; transform-origin: top center; background: linear-gradient(90deg, transparent 0%, rgba(253,224,165,0.22) 26%, rgba(254,243,199,0.56) 50%, rgba(253,224,165,0.20) 74%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.42) 52%, transparent 86%); mask-image: linear-gradient(to bottom, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.42) 52%, transparent 86%); will-change: opacity, transform; }
+    .arcane-atmo-beam-1 { left: 8%; width: clamp(72px, 13vw, 170px); transform: rotate(-20deg); animation: arcane-atmo-beam-breathe 7.5s ease-in-out both infinite; }
+    .arcane-atmo-beam-2 { left: 21%; width: clamp(54px, 9.5vw, 125px); transform: rotate(-18deg); animation: arcane-atmo-beam-breathe 9.5s ease-in-out -4.2s both infinite; }
+    @keyframes arcane-atmo-beam-breathe { 0%, 100% { opacity: 0.05; } 50% { opacity: 0.11; } }
     .arcane-atmo-ruins-edges { position: absolute; inset: 0; opacity: 0.20; -webkit-mask-image: linear-gradient(90deg, black 0%, transparent 24%, transparent 76%, black 100%); mask-image: linear-gradient(90deg, black 0%, transparent 24%, transparent 76%, black 100%); }
     .arcane-atmo-vignette-ruins { background: radial-gradient(ellipse 76% 72% at 50% 48%, transparent 50%, rgba(10,7,4,0.76) 100%); }
     /* 4. 异界低光（eldritch） */
