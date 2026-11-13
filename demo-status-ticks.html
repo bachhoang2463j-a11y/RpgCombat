@@ -99,15 +99,27 @@
         90% { opacity: 0.9; transform: translate3d(-1px, -13px, 0) scale(1.24); }
         100% { opacity: 0; transform: translate3d(-1px, -15px, 0) scale(0.35); }
     }
-    .arcane-status-zap-bolt { position: absolute; pointer-events: none; opacity: 0; will-change: opacity, transform; }
-    .arcane-status-zap-bolt.z1 { left: 12%; top: 18%; width: 24px; height: 18px; animation: arcane-status-zap-flicker 2.35s steps(1) infinite; }
-    .arcane-status-zap-bolt.z2 { left: 42%; top: 38%; width: 22px; height: 16px; animation: arcane-status-zap-flicker 2.35s steps(1) -1.12s infinite; }
-    @keyframes arcane-status-zap-flicker {
-        0%, 7%, 13%, 17%, 61%, 66%, 100% { opacity: 0; }
-        8% { opacity: 0.95; transform: translate3d(0, 0, 0) rotate(-4deg); }
-        12% { opacity: 0.3; transform: translate3d(1px, -1px, 0) rotate(2deg); }
-        15% { opacity: 0.88; transform: translate3d(-1px, 1px, 0) rotate(0deg); }
-        62% { opacity: 0.85; transform: translate3d(1px, 0, 0) rotate(3deg); }
+    .arcane-status-zap-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+    .arcane-status-zap-bolt { opacity: 0; will-change: opacity, transform; transform-origin: 50% 50%; }
+    .arcane-status-zap-bolt.z1 { animation: arcane-status-zap-a 1.28s steps(1) infinite; }
+    .arcane-status-zap-bolt.z2 { animation: arcane-status-zap-b 1.44s steps(1) -0.46s infinite; }
+    .arcane-status-zap-bolt.z3 { animation: arcane-status-zap-c 1.16s steps(1) -0.78s infinite; }
+    @keyframes arcane-status-zap-a {
+        0%, 38%, 74%, 100% { opacity: 0.96; transform: translate3d(0, 0, 0); }
+        18%, 62%, 88% { opacity: 0.16; transform: translate3d(1px, -1px, 0); }
+        26%, 50%, 82% { opacity: 1; transform: translate3d(-1px, 1px, 0); }
+        68% { opacity: 0; }
+    }
+    @keyframes arcane-status-zap-b {
+        0%, 28%, 66% { opacity: 0.12; }
+        10%, 46%, 80%, 94% { opacity: 0.98; transform: translate3d(-1px, 0, 0); }
+        20%, 56%, 88% { opacity: 0.58; transform: translate3d(1px, 1px, 0); }
+        38%, 72% { opacity: 0; }
+    }
+    @keyframes arcane-status-zap-c {
+        0%, 44%, 76% { opacity: 0; }
+        12%, 52%, 86% { opacity: 0.96; transform: translate3d(1px, -1px, 0); }
+        24%, 64%, 95% { opacity: 0.45; transform: translate3d(-1px, 0, 0); }
     }
     @keyframes arcane-status-badge-pulse {
         0%, 100% { opacity: 1; box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35), 0 0 5px rgba(245, 158, 11, 0.25); }
@@ -841,13 +853,9 @@ const arcaneVfxModule = (function () {
         ST.sfxAt.set(key, now);
         return gap < minGapMs ? 0.45 : 1;
     }
-    function statusHiss(delaySec, f0, f1, dur, vol, pan = 0, q = 2.4) {
-        if (!statusSfxOn || vol <= 0.002) return;
-        const ctx = audio(), t = ctx.currentTime + delaySec;
-        const bp = biquad(ctx, 'bandpass', f0, f1, q, t, dur);
-        const s = noiseSrc(ctx, t, dur, 1);
-        s.connect(bp);
-        chain(ctx, bp, t, { vol, dur, peak: 0.25, cut: true, pan, wet: 0.12 });
+    function playStatusSample(sampleKey, { pan = 0, vol = 0.25, rate = 1 } = {}) {
+        if (!statusSfxOn || vol <= 0.002) return false;
+        return !!(window.__playStatusSample && window.__playStatusSample(sampleKey, { volume: vol, pan, rate }));
     }
     function statusRun(totalMs) {
         const token = combatToken;
@@ -892,8 +900,18 @@ const arcaneVfxModule = (function () {
             return '<span class="arcane-status-bubble-dot b1"></span><span class="arcane-status-bubble-dot b2"></span><span class="arcane-status-bubble-dot b3"></span>';
         }
         if (kind === 'paralyze') {
-            const bolt = (cls, pts) => `<svg viewBox="0 0 24 18" class="arcane-status-zap-bolt ${cls} overflow-visible"><polyline points="${pts}" fill="none" stroke="#38bdf8" stroke-width="2.4" stroke-linejoin="bevel" stroke-linecap="butt" opacity="0.95"/><polyline points="${pts}" fill="none" stroke="#facc15" stroke-width="1" stroke-linejoin="bevel" stroke-linecap="butt"/></svg>`;
-            return bolt('z1', '2,15 10,8 8,10 18,2 15,6 22,2') + bolt('z2', '1,4 9,8 7,10 16,13 13,10 21,15');
+            const arc = (cls, pts) => `<g class="arcane-status-zap-bolt ${cls}">`
+                + `<polyline points="${pts}" fill="none" stroke="#0f172a" stroke-width="6.8" stroke-linejoin="bevel" stroke-linecap="round" opacity="0.78"/>`
+                + `<polyline points="${pts}" fill="none" stroke="#0284c7" stroke-width="4.5" stroke-linejoin="bevel" stroke-linecap="round" opacity="0.96"/>`
+                + `<polyline points="${pts}" fill="none" stroke="#38bdf8" stroke-width="2.6" stroke-linejoin="bevel" stroke-linecap="miter"/>`
+                + `<polyline points="${pts}" fill="none" stroke="#f0f9ff" stroke-width="1.25" stroke-linejoin="bevel" stroke-linecap="butt"/>`
+                + `<polyline points="${pts}" fill="none" stroke="#fde047" stroke-width="0.7" stroke-dasharray="6 9" stroke-linejoin="bevel"/>`
+                + `</g>`;
+            return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" class="arcane-status-zap-svg">`
+                + arc('z1', '10,28 29,14 24,31 49,17 44,34 68,21')
+                + arc('z2', '32,79 51,62 46,77 72,56 66,73 91,54')
+                + arc('z3', '78,12 63,34 75,38 58,61 70,66 56,88')
+                + `</svg>`;
         }
         return '';
     }
@@ -1008,10 +1026,7 @@ const arcaneVfxModule = (function () {
         const veins = layer.querySelector('.s-veins');
         if (veins) owner.anim(veins, [{ opacity: 0, transform: 'translateY(3px) scale(0.95)' }, { opacity: 0.92, transform: 'translateY(0px) scale(1)', offset: 0.3 }, { opacity: 0.65, transform: 'translateY(-2px)', offset: 0.65 }, { opacity: 0, transform: 'translateY(-4px)' }], { duration: 400, easing: 'ease-out', fill: 'forwards' });
         const gSfx = statusSfxGate('poison', 70);
-        if (gSfx > 0) {
-            statusHiss(0, 2600, 1250, 0.14, (0.042 + layers * 0.005) * gSfx, pan, 2.2);
-            tone(0.01, { type: 'triangle', f0: 210, f1: 125, dur: 0.12, vol: 0.022 * gSfx, pan, wet: 0.18 });
-        }
+        if (gSfx > 0) playStatusSample('poison', { pan, vol: (layers >= 3 ? 0.48 : 0.40) * gSfx, rate: layers >= 3 ? 0.94 : 1.04 });
         owner.at(60, () => { if (onBeat) onBeat({ event: 'poisonTick', entity, layers }); });
         layer.querySelectorAll('.s-bubble').forEach((bEl, idx) => {
             const d0 = 40 + idx * 62;
@@ -1020,8 +1035,6 @@ const arcaneVfxModule = (function () {
             });
             owner.at(d0 + 92, () => {
                 const bx = Number(bEl.dataset.bx), by = Number(bEl.dataset.by);
-                const gPop = statusSfxGate('poisonPop', 55);
-                if (gPop > 0) tone(0, { type: 'sine', f0: 480 + idx * 75, f1: 760, dur: 0.045, vol: 0.018 * gPop, pan, wet: 0.15 });
                 owner.burst(4 + (layers >= 3 ? 1 : 0), () => {
                     const a = rnd(-Math.PI * 0.9, -Math.PI * 0.1), sp = rnd(0.7, 1.6);
                     return { x: bx + rnd(-3, 3), y: by + rnd(-3, 3), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.35, drag: 0.94, decay: 0.048, size: rnd(2.0, 3.4), shape: 'glowOrb', core: '#e9d5ff', color: '#a855f7' };
@@ -1055,11 +1068,7 @@ const arcaneVfxModule = (function () {
         const tongues = layer.querySelector('.s-tongues'), flare = layer.querySelector('.s-flare');
         if (tongues) owner.anim(tongues, [{ opacity: 0, transform: 'translateY(6px) scaleY(0.55)' }, { opacity: 0.96, transform: 'translateY(-3px) scaleY(1.06)', offset: 0.35 }, { opacity: 0, transform: 'translateY(-11px) scaleY(0.75)' }], { duration: 360, easing: 'ease-out', fill: 'forwards' });
         const gSfx = statusSfxGate('burn', 70);
-        if (gSfx > 0) {
-            click(0.02, 0.068 * gSfx, 2600, 0.011, pan);
-            click(0.08, 0.045 * gSfx, 3400, 0.009, pan);
-            tone(0.05, { type: 'triangle', f0: 190, f1: 92, dur: 0.12, vol: 0.028 * gSfx, pan, wet: 0.16 });
-        }
+        if (gSfx > 0) playStatusSample('burn', { pan, vol: 0.22 * gSfx, rate: 1.02 });
         owner.at(60, () => { if (onBeat) onBeat({ event: 'burnTick', entity }); });
         owner.at(80, () => {
             if (flare) owner.anim(flare, [{ opacity: 0, transform: 'scale(0.35) rotate(0deg)' }, { opacity: 0.96, transform: 'scale(1.1) rotate(18deg)', offset: 0.32 }, { opacity: 0, transform: 'scale(0.6) rotate(35deg)' }], { duration: 190, easing: 'ease-out', fill: 'forwards' });
@@ -1089,49 +1098,47 @@ const arcaneVfxModule = (function () {
         if (hl) owner.anim(hl, [{ opacity: 0.75, transform: 'scaleY(0.95)' }, { opacity: 0.14, transform: 'scaleY(0.45)', offset: 0.45 }, { opacity: 0, transform: 'scaleY(0.25)' }], { duration: 220, easing: 'ease-out', fill: 'forwards' });
         if (cap) owner.anim(cap, [{ opacity: 0, transform: 'scaleY(0.3)' }, { opacity: 0.94, transform: 'scaleY(1.06)', offset: 0.35 }, { opacity: 0, transform: 'scaleY(0.82)' }], { duration: 210, easing: 'ease-out', delay: 20, fill: 'forwards' });
         const gSfx = statusSfxGate('healSuppress', 80);
-        if (gSfx > 0) {
-            statusHiss(0.02, 1800, 680, 0.12, 0.038 * gSfx, pan, 2.0);
-            tone(0.02, { type: 'sine', f0: 360, f1: 165, dur: 0.11, vol: 0.022 * gSfx, pan });
-        }
+        if (gSfx > 0) playStatusSample('burn', { pan, vol: 0.15 * gSfx, rate: 0.86 });
         owner.at(45, () => {
             owner.burst(4, () => ({ x: r.x + rnd(-rw * 0.45, rw * 0.45), y: r.y + rnd(-rh * 0.2, rh * 0.2), vx: rnd(-0.8, 0.8), vy: rnd(-1.3, -0.4), drag: 0.93, decay: 0.06, size: rnd(2.0, 3.2), shape: 'glowOrb', core: '#fed7aa', color: '#ea580c' }));
             if (onBeat) onBeat({ event: 'healSuppressed', entity });
         });
         return owner.handle;
     }
-    // 3. 麻痹僵直触发（锐利蓝电折线划过图标 + 黄电芯碎裂脱落 1 层）与未命中对照组
+    // 3. 麻痹僵直触发（高对比双边锐利蓝电裂过图标 + 耗层电晶飞溅）与未命中对照组
     function playStatusParaProc(entity, meta = {}, onBeat) {
         if (meta && meta.triggered === false) return null;
         const dom = domOf(entity); if (!dom) return null;
         const r = statusVisualRect(dom); if (!r) return null;
-        const owner = statusRun(440), uid = 'arcane-status-para-' + (++S.uid), pan = statusPanOf(r.x);
-        const W = Math.max(96, r.w * 1.18), H = Math.max(96, r.h * 1.18), cx = W / 2, cy = H / 2, rw = r.w * 0.42, rh = r.h * 0.42;
+        const owner = statusRun(480), uid = 'arcane-status-para-' + (++S.uid), pan = statusPanOf(r.x);
+        const W = Math.max(108, r.w * 1.28), H = Math.max(108, r.h * 1.28), cx = W / 2, cy = H / 2, rw = r.w * 0.46, rh = r.h * 0.46;
         const boltPts = [
-            `${(cx - rw * 0.56).toFixed(1)},${(cy - rh * 0.22).toFixed(1)} ${(cx - rw * 0.18).toFixed(1)},${(cy - rh * 0.44).toFixed(1)} ${(cx - rw * 0.24).toFixed(1)},${(cy - rh * 0.16).toFixed(1)} ${(cx + rw * 0.22).toFixed(1)},${(cy - rh * 0.42).toFixed(1)} ${(cx + rw * 0.12).toFixed(1)},${(cy - rh * 0.14).toFixed(1)} ${(cx + rw * 0.52).toFixed(1)},${(cy - rh * 0.34).toFixed(1)}`,
-            `${(cx - rw * 0.48).toFixed(1)},${(cy + rh * 0.32).toFixed(1)} ${(cx - rw * 0.06).toFixed(1)},${(cy + rh * 0.08).toFixed(1)} ${(cx - rw * 0.14).toFixed(1)},${(cy + rh * 0.34).toFixed(1)} ${(cx + rw * 0.28).toFixed(1)},${(cy + rh * 0.06).toFixed(1)} ${(cx + rw * 0.54).toFixed(1)},${(cy + rh * 0.26).toFixed(1)}`,
-            `${(cx - rw * 0.18).toFixed(1)},${(cy - rh * 0.52).toFixed(1)} ${(cx + rw * 0.06).toFixed(1)},${(cy - rh * 0.06).toFixed(1)} ${(cx - rw * 0.08).toFixed(1)},${(cy + rh * 0.02).toFixed(1)} ${(cx + rw * 0.18).toFixed(1)},${(cy + rh * 0.48).toFixed(1)}`
+            `${(cx - rw * 0.84).toFixed(1)},${(cy - rh * 0.28).toFixed(1)} ${(cx - rw * 0.32).toFixed(1)},${(cy - rh * 0.62).toFixed(1)} ${(cx - rw * 0.38).toFixed(1)},${(cy - rh * 0.22).toFixed(1)} ${(cx + rw * 0.22).toFixed(1)},${(cy - rh * 0.58).toFixed(1)} ${(cx + rw * 0.12).toFixed(1)},${(cy - rh * 0.18).toFixed(1)} ${(cx + rw * 0.82).toFixed(1)},${(cy - rh * 0.44).toFixed(1)}`,
+            `${(cx - rw * 0.78).toFixed(1)},${(cy + rh * 0.42).toFixed(1)} ${(cx - rw * 0.16).toFixed(1)},${(cy + rh * 0.12).toFixed(1)} ${(cx - rw * 0.26).toFixed(1)},${(cy + rh * 0.48).toFixed(1)} ${(cx + rw * 0.34).toFixed(1)},${(cy + rh * 0.08).toFixed(1)} ${(cx + rw * 0.82).toFixed(1)},${(cy + rh * 0.34).toFixed(1)}`,
+            `${(cx - rw * 0.32).toFixed(1)},${(cy - rh * 0.78).toFixed(1)} ${(cx + rw * 0.08).toFixed(1)},${(cy - rh * 0.12).toFixed(1)} ${(cx - rw * 0.12).toFixed(1)},${(cy + rh * 0.04).toFixed(1)} ${(cx + rw * 0.28).toFixed(1)},${(cy + rh * 0.74).toFixed(1)}`,
+            `${(cx + rw * 0.56).toFixed(1)},${(cy - rh * 0.68).toFixed(1)} ${(cx + rw * 0.22).toFixed(1)},${(cy - rh * 0.08).toFixed(1)} ${(cx + rw * 0.44).toFixed(1)},${(cy + rh * 0.06).toFixed(1)} ${(cx + rw * 0.12).toFixed(1)},${(cy + rh * 0.62).toFixed(1)}`
         ];
-        const sx = cx + rw * 0.38, sy = cy - rh * 0.34;
+        const sx = cx + rw * 0.5, sy = cy - rh * 0.42;
         const boltsHtml = boltPts.map(pts =>
-            `<polyline points="${pts}" fill="none" stroke="#38bdf8" stroke-width="2.6" stroke-linejoin="bevel" stroke-linecap="butt" opacity="0.96"/>`
-            + `<polyline points="${pts}" fill="none" stroke="#facc15" stroke-width="1.15" stroke-linejoin="bevel" stroke-linecap="butt" opacity="0.96"/>`
+            `<polyline points="${pts}" fill="none" stroke="#0f172a" stroke-width="5.2" stroke-linejoin="bevel" stroke-linecap="round" opacity="0.82"/>`
+            + `<polyline points="${pts}" fill="none" stroke="#0284c7" stroke-width="3.6" stroke-linejoin="bevel" stroke-linecap="round" opacity="0.98"/>`
+            + `<polyline points="${pts}" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linejoin="bevel" stroke-linecap="butt"/>`
+            + `<polyline points="${pts}" fill="none" stroke="#f0f9ff" stroke-width="1.15" stroke-linejoin="bevel" stroke-linecap="butt"/>`
         ).join('');
         const layer = owner.layer(
             `<div class="arcane-status-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
             + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.2)}</defs>`
-            + `<g class="s-arcs" filter="url(#${uid}-gl)" opacity="0">${boltsHtml}</g>`
+            + `<g class="s-arcs" opacity="0">${boltsHtml}</g>`
             + `<g class="s-para-flake" filter="url(#${uid}-gl)" style="transform-origin:${sx.toFixed(1)}px ${sy.toFixed(1)}px;opacity:0">`
-            + `<polygon points="${(sx - 6).toFixed(1)},${(sy + 2).toFixed(1)} ${(sx - 1).toFixed(1)},${(sy - 7).toFixed(1)} ${(sx + 6).toFixed(1)},${(sy - 3).toFixed(1)} ${(sx + 2).toFixed(1)},${(sy + 5).toFixed(1)}" fill="#facc15" stroke="#38bdf8" stroke-width="1.4" stroke-linejoin="bevel"/>`
+            + `<polygon points="${(sx - 8).toFixed(1)},${(sy + 3).toFixed(1)} ${(sx - 1).toFixed(1)},${(sy - 9).toFixed(1)} ${(sx + 8).toFixed(1)},${(sy - 4).toFixed(1)} ${(sx + 3).toFixed(1)},${(sy + 7).toFixed(1)}" fill="#fde047" stroke="#0f172a" stroke-width="2.2" stroke-linejoin="bevel"/>`
+            + `<polygon points="${(sx - 8).toFixed(1)},${(sy + 3).toFixed(1)} ${(sx - 1).toFixed(1)},${(sy - 9).toFixed(1)} ${(sx + 8).toFixed(1)},${(sy - 4).toFixed(1)} ${(sx + 3).toFixed(1)},${(sy + 7).toFixed(1)}" fill="none" stroke="#38bdf8" stroke-width="1.2" stroke-linejoin="bevel"/>`
             + `</g></svg></div>`
         );
         const arcs = layer.querySelector('.s-arcs'), flake = layer.querySelector('.s-para-flake');
-        if (arcs) owner.anim(arcs, [{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 0.22, offset: 0.32 }, { opacity: 0.96, offset: 0.56 }, { opacity: 0 }], { duration: 220, easing: 'steps(1)', fill: 'forwards' });
-        owner.anim(dom, [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(-2.5px,0,0)', offset: 0.16 }, { transform: 'translate3d(2.5px,1px,0)', offset: 0.34 }, { transform: 'translate3d(-2px,0,0)', offset: 0.56 }, { transform: 'translate3d(1.5px,-1px,0)', offset: 0.78 }, { transform: 'translate3d(0,0,0)' }], { duration: 330, easing: 'ease-out' });
+        if (arcs) owner.anim(arcs, [{ opacity: 0 }, { opacity: 1, offset: 0.06 }, { opacity: 0.45, offset: 0.24 }, { opacity: 1, offset: 0.42 }, { opacity: 0.35, offset: 0.62 }, { opacity: 0.94, offset: 0.78 }, { opacity: 0 }], { duration: 340, easing: 'steps(1)', fill: 'forwards' });
+        owner.anim(dom, [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(-3px,0,0)', offset: 0.16 }, { transform: 'translate3d(3px,1px,0)', offset: 0.34 }, { transform: 'translate3d(-2px,0,0)', offset: 0.56 }, { transform: 'translate3d(1.5px,-1px,0)', offset: 0.78 }, { transform: 'translate3d(0,0,0)' }], { duration: 350, easing: 'ease-out' });
         const gSfx = statusSfxGate('para', 70);
-        if (gSfx > 0) {
-            click(0, 0.062 * gSfx, 4200, 0.013, pan);
-            tone(0.01, { type: 'sawtooth', f0: 960, f1: 420, dur: 0.085, lp: 2600, vol: 0.028 * gSfx, pan });
-        }
+        if (gSfx > 0) playStatusSample('para', { pan, vol: 0.24 * gSfx, rate: 1.04 });
         owner.at(80, () => { if (onBeat) onBeat({ event: 'paraProc', entity }); });
         owner.at(110, () => {
             if (flake) owner.anim(flake, [{ opacity: 0.98, transform: 'translate(0px,0px) scale(1) rotate(0deg)' }, { opacity: 0.85, transform: 'translate(12px,-9px) scale(0.82) rotate(18deg)', offset: 0.45 }, { opacity: 0, transform: 'translate(22px,-16px) scale(0.4) rotate(36deg)' }], { duration: 280, easing: 'ease-out', fill: 'forwards' });
@@ -1182,15 +1189,7 @@ const arcaneVfxModule = (function () {
         const wave = layer.querySelector('.s-wave'), clean = layer.querySelector('.s-clean');
         if (wave) owner.anim(wave, [{ opacity: 0, transform: `translateY(${-rh * 0.78}px) scaleX(0.9)` }, { opacity: hasDebuff ? 0.95 : 0.48, transform: 'translateY(0px) scaleX(1.04)', offset: 0.48 }, { opacity: 0, transform: `translateY(${rh * 0.82}px) scaleX(0.92)` }], { duration: hasDebuff ? 380 : 340, easing: 'ease-in-out', fill: 'forwards' });
         const gSfx = statusSfxGate('dispel', 75);
-        if (gSfx > 0) {
-            if (hasDebuff) {
-                chime(0, 784, 0.48, 0.042 * gSfx, pan);
-                chime(0.06, 1046.5, 0.42, 0.032 * gSfx, pan);
-                whoosh(0, { f0: 950, f1: 2100, q: 1.4, dur: 0.24, vol: 0.048 * gSfx, peak: 0.4, pan });
-            } else {
-                tone(0, { type: 'sine', f0: 660, f1: 880, dur: 0.16, vol: 0.022 * gSfx, pan, wet: 0.25 });
-            }
-        }
+        if (gSfx > 0 && hasDebuff) playStatusSample('expire', { pan, vol: 0.20 * gSfx, rate: 1.15 });
         owner.at(160, () => {
             if (onBeat) onBeat({ event: 'dispel', entity, removedTypes: removed });
             if (!hasDebuff) return;
@@ -1219,10 +1218,7 @@ const arcaneVfxModule = (function () {
         const colors = types.map(t => colMap[t] || STATUS_COLORS[t] || '#cbd5e1');
         const owner = statusRun(420), pan = statusPanOf(r.x);
         const gSfx = statusSfxGate('expire', 70);
-        if (gSfx > 0) {
-            whoosh(0, { f0: 1350, f1: 680, q: 1.2, dur: 0.2, vol: 0.026 * gSfx, peak: 0.3, pan });
-            tone(0.02, { type: 'sine', f0: 520, f1: 380, dur: 0.14, vol: 0.016 * gSfx, pan });
-        }
+        if (gSfx > 0) playStatusSample('expire', { pan, vol: 0.36 * gSfx, rate: 1.0 });
         const badgeBox = id ? document.getElementById(`${id}-buffs`) : null;
         if (badgeBox) types.forEach(t => {
             const b = badgeBox.querySelector(`[data-buff-type="${t}"]`);
@@ -1282,6 +1278,7 @@ const arcaneVfxModule = (function () {
         S.shakeEls.forEach(el => el.classList.remove('arcane-shake-light', 'arcane-shake-heavy', 'arcane-shake-quake')); S.shakeEls.clear();
         if (S.dark) { S.dark.remove(); S.dark = null; }
         clearStatusLayers();
+        if (window.__stopStatusSamples) window.__stopStatusSamples();
         if (S.canvas) { S.canvas.remove(); S.canvas = null; S.ctx = null; }
         if (audioCtx) { audioCtx.close(); audioCtx = null; sfxBus = null; sfxVerb = null; sfxNoise = null; }
     }
@@ -1329,7 +1326,7 @@ const arcaneVfxModule = (function () {
             ]
         },
         {
-            title: '三 · 净化消散与蜕皮对照', badge: '4项',
+            title: '三 · 净化消散与蜕皮对照', badge: '4项', hidden: true,
             items: [
                 { name: '净化 · 单负面 (清中毒)', level: 'L1', targetId: 'h1', event: 'dispel', description: '淡金白波纹自上而下扫过 → 紫毒碎屑脱离 → 撤浮泡细节', init: { h1: { hp: 72, maxHp: 100, shield: 55, buffs: [{ type: 'poison', value: 15, duration: 2 }] } }, meta: { removedTypes: ['poison'], removedColors: { poison: '#a855f7' }, keptTypes: [] } },
                 { name: '净化 · 多负面混合', level: 'L2', targetId: 'e3', event: 'dispel', description: '清除毒/燃/麻3色分束剥离，保留atk-减益徽章', init: { e3: { hp: 620, maxHp: 1000, buffs: [{ type: 'poison', value: 18, duration: 2 }, { type: 'burn', value: 25, duration: 2 }, { type: 'paralyze', value: -5, duration: 2 }, { key: 'atk-', type: 'atk-', value: -12, duration: 2 }] } }, meta: { removedTypes: ['poison', 'burn', 'paralyze'], removedColors: { poison: '#a855f7', burn: '#f97316', paralyze: '#facc15' }, keptTypes: ['atk-'] } },
@@ -1349,7 +1346,7 @@ const arcaneVfxModule = (function () {
             items: [
                 { name: '共存 · 燃烧火苗 + 狂暴气浪', level: '共存', targetId: 'e4', event: 'coexistBurnRage', description: '底缘火苗+红黑狂暴气浪同体共存 → 燃发 → 到期留狂暴', init: { e4: { hp: 240, maxHp: 1000, buffs: [{ type: 'burn', value: 26, duration: 1 }] } }, meta: {} },
                 { name: '群发 · 多目标40ms错峰 (不叠音)', level: '压测', targetId: 'e1', event: 'multiTick', description: 'e1/e2/e3毒 + e4燃 每40ms错峰发作，门控防音压叠加', init: { e1: { hp: 780, maxHp: 1000, buffs: [{ type: 'poison', value: 15, duration: 2 }] }, e2: { hp: 780, maxHp: 1000, buffs: [{ type: 'poison', value: 15, duration: 2 }, { type: 'poison', value: 15, duration: 3 }] }, e3: { hp: 780, maxHp: 1000, buffs: [{ type: 'poison', value: 15, duration: 2 }] }, e4: { hp: 780, maxHp: 1000, buffs: [{ type: 'burn', value: 25, duration: 2 }] } }, meta: { targets: ['e1', 'e2', 'e3', 'e4'], staggerMs: 40 } },
-                { name: '压测 · 同体连发 + 中途重置检', level: '压测', targetId: 'e5', event: 'stressChain', description: 'e5同时挂毒泡/火苗/蓝电并连续发作→驱散（可随时点重置）', init: { e5: { hp: 720, maxHp: 1000, buffs: [{ type: 'poison', value: 18, duration: 3 }, { type: 'poison', value: 18, duration: 3 }, { type: 'burn', value: 24, duration: 2 }, { type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: {} }
+                { name: '压测 · 同体连发 + 中途重置检', level: '压测', targetId: 'e5', event: 'stressChain', description: 'e5同时挂毒泡/火苗/蓝电并连续发作→全部到期（可随时点重置）', init: { e5: { hp: 720, maxHp: 1000, buffs: [{ type: 'poison', value: 18, duration: 3 }, { type: 'poison', value: 18, duration: 3 }, { type: 'burn', value: 24, duration: 2 }, { type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: {} }
             ]
         }
     ];
@@ -1625,9 +1622,9 @@ const arcaneVfxModule = (function () {
                 window.renderDemoEntityBuffs(e);
                 spawnDemoFloat(e, '麻痹僵直', 'text-yellow-300');
             }));
-            demoAt(980, () => arcaneVfxModule.playStatusDispel(e, { removedTypes: ['poison', 'burn', 'paralyze'] }, () => {
+            demoAt(980, () => arcaneVfxModule.playStatusExpire(e, { expiredTypes: ['poison', 'burn', 'paralyze'] }, () => {
                 e.buffs = []; window.renderDemoEntityBuffs(e);
-                spawnDemoFloat(e, '驱散 3 负面', 'text-emerald-300');
+                spawnDemoFloat(e, '状态全部到期', 'text-slate-300');
             }));
             return 1750;
         }
@@ -1647,6 +1644,7 @@ const arcaneVfxModule = (function () {
         list.replaceChildren();
         const BADGE_CLS = { L1: 'border-cyan-500/60 text-cyan-300', L2: 'border-amber-400/70 text-amber-300', 对照: 'border-slate-500/60 text-slate-300', 对比: 'border-violet-400/70 text-violet-300', 共存: 'border-rose-400/70 text-rose-300', 压测: 'border-fuchsia-400/70 text-fuchsia-300' };
         DEMO_GROUPS.forEach(group => {
+            if (group.hidden) return;
             const hd = document.createElement('div');
             hd.className = 'arcane-status-group-hd';
             hd.innerHTML = `<span>${group.title}</span><span class="text-[8px] text-amber-400/80">${group.badge}</span>`;
@@ -1681,6 +1679,85 @@ const arcaneVfxModule = (function () {
     }
     $('#btn-reset').addEventListener('click', resetDemo);
     renderSkillCards();
+    const STATUS_SAMPLE_B64 = {
+        poison: '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',
+        burn: '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',
+        para: 'SUQzBAAAAAAAIlRTU0UAAAAOAAADTGF2ZjYzLjMuMTAwAAAAAAAAAAAAAAD/83DAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAIDwAjIyMjIzAwMDAwMD09PT09SkpKSkpKV1dXV1dkZGRkZGRxcXFxcX5+fn5+fouLi4uLmJiYmJiYpaWlpaWlsrKysrK/v7+/v7/MzMzMzNnZ2dnZ2ebm5ubm8vLy8vLy//////8AAAAATGF2YzYzLjYuAAAAAAAAAAAAAAAAJAPMAAAAAAAACA/Ece7QAAAAAAAAAAAAAAAAAP/zQMQAEWKSRWlBEAAALKBwARjHGOAGPkBT/kIykI1/Tqc7//+fO///nPoQmQjfQ5znO/+d/9Gk9CNIQhG/qc53IBgZ8EAwJAQh+Xf/8ufKAgGF1l09vs9frvej0cRbIacvGBQqbNzo//NCxBUYMOsWX4xAAmkfjFfd9YL11dB/DgMD1USi4VH1F7xp1VdP+/ucAII495gRwIYa95MEy6cCb3IBM4bTZ0V8m5LvKPR/NueDppg161RYh//S4mf/pkFtut1222MkmQKg3QRg4upB//NAxBAYenb6W8wYAFiVqm7ZSdXYV+R6vR/dAY5Kg+XAMyKGinuBDKwgERyUw6I5YJYdhkVHRyPK0ztlj2l9/7lLbk35f+WSfwv7lflI9+KPMLPoAgkEtpFj2HYJp9QKyyOa3RsCPh3/80LECRXxIwJcMkcAZS0oJhNHYm1xEED6WXc6dBJc8PudcW0kJ6VzI1MLHZCVVVvNMsOyTqjb1rTJPFCK2kR8sp4Ilm38fXtvSFDqg2UmL8RpZdZVS3seDjHoplJNHLrdJDVIEOJporz/80DEDRapYwZaMgZ0CHPFQuJpQ2mU8+ILYUYi2oknGm2UblXgzwG24wWSAwRKAJ16ll2yhSM04oMooJCa2icIKYAcUWy75TTFVHUHiYPNex+HxIfj1a6/ziBlVlub10tsF7yGLyIkev/zQsQNF6JvBlphipSOvPIbRGk8mjvKzqY2NThMcQ6bRL5j+CF1HvMJK4QM9zoKuyOxZxboijHoZkMzGdJkY7oUk53zNIzkmP3//f0/KZa1GqF50W1zDUErOzqQXR71gLWTus0buz0TYP/zQMQKFApzClgwxPC3c9hDLptJa+zmnyruwREcQIIlsNF2NLf4EXMQFJQq0VGP0VmqqD1TtrvVXo1q7GY/Kcv/38v065au6g2afGbSt+O6af3VqiGVa5c3GdkYWSUYLLS2pX5tLJJ3//NCxBQT8nMGWDDE5CsvfAap1gLOkTMYEov96gmUHSt6o3Odqq7Iz6NRG03u//PbRG9v6/TaiXq8iWYodgoSW90GmP1P8r+yPk0rpLtdY1k0kek5MHL1Ni0FrNPKwraPQjrU/iIvcSW7//NAxCATuncSXDBFcF/Y57zrU8TJ2aBmiYzRk1zcqUFTLlesSn3z4kv/2vPyJ/vq9RtK3Y2qNP/ZfoXRITMakclalcDZHhoKLkSI7iW7G0TZjE6KTIMHSIsoPc/kHOFG5oGKim1bh9L/80LELBQydwZaSMS8M0TbXJ5Ee+/6d/+tNWb3p93/1oabK3aoyi5Je0q6xTXs7fWqRSA3c3LG25dgCD9AL9HEAKk8SS6UBZM4bsU6pBzycjSCWNzUpnG2LB2alHzOi53da+t/tdu/L6X/80DENxK6cwZaMMTQPZE/9/rvo/33fGtancQTt+79p5htya22222Nwdd6GGCTdQ1qB+mVI2+pw2U5J+evj8UuGY0XBoIhIKQo5Etp5okiQzkzPMGVMh4szZFom+j6/Ml4NHv3pXRBq//zQsRHFCp3Nl5IRTpPQrZ2/1NGpGzNDeus2tv1/TwQMXg8hQ1NPp4eV3Cxyw3Ag602gu/r1Xvw9YplDJtWvG/wtA+5OZKkIm97a31a/tMZbP9fv9/3VXS7WoCGUVOhQhIGelrvb9QVWP/zQMRSE/p3FlwwxLiIu/u21hZHw0D6iIbUopEZTlJSTUYuRjo4zVtFmLNZ7IqhvuXdWZ6qUSdYPBB4jS5Twi4MNRMFa2sGlF51l+lkksis3TyDGu4DF0bhv2/bCWratlkagkxcIpPI//NCxF0UOPsS/kmEPAkiVQapZhYyUKVdKSDxVrocyOLhuO2yhsN2GVUyMj/pWl/DjNqX1uqQZ8lpCt5VlX34lUoDPcFWNBQLKWqETlwUT/p2ViI4NnbtLI0YEgTwbiJuQ2vlFWrs8Vu5//NAxGgUOYryWDmGDOYzuZysyuhS7Sl+pkcoZW6GMrWKb96OxSo9XTfOXr+1Syt//+36l0crWcsMO9Yr/ggo0kJZ7+T0xbvqA0ZAoqjgsIa5xHC+o+kEsigYmKyl+Q4g4YB1cORDVJD/80LEchRStt79RhAAhrq+fJk2FIidf/HJHCWDJMQlR//x1D0KSHoipqLOFxFav6K/+MqUFCEwzQ5RWHEQYZUcoP2EOr+jo0f/4Y1A08BE8BhIeqMcJ2C6IgCM+I6IUTdJ4Z01RYmjI2r/80DEfCMLNlwBk5gAkjHXo//+UyZFynBWwuL/EtVMQU1FMy4xMDEgKGJldGEgMylVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsRKAAADSAHAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==',
+        expire: 'SUQzBAAAAAAAIlRTU0UAAAAOAAADTGF2ZjYzLjMuMTAwAAAAAAAAAAAAAAD/83DAAAAAAAAAAAAASW5mbwAAAA8AAAARAAAHpgAlJSUlJTMzMzMzM0BAQEBAQE5OTk5OTlxcXFxcXGlpaWlpaXd3d3d3d4WFhYWFhZKSkpKSoKCgoKCgrq6urq6uu7u7u7u7ycnJycnJ19fX19fX5OTk5OTk8vLy8vLy//////8AAAAATGF2YzYzLjYuAAAAAAAAAAAAAAAAJANFAAAAAAAAB6aZ1MZMAAAAAAAAAAAAAAAAAP/zQMQAEYjh2ANJGAAkMuc6UYyGfqIBQwRgEBAkz1CFgAAm7u8AxZohbn/u7vAMW90u/h/D5c+IAQgg74ng/y7+6D4fEYfKAgsEHfw//g///wQOKgBDPDTDTzDQQfAIIByx0wDwCaZ8//NCxBQZKbKhlZNoAPg2uGC006JyBmCzE76ZksSwTAcnpnnRAo45yXC4fuy4/lNBE3//ePc3QOjjPj0/+t/oIJqQL58/+nU9BdJA4BDgg//8Mgg8uHy4OJ///4YghS3hB2gXjGPoBZE7//NAxAsVKPLEAY9gAD1VBjDEOB+MlQCTKBtMKhmDgeFRcO6GWfEIOhzEgVlcX6nSqyYfjkWSutN3Y1jOOTaZiPQwSe5eoWlEAQ2XfDLzMuKiVzK/3+1CBg1U14lPZcfmMBeZZLaIxjb/80LEERgbJtTXzCgCnFykO2URY1llvzzlGigmPCZRUXYrEqNGkIVyjGMtiPO7VvRVu2VdcY0BlFjPMqNMbzdevq4iVXlKn0b/ElFn/+n/+x+/cnbZ/yIOblW0AzWfN/zbhLnzJuejEhD/80DEDBVC8uDWSMT6sBRJpOSblyBkKs9s+ra0JSi9lsDKztow1eZVnwPUjLzvV/1P9zbIG5ESSrT039Snp/X0Vb//1Wn/Tb/308uV5sYqFTbhjufTFQnmetEw6PCocGgYJRHMGSIQhv/zQsQSGRJKyLZJippEdmFQoYURJMHTTDo3qCJAIQdbIk3JatK0SB7ZnRrlOc6Y/FdPrKznVJRi3M9TZLK7O9CLRy1S4OVsfT//lQcqQtYTifr9QHScAYaKg2SlW+WlFYNnuNO/cFQEF//zQMQJFCDW5X5IzLJE3bDLQ8w/EeqtS1ZaIpwGJdTqkqmCMMdnl4LOlEWDSaFhJNz2PeVdcwo1yFCYIzzekCixwo7+zKisA9L/qx4vknoUS6xVoTV1iIAzhRMIB4L3B5WB20JJ0nMm//NCxBMUmQLEFisMFo5E9MseT7GxOsgk3okE6zIxRUio3whWxDPZzGwtYICqiVKSUoXHAqFAdBIcwLggBACDiQwyhn////C6TTyvfQplkJAhCAZEofAamxIPX2WEaJAfWYTRm7fgp1Pk//NAxBwTcebEFmGE0rwuGoSxhCminpHYUUnsZWtqoEGJnOn/b13RFJLlaaxpDZxiaN3OqjHGt////9Hxg75OEZfc2wigRUAxtQNgtEL2MU/hLITNbDm50oQixmvNmy+/e+rrITVX0xb/80LEKRQY8tTWEkwCBYaWcM3mgMbtKidI+2KtBpQYVjUnRgeN/7qP8jktBuDRxBEuZYnzVYMJNybYJgUo3IuOqoTSGKOzlRRYYkaFvkfD5ylM5xhlzQ/WI2b/yX18qAndTMx1dQ1IQqX/80DENBO5vtTeSMR+HRVDCS73AQmw3lf7N7K6ivnZSeorYKVEu28+Q0ztoyhsBXvmxdlCwH0M0YvjCE02Hrkiym9zNSaZgxLxJUMrtRDs7kHnKzLq3r02b2qjuNz7CqRg8na6hSXjk//zQsRAE8FiyDZ6RFb9buMf+p/FVR51FtrffUsZiKdtE0bSEUilYUlBMPCq0S1aTJwQuVIamIJVUGAqDCyryjBnkQ16bgsMi1R8iXjzV9+/NdqISGJ8cdYVxnBq//121K3/zJ0zWaigsv/zQMRNE/FiwD5IztIZ6qZ6nYAUx2UEk7bGBJTwREZAXZPDLSEonfCExRukQGSn1UrG76sKf/VVGHIZsjIr/zbszPVRGJY9S3WnnwoZmpn5ZnTxTqB+tX9tSdX/651WukN1BACCAUkG//NCxFgT4eawFmJGTmIXPFUskUQlEQtYKqgZeMJDS0kZ+1RuTJVMK+uR69X/oCJoksv57LVVr1aCdSwKMjHOKU1Xb+Kvl98qgMFQITglPf///Hp99SBN0Q0jRDwHU1H6ynmXVzlThlG6//NAxGQT2facNmGGWj0ktXKhrWFtuQ5mNKAQCCpKWRScwBLBQnHfmhMWRme1Oq8bjN7f/l1VpN9ARMyf4V/ijgU4UlgIBCPBDQkwYofQfYDwA3gYEAhSdGhsgIyAuCoLDIeFiAcgeWX/80LEbxJpalQQeYbtFlFlHmFllGlFlHmFllGlFlWCYsLCws39QsLior/CoqKiosEhYSB+TEFNRTMuMTAxIChiZXRhIDMpqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqr/80DEgRLw0RVoekxoqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqg=='
+    };
+    (function initStatusAudioHost() {
+        let sCtx = null;
+        const decoded = new Map(), pending = new Map(), activeVoices = new Set();
+        function syncAudioAttr() {
+            const root = document.documentElement;
+            if (!root) return;
+            root.setAttribute('data-status-audio-decoded', Array.from(decoded.keys()).join(','));
+            root.setAttribute('data-status-audio-active', String(activeVoices.size));
+        }
+        function ensureCtx() {
+            if (!sCtx || sCtx.state === 'closed') {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (AC) sCtx = new AC();
+            }
+            if (sCtx && sCtx.state === 'suspended') sCtx.resume().catch(() => {});
+            return sCtx;
+        }
+        function decodeSample(key) {
+            const b64 = STATUS_SAMPLE_B64[key], c = ensureCtx();
+            if (!b64 || b64.startsWith('/*') || !c) return Promise.resolve(null);
+            if (decoded.has(key)) return Promise.resolve(decoded.get(key));
+            if (pending.has(key)) return pending.get(key);
+            try {
+                const raw = atob(b64), arr = new Uint8Array(raw.length);
+                for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+                const p = c.decodeAudioData(arr.buffer.slice(0)).then(buf => {
+                    decoded.set(key, buf); pending.delete(key); syncAudioAttr(); return buf;
+                }).catch(err => {
+                    pending.delete(key);
+                    document.documentElement.setAttribute('data-status-audio-err', key + ':' + (err && err.message || 'decode'));
+                    return null;
+                });
+                pending.set(key, p);
+                return p;
+            } catch (err) {
+                document.documentElement.setAttribute('data-status-audio-err', key + ':' + (err && err.message || 'atob'));
+                return Promise.resolve(null);
+            }
+        }
+        function playBuf(buf, { volume = 0.3, pan = 0, rate = 1 } = {}) {
+            const c = ensureCtx(); if (!c || !buf) return;
+            const src = c.createBufferSource();
+            src.buffer = buf;
+            if (src.playbackRate) src.playbackRate.value = Math.max(0.5, Math.min(2.0, Number(rate) || 1));
+            const gain = c.createGain();
+            gain.gain.value = Math.max(0, Math.min(1, Number(volume) || 0.3));
+            if (typeof c.createStereoPanner === 'function') {
+                const p = c.createStereoPanner();
+                p.pan.value = Math.max(-1, Math.min(1, Number(pan) || 0));
+                src.connect(gain); gain.connect(p); p.connect(c.destination);
+            } else {
+                src.connect(gain); gain.connect(c.destination);
+            }
+            const voice = { src };
+            activeVoices.add(voice); syncAudioAttr();
+            src.onended = () => { activeVoices.delete(voice); syncAudioAttr(); };
+            try { src.start(0); } catch { activeVoices.delete(voice); syncAudioAttr(); }
+        }
+        document.addEventListener('pointerdown', () => Object.keys(STATUS_SAMPLE_B64).forEach(decodeSample), { once: true });
+        syncAudioAttr();
+        window.__playStatusSample = function (key, opts) {
+            if (!STATUS_SAMPLE_B64[key] || STATUS_SAMPLE_B64[key].startsWith('/*')) return false;
+            if (decoded.has(key)) { playBuf(decoded.get(key), opts); return true; }
+            const tok = combatToken;
+            decodeSample(key).then(buf => { if (buf && tok === combatToken) playBuf(buf, opts); });
+            return true;
+        };
+        window.__stopStatusSamples = function () {
+            activeVoices.forEach(v => { try { v.src.stop(0); } catch {} });
+            activeVoices.clear(); syncAudioAttr();
+        };
+        window.__statusAudioStats = () => ({ keys: Object.keys(STATUS_SAMPLE_B64), decoded: Array.from(decoded.keys()), activeCount: activeVoices.size });
+    })();
     // ===== 演示控制 END =====
     // 移植：只将新增 arcane- CSS、技能函数、标签与分派合并到正式版已有模块。
     // 必须同时追加 WEBM_FX_REGISTRY 的 { url: '', scale: 1.0, particles: 'arcane', delay: 蓄势秒数 }。
