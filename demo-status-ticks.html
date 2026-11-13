@@ -55,39 +55,60 @@
     .arcane-status-anchor { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; }
     .arcane-status-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
     .arcane-status-host-rel { position: relative !important; }
-    .arcane-status-persist-poison, .arcane-status-persist-burn {
-        position: absolute; inset: 0; border-radius: 6px; pointer-events: none;
-        transition: opacity 0.28s ease-out; will-change: opacity;
+    .arcane-status-persist-layer {
+        position: absolute; inset: 0; pointer-events: none; z-index: 8; overflow: visible;
+        transition: opacity 0.26s ease-out; will-change: opacity;
     }
-    .arcane-status-persist-poison {
-        z-index: 16;
-        box-shadow: inset 0 0 12px rgba(147, 51, 234, 0.34), 0 0 8px rgba(168, 85, 247, 0.22);
-        background: radial-gradient(ellipse at 50% 45%, transparent 56%, rgba(88, 28, 135, 0.28) 88%, rgba(168, 85, 247, 0.42) 100%);
-        animation: arcane-status-poison-breathe 2.8s ease-in-out infinite;
+    .arcane-status-persist-layer.exiting { opacity: 0 !important; }
+    .arcane-status-flame-chip {
+        position: absolute; pointer-events: none; transform-origin: 50% 92%;
+        will-change: transform, opacity;
     }
-    .arcane-status-persist-burn {
-        z-index: 17;
-        border: 1.5px solid rgba(234, 88, 12, 0.56);
-        box-shadow: inset 0 0 14px rgba(124, 45, 18, 0.62), inset 0 0 6px rgba(249, 115, 22, 0.38), 0 0 9px rgba(234, 88, 12, 0.26);
-        background: radial-gradient(ellipse at 50% 45%, transparent 54%, rgba(67, 20, 7, 0.44) 86%, rgba(234, 88, 12, 0.48) 100%);
-        animation: arcane-status-burn-smolder 2.1s ease-in-out infinite;
+    .arcane-status-flame-chip.f1 { left: 15%; bottom: 1px; width: 11px; height: 16px; animation: arcane-status-flame-flicker 1.25s ease-in-out infinite; }
+    .arcane-status-flame-chip.f2 { left: 42%; bottom: -1px; width: 9px; height: 13px; animation: arcane-status-flame-flicker 1.05s ease-in-out -0.45s infinite; }
+    .arcane-status-flame-chip.f3 { right: 15%; bottom: 2px; width: 10px; height: 15px; animation: arcane-status-flame-flicker 1.42s ease-in-out -0.78s infinite; }
+    .arcane-status-ember-dot {
+        position: absolute; width: 2.5px; height: 2.5px; border-radius: 50%; pointer-events: none;
+        background: #fde047; box-shadow: 0 0 4px #f97316; will-change: transform, opacity;
     }
-    .arcane-status-persist-poison.is-sprite, .arcane-status-persist-burn.is-sprite {
-        inset: -10px -12px; border-radius: 50%; z-index: 2; border: none;
-        -webkit-mask-image: radial-gradient(circle, transparent 36%, rgba(0,0,0,0.75) 68%, rgba(0,0,0,1) 92%, transparent 100%);
-        mask-image: radial-gradient(circle, transparent 36%, rgba(0,0,0,0.75) 68%, rgba(0,0,0,1) 92%, transparent 100%);
+    .arcane-status-ember-dot.e1 { left: 26%; bottom: 10%; animation: arcane-status-ember-float 1.6s ease-out infinite; }
+    .arcane-status-ember-dot.e2 { right: 24%; bottom: 12%; animation: arcane-status-ember-float 1.85s ease-out -0.82s infinite; }
+    @keyframes arcane-status-flame-flicker {
+        0%, 100% { transform: translateY(0) scale(0.92, 0.9) skewX(-3deg); opacity: 0.72; }
+        35% { transform: translateY(-2px) scale(1.06, 1.12) skewX(3deg); opacity: 0.94; }
+        70% { transform: translateY(-1px) scale(0.96, 1.02) skewX(-2deg); opacity: 0.8; }
     }
-    .arcane-status-persist-poison.is-sprite {
-        box-shadow: none;
-        background: radial-gradient(circle at 50% 52%, transparent 34%, rgba(147, 51, 234, 0.34) 68%, rgba(192, 132, 252, 0.52) 86%, transparent 100%);
+    @keyframes arcane-status-ember-float {
+        0% { transform: translate3d(0, 2px, 0) scale(0.6); opacity: 0; }
+        25% { opacity: 0.92; }
+        100% { transform: translate3d(3px, -16px, 0) scale(0.35); opacity: 0; }
     }
-    .arcane-status-persist-burn.is-sprite {
-        box-shadow: none;
-        background: radial-gradient(circle at 50% 52%, transparent 32%, rgba(67, 20, 7, 0.55) 62%, rgba(234, 88, 12, 0.68) 84%, rgba(251, 146, 60, 0.16) 95%, transparent 100%);
+    .arcane-status-bubble-dot {
+        position: absolute; border-radius: 50%; pointer-events: none;
+        border: 1px solid rgba(216, 180, 254, 0.82);
+        background: radial-gradient(circle at 32% 30%, rgba(243, 232, 255, 0.88) 0%, rgba(168, 85, 247, 0.48) 55%, rgba(107, 33, 168, 0.75) 100%);
+        will-change: transform, opacity;
     }
-    .arcane-status-persist-poison.exiting, .arcane-status-persist-burn.exiting { opacity: 0 !important; animation: none; }
-    @keyframes arcane-status-poison-breathe { 0%, 100% { opacity: 0.72; } 50% { opacity: 0.96; } }
-    @keyframes arcane-status-burn-smolder { 0%, 100% { opacity: 0.78; } 50% { opacity: 1; } }
+    .arcane-status-bubble-dot.b1 { right: 12%; top: 44%; width: 6px; height: 6px; animation: arcane-status-bubble-drift 2.1s ease-out infinite; }
+    .arcane-status-bubble-dot.b2 { right: 25%; top: 34%; width: 5px; height: 5px; animation: arcane-status-bubble-drift 2.45s ease-out -0.85s infinite; }
+    .arcane-status-bubble-dot.b3 { right: 17%; top: 24%; width: 7px; height: 7px; animation: arcane-status-bubble-drift 1.95s ease-out -1.45s infinite; }
+    @keyframes arcane-status-bubble-drift {
+        0% { opacity: 0; transform: translate3d(0, 6px, 0) scale(0.5); }
+        22% { opacity: 0.92; transform: translate3d(1px, 1px, 0) scale(0.95); }
+        76% { opacity: 0.86; transform: translate3d(-1.5px, -10px, 0) scale(1.08); }
+        90% { opacity: 0.9; transform: translate3d(-1px, -13px, 0) scale(1.24); }
+        100% { opacity: 0; transform: translate3d(-1px, -15px, 0) scale(0.35); }
+    }
+    .arcane-status-zap-bolt { position: absolute; pointer-events: none; opacity: 0; will-change: opacity, transform; }
+    .arcane-status-zap-bolt.z1 { left: 12%; top: 18%; width: 24px; height: 18px; animation: arcane-status-zap-flicker 2.35s steps(1) infinite; }
+    .arcane-status-zap-bolt.z2 { left: 42%; top: 38%; width: 22px; height: 16px; animation: arcane-status-zap-flicker 2.35s steps(1) -1.12s infinite; }
+    @keyframes arcane-status-zap-flicker {
+        0%, 7%, 13%, 17%, 61%, 66%, 100% { opacity: 0; }
+        8% { opacity: 0.95; transform: translate3d(0, 0, 0) rotate(-4deg); }
+        12% { opacity: 0.3; transform: translate3d(1px, -1px, 0) rotate(2deg); }
+        15% { opacity: 0.88; transform: translate3d(-1px, 1px, 0) rotate(0deg); }
+        62% { opacity: 0.85; transform: translate3d(1px, 0, 0) rotate(3deg); }
+    }
     @keyframes arcane-status-badge-pulse {
         0%, 100% { opacity: 1; box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35), 0 0 5px rgba(245, 158, 11, 0.25); }
         50% { opacity: 0.54; box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.78), 0 0 9px rgba(245, 158, 11, 0.52); }
@@ -791,14 +812,23 @@ const arcaneVfxModule = (function () {
     function statusGlowDef(id, std = 3) {
         return `<filter id="${id}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${std}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
     }
+    function resolveStatusIconHost(dom) {
+        if (!dom) return null;
+        const portrait = dom.querySelector && dom.querySelector('.portrait');
+        if (portrait) return portrait.parentElement || portrait;
+        if (dom.classList && dom.classList.contains('hero-card-inner')) return dom.querySelector('.bg-gray-900') || dom;
+        return dom;
+    }
     function statusVisualRect(entityOrDom) {
         const dom = entityOrDom && entityOrDom.nodeType === 1 ? entityOrDom : domOf(entityOrDom);
         if (!dom) return null;
         const portrait = dom.querySelector && dom.querySelector('.portrait');
-        if (portrait) {
-            const r = ctr(portrait);
-            const prev = portrait.previousElementSibling;
-            const top = prev ? Math.max(r.top, prev.getBoundingClientRect().bottom) : r.top;
+        const normalHero = dom.classList && dom.classList.contains('hero-card-inner');
+        const target = portrait || (normalHero ? dom.querySelector('.bg-gray-900') : null);
+        if (target) {
+            const r = ctr(target);
+            const hdr = portrait ? portrait.previousElementSibling : target.querySelector('.z-10');
+            const top = hdr ? Math.max(r.top, hdr.getBoundingClientRect().bottom) : r.top;
             const h = Math.max(24, r.bottom - top);
             return { dom, x: r.x, y: (top + r.bottom) / 2, w: r.w, h, top, bottom: r.bottom, left: r.left, right: r.right, isHero: true };
         }
@@ -850,31 +880,54 @@ const arcaneVfxModule = (function () {
         owner.handle = handle;
         return owner;
     }
+    function buildStatusPersistHtml(kind) {
+        if (kind === 'burn') {
+            const flameSvg = d => `<svg viewBox="0 0 12 18" class="w-full h-full overflow-visible"><path d="${d}" fill="#ea580c" opacity="0.92"/><path d="M4,16 Q6,9 6.3,6.5 Q8.4,11.5 7.5,16 Z" fill="#fef08a" opacity="0.95"/></svg>`;
+            return `<span class="arcane-status-flame-chip f1">${flameSvg('M2,17 Q1.2,10 6.2,1.5 Q10.8,9 9.8,17 Z')}</span>`
+                + `<span class="arcane-status-flame-chip f2">${flameSvg('M2.2,17 Q2,11 5.8,3 Q9.8,10 9.4,17 Z')}</span>`
+                + `<span class="arcane-status-flame-chip f3">${flameSvg('M2,17 Q1.8,9.5 6.4,2 Q10.4,10.5 9.6,17 Z')}</span>`
+                + '<span class="arcane-status-ember-dot e1"></span><span class="arcane-status-ember-dot e2"></span>';
+        }
+        if (kind === 'poison') {
+            return '<span class="arcane-status-bubble-dot b1"></span><span class="arcane-status-bubble-dot b2"></span><span class="arcane-status-bubble-dot b3"></span>';
+        }
+        if (kind === 'paralyze') {
+            const bolt = (cls, pts) => `<svg viewBox="0 0 24 18" class="arcane-status-zap-bolt ${cls} overflow-visible"><polyline points="${pts}" fill="none" stroke="#38bdf8" stroke-width="2.4" stroke-linejoin="bevel" stroke-linecap="butt" opacity="0.95"/><polyline points="${pts}" fill="none" stroke="#facc15" stroke-width="1" stroke-linejoin="bevel" stroke-linecap="butt"/></svg>`;
+            return bolt('z1', '2,15 10,8 8,10 18,2 15,6 22,2') + bolt('z2', '1,4 9,8 7,10 16,13 13,10 21,15');
+        }
+        return '';
+    }
     function setStatusPersist(dom, kind, active) {
         if (!dom || !dom.isConnected) return;
-        const isSprite = !(dom.querySelector && dom.querySelector('.portrait'));
+        const host = resolveStatusIconHost(dom);
+        if (!host || !host.isConnected) return;
         const attr = 'data-arcane-status-persist';
-        let node = dom.querySelector('[' + attr + '="' + kind + '"]');
+        let node = host.querySelector(':scope > [' + attr + '="' + kind + '"]') || dom.querySelector('[' + attr + '="' + kind + '"]');
         if (active) {
-            if (!dom.classList.contains('relative')) dom.classList.add('arcane-status-host-rel');
+            if (getComputedStyle(host).position === 'static') host.classList.add('arcane-status-host-rel');
             if (!node) {
                 node = document.createElement('div');
                 node.setAttribute(attr, kind);
-                node.className = (kind === 'burn' ? 'arcane-status-persist-burn' : 'arcane-status-persist-poison') + (isSprite ? ' is-sprite' : '');
-                dom.appendChild(node);
-            } else { node.classList.remove('exiting'); }
+                node.className = 'arcane-status-persist-layer arcane-status-persist-' + kind;
+                node.innerHTML = buildStatusPersistHtml(kind);
+                host.appendChild(node);
+            } else {
+                if (node._exitTimer) { clearTimeout(node._exitTimer); S.timers.delete(node._exitTimer); node._exitTimer = null; }
+                node.classList.remove('exiting');
+            }
             let set = ST.persists.get(dom);
             if (!set) { set = new Set(); ST.persists.set(dom, set); }
             set.add(node);
-        } else if (node) {
+        } else if (node && !node.classList.contains('exiting')) {
             node.classList.add('exiting');
             const token = combatToken;
-            after(290, () => {
+            node._exitTimer = after(290, () => {
+                node._exitTimer = null;
                 if (token !== combatToken) return;
                 node.remove();
                 const set = ST.persists.get(dom);
                 if (set) { set.delete(node); if (!set.size) ST.persists.delete(dom); }
-                if (!dom.querySelector('[' + attr + ']')) dom.classList.remove('arcane-status-host-rel');
+                if (!host.querySelector('[' + attr + ']')) host.classList.remove('arcane-status-host-rel');
             });
         }
     }
@@ -884,61 +937,76 @@ const arcaneVfxModule = (function () {
         if (!dom) return;
         if (!entity.isAlive || entity.hp <= 0 || entity.isSubdued) { clearStatusLayers(entity); return; }
         const buffs = entity.buffs || [];
-        setStatusPersist(dom, 'poison', buffs.some(b => b.type === 'poison' && b.duration > 0));
-        setStatusPersist(dom, 'burn', buffs.some(b => b.type === 'burn' && b.duration > 0));
+        const has = t => buffs.some(b => b.type === t && (b.duration > 0 || b.permanent));
+        setStatusPersist(dom, 'poison', has('poison'));
+        setStatusPersist(dom, 'burn', has('burn'));
+        setStatusPersist(dom, 'paralyze', has('paralyze'));
     }
     function clearStatusLayers(entityOrId) {
         if (entityOrId) {
             const dom = domOf(entityOrId);
             if (dom) {
-                dom.querySelectorAll('[data-arcane-status-persist]').forEach(n => n.remove());
+                dom.querySelectorAll('[data-arcane-status-persist]').forEach(n => {
+                    if (n._exitTimer) { clearTimeout(n._exitTimer); S.timers.delete(n._exitTimer); }
+                    n.remove();
+                });
+                const host = resolveStatusIconHost(dom);
+                if (host) host.classList.remove('arcane-status-host-rel');
                 dom.classList.remove('arcane-status-host-rel');
                 ST.persists.delete(dom);
             }
             return;
         }
         ST.persists.forEach((set, dom) => {
-            set.forEach(n => n.remove());
+            set.forEach(n => {
+                if (n._exitTimer) { clearTimeout(n._exitTimer); S.timers.delete(n._exitTimer); }
+                n.remove();
+            });
+            const host = dom && dom.isConnected ? resolveStatusIconHost(dom) : null;
+            if (host) host.classList.remove('arcane-status-host-rel');
             if (dom && dom.isConnected) dom.classList.remove('arcane-status-host-rel');
         });
         ST.persists.clear();
         ST.sfxAt.clear();
-        document.querySelectorAll('[data-arcane-status-persist]').forEach(n => n.remove());
+        document.querySelectorAll('[data-arcane-status-persist]').forEach(n => {
+            if (n._exitTimer) { clearTimeout(n._exitTimer); S.timers.delete(n._exitTimer); }
+            n.remove();
+        });
         document.querySelectorAll('.arcane-status-host-rel').forEach(el => el.classList.remove('arcane-status-host-rel'));
     }
-    // 1. 中毒发作：紫色毒纹泛起 → 依层 2~4 毒泡破裂 → 细毒雾上浮 (L1 · 540ms)
+    // 1. 中毒发作：局部紫纹微渗 → 依层 2~4 毒泡从图标右/上方浮出破裂 → 细毒雾上浮 (L1 · 540ms)
     function playStatusPoisonTick(entity, meta = {}, onBeat) {
         const dom = domOf(entity); if (!dom) return null;
         const r = statusVisualRect(dom); if (!r) return null;
         const layers = Math.max(1, Math.min(5, Number(meta.layers) || 1));
         const bubbleCount = layers >= 3 ? 4 : (layers === 2 ? 3 : 2);
         const owner = statusRun(540), uid = 'arcane-status-poison-' + (++S.uid), pan = statusPanOf(r.x);
-        const W = Math.max(110, r.w * 1.45), H = Math.max(110, r.h * 1.45), cx = W / 2, cy = H / 2, rw = r.w * 0.44, rh = r.h * 0.44;
-        const veinSet = [
-            `M${cx - rw * 0.72},${cy + rh * 0.35} Q${cx - rw * 0.56},${cy - rh * 0.08} ${cx - rw * 0.25},${cy - rh * 0.46}`,
-            `M${cx + rw * 0.68},${cy + rh * 0.28} Q${cx + rw * 0.54},${cy - rh * 0.16} ${cx + rw * 0.22},${cy - rh * 0.52}`,
-            `M${cx - rw * 0.48},${cy + rh * 0.58} Q${cx},${cy + rh * 0.42} ${cx + rw * 0.46},${cy + rh * 0.52}`,
-            `M${cx - rw * 0.38},${cy - rh * 0.22} Q${cx},${cy - rh * 0.48} ${cx + rw * 0.34},${cy - rh * 0.26}`,
-            `M${cx - rw * 0.62},${cy - rh * 0.05} Q${cx - rw * 0.18},${cy + rh * 0.16} ${cx + rw * 0.56},${cy - rh * 0.04}`
+        const W = Math.max(96, r.w * 1.18), H = Math.max(96, r.h * 1.18), cx = W / 2, cy = H / 2, rw = r.w * 0.42, rh = r.h * 0.42;
+        const wispSet = [
+            `M${cx + rw * 0.14},${cy + rh * 0.25} L${cx + rw * 0.34},${cy - rh * 0.08} L${cx + rw * 0.28},${cy - rh * 0.32}`,
+            `M${cx - rw * 0.28},${cy + rh * 0.18} L${cx - rw * 0.14},${cy - rh * 0.12} L${cx - rw * 0.22},${cy - rh * 0.34}`,
+            `M${cx + rw * 0.04},${cy - rh * 0.06} L${cx + rw * 0.26},${cy - rh * 0.22}`,
+            `M${cx - rw * 0.1},${cy + rh * 0.28} L${cx + rw * 0.16},${cy + rh * 0.1}`,
+            `M${cx + rw * 0.34},${cy + rh * 0.18} L${cx + rw * 0.46},${cy - rh * 0.18}`
         ].slice(0, layers >= 3 ? 5 : (layers === 2 ? 4 : 3));
-        const bSlots = [[-0.36, -0.18], [0.34, -0.26], [-0.14, 0.22], [0.28, 0.18]].slice(0, bubbleCount);
-        const veinStrokeW = layers >= 3 ? 2.6 : 1.9, veinOp = layers >= 3 ? 0.88 : 0.68;
+        const bSlots = [[0.24, -0.14], [0.42, -0.34], [0.06, -0.42], [0.34, -0.56]].slice(0, bubbleCount);
+        const wispStrokeW = layers >= 3 ? 2.1 : 1.5, wispOp = layers >= 3 ? 0.85 : 0.65;
         const bubblesHtml = bSlots.map(([ox, oy], idx) => {
-            const bx = (cx + ox * rw * 1.45).toFixed(1), by = (cy + oy * rh * 1.35).toFixed(1), br = (6.2 + (idx % 2) * 1.8 + (layers >= 3 ? 1.2 : 0)).toFixed(1);
-            return `<g class="s-bubble" data-bx="${(r.x + ox * r.w * 0.64).toFixed(1)}" data-by="${(r.y + oy * r.h * 0.6).toFixed(1)}" style="transform-origin:${bx}px ${by}px;opacity:0">`
+            const bx = (cx + ox * rw).toFixed(1), by = (cy + oy * rh).toFixed(1), br = (4.6 + (idx % 2) * 1.4 + (layers >= 3 ? 0.9 : 0)).toFixed(1);
+            return `<g class="s-bubble" data-bx="${(r.x + ox * r.w * 0.42).toFixed(1)}" data-by="${(r.y + oy * r.h * 0.42 - 6).toFixed(1)}" style="transform-origin:${bx}px ${by}px;opacity:0">`
                 + `<circle cx="${bx}" cy="${by}" r="${br}" fill="url(#${uid}-bub)"/>`
-                + `<circle cx="${(Number(bx) - Number(br) * 0.32).toFixed(1)}" cy="${(Number(by) - Number(br) * 0.32).toFixed(1)}" r="${(Number(br) * 0.26).toFixed(1)}" fill="#f3e8ff" opacity="0.72"/></g>`;
+                + `<circle cx="${(Number(bx) - Number(br) * 0.32).toFixed(1)}" cy="${(Number(by) - Number(br) * 0.32).toFixed(1)}" r="${(Number(br) * 0.28).toFixed(1)}" fill="#f3e8ff" opacity="0.82"/></g>`;
         }).join('');
         const layer = owner.layer(
             `<div class="arcane-status-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
-            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.4)}`
-            + `<radialGradient id="${uid}-bub" cx="0.35" cy="0.32"><stop offset="0" stop-color="#f3e8ff" stop-opacity="0.35"/><stop offset="0.58" stop-color="#a855f7" stop-opacity="0.72"/><stop offset="0.88" stop-color="#7e22ce" stop-opacity="0.92"/><stop offset="1" stop-color="#581c87" stop-opacity="0"/></radialGradient>`
+            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.0)}`
+            + `<radialGradient id="${uid}-bub" cx="0.35" cy="0.32"><stop offset="0" stop-color="#f3e8ff" stop-opacity="0.45"/><stop offset="0.58" stop-color="#a855f7" stop-opacity="0.76"/><stop offset="0.88" stop-color="#7e22ce" stop-opacity="0.94"/><stop offset="1" stop-color="#581c87" stop-opacity="0"/></radialGradient>`
             + `</defs><g class="s-veins" filter="url(#${uid}-gl)" style="transform-origin:${cx}px ${cy}px;opacity:0">`
-            + veinSet.map(d => `<path d="${d}" fill="none" stroke="#c084fc" stroke-width="${veinStrokeW}" stroke-linecap="round" opacity="${veinOp}"/>`).join('')
+            + wispSet.map(d => `<path d="${d}" fill="none" stroke="#c084fc" stroke-width="${wispStrokeW}" stroke-linecap="round" stroke-linejoin="round" opacity="${wispOp}"/>`).join('')
             + `</g><g filter="url(#${uid}-gl)">${bubblesHtml}</g></svg></div>`
         );
         const veins = layer.querySelector('.s-veins');
-        if (veins) owner.anim(veins, [{ opacity: 0, transform: 'scale(0.92)' }, { opacity: 1, transform: 'scale(1.02)', offset: 0.32 }, { opacity: 0.72, transform: 'scale(1)', offset: 0.65 }, { opacity: 0, transform: 'scale(1.05)' }], { duration: 420, easing: 'ease-out', fill: 'forwards' });
+        if (veins) owner.anim(veins, [{ opacity: 0, transform: 'translateY(3px) scale(0.95)' }, { opacity: 0.92, transform: 'translateY(0px) scale(1)', offset: 0.3 }, { opacity: 0.65, transform: 'translateY(-2px)', offset: 0.65 }, { opacity: 0, transform: 'translateY(-4px)' }], { duration: 400, easing: 'ease-out', fill: 'forwards' });
         const gSfx = statusSfxGate('poison', 70);
         if (gSfx > 0) {
             statusHiss(0, 2600, 1250, 0.14, (0.042 + layers * 0.005) * gSfx, pan, 2.2);
@@ -948,42 +1016,44 @@ const arcaneVfxModule = (function () {
         layer.querySelectorAll('.s-bubble').forEach((bEl, idx) => {
             const d0 = 40 + idx * 62;
             owner.at(d0, () => {
-                owner.anim(bEl, [{ opacity: 0, transform: 'scale(0.28)' }, { opacity: 0.96, transform: 'scale(1.08)', offset: 0.58 }, { opacity: 0, transform: 'scale(1.42)' }], { duration: 155, easing: 'ease-out', fill: 'forwards' });
+                owner.anim(bEl, [{ opacity: 0, transform: 'translateY(4px) scale(0.32)' }, { opacity: 0.96, transform: 'translateY(-5px) scale(1.08)', offset: 0.58 }, { opacity: 0, transform: 'translateY(-11px) scale(1.36)' }], { duration: 155, easing: 'ease-out', fill: 'forwards' });
             });
             owner.at(d0 + 92, () => {
                 const bx = Number(bEl.dataset.bx), by = Number(bEl.dataset.by);
                 const gPop = statusSfxGate('poisonPop', 55);
                 if (gPop > 0) tone(0, { type: 'sine', f0: 480 + idx * 75, f1: 760, dur: 0.045, vol: 0.018 * gPop, pan, wet: 0.15 });
                 owner.burst(4 + (layers >= 3 ? 1 : 0), () => {
-                    const a = rnd(-Math.PI * 0.9, -Math.PI * 0.1), sp = rnd(0.7, 1.7);
-                    return { x: bx + rnd(-4, 4), y: by + rnd(-4, 4), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.35, drag: 0.94, decay: 0.046, size: rnd(2.2, 3.8), shape: 'glowOrb', core: '#e9d5ff', color: '#a855f7' };
+                    const a = rnd(-Math.PI * 0.9, -Math.PI * 0.1), sp = rnd(0.7, 1.6);
+                    return { x: bx + rnd(-3, 3), y: by + rnd(-3, 3), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.35, drag: 0.94, decay: 0.048, size: rnd(2.0, 3.4), shape: 'glowOrb', core: '#e9d5ff', color: '#a855f7' };
                 });
-                owner.addP({ x: bx, y: by - 2, vx: rnd(-0.35, 0.35), vy: rnd(-1.1, -0.55), drag: 0.96, decay: 0.036, size: rnd(8, 12), shape: 'gradMist', blend: 'source-over', mistCore: '#7e22ce', color: 'rgba(126,34,206,0.34)', fade: 'rgba(59,7,100,0)' });
+                owner.addP({ x: bx, y: by - 2, vx: rnd(-0.3, 0.3), vy: rnd(-1.05, -0.5), drag: 0.96, decay: 0.038, size: rnd(7, 10), shape: 'gradMist', blend: 'source-over', mistCore: '#7e22ce', color: 'rgba(126,34,206,0.3)', fade: 'rgba(59,7,100,0)' });
             });
         });
         return owner.handle;
     }
 
-    // 2. 燃烧发作：火舌沿轮廓窜起 → 单一小爆燃点 → 焦黑余烬上飘；不叠层强度恒定 (L1 · 540ms)
+    // 2. 燃烧发作：图标底部/表面细火苗涌起 → 锐利火星闪爆 → 黑灰余烬上飘；不叠层强度恒定 (L1 · 540ms)
     function playStatusBurnTick(entity, meta = {}, onBeat) {
         const dom = domOf(entity); if (!dom) return null;
         const r = statusVisualRect(dom); if (!r) return null;
         const owner = statusRun(540), uid = 'arcane-status-burn-' + (++S.uid), pan = statusPanOf(r.x);
-        const W = Math.max(115, r.w * 1.5), H = Math.max(115, r.h * 1.5), cx = W / 2, cy = H / 2, rw = r.w * 0.46, rh = r.h * 0.46;
-        const fx = cx + rw * 0.24, fy = cy - rh * 0.18;
+        const W = Math.max(96, r.w * 1.2), H = Math.max(96, r.h * 1.2), cx = W / 2, cy = H / 2, rw = r.w * 0.42, rh = r.h * 0.42;
+        const fx = cx + rw * 0.16, fy = cy + rh * 0.08;
+        const tongueAt = (tx, by, w, h) => `<path d="M${(tx - w).toFixed(1)},${by.toFixed(1)} Q${(tx - w * 0.7).toFixed(1)},${(by - h * 0.55).toFixed(1)} ${(tx + w * 0.08).toFixed(1)},${(by - h).toFixed(1)} Q${(tx + w * 0.85).toFixed(1)},${(by - h * 0.45).toFixed(1)} ${(tx + w).toFixed(1)},${by.toFixed(1)} Z" fill="url(#${uid}-fl)"/>`
+            + `<path d="M${(tx - w * 0.45).toFixed(1)},${by.toFixed(1)} Q${tx.toFixed(1)},${(by - h * 0.55).toFixed(1)} ${(tx + w * 0.45).toFixed(1)},${by.toFixed(1)} Z" fill="#fef08a" opacity="0.9"/>`;
         const layer = owner.layer(
             `<div class="arcane-status-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
-            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.6)}`
-            + `<linearGradient id="${uid}-fl" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#9a3412" stop-opacity="0"/><stop offset="0.35" stop-color="#ea580c" stop-opacity="0.88"/><stop offset="0.72" stop-color="#fb923c" stop-opacity="0.92"/><stop offset="1" stop-color="#fef3c7" stop-opacity="0"/></linearGradient>`
-            + `<radialGradient id="${uid}-pop"><stop offset="0" stop-color="#fef9c3" stop-opacity="0.95"/><stop offset="0.36" stop-color="#fb923c" stop-opacity="0.82"/><stop offset="0.75" stop-color="#c2410c" stop-opacity="0.38"/><stop offset="1" stop-color="#431407" stop-opacity="0"/></radialGradient>`
-            + `</defs><g class="s-tongues" filter="url(#${uid}-gl)" style="transform-origin:${cx}px ${cy + rh * 0.4}px;opacity:0">`
-            + `<path d="M${cx - rw * 0.85},${cy + rh * 0.55} Q${cx - rw * 1.05},${cy} ${cx - rw * 0.62},${cy - rh * 0.62} Q${cx - rw * 0.48},${cy - rh * 0.1} ${cx - rw * 0.64},${cy + rh * 0.52} Z" fill="url(#${uid}-fl)"/>`
-            + `<path d="M${cx + rw * 0.82},${cy + rh * 0.52} Q${cx + rw * 1.02},${cy - rh * 0.05} ${cx + rw * 0.58},${cy - rh * 0.68} Q${cx + rw * 0.46},${cy - rh * 0.12} ${cx + rw * 0.62},${cy + rh * 0.5} Z" fill="url(#${uid}-fl)"/>`
-            + `<path d="M${cx - rw * 0.25},${cy - rh * 0.55} Q${cx + rw * 0.04},${cy - rh * 1.12} ${cx + rw * 0.34},${cy - rh * 0.58} Q${cx + rw * 0.04},${cy - rh * 0.72} ${cx - rw * 0.25},${cy - rh * 0.55} Z" fill="url(#${uid}-fl)"/>`
-            + `</g><circle class="s-flare" cx="${fx}" cy="${fy}" r="${Math.max(12, Math.min(rw, rh) * 0.46)}" fill="url(#${uid}-pop)" opacity="0" style="transform-origin:${fx}px ${fy}px"/></svg></div>`
+            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.0)}`
+            + `<linearGradient id="${uid}-fl" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#c2410c" stop-opacity="0.92"/><stop offset="0.55" stop-color="#f97316" stop-opacity="0.95"/><stop offset="1" stop-color="#fef08a" stop-opacity="0.2"/></linearGradient>`
+            + `</defs><g class="s-tongues" filter="url(#${uid}-gl)" style="transform-origin:${cx}px ${cy + rh * 0.78}px;opacity:0">`
+            + tongueAt(cx - rw * 0.44, cy + rh * 0.78, Math.max(5.5, rw * 0.16), Math.max(14, rh * 0.52))
+            + tongueAt(cx - rw * 0.1, cy + rh * 0.84, Math.max(6.5, rw * 0.2), Math.max(18, rh * 0.68))
+            + tongueAt(cx + rw * 0.26, cy + rh * 0.8, Math.max(6, rw * 0.18), Math.max(16, rh * 0.6))
+            + tongueAt(cx + rw * 0.48, cy + rh * 0.72, Math.max(5, rw * 0.14), Math.max(12, rh * 0.44))
+            + `</g><polygon class="s-flare" points="${fx},${fy - 11} ${fx + 3},${fy - 3} ${fx + 11},${fy} ${fx + 3},${fy + 3} ${fx},${fy + 11} ${fx - 3},${fy + 3} ${fx - 11},${fy} ${fx - 3},${fy - 3}" fill="#fef08a" stroke="#f97316" stroke-width="1" opacity="0" style="transform-origin:${fx}px ${fy}px"/></svg></div>`
         );
         const tongues = layer.querySelector('.s-tongues'), flare = layer.querySelector('.s-flare');
-        if (tongues) owner.anim(tongues, [{ opacity: 0, transform: 'translateY(8px) scaleY(0.55)' }, { opacity: 0.94, transform: 'translateY(-4px) scaleY(1.06)', offset: 0.35 }, { opacity: 0, transform: 'translateY(-14px) scaleY(0.75)' }], { duration: 360, easing: 'ease-out', fill: 'forwards' });
+        if (tongues) owner.anim(tongues, [{ opacity: 0, transform: 'translateY(6px) scaleY(0.55)' }, { opacity: 0.96, transform: 'translateY(-3px) scaleY(1.06)', offset: 0.35 }, { opacity: 0, transform: 'translateY(-11px) scaleY(0.75)' }], { duration: 360, easing: 'ease-out', fill: 'forwards' });
         const gSfx = statusSfxGate('burn', 70);
         if (gSfx > 0) {
             click(0.02, 0.068 * gSfx, 2600, 0.011, pan);
@@ -992,67 +1062,70 @@ const arcaneVfxModule = (function () {
         }
         owner.at(60, () => { if (onBeat) onBeat({ event: 'burnTick', entity }); });
         owner.at(80, () => {
-            if (flare) owner.anim(flare, [{ opacity: 0, transform: 'scale(0.32)' }, { opacity: 0.96, transform: 'scale(1.12)', offset: 0.35 }, { opacity: 0, transform: 'scale(0.75)' }], { duration: 210, easing: 'ease-out', fill: 'forwards' });
-            const bx = r.x + r.w * 0.11, by = r.y - r.h * 0.08;
-            owner.addP({ x: bx, y: by, shape: 'gradRing', size: 0.75, decay: 0.085, color: 'rgba(249,115,22,0.5)' });
-            owner.burst(5, () => { const a = rnd(-Math.PI, 0), sp = rnd(1.1, 2.4); return { x: bx, y: by, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.5, drag: 0.92, decay: 0.055, size: rnd(1.2, 1.9), shape: 'spark', color: pick(['#fb923c', '#fbbf24']) }; });
-            owner.burst(6, i => ({ x: r.x + rnd(-rw * 0.65, rw * 0.65), y: r.y + rnd(-rh * 0.25, rh * 0.45), vx: rnd(-0.35, 0.35), vy: rnd(-1.6, -0.8), drag: 0.97, decay: rnd(0.028, 0.042), size: i % 2 ? rnd(2.2, 3.6) : rnd(7, 11), shape: i % 2 ? 'glowOrb' : 'gradMist', blend: i % 2 ? 'lighter' : 'source-over', core: '#fed7aa', mistCore: 'rgba(67,20,7,0.68)', color: i % 2 ? '#ea580c' : 'rgba(28,25,23,0.45)', fade: 'rgba(12,10,9,0)' }));
+            if (flare) owner.anim(flare, [{ opacity: 0, transform: 'scale(0.35) rotate(0deg)' }, { opacity: 0.96, transform: 'scale(1.1) rotate(18deg)', offset: 0.32 }, { opacity: 0, transform: 'scale(0.6) rotate(35deg)' }], { duration: 190, easing: 'ease-out', fill: 'forwards' });
+            const bx = r.x + r.w * 0.07, by = r.y + r.h * 0.04;
+            owner.burst(5, () => { const a = rnd(-Math.PI, 0), sp = rnd(1.0, 2.2); return { x: bx, y: by, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.45, drag: 0.92, decay: 0.058, size: rnd(1.2, 1.8), shape: 'spark', color: pick(['#fb923c', '#fbbf24']) }; });
+            owner.burst(6, i => ({ x: r.x + rnd(-rw * 0.48, rw * 0.48), y: r.y + rnd(-rh * 0.15, rh * 0.45), vx: rnd(-0.3, 0.3), vy: rnd(-1.5, -0.75), drag: 0.97, decay: rnd(0.03, 0.045), size: i % 2 ? rnd(2.0, 3.2) : rnd(6, 9), shape: i % 2 ? 'glowOrb' : 'gradMist', blend: i % 2 ? 'lighter' : 'source-over', core: '#fed7aa', mistCore: 'rgba(67,20,7,0.62)', color: i % 2 ? '#ea580c' : 'rgba(28,25,23,0.42)', fade: 'rgba(12,10,9,0)' }));
         });
         return owner.handle;
     }
 
-    // 2B. 燃烧禁疗轻提示：治疗光落于燃烧目标瞬间被暗橙火苗压低 ~200ms (L1 · 240ms)
+    // 2B. 燃烧禁疗轻提示：治疗光落于燃烧目标瞬间被暗橙火苗压灭 ~200ms (L1 · 240ms)
     function playStatusHealSuppressed(entity, meta = {}, onBeat) {
         const dom = domOf(entity); if (!dom) return null;
         const r = statusVisualRect(dom); if (!r) return null;
         const owner = statusRun(240), uid = 'arcane-status-hsup-' + (++S.uid), pan = statusPanOf(r.x);
-        const W = Math.max(105, r.w * 1.38), H = Math.max(105, r.h * 1.38), cx = W / 2, cy = H / 2, rw = r.w * 0.48, rh = r.h * 0.48;
+        const W = Math.max(96, r.w * 1.15), H = Math.max(96, r.h * 1.15), cx = W / 2, cy = H / 2, rw = r.w * 0.42, rh = r.h * 0.42;
+        const wisp = (wx, w, h) => `<path d="M${(wx - w).toFixed(1)},${(cy + rh * 0.42).toFixed(1)} Q${wx.toFixed(1)},${(cy + rh * 0.42 - h).toFixed(1)} ${(wx + w).toFixed(1)},${(cy + rh * 0.42).toFixed(1)} Z" fill="url(#${uid}-cap)"/>`;
         const layer = owner.layer(
             `<div class="arcane-status-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
-            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.4)}`
-            + `<radialGradient id="${uid}-hl"><stop offset="0" stop-color="#6ee7b7" stop-opacity="0.55"/><stop offset="0.6" stop-color="#10b981" stop-opacity="0.22"/><stop offset="1" stop-color="#059669" stop-opacity="0"/></radialGradient>`
-            + `<linearGradient id="${uid}-cap" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c2d12" stop-opacity="0.88"/><stop offset="0.55" stop-color="#ea580c" stop-opacity="0.72"/><stop offset="1" stop-color="#fb923c" stop-opacity="0"/></linearGradient>`
-            + `</defs><circle class="s-heal" cx="${cx}" cy="${cy}" r="${Math.max(rw, rh) * 1.05}" fill="url(#${uid}-hl)" style="transform-origin:${cx}px ${cy}px"/>`
-            + `<path class="s-cap" d="M${cx - rw * 1.05},${cy - rh * 0.9} Q${cx},${cy - rh * 1.15} ${cx + rw * 1.05},${cy - rh * 0.9} L${cx + rw * 0.88},${cy + rh * 0.6} Q${cx},${cy + rh * 0.25} ${cx - rw * 0.88},${cy + rh * 0.6} Z" fill="url(#${uid}-cap)" filter="url(#${uid}-gl)" opacity="0" style="transform-origin:${cx}px ${cy - rh * 0.6}px"/></svg></div>`
+            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.0)}`
+            + `<linearGradient id="${uid}-hl" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#34d399" stop-opacity="0"/><stop offset="0.5" stop-color="#6ee7b7" stop-opacity="0.52"/><stop offset="1" stop-color="#a7f3d0" stop-opacity="0"/></linearGradient>`
+            + `<linearGradient id="${uid}-cap" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#9a3412" stop-opacity="0.9"/><stop offset="0.6" stop-color="#ea580c" stop-opacity="0.86"/><stop offset="1" stop-color="#fdba74" stop-opacity="0.15"/></linearGradient>`
+            + `</defs><rect class="s-heal" x="${(cx - rw * 0.55).toFixed(1)}" y="${(cy - rh * 0.45).toFixed(1)}" width="${(rw * 1.1).toFixed(1)}" height="${(rh * 0.9).toFixed(1)}" rx="6" fill="url(#${uid}-hl)" style="transform-origin:${cx}px ${cy}px"/>`
+            + `<g class="s-cap" filter="url(#${uid}-gl)" opacity="0" style="transform-origin:${cx}px ${cy + rh * 0.4}px">${wisp(cx - rw * 0.3, 6, rh * 0.72)}${wisp(cx, 7.5, rh * 0.88)}${wisp(cx + rw * 0.3, 6, rh * 0.68)}</g></svg></div>`
         );
         const hl = layer.querySelector('.s-heal'), cap = layer.querySelector('.s-cap');
-        if (hl) owner.anim(hl, [{ opacity: 0.72, transform: 'scale(0.85)' }, { opacity: 0.16, transform: 'scale(0.68)', offset: 0.45 }, { opacity: 0, transform: 'scale(0.55)' }], { duration: 220, easing: 'ease-out', fill: 'forwards' });
-        if (cap) owner.anim(cap, [{ opacity: 0, transform: 'scaleY(0.35)' }, { opacity: 0.94, transform: 'scaleY(1.04)', offset: 0.35 }, { opacity: 0, transform: 'scaleY(0.88)' }], { duration: 210, easing: 'ease-out', delay: 20, fill: 'forwards' });
+        if (hl) owner.anim(hl, [{ opacity: 0.75, transform: 'scaleY(0.95)' }, { opacity: 0.14, transform: 'scaleY(0.45)', offset: 0.45 }, { opacity: 0, transform: 'scaleY(0.25)' }], { duration: 220, easing: 'ease-out', fill: 'forwards' });
+        if (cap) owner.anim(cap, [{ opacity: 0, transform: 'scaleY(0.3)' }, { opacity: 0.94, transform: 'scaleY(1.06)', offset: 0.35 }, { opacity: 0, transform: 'scaleY(0.82)' }], { duration: 210, easing: 'ease-out', delay: 20, fill: 'forwards' });
         const gSfx = statusSfxGate('healSuppress', 80);
         if (gSfx > 0) {
             statusHiss(0.02, 1800, 680, 0.12, 0.038 * gSfx, pan, 2.0);
             tone(0.02, { type: 'sine', f0: 360, f1: 165, dur: 0.11, vol: 0.022 * gSfx, pan });
         }
         owner.at(45, () => {
-            owner.burst(4, () => ({ x: r.x + rnd(-rw * 0.55, rw * 0.55), y: r.y + rnd(-rh * 0.3, rh * 0.2), vx: rnd(-0.9, 0.9), vy: rnd(-1.4, -0.4), drag: 0.93, decay: 0.06, size: rnd(2.2, 3.6), shape: 'glowOrb', core: '#fed7aa', color: '#ea580c' }));
+            owner.burst(4, () => ({ x: r.x + rnd(-rw * 0.45, rw * 0.45), y: r.y + rnd(-rh * 0.2, rh * 0.2), vx: rnd(-0.8, 0.8), vy: rnd(-1.3, -0.4), drag: 0.93, decay: 0.06, size: rnd(2.0, 3.2), shape: 'glowOrb', core: '#fed7aa', color: '#ea580c' }));
             if (onBeat) onBeat({ event: 'healSuppressed', entity });
         });
         return owner.handle;
     }
-    // 3. 麻痹僵直触发（蓝电外弧 + 麻黄内芯/碎裂剥落 1 层）与未命中对照组
+    // 3. 麻痹僵直触发（锐利蓝电折线划过图标 + 黄电芯碎裂脱落 1 层）与未命中对照组
     function playStatusParaProc(entity, meta = {}, onBeat) {
         if (meta && meta.triggered === false) return null;
         const dom = domOf(entity); if (!dom) return null;
         const r = statusVisualRect(dom); if (!r) return null;
         const owner = statusRun(440), uid = 'arcane-status-para-' + (++S.uid), pan = statusPanOf(r.x);
-        const W = Math.max(115, r.w * 1.45), H = Math.max(115, r.h * 1.45), cx = W / 2, cy = H / 2, rw = r.w * 0.46, rh = r.h * 0.46;
-        const arc1 = `M${cx - rw * 0.92},${cy - rh * 0.42} Q${cx - rw * 0.45},${cy - rh * 0.92} ${cx + rw * 0.08},${cy - rh * 0.56} Q${cx + rw * 0.55},${cy - rh * 0.9} ${cx + rw * 0.88},${cy - rh * 0.25}`;
-        const arc2 = `M${cx - rw * 0.82},${cy + rh * 0.32} Q${cx - rw * 0.3},${cy + rh * 0.85} ${cx + rw * 0.22},${cy + rh * 0.48} Q${cx + rw * 0.68},${cy + rh * 0.72} ${cx + rw * 0.9},${cy + rh * 0.14}`;
-        const sx = cx + rw * 0.52, sy = cy - rh * 0.44;
+        const W = Math.max(96, r.w * 1.18), H = Math.max(96, r.h * 1.18), cx = W / 2, cy = H / 2, rw = r.w * 0.42, rh = r.h * 0.42;
+        const boltPts = [
+            `${(cx - rw * 0.56).toFixed(1)},${(cy - rh * 0.22).toFixed(1)} ${(cx - rw * 0.18).toFixed(1)},${(cy - rh * 0.44).toFixed(1)} ${(cx - rw * 0.24).toFixed(1)},${(cy - rh * 0.16).toFixed(1)} ${(cx + rw * 0.22).toFixed(1)},${(cy - rh * 0.42).toFixed(1)} ${(cx + rw * 0.12).toFixed(1)},${(cy - rh * 0.14).toFixed(1)} ${(cx + rw * 0.52).toFixed(1)},${(cy - rh * 0.34).toFixed(1)}`,
+            `${(cx - rw * 0.48).toFixed(1)},${(cy + rh * 0.32).toFixed(1)} ${(cx - rw * 0.06).toFixed(1)},${(cy + rh * 0.08).toFixed(1)} ${(cx - rw * 0.14).toFixed(1)},${(cy + rh * 0.34).toFixed(1)} ${(cx + rw * 0.28).toFixed(1)},${(cy + rh * 0.06).toFixed(1)} ${(cx + rw * 0.54).toFixed(1)},${(cy + rh * 0.26).toFixed(1)}`,
+            `${(cx - rw * 0.18).toFixed(1)},${(cy - rh * 0.52).toFixed(1)} ${(cx + rw * 0.06).toFixed(1)},${(cy - rh * 0.06).toFixed(1)} ${(cx - rw * 0.08).toFixed(1)},${(cy + rh * 0.02).toFixed(1)} ${(cx + rw * 0.18).toFixed(1)},${(cy + rh * 0.48).toFixed(1)}`
+        ];
+        const sx = cx + rw * 0.38, sy = cy - rh * 0.34;
+        const boltsHtml = boltPts.map(pts =>
+            `<polyline points="${pts}" fill="none" stroke="#38bdf8" stroke-width="2.6" stroke-linejoin="bevel" stroke-linecap="butt" opacity="0.96"/>`
+            + `<polyline points="${pts}" fill="none" stroke="#facc15" stroke-width="1.15" stroke-linejoin="bevel" stroke-linecap="butt" opacity="0.96"/>`
+        ).join('');
         const layer = owner.layer(
             `<div class="arcane-status-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
-            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.6)}</defs>`
-            + `<g class="s-arcs" filter="url(#${uid}-gl)" opacity="0">`
-            + `<path d="${arc1}" fill="none" stroke="#38bdf8" stroke-width="3.2" stroke-linecap="round" opacity="0.9"/>`
-            + `<path d="${arc1}" fill="none" stroke="#facc15" stroke-width="1.35" stroke-linecap="round" opacity="0.95"/>`
-            + `<path d="${arc2}" fill="none" stroke="#38bdf8" stroke-width="2.8" stroke-linecap="round" opacity="0.86"/>`
-            + `<path d="${arc2}" fill="none" stroke="#facc15" stroke-width="1.15" stroke-linecap="round" opacity="0.9"/></g>`
-            + `<g class="s-para-flake" filter="url(#${uid}-gl)" style="transform-origin:${sx}px ${sy}px;opacity:0">`
-            + `<path d="M${sx - 8},${sy - 3} Q${sx + 2},${sy - 11} ${sx + 10},${sy - 1} Q${sx + 4},${sy + 8} ${sx - 7},${sy + 5} Z" fill="#facc15" opacity="0.92"/>`
-            + `<path d="M${sx - 6},${sy - 2} Q${sx + 2},${sy - 8} ${sx + 8},${sy - 1}" fill="none" stroke="#38bdf8" stroke-width="1.6" stroke-linecap="round"/></g></svg></div>`
+            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.2)}</defs>`
+            + `<g class="s-arcs" filter="url(#${uid}-gl)" opacity="0">${boltsHtml}</g>`
+            + `<g class="s-para-flake" filter="url(#${uid}-gl)" style="transform-origin:${sx.toFixed(1)}px ${sy.toFixed(1)}px;opacity:0">`
+            + `<polygon points="${(sx - 6).toFixed(1)},${(sy + 2).toFixed(1)} ${(sx - 1).toFixed(1)},${(sy - 7).toFixed(1)} ${(sx + 6).toFixed(1)},${(sy - 3).toFixed(1)} ${(sx + 2).toFixed(1)},${(sy + 5).toFixed(1)}" fill="#facc15" stroke="#38bdf8" stroke-width="1.4" stroke-linejoin="bevel"/>`
+            + `</g></svg></div>`
         );
         const arcs = layer.querySelector('.s-arcs'), flake = layer.querySelector('.s-para-flake');
-        if (arcs) owner.anim(arcs, [{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 0.28, offset: 0.32 }, { opacity: 0.95, offset: 0.55 }, { opacity: 0 }], { duration: 220, easing: 'steps(1)', fill: 'forwards' });
+        if (arcs) owner.anim(arcs, [{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 0.22, offset: 0.32 }, { opacity: 0.96, offset: 0.56 }, { opacity: 0 }], { duration: 220, easing: 'steps(1)', fill: 'forwards' });
         owner.anim(dom, [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(-2.5px,0,0)', offset: 0.16 }, { transform: 'translate3d(2.5px,1px,0)', offset: 0.34 }, { transform: 'translate3d(-2px,0,0)', offset: 0.56 }, { transform: 'translate3d(1.5px,-1px,0)', offset: 0.78 }, { transform: 'translate3d(0,0,0)' }], { duration: 330, easing: 'ease-out' });
         const gSfx = statusSfxGate('para', 70);
         if (gSfx > 0) {
@@ -1061,9 +1134,9 @@ const arcaneVfxModule = (function () {
         }
         owner.at(80, () => { if (onBeat) onBeat({ event: 'paraProc', entity }); });
         owner.at(110, () => {
-            if (flake) owner.anim(flake, [{ opacity: 0.98, transform: 'translate(0px,0px) scale(1) rotate(0deg)' }, { opacity: 0.85, transform: 'translate(14px,-10px) scale(0.8) rotate(14deg)', offset: 0.45 }, { opacity: 0, transform: 'translate(26px,-18px) scale(0.4) rotate(28deg)' }], { duration: 290, easing: 'ease-out', fill: 'forwards' });
-            const fx = r.x + r.w * 0.24, fy = r.y - r.h * 0.22;
-            owner.burst(5, i => ({ x: fx + rnd(-4, 4), y: fy + rnd(-4, 4), vx: rnd(0.8, 2.2), vy: rnd(-1.5, -0.3), drag: 0.92, decay: 0.055, size: rnd(1.5, 2.8), shape: i % 2 ? 'spark' : 'glowOrb', core: '#fef9c3', color: i % 2 ? '#38bdf8' : '#facc15' }));
+            if (flake) owner.anim(flake, [{ opacity: 0.98, transform: 'translate(0px,0px) scale(1) rotate(0deg)' }, { opacity: 0.85, transform: 'translate(12px,-9px) scale(0.82) rotate(18deg)', offset: 0.45 }, { opacity: 0, transform: 'translate(22px,-16px) scale(0.4) rotate(36deg)' }], { duration: 280, easing: 'ease-out', fill: 'forwards' });
+            const fx = r.x + r.w * 0.18, fy = r.y - r.h * 0.16;
+            owner.burst(5, i => ({ x: fx + rnd(-3, 3), y: fy + rnd(-3, 3), vx: rnd(0.8, 2.0), vy: rnd(-1.4, -0.3), drag: 0.92, decay: 0.056, size: rnd(1.5, 2.6), shape: i % 2 ? 'spark' : 'glowOrb', core: '#fef9c3', color: i % 2 ? '#38bdf8' : '#facc15' }));
         });
         return owner.handle;
     }
@@ -1240,25 +1313,25 @@ const arcaneVfxModule = (function () {
         {
             title: '一 · 持续伤害与禁疗', badge: '5项',
             items: [
-                { name: '毒发 · 1层 (2泡轻纹)', level: 'L1', targetId: 'e5', event: 'poisonTick', description: '1层紫纹泛起 → 2个毒泡破裂 → 细毒雾飘散', init: { e5: { hp: 740, maxHp: 1000, buffs: [{ type: 'poison', value: 18, duration: 3 }] } }, meta: { layers: 1, dmg: 18 } },
-                { name: '毒发 · 3层对照 (4泡深纹)', level: 'L1', targetId: 'e5', event: 'poisonTick', description: '3层紫纹加重 → 4个毒泡依层破裂（不改结算）', init: { e5: { hp: 740, maxHp: 1000, buffs: [{ type: 'poison', value: 18, duration: 3 }, { type: 'poison', value: 18, duration: 2 }, { type: 'poison', value: 18, duration: 2 }] } }, meta: { layers: 3, dmg: 54 } },
-                { name: '燃烧 · 发作与常驻焦痕', level: 'L1', targetId: 'e4', event: 'burnTick', description: '火舌窜起 + 小爆燃 + 余烬；常驻暗橙焦痕薄层', init: { e4: { hp: 680, maxHp: 1000, buffs: [{ type: 'burn', value: 30, duration: 3 }] } }, meta: { dmg: 30 } },
-                { name: '燃烧+禁疗 · 治疗压盖', level: 'L1', targetId: 'h2', event: 'healSuppressed', description: '治疗光落于燃烧目标被0.2s暗橙火舌压低(+30减半)', init: { h2: { hp: 85, maxHp: 180, buffs: [{ type: 'burn', value: 24, duration: 2 }] } }, meta: { healSuppressed: true, baseHeal: 60, actualHeal: 30 } },
-                { name: '对照 · 正常治疗 (无压盖)', level: '对照', targetId: 'h2', event: 'healNormal', description: '无燃烧目标受治疗：完整绿光+60HP无火舌压盖', init: { h2: { hp: 85, maxHp: 180, buffs: [] } }, meta: { healSuppressed: false, baseHeal: 60, actualHeal: 60 } }
+                { name: '毒发 · 1层 (2泡轻涌)', level: 'L1', targetId: 'e5', event: 'poisonTick', description: '图标浮出2颗紫毒泡破裂 → 细毒雾飘散（常驻浮泡）', init: { e5: { hp: 740, maxHp: 1000, buffs: [{ type: 'poison', value: 18, duration: 3 }] } }, meta: { layers: 1, dmg: 18 } },
+                { name: '毒发 · 3层对照 (4泡深涌)', level: 'L1', targetId: 'e5', event: 'poisonTick', description: '3层紫毒泡密度提升 → 4颗依序破裂（不改结算）', init: { e5: { hp: 740, maxHp: 1000, buffs: [{ type: 'poison', value: 18, duration: 3 }, { type: 'poison', value: 18, duration: 2 }, { type: 'poison', value: 18, duration: 2 }] } }, meta: { layers: 3, dmg: 54 } },
+                { name: '燃烧 · 发作与图标火苗', level: 'L1', targetId: 'e4', event: 'burnTick', description: '底缘小火苗窜起 + 火星 + 余烬；常驻底缘微弱火苗', init: { e4: { hp: 680, maxHp: 1000, buffs: [{ type: 'burn', value: 30, duration: 3 }] } }, meta: { dmg: 30 } },
+                { name: '燃烧+禁疗 · 治疗压盖', level: 'L1', targetId: 'h2', event: 'healSuppressed', description: '治疗光落于燃烧英雄被0.2s暗橙火苗压灭(+30减半)', init: { h2: { hp: 85, maxHp: 180, buffs: [{ type: 'burn', value: 24, duration: 2 }] } }, meta: { healSuppressed: true, baseHeal: 60, actualHeal: 30 } },
+                { name: '对照 · 正常治疗 (无压盖)', level: '对照', targetId: 'h2', event: 'healNormal', description: '无燃烧目标受治疗：完整绿光+60HP无火苗压盖', init: { h2: { hp: 85, maxHp: 180, buffs: [] } }, meta: { healSuppressed: false, baseHeal: 60, actualHeal: 60 } }
             ]
         },
         {
             title: '二 · 麻痹僵直与眩晕对比', badge: '3项',
             items: [
-                { name: '麻痹 · 掷骰命中 (耗1层)', level: 'L1', targetId: 'e2', event: 'paraProc', description: '蓝电外弧+麻黄内芯闪过 → 短硬直 → 碎裂脱落1层', init: { e2: { hp: 760, maxHp: 1000, buffs: [{ type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: { triggered: true } },
-                { name: '对照 · 麻痹未命中 (无演出)', level: '对照', targetId: 'e2', event: 'paraMiss', description: '掷骰未命中返回null：零电纹、零抖动、不耗层', init: { e2: { hp: 760, maxHp: 1000, buffs: [{ type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: { triggered: false } },
-                { name: '对比 · 麻痹僵直 vs 眩晕星环', level: '对比', targetId: 'e2', event: 'compareParaStun', description: 'e2短暂蓝黄僵直 vs e3头顶星环+整回合重晃', init: { e2: { hp: 760, maxHp: 1000, buffs: [{ type: 'paralyze', value: -5, duration: 2 }] }, e3: { hp: 760, maxHp: 1000, buffs: [{ type: 'stun', value: 0, duration: 1 }] } }, meta: { stunTargetId: 'e3' } }
+                { name: '麻痹 · 掷骰命中 (耗1层)', level: 'L1', targetId: 'e2', event: 'paraProc', description: '蓝电折线划过图标 → 短硬直 → 碎裂脱落1层（常驻蓝电）', init: { e2: { hp: 760, maxHp: 1000, buffs: [{ type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: { triggered: true } },
+                { name: '对照 · 麻痹未命中 (无演出)', level: '对照', targetId: 'e2', event: 'paraMiss', description: '掷骰未命中返回null：无触发折线、零抖动、不耗层', init: { e2: { hp: 760, maxHp: 1000, buffs: [{ type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: { triggered: false } },
+                { name: '对比 · 麻痹僵直 vs 眩晕星环', level: '对比', targetId: 'e2', event: 'compareParaStun', description: 'e2蓝电折线短硬直 vs e3头顶星环+整回合重晃', init: { e2: { hp: 760, maxHp: 1000, buffs: [{ type: 'paralyze', value: -5, duration: 2 }] }, e3: { hp: 760, maxHp: 1000, buffs: [{ type: 'stun', value: 0, duration: 1 }] } }, meta: { stunTargetId: 'e3' } }
             ]
         },
         {
             title: '三 · 净化消散与蜕皮对照', badge: '4项',
             items: [
-                { name: '净化 · 单负面 (清中毒)', level: 'L1', targetId: 'h1', event: 'dispel', description: '淡金白波纹自上而下扫过 → 紫毒碎屑脱离 → 撤毒纹', init: { h1: { hp: 72, maxHp: 100, shield: 55, buffs: [{ type: 'poison', value: 15, duration: 2 }] } }, meta: { removedTypes: ['poison'], removedColors: { poison: '#a855f7' }, keptTypes: [] } },
+                { name: '净化 · 单负面 (清中毒)', level: 'L1', targetId: 'h1', event: 'dispel', description: '淡金白波纹自上而下扫过 → 紫毒碎屑脱离 → 撤浮泡细节', init: { h1: { hp: 72, maxHp: 100, shield: 55, buffs: [{ type: 'poison', value: 15, duration: 2 }] } }, meta: { removedTypes: ['poison'], removedColors: { poison: '#a855f7' }, keptTypes: [] } },
                 { name: '净化 · 多负面混合', level: 'L2', targetId: 'e3', event: 'dispel', description: '清除毒/燃/麻3色分束剥离，保留atk-减益徽章', init: { e3: { hp: 620, maxHp: 1000, buffs: [{ type: 'poison', value: 18, duration: 2 }, { type: 'burn', value: 25, duration: 2 }, { type: 'paralyze', value: -5, duration: 2 }, { key: 'atk-', type: 'atk-', value: -12, duration: 2 }] } }, meta: { removedTypes: ['poison', 'burn', 'paralyze'], removedColors: { poison: '#a855f7', burn: '#f97316', paralyze: '#facc15' }, keptTypes: ['atk-'] } },
                 { name: '净化 · 无负面轻反馈', level: '对照', targetId: 'h3', event: 'dispel', description: '仅留增益def+：轻白波纹扫过+无负面轻提示，不造碎屑', init: { h3: { hp: 140, maxHp: 140, buffs: [{ key: 'def+', type: 'def+', value: 12, duration: 2 }] } }, meta: { removedTypes: [], removedColors: {}, keptTypes: ['def+'] } },
                 { name: '对比 · 外部净化 vs 蜕皮剥离', level: '对比', targetId: 'e3', event: 'compareDispelMolt', description: 'e3白金外部净化波纹 vs e6琥珀自我裂壳甩毒燃', init: { e3: { hp: 620, maxHp: 1000, buffs: [{ type: 'poison', value: 16, duration: 2 }, { type: 'burn', value: 20, duration: 2 }] }, e6: { hp: 460, maxHp: 1000, buffs: [{ type: 'poison', value: 16, duration: 2 }, { type: 'burn', value: 20, duration: 2 }] } }, meta: { moltTargetId: 'e6' } }
@@ -1267,16 +1340,16 @@ const arcaneVfxModule = (function () {
         {
             title: '四 · 到期消散与临期警示', badge: '2项',
             items: [
-                { name: '对比 · 自然到期 vs 主动驱散', level: '对比', targetId: 'e1', event: 'compareExpireDispel', description: 'e1自然轻蒸发撤焦痕 vs e4波纹碎屑主动驱散', init: { e1: { hp: 640, maxHp: 1000, buffs: [{ type: 'burn', value: 22, duration: 1 }] }, e4: { hp: 640, maxHp: 1000, buffs: [{ type: 'burn', value: 22, duration: 2 }] } }, meta: { dispelTargetId: 'e4' } },
-                { name: '演进 · 临期警示 (2回→1回→到期)', level: 'L1', targetId: 'h4', event: 'expiringLifecycle', description: 'h4毒/麻2回→1回琥珀缓闪→到期止损；h1续回解除警示', init: { h4: { hp: 112, maxHp: 140, buffs: [{ type: 'poison', value: 14, duration: 2 }, { type: 'paralyze', value: -5, duration: 2 }] }, h1: { hp: 82, maxHp: 100, buffs: [{ type: 'burn', value: 15, duration: 1 }] } }, meta: { refreshTargetId: 'h1' } }
+                { name: '对比 · 自然到期 vs 主动驱散', level: '对比', targetId: 'e1', event: 'compareExpireDispel', description: 'e1自然轻蒸发撤火苗 vs e4波纹碎屑主动驱散', init: { e1: { hp: 640, maxHp: 1000, buffs: [{ type: 'burn', value: 22, duration: 1 }] }, e4: { hp: 640, maxHp: 1000, buffs: [{ type: 'burn', value: 22, duration: 2 }] } }, meta: { dispelTargetId: 'e4' } },
+                { name: '演进 · 临期警示 (2回→1回→到期)', level: 'L1', targetId: 'h4', event: 'expiringLifecycle', description: 'h4毒泡/麻电2回→1回琥珀缓闪→到期止损；h1火苗续回解警示', init: { h4: { hp: 112, maxHp: 140, buffs: [{ type: 'poison', value: 14, duration: 2 }, { type: 'paralyze', value: -5, duration: 2 }] }, h1: { hp: 82, maxHp: 100, buffs: [{ type: 'burn', value: 15, duration: 1 }] } }, meta: { refreshTargetId: 'h1' } }
             ]
         },
         {
             title: '五 · 常驻共存与并发压测', badge: '3项',
             items: [
-                { name: '共存 · 燃烧焦痕 + 狂暴气浪', level: '共存', targetId: 'e4', event: 'coexistBurnRage', description: '焦痕薄层+红黑狂暴气浪同体共存 → 燃发 → 到期留狂暴', init: { e4: { hp: 240, maxHp: 1000, buffs: [{ type: 'burn', value: 26, duration: 1 }] } }, meta: {} },
+                { name: '共存 · 燃烧火苗 + 狂暴气浪', level: '共存', targetId: 'e4', event: 'coexistBurnRage', description: '底缘火苗+红黑狂暴气浪同体共存 → 燃发 → 到期留狂暴', init: { e4: { hp: 240, maxHp: 1000, buffs: [{ type: 'burn', value: 26, duration: 1 }] } }, meta: {} },
                 { name: '群发 · 多目标40ms错峰 (不叠音)', level: '压测', targetId: 'e1', event: 'multiTick', description: 'e1/e2/e3毒 + e4燃 每40ms错峰发作，门控防音压叠加', init: { e1: { hp: 780, maxHp: 1000, buffs: [{ type: 'poison', value: 15, duration: 2 }] }, e2: { hp: 780, maxHp: 1000, buffs: [{ type: 'poison', value: 15, duration: 2 }, { type: 'poison', value: 15, duration: 3 }] }, e3: { hp: 780, maxHp: 1000, buffs: [{ type: 'poison', value: 15, duration: 2 }] }, e4: { hp: 780, maxHp: 1000, buffs: [{ type: 'burn', value: 25, duration: 2 }] } }, meta: { targets: ['e1', 'e2', 'e3', 'e4'], staggerMs: 40 } },
-                { name: '压测 · 同体连发 + 中途重置检', level: '压测', targetId: 'e5', event: 'stressChain', description: 'e5连续触发 毒发→燃发→麻痹→驱散（可随时点右上重置）', init: { e5: { hp: 720, maxHp: 1000, buffs: [{ type: 'poison', value: 18, duration: 3 }, { type: 'poison', value: 18, duration: 3 }, { type: 'burn', value: 24, duration: 2 }, { type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: {} }
+                { name: '压测 · 同体连发 + 中途重置检', level: '压测', targetId: 'e5', event: 'stressChain', description: 'e5同时挂毒泡/火苗/蓝电并连续发作→驱散（可随时点重置）', init: { e5: { hp: 720, maxHp: 1000, buffs: [{ type: 'poison', value: 18, duration: 3 }, { type: 'poison', value: 18, duration: 3 }, { type: 'burn', value: 24, duration: 2 }, { type: 'paralyze', value: -5, duration: 2 }, { type: 'paralyze', value: -5, duration: 3 }] } }, meta: {} }
             ]
         }
     ];
@@ -1406,7 +1479,7 @@ const arcaneVfxModule = (function () {
             return 580;
         }
         if (card.event === 'burnTick') {
-            beatStatEl.textContent = '燃烧发作(焦痕)';
+            beatStatEl.textContent = '燃烧发作(火苗)';
             arcaneVfxModule.playStatusBurnTick(e, card.meta, () => {
                 updateDemoHp(e, e.hp - (card.meta.dmg || 30));
                 spawnDemoFloat(e, '火 -' + (card.meta.dmg || 30), 'text-orange-400');
@@ -1511,7 +1584,7 @@ const arcaneVfxModule = (function () {
         }
         if (card.event === 'coexistBurnRage') {
             setDemoRageOverlay(e, true);
-            beatStatEl.textContent = '焦痕+狂暴共存';
+            beatStatEl.textContent = '火苗+狂暴共存';
             demoAt(320, () => {
                 arcaneVfxModule.playStatusBurnTick(e, {}, () => {
                     updateDemoHp(e, e.hp - 26);
@@ -1522,7 +1595,7 @@ const arcaneVfxModule = (function () {
                 beatStatEl.textContent = '燃消散·狂暴留存';
                 arcaneVfxModule.playStatusExpire(e, { expiredTypes: ['burn'] }, () => {
                     e.buffs = []; window.renderDemoEntityBuffs(e);
-                    spawnDemoFloat(e, '焦痕移除(狂暴保留)', 'text-amber-200');
+                    spawnDemoFloat(e, '火苗移除(狂暴保留)', 'text-amber-200');
                 });
             });
             return 1520;
