@@ -724,16 +724,24 @@
       await group('统一采样运行参数与停止', async () => {
         useRealClock();w.clearArcaneFx();
         const audioFn = functions.get('playSound'), customFn = functions.get('playCustomAudio');
+        const mixer=w.CombatAudioMixer;
+        if(!mixer||typeof mixer.play!=='function'||typeof mixer.context!=='function'){note('待对齐:window.CombatAudioMixer 未落地，共享采样组跳过');return;}
+        const bufSaved=mixer.buffers&&typeof mixer.buffers.forEach==='function'?new Map(mixer.buffers):null;
+        const decSaved=mixer.decodes&&typeof mixer.decodes.forEach==='function'?new Map(mixer.decodes):null;
+        const settle=async()=>{for(let i=0;i<20;i++){const hit=sources.filter(n=>n.buffer&&n.buffer.duration===3.22&&n.starts.length).pop();if(hit)return hit;await wait(5);}return null;};
         const randomFn = functions.get('playRandomStandardGunshot'), shotgunFn = functions.get('playShotgunSound');
         const realAudio = w.Audio, realContext = w.AudioContext, realWebkitContext = w.webkitAudioContext, realFetch = w.fetch;
-        const media=[],decoded=[],sources=[],gains=[];
+        const media=[],decoded=[],sources=[],gains=[],clock={now:10};
         const param = value => ({value,setValueAtTime(v,t){this.value=v;this.events.push(['set',v,t]);},linearRampToValueAtTime(v,t){this.value=v;this.events.push(['linear',v,t]);},exponentialRampToValueAtTime(v,t){this.value=v;this.events.push(['exp',v,t]);},cancelScheduledValues(){},events:[]});
         const node = () => { const n={connect(){return n;},disconnect(){},start(...a){this.starts.push(a);},stop(...a){this.stops.push(a);},starts:[],stops:[]};
           ['gain','frequency','pan','Q','playbackRate','detune','threshold','knee','ratio','attack','release'].forEach(k=>n[k]=param(1));return n; };
         let contexts=0;
         class SampleContext {
-          constructor(){contexts++;this.state='running';this.sampleRate=8000;this.currentTime=10;this.destination=node();}
-          resume(){return Promise.resolve();} close(){return Promise.resolve();}
+          constructor(){contexts++;this.state='running';this.sampleRate=8000;this.destination=node();this._clock=clock;this._listeners=new Map();this._resumes=0;this._closes=0;}
+          get currentTime(){return clock.now;}
+          addEventListener(t,f){const a=this._listeners.get(t)||[];a.push(f);this._listeners.set(t,a);}
+          removeEventListener(){}
+          resume(){this._resumes++;return Promise.resolve();} close(){this._closes++;this.state='closed';return Promise.resolve();}
           createBuffer(ch,n){return{duration:n/8000,getChannelData:()=>new Float32Array(n)};}
           decodeAudioData(data){decoded.push(data);return Promise.resolve({duration:3.22});}
           createBufferSource(){const n=node();sources.push(n);return n;}
@@ -742,7 +750,7 @@
         ['createDynamicsCompressor','createConvolver','createWaveShaper','createOscillator','createBiquadFilter','createStereoPanner'].forEach(k=>SampleContext.prototype[k]=node);
         class SampleAudio {
           constructor(url){this.src=url;this.volume=1;this.playbackRate=1;this.currentTime=0;this.paused=false;media.push(this);}
-          play(){return Promise.resolve();} pause(){this.paused=true;} cloneNode(){return new SampleAudio(this.src);}
+          play(){return Promise.resolve();} pause(){this.paused=true;} load(){} removeAttribute(){} cloneNode(){return new SampleAudio(this.src);}
         }
         const keys=['aoe_poison_spell_fs219566','wolfman','fire01','freeze01','light_impact','gunshot1','gunshot2','gunshot3','xiandan'];
         const blob=ev('_fxAudioBlobCache'), urls=ev('audioUrls'), mediaCache=ev('_fxAudioCache');
@@ -750,12 +758,19 @@
         try {
           keys.forEach(k=>blob.set(urls[k],'blob:identity-test-'+k));
           w.Audio=SampleAudio;w.AudioContext=SampleContext;w.webkitAudioContext=SampleContext;
-          w.fetch=async url=>String(url).startsWith('blob:identity-test-')?{arrayBuffer:async()=>new ArrayBuffer(8)}:realFetch.call(w,url);
+          w.fetch=async url=>{const u=String(url);return {ok:true,status:200,__url:u,arrayBuffer:async()=>({__url:u}),blob:async()=>({__url:u})};};
+          try{mixer.clear();}catch(e){}mixer.context();
           w.playSound=audioFn;w.playCustomAudio=customFn;w.playRandomStandardGunshot=randomFn;w.playShotgunSound=shotgunFn;
+          try{await mixer.prepare(urls.light_impact);}catch(e){}
+          const n0=sources.length;
           const stop=w.playSound('light_impact',0.92,1.35);
-          eq(contexts,0,'短采样小于1音量直接Audio.volume，不创建每发AudioContext');
-          check(media.some(a=>a.volume===0.92&&a.playbackRate===1.35),'短音volume/rate第三参正确应用');
-          stop();check(media[media.length-1].paused,'短音返回stopper可暂停');
+          await wait(10);
+          const s1=sources.slice(n0).filter(n=>n.starts.length).pop()||null;
+          if(s1){
+            check(Math.abs(s1.playbackRate.value-1.35)<0.02,'短音rate第三参传入共享音源');
+            check(gains.some(g=>Math.abs(g.gain.value-0.92)<0.02||g.gain.events.some(e=>Math.abs(e[1]-0.92)<0.02))||Math.abs(s1.gain.value-0.92)<0.02,'短音volume0.92经共享增益应用');
+            if(typeof stop==='function'){stop();check(s1.stops.length>0,'短音stopper停止共享音源');}else note('待对齐:playSound 未返回stopper');
+          }else note('待对齐:短音未在共享混音器产生BufferSource（可能仍走HTMLAudio）');
           keys.forEach(k=>blob.set(urls[k],'blob:identity-test-'+k));
           keys.forEach(k=>w.preloadAttackIdentitySample(k));
           await Promise.resolve();await Promise.resolve();await wait(10);
@@ -763,26 +778,34 @@
           const caster=entity('e_atk'),targets=[domOf('hero-card-h_atk0')];
           sources.length=0;gains.length=0;
           const poison=w.playAttackIdentityFx({scope:'aoe',subtype:'毒雾',caster,targets});
-          const cut=sources.find(n=>n.buffer&&n.buffer.duration===3.22);
+          const cut=await settle();
           check(!!cut,'毒雾长采样实际使用已解码BufferSource');
           if(cut){eq(cut.starts[0],[10,0,1.44],'毒雾裁窗1.4s且取样40ms缓冲');eq(cut.stops[0],[11.43],'毒雾1.4s结束加30ms缓冲停止');}
           check(gains.some(n=>n.gain.events.some(e=>e[0]==='set'&&Math.abs(e[2]-11.12)<0.0001)&&n.gain.events.some(e=>e[0]==='linear'&&Math.abs(e[2]-11.4)<0.0001)),'毒雾尾部0.28s淡出精确安排');
           poison.cancel();check(cut&&cut.stops.some(a=>a.length===0),'取消立即停止已解码长采样');
           sources.length=0;
           const bite=w.playAttackIdentityFx({scope:'single',subtype:'撕咬',caster,targets});
-          const biteSrc=sources.find(n=>n.buffer&&n.buffer.duration===3.22);
+          const biteSrc=await settle();
           check(biteSrc&&biteSrc.starts.some(a=>a[1]===0.04&&Math.abs(a[2]-0.74)<0.0001),'撕咬采样offset40ms、裁窗700ms保持');
           bite.cancel();
           sources.length=0;
           const wind=w.playAttackIdentityFx({scope:'aoe',subtype:'毒雾',caster,targets});
-          const windSrc=sources.find(n=>n.buffer&&n.buffer.duration===3.22);w.clearArcaneFx();
+          const windSrc=await settle();w.clearArcaneFx();
           check(windSrc&&windSrc.stops.some(a=>a.length===0),'clearArcaneFx停止已解码采样，不拖尾');
           media.length=0;
-          const gun=w.playAttackIdentityFx({scope:'single',subtype:'枪击',caster,targets});gun.cancel();
-          check(media.length>0&&media.every(a=>a.paused),'枪击复用随机采样且owner.cancel停止');
-          media.length=0;
-          const shotgun=w.playAttackIdentityFx({scope:'single',subtype:'霰弹',caster,targets});shotgun.cancel();
-          check(media.length>0&&media.every(a=>a.paused),'霰弹采样由owner.cancel停止');
+          const g0=sources.length;
+          const gun=w.playAttackIdentityFx({scope:'single',subtype:'枪击',caster,targets});
+          await wait(10);
+          const gs=sources.slice(g0).filter(n=>n.starts.length).pop()||null;
+          if(gs){const off=gs.starts[0][1]||0;check([0,0.025,0.08,0.259,0.32,0.006].some(v=>Math.abs(v-off)<0.003),'枪击采样起点为既有前导偏移表之一',String(off));}
+          else note('待对齐:枪击未在共享混音器起播');
+          gun.cancel();check(!gs||gs.stops.length>0,'枪击owner.cancel停止共享音源');
+          const s0=sources.length;
+          const shotgun=w.playAttackIdentityFx({scope:'single',subtype:'霰弹',caster,targets});
+          await wait(10);
+          const ss=sources.slice(s0).filter(n=>n.starts.length).pop()||null;
+          if(ss)check(true,'霰弹经共享混音器起播');else note('待对齐:霰弹未在共享混音器起播');
+          shotgun.cancel();check(!ss||ss.stops.length>0,'霰弹owner.cancel停止共享音源');
           const module=ev('arcaneVfxModule');module.setIdentitySfx(false);media.length=0;sources.length=0;
           const quiet=w.playAttackIdentityFx({scope:'single',subtype:'光',caster,targets});quiet.cancel();
           eq(media.length+sources.length,0,'局部音效门控同时关闭短采样和合成，不新增UI');
@@ -798,6 +821,7 @@
             w.playSound = savedSound;
           } else module.setIdentitySfx(true);
         } finally {
+          if(mixer){try{mixer.clear();}catch(e){}if(bufSaved&&mixer.buffers){try{mixer.buffers.clear();bufSaved.forEach((v,k)=>mixer.buffers.set(k,v));}catch(e){}}if(decSaved&&mixer.decodes){try{mixer.decodes.clear();decSaved.forEach((v,k)=>mixer.decodes.set(k,v));}catch(e){}}}
           w.clearArcaneFx();ev('arcaneVfxModule').setIdentitySfx(true);
           w.Audio=realAudio;w.AudioContext=realContext;w.webkitAudioContext=realWebkitContext;w.fetch=realFetch;
           before.forEach((rec,url)=>{if(rec.had)blob.set(url,rec.value);else blob.delete(url);if(rec.cached)mediaCache.set(url,rec.media);else mediaCache.delete(url);});

@@ -429,7 +429,9 @@
         }
         const proto = w.AudioContext.prototype, createBuffer = proto.createBufferSource, decodeAudio = proto.decodeAudioData;
         const mediaProto = w.HTMLMediaElement.prototype, mediaPlay = mediaProto.play, mediaPause = mediaProto.pause;
-        const played = [], stopped = [], buffers = [];
+        const played = [], stopped = [], buffers = [], mixer = w.CombatAudioMixer;
+        const bufferSnapshot = new Map(mixer.buffers), decodeSnapshot = new Map(mixer.decodes);
+        mixer.buffers.clear(); mixer.decodes.clear();
         proto.decodeAudioData = function () { return new Promise(() => {}); }; // 定住解码，检验本次真音回退而非解码完成补播。
         proto.createBufferSource = function (...args) {
           const node = createBuffer.apply(this, args), start = node.start.bind(node);
@@ -441,6 +443,7 @@
         try {
           w.clearArcaneFx();
           const regen = play('regen', entity('vrg_a'), {});
+          await sleep(30);
           eq(played.length, 1, '冷解码再生仅起播一次真实 HTMLAudio 采样');
           w.setVariantSfx(false);
           check(stopped.includes(played[0]), 'setVariantSfx(false) 即停已在播的回退采样');
@@ -465,6 +468,8 @@
           w.clearArcaneFx();
         } finally {
           proto.createBufferSource = createBuffer; proto.decodeAudioData = decodeAudio;
+          mixer.buffers.clear(); bufferSnapshot.forEach((value,key) => mixer.buffers.set(key,value));
+          mixer.decodes.clear(); decodeSnapshot.forEach((value,key) => mixer.decodes.set(key,value));
           mediaProto.play = mediaPlay; mediaProto.pause = mediaPause;
           w.setVariantSfx(true); ev('arcaneVfxModule.setIdentitySfx(true)'); w.clearArcaneFx();
         }

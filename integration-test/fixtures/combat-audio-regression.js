@@ -693,6 +693,44 @@
       try { mod.setIdentitySfx(true); } catch (e) {}
       try { root.remove(); } catch (e) {}
     }
+    /* ========== 【从西班牙射击】穿透枪声起音门闩（真实 applySingleTagEffect） ========== */
+    await group('穿透枪声起音门闩与单次结算', async () => {
+      restoreTimers(); resetAll();
+      const mixer = w.CombatAudioMixer, realPlay = mixer.play, realSVG = w.playSVGEffect;
+      const savedPierceState = ev('({heroesData,enemiesData,battleHistory,_historyRawCache,token:combatToken,frozen:_pipelineFrozen,nonLethal:nonLethalSettings.enabled,random:Math.random})');
+      let resolveStart, cues = 0, svgCount = 0, resolvedEvents = 0;
+      const cue = () => { resolveStart(false); };
+      cue.ready = Promise.resolve(true); cue.started = new Promise(r => resolveStart = r); cue.done = Promise.resolve(true);
+      const onPierceResult = result => { if (result.targetId === 'h_ca1') resolvedEvents++; };
+      try {
+        doc.body.appendChild(root);
+        mixer.play = function (url, opts) { if (/gunshot_pierce\.mp3$/.test(url)) { cues++; return cue; } return realPlay.call(this, url, opts); };
+        w.playSVGEffect = (dom, type) => { if (type === 'gunshot_pierce') svgCount++; };
+        w.CombatEvents.on(E.DAMAGE_RESOLVED, onPierceResult);
+        w.Math.random = () => 0.5;
+        const d = install([entity('h_ca1')], [entity('e_ca1', { atk:0 })]); wireDom();
+        const skill = sk('【从西班牙射击】[穿透;power:80][单缓;power:10][暴击:10%][Turns:2][Aim:200][MP:1][远程][特效:枪击穿透]');
+        const hp0 = d.h[0].hp;
+        const action = w.applySingleTagEffect(d.e[0], d.h[0], '[穿透]', 80, 200, 1, 2, skill, 80);
+        await wait(20);
+        eq(cues, 1, '穿透枪声只调度一次');
+        eq(d.h[0].hp, hp0, 'cue.started放行前HP不提前结算');
+        eq(svgCount, 0, '枪声实际起播前不提前显示穿透冲击');
+        resolveStart(true); await action;
+        eq(hp0 - d.h[0].hp, 80, '起音放行后穿透伤害只结算一次');
+        eq(resolvedEvents, 1, '穿透结果事件只一次');
+        eq(svgCount, 1, '穿透冲击SVG只挂载一次');
+      } finally {
+        resolveStart(false); mixer.play = realPlay; w.playSVGEffect = realSVG;
+        w.clearArcaneFx();
+        w.CombatEvents.off(E.DAMAGE_RESOLVED, onPierceResult);
+        w.__pierceSaved = savedPierceState;
+        ev('heroesData=window.__pierceSaved.heroesData;enemiesData=window.__pierceSaved.enemiesData;battleHistory=window.__pierceSaved.battleHistory;_historyRawCache=window.__pierceSaved._historyRawCache;combatToken=window.__pierceSaved.token;_pipelineFrozen=window.__pierceSaved.frozen;nonLethalSettings.enabled=window.__pierceSaved.nonLethal;Math.random=window.__pierceSaved.random;delete window.__pierceSaved;');
+        root.remove();
+      }
+    });
+
+
     if (mock && typeof mock.genCount === 'function') eq(mock.genCount(), gen0, '音频专项未调用外部LLM');
     return { pending };
   };

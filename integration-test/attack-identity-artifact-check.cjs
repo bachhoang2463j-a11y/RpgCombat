@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ROOT = path.resolve(__dirname, '..');
-const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_06.json');
+const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_08.json');
 const pkg = JSON.parse(fs.readFileSync(artifact, 'utf8'));
 const src = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const fenced = pkg.replaceString;
@@ -34,7 +34,7 @@ function syntax(text, label) {
   catch (e) { check(false, label + '语法：' + e.message); }
 }
 console.log('== 攻击身份与命中分层 v12.0 产物专项 ==');
-check(path.basename(artifact) === 'regex-前端战斗v12_06.json' && pkg.scriptName === '前端战斗v12.06', '文件名与scriptName均为v12.06');
+check(path.basename(artifact) === 'regex-前端战斗v12_08.json' && pkg.scriptName === '前端战斗v12.08', '文件名与scriptName均为v12.08');
 check(count(src,'```') === 2 && count(fenced,'```') === 2, '源码与产物均只有头尾自围栏');
 check(!immune.includes('```') && !/&(?!amp;)/.test(immune), '内部围栏加固及全量实体免疫');
 check(raw.replace(/&/g,'&amp;') === immune, '单遍实体还原逐字符一致');
@@ -84,5 +84,11 @@ check(src.includes('Object.freeze(Object.assign({}, classified'), '伤害/闪避
 check(raw.includes('DamagePrevented') && raw.includes('prevented'), '复活与保命免伤独立结果入包');
 check(src.includes("else if (r.outcome === 'prevented') kind = 'prevented'") && src.includes("h.kind !== 'prevented'"), '复活免伤不误判格挡且不播放受击音');
 check(src.includes('if (result.isHero)') && src.includes('else wave.results.set(result.targetId, result)'), '英雄即时逐目标反馈，敌方仍按wave聚合');
+for (const key of ['CombatAudioMixer', 'skill', 'result', 'aux', 'sourcePaddingSec', 'stopPaddingSec']) check(raw.includes(key), '共享三轨与兼容裁窗入包：' + key);
+check(src.includes('cue.ready = new Promise') && src.includes('cue.started = new Promise') && src.includes('cue.done = new Promise'), '采样就绪／实际起音／自然结束契约入包');
+check(src.includes("['gunshot2.mp3', 0.259]") && src.includes("['gunshot3.mp3', 0.080]") && src.includes("['gunshot_pierce.mp3', 0.320]"), '明确枪声前导空白采样起点入包');
+check(src.includes('short: { holdMs:180, result:0.40, aux:0.30 }') && src.includes('special: { holdMs:450, result:0.25, aux:0.20 }'), '批准的短／专属保护参数入包');
+check(src.includes('when:cue.when + delayMs / 1000'), '重击子音按真实主音时钟调度');
+check(src.includes('owner.audioAt(T.impactMs') && !src.includes('owner.onClean(stop)'), '普通枪击接触跟随音频拍点且自然尾音不被视觉清理');
 console.log('\n统计：通过 ' + pass + ' 项，失败 ' + fail + ' 项');
 process.exitCode = fail ? 1 : 0;

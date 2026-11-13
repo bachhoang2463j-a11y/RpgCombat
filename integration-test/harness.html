@@ -35,12 +35,13 @@
 <script src="fixtures/attack-identity-regression.js"></script>
 <script src="fixtures/hit-feedback-regression.js"></script>
 <script src="fixtures/combat-audio-regression.js"></script>
+<script src="fixtures/audio-mixer-regression.js"></script>
 <script src="fixtures/variant-trigger-regression.js"></script>
 <script src="fixtures/item-fx-editor-regression.js"></script>
 <script>
 const TEST_PARAMS = new URLSearchParams(location.search);
 const RPG_SOURCE = TEST_PARAMS.get('artifact') !== '0'
-  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v12_06.json')
+  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v12_08.json')
   : (TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html');
 const RPG_READABLE_SOURCE = TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html';
 // 结构断言读取可读源码；行为断言始终操作 RPG_SOURCE 挂载的真实源码或压缩产物。
@@ -1364,7 +1365,7 @@ async function test23() {
   check(!src.includes('drop-shadow(0 0 10px #450a0a) drop-shadow(0 0 4px #7f1d1d)'), '血溅双 drop-shadow 已并单');
   check(!src.includes('drop-shadow(0 0 20px #f59e0b) drop-shadow(0 0 40px #d97706)'), '近战重击核心双 drop-shadow 已并单');
   // ⑥ 功能仿真（rpg iframe 内真触发）：特效挂载→自动清理；受击动画行内含 steps 闪色且播完恢复
-  rpgWin().eval(`try { var __rt = document.createElement('div'); __rt.id = 't23-target'; document.body.appendChild(__rt); spawnRangedHeavyParticles(400, 300, __rt); } catch (e) { window.__t23err = String(e); }`);
+  await rpgWin().eval(`(async () => { try { var __rt = document.createElement('div'); __rt.id = 't23-target'; document.body.appendChild(__rt); await spawnRangedHeavyParticles(400, 300, __rt); } catch (e) { window.__t23err = String(e); } })()`);
   check(!rpgWin().eval('window.__t23err || ""'), '触发远程重击特效无异常' + (rpgWin().eval('window.__t23err ? "：" + window.__t23err : ""') || ''));
   const animEarly = rpgWin().eval("document.getElementById('t23-target').style.animation");
   check((animEarly.match(/ranged-heavy-enemy-recoil(-flash)?/g) || []).length >= 2 && animEarly.includes('steps(1)'), '受击动画行内同时携带 transform 主体与 steps 闪色（CSSOM 序列化顺序无关）');
@@ -2123,7 +2124,7 @@ async function test33() {
   check(src.includes("skill.fxTag === '造雾术' || skill.fxTag === '高阶召唤术' || skill.fxTag === '障壁术'"), 'executeSkillAction 全屏 SVG 特判含障壁术');
   check(src.includes("skill.fxTag === '高阶召唤术' || skill.fxTag === '障壁术'"), '枪击命中豁免 _isHeavyFx 含障壁术');
   check(w.eval('Object.keys(WEBM_FX_REGISTRY).indexOf("障壁术") >= 0'), '注册表键含障壁术（技能编辑器下拉自动纳入）');
-  check(src.includes('playCustomAudio(RLYEH_FOG_CLOUD_URL, 2)'), '造雾术音量增益 2（fog.mp3 源文件偏轻，GainNode 硬件级放大）');
+  check(/playCustomAudio\(RLYEH_FOG_CLOUD_URL, 2(?:,|\))/.test(src), '造雾术音量增益 2（fog.mp3 源文件偏轻，GainNode 硬件级放大）');
   check(/'造雾术': \{ url: '', scale: 1\.0, particles: 'rlyeh_sediment', audioUrl: RLYEH_FOG_CLOUD_URL \},/.test(src), '造雾术注册表无 delay（立即结算）');
   // 新增三组 WebM 视频特效（my_assets 实测核名：miaozhun/ranshao = .mp3+.webm，weimu 音效 = .wav）
   check(w.eval('(() => { const x = WEBM_FX_REGISTRY["开镜瞄准"]; return /\\/miaozhun\\.webm$/.test(x.url) && /\\/miaozhun\\.mp3$/.test(x.audioUrl) && x.scale === 0.42 && !x.particles && !x.delay; })()'), '注册表：开镜瞄准（miaozhun.webm + mp3，无粒子无延迟，scale 0.42）');
@@ -2829,13 +2830,19 @@ async function test50() {
   if (TEST_PARAMS.get('version') === 'public') return;
   await window.runItemFxEditorRegression({ w:rpgWin(), check, eq, mock:MOCK });
 }
+async function test51() {
+  head('51 三轨音频：预解码、起音拍点、主辅避让与自然尾音');
+  if (TEST_PARAMS.get('version') === 'public') return;
+  const result = await window.runAudioMixerRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
+  eq(result.pending, [], '三轨播放器专项全部落地，无待对齐项');
+}
 async function runAll() {
   logEl.textContent = '';
   passN = failN = 0;
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47, test48, test49, test50];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47, test48, test49, test50, test51];
   const selectedTests = TEST_PARAMS.has('tests') ? new Set(TEST_PARAMS.get('tests').split(',').map(n => 'test' + n)) : null;
   for (const t of tests) {
     if (selectedTests && !selectedTests.has(t.name)) continue;

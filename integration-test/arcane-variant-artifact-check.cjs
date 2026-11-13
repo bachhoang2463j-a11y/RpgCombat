@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 'use strict';
-// 独立检查 v12.06 真实正则产物：只读、离线，不运行战斗或访问资源服务。
-// 默认检查 regex-前端战斗v12_06.json，可用 argv[2] 指定其它产物路径。
+// 独立检查真实正则产物：只读、离线，不运行战斗或访问资源服务。
+// 默认检查当前真实正则产物，可用 argv[2] 指定其它产物路径。
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
 const ROOT = path.resolve(__dirname, '..');
 const ASSET = 'http://192.168.110.83:8766';
-const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_06.json');
+const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_08.json');
 let pass = 0, fail = 0;
 const count = (text, needle) => text.split(needle).length - 1;
 function check(ok, label) { console.log((ok ? '[PASS] ' : '[FAIL] ') + label); ok ? pass++ : fail++; }
@@ -20,8 +20,8 @@ if (!fs.existsSync(artifact)) {
 }
 const pkg = JSON.parse(fs.readFileSync(artifact, 'utf8'));
 const base = path.basename(artifact);
-if (base !== 'regex-前端战斗v12_06.json' || pkg.scriptName !== '前端战斗v12.06') {
-  pending('产物版本为 ' + base + ' / ' + pkg.scriptName + '，等待 v12.06 打包');
+if (!/^regex-前端战斗v\d+_\d+\.json$/.test(base) || !/^前端战斗v\d+\.\d+$/.test(pkg.scriptName)) {
+  pending('产物不是维护版：' + base + ' / ' + pkg.scriptName);
   process.exit(0);
 }
 
@@ -74,8 +74,8 @@ function syntax(text, label) {
   catch (e) { check(false, label + '语法：' + e.message); }
 }
 
-console.log('== 变种触发与行军兽移植 v12.06 产物专项 ==');
-check(base === 'regex-前端战斗v12_06.json' && pkg.scriptName === '前端战斗v12.06', '文件名与scriptName均为v12.06');
+console.log('== 变种触发与行军兽移植 v12.08 产物专项 ==');
+check(base === 'regex-前端战斗v12_08.json' && pkg.scriptName === '前端战斗v12.08', '文件名与scriptName均为v12.08');
 check(count(src, '```') === 2 && count(fenced, '```') === 2, '源码与产物均只有头尾自围栏');
 check(!immune.includes('```') && !/&(?!amp;)/.test(immune), '内部围栏加固及全量实体免疫');
 check(raw.replace(/&/g, '&amp;') === immune, '单遍实体还原逐字符一致');

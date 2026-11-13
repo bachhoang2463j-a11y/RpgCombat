@@ -455,6 +455,12 @@
         if (keyByGroup.spell) {
           clearCalls();
           const t0 = Date.now();
+          const groupSound = w.playSound; let stoppedCue = 0, cueOwner = null;
+          w.playSound = (key, vol, rate, opts) => {
+            const stop = groupSound(key, vol, rate);
+            if (opts && opts.owner) { cueOwner = opts.owner; opts.owner.audioStoppers.add(() => { stoppedCue++; if (typeof stop === 'function') stop(); }); }
+            return stop;
+          };
           const h = w.playArcaneSkillFx(keyByGroup.spell, d.e[0], [d.h[0], d.h[1]]);
           check(!!h, '真实group演出返回句柄');
           await wait(220);
@@ -463,7 +469,9 @@
           const burst = calls.sounds.find(s => s.key === 'atk1');
           check(!!burst && burst.t - t0 >= 350, '爆发音在350ms拍点后出现');
           eq(burst ? burst.vol : null, 0.5, '法术群爆发音量0.5');
-          h.cancel();
+          h.cancel(); w.playSound = groupSound;
+          check(!!cueOwner, '群攻命中采样登记到本组owner');
+          eq(stoppedCue, 1, '群攻handle.cancel停止本组采样一次');
           eq(w.document.querySelectorAll('[data-arcane-fx]').length, 0, '爆发后cancel清场');
           await wait(400);
           eq(w.document.querySelectorAll('[data-arcane-fx]').length, 0, '爆发后cancel无延迟复活');

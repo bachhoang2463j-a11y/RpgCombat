@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ROOT = path.resolve(__dirname, '..');
-const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_06.json');
+const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_08.json');
 const pkg = JSON.parse(fs.readFileSync(artifact, 'utf8'));
 const src = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const fenced = pkg.replaceString;
@@ -49,7 +49,7 @@ function syntax(text, label) {
 }
 
 console.log('== 敌方群攻 v12.0 产物专项 ==\n' + path.basename(artifact));
-check(pkg.scriptName === '前端战斗v12.06', 'scriptName 为前端战斗v12.06');
+check(pkg.scriptName === '前端战斗v12.08', 'scriptName 为前端战斗v12.08');
 check(count(src, '```') === 2 && /^```html\r?\n/.test(src) && /\r?\n```\s*$/.test(src), '源码围栏恰为头尾2处');
 check(count(fenced, '```') === 2 && /^```html\r?\n/.test(fenced) && /\r?\n```\s*$/.test(fenced), '产物围栏恰为头尾2处');
 check(!immune.includes('```'), '产物内部无裸三反引号');
@@ -93,7 +93,7 @@ check(scope.resolveEnemyGroupAttackFx({ id: 'h_test' }, '[群攻]', {}) === null
 check(scope.resolveEnemyGroupAttackFx({ id: 's_test', isSummon: true, side: 'enemy' }, '[群攻]', { damageType: '远程' }) === 'group:ranged', '敌方召唤物使用远程兜底');
 
 for (const [key, volume] of [['enemyMeleeGroupHit', '.72'], ['enemyRangedGroupHit', '.75'], ['atk1', '.5']]) {
-  const call = new RegExp('playSound\\(["\x27]' + key + '["\x27]\\s*,\\s*0?' + volume.replace('.', '\\.') + '\\)');
+  const call = new RegExp('playSound\\(["\x27]' + key + '["\x27]\\s*,\\s*0?' + volume.replace('.', '\\.') + '(?:\\s*,|\\))');
   check(call.test(src) && call.test(raw), key + '显式命中音量' + volume + '入包');
 }
 const groupStart = src.indexOf('    function playSpellGroup('), groupEnd = src.indexOf('    // ===== 对外接口 =====', groupStart);

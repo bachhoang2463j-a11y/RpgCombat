@@ -4129,42 +4129,242 @@ function setHistoryFilter(f) {
 // 音频预缓存 Map：key=url, value=HTMLAudioElement（未预热时的回退路径）
 const _fxAudioCache = new Map();
 // 音频 Blob URL 缓存 Map：key=url, value=blobUrl（fetch 全量预载，播放即时；fetch 中为 null 占位）
-const _fxAudioBlobCache = new Map();
+const _fxAudioBlobCache = new Map(), _fxAudioLoads = new Map();
+// 现有采样的前导空白（本地 PCM 起音测量；不裁主体与尾音）。
+const AUDIO_CLIP_OFFSETS = new Map([
+    ['gunshot2.mp3', 0.259], ['gunshot3.mp3', 0.080], ['gunshot_pierce.mp3', 0.320],
+    ['shot01.mp3', 0.025], ['xiandan.mp3', 0.006]
+].map(([name, offset]) => [ASSET_BASE + '/' + name, offset]));
 
-// 用 Web Audio GainNode 放大音量（支持 Blob URL 本地音量硬件级放大；HTMLAudioElement.volume 上限为 1，无法直接 >1；复用 playWebMFX 增益先例）
-function applyAudioVolume(audio, volume) {
-    if (!volume || volume === 1) return;
-    if (volume < 1) { audio.volume = volume; return; }
-    try {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContextClass) return;
-        const audioCtx = new AudioContextClass();
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        const source = audioCtx.createMediaElementSource(audio);
-        const gainNode = audioCtx.createGain();
-        gainNode.gain.value = volume;
-        source.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-    } catch (e) {
-        console.warn('[FX] Web Audio 音量增益放大未开启:', e);
+const CombatAudioMixer = (function () {
+    let ctx = null, tracks = {}, generation = 0, nextCueId = 0;
+    const buffers = new Map(), decodes = new Map(), voices = new Set(), protections = new Set(), timers = new Map();
+    const profiles = { short: { holdMs:180, result:0.40, aux:0.30 }, special: { holdMs:450, result:0.25, aux:0.20 } };
+    let envelopes = { result:[], aux:[] };
+    function context() {
+        if (!ctx) {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return null;
+            ctx = new Ctx();
+            for (const name of ['skill', 'result', 'aux']) { const bus = ctx.createGain(); bus.connect(ctx.destination); tracks[name] = bus; }
+        }
+        return ctx;
     }
-}
+    function output(track = 'skill') { context(); return tracks[track]; }
+    function load(url) {
+        const blob = _fxAudioBlobCache.get(url);
+        if (blob) return Promise.resolve(blob);
+        if (_fxAudioLoads.has(url)) return _fxAudioLoads.get(url);
+        _fxAudioBlobCache.set(url, null);
+        const task = fetch(url).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); }).then(blob => {
+            const local = URL.createObjectURL(blob); _fxAudioBlobCache.set(url, local); return local;
+        }).catch(e => { _fxAudioBlobCache.delete(url); throw e; }).finally(() => _fxAudioLoads.delete(url));
+        _fxAudioLoads.set(url, task); return task;
+    }
+    function prepare(url) {
+        if (!url || url === 'none') return Promise.resolve(null);
+        if (buffers.has(url)) return Promise.resolve(buffers.get(url));
+        if (decodes.has(url)) return decodes.get(url);
+        const audioCtx = context();
+        if (!audioCtx) return Promise.resolve(null);
+        const task = load(url).then(local => fetch(local)).then(r => r.arrayBuffer()).then(data => audioCtx.decodeAudioData(data))
+            .then(buffer => { buffers.set(url, buffer); return buffer; }).catch(e => {
+                console.warn('[Audio] 采样加载失败:', url, e); buffers.set(url, null); return null;
+            }).finally(() => decodes.delete(url));
+        decodes.set(url, task); return task;
+    }
+    function valueAt(points, time) {
+        if (!points.length) return 1;
+        let prev = points[0];
+        for (const p of points) { if (p.t > time) return prev.v + (p.v - prev.v) * Math.max(0, (time - prev.t) / (p.t - prev.t)); prev = p; }
+        return prev.v;
+    }
+    function duck() {
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        for (const p of protections) if (p.end <= now) protections.delete(p);
+        const boundaries = [...new Set([now, ...[...protections].flatMap(p => [p.start, p.end]).filter(t => t > now)])].sort((a, b) => a - b);
+        for (const name of ['result', 'aux']) {
+            let points = [{ t:now, v:valueAt(envelopes[name], now) }];
+            for (const t of boundaries) {
+                const active = [...protections].filter(p => p.start <= t && p.end > t);
+                const target = Math.min(1, ...active.map(p => p[name])), current = valueAt(points, t);
+                points = points.filter(p => p.t < t);
+                points.push({ t, v:current }, { t:t + (target < current ? 0.010 : 0.120), v:target });
+            }
+            const gain = tracks[name].gain;
+            gain.cancelScheduledValues(now); gain.setValueAtTime(points[0].v, now);
+            points.slice(1).forEach(p => gain.linearRampToValueAtTime(p.v, p.t)); envelopes[name] = points;
+        }
+    }
+    function protect(profile = 'short', when, owner = null) {
+        const audioCtx = context(); if (!audioCtx) return () => {};
+        const p = Object.assign({ start:when == null ? audioCtx.currentTime : when, owner }, profiles[profile]);
+        p.end = p.start + p.holdMs / 1000; protections.add(p); duck();
+        const cancel = () => { protections.delete(p); duck(); };
+        atTime(p.end + 0.120, () => { protections.delete(p); }, false);
+        return cancel;
+    }
+    function outputDelay(time) {
+        const stamp = ctx.getOutputTimestamp && ctx.getOutputTimestamp();
+        if (stamp && stamp.performanceTime > 0) return Math.max(0, stamp.performanceTime + (time - stamp.contextTime) * 1000 - performance.now());
+        return Math.max(0, (time - ctx.currentTime + (ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000);
+    }
+    function atTime(time, fn, audible = true) {
+        const audioCtx = ctx, gen = generation;
+        let id = null, cancelled = false;
+        const cancel = () => { cancelled = true; if (id != null) { clearTimeout(id); timers.delete(id); } audioCtx.removeEventListener('statechange', schedule); };
+        function schedule() {
+            if (cancelled || gen !== generation) return;
+            if (audioCtx.state !== 'running') { audioCtx.addEventListener('statechange', schedule, { once:true }); return; }
+            const delay = audible ? outputDelay(time) : Math.max(0, (time - audioCtx.currentTime) * 1000);
+            id = setTimeout(() => {
+                timers.delete(id); id = null;
+                if (cancelled || gen !== generation) return;
+                if (audioCtx.state !== 'running') { schedule(); return; }
+                fn();
+            }, delay);
+            timers.set(id, cancel);
+        }
+        schedule(); return cancel;
+    }
+    function bindOwner(owner, cue) {
+        if (!owner) return cue;
+        cue.owner = owner; owner.audioStoppers.add(cue);
+        const token = combatToken;
+        owner.onClean(() => { if (owner.cancelled || token !== combatToken || _pipelineFrozen) cue(); });
+        if (!owner.mixerCancel) {
+            owner.mixerCancel = owner.handle.cancel;
+            owner.handle.cancel = () => { voices.forEach(v => { if (v.owner === owner) v(); }); owner.mixerCancel(); };
+        }
+        return cue;
+    }
+    function play(url, opts = {}) {
+        let source = null, gain = null, pan = null, media = null, stopped = false, cancelStart = null, cancelProtect = null;
+        let resolveReady, resolveStarted, resolveDone;
+        const token = combatToken, gen = generation;
+        const cue = () => finish(false);
+        cue.id = ++nextCueId; cue.track = opts.track || 'aux'; cue.when = null;
+        cue.ready = new Promise(r => resolveReady = r); cue.started = new Promise(r => resolveStarted = r); cue.done = new Promise(r => resolveDone = r);
+        const valid = () => !stopped && gen === generation && token === combatToken && !_pipelineFrozen && !(opts.owner && opts.owner.cancelled);
+        function finish(natural) {
+            if (stopped) return; stopped = true;
+            if (cancelStart) cancelStart();
+            if (!natural && cancelProtect) cancelProtect();
+            if (media) { media.onplaying = media.onended = media.onerror = media.onloadedmetadata = null; media.pause(); media.removeAttribute('src'); media.load(); }
+            if (source) { source.onended = null; if (!natural && source.stop) { try { source.stop(); } catch {} } source.disconnect(); }
+            if (gain) gain.disconnect(); if (pan) pan.disconnect();
+            voices.delete(cue); if (cue.owner) cue.owner.audioStoppers.delete(cue);
+            resolveReady(false); resolveStarted(false); resolveDone(natural);
+        }
+        function route(audioCtx) {
+            gain = audioCtx.createGain();
+            if (opts.pan != null && audioCtx.createStereoPanner) { pan = audioCtx.createStereoPanner(); pan.pan.value = opts.pan; gain.connect(pan); pan.connect(output(cue.track)); }
+            else gain.connect(output(cue.track));
+        }
+        function started(when, duration) {
+            cue.when = when;
+            if (gain) {
+                gain.gain.setValueAtTime(opts.vol == null ? 0.5 : opts.vol, when);
+                const fadeIn = opts.fadeInSec || 0, fadeOut = Math.min(opts.fadeOutSec || 0, duration * 0.45);
+                if (fadeIn) { gain.gain.setValueAtTime(0.0001, when); gain.gain.linearRampToValueAtTime(opts.vol == null ? 0.5 : opts.vol, when + Math.min(fadeIn, duration * 0.25)); }
+                if (fadeOut) { gain.gain.setValueAtTime(opts.vol == null ? 0.5 : opts.vol, when + duration - fadeOut); gain.gain.linearRampToValueAtTime(0.0001, when + duration); }
+            }
+            if (cue.track === 'skill') cancelProtect = protect(opts.profile || 'short', when, cue.owner);
+            resolveReady(true);
+            cancelStart = atTime(when, () => { if (valid()) resolveStarted(true); else finish(false); });
+        }
+        voices.add(cue); bindOwner(opts.owner, cue);
+        async function launch() {
+            const audioCtx = context();
+            let buffer = buffers.get(url);
+            if (opts.sync && audioCtx && !buffers.has(url)) buffer = await prepare(url);
+            if (!valid()) { finish(false); return; }
+            if (audioCtx && audioCtx.state === 'suspended') await audioCtx.resume();
+            if (!valid()) { finish(false); return; }
+            if (opts.sync && audioCtx && !buffer) { finish(false); return; }
+            const offset = opts.offsetSec == null ? AUDIO_CLIP_OFFSETS.get(url) || 0 : opts.offsetSec, speed = opts.rate || 1;
+            if (buffer && audioCtx) {
+                route(audioCtx); source = audioCtx.createBufferSource(); source.buffer = buffer; source.playbackRate.value = speed; source.connect(gain);
+                const duration = opts.maxDurSec ? Math.min(opts.maxDurSec, (buffer.duration - offset) / speed) : (buffer.duration - offset) / speed;
+                source.onended = () => cue.started.then(ok => finish(ok));
+                const when = Math.max(audioCtx.currentTime, opts.when == null ? audioCtx.currentTime : opts.when);
+                started(when, duration);
+                source.start(when, offset, Math.min(buffer.duration - offset, duration * speed + (opts.sourcePaddingSec || 0)));
+                if (opts.stopPaddingSec != null) source.stop(when + duration + opts.stopPaddingSec);
+            } else {
+                media = new Audio(); media.crossOrigin = 'anonymous'; media.src = _fxAudioBlobCache.get(url) || url; media.playbackRate = speed;
+                if (audioCtx) { route(audioCtx); source = audioCtx.createMediaElementSource(media); source.connect(gain); gain.gain.value = 0; }
+                else media.volume = Math.min(1, opts.vol == null ? 0.5 : opts.vol);
+                media.onloadedmetadata = () => { if (!stopped && offset) media.currentTime = offset; };
+                media.onplaying = () => {
+                    if (!valid()) { finish(false); return; }
+                    media.onplaying = null;
+                    const duration = opts.maxDurSec ? Math.min(opts.maxDurSec, (media.duration - offset) / speed) : (media.duration - offset) / speed;
+                    if (audioCtx) started(audioCtx.currentTime, duration);
+                    else { resolveReady(true); resolveStarted(true); }
+                    if (opts.maxDurSec) {
+                        const cancelEnd = audioCtx ? atTime(audioCtx.currentTime + duration, () => finish(true), false) : (() => { const id = setTimeout(() => finish(true), duration * 1000); return () => clearTimeout(id); })();
+                        cue.done.then(cancelEnd);
+                    }
+                };
+                media.onended = () => cue.started.then(ok => finish(ok)); media.onerror = () => finish(false); media.play().catch(e => { console.warn('[Audio] 起播失败:', url, e); finish(false); });
+            }
+        }
+        launch().catch(e => { console.warn('[Audio] 起播失败:', url, e); finish(false); }); return cue;
+    }
+    function media(element, volume, track = 'skill') {
+        const audioCtx = context(); if (!audioCtx) { element.volume = Math.min(1, volume); return () => {}; }
+        const source = audioCtx.createMediaElementSource(element), gain = audioCtx.createGain();
+        let released = false, cancelProtect = null;
+        gain.gain.value = volume; source.connect(gain); gain.connect(output(track));
+        function release(stop) {
+            if (released) return; released = true;
+            if (stop) element.pause();
+            if (cancelProtect) cancelProtect();
+            source.disconnect(); gain.disconnect(); voices.delete(cue);
+        }
+        const cue = () => release(true);
+        voices.add(cue);
+        element.addEventListener('ended', () => release(false), { once:true });
+        element.addEventListener('playing', () => { if (track === 'skill') cancelProtect = protect('special', audioCtx.currentTime); }, { once:true });
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        return cue;
+    }
+    function clear() {
+        generation++; voices.forEach(stop => stop()); voices.clear();
+        timers.forEach(cancel => cancel()); timers.clear(); protections.clear(); envelopes = { result:[], aux:[] };
+        if (ctx) ctx.close(); ctx = null; tracks = {};
+    }
+    function prepareSkill(skill) {
+        const keys = new Set(), tag = [skill.type, skill.type2, skill.type3].filter(Boolean).join(' ');
+        if (skill.fxTag) {
+            const entry = WEBM_FX_REGISTRY[skill.fxTag];
+            if (entry && entry.audioUrl && entry.audioUrl !== 'none') keys.add(entry.audioUrl);
+            if (skill.fxTag === '远程重击') { keys.add(audioUrls.shot); keys.add(audioUrls.hitDown); }
+            if (skill.fxTag === '近战重击') keys.add(audioUrls.hitDown);
+        } else {
+            if (tag.includes('枪击')) ['gunshot1', 'gunshot2', 'gunshot3'].forEach(key => keys.add(audioUrls[key]));
+            if (tag.includes('霰弹')) keys.add(audioUrls.xiandan);
+            if (tag.includes('火焰') || (skill.damageType === '法术' && tag.includes('单'))) keys.add(audioUrls.light_impact);
+        }
+        return Promise.all([...keys].map(prepare));
+    }
+    function skillContext() {
+        const audioCtx = context();
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        return audioCtx;
+    }
+    return { context, skillContext, output, load, prepare, prepareSkill, play, protect, atTime, bindOwner, media, clear, buffers, decodes };
+})();
+window.CombatAudioMixer = CombatAudioMixer;
 
-/**
- * 播放自定义音效（支持 Blob 预载零延迟与 Web Audio GainNode 音量放大）
- * @param {string} url - 音效地址
- * @param {number} [volume] - 音量增益倍率（>1 用 Web Audio GainNode 放大，默认 1 不调整）
- */
-function playCustomAudio(url, volume, rate = 1) {
+function applyAudioVolume(audio, volume) { return CombatAudioMixer.media(audio, volume); }
+
+/** 播放自定义采样；返回可调用停止句柄，started 对应实际输出起音而非 play() 请求。 */
+function playCustomAudio(url, volume, rate = 1, opts = {}) {
     if (!url || url === 'none') return;
-    const blobUrl = _fxAudioBlobCache.get(url), cached = _fxAudioCache.get(url);
-    const audio = blobUrl ? new Audio(blobUrl) : cached ? cached.cloneNode() : new Audio(url);
-    if (!blobUrl && !cached) { audio.preload = 'auto'; _fxAudioCache.set(url, audio); }
-    if (volume && volume !== 1) applyAudioVolume(audio, volume);
-    else audio.volume = 0.5;
-    if (rate && rate !== 1) audio.playbackRate = rate;
-    audio.play().catch(e => console.warn('[FX] 音效播放失败:', e));
-    return () => { audio.pause(); audio.currentTime = 0; };
+    return CombatAudioMixer.play(url, Object.assign({ vol:volume != null && volume !== 1 ? volume : 0.5, rate }, opts));
 }
 
 const audioUrls = {
@@ -4275,28 +4475,13 @@ const audioUrls = {
 // 预热全量基础音效为 Blob URL，确保零延迟与 Web Audio API 无跨域限制
 for (let key in audioUrls) {
     const u = audioUrls[key];
-    if (u && !_fxAudioBlobCache.has(u)) {
-        _fxAudioBlobCache.set(u, null);
-        fetch(u)
-            .then(r => r.blob())
-            .then(blob => { _fxAudioBlobCache.set(u, URL.createObjectURL(blob)); if (window.preloadAttackIdentitySample) window.preloadAttackIdentitySample(key); })
-            .catch(e => { _fxAudioBlobCache.delete(u); });
-    }
+    if (u) CombatAudioMixer.load(u).then(() => { if (window.preloadAttackIdentitySample) window.preloadAttackIdentitySample(key); }).catch(() => {});
 }
 
-const audioCache = {};
-for (let key in audioUrls) { audioCache[key] = new Audio(audioUrls[key]); audioCache[key].preload = 'auto'; }
-
-window.playSound = (key, volume = 1, rate = 1) => {
+const SKILL_CUE_KEYS = new Set(['atk1','atk2','burst','shot','gunshot1','gunshot2','gunshot3','xiandan','enemyMeleeGroupHit','enemyRangedGroupHit','enemySpellGroupHit','kanpo']);
+window.playSound = (key, volume = 1, rate = 1, opts = {}) => {
     const url = audioUrls[key];
-    if (url && ((volume && volume !== 1) || (rate && rate !== 1))) return playCustomAudio(url, volume, rate);
-    if (audioCache[key]) {
-        const sound = audioCache[key].cloneNode();
-        sound.volume = 0.5;
-        if (rate && rate !== 1) sound.playbackRate = rate;
-        sound.play().catch(() => {});
-        return () => { sound.pause(); sound.currentTime = 0; };
-    }
+    if (url) return playCustomAudio(url, volume, rate, Object.assign({ track:SKILL_CUE_KEYS.has(key) ? 'skill' : 'aux' }, opts));
 };
 
 // 看破音效独立接口：使用 test1 仓库专属 kanpo.wav 音效
@@ -4309,15 +4494,16 @@ function playKanpoSound() {
 function playRandomStandardGunshot(owner = null) {
     const candidates = ['gunshot1', 'gunshot2', 'gunshot3'];
     const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-    const stop = playSound(chosen, 0.95);
-    if (owner && typeof stop === 'function') { owner.audioStoppers.add(stop); owner.onClean(stop); }
+    const cue = playSound(chosen, 0.95, 1, { track:'skill', sync:true, owner });
+    if (owner) owner.attackCue = cue;
     return chosen;
 }
 
 // [散射(霰弹)] 霰弹击发音效：xiandan.mp3（demo-shotgun-vfx.html 方案1，12-Gauge 鹿弹）
 function playShotgunSound(owner = null) {
-    const stop = playSound('xiandan', 0.95);
-    if (owner && typeof stop === 'function') { owner.audioStoppers.add(stop); owner.onClean(stop); }
+    const cue = playSound('xiandan', 0.95, 1, { track:'skill', sync:true, owner });
+    if (owner) owner.attackCue = cue;
+    return cue;
 }
 window.isExecutingCutin = false; 
 
@@ -4729,7 +4915,7 @@ window.fxEngine = fxEngine;
 // 职责：既有秘术/敌方群攻 + 两期20类攻击身份演出 + 同拍命中反馈 + 通用火焰·敌方法术弹弹道
 // 边界：命中展示只读结算输入，不改战斗数据；粒子走自建 arcane 临时层（暗层z40 < DOM层z52 < canvas z55 < 浮字z60/70）；
 //       调度复用 fxEngine：一个"驱动粒子"经 fxEngine.addParticle 挂进既有循环，无自建粒子时自动退出，不另启永久 rAF；
-//       音效为模块私有 AudioContext（惰性初始化），clearArcaneFx 时关闭，不覆盖现有音色函数。
+//       音效共用 CombatAudioMixer 上下文，合成音保留原音色链，采样走独立三轨。
 // 对外接口（挂 window）：isArcaneSkillFx / playArcaneSkillFx / playArcaneProjectile / clearArcaneFx
 // ==========================================
 const arcaneVfxModule = (function () {
@@ -4762,7 +4948,7 @@ const arcaneVfxModule = (function () {
         canvas: null, ctx: null,
         dark: null,
     };
-    let audioCtx = null, sfxBus = null, sfxVerb = null, sfxNoise = null;
+    let audioCtx = null, sfxBus = null, sfxVerb = null, sfxNoise = null, resultOutput = false;
     let groupChargeOutput = null;
 
     // ===== combatToken 守卫定时 =====
@@ -4850,10 +5036,10 @@ const arcaneVfxModule = (function () {
 
     // ===== 私有合成音色（demo 原样移植，局部隔离） =====
     function audio() {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (!audioCtx || audioCtx !== CombatAudioMixer.context()) {
+            audioCtx = CombatAudioMixer.context();
             const ctx = audioCtx;
-            const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -10; comp.knee.value = 4; comp.ratio.value = 6; comp.attack.value = 0.001; comp.release.value = 0.12; comp.connect(ctx.destination);
+            const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -10; comp.knee.value = 4; comp.ratio.value = 6; comp.attack.value = 0.001; comp.release.value = 0.12; comp.connect(CombatAudioMixer.output('skill'));
             const sat = shaper(ctx, 1.6); sat.connect(comp);
             sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9; sfxBus.connect(sat);
             const len = ctx.sampleRate * 3, ir = ctx.createBuffer(2, len, ctx.sampleRate);
@@ -4871,8 +5057,8 @@ const arcaneVfxModule = (function () {
         if (o.cut) { gn.gain.setValueAtTime(o.vol, t + o.dur - 0.012); gn.gain.linearRampToValueAtTime(0.0001, t + o.dur); }
         else gn.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
         const p = ctx.createStereoPanner(); p.pan.setValueAtTime(o.pan || 0, t); if (o.pan1 !== undefined) p.pan.linearRampToValueAtTime(o.pan1, t + o.dur);
-        src.connect(gn); gn.connect(p); p.connect(groupChargeOutput || identityOutput || sfxBus);
-        if (o.wet && !groupChargeOutput && !identityOutput) { const w = ctx.createGain(); w.gain.value = o.wet; p.connect(w); w.connect(sfxVerb); }
+        src.connect(gn); gn.connect(p); p.connect(resultOutput ? CombatAudioMixer.output('result') : groupChargeOutput || identityOutput || sfxBus);
+        if (o.wet && !resultOutput && !groupChargeOutput && !identityOutput) { const w = ctx.createGain(); w.gain.value = o.wet; p.connect(w); w.connect(sfxVerb); }
     }
     function noiseSrc(ctx, t, dur, rate) { const s = ctx.createBufferSource(); s.buffer = sfxNoise; s.playbackRate.value = rate || 1; s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05); return s; }
     function biquad(ctx, type, f0, f1, q, t, dur, fd) { const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t); if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + (fd || dur)); return f; }
@@ -5694,7 +5880,7 @@ const arcaneVfxModule = (function () {
     // 敌方前摇音效：红色单体保留原版采样，其余七类各配专属前摇音频（audioUrls 预热缓存）
     function omenSound(kind) {
         if (kind === 'red-single') {
-            if (window.playSound) playSound('monsterAttack'); // 原·单体近战预警音效
+            if (window.playSound) playSound('monsterAttack', 1, 1, { track:'skill' }); // 原·单体近战预警音效
         } else if (kind === 'red-wide') {
             if (window.playSound) playSound('enemySwingGroup');
         } else if (kind === 'amber-single') {
@@ -5786,12 +5972,16 @@ const arcaneVfxModule = (function () {
         return { left, right, top, bottom, x: (left + right) / 2, y: (top + bottom) / 2, w: right - left, h: bottom - top };
     }
     function groupRun(ms) {
-        const owner = { timers: new Set(), layers: new Set(), animations: new Set(), flights: new Set(), hostParticles: new Set(), flashes: new Map(), soundGates: new Set() };
+        const owner = { cancelled:false, finished:false, audioStoppers:new Set(), onCleanups:new Set(), timers: new Set(), layers: new Set(), animations: new Set(), flights: new Set(), hostParticles: new Set(), flashes: new Map(), soundGates: new Set() };
+        owner.onClean = fn => owner.onCleanups.add(fn);
         owner.at = (delay, fn) => {
             const id = after(delay, () => { owner.timers.delete(id); fn(); });
             owner.timers.add(id); return id;
         };
         const finish = () => {
+            if (owner.finished) return;
+            owner.finished = true;
+            owner.onCleanups.forEach(fn => fn()); owner.onCleanups.clear();
             owner.timers.forEach(id => { clearTimeout(id); S.timers.delete(id); }); owner.timers.clear();
             owner.animations.forEach(a => a.cancel()); owner.animations.clear();
             owner.layers.forEach(d => { S.layers.delete(d); d.remove(); }); owner.layers.clear();
@@ -5811,7 +6001,7 @@ const arcaneVfxModule = (function () {
             }
             S.handles.delete(handle); releaseIdleCanvas();
         };
-        const handle = { doneAt: Date.now() + ms, cancel: finish };
+        const handle = { doneAt: Date.now() + ms, cancel() { owner.cancelled = true; owner.audioStoppers.forEach(stop => stop()); owner.audioStoppers.clear(); finish(); } };
         S.handles.add(handle); owner.at(ms, finish); owner.handle = handle;
         return owner;
     }
@@ -5983,7 +6173,7 @@ const arcaneVfxModule = (function () {
             groupShake(owner, 16, 340);
             groupLayer(owner, `<div class="absolute inset-0" style="background:radial-gradient(ellipse at ${row.cx}px ${row.cy}px, rgba(255,41,56,0.45) 0%, rgba(153,27,27,0.22) 48%, transparent 76%);animation:arcane-fs-flash 0.44s ease-out both;"></div>
                 <div class="arcane-fs-anchor" style="left:${row.cx}px;top:${row.cy}px;width:${w * 1.18}px;height:${42 * k}px;background:linear-gradient(90deg,transparent,rgba(255,41,56,0.75) 20%,#fff1f2 50%,rgba(255,41,56,0.75) 80%,transparent);filter:drop-shadow(0 0 24px #ff2938);animation:arcane-fs-flash 0.36s ease-out both;"></div>`);
-            playSound('enemyMeleeGroupHit', 0.72);
+            playSound('enemyMeleeGroupHit', 0.72, 1, { owner });
             const struck = new Set();
             const flight = fly({ x: 0, y: 0 }, { x: w + 36, y: 0 }, 0, 175, x => {
                 reveal.setAttribute('width', x + 24);
@@ -6133,7 +6323,7 @@ const arcaneVfxModule = (function () {
             const launchDelay = 350 + idx * 22, flyDur = isMain ? 235 : 205;
             owner.at(launchDelay, () => {
                 if (idx === 0) {
-                    playSound('enemyRangedGroupHit', 0.75);
+                    playSound('enemyRangedGroupHit', 0.75, 1, { owner });
                     groupLayer(owner, `<div class="absolute inset-0" style="background:radial-gradient(ellipse at ${rowCx}px ${rowCy}px, rgba(250,204,21,0.32) 0%, rgba(180,83,9,0.14) 50%, transparent 78%);animation:arcane-fs-flash 0.65s ease-out both;"></div>`);
                 }
                 const flight = fly(a, b, lift, flyDur, (x, y, progress) => {
@@ -6201,7 +6391,7 @@ const arcaneVfxModule = (function () {
         }
         groupCharge(owner, source);
         owner.at(350, () => {
-            playSound('atk1', 0.5); spawnSpellGroupParticles(cx, cy);
+            playSound('atk1', 0.5, 1, { owner }); spawnSpellGroupParticles(cx, cy);
             groupShake(owner, 28, 550); owner.at(220, () => groupShake(owner, 6, 180));
             const flashLayer = groupLayer(owner, `<div class="arcane-fs-flash" style="background:radial-gradient(ellipse at ${cx}px ${cy}px, rgba(255,255,255,0.68) 0%, rgba(186,230,253,0.42) 38%, rgba(56,189,248,0.16) 65%, transparent 82%);opacity:0;"></div>`);
             groupAnimate(owner, flashLayer.firstElementChild, [{ opacity: .98 }, { opacity: .45, offset: .3 }, { opacity: 0 }], 340);
@@ -6279,7 +6469,7 @@ const arcaneVfxModule = (function () {
         aoeLight:  { chargeMs: 350, flightMs: 240, impactMs: 590, totalMs: 1300 }
     };
     let identitySfxOn = true, identityOutput = null;
-    const identityBuffers = new Map(), identityDecodes = new Map(), identityAudioStoppers = new Set();
+    const identityBuffers = CombatAudioMixer.buffers, identityDecodes = CombatAudioMixer.decodes, identityAudioStoppers = new Set();
     const IDENTITY_CLIP_KEYS = new Set(['slash_whoosh_hit_fs434873','atk2','claw_bloody_blade_fs323526','wolfman','creature_slime_01','swish_3','frost_crystal_impact_fs550267','fire01','freeze01','aoe_gun_burst_fs482122','aoe_poison_spell_fs219566','aoe_wind_spin_fs772867','light_impact','mx_sand_swish','mx_stygian_whoosh','mx_sword_metal','mx_gear_lock','mx_tunnel','mx_rift_charge','mx_deep_impact','mx_giant_roar','mx_dino_roar','mx_golem_stomp','defUp','shieldUp','taunt','revive_gather','revive_bloom','molt_crack','molt_snap','molt_empower','rage_exit','link_dash','link_chime','leech_flow','regen_hum','thorn_parry']);
     function setIdentitySfx(on) {
         identitySfxOn = !!on;
@@ -6287,7 +6477,7 @@ const arcaneVfxModule = (function () {
         if (!identitySfxOn) identityAudioStoppers.forEach(stop => stop());
         return identitySfxOn;
     }
-    function idSfx(owner, fn) {
+    function idSfx(owner, fn, profile = 'special') {
         if (!identitySfxOn || (owner && (owner.cancelled || owner.finished)) || !(window.AudioContext || window.webkitAudioContext)) return;
         const prev = identityOutput;
         if (owner) {
@@ -6298,129 +6488,41 @@ const arcaneVfxModule = (function () {
             }
             identityOutput = owner.soundGate;
         }
+        CombatAudioMixer.protect(profile, audio().currentTime, owner);
         try { fn(); } finally { identityOutput = prev; }
     }
     function warmIdentitySample(key) {
-        const url = audioUrls[key], blobUrl = _fxAudioBlobCache.get(url);
-        if (!IDENTITY_CLIP_KEYS.has(key) || !blobUrl || !(window.AudioContext || window.webkitAudioContext) || identityBuffers.has(url) || identityDecodes.has(url)) return;
-        const ctx = audio();
-        const task = fetch(blobUrl).then(r => r.arrayBuffer()).then(data => ctx.decodeAudioData(data)).then(buffer => {
-            if (audioCtx === ctx) identityBuffers.set(url, buffer);
-        }).catch(() => {}).finally(() => { if (identityDecodes.get(url) === task) identityDecodes.delete(url); });
-        identityDecodes.set(url, task);
+        const url = audioUrls[key];
+        if (!IDENTITY_CLIP_KEYS.has(key) || !url) return;
+        return CombatAudioMixer.prepare(url);
     }
     function idSample(owner, key, optsOrVol = 0.9, rate = 1) {
         if (!identitySfxOn || (owner && (owner.cancelled || owner.finished))) return true;
-        const opts = typeof optsOrVol === 'object' ? Object.assign({ vol: 0.9, rate: 1, offsetSec: 0 }, optsOrVol) : { vol: optsOrVol, rate, offsetSec: 0 };
+        const opts = typeof optsOrVol === 'object' ? Object.assign({ vol:0.9, rate:1, offsetSec:0 }, optsOrVol) : { vol:optsOrVol, rate };
         if (opts.sampled) return playSampleClip(owner, key, opts);
-        if (!opts.maxDurSec && !opts.offsetSec) {
-            const stop = window.playSound(key, opts.vol, opts.rate);
-            if (typeof stop === 'function') {
-                identityAudioStoppers.add(stop);
-                if (owner) { owner.audioStoppers.add(stop); owner.onClean(stop); }
-            }
-            return !!audioUrls[key];
+        if (opts.maxDurSec || opts.offsetSec) {
+            warmIdentitySample(key);
+            if (!identityBuffers.get(audioUrls[key])) return false;
         }
-        warmIdentitySample(key);
-        const buffer = identityBuffers.get(audioUrls[key]);
-        if (!buffer || !audioCtx) return false;
-        const ctx = audio(), src = ctx.createBufferSource(), gain = ctx.createGain();
-        const now = ctx.currentTime, offset = opts.offsetSec || 0, speed = opts.rate || 1;
-        const available = Math.max(0, (buffer.duration - offset) / speed);
-        const duration = opts.maxDurSec ? Math.min(opts.maxDurSec, available) : available;
-        const fade = Math.min(opts.fadeOutSec === undefined ? 0.2 : opts.fadeOutSec, duration * 0.45);
-        src.buffer = buffer; src.playbackRate.value = speed;
-        gain.gain.setValueAtTime(opts.vol, now);
-        gain.gain.setValueAtTime(opts.vol, now + Math.max(0.02, duration - fade));
-        gain.gain.linearRampToValueAtTime(0.0001, now + duration);
-        src.connect(gain); gain.connect(sfxBus);
-        let stopped = false;
-        const stop = () => {
-            if (stopped) return; stopped = true;
-            try { src.stop(); } catch {}
-            src.disconnect(); gain.disconnect();
-            identityAudioStoppers.delete(stop);
-            if (owner) owner.audioStoppers.delete(stop);
-        };
-        src.onended = stop;
-        identityAudioStoppers.add(stop);
-        if (owner) { owner.audioStoppers.add(stop); owner.retain(duration * 1000 + 30); }
-        src.start(now, offset, Math.min(buffer.duration - offset, duration * speed + 0.04));
-        src.stop(now + duration + 0.03);
-        return true;
+        const cue = playSound(key, opts.vol, opts.rate, Object.assign({ track:'skill', owner, fadeOutSec:opts.maxDurSec ? 0.2 : 0,
+            sourcePaddingSec:opts.maxDurSec ? 0.04 : 0, stopPaddingSec:opts.maxDurSec ? 0.03 : undefined }, opts));
+        if (typeof cue === 'function') {
+            identityAudioStoppers.add(cue);
+            if (cue.done) cue.done.then(() => identityAudioStoppers.delete(cue));
+        }
+        return !!audioUrls[key];
     }
     // 新演出复用 Blob 解码与既有音频总线；冷解码只播本次真实采样，不补播第二遍。
     const variantAudioStoppers = new Set();
     function playSampleClip(owner, key, opts) {
         if (!identitySfxOn || (owner && (owner.cancelled || owner.finished))) return true;
-        const url = audioUrls[key];
-        if (!url) return false;
+        if (!audioUrls[key]) return false;
         warmIdentitySample(key);
-        const buffer = identityBuffers.get(url), token = combatToken;
-        const ctx = (window.AudioContext || window.webkitAudioContext) ? audio() : null;
-        const gain = ctx ? ctx.createGain() : null;
-        const panner = ctx && opts.pan != null && ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-        if (panner) { panner.pan.value = opts.pan; gain.connect(panner); panner.connect(sfxBus); }
-        else if (gain) gain.connect(sfxBus);
-        let source = null, media = null, timer = null, stopped = false;
-        const stop = () => {
-            if (stopped) return;
-            stopped = true;
-            if (timer != null) { clearTimeout(timer); S.timers.delete(timer); }
-            if (media) { media.onplaying = media.onloadedmetadata = media.onended = media.onerror = null; media.pause(); media.removeAttribute('src'); media.load(); }
-            if (source) { if (source.stop) { try { source.stop(); } catch {} } source.disconnect(); }
-            if (gain) gain.disconnect();
-            if (panner) panner.disconnect();
-            identityAudioStoppers.delete(stop); variantAudioStoppers.delete(stop);
-            if (owner) owner.audioStoppers.delete(stop);
-        };
-        stop.owner = owner;
-        identityAudioStoppers.add(stop);
-        if (opts.variant) variantAudioStoppers.add(stop);
-        if (owner) {
-            owner.audioStoppers.add(stop);
-            if (!owner.sampleCancel) {
-                owner.sampleCancel = owner.handle.cancel;
-                owner.handle.cancel = () => { identityAudioStoppers.forEach(fn => { if (fn.owner === owner) fn(); }); owner.sampleCancel(); };
-            }
-            owner.onClean(() => { if (owner.cancelled || token !== combatToken || _pipelineFrozen) stop(); });
-        }
-        const speed = opts.rate || 1, offset = opts.offsetSec || 0;
-        const envelope = duration => {
-            if (!gain) return;
-            const now = ctx.currentTime, fadeIn = opts.fadeInSec || 0;
-            const fadeOut = Math.min(opts.fadeOutSec === undefined ? 0.2 : opts.fadeOutSec, duration * 0.45);
-            gain.gain.cancelScheduledValues(now);
-            gain.gain.setValueAtTime(fadeIn ? 0.0001 : opts.vol, now);
-            if (fadeIn) gain.gain.linearRampToValueAtTime(opts.vol, now + Math.min(fadeIn, duration * 0.25));
-            gain.gain.setValueAtTime(opts.vol, now + Math.max(fadeIn, duration - fadeOut));
-            gain.gain.linearRampToValueAtTime(0.0001, now + duration);
-        };
-        if (buffer && ctx) {
-            const available = Math.max(0, (buffer.duration - offset) / speed);
-            const duration = opts.maxDurSec ? Math.min(opts.maxDurSec, available) : available;
-            if (!duration) { stop(); return true; }
-            source = ctx.createBufferSource(); source.buffer = buffer; source.playbackRate.value = speed;
-            source.connect(gain); envelope(duration); source.onended = stop;
-            source.start(ctx.currentTime, offset, duration * speed);
-        } else {
-            media = new Audio();
-            media.crossOrigin = 'anonymous';
-            media.src = _fxAudioBlobCache.get(url) || url;
-            media.playbackRate = speed;
-            media.volume = gain ? 1 : Math.min(1, opts.vol);
-            if (ctx) { source = ctx.createMediaElementSource(media); source.connect(gain); gain.gain.value = 0.0001; }
-            media.onloadedmetadata = () => { if (!stopped && offset) media.currentTime = offset; };
-            media.onplaying = () => {
-                if (stopped || token !== combatToken || !identitySfxOn || (owner && owner.cancelled)) { stop(); return; }
-                media.onplaying = null;
-                const available = Math.max(0, (media.duration - offset) / speed);
-                const duration = opts.maxDurSec ? Math.min(opts.maxDurSec, available) : available;
-                if (Number.isFinite(duration) && duration > 0) { envelope(duration); timer = after(duration * 1000 + 30, stop); }
-                else if (gain) gain.gain.value = opts.vol;
-            };
-            media.onended = media.onerror = stop;
-            media.play().catch(stop);
+        const cue = playCustomAudio(audioUrls[key], opts.vol, opts.rate, Object.assign({ track:'skill', owner, profile:'special', fadeOutSec:0.2 }, opts));
+        if (typeof cue === 'function') {
+            identityAudioStoppers.add(cue);
+            if (opts.variant) variantAudioStoppers.add(cue);
+            if (cue.done) cue.done.then(() => { identityAudioStoppers.delete(cue); variantAudioStoppers.delete(cue); });
         }
         return true;
     }
@@ -6533,6 +6635,21 @@ const arcaneVfxModule = (function () {
             return f;
         };
         owner.onClean = fn => owner.onCleanups.add(fn);
+        owner.audioAt = (delay, fn) => {
+            const cue = owner.attackCue;
+            if (!cue || !cue.ready) { owner.at(delay, fn); return; }
+            cue.ready.then(ok => {
+                if (owner.cancelled || owner.finished || token !== combatToken || _pipelineFrozen) return;
+                if (!ok || cue.when == null) { owner.at(delay, fn); return; }
+                const remaining = Math.max(0, (cue.when - CombatAudioMixer.context().currentTime) * 1000);
+                owner.retain(remaining + totalMs);
+                const cancel = CombatAudioMixer.atTime(cue.when + delay / 1000, () => {
+                    if (owner.cancelled || owner.finished || token !== combatToken || _pipelineFrozen) { handle.cancel(); return; }
+                    fn();
+                });
+                owner.onClean(cancel);
+            });
+        };
         function cleanup(stopAudio) {
             if (owner.finished) return;
             owner.finished = true;
@@ -6615,7 +6732,7 @@ const arcaneVfxModule = (function () {
             } else {
                 click(0, 0.75, 4200, 0.015); kick(0, { hi: 240, lo: 70, pd: 0.02, dur: 0.14, vol: 0.7, drive: 4 });
             }
-        });
+        }, 'short');
         const muzzleLayer = owner.layer(`
           <div class="arcane-identity-anchor" style="left:${g.muzzle.x}px;top:${g.muzzle.y}px;width:92px;height:92px;transform:translate(-50%,-50%) rotate(${g.angleDeg}deg);">
             <svg viewBox="-46 -46 92 92" class="w-full h-full arcane-identity-glow-amber" style="overflow:visible;">
@@ -6664,8 +6781,8 @@ const arcaneVfxModule = (function () {
         ], { duration: 125, easing: 'cubic-bezier(0.12,0.85,0.28,1)', fill: 'forwards' });
         owner.anim(wake, [{ opacity: 0.48 }, { opacity: 0.25, offset: 0.45 }, { opacity: 0 }], { duration: 220, easing: 'ease-out', fill: 'forwards' });
 
-        // 3. 接触拍点（90ms）：仅通知一次；命中复用现有枪击弹着，闪避仅擦空尾迹
-        owner.at(T.impactMs, () => {
+        // 3. 接触拍点（90ms）：以枪声实际输出起点计时，仅通知一次。
+        owner.audioAt(T.impactMs, () => {
             if (onImpact) onImpact(target, { subtype: '枪击', scope: 'single', outcome, point: dodged ? g.missPt : hitCenter, beatMs: T.impactMs });
             if (dodged) {
                 owner.burst(4, () => ({ x: g.missPt.x, y: g.missPt.y, vx: g.ux * rnd(3, 6) + rnd(-1, 1), vy: g.uy * rnd(3, 6) + rnd(-1, 1), drag: 0.9, decay: 0.08, size: 1.4, shape: 'streak', color: '#fde68a' }));
@@ -6716,9 +6833,9 @@ const arcaneVfxModule = (function () {
                 window.playShotgunSound(owner);
             } else {
                 kick(0, { hi: 220, lo: 55, pd: 0.03, dur: 0.25, vol: 0.85, drive: 5 });
-                boom(0, { f0: 4200, f1: 220, dur: 0.3, vol: 0.5 });
+                crunch(0, { f: 1800, f1: 650, dur: 0.18, vol: 0.52, drive: 4 });
             }
-        });
+        }, 'short');
         const muzzleRot = g.angleDeg + 90; // 原喇叭弧朝上(-90deg)，旋转至指向目标方向
         const muzzleLayer = owner.layer(`
           <div class="arcane-identity-anchor" style="left:${g.muzzle.x}px;top:${g.muzzle.y}px;width:220px;height:220px;transform:translate(-50%,-50%) rotate(${muzzleRot}deg);">
@@ -6785,8 +6902,8 @@ const arcaneVfxModule = (function () {
             ], { duration: 115 + (idx % 3) * 10, delay: (idx % 4) * 6, easing: 'cubic-bezier(0.12,0.85,0.28,1)', fill: 'forwards' });
         });
 
-        // 3. 主接触拍点（115ms）：仅触发一次结算通知
-        owner.at(T.impactMs, () => {
+        // 3. 主接触拍点（115ms）：以霰弹实际输出起点计时，仅通知一次。
+        owner.audioAt(T.impactMs, () => {
             if (onImpact) onImpact(target, { subtype: '霰弹', scope: 'single', outcome, point: baseCenter, beatMs: T.impactMs });
             if (dodged) {
                 owner.burst(5, () => ({ x: g.missPt.x + rnd(-18, 18), y: g.missPt.y + rnd(-18, 18), vx: g.ux * rnd(3, 6), vy: g.uy * rnd(3, 6), drag: 0.9, decay: 0.08, size: 1.5, shape: 'streak', color: '#fde68a' }));
@@ -8785,22 +8902,25 @@ const arcaneVfxModule = (function () {
             idx = (idx + 1 + Math.floor(Math.random() * (list.length - 1))) % list.length;
         }
         _lastHitAudioIdx[t] = idx;
-        playSound(list[idx], t === 3 ? 0.94 : t === 2 ? 0.88 : 0.82);
+        playSound(list[idx], t === 3 ? 0.94 : t === 2 ? 0.88 : 0.82, 1, { track:'result' });
     }
     function hitAudio(list) {
         list = list.filter(h => h.kind !== 'prevented');
         if (!identitySfxOn || !list.length) return;
         const anyBreak = list.some(h => h.shieldBroken), anyCrit = list.some(h => h.crit), anyBurst = list.some(h => h.burst);
         // 破盾瞬间无论多少伤害均播最大档 (GuardBreak)
-        if (anyBreak) { playSound('parry_3', 0.95); return; }
+        if (anyBreak) { playSound('parry_3', 0.95, 1, { track:'result' }); return; }
         const score = h => h.kind === 'hp' ? 10 + h.tier * 10 : h.kind === 'shield' ? (h.shieldBroken ? 15 : 5) : h.kind === 'block' ? 3 : 1;
         const top = list.reduce((a, b) => score(b) > score(a) ? b : a);
-        if (top.kind === 'dodge') { playSound('dodge_' + (top.dodgeTier || 1), (top.dodgeTier || 1) === 3 ? 0.92 : 0.82); return; }
-        if (top.kind === 'block') { playSound('parry_' + (top.blockTier || 1), (top.blockTier || 1) === 3 ? 0.95 : 0.85); return; }
-        if (top.kind === 'shield') { crystal(0, 1900, 0.1); tone(0, { f0: 1200, f1: 900, dur: 0.16, vol: 0.05, wet: 0.5 }); }
-        if (top.kind === 'hp') playHitTierAudio(top.tier || 1);
-        if (anyBurst) { chime(0, 1320, 0.6, 0.07); tone(0, { f0: 660, f1: 990, dur: 0.25, vol: 0.05, wet: 0.6 }); }
-        else if (anyCrit) { tone(0, { type: 'square', f0: 2400, f1: 1500, dur: 0.07, vol: 0.05 }); click(0, 0.6, 7000, 0.006); crystal(0.012, 3200, 0.07); }
+        if (top.kind === 'dodge') { playSound('dodge_' + (top.dodgeTier || 1), (top.dodgeTier || 1) === 3 ? 0.92 : 0.82, 1, { track:'result' }); return; }
+        if (top.kind === 'block') { playSound('parry_' + (top.blockTier || 1), (top.blockTier || 1) === 3 ? 0.95 : 0.85, 1, { track:'result' }); return; }
+        resultOutput = true;
+        try {
+            if (top.kind === 'shield') { crystal(0, 1900, 0.1); tone(0, { f0: 1200, f1: 900, dur: 0.16, vol: 0.05, wet: 0.5 }); }
+            if (top.kind === 'hp') playHitTierAudio(top.tier || 1);
+            if (anyBurst) { chime(0, 1320, 0.6, 0.07); tone(0, { f0: 660, f1: 990, dur: 0.25, vol: 0.05, wet: 0.6 }); }
+            else if (anyCrit) { tone(0, { type: 'square', f0: 2400, f1: 1500, dur: 0.07, vol: 0.05 }); click(0, 0.6, 7000, 0.006); crystal(0.012, 3200, 0.07); }
+        } finally { resultOutput = false; }
     }
 
     function playHitFeedback(results, opts = {}) {
@@ -10098,7 +10218,7 @@ const arcaneVfxModule = (function () {
         identityBuffers.clear(); identityDecodes.clear();
         CombatAudioDirector.clear();
         clearVariantState();
-        if (audioCtx) { audioCtx.close(); audioCtx = null; sfxBus = null; sfxVerb = null; sfxNoise = null; }
+        CombatAudioMixer.clear(); audioCtx = null; sfxBus = null; sfxVerb = null; sfxNoise = null;
     }
     window.isArcaneSkillFx = isArcaneSkillFx;
     window.playArcaneSkillFx = playArcaneSkillFx;
@@ -11319,20 +11439,20 @@ function createRangedHeavyBloodHtml() {
 }
 // ===== [特效:近战重击] 盾击推撞·破防重击 == 复刻 demo-melee-heavy-hit.html 方案1 =====
 const MELEE_HEAVY_GUARDBREAK_URL = `${ASSET_BASE}/parry_Weapon_GuardBreak.wav`;
-let _meleeHeavyAudioCtx = null;
-function getMeleeHeavyAudioContext() { if (!_meleeHeavyAudioCtx) { const Ctx = window.AudioContext || window.webkitAudioContext; if (Ctx) _meleeHeavyAudioCtx = new Ctx(); } if (_meleeHeavyAudioCtx && _meleeHeavyAudioCtx.state === 'suspended') _meleeHeavyAudioCtx.resume(); return _meleeHeavyAudioCtx; }
-function playMeleeHeavySubBass() {
+function getMeleeHeavyAudioContext() { return CombatAudioMixer.skillContext(); }
+function playMeleeHeavySubBass(when) {
     try {
         const ctx = getMeleeHeavyAudioContext();
         if (!ctx) return;
+        const now = Math.max(ctx.currentTime, when == null ? ctx.currentTime : when);
         const osc = ctx.createOscillator(); const gain = ctx.createGain();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(160, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(36, ctx.currentTime + 0.30);
-        gain.gain.setValueAtTime(0.75, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.30);
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.start(); osc.stop(ctx.currentTime + 0.30);
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(36, now + 0.30);
+        gain.gain.setValueAtTime(0.75, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.30);
+        osc.connect(gain); gain.connect(CombatAudioMixer.output('skill'));
+        osc.start(now); osc.stop(now + 0.30);
     } catch(e) {}
 }
 function createMeleeHeavyHtml() {
@@ -11394,10 +11514,22 @@ function playEnemyFlinchAnim(targetDom, animCss, durationMs) {
         delete targetDom._flinchRestoreTimer;
     }, durationMs);
 }
-function spawnMeleeHeavyParticles(x, y, targetDom) {
-    try { playMeleeHeavySubBass(); } catch(e) {}
-    playCustomAudio(MELEE_HEAVY_GUARDBREAK_URL);
-    setTimeout(()=>playCustomAudio(RANGED_HEAVY_HITDOWN_URL), 80);
+async function playHeavyImpactAudio(url, delayMs, bass) {
+    const token = combatToken;
+    const cue = playCustomAudio(url, undefined, 1, { track:'skill', sync:true, profile:'special' });
+    if (!cue || !cue.ready) { bass(); return; }
+    const ready = await cue.ready;
+    if (token !== combatToken || _pipelineFrozen) return;
+    if (ready) {
+        bass(cue.when);
+        playCustomAudio(RANGED_HEAVY_HITDOWN_URL, undefined, 1, { track:'skill', sync:true, profile:'special', when:cue.when + delayMs / 1000 });
+    }
+    await cue.started;
+}
+async function spawnMeleeHeavyParticles(x, y, targetDom) {
+    const token = combatToken;
+    await playHeavyImpactAudio(MELEE_HEAVY_GUARDBREAK_URL, 80, playMeleeHeavySubBass);
+    if (token !== combatToken || _pipelineFrozen) return;
     const sceneEl = document.getElementById('battle-scene');
     if (sceneEl) { sceneEl.classList.remove('ranged-heavy-shake','gunshot-shake','pierce-shake'); void sceneEl.offsetWidth; sceneEl.classList.add('melee-heavy-shake'); setTimeout(()=>sceneEl.classList.remove('melee-heavy-shake'), 440); } else { window.triggerScreenShake(8, 350); }
     if (targetDom) { playEnemyFlinchAnim(targetDom, 'enemy-ram-knockback 0.55s cubic-bezier(0.15,0.85,0.35,1) both, enemy-ram-knockback-flash 0.55s steps(1) both', 570); }
@@ -11414,11 +11546,10 @@ function spawnMeleeHeavyParticles(x, y, targetDom) {
     fxRoot.appendChild(wrap); setTimeout(()=>wrap.remove(), 1000);
 }
 
-function spawnRangedHeavyParticles(x, y, targetDom) {
-    // 音效：subBass + 强力反击枪声（shot01）+ 60ms后 hitDown—— 与 Demo 方案1完全一致
-    try { playRangedHeavySubBass(); } catch(e) {}
-    playCustomAudio(POWER_COUNTER_SOUND_URL);
-    setTimeout(()=>playCustomAudio(RANGED_HEAVY_HITDOWN_URL), 60);
+async function spawnRangedHeavyParticles(x, y, targetDom) {
+    const token = combatToken;
+    await playHeavyImpactAudio(POWER_COUNTER_SOUND_URL, 60, playRangedHeavySubBass);
+    if (token !== combatToken || _pipelineFrozen) return;
     // 重震屏：0.48s（独占，不与 triggerScreenShake 叠加）
     const sceneEl = document.getElementById('battle-scene');
     if (sceneEl) { sceneEl.classList.add('ranged-heavy-shake'); setTimeout(()=>sceneEl.classList.remove('ranged-heavy-shake'), 480); }
@@ -11450,8 +11581,7 @@ function spawnRangedHeavyParticles(x, y, targetDom) {
 // ===== [特效:造雾术] 黑曜沉潮·重水沉积冷雾 == 复刻 demo-rlyeh-mist.html 方案2 =====
 // ===== [特效:高阶召唤术] 旧日幻影·巨神凝视终局 == 复刻 demo-rlyeh-mist2.html 方案4 =====
 const RLYEH_FOG_CLOUD_URL = `${ASSET_BASE}/fog.mp3`;
-let _eldritchAudioCtx = null;
-function getEldritchAudioContext() { if (!_eldritchAudioCtx) { const Ctx = window.AudioContext || window.webkitAudioContext; if (Ctx) _eldritchAudioCtx = new Ctx(); } if (_eldritchAudioCtx && _eldritchAudioCtx.state === 'suspended') _eldritchAudioCtx.resume(); return _eldritchAudioCtx; }
+function getEldritchAudioContext() { const ctx = CombatAudioMixer.skillContext(); if (ctx) CombatAudioMixer.protect('special', ctx.currentTime); return ctx; }
 // 古神呓语与心智震颤：不和谐三全音 (Tritone) 双耳泛音，触发 SAN Check 幻听（移植自 demo-rlyeh-mist2 的"试听古神低语心智震颤"）
 function playEldritchWhisper() {
     try {
@@ -11466,7 +11596,7 @@ function playEldritchWhisper() {
             gain.gain.setValueAtTime(0.01, now);
             gain.gain.linearRampToValueAtTime(0.18, now + 0.15);
             gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
-            osc.connect(gain); gain.connect(ctx.destination);
+            osc.connect(gain); gain.connect(CombatAudioMixer.output('skill'));
             osc.start(now); osc.stop(now + 0.95);
         });
     } catch(e) {}
@@ -11566,7 +11696,7 @@ function _spawnFullscreenSvgFx(buildHtml, opts) {
 // skipAudio=true 时由 playAOEEffect 通用分支负责音效，避免双播；executeSkillAction 特判路径传 false 由本函数自播
 // 音量 2：fog.mp3 源文件偏轻（真机 1.2 仍偏轻），经 Web Audio GainNode 硬件级放大（HTMLAudioElement.volume 上限 1 不可用）
 function spawnRlyehSedimentFx(casterIsHero, skipAudio) {
-    if (!skipAudio) playCustomAudio(RLYEH_FOG_CLOUD_URL, 2);
+    if (!skipAudio) playCustomAudio(RLYEH_FOG_CLOUD_URL, 2, 1, { track:'skill', profile:'special' });
     _spawnFullscreenSvgFx(buildRlyehSedimentFxHtml, {
         shakeClass: 'fog-shake-std', shakeMs: 700,
         shroudAnim: 'target-fog-shroud', shroudDur: 1.1, shroudMs: 1200,
@@ -11583,8 +11713,7 @@ function spawnTitanGazeFx(casterIsHero, skipAudio) {
 }
 
 // ===== [特效:障壁术] 六边晶格·空间嵌合障壁 == 复刻 demo-nak-tith-barrier.html 视觉方案1；音效=方案3（528Hz 奇迹音叉） =====
-let _aegisAudioCtx = null;
-function getAegisAudioContext() { if (!_aegisAudioCtx) { const Ctx = window.AudioContext || window.webkitAudioContext; if (Ctx) _aegisAudioCtx = new Ctx(); } if (_aegisAudioCtx && _aegisAudioCtx.state === 'suspended') _aegisAudioCtx.resume(); return _aegisAudioCtx; }
+function getAegisAudioContext() { const ctx = CombatAudioMixer.skillContext(); if (ctx) CombatAudioMixer.protect('special', ctx.currentTime); return ctx; }
 // 528Hz 索尔费吉奥泛音共鸣：528/1056/1584Hz 三度泛音列错峰淡入、长尾指数衰减（零依赖现场合成）
 function playNakTithChime() {
     try {
@@ -11600,7 +11729,7 @@ function playNakTithChime() {
             gain.gain.linearRampToValueAtTime(0.2 / (idx + 1), now + 0.1);
             gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.2 + idx * 0.2);
             osc.connect(gain);
-            gain.connect(ctx.destination);
+            gain.connect(CombatAudioMixer.output('skill'));
             osc.start(now);
             osc.stop(now + 1.5);
         });
@@ -12622,23 +12751,8 @@ function preloadBattleAssets() {
         const entry = WEBM_FX_REGISTRY[tag];
         if (!entry) return;
 
-        // 1. 预缓存音频（fetch → Blob URL 全量预载，与视频同款；preload='auto' 对非挂载元素不可靠，播放时仍会现场拉取大文件）
-        if (entry.audioUrl && !_fxAudioBlobCache.has(entry.audioUrl)) {
-            // 先占位防止重复 fetch
-            _fxAudioBlobCache.set(entry.audioUrl, null);
-            fetch(entry.audioUrl)
-                .then(r => r.blob())
-                .then(blob => {
-                    const blobUrl = URL.createObjectURL(blob);
-                    _fxAudioBlobCache.set(entry.audioUrl, blobUrl);
-                    console.log(`[预加载] 音效: ${tag} → 已缓存为 Blob`);
-                })
-                .catch(e => {
-                    // 失败删除占位，允许后续重试
-                    _fxAudioBlobCache.delete(entry.audioUrl);
-                    console.warn(`[预加载] 音效加载失败: ${tag}`, e);
-                });
-        }
+        // 与普通采样共用下载／解码任务，'none' 不发起请求。
+        if (entry.audioUrl && entry.audioUrl !== 'none') CombatAudioMixer.prepare(entry.audioUrl);
 
         // 2. 预缓存视频（fetch → Blob URL，避免每次播放重新请求网络）
         if (entry.url && !_fxVideoBlobCache.has(entry.url)) {
@@ -12677,7 +12791,7 @@ function playWebMFX(x, y, fxTag) {
 
     // 独立音效处理：如果注册了真实独立音效地址，播放独立音频
     if (entry.audioUrl && entry.audioUrl !== 'none') {
-        playCustomAudio(entry.audioUrl);
+        playCustomAudio(entry.audioUrl, undefined, 1, { track:'skill', profile:'special' });
     }
 
     const baseSize = Math.min(window.innerWidth, window.innerHeight);
@@ -12725,25 +12839,8 @@ function playWebMFX(x, y, fxTag) {
         if (FX_WEBM_SCREEN_MODE) vCanvas.style.mixBlendMode = 'screen';
     };
 
-    vw.play().then(() => {
-        // 使用 Web Audio API 增益节点将视频声音放大 2.5 倍
-        if (!vw.muted) {
-            try {
-                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-                if (AudioContextClass) {
-                    const audioCtx = new AudioContextClass();
-                    if (audioCtx.state === 'suspended') audioCtx.resume();
-                    const source = audioCtx.createMediaElementSource(vw);
-                    const gainNode = audioCtx.createGain();
-                    gainNode.gain.value = 2.5; // 音量放大 2.5 倍
-                    source.connect(gainNode);
-                    gainNode.connect(audioCtx.destination);
-                }
-            } catch (e) {
-                console.warn('[FX] Web Audio 音量增益放大未开启:', e);
-            }
-        }
-    }).catch(e => console.warn('[FX] 视频播放受到限制或自动播放拦截:', e));
+    if (!vw.muted && CombatAudioMixer.context()) applyAudioVolume(vw, 2.5);
+    vw.play().catch(e => console.warn('[FX] 视频播放受到限制或自动播放拦截:', e));
 
     let animId;
     // rVFC 节流调度：新解码帧到达才处理（不支持 rVFC 的环境回落 rAF）
@@ -13904,7 +14001,7 @@ function playAOEEffect(containerId, type, fxTag) {
 
     // 音效：有 audioUrl 用自定义，否则回退默认攻击音效
     if (fxEntry.audioUrl) {
-        playCustomAudio(fxEntry.audioUrl);
+        playCustomAudio(fxEntry.audioUrl, undefined, 1, { track:'skill', profile:'special' });
     } else {
         playSound('atk1');   // 群攻默认音效
     }
@@ -13938,9 +14035,8 @@ function playAOEEffect(containerId, type, fxTag) {
 // 纯 Web Audio 程序化合成，零音频资源依赖：高压气阀喷射怒吼（低通白噪声 1800→3200→400Hz）即时起播，
 // 100ms 后叠加重锤爆破（150→32Hz 正弦亚低音 + 低通爆裂噪声）与密集噼啪火星（14 发随机三角波脉冲 1.8k~4.8kHz→400Hz）。
 // 各子音效独立 master 增益（0.65/0.8/0.5，与 demo masterVolume 一致）。
-let _dragonFireAudioCtx = null;
 let _dragonFireNoiseBuf = null;
-function getDragonFireAudioContext() { if (!_dragonFireAudioCtx) { const Ctx = window.AudioContext || window.webkitAudioContext; if (Ctx) _dragonFireAudioCtx = new Ctx(); } if (_dragonFireAudioCtx && _dragonFireAudioCtx.state === 'suspended') _dragonFireAudioCtx.resume(); return _dragonFireAudioCtx; }
+function getDragonFireAudioContext() { const ctx = CombatAudioMixer.skillContext(); if (ctx) CombatAudioMixer.protect('special', ctx.currentTime); return ctx; }
 function getDragonFireNoiseBuffer(ctx) {
     if (!_dragonFireNoiseBuf) {
         const len = Math.floor(ctx.sampleRate * 1.0);
@@ -13959,7 +14055,7 @@ function playDragonFireJetSFX() {
         const t = ctx.currentTime;
         const master = ctx.createGain();
         master.gain.setValueAtTime(0.65, t);
-        master.connect(ctx.destination);
+        master.connect(CombatAudioMixer.output('skill'));
         const noise = ctx.createBufferSource();
         noise.buffer = getDragonFireNoiseBuffer(ctx);
         const filter = ctx.createBiquadFilter();
@@ -13984,7 +14080,7 @@ function playDragonFireBoomSFX() {
         const t = ctx.currentTime;
         const master = ctx.createGain();
         master.gain.setValueAtTime(0.8, t);
-        master.connect(ctx.destination);
+        master.connect(CombatAudioMixer.output('skill'));
         const osc = ctx.createOscillator();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(150, t);
@@ -14015,7 +14111,7 @@ function playDragonFireCrackleSFX() {
         const t = ctx.currentTime;
         const master = ctx.createGain();
         master.gain.setValueAtTime(0.5, t);
-        master.connect(ctx.destination);
+        master.connect(CombatAudioMixer.output('skill'));
         for (let i = 0; i < 14; i++) {
             const popTime = t + Math.random() * 0.45;
             const osc = ctx.createOscillator();
@@ -14033,7 +14129,8 @@ function playDragonFireCrackleSFX() {
 // 龙息流火音效链调度：喷射即时起播，100ms 后爆破+噼啪齐发（demo triggerSchemeAudio case 4）
 function playDragonBreathFireSFX() {
     playDragonFireJetSFX();
-    setTimeout(() => { playDragonFireBoomSFX(); playDragonFireCrackleSFX(); }, 100);
+    const token = combatToken, ctx = getDragonFireAudioContext();
+    if (ctx) CombatAudioMixer.atTime(ctx.currentTime + 0.1, () => { if (token === combatToken && !_pipelineFrozen) { playDragonFireBoomSFX(); playDragonFireCrackleSFX(); } }, false);
 }
 
 function playSVGEffect(targetDom, type) {
@@ -16792,7 +16889,7 @@ async function doEnemySelfDestruct(enemy) {
         spriteDom.style.display = '';
         spriteDom.classList.remove('opacity-0', 'scale-50', 'breathe');
         spriteDom.classList.add('enemy-omen');
-        if (window.playSound) playSound('monsterAttack');
+        if (window.playSound) playSound('monsterAttack', 1, 1, { track:'skill' });
         createFloatingText(spriteDom, '💥 绝命反扑!', 'text-red-400');
     }
     addHistory(`   ⚠️ [${enemy.name}] 濒死之际体内残存力量狂暴失控——绝命反扑前兆！`);
@@ -18577,33 +18674,27 @@ async function playKanpoEffect(caster, enemy, skill) {
 // 强力反击专属音效（冲击波射出瞬间播放）—— 远程重击复用同一枪声
 const POWER_COUNTER_SOUND_URL = `${ASSET_BASE}/shot01.mp3`;
 const RANGED_HEAVY_HITDOWN_URL = `${ASSET_BASE}/hitDown.mp3`;
-let _rangedHeavyAudioCtx = null;
-function getRangedHeavyAudioContext() {
-    if (!_rangedHeavyAudioCtx) {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (Ctx) _rangedHeavyAudioCtx = new Ctx();
-    }
-    if (_rangedHeavyAudioCtx && _rangedHeavyAudioCtx.state === 'suspended') _rangedHeavyAudioCtx.resume();
-    return _rangedHeavyAudioCtx;
-}
-function playRangedHeavySubBass() {
+function getRangedHeavyAudioContext() { return CombatAudioMixer.skillContext(); }
+function playRangedHeavySubBass(when) {
     try {
         const ctx = getRangedHeavyAudioContext();
         if (!ctx) return;
+        const now = Math.max(ctx.currentTime, when == null ? ctx.currentTime : when);
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(140, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(32, ctx.currentTime + 0.35);
-        gain.gain.setValueAtTime(0.8, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.start(); osc.stop(ctx.currentTime + 0.35);
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.exponentialRampToValueAtTime(32, now + 0.35);
+        gain.gain.setValueAtTime(0.8, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+        osc.connect(gain); gain.connect(CombatAudioMixer.output('skill'));
+        osc.start(now); osc.stop(now + 0.35);
     } catch(e) {}
 }
 
 async function playPowerCounterEffect(counter, victim, counterDom) {
     const _actionToken = combatToken;
+    const shotReady = CombatAudioMixer.prepare(POWER_COUNTER_SOUND_URL);
     if (_pipelineFrozen) return;
     const victimDom = getEntitySpriteDom(victim) || (victim.id.startsWith('h') ? document.getElementById(`hero-card-${victim.id}`) : document.getElementById(`${victim.id}-sprite`));
     const victimCenter = getDomCenter(victimDom);
@@ -18632,6 +18723,10 @@ async function playPowerCounterEffect(counter, victim, counterDom) {
     await sleep(350); if (_actionToken !== combatToken || _pipelineFrozen) return;
 
     // ── 阶段2：命中瞬间 ──
+    await shotReady; if (_actionToken !== combatToken || _pipelineFrozen) return;
+    const cue = playCustomAudio(POWER_COUNTER_SOUND_URL, undefined, 1, { track:'skill', sync:true, profile:'special' });
+    if (cue && cue.started) await cue.started;
+    if (_actionToken !== combatToken || _pipelineFrozen) return;
     // 2a. 径向白闪（以受击者为圆心）
     const flash = document.createElement('div');
     flash.className = 'pc-radial-flash';
@@ -18640,8 +18735,7 @@ async function playPowerCounterEffect(counter, victim, counterDom) {
     document.body.appendChild(flash);
     setTimeout(() => flash.remove(), 240);
 
-    // 2b. 音效
-    playCustomAudio(POWER_COUNTER_SOUND_URL);
+    // 2b. 主音已在命中拍点起播。
 
     // 2c. 命中准星（圆形+十字线+辉光，替换有方块渲染问题的刀光）
     (() => {
@@ -19139,9 +19233,15 @@ function resolveSingleAttackFx(caster, tag, skill) {
 
 const SINGLE_IDENTITY_TYPES = { gunshot:'枪击', shotgun:'霰弹', light:'光', thunder_single:'雷', explosion_single:'爆炸', slash_identity:'刀砍', punch:'拳击', claw:'爪击', bite:'撕咬', venom:'毒液', arrow:'箭矢', frost:'冰霜' };
 const AOE_IDENTITY_TYPES = { explosion:'爆炸', thunder:'雷', fire:'火焰', gunshot:'枪击', poison:'毒雾', frost:'冰霜', wind:'风', light:'光' };
-function playSingleAttackFx(type, caster, targetDom, dodged, flinch = true, skill = null) {
+async function playSingleAttackFx(type, caster, targetDom, dodged, flinch = true, skill = null) {
     if (_pipelineFrozen) return Promise.resolve(false);
     if (type === 'fire' || type === 'enemy_spell') return playArcaneProjectile(type, getEntitySpriteDom(caster), targetDom, dodged).then(ok => ok !== false);
+    const token = combatToken;
+    if (type === 'gunshot' || type === 'shotgun') {
+        await Promise.all((type === 'gunshot' ? ['gunshot1', 'gunshot2', 'gunshot3'] : ['xiandan']).map(key => CombatAudioMixer.prepare(audioUrls[key])));
+        const ctx = CombatAudioMixer.context(); if (ctx && ctx.state === 'suspended') await ctx.resume();
+        if (token !== combatToken || _pipelineFrozen) return false;
+    }
     const subtype = SINGLE_IDENTITY_TYPES[type];
     if (!subtype) {
         if (!(type === 'slash' && dodged)) playSound('atk2');
@@ -19475,7 +19575,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
           _gunshotFiredThisHit = true;
           if (_isPierceFxDodge) {
               const _pe = WEBM_FX_REGISTRY[skill.fxTag];
-              if (_pe && _pe.audioUrl) playCustomAudio(_pe.audioUrl);
+                if (_pe && _pe.audioUrl) { const cue = playCustomAudio(_pe.audioUrl, undefined, 1, { track:'skill', sync:true, profile:'special' }); if (cue && cue.started) await cue.started; if (_actionToken !== combatToken || _pipelineFrozen) return; }
               if (targetDom) {
                   playSVGEffect(targetDom, 'gunshot_pierce');
                   playEnemyFlinchAnim(targetDom, 'enemy-pierce-stutter 0.45s cubic-bezier(0.15,0.85,0.35,1) both, enemy-pierce-stutter-flash 0.45s steps(1) both', 460);
@@ -19615,10 +19715,10 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
                 if (!tag.includes('群')) playSVGEffect(targetDom, 'shotgun');
             } else if (_isGunshotFxSkill) {
                 const _fxEntry = WEBM_FX_REGISTRY[skill.fxTag];
-                if (_fxEntry && _fxEntry.audioUrl) playCustomAudio(_fxEntry.audioUrl);
+                if (_fxEntry && _fxEntry.audioUrl) { const cue = playCustomAudio(_fxEntry.audioUrl, undefined, 1, { track:'skill', sync:true, profile:'special' }); if (cue && cue.started) await cue.started; if (_actionToken !== combatToken || _pipelineFrozen) return; }
                 if (!tag.includes('群')) {
                     playSVGEffect(targetDom, 'gunshot_pierce');
-                    if (targetDom) { playSVGEffect(targetDom, 'gunshot_pierce'); playEnemyFlinchAnim(targetDom, 'enemy-pierce-stutter 0.45s cubic-bezier(0.15,0.85,0.35,1) both, enemy-pierce-stutter-flash 0.45s steps(1) both', 460); }
+                    if (targetDom) playEnemyFlinchAnim(targetDom, 'enemy-pierce-stutter 0.45s cubic-bezier(0.15,0.85,0.35,1) both, enemy-pierce-stutter-flash 0.45s steps(1) both', 460);
                 }
             } else if (_isGunshotTagHit) {
                 if (typeof playRandomStandardGunshot === 'function') playRandomStandardGunshot();
@@ -19639,7 +19739,11 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         // 非枪击分支：保持原音效与默认刀光
         if (skill && skill.fxTag) {
             const _fxEntry = WEBM_FX_REGISTRY[skill.fxTag];
-            if (_fxEntry && _fxEntry.audioUrl) playCustomAudio(_fxEntry.audioUrl);
+            if (_fxEntry && _fxEntry.audioUrl) {
+                const cue = playCustomAudio(_fxEntry.audioUrl, undefined, 1, { track:'skill', sync:true, profile:'special' });
+                if (cue && cue.started) await cue.started;
+                if (_actionToken !== combatToken || _pipelineFrozen) return;
+            }
             // [单体(火焰)] 默认打击音升级为龙息流火合成音（Web Audio 程序化）；
             // 群攻含火焰的自定义标签保持原 atk 逐目标音，避免 N 重喷射怒吼叠加
             else if (tag.includes('火焰') && !tag.includes('群')) playSound('light_impact', 0.92);
@@ -20219,6 +20323,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     // 【制服】手动补刀豁免：只消费一次（顶层玩家动作），嵌套反应/多段调用读到 null，不会继承补刀权
     if (caster.isSubdued) return;
     skill._audioActionId = CombatAudioDirector.beginAction();
+    const audioReady = CombatAudioMixer.prepareSkill(skill);
     try {
     const _manualSubId = !isReactionTrigger && !caster.isSummon && (caster.id || '').startsWith('h') && manualTarget?.isSubdued ? manualTarget.id : null;
     const _pendingKills = []; // 收集本次技能中所有被击杀的敌人，最后统一播放特写
@@ -20403,6 +20508,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
     }
 
     if (!hasEnemyGroupFx && !hasIdentityFx && !(_summonDone && skill.fxTag === '蝎眼钥匙')) { await sleep(390); if (_actionToken !== combatToken || _pipelineFrozen) return; } // 新兜底群攻使用自身350ms蓄势，其余保持320ms+70ms缓冲
+    await audioReady; if (_actionToken !== combatToken || _pipelineFrozen) return;
     // 初始化本次技能结算的共享命中结论容器（跨标签共享：减益是否命中取决于同技能攻击的判定结果）
     if (skill) skill._bdg = { targetHit: {}, targetResolved: {}, manualSubduedTargetId: _manualSubId };
     let tagList = [{ tag: skill.type, power: skill.power, slotTurns: skill.slotTurns }, { tag: skill.type2, power: skill.power2 || 0, slotTurns: skill.slotTurns2 }, { tag: skill.type3, power: skill.power3 || 0, slotTurns: skill.slotTurns3 }].filter(t => t.tag && t.tag !== '[无]');
@@ -20512,14 +20618,14 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                 const _mEl = document.getElementById(_mHC);
                 if (_mEl) {
                     const _tryDom = (_mEl.querySelector('[id$="-sprite"]:not(.opacity-40):not(.hidden)') || _mEl.querySelector('[id$="-sprite"]'));
-                    if (_tryDom) { const _cr = _tryDom.getBoundingClientRect(); spawnMeleeHeavyParticles(_cr.left+_cr.width/2, _cr.top+_cr.height/2, _tryDom); }
-                    else { const _cr = _mEl.getBoundingClientRect(); spawnMeleeHeavyParticles(_cr.left+_cr.width/2, _cr.top+_cr.height/2, null); }
+                    if (_tryDom) { const _cr = _tryDom.getBoundingClientRect(); await spawnMeleeHeavyParticles(_cr.left+_cr.width/2, _cr.top+_cr.height/2, _tryDom); }
+                    else { const _cr = _mEl.getBoundingClientRect(); await spawnMeleeHeavyParticles(_cr.left+_cr.width/2, _cr.top+_cr.height/2, null); }
                 }
             } else {
                 const _mHT = targets[0];
                 if (_mHT) {
                     const _mDom = getEntitySpriteDom(_mHT);
-                    if (_mDom) { const _mTr = _mDom.getBoundingClientRect(); spawnMeleeHeavyParticles(_mTr.left + _mTr.width/2, _mTr.top + _mTr.height/2, _mDom); }
+                    if (_mDom) { const _mTr = _mDom.getBoundingClientRect(); await spawnMeleeHeavyParticles(_mTr.left + _mTr.width/2, _mTr.top + _mTr.height/2, _mDom); }
                 }
             }
             if (WEBM_FX_REGISTRY[skill.fxTag] && WEBM_FX_REGISTRY[skill.fxTag].delay) { await sleep(Math.round(WEBM_FX_REGISTRY[skill.fxTag].delay * 1000)); if (_actionToken !== combatToken || _pipelineFrozen) return; }
@@ -20536,9 +20642,10 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                     const _rDom = getEntitySpriteDom(_rHT);
                     if (_rDom) {
                         const _rTr = _rDom.getBoundingClientRect();
-                        spawnRangedHeavyParticles(_rTr.left + _rTr.width/2, _rTr.top + _rTr.height/2, _rDom);
+                        await spawnRangedHeavyParticles(_rTr.left + _rTr.width/2, _rTr.top + _rTr.height/2, _rDom);
                     }
                 }
+                if (_actionToken !== combatToken || _pipelineFrozen) return;
             }
             if (WEBM_FX_REGISTRY[skill.fxTag] && WEBM_FX_REGISTRY[skill.fxTag].delay) {
                 await sleep(Math.round(WEBM_FX_REGISTRY[skill.fxTag].delay * 1000)); if (_actionToken !== combatToken || _pipelineFrozen) return;
