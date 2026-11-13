@@ -59,7 +59,8 @@
     @keyframes arcane-sd-kanpo-fall { 0% { transform: translate(-50%,-50%) scale(1); opacity: 1; } 35% { transform: translate(-50%,-50%) scale(0.92,0.88); opacity: 0.95; } 100% { transform: translate(-50%,-50%) translateY(20px) scale(1.12,0.34); opacity: 0; } }
     @keyframes arcane-sd-subdue-press { 0% { transform: translate(-50%,-50%) translateY(-10px) scale(1.06,1.06); } 45% { transform: translate(-50%,-50%) translateY(14px) scale(1.14,0.62); } 100% { transform: translate(-50%,-50%) translateY(11px) scale(1.1,0.68); } }
     @keyframes arcane-sd-shock-ellipse { 0% { transform: translate(-50%,-50%) scale(0.2,0.16); opacity: 0.95; } 100% { transform: translate(-50%,-50%) scale(4.8,1.55); opacity: 0; } }
-    @keyframes arcane-sd-flame-lick { 0%,100% { transform: translateY(0) scaleY(1) scaleX(1); opacity: 0.88; } 50% { transform: translateY(-4px) scaleY(1.16) scaleX(0.93); opacity: 1; } }
+    @keyframes arcane-sd-flame-lick { 0%,100% { transform: translate(-50%,-50%) translateY(0) scaleY(1) scaleX(1); opacity: 0.9; } 50% { transform: translate(-50%,-50%) translateY(-4px) scaleY(1.12) scaleX(0.95); opacity: 1; } }
+    .arcane-sd-additive { mix-blend-mode: screen; }
     @keyframes arcane-sd-venom-pulse { 0%,100% { transform: scale(0.96); opacity: 0.78; } 50% { transform: scale(1.08); opacity: 0.98; } }
     .arcane-selfdestruct-warn { position: absolute; left: 50%; top: 50%; pointer-events: none; z-index: 3; will-change: transform, opacity; animation: arcane-sd-warn-pulse 3.4s ease-in-out infinite; }
     .arcane-selfdestruct-warn-cracks { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
@@ -1090,17 +1091,62 @@ const arcaneVfxModule = (function () {
     }
     function burstFireForm(origin, targetEntries, conf, onBeat, sched, entity) {
         const heroBox = unionRect(targetEntries.map(t => t.dom).filter(Boolean)) || { x: window.innerWidth * 0.42, y: window.innerHeight * 0.72, w: 380 };
-        // 纯减益·火海漫卷（严禁白闪爆轰与重震屏）
+        // 纯减益·火海漫卷（多层羽化热浪席卷 + 目标拟真多舌火苗附燃，严禁白闪爆轰与重震屏）
         playSdSample('sd_burst_fire_wave', { vol: 0.72, maxDurSec: 1.05, fadeOutSec: 0.26 });
-        const uid = ++S.uid, ang = Math.atan2(heroBox.y - origin.y, heroBox.x - origin.x);
-        const waveHtml = `<div class="arcane-fs-anchor" style="left:${(origin.x + heroBox.x) / 2}px;top:${(origin.y + heroBox.y) / 2}px;width:${Math.max(320, heroBox.w * 1.15)}px;height:140px;animation:arcane-fade-life 0.62s ease-out both;">
-          <svg viewBox="0 0 320 120" style="width:100%;height:100%;overflow:visible;">
-            <defs><linearGradient id="sd-fw-${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fde047" stop-opacity="0.72"/><stop offset="45%" stop-color="#f97316" stop-opacity="0.58"/><stop offset="100%" stop-color="#9a3412" stop-opacity="0"/></linearGradient></defs>
-            <path d="M12 20 Q95 -8 165 24 T308 18 L294 96 Q175 114 32 94 Z" fill="url(#sd-fw-${uid})" opacity="0.88"/>
-          </svg>
-        </div>`;
-        fsLayer(waveHtml, 640);
-        burst(24, () => { const a = ang + rnd(-0.55, 0.55), s = rnd(3.2, 6.6); return { x: origin.x + rnd(-16, 16), y: origin.y + rnd(-10, 10), vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.5, drag: 0.95, decay: 0.025, size: rnd(12, 22), shape: 'flame', color: pick(['#f97316', '#fb923c', '#f59e0b']) }; });
+        const uid = ++S.uid, dx = heroBox.x - origin.x, dy = heroBox.y - origin.y, ang = Math.atan2(dy, dx);
+        const waveW = Math.max(520, heroBox.w * 1.44), waveH = 220;
+        const midY = Math.round(origin.y * 0.28 + heroBox.y * 0.72) - 24;
+        const heatLayer = fsLayer(`<div class="arcane-fs-anchor arcane-sd-additive" style="left:${heroBox.x}px;top:${heroBox.y - 24}px;width:${Math.round(waveW * 1.05)}px;height:132px;pointer-events:none;">
+          <div class="sd-fw-heat" style="width:100%;height:100%;border-radius:50%;background:radial-gradient(ellipse at 50% 52%, rgba(253,224,71,0.34) 0%, rgba(249,115,22,0.34) 40%, rgba(194,65,12,0.14) 68%, transparent 82%);"></div>
+        </div>`, 960);
+        const heatEl = heatLayer.querySelector('.sd-fw-heat');
+        if (heatEl && heatEl.animate) heatEl.animate([{ transform: 'scaleX(0.35) scaleY(0.55)', opacity: 0 }, { transform: 'scaleX(1.04) scaleY(1.02)', opacity: 1, offset: 0.28 }, { transform: 'scaleX(1.1) scaleY(0.95)', opacity: 0.72, offset: 0.62 }, { transform: 'scaleX(1.14) scaleY(0.84)', opacity: 0 }], { duration: 920, easing: 'cubic-bezier(0.2,0.75,0.3,1)', fill: 'forwards' });
+        const waveLayer = fsLayer(`<div class="arcane-fs-anchor arcane-sd-additive" style="left:${heroBox.x}px;top:${midY}px;width:${waveW}px;height:${waveH}px;pointer-events:none;">
+          <div class="sd-fw-billow" style="width:100%;height:100%;transform-origin:50% 55%;">
+            <svg viewBox="0 0 540 220" style="width:100%;height:100%;overflow:visible;">
+              <defs>
+                <filter id="sd-fw-turb-${uid}" x="-18%" y="-28%" width="136%" height="156%">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.022 0.046" numOctaves="2" seed="11" result="noise"/>
+                  <feDisplacementMap in="SourceGraphic" in2="noise" scale="26" xChannelSelector="R" yChannelSelector="G" result="disp"/>
+                  <feGaussianBlur in="disp" stdDeviation="2.6" result="glow"/>
+                  <feMerge><feMergeNode in="glow"/><feMergeNode in="disp"/></feMerge>
+                </filter>
+                <radialGradient id="sd-fw-sheet-${uid}" cx="50%" cy="56%" r="50%">
+                  <stop offset="0%" stop-color="#fb923c" stop-opacity="0.92"/>
+                  <stop offset="48%" stop-color="#f97316" stop-opacity="0.72"/>
+                  <stop offset="78%" stop-color="#dc2626" stop-opacity="0.34"/>
+                  <stop offset="100%" stop-color="#7c2d12" stop-opacity="0"/>
+                </radialGradient>
+                <linearGradient id="sd-fw-core-${uid}" x1="0%" y1="50%" x2="100%" y2="50%">
+                  <stop offset="0%" stop-color="#f97316" stop-opacity="0"/>
+                  <stop offset="20%" stop-color="#fde047" stop-opacity="0.78"/>
+                  <stop offset="50%" stop-color="#fffbeb" stop-opacity="0.94"/>
+                  <stop offset="80%" stop-color="#fde047" stop-opacity="0.78"/>
+                  <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <g filter="url(#sd-fw-turb-${uid})">
+                <ellipse cx="270" cy="122" rx="236" ry="52" fill="url(#sd-fw-sheet-${uid})"/>
+                <path d="M52,126 Q270,84 488,126 Q270,158 52,126 Z" fill="url(#sd-fw-core-${uid})"/>
+              </g>
+            </svg>
+          </div>
+        </div>`, 800);
+        const billowEl = waveLayer.querySelector('.sd-fw-billow');
+        if (billowEl && billowEl.animate) {
+            const ox = Math.max(-200, Math.min(200, -dx * 0.45)), oy = Math.max(-140, Math.min(40, (origin.y - midY) * 0.65));
+            billowEl.animate([
+                { transform: `translate(${ox.toFixed(1)}px,${oy.toFixed(1)}px) scale(0.36,0.48)`, opacity: 0 },
+                { transform: 'translate(0px,0px) scale(1.04,1.02)', opacity: 1, offset: 0.34 },
+                { transform: 'translate(8px,20px) scale(1.12,0.92)', opacity: 0.88, offset: 0.64 },
+                { transform: 'translate(16px,38px) scale(1.18,0.7)', opacity: 0 }
+            ], { duration: 760, easing: 'cubic-bezier(0.16,0.84,0.28,1)', fill: 'forwards' });
+        }
+        burst(36, () => { const a = ang + rnd(-0.68, 0.68), s = rnd(3.8, 7.8); return { x: origin.x + rnd(-18, 18), y: origin.y + rnd(-12, 12), vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.4, drag: 0.95, decay: 0.023, size: rnd(15, 28), shape: 'flame', color: pick(['#f97316', '#fb923c', '#f59e0b']) }; });
+        burst(20, () => { const a = ang + rnd(-0.72, 0.72), s = rnd(4.6, 9.6); return { x: origin.x + rnd(-12, 12), y: origin.y + rnd(-8, 8), vx: Math.cos(a) * s, vy: Math.sin(a) * s, drag: 0.94, decay: 0.034, size: rnd(1.5, 2.7), shape: 'spark', color: pick(['#fef08a', '#fb923c', '#fffbeb']) }; });
+        sched(120, () => {
+            burst(24, () => ({ x: heroBox.x + rnd(-heroBox.w * 0.45, heroBox.w * 0.45), y: midY + rnd(-12, 24), vx: rnd(-1.4, 1.4), vy: rnd(-2.2, -0.4), drag: 0.96, decay: 0.025, size: rnd(14, 26), shape: 'flame', color: pick(['#fb923c', '#f97316', '#fde047']) }));
+        });
         let burnSoundCount = 0;
         targetEntries.forEach((entry, idx) => {
             const dest = entry.dodged ? entry.pt.miss : entry.pt.hit;
@@ -1115,14 +1161,31 @@ const arcaneVfxModule = (function () {
                     return;
                 }
                 if (burnSoundCount++ < 2) playSdSample('sd_burn_attach', { vol: 0.42, maxDurSec: 0.58, fadeOutSec: 0.18, rate: 0.98 + idx * 0.05, pan });
-                const fUid = ++S.uid;
-                fsLayer(`<div class="arcane-fs-anchor" style="left:${dest.x}px;top:${dest.y + 8}px;width:68px;height:78px;animation:arcane-sd-flame-lick 0.45s ease-in-out 2;">
-                  <svg viewBox="0 0 80 90" style="width:100%;height:100%;overflow:visible;">
-                    <defs><linearGradient id="sd-bt-${fUid}" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#ea580c" stop-opacity="0.88"/><stop offset="55%" stop-color="#fb923c" stop-opacity="0.86"/><stop offset="100%" stop-color="#fef08a" stop-opacity="0.92"/></linearGradient></defs>
-                    <path d="M40 84 C16 78 14 52 26 36 C28 45 34 45 36 30 C44 12 52 10 48 34 C54 28 60 36 58 50 C66 44 68 62 56 78 Z" fill="url(#sd-bt-${fUid})"/>
+                const fUid = ++S.uid, by = dest.y - 20;
+                const burnLayer = fsLayer(`<div class="arcane-fs-anchor" style="left:${dest.x}px;top:${by}px;width:96px;height:96px;pointer-events:none;">
+                  <svg viewBox="0 0 96 96" style="width:100%;height:100%;overflow:visible;">
+                    <defs>
+                      <filter id="sd-bt-gl-${fUid}" x="-28%" y="-28%" width="156%" height="156%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                      <radialGradient id="sd-bt-base-${fUid}" cx="50%" cy="68%" r="48%"><stop offset="0%" stop-color="#fde047" stop-opacity="0.48"/><stop offset="46%" stop-color="#ea580c" stop-opacity="0.34"/><stop offset="100%" stop-color="#7c2d12" stop-opacity="0"/></radialGradient>
+                      <linearGradient id="sd-bt-fl-${fUid}" x1="0.2" y1="1" x2="0.8" y2="0"><stop offset="0%" stop-color="#c2410c" stop-opacity="0.92"/><stop offset="48%" stop-color="#f97316" stop-opacity="0.94"/><stop offset="88%" stop-color="#fde047" stop-opacity="0.72"/><stop offset="100%" stop-color="#fffbeb" stop-opacity="0.18"/></linearGradient>
+                      <linearGradient id="sd-bt-core-${fUid}" x1="0.3" y1="1" x2="0.7" y2="0"><stop offset="0%" stop-color="#fb923c" stop-opacity="0.85"/><stop offset="50%" stop-color="#fef08a" stop-opacity="0.96"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0.35"/></linearGradient>
+                    </defs>
+                    <ellipse cx="48" cy="68" rx="40" ry="20" fill="url(#sd-bt-base-${fUid})" style="mix-blend-mode:screen;"/>
+                    <g class="sd-bt-tongues" filter="url(#sd-bt-gl-${fUid})" style="transform-origin:48px 78px;">
+                      <path d="M46,79 C26,77 20,58 29,43 C32,37 32,30 29,24 C38,31 41,42 40,51 C42,36 52,18 48,10 C60,21 61,39 56,51 C61,45 64,37 64,30 C72,41 72,62 59,74 C55,78 50,79 46,79 Z" fill="url(#sd-bt-fl-${fUid})"/>
+                      <path d="M23,60 C17,52 18,40 24,33 C23,42 26,48 29,56 C27,59 25,61 23,60 Z" fill="url(#sd-bt-fl-${fUid})" opacity="0.82"/>
+                      <path d="M72,56 C77,48 76,37 70,31 C71,39 68,46 66,53 C68,56 70,58 72,56 Z" fill="url(#sd-bt-fl-${fUid})" opacity="0.78"/>
+                      <path d="M47,76 C37,74 35,61 42,49 C45,42 48,34 47,26 C53,36 53,48 51,58 C56,54 58,47 58,42 C62,50 61,66 53,74 C51,75 49,76 47,76 Z" fill="url(#sd-bt-core-${fUid})" style="mix-blend-mode:screen;"/>
+                    </g>
+                    <polygon class="sd-bt-flare" points="54,28 57,37 66,40 57,43 54,52 51,43 42,40 51,37" fill="#fef9c3" stroke="#fb923c" stroke-width="0.9" opacity="0" style="transform-origin:54px 40px;"/>
                   </svg>
-                </div>`, 600);
-                burst(10, () => ({ x: dest.x + rnd(-16, 16), y: dest.y + rnd(-6, 18), vx: rnd(-0.6, 0.6), vy: rnd(-2.2, -0.8), drag: 0.96, decay: 0.032, size: rnd(6, 11), shape: 'flame', color: pick(['#f97316', '#fbbf24']) }));
+                </div>`, 640);
+                const tonguesEl = burnLayer.querySelector('.sd-bt-tongues'), flareEl = burnLayer.querySelector('.sd-bt-flare');
+                if (tonguesEl && tonguesEl.animate) tonguesEl.animate([{ opacity: 0, transform: 'translateY(8px) scaleY(0.45)' }, { opacity: 0.98, transform: 'translateY(-3px) scaleY(1.08)', offset: 0.36 }, { opacity: 0, transform: 'translateY(-11px) scaleY(0.72)' }], { duration: 580, easing: 'ease-out', fill: 'forwards' });
+                if (flareEl && flareEl.animate) flareEl.animate([{ opacity: 0, transform: 'scale(0.35) rotate(0deg)' }, { opacity: 0.95, transform: 'scale(1.12) rotate(18deg)', offset: 0.34 }, { opacity: 0, transform: 'scale(0.55) rotate(36deg)' }], { duration: 240, easing: 'ease-out', fill: 'forwards' });
+                burst(8, () => ({ x: dest.x + rnd(-20, 20), y: by + rnd(-8, 10), vx: rnd(-0.6, 0.6), vy: rnd(-2.4, -0.9), drag: 0.96, decay: 0.032, size: rnd(6, 12), shape: 'flame', color: pick(['#f97316', '#fbbf24']) }));
+                burst(6, () => ({ x: dest.x + rnd(-16, 16), y: by + rnd(-10, 6), vx: rnd(-0.8, 0.8), vy: rnd(-2.8, -1.1), drag: 0.95, decay: 0.04, size: rnd(1.3, 2.2), shape: 'spark', color: pick(['#fef08a', '#fb923c']) }));
+                burst(4, () => ({ x: dest.x + rnd(-14, 14), y: by + rnd(-6, 8), vx: rnd(-0.3, 0.3), vy: rnd(-1.4, -0.6), drag: 0.97, decay: 0.026, size: rnd(7, 11), shape: 'gradMist', blend: 'source-over', color: 'rgba(67,20,7,0.45)', mid: 'rgba(28,25,23,0.18)' }));
                 onBeat && onBeat('target_attach', { entity, target: entry.target, form: '群火', stateAttach: '燃烧', conf });
             }, k => k * (2 - k));
         });
