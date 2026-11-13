@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>变种能力 · 抗性与免疫生效瞬间</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap');
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    body { font-family: 'Noto Sans SC', sans-serif; user-select: none; }
+    /* —— 以下复刻主工程 index.html 主界面样式 —— */
+    .glass-panel { background: rgba(20, 25, 35, 0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); }
+    .text-outline { text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 1px 2px rgba(0,0,0,0.8); }
+    .mask-fade-y { -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .custom-scrollbar::-webkit-scrollbar { width: 3px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+    .timeline-rail { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: linear-gradient(180deg, rgba(250,204,21,0.85) 0%, rgba(6,182,212,0.65) 25%, rgba(99,102,241,0.45) 60%, rgba(255,255,255,0.05) 100%); box-shadow: 0 0 10px rgba(6,182,212,0.55); pointer-events: none; z-index: 0; }
+    @keyframes rail-pulse { 0% { transform: translateY(-100%); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(800%); opacity: 0; } }
+    .rail-pulse-beam { position: absolute; left: 0; top: 0; width: 2px; height: 40px; background: linear-gradient(180deg, transparent, #38bdf8, #fff); box-shadow: 0 0 12px #38bdf8; animation: rail-pulse 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+    .turn-dot { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; background: #111827; border: 2px solid; position: relative; z-index: 1; flex-shrink: 0; overflow: hidden; }
+    .turn-dot.cur { width: 52px; height: 52px; font-size: 26px; border-color: #facc15 !important; box-shadow: 0 0 20px rgba(250,204,21,0.9); }
+    .breathe { animation: breathe 3.2s ease-in-out infinite; } @keyframes breathe { 50% { transform: translateY(-4px) scale(1.02); } }
+    #chat-bar input { background: rgba(15,23,42,0.7); border: 1px solid rgba(255,255,255,0.12); color: #e2e8f0; }
+    .portrait { background: radial-gradient(ellipse at 50% 30%, #3b3f5c, #14151f 75%); display: flex; align-items: flex-end; justify-content: center; font-size: 64px; overflow: hidden; }
+    .card:disabled { pointer-events: none; opacity: 0.45; filter: grayscale(0.6); }
+
+    /* ===== 可移植特效样式 BEGIN：与 index.html 的 arcane- 命名及层序一致 ===== */
+    .arcane-fs-layer { position: fixed; inset: 0; pointer-events: none; z-index: 52; overflow: hidden; }
+    .arcane-fs-anchor { position: absolute; transform: translate(-50%, -50%); }
+    #arcane-fx-canvas { position: fixed; inset: 0; width: 100vw; height: 100dvh; pointer-events: none; z-index: 55; }
+    #arcane-dark { position: fixed; inset: 0; pointer-events: none; z-index: 40; opacity: 0; transition: opacity 0.35s ease; background: radial-gradient(ellipse at 40% 60%, rgba(5,6,20,0.55) 0%, rgba(2,3,10,0.92) 75%); }
+    @keyframes arcane-seed-bloom { 0% { transform: translate(-50%,-50%) scale(0); opacity: 0; } 70% { transform: translate(-50%,-50%) scale(1.25); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(0.6); opacity: 0; } }
+    @keyframes arcane-hit-flash { 0% { transform: translate(-50%,-50%) scale(0.2); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.7); opacity: 0; } }
+    @keyframes arcane-f-cold { 0% { filter: brightness(1.6) hue-rotate(180deg) saturate(2.5); } 60% { filter: none; } }
+    @keyframes arcane-f-heal { 0% { filter: brightness(1.8) drop-shadow(0 0 18px #34d399); } 100% { filter: none; } }
+    .arcane-flash-cold { animation: arcane-f-cold 0.5s steps(1) both !important; }
+    .arcane-flash-heal { animation: arcane-f-heal 0.6s ease-out both !important; }
+    @keyframes arcane-tint { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes arcane-ripple { 0% { transform: translate(-50%,-50%) scale(0.2); opacity: 0.9; } 100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; } }
+    @keyframes arcane-ring-out { 0% { r: 4; opacity: 0.95; stroke-width: 3; } 100% { r: 150; opacity: 0; stroke-width: 0.5; } }
+    @keyframes arcane-fs-flash { 0% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes arcane-draw-on { to { stroke-dashoffset: 0; } }
+    .arcane-grow { stroke-dasharray: 1; stroke-dashoffset: 1; }
+    @keyframes arcane-fade-life { 0% { opacity: 0; } 15% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes arcane-slow-rot { to { transform: rotate(360deg); } }
+    @keyframes arcane-s-light { 25% { transform: translate3d(-3px, 2px, 0); } 60% { transform: translate3d(3px, -2px, 0); } }
+    @keyframes arcane-s-heavy { 15% { transform: translate3d(-8px, 4px, 0); } 35% { transform: translate3d(7px, -5px, 0); } 60% { transform: translate3d(-4px, 3px, 0); } 85% { transform: translate3d(2px, -1px, 0); } }
+    @keyframes arcane-s-quake { 10% { transform: translate3d(-14px, 8px, 0); } 25% { transform: translate3d(12px, -10px, 0); } 40% { transform: translate3d(-9px, 6px, 0); } 60% { transform: translate3d(6px, -4px, 0); } 80% { transform: translate3d(-3px, 2px, 0); } }
+    .arcane-shake-light { animation: arcane-s-light 0.18s ease-out; }
+    .arcane-shake-heavy { animation: arcane-s-heavy 0.32s ease-out; }
+    .arcane-shake-quake { animation: arcane-s-quake 0.55s ease-out; }
+    /* 新技能的 arcane- 样式写在这里；移植时只追加新样式，不覆盖正式版的已有样式。 */
+    /* ===== 第二期：抗性与免疫特效样式 arcane-resist-*（可移植） ===== */
+    .arcane-resist-anchor { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; }
+    .arcane-resist-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .arcane-resist-ghost { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .arcane-resist-hit-flash { animation: arcane-resist-hit-step 0.22s steps(1) both; }
+    @keyframes arcane-resist-hit-step {
+        0% { filter: brightness(2.05) saturate(0.25); }
+        50% { filter: brightness(1.38) saturate(0.6); }
+        100% { filter: none; }
+    }
+    .arcane-resist-stun-pop {
+        display: flex; align-items: center; gap: 4px;
+        filter: drop-shadow(0 0 6px rgba(251,191,36,0.9));
+        font-size: 12px; line-height: 1; color: #fde047;
+        text-shadow: 0 0 8px rgba(251,191,36,0.95), 0 1px 2px rgba(0,0,0,0.85);
+    }
+    /* 一期常驻外观样式复用（正式版已存在，仅用于本 demo 验证常驻外观不冲突） */
+    .arcane-variant-host-rel { position: relative !important; }
+    .arcane-variant-molt-sprite { filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.72)) drop-shadow(0 0 16px rgba(245, 158, 11, 0.42)) drop-shadow(0 10px 10px rgba(0, 0, 0, 0.5)); }
+    .arcane-variant-rage-sprite { filter: drop-shadow(0 0 7px rgba(239, 68, 68, 0.85)) drop-shadow(0 0 18px rgba(185, 28, 28, 0.58)) drop-shadow(0 10px 10px rgba(0, 0, 0, 0.5)); }
+    .arcane-variant-molted-fx { position: absolute; inset: -3px; border-radius: 8px; pointer-events: none; z-index: 18; box-shadow: inset 0 0 14px rgba(245, 158, 11, 0.32), 0 0 14px rgba(251, 191, 36, 0.34); background: radial-gradient(ellipse at 50% 85%, rgba(251, 191, 36, 0.18) 0%, transparent 68%); }
+    .arcane-variant-molted-fx.is-sprite { inset: -24px -28px; box-shadow: none; border-radius: 50%; z-index: -1; background: radial-gradient(ellipse closest-side at 50% 70%, rgba(251, 191, 36, 0.42) 0%, rgba(217, 119, 6, 0.16) 54%, transparent 100%); }
+    .arcane-variant-rage-fx { position: absolute; inset: -3px; border-radius: 8px; pointer-events: none; z-index: 19; overflow: hidden; box-shadow: inset 0 0 18px rgba(220, 38, 38, 0.42), 0 0 16px rgba(220, 38, 38, 0.4); }
+    .arcane-variant-rage-fx.is-sprite { inset: -26px -30px; box-shadow: none; border-radius: 50%; z-index: -1; overflow: visible; background: radial-gradient(ellipse closest-side at 50% 56%, rgba(220, 38, 38, 0.34) 0%, rgba(127, 29, 29, 0.14) 58%, transparent 100%); }
+    /* 正式版眩晕星环样式（用于对照组展示存留晃动） + 演示列表辅助样式 */
+    .stun-fx { display: flex; align-items: center; gap: 4px; filter: drop-shadow(0 0 6px rgba(251,191,36,0.85)); animation: stun-sway 1.1s ease-in-out infinite; }
+    .stun-fx.hidden { display: none !important; }
+    .stun-star { font-size: 11px; line-height: 1; color: #fde047; text-shadow: 0 0 8px rgba(251,191,36,0.95), 0 1px 2px rgba(0,0,0,0.8); animation: stun-twinkle 0.9s ease-in-out infinite alternate; }
+    .stun-star:nth-child(2) { animation-delay: 0.15s; }
+    .stun-star:nth-child(3) { animation-delay: 0.30s; }
+    @keyframes stun-sway { 0%, 100% { transform: translateX(-50%) translateX(0) rotate(0deg); } 25% { transform: translateX(-50%) translateX(-2px) rotate(-1.6deg); } 75% { transform: translateX(-50%) translateX(2px) rotate(1.6deg); } }
+    @keyframes stun-twinkle { 0% { opacity: 0.72; transform: scale(0.92); } 100% { opacity: 1; transform: scale(1.14); } }
+    .arcane-variant-group-hd { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; color: #94a3b8; padding: 4px 6px 2px; border-bottom: 1px solid rgba(148,163,184,0.16); margin-top: 2px; display: flex; justify-content: space-between; align-items: center; }
+    @keyframes arcane-variant-float-up { 0% { opacity: 0; transform: translate(-50%, 6px) scale(0.84); } 18% { opacity: 1; transform: translate(-50%, -8px) scale(1.14); } 78% { opacity: 1; transform: translate(-50%, -22px) scale(1); } 100% { opacity: 0; transform: translate(-50%, -34px) scale(0.92); } }
+    .arcane-variant-float-text { position: fixed; pointer-events: none; z-index: 66; white-space: nowrap; font-weight: 800; text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7); animation: arcane-variant-float-up 1.15s ease-out forwards; }
+    /* ===== 可移植特效样式 END ===== */
+  </style>
+</head>
+<body class="text-white">
+ <div id="app" class="fixed inset-0 overflow-hidden">
+  <!-- 顶部控制按钮（复刻主界面） -->
+  <div class="absolute top-2 sm:top-4 right-2 sm:right-4 z-[115] flex gap-1.5 sm:gap-2">
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-violet-400 hover:text-violet-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>📚</span> <span class="hidden sm:inline">世界书</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-purple-400 hover:text-purple-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>📜</span> <span class="hidden sm:inline">记录</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-blue-400 hover:text-blue-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>🔲</span> <span class="hidden sm:inline">全屏</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-indigo-400 hover:text-indigo-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>💬</span> <span class="hidden sm:inline">对话</span></button>
+    <button class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-yellow-500 hover:text-yellow-400 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>⚙️</span> <span class="hidden sm:inline">设置</span></button>
+    <button id="btn-reset" class="glass-panel px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold text-emerald-400 hover:text-emerald-300 hover:bg-white/10 transition-all flex items-center gap-1.5 shadow-md"><span>🔄</span> <span class="hidden sm:inline">重置</span></button>
+  </div>
+
+  <!-- 全屏战场区域 -->
+  <div class="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-800 to-emerald-900 overflow-hidden z-0" id="battle-scene">
+    <div class="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+    <div class="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-0"></div>
+    <div class="absolute left-1 sm:left-4 md:left-6 top-16 sm:top-20 bottom-44 sm:bottom-48 w-12 sm:w-14 z-30 flex flex-col items-center select-none">
+      <div class="relative w-full h-full flex flex-col items-center">
+        <div class="timeline-rail"><div class="rail-pulse-beam"></div></div>
+        <div id="turn-order-container" class="relative w-full h-full flex flex-col gap-2 sm:gap-2.5 items-center overflow-y-auto no-scrollbar mask-fade-y py-3"></div>
+      </div>
+    </div>
+    <div id="enemies-container" class="absolute left-2 sm:left-6 right-2 sm:right-6 top-[10%] bottom-[190px] sm:bottom-[220px] z-10 flex flex-col items-center justify-start gap-6 overflow-visible pointer-events-none"></div>
+  </div>
+
+  <!-- 悬浮 UI 层 -->
+  <div class="absolute bottom-[52px] left-0 w-full p-1.5 sm:p-6 flex flex-col-reverse sm:flex-row items-end justify-between gap-1.5 sm:gap-4 z-20 pointer-events-none pb-2 sm:pb-6">
+    <div id="heroes-container" class="w-full sm:flex-1 grid grid-cols-4 gap-1 sm:gap-4 max-w-2xl pointer-events-auto relative"></div>
+    <div class="relative self-end">
+      <div id="menu-container" class="w-[260px] h-[172px] bg-slate-950/95 backdrop-blur-xl rounded-xl border border-slate-700/80 border-t-2 border-t-cyan-500/80 flex flex-col overflow-hidden relative shadow-[0_15px_35px_rgba(0,0,0,0.9)] pointer-events-auto self-end mb-1 sm:mb-0">
+        <div class="px-2.5 py-1 bg-gradient-to-r from-violet-950/60 via-slate-900/90 to-slate-950 border-b border-violet-900/40 flex justify-between items-center shrink-0">
+          <div class="flex items-center gap-1.5 min-w-0"><span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse shrink-0"></span><span class="text-xs font-bold text-sky-200 truncate">抗性与免疫 · 生效瞬间</span></div>
+          <div class="flex items-center gap-1 shrink-0"><span id="variant-beat-stat" class="text-[9px] font-mono text-sky-300/90 truncate max-w-[92px]" title="当前状态/拍点">待机</span><button id="btn-variant-sfx" class="text-[9px] font-bold px-1.5 rounded border border-emerald-500/60 text-emerald-300 hover:bg-white/10 transition-all shrink-0" aria-pressed="true">🔊 音开</button></div>
+        </div>
+        <div id="skill-list" class="flex-1 flex flex-col gap-1 p-1 overflow-y-auto custom-scrollbar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部对话栏（复刻主界面，仅装饰） -->
+  <div id="chat-bar" class="absolute bottom-0 left-0 right-0 h-[52px] z-30 flex items-center gap-2 px-2 sm:px-3 bg-black/60 border-t border-white/5">
+    <div class="w-9 h-9 rounded-full bg-slate-700 border border-white/20 shrink-0 flex items-center justify-center">🕵️</div>
+    <input type="text" placeholder="说点什么... (Enter发送)" class="flex-1 h-9 rounded-full px-4 text-sm outline-none">
+    <span class="px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/60 text-emerald-300 bg-emerald-950/50">友方旁白 ON</span>
+    <span class="px-3 py-1 rounded-full text-xs font-bold border border-rose-500/60 text-rose-300 bg-rose-950/50">敌方旁白 ON</span>
+    <div class="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center shrink-0">➤</div>
+  </div>
+ </div>
+  <script>
+    // ===== 演示宿主 BEGIN：占位数据、渲染、fxEngine；不移植到正式版 =====
+    const $ = s => document.querySelector(s);
+    let combatToken = 0;
+    let heroesData = [], enemiesData = [];
+    const HERO_AVATARS = {
+        '埃利奥特': 'https://imgur.la/images/2026/06/25/31a4dd84a831e3f76082542bf12fcf19.png',
+        '弗兰克': 'https://imgur.la/images/2026/06/25/26f001dbe399876cd74978bbe12a265b.png',
+        '玛德琳': 'https://imgur.la/images/2026/06/25/585bf7f2f1559168b419b8be56da36a6.png',
+        '索恩': 'https://imgur.la/images/2026/08/13/77fcdf0fd006c4ff1ccae30774322270.png'
+    };
+    const HERO_DATA = [['h1', '埃利奥特', '👨', 100, 55, 110, 5], ['h2', '弗兰克', '🧔', 180, 0, 17, 0], ['h3', '玛德琳', '👩', 140, 0, 14, 0], ['h4', '索恩', '🕵️', 140, 0, 20, 0]];
+    const ENEMY_ROWS = [[['e1', '🐟'], ['e2', '❄️'], ['e3', '🐟']], [['e4', '👻'], ['e5', '👻'], ['e6', '🌀']]];
+
+function createCompactBarHTML(id, type, label, val, max, colorClass, isTp = false, shield = 0) {
+  const pct = Math.max(0, Math.min(100, (val / max) * 100)); const barWidthClass = isTp ? 'w-1/3' : 'w-full';
+  const shieldText = shield > 0 && type === 'hp' ? `<span class="text-slate-300 ml-0.5 text-[7px] sm:text-[9px]">(盾${shield})</span>` : '';
+  let finalColor = colorClass; let extraClass = ''; if (isTp && val >= max) { finalColor = 'bg-amber-400'; extraClass = 'shadow-[0_0_10px_rgba(251,191,36,0.8)] animate-pulse'; }
+  return `<div class="relative pt-1.5 sm:pt-2.5 mb-0 sm:mb-[2px]"><span id="${id}-${type}-text" class="absolute right-0 top-0 text-[8px] sm:text-xs font-mono font-bold text-white leading-none text-outline z-10 whitespace-nowrap">${Math.floor(val)}${shieldText}</span><div class="flex items-center gap-1 sm:gap-1.5"><span class="text-[7px] sm:text-[10px] font-bold text-gray-200 leading-none text-outline w-3 sm:w-4">${label}</span><div class="flex-grow h-1 sm:h-1.5 bg-[#222] rounded-[1px] overflow-hidden border border-[#111]"><div id="${id}-${type}-bar" class="${barWidthClass} h-full ${finalColor} ${extraClass} transition-all duration-300 ease-out" style="width: ${pct}%"></div></div></div></div>`;
+}
+
+function getEntitySpriteDom(entityOrId){
+  const id = entityOrId && typeof entityOrId === 'object' ? entityOrId.id : String(entityOrId||'');
+  if(!id) return null;
+  return document.getElementById(`hero-card-${id}`) || document.getElementById(`${id}-sprite`) || document.getElementById(`hero-wrap-${id}`) || null;
+}
+window.getEntitySpriteDom = getEntitySpriteDom;
+
+    function renderEntityBuffs(entity) {
+        const box = document.getElementById(`${entity.id}-buffs`);
+        if (box) {
+            const buffs = entity.buffs || [];
+            box.innerHTML = buffs.map(b => `<span class="text-[8px] sm:text-[9px] font-bold px-1 rounded bg-black/75 border border-white/20 shadow" style="color:${b.color || '#f8fafc'}">${b.label}</span>`).join('');
+        }
+        updateDemoStunVisual(entity);
+    }
+    function updateDemoStunVisual(entity) {
+        const stunEl = document.getElementById(`${entity.id}-stunFx`);
+        if (!stunEl) return;
+        const isStunned = (entity.buffs || []).some(b => b.type === 'stun');
+        stunEl.classList.toggle('hidden', !(isStunned && entity.isAlive !== false));
+    }
+    window.renderDemoEntityBuffs = renderEntityBuffs;
+    window.updateDemoStunVisual = updateDemoStunVisual;
+
+    function initUI(init = {}) {
+        heroesData = HERO_DATA.map(([id, name, face, hp, shield, mp, tp]) => Object.assign({ id, name, face, img: HERO_AVATARS[name] || '', hp, maxHp: hp, shield, mp, maxMp: mp, tp, maxTp: 100, isAlive: true, buffs: [] }, init[id]));
+        enemiesData = ENEMY_ROWS.flat().map(([id, face]) => Object.assign({ id, name: id, face, hp: 1000, maxHp: 1000, shield: 0, isAlive: true, buffs: [] }, init[id]));
+        $('#heroes-container').innerHTML = heroesData.map(({ id, name, face, img, hp, maxHp, shield, mp, maxMp, tp, maxTp }) => `
+      <div class="hero relative transition-all duration-300 min-w-[70px] z-20" id="hero-wrap-${id}">
+        <div id="${id}-stunFx" class="stun-fx hidden absolute -top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none"><span class="stun-star">★</span><span class="stun-star">★</span><span class="stun-star">★</span></div>
+        <div id="hero-card-${id}" class="fx-body hero-card-inner bg-[#18181b] rounded overflow-hidden relative border shadow-2xl transition-all border-gray-800">
+          <div id="${id}-buffs" class="absolute top-1 right-1 flex flex-col gap-1 items-end z-20 pointer-events-none"></div>
+          <div class="w-full h-12 sm:h-auto sm:aspect-[4/3] relative bg-gray-900 border-b border-gray-700">
+            <div class="absolute top-0 left-0 w-full bg-gradient-to-b from-black/80 to-transparent px-1.5 py-1 text-[9px] sm:text-xs font-bold text-white z-10 flex justify-between"><span>${name}</span></div>
+            <div class="portrait w-full h-full">${img ? `<img src="${img}" alt="${name}" class="w-full h-full object-cover" onerror="this.style.display='none';this.nextElementSibling&&this.nextElementSibling.classList.remove('hidden')"><span class="hidden leading-none">${face}</span>` : face}</div>
+          </div>
+          <div class="px-1 py-1 sm:px-2 sm:py-1.5 flex flex-col gap-[1px] sm:gap-0.5">${createCompactBarHTML(id, 'hp', 'HP', hp, maxHp, 'bg-yellow-400', false, shield)}${createCompactBarHTML(id, 'mp', 'MP', mp, maxMp, 'bg-cyan-400')}${createCompactBarHTML(id, 'tp', 'TP', tp, maxTp, 'bg-green-500', true)}</div>
+        </div>
+      </div>`).join('');
+        $('#enemies-container').innerHTML = ENEMY_ROWS.map((row, ri) => `<div class="flex items-end justify-center" style="gap:${ri ? 26 : 22}px; ${ri ? 'margin-top:18px' : ''}">${row.map(([id, em]) => {
+            const e = enemiesData.find(x => x.id === id);
+            const pct = Math.max(0, Math.min(100, e.hp / e.maxHp * 100));
+            return `<div class="flex flex-col items-center group relative shrink-0" id="enemy-box-${id}" style="transform:scale(${ri ? 1 : 0.72}); ${ri ? '' : 'filter:brightness(0.82) saturate(0.92)'}">
+        <div id="${id}-buffs" class="absolute -top-2 right-0 flex flex-col gap-0.5 items-end z-20 pointer-events-none"></div>
+        <div id="${id}-stunFx" class="stun-fx hidden absolute -top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none"><span class="stun-star">★</span><span class="stun-star">★</span><span class="stun-star">★</span></div>
+        <div id="${id}-sprite" class="fx-body enemy-sprite text-7xl sm:text-8xl drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] breathe mt-2 sm:mt-4 flex justify-center items-center">${em}</div>
+        <div class="w-10 sm:w-16 h-1 sm:h-1.5 bg-black/50 mt-2 sm:mt-4 rounded-full overflow-hidden relative"><div id="${id}-hp-bar" class="h-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)] transition-all duration-300 ease-out" style="width:${pct}%"></div></div>
+        <div id="${id}-hp-text" class="mt-0.5 text-[9px] sm:text-[10px] font-mono font-bold text-white/80 text-outline leading-none">${Math.floor(e.hp)}/${e.maxHp}</div>
+      </div>`;
+        }).join('')}</div>`).join('');
+        heroesData.concat(enemiesData).forEach(e => {
+            renderEntityBuffs(e);
+            if (e.persist && typeof window.setPersistentFx === 'function') window.setPersistentFx(getEntitySpriteDom(e), e.persist, true);
+        });
+        const TURN_ITEMS = [{ e: '👨', name: '埃利奥特', hero: true }, { e: '❄️', name: 'e2', hero: false }, { e: '🧔', name: '弗兰克', hero: true }, { e: '👩', name: '玛德琳', hero: true }, { e: '🕵️', name: '索恩', hero: true }, { e: '👻', name: 'e4', hero: false }, { e: '👻', name: 'e5', hero: false }];
+        $('#turn-order-container').innerHTML = TURN_ITEMS.map((it, i) => {
+            const av = it.hero && HERO_AVATARS[it.name];
+            return `<div class="turn-dot ${i ? '' : 'cur'}" style="border-color:${it.hero ? '#06b6d4' : '#e11d48'}">${av ? `<img src="${av}" alt="${it.name}" class="w-full h-full object-cover rounded-full" onerror="this.style.display='none';this.nextElementSibling&&this.nextElementSibling.classList.remove('hidden')"><span class="hidden">${it.e}</span>` : it.e}</div>`;
+        }).join('');
+    }
+    initUI();
+
+class CanvasFxEngine {
+    constructor() {
+        this.canvas = null;
+        this.ctx = null;
+        this.particles = [];
+        this.animationFrameId = null;
+        this.hitStop = 0; // 定帧剩余毫秒：>0 时粒子冻结，制造重击顿挫感
+        this.lastFrameTime = 0; // 上一帧时间戳：用于计算真实帧间隔 dt
+        this.lastDt = 16.7;     // 最近一帧的真实间隔（毫秒），供雷电 overlay 等外部特效对齐
+        this.init();
+    }
+
+    init() {
+        this.canvas = document.getElementById('fx-canvas');
+        if (!this.canvas) {
+            this.canvas = document.createElement('canvas');
+            this.canvas.id = 'fx-canvas';
+            this.canvas.className = 'fixed inset-0 pointer-events-none z-[99]';
+            document.body.appendChild(this.canvas);
+        }
+        this.ctx = this.canvas.getContext('2d');
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+    }
+
+    resize() {
+        if (this.canvas) {
+            this.canvas.width = window.innerWidth;
+            this.canvas.height = window.innerHeight;
+        }
+    }
+
+    addParticle(p) {
+        this.particles.push(p);
+        if (this.particles.length === 1) {
+            this.startLoop();
+        }
+    }
+
+    startLoop() {
+        if (!this.animationFrameId) {
+            // 重置时间戳，避免空闲后重启的首帧因间隔过大而跳变（配合 update 内 33ms 上限钳制）
+            this.lastFrameTime = 0;
+            const loop = () => {
+                this.update();
+                this.draw();
+                if (this.particles.length > 0) {
+                    this.animationFrameId = requestAnimationFrame(loop);
+                } else {
+                    this.animationFrameId = null;
+                }
+            };
+            this.animationFrameId = requestAnimationFrame(loop);
+        }
+    }
+
+    update() {
+        // Delta-time：按真实帧间隔推进动画，速度与 FPS 解耦（高刷屏不加速、掉帧不减速）
+        // dt 上限 33ms：标签页休眠/卡顿后恢复时防止粒子瞬移跳变
+        const now = performance.now();
+        const dt = this.lastFrameTime ? Math.min(now - this.lastFrameTime, 33) : 16.7;
+        this.lastDt = dt;
+        this.lastFrameTime = now;
+        const k = dt / 16.7; // 归一化时间系数：1 = 60fps 基准步长
+
+        // Hit Stop 定帧：命中瞬间冻结粒子若干毫秒，制造"重击砸进肉里"的顿挫落差
+        if (this.hitStop > 0) {
+            this.hitStop -= dt;
+            return;
+        }
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const p = this.particles[i];
+            p.age += dt;
+
+            p.x += p.vx * k;
+            p.y += p.vy * k;
+
+            if (p.gravity) p.vy += p.gravity * k;
+            if (p.drag) {
+                const d = Math.pow(p.drag, k); // 阻尼按时间比例复合衰减
+                p.vx *= d;
+                p.vy *= d;
+            }
+            if (p.update) p.update(p);
+
+            if (p.age >= p.life) {
+                this.particles.splice(i, 1);
+            }
+        }
+    }
+
+    draw() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // 使用 'screen' 混合模式实现极具发光感的爆燃、辉光效果
+        this.ctx.globalCompositeOperation = 'screen';
+        
+        for (let i = 0; i < this.particles.length; i++) {
+            const p = this.particles[i];
+            const pct = p.age / p.life;
+            this.ctx.save();
+            p.draw(this.ctx, pct);
+            this.ctx.restore();
+        }
+        
+        this.ctx.globalCompositeOperation = 'source-over';
+    }
+}
+
+// 实例化全局特效引擎
+const fxEngine = new CanvasFxEngine();
+window.fxEngine = fxEngine;
+    // ===== 演示宿主 END =====
+
+    // ===== 可移植特效模块 BEGIN：底座取自 index.html；无战斗、LLM 或酒馆依赖 =====
+const arcaneVfxModule = (function () {
+    'use strict';
+    // 接入点 1：填写新技能的精确 fxTag，与下方分派和 CARDS 保持一致。
+    const ARCANE_TAGS = [];
+    const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
+
+    // —— 共享状态（clearArcaneFx 同步清空） ——
+    const S = {
+        uid: 0,
+        particles: [],
+        particleTimer: null,
+        particleUntil: 0,
+        flights: [],    // 贝塞尔弹道飞行物
+        timers: new Set(),     // combatToken 守卫的延时/收尾定时
+        rawTimers: new Map(),  // 弹道拍点及其完成回调，清理时同步解除等待
+        intervals: new Set(),  // 周期任务（蓄力抖动/羽流/光雨），回调内自守 token
+        layers: new Set(),     // data-arcane-fx 临时 DOM 层
+        anchors: new Set(),    // impactDom 无视觉锚点
+        handles: new Set(),    // 活动技能 handle
+        flashes: new Set(),    // 被加 arcane-flash-* 类的精灵
+        shakeEls: new Set(),   // 被加 arcane-shake-* 类的舞台
+        driver: null,          // 挂在 fxEngine.particles 里的驱动粒子
+        canvas: null, ctx: null,
+        dark: null,
+    };
+    let audioCtx = null, sfxBus = null, sfxVerb = null, sfxNoise = null;
+
+    // ===== combatToken 守卫定时 =====
+    function after(ms, fn) {
+        const token = combatToken;
+        const id = setTimeout(() => { S.timers.delete(id); if (token !== combatToken) return; fn(); }, ms);
+        S.timers.add(id);
+        return id;
+    }
+    function every(ms, fn) {
+        const token = combatToken;
+        const id = setInterval(() => { if (token !== combatToken) { clearInterval(id); S.intervals.delete(id); return; } fn(); }, ms);
+        S.intervals.add(id);
+        return id;
+    }
+    function stopEvery(id) { if (id != null) { clearInterval(id); S.intervals.delete(id); } }
+
+    // ===== 临时层 / 锚点 / 舞台效果 =====
+    function fsLayer(html, ms) {
+        const d = document.createElement('div');
+        d.className = 'arcane-fs-layer';
+        d.setAttribute('data-arcane-fx', 'layer');
+        d.innerHTML = html;
+        document.body.appendChild(d);
+        S.layers.add(d);
+        if (ms) setTimeout(() => { S.layers.delete(d); d.remove(); }, ms); // 纯清理回调，恒执行
+        return d;
+    }
+    function mkAnchor(x, y) {
+        const d = document.createElement('div');
+        d.style.cssText = 'position:fixed; left:' + (x - 1) + 'px; top:' + (y - 1) + 'px; width:2px; height:2px; pointer-events:none; z-index:56; opacity:0;';
+        d.setAttribute('data-arcane-fx', 'anchor');
+        document.body.appendChild(d);
+        S.anchors.add(d);
+        return d;
+    }
+    function dropAnchor(d) { if (d && d.isConnected) { S.anchors.delete(d); d.remove(); } }
+    function flash(el, cls) {
+        if (!el) return;
+        el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+        S.flashes.add(el);
+        after(700, () => { el.classList.remove(cls); S.flashes.delete(el); });
+    }
+    function shake(type) {
+        const scene = document.getElementById('battle-scene');
+        if (!scene) return;
+        const cls = 'arcane-shake-' + type;
+        scene.classList.remove('arcane-shake-light', 'arcane-shake-heavy', 'arcane-shake-quake');
+        void scene.offsetWidth;
+        scene.classList.add(cls);
+        S.shakeEls.add(scene);
+        after(type === 'quake' ? 560 : (type === 'heavy' ? 330 : 190), () => { scene.classList.remove(cls); S.shakeEls.delete(scene); });
+    }
+    function darken(o) {
+        if (!o && !S.dark) return;
+        if (!S.dark || !S.dark.isConnected) {
+            S.dark = document.createElement('div');
+            S.dark.id = 'arcane-dark';
+            S.dark.setAttribute('data-arcane-fx', 'dark');
+            document.body.appendChild(S.dark);
+        }
+        if (S.dark) S.dark.style.opacity = o;
+        if (!o && S.dark) {
+            const layer = S.dark;
+            after(360, () => { if (layer === S.dark && layer.style.opacity === '0') { layer.remove(); S.dark = null; } });
+        }
+    }
+
+    // ===== 几何 =====
+    function ctr(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, top: r.top, bottom: r.bottom, left: r.left, right: r.right }; }
+    function domOf(e) { return getEntitySpriteDom(e); }
+    function unionRect(doms) {
+        const rs = doms.map(d => d.getBoundingClientRect()).filter(r => r.width || r.height);
+        if (!rs.length) return null;
+        const l = Math.min(...rs.map(r => r.left)), rr = Math.max(...rs.map(r => r.right));
+        const t = Math.min(...rs.map(r => r.top)), b = Math.max(...rs.map(r => r.bottom));
+        return { x: (l + rr) / 2, y: (t + b) / 2, l, r: rr, t, b, w: rr - l, h: b - t };
+    }
+    // 施法者所属全队存活对象（含召唤物，isAlive 过滤）
+    function teamSprites(caster) {
+        const isHero = caster && (caster.isSummon ? caster.side === 'hero' : String(caster.id || '').startsWith('h'));
+        const arr = isHero ? heroesData : enemiesData;
+        return arr.filter(e => e.isAlive).map(e => domOf(e)).filter(Boolean);
+    }
+
+    // ===== 私有合成音色（demo 原样移植，局部隔离） =====
+    function audio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const ctx = audioCtx;
+            const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -10; comp.knee.value = 4; comp.ratio.value = 6; comp.attack.value = 0.001; comp.release.value = 0.12; comp.connect(ctx.destination);
+            const sat = shaper(ctx, 1.6); sat.connect(comp);
+            sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9; sfxBus.connect(sat);
+            const len = ctx.sampleRate * 3, ir = ctx.createBuffer(2, len, ctx.sampleRate);
+            for (let ch = 0; ch < 2; ch++) { const dd = ir.getChannelData(ch); for (let i = 0; i < len; i++) dd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4); }
+            sfxVerb = ctx.createConvolver(); sfxVerb.buffer = ir; const vg = ctx.createGain(); vg.gain.value = 0.5; sfxVerb.connect(vg); vg.connect(comp);
+            sfxNoise = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate); const nd = sfxNoise.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        return audioCtx;
+    }
+    function shaper(ctx, drive) { const ws = ctx.createWaveShaper(), c = new Float32Array(2048); for (let i = 0; i < 2048; i++) c[i] = Math.tanh((i / 1024 - 1) * drive) / Math.tanh(drive); ws.curve = c; ws.oversample = '2x'; return ws; }
+    function chain(ctx, src, t, o) {
+        const gn = ctx.createGain(), pk = o.peak || 0.002;
+        gn.gain.setValueAtTime(0.0001, t); gn.gain[o.peak ? 'exponentialRampToValueAtTime' : 'linearRampToValueAtTime'](o.vol, t + pk);
+        if (o.cut) { gn.gain.setValueAtTime(o.vol, t + o.dur - 0.012); gn.gain.linearRampToValueAtTime(0.0001, t + o.dur); }
+        else gn.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
+        const p = ctx.createStereoPanner(); p.pan.setValueAtTime(o.pan || 0, t); if (o.pan1 !== undefined) p.pan.linearRampToValueAtTime(o.pan1, t + o.dur);
+        src.connect(gn); gn.connect(p); p.connect(sfxBus);
+        if (o.wet) { const w = ctx.createGain(); w.gain.value = o.wet; p.connect(w); w.connect(sfxVerb); }
+    }
+    function noiseSrc(ctx, t, dur, rate) { const s = ctx.createBufferSource(); s.buffer = sfxNoise; s.playbackRate.value = rate || 1; s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05); return s; }
+    function biquad(ctx, type, f0, f1, q, t, dur, fd) { const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t); if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + (fd || dur)); return f; }
+    function click(d, vol = 0.7, f = 3500, dur = 0.012, pan = 0) { const ctx = audio(), t = ctx.currentTime + d; const f1 = biquad(ctx, 'highpass', f, 0, 0.7, t, dur); noiseSrc(ctx, t, dur).connect(f1); chain(ctx, f1, t, { vol, dur, pan }); }
+    function kick(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d; const s = ctx.createOscillator();
+        s.frequency.setValueAtTime(o.hi, t); s.frequency.exponentialRampToValueAtTime(o.lo, t + o.pd); s.frequency.exponentialRampToValueAtTime(o.lo * 0.7, t + o.dur);
+        const sh = shaper(ctx, o.drive || 3); s.connect(sh); s.start(t); s.stop(t + o.dur + 0.05); chain(ctx, sh, t, { vol: o.vol, dur: o.dur, wet: o.wet || 0 });
+    }
+    function crunch(d, o) { const ctx = audio(), t = ctx.currentTime + d; const bp = biquad(ctx, 'bandpass', o.f, o.f1, o.q || 1, t, o.dur); const sh = shaper(ctx, o.drive || 6); noiseSrc(ctx, t, o.dur).connect(bp); bp.connect(sh); chain(ctx, sh, t, { vol: o.vol, dur: o.dur, pan: o.pan || 0, wet: o.wet || 0 }); }
+    function boom(d, o) { const ctx = audio(), t = ctx.currentTime + d; const lp = biquad(ctx, 'lowpass', o.f0, o.f1, 0.9, t, o.dur, o.fd || o.dur * 0.6); noiseSrc(ctx, t, o.dur, o.rate).connect(lp); chain(ctx, lp, t, { vol: o.vol, dur: o.dur, peak: o.peak, wet: o.wet || 0, pan: o.pan || 0 }); }
+    function whoosh(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d; const f = biquad(ctx, o.type || 'bandpass', o.f0, o.f1, o.q || 1.2, t, o.dur);
+        if (o.wob) o.wob.forEach(([dt, hz]) => f.frequency.linearRampToValueAtTime(hz, t + dt));
+        noiseSrc(ctx, t, o.dur, o.rate).connect(f); chain(ctx, f, t, { vol: o.vol, dur: o.dur, peak: o.peak || o.dur * 0.5, cut: o.cut, pan: o.pan || 0, pan1: o.pan1, wet: o.wet || 0 });
+    }
+    function drone(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d;
+        [-12, 0, 9].forEach(dt => { const s = ctx.createOscillator(); s.type = 'sawtooth'; s.detune.value = dt; s.frequency.setValueAtTime(o.f0, t); s.frequency.exponentialRampToValueAtTime(o.f1, t + o.dur);
+            const lp = biquad(ctx, 'lowpass', o.lp0, o.lp1, 3, t, o.dur); s.connect(lp); s.start(t); s.stop(t + o.dur + 0.05); chain(ctx, lp, t, { vol: o.vol, dur: o.dur, peak: o.dur * 0.95, cut: true }); });
+    }
+    function tone(d, o) {
+        const ctx = audio(), t = ctx.currentTime + d; const s = ctx.createOscillator(); s.type = o.type || 'sine'; s.detune.value = o.detune || 0;
+        s.frequency.setValueAtTime(o.f0, t); if (o.f1) s.frequency.exponentialRampToValueAtTime(o.f1, t + (o.fd || o.dur));
+        let node = s; if (o.lp) { const f = biquad(ctx, 'lowpass', o.lp, o.lp1, o.q || 0.8, t, o.dur); s.connect(f); node = f; }
+        s.start(t); s.stop(t + o.dur + 0.05); chain(ctx, node, t, o);
+    }
+    function choir(d, freqs, dur, vol, peakFrac = 0.4, cut = false) {
+        const ctx = audio(), t = ctx.currentTime + d;
+        freqs.forEach((f, i) => [-9, 0, 8].forEach(dt => {
+            const s = ctx.createOscillator(); s.type = 'sawtooth'; s.frequency.value = f; s.detune.value = dt;
+            const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 5 + i * 0.4; lg.gain.value = f * 0.006; lfo.connect(lg); lg.connect(s.frequency);
+            const lp = biquad(ctx, 'lowpass', 900 + i * 200, 0, 0.6, t, dur); s.connect(lp); s.start(t); lfo.start(t); s.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+            chain(ctx, lp, t, { vol: vol / 3, dur, peak: dur * peakFrac, cut, wet: 0.7, pan: (i - 1) * 0.3 });
+        }));
+    }
+    function chime(d, f, dur = 1.2, vol = 0.1, pan = 0) { [[1, 1], [2.4, 0.4], [3.9, 0.18]].forEach(([m, v]) => tone(d, { f0: f * m, dur: dur / Math.sqrt(m), vol: vol * v, pan, wet: 0.7 })); }
+    function crystal(d, f, vol = 0.12, pan = 0) { tone(d, { f0: f, dur: 0.16, vol, pan, wet: 0.5 }); tone(d, { f0: f * 1.5, dur: 0.09, vol: vol * 0.5, pan }); click(d, vol * 1.5, 6000, 0.005, pan); }
+    function cry(d, vol = 0.12) {
+        const ctx = audio(), t = ctx.currentTime + d; const s = ctx.createOscillator(); s.type = 'sawtooth';
+        s.frequency.setValueAtTime(1500, t); s.frequency.exponentialRampToValueAtTime(2900, t + 0.12); s.frequency.exponentialRampToValueAtTime(2100, t + 0.6);
+        const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 22; lg.gain.value = 60; lfo.connect(lg); lg.connect(s.frequency);
+        const bp = biquad(ctx, 'bandpass', 2600, 0, 4, t, 0.6); s.connect(bp); s.start(t); lfo.start(t); s.stop(t + 0.65); lfo.stop(t + 0.65); chain(ctx, bp, t, { vol, dur: 0.6, peak: 0.08, wet: 0.6, pan: 0.3 });
+    }
+
+    // ===== arcane canvas 粒子层（绘制在 z55，低于浮字；调度复用 fxEngine 循环） =====
+    function ensureCanvas() {
+        if (S.canvas && S.canvas.isConnected) return;
+        const c = document.createElement('canvas');
+        c.id = 'arcane-fx-canvas';
+        c.setAttribute('data-arcane-fx', 'canvas');
+        document.body.appendChild(c);
+        S.canvas = c; S.ctx = c.getContext('2d');
+        resizeCanvas();
+    }
+    function resizeCanvas() { if (S.canvas) { S.canvas.width = window.innerWidth; S.canvas.height = window.innerHeight; } }
+    window.addEventListener('resize', resizeCanvas);
+    const DRAW = {
+        dot(g, p) { g.fillStyle = p.color; g.beginPath(); g.arc(0, 0, p.size, 0, 6.283); g.fill(); },
+        ring(g, p) { g.strokeStyle = p.color; g.lineWidth = 3 * p.life; g.beginPath(); g.arc(0, 0, 4 + p.size * (1 - p.life) * 40, 0, 6.283); g.stroke(); },
+        flame(g, p) { const r = p.size * (0.4 + p.life * 0.8); const gr = g.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, '#fff7d6'); gr.addColorStop(0.35, p.color); gr.addColorStop(1, 'rgba(120,20,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill(); },
+        smoke(g, p) { const r = p.size * (1.6 - p.life); const gr = g.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, p.color); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill(); },
+        feather(g, p) { const s = p.size; g.fillStyle = p.color; g.beginPath(); g.moveTo(-s * 1.5, 0); g.quadraticCurveTo(0, -s * 0.55, s * 1.5, 0); g.quadraticCurveTo(0, s * 0.4, -s * 1.5, 0); g.fill(); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-s * 1.8, 0); g.lineTo(s * 1.5, 0); g.stroke(); },
+        shard(g, p) { const s = p.size; g.fillStyle = p.fill || 'rgba(224,242,254,0.25)'; g.strokeStyle = p.color; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, -s); g.lineTo(s * 0.7, s * 0.3); g.lineTo(s * 0.1, s * 0.9); g.lineTo(-s * 0.6, s * 0.2); g.closePath(); g.fill(); g.stroke(); },
+        streak(g, p) { g.strokeStyle = p.color; g.lineWidth = p.size; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 0); g.lineTo(-p.vx * 4, -p.vy * 4); g.stroke(); },
+        glowOrb(g, p) {
+            const r = Math.max(2, p.size * (0.7 + p.life * 0.55));
+            const gr = g.createRadialGradient(0, 0, 0, 0, 0, r);
+            gr.addColorStop(0, p.core || 'rgba(255,255,255,0.92)');
+            gr.addColorStop(0.32, p.color);
+            gr.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill();
+        },
+        bloom(g, p) {
+            const r = Math.max(4, p.size * (1.2 - p.life * 0.3));
+            const gr = g.createRadialGradient(0, 0, 0, 0, 0, r);
+            gr.addColorStop(0, p.color);
+            gr.addColorStop(0.5, p.mid || p.color);
+            gr.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill();
+        },
+        spark(g, p) {
+            const tx = -p.vx * (p.tail || 4.4), ty = -p.vy * (p.tail || 4.4);
+            const gr = g.createLinearGradient(0, 0, tx, ty);
+            gr.addColorStop(0, '#ffffff');
+            gr.addColorStop(0.35, p.color);
+            gr.addColorStop(1, 'rgba(0,0,0,0)');
+            g.strokeStyle = gr; g.lineWidth = p.size * 1.35; g.lineCap = 'round';
+            g.beginPath(); g.moveTo(0, 0); g.lineTo(tx, ty); g.stroke();
+        },
+        gradRing(g, p) {
+            const r = Math.max(6, (p.r0 || 6) + (p.rSpan || 28) * (1 - p.life));
+            const gr = g.createRadialGradient(0, 0, r * 0.55, 0, 0, r);
+            gr.addColorStop(0, 'rgba(0,0,0,0)');
+            gr.addColorStop(0.68, p.color);
+            gr.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill();
+        },
+        droplet(g, p) {
+            const ang = Math.atan2(p.vy || 1, p.vx || 0), s = p.size;
+            g.rotate(ang);
+            const gr = g.createRadialGradient(s * 0.4, 0, 0, 0, 0, s * 1.6);
+            gr.addColorStop(0, p.core || '#ffffff');
+            gr.addColorStop(0.45, p.color);
+            gr.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = gr; g.beginPath();
+            g.moveTo(s * 1.4, 0); g.quadraticCurveTo(0, -s * 0.85, -s * 1.6, 0); g.quadraticCurveTo(0, s * 0.85, s * 1.4, 0); g.fill();
+        }
+    };
+    function releaseIdleCanvas() {
+        if (S.driver || S.handles.size || S.particles.length || S.flights.length || !S.canvas) return;
+        S.canvas.remove(); S.canvas = null; S.ctx = null;
+    }
+    function scheduleParticleCleanup() {
+        if (S.particleTimer !== null) return;
+        S.particleTimer = after(Math.max(0, S.particleUntil - performance.now()), () => {
+            S.particleTimer = null;
+            const now = performance.now();
+            S.particles = S.particles.filter(p => p.expiresAt > now);
+            if (S.particles.length) { scheduleParticleCleanup(); return; }
+            if (!S.flights.length && S.driver) {
+                const index = fxEngine.particles.indexOf(S.driver);
+                if (index >= 0) fxEngine.particles.splice(index, 1);
+                S.driver = null;
+            }
+            if (S.ctx) S.ctx.clearRect(0, 0, S.canvas.width, S.canvas.height);
+            releaseIdleCanvas();
+        });
+    }
+    function addP(o) {
+        const p = Object.assign({ vx: 0, vy: 0, life: 1, decay: 0.02, size: 3, color: '#fde68a', grav: 0, drag: 0.98, rot: 0, vr: 0, shape: 'dot', blend: 'lighter' }, o);
+        p.expiresAt = performance.now() + p.life / p.decay * 16.7;
+        S.particleUntil = Math.max(S.particleUntil, p.expiresAt);
+        S.particles.push(p);
+        ensureCanvas(); ensureDriver(); scheduleParticleCleanup();
+    }
+    function burst(n, fn) { for (let i = 0; i < n; i++) addP(fn(i)); }
+    // 绕场收束（demo orbitCharge 原样）
+    function orbitCharge(c, n, dur, mk, rx, ry, shrink = 0.8) {
+        const orb = []; for (let i = 0; i < n; i++) orb.push({ a: Math.random() * 6.283, r: rnd(0.45, 1), s: rnd(0.025, 0.05), k: Math.random() });
+        const t0 = performance.now();
+        const id = every(33, () => { const k = Math.min(1, (performance.now() - t0) / dur); orb.forEach(o => { o.a += o.s * (1 + k * 3); const r = o.r * (1 - k * shrink); addP(Object.assign({ x: c.x + Math.cos(o.a) * rx * r, y: c.y + Math.sin(o.a) * ry * r, decay: 0.25 }, mk(o))); }); });
+        after(dur, () => stopEvery(id));
+    }
+    // 贝塞尔弹道（demo fly 原样；由驱动粒子步进，不另启 rAF）
+    function fly(a, b, lift, dur, draw, done, ease) {
+        ease = ease || (k => k * k);
+        const cx = (a.x + b.x) / 2, cy = Math.min(a.y, b.y) - lift;
+        const startedAt = performance.now();
+        const f = {
+            age: 0, dur, timer: null,
+            step(pr) { const t = ease(pr), u = 1 - t; draw(u * u * a.x + 2 * u * t * cx + t * t * b.x, u * u * a.y + 2 * u * t * cy + t * t * b.y, pr); },
+            progress() { return Math.min(1, (performance.now() - startedAt) / dur); }
+        };
+        S.flights.push(f);
+        ensureCanvas(); ensureDriver();
+        f.timer = after(dur, () => {
+            const index = S.flights.indexOf(f);
+            if (index >= 0) S.flights.splice(index, 1);
+            f.step(1);
+            if (done) done();
+        });
+        return f;
+    }
+    function ensureDriver() {
+        if (S.driver) return;
+        const driver = {
+            age: 0, life: 1e9, x: 0, y: 0, vx: 0, vy: 0,
+            update(p) {
+                step(fxEngine.lastDt || 16.7);
+                if (!S.particles.length && !S.flights.length) {
+                    p.age = p.life; S.driver = null;
+                    if (S.ctx) S.ctx.clearRect(0, 0, S.canvas.width, S.canvas.height);
+                    releaseIdleCanvas();
+                }
+            },
+            draw() { render(); }
+        };
+        S.driver = driver;
+        fxEngine.addParticle(driver);
+    }
+    function step(dt) {
+        const k = dt / 16.7;
+        for (const f of S.flights) f.step(f.progress());
+        for (let i = S.particles.length - 1; i >= 0; i--) {
+            const p = S.particles[i];
+            p.vx *= Math.pow(p.drag, k); p.vy *= Math.pow(p.drag, k);
+            p.vy += p.grav * k;
+            p.x += p.vx * k; p.y += p.vy * k;
+            p.rot += p.vr * k;
+            p.life = Math.min(p.life - p.decay * k, Math.max(0, (p.expiresAt - performance.now()) * p.decay / 16.7));
+            if (p.life <= 0) S.particles.splice(i, 1);
+        }
+    }
+    function render() {
+        const g = S.ctx; if (!g || !S.canvas) return;
+        g.clearRect(0, 0, S.canvas.width, S.canvas.height);
+        for (let i = 0; i < S.particles.length; i++) {
+            const p = S.particles[i];
+            g.save();
+            g.globalAlpha = Math.min(1, p.life * 1.4);
+            g.globalCompositeOperation = p.blend;
+            g.translate(p.x, p.y);
+            if (p.shape !== 'streak') g.rotate(p.rot);
+            DRAW[p.shape](g, p);
+            g.restore();
+        }
+    }
+
+    // ===== ① 通用火焰弹（240 蓄 + 340 飞 = 580ms 命中拍点） =====
+    function fireProjectile(fromDom, toDom, dodged, token) {
+        const h = ctr(fromDom), t = ctr(toDom);
+        const a = { x: h.x + 10, y: h.top - 16 }, b = { x: t.x, y: t.y };
+        burst(22, () => { const ang = Math.random() * 6.283, d = rnd(40, 70); return { x: a.x + Math.cos(ang) * d, y: a.y + Math.sin(ang) * d, vx: -Math.cos(ang) * d / 9, vy: -Math.sin(ang) * d / 9, drag: 0.86, decay: 0.06, size: rnd(1.2, 2.4), color: pick(['#fdba74', '#f97316', '#fde68a']) }; });
+        fsLayer(`<div class="arcane-fs-anchor" style="left:${a.x}px; top:${a.y}px; width:64px; height:64px; border-radius:50%; background: radial-gradient(circle, #fff7d6 0%, #fb923c 35%, rgba(220,38,38,0.45) 60%, transparent 72%); animation: arcane-seed-bloom 0.26s ease-out both;"></div>`, 320);
+        whoosh(0, { f0: 400, f1: 1800, q: 1.2, dur: 0.22, vol: 0.3, peak: 0.18, pan: -0.5 }); boom(0.02, { f0: 900, f1: 300, dur: 0.25, vol: 0.25, peak: 0.08, pan: -0.5 });
+        for (let i = 0; i < 4; i++) click(0.04 + i * 0.04, 0.12, rnd(2500, 4500), 0.006, -0.5);
+        after(240, () => {
+            if (token !== combatToken) return; // 重置后停止绘制/音效启动
+            whoosh(0, { f0: 350, f1: 1500, q: 0.9, dur: 0.34, vol: 0.55, peak: 0.28, cut: true, pan: -0.6, pan1: 0.5 });
+            for (let i = 0; i < 6; i++) click(0.03 + i * 0.05, 0.1, rnd(2200, 4800), 0.006, -0.4 + i * 0.15);
+            fly(a, b, 90, 340, (x, y) => {
+                if (token !== combatToken) return;
+                addP({ x, y, shape: 'flame', size: 16, decay: 0.2, color: '#fb923c' });
+                burst(5, () => ({ x: x + rnd(-6, 6), y: y + rnd(-6, 6), vx: rnd(-1, 1), vy: rnd(-1.6, -0.3), drag: 0.94, decay: rnd(0.04, 0.07), size: rnd(6, 11), shape: 'flame', color: pick(['#f97316', '#ef4444', '#fbbf24']) }));
+                for (let j = 0; j < 2; j++) { const an = performance.now() / 45 + j * 3.14; addP({ x: x + Math.cos(an) * 11, y: y + Math.sin(an) * 11, decay: 0.3, size: 2, color: '#fff7d6' }); }
+            }, () => {
+                if (token !== combatToken || dodged) return; // 闪避：弹达原位，不爆散不响，不 flash/flinch
+                click(0, 0.8, 4000); kick(0, { hi: 240, lo: 55, pd: 0.035, dur: 0.26, vol: 0.9, drive: 3 }); crunch(0, { f: 1600, f1: 700, q: 1.2, dur: 0.12, vol: 0.5 });
+                boom(0.005, { f0: 5000, f1: 200, dur: 0.5, vol: 0.5, wet: 0.25 }); whoosh(0.05, { f0: 600, f1: 300, q: 0.8, dur: 0.6, vol: 0.15, peak: 0.05 });
+                for (let i = 0; i < 12; i++) click(rnd(0.06, 0.6), 0.15, rnd(2500, 6000), 0.006, rnd(0.1, 0.8));
+                fsLayer(`<div class="arcane-fs-anchor" style="left:${b.x}px; top:${b.y}px; width:140px; height:140px; border-radius:50%; background: radial-gradient(circle, #fff 0%, #fdba74 30%, rgba(239,68,68,0.5) 58%, transparent 72%); animation: arcane-hit-flash 0.34s ease-out both;"></div>`, 420);
+                burst(2, i => ({ x: b.x, y: b.y, shape: 'ring', size: 1.8 + i, decay: 0.07 - i * 0.02, color: i ? '#f97316' : '#fde68a' }));
+                burst(40, () => { const an = Math.random() * 6.283, s = rnd(2, 8); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s - 1, grav: 0.13, drag: 0.93, decay: rnd(0.025, 0.05), size: rnd(1, 2.2), color: pick(['#fde68a', '#fb923c', '#fff7d6']) }; });
+                burst(10, () => ({ x: b.x + rnd(-14, 14), y: b.y + rnd(-14, 14), vx: rnd(-1, 1), vy: rnd(-2, -0.5), drag: 0.95, decay: rnd(0.03, 0.05), size: rnd(12, 20), shape: 'flame', color: '#f97316' }));
+                burst(9, () => ({ x: b.x + rnd(-24, 24), y: b.y + rnd(-18, 18), vx: rnd(-0.3, 0.3), vy: rnd(-0.9, -0.4), drag: 0.99, decay: 0.011, size: rnd(16, 28), shape: 'smoke', blend: 'source-over', color: 'rgba(40,32,30,0.55)' }));
+            });
+        });
+    }
+
+    // ===== ② 敌方紫色法术弹（480ms 命中拍点） =====
+    function enemySpellProjectile(fromDom, toDom, dodged, token) {
+        const t = ctr(fromDom), h = ctr(toDom);
+        const a = { x: t.x - 20, y: t.y - 10 }, b = { x: h.x, y: toDom.hasAttribute('data-arcane-fx') ? h.y : h.top + 30 };
+        whoosh(0, { f0: 300, f1: 900, q: 1.4, dur: 0.48, vol: 0.32, peak: 0.4, pan: 0.6, pan1: -0.3 }); tone(0, { type: 'triangle', f0: 110, f1: 90, dur: 0.48, vol: 0.08 });
+        fly(a, b, 30, 480, (x, y) => {
+            if (token !== combatToken) return;
+            addP({ x, y, size: 9, decay: 0.22, color: '#c084fc' }); addP({ x, y, size: 4, decay: 0.3, color: '#fff' });
+            burst(3, () => ({ x: x + rnd(-5, 5), y: y + rnd(-5, 5), vx: rnd(0.5, 1.5), vy: rnd(-0.5, 0.5), drag: 0.94, decay: 0.06, size: rnd(1.5, 3), color: pick(['#7c3aed', '#a855f7']) }));
+        }, () => {
+            if (token !== combatToken || dodged) return;
+            click(0, 0.6, 3500); kick(0, { hi: 180, lo: 55, pd: 0.03, dur: 0.25, vol: 0.7, drive: 3 }); boom(0, { f0: 3000, f1: 200, dur: 0.4, vol: 0.35, wet: 0.3 });
+            burst(24, () => { const an = Math.random() * 6.283, s = rnd(1.5, 5); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.93, decay: 0.04, size: rnd(1, 2.4), color: pick(['#e9d5ff', '#c084fc', '#7c3aed']) }; });
+        }, k => k);
+    }
+
+    // ===== 新技能实现 BEGIN =====
+    // 接入点 2：在这里写 playXxx(caster, targets, isReaction)，使用 domOf / ctr / unionRect 定位。
+    // 延时用 after / every；SVG 用 fsLayer(html, 生命周期毫秒)；粒子用 addP / burst / fly；不要另起永久 rAF。
+    // 无固定寿命的图层由 handle.cancel() 和自然收尾显式移除；darken(o) 收尾必须调用 darken(0)。
+    // 保持纯演出：不改 HP/状态，不负责浮字或战斗结算；测试反馈放在下方演示控制区。
+    // 持续演出返回 handle：doneAt: Date.now() + 总演出毫秒（含尾韵），不能用 performance.now()。
+    // cancel() 只清理自身图层、计时和 WAAPI 动画，不在技能内部调用全局 clearArcaneFx()。
+    // 按需提供 dodge(success) / hit(type) / dispel(dom) / impactDom，与正式版反应接口一致。
+    // impactDom 可指向实体或 mkAnchor() 自建落点；dropAnchor() 只用于后者，不能删除真实角色 DOM。
+    // handle 加入 S.handles；结束时删除并调用 releaseIdleCanvas()；WAAPI 动画由 cancel() 取消。
+    // 普通/反应演练及完整可运行接入示例见根目录《技能SVG模板使用与快速移植.md》。
+    const V = { sfx: true, runs: new Set(), persist: new Map() };
+    function variantSfxOn() { return V.sfx; }
+    function setVariantSfx(v) { V.sfx = !!v; }
+    function entityIdOf(e) { return !e ? '' : typeof e === 'string' ? e : (e.id || (e.dataset && e.dataset.id) || ''); }
+    function isEntityVariantLocked() { return false; }
+
+    function entityVisualRect(dom) {
+      if (!dom || !dom.getBoundingClientRect) return null;
+      const isHero = (dom.id && dom.id.startsWith('hero-card-')) || (dom.classList && dom.classList.contains('hero-card-inner'));
+      const box = (isHero && dom.querySelector('.portrait')) || dom;
+      const b = box.getBoundingClientRect();
+      if (!b || b.width <= 0 || b.height <= 0) return null;
+      return { left: b.left, top: b.top, right: b.right, bottom: b.bottom, width: b.width, height: b.height, cx: b.left + b.width / 2, cy: b.top + b.height / 2 };
+    }
+
+    function cloneVisualOnly(dom) {
+      if (!dom) return null;
+      const isHero = (dom.id && dom.id.startsWith('hero-card-')) || (dom.classList && dom.classList.contains('hero-card-inner'));
+      const src = (isHero && dom.querySelector('.portrait')) || dom;
+      const cl = src.cloneNode(true);
+      cl.removeAttribute('id');
+      cl.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+      cl.querySelectorAll('.stun-fx,.arcane-variant-persist,[data-arcane-fx],[data-resist-fx],.status-badges,.hero-buffs,.enemy-buffs,.hp-bar-wrap').forEach(n => n.remove());
+      cl.style.pointerEvents = 'none';
+      cl.style.margin = '0';
+      return cl;
+    }
+
+    function panOf(x) { return Math.max(-0.85, Math.min(0.85, ((x / (window.innerWidth || 1280)) - 0.5) * 1.5)); }
+
+    function dirVecOf(from, r) {
+      const fDom = from ? domOf(from) : null;
+      const fc = fDom ? ctr(fDom) : null;
+      if (fc && r) {
+        const dx = r.cx - fc.x, dy = r.cy - fc.y;
+        const len = Math.hypot(dx, dy) || 1;
+        return { dx: dx / len, dy: dy / len };
+      }
+      return (r && r.cx > (window.innerWidth || 1280) * 0.5) ? { dx: 1, dy: 0.06 } : { dx: -1, dy: 0.06 };
+    }
+
+    function svgGlowDef(id, stops) {
+      return `<radialGradient id="${id}" cx="50%" cy="50%" r="50%">${stops.map(([o, c, op]) => `<stop offset="${o}" stop-color="${c}" stop-opacity="${op}"/>`).join('')}</radialGradient>`;
+    }
+
+    function playMatAudio(sampleKey, pan, vol, fb) {
+      if (!V.sfx) return;
+      const played = window.__playResistSample && window.__playResistSample(sampleKey, { volume: vol, pan });
+      if (!played && fb) fb();
+    }
+
+    function setPersistentFx(target, kind, on = true) {
+      const dom = domOf(target);
+      if (!dom) return;
+      const id = entityIdOf(target) || dom.id;
+      if (!on) {
+        dom.classList.remove('arcane-variant-rage-sprite', 'arcane-variant-molt-sprite');
+        dom.querySelectorAll('.arcane-variant-persist').forEach(n => n.remove());
+        V.persist.delete(id);
+        return;
+      }
+      dom.classList.remove('arcane-variant-rage-sprite', 'arcane-variant-molt-sprite');
+      dom.querySelectorAll('.arcane-variant-persist').forEach(n => n.remove());
+      dom.classList.add('arcane-variant-host-rel');
+      dom.classList.add(kind === 'rage' ? 'arcane-variant-rage-sprite' : 'arcane-variant-molt-sprite');
+      const fx = document.createElement('div');
+      const isSpr = dom.classList && dom.classList.contains('enemy-sprite');
+      fx.className = `arcane-variant-persist ${kind === 'rage' ? 'arcane-variant-rage-fx' : 'arcane-variant-molted-fx'}${isSpr ? ' is-sprite' : ''}`;
+      dom.appendChild(fx);
+      V.persist.set(id, { dom, kind });
+    }
+
+    function variantRun(totalMs) {
+      const run = {
+        doneAt: Date.now() + totalMs,
+        stopped: false, timers: new Set(), rafs: new Set(), anims: new Set(), layers: new Set(), restores: [],
+        after(ms, fn) {
+          if (run.stopped) return 0;
+          const id = setTimeout(() => { run.timers.delete(id); S.timers.delete(id); if (!run.stopped) fn(); }, ms);
+          run.timers.add(id); S.timers.add(id);
+          return id;
+        },
+        tween(dur, step, done) {
+          if (run.stopped) return;
+          const t0 = performance.now();
+          let rid = 0;
+          const tick = now => {
+            if (run.stopped) return;
+            const p = Math.min(1, (now - t0) / Math.max(1, dur));
+            step(p);
+            if (p < 1) { rid = requestAnimationFrame(tick); run.rafs.add(rid); }
+            else { run.rafs.delete(rid); if (done) done(); }
+          };
+          rid = requestAnimationFrame(tick);
+          run.rafs.add(rid);
+        },
+        addLayer(html, z = 440, cls = 'arcane-resist-layer') {
+          const el = document.createElement('div');
+          el.className = cls;
+          el.dataset.resistFx = '1';
+          el.dataset.arcaneFx = '1';
+          el.style.cssText = `position:fixed;inset:0;pointer-events:none;overflow:visible;z-index:${z};`;
+          if (html) el.innerHTML = html;
+          document.body.appendChild(el);
+          run.layers.add(el); S.layers.add(el);
+          return el;
+        },
+        anim(el, kfs, opt) {
+          if (run.stopped || !el || !el.animate) return null;
+          const a = el.animate(kfs, opt);
+          run.anims.add(a);
+          a.onfinish = () => run.anims.delete(a);
+          return a;
+        },
+        onRestore(fn) { run.restores.push(fn); },
+        cancel() {
+          if (run.stopped) return;
+          run.stopped = true;
+          run.timers.forEach(id => { clearTimeout(id); S.timers.delete(id); });
+          run.timers.clear();
+          run.rafs.forEach(id => cancelAnimationFrame(id));
+          run.rafs.clear();
+          run.anims.forEach(a => { try { a.cancel(); } catch (_) {} });
+          run.anims.clear();
+          run.layers.forEach(el => { try { el.remove(); } catch (_) {} S.layers.delete(el); });
+          run.layers.clear();
+          for (let i = run.restores.length - 1; i >= 0; i--) { try { run.restores[i](); } catch (_) {} }
+          run.restores.length = 0;
+          V.runs.delete(run);
+          S.handles.delete(run);
+          if (typeof releaseIdleCanvas === 'function') releaseIdleCanvas();
+        }
+      };
+      run.stop = run.cancel;
+      V.runs.add(run);
+      S.handles.add(run);
+      run.after(totalMs, () => run.cancel());
+      return run;
+    }
+
+    function clearVariantState() {
+      [...V.runs].forEach(r => r.cancel());
+      V.persist.forEach(({ dom }) => {
+        if (!dom) return;
+        dom.classList.remove('arcane-variant-rage-sprite', 'arcane-variant-molt-sprite', 'arcane-variant-host-rel');
+        dom.querySelectorAll('.arcane-variant-persist').forEach(n => n.remove());
+      });
+      V.persist.clear();
+      document.querySelectorAll('[data-resist-fx]').forEach(n => n.remove());
+    }
+    function playVariantFluid(entity, meta = {}, onBeat) {
+      if (meta.outcome === 'dodge' || meta.incomingType !== '远程') return null;
+      const dom = domOf(entity), r = entityVisualRect(dom);
+      if (!r) return null;
+      const run = variantRun(840), u = ++S.uid, sc = meta.scaleMul || 1;
+      const { dx, dy } = dirVecOf(meta.from || meta.attacker, r);
+      const hx = r.cx - dx * Math.min(20, r.width * 0.2), hy = r.cy - dy * Math.min(14, r.height * 0.16);
+      const R = Math.max(36, Math.min(62, Math.min(r.width, r.height) * 0.56)) * sc;
+      const pan = panOf(hx);
+      playMatAudio('resist_fluid', pan, 0.24, () => { whoosh(0, { f0: 600, f1: 230, q: 1.4, dur: 0.28, vol: 0.13, pan }); tone(0.05, { type: 'sine', f0: 290, f1: 420, dur: 0.22, vol: 0.11, pan }); });
+      const swirlArcs = [0, 90, 180, 270].map(deg => {
+        const a0 = deg * Math.PI / 180, a1 = a0 + 1.15, x0 = 60 + Math.cos(a0) * 14, y0 = 60 + Math.sin(a0) * 14;
+        const x1 = 60 + Math.cos(a1) * 44, y1 = 60 + Math.sin(a1) * 44, cx = 60 + Math.cos(a0 + 0.52) * 34, cy = 60 + Math.sin(a0 + 0.52) * 34;
+        return `<path d="M${x0.toFixed(1)},${y0.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}" fill="none" stroke="url(#fl-sw-${u})" stroke-width="5.2" stroke-linecap="round" opacity="0.88"/>`;
+      }).join('');
+      const drops = Array.from({ length: 8 }, (_, i) => {
+        const ang = (i / 8) * Math.PI * 2 + (i % 2 ? 0.18 : -0.14);
+        return { ang, dist: rnd(26, 48) * sc, sz: rnd(3.2, 5.2) * sc, side: i % 2 ? 1 : -1 };
+      });
+      const host = run.addLayer(`<div class="arcane-resist-anchor" style="left:${hx - R}px;top:${hy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 120 120"><defs>${svgGlowDef(`fl-pool-${u}`, [['0%', '#e0f2fe', 0.28], ['38%', '#38bdf8', 0.42], ['78%', '#0284c7', 0.16], ['100%', '#0284c7', 0]])}<linearGradient id="fl-sw-${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#bae6fd" stop-opacity="0.92"/><stop offset="100%" stop-color="#0ea5e9" stop-opacity="0"/></linearGradient></defs><circle cx="60" cy="60" r="46" fill="url(#fl-pool-${u})"/><g id="fl-spin-${u}" style="transform-origin:60px 60px">${swirlArcs}</g>${drops.map((_, i) => `<circle id="fl-dr-${u}-${i}" cx="60" cy="60" r="${drops[i].sz}" fill="#bae6fd" opacity="0"/>`).join('')}</svg></div>`, 442);
+      const wrap = host.firstElementChild, spin = host.querySelector(`#fl-spin-${u}`);
+      ensureCanvas();
+      run.anim(wrap, [{ transform: 'scale(0.32)', opacity: 0 }, { transform: 'scale(1.06)', opacity: 1, offset: 0.28 }, { transform: 'scale(0.95)', opacity: 0.92, offset: 0.62 }, { transform: 'scale(0.18)', opacity: 0 }], { duration: 760, easing: 'cubic-bezier(0.22,0.72,0.28,1)', fill: 'forwards' });
+      run.anim(spin, [{ transform: 'rotate(0deg) scale(1)' }, { transform: 'rotate(-165deg) scale(0.86)', offset: 0.45 }, { transform: 'rotate(-300deg) scale(1.02)' }], { duration: 740, easing: 'ease-in-out', fill: 'forwards' });
+      run.tween(700, p => {
+        const outP = p < 0.48 ? Math.sin((p / 0.48) * Math.PI * 0.5) : Math.cos(((p - 0.48) / 0.52) * Math.PI * 0.5);
+        const op = p < 0.14 ? p / 0.14 : (p > 0.8 ? Math.max(0, (1 - p) / 0.2) : 0.92);
+        drops.forEach((d, i) => {
+          const el = host.querySelector(`#fl-dr-${u}-${i}`);
+          if (!el) return;
+          const sw = d.ang + (p < 0.48 ? p * 1.1 : p * 2.2) * d.side;
+          const rad = d.dist * Math.max(0, outP);
+          el.setAttribute('cx', (60 + Math.cos(sw) * rad).toFixed(1));
+          el.setAttribute('cy', (60 + Math.sin(sw) * rad).toFixed(1));
+          el.setAttribute('opacity', op.toFixed(2));
+        });
+      });
+      burst(10, i => { const a = (i / 10) * Math.PI * 2; return { x: hx, y: hy, vx: Math.cos(a) * rnd(1.8, 3.6), vy: Math.sin(a) * rnd(1.8, 3.6), drag: 0.91, decay: 0.045, size: rnd(3, 5.5) * sc, shape: 'droplet', color: pick(['#bae6fd', '#38bdf8', '#7dd3fc']) }; });
+      run.after(170, () => {
+        burst(1, () => ({ x: hx, y: hy, shape: 'gradRing', size: 22 * sc, vr: 2.4, decay: 0.06, color: '#7dd3fc' }));
+        if (onBeat) onBeat('resist', { type: 'fluid', at: 170 });
+      });
+      return run;
+    }
+
+    function playVariantPhantom(entity, meta = {}, onBeat) {
+      if (meta.outcome === 'dodge' || meta.incomingType !== '近战') return null;
+      const dom = domOf(entity), r = entityVisualRect(dom);
+      if (!r) return null;
+      const run = variantRun(760), u = ++S.uid, sc = meta.scaleMul || 1;
+      const { dx, dy } = dirVecOf(meta.from || meta.attacker, r);
+      const sx = dx * Math.min(26, r.width * 0.28) * sc, sy = dy * Math.min(10, r.height * 0.14) * sc;
+      const pan = panOf(r.cx);
+      playMatAudio('resist_phantom', pan, 0.26, () => { whoosh(0, { f0: 420, f1: 1120, q: 1.2, dur: 0.25, vol: 0.12, pan }); tone(0.04, { type: 'triangle', f0: 520, f1: 250, dur: 0.26, vol: 0.08, pan }); });
+      const ghostHost = run.addLayer('', 441);
+      const wrap = document.createElement('div');
+      wrap.className = 'arcane-resist-ghost';
+      wrap.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:8px;`;
+      const clone = cloneVisualOnly(dom);
+      if (clone) {
+        clone.style.cssText = 'width:100%;height:100%;filter:brightness(1.38) hue-rotate(155deg) saturate(1.4);box-shadow:none;';
+        wrap.appendChild(clone);
+      }
+      ghostHost.appendChild(wrap);
+      const slashLayer = run.addLayer(`<div class="arcane-resist-anchor" style="left:${r.cx - 72}px;top:${r.cy - 44}px;width:144px;height:88px;"><svg class="arcane-resist-svg" viewBox="0 0 144 88"><defs><linearGradient id="ph-sl-${u}" x1="0" y1="0" x2="1" y2="0.4"><stop offset="0%" stop-color="#c4b5fd" stop-opacity="0"/><stop offset="48%" stop-color="#e0e7ff" stop-opacity="0.9"/><stop offset="100%" stop-color="#67e8f9" stop-opacity="0"/></linearGradient></defs><path d="M12,68 Q72,16 132,26 Q74,34 12,72 Z" fill="url(#ph-sl-${u})"/></svg></div>`, 444);
+      run.anim(wrap, [
+        { transform: 'translate3d(0,0,0) scale(1)', opacity: 0 },
+        { transform: `translate3d(${sx.toFixed(1)}px,${sy.toFixed(1)}px,0) scale(1.05)`, opacity: 0.60, offset: 0.22 },
+        { transform: `translate3d(${(sx * 1.18).toFixed(1)}px,${(sy * 1.15).toFixed(1)}px,0) scale(1.06)`, opacity: 0.56, offset: 0.56 },
+        { transform: 'translate3d(0,0,0) scale(1)', opacity: 0 }
+      ], { duration: 700, easing: 'cubic-bezier(0.2,0.8,0.25,1)', fill: 'forwards' });
+      run.anim(slashLayer.firstElementChild, [
+        { transform: `translate3d(${(-dx * 14).toFixed(1)}px,${(-dy * 8).toFixed(1)}px,0) scaleX(0.55)`, opacity: 0 },
+        { transform: `translate3d(${(sx * 0.9).toFixed(1)}px,${(sy * 0.9).toFixed(1)}px,0) scaleX(1.08)`, opacity: 0.95, offset: 0.32 },
+        { transform: `translate3d(${(sx * 1.4).toFixed(1)}px,${(sy * 1.4).toFixed(1)}px,0) scaleX(1.18)`, opacity: 0 }
+      ], { duration: 360, easing: 'ease-out', fill: 'forwards' });
+      ensureCanvas();
+      burst(12, () => ({ x: r.cx + sx * 0.7 + rnd(-12, 12), y: r.cy + sy * 0.5 + rnd(-14, 14), vx: dx * rnd(0.8, 2.6), vy: rnd(-0.8, 0.8), drag: 0.93, decay: 0.045, size: rnd(6, 12) * sc, shape: 'glowOrb', color: pick(['#a5b4fc', '#67e8f9', '#c4b5fd']) }));
+      run.after(160, () => { if (onBeat) onBeat('resist', { type: 'phantom', at: 160 }); });
+      return run;
+    }
+    function playVariantAntiMagic(entity, meta = {}, onBeat) {
+      if (meta.outcome === 'dodge' || meta.incomingType !== '法术') return null;
+      const dom = domOf(entity), r = entityVisualRect(dom);
+      if (!r) return null;
+      const run = variantRun(840), u = ++S.uid, sc = meta.scaleMul || 1;
+      const col = meta.spellColor || '#a855f7';
+      const R = Math.max(40, Math.min(68, Math.min(r.width, r.height) * 0.62)) * sc;
+      const pan = panOf(r.cx);
+      playMatAudio('resist_antimagic', pan, 0.24, () => { crystal(0.02, 1180, 0.10, pan); whoosh(0, { f0: 960, f1: 380, q: 1.5, dur: 0.25, vol: 0.11, pan }); });
+      const peelPaths = Array.from({ length: 6 }, (_, i) => {
+        const a0 = (i / 6) * Math.PI * 2 + 0.25, a1 = a0 - 0.85;
+        const x0 = 60 + Math.cos(a0) * 16, y0 = 60 + Math.sin(a0) * 16;
+        const cx = 60 + Math.cos(a0 - 0.35) * 40, cy = 60 + Math.sin(a0 - 0.35) * 40;
+        const x1 = 60 + Math.cos(a1) * 56, y1 = 60 + Math.sin(a1) * 56;
+        return `<path class="am-fil-${u}" d="M${x0.toFixed(1)},${y0.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}" fill="none" stroke="url(#am-g-${u})" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="14 68"/>`;
+      }).join('');
+      const host = run.addLayer(`<div class="arcane-resist-anchor" style="left:${r.cx - R}px;top:${r.cy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 120 120"><defs>${svgGlowDef(`am-core-${u}`, [['0%', '#ffffff', 0.85], ['34%', col, 0.62], ['75%', col, 0.12], ['100%', col, 0]])}<linearGradient id="am-g-${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f8fafc" stop-opacity="0.95"/><stop offset="45%" stop-color="${col}" stop-opacity="0.9"/><stop offset="100%" stop-color="${col}" stop-opacity="0"/></linearGradient></defs><g id="am-r1-${u}" style="transform-origin:60px 60px"><circle cx="60" cy="60" r="34" fill="none" stroke="url(#am-g-${u})" stroke-width="3.2" stroke-dasharray="28 18 14 20" stroke-linecap="round"/></g><g id="am-r2-${u}" style="transform-origin:60px 60px"><circle cx="60" cy="60" r="24" fill="none" stroke="url(#am-g-${u})" stroke-width="2.2" stroke-dasharray="18 14" stroke-linecap="round"/></g><g id="am-peel-${u}">${peelPaths}</g><circle id="am-sink-${u}" cx="60" cy="60" r="18" fill="url(#am-core-${u})" style="transform-origin:60px 60px"/></svg></div>`, 443);
+      const r1 = host.querySelector(`#am-r1-${u}`), r2 = host.querySelector(`#am-r2-${u}`), sink = host.querySelector(`#am-sink-${u}`);
+      run.anim(r1, [{ transform: 'rotate(0deg) scale(0.42)', opacity: 0 }, { transform: 'rotate(-95deg) scale(1.06)', opacity: 0.95, offset: 0.28 }, { transform: 'rotate(-210deg) scale(1.16)', opacity: 0 }], { duration: 760, easing: 'ease-out', fill: 'forwards' });
+      run.anim(r2, [{ transform: 'rotate(0deg) scale(0.45)', opacity: 0 }, { transform: 'rotate(90deg) scale(1.02)', opacity: 0.88, offset: 0.3 }, { transform: 'rotate(195deg) scale(0.88)', opacity: 0 }], { duration: 720, easing: 'ease-out', fill: 'forwards' });
+      run.anim(sink, [{ transform: 'scale(1.1)', opacity: 0.95 }, { transform: 'scale(0.86)', opacity: 0.82, offset: 0.35 }, { transform: 'scale(0.18)', opacity: 0 }], { duration: 480, easing: 'ease-in', fill: 'forwards' });
+      run.tween(700, p => {
+        const off = (-p * 74).toFixed(1), op = (p < 0.2 ? p / 0.2 : Math.max(0, 1 - (p - 0.2) / 0.8)).toFixed(2);
+        host.querySelectorAll(`.am-fil-${u}`).forEach(el => { el.setAttribute('stroke-dashoffset', off); el.setAttribute('opacity', op); });
+      });
+      ensureCanvas();
+      burst(14, i => { const a = (i / 14) * Math.PI * 2; return { x: r.cx, y: r.cy, vx: Math.cos(a) * rnd(2.2, 4.4), vy: Math.sin(a) * rnd(2.2, 4.4), drag: 0.91, decay: 0.04, size: rnd(1.8, 3.2) * sc, shape: 'spark', color: i % 3 === 0 ? '#f8fafc' : col }; });
+      run.after(180, () => {
+        burst(1, () => ({ x: r.cx, y: r.cy, shape: 'bloom', size: 16 * sc, decay: 0.09, color: col }));
+        if (onBeat) onBeat('resist', { type: 'antiMagic', at: 180 });
+      });
+      return run;
+    }
+
+    function playVariantVital(entity, meta = {}, onBeat) {
+      const isAoE = !!(meta.isAoE || meta.isAoe);
+      if (meta.outcome === 'dodge' || !isAoE) return null;
+      const dom = domOf(entity), r = entityVisualRect(dom);
+      if (!r) return null;
+      const run = variantRun(780), u = ++S.uid, sc = meta.scaleMul || 1;
+      const { dx, dy } = dirVecOf(meta.from || meta.attacker, r);
+      const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+      const pan = panOf(r.cx);
+      playMatAudio('resist_vital', pan, 0.24, () => { whoosh(0, { f0: 360, f1: 840, q: 1.3, dur: 0.24, vol: 0.12, pan }); tone(0.03, { type: 'triangle', f0: 440, f1: 320, dur: 0.22, vol: 0.10, pan }); });
+      const clampHost = run.addLayer('', 441);
+      const sil = document.createElement('div');
+      sil.className = 'arcane-resist-ghost';
+      sil.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:8px;`;
+      const cl = cloneVisualOnly(dom);
+      if (cl) { cl.style.cssText = 'width:100%;height:100%;filter:brightness(1.18) sepia(0.25) drop-shadow(0 0 8px rgba(250,204,21,0.55));'; sil.appendChild(cl); }
+      clampHost.appendChild(sil);
+      run.anim(sil, [{ transform: 'scale(1.06)', opacity: 0 }, { transform: 'scale(0.90)', opacity: 0.44, offset: 0.26 }, { transform: 'scale(0.92)', opacity: 0.34, offset: 0.56 }, { transform: 'scale(1)', opacity: 0 }], { duration: 540, easing: 'ease-out', fill: 'forwards' });
+      const R = Math.max(42, Math.min(72, Math.max(r.width, r.height) * 0.68)) * sc;
+      const svgHost = run.addLayer(`<div class="arcane-resist-anchor" style="left:${r.cx - R}px;top:${r.cy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 120 120"><defs><linearGradient id="vt-arc-${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fef08a" stop-opacity="0"/><stop offset="50%" stop-color="#fbbf24" stop-opacity="0.92"/><stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/></linearGradient><linearGradient id="vt-div-${u}" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#f8fafc" stop-opacity="0.92"/><stop offset="50%" stop-color="#38bdf8" stop-opacity="0.72"/><stop offset="100%" stop-color="#fbbf24" stop-opacity="0"/></linearGradient></defs><g id="vt-ring-${u}" style="transform-origin:60px 60px"><path d="M24,38 A42,42 0 0,1 96,38" fill="none" stroke="url(#vt-arc-${u})" stroke-width="4" stroke-linecap="round"/><path d="M24,82 A42,42 0 0,0 96,82" fill="none" stroke="url(#vt-arc-${u})" stroke-width="4" stroke-linecap="round"/><path d="M20,48 A44,44 0 0,0 20,72" fill="none" stroke="url(#vt-arc-${u})" stroke-width="3" stroke-linecap="round"/><path d="M100,48 A44,44 0 0,1 100,72" fill="none" stroke="url(#vt-arc-${u})" stroke-width="3" stroke-linecap="round"/></g><g transform="rotate(${ang.toFixed(1)} 60 60)" id="vt-flow-${u}" style="transform-origin:60px 60px"><path d="M10,60 Q48,54 78,16" fill="none" stroke="url(#vt-div-${u})" stroke-width="3.6" stroke-linecap="round"/><path d="M10,60 Q48,66 78,104" fill="none" stroke="url(#vt-div-${u})" stroke-width="3.6" stroke-linecap="round"/></g></svg></div>`, 444);
+      const ringEl = svgHost.querySelector(`#vt-ring-${u}`), flowEl = svgHost.querySelector(`#vt-flow-${u}`);
+      run.anim(ringEl, [{ transform: 'scale(1.22)', opacity: 0 }, { transform: 'scale(0.88)', opacity: 0.96, offset: 0.28 }, { transform: 'scale(0.95)', opacity: 0.72, offset: 0.65 }, { transform: 'scale(1.06)', opacity: 0 }], { duration: 720, easing: 'cubic-bezier(0.22,0.8,0.28,1)', fill: 'forwards' });
+      run.anim(flowEl, [{ transform: `rotate(${ang.toFixed(1)}deg) translateX(-14px) scale(0.7)`, opacity: 0 }, { transform: `rotate(${ang.toFixed(1)}deg) translateX(4px) scale(1.04)`, opacity: 0.95, offset: 0.38 }, { transform: `rotate(${ang.toFixed(1)}deg) translateX(24px) scale(1.14)`, opacity: 0 }], { duration: 540, easing: 'ease-out', fill: 'forwards' });
+      ensureCanvas();
+      const perpX = -dy, perpY = dx;
+      burst(12, i => { const s = i % 2 ? 1 : -1; return { x: r.cx - dx * 18, y: r.cy - dy * 18, vx: dx * rnd(1.6, 3.0) + perpX * s * rnd(1.8, 3.4), vy: dy * rnd(1.6, 3.0) + perpY * s * rnd(1.8, 3.4), drag: 0.92, decay: 0.045, size: rnd(1.8, 3) * sc, shape: 'spark', color: pick(['#fef08a', '#38bdf8', '#fbbf24']) }; });
+      run.after(180, () => { if (onBeat) onBeat('resist', { type: 'vital', at: 180 }); });
+      return run;
+    }
+    function playVariantFireproof(entity, meta = {}, onBeat) {
+      if (meta.outcome === 'dodge' || (meta.stateResult && meta.stateResult !== 'immuneBurn')) return null;
+      const dom = domOf(entity), r = entityVisualRect(dom);
+      if (!r) return null;
+      const run = variantRun(580), u = ++S.uid, sc = meta.scaleMul || 1;
+      const { dx, dy } = dirVecOf(meta.from || meta.attacker, r);
+      const sx = r.cx - dx * Math.min(26, r.width * 0.34), sy = r.cy - dy * Math.min(18, r.height * 0.24);
+      const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+      const pan = panOf(sx);
+      playMatAudio('resist_fireproof', pan, 0.20, () => { whoosh(0.04, { f0: 1300, f1: 300, q: 1.7, dur: 0.22, vol: 0.09, pan }); });
+      const R = Math.max(36, Math.min(54, Math.min(r.width, r.height) * 0.48)) * sc;
+      const host = run.addLayer(`<div class="arcane-resist-anchor" style="left:${sx - R}px;top:${sy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 100 100"><defs><linearGradient id="fp-sh-${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ffedd5" stop-opacity="0"/><stop offset="50%" stop-color="#fdba74" stop-opacity="0.92"/><stop offset="100%" stop-color="#fb923c" stop-opacity="0"/></linearGradient><radialGradient id="fp-fl-${u}" cx="50%" cy="62%" r="50%"><stop offset="0%" stop-color="#fef08a" stop-opacity="0.96"/><stop offset="52%" stop-color="#f97316" stop-opacity="0.82"/><stop offset="100%" stop-color="#ea580c" stop-opacity="0"/></radialGradient></defs><g transform="rotate(${ang.toFixed(1)} 50 50)"><path id="fp-flame-${u}" d="M12,50 Q26,34 42,50 Q26,66 12,50 Z" fill="url(#fp-fl-${u})" style="transform-origin:34px 50px"/><path id="fp-arc-${u}" d="M48,18 Q62,50 48,82" fill="none" stroke="url(#fp-sh-${u})" stroke-width="5" stroke-linecap="round"/><path id="fp-arc2-${u}" d="M53,26 Q65,50 53,74" fill="none" stroke="url(#fp-sh-${u})" stroke-width="2" stroke-linecap="round" opacity="0.7"/></g></svg></div>`, 445);
+      const fl = host.querySelector(`#fp-flame-${u}`), arc = host.querySelector(`#fp-arc-${u}`), arc2 = host.querySelector(`#fp-arc2-${u}`);
+      run.anim(fl, [{ transform: 'translateX(-14px) scale(0.45)', opacity: 0 }, { transform: 'translateX(4px) scale(1.06)', opacity: 1, offset: 0.25 }, { transform: 'translateX(-2px) scale(0.22)', opacity: 0 }], { duration: 280, easing: 'ease-out', fill: 'forwards' });
+      run.anim(arc, [{ transform: 'scale(0.7)', opacity: 0 }, { transform: 'scale(1.05)', opacity: 0.95, offset: 0.32 }, { transform: 'scale(1.12)', opacity: 0 }], { duration: 360, easing: 'ease-out', fill: 'forwards' });
+      run.anim(arc2, [{ transform: 'scale(0.75)', opacity: 0 }, { transform: 'scale(1.08)', opacity: 0.8, offset: 0.35 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: 340, easing: 'ease-out', fill: 'forwards' });
+      ensureCanvas();
+      run.after(120, () => {
+        burst(10, () => ({ x: sx + rnd(-6, 6), y: sy + rnd(-8, 8), vx: -dx * rnd(0.4, 1.4) + rnd(-0.7, 0.7), vy: rnd(-1.4, -0.4), drag: 0.94, decay: rnd(0.024, 0.042), size: rnd(4, 7.5) * sc, shape: 'glowOrb', blend: 'source-over', color: pick(['#cbd5e1', '#94a3b8', '#64748b']) }));
+        if (onBeat) onBeat('immune', { type: 'fireproof', at: 120 });
+      });
+      return run;
+    }
+
+    function playVariantPoisonproof(entity, meta = {}, onBeat) {
+      if (meta.outcome === 'dodge' || (meta.stateResult && meta.stateResult !== 'immunePoison')) return null;
+      const dom = domOf(entity), r = entityVisualRect(dom);
+      if (!r) return null;
+      const run = variantRun(640), u = ++S.uid, sc = meta.scaleMul || 1;
+      const pan = panOf(r.cx);
+      playMatAudio('resist_poisonproof', pan, 0.26, () => { click(0.18, 0.16, 880, 0.015, pan); click(0.25, 0.13, 700, 0.015, pan); });
+      const R = Math.max(40, Math.min(64, Math.min(r.width, r.height) * 0.56)) * sc;
+      const specs = [[-18, -14, 7.5], [16, -16, 6.2], [-22, 8, 8.2], [20, 6, 7], [0, -24, 6.8]];
+      const bubbles = specs.map(([bx, by, rad], i) => `<g id="pp-b-${u}-${i}" style="transform-origin:${60 + bx}px ${60 + by}px"><circle cx="${60 + bx}" cy="${60 + by}" r="${rad}" fill="url(#pp-g-${u})"/><circle cx="${60 + bx - rad * 0.28}" cy="${60 + by - rad * 0.3}" r="${(rad * 0.28).toFixed(1)}" fill="#fdf4ff" opacity="0.9"/></g>`).join('');
+      const host = run.addLayer(`<div class="arcane-resist-anchor" style="left:${r.cx - R}px;top:${r.cy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 120 120"><defs>${svgGlowDef(`pp-g-${u}`, [['0%', '#f3e8ff', 0.32], ['55%', '#c084fc', 0.78], ['90%', '#7e22ce', 0.85], ['100%', '#581c87', 0]])}</defs>${bubbles}</svg></div>`, 445);
+      specs.forEach(([bx, by], i) => {
+        const el = host.querySelector(`#pp-b-${u}-${i}`);
+        run.anim(el, [
+          { transform: 'scale(0.15)', opacity: 0 },
+          { transform: 'scale(1.08)', opacity: 0.95, offset: 0.32 + i * 0.02 },
+          { transform: `translate3d(${(bx * 0.25).toFixed(1)}px,16px,0) scale(0.85)`, opacity: 0.82, offset: 0.56 },
+          { transform: `translate3d(${(bx * 0.45).toFixed(1)}px,42px,0) scale(0.18)`, opacity: 0 }
+        ], { duration: 540, delay: i * 18, easing: 'cubic-bezier(0.28,0.65,0.4,1)', fill: 'forwards' });
+      });
+      ensureCanvas();
+      run.after(200, () => {
+        burst(1, () => ({ x: r.cx, y: r.cy, shape: 'gradRing', size: 22 * sc, vr: 2.2, decay: 0.08, color: '#d8b4fe' }));
+        burst(9, i => ({ x: r.cx + (specs[i % 5][0]) * sc, y: r.cy + (specs[i % 5][1]) * sc, vx: rnd(-0.9, 0.9), vy: rnd(0.8, 2.2), grav: 0.16, drag: 0.96, decay: 0.036, size: rnd(2.8, 4.8) * sc, shape: 'droplet', color: pick(['#c084fc', '#e9d5ff', '#a855f7']) }));
+        if (onBeat) onBeat('immune', { type: 'poisonproof', at: 200 });
+      });
+      return run;
+    }
+
+    function playVariantIronBody(entity, meta = {}, onBeat) {
+      if (meta.outcome === 'dodge' || (meta.stateResult && meta.stateResult !== 'immuneStun')) return null;
+      const dom = domOf(entity), r = entityVisualRect(dom);
+      if (!r) return null;
+      const run = variantRun(540), u = ++S.uid, sc = meta.scaleMul || 1;
+      const hx = r.cx, hy = Math.max(20, r.top - 8), pan = panOf(hx);
+      playMatAudio('resist_ironbody', pan, 0.28, () => { click(0.11, 0.22, 3200, 0.018, pan); crystal(0.11, 1500, 0.11, pan); });
+      const stars = [-20, 0, 20].map((ox, i) => {
+        const cx = 60 + ox * sc, cy = 44 + (i === 1 ? -4 : 2);
+        return `<g id="ib-st-${u}-${i}" style="transform-origin:${cx}px ${cy}px"><polygon id="ib-l-${u}-${i}" points="${cx},${cy - 8} ${cx + 2},${cy - 2} ${cx + 1},${cy + 4} ${cx - 5},${cy + 6} ${cx - 3},${cy + 1} ${cx - 7},${cy - 2}" fill="#fde047"/><polygon id="ib-r-${u}-${i}" points="${cx},${cy - 8} ${cx + 7},${cy - 2} ${cx + 3},${cy + 1} ${cx + 5},${cy + 6} ${cx},${cy + 4}" fill="#fef08a"/></g>`;
+      }).join('');
+      const host = run.addLayer(`<div class="arcane-resist-anchor" style="left:${hx - 60}px;top:${hy - 44}px;width:120px;height:88px;"><svg class="arcane-resist-svg" viewBox="0 0 120 88"><defs><linearGradient id="ib-gl-${u}" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#f8fafc" stop-opacity="0"/><stop offset="50%" stop-color="#f8fafc" stop-opacity="0.96"/><stop offset="100%" stop-color="#94a3b8" stop-opacity="0"/></linearGradient></defs>${stars}<path id="ib-cut-${u}" d="M20,44 L100,40" fill="none" stroke="url(#ib-gl-${u})" stroke-width="3.6" stroke-linecap="round" opacity="0"/></svg></div>`, 446);
+      [-20, 0, 20].forEach((ox, i) => {
+        const st = host.querySelector(`#ib-st-${u}-${i}`);
+        run.anim(st, [{ transform: 'scale(0.25) translateY(6px)', opacity: 0 }, { transform: 'scale(1.08) translateY(0)', opacity: 1, offset: 0.24 }, { transform: 'scale(1) translateY(0)', opacity: 1 }], { duration: 135, fill: 'forwards' });
+        run.after(118, () => {
+          const sl = host.querySelector(`#ib-l-${u}-${i}`), sr = host.querySelector(`#ib-r-${u}-${i}`);
+          run.anim(sl, [{ transform: 'translate(0,0) rotate(0deg)', opacity: 1 }, { transform: `translate(${-14 - i * 2}px,${10 + i * 2}px) rotate(-48deg)`, opacity: 0 }], { duration: 290, easing: 'ease-out', fill: 'forwards' });
+          run.anim(sr, [{ transform: 'translate(0,0) rotate(0deg)', opacity: 1 }, { transform: `translate(${14 + i * 2}px,${-8 + i * 3}px) rotate(52deg)`, opacity: 0 }], { duration: 290, easing: 'ease-out', fill: 'forwards' });
+        });
+      });
+      const cut = host.querySelector(`#ib-cut-${u}`);
+      run.after(115, () => {
+        run.anim(cut, [{ transform: 'scaleX(0.3)', opacity: 0 }, { transform: 'scaleX(1.08)', opacity: 1, offset: 0.3 }, { transform: 'scaleX(1.22)', opacity: 0 }], { duration: 220, easing: 'ease-out', fill: 'forwards' });
+        ensureCanvas();
+        burst(1, () => ({ x: hx, y: hy, shape: 'gradRing', size: 18 * sc, vr: 2.5, decay: 0.09, color: '#e2e8f0' }));
+        burst(12, () => { const a = rnd(-2.9, 0.3); const sp = rnd(1.8, 4.4); return { x: hx + rnd(-18, 18), y: hy + rnd(-4, 4), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.6, grav: 0.14, drag: 0.93, decay: 0.045, size: rnd(1.6, 3.0) * sc, shape: 'spark', color: pick(['#fde047', '#f8fafc', '#cbd5e1']) }; });
+        if (onBeat) onBeat('immune', { type: 'ironBody', at: 120 });
+      });
+      return run;
+    }
+
+    const RESIST_FN_MAP = { fluid: playVariantFluid, phantom: playVariantPhantom, antiMagic: playVariantAntiMagic, antimagic: playVariantAntiMagic, vital: playVariantVital, fireproof: playVariantFireproof, poisonproof: playVariantPoisonproof, ironBody: playVariantIronBody, ironbody: playVariantIronBody };
+
+    function playVariantResistFx(opts = {}) {
+      if (!opts || opts.outcome === 'dodge') return null;
+      const ent = opts.entity || opts.target;
+      const baseMeta = Object.assign({}, opts.meta, { incomingType: opts.incomingType, isAoE: !!(opts.isAoE || opts.isAoe), outcome: opts.outcome || 'hit', stateResult: opts.stateResult, from: opts.from || (opts.meta && opts.meta.from) });
+      const rawLayers = Array.isArray(opts.layers) && opts.layers.length ? opts.layers.slice(0, 2) : ((opts.kind || opts.trigger) ? [opts.kind || opts.trigger] : []);
+      if (!rawLayers.length) return null;
+      const fn0 = RESIST_FN_MAP[rawLayers[0]];
+      const h0 = fn0 ? fn0(ent, baseMeta, opts.onBeat) : null;
+      if (rawLayers.length === 1) return h0;
+      const fn1 = RESIST_FN_MAP[rawLayers[1]];
+      if (!fn1) return h0;
+      const sub = [h0];
+      let dead = false, t2 = 0, tClean = 0;
+      const wrap = {
+        doneAt: Date.now() + 980,
+        cancel() {
+          if (dead) return;
+          dead = true;
+          clearTimeout(t2); S.timers.delete(t2);
+          clearTimeout(tClean); S.timers.delete(tClean);
+          sub.forEach(s => s && s.cancel && s.cancel());
+          S.handles.delete(wrap);
+        }
+      };
+      wrap.stop = wrap.cancel;
+      S.handles.add(wrap);
+      t2 = setTimeout(() => {
+        S.timers.delete(t2);
+        if (dead) return;
+        sub.push(fn1(ent, Object.assign({}, baseMeta, { scaleMul: 0.86 }), opts.onBeat));
+      }, 120);
+      S.timers.add(t2);
+      tClean = setTimeout(() => { S.timers.delete(tClean); S.handles.delete(wrap); }, 980);
+      S.timers.add(tClean);
+      return wrap;
+    }
+    // ===== 新技能实现 END =====
+
+    // ===== 对外接口（与正式版同名同参；不将演示卡片或占位数据带入模块） =====
+    function isArcaneSkillFx(fxTag) { return ARCANE_TAGS.indexOf(fxTag) !== -1; }
+    function playArcaneSkillFx(fxTag, caster, targets, isReaction = false) {
+        if (!isArcaneSkillFx(fxTag)) return null;
+        // 接入点 3：按 fxTag 分派到上方新技能函数，返回它的 handle。
+        return null;
+    }
+    function playArcaneProjectile(type, fromDom, toDom, dodged = false) {
+        if (!fromDom || !toDom || !fromDom.getBoundingClientRect || !toDom.getBoundingClientRect) return Promise.resolve();
+        const token = combatToken;
+        ensureCanvas(); ensureDriver();
+        if (type === 'fire') fireProjectile(fromDom, toDom, !!dodged, token);
+        else if (type === 'enemy_spell') enemySpellProjectile(fromDom, toDom, !!dodged, token);
+        const beat = type === 'fire' ? 580 : 480;
+        return new Promise(res => {
+            const id = setTimeout(() => { S.rawTimers.delete(id); res(); }, beat);
+            S.rawTimers.set(id, res);
+        });
+    }
+    function clearArcaneFx() {
+      clearVariantState();
+      S.timers.forEach(id => clearTimeout(id)); S.timers.clear();
+      S.rawTimers.forEach(id => clearTimeout(id)); S.rawTimers.clear();
+      S.intervals.forEach(id => clearInterval(id)); S.intervals.clear();
+      S.flights.length = 0;
+      S.particles.length = 0;
+      if (S.driver) { cancelAnimationFrame(S.driver); S.driver = 0; }
+      [...S.handles].forEach(h => { try { h && h.cancel && h.cancel(); } catch (_) {} });
+      S.handles.clear();
+      S.layers.forEach(el => { try { el.remove(); } catch (_) {} }); S.layers.clear();
+      S.anchors.forEach(el => { try { el.remove(); } catch (_) {} }); S.anchors.clear();
+      S.flashes.forEach(el => { try { el.classList.remove('arcane-flash', 'arcane-hit'); } catch (_) {} }); S.flashes.clear();
+      S.shakeEls.forEach(el => { try { el.classList.remove('arcane-shake-light', 'arcane-shake-heavy', 'arcane-shake-quake'); } catch (_) {} }); S.shakeEls.clear();
+      if (S.dark && S.dark.remove) { try { S.dark.remove(); } catch (_) {} S.dark = null; }
+      if (S.canvas) { try { S.canvas.remove(); } catch (_) {} S.canvas = null; S.ctx = null; }
+    }
+
+    const exportsObj = {
+      playArcaneSkillFx, playArcaneProjectile, clearArcaneFx,
+      playVariantResistFx, playVariantFluid, playVariantPhantom, playVariantAntiMagic, playVariantVital,
+      playVariantFireproof, playVariantPoisonproof, playVariantIronBody,
+      setPersistentFx, clearVariantState, setVariantSfx, variantSfxOn, isEntityVariantLocked
+    };
+    Object.assign(window, exportsObj);
+    return exportsObj;
+})();
+    // ===== 可移植特效模块 END =====
+
+    // ===== 演示控制 BEGIN：仅驱动上述正式版接口，不参与移植 =====
+    // 接入点 4：CARDS 每项为 { name, level, description, fxTag, casterId, targetIds, isReaction }。
+    // casterId / targetIds 使用上方 h1-h4、e1-e6；level 使用 L1-L4，默认列表为空。
+    // 反应演练可在 playDemoSkill 中调用返回的 handle.dodge / hit，不把模拟攻击写进技能实现。
+    const RESIST_SAMPLE_B64 = {"resist_fluid":"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","resist_phantom":"SUQzBAAAAAACT1RFTkMAAAAPAAADTG9naWMgRXhwcmVzcwBURFJDAAAACwAAAzIwMTAtMDUtMQBUWFhYAAAAGgAAA3RpbWVfcmVmZXJlbmNlADE1ODc2MDAwMABUWFhYAAABCQAAA3VtaWQAMHgwMDAwMDAwMDAwQTVEMTAwMDAwMDAwMDA0OEI3RkYzMTMwMzAzMDMwQTRCN0ZGQkY1MDAwMDAwMDUwMDAwMDAwRjQ5MDBCOTJBQ0JFRkZCRjQ1NTY0MTU3NjhCN0ZGQkY0MTdGNTI4QUE0QjdGRkJGNTAwMDAwMDA1MDAwMDAwMABUWFhYAAAAPgAAA2NvZGluZ19oaXN0b3J5AEE9TWljcm9zb2Z0IFBDTSBGb3JtYXQgRj00NDEwMCBXPTE2IE09c3RlcmVvDQBUU1NFAAAADgAAA0xhdmY2My4zLjEwMAAAAAAAAAAAAAAA//NwwAAAAAAAAAAAAEluZm8AAAAPAAAADwAACeUAIiIiIiIiMjIyMjIyMkFBQUFBQVFRUVFRUVFhYWFhYWFhcXFxcXFxgYGBgYGBgZGRkZGRkZGgoKCgoKCwsLCwsLCwwMDAwMDAwNDQ0NDQ0ODg4ODg4ODw8PDw8PDw////////AAAAAExhdmM2My42LgAAAAAAAAAAAAAAACQDmgAAAAAAAAnlx+zVkQAAAAAAAAAAAAAAAAD/82DEAByxKmwDT0gAG8ePHjx48ePFer0PNM0zrZ7MBzlvFvDViHkLOtnv/AgCgIAgGHKQtGKydGjRigUIECBBCHhD3Oc5zhCEP/UEaMP4OAg7y4Pg4CAIAgCAPg/wQOYPg+fgmf4PvE4Pg4CAY/lAQw/rBwEP/znygIO/4Pg+fdpI6zxzTEIjEGhEWjKyDvELBfgACK3s6wcDIWP/82LEHCbyFuI/j3gCEyXYk7XKJ6GmtjZalUhyvYJ7S3nkR80B/TUR5iXNk+/ZdTXrurzVpoMuPqPrESPExJTVYl3jZEzJWG4xL3xEzf2lj6tnVKfPj5jxPT//NNY9M7/3T+9feICgkGny7xYocKF4RSBGrIgS+Qa0Tng+ly2imhPDHosEBtWllbGNnKUuVgAmxqCGkxMsADQVdVym//NixBAjamLJ5dgYAZT+l03lupurOdeyzpvG/Y2la15kTrVMBhgpCnAAInGLGgUTstYMKlUwoDmFGwuoldSRgowqxjKEGDHrM2P6RKdsZmjdUsKAlyNwMzW9JZl6qqs1UqX9ASg/0KCuZead8I6KtN/ucy6KFPN//f/ze7/4Nu4lFJJo2ILlwVL4KngBWcGUT0lvUu4zbgt34u/zY//zYsQSIYJCqUTBhxB+GpqYtBFCCzkhUHBITH2TsslkkppqVSWyGTOQwCMNRLwgRwBJJIHW9PzSjt7ck2kXYBJYu5ypyv/Gbh99VjGZLUg6hWIsqq63Upfz/pZ//0Zhig7eVOXIgkkTKebDqkno0NiFzsO/TpspqJWOFYuGg08sFZAABHTci9C28u1bguLejY703CBHUVAhxiK1YPD/82DEHB66PqIOewasTDAJlVzml2r191mNncjClcEysCeHFrKX1aoXyMdpZhO+s4fG6VYzyvk2ZTvGbyPqmXeLSI7yVaZ6AjL3EXtItUQBkmsVIh0KPDZGKnGbkbK49bxsKi6rWIGeOUeZOyuAVrpR5yRpQPF24vbLhAVMyHUAqJpdZSSARZ6tqNNLG4uOULB5sVuaWakJBU2kSxT/82LEMCAZKoSkNhJQkeRqevlcSqsWsR2+KsHM0lfkkKiqAZHF48ToB4GxoiCoCI0yQsYPB1bTK2Q3IhKBg4PnkBdRElANCEBra6r19upblWuZDxVAu4WPHqA89z2qUYAAhW1JLDpAd4gRYatnVU9WFKF+LEqTYGGjBdkukkgm3hq4kQQwBkJCDsCFnetBQNRmpli2aGGNEHBHSdfP//NixD8fu7qONnjE+c8ljSkdqdNjb3mFM7CXumrXY3MXs8yXqs7S4IZQZyqUul1pK90MyKVqqW3sq/9P/6eWXdP193wVIpcV+pTrFSEkAQSUoSaclzbKImYBoYhH6KaBlVCFivC/CSIpCz3LEyO5Gat8YmjwpeZLjmF8skDbpqy7hvFoo0wGgCEgdU4XIhlijxKqdCTRoidFjRU2Ev/zYsRQHaD2dW5LzHQkt1qXAFwCe/Bht+dXSIqHpeRUXbWvVV8RJr6KioMrSIpMXPCsJoUhlFArCY4E+cq9DG/bMyk5UQ5iwECBvp0dx3IlQsSFKazdPEc3S/hZ2Ek0Tc08OEuacr1UzJHwB49U+x05pG5O7/asxUShqIOAn/TVYIUPYjX9ZnbbLdmLRKGUEj2SuetcDzmVMLPNLBv/82DEaR3CWlwKeYUQcGLWP9RIsRUJJpZX/UkOq6unasQvo8TRGkMmrXTIlKSGoHkYMprMwISuKe73lsSaNcnKAgwUSgUvarG+hhRQ6YDFb21OHDXectyLLPUTKd09N4VBZmf3+lDzz+f96nQRD4nhwXAiUdWFI2t0Wu/9H9ICZECSaYTcovchMvKyxYnURKn3S5GNE2dyU7GTjSj/82LEgRi6WmBUMwZ0mnRZ0IPGMMDX+HmTo0NTrpmZiYKpfWYhQYeku0YfBhVBPHyW7GRyjC3JqCuTRugrCygsWKsOiZQsH2PJgku1SFrPSrLFLBUid/0egV4Ce4736hAkiEayCLbSKJwVBYGhCEfhS4LJRZqpKSBpNIkTTiXmMdAQKdzOWlRK/9wxiqJ6F2IKJCkp3Y+HaJdTLZvb//NixK4cAipISjJGPOrNVLIiZ8js15l1TUYMUcgFZ0oJQUScTAtrsGTJUs97cKETpVYU++YERSPYVMriVD8XAR6/bTI7E4uAFlohVVTQ5s1YSESNtUlAyT31DDrVYKQqw9lJmYwFf9SqqVARPSY1pZ4YdQShRJeTWk1ARLNqArGOyKWqlWba1QQo/yY6JS/V6XaqiVXolj2Y6Xs38f/zYsTOHOoyLAJJhqyvDo30EJEyqXV2ZmY8isdf2tRmNjw3hRKnxRNYyFGlVVJS6Gap5YRKQpVkvwuSOoSjsESd50qORFPTla8VRJd8wDBRFE4lVJGka7zlb/2qnzZ7UkWizmoyi2m5Ty+VYKi2saCjTkqJVXaqok+UcFWi2mo4bmzJRJ89JOblOi6LU85Venw65Zztn7JGaz+W2c//82DE6iBb1gwMSYakVkVbP/8zOdjiWVVVVPNVX/fKaq15nv5n1X9ZW+knnsS18osA5nc1EiWdBQOlTOWqTEFNRTMuMTAxIChiZXRhIDMpqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqr/82LE9yXTvcgCewwwqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqTEFNRTMuMTAxIChiZXRhIDMpqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NixG8AAANIAAAAAKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqg==","resist_antimagic":"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","resist_vital":"SUQzBAAAAAACbVRFTkMAAAAPAAADTG9naWMgRXhwcmVzcwBURFJDAAAADAAAAzIwMTEtMDQtMjIAVFhYWAAAABEAAANjb2RpbmdfaGlzdG9yeQAAVFhYWAAAABoAAAN0aW1lX3JlZmVyZW5jZQAxNTk1MTc2NzAAVFhYWAAAAQkAAAN1bWlkADB4MDAwMDAwMDcwMDAxMDAwMDAwMDA5MTE1MDdBNzY4RTAwNDAwQjA5MUZGQkY1ODkwRkYzMTMwMzAzMDMwQjQ5MEZGQkY1MDAwMDAwMDUwMDAwMDAwNzhFMDA0QTBFQzk3RkZCRjQ1NTY0MTU3Nzg5MEZGQkY5MTE1MDdBN0I0OTAAVFNTRQAAAA4AAANMYXZmNjMuMy4xMDAAQ1RPQwAAAAoAAHRvYwADAWNoMABDSEFQAAAALAAAY2gwAAAAAAAAAAGY//////////9USVQyAAAADgAAA1RlbXBvOiAxMjAuMAAAAAAAAAAAAAAA//NwwAAAAAAAAAAAAEluZm8AAAAPAAAAEQAACx4AHh4eHh4sLCwsLCw6Ojo6OjpISEhISEhWVlZWVlZkZGRkZGRzc3Nzc3OBgYGBgYGPj4+Pj52dnZ2dnaurq6urq7m5ubm5ucfHx8fHx9XV1dXV1ePj4+Pj4/Hx8fHx8f//////AAAAAExhdmM2My42LgAAAAAAAAAAAAAAACQDRQAAAAAAAAseKwZ9HQAAAAAAAAAAAAAAAAD/82DEABiZYogFTzAAku94b9Xq9Xwi+CHjjVbYnGTUNXoYoGSJq99wAGFp7ERJMAAAIIZZ5NNCIj/+47nkyad+7PJp3rGEyZNO9/i77QYgGNTigIAgCDvQUd5RxR38uD4f3/KAgc//1Ag7rPrP/8MKlAA0jDFFNNDEaDWDCbSEGYOobA8z+AcQj6sHUYwZTEUnSQCKKYtHMOKB1jf/82LELCsjnrl1j1gAnwRTMgWBhI2wcYSC80SIzDzWIkxIsc9RzDcbElTqBtB640jt66J43izt0bIvPpyu1xo62G523uabsPptezmlbrjnYyWLzFnKmLUa49c6xuf9A4jd1F1E7pr/91Uv9VTK6p7FPVmVnrtrrmf3/x/+yWf1H1DXWuw+ZJM3IlGyCz6qoACQKjlltquT/G8oLq9D//NixA8j6kLeX89IANuoc51qp5F0xs8BuYosF/HxCiagQRnA+rAjcTk6pQmMMGjGIHdfZeaOSDrqKCJSmITbU2j0sThCScItoqnNKE73srQZyTEnLdvTkk+XknbTDcWH36hck1dj2/88IQtZ2AE+Kg4FxefPiMQm3hcPAWLicIGxopxO3//16WpLwJWaXQGn+S6LIx0AyYpy+RoL4v/zYsQPH7kGzBRj0kEMKAFJ22QFIgXAlDjZaROWA0TRAKCItB6qFKSW70KVaXjbpLM9qlmttVE8DFAvnkzTfBRQi0kLtaaSNlvfGiXYsXa2l/msX8nV/O/+t+MZY9F/WXXrWGYxk2PBnX//4/pu8yP9nahfTxaPU67Hjv8WL8i4xRiS011TLRh5Zcq21x9nuvv5Wgh+b8+RAwstE0T/82DEICQzCrgCwkbcFOJ4hEtaTLZr4uWONrFp3qqiM9twQt2gxy666BCXNqE/JE5yQHW1V4IIvcQX2V8pc31IEWj1yaQmRXcXQAn5DJXmguJJT0plJUsK17IpxDK+VImyIvmkO3WmVikOQMi6v8COaKPJucDh4LwsLo0IQFoAIIBN/5UkqTHR6cOFIAu1oyS+dOrijxcN1VKTTWH/82LEHh251sV0eYbMMPeoTw6Y1ZbPF4dtMvPVGKXMyyToVS6uUFHJOUtj/mS20STSIjn75ETmwkC2yaGhQw1JYKhG4yVJstGKYZHnkmGvQSVOijyJkFzvW+2ZQLoWSShytKc9ctdGtTbFg+pYSHGbkyoYCaEB+i0b1PDJ1gKfMSTcQlOoiVZgpDVkb4I1Ejx+XbhKmc1bsQxVNTjV//NixDceYeq4BMJGmEgJGyLJ2aLET5Gdc7m2q29Uu2If33yyMdAbDiiQ7OwfNVkdTUoASkooHEieovpeKgit3U0c4BrMLklIxukaAGi7HIWAAieaSTmzBHeOg5ywzLzSHEFUIGBBZebGrHVVQRKsss4ZyUS4EHFBox0O0LUCfohiYOGwOPFQCVERAStNR9IMqC0AjEpaARx4+IiThv/zYsRNHLjmwZZ6RmyDMTBUJgstrmMlhGGqk3XPf3M3qaeta9CulRcnFW2socelmrfI1gS6TExZKlaEFjL9uK1sswX7fVWyA6CgcYgDApFgYmEyJyQFxPf4Wr+j8YqpNi9lKczEzE2idEw2eBV3MoTUhiJE99JDqxgrCKKRXf+v1zpTuK7Svv7V/O7v1S+SYJ8JKPzS+MaPBn3///7/82DEah5I+qAEfgwRF//p3/bGaSbnX3bh5o6dVQADClD9SUc9hUGTgakuJBSIh4JkkTDEWp0aO5vmNfNlBFQUfTMec8xccMaprGKBZ1Es9s504fsbW5EsHdB00SO62rm5okkXQjO3sO3UnUnUisfCRkEh0BKc0CuUA93fUrfnkFHrNjTb7yLnmFIAiRR2wjJjhcsQnCohMHxEjk3/82LEfxspfqpWSYZ0THERsqSpkdz5UmTVomJI7vmkS1xFRkidXI1tedGB2GSydOoxT8nKULLCIlWakwxA7SXBYkwRAwvUNAZO+VJj2XyqRhpclVKy0qYiZflAdKpPNM5gqQaxSAwxMjS9VSeSGB9wLhmDZLsqB0DIInlWbQnhkHDwjK9fAkiSOqdw5NSMV7g03Gp8emJX3i67b+2W//NixKIb2bqBgkmGlJWN5aiS3NU+c/ygExo0VGDGnrcR1HhZoUaWnckBhqAShVQNRw5oVOhVgSYWY4c8Kg09ZU78SkaooexEZO3h0J1hquDT51W4xJUzKzZUTKs8ixGiU4ckaRiwVI1EGCnRKCpw6xOqlAI6qwwGhUYMBGzc9qQEdXlLhxursKyYUcy7AzqTerM3VjMqr2HVbWf5Uv/zYsTCHdGebPJJhryqqqFL+Mx+sPlX6q9UmAinWYalQDWGgk48rPOjIKlTq9R48DWrBUFVsbpYSVJ9AkqQQ9JMTVZnraqTmXbQrXFPO4sk72L/Bo+vEVy5ni4fbJ1kUjSl42kWYuCT4DJVjtXpKWx5Z5z+tZ2JJYAjE5nCSX/mfTzgMYufLV57HHEs5Kvf+L1YcFBT+f7BnWkGPCn/82DE2hxisjwASYZ0hSNUaxYdKGrdRllUMCHXNUcK2MpLWMuJvisZTf/HuPjdg0pIodJCu2iVTEFNRTMuMTAxIChiZXRhIDMpVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/82LE9yRTHeQAeYc1VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQBMTEFNRTMuMTAxIChiZXRhIDMpqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NixHEAeAQAAHgAAKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqkxBTUUzLjEwMSAoYmV0YSAzKaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv/zYsRvAAADSAAAAACqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqkxBTUUzLjEwMSAoYmV0YSAzKaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqr/82DEcAAAA0gAAAAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=","resist_fireproof":"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","resist_poisonproof":"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","demo_atk":"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","demo_gun":"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FREKCMMDRkNCz6xJYAUONmywhfXs0Qp4DjdwM0BWtB2rF99EiOdrQIDz1P/zYsSUH7lWtMbCTFypGK6lETSVhqgNOTGGEnW+GNpdElgycMajSA60cKQZlI/NZ9WeXOE6ZoxfmTyn98r3+UNP2VBmiF0x9MsHXmUhP3/14jZm74/r3du9ff/lrnDRFflK/djc0dm/4431v4sh/n4qIBLiVJQqkn47IY1MxnLdLJAphVMibNio8goVJIYkQmDTRN4uWGEl1cOp2w//82LEpR4aIrlueYZ9FwvkkI10FmwITRYKVSrsYWBNzfOVNSJmZxIORgMiMPGAIBzQLhhFEkIYlpEz4FJVBixjCK7FEhWwlsH9k6oRD7YXRHrcKXWiJ6D5ymPHUmXVIEVJkjg0Um1EonLojq1KY3MxW/ChxyZ32yhtyONQ+2dlLFbSGeoysdnEZ8xCYhyapzKT5rkSCtNby1Pb+1o8//NgxLwfGXKkpsJGfKSg0KDFpHXd2SIfSXh8+8I2Sc9DybkY2y+Xf6f0jw0QWfF33yN4TFiwFUGqkNCS8UmVLphwV7uwirCCAza6sgoGr2WvklwPDfMtdLTL+iSrVtXfhPqvPHGc2ulqGsS4yP/Wnt6FSnQZBQETXKswCoIGV1hKTNGsYzVUXwrrxJczmQZc9lIM/YfqVOBmVikX//NixM4fmkqcrsMGnJrFVj7WZiaU9Xb7qa+82pHXs1lqWZdLOyo67paeplK3pzFbTYKQoI+pL1Rn7915qkxBTUUzLjEwMSAoUAtSbg1QOdFo1lflMZlt2M4WRRxwUlSRoSUAgolOHBWtvEgKjiSRqnR3nAIkSJPJyWU5NhgEvYUalVJj+q3gRr8VVUvWBRPf2aGv6rqJKMxsxf9hqf/zYsTfH5O2rZZgxTvf/9qsZmMKOPREsNEoaK+dR53I1Hg6DSp5boiZPJkd5WpMQU1FMy4xMDEgKGJlCk4Q0ZRByaGsjVEcpfjCP9CCialokjkQSmcNwMpiqQhPE84bstMglB4Lx7JiuKOI+EkJgLBqOBPPG0xBE4TiusfhzhIEBHmWznGgRVw7ScaBFA4aNBVv8qEm4KiMyEm//xT/82LE5R1SZmy2wYZ8JGgKKi2JhcRuWKksVFCX8Jipkz4CCYjDMVFqhbgIWEdMQU1FMy4xMDEgKGJldGEgMylVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NgxPIgeUnQBnsMfFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV","demo_spell":"SUQzBAAAAAAAIlRTU0UAAAAOAAADTGF2ZjYzLjMuMTAwAAAAAAAAAAAAAAD/83DAAAAAAAAAAAAASW5mbwAAAA8AAAATAAAMWAAbGxsbGygoKCgoNDQ0NDRBQUFBQUFOTk5OTlpaWlpaZ2dnZ2d0dHR0dHSAgICAgI2NjY2Nmpqampqnp6enp6ezs7Ozs8DAwMDAzc3Nzc3Z2dnZ2dnm5ubm5vPz8/Pz//////8AAAAATGF2YzYzLjYuAAAAAAAAAAAAAAAAJARRAAAAAAAADFjOHW30AAAAAAAAAAAAAAAAAP/zYMQADMA2qF9DGAAAiUo5d0RPd39w4GHwQKOiBwIOwTB83858P/Lh/UCBz//BDr8H3wQ//4IO/3eJ3h+GP+gVCCaIIVCghMyVYjYLGJBEiEFgphKcSRL/NbLYLDrKKxHfY0VjUiywG6tH8sIl+aDcW86mE/3B2cVFWqiCnO4pBWK86GuIdcRvaYSojk4in+nUocrHZPwmOZzZsP/zYsRcNqv2tE2ZeADYrWpOOF1lzePXJea1ZF19uGcRJ76cmqbr+MMWYNYu2ttp567xSkSNmlL7Z72w8cottxrv60Z26/tr71Nud5mHaltU/v8RM5peBAg78TMLwNZgZpvUGlNbzrfvvGcY8TX/prN6a3//7Zvq+cRMY9J6/+ufS0tppoWK03D2SLyaQIFOznEBAOAcAsiMHmyq0jb/82LEESJTQswvz0AAVBKjnQtNKpTotgenWzMrpXogesyH4oZAYEg2Rg9hopAhDpJa1OlYHwqs9di5k1rCFpDxW8+4zqC7tlfxqTCX+vffV9dNX3UREzX//X+vSq1WsXcsv031MPHLcJPPTa3dfp9/x8/Nd5Mh+hogbpU+eVe0Y8RnCOCSqgXmWpCg2UkNU51KlFYu5rBmjr+h+Xhh//NixBci4g7ABMMGnCVTsTLtqwMRYnHVecQkBYmUrImzYqVYZO1KI89/eZiZWwvwGlV9rxVivnsRUJ2BEQ7sHgxG4onjKajwjrjkE1g+Yw5F3kpmiERPhCapBrwosZjiskfLEkXOKhRYfg+sRCxJxCPhHMYlTtrNMjhISBd5t8Q5ulbbuKtQCMTBAmwroQko63nnXpAkCTDQXRWmG//zYMQbIdtCxATCRJ0qjMkQwmPIxGKikzwcVHTBtmXjhgOrhWM2k7UbgoQGmdh1EeeSTLTlfHRyqKRJlbdmpQrCmq9srzSbZmciOtC3Xs1D0yP6atu9aGZluq29VuxHY3f2azKiTKNHzTWo0pa1LjnfJ/VDqaZzOvT1GDvLknBVgcRHyBD+JKJKoJTSOiMOBN6ACRohIhQhwVkNDv/zYsQiIMH6xAJ6RpgqsGHDaINtiknFYqIxe9MQ1lEhtNpVSgM2GAWZBGoi6zJy2okgZjZmVFGaZ7Qif8IkzPhlwtzPMQdNGwfChNEVxi74SQ9sTDnyF7XO1IDCHuvYLIKJz4d0gRrx7xHV1LNtAKQs09iSHJKBmXgJFUnGI6uGi0U6fYIm9pT9bDlUSK0xOuuL+tCdOQuW9rJ76UT/82LELx0LBt10YEeQnUXZzMzs9Xbzt0QCpBQTVbdOMTOSKZIBgAc5MY4E0v2aICJyM/l56nVc+yPO3/i3kLKJzFmUm5QJVJsOdXh6MIwfbzgIKgh4vKreGKAPp6OAfD84jYhTLj0UFdAiWHsruW1f6aPuMQIf5Lr1ulpuzG/ME2vWfcPT+TFt72Lxrbb05MPwzevW5Ir2isiA5ZMD//NixEofk7rhdGBHsZSMgZX1Wsxm/2xsmUHNsjNedgzbR+c9b3bzdc04cKd6n8rm5TjF3f6gMXhI8uHgi8fOPAnqAKYQLRuIQ5DvSMeFp6iPmlI8ATdT1IUYlbyohZHkVlVSSCWe4uSJKTUKzhImjlbU5UZ1Zjy2RRZye9p3vTW16Oha1X5yO16pQ9PR9t9lO7VfWtb6EIr7LqTNfv/zYMRbHFPC3WphirDq3XtTZErqleuVcn0nTodBr44aaZJE6iEpHg4EuLiQlJ2QuicWNkxMrIVsm9ttGnKWIOzBWP1iowZvEsVqmanu/IxYpOcIsKM1W569fJ+VxtRjazfXnOE73MT0QHkjYdhpkYiETZmyOhwEI22ySVVoDaKM03Ij8Usz9pvLhhMHKaHlRGRn8EqVun7wS8ykZv/zYsR4HjvK4DJIR9AtFACYEzwlDwbKFQPQEx8XEibLDLMXsTgs2qbDZPBQgO5uSq4IztQGsLC7LhjPJ0FsU2TfIaSBITOHBSFhYKKHi5pxUDCuD5Rw1qUz9Z0Yi8oWKh0kLvSRqAZ82ZPs6nsAowjPApJJT8OshBx3NlbXoF0KGlAHRmRTaNoowturStdcgaeDHmbpYIVlH0zumc7/82LEjxwxPtwwYkYYljagNpmjHWtIyehHZWJnIkKbFm0p+07QSk5K6gQm5cXCDk+n68sTd8y1bVzJTDAg5I5CwGgo1day66lm5EWHIJJboWVjyg9toHcKFmHGl2het4jZh03WAl7eZvE8JYLa1OSpZU0sPE6oZ4pZvE5CZjh0PNUi6D9mNjrZodzmy7N2wdVxmShiKHHt/FN1SBRk//NixK4dOgLcyGGGnKZBRJls9OtNSK6kX7c8zUjZSI2KTy9bfyyUJLyKbcQTiTZfJzmfuCedfq3XjZAuB3bruOd407PPfRMOOZp1hC/6X9kE4KABGoA6VLhA0hwlaMIR5QYUUFmfvFVu6OW0JonLVAlnhoCUl0QiPgNlnemhkVQ5dVTQ5q+lhE9xEyuX6zydSprlbzy9KnuvPPD67P/zYMTJHwJK3Wp5hpl3yuUJD+5z/c5ZTaeWRnkXzke2rRLRap3V1f+PNJCDNFF5yfqct3/oUJJZAdwgsCMiVchaINBrbHN5Ha5NqDiQp0HAJp8okSlrZSiW+wM0Gpz0I1elHGsVRJ9LMKUczy6s2zYrc6SW+HDOCWbY4wsUOFRRCnQIUKFViIeA1/twY11Z9pe37SL6r1Ri2XiMXv/zYsTcHUMu1MBKBpF4JTTdoXnuXo1IaaKXtVJc49WlYHlcjYEe3sTcqw5kKeLZNbEhTf5LYwqC6DdHqdoUczOwMuKMJ/KdztuJhi3GhZfWwf3PA2Tc5SZVZJqqrVkUTN1MxeSbp1fzZsu5E1PVSijOS8v97v3pJ8N+9zmSzJlD/cz2qVY3bzP5Tf7iX2n7NOMjLblxtOz19hJpZ+3/82LE9yP7tsBIeYa9rS15M47L94895mPX9d5yK3v++Y3f/ZZ2rfv7P/9jXl6pvcVvfP2tt8o37goCsdO2aKlUykwGFUpnXMkmYiaQqf80RKiy6ELevFGU818OzGXqdZpDvsPbZr7WG5ReNoqhExGNxE70aIu8K0UinXYm9bcX9n4jQU1DEnAg+HoNlcZhmzRwy0lyYi9tPDO+VHDk//NixPckm/60qU8wARE5XUtxuHJXAGEzZvUsqgJ9aV9n6rxGXS6m7KZfVzpqb7VeW3sJVEbOfy7tvWduklUdpM87c7vdXtTKtdmbPauVDGq1PTRqfppVPVaXGtVz5cu1aTG5FZns1lVmpXYws1aWkyzsc3V+7TVrlSeocbstpqtnCmrTEq5L8b+Vi3vfK9XuNLrD7lPZtapdXeWrm//zYMT0Qavemb+ZwAGz/MMaanxzuY46x+lyoKJoptU1DDrIS1WkoJQAMyFMgy0KYLXYaf6NRqNRqNRqmx/Kta7jKYyC5xUVFRVRVb/lVVWFg6FhYWaV1WChYWFhYVVVUVFVVihYWFma/4ZmFhYWXZmZmZa5VSRUVZv9SRWyVVVUVFWZma5VW/hmZv/9Vv/ZijjoifFga4lBUNVA0P/zYsR8JHqKSO3YQAA1BpR71gqdKgqCoa6nwaBoGgZUHVA0TEFNRTMuMTAxIChMQU1FMy4xMDEgKGJldGEgMymqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqr/82LEbwAAA0gAAAAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq","resist_ironbody":"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"};
+    let demoSfxOn = true, resAudioCtx = null, resDecodePromise = null;
+    const resBuffers = {}, resPlaying = new Set(), demoTimers = new Set(), demoExtras = new Set();
+    function getResCtx() {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      if (!resAudioCtx || resAudioCtx.state === 'closed') resAudioCtx = new AC();
+      if (resAudioCtx.state === 'suspended' && resAudioCtx.resume) resAudioCtx.resume().catch(() => {});
+      return resAudioCtx;
+    }
+    function ensureVariantSamples() {
+      if (resDecodePromise) return resDecodePromise;
+      const ctx = getResCtx();
+      if (!ctx) return Promise.resolve();
+      resDecodePromise = Promise.all(Object.entries(RESIST_SAMPLE_B64).map(async ([k, b64]) => {
+        try {
+          const bin = atob(b64), arr = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+          resBuffers[k] = await ctx.decodeAudioData(arr.buffer);
+        } catch (_) {}
+      }));
+      return resDecodePromise;
+    }
+    try { const AC = window.AudioContext || window.webkitAudioContext; if (AC) { resAudioCtx = new AC(); ensureVariantSamples(); } } catch (_) {}
+
+    function playVariantSample(key, { volume = 0.25, pan = 0, rate = 1 } = {}) {
+      if (!demoSfxOn || !variantSfxOn()) return false;
+      const ctx = getResCtx(), buf = resBuffers[key];
+      if (!ctx || !buf) { ensureVariantSamples(); return false; }
+      try {
+        const src = ctx.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate;
+        const g = ctx.createGain(); g.gain.value = volume;
+        let tail = src;
+        if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); tail.connect(p); tail = p; }
+        tail.connect(g); g.connect(ctx.destination);
+        resPlaying.add(src);
+        src.onended = () => resPlaying.delete(src);
+        src.start();
+        return true;
+      } catch (_) { return false; }
+    }
+    window.__playResistSample = playVariantSample;
+
+    function stopVariantHostAudio() {
+      resPlaying.forEach(s => { try { s.stop(); } catch (_) {} });
+      resPlaying.clear();
+    }
+    function demoAt(ms, fn) {
+      const tok = combatToken;
+      const id = setTimeout(() => { demoTimers.delete(id); if (tok === combatToken) fn(); }, ms);
+      demoTimers.add(id);
+      return id;
+    }
+    function setBeatStat(txt, color = '#7dd3fc') {
+      const el = document.getElementById('variant-beat-stat');
+      if (!el) return;
+      el.textContent = txt;
+      el.style.color = color;
+    }
+    (function wireSfxBtn() {
+      const btn = document.getElementById('btn-variant-sfx');
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        demoSfxOn = !demoSfxOn;
+        setVariantSfx(demoSfxOn);
+        btn.setAttribute('aria-pressed', String(demoSfxOn));
+        btn.textContent = demoSfxOn ? '🔊 音开' : '🔇 静音';
+        btn.className = demoSfxOn
+          ? 'text-[9px] font-bold px-1.5 rounded border border-emerald-500/60 text-emerald-300 hover:bg-white/10 transition-all shrink-0'
+          : 'text-[9px] font-bold px-1.5 rounded border border-slate-600 text-slate-400 hover:bg-white/10 transition-all shrink-0';
+        if (!demoSfxOn) stopVariantHostAudio();
+      });
+    })();
+    function resolveResistLayers(card) {
+      if (!card || card.outcome === 'dodge') return [];
+      const tags = card.hasTag || [];
+      const out = [];
+      if (card.incomingType === '远程' && tags.includes('[流体]')) out.push('fluid');
+      if (card.incomingType === '近战' && tags.includes('[虚形]')) out.push('phantom');
+      if (card.incomingType === '法术' && tags.includes('[破法]')) out.push('antiMagic');
+      if (card.isAoe && tags.includes('[要害]')) out.push('vital');
+      return out.slice(0, 2);
+    }
+
+    function resolveImmuneKind(card) {
+      if (!card || card.outcome === 'dodge') return '';
+      if (card.stateResult === 'immuneBurn') return 'fireproof';
+      if (card.stateResult === 'immunePoison') return 'poisonproof';
+      if (card.stateResult === 'immuneStun') return 'ironBody';
+      return '';
+    }
+
+    const DEMO_GROUPS = [
+      { title: '一、四抗性：匹配触发 vs 错配无响应 (我→敌)', tag: '接触拍点', cards: [
+        { name: '流体·枪击命中 [液化卸力]', targetId: 'e1', fromId: 'h4', incomingType: '远程', isAoe: false, hasTag: ['[流体]'], outcome: 'hit', stateResult: 'none', meta: { rawDamage: 180, finalDamage: 90, resistReduced: 90 } },
+        { name: '流体·近战错配 (无响应)', targetId: 'e1', fromId: 'h2', incomingType: '近战', isAoe: false, hasTag: ['[流体]'], outcome: 'hit', stateResult: 'none', meta: { rawDamage: 150, finalDamage: 150 } },
+        { name: '虚形·近战命中 [错层虚影]', targetId: 'e4', fromId: 'h2', incomingType: '近战', isAoe: false, hasTag: ['[虚形]'], outcome: 'hit', stateResult: 'none', meta: { rawDamage: 200, finalDamage: 100, resistReduced: 100 } },
+        { name: '虚形·远程错配 (无响应)', targetId: 'e4', fromId: 'h4', incomingType: '远程', isAoe: false, hasTag: ['[虚形]'], outcome: 'hit', stateResult: 'none', meta: { rawDamage: 165, finalDamage: 165 } },
+        { name: '破法·雷法命中 [能量剥离]', targetId: 'e2', fromId: 'h3', incomingType: '法术', isAoe: false, hasTag: ['[破法]'], outcome: 'hit', stateResult: 'none', meta: { spellColor: '#38bdf8', rawDamage: 210, finalDamage: 105, resistReduced: 105 } },
+        { name: '破法·近战错配 (无响应)', targetId: 'e2', fromId: 'h2', incomingType: '近战', isAoe: false, hasTag: ['[破法]'], outcome: 'hit', stateResult: 'none', meta: { rawDamage: 145, finalDamage: 145 } },
+        { name: '要害·群攻命中 [收紧分流]', targetId: 'e5', fromId: 'h3', incomingType: '法术', isAoe: true, hasTag: ['[要害]'], outcome: 'hit', stateResult: 'none', meta: { spellColor: '#fbbf24', rawDamage: 180, finalDamage: 90, resistReduced: 90 } },
+        { name: '要害·单体对照 (无响应)', targetId: 'e5', fromId: 'h2', incomingType: '近战', isAoe: false, hasTag: ['[要害]'], outcome: 'hit', stateResult: 'none', meta: { rawDamage: 180, finalDamage: 180 } }
+      ] },
+      { title: '二、四抗性双向：敌→我 (对应上组我→敌)', tag: '友方受击', cards: [
+        { name: '敌→我 · 流体(远程打埃利奥特)', targetId: 'h1', fromId: 'e1', incomingType: '远程', isAoe: false, hasTag: ['[流体]'], outcome: 'hit', stateResult: 'none', meta: { rawDamage: 30, finalDamage: 15, resistReduced: 15 } },
+        { name: '敌→我 · 虚形(近战打弗兰克)', targetId: 'h2', fromId: 'e4', incomingType: '近战', isAoe: false, hasTag: ['[虚形]'], outcome: 'hit', stateResult: 'none', meta: { rawDamage: 42, finalDamage: 21, resistReduced: 21 } },
+        { name: '敌→我 · 破法(紫法打玛德琳)', targetId: 'h3', fromId: 'e2', incomingType: '法术', isAoe: false, hasTag: ['[破法]'], outcome: 'hit', stateResult: 'none', meta: { spellColor: '#a855f7', rawDamage: 38, finalDamage: 19, resistReduced: 19 } },
+        { name: '敌→我 · 要害(群攻打索恩)', targetId: 'h4', fromId: 'e5', incomingType: '法术', isAoe: true, hasTag: ['[要害]'], outcome: 'hit', stateResult: 'none', meta: { spellColor: '#38bdf8', rawDamage: 36, finalDamage: 18, resistReduced: 18 } }
+      ] },
+      { title: '三、双层叠加 & 一期常驻外观共存', tag: '兼容验证', cards: [
+        { name: '破法+要害 · 群法术双层叠加', targetId: 'e4', fromId: 'h3', incomingType: '法术', isAoe: true, hasTag: ['[破法]', '[要害]'], outcome: 'hit', stateResult: 'none', meta: { spellColor: '#a855f7', rawDamage: 220, finalDamage: 55, resistReduced: 165 } },
+        { name: '狂暴红外观 + 虚形(近战)共存', targetId: 'e4', fromId: 'h2', incomingType: '近战', isAoe: false, hasTag: ['[虚形]'], outcome: 'hit', stateResult: 'none', setupPersist: { id: 'e4', kind: 'rage' }, meta: { rawDamage: 190, finalDamage: 95, resistReduced: 95 } },
+        { name: '蜕皮金外观 + 钢体(近战)共存', targetId: 'h2', fromId: 'e5', incomingType: '近战', isAoe: false, hasTag: ['[钢体]'], outcome: 'hit', stateResult: 'immuneStun', setupPersist: { id: 'h2', kind: 'molt' }, meta: { rawDamage: 28, finalDamage: 28 } }
+      ] },
+      { title: '四、三免疫对照 · 扣血不抹除 · 闪避无响应', tag: '状态拍点', cards: [
+        { name: '防火 · 免疫点燃 [火焰隔熄]', targetId: 'e3', fromId: 'h1', incomingType: '法术', isAoe: false, hasTag: ['[防火]'], outcome: 'hit', stateResult: 'immuneBurn', meta: { spellColor: '#f97316', rawDamage: 115, finalDamage: 115 } },
+        { name: '无防火对照 · 正常挂上灼烧', targetId: 'e1', fromId: 'h1', incomingType: '法术', isAoe: false, hasTag: [], outcome: 'hit', stateResult: 'burn', meta: { spellColor: '#f97316', rawDamage: 115, finalDamage: 115 } },
+        { name: '耐毒 · 免疫中毒 [毒层脱落]', targetId: 'e6', fromId: 'h4', incomingType: '远程', isAoe: false, hasTag: ['[耐毒]'], outcome: 'hit', stateResult: 'immunePoison', meta: { rawDamage: 95, finalDamage: 95 } },
+        { name: '无耐毒对照 · 毒层渗入存留', targetId: 'e1', fromId: 'h4', incomingType: '远程', isAoe: false, hasTag: [], outcome: 'hit', stateResult: 'poison', meta: { rawDamage: 95, finalDamage: 95 } },
+        { name: '钢体 · 免疫眩晕 [星环碎裂]', targetId: 'h2', fromId: 'e5', incomingType: '近战', isAoe: false, hasTag: ['[钢体]'], outcome: 'hit', stateResult: 'immuneStun', meta: { rawDamage: 26, finalDamage: 26 } },
+        { name: '无钢体对照 · 眩晕星环存留晃动', targetId: 'h3', fromId: 'e5', incomingType: '近战', isAoe: false, hasTag: [], outcome: 'hit', stateResult: 'stun', meta: { rawDamage: 26, finalDamage: 26 } },
+        { name: '免疫仍扣血 · 先重击扣血后星环碎裂', targetId: 'h2', fromId: 'e4', incomingType: '近战', isAoe: false, hasTag: ['[钢体]'], outcome: 'hit', stateResult: 'immuneStun', meta: { rawDamage: 62, finalDamage: 62 } },
+        { name: '闪避目标 · 全抗性/免疫均无响应', targetId: 'e4', fromId: 'h3', incomingType: '法术', isAoe: true, hasTag: ['[破法]', '[要害]', '[防火]', '[钢体]'], outcome: 'dodge', stateResult: 'immuneStun', meta: { spellColor: '#a855f7', rawDamage: 0, finalDmg: 0 } }
+      ] },
+      { title: '五、连发并发压测 & 中途重置', tag: '并发鲁棒', cards: [
+        { name: '连发压测 · 同体连吃近战→法术', mode: 'seq', steps: [
+          { delay: 0, targetId: 'e4', fromId: 'h2', incomingType: '近战', isAoe: false, hasTag: ['[虚形]'], outcome: 'hit', stateResult: 'none', meta: { rawDamage: 160, finalDamage: 80, resistReduced: 80 } },
+          { delay: 290, targetId: 'e4', fromId: 'h3', incomingType: '法术', isAoe: false, hasTag: ['[破法]'], outcome: 'hit', stateResult: 'none', meta: { spellColor: '#38bdf8', rawDamage: 180, finalDamage: 90, resistReduced: 90 } }
+        ] },
+        { name: 'AoE同批 · 有[要害]与无[要害]齐中', mode: 'batch', targets: [
+          { targetId: 'e5', hasTag: ['[要害]'], meta: { rawDamage: 170, finalDamage: 85, resistReduced: 85 } },
+          { targetId: 'e6', hasTag: [], meta: { rawDamage: 170, finalDamage: 170 } }
+        ], fromId: 'h3', incomingType: '法术', isAoe: true, outcome: 'hit', stateResult: 'none', meta: { spellColor: '#fbbf24' } }
+      ] }
+    ];
+
+    function clearDemoExtras() {
+      demoTimers.forEach(id => clearTimeout(id)); demoTimers.clear();
+      demoExtras.forEach(el => { try { el.remove(); } catch (_) {} }); demoExtras.clear();
+      stopVariantHostAudio();
+    }
+    function findDemoEnt(id) { return heroesData.find(x => x.id === id) || enemiesData.find(x => x.id === id) || null; }
+    function spawnDemoFloat(targetId, text, color = '#f8fafc', dy = -12) {
+      const dom = getEntitySpriteDom(targetId);
+      if (!dom) return;
+      const b = dom.getBoundingClientRect();
+      const el = document.createElement('div');
+      el.className = 'arcane-variant-float-text text-xs sm:text-sm';
+      el.textContent = text;
+      el.style.cssText = `left:${b.left + b.width / 2}px;top:${b.top + dy}px;color:${color};`;
+      document.body.appendChild(el);
+      demoExtras.add(el);
+      demoAt(1180, () => { try { el.remove(); } catch (_) {} demoExtras.delete(el); });
+    }
+    function updateDemoHp(ent, dmg) {
+      if (!ent || !dmg) return;
+      let rem = Math.max(0, Math.floor(dmg));
+      if (ent.shield > 0) { const s = Math.min(ent.shield, rem); ent.shield -= s; rem -= s; }
+      ent.hp = Math.max(12, ent.hp - rem);
+      const bar = document.getElementById(`${ent.id}-hp-bar`), txt = document.getElementById(`${ent.id}-hp-text`);
+      if (bar) bar.style.width = `${Math.max(0, Math.min(100, (ent.hp / ent.maxHp) * 100))}%`;
+      if (txt) {
+        const isHero = heroesData.some(h => h.id === ent.id);
+        txt.innerHTML = isHero ? `${Math.floor(ent.hp)}${ent.shield > 0 ? `<span class="text-slate-300 ml-0.5 text-[7px] sm:text-[9px]">(盾${ent.shield})</span>` : ''}` : `${Math.floor(ent.hp)}/${ent.maxHp}`;
+      }
+    }
+    function playDemoPoisonSeep(dom, token) {
+      if (!dom || token !== combatToken) return;
+      const r = dom.getBoundingClientRect();
+      const el = document.createElement('div');
+      el.style.cssText = `position:fixed;left:${r.left + r.width / 2 - 36}px;top:${r.top + r.height / 2 - 36}px;width:72px;height:72px;border-radius:50%;pointer-events:none;z-index:445;background:radial-gradient(circle,rgba(192,132,252,0.75) 0%,rgba(126,34,206,0.4) 55%,transparent 75%);`;
+      document.body.appendChild(el); demoExtras.add(el);
+      el.animate([{ transform: 'scale(1.2)', opacity: 0.9 }, { transform: 'scale(0.55)', opacity: 0 }], { duration: 480, fill: 'forwards' });
+      demoAt(500, () => { try { el.remove(); } catch (_) {} demoExtras.delete(el); });
+    }
+    function triggerDemoHitCoexist(step, tDom, quietIdle = false) {
+      const ent = findDemoEnt(step.targetId), dmg = (step.meta && (step.meta.finalDamage ?? step.meta.finalDmg)) || 0;
+      if (tDom) {
+        tDom.classList.remove('arcane-resist-hit-flash');
+        void tDom.offsetWidth;
+        tDom.classList.add('arcane-resist-hit-flash');
+        demoAt(240, () => tDom.classList.remove('arcane-resist-hit-flash'));
+        if (!quietIdle && tDom.animate) {
+          tDom.animate([{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(4px,-2px,0)' }, { transform: 'translate3d(0,0,0)' }], { duration: 150, easing: 'ease-out' });
+        }
+      }
+      if (ent && dmg > 0) { updateDemoHp(ent, dmg); spawnDemoFloat(ent.id, `-${dmg}`, step.meta && step.meta.resistReduced ? '#fda4af' : '#f8fafc', -6); }
+    }
+    function playDemoLeadIn(fromDom, toDoms, step, token, onImpact) {
+      const fc = fromDom ? fromDom.getBoundingClientRect() : { left: 180, top: 360, width: 40, height: 40 };
+      const sx = fc.left + fc.width / 2, sy = fc.top + fc.height / 2;
+      const pan = Math.max(-0.8, Math.min(0.8, (sx / (window.innerWidth || 1280) - 0.5) * 1.4));
+      const sKey = step.incomingType === '远程' ? 'demo_gun' : (step.incomingType === '法术' ? 'demo_spell' : 'demo_atk');
+      playVariantSample(sKey, { volume: 0.44, pan });
+      const col = (step.meta && step.meta.spellColor) || (step.incomingType === '远程' ? '#fde047' : (step.incomingType === '近战' ? '#f8fafc' : '#a855f7'));
+      if (fromDom && fromDom.animate) {
+        const dxLunge = (toDoms[0] && toDoms[0].getBoundingClientRect().left > sx ? 14 : -14);
+        fromDom.animate([{ transform: 'translateX(0)' }, { transform: `translateX(${dxLunge}px)` }, { transform: 'translateX(0)' }], { duration: 220, easing: 'ease-out' });
+      }
+      toDoms.forEach(td => {
+        if (!td) return;
+        const tb = td.getBoundingClientRect();
+        const tx = tb.left + tb.width / 2 + (step.outcome === 'dodge' ? 38 : 0), ty = tb.top + tb.height / 2;
+        const orb = document.createElement('div');
+        orb.style.cssText = `position:fixed;left:${sx - 9}px;top:${sy - 9}px;width:${step.isAoe ? 24 : 16}px;height:${step.isAoe ? 24 : 16}px;border-radius:50%;pointer-events:none;z-index:438;background:radial-gradient(circle,#fff 0%,${col} 52%,transparent 76%);box-shadow:0 0 12px ${col};`;
+        document.body.appendChild(orb); demoExtras.add(orb);
+        orb.animate([{ transform: 'translate3d(0,0,0) scale(0.75)', opacity: 0.95 }, { transform: `translate3d(${(tx - sx).toFixed(1)}px,${(ty - sy).toFixed(1)}px,0) scale(${step.isAoe ? 1.4 : 1})`, opacity: step.outcome === 'dodge' ? 0.35 : 1 }], { duration: 220, easing: 'cubic-bezier(0.3,0.7,0.4,1)', fill: 'forwards' });
+        demoAt(240, () => { try { orb.remove(); } catch (_) {} demoExtras.delete(orb); });
+      });
+      demoAt(225, () => { if (token === combatToken) onImpact(); });
+    }
+    function applyDemoStatusOrImmune(step, tDom, fDom, token) {
+      const ent = findDemoEnt(step.targetId), sr = step.stateResult;
+      if (!ent || !sr || sr === 'none' || token !== combatToken) return;
+      const imm = resolveImmuneKind(step);
+      if (imm) {
+        setBeatStat(`状态免疫 · ${imm}`, '#fde047');
+        playVariantResistFx({ target: tDom, incomingType: step.incomingType, isAoe: step.isAoe, outcome: step.outcome, stateResult: sr, kind: imm, meta: { from: fDom }, onBeat: () => setBeatStat(`完成 · ${sr}`, '#86efac') });
+        const lbl = sr === 'immuneBurn' ? '免疫·燃' : (sr === 'immunePoison' ? '免疫·毒' : '免疫·晕');
+        spawnDemoFloat(ent.id, lbl, '#fde047', -28);
+        return;
+      }
+      if (sr === 'burn') {
+        if (!ent.buffs.some(b => b.type === 'burn')) ent.buffs.push({ type: 'burn', label: '🔥 灼烧', color: '#fb923c' });
+        renderEntityBuffs(ent);
+        spawnDemoFloat(ent.id, '灼烧 +1', '#fb923c', -26);
+        setBeatStat('状态挂上 · 灼烧', '#fb923c');
+      } else if (sr === 'poison') {
+        if (!ent.buffs.some(b => b.type === 'poison')) ent.buffs.push({ type: 'poison', label: '☠️ 中毒', color: '#c084fc' });
+        renderEntityBuffs(ent);
+        playDemoPoisonSeep(tDom, token);
+        spawnDemoFloat(ent.id, '中毒 +1', '#c084fc', -26);
+        setBeatStat('状态挂上 · 中毒', '#c084fc');
+      } else if (sr === 'stun') {
+        if (!ent.buffs.some(b => b.type === 'stun')) ent.buffs.push({ type: 'stun', label: '⚡ 眩晕', color: '#fde047' });
+        renderEntityBuffs(ent);
+        spawnDemoFloat(ent.id, '眩晕!', '#fde047', -28);
+        setBeatStat('状态挂上 · 眩晕星环', '#fde047');
+      }
+    }
+
+    function executeDemoStep(step, token) {
+      if (token !== combatToken) return;
+      if (step.setupPersist) { const pd = getEntitySpriteDom(step.setupPersist.id); if (pd) setPersistentFx(pd, step.setupPersist.kind, true); }
+      const fDom = getEntitySpriteDom(step.fromId), tDom = getEntitySpriteDom(step.targetId);
+      setBeatStat('前摇蓄势...', '#93c5fd');
+      playDemoLeadIn(fDom, [tDom], step, token, () => {
+        if (token !== combatToken) return;
+        if (step.outcome === 'dodge') {
+          if (tDom && tDom.animate) tDom.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(20px)' }, { transform: 'translateX(0)' }], { duration: 240, easing: 'ease-out' });
+          playVariantResistFx({ target: tDom, incomingType: step.incomingType, isAoe: step.isAoe, outcome: 'dodge', stateResult: step.stateResult, layers: ['antiMagic', 'vital'] });
+          spawnDemoFloat(step.targetId, '闪避 · 无响应', '#94a3b8', -14);
+          setBeatStat('闪避 · 无抗性/免疫', '#94a3b8');
+          demoAt(650, () => setBeatStat('待机', '#7dd3fc'));
+          return;
+        }
+        triggerDemoHitCoexist(step, tDom, step.stateResult === 'immuneStun');
+        const layers = resolveResistLayers(step);
+        if (layers.length) {
+          setBeatStat(`抗性接触 · ${layers.join('+')}`, '#38bdf8');
+          playVariantResistFx({ target: tDom, incomingType: step.incomingType, isAoe: step.isAoe, outcome: 'hit', layers, meta: Object.assign({ from: fDom }, step.meta), onBeat: (_, info) => setBeatStat(`卸力 · ${info.type}`, '#67e8f9') });
+        } else {
+          setBeatStat('常规命中 · 无匹配抗性', '#cbd5e1');
+        }
+        if (step.stateResult && step.stateResult !== 'none') {
+          demoAt(190, () => applyDemoStatusOrImmune(step, tDom, fDom, token));
+          demoAt(820, () => setBeatStat('待机', '#7dd3fc'));
+        } else {
+          demoAt(840, () => setBeatStat('待机', '#7dd3fc'));
+        }
+      });
+    }
+
+    function playDemoSkill(card, btn) {
+      ensureVariantSamples();
+      if (btn) { document.querySelectorAll('#skill-list button').forEach(b => b.classList.remove('ring-1', 'ring-sky-400/70')); btn.classList.add('ring-1', 'ring-sky-400/70'); }
+      const tok = combatToken;
+      if (card.mode === 'seq' && Array.isArray(card.steps)) {
+        card.steps.forEach(s => demoAt(s.delay || 0, () => executeDemoStep(s, tok)));
+        return;
+      }
+      if (card.mode === 'batch' && Array.isArray(card.targets)) {
+        const fDom = getEntitySpriteDom(card.fromId), toDoms = card.targets.map(t => getEntitySpriteDom(t.targetId));
+        setBeatStat('AoE 同批前摇...', '#93c5fd');
+        playDemoLeadIn(fDom, toDoms, card, tok, () => {
+          card.targets.forEach(t => {
+            const sub = Object.assign({}, card, t);
+            const tDom = getEntitySpriteDom(sub.targetId);
+            triggerDemoHitCoexist(sub, tDom, false);
+            const layers = resolveResistLayers(sub);
+            if (layers.length) playVariantResistFx({ target: tDom, incomingType: sub.incomingType, isAoe: true, outcome: 'hit', layers, meta: Object.assign({ from: fDom }, sub.meta) });
+          });
+          setBeatStat('AoE 同批分化完成', '#67e8f9');
+          demoAt(840, () => setBeatStat('待机', '#7dd3fc'));
+        });
+        return;
+      }
+      executeDemoStep(card, tok);
+    }
+
+    function renderSkillCards() {
+      const box = $('#skill-list');
+      if (!box) return;
+      box.innerHTML = DEMO_GROUPS.map((g, gi) => `<div class="arcane-variant-group-hd"><span>${g.title}</span><span class="text-[8px] text-sky-400/80">${g.tag}</span></div>` + g.cards.map((c, ci) => `<button type="button" data-gi="${gi}" data-ci="${ci}" class="w-full text-left px-2 py-1 rounded bg-slate-900/85 hover:bg-slate-800/95 border border-slate-700/60 hover:border-sky-500/50 transition-all text-[10px] text-slate-200 flex items-center justify-between gap-1 shrink-0"><span class="truncate">${c.name}</span><span class="text-[8px] font-mono text-slate-400 shrink-0">${c.mode ? '并发' : (c.outcome === 'dodge' ? '闪避' : (c.isAoe ? '群·' : '') + (c.incomingType || ''))}</span></button>`).join('')).join('');
+      box.querySelectorAll('button[data-gi]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const c = DEMO_GROUPS[+btn.dataset.gi].cards[+btn.dataset.ci];
+          if (c) playDemoSkill(c, btn);
+        });
+      });
+    }
+
+    function resetDemo() {
+      combatToken++;
+      clearDemoExtras();
+      clearArcaneFx();
+      initUI();
+      renderSkillCards();
+      setBeatStat('已重置 · 待机', '#86efac');
+    }
+    $('#btn-reset').addEventListener('click', resetDemo);
+    renderSkillCards();
+    // ===== 演示控制 END =====
+    // 移植：只将新增 arcane- CSS、技能函数、标签与分派合并到正式版已有模块。
+    // 必须同时追加 WEBM_FX_REGISTRY 的 { url: '', scale: 1.0, particles: 'arcane', delay: 蓄势秒数 }。
+    // 技能数据追加 [特效:精确标签]；按技能类型核对默认光效去重与真实反应回调，不改数值规则。
+    // 详细接线、测试与打包步骤见《技能SVG模板使用与快速移植.md》，不是复制整页即可上线。
+    // 正式版已提供 fxEngine / combatToken / getEntitySpriteDom / heroesData / enemiesData，勿重复复制演示宿主。
+  </script>
+</body>
+</html>
