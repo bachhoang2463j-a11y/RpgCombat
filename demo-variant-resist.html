@@ -54,6 +54,7 @@
     /* ===== 第二期：抗性与免疫特效样式 arcane-resist-*（可移植） ===== */
     .arcane-resist-anchor { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; }
     .arcane-resist-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .arcane-resist-shard { transform-box: fill-box; transform-origin: center; }
     .arcane-resist-ghost { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; display: flex; align-items: center; justify-content: center; overflow: hidden; }
     .arcane-resist-hit-flash { animation: arcane-resist-hit-step 0.22s steps(1) both; }
     @keyframes arcane-resist-hit-step {
@@ -430,7 +431,7 @@ const arcaneVfxModule = (function () {
 
     // ===== 几何 =====
     function ctr(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, top: r.top, bottom: r.bottom, left: r.left, right: r.right }; }
-    function domOf(e) { return getEntitySpriteDom(e); }
+    function domOf(e) { return (e && e.nodeType === 1) ? e : getEntitySpriteDom(e); }
     function unionRect(doms) {
         const rs = doms.map(d => d.getBoundingClientRect()).filter(r => r.width || r.height);
         if (!rs.length) return null;
@@ -891,42 +892,55 @@ const arcaneVfxModule = (function () {
       if (meta.outcome === 'dodge' || meta.incomingType !== '远程') return null;
       const dom = domOf(entity), r = entityVisualRect(dom);
       if (!r) return null;
-      const run = variantRun(840), u = ++S.uid, sc = meta.scaleMul || 1;
+      const run = variantRun(880), u = ++S.uid, sc = meta.scaleMul || 1;
       const { dx, dy } = dirVecOf(meta.from || meta.attacker, r);
-      const hx = r.cx - dx * Math.min(20, r.width * 0.2), hy = r.cy - dy * Math.min(14, r.height * 0.16);
-      const R = Math.max(36, Math.min(62, Math.min(r.width, r.height) * 0.56)) * sc;
+      const hx = r.cx - dx * Math.min(18, r.width * 0.16), hy = r.cy - dy * Math.min(12, r.height * 0.14);
+      const R = Math.max(54, Math.min(82, Math.max(r.width, r.height) * 0.72)) * sc;
       const pan = panOf(hx);
       playMatAudio('resist_fluid', pan, 0.24, () => { whoosh(0, { f0: 600, f1: 230, q: 1.4, dur: 0.28, vol: 0.13, pan }); tone(0.05, { type: 'sine', f0: 290, f1: 420, dur: 0.22, vol: 0.11, pan }); });
+      const wobHost = run.addLayer('', 441);
+      const wob = document.createElement('div');
+      wob.className = 'arcane-resist-ghost';
+      wob.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:8px;`;
+      const cl = cloneVisualOnly(dom);
+      if (cl) { cl.style.cssText = 'width:100%;height:100%;filter:sepia(0.8) hue-rotate(145deg) saturate(3) brightness(1.35) drop-shadow(0 0 10px rgba(103,232,249,0.75));'; wob.appendChild(cl); }
+      wobHost.appendChild(wob);
+      run.anim(wob, [
+        { transform: 'scale(1,1)', opacity: 0 },
+        { transform: 'scale(0.88,1.12)', opacity: 0.56, offset: 0.22 },
+        { transform: 'scale(1.10,0.91)', opacity: 0.46, offset: 0.54 },
+        { transform: 'scale(1,1)', opacity: 0 }
+      ], { duration: 640, easing: 'ease-in-out', fill: 'forwards' });
       const swirlArcs = [0, 90, 180, 270].map(deg => {
-        const a0 = deg * Math.PI / 180, a1 = a0 + 1.15, x0 = 60 + Math.cos(a0) * 14, y0 = 60 + Math.sin(a0) * 14;
-        const x1 = 60 + Math.cos(a1) * 44, y1 = 60 + Math.sin(a1) * 44, cx = 60 + Math.cos(a0 + 0.52) * 34, cy = 60 + Math.sin(a0 + 0.52) * 34;
-        return `<path d="M${x0.toFixed(1)},${y0.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}" fill="none" stroke="url(#fl-sw-${u})" stroke-width="5.2" stroke-linecap="round" opacity="0.88"/>`;
+        const a0 = deg * Math.PI / 180, a1 = a0 + 1.35, x0 = 60 + Math.cos(a0) * 12, y0 = 60 + Math.sin(a0) * 12;
+        const x1 = 60 + Math.cos(a1) * 48, y1 = 60 + Math.sin(a1) * 48, cx = 60 + Math.cos(a0 + 0.58) * 38, cy = 60 + Math.sin(a0 + 0.58) * 38;
+        return `<path d="M${x0.toFixed(1)},${y0.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}" fill="none" stroke="url(#fl-sw-${u})" stroke-width="5.6" stroke-linecap="round" opacity="0.96"/>`;
       }).join('');
-      const drops = Array.from({ length: 8 }, (_, i) => {
-        const ang = (i / 8) * Math.PI * 2 + (i % 2 ? 0.18 : -0.14);
-        return { ang, dist: rnd(26, 48) * sc, sz: rnd(3.2, 5.2) * sc, side: i % 2 ? 1 : -1 };
+      const drops = Array.from({ length: 10 }, (_, i) => {
+        const ang = (i / 10) * Math.PI * 2 + (i % 2 ? 0.2 : -0.15);
+        return { ang, dist: rnd(38, 54) * sc, sz: rnd(4.2, 6.2) * sc, side: i % 2 ? 1 : -1 };
       });
-      const host = run.addLayer(`<div class="arcane-resist-anchor" style="left:${hx - R}px;top:${hy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 120 120"><defs>${svgGlowDef(`fl-pool-${u}`, [['0%', '#e0f2fe', 0.28], ['38%', '#38bdf8', 0.42], ['78%', '#0284c7', 0.16], ['100%', '#0284c7', 0]])}<linearGradient id="fl-sw-${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#bae6fd" stop-opacity="0.92"/><stop offset="100%" stop-color="#0ea5e9" stop-opacity="0"/></linearGradient></defs><circle cx="60" cy="60" r="46" fill="url(#fl-pool-${u})"/><g id="fl-spin-${u}" style="transform-origin:60px 60px">${swirlArcs}</g>${drops.map((_, i) => `<circle id="fl-dr-${u}-${i}" cx="60" cy="60" r="${drops[i].sz}" fill="#bae6fd" opacity="0"/>`).join('')}</svg></div>`, 442);
+      const host = run.addLayer(`<div class="arcane-resist-anchor" style="left:${hx - R}px;top:${hy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 120 120"><defs>${svgGlowDef(`fl-pool-${u}`, [['0%', '#ffffff', 0.45], ['36%', '#67e8f9', 0.52], ['74%', '#06b6d4', 0.2], ['100%', '#0891b2', 0]])}<linearGradient id="fl-sw-${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.98"/><stop offset="45%" stop-color="#67e8f9" stop-opacity="0.92"/><stop offset="100%" stop-color="#06b6d4" stop-opacity="0"/></linearGradient></defs><circle cx="60" cy="60" r="49" fill="url(#fl-pool-${u})"/><circle cx="60" cy="60" r="36" fill="none" stroke="#cffafe" stroke-width="2" opacity="0.55"/><g id="fl-spin-${u}" style="transform-origin:60px 60px">${swirlArcs}</g>${drops.map((_, i) => `<circle id="fl-dr-${u}-${i}" cx="60" cy="60" r="${drops[i].sz}" fill="#ecfeff" opacity="0"/>`).join('')}</svg></div>`, 443);
       const wrap = host.firstElementChild, spin = host.querySelector(`#fl-spin-${u}`);
       ensureCanvas();
-      run.anim(wrap, [{ transform: 'scale(0.32)', opacity: 0 }, { transform: 'scale(1.06)', opacity: 1, offset: 0.28 }, { transform: 'scale(0.95)', opacity: 0.92, offset: 0.62 }, { transform: 'scale(0.18)', opacity: 0 }], { duration: 760, easing: 'cubic-bezier(0.22,0.72,0.28,1)', fill: 'forwards' });
-      run.anim(spin, [{ transform: 'rotate(0deg) scale(1)' }, { transform: 'rotate(-165deg) scale(0.86)', offset: 0.45 }, { transform: 'rotate(-300deg) scale(1.02)' }], { duration: 740, easing: 'ease-in-out', fill: 'forwards' });
-      run.tween(700, p => {
-        const outP = p < 0.48 ? Math.sin((p / 0.48) * Math.PI * 0.5) : Math.cos(((p - 0.48) / 0.52) * Math.PI * 0.5);
-        const op = p < 0.14 ? p / 0.14 : (p > 0.8 ? Math.max(0, (1 - p) / 0.2) : 0.92);
+      run.anim(wrap, [{ transform: 'scale(0.35)', opacity: 0 }, { transform: 'scale(1.08)', opacity: 1, offset: 0.24 }, { transform: 'scale(0.96)', opacity: 0.94, offset: 0.68 }, { transform: 'scale(0.18)', opacity: 0 }], { duration: 820, easing: 'cubic-bezier(0.22,0.72,0.28,1)', fill: 'forwards' });
+      run.anim(spin, [{ transform: 'rotate(0deg) scale(1)' }, { transform: 'rotate(-175deg) scale(0.86)', offset: 0.45 }, { transform: 'rotate(-320deg) scale(1.02)' }], { duration: 800, easing: 'ease-in-out', fill: 'forwards' });
+      run.tween(760, p => {
+        const outP = p < 0.46 ? Math.sin((p / 0.46) * Math.PI * 0.5) : Math.cos(((p - 0.46) / 0.54) * Math.PI * 0.5);
+        const op = p < 0.14 ? p / 0.14 : (p > 0.82 ? Math.max(0, (1 - p) / 0.18) : 0.96);
         drops.forEach((d, i) => {
           const el = host.querySelector(`#fl-dr-${u}-${i}`);
           if (!el) return;
-          const sw = d.ang + (p < 0.48 ? p * 1.1 : p * 2.2) * d.side;
+          const sw = d.ang + (p < 0.46 ? p * 1.15 : p * 2.25) * d.side;
           const rad = d.dist * Math.max(0, outP);
           el.setAttribute('cx', (60 + Math.cos(sw) * rad).toFixed(1));
           el.setAttribute('cy', (60 + Math.sin(sw) * rad).toFixed(1));
           el.setAttribute('opacity', op.toFixed(2));
         });
       });
-      burst(10, i => { const a = (i / 10) * Math.PI * 2; return { x: hx, y: hy, vx: Math.cos(a) * rnd(1.8, 3.6), vy: Math.sin(a) * rnd(1.8, 3.6), drag: 0.91, decay: 0.045, size: rnd(3, 5.5) * sc, shape: 'droplet', color: pick(['#bae6fd', '#38bdf8', '#7dd3fc']) }; });
+      burst(12, i => { const a = (i / 12) * Math.PI * 2; return { x: hx, y: hy, vx: Math.cos(a) * rnd(2.2, 4.2), vy: Math.sin(a) * rnd(2.2, 4.2), drag: 0.91, decay: 0.035, size: rnd(3.5, 6.2) * sc, shape: 'droplet', color: pick(['#ffffff', '#a5f3fc', '#22d3ee']) }; });
       run.after(170, () => {
-        burst(1, () => ({ x: hx, y: hy, shape: 'gradRing', size: 22 * sc, vr: 2.4, decay: 0.06, color: '#7dd3fc' }));
+        burst(1, () => ({ x: hx, y: hy, shape: 'gradRing', size: 28 * sc, vr: 2.6, decay: 0.05, color: '#a5f3fc' }));
         if (onBeat) onBeat('resist', { type: 'fluid', at: 170 });
       });
       return run;
@@ -936,9 +950,9 @@ const arcaneVfxModule = (function () {
       if (meta.outcome === 'dodge' || meta.incomingType !== '近战') return null;
       const dom = domOf(entity), r = entityVisualRect(dom);
       if (!r) return null;
-      const run = variantRun(760), u = ++S.uid, sc = meta.scaleMul || 1;
+      const run = variantRun(820), u = ++S.uid, sc = meta.scaleMul || 1;
       const { dx, dy } = dirVecOf(meta.from || meta.attacker, r);
-      const sx = dx * Math.min(26, r.width * 0.28) * sc, sy = dy * Math.min(10, r.height * 0.14) * sc;
+      const sx = dx * Math.max(30, Math.min(44, r.width * 0.40)) * sc, sy = dy * Math.max(10, Math.min(18, r.height * 0.18)) * sc;
       const pan = panOf(r.cx);
       playMatAudio('resist_phantom', pan, 0.26, () => { whoosh(0, { f0: 420, f1: 1120, q: 1.2, dur: 0.25, vol: 0.12, pan }); tone(0.04, { type: 'triangle', f0: 520, f1: 250, dur: 0.26, vol: 0.08, pan }); });
       const ghostHost = run.addLayer('', 441);
@@ -947,24 +961,24 @@ const arcaneVfxModule = (function () {
       wrap.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:8px;`;
       const clone = cloneVisualOnly(dom);
       if (clone) {
-        clone.style.cssText = 'width:100%;height:100%;filter:brightness(1.38) hue-rotate(155deg) saturate(1.4);box-shadow:none;';
+        clone.style.cssText = 'width:100%;height:100%;filter:sepia(1) hue-rotate(175deg) saturate(4.2) brightness(1.08) drop-shadow(0 0 12px rgba(56,189,248,0.88));box-shadow:none;';
         wrap.appendChild(clone);
       }
       ghostHost.appendChild(wrap);
-      const slashLayer = run.addLayer(`<div class="arcane-resist-anchor" style="left:${r.cx - 72}px;top:${r.cy - 44}px;width:144px;height:88px;"><svg class="arcane-resist-svg" viewBox="0 0 144 88"><defs><linearGradient id="ph-sl-${u}" x1="0" y1="0" x2="1" y2="0.4"><stop offset="0%" stop-color="#c4b5fd" stop-opacity="0"/><stop offset="48%" stop-color="#e0e7ff" stop-opacity="0.9"/><stop offset="100%" stop-color="#67e8f9" stop-opacity="0"/></linearGradient></defs><path d="M12,68 Q72,16 132,26 Q74,34 12,72 Z" fill="url(#ph-sl-${u})"/></svg></div>`, 444);
+      const slashLayer = run.addLayer(`<div class="arcane-resist-anchor" style="left:${r.cx - 84}px;top:${r.cy - 50}px;width:168px;height:100px;"><svg class="arcane-resist-svg" viewBox="0 0 168 100"><defs><linearGradient id="ph-sl-${u}" x1="0" y1="0" x2="1" y2="0.4"><stop offset="0%" stop-color="#818cf8" stop-opacity="0"/><stop offset="46%" stop-color="#ffffff" stop-opacity="0.98"/><stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/></linearGradient></defs><path d="M12,78 Q84,12 156,28 Q86,36 12,84 Z" fill="url(#ph-sl-${u})"/><path d="M22,88 Q88,26 146,40" fill="none" stroke="url(#ph-sl-${u})" stroke-width="2.4" stroke-linecap="round"/></svg></div>`, 445);
       run.anim(wrap, [
         { transform: 'translate3d(0,0,0) scale(1)', opacity: 0 },
-        { transform: `translate3d(${sx.toFixed(1)}px,${sy.toFixed(1)}px,0) scale(1.05)`, opacity: 0.60, offset: 0.22 },
-        { transform: `translate3d(${(sx * 1.18).toFixed(1)}px,${(sy * 1.15).toFixed(1)}px,0) scale(1.06)`, opacity: 0.56, offset: 0.56 },
+        { transform: `translate3d(${sx.toFixed(1)}px,${sy.toFixed(1)}px,0) scale(1.06)`, opacity: 0.64, offset: 0.2 },
+        { transform: `translate3d(${(sx * 1.12).toFixed(1)}px,${(sy * 1.1).toFixed(1)}px,0) scale(1.06)`, opacity: 0.60, offset: 0.62 },
         { transform: 'translate3d(0,0,0) scale(1)', opacity: 0 }
-      ], { duration: 700, easing: 'cubic-bezier(0.2,0.8,0.25,1)', fill: 'forwards' });
+      ], { duration: 760, easing: 'cubic-bezier(0.2,0.8,0.25,1)', fill: 'forwards' });
       run.anim(slashLayer.firstElementChild, [
-        { transform: `translate3d(${(-dx * 14).toFixed(1)}px,${(-dy * 8).toFixed(1)}px,0) scaleX(0.55)`, opacity: 0 },
-        { transform: `translate3d(${(sx * 0.9).toFixed(1)}px,${(sy * 0.9).toFixed(1)}px,0) scaleX(1.08)`, opacity: 0.95, offset: 0.32 },
-        { transform: `translate3d(${(sx * 1.4).toFixed(1)}px,${(sy * 1.4).toFixed(1)}px,0) scaleX(1.18)`, opacity: 0 }
-      ], { duration: 360, easing: 'ease-out', fill: 'forwards' });
+        { transform: `translate3d(${(-dx * 16).toFixed(1)}px,${(-dy * 10).toFixed(1)}px,0) scaleX(0.6)`, opacity: 0 },
+        { transform: `translate3d(${(sx * 0.95).toFixed(1)}px,${(sy * 0.95).toFixed(1)}px,0) scaleX(1.12)`, opacity: 1, offset: 0.34 },
+        { transform: `translate3d(${(sx * 1.45).toFixed(1)}px,${(sy * 1.45).toFixed(1)}px,0) scaleX(1.22)`, opacity: 0 }
+      ], { duration: 420, easing: 'ease-out', fill: 'forwards' });
       ensureCanvas();
-      burst(12, () => ({ x: r.cx + sx * 0.7 + rnd(-12, 12), y: r.cy + sy * 0.5 + rnd(-14, 14), vx: dx * rnd(0.8, 2.6), vy: rnd(-0.8, 0.8), drag: 0.93, decay: 0.045, size: rnd(6, 12) * sc, shape: 'glowOrb', color: pick(['#a5b4fc', '#67e8f9', '#c4b5fd']) }));
+      burst(14, () => ({ x: r.cx + sx * 0.75 + rnd(-14, 14), y: r.cy + sy * 0.5 + rnd(-16, 16), vx: dx * rnd(0.9, 2.8), vy: rnd(-0.9, 0.9), drag: 0.93, decay: 0.036, size: rnd(7, 13) * sc, shape: 'glowOrb', color: pick(['#c4b5fd', '#67e8f9', '#818cf8']) }));
       run.after(160, () => { if (onBeat) onBeat('resist', { type: 'phantom', at: 160 }); });
       return run;
     }
@@ -972,31 +986,31 @@ const arcaneVfxModule = (function () {
       if (meta.outcome === 'dodge' || meta.incomingType !== '法术') return null;
       const dom = domOf(entity), r = entityVisualRect(dom);
       if (!r) return null;
-      const run = variantRun(840), u = ++S.uid, sc = meta.scaleMul || 1;
+      const run = variantRun(880), u = ++S.uid, sc = meta.scaleMul || 1;
       const col = meta.spellColor || '#a855f7';
-      const R = Math.max(40, Math.min(68, Math.min(r.width, r.height) * 0.62)) * sc;
+      const R = Math.max(54, Math.min(82, Math.max(r.width, r.height) * 0.74)) * sc;
       const pan = panOf(r.cx);
       playMatAudio('resist_antimagic', pan, 0.24, () => { crystal(0.02, 1180, 0.10, pan); whoosh(0, { f0: 960, f1: 380, q: 1.5, dur: 0.25, vol: 0.11, pan }); });
       const peelPaths = Array.from({ length: 6 }, (_, i) => {
-        const a0 = (i / 6) * Math.PI * 2 + 0.25, a1 = a0 - 0.85;
-        const x0 = 60 + Math.cos(a0) * 16, y0 = 60 + Math.sin(a0) * 16;
-        const cx = 60 + Math.cos(a0 - 0.35) * 40, cy = 60 + Math.sin(a0 - 0.35) * 40;
-        const x1 = 60 + Math.cos(a1) * 56, y1 = 60 + Math.sin(a1) * 56;
-        return `<path class="am-fil-${u}" d="M${x0.toFixed(1)},${y0.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}" fill="none" stroke="url(#am-g-${u})" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="14 68"/>`;
+        const a0 = (i / 6) * Math.PI * 2 + 0.25, a1 = a0 - 1.05;
+        const x0 = 60 + Math.cos(a0) * 14, y0 = 60 + Math.sin(a0) * 14;
+        const cx = 60 + Math.cos(a0 - 0.42) * 44, cy = 60 + Math.sin(a0 - 0.42) * 44;
+        const x1 = 60 + Math.cos(a1) * 58, y1 = 60 + Math.sin(a1) * 58;
+        return `<path class="am-fil-${u}" d="M${x0.toFixed(1)},${y0.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}" fill="none" stroke="url(#am-g-${u})" stroke-width="3.6" stroke-linecap="round" stroke-dasharray="32 52"/>`;
       }).join('');
-      const host = run.addLayer(`<div class="arcane-resist-anchor" style="left:${r.cx - R}px;top:${r.cy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 120 120"><defs>${svgGlowDef(`am-core-${u}`, [['0%', '#ffffff', 0.85], ['34%', col, 0.62], ['75%', col, 0.12], ['100%', col, 0]])}<linearGradient id="am-g-${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f8fafc" stop-opacity="0.95"/><stop offset="45%" stop-color="${col}" stop-opacity="0.9"/><stop offset="100%" stop-color="${col}" stop-opacity="0"/></linearGradient></defs><g id="am-r1-${u}" style="transform-origin:60px 60px"><circle cx="60" cy="60" r="34" fill="none" stroke="url(#am-g-${u})" stroke-width="3.2" stroke-dasharray="28 18 14 20" stroke-linecap="round"/></g><g id="am-r2-${u}" style="transform-origin:60px 60px"><circle cx="60" cy="60" r="24" fill="none" stroke="url(#am-g-${u})" stroke-width="2.2" stroke-dasharray="18 14" stroke-linecap="round"/></g><g id="am-peel-${u}">${peelPaths}</g><circle id="am-sink-${u}" cx="60" cy="60" r="18" fill="url(#am-core-${u})" style="transform-origin:60px 60px"/></svg></div>`, 443);
+      const host = run.addLayer(`<div class="arcane-resist-anchor" style="left:${r.cx - R}px;top:${r.cy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 120 120"><defs>${svgGlowDef(`am-core-${u}`, [['0%', '#ffffff', 0.96], ['38%', col, 0.78], ['76%', col, 0.18], ['100%', col, 0]])}<linearGradient id="am-g-${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ffffff" stop-opacity="1"/><stop offset="42%" stop-color="${col}" stop-opacity="0.96"/><stop offset="100%" stop-color="${col}" stop-opacity="0"/></linearGradient></defs><g id="am-r1-${u}" style="transform-origin:60px 60px"><circle cx="60" cy="60" r="38" fill="none" stroke="url(#am-g-${u})" stroke-width="4" stroke-dasharray="32 16 18 18" stroke-linecap="round"/></g><g id="am-r2-${u}" style="transform-origin:60px 60px"><circle cx="60" cy="60" r="25" fill="none" stroke="#f8fafc" stroke-width="2.4" stroke-dasharray="22 14" stroke-linecap="round" opacity="0.88"/></g><g id="am-peel-${u}">${peelPaths}</g><circle id="am-sink-${u}" cx="60" cy="60" r="20" fill="url(#am-core-${u})" style="transform-origin:60px 60px"/></svg></div>`, 443);
       const r1 = host.querySelector(`#am-r1-${u}`), r2 = host.querySelector(`#am-r2-${u}`), sink = host.querySelector(`#am-sink-${u}`);
-      run.anim(r1, [{ transform: 'rotate(0deg) scale(0.42)', opacity: 0 }, { transform: 'rotate(-95deg) scale(1.06)', opacity: 0.95, offset: 0.28 }, { transform: 'rotate(-210deg) scale(1.16)', opacity: 0 }], { duration: 760, easing: 'ease-out', fill: 'forwards' });
-      run.anim(r2, [{ transform: 'rotate(0deg) scale(0.45)', opacity: 0 }, { transform: 'rotate(90deg) scale(1.02)', opacity: 0.88, offset: 0.3 }, { transform: 'rotate(195deg) scale(0.88)', opacity: 0 }], { duration: 720, easing: 'ease-out', fill: 'forwards' });
-      run.anim(sink, [{ transform: 'scale(1.1)', opacity: 0.95 }, { transform: 'scale(0.86)', opacity: 0.82, offset: 0.35 }, { transform: 'scale(0.18)', opacity: 0 }], { duration: 480, easing: 'ease-in', fill: 'forwards' });
-      run.tween(700, p => {
-        const off = (-p * 74).toFixed(1), op = (p < 0.2 ? p / 0.2 : Math.max(0, 1 - (p - 0.2) / 0.8)).toFixed(2);
+      run.anim(r1, [{ transform: 'rotate(0deg) scale(0.45)', opacity: 0 }, { transform: 'rotate(-100deg) scale(1.08)', opacity: 0.98, offset: 0.28 }, { transform: 'rotate(-220deg) scale(1.18)', opacity: 0 }], { duration: 820, easing: 'ease-out', fill: 'forwards' });
+      run.anim(r2, [{ transform: 'rotate(0deg) scale(0.45)', opacity: 0 }, { transform: 'rotate(95deg) scale(1.04)', opacity: 0.92, offset: 0.3 }, { transform: 'rotate(205deg) scale(0.9)', opacity: 0 }], { duration: 780, easing: 'ease-out', fill: 'forwards' });
+      run.anim(sink, [{ transform: 'scale(1.18)', opacity: 0.98 }, { transform: 'scale(0.88)', opacity: 0.86, offset: 0.38 }, { transform: 'scale(0.16)', opacity: 0 }], { duration: 540, easing: 'ease-in', fill: 'forwards' });
+      run.tween(760, p => {
+        const off = (-p * 84).toFixed(1), op = (p < 0.16 ? p / 0.16 : Math.max(0, 1 - (p - 0.16) / 0.84)).toFixed(2);
         host.querySelectorAll(`.am-fil-${u}`).forEach(el => { el.setAttribute('stroke-dashoffset', off); el.setAttribute('opacity', op); });
       });
       ensureCanvas();
-      burst(14, i => { const a = (i / 14) * Math.PI * 2; return { x: r.cx, y: r.cy, vx: Math.cos(a) * rnd(2.2, 4.4), vy: Math.sin(a) * rnd(2.2, 4.4), drag: 0.91, decay: 0.04, size: rnd(1.8, 3.2) * sc, shape: 'spark', color: i % 3 === 0 ? '#f8fafc' : col }; });
+      burst(16, i => { const a = (i / 16) * Math.PI * 2; return { x: r.cx, y: r.cy, vx: Math.cos(a) * rnd(2.4, 4.8), vy: Math.sin(a) * rnd(2.4, 4.8), drag: 0.91, decay: 0.035, size: rnd(2.2, 3.6) * sc, shape: 'spark', color: i % 2 === 0 ? '#ffffff' : col }; });
       run.after(180, () => {
-        burst(1, () => ({ x: r.cx, y: r.cy, shape: 'bloom', size: 16 * sc, decay: 0.09, color: col }));
+        burst(1, () => ({ x: r.cx, y: r.cy, shape: 'bloom', size: 22 * sc, decay: 0.075, color: col }));
         if (onBeat) onBeat('resist', { type: 'antiMagic', at: 180 });
       });
       return run;
@@ -1007,7 +1021,7 @@ const arcaneVfxModule = (function () {
       if (meta.outcome === 'dodge' || !isAoE) return null;
       const dom = domOf(entity), r = entityVisualRect(dom);
       if (!r) return null;
-      const run = variantRun(780), u = ++S.uid, sc = meta.scaleMul || 1;
+      const run = variantRun(820), u = ++S.uid, sc = meta.scaleMul || 1;
       const { dx, dy } = dirVecOf(meta.from || meta.attacker, r);
       const ang = Math.atan2(dy, dx) * 180 / Math.PI;
       const pan = panOf(r.cx);
@@ -1017,17 +1031,17 @@ const arcaneVfxModule = (function () {
       sil.className = 'arcane-resist-ghost';
       sil.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:8px;`;
       const cl = cloneVisualOnly(dom);
-      if (cl) { cl.style.cssText = 'width:100%;height:100%;filter:brightness(1.18) sepia(0.25) drop-shadow(0 0 8px rgba(250,204,21,0.55));'; sil.appendChild(cl); }
+      if (cl) { cl.style.cssText = 'width:100%;height:100%;filter:sepia(0.9) hue-rotate(12deg) saturate(2.5) brightness(1.22) drop-shadow(0 0 10px rgba(250,204,21,0.8));'; sil.appendChild(cl); }
       clampHost.appendChild(sil);
-      run.anim(sil, [{ transform: 'scale(1.06)', opacity: 0 }, { transform: 'scale(0.90)', opacity: 0.44, offset: 0.26 }, { transform: 'scale(0.92)', opacity: 0.34, offset: 0.56 }, { transform: 'scale(1)', opacity: 0 }], { duration: 540, easing: 'ease-out', fill: 'forwards' });
-      const R = Math.max(42, Math.min(72, Math.max(r.width, r.height) * 0.68)) * sc;
-      const svgHost = run.addLayer(`<div class="arcane-resist-anchor" style="left:${r.cx - R}px;top:${r.cy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 120 120"><defs><linearGradient id="vt-arc-${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fef08a" stop-opacity="0"/><stop offset="50%" stop-color="#fbbf24" stop-opacity="0.92"/><stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/></linearGradient><linearGradient id="vt-div-${u}" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#f8fafc" stop-opacity="0.92"/><stop offset="50%" stop-color="#38bdf8" stop-opacity="0.72"/><stop offset="100%" stop-color="#fbbf24" stop-opacity="0"/></linearGradient></defs><g id="vt-ring-${u}" style="transform-origin:60px 60px"><path d="M24,38 A42,42 0 0,1 96,38" fill="none" stroke="url(#vt-arc-${u})" stroke-width="4" stroke-linecap="round"/><path d="M24,82 A42,42 0 0,0 96,82" fill="none" stroke="url(#vt-arc-${u})" stroke-width="4" stroke-linecap="round"/><path d="M20,48 A44,44 0 0,0 20,72" fill="none" stroke="url(#vt-arc-${u})" stroke-width="3" stroke-linecap="round"/><path d="M100,48 A44,44 0 0,1 100,72" fill="none" stroke="url(#vt-arc-${u})" stroke-width="3" stroke-linecap="round"/></g><g transform="rotate(${ang.toFixed(1)} 60 60)" id="vt-flow-${u}" style="transform-origin:60px 60px"><path d="M10,60 Q48,54 78,16" fill="none" stroke="url(#vt-div-${u})" stroke-width="3.6" stroke-linecap="round"/><path d="M10,60 Q48,66 78,104" fill="none" stroke="url(#vt-div-${u})" stroke-width="3.6" stroke-linecap="round"/></g></svg></div>`, 444);
+      run.anim(sil, [{ transform: 'scale(1.08)', opacity: 0 }, { transform: 'scale(0.88)', opacity: 0.54, offset: 0.25 }, { transform: 'scale(0.90)', opacity: 0.42, offset: 0.62 }, { transform: 'scale(1)', opacity: 0 }], { duration: 600, easing: 'ease-out', fill: 'forwards' });
+      const R = Math.max(50, Math.min(78, Math.max(r.width, r.height) * 0.72)) * sc;
+      const svgHost = run.addLayer(`<div class="arcane-resist-anchor" style="left:${r.cx - R}px;top:${r.cy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 120 120"><defs><linearGradient id="vt-arc-${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fef08a" stop-opacity="0"/><stop offset="50%" stop-color="#fbbf24" stop-opacity="0.96"/><stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/></linearGradient><linearGradient id="vt-div-${u}" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"/><stop offset="52%" stop-color="#fbbf24" stop-opacity="0.88"/><stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/></linearGradient></defs><g id="vt-ring-${u}" style="transform-origin:60px 60px"><path d="M22,36 A42,42 0 0,1 98,36" fill="none" stroke="url(#vt-arc-${u})" stroke-width="4.5" stroke-linecap="round"/><path d="M22,84 A42,42 0 0,0 98,84" fill="none" stroke="url(#vt-arc-${u})" stroke-width="4.5" stroke-linecap="round"/><path d="M18,44 A45,45 0 0,0 18,76" fill="none" stroke="url(#vt-arc-${u})" stroke-width="3.6" stroke-linecap="round"/><path d="M102,44 A45,45 0 0,1 102,76" fill="none" stroke="url(#vt-arc-${u})" stroke-width="3.6" stroke-linecap="round"/></g><g id="vt-flow-${u}" style="transform-origin:60px 60px"><path d="M22,60 C38,44 64,20 98,16" fill="none" stroke="url(#vt-div-${u})" stroke-width="4" stroke-linecap="round"/><path d="M22,60 C38,76 64,100 98,104" fill="none" stroke="url(#vt-div-${u})" stroke-width="4" stroke-linecap="round"/></g></svg></div>`, 444);
       const ringEl = svgHost.querySelector(`#vt-ring-${u}`), flowEl = svgHost.querySelector(`#vt-flow-${u}`);
-      run.anim(ringEl, [{ transform: 'scale(1.22)', opacity: 0 }, { transform: 'scale(0.88)', opacity: 0.96, offset: 0.28 }, { transform: 'scale(0.95)', opacity: 0.72, offset: 0.65 }, { transform: 'scale(1.06)', opacity: 0 }], { duration: 720, easing: 'cubic-bezier(0.22,0.8,0.28,1)', fill: 'forwards' });
-      run.anim(flowEl, [{ transform: `rotate(${ang.toFixed(1)}deg) translateX(-14px) scale(0.7)`, opacity: 0 }, { transform: `rotate(${ang.toFixed(1)}deg) translateX(4px) scale(1.04)`, opacity: 0.95, offset: 0.38 }, { transform: `rotate(${ang.toFixed(1)}deg) translateX(24px) scale(1.14)`, opacity: 0 }], { duration: 540, easing: 'ease-out', fill: 'forwards' });
+      run.anim(ringEl, [{ transform: 'scale(1.26)', opacity: 0 }, { transform: 'scale(0.86)', opacity: 0.98, offset: 0.28 }, { transform: 'scale(0.94)', opacity: 0.78, offset: 0.66 }, { transform: 'scale(1.06)', opacity: 0 }], { duration: 760, easing: 'cubic-bezier(0.22,0.8,0.28,1)', fill: 'forwards' });
+      run.anim(flowEl, [{ transform: `rotate(${ang.toFixed(1)}deg) translateX(-10px) scale(0.75)`, opacity: 0 }, { transform: `rotate(${ang.toFixed(1)}deg) translateX(2px) scale(1.02)`, opacity: 0.96, offset: 0.36 }, { transform: `rotate(${ang.toFixed(1)}deg) translateX(16px) scale(1.1)`, opacity: 0 }], { duration: 600, easing: 'ease-out', fill: 'forwards' });
       ensureCanvas();
       const perpX = -dy, perpY = dx;
-      burst(12, i => { const s = i % 2 ? 1 : -1; return { x: r.cx - dx * 18, y: r.cy - dy * 18, vx: dx * rnd(1.6, 3.0) + perpX * s * rnd(1.8, 3.4), vy: dy * rnd(1.6, 3.0) + perpY * s * rnd(1.8, 3.4), drag: 0.92, decay: 0.045, size: rnd(1.8, 3) * sc, shape: 'spark', color: pick(['#fef08a', '#38bdf8', '#fbbf24']) }; });
+      burst(14, i => { const s = i % 2 ? 1 : -1; return { x: r.cx - dx * 16, y: r.cy - dy * 16, vx: dx * rnd(1.5, 2.8) + perpX * s * rnd(2.0, 3.8), vy: dy * rnd(1.5, 2.8) + perpY * s * rnd(2.0, 3.8), drag: 0.92, decay: 0.036, size: rnd(2.2, 3.4) * sc, shape: 'spark', color: pick(['#fef08a', '#38bdf8', '#fbbf24']) }; });
       run.after(180, () => { if (onBeat) onBeat('resist', { type: 'vital', at: 180 }); });
       return run;
     }
@@ -1035,22 +1049,22 @@ const arcaneVfxModule = (function () {
       if (meta.outcome === 'dodge' || (meta.stateResult && meta.stateResult !== 'immuneBurn')) return null;
       const dom = domOf(entity), r = entityVisualRect(dom);
       if (!r) return null;
-      const run = variantRun(580), u = ++S.uid, sc = meta.scaleMul || 1;
+      const run = variantRun(660), u = ++S.uid, sc = meta.scaleMul || 1;
       const { dx, dy } = dirVecOf(meta.from || meta.attacker, r);
-      const sx = r.cx - dx * Math.min(26, r.width * 0.34), sy = r.cy - dy * Math.min(18, r.height * 0.24);
+      const sx = r.cx - dx * Math.min(26, r.width * 0.28), sy = r.cy - dy * Math.min(18, r.height * 0.2);
       const ang = Math.atan2(dy, dx) * 180 / Math.PI;
       const pan = panOf(sx);
       playMatAudio('resist_fireproof', pan, 0.20, () => { whoosh(0.04, { f0: 1300, f1: 300, q: 1.7, dur: 0.22, vol: 0.09, pan }); });
-      const R = Math.max(36, Math.min(54, Math.min(r.width, r.height) * 0.48)) * sc;
-      const host = run.addLayer(`<div class="arcane-resist-anchor" style="left:${sx - R}px;top:${sy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 100 100"><defs><linearGradient id="fp-sh-${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ffedd5" stop-opacity="0"/><stop offset="50%" stop-color="#fdba74" stop-opacity="0.92"/><stop offset="100%" stop-color="#fb923c" stop-opacity="0"/></linearGradient><radialGradient id="fp-fl-${u}" cx="50%" cy="62%" r="50%"><stop offset="0%" stop-color="#fef08a" stop-opacity="0.96"/><stop offset="52%" stop-color="#f97316" stop-opacity="0.82"/><stop offset="100%" stop-color="#ea580c" stop-opacity="0"/></radialGradient></defs><g transform="rotate(${ang.toFixed(1)} 50 50)"><path id="fp-flame-${u}" d="M12,50 Q26,34 42,50 Q26,66 12,50 Z" fill="url(#fp-fl-${u})" style="transform-origin:34px 50px"/><path id="fp-arc-${u}" d="M48,18 Q62,50 48,82" fill="none" stroke="url(#fp-sh-${u})" stroke-width="5" stroke-linecap="round"/><path id="fp-arc2-${u}" d="M53,26 Q65,50 53,74" fill="none" stroke="url(#fp-sh-${u})" stroke-width="2" stroke-linecap="round" opacity="0.7"/></g></svg></div>`, 445);
+      const R = Math.max(52, Math.min(74, Math.max(r.width, r.height) * 0.68)) * sc;
+      const host = run.addLayer(`<div class="arcane-resist-anchor" style="left:${sx - R}px;top:${sy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 100 100"><defs><linearGradient id="fp-sh-${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff7ed" stop-opacity="0"/><stop offset="50%" stop-color="#fed7aa" stop-opacity="0.98"/><stop offset="100%" stop-color="#fb923c" stop-opacity="0"/></linearGradient><radialGradient id="fp-fl-${u}" cx="55%" cy="50%" r="50%"><stop offset="0%" stop-color="#fef9c3" stop-opacity="1"/><stop offset="55%" stop-color="#f97316" stop-opacity="0.9"/><stop offset="100%" stop-color="#ea580c" stop-opacity="0"/></radialGradient></defs><g transform="rotate(${ang.toFixed(1)} 50 50)"><path id="fp-flame-${u}" d="M4,50 Q24,20 46,50 Q24,80 4,50 Z" fill="url(#fp-fl-${u})" style="transform-origin:36px 50px"/><path id="fp-arc-${u}" d="M46,10 Q72,50 46,90" fill="none" stroke="url(#fp-sh-${u})" stroke-width="6.5" stroke-linecap="round"/><path id="fp-arc2-${u}" d="M54,18 Q76,50 54,82" fill="none" stroke="url(#fp-sh-${u})" stroke-width="2.6" stroke-linecap="round" opacity="0.82"/></g></svg></div>`, 445);
       const fl = host.querySelector(`#fp-flame-${u}`), arc = host.querySelector(`#fp-arc-${u}`), arc2 = host.querySelector(`#fp-arc2-${u}`);
-      run.anim(fl, [{ transform: 'translateX(-14px) scale(0.45)', opacity: 0 }, { transform: 'translateX(4px) scale(1.06)', opacity: 1, offset: 0.25 }, { transform: 'translateX(-2px) scale(0.22)', opacity: 0 }], { duration: 280, easing: 'ease-out', fill: 'forwards' });
-      run.anim(arc, [{ transform: 'scale(0.7)', opacity: 0 }, { transform: 'scale(1.05)', opacity: 0.95, offset: 0.32 }, { transform: 'scale(1.12)', opacity: 0 }], { duration: 360, easing: 'ease-out', fill: 'forwards' });
-      run.anim(arc2, [{ transform: 'scale(0.75)', opacity: 0 }, { transform: 'scale(1.08)', opacity: 0.8, offset: 0.35 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: 340, easing: 'ease-out', fill: 'forwards' });
+      run.anim(fl, [{ transform: 'translateX(-16px) scale(0.45)', opacity: 0 }, { transform: 'translateX(4px) scale(1.12)', opacity: 1, offset: 0.28 }, { transform: 'translateX(-4px) scale(0.18)', opacity: 0 }], { duration: 340, easing: 'ease-out', fill: 'forwards' });
+      run.anim(arc, [{ transform: 'scale(0.68)', opacity: 0 }, { transform: 'scale(1.06)', opacity: 0.98, offset: 0.3 }, { transform: 'scale(1.14)', opacity: 0 }], { duration: 480, easing: 'ease-out', fill: 'forwards' });
+      run.anim(arc2, [{ transform: 'scale(0.72)', opacity: 0 }, { transform: 'scale(1.08)', opacity: 0.86, offset: 0.35 }, { transform: 'scale(1.18)', opacity: 0 }], { duration: 460, easing: 'ease-out', fill: 'forwards' });
       ensureCanvas();
-      run.after(120, () => {
-        burst(10, () => ({ x: sx + rnd(-6, 6), y: sy + rnd(-8, 8), vx: -dx * rnd(0.4, 1.4) + rnd(-0.7, 0.7), vy: rnd(-1.4, -0.4), drag: 0.94, decay: rnd(0.024, 0.042), size: rnd(4, 7.5) * sc, shape: 'glowOrb', blend: 'source-over', color: pick(['#cbd5e1', '#94a3b8', '#64748b']) }));
-        if (onBeat) onBeat('immune', { type: 'fireproof', at: 120 });
+      run.after(140, () => {
+        burst(14, () => ({ x: sx + rnd(-10, 10), y: sy + rnd(-14, 14), vx: -dx * rnd(0.5, 1.8) + rnd(-0.9, 0.9), vy: rnd(-1.9, -0.5), drag: 0.94, decay: rnd(0.02, 0.036), size: rnd(5, 9) * sc, shape: 'glowOrb', blend: 'source-over', color: pick(['#e2e8f0', '#94a3b8', '#64748b']) }));
+        if (onBeat) onBeat('immune', { type: 'fireproof', at: 140 });
       });
       return run;
     }
@@ -1059,27 +1073,27 @@ const arcaneVfxModule = (function () {
       if (meta.outcome === 'dodge' || (meta.stateResult && meta.stateResult !== 'immunePoison')) return null;
       const dom = domOf(entity), r = entityVisualRect(dom);
       if (!r) return null;
-      const run = variantRun(640), u = ++S.uid, sc = meta.scaleMul || 1;
+      const run = variantRun(680), u = ++S.uid, sc = meta.scaleMul || 1;
       const pan = panOf(r.cx);
       playMatAudio('resist_poisonproof', pan, 0.26, () => { click(0.18, 0.16, 880, 0.015, pan); click(0.25, 0.13, 700, 0.015, pan); });
-      const R = Math.max(40, Math.min(64, Math.min(r.width, r.height) * 0.56)) * sc;
-      const specs = [[-18, -14, 7.5], [16, -16, 6.2], [-22, 8, 8.2], [20, 6, 7], [0, -24, 6.8]];
-      const bubbles = specs.map(([bx, by, rad], i) => `<g id="pp-b-${u}-${i}" style="transform-origin:${60 + bx}px ${60 + by}px"><circle cx="${60 + bx}" cy="${60 + by}" r="${rad}" fill="url(#pp-g-${u})"/><circle cx="${60 + bx - rad * 0.28}" cy="${60 + by - rad * 0.3}" r="${(rad * 0.28).toFixed(1)}" fill="#fdf4ff" opacity="0.9"/></g>`).join('');
-      const host = run.addLayer(`<div class="arcane-resist-anchor" style="left:${r.cx - R}px;top:${r.cy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 120 120"><defs>${svgGlowDef(`pp-g-${u}`, [['0%', '#f3e8ff', 0.32], ['55%', '#c084fc', 0.78], ['90%', '#7e22ce', 0.85], ['100%', '#581c87', 0]])}</defs>${bubbles}</svg></div>`, 445);
-      specs.forEach(([bx, by], i) => {
+      const R = Math.max(48, Math.min(72, Math.max(r.width, r.height) * 0.64)) * sc;
+      const specs = [[-22, -16, 9], [20, -18, 7.6], [-26, 8, 9.5], [24, 6, 8.2], [0, -28, 8.2]];
+      const bubbles = specs.map(([bx, by, rad], i) => `<g id="pp-b-${u}-${i}" style="transform-origin:${60 + bx}px ${60 + by}px"><circle cx="${60 + bx}" cy="${60 + by}" r="${rad}" fill="url(#pp-g-${u})"/><circle cx="${60 + bx - rad * 0.28}" cy="${60 + by - rad * 0.3}" r="${(rad * 0.28).toFixed(1)}" fill="#fdf4ff" opacity="0.95"/></g>`).join('');
+      const host = run.addLayer(`<div class="arcane-resist-anchor" style="left:${r.cx - R}px;top:${r.cy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 120 120"><defs>${svgGlowDef(`pp-g-${u}`, [['0%', '#f5d0fe', 0.36], ['55%', '#c084fc', 0.84], ['90%', '#9333ea', 0.92], ['100%', '#581c87', 0]])}</defs>${bubbles}</svg></div>`, 445);
+      specs.forEach(([bx], i) => {
         const el = host.querySelector(`#pp-b-${u}-${i}`);
         run.anim(el, [
           { transform: 'scale(0.15)', opacity: 0 },
-          { transform: 'scale(1.08)', opacity: 0.95, offset: 0.32 + i * 0.02 },
-          { transform: `translate3d(${(bx * 0.25).toFixed(1)}px,16px,0) scale(0.85)`, opacity: 0.82, offset: 0.56 },
-          { transform: `translate3d(${(bx * 0.45).toFixed(1)}px,42px,0) scale(0.18)`, opacity: 0 }
-        ], { duration: 540, delay: i * 18, easing: 'cubic-bezier(0.28,0.65,0.4,1)', fill: 'forwards' });
+          { transform: 'scale(1.1)', opacity: 0.98, offset: 0.32 + i * 0.02 },
+          { transform: `translate3d(${(bx * 0.32).toFixed(1)}px,22px,0) scale(0.92)`, opacity: 0.88, offset: 0.56 },
+          { transform: `translate3d(${(bx * 0.55).toFixed(1)}px,58px,0) scale(0.18)`, opacity: 0 }
+        ], { duration: 600, delay: i * 18, easing: 'cubic-bezier(0.28,0.65,0.4,1)', fill: 'forwards' });
       });
       ensureCanvas();
-      run.after(200, () => {
-        burst(1, () => ({ x: r.cx, y: r.cy, shape: 'gradRing', size: 22 * sc, vr: 2.2, decay: 0.08, color: '#d8b4fe' }));
-        burst(9, i => ({ x: r.cx + (specs[i % 5][0]) * sc, y: r.cy + (specs[i % 5][1]) * sc, vx: rnd(-0.9, 0.9), vy: rnd(0.8, 2.2), grav: 0.16, drag: 0.96, decay: 0.036, size: rnd(2.8, 4.8) * sc, shape: 'droplet', color: pick(['#c084fc', '#e9d5ff', '#a855f7']) }));
-        if (onBeat) onBeat('immune', { type: 'poisonproof', at: 200 });
+      run.after(210, () => {
+        burst(1, () => ({ x: r.cx, y: r.cy, shape: 'gradRing', size: 26 * sc, vr: 2.3, decay: 0.07, color: '#d8b4fe' }));
+        burst(11, i => ({ x: r.cx + (specs[i % 5][0]) * sc, y: r.cy + (specs[i % 5][1]) * sc, vx: rnd(-1.1, 1.1), vy: rnd(1.1, 2.6), grav: 0.18, drag: 0.96, decay: 0.032, size: rnd(3.4, 5.5) * sc, shape: 'droplet', color: pick(['#e9d5ff', '#c084fc', '#a855f7']) }));
+        if (onBeat) onBeat('immune', { type: 'poisonproof', at: 210 });
       });
       return run;
     }
@@ -1088,30 +1102,30 @@ const arcaneVfxModule = (function () {
       if (meta.outcome === 'dodge' || (meta.stateResult && meta.stateResult !== 'immuneStun')) return null;
       const dom = domOf(entity), r = entityVisualRect(dom);
       if (!r) return null;
-      const run = variantRun(540), u = ++S.uid, sc = meta.scaleMul || 1;
+      const run = variantRun(620), u = ++S.uid, sc = meta.scaleMul || 1;
       const hx = r.cx, hy = Math.max(20, r.top - 8), pan = panOf(hx);
-      playMatAudio('resist_ironbody', pan, 0.28, () => { click(0.11, 0.22, 3200, 0.018, pan); crystal(0.11, 1500, 0.11, pan); });
-      const stars = [-20, 0, 20].map((ox, i) => {
-        const cx = 60 + ox * sc, cy = 44 + (i === 1 ? -4 : 2);
-        return `<g id="ib-st-${u}-${i}" style="transform-origin:${cx}px ${cy}px"><polygon id="ib-l-${u}-${i}" points="${cx},${cy - 8} ${cx + 2},${cy - 2} ${cx + 1},${cy + 4} ${cx - 5},${cy + 6} ${cx - 3},${cy + 1} ${cx - 7},${cy - 2}" fill="#fde047"/><polygon id="ib-r-${u}-${i}" points="${cx},${cy - 8} ${cx + 7},${cy - 2} ${cx + 3},${cy + 1} ${cx + 5},${cy + 6} ${cx},${cy + 4}" fill="#fef08a"/></g>`;
+      playMatAudio('resist_ironbody', pan, 0.28, () => { click(0.17, 0.22, 3200, 0.018, pan); crystal(0.17, 1500, 0.11, pan); });
+      const stars = [-24, 0, 24].map((ox, i) => {
+        const cx = 60 + ox * sc, cy = 44 + (i === 1 ? -5 : 3);
+        return `<g id="ib-st-${u}-${i}" style="transform-origin:${cx}px ${cy}px"><polygon class="arcane-resist-shard" id="ib-l-${u}-${i}" points="${cx},${cy - 11} ${cx + 2.5},${cy - 3} ${cx + 1},${cy + 5} ${cx - 6.5},${cy + 8.5} ${cx - 4},${cy + 1.5} ${cx - 9.5},${cy - 3}" fill="#fde047"/><polygon class="arcane-resist-shard" id="ib-r-${u}-${i}" points="${cx},${cy - 11} ${cx + 9.5},${cy - 3} ${cx + 4},${cy + 1.5} ${cx + 6.5},${cy + 8.5} ${cx},${cy + 5}" fill="#fef9c3"/></g>`;
       }).join('');
-      const host = run.addLayer(`<div class="arcane-resist-anchor" style="left:${hx - 60}px;top:${hy - 44}px;width:120px;height:88px;"><svg class="arcane-resist-svg" viewBox="0 0 120 88"><defs><linearGradient id="ib-gl-${u}" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#f8fafc" stop-opacity="0"/><stop offset="50%" stop-color="#f8fafc" stop-opacity="0.96"/><stop offset="100%" stop-color="#94a3b8" stop-opacity="0"/></linearGradient></defs>${stars}<path id="ib-cut-${u}" d="M20,44 L100,40" fill="none" stroke="url(#ib-gl-${u})" stroke-width="3.6" stroke-linecap="round" opacity="0"/></svg></div>`, 446);
-      [-20, 0, 20].forEach((ox, i) => {
+      const host = run.addLayer(`<div class="arcane-resist-anchor" style="left:${hx - 68}px;top:${hy - 44}px;width:136px;height:88px;"><svg class="arcane-resist-svg" viewBox="0 0 120 88" style="filter:drop-shadow(0 0 6px rgba(250,204,21,0.75))"><defs><linearGradient id="ib-gl-${u}" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ffffff" stop-opacity="0"/><stop offset="50%" stop-color="#f8fafc" stop-opacity="1"/><stop offset="100%" stop-color="#94a3b8" stop-opacity="0"/></linearGradient></defs>${stars}<path id="ib-cut-${u}" d="M12,48 L108,36" fill="none" stroke="url(#ib-gl-${u})" stroke-width="4.4" stroke-linecap="round" opacity="0"/></svg></div>`, 446);
+      [-24, 0, 24].forEach((ox, i) => {
         const st = host.querySelector(`#ib-st-${u}-${i}`);
-        run.anim(st, [{ transform: 'scale(0.25) translateY(6px)', opacity: 0 }, { transform: 'scale(1.08) translateY(0)', opacity: 1, offset: 0.24 }, { transform: 'scale(1) translateY(0)', opacity: 1 }], { duration: 135, fill: 'forwards' });
-        run.after(118, () => {
+        run.anim(st, [{ transform: 'scale(0.3) translateY(6px)', opacity: 0 }, { transform: 'scale(1.12) translateY(0)', opacity: 1, offset: 0.35 }, { transform: 'scale(1) translateY(0)', opacity: 1 }], { duration: 195, fill: 'forwards' });
+        run.after(170, () => {
           const sl = host.querySelector(`#ib-l-${u}-${i}`), sr = host.querySelector(`#ib-r-${u}-${i}`);
-          run.anim(sl, [{ transform: 'translate(0,0) rotate(0deg)', opacity: 1 }, { transform: `translate(${-14 - i * 2}px,${10 + i * 2}px) rotate(-48deg)`, opacity: 0 }], { duration: 290, easing: 'ease-out', fill: 'forwards' });
-          run.anim(sr, [{ transform: 'translate(0,0) rotate(0deg)', opacity: 1 }, { transform: `translate(${14 + i * 2}px,${-8 + i * 3}px) rotate(52deg)`, opacity: 0 }], { duration: 290, easing: 'ease-out', fill: 'forwards' });
+          run.anim(sl, [{ transform: 'translate(0,0) rotate(0deg) scale(1)', opacity: 1 }, { transform: `translate(${-16 - i * 3}px,${10 + i * 3}px) rotate(-52deg) scale(0.45)`, opacity: 0 }], { duration: 340, easing: 'ease-out', fill: 'forwards' });
+          run.anim(sr, [{ transform: 'translate(0,0) rotate(0deg) scale(1)', opacity: 1 }, { transform: `translate(${16 + i * 3}px,${-10 + i * 3}px) rotate(56deg) scale(0.45)`, opacity: 0 }], { duration: 340, easing: 'ease-out', fill: 'forwards' });
         });
       });
       const cut = host.querySelector(`#ib-cut-${u}`);
-      run.after(115, () => {
-        run.anim(cut, [{ transform: 'scaleX(0.3)', opacity: 0 }, { transform: 'scaleX(1.08)', opacity: 1, offset: 0.3 }, { transform: 'scaleX(1.22)', opacity: 0 }], { duration: 220, easing: 'ease-out', fill: 'forwards' });
+      run.after(165, () => {
+        run.anim(cut, [{ transform: 'scaleX(0.35)', opacity: 0 }, { transform: 'scaleX(1.1)', opacity: 1, offset: 0.3 }, { transform: 'scaleX(1.26)', opacity: 0 }], { duration: 240, easing: 'ease-out', fill: 'forwards' });
         ensureCanvas();
-        burst(1, () => ({ x: hx, y: hy, shape: 'gradRing', size: 18 * sc, vr: 2.5, decay: 0.09, color: '#e2e8f0' }));
-        burst(12, () => { const a = rnd(-2.9, 0.3); const sp = rnd(1.8, 4.4); return { x: hx + rnd(-18, 18), y: hy + rnd(-4, 4), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.6, grav: 0.14, drag: 0.93, decay: 0.045, size: rnd(1.6, 3.0) * sc, shape: 'spark', color: pick(['#fde047', '#f8fafc', '#cbd5e1']) }; });
-        if (onBeat) onBeat('immune', { type: 'ironBody', at: 120 });
+        burst(1, () => ({ x: hx, y: hy, shape: 'gradRing', size: 22 * sc, vr: 2.6, decay: 0.08, color: '#f8fafc' }));
+        burst(14, () => { const a = rnd(-2.9, 0.3), sp = rnd(2.0, 4.8); return { x: hx + rnd(-22, 22), y: hy + rnd(-4, 4), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.6, grav: 0.14, drag: 0.93, decay: 0.038, size: rnd(1.8, 3.2) * sc, shape: 'spark', color: pick(['#fde047', '#ffffff', '#cbd5e1']) }; });
+        if (onBeat) onBeat('immune', { type: 'ironBody', at: 170 });
       });
       return run;
     }
@@ -1378,10 +1392,19 @@ const arcaneVfxModule = (function () {
       if (!dom || token !== combatToken) return;
       const r = dom.getBoundingClientRect();
       const el = document.createElement('div');
-      el.style.cssText = `position:fixed;left:${r.left + r.width / 2 - 36}px;top:${r.top + r.height / 2 - 36}px;width:72px;height:72px;border-radius:50%;pointer-events:none;z-index:445;background:radial-gradient(circle,rgba(192,132,252,0.75) 0%,rgba(126,34,206,0.4) 55%,transparent 75%);`;
+      el.style.cssText = `position:fixed;left:${r.left + r.width / 2 - 40}px;top:${r.top + r.height / 2 - 40}px;width:80px;height:80px;border-radius:50%;pointer-events:none;z-index:445;background:radial-gradient(circle,rgba(216,180,254,0.85) 0%,rgba(147,51,234,0.5) 55%,transparent 75%);`;
       document.body.appendChild(el); demoExtras.add(el);
-      el.animate([{ transform: 'scale(1.2)', opacity: 0.9 }, { transform: 'scale(0.55)', opacity: 0 }], { duration: 480, fill: 'forwards' });
-      demoAt(500, () => { try { el.remove(); } catch (_) {} demoExtras.delete(el); });
+      el.animate([{ transform: 'scale(1.25)', opacity: 0.92 }, { transform: 'scale(0.5)', opacity: 0 }], { duration: 520, fill: 'forwards' });
+      demoAt(540, () => { try { el.remove(); } catch (_) {} demoExtras.delete(el); });
+    }
+    function playDemoBurnFlare(dom, token) {
+      if (!dom || token !== combatToken) return;
+      const r = dom.getBoundingClientRect();
+      const el = document.createElement('div');
+      el.style.cssText = `position:fixed;left:${r.left + r.width / 2 - 42}px;top:${r.top + r.height / 2 - 42}px;width:84px;height:84px;border-radius:50%;pointer-events:none;z-index:445;background:radial-gradient(circle,rgba(254,240,138,0.9) 0%,rgba(249,115,22,0.65) 55%,transparent 76%);`;
+      document.body.appendChild(el); demoExtras.add(el);
+      el.animate([{ transform: 'scale(1.2)', opacity: 0.95 }, { transform: 'scale(0.65)', opacity: 0 }], { duration: 500, fill: 'forwards' });
+      demoAt(520, () => { try { el.remove(); } catch (_) {} demoExtras.delete(el); });
     }
     function triggerDemoHitCoexist(step, tDom, quietIdle = false) {
       const ent = findDemoEnt(step.targetId), dmg = (step.meta && (step.meta.finalDamage ?? step.meta.finalDmg)) || 0;
@@ -1394,7 +1417,7 @@ const arcaneVfxModule = (function () {
           tDom.animate([{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(4px,-2px,0)' }, { transform: 'translate3d(0,0,0)' }], { duration: 150, easing: 'ease-out' });
         }
       }
-      if (ent && dmg > 0) { updateDemoHp(ent, dmg); spawnDemoFloat(ent.id, `-${dmg}`, step.meta && step.meta.resistReduced ? '#fda4af' : '#f8fafc', -6); }
+      if (ent && dmg > 0) { updateDemoHp(ent, dmg); spawnDemoFloat(ent.id, `-${dmg}`, step.meta && step.meta.resistReduced ? '#fda4af' : '#f8fafc', 14); }
     }
     function playDemoLeadIn(fromDom, toDoms, step, token, onImpact) {
       const fc = fromDom ? fromDom.getBoundingClientRect() : { left: 180, top: 360, width: 40, height: 40 };
@@ -1433,6 +1456,7 @@ const arcaneVfxModule = (function () {
       if (sr === 'burn') {
         if (!ent.buffs.some(b => b.type === 'burn')) ent.buffs.push({ type: 'burn', label: '🔥 灼烧', color: '#fb923c' });
         renderEntityBuffs(ent);
+        playDemoBurnFlare(tDom, token);
         spawnDemoFloat(ent.id, '灼烧 +1', '#fb923c', -26);
         setBeatStat('状态挂上 · 灼烧', '#fb923c');
       } else if (sr === 'poison') {
