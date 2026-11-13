@@ -51,6 +51,12 @@
     const replace = (name, fn) => { if (!functions.has(name)) functions.set(name, w[name]); w[name] = fn; };
     const sounds = [], events = [];
     replace('playSound', (key, vol, rate) => { sounds.push({ key, vol, rate }); return () => {}; });
+    // v12.06：复活专属 cue 走 playVariantTriggerFx 业务分派；此处只 spy 分派参数，
+    // 不 mock 数值，也不以 playSound 记录其实际采样（采样由 idSample 完成）。
+    let reviveCueArgs = null;
+    if (typeof w.playVariantTriggerFx === 'function') {
+      replace('playVariantTriggerFx', function (...args) { reviveCueArgs = args; return undefined; });
+    }
     const onDmg = ctx => events.push({ kind: 'damage', ctx });
     const onDdg = ctx => events.push({ kind: 'dodge', ctx });
     w.CombatEvents.on(E.DAMAGE_RESOLVED, onDmg);
@@ -405,6 +411,26 @@
       resetAll();
     });
 
+    await group('真实DoT致死复活收口', async () => {
+      const d=install([entity('h_ca1')],[entity('e_ca1',{hp:5,maxHp:1000,reviveCount:1})]);
+      wireDom();
+      const sprite=w.getEntitySpriteDom(d.e[0]);sprite.style.display='';sprite.classList.remove('opacity-0','scale-50');
+      d.e[0].buffs=[{type:'poison',value:20,duration:2},{type:'stun',duration:2}];
+      const priorEnd=w.endTurn;
+      replace('endTurn',()=>{});
+      const cue=w.playVariantTriggerFx;
+      let called=null;
+      replace('playVariantTriggerFx',opts=>{called=opts;return null;});
+      ev('state.isGameStarted=true;state.round=1;state.queueIndex=0;state.actionQueue=[{type:"enemy",ref:enemiesData[0]}];');
+      try {
+        await w.nextTurn();
+        eq([d.e[0].hp,d.e[0].reviveCount,d.e[0].isAlive],[300,0,true],'真实nextTurn毒致死后先复活，保留30%HP与存活');
+        eq([called&&called.trigger,called&&called.enemyId],['revive','e_ca1'],'DoT致死走统一变种复活声画入口');
+        const dom=w.getEntitySpriteDom(d.e[0]);
+        check(!!dom&&dom.style.display!=='none'&&!dom.classList.contains('opacity-0'),'DoT复活期间真实精灵未隐藏');
+      } finally {w.endTurn=priorEnd;w.playVariantTriggerFx=cue;ev('state.isGameStarted=false;state.actionQueue=[];');}
+    });
+
     /* ================================================================
        组四A：HP Cost 施放代价（executeSkillAction 直达路径）真实负向断言
        ================================================================ */
@@ -495,6 +521,13 @@
       }
       eq(events.filter(x => x.kind === 'damage').length, 1, '反伤不再触发 AFTER_DAMAGE（无递归二次发布）');
       eq(impactSounds().length, 1, '反伤受击音恰一次');
+      for (const armor of [0, 40]) {
+        resetAll();
+        const low = install([entity('h_ca1', { hp:1000,maxHp:1000,def:armor })],[entity('e_ca1',{tags:['[荆棘]']})]);
+        wireDom();
+        w.CombatEvents.emit(E.AFTER_DAMAGE,{caster:low.h[0],target:low.e[0],incomingDamageType:'近战',hpDmg:2,shieldDmg:0});
+        eq(low.h[0].hp,990,'荆棘实际反伤下限10，护甲'+armor+'不把下限减成1');
+      }
       /* 2) 反伤致命先经 ON_FATAL_DAMAGE 保命，发布保命后的结果 */
       resetAll();
       const dE2 = install([entity('h_ca1', { classType: '防守者', hp: 5, maxHp: 1000, atk: 100, def: 0 })],
@@ -542,13 +575,27 @@
       wireDom();
       const s = sk('【召雷术复活回归】[群攻;power:210][法术][必中]');
       const wave = dir.beginWave(['e_ca1']);
+      reviveCueArgs = null;
       await w.applySingleTagEffect(d.h[0], d.e[0], '[群攻]', 210, 300, 1, null, s, 210, true, { audioWave:wave });
       dir.closeWave(wave);
       eq([d.e[0].hp,d.e[0].reviveCount,d.e[0].shield], [39,0,0], '真实致命法术触发复活，仍无个人盾');
       const result = dmgCtx(c => c.targetId === 'e_ca1');
       eq([result?.kind,result?.resultType,result?.hpDmg,result?.shieldBroken], ['prevented','DamagePrevented',0,false], '复活免伤发布独立结果，不冒充格挡或破盾');
       eq(impactSounds().length, 0, '纯复活波不播放最高档格挡或受击音');
-      eq(sounds.filter(s => s.key === 'hpHeal').length, 1, '复活自身回血音保留一次');
+      if (typeof w.playVariantTriggerFx === 'function') {
+        eq(sounds.filter(s => s.key === 'hpHeal').length, 0, '复活不再走 hpHeal 旧回血音');
+        const arg0 = reviveCueArgs && reviveCueArgs[0];
+        const arg1 = reviveCueArgs && reviveCueArgs[1];
+        let cue;
+        if (arg0 && typeof arg0 === 'object') cue = arg0;
+        else if (arg1 && typeof arg1 === 'object') cue = Object.assign({ trigger: arg0 }, arg1);
+        else cue = { trigger: arg0, enemyId: arg1, meta: reviveCueArgs && reviveCueArgs[2] };
+        eq(cue.trigger, 'revive', '复活 cue 走 trigger:revive 业务分派');
+        eq(cue.enemyId, 'e_ca1', '复活 cue 携带真实 enemyId');
+        eq(cue.meta && cue.meta.healTo, 39, '复活 cue meta.healTo=30%最大HP');
+      } else {
+        pending.push('待对齐:playVariantTriggerFx 复活专属 cue 未接管');
+      }
       resetAll();
     });
 

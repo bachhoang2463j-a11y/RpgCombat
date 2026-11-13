@@ -1,0 +1,73 @@
+{
+  "source": "demo-variant-triggers.html",
+  "sourceSha256": "7d2594e1b2a39baf4fce1ec714f2a460e032522de170729a1f2437ef2eda6e4c",
+  "rage_roar": "复用 audioUrls.taunt / taunt.mp3",
+  "samples": [
+    {
+      "key": "revive_gather",
+      "file": "vfx_variant_revive_gather.mp3",
+      "bytes": 3764,
+      "sha256": "ea04976b5427c8ba2a3bd2dc6c01751f0f2785035a59d2b83f6c37f630f6c501"
+    },
+    {
+      "key": "revive_bloom",
+      "file": "vfx_variant_revive_bloom.mp3",
+      "bytes": 8636,
+      "sha256": "f02e3d7806b8550158f5812b03983241b57b09d04d56734b085924c2a32233b2"
+    },
+    {
+      "key": "molt_crack",
+      "file": "vfx_variant_molt_crack.mp3",
+      "bytes": 5276,
+      "sha256": "8d11ebf2f55a3cdaba72799cca80c1c9b849ca85a196e885be15afeda9f7dc94"
+    },
+    {
+      "key": "molt_snap",
+      "file": "vfx_variant_molt_snap.mp3",
+      "bytes": 3428,
+      "sha256": "b4cb22189f83ff4c47e01930e64f1521b1db4fa3606fa209c107876c16bdd9d9"
+    },
+    {
+      "key": "molt_empower",
+      "file": "vfx_variant_molt_empower.mp3",
+      "bytes": 7597,
+      "sha256": "3b31001b39ad86c281fad5fd651c5ec57baaaa8180ae0aa56fa9bb4d6d32fb0e"
+    },
+    {
+      "key": "rage_exit",
+      "file": "vfx_variant_rage_exit.mp3",
+      "bytes": 5276,
+      "sha256": "97d7be725308d726c0fa88f1843bd406c67bd82e79c81e38815880f9d816cb25"
+    },
+    {
+      "key": "link_dash",
+      "file": "vfx_variant_link_dash.mp3",
+      "bytes": 3057,
+      "sha256": "1e300193eb5daf7ddbced4cf85855e0e356c893dc8ea252e7e659861ea433228"
+    },
+    {
+      "key": "link_chime",
+      "file": "vfx_variant_link_chime.mp3",
+      "bytes": 4095,
+      "sha256": "01fec46f60fba9f6d9383a5c73d35304e153690aa4f1966a413224a498a13de2"
+    },
+    {
+      "key": "leech_flow",
+      "file": "vfx_variant_leech_flow.mp3",
+      "bytes": 4268,
+      "sha256": "db398032ae20fefaeefc747396b69b3e8977be1e544d3c2870a380e5c63ef054"
+    },
+    {
+      "key": "regen_hum",
+      "file": "vfx_variant_regen_hum.mp3",
+      "bytes": 4772,
+      "sha256": "4b361d6020ea5fe41d173c7a09ea7bda56722433cdf8d75b1209786a94ddda3e"
+    },
+    {
+      "key": "thorn_parry",
+      "file": "vfx_variant_thorn_parry.mp3",
+      "bytes": 5580,
+      "sha256": "10e87da501bae4dc8c7a07b5c436ad60aac769ace3a7a352a2ff1cc055dc7444"
+    }
+  ]
+}

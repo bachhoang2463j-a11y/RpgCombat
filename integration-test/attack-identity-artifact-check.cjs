@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ROOT = path.resolve(__dirname, '..');
-const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_05.json');
+const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_06.json');
 const pkg = JSON.parse(fs.readFileSync(artifact, 'utf8'));
 const src = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const fenced = pkg.replaceString;
@@ -34,7 +34,7 @@ function syntax(text, label) {
   catch (e) { check(false, label + '语法：' + e.message); }
 }
 console.log('== 攻击身份与命中分层 v12.0 产物专项 ==');
-check(path.basename(artifact) === 'regex-前端战斗v12_05.json' && pkg.scriptName === '前端战斗v12.05', '文件名与scriptName均为v12.05');
+check(path.basename(artifact) === 'regex-前端战斗v12_06.json' && pkg.scriptName === '前端战斗v12.06', '文件名与scriptName均为v12.06');
 check(count(src,'```') === 2 && count(fenced,'```') === 2, '源码与产物均只有头尾自围栏');
 check(!immune.includes('```') && !/&(?!amp;)/.test(immune), '内部围栏加固及全量实体免疫');
 check(raw.replace(/&/g,'&amp;') === immune, '单遍实体还原逐字符一致');

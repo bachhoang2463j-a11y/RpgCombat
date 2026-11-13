@@ -20,6 +20,18 @@
     const missing = api.filter(name => ev('typeof ' + name) !== 'function');
     eq(missing, [], '秘术与命中出口接口全部存在');
     if (missing.length) return { pending: missing };
+    // v12.06 新增两项：注册/分派未落地时只登记待对齐，不误伤原五技能用例。
+    const pending = [];
+    const soft = (cond, name, reason) => {
+      if (cond) { check(true, name); return; }
+      pending.push(name + (reason ? ' — ' + reason : ''));
+      check(false, name + '（待对齐：' + (reason || '接口/行为未落地') + '）');
+    };
+    const NEW_TAGS = ['飞沙化甲', '蝎眼钥匙'];
+    const fsText = '【飞沙化甲】[单防;power:50][单瞄;power:30][再动;power:1][MP:10][法术][特效:飞沙化甲]';
+    const xyText = '【蝎眼钥匙】[召唤:幻梦行军兽][单防;power:10][MP:10][法术][特效:蝎眼钥匙]';
+    const xyPureText = '【蝎眼钥匙】[召唤:幻梦行军兽][无;power:0][MP:10][法术][特效:蝎眼钥匙]';
+    const newDelays = NEW_TAGS.map(n => { try { return ev('WEBM_FX_REGISTRY[' + JSON.stringify(n) + '] && WEBM_FX_REGISTRY[' + JSON.stringify(n) + '].delay'); } catch (e) { return undefined; } });
     const gen0 = mock.genCount();
     const saved = ev(`({ heroesData, enemiesData, initialHeroesCache, initialEnemiesCache, battleHistory, _historyRawCache,
       teamBarrier, teamBarrierMax, teamBarrierName, barrierArmor, barrierSub, barrierStandIn, barrierAoEActive, barrierAoELeak,
@@ -40,6 +52,15 @@
     const restoreTimers = () => {
       timerIds.clear();
       w.setTimeout = nativeSetTimeout; w.clearTimeout = nativeClearTimeout;
+    };
+    const installFakeTimers = () => {
+      w.setTimeout = (fn, ms, ...args) => {
+        const id = {};
+        timerIds.add(id);
+        Promise.resolve().then(() => { if (timerIds.delete(id)) fn(...args); });
+        return id;
+      };
+      w.clearTimeout = id => { timerIds.delete(id); };
     };
     const reg = ev('WEBM_FX_REGISTRY');
     const delays = names.map(name => reg[name].delay);
@@ -270,6 +291,229 @@
         eq(calls.projectiles.length,0,'显式标记已播的溢出不重复弹道');
       });
 
+      await group('新技能注册与解析', async () => {
+        let regs = null, tagged = false;
+        try {
+          regs = ev(`({ a:WEBM_FX_REGISTRY['飞沙化甲'], b:WEBM_FX_REGISTRY['蝎眼钥匙'], tags:${JSON.stringify(names.concat(NEW_TAGS))}.filter(n=>isArcaneSkillFx(n)) })`);
+          tagged = ev(`isArcaneSkillFx('飞沙化甲') === true && isArcaneSkillFx('蝎眼钥匙') === true`);
+        } catch (e) { regs = null; }
+        soft(tagged, '飞沙化甲/蝎眼钥匙被 isArcaneSkillFx 精确识别', '新标签未注册');
+        const ra = regs && regs.a, rb = regs && regs.b;
+        soft(!!ra && ra.url === '' && ra.particles === 'arcane' && Number(ra.delay) === 0.28,
+          '飞沙化甲注册表：本地程序生成/delay 0.28', ra ? '实际 ' + JSON.stringify(ra) : '缺注册表');
+        soft(!!rb && rb.url === '' && rb.particles === 'arcane' && Number(rb.delay) === 1.15,
+          '蝎眼钥匙注册表：本地程序生成/delay 1.15', rb ? '实际 ' + JSON.stringify(rb) : '缺注册表');
+        soft(!!regs && ['灵风术', '纳克提特障壁术', '伊西丝之拥', '折影步', '巫师护盾'].every(n => regs.tags.includes(n)),
+          '旧五项标签仍在数组中，未被新技能替换', '旧标签丢失');
+        const protoFs = w.parseSkill('【飞沙化甲】[单防;power:50][单瞄:30][再动;power:1][MP:8][Turns:5][法术][他人][特效:飞沙化甲]');
+        const protoItem = w.parseItem('【蝎眼钥匙】[召唤:幻梦行军兽][单防;power:10][MP:20][高阶][延迟:0][道具][次数:1][特效:蝎眼钥匙]');
+        eq([protoFs.type,protoFs.power,protoFs.type2,protoFs.power2,protoFs.type3,protoFs.power3,protoFs.cost,protoFs.turns,protoFs.isOthers,protoFs.fxTag],
+          ['[单防]',50,'[单瞄]',30,'[再动]',1,8,5,true,'飞沙化甲'],'定稿飞沙化甲真实原型：瞄冒号、MP8、五回合与他人解析');
+        eq([protoItem.summonTarget,protoItem.type,protoItem.power,protoItem.cost,protoItem.isHighTier,protoItem.delay,protoItem.category,protoItem.maxUses,protoItem.fxTag],
+          ['幻梦行军兽','[单防]',10,20,true,0,'道具',1,'蝎眼钥匙'],'定稿蝎眼钥匙真实道具原型：零延迟、次数1与召唤+单防解析');
+        const s = w.itemToPseudoSkill(protoItem);
+        eq([s.isItem,s.summonTarget,s.fxTag,s.delay,s.cost,s.itemRef], [true,'幻梦行军兽','蝎眼钥匙',0,20,protoItem],'蝎眼钥匙正式物品伪技能透传');
+        const fs = w.parseSkill(fsText), xy = w.parseSkill(xyText), pure = w.parseSkill(xyPureText);
+        soft([fs.fxTag, fs.type, fs.power, fs.type2, fs.power2, fs.type3, fs.power3, fs.cost].join('|') ===
+          '飞沙化甲|[单防]|50|[单瞄]|30|[再动]|1|10', '飞沙化甲三槽（防50/瞄30/再动1）与MP解析',
+          [fs.fxTag, fs.type, fs.power, fs.type2, fs.power2, fs.type3, fs.power3, fs.cost].join('|'));
+        soft([xy.summonTarget, xy.fxTag, xy.type, xy.power].join('|') === '幻梦行军兽|蝎眼钥匙|[单防]|10',
+          '蝎眼召唤+单防附签分别解析', [xy.summonTarget, xy.fxTag, xy.type, xy.power].join('|'));
+        soft([pure.summonTarget, pure.type, pure.cost].join('|') === '幻梦行军兽|[无]|10',
+          '蝎眼纯召唤（[无]）解析', [pure.summonTarget, pure.type, pure.cost].join('|'));
+      });
+
+      await group('新技能防瞄再动声画去重', async () => {
+        const d = installData([entity('h_arcane0', { skills: [w.parseSkill(fsText)] })], [entity('e_arcane')]);
+        ev('battleHistory=[];state.actionQueue=[{type:"hero",ref:heroesData[0]}];state.queueIndex=0;state.isGameStarted=false;');
+        clearCalls();
+        await w.executeSkillAction(d.h[0], d.h[0], d.h[0].skills[0], 1);
+        soft(calls.skills.filter(c => c.tag === '飞沙化甲').length === 1, '飞沙化甲专属演出只起播一次（防/瞄/再动三槽合计）',
+          '实际 ' + calls.skills.map(c => c.tag).join(','));
+        soft(d.h[0].buffs.some(b => b.type === 'def' && b.value === 50) && d.h[0].buffs.some(b => b.type === 'hit' && b.value === 30),
+          '防御+50、命中+30 数值原样落 buff', JSON.stringify(d.h[0].buffs));
+        soft(d.h[0].mp === 90, 'MP 按原逻辑扣 10', 'MP=' + d.h[0].mp);
+        soft(!calls.sounds.some(k => k === 'defUp' || k === 'hitUp' || k === 'atkUp'),
+          '新技能 defUp/hitUp/atkUp 默认音全部抑制', calls.sounds.join(','));
+        soft(calls.svg.length === 0, '新技能不再叠默认盾/增益 SVG', calls.svg.map(c => c.type).join(','));
+        soft(calls.floats.some(t => t.includes('防+50')) && calls.floats.some(t => t.includes('准+30')) && calls.floats.some(t => t.includes('再动+1')),
+          '防御/命中/再动浮字保留', calls.floats.join('|'));
+        soft(ev('state.actionQueue.filter(q=>q.isExtraTurn).length') >= 1, '再动仍插入额外行动');
+        soft((ev('battleHistory').filter(l => l.includes('发动了【飞沙化甲】')).length) === 1,
+          '飞沙一次释放只写一条行动战报', '实际 ' + ev('battleHistory').filter(l => l.includes('飞沙化甲')).join(' / '));
+        // 普通技能对照：未挂新特效时仍走原声画。
+        const plainDef = w.parseSkill('【普通防】[单防;power:12]');
+        clearCalls();
+        await w.executeSkillAction(d.h[0], d.h[0], plainDef, 1);
+        soft(calls.sounds.includes('defUp') && calls.svg.some(c => c.type === 'shield'), '普通[单防]仍播 defUp+盾牌 SVG',
+          'sounds=' + calls.sounds.join(',') + ' svg=' + calls.svg.map(c => c.type).join(','));
+        const plainAim = w.parseSkill('【普通瞄】[单瞄;power:12]');
+        clearCalls();
+        await w.executeSkillAction(d.h[0], d.h[0], plainAim, 1);
+        soft(calls.sounds.includes('hitUp') && calls.svg.some(c => c.type === 'buff'), '普通[单瞄]仍播 hitUp+增益 SVG',
+          'sounds=' + calls.sounds.join(',') + ' svg=' + calls.svg.map(c => c.type).join(','));
+        const plainRe = w.parseSkill('【普通再动】[再动;power:1]');
+        clearCalls();
+        await w.executeSkillAction(d.h[0], d.h[0], plainRe, 1);
+        soft(calls.sounds.includes('atkUp') && calls.svg.some(c => c.type === 'buff'), '普通[再动]仍播 atkUp+增益 SVG',
+          'sounds=' + calls.sounds.join(',') + ' svg=' + calls.svg.map(c => c.type).join(','));
+        // 旧五技能辅助音对照（灵风术 defUp+atkUp 保留）。
+        const old = installData([entity('h_arcane0', { skills: [skill(0)] })], [entity('e_arcane')]);
+        clearCalls();
+        await w.executeSkillAction(old.h[0], old.h[0], old.h[0].skills[0], 1);
+        soft(calls.sounds.includes('defUp') && calls.sounds.includes('atkUp'), '旧五灵风术辅助音未被新抑制规则波及',
+          calls.sounds.join(','));
+      });
+
+      await group('蝎眼召唤契约', async () => {
+        const xyFx = [], summonRec = [], wardSeen = [];
+        let summonMode = { result: true, delay: 0 };
+        let lastRealHandle = null;
+        const xyStub = (tag, caster, targets, reaction) => {
+          if (tag !== '蝎眼钥匙') return realSkill(tag, caster, targets, reaction);
+          let release = null;
+          const burstReady = new Promise(resolve => { release = resolve; });
+          const rec = { caster, targets: (targets || []).slice(), wardCalls: [], handle: null };
+          const handle = {
+            doneAt: Date.now() + (summonMode.doneIn || 60),
+            burstReady,
+            cancel() { if (release) { release(false); release = null; } },
+            setWardTargets(list) { rec.wardCalls.push((list || []).slice()); }
+          };
+          rec.handle = handle;
+          xyFx.push(rec);
+          if (summonMode.delay > 0) wait(summonMode.delay).then(() => { if (release) { release(true); release = null; } });
+          else if (!summonMode.defer && release) { release(true); release = null; }
+          return handle;
+        };
+        replace('playArcaneSkillFx', xyStub);
+        replace('summonFromWorldbook', async (caster, text, opts = {}) => {
+          const rec = { caster, text, opts, startedAt: Date.now(), before: null, completedAt: null, result: summonMode.result };
+          summonRec.push(rec);
+          if (opts && opts.beforeEnter && typeof opts.beforeEnter.then === 'function') rec.before = await opts.beforeEnter;
+          rec.completedAt = Date.now();
+          // beforeEnter=false（提前取消/换 token）时不创建实体，也不向调用方报成功。
+          return rec.result && rec.before !== false;
+        });
+        const xy = w.parseSkill(xyText), pure = w.parseSkill(xyPureText);
+        const setup = (skill) => {
+          const d = installData([entity('h_arcane0', { skills: [skill] })], [entity('e_arcane')]);
+          ev('battleHistory=[];state.actionQueue=[{type:"hero",ref:heroesData[0]}];state.queueIndex=0;state.isGameStarted=false;');
+          return d;
+        };
+
+        // 1) 召唤 + 单防：同一 handle、实际防回流目标、费用战报与 MP。
+        summonMode = { result: true, delay: 0 };
+        let d = setup(xy); clearCalls(); xyFx.length = 0; summonRec.length = 0; wardSeen.length = 0;
+        await w.executeSkillAction(d.h[0], d.h[0], d.h[0].skills[0], 1);
+        soft(xyFx.length === 1 && summonRec.length === 1, '蝎眼召唤只起播一次演出并只调用一次召唤',
+          'fx=' + xyFx.length + ' summon=' + summonRec.length);
+        if (summonRec[0]) {
+          soft(summonRec[0].text === '幻梦行军兽' && summonRec[0].opts && typeof summonRec[0].opts.beforeEnter?.then === 'function',
+            'summonFromWorldbook 收到词条名与 beforeEnter Promise', JSON.stringify({ text: summonRec[0].text, opts: !!summonRec[0].opts }));
+          soft(summonRec[0].opts.beforeEnter === (xyFx[0] && xyFx[0].handle.burstReady), 'beforeEnter 就是本 handle.burstReady');
+          soft(summonRec[0].before === true, 'beforeEnter 解析为 true 后才继续入场', String(summonRec[0].before));
+        }
+        const ward = xyFx[0] && xyFx[0].wardCalls.filter(l => l.length);
+        soft(!!ward && ward.length > 0 && ward.some(l => l.includes(d.h[0])), 'setWardTargets 收到实际[防]回流目标（不是伪造对象）',
+          JSON.stringify(xyFx[0] && xyFx[0].wardCalls));
+        soft(d.h[0].buffs.some(b => b.type === 'def' && b.value === 10) && d.h[0].mp === 90,
+          '召唤后附签单防+10 与 MP-10 仍按原结算', 'buffs=' + JSON.stringify(d.h[0].buffs) + ' mp=' + d.h[0].mp);
+        soft(ev('battleHistory').filter(l => l.includes('发动了【蝎眼钥匙】')).length === 1,
+          '召唤+附签一次释放只写一条行动战报', ev('battleHistory').filter(l => l.includes('蝎眼钥匙')).join(' / '));
+
+        // 2) 纯召唤：空 targets 不伪造防回流，起播等 doneAt 后交棒并复位 fx 标记。
+        summonMode = { result: true, delay: 0 };
+        d = setup(pure); clearCalls(); xyFx.length = 0; summonRec.length = 0;
+        await w.executeSkillAction(d.h[0], d.h[0], d.h[0].skills[0], 1);
+        soft(xyFx.length === 1 && summonRec.length === 1, '纯召唤只起播一次并召唤一次');
+        soft(!xyFx[0] || xyFx[0].wardCalls.every(l => !l.length), '纯召唤空 targets 不伪造防回流',
+          JSON.stringify(xyFx[0] && xyFx[0].wardCalls));
+        soft(ev('battleHistory').filter(l => l.includes('发动了【蝎眼钥匙】')).length === 1, '纯召唤只写一条行动战报');
+        soft(ev('heroesData[0].skills[0]._fxPlayed') === undefined && ev('heroesData[0].skills[0]._arcaneFx') === undefined,
+          '纯召唤交棒后复位 _fxPlayed/_arcaneFx，供再次释放');
+
+        // 2b) 纯召唤确实等到 doneAt 才交棒（真实时钟，避免假时钟瞬时击穿）。
+        restoreTimers();
+        summonMode = { result: true, delay: 0, doneIn: 300 };
+        d = setup(pure); clearCalls(); xyFx.length = 0; summonRec.length = 0;
+        const pureT0 = Date.now();
+        await w.executeSkillAction(d.h[0], d.h[0], d.h[0].skills[0], 1);
+        const pureElapsed = Date.now() - pureT0;
+        soft(pureElapsed >= 260, '纯召唤在 doneAt 之后才交棒', '实测 ' + pureElapsed + 'ms');
+        soft(ev('heroesData[0].skills[0]._fxPlayed') === undefined && ev('heroesData[0].skills[0]._arcaneFx') === undefined,
+          '真实时钟下纯召唤交棒后仍复位 fx 标记');
+        installFakeTimers();
+        summonMode = { result: true, delay: 0 };
+
+        // 3) 召唤失败：附签按原路继续，不中断。
+        summonMode = { result: false, delay: 0 };
+        d = setup(xy); clearCalls(); xyFx.length = 0; summonRec.length = 0;
+        await w.executeSkillAction(d.h[0], d.h[0], d.h[0].skills[0], 1);
+        soft(d.h[0].buffs.some(b => b.type === 'def' && b.value === 10), '召唤失败后附签[单防]仍按原路结算',
+          JSON.stringify(d.h[0].buffs));
+
+        // 4) 提前 cancel：burstReady=false，上层不伪造成功入场。
+        summonMode = { result: true, defer: true, delay: 0 };
+        d = setup(xy); clearCalls(); xyFx.length = 0; summonRec.length = 0;
+        const p = w.executeSkillAction(d.h[0], d.h[0], d.h[0].skills[0], 1);
+        await wait(0);
+        if (xyFx[0]) xyFx[0].handle.cancel();
+        await Promise.race([p, wait(1200)]);
+        soft(!!summonRec[0] && summonRec[0].before === false, '提前 cancel 时 beforeEnter=false，不新建过期召唤',
+          String(summonRec[0] && summonRec[0].before));
+        w.clearArcaneFx();
+
+        // 5) 重复释放：每次重新起播，不残留标记。
+        summonMode = { result: true, delay: 0 };
+        d = setup(xy); clearCalls(); xyFx.length = 0; summonRec.length = 0;
+        await w.executeSkillAction(d.h[0], d.h[0], d.h[0].skills[0], 1);
+        await w.executeSkillAction(d.h[0], d.h[0], d.h[0].skills[0], 1);
+        soft(xyFx.length === 2 && summonRec.length === 2, '同一技能重复释放各起播/召唤一次', 'fx=' + xyFx.length + ' summon=' + summonRec.length);
+        soft(ev('heroesData[0].skills[0]._fxPlayed') === undefined, '第二次释放后仍清除 _fxPlayed');
+        soft(d.h[0].mp === 80, '两次释放各扣 10 MP', 'MP=' + d.h[0].mp);
+
+        // 6) 静态：入场等待发生在资料读取后、实体入队前。
+        const createSrc = String(w.createSummonEntity || '');
+        const execSrc = String(w.executeSkillAction || '');
+        soft(/beforeEnter/.test(createSrc), 'createSummonEntity 接入 beforeEnter 门槛', '未找到 beforeEnter');
+        if (/beforeEnter/.test(createSrc)) {
+          const gateAt = createSrc.indexOf('beforeEnter');
+          const pushAt = createSrc.search(/(?:heroesData|enemiesData)\.push\s*\(/);
+          const segment = pushAt > gateAt ? createSrc.slice(gateAt, pushAt) : '';
+          soft(pushAt > gateAt && /combatToken/.test(segment), 'createSummonEntity 在 await beforeEnter 后复查 token 再入队',
+            'pushAt=' + pushAt + ' gateAt=' + gateAt);
+        }
+        soft(/summonFromWorldbook\([^;]{0,400}beforeEnter/.test(execSrc), 'executeSkillAction 向 summonFromWorldbook 传 beforeEnter',
+          '未在调用点找到 beforeEnter');
+
+        // 7) 真实 1150ms 入场时序：不能叠 400/390/1.15 第二等待。
+        restoreTimers();
+        w.playArcaneSkillFx = (tag, caster, targets, reaction) => {
+          const h = realSkill(tag, caster, targets, reaction);
+          if (tag === '蝎眼钥匙' && h) {
+            lastRealHandle = h;
+            const orig = h.setWardTargets;
+            h.setWardTargets = list => { wardSeen.push((list || []).slice()); return typeof orig === 'function' ? orig.call(h, list) : undefined; };
+          }
+          return h;
+        };
+        summonMode = { result: true, delay: 0 };
+        d = setup(xy); clearCalls(); summonRec.length = 0; wardSeen.length = 0;
+        const t0 = Date.now();
+        const runP = w.executeSkillAction(d.h[0], d.h[0], d.h[0].skills[0], 1);
+        for (let i = 0; i < 200 && !(summonRec[0] && summonRec[0].completedAt); i++) await wait(20);
+        const elapsed = summonRec[0] && summonRec[0].completedAt ? summonRec[0].completedAt - t0 : -1;
+        soft(elapsed >= 1100 && elapsed < 1530, '真实入场 ≥1150ms 且无额外 400/390ms 二次等待',
+          '实测 ' + elapsed + 'ms');
+        soft(!!wardSeen.filter(l => l.length).length, '真实 handle 的 setWardTargets 接到实际[防]目标', JSON.stringify(wardSeen));
+        if (lastRealHandle) lastRealHandle.doneAt = Date.now();
+        await Promise.race([runP, wait(3000)]);
+        w.playArcaneSkillFx = xyStub;
+        w.clearArcaneFx();
+        installFakeTimers();
+      });
+
       await group('真实绘制与清理', async () => {
         restoreTimers();
         const d = installData([entity('h_arcane0'),entity('h_arcane1'),entity('h_arcane2')],[entity('e_arcane')]);
@@ -329,10 +573,109 @@
         eq(w.document.querySelectorAll('[data-arcane-fx]').length,0,'中途清理settle待完成弹道且无延迟复活');
         w.clearArcaneFx();
       });
+      await group('真实世界书召唤爆发门闩', async () => {
+        restoreTimers();
+        const wbSaved = ev('({worldbookCache,worldbookIndex,worldbookSettings,pendingSummons,summonSeq})');
+        const entries = [{uid:991,name:'幻梦行军兽',keys:['幻梦行军兽'],content:'描述: 召唤回归测试\n<Combat_block>\n名字: 幻梦行军兽\n属性: "[HP:200][MP:20][Atk:10][Armor:3][Speed:10]"\n技能: []\n</Combat_block>'}];
+        const summon = functions.get('summonFromWorldbook') || w.summonFromWorldbook;
+        w.summonFromWorldbook = summon;
+        w.playArcaneSkillFx = realSkill;
+        ev('worldbookCache='+JSON.stringify(entries)+';worldbookIndex={};worldbookSettings={boundName:"回归图鉴",entries:{}};pendingSummons=[];');
+        try {
+          let d = installData([entity('h_arcane0'),entity('h_arcane1')],[entity('e_arcane')]);
+          ev('state.isGameStarted=true;state.round=1;state.actionQueue=[{type:"hero",ref:heroesData[0]}];state.queueIndex=0;');
+          const item = w.parseItem('【蝎眼钥匙】[召唤:幻梦行军兽][单防;power:10][MP:20][高阶][延迟:0][道具][次数:1][特效:蝎眼钥匙]');
+          d.h[0].items=[item];
+          const pseudo=w.itemToPseudoSkill(item), t0=Date.now();
+          const p=w.executeSkillAction(d.h[0],d.h[0],pseudo,1);
+          await wait(450);
+          eq(ev('heroesData.filter(e=>e.isSummon).length'),0,'真实世界书已解析但裂隙未开时不入队');
+          await wait(800);
+          const summoned=ev('heroesData.find(e=>e.isSummon)');
+          check(!!summoned,'1150ms爆发后真实世界书召唤实体入队');
+          check(!!summoned && !!w.getEntitySpriteDom(summoned),'真实召唤卡增量挂载而非等待桩');
+          check(ev('state.actionQueue.some(q=>q.ref.isSummon)'),'真实召唤物即时加入行动队列');
+          eq([d.h[0].mp,item.usesRemaining,d.h[0].buffs.some(b=>b.type==='def'&&b.value===10)], [80,0,true],'定稿道具只扣MP20及一次次数，单防仍落施法者');
+          check(!summoned || !summoned.buffs.some(b=>b.type==='def'),'新召唤物不被擅自加单防');
+          await p;
+          check(Date.now()-t0>=3300,'真实召唤+单防等待3350ms余韵后交棒');
+          w.clearArcaneFx();
+          d=installData([entity('h_arcane0')],[entity('e_arcane')]);
+          ev('state.actionQueue=[{type:"hero",ref:heroesData[0]}];state.queueIndex=0;');
+          const token=w.eval('combatToken');
+          let release;const gate=new Promise(resolve=>{release=resolve;});
+          const create=w.createSummonEntity(d.h[0],{name:'幻梦行军兽'},'hero',{beforeEnter:gate});
+          ev('combatToken={};');release(true);
+          await create;
+          eq(ev('heroesData.filter(e=>e.isSummon).length'),0,'真实createSummonEntity门闩醒来后复查token，不入过期战局');
+          w.__arcaneGateToken=token;ev('combatToken=window.__arcaneGateToken;delete window.__arcaneGateToken;');
+          const cancelled=w.playArcaneSkillFx('蝎眼钥匙',d.h[0],[],false);
+          const cancelledCreate=w.createSummonEntity(d.h[0],{name:'幻梦行军兽'},'hero',{beforeEnter:cancelled.burstReady});
+          cancelled.cancel();await cancelledCreate;
+          eq(ev('heroesData.filter(e=>e.isSummon).length'),0,'真实cancel解除burst门闩，尚未入场的召唤不生成');
+        } finally {
+          w.clearArcaneFx();
+          w.__arcaneWb=wbSaved;
+          ev('({worldbookCache,worldbookIndex,worldbookSettings,pendingSummons,summonSeq}=window.__arcaneWb);delete window.__arcaneWb;state.isGameStarted=false;');
+          w.playArcaneSkillFx=realSkill;
+          w.document.querySelectorAll('#heroes-summon-row, [id^="hero-wrap-s_"], [id^="hero-card-s_"]').forEach(node=>node.remove());
+        }
+      });
+      await group('新技能真实绘制与自然清理', async () => {
+        restoreTimers();
+        const d = installData([entity('h_arcane0')], [entity('e_arcane')]);
+        w.clearArcaneFx();
+        const fsStart = Date.now();
+        const fsHandle = realSkill('飞沙化甲', d.h[0], [d.h[0]], false);
+        const fsDoneAt = fsHandle && fsHandle.doneAt;
+        soft(!!fsHandle && typeof fsHandle.doneAt === 'number' && typeof fsHandle.cancel === 'function',
+          '飞沙化甲真实绘制返回可清理实例');
+        soft(!!fsHandle && Math.abs(fsHandle.doneAt - fsStart - 1320) < 40,
+          '飞沙化甲 doneAt 精确锁定 1320ms', fsHandle ? String(fsHandle.doneAt - fsStart) : '无 handle');
+        soft(w.document.querySelectorAll('[data-arcane-fx]').length > 0, '飞沙化甲真实挂载演出层');
+        await wait(340);
+        eq(fsHandle.doneAt, fsDoneAt, '飞沙280ms盾框挂载后不因回收定时延长 LIFE');
+        w.clearArcaneFx();
+        soft(w.document.querySelectorAll('[data-arcane-fx]').length === 0, '飞沙化甲同步清理无残留');
+        const xyHandle = realSkill('蝎眼钥匙', d.h[0], [], false);
+        soft(!!xyHandle && !!xyHandle.burstReady && typeof xyHandle.burstReady.then === 'function',
+          '蝎眼真实绘制返回 burstReady Promise');
+        soft(!!xyHandle && typeof xyHandle.setWardTargets === 'function', '蝎眼 handle 提供 setWardTargets');
+        soft(!!xyHandle && Math.abs(xyHandle.doneAt - Date.now() - 3350) < 420,
+          '蝎眼 doneAt ≈ 3350ms', xyHandle ? String(xyHandle.doneAt - Date.now()) : '无 handle');
+        const t0 = Date.now();
+        const burst = xyHandle ? await Promise.race([xyHandle.burstReady, wait(2600).then(() => '__timeout__')]) : '__nohandle__';
+        soft(burst === true && Date.now() - t0 >= 1080, '蝎眼 burstReady 在 ≥1150ms 裂隙挂载后 true',
+          'burst=' + burst + ' elapsed=' + (Date.now() - t0));
+        soft(w.document.querySelector('[data-arcane-fx]') !== null, '蝎眼裂隙挂载后存在演出层');
+        if (xyHandle) {
+          try { xyHandle.setWardTargets([d.h[0]]); check(true, 'setWardTargets 接受实际防回流对象'); }
+          catch (e) { check(false, 'setWardTargets 接受实际防回流对象', String(e)); }
+        }
+        const early = realSkill('蝎眼钥匙', d.h[0], [], false);
+        const earlyP = early && early.burstReady;
+        if (early) early.cancel();
+        const earlyResult = earlyP ? await Promise.race([earlyP, wait(700).then(() => '__timeout__')]) : '__nohandle__';
+        soft(earlyResult === false, '提前 cancel 时 burstReady=false 且不复活演出', String(earlyResult));
+        w.clearArcaneFx();
+        soft(w.document.querySelectorAll('[data-arcane-fx]').length === 0, '蝎眼 cancel 后清理无残留');
+        realSkill('飞沙化甲', d.h[0], [d.h[0]], false);
+        realSkill('蝎眼钥匙', d.h[0], [], false);
+        await wait(3800);
+        soft(w.document.querySelectorAll('[data-arcane-fx]').length === 0, '两新技能自然收尾无残留，不依赖强制清理');
+        soft(!w.document.getElementById('battle-scene').className.includes('arcane-shake'), '新技能自然收尾后蓄势震动停止');
+        w.clearArcaneFx();
+      });
     } finally {
       restoreTimers();
       w.clearArcaneFx();
       names.forEach((name,i) => { reg[name].delay = delays[i]; });
+      NEW_TAGS.forEach((name, i) => {
+        try {
+          const entry = ev('WEBM_FX_REGISTRY[' + JSON.stringify(name) + ']');
+          if (entry && newDelays[i] !== undefined) entry.delay = newDelays[i];
+        } catch (e) { /* 未运行时无注册表，忽略 */ }
+      });
       for (const [name,fn] of functions) w[name] = fn;
       w.Math.random = saved.random;
       w.__arcaneRestore = saved;
@@ -350,6 +693,6 @@
       root.remove();
     }
     eq(mock.genCount(),gen0,'秘术专项未调用外部LLM');
-    return { pending:[] };
+    return { pending };
   };
 })();

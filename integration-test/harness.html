@@ -35,10 +35,12 @@
 <script src="fixtures/attack-identity-regression.js"></script>
 <script src="fixtures/hit-feedback-regression.js"></script>
 <script src="fixtures/combat-audio-regression.js"></script>
+<script src="fixtures/variant-trigger-regression.js"></script>
+<script src="fixtures/item-fx-editor-regression.js"></script>
 <script>
 const TEST_PARAMS = new URLSearchParams(location.search);
 const RPG_SOURCE = TEST_PARAMS.get('artifact') !== '0'
-  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v12_05.json')
+  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v12_06.json')
   : (TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html');
 const RPG_READABLE_SOURCE = TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html';
 // 结构断言读取可读源码；行为断言始终操作 RPG_SOURCE 挂载的真实源码或压缩产物。
@@ -2811,13 +2813,29 @@ async function test48() {
   const result = await window.runCombatAudioRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
   eq(result.pending, [], '音频事件专项全部落地，无待对齐项');
 }
+async function test49() {
+  head('49 变种触发：复活/荆棘/狂暴等新动画分派与音画去重');
+  if (TEST_PARAMS.get('version') === 'public') return;
+  if (typeof window.runVariantTriggerRegression !== 'function') {
+    bad('49 变种触发 fixture 未加载（fixtures/variant-trigger-regression.js）');
+    return;
+  }
+  if (TEST_PARAMS.get('artifact') !== '0') out('info', '运行目标：真实压缩产物；结构断言另行读取可读源码。');
+  const result = await window.runVariantTriggerRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
+  eq(result && result.pending, [], '变种触发专项全部落地，无待对齐项');
+}
+async function test50() {
+  head('50 物品特效编辑器：普通物品与变体用法的选择、保存、重开和清空');
+  if (TEST_PARAMS.get('version') === 'public') return;
+  await window.runItemFxEditorRegression({ w:rpgWin(), check, eq, mock:MOCK });
+}
 async function runAll() {
   logEl.textContent = '';
   passN = failN = 0;
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47, test48];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47, test48, test49, test50];
   const selectedTests = TEST_PARAMS.has('tests') ? new Set(TEST_PARAMS.get('tests').split(',').map(n => 'test' + n)) : null;
   for (const t of tests) {
     if (selectedTests && !selectedTests.has(t.name)) continue;
