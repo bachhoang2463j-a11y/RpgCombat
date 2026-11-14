@@ -1,0 +1,48 @@
+{
+  "source": "demo-variant-resist.html",
+  "sourceSha256": "80f95274fbc90195f919c3c86bbcccd43c14dd1122410ffc3e880615ef397f33",
+  "samples": [
+    {
+      "key": "resist_fluid",
+      "file": "vfx_variant_resist_fluid.mp3",
+      "bytes": 3360,
+      "sha256": "3081e1946cf2a762bb7fa52f23bdc96a36baa508588c381c145e54fdd879d636"
+    },
+    {
+      "key": "resist_phantom",
+      "file": "vfx_variant_resist_phantom.mp3",
+      "bytes": 2878,
+      "sha256": "b9159b5a0942aa263e4bcbd9f36254699d8d3ef5067f3cc99e88c044308ebab7"
+    },
+    {
+      "key": "resist_antimagic",
+      "file": "vfx_variant_resist_antimagic.mp3",
+      "bytes": 3517,
+      "sha256": "9c16e54666acdb26d4b31953004b73ab78e1087bcaad82592073c56758b7b90c"
+    },
+    {
+      "key": "resist_vital",
+      "file": "vfx_variant_resist_vital.mp3",
+      "bytes": 3221,
+      "sha256": "c9198bb0e3f02ab6485945b43c2f362b1de98dd419ae4fb66464800236bc63c2"
+    },
+    {
+      "key": "resist_fireproof",
+      "file": "vfx_variant_resist_fireproof.mp3",
+      "bytes": 2734,
+      "sha256": "458a77e36ce49e676591cbcdc43658cdeeb07215f79cd92ecf11ba76302d8006"
+    },
+    {
+      "key": "resist_poisonproof",
+      "file": "vfx_variant_resist_poisonproof.mp3",
+      "bytes": 3221,
+      "sha256": "2e747de0804da26d3d185f710432476e5b14a4d151dff566239e223ad115a539"
+    },
+    {
+      "key": "resist_ironbody",
+      "file": "vfx_variant_resist_ironbody.mp3",
+      "bytes": 2263,
+      "sha256": "541f9eeb99cabf0b854af5d8758203d008f2d04a9c4efd58d3be8304739906fd"
+    }
+  ]
+}

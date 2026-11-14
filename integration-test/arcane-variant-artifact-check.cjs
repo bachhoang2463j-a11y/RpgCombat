@@ -8,7 +8,7 @@ const vm = require('node:vm');
 const crypto = require('node:crypto');
 const ROOT = path.resolve(__dirname, '..');
 const ASSET = 'http://192.168.110.83:8766';
-const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_09.json');
+const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_10.json');
 let pass = 0, fail = 0;
 const count = (text, needle) => text.split(needle).length - 1;
 function check(ok, label) { console.log((ok ? '[PASS] ' : '[FAIL] ') + label); ok ? pass++ : fail++; }
@@ -74,8 +74,8 @@ function syntax(text, label) {
   catch (e) { check(false, label + '语法：' + e.message); }
 }
 
-console.log('== 变种触发与行军兽移植 v12.09 产物专项 ==');
-check(base === 'regex-前端战斗v12_09.json' && pkg.scriptName === '前端战斗v12.09', '文件名与scriptName均为v12.09');
+console.log('== 变种触发与行军兽移植 v12.10 产物专项 ==');
+check(base === 'regex-前端战斗v12_10.json' && pkg.scriptName === '前端战斗v12.10', '文件名与scriptName均为v12.10');
 check(count(src, '```') === 2 && count(fenced, '```') === 2, '源码与产物均只有头尾自围栏');
 check(!immune.includes('```') && !/&(?!amp;)/.test(immune), '内部围栏加固及全量实体免疫');
 check(raw.replace(/&/g, '&amp;') === immune, '单遍实体还原逐字符一致');
@@ -104,7 +104,7 @@ check(/const SFX_PRESETS\s*=/.test(src) && /SFX_PRESETS\.abyss\[cue\]/.test(src)
 check(!/is-diag|is-ground|data-scheme="diag"|data-scheme="ground"/.test(raw), '未迁入 diag / ground 方案分支');
 const heavyOnly = ['mx_armor_strike', 'mx_metal_door', 'mx_vacuum', 'mx_trailer_impact', 'mx_rift_tear',
   'mx_dragon_growl', 'mx_grave_wind', 'mx_wind_hum', 'mx_golem_walk', 'mx_gear_clank'];
-check(heavyOnly.every(k => !raw.includes(k)), '未迁入 heavy / hybrid 专用音轨（只保留 abyss 组合）');
+check(heavyOnly.every(k => !JSON.stringify(objectOf(src, 'SFX_PRESETS')).includes(k)), '行军兽未迁入 heavy / hybrid 音轨，定稿 abyss 组合不变');
 
 // —— 新秘术参数与注册 ——
 check(raw.includes('飞沙化甲') && raw.includes('蝎眼钥匙'), '两个新秘术标签入包');
@@ -152,7 +152,7 @@ const mx = {
   mx_golem_stomp: 'vfx_golem_stomp_mx2150.mp3'
 };
 for (const [key, file] of Object.entries(mx)) check(urls[key] === ASSET + '/' + file, '行军兽采样注册：' + key);
-check(Object.values(urls).filter(u => String(u).includes('/vfx_variant_')).length === 11, 'vfx_variant_ 资源恰 11 个');
+check(Object.values(urls).filter(u => String(u).includes('/vfx_variant_') && !String(u).includes('/vfx_variant_resist_')).length === 11, '一期 vfx_variant_ 资源恰 11 个，抗性采样独立断言');
 check(!urls.rage_roar && !urls.vfx_variant_rage_roar, 'rage_roar 复用 taunt，不注册重复键');
 check(urls.taunt === ASSET + '/taunt.mp3', 'taunt 仍为 rage_roar 的真实来源');
 

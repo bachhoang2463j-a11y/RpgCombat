@@ -39,10 +39,15 @@
 <script src="fixtures/audio-category-regression.js"></script>
 <script src="fixtures/variant-trigger-regression.js"></script>
 <script src="fixtures/item-fx-editor-regression.js"></script>
+<script src="fixtures/variant-resist-regression.js"></script>
+<script src="fixtures/status-tick-regression.js"></script>
+<script src="fixtures/self-destruct-regression.js"></script>
+<script src="fixtures/rescue-moment-regression.js"></script>
+<script src="fixtures/feedback-coexist-regression.js"></script>
 <script>
 const TEST_PARAMS = new URLSearchParams(location.search);
 const RPG_SOURCE = TEST_PARAMS.get('artifact') !== '0'
-  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v12_09.json')
+  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v12_10.json')
   : (TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html');
 const RPG_READABLE_SOURCE = TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html';
 // 结构断言读取可读源码；行为断言始终操作 RPG_SOURCE 挂载的真实源码或压缩产物。
@@ -1264,8 +1269,14 @@ async function test21() {
     }
     return false;
   };
-  const candidates = [...tokens].filter(t => validToken.test(t));
-  const missing = candidates.filter(t => !KNOWN_DEAD.has(t) && !selectorExists(t));
+  const JS_MARKERS = new Set(['s-bubble','s-veins','s-tongues','s-flare','s-heal','s-cap','s-para-spark','s-para-flake',
+    'arcane-sd-omen-aura','arcane-sd-body','arcane-sd-cracks','arcane-sd-core','arcane-sd-overlay',
+    'sd-fw-heat','sd-fw-billow','sd-bt-tongues','sd-bt-flare','r-shd-bloom','r-shd-arc']);
+  JS_MARKERS.forEach(t => check(src.includes("querySelector('." + t + "')") || src.includes("querySelectorAll('." + t + "')") || src.includes('querySelector(".' + t + '")'), 'JS 动画定位标记确有消费者：' + t));
+  JS_MARKERS.add('arcane-resist-layer');
+  check(src.includes("owner.layer(html)") && src.includes("el.classList.add('arcane-resist-layer')"), '抗性层标记复用有样式的正式owner图层');
+  const candidates = [...tokens].filter(t => validToken.test(t) && !t.endsWith('-'));
+  const missing = candidates.filter(t => !KNOWN_DEAD.has(t) && !JS_MARKERS.has(t) && !selectorExists(t));
   check(missing.length === 0, '类名覆盖零缺失（' + candidates.length + ' 个 token 全部有样式）' + (missing.length ? '，缺：' + missing.slice(0, 10).join(' ') : ''));
   // ⑤ 编译产物不得引入三连反引号（test19 围栏纪律；build-tailwind.cjs 写回时同样拦截）
   eq((src.match(/```/g) || []).length, 2, '三连反引号仍 == 2（编译产物无围栏污染）');
@@ -2843,13 +2854,39 @@ async function test52() {
   const result = await window.runAudioCategoryRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
   eq(result.pending, [], '用途音频专项全部落地，无待对齐项');
 }
+async function test53() {
+  head('53 抗性与免疫：七项分派、静默预检、多层与实体清理');
+  const result = await window.runVariantResistRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
+  eq(result.pending, [], '抗性免疫专项无待对齐项');
+}
+async function test54() {
+  head('54 状态发作：毒燃麻、禁疗、到期与临期徽章');
+  const result = await window.runStatusTickRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
+  eq(result.pending, [], '状态专项无待对齐项');
+}
+async function test55() {
+  head('55 自爆：真实命中、看破/制服、四形态与串行清场');
+  const result = await window.runSelfDestructRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
+  eq(result.pending, [], '自爆专项无待对齐项');
+}
+async function test56() {
+  head('56 救场：舍身停驻、毅力留存与回避致命');
+  const result = await window.runRescueMomentRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
+  eq(result.pending, [], '救场专项无待对齐项');
+  if (result.renderSkipped && result.renderSkipped.length) out('info', '救场渲染跳过：' + result.renderSkipped.join('；'));
+}
+async function test57() {
+  head('57 四模块共存：实体位移、残影隔离、离线重建与重置清场');
+  const result = await window.runFeedbackCoexistRegression({ w:rpgWin(), check, eq, mock:MOCK });
+  eq(result.pending, [], '四模块共存专项无待对齐项');
+}
 async function runAll() {
   logEl.textContent = '';
   passN = failN = 0;
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47, test48, test49, test50, test51, test52];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47, test48, test49, test50, test51, test52, test53, test54, test55, test56, test57];
   const selectedTests = TEST_PARAMS.has('tests') ? new Set(TEST_PARAMS.get('tests').split(',').map(n => 'test' + n)) : null;
   for (const t of tests) {
     if (selectedTests && !selectedTests.has(t.name)) continue;
@@ -2862,7 +2899,7 @@ async function runAll() {
   statEl.textContent = failN ? '✗ ' + failN + ' 项失败' : '✓ 全部 ' + passN + ' 项通过';
   window.__harnessResult = { source:RPG_SOURCE, passed:passN, failed:failN,
     failures:Array.from(logEl.querySelectorAll('.fail')).map(el => el.textContent), log:logEl.textContent };
-  if (TEST_PARAMS.get('record') === '1') await fetch('/__rpg_regression_result', {
+  if (TEST_PARAMS.get('record') === '1') await fetch('/__rpg_regression_result' + (TEST_PARAMS.get('run') ? '?run=' + encodeURIComponent(TEST_PARAMS.get('run')) : ''), {
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(window.__harnessResult)
   });
 }

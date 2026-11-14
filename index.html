@@ -927,6 +927,155 @@
         100% { transform: translateY(8%) scaleX(0.96); opacity: 0.65; }
     }
     .arcane-variant-rage-fx.exiting { opacity: 0 !important; transform: scale(0.95); }
+/* ===== 第二期：抗性与免疫特效样式 arcane-resist-*（可移植） ===== */
+.arcane-resist-anchor { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; }
+.arcane-resist-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.arcane-resist-shard { transform-box: fill-box; transform-origin: center; }
+.arcane-resist-ghost { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.arcane-resist-hit-flash { animation: arcane-resist-hit-step 0.22s steps(1) both; }
+@keyframes arcane-resist-hit-step {
+    0% { filter: brightness(2.05) saturate(0.25); }
+    50% { filter: brightness(1.38) saturate(0.6); }
+    100% { filter: none; }
+}
+.arcane-resist-stun-pop {
+    display: flex; align-items: center; gap: 4px;
+    filter: drop-shadow(0 0 6px rgba(251,191,36,0.9));
+    font-size: 12px; line-height: 1; color: #fde047;
+    text-shadow: 0 0 8px rgba(251,191,36,0.95), 0 1px 2px rgba(0,0,0,0.85);
+}
+
+/* v12.10 状态四项 CSS（毒/燃/麻/到期；自 demo-status-ticks.html 54-142 行原样移植）
+   合入位置：既有自定义样式块内，紧邻 arcane-variant-* / arcane-fx-* 动画区。
+   仅供 index.html 使用；Demo 与公开版不引用本文件。 */
+
+/* ===== 状态发作、解除与到期 arcane-status-*（可移植） ===== */
+.arcane-status-anchor { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; }
+.arcane-status-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.arcane-status-host-rel { position: relative !important; }
+.arcane-status-persist-layer {
+    position: absolute; inset: 0; pointer-events: none; z-index: 8; overflow: visible;
+    transition: opacity 0.26s ease-out; will-change: opacity;
+}
+.arcane-status-persist-layer.exiting { opacity: 0 !important; }
+.arcane-status-flame-chip {
+    position: absolute; pointer-events: none; transform-origin: 50% 92%;
+    will-change: transform, opacity;
+}
+.arcane-status-flame-chip.f1 { left: 15%; bottom: 1px; width: 11px; height: 16px; animation: arcane-status-flame-flicker 1.25s ease-in-out infinite; }
+.arcane-status-flame-chip.f2 { left: 42%; bottom: -1px; width: 9px; height: 13px; animation: arcane-status-flame-flicker 1.05s ease-in-out -0.45s infinite; }
+.arcane-status-flame-chip.f3 { right: 15%; bottom: 2px; width: 10px; height: 15px; animation: arcane-status-flame-flicker 1.42s ease-in-out -0.78s infinite; }
+.arcane-status-ember-dot {
+    position: absolute; width: 2.5px; height: 2.5px; border-radius: 50%; pointer-events: none;
+    background: #fde047; box-shadow: 0 0 4px #f97316; will-change: transform, opacity;
+}
+.arcane-status-ember-dot.e1 { left: 26%; bottom: 10%; animation: arcane-status-ember-float 1.6s ease-out infinite; }
+.arcane-status-ember-dot.e2 { right: 24%; bottom: 12%; animation: arcane-status-ember-float 1.85s ease-out -0.82s infinite; }
+@keyframes arcane-status-flame-flicker {
+    0%, 100% { transform: translateY(0) scale(0.92, 0.9) skewX(-3deg); opacity: 0.72; }
+    35% { transform: translateY(-2px) scale(1.06, 1.12) skewX(3deg); opacity: 0.94; }
+    70% { transform: translateY(-1px) scale(0.96, 1.02) skewX(-2deg); opacity: 0.8; }
+}
+@keyframes arcane-status-ember-float {
+    0% { transform: translate3d(0, 2px, 0) scale(0.6); opacity: 0; }
+    25% { opacity: 0.92; }
+    100% { transform: translate3d(3px, -16px, 0) scale(0.35); opacity: 0; }
+}
+.arcane-status-bubble-dot {
+    position: absolute; border-radius: 50%; pointer-events: none;
+    border: 1px solid rgba(216, 180, 254, 0.82);
+    background: radial-gradient(circle at 32% 30%, rgba(243, 232, 255, 0.88) 0%, rgba(168, 85, 247, 0.48) 55%, rgba(107, 33, 168, 0.75) 100%);
+    will-change: transform, opacity;
+}
+.arcane-status-bubble-dot.b1 { right: 12%; top: 44%; width: 6px; height: 6px; animation: arcane-status-bubble-drift 2.1s ease-out infinite; }
+.arcane-status-bubble-dot.b2 { right: 25%; top: 34%; width: 5px; height: 5px; animation: arcane-status-bubble-drift 2.45s ease-out -0.85s infinite; }
+.arcane-status-bubble-dot.b3 { right: 17%; top: 24%; width: 7px; height: 7px; animation: arcane-status-bubble-drift 1.95s ease-out -1.45s infinite; }
+@keyframes arcane-status-bubble-drift {
+    0% { opacity: 0; transform: translate3d(0, 6px, 0) scale(0.5); }
+    22% { opacity: 0.92; transform: translate3d(1px, 1px, 0) scale(0.95); }
+    76% { opacity: 0.86; transform: translate3d(-1.5px, -10px, 0) scale(1.08); }
+    90% { opacity: 0.9; transform: translate3d(-1px, -13px, 0) scale(1.24); }
+    100% { opacity: 0; transform: translate3d(-1px, -15px, 0) scale(0.35); }
+}
+.arcane-status-spark-star { position: absolute; pointer-events: none; transform-origin: 50% 50%; will-change: transform, opacity; }
+.arcane-status-spark-star.s1 { left: 20%; top: 10%; width: 9px; height: 9px; animation: arcane-status-para-spark 1.24s ease-out infinite; }
+.arcane-status-spark-star.s2 { left: 49%; top: 5%; width: 10px; height: 10px; animation: arcane-status-para-spark 1.46s ease-out -0.52s infinite; }
+.arcane-status-spark-star.s3 { right: 17%; top: 14%; width: 8px; height: 8px; animation: arcane-status-para-spark 1.12s ease-out -0.84s infinite; }
+.arcane-status-spark-dot {
+    position: absolute; border-radius: 50%; pointer-events: none;
+    background: #fef9c3; border: 0.8px solid rgba(180, 83, 9, 0.75);
+    box-shadow: 0 0 4px #facc15, 0 0 7px rgba(245, 158, 11, 0.7);
+    will-change: transform, opacity;
+}
+.arcane-status-spark-dot.d1 { left: 34%; top: 18%; width: 3.5px; height: 3.5px; animation: arcane-status-para-dot 1.32s ease-out -0.26s infinite; }
+.arcane-status-spark-dot.d2 { right: 27%; top: 9%; width: 3px; height: 3px; animation: arcane-status-para-dot 1.54s ease-out -0.96s infinite; }
+.arcane-status-persist-layer.is-hero .arcane-status-spark-star.s1 { left: 16%; top: 25%; }
+.arcane-status-persist-layer.is-hero .arcane-status-spark-star.s2 { left: 32%; top: 20%; }
+.arcane-status-persist-layer.is-hero .arcane-status-spark-star.s3 { left: 45%; right: auto; top: 32%; }
+.arcane-status-persist-layer.is-hero .arcane-status-spark-dot.d1 { left: 23%; top: 34%; }
+.arcane-status-persist-layer.is-hero .arcane-status-spark-dot.d2 { left: 52%; right: auto; top: 25%; }
+@keyframes arcane-status-para-spark {
+    0%, 100% { opacity: 0.15; transform: translate3d(0, 1px, 0) scale(0.55) rotate(-8deg); }
+    22% { opacity: 0.98; transform: translate3d(0.5px, -2px, 0) scale(1.12) rotate(10deg); }
+    46% { opacity: 0.42; transform: translate3d(-0.5px, -3px, 0) scale(0.72) rotate(-4deg); }
+    68% { opacity: 0.92; transform: translate3d(1px, -4px, 0) scale(0.96) rotate(14deg); }
+    88% { opacity: 0; transform: translate3d(0, -6px, 0) scale(0.4) rotate(20deg); }
+}
+@keyframes arcane-status-para-dot {
+    0%, 100% { opacity: 0; transform: translate3d(0, 2px, 0) scale(0.5); }
+    28% { opacity: 0.95; transform: translate3d(-1px, -2px, 0) scale(1.15); }
+    70% { opacity: 0.75; transform: translate3d(1px, -6px, 0) scale(0.85); }
+    94% { opacity: 0; transform: translate3d(1.5px, -9px, 0) scale(0.35); }
+}
+@keyframes arcane-status-badge-pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35), 0 0 5px rgba(245, 158, 11, 0.25); }
+    50% { opacity: 0.54; box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.78), 0 0 9px rgba(245, 158, 11, 0.52); }
+}
+.arcane-status-badge-expiring {
+    color: #fde68a !important;
+    background: rgba(120, 53, 15, 0.88) !important;
+    border-color: rgba(245, 158, 11, 0.92) !important;
+    animation: arcane-status-badge-pulse 2s ease-in-out infinite;
+}
+.arcane-status-badge-fading { opacity: 0 !important; transform: translateY(-4px) scale(0.92); transition: opacity 0.22s ease-out, transform 0.22s ease-out; }
+
+    @keyframes arcane-sd-warn-pulse { 0%,100% { opacity: 0.24; transform: translate(-50%,-50%) scale(0.95); } 50% { opacity: 0.62; transform: translate(-50%,-50%) scale(1.04); } }
+    @keyframes arcane-sd-dying-tremble { 0%,100% { transform: translate(-50%,-50%) translate3d(0,1px,0) rotate(0deg); } 25% { transform: translate(-50%,-50%) translate3d(-2.5px,2px,0) rotate(-1.5deg); } 70% { transform: translate(-50%,-50%) translate3d(2px,3px,0) rotate(1.4deg); } }
+    @keyframes arcane-sd-gather-pulse { 0%,100% { transform: translate(-50%,-50%) scale(0.98); opacity: 0.92; } 50% { transform: translate(-50%,-50%) scale(1.04); opacity: 1; } }
+    @keyframes arcane-sd-crit-flicker { 0%,49% { opacity: 1; filter: brightness(1.45) contrast(1.2); } 50%,100% { opacity: 0.72; filter: brightness(2.05) contrast(1.35); } }
+    @keyframes arcane-sd-crit-snap { 0% { transform: translate(-50%,-50%) scale(1.05); } 65% { transform: translate(-50%,-50%) scale(0.84); } 100% { transform: translate(-50%,-50%) scale(0.96); } }
+    @keyframes arcane-sd-kanpo-fall { 0% { transform: translate(-50%,-50%) scale(1); opacity: 1; } 35% { transform: translate(-50%,-50%) scale(0.92,0.88); opacity: 0.95; } 100% { transform: translate(-50%,-50%) translateY(20px) scale(1.12,0.34); opacity: 0; } }
+    @keyframes arcane-sd-subdue-press { 0% { transform: translate(-50%,-50%) translateY(-10px) scale(1.06,1.06); } 45% { transform: translate(-50%,-50%) translateY(14px) scale(1.14,0.62); } 100% { transform: translate(-50%,-50%) translateY(11px) scale(1.1,0.68); } }
+    @keyframes arcane-sd-shock-ellipse { 0% { transform: translate(-50%,-50%) scale(0.2,0.16); opacity: 0.95; } 100% { transform: translate(-50%,-50%) scale(4.8,1.55); opacity: 0; } }
+    @keyframes arcane-sd-flame-lick { 0%,100% { transform: translate(-50%,-50%) translateY(0) scaleY(1) scaleX(1); opacity: 0.9; } 50% { transform: translate(-50%,-50%) translateY(-4px) scaleY(1.12) scaleX(0.95); opacity: 1; } }
+    .arcane-sd-additive { mix-blend-mode: screen; }
+    @keyframes arcane-sd-venom-pulse { 0%,100% { transform: scale(0.96); opacity: 0.78; } 50% { transform: scale(1.08); opacity: 0.98; } }
+    .arcane-selfdestruct-warn { position: absolute; left: 50%; top: 50%; pointer-events: none; z-index: 3; will-change: transform, opacity; animation: arcane-sd-warn-pulse 3.4s ease-in-out infinite; }
+    .arcane-selfdestruct-warn-cracks { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+    .arcane-selfdestruct-host-corpse .arcane-hit-track { opacity: 0.14 !important; transition: opacity 0.25s ease; }
+    .arcane-selfdestruct-sprite-subdued { filter: saturate(0.32) brightness(0.76) !important; transform: translateY(10px) scale(1.08, 0.7) !important; opacity: 0.78; transition: transform 0.25s ease, filter 0.25s ease, opacity 0.25s ease; }
+    .arcane-selfdestruct-stage { position: fixed; transform: translate(-50%,-50%); pointer-events: none; z-index: 54; will-change: transform, opacity; }
+    .arcane-selfdestruct-dying-visual { filter: saturate(0.28) brightness(0.84); transition: filter 0.32s ease; }
+    .arcane-selfdestruct-crit-flash { animation: arcane-sd-crit-flicker 0.11s steps(1) infinite !important; }
+
+/* ===== 救援时刻 v12.10 CSS BEGIN =====
+   仅追加救援模块新增类，不改写、不覆盖正式版已有样式。
+   合并位置：既有自定义样式块末端。 */
+
+/* 救援锚点：外层 .arcane-fs-layer 已是 fixed 全屏，锚点用绝对坐标 */
+.arcane-rescue-anchor { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
+
+/* 残影：固定定位，尺寸与目标视觉容器一致 */
+.arcane-rescue-ghost { position: fixed; pointer-events: none; will-change: transform, opacity; overflow: hidden; border-radius: 6px; }
+
+/* 卡内血幕：只覆盖视觉容器，不覆盖 Buff / HP 行 */
+.arcane-rescue-blood-wrap { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 12; border-radius: inherit; }
+.arcane-rescue-blood-wash { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 42%, rgba(127,29,29,0.08) 18%, rgba(153,27,27,0.52) 74%, rgba(69,10,10,0.88) 100%); box-shadow: inset 0 0 18px rgba(220,38,38,0.65); will-change: opacity; }
+.arcane-rescue-blood-trail { position: absolute; top: -6px; border-radius: 999px; background: linear-gradient(180deg, rgba(69,10,10,0.45) 0%, #991b1b 42%, #dc2626 78%, #fca5a5 96%, #7f1d1d 100%); box-shadow: 0 0 6px rgba(220,38,38,0.75); transform-origin: 50% 0%; will-change: transform, opacity; }
+.arcane-rescue-blood-trail::after { content: ''; position: absolute; left: 50%; bottom: -3px; width: 150%; height: 6px; transform: translateX(-50%); border-radius: 50% 50% 50% 50% / 38% 38% 62% 62%; background: radial-gradient(circle at 38% 36%, #fecaca 0%, #dc2626 55%, #7f1d1d 100%); }
+
+/* ===== 救援时刻 v12.10 CSS END ===== */
+
 
     /* ===== 攻击身份与弹道表现（.arcane-identity-* 专属前缀，不污染现有层） ===== */
     .arcane-identity-anchor { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; }
@@ -4508,7 +4657,27 @@ const audioUrls = {
     'link_chime': `${ASSET_BASE}/vfx_variant_link_chime.mp3`,
     'leech_flow': `${ASSET_BASE}/vfx_variant_leech_flow.mp3`,
     'regen_hum': `${ASSET_BASE}/vfx_variant_regen_hum.mp3`,
-    'thorn_parry': `${ASSET_BASE}/vfx_variant_thorn_parry.mp3`
+    'thorn_parry': `${ASSET_BASE}/vfx_variant_thorn_parry.mp3`,
+    // 抗性与免疫：七条定稿采样外置，与一期变种共用音频总线
+    'resist_fluid': `${ASSET_BASE}/vfx_variant_resist_fluid.mp3`,
+    'resist_phantom': `${ASSET_BASE}/vfx_variant_resist_phantom.mp3`,
+    'resist_antimagic': `${ASSET_BASE}/vfx_variant_resist_antimagic.mp3`,
+    'resist_vital': `${ASSET_BASE}/vfx_variant_resist_vital.mp3`,
+    'resist_fireproof': `${ASSET_BASE}/vfx_variant_resist_fireproof.mp3`,
+    'resist_poisonproof': `${ASSET_BASE}/vfx_variant_resist_poisonproof.mp3`,
+    'resist_ironbody': `${ASSET_BASE}/vfx_variant_resist_ironbody.mp3`,
+    // 状态 / 自爆 / 救场：只补同源真音，其余复用已有键
+    'ranshao': `${ASSET_BASE}/ranshao.mp3`,
+    'fog': `${ASSET_BASE}/fog.mp3`,
+    'mx_rift_tear': `${ASSET_BASE}/vfx_rift_tear_mx788.mp3`,
+    'mx_vacuum': `${ASSET_BASE}/vfx_vacuum_suck_mx2608.mp3`,
+    'mx_armor_strike': `${ASSET_BASE}/vfx_armor_strike_mx2765.mp3`,
+    'sd_ring_blast': `${ASSET_BASE}/B2_脉冲环状冲击波爆_fs211423_Ring_Blast_Explosion.mp3`,
+    'sd_shatter_blast': `${ASSET_BASE}/B4_破片贯穿引爆_mx1693_Shatter_shot_explosion.mp3`,
+    'huoyan01': `${ASSET_BASE}/huoyan01.mp3`,
+    'parry_perfect': `${ASSET_BASE}/parry_Weapon_Perfect.wav`,
+    'avoid_dash_perfect': `${ASSET_BASE}/avoid_dash_fs521999.mp3`,
+    'sheshen_armor_step': `${ASSET_BASE}/sheshen_armor_step_fs705490.mp3`
 };
 
 // 预热全量基础音效为 Blob URL，确保零延迟与 Web Audio API 无跨域限制
@@ -5298,6 +5467,21 @@ const arcaneVfxModule = (function () {
         },
         omen(g, p) { drawOmenParticle(g, p); }
     };
+    DRAW.rescueBloodDrop = function(g, p) {
+    const s = p.size || 3;
+    g.fillStyle = p.color || '#dc2626';
+    g.beginPath();
+    g.moveTo(0, -s * 1.55);
+    g.quadraticCurveTo(s * 0.95, 0, 0, s);
+    g.quadraticCurveTo(-s * 0.95, 0, 0, -s * 1.55);
+    g.fill();
+    if (p.glint) {
+        g.fillStyle = p.glint;
+        g.beginPath();
+        g.arc(-s * 0.22, s * 0.12, s * 0.28, 0, 6.283);
+        g.fill();
+    }
+};
     function releaseIdleCanvas() {
         if (S.driver || S.handles.size || S.particles.length || S.flights.length || !S.canvas) return;
         S.canvas.remove(); S.canvas = null; S.ctx = null;
@@ -6522,7 +6706,7 @@ const arcaneVfxModule = (function () {
     };
     let identitySfxOn = true, identityOutput = null;
     const identityBuffers = CombatAudioMixer.buffers, identityDecodes = CombatAudioMixer.decodes, identityAudioStoppers = new Set();
-    const IDENTITY_CLIP_KEYS = new Set(['slash_whoosh_hit_fs434873','atk2','claw_bloody_blade_fs323526','wolfman','creature_slime_01','swish_3','frost_crystal_impact_fs550267','fire01','freeze01','aoe_gun_burst_fs482122','aoe_poison_spell_fs219566','aoe_wind_spin_fs772867','light_impact','mx_sand_swish','mx_stygian_whoosh','mx_sword_metal','mx_gear_lock','mx_tunnel','mx_rift_charge','mx_deep_impact','mx_giant_roar','mx_dino_roar','mx_golem_stomp','defUp','shieldUp','taunt','revive_gather','revive_bloom','molt_crack','molt_snap','molt_empower','rage_exit','link_dash','link_chime','leech_flow','regen_hum','thorn_parry']);
+    const IDENTITY_CLIP_KEYS = new Set(['slash_whoosh_hit_fs434873','atk2','claw_bloody_blade_fs323526','wolfman','creature_slime_01','swish_3','frost_crystal_impact_fs550267','fire01','freeze01','aoe_gun_burst_fs482122','aoe_poison_spell_fs219566','aoe_wind_spin_fs772867','light_impact','mx_sand_swish','mx_stygian_whoosh','mx_sword_metal','mx_gear_lock','mx_tunnel','mx_rift_charge','mx_deep_impact','mx_giant_roar','mx_dino_roar','mx_golem_stomp','defUp','shieldUp','taunt','revive_gather','revive_bloom','molt_crack','molt_snap','molt_empower','rage_exit','link_dash','link_chime','leech_flow','regen_hum','thorn_parry','resist_fluid','resist_phantom','resist_antimagic','resist_vital','resist_fireproof','resist_poisonproof','resist_ironbody','thunder_charge','ranshao','fog','mx_rift_tear','mx_vacuum','mx_armor_strike','sd_ring_blast','sd_shatter_blast','huoyan01','explosion_aoe_charge','defDown','dodge_2','parry_perfect','avoid_dash_perfect','sheshen_armor_step','hide']);
     function setIdentitySfx(on) {
         identitySfxOn = !!on;
         if (audioCtx) synthBuses.forEach(({ bus }) => { bus.gain.cancelScheduledValues(audioCtx.currentTime); bus.gain.value = identitySfxOn ? 0.9 : 0; });
@@ -6627,6 +6811,7 @@ const arcaneVfxModule = (function () {
         const handle = { doneAt: Date.now() + totalMs, cancel() { owner.cancelled = true; cleanup(true); }, onFinish: new Set() };
         function finishLater() {
             clearTimeout(finishTimer); S.timers.delete(finishTimer);
+            if (owner.held || owner.finished || owner.cancelled) { finishTimer = null; return; }
             finishTimer = setTimeout(() => {
                 S.timers.delete(finishTimer); finishTimer = null;
                 if (token !== combatToken || _pipelineFrozen) { handle.cancel(); return; }
@@ -6637,6 +6822,11 @@ const arcaneVfxModule = (function () {
         owner.retain = ms => {
             handle.doneAt = Math.max(handle.doneAt, Date.now() + ms);
             if (!owner.finished) finishLater();
+        };
+        owner.hold = () => { owner.held = true; finishLater(); };
+        owner.resume = ms => {
+            if (owner.finished || owner.cancelled) return;
+            owner.held = false; handle.doneAt = Date.now() + ms; finishLater();
         };
         owner.at = (delay, fn) => {
             const id = after(delay, () => {
@@ -9335,9 +9525,9 @@ const arcaneVfxModule = (function () {
     function cloneVisualOnly(dom) {
         const rect = entityVisualRect(dom), target = rect.visualDom;
         const clone = target.cloneNode(true);
-        clone.querySelectorAll('[data-arcane-variant-persist], .arcane-hit-track, .floating-text, [id*="hp-"], [id*="buff"], [class*="badge"], [class*="buff"]').forEach(node => node.remove());
+        clone.querySelectorAll('[data-arcane-variant-persist], [data-arcane-status-persist], [data-arcane-selfdestruct-warning], .arcane-rescue-blood-wrap, .arcane-hit-track, .floating-text, [id*="hp-"], [id*="buff"], [class*="badge"], [class*="buff"]').forEach(node => node.remove());
         [clone, ...clone.querySelectorAll('[id]')].forEach(node => node.removeAttribute('id'));
-        clone.classList.remove('arcane-variant-revive-desat', 'arcane-variant-molt-sprite', 'arcane-variant-rage-sprite', 'breathe', 'shake', 'charge-full-danger');
+        clone.classList.remove('arcane-variant-revive-desat', 'arcane-variant-molt-sprite', 'arcane-variant-rage-sprite', 'arcane-status-host-rel', 'arcane-selfdestruct-sprite-subdued', 'breathe', 'shake', 'charge-full-danger');
         clone.style.width = '100%'; clone.style.height = '100%'; clone.style.margin = '0'; clone.style.maxWidth = 'none';
         clone.style.transform = 'none'; clone.style.animation = 'none'; clone.style.fontSize = 'inherit';
         return clone.outerHTML;
@@ -10260,7 +10450,1633 @@ const arcaneVfxModule = (function () {
             else done(false);
         });
     }
+// ===== 抗性与免疫演出 BEGIN（v12.10 · demo-variant-resist 定稿移植，并入 arcaneVfxModule 内部） =====
+// 依赖模块内既有：S / variantRun / entityVisualRect / cloneVisualOnly / domOf / ctr / panOf /
+// vSample / svgGlowDef / stopEvery。音效只走 vSample(owner, 'resist_*')，不合成兜底、不依赖 demo 宿主。
+// 生命周期全部挂在 variantRun owner 上（at/every/anim/layer/burst/onClean），不另起永久 rAF。
+
+const RESIST_FX = {
+    fluid: { ms: 880, kind: 'fluid', play: playResistFluid },
+    phantom: { ms: 820, kind: 'phantom', play: playResistPhantom },
+    antiMagic: { ms: 880, kind: 'antiMagic', play: playResistAntiMagic },
+    antimagic: { ms: 880, kind: 'antiMagic', play: playResistAntiMagic },
+    vital: { ms: 820, kind: 'vital', play: playResistVital },
+    fireproof: { ms: 660, kind: 'fireproof', play: playResistFireproof },
+    poisonproof: { ms: 680, kind: 'poisonproof', play: playResistPoisonproof },
+    ironBody: { ms: 620, kind: 'ironBody', play: playResistIronBody },
+    ironbody: { ms: 620, kind: 'ironBody', play: playResistIronBody },
+    // 业务层 applyEnemyTypeResist 的 hits 是中文类型名，可直接作为 layers 传入。
+    远程: { ms: 880, kind: 'fluid', play: playResistFluid },
+    近战: { ms: 820, kind: 'phantom', play: playResistPhantom },
+    法术: { ms: 880, kind: 'antiMagic', play: playResistAntiMagic },
+    要害: { ms: 820, kind: 'vital', play: playResistVital }
+};
+
+// 正式 entityVisualRect 返回 dom/visualDom/isHero/x/y/w/h/left/top；这里只做轻适配。
+function resistRect(entity) {
+    const r = entityVisualRect(entity);
+    if (!r || !r.visualDom || !(r.w > 0) || !(r.h > 0)) return null;
+    return {
+        dom: r.dom, visualDom: r.visualDom, isHero: r.isHero,
+        left: r.left, top: r.top, width: r.w, height: r.h, cx: r.x, cy: r.y
+    };
+}
+
+// demo 的 svgGlowDef 是径向梯度；正式版 svgGlowDef 是 filter，不可覆盖。
+function resistRadGrad(id, stops) {
+    return `<radialGradient id="${id}" cx="50%" cy="50%" r="50%">${stops.map(([o, c, op]) => `<stop offset="${o}" stop-color="${c}" stop-opacity="${op}"/>`).join('')}</radialGradient>`;
+}
+
+function resistLayer(owner, html, z, kind) {
+    const el = owner.layer(html);
+    el.classList.add('arcane-resist-layer');
+    el.dataset.resistFx = '1';
+    el.dataset.resistKind = kind;
+    el.style.zIndex = String(z);
+    el.style.overflow = 'visible';
+    return el;
+}
+
+// 逐帧 tween 用模块现有 every（token 守卫），结束即 stopEvery，不占永久引擎。
+function resistTween(owner, dur, step) {
+    const t0 = performance.now();
+    const id = owner.every(16, () => {
+        const p = Math.min(1, (performance.now() - t0) / Math.max(1, dur));
+        step(p);
+        if (p >= 1) { stopEvery(id); owner.intervals.delete(id); }
+    });
+    owner.onClean(() => stopEvery(id));
+}
+
+function resistDir(from, r) {
+    const fDom = from ? domOf(from) : null;
+    if (fDom) {
+        const c = ctr(fDom);
+        const dx = r.cx - c.x, dy = r.cy - c.y, len = Math.hypot(dx, dy) || 1;
+        return { dx: dx / len, dy: dy / len };
+    }
+    return r.cx > (window.innerWidth || 1280) * 0.5 ? { dx: 1, dy: 0.06 } : { dx: -1, dy: 0.06 };
+}
+
+// cloneVisualOnly 正式版返回 outerHTML 字符串；只 wrap.innerHTML 后操作 firstElementChild。
+function resistClone(wrap, r, css) {
+    const html = cloneVisualOnly(r.dom);
+    if (!html) return null;
+    wrap.innerHTML = html;
+    const node = wrap.firstElementChild;
+    if (!node) return null;
+    // 追加而非覆盖 cloneVisualOnly 已做的 transform/animation/max-width 复位。
+    const visualBox = r.visualDom.getBoundingClientRect();
+    const scale = visualBox.width / (r.visualDom.offsetWidth || visualBox.width);
+    node.style.cssText = node.style.cssText + ';width:100%;height:100%;font-size:' + (parseFloat(getComputedStyle(r.visualDom).fontSize) * scale) + 'px;' + css;
+    return node;
+}
+
+function resistAudio(owner, key, pan, vol) {
+    vSample(owner, key, { vol, pan });
+}
+
+function playResistFluid(owner, entity, r, meta, onBeat, kind) {
+    const u = ++S.uid, sc = meta.scaleMul || 1;
+    const { dx, dy } = resistDir(meta.from || meta.attacker, r);
+    const hx = r.cx - dx * Math.min(18, r.width * 0.16), hy = r.cy - dy * Math.min(12, r.height * 0.14);
+    const R = Math.max(54, Math.min(82, Math.max(r.width, r.height) * 0.72)) * sc;
+    resistAudio(owner, 'resist_fluid', panOf(hx), 0.24);
+    const wobHost = resistLayer(owner, '', 441, kind);
+    const wob = document.createElement('div');
+    wob.className = 'arcane-resist-ghost';
+    wob.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:8px;`;
+    resistClone(wob, r, 'filter:sepia(0.8) hue-rotate(145deg) saturate(3) brightness(1.35) drop-shadow(0 0 10px rgba(103,232,249,0.75));');
+    wobHost.appendChild(wob);
+    owner.anim(wob, [
+        { transform: 'scale(1,1)', opacity: 0 },
+        { transform: 'scale(0.88,1.12)', opacity: 0.56, offset: 0.22 },
+        { transform: 'scale(1.10,0.91)', opacity: 0.46, offset: 0.54 },
+        { transform: 'scale(1,1)', opacity: 0 }
+    ], { duration: 640, easing: 'ease-in-out', fill: 'forwards' });
+    const swirlArcs = [0, 90, 180, 270].map(deg => {
+        const a0 = deg * Math.PI / 180, a1 = a0 + 1.35, x0 = 60 + Math.cos(a0) * 12, y0 = 60 + Math.sin(a0) * 12;
+        const x1 = 60 + Math.cos(a1) * 48, y1 = 60 + Math.sin(a1) * 48, cx = 60 + Math.cos(a0 + 0.58) * 38, cy = 60 + Math.sin(a0 + 0.58) * 38;
+        return `<path d="M${x0.toFixed(1)},${y0.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}" fill="none" stroke="url(#fl-sw-${u})" stroke-width="5.6" stroke-linecap="round" opacity="0.96"/>`;
+    }).join('');
+    const drops = Array.from({ length: 10 }, (_, i) => {
+        const ang = (i / 10) * Math.PI * 2 + (i % 2 ? 0.2 : -0.15);
+        return { ang, dist: rnd(38, 54) * sc, sz: rnd(4.2, 6.2) * sc, side: i % 2 ? 1 : -1 };
+    });
+    const host = resistLayer(owner, `<div class="arcane-resist-anchor" style="left:${hx - R}px;top:${hy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 120 120"><defs>${resistRadGrad(`fl-pool-${u}`, [['0%', '#ffffff', 0.45], ['36%', '#67e8f9', 0.52], ['74%', '#06b6d4', 0.2], ['100%', '#0891b2', 0]])}<linearGradient id="fl-sw-${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.98"/><stop offset="45%" stop-color="#67e8f9" stop-opacity="0.92"/><stop offset="100%" stop-color="#06b6d4" stop-opacity="0"/></linearGradient></defs><circle cx="60" cy="60" r="49" fill="url(#fl-pool-${u})"/><circle cx="60" cy="60" r="36" fill="none" stroke="#cffafe" stroke-width="2" opacity="0.55"/><g id="fl-spin-${u}" style="transform-origin:60px 60px">${swirlArcs}</g>${drops.map((_, i) => `<circle id="fl-dr-${u}-${i}" cx="60" cy="60" r="${drops[i].sz}" fill="#ecfeff" opacity="0"/>`).join('')}</svg></div>`, 443, kind);
+    const wrap = host.firstElementChild, spin = host.querySelector(`#fl-spin-${u}`);
+    owner.anim(wrap, [{ transform: 'scale(0.35)', opacity: 0 }, { transform: 'scale(1.08)', opacity: 1, offset: 0.24 }, { transform: 'scale(0.96)', opacity: 0.94, offset: 0.68 }, { transform: 'scale(0.18)', opacity: 0 }], { duration: 820, easing: 'cubic-bezier(0.22,0.72,0.28,1)', fill: 'forwards' });
+    owner.anim(spin, [{ transform: 'rotate(0deg) scale(1)' }, { transform: 'rotate(-175deg) scale(0.86)', offset: 0.45 }, { transform: 'rotate(-320deg) scale(1.02)' }], { duration: 800, easing: 'ease-in-out', fill: 'forwards' });
+    resistTween(owner, 760, p => {
+        const outP = p < 0.46 ? Math.sin((p / 0.46) * Math.PI * 0.5) : Math.cos(((p - 0.46) / 0.54) * Math.PI * 0.5);
+        const op = p < 0.14 ? p / 0.14 : (p > 0.82 ? Math.max(0, (1 - p) / 0.18) : 0.96);
+        drops.forEach((d, i) => {
+            const el = host.querySelector(`#fl-dr-${u}-${i}`);
+            if (!el) return;
+            const sw = d.ang + (p < 0.46 ? p * 1.15 : p * 2.25) * d.side;
+            const rad = d.dist * Math.max(0, outP);
+            el.setAttribute('cx', (60 + Math.cos(sw) * rad).toFixed(1));
+            el.setAttribute('cy', (60 + Math.sin(sw) * rad).toFixed(1));
+            el.setAttribute('opacity', op.toFixed(2));
+        });
+    });
+    owner.burst(12, i => { const a = (i / 12) * Math.PI * 2; return { x: hx, y: hy, vx: Math.cos(a) * rnd(2.2, 4.2), vy: Math.sin(a) * rnd(2.2, 4.2), drag: 0.91, decay: 0.035, size: rnd(3.5, 6.2) * sc, shape: 'droplet', color: pick(['#a5f3fc', '#67e8f9', '#22d3ee']), hiColor: '#ffffff' }; });
+    owner.at(170, () => {
+        owner.burst(1, () => ({ x: hx, y: hy, shape: 'gradRing', size: 1.35 * sc, vr: 2.6, decay: 0.05, color: '#a5f3fc' }));
+        if (onBeat) onBeat('resist', { type: 'fluid', at: 170 });
+    });
+}
+
+function playResistPhantom(owner, entity, r, meta, onBeat, kind) {
+    const u = ++S.uid, sc = meta.scaleMul || 1;
+    const { dx, dy } = resistDir(meta.from || meta.attacker, r);
+    const sx = dx * Math.max(30, Math.min(44, r.width * 0.40)) * sc, sy = dy * Math.max(10, Math.min(18, r.height * 0.18)) * sc;
+    resistAudio(owner, 'resist_phantom', panOf(r.cx), 0.26);
+    const ghostHost = resistLayer(owner, '', 441, kind);
+    const wrap = document.createElement('div');
+    wrap.className = 'arcane-resist-ghost';
+    wrap.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:8px;`;
+    resistClone(wrap, r, 'filter:sepia(1) hue-rotate(175deg) saturate(4.2) brightness(1.08) drop-shadow(0 0 12px rgba(56,189,248,0.88));box-shadow:none;');
+    ghostHost.appendChild(wrap);
+    const slashLayer = resistLayer(owner, `<div class="arcane-resist-anchor" style="left:${r.cx - 84}px;top:${r.cy - 50}px;width:168px;height:100px;"><svg class="arcane-resist-svg" viewBox="0 0 168 100"><defs><linearGradient id="ph-sl-${u}" x1="0" y1="0" x2="1" y2="0.4"><stop offset="0%" stop-color="#818cf8" stop-opacity="0"/><stop offset="46%" stop-color="#ffffff" stop-opacity="0.98"/><stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/></linearGradient></defs><path d="M12,78 Q84,12 156,28 Q86,36 12,84 Z" fill="url(#ph-sl-${u})"/><path d="M22,88 Q88,26 146,40" fill="none" stroke="url(#ph-sl-${u})" stroke-width="2.4" stroke-linecap="round"/></svg></div>`, 445, kind);
+    owner.anim(wrap, [
+        { transform: 'translate3d(0,0,0) scale(1)', opacity: 0 },
+        { transform: `translate3d(${sx.toFixed(1)}px,${sy.toFixed(1)}px,0) scale(1.06)`, opacity: 0.64, offset: 0.2 },
+        { transform: `translate3d(${(sx * 1.12).toFixed(1)}px,${(sy * 1.1).toFixed(1)}px,0) scale(1.06)`, opacity: 0.60, offset: 0.62 },
+        { transform: 'translate3d(0,0,0) scale(1)', opacity: 0 }
+    ], { duration: 760, easing: 'cubic-bezier(0.2,0.8,0.25,1)', fill: 'forwards' });
+    owner.anim(slashLayer.firstElementChild, [
+        { transform: `translate3d(${(-dx * 16).toFixed(1)}px,${(-dy * 10).toFixed(1)}px,0) scaleX(0.6)`, opacity: 0 },
+        { transform: `translate3d(${(sx * 0.95).toFixed(1)}px,${(sy * 0.95).toFixed(1)}px,0) scaleX(1.12)`, opacity: 1, offset: 0.34 },
+        { transform: `translate3d(${(sx * 1.45).toFixed(1)}px,${(sy * 1.45).toFixed(1)}px,0) scaleX(1.22)`, opacity: 0 }
+    ], { duration: 420, easing: 'ease-out', fill: 'forwards' });
+    owner.burst(14, () => ({ x: r.cx + sx * 0.75 + rnd(-14, 14), y: r.cy + sy * 0.5 + rnd(-16, 16), vx: dx * rnd(0.9, 2.8), vy: rnd(-0.9, 0.9), drag: 0.93, decay: 0.036, size: rnd(7, 13) * sc, shape: 'glowOrb', color: pick(['#c4b5fd', '#67e8f9', '#818cf8']) }));
+    owner.at(160, () => { if (onBeat) onBeat('resist', { type: 'phantom', at: 160 }); });
+}
+
+function playResistAntiMagic(owner, entity, r, meta, onBeat, kind) {
+    const u = ++S.uid, sc = meta.scaleMul || 1;
+    const col = meta.spellColor || '#a855f7';
+    const R = Math.max(54, Math.min(82, Math.max(r.width, r.height) * 0.74)) * sc;
+    resistAudio(owner, 'resist_antimagic', panOf(r.cx), 0.24);
+    const peelPaths = Array.from({ length: 6 }, (_, i) => {
+        const a0 = (i / 6) * Math.PI * 2 + 0.25, a1 = a0 - 1.05;
+        const x0 = 60 + Math.cos(a0) * 14, y0 = 60 + Math.sin(a0) * 14;
+        const cx = 60 + Math.cos(a0 - 0.42) * 44, cy = 60 + Math.sin(a0 - 0.42) * 44;
+        const x1 = 60 + Math.cos(a1) * 58, y1 = 60 + Math.sin(a1) * 58;
+        return `<path class="am-fil-${u}" d="M${x0.toFixed(1)},${y0.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}" fill="none" stroke="url(#am-g-${u})" stroke-width="3.6" stroke-linecap="round" stroke-dasharray="32 52"/>`;
+    }).join('');
+    const host = resistLayer(owner, `<div class="arcane-resist-anchor" style="left:${r.cx - R}px;top:${r.cy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 120 120"><defs>${resistRadGrad(`am-core-${u}`, [['0%', '#ffffff', 0.96], ['38%', col, 0.78], ['76%', col, 0.18], ['100%', col, 0]])}<linearGradient id="am-g-${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ffffff" stop-opacity="1"/><stop offset="42%" stop-color="${col}" stop-opacity="0.96"/><stop offset="100%" stop-color="${col}" stop-opacity="0"/></linearGradient></defs><g id="am-r1-${u}" style="transform-origin:60px 60px"><circle cx="60" cy="60" r="38" fill="none" stroke="url(#am-g-${u})" stroke-width="4" stroke-dasharray="32 16 18 18" stroke-linecap="round"/></g><g id="am-r2-${u}" style="transform-origin:60px 60px"><circle cx="60" cy="60" r="25" fill="none" stroke="#f8fafc" stroke-width="2.4" stroke-dasharray="22 14" stroke-linecap="round" opacity="0.88"/></g><g id="am-peel-${u}">${peelPaths}</g><circle id="am-sink-${u}" cx="60" cy="60" r="20" fill="url(#am-core-${u})" style="transform-origin:60px 60px"/></svg></div>`, 443, kind);
+    const r1 = host.querySelector(`#am-r1-${u}`), r2 = host.querySelector(`#am-r2-${u}`), sink = host.querySelector(`#am-sink-${u}`);
+    owner.anim(r1, [{ transform: 'rotate(0deg) scale(0.45)', opacity: 0 }, { transform: 'rotate(-100deg) scale(1.08)', opacity: 0.98, offset: 0.28 }, { transform: 'rotate(-220deg) scale(1.18)', opacity: 0 }], { duration: 820, easing: 'ease-out', fill: 'forwards' });
+    owner.anim(r2, [{ transform: 'rotate(0deg) scale(0.45)', opacity: 0 }, { transform: 'rotate(95deg) scale(1.04)', opacity: 0.92, offset: 0.3 }, { transform: 'rotate(205deg) scale(0.9)', opacity: 0 }], { duration: 780, easing: 'ease-out', fill: 'forwards' });
+    owner.anim(sink, [{ transform: 'scale(1.18)', opacity: 0.98 }, { transform: 'scale(0.88)', opacity: 0.86, offset: 0.38 }, { transform: 'scale(0.16)', opacity: 0 }], { duration: 540, easing: 'ease-in', fill: 'forwards' });
+    resistTween(owner, 760, p => {
+        const off = (-p * 84).toFixed(1), op = (p < 0.16 ? p / 0.16 : Math.max(0, 1 - (p - 0.16) / 0.84)).toFixed(2);
+        host.querySelectorAll(`.am-fil-${u}`).forEach(el => { el.setAttribute('stroke-dashoffset', off); el.setAttribute('opacity', op); });
+    });
+    owner.burst(16, i => { const a = (i / 16) * Math.PI * 2; return { x: r.cx, y: r.cy, vx: Math.cos(a) * rnd(2.4, 4.8), vy: Math.sin(a) * rnd(2.4, 4.8), drag: 0.91, decay: 0.035, size: rnd(2.2, 3.6) * sc, shape: 'spark', color: i % 2 === 0 ? '#ffffff' : col }; });
+    owner.at(180, () => {
+        owner.burst(1, () => ({ x: r.cx, y: r.cy, shape: 'bloom', size: 22 * sc, decay: 0.075, color: col }));
+        if (onBeat) onBeat('resist', { type: 'antiMagic', at: 180 });
+    });
+}
+
+function playResistVital(owner, entity, r, meta, onBeat, kind) {
+    const u = ++S.uid, sc = meta.scaleMul || 1;
+    const { dx, dy } = resistDir(meta.from || meta.attacker, r);
+    const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    resistAudio(owner, 'resist_vital', panOf(r.cx), 0.24);
+    const clampHost = resistLayer(owner, '', 441, kind);
+    const sil = document.createElement('div');
+    sil.className = 'arcane-resist-ghost';
+    sil.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:8px;`;
+    resistClone(sil, r, 'filter:sepia(0.9) hue-rotate(12deg) saturate(2.5) brightness(1.22) drop-shadow(0 0 10px rgba(250,204,21,0.8));');
+    clampHost.appendChild(sil);
+    owner.anim(sil, [{ transform: 'scale(1.08)', opacity: 0 }, { transform: 'scale(0.88)', opacity: 0.54, offset: 0.25 }, { transform: 'scale(0.90)', opacity: 0.42, offset: 0.62 }, { transform: 'scale(1)', opacity: 0 }], { duration: 600, easing: 'ease-out', fill: 'forwards' });
+    const R = Math.max(50, Math.min(78, Math.max(r.width, r.height) * 0.72)) * sc;
+    const svgHost = resistLayer(owner, `<div class="arcane-resist-anchor" style="left:${r.cx - R}px;top:${r.cy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 120 120"><defs><linearGradient id="vt-arc-${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fef08a" stop-opacity="0"/><stop offset="50%" stop-color="#fbbf24" stop-opacity="0.96"/><stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/></linearGradient><linearGradient id="vt-div-${u}" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"/><stop offset="52%" stop-color="#fbbf24" stop-opacity="0.88"/><stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/></linearGradient></defs><g id="vt-ring-${u}" style="transform-origin:60px 60px"><path d="M22,36 A42,42 0 0,1 98,36" fill="none" stroke="url(#vt-arc-${u})" stroke-width="4.5" stroke-linecap="round"/><path d="M22,84 A42,42 0 0,0 98,84" fill="none" stroke="url(#vt-arc-${u})" stroke-width="4.5" stroke-linecap="round"/><path d="M18,44 A45,45 0 0,0 18,76" fill="none" stroke="url(#vt-arc-${u})" stroke-width="3.6" stroke-linecap="round"/><path d="M102,44 A45,45 0 0,1 102,76" fill="none" stroke="url(#vt-arc-${u})" stroke-width="3.6" stroke-linecap="round"/></g><g id="vt-flow-${u}" style="transform-origin:60px 60px"><path d="M22,60 C38,44 64,20 98,16" fill="none" stroke="url(#vt-div-${u})" stroke-width="4" stroke-linecap="round"/><path d="M22,60 C38,76 64,100 98,104" fill="none" stroke="url(#vt-div-${u})" stroke-width="4" stroke-linecap="round"/></g></svg></div>`, 444, kind);
+    const ringEl = svgHost.querySelector(`#vt-ring-${u}`), flowEl = svgHost.querySelector(`#vt-flow-${u}`);
+    owner.anim(ringEl, [{ transform: 'scale(1.26)', opacity: 0 }, { transform: 'scale(0.86)', opacity: 0.98, offset: 0.28 }, { transform: 'scale(0.94)', opacity: 0.78, offset: 0.66 }, { transform: 'scale(1.06)', opacity: 0 }], { duration: 760, easing: 'cubic-bezier(0.22,0.8,0.28,1)', fill: 'forwards' });
+    owner.anim(flowEl, [{ transform: `rotate(${ang.toFixed(1)}deg) translateX(-10px) scale(0.75)`, opacity: 0 }, { transform: `rotate(${ang.toFixed(1)}deg) translateX(2px) scale(1.02)`, opacity: 0.96, offset: 0.36 }, { transform: `rotate(${ang.toFixed(1)}deg) translateX(16px) scale(1.1)`, opacity: 0 }], { duration: 600, easing: 'ease-out', fill: 'forwards' });
+    const perpX = -dy, perpY = dx;
+    owner.burst(14, i => { const s = i % 2 ? 1 : -1; return { x: r.cx - dx * 16, y: r.cy - dy * 16, vx: dx * rnd(1.5, 2.8) + perpX * s * rnd(2.0, 3.8), vy: dy * rnd(1.5, 2.8) + perpY * s * rnd(2.0, 3.8), drag: 0.92, decay: 0.036, size: rnd(2.2, 3.4) * sc, shape: 'spark', color: pick(['#fef08a', '#38bdf8', '#fbbf24']) }; });
+    owner.at(180, () => { if (onBeat) onBeat('resist', { type: 'vital', at: 180 }); });
+}
+
+function playResistFireproof(owner, entity, r, meta, onBeat, kind) {
+    const u = ++S.uid, sc = meta.scaleMul || 1;
+    const { dx, dy } = resistDir(meta.from || meta.attacker, r);
+    const sx = r.cx - dx * Math.min(26, r.width * 0.28), sy = r.cy - dy * Math.min(18, r.height * 0.2);
+    const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    resistAudio(owner, 'resist_fireproof', panOf(sx), 0.20);
+    const R = Math.max(52, Math.min(74, Math.max(r.width, r.height) * 0.68)) * sc;
+    const host = resistLayer(owner, `<div class="arcane-resist-anchor" style="left:${sx - R}px;top:${sy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 100 100"><defs><linearGradient id="fp-sh-${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff7ed" stop-opacity="0"/><stop offset="50%" stop-color="#fed7aa" stop-opacity="0.98"/><stop offset="100%" stop-color="#fb923c" stop-opacity="0"/></linearGradient><radialGradient id="fp-fl-${u}" cx="55%" cy="50%" r="50%"><stop offset="0%" stop-color="#fef9c3" stop-opacity="1"/><stop offset="55%" stop-color="#f97316" stop-opacity="0.9"/><stop offset="100%" stop-color="#ea580c" stop-opacity="0"/></radialGradient></defs><g transform="rotate(${ang.toFixed(1)} 50 50)"><path id="fp-flame-${u}" d="M4,50 Q24,20 46,50 Q24,80 4,50 Z" fill="url(#fp-fl-${u})" style="transform-origin:36px 50px"/><path id="fp-arc-${u}" d="M46,10 Q72,50 46,90" fill="none" stroke="url(#fp-sh-${u})" stroke-width="6.5" stroke-linecap="round"/><path id="fp-arc2-${u}" d="M54,18 Q76,50 54,82" fill="none" stroke="url(#fp-sh-${u})" stroke-width="2.6" stroke-linecap="round" opacity="0.82"/></g></svg></div>`, 445, kind);
+    const fl = host.querySelector(`#fp-flame-${u}`), arc = host.querySelector(`#fp-arc-${u}`), arc2 = host.querySelector(`#fp-arc2-${u}`);
+    owner.anim(fl, [{ transform: 'translateX(-16px) scale(0.45)', opacity: 0 }, { transform: 'translateX(4px) scale(1.12)', opacity: 1, offset: 0.28 }, { transform: 'translateX(-4px) scale(0.18)', opacity: 0 }], { duration: 340, easing: 'ease-out', fill: 'forwards' });
+    owner.anim(arc, [{ transform: 'scale(0.68)', opacity: 0 }, { transform: 'scale(1.06)', opacity: 0.98, offset: 0.3 }, { transform: 'scale(1.14)', opacity: 0 }], { duration: 480, easing: 'ease-out', fill: 'forwards' });
+    owner.anim(arc2, [{ transform: 'scale(0.72)', opacity: 0 }, { transform: 'scale(1.08)', opacity: 0.86, offset: 0.35 }, { transform: 'scale(1.18)', opacity: 0 }], { duration: 460, easing: 'ease-out', fill: 'forwards' });
+    owner.at(140, () => {
+        owner.burst(14, () => ({ x: sx + rnd(-10, 10), y: sy + rnd(-14, 14), vx: -dx * rnd(0.5, 1.8) + rnd(-0.9, 0.9), vy: rnd(-1.9, -0.5), drag: 0.94, decay: rnd(0.02, 0.036), size: rnd(5, 9) * sc, shape: 'glowOrb', blend: 'source-over', color: pick(['#e2e8f0', '#94a3b8', '#64748b']) }));
+        if (onBeat) onBeat('immune', { type: 'fireproof', at: 140 });
+    });
+}
+
+function playResistPoisonproof(owner, entity, r, meta, onBeat, kind) {
+    const u = ++S.uid, sc = meta.scaleMul || 1;
+    resistAudio(owner, 'resist_poisonproof', panOf(r.cx), 0.26);
+    const R = Math.max(48, Math.min(72, Math.max(r.width, r.height) * 0.64)) * sc;
+    const specs = [[-22, -16, 9], [20, -18, 7.6], [-26, 8, 9.5], [24, 6, 8.2], [0, -28, 8.2]];
+    const bubbles = specs.map(([bx, by, rad], i) => `<g id="pp-b-${u}-${i}" style="transform-origin:${60 + bx}px ${60 + by}px"><circle cx="${60 + bx}" cy="${60 + by}" r="${rad}" fill="url(#pp-g-${u})"/><circle cx="${60 + bx - rad * 0.28}" cy="${60 + by - rad * 0.3}" r="${(rad * 0.28).toFixed(1)}" fill="#fdf4ff" opacity="0.95"/></g>`).join('');
+    const host = resistLayer(owner, `<div class="arcane-resist-anchor" style="left:${r.cx - R}px;top:${r.cy - R}px;width:${R * 2}px;height:${R * 2}px;"><svg class="arcane-resist-svg" viewBox="0 0 120 120"><defs>${resistRadGrad(`pp-g-${u}`, [['0%', '#f5d0fe', 0.36], ['55%', '#c084fc', 0.84], ['90%', '#9333ea', 0.92], ['100%', '#581c87', 0]])}</defs>${bubbles}</svg></div>`, 445, kind);
+    specs.forEach(([bx], i) => {
+        const el = host.querySelector(`#pp-b-${u}-${i}`);
+        owner.anim(el, [
+            { transform: 'scale(0.15)', opacity: 0 },
+            { transform: 'scale(1.1)', opacity: 0.98, offset: 0.32 + i * 0.02 },
+            { transform: `translate3d(${(bx * 0.32).toFixed(1)}px,22px,0) scale(0.92)`, opacity: 0.88, offset: 0.56 },
+            { transform: `translate3d(${(bx * 0.55).toFixed(1)}px,58px,0) scale(0.18)`, opacity: 0 }
+        ], { duration: 600, delay: i * 18, easing: 'cubic-bezier(0.28,0.65,0.4,1)', fill: 'forwards' });
+    });
+    owner.at(210, () => {
+        owner.burst(1, () => ({ x: r.cx, y: r.cy, shape: 'gradRing', size: 1.15 * sc, vr: 2.3, decay: 0.07, color: '#d8b4fe' }));
+        owner.burst(11, i => ({ x: r.cx + (specs[i % 5][0]) * sc, y: r.cy + (specs[i % 5][1]) * sc, vx: rnd(-1.1, 1.1), vy: rnd(1.1, 2.6), grav: 0.18, drag: 0.96, decay: 0.032, size: rnd(3.4, 5.5) * sc, shape: 'droplet', color: pick(['#e9d5ff', '#c084fc', '#a855f7']), hiColor: '#fdf4ff' }));
+        if (onBeat) onBeat('immune', { type: 'poisonproof', at: 210 });
+    });
+}
+
+function playResistIronBody(owner, entity, r, meta, onBeat, kind) {
+    const u = ++S.uid, sc = meta.scaleMul || 1;
+    const hx = r.cx, hy = Math.max(20, r.top - 8);
+    resistAudio(owner, 'resist_ironbody', panOf(hx), 0.28);
+    const stars = [-24, 0, 24].map((ox, i) => {
+        const cx = 60 + ox * sc, cy = 44 + (i === 1 ? -5 : 3);
+        return `<g id="ib-st-${u}-${i}" style="transform-origin:${cx}px ${cy}px"><polygon class="arcane-resist-shard" id="ib-l-${u}-${i}" points="${cx},${cy - 11} ${cx + 2.5},${cy - 3} ${cx + 1},${cy + 5} ${cx - 6.5},${cy + 8.5} ${cx - 4},${cy + 1.5} ${cx - 9.5},${cy - 3}" fill="#fde047"/><polygon class="arcane-resist-shard" id="ib-r-${u}-${i}" points="${cx},${cy - 11} ${cx + 9.5},${cy - 3} ${cx + 4},${cy + 1.5} ${cx + 6.5},${cy + 8.5} ${cx},${cy + 5}" fill="#fef9c3"/></g>`;
+    }).join('');
+    const host = resistLayer(owner, `<div class="arcane-resist-anchor" style="left:${hx - 68}px;top:${hy - 44}px;width:136px;height:88px;"><svg class="arcane-resist-svg" viewBox="0 0 120 88" style="filter:drop-shadow(0 0 6px rgba(250,204,21,0.75))"><defs><linearGradient id="ib-gl-${u}" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ffffff" stop-opacity="0"/><stop offset="50%" stop-color="#f8fafc" stop-opacity="1"/><stop offset="100%" stop-color="#94a3b8" stop-opacity="0"/></linearGradient></defs>${stars}<path id="ib-cut-${u}" d="M12,48 L108,36" fill="none" stroke="url(#ib-gl-${u})" stroke-width="4.4" stroke-linecap="round" opacity="0"/></svg></div>`, 446, kind);
+    [-24, 0, 24].forEach((ox, i) => {
+        const st = host.querySelector(`#ib-st-${u}-${i}`);
+        owner.anim(st, [{ transform: 'scale(0.3) translateY(6px)', opacity: 0 }, { transform: 'scale(1.12) translateY(0)', opacity: 1, offset: 0.35 }, { transform: 'scale(1) translateY(0)', opacity: 1 }], { duration: 195, fill: 'forwards' });
+        owner.at(170, () => {
+            const sl = host.querySelector(`#ib-l-${u}-${i}`), sr = host.querySelector(`#ib-r-${u}-${i}`);
+            owner.anim(sl, [{ transform: 'translate(0,0) rotate(0deg) scale(1)', opacity: 1 }, { transform: `translate(${-16 - i * 3}px,${10 + i * 3}px) rotate(-52deg) scale(0.45)`, opacity: 0 }], { duration: 340, easing: 'ease-out', fill: 'forwards' });
+            owner.anim(sr, [{ transform: 'translate(0,0) rotate(0deg) scale(1)', opacity: 1 }, { transform: `translate(${16 + i * 3}px,${-10 + i * 3}px) rotate(56deg) scale(0.45)`, opacity: 0 }], { duration: 340, easing: 'ease-out', fill: 'forwards' });
+        });
+    });
+    const cut = host.querySelector(`#ib-cut-${u}`);
+    owner.at(165, () => {
+        owner.anim(cut, [{ transform: 'scaleX(0.35)', opacity: 0 }, { transform: 'scaleX(1.1)', opacity: 1, offset: 0.3 }, { transform: 'scaleX(1.26)', opacity: 0 }], { duration: 240, easing: 'ease-out', fill: 'forwards' });
+        owner.burst(1, () => ({ x: hx, y: hy, shape: 'gradRing', size: 1.05 * sc, vr: 2.6, decay: 0.08, color: '#f8fafc' }));
+        owner.burst(14, () => { const a = rnd(-2.9, 0.3), sp = rnd(2.0, 4.8); return { x: hx + rnd(-22, 22), y: hy + rnd(-4, 4), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.6, grav: 0.14, drag: 0.93, decay: 0.038, size: rnd(1.8, 3.2) * sc, shape: 'spark', color: pick(['#fde047', '#ffffff', '#cbd5e1']) }; });
+        if (onBeat) onBeat('immune', { type: 'ironBody', at: 170 });
+    });
+}
+
+// 对外唯一入口：层选择由调用方给，不按 stateResult 猜测是否播放。
+// 最多两层、顺序错峰 120ms；owner 至少 980ms，第二层结束时按尾段补齐。
+function playVariantResistFx(opts = {}) {
+    if (!opts || opts.outcome === 'dodge') return null;
+    const entity = opts.entity || opts.target;
+    const rect = resistRect(entity);
+    if (!rect) return null;
+    const raw = Array.isArray(opts.layers) && opts.layers.length
+        ? opts.layers.slice(0, 2)
+        : ((opts.kind || opts.trigger) ? [opts.kind || opts.trigger] : []);
+    const picks = [];
+    for (let i = 0; i < raw.length; i++) {
+        const spec = RESIST_FX[raw[i]];
+        if (spec) picks.push(spec);
+    }
+    if (!picks.length) return null;
+    const meta = Object.assign({}, opts.meta, {
+        incomingType: opts.incomingType,
+        isAoE: !!(opts.isAoE || opts.isAoe),
+        outcome: opts.outcome || 'hit',
+        stateResult: opts.stateResult !== undefined ? opts.stateResult : (opts.meta && opts.meta.stateResult),
+        from: opts.from || (opts.meta && opts.meta.from)
+    });
+    const delay = meta.delayMs || 0;
+    const total = delay + Math.max(980, picks.length > 1 ? 120 + picks[1].ms : 0);
+    const owner = variantRun(total, null, [entity]);
+    const play = () => {
+        picks[0].play(owner, entity, rect, meta, opts.onBeat, picks[0].kind);
+        if (picks[1]) {
+            const second = picks[1];
+            owner.at(120, () => second.play(owner, entity, rect, Object.assign({}, meta, { scaleMul: 0.86 }), opts.onBeat, second.kind));
+        }
+    };
+    if (delay) owner.at(delay, play); else play();
+    return owner.handle;
+}
+
+window.playVariantResistFx = playVariantResistFx;
+// ===== 抗性与免疫演出 END =====
+
+/* v12.10 状态四项（毒/燃/麻/到期）＋【燃烧】禁疗提示
+   用途：整段合入 index.html 的 arcaneVfxModule 内部（放在变种演出 END 之后、return 之前）。
+   约定：
+   - 只复用模块既有 variantRun / idSample / entityVisualRect / domOf / ctr / S / after / fsLayer / addP /
+     isEntityVariantLocked / getEntitySpriteDom / combatToken，不新建 timer / rAF / 合成音引擎。
+   - 不移植 playStatusDispel；驱散仍走 index.html 原 registerTagHandler('驱散')。
+   - 主代理在 arcaneVfxModule 的 return 对象中展开 statusFxApi；并在 clearArcaneFx 内调用 clearStatusLayers()。
+   - 主代理负责把 ranshao / fog 采样注册进 audioUrls 与 IDENTITY_CLIP_KEYS（若尚未注册），本片段无合成兜底。 */
+
+    // ===== v12.10 状态发作 / 禁疗 / 到期（可移植自 demo-status-ticks.html，去驱散、去宿主音频） =====
+    const ST = {
+        persists: new Map(),   // dom -> Set(persistNode)
+        persistIds: new Map(), // dom -> entityId（DOM 已离线也能按实体清理）
+        sfxAt: new Map(),      // 节流键 -> 上次播放时刻
+        runs: new Map()        // entityId -> Set(owner)，清实体时取消活动演出
+    };
+    let statusSfxOn = true;
+    const STATUS_COLORS = { poison: '#a855f7', burn: '#f97316', paralyze: '#facc15', stun: '#fde047', 'atk-': '#c084fc', 'def-': '#c084fc', 'spd-': '#c084fc', 'hit-': '#c084fc', 'eva-': '#c084fc', debuff: '#c084fc' };
+    const STATUS_SAMPLE_MAP = {
+        poison: 'creature_slime_01',
+        para: 'thunder_charge',
+        paralyze: 'thunder_charge',
+        burn: 'ranshao',
+        healSuppress: 'ranshao',
+        expire: 'fog'
+    };
+    const STATUS_SAMPLE_KEYS = ['creature_slime_01', 'thunder_charge', 'ranshao', 'fog'];
+
+    function statusEntityId(e) { return e && typeof e === 'object' && e.nodeType !== 1 ? String(e.id || '') : (e && e.nodeType === 1 ? String(identityTargetKey(e)) : String(e || '')); }
+    function statusDomOf(e) { return e && e.nodeType === 1 ? e : domOf(e); }
+    function statusPanOf(x) { return Math.max(-0.75, Math.min(0.75, (x / Math.max(640, window.innerWidth) - 0.5) * 1.35)); }
+    function statusGlowDef(id, std = 3) {
+        return `<filter id="${id}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${std}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+    }
+    // 常驻图标宿主：hero-card-inner 的 .bg-gray-900（正式英雄无 .portrait）＞既有 .portrait 父层＞精灵本体
+    function resolveStatusIconHost(dom) {
+        if (!dom) return null;
+        const portrait = dom.querySelector && dom.querySelector('.portrait');
+        if (portrait) return portrait.parentElement || portrait;
+        if (dom.classList && dom.classList.contains('hero-card-inner')) return dom.querySelector('.bg-gray-900') || dom;
+        return dom;
+    }
+    // 正式版 entityVisualRect 已含 hero/portrait/img 判定；此处仅做薄映射，不复制几何逻辑
+    function statusVisualRect(entityOrDom) { return entityVisualRect(entityOrDom); }
+    function statusVisualOk(r) { return !!r && r.w > 0 && r.h > 0; }
+    // is-hero 只认 DOM 契约：hero-card-inner 或 .portrait；召唤物（hero-card-s_* 但 class=enemy-sprite）不算
+    function statusPersistIsHero(dom) {
+        return !!(dom && ((dom.querySelector && dom.querySelector('.portrait')) || (dom.classList && dom.classList.contains('hero-card-inner'))));
+    }
+    function statusSfxGate(key, minGapMs = 65) {
+        if (!statusSfxOn) return 0;
+        const now = performance.now(), prev = ST.sfxAt.get(key) || 0, gap = now - prev;
+        if (gap < 28) return 0;
+        ST.sfxAt.set(key, now);
+        return gap < minGapMs ? 0.45 : 1;
+    }
+    // 只走真实采样；无合成 fallback。采样键与预热由主代理注册。
+    function playStatusSample(owner, key, opts = {}) {
+        if (!statusSfxOn) return false;
+        const mapped = STATUS_SAMPLE_MAP[key] || key;
+        return !!idSample(owner, mapped, Object.assign({ sampled: true, category: 'K' }, opts));
+    }
+    // 复用变种 owner：handle 带 doneAt/cancel/onFinish；实体活动登记到 ST.runs 便于死亡/离线清理
+    function statusRun(totalMs, entity) {
+        const owner = variantRun(totalMs, null, entity ? [entity] : []);
+        owner.onRestore = owner.onClean;
+        const id = statusEntityId(entity);
+        if (id) {
+            let runs = ST.runs.get(id);
+            if (!runs) { runs = new Set(); ST.runs.set(id, runs); }
+            runs.add(owner);
+            owner.onClean(() => {
+                const set = ST.runs.get(id);
+                if (set) { set.delete(owner); if (!set.size) ST.runs.delete(id); }
+            });
+        }
+        return owner;
+    }
+    function buildStatusPersistHtml(kind) {
+        if (kind === 'burn') {
+            const flameSvg = d => `<svg viewBox="0 0 12 18" class="w-full h-full overflow-visible"><path d="${d}" fill="#ea580c" opacity="0.92"/><path d="M4,16 Q6,9 6.3,6.5 Q8.4,11.5 7.5,16 Z" fill="#fef08a" opacity="0.95"/></svg>`;
+            return `<span class="arcane-status-flame-chip f1">${flameSvg('M2,17 Q1.2,10 6.2,1.5 Q10.8,9 9.8,17 Z')}</span>`
+                + `<span class="arcane-status-flame-chip f2">${flameSvg('M2.2,17 Q2,11 5.8,3 Q9.8,10 9.4,17 Z')}</span>`
+                + `<span class="arcane-status-flame-chip f3">${flameSvg('M2,17 Q1.8,9.5 6.4,2 Q10.4,10.5 9.6,17 Z')}</span>`
+                + '<span class="arcane-status-ember-dot e1"></span><span class="arcane-status-ember-dot e2"></span>';
+        }
+        if (kind === 'poison') {
+            return '<span class="arcane-status-bubble-dot b1"></span><span class="arcane-status-bubble-dot b2"></span><span class="arcane-status-bubble-dot b3"></span>';
+        }
+        if (kind === 'paralyze') {
+            const starSvg = () => '<svg viewBox="0 0 20 20" class="w-full h-full overflow-visible">'
+                + '<path d="M10,1 L12.1,7.9 L19,10 L12.1,12.1 L10,19 L7.9,12.1 L1,10 L7.9,7.9 Z" fill="#facc15" stroke="#713f12" stroke-width="1.35" stroke-linejoin="round"/>'
+                + '<circle cx="10" cy="10" r="2.2" fill="#fef9c3"/></svg>';
+            return `<span class="arcane-status-spark-star s1">${starSvg()}</span>`
+                + `<span class="arcane-status-spark-star s2">${starSvg()}</span>`
+                + `<span class="arcane-status-spark-star s3">${starSvg()}</span>`
+                + '<span class="arcane-status-spark-dot d1"></span><span class="arcane-status-spark-dot d2"></span>';
+        }
+        return '';
+    }
+    function statusClearNodeTimer(node) {
+        if (node && node._exitTimer) { clearTimeout(node._exitTimer); S.timers.delete(node._exitTimer); node._exitTimer = null; }
+    }
+    function setStatusPersist(dom, kind, active, entityId) {
+        if (!dom || !dom.isConnected) return;
+        const host = resolveStatusIconHost(dom);
+        if (!host || !host.isConnected) return;
+        const attr = 'data-arcane-status-persist';
+        let node = host.querySelector(':scope > [' + attr + '="' + kind + '"]') || dom.querySelector('[' + attr + '="' + kind + '"]');
+        if (active) {
+            if (getComputedStyle(host).position === 'static') host.classList.add('arcane-status-host-rel');
+            if (!node) {
+                node = document.createElement('div');
+                node.setAttribute(attr, kind);
+                node.className = 'arcane-status-persist-layer arcane-status-persist-' + kind + (statusPersistIsHero(dom) ? ' is-hero' : '');
+                node.innerHTML = buildStatusPersistHtml(kind);
+                host.appendChild(node);
+            } else {
+                statusClearNodeTimer(node);
+                node.classList.remove('exiting');
+            }
+            let set = ST.persists.get(dom);
+            if (!set) { set = new Set(); ST.persists.set(dom, set); }
+            set.add(node);
+            if (entityId) ST.persistIds.set(dom, entityId);
+        } else if (node && !node.classList.contains('exiting')) {
+            node.classList.add('exiting');
+            const token = combatToken;
+            node._exitTimer = after(290, () => {
+                node._exitTimer = null;
+                if (token !== combatToken) return;
+                node.remove();
+                const set = ST.persists.get(dom);
+                if (set) {
+                    set.delete(node);
+                    if (!set.size) { ST.persists.delete(dom); ST.persistIds.delete(dom); }
+                }
+                if (!host.querySelector('[' + attr + ']')) host.classList.remove('arcane-status-host-rel');
+            });
+        }
+    }
+    function syncStatusLayers(entity) {
+        if (!entity) return;
+        if (!entity.isAlive || entity.hp <= 0 || entity.isSubdued) { clearStatusLayers(entity); return; }
+        const dom = statusDomOf(entity);
+        if (!dom) return;
+        const id = statusEntityId(entity);
+        ST.persists.forEach((nodes, oldDom) => {
+            if (oldDom !== dom && ST.persistIds.get(oldDom) === id) {
+                nodes.forEach(node => { statusClearNodeTimer(node); node.remove(); });
+                const oldHost = resolveStatusIconHost(oldDom);
+                if (oldHost) oldHost.classList.remove('arcane-status-host-rel');
+                ST.persists.delete(oldDom); ST.persistIds.delete(oldDom);
+            }
+        });
+        const buffs = entity.buffs || [];
+        const has = t => buffs.some(b => b.type === t && (b.duration > 0 || b.permanent));
+        setStatusPersist(dom, 'poison', has('poison'), id);
+        setStatusPersist(dom, 'burn', has('burn'), id);
+        setStatusPersist(dom, 'paralyze', has('paralyze'), id);
+    }
+    function clearStatusLayers(entityOrId) {
+        const dropDom = (d, set) => {
+            (set || new Set()).forEach(node => { statusClearNodeTimer(node); node.remove(); });
+            ST.persists.delete(d); ST.persistIds.delete(d);
+            const host = d ? resolveStatusIconHost(d) : null;
+            if (host) host.classList.remove('arcane-status-host-rel');
+            if (d && d.classList) d.classList.remove('arcane-status-host-rel');
+            if (d && d.querySelectorAll) d.querySelectorAll('[data-arcane-status-persist]').forEach(node => { statusClearNodeTimer(node); node.remove(); });
+        };
+        if (entityOrId) {
+            const id = entityOrId.nodeType === 1 ? '' : statusEntityId(entityOrId);
+            const dom = statusDomOf(entityOrId);
+            if (id) {
+                const runs = ST.runs.get(id);
+                if (runs) {
+                    [...runs].forEach(owner => { try { owner.handle && owner.handle.cancel(); } catch (e) {} });
+                    ST.runs.delete(id);
+                }
+                ST.persists.forEach((set, d) => {
+                    if (ST.persistIds.get(d) !== id && d !== dom) return;
+                    dropDom(d, set);
+                });
+            } else if (dom) {
+                dropDom(dom, ST.persists.get(dom));
+            }
+            return;
+        }
+        ST.runs.forEach(set => { [...set].forEach(owner => { try { owner.handle && owner.handle.cancel(); } catch (e) {} }); });
+        ST.runs.clear();
+        ST.persists.forEach((set, d) => { set.forEach(node => { statusClearNodeTimer(node); node.remove(); }); });
+        ST.persists.clear(); ST.persistIds.clear(); ST.sfxAt.clear();
+        document.querySelectorAll('[data-arcane-status-persist]').forEach(node => { statusClearNodeTimer(node); node.remove(); });
+        document.querySelectorAll('.arcane-status-host-rel').forEach(el => el.classList.remove('arcane-status-host-rel'));
+    }
+
+    // 1. 中毒发作：局部紫纹微渗 → 依层 2~4 毒泡浮出破裂 → 细毒雾上浮 (L1 · 540ms)
+    function playStatusPoisonTick(entity, meta = {}, onBeat) {
+        const dom = statusDomOf(entity); if (!dom || !dom.isConnected) return null;
+        const r = statusVisualRect(dom); if (!statusVisualOk(r)) return null;
+        const layers = Math.max(1, Math.min(5, Number(meta.layers) || 1));
+        const bubbleCount = layers >= 3 ? 4 : (layers === 2 ? 3 : 2);
+        const owner = statusRun(540, entity), uid = 'arcane-status-poison-' + (++S.uid), pan = statusPanOf(r.x);
+        const W = Math.max(96, r.w * 1.18), H = Math.max(96, r.h * 1.18), cx = W / 2, cy = H / 2, rw = r.w * 0.42, rh = r.h * 0.42;
+        const wispSet = [
+            `M${cx + rw * 0.14},${cy + rh * 0.25} L${cx + rw * 0.34},${cy - rh * 0.08} L${cx + rw * 0.28},${cy - rh * 0.32}`,
+            `M${cx - rw * 0.28},${cy + rh * 0.18} L${cx - rw * 0.14},${cy - rh * 0.12} L${cx - rw * 0.22},${cy - rh * 0.34}`,
+            `M${cx + rw * 0.04},${cy - rh * 0.06} L${cx + rw * 0.26},${cy - rh * 0.22}`,
+            `M${cx - rw * 0.1},${cy + rh * 0.28} L${cx + rw * 0.16},${cy + rh * 0.1}`,
+            `M${cx + rw * 0.34},${cy + rh * 0.18} L${cx + rw * 0.46},${cy - rh * 0.18}`
+        ].slice(0, layers >= 3 ? 5 : (layers === 2 ? 4 : 3));
+        const bSlots = [[0.24, -0.14], [0.42, -0.34], [0.06, -0.42], [0.34, -0.56]].slice(0, bubbleCount);
+        const wispStrokeW = layers >= 3 ? 2.1 : 1.5, wispOp = layers >= 3 ? 0.85 : 0.65;
+        const bubblesHtml = bSlots.map(([ox, oy], idx) => {
+            const bx = (cx + ox * rw).toFixed(1), by = (cy + oy * rh).toFixed(1), br = (4.6 + (idx % 2) * 1.4 + (layers >= 3 ? 0.9 : 0)).toFixed(1);
+            return `<g class="s-bubble" data-bx="${(r.x + ox * r.w * 0.42).toFixed(1)}" data-by="${(r.y + oy * r.h * 0.42 - 6).toFixed(1)}" style="transform-origin:${bx}px ${by}px;opacity:0">`
+                + `<circle cx="${bx}" cy="${by}" r="${br}" fill="url(#${uid}-bub)"/>`
+                + `<circle cx="${(Number(bx) - Number(br) * 0.32).toFixed(1)}" cy="${(Number(by) - Number(br) * 0.32).toFixed(1)}" r="${(Number(br) * 0.28).toFixed(1)}" fill="#f3e8ff" opacity="0.82"/></g>`;
+        }).join('');
+        const layer = owner.layer(
+            `<div class="arcane-status-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
+            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.0)}`
+            + `<radialGradient id="${uid}-bub" cx="0.35" cy="0.32"><stop offset="0" stop-color="#f3e8ff" stop-opacity="0.45"/><stop offset="0.58" stop-color="#a855f7" stop-opacity="0.76"/><stop offset="0.88" stop-color="#7e22ce" stop-opacity="0.94"/><stop offset="1" stop-color="#581c87" stop-opacity="0"/></radialGradient>`
+            + `</defs><g class="s-veins" filter="url(#${uid}-gl)" style="transform-origin:${cx}px ${cy}px;opacity:0">`
+            + wispSet.map(d => `<path d="${d}" fill="none" stroke="#c084fc" stroke-width="${wispStrokeW}" stroke-linecap="round" stroke-linejoin="round" opacity="${wispOp}"/>`).join('')
+            + `</g><g filter="url(#${uid}-gl)">${bubblesHtml}</g></svg></div>`
+        );
+        const veins = layer.querySelector('.s-veins');
+        if (veins) owner.anim(veins, [{ opacity: 0, transform: 'translateY(3px) scale(0.95)' }, { opacity: 0.92, transform: 'translateY(0px) scale(1)', offset: 0.3 }, { opacity: 0.65, transform: 'translateY(-2px)', offset: 0.65 }, { opacity: 0, transform: 'translateY(-4px)' }], { duration: 400, easing: 'ease-out', fill: 'forwards' });
+        const gSfx = statusSfxGate('poison', 70);
+        if (gSfx > 0) playStatusSample(owner, 'poison', { pan, vol: (layers >= 3 ? 0.48 : 0.40) * gSfx, rate: layers >= 3 ? 0.94 : 1.04 });
+        owner.at(60, () => { if (onBeat) onBeat({ event: 'poisonTick', entity, layers }); });
+        layer.querySelectorAll('.s-bubble').forEach((bEl, idx) => {
+            const d0 = 40 + idx * 62;
+            owner.at(d0, () => {
+                owner.anim(bEl, [{ opacity: 0, transform: 'translateY(4px) scale(0.32)' }, { opacity: 0.96, transform: 'translateY(-5px) scale(1.08)', offset: 0.58 }, { opacity: 0, transform: 'translateY(-11px) scale(1.36)' }], { duration: 155, easing: 'ease-out', fill: 'forwards' });
+            });
+            owner.at(d0 + 92, () => {
+                const bx = Number(bEl.dataset.bx), by = Number(bEl.dataset.by);
+                owner.burst(4 + (layers >= 3 ? 1 : 0), () => {
+                    const a = rnd(-Math.PI * 0.9, -Math.PI * 0.1), sp = rnd(0.7, 1.6);
+                    return { x: bx + rnd(-3, 3), y: by + rnd(-3, 3), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.35, drag: 0.94, decay: 0.048, size: rnd(2.0, 3.4), shape: 'glowOrb', core: '#e9d5ff', color: '#a855f7' };
+                });
+                owner.addP({ x: bx, y: by - 2, vx: rnd(-0.3, 0.3), vy: rnd(-1.05, -0.5), drag: 0.96, decay: 0.038, size: rnd(7, 10), shape: 'gradMist', blend: 'source-over', mistCore: '#7e22ce', color: 'rgba(126,34,206,0.3)', fade: 'rgba(59,7,100,0)' });
+            });
+        });
+        return owner.handle;
+    }
+
+    // 2. 燃烧发作：底部火焰上涌 → 锐利火星闪爆 → 黑灰余烬上飘；不叠层强度恒定 (L1 · 540ms)
+    function playStatusBurnTick(entity, meta = {}, onBeat) {
+        const dom = statusDomOf(entity); if (!dom || !dom.isConnected) return null;
+        const r = statusVisualRect(dom); if (!statusVisualOk(r)) return null;
+        const owner = statusRun(540, entity), uid = 'arcane-status-burn-' + (++S.uid), pan = statusPanOf(r.x);
+        const W = Math.max(96, r.w * 1.2), H = Math.max(96, r.h * 1.2), cx = W / 2, cy = H / 2, rw = r.w * 0.42, rh = r.h * 0.42;
+        const fx = cx + rw * 0.16, fy = cy + rh * 0.08;
+        const tongueAt = (tx, by, w, h) => `<path d="M${(tx - w).toFixed(1)},${by.toFixed(1)} Q${(tx - w * 0.7).toFixed(1)},${(by - h * 0.55).toFixed(1)} ${(tx + w * 0.08).toFixed(1)},${(by - h).toFixed(1)} Q${(tx + w * 0.85).toFixed(1)},${(by - h * 0.45).toFixed(1)} ${(tx + w).toFixed(1)},${by.toFixed(1)} Z" fill="url(#${uid}-fl)"/>`
+            + `<path d="M${(tx - w * 0.45).toFixed(1)},${by.toFixed(1)} Q${tx.toFixed(1)},${(by - h * 0.55).toFixed(1)} ${(tx + w * 0.45).toFixed(1)},${by.toFixed(1)} Z" fill="#fef08a" opacity="0.9"/>`;
+        const layer = owner.layer(
+            `<div class="arcane-status-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
+            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.0)}`
+            + `<linearGradient id="${uid}-fl" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#c2410c" stop-opacity="0.92"/><stop offset="0.55" stop-color="#f97316" stop-opacity="0.95"/><stop offset="1" stop-color="#fef08a" stop-opacity="0.2"/></linearGradient>`
+            + `</defs><g class="s-tongues" filter="url(#${uid}-gl)" style="transform-origin:${cx}px ${cy + rh * 0.78}px;opacity:0">`
+            + tongueAt(cx - rw * 0.44, cy + rh * 0.78, Math.max(5.5, rw * 0.16), Math.max(14, rh * 0.52))
+            + tongueAt(cx - rw * 0.1, cy + rh * 0.84, Math.max(6.5, rw * 0.2), Math.max(18, rh * 0.68))
+            + tongueAt(cx + rw * 0.26, cy + rh * 0.8, Math.max(6, rw * 0.18), Math.max(16, rh * 0.6))
+            + tongueAt(cx + rw * 0.48, cy + rh * 0.72, Math.max(5, rw * 0.14), Math.max(12, rh * 0.44))
+            + `</g><polygon class="s-flare" points="${fx},${fy - 11} ${fx + 3},${fy - 3} ${fx + 11},${fy} ${fx + 3},${fy + 3} ${fx},${fy + 11} ${fx - 3},${fy + 3} ${fx - 11},${fy} ${fx - 3},${fy - 3}" fill="#fef08a" stroke="#f97316" stroke-width="1" opacity="0" style="transform-origin:${fx}px ${fy}px"/></svg></div>`
+        );
+        const tongues = layer.querySelector('.s-tongues'), flare = layer.querySelector('.s-flare');
+        if (tongues) owner.anim(tongues, [{ opacity: 0, transform: 'translateY(6px) scaleY(0.55)' }, { opacity: 0.96, transform: 'translateY(-3px) scaleY(1.06)', offset: 0.35 }, { opacity: 0, transform: 'translateY(-11px) scaleY(0.75)' }], { duration: 360, easing: 'ease-out', fill: 'forwards' });
+        const gSfx = statusSfxGate('burn', 70);
+        if (gSfx > 0) playStatusSample(owner, 'burn', { pan, vol: 0.22 * gSfx, rate: 1.02 });
+        owner.at(60, () => { if (onBeat) onBeat({ event: 'burnTick', entity }); });
+        owner.at(80, () => {
+            if (flare) owner.anim(flare, [{ opacity: 0, transform: 'scale(0.35) rotate(0deg)' }, { opacity: 0.96, transform: 'scale(1.1) rotate(18deg)', offset: 0.32 }, { opacity: 0, transform: 'scale(0.6) rotate(35deg)' }], { duration: 190, easing: 'ease-out', fill: 'forwards' });
+            const bx = r.x + r.w * 0.07, by = r.y + r.h * 0.04;
+            owner.burst(5, () => { const a = rnd(-Math.PI, 0), sp = rnd(1.0, 2.2); return { x: bx, y: by, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.45, drag: 0.92, decay: 0.058, size: rnd(1.2, 1.8), shape: 'spark', color: pick(['#fb923c', '#fbbf24']) }; });
+            owner.burst(6, i => ({ x: r.x + rnd(-rw * 0.48, rw * 0.48), y: r.y + rnd(-rh * 0.15, rh * 0.45), vx: rnd(-0.3, 0.3), vy: rnd(-1.5, -0.75), drag: 0.97, decay: rnd(0.03, 0.045), size: i % 2 ? rnd(2.0, 3.2) : rnd(6, 9), shape: i % 2 ? 'glowOrb' : 'gradMist', blend: i % 2 ? 'lighter' : 'source-over', core: '#fed7aa', mistCore: 'rgba(67,20,7,0.62)', color: i % 2 ? '#ea580c' : 'rgba(28,25,23,0.42)', fade: 'rgba(12,10,9,0)' }));
+        });
+        return owner.handle;
+    }
+
+    // 2B. 燃烧禁疗轻提示：治疗光落于燃烧目标瞬间被暗橙火苗压灭 ~240ms
+    function playStatusHealSuppressed(entity, meta = {}, onBeat) {
+        const dom = statusDomOf(entity); if (!dom || !dom.isConnected) return null;
+        const r = statusVisualRect(dom); if (!statusVisualOk(r)) return null;
+        const owner = statusRun(240, entity), uid = 'arcane-status-hsup-' + (++S.uid), pan = statusPanOf(r.x);
+        const W = Math.max(96, r.w * 1.15), H = Math.max(96, r.h * 1.15), cx = W / 2, cy = H / 2, rw = r.w * 0.42, rh = r.h * 0.42;
+        const wisp = (wx, w, h) => `<path d="M${(wx - w).toFixed(1)},${(cy + rh * 0.42).toFixed(1)} Q${wx.toFixed(1)},${(cy + rh * 0.42 - h).toFixed(1)} ${(wx + w).toFixed(1)},${(cy + rh * 0.42).toFixed(1)} Z" fill="url(#${uid}-cap)"/>`;
+        const layer = owner.layer(
+            `<div class="arcane-status-anchor" style="left:${r.x}px;top:${r.y}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
+            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.0)}`
+            + `<linearGradient id="${uid}-hl" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#34d399" stop-opacity="0"/><stop offset="0.5" stop-color="#6ee7b7" stop-opacity="0.52"/><stop offset="1" stop-color="#a7f3d0" stop-opacity="0"/></linearGradient>`
+            + `<linearGradient id="${uid}-cap" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#9a3412" stop-opacity="0.9"/><stop offset="0.6" stop-color="#ea580c" stop-opacity="0.86"/><stop offset="1" stop-color="#fdba74" stop-opacity="0.15"/></linearGradient>`
+            + `</defs><rect class="s-heal" x="${(cx - rw * 0.55).toFixed(1)}" y="${(cy - rh * 0.45).toFixed(1)}" width="${(rw * 1.1).toFixed(1)}" height="${(rh * 0.9).toFixed(1)}" rx="6" fill="url(#${uid}-hl)" style="transform-origin:${cx}px ${cy}px"/>`
+            + `<g class="s-cap" filter="url(#${uid}-gl)" opacity="0" style="transform-origin:${cx}px ${cy + rh * 0.4}px">${wisp(cx - rw * 0.3, 6, rh * 0.72)}${wisp(cx, 7.5, rh * 0.88)}${wisp(cx + rw * 0.3, 6, rh * 0.68)}</g></svg></div>`
+        );
+        const hl = layer.querySelector('.s-heal'), cap = layer.querySelector('.s-cap');
+        if (hl) owner.anim(hl, [{ opacity: 0.75, transform: 'scaleY(0.95)' }, { opacity: 0.14, transform: 'scaleY(0.45)', offset: 0.45 }, { opacity: 0, transform: 'scaleY(0.25)' }], { duration: 220, easing: 'ease-out', fill: 'forwards' });
+        if (cap) owner.anim(cap, [{ opacity: 0, transform: 'scaleY(0.3)' }, { opacity: 0.94, transform: 'scaleY(1.06)', offset: 0.35 }, { opacity: 0, transform: 'scaleY(0.82)' }], { duration: 210, easing: 'ease-out', delay: 20, fill: 'forwards' });
+        const gSfx = statusSfxGate('healSuppress', 80);
+        if (gSfx > 0) playStatusSample(owner, 'healSuppress', { pan, vol: 0.15 * gSfx, rate: 0.86 });
+        owner.at(45, () => {
+            owner.burst(4, () => ({ x: r.x + rnd(-rw * 0.45, rw * 0.45), y: r.y + rnd(-rh * 0.2, rh * 0.2), vx: rnd(-0.8, 0.8), vy: rnd(-1.3, -0.4), drag: 0.93, decay: 0.06, size: rnd(2.0, 3.2), shape: 'glowOrb', core: '#fed7aa', color: '#ea580c' }));
+            if (onBeat) onBeat({ event: 'healSuppressed', entity });
+        });
+        return owner.handle;
+    }
+
+    // 3. 麻痹僵直触发：头部黄火星爆发 + 350ms 轻硬直 + 1 枚电星脱落；锁定期只保留粒子
+    function playStatusParaProc(entity, meta = {}, onBeat) {
+        if (meta && meta.triggered === false) return null;
+        const dom = statusDomOf(entity); if (!dom || !dom.isConnected) return null;
+        const r = statusVisualRect(dom); if (!statusVisualOk(r)) return null;
+        const owner = statusRun(480, entity), uid = 'arcane-status-para-' + (++S.uid), pan = statusPanOf(r.x);
+        const hy = r.top + r.h * 0.22;
+        const W = Math.max(118, r.w * 1.3), H = Math.max(96, r.h * 1.02), cx = W / 2, cy = H * 0.56, rw = r.w * 0.46, rh = r.h * 0.36;
+        const starSpots = [
+            [-0.72, -0.06, 1.05], [-0.48, -0.46, 0.95], [-0.22, -0.62, 1.22], [0.08, -0.58, 1.15],
+            [0.36, -0.46, 1.02], [0.64, -0.18, 1.1], [-0.56, 0.18, 0.88], [-0.14, -0.18, 1.08],
+            [0.24, -0.12, 0.96], [0.52, 0.16, 0.88], [-0.32, 0.08, 0.85], [0.02, -0.4, 0.9]
+        ];
+        const sparksHtml = starSpots.map(([ox, oy, sc], idx) => {
+            const x = cx + ox * rw, y = cy + oy * rh, rad = 6.8 * sc, inn = 1.75 * sc;
+            const d = `M${x.toFixed(1)},${(y - rad).toFixed(1)} L${(x + inn).toFixed(1)},${(y - inn).toFixed(1)} L${(x + rad).toFixed(1)},${y.toFixed(1)} L${(x + inn).toFixed(1)},${(y + inn).toFixed(1)} L${x.toFixed(1)},${(y + rad).toFixed(1)} L${(x - inn).toFixed(1)},${(y + inn).toFixed(1)} L${(x - rad).toFixed(1)},${y.toFixed(1)} L${(x - inn).toFixed(1)},${(y - inn).toFixed(1)} Z`;
+            return `<g class="s-para-spark" data-del="${(idx % 4) * 26}" style="transform-origin:${x.toFixed(1)}px ${y.toFixed(1)}px;opacity:0">`
+                + `<path d="${d}" fill="${idx % 2 ? '#fef08a' : '#facc15'}" stroke="#713f12" stroke-width="1.3" stroke-linejoin="round"/>`
+                + `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(inn * 1.18).toFixed(1)}" fill="#ffffff"/></g>`;
+        }).join('');
+        const sx = cx + rw * 0.56, sy = cy - rh * 0.4;
+        const flakeD = `M${sx.toFixed(1)},${(sy - 8.5).toFixed(1)} L${(sx + 2.5).toFixed(1)},${(sy - 2.5).toFixed(1)} L${(sx + 8.5).toFixed(1)},${sy.toFixed(1)} L${(sx + 2.5).toFixed(1)},${(sy + 2.5).toFixed(1)} L${sx.toFixed(1)},${(sy + 8.5).toFixed(1)} L${(sx - 2.5).toFixed(1)},${(sy + 2.5).toFixed(1)} L${(sx - 8.5).toFixed(1)},${sy.toFixed(1)} L${(sx - 2.5).toFixed(1)},${(sy - 2.5).toFixed(1)} Z`;
+        const layer = owner.layer(
+            `<div class="arcane-status-anchor" style="left:${r.x}px;top:${hy.toFixed(1)}px;width:${W}px;height:${H}px;transform:translate(-50%,-50%)">`
+            + `<svg class="arcane-status-svg" viewBox="0 0 ${W} ${H}"><defs>${statusGlowDef(uid + '-gl', 2.0)}</defs>`
+            + `<g filter="url(#${uid}-gl)">${sparksHtml}</g>`
+            + `<g class="s-para-flake" filter="url(#${uid}-gl)" style="transform-origin:${sx.toFixed(1)}px ${sy.toFixed(1)}px;opacity:0">`
+            + `<path d="${flakeD}" fill="#fde047" stroke="#713f12" stroke-width="1.6" stroke-linejoin="round"/>`
+            + `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="2.4" fill="#ffffff"/>`
+            + `</g></svg></div>`
+        );
+        layer.querySelectorAll('.s-para-spark').forEach(spEl => {
+            owner.anim(spEl, [
+                { opacity: 0.35, transform: 'scale(0.55) rotate(-14deg)' },
+                { opacity: 1, transform: 'translateY(-3px) scale(1.24) rotate(12deg)', offset: 0.24 },
+                { opacity: 0.82, transform: 'translateY(-6px) scale(0.96) rotate(24deg)', offset: 0.6 },
+                { opacity: 0, transform: 'translateY(-11px) scale(0.42) rotate(38deg)' }
+            ], { duration: 290, delay: Number(spEl.dataset.del) || 0, easing: 'ease-out', fill: 'forwards' });
+        });
+        const flake = layer.querySelector('.s-para-flake');
+        // 轻硬直不与变种/复活等实体锁抢动画；锁定期只保留粒子与电星
+        if (!isEntityVariantLocked(dom)) {
+            owner.anim(dom, [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(-3px,0,0)', offset: 0.16 }, { transform: 'translate3d(3px,1px,0)', offset: 0.34 }, { transform: 'translate3d(-2px,0,0)', offset: 0.56 }, { transform: 'translate3d(1.5px,-1px,0)', offset: 0.78 }, { transform: 'translate3d(0,0,0)' }], { duration: 350, easing: 'ease-out' });
+        }
+        const gSfx = statusSfxGate('para', 70);
+        if (gSfx > 0) playStatusSample(owner, 'para', { pan, vol: 0.24 * gSfx, rate: 1.04 });
+        const sparkAt = (n, xSpan, yOff) => owner.burst(n, i => {
+            const up = rnd(-2.3, -0.45), side = rnd(-2.0, 2.0);
+            return { x: r.x + rnd(-xSpan, xSpan), y: hy + rnd(-r.h * 0.16, r.h * 0.12) + yOff, vx: side, vy: up, drag: 0.92, decay: rnd(0.042, 0.062), size: rnd(1.7, 2.8), shape: i % 3 ? 'spark' : 'glowOrb', tail: 3.6, core: '#ffffff', color: pick(['#fef9c3', '#fde047', '#facc15', '#f59e0b']) };
+        });
+        sparkAt(14, r.w * 0.42, 0);
+        owner.at(75, () => {
+            sparkAt(9, r.w * 0.45, -4);
+            if (onBeat) onBeat({ event: 'paraProc', entity });
+        });
+        owner.at(105, () => {
+            if (flake) owner.anim(flake, [{ opacity: 0.98, transform: 'translate(0px,0px) scale(1) rotate(0deg)' }, { opacity: 0.88, transform: 'translate(13px,-10px) scale(0.85) rotate(24deg)', offset: 0.45 }, { opacity: 0, transform: 'translate(22px,-17px) scale(0.4) rotate(48deg)' }], { duration: 280, easing: 'ease-out', fill: 'forwards' });
+        });
+        return owner.handle;
+    }
+    function playStatusParaMiss() { return null; }
+
+    // 4. 到期消散：对应色微粒轻蒸发（徽章由 updateBuffUI 同帧重写，不依赖 fading class）
+    function playStatusExpire(entity, meta = {}, onBeat) {
+        if (!entity || entity.isAlive === false || entity.isSubdued || (typeof entity.hp === 'number' && entity.hp <= 0)) return null;
+        const dom = statusDomOf(entity); if (!dom || !dom.isConnected) return null;
+        const r = statusVisualRect(dom); if (!statusVisualOk(r)) return null;
+        const types = Array.isArray(meta.expiredTypes) ? meta.expiredTypes : (meta.expiredType ? [meta.expiredType] : ['poison']);
+        const colMap = meta.expiredColors || {};
+        const colors = types.map(t => colMap[t] || STATUS_COLORS[t] || '#cbd5e1');
+        const owner = statusRun(420, entity), pan = statusPanOf(r.x);
+        const gSfx = statusSfxGate('expire', 70);
+        if (gSfx > 0) playStatusSample(owner, 'expire', { pan, vol: 0.36 * gSfx, rate: 1.0 });
+        owner.burst(8, i => {
+            const c = colors[i % colors.length];
+            return { x: r.x + rnd(-r.w * 0.38, r.w * 0.38), y: r.y + rnd(-r.h * 0.25, r.h * 0.25), vx: rnd(-0.32, 0.32), vy: rnd(-1.35, -0.65), drag: 0.96, decay: rnd(0.036, 0.052), size: rnd(2.2, 3.8), shape: 'glowOrb', core: '#f8fafc', color: c };
+        });
+        owner.at(160, () => { if (onBeat) onBeat({ event: 'expire', entity, expiredTypes: types }); });
+        return owner.handle;
+    }
+
+    function playStatusTickFx(opts = {}) {
+        const { event, entity, meta = {}, onBeat } = opts;
+        if (event === 'poisonTick') return playStatusPoisonTick(entity, meta, onBeat);
+        if (event === 'burnTick') return playStatusBurnTick(entity, meta, onBeat);
+        if (event === 'healSuppressed') return playStatusHealSuppressed(entity, meta, onBeat);
+        if (event === 'paraProc') return playStatusParaProc(entity, meta, onBeat);
+        if (event === 'paraMiss') return playStatusParaMiss(entity, meta, onBeat);
+        if (event === 'expire') return playStatusExpire(entity, meta, onBeat);
+        return null;
+    }
+    function setStatusSfx(on) {
+        statusSfxOn = !!on;
+        if (!statusSfxOn) ST.runs.forEach(runs => runs.forEach(owner => owner.audioStoppers.forEach(stop => stop())));
+        return statusSfxOn;
+    }
+    // ===== v12.10 状态 END =====
+
+    // 合入 arcaneVfxModule 的 return 对象时展开本对象（不要把 clearStatusLayers 误删）：
+    const statusFxApi = {
+        playStatusTickFx, playStatusPoisonTick, playStatusBurnTick, playStatusHealSuppressed,
+        playStatusParaProc, playStatusParaMiss, playStatusExpire,
+        syncStatusLayers, clearStatusLayers, setStatusSfx
+    };
+
+    // 自爆：存活预警与三幕尸体舞台，结算仍由正式战斗管线掌握。
+    const SD_WARNINGS = new Map(), SD_RUNS = new Set();
+    let sdSfxOn = true;
+    const SD_CONF = {
+        '群伤': { key:'aoe', main:'#ef4444', soft:'#fca5a5', dark:'#991b1b', glow:'rgba(239,68,68,0.45)' },
+        '群穿': { key:'pierce', main:'#f43f5e', soft:'#fda4af', dark:'#9f1239', glow:'rgba(244,63,94,0.45)' },
+        '群火': { key:'fire', main:'#f97316', soft:'#fdba74', dark:'#9a3412', glow:'rgba(249,115,22,0.45)' },
+        '群毒': { key:'poison', main:'#a855f7', soft:'#d8b4fe', dark:'#581c87', glow:'rgba(168,85,247,0.45)' }
+    };
+    const SD_SAMPLES = {
+        sd_crack:'molt_crack', sd_tear:'mx_rift_tear', sd_gather:'mx_rift_charge', sd_charge_low:'explosion_aoe_charge',
+        sd_crit_tick:'mx_gear_lock', sd_snap:'mx_vacuum', sd_kanpo_exit:'rage_exit', sd_kanpo_drop:'defDown',
+        sd_subdue_stomp:'mx_golem_stomp', sd_contest_break:'mx_armor_strike', sd_burst_aoe:'sd_ring_blast',
+        sd_deep_impact:'mx_deep_impact', sd_burst_pierce:'sd_shatter_blast', sd_pierce_shard:'frost_crystal_impact_fs550267',
+        sd_burst_fire_wave:'huoyan01', sd_burn_attach:'ranshao', sd_burst_poison_sac:'creature_slime_01',
+        sd_burst_poison_mist:'aoe_poison_spell_fs219566', sd_fog_attach:'fog', sd_dodge:'dodge_2'
+    };
+    const sdEntityId = entityIdOf;
+    const sdConf = (form, meta = {}) => meta.accentColor ? Object.assign({}, SD_CONF[form] || SD_CONF['群伤'], { main:meta.accentColor }) : SD_CONF[form] || SD_CONF['群伤'];
+    function playSdSample(owner, key, opts = {}) {
+        if (!sdSfxOn) return true;
+        return idSample(owner, SD_SAMPLES[key], Object.assign({ sampled:true, category:key === 'sd_dodge' ? 'H' : 'A' }, opts));
+    }
+    function sdRun(ms, entity) {
+        const owner = identityRun(ms, 1);
+        owner.entityIds = new Set([sdEntityId(entity)]);
+        SD_RUNS.add(owner); owner.onClean(() => SD_RUNS.delete(owner));
+        owner.handle.done = new Promise(resolve => owner.handle.onFinish.add(resolve));
+        return owner;
+    }
+    function sdLayer(owner, html, ms, z = 54) {
+        const layer = owner.layer(html); layer.style.zIndex = String(z); layer.dataset.selfdestructFx = '1';
+        if (ms) owner.at(ms, () => { layer.remove(); S.layers.delete(layer); owner.layers.delete(layer); });
+        return layer;
+    }
+    function sdCrackSvg(conf, intense, uid) {
+        const gid = `sd-${conf.key}-rg-${uid}`, fid = `sd-${conf.key}-gl-${uid}`;
+        const op = intense ? '0.96' : '0.46', sw = intense ? '2.6' : '1.45', glowStop = intense ? '0.42' : '0.24';
+        return `<svg viewBox="0 0 120 120" class="arcane-selfdestruct-warn-cracks">
+          <defs>
+            <radialGradient id="${gid}" cx="50%" cy="54%" r="50%">
+              <stop offset="0%" stop-color="${intense ? '#ffffff' : conf.soft}" stop-opacity="${glowStop}"/>
+              <stop offset="48%" stop-color="${conf.main}" stop-opacity="${intense ? '0.32' : '0.14'}"/>
+              <stop offset="100%" stop-color="${conf.dark}" stop-opacity="0"/>
+            </radialGradient>
+            <filter id="${fid}" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="${intense ? 2.4 : 1.3}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          </defs>
+          <circle cx="60" cy="64" r="${intense ? 50 : 42}" fill="url(#${gid})"/>
+          <g fill="none" stroke-linecap="round" stroke-linejoin="round" filter="url(#${fid})" opacity="${op}">
+            <path d="M58 26 L53 44 L62 56 L50 74 L56 92" stroke="${conf.main}" stroke-width="${sw}"/>
+            <path d="M53 44 L36 38 L27 46 M62 56 L82 48 L93 56 M50 74 L34 80 L25 89 M62 56 L77 73 L85 88" stroke="${conf.soft}" stroke-width="${intense ? 1.8 : 1.05}"/>
+            ${intense ? `<path d="M58 32 L54 44 L61 56 L52 72" stroke="#ffffff" stroke-width="1.2" opacity="0.88"/>` : ''}
+          </g>
+        </svg>`;
+    }
+    function clearSelfDestructWarning(entityOrId) {
+        const id = sdEntityId(entityOrId), rec = SD_WARNINGS.get(id);
+        if (!rec) return;
+        stopEvery(rec.emberTimer); rec.layer.remove();
+        rec.host.style.position = rec.position;
+        S.particles = S.particles.filter(p => p.owner !== rec);
+        SD_WARNINGS.delete(id); releaseIdleCanvas();
+    }
+    function clearAllSelfDestructWarnings() { [...SD_WARNINGS.keys()].forEach(clearSelfDestructWarning); }
+    function clearSelfDestructState(entityOrId) {
+        const id = entityOrId == null ? '' : sdEntityId(entityOrId);
+        if (id) clearSelfDestructWarning(id); else clearAllSelfDestructWarnings();
+        [...SD_RUNS].filter(owner => !id || owner.entityIds.has(id)).forEach(owner => owner.handle.cancel());
+        const dom = id ? domOf(id) : null;
+        if (dom) dom.classList.remove('arcane-selfdestruct-sprite-subdued');
+        if (!id) document.querySelectorAll('.arcane-selfdestruct-sprite-subdued').forEach(node => node.classList.remove('arcane-selfdestruct-sprite-subdued'));
+    }
+    function setSelfDestructSfx(on) {
+        sdSfxOn = !!on;
+        if (!sdSfxOn) SD_RUNS.forEach(owner => owner.audioStoppers.forEach(stop => stop()));
+        return sdSfxOn;
+    }
+    function setSelfDestructWarning(entityOrId, form, opts = {}) {
+        const id = sdEntityId(entityOrId), dom = domOf(entityOrId);
+        const rec = SD_WARNINGS.get(id);
+        if (rec && rec.dom === dom && rec.form === form && rec.layer.isConnected) return rec;
+        clearSelfDestructWarning(id);
+        const r = entityVisualRect(dom);
+        if (!r || !r.w || !r.h || !dom.isConnected || !form) return null;
+        const host = r.visualDom.tagName === 'IMG' ? r.visualDom.parentElement : r.visualDom;
+        const position = host.style.position;
+        if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+        const conf = sdConf(form, opts), uid = ++S.uid;
+        const layer = document.createElement('div'); layer.className = 'arcane-selfdestruct-warn';
+        layer.dataset.arcaneSelfdestructWarning = id;
+        layer.style.cssText = 'left:50%;top:50%;width:116%;height:116%;';
+        layer.innerHTML = sdCrackSvg(conf, false, uid); host.appendChild(layer);
+        const token = combatToken, warning = { dom, host, position, layer, form, emberTimer:null };
+        warning.emberTimer = every(2200, () => {
+            if (!layer.isConnected || !dom.isConnected || token !== combatToken) { clearSelfDestructWarning(id); return; }
+            const r = entityVisualRect(dom);
+            if (!r) return;
+            ensureCanvas(); ensureDriver();
+            addP({ owner:warning, x:r.x + rnd(-r.w * 0.24, r.w * 0.24), y:r.y + rnd(-r.h * 0.1, r.h * 0.22), vx:rnd(-0.18,0.18), vy:rnd(-0.85,-0.45), drag:0.98, decay:0.022, size:rnd(1.5,2.3), shape:'glowOrb', core:conf.soft, color:conf.main });
+        });
+        SD_WARNINGS.set(id, warning); return warning;
+    }
+    function syncSelfDestructWarning(entity) {
+        if (!entity) return;
+        if (!entity.explode || !entity.isAlive || entity.hp <= 0 || entity.isSubdued) { clearSelfDestructWarning(entity); return; }
+        setSelfDestructWarning(entity, entity.explode.type);
+    }
+    function createCorpseStage(entity, conf, owner) {
+        const sprite = entity && entity.selfDestructDom || domOf(entity), r = sprite && entityVisualRect(sprite);
+        if (!r || !r.w || !r.h || !sprite.isConnected) return null;
+        const box = sprite.closest('[id^="enemy-box-"],[id^="hero-wrap-"]') || sprite.parentElement || sprite;
+        const previous = { visibility:sprite.style.visibility, breathe:sprite.classList.contains('breathe'), charge:sprite.classList.contains('charge-full-danger') };
+        sprite.classList.remove('breathe','charge-full-danger'); sprite.style.visibility = 'hidden';
+        box.classList.add('arcane-selfdestruct-host-corpse');
+        const uid = ++S.uid, faceHtml = cloneVisualOnly(sprite);
+        const layer = sdLayer(owner, '', 0);
+        const stage = document.createElement('div'); stage.className = 'arcane-selfdestruct-stage';
+        stage.style.cssText = `left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;`;
+        stage.innerHTML = `<div class="arcane-sd-omen-aura" style="position:absolute;inset:-24px;border-radius:50%;background:radial-gradient(circle,${conf.glow} 0%,${conf.glow} 36%,transparent 72%);opacity:0"></div>`
+            + `<div class="arcane-sd-body arcane-selfdestruct-dying-visual" style="position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center">${faceHtml}</div>`
+            + `<div class="arcane-sd-cracks" style="position:absolute;inset:-10%;opacity:0.65">${sdCrackSvg(conf,true,uid)}</div>`
+            + `<div class="arcane-sd-core" style="position:absolute;left:50%;top:54%;width:48px;height:48px;border-radius:50%;transform:translate(-50%,-50%) scale(0.35);opacity:0;background:radial-gradient(circle,#fff 0%,${conf.soft} 42%,${conf.main} 70%,transparent 75%)"></div>`
+            + '<div class="arcane-sd-overlay" style="position:absolute;inset:-16%"></div>';
+        layer.appendChild(stage);
+        const face = stage.querySelector('.arcane-sd-body').firstElementChild;
+        if (face && face.tagName !== 'IMG') face.style.fontSize = (parseFloat(getComputedStyle(r.visualDom).fontSize) * r.w / (r.visualDom.offsetWidth || r.w)) + 'px';
+        let restored = false;
+        const restore = mode => {
+            if (restored) return; restored = true;
+            box.classList.remove('arcane-selfdestruct-host-corpse');
+            layer.remove(); owner.layers.delete(layer); S.layers.delete(layer);
+            sprite.style.visibility = mode === 'dead' ? 'hidden' : previous.visibility;
+            if (mode === 'subdued') sprite.classList.add('arcane-selfdestruct-sprite-subdued');
+            if (mode === 'cancel') {
+                if (previous.breathe) sprite.classList.add('breathe');
+                if (previous.charge) sprite.classList.add('charge-full-danger');
+            }
+        };
+        owner.onClean(() => restore('cancel'));
+        return { owner, layer, stage, r, box, sprite, bodyEl:stage.querySelector('.arcane-sd-body'), auraEl:stage.querySelector('.arcane-sd-omen-aura'), crackEl:stage.querySelector('.arcane-sd-cracks'), coreEl:stage.querySelector('.arcane-sd-core'), overlayEl:stage.querySelector('.arcane-sd-overlay'), restore };
+    }
+    function playInterruptOnStage(ctx, mode, entity, conf, onBeat) {
+        const owner = ctx.owner, { x,y } = ctx.r;
+        owner.animations.forEach(a => a.cancel()); owner.animations.clear();
+        owner.intervals.forEach(stopEvery); owner.intervals.clear();
+        owner.audioStoppers.forEach(stop => stop()); owner.audioStoppers.clear();
+        ctx.stage.classList.remove('arcane-selfdestruct-crit-flash');
+        ctx.stage.style.animation = 'none';
+        if (mode === 'kanpo') {
+            onBeat && onBeat('kanpo_start',{ entity,conf });
+            playSdSample(owner,'sd_snap',{ vol:0.78,rate:0.92 });
+            owner.at(35,() => playSdSample(owner,'sd_kanpo_exit',{ vol:0.66 }));
+            owner.at(95,() => playSdSample(owner,'sd_kanpo_drop',{ vol:0.56,offsetSec:0.17,maxDurSec:0.72,fadeOutSec:0.24 }));
+            owner.anim(ctx.coreEl,[{ transform:'translate(-50%,-50%) scale(1.25)',opacity:0.95 },{ transform:'translate(-50%,-50%) scale(0.08)',opacity:0 }],{ duration:180,easing:'ease-in',fill:'forwards' });
+            owner.anim(ctx.crackEl,[{ opacity:0.95 },{ opacity:0 }],{ duration:220,fill:'forwards' });
+            owner.anim(ctx.auraEl,[{ opacity:0.7 },{ opacity:0 }],{ duration:220,fill:'forwards' });
+            owner.burst(16,() => { const a = rnd(0,6.283),d = rnd(44,78); return { x:x+Math.cos(a)*d,y:y+Math.sin(a)*d,vx:-Math.cos(a)*d/8,vy:-Math.sin(a)*d/8,drag:0.85,decay:0.08,size:rnd(1.8,3),shape:'glowOrb',core:'#e2e8f0',color:conf.main }; });
+            ctx.overlayEl.innerHTML = '<div style="position:absolute;left:50%;top:54%;width:92px;height:92px;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,transparent 48%,rgba(148,163,184,0.45) 68%,transparent 76%)"></div>';
+            owner.anim(ctx.overlayEl,[{ transform:'scale(1.35)',opacity:0.9 },{ transform:'scale(0.18)',opacity:0 }],{ duration:220,easing:'ease-in',fill:'forwards' });
+            owner.at(190,() => { ctx.stage.style.animation = 'arcane-sd-kanpo-fall 0.48s cubic-bezier(0.32,0,0.65,1) forwards'; onBeat && onBeat('kanpo_suppressed',{ entity,conf }); });
+            owner.at(690,() => { ctx.restore('dead'); onBeat && onBeat('kanpo_done',{ entity,conf }); });
+        } else {
+            onBeat && onBeat('subdue_start',{ entity,conf });
+            playSdSample(owner,'sd_subdue_stomp',{ vol:0.78,offsetSec:0.1 });
+            owner.at(80,() => playSdSample(owner,'sd_crit_tick',{ vol:0.62,rate:0.92,maxDurSec:0.24,fadeOutSec:0.08 }));
+            const uid = ++S.uid;
+            ctx.overlayEl.innerHTML = `<svg viewBox="0 0 120 120" style="width:100%;height:100%;overflow:visible"><defs><linearGradient id="sd-sub-g-${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e2e8f0" stop-opacity="0.9"/><stop offset="50%" stop-color="#38bdf8" stop-opacity="0.55"/><stop offset="100%" stop-color="#0f172a" stop-opacity="0"/></linearGradient></defs><g fill="url(#sd-sub-g-${uid})"><rect x="16" y="30" width="88" height="7" rx="3.5"/><rect x="24" y="54" width="72" height="6" rx="3"/><rect x="30" y="76" width="60" height="5" rx="2.5"/></g></svg>`;
+            owner.anim(ctx.overlayEl,[{ transform:'translateY(-28px) scale(1.12)',opacity:0.95 },{ transform:'translateY(8px) scale(0.98)',opacity:0.95,offset:0.45 },{ transform:'translateY(12px) scale(0.95)',opacity:0 }],{ duration:480,easing:'cubic-bezier(0.18,0.9,0.28,1)',fill:'forwards' });
+            owner.anim(ctx.coreEl,[{ transform:'translate(-50%,-50%) scale(1.1)',opacity:0.85 },{ transform:'translate(-50%,-50%) scale(0.15)',opacity:0 }],{ duration:200,fill:'forwards' });
+            owner.anim(ctx.crackEl,[{ opacity:0.9 },{ opacity:0 }],{ duration:260,fill:'forwards' });
+            owner.anim(ctx.auraEl,[{ opacity:0.65 },{ opacity:0 }],{ duration:220,fill:'forwards' });
+            ctx.stage.style.animation = 'arcane-sd-subdue-press 0.45s cubic-bezier(0.2,0.85,0.3,1) forwards';
+            owner.at(460,() => { ctx.restore('subdued'); onBeat && onBeat('subdued_locked',{ entity,conf }); });
+        }
+        owner.resume(740); return owner.handle;
+    }
+    function playSelfDestructInterrupt(entity, mode = 'kanpo', meta = {}, onBeat) {
+        clearSelfDestructWarning(entity);
+        const conf = sdConf(meta.form || entity?.explode?.type,meta), owner = sdRun(740,entity), ctx = createCorpseStage(entity,conf,owner);
+        if (!ctx) { owner.handle.cancel(); return null; }
+        return playInterruptOnStage(ctx,mode,entity,conf,onBeat);
+    }
+    function playSelfDestructWindup(entity, meta = {}, onBeat) {
+        clearSelfDestructWarning(entity);
+        const form = meta.form || entity?.explode?.type || '群伤', conf = sdConf(form,meta);
+        const owner = sdRun(1250,entity), ctx = createCorpseStage(entity,conf,owner);
+        if (!ctx) { owner.handle.cancel(); return null; }
+        const wms = Object.assign({ unstable:400,gather:600,critical:250 },meta.windupMs);
+        const handle = owner.handle;
+        owner.hold();
+        let released = false, interrupted = false, readyResolve;
+        const startAt = Date.now();
+        handle.ready = new Promise(resolve => { readyResolve = resolve; });
+        handle.onFinish.add(() => readyResolve(false));
+        handle.stageCtx = ctx;
+        onBeat && onBeat('unstable_start',{ entity,form,conf });
+        playSdSample(owner,'sd_crack',{ vol:0.7,rate:0.96 });
+        playSdSample(owner,'sd_tear',{ vol:0.48,maxDurSec:0.42,fadeOutSec:0.14 });
+        ctx.stage.style.animation = `arcane-sd-dying-tremble ${Math.max(180,Math.round(wms.unstable*0.5))}ms ease-in-out 2`;
+        owner.anim(ctx.auraEl,[{ opacity:0 },{ opacity:0.78,offset:0.4 },{ opacity:0.45 }],{ duration:wms.unstable,fill:'forwards' });
+        owner.anim(ctx.crackEl,[{ opacity:0.55,transform:'scale(0.95)' },{ opacity:1,transform:'scale(1.06)' }],{ duration:wms.unstable,fill:'forwards' });
+        owner.at(wms.unstable,() => {
+            if (interrupted) return;
+            onBeat && onBeat('gather_start',{ entity,form,conf });
+            ctx.stage.style.animation = 'arcane-sd-gather-pulse 0.36s ease-in-out infinite';
+            playSdSample(owner,'sd_gather',{ vol:0.66,maxDurSec:wms.gather/1000+0.06,fadeOutSec:0.1 });
+            playSdSample(owner,'sd_charge_low',{ vol:0.42,rate:0.94 });
+            owner.anim(ctx.coreEl,[{ transform:'translate(-50%,-50%) scale(0.35)',opacity:0.2 },{ transform:'translate(-50%,-50%) scale(1.18)',opacity:0.92 }],{ duration:wms.gather,easing:'cubic-bezier(0.3,0,0.6,1)',fill:'forwards' });
+            owner.every(40,() => owner.burst(2,() => { const a = rnd(0,6.283),d = rnd(48,86); return { x:ctx.r.x+Math.cos(a)*d,y:ctx.r.y+Math.sin(a)*d,vx:-Math.cos(a)*d/11,vy:-Math.sin(a)*d/11,drag:0.89,decay:0.08,size:rnd(1.8,3.1),shape:'glowOrb',core:conf.soft,color:conf.main }; }));
+            if (entity._sdContestFailed) owner.at(Math.round(wms.gather * 0.55),() => {
+                playSdSample(owner,'sd_contest_break',{ vol:0.74,rate:0.98 });
+                onBeat && onBeat('contest_failed',{ entity,form });
+            });
+            owner.at(100,() => { onBeat && onBeat('gather_window',{ entity,form,conf,interruptible:true }); readyResolve(true); });
+        });
+        handle.release = () => {
+            if (released || interrupted || owner.finished || owner.cancelled) return;
+            released = true;
+            const gatherTail = Math.max(0,wms.unstable+wms.gather - (Date.now() - startAt));
+            owner.at(gatherTail,() => {
+                owner.intervals.forEach(stopEvery); owner.intervals.clear();
+                onBeat && onBeat('critical_start',{ entity,form,conf });
+                ctx.stage.style.animation = 'none'; ctx.stage.classList.add('arcane-selfdestruct-crit-flash');
+                playSdSample(owner,'sd_crit_tick',{ vol:0.62,rate:1.08,maxDurSec:0.15,fadeOutSec:0.04 });
+                owner.at(Math.round(wms.critical*0.4),() => playSdSample(owner,'sd_crit_tick',{ vol:0.68,rate:1.24,maxDurSec:0.14,fadeOutSec:0.04 }));
+                owner.at(Math.max(45,wms.critical-55),() => { ctx.stage.classList.remove('arcane-selfdestruct-crit-flash'); ctx.stage.style.animation = 'arcane-sd-crit-snap 0.055s ease-in forwards'; playSdSample(owner,'sd_snap',{ vol:0.78,rate:1.05 }); onBeat && onBeat('critical_snap',{ entity,form,conf }); });
+                owner.at(wms.critical,() => { onBeat && onBeat('windup_ready',{ entity,form,conf }); handle.burstResolve && handle.burstResolve(ctx); });
+            });
+        };
+        handle.burstReady = new Promise(resolve => { handle.burstResolve = resolve; handle.onFinish.add(() => resolve(null)); });
+        handle.interrupt = (mode = 'kanpo') => {
+            if (interrupted || owner.finished || owner.cancelled) return false;
+            interrupted = true;
+            owner.timers.forEach(id => { clearTimeout(id); S.timers.delete(id); }); owner.timers.clear();
+            readyResolve(false); handle.burstResolve(null);
+            playInterruptOnStage(ctx,mode,entity,conf,onBeat); return true;
+        };
+        handle.finish = () => { ctx.restore('dead'); owner.resume(0); };
+        return handle;
+    }
+    function resolveTargetPoint(target, origin) {
+        const dom = target && target.identityDom || domOf(target), r = dom && entityVisualRect(dom);
+        if (!r || !r.w || !r.h) return null;
+        const dir = r.x >= origin.x ? 1 : -1;
+        return { dom,r,hit:{ x:r.x,y:r.y-6 },miss:{ x:r.x+dir*(r.w*0.48+26),y:r.y-18 } };
+    }
+
+    function burstAoeForm(origin, targetEntries, conf, onBeat, sched, entity, owner) {
+        const heroBox = unionRect(targetEntries.map(t => t.dom).filter(Boolean)) || { x: window.innerWidth * 0.42, y: window.innerHeight * 0.72, w: 360 };
+        playSdSample(owner,'sd_burst_aoe', { vol: 0.82, maxDurSec: 1.05, fadeOutSec: 0.22 });
+        playSdSample(owner,'sd_deep_impact', { vol: 0.62, maxDurSec: 0.85, fadeOutSec: 0.24 });
+        shake('heavy'); darken(0.24); sched(320, () => darken(0));
+        owner.onClean(() => darken(0));
+        sdLayer(owner,`<div class="arcane-fs-anchor" style="left:${origin.x}px;top:${origin.y}px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,#fff 0%,${conf.soft} 28%,${conf.main} 58%,transparent 72%);animation:arcane-hit-flash 0.38s ease-out both;"></div>
+          <div class="arcane-fs-anchor" style="left:${origin.x}px;top:${origin.y}px;width:${Math.max(260, heroBox.w * 0.55)}px;height:${Math.max(120, heroBox.w * 0.22)}px;border-radius:50%;background:radial-gradient(ellipse,transparent 46%,${conf.soft} 68%,${conf.main} 82%,transparent 94%);animation:arcane-sd-shock-ellipse 0.46s cubic-bezier(0.12,0.82,0.22,1) both;"></div>`, 520);
+        owner.burst(2, i => ({ x: origin.x, y: origin.y, shape: 'ring', size: 2.2 + i * 1.4, decay: 0.055 - i * 0.015, color: i ? conf.main : '#ffffff' }));
+        owner.burst(38, () => { const an = Math.random() * 6.283, s = rnd(3.5, 11); return { x: origin.x, y: origin.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s * 0.72 - 1.2, grav: 0.16, drag: 0.92, decay: rnd(0.02, 0.042), size: rnd(1.8, 3.4), shape: 'spark', color: pick(['#ffffff', conf.soft, conf.main]) }; });
+        owner.burst(14, () => ({ x: origin.x + rnd(-28, 28), y: origin.y + rnd(-20, 20), vx: rnd(-1.4, 1.4), vy: rnd(-1.8, -0.5), drag: 0.97, decay: 0.012, size: rnd(20, 36), shape: 'gradMist', blend: 'source-over', color: 'rgba(30,27,32,0.58)', mistCore: 'rgba(127,29,29,0.18)' }));
+        sched(145, () => {
+            targetEntries.forEach(entry => {
+                if (entry.dodged) {
+                    owner.burst(6, () => ({ x: entry.pt.miss.x, y: entry.pt.miss.y, vx: rnd(-2.5, 2.5), vy: rnd(-1.5, 0.5), drag: 0.92, decay: 0.05, size: 2, shape: 'glowOrb', core: '#cbd5e1', color: 'rgba(148,163,184,0.35)' }));
+                    onBeat && onBeat('target_dodge', { entity, target: entry.target, form: '群伤', conf });
+                } else {
+                    const b = entry.pt.hit;
+                    sdLayer(owner,`<div class="arcane-fs-anchor" style="left:${b.x}px;top:${b.y}px;width:110px;height:110px;border-radius:50%;background:radial-gradient(circle,#fff 0%,${conf.soft} 38%,${conf.glow} 66%,transparent 75%);animation:arcane-hit-flash 0.28s ease-out both;"></div>`, 320);
+                    owner.burst(14, () => { const an = Math.random() * 6.283, s = rnd(2, 6.2); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.91, decay: 0.045, size: rnd(1.6, 2.6), shape: 'spark', color: pick(['#fff', conf.soft, conf.main]) }; });
+                    onBeat && onBeat('target_hit', { entity, target: entry.target, form: '群伤', conf });
+                }
+            });
+        });
+        return 760;
+    }
+    function burstPierceForm(origin, targetEntries, conf, onBeat, sched, entity, owner) {
+        playSdSample(owner,'sd_burst_pierce', { vol: 0.72, maxDurSec: 1.35, fadeOutSec: 0.25 });
+        sdLayer(owner,`<div class="arcane-fs-anchor" style="left:${origin.x}px;top:${origin.y}px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,#fff 0%,${conf.soft} 35%,${conf.main} 60%,transparent 72%);animation:arcane-hit-flash 0.26s ease-out both;"></div>`, 300);
+        owner.burst(20, () => { const an = Math.random() * 6.283, s = rnd(4, 10); return { x: origin.x, y: origin.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.9, decay: 0.055, size: rnd(1.8, 3), shape: 'spark', color: pick(['#fff', conf.soft, conf.main]) }; });
+        targetEntries.forEach((entry, idx) => {
+            const delay = idx * 65, dest = entry.dodged ? entry.pt.miss : entry.pt.hit;
+            const angDeg = Math.atan2(dest.y - origin.y, dest.x - origin.x) * 180 / Math.PI;
+            const pan = Math.max(-0.6, Math.min(0.6, (idx - 1.5) * 0.3));
+            sched(delay, () => {
+                owner.fly(origin, dest, 12, 195, (x, y) => {
+                    owner.addP({ x, y, shape: 'shard', size: 6.5, rot: angDeg * Math.PI / 180, color: '#fff', fill: conf.main });
+                    owner.addP({ x, y, shape: 'glowOrb', size: 2.8, decay: 0.18, core: conf.soft, color: conf.main });
+                }, () => {
+                    if (entry.dodged) {
+                        owner.burst(7, () => ({ x: dest.x, y: dest.y, vx: (dest.x - origin.x) * 0.02 + rnd(-1, 1), vy: rnd(-1.5, 1.5), drag: 0.91, decay: 0.06, size: 2.2, shape: 'spark', color: '#cbd5e1' }));
+                        onBeat && onBeat('target_dodge', { entity, target: entry.target, form: '群穿', conf });
+                        return;
+                    }
+                    playSdSample(owner,'sd_pierce_shard', { vol: 0.44, maxDurSec: 0.42, fadeOutSec: 0.14, rate: 1.04 + idx * 0.06, pan });
+                    const uid = ++S.uid;
+                    sdLayer(owner,`<div class="arcane-fs-anchor" style="left:${dest.x}px;top:${dest.y}px;width:96px;height:96px;transform:translate(-50%,-50%) rotate(${angDeg}deg);animation:arcane-fade-life 0.36s ease-out both;">
+                      <svg viewBox="0 0 100 100" style="width:100%;height:100%;overflow:visible;">
+                        <defs><linearGradient id="sd-prc-${uid}" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="${conf.soft}" stop-opacity="0.1"/><stop offset="65%" stop-color="${conf.main}"/><stop offset="100%" stop-color="#ffffff"/></linearGradient></defs>
+                        <polygon points="18,46 86,50 18,54 28,50" fill="url(#sd-prc-${uid})"/>
+                        <polygon points="34,34 62,50 38,44" fill="${conf.soft}" opacity="0.88"/>
+                        <polygon points="34,66 62,50 38,56" fill="${conf.soft}" opacity="0.88"/>
+                      </svg>
+                    </div>`, 390);
+                    owner.burst(16, () => { const an = Math.random() * 6.283, s = rnd(2.2, 6.8); return { x: dest.x, y: dest.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.91, decay: 0.048, size: rnd(1.5, 2.5), shape: 'spark', color: pick(['#fff', conf.soft, conf.main]) }; });
+                    onBeat && onBeat('target_hit', { entity, target: entry.target, form: '群穿', conf });
+                }, k => k);
+            });
+        });
+        return 640 + Math.max(0, targetEntries.length - 1) * 65;
+    }
+    function burstFireForm(origin, targetEntries, conf, onBeat, sched, entity, owner) {
+        const heroBox = unionRect(targetEntries.map(t => t.dom).filter(Boolean)) || { x: window.innerWidth * 0.42, y: window.innerHeight * 0.72, w: 380 };
+        // 纯减益·火海漫卷（多层羽化热浪席卷 + 目标拟真多舌火苗附燃，严禁白闪爆轰与重震屏）
+        playSdSample(owner,'sd_burst_fire_wave', { vol: 0.72, maxDurSec: 1.05, fadeOutSec: 0.26 });
+        const uid = ++S.uid, dx = heroBox.x - origin.x, dy = heroBox.y - origin.y, ang = Math.atan2(dy, dx);
+        const waveW = Math.max(520, heroBox.w * 1.44), waveH = 220;
+        const midY = Math.round(origin.y * 0.28 + heroBox.y * 0.72) - 24;
+        const heatLayer = sdLayer(owner,`<div class="arcane-fs-anchor arcane-sd-additive" style="left:${heroBox.x}px;top:${heroBox.y - 24}px;width:${Math.round(waveW * 1.05)}px;height:132px;pointer-events:none;">
+          <div class="sd-fw-heat" style="width:100%;height:100%;border-radius:50%;background:radial-gradient(ellipse at 50% 52%, rgba(253,224,71,0.34) 0%, rgba(249,115,22,0.34) 40%, rgba(194,65,12,0.14) 68%, transparent 82%);"></div>
+        </div>`, 960);
+        const heatEl = heatLayer.querySelector('.sd-fw-heat');
+        if (heatEl && heatEl.animate) owner.anim(heatEl,[{ transform: 'scaleX(0.35) scaleY(0.55)', opacity: 0 }, { transform: 'scaleX(1.04) scaleY(1.02)', opacity: 1, offset: 0.28 }, { transform: 'scaleX(1.1) scaleY(0.95)', opacity: 0.72, offset: 0.62 }, { transform: 'scaleX(1.14) scaleY(0.84)', opacity: 0 }], { duration: 920, easing: 'cubic-bezier(0.2,0.75,0.3,1)', fill: 'forwards' });
+        const waveLayer = sdLayer(owner,`<div class="arcane-fs-anchor arcane-sd-additive" style="left:${heroBox.x}px;top:${midY}px;width:${waveW}px;height:${waveH}px;pointer-events:none;">
+          <div class="sd-fw-billow" style="width:100%;height:100%;transform-origin:50% 55%;">
+            <svg viewBox="0 0 540 220" style="width:100%;height:100%;overflow:visible;">
+              <defs>
+                <filter id="sd-fw-turb-${uid}" x="-18%" y="-28%" width="136%" height="156%">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.022 0.046" numOctaves="2" seed="11" result="noise"/>
+                  <feDisplacementMap in="SourceGraphic" in2="noise" scale="26" xChannelSelector="R" yChannelSelector="G" result="disp"/>
+                  <feGaussianBlur in="disp" stdDeviation="2.6" result="glow"/>
+                  <feMerge><feMergeNode in="glow"/><feMergeNode in="disp"/></feMerge>
+                </filter>
+                <radialGradient id="sd-fw-sheet-${uid}" cx="50%" cy="56%" r="50%">
+                  <stop offset="0%" stop-color="#fb923c" stop-opacity="0.92"/>
+                  <stop offset="48%" stop-color="#f97316" stop-opacity="0.72"/>
+                  <stop offset="78%" stop-color="#dc2626" stop-opacity="0.34"/>
+                  <stop offset="100%" stop-color="#7c2d12" stop-opacity="0"/>
+                </radialGradient>
+                <linearGradient id="sd-fw-core-${uid}" x1="0%" y1="50%" x2="100%" y2="50%">
+                  <stop offset="0%" stop-color="#f97316" stop-opacity="0"/>
+                  <stop offset="20%" stop-color="#fde047" stop-opacity="0.78"/>
+                  <stop offset="50%" stop-color="#fffbeb" stop-opacity="0.94"/>
+                  <stop offset="80%" stop-color="#fde047" stop-opacity="0.78"/>
+                  <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <g filter="url(#sd-fw-turb-${uid})">
+                <ellipse cx="270" cy="122" rx="236" ry="52" fill="url(#sd-fw-sheet-${uid})"/>
+                <path d="M52,126 Q270,84 488,126 Q270,158 52,126 Z" fill="url(#sd-fw-core-${uid})"/>
+              </g>
+            </svg>
+          </div>
+        </div>`, 800);
+        const billowEl = waveLayer.querySelector('.sd-fw-billow');
+        if (billowEl && billowEl.animate) {
+            const ox = Math.max(-200, Math.min(200, -dx * 0.45)), oy = Math.max(-140, Math.min(40, (origin.y - midY) * 0.65));
+            owner.anim(billowEl,[
+                { transform: `translate(${ox.toFixed(1)}px,${oy.toFixed(1)}px) scale(0.36,0.48)`, opacity: 0 },
+                { transform: 'translate(0px,0px) scale(1.04,1.02)', opacity: 1, offset: 0.34 },
+                { transform: 'translate(8px,20px) scale(1.12,0.92)', opacity: 0.88, offset: 0.64 },
+                { transform: 'translate(16px,38px) scale(1.18,0.7)', opacity: 0 }
+            ], { duration: 760, easing: 'cubic-bezier(0.16,0.84,0.28,1)', fill: 'forwards' });
+        }
+        owner.burst(36, () => { const a = ang + rnd(-0.68, 0.68), s = rnd(3.8, 7.8); return { x: origin.x + rnd(-18, 18), y: origin.y + rnd(-12, 12), vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.4, drag: 0.95, decay: 0.023, size: rnd(15, 28), shape: 'flame', color: pick(['#f97316', '#fb923c', '#f59e0b']) }; });
+        owner.burst(20, () => { const a = ang + rnd(-0.72, 0.72), s = rnd(4.6, 9.6); return { x: origin.x + rnd(-12, 12), y: origin.y + rnd(-8, 8), vx: Math.cos(a) * s, vy: Math.sin(a) * s, drag: 0.94, decay: 0.034, size: rnd(1.5, 2.7), shape: 'spark', color: pick(['#fef08a', '#fb923c', '#fffbeb']) }; });
+        sched(120, () => {
+            owner.burst(24, () => ({ x: heroBox.x + rnd(-heroBox.w * 0.45, heroBox.w * 0.45), y: midY + rnd(-12, 24), vx: rnd(-1.4, 1.4), vy: rnd(-2.2, -0.4), drag: 0.96, decay: 0.025, size: rnd(14, 26), shape: 'flame', color: pick(['#fb923c', '#f97316', '#fde047']) }));
+        });
+        let burnSoundCount = 0;
+        targetEntries.forEach((entry, idx) => {
+            const dest = entry.dodged ? entry.pt.miss : entry.pt.hit;
+            const pan = Math.max(-0.6, Math.min(0.6, (idx - 1.5) * 0.3));
+            owner.fly(origin, dest, 18, 250 + idx * 35, (x, y) => {
+                owner.addP({ x: x + rnd(-6, 6), y: y + rnd(-6, 6), shape: 'flame', size: 12, decay: 0.14, color: '#fb923c' });
+            }, () => {
+                if (entry.dodged) {
+                    owner.burst(5, () => ({ x: dest.x, y: dest.y, vx: rnd(-1.2, 1.2), vy: rnd(-2, -0.6), drag: 0.95, decay: 0.05, size: 7, shape: 'flame', color: '#fdba74' }));
+                    onBeat && onBeat('target_dodge', { entity, target: entry.target, form: '群火', stateAttach: '燃烧', conf });
+                    return;
+                }
+                if (entry.immune) { onBeat && onBeat('target_attach', { entity, target:entry.target, form:'群火', conf, immune:true }); return; }
+                if (burnSoundCount++ < 2) playSdSample(owner,'sd_burn_attach', { vol: 0.42, maxDurSec: 0.58, fadeOutSec: 0.18, rate: 0.98 + idx * 0.05, pan });
+                const fUid = ++S.uid, by = dest.y - 20;
+                const burnLayer = sdLayer(owner,`<div class="arcane-fs-anchor" style="left:${dest.x}px;top:${by}px;width:96px;height:96px;pointer-events:none;">
+                  <svg viewBox="0 0 96 96" style="width:100%;height:100%;overflow:visible;">
+                    <defs>
+                      <filter id="sd-bt-gl-${fUid}" x="-28%" y="-28%" width="156%" height="156%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                      <radialGradient id="sd-bt-base-${fUid}" cx="50%" cy="68%" r="48%"><stop offset="0%" stop-color="#fde047" stop-opacity="0.48"/><stop offset="46%" stop-color="#ea580c" stop-opacity="0.34"/><stop offset="100%" stop-color="#7c2d12" stop-opacity="0"/></radialGradient>
+                      <linearGradient id="sd-bt-fl-${fUid}" x1="0.2" y1="1" x2="0.8" y2="0"><stop offset="0%" stop-color="#c2410c" stop-opacity="0.92"/><stop offset="48%" stop-color="#f97316" stop-opacity="0.94"/><stop offset="88%" stop-color="#fde047" stop-opacity="0.72"/><stop offset="100%" stop-color="#fffbeb" stop-opacity="0.18"/></linearGradient>
+                      <linearGradient id="sd-bt-core-${fUid}" x1="0.3" y1="1" x2="0.7" y2="0"><stop offset="0%" stop-color="#fb923c" stop-opacity="0.85"/><stop offset="50%" stop-color="#fef08a" stop-opacity="0.96"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0.35"/></linearGradient>
+                    </defs>
+                    <ellipse cx="48" cy="68" rx="40" ry="20" fill="url(#sd-bt-base-${fUid})" style="mix-blend-mode:screen;"/>
+                    <g class="sd-bt-tongues" filter="url(#sd-bt-gl-${fUid})" style="transform-origin:48px 78px;">
+                      <path d="M46,79 C26,77 20,58 29,43 C32,37 32,30 29,24 C38,31 41,42 40,51 C42,36 52,18 48,10 C60,21 61,39 56,51 C61,45 64,37 64,30 C72,41 72,62 59,74 C55,78 50,79 46,79 Z" fill="url(#sd-bt-fl-${fUid})"/>
+                      <path d="M23,60 C17,52 18,40 24,33 C23,42 26,48 29,56 C27,59 25,61 23,60 Z" fill="url(#sd-bt-fl-${fUid})" opacity="0.82"/>
+                      <path d="M72,56 C77,48 76,37 70,31 C71,39 68,46 66,53 C68,56 70,58 72,56 Z" fill="url(#sd-bt-fl-${fUid})" opacity="0.78"/>
+                      <path d="M47,76 C37,74 35,61 42,49 C45,42 48,34 47,26 C53,36 53,48 51,58 C56,54 58,47 58,42 C62,50 61,66 53,74 C51,75 49,76 47,76 Z" fill="url(#sd-bt-core-${fUid})" style="mix-blend-mode:screen;"/>
+                    </g>
+                    <polygon class="sd-bt-flare" points="54,28 57,37 66,40 57,43 54,52 51,43 42,40 51,37" fill="#fef9c3" stroke="#fb923c" stroke-width="0.9" opacity="0" style="transform-origin:54px 40px;"/>
+                  </svg>
+                </div>`, 640);
+                const tonguesEl = burnLayer.querySelector('.sd-bt-tongues'), flareEl = burnLayer.querySelector('.sd-bt-flare');
+                if (tonguesEl && tonguesEl.animate) owner.anim(tonguesEl,[{ opacity: 0, transform: 'translateY(8px) scaleY(0.45)' }, { opacity: 0.98, transform: 'translateY(-3px) scaleY(1.08)', offset: 0.36 }, { opacity: 0, transform: 'translateY(-11px) scaleY(0.72)' }], { duration: 580, easing: 'ease-out', fill: 'forwards' });
+                if (flareEl && flareEl.animate) owner.anim(flareEl,[{ opacity: 0, transform: 'scale(0.35) rotate(0deg)' }, { opacity: 0.95, transform: 'scale(1.12) rotate(18deg)', offset: 0.34 }, { opacity: 0, transform: 'scale(0.55) rotate(36deg)' }], { duration: 240, easing: 'ease-out', fill: 'forwards' });
+                owner.burst(8, () => ({ x: dest.x + rnd(-20, 20), y: by + rnd(-8, 10), vx: rnd(-0.6, 0.6), vy: rnd(-2.4, -0.9), drag: 0.96, decay: 0.032, size: rnd(6, 12), shape: 'flame', color: pick(['#f97316', '#fbbf24']) }));
+                owner.burst(6, () => ({ x: dest.x + rnd(-16, 16), y: by + rnd(-10, 6), vx: rnd(-0.8, 0.8), vy: rnd(-2.8, -1.1), drag: 0.95, decay: 0.04, size: rnd(1.3, 2.2), shape: 'spark', color: pick(['#fef08a', '#fb923c']) }));
+                owner.burst(4, () => ({ x: dest.x + rnd(-14, 14), y: by + rnd(-6, 8), vx: rnd(-0.3, 0.3), vy: rnd(-1.4, -0.6), drag: 0.97, decay: 0.026, size: rnd(7, 11), shape: 'gradMist', blend: 'source-over', color: 'rgba(67,20,7,0.45)', mistCore: 'rgba(28,25,23,0.18)' }));
+                onBeat && onBeat('target_attach', { entity, target: entry.target, form: '群火', stateAttach: '燃烧', conf });
+            }, k => k * (2 - k));
+        });
+        return 800;
+    }
+    function burstPoisonForm(origin, targetEntries, conf, onBeat, sched, entity, owner) {
+        const heroBox = unionRect(targetEntries.map(t => t.dom).filter(Boolean)) || { x: window.innerWidth * 0.42, y: window.innerHeight * 0.72, w: 380 };
+        // 纯减益·毒囊毒雾翻滚（严禁爆轰感与震屏，禁用空心气泡）
+        playSdSample(owner,'sd_burst_poison_sac', { vol: 0.72, maxDurSec: 0.52, fadeOutSec: 0.1 });
+        sched(70, () => playSdSample(owner,'sd_burst_poison_mist', { vol: 0.64, offsetSec: 0.055, maxDurSec: 1.05, fadeOutSec: 0.28 }));
+        const uid = ++S.uid;
+        sdLayer(owner,`<div class="arcane-fs-anchor" style="left:${heroBox.x}px;top:${heroBox.y - 6}px;width:${Math.max(360, heroBox.w * 1.25)}px;height:165px;animation:arcane-fade-life 0.82s ease-out both;">
+          <svg viewBox="0 0 360 150" style="width:100%;height:100%;overflow:visible;">
+            <defs><radialGradient id="sd-pm-${uid}" cx="50%" cy="55%" r="52%"><stop offset="0%" stop-color="#84cc16" stop-opacity="0.34"/><stop offset="48%" stop-color="#9333ea" stop-opacity="0.28"/><stop offset="100%" stop-color="#3b0764" stop-opacity="0"/></radialGradient></defs>
+            <ellipse cx="180" cy="82" rx="168" ry="64" fill="url(#sd-pm-${uid})"/>
+          </svg>
+        </div>`, 840);
+        owner.burst(26, () => ({ x: origin.x + rnd(-26, 26), y: origin.y + rnd(-16, 16), vx: (heroBox.x - origin.x) * rnd(0.008, 0.022) + rnd(-1.4, 1.4), vy: (heroBox.y - origin.y) * rnd(0.008, 0.022) + rnd(-0.8, 0.8), drag: 0.96, decay: 0.014, size: rnd(22, 42), shape: 'gradMist', blend: 'source-over', color: pick(['rgba(168,85,247,0.34)', 'rgba(132,204,22,0.28)']), mistCore: 'rgba(88,28,135,0.16)' }));
+        let fogSoundCount = 0;
+        targetEntries.forEach((entry, idx) => {
+            const dest = entry.dodged ? entry.pt.miss : entry.pt.hit;
+            const pan = Math.max(-0.6, Math.min(0.6, (idx - 1.5) * 0.3));
+            owner.fly(origin, dest, 54, 270 + idx * 40, (x, y) => {
+                owner.addP({ x, y, shape: 'glowOrb', size: 4.5, decay: 0.16, core: '#a3e635', color: '#9333ea' });
+            }, () => {
+                if (entry.dodged) {
+                    owner.burst(6, () => ({ x: dest.x, y: dest.y, vx: rnd(-1, 1), vy: rnd(-0.6, 1.2), drag: 0.94, decay: 0.035, size: 12, shape: 'gradMist', blend: 'source-over', color: 'rgba(168,85,247,0.28)' }));
+                    onBeat && onBeat('target_dodge', { entity, target: entry.target, form: '群毒', stateAttach: '中毒', conf });
+                    return;
+                }
+                if (entry.immune) { onBeat && onBeat('target_attach', { entity, target:entry.target, form:'群毒', conf, immune:true }); return; }
+                if (fogSoundCount++ < 2) playSdSample(owner,'sd_fog_attach', { vol: 0.38, maxDurSec: 0.55, fadeOutSec: 0.18, rate: 1.02 + idx * 0.04, pan });
+                const pUid = ++S.uid;
+                sdLayer(owner,`<div class="arcane-fs-anchor" style="left:${dest.x}px;top:${dest.y}px;width:82px;height:82px;animation:arcane-sd-venom-pulse 0.44s ease-in-out 2;">
+                  <svg viewBox="0 0 90 90" style="width:100%;height:100%;overflow:visible;">
+                    <defs><radialGradient id="sd-ps-${pUid}" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#a3e635" stop-opacity="0.72"/><stop offset="52%" stop-color="#9333ea" stop-opacity="0.46"/><stop offset="100%" stop-color="#581c87" stop-opacity="0"/></radialGradient></defs>
+                    <circle cx="45" cy="46" r="34" fill="url(#sd-ps-${pUid})"/>
+                  </svg>
+                </div>`, 620);
+                owner.burst(10, () => ({ x: dest.x + rnd(-18, 18), y: dest.y + rnd(-12, 16), vx: rnd(-0.8, 0.8), vy: rnd(-1.4, -0.4), drag: 0.96, decay: 0.022, size: rnd(12, 22), shape: 'gradMist', blend: 'source-over', color: pick(['rgba(132,204,22,0.42)', 'rgba(168,85,247,0.36)']) }));
+                onBeat && onBeat('target_attach', { entity, target: entry.target, form: '群毒', stateAttach: '中毒', conf });
+            }, k => k);
+        });
+        return 850;
+    }
+
+    function playSelfDestructBurst(entity, targets = [], meta = {}, onBeat, stageCtx = null) {
+        const form = meta.form || entity?.explode?.type || '群伤', conf = sdConf(form,meta);
+        clearSelfDestructWarning(entity);
+        const r = stageCtx && stageCtx.r || entityVisualRect(entity && entity.selfDestructDom || entity);
+        if (!r || !r.w || !r.h) return null;
+        const owner = sdRun(form === '群穿' ? 800 + targets.length * 65 : 1100,entity), origin = { x:r.x,y:r.y };
+        const outcome = normalizeOutcomes(meta.outcomes);
+        const entries = targets.filter(Boolean).map(target => ({ target, dodged:outcome(target) === 'dodge',
+            immune:form === '群火' ? target.immuneBurn : form === '群毒' ? target.immunePoison : false,
+            pt:resolveTargetPoint(target,origin) })).filter(entry => entry.pt);
+        const sched = owner.at;
+        onBeat && onBeat('burst_start',{ entity,form,conf });
+        if (stageCtx) owner.at(110,() => stageCtx.restore('dead'));
+        if (stageCtx) owner.onClean(() => stageCtx.restore('dead'));
+        const dur = form === '群穿' ? burstPierceForm(origin,entries,conf,onBeat,sched,entity,owner)
+            : form === '群火' ? burstFireForm(origin,entries,conf,onBeat,sched,entity,owner)
+            : form === '群毒' ? burstPoisonForm(origin,entries,conf,onBeat,sched,entity,owner)
+            : burstAoeForm(origin,entries,conf,onBeat,sched,entity,owner);
+        owner.at(dur + 80,() => onBeat && onBeat('burst_end',{ entity,form,conf }));
+        return owner.handle;
+    }
+
+/* ===== 救援时刻 v12.10 BEGIN =====
+   合并位置：arcaneVfxModule IIFE 内、最终 return 之前。
+   依赖正式模块内已有：identityRun / idSample / entityVisualRect / cloneVisualOnly /
+   domOf / panOf / shake / addP / S / combatToken / _pipelineFrozen。
+   不引入 Demo 的 rescueRun timer engine、飞行弹道、来袭音效与攻击模拟。
+   合并后请在模块 return 对象中追加：
+   playRescueSheshen, playRescueGrit, playRescueAvoidFatal, clearRescueState
+   共用正式 owner 的保持/释放与真实采样，不设置反应等待期限。 */
+
+const R_ACTIVE = new Map();
+const RESCUE_STYLE_MEMO = new Map();
+
+function heroWrapOf(entityOrId) {
+    const id = entityOrId && typeof entityOrId === 'object' ? entityOrId.id : String(entityOrId || '');
+    return id ? document.getElementById('hero-wrap-' + id) : null;
+}
+
+function rescueStyle(el, props) {
+    if (!el) return function () {};
+    let memo = RESCUE_STYLE_MEMO.get(el);
+    if (!memo) {
+        memo = { count: 0, orig: {} };
+        props.forEach(p => { memo.orig[p] = el.style[p]; });
+        RESCUE_STYLE_MEMO.set(el, memo);
+    } else {
+        props.forEach(p => { if (!(p in memo.orig)) memo.orig[p] = el.style[p]; });
+    }
+    memo.count++;
+    let released = false;
+    return function () {
+        if (released) return;
+        released = true;
+        memo.count--;
+        if (memo.count > 0) return;
+        Object.keys(memo.orig).forEach(p => { el.style[p] = memo.orig[p]; });
+        RESCUE_STYLE_MEMO.delete(el);
+    };
+}
+
+function rescueLayer(owner, markup, z, tag) {
+    const layer = owner.layer(markup);
+    layer.style.zIndex = String(z);
+    layer.setAttribute('data-rescue', tag);
+    return layer;
+}
+
+function dropOwnedLayer(owner, layer) {
+    if (!layer) return;
+    owner.layers.delete(layer);
+    S.layers.delete(layer);
+    if (layer.isConnected) layer.remove();
+}
+
+function rescueSample(owner, key, opts) {
+    return idSample(owner, key, Object.assign({ sampled: true, category: 'B', vol: 0.9, rate: 1 }, opts || {}));
+}
+
+function rescueVisualHost(dom) {
+    if (!dom) return null;
+    return dom.querySelector('.portrait')
+        || dom.querySelector('.bg-gray-900')
+        || (dom.classList.contains('hero-card-inner') ? dom : (dom.querySelector('img') && dom.querySelector('img').parentElement))
+        || dom;
+}
+
+function rescueRun(totalMs, lockKeys) {
+    const owner = identityRun(totalMs, 1);
+    const keys = (lockKeys || []).filter(Boolean).map(String);
+    keys.forEach(k => {
+        const prev = R_ACTIVE.get(k);
+        if (prev && prev.handle) prev.handle.cancel();
+    });
+    keys.forEach(k => R_ACTIVE.set(k, owner));
+    owner.onClean(() => keys.forEach(k => { if (R_ACTIVE.get(k) === owner) R_ACTIVE.delete(k); }));
+    owner.cancel = () => owner.handle.cancel();
+    owner.onRestore = fn => owner.onClean(fn);
+    owner.valid = () => !owner.cancelled && !owner.finished && owner.token === combatToken && !_pipelineFrozen;
+    return owner;
+}
+
+function clearRescueState(entity) {
+    const id = entity == null ? '' : (typeof entity === 'object' ? entity.id : String(entity));
+    const seen = new Set();
+    [...R_ACTIVE.entries()].forEach(([key, owner]) => {
+        if (id && !key.endsWith(':' + id)) return;
+        R_ACTIVE.delete(key);
+        if (seen.has(owner)) return;
+        seen.add(owner);
+        if (owner && owner.handle) owner.handle.cancel();
+    });
+    if (!id) {
+        document.querySelectorAll('.arcane-rescue-blood-wrap').forEach(el => el.remove());
+        RESCUE_STYLE_MEMO.clear();
+    }
+}
+
+/* 舍身最终契约：630ms 到达 → 立即一次钢蓝格挡（无数值）→ +480ms resolve ready；
+   保持外 wrap 在 dashX；release() 只做 350ms 归位 + 目标余光，不再格挡/不再播来袭。 */
+function playRescueSheshen(guardian, target, meta, onBeat) {
+    const gRect = entityVisualRect(guardian), tRect = entityVisualRect(target);
+    if (!gRect || !tRect) return null;
+    const gDom = gRect.dom, gVisual = gRect.visualDom || gDom;
+    const gId = guardian.id || String(guardian), tId = target.id || String(target);
+    const rawDx = tRect.x - gRect.x;
+    const dir = rawDx >= 0 ? 1 : -1;
+    const dashX = rawDx - dir * Math.min(26, tRect.w * 0.22);
+    const blockPt = { x: gRect.x + dashX, y: tRect.y - 16 };
+    const gWrap = heroWrapOf(guardian);
+    const uid = ++S.uid;
+    const owner = rescueRun(1560, ['sheshen:' + gId, 'sheshen:' + tId]);
+    owner.hold();
+
+    const releaseVisual = rescueStyle(gVisual, ['transform']);
+    const releaseGlow = rescueStyle(gDom, ['borderColor', 'boxShadow']);
+    const releaseWrap = gWrap ? rescueStyle(gWrap, ['zIndex', 'transition', 'transform']) : null;
+    owner.onClean(() => {
+        if (releaseWrap) releaseWrap();
+        releaseGlow();
+        releaseVisual();
+    });
+    if (gWrap) { gWrap.style.zIndex = '46'; gWrap.style.transition = 'none'; }
+
+    let blockFired = false, released = false, readySettled = false, doneSettled = false;
+    let settleReady, settleDone;
+    const ready = new Promise(res => { settleReady = value => { if (readySettled) return; readySettled = true; res(value); }; });
+    const done = new Promise(res => { settleDone = value => { if (doneSettled) return; doneSettled = true; res(value); }; });
+    owner.handle.onFinish.add(ok => {
+        if (!readySettled) settleReady({ ok: false, cancelled: true });
+        settleDone(!!ok);
+    });
+    const beat = phase => {
+        if (!onBeat) return;
+        try { onBeat(Object.assign({ guardian, target }, phase)); } catch (_) {}
+    };
+
+    function triggerBlockImpact() {
+        if (blockFired || released || !owner.valid()) return;
+        blockFired = true;
+        const sLayer = rescueLayer(owner, `<div class="arcane-rescue-anchor" style="left:${blockPt.x}px;top:${blockPt.y}px;width:148px;height:148px;transform:translate(-50%,-50%) rotate(${(-dir * 6).toFixed(1)}deg);"><svg viewBox="0 0 120 120" class="w-full h-full" style="overflow:visible;"><defs><linearGradient id="rescue-shd-${uid}" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#0284c7" stop-opacity="0.12"/><stop offset="50%" stop-color="#bae6fd" stop-opacity="0.98"/><stop offset="100%" stop-color="#0284c7" stop-opacity="0.12"/></linearGradient><radialGradient id="rescue-shd-core-${uid}" cx="50%" cy="48%" r="50%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/><stop offset="38%" stop-color="#38bdf8" stop-opacity="0.55"/><stop offset="100%" stop-color="#0369a1" stop-opacity="0"/></radialGradient><filter id="rescue-shd-glow-${uid}" x="-35%" y="-35%" width="170%" height="170%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><circle cx="60" cy="56" r="48" fill="url(#rescue-shd-core-${uid})" class="r-shd-bloom"/><g filter="url(#rescue-shd-glow-${uid})" class="r-shd-arc"><path d="M14 76 Q60 10 106 76 Q60 30 14 76 Z" fill="url(#rescue-shd-${uid})"/><path d="M20 70 Q60 16 100 70" fill="none" stroke="#e0f2fe" stroke-width="4" stroke-linecap="round"/></g></svg></div>`, 59, 'sheshen-block');
+        owner.anim(sLayer.querySelector('.r-shd-arc'), [{ transform: 'scale(0.55)', opacity: 0 }, { transform: 'scale(1.14)', opacity: 1, offset: 0.18 }, { transform: 'scale(1.03)', opacity: 0.94, offset: 0.72 }, { transform: 'scale(1.16)', opacity: 0 }], { duration: 480, easing: 'cubic-bezier(0.16,0.88,0.3,1)', fill: 'forwards' });
+        owner.anim(sLayer.querySelector('.r-shd-bloom'), [{ transform: 'scale(0.3)', opacity: 1 }, { transform: 'scale(1.4)', opacity: 0 }], { duration: 380, easing: 'ease-out', fill: 'forwards' });
+        owner.at(490, () => dropOwnedLayer(owner, sLayer));
+        shake('heavy');
+        owner.anim(gVisual, [{ transform: 'translate3d(0,0,0) scale(1.04)' }, { transform: `translate3d(${(-dir * 13).toFixed(1)}px,4px,0) scale(0.96,1.01)`, offset: 0.24 }, { transform: `translate3d(${(-dir * 10).toFixed(1)}px,3px,0) scale(0.98,1.0)`, offset: 0.62 }, { transform: 'translate3d(0,0,0) scale(1.01)' }], { duration: 480, easing: 'cubic-bezier(0.22,0.84,0.36,1)', fill: 'forwards' });
+        owner.burst(26, () => {
+            const a = rnd(-2.7, -0.45), sp = rnd(3.0, 8.0);
+            return { x: blockPt.x + rnd(-10, 10), y: blockPt.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, grav: 0.15, drag: 0.91, decay: rnd(0.042, 0.075), size: rnd(2.0, 3.0), shape: 'spark', color: pick(['#ffffff', '#bae6fd', '#38bdf8', '#7dd3fc']) };
+        });
+        owner.burst(2, i => ({ x: blockPt.x, y: blockPt.y, shape: 'gradRing', size: i ? 1.5 : 2.0, decay: 0.062 - i * 0.018, color: i ? 'rgba(56,189,248,0.72)' : 'rgba(224,242,254,0.9)' }));
+        rescueSample(owner, 'parry_perfect', { vol: 0.98, pan: panOf(blockPt.x) });
+        beat({ phase: 'blockImpact', blockPt });
+    }
+
+    function release() {
+        if (released || !owner.valid()) return done;
+        released = true;
+        if (!readySettled) settleReady({ ok: true, early: true, blockPt });
+        owner.resume(430);
+        gDom.style.borderColor = ''; gDom.style.boxShadow = '';
+        if (gWrap) owner.anim(gWrap, [{ transform: `translate3d(${dashX.toFixed(1)}px,-2px,0)` }, { transform: 'translate3d(0,0,0)' }], { duration: 350, easing: 'cubic-bezier(0.26,0.82,0.36,1)', fill: 'forwards' });
+        owner.anim(gVisual, [{ transform: 'scale(1.01)' }, { transform: 'scale(1)' }], { duration: 350, easing: 'cubic-bezier(0.26,0.82,0.36,1)', fill: 'forwards' });
+        const auraLayer = rescueLayer(owner, `<div class="arcane-rescue-anchor" style="left:${tRect.x}px;top:${tRect.y}px;width:${tRect.w + 10}px;height:${tRect.h + 10}px;border-radius:8px;border:1.5px solid rgba(125,211,252,0.68);box-shadow:inset 0 0 16px rgba(56,189,248,0.28),0 0 18px rgba(56,189,248,0.34);"></div>`, 51, 'sheshen-return');
+        owner.anim(auraLayer.firstElementChild, [{ opacity: 0, transform: 'translate(-50%,-50%) scale(0.95)' }, { opacity: 0.9, transform: 'translate(-50%,-50%) scale(1.01)', offset: 0.28 }, { opacity: 0, transform: 'translate(-50%,-50%) scale(1.04)' }], { duration: 420, easing: 'ease-out', fill: 'forwards' });
+        owner.at(430, () => dropOwnedLayer(owner, auraLayer));
+        rescueSample(owner, 'sheshen_armor_step', { offsetSec: 0.34, maxDurSec: 0.27, vol: 0.45, pan: panOf(gRect.x) });
+        beat({ phase: 'return' });
+        return done;
+    }
+
+    // 1. 决意蓄势 0~340ms
+    gDom.style.borderColor = '#38bdf8';
+    gDom.style.boxShadow = '0 0 20px rgba(56,189,248,0.6)';
+    owner.anim(gVisual, [{ transform: 'translate3d(0,0,0) scale(1)' }, { transform: `translate3d(${-dir * 3}px,3px,0) scale(0.99,0.97)`, offset: 0.48 }, { transform: `translate3d(${dir * 4}px,2px,0) scale(1.03)` }], { duration: 340, easing: 'cubic-bezier(0.28,0.82,0.34,1)', fill: 'forwards' });
+    owner.burst(16, () => {
+        const a = rnd(0, 6.283), d = rnd(34, 58);
+        return { x: gRect.x + Math.cos(a) * d, y: gRect.y + Math.sin(a) * d, vx: -Math.cos(a) * d / 13, vy: -Math.sin(a) * d / 13, drag: 0.88, decay: 0.048, size: 2.4, shape: 'glowOrb', color: '#38bdf8', core: '#e0f2fe' };
+    });
+    rescueSample(owner, 'mx_golem_stomp', { vol: 0.56, rate: 0.92, pan: panOf(gRect.x) });
+    owner.at(0, () => beat({ phase: 'resolve' }));
+
+    // 2. 重甲突进 335~630ms
+    owner.at(335, () => {
+        const gLayer = rescueLayer(owner, '', 44, 'sheshen-dash');
+        const ghost = document.createElement('div');
+        ghost.className = 'arcane-rescue-ghost';
+        ghost.style.cssText = `left:${gRect.left}px;top:${gRect.top}px;width:${gRect.w}px;height:${gRect.h}px;border:1px solid rgba(56,189,248,0.65);box-shadow:0 0 14px rgba(56,189,248,0.45);filter:hue-rotate(10deg) saturate(1.4) brightness(1.1);`;
+        ghost.innerHTML = cloneVisualOnly(gDom);
+        ghost.style.fontSize = (parseFloat(getComputedStyle(gVisual).fontSize) * gRect.w / (gVisual.offsetWidth || gRect.w)) + 'px';
+        gLayer.appendChild(ghost);
+        owner.anim(ghost, [{ transform: 'scale(1)', opacity: 0.68 }, { transform: 'scale(0.95)', opacity: 0 }], { duration: 420, easing: 'ease-out', fill: 'forwards' });
+        owner.at(440, () => dropOwnedLayer(owner, gLayer));
+        if (gWrap) owner.anim(gWrap, [{ transform: 'translate3d(0,0,0)' }, { transform: `translate3d(${dashX.toFixed(1)}px,-2px,0)` }], { duration: 290, easing: 'cubic-bezier(0.24,0.82,0.34,1)', fill: 'forwards' });
+        owner.anim(gVisual, [{ transform: `translate3d(${dir * 4}px,2px,0) scale(1.03)` }, { transform: 'translate3d(0,0,0) scale(1.04)' }], { duration: 290, easing: 'cubic-bezier(0.24,0.82,0.34,1)', fill: 'forwards' });
+        rescueSample(owner, 'sheshen_armor_step', { offsetSec: 0.92, maxDurSec: 0.45, vol: 0.9, pan: panOf((gRect.x + blockPt.x) * 0.5) });
+        owner.burst(10, i => ({ x: gRect.x + dashX * (i / 10), y: gRect.y + rnd(-10, 10), vx: -dir * rnd(0.7, 2.0), vy: rnd(-0.4, 0.5), drag: 0.9, decay: 0.065, size: rnd(3, 6), shape: 'glowOrb', color: '#38bdf8', core: '#f0f9ff' }));
+        beat({ phase: 'dash', dashX, blockPt });
+    });
+
+    // 3. 630ms 到达：统一一次性钢蓝格挡，之后外 wrap 保持
+    owner.at(630, triggerBlockImpact);
+    // 4. 格挡约 480ms 收回后放行 ready（只表示可进入反应/结算，不归位）
+    owner.at(1110, () => {
+        if (!owner.valid()) return;
+        settleReady({ ok: true, blockPt });
+        beat({ phase: 'reactionReady', blockPt, dashX, release });
+    });
+
+    Object.assign(owner.handle, {
+        guardian, target, owner, dashX, blockPt, ready, done, release,
+        isReleased() { return released; }
+    });
+    return owner.handle;
+}
+
+/* 毅力留存：卡内血幕/血轨/竖直血滴 + 380ms 三向猩红交叉圆弧。
+   只动画 visualDom 与卡内血层，保留本体标准受击反馈；只播 380ms taunt。 */
+function playRescueGrit(entity, meta, onBeat) {
+    if (meta && meta.hasPassive === false) return null;
+    const dom = domOf(entity), rect = entityVisualRect(entity);
+    if (!dom || !rect) return null;
+    const id = entity.id || String(entity);
+    const visual = rect.visualDom || dom;
+    const host = rescueVisualHost(dom) || dom;
+    const wrap = heroWrapOf(entity);
+    const uid = ++S.uid;
+    const owner = rescueRun(1360, ['grit:' + id]);
+    const releaseWrap = wrap ? rescueStyle(wrap, ['zIndex']) : null;
+    const releaseHost = rescueStyle(host, ['position']);
+    const releaseVisual = rescueStyle(visual, ['transform']);
+    const releaseGlow = rescueStyle(dom, ['borderColor', 'boxShadow']);
+    if (wrap) wrap.style.zIndex = String(Math.max(43, Number(wrap.style.zIndex) || 0));
+    if (host !== dom && getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    owner.onClean(() => {
+        releaseGlow();
+        releaseVisual();
+        releaseHost();
+        if (releaseWrap) releaseWrap();
+    });
+    const beat = phase => {
+        if (!onBeat) return;
+        try { onBeat(Object.assign({ entity }, phase)); } catch (_) {}
+    };
+
+    const bloodWrap = document.createElement('div');
+    bloodWrap.className = 'arcane-rescue-blood-wrap';
+    const trails = [[16, 4, 72, 0], [32, 3, 86, 45], [50, 5, 92, 20], [68, 3.5, 78, 70], [83, 3, 64, 95]];
+    bloodWrap.innerHTML = `<div class="arcane-rescue-blood-wash" style="opacity:0;"></div>`
+        + trails.map(([l, w, h, d], idx) => `<div class="arcane-rescue-blood-trail" data-delay="${d}" data-idx="${idx}" style="left:${l}%;width:${w}px;height:${h}%;transform:translate3d(0,-105%,0) scaleY(0.45);opacity:0;"></div>`).join('');
+    host.appendChild(bloodWrap);
+    owner.onClean(() => bloodWrap.remove());
+
+    // 0~380ms：致命一击重创 → 暗红血流沿视觉容器滴落
+    owner.at(0, () => beat({ phase: 'lethalImpact' }));
+    dom.style.borderColor = '#dc2626';
+    dom.style.boxShadow = '0 0 22px rgba(220,38,38,0.72), inset 0 0 14px rgba(153,27,27,0.55)';
+    owner.anim(visual, [
+        { transform: 'translate3d(0,0,0)' },
+        { transform: 'translate3d(-3px,2px,0)', offset: 0.25 },
+        { transform: 'translate3d(2px,-1px,0)', offset: 0.58 },
+        { transform: 'translate3d(0,0,0)' }
+    ], { duration: 190, easing: 'ease-out' });
+    const washEl = bloodWrap.querySelector('.arcane-rescue-blood-wash');
+    owner.anim(washEl, [{ opacity: 0 }, { opacity: 0.92, offset: 0.35 }, { opacity: 0.88 }], { duration: 360, easing: 'ease-out', fill: 'forwards' });
+    bloodWrap.querySelectorAll('.arcane-rescue-blood-trail').forEach(tr => {
+        const d = Number(tr.dataset.delay || 0);
+        owner.anim(tr, [
+            { transform: 'translate3d(0,-105%,0) scaleY(0.45)', opacity: 0 },
+            { transform: 'translate3d(0,-38%,0) scaleY(0.82)', opacity: 0.96, offset: 0.28 },
+            { transform: 'translate3d(0,6%,0) scaleY(1.06)', opacity: 0.92 }
+        ], { duration: 380, delay: d, easing: 'cubic-bezier(0.22,0.72,0.34,1)', fill: 'forwards' });
+    });
+    owner.burst(16, () => {
+        const ang = rnd(-2.9, -0.25), spd = rnd(1.8, 5.2);
+        return { x: rect.x + rnd(-22, 22), y: rect.top + rnd(8, rect.h * 0.45), vx: Math.cos(ang) * spd * 0.75, vy: Math.sin(ang) * spd * 0.4 + rnd(-0.6, 1.4), grav: 0.22, drag: 0.94, decay: rnd(0.028, 0.048), size: rnd(2.2, 4.2), shape: 'rescueBloodDrop', blend: 'source-over', color: pick(['#7f1d1d', '#b91c1c', '#dc2626']), glint: 'rgba(254,202,202,0.75)' };
+    });
+    shake('light');
+
+    // 380~1020ms：taunt 同款怒吼 → 三向猩红交叉圆弧 + 放射火花
+    owner.at(380, () => {
+        dom.style.borderColor = '#ef4444';
+        dom.style.boxShadow = '0 0 28px rgba(239,68,68,0.88), 0 0 12px rgba(254,202,202,0.45)';
+        owner.anim(visual, [
+            { transform: 'translate3d(0,0,0) scale(1)' },
+            { transform: 'translate3d(-2px,1px,0) scale(1.04)', offset: 0.22 },
+            { transform: 'translate3d(2px,-1px,0) scale(1.022)', offset: 0.48 },
+            { transform: 'translate3d(0,0,0) scale(1)' }
+        ], { duration: 340, easing: 'ease-out' });
+        const corePt = { x: rect.x, y: rect.top + rect.h * 0.48 };
+        const arcAngles = [-26, 94, 214];
+        const gLayer = rescueLayer(owner, `
+          <div class="arcane-rescue-anchor" style="left:${corePt.x}px;top:${corePt.y}px;width:236px;height:236px;">
+            <svg viewBox="-118 -118 236 236" class="w-full h-full" style="overflow:visible;">
+              <defs>
+                <linearGradient id="rescue-grit-arc-${uid}" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#991b1b" stop-opacity="0.1"/>
+                  <stop offset="32%" stop-color="#dc2626" stop-opacity="0.96"/>
+                  <stop offset="50%" stop-color="#fff1f2" stop-opacity="1"/>
+                  <stop offset="68%" stop-color="#ef4444" stop-opacity="0.96"/>
+                  <stop offset="100%" stop-color="#7f1d1d" stop-opacity="0.1"/>
+                </linearGradient>
+                <filter id="rescue-grit-rf-${uid}" x="-35%" y="-35%" width="170%" height="170%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              </defs>
+              ${arcAngles.map((ang, i) => `
+              <g transform="rotate(${ang})" filter="url(#rescue-grit-rf-${uid})">
+                <g class="r-grit-arc-${i}" style="transform-origin:0 0;">
+                  <path d="M -82 -44 Q 0 -144 82 -44 Q 0 -102 -82 -44 Z" fill="url(#rescue-grit-arc-${uid})"/>
+                  <path d="M -70 -44 Q 0 -122 70 -44" fill="none" stroke="#fff1f2" stroke-width="3.2" stroke-linecap="round"/>
+                </g>
+              </g>`).join('')}
+            </svg>
+          </div>`, 57, 'grit-core');
+        arcAngles.forEach((_, i) => {
+            owner.anim(gLayer.querySelector('.r-grit-arc-' + i), [
+                { transform: 'scale(0.32) rotate(-20deg)', opacity: 0 },
+                { transform: 'scale(0.92) rotate(4deg)', opacity: 1, offset: 0.22 },
+                { transform: 'scale(1.42) rotate(26deg)', opacity: 0 }
+            ], { duration: 480 + i * 35, delay: i * 35, easing: 'cubic-bezier(0.14,0.88,0.28,1)', fill: 'forwards' });
+        });
+        owner.at(640, () => dropOwnedLayer(owner, gLayer));
+        shake('heavy');
+        owner.burst(38, i => {
+            const ang = (i / 38) * 6.283 + rnd(-0.14, 0.14), spd = rnd(4.2, 11.4);
+            return { x: corePt.x + Math.cos(ang) * 14, y: corePt.y + Math.sin(ang) * 14, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, grav: 0.08, drag: 0.91, decay: rnd(0.038, 0.068), size: rnd(1.8, 3.0), shape: pick(['streak', 'spark']), color: pick(['#fff1f2', '#fca5a5', '#ef4444', '#dc2626']) };
+        });
+        owner.burst(18, () => ({ x: corePt.x + rnd(-26, 26), y: corePt.y + rnd(-12, 18), vx: rnd(-1.4, 1.4), vy: -rnd(1.8, 4.6), drag: 0.94, decay: rnd(0.025, 0.045), size: rnd(3.2, 6.0), shape: 'glowOrb', color: pick(['#991b1b', '#dc2626', '#ef4444']), core: '#fff1f2' }));
+        owner.burst(3, i => ({ x: corePt.x, y: corePt.y, shape: 'gradRing', size: i === 0 ? 2.0 : (i === 1 ? 2.5 : 3.0), decay: 0.056 - i * 0.01, color: i === 0 ? 'rgba(255,241,242,0.95)' : (i === 1 ? 'rgba(239,68,68,0.88)' : 'rgba(153,27,27,0.78)') }));
+        rescueSample(owner, 'taunt', { vol: 0.96, pan: panOf(rect.x) });
+        beat({ phase: 'gritCore', pt: corePt });
+    });
+
+    // 1020~1340ms：血痕渐消，保持 HP=1 站立
+    owner.at(1020, () => {
+        dom.style.borderColor = '';
+        dom.style.boxShadow = '';
+        owner.anim(bloodWrap, [{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: 'ease-out', fill: 'forwards' });
+        beat({ phase: 'recovered' });
+    });
+    return owner;
+}
+
+/* 规避致命：44px 卡内错位 + 215ms 碎散；只播 0ms avoid_dash_perfect 与 150ms hide。 */
+function playRescueAvoidFatal(entity, meta, onBeat) {
+    if (meta && meta.hasPassive === false) return null;
+    const dom = domOf(entity), rect = entityVisualRect(entity);
+    if (!dom || !rect) return null;
+    const id = entity.id || String(entity);
+    const visual = rect.visualDom || dom;
+    const wrap = heroWrapOf(entity);
+    const hitLinePt = { x: rect.x, y: rect.y };
+    const dodgeDir = rect.x < window.innerWidth * 0.5 ? -1 : 1;
+    const dodgePx = dodgeDir * 44;
+    const owner = rescueRun(950, ['avoidFatal:' + id]);
+    const releaseWrap = wrap ? rescueStyle(wrap, ['zIndex']) : null;
+    const releaseVisual = rescueStyle(visual, ['transform']);
+    const releaseGlow = rescueStyle(dom, ['borderColor', 'boxShadow']);
+    if (wrap) wrap.style.zIndex = String(Math.max(44, Number(wrap.style.zIndex) || 0));
+    owner.onClean(() => {
+        releaseGlow();
+        releaseVisual();
+        if (releaseWrap) releaseWrap();
+    });
+    const beat = phase => {
+        if (!onBeat) return;
+        try { onBeat(Object.assign({ entity }, phase)); } catch (_) {}
+    };
+
+    rescueSample(owner, 'avoid_dash_perfect', { vol: 0.9, pan: panOf(rect.x) });
+    owner.at(150, () => rescueSample(owner, 'hide', { vol: 0.9, pan: panOf(rect.x) }));
+
+    // 50ms：生死一瞬大幅侧向错位闪开，原受击线留驻靛银残影
+    owner.at(50, () => {
+        const gLayer = rescueLayer(owner, '', 51, 'avoid-ghost');
+        const ghost = document.createElement('div');
+        ghost.className = 'arcane-rescue-ghost';
+        ghost.style.cssText = `left:${rect.left}px;top:${rect.top}px;width:${rect.w}px;height:${rect.h}px;border:1.5px solid rgba(129,140,248,0.85);box-shadow:0 0 18px rgba(99,102,241,0.52);filter:hue-rotate(195deg) saturate(1.4) brightness(1.18);`;
+        ghost.innerHTML = cloneVisualOnly(dom);
+        ghost.style.fontSize = (parseFloat(getComputedStyle(visual).fontSize) * rect.w / (visual.offsetWidth || rect.w)) + 'px';
+        gLayer.appendChild(ghost);
+        dom.style.borderColor = '#818cf8';
+        dom.style.boxShadow = '0 0 16px rgba(129,140,248,0.45)';
+        owner.anim(visual, [
+            { transform: 'translate3d(0,0,0) rotate(0deg)' },
+            { transform: `translate3d(${dodgePx}px,4px,0) rotate(${dodgeDir * 6.5}deg)`, offset: 0.24 },
+            { transform: `translate3d(${dodgePx * 0.92}px,3px,0) rotate(${dodgeDir * 5}deg)`, offset: 0.62 },
+            { transform: 'translate3d(0,0,0) rotate(0deg)' }
+        ], { duration: 760, easing: 'cubic-bezier(0.16,0.9,0.28,1)', fill: 'forwards' });
+        owner.anim(ghost, [
+            { transform: 'scale(1)', opacity: 0.78 },
+            { transform: 'scale(1.03)', opacity: 0.64, offset: 0.35 },
+            { transform: `translate3d(${-dodgeDir * 12}px,-4px,0) scale(1.1)`, opacity: 0 }
+        ], { duration: 520, easing: 'ease-out', fill: 'forwards' });
+        owner.at(540, () => dropOwnedLayer(owner, gLayer));
+    });
+
+    // 215ms：原受击线碎散（不另播来袭刀光/来袭音）
+    owner.at(215, () => {
+        const cLayer = rescueLayer(owner, `<div class="arcane-rescue-anchor" style="left:${hitLinePt.x}px;top:${hitLinePt.y}px;width:94px;height:94px;"><svg viewBox="-47 -47 94 94" class="w-full h-full"><polygon points="-42,0 -5,-3 0,-36 5,-3 42,0 5,3 0,36 -5,3" fill="#e0e7ff" opacity="0.92"/></svg></div>`, 58, 'avoid-shatter');
+        owner.anim(cLayer.firstElementChild, [{ transform: 'translate(-50%,-50%) scale(0.3) rotate(12deg)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1.18) rotate(32deg)', opacity: 0 }], { duration: 260, easing: 'ease-out', fill: 'forwards' });
+        owner.at(270, () => dropOwnedLayer(owner, cLayer));
+        owner.burst(20, () => {
+            const a = rnd(0, 6.283), s = rnd(2.2, 6.4);
+            return { x: hitLinePt.x + rnd(-10, 10), y: hitLinePt.y + rnd(-12, 12), vx: Math.cos(a) * s, vy: Math.sin(a) * s, drag: 0.91, decay: rnd(0.045, 0.075), size: rnd(1.8, 3.2), shape: 'glowOrb', color: pick(['#818cf8', '#a5b4fc', '#38bdf8']), core: '#f8fafc' };
+        });
+        beat({ phase: 'avoided', pt: hitLinePt });
+    });
+
+    owner.at(780, () => {
+        dom.style.borderColor = '';
+        dom.style.boxShadow = '';
+        beat({ phase: 'reset' });
+    });
+    return owner;
+}
+/* ===== 救援时刻 v12.10 END ===== */
+
     function clearArcaneFx() {
+        clearStatusLayers(); clearSelfDestructState(); clearRescueState();
         clearHitFeedback();
         identityAudioStoppers.forEach(stop => stop()); identityAudioStoppers.clear();
         S.timers.forEach(id => clearTimeout(id)); S.timers.clear();
@@ -10297,7 +12113,8 @@ const arcaneVfxModule = (function () {
     window.isEntityVariantLocked = isEntityVariantLocked;
     window.clearVariantState = clearVariantState;
     window.setVariantSfx = setVariantSfx;
-    return { isArcaneSkillFx, playArcaneSkillFx, playArcaneProjectile, clearArcaneFx, playEnemyWindup, playAttackIdentityFx, playHitFeedback, playCounterAttackL1, classifyHit, clearHitFeedback, syncHitBar, playWoundedHint, setIdentitySfx, CombatAudioDirector, playVariantTriggerFx, isEntityVariantLocked, clearVariantState, setVariantSfx, syncVariantState };
+    Object.assign(window, statusFxApi, { playStatusTickFx, syncStatusLayers, clearStatusLayers, setStatusSfx, setSelfDestructWarning, syncSelfDestructWarning, clearSelfDestructWarning, clearAllSelfDestructWarnings, clearSelfDestructState, setSelfDestructSfx, playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, playRescueSheshen, playRescueGrit, playRescueAvoidFatal, clearRescueState });
+    return { isArcaneSkillFx, playArcaneSkillFx, playArcaneProjectile, clearArcaneFx, playEnemyWindup, playAttackIdentityFx, playHitFeedback, playCounterAttackL1, classifyHit, clearHitFeedback, syncHitBar, playWoundedHint, setIdentitySfx, CombatAudioDirector, playVariantTriggerFx, isEntityVariantLocked, clearVariantState, setVariantSfx, syncVariantState, ...statusFxApi, playVariantResistFx, playStatusTickFx, syncStatusLayers, clearStatusLayers, setStatusSfx, setSelfDestructWarning, syncSelfDestructWarning, clearSelfDestructWarning, clearAllSelfDestructWarnings, clearSelfDestructState, setSelfDestructSfx, playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, playRescueSheshen, playRescueGrit, playRescueAvoidFatal, clearRescueState };
 
 })();
 
@@ -16415,7 +18232,8 @@ function createCompactBarHTML(id, type, label, val, max, colorClass, isTp = fals
 }
 
 function updateBuffUI(entity) {
-  const buffContainer = document.getElementById(`${entity.id}-buffs`); if (!buffContainer) return;
+  const buffContainer = document.getElementById(`${entity.id}-buffs`);
+  if (!buffContainer) { arcaneVfxModule.syncStatusLayers(entity); return; }
   let totalAtk = 0; let maxAtkDur = 0; let totalDef = 0; let maxDefDur = 0;
   let totalTaunt = 0;
   let totalHit = entity.hitBonus || 0; 
@@ -16440,33 +18258,35 @@ function updateBuffUI(entity) {
       if(b.type === 'spd') { totalSpd += b.value; maxSpdDur = Math.max(maxSpdDur, b.duration); }
   });
   
+  const expiring = type => (entity.buffs || []).some(b => !b.permanent && b.duration > 0 && b.duration <= 1 &&
+      (type === 'concealAtk' ? b.isConcealAtk : type === 'atk' ? b.type === 'atk' && !b.isConcealAtk : type === 'eva' ? b.type === 'eva' || b.type === 'paralyze' : b.type === type));
   let html = '';
   // 显示嘲讽值（包含 baseTauntBonus 的永久调整）
   const baseTauntAdj = entity.baseTauntBonus || 0;
   const displayTaunt = totalTaunt + baseTauntAdj; // totalTaunt 来自临时buff，baseTauntAdj 是永久修正
-  if (displayTaunt > 0 || baseTauntAdj > 0) html += `<div class="text-red-200 text-[8px] sm:text-[10px] bg-red-900/80 border border-red-500/50 px-1 rounded backdrop-blur font-mono shadow-md animate-pulse">💢仇恨${displayTaunt >= 0 ? '+' : ''}${displayTaunt}</div>`;
-  else if (displayTaunt < 0 || baseTauntAdj < 0) html += `<div class="text-gray-400 text-[8px] sm:text-[10px] bg-gray-900/80 border border-gray-500/50 px-1 rounded backdrop-blur font-mono shadow-md">🌫️隐匿${displayTaunt}</div>`;
+  if (displayTaunt > 0 || baseTauntAdj > 0) html += `<div data-buff-type="taunt" class="${expiring('taunt') ? 'arcane-status-badge-expiring ' : ''}text-red-200 text-[8px] sm:text-[10px] bg-red-900/80 border border-red-500/50 px-1 rounded backdrop-blur font-mono shadow-md ${expiring('taunt') ? '' : 'animate-pulse'}">💢仇恨${displayTaunt >= 0 ? '+' : ''}${displayTaunt}</div>`;
+  else if (displayTaunt < 0 || baseTauntAdj < 0) html += `<div data-buff-type="taunt" class="${expiring('taunt') ? 'arcane-status-badge-expiring ' : ''}text-gray-400 text-[8px] sm:text-[10px] bg-gray-900/80 border border-gray-500/50 px-1 rounded backdrop-blur font-mono shadow-md">🌫️隐匿${displayTaunt}</div>`;
 
   if (entity.isDefending) html += `<div class="text-emerald-300 text-[8px] sm:text-[10px] bg-black/70 border border-emerald-900/50 px-1 rounded backdrop-blur font-mono shadow-md animate-pulse">🛡️防卫</div>`;
-  if (isCountering) html += `<div class="text-amber-300 text-[8px] sm:text-[10px] bg-amber-900/80 border border-amber-500/50 px-1 rounded backdrop-blur font-mono shadow-md">⚔️反击+${counterPower}</div>`;
+  if (isCountering) html += `<div data-buff-type="counter" class="${expiring('counter') ? 'arcane-status-badge-expiring ' : ''}text-amber-300 text-[8px] sm:text-[10px] bg-amber-900/80 border border-amber-500/50 px-1 rounded backdrop-blur font-mono shadow-md">⚔️反击+${counterPower}</div>`;
   
-  if (totalHit > 0) html += `<div class="text-yellow-300 text-[8px] sm:text-[10px] bg-black/70 border border-yellow-900/50 px-1 rounded backdrop-blur font-mono shadow-md">🎯+${totalHit}%</div>`;
-  else if (totalHit < 0) html += `<div class="text-purple-400 text-[8px] sm:text-[10px] bg-black/70 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">🌫️${totalHit}%</div>`;
+  if (totalHit > 0) html += `<div data-buff-type="hit" class="${expiring('hit') ? 'arcane-status-badge-expiring ' : ''}text-yellow-300 text-[8px] sm:text-[10px] bg-black/70 border border-yellow-900/50 px-1 rounded backdrop-blur font-mono shadow-md">🎯+${totalHit}%</div>`;
+  else if (totalHit < 0) html += `<div data-buff-type="hit" class="${expiring('hit') ? 'arcane-status-badge-expiring ' : ''}text-purple-400 text-[8px] sm:text-[10px] bg-black/70 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">🌫️${totalHit}%</div>`;
   
-  if (totalEva > 0) html += `<div class="text-teal-300 text-[8px] sm:text-[10px] bg-black/70 border border-teal-900/50 px-1 rounded backdrop-blur font-mono shadow-md">💨避+${totalEva}</div>`;
-  else if (totalEva < 0) html += `<div class="text-purple-400 text-[8px] sm:text-[10px] bg-black/70 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">💨避${totalEva}</div>`;
-  if (totalSpd > 0) html += `<div class="text-cyan-300 text-[8px] sm:text-[10px] bg-black/70 border border-cyan-800/60 px-1 rounded backdrop-blur font-mono shadow-md">⚡速+${totalSpd}·${maxSpdDur}回</div>`;
-  else if (totalSpd < 0) html += `<div class="text-purple-400 text-[8px] sm:text-[10px] bg-black/70 border border-purple-800/60 px-1 rounded backdrop-blur font-mono shadow-md">🐌速${totalSpd}·${maxSpdDur}回</div>`;
-  if (totalPoison > 0) html += `<div class="text-purple-400 text-[8px] sm:text-[10px] bg-black/60 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">☠️毒${totalPoison}·${maxPoisonDur}回</div>`;
-  if (burnPower > 0) html += `<div class="text-orange-400 text-[8px] sm:text-[10px] bg-black/60 border border-orange-600/50 px-1 rounded backdrop-blur font-mono shadow-md">🔥燃${burnPower}·${burnDur}回</div>`;
-  if (paraLayers > 0) html += `<div class="text-yellow-300 text-[8px] sm:text-[10px] bg-black/60 border border-yellow-500/50 px-1 rounded backdrop-blur font-mono shadow-md">⚡麻${paraLayers}层·${Math.min(20, paraLayers * 5)}%·${maxParaDur}回</div>`;
-  if (oneTimeGuard > 0) html += `<div class="text-sky-300 text-[8px] sm:text-[10px] bg-black/70 border border-sky-500/50 px-1 rounded backdrop-blur font-mono shadow-md animate-pulse">🛡️免伤+${oneTimeGuard} 1次</div>`;
-  if (concealAtk > 0) html += `<div class="text-orange-400 text-[8px] sm:text-[10px] bg-black/70 border border-orange-500/50 px-1 rounded backdrop-blur font-mono shadow-md animate-pulse">🎯隐匿急袭+${concealAtk} 1次</div>`;
+  if (totalEva > 0) html += `<div data-buff-type="eva" class="${expiring('eva') ? 'arcane-status-badge-expiring ' : ''}text-teal-300 text-[8px] sm:text-[10px] bg-black/70 border border-teal-900/50 px-1 rounded backdrop-blur font-mono shadow-md">💨避+${totalEva}</div>`;
+  else if (totalEva < 0) html += `<div data-buff-type="eva" class="${expiring('eva') ? 'arcane-status-badge-expiring ' : ''}text-purple-400 text-[8px] sm:text-[10px] bg-black/70 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">💨避${totalEva}</div>`;
+  if (totalSpd > 0) html += `<div data-buff-type="spd" class="${expiring('spd') ? 'arcane-status-badge-expiring ' : ''}text-cyan-300 text-[8px] sm:text-[10px] bg-black/70 border border-cyan-800/60 px-1 rounded backdrop-blur font-mono shadow-md">⚡速+${totalSpd}·${maxSpdDur}回</div>`;
+  else if (totalSpd < 0) html += `<div data-buff-type="spd" class="${expiring('spd') ? 'arcane-status-badge-expiring ' : ''}text-purple-400 text-[8px] sm:text-[10px] bg-black/70 border border-purple-800/60 px-1 rounded backdrop-blur font-mono shadow-md">🐌速${totalSpd}·${maxSpdDur}回</div>`;
+  if (totalPoison > 0) html += `<div data-buff-type="poison" class="${expiring('poison') ? 'arcane-status-badge-expiring ' : ''}text-purple-400 text-[8px] sm:text-[10px] bg-black/60 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">☠️毒${totalPoison}·${maxPoisonDur}回</div>`;
+  if (burnPower > 0) html += `<div data-buff-type="burn" class="${expiring('burn') ? 'arcane-status-badge-expiring ' : ''}text-orange-400 text-[8px] sm:text-[10px] bg-black/60 border border-orange-600/50 px-1 rounded backdrop-blur font-mono shadow-md">🔥燃${burnPower}·${burnDur}回</div>`;
+  if (paraLayers > 0) html += `<div data-buff-type="paralyze" class="${expiring('paralyze') ? 'arcane-status-badge-expiring ' : ''}text-yellow-300 text-[8px] sm:text-[10px] bg-black/60 border border-yellow-500/50 px-1 rounded backdrop-blur font-mono shadow-md">⚡麻${paraLayers}层·${Math.min(20, paraLayers * 5)}%·${maxParaDur}回</div>`;
+  if (oneTimeGuard > 0) html += `<div data-buff-type="damageGuard" class="${expiring('damageGuard') ? 'arcane-status-badge-expiring ' : ''}text-sky-300 text-[8px] sm:text-[10px] bg-black/70 border border-sky-500/50 px-1 rounded backdrop-blur font-mono shadow-md ${expiring('damageGuard') ? '' : 'animate-pulse'}">🛡️免伤+${oneTimeGuard} 1次</div>`;
+  if (concealAtk > 0) html += `<div data-buff-type="concealAtk" class="${expiring('concealAtk') ? 'arcane-status-badge-expiring ' : ''}text-orange-400 text-[8px] sm:text-[10px] bg-black/70 border border-orange-500/50 px-1 rounded backdrop-blur font-mono shadow-md ${expiring('concealAtk') ? '' : 'animate-pulse'}">🎯隐匿急袭+${concealAtk} 1次</div>`;
   
-  if (totalAtk > 0) html += `<div class="text-orange-400 text-[8px] sm:text-[10px] bg-black/60 border border-orange-900/50 px-1 rounded backdrop-blur font-mono shadow-md">⚔️+${totalAtk}</div>`;
-  else if (totalAtk < 0) html += `<div class="text-purple-400 text-[8px] sm:text-[10px] bg-black/60 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">⚔️${totalAtk}</div>`;
-  if (totalDef > 0) html += `<div class="text-blue-400 text-[8px] sm:text-[10px] bg-black/60 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">🛡️+${totalDef}</div>`;
-  else if (totalDef < 0) html += `<div class="text-purple-400 text-[8px] sm:text-[10px] bg-black/60 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">🛡️${totalDef}</div>`;
+  if (totalAtk > 0) html += `<div data-buff-type="atk" class="${expiring('atk') ? 'arcane-status-badge-expiring ' : ''}text-orange-400 text-[8px] sm:text-[10px] bg-black/60 border border-orange-900/50 px-1 rounded backdrop-blur font-mono shadow-md">⚔️+${totalAtk}</div>`;
+  else if (totalAtk < 0) html += `<div data-buff-type="atk" class="${expiring('atk') ? 'arcane-status-badge-expiring ' : ''}text-purple-400 text-[8px] sm:text-[10px] bg-black/60 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">⚔️${totalAtk}</div>`;
+  if (totalDef > 0) html += `<div data-buff-type="def" class="${expiring('def') ? 'arcane-status-badge-expiring ' : ''}text-blue-400 text-[8px] sm:text-[10px] bg-black/60 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">🛡️+${totalDef}</div>`;
+  else if (totalDef < 0) html += `<div data-buff-type="def" class="${expiring('def') ? 'arcane-status-badge-expiring ' : ''}text-purple-400 text-[8px] sm:text-[10px] bg-black/60 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">🛡️${totalDef}</div>`;
   
   // === 职业先天被动 UI 徽章（狂战士浴血/死斗、风行者 TP 闪避）===
   if (entity.classType === '狂战士') {
@@ -16497,6 +18317,7 @@ function updateBuffUI(entity) {
   buffContainer.innerHTML = html;
   // 眩晕星环显隐联动（不灰化，仅头顶星环+微晃）
   updateStunVisual(entity);
+  arcaneVfxModule.syncStatusLayers(entity);
 }
 
 function updateStunVisual(entity) {
@@ -16824,6 +18645,9 @@ function updateHeroUI(hero) {
       if (hero.isSummon) { resolveSummonDeath(hero, getEntitySpriteDom(hero)); return; }
       hero.isAlive = false; hero.shield = 0; hero.buffs = []; hero.isDefending = false; hero.hitBonus = 0; hero.evaBonus = 0; hero.burstActivated = false;
       clearVariantState(hero.id);
+      arcaneVfxModule.clearStatusLayers(hero.id);
+      arcaneVfxModule.clearSelfDestructWarning(hero.id);
+      arcaneVfxModule.clearRescueState(hero.id);
       hero.dom.classList.add('opacity-40', 'grayscale'); 
       if(cardInner) cardInner.classList.remove('ring-2', 'ring-yellow-400', 'scale-105'); 
       document.getElementById(`${hero.id}-status`).classList.remove('hidden'); 
@@ -16859,6 +18683,10 @@ function tryReviveEnemy(enemy, dom) {
     arcaneVfxModule.syncHitBar(enemy.id, enemy.hp, enemy.maxHp, true);
     if (dom) createFloatingText(dom, '死里逃生!', 'text-emerald-300');
     clearVariantState(enemy.id);
+    arcaneVfxModule.clearStatusLayers(enemy.id);
+    arcaneVfxModule.clearSelfDestructWarning(enemy.id);
+    arcaneVfxModule.clearSelfDestructState(enemy.id);
+    arcaneVfxModule.clearRescueState(enemy.id);
     playVariantTriggerFx({ trigger: 'revive', enemyId: enemy.id, meta: { healTo: enemy.hp } });
     addHistory(`   ↳ 💀 [${enemy.name}] 遭受致命一击倒地……却强行撑住一口气猛地站起（死里逃生）！恢复了 ${Math.floor(enemy.maxHp * 0.3)}/${enemy.maxHp} 点生命重返战场！`);
     return true;
@@ -16873,11 +18701,17 @@ function resolveSummonDeath(entity, spriteDom, skipRevive) {
     const isHeroSide = entity.side === 'hero';
     entity.isAlive = false; entity.shield = 0; entity.buffs = [];
     clearVariantState(entity.id);
+    arcaneVfxModule.clearStatusLayers(entity.id);
+    arcaneVfxModule.clearSelfDestructWarning(entity.id);
+    arcaneVfxModule.clearRescueState(entity.id);
+    if (entity.explode) entity.selfDestructDom = spriteDom || getEntitySpriteDom(entity);
     triggerEnemySelfDestruct(entity);                                    // [自爆] 继承：真正死亡后结算（自带 .explode 守卫，异步排队）
     const arr = isHeroSide ? heroesData : enemiesData;
     const idx = arr.indexOf(entity);
     if (idx !== -1) arr.splice(idx, 1);
-    if (isHeroSide) {
+    if (entity.explode) {
+        if (spriteDom) spriteDom.classList.remove('breathe');
+    } else if (isHeroSide) {
         if (entity.dom && entity.dom.parentNode) entity.dom.remove();
         else { const wrap = document.getElementById(`hero-wrap-${entity.id}`); if (wrap) wrap.remove(); }
     } else {
@@ -16932,7 +18766,8 @@ async function doEnemySelfDestruct(enemy) {
     if (!boom) return;
     const _sdToken = combatToken; // 本任务所属代际：前摇/看破等待期间发生重置则终止
     const subLabel = boom.type;
-    const spriteDom = enemy.id ? document.getElementById(`${enemy.id}-sprite`) : null;
+    const spriteDom = enemy.selfDestructDom || getEntitySpriteDom(enemy);
+    let windup = null;
 
     // 构造合成技能：纯群攻/纯群减益，零消耗（已死敌人不能再扣自身资源）。
     // 群火→[群燃烧]、群毒→[群中毒] 走纯减益路径（逐目标闪避，闪避成功连状态也不中）；群穿→[群穿透] 无视防御。
@@ -16946,43 +18781,27 @@ async function doEnemySelfDestruct(enemy) {
         guaranteedHit: false, isReaction: false, isSelfDestruct: true, skipKanpoWindow: true
     };
 
-    // 前摇预警：自爆敌人死亡时保留尸体（见 updateEnemyUI 死亡分支），此处复用敌方攻击预警红色轮廓光晕
-    // （enemy-omen）+ 专属预警音效 + 飘字，让玩家看清是哪个敌人即将自爆
+    // 聚能窗口等待看破，只有明确放行后才进入临界与真实逐目标结算。
     if (spriteDom) {
         spriteDom.style.display = '';
-        spriteDom.classList.remove('opacity-0', 'scale-50', 'breathe');
-        spriteDom.classList.add('enemy-omen');
+        spriteDom.classList.remove('opacity-0','scale-50','breathe');
         if (window.playSound) playSound('monsterAttack', 1, 1, { track:'skill', category:'L' });
         createFloatingText(spriteDom, '💥 绝命反扑!', 'text-red-400');
     }
     addHistory(`   ⚠️ [${enemy.name}] 濒死之际体内残存力量狂暴失控——绝命反扑前兆！`);
-    await sleep(600); if (_actionToken !== combatToken || _pipelineFrozen) return; // 前摇时长与 enemy-omen 动画（600ms）对齐
-    if (_sdToken !== combatToken) return; // 前摇期间被重置：终止过期自爆
-
-    // === 看破判定前置于爆炸演出之前：被看破则本次自爆被彻底无效化（无爆炸、无伤害），避免"先爆炸再看破"的演出矛盾 ===
-    // 复用现役 checkKanpoInterrupt（index.html:6455，BEFORE_SKILL_RESOLVE 订阅的同一函数）——扣费/[限N次]/旁白/演出全复用
-    const kanpoCtx = { caster: enemy, skill: boomSkill, target: null, cancelled: false };
-    await checkKanpoInterrupt(kanpoCtx); if (_actionToken !== combatToken || _pipelineFrozen) return;
-    if (_sdToken !== combatToken) return; // 看破弹窗等待期间被重置：终止过期自爆
-    if (kanpoCtx.cancelled) {
-        addHistory(`   ⛔ [${enemy.name}] 的绝命反扑（${subLabel}）被看破破局，完全无效化！`);
-        // 看破成功：无爆炸演出，直接收尾隐藏尸体
-        if (spriteDom) {
-            spriteDom.classList.remove('enemy-omen');
-            spriteDom.classList.add('opacity-0', 'scale-50');
-            setTimeout(() => { if (_actionToken !== combatToken) return;  if (spriteDom) spriteDom.style.display = 'none'; if (enemy.dom) enemy.dom.style.display = 'none'; }, 500);
+    windup = arcaneVfxModule.playSelfDestructWindup(enemy,{ form:boom.type });
+    if (windup && !(await windup.ready)) return;
+    if (_actionToken !== combatToken || _pipelineFrozen) return;
+    const kanpoCtx = { caster:enemy,skill:boomSkill,target:null,cancelled:false };
+    try {
+        await checkKanpoInterrupt(kanpoCtx);
+        if (_sdToken !== combatToken || _pipelineFrozen) return;
+        if (kanpoCtx.cancelled) {
+            addHistory(`   ⛔ [${enemy.name}] 的绝命反扑（${subLabel}）被看破破局，完全无效化！`);
+            if (windup) { windup.interrupt('kanpo'); await windup.done; }
+            return;
         }
-        return;
-    }
-
-    // 演出：爆炸粒子 + 震屏 + 音效（以敌人当前位置为中心）
-    const center = (spriteDom && spriteDom.getBoundingClientRect().width > 0) ? getDomCenter(spriteDom) : null;
-    if (center) {
-        spawnExplosionParticles(center.x, center.y, 1.4);
-        const scene = document.getElementById('battle-scene');
-        if (scene) { scene.classList.add('shake'); setTimeout(() => scene.classList.remove('shake'), 500); }
-    }
-    if (window.playSound) playSound('kill', 1, 1, { category:'M' });
+        boomSkill._selfDestructWindup = windup;
     if (boom.type === '群火') {
         addHistory(`   🔥 [${enemy.name}] 倒地之际狂暴烈焰/易燃物质爆燃，灼热火浪席卷全场！（施加灼烧，持续 3 回合）`);
     } else if (boom.type === '群毒') {
@@ -16994,11 +18813,17 @@ async function doEnemySelfDestruct(enemy) {
     }
 
     await executeSkillAction(enemy, null, boomSkill, 1); if (_actionToken !== combatToken || _pipelineFrozen) return;
-    // 收尾：自爆结算完成后隐藏尸体（前摇期间保留可见）
-    if (spriteDom) {
-        spriteDom.classList.remove('enemy-omen');
-        spriteDom.classList.add('opacity-0', 'scale-50');
-        setTimeout(() => { if (_actionToken !== combatToken) return;  if (spriteDom) spriteDom.style.display = 'none'; if (enemy.dom) enemy.dom.style.display = 'none'; }, 500);
+    } finally {
+        if (windup) windup.cancel();
+        if (_sdToken === combatToken) {
+            if (spriteDom) { spriteDom.style.visibility = 'hidden'; spriteDom.style.display = 'none'; }
+            if (enemy.dom) enemy.dom.style.display = 'none';
+            if (enemy.isSummon) {
+                const box = spriteDom && spriteDom.closest('[id^="enemy-box-"],[id^="hero-wrap-"]') || enemy.dom;
+                if (box) box.remove();
+            }
+            delete enemy.selfDestructDom;
+        }
     }
 }
 
@@ -17023,6 +18848,7 @@ function updateEnemyUI(enemy) {
   arcaneVfxModule.syncHitBar(enemy.id, enemy.hp, enemy.maxHp);
   updateBuffUI(enemy);
   arcaneVfxModule.syncVariantState(enemy);
+  arcaneVfxModule.syncSelfDestructWarning(enemy);
   
   // FGO 充能格子动态计算与渲染
   const chargeSkill = enemy.skills.find(s => s.charge > 0);
@@ -17088,6 +18914,9 @@ function updateEnemyUI(enemy) {
       tryTriggerEnemyDeathSpeak(enemy);
       enemy.isAlive = false; enemy.shield = 0; enemy.buffs = []; enemy.isDefending = false; enemy.hitBonus = 0; enemy.evaBonus = 0;
       clearVariantState(enemy.id);
+      arcaneVfxModule.clearStatusLayers(enemy.id);
+      arcaneVfxModule.clearSelfDestructWarning(enemy.id);
+      arcaneVfxModule.clearRescueState(enemy.id);
       // 【自爆】真正死亡后触发自爆（isAlive 置 false 之后接线，异步入队不会与本分支重复触发；[复活] 拦截成功早已 return）
       triggerEnemySelfDestruct(enemy);
       // 自爆敌人保留尸体供前摇演出（doEnemySelfDestruct 前摇/爆炸结算后收尾隐藏）；普通敌人立即播放消失演出
@@ -17174,6 +19003,7 @@ registerTagHandler('中毒', (ctx) => {
     if (ctx.target && ctx.target.immunePoison) {
         if (ctx.targetDom) createFloatingText(ctx.targetDom, '免疫·毒', 'text-lime-300');
         addHistory(`   ↳ 🧪 [${ctx.target.name}] 具备毒素抗性/耐受体质，免疫了剧毒侵蚀！`);
+        playVariantImmunity(ctx.target,'poisonproof',ctx.caster,ctx.skill,ctx.tag);
         return;
     }
     playSound('defDown'); playSVGEffect(ctx.targetDom, 'debuff');
@@ -17190,6 +19020,7 @@ registerTagHandler('燃烧', (ctx) => {
     if (ctx.target && ctx.target.immuneBurn) {
         if (ctx.targetDom) createFloatingText(ctx.targetDom, '免疫·燃', 'text-orange-300');
         addHistory(`   ↳ 🔥 [${ctx.target.name}] 耐火防护/抗热体质阻绝了烈焰，免疫了灼烧！`);
+        playVariantImmunity(ctx.target,'fireproof',ctx.caster,ctx.skill,ctx.tag);
         return;
     }
     playSound('defDown'); playSVGEffect(ctx.targetDom, 'debuff');
@@ -17392,6 +19223,7 @@ registerTagHandler('回', (ctx) => {
     const oldHp = ctx.target.hp;
     // 【燃烧】灼烧禁疗：燃烧期间目标受到的 HP 治疗/回复效果减半
     const isBurning = (ctx.target.buffs || []).some(b => b.type === 'burn');
+    if (isBurning) arcaneVfxModule.playStatusTickFx({ event:'healSuppressed',entity:ctx.target });
     const healAmount = isBurning ? Math.floor(ctx.actualPower / 2) : ctx.actualPower;
     ctx.target.hp = Math.min(ctx.target.maxHp, ctx.target.hp + healAmount);
     const healCtx = { caster: ctx.caster, target: ctx.target, targetDom: ctx.targetDom, oldHp, actualPower: healAmount, extraText: isBurning ? '（🔥燃烧下愈合受阻，治疗减半）' : '' };
@@ -17474,6 +19306,10 @@ function subdueEnemy(target, targetDom) {
     if (!target || target.isSubdued) return;
     target.isSubdued = true;
     clearVariantState(target.id);
+    arcaneVfxModule.clearStatusLayers(target.id);
+    arcaneVfxModule.clearSelfDestructWarning(target.id);
+    arcaneVfxModule.clearSelfDestructState(target.id);
+    arcaneVfxModule.clearRescueState(target.id);
     target.buffs = target.buffs || [];
     target.buffs.push({ type: 'stun', value: 1, duration: 9999, permanent: true });
     if (targetDom) createFloatingText(targetDom, '⛓️ 制服!', 'text-amber-300');
@@ -17508,6 +19344,7 @@ function resolveNonLethalLethal(target, hpDmg, interceptor) {
         addHistory(`   ⚔️ 敏捷对抗——${interceptor ? `${interceptor.name}（敏捷 ${iSpd}）掷出 ${iRoll}` : '我方已无人在场'}，濒死的 ${target.name}（敏捷 ${tSpd}）掷出 ${tRoll}！`);
         if (iRoll > tRoll) {
             subdueEnemy(target, _dom);
+            arcaneVfxModule.playSelfDestructInterrupt(target,'subdued',{ form:target.explode.type });
             if (_dom) createFloatingText(_dom, '🛑 自爆被阻止!', 'text-amber-300');
             addHistory(`   ✋ ${interceptor.name} 抢在最后关头按住了 ${target.name} 的绝命反扑并将其制服——自爆被成功阻止！`);
             return Math.max(0, target.hp - 1);
@@ -17611,9 +19448,9 @@ registerClassPassive('防守者', {
             ctx.target.hasTriggeredGrit = true;
             ctx.hpDmg = ctx.target.hp - 1;
             ctx.prevented = true;
+            arcaneVfxModule.playRescueGrit(ctx.target);
             setTimeout(() => {
                 if (ctx.targetDom) createFloatingText(ctx.targetDom, '毅力留存!', 'text-yellow-400');
-                if (window.playSound) playSound('taunt');
             }, 300);
             addHistory(`   ↳ 🛡️ ${ctx.target.name} 触发被动【毅力】，强制保留了 1 点生命值避免死亡！`);
             return true;
@@ -17693,9 +19530,9 @@ registerClassPassive('狂战士', {
             ctx.target.hasTriggeredGrit = true;
             ctx.hpDmg = ctx.target.hp - 1;
             ctx.prevented = true;
+            arcaneVfxModule.playRescueGrit(ctx.target);
             setTimeout(() => {
                 if (ctx.targetDom) createFloatingText(ctx.targetDom, '毅力留存!', 'text-yellow-400');
-                if (window.playSound) playSound('taunt');
             }, 300);
             addHistory(`   ↳ 🛡️ ${ctx.target.name} 触发被动【毅力】，强制保留了 1 点生命值避免死亡！`);
             return true;
@@ -17729,9 +19566,9 @@ registerClassPassive('风行者', {
             ctx.hpDmg = 0;
             ctx.shieldDmg = 0;
             ctx.prevented = true;
+            arcaneVfxModule.playRescueAvoidFatal(ctx.target);
             setTimeout(() => {
                 if (ctx.targetDom) createFloatingText(ctx.targetDom, '回避致命!', 'text-indigo-400');
-                if (window.playSound) playSound('miss', 1, 1, { category:'H' });
             }, 300);
             addHistory(`   ↳ 👤 ${ctx.target.name} 触发被动【回避】，在致命伤害临身的一瞬闪避，完美免除本次伤害！`);
             return true;
@@ -17802,9 +19639,9 @@ registerClassPassive('隐匿者', {
             ctx.hpDmg = 0;
             ctx.shieldDmg = 0;
             ctx.prevented = true;
+            arcaneVfxModule.playRescueAvoidFatal(ctx.target);
             setTimeout(() => {
                 if (ctx.targetDom) createFloatingText(ctx.targetDom, '回避致命!', 'text-indigo-400');
-                if (window.playSound) playSound('miss', 1, 1, { category:'H' });
             }, 300);
             addHistory(`   ↳ 👤 ${ctx.target.name} 触发被动【回避】，在致命伤害临身的一瞬闪避，完美免除本次伤害！`);
             return true;
@@ -17829,6 +19666,7 @@ registerClassPassive('隐匿者', {
                 if (target.tags && target.tags.includes('[钢体]')) {
                     if (targetDom) createFloatingText(targetDom, '免疫·眩晕', 'text-yellow-300');
                     addHistory(`   ↳ ⛓️ [${target.name}] 强韧意志/抗震结构硬抗了暗袭，免疫了眩晕！`);
+                    playVariantImmunity(target,'ironBody',caster,null,null,true);
                     return;
                 }
                 target.buffs = target.buffs || [];
@@ -17909,6 +19747,7 @@ const corruptorPassive = {
             if (target.immunePoison || (target.tags && target.tags.includes('[耐毒]'))) {
                 if (targetDom) createFloatingText(targetDom, '免疫·毒', 'text-lime-300');
                 addHistory(`   ↳ 🧪 [${target.name}] 具备毒素抗性/耐受体质，免疫了淬毒！`);
+                playVariantImmunity(target,'poisonproof',caster,null,null,true);
                 return;
             }
             const cStats = getEffectiveStats(caster);
@@ -18138,6 +19977,12 @@ CombatEvents.on(EVENTS.BUFF_EXPIRED, (ctx) => {
     if (ctx.entity.classType !== '隐匿者') return;
     const p = CLASS_PASSIVES['隐匿者'];
     if (p && p.checkStealthThresholds) p.checkStealthThresholds(ctx.entity);
+});
+
+// 状态到期仅反馈，不改既有职业订阅与状态衰减。
+CombatEvents.on(EVENTS.BUFF_EXPIRED, ctx => {
+    if (ctx.entity && ctx.entity.isAlive && ctx.entity.hp > 0 && !ctx.entity.isSubdued)
+        arcaneVfxModule.playStatusTickFx({ event:'expire',entity:ctx.entity,meta:{ expiredType:ctx.buff.type } });
 });
 
 // 灾厄使/施毒者：伤害后淬毒 (priority=5)
@@ -19015,7 +20860,19 @@ function wouldSegmentClearHp(caster, target, targetType, rawDamage, tag, skill, 
 // 作用于折算前的原始伤害（与屏障克制同型独立减伤系数）；【穿透】无视的是护甲、仍吃此属性减伤。
 // target 无 resistMap（英雄/无标签敌人）时原样返回。dom 用于减伤飘字（可省略）。
 // damageType 与 isAoE 分别命中对应抗性并顺序相乘；反击等单体场景传 isAoE=false。
-function applyEnemyTypeResist(rawDmg, damageType, target, dom, isAoE = false, silent = false) {
+function resistSpellColor(skill, tag) {
+    const text = [skill && skill.fxTag,skill && skill.type,skill && skill.type2,skill && skill.type3,tag].filter(Boolean).join(' ');
+    if (/火焰|燃烧|火浪|群火/.test(text)) return '#fb923c';
+    if (/雷|麻痹/.test(text)) return '#fde047';
+    if (/冰|霜/.test(text)) return '#7dd3fc';
+    return '#c084fc';
+}
+function playVariantImmunity(entity, kind, from, skill, tag, afterHit = false) {
+    const damageAttached = afterHit || !!(skill && [skill.type,skill.type2,skill.type3].some(t => t && /攻|单体|穿透|眩晕|散射/.test(t)));
+    return arcaneVfxModule.playVariantResistFx({ entity,layers:[kind],from,meta:{ delayMs:damageAttached ? 70 : 0,spellColor:resistSpellColor(skill,tag) } });
+}
+
+function applyEnemyTypeResist(rawDmg, damageType, target, dom, isAoE = false, silent = false, visual = null) {
     if (!target || !target.resistMap || !(rawDmg > 0)) return rawDmg;
     let dmg = rawDmg;
     const hits = [];
@@ -19024,7 +20881,11 @@ function applyEnemyTypeResist(rawDmg, damageType, target, dom, isAoE = false, si
     if (isAoE && target.resistMap['AoE']) { dmg = Math.max(1, Math.floor(dmg * target.resistMap['AoE'])); hits.push('要害'); }
     if (hits.length && dmg < rawDmg) {
         if (dom && !silent) createFloatingText(dom, `-${rawDmg - dmg} 抗性`, 'text-sky-300');
-        if (!silent) addHistory(`   ↳ 🛡️ ${target.name} 的【${hits.join('】【')}】抗性使伤害减少了 ${rawDmg - dmg} 点。`);
+        if (!silent) {
+            addHistory(`   ↳ 🛡️ ${target.name} 的【${hits.join('】【')}】抗性使伤害减少了 ${rawDmg - dmg} 点。`);
+            if (dom) arcaneVfxModule.playVariantResistFx({ entity:target,layers:hits,incomingType:damageType,isAoE,
+                from:visual && visual.from,meta:{ spellColor:resistSpellColor(visual && visual.skill,visual && visual.tag) } });
+        }
         return dmg;
     }
     return dmg;
@@ -19205,17 +21066,12 @@ async function runReactionIntercept(caster, target, skill, hitChance, incomingDa
 
         addHistory(`   🛡️ ${guardian.name} 施展【${chosen.skill.name}】舍身护佑，替 ${target.name} 承受攻击！`);
         if (_sheshenBindSpend) addHistory(`   ↳ ${bindingsSpendLabel(guardian, chosen.skill)}：${_sheshenBindSpend}`);
-        // 轻量演出：聚焦暗化 + 钢蓝蓄力粒子
-        const guardianDom = document.getElementById(`hero-card-${guardian.id}`);
-        if (guardianDom) {
-            if (window.spawnFocusOverlay) window.spawnFocusOverlay(guardianDom, 600);
-            const gRect = guardianDom.getBoundingClientRect();
-            if (window.spawnChargeUpParticles) window.spawnChargeUpParticles(
-                gRect.left + gRect.width / 2, gRect.top + gRect.height / 2, '#38bdf8', 310
-            );
+        const rescueHandle = arcaneVfxModule.playRescueSheshen(guardian,target,{ incomingType:incomingDamageType,from:caster });
+        if (rescueHandle) {
+            const ready = await rescueHandle.ready;
+            if (!ready.ok || _actionToken !== combatToken || _pipelineFrozen) return;
         }
-        await sleep(520); if (_actionToken !== combatToken || _pipelineFrozen) return; // 视觉停顿
-        return { dodged: false, guardian, usedSheshen: true };
+        return { dodged:false,guardian,usedSheshen:true,rescueHandle };
     }
 
     if (chosen) {
@@ -19327,7 +21183,7 @@ function attackFeedbackOptions(caster, target, tag, skill, singleType, ctx, dodg
     const strafe = skill && skill.fxTag === '连续扫射' || typeof _strafeLock !== 'undefined' && _strafeLock || getEntitySpriteDom(target)?.classList.contains('target-bullet-stutter');
     const groupIdentity = !(skill && skill.fxTag) && tag.includes('群') ? AOE_IDENTITY_TYPES[resolveGroupAttackSubtypeFx(tag)] : null;
     return { wave,
-        suppressShake:!!group || !!strafe || !!(skill && skill.fxTag) || singleType === 'punch' || singleType === 'explosion_single' || groupIdentity === '爆炸' || groupIdentity === '雷',
+        suppressShake:!!group || !!strafe || !!(skill && skill.fxTag) || !!(skill && skill.isSelfDestruct) || singleType === 'punch' || singleType === 'explosion_single' || groupIdentity === '爆炸' || groupIdentity === '雷',
         suppressRecoil:!!strafe || !!(skill && ['近战重击','远程重击','枪击穿透'].includes(skill.fxTag)) };
 }
 
@@ -19426,10 +21282,88 @@ async function playIdentityAttackWave(caster, targets, subtype, tag, power, hitC
     return { kills, handle };
 }
 
+async function playSelfDestructAttackWave(caster, targets, tag, power, hitChance, multiplier, globalTurns, skill) {
+    const token = combatToken, prepared = [], posts = [], kills = [], wave = skill._hitWave || (skill._hitWave = { shook:false,hitStopped:false,classified:[] });
+    const windup = skill._selfDestructWindup;
+    const release = () => prepared.forEach(p => { if (p.reactionFx && p.reactionFx.releaseImpact) p.reactionFx.releaseImpact(); });
+    const barrier = !isHeroSideEntity(caster) && teamBarrier > 0;
+    if (barrier) {
+        const proxy = targets.find(t => !t.isBarrierTarget && !t.isSummon) || heroesData.find(h => isCombatActive(h) && !h.isSummon);
+        const target = { id:'barrier2',isAlive:true,isBarrierTarget:true,name:teamBarrierName,spd:0,buffs:[],classType:null,skills:[],proxyHero:proxy };
+        barrierStandIn = target;
+        prepared.push({ target,targetDom:document.getElementById('team-barrier-dome') || document.getElementById('team-barrier-wrapper'),isDodged:false });
+    } else {
+        for (const target of targets) {
+            if (!target || !target.isAlive) continue;
+            const p = await applySingleTagEffect(caster,target,tag,power,hitChance,multiplier,globalTurns,skill,null,true,{ prepareOnly:true });
+            if (token !== combatToken || _pipelineFrozen) { release(); return { kills,handle:null }; }
+            if (p) prepared.push(p);
+        }
+        prepared.forEach(p => {
+            if (p.reactionFx && p.reactionFx.dodge) {
+                p.reactionFx.dodge(p.isDodged); p.reactionDriven = true;
+            }
+            const pierce = tag.includes('穿透') || (CLASS_PASSIVES[caster.classType]?.checkPierce?.(caster) || false);
+            p.impactDom = p.reactionFx && p.reactionFx.impactDom && (p.isDodged || !p.reactionFx.hit || (!pierce && p.target.shield > 0)) ? p.reactionFx.impactDom : p.targetDom;
+        });
+    }
+    if (windup) {
+        windup.release();
+        const stage = await windup.burstReady;
+        if (!stage || token !== combatToken || _pipelineFrozen) { release(); return { kills,handle:null }; }
+    }
+    const ids = prepared.filter(p => !p.target.isBarrierTarget).map(p => p.target.id);
+    const audioWave = ids.length ? CombatAudioDirector.beginWave(ids,skill._audioActionId) : null;
+    skill._impactAudioWave = audioWave;
+    const outcomes = new Map(prepared.map(p => [p.target.id,p.isDodged ? 'dodge' : 'hit']));
+    const visualTargets = prepared.map(p => Object.assign({},p.target,{ identityDom:p.impactDom || p.targetDom }));
+    const lookup = new Map(prepared.map(p => [p.target.id,p])), tasks = [], contacted = new Set();
+    const contact = target => {
+        if (token !== combatToken || _pipelineFrozen || contacted.has(target.id)) return;
+        const p = lookup.get(target.id); if (!p) return;
+        contacted.add(target.id);
+        const context = { prepared:p,identity:true,selfDestruct:true,wave,audioWave,postQueue:posts };
+        const task = p.target.isBarrierTarget && (tag.includes('攻') || tag.includes('穿透'))
+            ? applyBarrierHit(caster,p.target,tag,power,skill,multiplier,globalTurns,context)
+            : applySingleTagEffect(caster,p.target,tag,power,hitChance,multiplier,globalTurns,skill,null,true,context);
+        tasks.push(Promise.resolve(task).then(result => { if (result === '__killed__') kills.push(p.target); }));
+    };
+    let handle;
+    try {
+        handle = arcaneVfxModule.playSelfDestructBurst(caster,visualTargets,{ form:caster.explode.type,outcomes },(event,meta) => {
+            if (event === 'target_hit' || event === 'target_dodge' || event === 'target_attach') contact(meta.target);
+        },windup && windup.stageCtx);
+        // 无可视节点仅跳过反馈，仍使用同一 prepared 结算，不重复掷骰。
+        prepared.filter(p => !p.targetDom).forEach(p => contact(p.target));
+        if (handle) {
+            await handle.done;
+            if (token !== combatToken || _pipelineFrozen) return { kills,handle };
+        }
+        prepared.filter(p => !contacted.has(p.target.id)).forEach(p => contact(p.target));
+        await Promise.all(tasks);
+        if (token !== combatToken || _pipelineFrozen) return { kills,handle };
+        for (const p of prepared) {
+            for (const post of posts.filter(post => post.target === p.target)) {
+                await post.run();
+                if (token !== combatToken || _pipelineFrozen) return { kills,handle };
+            }
+        }
+        for (const post of posts.filter(post => !prepared.some(p => p.target === post.target))) {
+            await post.run();
+            if (token !== combatToken || _pipelineFrozen) return { kills,handle };
+        }
+        return { kills,handle };
+    } finally {
+        release(); CombatAudioDirector.closeWave(audioWave);
+        if (windup) { windup.finish(); await windup.done; }
+        if (skill._impactAudioWave === audioWave) skill._impactAudioWave = null;
+    }
+}
+
 async function prepareSingleAttackHit(caster, target, tag, tagPower, hitChance, multiplier, skill, fixedRawDamage = null, holdReactionFx = false) {
     const _actionToken = combatToken;
     const targetType = isHeroSideEntity(target) ? 'hero' : 'enemy';
-    let targetDom = getEntitySpriteDom(target), reactionFx = null, isDodged = false;
+    let targetDom = getEntitySpriteDom(target), reactionFx = null, isDodged = false, rescueHandle = null;
     const isDamage = ['攻','单体','穿透','眩晕','散射'].some(k => tag.includes(k));
     const isSelfDebuff = isSelfDebuffTag(tag);
     const isDebuffTag = ['降','盲','滞','弱','中毒','燃烧','麻痹','缓','吸蓝'].some(k => tag.includes(k));
@@ -19516,6 +21450,7 @@ async function prepareSingleAttackHit(caster, target, tag, tagPower, hitChance, 
             intercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, filteredForPrompt, isDamage, isPierce, multiplier, holdReactionFx); if (_actionToken !== combatToken || _pipelineFrozen) return;
         }
         if (intercept && intercept.usedSheshen && intercept.guardian) {
+            rescueHandle = intercept.rescueHandle;
             // 【舍身】生效：受击目标切换为守护者（跳过闪避、必中），后续管线对守护者完整结算，原目标毫发无伤
             target = intercept.guardian;
             targetDom = document.getElementById(`hero-card-${target.id}`);
@@ -19545,7 +21480,7 @@ async function prepareSingleAttackHit(caster, target, tag, tagPower, hitChance, 
 
     }
     const impactDom = reactionFx && reactionFx.impactDom && (isDodged || !reactionFx.hit || (!isPierce && target.shield > 0)) ? reactionFx.impactDom : targetDom;
-    return { target, targetDom, reactionFx, isDodged, segRoll:_segRoll, impactDom };
+    return { target, targetDom, reactionFx, isDodged, segRoll:_segRoll, impactDom, rescueHandle };
 }
 
 async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, multiplier, globalTurns, skill, fixedRawDamage = null, attackFxPlayed = false, attackContext = null) {
@@ -19704,7 +21639,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
                   counterSettled = true;
                   // 只在命中拍点吸收个人盾并提交HP；视觉取消不取消同代际的结算权。
                   const counterHpBefore = Math.max(0, caster.hp), counterShieldBefore = caster.shield || 0;
-                  const counterDmgToCaster = isHeroSideEntity(caster) ? counterRawDmg : applyEnemyTypeResist(counterRawDmg, '近战', caster, casterDom, false);
+                  const counterDmgToCaster = isHeroSideEntity(caster) ? counterRawDmg : applyEnemyTypeResist(counterRawDmg, '近战', caster, casterDom, false, false, { from:target });
                   const { hpDmg:counterHpDmg, shieldDmg:counterShieldDmg } = calculateDamage(counterDmgToCaster, caster);
                   const counterShieldAfter = caster.shield || 0;
                   caster.hp -= counterHpDmg;
@@ -19737,8 +21672,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
       }
       
       };
-      if (postQueue) postQueue.push({ target, run:async () => { await finishDodge(); completeAudioTarget(); } });
-      else { await finishDodge(); completeAudioTarget(); }
+      if (postQueue) postQueue.push({ target, run:async () => { await finishDodge(); if (prepared.rescueHandle) await prepared.rescueHandle.release(); completeAudioTarget(); } });
+      else { await finishDodge(); if (prepared.rescueHandle) await prepared.rescueHandle.release(); completeAudioTarget(); }
       return; // 闪避成功中止中招结算
     }
   }
@@ -19901,7 +21836,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     
     // 敌方变种标签类型减伤（【流体/虚形/破法/要害】）：屏障之后、护甲结算之前，对目标侧的对应伤害类型减半；
     // 群攻标签（含 [群穿透] 等）判定为 AoE，命中【要害】的 AoE 哨兵 key
-    rawDamage = applyEnemyTypeResist(rawDamage, incomingDamageType, target, targetDom, tag.includes('群'));
+    rawDamage = applyEnemyTypeResist(rawDamage, incomingDamageType, target, targetDom, tag.includes('群'), false, { from:caster,skill,tag });
     
     const hpBefore = Math.max(0, target.hp), shieldBefore = target.shield || 0;
     let damagePrevented = false;
@@ -19980,6 +21915,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
         if (target.tags && target.tags.includes('[钢体]')) {
             if (targetDom) createFloatingText(targetDom, '免疫·眩晕', 'text-yellow-300');
             addHistory(`   ↳ ⛓️ [${target.name}] 强韧意志/抗震结构硬抗了冲击，免疫了眩晕！`);
+            playVariantImmunity(target,'ironBody',caster,skill,tag,true);
         } else {
             target.buffs = target.buffs || [];
             target.buffs.push({ type: 'stun', value: 1, duration: 1 });
@@ -20004,8 +21940,12 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     };
     if (postQueue) {
         if (target.hp > 0) { if (targetType === 'hero') updateHeroUI(target); else updateEnemyUI(target); }
-        postQueue.push({ target, run:() => { finishDamage(); completeAudioTarget(); } });
-    } else { finishDamage(); completeAudioTarget(); }
+        postQueue.push({ target, run:async () => { finishDamage(); if (prepared.rescueHandle) { await sleep(500); if (_actionToken === combatToken && !_pipelineFrozen) await prepared.rescueHandle.release(); } completeAudioTarget(); } });
+    } else {
+        finishDamage();
+        if (prepared.rescueHandle) { await sleep(500); if (_actionToken === combatToken && !_pipelineFrozen) await prepared.rescueHandle.release(); }
+        completeAudioTarget();
+    }
     return killed ? '__killed__' : undefined;
   } else {
     // === 非伤害标签 → TAG_HANDLERS 注册表分发 ===
@@ -20655,6 +22595,12 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         targets = targets.filter(t => t && (!t.isSubdued || isManualSubduedExempt(skill, t)));
         if (skill.fxTag === '蝎眼钥匙' && arcaneFx && isBeneficial && tag.includes('防')) arcaneFx.setWardTargets(targets);
 
+        if (skill.isSelfDestruct) {
+            const result = await playSelfDestructAttackWave(caster,targets,tag,tagPower,skill.hit,multiplier,effTurns,skill);
+            if (_actionToken !== combatToken || _pipelineFrozen) return;
+            _pendingKills.push(...result.kills); arcaneFx = result.handle || arcaneFx;
+            continue;
+        }
         const identitySubtype = !skill.fxTag && isAoe && isDmgTag(item) ? AOE_IDENTITY_TYPES[resolveGroupAttackSubtypeFx(tag)] : null;
         const isAudioDamageSegment = isDmgTag(item) && !isBeneficial;
         skill._impactAudioWave = null;
@@ -21205,7 +23151,9 @@ async function nextTurn(token = combatToken) {
                       tryTriggerEnemyLink(currentEntity.ref);
                   }
                   const targetDom = getEntitySpriteDom(currentEntity.ref) || (currentEntity.ref.id.startsWith('h') ? document.getElementById(`hero-card-${currentEntity.ref.id}`) : document.getElementById(`${currentEntity.ref.id}-sprite`));
-                  if (targetDom) { createFloatingText(targetDom, `${isBurn ? '火' : '毒'} -${dotDmg}`, isBurn ? 'text-orange-400' : 'text-purple-400'); if (!isEntityVariantLocked(targetDom)) { targetDom.classList.add('shake'); setTimeout(() => targetDom.classList.remove('shake'), 400); } }
+                  if (targetDom) createFloatingText(targetDom, `${isBurn ? '火' : '毒'} -${dotDmg}`, isBurn ? 'text-orange-400' : 'text-purple-400');
+                  arcaneVfxModule.playStatusTickFx({ event:isBurn ? 'burnTick' : 'poisonTick',entity:currentEntity.ref,
+                      meta:{ layers:currentEntity.ref.buffs.filter(buff => buff.type === 'poison' && (buff.duration > 0 || buff === b)).length } });
                   addHistory(`   ${isBurn ? '🔥' : '🦠'} [${currentEntity.ref.name}] ${isBurn ? '灼烧' : '毒性'}发作，受到了 ${dotDmg} 点真实伤害！`);
               }
           });
@@ -21253,6 +23201,9 @@ async function nextTurn(token = combatToken) {
           if (currentEntity.type !== 'hero') tryTriggerEnemyDeathSpeak(currentEntity.ref);
           currentEntity.ref.isAlive = false;
           clearVariantState(currentEntity.ref.id);
+          arcaneVfxModule.clearStatusLayers(currentEntity.ref.id);
+          arcaneVfxModule.clearSelfDestructWarning(currentEntity.ref.id);
+          arcaneVfxModule.clearRescueState(currentEntity.ref.id);
           // 【自爆】DoT 致死路径单独接线（此路径已手动置死，随后 updateEnemyUI 的死亡分支守卫失效，不会重复触发）
           triggerEnemySelfDestruct(currentEntity.ref);
           if (currentEntity.ref.currentDelay) {
@@ -21299,7 +23250,7 @@ async function nextTurn(token = combatToken) {
       const targetDom = getEntitySpriteDom(currentEntity.ref) || (currentEntity.ref.id.startsWith('h') ? document.getElementById(`hero-card-${currentEntity.ref.id}`) : document.getElementById(`${currentEntity.ref.id}-sprite`));
       if (targetDom) {
           createFloatingText(targetDom, '麻痹僵直', 'text-yellow-300');
-          if (!isEntityVariantLocked(targetDom)) { targetDom.classList.add('shake'); setTimeout(() => targetDom.classList.remove('shake'), 400); }
+          arcaneVfxModule.playStatusTickFx({ event:'paraProc',entity:currentEntity.ref });
       }
 
       await sleep(800);

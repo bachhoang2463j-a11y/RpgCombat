@@ -1,0 +1,17 @@
+{
+  "source": "demo-self-destruct.html",
+  "samples": [
+    {
+      "key": "sd_ring_blast",
+      "file": "B2_脉冲环状冲击波爆_fs211423_Ring_Blast_Explosion.mp3",
+      "bytes": 32448,
+      "sha256": "0f8a8fb86d422acba241a431f9ba4991586d5ad5de46367d2efb68a2407112d5"
+    },
+    {
+      "key": "sd_shatter_blast",
+      "file": "B4_破片贯穿引爆_mx1693_Shatter_shot_explosion.mp3",
+      "bytes": 95305,
+      "sha256": "c34617ce11b48229bae76a955c6bbf34c92ddfa6246accf9f1f666dab166a4b7"
+    }
+  ]
+}
