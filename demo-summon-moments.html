@@ -1451,8 +1451,8 @@ const arcaneVfxModule = (function () {
             const box = document.createElement('div');
             box.className = 'flex flex-col items-center group relative shrink-0';
             box.id = `enemy-box-${id}`;
-            const faceHtml = ent.img ? `<img src="${ent.img}" alt="${ent.name}" class="w-12 h-12 sm:w-14 sm:h-14 object-cover rounded-xl border border-fuchsia-400/60 shadow-[0_0_12px_rgba(217,70,239,0.45)]"/>` : `<span class="text-4xl sm:text-5xl drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]">${ent.emoji}</span>`;
-            box.innerHTML = `<div id="${id}-sprite" class="fx-body enemy-sprite breathe mt-1 flex justify-center items-center w-12 h-12 sm:w-14 sm:h-14 relative">${faceHtml}</div><div class="w-10 sm:w-14 h-1 sm:h-1.5 bg-black/60 mt-1 rounded-full overflow-hidden relative arcane-hit-track"><div id="${id}-hp-ghost" class="arcane-hit-ghost" style="width:${pct}%"></div><div id="${id}-hp-bar" class="h-full bg-fuchsia-500 arcane-hit-fill" style="width:${pct}%"></div></div><div class="text-[8px] sm:text-[9px] text-fuchsia-200/90 mt-0.5 text-outline whitespace-nowrap">${ent.name}</div>`;
+            const faceHtml = ent.img ? `<img src="${ent.img}" alt="${ent.name}" class="w-12 h-12 sm:w-14 sm:h-14 object-cover rounded-xl border border-fuchsia-400/60 shadow-[0_0_12px_rgba(217,70,239,0.45)]"/>` : `<span class="text-[48px] sm:text-[56px] leading-none drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]">${ent.emoji}</span>`;
+            box.innerHTML = `<div id="${id}-sprite" class="fx-body enemy-sprite breathe mt-1 flex justify-center items-center w-12 h-12 sm:w-14 sm:h-14 relative">${faceHtml}</div><div class="w-10 sm:w-14 h-1 sm:h-1.5 bg-black/60 mt-1 rounded-full overflow-hidden relative arcane-hit-track"><div id="${id}-hp-ghost" class="arcane-hit-ghost" style="width:${pct}%"></div><div id="${id}-hp-bar" class="h-full bg-fuchsia-500 arcane-hit-fill" style="width:${pct}%"></div></div>`;
             if (frontRow) frontRow.appendChild(box);
             ent.dom = box;
             enemiesData.push(ent);
@@ -1461,8 +1461,8 @@ const arcaneVfxModule = (function () {
             const wrap = document.createElement('div');
             wrap.className = 'relative shrink-0 z-10';
             wrap.id = `hero-wrap-${id}`;
-            const faceHtml = ent.img ? `<img src="${ent.img}" alt="${ent.name}" class="w-12 h-12 sm:w-14 sm:h-14 object-cover rounded-xl border border-cyan-400/55 shadow-[0_0_12px_rgba(34,211,238,0.35)]"/>` : `<div class="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center text-3xl sm:text-4xl rounded-xl bg-slate-900/55 border border-violet-400/45 shadow-[0_6px_12px_rgba(0,0,0,0.65)]">${ent.emoji}</div>`;
-            wrap.innerHTML = `<div class="flex flex-col items-center group relative pointer-events-auto"><div id="hero-card-${id}" class="fx-body enemy-sprite breathe flex justify-center items-center relative">${faceHtml}</div><div class="w-10 sm:w-14 h-1 sm:h-1.5 bg-black/65 mt-1 rounded-full overflow-hidden relative pointer-events-none arcane-hit-track"><div id="${id}-hp-ghost" class="arcane-hit-ghost" style="width:${pct}%"></div><div id="${id}-hp-bar" class="h-full bg-rose-500 arcane-hit-fill" style="width:${pct}%"></div></div><div class="text-[8px] sm:text-[9px] text-cyan-200/90 mt-0.5 text-outline whitespace-nowrap">${ent.name}</div></div>`;
+            const faceHtml = ent.img ? `<img src="${ent.img}" alt="${ent.name}" class="w-12 h-12 sm:w-14 sm:h-14 object-cover rounded-xl border border-cyan-400/55 shadow-[0_0_12px_rgba(34,211,238,0.35)]"/>` : `<span class="text-[48px] sm:text-[56px] leading-none flex items-center justify-center drop-shadow-[0_6px_10px_rgba(0,0,0,0.65)]">${ent.emoji}</span>`;
+            wrap.innerHTML = `<div class="flex flex-col items-center group relative pointer-events-auto"><div id="hero-card-${id}" class="fx-body enemy-sprite breathe flex justify-center items-center relative">${faceHtml}</div><div class="w-10 sm:w-14 h-1 sm:h-1.5 bg-black/65 mt-1 rounded-full overflow-hidden relative pointer-events-none arcane-hit-track"><div id="${id}-hp-ghost" class="arcane-hit-ghost" style="width:${pct}%"></div><div id="${id}-hp-bar" class="h-full bg-rose-500 arcane-hit-fill" style="width:${pct}%"></div></div></div>`;
             if (row) row.appendChild(wrap);
             ent.dom = wrap;
             heroesData.push(ent);
