@@ -3595,3 +3595,19 @@
   2. **同步更新 Demo 路径解析与定稿默认预设（`demo-skill-items-vfx.html`）**：新增多级路径拼接助手 `assetUrl()` 替代单段 `encodeURIComponent`（修复子目录 `/` 被编码为 `%2F` 的问题），更新 `SFX_FILES`、`playWebMFX` 与 `[移植定稿备忘]`，并依用户确认将 Demo 默认预设锁定为 **音叉=`B暗铁`**、**狮神=`狮吼炎`**。
 - **涉及文件**：`demo-skill-items-vfx.html`、`D:\Project\my_assets\RpgCombat_Sound\`（14 个 MP3）、`D:\Project\my_assets\RpmCombat_Spine\`（11 个 WebM）、`LOG.md`、`LOG-INDEX.md`。
 - **验证**：磁盘目录核验 `SOUND_COUNT=14`、`SPINE_COUNT=11`；`verify_categorized.cjs` 校验 `vm.Script` 语法通过且全部带前缀 `RpgCombat_Sound/`、`RpmCombat_Spine/` 与根级引用路径 100% 存在；未改动 `index.html`、`README.md` 与打包产物。
+
+## [LOG-296] 2026-11-15 — 五项奇物/技能定稿完整移植与舍身300ms停驻/500ms归位，发布v12.11
+
+- **业务提交**：`e795482`。
+- **核心目的**：把已定稿Demo的五项视听完整落到正式战斗，同时让舍身在受击/反击后明确停驻、减速归位；不改变数值、显式特效标签规则或既有UI入口。
+- **变更行为**：
+  1. **定稿五技能接入**：新增谐律之庇/静默之域/碎裂之响/塞赫美特之愠/逆咒归源镜精确标签、分派、CSS离散闪色、音叉SVG/红晶神像/镜虹吸及透明WebM。旧DRAW.ring不动，旧渐变绘制由itemFx分支隔离；新增histOrb相对坐标拖尾与共用贝塞尔控制点。
+  2. **正式音频与清场**：B暗铁/狮吼炎唯一音组注册audioUrls，新采样从RpgCombat_Sound读取、透明视频从RpmCombat_Spine逐段编码读取。谐律固定B、其余固定A；镜按本轮用户要求起手双音、420ms双轨回流。共用Mixer预热/三轨避让/owner/combatToken，活动视频与采样及新闪色同步纳入clearArcaneFx；吸蓝/驱散默认视听门控，原数值与真实dispel仍执行。
+  3. **延迟与接口兼容**：WEBM_FX_REGISTRY登记0.90/0.95/0.95/1.45/0.45秒，由真实结算链消费。只读审查发现反应hit传攻击类型字符串，而Demo为DOM；本轮兼容两种入口并加回归，避免带盾反应链中断。
+  4. **舍身回位**：release新增300ms停驻，双位移350→500ms（速度降低30%），830ms收尾；突进/630ms格挡/1110msready及承伤后既有500ms等待保留。取消停驻/归位立即恢复，不二次格挡或复活旧音。
+  5. **回归与递增打包**：新增五技能155项夹具、更新舍身停驻及旧秘术入场验证；仅用相关回归调试，再唯一一次全量。git mv维护包v12_10→v12_11、scriptName同步并运行build-regex，旧产物专项版本锁同步。
+- **涉及文件**：`index.html`、`regex-前端战斗v12_11.json`、`integration-test/harness.html`、`integration-test/fixtures/skill-items-vfx-regression.js`、`integration-test/fixtures/rescue-moment-regression.js`、`integration-test/fixtures/arcane-vfx-regression.js`、`integration-test/skill-items-artifact-check.cjs`、两份既有产物专项及`integration-test/fixtures/verification-v12_11.md`。
+- **验证**：源码最终相关531/0、新技能最终155/0；**唯一一次源码全量2772/0**；真Chrome相关332/0且无舍身渲染跳过项；产物专项138+87+89=314/0；**压缩产物相关740/0**，未对产物再跑全量。产物1422392字符（压缩31%），围栏/全量&amp;/捕获组/内网隔离/新代码入包/monsterAttack三处全通过。
+- **失败与限制如实记录**：旧蝎眼入场墙钟断言被IAB节流拉到约1.99s，改验证1150ms调度、门闩后即时入场及无二次等待，未改生产时序；舍身余光DOM标记和旧专项v12.10锁定纠正后仅复跑相关。首次全量挂载因服务到期Failed to fetch、断言0项，恢复后才执行唯一全量。真Chrome五技能截图因MCP路径拒绝/后续30s超时未完成，按熔断停止，不宣称截图复核通过；完整失败历史见验收记录。
+- **目的 vs 现状**：正式版五项定稿已落地，舍身停顿/减速已验证；截图视检尚未完成，交用户导入体验。原Demo指纹`5b4804fe14069e9b77835760efddad5d9eb8cda6`始末一致；未改README/SPEC/公开版，未混入现有无关改动，未导入酒馆/上传素材/推送远程。
+
