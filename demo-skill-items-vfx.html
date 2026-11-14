@@ -106,8 +106,8 @@
         </div>
         <div id="audio-preset-bar" class="px-2 py-1 border-b border-slate-800/90 bg-slate-900/70 flex flex-wrap items-center gap-1 text-[9px] shrink-0">
           <span class="text-slate-400 mr-0.5">音叉组:</span>
-          <button data-fork-preset="A" class="arcane-preset-btn active px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 hover:border-cyan-400 transition">A澄澈</button>
-          <button data-fork-preset="B" class="arcane-preset-btn px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 hover:border-cyan-400 transition">B暗铁</button>
+          <button data-fork-preset="A" class="arcane-preset-btn px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 hover:border-cyan-400 transition">A澄澈</button>
+          <button data-fork-preset="B" class="arcane-preset-btn active px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 hover:border-cyan-400 transition">B暗铁</button>
           <button data-fork-preset="C" class="arcane-preset-btn px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 hover:border-cyan-400 transition">C深海</button>
           <span class="text-slate-600 mx-0.5">|</span>
           <span class="text-slate-400">狮神:</span>
@@ -310,18 +310,18 @@ const arcaneVfxModule = (function () {
         : 'http://192.168.110.83:8766');
 
     const SFX_FILES = {
-        fork432: 'vfx_fork_432_strike.mp3',
-        fork440: 'vfx_fork_440_pure.mp3',
-        forkWiki: 'vfx_fork_440_wiki.mp3',
-        forkDark: 'vfx_fork_dark_chime.mp3',
-        forkHum: 'vfx_fork_physics_hum.mp3',
-        forkMute: 'vfx_fork_muted_stop.mp3',
-        forkAbyss: 'vfx_fork_abyss_40hz.mp3',
-        bowlNepal: 'vfx_bowl_nepal_harmony.mp3',
-        bowlBronze: 'vfx_bowl_bronze_silence.mp3',
-        bowlClear: 'vfx_bowl_crystal_clear.mp3',
-        bellPing: 'vfx_bell_dispel_ping.mp3',
-        crystalSnap: 'vfx_crystal_shatter_snap.mp3',
+        fork432: 'RpgCombat_Sound/vfx_fork_432_strike.mp3',
+        fork440: 'RpgCombat_Sound/vfx_fork_440_pure.mp3',
+        forkWiki: 'RpgCombat_Sound/vfx_fork_440_wiki.mp3',
+        forkDark: 'RpgCombat_Sound/vfx_fork_dark_chime.mp3',
+        forkHum: 'RpgCombat_Sound/vfx_fork_physics_hum.mp3',
+        forkMute: 'RpgCombat_Sound/vfx_fork_muted_stop.mp3',
+        forkAbyss: 'RpgCombat_Sound/vfx_fork_abyss_40hz.mp3',
+        bowlNepal: 'RpgCombat_Sound/vfx_bowl_nepal_harmony.mp3',
+        bowlBronze: 'RpgCombat_Sound/vfx_bowl_bronze_silence.mp3',
+        bowlClear: 'RpgCombat_Sound/vfx_bowl_crystal_clear.mp3',
+        bellPing: 'RpgCombat_Sound/vfx_bell_dispel_ping.mp3',
+        crystalSnap: 'RpgCombat_Sound/vfx_crystal_shatter_snap.mp3',
         crystalChime: 'vfx_crystal_chime_mx2950.mp3',
         ringBlast: 'B2_脉冲环状冲击波爆_fs211423_Ring_Blast_Explosion.mp3',
         shatterBoom: 'B4_破片贯穿引爆_mx1693_Shatter_shot_explosion.mp3',
@@ -329,14 +329,14 @@ const arcaneVfxModule = (function () {
         flameBurn: 'ranshao.mp3',
         flameSea: 'fire01.mp3',
         aoeBlast: 'explosion_aoe_blast.mp3',
-        mirrorRing: 'vfx_mirror_ring_activate.mp3',
-        mirrorStream: 'vfx_mirror_mana_stream.mp3',
+        mirrorRing: 'RpgCombat_Sound/vfx_mirror_ring_activate.mp3',
+        mirrorStream: 'RpgCombat_Sound/vfx_mirror_mana_stream.mp3',
         vacSuck: 'vfx_vacuum_suck_mx2608.mp3',
         leechFlow: 'vfx_variant_leech_flow.mp3',
     };
 
     const sfxBufferCache = new Map();
-    const audioPresetState = window.__ARCANE_AUDIO_PRESET || (window.__ARCANE_AUDIO_PRESET = { fork: 'A', lion: 'roar' });
+    const audioPresetState = window.__ARCANE_AUDIO_PRESET || (window.__ARCANE_AUDIO_PRESET = { fork: 'B', lion: 'roar' });
 
     // —— 共享状态（clearArcaneFx 同步清空） ——
     const S = {
@@ -752,12 +752,13 @@ const arcaneVfxModule = (function () {
 
     // ===== 新技能实现 BEGIN =====
     // —— 真音采样播放器（零振荡器合成：Buffer 缓存 + <audio> 自动降级，受 combatToken 与重置控制） ——
+    const assetUrl = rel => `${ASSET_BASE}/${String(rel).split('/').map(encodeURIComponent).join('/')}`;
     async function loadSfxBuffer(ctx, key) {
         if (sfxBufferCache.has(key)) return sfxBufferCache.get(key);
         const file = SFX_FILES[key]; if (!file) return null;
         const p = (async () => {
             try {
-                const res = await fetch(`${ASSET_BASE}/${encodeURIComponent(file)}`);
+                const res = await fetch(assetUrl(file));
                 if (!res.ok) return null;
                 const ab = await res.arrayBuffer();
                 return await ctx.decodeAudioData(ab);
@@ -801,7 +802,7 @@ const arcaneVfxModule = (function () {
         function fallbackHtmlAudio() {
             if (token !== combatToken) return;
             try {
-                const a = new Audio(`${ASSET_BASE}/${encodeURIComponent(file)}`);
+                const a = new Audio(assetUrl(file));
                 a.volume = Math.max(0, Math.min(1, vol));
                 a.playbackRate = rate;
                 if (offset) a.currentTime = offset;
@@ -826,7 +827,7 @@ const arcaneVfxModule = (function () {
             if (token !== combatToken) { cleanup(); return; }
             const v = document.createElement('video');
             v.muted = true; v.playsInline = true; v.preload = 'auto'; v.crossOrigin = 'anonymous';
-            v.src = `${ASSET_BASE}/${encodeURIComponent(file)}`;
+            v.src = assetUrl(file.indexOf('/') === -1 ? `RpmCombat_Spine/${file}` : file);
             const cv = document.createElement('canvas');
             cv.className = 'arcane-webm-cv';
             cv.setAttribute('data-arcane-fx', 'webm');
@@ -1555,16 +1556,19 @@ const arcaneVfxModule = (function () {
     //      playShatterResonance (2500ms / 950ms / handle.hit), playSekhmetWrath (3500ms / 1450ms / handle.hit),
     //      playReverseSpellMirror (1250ms / 450ms)
     //    - clearArcaneFx() 须清理 S.videos, S.sampleAudios 及新增 arcane-flash-* 类
-    // 4. WEBM_FX_REGISTRY / 资产入库与上传:
-    //    - 以下新文件已存放在 D:\Project\my_assets\ (正式打包/远程游览前须同步 upload-to-r2.cjs 上传 R2):
-    //      WebM (11个): vfx_harmony_ripple.webm(002), vfx_silence_ripple.webm(458), vfx_silence_crack.webm(335),
+    // 4. WEBM_FX_REGISTRY / 资产入库与上传 (定稿预设: 音叉=B暗铁, 狮神=狮吼炎):
+    //    - 本次新增文件已分类存放在 D:\Project\my_assets\ 子目录 (正式打包/远程游览前须同步 upload-to-r2.cjs 上传 R2):
+    //      WebM -> RpmCombat_Spine/ (11个): vfx_harmony_ripple.webm(002), vfx_silence_ripple.webm(458), vfx_silence_crack.webm(335),
     //        vfx_shatter_arc.webm(077), vfx_shatter_spark.webm(030), vfx_shatter_crystal.webm(392),
     //        vfx_sekhmet_lion.webm(317), vfx_sekhmet_pillar.webm(089), vfx_sekhmet_orb.webm(379),
     //        vfx_mirror_cage.webm(437), vfx_mirror_vortex.webm(011)
-    //      真音 MP3 (14个新增 + 9个既有复用): vfx_fork_432_strike.mp3, vfx_fork_440_pure.mp3, vfx_fork_440_wiki.mp3,
+    //      新增真音 MP3 -> RpgCombat_Sound/ (14个): vfx_fork_432_strike.mp3, vfx_fork_440_pure.mp3, vfx_fork_440_wiki.mp3,
     //        vfx_fork_dark_chime.mp3, vfx_fork_physics_hum.mp3, vfx_fork_muted_stop.mp3, vfx_fork_abyss_40hz.mp3,
     //        vfx_bowl_nepal_harmony.mp3, vfx_bowl_bronze_silence.mp3, vfx_bowl_crystal_clear.mp3, vfx_bell_dispel_ping.mp3,
     //        vfx_crystal_shatter_snap.mp3, vfx_mirror_ring_activate.mp3, vfx_mirror_mana_stream.mp3
+    //      既有复用 MP3 (9个仍在 my_assets 根目录): vfx_crystal_chime_mx2950.mp3, B2_脉冲环状冲击波爆_fs211423_Ring_Blast_Explosion.mp3,
+    //        B4_破片贯穿引爆_mx1693_Shatter_shot_explosion.mp3, vfx_giant_roar_mx1972.mp3, ranshao.mp3, fire01.mp3,
+    //        explosion_aoe_blast.mp3, vfx_vacuum_suck_mx2608.mp3, vfx_variant_leech_flow.mp3
     //    - 正式版 WEBM_FX_REGISTRY 必须补充对应延迟拍点条目:
     //      '谐律之庇': { url: '', scale: 1.0, particles: 'arcane', delay: 0.90 }
     //      '静默之域': { url: '', scale: 1.0, particles: 'arcane', delay: 0.95 }
