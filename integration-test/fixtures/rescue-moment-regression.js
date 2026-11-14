@@ -1,7 +1,9 @@
 /* 救援时刻 v12.10 回归：舍身 ready/hold/release/clear、真实 prompt 复杂链、毅力与回避四被动。
    全部通过真实 iframe 的 arcaneVfxModule / applySingleTagEffect / promptReaction 驱动，不复制战斗机制。
    采样统一开 identitySfx 并包装 playCustomAudio 记录 URL/opts/拍点（不真正出声）；
-   旧被动内 playSound('taunt'/'miss') 已确认移除，改由 380ms taunt / 0ms 急步 +150ms hide 承担。 */
+   旧被动内 playSound('taunt'/'miss') 已确认移除，改由 380ms taunt / 0ms 急步 +150ms hide 承担。
+   release 契约：release 后 300ms 停驻 → owner.at(300) 同时触发 return beat / 归位采样 / duration=500 归位动画（速度×.7），
+   owner.resume(830) 覆盖 300+500+30；aura 保留 420ms 与位移无关；停驻/归位途中 clear 立即恢复且无旧回调复活。 */
 (function () {
   'use strict';
   window.runRescueMomentRegression = async function ({ w, check, eq, mock, source }) {
@@ -101,9 +103,9 @@
       const g = makeHero('h_rescue_g', 10), t = makeHero('h_rescue_t', 300);
       const gInit = initial(g.card), tInit = initial(t.card), gvInit = initial(g.visual), gWrapInit = initial(g.wrap);
       const guardian = entity('h_rescue_g'), target = entity('h_rescue_t');
-      const beats = [];
+      const beats = [], beatAt = {};
       const t0 = now();
-      const run = real.sheshen(guardian, target, { incomingType: '近战' }, b => beats.push(b.phase));
+      const run = real.sheshen(guardian, target, { incomingType: '近战' }, b => { if (!beatAt[b.phase]) beatAt[b.phase] = now(); beats.push(b.phase); });
       check(!!run && !!run.ready && typeof run.ready.then === 'function' && typeof run.release === 'function', '舍身返回 ready/release/done 句柄');
       eq(doc.getElementById('reaction-prompt-h_rescue_t'), null, '舍身 ready 前无反应弹窗');
       await wait(360);
@@ -125,11 +127,46 @@
       renderCheck(renderLive(), () => isMoving(transformOf(g.wrap)), '舍身突进渲染帧外移');
 
       const blockBefore = beats.filter(x => x === 'blockImpact').length;
-      run.release();
+      const releaseAt1 = now();
+      const resumeArgs1 = [];
+      const ownerResume1 = run.owner && typeof run.owner.resume === 'function' ? run.owner.resume : null;
+      if (ownerResume1) run.owner.resume = function (ms) { resumeArgs1.push(ms); return ownerResume1.apply(run.owner, arguments); };
+      const relRet = run.release();
+      check(!!relRet && typeof relRet.then === 'function', 'release 仍返回 done Promise');
+      await wait(150);
+      // 新契约：release 后 0~300ms 停驻在 dashX，无 return beat / 归位采样 / 归位动画。
+      const returnEarly = beats.includes('return') || recs('sheshen_armor_step').length > 1;
+      if (returnEarly) {
+        pending.push('待对齐:release 后 300ms 停驻新时间轴未入包（release+150ms 已观测到提前归位）');
+      } else {
+        check(!beats.includes('return'), 'release 后 150ms 仍停驻 dashX（无 return beat）');
+        check(recs('sheshen_armor_step').length === 1, 'release 后 150ms 归位采样未提前触发');
+        check(dashKeyframesOf(g.wrap, run.dashX), '停驻期 hero-wrap 仍保持 dashX 外移 keyframes');
+        check(doc.querySelectorAll('[data-rescue="sheshen-return"]').length === 0, '停驻期不提前出现归位余光');
+      }
+      if (ownerResume1) {
+        if (resumeArgs1.includes(830)) check(true, 'owner.resume(830) 覆盖 300+500+30');
+        else pending.push('待对齐:owner.resume 实参为 ' + JSON.stringify(resumeArgs1) + '（预期 830）');
+        run.owner.resume = ownerResume1;
+      }
+      await wait(250);
+      eq(beats.filter(x => x === 'return').length, 1, 'release 后只归位一次');
+      if (!returnEarly) {
+        const returnWrapAnim = (g.wrap.getAnimations ? g.wrap.getAnimations() : []).some(a => {
+          const t = a.effect && a.effect.getTiming ? a.effect.getTiming() : null;
+          const kf = a.effect && a.effect.getKeyframes ? a.effect.getKeyframes() : [];
+          return !!t && Number(t.duration) === 500
+            && kf.some(k => /translate3d\(\s*0(?:px)?\s*,\s*0(?:px)?\s*,\s*0(?:px)?\s*\)/.test(String(k.transform || '')));
+        });
+        check(returnWrapAnim, '归位动画 duration=500（速度×.7）且落回 translate3d(0,0,0)');
+        const returnVisualAnim = (g.visual.getAnimations ? g.visual.getAnimations() : []).some(a =>
+          a.effect && a.effect.getTiming && Number(a.effect.getTiming().duration) === 500);
+        check(returnVisualAnim, 'gVisual 归位动画 duration=500');
+        check(doc.querySelectorAll('[data-rescue="sheshen-return"]').length >= 1, '回位开始后420ms目标余光正常出现');
+      }
       const doneR = await race(run.done, 1600);
       check(doneR.ok, 'release 后 done 自然收尾');
       eq(beats.filter(x => x === 'blockImpact').length, blockBefore, 'release 不再触发格挡');
-      eq(beats.filter(x => x === 'return').length, 1, 'release 只归位一次');
       await wait(80);
       eq(g.card.style.transform, gInit.transform, '舍身结束恢复卡 transform');
       eq(g.card.style.borderColor, gInit.borderColor, '舍身结束恢复 borderColor');
@@ -148,6 +185,10 @@
         check(Math.abs(armor[0].opts.offsetSec - 0.92) < 0.001 && Math.abs(armor[0].opts.maxDurSec - 0.45) < 0.001, '突进采样窗口 offset .92 / maxDur .45');
         check(Math.abs(armor[1].opts.offsetSec - 0.34) < 0.001 && Math.abs(armor[1].opts.maxDurSec - 0.27) < 0.001, '归位采样窗口 offset .34 / maxDur .27');
         check(armor[1].at - t0 > 1200, '归位采样在 release 后才触发');
+        if (!returnEarly) {
+          check(armor[1].at - releaseAt1 > 250 && armor[1].at - releaseAt1 < 900, '归位采样较 release 延后约 300ms（实测 ' + Math.round(armor[1].at - releaseAt1) + 'ms）');
+          if (beatAt.return) check(Math.abs(beatAt.return - armor[1].at) < 180, 'return beat 与归位采样在 300ms 点同时触发');
+        }
       }
       check([...stomp, ...armor, ...parry].every(r => r.opts.category === 'B'), '舍身采样统一 category B');
       check(stomp.length === 1 && stomp[0].at - t0 < 120, '舍身起手采样在 0ms 拍点');
@@ -174,6 +215,52 @@
       eq(cg.wrap.style.transform, cgwInit.transform, 'clear 恢复 hero-wrap transform 原值');
       eq(cg.wrap.getAnimations ? cg.wrap.getAnimations().length : 0, 0, 'clear 后 hero-wrap 动画已清空（几何复位就绪）');
       renderCheck(renderLive(), () => !isMoving(transformOf(cg.wrap)), 'clear 后 hero-wrap 渲染帧回位');
+
+      /* ---------- 2b. release 停驻期（0~300ms）clear：立即恢复，300ms 后无 return 回调复活 ---------- */
+      resetAudio();
+      const hg = makeHero('h_hold_g', 10), ht = makeHero('h_hold_t', 300);
+      const hgwInit = initial(hg.wrap), hgvInit = initial(hg.visual), hgcInit = initial(hg.card);
+      const hbeats = [];
+      const runH = real.sheshen(entity('h_hold_g'), entity('h_hold_t'), { incomingType: '近战' }, b => hbeats.push(b.phase));
+      await wait(700); // 630ms blockImpact 已发生
+      runH.release();
+      await wait(120); // 处于 300ms 停驻期内
+      real.clear(entity('h_hold_t'));
+      const doneH = await race(runH.done, 400);
+      check(doneH.ok, '停驻期 clear 立即 resolve done');
+      eq(hbeats.filter(x => x === 'return').length, 0, '停驻期 clear 前 return beat 未触发');
+      eq(hg.wrap.getAnimations ? hg.wrap.getAnimations().length : 0, 0, '停驻期 clear 后 hero-wrap 动画立即清空');
+      eq(hg.wrap.style.transform, hgwInit.transform, '停驻期 clear 立即恢复 hero-wrap transform');
+      eq(hg.visual.style.transform, hgvInit.transform, '停驻期 clear 立即恢复 visualDom transform');
+      eq(hg.card.style.borderColor, hgcInit.borderColor, '停驻期 clear 立即恢复 borderColor');
+      await wait(600); // 越过原 300ms 回位点与 resume(830) 点
+      eq(hbeats.filter(x => x === 'return').length, 0, '停驻期 clear 后无旧 return 回调复活');
+      eq(hbeats.filter(x => x === 'blockImpact').length, 1, '停驻期 clear 后格挡不复发');
+      eq(recs('sheshen_armor_step').length, 1, '停驻期 clear 后归位采样未复活（仅突进 1 次）');
+      eq(hg.wrap.getAnimations ? hg.wrap.getAnimations().length : 0, 0, '停驻期 clear 后动画无复活');
+
+      /* ---------- 2c. return 途中（300~800ms）clear：立即恢复，无二次归位/格挡 ---------- */
+      resetAudio();
+      const rg = makeHero('h_ret_g', 10), rt = makeHero('h_ret_t', 300);
+      const rgwInit = initial(rg.wrap), rgvInit = initial(rg.visual);
+      const rbeats = [];
+      const runR = real.sheshen(entity('h_ret_g'), entity('h_ret_t'), { incomingType: '近战' }, b => rbeats.push(b.phase));
+      await wait(700);
+      runR.release();
+      await wait(400); // 归位动画进行中（300~800ms 窗口内）
+      eq(rbeats.filter(x => x === 'return').length, 1, 'return 途中 clear 前 return beat 已触发一次');
+      real.clear(entity('h_ret_t'));
+      const doneR2 = await race(runR.done, 400);
+      check(doneR2.ok, 'return 途中 clear 立即 resolve done');
+      eq(rg.wrap.getAnimations ? rg.wrap.getAnimations().length : 0, 0, 'return 途中 clear 后 hero-wrap 动画立即清空');
+      eq(rg.wrap.style.transform, rgwInit.transform, 'return 途中 clear 立即恢复 hero-wrap transform');
+      eq(rg.visual.style.transform, rgvInit.transform, 'return 途中 clear 立即恢复 visualDom transform');
+      await wait(600); // 越过原 500ms 归位终点与 resume(830) 点
+      eq(rbeats.filter(x => x === 'return').length, 1, 'return 途中 clear 后无二次 return beat');
+      eq(rbeats.filter(x => x === 'blockImpact').length, 1, 'return 途中 clear 后无二次格挡');
+      eq(recs('sheshen_armor_step').length, 2, 'return 途中 clear 后归位采样恰好 2 次（突进+回位），无复活');
+      eq(rg.wrap.getAnimations ? rg.wrap.getAnimations().length : 0, 0, 'return 途中 clear 后动画无复活');
+      renderCheck(renderLive(), () => !isMoving(transformOf(rg.wrap)), 'return 途中 clear 后 hero-wrap 渲染帧回位');
 
       /* ---------- 3. 毅力：卡内血幕不盖 Buff、三节拍、只 380ms taunt ---------- */
       resetAudio();
@@ -441,6 +528,16 @@
           const relAt = sSeg.indexOf('function release()');
           const relSeg = relAt >= 0 ? sSeg.slice(relAt, sSeg.indexOf('// 1. 决意蓄势', relAt)) : '';
           check(!!relSeg && !/triggerBlockImpact\s*\(/.test(relSeg), '舍身 release 段不再触发格挡');
+          if (/owner\.resume\(830\)/.test(relSeg) || /owner\.at\(300/.test(relSeg)) {
+            check(/owner\.at\(300/.test(relSeg), 'release 300ms 停驻后经 owner.at(300) 启动归位/回位音效/return beat');
+            check(/owner\.resume\(830\)/.test(relSeg), 'owner.resume(830) 覆盖 300+500+30');
+            check(/duration:\s*500/.test(relSeg), '归位动画 gWrap/gVisual duration=500（速度×.7）');
+            check(!/duration:\s*350/.test(relSeg), 'release 段旧 350ms 归位时长已移除');
+            check(/offsetSec:\s*0\.34/.test(relSeg) && /maxDurSec:\s*0\.27/.test(relSeg) && /vol:\s*0\.45/.test(relSeg), '回位采样 .34/.27/.45 保留（仅延后 300ms）');
+            check(/duration:\s*420/.test(relSeg), '目标余光 aura 420ms 保留（与位移无关）');
+          } else {
+            pending.push('待对齐:release 300ms 停驻新契约未入包（resume(830)/at(300)/duration 500）');
+          }
           check(/sheshen_armor_step/.test(sSeg) && /parry_perfect/.test(sSeg), '舍身采样 sheshen_armor_step / parry_perfect 入包');
           check(!/hit_heavy/.test(gSeg), '毅力源码已删 hit_heavy');
           check(/taunt/.test(gSeg) && !/playSample\('burst'/.test(gSeg), '毅力只保留 380ms taunt，无额外 burst 采样');

@@ -818,6 +818,23 @@
     .arcane-shake-light { animation: arcane-s-light 0.18s ease-out; }
     .arcane-shake-heavy { animation: arcane-s-heavy 0.32s ease-out; }
     .arcane-shake-quake { animation: arcane-s-quake 0.55s ease-out; }
+    /* 音叉 / 狮神 / 秘银镜：定稿样式，闪色保持离散步进 */
+    .arcane-tint-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 41; opacity: 0; }
+    .arcane-prop-wrap { position: fixed; pointer-events: none; z-index: 53; transform-origin: center center; will-change: transform, opacity; }
+    .arcane-webm-cv { position: fixed; pointer-events: none; z-index: 54; transform: translate(-50%, -50%); will-change: transform, opacity; }
+    @keyframes arcane-f-silence { 0% { filter: brightness(0.65) saturate(0.25) hue-rotate(45deg) drop-shadow(0 0 18px #7c3aed); } 55% { filter: brightness(0.85) saturate(0.5); } 100% { filter: none; } }
+    @keyframes arcane-f-shatter { 0% { filter: brightness(2.6) contrast(1.6) drop-shadow(0 0 22px #e0f2fe); } 45% { filter: brightness(1.5) contrast(1.25); } 100% { filter: none; } }
+    @keyframes arcane-f-lava { 0% { filter: brightness(2.8) saturate(2.2) hue-rotate(-25deg) drop-shadow(0 0 28px #f97316); } 35% { filter: brightness(1.7) saturate(1.8) drop-shadow(0 0 14px #ef4444); } 100% { filter: none; } }
+    @keyframes arcane-f-drain { 0% { filter: brightness(1.65) hue-rotate(30deg) drop-shadow(0 0 16px #38bdf8); } 100% { filter: none; } }
+    .arcane-flash-silence { animation: arcane-f-silence 0.65s steps(1) both !important; }
+    .arcane-flash-shatter { animation: arcane-f-shatter 0.48s steps(1) both !important; }
+    .arcane-flash-lava { animation: arcane-f-lava 0.72s steps(1) both !important; }
+    .arcane-flash-drain { animation: arcane-f-drain 0.45s steps(1) both !important; }
+    .arcane-item-heal { animation-timing-function: steps(1) !important; }
+    @keyframes arcane-fork-hum { 0%, 100% { transform: translate(-50%, -50%) translateX(-1.5px) scale(1); } 50% { transform: translate(-50%, -50%) translateX(1.5px) scale(1.015); } }
+    @keyframes arcane-fork-viol { 0%, 100% { transform: translate(-50%, -50%) translate(-4px, -1px) rotate(-1.6deg); } 50% { transform: translate(-50%, -50%) translate(4px, 1px) rotate(1.6deg); } }
+    @keyframes arcane-pulse-ring { 0% { transform: translate(-50%, -50%) scale(0.25); opacity: 0.92; } 100% { transform: translate(-50%, -50%) scale(2.1); opacity: 0; } }
+    @keyframes arcane-beam-slash { 0% { transform: translate(-50%, -50%) scaleX(0.08) scaleY(1.9); opacity: 0.95; } 35% { transform: translate(-50%, -50%) scaleX(1.08) scaleY(1); opacity: 1; } 100% { transform: translate(-50%, -50%) scaleX(1.25) scaleY(0.05); opacity: 0; } }
     /* L2+：敌方群攻跨排破框与受击闪色 */
     @keyframes arcane-f-melee { 0%, 45% { filter: brightness(2.4) saturate(1.9) drop-shadow(0 0 18px #ff2938); } 46%, 100% { filter: none; } }
     @keyframes arcane-f-ranged { 0%, 45% { filter: brightness(2.6) saturate(1.6) drop-shadow(0 0 20px #facc15); } 46%, 100% { filter: none; } }
@@ -4285,6 +4302,15 @@ const AUDIO_CLIP_OFFSETS = new Map([
     ['shot01.mp3', 0.025], ['xiandan.mp3', 0.006]
 ].map(([name, offset]) => [ASSET_BASE + '/' + name, offset]));
 
+const ITEM_SKILL_FX = {
+    '谐律之庇': { category:'B', audioKeys:['forkHum','bowlClear','bellPing'], videoFiles:['vfx_harmony_ripple.webm'] },
+    '静默之域': { category:'A', audioKeys:['bowlBronze','forkMute','sd_ring_blast'], videoFiles:['vfx_silence_ripple.webm','vfx_silence_crack.webm'] },
+    '碎裂之响': { category:'A', audioKeys:['fork432','sd_shatter_blast'], videoFiles:['vfx_shatter_arc.webm','vfx_shatter_spark.webm','vfx_shatter_crystal.webm'] },
+    '塞赫美特之愠': { category:'A', audioKeys:['ranshao','mx_giant_roar','crystalSnap','fire01','explosion_aoe_blast'], videoFiles:['vfx_sekhmet_lion.webm','vfx_sekhmet_pillar.webm','vfx_sekhmet_orb.webm'] },
+    '逆咒归源镜': { category:'A', audioKeys:['mirrorRing','mx_vacuum','mirrorStream','leech_flow'], videoFiles:['vfx_mirror_cage.webm','vfx_mirror_vortex.webm'] }
+};
+const itemFxAssetUrl = file => ASSET_BASE + '/' + file.split('/').map(encodeURIComponent).join('/');
+
 const CombatAudioMixer = (function () {
     let ctx = null, tracks = {}, categoryTracks = new Map(), generation = 0, nextCueId = 0, audioScope = null;
     const buffers = new Map(), decodes = new Map(), voices = new Set(), protections = new Set(), timers = new Map();
@@ -4305,6 +4331,7 @@ const CombatAudioMixer = (function () {
         try { return fn(); } finally { audioScope = previous; }
     }
     function classify(skill) {
+        if (ITEM_SKILL_FX[skill?.fxTag]) return ITEM_SKILL_FX[skill.fxTag].category;
         if (skill?.fxTag?.startsWith('group:')) return 'D';
         const damaging = [skill?.type, skill?.type2, skill?.type3].some(tag => tag && ['攻','单体','穿透','眩晕','散射'].some(word => tag.includes(word)));
         return skill?.fxTag ? damaging ? 'A' : 'B' : damaging ? 'D' : 'K';
@@ -4527,6 +4554,8 @@ const CombatAudioMixer = (function () {
     function prepareSkill(skill) {
         const keys = new Set(), tag = [skill.type, skill.type2, skill.type3].filter(Boolean).join(' ');
         if (skill.fxTag) {
+            const itemFx = ITEM_SKILL_FX[skill.fxTag];
+            if (itemFx) itemFx.audioKeys.forEach(key => keys.add(audioUrls[key]));
             const entry = WEBM_FX_REGISTRY[skill.fxTag];
             if (entry && entry.audioUrl && entry.audioUrl !== 'none') keys.add(entry.audioUrl);
             if (skill.fxTag === '远程重击') { keys.add(audioUrls.shot); keys.add(audioUrls.hitDown); }
@@ -4677,7 +4706,17 @@ const audioUrls = {
     'huoyan01': `${ASSET_BASE}/huoyan01.mp3`,
     'parry_perfect': `${ASSET_BASE}/parry_Weapon_Perfect.wav`,
     'avoid_dash_perfect': `${ASSET_BASE}/avoid_dash_fs521999.mp3`,
-    'sheshen_armor_step': `${ASSET_BASE}/sheshen_armor_step_fs705490.mp3`
+    'sheshen_armor_step': `${ASSET_BASE}/sheshen_armor_step_fs705490.mp3`,
+    // 五项奇物/技能定稿：暗铁音叉、狮吼炎与秘银镜；复用音保持根级键
+    'fork432': `${ASSET_BASE}/RpgCombat_Sound/vfx_fork_432_strike.mp3`,
+    'forkHum': `${ASSET_BASE}/RpgCombat_Sound/vfx_fork_physics_hum.mp3`,
+    'forkMute': `${ASSET_BASE}/RpgCombat_Sound/vfx_fork_muted_stop.mp3`,
+    'bowlBronze': `${ASSET_BASE}/RpgCombat_Sound/vfx_bowl_bronze_silence.mp3`,
+    'bowlClear': `${ASSET_BASE}/RpgCombat_Sound/vfx_bowl_crystal_clear.mp3`,
+    'bellPing': `${ASSET_BASE}/RpgCombat_Sound/vfx_bell_dispel_ping.mp3`,
+    'crystalSnap': `${ASSET_BASE}/RpgCombat_Sound/vfx_crystal_shatter_snap.mp3`,
+    'mirrorRing': `${ASSET_BASE}/RpgCombat_Sound/vfx_mirror_ring_activate.mp3`,
+    'mirrorStream': `${ASSET_BASE}/RpgCombat_Sound/vfx_mirror_mana_stream.mp3`
 };
 
 // 预热全量基础音效为 Blob URL，确保零延迟与 Web Audio API 无跨域限制
@@ -5128,7 +5167,7 @@ window.fxEngine = fxEngine;
 const arcaneVfxModule = (function () {
     'use strict';
     // 精确特效名；group:* 为敌方兜底群攻的内部演出键
-    const ARCANE_TAGS = ['灵风术', '纳克提特障壁术', '伊西丝之拥', '折影步', '巫师护盾', 'group:melee', 'group:ranged', 'group:spell', '飞沙化甲', '蝎眼钥匙'];
+    const ARCANE_TAGS = ['灵风术', '纳克提特障壁术', '伊西丝之拥', '折影步', '巫师护盾', 'group:melee', 'group:ranged', 'group:spell', '飞沙化甲', '蝎眼钥匙', '谐律之庇', '静默之域', '碎裂之响', '塞赫美特之愠', '逆咒归源镜'];
     const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
     const GROUP_COLORS = {
         melee: ['#fff1dc', '#ff916d', '#e53532'],
@@ -5149,11 +5188,13 @@ const arcaneVfxModule = (function () {
         layers: new Set(),     // data-arcane-fx 临时 DOM 层
         anchors: new Set(),    // impactDom 无视觉锚点
         handles: new Set(),    // 活动技能 handle
+        videos: new Set(),     // 透明 WebM 播放与解码帧清理
+        sampleAudios: new Set(), // 奇物定稿采样 cue，取消与全局清场统一止音
         flashes: new Set(),    // 被加 arcane-flash-* 类的精灵
         shakeEls: new Set(),   // 被加 arcane-shake-* 类的舞台
         driver: null,          // 挂在 fxEngine.particles 里的驱动粒子
         canvas: null, ctx: null,
-        dark: null,
+        dark: null, itemDarkOwner: null,
     };
     let audioCtx = null, sfxBus = null, sfxVerb = null, sfxNoise = null, sfxIR = null, resultOutput = false;
     const synthBuses = new Map();
@@ -5346,12 +5387,14 @@ const arcaneVfxModule = (function () {
         shard(g, p) { const s = p.size; g.fillStyle = p.fill || 'rgba(224,242,254,0.25)'; g.strokeStyle = p.color; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, -s); g.lineTo(s * 0.7, s * 0.3); g.lineTo(s * 0.1, s * 0.9); g.lineTo(-s * 0.6, s * 0.2); g.closePath(); g.fill(); g.stroke(); },
         streak(g, p) { g.strokeStyle = p.color; g.lineWidth = p.size; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 0); g.lineTo(-p.vx * 4, -p.vy * 4); g.stroke(); },
         gradRing(g, p) {
+            if (p.itemFx) return DRAW.item_gradRing(g, p);
             const out = 10 + p.size * (1 - p.life) * 44, inn = Math.max(0.1, out * 0.58);
             const gr = g.createRadialGradient(0, 0, inn, 0, 0, out);
             gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.58, p.color); gr.addColorStop(1, 'rgba(0,0,0,0)');
             g.fillStyle = gr; g.beginPath(); g.arc(0, 0, out, 0, 6.283); g.fill();
         },
         gradOrb(g, p) {
+            if (p.itemFx) return DRAW.item_gradOrb(g, p);
             const r = Math.max(1.2, p.size * (0.45 + 0.55 * p.life));
             if (p.hist && p.hist.length) {
                 const a0 = g.globalAlpha;
@@ -5372,6 +5415,7 @@ const arcaneVfxModule = (function () {
             g.fillStyle = orb; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill();
         },
         gradMist(g, p) {
+            if (p.itemFx) return DRAW.item_gradMist(g, p);
             const r = p.size * (1.72 - p.life * 0.62);
             g.save(); g.scale(p.sx || 1.45, p.sy || 0.78);
             const gr = g.createRadialGradient(-r * 0.14, 0, 0, 0, 0, r);
@@ -5380,6 +5424,7 @@ const arcaneVfxModule = (function () {
             g.restore();
         },
         gradFlare(g, p) {
+            if (p.itemFx) return DRAW.item_gradFlare(g, p);
             const r = p.size * (0.6 + 0.55 * Math.sin((1 - p.life) * Math.PI));
             const core = p.core || 'rgba(255,251,235,0.95)', col = p.color || 'rgba(167,139,250,0.6)';
             [[1, 0.15], [0.15, 1]].forEach(([sx, sy]) => {
@@ -5389,6 +5434,66 @@ const arcaneVfxModule = (function () {
                 g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r * 2.2, 0, 6.283); g.fill();
                 g.restore();
             });
+        },
+        item_gradOrb(g, p) {
+            const r = Math.max(2, p.size * (p.pulse ? (0.85 + 0.35 * Math.sin(p.life * 9)) : (0.55 + 0.45 * p.life)));
+            const gr = g.createRadialGradient(0, 0, 0, 0, 0, r);
+            gr.addColorStop(0, p.core || '#ffffff');
+            gr.addColorStop(0.26, p.mid || p.color || '#7dd3fc');
+            gr.addColorStop(0.66, p.outer || 'rgba(56,189,248,0.18)');
+            gr.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill();
+        },
+        item_gradMist(g, p) {
+            // 严禁共用亮白 core，防止暗/彩雾呈现出白心黑圈气泡伪影
+            const r = Math.max(4, p.size * (1.55 - 0.55 * p.life));
+            const gr = g.createRadialGradient(0, 0, 0, 0, 0, r);
+            gr.addColorStop(0, p.inner || 'rgba(99,102,241,0.34)');
+            gr.addColorStop(0.55, p.outer || 'rgba(49,46,129,0.14)');
+            gr.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill();
+        },
+        item_gradFlare(g, p) {
+            const rx = Math.max(4, p.rx || p.size * 3.8), ry = Math.max(2, p.ry || p.size * 0.65);
+            g.save(); g.scale(1, ry / rx);
+            const gr = g.createRadialGradient(0, 0, 0, 0, 0, rx);
+            gr.addColorStop(0, p.core || '#ffffff');
+            gr.addColorStop(0.28, p.mid || p.color || '#bae6fd');
+            gr.addColorStop(0.72, p.outer || 'rgba(14,165,233,0.15)');
+            gr.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = gr; g.beginPath(); g.arc(0, 0, rx, 0, 6.283); g.fill();
+            g.restore();
+        },
+        item_gradRing(g, p) {
+            const R = Math.max(8, (p.r0 || 12) + (p.r1 || 90) * (1 - p.life));
+            const sy = p.sy ?? 1;
+            const inner = Math.max(0, R * 0.87);
+            g.save();
+            if (sy !== 1) g.scale(1, sy);
+            const gr = g.createRadialGradient(0, 0, inner, 0, 0, R);
+            gr.addColorStop(0, 'rgba(0,0,0,0)');
+            gr.addColorStop(0.35, p.color || 'rgba(125,211,252,0.22)');
+            gr.addColorStop(0.68, p.edge || 'rgba(224,242,254,0.52)');
+            gr.addColorStop(1, 'rgba(0,0,0,0)');
+            g.globalAlpha *= 0.65;
+            g.fillStyle = gr; g.beginPath(); g.arc(0, 0, R, 0, 6.283); g.fill();
+            g.restore();
+        },
+        histOrb(g, p) {
+            const h = p.hist;
+            if (h && h.length > 1) {
+                g.save();
+                for (let i = 0; i < h.length; i++) {
+                    const pt = h[i], f = (i + 1) / h.length, x = pt.x - p.x, y = pt.y - p.y;
+                    const rr = Math.max(1.5, p.size * 0.62 * f);
+                    g.globalAlpha = Math.min(1, p.life) * f * 0.45;
+                    const tr = g.createRadialGradient(x, y, 0, x, y, rr);
+                    tr.addColorStop(0, p.core || '#fff'); tr.addColorStop(0.4, p.mid || p.color); tr.addColorStop(1, 'rgba(0,0,0,0)');
+                    g.fillStyle = tr; g.beginPath(); g.arc(x, y, rr, 0, 6.283); g.fill();
+                }
+                g.restore();
+            }
+            DRAW.item_gradOrb(g, p);
         },
         glowOrb(g, p) {
             const r = Math.max(2, p.size * (0.7 + p.life * 0.55));
@@ -5564,7 +5669,8 @@ const arcaneVfxModule = (function () {
             p.vx *= Math.pow(p.drag, k); p.vy *= Math.pow(p.drag, k);
             p.vy += p.grav * k;
             p.x += p.vx * k; p.y += p.vy * k;
-            if (p.trail) { (p.hist || (p.hist = [])).unshift([p.x, p.y]); if (p.hist.length > p.trail) p.hist.pop(); }
+            if (p.trailMax) { (p.hist || (p.hist = [])).push({ x:p.x, y:p.y }); if (p.hist.length > p.trailMax) p.hist.shift(); }
+            else if (p.trail) { (p.hist || (p.hist = [])).unshift([p.x, p.y]); if (p.hist.length > p.trail) p.hist.pop(); }
             p.rot += p.vr * k;
             p.life = Math.min(p.life - p.decay * k, Math.max(0, (p.expiresAt - performance.now()) * p.decay / 16.7));
             if (p.life <= 0) S.particles.splice(i, 1);
@@ -6730,7 +6836,7 @@ const arcaneVfxModule = (function () {
     }
     function warmIdentitySample(key) {
         const url = audioUrls[key];
-        if (!IDENTITY_CLIP_KEYS.has(key) || !url) return;
+        if ((!IDENTITY_CLIP_KEYS.has(key) && !Object.values(ITEM_SKILL_FX).some(fx => fx.audioKeys.includes(key))) || !url) return;
         return CombatAudioMixer.prepare(url);
     }
     function idSample(owner, key, optsOrVol = 0.9, rate = 1) {
@@ -10419,10 +10525,623 @@ const arcaneVfxModule = (function () {
         return handle;
     }
 
+    // ===== 奇物与技能定稿 v12.11 BEGIN =====
+    function visualCtr(el) {
+        return entityVisualRect(el) || { x:window.innerWidth * 0.5, y:window.innerHeight * 0.5, w:96, h:96, top:0, bottom:96, left:0, right:96 };
+    }
+    function tintOverlay(owner, bgGradient, durMs, peakOpacity = 0.72) {
+        const wrap = skillLayer(owner, `<div class="arcane-tint-overlay" style="background:${bgGradient};"></div>`, durMs + 60);
+        wrap.style.zIndex = '41';
+        owner.anim(wrap.firstElementChild, [{ opacity:0 }, { opacity:peakOpacity, offset:0.16 }, { opacity:peakOpacity, offset:0.76 }, { opacity:0 }], { duration:durMs, fill:'both' });
+        return wrap;
+    }
+    function itemSkillRun(totalMs) {
+        const owner = identityRun(totalMs, 1);
+        owner.handle.owner = owner;
+        owner.cancel = () => owner.handle.cancel();
+        owner.onClean(() => {
+            if (S.itemDarkOwner === owner) { if (S.dark) S.dark.remove(); S.dark = null; S.itemDarkOwner = null; }
+        });
+        return owner;
+    }
+    function itemDarken(owner, opacity) {
+        if (opacity) { darken(opacity); S.itemDarkOwner = owner; }
+        else if (S.itemDarkOwner === owner) darken(0);
+    }
+    function itemFlash(owner, dom, cls) {
+        if (cls === 'arcane-flash-heal' && dom) {
+            dom.classList.add('arcane-item-heal');
+            owner.at(700, () => dom.classList.remove('arcane-item-heal'));
+            owner.onClean(() => dom.classList.remove('arcane-item-heal'));
+        }
+        flashOwned(owner, dom, cls);
+    }
+    function playItemSample(owner, key, delaySec = 0, opts = {}) {
+        const play = () => {
+            if (owner.cancelled || owner.finished || owner.token !== combatToken || _pipelineFrozen) return;
+            const cue = playSound(key, opts.volume ?? 0.78, opts.rate ?? 1, {
+                owner, audioContext:owner.audioContext, category:owner.audioContext.category, sync:true,
+                pan:opts.pan ?? 0, offsetSec:opts.offset ?? 0, maxDurSec:opts.durCap, fadeOutSec:opts.fadeOut ?? 0
+            });
+            if (typeof cue === 'function') {
+                S.sampleAudios.add(cue);
+                cue.done.then(() => S.sampleAudios.delete(cue));
+            }
+        };
+        if (delaySec > 0) owner.at(Math.round(delaySec * 1000), play);
+        else play();
+    }
+    function flyItemBezier(owner, a, ctrl, b, dur, draw, done, ease) {
+        const valid = () => !owner.cancelled && !owner.finished && owner.token === combatToken && !_pipelineFrozen;
+        const f = flyBezier(a, ctrl, b, dur, (x, y, pr) => { if (valid()) draw(x, y, pr); }, () => {
+            owner.flights.delete(f);
+            if (valid() && done) done();
+        }, ease);
+        owner.flights.add(f); owner.retain(dur);
+        return f;
+    }
+
+    function playArcaneWebM(file, x, y, opts = {}, owner) {
+        const token = combatToken;
+        const cleanups = [];
+        const cleanup = () => { while (cleanups.length) { try { cleanups.pop()(); } catch (_) {} } S.videos.delete(cleanup); };
+        S.videos.add(cleanup);
+        owner.onClean(cleanup);
+        const startPlay = () => {
+            if (token !== combatToken || owner.cancelled || owner.finished) { cleanup(); return; }
+            const v = document.createElement('video');
+            v.muted = true; v.playsInline = true; v.preload = 'auto'; v.crossOrigin = 'anonymous';
+            const url = itemFxAssetUrl(file.indexOf('/') === -1 ? `RpmCombat_Spine/${file}` : file);
+            v.src = _fxVideoBlobCache.get(url) || url;
+            const cv = document.createElement('canvas');
+            cv.className = 'arcane-webm-cv';
+            cv.setAttribute('data-arcane-fx', 'webm');
+            cv.style.left = `${x}px`; cv.style.top = `${y}px`;
+            cv.style.zIndex = String(opts.zIndex || 54);
+            cv.style.mixBlendMode = opts.blend || 'screen';
+            cv.style.opacity = String(opts.opacity ?? 0.96);
+            if (opts.filter) cv.style.filter = opts.filter;
+            document.body.appendChild(cv);
+            let stopped = false, rafId = 0, rvfcId = 0;
+            cleanups.push(() => {
+                stopped = true;
+                if (rafId) cancelAnimationFrame(rafId);
+                if (rvfcId && v.cancelVideoFrameCallback) try { v.cancelVideoFrameCallback(rvfcId); } catch (_) {}
+                try { v.pause(); v.removeAttribute('src'); v.load(); } catch (_) {}
+                cv.remove();
+            });
+            const scale = opts.scale ?? 1.0, rate = opts.playbackRate ?? 1.0;
+            v.playbackRate = rate;
+            v.addEventListener('loadedmetadata', () => {
+                if (stopped || token !== combatToken || owner.cancelled || owner.finished) { cleanup(); return; }
+                const natW = v.videoWidth || 480, natH = v.videoHeight || 360;
+                const drawW = opts.width ? opts.width : Math.round(natW * scale);
+                const drawH = opts.height ? opts.height : Math.round(natH * scale);
+                const keyW = Math.min(drawW, 960), keyH = Math.round(keyW * (drawH / Math.max(1, drawW)));
+                cv.width = keyW; cv.height = keyH;
+                cv.style.width = `${drawW}px`; cv.style.height = `${drawH}px`;
+                if (opts.flipX) cv.style.transform = 'translate(-50%, -50%) scaleX(-1)';
+                const g = cv.getContext('2d', { willReadFrequently: true });
+                const renderFrame = () => {
+                    if (stopped || token !== combatToken || owner.cancelled || owner.finished || v.ended) { cleanup(); return; }
+                    if (v.readyState >= 2) {
+                        g.clearRect(0, 0, keyW, keyH);
+                        g.drawImage(v, 0, 0, keyW, keyH);
+                        if (opts.keyDark) {
+                            const img = g.getImageData(0, 0, keyW, keyH), d = img.data;
+                            for (let i = 0; i < d.length; i += 4) {
+                                const mx = Math.max(d[i], d[i + 1], d[i + 2]);
+                                if (mx < 10) d[i + 3] = 0;
+                                else if (mx < 26) d[i + 3] = Math.round(d[i + 3] * (mx - 10) / 16);
+                            }
+                            g.putImageData(img, 0, 0);
+                        }
+                    }
+                    if (v.requestVideoFrameCallback) rvfcId = v.requestVideoFrameCallback(renderFrame);
+                    else rafId = requestAnimationFrame(renderFrame);
+                };
+                v.play().then(() => {
+                    if (stopped || token !== combatToken || owner.cancelled || owner.finished) { cleanup(); return; }
+                    renderFrame();
+                    if (opts.onStart) opts.onStart(v);
+                }).catch(() => cleanup());
+            }, { once: true });
+            v.addEventListener('ended', cleanup, { once: true });
+            v.addEventListener('error', cleanup, { once: true });
+            if (opts.durMs) owner.at(opts.durMs, cleanup);
+        };
+        if (opts.delayMs) owner.at(opts.delayMs, startPlay);
+        else startPlay();
+        return cleanup;
+    }
+
+    function mkTuningForkGroupSvg(uid, mode = 'harmony') {
+        const palette = mode === 'harmony'
+            ? { a: '#e0f2fe', b: '#38bdf8', c: '#0c4a6e', glow: 'rgba(125,211,252,0.85)', rune: '#bae6fd' }
+            : (mode === 'silence'
+                ? { a: '#ddd6fe', b: '#7c3aed', c: '#1e1b4b', glow: 'rgba(139,92,246,0.85)', rune: '#c4b5fd' }
+                : { a: '#f8fafc', b: '#7dd3fc', c: '#0f172a', glow: 'rgba(224,242,254,0.95)', rune: '#e0f2fe' });
+        return `<svg viewBox="0 0 280 260" class="w-full h-full overflow-visible">
+            <defs>
+                <radialGradient id="fk-aura-${uid}" cx="50%" cy="44%" r="50%">
+                    <stop offset="0%" stop-color="${palette.glow}" stop-opacity="0.55"/>
+                    <stop offset="52%" stop-color="${palette.b}" stop-opacity="0.18"/>
+                    <stop offset="100%" stop-color="${palette.c}" stop-opacity="0"/>
+                </radialGradient>
+                <linearGradient id="fk-iron-${uid}" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#475569"/>
+                    <stop offset="32%" stop-color="#1e293b"/>
+                    <stop offset="72%" stop-color="#090d16"/>
+                    <stop offset="100%" stop-color="#334155"/>
+                </linearGradient>
+                <linearGradient id="fk-edge-${uid}" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="${palette.a}" stop-opacity="0.95"/>
+                    <stop offset="65%" stop-color="${palette.b}" stop-opacity="0.72"/>
+                    <stop offset="100%" stop-color="${palette.c}" stop-opacity="0.15"/>
+                </linearGradient>
+                <filter id="fk-soft-${uid}" x="-35%" y="-35%" width="170%" height="170%"><feGaussianBlur stdDeviation="3.5"/></filter>
+            </defs>
+            <circle cx="140" cy="118" r="112" fill="url(#fk-aura-${uid})"/>
+            <g opacity="0.72" style="transform-origin:140px 118px;animation:arcane-slow-rot 18s linear infinite;">
+                <circle cx="140" cy="118" r="88" fill="none" stroke="url(#fk-edge-${uid})" stroke-width="1.4" stroke-dasharray="14 8 3 8"/>
+                <circle cx="140" cy="118" r="68" fill="none" stroke="url(#fk-edge-${uid})" stroke-width="0.9" stroke-dasharray="4 10"/>
+            </g>
+            <!-- 左副短音叉 -->
+            <g transform="translate(82,126) rotate(-14) scale(0.68)">
+                <rect x="-14" y="-88" width="6" height="68" rx="3" fill="url(#fk-iron-${uid})"/>
+                <rect x="8" y="-88" width="6" height="68" rx="3" fill="url(#fk-iron-${uid})"/>
+                <path d="M-11 -22 Q-11 2 0 4 Q11 2 11 -22" fill="none" stroke="url(#fk-iron-${uid})" stroke-width="6.5" stroke-linecap="round"/>
+                <rect x="-3.5" y="2" width="7" height="44" rx="3.5" fill="url(#fk-iron-${uid})"/>
+                <circle cx="0" cy="48" r="5.5" fill="url(#fk-edge-${uid})"/>
+            </g>
+            <!-- 右副中音叉 -->
+            <g transform="translate(198,124) rotate(13) scale(0.78)">
+                <rect x="-15" y="-98" width="6.5" height="76" rx="3" fill="url(#fk-iron-${uid})"/>
+                <rect x="8.5" y="-98" width="6.5" height="76" rx="3" fill="url(#fk-iron-${uid})"/>
+                <path d="M-11.5 -24 Q-11.5 2 0 4 Q11.5 2 11.5 -24" fill="none" stroke="url(#fk-iron-${uid})" stroke-width="7" stroke-linecap="round"/>
+                <rect x="-3.5" y="2" width="7" height="48" rx="3.5" fill="url(#fk-iron-${uid})"/>
+                <circle cx="0" cy="52" r="6" fill="url(#fk-edge-${uid})"/>
+            </g>
+            <!-- 中央主长音叉（密大深海暗铁流物符文） -->
+            <g transform="translate(140,122)">
+                <rect x="-22" y="-110" width="9" height="90" rx="4.5" fill="url(#fk-iron-${uid})"/>
+                <rect x="13" y="-110" width="9" height="90" rx="4.5" fill="url(#fk-iron-${uid})"/>
+                <rect x="-22" y="-110" width="9" height="90" rx="4.5" fill="url(#fk-edge-${uid})" opacity="0.58" filter="url(#fk-soft-${uid})"/>
+                <rect x="13" y="-110" width="9" height="90" rx="4.5" fill="url(#fk-edge-${uid})" opacity="0.58" filter="url(#fk-soft-${uid})"/>
+                <path d="M-17.5 -22 Q-17.5 10 0 12 Q17.5 10 17.5 -22" fill="none" stroke="url(#fk-iron-${uid})" stroke-width="9" stroke-linecap="round"/>
+                <path d="M-17.5 -22 Q-17.5 10 0 12 Q17.5 10 17.5 -22" fill="none" stroke="url(#fk-edge-${uid})" stroke-width="2.4" stroke-linecap="round"/>
+                <rect x="-4.5" y="10" width="9" height="62" rx="4.5" fill="url(#fk-iron-${uid})"/>
+                <circle cx="0" cy="76" r="8" fill="url(#fk-edge-${uid})"/>
+                <path d="M-17.5 -86 L-17.5 -46 M17.5 -86 L17.5 -46 M0 22 L0 58" stroke="${palette.rune}" stroke-width="1.3" stroke-dasharray="3 4" opacity="0.9"/>
+            </g>
+        </svg>`;
+    }
+    function playHarmonyShelter(caster, targets) {
+        const token = combatToken, uid = ++S.uid;
+        const owner = itemSkillRun(2300), handle = owner.handle;
+        const after = owner.at, every = owner.every, fsLayer = (markup, ms) => skillLayer(owner, markup, ms);
+        const addP = p => owner.addP(Object.assign({ itemFx:true }, p)), burst = (n, fn) => { for (let i = 0; i < n; i++) addP(fn(i)); };
+        const playSfxSample = (key, delay, opts) => playItemSample(owner, key, delay, opts);
+        const playWebMFX = (file, x, y, opts) => playArcaneWebM(file, x, y, opts, owner);
+        const darken = opacity => itemDarken(owner, opacity), flash = (dom, cls) => itemFlash(owner, dom, cls);
+        const doms = teamSprites(caster);
+        const rawDoms = (targets || []).map(domOf).filter(Boolean);
+        const allyDoms = doms.length ? doms : rawDoms;
+        const box = unionRect(allyDoms) || { x: window.innerWidth * 0.4, y: window.innerHeight * 0.72, w: 520, h: 160 };
+        const forkPos = { x: window.innerWidth * 0.5, y: Math.max(150, window.innerHeight * 0.34) };
+
+        darken(0.55);
+        tintOverlay(owner, 'radial-gradient(ellipse at 50% 60%, rgba(14,116,144,0.34) 0%, rgba(15,23,42,0.58) 72%, rgba(2,6,23,0.82) 100%)', 2300, 0.78);
+        playSfxSample('forkHum', 0.08, { volume: 0.85, fadeOut: 0.5 });
+        playSfxSample('bowlClear', 0.82, { volume: 0.72, fadeOut: 0.6 });
+
+        const propWrap = fsLayer(`<div class="arcane-fs-anchor" style="left:${forkPos.x}px; top:${forkPos.y}px; width:260px; height:240px;">${mkTuningForkGroupSvg(uid, 'harmony')}</div>`, 2250);
+        const propEl = propWrap.firstElementChild;
+        owner.anim(propEl, [
+            { transform: 'translate(-50%, -50%) scale(0.55)', opacity: 0 },
+            { transform: 'translate(-50%, -50%) scale(1)', opacity: 1, offset: 0.14 },
+            { transform: 'translate(-50%, -50%) scale(1.06)', opacity: 1, offset: 0.86 },
+            { transform: 'translate(-50%, -50%) scale(0.85)', opacity: 0 }
+        ], { duration: 2150, fill: 'both' });
+
+        after(120, () => {
+            if (token !== combatToken) return;
+            propEl.style.animation = 'arcane-fork-hum 0.11s linear infinite';
+            burst(16, () => { const a = rnd(0, 6.283), s = rnd(1.5, 4); return { x: forkPos.x + 18, y: forkPos.y - 45, vx: Math.cos(a) * s, vy: Math.sin(a) * s, drag: 0.93, decay: 0.04, size: rnd(10, 18), shape: 'gradOrb', core: '#ffffff', mid: '#7dd3fc', outer: 'rgba(14,165,233,0.12)' }; });
+            addP({ x: forkPos.x + 16, y: forkPos.y - 42, shape: 'gradFlare', rx: 64, ry: 12, decay: 0.06, core: '#fff', mid: '#bae6fd', outer: 'rgba(56,189,248,0.1)' });
+        });
+
+        // 蓄势阶段聚拢光尘与双道青银音律涟漪
+        const cId = every(90, () => {
+            if (token !== combatToken) return;
+            allyDoms.forEach(d => {
+                const c = visualCtr(d), ang = rnd(0, 6.283), rad = rnd(58, 92);
+                addP({ x: c.x + Math.cos(ang) * rad, y: c.y + Math.sin(ang) * rad, vx: -Math.cos(ang) * 2.4, vy: -Math.sin(ang) * 2.2 - 0.5, drag: 0.96, decay: 0.04, size: rnd(6, 12), shape: 'gradOrb', core: '#ffffff', mid: '#38bdf8', outer: 'rgba(186,230,253,0.08)' });
+            });
+        });
+        after(820, () => stopEvery(cId));
+
+        after(900, () => {
+            if (token !== combatToken) return;
+            shake('light');
+            addP({ x: box.x, y: box.y + 12, shape: 'gradRing', sy: 0.36, r0: 45, r1: 380, decay: 0.025, color: 'rgba(186,230,253,0.28)', edge: 'rgba(224,242,254,0.58)' });
+            playWebMFX('vfx_harmony_ripple.webm', box.x, box.y + 18, { width: Math.max(540, box.w * 1.15), height: 210, opacity: 0.94, blend: 'screen', durMs: 1450 });
+            allyDoms.forEach((d, idx) => {
+                const c = visualCtr(d), rw = Math.max(82, c.w * 1.15), rh = Math.max(38, c.h * 0.42);
+                const halo = fsLayer(`<div class="arcane-fs-anchor" style="left:${c.x}px; top:${c.bottom - 6}px; width:${rw}px; height:${rh}px; border-radius:50%; background:radial-gradient(ellipse at 50% 50%, transparent 48%, rgba(56,189,248,0.42) 76%, rgba(186,230,253,0.55) 86%, transparent 100%); box-shadow:0 0 18px rgba(125,211,252,0.45);"></div>`, 1350);
+                owner.anim(halo.firstElementChild, [{ transform: 'translate(-50%,-50%) scale(0.75)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1.06)', opacity: 0.92, offset: 0.25 }, { transform: 'translate(-50%,-50%) scale(1.18)', opacity: 0 }], { duration: 1250, delay: idx * 45, fill: 'both' });
+                flash(d, 'arcane-flash-heal');
+                burst(14, () => ({ x: c.x + rnd(-c.w * 0.42, c.w * 0.42), y: c.y + rnd(-c.h * 0.25, c.h * 0.35), vx: rnd(-0.6, 0.6), vy: rnd(-2.4, -0.8), drag: 0.97, decay: rnd(0.018, 0.03), size: rnd(7, 14), shape: 'gradOrb', core: '#ffffff', mid: '#7dd3fc', outer: 'rgba(186,230,253,0.1)' }));
+                burst(4, () => ({ x: c.x + rnd(-26, 26), y: c.y + rnd(-20, 20), vx: rnd(-0.3, 0.3), vy: rnd(-0.9, -0.3), drag: 0.99, decay: 0.018, size: rnd(26, 40), shape: 'gradMist', blend: 'screen', inner: 'rgba(125,211,252,0.26)', outer: 'rgba(14,116,144,0.08)' }));
+            });
+        });
+
+        after(1950, () => darken(0));
+        handle.dispel = tDom => {
+            if (owner.cancelled || owner.finished || token !== combatToken || !tDom) return;
+            const c = visualCtr(tDom);
+            playSfxSample('bellPing', 0, { volume:0.72, pan:Math.max(-0.8, Math.min(0.8, (c.x / window.innerWidth - 0.5) * 1.4)) });
+            addP({ x:c.x, y:c.y, shape:'gradRing', r0:14, r1:92, decay:0.04, color:'rgba(224,242,254,0.6)', edge:'#fff' });
+            addP({ x:c.x, y:c.y, shape:'gradFlare', rx:78, ry:14, decay:0.05, core:'#ffffff', mid:'#bae6fd', outer:'rgba(56,189,248,0.12)' });
+            burst(18, () => ({ x:c.x + rnd(-24,24), y:c.y + rnd(-12,24), vx:rnd(-1.2,1.2), vy:rnd(-3.2,-1), drag:0.95, decay:rnd(0.025,0.045), size:rnd(8,16), shape:'gradOrb', core:'#ffffff', mid:'#e0f2fe', outer:'rgba(56,189,248,0.1)' }));
+        };
+        return handle;
+    }
+
+    function playSilenceDomain(caster, targets) {
+        const token = combatToken, uid = ++S.uid;
+        const owner = itemSkillRun(2400), handle = owner.handle;
+        const after = owner.at, every = owner.every, fsLayer = (markup, ms) => skillLayer(owner, markup, ms);
+        const addP = p => owner.addP(Object.assign({ itemFx:true }, p)), burst = (n, fn) => { for (let i = 0; i < n; i++) addP(fn(i)); };
+        const playSfxSample = (key, delay, opts) => playItemSample(owner, key, delay, opts);
+        const playWebMFX = (file, x, y, opts) => playArcaneWebM(file, x, y, opts, owner);
+        const darken = opacity => itemDarken(owner, opacity), flash = (dom, cls) => itemFlash(owner, dom, cls);
+        const eDoms = (targets || []).map(domOf).filter(Boolean);
+        const fallbackDoms = enemiesData.filter(e => e.isAlive).map(domOf).filter(Boolean);
+        const activeDoms = eDoms.length ? eDoms : fallbackDoms;
+        const box = unionRect(activeDoms) || { x: window.innerWidth * 0.52, y: window.innerHeight * 0.34, w: 540, h: 180 };
+        const forkPos = { x: box.x, y: Math.max(96, box.y - 68) };
+
+        darken(0.70);
+        tintOverlay(owner, 'radial-gradient(ellipse at 50% 35%, rgba(76,29,149,0.44) 0%, rgba(30,27,75,0.68) 65%, rgba(5,5,18,0.9) 100%)', 2400, 0.85);
+        playSfxSample('bowlBronze', 0.04, { volume: 0.82, rate: 0.88, durCap: 0.82, fadeOut: 0.12 });
+        playSfxSample('forkMute', 0.84, { volume: 0.85 });
+        playSfxSample('sd_ring_blast', 0.95, { volume: 0.82 });
+
+        const propWrap = fsLayer(`<div class="arcane-fs-anchor" style="left:${forkPos.x}px; top:${forkPos.y}px; width:240px; height:220px;">${mkTuningForkGroupSvg(uid, 'silence')}</div>`, 2250);
+        const propEl = propWrap.firstElementChild;
+        owner.anim(propEl, [
+            { transform: 'translate(-50%, -50%) rotate(180deg) scale(0.55)', opacity: 0 },
+            { transform: 'translate(-50%, -50%) rotate(180deg) scale(1)', opacity: 0.98, offset: 0.16 },
+            { transform: 'translate(-50%, -50%) rotate(180deg) scale(1.04)', opacity: 0.96, offset: 0.84 },
+            { transform: 'translate(-50%, -50%) rotate(180deg) scale(0.9)', opacity: 0 }
+        ], { duration: 2150, fill: 'both' });
+
+        // 0-840ms 低频压迫向心收缩；840ms 触发 110ms 绝对静默骤停反差
+        const sId = every(75, () => {
+            if (token !== combatToken) return;
+            const ang = rnd(0, 6.283), rx = rnd(140, 290), ry = rnd(60, 120);
+            addP({ x: box.x + Math.cos(ang) * rx, y: box.y + Math.sin(ang) * ry, vx: -Math.cos(ang) * 3.8, vy: -Math.sin(ang) * 1.9, drag: 0.96, decay: 0.045, size: rnd(18, 30), shape: 'gradMist', blend: 'source-over', inner: 'rgba(109,40,217,0.38)', outer: 'rgba(30,27,75,0.12)' });
+        });
+        after(830, () => {
+            stopEvery(sId);
+            if (token !== combatToken) return;
+            propEl.style.animation = 'none';
+            fxEngine.hitStop = 105; // 110ms "绝对静默" 定帧
+        });
+
+        after(950, () => {
+            if (token !== combatToken) return;
+            shake('heavy');
+            playWebMFX('vfx_silence_ripple.webm', box.x, box.y + 38, { width: Math.max(620, box.w * 1.25), height: 220, opacity: 0.96, blend: 'screen', durMs: 1450 });
+            playWebMFX('vfx_silence_crack.webm', box.x, box.y + 28, { width: Math.max(480, box.w * 0.95), height: 210, opacity: 0.58, blend: 'screen', durMs: 1350 });
+            addP({ x: box.x, y: box.y + 24, shape: 'gradRing', sy: 0.42, r0: 36, r1: 380, decay: 0.022, color: 'rgba(139,92,246,0.32)', edge: 'rgba(221,214,254,0.52)' });
+            activeDoms.forEach(d => {
+                const c = visualCtr(d);
+                flash(d, 'arcane-flash-silence');
+                burst(8, () => ({ x: c.x + rnd(-22, 22), y: c.y + rnd(-16, 20), vx: rnd(-1.4, 1.4), vy: rnd(-0.8, 0.8), drag: 0.95, decay: 0.02, size: rnd(26, 44), shape: 'gradMist', blend: 'source-over', inner: 'rgba(91,33,182,0.42)', outer: 'rgba(17,24,39,0.14)' }));
+                burst(6, () => ({ x: c.x + rnd(-18, 18), y: c.y + rnd(-18, 18), vx: rnd(-1.6, 1.6), vy: rnd(-1.6, 1.6), drag: 0.92, decay: 0.032, size: rnd(5, 10), shape: 'gradOrb', core: '#f5f3ff', mid: '#8b5cf6', outer: 'rgba(76,29,149,0.14)' }));
+            });
+        });
+
+        after(2020, () => darken(0));
+        return handle;
+    }
+
+    function playShatterResonance(caster, targets) {
+        const token = combatToken, uid = ++S.uid;
+        const owner = itemSkillRun(2500), handle = owner.handle;
+        const after = owner.at, every = owner.every, fsLayer = (markup, ms) => skillLayer(owner, markup, ms);
+        const addP = p => owner.addP(Object.assign({ itemFx:true }, p)), burst = (n, fn) => { for (let i = 0; i < n; i++) addP(fn(i)); };
+        const playSfxSample = (key, delay, opts) => playItemSample(owner, key, delay, opts);
+        const playWebMFX = (file, x, y, opts) => playArcaneWebM(file, x, y, opts, owner);
+        const darken = opacity => itemDarken(owner, opacity), flash = (dom, cls) => itemFlash(owner, dom, cls);
+        const eDoms = (targets || []).map(domOf).filter(Boolean);
+        const activeDoms = eDoms.length ? eDoms : enemiesData.filter(e => e.isAlive).map(domOf).filter(Boolean);
+        const box = unionRect(activeDoms) || { x: window.innerWidth * 0.52, y: window.innerHeight * 0.34, w: 540, h: 180 };
+        const forkPos = { x: box.x, y: Math.max(120, box.y - 30) };
+
+        darken(0.70);
+        tintOverlay(owner, 'radial-gradient(ellipse at 50% 35%, rgba(14,165,233,0.22) 0%, rgba(15,23,42,0.72) 64%, rgba(2,6,23,0.92) 100%)', 2500, 0.84);
+        // 三连音叉高频递进起振 + 爆破音
+        [0, 270, 540].forEach((ms, idx) => {
+            after(ms, () => {
+                if (token !== combatToken) return;
+                playSfxSample('fork432', 0, { volume: 0.65 + idx * 0.1, rate: 0.95 + idx * 0.19, durCap: 0.85, fadeOut: 0.25 });
+                addP({ x: box.x, y: box.y, shape: 'gradOrb', size: 22 + idx * 14, decay: 0.08, core: '#fff', mid: '#bae6fd', outer: 'rgba(56,189,248,0.18)' });
+                burst(10 + idx * 6, () => { const a = rnd(0, 6.283), r = rnd(95, 165); return { x: box.x + Math.cos(a) * r, y: box.y + Math.sin(a) * r * 0.65, vx: -Math.cos(a) * (4 + idx), vy: -Math.sin(a) * (2.6 + idx * 0.7), drag: 0.94, decay: 0.08, size: rnd(6, 12), shape: 'gradOrb', core: '#ffffff', mid: '#7dd3fc', outer: 'rgba(14,165,233,0.1)' }; });
+            });
+        });
+        playSfxSample('sd_shatter_blast', 0.95, { volume: 0.9 });
+
+        const propWrap = fsLayer(`<div class="arcane-fs-anchor" style="left:${forkPos.x}px; top:${forkPos.y}px; width:250px; height:230px;">${mkTuningForkGroupSvg(uid, 'shatter')}</div>`, 1900);
+        const propEl = propWrap.firstElementChild;
+        owner.anim(propEl, [
+            { transform: 'translate(-50%, -50%) scale(0.65)', opacity: 0 },
+            { transform: 'translate(-50%, -50%) scale(1.06)', opacity: 1, offset: 0.18 },
+            { transform: 'translate(-50%, -50%) scale(1.18)', opacity: 1, offset: 0.56 },
+            { transform: 'translate(-50%, -50%) scale(1.45)', opacity: 0 }
+        ], { duration: 1080, fill: 'both' });
+        after(300, () => { if (token === combatToken) propEl.style.animation = 'arcane-fork-viol 0.075s linear infinite'; });
+        after(830, () => { if (token === combatToken) fxEngine.hitStop = 105; });
+
+        after(950, () => {
+            if (token !== combatToken) return;
+            shake('quake');
+            // 贯穿全屏的冷银过载音爆撕裂光带
+            fsLayer(`<div style="position:fixed; left:50%; top:${box.y}px; width:130vw; height:58px; transform:translate(-50%,-50%); background:linear-gradient(90deg, transparent 0%, rgba(186,230,253,0.75) 22%, #ffffff 50%, rgba(186,230,253,0.75) 78%, transparent 100%); filter:blur(2px); animation:arcane-beam-slash 0.42s ease-out both;"></div>`, 480);
+            playWebMFX('vfx_shatter_arc.webm', box.x, box.y, { width: Math.max(660, box.w * 1.32), height: 320, opacity: 0.98, blend: 'screen', durMs: 950 });
+            addP({ x: box.x, y: box.y + 10, shape: 'gradRing', sy: 0.44, r0: 25, r1: 420, decay: 0.028, color: 'rgba(186,230,253,0.34)', edge: 'rgba(224,242,254,0.62)' });
+            addP({ x: box.x, y: box.y, shape: 'gradFlare', rx: 320, ry: 22, decay: 0.045, core: '#ffffff', mid: '#e0f2fe', outer: 'rgba(56,189,248,0.12)' });
+            activeDoms.forEach((d, idx) => {
+                const c = visualCtr(d);
+                flash(d, 'arcane-flash-shatter');
+                if (idx % 2 === 0 || idx === activeDoms.length - 1) {
+                    playWebMFX('vfx_shatter_spark.webm', c.x, c.y, { width: 220, height: 220, opacity: 0.95, blend: 'screen', delayMs: idx * 35, durMs: 620 });
+                }
+                burst(14, () => { const an = rnd(0, 6.283), sp = rnd(3, 10.5); return { x: c.x, y: c.y, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp - 1, grav: 0.16, drag: 0.93, decay: rnd(0.025, 0.048), size: rnd(6, 13), shape: 'gradOrb', core: '#ffffff', mid: '#bae6fd', outer: 'rgba(14,165,233,0.12)' }; });
+                burst(7, () => { const an = rnd(0, 6.283), sp = rnd(2.2, 7.5); return { x: c.x, y: c.y, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp - 1.5, grav: 0.22, drag: 0.95, rot: rnd(0, 6.28), vr: rnd(-0.22, 0.22), decay: 0.032, size: rnd(5, 9), shape: 'shard', fill: 'rgba(148,163,184,0.35)', color: '#e0f2fe' }; });
+            });
+        });
+
+        after(2050, () => darken(0));
+        handle.hit = targetOrType => {
+            const tDom = typeof targetOrType === 'string' ? activeDoms[0] : targetOrType;
+            if (owner.cancelled || owner.finished || token !== combatToken || !tDom) return;
+            const c = visualCtr(tDom);
+            addP({ x:c.x, y:c.y, shape:'gradFlare', rx:95, ry:18, decay:0.06, core:'#ffffff', mid:'#bae6fd', outer:'rgba(56,189,248,0.15)' });
+            burst(12, () => { const a = rnd(0,6.283), s = rnd(3,8); return { x:c.x, y:c.y, vx:Math.cos(a)*s, vy:Math.sin(a)*s, drag:0.93, decay:0.04, size:rnd(5,11), shape:'gradOrb', core:'#fff', mid:'#7dd3fc', outer:'rgba(14,165,233,0.1)' }; });
+        };
+        return handle;
+    }
+
+    function playReverseSpellMirror(caster, targets) {
+        const token = combatToken, uid = ++S.uid;
+        const owner = itemSkillRun(1250), handle = owner.handle;
+        const after = owner.at, every = owner.every, fsLayer = (markup, ms) => skillLayer(owner, markup, ms);
+        const addP = p => owner.addP(Object.assign({ itemFx:true }, p)), burst = (n, fn) => { for (let i = 0; i < n; i++) addP(fn(i)); };
+        const playSfxSample = (key, delay, opts) => playItemSample(owner, key, delay, opts);
+        const playWebMFX = (file, x, y, opts) => playArcaneWebM(file, x, y, opts, owner);
+        const darken = opacity => itemDarken(owner, opacity), flash = (dom, cls) => itemFlash(owner, dom, cls);
+        const tDom = domOf((targets && targets[0]) || enemiesData.find(e => e.isAlive));
+        const cDom = domOf(caster || heroesData.find(h => h.isAlive));
+        const tp = visualCtr(tDom), cp = visualCtr(cDom);
+
+        darken(0.28); // L2 层次轻压暗，与 L3/L4 明确拉出梯度
+        playSfxSample('mirrorRing', 0, { volume: 0.8 });
+        playSfxSample('mx_vacuum', 0, { volume: 0.85 });
+        playSfxSample('mirrorStream', 0.42, { volume: 0.82, durCap: 0.95, fadeOut: 0.25 });
+        playSfxSample('leech_flow', 0.42, { volume: 0.82, durCap: 0.95, fadeOut: 0.25 });
+
+        // 敌方目标前显化纯 SVG 传奇秘银魔镜
+        const mirrorHtml = `<div class="arcane-fs-anchor" style="left:${tp.x}px; top:${tp.y}px; width:136px; height:164px;">
+            <svg viewBox="0 0 140 168" class="w-full h-full overflow-visible">
+                <defs>
+                    <radialGradient id="mr-glass-${uid}" cx="45%" cy="40%" r="55%">
+                        <stop offset="0%" stop-color="#e0f2fe" stop-opacity="0.95"/>
+                        <stop offset="32%" stop-color="#3b82f6" stop-opacity="0.72"/>
+                        <stop offset="72%" stop-color="#4c1d95" stop-opacity="0.88"/>
+                        <stop offset="100%" stop-color="#0f172a" stop-opacity="0.95"/>
+                    </radialGradient>
+                    <linearGradient id="mr-silver-${uid}" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#f1f5f9"/>
+                        <stop offset="45%" stop-color="#94a3b8"/>
+                        <stop offset="100%" stop-color="#475569"/>
+                    </linearGradient>
+                    <filter id="mr-blur-${uid}" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.5"/></filter>
+                </defs>
+                <ellipse cx="70" cy="76" rx="50" ry="62" fill="rgba(59,130,246,0.22)" filter="url(#mr-blur-${uid})"/>
+                <ellipse cx="70" cy="76" rx="44" ry="56" fill="url(#mr-glass-${uid})" stroke="url(#mr-silver-${uid})" stroke-width="5"/>
+                <ellipse cx="70" cy="76" rx="36" ry="47" fill="none" stroke="#bae6fd" stroke-width="1" stroke-dasharray="6 4" opacity="0.85"/>
+                <path d="M70 28 L76 68 L104 76 L76 84 L70 124 L64 84 L36 76 L64 68 Z" fill="#e0f2fe" opacity="0.65" filter="url(#mr-blur-${uid})"/>
+                <path d="M58 134 L82 134 L74 156 L66 156 Z" fill="url(#mr-silver-${uid})"/>
+                <circle cx="70" cy="14" r="6" fill="#60a5fa"/>
+            </svg>
+        </div>`;
+        const mLayer = fsLayer(mirrorHtml, 1180);
+        owner.anim(mLayer.firstElementChild, [
+            { transform: 'translate(-50%,-50%) scale(0.35)', opacity: 0 },
+            { transform: 'translate(-50%,-50%) scale(1.06)', opacity: 0.98, offset: 0.24 },
+            { transform: 'translate(-50%,-50%) scale(1)', opacity: 0.95, offset: 0.78 },
+            { transform: 'translate(-50%,-50%) scale(0.7)', opacity: 0 }
+        ], { duration: 1120, fill: 'both' });
+        playWebMFX('vfx_mirror_cage.webm', tp.x, tp.y, { width: 190, height: 205, opacity: 0.9, blend: 'screen', durMs: 920 });
+
+        // 420ms 爆发：共享贝塞尔控制点，SVG 流光与 Canvas histOrb 双轨同步自敌人倒灌施法者
+        after(420, () => {
+            if (token !== combatToken) return;
+            const mx = (tp.x + cp.x) * 0.5, my = Math.min(tp.y, cp.y) - 96;
+            const trailSvg = fsLayer(`<svg viewBox="0 0 ${window.innerWidth} ${window.innerHeight}" class="w-full h-full">
+                <defs><linearGradient id="mr-tr-${uid}" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#c084fc" stop-opacity="0.2"/><stop offset="55%" stop-color="#38bdf8" stop-opacity="0.95"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0.95"/></linearGradient></defs>
+                <path id="mr-p-${uid}" d="M${tp.x},${tp.y} Q${mx},${my} ${cp.x},${cp.y}" fill="none" stroke="url(#mr-tr-${uid})" stroke-width="5" stroke-linecap="round" pathLength="100" stroke-dasharray="32 100" stroke-dashoffset="32"/>
+            </svg>`, 640);
+            const pathEl = trailSvg.querySelector('path');
+            if (pathEl && pathEl.animate) owner.anim(pathEl, [{ strokeDashoffset: 32, opacity: 0.95 }, { strokeDashoffset: -102, opacity: 0.85 }, { strokeDashoffset: -130, opacity: 0 }], { duration: 480, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'both' });
+            if (tDom) flash(tDom, 'arcane-flash-silence');
+
+            for (let s = 0; s < 4; s++) {
+                after(s * 28, () => {
+                    if (token !== combatToken) return;
+                    flyItemBezier(owner, tp, { x:mx, y:my }, cp, 410, (x, y) => {
+                        if (token !== combatToken) return;
+                        addP({ x, y, shape: 'histOrb', trailMax: 14, size: 12 - s * 1.4, decay: 0.11, core: '#ffffff', mid: s % 2 ? '#a855f7' : '#38bdf8', outer: 'rgba(59,130,246,0.16)' });
+                        if (Math.random() < 0.55) addP({ x: x + rnd(-6, 6), y: y + rnd(-6, 6), vx: rnd(-0.6, 0.6), vy: rnd(-0.6, 0.6), decay: 0.06, size: rnd(4, 7), shape: 'gradOrb', core: '#e0f2fe', mid: '#60a5fa', outer: 'rgba(139,92,246,0.08)' });
+                    }, () => {
+                        if (token !== combatToken || s !== 0) return;
+                        shake('light');
+                        if (cDom) flash(cDom, 'arcane-flash-drain');
+                        playWebMFX('vfx_mirror_vortex.webm', cp.x, cp.y, { width: 175, height: 180, opacity: 0.92, blend: 'screen', durMs: 650 });
+                        addP({ x: cp.x, y: cp.y, shape: 'gradRing', r0: 12, r1: 88, decay: 0.04, color: 'rgba(56,189,248,0.5)', edge: '#e0f2fe' });
+                        addP({ x: cp.x, y: cp.y, shape: 'gradFlare', rx: 74, ry: 12, decay: 0.055, core: '#ffffff', mid: '#38bdf8', outer: 'rgba(99,102,241,0.15)' });
+                        burst(16, () => { const a = rnd(0, 6.283), sp = rnd(1.5, 4.5); return { x: cp.x, y: cp.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, drag: 0.94, decay: 0.035, size: rnd(6, 12), shape: 'gradOrb', core: '#ffffff', mid: pick(['#38bdf8', '#a855f7']), outer: 'rgba(59,130,246,0.1)' }; });
+                    }, k => k * (1.8 - 0.8 * k));
+                });
+            }
+        });
+
+        after(980, () => darken(0));
+        return handle;
+    }
+
+    function playSekhmetWrath(caster, targets) {
+        const token = combatToken, uid = ++S.uid;
+        const owner = itemSkillRun(3500), handle = owner.handle;
+        const after = owner.at, every = owner.every, fsLayer = (markup, ms) => skillLayer(owner, markup, ms);
+        const addP = p => owner.addP(Object.assign({ itemFx:true }, p)), burst = (n, fn) => { for (let i = 0; i < n; i++) addP(fn(i)); };
+        const playSfxSample = (key, delay, opts) => playItemSample(owner, key, delay, opts);
+        const playWebMFX = (file, x, y, opts) => playArcaneWebM(file, x, y, opts, owner);
+        const darken = opacity => itemDarken(owner, opacity), flash = (dom, cls) => itemFlash(owner, dom, cls);
+        const tDom = domOf((targets && targets[0]) || enemiesData.find(e => e.isAlive));
+        const tp = visualCtr(tDom);
+        const sx = Math.round(window.innerWidth * 0.45), sy = Math.round(window.innerHeight * 0.49);
+
+        darken(0.86);
+        tintOverlay(owner, 'radial-gradient(ellipse at 50% 48%, rgba(194,65,12,0.34) 0%, rgba(69,10,10,0.68) 60%, rgba(5,2,4,0.95) 100%)', 3500, 0.92);
+        playSfxSample('ranshao', 0.04, { volume: 0.72 });
+        playSfxSample('mx_giant_roar', 1.24, { volume: 0.88 });
+        playSfxSample('crystalSnap', 1.26, { volume: 0.86 });
+        playSfxSample('fire01', 1.46, { volume: 0.88 });
+        playSfxSample('explosion_aoe_blast', 1.48, { volume: 0.82 });
+
+        // SVG 精雕暗红晶石狮首女躯神像 + 古埃及太阳圣轮
+        const idolHtml = `<div class="arcane-fs-anchor" style="left:${sx}px; top:${sy}px; width:240px; height:260px;">
+            <svg viewBox="0 0 240 260" class="w-full h-full overflow-visible">
+                <defs>
+                    <radialGradient id="sk-sun-${uid}" cx="50%" cy="46%" r="52%"><stop offset="0%" stop-color="#fef08a" stop-opacity="0.88"/><stop offset="40%" stop-color="#ef4444" stop-opacity="0.45"/><stop offset="100%" stop-color="#450a0a" stop-opacity="0"/></radialGradient>
+                    <linearGradient id="sk-ruby-${uid}" x1="15%" y1="0%" x2="85%" y2="100%"><stop offset="0%" stop-color="#fca5a5"/><stop offset="28%" stop-color="#dc2626"/><stop offset="72%" stop-color="#7f1d1d"/><stop offset="100%" stop-color="#2a0808"/></linearGradient>
+                    <linearGradient id="sk-gold-${uid}" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fef9c3"/><stop offset="50%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#b45309"/></linearGradient>
+                    <filter id="sk-blur-${uid}" x="-35%" y="-35%" width="170%" height="170%"><feGaussianBlur stdDeviation="4"/></filter>
+                </defs>
+                <circle cx="120" cy="126" r="118" fill="url(#sk-sun-${uid})"/>
+                <g opacity="0.82" style="transform-origin:120px 126px;animation:arcane-slow-rot 14s linear infinite;">
+                    <circle cx="120" cy="126" r="98" fill="none" stroke="url(#sk-gold-${uid})" stroke-width="2" stroke-dasharray="18 8 4 8"/>
+                    <circle cx="120" cy="126" r="78" fill="none" stroke="#f87171" stroke-width="1.2" stroke-dasharray="6 10"/>
+                </g>
+                <!-- 古埃及神庙阶梯底座 + 黄金双羽护翼 -->
+                <path d="M74 224 L166 224 L154 206 L86 206 Z" fill="url(#sk-ruby-${uid})"/>
+                <path d="M86 206 L154 206 L144 196 L96 196 Z" fill="#450a0a"/>
+                <path d="M98 134 L48 112 L56 132 L84 148 L64 152 L92 162 Z" fill="url(#sk-ruby-${uid})" opacity="0.88"/>
+                <path d="M142 134 L192 112 L184 132 L156 148 L176 152 L148 162 Z" fill="url(#sk-ruby-${uid})" opacity="0.88"/>
+                <!-- 日轮圣盘、弯角冠与乌赖乌斯圣蛇头饰 -->
+                <circle cx="120" cy="40" r="18" fill="url(#sk-gold-${uid})" filter="url(#sk-blur-${uid})" opacity="0.9"/>
+                <circle cx="120" cy="40" r="11.5" fill="#fef08a"/>
+                <path d="M88 42 Q96 64 120 62 Q144 64 152 42 Q142 56 120 55 Q98 56 88 42 Z" fill="url(#sk-gold-${uid})"/>
+                <path d="M117 55 Q120 46 123 55 L121 63 L119 63 Z" fill="#fef08a"/>
+                <!-- 威严雕刻多面红宝石狮首与怒张放射狮鬃 -->
+                <polygon points="82,78 96,54 108,64 120,52 132,64 144,54 158,78 152,108 134,120 106,120 88,108" fill="url(#sk-ruby-${uid})"/>
+                <polygon points="98,66 120,60 142,66 138,102 120,115 102,102" fill="#991b1b"/>
+                <polygon points="104,72 120,64 120,96 106,92" fill="#dc2626" opacity="0.85"/>
+                <polygon points="136,72 120,64 120,96 134,92" fill="#7f1d1d" opacity="0.9"/>
+                <polygon points="113,92 127,92 123,108 117,108" fill="#450a0a"/>
+                <!-- 修长女神神躯、古埃及黄金项圈(Usekh)与紧身晶石裙台 -->
+                <polygon points="102,118 138,118 148,136 134,158 140,196 100,196 106,158 92,136" fill="url(#sk-ruby-${uid})"/>
+                <polygon points="106,120 120,148 134,120" fill="#7f1d1d" opacity="0.8"/>
+                <path d="M98 120 Q120 144 142 120 Q120 132 98 120 Z" fill="url(#sk-gold-${uid})"/>
+                <path d="M104 128 Q120 148 136 128" fill="none" stroke="#fef08a" stroke-width="1.6" opacity="0.9"/>
+                <!-- 炽金竖瞳双眸与贯穿全像晶石体的熔岩碎裂纹路 -->
+                <polygon points="106,80 115,83 112,86 106,84" fill="#fef08a"/>
+                <polygon points="134,80 125,83 128,86 134,84" fill="#fef08a"/>
+                <path d="M120 62 L113 88 L125 104 L111 134 L129 162 L116 196 M115 102 L98 126 M124 144 L138 166" fill="none" stroke="#fde047" stroke-width="2.2" stroke-linecap="round" opacity="0.92" filter="url(#sk-blur-${uid})"/>
+                <path d="M120 62 L113 88 L125 104 L111 134 L129 162 L116 196" fill="none" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity="0.95"/>
+            </svg>
+        </div>`;
+        const idolLayer = fsLayer(idolHtml, 1380);
+        const idolEl = idolLayer.firstElementChild;
+        owner.anim(idolEl, [
+            { transform: 'translate(-50%, -35%) scale(0.45)', opacity: 0 },
+            { transform: 'translate(-50%, -50%) scale(1)', opacity: 1, offset: 0.22 },
+            { transform: 'translate(-50%, -62%) scale(1.12)', opacity: 1, offset: 0.85 },
+            { transform: 'translate(-50%, -46%) scale(1.24)', opacity: 0 }
+        ], { duration: 1320, fill: 'both' });
+
+        const cId = every(65, () => {
+            if (token !== combatToken) return;
+            const ang = rnd(0, 6.283), d = rnd(130, 260);
+            addP({ x: sx + Math.cos(ang) * d, y: sy + Math.sin(ang) * d, vx: -Math.cos(ang) * 4.2, vy: -Math.sin(ang) * 4.2, drag: 0.95, decay: 0.045, size: rnd(6, 13), shape: 'gradOrb', core: '#fef9c3', mid: '#f97316', outer: 'rgba(220,38,38,0.16)' });
+        });
+        after(360, () => { if (token === combatToken) shake('light'); });
+        after(900, () => { if (token === combatToken) shake('heavy'); });
+
+        // 1260ms 猛力摔碎神像 + 140ms 定帧
+        after(1250, () => {
+            stopEvery(cId);
+            if (token !== combatToken) return;
+            fxEngine.hitStop = 120;
+            shake('heavy');
+            addP({ x: sx, y: sy, shape: 'gradFlare', rx: 190, ry: 28, decay: 0.055, core: '#ffffff', mid: '#fde047', outer: 'rgba(239,68,68,0.22)' });
+            burst(14, () => { const a = rnd(0, 6.283), sp = rnd(3.5, 10); return { x: sx, y: sy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1.5, grav: 0.22, drag: 0.95, rot: rnd(0, 6.28), vr: rnd(-0.25, 0.25), decay: 0.025, size: rnd(6, 12), shape: 'shard', fill: 'rgba(220,38,38,0.65)', color: '#fde047' }; });
+            burst(22, () => { const a = rnd(0, 6.283), sp = rnd(2, 7.5); return { x: sx, y: sy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, drag: 0.93, decay: 0.032, size: rnd(8, 16), shape: 'gradOrb', core: '#fff', mid: '#fb923c', outer: 'rgba(185,28,28,0.18)' }; });
+        });
+
+        // 1380ms 神力跨空直扑锁定单体，1480ms 狮首降临 + 目标体内核爆！
+        after(1380, () => {
+            if (token !== combatToken) return;
+            const mx = (sx + tp.x) * 0.5, my = Math.min(sy, tp.y) - 105;
+            const arc = fsLayer(`<svg viewBox="0 0 ${window.innerWidth} ${window.innerHeight}" class="w-full h-full">
+                <defs><linearGradient id="sk-arc-${uid}" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#f59e0b" stop-opacity="0.1"/><stop offset="55%" stop-color="#ef4444" stop-opacity="0.95"/><stop offset="100%" stop-color="#fef08a" stop-opacity="1"/></linearGradient></defs>
+                <path d="M${sx},${sy} Q${mx},${my} ${tp.x},${tp.y}" fill="none" stroke="url(#sk-arc-${uid})" stroke-width="10" stroke-linecap="round" pathLength="100" stroke-dasharray="38 100" stroke-dashoffset="38"/>
+            </svg>`, 520);
+            const pEl = arc.querySelector('path');
+            if (pEl && pEl.animate) owner.anim(pEl, [{ strokeDashoffset: 38 }, { strokeDashoffset: -105 }], { duration: 240, fill: 'both' });
+            flyItemBezier(owner, { x:sx, y:sy }, { x:mx, y:my }, tp, 190, (x, y) => {
+                if (token !== combatToken) return;
+                addP({ x, y, shape: 'histOrb', trailMax: 9, size: 18, decay: 0.16, core: '#ffffff', mid: '#f97316', outer: 'rgba(220,38,38,0.2)' });
+            }, () => {
+                if (token !== combatToken) return;
+                shake('quake');
+                if (tDom) flash(tDom, 'arcane-flash-lava');
+                // 狮首 WebM 贴靶咆哮吞噬 + 冲天火柱 + 自转金焰风暴球
+                playWebMFX('vfx_sekhmet_lion.webm', tp.x - 24, tp.y - 4, { width: 340, height: 128, opacity: 0.98, blend: 'screen', durMs: 850 });
+                playWebMFX('vfx_sekhmet_pillar.webm', tp.x, tp.y - 34, { width: 310, height: 245, opacity: 0.98, blend: 'screen', delayMs: 70, durMs: 1150 });
+                playWebMFX('vfx_sekhmet_orb.webm', tp.x, tp.y, { width: 280, height: 280, opacity: 0.88, blend: 'screen', delayMs: 110, durMs: 1300 });
+                addP({ x: tp.x, y: tp.y + 18, shape: 'gradRing', sy: 0.45, r0: 20, r1: 280, decay: 0.025, color: 'rgba(249,115,22,0.34)', edge: 'rgba(254,240,138,0.58)' });
+                addP({ x: tp.x, y: tp.y, shape: 'gradFlare', rx: 280, ry: 24, decay: 0.042, core: '#ffffff', mid: '#fde047', outer: 'rgba(239,68,68,0.18)' });
+                addP({ x: tp.x, y: tp.y, shape: 'gradFlare', rx: 24, ry: 240, decay: 0.042, core: '#ffffff', mid: '#fb923c', outer: 'rgba(220,38,38,0.18)' });
+                burst(36, () => { const a = rnd(0, 6.283), s = rnd(2.8, 12.5); return { x: tp.x, y: tp.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1.4, grav: 0.14, drag: 0.93, decay: rnd(0.018, 0.036), size: rnd(8, 18), shape: 'gradOrb', core: '#fef9c3', mid: pick(['#f97316', '#ef4444', '#fbbf24']), outer: 'rgba(153,27,27,0.18)' }; });
+                burst(14, () => ({ x: tp.x + rnd(-45, 45), y: tp.y + rnd(-30, 30), vx: rnd(-1.2, 1.2), vy: rnd(-2.2, -0.5), drag: 0.98, decay: 0.011, size: rnd(30, 52), shape: 'gradMist', blend: 'source-over', inner: 'rgba(127,29,29,0.44)', outer: 'rgba(24,12,12,0.16)' }));
+            }, k => k);
+        });
+
+        after(3050, () => darken(0));
+        handle.hit = targetOrType => {
+            const hitDom = typeof targetOrType === 'string' ? tDom : targetOrType;
+            if (!owner.cancelled && !owner.finished && token === combatToken && hitDom) flash(hitDom, 'arcane-flash-lava');
+        };
+        return handle;
+    }
+
+    // ===== 奇物与技能定稿 v12.11 END =====
+
     function playArcaneSkillFx(fxTag, caster, targets, isReaction = false, sound = null) {
         if (!isArcaneSkillFx(fxTag)) return null;
-        const audioContext = sound || CombatAudioMixer.capture(fxTag.startsWith('group:') ? 'D' : 'B');
+        const itemFx = ITEM_SKILL_FX[fxTag];
+        const audioContext = itemFx ? Object.freeze({ category:itemFx.category }) : sound || CombatAudioMixer.capture(fxTag.startsWith('group:') ? 'D' : 'B');
         return CombatAudioMixer.withContext(audioContext, () => {
+            if (fxTag === '谐律之庇') return playHarmonyShelter(caster, targets);
+            if (fxTag === '静默之域') return playSilenceDomain(caster, targets);
+            if (fxTag === '碎裂之响') return playShatterResonance(caster, targets);
+            if (fxTag === '塞赫美特之愠') return playSekhmetWrath(caster, targets);
+            if (fxTag === '逆咒归源镜') return playReverseSpellMirror(caster, targets);
             if (fxTag === '折影步') return playZheYingBu(caster, targets, !!isReaction);
             if (fxTag === '巫师护盾') return playWuShiHuDun(caster);
             if (fxTag === '灵风术') return playLingFeng((targets && targets[0]) || caster);
@@ -11757,7 +12476,7 @@ function clearRescueState(entity) {
 }
 
 /* 舍身最终契约：630ms 到达 → 立即一次钢蓝格挡（无数值）→ +480ms resolve ready；
-   保持外 wrap 在 dashX；release() 只做 350ms 归位 + 目标余光，不再格挡/不再播来袭。 */
+   保持外 wrap 在 dashX；release() 停驻300ms后以500ms归位 + 目标余光，不再格挡/不再播来袭。 */
 function playRescueSheshen(guardian, target, meta, onBeat) {
     const gRect = entityVisualRect(guardian), tRect = entityVisualRect(target);
     if (!gRect || !tRect) return null;
@@ -11817,15 +12536,17 @@ function playRescueSheshen(guardian, target, meta, onBeat) {
         if (released || !owner.valid()) return done;
         released = true;
         if (!readySettled) settleReady({ ok: true, early: true, blockPt });
-        owner.resume(430);
+        owner.resume(830);
         gDom.style.borderColor = ''; gDom.style.boxShadow = '';
-        if (gWrap) owner.anim(gWrap, [{ transform: `translate3d(${dashX.toFixed(1)}px,-2px,0)` }, { transform: 'translate3d(0,0,0)' }], { duration: 350, easing: 'cubic-bezier(0.26,0.82,0.36,1)', fill: 'forwards' });
-        owner.anim(gVisual, [{ transform: 'scale(1.01)' }, { transform: 'scale(1)' }], { duration: 350, easing: 'cubic-bezier(0.26,0.82,0.36,1)', fill: 'forwards' });
-        const auraLayer = rescueLayer(owner, `<div class="arcane-rescue-anchor" style="left:${tRect.x}px;top:${tRect.y}px;width:${tRect.w + 10}px;height:${tRect.h + 10}px;border-radius:8px;border:1.5px solid rgba(125,211,252,0.68);box-shadow:inset 0 0 16px rgba(56,189,248,0.28),0 0 18px rgba(56,189,248,0.34);"></div>`, 51, 'sheshen-return');
-        owner.anim(auraLayer.firstElementChild, [{ opacity: 0, transform: 'translate(-50%,-50%) scale(0.95)' }, { opacity: 0.9, transform: 'translate(-50%,-50%) scale(1.01)', offset: 0.28 }, { opacity: 0, transform: 'translate(-50%,-50%) scale(1.04)' }], { duration: 420, easing: 'ease-out', fill: 'forwards' });
-        owner.at(430, () => dropOwnedLayer(owner, auraLayer));
-        rescueSample(owner, 'sheshen_armor_step', { offsetSec: 0.34, maxDurSec: 0.27, vol: 0.45, pan: panOf(gRect.x) });
-        beat({ phase: 'return' });
+        owner.at(300, () => {
+            if (gWrap) owner.anim(gWrap, [{ transform: `translate3d(${dashX.toFixed(1)}px,-2px,0)` }, { transform: 'translate3d(0,0,0)' }], { duration: 500, easing: 'cubic-bezier(0.26,0.82,0.36,1)', fill: 'forwards' });
+            owner.anim(gVisual, [{ transform: 'scale(1.01)' }, { transform: 'scale(1)' }], { duration: 500, easing: 'cubic-bezier(0.26,0.82,0.36,1)', fill: 'forwards' });
+            const auraLayer = rescueLayer(owner, `<div class="arcane-rescue-anchor" style="left:${tRect.x}px;top:${tRect.y}px;width:${tRect.w + 10}px;height:${tRect.h + 10}px;border-radius:8px;border:1.5px solid rgba(125,211,252,0.68);box-shadow:inset 0 0 16px rgba(56,189,248,0.28),0 0 18px rgba(56,189,248,0.34);"></div>`, 51, 'sheshen-return');
+            owner.anim(auraLayer.firstElementChild, [{ opacity: 0, transform: 'translate(-50%,-50%) scale(0.95)' }, { opacity: 0.9, transform: 'translate(-50%,-50%) scale(1.01)', offset: 0.28 }, { opacity: 0, transform: 'translate(-50%,-50%) scale(1.04)' }], { duration: 420, easing: 'ease-out', fill: 'forwards' });
+            owner.at(430, () => dropOwnedLayer(owner, auraLayer));
+            rescueSample(owner, 'sheshen_armor_step', { offsetSec: 0.34, maxDurSec: 0.27, vol: 0.45, pan: panOf(gRect.x) });
+            beat({ phase: 'return' });
+        });
         return done;
     }
 
@@ -12086,11 +12807,14 @@ function playRescueAvoidFatal(entity, meta, onBeat) {
         S.particleTimer = null; S.particleUntil = 0;
         if (S.driver) { const idx = fxEngine.particles.indexOf(S.driver); if (idx >= 0) fxEngine.particles.splice(idx, 1); S.driver = null; }
         S.handles.forEach(h => { if (h && h.cancel) h.cancel(); }); S.handles.clear();
+        S.videos.forEach(cleanup => cleanup()); S.videos.clear();
+        S.sampleAudios.forEach(stop => stop()); S.sampleAudios.clear();
         S.layers.forEach(d => d.remove()); S.layers.clear();
         S.anchors.forEach(d => d.remove()); S.anchors.clear();
-        S.flashes.forEach(el => el.classList.remove('arcane-flash-cold', 'arcane-flash-heal', 'arcane-flash-melee', 'arcane-flash-ranged', 'arcane-flash-spell')); S.flashes.clear();
+        S.flashes.forEach(el => el.classList.remove('arcane-flash-cold', 'arcane-flash-heal', 'arcane-flash-melee', 'arcane-flash-ranged', 'arcane-flash-spell', 'arcane-flash-silence', 'arcane-flash-shatter', 'arcane-flash-lava', 'arcane-flash-drain', 'arcane-item-heal')); S.flashes.clear();
         S.shakeEls.forEach(el => el.classList.remove('arcane-shake-light', 'arcane-shake-heavy', 'arcane-shake-quake')); S.shakeEls.clear();
         if (S.dark) { S.dark.remove(); S.dark = null; }
+        S.itemDarkOwner = null;
         if (S.canvas) { S.canvas.remove(); S.canvas = null; S.ctx = null; }
         identityBuffers.clear(); identityDecodes.clear();
         CombatAudioDirector.clear();
@@ -14587,6 +15311,11 @@ const WEBM_FX_REGISTRY = {
     '巫师护盾': { url: '', scale: 1.0, particles: 'arcane', delay: 0 },
     '飞沙化甲': { url: '', scale: 1.0, particles: 'arcane', delay: 0.28 },
     '蝎眼钥匙': { url: '', scale: 1.0, particles: 'arcane', delay: 1.15 },
+    '谐律之庇': { url: '', scale: 1.0, particles: 'arcane', delay: 0.90 },
+    '静默之域': { url: '', scale: 1.0, particles: 'arcane', delay: 0.95 },
+    '碎裂之响': { url: '', scale: 1.0, particles: 'arcane', delay: 0.95 },
+    '塞赫美特之愠': { url: '', scale: 1.0, particles: 'arcane', delay: 1.45 },
+    '逆咒归源镜': { url: '', scale: 1.0, particles: 'arcane', delay: 0.45 },
     'group:melee': { url: '', scale: 1.0, particles: 'arcane', delay: 0.35 },
     'group:ranged': { url: '', scale: 1.0, particles: 'arcane', delay: 0.35 },
     'group:spell': { url: '', scale: 1.0, particles: 'arcane', delay: 0.35 },
@@ -14629,6 +15358,17 @@ function preloadBattleAssets() {
         const entry = WEBM_FX_REGISTRY[tag];
         if (!entry) return;
 
+        const itemFx = ITEM_SKILL_FX[tag];
+        if (itemFx) {
+            itemFx.audioKeys.forEach(key => CombatAudioMixer.prepare(audioUrls[key]));
+            itemFx.videoFiles.forEach(file => {
+                const url = itemFxAssetUrl('RpmCombat_Spine/' + file);
+                if (_fxVideoBlobCache.has(url)) return;
+                _fxVideoBlobCache.set(url, null);
+                fetch(url).then(r => r.blob()).then(blob => _fxVideoBlobCache.set(url, URL.createObjectURL(blob)))
+                    .catch(e => { _fxVideoBlobCache.delete(url); console.warn('[预加载] 奇物视频加载失败:', file, e); });
+            });
+        }
         // 与普通采样共用下载／解码任务，'none' 不发起请求。
         if (entry.audioUrl && entry.audioUrl !== 'none') CombatAudioMixer.prepare(entry.audioUrl);
 
@@ -19159,7 +19899,7 @@ registerTagHandler('增', (ctx) => {
 
 // --- 驱散类（我方专属）---
 registerTagHandler('驱散', (ctx) => {
-    playSound('defUp'); if (!isArcaneSkillFx(ctx.skill && ctx.skill.fxTag)) playSVGEffect(ctx.targetDom, 'buff');
+    if (!isArcaneSkillFx(ctx.skill?.fxTag)) { playSound('defUp'); playSVGEffect(ctx.targetDom, 'buff'); }
     ctx.target.buffs = ctx.target.buffs || [];
     const count = Math.max(1, Math.floor(ctx.actualPower || 1));
     // 复用灾厄使被动的负面判定谓词（项目内"何为负面"的权威定义）
@@ -19201,7 +19941,7 @@ registerTagHandler('吸蓝', (ctx) => {
         addHistory(`   ↳ ${ctx.target.name} 已无法力可供抽取。`);
         return;
     }
-    playSound('mpHeal'); playSVGEffect(ctx.targetDom, 'debuff');
+    if (!isArcaneSkillFx(ctx.skill?.fxTag)) { playSound('mpHeal'); playSVGEffect(ctx.targetDom, 'debuff'); }
     ctx.target.mp = Math.max(0, (ctx.target.mp || 0) - drained);
     ctx.caster.mp = Math.min(ctx.caster.maxMp, (ctx.caster.mp || 0) + drained);
     createFloatingText(ctx.targetDom, `-${drained}MP`, 'text-purple-400');

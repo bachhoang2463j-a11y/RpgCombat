@@ -487,12 +487,19 @@
         soft(/summonFromWorldbook\([^;]{0,400}beforeEnter/.test(execSrc), 'executeSkillAction 向 summonFromWorldbook 传 beforeEnter',
           '未在调用点找到 beforeEnter');
 
-        // 7) 真实 1150ms 入场时序：不能叠 400/390/1.15 第二等待。
+        // 7) 真实1150ms入场：记录调度拍点与门闩到入场间隔，免受IAB后台timer节流误判。
         restoreTimers();
+        const entryTimers = [];
+        let burstAt = 0;
+        w.setTimeout = (fn, ms, ...args) => {
+          entryTimers.push({ ms, at:Date.now() });
+          return nativeSetTimeout.call(w, fn, ms, ...args);
+        };
         w.playArcaneSkillFx = (tag, caster, targets, reaction) => {
           const h = realSkill(tag, caster, targets, reaction);
           if (tag === '蝎眼钥匙' && h) {
             lastRealHandle = h;
+            h.burstReady.then(() => { burstAt = Date.now(); });
             const orig = h.setWardTargets;
             h.setWardTargets = list => { wardSeen.push((list || []).slice()); return typeof orig === 'function' ? orig.call(h, list) : undefined; };
           }
@@ -504,8 +511,14 @@
         const runP = w.executeSkillAction(d.h[0], d.h[0], d.h[0].skills[0], 1);
         for (let i = 0; i < 200 && !(summonRec[0] && summonRec[0].completedAt); i++) await wait(20);
         const elapsed = summonRec[0] && summonRec[0].completedAt ? summonRec[0].completedAt - t0 : -1;
-        soft(elapsed >= 1100 && elapsed < 1530, '真实入场 ≥1150ms 且无额外 400/390ms 二次等待',
-          '实测 ' + elapsed + 'ms');
+        const entry = summonRec[0];
+        const beforeEntryTimers = entryTimers.filter(t => entry && t.at <= entry.completedAt);
+        soft(elapsed >= 1100 && !!burstAt && entry.completedAt - burstAt < 180
+          && beforeEntryTimers.some(t => t.ms === 1150)
+          && !beforeEntryTimers.some(t => t.ms === 400 || t.ms === 390),
+          '真实入场使用1150ms爆发门闩且无400/390ms二次等待',
+          '实测 ' + elapsed + 'ms；门闩后 ' + (entry && burstAt ? entry.completedAt - burstAt : -1) + 'ms');
+        restoreTimers();
         soft(!!wardSeen.filter(l => l.length).length, '真实 handle 的 setWardTargets 接到实际[防]目标', JSON.stringify(wardSeen));
         if (lastRealHandle) lastRealHandle.doneAt = Date.now();
         await Promise.race([runP, wait(3000)]);
