@@ -1189,6 +1189,21 @@
     /* ===== 命中结果反馈 END ===== */
     .arcane-hit-track { position: relative; }
     .arcane-hit-fill { position: relative; }
+    /* ===== 召唤三瞬：阵成 / 散逸 / 主动挡刀 ===== */
+    .arcane-summon-pending { opacity: 0; }
+    .arcane-summon-anchor { position: absolute; transform: translate(-50%, -50%); pointer-events: none; will-change: transform, opacity; }
+    .summon-circle-wrap { transform-origin: center; }
+    .summon-ring-outer, .summon-ring-inner { transform-origin: 0 0; will-change: transform; }
+    .s-shd-bloom, .s-shd-arc { transform-origin: 60px 56px; will-change: transform, opacity; }
+    .arcane-summon-beam { position: absolute; transform: translate(-50%, -100%); transform-origin: 50% 100%; pointer-events: none; will-change: transform, opacity; }
+    .arcane-summon-ghost { position: fixed; pointer-events: none; will-change: transform, opacity; border-radius: 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .arcane-summon-aura { position: absolute; transform: translate(-50%, -50%); border-radius: 10px; border: 1.5px solid rgba(125,211,252,0.72); box-shadow: inset 0 0 18px rgba(56,189,248,0.28), 0 0 18px rgba(56,189,248,0.34); pointer-events: none; will-change: transform, opacity; }
+    .arcane-summon-omen-ring { position: absolute; inset: -6px; border-radius: 14px; border: 2px solid rgba(244,63,94,0.85); box-shadow: 0 0 18px rgba(244,63,94,0.65); pointer-events: none; animation: arcane-summon-omen-pulse 0.45s ease-in-out infinite alternate; }
+    @keyframes arcane-summon-omen-pulse { from { opacity: 0.45; transform: scale(0.96); } to { opacity: 1; transform: scale(1.06); } }
+    .arcane-summon-revive-seal { position: absolute; inset: -8px; border-radius: 14px; border: 1.5px solid rgba(52,211,153,0.85); box-shadow: inset 0 0 16px rgba(250,204,21,0.35), 0 0 20px rgba(52,211,153,0.55); pointer-events: none; will-change: transform, opacity; }
+    .arcane-enemy-summon-visual { width: 48px; height: 48px; font-size: 48px; line-height: 1; }
+    .arcane-enemy-summon-visual > img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+    @media (min-width: 640px) { .arcane-enemy-summon-visual { width: 56px; height: 56px; font-size: 56px; } }
     .arcane-hit-wounded { position: absolute; transform: translate(0,-100%); font: 700 12px/1.2 'Noto Sans SC',sans-serif; color: #fb7185; white-space: nowrap; text-shadow: 0 1px 3px #000; pointer-events: none; }
 
     .floating-text { position: absolute; animation: float-up 1s ease-out forwards; pointer-events: none; z-index: 60; text-shadow: 0 2px 4px rgba(0,0,0,0.8); white-space: nowrap; }
@@ -12796,7 +12811,347 @@ function playRescueAvoidFatal(entity, meta, onBeat) {
 }
 /* ===== 救援时刻 v12.10 END ===== */
 
+    // ===== 召唤三瞬默认演出 v12.12 BEGIN =====
+    const SUMMON_DEDICATED_TAGS = new Set(['高阶召唤术', '蝎眼钥匙', '圣域帷幕', '塞赫美特之愠', '逆咒归源镜', '谐律之庇', '静默之域', '碎裂之响']);
+    const SUMMON_ACTIVE = new Map();
+    const SUMMON_STYLE_MEMO = new WeakMap();
+    function isSummonDedicatedFx(fxTag) {
+        return !!fxTag && (SUMMON_DEDICATED_TAGS.has(fxTag) || !!WEBM_FX_REGISTRY[fxTag] || isArcaneSkillFx(fxTag));
+    }
+    function summonWrapOf(entity) {
+        if (!entity) return null;
+        if (entity.nodeType === 1) return entity.closest('[id^="hero-wrap-"],[id^="enemy-box-"]') || entity;
+        const id = entity.id || String(entity);
+        return document.getElementById('hero-wrap-' + id) || document.getElementById('enemy-box-' + id) || entity.dom || null;
+    }
+    function summonSaveStyle(el, props) {
+        if (!el) return () => {};
+        let entry = SUMMON_STYLE_MEMO.get(el);
+        if (!entry) { entry = { count: 0, base: {} }; SUMMON_STYLE_MEMO.set(el, entry); }
+        props.forEach(p => { if (!(p in entry.base)) entry.base[p] = el.style[p]; });
+        entry.count++;
+        let released = false;
+        return () => {
+            if (released) return;
+            released = true;
+            if (--entry.count) return;
+            Object.keys(entry.base).forEach(p => { el.style[p] = entry.base[p]; });
+            SUMMON_STYLE_MEMO.delete(el);
+        };
+    }
+    function cloneSummonVisual(dom) { return cloneVisualOnly(dom); }
+    function summonGhost(owner, rect, color, tag) {
+        const layer = owner.layer('', 44, tag), ghost = document.createElement('div');
+        ghost.className = 'arcane-summon-ghost';
+        ghost.style.cssText = `left:${rect.left}px;top:${rect.top}px;width:${rect.w}px;height:${rect.h}px;filter:drop-shadow(0 0 10px ${color});`;
+        ghost.innerHTML = cloneSummonVisual(rect.dom);
+        const visual = rect.visualDom || rect.dom;
+        ghost.style.fontSize = (parseFloat(getComputedStyle(visual).fontSize) * rect.w / (visual.offsetWidth || rect.w)) + 'px';
+        layer.appendChild(ghost);
+        return { layer, ghost };
+    }
+    function summonRun(totalMs, lockKeys) {
+        const keys = (lockKeys || []).filter(Boolean).map(String);
+        keys.forEach(k => { const old = SUMMON_ACTIVE.get(k); if (old) old.handle.cancel(); });
+        const owner = identityRun(totalMs, 1), layer = owner.layer;
+        owner.fixedLife = true;
+        owner.valid = () => !owner.cancelled && !owner.finished && owner.token === combatToken && !_pipelineFrozen;
+        owner.layer = (html, z = 54, tag = 'summon') => {
+            const d = layer(html); d.style.zIndex = String(z); d.dataset.summonTag = tag;
+            return d;
+        };
+        owner.dropLayer = d => dropOwnedLayer(owner, d);
+        owner.cancel = () => owner.handle.cancel();
+        owner.sound = (key, opts = {}) => {
+            const clips = {
+                armor_step_1: { key: 'sheshen_armor_step', offsetSec: 0.34 },
+                armor_step_2: { key: 'sheshen_armor_step', offsetSec: 0.92 },
+                parry: { key: 'parry_perfect' }, avoid_dash2: { key: 'avoid_dash_perfect' }
+            };
+            const clip = clips[key];
+            return playSampleClip(owner, clip ? clip.key : key, Object.assign({ category: 'B', rate: 1 }, clip, opts));
+        };
+        keys.forEach(k => SUMMON_ACTIVE.set(k, owner));
+        owner.onClean(() => keys.forEach(k => { if (SUMMON_ACTIVE.get(k) === owner) SUMMON_ACTIVE.delete(k); }));
+        owner.handle.done = new Promise(resolve => owner.handle.onFinish.add(resolve));
+        return owner;
+    }
+    function clearSummonState(entity) {
+        const id = entity == null ? '' : (typeof entity === 'object' ? entity.id : String(entity));
+        const seen = new Set();
+        [...SUMMON_ACTIVE.entries()].forEach(([key, owner]) => {
+            if (id && !key.endsWith(':' + id)) return;
+            if (seen.has(owner)) return;
+            seen.add(owner); owner.handle.cancel();
+        });
+        if (id) summonEnterPending.delete(id); else summonEnterPending.clear();
+        document.querySelectorAll('.arcane-summon-pending').forEach(el => {
+            if (!id || el.id === 'hero-wrap-' + id || el.id === 'enemy-box-' + id) el.classList.remove('arcane-summon-pending');
+        });
+    }
+    function buildSummonCircleHtml(uid, w, h, cx, cy, isEnemy) {
+        const ringA = isEnemy ? '#c026d3' : '#22d3ee', ringB = isEnemy ? '#a78bfa' : '#818cf8';
+        const edgeGlow = isEnemy ? 'rgba(217,70,239,0.52)' : 'rgba(34,211,238,0.48)';
+        return `<div class="arcane-summon-anchor summon-circle-wrap" style="left:${cx}px;top:${cy}px;width:${w}px;height:${h}px;">
+          <svg viewBox="-120 -60 240 120" class="w-full h-full" style="overflow:visible;">
+            <defs>
+              <radialGradient id="summon-disc-${uid}" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#e0f2fe" stop-opacity="0.48"/><stop offset="42%" stop-color="${ringB}" stop-opacity="0.28"/><stop offset="78%" stop-color="${ringA}" stop-opacity="0.16"/><stop offset="100%" stop-color="${ringA}" stop-opacity="0"/></radialGradient>
+              <linearGradient id="summon-ring-grad-${uid}" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="${ringA}" stop-opacity="0.2"/><stop offset="50%" stop-color="#e0f2fe" stop-opacity="0.95"/><stop offset="100%" stop-color="${ringB}" stop-opacity="0.25"/></linearGradient>
+              <filter id="summon-circle-blur-${uid}" x="-25%" y="-25%" width="150%" height="150%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <ellipse cx="0" cy="0" rx="114" ry="52" fill="url(#summon-disc-${uid})"/>
+            <g transform="scale(1,0.46)" filter="url(#summon-circle-blur-${uid})">
+              <g class="summon-ring-outer" style="transform-origin:0 0;"><circle cx="0" cy="0" r="102" fill="none" stroke="url(#summon-ring-grad-${uid})" stroke-width="2.6" stroke-dasharray="28 12 8 12" stroke-linecap="round"/><circle cx="0" cy="0" r="90" fill="none" stroke="${ringA}" stroke-width="1.4" stroke-opacity="0.65" stroke-dasharray="16 14" stroke-linecap="round"/></g>
+              <g class="summon-ring-inner" style="transform-origin:0 0;"><polygon points="0,-78 68,39 -68,39" fill="none" stroke="${ringB}" stroke-width="1.6" stroke-opacity="0.58" stroke-linejoin="round"/><polygon points="0,78 68,-39 -68,-39" fill="none" stroke="${ringA}" stroke-width="1.4" stroke-opacity="0.52" stroke-linejoin="round"/><circle cx="0" cy="0" r="46" fill="none" stroke="#e0f2fe" stroke-width="1.5" stroke-opacity="0.72" style="filter:drop-shadow(0 0 6px ${edgeGlow});"/></g>
+            </g>
+          </svg>
+        </div>`;
+    }
+    function playSummonEnter(caster, targets, meta = {}, onBeat) {
+        if (isSummonDedicatedFx(meta.fxTag)) {
+            if (onBeat) onBeat({ phase: 'skippedByFxTag', fxTag: meta.fxTag });
+            return { doneAt: Date.now(), done: Promise.resolve(true), skipped: true, fxTag: meta.fxTag, cancel() {} };
+        }
+        const list = (Array.isArray(targets) ? targets : [targets]).filter(Boolean);
+        const rects = list.map(entity => ({ entity, rect: entityVisualRect(entity) })).filter(x => x.rect && x.rect.dom.isConnected);
+        if (!rects.length) return null;
+        const isEnemy = meta.side === 'enemy' || list[0].side === 'enemy';
+        const colCore = '#e0f2fe', colArc = isEnemy ? '#e879f9' : '#22d3ee', colViolet = '#a78bfa', uid = ++S.uid;
+        const createdAt = Date.now();
+        const owner = summonRun(1800 + 350 + rects.length * 110, list.flatMap(t => ['summon:' + t.id, 'enter:' + t.id]));
+        owner.hold();
+        const beat = (phase, extra = {}) => { if (onBeat) onBeat(Object.assign({ phase, side: isEnemy ? 'enemy' : 'hero' }, extra)); };
+        rects.forEach(({ entity, rect }) => {
+            const box = summonWrapOf(entity) || rect.dom;
+            const restore = summonSaveStyle(box, ['opacity', 'transform', 'transition']);
+            box.classList.remove('anim-enter-hero', 'anim-enter-enemy');
+            box.style.opacity = '0'; box.style.transition = 'none';
+            owner.onClean(() => { restore(); summonEnterPending.delete(entity.id); box.classList.remove('arcane-summon-pending'); });
+        });
+        const cRect = caster && entityVisualRect(caster);
+        if (cRect) {
+            const size = Math.round(Math.max(54, Math.min(92, cRect.w * 0.72)));
+            const pulse = owner.layer(`<div class="arcane-summon-anchor" style="left:${cRect.x}px;top:${cRect.y}px;width:${size}px;height:${size}px;border-radius:50%;background:radial-gradient(circle,rgba(224,242,254,0.72) 0%,rgba(167,139,250,0.45) 45%,transparent 72%);"></div>`, 53, 'summon-caster-pulse');
+            owner.anim(pulse.firstElementChild, [{ transform: 'translate(-50%,-50%) scale(0.45)', opacity: 0.7 }, { transform: 'translate(-50%,-50%) scale(1.15)', opacity: 0 }], { duration: 210, easing: 'ease-out', fill: 'forwards' });
+            owner.at(220, () => owner.dropLayer(pulse));
+            owner.burst(6, () => {
+                const a = rnd(0, 6.283), d = rnd(20, size * 0.45);
+                return { x: cRect.x + Math.cos(a) * d, y: cRect.y + Math.sin(a) * d, vx: -Math.cos(a) * d / 10, vy: -Math.sin(a) * d / 10, drag: 0.86, decay: 0.085, size: 2.4, shape: 'glowOrb', color: colViolet, core: colCore };
+            });
+        }
+        const left = Math.min(...rects.map(x => x.rect.left)), right = Math.max(...rects.map(x => x.rect.right));
+        const top = Math.min(...rects.map(x => x.rect.top)), bottom = Math.max(...rects.map(x => x.rect.bottom));
+        const anchorPt = { x: (left + right) * 0.5, y: bottom - Math.min(18, rects[0].rect.h * 0.16) };
+        const fW = Math.round(Math.max(rects[0].rect.w * 1.7, Math.min(right - left + rects[0].rect.w * 0.72, 540)));
+        const fH = Math.round(Math.max(66, Math.min(138, (bottom - top) * 0.48 + 44)));
+        const circle = owner.layer(buildSummonCircleHtml(uid, fW, fH, anchorPt.x, anchorPt.y, isEnemy), 52, 'summon-circle');
+        const circleWrap = circle.querySelector('.summon-circle-wrap');
+        owner.anim(circleWrap, [{ opacity: 0, transform: 'translate(-50%,-50%) scale(0.55)' }, { opacity: 1, transform: 'translate(-50%,-50%) scale(1)' }], { duration: 340, easing: 'cubic-bezier(0.2,0.86,0.3,1)', fill: 'forwards' });
+        owner.anim(circle.querySelector('.summon-ring-outer'), [{ transform: 'rotate(0deg)' }, { transform: 'rotate(180deg)' }], { duration: 1800, easing: 'linear', iterations: Infinity });
+        owner.anim(circle.querySelector('.summon-ring-inner'), [{ transform: 'rotate(0deg)' }, { transform: 'rotate(-180deg)' }], { duration: 1500, easing: 'linear', iterations: Infinity });
+        owner.sound('light_charge', { vol: 0.72, pan: panOf(anchorPt.x) });
+        beat('circle', { anchorPt, count: rects.length });
+        const gather = owner.every(55, () => {
+            const a = rnd(0, 6.283), rx = rnd(fW * 0.34, fW * 0.54), ry = rnd(fH * 0.3, fH * 0.52);
+            const x = anchorPt.x + Math.cos(a) * rx, y = anchorPt.y + Math.sin(a) * ry;
+            owner.addP({ x, y, vx: (anchorPt.x - x) / 11, vy: (anchorPt.y - y) / 11, drag: 0.88, decay: 0.068, size: rnd(2.2, 3.6), shape: 'glowOrb', color: pick([colArc, colViolet]), core: colCore });
+        });
+        let revealed = false, minDone = false, dataReady = !(meta.beforeEnter && typeof meta.beforeEnter.then === 'function');
+        function reveal() {
+            if (revealed || !owner.valid()) return;
+            revealed = true;
+            stopEvery(gather); owner.intervals.delete(gather);
+            owner.sound('light_impact', { vol: 0.88, pan: panOf(anchorPt.x) });
+            beat('riftOpen', { count: rects.length });
+            const beamW = Math.round(Math.max(46, Math.min(110, rects[0].rect.w * 0.92)));
+            const beamH = Math.round(Math.max(130, Math.min(240, rects[0].rect.h * 2.1)));
+            const beam = owner.layer(`<div class="arcane-summon-beam" style="left:${anchorPt.x}px;top:${anchorPt.y + 8}px;width:${beamW}px;height:${beamH}px;background:radial-gradient(ellipse at 50% 85%,rgba(224,242,254,0.92) 0%,rgba(34,211,238,0.52) 32%,rgba(167,139,250,0.28) 62%,transparent 85%);border-radius:50% 50% 30% 30%;"></div><div class="arcane-summon-beam" style="left:${anchorPt.x}px;top:${anchorPt.y + 6}px;width:${Math.round(beamW * 0.28)}px;height:${Math.round(beamH * 0.9)}px;background:linear-gradient(180deg,transparent 0%,#ffffff 38%,#e0f2fe 78%,transparent 100%);"></div>`, 55, 'summon-rift');
+            beam.querySelectorAll('.arcane-summon-beam').forEach((b, idx) => owner.anim(b, [{ transform: 'translate(-50%,-100%) scaleX(0.28) scaleY(0.18)', opacity: 0 }, { transform: `translate(-50%,-100%) scaleX(${idx ? 1.15 : 1.08}) scaleY(1.04)`, opacity: 1, offset: 0.34 }, { transform: 'translate(-50%,-100%) scaleX(0.32) scaleY(1.12)', opacity: 0 }], { duration: 280, easing: 'cubic-bezier(0.18,0.88,0.3,1)', fill: 'forwards' }));
+            owner.at(295, () => owner.dropLayer(beam));
+            owner.burst(2, i => ({ x: anchorPt.x, y: anchorPt.y, shape: 'gradRing', r0: 12, r1: fW * (0.42 + i * 0.12), w: 3 - i, decay: 0.055 - i * 0.015, color: i ? colArc : colCore }));
+            let endMs = 0;
+            rects.forEach(({ entity, rect }, index) => {
+                const fast = index >= 4, delay = fast ? 330 + (index - 3) * 75 : index * 110, formMs = fast ? 200 : 350;
+                endMs = Math.max(endMs, delay + formMs);
+                owner.at(delay, () => {
+                    const box = summonWrapOf(entity) || rect.dom, base = box.style.transform;
+                    const size = Math.round(Math.max(66, Math.max(rect.w, rect.h) * (fast ? 1.18 : 1.42)));
+                    const glow = owner.layer(`<div class="arcane-summon-anchor" style="left:${rect.x}px;top:${rect.y}px;width:${size}px;height:${size}px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.92) 0%,${isEnemy ? 'rgba(232,121,249,0.52)' : 'rgba(34,211,238,0.58)'} 42%,rgba(167,139,250,0.22) 68%,transparent 82%);"></div>`, 56, 'summon-manifest');
+                    owner.anim(glow.firstElementChild, [{ transform: 'translate(-50%,-50%) scale(0.35)', opacity: 0.95 }, { transform: 'translate(-50%,-50%) scale(1.22)', opacity: 0 }], { duration: formMs, easing: 'ease-out', fill: 'forwards' });
+                    owner.at(formMs + 20, () => owner.dropLayer(glow));
+                    summonEnterPending.delete(entity.id); box.classList.remove('arcane-summon-pending'); box.style.opacity = '1';
+                    owner.anim(box, [{ transform: `translate3d(0,8px,0) scale(0.76) ${base}`, opacity: 0 }, { transform: `translate3d(0,-2px,0) scale(1.04) ${base}`, opacity: 1, offset: 0.62 }, { transform: base || 'none', opacity: 1 }], { duration: formMs, easing: 'cubic-bezier(0.22,0.88,0.34,1)', fill: 'forwards' });
+                    owner.burst(fast ? 3 : 10, () => ({ x: rect.x + rnd(-rect.w * 0.34, rect.w * 0.34), y: rect.y + rnd(-rect.h * 0.25, rect.h * 0.3), vx: rnd(-0.6, 0.6), vy: rnd(-2.2, -0.8), grav: -0.02, drag: 0.95, decay: rnd(0.055, 0.085), size: rnd(2.2, 4), shape: 'glowOrb', color: pick([colArc, colViolet]), core: colCore }));
+                    if (!index) owner.sound('link_chime', { vol: 0.32, pan: panOf(rect.x) });
+                    beat('manifest', { entity, index, fast, rect });
+                });
+            });
+            owner.at(endMs, () => {
+                owner.anim(circleWrap, [{ opacity: 1, transform: 'translate(-50%,-50%) scale(1)' }, { opacity: 0, transform: 'translate(-50%,-50%) scale(1.08)' }], { duration: 220, easing: 'ease-out', fill: 'forwards' });
+                beat('settled', { count: rects.length }); owner.resume(230);
+            });
+        }
+        owner.at(400, () => { minDone = true; if (dataReady) reveal(); else beat('waitingData', { elapsed: 400 }); });
+        let waitTimer = null;
+        if (!dataReady) {
+            const ready = () => {
+                if (!owner.valid()) return;
+                if (waitTimer != null) { clearTimeout(waitTimer); owner.timers.delete(waitTimer); S.timers.delete(waitTimer); waitTimer = null; }
+                dataReady = true; if (minDone) reveal();
+            };
+            Promise.resolve(meta.beforeEnter).then(ready, ready);
+            waitTimer = owner.at(1800, ready); // 只放行视觉，不取消资料读取或合法召唤。
+        }
+        const lastIndex = rects.length - 1, lastDelay = lastIndex < 4 ? lastIndex * 110 : 330 + (lastIndex - 3) * 75;
+        owner.handle.doneAt = createdAt + (dataReady ? 400 : 1800) + Math.max(680, lastDelay + (lastIndex >= 4 ? 200 : 350)) + 230;
+        return owner.handle;
+    }
+    function playSummonExit(entity, meta = {}, onBeat) {
+        if (!entity) return null;
+        if (meta.exitCause === 'reviveIntercept' || meta.exitCause === 'explode' || entity.explode) {
+            if (onBeat) onBeat({ phase: 'exitBypassed', reason: meta.exitCause || 'explode', entity });
+            return null;
+        }
+        const id = entity.id || String(entity), active = SUMMON_ACTIVE.get('summon:' + id);
+        if (!meta.fromGuard && active && active.handle.exit && !active.handle.isReleased()) { active.handle.exit(meta, onBeat); return active.handle; }
+        if (active && active.handle.isSummonExit) return active.handle;
+        const preRect = meta.anchorRect || entityVisualRect(entity);
+        if (!preRect || !preRect.dom.isConnected) return null;
+        if (active && active.handle.exit) meta = Object.assign({}, meta, { anchorRect: preRect, holdTransform: (summonWrapOf(entity) || preRect.dom).style.transform });
+        const owner = summonRun(840, ['summon:' + id, 'exit:' + id]);
+        const rect = meta.anchorRect || entityVisualRect(entity), dom = rect.dom, box = summonWrapOf(dom) || dom;
+        const restoreBox = summonSaveStyle(box, ['opacity', 'transform', 'transition', 'filter']);
+        const restoreDom = dom !== box ? summonSaveStyle(dom, ['opacity', 'transform', 'transition', 'filter']) : () => {};
+        owner.onClean(() => { restoreDom(); restoreBox(); });
+        box.classList.remove('arcane-summon-pending', 'anim-enter-hero', 'anim-enter-enemy');
+        dom.classList.remove('breathe'); box.style.transition = 'none';
+        if (meta.holdTransform) box.style.transform = meta.holdTransform;
+        const base = dom.style.transform;
+        const beat = (phase, extra = {}) => { if (onBeat) onBeat(Object.assign({ phase, entity }, extra)); };
+        const isEnemy = meta.side === 'enemy' || entity.side === 'enemy';
+        const colCore = '#e0f2fe', colArc = isEnemy ? '#e879f9' : '#22d3ee', colViolet = '#a78bfa';
+        const uid = ++S.uid, footY = rect.bottom - Math.min(12, rect.h * 0.1);
+        const rW = Math.round(Math.max(76, rect.w * 1.45)), rH = Math.round(Math.max(32, rW * 0.44));
+        owner.sound('resist_phantom', { vol: 0.38, rate: 0.94, pan: panOf(rect.x) });
+        beat('destabilize', { rect });
+        const glow = owner.layer(`<div class="arcane-summon-anchor" style="left:${rect.x}px;top:${rect.y}px;width:${Math.round(rect.w * 1.25)}px;height:${Math.round(rect.h * 1.25)}px;border-radius:50%;background:radial-gradient(circle,rgba(224,242,254,0.68) 0%,rgba(167,139,250,0.34) 46%,transparent 76%);"></div>`, 55, 'summon-exit-glow');
+        owner.anim(glow.firstElementChild, [{ transform: 'translate(-50%,-50%) scale(0.7)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1.06)', opacity: 0.85, offset: 0.32 }, { transform: 'translate(-50%,-50%) scale(1.18)', opacity: 0 }], { duration: 480, easing: 'ease-out', fill: 'forwards' });
+        owner.at(490, () => owner.dropLayer(glow));
+        owner.anim(dom, [{ transform: base || 'none', opacity: 1 }, { transform: `translate3d(-3px,-1px,0) scale(1.02,0.98) ${base}`, opacity: 0.88, offset: 0.35 }, { transform: `translate3d(3px,-3px,0) scale(0.98,1.03) ${base}`, opacity: 0.95, offset: 0.72 }, { transform: `translate3d(0,-5px,0) scale(0.96,1.04) ${base}`, opacity: 0.75 }], { duration: 190, easing: 'ease-in-out', fill: 'forwards' });
+        const ring = owner.layer(`<div class="arcane-summon-anchor" style="left:${rect.x}px;top:${footY}px;width:${rW}px;height:${rH}px;"><svg viewBox="-60 -26 120 52" class="w-full h-full" style="overflow:visible;"><defs><radialGradient id="summon-rem-${uid}" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="${colArc}" stop-opacity="0.45"/><stop offset="65%" stop-color="${colViolet}" stop-opacity="0.22"/><stop offset="100%" stop-color="${colViolet}" stop-opacity="0"/></radialGradient></defs><ellipse cx="0" cy="0" rx="54" ry="20" fill="url(#summon-rem-${uid})" stroke="${colArc}" stroke-opacity="0.55" stroke-width="1.2" stroke-dasharray="10 7"/></svg></div>`, 52, 'summon-exit-remnant');
+        owner.anim(ring.firstElementChild, [{ opacity: 0, transform: 'translate(-50%,-50%) scale(0.85)' }, { opacity: 0.72, transform: 'translate(-50%,-50%) scale(1)', offset: 0.25 }, { opacity: 0.45, transform: 'translate(-50%,-50%) scale(0.92)', offset: 0.72 }, { opacity: 0, transform: 'translate(-50%,-50%) scale(0.45)' }], { duration: 740, easing: 'ease-out', fill: 'forwards' });
+        owner.at(160, () => {
+            owner.sound('rage_exit', { vol: 0.30, rate: 1.08, maxDurSec: 0.48, fadeOutSec: 0.2, pan: panOf(rect.x) });
+            beat('unravel', { rect });
+            owner.anim(dom, [{ transform: `translate3d(0,-5px,0) scale(0.96,1.04) ${base}`, opacity: 0.75 }, { transform: `translate3d(4px,-14px,0) scale(0.76,1.08) ${base}`, opacity: 0.22, offset: 0.65 }, { transform: `translate3d(8px,-22px,0) scale(0.56,1.12) ${base}`, opacity: 0 }], { duration: 380, easing: 'ease-in', fill: 'forwards' });
+            owner.burst(Math.max(18, Math.min(28, Math.round(rect.w * 0.28))), () => ({ x: rect.x + rnd(-rect.w * 0.38, rect.w * 0.38), y: rect.y + rnd(-rect.h * 0.35, rect.h * 0.32), vx: rnd(0.25, 1.45), vy: rnd(-2.5, -0.9), grav: -0.04, drag: 0.96, decay: rnd(0.032, 0.056), size: rnd(2.2, 4.4), shape: 'glowOrb', color: pick([colArc, colViolet, colCore]), core: colCore }));
+        });
+        owner.at(560, () => beat('extinguish'));
+        owner.at(750, () => { owner.dropLayer(ring); beat('vacated'); });
+        owner.handle.isSummonExit = true;
+        return owner.handle;
+    }
+    function playSummonGuard(guardian, ownerEntity, meta = {}, onBeat) {
+        if (!guardian || !ownerEntity || meta.incomingLethal === false) return null;
+        const gRect = entityVisualRect(guardian), oRect = entityVisualRect(ownerEntity);
+        if (!gRect || !oRect) return null;
+        const gId = guardian.id || String(guardian), oId = ownerEntity.id || String(ownerEntity);
+        const shoulderSide = oRect.x >= gRect.x ? -1 : 1;
+        const interceptX = oRect.x + shoulderSide * Math.min(20, oRect.w * 0.16), interceptY = oRect.y - Math.min(30, oRect.h * 0.26);
+        const dashX = interceptX - gRect.x, dashY = interceptY - gRect.y, dir = dashX >= 0 ? 1 : -1;
+        const blockPt = { x: interceptX, y: interceptY - Math.min(10, gRect.h * 0.12) };
+        const gDom = gRect.dom, gWrap = summonWrapOf(guardian) || gDom, base = gWrap.style.transform;
+        const dashTransform = `translate3d(${dashX.toFixed(1)}px,${dashY.toFixed(1)}px,0) ${base}`;
+        const owner = summonRun(920, ['summon:' + gId, 'guard:' + oId]), uid = ++S.uid;
+        owner.hold();
+        const restoreWrap = summonSaveStyle(gWrap, ['zIndex', 'transition', 'transform']);
+        const restoreDom = summonSaveStyle(gDom, ['transform', 'transition', 'filter']);
+        owner.onClean(() => { restoreDom(); restoreWrap(); });
+        gWrap.style.zIndex = '46'; gWrap.style.transition = 'none'; gDom.style.filter = 'drop-shadow(0 0 12px rgba(56,189,248,0.8))';
+        let settled = false, released = false, impactAt = 0, outcome = meta.guardOutcome || 'survived', chaining = false, exitHandle = null;
+        let resolveReady, resolveDone;
+        const ready = new Promise(resolve => { resolveReady = resolve; });
+        const done = new Promise(resolve => { resolveDone = resolve; });
+        const exitBeats = [], exitMeta = {};
+        const cancelRun = owner.handle.cancel;
+        owner.handle.cancel = () => { cancelRun(); if (exitHandle) exitHandle.cancel(); resolveDone(false); };
+        owner.handle.onFinish.add(ok => { resolveReady({ ok: !!ok, blockPt }); if (!chaining) resolveDone(!!ok); });
+        const beat = (phase, extra = {}) => { if (onBeat) onBeat(Object.assign({}, extra, { phase, guardian, owner: ownerEntity, guardOutcome: outcome })); };
+        const shieldSize = Math.round(Math.max(94, Math.min(118, gRect.w * 1.4)));
+        function impact(finalOutcome = 'hit', opts = {}) {
+            if (settled || !owner.valid()) return;
+            settled = true; impactAt = Date.now();
+            if (finalOutcome === 'secondDodge') {
+                outcome = 'secondDodge';
+                if (!opts.suppressDodgeFx) {
+                    const live = entityVisualRect(guardian) || gRect, ghost = summonGhost(owner, live, '#67e8f9', 'summon-dodge-ghost');
+                    owner.anim(ghost.ghost, [{ transform: 'scale(1)', opacity: 0.7 }, { transform: 'translate3d(0,4px,0) scale(0.92)', opacity: 0 }], { duration: 280, easing: 'ease-out', fill: 'forwards' });
+                    owner.at(300, () => owner.dropLayer(ghost.layer));
+                    owner.anim(gDom, [{ transform: 'translate3d(0,0,0)' }, { transform: `translate3d(${-dir * 26}px,-7px,0) scale(1.03)`, offset: 0.32 }, { transform: 'translate3d(0,0,0)' }], { duration: 320, easing: 'cubic-bezier(0.2,0.88,0.32,1)' });
+                    owner.burst(12, () => ({ x: blockPt.x + rnd(-10, 10), y: blockPt.y, vx: rnd(-2.5, 2.5), vy: rnd(-2.2, 0.8), drag: 0.9, decay: 0.07, size: rnd(2.2, 4), shape: 'glowOrb', color: '#67e8f9', core: '#ffffff' }));
+                }
+                if (!opts.silentDodge) { owner.sound('avoid_dash2', { vol: 0.72, pan: panOf(blockPt.x) }); owner.at(100, () => owner.sound('hide', { vol: 0.65, maxDurSec: 0.35, pan: panOf(blockPt.x) })); }
+                beat('secondDodge', { blockPt });
+                return;
+            }
+            const tilt = -dir * 5;
+            const shield = owner.layer(`<div class="arcane-summon-anchor" style="left:${blockPt.x}px;top:${blockPt.y}px;width:${shieldSize}px;height:${shieldSize}px;transform:translate(-50%,-50%) rotate(${tilt}deg);"><svg viewBox="0 0 120 120" class="w-full h-full" style="overflow:visible;"><defs><linearGradient id="summon-shd-${uid}" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#0284c7" stop-opacity="0.14"/><stop offset="50%" stop-color="#bae6fd" stop-opacity="0.96"/><stop offset="100%" stop-color="#0284c7" stop-opacity="0.14"/></linearGradient><radialGradient id="summon-shd-core-${uid}" cx="50%" cy="48%" r="50%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.92"/><stop offset="40%" stop-color="#38bdf8" stop-opacity="0.52"/><stop offset="100%" stop-color="#0369a1" stop-opacity="0"/></radialGradient><filter id="summon-shd-glow-${uid}" x="-35%" y="-35%" width="170%" height="170%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><circle cx="60" cy="56" r="44" fill="url(#summon-shd-core-${uid})" class="s-shd-bloom"/><g filter="url(#summon-shd-glow-${uid})" class="s-shd-arc"><path d="M16 74 Q60 12 104 74 Q60 32 16 74 Z" fill="url(#summon-shd-${uid})"/><path d="M22 68 Q60 18 98 68" fill="none" stroke="#e0f2fe" stroke-width="3.6" stroke-linecap="round"/></g></svg></div>`, 59, 'summon-guard-shield');
+            owner.anim(shield.querySelector('.s-shd-arc'), [{ transform: 'scale(0.55)', opacity: 0 }, { transform: 'scale(1.12)', opacity: 1, offset: 0.18 }, { transform: 'scale(1.02)', opacity: 0.92, offset: 0.72 }, { transform: 'scale(1.14)', opacity: 0 }], { duration: 360, easing: 'cubic-bezier(0.16,0.88,0.3,1)', fill: 'forwards' });
+            owner.anim(shield.querySelector('.s-shd-bloom'), [{ transform: 'scale(0.3)', opacity: 0.95 }, { transform: 'scale(1.32)', opacity: 0 }], { duration: 310, easing: 'ease-out', fill: 'forwards' });
+            owner.at(370, () => owner.dropLayer(shield));
+            owner.sound('parry', { vol: 0.84, pan: panOf(blockPt.x) });
+            owner.burst(16, () => { const a = rnd(-2.7, -0.45), sp = rnd(2.6, 6.8); return { x: blockPt.x + rnd(-8, 8), y: blockPt.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, grav: 0.14, drag: 0.91, decay: rnd(0.048, 0.082), size: rnd(1.8, 2.8), shape: 'spark', color: pick(['#ffffff', '#bae6fd', '#38bdf8', '#7dd3fc']) }; });
+            owner.burst(2, i => ({ x: blockPt.x, y: blockPt.y, shape: 'gradRing', r0: 8, r1: 52 + i * 20, w: 3.2 - i, decay: 0.068 - i * 0.018, color: i ? 'rgba(56,189,248,0.72)' : 'rgba(224,242,254,0.9)' }));
+            beat('blockImpact', { blockPt, finalOutcome }); beat('guardHold', { blockPt });
+        }
+        function doReturn() {
+            gDom.style.filter = '';
+            gWrap.style.transform = base;
+            owner.anim(gWrap, [{ transform: dashTransform }, { transform: base || 'none' }], { duration: 320, easing: 'cubic-bezier(0.26,0.82,0.36,1)', fill: 'forwards' });
+            const aura = owner.layer(`<div class="arcane-summon-aura" style="left:${oRect.x}px;top:${oRect.y}px;width:${oRect.w + 10}px;height:${oRect.h + 10}px;"></div>`, 51, 'summon-owner-aura');
+            owner.anim(aura.firstElementChild, [{ opacity: 0, transform: 'translate(-50%,-50%) scale(0.95)' }, { opacity: 0.88, transform: 'translate(-50%,-50%) scale(1.01)', offset: 0.28 }, { opacity: 0, transform: 'translate(-50%,-50%) scale(1.04)' }], { duration: 420, easing: 'ease-out', fill: 'forwards' });
+            owner.at(430, () => owner.dropLayer(aura));
+            owner.sound('armor_step_1', { vol: 0.38, rate: 1.08, maxDurSec: 0.28, pan: panOf(gRect.x) });
+            beat('return', { blockPt });
+        }
+        function release(finalOutcome = outcome) {
+            if (released || !owner.valid()) return done;
+            released = true; outcome = finalOutcome;
+            if (finalOutcome === 'explode') { cancelRun(); return done; }
+            impact(finalOutcome === 'secondDodge' ? 'secondDodge' : 'hit');
+            if (finalOutcome === 'guardianDown') {
+                owner.at(210, () => {
+                    const rect = entityVisualRect(guardian);
+                    chaining = true; cancelRun();
+                    exitHandle = playSummonExit(guardian, Object.assign({}, exitMeta, { exitCause: 'killed', fromGuard: true, anchorRect: rect, holdTransform: dashTransform }), ev => { beat('exitChain:' + ev.phase, ev); exitBeats.forEach(fn => fn(ev)); });
+                    if (exitHandle) exitHandle.done.then(resolveDone); else resolveDone(true);
+                });
+                return done;
+            }
+            const delay = Math.max(0, impactAt + (finalOutcome === 'secondDodge' ? 330 : 360) - Date.now());
+            owner.at(delay, doReturn); owner.resume(delay + 450);
+            return done;
+        }
+        const ghost = summonGhost(owner, gRect, '#38bdf8', 'summon-guard-ghost');
+        owner.anim(ghost.ghost, [{ transform: 'scale(1)', opacity: 0.62 }, { transform: 'scale(0.9)', opacity: 0 }], { duration: 290, easing: 'ease-out', fill: 'forwards' });
+        owner.at(300, () => owner.dropLayer(ghost.layer));
+        owner.anim(gWrap, [{ transform: base || 'none' }, { transform: dashTransform }], { duration: 180, easing: 'cubic-bezier(0.22,0.88,0.32,1)', fill: 'forwards' });
+        gWrap.style.transform = dashTransform;
+        owner.sound('armor_step_2', { vol: 0.68, rate: 1.08, maxDurSec: 0.34, pan: panOf((gRect.x + blockPt.x) * 0.5) });
+        owner.burst(8, i => ({ x: gRect.x + dashX * (i / 8), y: gRect.y + dashY * (i / 8) + rnd(-6, 6), vx: -dashX * 0.015 + rnd(-0.6, 0.6), vy: -dashY * 0.015 + rnd(-0.5, 0.5), drag: 0.9, decay: 0.08, size: rnd(2.2, 4.2), shape: 'glowOrb', color: '#38bdf8', core: '#e0f2fe' }));
+        beat('dash', { dashX, dashY, blockPt });
+        owner.at(180, () => {
+            resolveReady({ ok: true, blockPt }); beat('reactionReady', { blockPt, release });
+            if (!meta.deferredRelease) release(outcome);
+        });
+        Object.assign(owner.handle, { ready, done, impact, release, blockPt, dashX, dashY, guardian, isReleased: () => released,
+            exit(meta2, cb) { Object.assign(exitMeta, meta2); if (cb) exitBeats.push(cb); release('guardianDown'); } });
+        return owner.handle;
+    }
+    // ===== 召唤三瞬默认演出 v12.12 END =====
+
     function clearArcaneFx() {
+        clearSummonState();
         clearStatusLayers(); clearSelfDestructState(); clearRescueState();
         clearHitFeedback();
         identityAudioStoppers.forEach(stop => stop()); identityAudioStoppers.clear();
@@ -12825,6 +13180,7 @@ function playRescueAvoidFatal(entity, meta, onBeat) {
     window.playArcaneSkillFx = playArcaneSkillFx;
     window.playArcaneProjectile = playArcaneProjectile;
     window.clearArcaneFx = clearArcaneFx;
+    Object.assign(window, { SUMMON_DEDICATED_TAGS, isSummonDedicatedFx, summonRun, entityVisualRect, summonWrapOf, summonSaveStyle, cloneSummonVisual, buildSummonCircleHtml, playSummonEnter, playSummonExit, playSummonGuard, clearSummonState });
     window.playEnemyWindup = playEnemyWindup;
     window.playAttackIdentityFx = playAttackIdentityFx;
     window.CombatAudioDirector = CombatAudioDirector;
@@ -12838,7 +13194,7 @@ function playRescueAvoidFatal(entity, meta, onBeat) {
     window.clearVariantState = clearVariantState;
     window.setVariantSfx = setVariantSfx;
     Object.assign(window, statusFxApi, { playStatusTickFx, syncStatusLayers, clearStatusLayers, setStatusSfx, setSelfDestructWarning, syncSelfDestructWarning, clearSelfDestructWarning, clearAllSelfDestructWarnings, clearSelfDestructState, setSelfDestructSfx, playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, playRescueSheshen, playRescueGrit, playRescueAvoidFatal, clearRescueState });
-    return { isArcaneSkillFx, playArcaneSkillFx, playArcaneProjectile, clearArcaneFx, playEnemyWindup, playAttackIdentityFx, playHitFeedback, playCounterAttackL1, classifyHit, clearHitFeedback, syncHitBar, playWoundedHint, setIdentitySfx, CombatAudioDirector, playVariantTriggerFx, isEntityVariantLocked, clearVariantState, setVariantSfx, syncVariantState, ...statusFxApi, playVariantResistFx, playStatusTickFx, syncStatusLayers, clearStatusLayers, setStatusSfx, setSelfDestructWarning, syncSelfDestructWarning, clearSelfDestructWarning, clearAllSelfDestructWarnings, clearSelfDestructState, setSelfDestructSfx, playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, playRescueSheshen, playRescueGrit, playRescueAvoidFatal, clearRescueState };
+    return { SUMMON_DEDICATED_TAGS, isSummonDedicatedFx, summonRun, entityVisualRect, summonWrapOf, summonSaveStyle, cloneSummonVisual, buildSummonCircleHtml, playSummonEnter, playSummonExit, playSummonGuard, clearSummonState, isArcaneSkillFx, playArcaneSkillFx, playArcaneProjectile, clearArcaneFx, playEnemyWindup, playAttackIdentityFx, playHitFeedback, playCounterAttackL1, classifyHit, clearHitFeedback, syncHitBar, playWoundedHint, setIdentitySfx, CombatAudioDirector, playVariantTriggerFx, isEntityVariantLocked, clearVariantState, setVariantSfx, syncVariantState, ...statusFxApi, playVariantResistFx, playStatusTickFx, syncStatusLayers, clearStatusLayers, setStatusSfx, setSelfDestructWarning, syncSelfDestructWarning, clearSelfDestructWarning, clearAllSelfDestructWarnings, clearSelfDestructState, setSelfDestructSfx, playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, playRescueSheshen, playRescueGrit, playRescueAvoidFatal, clearRescueState };
 
 })();
 
@@ -17055,6 +17411,7 @@ let barrierStandIn = null;
 // ==========================================
 let pendingSummons = [];
 let summonSeq = 0;
+const summonEnterPending = new Set(); // 仅隐藏本批尚未显象的占位，不参与名额、存档或结算。
 
 // 【召唤】名额与硬闸（调参点集中在这里）
 const SUMMON_SIDE_LIMIT = 4;    // 每阵营（我方/敌方各自）存活召唤物名额；带 [众召] 的技能不受此限
@@ -18209,7 +18566,7 @@ async function createSummonEntity(caster, spec, side, opts) {
         return false;
     }
     // 蝎眼钥匙：资料读取与蓄势并行，裂隙爆发后才创建实体、入队与挂载卡牌。
-    if (opts && opts.beforeEnter) {
+    if (opts && opts.beforeEnter && !opts.defaultEnter) {
         const ready = await opts.beforeEnter;
         if (!ready || _actionToken !== combatToken || _pipelineFrozen) return false;
     }
@@ -18250,9 +18607,9 @@ async function createSummonEntity(caster, spec, side, opts) {
             state.actionQueue.splice(state.queueIndex + 1, 0, ...entries);
         } catch(e) {}
     }
-    // 每只都给即时反馈（多召时逐只飘字 + 爆闪光环，反馈密度与单只一致）
+    // 默认入场由批量序列统一接管；保留原浮字，不再逐只叠加旧爆闪。
     const casterDom = caster && caster.id ? (document.getElementById(`hero-card-${caster.id}`) || document.getElementById(`${caster.id}-sprite`)) : null;
-    if (casterDom) { createFloatingText(casterDom, `召唤阵：${summonName}`, 'text-sky-300'); if (window.spawnBurstAura) spawnBurstAura(casterDom); }
+    if (casterDom) createFloatingText(casterDom, `召唤阵：${summonName}`, 'text-sky-300');
     return summonEntity;
 }
 
@@ -18264,6 +18621,7 @@ async function summonFromWorldbook(caster, summonText, opts) {
     if (_pipelineFrozen) return;
     const side = isHeroSideEntity(caster) ? 'hero' : 'enemy'; // 召唤物 id 为 s_* 前缀，链式召唤需按 side 判定阵营
     const noLimit = !!(opts && opts.noLimit);
+    opts = Object.assign({}, opts, { defaultEnter: !isSummonDedicatedFx(opts && opts.fxTag) });
     const specs = parseSummonList(summonText);
     const _casterDom = caster && caster.id ? (document.getElementById(`hero-card-${caster.id}`) || document.getElementById(`${caster.id}-sprite`)) : null;
     if (!specs.length) {
@@ -18307,6 +18665,7 @@ async function summonFromWorldbook(caster, summonText, opts) {
         return false;
     }
     // ---- 批量收尾：一次重排 + 一次渲染 ----
+    if (opts.defaultEnter) created.forEach(ent => summonEnterPending.add(ent.id));
     if (state && state.isGameStarted) {
         try {
             if (typeof reorderRemainingQueue === 'function') reorderRemainingQueue();
@@ -18316,7 +18675,7 @@ async function summonFromWorldbook(caster, summonText, opts) {
             // 我方召唤行走增量追加（每只一次），不重建全场
             created.forEach(ent => { try { window.initUIIncrementalSummon(ent); } catch(e) { try { initUI(); } catch(e2) {} } });
         } else {
-            try { if (typeof window.renderEnemyFormation === 'function') window.renderEnemyFormation(); } catch(e) { try { initUI(); } catch(e2) {} }
+            try { if (typeof window.renderEnemyFormation === 'function') window.renderEnemyFormation({ summoning: true }); } catch(e) { try { initUI(); } catch(e2) {} }
         }
     } else {
         try { if (typeof window.renderEnemyFormation === 'function' && side === 'enemy') window.renderEnemyFormation(); else initUI(); } catch(e) { try { initUI(); } catch(e2) {} }
@@ -18332,6 +18691,12 @@ async function summonFromWorldbook(caster, summonText, opts) {
         addHistory(`   ⚠️ [${caster.name}] 召唤名额不足，仅召唤 ${created.length} 只（${why}）`);
     }
     showLog(`召唤成功：${created.length} 只已参战`);
+    if (opts.defaultEnter) {
+        const entrance = playSummonEnter(caster, created, { side, fxTag: opts.fxTag, beforeEnter: opts.beforeEnter });
+        if (entrance) await entrance.done;
+        else created.forEach(ent => { summonEnterPending.delete(ent.id); const box = arcaneVfxModule.summonWrapOf(ent); if (box) box.classList.remove('arcane-summon-pending'); });
+        if (_actionToken !== combatToken || _pipelineFrozen) return;
+    }
     return true;
 }
 
@@ -18344,8 +18709,16 @@ function flushPendingSummons() {
     });
     // 敌方召唤物：若未手动指定 [前排]/[后排] 则默认前排；手动指定的 row 已保留
     batch.forEach(p => { if (p.side === 'enemy' && !p.entity.row) { p.entity.row = 'front'; if (p.entity._rowOrder === undefined) p.entity._rowOrder = 999; } });
-    // 我方召唤物入队后需要重建头像区召唤行
+    // 我方召唤物入队后需要重建头像区召唤行；遗留批次也只走一次默认阵成。
+    batch.forEach(p => { if (!isSummonDedicatedFx(p.fxTag)) summonEnterPending.add(p.entity.id); });
     try { if (state.isGameStarted) initUI(); } catch(e) {}
+    ['hero', 'enemy'].forEach(side => {
+        const group = batch.filter(p => p.side === side && !isSummonDedicatedFx(p.fxTag));
+        if (!group.length) return;
+        const first = group[0], caster = heroesData.concat(enemiesData).find(e => e.id === first.entity.summonOwnerId);
+        const entrance = playSummonEnter(caster, group.map(p => p.entity), { side, beforeEnter: first.beforeEnter });
+        if (!entrance) group.forEach(p => { summonEnterPending.delete(p.entity.id); const box = arcaneVfxModule.summonWrapOf(p.entity); if (box) box.classList.remove('arcane-summon-pending'); });
+    });
 }
 
 // 【世界书载入】入口：按名字用图鉴词条数据替换敌方（未命中保留 Yaml 原样）
@@ -18801,6 +19174,7 @@ function initUI() {
     const sd = document.createElement('div');
     sd.className = 'relative shrink-0 z-10';
     sd.id = `hero-wrap-${summonEntity.id}`;
+    if (summonEnterPending.has(summonEntity.id)) sd.classList.add('arcane-summon-pending');
     const icon = summonEntity.img
       ? `<img src="${escapeHistoryHtml(summonEntity.img)}" class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 object-cover rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.8)]" />`
       : `<div class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 flex items-center justify-center text-5xl sm:text-7xl drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]">${escapeHistoryHtml(summonEntity.emoji || '👻')}</div>`;
@@ -18833,6 +19207,7 @@ function initUI() {
       const sd = document.createElement('div');
       sd.className = 'relative shrink-0 z-10';
       sd.id = `hero-wrap-${sh.id}`;
+      if (summonEnterPending.has(sh.id)) sd.classList.add('arcane-summon-pending');
       const icon2 = sh.img
         ? `<img src="${escapeHistoryHtml(sh.img)}" class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 object-cover rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.8)]" />`
         : `<div class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 flex items-center justify-center text-5xl sm:text-7xl drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]">${escapeHistoryHtml(sh.emoji || '👻')}</div>`;
@@ -18871,7 +19246,7 @@ function initUI() {
     heroesContainer.appendChild(hero.dom); updateBuffUI(hero); 
   });
   // ---- 敌人前后排棋盘：按 row 分组渲染（固定视觉2行，逻辑前/后排决定玩法）----
-  window.renderEnemyFormation = function(){
+  window.renderEnemyFormation = function(opts = {}){
     const enemiesContainer2 = document.getElementById('enemies-container');
     if (!enemiesContainer2 || !enemiesData || !enemiesData.length) return;
     // 用离屏 fragment 原子替换，避免 innerHTML='' 瞬间空容器导致的“消失”
@@ -18914,14 +19289,15 @@ function initUI() {
       el.className = `flex flex-col items-center group relative ${!enemy.isAlive ? 'hidden' : ''} cursor-pointer pointer-events-auto shrink-0`;
       el.id = `enemy-box-${enemy.id}`;
       el.dataset.row = enemy.row || '';
-      // 保存路径原地刷新：不重触发入场/隐身，避免“空1s再右侧滑入”
-      if (window._isSaving) { /* 静止可见，保留 breathe */ }
+      if (summonEnterPending.has(enemy.id)) el.classList.add('arcane-summon-pending');
+      // 保存或召唤刷新保留旧单位静态显示，新召唤物交给三瞬序列。
+      if (window._isSaving || opts.summoning || enemy.isSummon) { /* 静止可见，保留 breathe */ }
       else if (state.isGameStarted) { el.classList.add('anim-enter-enemy'); el.style.animationDelay = `${index * 0.08}s`; setTimeout(() => { if (el) el.classList.remove('anim-enter-enemy'); }, 800 + index * 80); } else { el.classList.add('opacity-0'); }
       el.style.transform = `scale(${sc})`;
       el.style.filter = isBack ? 'brightness(0.82) saturate(0.92)' : '';
       el.onclick = () => handleTargetClick(enemy, 'enemy');
-      const enemyVisual = enemy.img ? `<img src="${enemy.img}" class="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 object-cover rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.8)]" />` : enemy.emoji;
-      const visualClass = enemy.img ? "" : enemy.size;
+      const enemyVisual = enemy.img ? `<img src="${enemy.img}" class="${enemy.isSummon ? 'object-cover rounded-xl' : 'w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 object-cover rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.8)]'}" />` : enemy.emoji;
+      const visualClass = enemy.isSummon ? 'arcane-enemy-summon-visual' : (enemy.img ? "" : enemy.size);
       let chargeHtml = '';
       const maxCharge = Math.max(0, ...enemy.skills.map(s => s.charge || 0));
       if (maxCharge > 0) chargeHtml = `<div id="${enemy.id}-charge-pips" class="flex justify-center mt-2 pointer-events-none h-3 items-center"></div>`;
@@ -19451,13 +19827,13 @@ function resolveSummonDeath(entity, spriteDom, skipRevive) {
     if (idx !== -1) arr.splice(idx, 1);
     if (entity.explode) {
         if (spriteDom) spriteDom.classList.remove('breathe');
-    } else if (isHeroSide) {
-        if (entity.dom && entity.dom.parentNode) entity.dom.remove();
-        else { const wrap = document.getElementById(`hero-wrap-${entity.id}`); if (wrap) wrap.remove(); }
     } else {
-        if (spriteDom) { spriteDom.classList.remove('breathe', 'enemy-sprite'); spriteDom.classList.add('opacity-0', 'scale-50'); }
-        const box = document.getElementById(`enemy-box-${entity.id}`) || entity.dom;
-        if (box) setTimeout(() => { if (box.parentNode) box.remove(); }, 500);
+        const removeSlot = () => {
+            const box = document.getElementById(isHeroSide ? `hero-wrap-${entity.id}` : `enemy-box-${entity.id}`) || entity.dom;
+            if (box) box.remove();
+        };
+        const exit = playSummonExit(entity, { exitCause: 'killed', side: entity.side }, ev => { if (ev.phase === 'vacated') removeSlot(); });
+        if (!exit) removeSlot();
     }
     renderTurnQueue();
     addHistory(`[战况] 💨 召唤物 ${entity.name} 消散了。`);
@@ -20831,7 +21207,7 @@ function isSingleTargetSkill(skill) {
     if (!skill) return true;
     return ![skill.type, skill.type2, skill.type3].some(t => t && String(t).includes('群'));
 }
-async function tryAutoSummonGuard(sheshenCandidates, target) {
+async function tryAutoSummonGuard(sheshenCandidates, target, meta = {}) {
     const _actionToken = combatToken;
     if (_pipelineFrozen) return;
     if (!sheshenCandidates || !sheshenCandidates.length || !target || target.isSummon) return null;
@@ -20847,14 +21223,12 @@ async function tryAutoSummonGuard(sheshenCandidates, target) {
     if (realSkill && realSkill.maxUses > 0) realSkill.usesRemaining = Math.max(0, (realSkill.usesRemaining ?? realSkill.maxUses) - 1);
     if (typeof updateHeroUI === 'function') updateHeroUI(guardian);
     if (typeof addHistory === 'function') addHistory(`   🛡️ ${guardian.name} 施展【${gSkill.name}】舍身护佑，替 ${target.name} 承受攻击！(自动)`);
-    const guardianDom = document.getElementById(`hero-card-${guardian.id}`);
-    if (guardianDom) {
-        if (window.spawnFocusOverlay) window.spawnFocusOverlay(guardianDom, 600);
-        const gRect = guardianDom.getBoundingClientRect();
-        if (window.spawnChargeUpParticles) window.spawnChargeUpParticles(gRect.left + gRect.width / 2, gRect.top + gRect.height / 2, '#38bdf8', 310);
+    const summonGuardHandle = playSummonGuard(guardian, target, Object.assign({ deferredRelease: true }, meta));
+    if (summonGuardHandle) {
+        const ready = await summonGuardHandle.ready;
+        if (!ready.ok || _actionToken !== combatToken || _pipelineFrozen) return;
     }
-    await sleep(520); if (_actionToken !== combatToken || _pipelineFrozen) return;
-    return { guardian, skill: gSkill };
+    return { guardian, skill: gSkill, summonGuardHandle };
 }
 
 // ==========================================
@@ -22103,7 +22477,7 @@ async function playSelfDestructAttackWave(caster, targets, tag, power, hitChance
 async function prepareSingleAttackHit(caster, target, tag, tagPower, hitChance, multiplier, skill, fixedRawDamage = null, holdReactionFx = false) {
     const _actionToken = combatToken;
     const targetType = isHeroSideEntity(target) ? 'hero' : 'enemy';
-    let targetDom = getEntitySpriteDom(target), reactionFx = null, isDodged = false, rescueHandle = null;
+    let targetDom = getEntitySpriteDom(target), reactionFx = null, isDodged = false, rescueHandle = null, summonGuardHandle = null;
     const isDamage = ['攻','单体','穿透','眩晕','散射'].some(k => tag.includes(k));
     const isSelfDebuff = isSelfDebuffTag(tag);
     const isDebuffTag = ['降','盲','滞','弱','中毒','燃烧','麻痹','缓','吸蓝'].some(k => tag.includes(k));
@@ -22172,9 +22546,10 @@ async function prepareSingleAttackHit(caster, target, tag, tagPower, hitChance, 
             const _guardRaw = fixedRawDamage != null ? fixedRawDamage : computeSegmentRawDamage(caster, tagPower, multiplier, skill, target, _segRoll);
             const _guardLethal = isDamage && wouldSegmentClearHp(caster, target, targetType, _guardRaw, tag, skill, incomingDamageType);
             if (_guardLethal) {
-                autoGuardInfo = await tryAutoSummonGuard(sheshenCandidates, target); if (_actionToken !== combatToken || _pipelineFrozen) return;
+                autoGuardInfo = await tryAutoSummonGuard(sheshenCandidates, target, { incomingFrom: caster, incomingType: incomingDamageType }); if (_actionToken !== combatToken || _pipelineFrozen) return;
             }
             if (autoGuardInfo && autoGuardInfo.guardian) {
+                summonGuardHandle = autoGuardInfo.summonGuardHandle;
                 target = autoGuardInfo.guardian;
                 targetDom = getEntitySpriteDom(target) || document.getElementById(`hero-card-${target.id}`);
                 const guardianIntercept = await runReactionIntercept(caster, target, skill, hitChance, incomingDamageType, [], isDamage, isPierce, multiplier, holdReactionFx); if (_actionToken !== combatToken || _pipelineFrozen) return;
@@ -22220,7 +22595,7 @@ async function prepareSingleAttackHit(caster, target, tag, tagPower, hitChance, 
 
     }
     const impactDom = reactionFx && reactionFx.impactDom && (isDodged || !reactionFx.hit || (!isPierce && target.shield > 0)) ? reactionFx.impactDom : targetDom;
-    return { target, targetDom, reactionFx, isDodged, segRoll:_segRoll, impactDom, rescueHandle };
+    return { target, targetDom, reactionFx, isDodged, segRoll:_segRoll, impactDom, rescueHandle, summonGuardHandle };
 }
 
 async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, multiplier, globalTurns, skill, fixedRawDamage = null, attackFxPlayed = false, attackContext = null) {
@@ -22346,7 +22721,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
       const _dodgeFeedback = { targetId:target.id, outcome:'dodge', maxHp:target.maxHp, hpBefore:target.hp, hpAfter:target.hp,
           hpDmg:0, shieldBefore:target.shield || 0, shieldAfter:target.shield || 0, shieldDmg:0,
           incomingDmg:_dodgeIncomingDmg, suppressDodgeFx:!!(reactionFx && reactionFx.dodge), isHero:targetType === 'hero' };
-      playHitFeedback(_dodgeFeedback, dodgeOpts);
+      playHitFeedback(_dodgeFeedback, Object.assign({}, dodgeOpts, { suppressDodgeFx: !!prepared.summonGuardHandle || dodgeOpts.suppressDodgeFx }));
+      if (prepared.summonGuardHandle) prepared.summonGuardHandle.impact('secondDodge', { suppressDodgeFx: !!(reactionFx && reactionFx.dodge), silentDodge: true });
       CombatAudioDirector.publish(Object.assign({}, _dodgeFeedback, { sourceId:caster.id, actionId, damageType:incomingDamageType,
           eventId:attackContext && attackContext.eventId || null, wave:audioWave, source:'attack' }));
       addHistory(`   ↳ 但被 ${target.name} 敏捷地闪避了！`);
@@ -22412,8 +22788,8 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
       }
       
       };
-      if (postQueue) postQueue.push({ target, run:async () => { await finishDodge(); if (prepared.rescueHandle) await prepared.rescueHandle.release(); completeAudioTarget(); } });
-      else { await finishDodge(); if (prepared.rescueHandle) await prepared.rescueHandle.release(); completeAudioTarget(); }
+      if (postQueue) postQueue.push({ target, run:async () => { await finishDodge(); if (prepared.rescueHandle) await prepared.rescueHandle.release(); if (prepared.summonGuardHandle) await prepared.summonGuardHandle.release('secondDodge'); completeAudioTarget(); } });
+      else { await finishDodge(); if (prepared.rescueHandle) await prepared.rescueHandle.release(); if (prepared.summonGuardHandle) await prepared.summonGuardHandle.release('secondDodge'); completeAudioTarget(); }
       return; // 闪避成功中止中招结算
     }
   }
@@ -22627,6 +23003,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
             isHero:targetType === 'hero', dirX:a && b ? b.left + b.width / 2 - a.left - a.width / 2 : 0.25,
             dirY:a && b ? b.top + b.height / 2 - a.top - a.height / 2 : -0.35 };
         playHitFeedback(hitResult, attackFeedbackOptions(caster, target, tag, skill, singleAttackFx, attackContext));
+        if (prepared.summonGuardHandle) prepared.summonGuardHandle.impact('hit');
         CombatAudioDirector.publish(Object.assign({}, hitResult, { sourceId:caster.id, actionId, damageType:incomingDamageType,
             eventId:attackContext && attackContext.eventId || null, wave:audioWave, source:'attack' }));
     }
@@ -22680,10 +23057,11 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
     };
     if (postQueue) {
         if (target.hp > 0) { if (targetType === 'hero') updateHeroUI(target); else updateEnemyUI(target); }
-        postQueue.push({ target, run:async () => { finishDamage(); if (prepared.rescueHandle) { await sleep(500); if (_actionToken === combatToken && !_pipelineFrozen) await prepared.rescueHandle.release(); } completeAudioTarget(); } });
+        postQueue.push({ target, run:async () => { finishDamage(); if (prepared.rescueHandle) { await sleep(500); if (_actionToken === combatToken && !_pipelineFrozen) await prepared.rescueHandle.release(); } if (prepared.summonGuardHandle) await prepared.summonGuardHandle.release(target.explode && !target.isAlive ? 'explode' : !target.isAlive || target.hp <= 0 ? 'guardianDown' : 'survived'); completeAudioTarget(); } });
     } else {
         finishDamage();
         if (prepared.rescueHandle) { await sleep(500); if (_actionToken === combatToken && !_pipelineFrozen) await prepared.rescueHandle.release(); }
+        if (prepared.summonGuardHandle) await prepared.summonGuardHandle.release(target.explode && !target.isAlive ? 'explode' : !target.isAlive || target.hp <= 0 ? 'guardianDown' : 'survived');
         completeAudioTarget();
     }
     return killed ? '__killed__' : undefined;
@@ -23169,12 +23547,29 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         if (skill.fxTag === '蝎眼钥匙') {
             arcaneFx = playArcaneSkillFx(skill.fxTag, caster, [], false, skillAudioContext);
             skill._fxPlayed = true; skill._arcaneFx = arcaneFx;
-            await summonFromWorldbook(caster, skill.summonTarget, { noLimit: !!skill.summonNoLimit, beforeEnter: arcaneFx.burstReady });
+            await summonFromWorldbook(caster, skill.summonTarget, { noLimit: !!skill.summonNoLimit, fxTag: skill.fxTag, beforeEnter: arcaneFx.burstReady });
             if (_actionToken !== combatToken || _pipelineFrozen) return;
             if (!(await arcaneFx.burstReady) || arcaneFx.cancelled || _actionToken !== combatToken || _pipelineFrozen) return;
         } else {
-            await sleep(400); if (_actionToken !== combatToken || _pipelineFrozen) return;
-            await summonFromWorldbook(caster, skill.summonTarget, { noLimit: !!skill.summonNoLimit }); if (_actionToken !== combatToken || _pipelineFrozen) return;
+            if (_onlySummon && isSummonDedicatedFx(skill.fxTag) && !skill._fxPlayed) {
+                skill._fxPlayed = true;
+                if (isArcaneSkillFx(skill.fxTag)) {
+                    arcaneFx = playArcaneSkillFx(skill.fxTag, caster, [], false, skillAudioContext);
+                    skill._arcaneFx = arcaneFx;
+                } else if (skill.fxTag === '高阶召唤术') CombatAudioMixer.withContext(skillAudioContext, () => spawnTitanGazeFx(isHeroSideEntity(caster), false));
+                else if (skill.fxTag === '造雾术') CombatAudioMixer.withContext(skillAudioContext, () => spawnRlyehSedimentFx(isHeroSideEntity(caster), false));
+                else if (skill.fxTag === '障壁术') CombatAudioMixer.withContext(skillAudioContext, () => spawnNakTithAegisFx(isHeroSideEntity(caster), false));
+                else {
+                    const casterDom = getEntitySpriteDom(caster);
+                    if (casterDom) { const rect = casterDom.getBoundingClientRect(); playWebMFX(rect.left + rect.width / 2, rect.top + rect.height / 2, skill.fxTag, skillAudioContext); }
+                }
+            }
+            if (isSummonDedicatedFx(skill.fxTag)) { await sleep(400); if (_actionToken !== combatToken || _pipelineFrozen) return; }
+            await summonFromWorldbook(caster, skill.summonTarget, { noLimit: !!skill.summonNoLimit, fxTag: skill.fxTag }); if (_actionToken !== combatToken || _pipelineFrozen) return;
+            if (_onlySummon && !arcaneFx && isSummonDedicatedFx(skill.fxTag)) {
+                const delay = WEBM_FX_REGISTRY[skill.fxTag]?.delay;
+                if (delay) { await sleep(Math.round(delay * 1000)); if (_actionToken !== combatToken || _pipelineFrozen) return; }
+            }
         }
         _summonDone = true;
         if (_onlySummon) {
@@ -23182,6 +23577,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
                 const remain = arcaneFx.doneAt - Date.now();
                 if (remain > 0) { await sleep(remain); if (_actionToken !== combatToken || _pipelineFrozen) return; }
             }
+            delete skill._arcaneFx; delete skill._fxPlayed;
             return arcaneFx;
         }
     }
@@ -24501,10 +24897,12 @@ async function executeSummonTurn(summon, token = combatToken) {
   }
   const summonMult = await triggerBurstIfNeeded(summon); if (token !== combatToken || _pipelineFrozen) return;
   const summonSprite = getEntitySpriteDom(summon);
-  if (summonSprite && selectedSkillS) {
-      const isAtk = ['单体','群攻','穿透','眩晕'].some(t => [selectedSkillS.type, selectedSkillS.type2, selectedSkillS.type3].some(x => x && x.includes(t)));
-      if (isAtk) { summonSprite.classList.remove('breathe'); summonSprite.classList.add('enemy-omen'); setTimeout(()=>{ if (token !== combatToken) return;  if(summonSprite){ summonSprite.classList.remove('enemy-omen'); if(!summonSprite.classList.contains('breathe') && summon.isAlive) summonSprite.classList.add('breathe'); } },600); }
-      await sleep(330); if (token !== combatToken || _pipelineFrozen) return;
+  if (summonSprite) {
+      const windupKind = classifyEnemyWindup(selectedSkillS);
+      if (windupKind) {
+          playEnemyWindup(summon, windupKind);
+          await sleep(330); if (token !== combatToken || _pipelineFrozen) return;
+      }
   }
   if (selectedSkillS) { await executeSkillAction(summon, specificTargetS, selectedSkillS, summonMult); if (token !== combatToken || _pipelineFrozen) return; }
   else {
