@@ -3556,3 +3556,22 @@
 - **全量纪律**：本轮唯一一次源码全量 **2099通过／1旧签名断言失败**（test25硬编码三参playWebMFX提取，新增上下文参后未匹配）；仅修结构提取并复跑test25 **9/9**，未第二次全量，未把原全量说成全绿。最终真实压缩产物相关回归 **1491/1491**，三组产物专项 **98＋61＋89全通过**；围栏／实体／捕获组／内网隔离／新代码入包／`monsterAttack=3`全通过，未跑产物全量。
 - **留存**：`.audit-work/v12_09-source-full-initial.json`（唯一全量2099/1）；`v12_09-artifact-harness-result.json`（最终1491/0）；最终包1,360,575字节，SHA256 `d01a12eda999187127bb398629d183bb49f8344a9d2819c2c1691b2520c6e8ab`。
 - **边界与待反馈**：未导入／操作真实酒馆战局，未实际耳听验收最终增益；等待用户导入v12.09试听。只提交本轮修改与日志，其他会话删除／备份／Demo不纳入。未启动／操作模拟器，不推送远端，业务hash单向回填日志，禁止amend。
+
+## [LOG-293] 2026-11-14 — 四个定稿反馈 Demo 正式合并移植，交付 v12.10
+
+- **业务提交**：`6ec9b47`。
+- **核心目的**：把抗性免疫、状态发作、自爆、救场情绪四套定稿演出接入正式战斗与清理管线；只改反馈时序/真实采样，不改数值、命中/对抗骰、护盾、致命被动次数及优先级。
+- **用户决策**：七抗性采样外置并同步缺失服务素材；全部真实采样无合成回退；开启燃烧禁疗轻提示且无新增开关；自爆仅纯视觉存活预警、聚能等待看破、既有金眼/锁印后压灭，先自爆完整结束再击杀特写；新形态替换旧通用爆炸但保留一次 monsterAttack、绝命反扑飘字与战报。舍身最终改为 630ms 到位统一格挡+音效→约480ms后放行二次反应/真实承伤→原生/专属闪避及反击/强反击收尾→350ms归位，格挡不扣血、不新增闪避骰。
+- **变更行为**：
+  1. 七抗性复用 variantRun(total,null,[entity])，resistRect/径向梯度重命名/字符串克隆适配，最多两层120ms错峰；gradRing size适配1.05–1.35而不覆写DRAW。applyEnemyTypeResist真减伤且非silent才演出；主攻/反击来源与法术色统一；耐毒/防火/钢体五路径保留免疫飘字、战报、正常受击，伴随命中70ms错拍。
+  2. 毒/燃DoT分化、毒泡/底火苗/黄色麻痹5星常驻、麻痹命中12星+23粒子+350ms轻硬直（尊重变种锁）；独立BUFF_EXPIRED存活订阅、禁疗压暗及有限持续最短临期徽章。hero-card-inner无portrait避让Buff、召唤按sprite。驱散原handler、眩晕星环/跳过不动。
+  3. 自爆新存活预警与三幕舞台；保留唯一selfDestructChain/count队列，真实prepareOnly/outcomes接四形态接触拍，再原applySingleTagEffect/applyBarrierHit结算，屏障/闪避/纯状态免疫不改。群火/群毒无白爆重震、闪避与免疫不附着；看破/敏捷按住成功失败接独立结局；召唤先移出名单但保留尸体DOM到收尾，真实缩放emoji/图片快照对齐。
+  4. 救场三项合入：舍身句柄ready/hold/release随prepared跨二次反应与反击；毅力两职业即刻起卡内血幕/轨/竖血滴、380ms三向猩红弧与一次taunt；回避两职业44px错位与215ms碎散，0ms急步+150ms hide。删除旧重复taunt/miss和Demo模拟来袭，触发瞬间语音不延后；仅新增DRAW.rescueBloodDrop，不覆盖bloodDrop，不改我方倒下。
+  5. identityRun只补显式hold/resume；全局及死亡/复活/制服/DoT清场对称，恢复临时inline原值，四模块不建第二个canvas/计时/AudioContext。新常驻不复制到ghost，离线重建旧节点/定时器取消；舍身外层与内层救场可以并存。
+  6. 新音频按J抗性/K状态/A自爆/B救場沿用v12.09类别/优先级、预解码与owner止音。资源/variant-resist七条＋manifest、资源/self-destruct两条B2/B4＋manifest均校验指纹，同步D:/Project/my_assets仅新增9文件，不覆盖已有素材。其余自爆/状态/救场复用同源服务音，重甲步只裁窗不拆文件。
+- **涉及文件**：index.html；五份新fixture与harness；四Demo产物专项、三份旧专项版本/资源作用域适配；七抗性＋两自爆素材及manifest；regex-前端战斗v12_10.json。四Demo、母版、公开版/公开构建、README/SPEC、历史归档均未改；无关已删除/未跟踪文件不纳入。
+- **验证**：内联/fixture语法与差异格式通过；相关组最终源码 **1865/0**、真实压缩维护包 **1865/0**；四模块共存/重置、舍身真实反应+普通反击+实际承伤延迟归位、自爆真实主链数值/屏障/看破/制服/双尸串行均覆盖。
+- **全量纪律**：唯一一次打包前源码全量 **2559通过/2失败**（test21把新增CSS注释内style文字计为块、把JS动画定位类误判为未编译工具类）。修注释和精确定位类消费者断言，仅复跑相关组；清场收口复验 **355条功能通过**，test21最终 **33/33**，未第二次全量，不把原全量报告为全绿。一次node build-regex.cjs生成v12.10，打包后仅相关与专项；旧专项 **89+98+61**、新专项 **87**，合计 **335全通过**（围栏/实体/捕获组/内网/宿主Base64清零/monsterAttack=3/接口采样入包）。
+- **只读审查**：独立配置模型GLM-5.3-Flash审查无high/medium发布阻断；所提死亡时救场短暂叠加已补clearRescueState并相关复验。报告留integration-test/fixtures/v12_10-feedback-readonly-review.md，未纳入业务提交；原工具无research/model字段，以经批准的独立Flash会话替代，不改代理配置。
+- **留存**：.audit-work/v12_10-source-related.json（1865/0）；v12_10-source-full-initial.json（2559/2唯一全量）；v12_10-source-final-related.json（修复局域记录）；v12_10-tailwind-final.json（33/0）；v12_10-artifact-related.json（1865/0）；四份artifact专项txt。包1474007字节，SHA256 `c2453359f2395b4c09333e064a06ea2072c27f79e0a598b4c304759ee23eeee9`。
+- **边界与待反馈**：IAB未推进帧的7项救场render单独skip，逻辑/WAAPI keyframes及取消复位已测；另probe实测224px外移并24秒持续停驻，未提前归位。未做最终真Chrome完整动画/耳听验收、未导入或操作真实酒馆、未启动模拟器；等待用户导入v12.10反馈。两步业务/日志提交，不amend，不push，不改README。
