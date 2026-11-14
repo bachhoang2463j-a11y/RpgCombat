@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ROOT = path.resolve(__dirname, '..');
-const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_08.json');
+const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_09.json');
 const pkg = JSON.parse(fs.readFileSync(artifact, 'utf8'));
 const src = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const fenced = pkg.replaceString;
@@ -34,7 +34,7 @@ function syntax(text, label) {
   catch (e) { check(false, label + '语法：' + e.message); }
 }
 console.log('== 攻击身份与命中分层 v12.0 产物专项 ==');
-check(path.basename(artifact) === 'regex-前端战斗v12_08.json' && pkg.scriptName === '前端战斗v12.08', '文件名与scriptName均为v12.08');
+check(path.basename(artifact) === 'regex-前端战斗v12_09.json' && pkg.scriptName === '前端战斗v12.09', '文件名与scriptName均为v12.09');
 check(count(src,'```') === 2 && count(fenced,'```') === 2, '源码与产物均只有头尾自围栏');
 check(!immune.includes('```') && !/&(?!amp;)/.test(immune), '内部围栏加固及全量实体免疫');
 check(raw.replace(/&/g,'&amp;') === immune, '单遍实体还原逐字符一致');
@@ -87,7 +87,10 @@ check(src.includes('if (result.isHero)') && src.includes('else wave.results.set(
 for (const key of ['CombatAudioMixer', 'skill', 'result', 'aux', 'sourcePaddingSec', 'stopPaddingSec']) check(raw.includes(key), '共享三轨与兼容裁窗入包：' + key);
 check(src.includes('cue.ready = new Promise') && src.includes('cue.started = new Promise') && src.includes('cue.done = new Promise'), '采样就绪／实际起音／自然结束契约入包');
 check(src.includes("['gunshot2.mp3', 0.259]") && src.includes("['gunshot3.mp3', 0.080]") && src.includes("['gunshot_pierce.mp3', 0.320]"), '明确枪声前导空白采样起点入包');
-check(src.includes('short: { holdMs:180, result:0.40, aux:0.30 }') && src.includes('special: { holdMs:450, result:0.25, aux:0.20 }'), '批准的短／专属保护参数入包');
+check(src.includes('short:{ holdMs:180 }') && src.includes('special:{ holdMs:450 }') && src.includes('gap === 1 ? 0.85 : gap < 4 ? 0.65 : 0.40'), '批准的按等级避让与180/450ms保护入包');
+for (const name of ['categories','classify','capture','withContext','audioContext']) check(raw.includes(name), '自动音频用途契约入包：' + name);
+check(src.includes('A:{ priority:8, gain:1.3 }') && src.includes('C:{ priority:8, gain:1.3 }') && src.includes('B:{ priority:6, gain:1.3 }'), '特效与强反击类别统一乘1.3');
+check(!src.includes('SKILL_CUE_KEYS'), '新音效无需文件名优先级白名单');
 check(src.includes('when:cue.when + delayMs / 1000'), '重击子音按真实主音时钟调度');
 check(src.includes('owner.audioAt(T.impactMs') && !src.includes('owner.onClean(stop)'), '普通枪击接触跟随音频拍点且自然尾音不被视觉清理');
 console.log('\n统计：通过 ' + pass + ' 项，失败 ' + fail + ' 项');

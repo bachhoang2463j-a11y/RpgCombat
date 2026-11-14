@@ -36,12 +36,13 @@
 <script src="fixtures/hit-feedback-regression.js"></script>
 <script src="fixtures/combat-audio-regression.js"></script>
 <script src="fixtures/audio-mixer-regression.js"></script>
+<script src="fixtures/audio-category-regression.js"></script>
 <script src="fixtures/variant-trigger-regression.js"></script>
 <script src="fixtures/item-fx-editor-regression.js"></script>
 <script>
 const TEST_PARAMS = new URLSearchParams(location.search);
 const RPG_SOURCE = TEST_PARAMS.get('artifact') !== '0'
-  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v12_08.json')
+  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v12_09.json')
   : (TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html');
 const RPG_READABLE_SOURCE = TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html';
 // 结构断言读取可读源码；行为断言始终操作 RPG_SOURCE 挂载的真实源码或压缩产物。
@@ -1421,7 +1422,7 @@ async function test24() {
 async function test25() {
   head('25 WebM 特效抠图成本控制：rVFC 节流 + 画布封顶降采样 + screen 降级开关');
   const src = await readRpgSource();
-  const start = src.indexOf('function playWebMFX(x, y, fxTag) {');
+  const start = src.indexOf('function playWebMFX(');
   const end = src.indexOf('function spawnFrostParticles');
   const fx = start !== -1 && end !== -1 ? src.slice(start, end) : '';
   check(!!fx, '可提取 playWebMFX 段');
@@ -2241,7 +2242,7 @@ async function test34() {
   check(src.includes('let _barrierShatterAt = 0;'), '击碎时间戳 _barrierShatterAt 存在（反应弹窗延迟避让依据）');
   const shatterCalls = (src.match(/triggerBarrierShatter\(\)/g) || []).length;
   eq(shatterCalls, 3, 'triggerBarrierShatter 共3处（1定义 + 主路径/AoE泄漏路径2调用）');
-  check(src.includes("try { playSound('atk1'); } catch(e) {}"), '击碎音效为 atk1（try/catch 包裹）');
+  check(/try \{ playSound\('atk1'(?:, 1, 1, \{ category:'D' \})?\); \} catch\(e\) \{\}/.test(src), '击碎音效为 atk1（try/catch 包裹）');
   const oldKillFx = src.includes("spawnHitFlash(barrierDom, 0.9)");
   check(!oldKillFx, '旧击碎演出（红闪 + kill 音效）已移除，由方案5演出替代');
 
@@ -2836,13 +2837,19 @@ async function test51() {
   const result = await window.runAudioMixerRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
   eq(result.pending, [], '三轨播放器专项全部落地，无待对齐项');
 }
+async function test52() {
+  head('52 音频用途：新特效自动继承、原始增益与混合标签隔离');
+  if (TEST_PARAMS.get('version') === 'public') return;
+  const result = await window.runAudioCategoryRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
+  eq(result.pending, [], '用途音频专项全部落地，无待对齐项');
+}
 async function runAll() {
   logEl.textContent = '';
   passN = failN = 0;
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47, test48, test49, test50, test51];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47, test48, test49, test50, test51, test52];
   const selectedTests = TEST_PARAMS.has('tests') ? new Set(TEST_PARAMS.get('tests').split(',').map(n => 'test' + n)) : null;
   for (const t of tests) {
     if (selectedTests && !selectedTests.has(t.name)) continue;

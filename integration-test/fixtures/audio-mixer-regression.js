@@ -1,11 +1,14 @@
 /* 共享音频混音器回归（CombatAudioMixer 契约）：同一 URL 预解码任务合并、热/冷主音与
-   started 门闩、三轨输出与保护系数、short/special 重叠保护不提前恢复、自然尾音 >460ms
-   不被清理、取消/clear/冻结/换代不晚播、默认 0.5 与显式 volume/rate 兼容、短 stop 可调用。
+   started 门闩、三轨输出与类别增益（A/B/C ×1.3 仅一次）、用途自动分类、withContext/
+   capture 延迟继承、protect 按 rank duck 类别 Gain（同级/低 rank 不压、取最严格不连乘）、
+   short/special 类别 hold 不被后来者提前恢复、雷击/扫射重复与自然尾音不裁、取消/clear/
+   冻结/换代不晚播、默认 0.5 与显式 volume/rate 兼容、短 stop 可调用。
    约定：
-   1) 全部断言走 iframe 内真实 CombatAudioMixer / playSound / playCustomAudio，不复制业务实现；
+   1) 全部断言走 iframe 内真实 CombatAudioMixer / playSound / playCustomAudio / classify /
+      withContext / capture / protect / output / media，不复制业务算法；expected 一律用批准常量；
    2) 假 AudioContext / Audio / fetch 按引用安装到目标 window，结束按描述符与 Map 快照恢复，
       不做 JSON 序列化；假源如实记录 start/stop/onended 与 Gain 自动化时间；
-   3) 未落地接口一律并入 pending，不误判失败；枪声采样起点元数据仅作备注，不依赖随机未定。 */
+   3) 未落地接口一律并入 pending，不误判失败；started/done 用 then 追踪，禁止 Promise 直比布尔。 */
 (function () {
   'use strict';
   window.runAudioMixerRegression = async function ({ w, check, eq, mock, source } = {}) {
@@ -374,6 +377,42 @@
       try { await fn(); } catch (e) { check(false, name + '执行异常', String(e && e.stack || e)); }
     };
 
+    /* ---------- 类别契约证据工具（只读真实 output/类别 Gain，不复制业务算法） ---------- */
+    const CATS = ['A','B','C','M','D','E','N','F','G','H','I','K','J','L'];
+    const catBase = cat => (cat === 'A' || cat === 'B' || cat === 'C') ? 1.3 : 1;
+    const categoryNode = (track, cat) => {
+      try { return mixer.output(track, cat); } catch (e) { return null; }
+    };
+    const categoryNodes = cat => [...new Set(['skill', 'result', 'aux']
+      .map(track => categoryNode(track, cat)).filter(Boolean))];
+    const categoryOutputOk = (() => {
+      try {
+        const a = categoryNode('skill', 'A');
+        return !!a && a !== mixer.output('skill') && near(a.gain && a.gain.value, 1.3);
+      } catch (e) { return false; }
+    })();
+    const catNodesReady = () => { if (categoryOutputOk) CATS.forEach(categoryNodes); };
+    const catCalls = (cat, seq0) => {
+      const out = [];
+      categoryNodes(cat).forEach(n => {
+        if (n.gain && n.gain._calls) n.gain._calls.forEach(c => { if (c.seq > seq0) out.push(c); });
+      });
+      return out;
+    };
+    const isDuck = (cat, c) => typeof c.v === 'number' && c.v < catBase(cat) - 1e-6;
+    const recoveredTo = (cat, c) => (c.type === 'lin' || c.type === 'exp' || c.type === 'target') &&
+      near(c.v, catBase(cat)) && c.t != null;
+    const duckedTo = (cat, calls, v) => calls.some(c => isDuck(cat, c) && near(c.v, v));
+    const resetCategoryGains = () => {
+      if (!categoryOutputOk) return;
+      catNodesReady();
+      CATS.forEach(cat => categoryNodes(cat).forEach(n => {
+        try { if (n.gain.cancelScheduledValues) n.gain.cancelScheduledValues(clock.now); } catch (e) {}
+        try { n.gain.value = catBase(cat); } catch (e) {}
+      }));
+    };
+    const cancelProtect = p => { if (isFn(p)) { try { p(); } catch (e) {} } };
+
     try {
       if (injected) {
       /* ========== 组一：context 懒创建 / 三轨输出 ========== */
@@ -385,9 +424,135 @@
         check(!!o.skill && !!o.result && !!o.aux, 'output 返回 skill/result/aux 三轨 GainNode');
         check(o.skill !== o.result && o.result !== o.aux && o.skill !== o.aux, '三轨 GainNode 互不相同');
         check(mixer.output('skill') === o.skill && mixer.output('result') === o.result, '同轨重复取用返回同一 GainNode');
+        check(near(o.skill.gain.value, 1) && near(o.result.gain.value, 1) && near(o.aux.gain.value, 1),
+          '无 category 时原三轨保持基础增益 1');
+        check(near(mixer.output('result', 'F').gain.value, 1),
+          "output('result','F') 类别基准增益为 1");
+        const spec = { A:[8,1.3], C:[8,1.3], M:[7,1], B:[6,1.3], D:[5,1], E:[4,1], N:[3,1],
+          F:[2,1], G:[2,1], H:[1,1], I:[1,1], K:[0,1], J:[0,1], L:[0,1] };
+        const info = mixer.categories;
+        if (!info || typeof info !== 'object') note('待对齐:CombatAudioMixer.categories 未落地');
+        else {
+          const bad = Object.keys(spec).filter(c => !info[c] ||
+            info[c].priority !== spec[c][0] || !near(info[c].gain, spec[c][1]));
+          eq(bad, [], 'categories 优先级/增益为 A=C>M>B>D>E>N>F=G>H=I>K=J=L');
+        }
       });
 
-      /* ========== 组二：prepare 同 URL 任务合并 ========== */
+      /* ========== 组二：用途自动分类与未知新 fxTag 继承 ========== */
+      await group('用途分类与未知特效继承', async () => {
+        if (!isFn(mixer.classify)) { note('待对齐:CombatAudioMixer.classify 未落地'); return; }
+        eq(mixer.classify({ fxTag:'全新雷击特效', type:'[单体]', type2:'[雷]' }), 'A',
+          '未知攻击型 fxTag（单体）自动归 A');
+        eq(mixer.classify({ fxTag:'群体鼓舞', type:'[群体增益]' }), 'B',
+          '未知辅助型 fxTag 自动归 B');
+        eq(mixer.classify({ fxTag:'扫射新特效', type:'[散射]' }), 'A',
+          '散射伤害标签自动归 A');
+        eq(mixer.classify({ fxTag:'group:enemyBuff', type:'[单体]' }), 'D',
+          'group:* 恒归 D');
+        eq(mixer.classify({ type:'[单体]', type2:'[枪击]' }), 'D',
+          '无 fxTag 的伤害技能归 D');
+        eq(mixer.classify({ type:'[回复]' }), 'K',
+          '无 fxTag 的辅助技能归 K');
+      });
+
+      /* ========== 组三：withContext / capture 继承、嵌套与 finally 恢复 ========== */
+      await group('withContext/capture 继承与恢复', async () => {
+        if (!isFn(mixer.withContext) || !isFn(mixer.capture)) {
+          note('待对齐:CombatAudioMixer.withContext/capture 未落地');
+          return;
+        }
+        const cap = fallback => {
+          const c = fallback == null ? mixer.capture() : mixer.capture(fallback);
+          return c && c.category;
+        };
+        eq(cap(), 'K', '无上下文时 capture 默认 K');
+        eq(cap('M'), 'M', 'capture 显式 fallback 生效');
+        check(Object.isFrozen(mixer.capture('F')), 'capture 返回冻结上下文');
+        mixer.withContext('A', () => {
+          eq(cap(), 'A', 'withContext 字符串临时进入');
+          mixer.withContext({ category:'M' }, () => eq(cap(), 'M', 'withContext 对象参数可嵌套'));
+          eq(cap(), 'A', '嵌套退出恢复外层 A');
+        });
+        eq(cap(), 'K', '退出 withContext 恢复默认 fallback');
+        let threw = false;
+        try { mixer.withContext('B', () => { throw new Error('ctx'); }); } catch (e) { threw = true; }
+        check(threw, 'withContext 不吞业务异常');
+        eq(cap(), 'K', 'withContext 异常后 finally 仍恢复');
+      });
+
+      /* ========== 组四：play 类别解析优先级与延迟继承 ========== */
+      await group('play 类别解析与延迟继承', async () => {
+        if (!categoryOutputOk) { note('待对齐:output(track,category) 类别 Gain 未落地'); return; }
+        const urls = ['amx-test/cat-fallback-skill.mp3', 'amx-test/cat-fallback-result.mp3',
+          'amx-test/cat-fallback-aux.mp3'];
+        urls.forEach(u => durations.set(u, 0.4));
+        for (const u of urls) await prefill(u);
+        const cueS = mixer.play(urls[0], { track:'skill', sync:true, vol:0.5 }); stops.push(cueS);
+        if (cueS.category == null) { note('待对齐:play 未解析/透出 cue.category'); return; }
+        eq(cueS.category, 'D', '无上下文 skill 轨 fallback 为 D');
+        const cueR = mixer.play(urls[1], { track:'result', sync:true, vol:0.5 }); stops.push(cueR);
+        eq(cueR.category, 'F', '无上下文 result 轨 fallback 为 F');
+        const cueA = mixer.play(urls[2], { track:'aux', sync:true, vol:0.5 }); stops.push(cueA);
+        eq(cueA.category, 'K', '无上下文 aux 轨 fallback 为 K');
+        let scoped = null, explicit = null, ctxArg = null;
+        if (isFn(mixer.withContext)) {
+          mixer.withContext('A', () => {
+            scoped = mixer.play(urls[0], { track:'result', sync:true }); stops.push(scoped);
+            explicit = mixer.play(urls[0], { track:'skill', sync:true, category:'M' }); stops.push(explicit);
+            ctxArg = mixer.play(urls[0], { track:'skill', sync:true,
+              audioContext:Object.freeze({ category:'C' }) }); stops.push(ctxArg);
+          });
+          eq(scoped.category, 'A', '作用域类别覆盖 result 轨 fallback');
+          eq(explicit.category, 'M', '显式 category 优先于作用域');
+          eq(ctxArg.category, 'C', 'audioContext 优先于作用域');
+        } else note('待对齐:withContext 未落地，跳过作用域优先级');
+        const owner = { cancelled:false, finished:false, audioStoppers:new Set(),
+          audioContext:Object.freeze({ category:'B' }), handle:{ cancel() {} },
+          onClean() { return () => {}; }, retain() {} };
+        const ownerCue = mixer.play(urls[0], { track:'skill', sync:true, owner }); stops.push(ownerCue);
+        eq(ownerCue.category, 'B', 'owner.audioContext 供延迟播放继承');
+        const ownerExplicit = mixer.play(urls[1], { track:'skill', sync:true, owner, category:'N' });
+        stops.push(ownerExplicit);
+        eq(ownerExplicit.category, 'N', '显式 category 优先于 owner.audioContext');
+
+        // 延迟解码：类别必须在 play 调用时捕获，而不是 source 起音时才读作用域
+        const uDelay = 'amx-test/cat-delayed.mp3';
+        durations.set(uDelay, 0.4);
+        const ctx = mixer.context();
+        let release;
+        ctx.decodeGate = { promise: new Promise(r => { release = r; }) };
+        let delayed = null;
+        try {
+          if (isFn(mixer.withContext)) {
+            mixer.withContext('A', () => {
+              delayed = mixer.play(uDelay, { track:'skill', sync:true, vol:0.5 });
+            });
+            stops.push(delayed);
+            eq(delayed.category, 'A', '未解码的 cue 已捕获调用时类别 A');
+            await flush(6);
+            check(!sourceFor(uDelay), '解码未就绪前不起音');
+            release();
+            await flush(10);
+          } else {
+            release();
+            note('待对齐:withContext 未落地，无法验证延迟继承');
+          }
+        } finally {
+          try { release(); } catch (e) {}
+          ctx.decodeGate = null;
+        }
+        if (delayed) {
+          const dsrc = sourceFor(uDelay);
+          check(!!dsrc && categoryNodes('A').some(n => reaches(dsrc, n)),
+            '异步起音后仍路由到 A 类别总线');
+          check(near(delayed.baseVolume, 0.5), '延迟起音 cue.baseVolume 保留 0.5');
+        }
+        await flush(8);
+      });
+
+
+      /* ========== 组五：prepare 同 URL 任务合并 ========== */
       await group('prepare 解码合并与缓存', async () => {
         autoFetch = false;
         const u = 'amx-test/dedupe-1.mp3';
@@ -492,49 +657,231 @@
         check(typeof cue.when === 'number' && cue.when >= target - 0.001, 'cue.when 记录实际起音拍点');
       });
 
-      /* ========== 组五：保护系数与重叠不提前恢复 ========== */
-      await group('保护系数与重叠保护', async () => {
-        const o = outs();
-        const t0 = clock.now;
-        let seq0 = paramSeq;
-        mixer.protect('short', t0);
-        const shortRes = trackCalls(o.result, seq0);
-        const shortAux = trackCalls(o.aux, seq0);
-        const shortSkill = trackCalls(o.skill, seq0);
-        check(hasVal(shortRes, 0.40), 'short 保护将 result 压到 0.40');
-        check(hasVal(shortAux, 0.30), 'short 保护将 aux 压到 0.30');
-        check(shortSkill.length === 0, 'short 保护不触碰 skill 轨');
-        // 只认朝 1 的恢复自动调度（lin/exp/target）；初始 set(1,t0) 不是恢复
-        const isRecovery = c => (c.type === 'lin' || c.type === 'exp' || c.type === 'target') && near(c.v, 1) && c.t != null;
-        const shortRec = shortRes.filter(isRecovery);
-        if (shortRec.length) check(Math.min(...shortRec.map(c => c.t)) >= t0 + 0.18 - 1e-6, 'short 保护恢复不早于 180ms hold',
-          '恢复于 ' + Math.min(...shortRec.map(c => c.t)));
-        else note('待对齐:short 保护未用 Gain 自动调度恢复（缺少可记录时间）');
+      /* ========== 组五：类别增益只在统一 output 层乘一次 ========== */
+      await group('类别增益一次与不叠乘', async () => {
+        if (!categoryOutputOk) { note('待对齐:output(track,category) 类别 Gain 未落地'); return; }
+        advance(1); resetCategoryGains();
+        eq(['A','B','C'].filter(c => !near(categoryNode('skill', c).gain.value, 1.3)), [],
+          'A/B/C 类别基准增益均为 1.3');
+        eq(CATS.filter(c => catBase(c) === 1 && !near(categoryNode('skill', c).gain.value, 1)), [],
+          '其它类别基准增益保持 1');
+        check(mixer.output('skill', 'A') !== mixer.output('skill', 'M'), '不同类别 Gain 相互独立');
 
-        advance(0.6);
-        o.result.gain.value = 1; o.aux.gain.value = 1; o.skill.gain.value = 1;
-        const t1 = clock.now;
-        seq0 = paramSeq;
-        mixer.protect('special', t1);
-        const spRes = trackCalls(o.result, seq0);
-        const spAux = trackCalls(o.aux, seq0);
-        check(hasVal(spRes, 0.25), 'special 保护将 result 压到 0.25');
-        check(hasVal(spAux, 0.20), 'special 保护将 aux 压到 0.20');
-        const spRec = spRes.filter(isRecovery);
-        if (spRec.length) check(Math.min(...spRec.map(c => c.t)) >= t1 + 0.45 - 1e-6, 'special 保护恢复不早于 450ms hold',
-          '恢复于 ' + Math.min(...spRec.map(c => c.t)));
-        else note('待对齐:special 保护未用 Gain 自动调度恢复（缺少可记录时间）');
+        resetCategoryGains();
+        const u = 'amx-test/cat-gain-once.mp3';
+        durations.set(u, 0.45);
+        await prefill(u);
+        const seq0 = paramSeq;
+        const cue = mixer.play(u, { track:'skill', sync:true, vol:0.5, category:'A' });
+        stops.push(cue);
+        await flush(8);
+        const src = sourceFor(u);
+        check(!!src, '类别 A 主音真实起音');
+        if (cue.category == null || cue.baseVolume == null) {
+          note('待对齐:play 未透出 category/baseVolume');
+          return;
+        }
+        eq(cue.category, 'A', 'cue.category 透出 A');
+        check(near(cue.baseVolume, 0.5), 'cue.baseVolume 保留原始 vol 0.5', String(cue.baseVolume));
+        const vals = src ? chainGains(src).map(g => g.gain.value) : [];
+        eq(vals.filter(v => near(v, 1.3)).length, 1, '×1.3 只在统一输出层出现一次');
+        check(!vals.some(v => near(v, 0.65)), '链路中不存在 0.5×1.3 的二次乘积');
+        const local = src && (src.connections || []).find(n => n && n.gain && n.gain._calls);
+        check(!!local && hasVal(trackCalls(local, seq0), 0.5), '源级本地 Gain 仍为 volume 0.5');
+        check(!local || !hasVal(trackCalls(local, seq0), 0.65), '源级本地 Gain 未乘类别增益');
+        check(categoryNodes('A').some(n => reaches(src, n)), 'A 主音接入 A 类别 Gain');
 
-        // 后来的短保护不得抢先在强保护结束前恢复
-        seq0 = paramSeq;
-        mixer.protect('short', t1 + 0.05);
-        const overlapRec = trackCalls(o.result, seq0).filter(isRecovery);
-        const early = overlapRec.filter(c => c.t < t1 + 0.45 - 1e-6);
-        check(early.length === 0, '后来的 short 保护未提前取消仍在的 special 保护',
-          early.length ? '提前恢复于 ' + early[0].t : '');
+        const uM = 'amx-test/cat-gain-base.mp3';
+        durations.set(uM, 0.45);
+        await prefill(uM);
+        const seqM = paramSeq;
+        const cueM = mixer.play(uM, { track:'skill', sync:true, vol:0.5, category:'M' });
+        stops.push(cueM);
+        await flush(8);
+        const srcM = sourceFor(uM);
+        const valsM = srcM ? chainGains(srcM).map(g => g.gain.value) : [];
+        check(!valsM.some(v => near(v, 1.3)), 'M 类别不继承 ×1.3');
+        const localM = srcM && (srcM.connections || []).find(n => n && n.gain && n.gain._calls);
+        check(!!localM && hasVal(trackCalls(localM, seqM), 0.5), 'M 类别本地 Gain 仍为 0.5');
+
+        if (isFn(mixer.media)) {
+          const el = new FakeAudio('amx-test/media-category.mp3');
+          const mseq = paramSeq;
+          let stopMedia = null, mediaErr = null;
+          try { stopMedia = mixer.media(el, 0.6, 'skill', { category:'A' }); }
+          catch (e) { mediaErr = e; }
+          if (mediaErr) note('待对齐:CombatAudioMixer.media 尚不支持 category 参数');
+          else {
+            if (isFn(stopMedia)) stops.push(stopMedia);
+            const node = mediaNodeFor(el);
+            const mvals = node ? chainGains(node).map(g => g.gain.value) : [];
+            if (mvals.some(v => near(v, 1.3))) {
+              check(hasVal(callsFrom(node, mseq), 0.6), 'media 本地 Gain 仍为 volume 0.6');
+              eq(mvals.filter(v => near(v, 1.3)).length, 1, 'media 类别增益只在统一输出层一次');
+              check(!mvals.some(v => near(v, 0.78)), 'media 不重复乘 1.3');
+            } else note('待对齐:CombatAudioMixer.media 未支持 category');
+          }
+        } else note('待对齐:CombatAudioMixer.media 未落地');
+
+        if (isFn(mixer.classify) && isFn(mixer.withContext)) {
+          const uNew = 'amx-test/new-fx-inherit.mp3';
+          durations.set(uNew, 0.45);
+          await prefill(uNew);
+          let ncue = null;
+          mixer.withContext(mixer.classify({ fxTag:'全新未知攻击', type:'[单体]' }), () => {
+            ncue = mixer.play(uNew, { track:'skill', sync:true, vol:0.5 });
+          });
+          stops.push(ncue);
+          await flush(8);
+          eq(ncue.category, 'A', '未知新 fxTag 攻击按用途继承 A');
+          const nsrc = sourceFor(uNew);
+          const nvals = nsrc ? chainGains(nsrc).map(g => g.gain.value) : [];
+          eq(nvals.filter(v => near(v, 1.3)).length, 1, '未知新特效无需白名单即获一次 ×1.3');
+        }
       });
 
-      /* ========== 组六：自然尾音 >460ms 不被清理 ========== */
+      /* ========== 组六：protect 按 rank duck 类别 Gain 与重叠不提前恢复 ========== */
+      await group('类别保护与重叠保护', async () => {
+        if (!categoryOutputOk) { note('待对齐:protect 类别 Gain 未落地，旧 result/aux 压轨断言改测类别'); return; }
+        // 先越过前面播放遗留的 short/special 保护窗口，并借一次 rank0 保护触发清理
+        advance(1.0);
+        catNodesReady();
+        resetCategoryGains();
+        const pPurge = mixer.protect('short', clock.now, null, 'J');
+        cancelProtect(pPurge);
+        resetCategoryGains();
+        const o = outs();
+
+        // short 默认 D：压低 rank，不压更高 rank；不再整体压 result/aux 原轨
+        const t0 = clock.now;
+        resetCategoryGains();
+        let seq0 = paramSeq;
+        const pShort = mixer.protect('short', t0);
+        const f1 = catCalls('F', seq0), m1 = catCalls('M', seq0), b1 = catCalls('B', seq0);
+        if (!f1.some(c => isDuck('F', c))) {
+          cancelProtect(pShort);
+          note('待对齐:protect(short) 未按 rank duck 类别 Gain');
+          return;
+        }
+        check(duckedTo('F', f1, 0.65), 'short 默认 D 将低 3 级 F 压到 0.65');
+        check(!m1.some(c => isDuck('M', c)), 'D 不压更高 rank 的 M');
+        check(!b1.some(c => isDuck('B', c)), 'D 不压更高 rank 的 B');
+        check(!hasVal(trackCalls(o.result, seq0), 0.40) && !hasVal(trackCalls(o.aux, seq0), 0.30),
+          'protect 不再整体压 result/aux 原轨');
+        const f1rec = f1.filter(c => recoveredTo('F', c));
+        if (f1rec.length) check(Math.min(...f1rec.map(c => c.t)) >= t0 + 0.18 - 1e-6,
+          'D 类短保护恢复不早于 180ms hold', '恢复于 ' + Math.min(...f1rec.map(c => c.t)));
+        else note('待对齐:类别保护未用 Gain 自动调度恢复（缺少可记录时间）');
+        cancelProtect(pShort);
+        advance(0.6); resetCategoryGains();
+
+        // A 类：short profile 也按 special 450ms；A→M .85 / A→B .65 / A→F .4；同级 C 不互压
+        const t1 = clock.now;
+        resetCategoryGains();
+        seq0 = paramSeq;
+        const pA = mixer.protect('short', t1, null, 'A');
+        const aM = catCalls('M', seq0), aB = catCalls('B', seq0);
+        const aF = catCalls('F', seq0), aC = catCalls('C', seq0);
+        check(duckedTo('M', aM, 0.85), 'A→M 差 1 级压到 0.85');
+        check(duckedTo('B', aB, 1.3 * 0.65), 'A→B 差 2 级为类别基准1.3×0.65');
+        check(duckedTo('F', aF, 0.40), 'A→F 差 6 级压到 0.40');
+        check(!aC.some(c => isDuck('C', c)), '同级 A 保护不压 C');
+        const aFrec = aF.filter(c => recoveredTo('F', c));
+        if (aFrec.length) check(Math.min(...aFrec.map(c => c.t)) >= t1 + 0.45 - 1e-6,
+          'A/B/C 类实际按 special 450ms 恢复', '恢复于 ' + Math.min(...aFrec.map(c => c.t)));
+        else note('待对齐:A 类保护缺少可记录恢复时间');
+        cancelProtect(pA);
+        advance(0.7); resetCategoryGains();
+
+        // 旧调用 protect('special') 默认类别 A，仍应压 M 到 0.85
+        const tDef = clock.now;
+        resetCategoryGains();
+        seq0 = paramSeq;
+        const pDef = mixer.protect('special', tDef);
+        const defM = catCalls('M', seq0);
+        check(duckedTo('M', defM, 0.85), 'special 默认类别 A 将 M 压到 0.85');
+        cancelProtect(pDef);
+        advance(0.7); resetCategoryGains();
+
+        // J（rank 0）不 duck 任何类别
+        const t2 = clock.now;
+        resetCategoryGains();
+        seq0 = paramSeq;
+        const pJ = mixer.protect('special', t2, null, 'J');
+        const jF = catCalls('F', seq0), jM = catCalls('M', seq0);
+        check(!jF.some(c => isDuck('F', c)) && !jM.some(c => isDuck('M', c)),
+          'J rank0 不压任何类别');
+        cancelProtect(pJ);
+        advance(0.5); resetCategoryGains();
+
+        // A + C 同级多保护取最严格不连乘；后来的 D 短保护不得提前恢复 A 的 450ms hold
+        const t3 = clock.now;
+        resetCategoryGains();
+        seq0 = paramSeq;
+        const pA2 = mixer.protect('special', t3, null, 'A');
+        const pC2 = mixer.protect('special', t3 + 0.05, null, 'C');
+        const pD2 = mixer.protect('short', t3 + 0.10);
+        const multiM = catCalls('M', seq0), multiF = catCalls('F', seq0);
+        const minM = Math.min(...multiM.filter(c => isDuck('M', c)).map(c => c.v));
+        const minF = Math.min(...multiF.filter(c => isDuck('F', c)).map(c => c.v));
+        check(near(minM, 0.85) && !hasVal(multiM, 0.7225),
+          'A+C 对 M 取 0.85 最严格，不连乘', '最低 ' + minM);
+        check(near(minF, 0.40) && !hasVal(multiF, 0.26) && !hasVal(multiF, 0.16) &&
+          !hasVal(multiF, 0.104), 'A+C+D 对 F 取 0.40 最严格，不连乘', '最低 ' + minF);
+        const multiRec = multiF.filter(c => recoveredTo('F', c));
+        const early = multiRec.filter(c => c.t < t3 + 0.45 - 1e-6);
+        check(early.length === 0, '后来的 D 短保护未提前恢复 A 的 450ms hold',
+          early.length ? '提前恢复于 ' + early[0].t : '');
+        cancelProtect(pA2); cancelProtect(pC2); cancelProtect(pD2);
+        advance(0.8); resetCategoryGains();
+      });
+
+      /* ========== 组七：雷击/连续扫射重复不互相停、自然尾音不裁 ========== */
+      await group('雷击与连续扫射重复尾音', async () => {
+        const urls = ev('typeof audioUrls === "object" ? audioUrls : null');
+        const thunder = urls && urls.thunder_single_hit;
+        const sweep = urls && urls.gunshot1;
+        if (!thunder) { note('待对齐:audioUrls.thunder_single_hit 不存在'); return; }
+        durations.set(thunder, 0.92);
+        await prefill(thunder);
+        durations.set(thunder, 0.92); mixer.buffers.set(thunder, makeBuffer(thunder));
+        const cues = [0, 1, 2].map(() => {
+          const c = mixer.play(thunder, { track:'skill', sync:true, vol:0.5 });
+          stops.push(c); return c;
+        });
+        await flush(10);
+        const srcs = allSources.filter(s => s.startedAt != null && s.buffer && s.buffer.__url === thunder);
+        eq(srcs.length, 3, '雷击重复三声全部起音');
+        check(new Set(srcs).size === 3, '雷击重复声源互不覆盖');
+        check(srcs.every(s => !s._ended), '雷击三声并发均存活');
+        check(srcs.every(s => s.stopAt == null || s.stopAt >= s.startedAt + 0.9),
+          '雷击尾音未被裁短或加上限');
+        check(srcs.every(s => !s.startArgs || s.startArgs.dur == null || s.startArgs.dur >= 0.9),
+          '雷击起音窗口未按上限裁剪');
+        if (sweep) {
+          durations.set(sweep, 0.5);
+          await prefill(sweep);
+          for (let i = 0; i < 4; i++) {
+            const c = mixer.play(sweep, { track:'skill', sync:true, vol:0.5 });
+            stops.push(c);
+          }
+          await flush(10);
+          const scanSrcs = allSources.filter(s => s.startedAt != null && s.buffer &&
+            s.buffer.__url === sweep).slice(-4);
+          eq(scanSrcs.length, 4, '连续扫射四次重复全部起音');
+          check(scanSrcs.every(s => !s._ended), '连续扫射重复声源可同时存活');
+          check(scanSrcs.every(s => s.stopAt == null || s.stopAt >= s.startedAt + 0.49),
+            '连续扫射重复未被裁尾');
+          check(scanSrcs.every(s => !s.startArgs || s.startArgs.dur == null || s.startArgs.dur >= 0.49),
+            '连续扫射起音窗口未按上限裁剪');
+        } else note('待对齐:audioUrls.gunshot1 不存在');
+        advance(0.95);
+        await flush(4);
+        check(srcs.every(s => s._ended), '雷击尾音按自然时长自然收口');
+        if (cues.length !== 3) check(false, '雷击 cue 数量异常');
+      });
+
+      /* ========== 组八：自然尾音 >460ms 不被清理 ========== */
       await group('自然尾音不被截断', async () => {
         const u = 'amx-test/tail.mp3';
         durations.set(u, 0.9);

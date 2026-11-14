@@ -8,7 +8,7 @@ const vm = require('node:vm');
 const crypto = require('node:crypto');
 const ROOT = path.resolve(__dirname, '..');
 const ASSET = 'http://192.168.110.83:8766';
-const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_08.json');
+const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_09.json');
 let pass = 0, fail = 0;
 const count = (text, needle) => text.split(needle).length - 1;
 function check(ok, label) { console.log((ok ? '[PASS] ' : '[FAIL] ') + label); ok ? pass++ : fail++; }
@@ -74,8 +74,8 @@ function syntax(text, label) {
   catch (e) { check(false, label + '语法：' + e.message); }
 }
 
-console.log('== 变种触发与行军兽移植 v12.08 产物专项 ==');
-check(base === 'regex-前端战斗v12_08.json' && pkg.scriptName === '前端战斗v12.08', '文件名与scriptName均为v12.08');
+console.log('== 变种触发与行军兽移植 v12.09 产物专项 ==');
+check(base === 'regex-前端战斗v12_09.json' && pkg.scriptName === '前端战斗v12.09', '文件名与scriptName均为v12.09');
 check(count(src, '```') === 2 && count(fenced, '```') === 2, '源码与产物均只有头尾自围栏');
 check(!immune.includes('```') && !/&(?!amp;)/.test(immune), '内部围栏加固及全量实体免疫');
 check(raw.replace(/&/g, '&amp;') === immune, '单遍实体还原逐字符一致');
