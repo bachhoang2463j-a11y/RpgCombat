@@ -3611,3 +3611,19 @@
 - **失败与限制如实记录**：旧蝎眼入场墙钟断言被IAB节流拉到约1.99s，改验证1150ms调度、门闩后即时入场及无二次等待，未改生产时序；舍身余光DOM标记和旧专项v12.10锁定纠正后仅复跑相关。首次全量挂载因服务到期Failed to fetch、断言0项，恢复后才执行唯一全量。真Chrome五技能截图因MCP路径拒绝/后续30s超时未完成，按熔断停止，不宣称截图复核通过；完整失败历史见验收记录。
 - **目的 vs 现状**：正式版五项定稿已落地，舍身停顿/减速已验证；截图视检尚未完成，交用户导入体验。原Demo指纹`5b4804fe14069e9b77835760efddad5d9eb8cda6`始末一致；未改README/SPEC/公开版，未混入现有无关改动，未导入酒馆/上传素材/推送远程。
 
+## [LOG-297] 2026-11-15 — 召唤三瞬默认通道移植、召唤分类前摇与敌方独立小图标，打包v12.12
+
+- **业务提交**：`1e1a276`。
+- **核心目的**：将 `demo-summon-moments.html` 已定稿的出场阵成、退场散逸、主动挡刀带入正式战斗；只改视听，不改召唤名额、继承、复活/自爆、致死与伤害规则。
+- **变更行为**：
+  1. **模块移植与复用**：新增 arcane-summon 样式、三瞬入口及召唤锁/清场；summonRun 薄适配既有 identityRun，复用 entityVisualRect、cloneVisualOnly、音频 Mixer 和正式命中反馈。clearArcaneFx 同步撤销召唤句柄、样式、音轨与等待；没有复制演示 Base64、独立音频上下文或来袭攻击。
+  2. **批次默认入场与专属优先**：summonFromWorldbook 以整批 created 统一挂载并只播一个阵成、主音；400ms 阵成与 beforeEnter 并行汇合，视觉最多等1800ms，不给世界书读取新增取消期限。前四只110ms完整显象，第五只起75ms快闪；fxTag透传并核对固定专属清单/WEBM/arcane注册，保留蝎眼门闩，纯召唤专属提前return也只播一次。名额账本、实体生成/继承与队列插入原样。
+  3. **真实退场与护主接线**：普通召唤死亡用750ms vacated移除DOM；复活前置拦截、自爆尸体保留与阵营逻辑移除保持原顺序。自动护主以180ms扑挡ready替换旧520ms聚焦停顿，原owner-only致死判定与二次反应/伤害链不变；真实结果驱动impact/release，存活归位、二次闪避去重、被击穿在主人身前衔接同一散逸。英雄playRescueSheshen定稿时序不改。
+  4. **真音与布局**：阵成复用light_charge/light_impact/link_chime，散逸复用resist_phantom/rage_exit，脚步/parry/闪避内部别名映射sheshen_armor_step裁窗/parry_perfect/avoid_dash_perfect与hide。双方召唤Turn复用classifyEnemyWindup/playEnemyWindup，红单体enemy-omen原样。依用户选定，敌召唤沿现有逻辑前后排/排尾独立占位，emoji48/56px，不做主人附着布局；召唤刷新不重播老敌入场。我方无外框大emoji及召唤行穿透none/auto不改。
+  5. **审查修正**：修正已release护主归位窗口再次死亡时的exit委托空转、flush遗留批次无DOM时隐藏标记残留，补真实回归；仅移除本轮造成的互斥恒假旧爆闪分支，不清理其他历史管线。
+- **涉及文件**：`index.html`、`integration-test/harness.html`、`integration-test/fixtures/summon-moments-regression.js`、`integration-test/summon-moments-artifact-check.cjs`、维护包 `regex-前端战斗v12_11.json` → `regex-前端战斗v12_12.json`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：语法全通过；召唤专项最终IAB171/0、真Chrome171/0，既有相关真Chrome696/0。**唯一一次源码全量2950通过/1失败**（test21新增五个JS动画控制类缺CSS声明），补transform-origin/will-change后**仅复跑21/59，204/0**，没有再次跑全量。git mv升版、scriptName同步、node build-regex.cjs一次构建完成，产物replaceString1448596字符；**产物专项最终74/0**。压缩产物相关首轮897/3为同一静态测试按单引号检查压缩函数的误判（实际行为通过），改静态读取可读源码后**仅复跑产物59，171/0**，其余产物相关分组726/0；未跑产物全量。
+- **动画/布局核验**：在用户授权的排障测试页使用真实index函数，敌4只/我方众召8只整批入场各一组主音，实测阵成约401~406ms，前四110ms、尾部75ms错峰。桌面敌小emoji56px、窄屏48px，同排无重叠；我方召唤行计算pointer-events为none、子项auto。护主ready约184ms、钢蓝盾弧截图确认同族色，归位后transform为空且动画0；普通死亡vacated约752ms后DOM移除、图层0。截图检查含桌面/窄屏与定格盾弧，未检查真酒馆导入或实际音源听感（测试音频以spy记录路由，避免外部请求）。
+- **失败如实记录**：IAB初轮既有相关690/1为英雄舍身渲染帧采样，真Chrome同组696/0后未改英雄动画；专项夹具的数据隔离/同名DOM/ready-release使用错误由主代理修正，仅复跑相关。产物专项首轮73/4因检查被mangle的私有符号名，改为公开接口/真音映射入包加真实产物行为后74/0；没有因此重复构建同版本。测试页脚本路径被MCP拒绝与两个setup定位错误转为内联真实入口后推进，没有修改用户环境。
+- **目的 vs 现状**：三瞬默认通道与双方分类前摇已经落地，敌方小召唤为用户选定的独立排尾而非主人旁挂；原数值和继承边界保持。未改demo/README/SPEC/公开版，未混入工作区已有删除/临时文件，未导入酒馆/启动模拟器/上传素材/推送远程。
+
