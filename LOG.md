@@ -3586,3 +3586,12 @@
   4. **实机复查与二轮视觉精修**：首轮内置浏览器实机跑通 5 技+对比切换+中途重置后，针对气泡厚环、神像立体切面、全队透白遮挡及第 5 张卡滚出视口完成精修；二轮复查（`3527a854`）确认 5 技免滚完整可见、零控制台报错/404/CORS，并保留内置浏览器标签页与 `:8766`/`:8084` 本地服务供实时试听。
 - **涉及文件**：`webm_effects_index.md`、`webm_effects_index.json`、`demo-skill-items-vfx.html`（`D:\Project\my_assets\` 11 路 WebM 与 14 条新 MP3 位于仓外目录）；`LOG.md`、`LOG-INDEX.md`。
 - **验证**：`check_demo.cjs` 校验内联脚本 `vm.Script` 语法通过（`SYNTAX_OK, chars: 218424`）及 33 个引用媒体资产磁盘零缺失；内置浏览器实机两轮截图核验与重置复原通过；严格遵循 Demo 免测免审与模板/正式版隔离规则，未改动 `index.html`、`demo-skill-vfx-template.html`、`README.md` 与正则打包产物；无关工作区未提交/删除文件未纳入本轮提交。
+
+## [LOG-295] 2026-11-15 — 新增音视频素材按子目录分类归档并锁定「暗铁+狮吼」定稿默认预设
+
+- **业务提交**：`a87c05f`。
+- **变更行为**：
+  1. **素材分类归档 `D:\Project\my_assets\`**：将本轮新增的 `14` 条实录音效 MP3 移入 `D:\Project\my_assets\RpgCombat_Sound\`，将 `11` 个透明通道 WebM 移入 `D:\Project\my_assets\RpmCombat_Spine\`；既有 `9` 条复用的根级战斗音频保持原位不动，避免影响正式版旧链接。
+  2. **同步更新 Demo 路径解析与定稿默认预设（`demo-skill-items-vfx.html`）**：新增多级路径拼接助手 `assetUrl()` 替代单段 `encodeURIComponent`（修复子目录 `/` 被编码为 `%2F` 的问题），更新 `SFX_FILES`、`playWebMFX` 与 `[移植定稿备忘]`，并依用户确认将 Demo 默认预设锁定为 **音叉=`B暗铁`**、**狮神=`狮吼炎`**。
+- **涉及文件**：`demo-skill-items-vfx.html`、`D:\Project\my_assets\RpgCombat_Sound\`（14 个 MP3）、`D:\Project\my_assets\RpmCombat_Spine\`（11 个 WebM）、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：磁盘目录核验 `SOUND_COUNT=14`、`SPINE_COUNT=11`；`verify_categorized.cjs` 校验 `vm.Script` 语法通过且全部带前缀 `RpgCombat_Sound/`、`RpmCombat_Spine/` 与根级引用路径 100% 存在；未改动 `index.html`、`README.md` 与打包产物。
