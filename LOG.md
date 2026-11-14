@@ -3575,3 +3575,14 @@
 - **只读审查**：独立配置模型GLM-5.3-Flash审查无high/medium发布阻断；所提死亡时救场短暂叠加已补clearRescueState并相关复验。报告留integration-test/fixtures/v12_10-feedback-readonly-review.md，未纳入业务提交；原工具无research/model字段，以经批准的独立Flash会话替代，不改代理配置。
 - **留存**：.audit-work/v12_10-source-related.json（1865/0）；v12_10-source-full-initial.json（2559/2唯一全量）；v12_10-source-final-related.json（修复局域记录）；v12_10-tailwind-final.json（33/0）；v12_10-artifact-related.json（1865/0）；四份artifact专项txt。包1474007字节，SHA256 `c2453359f2395b4c09333e064a06ea2072c27f79e0a598b4c304759ee23eeee9`。
 - **边界与待反馈**：IAB未推进帧的7项救场render单独skip，逻辑/WAAPI keyframes及取消复位已测；另probe实测224px外移并24秒持续停驻，未提前归位。未做最终真Chrome完整动画/耳听验收、未导入或操作真实酒馆、未启动模拟器；等待用户导入v12.10反馈。两步业务/日志提交，不amend，不push，不改README。
+
+## [LOG-294] 2026-11-15 — 500 路透明 WebM 资产全量建档与 5 项奇物/技能特效独立 Demo 交付
+
+- **业务提交**：`48c1b5d`。
+- **变更行为**：
+  1. **500 路 WebM 特效全量索引（`/swarm` 并行摸底）**：对 `D:\BaiduNetdiskDownload\技能特效【PNG序列】\技能特效【PNG序列】\webm_outputs`（`001.webm`–`500.webm`，实存 498 个、缺 `156`/`157`，均无音轨）按 8 分片提取视觉特征、分辨率、时长、色调与适用场景，产出 [webm_effects_index.md](file:///d:/Project/RpgCombat/webm_effects_index.md) 与 [webm_effects_index.json](file:///d:/Project/RpgCombat/webm_effects_index.json)。
+  2. **外部真音寻源、逐条多模态试听与 11 路 WebM 精选落盘 `D:\Project\my_assets\`**：从 Freesound / Wikimedia Commons / Mixkit 下载真实音叉、钵铃、晶体破碎与回流音效，经 `ffmpeg` 前导静音裁剪、时长封顶淡出与响度归一化，全量使用 `read_file` 多模态亲耳试听筛选后落地 14 条真音 MP3（配 9 条现有素材），零合成振荡器；经视觉拼图复核挑选 11 个 VP9 Alpha 透明 WebM 拷贝至 `my_assets`。
+  3. **独立演练 Demo（`demo-skill-items-vfx.html`）**：基于空白模板搭建，内置 `音叉组(A澄澈/B暗铁/C深海)` 与 `狮神(狮吼炎/纯轰)` 实时试听对比栏，完成全部 5 项三幕特效与 `[移植定稿备忘]`：① `谐律之庇`（L3，青银谐波涟漪+角色护盾）；② `静默之域`（L3，紫暗低频压迫+105ms 骤停静音反差+裂纹印记）；③ `碎裂之响`（L3，三连递增音叉谐振+全屏音爆光带+结晶碎片）；④ `塞赫美特之愠`（L4，多面红晶狮首神像+日轮护翼蓄势→碎像跨空→咆哮狮首 WebM/火柱/金焰球爆裂）；⑤ `逆咒归源镜`（L2，秘银魔镜旋涡+SVG/Canvas `histOrb` 双轨虹吸回流）。
+  4. **实机复查与二轮视觉精修**：首轮内置浏览器实机跑通 5 技+对比切换+中途重置后，针对气泡厚环、神像立体切面、全队透白遮挡及第 5 张卡滚出视口完成精修；二轮复查（`3527a854`）确认 5 技免滚完整可见、零控制台报错/404/CORS，并保留内置浏览器标签页与 `:8766`/`:8084` 本地服务供实时试听。
+- **涉及文件**：`webm_effects_index.md`、`webm_effects_index.json`、`demo-skill-items-vfx.html`（`D:\Project\my_assets\` 11 路 WebM 与 14 条新 MP3 位于仓外目录）；`LOG.md`、`LOG-INDEX.md`。
+- **验证**：`check_demo.cjs` 校验内联脚本 `vm.Script` 语法通过（`SYNTAX_OK, chars: 218424`）及 33 个引用媒体资产磁盘零缺失；内置浏览器实机两轮截图核验与重置复原通过；严格遵循 Demo 免测免审与模板/正式版隔离规则，未改动 `index.html`、`demo-skill-vfx-template.html`、`README.md` 与正则打包产物；无关工作区未提交/删除文件未纳入本轮提交。
