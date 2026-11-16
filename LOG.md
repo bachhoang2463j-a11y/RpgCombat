@@ -3659,3 +3659,21 @@
 - **失败与环境记录**：IAB新URL曾回退到已有URL并自动重跑，以真实location/source/汇总核对，不算未运行分组；独立页完成唯一全量。有限测试服务到期后同端口恢复，无重跑全量。产物首次打包成功，无同版本重复发布。
 - **目的 vs 现状**：12种特性已限时敌我生效，原生能力不被重复放大或到期误删；等待用户导入确认。未改README/SPEC/公开版，未混入已有删除/临时文件，未操作真实酒馆/设备/模拟器，未远程推送；测试页与服务已关闭。
 
+## [LOG-300] 2026-11-17 — 三项定稿特效、灵风真音A组与无字近战阻挡移植，发布v12.15
+
+- **业务提交**：`459c733`。
+- **核心目的**：把实机预览定稿的【芭斯特的猫眼石】【奇异海螺】【砷弹射击】、灵风术真音A组与近战点后排无字阻挡接入主工程；清单外技能与逻辑零改动。
+- **具体任务与决策**：三新技能走 fixedItemSkillRun owner 生命周期（正常完成不停音保尾音，cancel/clearArcaneFx 统一清层/粒子/WebM/延时采样）；海螺禁 conchHorn、conchFog 复用 mx_stygian_whoosh；砷弹唯一 gunshot_pierce 无 durCap 且无 347/249/虚线菱形、保留 source-over droplet；灵风只删本函数振荡器合成音、视觉原样（函数边界对拍验证）、换A组五拍真音；近战拦截去 showLog 文字改顶盾动效、不耗回合，syncRowTargetingCues 覆盖五入口且 ignoreRow/征伐者放行；远程掩护与 B/C 切换、对比 UI 不移植。
+- **变更行为**：
+  1. index.html 新增三函数与近战四接口，注册 ARCANE_TAGS/ITEM_SKILL_FX/WEBM_FX_REGISTRY/audioUrls（九个新音键+五个WebM，复用四键不动），playItemSample 增 fadeIn 参数，clearArcaneFx 扩充 rowAimLayers/arsenic 闪色与震屏清理。
+  2. harness 增第 62 组与新夹具 bastet-conch-arsenic-regression.js；test21 JS 动画定位标记（ar-chg 等 6 个）补入豁免表。
+  3. **版本断言动态化（用户指示"去掉所有版本断言"）**：九个产物专项 scriptName 断言统一改为从文件名推导（vN_M ↔ vN.M，沿用 battle-atmosphere 既有模式），默认产物路径改为自动探测根目录唯一维护版 JSON——升版裸跑不再失败，仅真实失配才报错。
+  4. 打包 v12.14→v12.15（git mv+scriptName 同步，正则 ID 不变），2180463→1512395 字符（-31%）。
+  5. 验收留档 integration-test/fixtures/verification-v12_15.md；定稿 Demo 不入库（随仓库 Demo 清理方向），SHA256 e610f6ac5b759f18127693a28660c1c8fe50f96d35fa8e10f1b26eaa8eecd0b7 已记录。
+- **涉及文件**：`index.html`、`integration-test/harness.html`、`integration-test/fixtures/bastet-conch-arsenic-regression.js`、`integration-test/fixtures/verification-v12_15.md`、`integration-test/bastet-conch-arsenic-artifact-check.cjs`、`integration-test/{skill-items,variant-grant,feedback-demo,enemy-group,attack-identity,arcane-variant,summon-moments,battle-atmosphere}-artifact-check.cjs`、`regex-前端战斗v12_15.json`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：相关36/42/43/44/48/51/52/58为739/0；新专项62首轮153/3（夹具误断言）修后155/0；IAB唯一全量遭宿主重置中断不计；**经用户批准排障模式真Chrome补跑**：第一轮3404/6（六项均为夹具粒子基线断言错误，前序组遗留75个非arcane粒子），夹具改记录进入时基线+不误删他组粒子后21+62为201/0，最终全量**3423/0**（两次补跑间生产代码零改动，809段函数边界比对一致）；产物专项bastet130/skill-items143/variant-grant23全绿；版本断言动态化后九专项裸跑全绿（另含74/68/61/98/87/89）；压缩产物相关21/38/44/48/51/52/58/62为**900/0**，未跑产物全量。
+- **独立审查与修正**：只读审查无阻断，确认灵风只去本函数合成音、三新技能定稿数值与禁项逐项吻合；新夹具两轮修正均为测试侧误断言（maxDurSec=null 判定、静态窗口取错函数、粒子基线、WebM 450ms 才创建等），生产逻辑未迎合断言改动。
+- **失败与环境记录**：IAB 曾回退新标签页地址到旧 URL 并疑似宿主重置运行上下文，以真实 location/source/汇总核对，不把未执行分组计为通过；获准 Chrome 共补跑两次全量（第一轮暴露夹具缺陷）；有限本地服务到期后同端口恢复；无无界循环。未操作真实酒馆/设备/模拟器，未远程推送；未改 README/SPEC/公开版，未混入用户既有删除与 .audit-work 临时文件。
+- **目的 vs 现状**：三项定稿演出、灵风真音与无字近战阻挡已入主工程并过源码/产物双层回归；升版后产物专项可裸跑不红。等待用户在酒馆导入确认后才更新 README。
+
+
