@@ -3093,6 +3093,24 @@ console.log('CRITICAL_LOG: 1. Script tag start');
 // ==========================================
 // 全局常量与技能池
 // ==========================================
+const VARIANT_GRANT_NAMES = ['流体', '虚形', '破法', '要害', '防火', '耐毒', '钢体', '再生', '狂暴', '吸血', '荆棘', '复活'];
+const VARIANT_GRANT_TIPS = {
+  '流体': '受到的远程伤害减半。', '虚形': '受到的近战伤害减半。',
+  '破法': '受到的法术伤害减半。', '要害': '受到的群攻伤害减半，可与类型减伤叠加。',
+  '防火': '免疫后续燃烧状态施加。', '耐毒': '免疫后续中毒状态施加。', '钢体': '免疫后续眩晕状态施加。',
+  '再生': '每回合首次行动前回复最大生命值的10%。', '狂暴': '生命值不高于30%时攻击力提升50%。',
+  '吸血': '造成实质生命伤害时回复伤害量的30%。', '荆棘': '被近战命中时反弹50%实质伤害，护甲减免后保底10点。',
+  '复活': '有效期内遭致命伤以最大生命值的30%复活，本场仅一次，重施不恢复机会。'
+};
+function getGrantedVariantName(tag) {
+  const m = String(tag || '').match(/^\[赋予[:：]([^\[\];]+)\]$/);
+  return m && VARIANT_GRANT_NAMES.includes(m[1].trim()) ? m[1].trim() : null;
+}
+// 原生标签与限时赋予分层读取，到期不修改原生标签或开场派生字段。
+function hasVariantTag(entity, name) {
+  return !!entity && ((entity.tags || []).includes('[' + name + ']') ||
+    (entity.buffs || []).some(b => b.type === 'variant' && b.variant === name && b.duration > 0));
+}
 const SKILL_TYPES = [
   '[无]', '[群攻]', '[群攻(爆炸)]', '[群攻(雷)]', '[群攻(火焰)]', '[群攻(枪击)]', '[群攻(毒雾)]', '[群攻(冰霜)]', '[群攻(风)]', '[群攻(光)]',
   '[单体]', '[单体(枪击)]', '[单体(火焰)]', '[单体(光)]', '[单体(雷)]', '[单体(爆炸)]', '[单体(刀砍)]', '[单体(拳击)]', '[单体(爪击)]', '[单体(撕咬)]', '[单体(毒液)]', '[单体(冰霜)]', '[群回]', '[单回]', '[群增]',
@@ -3104,6 +3122,7 @@ const SKILL_TYPES = [
   '[自盲]', '[自降]', '[自弱]', '[自滞]', '[自缓]',
   '[驱散]', '[群驱散]',
   '[肃正]', '[肃正:近战]', '[肃正:远程]', '[肃正:法术]',
+  ...VARIANT_GRANT_NAMES.map(name => `[赋予:${name}]`),
   '[必中]', '[转火]', '[突进]', '[众召]',
   '[高阶]', '[传奇]', '[神术]',
   '[近战]', '[远程]', '[法术]'
@@ -3144,6 +3163,8 @@ function expandTagLabel(typeStr) {
   if (!typeStr) return '';
   let core = String(typeStr).replace(/[\[\]]/g, '').trim();
   if (!core) return core;
+  const grantName = getGrantedVariantName('[' + core + ']');
+  if (grantName) return '赋予·' + grantName;
   const _szm = core.match(/^肃正[:：](.+)$/);
   if (_szm) return '肃正·' + _szm[1].trim();
   core = core.replace(/[（(][^）)]*[）)]/g, '');
@@ -3228,6 +3249,8 @@ const TAG_EFFECT_TIPS = {
 function getTagTip(typeStr, powerNum) {
   if (!typeStr) return '';
   let core = String(typeStr).replace(/[\[\]]/g, '').trim();
+  const grantName = getGrantedVariantName('[' + core + ']');
+  if (grantName) return `限时赋予目标【${grantName}】：${VARIANT_GRANT_TIPS[grantName]}持续由槽位回合或技能持续指定，默认3回合；同名不叠强度，重施仅延长持续。`;
   if (/^肃正[:：]/.test(core)) core = '肃正';
   if (String(core) === '嘲讽' && Number(powerNum) < 0) core = '隐匿';
   core = core.replace(/[（(][^）)]*[）)]/g, '');
@@ -3802,6 +3825,8 @@ const DIGEST_RULES = [
   { srcLine: 12639, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的【.+?】抗性使伤害减少了 \d+ 点。$/, build: m => ({ token: '抗性减免' }) },
   { srcLine: 13157, kind: 'token',  re: /^ {0,4}↳ 🛡️ (.+?) 的【免伤】生效，本次攻击的防御额外提高 \d+ 点。$/, build: m => ({ token: '免伤生效' }) },
   // --- 状态施加 ---
+  { kind: 'token', re: /^ {0,4}↳ (.+?) 获得了【(.+?)】特性，持续\d+回合。$/, build: m => ({ token: `${m[1]}获得【${m[2]}】特性`, buffTarget: m[1], buffKey: 'variant' }) },
+  { kind: 'token', re: /^ {0,4}↳ (.+?) 本场的【复活】机会已耗尽，重施不恢复次数。$/, build: m => ({ token: `${m[1]}复活已耗尽` }) },
   { srcLine: 10759,  kind: 'token',  re: /^ {0,4}↳ 提升了 (.+?) \d+% 的命中率 持续\d+回合。$/, build: m => ({ token: `${m[1]}命中提升`, buffTarget: m[1], buffKey: 'hit' }) },
   { srcLine: 10767,  kind: 'token',  re: /^ {0,4}↳ 干扰了 (.+?) 的视线，命中率下降 \d+% 持续\d+回合。$/, build: m => ({ token: `${m[1]}视线受扰`, buffTarget: m[1], buffKey: 'blind' }) },
   { srcLine: 10776,  kind: 'token',  re: /^ {0,4}↳ 削弱了 (.+?) 的防御力。$/, build: m => ({ token: `${m[1]}防御削弱`, buffTarget: m[1], buffKey: 'defDown' }) },
@@ -10182,7 +10207,11 @@ const arcaneVfxModule = (function () {
         if (!entity || !entity.isAlive || entity.hp <= 0 || entity.isSubdued) { if (entity) clearVariantState(entity.id); return; }
         const id = entityIdOf(entity), dom = domOf(entity);
         if (entity.molted && ![...V.runs].some(owner => owner.trigger === 'molt' && owner.entityIds.has(id))) setPersistentFx(dom, 'molt', true);
-        if (!entity.tags || !entity.tags.includes('[狂暴]') || !entity.hasRageNarrated) return;
+        if (!hasVariantTag(entity, '狂暴')) {
+            if (V.rage.has(id)) playVariantTriggerFx({ trigger: 'rageExit', entity });
+            return;
+        }
+        if (!entity.hasRageNarrated) return;
         if (entity.hp / entity.maxHp > 0.3) {
             if (V.rage.has(id)) playVariantTriggerFx({ trigger: 'rageExit', entity });
         } else if (!V.rage.has(id)) playVariantTriggerFx({ trigger: 'rage', entity, meta: { instant: true } });
@@ -12881,7 +12910,7 @@ window.playVariantResistFx = playVariantResistFx;
         const owner = sdRun(form === '群穿' ? 800 + targets.length * 65 : 1100,entity), origin = { x:r.x,y:r.y };
         const outcome = normalizeOutcomes(meta.outcomes);
         const entries = targets.filter(Boolean).map(target => ({ target, dodged:outcome(target) === 'dodge',
-            immune:form === '群火' ? target.immuneBurn : form === '群毒' ? target.immunePoison : false,
+            immune:form === '群火' ? target.immuneBurn || hasVariantTag(target, '防火') : form === '群毒' ? target.immunePoison || hasVariantTag(target, '耐毒') : false,
             pt:resolveTargetPoint(target,origin) })).filter(entry => entry.pt);
         const sched = owner.at;
         onBeat && onBeat('burst_start',{ entity,form,conf });
@@ -18100,7 +18129,8 @@ function normalizeColonPowerTags(str) {
         const EXCLUDE = new Set(['驱散', '群驱散', '肃正']);
         _slotTagNamesCache = new Set(SKILL_TYPES.map(t => t.replace(/[\[\]]/g, '')).filter(n => !EXCLUDE.has(n)));
     }
-    return String(str || '').replace(/\[([^\[\]:;]+)[:：](-?\d+)\]/g,
+    return String(str || '').replace(/\[赋予[:：]\s*([^\[\];]+?)\s*(?=;|\])/g, (m, name) => `[赋予:${name.trim()}`)
+        .replace(/\[([^\[\]:;]+)[:：](-?\d+)\]/g,
         (m, tag, n) => _slotTagNamesCache.has(tag.trim()) ? `[${tag.trim()};power:${n}]` : m);
 }
 
@@ -18215,7 +18245,7 @@ function parseSkill(skillStr) {
     let types = ['[无]', '[无]', '[无]']; let powers = [0, 0, 0]; let slotTurnsArr = [null, null, null];
     for (let i = 0; i < Math.min(typeMatches.length, 3); i++) {
         types[i] = '[' + typeMatches[i][1] + ']';
-        powers[i] = typeMatches[i][2] !== undefined ? parseInt(typeMatches[i][2]) : (types[i] === '[再动]' || types[i].includes('驱散') ? 1 : 50);
+        powers[i] = getGrantedVariantName(types[i]) ? 0 : (typeMatches[i][2] !== undefined ? parseInt(typeMatches[i][2]) : (types[i] === '[再动]' || types[i].includes('驱散') ? 1 : 50));
         if (typeMatches[i][3] !== undefined) slotTurnsArr[i] = parseInt(typeMatches[i][3]);
     }
     if (!typeMatches.length) { types[0] = '[单体]'; powers[0] = 20; }
@@ -18329,7 +18359,7 @@ function parseItem(itemStr) {
     let types = ['[无]', '[无]', '[无]']; let powers = [0, 0, 0]; let slotTurnsArr = [null, null, null];
     for (let i = 0; i < Math.min(typeMatches.length, 3); i++) {
         types[i] = '[' + typeMatches[i][1] + ']';
-        powers[i] = typeMatches[i][2] !== undefined ? parseInt(typeMatches[i][2]) : (types[i] === '[再动]' || types[i].includes('驱散') ? 1 : 50);
+        powers[i] = getGrantedVariantName(types[i]) ? 0 : (typeMatches[i][2] !== undefined ? parseInt(typeMatches[i][2]) : (types[i] === '[再动]' || types[i].includes('驱散') ? 1 : 50));
         if (typeMatches[i][3] !== undefined) slotTurnsArr[i] = parseInt(typeMatches[i][3]);
     }
 
@@ -19907,6 +19937,11 @@ function updateBuffUI(entity) {
   if (totalDef > 0) html += `<div data-buff-type="def" class="${expiring('def') ? 'arcane-status-badge-expiring ' : ''}text-blue-400 text-[8px] sm:text-[10px] bg-black/60 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">🛡️+${totalDef}</div>`;
   else if (totalDef < 0) html += `<div data-buff-type="def" class="${expiring('def') ? 'arcane-status-badge-expiring ' : ''}text-purple-400 text-[8px] sm:text-[10px] bg-black/60 border border-purple-900/50 px-1 rounded backdrop-blur font-mono shadow-md">🛡️${totalDef}</div>`;
   
+  (entity.buffs || []).filter(b => b.type === 'variant' && b.duration > 0).forEach(b => {
+    const tip = VARIANT_GRANT_TIPS[b.variant];
+    html += `<div data-buff-type="variant" data-variant="${b.variant}" data-tagtip-title="【${b.variant}】" data-tagtip-body="${tip}剩余${b.duration}回合。" class="${b.duration <= 1 ? 'arcane-status-badge-expiring ' : ''}text-cyan-300 text-[8px] sm:text-[10px] bg-cyan-950/80 border border-cyan-800/60 px-1 rounded backdrop-blur font-mono shadow-md">🧬${b.variant}·${b.duration}回</div>`;
+  });
+
   // === 职业先天被动 UI 徽章（狂战士浴血/死斗、风行者 TP 闪避）===
   if (entity.classType === '狂战士') {
       if (entity.hp < entity.maxHp && entity.maxHp > 0) {
@@ -20257,11 +20292,14 @@ function updateHeroUI(hero) {
   }
 
   updateBuffUI(hero);
+  tryTriggerEnemyRage(hero);
+  arcaneVfxModule.syncVariantState(hero);
 
   // 【召唤】不触发常规倒下流程：死亡后自动从阵营移除（不计入胜负），由调用方 splice
   if (hero.hp <= 0 && hero.isAlive) {
       // 召唤物：先按既有机制结算 [复活]/[自爆]，真正死亡才消散（与 updateEnemyUI / DoT 路径同一收口）
       if (hero.isSummon) { resolveSummonDeath(hero, getEntitySpriteDom(hero)); return; }
+      if (tryReviveEnemy(hero, getEntitySpriteDom(hero))) { updateHeroUI(hero); return; }
       hero.isAlive = false; hero.shield = 0; hero.buffs = []; hero.isDefending = false; hero.hitBonus = 0; hero.evaBonus = 0; hero.burstActivated = false;
       clearVariantState(hero.id);
       arcaneVfxModule.clearStatusLayers(hero.id);
@@ -20291,12 +20329,15 @@ function updateHeroUI(hero) {
   }
 }
 
-// 【复活】敌方死亡复活：带 [复活] 名字标签的敌人第一次被击杀时以 30% 最大血量原地复活（仅敌方、仅一次）。
-// 供 updateEnemyUI 死亡收口 / ON_FATAL_DAMAGE / DoT 回合起始致死三处调用；复活成功返回 true（跳过死亡处理）。
-function tryReviveEnemy(enemy, dom) {
-    if (!enemy || enemy.isSubdued) return false;   // 【制服】被制服单位本场退出：不复活、不再参战
-    if (!enemy || !enemy.reviveCount || enemy.reviveCount <= 0) return false;
-    enemy.reviveCount--;
+// 【复活】原生与限时赋予共用本场一次机会；grantedAtTick 保留回合起始 DoT 结算前的限时资格。
+function canReviveEntity(entity, grantedAtTick = false) {
+    return !!entity && !entity.isSubdued && !entity.variantReviveUsed && (entity.reviveCount > 0 || grantedAtTick ||
+        (entity.buffs || []).some(b => b.type === 'variant' && b.variant === '复活' && b.duration > 0));
+}
+function tryReviveEnemy(enemy, dom, grantedAtTick = false) {
+    if (!canReviveEntity(enemy, grantedAtTick)) return false;
+    enemy.variantReviveUsed = true;
+    if (enemy.reviveCount > 0) enemy.reviveCount--;
     enemy.hp = Math.floor(enemy.maxHp * 0.3);
     enemy.shield = 0; enemy.buffs = []; enemy.isDefending = false;
     arcaneVfxModule.syncHitBar(enemy.id, enemy.hp, enemy.maxHp, true);
@@ -20572,6 +20613,25 @@ function registerTagHandler(tagKey, handler) {
     TAG_HANDLERS[tagKey] = ctx => CombatAudioMixer.withContext('K', () => handler(ctx));
 }
 
+// --- 限时变种赋予（不修改原生 tags/抗性/免疫；同名刷新而不叠层）---
+registerTagHandler('赋予', (ctx) => {
+    const name = getGrantedVariantName(ctx.tag);
+    if (!name) return;
+    if (name === '复活' && ctx.target.variantReviveUsed) {
+        createFloatingText(ctx.targetDom, '复活已耗尽', 'text-slate-300');
+        addHistory(`   ↳ ${ctx.target.name} 本场的【复活】机会已耗尽，重施不恢复次数。`);
+        return;
+    }
+    ctx.target.buffs = ctx.target.buffs || [];
+    const existing = ctx.target.buffs.find(b => b.type === 'variant' && b.variant === name);
+    if (existing) existing.duration = Math.max(existing.duration, ctx.effectTurns);
+    else ctx.target.buffs.push({ type: 'variant', variant: name, value: 1, duration: ctx.effectTurns });
+    const duration = existing ? existing.duration : ctx.effectTurns;
+    if (!isArcaneSkillFx(ctx.skill && ctx.skill.fxTag)) playSVGEffect(ctx.targetDom, 'buff');
+    createFloatingText(ctx.targetDom, `${name} ${duration}回`, 'text-cyan-300');
+    addHistory(`   ↳ ${ctx.target.name} 获得了【${name}】特性，持续${duration}回合。`);
+});
+
 // --- 命中/闪避类 ---
 registerTagHandler('瞄', (ctx) => {
     if (!ctx.skill || (ctx.skill.fxTag !== '飞沙化甲' && ctx.skill.fxTag !== '蝎眼钥匙')) playSound('hitUp');
@@ -20618,8 +20678,8 @@ registerTagHandler('弱', (ctx) => {
 // --- 持续伤害(DoT)类 ---
 // 【中毒】：叠层加深——每次施放直接叠加新毒层，各层独立发作、互不覆盖（与灾厄使淬毒同语义）
 registerTagHandler('中毒', (ctx) => {
-    // 【耐毒】敌方免疫中毒：跳过施加
-    if (ctx.target && ctx.target.immunePoison) {
+    // 【耐毒】原生/限时免疫中毒：跳过施加
+    if (ctx.target && (ctx.target.immunePoison || hasVariantTag(ctx.target, '耐毒'))) {
         if (ctx.targetDom) createFloatingText(ctx.targetDom, '免疫·毒', 'text-lime-300');
         addHistory(`   ↳ 🧪 [${ctx.target.name}] 具备毒素抗性/耐受体质，免疫了剧毒侵蚀！`);
         playVariantImmunity(ctx.target,'poisonproof',ctx.caster,ctx.skill,ctx.tag);
@@ -20635,8 +20695,8 @@ registerTagHandler('中毒', (ctx) => {
 
 // 【燃烧】：灼烧禁疗——重复施放不叠层、仅刷新强度与持续时间；燃烧期间目标受到的治疗减半
 registerTagHandler('燃烧', (ctx) => {
-    // 【防火】敌方免疫点燃：跳过施加
-    if (ctx.target && ctx.target.immuneBurn) {
+    // 【防火】原生/限时免疫点燃：跳过施加
+    if (ctx.target && (ctx.target.immuneBurn || hasVariantTag(ctx.target, '防火'))) {
         if (ctx.targetDom) createFloatingText(ctx.targetDom, '免疫·燃', 'text-orange-300');
         addHistory(`   ↳ 🔥 [${ctx.target.name}] 耐火防护/抗热体质阻绝了烈焰，免疫了灼烧！`);
         playVariantImmunity(ctx.target,'fireproof',ctx.caster,ctx.skill,ctx.tag);
@@ -20950,10 +21010,10 @@ function clampNonLethalDamage(target, hpDmg) {
 //  - 带 [自爆] 的敌人由 interceptor 与其敏捷对骰（同命中判定公式：双方各掷 1..当前敏捷，拦截方严格大于才算阻止成功）：
 //    成功→钳制 1 HP+制服；失败→不钳制并打 _sdContestFailed 标记，放行真实死亡走现有自爆管线（updateEnemyUI 兜底钳制据此放行）；
 //  - 其余敌人维持无条件制服（clampNonLethalDamage）。
-function resolveNonLethalLethal(target, hpDmg, interceptor) {
+function resolveNonLethalLethal(target, hpDmg, interceptor, grantedAtTick = false) {
     if (!nonLethalSettings.enabled || !target || isHeroSideEntity(target)) return hpDmg;
     if (hpDmg < target.hp) return hpDmg;
-    if ((target.reviveCount || 0) > 0) return hpDmg; // 复活优先：不钳制，照常走死亡→复活
+    if (canReviveEntity(target, grantedAtTick)) return hpDmg; // 复活优先：不钳制，照常走死亡→复活
     if (target.explode) {
         const iSpd = interceptor ? Math.max(1, getEffectiveSpeed(interceptor) || 1) : 0;
         const tSpd = Math.max(1, getEffectiveSpeed(target) || 1);
@@ -21091,7 +21151,8 @@ registerClassPassive('防守者', {
         const counterRawDmg = tStatsForCounter.atk * 2; // 双倍攻击力
         const counterHpBefore = Math.max(0, caster.hp);
         const counterShieldBefore = caster.shield || 0;
-        const { hpDmg: counterHpDmg, shieldDmg: counterShieldDmg } = calculateDamage(counterRawDmg, caster);
+        const counterDmgToCaster = applyEnemyTypeResist(counterRawDmg, '近战', caster, getEntitySpriteDom(caster), false, false, { from:target });
+        const { hpDmg: counterHpDmg, shieldDmg: counterShieldDmg } = calculateDamage(counterDmgToCaster, caster);
         const counterShieldAfter = caster.shield || 0;
 
         // 播放红色圆锥冲击波特效（音效在冲击波射出瞬间播放）
@@ -21282,7 +21343,7 @@ registerClassPassive('隐匿者', {
             const stunChance = stealthVal / 10;
             if (Math.random() * 100 < stunChance) {
                 // 【钢体】目标免疫眩晕：与标签 handler 同口径，职业暗袭不得绕过
-                if (target.tags && target.tags.includes('[钢体]')) {
+                if (hasVariantTag(target, '钢体')) {
                     if (targetDom) createFloatingText(targetDom, '免疫·眩晕', 'text-yellow-300');
                     addHistory(`   ↳ ⛓️ [${target.name}] 强韧意志/抗震结构硬抗了暗袭，免疫了眩晕！`);
                     playVariantImmunity(target,'ironBody',caster,null,null,true);
@@ -21363,7 +21424,7 @@ const corruptorPassive = {
     onAfterDamageDealt(caster, target, targetDom) {
         if (target.isAlive) {
             // 【耐毒】目标免疫中毒：与标签 handler 同口径，职业淬毒不得绕过
-            if (target.immunePoison || (target.tags && target.tags.includes('[耐毒]'))) {
+            if (target.immunePoison || hasVariantTag(target, '耐毒')) {
                 if (targetDom) createFloatingText(targetDom, '免疫·毒', 'text-lime-300');
                 addHistory(`   ↳ 🧪 [${target.name}] 具备毒素抗性/耐受体质，免疫了淬毒！`);
                 playVariantImmunity(target,'poisonproof',caster,null,null,true);
@@ -21536,26 +21597,27 @@ CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
     if (p && p.onFatalDamage) p.onFatalDamage(ctx);
 }, 5);
 
-// 敌人：[复活] 击杀时以 30% 血复活（priority=8，位于毅力留存/回避致命被动之下；仅敌方、仅一次）
+// 原生/限时【复活】：致命伤害时以30%血复活，保留既有保命优先级。
 CombatEvents.on(EVENTS.ON_FATAL_DAMAGE, (ctx) => {
     if (ctx.prevented) return; // 已被毅力留存等被动阻止，不再复活
     const t = ctx.target;
-    if (t.isSubdued) return;   // 【制服】被制服单位本场退出：不触发复活
-    if (!t.reviveCount || t.reviveCount <= 0) return;
-    ctx.hpDmg = 0;                     // 先归零本次伤害，复活回血后才不会被随后扣减再次带走
-    if (tryReviveEnemy(t, ctx.targetDom)) ctx.prevented = true; // 复活成功 → 本次不致死、不判假击杀
+    if (!canReviveEntity(t)) return;
+    if (tryReviveEnemy(t, ctx.targetDom)) {
+        ctx.hpDmg = 0; // 复活回血后，不再扣减同一次致命伤害
+        ctx.prevented = true;
+    }
 }, 8);
 
-// 敌人：【再生】每回合开始回复最大 HP 10%（仅敌方、存活时；上限不超过 maxHp）
+// 【再生】每回合开始回复最大 HP 10%（原生/限时、敌我通用）
 CombatEvents.on(EVENTS.TURN_START, (ctx) => {
     const e = ctx.entity;
-    if (!e || e.id.startsWith('h') || !e.isAlive || e.isSubdued || !e.tags || !e.tags.includes('[再生]')) return;
+    if (!e || !e.isAlive || e.isSubdued || !hasVariantTag(e, '再生')) return;
     const healAmt = Math.max(1, Math.floor(e.maxHp * 0.1));
     if (e.hp >= e.maxHp) return;
     e.hp = Math.min(e.maxHp, e.hp + healAmt);
-    const dom = e.id ? document.getElementById(`${e.id}-sprite`) : null;
+    const dom = getEntitySpriteDom(e);
     if (dom) createFloatingText(dom, `调息 +${healAmt}`, 'text-green-300');
-    updateEnemyUI(e);
+    if (isHeroSideEntity(e)) updateHeroUI(e); else updateEnemyUI(e);
     playVariantTriggerFx({ trigger: 'regen', enemyId: e.id, meta: { heal: healAmt } });
     addHistory(`   ↳ 💚 [${e.name}] 凭借【持续调息/自愈本能】平复伤势，恢复了 ${healAmt} 点生命（${Math.floor(e.hp)}/${e.maxHp}）。`);
 });
@@ -21564,9 +21626,9 @@ CombatEvents.on(EVENTS.TURN_START, (ctx) => {
 // 插队与 tryTriggerEnemyLink 同款；linked 守卫防重复，避免与受击触发叠加
 CombatEvents.on(EVENTS.TURN_START, (ctx) => {
     const e = ctx.entity;
-    if (!e || e.id.startsWith('h') || !e.isAlive || !e.tags) return;
-    if (e.tags.includes('[狂暴]')) tryTriggerEnemyRage(e);
-    if (e.tags.includes('[连动]')) {
+    if (!e || !e.isAlive || e.isSubdued) return;
+    if (hasVariantTag(e, '狂暴')) tryTriggerEnemyRage(e);
+    if (!e.id.startsWith('h') && e.tags && e.tags.includes('[连动]')) {
         if (!e.linked && e.maxHp > 0 && e.hp > 0 && e.hp / e.maxHp <= 0.3) {
             tryTriggerEnemyLink(e);
         }
@@ -21613,7 +21675,7 @@ CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
     }
     // 【吸血】：造成实际伤害时吸取其 30% 转为自身回复（按真实阵营判定归属与 UI，友方召唤物同样继承该变种；存活时）
     const caster = ctx.caster;
-    if (caster && caster.tags && caster.tags.includes('[吸血]') && caster.isAlive && (ctx.hpDmg > 0)) {
+    if (caster && hasVariantTag(caster, '吸血') && caster.isAlive && (ctx.hpDmg > 0)) {
         const drain = Math.max(1, Math.floor(ctx.hpDmg * 0.3));
         caster.hp = Math.min(caster.maxHp, caster.hp + drain);
         const casterDom = getEntitySpriteDom(caster);
@@ -21622,11 +21684,11 @@ CombatEvents.on(EVENTS.AFTER_DAMAGE, (ctx) => {
         addHistory(`   ↳ 🩸 [${caster.name}] 触发【嗜血/生机掠夺】，从凶狠的命中中汲取战意与生机，恢复了 ${drain} 点生命（${Math.floor(caster.hp)}/${caster.maxHp}）。`);
         if (isHeroSideEntity(caster)) updateHeroUI(caster); else updateEnemyUI(caster);
     }
-    // 敌人【荆棘】：被近战命中时反弹 50% 实际伤害（下限 10 点）——走正常减伤管线（受攻击者护甲/护盾/防御姿态减免）；
+    // 【荆棘】原生/限时：被近战命中时反弹50%实际伤害（下限10点），敌我通用；
     // 反弹致命伤害经 ON_FATAL_DAMAGE 可被保命被动救场；与【吸血】同管道，致死一击早退不触发 → 斩杀可规避反伤）
     const thornTarget = ctx.target;
     const attacker = ctx.caster;
-    if (thornTarget && !thornTarget.id.startsWith('h') && thornTarget.tags && thornTarget.tags.includes('[荆棘]')
+    if (thornTarget && hasVariantTag(thornTarget, '荆棘')
         && thornTarget.isAlive && (ctx.hpDmg > 0) && attacker && attacker.isAlive
         && ctx.incomingDamageType && (ctx.incomingDamageType === '近战' || ctx.incomingDamageType === '[近战]'
             || (!ctx.incomingDamageType.includes('远程') && !ctx.incomingDamageType.includes('法术')))) {
@@ -21807,7 +21869,7 @@ function buildSkillDetailHTML(skill, showTarget, target) {
         + `<span class="px-1.5 py-0.2 rounded text-[9px] bg-slate-800/80 text-slate-300">${isAoe ? '群攻' : '单体'}</span>`
         + `</div>`
         + `<div class="flex items-center gap-2">`
-        + `<span class="text-slate-400">威力 <strong class="text-cyan-300">${(skill.power || 0) > 0 ? skill.power : '普攻'}</strong></span>`
+        + (getGrantedVariantName(skill.type) ? `<span class="text-cyan-300">${expandTagLabel(skill.type)}</span>` : `<span class="text-slate-400">威力 <strong class="text-cyan-300">${(skill.power || 0) > 0 ? skill.power : '普攻'}</strong></span>`)
         + `<span class="text-slate-400">命中 <strong class="text-indigo-300">${skill.hit ?? 100}</strong></span>`
         + ((skill.critRate || 0) > 0 ? `<span class="text-orange-300 font-bold">💥${skill.critRate}%</span>` : '')
         + (targetText ? `<span class="text-emerald-300">${targetText}</span>` : '')
@@ -21868,6 +21930,8 @@ function buildReactionDamagePreview(attacker, target, skill, multiplier = 1) {
             barrierNote = `<span class="text-cyan-300">🛡️ 屏障吸收（${teamBarrierName}）</span>`;
         }
 
+        rawMin = applyEnemyTypeResist(rawMin, incomingDamageType, target, null, String(slot.tag).includes('群'), true);
+        rawMax = applyEnemyTypeResist(rawMax, incomingDamageType, target, null, String(slot.tag).includes('群'), true);
         // 减甲后具体 HP 伤害区间：对 min/max 边界各算一次（浅拷贝防 calculateDamage 改写真实 shield）
         const calcMin = calculateDamage(rawMin, Object.assign({}, target, { shield: target.shield || 0 }), isPierce, armorMult);
         const calcMax = calculateDamage(rawMax, Object.assign({}, target, { shield: target.shield || 0 }), isPierce, armorMult);
@@ -22405,8 +22469,8 @@ function getEffectiveStats(entity) {
     }
     finalAtk = statsObj.atk; finalDef = statsObj.def; finalHit = statsObj.hit; finalEva = statsObj.eva; finalTaunt = statsObj.taunt;
     
-    // 敌人【狂暴】：HP ≤ 30% 时攻击 +50%（肉鸽"半血狂怒"；仅敌方）
-    if (entity.id && !entity.id.startsWith('h') && entity.tags && entity.tags.includes('[狂暴]') && entity.maxHp > 0 && entity.hp / entity.maxHp <= 0.3) {
+    // 【狂暴】原生/限时、敌我通用：HP≤30%时攻击+50%，同名不重复放大。
+    if (hasVariantTag(entity, '狂暴') && entity.maxHp > 0 && entity.hp / entity.maxHp <= 0.3) {
         finalAtk = Math.floor(finalAtk * 1.5);
     }
     
@@ -22473,9 +22537,8 @@ function wouldSegmentClearHp(caster, target, targetType, rawDamage, tag, skill, 
     return target.hp - hpDmg <= 0;
 }
 
-// 敌方变种标签类型减伤：【流体】远程-50% / 【虚形】近战-50% / 【破法】法术-50% / 【要害】群攻-50%（类型与 AoE 独立判定、可叠加至 25%）。
-// 作用于折算前的原始伤害（与屏障克制同型独立减伤系数）；【穿透】无视的是护甲、仍吃此属性减伤。
-// target 无 resistMap（英雄/无标签敌人）时原样返回。dom 用于减伤飘字（可省略）。
+// 原生/限时变种类型减伤：【流体】远程-50% / 【虚形】近战-50% / 【破法】法术-50% / 【要害】群攻-50%（类型与 AoE 独立判定、可叠加至25%）。
+// 作用于折算前的原始伤害；【穿透】无视的是护甲，仍吃属性减伤。原生与限时同种只计算一次。
 // damageType 与 isAoE 分别命中对应抗性并顺序相乘；反击等单体场景传 isAoE=false。
 function resistSpellColor(skill, tag) {
     const text = [skill && skill.fxTag,skill && skill.type,skill && skill.type2,skill && skill.type3,tag].filter(Boolean).join(' ');
@@ -22490,12 +22553,15 @@ function playVariantImmunity(entity, kind, from, skill, tag, afterHit = false) {
 }
 
 function applyEnemyTypeResist(rawDmg, damageType, target, dom, isAoE = false, silent = false, visual = null) {
-    if (!target || !target.resistMap || !(rawDmg > 0)) return rawDmg;
+    if (!target || !(rawDmg > 0)) return rawDmg;
     let dmg = rawDmg;
     const hits = [];
-    const typeResist = damageType ? target.resistMap[damageType] : null;
+    const map = target.resistMap || {};
+    const name = damageType === '近战' ? '虚形' : damageType === '远程' ? '流体' : damageType === '法术' ? '破法' : null;
+    const typeResist = map[damageType] || (name && hasVariantTag(target, name) ? 0.5 : null);
+    const aoeResist = map['AoE'] || (hasVariantTag(target, '要害') ? 0.5 : null);
     if (typeResist) { dmg = Math.max(1, Math.floor(dmg * typeResist)); hits.push(damageType); }
-    if (isAoE && target.resistMap['AoE']) { dmg = Math.max(1, Math.floor(dmg * target.resistMap['AoE'])); hits.push('要害'); }
+    if (isAoE && aoeResist) { dmg = Math.max(1, Math.floor(dmg * aoeResist)); hits.push('要害'); }
     if (hits.length && dmg < rawDmg) {
         if (dom && !silent) createFloatingText(dom, `-${rawDmg - dmg} 抗性`, 'text-sky-300');
         if (!silent) {
@@ -23150,7 +23216,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
 
 
   let _gunshotFiredThisHit = false;
-  let effectTurns = globalTurns !== null ? globalTurns : 3;
+  let effectTurns = globalTurns != null ? globalTurns : 3;
 
   // 【免伤】是预存的一次性防御：只对下一次攻击生效，结算后立即移除。
   const consumeOneTimeDamageGuard = () => {
@@ -23258,7 +23324,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
                   counterSettled = true;
                   // 只在命中拍点吸收个人盾并提交HP；视觉取消不取消同代际的结算权。
                   const counterHpBefore = Math.max(0, caster.hp), counterShieldBefore = caster.shield || 0;
-                  const counterDmgToCaster = isHeroSideEntity(caster) ? counterRawDmg : applyEnemyTypeResist(counterRawDmg, '近战', caster, casterDom, false, false, { from:target });
+                  const counterDmgToCaster = applyEnemyTypeResist(counterRawDmg, '近战', caster, casterDom, false, false, { from:target });
                   const { hpDmg:counterHpDmg, shieldDmg:counterShieldDmg } = calculateDamage(counterDmgToCaster, caster);
                   const counterShieldAfter = caster.shield || 0;
                   caster.hp -= counterHpDmg;
@@ -23532,7 +23598,7 @@ async function applySingleTagEffect(caster, target, tag, tagPower, hitChance, mu
 
     if (tag.includes('眩晕') && target.isAlive && !target.isSubdued) {
         // 【钢体】敌方免疫眩晕：跳过施加
-        if (target.tags && target.tags.includes('[钢体]')) {
+        if (hasVariantTag(target, '钢体')) {
             if (targetDom) createFloatingText(targetDom, '免疫·眩晕', 'text-yellow-300');
             addHistory(`   ↳ ⛓️ [${target.name}] 强韧意志/抗震结构硬抗了冲击，免疫了眩晕！`);
             playVariantImmunity(target,'ironBody',caster,skill,tag,true);
@@ -24166,7 +24232,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         const tag = item.tag; const tagPower = item.power;
         // 槽位级轮数优先（如 [自盲;power:30;turns:2]），缺省回落技能级 [Turns:N]，再缺省由 applySingleTagEffect 默认3
         const effTurns = item.slotTurns != null ? item.slotTurns : skill.turns;
-        const isBeneficial = tag.includes('回') || tag.includes('冲') || tag.includes('增') || tag.includes('防') || tag.includes('盾') || tag.includes('瞄') || tag.includes('嘲') || tag.includes('再动') || tag.includes('避') || tag.includes('免伤') || tag.includes('反击') || tag.includes('驱散') || tag.includes('肃正') || tag.includes('速');
+        const isBeneficial = !!getGrantedVariantName(tag) || tag.includes('回') || tag.includes('冲') || tag.includes('增') || tag.includes('防') || tag.includes('盾') || tag.includes('瞄') || tag.includes('嘲') || tag.includes('再动') || tag.includes('避') || tag.includes('免伤') || tag.includes('反击') || tag.includes('驱散') || tag.includes('肃正') || tag.includes('速');
         const isAoe = tag.includes('群'); const casterIsHero = caster.isSummon ? (caster.side === 'hero') : caster.id.startsWith('h');
         const allies = casterIsHero ? heroesData.filter(h=>h.isAlive && !h.isSubdued) : enemiesData.filter(e=>e.isAlive && !e.isSubdued);
         const opponents = (casterIsHero ? enemiesData : heroesData).filter(e => e.isAlive && !e.isSubdued && !isIgnoredSummonTarget(caster, e));
@@ -24175,7 +24241,7 @@ async function executeSkillAction(caster, primaryTarget, skill, multiplier, isRe
         let targets = [];
         
         // 再动/肃正 恒打自身；自X 自身负面代价标签同理：目标恒为施法者（不随主目标/随机对手路由）
-        if (tag.includes('再动') || tag.includes('肃正') || isSelfDebuffTag(tag)) {
+        if (tag.includes('再动') || tag.includes('肃正') || isSelfDebuffTag(tag) || (getGrantedVariantName(tag) && !skill.isOthers)) {
             targets = [caster];
         } else if (isManualSubduedExempt(skill, primaryTarget) && !isBeneficial && !isAoe) {
             targets = [primaryTarget];
@@ -24627,6 +24693,7 @@ function startGame() {
   // 初始化避死被动触发状态
   heroesData.forEach(h => { delete h.hasTriggeredGrit; delete h.hasTriggeredAvoidFatal; });
   enemiesData.forEach(e => { delete e.hasTriggeredGrit; delete e.hasTriggeredAvoidFatal; });
+  heroesData.concat(enemiesData).forEach(e => { delete e.variantReviveUsed; delete e.hasRageNarrated; });
   // 初始化敌方变种标签一次性触发状态（【蜕皮】/【连动】/【狂暴】本场仅一次；重置/新战局经缓存深拷贝天然复原）
   enemiesData.forEach(e => { delete e.molted; delete e.linked; delete e.hasRageNarrated; });
   // 【非致命】重置全员制服胜利标志（敌方每场为缓存深拷贝，isSubdued 天然不会跨场残留）
@@ -24752,6 +24819,7 @@ async function nextTurn(token = combatToken) {
           sourceId:'dot:' + currentEntity.ref.id, source:'dot', damageType:'真实' });
       dotSnapshot = null;
   };
+  const grantedReviveAtTick = (currentEntity.ref.buffs || []).some(b => b.type === 'variant' && b.variant === '复活' && b.duration > 0);
   if (currentEntity.ref.buffs && currentEntity.ref.buffs.length > 0) {
       // 眩晕检测：每次行动（含多动单位的额外行动）都判定——被眩晕即跳过其"下一次行动"
       isStunned = currentEntity.ref.buffs.some(b => b.type === 'stun');
@@ -24775,7 +24843,7 @@ async function nextTurn(token = combatToken) {
                   // 【非致命】敌方 DoT 致死同样走总入口（复活优先→自爆敏捷对抗→普通制服；自爆拦截方=我方当前敏捷最高的存活者，否则敌人可能在轮到回合前被毒死，破坏非致命语义）
                   if (nonLethalSettings.enabled && !isHeroSideEntity(currentEntity.ref) && currentEntity.ref.hp - dotDmg <= 0) {
                       const _dotInterceptor = heroesData.filter(h => h.isAlive && !h.isSubdued).sort((a, b) => getEffectiveSpeed(b) - getEffectiveSpeed(a))[0] || null;
-                      dotDmg = resolveNonLethalLethal(currentEntity.ref, dotDmg, _dotInterceptor);
+                      dotDmg = resolveNonLethalLethal(currentEntity.ref, dotDmg, _dotInterceptor, grantedReviveAtTick);
                   }
                   const isBurn = b.type === 'burn';
                   currentEntity.ref.hp -= dotDmg;
@@ -24783,11 +24851,11 @@ async function nextTurn(token = combatToken) {
                   // 敌方 DoT 扣血后触发智慧低血旁白判定（致死由下方死亡收口触发死亡旁白）
                   const _isSummonDot = !!currentEntity.ref.isSummon;
                   const _isEnemyDot = _isSummonDot ? (currentEntity.ref.side !== 'hero') : !currentEntity.ref.id.startsWith('h');
+                  tryTriggerEnemyRage(currentEntity.ref);
                   if (_isEnemyDot) {
                       tryTriggerEnemyLowHpSpeak(currentEntity.ref);
                       // 【蜕皮】首次跌破50%触发二阶段；【连动】≤30% 插队行动（DoT 致死不触发，与主伤害管线同规则）
                       tryTriggerEnemyMolt(currentEntity.ref);
-                      tryTriggerEnemyRage(currentEntity.ref);
                       tryTriggerEnemyLink(currentEntity.ref);
                   }
                   const targetDom = getEntitySpriteDom(currentEntity.ref) || (currentEntity.ref.id.startsWith('h') ? document.getElementById(`hero-card-${currentEntity.ref.id}`) : document.getElementById(`${currentEntity.ref.id}-sprite`));
@@ -24828,7 +24896,7 @@ async function nextTurn(token = combatToken) {
   
   if (currentEntity.ref.hp <= 0) {
       // 【复活】DoT（中毒/燃烧）在回合起始致死时先尝试原地复活——复活成功则不判死、沿用下方正常行动流程
-      const revived = tryReviveEnemy(currentEntity.ref, getEntitySpriteDom(currentEntity.ref));
+      const revived = tryReviveEnemy(currentEntity.ref, getEntitySpriteDom(currentEntity.ref), grantedReviveAtTick);
       if (!revived) {
           publishDotResult();
           // 【召唤】DoT 致死：走统一死亡收口（[自爆] 结算 + 从阵营消散），复活已在上方尝试
@@ -25266,7 +25334,7 @@ function selectEnemySkillAndTarget(enemy, validSkills, aliveEnemies, aliveHeroes
         const tags = skill => [skill.type, skill.type2, skill.type3].filter(Boolean).join('');
         const selfGuard = validSkills.filter(skill => {
             const t = tags(skill);
-            return !skill.isOthers && !/攻|单体|穿透|散射|眩晕/.test(t) && /单回]|群回]|防|盾|避|免伤/.test(t);
+            return !skill.isOthers && !/攻|单体|穿透|散射|眩晕/.test(t) && /单回]|群回]|防|盾|避|免伤|赋予/.test(t);
         });
         if (enemy.hp / enemy.maxHp <= 0.25 && selfGuard.length) {
             return { selectedSkill: selfGuard[Math.floor(Math.random() * selfGuard.length)], specificTarget: enemy };
@@ -25289,6 +25357,16 @@ function selectEnemySkillAndTarget(enemy, validSkills, aliveEnemies, aliveHeroes
         const isBuff = skill.type.includes('增') || skill.type.includes('防') || skill.type.includes('盾') || skill.type.includes('避') || skill.type.includes('反击');
         const isDebuff = skill.type.includes('降') || skill.type.includes('盲') || skill.type.includes('滞') || skill.type.includes('弱') || skill.type.includes('中毒') || skill.type.includes('燃烧') || skill.type.includes('麻痹');
         const isAtk = skill.type.includes('单体') || skill.type.includes('群攻') || skill.type.includes('穿透') || skill.type.includes('散射');
+        const grantNames = [skill.type, skill.type2, skill.type3].map(getGrantedVariantName).filter(Boolean);
+        const hasAttackSlot = [skill.type, skill.type2, skill.type3].some(t => t && /攻|单体|穿透|散射|眩晕/.test(t));
+        // 赋予是单体增益；混合攻击仍选对手，赋予槽由执行层回落自身。
+        if (grantNames.length && !hasAttackSlot) {
+            const grantTargets = skill.isOthers ? aliveEnemies : [enemy];
+            const usefulTarget = grantTargets.find(e => grantNames.some(name =>
+                name === '复活' ? !canReviveEntity(e) && !e.variantReviveUsed : !hasVariantTag(e, name)));
+            weight += usefulTarget ? 80 : 5;
+            target = usefulTarget || enemy;
+        }
         
         // 治疗技能逻辑
         if (isHeal) {
@@ -25790,7 +25868,7 @@ function classifySkill(skill) {
   // 自X 自身负面标签目标恒为施法者：排除在外（纯自X 技能走自施放；与攻击标签混排时仅攻击部分进敌方选目标）
   const hasEnemyTargetTag = tags.some(t => !isSelfDebuffTag(t) && !t.includes('群') && (t.includes('单体') || t.includes('穿透') || t.includes('散射') || t.includes('眩晕') || t.includes('降') || t.includes('盲') || t.includes('滞') || t.includes('弱') || t.includes('中毒') || t.includes('燃烧') || t.includes('麻痹') || t.includes('缓') || t.includes('吸蓝')));
   // 纯有益单体标签：用于 [他人] 技能选我方目标（含 单X 前缀与 嘲讽/回避/免伤/反击 等单目标有益标签）
-  const hasSingleBuff = tags.some(t => !t.includes('群') && (t.includes('单回') || t.includes('单增') || t.includes('单防') || t.includes('单盾') || t.includes('单瞄') || t.includes('单冲') || t.includes('嘲') || t.includes('避') || t.includes('免伤') || t.includes('反击') || t.includes('驱散') || t.includes('单速')));
+  const hasSingleBuff = tags.some(t => !t.includes('群') && (getGrantedVariantName(t) || t.includes('单回') || t.includes('单增') || t.includes('单防') || t.includes('单盾') || t.includes('单瞄') || t.includes('单冲') || t.includes('嘲') || t.includes('避') || t.includes('免伤') || t.includes('反击') || t.includes('驱散') || t.includes('单速')));
   const hasOthers = !!skill.isOthers;
   const hasSummon = !!skill.summonTarget;
   return { hasEnemyTargetTag, hasSingleBuff, hasOthers, hasSummon };
@@ -25930,19 +26008,19 @@ function showEnemyInfo(enemy) {
       else if (clean.includes('增') || clean.includes('狂暴') || clean.includes('速')) style = 'bg-orange-950/70 text-orange-300 border-orange-700/70';
       else if (clean.includes('弱') || clean.includes('降') || clean.includes('盲') || clean.includes('滞') || clean.includes('缓') || clean.includes('中毒') || clean.includes('燃烧') || clean.includes('麻痹') || clean.includes('眩晕')) style = 'bg-purple-950/70 text-purple-300 border-purple-700/70';
       
-      let pVal = skill.power ? `<span class="font-mono-num ml-0.5">${skill.power}</span>` : '';
+      let pVal = skill.power && !getGrantedVariantName(skill.type) ? `<span class="font-mono-num ml-0.5">${skill.power}</span>` : '';
       pills.push(`<span${tagTipAttrs(clean, skill.power, skill.type)} class="text-[9px] px-1.5 py-0.2 rounded border ${style} flex items-center leading-none">${tagDisplayLabel(clean, skill.power)} ${pVal}</span>`);
     }
     if (skill.type2 && skill.type2 !== '[无]') {
       let clean = skill.type2.replace(/[\\[\\]]/g, '');
       let style = 'bg-slate-900/70 text-slate-300 border-slate-700/70';
-      let pVal = skill.power2 ? `<span class="font-mono-num ml-0.5">${skill.power2}</span>` : '';
+      let pVal = skill.power2 && !getGrantedVariantName(skill.type2) ? `<span class="font-mono-num ml-0.5">${skill.power2}</span>` : '';
       pills.push(`<span${tagTipAttrs(clean, skill.power2, skill.type2)} class="text-[9px] px-1.5 py-0.2 rounded border ${style} flex items-center leading-none">${tagDisplayLabel(clean, skill.power2)} ${pVal}</span>`);
     }
     if (skill.type3 && skill.type3 !== '[无]') {
       let clean = skill.type3.replace(/[\\[\\]]/g, '');
       let style = 'bg-slate-900/70 text-slate-300 border-slate-700/70';
-      let pVal = skill.power3 ? `<span class="font-mono-num ml-0.5">${skill.power3}</span>` : '';
+      let pVal = skill.power3 && !getGrantedVariantName(skill.type3) ? `<span class="font-mono-num ml-0.5">${skill.power3}</span>` : '';
       pills.push(`<span${tagTipAttrs(clean, skill.power3, skill.type3)} class="text-[9px] px-1.5 py-0.2 rounded border ${style} flex items-center leading-none">${tagDisplayLabel(clean, skill.power3)} ${pVal}</span>`);
     }
 
@@ -26400,7 +26478,8 @@ function formatTagPill(typeStr, powerNum) {
   if (!typeStr || typeStr === '[无]') return '';
   let cleanTag = typeStr.replace(/[\[\]]/g, '');
   let colorStyle = 'bg-slate-900/80 text-slate-300 border-slate-700';
-  if (cleanTag.includes('攻') || cleanTag.includes('单体') || cleanTag.includes('穿透')) colorStyle = 'bg-rose-950/80 text-rose-300 border-rose-800/70';
+  if (getGrantedVariantName(typeStr)) colorStyle = 'bg-cyan-950/80 text-cyan-300 border-cyan-700/70';
+  else if (cleanTag.includes('攻') || cleanTag.includes('单体') || cleanTag.includes('穿透')) colorStyle = 'bg-rose-950/80 text-rose-300 border-rose-800/70';
   else if (cleanTag.includes('吸蓝')) colorStyle = 'bg-cyan-950/80 text-cyan-300 border-cyan-700/70';
   else if (cleanTag.includes('回') || cleanTag.includes('冲') || cleanTag.includes('驱散')) colorStyle = 'bg-emerald-950/80 text-emerald-300 border-emerald-800/70';
   else if (cleanTag.includes('盾') || cleanTag.includes('防')) colorStyle = 'bg-blue-950/80 text-blue-300 border-blue-800/70';
@@ -26414,7 +26493,7 @@ function formatTagPill(typeStr, powerNum) {
   else if (cleanTag.includes('高阶')) colorStyle = 'bg-violet-950/90 text-violet-200 border-violet-500/70 font-bold';
   else if (cleanTag.includes('肃正')) colorStyle = 'bg-cyan-950/80 text-cyan-300 border-cyan-700/70';
   else if (cleanTag.includes('召唤')) colorStyle = 'bg-sky-950/90 text-sky-300 border-sky-500/70 font-bold';
-  let pText = powerNum !== undefined && powerNum !== 0 ? `<span class="opacity-90 font-mono-num ml-0.5">${powerNum}</span>` : '';
+  let pText = !getGrantedVariantName(typeStr) && powerNum !== undefined && powerNum !== 0 ? `<span class="opacity-90 font-mono-num ml-0.5">${powerNum}</span>` : '';
   return `<span${tagTipAttrs(cleanTag, powerNum, typeStr)} class="text-[8px] px-1 py-0.2 rounded border ${colorStyle} shrink-0 flex items-center leading-none">${tagDisplayLabel(cleanTag, powerNum)}${pText}</span>`;
 }
 
@@ -26905,7 +26984,7 @@ function runResetPipeline() {
   window.isExecutingCutin = false;
   // 5) 数据回滚：本场开场基线深拷贝 + 显式清零蓄力与自爆对抗标记
   heroesData = JSON.parse(JSON.stringify(initialHeroesCache)); enemiesData = JSON.parse(JSON.stringify(initialEnemiesCache));
-  heroesData.concat(enemiesData).forEach(u => { u.currentDelay = null; u.currentCharge = 0; delete u._sdContestFailed; });
+  heroesData.concat(enemiesData).forEach(u => { u.currentDelay = null; u.currentCharge = 0; delete u._sdContestFailed; delete u.variantReviveUsed; });
   // 6) 召唤/屏障/制服胜利/旁白去重/行动队列
   if (typeof pendingSummons !== 'undefined' && Array.isArray(pendingSummons)) pendingSummons.length = 0;
   teamBarrier = 0; teamBarrierMax = 0; barrierStandIn = null; teamBarrierName = '圣域帷幕'; barrierArmor = 0; barrierSub = null;
@@ -26946,7 +27025,7 @@ function buildEditorSkillTagPreview(type, power, type2, power2, type3, power3, t
   var slots = [[type, power], [type2, power2], [type3, power3]];
   var colorClass = tone === 'enemy' ? 'text-rose-300' : 'text-cyan-300';
   return slots.filter(function(slot) { return slot[0] && slot[0] !== '[无]'; }).map(function(slot) {
-    var powerText = Number(slot[1]) ? ' ' + slot[1] : '';
+    var powerText = !getGrantedVariantName(slot[0]) && Number(slot[1]) ? ' ' + slot[1] : '';
     var _core = String(slot[0]).replace(/[\[\]]/g, '');
     return `<span${tagTipAttrs(_core, slot[1], slot[0])} class="px-1.5 py-0.2 rounded text-[9px] font-mono-num font-semibold bg-slate-800 ${colorClass} border border-slate-700 shrink-0 whitespace-nowrap">${tagDisplayLabel(_core, slot[1])}${powerText}</span>`;
   }).join('');
@@ -27025,6 +27104,17 @@ function buildSkillFormFieldsHtml(idNS, s, onInputJs) {
 // 【标签槽位下拉选项】编辑器专用：SKILL_TYPE_EDIT_OPTIONS（非槽位标签已剔除，浮层可搜索）。
 // 旧数据槽位若残留非槽位标签（如 [必中]），动态注入该值保显示/保存不劣化（不主动出现在可选列表）。
 // ==========================================
+function syncGrantSlotPower(select) {
+  const powerId = select.id.replace(/-type(\d?)$/, (_, suffix) => '-power' + suffix);
+  const power = document.getElementById(powerId);
+  if (!power) return;
+  power.disabled = !!getGrantedVariantName(select.value);
+  if (power.disabled) power.value = 0;
+}
+document.addEventListener('change', e => {
+  const select = e.target;
+  if (select.tagName === 'SELECT' && /^edit-.*-type\d?$/.test(select.id)) syncGrantSlotPower(select);
+});
 function renderSkillTypeOptions(curVal) {
   const _nonSlot = new Set(['[必中]', '[转火]', '[突进]', '[众召]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]']);
   const opts = (curVal && _nonSlot.has(curVal)) ? [curVal, ...SKILL_TYPE_EDIT_OPTIONS] : SKILL_TYPE_EDIT_OPTIONS;
@@ -27079,7 +27169,7 @@ function applySkillTypeCombo(val) {
   const pop = document.getElementById('skill-type-combo-popup');
   if (!pop) return;
   const sel = pop.__comboSelect, btn = pop.__comboBtn;
-  if (sel) { sel.value = val; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+  if (sel) { sel.value = val; syncGrantSlotPower(sel); sel.dispatchEvent(new Event('change', { bubbles: true })); }
   if (btn) { const label = btn.querySelector('span'); if (label) label.textContent = val; }
   closeSkillTypeCombo();
 }
@@ -27608,6 +27698,7 @@ function openEditor(keepScroll) {
   html += `</div>`; // close #editor-scroll-container
   
   modal.innerHTML = html;
+  modal.querySelectorAll('select[id$="-type"], select[id$="-type2"], select[id$="-type3"]').forEach(syncGrantSlotPower);
   document.getElementById('global-settings-body').insertAdjacentHTML('beforeend', buildBattleAtmosphereSettingsHtml());
   if (savedScrollTop > 0) {
     const nc = document.getElementById('editor-scroll-container'); if(nc) nc.scrollTop = savedScrollTop;
@@ -30455,14 +30546,14 @@ function tryTriggerEnemyMolt(enemy) {
   addHistory(`   💥 [${enemy.name}] 生命跌破极限，触发【绝境爆发】（二阶段觉醒）！${cleared ? `强行排除了 ${cleared} 个负面状态，` : ''}伤势稳固并恢复了 ${Math.floor(enemy.hp - oldHp)} 点生命（${Math.floor(enemy.hp)}/${enemy.maxHp}），进入狂怒强化状态（攻击+50%）！`);
 }
 
-// ---- 敌方【狂暴】文案触发判定：首次 HP ≤ 30% 时记录战报（仅记录文案与飘字，不影响数值被动读取；仅敌方、一次性）----
+// ---- 【狂暴】文案触发判定：首次HP≤30%时记录战报，敌我原生/限时共用，不影响数值读取 ----
 function tryTriggerEnemyRage(enemy) {
-  if (!enemy || enemy.id.startsWith('h') || enemy.hasRageNarrated) return;
-  if (!enemy.tags || !enemy.tags.includes('[狂暴]')) return;
+  if (!enemy || enemy.hasRageNarrated) return;
+  if (!hasVariantTag(enemy, '狂暴')) return;
   if (enemy.isSubdued) return; // 【非致命】被制服的敌人无法狂暴（演出一致性）
   if (!enemy.isAlive || enemy.maxHp <= 0 || enemy.hp <= 0 || enemy.hp / enemy.maxHp > 0.3) return;
   enemy.hasRageNarrated = true;
-  const dom = enemy.id ? document.getElementById(`${enemy.id}-sprite`) : null;
+  const dom = getEntitySpriteDom(enemy);
   if (dom) createFloatingText(dom, '狂暴!', 'text-red-400');
   playVariantTriggerFx({ trigger: 'rage', enemyId: enemy.id, meta: { atkMul: 1.5 } });
   addHistory(`   ↳ 🩸 [${enemy.name}] 伤势沉重陷入【濒死狂怒】，凶暴之气大涨（攻击力提升 50%）！`);

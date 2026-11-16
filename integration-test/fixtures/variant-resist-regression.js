@@ -106,7 +106,7 @@
         return count;
       };
       const wired = nearCall('ctx.target.immunePoison') + nearCall('ctx.target.immuneBurn') +
-        nearCall('target.immunePoison || (target.tags') + nearCall("target.tags.includes('[钢体]')");
+        nearCall("hasVariantTag(target, '耐毒')") + nearCall("hasVariantTag(target, '钢体')");
       if (wired < 5) pending.push('待对齐:五免疫分支演出接线（已见 ' + wired + '/5 处免疫判定附近调用' + (helperAt >= 0 ? '，helper 已存在' : '，helper 未落地') + '）');
     }
 
