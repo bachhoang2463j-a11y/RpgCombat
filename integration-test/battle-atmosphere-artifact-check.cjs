@@ -3,7 +3,12 @@
 // 氛围维护包专项：离线检查围栏、实体免疫、隔离与公开入口入包。
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 const root = path.resolve(__dirname, '..');
-const file = path.resolve(root, process.argv[2] || 'regex-前端战斗v12_13.json');
+const detectArtifact = () => {
+  const files = fs.readdirSync(root).filter(f => /^regex-前端战斗(?!.*-公开版).*\.json$/.test(f));
+  if (files.length !== 1) throw new Error('根目录应有且仅有一个维护版 regex-前端战斗*.json，实际：' + files.join(', '));
+  return files[0];
+};
+const file = path.resolve(root, process.argv[2] || detectArtifact());
 const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
 const source = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const fenced = pkg.replaceString, immune = fenced.replace(/^```[^\r\n]*\r?\n/, '').replace(/\r?\n```\s*$/, ''), raw = immune.replace(/&amp;/g, '&');

@@ -5,7 +5,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ROOT = path.resolve(__dirname, '..');
-const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_14.json');
+const detectArtifact = () => {
+  const files = fs.readdirSync(ROOT).filter(f => /^regex-前端战斗(?!.*-公开版).*\.json$/.test(f));
+  if (files.length !== 1) throw new Error('根目录应有且仅有一个维护版 regex-前端战斗*.json，实际：' + files.join(', '));
+  return files[0];
+};
+const artifact = path.resolve(ROOT, process.argv[2] || detectArtifact());
 const src = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const pkg = JSON.parse(fs.readFileSync(artifact, 'utf8'));
 const fenced = pkg.replaceString;
@@ -26,7 +31,8 @@ function syntax(text, label) {
 }
 
 console.log('== v12.14 限时赋予产物专项 ==');
-check(path.basename(artifact) === 'regex-前端战斗v12_14.json' && pkg.scriptName === '前端战斗v12.14', '版本名与文件名一致');
+const stem = path.basename(artifact).match(/v(\d+)_(\d+)\.json$/);
+check(!!stem && pkg.scriptName === '前端战斗v' + stem[1] + '.' + stem[2], '文件名与scriptName版本同步（' + pkg.scriptName + '）');
 check(count(src, '```') === 2 && count(fenced, '```') === 2, '源码与产物仅头尾自围栏');
 check(!immune.includes('```'), '内联围栏加固');
 check(!/&(?!amp;)/.test(immune) && raw.replace(/&/g, '&amp;') === immune, '实体免疫与单遍还原逐字符一致');

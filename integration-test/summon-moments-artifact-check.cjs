@@ -3,7 +3,7 @@
 // 召唤三瞬（Enter/Exit/Guard）+ 真实接线：源码/维护包双验收，不启动浏览器或访问网络。
 // 用法：node summon-moments-artifact-check.cjs [--source] [regex-前端战斗v12_12.json]
 //   --source           仅验收 index.html 源码（跳过产物包检查）
-//   位置参数           维护包 JSON 路径，缺省 regex-前端战斗v12_12.json
+//   位置参数           维护包 JSON 路径，缺省自动探测根目录唯一维护版 regex-前端战斗*.json
 // 只核对召唤三瞬相关接口与通用项（围栏/&实体/$捕获组/内网静态Tailwind/monsterAttack恰3处/
 // 不带SUMMON_SAMPLE_B64）；不依赖 v12.11 相关注释或标记，版本仅按文件名与 scriptName 对齐。
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
@@ -11,7 +11,12 @@ const ROOT = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const sourceOnly = process.argv.includes('--source');
 const fileArg = process.argv.slice(2).find((a) => !a.startsWith('--'));
-const file = path.resolve(ROOT, fileArg || 'regex-前端战斗v12_12.json');
+const detectArtifact = () => {
+  const files = fs.readdirSync(ROOT).filter(f => /^regex-前端战斗(?!.*-公开版).*\.json$/.test(f));
+  if (files.length !== 1) throw new Error('根目录应有且仅有一个维护版 regex-前端战斗*.json，实际：' + files.join(', '));
+  return files[0];
+};
+const file = path.resolve(ROOT, fileArg || detectArtifact());
 const pkg = sourceOnly ? null : JSON.parse(fs.readFileSync(file, 'utf8'));
 const fence = pkg && pkg.replaceString;
 const immune = fence && fence.replace(/^```[^\r\n]*\r?\n/, '').replace(/\r?\n```\s*$/, '');

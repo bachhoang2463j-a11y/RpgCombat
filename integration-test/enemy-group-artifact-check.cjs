@@ -5,7 +5,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ROOT = path.resolve(__dirname, '..');
-const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_10.json');
+const detectArtifact = () => {
+  const files = fs.readdirSync(ROOT).filter(f => /^regex-前端战斗(?!.*-公开版).*\.json$/.test(f));
+  if (files.length !== 1) throw new Error('根目录应有且仅有一个维护版 regex-前端战斗*.json，实际：' + files.join(', '));
+  return files[0];
+};
+const artifact = path.resolve(ROOT, process.argv[2] || detectArtifact());
 const pkg = JSON.parse(fs.readFileSync(artifact, 'utf8'));
 const src = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const fenced = pkg.replaceString;
@@ -49,7 +54,8 @@ function syntax(text, label) {
 }
 
 console.log('== 敌方群攻 v12.0 产物专项 ==\n' + path.basename(artifact));
-check(pkg.scriptName === '前端战斗v12.10', 'scriptName 为前端战斗v12.10');
+const stem = path.basename(artifact).match(/v(\d+)_(\d+)\.json$/);
+check(!!stem && pkg.scriptName === '前端战斗v' + stem[1] + '.' + stem[2], 'scriptName 与文件名版本同步（' + pkg.scriptName + '）');
 check(count(src, '```') === 2 && /^```html\r?\n/.test(src) && /\r?\n```\s*$/.test(src), '源码围栏恰为头尾2处');
 check(count(fenced, '```') === 2 && /^```html\r?\n/.test(fenced) && /\r?\n```\s*$/.test(fenced), '产物围栏恰为头尾2处');
 check(!immune.includes('```'), '产物内部无裸三反引号');

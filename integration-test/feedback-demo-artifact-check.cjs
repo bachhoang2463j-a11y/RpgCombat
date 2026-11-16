@@ -2,7 +2,8 @@
 'use strict';
 // 四Demo合并产物专项：只读源码/维护包与资源manifest，不启动战斗或访问网络。
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),crypto=require('node:crypto');
-const ROOT=path.resolve(__dirname,'..'),file=path.resolve(ROOT,process.argv[2]||'regex-前端战斗v12_11.json');
+const detectArtifact=()=>{const files=fs.readdirSync(ROOT).filter(f=>/^regex-前端战斗(?!.*-公开版).*\.json$/.test(f));if(files.length!==1)throw new Error('根目录应有且仅有一个维护版 regex-前端战斗*.json，实际：'+files.join(', '));return files[0];};
+const ROOT=path.resolve(__dirname,'..'),file=path.resolve(ROOT,process.argv[2]||detectArtifact());
 const src=fs.readFileSync(path.join(ROOT,'index.html'),'utf8'),pkg=JSON.parse(fs.readFileSync(file,'utf8'));
 const fenced=pkg.replaceString,immune=fenced.replace(/^```[^\r\n]*\r?\n/,'').replace(/\r?\n```\s*$/,''),raw=immune.replace(/&amp;/g,'&');
 const count=(s,n)=>s.split(n).length-1;
@@ -16,7 +17,8 @@ function objectOf(text,name){
     throw new Error('未闭合'+name);
 }
 console.log('== 四Demo反馈合并 v12.11 产物专项 ==');
-check(path.basename(file)==='regex-前端战斗v12_11.json'&&pkg.scriptName==='前端战斗v12.11','维护包文件名和scriptName同步v12.11');
+const stemFile=path.basename(file).match(/v(\d+)_(\d+)\.json$/);
+check(!!stemFile&&pkg.scriptName==='前端战斗v'+stemFile[1]+'.'+stemFile[2],'文件名与scriptName版本同步（'+pkg.scriptName+'）');
 check(count(src,'```')===2&&count(fenced,'```')===2,'源码与产物仅头尾围栏');
 check(!immune.includes('```')&&!/&(?!amp;)/.test(immune)&&raw.replace(/&/g,'&amp;')===immune,'围栏/单遍实体还原免疫');
 check(!/\$[$&`'\d<]/.test(raw),'捕获组替换免疫');

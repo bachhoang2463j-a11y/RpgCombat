@@ -8,7 +8,12 @@ const vm = require('node:vm');
 const crypto = require('node:crypto');
 const ROOT = path.resolve(__dirname, '..');
 const ASSET = 'http://192.168.110.83:8766';
-const artifact = path.resolve(ROOT, process.argv[2] || 'regex-前端战斗v12_11.json');
+const detectArtifact = () => {
+  const files = fs.readdirSync(ROOT).filter(f => /^regex-前端战斗(?!.*-公开版).*\.json$/.test(f));
+  if (files.length !== 1) throw new Error('根目录应有且仅有一个维护版 regex-前端战斗*.json，实际：' + files.join(', '));
+  return files[0];
+};
+const artifact = path.resolve(ROOT, process.argv[2] || detectArtifact());
 let pass = 0, fail = 0;
 const count = (text, needle) => text.split(needle).length - 1;
 function check(ok, label) { console.log((ok ? '[PASS] ' : '[FAIL] ') + label); ok ? pass++ : fail++; }
@@ -75,7 +80,8 @@ function syntax(text, label) {
 }
 
 console.log('== 变种触发与行军兽移植 v12.11 产物专项 ==');
-check(base === 'regex-前端战斗v12_11.json' && pkg.scriptName === '前端战斗v12.11', '文件名与scriptName均为v12.11');
+const stem = base.match(/v(\d+)_(\d+)\.json$/);
+check(!!stem && pkg.scriptName === '前端战斗v' + stem[1] + '.' + stem[2], '文件名与scriptName版本同步（' + pkg.scriptName + '）');
 check(count(src, '```') === 2 && count(fenced, '```') === 2, '源码与产物均只有头尾自围栏');
 check(!immune.includes('```') && !/&(?!amp;)/.test(immune), '内部围栏加固及全量实体免疫');
 check(raw.replace(/&/g, '&amp;') === immune, '单遍实体还原逐字符一致');

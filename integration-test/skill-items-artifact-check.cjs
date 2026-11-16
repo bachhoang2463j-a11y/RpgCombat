@@ -4,7 +4,12 @@
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm'), cp = require('node:child_process');
 const ROOT = path.resolve(__dirname, '..'), source = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const sourceOnly = process.argv.includes('--source');
-const file = path.resolve(ROOT, process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'regex-前端战斗v12_11.json');
+const detectArtifact = () => {
+    const files = fs.readdirSync(ROOT).filter(f => /^regex-前端战斗(?!.*-公开版).*\.json$/.test(f));
+    if (files.length !== 1) throw new Error('根目录应有且仅有一个维护版 regex-前端战斗*.json，实际：' + files.join(', '));
+    return files[0];
+};
+const file = path.resolve(ROOT, process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : detectArtifact());
 const pkg = sourceOnly ? null : JSON.parse(fs.readFileSync(file, 'utf8'));
 const fence = pkg && pkg.replaceString, immune = fence && fence.replace(/^```[^\r\n]*\r?\n/, '').replace(/\r?\n```\s*$/, '');
 const raw = immune && immune.replace(/&amp;/g, '&');
@@ -36,7 +41,8 @@ const reuse = { ranshao:'ranshao.mp3', fire01:'fire01.mp3', explosion_aoe_blast:
 console.log('== 五项定稿与舍身 v12.11 ' + (sourceOnly ? '源码' : '产物') + '专项 ==');
 check(count(source, '```') === 2, '源码仅头尾围栏');
 if (pkg) {
-    check(path.basename(file) === 'regex-前端战斗v12_11.json' && pkg.scriptName === '前端战斗v12.11', '版本名与scriptName同步v12.11');
+    const stem = path.basename(file).match(/v(\d+)_(\d+)\.json$/);
+    check(!!stem && pkg.scriptName === '前端战斗v' + stem[1] + '.' + stem[2], '文件名与scriptName版本同步（' + pkg.scriptName + '）');
     check(count(fence, '```') === 2 && !immune.includes('```'), '产物围栏加固');
     check(!/&(?!amp;)/.test(immune) && raw.replace(/&/g, '&amp;') === immune, '全量&amp;免疫及单遍还原');
     check(!/\$[$&`'\d<]/.test(raw), '$捕获组替换免疫');

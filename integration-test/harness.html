@@ -48,10 +48,11 @@
 <script src="fixtures/summon-moments-regression.js?v=12.12"></script>
 <script src="fixtures/battle-atmosphere-regression.js"></script>
 <script src="fixtures/variant-grant-regression.js"></script>
+<script src="fixtures/bastet-conch-arsenic-regression.js"></script>
 <script>
 const TEST_PARAMS = new URLSearchParams(location.search);
 const RPG_SOURCE = TEST_PARAMS.get('artifact') !== '0'
-  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v12_14.json')
+  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v12_15.json')
   : (TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html');
 const RPG_READABLE_SOURCE = TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html';
 // 结构断言读取可读源码；行为断言始终操作 RPG_SOURCE 挂载的真实源码或压缩产物。
@@ -1275,7 +1276,8 @@ async function test21() {
   };
   const JS_MARKERS = new Set(['s-bubble','s-veins','s-tongues','s-flare','s-heal','s-cap','s-para-spark','s-para-flake',
     'arcane-sd-omen-aura','arcane-sd-body','arcane-sd-cracks','arcane-sd-core','arcane-sd-overlay',
-    'sd-fw-heat','sd-fw-billow','sd-bt-tongues','sd-bt-flare','r-shd-bloom','r-shd-arc']);
+    'sd-fw-heat','sd-fw-billow','sd-bt-tongues','sd-bt-flare','r-shd-bloom','r-shd-arc',
+    'ar-chg','ar-bullet','ar-boom','ar-splat','ar-stain','ar-bub']);
   JS_MARKERS.forEach(t => check(src.includes("querySelector('." + t + "')") || src.includes("querySelectorAll('." + t + "')") || src.includes('querySelector(".' + t + '")'), 'JS 动画定位标记确有消费者：' + t));
   JS_MARKERS.add('arcane-resist-layer');
   check(src.includes("owner.layer(html)") && src.includes("el.classList.add('arcane-resist-layer')"), '抗性层标记复用有样式的正式owner图层');
@@ -2904,13 +2906,18 @@ async function test61() {
   const result = await window.runVariantGrantRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
   eq(result.pending, [], '限时赋予专项无待对齐项');
 }
+async function test62() {
+  head('62 猫眼石、海螺、砷弹：定稿路由、灵风真音与无字近战阻挡清场');
+  const result = await window.runBastetConchArsenicRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
+  eq(result.pending, [], '三项定稿移植专项无待对齐项');
+}
 async function runAll() {
   logEl.textContent = '';
   passN = failN = 0;
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47, test48, test49, test50, test51, test52, test53, test54, test55, test56, test57, test58, test59, test60, test61];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47, test48, test49, test50, test51, test52, test53, test54, test55, test56, test57, test58, test59, test60, test61, test62];
   const selectedTests = TEST_PARAMS.has('tests') ? new Set(TEST_PARAMS.get('tests').split(',').map(n => 'test' + n)) : null;
   for (const t of tests) {
     if (selectedTests && !selectedTests.has(t.name)) continue;
