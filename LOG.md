@@ -3688,4 +3688,21 @@
 - **验证与边界**：正式 `index.html` 与 v12.15 包零修改；本轮只诊断未修复，不构建、不跑回归、不升版，不改 README/SPEC/公开版，不创建 mock/harness/服务，不改酒馆数值、不代导入、不混入已有删除/临时文件、不推送。
 - **目的 vs 现状**：②取得根因级数据交接证据，①保留未证实项；仍是故障解释，不擅自扩大为性能重构。
 
+## [LOG-302] 2026-11-17 — 编辑器草稿与实时战局数据隔离修复，发布v12.16
+
+- **业务提交**：`623ba5b`。
+- **核心目的**：根治"载入前打开设置→载入战斗→首回合 `updateActiveHeroDisplay` 访问无 DOM 编辑副本抛 `undefined.classList`"（LOG-301 ②已证实根因）；保留开场基线、保存后完整重置与既有持久化规则。用户定版：准备页与战斗中统一独立草稿（保存才生效、取消全丢弃）；正式载入/成功新YAML/重置时关闭并丢弃旧草稿。
+- **变更行为**：
+  1. index.html 独立草稿 `editorDraftHeroes/editorDraftEnemies` + 访问器 `edHeroes()/edEnemies()`、共享剥 DOM 克隆 `_cloneRosterArray`、`freezeInitialCaches` 带默认参（开场/载入无参路径不变）；openEditor 战斗中以本场基线建草稿、准备页以实时阵容建草稿、重渲染复用；实时数组全程不被交换。
+  2. 编辑器全部读写入口迁移草稿：表单渲染、syncEditorDataToMemory、角色/技能/物品/绑定增删、变体组与子用法增删折叠、toggle* 系列、头部/子技能摘要；syncSkillGroupFromChildren 保持显式实参（载入链共用）。战斗链（startRound/nextTurn/updateActiveHeroDisplay/initUI/applyPersistedRoster 等）零改动。
+  3. saveEditor：捕获草稿→persistHeroesRoster(草稿)→草稿归一化/职业收敛→freezeInitialCaches(草稿)→closeEditor→runResetPipeline；serializeHeroesForSave/persistHeroesRoster 带默认参（无参直存兼容）。closeEditor 仅关面板+closeSkillTypeCombo 清浮层+丢草稿，删除恢复赋值。失效边界：startGame 开战前、buildCombatDataFromYAML 成功尾部、runResetPipeline 重建入口。
+  4. 测试：harness 新增第 63 组 + editor-live-isolation-regression.js；适配 opening-roster/item-fx-editor/variant-grant 三夹具与 test20（源码仿真注入访问器，守卫与对照组保留）；新增产物专项 editor-live-isolation-artifact-check.cjs；harness 维护包路径 v12.15→v12.16。
+  5. 打包 v12.15→v12.16（git mv+scriptName 同步，ID 保持 98df0348…），源码 2181256→产物 1512534 字符（-31%）。
+- **涉及文件**：`index.html`、`integration-test/harness.html`、`integration-test/fixtures/editor-live-isolation-regression.js`（新）、`integration-test/editor-live-isolation-artifact-check.cjs`（新）、`integration-test/fixtures/{opening-roster,item-fx-editor,variant-grant}-regression.js`、`integration-test/fixtures/verification-v12_16.md`（新）、`regex-前端战斗v12_16.json`、`LOG.md`、`LOG-INDEX.md`。
+- **验证**：相关组 469/0；唯一源码全量（IAB 63 组）**3463/0**；产物行为回归（v12.16 压缩包 63/43/50）63/0；产物专项首轮 39/11（断言对产物空白/引号/mangle 敏感）改空白无关后 50/0。
+- **交付前简易审核与修正（仅测试侧，生产零改动）**：审核发现产物专项"编辑器区间无实时数组直读/直改"两断言在产物上因起点标记带空格 indexOf=-1、slice 空片段而假绿——修正为无空格前缀定位+起点/终点/长度哨兵（片段<10000 即 FAIL），修正后产物片段真实有效，专项 **52/0**（假绿期 50/0 结论作废）；夹具补强 25→54 断言：场景四B 敌方 AI 实际行动链进行中开关编辑器（伤害落实时体、链无 rejection）、场景四C 开窗召唤入队守卫与取消保留、场景六改真实 `startGame()` 完整路径（载入前开设置→新YAML→开战→首回合全程无 classList rejection）。复跑：源码组63 **54/0**、压缩产物组63 **54/0**（source=v12_16）、相关组子集 20/43/50/63 **87/0**。生产零改动未重跑全量（协定允许）。
+- **失败与环境记录**：IAB 宿主两次干扰（新标签 URL 回退旧地址、页面置空 stat=null），均以真实 location/title/source/组头核对未计入；本地回归服务一次终止（HTTP 000）重启后完成；全量等待中曾读到旧实例 469 残留，最终以 3463/0 与 64 组头核实。静态只读审查（独立复核）确认四阶段符合计划、无生产代码新增确定阻断；遗留一处理论边界（startGameFromWorldbook 直改实时敌方不失效草稿，但其按钮位于编辑器遮罩下不可达，旧结构遗留非本轮引入）。
+- **边界**：未跑产物全量；未改 README（待真机确认后更新）/SPEC/公开版/LLM 提示词；扫射黑块频闪（LOG-301 ①）不在本轮；未混入已有删除与 .audit-work 临时文件；未推送远程。
+- **目的 vs 现状**：数据混用根因已隔离修复并通过源码/产物双层回归；真机确认仍待用户导入 v12.16 后走原始故障路径，未验证不宣称通过。
+
 
