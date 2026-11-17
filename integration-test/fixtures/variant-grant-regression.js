@@ -123,7 +123,7 @@
       pendingSummons: pendingSummons.slice(),
       llmAlly: llmState.allyAutoSpeak, llmEnemy: llmState.enemyAutoSpeak,
       ihc: initialHeroesCache, iec: initialEnemiesCache,
-      stateValues: { ...state }, editorHeroes: editorLiveHeroes, editorEnemies: editorLiveEnemies })`);
+      stateValues: { ...state }, editorDraft: editorDraftHeroes, editorDraftE: editorDraftEnemies })`);
     const originals = new Map();
     const replace = (name, fn) => { if (!originals.has(name)) originals.set(name, w[name]); w[name] = fn; };
     const realBuffUI = w.updateBuffUI;
@@ -553,7 +553,7 @@
       /* ========== 十四、编辑器保存/重开：三槽往返与威力禁用 ========== */
       await group('编辑器 openEditor/syncEditorDataToMemory 三槽往返', async () => {
         const d = install([hero('gv0')], [entity('e_gva')]);
-        ev('state.isGameStarted=false;_pipelineFrozen=false;editorLiveHeroes=null;editorLiveEnemies=null;');
+        ev('state.isGameStarted=false;_pipelineFrozen=false;editorDraftHeroes=null;editorDraftEnemies=null;');
         d.h[0].skills = [w.parseSkill('【灵风术】[单避;power:50][单速;power:30][赋予:虚形][Turns:10][MP:10][限1次]')];
         ev('openEditor()');
         const t3 = doc.getElementById('edit-h-0-s-0-type3');
@@ -565,7 +565,7 @@
         if (t3) t3.value = '[赋予:狂暴]';
         if (st3) st3.value = '7';
         w.syncEditorDataToMemory();
-        const s0 = d.h[0].skills[0];
+        const s0 = ev('editorDraftHeroes[0].skills[0]'); // 【数据隔离】表单写回独立草稿，实时 d.h[0] 不再被就地修改
         eq(s0.type3, '[赋予:狂暴]', 'syncEditorDataToMemory 保存赋予槽改动');
         eq(s0.slotTurns3, 7, '槽位轮数写回');
         ev('openEditor()');   // 重开
@@ -574,9 +574,10 @@
         eq(t3b && t3b.value, '[赋予:狂暴]', '重开后赋予槽往返一致');
         eq(p3b && p3b.disabled, true, '重开后威力输入仍禁用');
         w.syncEditorDataToMemory();
-        eq(d.h[0].skills[0].type3, '[赋予:狂暴]', '二次保存往返一致');
+        eq(ev('editorDraftHeroes[0].skills[0].type3'), '[赋予:狂暴]', '二次保存往返一致');
         const modal = doc.getElementById('editor-modal');
         if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+        ev('editorDraftHeroes=null;editorDraftEnemies=null;'); // 防草稿跨组残留
       });
 
       /* ========== 十五、UI 契约 ========== */
@@ -676,7 +677,7 @@
         initialHeroesCache = s.ihc; initialEnemiesCache = s.iec;
         Object.assign(state, s.stateValues);
         state.actionQueue = s.stateQueue; state.queueIndex = s.stateIndex;
-        editorLiveHeroes = s.editorHeroes; editorLiveEnemies = s.editorEnemies;
+        editorDraftHeroes = s.editorDraft; editorDraftEnemies = s.editorDraftE;
         nonLethalSettings.enabled = s.nonLethal; state.isGameStarted = s.started;
         combatToken = s.token; _pipelineFrozen = s.frozen;
         pendingSummons = s.pendingSummons;

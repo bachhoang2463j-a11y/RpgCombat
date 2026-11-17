@@ -4,7 +4,7 @@
   window.runItemFxEditorRegression = async function ({ w, check, eq, mock }) {
     const ev = code => w.eval(code);
     const doc = w.document;
-    const saved = ev(`({heroesData,enemiesData,initialHeroesCache,initialEnemiesCache,editorLiveHeroes,editorLiveEnemies,
+    const saved = ev(`({heroesData,enemiesData,initialHeroesCache,initialEnemiesCache,editorDraftHeroes,editorDraftEnemies,
       state:{...state},defend:{...defendSettings},token:combatToken,frozen:_pipelineFrozen,
       battleHistory,_historyRawCache,itemBindingKnowledge,particles:fxEngine.particles.slice(),
       tab:window.__editorFactionTab})`);
@@ -15,7 +15,7 @@
     const gen0 = mock.genCount();
     try {
       w.clearArcaneFx();
-      ev('state.isGameStarted=false;editorLiveHeroes=null;editorLiveEnemies=null;');
+      ev('state.isGameStarted=false;editorDraftHeroes=null;editorDraftEnemies=null;');
       const item=w.parseItem('【蝎眼钥匙】[召唤:幻梦行军兽][单防;power:10][MP:20][高阶][延迟:0][道具][次数:1][特效:蝎眼钥匙]');
       const parent=w.parseItem('【化尘者之瓶】[道具][次数:3]');
       parent.children=[w.parseSkill('【飞沙化甲】[单防;power:50][单瞄:30][再动;power:1][MP:8][Turns:5][法术][他人][特效:飞沙化甲]')];
@@ -56,7 +56,7 @@
       w.localStorage.clear();Object.entries(storage).forEach(([key,value])=>w.localStorage.setItem(key,value));
       w.__itemFxRestore=saved;
       ev(`(()=>{const s=window.__itemFxRestore;
-        ({heroesData,enemiesData,initialHeroesCache,initialEnemiesCache,editorLiveHeroes,editorLiveEnemies,battleHistory,_historyRawCache,itemBindingKnowledge}=s);
+        ({heroesData,enemiesData,initialHeroesCache,initialEnemiesCache,editorDraftHeroes,editorDraftEnemies,battleHistory,_historyRawCache,itemBindingKnowledge}=s);
         for(const key of Object.keys(state))delete state[key];Object.assign(state,s.state);
         for(const key of Object.keys(defendSettings))delete defendSettings[key];Object.assign(defendSettings,s.defend);
         combatToken=s.token;_pipelineFrozen=s.frozen;fxEngine.particles=s.particles;window.__editorFactionTab=s.tab;

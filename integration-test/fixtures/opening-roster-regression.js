@@ -6,7 +6,7 @@ window.runOpeningRosterRegression = async function ({ w, check, eq, mock, mountF
   frame.style.cssText = 'width:640px;height:420px;';
   document.getElementById('frames').appendChild(frame);
   const previousVars = mock.api.getVariables({ type: 'chat' });
-  w.eval('window.__odState = { heroesData, enemiesData, initialHeroesCache, initialEnemiesCache, itemBindingKnowledge, battleHistory, state: {...state}, editorLiveHeroes, editorLiveEnemies };');
+  w.eval('window.__odState = { heroesData, enemiesData, initialHeroesCache, initialEnemiesCache, itemBindingKnowledge, battleHistory, state: {...state}, editorDraftHeroes, editorDraftEnemies };');
   try {
     mock.resetVars();
     mock.api.createChatMessages = async () => {};
@@ -50,7 +50,7 @@ window.runOpeningRosterRegression = async function ({ w, check, eq, mock, mountF
     const slot2 = dom.getElementById('edit-h-0-s-' + sIndex + '-slot-turns2');
     eq(slot2.value, '2', '技能编辑器自盲回合框真实显示2，而非占位默认');
     w.syncEditorDataToMemory();
-    w.persistHeroesRoster();
+    w.persistHeroesRoster(w.eval('editorDraftHeroes')); // 【数据隔离】草稿打开期间必须显式保存草稿，无参会误存旧实时数组
     w.closeEditor();
     w.onCombatDataReceived(yaml);
     eq(w.eval('heroesData[0].skills.find(s=>s.name==="战意激增").slotTurns2'), 2, '编辑器同步、保存、再次读回后自盲仍2回合');
@@ -74,7 +74,7 @@ window.runOpeningRosterRegression = async function ({ w, check, eq, mock, mountF
   } finally {
     delete mock.api.createChatMessages;
     mock.api.replaceVariables(previousVars, { type: 'chat' });
-    w.eval('({heroesData,enemiesData,initialHeroesCache,initialEnemiesCache,itemBindingKnowledge,battleHistory,editorLiveHeroes,editorLiveEnemies}=window.__odState);Object.assign(state,window.__odState.state);delete window.__odState;');
+    w.eval('({heroesData,enemiesData,initialHeroesCache,initialEnemiesCache,itemBindingKnowledge,battleHistory,editorDraftHeroes,editorDraftEnemies}=window.__odState);Object.assign(state,window.__odState.state);delete window.__odState;');
     frame.remove();
   }
 };

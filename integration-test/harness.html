@@ -49,10 +49,11 @@
 <script src="fixtures/battle-atmosphere-regression.js"></script>
 <script src="fixtures/variant-grant-regression.js"></script>
 <script src="fixtures/bastet-conch-arsenic-regression.js"></script>
+<script src="fixtures/editor-live-isolation-regression.js"></script>
 <script>
 const TEST_PARAMS = new URLSearchParams(location.search);
 const RPG_SOURCE = TEST_PARAMS.get('artifact') !== '0'
-  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v12_15.json')
+  ? (TEST_PARAMS.get('version') === 'public' ? '../regex-前端战斗v11_2-公开版.json' : '../regex-前端战斗v12_16.json')
   : (TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html');
 const RPG_READABLE_SOURCE = TEST_PARAMS.get('version') === 'public' ? '../index-公开版.html' : '../index.html';
 // 结构断言读取可读源码；行为断言始终操作 RPG_SOURCE 挂载的真实源码或压缩产物。
@@ -1206,7 +1207,8 @@ async function test20() {
     { name: 'SUMMON', hp: 123, skills: [{ name: 'guard' }] }
   ];
   let threw = null;
-  try { new Function('heroesData', 'enemiesData', 'document', fnSrc + '\nsyncEditorDataToMemory();')(heroesData, enemiesData, stubDoc); }
+  // 【数据隔离】syncEditorDataToMemory 经 edHeroes/edEnemies 访问器取数组：仿真注入恒等访问器（返回实参数组）
+  try { new Function('heroesData', 'enemiesData', 'edHeroes', 'edEnemies', 'document', fnSrc + '\nsyncEditorDataToMemory();')(heroesData, enemiesData, () => heroesData, () => enemiesData, stubDoc); }
   catch (e) { threw = e; }
   check(!threw, '发散场景不抛错（守卫生效）' + (threw ? '  实际: ' + threw.message : ''));
   eq(enemiesData[1].hp, 123, '召唤物运行时数据未被表单覆盖（守卫跳过）');
@@ -1216,8 +1218,8 @@ async function test20() {
   const stripped = fnSrc.replace(/^.*if \(!document\.getElementById\(`edit-[he]-\$\{i\}(-s-\$\{si\})?-name`\)\) return.*$/gm, '');
   check(stripped.length < fnSrc.length, '对照组成功剥除守卫行');
   let threwCtrl = null;
-  try { new Function('heroesData', 'enemiesData', 'document', stripped + '\nsyncEditorDataToMemory();')(
-    JSON.parse(JSON.stringify(heroesData)), JSON.parse(JSON.stringify(enemiesData)), stubDoc); }
+  try { new Function('heroesData', 'enemiesData', 'edHeroes', 'edEnemies', 'document', stripped + '\nsyncEditorDataToMemory();')(
+    JSON.parse(JSON.stringify(heroesData)), JSON.parse(JSON.stringify(enemiesData)), () => heroesData, () => enemiesData, stubDoc); }
   catch (e) { threwCtrl = e; }
   check(threwCtrl instanceof TypeError && /null/.test(String(threwCtrl.message)), '对照组（无守卫）抛 null TypeError（仿真有效）' + (threwCtrl ? '' : '  实际未抛'));
 }
@@ -2911,13 +2913,19 @@ async function test62() {
   const result = await window.runBastetConchArsenicRegression({ w:rpgWin(), check, eq, mock:MOCK, source:await readRpgSource() });
   eq(result.pending, [], '三项定稿移植专项无待对齐项');
 }
+async function test63() {
+  head('63 编辑器数据隔离：草稿独立、取消不回滚、保存交接与载入/重置边界');
+  if (TEST_PARAMS.get('version') === 'public') return;
+  // 顶层词法变量名在产物中不被 mangle（build-regex 未开 toplevel mangle），行为断言在源码与压缩产物上均可运行
+  await window.runEditorLiveIsolationRegression({ w:rpgWin(), check, eq, mock:MOCK });
+}
 async function runAll() {
   logEl.textContent = '';
   passN = failN = 0;
   const statEl = document.getElementById('stat');
   statEl.className = 'info';
   statEl.textContent = '运行中…';
-  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47, test48, test49, test50, test51, test52, test53, test54, test55, test56, test57, test58, test59, test60, test61, test62];
+  const tests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47, test48, test49, test50, test51, test52, test53, test54, test55, test56, test57, test58, test59, test60, test61, test62, test63];
   const selectedTests = TEST_PARAMS.has('tests') ? new Set(TEST_PARAMS.get('tests').split(',').map(n => 'test' + n)) : null;
   for (const t of tests) {
     if (selectedTests && !selectedTests.has(t.name)) continue;

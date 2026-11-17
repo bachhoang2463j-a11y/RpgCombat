@@ -18415,10 +18415,13 @@ let initialHeroesCache = []; let initialEnemiesCache = [];
 
 // R03 开场真值：冻结本场重置基线。权威覆盖（状态栏数值 / 商店受管物品 / 战斗态清零）全部完成后调用。
 // 深拷贝时剥除 DOM 引用（h.dom / e.dom，避免 JSON 循环），其余字段照旧进入基线供 resetBattle 恢复。
-function freezeInitialCaches() {
-  const _stripDom = (k, v) => (k === 'dom' ? undefined : v);
-  initialHeroesCache = JSON.parse(JSON.stringify(heroesData, _stripDom));
-  initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData, _stripDom));
+// 带参形式供 saveEditor 把编辑器草稿固化为新基线；无参默认仍冻结当前实时数组（开场/载入路径不变）。
+function _cloneRosterArray(arr) {
+  return JSON.parse(JSON.stringify(arr, (k, v) => (k === 'dom' ? undefined : v)));
+}
+function freezeInitialCaches(heroes = heroesData, enemies = enemiesData) {
+  initialHeroesCache = _cloneRosterArray(heroes);
+  initialEnemiesCache = _cloneRosterArray(enemies);
 }
 console.log('CRITICAL_LOG: 2. Before state initialization');
 const state = { round: 1, actionQueue: [], queueIndex: 0, isGameStarted: false, isAnimating: false, isTargeting: false, pendingAction: null, usedExtraTurnSkillsThisRound: new Set(), highTierNarrated: new Set() };
@@ -19339,6 +19342,7 @@ function buildCombatDataFromYAML(yamlContent) {
         assignEnemyRows();
         initialHeroesCache = JSON.parse(JSON.stringify(heroesData)); initialEnemiesCache = JSON.parse(JSON.stringify(enemiesData));
         setBattleAtmosphereData(block['战场氛围']);
+        closeEditor(); // 【数据隔离】成功载入新战局后旧编辑草稿失效（防旧表单覆盖新数据）
         return true;
     } catch (e) { console.error('Combat_block 构建失败:', e); return false; }
 }
@@ -25155,6 +25159,7 @@ async function triggerBurstIfNeeded(caster) {
 // 战斗流程与结算控制
 // ==========================================
 function startGame() {
+  closeEditor(); // 【数据隔离】正式开战前关闭并丢弃遗留编辑草稿（覆盖"载入前开设置→载入战斗"的原始故障边界）
   state.isGameStarted = true;
   combatToken = {}; _pipelineFrozen = false; // 新战局换新代际令牌：作废上一场残留的回合链
   clearArcaneFx();
@@ -27451,6 +27456,7 @@ function closeSkillMenu() { closeAllSubMenus(); }
 //  6) 清召唤 pending、全队屏障、制服胜利标志、高阶旁白去重表、行动队列，回合状态归 1，重建 UI。
 // ==========================================
 function runResetPipeline() {
+  closeEditor(); // 【数据隔离】重置/保存交接丢弃编辑草稿（saveEditor 已先固化新基线，此处幂等）
   // 1) 换代际令牌 + 冻结推进
   combatToken = {};
   _pipelineFrozen = true;
@@ -27684,22 +27690,24 @@ document.addEventListener('mousedown', function (e) {
   closeSkillTypeCombo();
 });
 
-// 【保存基线】编辑器工作副本暂存：非 null 表示编辑器正以基线副本运行（战斗中打开），
-// heroesData/enemiesData 此时指向副本，实时战斗数组暂存于此，closeEditor 时恢复
-let editorLiveHeroes = null;
-let editorLiveEnemies = null;
+// 【数据隔离】编辑器独立草稿：非 null 表示编辑器面板正打开。草稿只在保存时经重置管线合入战局，
+// 实时 heroesData/enemiesData 全程不被交换（回合队列/战场 DOM 引用恒定，修复"开设置后载入战斗首回合 classList 报错"根因）。
+let editorDraftHeroes = null;
+let editorDraftEnemies = null;
+// 编辑器数据源访问器：面板打开期间一律读草稿；关闭后回落实时数组。编辑器可达的表单/增删/折叠/摘要函数只经此取数组。
+const edHeroes = () => editorDraftHeroes || heroesData;
+const edEnemies = () => editorDraftEnemies || enemiesData;
 function openEditor(keepScroll) {
   const modal = document.getElementById('editor-modal');
   modal.onclick = null; // 清除 showEnemyInfo 遗留的遮罩关闭处理器，防点击输入框冒泡误关编辑器
   modal.classList.remove('hidden');
   modal.classList.add('flex');
-  // 【保存基线】战斗进行中打开编辑器：切换到"本场开场基线"的工作副本（表单显示开场值，战斗中的 HP/属性/道具消耗变动不进表单），
-  // 只有用户在编辑器里改动的值才会在保存时合入新基线；取消关闭即丢弃副本恢复实时数组。
-  // 未开战时实时数组即基线，沿用原行为。editorLiveHeroes 判空防止 openEditor 重渲染（增删技能等）时重拷丢失已编辑内容。
-  if (state.isGameStarted && !editorLiveHeroes) {
-    editorLiveHeroes = heroesData; editorLiveEnemies = enemiesData;
-    heroesData = JSON.parse(JSON.stringify(initialHeroesCache));
-    enemiesData = JSON.parse(JSON.stringify(initialEnemiesCache));
+  // 【数据隔离】首次打开建草稿：战斗中以本场开场基线为源（表单显示开场值，战斗中的 HP/属性/道具消耗变动不进表单）；
+  // 准备页以当前实时阵容为源（含 YAML/roster 合并结果）。重渲染（增删技能等）复用现有草稿，不丢已编辑内容。
+  // 准备页与战斗中统一"保存才生效、取消全丢弃"（用户定版），不再提前改动实时数组。
+  if (!editorDraftHeroes) {
+    editorDraftHeroes = _cloneRosterArray(state.isGameStarted ? initialHeroesCache : heroesData);
+    editorDraftEnemies = _cloneRosterArray(state.isGameStarted ? initialEnemiesCache : enemiesData);
   }
   let savedScrollTop = 0;
   if (keepScroll) {
@@ -27725,11 +27733,11 @@ function openEditor(keepScroll) {
 
   // 原生阵营 Tab 栏
   var _curTab = window.__editorFactionTab; if (!_curTab) _curTab = 'hero';
-  html += `<div class="flex items-center justify-between gap-2 border-b border-slate-700/50 pb-1.5"><div class="flex items-center gap-1 p-0.5 bg-slate-900/90 rounded-lg border border-slate-700/70"><button id="tab-btn-heroes" onclick="switchPartyTab('hero')" class="px-2.5 py-1 rounded text-xs font-bold transition-all ${_curTab === 'hero' ? 'bg-cyan-950 text-cyan-300 border border-cyan-600/50 shadow' : 'text-slate-400 hover:text-cyan-300 hover:bg-cyan-950/40'} flex items-center gap-1"><span>🛡️</span> 我方英雄 <span id="hero-count-badge" class="px-1 py-0.2 rounded-full bg-cyan-500/20 text-[9px] font-mono-num">${heroesData.length}</span></button><button id="tab-btn-enemies" onclick="switchPartyTab('enemy')" class="px-2.5 py-1 rounded text-xs font-bold transition-all ${_curTab === 'enemy' ? 'bg-rose-950 text-rose-300 border border-rose-600/50 shadow' : 'text-slate-400 hover:text-rose-300 hover:bg-rose-950/40'} flex items-center gap-1"><span>👾</span> 敌方单位 <span id="enemy-count-badge" class="px-1 py-0.2 rounded-full bg-rose-500/20 text-[9px] font-mono-num text-rose-300">${enemiesData.length}</span></button></div><button id="add-entity-btn" onclick="addNewEntityFromTab()" class="px-2.5 py-1 ${_curTab === 'enemy' ? 'bg-rose-900/60 hover:bg-rose-800 text-rose-200 border-rose-500/40' : 'bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 border-cyan-500/40'} text-xs font-bold rounded border transition-all flex items-center gap-1 shadow-sm"><span>+</span> ${_curTab === 'enemy' ? '添加敌方怪物' : '添加我方角色'}</button></div>`;
+  html += `<div class="flex items-center justify-between gap-2 border-b border-slate-700/50 pb-1.5"><div class="flex items-center gap-1 p-0.5 bg-slate-900/90 rounded-lg border border-slate-700/70"><button id="tab-btn-heroes" onclick="switchPartyTab('hero')" class="px-2.5 py-1 rounded text-xs font-bold transition-all ${_curTab === 'hero' ? 'bg-cyan-950 text-cyan-300 border border-cyan-600/50 shadow' : 'text-slate-400 hover:text-cyan-300 hover:bg-cyan-950/40'} flex items-center gap-1"><span>🛡️</span> 我方英雄 <span id="hero-count-badge" class="px-1 py-0.2 rounded-full bg-cyan-500/20 text-[9px] font-mono-num">${edHeroes().length}</span></button><button id="tab-btn-enemies" onclick="switchPartyTab('enemy')" class="px-2.5 py-1 rounded text-xs font-bold transition-all ${_curTab === 'enemy' ? 'bg-rose-950 text-rose-300 border border-rose-600/50 shadow' : 'text-slate-400 hover:text-rose-300 hover:bg-rose-950/40'} flex items-center gap-1"><span>👾</span> 敌方单位 <span id="enemy-count-badge" class="px-1 py-0.2 rounded-full bg-rose-500/20 text-[9px] font-mono-num text-rose-300">${edEnemies().length}</span></button></div><button id="add-entity-btn" onclick="addNewEntityFromTab()" class="px-2.5 py-1 ${_curTab === 'enemy' ? 'bg-rose-900/60 hover:bg-rose-800 text-rose-200 border-rose-500/40' : 'bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 border-cyan-500/40'} text-xs font-bold rounded border transition-all flex items-center gap-1 shadow-sm"><span>+</span> ${_curTab === 'enemy' ? '添加敌方怪物' : '添加我方角色'}</button></div>`;
 
   // 我方英雄列表
   html += `<div id="heroes-list-container" class="space-y-2.5 ${_curTab === 'hero' ? '' : 'hidden'}">`;
-  heroesData.forEach((h, i) => {
+  edHeroes().forEach((h, i) => {
     var isExp = !!h.isExpanded;
     var _hName = h.name || '未命名';
     var _hClass = h.classType || '无职业';
@@ -28019,7 +28027,7 @@ function openEditor(keepScroll) {
 
   // 敌方单位列表
   html += `<div id="enemies-list-container" class="space-y-2.5 ${_curTab === 'enemy' ? '' : 'hidden'}">`;
-  enemiesData.forEach((e, i) => {
+  edEnemies().forEach((e, i) => {
     var isExp = !!e.isExpanded;
     var _eName = e.name || '未命名怪物';
     var _eEmoji = e.emoji || '👾';
@@ -28252,7 +28260,7 @@ function addNewEntityFromTab() {
 
 function toggleCharFold(kind, idx) {
   var isHero = kind === 'hero';
-  var dataList = isHero ? heroesData : enemiesData;
+  var dataList = isHero ? edHeroes() : edEnemies();
   if (!dataList || !dataList[idx]) return;
   var ent = dataList[idx];
   ent.isExpanded = !ent.isExpanded;
@@ -28274,7 +28282,7 @@ function toggleCharFold(kind, idx) {
 
 function toggleSkillFold(partyType, entityIdx, skillIdx) {
   var isHero = partyType === 'hero';
-  var dataList = isHero ? heroesData : enemiesData;
+  var dataList = isHero ? edHeroes() : edEnemies();
   if (!dataList || !dataList[entityIdx]) return;
   var ent = dataList[entityIdx];
   if (!ent.skills || !ent.skills[skillIdx]) return;
@@ -28297,8 +28305,8 @@ function toggleSkillFold(partyType, entityIdx, skillIdx) {
 }
 
 function toggleItemFold(entityIdx, itemIdx) {
-  if (!heroesData || !heroesData[entityIdx]) return;
-  var ent = heroesData[entityIdx];
+  if (!edHeroes() || !edHeroes()[entityIdx]) return;
+  var ent = edHeroes()[entityIdx];
   if (!ent.items || !ent.items[itemIdx]) return;
   var it = ent.items[itemIdx];
   it.isExpanded = !it.isExpanded;
@@ -28324,7 +28332,7 @@ function toggleItemFold(entityIdx, itemIdx) {
 // 增删走"先 syncEditorDataToMemory 再 openEditor() 重建"模式（与 addHeroSkill 同规范）。
 // ==========================================
 function toggleHeroSubSkillFold(hi, si, ci) {
-  var h = heroesData[hi]; if (!h || !h.skills) return;
+  var h = edHeroes()[hi]; if (!h || !h.skills) return;
   var parent = h.skills[si]; if (!parent || !parent.children) return;
   var c = parent.children[ci]; if (!c) return;
   c.isExpanded = !c.isExpanded;
@@ -28337,7 +28345,7 @@ function toggleHeroSubSkillFold(hi, si, ci) {
 }
 
 function toggleHeroItemSubSkillFold(hi, ii, ci) {
-  var h = heroesData[hi]; if (!h || !h.items) return;
+  var h = edHeroes()[hi]; if (!h || !h.items) return;
   var it = h.items[ii]; if (!it || !it.children) return;
   var c = it.children[ci]; if (!c) return;
   c.isExpanded = !c.isExpanded;
@@ -28356,26 +28364,26 @@ function _newSkillObj(displayName) {
 
 function addHeroSubSkill(hi, si) {
   syncEditorDataToMemory();
-  var parent = heroesData[hi] && heroesData[hi].skills[si];
+  var parent = edHeroes()[hi] && edHeroes()[hi].skills[si];
   if (!parent) return;
   if (!parent.isGroup) { parent.isGroup = true; if (!parent.children) parent.children = []; }
   parent.children.push(Object.assign(_newSkillObj('新变体'), { _inGroup: true, parentName: parent.name, isExpanded: true }));
-  syncSkillGroupFromChildren(heroesData[hi], parent);
+  syncSkillGroupFromChildren(edHeroes()[hi], parent);
   openEditor();
 }
 
 function removeHeroSubSkill(hi, si, ci) {
   syncEditorDataToMemory();
-  var parent = heroesData[hi] && heroesData[hi].skills[si];
+  var parent = edHeroes()[hi] && edHeroes()[hi].skills[si];
   if (!parent || !parent.children) return;
   parent.children.splice(ci, 1);
-  syncSkillGroupFromChildren(heroesData[hi], parent);
+  syncSkillGroupFromChildren(edHeroes()[hi], parent);
   openEditor();
 }
 
 function addHeroItemSubSkill(hi, ii) {
   syncEditorDataToMemory();
-  var it = heroesData[hi] && heroesData[hi].items && heroesData[hi].items[ii];
+  var it = edHeroes()[hi] && edHeroes()[hi].items && edHeroes()[hi].items[ii];
   if (!it) return;
   if (!it.children) it.children = [];
   it.children.push(Object.assign(_newSkillObj('新用法'), { isExpanded: true }));
@@ -28384,7 +28392,7 @@ function addHeroItemSubSkill(hi, ii) {
 
 function removeHeroItemSubSkill(hi, ii, ci) {
   syncEditorDataToMemory();
-  var it = heroesData[hi] && heroesData[hi].items && heroesData[hi].items[ii];
+  var it = edHeroes()[hi] && edHeroes()[hi].items && edHeroes()[hi].items[ii];
   if (!it || !it.children) return;
   it.children.splice(ci, 1);
   openEditor();
@@ -28412,7 +28420,7 @@ function syncSkillGroupFromChildren(hero, parent) {
 
 // 子技能头部摘要（名称/标签/MP 即时回显到子卡折叠头）
 function updateHeroSubSkillHeaderSummary(hi, si, ci) {
-  var parent = heroesData[hi] && heroesData[hi].skills && heroesData[hi].skills[si];
+  var parent = edHeroes()[hi] && edHeroes()[hi].skills && edHeroes()[hi].skills[si];
   var c = parent && parent.children && parent.children[ci];
   if (!c) return;
   var card = document.getElementById(`hero-${hi}-s-${si}-sub-${ci}`);
@@ -28444,7 +28452,7 @@ function onItemCategoryChange(hi, ii) {  const catEl = document.getElementById(`
 
 function toggleAllEntitySkills(partyType, entityIdx, expand) {
   var isHero = partyType === 'hero';
-  var dataList = isHero ? heroesData : enemiesData;
+  var dataList = isHero ? edHeroes() : edEnemies();
   if (!dataList || !dataList[entityIdx]) return;
   var ent = dataList[entityIdx];
   if (!ent.skills) return;
@@ -28506,11 +28514,11 @@ function updateEnemyHeaderSummary(i) {
   var eName = document.getElementById('enemy-header-name-' + i); if (eName && nameEl) eName.textContent = nameEl.value || '未命名怪物';
   var eTier = document.getElementById('enemy-header-tier-' + i);
   if (eTier) {
-    var tierTarget = Object.assign({}, enemiesData[i], {
-      maxHp: Number(maxHpEl && maxHpEl.value) || enemiesData[i].maxHp,
-      atk: Number(document.getElementById('edit-e-' + i + '-atk').value) || enemiesData[i].atk,
-      def: Number(document.getElementById('edit-e-' + i + '-def').value) || enemiesData[i].def,
-      actCount: Number(document.getElementById('edit-e-' + i + '-act') && document.getElementById('edit-e-' + i + '-act').value) || enemiesData[i].actCount
+    var tierTarget = Object.assign({}, edEnemies()[i], {
+      maxHp: Number(maxHpEl && maxHpEl.value) || edEnemies()[i].maxHp,
+      atk: Number(document.getElementById('edit-e-' + i + '-atk').value) || edEnemies()[i].atk,
+      def: Number(document.getElementById('edit-e-' + i + '-def').value) || edEnemies()[i].def,
+      actCount: Number(document.getElementById('edit-e-' + i + '-act') && document.getElementById('edit-e-' + i + '-act').value) || edEnemies()[i].actCount
     });
     var tier = getEnemyTier(tierTarget);
     eTier.textContent = getEnemyTierLabel(tier);
@@ -28573,11 +28581,10 @@ function updateEnemySkillHeaderSummary(i, si) {
 function closeEditor() {
   document.getElementById('editor-modal').classList.add('hidden');
   document.getElementById('editor-modal').classList.remove('flex');
-  // 丢弃未保存的工作副本：恢复战斗中的实时数组（保存路径已在 saveEditor 内接管副本数据后才走到这里）
-  if (editorLiveHeroes) {
-    heroesData = editorLiveHeroes; enemiesData = editorLiveEnemies;
-    editorLiveHeroes = null; editorLiveEnemies = null;
-  }
+  closeSkillTypeCombo(); // 清除挂在 body 的标签搜索浮层，防其继续引用已失效的表单控件
+  // 【数据隔离】仅丢弃草稿：实时 heroesData/enemiesData 从未被交换，无需恢复；
+  // 开窗期间的伤害/冷却/召唤等战斗进展天然保留（不再被"恢复旧数组"覆盖）
+  editorDraftHeroes = null; editorDraftEnemies = null;
 }
 
 function toggleGlobalEditor() {
@@ -28610,7 +28617,7 @@ function syncGlobalEditorSummary() {
 }
 
 function syncEditorDataToMemory() {
-  heroesData.forEach((h, i) => {
+  edHeroes().forEach((h, i) => {
     // 守卫：编辑器打开期间战斗新增的召唤物无表单（DOM 与实时数组发散），跳过以免读 null.value 崩掉保存
     if (!document.getElementById(`edit-h-${i}-name`)) return;
     h.name = document.getElementById(`edit-h-${i}-name`).value;
@@ -28864,7 +28871,7 @@ function syncEditorDataToMemory() {
     // 组父技能与平铺子技能关系重排（children 为权威源：改名/增删后保证平铺顺序与 parentName 一致）
     h.skills.forEach(s => { if (s.isGroup) syncSkillGroupFromChildren(h, s); });
   });
-  enemiesData.forEach((e, i) => {
+  edEnemies().forEach((e, i) => {
     // 守卫：编辑器打开期间战斗新增的召唤物无表单（DOM 与实时数组发散），跳过以免读 null.value 崩掉保存
     if (!document.getElementById(`edit-e-${i}-name`)) return;
     e.name = document.getElementById(`edit-e-${i}-name`).value;
@@ -28944,8 +28951,12 @@ function saveEditor() {
   try { if (typeof _strafeLock !== 'undefined') _strafeLock = false; } catch(e) {}
   try { const _ov = document.querySelector('.strafe-blood-overlay'); if (_ov) _ov.remove(); if (typeof _strafeBloodOverlay !== 'undefined' && _strafeBloodOverlay) { try { _strafeBloodOverlay.remove(); } catch(e2) {} _strafeBloodOverlay = null; } } catch(e) {}
   try { document.querySelectorAll('.melee-heavy-flash,.melee-heavy-wrap').forEach(el=>el.remove()); document.getElementById('battle-scene')?.classList.remove('melee-heavy-shake'); } catch(e) {}
-  try { heroesData.forEach(h => h.skills && h.skills.forEach(s => { delete s._fxPlayed; delete s._strafeBurstStart; delete s._arcaneFx; })); } catch(e) {}
-  try { enemiesData.forEach(e2 => e2.skills && e2.skills.forEach(s => { delete s._fxPlayed; delete s._strafeBurstStart; delete s._arcaneFx; })); } catch(e) {}
+  // 【数据隔离】捕获本次草稿引用：以下清扫/归一化/持久化/新基线只操作草稿；
+  // 编辑器未打开时回落实时数组（直存调用兼容，与旧无参语义一致）
+  const _draftH = editorDraftHeroes || heroesData;
+  const _draftE = editorDraftEnemies || enemiesData;
+  try { _draftH.forEach(h => h.skills && h.skills.forEach(s => { delete s._fxPlayed; delete s._strafeBurstStart; delete s._arcaneFx; })); } catch(e) {}
+  try { _draftE.forEach(e2 => e2.skills && e2.skills.forEach(s => { delete s._fxPlayed; delete s._strafeBurstStart; delete s._arcaneFx; })); } catch(e) {}
   syncEditorDataToMemory();
   defendSettings.mpRecoverPct = clampPct(document.getElementById('edit-defend-mp-pct').value);
   defendSettings.tpRecoverPct = clampPct(document.getElementById('edit-defend-tp-pct').value);
@@ -28958,10 +28969,10 @@ function saveEditor() {
   defendSettings.mutationEnabled = document.getElementById('edit-mutation-enabled').checked;
   defendSettings.mutationPercent = Math.max(0, Math.min(100, Number(document.getElementById('edit-mutation-percent').value) || 0));
   persistDefendSettings();
-  persistHeroesRoster();
-  // 以下 heroesData/enemiesData 在战斗中为编辑器基线副本（开场基线 + 本次编辑），未开战时即实时数组；
-  // 战斗中的 HP/属性/道具消耗变动已被工作副本隔离，不会混入新基线
-  heroesData.forEach(h => {
+  persistHeroesRoster(_draftH);
+  // 【数据隔离】以下归一化/职业收敛只操作草稿（战斗中=开场基线+本次编辑；准备页=当前阵容草稿）；
+  // 实时 heroesData/enemiesData 由 runResetPipeline 从新基线重建，开窗期间的战斗消耗不混入新基线
+  _draftH.forEach(h => {
     if(h.hp > h.maxHp) h.hp = h.maxHp;
     if(h.mp > h.maxMp) h.mp = h.maxMp;
     h.isAlive = h.hp > 0;
@@ -28980,7 +28991,7 @@ function saveEditor() {
     h.currentDelay = null; // 蓄力中状态不得进入新基线
     delete h.stealthHitThisRound;
   });
-  enemiesData.forEach(e => {
+  _draftE.forEach(e => {
     if(e.hp > e.maxHp) e.hp = e.maxHp;
     if(e.mp > e.maxMp) e.mp = e.maxMp;
     e.isAlive = e.hp > 0;
@@ -28999,9 +29010,9 @@ function saveEditor() {
     delete e.molted; delete e.linked; delete e.hasRageNarrated;
     delete e._sdContestFailed;
   });
-  freezeInitialCaches();
+  freezeInitialCaches(_draftH, _draftE);
   const _wasStarted = state.isGameStarted;
-  closeEditor(); // 战斗中：丢弃工作副本恢复实时数组（随后由重置管线从新基线重建）
+  closeEditor(); // 【数据隔离】关闭面板并丢弃草稿（新基线已固化，实时数组随后由重置管线从新基线重建）
   runResetPipeline(); // 保存 = 刷新技能/数据 + 完整重置（清弹窗/蓄力/道具变动/屏障，冻结回合管线）
   if (_wasStarted) {
     showLog("设置已保存，战斗已重置！");
@@ -29010,20 +29021,20 @@ function saveEditor() {
     showLog("设置已保存！");
   }
 }
-function addHeroSkill(hi) { syncEditorDataToMemory(); heroesData[hi].skills.push({ name: '新技能', isReaction: false, reactionTarget: 'all', kanpoTarget: null, sheshenTarget: null, isOthers: false, guaranteedHit: false, switchTarget: false, critRate: 0, isHighTier: false, isLegendary: false, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, hit: 100, delay: 0, haste: 0, summonTarget: null }); openEditor(); }
-function removeHeroSkill(hi, si) { syncEditorDataToMemory(); heroesData[hi].skills.splice(si, 1); openEditor(); }
+function addHeroSkill(hi) { syncEditorDataToMemory(); edHeroes()[hi].skills.push({ name: '新技能', isReaction: false, reactionTarget: 'all', kanpoTarget: null, sheshenTarget: null, isOthers: false, guaranteedHit: false, switchTarget: false, critRate: 0, isHighTier: false, isLegendary: false, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, hit: 100, delay: 0, haste: 0, summonTarget: null }); openEditor(); }
+function removeHeroSkill(hi, si) { syncEditorDataToMemory(); edHeroes()[hi].skills.splice(si, 1); openEditor(); }
 // 物品增删：默认新建一个 [单回] 道具（次数 1），与技能增删同样先同步再重建编辑器
-function addHeroItem(hi) { syncEditorDataToMemory(); if (!heroesData[hi].items) heroesData[hi].items = []; heroesData[hi].items.push({ isItem: true, name: '新物品', category: '道具', count: 1, maxUses: 1, usesRemaining: 1, bindings: [], type: '[单回]', power: 30, type2: '[无]', power2: 0, type3: '[无]', power3: 0, hit: 100, turns: null, isOthers: false, guaranteedHit: false, switchTarget: false, critRate: 0, fxTag: null, damageType: null, isExpanded: true }); openEditor(); }
-function removeHeroItem(hi, ii) { syncEditorDataToMemory(); heroesData[hi].items.splice(ii, 1); openEditor(); }
+function addHeroItem(hi) { syncEditorDataToMemory(); if (!edHeroes()[hi].items) edHeroes()[hi].items = []; edHeroes()[hi].items.push({ isItem: true, name: '新物品', category: '道具', count: 1, maxUses: 1, usesRemaining: 1, bindings: [], type: '[单回]', power: 30, type2: '[无]', power2: 0, type3: '[无]', power3: 0, hit: 100, turns: null, isOthers: false, guaranteedHit: false, switchTarget: false, critRate: 0, fxTag: null, damageType: null, isExpanded: true }); openEditor(); }
+function removeHeroItem(hi, ii) { syncEditorDataToMemory(); edHeroes()[hi].items.splice(ii, 1); openEditor(); }
 // 弹药绑定行增删：先同步当前表单到内存（保留已填绑定），再变更数量并重渲染
-function addItemBinding(hi, ii) { syncEditorDataToMemory(); heroesData[hi].items[ii].bindings.push({ skillName: (heroesData[hi].skills[0] && heroesData[hi].skills[0].name) || '', cost: 1 }); openEditor(); }
-function removeItemBinding(hi, ii, bi) { syncEditorDataToMemory(); heroesData[hi].items[ii].bindings.splice(bi, 1); openEditor(); }
-function addEnemySkill(ei) { syncEditorDataToMemory(); enemiesData[ei].skills.push({ name: '新技能', isOthers: false, guaranteedHit: false, switchTarget: false, critRate: 0, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, charge: 0, hit: 100, summonTarget: null }); openEditor(); }
-function removeEnemySkill(ei, si) { syncEditorDataToMemory(); enemiesData[ei].skills.splice(si, 1); openEditor(); }
-function addHero() { syncEditorDataToMemory(); heroesData.push({ id: 'h' + Date.now(), name: '新角色', img: DEFAULT_HERO_IMG, classType: null, hp: 400, maxHp: 400, mp: 200, maxMp: 200, tp: 0, maxTp: 100, atk: 80, def: 30, spd: 100, shield: 0, actCount: 1, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, burstActivated: false, skills: [ { name: '攻击', isReaction: false, reactionTarget: 'all', damageType: null, fxTag: null, guaranteedHit: false, switchTarget: false, critRate: 0, cost: 0, hpCost: 0, tpCost: 0, hit: 100, type: '[单体]', power: 60, type2: '[无]', power2: 0, type3: '[无]', power3: 0 } ], items: [] }); openEditor(); }
-function removeHero(i) { if (heroesData.length <= 1) return alert("至少保留一名我方！"); if (confirm("删除角色？")) { syncEditorDataToMemory(); heroesData.splice(i, 1); openEditor(); } }
-function addEnemy() { syncEditorDataToMemory(); enemiesData.push({ id: 'e' + Date.now(), name: '新怪物', emoji: '👾', classType: null, hp: 500, maxHp: 500, mp: 200, maxMp: 200, size: 'text-5xl', atk: 90, def: 20, spd: 90, shield: 0, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, currentCharge: 0, isWise: false, row: 'front', tier: 'fodder', skills: [ { name: '撕咬', damageType: null, fxTag: null, guaranteedHit: false, switchTarget: false, critRate: 0, cost: 0, hpCost: 0, tpCost: 0, charge: 0, hit: 100, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0 } ] }); openEditor(); }
-function removeEnemy(i) { if (enemiesData.length <= 1) return alert("至少保留一只怪物！"); if (confirm("删除怪物？")) { syncEditorDataToMemory(); enemiesData.splice(i, 1); openEditor(); } }
+function addItemBinding(hi, ii) { syncEditorDataToMemory(); edHeroes()[hi].items[ii].bindings.push({ skillName: (edHeroes()[hi].skills[0] && edHeroes()[hi].skills[0].name) || '', cost: 1 }); openEditor(); }
+function removeItemBinding(hi, ii, bi) { syncEditorDataToMemory(); edHeroes()[hi].items[ii].bindings.splice(bi, 1); openEditor(); }
+function addEnemySkill(ei) { syncEditorDataToMemory(); edEnemies()[ei].skills.push({ name: '新技能', isOthers: false, guaranteedHit: false, switchTarget: false, critRate: 0, damageType: null, fxTag: null, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0, cost: 10, hpCost: 0, tpCost: 0, charge: 0, hit: 100, summonTarget: null }); openEditor(); }
+function removeEnemySkill(ei, si) { syncEditorDataToMemory(); edEnemies()[ei].skills.splice(si, 1); openEditor(); }
+function addHero() { syncEditorDataToMemory(); edHeroes().push({ id: 'h' + Date.now(), name: '新角色', img: DEFAULT_HERO_IMG, classType: null, hp: 400, maxHp: 400, mp: 200, maxMp: 200, tp: 0, maxTp: 100, atk: 80, def: 30, spd: 100, shield: 0, actCount: 1, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, burstActivated: false, skills: [ { name: '攻击', isReaction: false, reactionTarget: 'all', damageType: null, fxTag: null, guaranteedHit: false, switchTarget: false, critRate: 0, cost: 0, hpCost: 0, tpCost: 0, hit: 100, type: '[单体]', power: 60, type2: '[无]', power2: 0, type3: '[无]', power3: 0 } ], items: [] }); openEditor(); }
+function removeHero(i) { if (edHeroes().length <= 1) return alert("至少保留一名我方！"); if (confirm("删除角色？")) { syncEditorDataToMemory(); edHeroes().splice(i, 1); openEditor(); } }
+function addEnemy() { syncEditorDataToMemory(); edEnemies().push({ id: 'e' + Date.now(), name: '新怪物', emoji: '👾', classType: null, hp: 500, maxHp: 500, mp: 200, maxMp: 200, size: 'text-5xl', atk: 90, def: 20, spd: 90, shield: 0, isAlive: true, buffs: [], isDefending: false, hitBonus: 0, evaBonus: 0, currentCharge: 0, isWise: false, row: 'front', tier: 'fodder', skills: [ { name: '撕咬', damageType: null, fxTag: null, guaranteedHit: false, switchTarget: false, critRate: 0, cost: 0, hpCost: 0, tpCost: 0, charge: 0, hit: 100, type: '[单体]', power: 50, type2: '[无]', power2: 0, type3: '[无]', power3: 0 } ] }); openEditor(); }
+function removeEnemy(i) { if (edEnemies().length <= 1) return alert("至少保留一只怪物！"); if (confirm("删除怪物？")) { syncEditorDataToMemory(); edEnemies().splice(i, 1); openEditor(); } }
 
 // ==========================================
 // LLM 对话扮演系统
@@ -29207,7 +29218,7 @@ function updateNonLethalToggleUI() {
 const ROSTER_VAR_KEY = 'rpg_combat_roster';
 const ROSTER_VERSION = 1;
 
-// 序列化：heroesData → 可存对象数组（仅角色配置字段 + 技能集，不含 DOM/战斗态字段）
+// 序列化：heroesData（或显式传入的阵容数组）→ 可存对象数组（仅角色配置字段 + 技能集，不含 DOM/战斗态字段）
 // 技能/子技能字段集（组父与 children 共用；不含 isGroup/children/_inGroup/parentName 等结构键，由外层按需附加）
 function _serializeSkillForRoster(s) {
   return {
@@ -29220,8 +29231,8 @@ function _serializeSkillForRoster(s) {
     summonNoLimit: !!s.summonNoLimit, ignoreRow: !!s.ignoreRow, charge: s.charge || 0
   };
 }
-function serializeHeroesForSave() {
-  return heroesData.map(h => ({
+function serializeHeroesForSave(heroes = heroesData) {
+  return heroes.map(h => ({
     name: h.name,
     // extraConfig：applyPersistedRoster 收下的白名单外 config 键（外部写方如 OpeningSetup
     // 的扩展字段）原样带回；白名单键以运行时扁平字段为准（覆盖同名旧值）
@@ -29253,9 +29264,10 @@ function serializeHeroesForSave() {
   }));
 }
 
-// 写入：saveEditor 内调用，把清洗后的我方阵容写入 chat 变量（直接依赖酒馆助手，无降级）
-function persistHeroesRoster() {
-  const payload = { version: ROSTER_VERSION, heroes: serializeHeroesForSave() };
+// 写入：saveEditor 内调用，把清洗后的我方阵容写入 chat 变量（直接依赖酒馆助手，无降级）。
+// 带参形式供保存编辑器草稿（编辑器打开时必须显式传草稿，防误存旧实时战局）；无参默认序列化实时数组
+function persistHeroesRoster(heroes = heroesData) {
+  const payload = { version: ROSTER_VERSION, heroes: serializeHeroesForSave(heroes) };
   insertOrAssignVariables({ [ROSTER_VAR_KEY]: payload }, { type: 'chat' });
 }
 
