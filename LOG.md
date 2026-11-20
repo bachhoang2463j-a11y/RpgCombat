@@ -3737,3 +3737,17 @@
 - **失败与环境记录**：gh 缺失转官方 API；poly-decomp 无 v0.3.0 标签转 npm gitHead；IAB 导航回退／重载及 DOM 一帧滞后不计入结果，独立标签完成验证；iframe locator 点击误报遮挡后以只读命中核对和普通 CUA 点选完成。未采集控制台，不能称 console 零错。测试后关闭本轮标签和服务。
 - **边界**：未改原 index／v12.16／根 README、SPEC／旧 harness／MMS／生产提示词或角色技能；未跑原 RPG 全量、未进入真实酒馆、未调用其他 Agent、未启动系统 Chrome／模拟器；不 amend、不 push。真实导入、WebGL／动画性能／大地图与八向加权仍待验证。
 - **目的 vs 现状**：P00 承载、坐标、绕墙遮挡和单文件 iframe 技术验证达标，完整战棋和 P01 尚未开始；停止等待用户检查。
+
+## [LOG-305] 2026-11-21 — 战棋文档第二轮复核收敛与 MMS/复用边界修订
+
+- **业务提交**：`285e638`。
+- **核心目的**：在完整保留 `doc/tactics/SPEC.md` 已确认玩法、99 项阶段验收及 `ca38c2b` P00 历史报告的前提下，吸收第二轮跨项目资产审计与双主审收敛意见，修订 `INDEX.md`、`PLAN.md`、`RESOURCES.md` 并新增 `REVISION-2026-11-21.md`。
+- **变更行为**：
+  1. `RESOURCES.md` 新增 `R13`（`D:\Project\MiniMapStatus\MiniMapStatus.html` 10 种近景材质、24 类近景图元、`mmsRenderMapArt(json, style, 'mini')`、`demo-bigmap.html` 缩放平移、`MMSImages.resolveAvatar` 及 `$rpg_combat_result` 幂等单写者接收协议），明确不修改 MMS 源码与根目录原 RPG 打包器，并更新 `R01—R12` 与 `E01—E09` 推荐路线（R13 SVG 底图＋原生 Canvas 2D/DOM＋统一格网）。
+  2. 明确 8 项最小复用与适配切口：修复 `applyPersistedRoster`/`applyStatusBarRoster` 覆盖 YAML 显式字段；权威场景数据双输出；连续 10000 时钟；再动改为主行动点；拟建逐槽空间目标上下文 `spatialCtx.resolveSlotTargets` 与空间合法 `[转火]`；独立闪避与距离视线反应；空间结界；`mkAnchor` 动态重投影/统一变换容器、P08 表现静默与 P09 适配新空间规则的只读预测器分置。
+  3. 同步修订 `PLAN.md` 与 `INDEX.md` 工时（完整首版候选净工时 `128—185h`，含 15%—20% 缓冲 `147—222h`；扣除 `ca38c2b` P00 探针后剩余净工时 `127—184h`；MVP `28—40h`），扣除 P02/P05 重复计费，弃用无实测统计的“85%／650行／<0.5ms”口号。
+  4. 记录离线实测 `tactics/p00-probe/probe.html` 含 26 处 `/\$[$&`'\d<]/` 序列，区分“禁止危险序列（契约 A）”与“传输层 `$` 加倍后验证单次 `String.replace`＋实体还原字节一致（契约 B）”，保留 `P00-REPORT.md` 与 `VERIFICATION.md` 历史原文不倒改。
+- **涉及文件**：`doc/tactics/INDEX.md`、`doc/tactics/PLAN.md`、`doc/tactics/RESOURCES.md`、`doc/tactics/REVISION-2026-11-21.md`；`LOG.md`、`LOG-INDEX.md`。
+- **验证**：静态校验确认 13 阶段净工时相加精确为 `128—185h`、99 个唯一测试 ID 完整保留、128 个本地 Markdown 链接断链 `0`；未修改 `SPEC.md`、`P00-REPORT.md`、`VERIFICATION.md`、根 `README.md`/`index.html`/`build-regex.cjs` 或 `MiniMapStatus` 源码。
+- **边界**：仅完成文档重构与静态链接/算术检查；未启动浏览器或服务，未重跑 P00 探针、原 RPG 回归或未来 P01—P12 功能测试；未混入既有工作树删除或 `.audit-work` 临时文件；未推送远程。
+- **目的 vs 现状**：战棋文档已按双主审共识收敛并固化至 `285e638`；待主审审核确认后可按 P00 补验（真实 `String.replace` 往返与原生视口）及 P01 推进。
