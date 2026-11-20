@@ -384,5 +384,5 @@ export const groups = {
   'T02-01': { run: t0201 },
   'T02-02': { run: t0202 },
   'T02-03': { run: t0203 },
-  'T02-04': { run: t0204 },
+  'T02-04': { run: async deps => { const base = await t0204(deps); const {runReviewCases}=await import('./p02-review-node.mjs'); base.cases.push(...runReviewCases()); return base; } },
 };

@@ -205,14 +205,15 @@ export function createSandbox(rootEl, deps = {}) {
     vfxHost = createVfxHost(
       { anchorLayer: dom.anchorLayer, domLayer: dom.fxLayer, canvasHolder: dom.fxCanvasHolder },
       {
-        getPlacement: (id) => vd.placementsById[id] || null,
-        getFootprint: (id) => vd.footprintsById[id] || { width: 1, height: 1 },
-        getFacing: (id) => vd.placementsById[id] ? vd.placementsById[id].facing || 0 : 0,
+        getPlacement: (id) => viewData.placementsById[id] || null,
+        getFootprint: (id) => viewData.footprintsById[id] || { width: 1, height: 1 },
+        getFacing: (id) => viewData.placementsById[id] ? viewData.placementsById[id].facing || 0 : 0,
         scope,
         metersPerArtPx: 1 / 50,
       },
     );
-    vfx = createArcaneVfxModule(vfxHost, () => (scope.isLive ? token : null));
+    const instanceScope = scope;
+    vfx = createArcaneVfxModule(vfxHost, () => (instanceScope.isLive ? token : null));
     bindInput();
     // ResizeObserver：只更新 origin（不重置相机 pose）
     const ro = new ResizeObserver(() => updateOrigin());
@@ -236,22 +237,25 @@ export function createSandbox(rootEl, deps = {}) {
   // 同 scene+同 battle 增量：更新单位视图，不重建地图/不重置相机/不重绑监听
   function update(vd) {
     if (!scope || !scope.isLive) { mount(vd); return; }
+    const changed = JSON.stringify([viewData.scene, viewData.units, viewData.placementsById]) !== JSON.stringify([vd.scene, vd.units, vd.placementsById]);
+    if (changed) vfx.clearFx();
     token = vd.combatToken;
+    const sceneChanged = JSON.stringify(viewData.scene) !== JSON.stringify(vd.scene);
     viewData = vd;
+    if (sceneChanged) { compiled = compileScene(vd.scene); dom.art.innerHTML = renderSceneArt(compiled.artJson); }
     occupancy = buildOccupancyIndex(
       vd.units.map(u => ({ unitId: u.id, col: vd.placementsById[u.id].col, row: vd.placementsById[u.id].row })),
       vd.footprintsById,
     );
-    for (const u of vd.units) {
-      if (vd.placementsById[u.id]) {
-        unitView.updateUnit(u.id, { unit: u, placement: vd.placementsById[u.id] });
-      }
-    }
+    unitView.syncUnits(vd.units, vd.placementsById);
+    if (selectedId && !vd.units.some(u => u.id === selectedId)) selectedId = null;
     drawSelection();
   }
 
   // reset：失效旧代际→清演出→重建（新 battle 用保留位置；新 scene 重建场景）
   function reset(vd) {
+    stopFocusAnim();
+    if (vfx) vfx.clearFx();
     if (scope) scope.dispose();
     teardownDom();
     buildInstance(vd);
@@ -266,6 +270,8 @@ export function createSandbox(rootEl, deps = {}) {
   }
 
   function destroy() {
+    stopFocusAnim();
+    if (vfx) vfx.clearFx();
     if (scope) scope.dispose();
     scope = null; token = null; viewData = null; compiled = null;
     teardownDom();

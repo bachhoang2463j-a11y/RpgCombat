@@ -72,7 +72,7 @@ export function createUnitView(parent, deps) {
 
     const img = billboard.querySelector('img');
     img.src = resolveAvatarUrl(unit);
-    img.addEventListener('error', () => { img.onerror = null; img.src = fallbackAvatar(unit.name); });
+    img.onerror = () => { img.onerror = null; if (scope.isLive) img.src = fallbackAvatar(unit.name); };
 
     root.appendChild(billboard);
     parent.appendChild(root);
@@ -110,7 +110,7 @@ export function createUnitView(parent, deps) {
 
   // 全量建层（覆盖式；供 mount/reset 重建）
   function setUnits(units, placementsById) {
-    for (const rec of nodes.values()) rec.root.remove();
+    for (const rec of nodes.values()) scope.removeNode(rec.root);
     nodes.clear();
     for (const unit of units) {
       const placement = placementsById[unit.id];
@@ -119,11 +119,28 @@ export function createUnitView(parent, deps) {
     }
   }
 
+  function syncUnits(units, placementsById) {
+    const ids = new Set(units.map(u => u.id));
+    for (const [id, rec] of nodes) {
+      if (!ids.has(id)) { scope.removeNode(rec.root); nodes.delete(id); }
+    }
+    for (const unit of units) {
+      const rec = nodes.get(unit.id);
+      if (rec && JSON.stringify(rec.unit.footprint) !== JSON.stringify(unit.footprint)) {
+        scope.removeNode(rec.root); nodes.delete(unit.id);
+      }
+      if (!nodes.has(unit.id)) buildNode(unit, placementsById[unit.id]);
+      else updateUnit(unit.id, { unit, placement: placementsById[unit.id] });
+    }
+  }
+
   function updateUnit(id, patch) {
     const rec = nodes.get(id);
     if (!rec) return;
     if (patch.unit) {
       rec.unit = patch.unit;
+      rec.bars = patch.unit.bars;
+      applyBars(rec);
       if (patch.unit.img !== undefined) {
         const img = rec.billboard.querySelector('img');
         img.src = resolveAvatarUrl(patch.unit);
@@ -135,6 +152,7 @@ export function createUnitView(parent, deps) {
       const c = unitCenter(rec.placement, rec.unit.footprint || { width: 1, height: 1 });
       rec.root.style.left = (c.x * Q) + 'px';
       rec.root.style.top = (c.y * Q) + 'px';
+      applyFacing(rec);
     }
   }
 
@@ -161,5 +179,5 @@ export function createUnitView(parent, deps) {
     return rec ? rec.root : null;
   }
 
-  return { setUnits, updateUnit, setFacing, onCameraChange, getEntitySpriteDom, nodes };
+  return { setUnits, syncUnits, updateUnit, setFacing, onCameraChange, getEntitySpriteDom, nodes };
 }

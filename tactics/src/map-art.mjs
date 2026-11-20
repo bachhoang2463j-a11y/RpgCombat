@@ -22,6 +22,8 @@ function tintDefs({ brickBase, brickLine, carpetBase, carpetAlt, carpetLine, vig
 // 战棋 flat 调色板（vendor renderMiniMapArt 消费；键名与 MMS_MAPART_STYLES 消费习惯对齐）
 export const TACTICS_PALETTE = {
   fam: 'wood',
+  wallEdge: '#2c313a',
+  doorInk: '#b8b2a4',
   font: "'Noto Sans SC','Microsoft YaHei',sans-serif",
   patternDefs: tintDefs({
     brickBase: '#41474f', brickLine: '#31363d',        // 深灰石砖

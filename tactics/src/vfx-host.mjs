@@ -11,7 +11,7 @@ import { unitCenter } from './geometry.mjs';
 // layers: { anchorLayer, domLayer, canvasHolder } 均为 world-root 子层（sandbox 提供）
 // deps:   { getPlacement(unitId), getFootprint(unitId), getFacing(unitId), scope, metersPerArtPx }
 export function createVfxHost({ anchorLayer, domLayer, canvasHolder }, deps) {
-  const { getPlacement, getFootprint, scope, metersPerArtPx } = deps;
+  const { getPlacement, getFootprint, getFacing, scope, metersPerArtPx } = deps;
   const Q = 1 / metersPerArtPx; // 米 → 美术像素
 
   // 目标解析：unitId → 世界美术坐标；{wx,wy}（米）→ 直接换算
@@ -54,7 +54,7 @@ export function createVfxHost({ anchorLayer, domLayer, canvasHolder }, deps) {
   }
   function dropAnchor(d) {
     if (d && d.isConnected) d.remove();
-    scope.nodes.delete(d);
+    scope.removeNode(d);
   }
 
   // 世界 DOM/SVG 演出层；ms 给定则定时自收尾，不给由调用方/handle 负责
@@ -66,7 +66,7 @@ export function createVfxHost({ anchorLayer, domLayer, canvasHolder }, deps) {
     domLayer.appendChild(d);
     scope.addNode(d);
     if (ms) {
-      scope.after(ms, () => { d.remove(); scope.nodes.delete(d); });
+      scope.after(ms, () => { d.remove(); scope.removeNode(d); });
     }
     return d;
   }
@@ -74,6 +74,7 @@ export function createVfxHost({ anchorLayer, domLayer, canvasHolder }, deps) {
   return {
     pointOf, rectOf, mkAnchor, dropAnchor, layer,
     canvasHolder,
+    getFacing,
     scope,
     after: (ms, fn) => scope.after(ms, fn),
     every: (ms, fn) => scope.every(ms, fn),

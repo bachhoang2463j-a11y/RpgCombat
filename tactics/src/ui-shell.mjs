@@ -78,8 +78,8 @@ export function buildShell(root) {
       '<button class="t-hero-card" data-unit-id="' + ESC(u.id) + '">' +
         '<span class="t-hero-avatar"><img src="' + ESC(u.avatarUrl || '') + '" alt="" onerror="this.style.visibility=\'hidden\'"></span>' +
         '<span class="t-hero-info"><b>' + ESC(u.name) + '</b>' +
-          '<i class="t-bar t-bar-hp"><i style="width:' + pct(u.hp, u.maxHp) + '%"></i></i>' +
-          '<i class="t-bar t-bar-mp"><i style="width:' + pct(u.mp, u.maxMp) + '%"></i></i>' +
+          '<i class="t-bar t-bar-hp"><i style="width:' + pct(u.bars.hp, u.bars.maxHp) + '%"></i></i>' +
+          '<i class="t-bar t-bar-mp"><i style="width:' + pct(u.bars.mp, u.bars.maxMp) + '%"></i></i>' +
         '</span></button>').join('');
     els.heroes.querySelectorAll('.t-hero-card').forEach(card => {
       card.addEventListener('click', () => {
@@ -146,7 +146,7 @@ export function buildShell(root) {
   }
   function showEditor() {
     const rows = state.units.map(u => '<tr><td>' + ESC(u.name) + '</td><td>' + ESC(u.side === 'hero' ? '我方' : '敌方') + '</td><td>' +
-      (u.footprint ? u.footprint.width + '×' + u.footprint.height : '1×1') + '</td><td>' + (u.hp == null ? '-' : u.hp + '/' + u.maxHp) + '</td></tr>').join('');
+      (u.footprint ? u.footprint.width + '×' + u.footprint.height : '1×1') + '</td><td>' + (u.bars.hp == null ? '-' : u.bars.hp + '/' + u.bars.maxHp) + '</td></tr>').join('');
     openPanel('⚙️ 设置 · 角色概览（编辑器在 P11 接入）',
       '<table class="t-roster-table"><tr><th>名字</th><th>阵营</th><th>体型</th><th>HP</th></tr>' + rows + '</table>' +
       '<div class="t-submenu-empty">配置编辑/导入导出属后续阶段；本面板仅为 P01 数据只读展示。</div>');
@@ -206,7 +206,7 @@ export function buildShell(root) {
     const rootRect = root.getBoundingClientRect();
     const left = Math.max(rail.right - rootRect.left, 0);
     const top = Math.max(topbar.bottom - rootRect.top, 0);
-    const bottom = Math.max(floatUi.bottom - rootRect.top, chat.top - rootRect.top);
+    const bottom = Math.min(floatUi.top - rootRect.top, chat.top - rootRect.top);
     const right = rootRect.width;
     return { left, top, width: Math.max(120, right - left), height: Math.max(120, bottom - top) };
   }
@@ -223,6 +223,7 @@ export function buildShell(root) {
   }
 
   return {
+    destroy: () => { clearTimeout(showLog._t); state.onReset = null; state.onUnitClick = null; root.replaceChildren(); },
     els, renderHeroes, renderTurnOrder, bindMenus, closeSubmenu, setSelected,
     getSafeRect, showLog, openPanel, closePanel,
     set onUnitClick(fn) { state.onUnitClick = fn; },

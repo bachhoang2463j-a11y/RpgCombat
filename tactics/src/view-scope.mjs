@@ -38,6 +38,7 @@ export function createViewScope(clock = {}) {
       timers.add(id);
       return id;
     },
+    cancelAfter(id) { t.clearTimeout(id); timers.delete(id); },
     every(ms, fn) {
       if (!active) return null;
       const id = t.setInterval(() => { if (!active) { t.clearInterval(id); intervals.delete(id); return; } fn(); }, ms);
@@ -62,9 +63,12 @@ export function createViewScope(clock = {}) {
       if (!active) return () => {};
       let stopped = false;
       const tick = (now) => {
+        loopRafIds.delete(rafId);
         if (stopped || !active) return;
         if (fn(now) === false) { stopped = true; loopRafIds.delete(rafId); return; }
+        if (stopped || !active) return;
         rafId = t.raf(tick);
+        loopRafIds.add(rafId);
       };
       let rafId = t.raf(tick);
       loopRafIds.add(rafId);
@@ -98,6 +102,7 @@ export function createViewScope(clock = {}) {
       if (el) nodes.add(el);
       return el;
     },
+    removeNode(el) { nodes.delete(el); if (el) el.remove(); },
     onDispose(fn) {
       if (!active) { return () => {}; }
       disposers.add(fn);
@@ -110,6 +115,7 @@ export function createViewScope(clock = {}) {
       let done = false;
       const once = () => { if (!done) { done = true; settle(false); } };
       cancelCallbacks.add(once);
+      return () => { done = true; cancelCallbacks.delete(once); };
     },
 
     // ---- 收据（测试断言用）：全部归零才算清理干净 ----

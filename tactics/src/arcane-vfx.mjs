@@ -51,7 +51,21 @@ export function createArcaneVfxModule(host, getToken) {
     canvas: null, ctx: null,
   };
 
-  const after = (ms, fn) => host.after(ms, fn);
+  const timers = new Set();
+  const pending = new Set();
+  const layers = new Set();
+  const after = (ms, fn) => {
+    const id = host.after(ms, () => { timers.delete(id); fn(); });
+    timers.add(id);
+    return id;
+  };
+  function layer(html, ms) {
+    const node = host.layer(html);
+    layers.add(node);
+    after(ms, () => { layers.delete(node); host.scope.removeNode(node); });
+    return node;
+  }
+  host.scope.onDispose(clearFx);
 
   // ---- 粒子 Canvas（固定美术 1000×1000，DPR backing；挂 canvasHolder） ----
   function ensureCanvas() {
@@ -169,7 +183,7 @@ export function createArcaneVfxModule(host, getToken) {
       const ang = Math.random() * TAU, d = rnd(40, 70);
       return { x: a.x + Math.cos(ang) * d, y: a.y + Math.sin(ang) * d, vx: -Math.cos(ang) * d / 9, vy: -Math.sin(ang) * d / 9, drag: 0.86, decay: 0.06, size: rnd(1.2, 2.4), color: pick(['#fdba74', '#f97316', '#fde68a']) };
     });
-    host.layer('<div style="position:absolute; left:' + (a.x - 32) + 'px; top:' + (a.y - 32) + 'px; width:64px; height:64px; border-radius:50%; background: radial-gradient(circle, #fff7d6 0%, #fb923c 35%, rgba(220,38,38,0.45) 60%, transparent 72%);"></div>', 320);
+    layer('<div style="position:absolute; left:' + (a.x - 32) + 'px; top:' + (a.y - 32) + 'px; width:64px; height:64px; border-radius:50%; background: radial-gradient(circle, #fff7d6 0%, #fb923c 35%, rgba(220,38,38,0.45) 60%, transparent 72%);"></div>', 320);
     after(240, () => {
       if (token !== getToken()) return; // 代际失效即停
       fly(a, b, 90, 340, (x, y) => {
@@ -178,9 +192,10 @@ export function createArcaneVfxModule(host, getToken) {
         burst(5, () => ({ x: x + rnd(-6, 6), y: y + rnd(-6, 6), vx: rnd(-1, 1), vy: rnd(-1.6, -0.3), drag: 0.94, decay: rnd(0.04, 0.07), size: rnd(6, 11), shape: 'flame', color: pick(['#f97316', '#ef4444', '#fbbf24']) }));
         for (let j = 0; j < 2; j++) { const an = performance.now() / 45 + j * 3.14; addP({ x: x + Math.cos(an) * 11, y: y + Math.sin(an) * 11, decay: 0.3, size: 2, color: '#fff7d6' }); }
       }, () => {
+        if (token !== getToken()) return;
         if (onImpact) onImpact();
         if (token !== getToken() || dodged) return;
-        host.layer('<div style="position:absolute; left:' + (b.x - 70) + 'px; top:' + (b.y - 70) + 'px; width:140px; height:140px; border-radius:50%; background: radial-gradient(circle, #fff 0%, #fdba74 30%, rgba(239,68,68,0.5) 58%, transparent 72%);"></div>', 420);
+        layer('<div style="position:absolute; left:' + (b.x - 70) + 'px; top:' + (b.y - 70) + 'px; width:140px; height:140px; border-radius:50%; background: radial-gradient(circle, #fff 0%, #fdba74 30%, rgba(239,68,68,0.5) 58%, transparent 72%);"></div>', 420);
         burst(2, i => ({ x: b.x, y: b.y, shape: 'ring', size: 1.8 + i, decay: 0.07 - i * 0.02, color: i ? '#f97316' : '#fde68a' }));
         burst(40, () => { const an = Math.random() * TAU, s = rnd(2, 8); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s - 1, grav: 0.13, drag: 0.93, decay: rnd(0.025, 0.05), size: rnd(1, 2.2), color: pick(['#fde68a', '#fb923c', '#fff7d6']) }; });
         burst(10, () => ({ x: b.x + rnd(-14, 14), y: b.y + rnd(-14, 14), vx: rnd(-1, 1), vy: rnd(-2, -0.5), drag: 0.95, decay: rnd(0.03, 0.05), size: rnd(12, 20), shape: 'flame', color: '#f97316' }));
@@ -199,6 +214,7 @@ export function createArcaneVfxModule(host, getToken) {
       addP({ x, y, size: 4, decay: 0.3, color: '#fff' });
       burst(3, () => ({ x: x + rnd(-5, 5), y: y + rnd(-5, 5), vx: rnd(0.5, 1.5), vy: rnd(-0.5, 0.5), drag: 0.94, decay: 0.06, size: rnd(1.5, 3), color: pick(['#7c3aed', '#a855f7']) }));
     }, () => {
+      if (token !== getToken()) return;
       if (onImpact) onImpact();
       if (token !== getToken() || dodged) return;
       burst(24, () => { const an = Math.random() * TAU, s = rnd(1.5, 5); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.93, decay: 0.04, size: rnd(1, 2.4), color: pick(['#e9d5ff', '#c084fc', '#7c3aed']) }; });
@@ -209,12 +225,12 @@ export function createArcaneVfxModule(host, getToken) {
   function playArcaneProjectile(type, fromId, toId, dodged = false) {
     if (!fromId || !toId) return Promise.resolve(true);
     const token = getToken();
-    if (!token) return Promise.resolve(false);
+    if (!token || !host.scope.isLive) return Promise.resolve(false);
     ensureCanvas(); ensureDriver();
     return new Promise(resolve => {
       let settled = false;
-      const done = ok => { if (settled) return; settled = true; resolve(!!ok && token === getToken()); };
-      host.scope.settleOnDispose(() => done(false)); // 代际失效结算一次 false
+      const done = ok => { if (settled) return; settled = true; pending.delete(done); resolve(!!ok && token === getToken()); };
+      pending.add(done); // 代际失效结算一次 false
       if (type === 'fire') fireProjectile(fromId, toId, !!dodged, token, () => done(true));
       else if (type === 'enemy_spell') enemySpellProjectile(fromId, toId, !!dodged, token, () => done(true));
       else done(false);
@@ -223,6 +239,9 @@ export function createArcaneVfxModule(host, getToken) {
 
   // ---- 统一清场（原 clearArcaneFx 的本切片子集；单个 handle 取消不走这里） ----
   function clearFx() {
+    timers.forEach(id => host.scope.cancelAfter(id)); timers.clear();
+    pending.forEach(done => done(false)); pending.clear();
+    layers.forEach(node => host.scope.removeNode(node)); layers.clear();
     S.flights.length = 0;
     S.particles.length = 0;
     S.particleUntil = 0;

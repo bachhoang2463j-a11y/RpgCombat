@@ -75,12 +75,12 @@ export function mapArtFeature(f, S, style, fam) {
     case 'wall': {
       const ww = w || 120, wh = h || 16;
       const fill = style === 'parchment' ? 'url(#mms-map-hatch)' : (fam === 'mod' ? '#9aa8b8' : 'url(#mms-mini-brick)');
-      const edge = style === 'parchment' ? '#3f3020' : (fam === 'mod' ? '#4a5c70' : '%%WALL_EDGE%%');
+      const edge = style === 'parchment' ? '#3f3020' : (fam === 'mod' ? '#4a5c70' : S.wallEdge);
       return '<rect x="' + x + '" y="' + y + '" width="' + ww + '" height="' + wh + '" fill="' + fill + '" stroke="' + edge + '" stroke-width="2"/>';
     }
     case 'door': {
       const r = w || 36;
-      const ink = style === 'parchment' ? '#3f3020' : '%%DOOR_INK%%';
+      const ink = style === 'parchment' ? '#3f3020' : S.doorInk;
       return '<path d="M ' + x + ' ' + y + ' V ' + (y - r) + '" stroke="' + ink + '" stroke-width="4" fill="none" stroke-linecap="round"/>' +
         '<path d="M ' + x + ' ' + (y - r) + ' A ' + r + ' ' + r + ' 0 0 1 ' + (x + r) + ' ' + y + '" fill="none" stroke="' + ink + '" stroke-width="2" stroke-dasharray="6 5"/>' +
         '<circle cx="' + (x + 4) + '" cy="' + (y - r + 6) + '" r="2" fill="' + ink + '"/>';

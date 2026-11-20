@@ -1,0 +1,14 @@
+{
+  "stage": "P02-review-repair",
+  "date": "2026-11-21",
+  "baseline": "2024d5a",
+  "node": {"command": "node tactics/tools/run-tests.cjs --stage=p02", "passed":69, "failed":0, "pending":0, "newReviewCases":8},
+  "runnerGateRegression": {"command":"node tactics/tools/run-tests.cjs --stage=p01 --group=T01-06","passed":16,"failed":0},
+  "chrome": {"url":"http://127.0.0.1:8123/RpgCombat/integration-test/tactics-harness.html?stage=p02","harnessPassed":45,"harnessFailed":0,"harnessPending":0,"reviewPassed":16,"reviewFailed":0,"runtimeErrors":[],"viewports":[[1280,720],[1600,900]]},
+  "verifiedRepairs":["public scope node removal API","current pending rAF cancellation","HP/MP bars and facing refresh","unit addition/removal with explicit placement","saved doors/objects restored into both outputs","return to saved scene preserves positions","reset clears old effects and settles promise false","natural cleanup leaves zero rAF and cancellation handles","world palette placeholders resolved","strict synchronous camera/particle invariant assertion","runtime error capture"],
+  "inputCoverage":"Harness pointer/wheel events are synthetic handler integration tests. Native Chrome menu click was separately verified. Full trusted map drag/wheel sequence was not rerun and is not claimed.",
+  "scopeBoundary":"New units require explicit positions via loadYaml options. No P05 auto-placement or map generator was added. Invalid missing placement is rejected before tactical state save.",
+  "independentReview":"Completed: no blocking defect reported; subsequent small changes preserve identical-load token/effects and limit reset restoration to the current scene.",
+  "notRun":["RPG global regression","tactics --all","release build","real SillyTavern import"],
+  "purposeVsState":"Reviewed P02 runtime and state/view defects repaired; targeted Node and Chrome tests pass. No complete-game, release, or trusted map-gesture acceptance is claimed."
+}

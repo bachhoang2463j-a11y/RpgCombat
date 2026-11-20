@@ -1,6 +1,6 @@
 // ==========================================
 // P02 浏览器侧用例（?stage=p02 时由 tactics-harness.html 挂载真实 tactics/index.html 执行）
-// 测真实产物：iframe src 指向真实入口，不复制业务实现；交互用真实 PointerEvent/WheelEvent。
+// 测真实产物：iframe src 指向真实入口，不复制业务实现；交互用合成 PointerEvent/WheelEvent（真实输入另验）。
 // 结果数组由宿主页汇总（window.__TACTICS_P02_RESULT）。
 // IAB 已知环境限制（rAF 节流/截图管道）如实记 pending，不改业务时序凑绿。
 // ==========================================
@@ -11,7 +11,7 @@ function ok(id, pass, detail) {
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-// 在地图视口派发真实指针事件（合成事件无真实 capture；sandbox 已容忍 capture 失败）
+// 在地图视口派发合成指针事件（合成事件无真实 capture；sandbox 已容忍 capture 失败）
 function pointerEvents(win, viewport, seq) {
   for (const [type, x, y, extra] of seq) {
     const ev = new win.PointerEvent(type, Object.assign({
@@ -45,6 +45,10 @@ export async function runBrowserCases(frame) {
     return [ok('p02-iframe-boot', false, '真实入口未暴露 __TACTICS_APP__')];
   }
   const app = handle.app;
+  const runtimeErrors = [];
+  const captureError = e => runtimeErrors.push(String(e.message || e.reason));
+  win.addEventListener('error', captureError);
+  win.addEventListener('unhandledrejection', captureError);
   const viewport = doc.getElementById('tactics-map-viewport');
 
   // ---------- T02-01：双尺寸槽位 / 菜单 / 面板 ----------
@@ -179,10 +183,9 @@ export async function runBrowserCases(frame) {
     const midParticles = beforeParticles();
     cases.push(ok('T02-02-b 火焰弹已发射（飞行粒子>0）', midParticles.length > 0, String(midParticles.length)));
     app.sandbox.setCamera({ tx: poseAfterPan.tx + 200, ty: poseAfterPan.ty + 100, scale: 1.4 }); // 播放中改镜头
-    await sleep(60);
     const afterMove = vfx.state.particles.map(x => [Math.round(x.x), Math.round(x.y)]);
     cases.push(ok('T02-02-b 相机变化不改粒子世界坐标',
-      JSON.stringify(midParticles) === JSON.stringify(afterMove.slice(0, midParticles.length)) || afterMove.length > 0,
+      midParticles.length > 0 && JSON.stringify(midParticles) === JSON.stringify(afterMove),
       'n=' + afterMove.length));
     // 粒子 canvas 有真实绘制内容（P00-native Canvas 证据；IAB rAF 节流时等待到飞行中段重采样）
     let hasPixels = false;
@@ -208,7 +211,7 @@ export async function runBrowserCases(frame) {
     // focusWorld 落 safeRect 中心（容差 2px；IAB rAF 节流时放宽等待）
     const safeCenter = app.shell.getSafeRect();
     app.sandbox.focusWorld(p.col + 0.5, p.row + 0.5);
-    await sleep(1500);
+    for (let i = 0; i < 4; i++) await new Promise(resolve => win.requestAnimationFrame(resolve));
     const fs = app.sandbox.worldToScreenClient(p.col + 0.5, p.row + 0.5);
     const expX = origin.left + safeCenter.left + safeCenter.width / 2;
     const expY = origin.top + safeCenter.top + safeCenter.height / 2;
@@ -333,5 +336,8 @@ export async function runBrowserCases(frame) {
   results.push(...await stage02());
   results.push(...await stage03());
   results.push(...await stage04());
+  results.push(ok('T02-runtime-errors', runtimeErrors.length === 0, JSON.stringify(runtimeErrors)));
+  win.removeEventListener('error', captureError);
+  win.removeEventListener('unhandledrejection', captureError);
   return results;
 }

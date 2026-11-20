@@ -11,7 +11,7 @@
 
 import { parseYamlText } from './parser.mjs';
 import { loadTacticsRoster, readTacticsState, saveTacticsState } from './storage.mjs';
-import { applyLoad, reopenLoad, classifyLoad } from './lifecycle.mjs';
+import { applyLoad } from './lifecycle.mjs';
 import { createSandbox } from './sandbox.mjs';
 import { buildShell } from './ui-shell.mjs';
 import { resolveAvatarUrl } from './unit-view.mjs';
@@ -22,10 +22,17 @@ const SCENE_LIBRARY = {
   'sc-test-room': TEST_ROOM,
   'sc-second-room': { ...TEST_ROOM, sceneId: 'sc-second-room' },
 };
-function sceneForId(sceneId) {
+export function sceneForState(sceneId, sceneState = {}) {
   const s = SCENE_LIBRARY[sceneId];
   if (!s) throw new Error('P02 固定图库无此场景: ' + sceneId);
-  return JSON.parse(JSON.stringify(s));
+  const scene = JSON.parse(JSON.stringify(sceneState.layout || s));
+  scene.sceneId = sceneId;
+  scene.objects = scene.objects.filter(obj => sceneState.objects?.[obj.id] !== null).map(obj => {
+    const next = { ...obj, ...(sceneState.objects?.[obj.id] || {}) };
+    if (obj.kind === 'door' && Object.hasOwn(sceneState.doors || {}, obj.id)) next.open = sceneState.doors[obj.id];
+    return next;
+  });
+  return scene;
 }
 
 // ---------- 默认夹具输入（与 integration-test/fixtures/tactics/p02-fixture.mjs 同源） ----------
@@ -87,7 +94,7 @@ export const DEFAULT_PLACEMENTS = {
 // ---------- 派生单位 ID（确定性；同 scene 稳定；前缀 h:/e: 与夹具站位键对齐） ----------
 export function deriveUnitId(side, name, occurrence) {
   const prefix = side === 'hero' ? 'h' : 'e';
-  return prefix + ':' + name + (occurrence > 1 ? ':' + occurrence : '');
+  return prefix + ':' + name.replace(/%/g, '%25').replace(/:/g, '%3A') + (occurrence > 1 ? ':' + occurrence : '');
 }
 
 // ---------- 独立页内存变量宿主（真实 storage 路径不变；酒馆 iframe 不进此分支） ----------
@@ -183,33 +190,37 @@ export function createApp(rootEl, opts = {}) {
 
   let currentYamlText = null;
   let currentViewData = null;
-  let currentSceneId = null;
+  const openingStates = new Map();
 
-  function placementsFor(result, sceneId) {
-    // 新 scene：夹具默认站位经 explicitOverrides 落档；同 scene：读取档内保留位置
-    const saved = result.sceneState && result.sceneState.positions && Object.keys(result.sceneState.positions).length
-      ? result.sceneState.positions : null;
-    return saved || opts.defaultPlacements || DEFAULT_PLACEMENTS;
-  }
-
-  function loadYaml(text, { forceReset = false } = {}) {
+  function loadYaml(text, { forceReset = false, positions = {}, sceneOverrides = {} } = {}) {
     const block = parseYamlText(text);
-    const roster = loadTacticsRoster(block, []); // P01 真实装配入口（resolveHero 合并 + 闪避迁移）
     const state = readTacticsState();
     const incoming = { sceneId: block.sceneId, battleId: block.battleId };
-    const cls = classifyLoad(state && state.current, incoming);
-    // 新 scene：夹具默认站位作为显式增量落档（P05 布阵求解前的固定站位入口）；
-    // resume/new-battle：不传覆盖，读档内保留位置。重置按钮：强制恢复夹具开场站位。
-    const explicit = (cls.branch === 'new-scene' || forceReset)
-      ? { positions: opts.defaultPlacements || DEFAULT_PLACEMENTS } : null;
-    const result = applyLoad(state, incoming, explicit, {});
+    const knownScene = state?.scenes?.[block.sceneId];
+    const defaults = opts.defaultPlacements || DEFAULT_PLACEMENTS;
+    const explicit = { ...sceneOverrides, positions: { ...positions } };
+    // 仅为尚无位置的固定夹具单位补初始站位，不覆盖已保存站位。新增单位由调用方显式给站位。
+    for (const [id, p] of Object.entries(defaults)) {
+      if (!Object.hasOwn(knownScene?.positions || {}, id) && !Object.hasOwn(positions, id)) explicit.positions[id] = p;
+    }
+    const base = state;
+    if (forceReset && openingStates.has(block.sceneId)) {
+      base.scenes[block.sceneId] = structuredClone(openingStates.get(block.sceneId));
+    }
+    const result = applyLoad(base, incoming, explicit, {});
+    const scene = sceneForState(block.sceneId, result.sceneState);
+    // 先校验新视图可装配，再写入战术档；资源合并仍只走 P01。
+    const nextToken = {};
+    buildViewData(block, block.heroes, scene, result.sceneState.positions, nextToken);
+    const roster = loadTacticsRoster(block, []);
+    const nextView = buildViewData(block, roster.heroes, scene, result.sceneState.positions, nextToken);
     saveTacticsState(result.state);
+    if (!openingStates.has(block.sceneId)) openingStates.set(block.sceneId, structuredClone(result.sceneState));
     currentYamlText = text;
-    currentSceneId = block.sceneId;
-
-    const scene = sceneForId(block.sceneId);
-    combatToken = {}; // 换代：每次载入/重置新代
-    currentViewData = buildViewData(block, roster.heroes, scene, placementsFor(result, block.sceneId), combatToken);
+    const unchanged = !forceReset && currentViewData && result.branch === "resume" && currentViewData.sceneId === nextView.sceneId && currentViewData.battleId === nextView.battleId && JSON.stringify([currentViewData.scene, currentViewData.units, currentViewData.placementsById]) === JSON.stringify([nextView.scene, nextView.units, nextView.placementsById]);
+    combatToken = unchanged ? combatToken : nextToken;
+    nextView.combatToken = combatToken;
+    currentViewData = nextView;
 
     const branch = result.branch;
     const snap = sandbox.getSnapshot();
@@ -242,7 +253,9 @@ export function createApp(rootEl, opts = {}) {
   }
 
   function destroy() {
+    combatToken = {};
     sandbox.destroy();
+    shell.destroy();
   }
 
   return {
