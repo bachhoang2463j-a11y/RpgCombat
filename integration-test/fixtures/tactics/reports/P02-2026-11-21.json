@@ -1,0 +1,49 @@
+{
+  "stage": "P02",
+  "source": "tactics/index.html + tactics/src/*.mjs",
+  "sourceCommit": "待回填（业务提交后见 LOG-INDEX）",
+  "mode": "source",
+  "command": "node tactics/tools/run-tests.cjs --stage=p02 ; --stage=p01 回归 ; --all ; integration-test/tactics-harness.html?stage=p02（IAB） ; ?无参 P01 harness 回归（IAB）",
+  "executed": true,
+  "date": "2026-11-21",
+  "environment": "Node 24.12.0 纯模块断言 + IAB 真实 iframe 挂载（1280×720 与 1600×900 双尺寸实测）",
+  "summary": {
+    "nodePassed": 227,
+    "nodeFailed": 0,
+    "nodePending": 0,
+    "browserPassed": 42,
+    "browserFailed": 0,
+    "browserPending": 2,
+    "p01HarnessRegression": "16/16 通过（P02 改动未破坏 P01 harness 契约 B 传输流程）",
+    "p01NodeRegression": "166/166 通过（敌方原型缺省修复无回归）"
+  },
+  "groups": [
+    { "id": "T02-01", "passed": 21, "failed": 0, "pending": 0, "scope": "原槽位结构/无外链/菜单260×172/双输出冒烟/双尺寸fit（Node）+ 双尺寸真实挂载/菜单导航/面板开合/旁白开关/按钮命中/零外部资源（IAB）" },
+    { "id": "T02-02", "passed": 12, "failed": 0, "pending": 0, "scope": "双向投影往返/光标锚定缩放/越界null/朝向向量/单位中心/聚焦/贝塞尔公式（Node）+ 点击选取/拖拽平移/缩放点击/正立头像/朝向箭头/播放中粒子世界坐标不变/特效节点挂世界层/Promise结算（IAB）" },
+    { "id": "T02-03", "passed": 18, "failed": 0, "pending": 0, "scope": "占格枚举/占位索引/同名ID派生/缺站位抛错/手势状态机全路径/单源反证（Node）+ 2×2四格命中/圆标外延不命中/同名分别ID/拖拽零选取/占格选框像素（IAB）" },
+    { "id": "T02-04", "passed": 10, "failed": 0, "pending": 0, "scope": "可控时钟dispose/settleOnDispose一次/loop自停/监听解绑/三分支路由/resume幂等（Node）+ 重置清粒子/监听单份基线/旧弹道Promise结算false/新battle保留档位/换场景重建/3循环不递增/零LLM/P00-native双相机位同格（IAB）" },
+    { "id": "T02-browser-pending", "passed": 0, "failed": 0, "pending": 2, "scope": "①特效Canvas真实产出像素采样（IAB rAF暂停无法采样）②focusWorld缓动推进（IAB rAF暂停不推进）——两项的纯逻辑已在Node组验证（T02-02 focusPose/贝塞尔公式；Canvas绘制链路为纯rAF渲染），需用户授权排障模式（真Chrome）复验后才能关闭" }
+  ],
+  "cases": [
+    { "id": "T02-04-b P00-native 双相机位同格", "status": "passed", "input": "setCamera({tx:60,ty:30,scale:1.25}) 与 {tx:-80,ty:50,scale:0.8} 下对世界(17.5,3.5)逆投影", "expected": "两相机位均返回格(17,3)", "actual": "两相机位均返回格(17,3)" },
+    { "id": "T02-04-b 3次循环监听不递增", "status": "passed", "input": "连续3次loadYaml（重开语义）", "expected": "监听数保持基线6、无残留计时/rAF/动画", "actual": "listeners=6, timers=0, raf=0, animations=0" },
+    { "id": "T02-04-b 旧弹道Promise因重置结算false", "status": "passed", "input": "播放中火焰弹+forceReset", "expected": "Promise结算一次false，不悬挂", "actual": "false（一次）" }
+  ],
+  "pendingItems": [
+    "T02-02-b 特效 Canvas 真实产出像素（IAB rAF 暂停）——排障模式真 Chrome 复验",
+    "T02-02-b focusWorld 落 safeRect 中心缓动推进（IAB rAF 暂停）——排障模式真 Chrome 复验",
+    "P00 原生视口待验项（P01-CONTRACT 第9节）：本轮IAB已补验 SVG 显示/双向坐标/无外链/LLM计数0，但 Canvas 像素与 rAF 时序项 pending，待真 Chrome 复验后再关闭契约待验状态，本轮不改 P00-REPORT"
+  ],
+  "p01GapFix": {
+    "file": "tactics/src/parser.mjs parseEnemyEntry",
+    "change": "敌方条目补齐原型缺省（口径同 parseHeroEntry：缺省补齐值不标 _explicit）",
+    "reason": "P01-CONTRACT 第1节'三原型缺省值（新建角色）'覆盖敌方；原实现忽略 原型 字段导致大型生物 footprint 落 1×1，T02 夹具无法渲染 2×2",
+    "regression": "T01-01~T01-08 全部 166 断言通过，无回归"
+  },
+  "uiFix": {
+    "file": "tactics/src/ui-shell.mjs",
+    "change": "友方/敌方旁白开关初始 class t-toggle-on 与默认开启状态同步",
+    "reason": "T02-01-b 旁白开关切换断言暴露初始 class 与状态不同步"
+  },
+  "purposeVsState": "目的为视频式战术沙盘承载；现状为固定测试房间双输出、世界↔屏幕双向一致、圆形头像正立+独立朝向、真实占格选取、播放中特效世界坐标跟随、生命周期清理均已实测通过（Node227+IAB42）；IAB rAF 受限的 2 项表现层验证（Canvas像素采样/聚焦缓动推进）如实 pending 待真 Chrome 复验，不冒充全绿；固定图不是最终地图生成，跑圈/结算/感知均未在本阶段实现"
+}

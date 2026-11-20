@@ -722,7 +722,7 @@ export function parseEnemyEntry(entry, index) {
   const count = m ? Math.max(1, parseInt(m[2])) : 1;
   const out = [];
   for (let i = 0; i < count; i++) {
-    out.push({
+    const u = {
       name: name + (count > 1 ? `·${i + 1}` : ''),
       maxHp: attrs.maxHp, hp: attrs.hp, maxMp: attrs.maxMp, mp: attrs.mp, maxTp: attrs.maxTp, tp: attrs.tp,
       atk: attrs.atk, def: attrs.def, spd: attrs.spd, actCount: attrs.actCount,
@@ -730,7 +730,22 @@ export function parseEnemyEntry(entry, index) {
       evasion: attrs.evasion, strength: attrs.strength, totalWeight: attrs.totalWeight,
       moveDistance: attrs.moveDistance, perception: attrs.perception, footprint: attrs.footprint,
       skills,
-    });
+    };
+    // 原型只补缺失（P01-CONTRACT 第 1 节；口径同 parseHeroEntry，补齐值不标 _explicit）
+    if (Object.prototype.hasOwnProperty.call(entry, '原型')) {
+      const proto = String(entry['原型'] || '').trim();
+      if (PROTOTYPE_NAMES.includes(proto)) {
+        u.prototype = proto;
+        const p = PROTOTYPES[proto];
+        if (u.evasion == null) { u.evasion = p.evasion; u._protoEvasion = true; }
+        if (u.strength == null) u.strength = p.strength;
+        if (u.totalWeight == null) u.totalWeight = p.totalWeight;
+        if (u.moveDistance == null) u.moveDistance = p.moveDistance;
+        if (u.perception == null) u.perception = p.perception;
+        if (!u.footprint) u.footprint = Object.assign({}, p.footprint);
+      }
+    }
+    out.push(u);
   }
   return out;
 }

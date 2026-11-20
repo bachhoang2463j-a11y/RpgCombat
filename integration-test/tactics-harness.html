@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>战棋 P01 Harness</title>
+<title>战棋 Harness</title>
 <style>
   body { font-family: 'Noto Sans SC', sans-serif; background: #10141c; color: #d7dde8; margin: 24px; }
   h1 { font-size: 18px; } h2 { font-size: 14px; color: #9fb4d8; margin: 18px 0 6px; }
@@ -10,16 +10,20 @@
   .pass { color: #7ee787; } .fail { color: #ff7b72; border-left-color: #ff7b72; }
   .total { margin-top: 12px; font-weight: 700; }
   pre { background: #0b0f16; padding: 10px; font-size: 11px; overflow: auto; max-height: 260px; }
-  iframe { display: none; }
+  iframe.p01 { display: none; }
+  /* P02：真实挂载被测入口（可见尺寸即测试尺寸，不用 transform 缩放） */
+  iframe#frame.p02 { display: block; width: 1280px; height: 720px; border: 1px solid #334; background: #000; }
 </style>
 </head>
 <body>
-<h1>战棋 P01 Harness（真实模块 + 保真 Mock + 契约 B 传输通道）</h1>
+<h1 id="title">战棋 P01 Harness（真实模块 + 保真 Mock + 契约 B 传输通道）</h1>
 <div id="out"></div>
 <div class="total" id="total">运行中…</div>
 <pre id="json">机器可读结果待运行完成</pre>
-<iframe id="frame"></iframe>
+<iframe id="frame" class="p01"></iframe>
 <script>
+/* P02 分流（?stage=p02）：真实 iframe 挂载 tactics/index.html，浏览器用例驱动；
+   默认（无参数）仍为 P01 契约 B 传输通道流程，语义不变。 */
 /* ==========================================================================
    P01 宿主页职责：
    1. 契约 B 传输通道：真实 String.prototype.replace(findRegex, replaceString)
@@ -32,10 +36,13 @@
   const results = [];   // { group, id, pass, detail }
 
   function add(group, id, pass, detail) {
-    results.push({ group, id, pass: !!pass, detail: detail || '' });
+    // 三态：true 通过 / null pending（环境受限待复验） / false 失败
+    const state = pass === null ? null : !!pass;
+    results.push({ group, id, pass: state, detail: detail || '' });
     const div = document.createElement('div');
-    div.className = 'row ' + (pass ? 'pass' : 'fail');
-    div.textContent = (pass ? '✓ ' : '✗ ') + group + ' · ' + id + (detail ? ' — ' + detail : '');
+    div.className = 'row ' + (state === null ? 'row' : state ? 'pass' : 'fail');
+    div.style.borderLeftColor = state === null ? '#e3b341' : '';
+    div.textContent = (state === null ? '⏳ ' : state ? '✓ ' : '✗ ') + group + ' · ' + id + (detail ? ' — ' + detail : '');
     out.appendChild(div);
   }
 
@@ -139,14 +146,15 @@
   }
 
   function finish() {
-    const passed = results.filter(r => r.pass).length;
-    const failed = results.length - passed;
+    const passed = results.filter(r => r.pass === true).length;
+    const pending = results.filter(r => r.pass === null || r.pass === undefined && r.pending).length;
+    const failed = results.length - passed - pending;
     const total = document.getElementById('total');
-    total.textContent = passed + ' / ' + results.length + ' 通过' + (failed ? ' — ' + failed + ' 项失败' : '');
-    total.style.color = failed ? '#ff7b72' : '#7ee787';
+    total.textContent = passed + ' / ' + results.length + ' 通过' + (pending ? '（含 ' + pending + ' 项 pending）' : '') + (failed ? ' — ' + failed + ' 项失败' : '');
+    total.style.color = failed ? '#ff7b72' : (pending ? '#e3b341' : '#7ee787');
     const groups = {};
     results.forEach(r => { (groups[r.group] = groups[r.group] || []).push(r); });
-    const summary = { harness: 'tactics-harness', groups, passed, failed, total: results.length };
+    const summary = { harness: 'tactics-harness', stage: new URLSearchParams(location.search).get('stage') || 'p01', groups, passed, failed, pending, total: results.length };
     document.getElementById('json').textContent = JSON.stringify(summary, null, 2);
     window.__TACTICS_P01_RESULT = summary;
     document.title = failed ? 'P01 Harness FAIL(' + failed + ')' : 'P01 Harness PASS(' + passed + ')';
@@ -159,7 +167,37 @@
     finish();
   });
 
-  const decoded = runTransportChannel();
+  // ---------- P02 分流 ----------
+  async function runP02() {
+    document.getElementById('title').textContent = '战棋 P02 Harness（真实入口挂载 + 双尺寸 + 播放中特效跟随）';
+    document.getElementById('frame').className = 'p02';
+    const frame = document.getElementById('frame');
+    frame.src = '../tactics/index.html';
+    const bootUrl = location.href.replace(/integration-test\/tactics-harness\.html.*$/, '') +
+      'integration-test/fixtures/tactics/p02-browser-cases.mjs';
+    // 等真实入口挂载完成
+    await new Promise((resolve, reject) => {
+      frame.addEventListener('load', () => resolve(), { once: true });
+      frame.addEventListener('error', () => reject(new Error('真实入口加载失败')), { once: true });
+      setTimeout(() => reject(new Error('真实入口 15s 未加载完成')), 15000);
+    });
+    // 等 boot 完成（app 暴露）
+    for (let i = 0; i < 50 && !frame.contentWindow.__TACTICS_APP__; i++) await new Promise(r => setTimeout(r, 100));
+    const casesMod = await import(bootUrl);
+    try {
+      const results = await casesMod.runBrowserCases(frame);
+      results.forEach(r => add('T02', r.id, r.pass, r.detail));
+    } catch (e) {
+      add('T02', 'p02-run', false, String(e && e.stack || e));
+    }
+    finish();
+  }
+
+  const params = new URLSearchParams(location.search);
+  if (params.get('stage') === 'p02') {
+    runP02().catch(e => { add('T02', 'p02-boot', false, String(e && e.message || e)); finish(); });
+  } else {
+    const decoded = runTransportChannel();
   if (decoded) {
     const frame = document.getElementById('frame');
     frame.srcdoc = buildIframeHtml(decoded);
@@ -173,6 +211,7 @@
   } else {
     finish();
   }
+  } // else: P01 默认流程结束
 })();
 </script>
 </body>

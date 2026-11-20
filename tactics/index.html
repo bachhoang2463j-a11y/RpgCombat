@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>战棋战斗（独立前端 · P02）</title>
+<link rel="stylesheet" href="./tactics.css">
+</head>
+<body>
+<div id="tactics-app"></div>
+<script type="module">
+import { createApp, DEFAULT_YAML_A } from './src/main.mjs';
+
+const app = createApp(document.getElementById('tactics-app'), {
+  defaultYaml: DEFAULT_YAML_A,
+});
+app.boot();
+
+// 调试句柄（测试读数专用：只回 JSON 快照，不暴露写规则状态的入口）
+window.__TACTICS_APP__ = {
+  app,
+  snapshot: () => app.sandbox.getSnapshot(),
+  loadYaml: (text, opts) => app.loadYaml(text, opts),
+  playProjectile: (type, from, to) => app.playProjectile(type, from, to),
+};
+</script>
+</body>
+</html>

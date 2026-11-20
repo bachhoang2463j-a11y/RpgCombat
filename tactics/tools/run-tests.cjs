@@ -18,6 +18,8 @@ const { pathToFileURL } = require('url');
 const ROOT = path.resolve(__dirname, '..', '..');
 // P01 用例（ESM，Node 与浏览器共用同一份业务模块）
 const P01_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p01-node-cases.mjs');
+// P02 用例（场景双输出 / 相机手势 / 占格选取 / 生命周期）
+const P02_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p02-node-cases.mjs');
 
 // 阶段注册表：只登记真实存在的用例文件；--all 只聚合这里的条目，不虚构未来阶段。
 const STAGES = {
@@ -34,6 +36,22 @@ const STAGES = {
       ['configPackage', 'buildConfigPackage'], ['configPackage', 'createImportDraft'], ['configPackage', 'finalizeImportDraft'],
       ['storage', 'loadTacticsRoster'], ['storage', 'saveTacticsKey'], ['storage', 'readTacticsRoster'], ['storage', 'saveTacticsRoster'], ['storage', 'buildTacticsResultPayload'],
     ],
+    modules: ['protocol', 'parser', 'roster', 'lifecycle', 'configPackage', 'storage'],
+  },
+  p02: {
+    file: P02_CASES,
+    groups: ['T02-01', 'T02-02', 'T02-03', 'T02-04'],
+    requiredExports: [
+      ['scene', 'compileScene'], ['scene', 'TEST_ROOM'],
+      ['geometry', 'occupiedCells'], ['geometry', 'buildOccupancyIndex'], ['geometry', 'unitAt'], ['geometry', 'unitCenter'], ['geometry', 'directionVector'],
+      ['mapArt', 'renderSceneArt'],
+      ['camera', 'createPose'], ['camera', 'worldToScreen'], ['camera', 'screenToWorld'], ['camera', 'screenToGrid'],
+      ['camera', 'zoomAtPose'], ['camera', 'focusPose'], ['camera', 'fitPose'], ['camera', 'createGesture'],
+      ['viewScope', 'createViewScope'],
+      ['arcaneVfx', 'bezierPoint'],
+      ['main', 'buildViewData'], ['main', 'deriveUnitId'], ['main', 'DEFAULT_YAML_A'], ['main', 'DEFAULT_PLACEMENTS'],
+    ],
+    modules: ['scene', 'geometry', 'mapArt', 'camera', 'viewScope', 'arcaneVfx', 'parser', 'storage', 'lifecycle', 'main'],
   },
 };
 
@@ -58,14 +76,33 @@ function parseArgs(argv) {
   return args;
 }
 
+// 模块文件名 → 加载键（stageDef.modules 列出该阶段真正需要的模块）
+const MODULE_FILES = {
+  protocol: 'protocol.mjs',
+  parser: 'parser.mjs',
+  roster: 'roster.mjs',
+  lifecycle: 'lifecycle.mjs',
+  configPackage: 'config-package.mjs',
+  storage: 'storage.mjs',
+  scene: 'scene.mjs',
+  geometry: 'geometry.mjs',
+  mapArt: 'map-art.mjs',
+  camera: 'camera.mjs',
+  viewScope: 'view-scope.mjs',
+  vfxHost: 'vfx-host.mjs',
+  arcaneVfx: 'arcane-vfx.mjs',
+  unitView: 'unit-view.mjs',
+  main: 'main.mjs',
+};
+
 async function loadModules(stageDef) {
   const modules = {};
-  modules.protocol = await import(pathToFileURL(path.join(ROOT, 'tactics', 'src', 'protocol.mjs')).href);
-  modules.parser = await import(pathToFileURL(path.join(ROOT, 'tactics', 'src', 'parser.mjs')).href);
-  modules.roster = await import(pathToFileURL(path.join(ROOT, 'tactics', 'src', 'roster.mjs')).href);
-  modules.lifecycle = await import(pathToFileURL(path.join(ROOT, 'tactics', 'src', 'lifecycle.mjs')).href);
-  modules.configPackage = await import(pathToFileURL(path.join(ROOT, 'tactics', 'src', 'config-package.mjs')).href);
-  modules.storage = await import(pathToFileURL(path.join(ROOT, 'tactics', 'src', 'storage.mjs')).href);
+  const list = stageDef.modules || ['protocol', 'parser', 'roster', 'lifecycle', 'configPackage', 'storage'];
+  for (const key of list) {
+    const file = MODULE_FILES[key];
+    if (!file) throw new Error('未知模块键: ' + key);
+    modules[key] = await import(pathToFileURL(path.join(ROOT, 'tactics', 'src', file)).href);
+  }
   assertRequiredExports(modules, stageDef.requiredExports);
   return modules;
 }
@@ -158,13 +195,20 @@ async function runStage(stageName, onlyGroup) {
       stage: stageName, groups: results.map(r => ({ id: r.id, passed: r.passed, failed: r.failed, pending: r.pending, cases: r.cases })),
     }) + '__END__\n');
   }
+  return { stage: stageName, passed, results };
 }
 
 function assertRequiredExports(modules, required) {
-  const constants = new Set(['PROTOTYPES','RANGE_TYPES','TACTICS_ROSTER_KEY']);
+  // 数据常量白名单之外一律要求函数类型（T01-06 依赖该门禁：传不存在函数必须失败）
+  const constants = new Set([
+    'PROTOTYPES', 'RANGE_TYPES', 'TACTICS_ROSTER_KEY',
+    'TEST_ROOM', 'DEFAULT_YAML_A', 'DEFAULT_YAML_B', 'DEFAULT_YAML_C', 'DEFAULT_PLACEMENTS',
+  ]);
   for (const [mod, name] of required) {
     const value = modules[mod]?.[name];
-    if (constants.has(name) ? value === undefined : typeof value !== 'function') throw new Error('业务导出缺失或类型错误: ' + mod + '.' + name);
+    if (constants.has(name) ? value === undefined : typeof value !== 'function') {
+      throw new Error('业务导出缺失或类型错误: ' + mod + '.' + name);
+    }
   }
 }
 module.exports = { assertRequiredExports, runGroup, parseArgs };
