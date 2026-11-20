@@ -3792,3 +3792,20 @@
 - **验证**：P01限定8组166项通过，IAB16/16，生成调用0；语法与diff检查通过，报告源码指纹一致。未运行原RPG或战棋全量，未改根生产文件/MMS/P00探针/冻结SPEC，未混入既有删除与.audit-work。
 - **复审限制**：独立只读代理未返回最终结论，已停止；不宣称独立复审通过。主代理完成六项反例验证与检查。
 - **目的 vs 现状**：六项审查修复已实现并回归通过；独立复审仍未完成，完整战场/UI/MMS接线范围不变。
+
+## [LOG-309] 2026-11-21 — P02 地图呈现、圆形头像、相机与原槽位 UI
+
+- **业务提交**：`2024d5a`。
+- **核心目的**：在不动原 RPG、不抢跑后续玩法阶段的前提下，把固定测试房间做成可交互正交战术沙盘：地图、真实占格、圆形头像、状态条与播放中特效共用世界坐标；镜头可平移/缩放/聚焦；原行动轴、菜单、编辑、记录与旁白入口保持原位。
+- **变更行为**：
+  1. 新增 `tactics/src/` 十一个 P02 模块：`scene.mjs`（固定 20×20 测试房间权威描述 + compileScene 双输出：规则格表(通行/挡弹/遮视/低障碍/材质独立) + R13 美术 JSON + 物件索引）、`geometry.mjs`（米格标尺/占格枚举/占位索引/朝向向量，90° 倍数查表防浮点残差）、`map-art.mjs`（战棋深灰石砖+暗红毯调色板注入）、`vendor/mms-map-art.mjs`（R13 MiniMapStatus mini 渲染管线移植：pattern defs/图元画法同源，不移植宿主/LLM/大地图段；新增战棋侧关闭门叶图元）、`camera.mjs`（唯一 {tx,ty,scale} 矩阵、双向投影、光标锚定缩放、fit/focus、拖拽阈值 6px 手势状态机：pending→dragging 永久、拖远回原点不算点击）、`unit-view.mjs`（正立圆标+阵营环+独立金色朝向箭头+名字/资源条 billboard 逆缩放；头像链 P01 显式 img→MMSImages.resolveAvatar→本地首字 SVG）、`vfx-host.mjs`（世界美术坐标锚点/矩形解析，position:absolute 挂世界层，替代根工程 mkAnchor position:fixed 痛点）、`arcane-vfx.mjs`（R08 切片移植：粒子/贝塞尔弹道/驱动循环 + 真实火焰弹 240+340ms 与敌方法术弹 480ms；坐标全存世界美术 px，相机变化不改演出数据；去音频）、`view-scope.mjs`（代际作用域：计时/rAF/监听/观察器/动画/节点统一注销 + Promise 结算一次 false，时钟可注入）、`sandbox.mjs`（编排：视口/world-root 六分层/R13 底图/叠加 Canvas/手势/选中占格框/mount/reset/destroy）、`ui-shell.mjs`（原槽位壳：行动轴/我方四列/260×172 菜单/顶栏七入口/底栏旁白/safeRect 实算）、`main.mjs`（P01 薄适配：parseYamlText→loadTacticsRoster→applyLoad 三分支路由 mount/update/reset；(side,name,出现序号) 确定性派生 scene 内稳定单位 ID；combatToken 集中换代；独立页内存变量宿主）。
+  2. 新增 `tactics/index.html` + `tactics.css`（无 Tailwind CDN/Google Fonts 外链；系统字体栈）；`#enemies-container` 槽位替换为全屏地图视口，UI 悬浮层/行动轴/顶栏在相机树之外。
+  3. `tactics/src/parser.mjs` 手术式修复：parseEnemyEntry 补齐原型缺省（口径同 parseHeroEntry，补齐值不标 _explicit）——契约第 1 节"新建角色"覆盖敌方，原实现忽略 原型 字段导致大型生物 footprint 落 1×1；T01 全量 166 断言回归通过。
+  4. `tactics/tools/run-tests.cjs`：注册 `--stage=p02`（T02-01~04，requiredExports 存在性门禁 + 函数类型检查保留）、loadModules 按 stage 模块清单加载、runStage 返回汇总修复 --all 既有崩溃、assertRequiredExports 常量白名单扩展（T01-06 函数门禁语义不变）。
+  5. `integration-test/tactics-harness.html`：`?stage=p02` 分流（默认 P01 契约 B 流程语义不变）；真实 iframe 挂载 `tactics/index.html`（非 srcdoc 复制）、1280×720/1600×900 双尺寸实测、三态结果（通过/pending/失败）与机器可读 JSON。
+  6. 测试：Node 侧 T02-01~04 共 61 用例（双输出单源反证/投影往返/手势全路径/可控时钟生命周期/同名派生 ID/路由分支）+ 浏览器侧 44 断言（双尺寸槽位/菜单导航/正立头像/播放中特效粒子世界坐标不变/2×2 四格命中/拖拽零选取/重置清理/监听不递增/P00-native 双相机位同格）。
+- **涉及文件**：`tactics/index.html`、`tactics/tactics.css`、`tactics/src/`（11 新 + parser.mjs + vendor/）、`tactics/tools/run-tests.cjs`、`integration-test/tactics-harness.html`、`integration-test/fixtures/tactics/`（p02-node-cases/p02-browser-cases/p02-fixture + reports/P02-2026-11-21.json + p02-viewport-1280.png）；本条与 LOG-INDEX。
+- **验证**：`node tactics/tools/run-tests.cjs --all` 227 通过（P01 166 + P02 61）failed=0 pending=0；`--self-check` 负路径全过；IAB 实跑 P02 harness 42 通过/0 失败/2 pending（报告落盘 `P02-2026-11-21.json`，截图留档）；P01 harness 回归 16/16；generateRaw/generate 双计数 0；禁改文件（根 index.html/根构建器/regex 包/P00 报告/SPEC/README/MMS 仓库）零改动；未混入工作树既有删除与 .audit-work。
+- **pending（不冒充全绿）**：①特效 Canvas 真实像素采样 ②focusWorld 缓动推进——IAB rAF 暂停无法验证（两项纯逻辑已在 Node 组覆盖），需用户授权排障模式（真 Chrome）复验；P00 原生视口待验项（P01-CONTRACT 第 9 节）本轮补验了 SVG 显示/双向坐标/无外链/LLM 计数 0，Canvas/rAF 项待真 Chrome 后再关闭，本轮不改 P00-REPORT。
+- **边界**：不实施跑圈、六范围结算、感知、AI、布阵求解（P03+）；行动/技能按钮仅导航与 P01 数据展示，不冒充业务能力；固定图不是最终地图生成；本阶段不运行根 RPG 构建、不发布战棋正则包。
+- **目的 vs 现状**：P02 目的（视频式战术沙盘承载 + 世界↔屏幕一致 + 原槽位保留 + 特效动态跟随）已达成并实测；表现层 2 项 rAF 依赖验证 pending 待真 Chrome；完整玩法属 P03+。

@@ -1,7 +1,7 @@
 {
   "stage": "P02",
   "source": "tactics/index.html + tactics/src/*.mjs",
-  "sourceCommit": "待回填（业务提交后见 LOG-INDEX）",
+  "sourceCommit": "2024d5a",
   "mode": "source",
   "command": "node tactics/tools/run-tests.cjs --stage=p02 ; --stage=p01 回归 ; --all ; integration-test/tactics-harness.html?stage=p02（IAB） ; ?无参 P01 harness 回归（IAB）",
   "executed": true,
