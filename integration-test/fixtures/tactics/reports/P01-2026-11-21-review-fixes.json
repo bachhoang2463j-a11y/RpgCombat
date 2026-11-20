@@ -3,7 +3,7 @@
   "revision": "review-fixes",
   "executed": true,
   "executedAt": "2026-11-20T20:50:46.329Z",
-  "sourceCommit": "f308914770ff3323a3c3f2ac228329b2693a0c38",
+  "sourceCommit": "8ebd29b",
   "sourceDirty": true,
   "mode": "source",
   "command": "node tactics/tools/run-tests.cjs --stage=p01",
@@ -1289,5 +1289,7 @@
     "reason": "独立只读代理未返回最终结论，已停止；不计通过",
     "primaryVerification": "六项真实反例、Node166与IAB16通过"
   },
-  "purposeVsState": "六项审查修复已实施，Node166/IAB16通过；独立代理复审未完成，不宣称通过。"
+  "purposeVsState": "六项审查修复已实施，Node166/IAB16通过；独立代理复审未完成，不宣称通过。",
+  "baseHeadAtRun": "f308914770ff3323a3c3f2ac228329b2693a0c38",
+  "sourceCommitNote": "业务提交源码与报告指纹一致，保留执行时 sourceDirty 和基线。"
 }

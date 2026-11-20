@@ -3782,3 +3782,13 @@
 - **验证**：`node tactics/tools/run-tests.cjs --stage=p01` 8 组 146 用例全绿；`--self-check` 负路径全过；IAB 实跑 harness 13/13（截图与机器可读结果已留档）；generateRaw/generate 双计数 0；禁改文件（根 index.html/regex v12_16/build-regex.cjs/README/根 SPEC/doc SPEC/P00 报告/MMS）零改动；未混入工作树既有删除与 .audit-work。
 - **边界**：不实施跑圈引擎、地图、AI、命中结算（P02+）；配置导入导出 UI 与真实 MMS 接线留 P11；三键整档保存的串行约束已记入契约第 9 节；未新增生产 LLM 提示词。
 - **目的 vs 现状**：P01 目的（可信数据协议 + 真代码测试底座）已达成且可复现；完整战场、UI 与发布打包仍属 P02—P12。
+
+## [LOG-308] 2026-11-21 — 修复 P01 六项交付审查问题
+
+- **业务提交**：`8ebd29b`。
+- **核心目的**：修复已复现的六项问题，使协议与保存/重载链路由真实行为测试验证。
+- **变更行为**：最大HP/MP独立走配置来源链；配置包支持扁平角色与保存形态再次导出；新增 `loadTacticsRoster` 读档/合并/首次闪避基准写入；按已存scene+battle续接并修复reopen当前指针；尊重组children与物品children/bindings显式空集合；严格验证函数导出与非法筛选参数，并用真实缺函数/零用例子进程失败替换源码文案检查。
+- **涉及文件**：tactics/src/{roster,storage,lifecycle,config-package}.mjs、tactics/tools/run-tests.cjs、fixtures/tactics/{p01-node-cases,p01-review-regressions,p01-browser-cases}.mjs、P01-CONTRACT.md、本轮报告及PLAN状态引用。
+- **验证**：P01限定8组166项通过，IAB16/16，生成调用0；语法与diff检查通过，报告源码指纹一致。未运行原RPG或战棋全量，未改根生产文件/MMS/P00探针/冻结SPEC，未混入既有删除与.audit-work。
+- **复审限制**：独立只读代理未返回最终结论，已停止；不宣称独立复审通过。主代理完成六项反例验证与检查。
+- **目的 vs 现状**：六项审查修复已实现并回归通过；独立复审仍未完成，完整战场/UI/MMS接线范围不变。
