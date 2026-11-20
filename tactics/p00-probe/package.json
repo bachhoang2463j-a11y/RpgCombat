@@ -1,0 +1,18 @@
+{
+  "name": "rpgcombat-tactics-p00-probe",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test rules.test.mjs",
+    "build": "node build.mjs",
+    "check:artifact": "node check-artifact.mjs",
+    "serve": "node serve.mjs"
+  },
+  "dependencies": {
+    "phaser": "3.90.0",
+    "rot-js": "2.2.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

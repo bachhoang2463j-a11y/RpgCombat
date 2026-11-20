@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>战棋 P00 · iframe mock</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root { color-scheme: dark; font: 13px/1.35 system-ui, sans-serif; background: #0b111b; }
+    body { margin: 0; }
+    iframe { display: block; width: 100%; height: 100vh; border: 0; }
+    section { position: fixed; top: 10px; right: max(28px, calc((100vw - 1480px) / 2)); z-index: 1; min-width: 295px; padding: 6px 10px; background: #151f2d; border: 1px solid #394d68; border-radius: 6px; color: #e3e9f2; pointer-events: none; }
+    h1 { margin: 0 0 2px; font-size: 13px; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    [data-state="pass"] { color: #88e4c9; }
+    [data-state="fail"] { color: #ffaba3; }
+  </style>
+</head>
+<body>
+  <section aria-label="P00 断言状态">
+    <h1>iframe mock <span id="total">· 0/4 通过</span></h1>
+    <ul>
+      <li id="T00-01">T00-01 等待画布</li>
+      <li id="T00-02">T00-02 等待点选</li>
+      <li id="T00-03">T00-03 等待产物</li>
+      <li id="T00-04">T00-04 等待算法结果</li>
+    </ul>
+  </section>
+  <iframe id="probe-frame" title="P00 探针 iframe" sandbox="allow-scripts allow-same-origin"></iframe>
+  <script>
+    const frame = document.getElementById('probe-frame');
+    const marks = new Map();
+    let roundTrip = false;
+
+    function installMock() {
+      const vars = { message: {}, chat: {}, global: {} };
+      const calls = window.p00MockCalls = { generateRaw: 0, generate: 0 };
+      const type = (options) => options?.type ?? 'chat';
+      const merge = (base, patch) => {
+        for (const [key, value] of Object.entries(patch)) {
+          base[key] = value && typeof value === 'object' && !Array.isArray(value)
+            ? merge(base[key] ?? {}, value) : value;
+        }
+        return base;
+      };
+      const stop = (name) => async () => {
+        calls[name]++;
+        throw new Error(`生成调用不应发生：${name}`);
+      };
+      const api = {
+        getVariables: (options) => structuredClone(vars[type(options)]),
+        replaceVariables: (value, options) => { vars[type(options)] = structuredClone(value); },
+        insertOrAssignVariables: (value, options) => merge(vars[type(options)], structuredClone(value)),
+        getCurrentMessageId: () => 0,
+        getChatMessages: () => [{ message_id: 0, role: 'assistant', message: '' }],
+        generateRaw: stop('generateRaw'),
+        generate: stop('generate'),
+      };
+      Object.assign(window, api, { TavernHelper: api });
+    }
+
+    function mark(id, value, detail) {
+      const row = document.getElementById(id);
+      row.dataset.state = value === null ? 'pending' : value ? 'pass' : 'fail';
+      row.textContent = `${id} ${value === null ? '待测' : value ? '✓' : '✗'} ${detail}`;
+      marks.set(id, value);
+      document.getElementById('total').textContent = `· ${[...marks.values()].filter(Boolean).length}/4 通过`;
+    }
+
+    function inspect() {
+      const child = frame.contentWindow;
+      const probe = child.p00Probe;
+      if (!probe?.ready) return;
+      const calls = child.p00MockCalls;
+      const viewport = `${child.innerWidth}×${child.innerHeight}`;
+      mark('T00-01', child.location.href === 'about:srcdoc' && probe.renderer === 1 &&
+        probe.pixels.every(Boolean) && calls.generateRaw === 0 && calls.generate === 0,
+      `${viewport} · 画布 ${probe.pixels.filter(Boolean).length}/3 · 生成 ${calls.generateRaw + calls.generate}`);
+
+      const isHit = ({ id, grid, trusted }) => id === 'target' && grid[0] === 7 && grid[1] === 3 && trusted;
+      const exactPose = (click, x, y, zoom) => isHit(click) &&
+        click.camera.x === x && click.camera.y === y && click.camera.zoom === zoom;
+      const normal = probe.clicks.find(click => exactPose(click, 0, 0, 1));
+      const transformed = probe.clicks.find(click => exactPose(click, 94, 10, 1.3));
+      const movement = normal && transformed && Math.hypot(normal.screen[0] - transformed.screen[0], normal.screen[1] - transformed.screen[1]);
+      const clickPass = probe.clicks.some(click => !isHit(click)) ? false : movement ? movement > 40 : null;
+      mark('T00-02', clickPass, `原位 ${normal ? '✓' : '—'} / 平移缩放 ${transformed ? '✓' : '—'}`);
+
+      const http = probe.resources().filter(({ name }) => /^https?:/i.test(name));
+      const entities = probe.transport === '&amp;|&lt;|&quot;|<|>|$&|$1';
+      mark('T00-03', roundTrip && entities && http.length === 0 && probe.csp.length === 0,
+        `围栏与实体 ${roundTrip && entities ? '✓' : '✗'} · 子请求 ${http.length} · CSP ${probe.csp.length}`);
+
+      const { path, gap, openSteps, blocked, revealed, clear, outside, outsideVisibility } = probe.geometry;
+      mark('T00-04', path.length === 10 && JSON.stringify(gap) === '[[4,5]]' && openSteps === 5 &&
+        !blocked && revealed && clear && !outside && outsideVisibility === 1,
+      `绕墙 ${path.length - 1} / 开墙 ${openSteps} 步 · 遮挡 ${!blocked && revealed ? '✓' : '✗'}`);
+    }
+
+    async function mount() {
+      const response = await fetch('../tactics/p00-probe/probe.html');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const html = await response.text();
+      const fence = '\u0060\u0060\u0060';
+      const fenced = `${fence}html\n${html}\n${fence}`;
+      const [, block] = fenced.match(/^```html\n([^]*?)\n```$/);
+      const entities = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+      const codeBlock = document.createElement('textarea');
+      codeBlock.innerHTML = block.replace(/[&<>"']/g, (char) => entities[char]);
+      const payload = codeBlock.value;
+      roundTrip = fenced.split(fence).length === 3 && payload === html;
+      const mock = `<script>(${installMock.toString()})();<\/script>`;
+      frame.addEventListener('load', () => {
+        const child = frame.contentWindow;
+        if (child.location.href !== 'about:srcdoc') return;
+        child.addEventListener('p00-evidence', inspect);
+        child.addEventListener('resize', inspect);
+        inspect();
+      });
+      frame.srcdoc = payload.replace('<!-- P00_MOCK -->', () => mock);
+    }
+
+    mount().catch(error => mark('T00-01', false, `挂载失败 ${error.message}`));
+  </script>
+</body>
+</html>
