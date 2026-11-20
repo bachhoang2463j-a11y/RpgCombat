@@ -10,32 +10,47 @@
 2. 以 [SPEC.md](SPEC.md) 的最终规则为准，特别是范围／穿透分离、蓄力释放不扣主行动、YAML最高优先、MMS只战后同步。
 3. 用真实源码／真实压缩产物测试，不把mock里复制的一套“正确实现”当作业务代码；数值测试与视觉验收分开。
 4. 先过一张测试地图的闭环，再完善可变地图、三个视觉主题和完整能力；阶段较长也必须产出可独立验证的切片。
-5. 本轮只做文档。**下列所有阶段都是未开工；拟建命令和路径暂不存在，不应现在执行。**
+5. 状态说明：P00 已完成隔离承载探针（业务提交 `ca38c2b`，日志提交 `f306555`，详见 [P00-REPORT.md](P00-REPORT.md)），仍需补验真实正则替换链与原生路线视口；**P01—P12 均未开工，拟建正式命令和路径暂不存在，不应现在执行。**
 
-## 状态、依赖与工时
+## 状态、依赖与工时（第二轮复核修订）
 
-| 阶段 | 交付切片 | 依赖 | 已有资源ID | 净工时 | 状态 |
-| --- | --- | --- | --- | --- | --- |
-| P00 | 资源与独立分发技术验证 | 无 | R08/R10/R12，E01—E06 | 4—6h | 未开工 |
-| P01 | 协议、独立闪避、配置包数据模型、真代码测试底座 | P00 | R01/R05/R06/R07/R10 | 12—16h | 未开工 |
-| P02 | 地图＋圆形头像＋相机与原槽位UI | P01 | R02/R08/R09，E01/E08 | 10—14h | 未开工 |
-| P03 | 跑圈与全局事件时钟 | P01 | R02/R03，E02/E09作参考 | 14—20h | 未开工 |
-| P04 | 多格移动、跳跃、推动、碰撞 | P02/P03 | R03，E02/E03/E05/E07 | 18—26h | 未开工 |
-| P05 | 三主题可变地图与语义布阵 | P04 | R01/R07，E02/E03/Tiled出处 | 20—30h | 未开工 |
-| P06 | 六种范围、命中预览与投射／爆炸 | P04 | R01/R03/R08，E03/E04/E07/E08 | 22—32h | 未开工 |
-| P07 | 资源、独立闪避、再动、蓄力、反应与旧能力迁移 | P03/P06 | R01/R03/R07/R11 | 20—30h | 未开工 |
-| P08 | 感知、声音、记忆和信息隔离 | P05/P06 | R03/R09/R10，E02/E04/E06 | 18—28h | 未开工 |
-| P09 | 本地敌友AI与通用任务 | P07/P08 | R04/R11，E06/E07/E09 | 20—32h | 未开工 |
-| P10 | 倒地救援、场地结界、目标与撤离 | P04/P07/P09 | R03/R06/R07/R08/R11 | 16—24h | 未开工 |
-| P11 | 酒馆接线、全体／单角色配置导入导出、存档与战后MMS | P05—P10 | R01/R05/R06/R07/R10/R11 | 16—26h | 未开工 |
-| P12 | 唯一最终全量、视觉复检与独立打包 | P11，各相关组已稳定 | R08/R09/R10/R12 | 8—14h | 未开工 |
-| **总计** | **完整首版，包含新增独立闪避与角色配置导入导出，不含已完成访谈** | | | **198—298h** | **未开工** |
+| 阶段 | 交付切片 | 依赖 | 已有资源ID | 原估算 | 修订净工时 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| P00 | 资源与独立分发技术验证 | 无 | R08/R10/R12/R13，E01/E02 | 4—6h | 2—3h | 隔离探针已过（`ca38c2b`）；剩余正则传输与原生视口补验 1—2h |
+| P01 | 协议、独立闪避、配置包数据模型、真代码测试底座 | P00 | R01/R05/R06/R07/R10 | 12—16h | 9—12h | 未开工 |
+| P02 | 地图＋圆形头像＋相机与原槽位UI | P01 | R02/R08/R09/R13，E08参考 | 10—14h | 6—9h | 未开工 |
+| P03 | 跑圈与全局事件时钟 | P01 | R02/R03，E02/E07参考 | 14—20h | 10—14h | 未开工 |
+| P04 | 多格移动、跳跃、推动、碰撞 | P02/P03 | R03，E02/E07参考 | 18—26h | 11—16h | 未开工 |
+| P05 | 三主题可变地图与语义布阵 | P04 | R01/R07/R13，E02参考 | 20—30h | 14—20h | 未开工 |
+| P06 | 六种范围、命中预览与投射／爆炸 | P04 | R01/R03/R08，E07/E08参考 | 22—32h | 12—17h | 未开工 |
+| P07 | 资源、独立闪避、再动、蓄力、反应与旧能力迁移 | P03/P06 | R01/R03/R07/R11 | 20—30h | 15—22h | 未开工 |
+| P08 | 感知、声音、记忆和信息隔离 | P05/P06 | R03/R09/R10，E02参考 | 18—28h | 10—15h | 未开工 |
+| P09 | 本地敌友AI与通用任务 | P07/P08 | R04/R11，E06/E07/E09参考 | 20—32h | 13—19h | 未开工 |
+| P10 | 倒地救援、场地结界、目标与撤离 | P04/P07/P09 | R03/R06/R07/R08/R11 | 16—24h | 12—17h | 未开工 |
+| P11 | 酒馆接线、全体／单角色配置导入导出、存档与战后MMS | P05—P10 | R01/R05/R06/R07/R10/R11/R13 | 16—26h | 10—15h | 未开工 |
+| P12 | 唯一最终全量、视觉复检与独立打包 | P11，各相关组已稳定 | R08/R09/R10/R12/R13 | 8—14h | 4—6h | 未开工 |
+| **总计** | **完整首版（P00—P12 共 13 阶段，含独立闪避与角色配置导入导出）** | | | **198—298h** | **128—185h** | **P00 探针已过，P01—P12 未开工** |
 
-建议预留15%—25%联调／返工后安排 **230—375h**，即约 **29—47个8小时工作日**。这不是模型自动运行的墙钟时间承诺。新增两项约增加10—16h净工程量，主要为旧值迁移、命闪钩子审计、配置往返与草稿覆盖测试。
+### 工时口径区分（候选工程估算，非墙钟自动运行承诺）
 
-### 最早可玩切片
+- **完整首版总投入（P00—P12）**：净工时 **`128—185h`**；加上 15%—20% 跨模块联调与返工缓冲后建议安排 **`147—222h`**（约 **`19—28 个 8 小时工作日`**）。对比原估算 `198—298h` 净差额为 **`70—113h`**（估算降幅约 **`35%—38%`**）。
+- **当前剩余投入**：扣除已提交的 `ca38c2b` P00 隔离承载探针后，P00 剩余补验为 **`1—2h`**，P01—P12 未开工部分合计为 **`126—182h`**，当前剩余净工时合计 **`127—184h`**。
+- **最早可玩切片（MVP）**：约 **`28—40h`**，覆盖单张 R13 固定测试地图、圆形头像与视口、跑圈时钟、基础八向移动与主辅资源、单体／扇形／直线开火及接近攻击的简易敌人。这是 P00—P09 的薄纵向子集，不等同于 P00—P09 全通过，也不含三主题可变地图生成、蓄力／结界／救援和配置导入导出。
 
-约40—60h可先做固定测试地图、圆形头像、跑圈、基础移动／主辅资源、单体开火及只会接近攻击的敌人。这是P00—P09的薄纵向子集，不是完整P00—P09都通过；暂不含地图生成、完整感知、蓄力／结界／救援和三主题定稿，不改最终目标。
+## 核心复用与最小适配职责边界
+
+正式路线推荐采用 **R13 `MiniMapStatus` 室内外语义底图（`mmsRenderMapArt('mini')`）＋原生 Canvas 2D／DOM＋统一格网几何（可按需保留 `rot-js` 纯算法子模块）**。大量解析、数值、状态、编辑器与表现资产直接复用自本地 `index.html` 与 `MiniMapStatus.html`（详见 [RESOURCES.md](RESOURCES.md) R01—R13），但必须在以下 8 项职责切口完成结构化适配：
+
+| 职责切口 | 复用资产（R01—R13） | 必须新增或替换的规则职责 |
+| --- | --- | --- |
+| 1. 协议与 YAML 最高优先 | R01 `parseSkill/parseItem/_explicit`、R05 `_gapFillSkill` | 扩充六范围、主辅成本、独立闪避与三原型缺省值；**修复 `applyPersistedRoster`（L29815—29821）与 `applyStatusBarRoster`（L29526—29534）覆盖 YAML 显式字段（含 `0`/`false`）的旧逻辑** |
+| 2. 地图双输出与相机手势 | R13 `MMS_MINI_*` 10材质＋24图元、`mmsRenderMapArt('mini')`、`demo-bigmap` 缩放平移、`MMSImages.resolveAvatar` | 图元素材收益仅计入 P02；P05 由**单一权威场景数据**同时输出米格规则属性表（通行／挡弹／遮视／低障碍／多格占地）与底图视觉 JSON；相机补 `screenToWorld` 与拖拽／点选手势分离 |
+| 3. 连续跑圈与全局时钟 | R02 `getEffectiveSpeed`、`combatToken`、`renderTurnQueue` 槽位 | 废弃 `startRound` 大回合重建与 `Act` 多动衰减；实现 10000 距离连续时钟（周期尾跳→到期/CD/救援截止→角色到轴）及隐藏敌人轴项过滤 |
+| 4. 主辅资源、蓄力与再动 | R01/R03 消耗与限次扣减、`[加速:N]` 释放后入账 | 替换 `TAG_HANDLERS['再动']`、风行者、隐匿者的 `actionQueue.splice` 为增加当前或待领取主行动点（不刷移动／辅助）；蓄力改为开始付 1 主行动＋资源并启 CD，后续投库存与可用主点 |
+| 5. 逐槽空间目标与转火 | R03 `executeSkillAction` 槽排序、25 个面板／状态 `TAG_HANDLERS`、弹药按发消耗、召唤／制服过滤 | 替换 L24738—24803 的逐槽前后排／全队／随机目标计算：拟建 `spatialCtx.resolveSlotTargets(slot, caster, skill)`，共享单次施放几何覆盖，但按每槽自身／友方／敌方语义分流目标，并对齐下游单群判断与空间合法 `[转火]` |
+| 6. 独立闪避、空间反应与场地结界 | R03 双骰命闪、征伐者 `modifyDodgeCap`、二次反应闪避、`applyBarrierResist`、`triggerBarrierShatter` | 命闪防御基础改读独立 `target.evasion` 并移除后排掩护扣命中；反应／看破／舍身增加技能距离、本人视线与实墙检查；以独立地图结界替换全局 `teamBarrier` 及群攻溢出平摊 |
+| 7. 特效坐标跟随与表现静默 | R08 `arcaneVfxModule`、`mkAnchor`、R09 `CombatAudioMixer` | 为 `mkAnchor`（L5792 `position:fixed`）与粒子层补充**动态重投影或统一变换容器**，确保播放中相机平移／缩放／跟随一致；P08 输出层统一过滤盲区受击浮字、隐藏坐标特效、战报姓名／HP 与 LLM 旁白入参 |
+| 8. AI 只读预测与构建契约 | R03 `computeSegmentRawDamage/applyEnemyTypeResist`、R04 `selectEnemySkillAndTarget` 权重、R12 `build-regex.cjs` | P09 组装**适配新空间规则的只读预测器**（在预测副本上连续扣减多段护盾／一次性免伤，按显式空间范围判 AoE 抗性与场地结界，不调旧 `wouldSegmentClearHp` 或异步执行链）；P00/P12 独立打包器明确 `$` 序列拦截（契约 A）或传输层转义后 `String.replace`＋实体还原字节往返验证（契约 B） |
 
 ## 通用验收方法
 
@@ -90,29 +105,29 @@
 <a id="p00"></a>
 ## P00. 验证真正可用的底座与单HTML分发
 
-**产物：** 一页无业务的技术试验，圆形头像／地图片段可显示；锁定表现、寻路／FOV候选与版本；记录许可证和模块入包方式，不同时安装所有库。
+**产物：** 一页无业务的技术试验，圆形头像／地图片段可显示；锁定表现、寻路／FOV候选与版本；记录许可证和模块入包方式，不同时安装所有库。已提交隔离探针 `ca38c2b`（[P00-REPORT.md](P00-REPORT.md)），待补真实正则 `String.replace` 替换链往返验证与正式路线原生视口探针。
 
-**已有资源：** [R08母版与移植说明](RESOURCES.md)、[R10真实iframe mock](RESOURCES.md)、[R12构建／免疫方法](RESOURCES.md)；[Phaser相机](https://docs.phaser.io/phaser/concepts/cameras)、[ROT源码与构建形式](https://github.com/ondras/rot.js)、[Rex Board](https://rexrainbow.github.io/phaser3-rex-notes/docs/site/board/)、[raycaster](https://github.com/wiserim/phaser-raycaster)。
+**已有资源：** [R08母版与移植说明](RESOURCES.md)、[R10真实iframe mock](RESOURCES.md)、[R12构建／免疫方法](RESOURCES.md)、[R13 MMS室内外底图与视口](RESOURCES.md)；[Phaser相机](https://docs.phaser.io/phaser/concepts/cameras)、[ROT源码与构建形式](https://github.com/ondras/rot.js)。
 
-**范围：** 只测承载，不创建另一套音频、规则或用户入口；检查外库的隐藏生成时间上限，未经批准不能移植为项目限制。
+**范围：** 只测承载，不创建另一套音频、规则或用户入口；检查外库的隐藏生成时间上限，未经批准不能移植为项目限制。本轮已发现 `tactics/p00-probe/probe.html` 含 26 处 `$1`/`$&` 序列；正式打包器须明确选择“源码/产物禁止危险 `$` 序列（契约 A）”或“传输层将 `$` 加倍转义后验证单次 `String.replace`＋实体还原字节一致（契约 B）”，不顺手修改根 `build-regex.cjs`。
 
 | 测试ID | 可复现输入／操作 | 必须得到的结果 |
 | --- | --- | --- |
 | T00-01 | 实际试验HTML挂入模拟TavernHelper iframe，分别宽1280与1600 | 地图和头像正常初始化，未调用generateRaw，不依赖用户账户服务 |
 | T00-02 | 相机平移、缩放后点击已知世界位置 | 返回同一逻辑格／对象；视口坐标与世界坐标明确分离 |
-| T00-03 | 锁版本生成单HTML，再经过围栏／实体处理加载 | 外模块确实执行；不是仅字符串出现；许可声明保留 |
+| T00-03 | 锁版本生成单HTML，再经过围栏／实体处理加载 | 外模块确实执行；不是仅字符串出现；许可声明保留；补验模拟 `String.prototype.replace(findRegex, replaceString)` 捕获组替换与实体还原字节往返 |
 | T00-04 | 读取所选ROT／Rex／raycaster配置与源码 | 版本匹配和时间／规模限制有明确记录；不适合的组件不用，不暗改玩法 |
 
-**退出条件：** 明确只选择一套规则寻路／FOV查询，表现层不得另建权威几何；记录实际版本、依赖和许可。遇平台无法承载时提交反例让用户决定，不越过此门直接自研。
+**退出条件：** 明确只选择一套规则寻路／FOV查询，表现层不得另建权威几何；记录实际版本、依赖和许可。正式路线采用 R13 MMS 底图＋原生 Canvas/DOM＋统一格网（可按需保留 ROT 纯算法），不再打包 Phaser 表现壳。
 
-**阶段回述：** 目的为选可用底座；现状只证明承载／打包，不宣称战棋功能完成。
+**阶段回述：** 目的为选可用底座；现状已完成 `ca38c2b` 隔离承载探针，仍需补验真实正则替换链与新原生路线，不宣称战棋功能完成。
 
 <a id="p01"></a>
 ## P01. 协议与测试底座先行
 
 **产物：** 场景／战斗ID、单位属性／独立闪避／体型、六范围、主辅成本、效果槽、软硬语义约束的规范数据模型；带版本的全体／单角色配置包结构；真实函数或模块测试入口；MMS／chat变量保真mock。
 
-**已有资源：** [R01解析](RESOURCES.md)、[R05配置合并](RESOURCES.md)、[R06结果事件](RESOURCES.md)、[R07草稿](RESOURCES.md)、[R10测试壳](RESOURCES.md)；本地 `integration-test/fixtures/verify-shop-catalog.cjs` 的真实函数提取、`harness.html` 的深合并／替换区别。规则见SPEC S01/S05/S12/S14。
+**已有资源：** [R01解析](RESOURCES.md)、[R05配置合并](RESOURCES.md)、[R06结果事件](RESOURCES.md)、[R07草稿](RESOURCES.md)、[R10测试壳](RESOURCES.md)；本地 `integration-test/fixtures/verify-shop-catalog.cjs` 的真实函数提取、`harness.html` 的深合并／替换区别。重点修复 `applyPersistedRoster`（L29815—29821）与 `applyStatusBarRoster`（L29526—29534）无视 `statSource/_explicit` 直接覆盖 YAML 显式字段的旧逻辑。规则见SPEC S01/S05/S12/S14。
 
 | 测试ID | 输入／操作 | 预期 |
 | --- | --- | --- |
@@ -138,27 +153,27 @@ node tactics/tools/run-tests.cjs --stage=p01
 <a id="p02"></a>
 ## P02. 地图呈现、头像与相机
 
-**产物：** 固定测试房间、墙和低障碍；保持原菜单槽位；圆形头像正立／独立朝向、状态显示、相机和世界位置适配。先用一张图，避免生成器问题混入点击问题。
+**产物：** 固定测试房间、墙和低障碍；保持原菜单槽位；圆形头像正立／独立朝向、状态显示、相机和世界位置适配；补齐 `screenToWorld`、拖拽／点选手势分离及特效坐标在相机平移缩放下的动态跟随机制。先用一张图，避免生成器问题混入点击问题。
 
-**已有资源：** [R02行动轴UI](RESOURCES.md)、[R08锚点／粒子](RESOURCES.md)、[R09音频与WebM索引](RESOURCES.md)；[E01相机](https://docs.phaser.io/phaser/concepts/cameras)、[E08棋盘交互参考](https://github.com/pongstylin/tactics/blob/master/src/tactics/Board.js)；[四张原型缩略图](references/SOURCE.md)。
+**已有资源：** [R02行动轴UI](RESOURCES.md)、[R08锚点／粒子](RESOURCES.md)、[R09音频与WebM索引](RESOURCES.md)、[R13 MMS 10材质＋24图元／demo-bigmap缩放平移／MMSImages](RESOURCES.md)；[E08棋盘交互参考](https://github.com/pongstylin/tactics/blob/master/src/tactics/Board.js)；[四张原型缩略图](references/SOURCE.md)。
 
 | 测试ID | 操作 | 预期 |
 | --- | --- | --- |
 | T02-01 | 1280×720和1600×900，展开行动／技能／编辑菜单 | 入口位置沿用，地图不挡菜单、按钮不丢；不声称已支持手机 |
-| T02-02 | 旋转瞄准方向360°、相机平移缩放 | 头像人脸不旋转，箭头随方向；单位状态条跟随同一世界对象 |
-| T02-03 | 1×1与2×2单位同时显示与选取 | 头像大小不替代真实占地；点选返回正确单位，无ID串目标 |
+| T02-02 | 旋转瞄准方向360°、相机平移缩放（含特效播放中途平移缩放与镜头跟随） | 头像人脸不旋转，箭头随方向；单位状态条与播放中特效锚点／轨迹跟随同一世界对象，不漂移不靠禁用镜头省验收 |
+| T02-03 | 1×1与2×2单位同时显示与选取 | 头像大小不替代真实占地；拖拽与点选分离，点选返回正确单位，无ID串目标 |
 | T02-04 | 开启后重置／更换场景／关闭再打开 | 临时效果、监听和相机状态不残留到新场，旧回调不二次生成对象 |
 
-**退出条件：** 固定图操作可用、世界→屏幕一致，截图对照地图／圆标／射界目标；规则不从DOM算位置。
+**退出条件：** 固定图操作可用、世界↔屏幕双向一致、特效动态重投影或统一变换容器验证通过，截图对照地图／圆标／射界目标；规则不从DOM算位置。
 
-**阶段回述：** 目的为视频式战术沙盘；现状只验表现承载，不把固定测试地图当最终地图生成。
+**阶段回述：** 目的为视频式战术沙盘；现状只验表现承载，不把固定测试地图当最终地图生成（R13 底图素材复用收益计入本阶段，不在 P05 重复扣除）。
 
 <a id="p03"></a>
 ## P03. 跑圈与事件时钟
 
 **产物：** 可复现的纯规则调度器、事件时间线、隐蔽UI过滤、状态／CD／新单位调度，不靠rAF／现实定时推进。
 
-**已有资源：** [R02 getEffectiveSpeed／nextTurn／endTurn](RESOURCES.md)、[R03事件总线](RESOURCES.md)；[ROT scheduler目录](https://github.com/ondras/rot.js/tree/master/src/scheduler)和[原型game阶段](https://github.com/semibran/tactics/blob/master/lib/game.js)只参考，不照搬双方大回合。规则见SPEC S02/S03/S06。
+**已有资源：** [R02 getEffectiveSpeed／combatToken／renderTurnQueue](RESOURCES.md)、[R03事件总线](RESOURCES.md)；[ROT scheduler目录](https://github.com/ondras/rot.js/tree/master/src/scheduler)和[原型game阶段](https://github.com/semibran/tactics/blob/master/lib/game.js)只参考，不照搬双方大回合。规则见SPEC S02/S03/S06。
 
 | 测试ID | 输入 | 预期 |
 | --- | --- | --- |
@@ -184,9 +199,9 @@ node tactics/tools/run-tests.cjs --stage=p03
 <a id="p04"></a>
 ## P04. 通行、多格体型与位移
 
-**产物：** 世界格网查询、路径成本、移动额度、发现停步接口、普通跳跃、力量推动／碰撞、独立位移技能基础。
+**产物：** 统一支持 `1×1`／`2×2` 多格占地、八向 `1+√2` 成本与两实障夹角禁穿的格网寻路／可达域查询、移动额度、发现停步接口、普通跳跃、力量推动／碰撞、独立位移技能基础。
 
-**已有资源：** [ROT寻路](https://github.com/ondras/rot.js/tree/master/src/path)、[Rex Pathfinder](https://rexrainbow.github.io/phaser3-rex-notes/docs/site/board-pathfinder/)、[EasyStar](https://github.com/prettymuchbryce/easystarjs)、[semibran pathfind](https://github.com/semibran/tactics/blob/master/lib/pathfind.js)四选其一或薄适配；[R03伤害工具](RESOURCES.md)用于碰撞。见SPEC S04/S10。
+**已有资源：** 自建统一八向多格格网寻路＋[semibran pathfind](https://github.com/semibran/tactics/blob/master/lib/pathfind.js)／[ROT寻路](https://github.com/ondras/rot.js/tree/master/src/path)（已核实 ROT 原生等步成本不满足 `1+√2` 与多格占地，仅作对照）；[R03伤害工具](RESOURCES.md)用于碰撞。见SPEC S04/S10。
 
 | 测试ID | 输入／操作 | 预期 |
 | --- | --- | --- |
@@ -206,13 +221,13 @@ node tactics/tools/run-tests.cjs --stage=p03
 <a id="p05"></a>
 ## P05. 可变地图与低token语义布阵
 
-**产物：** 古典石造、自然野外、街巷庭院三个主题包；布局／主题／对象分离；scene/battle种子与物件状态；区域图、地标关系、组布阵和个体覆盖；软约束调整详情。
+**产物：** 古典石造、自然野外、街巷庭院三个主题包；由**单一权威场景数据**同步生成战棋米格逻辑层（通行／挡弹／遮视／低障碍／门洞开关／`rot` 与多格占地）与 [R13](RESOURCES.md) `mmsRenderMapArt('mini')` 视觉底图（不从 SVG 反推规则）；scene/battle 种子与物件状态；区域图、地标关系、组布阵、个体覆盖与软硬约束求解详情。
 
-**已有资源：** [ROT Digger](https://github.com/ondras/rot.js/blob/master/src/map/digger.ts)、[Cellular等地图模块](https://github.com/ondras/rot.js/tree/master/src/map)、[Tiled对象自定义属性](https://doc.mapeditor.org/en/latest/manual/custom-properties/)、[R01数据解析](RESOURCES.md)、[R07基线](RESOURCES.md)；本项目原型 [全片图](references/prototype-overview.jpg)。不是从第三方游戏复制地图素材。
+**已有资源：** [R13 `mmsRenderMapArt('mini')` 视觉底图出力](RESOURCES.md)（素材复用收益已计入 P02，此处专注双输出派生与约束生成）、[R01数据解析](RESOURCES.md)、[R07基线](RESOURCES.md)；[ROT地图模块](https://github.com/ondras/rot.js/tree/master/src/map)仅作区块对照参考；本项目原型 [全片图](references/prototype-overview.jpg)。不是从第三方游戏复制地图素材。
 
 | 测试ID | 样本 | 预期 |
 | --- | --- | --- |
-| T05-01 | 每主题至少3种场景结构，各取固定种子组 | 同seed一致、不同seed布局变化；地标／通路合法，主题不是固定整图背景 |
+| T05-01 | 每主题至少3种场景结构，各取固定种子组 | 同seed一致、不同seed布局变化；地标／通路合法，权威数据同步驱动底图与米格逻辑属性，主题不是固定整图背景 |
 | T05-02 | 两友方南门、一友方东室、敌人北祭坛、一个个体覆盖到掩体后 | 各组和覆盖生效；程序给精确坐标，不要求模型逐人输出x/y |
 | T05-03 | 明确贴身／包围／被关房间，附带次要侧向位置 | 保留剧情关系，只放宽允许的软条件；生成详情有改动，不自动保护玩家 |
 | T05-04 | 2×2大型敌人被要求放入过窄封闭区域 | 先调整自由尺寸，仍无解报告具体硬冲突，不删单位或解除剧情关系 |
@@ -220,16 +235,16 @@ node tactics/tools/run-tests.cjs --stage=p03
 | T05-06 | 开场玩家微调合法／非法位置 | 合法可编辑，非法可见且不能开场；不强制每场逐人确认 |
 | T05-07 | 同一遭遇用逐格坐标全表和语义组描述各一次 | 保存实际token统计／文本长度、最终布阵校验；报告节省量，不编造固定百分比承诺 |
 
-**退出条件：** 三主题各有可复现布局与语义夹具；约束成功是合法且剧情一致，不是只画出来。若需生产LLM初始化提示词，完整文本先审，不在此文档暗定提示词。
+**退出条件：** 三主题各有可复现布局、双输出校验与语义夹具；约束成功是合法且剧情一致，不是只画出来。若需生产LLM初始化提示词，完整文本先审，不在此文档暗定提示词。
 
 **阶段回述：** 目的为可变而不乱变；现状同时验证随机性、可续接和剧情约束，不能只展示三个皮肤。
 
 <a id="p06"></a>
 ## P06. 六范围统一查询、预览与命中
 
-**产物：** 唯一空间技能查询返回实际作用区／碰撞点／合法目标；单体、直线、扇形、圆形、全域、爆炸；预览和真结算使用同一对象。
+**产物：** 唯一空间技能查询返回实际作用区／碰撞点／合法目标；拟建槽级目标上下文 `spatialCtx.resolveSlotTargets`（按槽位自身／友方／敌方语义分流并对齐单群判断）；单体、直线、扇形、圆形、全域、爆炸；预览和真结算使用同一对象。
 
-**已有资源：** [R01分类／解析](RESOURCES.md)、[R03效果／命闪](RESOURCES.md)、[R08落点／粒子](RESOURCES.md)、[Rex Shape](https://rexrainbow.github.io/phaser3-rex-notes/docs/site/board-shape/)、[raycaster最近交点](https://wiserim.github.io/phaser-raycaster/Raycaster.Ray.html)、[Board范围函数参考](https://github.com/pongstylin/tactics/blob/master/src/tactics/Board.js)。见SPEC S05。
+**已有资源：** [R01分类／解析](RESOURCES.md)、[R03效果／命闪](RESOURCES.md)、[R08落点／粒子](RESOURCES.md)、[semibran range](https://github.com/semibran/tactics/blob/master/lib/range.js)与[Board范围函数参考](https://github.com/pongstylin/tactics/blob/master/src/tactics/Board.js)。见SPEC S05。
 
 | 测试ID | 输入 | 预期 |
 | --- | --- | --- |
@@ -249,9 +264,9 @@ node tactics/tools/run-tests.cjs --stage=p03
 <a id="p07"></a>
 ## P07. 行动提交、蓄力、反应和旧效果迁移
 
-**产物：** 主辅资源、专属加速、技能准备状态、状态时钟、旧职业／变种／反应适配；保持真实伤害与表现事件分离。
+**产物：** 主辅资源、专属加速、技能准备状态、状态时钟、旧职业／变种／反应适配；接入拟建逐槽空间目标上下文 `spatialCtx.resolveSlotTargets`、独立 `target.evasion` 与空间合法 `[转火]`；保持真实伤害与表现事件分离。
 
-**已有资源：** [R03 executeSkillAction／CLASS_PASSIVES](RESOURCES.md)、[R01 parseSkill](RESOURCES.md)、[R07基线与取消](RESOURCES.md)、[R11状态／召唤／编辑回归](RESOURCES.md)；真实源码`handleChargeSkill`、`releaseCharge`、`continueCharge`作结构参考，不沿用旧大回合准备减一。见SPEC S03/S06。
+**已有资源：** [R03 `executeSkillAction`／`CLASS_PASSIVES`／`TAG_HANDLERS`](RESOURCES.md)（27 个注册键中 25 个数值／状态处理复用，替换 `肃正`、`再动` 2 个及 `actionQueue.splice` 钩子）、[R01 parseSkill](RESOURCES.md)、[R07基线与取消](RESOURCES.md)、[R11状态／召唤／编辑回归](RESOURCES.md)；真实源码`handleChargeSkill`、`releaseCharge`、`continueCharge`作结构参考，不沿用旧大回合准备减一。见SPEC S03/S06。
 
 | 测试ID | 输入／操作 | 预期 |
 | --- | --- | --- |
@@ -273,9 +288,9 @@ node tactics/tools/run-tests.cjs --stage=p03
 <a id="p08"></a>
 ## P08. 感知、声音、记忆与信息隔离
 
-**产物：** 本人／共享视野、环境标签、区域声音路径、敌方记忆和通讯、可见轴／战报过滤；动态门／烟更新查询。
+**产物：** 本人／共享视野、环境标签、区域声音路径、敌方记忆和通讯、可见轴／战报过滤；动态门／烟更新查询；输出层统一表现静默守卫（与 P09 只读预测隔离分置）。
 
-**已有资源：** [ROT FOV](https://github.com/ondras/rot.js/tree/master/src/fov)、[Rex Field of view](https://rexrainbow.github.io/phaser3-rex-notes/docs/site/board-fieldofview/)、[raycaster](https://github.com/wiserim/phaser-raycaster)、[Yuka Docs](https://mugen87.github.io/yuka/docs/)视觉／记忆模式；[R09结果事件](RESOURCES.md)、[R10LLM计数mock](RESOURCES.md)。見SPEC S08。
+**已有资源：** 统一格网视线／[ROT FOV](https://github.com/ondras/rot.js/tree/master/src/fov)（`PreciseShadowcasting` 对照）＋加权声波 BFS；[R08特效重投影与清理](RESOURCES.md)、[R09结果事件与音频](RESOURCES.md)、[R10LLM计数mock](RESOURCES.md)；[E06 Yuka](RESOURCES.md) 仅作记忆模式概念参考，不引入运行时库。见SPEC S08。
 
 | 测试ID | 输入 | 预期 |
 | --- | --- | --- |
@@ -294,9 +309,9 @@ node tactics/tools/run-tests.cjs --stage=p03
 <a id="p09"></a>
 ## P09. 敌友AI、空间技能选择与任务倾向
 
-**产物：** 合法行动枚举＋角色倾向评分，同一次自然行动能合理使用移动、主辅资源；巡逻、守点、调查、抵达、撤离；友方AI使用同体系。
+**产物：** 合法行动枚举＋角色倾向评分，同一次自然行动能合理使用移动、主辅资源；巡逻、守点、调查、抵达、撤离；友方AI使用同体系；**复用伤害公式组装适配新空间规则的只读预测器**（在预测副本上连续更新多段护盾与一次性免伤，明确结界拦截、显式空间范围 AoE 分类与随机命闪估算边界，不调用异步 `executeSkillAction` 或直接调用读取旧 `teamBarrier`／`tag.includes('群')` 的 `wouldSegmentClearHp`）。
 
-**已有资源：** [R04原评分入口](RESOURCES.md)、[Yuka目标驱动](https://github.com/Mugen87/yuka)、[Athena AI](https://github.com/nkzw-tech/athena-crisis/tree/main/dionysus)、[semibran AI](https://github.com/semibran/tactics/blob/master/lib/ai.js)。框架不负责自己的评分规则，纯回合制不引入实时steering大循环。
+**已有资源：** [R03数值公式](RESOURCES.md)、[R04原评分思想与权重](RESOURCES.md)（严格过滤输入至 AI 自身视听与记忆，不读取全体真实隐藏名册）、[R11](RESOURCES.md)；[Athena AI](https://github.com/nkzw-tech/athena-crisis/tree/main/dionysus)、[semibran AI](https://github.com/semibran/tactics/blob/master/lib/ai.js)仅作结构参考，不安装 Yuka 运行时库。
 
 | 测试ID | 场景 | 预期 |
 | --- | --- | --- |
@@ -340,9 +355,9 @@ node tactics/tools/run-tests.cjs --stage=p03
 <a id="p11"></a>
 ## P11. 酒馆接线、配置编辑与存档
 
-**产物：** 独立前端接收YAML、现有技能编辑器新增结构化范围／原型／独立闪避字段和全体／单角色配置导入导出、战术存档／MMS结果桥、隐藏情报的旁白入参，原RPG不受影响。
+**产物：** 独立前端接收YAML（修复持久化／MMS 覆盖 YAML 显式字段的旧实现）、现有技能编辑器新增结构化范围／原型／独立闪避字段和全体／单角色配置导入导出、独立存档命名空间与原版战后 MMS 结果桥（默认不改 MMS 源码）、隐藏情报的旁白入参，原RPG不受影响。
 
-**已有资源：** [R05优先合并与MMS](RESOURCES.md)、[R06结果回执](RESOURCES.md)、[R07编辑隔离](RESOURCES.md)、[R10真实harness](RESOURCES.md)、[R11商店／编辑回归](RESOURCES.md)、[酒馆完整文档](../../../酒馆助手_TavernHelper_完整开发文档.md)。
+**已有资源：** [R05优先合并与MMS](RESOURCES.md)、[R06结果回执](RESOURCES.md)、[R07编辑隔离](RESOURCES.md)、[R10真实harness](RESOURCES.md)、[R11商店／编辑回归](RESOURCES.md)、[R13 MMS接收端单写者与幂等契约](RESOURCES.md)、[酒馆完整文档](../../../酒馆助手_TavernHelper_完整开发文档.md)。
 
 | 测试ID | 输入／操作 | 预期 |
 | --- | --- | --- |
@@ -365,9 +380,9 @@ node tactics/tools/run-tests.cjs --stage=p03
 <a id="p12"></a>
 ## P12. 最终回归、视觉验收与独立打包
 
-**产物：** 经唯一最终全量的源码、独立版本化正则包、产物专项报告、截图／视频证据和用户导入说明。原RPG源码与现有包不变。
+**产物：** 经唯一最终全量的源码、独立版本化正则包（明确采用“禁止危险 `$` 序列”或“传输层 `$` 加倍转义后验证单次 `String.replace`＋实体还原字节一致”契约之一，**严禁修改根目录原 RPG 打包器**）、产物专项报告、截图／视频证据和用户导入说明。原RPG源码与现有包不变。
 
-**已有资源：** [R10全量harness方法](RESOURCES.md)、[R12构建／产物免疫](RESOURCES.md)、[R08表现清理](RESOURCES.md)、[R09音频](RESOURCES.md)、[原型四图](references/SOURCE.md)。
+**已有资源：** [R10全量harness方法](RESOURCES.md)、[R12构建／产物免疫](RESOURCES.md)、[R08表现清理与动态重投影](RESOURCES.md)、[R09音频](RESOURCES.md)、[R13 MMS资产与跨组件回执](RESOURCES.md)、[原型四图](references/SOURCE.md)。
 
 | 测试ID | 验证 | 必须得到的结果 |
 | --- | --- | --- |
@@ -400,29 +415,35 @@ node tactics/tools/run-tests.cjs --artifact --stage=package,p03,p06,p07,p10,p11
 
 ---
 
-## 工时说明与成本来源
+## 工时说明与成本来源（候选估算，非已核定工程量）
 
 ### 为什么不是“换头像＋几天”
 
-- 地图空间化会替换原前后排／全队索敌，影响几乎全部技能、反应和表现落点。
-- 跑圈使“大回合”不再存在，CD、DoT、职业机会、再动与蓄力都要有一致新时钟，不只是排序函数。
-- 库提供A*、FOV或状态机，不理解自己的6种范围、结界、资源、救援和剧情布阵。
-- 原项目已经有有价值的解析／效果／音频／MMS／测试，但整体HTML与DOM依赖仍需拆接口；“直接拷贝”可能产生双状态和假绿。
-- 三主题各需模块化美术和地图约束，不等于换三张背景。AI感知／走位和读档联动是最大不确定项。
+- 地图空间化会替换原前后排／全队索敌，影响 `executeSkillAction` 逐槽目标分流、转火、反应／看破距离视线检查与特效坐标跟随（`mkAnchor` 固定定位在相机移动／缩放下须做动态重投影或统一变换容器）。
+- 跑圈使“大回合”不再存在，CD、DoT、职业机会、再动主行动点与蓄力都要有一致新时钟，不只是排序函数。
+- 既要复用原计算与状态处理器，又必须拆开“表现静默”（P08 盲区过滤）与“只读预测”（P09 组装新空间规则预测器，修复 `calculateDamage` 原地扣盾、`wouldSegmentClearHp` 旧 `teamBarrier` 及 `tag.includes('群')` 抗性耦合）。
+- 由单一权威场景数据同时生成米格规则与 `mmsRenderMapArt('mini')` 底图、三主题种子变化及剧情硬软约束求解，加上 AI 感知走位与 YAML 最高优先修复，构成本项目的核心工时。
 
-### 估算包含
+### 成本分类与估算包含
 
-净198—298h包含实现、相关自动测试、三个主题的首版可用表现、旧能力适配、独立闪避迁移、全体／单角色配置导入导出、单HTML/正则打包与桌面验收准备。预留联调后230—375h更适合排期；按5天×8h/周约6—10周，按每周5天、每日4h约12—19周，不包含用户等待反馈的空档。
+- **完整首版净工时（P00—P12）**：**`128—185h`**；加上 15%—20% 跨模块联调与返工余量后为 **`147—222h`**（约 **`19—28 个 8 小时工作日`**）。对比原估算 `198—298h` 净差额 **`70—113h`**（降幅约 **`35%—38%`**）。按每周 5 天×8h 约 4—6 周，按每日 4h 约 8—11 周（不含用户等待反馈空档）。
+- **当前剩余净工时**：扣除已提交的 `ca38c2b` P00 隔离承载探针后，P00 补验为 **`1—2h`**，P01—P12 未开工部分为 **`126—182h`**，合计剩余净工时 **`127—184h`**（含 15%—20% 缓冲约 **`146—221h`**）。
+- **工时构成拆分**：
+  1. **素材与代码资产复用节省**：复用 R13 `MiniMapStatus` 10 材质／24 类图元／缩放大地图控制器／头像解析／MMS 接收协议，及 R01/R03/R05/R07/R08/R09 现有解析、数值公式、25 个面板／状态 handler、草稿隔离与音频/VFX 宿主（不计入未确定实施的外部多库组合）。
+  2. **跨阶段去重计费**：R13 底图图元素材复用收益仅计入 P02，不在 P05 重复扣减；P05 专注权威数据双输出与约束求解。
+  3. **核心算法新增**：连续 10000 时钟、多格（1×1/2×2）加权八向寻路与推撞、六范围统一几何／爆炸首碰、权威场景约束生成、声音/FOV/记忆隔离。
+  4. **旧能力适配与预测器组装**：`spatialCtx.resolveSlotTargets` 逐槽分流、独立闪避迁移、再动主行动点、空间结界、`applyPersistedRoster`/`applyStatusBarRoster` YAML 最高优先修复、特效动态重投影及只读空间预测器。
+  5. **测试、视觉与打包验收**：99 项 stage 用例、真实 `String.replace` 正则往返与 `$` 契约验证、唯一最终源码全量、三主题视觉核对与独立打包。
 
 ### 估算不包含
 
 - 未要求的手机触控、真实三维／多层高度、任意墙体破坏、危险地形系统、弹匣换弹、手持状态、警戒与借机攻击。
 - 从零画完全部专属角色／技能美术、给全部历史技能重新设计专属动画、购买或制作大量音视频资产。
-- 完整MMS协议扩容或外部项目重大重构、部署新云服务、跨轮次小组协同推演。
-- 用户后续改变已确认规则的返工，以及本轮已完成的访谈和文档整理。
+- 修改 `MiniMapStatus` 源码或根目录原 RPG 打包器、完整 MMS 协议扩容、部署新云服务、跨轮次小组协同推演。
+- 用户后续改变已确认规则的返工，以及本轮已完成的访谈、P00 探针（`ca38c2b`）与文档修订。
 
 ### 并行与阶段复盘
 
-- 可在稳定接口后把P02表现、纯规则测试和P05美术资源分给独立人员／Agent；同一文件不并发改，测试代理与业务文件边界分开。
-- 墙钟时间可被并行缩短，但净工程量不会因为多开Agent等比例消失，关键接口和验收仍需串行。
-- 完成P00/P03/P06后分别重新估算剩余工时，依据实际库适配、时钟反例和6范围联测，而不是一直维持最初估数。
+- 可在稳定接口后把 P02 表现、纯规则测试和 P05 权威场景数据模板分给独立人员／Agent；同一文件不并发改，测试代理与业务文件边界分开。
+- 墙钟时间可被并行缩短，但净工程量不会因为多开 Agent 等比例消失，关键接口和验收仍需串行。
+- 完成 P00 补验、P03 时钟与 P06 六范围后分别复核剩余工时，不维持静态估数；“约 650 行”“<0.5ms”等无实测指标仅作内部设计目标，不写入已验收承诺。
