@@ -1,0 +1,399 @@
+{
+  "stage": "P03",
+  "source": "tactics/src/clock.mjs + tactics/src/scheduler.mjs",
+  "sourceCommit": "6c1339a",
+  "baseHeadAtRun": "6c1339a553285c71d072e011591c77150377182e",
+  "sourceDirty": true,
+  "dirtyNote": "工作区含历史遗留删除与 .audit-work 未跟踪文件（与本轮无关）；P03 五个文件在实测时为未跟踪/追加态，以 filesTested sha256 标识被测版本",
+  "mode": "source",
+  "command": [
+    "RUN_TESTS_JSON=1 node tactics/tools/run-tests.cjs --stage=p03",
+    "node tactics/tools/run-tests.cjs --stage=p01",
+    "node tactics/tools/run-tests.cjs --self-check"
+  ],
+  "executed": true,
+  "executedAt": "2026-11-21T07:09:08+08:00",
+  "executedAtLocal": "2026-11-21 07:09:08 (UTC+8)",
+  "passed": 55,
+  "failed": 0,
+  "pending": 0,
+  "groups": [
+    {
+      "id": "T03-01",
+      "passed": 9,
+      "failed": 0,
+      "pending": 0,
+      "cases": [
+        {
+          "id": "T03-01 200速单位在50/100/150/200获得机会",
+          "pass": true,
+          "detail": "fast=[50,100,150,200]"
+        },
+        {
+          "id": "T03-01 100速单位在100/200获得机会",
+          "pass": true,
+          "detail": "slow=[100,200]"
+        },
+        {
+          "id": "T03-01 同刻t=100基础敏捷高者先取得行动",
+          "pass": true,
+          "detail": "t=100序=[\"u-fast\",\"u-slow\"]"
+        },
+        {
+          "id": "T03-01 有效敏捷驱动到轴（低基础高有效者t=50首到）",
+          "pass": true,
+          "detail": "首行动={\"t\":50,\"unitId\":\"u-lowbase\"} 全序=[{\"t\":50,\"unitId\":\"u-lowbase\"},{\"t\":100,\"unitId\":\"u-highbase\"},{\"t\":100,\"unitId\":\"u-lowbase\"},{\"t\":150,\"unitId\":\"u-lowbase\"},{\"t\":200,\"unitId\":\"u-highbase\"},{\"t\":200,\"unitId\":\"u-lowbase\"}]"
+        },
+        {
+          "id": "T03-01 基础与有效相反时同刻仍按基础敏捷降序",
+          "pass": true,
+          "detail": "t=100序=[\"u-highbase\",\"u-lowbase\"]"
+        },
+        {
+          "id": "T03-01 actCount不产生额外行动不影响时序且不入档",
+          "pass": true,
+          "detail": "seq=[{\"t\":50,\"unitId\":\"u-a\"},{\"t\":100,\"unitId\":\"u-a\"},{\"t\":100,\"unitId\":\"u-b\"},{\"t\":150,\"unitId\":\"u-a\"},{\"t\":200,\"unitId\":\"u-a\"},{\"t\":200,\"unitId\":\"u-b\"}]"
+        },
+        {
+          "id": "T03-01 同速按稳定ID字典序建轴（alpha先于beta）",
+          "pass": true,
+          "detail": "order=[\"u-alpha\",\"u-beta\"] seq=[{\"t\":100,\"unitId\":\"u-alpha\"},{\"t\":100,\"unitId\":\"u-beta\"}]"
+        },
+        {
+          "id": "T03-01 恢复忽略输入数组顺序且不重置进度",
+          "pass": true,
+          "detail": "order=[\"u-alpha\",\"u-beta\"] lap=1 now=100"
+        },
+        {
+          "id": "T03-01 恢复后同刻仍按稳定序（alpha先于beta）",
+          "pass": true,
+          "detail": "seq=[{\"t\":200,\"unitId\":\"u-alpha\"},{\"t\":200,\"unitId\":\"u-beta\"}] lapAlpha=2"
+        }
+      ]
+    },
+    {
+      "id": "T03-02",
+      "passed": 4,
+      "failed": 0,
+      "pending": 0,
+      "cases": [
+        {
+          "id": "T03-02 冻结期内推进返回frozen且时间进度静止",
+          "pass": true,
+          "detail": "{\"status\":\"frozen\",\"time\":30,\"now\":30,\"dist\":3000}"
+        },
+        {
+          "id": "T03-02 变速结算已跑距离3000不重置（非重新起跑）",
+          "pass": true,
+          "detail": "{\"ok\":true,\"dist\":3000,\"lap\":0,\"speedLog\":[{\"t\":30,\"unitId\":\"runner\",\"speed\":200}],\"nextAt\":65}"
+        },
+        {
+          "id": "T03-02 余7000用35时间下次t=65且途中连续计息",
+          "pass": true,
+          "detail": "nextAt=65 dist60=9000 grant={\"t\":65,\"lap\":1,\"moveQuota\":1,\"dist\":0}"
+        },
+        {
+          "id": "T03-02 加速不是赠送轮次（lap=1配额标准）且pacer照常行动",
+          "pass": true,
+          "detail": "post=[{\"t\":40,\"unitId\":\"pacer\"},{\"t\":50,\"unitId\":\"pacer\"},{\"t\":60,\"unitId\":\"pacer\"}] grant={\"t\":65,\"lap\":1,\"moveQuota\":1,\"dist\":0}"
+        }
+      ]
+    },
+    {
+      "id": "T03-03",
+      "passed": 6,
+      "failed": 0,
+      "pending": 0,
+      "cases": [
+        {
+          "id": "T03-03 归零生效且已跑距离3000保留",
+          "pass": true,
+          "detail": "{\"ok\":true,\"distBefore\":3000,\"endAt\":100,\"speed\":0,\"dist\":3000}"
+        },
+        {
+          "id": "T03-03 停跑期间距离冻结且runner无行动（非重新起跑）",
+          "pass": true,
+          "detail": "dists=[3000,3000,3000,3000,3000,3000] seq=[\"pacer\",\"pacer\",\"pacer\",\"pacer\",\"pacer\",\"pacer\"]"
+        },
+        {
+          "id": "T03-03 到期事件照常推进且速度恢复为100",
+          "pass": true,
+          "detail": "{\"grantUnit\":\"pacer\",\"grantTime\":100,\"expired\":[{\"t\":100,\"unitId\":\"runner\"}],\"speed\":100,\"dist\":3000}"
+        },
+        {
+          "id": "T03-03 恢复后按剩余距离到轴不倒退（100+7000/100=170）",
+          "pass": true,
+          "detail": "nextAt=170 first={\"t\":170,\"lap\":1,\"dist\":0}"
+        },
+        {
+          "id": "T03-03 负速按零处理：不计时距无到轴不被发放行动",
+          "pass": true,
+          "detail": "dist=0 next=null"
+        },
+        {
+          "id": "T03-03 仅负速单位视同无人可行动（僵持预检）",
+          "pass": true,
+          "detail": "{\"status\":\"terminal\",\"terminal\":{\"type\":\"stalemate\",\"at\":0}}"
+        }
+      ]
+    },
+    {
+      "id": "T03-04",
+      "passed": 4,
+      "failed": 0,
+      "pending": 0,
+      "cases": [
+        {
+          "id": "T03-04 首跳恰在t=135（施毒后+100，不因重施推迟）",
+          "pass": true,
+          "detail": "rec={\"key\":\"victim\\u0000venom\",\"unitId\":\"victim\",\"source\":\"venom\",\"kind\":\"poison\",\"strength\":5,\"interval\":100,\"appliedAt\":35,\"endAt\":335,\"nextTickAt\":135} ticks=[135,235,335]"
+        },
+        {
+          "id": "T03-04 同源重施保节拍仅更新强度与到期（endAt=125+300）",
+          "pass": true,
+          "detail": "rec={\"key\":\"victim\\u0000venom\",\"unitId\":\"victim\",\"source\":\"venom\",\"kind\":\"poison\",\"strength\":8,\"interval\":100,\"appliedAt\":35,\"endAt\":425,\"nextTickAt\":135} strengths=[8,8,8]"
+        },
+        {
+          "id": "T03-04 末跳先于到期移除且过期后不再跳",
+          "pass": true,
+          "detail": "expired=[425] ticks=[135,235,335]"
+        },
+        {
+          "id": "T03-04 末跳与到期同刻先跳后移（跳完才移除）",
+          "pass": true,
+          "detail": "types300=[\"dot-tick\",\"status-expired\",\"stalemate\"] ticks=[100,200,300]"
+        }
+      ]
+    },
+    {
+      "id": "T03-05",
+      "passed": 19,
+      "failed": 0,
+      "pending": 0,
+      "cases": [
+        {
+          "id": "T03-05 t=300同刻事件按契约阶段序（先效果与截止后行动）",
+          "pass": true,
+          "detail": "{\"unitId\":\"hero\",\"types\":[\"dot-tick\",\"cooldown-ready\",\"rescue-deadline\",\"action-granted\"],\"ts\":[300,300,300,300],\"rescues\":[],\"patientStatus\":\"down\",\"logTypes\":[\"dot-tick\",\"cooldown-ready\",\"rescue-deadline\",\"action-granted\"]}"
+        },
+        {
+          "id": "T03-05 归零CD当次可用（未到期不提前解除且不重发）",
+          "pass": true,
+          "detail": "cd100=300 cd200=300 refired=0"
+        },
+        {
+          "id": "T03-05 压线救援来不及（截止先于当刻行动且不自动救起）",
+          "pass": true,
+          "detail": "{\"unitId\":\"hero\",\"types\":[\"dot-tick\",\"cooldown-ready\",\"rescue-deadline\",\"action-granted\"],\"ts\":[300,300,300,300],\"rescues\":[],\"patientStatus\":\"down\",\"logTypes\":[\"dot-tick\",\"cooldown-ready\",\"rescue-deadline\",\"action-granted\"]}"
+        },
+        {
+          "id": "T03-05 缺省救援窗口=now+300",
+          "pass": true,
+          "detail": "deadline=300"
+        },
+        {
+          "id": "T03-05 压线前取消后无截止事件",
+          "pass": true,
+          "detail": "cancelled=true"
+        },
+        {
+          "id": "T03-05 临时眩晕到轴发stun-skip且消耗眩晕",
+          "pass": true,
+          "detail": "skips=[{\"seq\":4,\"t\":10,\"type\":\"stun-skip\",\"unitId\":\"bashful\"}] stunLeft=null"
+        },
+        {
+          "id": "T03-05 眩晕本圈资源不发且重跑一圈后t=20取得行动",
+          "pass": true,
+          "detail": "grant={\"status\":\"action\",\"time\":20,\"unitId\":\"bashful\",\"res\":{\"moveQuota\":1,\"main\":2,\"aux\":1,\"deliveredMainSources\":[\"再动A\"]}} grantsAt10=0"
+        },
+        {
+          "id": "T03-05 待领取点跨眩晕保留并在下次自然行动交付（main=2）",
+          "pass": true,
+          "detail": "res={\"moveQuota\":1,\"main\":2,\"aux\":1,\"deliveredMainSources\":[\"再动A\"]}"
+        },
+        {
+          "id": "T03-05 隐匿窗口每100时间发事件（t=100/200/300）",
+          "pass": true,
+          "detail": "wins=[{\"t\":100,\"wasHit\":false},{\"t\":200,\"wasHit\":true},{\"t\":300,\"wasHit\":false}]"
+        },
+        {
+          "id": "T03-05 wasHit先false后true且事件后窗口标记复位",
+          "pass": true,
+          "detail": "wasHit=[false,true,false]"
+        },
+        {
+          "id": "T03-05 行动中grantMainPoint立即加点且getActionState实时含余额",
+          "pass": true,
+          "detail": "state={\"unitId\":\"a-actor\",\"resources\":{\"moveQuota\":1,\"main\":2,\"aux\":1}} logs=[{\"seq\":3,\"t\":10,\"type\":\"main-point-granted\",\"targetId\":\"a-actor\",\"sourceKey\":\"迅捷\",\"immediate\":true},{\"seq\":4,\"t\":10,\"type\":\"main-point-granted\",\"targetId\":\"a-actor\",\"sourceKey\":\"风行\",\"immediate\":true},{\"seq\":7,\"t\":20,\"type\":\"main-point-granted\",\"targetId\":\"b-buddy\",\"sourceKey\":\"援射\",\"immediate\":false},{\"seq\":12,\"t\":30,\"type\":\"main-point-granted\",\"targetId\":\"b-buddy\",\"sourceKey\":\"再动B\",\"immediate\":false}]"
+        },
+        {
+          "id": "T03-05 同sourceKey本次行动二次拒绝而不同来源可叠加",
+          "pass": true,
+          "detail": "dup={\"ok\":false,\"events\":[]} third={\"ok\":true,\"events\":[{\"seq\":4,\"t\":10,\"type\":\"main-point-granted\",\"targetId\":\"a-actor\",\"sourceKey\":\"风行\",\"immediate\":true}]} state={\"unitId\":\"a-actor\",\"resources\":{\"moveQuota\":1,\"main\":3,\"aux\":1}}"
+        },
+        {
+          "id": "T03-05 endAction清未用点并解冻（getActionState回null）",
+          "pass": true,
+          "detail": "{\"extraMain\":0,\"sources\":[],\"state\":null}"
+        },
+        {
+          "id": "T03-05 非当前行动者转待领取并在其自然行动交付（main=2）",
+          "pass": true,
+          "detail": "pend={\"ok\":true,\"events\":[{\"seq\":7,\"t\":20,\"type\":\"main-point-granted\",\"targetId\":\"b-buddy\",\"sourceKey\":\"援射\",\"immediate\":false}]} snapshot=[{\"targetId\":\"b-buddy\",\"sourceKey\":\"援射\"}] grant={\"t\":20,\"res\":{\"moveQuota\":1,\"main\":2,\"aux\":1,\"deliveredMainSources\":[\"援射\"]}}"
+        },
+        {
+          "id": "T03-05 exitUnit清除指向该单位的待领取点",
+          "pass": true,
+          "detail": "pendB={\"ok\":true,\"events\":[{\"seq\":12,\"t\":30,\"type\":\"main-point-granted\",\"targetId\":\"b-buddy\",\"sourceKey\":\"再动B\",\"immediate\":false}]} afterExit=[]"
+        },
+        {
+          "id": "T03-05 机会门槛readyAt=now+100且到期前false同刻起true",
+          "pass": true,
+          "detail": "{\"readyAt\":100,\"now0\":false,\"at50\":false,\"at100\":true}"
+        },
+        {
+          "id": "T03-05 defend恰100时间到期发defend-expired",
+          "pass": true,
+          "detail": "defends=[{\"t\":100,\"kind\":\"defend\"}]"
+        },
+        {
+          "id": "T03-05 periodic按interval=50结算且零速单位照常触发",
+          "pass": true,
+          "detail": "ticks=[50,100,150,200]"
+        },
+        {
+          "id": "T03-05 交付点入冻结期实时余额（getActionState main=2）",
+          "pass": true,
+          "detail": "frozen={\"unitId\":\"receiver\",\"resources\":{\"moveQuota\":1,\"main\":2,\"aux\":1}} extraFrozen=1 res={\"moveQuota\":1,\"main\":2,\"aux\":1,\"deliveredMainSources\":[\"策应\"]} after=null"
+        }
+      ]
+    },
+    {
+      "id": "T03-06",
+      "passed": 5,
+      "failed": 0,
+      "pending": 0,
+      "cases": [
+        {
+          "id": "T03-06 新单位立即占位但首行动=注册时刻+10000/速度（120+50=170）",
+          "pass": true,
+          "detail": "rec={\"id\":\"spawn\",\"side\":\"ally\",\"name\":\"援军\",\"baseSpd\":200,\"speed\":200,\"status\":\"active\",\"lastSync\":120,\"spawnedAt\":120,\"stun\":null,\"hitSinceWindow\":false,\"extraMain\":0,\"mainPointSources\":[]} next=170 log={\"seq\":25,\"t\":120,\"type\":\"unit-registered\",\"unitId\":\"spawn\",\"via\":\"spawn\",\"firstActionAt\":170} queue=[\"pacer\",\"spawn\",\"scout\"]"
+        },
+        {
+          "id": "T03-06 重复注册被拒且不重置既有进度",
+          "pass": true,
+          "detail": "dupPacer={\"ok\":false,\"events\":[]} regLogs=3 scoutDist=2000 scoutNext=170"
+        },
+        {
+          "id": "T03-06 隐藏巡逻单位内部正常调度但玩家轴零泄露",
+          "pass": true,
+          "detail": "patrolActs=13 q120=[\"pacer\",\"spawn\",\"scout\"] q200=[\"pacer\",\"spawn\",\"scout\"]"
+        },
+        {
+          "id": "T03-06 exitUnit后不进轴不计时距（距离冻结6000）",
+          "pass": true,
+          "detail": "dist150=6000 dist200=6000 next=null qDown=[\"pacer\",\"spawn\"]"
+        },
+        {
+          "id": "T03-06 reenterUnit从零跑圈（200+50=250）",
+          "pass": true,
+          "detail": "rec={\"dist\":0,\"lastSync\":200,\"status\":\"active\",\"next\":250} action={\"t\":250}"
+        }
+      ]
+    },
+    {
+      "id": "T03-07",
+      "passed": 4,
+      "failed": 0,
+      "pending": 0,
+      "cases": [
+        {
+          "id": "T03-07 冻结期推进返回frozen且完整快照不变",
+          "pass": true,
+          "detail": "first={\"status\":\"action\",\"time\":50,\"unitId\":\"u-alpha\",\"resources\":{\"moveQuota\":1,\"main\":1,\"aux\":1,\"deliveredMainSources\":[]},\"events\":[{\"seq\":2,\"t\":50,\"type\":\"action-granted\",\"unitId\":\"u-alpha\",\"main\":1,\"aux\":1,\"lap\":1}]} frozen={\"status\":\"frozen\",\"time\":50} snapshotSame=true"
+        },
+        {
+          "id": "T03-07 现实钟前移30s虚拟推进与对照逐字节一致（引擎不读现实钟）",
+          "pass": true,
+          "detail": "nowD=200 nowE=200 shifted=[{\"t\":150,\"unitId\":\"u-alpha\"},{\"t\":200,\"unitId\":\"u-alpha\"},{\"t\":200,\"unitId\":\"u-beta\"}]"
+        },
+        {
+          "id": "T03-07 恢复保留now/order/进度且输入重排不影响order",
+          "pass": true,
+          "detail": "now=100 order=[\"u-alpha\",\"u-beta\"]"
+        },
+        {
+          "id": "T03-07 相同命令序列重放后状态与log逐字节一致",
+          "pass": true,
+          "detail": "nowR=200 identical=true"
+        }
+      ]
+    },
+    {
+      "id": "T03-08",
+      "passed": 4,
+      "failed": 0,
+      "pending": 0,
+      "cases": [
+        {
+          "id": "T03-08 首次推进即一次僵持终局（不无限循环）",
+          "pass": true,
+          "detail": "{\"status\":\"terminal\",\"terminal\":{\"type\":\"stalemate\",\"at\":0},\"staleLogs\":1}"
+        },
+        {
+          "id": "T03-08 重复查询不重发僵持且不恢复速度",
+          "pass": true,
+          "detail": "staleLogs=1 logLen=2 speed=0"
+        },
+        {
+          "id": "T03-08 存在未到期spd时不误判僵持（推进至t=100到期后才终局）",
+          "pass": true,
+          "detail": "at=100 spdExpired=[100]"
+        },
+        {
+          "id": "T03-08 永久眩晕与周期状态均不阻止僵持（首推即t=0终局）",
+          "pass": true,
+          "detail": "C={\"status\":\"terminal\",\"terminal\":{\"type\":\"stalemate\",\"at\":0}} D={\"status\":\"terminal\",\"terminal\":{\"type\":\"stalemate\",\"at\":0}}"
+        }
+      ]
+    }
+  ],
+  "filesTested": [
+    {
+      "path": "tactics/src/clock.mjs",
+      "sha256": "fd2f204ed355811197cd35f1276b8fd36b9b6f44b9bf009e89bb88ffa85c657a"
+    },
+    {
+      "path": "tactics/src/scheduler.mjs",
+      "sha256": "8d54fa478316654b40d8c0dd6b33b41b05ebe3956fe69b7ba72b390168788fc2"
+    },
+    {
+      "path": "tactics/tools/run-tests.cjs",
+      "sha256": "6b88ec197c0b8d59429273948af5b35a5498ba430b0985648f08458ddb1ba06c"
+    },
+    {
+      "path": "doc/tactics/P03-CLOCK-CONTRACT.md",
+      "sha256": "6070fee54c321f171b0a52e2f4ee00ea531e8a7854dcc718213158d418651722"
+    },
+    {
+      "path": "integration-test/fixtures/tactics/p03-node-cases.mjs",
+      "sha256": "234424004e06ef12a22f6a8fcbbae94569eabaa9d4736a35063b8791d30f21aa"
+    }
+  ],
+  "review": {
+    "reviewer": "独立只读审查子代理（未参与业务/测试编写）",
+    "verdict": "pass",
+    "blockers": 0,
+    "scope": "P03 改动恰好落在 5 个文件（run-tests.cjs 仅追加 p03 注册），P03 依赖路径无 startRound/actionQueue/大回合残留；测试全部真实导入无 mock 实现、无 sleep；__RUN_TESTS_JSON__ 逐用例数与组计数一致",
+    "fixedAfterReview": [
+      "低-2：grantNaturalAction 交付待领取点并入 u.extraMain，冻结期 getActionState 实时余额正确（补 T03-05 回归断言）",
+      "低-1/低-3：契约补 interval 有效域 ≥1 注记，hasBattleEndingFuture 注释与实现拆分对齐",
+      "低-5：夹具 T03-03/T03-04 未使用的 scheduler 解构清理"
+    ],
+    "deferred": [
+      "低-4：collectArrivals 的 t 参数保留（契约冻结签名，避免连带改契约）",
+      "引擎零速恢复追溯计息缺陷（T03-03 首轮暴露）已在审查前修复并全绿"
+    ]
+  },
+  "purposeVsState": "目的为可重放的敏捷跑圈与全局事件时钟（S02/S03/S06/S15#3）；现状为纯规则模块 clock+scheduler、契约冻结、T03-01~08 共 8 组 55 例实跑全绿、独立审查 0 阻断、P01 回归 166 全绿；P02 轴投影、P07 数值链、P10 救援交互与 P11 续载接线尚未接入，不宣称完整战场可用。"
+}

@@ -20,6 +20,8 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const P01_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p01-node-cases.mjs');
 // P02 用例（场景双输出 / 相机手势 / 占格选取 / 生命周期）
 const P02_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p02-node-cases.mjs');
+// P03 用例（跑圈 / 全局事件时钟 / 同刻三阶段 / 隐藏轴过滤）
+const P03_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p03-node-cases.mjs');
 
 // 阶段注册表：只登记真实存在的用例文件；--all 只聚合这里的条目，不虚构未来阶段。
 const STAGES = {
@@ -52,6 +54,20 @@ const STAGES = {
       ['main', 'buildViewData'], ['main', 'deriveUnitId'], ['main', 'DEFAULT_YAML_A'], ['main', 'DEFAULT_PLACEMENTS'],
     ],
     modules: ['scene', 'geometry', 'mapArt', 'camera', 'viewScope', 'arcaneVfx', 'parser', 'storage', 'lifecycle', 'main'],
+  },
+  p03: {
+    file: P03_CASES,
+    groups: ['T03-01', 'T03-02', 'T03-03', 'T03-04', 'T03-05', 'T03-06', 'T03-07', 'T03-08'],
+    // P03 依赖的业务导出（存在性门禁：缺任何一个直接失败，不许 0 断言报绿）
+    requiredExports: [
+      ['clock', 'createClock'], ['clock', 'dispatchClock'], ['clock', 'advanceToNextAction'],
+      ['clock', 'getVisibleTurnQueue'], ['clock', 'getUnitNextActionAt'], ['clock', 'getActionState'],
+      ['clock', 'isOpportunityReadyAt'],
+      ['scheduler', 'settlePhase12'], ['scheduler', 'collectArrivals'], ['scheduler', 'nextEffectEventTime'],
+      ['scheduler', 'hasActionableUnit'], ['scheduler', 'applyStatusRecord'], ['scheduler', 'grantNaturalAction'],
+      ['scheduler', 'processStunSkip'], ['scheduler', 'grantMainPoint'], ['scheduler', 'isOpportunityReady'],
+    ],
+    modules: ['clock', 'scheduler', 'lifecycle'],
   },
 };
 
@@ -93,6 +109,8 @@ const MODULE_FILES = {
   arcaneVfx: 'arcane-vfx.mjs',
   unitView: 'unit-view.mjs',
   main: 'main.mjs',
+  clock: 'clock.mjs',
+  scheduler: 'scheduler.mjs',
 };
 
 async function loadModules(stageDef) {
