@@ -3820,3 +3820,20 @@
 - 边界：地图完整可信拖拽/滚轮序列本轮未重跑，合成事件只作为处理器集成证据；未跑全量、未发布打包、未代导入酒馆。新增单位必须显式提供位置，不提前实现P05。
 - 文件：tactics/src/{view-scope,vfx-host,arcane-vfx,main,sandbox,unit-view,ui-shell,map-art}.mjs、vendor/mms-map-art.mjs、P02测试和repair报告。
 - 目的vs现状：审查反例已修复并通过定向测试；完整玩法与发布验收边界未扩大。
+
+## [LOG-311] 2026-11-21 — 战棋 P03 跑圈与全局事件时钟交付
+
+- **业务提交**：`a9097be`。
+- **核心目的**：按已批准方案把 SPEC S02/S03/S06/S15#3 固化为无 DOM、无 rAF、无现实定时器的纯规则跑圈时钟与全局事件调度：虚拟时间只在事件点之间跳转，旧大回合能力逐项映射为时钟事件，现实等待（动画/旁白/思考）完全不推进战斗。
+- **变更行为**：
+  1. 新增契约 `doc/tactics/P03-CLOCK-CONTRACT.md`（冻结）：battleState 数据形状（progress 唯一距离真值、cooldowns 绝对到期、combatState.clock 全量调度元数据）、模块接口（首参统一 battleState）、同刻三阶段时序、旧大回合能力逐项映射表（S15#3：startRound 排轴/CD 扣减、nextTurn Buff/DoT、防御、再生/充能、隐匿者窗口、每回合机会、再动 splice、召唤、复活、救援截止、蓄力、麻痹）与责任边界。
+  2. 新增 `tactics/src/scheduler.mjs`（288 行，零 import）：LAP_DISTANCE=10000/ROUND_TIME=100/DEFAULT_RESCUE_TIME=300；settlePhase12 阶段①周期效果含末跳→阶段②状态到期/CD 解除/救援截止；applyStatusRecord 同源重施保节拍仅更新强度/到期；grantNaturalAction 发放 1 移动额度+1主+1辅并交付待领取点；processStunSkip 消耗眩晕重跑一圈；grantMainPoint 立即/待领取两级去重；机会门槛；collectArrivals 基础敏捷降序→稳定序升序。
+  3. 新增 `tactics/src/clock.mjs`（346 行，单向 import scheduler）：createClock 恢复/初始化（平局序冻结、忽略输入重排、新单位追加）、dispatchClock 13 类命令、advanceToNextAction 跳点推进（僵持预检=无可行动且无 spd 恢复且无导向终局事件；行动冻结期返回 frozen）、getVisibleTurnQueue 隐藏敌方零占位零人数零身份、getActionState/isOpportunityReadyAt 查询。
+  4. `tactics/tools/run-tests.cjs` 仅追加 p03 注册（8 组、requiredExports 门禁、MODULE_FILES 两键），p01/p02 配置零改动。
+  5. 独立测试角色（子代理，只写夹具）交付 `p03-node-cases.mjs`：首轮 41 例暴露真实引擎缺陷——零速恢复正速时 lastSync 未锚定导致停跑期追溯计息，违反 T03-03 不倒退；修复为 resyncUnitSpeed 统一入口（先按旧速计息再锚定）。
+  6. 只读审查（独立子代理）0 阻断；按其清单处理低级项：交付点并入 extraMain 使冻结期 getActionState 余额正确（补回归断言）、契约补 interval≥1 注记与 hasBattleEndingFuture 注释对齐、夹具未用解构清理；并补齐契约功能面 14 条断言（临时眩晕跳过/隐匿窗口 wasHit/再动全链路/机会门槛/defend/periodic/交付余额）。低-4（collectArrivals 未用 t 参）按冻结签名保留。
+  7. 实测报告 `integration-test/fixtures/tactics/reports/P03-2026-11-21.json`：executed:true、HEAD 6c1339a、sourceDirty 标注、8 组 55 例逐用例实际输出、filesTested SHA-256、审查与修复记录。
+- **涉及文件**：`doc/tactics/P03-CLOCK-CONTRACT.md`、`tactics/src/clock.mjs`、`tactics/src/scheduler.mjs`、`tactics/tools/run-tests.cjs`、`integration-test/fixtures/tactics/p03-node-cases.mjs`、`integration-test/fixtures/tactics/reports/P03-2026-11-21.json`；本条与 LOG-INDEX。
+- **验证**：`node tactics/tools/run-tests.cjs --stage=p03` 8 组 55 例全绿（failed=0 pending=0）；`--stage=p01` 166 全绿；`--self-check` 负路径全过；RUN_TESTS_JSON 机器可读块与逐用例数一致；T03-07 用受控现实钟（Date.now 前移 30000ms 后还原）与 JSON 往返重放逐字节一致证明引擎不读现实钟；禁改文件（根 index.html、tactics/index.html、P02 视图模块、SPEC、P01 契约、根构建器、README、MMS）零改动；未混入工作树既有删除与 .audit-work。
+- **边界**：P03 只交付时序与行动资格纯数据接口——伤害数值/技能/蓄力投点归 P07，救援交互归 P10，行动轴渲染由 P02 消费 getVisibleTurnQueue，续载接线归 P11；本轮不接线 UI、不宣称完整战场。备注：PLAN 状态表中 P02 行原为"未开工"，与 LOG-309/310 及 git 历史（2024d5a/b1c0c96）不符，本轮按已提交事实同步该行，避免同表自相矛盾。
+- **目的 vs 现状**：P03 目的（可重放跑圈与全局事件时钟、旧大回合逐项映射不留缺口）已达成并实测全绿；P04+ 空间/感知/AI/结算接线未开工。
