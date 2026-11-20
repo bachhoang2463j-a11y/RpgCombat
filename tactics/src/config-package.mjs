@@ -70,7 +70,7 @@ export function buildConfigPackage(heroes, scope = 'all') {
   const list = Array.isArray(heroes) ? heroes : [heroes];
   const packed = list.map(h => {
     const entry = { name: h.name };
-    entry.config = pickWhitelist(h, CONFIG_PACKAGE_CONFIG_KEYS);
+    entry.config = pickWhitelist(h.config || h, CONFIG_PACKAGE_CONFIG_KEYS);
     if (h.persist) entry.persist = pickWhitelist(h.persist, CONFIG_PACKAGE_PERSIST_KEYS);
     // 技能：平铺子行（_inGroup）随组父 children 走（原版口径，防组结构丢失）
     entry.skills = (Array.isArray(h.skills) ? h.skills : []).filter(s => !s._inGroup).map(packSkill);

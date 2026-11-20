@@ -46,7 +46,7 @@ const CONFIG_FIELDS = ['img', 'classType', 'isWise', 'prototype', 'maxHp', 'maxM
                        'evasion', 'strength', 'totalWeight', 'moveDistance', 'perception'];
 
 // MMS 对配置字段的贡献映射（原版 applyStatusBarRoster 语义：armor → def）
-const MMS_CONFIG_FIELDS = { def: 'armor' };
+const MMS_CONFIG_FIELDS = { def: 'armor', maxHp: 'maxHp', maxMp: 'maxMp' };
 
 // ---------- 技能字段级补齐（原版 _gapFillSkill 移植 + range/actionCost） ----------
 
@@ -144,7 +144,7 @@ export function resolveHero(yamlHero, opts = {}) {
       return;
     }
     const mmsKey = MMS_CONFIG_FIELDS[f];
-    if (mmsKey && mmsHero && mmsHero[mmsKey] != null && hero[f] == null) {
+    if (mmsKey && mmsHero && mmsHero[mmsKey] != null) {
       hero[f] = mmsHero[mmsKey];
       sources[f] = 'mms';
       return;
@@ -157,9 +157,8 @@ export function resolveHero(yamlHero, opts = {}) {
   RUNTIME_RESOURCE_FIELDS.forEach(f => {
     const maxKey = 'max' + f.charAt(0).toUpperCase() + f.slice(1);
     if (yamlHeroExplicit(f)) { sources[f] = 'yaml'; return; }
-    if (mmsHero && mmsHero[f] != null && (f === 'tp' ? true : mmsHero[maxKey] != null)) {
-      hero[f] = f === 'tp' ? mmsHero[f] : mmsHero[f];
-      if (f !== 'tp' && mmsHero[maxKey] != null) hero[maxKey] = mmsHero[maxKey];
+    if (f !== 'tp' && mmsHero && mmsHero[f] != null) {
+      hero[f] = mmsHero[f];
       sources[f] = 'mms';
       return;
     }
@@ -232,7 +231,7 @@ function mergeSkillSet(yamlSkills, savedSkills, sources) {
   // 同名组：补持久化独有子技能
   const savedGroups = new Map(savedSkills.filter(sv => sv && sv.isGroup && Array.isArray(sv.children) && sv.children.length).map(g => [g.name, g]));
   yamlSkills.slice().forEach(s => {
-    if (!s || s._inGroup) return;
+    if (!s || s._inGroup || (yamlFieldExplicit(s, 'children') && s.children.length === 0)) return;
     const sv = savedGroups.get(s.name);
     if (!sv) return;
     const yamlChildNames = new Set((Array.isArray(s.children) ? s.children : []).map(c => c && c.name).filter(Boolean));
@@ -291,7 +290,7 @@ function mergeItemSet(yamlItems, savedItems, sources) {
     const out = Object.assign({}, sItem, yItem, { isItem: true });
     gapFillSkill(out, sItem);
     // 变体用法：同名 YAML 为准，持久化独有并入
-    if (Array.isArray(sItem.children) && sItem.children.length) {
+    if (Array.isArray(sItem.children) && sItem.children.length && !(yamlFieldExplicit(yItem, 'children') && yItem.children.length === 0)) {
       const yChildren = Array.isArray(yItem.children) ? yItem.children : [];
       const yNames = new Set(yChildren.map(c => c && c.name).filter(Boolean));
       const extra = sItem.children.filter(sc => sc && sc.name && !yNames.has(sc.name)).map(sc => Object.assign({}, sc));
@@ -300,7 +299,7 @@ function mergeItemSet(yamlItems, savedItems, sources) {
       out.children.forEach(c => { if (c && c.name) gapFillSkill(c, sChildByName.get(c.name)); });
     }
     // 绑定：同 skillName YAML 为准，持久化独有并入（按 skillName 去重）
-    if (Array.isArray(sItem.bindings) && sItem.bindings.length) {
+    if (Array.isArray(sItem.bindings) && sItem.bindings.length && !(yamlFieldExplicit(yItem, 'bindings') && yItem.bindings.length === 0)) {
       const yBindings = Array.isArray(yItem.bindings) ? yItem.bindings : [];
       const yBindSkills = new Set(yBindings.map(b => b && b.skillName).filter(Boolean));
       const extra = sItem.bindings.filter(b => b && b.skillName && !yBindSkills.has(b.skillName)).map(b => Object.assign({}, b));

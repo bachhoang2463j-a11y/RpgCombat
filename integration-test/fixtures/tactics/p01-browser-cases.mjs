@@ -56,6 +56,20 @@ export async function runBrowserCases() {
   const r = lifecycle.applyLoad(null, { sceneId: 'sc-b', battleId: 'bt-b' }, null, { initScene: () => { browserSceneCalls++; return { ok: true }; } });
   ok('T01-05-iframe 生命周期冒烟', r.branch === 'new-scene' && r.initSceneCalls === 1 && browserSceneCalls === 1, r.branch + ' init=' + r.initSceneCalls);
 
+  const configPackage = await import('../../../tactics/src/config-package.mjs');
+  const legacy = speed => parser.parseYamlCombatBlock({ 战斗数据栏: { 我方列表: [{ 角色: { 名字: '浏览器旧角', 属性: { spd: speed, hp: 17 } } }] } });
+  const migrated = storage.loadTacticsRoster(legacy(120));
+  const reloaded = storage.loadTacticsRoster(legacy(300));
+  ok('T01-07-iframe 闪避首次落盘与重载', migrated.persisted && !reloaded.persisted && reloaded.heroes[0].evasion === 120 && reloaded.heroes[0].spd === 300, '');
+  const original = configPackage.buildConfigPackage(block.heroes);
+  const draft = configPackage.finalizeImportDraft(configPackage.createImportDraft([], original).draft);
+  ok('T01-08-iframe 配置再次导出一致', JSON.stringify(configPackage.buildConfigPackage(draft)) === JSON.stringify(original), '');
+  let state = r.state;
+  state.battles[lifecycle.battleKey('sc-b','bt-b')].perBattleUses = { skill: 1 };
+  state = lifecycle.applyLoad(state,{sceneId:'sc-b',battleId:'next'}).state;
+  const back = lifecycle.applyLoad(state,{sceneId:'sc-b',battleId:'bt-b'});
+  ok('T01-04-iframe 返回旧战斗不刷新限次', back.branch === 'resume' && back.battleState.perBattleUses.skill === 1, '');
+
   // 6. LLM 计数为 0（generateRaw + generate 双计数）
   ok('T01-05-iframe generateRaw=0', counts.generateRaw === 0, String(counts.generateRaw));
   ok('T01-05-iframe generate=0', counts.generate === 0, String(counts.generate));

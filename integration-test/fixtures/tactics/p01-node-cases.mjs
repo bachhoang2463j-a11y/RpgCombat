@@ -384,11 +384,6 @@ async function t0106(deps) {
   const sc = run(['--self-check']);
   cases.push(ok('T01-06 self-check通过', sc.status === 0, sc.status === 0 ? '' : String(sc.stdout).slice(-400)));
 
-  // 门禁代码存在性（弱断言，配合上述真实负路径）：缺导出/零用例/passed=0 的 fail 逻辑在源中
-  const fsMod = await import('fs');
-  const runnerSrc = fsMod.readFileSync(runner, 'utf8');
-  cases.push(ok('T01-06 门禁代码存在', runnerSrc.includes('业务导出缺失') && runnerSrc.includes('用例数为 0') && runnerSrc.includes("passed === 0"), ''));
-
   return { cases };
 }
 
@@ -571,12 +566,59 @@ function rosterResolve(deps, yamlHero, persistedHero) {
 // ---------- 注册表 ----------
 
 export const groups = {
-  'T01-01': { run: t0101 },
+  'T01-01': { run: withReview(t0101, 'T01-01') },
   'T01-02': { run: t0102 },
   'T01-03': { run: t0103 },
-  'T01-04': { run: t0104 },
+  'T01-04': { run: withReview(t0104, 'T01-04') },
   'T01-05': { run: t0105 },
-  'T01-06': { run: t0106 },
-  'T01-07': { run: t0107 },
-  'T01-08': { run: t0108 },
+  'T01-06': { run: withReview(t0106, 'T01-06') },
+  'T01-07': { run: withReview(t0107, 'T01-07') },
+  'T01-08': { run: withReview(t0108, 'T01-08') },
 };
+
+async function withLocalReview(modules) {
+  const { parser, roster, storage, lifecycle } = modules;
+  const cases = [];
+  const check = (id, input, expected, actual) => cases.push({ id, input, expected, actual, pass: JSON.stringify(expected) === JSON.stringify(actual) });
+  const y = parser.parseHeroEntry({ 名字: 'A', 属性: { maxHp: 200, maxMp: 150 } });
+  const resolved = roster.resolveHero(y, { mmsHero: { hp: 50, maxHp: 55, mp: 20, maxMp: 25 }, hasProtocolVersion: true });
+  check('T01-01 review resource maxima', { maxHp:200,maxMp:150,mmsHp:50,mmsMaxHp:55 }, [200,150,50,20,'yaml','yaml'], [resolved.hero.maxHp,resolved.hero.maxMp,resolved.hero.hp,resolved.hero.mp,resolved.sources.maxHp,resolved.sources.maxMp]);
+  const emptyHero = parser.parseHeroEntry({ 名字:'A', 技能:[{name:'组',isGroup:true,children:[]}], 物品:[{name:'装置',children:[],bindings:[]}] });
+  const cleared = roster.resolveHero(emptyHero, {persistedHero:{name:'A',config:{},skills:[{name:'组',isGroup:true,children:[{name:'旧技'}]}],items:[{name:'装置',children:[{name:'旧用法'}],bindings:[{skillName:'旧技',cost:2}]}]},hasProtocolVersion:true}).hero;
+  check('T01-01 review nested clear', {children:[],bindings:[]}, [0,0,0], [cleared.skills[0].children.length,cleared.items[0].children.length,cleared.items[0].bindings.length]);
+  const mock = installGlobalMock(createTavernMock());
+  let writes=0; const replace=globalThis.replaceVariables; globalThis.replaceVariables=(...args)=>{writes++;return replace(...args);};
+  const block=spd=>({protocolVersion:null,heroes:[parser.parseHeroEntry({名字:'旧角',属性:{spd,hp:23,mp:7},物品:[{name:'弹',category:'弹药',count:9}]})]});
+  const first=storage.loadTacticsRoster(block(120));
+  const second=storage.loadTacticsRoster(block(300));
+  check('T01-07 review migration persists once', {firstSpd:120,nextSpd:300}, [120,120,300,1,true,false], [first.heroes[0].evasion,second.heroes[0].evasion,second.heroes[0].spd,writes,first.persisted,second.persisted]);
+  check('T01-07 review baseline only', {}, {name:'旧角',config:{evasion:120}}, storage.readTacticsRoster().heroes[0]);
+  for (const evasion of [0,40]) {
+    storage.loadTacticsRoster({protocolVersion:null,heroes:[parser.parseHeroEntry({名字:'显式'+evasion,属性:{spd:999,evasion}})]});
+    check('T01-07 review explicit '+evasion,{evasion},evasion,storage.readTacticsRoster().heroes.find(h=>h.name==='显式'+evasion).config.evasion);
+  }
+  let init=0; const deps={initScene:()=>++init};
+  let state=lifecycle.applyLoad(null,{sceneId:'s',battleId:'b1'},null,deps).state;
+  state.battles[lifecycle.battleKey('s','b1')].perBattleUses={ult:1};
+  state=lifecycle.applyLoad(state,{sceneId:'s',battleId:'b2'},null,deps).state;
+  const old=lifecycle.applyLoad(state,{sceneId:'s',battleId:'b1'},null,deps);
+  check('T01-04 review old battle retains uses',{},['resume',1], [old.branch,old.battleState.perBattleUses.ult]);
+  state=lifecycle.applyLoad(state,{sceneId:'other',battleId:'b'},null,deps).state;
+  const reopen=lifecycle.reopenLoad(state,{sceneId:'s',battleId:'b1'});
+  const follow=lifecycle.applyLoad(reopen.state,{sceneId:'s',battleId:'b1'},null,deps);
+  check('T01-04 review reopen then update',{},['s','b1','resume',2], [reopen.state.current.sceneId,reopen.state.current.battleId,follow.branch,init]);
+  return cases;
+}
+
+function withReview(run, group) {
+  return async deps => {
+    const result = await run(deps);
+    if (['T01-01','T01-04','T01-07'].includes(group)) result.cases.push(...(await withLocalReview(deps.modules)).filter(c=>c.id.startsWith(group)));
+    if (['T01-06','T01-08'].includes(group)) {
+      const { runReviewRegressions } = await import('./p01-review-regressions.mjs');
+      const extra=await runReviewRegressions(deps.modules);
+      result.cases.push(...extra.filter(c=>c.id.startsWith(group)));
+    }
+    return result;
+  };
+}

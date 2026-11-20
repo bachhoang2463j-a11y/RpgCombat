@@ -1,0 +1,18 @@
+{
+  "executed": true,
+  "backend": "iab",
+  "url": "http://127.0.0.1:8129/integration-test/tactics-harness.html",
+  "title": "P01 Harness PASS(16)",
+  "passed": 16,
+  "failed": 0,
+  "pending": 0,
+  "generateRawCount": 0,
+  "generateCount": 0,
+  "newCases": [
+    {"id":"T01-07-iframe 闪避首次落盘与重载","input":{"spd":[120,300]},"expected":{"evasion":120,"secondWrite":false},"actual":"passed"},
+    {"id":"T01-08-iframe 配置再次导出一致","input":"轻型生物角色配置导出/导入/finalize/再次导出","expected":"JSON一致","actual":"passed"},
+    {"id":"T01-04-iframe 返回旧战斗不刷新限次","input":"bt-b → next → bt-b","expected":{"branch":"resume","perBattleUses.skill":1},"actual":"passed"}
+  ],
+  "existingCases": {"transport":3,"iframe":10,"passed":13},
+  "testTabClosed": true
+}

@@ -1,0 +1,1293 @@
+{
+  "stage": "P01",
+  "revision": "review-fixes",
+  "executed": true,
+  "executedAt": "2026-11-20T20:50:46.329Z",
+  "sourceCommit": "f308914770ff3323a3c3f2ac228329b2693a0c38",
+  "sourceDirty": true,
+  "mode": "source",
+  "command": "node tactics/tools/run-tests.cjs --stage=p01",
+  "filesTested": [
+    {
+      "path": "tactics/src/roster.mjs",
+      "sha256": "2dd32c3bdc427afa8da15d5caabd9d8e1e8eb175fd539030f671cabddea3d18b"
+    },
+    {
+      "path": "tactics/src/storage.mjs",
+      "sha256": "56598e8156a8ea1d385b34487dedc69c6781388d1fab279720acf3009c4a4be3"
+    },
+    {
+      "path": "tactics/src/lifecycle.mjs",
+      "sha256": "076c65cd118a7c326bbb6cf4df4312926c734a3185fc4a6c08fb841cb669c794"
+    },
+    {
+      "path": "tactics/src/config-package.mjs",
+      "sha256": "11d811c2805e240ce8eecb206463df4307f32ec580fe25cd167188e7ba57bf8c"
+    },
+    {
+      "path": "tactics/tools/run-tests.cjs",
+      "sha256": "ac84ac81f8b27c7a6d196f6322e5d3992bc7b1187deb8d3a9cd3debd41836d98"
+    },
+    {
+      "path": "integration-test/fixtures/tactics/p01-node-cases.mjs",
+      "sha256": "0e3e7b59ce2ee315604322ebc92854c86ebe39e659f8a903a3f28e69338f2b38"
+    },
+    {
+      "path": "integration-test/fixtures/tactics/p01-review-regressions.mjs",
+      "sha256": "0f0a88cb5bee34288088d3eeb9ad1b3f5a2de7b89a392a83c42c3347b49e6c38"
+    },
+    {
+      "path": "integration-test/fixtures/tactics/p01-browser-cases.mjs",
+      "sha256": "238274d48d3fe2bf4d573b1cfed09e0aeda086dea66e8c8a099bc77b60a0b045"
+    },
+    {
+      "path": "doc/tactics/P01-CONTRACT.md",
+      "sha256": "0b2cb0e9829aff6afa51e2389e3bb47b5e7f03efa8daef162325dc9692591198"
+    }
+  ],
+  "node": {
+    "stage": "p01",
+    "groups": [
+      {
+        "id": "T01-01",
+        "passed": 18,
+        "failed": 0,
+        "pending": 0,
+        "cases": [
+          {
+            "id": "T01-01 hp显式0胜MMS",
+            "pass": true,
+            "detail": "hp=0（期望0，MMS给50）"
+          },
+          {
+            "id": "T01-01 maxHp显式胜persisted",
+            "pass": true,
+            "detail": "maxHp=100"
+          },
+          {
+            "id": "T01-01 mp显式0胜MMS",
+            "pass": true,
+            "detail": "mp=0"
+          },
+          {
+            "id": "T01-01 atk显式0胜persisted",
+            "pass": true,
+            "detail": "atk=0"
+          },
+          {
+            "id": "T01-01 def显式0胜persisted+MMS",
+            "pass": true,
+            "detail": "def=0"
+          },
+          {
+            "id": "T01-01 spd显式120胜persisted",
+            "pass": true,
+            "detail": "spd=120"
+          },
+          {
+            "id": "T01-01 evasion显式0胜persisted",
+            "pass": true,
+            "detail": "evasion=0"
+          },
+          {
+            "id": "T01-01 classType显式null胜persisted",
+            "pass": true,
+            "detail": "classType=null"
+          },
+          {
+            "id": "T01-01 isWise显式false胜persisted",
+            "pass": true,
+            "detail": "isWise=false"
+          },
+          {
+            "id": "T01-01 skills显式[]清空不补回",
+            "pass": true,
+            "detail": "skills=[]"
+          },
+          {
+            "id": "T01-01 count显式0胜MMS",
+            "pass": true,
+            "detail": "count=0"
+          },
+          {
+            "id": "T01-01 正对照 maxTp缺失回填persisted",
+            "pass": true,
+            "detail": "maxTp=3"
+          },
+          {
+            "id": "T01-01 正对照 hp缺失走MMS",
+            "pass": true,
+            "detail": "hp=42"
+          },
+          {
+            "id": "T01-01 正对照 技能slotTurns缺失回填",
+            "pass": true,
+            "detail": "slotTurns=4"
+          },
+          {
+            "id": "T01-01 persist开启仍YAML显式胜出",
+            "pass": true,
+            "detail": "atk=0 evasion=0"
+          },
+          {
+            "id": "T01-01 敌方解析存在",
+            "pass": true,
+            "detail": "[\"侦察兵\"]"
+          },
+          {
+            "id": "T01-01 review resource maxima",
+            "input": {
+              "maxHp": 200,
+              "maxMp": 150,
+              "mmsHp": 50,
+              "mmsMaxHp": 55
+            },
+            "expected": [
+              200,
+              150,
+              50,
+              20,
+              "yaml",
+              "yaml"
+            ],
+            "actual": [
+              200,
+              150,
+              50,
+              20,
+              "yaml",
+              "yaml"
+            ],
+            "pass": true
+          },
+          {
+            "id": "T01-01 review nested clear",
+            "input": {
+              "children": [],
+              "bindings": []
+            },
+            "expected": [
+              0,
+              0,
+              0
+            ],
+            "actual": [
+              0,
+              0,
+              0
+            ],
+            "pass": true
+          }
+        ]
+      },
+      {
+        "id": "T01-02",
+        "passed": 27,
+        "failed": 0,
+        "pending": 0,
+        "cases": [
+          {
+            "id": "T01-02 标准人形 evasion",
+            "pass": true,
+            "detail": "50≠50"
+          },
+          {
+            "id": "T01-02 标准人形 strength",
+            "pass": true,
+            "detail": "50≠50"
+          },
+          {
+            "id": "T01-02 标准人形 totalWeight",
+            "pass": true,
+            "detail": "70≠70"
+          },
+          {
+            "id": "T01-02 标准人形 moveDistance",
+            "pass": true,
+            "detail": "6≠6"
+          },
+          {
+            "id": "T01-02 标准人形 perception",
+            "pass": true,
+            "detail": "50≠50"
+          },
+          {
+            "id": "T01-02 标准人形 footprint",
+            "pass": true,
+            "detail": "{\"width\":1,\"height\":1}"
+          },
+          {
+            "id": "T01-02 轻型生物 evasion",
+            "pass": true,
+            "detail": "70≠70"
+          },
+          {
+            "id": "T01-02 轻型生物 strength",
+            "pass": true,
+            "detail": "30≠30"
+          },
+          {
+            "id": "T01-02 轻型生物 totalWeight",
+            "pass": true,
+            "detail": "25≠25"
+          },
+          {
+            "id": "T01-02 轻型生物 moveDistance",
+            "pass": true,
+            "detail": "8≠8"
+          },
+          {
+            "id": "T01-02 轻型生物 perception",
+            "pass": true,
+            "detail": "60≠60"
+          },
+          {
+            "id": "T01-02 轻型生物 footprint",
+            "pass": true,
+            "detail": "{\"width\":1,\"height\":1}"
+          },
+          {
+            "id": "T01-02 大型生物 evasion",
+            "pass": true,
+            "detail": "30≠30"
+          },
+          {
+            "id": "T01-02 大型生物 strength",
+            "pass": true,
+            "detail": "150≠150"
+          },
+          {
+            "id": "T01-02 大型生物 totalWeight",
+            "pass": true,
+            "detail": "250≠250"
+          },
+          {
+            "id": "T01-02 大型生物 moveDistance",
+            "pass": true,
+            "detail": "8≠8"
+          },
+          {
+            "id": "T01-02 大型生物 perception",
+            "pass": true,
+            "detail": "50≠50"
+          },
+          {
+            "id": "T01-02 大型生物 footprint",
+            "pass": true,
+            "detail": "{\"width\":2,\"height\":2}"
+          },
+          {
+            "id": "T01-02 已有HP不重设",
+            "pass": true,
+            "detail": "[80,120]"
+          },
+          {
+            "id": "T01-02 已有敏捷不重设",
+            "pass": true,
+            "detail": "spd=250"
+          },
+          {
+            "id": "T01-02 已有敏捷不被闪避覆盖",
+            "pass": true,
+            "detail": "spd=250 evasion=30"
+          },
+          {
+            "id": "T01-02 显式evasion0保留",
+            "pass": true,
+            "detail": "evasion=0"
+          },
+          {
+            "id": "T01-02 显式strength保留",
+            "pass": true,
+            "detail": "strength=99"
+          },
+          {
+            "id": "T01-02 显式move保留",
+            "pass": true,
+            "detail": "move=3"
+          },
+          {
+            "id": "T01-02 显式perception保留",
+            "pass": true,
+            "detail": "perception=10"
+          },
+          {
+            "id": "T01-02 显式totalWeight保留",
+            "pass": true,
+            "detail": "weight=500"
+          },
+          {
+            "id": "T01-02 footprint仍补齐",
+            "pass": true,
+            "detail": "{\"width\":1,\"height\":1}"
+          }
+        ]
+      },
+      {
+        "id": "T01-03",
+        "passed": 26,
+        "failed": 0,
+        "pending": 0,
+        "cases": [
+          {
+            "id": "T01-03 range 单体",
+            "pass": true,
+            "detail": "{\"type\":\"单体\"}"
+          },
+          {
+            "id": "T01-03 range 直线",
+            "pass": true,
+            "detail": "{\"type\":\"直线\",\"length\":10,\"width\":1}"
+          },
+          {
+            "id": "T01-03 range 扇形",
+            "pass": true,
+            "detail": "{\"type\":\"扇形\",\"castRange\":3,\"angle\":90}"
+          },
+          {
+            "id": "T01-03 range 圆形",
+            "pass": true,
+            "detail": "{\"type\":\"圆形\",\"castRange\":15,\"radius\":3}"
+          },
+          {
+            "id": "T01-03 range 全域",
+            "pass": true,
+            "detail": "{\"type\":\"全域\"}"
+          },
+          {
+            "id": "T01-03 range 爆炸",
+            "pass": true,
+            "detail": "{\"type\":\"爆炸\",\"castRange\":12,\"radius\":4}"
+          },
+          {
+            "id": "T01-03 直线缺尺寸补10/1",
+            "pass": true,
+            "detail": "{\"type\":\"直线\",\"length\":10,\"width\":1}"
+          },
+          {
+            "id": "T01-03 补齐值不标explicit",
+            "pass": true,
+            "detail": "[\"range\",\"range.type\"]"
+          },
+          {
+            "id": "T01-03 爆炸缺尺寸补15/3",
+            "pass": true,
+            "detail": "{\"type\":\"爆炸\",\"castRange\":15,\"radius\":3}"
+          },
+          {
+            "id": "T01-03 显式范围配旧单体并存",
+            "pass": true,
+            "detail": "{\"range\":{\"type\":\"直线\",\"length\":12,\"width\":2},\"type\":\"[单体]\",\"power\":40}"
+          },
+          {
+            "id": "T01-03 显式范围配旧群攻并存",
+            "pass": true,
+            "detail": "{\"range\":{\"type\":\"圆形\",\"castRange\":10,\"radius\":5},\"type\":\"[群攻]\"}"
+          },
+          {
+            "id": "T01-03 行动辅",
+            "pass": true,
+            "detail": "{\"main\":0,\"aux\":1}"
+          },
+          {
+            "id": "T01-03 主槽仍为群攻(枪击)",
+            "pass": true,
+            "detail": "[\"[群攻(枪击)]\",\"[无]\"]"
+          },
+          {
+            "id": "T01-03 行动主",
+            "pass": true,
+            "detail": "{\"main\":1,\"aux\":0}"
+          },
+          {
+            "id": "T01-03 缺省主行动",
+            "pass": true,
+            "detail": "{\"main\":1,\"aux\":0}"
+          },
+          {
+            "id": "T01-03 缺省行动不标explicit",
+            "pass": true,
+            "detail": "[\"type\"]"
+          },
+          {
+            "id": "T01-03 组父存在",
+            "pass": true,
+            "detail": "无组父"
+          },
+          {
+            "id": "T01-03 子行数",
+            "pass": true,
+            "detail": "2"
+          },
+          {
+            "id": "T01-03 子slotTurns不丢",
+            "pass": true,
+            "detail": "2"
+          },
+          {
+            "id": "T01-03 子range不丢",
+            "pass": true,
+            "detail": "{\"type\":\"扇形\",\"castRange\":5,\"angle\":60}"
+          },
+          {
+            "id": "T01-03 纯名父groupOnly假槽清空",
+            "pass": true,
+            "detail": "[true,\"[无]\",0]"
+          },
+          {
+            "id": "T01-03 同名父子并行存在",
+            "pass": true,
+            "detail": "[10,99]"
+          },
+          {
+            "id": "T01-03 物品组children",
+            "pass": true,
+            "detail": "[\"爆射\"]"
+          },
+          {
+            "id": "T01-03 弹药效果槽清空",
+            "pass": true,
+            "detail": "[无]"
+          },
+          {
+            "id": "T01-03 绑定参数",
+            "pass": true,
+            "detail": "[{\"skillName\":\"爆射\",\"cost\":1}]"
+          },
+          {
+            "id": "T01-03 JSON往返标记保留",
+            "pass": true,
+            "detail": "[true,\"同名技\"]"
+          }
+        ]
+      },
+      {
+        "id": "T01-04",
+        "passed": 25,
+        "failed": 0,
+        "pending": 0,
+        "cases": [
+          {
+            "id": "T01-04 新scene分支",
+            "pass": true,
+            "detail": "new-scene"
+          },
+          {
+            "id": "T01-04 新scene初始化1+1",
+            "pass": true,
+            "detail": "[1,1]"
+          },
+          {
+            "id": "T01-04 战术档无资源真值",
+            "pass": true,
+            "detail": "ok"
+          },
+          {
+            "id": "T01-04 续接分支",
+            "pass": true,
+            "detail": "resume"
+          },
+          {
+            "id": "T01-04 续接零初始化",
+            "pass": true,
+            "detail": "[0,0]"
+          },
+          {
+            "id": "T01-04 续接保留进度",
+            "pass": true,
+            "detail": "{\"甲\":5000}"
+          },
+          {
+            "id": "T01-04 续接保留限次用量",
+            "pass": true,
+            "detail": "{\"大招\":1}"
+          },
+          {
+            "id": "T01-04 重复载入无副作用",
+            "pass": true,
+            "detail": "state 被意外修改"
+          },
+          {
+            "id": "T01-04 显式增量生效",
+            "pass": true,
+            "detail": "{\"door-1\":\"broken\",\"door-2\":\"open\"}"
+          },
+          {
+            "id": "T01-04 未提供键不动",
+            "pass": true,
+            "detail": "{\"door-1\":\"broken\",\"door-2\":\"open\"}"
+          },
+          {
+            "id": "T01-04 重复增量幂等",
+            "pass": true,
+            "detail": "重复增量改变状态"
+          },
+          {
+            "id": "T01-04 新battle分支",
+            "pass": true,
+            "detail": "new-battle"
+          },
+          {
+            "id": "T01-04 新battle只初始化battle",
+            "pass": true,
+            "detail": "[0,1]"
+          },
+          {
+            "id": "T01-04 新battle留物件",
+            "pass": true,
+            "detail": "{\"door-1\":\"broken\"}"
+          },
+          {
+            "id": "T01-04 新battle留位置",
+            "pass": true,
+            "detail": "{\"甲\":{\"x\":4,\"y\":7}}"
+          },
+          {
+            "id": "T01-04 新battle清进度",
+            "pass": true,
+            "detail": "[{},{}]"
+          },
+          {
+            "id": "T01-04 新scene重建",
+            "pass": true,
+            "detail": "[\"new-scene\",1,1]"
+          },
+          {
+            "id": "T01-04 新scene物件独立",
+            "pass": true,
+            "detail": "{}"
+          },
+          {
+            "id": "T01-04 重开保留场景态",
+            "pass": true,
+            "detail": "\"reopen-existing\""
+          },
+          {
+            "id": "T01-04 重开零初始化",
+            "pass": true,
+            "detail": "[0,0]"
+          },
+          {
+            "id": "T01-04 重开不恢复资源",
+            "pass": true,
+            "detail": "ok"
+          },
+          {
+            "id": "T01-04 不重复生成",
+            "pass": true,
+            "detail": "initScene=2"
+          },
+          {
+            "id": "T01-04 缺sceneId报错",
+            "pass": true,
+            "detail": "未抛错"
+          },
+          {
+            "id": "T01-04 review old battle retains uses",
+            "input": {},
+            "expected": [
+              "resume",
+              1
+            ],
+            "actual": [
+              "resume",
+              1
+            ],
+            "pass": true
+          },
+          {
+            "id": "T01-04 review reopen then update",
+            "input": {},
+            "expected": [
+              "s",
+              "b1",
+              "resume",
+              2
+            ],
+            "actual": [
+              "s",
+              "b1",
+              "resume",
+              2
+            ],
+            "pass": true
+          }
+        ]
+      },
+      {
+        "id": "T01-05",
+        "passed": 13,
+        "failed": 0,
+        "pending": 0,
+        "cases": [
+          {
+            "id": "T01-05 global隔离",
+            "pass": true,
+            "detail": ""
+          },
+          {
+            "id": "T01-05 chat隔离",
+            "pass": true,
+            "detail": ""
+          },
+          {
+            "id": "T01-05 message楼层隔离",
+            "pass": true,
+            "detail": ""
+          },
+          {
+            "id": "T01-05 替换删旧键",
+            "pass": true,
+            "detail": "{\"k2\":9}"
+          },
+          {
+            "id": "T01-05 替换留新键",
+            "pass": true,
+            "detail": "{\"k2\":9}"
+          },
+          {
+            "id": "T01-05 深合并留未声明键",
+            "pass": true,
+            "detail": "{\"a\":{\"b\":1,\"c\":2}}"
+          },
+          {
+            "id": "T01-05 数组整体替换",
+            "pass": true,
+            "detail": "[3]"
+          },
+          {
+            "id": "T01-05 保留原RPG键",
+            "pass": true,
+            "detail": "[\"k2\",\"rpg_combat_roster\",\"$shop_catalog\",\"rpg_tactics_roster\"]"
+          },
+          {
+            "id": "T01-05 写入战棋键",
+            "pass": true,
+            "detail": ""
+          },
+          {
+            "id": "T01-05 整档替换无残留",
+            "pass": true,
+            "detail": ""
+          },
+          {
+            "id": "T01-05 get返回副本",
+            "pass": true,
+            "detail": ""
+          },
+          {
+            "id": "T01-05 generateRaw=0",
+            "pass": true,
+            "detail": "0"
+          },
+          {
+            "id": "T01-05 generate=0",
+            "pass": true,
+            "detail": "0"
+          }
+        ]
+      },
+      {
+        "id": "T01-06",
+        "passed": 16,
+        "failed": 0,
+        "pending": 0,
+        "cases": [
+          {
+            "id": "T01-06 不存在stage非零",
+            "pass": true,
+            "detail": "status=1"
+          },
+          {
+            "id": "T01-06 不存在group非零",
+            "pass": true,
+            "detail": "status=1"
+          },
+          {
+            "id": "T01-06 artifact明确拒绝",
+            "pass": true,
+            "detail": "status=1"
+          },
+          {
+            "id": "T01-06 真实组执行成功对照",
+            "pass": true,
+            "detail": "status=0"
+          },
+          {
+            "id": "T01-06 self-check通过",
+            "pass": true,
+            "detail": ""
+          },
+          {
+            "id": "T01-06 review missing function undefined",
+            "input": {
+              "value": "undefined"
+            },
+            "expected": true,
+            "actual": true,
+            "pass": true
+          },
+          {
+            "id": "T01-06 review missing function 0",
+            "input": {
+              "value": "0"
+            },
+            "expected": true,
+            "actual": true,
+            "pass": true
+          },
+          {
+            "id": "T01-06 review missing function null",
+            "input": {
+              "value": "null"
+            },
+            "expected": true,
+            "actual": true,
+            "pass": true
+          },
+          {
+            "id": "T01-06 review missing function [object Object]",
+            "input": {
+              "value": "[object Object]"
+            },
+            "expected": true,
+            "actual": true,
+            "pass": true
+          },
+          {
+            "id": "T01-06 review real function control",
+            "input": {},
+            "expected": 1,
+            "actual": 1,
+            "pass": true
+          },
+          {
+            "id": "T01-06 review zero case rejected",
+            "input": {},
+            "expected": true,
+            "actual": true,
+            "pass": true
+          },
+          {
+            "id": "T01-06 review empty group",
+            "input": {
+              "args": [
+                "--stage=p01",
+                "--group="
+              ]
+            },
+            "expected": 1,
+            "actual": 1,
+            "pass": true
+          },
+          {
+            "id": "T01-06 review empty stage",
+            "input": {
+              "args": [
+                "--stage="
+              ]
+            },
+            "expected": 1,
+            "actual": 1,
+            "pass": true
+          },
+          {
+            "id": "T01-06 review conflicting mode",
+            "input": {
+              "args": [
+                "--self-check",
+                "--stage=nonexistent"
+              ]
+            },
+            "expected": 1,
+            "actual": 1,
+            "pass": true
+          },
+          {
+            "id": "T01-06 review subprocess failure 11",
+            "input": {
+              "expression": "g.assertRequiredExports({x:{}},[['x','absent']]);"
+            },
+            "expected": 1,
+            "actual": 1,
+            "pass": true
+          },
+          {
+            "id": "T01-06 review subprocess failure 12",
+            "input": {
+              "expression": "g.runGroup({groups:{empty:{run:async()=>({cases:[]})}}},'empty',{}).catch(e=>{console.error(e.message);process.exitCode=1});"
+            },
+            "expected": 1,
+            "actual": 1,
+            "pass": true
+          }
+        ]
+      },
+      {
+        "id": "T01-07",
+        "passed": 14,
+        "failed": 0,
+        "pending": 0,
+        "cases": [
+          {
+            "id": "T01-07 首次迁移=spd",
+            "pass": true,
+            "detail": "{\"evasion\":120,\"source\":\"legacy-spd\",\"migrated\":true}"
+          },
+          {
+            "id": "T01-07 改敏捷闪避仍120",
+            "pass": true,
+            "detail": "{\"evasion\":120,\"source\":\"baseline\",\"migrated\":false}"
+          },
+          {
+            "id": "T01-07 敏捷已改300",
+            "pass": true,
+            "detail": "spd=300"
+          },
+          {
+            "id": "T01-07 显式40不被迁移覆盖",
+            "pass": true,
+            "detail": "{\"evasion\":40,\"source\":\"yaml\",\"migrated\":false}"
+          },
+          {
+            "id": "T01-07 显式0不被迁移覆盖",
+            "pass": true,
+            "detail": "{\"evasion\":0,\"source\":\"yaml\",\"migrated\":false}"
+          },
+          {
+            "id": "T01-07 重复迁移不再写",
+            "pass": true,
+            "detail": "{\"evasion\":120,\"source\":\"baseline\",\"migrated\":false}"
+          },
+          {
+            "id": "T01-07 v1新角色原型闪避",
+            "pass": true,
+            "detail": "{\"evasion\":50,\"source\":\"prototype\",\"migrated\":false}"
+          },
+          {
+            "id": "T01-07 v1无原型缺省50",
+            "pass": true,
+            "detail": "{\"evasion\":50,\"source\":\"default-humanoid\",\"migrated\":true}"
+          },
+          {
+            "id": "T01-07 同名历史角色用基准",
+            "pass": true,
+            "detail": "{\"evasion\":120,\"source\":\"baseline\",\"migrated\":false}"
+          },
+          {
+            "id": "T01-07 persist关闭仍用基准",
+            "pass": true,
+            "detail": "{\"evasion\":120,\"source\":\"baseline\",\"migrated\":false}"
+          },
+          {
+            "id": "T01-07 review migration persists once",
+            "input": {
+              "firstSpd": 120,
+              "nextSpd": 300
+            },
+            "expected": [
+              120,
+              120,
+              300,
+              1,
+              true,
+              false
+            ],
+            "actual": [
+              120,
+              120,
+              300,
+              1,
+              true,
+              false
+            ],
+            "pass": true
+          },
+          {
+            "id": "T01-07 review baseline only",
+            "input": {},
+            "expected": {
+              "name": "旧角",
+              "config": {
+                "evasion": 120
+              }
+            },
+            "actual": {
+              "name": "旧角",
+              "config": {
+                "evasion": 120
+              }
+            },
+            "pass": true
+          },
+          {
+            "id": "T01-07 review explicit 0",
+            "input": {
+              "evasion": 0
+            },
+            "expected": 0,
+            "actual": 0,
+            "pass": true
+          },
+          {
+            "id": "T01-07 review explicit 40",
+            "input": {
+              "evasion": 40
+            },
+            "expected": 40,
+            "actual": 40,
+            "pass": true
+          }
+        ]
+      },
+      {
+        "id": "T01-08",
+        "passed": 27,
+        "failed": 0,
+        "pending": 0,
+        "cases": [
+          {
+            "id": "T01-08 对象形态maxUses解锁",
+            "pass": true,
+            "detail": "usesRemaining=5"
+          },
+          {
+            "id": "T01-08 物品对象形态children解析",
+            "pass": true,
+            "detail": "[\"爆射\"]"
+          },
+          {
+            "id": "T01-08 包结构",
+            "pass": true,
+            "detail": "[\"rpg-tactics-config\",1,\"all\"]"
+          },
+          {
+            "id": "T01-08 显式0保留",
+            "pass": true,
+            "detail": "[0,0]"
+          },
+          {
+            "id": "T01-08 persist开关保留",
+            "pass": true,
+            "detail": "{\"persistAtk\":true,\"persistSpd\":false}"
+          },
+          {
+            "id": "T01-08 组子技能保留",
+            "pass": true,
+            "detail": "[{\"name\":\"霰弹\",\"cost\":2,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":0,\"haste\":0,\"maxUses\":0,\"hit\":100,\"turns\":null,\"slotTurns\":2,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[单体(枪击)]\",\"power\":25,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":null,\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":null,\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"summonTarget\":null,\"summonNoLimit\":false,\"range\":null,\"actionCost\":{\"main\":1,\"aux\":0}}]"
+          },
+          {
+            "id": "T01-08 范围/成本保留",
+            "pass": true,
+            "detail": "[{\"type\":\"直线\",\"length\":10,\"width\":1},{\"main\":1,\"aux\":0}]"
+          },
+          {
+            "id": "T01-08 绑定保留",
+            "pass": true,
+            "detail": "[{\"skillName\":\"霰弹\",\"cost\":2}]"
+          },
+          {
+            "id": "T01-08 无当前hp/mp/tp",
+            "pass": true,
+            "detail": "当前资源未序列化（config 白名单不含）"
+          },
+          {
+            "id": "T01-08 无count/usesRemaining",
+            "pass": true,
+            "detail": ""
+          },
+          {
+            "id": "T01-08 全包无usesRemaining含物品children",
+            "pass": true,
+            "detail": ""
+          },
+          {
+            "id": "T01-08 物品children白名单往返",
+            "pass": true,
+            "detail": "[{\"name\":\"爆射\",\"cost\":3,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":0,\"haste\":0,\"maxUses\":0,\"hit\":100,\"turns\":null,\"slotTurns\":null,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[单体(枪击)]\",\"power\":35,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":null,\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":null,\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"summonTarget\":null,\"summonNoLimit\":false,\"range\":null,\"actionCost\":{\"main\":1,\"aux\":0}}]"
+          },
+          {
+            "id": "T01-08 无API密钥",
+            "pass": true,
+            "detail": ""
+          },
+          {
+            "id": "T01-08 无地图/桥台账",
+            "pass": true,
+            "detail": ""
+          },
+          {
+            "id": "T01-08 无实时护盾/Buff",
+            "pass": true,
+            "detail": ""
+          },
+          {
+            "id": "T01-08 导入children不走私键",
+            "pass": true,
+            "detail": "[\"name\",\"cost\",\"hpCost\",\"tpCost\",\"charge\",\"delay\",\"haste\",\"maxUses\",\"hit\",\"turns\",\"slotTurns\",\"slotTurns2\",\"slotTurns3\",\"type\",\"power\",\"type2\",\"power2\",\"type3\",\"power3\",\"isReaction\",\"reactionTarget\",\"kanpoTarget\",\"sheshenTarget\",\"damageType\",\"isOthers\",\"guaranteedHit\",\"switchTarget\",\"ignoreRow\",\"critRate\",\"fxTag\",\"barrierSub\",\"barrierArmor\",\"isHighTier\",\"isLegendary\",\"summonTarget\",\"summonNoLimit\",\"range\",\"actionCost\"]"
+          },
+          {
+            "id": "T01-08 单角色包一项",
+            "pass": true,
+            "detail": ""
+          },
+          {
+            "id": "T01-08 单角色包两项报错",
+            "pass": true,
+            "detail": ""
+          },
+          {
+            "id": "T01-08 A完整替换",
+            "pass": true,
+            "detail": "[\"A\",\"B\"]"
+          },
+          {
+            "id": "T01-08 C追加",
+            "pass": true,
+            "detail": "[\"C\"]"
+          },
+          {
+            "id": "T01-08 B保留",
+            "pass": true,
+            "detail": "[[\"C\"],[\"A\",\"B\"],[]]"
+          },
+          {
+            "id": "T01-08 取消零写入",
+            "pass": true,
+            "detail": "{}"
+          },
+          {
+            "id": "T01-08 保存后可读回",
+            "pass": true,
+            "detail": "[\"A\",\"B\",\"C\"]"
+          },
+          {
+            "id": "T01-08 删除技能不复活",
+            "pass": true,
+            "detail": "[\"零耗技\",\"限次技\",\"枪组\"]"
+          },
+          {
+            "id": "T01-08 保存后YAML显式仍最高",
+            "pass": true,
+            "detail": "evasion=33"
+          },
+          {
+            "id": "T01-08 review roundtrip all",
+            "input": {
+              "scope": "all"
+            },
+            "expected": {
+              "format": "rpg-tactics-config",
+              "version": 1,
+              "scope": "all",
+              "heroes": [
+                {
+                  "name": "往返角色",
+                  "config": {
+                    "classType": null,
+                    "isWise": false,
+                    "prototype": "轻型生物",
+                    "maxHp": 200,
+                    "maxMp": 50,
+                    "maxTp": 0,
+                    "atk": 10,
+                    "def": 5,
+                    "spd": 100,
+                    "evasion": 0,
+                    "strength": 30,
+                    "totalWeight": 25,
+                    "moveDistance": 8,
+                    "perception": 60,
+                    "footprint": {
+                      "width": 1,
+                      "height": 1
+                    },
+                    "actCount": 1
+                  },
+                  "persist": {
+                    "persistSpd": false
+                  },
+                  "skills": [],
+                  "items": []
+                }
+              ]
+            },
+            "actual": {
+              "format": "rpg-tactics-config",
+              "version": 1,
+              "scope": "all",
+              "heroes": [
+                {
+                  "name": "往返角色",
+                  "config": {
+                    "classType": null,
+                    "isWise": false,
+                    "prototype": "轻型生物",
+                    "maxHp": 200,
+                    "maxMp": 50,
+                    "maxTp": 0,
+                    "atk": 10,
+                    "def": 5,
+                    "spd": 100,
+                    "evasion": 0,
+                    "strength": 30,
+                    "totalWeight": 25,
+                    "moveDistance": 8,
+                    "perception": 60,
+                    "footprint": {
+                      "width": 1,
+                      "height": 1
+                    },
+                    "actCount": 1
+                  },
+                  "persist": {
+                    "persistSpd": false
+                  },
+                  "skills": [],
+                  "items": []
+                }
+              ]
+            },
+            "pass": true
+          },
+          {
+            "id": "T01-08 review roundtrip hero",
+            "input": {
+              "scope": "hero"
+            },
+            "expected": {
+              "format": "rpg-tactics-config",
+              "version": 1,
+              "scope": "hero",
+              "heroes": [
+                {
+                  "name": "往返角色",
+                  "config": {
+                    "classType": null,
+                    "isWise": false,
+                    "prototype": "轻型生物",
+                    "maxHp": 200,
+                    "maxMp": 50,
+                    "maxTp": 0,
+                    "atk": 10,
+                    "def": 5,
+                    "spd": 100,
+                    "evasion": 0,
+                    "strength": 30,
+                    "totalWeight": 25,
+                    "moveDistance": 8,
+                    "perception": 60,
+                    "footprint": {
+                      "width": 1,
+                      "height": 1
+                    },
+                    "actCount": 1
+                  },
+                  "persist": {
+                    "persistSpd": false
+                  },
+                  "skills": [],
+                  "items": []
+                }
+              ]
+            },
+            "actual": {
+              "format": "rpg-tactics-config",
+              "version": 1,
+              "scope": "hero",
+              "heroes": [
+                {
+                  "name": "往返角色",
+                  "config": {
+                    "classType": null,
+                    "isWise": false,
+                    "prototype": "轻型生物",
+                    "maxHp": 200,
+                    "maxMp": 50,
+                    "maxTp": 0,
+                    "atk": 10,
+                    "def": 5,
+                    "spd": 100,
+                    "evasion": 0,
+                    "strength": 30,
+                    "totalWeight": 25,
+                    "moveDistance": 8,
+                    "perception": 60,
+                    "footprint": {
+                      "width": 1,
+                      "height": 1
+                    },
+                    "actCount": 1
+                  },
+                  "persist": {
+                    "persistSpd": false
+                  },
+                  "skills": [],
+                  "items": []
+                }
+              ]
+            },
+            "pass": true
+          }
+        ]
+      }
+    ],
+    "passed": 166,
+    "failed": 0,
+    "pending": 0
+  },
+  "iab": {
+    "executed": true,
+    "backend": "iab",
+    "url": "http://127.0.0.1:8129/integration-test/tactics-harness.html",
+    "title": "P01 Harness PASS(16)",
+    "passed": 16,
+    "failed": 0,
+    "pending": 0,
+    "generateRawCount": 0,
+    "generateCount": 0,
+    "newCases": [
+      {
+        "id": "T01-07-iframe 闪避首次落盘与重载",
+        "input": {
+          "spd": [
+            120,
+            300
+          ]
+        },
+        "expected": {
+          "evasion": 120,
+          "secondWrite": false
+        },
+        "actual": "passed"
+      },
+      {
+        "id": "T01-08-iframe 配置再次导出一致",
+        "input": "轻型生物角色配置导出/导入/finalize/再次导出",
+        "expected": "JSON一致",
+        "actual": "passed"
+      },
+      {
+        "id": "T01-04-iframe 返回旧战斗不刷新限次",
+        "input": "bt-b → next → bt-b",
+        "expected": {
+          "branch": "resume",
+          "perBattleUses.skill": 1
+        },
+        "actual": "passed"
+      }
+    ],
+    "existingCases": {
+      "transport": 3,
+      "iframe": 10,
+      "passed": 13
+    },
+    "testTabClosed": true
+  },
+  "review": {
+    "status": "incomplete",
+    "reason": "独立只读代理未返回最终结论，已停止；不计通过",
+    "primaryVerification": "六项真实反例、Node166与IAB16通过"
+  },
+  "purposeVsState": "六项审查修复已实施，Node166/IAB16通过；独立代理复审未完成，不宣称通过。"
+}

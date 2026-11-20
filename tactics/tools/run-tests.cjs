@@ -32,7 +32,7 @@ const STAGES = {
       ['roster', 'resolveHero'], ['roster', 'ensureEvasionBaseline'], ['roster', 'gapFillSkill'],
       ['lifecycle', 'classifyLoad'], ['lifecycle', 'applyLoad'], ['lifecycle', 'reopenLoad'],
       ['configPackage', 'buildConfigPackage'], ['configPackage', 'createImportDraft'], ['configPackage', 'finalizeImportDraft'],
-      ['storage', 'saveTacticsKey'], ['storage', 'readTacticsRoster'], ['storage', 'saveTacticsRoster'], ['storage', 'buildTacticsResultPayload'],
+      ['storage', 'loadTacticsRoster'], ['storage', 'saveTacticsKey'], ['storage', 'readTacticsRoster'], ['storage', 'saveTacticsRoster'], ['storage', 'buildTacticsResultPayload'],
     ],
   },
 };
@@ -53,6 +53,8 @@ function parseArgs(argv) {
     else if (a.startsWith('--group=')) args.group = a.slice(8).trim().toUpperCase();
     else fail('未知参数: ' + a);
   }
+  if (args.stage === '' || args.group === '') throw new Error('stage/group 不允许空值');
+  if ((args.selfCheck && (args.stage || args.group || args.all)) || (args.all && (args.stage || args.group))) throw new Error('测试选择参数互斥');
   return args;
 }
 
@@ -64,26 +66,21 @@ async function loadModules(stageDef) {
   modules.lifecycle = await import(pathToFileURL(path.join(ROOT, 'tactics', 'src', 'lifecycle.mjs')).href);
   modules.configPackage = await import(pathToFileURL(path.join(ROOT, 'tactics', 'src', 'config-package.mjs')).href);
   modules.storage = await import(pathToFileURL(path.join(ROOT, 'tactics', 'src', 'storage.mjs')).href);
-  // 存在性门禁：缺导出直接失败（T01-06 正对照也依赖这里）
-  for (const [mod, fn] of stageDef.requiredExports) {
-    if (!modules[mod] || typeof modules[mod][fn] !== 'function' && !(fn in modules[mod])) {
-      fail('业务导出缺失: ' + mod + '.' + fn);
-    }
-  }
+  assertRequiredExports(modules, stageDef.requiredExports);
   return modules;
 }
 
 async function runGroup(casesMod, groupId, deps) {
   const runner = casesMod.groups && casesMod.groups[groupId];
-  if (!runner || typeof runner.run !== 'function') fail('测试组不存在或不可运行: ' + groupId);
+  if (!runner || typeof runner.run !== 'function') throw new Error('测试组不存在或不可运行: ' + groupId);
   const started = Date.now();
   const result = await runner.run(deps);
-  if (!result || !Array.isArray(result.cases)) fail('测试组 ' + groupId + ' 未返回用例数组');
-  if (!result.cases.length) fail('测试组 ' + groupId + ' 用例数为 0（禁止空组报绿）');
+  if (!result || !Array.isArray(result.cases)) throw new Error('测试组 ' + groupId + ' 未返回用例数组');
+  if (!result.cases.length) throw new Error('测试组 ' + groupId + ' 用例数为 0（禁止空组报绿）');
   const passed = result.cases.filter(c => c.pass === true).length;
   const failed = result.cases.filter(c => c.pass === false).length;
   const pending = result.cases.filter(c => c.pass !== true && c.pass !== false).length;
-  if (passed === 0) fail('测试组 ' + groupId + ' passed=0');
+  if (passed === 0) throw new Error('测试组 ' + groupId + ' passed=0');
   if (failed > 0 || pending > 0) {
     result.cases.filter(c => c.pass !== true).forEach(c => console.error('  ✗ ' + c.id + ': ' + (c.detail || '')));
     fail('测试组 ' + groupId + ' failed=' + failed + ' pending=' + pending);
@@ -163,4 +160,12 @@ async function runStage(stageName, onlyGroup) {
   }
 }
 
-main().catch(e => { fail(e && e.stack || String(e)); });
+function assertRequiredExports(modules, required) {
+  const constants = new Set(['PROTOTYPES','RANGE_TYPES','TACTICS_ROSTER_KEY']);
+  for (const [mod, name] of required) {
+    const value = modules[mod]?.[name];
+    if (constants.has(name) ? value === undefined : typeof value !== 'function') throw new Error('业务导出缺失或类型错误: ' + mod + '.' + name);
+  }
+}
+module.exports = { assertRequiredExports, runGroup, parseArgs };
+if (require.main === module) main().catch(e => { fail(e && e.stack || String(e)); });

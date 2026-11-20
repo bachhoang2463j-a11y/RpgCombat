@@ -15,6 +15,33 @@ export {
   COMBAT_BRIDGE_CHANNEL, TACTICS_RESULT_ID_PREFIX,
 };
 
+import { resolveHero } from './roster.mjs';
+
+// 载入编排：纯合并后只保存首次建立的闪避基准，不把当前资源写入配置档。
+export function loadTacticsRoster(combatBlock, mmsHeroes = []) {
+  const payload = readTacticsRoster() || { version: 1, heroes: [] };
+  const savedByName = new Map(payload.heroes.map(h => [h.name, h]));
+  const mmsByName = new Map(mmsHeroes.map(h => [h.name, h]));
+  let changed = false;
+  const results = combatBlock.heroes.map(yamlHero => {
+    const saved = savedByName.get(yamlHero.name);
+    const result = resolveHero(yamlHero, {
+      persistedHero: saved, mmsHero: mmsByName.get(yamlHero.name),
+      hasProtocolVersion: combatBlock.protocolVersion === 1,
+    });
+    if (!saved || saved.config?.evasion == null) {
+      const entry = saved || { name: yamlHero.name, config: {} };
+      entry.config = { ...entry.config, evasion: result.hero.evasion };
+      if (!saved) payload.heroes.push(entry);
+      savedByName.set(entry.name, entry);
+      changed = true;
+    }
+    return result;
+  });
+  if (changed) saveTacticsRoster(payload);
+  return { heroes: results.map(r => r.hero), results, persisted: changed };
+}
+
 // ---------- 变量 API 适配（缺失即抛错，不做静默降级） ----------
 
 function api() {

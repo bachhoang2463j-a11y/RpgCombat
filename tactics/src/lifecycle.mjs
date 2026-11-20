@@ -63,7 +63,11 @@ function applyExplicitMap(target, patch) {
 // 返回 { state, branch, sceneState, battleState, initSceneCalls, initBattleCalls, explicitApplied }
 export function applyLoad(state, incoming, explicitOverrides = null, deps = {}) {
   const cur = state && state.current ? state.current : null;
-  const classification = classifyLoad(cur, incoming);
+  let classification = classifyLoad(cur, incoming);
+  const savedScene = state && state.scenes && state.scenes[incoming.sceneId];
+  const savedBattle = state && state.battles && state.battles[battleKey(incoming.sceneId, incoming.battleId)];
+  if (savedScene && savedBattle) classification = { branch: LOAD_BRANCH_RESUME, sceneId: incoming.sceneId, battleId: incoming.battleId };
+  else if (savedScene) classification = { branch: LOAD_BRANCH_NEW_BATTLE, sceneId: incoming.sceneId, battleId: incoming.battleId };
   const next = state ? JSON.parse(JSON.stringify(state)) : emptyTacticsState();
   if (!next.scenes || !next.battles) throw new Error('战术档结构不合法（缺 scenes/battles）');
   const { sceneId, battleId } = classification;
@@ -123,7 +127,9 @@ export function reopenLoad(state, incoming, deps = {}) {
   const hasScene = !!(state && state.scenes && state.scenes[incoming.sceneId]);
   const hasBattle = !!(state && state.battles && state.battles[key]);
   if (hasScene && hasBattle) {
-    return { state, branch: 'reopen-existing', sceneState: state.scenes[incoming.sceneId], battleState: state.battles[key], initSceneCalls: 0, initBattleCalls: 0 };
+    const next = JSON.parse(JSON.stringify(state));
+    next.current = { sceneId: incoming.sceneId, battleId: incoming.battleId };
+    return { state: next, branch: 'reopen-existing', sceneState: next.scenes[incoming.sceneId], battleState: next.battles[key], initSceneCalls: 0, initBattleCalls: 0 };
   }
   return applyLoad(state, incoming, null, deps);
 }
