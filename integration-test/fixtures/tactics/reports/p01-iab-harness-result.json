@@ -1,0 +1,90 @@
+{
+  "failed": 0,
+  "groups": {
+    "T01-05-iframe": [
+      {
+        "detail": "[\"global\",\"chat\"]",
+        "group": "T01-05-iframe",
+        "id": "T01-05-iframe global/chat/message 隔离",
+        "pass": true
+      },
+      {
+        "detail": "[\"scope\",\"rpg_combat_roster\",\"$shop_catalog\",\"rpg_tactics_roster\"]",
+        "group": "T01-05-iframe",
+        "id": "T01-05-iframe 保留原RPG键",
+        "pass": true
+      },
+      {
+        "detail": "",
+        "group": "T01-05-iframe",
+        "id": "T01-05-iframe 战棋键写入",
+        "pass": true
+      },
+      {
+        "detail": "",
+        "group": "T01-05-iframe",
+        "id": "T01-05-iframe 整档替换无残留",
+        "pass": true
+      },
+      {
+        "detail": "",
+        "group": "T01-05-iframe",
+        "id": "T01-05-iframe 业务删键生效",
+        "pass": true
+      },
+      {
+        "detail": "\"rt-$1-$&-$$-&amp;-预转义实体-反引号`x`&实体<ok>\"",
+        "group": "T01-05-iframe",
+        "id": "T01-05-iframe 传输样本标记",
+        "pass": true
+      },
+      {
+        "detail": "70",
+        "group": "T01-05-iframe",
+        "id": "T01-05-iframe 真实模块解析",
+        "pass": true
+      },
+      {
+        "detail": "new-scene init=1",
+        "group": "T01-05-iframe",
+        "id": "T01-05-iframe 生命周期冒烟",
+        "pass": true
+      },
+      {
+        "detail": "0",
+        "group": "T01-05-iframe",
+        "id": "T01-05-iframe generateRaw=0",
+        "pass": true
+      },
+      {
+        "detail": "0",
+        "group": "T01-05-iframe",
+        "id": "T01-05-iframe generate=0",
+        "pass": true
+      }
+    ],
+    "T01-05-transport": [
+      {
+        "detail": "",
+        "group": "T01-05-transport",
+        "id": "替换产物非空",
+        "pass": true
+      },
+      {
+        "detail": "",
+        "group": "T01-05-transport",
+        "id": "$ 加倍往返字节一致（含 $1/$&/$$）",
+        "pass": true
+      },
+      {
+        "detail": "",
+        "group": "T01-05-transport",
+        "id": "不加倍通道确实破坏 $ 序列（对照）",
+        "pass": true
+      }
+    ]
+  },
+  "harness": "tactics-harness",
+  "passed": 13,
+  "total": 13
+}

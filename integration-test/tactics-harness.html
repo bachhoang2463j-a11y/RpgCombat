@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>战棋 P01 Harness</title>
+<style>
+  body { font-family: 'Noto Sans SC', sans-serif; background: #10141c; color: #d7dde8; margin: 24px; }
+  h1 { font-size: 18px; } h2 { font-size: 14px; color: #9fb4d8; margin: 18px 0 6px; }
+  .row { padding: 3px 8px; font-size: 13px; border-left: 3px solid transparent; }
+  .pass { color: #7ee787; } .fail { color: #ff7b72; border-left-color: #ff7b72; }
+  .total { margin-top: 12px; font-weight: 700; }
+  pre { background: #0b0f16; padding: 10px; font-size: 11px; overflow: auto; max-height: 260px; }
+  iframe { display: none; }
+</style>
+</head>
+<body>
+<h1>战棋 P01 Harness（真实模块 + 保真 Mock + 契约 B 传输通道）</h1>
+<div id="out"></div>
+<div class="total" id="total">运行中…</div>
+<pre id="json">机器可读结果待运行完成</pre>
+<iframe id="frame"></iframe>
+<script>
+/* ==========================================================================
+   P01 宿主页职责：
+   1. 契约 B 传输通道：真实 String.prototype.replace(findRegex, replaceString)
+      （replacement 为字符串，禁止函数绕过）+ $ 加倍 + 实体处理，字节往返断言
+   2. 还原产物写入 srcdoc iframe：mock 先装、真实模块后跑（p01-browser-cases.mjs）
+   3. 汇总分组断言 + 机器可读 JSON（window.__TACTICS_P01_RESULT）
+   ========================================================================== */
+(function () {
+  const out = document.getElementById('out');
+  const results = [];   // { group, id, pass, detail }
+
+  function add(group, id, pass, detail) {
+    results.push({ group, id, pass: !!pass, detail: detail || '' });
+    const div = document.createElement('div');
+    div.className = 'row ' + (pass ? 'pass' : 'fail');
+    div.textContent = (pass ? '✓ ' : '✗ ') + group + ' · ' + id + (detail ? ' — ' + detail : '');
+    out.appendChild(div);
+  }
+
+  // ---------- 契约 B 传输通道 ----------
+  // 酒馆真实链路：脚本内容嵌入 replaceString 本体（非捕获组），findRegex 匹配楼层占位。
+  // 契约 B：传输前 $ 加倍（$$），String.replace 的替换语义把 $$ 还原为 $，字节往返一致。
+  const TRANSPORT_MARKER = 'rt-$1-$&-$$-&amp;-预转义实体-反引号`x`&实体<ok>';
+  function runTransportChannel() {
+    const fence = '\u0060\u0060\u0060';
+    const sourceHtml = [
+      '<!DOCTYPE html><html><head>',
+      '<base href="../../">',
+      '<script>window.__P01_TRANSPORT_MARKER = ' + JSON.stringify(TRANSPORT_MARKER) + ';</' + 'script>',
+      '<script>/*注入点*/</' + 'script>',
+      '</head><body><script type="module">/*用例*/</' + 'script></body></html>',
+    ].join('');
+
+    // 1) 围栏包裹 → 2) 契约 B：$ 加倍 → 3) 实体处理 → 作为 replaceString 本体
+    const fenced = fence + 'html\n' + sourceHtml + '\n' + fence;
+    const doubled = fenced.split('$').join('$$');
+    const entities = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    const encoded = doubled.replace(/[&<>"']/g, c => entities[c]);
+
+    // 4) 模拟酒馆：楼层占位 + 真实 String.replace(findRegex, replaceString)（字符串替换串，禁止函数）
+    const target = fence + 'html\n旧占位内容\n' + fence;
+    const findRegex = new RegExp(fence + 'html\\n[\\s\\S]*?\\n' + fence);
+    const replaced = target.replace(findRegex, encoded); // replace 内部把 $$ 还原为 $
+    // 5) 实体还原 → 传输产物
+    const decoded = replaced.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    // decoded 中围栏包裹仍在，剥围栏得源码
+    const m = decoded.match(new RegExp(fence + 'html\\n([\\s\\S]*?)\\n' + fence));
+    const restored = m ? m[1] : null;
+    const roundTrip = restored === sourceHtml;
+
+    add('T01-05-transport', '替换产物非空', restored != null, '');
+    add('T01-05-transport', '$ 加倍往返字节一致（含 $1/$&/$$）', roundTrip, roundTrip ? '' : 'restored=' + JSON.stringify(restored && restored.slice(0, 120)));
+    // 对照：不加倍直接嵌入 replaceString → $ 序列被替换语义破坏（验证契约 B 必要性）
+    const encodedNoDoubled = fenced.replace(/[&<>"']/g, c => entities[c]);
+    const bad = target.replace(findRegex, encodedNoDoubled).replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    const bm = bad.match(new RegExp(fence + 'html\\n([\\s\\S]*?)\\n' + fence));
+    add('T01-05-transport', '不加倍通道确实破坏 $ 序列（对照）', !bm || bm[1] !== sourceHtml, '');
+    return restored;
+  }
+
+  // ---------- Mock 源码（iframe 内 boot 前安装） ----------
+  function mockSource() {
+    return [
+      'window.__P01_MOCK_COUNTS = { generateRaw: 0, generate: 0 };',
+      '(function () {',
+      '  const store = { global: {}, chat: {}, message: {} };',
+      '  const counts = window.__P01_MOCK_COUNTS;',
+      '  const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));',
+      '  function bucket(opt) {',
+      '    const o = opt || {};',
+      '    if (o.type === "message") {',
+      '      const id = o.message_id == null ? 0 : o.message_id;',
+      '      if (!store.message[id]) store.message[id] = {};',
+      '      return store.message[id];',
+      '    }',
+      '    if (o.type === "chat") return store.chat;',
+      '    return store.global;',
+      '  }',
+      '  function deepMerge(t, s) {',
+      '    for (const k of Object.keys(s || {})) {',
+      '      const v = s[k];',
+      '      if (v && typeof v === "object" && !Array.isArray(v) && t[k] && typeof t[k] === "object" && !Array.isArray(t[k])) deepMerge(t[k], v);',
+      '      else t[k] = clone(v);',
+      '    }',
+      '    return t;',
+      '  }',
+      '  const api = {',
+      '    getVariables: (opt) => clone(bucket(opt)),',
+      '    replaceVariables: (vars, opt) => { const b = bucket(opt); for (const k of Object.keys(b)) delete b[k]; deepMerge(b, vars); return clone(bucket(opt)); },',
+      '    insertOrAssignVariables: (vars, opt) => { deepMerge(bucket(opt), vars); return clone(bucket(opt)); },',
+      '    generateRaw: async () => { counts.generateRaw++; throw new Error("P01 不应调用 generateRaw"); },',
+      '    generate: async () => { counts.generate++; throw new Error("P01 不应调用 generate"); },',
+      '    getLastMessageId: () => 0,',
+      '    getCurrentMessageId: () => 0,',
+      '  };',
+      '  window.__P01_MOCK_API = api;',
+      '  Object.assign(window, api);',
+      '})();',
+    ].join('\n');
+  }
+
+  // ---------- iframe 宿主（传输还原产物 + mock 注入 + 真实模块用例） ----------
+  function buildIframeHtml(decodedHtml) {
+    // 仓库根绝对 URL（srcdoc 内裸 specifier 解析不可靠，统一绝对 URL）
+    const rootUrl = location.href.replace(/integration-test\/tactics-harness\.html.*$/, '');
+    const bootUrl = rootUrl + 'integration-test/fixtures/tactics/p01-browser-cases.mjs';
+    const injected = decodedHtml
+      .replace('<script>/*注入点*/</' + 'script>', '<script>' + mockSource() + '</' + 'script>')
+      .replace('<script type="module">/*用例*/</' + 'script>',
+        '<script type="module">' +
+        'try { const { runBrowserCases } = await import(' + JSON.stringify(bootUrl) + ');' +
+        ' const results = await runBrowserCases();' +
+        ' parent.postMessage({ type: "p01-browser-result", results }, "*"); }' +
+        ' catch (e) { parent.postMessage({ type: "p01-browser-result", results: [{ id: "iframe-boot", pass: false, detail: String(e && e.message || e) }] }, "*"); }' +
+        '</' + 'script>');
+    return injected;
+  }
+
+  function finish() {
+    const passed = results.filter(r => r.pass).length;
+    const failed = results.length - passed;
+    const total = document.getElementById('total');
+    total.textContent = passed + ' / ' + results.length + ' 通过' + (failed ? ' — ' + failed + ' 项失败' : '');
+    total.style.color = failed ? '#ff7b72' : '#7ee787';
+    const groups = {};
+    results.forEach(r => { (groups[r.group] = groups[r.group] || []).push(r); });
+    const summary = { harness: 'tactics-harness', groups, passed, failed, total: results.length };
+    document.getElementById('json').textContent = JSON.stringify(summary, null, 2);
+    window.__TACTICS_P01_RESULT = summary;
+    document.title = failed ? 'P01 Harness FAIL(' + failed + ')' : 'P01 Harness PASS(' + passed + ')';
+  }
+
+  window.addEventListener('message', (ev) => {
+    const d = ev.data;
+    if (!d || d.type !== 'p01-browser-result') return;
+    d.results.forEach(r => add('T01-05-iframe', r.id, r.pass, r.detail));
+    finish();
+  });
+
+  const decoded = runTransportChannel();
+  if (decoded) {
+    const frame = document.getElementById('frame');
+    frame.srcdoc = buildIframeHtml(decoded);
+    // iframe 用例完成会 postMessage；超时 20s 兜底结束（不留悬挂）
+    setTimeout(() => {
+      if (!window.__TACTICS_P01_RESULT) {
+        add('T01-05-iframe', 'iframe-boot', false, '20s 内未收到 iframe 结果');
+        finish();
+      }
+    }, 20000);
+  } else {
+    finish();
+  }
+})();
+</script>
+</body>
+</html>
