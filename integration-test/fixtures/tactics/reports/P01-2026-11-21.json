@@ -1,7 +1,7 @@
 {
   "stage": "P01",
   "source": "tactics/src/*.mjs",
-  "sourceCommit": "pending-first-commit",
+  "sourceCommit": "d615d8c",
   "executedAt": "2026-11-20T20:25:04.535Z",
   "executedAtLocal": "2026/11/21 04:25:04",
   "baseHeadAtRun": "97cf9a2182ee34b199352f7cfb391a6cbf0ab998",
@@ -990,5 +990,6 @@
   },
   "generateRawCount": 0,
   "generateCount": 0,
-  "purposeVsState": "P01 目的为协议、独立闪避、配置包数据模型与真代码测试底座；现状 Node 146 用例与 IAB 13 断言全绿（含审查修复后的回归锁），契约与底座已可复现，但不等于完整战场（P02+）、导入导出 UI（P11）或真实 MMS 同步已完成。"
+  "purposeVsState": "P01 目的为协议、独立闪避、配置包数据模型与真代码测试底座；现状 Node 146 用例与 IAB 13 断言全绿（含审查修复后的回归锁），契约与底座已可复现，但不等于完整战场（P02+）、导入导出 UI（P11）或真实 MMS 同步已完成。",
+  "sourceCommitNote": "执行时基线 baseHeadAtRun=97cf9a2（sourceDirty:true），业务提交 d615d8c 的业务文件指纹与 filesTested 一致"
 }

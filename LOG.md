@@ -3765,3 +3765,20 @@
 - **验证**：仅静态检查改动四处均为一句话级增改；未运行构建、回归或浏览器，不涉及代码。
 - **边界**：未改 `SPEC.md`、`INDEX.md`、`REVISION`、`P00-REPORT.md`、根业务源码或打包器；不新增测试清单、FPS 门槛、自动恢复或防御性兜底；不混入工作树既有删除与临时文件。
 - **目的 vs 现状**：运行优先级与口径歧义已落盘；P00 补验与 P01—P12 施工仍按修订后 PLAN 未开工。
+
+## [LOG-307] 2026-11-21 — 战棋 P01 协议、独立闪避、配置包与真代码测试底座交付
+
+- **业务提交**：`d615d8c`。
+- **核心目的**：按已批准计划完成 P01——独立规范数据协议与冻结契约、独立闪避首次迁移、统一优先级合并（修复 YAML 显式字段被覆盖的旧缺陷）、带版本全体/单角色配置包数据模型，以及测真实业务代码的测试底座；不改原 RPG 与 MiniMapStatus。
+- **变更行为**：
+  1. 新增 `doc/tactics/P01-CONTRACT.md` 冻结用户确认契约：三原型新建闪避初值（标准人形50/轻型生物70/大型生物30）、三键独立存档（`rpg_tactics_roster`/`$rpg_tactics_state`/`$rpg_tactics_bridge`）、YAML 字段与合法空值、六范围参数映射、主辅行动成本、资源优先级链、配置包白名单与语义布阵数据结构。
+  2. 新增 `tactics/src/` 六模块（原生 ESM）：`protocol.mjs`（常量/字段表/原型）、`parser.mjs`（移植 parseSkill/parseItem/parseSkillList/parseItemList/parseAttributes 并扩展 [范围:类型;参数]、[行动:主辅]、[闪避][力量][总重][移动][感知][体型] 标签、对象形态与显式来源追踪；vendor 内联 js-yaml 4.1.0 保留 MIT）、`roster.mjs`（统一合并入口 resolveHero/gapFillSkill/ensureEvasionBaseline，YAML 显式含 0/false/null/空集合严格胜出，persist 开关不反转显式优先）、`lifecycle.mjs`（scene/battle 三分支 classifyLoad/applyLoad/reopenLoad 纯状态转移）、`config-package.mjs`（白名单配置包与导入草稿事务：同名完整替换/新人追加/取消零写入/保存才持久化）、`storage.mjs`（三键整档替换 + rt- 前缀 MMS 兼容桥最小契约）。
+  3. 新增 `tactics/tools/run-tests.cjs`：--stage/--group/--all/--self-check/--artifact 门禁，不存在 stage/group/导出、空提取、零用例一律非零退出，T01-06 实测负路径。
+  4. 新增 `integration-test/tactics-harness.html` 与 `fixtures/tactics/`：保真三作用域 mock（replaceVariables 真删键/insertOrAssign 深合并/双 LLM 计数恒 0）、契约 B 传输通道（$ 加倍 + 实体处理经真实 String.prototype.replace 字符串替换串往返字节一致）、srcdoc 挂载真实模块执行浏览器侧断言。
+  5. 测试覆盖 T01-01～T01-08：Node 侧 146 用例 + IAB 13 断言全绿（passed>0, failed=0, pending=0），报告落盘 `integration-test/fixtures/tactics/reports/P01-2026-11-21.json`（含被测 13 文件 SHA-256、执行 HEAD 97cf9a2+sourceDirty 标注、审查修复记录）。
+  6. 只读审查发现并修复 2 处高危：配置包物品 children 绕过白名单泄漏运行态键（packItem/unpackItem 接入 packSkill/unpackSkill 白名单）；对象形态技能/物品 usesRemaining 时序缺陷（maxUses>0 开局锁死）。同步修复中低危 5 项（hasOwnProperty 防原型链、取消零写入真断言、syncGroupFlatRows 同名 FIFO、spd null 迁移缺省、explicitApplied 真实增量）并补回归锁。
+  7. `doc/tactics/PLAN.md`/`INDEX.md` 更新 P01 状态为已完成验证、P02—P12 未开工，剩余工时按算术推导为 118—172h；不改已确认玩法与单阶段估算。
+- **涉及文件**：`doc/tactics/P01-CONTRACT.md`、`doc/tactics/PLAN.md`、`doc/tactics/INDEX.md`、`tactics/src/`（7 文件）、`tactics/tools/run-tests.cjs`、`integration-test/tactics-harness.html`、`integration-test/fixtures/tactics/`（5 文件）；本条与 LOG-INDEX。
+- **验证**：`node tactics/tools/run-tests.cjs --stage=p01` 8 组 146 用例全绿；`--self-check` 负路径全过；IAB 实跑 harness 13/13（截图与机器可读结果已留档）；generateRaw/generate 双计数 0；禁改文件（根 index.html/regex v12_16/build-regex.cjs/README/根 SPEC/doc SPEC/P00 报告/MMS）零改动；未混入工作树既有删除与 .audit-work。
+- **边界**：不实施跑圈引擎、地图、AI、命中结算（P02+）；配置导入导出 UI 与真实 MMS 接线留 P11；三键整档保存的串行约束已记入契约第 9 节；未新增生产 LLM 提示词。
+- **目的 vs 现状**：P01 目的（可信数据协议 + 真代码测试底座）已达成且可复现；完整战场、UI 与发布打包仍属 P02—P12。
