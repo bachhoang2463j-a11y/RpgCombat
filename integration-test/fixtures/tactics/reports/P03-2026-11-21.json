@@ -1,8 +1,8 @@
 {
   "stage": "P03",
   "source": "tactics/src/clock.mjs + tactics/src/scheduler.mjs",
-  "sourceCommit": "6c1339a",
-  "baseHeadAtRun": "6c1339a553285c71d072e011591c77150377182e",
+  "sourceCommit": "2b75c11",
+  "baseHeadAtRun": "2b75c11",
   "sourceDirty": true,
   "dirtyNote": "工作区含历史遗留删除与 .audit-work 未跟踪文件（与本轮无关）；P03 五个文件在实测时为未跟踪/追加态，以 filesTested sha256 标识被测版本",
   "mode": "source",
@@ -12,9 +12,9 @@
     "node tactics/tools/run-tests.cjs --self-check"
   ],
   "executed": true,
-  "executedAt": "2026-11-21T07:09:08+08:00",
-  "executedAtLocal": "2026-11-21 07:09:08 (UTC+8)",
-  "passed": 55,
+  "executedAt": "2026-11-21T00:06:53.226Z",
+  "executedAtLocal": "2026-11-21 (修复复测)",
+  "passed": 58,
   "failed": 0,
   "pending": 0,
   "groups": [
@@ -139,19 +139,19 @@
     },
     {
       "id": "T03-04",
-      "passed": 4,
+      "passed": 5,
       "failed": 0,
       "pending": 0,
       "cases": [
         {
           "id": "T03-04 首跳恰在t=135（施毒后+100，不因重施推迟）",
           "pass": true,
-          "detail": "rec={\"key\":\"victim\\u0000venom\",\"unitId\":\"victim\",\"source\":\"venom\",\"kind\":\"poison\",\"strength\":5,\"interval\":100,\"appliedAt\":35,\"endAt\":335,\"nextTickAt\":135} ticks=[135,235,335]"
+          "detail": "rec={\"key\":\"victim\\u0000caster\\u0000venom\\u0000slot-1\",\"unitId\":\"victim\",\"source\":{\"casterId\":\"caster\",\"skillId\":\"venom\",\"effectId\":\"slot-1\"},\"kind\":\"poison\",\"strength\":5,\"interval\":100,\"appliedAt\":35,\"endAt\":335,\"nextTickAt\":135} ticks=[135,235,335]"
         },
         {
           "id": "T03-04 同源重施保节拍仅更新强度与到期（endAt=125+300）",
           "pass": true,
-          "detail": "rec={\"key\":\"victim\\u0000venom\",\"unitId\":\"victim\",\"source\":\"venom\",\"kind\":\"poison\",\"strength\":8,\"interval\":100,\"appliedAt\":35,\"endAt\":425,\"nextTickAt\":135} strengths=[8,8,8]"
+          "detail": "rec={\"key\":\"victim\\u0000caster\\u0000venom\\u0000slot-1\",\"unitId\":\"victim\",\"source\":{\"casterId\":\"caster\",\"skillId\":\"venom\",\"effectId\":\"slot-1\"},\"kind\":\"poison\",\"strength\":8,\"interval\":100,\"appliedAt\":35,\"endAt\":425,\"nextTickAt\":135} strengths=[8,8,8]"
         },
         {
           "id": "T03-04 末跳先于到期移除且过期后不再跳",
@@ -162,6 +162,11 @@
           "id": "T03-04 末跳与到期同刻先跳后移（跳完才移除）",
           "pass": true,
           "detail": "types300=[\"dot-tick\",\"status-expired\",\"stalemate\"] ticks=[100,200,300]"
+        },
+        {
+          "id": "T03-04 同目标同技能不同施术者建立独立状态键",
+          "pass": true,
+          "detail": "keys=[\"target\\u0000hero-a\\u0000venom\\u0000slot-1\",\"target\\u0000hero-b\\u0000venom\\u0000slot-1\"] A={\"key\":\"target\\u0000hero-a\\u0000venom\\u0000slot-1\",\"unitId\":\"target\",\"source\":{\"casterId\":\"hero-a\",\"skillId\":\"venom\",\"effectId\":\"slot-1\"},\"kind\":\"poison\",\"strength\":8,\"interval\":100,\"appliedAt\":0,\"endAt\":500,\"nextTickAt\":100} B={\"key\":\"target\\u0000hero-b\\u0000venom\\u0000slot-1\",\"unitId\":\"target\",\"source\":{\"casterId\":\"hero-b\",\"skillId\":\"venom\",\"effectId\":\"slot-1\"},\"kind\":\"poison\",\"strength\":5,\"interval\":100,\"appliedAt\":0,\"endAt\":400,\"nextTickAt\":100}"
         }
       ]
     },
@@ -331,7 +336,7 @@
     },
     {
       "id": "T03-08",
-      "passed": 4,
+      "passed": 6,
       "failed": 0,
       "pending": 0,
       "cases": [
@@ -354,6 +359,16 @@
           "id": "T03-08 永久眩晕与周期状态均不阻止僵持（首推即t=0终局）",
           "pass": true,
           "detail": "C={\"status\":\"terminal\",\"terminal\":{\"type\":\"stalemate\",\"at\":0}} D={\"status\":\"terminal\",\"terminal\":{\"type\":\"stalemate\",\"at\":0}}"
+        },
+        {
+          "id": "T03-08 永久DoT不阻止僵持且重复查询不重发",
+          "pass": true,
+          "detail": "first={\"status\":\"terminal\",\"time\":0} second={\"status\":\"terminal\",\"time\":0} dotTicks=0 log=3"
+        },
+        {
+          "id": "T03-08 倒地单位DoT照计时但标记suppressed，存活单位正常tick",
+          "pass": true,
+          "detail": "at=100 down={\"seq\":5,\"t\":100,\"type\":\"dot-tick\",\"key\":\"down-target\\u0000c1\\u0000fire\\u0000slot0\",\"unitId\":\"down-target\",\"source\":{\"casterId\":\"c1\",\"skillId\":\"fire\",\"effectId\":\"slot0\"},\"kind\":\"burn\",\"strength\":4,\"suppressed\":true} active={\"seq\":6,\"t\":100,\"type\":\"dot-tick\",\"key\":\"active-target\\u0000c1\\u0000fire\\u0000slot0\",\"unitId\":\"active-target\",\"source\":{\"casterId\":\"c1\",\"skillId\":\"fire\",\"effectId\":\"slot0\"},\"kind\":\"burn\",\"strength\":4,\"suppressed\":false}"
         }
       ]
     }
@@ -361,11 +376,11 @@
   "filesTested": [
     {
       "path": "tactics/src/clock.mjs",
-      "sha256": "fd2f204ed355811197cd35f1276b8fd36b9b6f44b9bf009e89bb88ffa85c657a"
+      "sha256": "b55091649371e8099d185474bfd2724e4a26ca2acb74200566e34fca46889bcd"
     },
     {
       "path": "tactics/src/scheduler.mjs",
-      "sha256": "8d54fa478316654b40d8c0dd6b33b41b05ebe3956fe69b7ba72b390168788fc2"
+      "sha256": "18f19185d6bb65d6d4f9ced6592b076561b7dae73f383de0b689e361c0b5c115"
     },
     {
       "path": "tactics/tools/run-tests.cjs",
@@ -373,27 +388,28 @@
     },
     {
       "path": "doc/tactics/P03-CLOCK-CONTRACT.md",
-      "sha256": "6070fee54c321f171b0a52e2f4ee00ea531e8a7854dcc718213158d418651722"
+      "sha256": "8ee25a91ecb1d963979a7b1c56166d17d5a328b7f67488262af8cdcd4b5f820a"
     },
     {
       "path": "integration-test/fixtures/tactics/p03-node-cases.mjs",
-      "sha256": "234424004e06ef12a22f6a8fcbbae94569eabaa9d4736a35063b8791d30f21aa"
+      "sha256": "10cd0847d7d11bab771a5d8f5e0dde835a98f906a968bc6d4a3112b5a9fa0aa9"
     }
   ],
   "review": {
-    "reviewer": "独立只读审查子代理（未参与业务/测试编写）",
-    "verdict": "pass",
+    "reviewer": "主代理客观复核（独立子代理因并发额度未执行）",
+    "verdict": "pass-with-notes",
     "blockers": 0,
-    "scope": "P03 改动恰好落在 5 个文件（run-tests.cjs 仅追加 p03 注册），P03 依赖路径无 startRound/actionQueue/大回合残留；测试全部真实导入无 mock 实现、无 sleep；__RUN_TESTS_JSON__ 逐用例数与组计数一致",
-    "fixedAfterReview": [
-      "低-2：grantNaturalAction 交付待领取点并入 u.extraMain，冻结期 getActionState 实时余额正确（补 T03-05 回归断言）",
-      "低-1/低-3：契约补 interval 有效域 ≥1 注记，hasBattleEndingFuture 注释与实现拆分对齐",
-      "低-5：夹具 T03-03/T03-04 未使用的 scheduler 解构清理"
+    "commands": [
+      "node tactics/tools/run-tests.cjs --stage=p03",
+      "node tactics/tools/run-tests.cjs --stage=p01",
+      "node tactics/tools/run-tests.cjs --self-check"
     ],
-    "deferred": [
-      "低-4：collectArrivals 的 t 参数保留（契约冻结签名，避免连带改契约）",
-      "引擎零速恢复追溯计息缺陷（T03-03 首轮暴露）已在审查前修复并全绿"
+    "notes": [
+      "永久DoT不阻止僵持并补回归",
+      "毒燃来源要求casterId/skillId/effectId并隔离刷新",
+      "倒地/离场dot-tick带suppressed:true并补回归",
+      "独立复审子代理本轮因并发额度未启动，未伪造其结论"
     ]
   },
-  "purposeVsState": "目的为可重放的敏捷跑圈与全局事件时钟（S02/S03/S06/S15#3）；现状为纯规则模块 clock+scheduler、契约冻结、T03-01~08 共 8 组 55 例实跑全绿、独立审查 0 阻断、P01 回归 166 全绿；P02 轴投影、P07 数值链、P10 救援交互与 P11 续载接线尚未接入，不宣称完整战场可用。"
+  "purposeVsState": "三项交付审查问题已修复并补回归：永久DoT不阻止僵持、毒燃来源按目标/施术者/技能/效果身份隔离、倒地DoT带suppressed且不得扣持续伤害；P03 8组58例全绿，P01 166例全绿，self-check通过。"
 }

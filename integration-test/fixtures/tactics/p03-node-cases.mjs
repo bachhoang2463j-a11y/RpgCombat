@@ -38,8 +38,10 @@ function typesAt(bs, t) {
 }
 
 function statusOf(bs, unitId, source) {
-  // 契约 §一：statuses key = unitId \u0000 source
-  return bs.combatState.clock.statuses[unitId + '\u0000' + source] || null;
+  const key = typeof source === 'object'
+    ? [unitId, source.casterId ?? source.caster ?? '', source.skillId ?? source.skill ?? '', source.effectId ?? source.effect ?? ''].map(String).join('\u0000')
+    : unitId + '\u0000' + source;
+  return bs.combatState.clock.statuses[key] || null;
 }
 
 // 通用推进：连续取得 n 次自然行动，每次立即 endAction；返回行动序列与终局
@@ -349,7 +351,7 @@ async function t0303(deps) {
 // ---------- T03-04 t=35施毒持续300、t=125同源重施：首跳仍135、保节拍、末跳先于移除 ----------
 
 async function t0304(deps) {
-  const { clock, lifecycle } = deps.modules;
+  const { clock, scheduler, lifecycle } = deps.modules;
   const cases = [];
   const bs = lifecycle.emptyBattleState('sc-t03', 'bt-t03i');
   // 施法者速度 2000：每 5 时间到轴（5,10,…），可在 t=35 / t=125 精确落点施毒
@@ -357,6 +359,7 @@ async function t0304(deps) {
     { id: 'caster', side: 'ally', baseSpd: 2000 },
     { id: 'victim', side: 'enemy', baseSpd: 0 },
   ]);
+  const cadence = { casterId: 'caster', skillId: 'venom', effectId: 'slot-1' };
   let recAtApply = null;
   let recAtRefresh = null;
   let applied = false;
@@ -367,16 +370,16 @@ async function t0304(deps) {
     if (near(r.time, 35) && !applied) {
       applied = true;
       clock.dispatchClock(bs, {
-        type: 'applyStatus', unitId: 'victim', source: 'venom', kind: 'poison', strength: 5, duration: 300,
+        type: 'applyStatus', unitId: 'victim', source: cadence, kind: 'poison', strength: 5, duration: 300,
       });
-      recAtApply = Object.assign({}, statusOf(bs, 'victim', 'venom'));
+      recAtApply = Object.assign({}, statusOf(bs, 'victim', cadence));
     }
     if (near(r.time, 125) && applied && !refreshed) {
       refreshed = true;
       clock.dispatchClock(bs, {
-        type: 'applyStatus', unitId: 'victim', source: 'venom', kind: 'poison', strength: 8, duration: 300,
+        type: 'applyStatus', unitId: 'victim', source: cadence, kind: 'poison', strength: 8, duration: 300,
       });
-      recAtRefresh = Object.assign({}, statusOf(bs, 'victim', 'venom'));
+      recAtRefresh = Object.assign({}, statusOf(bs, 'victim', cadence));
     }
     clock.dispatchClock(bs, { type: 'endAction', unitId: r.unitId }, {});
     if (entriesOf(bs, 'status-expired').length > 0) break;
@@ -405,7 +408,7 @@ async function t0304(deps) {
   const bs2 = lifecycle.emptyBattleState('sc-t03', 'bt-t03j');
   clock.createClock(bs2, [{ id: 'victim2', side: 'enemy', baseSpd: 0 }]);
   clock.dispatchClock(bs2, {
-    type: 'applyStatus', unitId: 'victim2', source: 'venom2', kind: 'poison', strength: 4, duration: 300,
+    type: 'applyStatus', unitId: 'victim2', source: { casterId: 'caster2', skillId: 'venom2', effectId: 'slot-1' }, kind: 'poison', strength: 4, duration: 300,
   });
   const rT = clock.advanceToNextAction(bs2, {});
   const types300 = typesAt(bs2, 300);
@@ -415,6 +418,25 @@ async function t0304(deps) {
     eqJson(types300, ['dot-tick', 'status-expired', 'stalemate']) &&
     timesNear(miniTicks, [100, 200, 300]),
     'types300=' + JSON.stringify(types300) + ' ticks=' + JSON.stringify(miniTicks)));
+
+  // 来源身份包含目标、施术者、技能与效果槽；不同施术者的同名技能不可互刷。
+  const bs3 = lifecycle.emptyBattleState('sc-t03', 'bt-t03source');
+  clock.createClock(bs3, [{ id: 'target', side: 'enemy', baseSpd: 0 }]);
+  const sourceA = { casterId: 'hero-a', skillId: 'venom', effectId: 'slot-1' };
+  const sourceB = { casterId: 'hero-b', skillId: 'venom', effectId: 'slot-1' };
+  clock.dispatchClock(bs3, { type: 'applyStatus', unitId: 'target', source: sourceA, kind: 'poison', strength: 3, duration: 300 });
+  clock.dispatchClock(bs3, { type: 'applyStatus', unitId: 'target', source: sourceB, kind: 'poison', strength: 5, duration: 400 });
+  const keyA = scheduler.statusKeyOf('target', sourceA);
+  const keyB = scheduler.statusKeyOf('target', sourceB);
+  const cadenceB = bs3.combatState.clock.statuses[keyB].nextTickAt;
+  clock.dispatchClock(bs3, { type: 'applyStatus', unitId: 'target', source: sourceA, kind: 'poison', strength: 8, duration: 500 });
+  const recA = bs3.combatState.clock.statuses[keyA];
+  const recB = bs3.combatState.clock.statuses[keyB];
+  cases.push(ok('T03-04 同目标同技能不同施术者建立独立状态键',
+    keyA !== keyB && Object.keys(bs3.combatState.clock.statuses).length === 2 &&
+    recA.strength === 8 && near(recA.endAt, 500) && near(recA.nextTickAt, 100) &&
+    recB.strength === 5 && near(recB.endAt, 400) && near(recB.nextTickAt, cadenceB),
+    'keys=' + JSON.stringify([keyA, keyB]) + ' A=' + JSON.stringify(recA) + ' B=' + JSON.stringify(recB)));
 
   return { cases };
 }
@@ -433,7 +455,7 @@ async function t0305(deps) {
   clock.dispatchClock(bs, { type: 'scheduleRescue', unitId: 'patient', deadline: 300 });
   clock.dispatchClock(bs, { type: 'applyCooldown', unitId: 'hero', skillKey: 'ult', duration: 300 });
   clock.dispatchClock(bs, {
-    type: 'applyStatus', unitId: 'patient', source: 'venom', kind: 'poison', strength: 5, duration: 600,
+    type: 'applyStatus', unitId: 'patient', source: { casterId: 'hero', skillId: 'venom', effectId: 'slot-1' }, kind: 'poison', strength: 5, duration: 600,
   });
   let grant300 = null;
   const cdAt = {};
@@ -935,6 +957,39 @@ async function t0308(deps) {
     rD.status === 'terminal' && !!rD.terminal && rD.terminal.type === 'stalemate' && near(rD.time, 0),
     'C=' + JSON.stringify({ status: rC.status, terminal: rC.terminal }) +
     ' D=' + JSON.stringify({ status: rD.status, terminal: rD.terminal })));
+
+  // 永久 DoT（endAt=null）不可无限推迟僵持；同一事件点最多结算一次后终局。
+  const bsE = lifecycle.emptyBattleState('sc-t03', 'bt-t03forever');
+  clock.createClock(bsE, [{ id: 'still-target', side: 'enemy', baseSpd: 0 }]);
+  clock.dispatchClock(bsE, { type: 'applyStatus', unitId: 'still-target', source: { casterId: 'eternal', skillId: 'poison', effectId: 'permanent' }, kind: 'poison', strength: 1 });
+  const rE = clock.advanceToNextAction(bsE, {});
+  const rE2 = clock.advanceToNextAction(bsE, {});
+  cases.push(ok('T03-08 永久DoT不阻止僵持且重复查询不重发',
+    rE.status === 'terminal' && rE.terminal.type === 'stalemate' && near(rE.time, 0) &&
+    entriesOf(bsE, 'dot-tick').length === 0 && entriesOf(bsE, 'stalemate').length === 1 &&
+    rE2.status === 'terminal' && rE2.terminal.type === 'stalemate' && clockLog(bsE).length === 3,
+    'first=' + JSON.stringify({ status: rE.status, time: rE.time }) +
+    ' second=' + JSON.stringify({ status: rE2.status, time: rE2.time }) +
+    ' dotTicks=' + entriesOf(bsE, 'dot-tick').length + ' log=' + clockLog(bsE).length));
+
+  // 倒地：状态时钟继续，tick明确抑制伤害；存活目标同刻照常可结算。
+  const bsF = lifecycle.emptyBattleState('sc-t03', 'bt-t03down-dot');
+  clock.createClock(bsF, [
+    { id: 'down-target', side: 'ally', baseSpd: 100 },
+    { id: 'active-target', side: 'ally', baseSpd: 100 },
+  ]);
+  clock.dispatchClock(bsF, { type: 'exitUnit', unitId: 'down-target', cause: 'down' });
+  clock.dispatchClock(bsF, { type: 'applyStatus', unitId: 'down-target', source: { casterId: 'c1', skillId: 'fire', effectId: 'slot0' }, kind: 'burn', strength: 4, duration: 200 });
+  clock.dispatchClock(bsF, { type: 'applyStatus', unitId: 'active-target', source: { casterId: 'c1', skillId: 'fire', effectId: 'slot0' }, kind: 'burn', strength: 4, duration: 200 });
+  const hitEvents = [];
+  const rF = clock.advanceToNextAction(bsF, { onEvent: ev => hitEvents.push(ev) });
+  const downTick = hitEvents.find(e => e.type === 'dot-tick' && e.unitId === 'down-target');
+  const activeTick = hitEvents.find(e => e.type === 'dot-tick' && e.unitId === 'active-target');
+  cases.push(ok('T03-08 倒地单位DoT照计时但标记suppressed，存活单位正常tick',
+    near(rF.time, 100) && !!downTick && downTick.suppressed === true &&
+    !!activeTick && activeTick.suppressed === false &&
+    entriesOf(bsF, 'status-expired').length === 0,
+    'at=' + rF.time + ' down=' + JSON.stringify(downTick) + ' active=' + JSON.stringify(activeTick)));
 
   return { cases };
 }

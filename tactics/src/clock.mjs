@@ -135,7 +135,10 @@ export function dispatchClock(battleState, command, rulesContext = {}) {
       return { ok: true, events: [pushLog(clock, t, 'speed-changed', { unitId: command.unitId, speed: u.speed })] };
     }
     case 'applyStatus': {
-      const events = applyStatusRecord(battleState, command, t);
+      const source = command.source && typeof command.source === 'object'
+        ? Object.assign({}, command.source)
+        : command.source;
+      const events = applyStatusRecord(battleState, Object.assign({}, command, { source }), t);
       if (command.kind === 'spd') resyncUnitSpeed(battleState, command.unitId, rulesContext, t);
       return { ok: true, events };
     }

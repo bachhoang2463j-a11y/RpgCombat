@@ -28,7 +28,7 @@ battleState.combatState.clock = {
     hitSinceWindow,                                   // 隐匿窗口受击标记
     extraMain, mainPointSources: [sourceKey...],      // 当前行动内立即生效的额外主行动点及其来源
   }},
-  statuses: { [key]: {                                // key = unitId \u0000 source
+  statuses: { [key]: {                                // key = unitId \u0000 casterId \u0000 skillId \u0000 effectId
     key, unitId, source, kind, strength?,
     interval,                                         // 跳伤/周期间隔（缺省 100）
     appliedAt, nextTickAt?, endAt|null,               // endAt=null 表示随战斗存续
@@ -46,7 +46,7 @@ battleState.combatState.clock = {
 
 1. `progress[unitId].distance` 是唯一距离真值；下一到轴时刻一律由 `剩余距离 ÷ 有效敏捷` 现算，不另存预测真值。
 2. `combatState.clock` 是全局时间与调度元数据的唯一家；HP/MP/TP/库存真值仍不进战术档（P01 契约 §3）。
-3. 周期事件携带 `{source, kind, strength, t}` 交给调用方同步结算；时钟不存资源真值、不异步补账。
+3. 周期事件携带 `{source, kind, strength, t}` 交给调用方同步结算；`dot-tick` 额外携带 `suppressed`：倒地/离场目标为 `true`（状态照计时但禁止下游扣持续伤害），存活目标为 `false`；时钟不存资源真值、不异步补账。
 
 ## 二、模块与接口（`tactics/src/scheduler.mjs` + `tactics/src/clock.mjs`）
 
@@ -89,6 +89,8 @@ dispatchClock(battleState, command, rulesContext?) -> {ok, events}
 // command.type：
 //   speedChange      {unitId}                          结算已跑距离并按 rulesContext.speedOf 重读有效敏捷
 //   applyStatus      {unitId, source, kind, strength?, duration?, interval?}
+//                    poison/burn 的 source 必须是 {casterId, skillId, effectId}，稳定同源键为
+//                    unitId+casterId+skillId+effectId；其他 kind 可继续使用简单 source 字符串。
 //                    kind: 'poison'|'burn'（首跳施加+100；同源重施保节拍）、'spd'（到期重算耗时）、
 //                          'defend'（刷新期限不叠减伤）、'periodic'（每 interval 触发）、
 //                          'stealth-window'（隐匿窗口）、'generic'（仅期限）
@@ -112,9 +114,8 @@ advanceToNextAction(battleState, rulesContext) -> result
 //   { status:'frozen',  time }                // 行动冻结期内调用，时间与进度不变（T03-07）
 //   { status:'terminal',time, terminal }      // stalemate/battle-end 只发一次；之后重复查询不重发
 // 推进循环：僵持预检 → 跳到最近事件 → 同刻三阶段结算 → 战斗终局钩子 → 发放行动资格。
-// 僵持判定 = 无可行动单位 且 无未到期 spd 效果 且 无可导向终局的未来事件（毒/燃未跳完、救援截止）；
-// 永久周期回血无法恢复行动资格，不阻止僵持。全员永久眩晕视为无人可行动（制服胜负由调用方在
-// 自身管线内先行结算，不经时钟）。
+// 僵持判定 = 无可行动单位 且 无未到期 spd 效果 且 无可导向终局的有限未来事件（有限毒/燃末跳、救援截止）；
+// 永久周期回血、永久毒/燃（endAt=null）与已退出单位的状态 tick 不阻止僵持；全员永久眩晕视为无人可行动。
 
 getVisibleTurnQueue(battleState, viewerSide, visibilityState) -> [ {unitId, side, name?, nextActionAt} ]
 // visibilityState: { visibleUnitIds:[...] }；友方全显，敌方仅可见集合内返回；隐藏者零占位、零人数、零身份（S02 L37）
@@ -127,11 +128,11 @@ isOpportunityReady(battleState, key) -> bool
 
 ## 三、时序规则（同刻三阶段，SPEC S02 L33）
 
-1. **阶段①周期效果**：`nextTickAt == t` 的效果结算（毒/燃跳伤、周期回血/蓄能、隐匿窗口）；同刻死亡→复活→资格变化在本阶段内同步生效。
+1. **阶段①周期效果**：`nextTickAt == t` 的效果结算（毒/燃跳伤、周期回血/蓄能、隐匿窗口）；同刻死亡→复活→资格变化在本阶段内同步生效。倒地/离场单位的状态时钟继续推进，但其毒/燃 `dot-tick` 必须带 `suppressed:true`，下游不得扣除持续伤害；存活单位为 `suppressed:false`。
 2. **阶段②到期/解除/截止**：`endAt == t` 的状态移除（'spd' 到期立即重算该单位后续耗时）、CD 解除、救援截止、防御到期。
 3. **阶段③行动资格**：重新收集 `t` 到轴且仍 active 的单位，按基础敏捷降序→稳定序升序逐一处理：眩晕者跳过（消耗眩晕、重跑一圈、不发资源、待领取点保留），首个可用者获得行动并冻结时钟。
 4. 跳点推进：时钟永远停在最早事件点，不逐帧推进、不跳过任何行动点；行动冻结期（grant→endAction）虚拟时间完全静止。
-5. 僵持预检：全部参与单位 `speed<=0` 且不存在任何未到期 'spd' 效果 → 一次僵持终局；周期事件无法恢复行动资格，不阻止僵持判定（S02 L36）。
+5. **僵持预检**：全部参与单位 `speed<=0` 且不存在任何未到期 `'spd'` 效果，并且没有可改变行动资格的有限未来事件时，本场一次僵持结束；周期回血、永久毒/燃（`endAt:null`）和仅对已退出单位的状态 tick 都不阻止僵持。有限期毒/燃仍推进到末跳/到期，供调用方完成终局结算。
 6. DoT 节拍：新施加首跳 `施加时刻+100`；同源（目标+施术者+技能+效果身份）重施保留 `nextTickAt`、仅更新强度与 `endAt=重施时刻+时长`；末跳与到期同刻时先跳后移（阶段①先于②）。
 
 ## 四、旧大回合能力映射表（S15#3，锚点按函数名定位 index.html）

@@ -17,6 +17,12 @@ function clockOf(battleState) {
 }
 
 export function statusKeyOf(unitId, source) {
+  if (source && typeof source === 'object') {
+    const casterId = source.casterId ?? source.caster ?? '';
+    const skillId = source.skillId ?? source.skill ?? '';
+    const effectId = source.effectId ?? source.effect ?? '';
+    return [unitId, casterId, skillId, effectId].map(String).join('\u0000');
+  }
   return String(unitId) + '\u0000' + String(source);
 }
 
@@ -90,7 +96,7 @@ export function hasBattleEndingFuture(battleState) {
   const clock = clockOf(battleState);
   for (const key in clock.statuses) {
     const s = clock.statuses[key];
-    if ((s.kind === 'poison' || s.kind === 'burn') && s.nextTickAt !== undefined) return true;
+    if ((s.kind === 'poison' || s.kind === 'burn') && s.nextTickAt !== undefined && s.endAt != null) return true;
   }
   for (const id in clock.rescues) return true;
   return false;
@@ -131,7 +137,11 @@ export function settlePhase12(battleState, t, hooks = {}) {
       if (u) u.hitSinceWindow = false;
     } else {
       const type = (s.kind === 'poison' || s.kind === 'burn') ? 'dot-tick' : 'periodic-tick';
-      ev = pushLog(clock, t, type, { key, unitId: s.unitId, source: s.source, kind: s.kind, strength: s.strength });
+      const target = clock.units[s.unitId];
+      ev = pushLog(clock, t, type, {
+        key, unitId: s.unitId, source: s.source, kind: s.kind, strength: s.strength,
+        suppressed: !!(target && target.status !== 'active'),
+      });
     }
     events.push(ev);
     hooks.onEvent && hooks.onEvent(ev);
@@ -246,6 +256,11 @@ export function clearPendingPointsFor(battleState, unitId) {
 
 export function applyStatusRecord(battleState, cmd, now) {
   const clock = clockOf(battleState);
+  if ((cmd.kind === 'poison' || cmd.kind === 'burn')
+      && (!cmd.source || typeof cmd.source !== 'object'
+        || cmd.source.casterId == null || cmd.source.skillId == null || cmd.source.effectId == null)) {
+    throw new Error('毒/燃状态必须提供 casterId、skillId、effectId 来源身份');
+  }
   const key = statusKeyOf(cmd.unitId, cmd.source);
   const prev = clock.statuses[key];
   if (prev) {
