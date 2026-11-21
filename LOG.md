@@ -3847,3 +3847,20 @@
 - **验证**：P03 8组58例全绿；P01 166例全绿；`--self-check` 通过。新增断言覆盖永久 DoT 不死循环、两个施术者同名技能独立刷新、倒地/存活目标 tick 的 suppressed 差异。独立子代理因并发额度未能启动，本轮由主代理核对改动与实跑结果，报告不声称独立复审通过。
 - **边界**：未改 P02/UI、SPEC、P01 核心；未触碰工作区历史删除与 `.audit-work`；未推送。
 - **目的 vs 现状**：三项审查问题已由具体规则与回归锁定，P03/P01 定向测试全绿；P07 接线仍须遵守四元状态来源与 `suppressed` 过滤契约。
+
+## [LOG-313] 2026-11-21 — 最小可玩战斗 MVP 合体交付
+
+- **业务提交**：`de9e82a`。
+- **核心目的**：快速输出能走、能打、敏捷跑圈、敌方还手、分胜负并重开的网页 Demo，供用户亲手确认，不等待 P04—P09 全量施工。
+- **变更行为**：
+  1. 复用 P01 角色资源、P02 地图/相机/血条、P03 时钟，新增 battle/movement/range/damage/ai/demo-fixture 六个纯模块；当前行动余额直接消费时钟 currentAction.resources，恢复不重发。
+  2. 八向 1/√2 移动、完整多格通行、友穿敌挡、绿格与路径；单体/直线/扇形共享预览/执行/AI，独立闪避双骰与基础护甲扣血，HP归零退轴不挡路。
+  3. 用户确认复用基础行动/攻击技能/菜单标题/轴/记录/面板壳/右上重置，无新工具栏；查看角色不夺权，点目标两次确认，返回/Esc取消不扣费。敌方采用接近+近远程追打，行动结束全灭结算与完整开场重置。
+  4. 独立固定2我方/3敌方样本，全员公开位置；原 P02 A/B/C 夹具隔离（入口 ?stage=p02）。未迁移复杂职业/标签/反应，不接真实酒馆/MMS，根 RPG 与正则未改。
+  5. 新增 MVP Node/浏览器用例，注册独立 runner/harness；只读审查发现的恢复余额、AI友方路径提前停步、大型夹角、空范围候选已修复并验证。测试自身 side/起点/共享位置与取消顺序问题修夹具，不改玩法凑绿。
+  6. 本地启动脚本与 Demo 说明、ZIP交付；解包真实页面验证5单位启动、CSS与火舌预览提交（main1→0、MP30→27、守卫-14HP）。
+- **涉及文件**：`tactics/src/{battle,movement,range,damage,ai,demo-fixture,main,sandbox,ui-shell}.mjs`、`tactics/index.html`/`tactics.css`/`DEMO.md`/`启动Demo.bat`、`tactics/tools/{run-tests,serve,verify-demo}.cjs`、MVP Node/浏览器夹具与三份报告、`integration-test/tactics-harness.html`、`tactics-mvp-2026-11-21.zip`、`doc/tactics/{MVP-PLAN,PLAN}.md`；本条与 LOG-INDEX。
+- **验证**：稳定后唯一一次战棋 Node --all 349通过（P01 166/P02 69/P03 58/MVP 56，failed0/pending0）；MVP真实iframe 24通过（含三范围实打、敌还手、GUI失败和重开、独立controller完整局胜利）；直接真实鼠标移动2m与火舌-14HP通过；ZIP解包专项3通过，不再全量。报告含真实逐例结果/源码指纹，源HEAD标记施工前d195c1a+dirty，不回填自指hash。
+- **未验/边界**：旧P02浏览器完整动画组在IAB rAF依赖的弹道Promise等待未结束，未报通过；真Chrome动画/时序/截图未获排障授权；不操作安卓/真实酒馆。完整P04/P06/P07/P09仍未验收，其他后置阶段不纳入MVP。README等待用户确认有效后更新。
+- **目的 vs 现状**：最小可玩闭环与相关测试/唯一Node全量已达成，可本地打开并重玩；交付让用户确认，不继续扩建完整功能。
+
