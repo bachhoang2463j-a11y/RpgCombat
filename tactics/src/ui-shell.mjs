@@ -102,7 +102,7 @@ export function buildShell(root) {
   function openSubmenu(title, rows) {
     els.submenuTitle.textContent = title;
     els.submenuList.innerHTML = rows.length
-      ? rows.map(r => '<button class="t-submenu-item" data-skill="' + ESC(r.key || '') + '">' + r.html + '</button>').join('')
+      ? rows.map(r => '<button class="t-submenu-item" data-skill="' + ESC(r.key || '') + '"' + (r.disabled ? ' disabled' : '') + '>' + r.html + '</button>').join('')
       : '<div class="t-submenu-empty">（无可选项）</div>';
     els.menuMain.style.display = 'none';
     els.submenu.style.display = 'flex';
@@ -112,6 +112,7 @@ export function buildShell(root) {
     els.menuMain.style.display = 'flex';
   }
   function bindMenus(units) {
+    if (state.battleView) { bindBattleMenus(); return; }
     const hero = units.find(u => u.side === 'hero' && (!state.selectedId || u.id === state.selectedId)) || null;
     const label = hero ? hero.name : '等待指令';
     els.activeHeroName.textContent = label;
@@ -130,6 +131,55 @@ export function buildShell(root) {
     const itemRows = (hero && hero.items || []).map(it => ({ key: 'item', html: '<b>' + ESC(it.name) + '</b><i>×' + (it.count == null ? '-' : it.count) + '</i>' }));
     $('menu-item').onclick = () => openSubmenu('物品道具 · ' + label, itemRows);
     $('submenu-back').onclick = closeSubmenu;
+  }
+
+  // ---------- MVP：只操作到轴者，不随查看角色切换行动权 ----------
+  function bindBattleMenus() {
+    const { snapshot, skills, onCommand } = state.battleView;
+    const unit = state.units.find(u => u.id === snapshot.currentId);
+    const r = snapshot.resources;
+    const playable = unit?.side === 'hero' && r && !snapshot.terminal;
+    els.activeHeroName.textContent = snapshot.terminal ? '战斗结束' : unit
+      ? unit.name + ' · ' + (r ? r.moveRemaining.toFixed(1) + 'm / 主' + r.main : '行动中')
+      : '等待指令';
+    ['menu-basic', 'menu-attack'].forEach(id => { $(id).disabled = !playable; });
+    ['menu-support', 'menu-item'].forEach(id => { $(id).disabled = true; $(id).title = 'MVP 暂未开放'; });
+    $('menu-basic').onclick = () => {
+      openSubmenu('基础行动', [
+        { key: 'move', html: '移动 · 预览后再点确认', disabled: r.moveRemaining <= 0 },
+        { key: 'attack', html: '普通攻击 · 主行动', disabled: r.main <= 0 },
+        { key: 'end', html: '结束行动' },
+      ]);
+    };
+    $('menu-attack').onclick = () => openSubmenu('攻击技能', skills.map((s, i) => ({
+      key: 'skill-' + i,
+      html: '<b>' + ESC(s.name) + '</b><i>' + ESC(s.range.type) + ' · MP ' + s.cost + '</i>',
+      disabled: r.main <= 0 || unit.ref.mp < s.cost,
+    })));
+    els.submenuList.onclick = e => {
+      const button = e.target.closest('button[data-skill]');
+      if (button && !button.disabled) onCommand(button.dataset.skill);
+    };
+    $('submenu-back').onclick = () => { onCommand('cancel'); closeSubmenu(); };
+  }
+  function renderBattle(snapshot, skills, onCommand, queue) {
+    state.battleView = { snapshot, skills, onCommand };
+    state.history = snapshot.log.slice();
+    closeSubmenu();
+    bindBattleMenus();
+    els.turnOrder.innerHTML = queue.map(row => {
+      const u = state.units.find(u => u.id === row.unitId);
+      return '<div class="t-queue-item' + (row.unitId === snapshot.currentId ? ' t-queue-current' : '') +
+        '" data-unit-id="' + ESC(u.id) + '" title="' + ESC(u.name) + ' · t=' + row.nextActionAt.toFixed(2) +
+        '"><img src="' + ESC(u.avatarUrl) + '" alt=""></div>';
+    }).join('');
+  }
+  function clearBattle() {
+    state.battleView = null;
+    state.history = [];
+    els.submenuList.onclick = null;
+    ['menu-basic', 'menu-attack', 'menu-support', 'menu-item'].forEach(id => { $(id).disabled = false; });
+    closePanel(); closeSubmenu();
   }
 
   // ---------- 面板壳 ----------
@@ -218,14 +268,14 @@ export function buildShell(root) {
       c.classList.toggle('t-selected', c.getAttribute('data-unit-id') === unitId);
     });
     const sel = state.units.find(u => u.id === unitId);
-    els.activeHeroName.textContent = sel ? sel.name : '等待指令';
+    if (!state.battleView) els.activeHeroName.textContent = sel ? sel.name : '等待指令';
     bindMenus(state.units);
   }
 
   return {
     destroy: () => { clearTimeout(showLog._t); state.onReset = null; state.onUnitClick = null; root.replaceChildren(); },
     els, renderHeroes, renderTurnOrder, bindMenus, closeSubmenu, setSelected,
-    getSafeRect, showLog, openPanel, closePanel,
+    getSafeRect, showLog, openPanel, closePanel, renderBattle, clearBattle,
     set onUnitClick(fn) { state.onUnitClick = fn; },
     set onReset(fn) { state.onReset = fn; },
     get state() { return state; },

@@ -157,7 +157,8 @@
     const summary = { harness: 'tactics-harness', stage: new URLSearchParams(location.search).get('stage') || 'p01', groups, passed, failed, pending, total: results.length };
     document.getElementById('json').textContent = JSON.stringify(summary, null, 2);
     window.__TACTICS_P01_RESULT = summary;
-    document.title = failed ? 'P01 Harness FAIL(' + failed + ')' : 'P01 Harness PASS(' + passed + ')';
+    document.title = summary.stage.toUpperCase() + ' Harness ' + (failed ? 'FAIL(' + failed + ')' : pending ? 'PENDING(' + pending + ')' : 'PASS(' + passed + ')');
+    window.__TACTICS_RESULT = summary;
   }
 
   window.addEventListener('message', (ev) => {
@@ -172,7 +173,7 @@
     document.getElementById('title').textContent = '战棋 P02 Harness（真实入口挂载 + 双尺寸 + 播放中特效跟随）';
     document.getElementById('frame').className = 'p02';
     const frame = document.getElementById('frame');
-    frame.src = '../tactics/index.html';
+    frame.src = '../tactics/index.html?stage=p02';
     const bootUrl = location.href.replace(/integration-test\/tactics-harness\.html.*$/, '') +
       'integration-test/fixtures/tactics/p02-browser-cases.mjs';
     // 等真实入口挂载完成
@@ -193,8 +194,26 @@
     finish();
   }
 
+  async function runMvp() {
+    document.getElementById('title').textContent = '战棋 MVP Harness（真实入口与真实规则）';
+    const frame = document.getElementById('frame');
+    frame.className = 'p02';
+    const loaded = new Promise((resolve, reject) => {
+      frame.addEventListener('load', resolve, { once: true });
+      frame.addEventListener('error', () => reject(new Error('MVP 入口加载失败')), { once: true });
+    });
+    frame.src = '../tactics/index.html';
+    await loaded;
+    const { runBrowserCases } = await import('./fixtures/tactics/mvp-browser-cases.mjs');
+    const rows = await runBrowserCases(frame);
+    rows.forEach(r => add('MVP', r.id, r.pass, r.detail));
+    finish();
+  }
+
   const params = new URLSearchParams(location.search);
-  if (params.get('stage') === 'p02') {
+  if (params.get('stage') === 'mvp') {
+    runMvp().catch(e => { add('MVP', 'mvp-boot', false, String(e.stack || e)); finish(); });
+  } else if (params.get('stage') === 'p02') {
     runP02().catch(e => { add('T02', 'p02-boot', false, String(e && e.message || e)); finish(); });
   } else {
     const decoded = runTransportChannel();

@@ -3,16 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>战棋战斗（独立前端 · P02）</title>
+<title>战棋战斗 · 最小可玩 Demo</title>
 <link rel="stylesheet" href="./tactics.css">
 </head>
 <body>
 <div id="tactics-app"></div>
 <script type="module">
 import { createApp, DEFAULT_YAML_A } from './src/main.mjs';
+import { DEMO_YAML, DEMO_PLACEMENTS } from './src/demo-fixture.mjs';
 
+const p02 = new URLSearchParams(location.search).get('stage') === 'p02';
 const app = createApp(document.getElementById('tactics-app'), {
-  defaultYaml: DEFAULT_YAML_A,
+  defaultYaml: p02 ? DEFAULT_YAML_A : DEMO_YAML,
+  defaultPlacements: p02 ? undefined : DEMO_PLACEMENTS,
+  playable: !p02,
 });
 app.boot();
 

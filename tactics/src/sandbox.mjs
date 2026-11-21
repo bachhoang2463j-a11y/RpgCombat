@@ -37,6 +37,8 @@ export function createSandbox(rootEl, deps = {}) {
   let focusStop = null;
   let dom = null;            // { viewport, world, art, overlay, unitLayer, anchorLayer, fxLayer, fxCanvasHolder }
   let onSelectCb = null;
+  let onMapClickCb = null;
+  let preview = null;
 
   // ---------- DOM 构建 ----------
   function buildDom() {
@@ -105,6 +107,22 @@ export function createSandbox(rootEl, deps = {}) {
     const g = dom.overlay.getContext('2d');
     g.setTransform(dom.dpr, 0, 0, dom.dpr, 0, 0);
     g.clearRect(0, 0, 1000, 1000);
+    if (preview) {
+      for (const c of preview.cells || []) {
+        g.fillStyle = preview.kind === 'move' ? 'rgba(34,197,94,.24)' : 'rgba(244,63,94,.26)';
+        g.fillRect(c.col * 50 + 1, c.row * 50 + 1, 48, 48);
+      }
+      if (preview.path?.length) {
+        g.beginPath();
+        preview.path.forEach((c, i) => { const x = (c.col + .5) * 50, y = (c.row + .5) * 50; if (i) g.lineTo(x, y); else g.moveTo(x, y); });
+        g.strokeStyle = '#86efac'; g.lineWidth = 3; g.stroke();
+      }
+      for (const id of preview.targetIds || []) {
+        for (const c of occupiedCells(viewData.placementsById[id], viewData.footprintsById[id])) {
+          g.strokeStyle = '#facc15'; g.lineWidth = 3; g.strokeRect(c.col * 50 + 2, c.row * 50 + 2, 46, 46);
+        }
+      }
+    }
     if (!selectedId || !viewData) return;
     const p = viewData.placementsById[selectedId];
     const fp = viewData.footprintsById[selectedId];
@@ -155,6 +173,7 @@ export function createSandbox(rootEl, deps = {}) {
     const gridHit = screenToGrid(pose, origin, 50, compiled.grid, sx, sy);
     let unitId = null;
     if (gridHit && occupancy) unitId = unitAt(occupancy, gridHit.col, gridHit.row) || null;
+    if (onMapClickCb && gridHit && onMapClickCb({ ...gridHit, x: gridHit.col + .5, y: gridHit.row + .5, targetId: unitId })) return;
     selectedId = unitId;
     drawSelection();
     if (onSelectCb) onSelectCb(unitId ? viewData.units.find(u => u.id === unitId) : null);
@@ -192,12 +211,13 @@ export function createSandbox(rootEl, deps = {}) {
     scope = createViewScope();
     token = vd.combatToken;
     viewData = vd;
+    preview = null;
     compiled = compileScene(vd.scene);
     buildDom();
     updateOrigin();
     dom.art.innerHTML = renderSceneArt(compiled.artJson);
     occupancy = buildOccupancyIndex(
-      vd.units.map(u => ({ unitId: u.id, col: vd.placementsById[u.id].col, row: vd.placementsById[u.id].row })),
+      vd.units.filter(u => u.bars.hp > 0).map(u => ({ unitId: u.id, col: vd.placementsById[u.id].col, row: vd.placementsById[u.id].row })),
       vd.footprintsById,
     );
     unitView = createUnitView(dom.unitLayer, { scope, metersPerArtPx: 1 / 50 });
@@ -244,7 +264,7 @@ export function createSandbox(rootEl, deps = {}) {
     viewData = vd;
     if (sceneChanged) { compiled = compileScene(vd.scene); dom.art.innerHTML = renderSceneArt(compiled.artJson); }
     occupancy = buildOccupancyIndex(
-      vd.units.map(u => ({ unitId: u.id, col: vd.placementsById[u.id].col, row: vd.placementsById[u.id].row })),
+      vd.units.filter(u => u.bars.hp > 0).map(u => ({ unitId: u.id, col: vd.placementsById[u.id].col, row: vd.placementsById[u.id].row })),
       vd.footprintsById,
     );
     unitView.syncUnits(vd.units, vd.placementsById);
@@ -312,6 +332,8 @@ export function createSandbox(rootEl, deps = {}) {
     getUnitView: () => unitView,
     getVfx: () => vfx,
     onSelect: (cb) => { onSelectCb = cb; },
+    onMapClick: (cb) => { onMapClickCb = cb; },
+    setPreview: (data) => { preview = data; drawSelection(); },
     getSnapshot,
     getScope: () => scope,
   };

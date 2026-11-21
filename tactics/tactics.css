@@ -115,6 +115,14 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .t-submenu-item i { margin-left: auto; font-style: normal; font-size: 10px; color: #94a3b8; }
 .t-submenu-empty { padding: 12px; font-size: 11px; color: #64748b; text-align: center; }
 
+/* ---- MVP：原槽位状态，不新增入口 ---- */
+button:disabled { opacity: .42; cursor: default; }
+#active-hero-name { letter-spacing: .3px; }
+.t-unit-down .t-unit-medal { opacity: .35; filter: grayscale(1); }
+.t-unit-down .t-unit-name { color: #94a3b8; }
+.t-unit-hit .t-unit-avatar { box-shadow: 0 0 20px #facc15; }
+.t-hero-card.t-down { opacity: .45; }
+
 /* ---- 底部聊天输入区（原 #chat-input-area 槽位） ---- */
 #chat-input-area { position: fixed; bottom: 0; left: 0; width: 100%; z-index: 90; }
 #chat-input-bar {

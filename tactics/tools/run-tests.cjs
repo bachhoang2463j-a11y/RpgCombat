@@ -55,6 +55,16 @@ const STAGES = {
     ],
     modules: ['scene', 'geometry', 'mapArt', 'camera', 'viewScope', 'arcaneVfx', 'parser', 'storage', 'lifecycle', 'main'],
   },
+  mvp: {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'mvp-node-cases.mjs'),
+    groups: ['TM-01', 'TM-02', 'TM-03', 'TM-04', 'TM-05', 'TM-06'],
+    requiredExports: [
+      ['movement', 'findReachable'], ['range', 'queryAttack'], ['damage', 'resolveHit'],
+      ['damage', 'calculateDamage'], ['damage', 'applyAttackDamage'],
+      ['ai', 'chooseEnemyAction'], ['battle', 'createBattle'],
+    ],
+    modules: ['scene', 'geometry', 'movement', 'range', 'damage', 'ai', 'battle', 'parser', 'clock'],
+  },
   p03: {
     file: P03_CASES,
     groups: ['T03-01', 'T03-02', 'T03-03', 'T03-04', 'T03-05', 'T03-06', 'T03-07', 'T03-08'],
@@ -111,6 +121,11 @@ const MODULE_FILES = {
   main: 'main.mjs',
   clock: 'clock.mjs',
   scheduler: 'scheduler.mjs',
+  movement: 'movement.mjs',
+  range: 'range.mjs',
+  damage: 'damage.mjs',
+  ai: 'ai.mjs',
+  battle: 'battle.mjs',
 };
 
 async function loadModules(stageDef) {

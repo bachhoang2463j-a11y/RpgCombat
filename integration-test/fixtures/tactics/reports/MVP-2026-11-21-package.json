@@ -1,0 +1,17 @@
+{
+  "artifact": "tactics-mvp-2026-11-21.zip",
+  "bytes": 110888,
+  "executed": true,
+  "mode": "extracted-ZIP-IAB",
+  "url": "http://127.0.0.1:8127/tactics/index.html",
+  "passed": 3,
+  "failed": 0,
+  "pending": 0,
+  "cases": [
+    {"id":"package-boot","pass":true,"actual":"默认5单位载入，先锋t83.33行动，主1移动6"},
+    {"id":"package-style","pass":true,"actual":"本地CSS stylesheet数量1，界面正常渲染"},
+    {"id":"package-attack","pass":true,"actual":"真实菜单共享命令+地图点击入口：预览main1/MP30，确认后main0/MP27，守卫-14HP"}
+  ],
+  "fullSuiteRepeated": false,
+  "delivery": "多文件本地网页Demo，不是酒馆正式正则或单HTML产物"
+}

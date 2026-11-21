@@ -16,6 +16,9 @@ import { createSandbox } from './sandbox.mjs';
 import { buildShell } from './ui-shell.mjs';
 import { resolveAvatarUrl } from './unit-view.mjs';
 import { TEST_ROOM } from './scene.mjs';
+import { createBattle, BASIC_ATTACK } from './battle.mjs';
+import { getVisibleTurnQueue } from './clock.mjs';
+import { emptyBattleState } from './lifecycle.mjs';
 
 // ---------- P02 固定图库（同一张权威几何，两个 sceneId 身份；不做生成器） ----------
 const SCENE_LIBRARY = {
@@ -170,6 +173,12 @@ export function createApp(rootEl, opts = {}) {
   const shell = buildShell(rootEl);
   const sandbox = createSandbox(shell.els.mapSlot, { getSafeRect: () => shell.getSafeRect() });
   let combatToken = {}; // main 唯一换代；对象快照相等语义
+  let battle = null;
+  let inputMode = null;
+  let pendingAim = null;
+  let enemyTimer = null;
+  let currentState = null;
+  let lastResult = null;
 
   shell.onUnitClick = (unitId) => {
     const snap = sandbox.getUnitView();
@@ -193,6 +202,9 @@ export function createApp(rootEl, opts = {}) {
   const openingStates = new Map();
 
   function loadYaml(text, { forceReset = false, positions = {}, sceneOverrides = {} } = {}) {
+    if (opts.playable && !forceReset && battle && text === currentYamlText && !Object.keys(positions).length && !Object.keys(sceneOverrides).length) {
+      return { branch: 'resume', viewData: currentViewData };
+    }
     const block = parseYamlText(text);
     const state = readTacticsState();
     const incoming = { sceneId: block.sceneId, battleId: block.battleId };
@@ -208,6 +220,10 @@ export function createApp(rootEl, opts = {}) {
       base.scenes[block.sceneId] = structuredClone(openingStates.get(block.sceneId));
     }
     const result = applyLoad(base, incoming, explicit, {});
+    if (forceReset) {
+      result.battleState = emptyBattleState(block.sceneId, block.battleId);
+      result.state.battles[block.sceneId + '\u0000' + block.battleId] = result.battleState;
+    }
     const scene = sceneForState(block.sceneId, result.sceneState);
     // 先校验新视图可装配，再写入战术档；资源合并仍只走 P01。
     const nextToken = {};
@@ -233,11 +249,124 @@ export function createApp(rootEl, opts = {}) {
       sandbox.reset(currentViewData); // new-battle：sceneState.positions 保留传入；new-scene：重建
     }
 
+    if (opts.playable) {
+      clearTimeout(enemyTimer);
+      inputMode = null; pendingAim = null;
+      if (!unchanged || forceReset || !battle) {
+        shell.clearBattle();
+        currentState = result.state;
+        lastResult = null;
+        battle = createBattle({ units: currentViewData.units, placementsById: currentViewData.placementsById, scene, battleState: result.battleState, random: opts.random });
+        battle.start();
+      }
+      refreshBattle();
+      scheduleEnemy();
+      return { block, roster, result, branch, viewData: currentViewData };
+    }
     shell.renderHeroes(currentViewData.units);
     shell.renderTurnOrder(currentViewData.units);
     shell.bindMenus(currentViewData.units);
     shell.showLog('已载入 ' + block.sceneId + ' / ' + block.battleId + '（分支 ' + branch + '）');
     return { block, roster, result, branch, viewData: currentViewData };
+  }
+
+  // ---------- MVP 命令接线：查看与行动分离，预览不付费 ----------
+  function currentUnit() {
+    return currentViewData.units.find(u => u.id === battle.snapshot().currentId);
+  }
+  function availableSkills() {
+    return (currentUnit()?.skills || []).filter(s => s.actionCost.main === 1 && ['单体', '直线', '扇形'].includes(s.range?.type));
+  }
+  function refreshBattle() {
+    const snap = battle.snapshot();
+    for (const u of currentViewData.units) {
+      u.bars = { ...u.bars, hp: u.ref.hp, mp: u.ref.mp };
+    }
+    sandbox.update(currentViewData);
+    for (const u of currentViewData.units) {
+      const rec = sandbox.getUnitView().nodes.get(u.id);
+      rec.root.classList.toggle('t-unit-down', u.ref.hp <= 0);
+    }
+    shell.renderHeroes(currentViewData.units);
+    const visibleUnitIds = currentViewData.units.map(u => u.id);
+    const queue = getVisibleTurnQueue(battle.battleState, 'hero', { visibleUnitIds }).filter(r => r.unitId !== snap.currentId);
+    if (snap.currentId) queue.unshift({ unitId: snap.currentId, nextActionAt: snap.now });
+    shell.renderBattle(snap, availableSkills(), handleCommand, queue);
+    shell.showLog(snap.log[snap.log.length - 1] || '选择基础行动移动，或攻击技能瞄准；再次点击确认。');
+    currentState.scenes[currentViewData.sceneId].positions = structuredClone(currentViewData.placementsById);
+    saveTacticsState(currentState);
+    if (snap.terminal && lastResult !== snap.terminal.type) {
+      lastResult = snap.terminal.type;
+      shell.openPanel(snap.terminal.type === 'victory' ? '胜利' : snap.terminal.type === 'defeat' ? '失败' : '僵持',
+        '<p>' + (snap.terminal.type === 'victory' ? '敌方已全灭。' : snap.terminal.type === 'defeat' ? '我方已全部倒地。' : '无人可继续行动。') +
+        '</p><p>点击右上「重置」重新开始；本 Demo 不同步 MMS。</p>');
+    }
+  }
+  function cancelInput() {
+    inputMode = null; pendingAim = null;
+    sandbox.setPreview(null);
+  }
+  function handleCommand(key) {
+    if (key === 'cancel') { cancelInput(); return; }
+    if (!battle || currentUnit()?.side !== 'hero' || battle.snapshot().terminal) return;
+    cancelInput();
+    if (key === 'end') {
+      battle.endAction(); refreshBattle(); scheduleEnemy(); return;
+    }
+    if (key === 'move') {
+      inputMode = { kind: 'move' };
+      sandbox.setPreview({ kind: 'move', cells: battle.reachable().cells });
+      shell.showLog('点击绿格预览路径，再点同一格确认；返回或 Esc 取消。');
+      return;
+    }
+    const skill = key === 'attack' ? BASIC_ATTACK : availableSkills()[Number(key.slice(6))];
+    if (skill) {
+      inputMode = { kind: 'attack', skill };
+      shell.showLog('点击敌人或方向预览 ' + skill.range.type + '，再点确认；返回或 Esc 取消。');
+    }
+  }
+  sandbox.onMapClick(aim => {
+    if (!inputMode || currentUnit()?.side !== 'hero') return false;
+    if (pendingAim && pendingAim.col === aim.col && pendingAim.row === aim.row) {
+      const result = inputMode.kind === 'move' ? battle.move(aim.col, aim.row) : battle.attack(inputMode.skill, aim);
+      if (!result.ok) { shell.showLog(result.reason); return true; }
+      cancelInput(); refreshBattle();
+      if (result.hits?.length) {
+        for (const hit of result.hits) {
+          const rec = sandbox.getUnitView().nodes.get(hit.targetId);
+          rec.root.classList.add('t-unit-hit');
+          sandbox.getScope().after(240, () => rec.root.classList.remove('t-unit-hit'));
+        }
+        playProjectile('fire', result.casterId, result.hits[0].targetId);
+      }
+      return true;
+    }
+    if (inputMode.kind === 'move') {
+      const cell = battle.previewMove(aim.col, aim.row);
+      if (!cell || !cell.cost) { pendingAim = null; shell.showLog('落点不可达'); return true; }
+      pendingAim = aim;
+      sandbox.setPreview({ kind: 'move', cells: battle.reachable().cells, path: cell.path });
+      shell.showLog('移动 ' + cell.cost.toFixed(2) + 'm · 再点同一格确认');
+    } else {
+      const query = battle.previewAttack(inputMode.skill, aim);
+      pendingAim = query.ok ? aim : null;
+      sandbox.setPreview({ kind: 'attack', cells: query.cells, targetIds: query.targetIds });
+      shell.showLog(query.ok ? '预计命中 ' + query.targetIds.length + ' 名敌人 · 再点确认' : query.reason);
+    }
+    return true;
+  });
+  const escapeInput = e => { if (e.key === 'Escape') { cancelInput(); shell.closeSubmenu(); } };
+  rootEl.ownerDocument.addEventListener('keydown', escapeInput);
+
+  function scheduleEnemy() {
+    clearTimeout(enemyTimer);
+    if (!battle || battle.snapshot().terminal || currentUnit()?.side !== 'enemy') return;
+    const token = combatToken;
+    // 仅表现间隔；规则推进仍由 P03 跳点，不以墙钟计算跑圈。
+    enemyTimer = setTimeout(() => {
+      if (token !== combatToken) return;
+      battle.runEnemyTurn(); refreshBattle(); scheduleEnemy();
+    }, 420);
   }
 
   // 验证用旧弹道演出（真实火焰弹/敌方法术弹；坐标验证样本无声）
@@ -253,6 +382,8 @@ export function createApp(rootEl, opts = {}) {
   }
 
   function destroy() {
+    clearTimeout(enemyTimer);
+    rootEl.ownerDocument.removeEventListener('keydown', escapeInput);
     combatToken = {};
     sandbox.destroy();
     shell.destroy();
@@ -263,5 +394,6 @@ export function createApp(rootEl, opts = {}) {
     sandbox, shell,
     getToken: () => combatToken,
     getViewData: () => currentViewData,
+    getBattle: () => battle,
   };
 }
