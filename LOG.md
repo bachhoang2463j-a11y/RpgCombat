@@ -3837,3 +3837,13 @@
 - **验证**：`node tactics/tools/run-tests.cjs --stage=p03` 8 组 55 例全绿（failed=0 pending=0）；`--stage=p01` 166 全绿；`--self-check` 负路径全过；RUN_TESTS_JSON 机器可读块与逐用例数一致；T03-07 用受控现实钟（Date.now 前移 30000ms 后还原）与 JSON 往返重放逐字节一致证明引擎不读现实钟；禁改文件（根 index.html、tactics/index.html、P02 视图模块、SPEC、P01 契约、根构建器、README、MMS）零改动；未混入工作树既有删除与 .audit-work。
 - **边界**：P03 只交付时序与行动资格纯数据接口——伤害数值/技能/蓄力投点归 P07，救援交互归 P10，行动轴渲染由 P02 消费 getVisibleTurnQueue，续载接线归 P11；本轮不接线 UI、不宣称完整战场。备注：PLAN 状态表中 P02 行原为"未开工"，与 LOG-309/310 及 git 历史（2024d5a/b1c0c96）不符，本轮按已提交事实同步该行，避免同表自相矛盾。
 - **目的 vs 现状**：P03 目的（可重放跑圈与全局事件时钟、旧大回合逐项映射不留缺口）已达成并实测全绿；P04+ 空间/感知/AI/结算接线未开工。
+
+## [LOG-312] 2026-11-21 — 修复 P03 交付审查发现的时钟边界
+
+- **修复提交**：`2963011`。
+- **核心目的**：封闭 P03 时钟的永久 DoT 僵持循环、持续伤害来源误合并与倒地目标持续伤害误结算风险。
+- **变更行为**：永久毒/燃（`endAt:null`）不再作为可无限推进的未来终局事件，零速无行动者可一次返回僵持；毒/燃 `source` 强制提供 `{casterId, skillId, effectId}`，连同目标 ID 构成同源键，不同施术者/技能/效果相互隔离；倒地/离场目标仍推进状态节拍，但 `dot-tick.suppressed=true`，下游不得扣持续伤害；契约与 T03 夹具同步。
+- **涉及文件**：`tactics/src/{clock,scheduler}.mjs`、`doc/tactics/P03-CLOCK-CONTRACT.md`、`integration-test/fixtures/tactics/p03-node-cases.mjs`、P03 实测报告；本条与 LOG-INDEX。
+- **验证**：P03 8组58例全绿；P01 166例全绿；`--self-check` 通过。新增断言覆盖永久 DoT 不死循环、两个施术者同名技能独立刷新、倒地/存活目标 tick 的 suppressed 差异。独立子代理因并发额度未能启动，本轮由主代理核对改动与实跑结果，报告不声称独立复审通过。
+- **边界**：未改 P02/UI、SPEC、P01 核心；未触碰工作区历史删除与 `.audit-work`；未推送。
+- **目的 vs 现状**：三项审查问题已由具体规则与回归锁定，P03/P01 定向测试全绿；P07 接线仍须遵守四元状态来源与 `suppressed` 过滤契约。
