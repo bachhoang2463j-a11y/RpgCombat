@@ -20,10 +20,11 @@ function footprintOf(ctx, u) {
   return ctx.footprintsById[u.id] || u.footprint || { width: 1, height: 1 };
 }
 
-// 普通近战/远程单体攻击技为候选（反应技与他人技除外）
+// 攻击候选：单体/直线/扇形三种已实现范围（反应技与他人技除外）。
+// 瞄准点取目标占格中心：直线/扇形按同一 queryAttack 求交，候选只在真实 targetIds 含该目标时成立。
 function attackCandidates(skills) {
   return (skills || []).filter(s =>
-    !s.isReaction && !s.isOthers && (s.type === '[单体]' || (s.range && s.range.type === '单体')));
+    !s.isReaction && !s.isOthers && (s.type === '[单体]' || (s.range && ['单体', '直线', '扇形'].includes(s.range.type))));
 }
 
 // 假设单位移动到 (col,row) 后的查询视图：浅复制 placementsById，不改原 ctx

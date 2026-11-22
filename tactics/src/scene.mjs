@@ -12,6 +12,15 @@ const KIND_RULES = {
   lowCounter: { blocksMovement: true,  blocksProjectile: false, blocksVision: false, lowObstacle: true },
   carpet:     { blocksMovement: false, blocksProjectile: false, blocksVision: false, lowObstacle: false, material: 'carpet' },
   light:      { blocksMovement: false, blocksProjectile: false, blocksVision: false, lowObstacle: false },
+  // 礼拜堂语义物件（规则同已有三类，只多一种画法）
+  pillar:     { blocksMovement: true,  blocksProjectile: true,  blocksVision: true,  lowObstacle: false },
+  statue:     { blocksMovement: true,  blocksProjectile: true,  blocksVision: true,  lowObstacle: false },
+  pew:        { blocksMovement: true,  blocksProjectile: false, blocksVision: false, lowObstacle: true },
+  altar:      { blocksMovement: true,  blocksProjectile: false, blocksVision: false, lowObstacle: true },
+  tomb:       { blocksMovement: true,  blocksProjectile: false, blocksVision: false, lowObstacle: true },
+  // 纯装饰（不进规则）
+  banner:     { blocksMovement: false, blocksProjectile: false, blocksVision: false, lowObstacle: false, decor: true },
+  rubble:     { blocksMovement: false, blocksProjectile: false, blocksVision: false, lowObstacle: false, decor: true },
 };
 
 // ---------- 固定测试房间（石造大厅：隔墙+门洞+低柜+长红毯+四处暖灯） ----------
@@ -54,14 +63,24 @@ export function compileScene(scene) {
 
   const q = 1000 / columns; // 美术像素/米（渲染比例，不进规则距离）
   const cells = new Array(columns * rows);
+  // scene.floor：可行走区域矩形清单；区域外一律为实心外壁（void，挡移动/弹道/视线）
+  const hasFloor = Array.isArray(scene.floor);
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < columns; c++) {
       cells[r * columns + c] = {
         col: c, row: r,
-        blocksMovement: false, blocksProjectile: false, blocksVision: false, lowObstacle: false,
+        blocksMovement: hasFloor, blocksProjectile: hasFloor, blocksVision: hasFloor, lowObstacle: false, void: hasFloor,
         material: scene.ground && scene.ground.material || 'wood',
         objectIds: [],
       };
+    }
+  }
+  if (hasFloor) {
+    for (const f of scene.floor) {
+      for (const c of boundsCells(f)) {
+        if (c.col < 0 || c.col >= columns || c.row < 0 || c.row >= rows) throw new Error('地面越出网格');
+        Object.assign(cells[c.row * columns + c.col], { blocksMovement: false, blocksProjectile: false, blocksVision: false, void: false });
+      }
     }
   }
   const artJson = { ground: scene.ground && scene.ground.material || 'wood', terrain: [], features: [], labels: [] };
@@ -77,13 +96,16 @@ export function compileScene(scene) {
       artJson.features.push({ type: 'lantern', at: [Math.round(obj.at.col * q), Math.round(obj.at.row * q)] });
       continue;
     }
+    if (rule.decor) continue;   // 装饰物只进 objectsIndex 供画法使用
     if (obj.kind === 'carpet') {
       artJson.terrain.push({ type: 'carpet', at: [obj.bounds.col * q, obj.bounds.row * q], size: [obj.bounds.width * q, obj.bounds.height * q] });
     } else if (obj.kind === 'wall') {
       // wall/counter 图元为左上角锚点
       artJson.features.push({ type: 'wall', at: [obj.bounds.col * q, obj.bounds.row * q], size: [obj.bounds.width * q, obj.bounds.height * q] });
-    } else if (obj.kind === 'lowCounter') {
+    } else if (obj.kind === 'lowCounter' || obj.kind === 'pew' || obj.kind === 'altar' || obj.kind === 'tomb') {
       artJson.features.push({ type: 'counter', at: [obj.bounds.col * q, obj.bounds.row * q], size: [obj.bounds.width * q, obj.bounds.height * q] });
+    } else if (obj.kind === 'pillar' || obj.kind === 'statue') {
+      artJson.features.push({ type: 'wall', at: [obj.bounds.col * q, obj.bounds.row * q], size: [obj.bounds.width * q, obj.bounds.height * q] });
     } else if (obj.kind === 'door') {
       // 门叶画法是战棋侧补充：开=MMS door 弧线（枢轴洞底、向东摆开）；关=实心门叶填洞
       const cx = obj.bounds.col * q + q / 2;
@@ -109,7 +131,7 @@ export function compileScene(scene) {
       if (rule.material) cell.material = rule.material;
     }
   }
-  return { grid: { columns, rows, metersPerCell }, cells, artJson, objectsIndex };
+  return { grid: { columns, rows, metersPerCell }, cells, artJson, objectsIndex, style: scene.style || null, floor: hasFloor ? scene.floor.map(f => ({ ...f })) : null };
 }
 
 // 格查询：越界返回 null（不 clamp）

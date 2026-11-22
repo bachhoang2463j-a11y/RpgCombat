@@ -1,5 +1,7 @@
 'use strict';
-// MVP 单文件版打包：esbuild IIFE 内联 + CSS 内联；仅本地 Demo 分发，不是酒馆正则产物。
+// 战棋视听切片单文件打包：esbuild IIFE 内联 + CSS 内联；仅本地 Demo 分发，不是酒馆正则产物。
+// 先校验回合制视听底座生成物未过期（extract-rpg-av --check 同一判定），再打包。
+// 媒体（头像/音效/语音）按既有资源基址外链加载，是预期行为；业务 JS/CSS 必须零外部依赖。
 // 替换一律用函数式 replacer，防止产物中的 $ 序列被 String.replace 替换语义破坏。
 const { readFileSync, writeFileSync } = require('node:fs');
 const path = require('node:path');
@@ -8,13 +10,18 @@ const { createRequire } = require('node:module');
 
 const tacticsDir = path.resolve(__dirname, '..');
 const esbuild = createRequire(path.join(tacticsDir, 'p00-probe', 'package.json'))('esbuild');
+const { build: buildRpgAv } = require('./extract-rpg-av.cjs');
 
 // 产物专项断言：本轮新增与核心模块必须真实入包（存在性，不是仅字符串出现）
 const REQUIRED_INPUTS = [
   'src/main.mjs', 'src/battle.mjs', 'src/movement.mjs', 'src/range.mjs',
   'src/damage.mjs', 'src/ai.mjs', 'src/demo-fixture.mjs', 'src/clock.mjs',
   'src/scheduler.mjs', 'src/parser.mjs', 'src/vendor/js-yaml-4.1.0.mjs',
+  'src/av-host.mjs', 'src/action-director.mjs', 'src/motion.mjs', 'src/range-overlay.mjs',
+  'src/vendor/rpg-av/rpg-av.mjs', 'src/chapel-scene.mjs', 'src/chapel-art.mjs', 'src/ui-sfx.mjs',
 ];
+// 复用模块关键函数必须进入产物（防止 tree-shaking 或误删导致"复用"名不副实）
+const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFeedback', 'classifyHit', 'playArsenicShot', 'CombatAudioMixer', 'HERO_VOICE_LINES', 'playSingleGunshot', 'playSingleShotgun', 'playSingleThunder', 'playSingleSlash', 'playSingleClaw', 'playSingleArrow', 'enemySpellProjectile'];
 
 const entry = [
   "import { createApp } from './src/main.mjs';",
@@ -24,31 +31,41 @@ const entry = [
   '});',
   'app.boot();',
   'window.__TACTICS_APP__ = { app, snapshot: () => app.sandbox.getSnapshot(),',
-  '  loadYaml: (t, o) => app.loadYaml(t, o), playProjectile: (a, b, c) => app.playProjectile(a, b, c) };',
+  '  loadYaml: (t, o) => app.loadYaml(t, o), playProjectile: (a, b, c) => app.playProjectile(a, b, c),',
+  '  resources: () => app.resources() };',
 ].join('\n');
 
 (async () => {
+  // 视听底座生成物必须与当前根 index.html 一致（过期即失败，不打包旧提取）
+  const av = buildRpgAv();
+  const avDir = path.join(tacticsDir, 'src', 'vendor', 'rpg-av');
+  for (const [name, text] of [['rpg-av.mjs', av.js], ['rpg-av.css', av.css]]) {
+    if (readFileSync(path.join(avDir, name), 'utf8') !== text) throw new Error('视听底座生成物过期: ' + name + '（先运行 node tactics/tools/extract-rpg-av.cjs）');
+  }
   const result = await esbuild.build({
     absWorkingDir: tacticsDir,
     stdin: { contents: entry, resolveDir: tacticsDir, sourcefile: 'demo-entry.mjs' },
     bundle: true, format: 'iife', platform: 'browser', target: 'es2020',
-    minify: true, legalComments: 'none', metafile: true, write: false,
+    minifyWhitespace: true, minifySyntax: true, minifyIdentifiers: false, legalComments: 'none', metafile: true, write: false,
   });
   const inputs = Object.keys(result.metafile.inputs).map(p => p.replace(/\\/g, '/'));
   const missing = REQUIRED_INPUTS.filter(name => !inputs.some(p => p.endsWith(name)));
   if (missing.length) throw new Error('新代码未入包: ' + missing.join(', '));
   if (Object.values(result.metafile.outputs).some(o => o.imports.length)) throw new Error('产物仍含外部 import');
 
-  const css = readFileSync(path.join(tacticsDir, 'tactics.css'), 'utf8');
+  const css = readFileSync(path.join(tacticsDir, 'tactics.css'), 'utf8').replace(/^\uFEFF/, '') + '\n' + readFileSync(path.join(avDir, 'rpg-av.css'), 'utf8');
   // </script 只可能出现在字符串字面量内；转义斜杠不改变字符串值，防止提前闭合脚本
   const bundle = result.outputFiles[0].text.split('</script').join('<\\/script');
+  const lostSymbols = REQUIRED_SYMBOLS.filter(s => !new RegExp('\\b' + s + '\\b').test(bundle));
+  if (lostSymbols.length) throw new Error('复用模块关键函数未入包: ' + lostSymbols.join(', '));
+  if (/<link[^>]+stylesheet|<script[^>]+src=/i.test(css + bundle)) throw new Error('产物含外部业务 CSS/JS 引用');
   const html = [
     '<!DOCTYPE html>',
     '<html lang="zh-CN">',
     '<head>',
     '<meta charset="UTF-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-    '<title>战棋战斗 · 最小可玩 Demo（单文件）</title>',
+    '<title>战棋战斗 · 视听切片 Demo（单文件）</title>',
     '<style>', css, '</style>',
     '</head>',
     '<body>',
@@ -65,6 +82,7 @@ const entry = [
     artifact: 'tactics/mvp-standalone.html',
     bytes: Buffer.byteLength(html),
     sha256: createHash('sha256').update(html).digest('hex'),
-    bundled: inputs.length, asserted: REQUIRED_INPUTS.length,
+    bundled: inputs.length, asserted: REQUIRED_INPUTS.length, symbols: REQUIRED_SYMBOLS.length,
+    builtAt: new Date().toISOString(), rpgAvSource: av.report.sourceSha,
   }));
 })().catch(e => { console.error('[build-demo-html] FAIL: ' + (e && e.message || e)); process.exit(1); });

@@ -5,6 +5,7 @@
 // ==========================================
 
 import { MINI_PATTERN_DEFS, renderMiniMapArt } from './vendor/mms-map-art.mjs';
+import { renderChapelArt } from './chapel-art.mjs';
 
 // 占位符注入：只覆盖配色，不改画法
 function tintDefs({ brickBase, brickLine, carpetBase, carpetAlt, carpetLine, vigEdge, wallEdge, doorInk }) {
@@ -40,6 +41,8 @@ export const TACTICS_PALETTE = {
 };
 
 // 渲染场景美术 JSON（scene.compileScene 产物）→ 底图 SVG 字符串
-export function renderSceneArt(artJson) {
+// 传入 compiled 且场景声明 style:'chapel' 时走礼拜堂画法（格表派生墙线），否则沿用 R13 mini 底图
+export function renderSceneArt(artJson, compiled) {
+  if (compiled && compiled.style === 'chapel') return renderChapelArt(compiled);
   return renderMiniMapArt(artJson, TACTICS_PALETTE);
 }

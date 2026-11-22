@@ -65,6 +65,16 @@ const STAGES = {
     ],
     modules: ['scene', 'geometry', 'movement', 'range', 'damage', 'ai', 'battle', 'parser', 'clock'],
   },
+  av: {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'av-node-cases.mjs'),
+    groups: ['TAV-01', 'TAV-02', 'TAV-03', 'TAV-04', 'TAV-05', 'TAV-06'],
+    requiredExports: [
+      ['director', 'resolveAttackIdentity'], ['director', 'resolveWindupKind'], ['director', 'createActionDirector'],
+      ['motion', 'pathSegments'], ['motion', 'pathDuration'], ['motion', 'travelFraction'], ['motion', 'pointAtDistance'], ['motion', 'playPathMotion'],
+      ['avHost', 'createAvHost'], ['vendor', 'createRpgAv'], ['battle', 'createBattle'], ['range', 'queryAttack'], ['main', 'buildViewData'],
+    ],
+    modules: ['parser', 'scene', 'geometry', 'movement', 'range', 'damage', 'ai', 'battle', 'clock', 'main', 'fixture', 'director', 'motion', 'avHost', 'vendor'],
+  },
   p03: {
     file: P03_CASES,
     groups: ['T03-01', 'T03-02', 'T03-03', 'T03-04', 'T03-05', 'T03-06', 'T03-07', 'T03-08'],
@@ -126,6 +136,11 @@ const MODULE_FILES = {
   damage: 'damage.mjs',
   ai: 'ai.mjs',
   battle: 'battle.mjs',
+  fixture: 'demo-fixture.mjs',
+  director: 'action-director.mjs',
+  motion: 'motion.mjs',
+  avHost: 'av-host.mjs',
+  vendor: 'vendor/rpg-av/rpg-av.mjs',
 };
 
 async function loadModules(stageDef) {

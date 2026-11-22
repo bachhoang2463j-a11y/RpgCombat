@@ -1,0 +1,205 @@
+// ==========================================
+// 战棋视听宿主：把回合制成熟视听底座（vendor/rpg-av，生成文件）接到战棋地图。
+// 职责只限宿主适配：
+//   · 特效舞台：world-root 内的绝对定位层（随相机平移缩放，不漂移），FX_SCALE 校准卡片尺寸 → 地图尺寸；
+//   · 坐标：Element[rectSymbol]() 把屏幕矩形换成舞台坐标（替代旧 getBoundingClientRect 屏幕像素）；
+//   · 实体：spriteOf/isHero/isActive 改查战棋单位视图；
+//   · 生命周期：combatToken 与 view-scope 换代同步，clear() 停全部演出与声音；
+//   · 声音：首次真实交互解锁 AudioContext，显式清单预载，资源加载结果可报告；
+//   · 角色语音：沿用 HERO_VOICE_LINES/pickHeroVoice，按每名角色自己的自然行动触发。
+// 不在这里做任何规则结算；特效函数也不负责扣血。
+// ==========================================
+
+import { createRpgAv, RPG_AVATAR_MAP, RPG_HERO_VOICE_LINES } from './vendor/rpg-av/rpg-av.mjs';
+
+export const FX_SCALE = 0.72;            // 卡片尺寸特效 → 地图尺度（舞台整体 scale，坐标同步换算）
+let STAGE_W = 1000 / FX_SCALE;            // 舞台尺寸 = 世界尺寸 / FX_SCALE（随场景网格变化）
+let STAGE_H = 1000 / FX_SCALE;
+
+// 本 Demo 实际用到的采样（按复用演出逐项核对；不预载整个素材库）
+export const DEMO_AUDIO_KEYS = [
+  'gunshot1', 'gunshot2', 'gunshot3', 'xiandan', 'gunshot_pierce',            // 枪械：玛德琳/弗兰克/索恩
+  'thunder_charge', 'thunder_single_hit',                                     // 法术：埃利奥特召雷
+  'slash_whoosh_hit_fs434873', 'claw_bloody_blade_fs323526', 'swish_3',       // 近战刀砍/爪击、箭矢
+  'monsterAttack', 'enemySwingGroup', 'enemyRanged', 'enemyMagic',            // 敌方前摇
+  'hit_1a', 'hit_1b', 'hit_1c', 'hit_2a', 'hit_2b', 'hit_2c', 'hit_3a', 'hit_3b', 'hit_3c', // 受击三档
+  'dodge_1', 'dodge_2', 'dodge_3',                                            // 闪避
+  'heroTurn', 'avatarClick', 'kill', 'combatKill', 'magicKill', 'herochargedone', 'defDown', // 轮次/界面/收束
+];
+
+export function heroAvatarUrl(name) {
+  return Object.prototype.hasOwnProperty.call(RPG_AVATAR_MAP, name) ? RPG_AVATAR_MAP[name] : null;
+}
+export function heroHasVoice(name) {
+  return Object.prototype.hasOwnProperty.call(RPG_HERO_VOICE_LINES, name);
+}
+
+export function createAvHost({ getUnitView, getUnits }) {
+  const rectSymbol = Symbol('tacticsStageRect');
+  let stageEl = document.createElement('div');   // 初始占位；sandbox 挂载后 attachStage 换成真实舞台
+  let shakeEl = null;
+  const resizeFns = [];
+  const reports = { images: new Map(), audio: new Map(), missing: [] };
+
+  function toStage(r) {
+    const sr = stageEl.isConnected ? stageEl.getBoundingClientRect() : null;
+    if (!sr || !sr.width) return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0 };
+    const k = STAGE_W / sr.width;
+    const left = (r.left - sr.left) * k, top = (r.top - sr.top) * k;
+    const width = r.width * k, height = r.height * k;
+    return { left, top, width, height, right: left + width, bottom: top + height, x: left, y: top };
+  }
+  // 旧模块按元素查询屏幕矩形；战棋给它舞台坐标（DOMRect 形状）
+  Object.defineProperty(Element.prototype, rectSymbol, {
+    value: function () { return toStage(this.getBoundingClientRect()); }, configurable: true,
+  });
+
+  const unitById = id => (getUnits() || []).find(u => u.id === id) || null;
+  const idOf = e => (e && typeof e === 'object' ? (e.nodeType === 1 ? e.dataset.arcaneTargetId : e.id) : e) || null;
+
+  const host = {
+    stage: {
+      get el() { return stageEl; },
+      get w() { return STAGE_W; }, get h() { return STAGE_H; },
+      onResize(fn) { resizeFns.push(fn); },
+      shakeEl() { return shakeEl; },
+    },
+    rectSymbol,
+    initialToken: {},
+    spriteOf(e) {
+      if (e && e.nodeType === 1) return e;
+      const id = idOf(e);
+      const view = getUnitView();
+      const rec = id && view && view.nodes.get(id);
+      return rec ? rec.sprite : null;
+    },
+    isHero(e) { const u = unitById(idOf(e)); return u ? u.side === 'hero' : false; },
+    isActive(e) { const u = unitById(idOf(e)); return !!(u && u.ref.hp > 0); },
+    report(kind, detail) { reports.missing.push({ kind, detail }); },
+  };
+
+  const av = createRpgAv(host);
+
+  // ---------- 舞台挂载（sandbox 每次 buildDom 后调用） ----------
+  function attachStage({ stage, shake, worldW = 1000, worldH = 1000 }) {
+    stageEl = stage; shakeEl = shake;
+    STAGE_W = worldW / FX_SCALE; STAGE_H = worldH / FX_SCALE;
+    stage.setAttribute('data-tactics-fx', 'rpg-av-stage');
+    stage.style.cssText = 'position:absolute; left:0; top:0; width:' + STAGE_W + 'px; height:' + STAGE_H + 'px; transform-origin:0 0; transform:scale(' + FX_SCALE + '); pointer-events:none; overflow:visible;';
+    if (av.fxEngine.canvas && av.fxEngine.canvas.parentNode !== stage) { stage.appendChild(av.fxEngine.canvas); av.fxEngine.resize(); }
+    resizeFns.forEach(fn => { try { fn(); } catch (e) { /* 尺寸恒定，回调仅为兼容 */ } });
+  }
+
+  // ---------- 实体视图对象（旧模块按 { id, isAlive, name } 读取） ----------
+  function entity(id) {
+    const u = unitById(id);
+    if (!u) return null;
+    return { id: u.id, name: u.name, isAlive: u.ref.hp > 0, isHero: u.side === 'hero', side: u.side, hp: u.ref.hp, maxHp: u.ref.maxHp };
+  }
+  function syncRoster() {
+    const units = getUnits() || [];
+    av.setRoster(units.filter(u => u.side === 'hero').map(u => entity(u.id)), units.filter(u => u.side !== 'hero').map(u => entity(u.id)));
+  }
+
+  // ---------- 声音：首次真实交互解锁 + 显式预载 + 加载报告 ----------
+  let unlocked = false;
+  let queuedVoice = null;          // 解锁前取得的自然行动语音：首次真实交互后补播（同一次行动只播一次）
+  function unlockAudio() {
+    const ctx = av.CombatAudioMixer.skillContext();
+    if (!ctx) return false;
+    unlocked = true;               // 真实交互内 resume；之后页面具备粘性激活，重建上下文无需再次手势
+    preload();
+    if (queuedVoice) { const url = queuedVoice; queuedVoice = null; av.playCustomAudio(url, 2, 1, { category: 'N' }); }
+    return true;
+  }
+  const docUnlock = () => { unlockAudio(); };
+  document.addEventListener('pointerdown', docUnlock, { capture: true });
+  document.addEventListener('click', docUnlock, { capture: true });
+  document.addEventListener('keydown', docUnlock, { capture: true });
+
+  function voiceFiles() {
+    const files = [];
+    for (const cfg of Object.values(av.HERO_VOICE_LINES)) { files.push(cfg.first, ...cfg.turn, ...cfg.low); }
+    return files;
+  }
+  function voiceUrl(file) { return av.itemFxAssetUrl(file); }
+  function trackLoad(key, url, kind) {
+    if (reports.audio.has(url)) return;
+    const rec = { key, url, kind, status: 'loading', error: null };
+    reports.audio.set(url, rec);
+    av.CombatAudioMixer.load(url).then(buf => { rec.status = buf ? 'ok' : 'empty'; }, err => { rec.status = 'error'; rec.error = String(err && err.message || err); });
+  }
+  let preloaded = false;
+  function preload() {
+    if (preloaded) return; preloaded = true;
+    for (const key of DEMO_AUDIO_KEYS) {
+      const url = av.audioUrls[key];
+      if (!url) { reports.missing.push({ kind: 'audio-key', detail: key }); continue; }
+      trackLoad(key, url, 'sfx');
+      av.warmIdentitySample(key);
+    }
+    for (const f of voiceFiles()) trackLoad(f, voiceUrl(f), 'voice');
+  }
+
+  // ---------- 角色语音（每名角色自己的自然行动；查看/悬停/预览/额外主行动不触发） ----------
+  const voiceState = new Map(); // unitId → { spoken, last, serial }
+  function playTurnVoice(unit, actionSerial) {
+    const cfg = av.HERO_VOICE_LINES[unit.name];
+    if (!cfg) return null;
+    const st = voiceState.get(unit.id) || { spoken: false, last: null, serial: -1 };
+    if (st.serial === actionSerial) return null;           // 同一次自然行动只播一次
+    st.serial = actionSerial;
+    let file;
+    if (!st.spoken) file = cfg.first;
+    else if (unit.ref.maxHp > 0 && unit.ref.hp / unit.ref.maxHp <= 0.5) file = av.pickHeroVoice(cfg.low, st.last);
+    else file = av.pickHeroVoice(cfg.turn, st.last);
+    st.spoken = true; st.last = file;
+    voiceState.set(unit.id, st);
+    if (!unlocked) queuedVoice = voiceUrl(file);
+    else { queuedVoice = null; av.playCustomAudio(voiceUrl(file), 2, 1, { category: 'N' }); }
+    return file;
+  }
+
+  function sfx(key, vol = 1, opts = {}) { return av.playSound(key, vol, 1, Object.assign({ category: 'K' }, opts)); }
+
+  // ---------- 换代与清场 ----------
+  function setToken(token) { av.setToken(token); }
+  function clear({ resetVoices = false } = {}) {
+    av.clearArcaneFx();             // 原清场：演出层/粒子/定时/采样/混音器上下文一并关闭
+    if (resetVoices) { voiceState.clear(); queuedVoice = null; }
+    preloaded = false;              // 混音器 clear 关闭了上下文与解码缓冲；已解锁则在下一拍重建并重新预载
+    reports.audio.clear();
+    if (unlocked) setTimeout(() => { if (!preloaded) unlockAudio(); }, 0);
+  }
+
+  function trackImage(url, kind, name) {
+    if (!url || reports.images.has(url)) return;
+    const rec = { url, kind, name, status: 'loading' };
+    reports.images.set(url, rec);
+    const img = new Image();
+    img.referrerPolicy = 'no-referrer';
+    img.onload = () => { rec.status = 'ok'; rec.size = img.naturalWidth + '×' + img.naturalHeight; };
+    img.onerror = () => { rec.status = 'error'; };
+    img.src = url;
+  }
+
+  function resourceReport() {
+    return {
+      assetBase: av.ASSET_BASE,
+      unlocked, audioState: av.CombatAudioMixer.context() ? av.CombatAudioMixer.context().state : 'none',
+      images: [...reports.images.values()].map(r => ({ ...r })),
+      audio: [...reports.audio.values()].map(r => ({ ...r })),
+      missing: reports.missing.slice(),
+    };
+  }
+
+  function destroy() {
+    document.removeEventListener('pointerdown', docUnlock, { capture: true });
+    document.removeEventListener('click', docUnlock, { capture: true });
+    document.removeEventListener('keydown', docUnlock, { capture: true });
+    clear({ resetVoices: true });
+    delete Element.prototype[rectSymbol];
+  }
+
+  return { av, host, attachStage, entity, syncRoster, unlockAudio, playTurnVoice, sfx, setToken, clear, trackImage, resourceReport, destroy, voiceUrl };
+}

@@ -28,6 +28,7 @@ export function createBattle({ units, placementsById, scene, battleState, random
   };
   let resources = null;
   let log = [];
+  let actionSerial = 0;            // 每次取得自然行动 +1（额外主行动点不计；供语音与表现去重）
   const byId = new Map(units.map(u => [u.id, u]));
   const currentId = () => state.combatState.clock?.currentAction?.unitId || null;
   const actor = () => byId.get(currentId());
@@ -59,6 +60,7 @@ export function createBattle({ units, placementsById, scene, battleState, random
       const u = byId.get(next.unitId);
       resources = state.combatState.clock.currentAction.resources;
       resources.moveRemaining = u.ref.moveDistance * resources.moveQuota;
+      actionSerial++;
       addLog('t=' + next.time.toFixed(2) + ' · ' + u.name + ' 行动');
     } else if (next.status === 'terminal') addLog('僵持：无人可继续行动。');
     return snapshot();
@@ -72,6 +74,7 @@ export function createBattle({ units, placementsById, scene, battleState, random
       const r = state.combatState.clock.currentAction.resources;
       resources = r;
       if (resources.moveRemaining === undefined) resources.moveRemaining = u.ref.moveDistance * r.moveQuota;
+      actionSerial++;
       return snapshot();
     }
     return advance();
@@ -80,7 +83,7 @@ export function createBattle({ units, placementsById, scene, battleState, random
   function snapshot() {
     const clock = state.combatState.clock;
     return {
-      now: clock?.now || 0, currentId: currentId(), resources: resources ? { moveRemaining: resources.moveRemaining, main: resources.main, aux: resources.aux } : null,
+      now: clock?.now || 0, currentId: currentId(), actionSerial, resources: resources ? { moveRemaining: resources.moveRemaining, main: resources.main, aux: resources.aux } : null,
       terminal: clock?.terminal ? { ...clock.terminal } : null,
       units: units.map(u => ({ id: u.id, hp: u.ref.hp, mp: u.ref.mp, status: u.ref.hp > 0 ? 'active' : u.side === 'hero' ? 'down' : 'dead' })),
       positions: structuredClone(placementsById), log: log.slice(),
@@ -98,12 +101,14 @@ export function createBattle({ units, placementsById, scene, battleState, random
     const cell = previewMove(col, row);
     if (!cell || cell.cost === 0) return { ok: false, reason: '落点不可达' };
     const p = placementsById[currentId()];
+    const from = { col: p.col, row: p.row, facing: p.facing };
     const last = cell.path[cell.path.length - 2] || p;
     p.facing = ((Math.atan2(col - last.col, -(row - last.row)) * 180 / Math.PI) + 360) % 360;
     p.col = col; p.row = row;
+    const before = resources.moveRemaining;
     resources.moveRemaining = Math.max(0, resources.moveRemaining - cell.cost);
     addLog(actor().name + ' 移动 ' + cell.cost.toFixed(2) + 'm');
-    return { ok: true, cell };
+    return { ok: true, cell, from, unitId: currentId(), moveBefore: before, moveAfter: resources.moveRemaining };
   }
 
   function previewAttack(skill, aim) {
@@ -120,18 +125,22 @@ export function createBattle({ units, placementsById, scene, battleState, random
     u.ref.mp -= skill.cost || 0;
     const p = placementsById[u.id];
     p.facing = ((Math.atan2(aim.x - query.origin.x, -(aim.y - query.origin.y)) * 180 / Math.PI) + 360) % 360;
+    const logFrom = log.length;
     const hits = query.targetIds.map(id => {
       const target = byId.get(id);
+      const hpBefore = target.ref.hp;
       const result = applyAttackDamage(u.ref, target.ref, skill, random);
+      const logIndex = log.length;
       addLog(u.name + ' · ' + skill.name + ' → ' + target.name + (result.hit ? ' -' + result.hpDmg + ' HP' : ' 闪避'));
-      if (target.ref.hp <= 0) {
+      const down = target.ref.hp <= 0;
+      if (down) {
         dispatchClock(state, { type: 'exitUnit', unitId: id, cause: 'down' });
         addLog(target.name + (target.side === 'hero' ? ' 倒地' : ' 死亡'));
       }
-      return { targetId: id, ...result };
+      return { targetId: id, ...result, hpBefore, hpAfter: target.ref.hp, maxHp: target.ref.maxHp, down, side: target.side, logIndex, logEnd: log.length };
     });
     if (!hits.length) addLog(u.name + ' · ' + skill.name + '：未命中敌方（阻挡或空范围）');
-    return { ok: true, hits, query, casterId: u.id };
+    return { ok: true, hits, query, casterId: u.id, skill, aim: { ...aim }, facing: p.facing, mpCost: skill.cost || 0, logFrom, logTo: log.length };
   }
 
   function endAction() {
@@ -144,9 +153,14 @@ export function createBattle({ units, placementsById, scene, battleState, random
   function enemySkills() {
     return actor().skills.filter(s => s.actionCost?.main === 1 && (s.cost || 0) <= actor().ref.mp && ['单体', '直线', '扇形'].includes(s.range?.type)).concat(BASIC_ATTACK);
   }
+  // 敌方决策（只读）：与 runEnemyTurn 同一 AI 与同一合法性查询；执行仍走 move/attack/endAction 同一命令
+  function planEnemyAction() {
+    if (!actor() || actor().side !== 'enemy' || state.combatState.clock.terminal || !resources) return null;
+    return chooseEnemyAction(ctx, currentId(), resources.moveRemaining, enemySkills());
+  }
   function runEnemyTurn() {
     if (!actor() || actor().side !== 'enemy' || state.combatState.clock.terminal) return snapshot();
-    const choice = chooseEnemyAction(ctx, currentId(), resources.moveRemaining, enemySkills());
+    const choice = planEnemyAction();
     if (choice.moveTo) move(choice.moveTo.col, choice.moveTo.row);
     if (choice.skill && resources.main > 0) attack(choice.skill, choice.aim);
     return endAction();
@@ -159,9 +173,9 @@ export function createBattle({ units, placementsById, scene, battleState, random
     }
     for (const id of Object.keys(placementsById)) Object.assign(placementsById[id], opening.positions[id]);
     Object.assign(state, emptyBattleState(state.sceneId, state.battleId));
-    resources = null; log = [];
+    resources = null; log = []; actionSerial = 0;
     return start();
   }
 
-  return { ctx, battleState: state, start, snapshot, reachable, previewMove, move, previewAttack, attack, endAction, runEnemyTurn, reset };
+  return { ctx, battleState: state, start, snapshot, reachable, previewMove, move, previewAttack, attack, endAction, planEnemyAction, runEnemyTurn, reset };
 }

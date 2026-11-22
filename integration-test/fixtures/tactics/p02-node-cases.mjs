@@ -42,9 +42,9 @@ async function t0201(deps) {
   cases.push(ok('T02-01 无 CDN/字体外链', externalLinks.length === 0 && cdnRefs.length === 0,
     JSON.stringify(externalLinks.concat(cdnRefs).slice(0, 3))));
 
-  // 3. 菜单 260×172 与四列我方区
-  cases.push(ok('T02-01 菜单 260×172', css.includes('width: 260px') && css.includes('height: 172px'), ''));
-  cases.push(ok('T02-01 我方四列 grid', css.includes('grid-template-columns: repeat(4, 1fr)'), ''));
+  // 3. 指令面板（视听切片翻新：原菜单槽改为技能栏，340 宽）与四列我方区
+  cases.push(ok('T02-01 指令面板 340 宽', css.includes('width: 340px'), ''));
+  cases.push(ok('T02-01 我方四列 grid', css.includes('grid-template-columns: repeat(4,'), ''));
   cases.push(ok('T02-01 顶栏入口顺序（世界书/记录/全屏/对话/设置/重置）',
     shell.indexOf('btn-worldbook') < shell.indexOf('btn-history') &&
     shell.indexOf('btn-history') < shell.indexOf('btn-fullscreen') &&

@@ -1,297 +1,336 @@
 // ==========================================
-// 战棋 P02 沙盘编排：地图视口 + 唯一 world-root + 相机手势 + 单位层 + 特效层 + 生命周期
-// 分层（world-root 内自底向上）：R13 底图 SVG → 几何叠加 Canvas → 单位层 → 特效锚点层
-//   → 特效 DOM 层 → 特效粒子 Canvas。全部继承同一相机变换；原 UI 悬浮层在相机树之外。
-// 生命周期：mount/reset/destroy + view-scope 代际；reset 失效旧代际→清演出→重建；
-//   同 scene+同 battle 增量走 update（不重建地图、不重置相机、不重绑监听）。
-// 本模块只消费审定数据，不另建资源真值；不读头像 DOM rect 决定世界位置。
+// 战棋沙盘编排：地图视口 + 唯一 world-root + 相机手势 + 单位层 + 范围叠加层 + 视听舞台 + 生命周期
+// 分层（viewport 内自外向内）：viewport[data-rpg-av-scope] → shake（只承担震屏，独立 transform）
+//   → world-root（只承担相机 translate/scale）→ 底图 SVG / 叠加 Canvas / 单位层 / 视听舞台（rpg-av stage）。
+// 全部世界内容继承同一相机变换：演出中平移缩放，特效与单位同步，不靠禁用镜头省掉验收。
+// 生命周期：mount/reset/destroy + view-scope 代际；reset 失效旧代际 → 清演出 → 重建。
+// 本模块只消费审定数据，不另建资源真值；规则位置不从 DOM 反算。
 // ==========================================
 
-import { compileScene, cellAt } from './scene.mjs';
+import { compileScene } from './scene.mjs';
 import { renderSceneArt } from './map-art.mjs';
 import { screenToWorld, screenToGrid, zoomAtPose, focusPose, fitPose, createPose, createGesture } from './camera.mjs';
-import { buildOccupancyIndex, unitAt, occupiedCells } from './geometry.mjs';
+import { buildOccupancyIndex, unitAt, unitCenter } from './geometry.mjs';
 import { createUnitView } from './unit-view.mjs';
-import { createVfxHost } from './vfx-host.mjs';
-import { createArcaneVfxModule } from './arcane-vfx.mjs';
 import { createViewScope } from './view-scope.mjs';
+import { drawOverlay } from './range-overlay.mjs';
 
-const FOCUS_MS = 180;        // 聚焦缓动时长（交互参数，非玩法预算）
-const WHEEL_FACTOR = 1.15;   // 每档滚轮倍率
+const FOCUS_MS = 320;        // 镜头引导缓动时长（表现参数，非玩法预算）
+const WHEEL_FACTOR = 1.15;
+const MIN_SCALE = 0.2, MAX_SCALE = 3.2;
 
 export function createSandbox(rootEl, deps = {}) {
   const getSafeRect = deps.getSafeRect || (() => ({ left: 0, top: 0, width: rootEl.clientWidth, height: rootEl.clientHeight }));
 
   let scope = null;
-  let token = null;          // combatToken 对象快照（宿主唯一换代）
-  let compiled = null;       // compileScene 产物
-  let viewData = null;       // 当前 { scene, units, placementsById, footprintsById, battleId, sceneId }
+  let token = null;
+  let compiled = null;
+  let viewData = null;
   let pose = createPose();
   let origin = { left: 0, top: 0 };
   let gesture = null;
   let occupancy = null;
   let selectedId = null;
   let unitView = null;
-  let vfx = null;
-  let vfxHost = null;
   let focusStop = null;
-  let dom = null;            // { viewport, world, art, overlay, unitLayer, anchorLayer, fxLayer, fxCanvasHolder }
+  let dom = null;
   let onSelectCb = null;
   let onMapClickCb = null;
+  let onHoverCb = null;
   let preview = null;
+  let hoverKey = null;
+  let userCamTouched = false;     // 本次动作内玩家是否拖拽/缩放过（中断自动跟随）
+  let worldW = 1000, worldH = 1000;
+  let onCancelCb = null;
+  const cameraListeners = new Set();
 
   // ---------- DOM 构建 ----------
   function buildDom() {
     const viewport = document.createElement('div');
     viewport.id = 'tactics-map-viewport';
+    viewport.setAttribute('data-rpg-av-scope', '');
     viewport.style.cssText = 'position:absolute; inset:0; overflow:hidden; touch-action:none; cursor:grab;';
+    const shake = document.createElement('div');
+    shake.className = 't-map-shake';
+    shake.style.cssText = 'position:absolute; inset:0;';
     const world = document.createElement('div');
     world.id = 'tactics-world-root';
-    world.style.cssText = 'position:absolute; left:0; top:0; width:1000px; height:1000px; transform-origin:0 0; will-change:transform;';
+    world.style.cssText = 'position:absolute; left:0; top:0; width:' + worldW + 'px; height:' + worldH + 'px; transform-origin:0 0; will-change:transform;';
 
     const art = document.createElement('div');
     art.setAttribute('data-tactics-layer', 'art');
     art.style.cssText = 'position:absolute; left:0; top:0; width:100%; height:100%;';
-
+    const light = document.createElement('div');
+    light.setAttribute('data-tactics-layer', 'light');
+    light.className = 't-map-light';
     const overlay = document.createElement('canvas');
     overlay.setAttribute('data-tactics-layer', 'overlay');
     overlay.style.cssText = 'position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;';
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    overlay.width = 1000 * dpr; overlay.height = 1000 * dpr;
-
+    const dpr = worldW * worldH > 1.5e6 ? 1.5 : 2;
+    overlay.width = Math.round(worldW * dpr); overlay.height = Math.round(worldH * dpr);
     const unitLayer = document.createElement('div');
     unitLayer.setAttribute('data-tactics-layer', 'units');
     unitLayer.style.cssText = 'position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;';
+    const avStage = document.createElement('div');
+    avStage.setAttribute('data-tactics-layer', 'rpg-av-stage');
 
-    const anchorLayer = document.createElement('div');
-    anchorLayer.setAttribute('data-tactics-layer', 'fx-anchors');
-    anchorLayer.style.cssText = 'position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;';
-
-    const fxLayer = document.createElement('div');
-    fxLayer.setAttribute('data-tactics-layer', 'fx-dom');
-    fxLayer.style.cssText = 'position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;';
-
-    const fxCanvasHolder = document.createElement('div');
-    fxCanvasHolder.setAttribute('data-tactics-layer', 'fx-canvas-holder');
-    fxCanvasHolder.style.cssText = 'position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;';
-
-    world.appendChild(art);
-    world.appendChild(overlay);
-    world.appendChild(unitLayer);
-    world.appendChild(anchorLayer);
-    world.appendChild(fxLayer);
-    world.appendChild(fxCanvasHolder);
-    viewport.appendChild(world);
+    world.append(art, light, overlay, unitLayer, avStage);
+    shake.appendChild(world);
+    const hint = document.createElement('div');
+    hint.className = 't-map-hint';
+    viewport.append(shake, hint);
     rootEl.appendChild(viewport);
-    dom = { viewport, world, art, overlay, unitLayer, anchorLayer, fxLayer, fxCanvasHolder, dpr };
+    dom = { viewport, shake, world, art, light, overlay, unitLayer, avStage, hint, dpr };
   }
 
   // ---------- 相机 ----------
   function applyCamera() {
     dom.world.style.transform = 'translate(' + pose.tx + 'px,' + pose.ty + 'px) scale(' + pose.scale + ')';
     if (unitView) unitView.onCameraChange(pose);
+    cameraListeners.forEach(fn => { try { fn(pose); } catch (e) { /* 监听方异常不阻断相机 */ } });
   }
-
   function updateOrigin() {
     const r = dom.viewport.getBoundingClientRect();
     origin = { left: r.left, top: r.top };
   }
-
   function safeRectClient() {
     const s = getSafeRect();
     return { left: s.left, top: s.top, width: s.width, height: s.height };
   }
+  function clampScale(s) { return Math.max(MIN_SCALE, Math.min(MAX_SCALE, s)); }
 
-  // ---------- 选中框绘制（世界美术坐标；规则数据不从 DOM 反算） ----------
-  function drawSelection() {
+  function redrawOverlay() {
+    if (!dom) return;
     const g = dom.overlay.getContext('2d');
     g.setTransform(dom.dpr, 0, 0, dom.dpr, 0, 0);
-    g.clearRect(0, 0, 1000, 1000);
-    if (preview) {
-      for (const c of preview.cells || []) {
-        g.fillStyle = preview.kind === 'move' ? 'rgba(34,197,94,.24)' : 'rgba(244,63,94,.26)';
-        g.fillRect(c.col * 50 + 1, c.row * 50 + 1, 48, 48);
-      }
-      if (preview.path?.length) {
-        g.beginPath();
-        preview.path.forEach((c, i) => { const x = (c.col + .5) * 50, y = (c.row + .5) * 50; if (i) g.lineTo(x, y); else g.moveTo(x, y); });
-        g.strokeStyle = '#86efac'; g.lineWidth = 3; g.stroke();
-      }
-      for (const id of preview.targetIds || []) {
-        for (const c of occupiedCells(viewData.placementsById[id], viewData.footprintsById[id])) {
-          g.strokeStyle = '#facc15'; g.lineWidth = 3; g.strokeRect(c.col * 50 + 2, c.row * 50 + 2, 46, 46);
-        }
-      }
-    }
-    if (!selectedId || !viewData) return;
-    const p = viewData.placementsById[selectedId];
-    const fp = viewData.footprintsById[selectedId];
-    if (!p || !fp) return;
-    for (const c of occupiedCells(p, fp)) {
-      g.strokeStyle = 'rgba(56,189,248,0.9)';
-      g.lineWidth = 2;
-      g.strokeRect(c.col * 50 + 1, c.row * 50 + 1, 48, 48);
-      g.fillStyle = 'rgba(56,189,248,0.10)';
-      g.fillRect(c.col * 50 + 1, c.row * 50 + 1, 48, 48);
-    }
+    g.clearRect(0, 0, worldW, worldH);
+    drawOverlay(g, preview, viewData, selectedId);
   }
 
-  // ---------- 手势绑定（只绑一次 per mount；update 不重绑） ----------
+  // ---------- 手势（每 mount 绑定一次） ----------
   function bindInput() {
     gesture = createGesture({ threshold: 6 });
     scope.listen(dom.viewport, 'pointerdown', (e) => {
       if (e.button !== 0) return;
-      stopFocusAnim();
       gesture.down(e, pose);
       try { dom.viewport.setPointerCapture(e.pointerId); } catch (err) { /* 已释放时忽略 */ }
     });
     scope.listen(dom.viewport, 'pointermove', (e) => {
       const r = gesture.move(e);
       if (r && r.state === 'dragging') {
+        stopFocusAnim(); userCamTouched = true;
         pose = r.pose;
         applyCamera();
+        dom.viewport.style.cursor = 'grabbing';
+        return;
       }
+      if (gesture.state === 'idle') handleHover(e.clientX, e.clientY);
     });
     scope.listen(dom.viewport, 'pointerup', (e) => {
+      dom.viewport.style.cursor = 'grab';
       const r = gesture.up(e);
       if (!r) return;
       if (r.type === 'click') handleSelect(r.x, r.y);
     });
+    scope.listen(dom.viewport, 'pointerleave', () => { if (gesture.state === 'idle') setHover(null); });
+    scope.listen(dom.viewport, 'contextmenu', (e) => { e.preventDefault(); if (onCancelCb) onCancelCb(); });
     scope.listen(dom.viewport, 'pointercancel', (e) => gesture.cancel(e));
     scope.listen(dom.viewport, 'lostpointercapture', (e) => gesture.cancel(e));
     scope.listen(dom.viewport, 'wheel', (e) => {
       e.preventDefault();
-      stopFocusAnim();
+      stopFocusAnim(); userCamTouched = true;
       const factor = e.deltaY < 0 ? WHEEL_FACTOR : 1 / WHEEL_FACTOR;
       const px = e.clientX - origin.left, py = e.clientY - origin.top;
-      pose = zoomAtPose(pose, px, py, factor);
+      const next = zoomAtPose(pose, px, py, factor);
+      if (next.scale !== clampScale(next.scale)) return;
+      pose = next;
       applyCamera();
     }, { passive: false });
   }
 
-  function handleSelect(sx, sy) {
+  function hitAt(sx, sy) {
     const gridHit = screenToGrid(pose, origin, 50, compiled.grid, sx, sy);
-    let unitId = null;
-    if (gridHit && occupancy) unitId = unitAt(occupancy, gridHit.col, gridHit.row) || null;
-    if (onMapClickCb && gridHit && onMapClickCb({ ...gridHit, x: gridHit.col + .5, y: gridHit.row + .5, targetId: unitId })) return;
-    selectedId = unitId;
-    drawSelection();
-    if (onSelectCb) onSelectCb(unitId ? viewData.units.find(u => u.id === unitId) : null);
+    if (!gridHit) return null;
+    const unitId = occupancy ? unitAt(occupancy, gridHit.col, gridHit.row) || null : null;
+    return { ...gridHit, x: gridHit.col + .5, y: gridHit.row + .5, targetId: unitId, client: { x: sx, y: sy } };
+  }
+  function setHover(hit) {
+    const key = hit ? hit.col + ',' + hit.row + ',' + (hit.targetId || '') : null;
+    if (key === hoverKey) return;
+    hoverKey = key;
+    if (unitView) {
+      unitView.clearFlag('t-unit-hover');
+      if (hit && hit.targetId) unitView.setFlag(hit.targetId, 't-unit-hover', true);
+    }
+    if (onHoverCb) onHoverCb(hit);
+  }
+  function handleHover(sx, sy) { if (compiled) setHover(hitAt(sx, sy)); }
+
+  function handleSelect(sx, sy) {
+    const hit = hitAt(sx, sy);
+    if (onMapClickCb && hit && onMapClickCb(hit)) return;
+    selectedId = hit ? hit.targetId : null;
+    redrawOverlay();
+    if (onSelectCb) onSelectCb(selectedId ? viewData.units.find(u => u.id === selectedId) : null);
   }
 
-  // ---------- 聚焦缓动（每帧只调 setCamera；用户手势/滚轮可中断；不被特效禁用） ----------
-  function stopFocusAnim() {
-    if (focusStop) { focusStop(); focusStop = null; }
-  }
-
-  function focusWorld(wx, wy) {
-    const safe = safeRectClient();
-    const target = focusPose(wx, wy, pose.scale, origin, 50, {
-      x: origin.left + safe.left + safe.width / 2,
-      y: origin.top + safe.top + safe.height / 2,
-    });
+  // ---------- 镜头：引导聚焦与自动跟随（保留玩家缩放；玩家拖拽即中断本次跟随） ----------
+  function stopFocusAnim() { if (focusStop) { focusStop(); focusStop = null; } }
+  function animateTo(target, ms) {
     stopFocusAnim();
     const from = { ...pose };
     const t0 = performance.now();
-    focusStop = scope.loop((now) => {
-      const k = Math.min(1, (now - t0) / FOCUS_MS);
-      const e = 1 - Math.pow(1 - k, 3); // easeOutCubic
-      pose = {
-        tx: from.tx + (target.tx - from.tx) * e,
-        ty: from.ty + (target.ty - from.ty) * e,
-        scale: from.scale + (target.scale - from.scale) * e,
-      };
-      applyCamera();
-      if (k >= 1) { focusStop = null; return false; }
+    return new Promise(resolve => {
+      const cancelSettle = scope.settleOnDispose(resolve);
+      const stop = scope.loop((now) => {
+        const k = Math.min(1, (now - t0) / ms);
+        const e = 1 - Math.pow(1 - k, 3);
+        pose = { tx: from.tx + (target.tx - from.tx) * e, ty: from.ty + (target.ty - from.ty) * e, scale: from.scale + (target.scale - from.scale) * e };
+        applyCamera();
+        if (k >= 1) { focusStop = null; if (cancelSettle) cancelSettle(); resolve(true); return false; }
+      });
+      focusStop = () => { stop(); if (cancelSettle) cancelSettle(); resolve(false); };
     });
   }
+  function centerPoseFor(wx, wy) {
+    const safe = safeRectClient();
+    return focusPose(wx, wy, pose.scale, origin, 50, { x: origin.left + safe.left + safe.width / 2, y: origin.top + safe.top + safe.height / 2 });
+  }
+  function isComfortablyVisible(points, inset = 0.18) {
+    const safe = safeRectClient();
+    const l = safe.left + safe.width * inset, r = safe.left + safe.width * (1 - inset);
+    const t = safe.top + safe.height * inset, b = safe.top + safe.height * (1 - inset);
+    return points.every(p => {
+      const sx = pose.tx + pose.scale * 50 * p.x, sy = pose.ty + pose.scale * 50 * p.y;
+      return sx >= l && sx <= r && sy >= t && sy <= b;
+    });
+  }
+  // 引导：点集（行动者+目标）已舒适可见则不动；否则平移到其中心。玩家本次已手动操作则尊重玩家。
+  function guideTo(points, { force = false, ms = FOCUS_MS } = {}) {
+    if (!scope || !points.length) return Promise.resolve(false);
+    if (!force && (userCamTouched || isComfortablyVisible(points))) return Promise.resolve(false);
+    const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
+    const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
+    return animateTo(centerPoseFor(cx, cy), ms);
+  }
+  function followWorld(wx, wy) {
+    if (!scope || userCamTouched || focusStop) return;
+    if (isComfortablyVisible([{ x: wx, y: wy }], 0.2)) return;
+    const target = centerPoseFor(wx, wy);
+    pose = { tx: pose.tx + (target.tx - pose.tx) * 0.12, ty: pose.ty + (target.ty - pose.ty) * 0.12, scale: pose.scale };
+    applyCamera();
+  }
+  function focusWorld(wx, wy) { userCamTouched = false; return animateTo(centerPoseFor(wx, wy), 180); }
 
-  // ---------- 组装一次实例（mount 与 reset 共用） ----------
+  // 开场构图：框住我方所在区域（含留白），战场成为主视觉；不改网格与几何
+  function openingPose(vd) {
+    const safe = safeRectClient();
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const heroes = vd.units.filter(u => u.side === 'hero');
+    for (const u of (heroes.length ? heroes : vd.units)) {
+      const p = vd.placementsById[u.id]; if (!p) continue;
+      const fp = vd.footprintsById[u.id] || { width: 1, height: 1 };
+      minX = Math.min(minX, p.col); minY = Math.min(minY, p.row);
+      maxX = Math.max(maxX, p.col + fp.width); maxY = Math.max(maxY, p.row + fp.height);
+    }
+    if (!Number.isFinite(minX)) return fitPose(compiled.grid, 50, origin, safe);
+    const pad = 3.2;
+    const { columns, rows } = compiled.grid;
+    minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
+    maxX = Math.min(columns, maxX + pad); maxY = Math.min(rows, maxY + pad);
+    const w = maxX - minX, h = maxY - minY;
+    const scale = clampScale(Math.min((safe.width - 24) / (w * 50), (safe.height - 24) / (h * 50)));
+    return focusPose((minX + maxX) / 2, (minY + maxY) / 2, scale, origin, 50, { x: origin.left + safe.left + safe.width / 2, y: origin.top + safe.top + safe.height / 2 });
+  }
+
+  function rebuildOccupancy(vd) {
+    occupancy = buildOccupancyIndex(
+      vd.units.filter(u => u.bars.hp > 0).map(u => ({ unitId: u.id, col: vd.placementsById[u.id].col, row: vd.placementsById[u.id].row })),
+      vd.footprintsById,
+    );
+  }
+
+  // ---------- 组装实例 ----------
   function buildInstance(vd) {
     scope = createViewScope();
     token = vd.combatToken;
     viewData = vd;
-    preview = null;
+    preview = null; hoverKey = null; userCamTouched = false;
     compiled = compileScene(vd.scene);
+    worldW = compiled.grid.columns * 50; worldH = compiled.grid.rows * 50;
     buildDom();
     updateOrigin();
-    dom.art.innerHTML = renderSceneArt(compiled.artJson);
-    occupancy = buildOccupancyIndex(
-      vd.units.filter(u => u.bars.hp > 0).map(u => ({ unitId: u.id, col: vd.placementsById[u.id].col, row: vd.placementsById[u.id].row })),
-      vd.footprintsById,
-    );
-    unitView = createUnitView(dom.unitLayer, { scope, metersPerArtPx: 1 / 50 });
+    setArt();
+    dom.light.innerHTML = lightMarkup(compiled);
+    rebuildOccupancy(vd);
+    unitView = createUnitView(dom.unitLayer, { scope, metersPerArtPx: 1 / 50, onAvatarStatus: deps.onAvatarStatus });
     unitView.setUnits(vd.units, vd.placementsById);
-    vfxHost = createVfxHost(
-      { anchorLayer: dom.anchorLayer, domLayer: dom.fxLayer, canvasHolder: dom.fxCanvasHolder },
-      {
-        getPlacement: (id) => viewData.placementsById[id] || null,
-        getFootprint: (id) => viewData.footprintsById[id] || { width: 1, height: 1 },
-        getFacing: (id) => viewData.placementsById[id] ? viewData.placementsById[id].facing || 0 : 0,
-        scope,
-        metersPerArtPx: 1 / 50,
-      },
-    );
-    const instanceScope = scope;
-    vfx = createArcaneVfxModule(vfxHost, () => (instanceScope.isLive ? token : null));
+    if (deps.onStage) deps.onStage({ stage: dom.avStage, shake: dom.shake, viewport: dom.viewport, scope, worldW, worldH });
     bindInput();
-    // ResizeObserver：只更新 origin（不重置相机 pose）
     const ro = new ResizeObserver(() => updateOrigin());
     ro.observe(dom.viewport);
     scope.observe(ro);
-    // 初次 fit：按本尺寸 UI 边界计算，不沿用另一尺寸
-    const safe = safeRectClient();
-    pose = fitPose(compiled.grid, 50, origin, {
-      left: safe.left, top: safe.top, width: Math.max(120, safe.width), height: Math.max(120, safe.height),
-    });
+    pose = openingPose(vd);
     applyCamera();
-    drawSelection();
+    redrawOverlay();
+  }
+  // 底图：礼拜堂画法以 <img> 承载 SVG（一次栅格化，平移缩放只走合成，不重跑滤镜）
+  function setArt() {
+    const svg = renderSceneArt(compiled.artJson, compiled);
+    if (compiled.style === 'chapel') {
+      dom.art.innerHTML = '<img alt="" draggable="false" style="display:block;width:' + worldW + 'px;height:' + worldH + 'px;pointer-events:none;user-select:none" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg) + '">';
+    } else dom.art.innerHTML = svg;
+  }
+  // 开场镜头：全图俯瞰 → 缓推到我方所在房间（只是相机动画，不推进规则）
+  function introSweep(ms = 1500) {
+    if (!scope || !compiled) return Promise.resolve(false);
+    const target = { ...pose };
+    const safe = safeRectClient();
+    pose = fitPose(compiled.grid, 50, origin, safe, 10);
+    applyCamera();
+    return animateTo(target, ms);
   }
 
-  // ---------- 生命周期入口 ----------
-  function mount(vd) {
-    if (scope) destroy();
-    buildInstance(vd);
+  // 局部暖光：灯具格周围的柔光圈（纯美术，不参与规则）
+  function lightMarkup(cmp) {
+    const out = [];
+    for (const obj of cmp.objectsIndex.values()) {
+      if (obj.kind !== 'light' || !obj.at) continue;
+      out.push('<i class="t-light-pool" style="left:' + (obj.at.col * 50) + 'px; top:' + (obj.at.row * 50) + 'px;"></i>');
+    }
+    return out.join('');
   }
 
-  // 同 scene+同 battle 增量：更新单位视图，不重建地图/不重置相机/不重绑监听
+  function mount(vd) { if (scope) destroy(); buildInstance(vd); }
+
   function update(vd) {
     if (!scope || !scope.isLive) { mount(vd); return; }
-    const changed = JSON.stringify([viewData.scene, viewData.units, viewData.placementsById]) !== JSON.stringify([vd.scene, vd.units, vd.placementsById]);
-    if (changed) vfx.clearFx();
     token = vd.combatToken;
     const sceneChanged = JSON.stringify(viewData.scene) !== JSON.stringify(vd.scene);
     viewData = vd;
-    if (sceneChanged) { compiled = compileScene(vd.scene); dom.art.innerHTML = renderSceneArt(compiled.artJson); }
-    occupancy = buildOccupancyIndex(
-      vd.units.filter(u => u.bars.hp > 0).map(u => ({ unitId: u.id, col: vd.placementsById[u.id].col, row: vd.placementsById[u.id].row })),
-      vd.footprintsById,
-    );
+    if (sceneChanged) { compiled = compileScene(vd.scene); setArt(); dom.light.innerHTML = lightMarkup(compiled); }
+    rebuildOccupancy(vd);
     unitView.syncUnits(vd.units, vd.placementsById);
     if (selectedId && !vd.units.some(u => u.id === selectedId)) selectedId = null;
-    drawSelection();
+    redrawOverlay();
   }
 
-  // reset：失效旧代际→清演出→重建（新 battle 用保留位置；新 scene 重建场景）
   function reset(vd) {
     stopFocusAnim();
-    if (vfx) vfx.clearFx();
+    if (deps.onTeardown) deps.onTeardown();
     if (scope) scope.dispose();
     teardownDom();
     buildInstance(vd);
   }
 
   function teardownDom() {
-    if (dom) {
-      dom.viewport.remove();
-      dom = null;
-    }
-    unitView = null; vfx = null; vfxHost = null; occupancy = null; selectedId = null;
+    if (dom) { dom.viewport.remove(); dom = null; }
+    unitView = null; occupancy = null; selectedId = null;
   }
 
   function destroy() {
     stopFocusAnim();
-    if (vfx) vfx.clearFx();
+    if (deps.onTeardown) deps.onTeardown();
     if (scope) scope.dispose();
     scope = null; token = null; viewData = null; compiled = null;
     teardownDom();
@@ -299,42 +338,70 @@ export function createSandbox(rootEl, deps = {}) {
     pose = createPose();
   }
 
-  // ---------- 对外读取（测试/宿主；只回 JSON 数据） ----------
   function getSnapshot() {
     return {
       mounted: !!(scope && scope.isLive),
       sceneId: viewData ? viewData.sceneId : null,
       battleId: viewData ? viewData.battleId : null,
-      pose: { ...pose },
-      origin: { ...origin },
+      pose: { ...pose }, origin: { ...origin },
       selection: selectedId,
       scopeCounts: scope ? scope.counts() : null,
       grid: compiled ? compiled.grid : null,
+      userCamTouched,
     };
+  }
+
+  // 地图提示（屏幕空间，跟随世界锚点）：费用/剩余额度/失败原因就地显示
+  let hintAnchor = null;
+  function placeHint() {
+    if (!dom || !hintAnchor) return;
+    const sx = pose.tx + pose.scale * 50 * hintAnchor.x, sy = pose.ty + pose.scale * 50 * hintAnchor.y;
+    dom.hint.style.transform = 'translate(' + Math.round(sx) + 'px,' + Math.round(sy) + 'px)';
+  }
+  cameraListeners.add(placeHint);
+  function setHint(anchor, html, tone) {
+    if (!dom) return;
+    hintAnchor = anchor;
+    if (!anchor || !html) { dom.hint.className = 't-map-hint'; dom.hint.innerHTML = ''; return; }
+    dom.hint.innerHTML = html;
+    dom.hint.className = 't-map-hint t-visible' + (tone ? ' t-hint-' + tone : '');
+    placeHint();
   }
 
   return {
     mount, update, reset, destroy,
-    focusWorld,
+    focusWorld, guideTo, followWorld,
+    introSweep,
+    onCancel: (cb) => { onCancelCb = cb; },
+    getWorldSize: () => ({ w: worldW, h: worldH }),
+    beginAction: () => { userCamTouched = false; },
     setCamera: (p) => { pose = { ...p }; applyCamera(); },
     applyCamera,
     getPose: () => ({ ...pose }),
     getOrigin: () => ({ ...origin }),
-    worldToScreenClient: (wx, wy) => ({
-      x: origin.left + pose.tx + pose.scale * 50 * wx,
-      y: origin.top + pose.ty + pose.scale * 50 * wy,
-    }),
+    worldToScreenClient: (wx, wy) => ({ x: origin.left + pose.tx + pose.scale * 50 * wx, y: origin.top + pose.ty + pose.scale * 50 * wy }),
     screenToWorldClient: (sx, sy) => screenToWorld(pose, origin, 50, sx, sy),
     screenToGridClient: (sx, sy) => screenToGrid(pose, origin, 50, compiled.grid, sx, sy),
     selectAt: (sx, sy) => { handleSelect(sx, sy); return selectedId; },
+    hoverAt: (sx, sy) => handleHover(sx, sy),
     getSelectedId: () => selectedId,
     getCompiled: () => compiled,
     getUnitView: () => unitView,
-    getVfx: () => vfx,
+    getViewData: () => viewData,
+    unitWorldCenter: (id) => {
+      const p = viewData && viewData.placementsById[id];
+      return p ? unitCenter(p, viewData.footprintsById[id] || { width: 1, height: 1 }) : null;
+    },
     onSelect: (cb) => { onSelectCb = cb; },
     onMapClick: (cb) => { onMapClickCb = cb; },
-    setPreview: (data) => { preview = data; drawSelection(); },
+    onHover: (cb) => { onHoverCb = cb; },
+    onCamera: (fn) => { cameraListeners.add(fn); return () => cameraListeners.delete(fn); },
+    setPreview: (data) => { preview = data; redrawOverlay(); },
+    getPreview: () => preview,
+    setHint,
+    refreshHover: () => { hoverKey = null; },
     getSnapshot,
     getScope: () => scope,
+    getDom: () => dom,
   };
 }

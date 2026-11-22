@@ -36,7 +36,7 @@ function buildLiveOcc(ctx) {
   return occ;
 }
 
-// 射线采样：origin → 终点途经任何挡弹格（实墙/关门）返回 true；低障碍 blocksProjectile=false 不挡
+// 射线采样：origin → 终点途经任何挡弹格（实墙/关门）返回首个挡点 {x,y}（真值）；低障碍 blocksProjectile=false 不挡
 function pathHitsWall(ctx, x0, y0, x1, y1) {
   const dx = x1 - x0, dy = y1 - y0;
   const len = Math.hypot(dx, dy);
@@ -44,9 +44,9 @@ function pathHitsWall(ctx, x0, y0, x1, y1) {
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
     const cell = cellAt(ctx.compiled, Math.floor(x0 + dx * t), Math.floor(y0 + dy * t));
-    if (cell && cell.blocksProjectile) return true;
+    if (cell && cell.blocksProjectile) return { x: x0 + dx * t, y: y0 + dy * t };
   }
-  return false;
+  return null;
 }
 
 // 射线采样：途经第一个非跳过名单的站立单位（单体投射遇第一站立角色停止）
@@ -57,7 +57,7 @@ function firstUnitBlocker(ctx, occ, x0, y0, x1, y1, skipIds) {
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
     const o = occ.get(cellKey(Math.floor(x0 + dx * t), Math.floor(y0 + dy * t)));
-    if (o && !skipIds.has(o.id)) return o;
+    if (o && !skipIds.has(o.id)) return { ...o, x: x0 + dx * t, y: y0 + dy * t };
   }
   return null;
 }
@@ -113,7 +113,8 @@ function collectTargetsInCells(ctx, cells, caster) {
   return targetIds;
 }
 
-// 攻击查询：{ ok, reason, origin:{x,y}, aim:{x,y,targetId?}, range, cells:[{col,row}], targetIds, blockedBy? }
+// 攻击查询：{ ok, reason, origin:{x,y}, aim:{x,y,targetId?}, range, cells:[{col,row}], targetIds, blockedBy?, shape? }
+// blockedBy.point / shape 只是同一次查询的几何副产物（供叠加层画阻挡点与射界轮廓），不另立判定。
 export function queryAttack(ctx, casterId, skill, aim) {
   const caster = unitById(ctx, casterId);
   if (!caster) return { ok: false, reason: '施法者不存在', origin: null, aim: null, range: null, cells: [], targetIds: [] };
@@ -145,17 +146,19 @@ export function queryAttack(ctx, casterId, skill, aim) {
     const tfp = footprintOf(ctx, target);
     const tc = unitCenter(tp, tfp);
     const dist = Math.hypot(tc.x - origin.x, tc.y - origin.y);
-    if (range.castRange !== undefined && dist > range.castRange + EPS) return fail('目标超出射程');
-    if (pathHitsWall(ctx, origin.x, origin.y, tc.x, tc.y)) return fail('视线被墙阻挡', { type: 'wall' });
+    if (range.castRange !== undefined && dist > range.castRange + EPS) return fail('目标超出射程', { type: 'range', point: { x: tc.x, y: tc.y } });
+    const wallAt = pathHitsWall(ctx, origin.x, origin.y, tc.x, tc.y);
+    if (wallAt) return fail('视线被墙阻挡', { type: 'wall', point: wallAt });
     const occ = buildLiveOcc(ctx);
     const blocker = firstUnitBlocker(ctx, occ, origin.x, origin.y, tc.x, tc.y, new Set([casterId, target.id]));
     if (blocker) {
-      return fail(blocker.side === caster.side ? '友方挡弹' : '被其他敌人阻挡', { type: 'unit', unitId: blocker.id });
+      return fail(blocker.side === caster.side ? '友方挡弹' : '被其他敌人阻挡', { type: 'unit', unitId: blocker.id, point: { x: blocker.x, y: blocker.y } });
     }
     return {
       ok: true, reason: null, origin, aim: normAim,
       range: range.castRange !== undefined ? range.castRange : null,
       cells: occupiedCells(tp, tfp), targetIds: [target.id],
+      shape: { type: '单体', from: origin, to: tc, castRange: range.castRange },
     };
   }
 
@@ -166,5 +169,9 @@ export function queryAttack(ctx, casterId, skill, aim) {
   if (range.type === '扇形' && range.castRange !== undefined && Math.hypot(vx, vy) > range.castRange + EPS) return fail('瞄准点超出射程');
   const cells = collectAreaCells(ctx, origin, normAim, range);
   const targetIds = collectTargetsInCells(ctx, cells, caster);
-  return { ok: true, reason: null, origin, aim: normAim, range: effRange, cells, targetIds };
+  const dir = Math.atan2(vy, vx);
+  const shape = range.type === '直线'
+    ? { type: '直线', from: origin, dir, length: range.length, width: range.width }
+    : { type: '扇形', from: origin, dir, radius: range.castRange, angle: range.angle };
+  return { ok: true, reason: null, origin, aim: normAim, range: effRange, cells, targetIds, shape };
 }
