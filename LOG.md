@@ -3719,3 +3719,12 @@
 - **决策原因**：master 长期停在 10-09 导致 v12.x 全部版本只在审计分支上；趁战棋线历史与回合制历史在时间上完全分段（11-17 后无回合制提交）的零成本窗口完成切分，晚切将交错难分。AGENTS.md 两分支写入同内容，避免未来合并冲突。
 - **验证**：纯纪律/文档轮，无代码改动；ff 合并经 `merge-base --is-ancestor` 预检，推送后 `origin/master` = `1016faa`。
 - **目的 vs 现状**：一致——master 恢复为回合制基线并携带双线纪律；战棋线日志解耦在 tactics 分支执行。
+
+## [LOG-304] 2026-11-23 — master 同步 README v12.16 更新（自 tactics 线 e91dadb）
+
+- **提交**：`4479591`；本记录另行单向提交，不 amend、不推送。
+- **核心目的**：README 的 v12.16 现状更新当日落在旧分支（现 tactics 线）的 `e91dadb` 中，master 补齐基线后 README 仍为 V11.2 旧版，与本轮"master 补齐至 v12.16"裁定不符。
+- **变更行为**：`git checkout tactics -- README.md` 将更新后的 README 同步至 master（仅 README 一个文件；STATUS.md 等 doc/tactics/ 战棋文档不同步，master 保持纯回合制内容）。
+- **涉及文件**：`README.md`。
+- **验证**：master README 与 tactics 分支 e91dadb 版本一致（含 §14 批次摘要表）；§14 中指向 doc/tactics/STATUS.md 的跨线说明为语义指引，master 分支上该文件随 tactics 线存在。
+- **目的 vs 现状**：一致——master = 回合制代码 v12.16 + README v12.16 + 双线纪律；战棋全套文档与日志在 tactics 分支。
