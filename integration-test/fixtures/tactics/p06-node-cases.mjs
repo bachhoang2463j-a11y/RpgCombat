@@ -104,9 +104,10 @@ async function p06(m) {
     placementsById: { h: { col: 1, row: 4 }, dodger: { col: 5, row: 4 }, rear: { col: 8, row: 4 } }, scene: open,
     random: () => { dice++; return 0.99; } });
   dodgeBattle.start();
+  // 每段固定先消费伤害系数 roll（battle.mjs 0.8+0.4r）再掷命闪两 roll，miss 也消费：单目标恰 3 次
   const dodgeResult = dodgeBattle.attack(attack, aim(5, 4, 'dodger'));
   cases.push(ok('T06-06 锁定目标闪避后不转火后方单位',
-    dodgeResult.ok && dodgeResult.hits.length === 1 && dodgeResult.hits[0].targetId === 'dodger' && !dodgeResult.hits[0].hit && rear.ref.hp === 30 && dice === 2,
+    dodgeResult.ok && dodgeResult.hits.length === 1 && dodgeResult.hits[0].targetId === 'dodger' && !dodgeResult.hits[0].hit && rear.ref.hp === 30 && dice === 3,
     j({ hits: dodgeResult.hits.map(h => ({ id: h.targetId, hit: h.hit })), rearHp: rear.ref.hp, dice })));
 
   const circle = skill(m, '【爆轰】[群攻;power:5][范围:圆形;半径:5;射程:12]');
@@ -146,7 +147,8 @@ async function p06(m) {
   cases.push(ok('T06-08 预览不扣费不泄露隐藏目标，真实结算同查询且AI可消费六范围',
     preview.ok && has(preview.actualTargetIds, 'hidden') && !has(preview.disclosureTargetIds, 'hidden') &&
     before.resources.main === after.resources.main + 1 && before.units.find(u => u.id === 'hidden').hp === 40 &&
-    actual.ok && has(actual.hits.map(h => h.targetId), 'hidden') && attackRolls === 4 && aiPlan.skill === aiSkill,
+    // 每目标固定消费系数+两命闪 roll：2 目标恰 6 次；AI 候选为归一副本（ai.mjs attackCandidates 复制），按名字断言
+    actual.ok && has(actual.hits.map(h => h.targetId), 'hidden') && attackRolls === 6 && aiPlan.skill && aiPlan.skill.name === aiSkill.name,
     j({ disclosed: preview.disclosureTargetIds, actual: actual.hits.map(h => h.targetId), rolls: attackRolls, ai: aiPlan.skill?.name })));
 
   return { cases };

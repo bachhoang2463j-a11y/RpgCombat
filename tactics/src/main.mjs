@@ -24,6 +24,7 @@ import { createUiSfx } from './ui-sfx.mjs';
 import { CHAPEL_SCENE } from './chapel-scene.mjs';
 import { resolveUnitStyles } from './unit-style.mjs';
 import { createEditorPanel } from './editor-panel.mjs';
+import { autoPickChoice } from './reaction-prompt.mjs';
 import { unitCenter } from './geometry.mjs';
 // ---------- P02 固定图库（同一张权威几何，两个 sceneId 身份；不做生成器） ----------
 const SCENE_LIBRARY = {
@@ -178,18 +179,6 @@ export function buildViewData(block, resolvedHeroes, scene, positions, combatTok
 }
 
 // ---------- App ----------
-// 命中概率（与 damage.resolveHit 同一口径：攻击骰 1..A ≥ 闪避骰 1..D）
-function hitChance(caster, target, skill) {
-  const A = Math.max(1, (skill.hit ?? 100) + (caster.hitBonus || 0));
-  const D = Math.max(1, (target.evasion || 0) + (target.evaBonus || 0));
-  let s = 0;
-  for (let x = 1; x <= A; x++) s += Math.min(x, D);
-  return s / (A * D);
-}
-function expectedDamage(caster, target, skill) {
-  const raw = skill.power === 0 ? caster.atk : skill.power;
-  return raw <= 0 ? 0 : Math.max(1, raw - Math.floor(target.def || 0));
-}
 export function createApp(rootEl, opts = {}) {
   ensureMemoryVarHost();
   const shell = buildShell(rootEl);
@@ -207,7 +196,28 @@ export function createApp(rootEl, opts = {}) {
     onReveal: (hit, meta) => revealHit(hit, meta),
     onMoveFeedback: (id, kind, p) => moveFeedback(id, kind, p),
     getUnitStyle: (id) => unitStyles[id] || null,
+    // FX02 反应接线（contract v2/v3）：玩家控制的单位（controller 优先，缺省按 side）受击弹全屏反应弹窗；
+    // AI 控制的（敌方/召唤物/AI 侧 hero）不弹窗，自动选首个可用候选（原版敌方口径）
+    promptReaction: (req) => {
+      const responder = unitById(req && req.responderId);
+      if (!responder) return Promise.resolve(autoPickChoice(req));
+      const controller = responder.controller || (responder.side === 'hero' ? 'player' : 'ai');
+      if (controller !== 'player') return Promise.resolve(autoPickChoice(req));
+      return shell.promptReaction(enrichReactionReq(req));
+    },
+    battle: () => battle,
   });
+  function enrichReactionReq(req) {
+    if (!req) return req;
+    const responder = unitById(req.responderId), caster = unitById(req.casterId);
+    return Object.assign({}, req, {
+      responderName: responder ? responder.name : req.responderId,
+      responderEmoji: responder ? responder.emoji : null,
+      responderAvatarUrl: responder ? responder.avatarUrl : null,
+      casterName: caster ? caster.name : (req.casterId || '敌人'),
+      casterEmoji: caster ? caster.emoji : null,
+    });
+  }
   let combatToken = {};
   let battle = null;
   let aim = null;            // 瞄准模式 { key, skill }；null = 自由模式（点地面移动、点敌人攻击）
@@ -303,7 +313,12 @@ export function createApp(rootEl, opts = {}) {
     if (!openingStates.has(block.sceneId)) openingStates.set(block.sceneId, structuredClone(result.sceneState));
     currentYamlText = text;
     const unchanged = !forceReset && currentViewData && result.branch === 'resume' && currentViewData.sceneId === nextView.sceneId && currentViewData.battleId === nextView.battleId && JSON.stringify([currentViewData.scene, currentViewData.units, currentViewData.placementsById]) === JSON.stringify([nextView.scene, nextView.units, nextView.placementsById]);
-    if (!unchanged) { flow++; avHost.clear({ resetVoices: true }); }
+    if (!unchanged) {
+      flow++;
+      director.cancelAttack();          // 旧攻击 generator 作废（generator.return）
+      shell.cancelReactionPrompt();     // 旧反应弹窗/收起胶囊立即关闭并以 null 结算
+      avHost.clear({ resetVoices: true });
+    }
     combatToken = unchanged ? combatToken : nextToken;
     avHost.setToken(combatToken);
     nextView.combatToken = combatToken;
@@ -324,7 +339,7 @@ export function createApp(rootEl, opts = {}) {
         shell.clearBattle();
         currentState = result.state;
         lastResult = null;
-        battle = createBattle({ units: currentViewData.units, placementsById: currentViewData.placementsById, scene, battleState: result.battleState, random: opts.random });
+        battle = createBattle({ units: currentViewData.units, placementsById: currentViewData.placementsById, scene, battleState: result.battleState, random: opts.random, summonProvider: opts.summonProvider });
         battle.start();
         unitStyles = resolveUnitStyles(currentViewData.units);
       }
@@ -349,7 +364,8 @@ export function createApp(rootEl, opts = {}) {
   function visibleLog() { return battle.snapshot().log.filter((_, i) => !hiddenLog.has(i)); }
   function unitById(id) { return currentViewData.units.find(u => u.id === id) || null; }
   function currentUnit() { return battle && currentViewData ? unitById(battle.snapshot().currentId) : null; }
-  function isHeroTurn() { const u = currentUnit(); return !!(u && u.side === 'hero' && !battle.snapshot().terminal); }
+  function isPlayerUnit(u) { return !!(u && (u.controller || (u.side === 'hero' ? 'player' : 'ai')) === 'player'); }
+  function isHeroTurn() { return isPlayerUnit(currentUnit()) && !battle.snapshot().terminal; }
   function skillUsable(skill) { return !!(battle && battle.skillStatus(skill).ok); }
   function skillReason(skill) {
     if (!battle) return '当前不能使用技能';
@@ -361,7 +377,7 @@ export function createApp(rootEl, opts = {}) {
     }
     return battle.skillStatus(skill).reason || '';
   }
-  const isSelfCast = skill => !!(skill.range && skill.range.type === '单体' && skill.range.castRange === 0);
+  const isSelfCast = skill => !!(skill.range && (skill.range.type === '自身' || (skill.range.type === '单体' && skill.range.castRange === 0)));
   function skillOfKey(key) {
     if (key === 'attack') return BASIC_ATTACK;
     const m = /^sk:(\d+)$/.exec(key || '');
@@ -385,7 +401,7 @@ export function createApp(rootEl, opts = {}) {
     const u = currentUnit();
     if (!u) { shell.renderCommand(null); return; }
     const r = snap.resources;
-    const hero = u.side === 'hero' && !snap.terminal;
+    const hero = isPlayerUnit(u) && !snap.terminal;
     const esc = t => String(t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     const carrying = snap.carrying[u.id] || null;
     const basic = hero && r ? basicActions(u, r, carrying) : [];
@@ -403,6 +419,8 @@ export function createApp(rootEl, opts = {}) {
         : '【' + esc(aim.skill.name) + '】请在地图上选择目标',
       canUse: skillUsable,
       skillReason,
+      canUseItem: (it) => battle.canUseItem(it).ok,
+      onItem: (idx) => handleItemEntry(idx),
       onSkill: (idx) => handleCommand('sk:' + idx),
       onAttack: () => handleCommand('attack'),
       onEnd: () => handleCommand('end'),
@@ -419,6 +437,10 @@ export function createApp(rootEl, opts = {}) {
     const carried = carrying ? unitById(carrying) : null;
     return [
       { key: 'attack', icon: '⚔️', name: '普通攻击', cost: { main: 1 }, mode: 'target', tone: 'rose', ok: !atkReason, reason: atkReason, short: atkReason && shortLabel(atkReason) },
+      { key: 'defend', icon: '🛡️', name: '防御姿态', cost: { main: 1 }, mode: 'instant', tone: 'emerald',
+        ok: typeof battle.defend === 'function' && r.main >= 1,
+        reason: typeof battle.defend !== 'function' ? '防御姿态：规则接口待对齐' : '主行动已用完',
+        short: typeof battle.defend !== 'function' ? '⏳ 待规则接入' : '◆ 主行动已用完', desc: '恢复 MP／TP 并进入防御姿态，持续 100 虚拟时间' },
       { key: 'sprint', icon: '💨', name: '冲刺', cost: { main: 1 }, mode: 'instant', tone: 'sky', note: '+' + u.ref.moveDistance + 'm', ok: r.main >= 1, reason: '主行动已用完', short: '◆ 主行动已用完', desc: '消耗主行动，立即追加一份移动额度' },
       { key: 'jump', icon: '🦘', name: '跳跃', cost: { aux: 1 }, mode: 'target', tone: 'violet', note: '≤' + (+reach.toFixed(1)) + 'm', ok: r.aux >= 1 && reach >= 1,
         reason: r.aux < 1 ? '辅助行动不足' : '移动额度不足以起跳（至少 1m）', short: r.aux < 1 ? '◇ 辅助行动已用完' : '🦶 移动额度不足', desc: '沿八方向直线跳跃，越过低矮障碍；距离计入移动额度' },
@@ -432,7 +454,11 @@ export function createApp(rootEl, opts = {}) {
   function shortLabel(reason) { return /主行动/.test(reason) ? '◆ 主行动已用完' : reason; }
   function refreshBattle() {
     const snap = battle.snapshot();
-    for (const u of currentViewData.units) { const s = shownOf(u); u.bars = { ...u.bars, hp: s.hp, mp: s.mp }; }
+    for (const u of currentViewData.units) {
+      const s = shownOf(u);
+      u.effective = battle.getEffectiveUnit(u.id);
+      u.bars = { ...u.bars, hp: s.hp, mp: s.mp };
+    }
     sandbox.update(currentViewData);
     const view = sandbox.getUnitView();
     for (const u of currentViewData.units) {
@@ -477,7 +503,7 @@ export function createApp(rootEl, opts = {}) {
     return { ok: false, reason: '无法到达' };
   }
   function aimFor(skill, hit) {
-    if (skill.range.type === '单体') {
+    if (skill.range.type === '单体' || skill.range.type === '自身') {
       if (!hit.targetId) return null;
       const c = sandbox.unitWorldCenter(hit.targetId);
       return { x: c.x, y: c.y, targetId: hit.targetId };
@@ -497,19 +523,23 @@ export function createApp(rootEl, opts = {}) {
     sandbox.setPreview({ kind: 'attack', casterId: id, skill, query: q, locked });
     let html;
     const segs = q.ok ? (q.slotTargets || []).filter(s => s.attack).length : 0;
-    const me = currentUnit();
-    const ammo = (me.items || []).some(it => (it.bindings || []).some(b => b.skillName === skill.name)) ? ' · <small>弹药未扣减（物品未迁移）</small>' : '';
+    const prediction = q.ok ? battle.predictAttack(skill, a) : null;
+    const ammo = (prediction?.ammoPlan || []).map(p => ' · <small>' + esc(p.item) + ' 消耗 ' + p.totalCost + '</small>').join('');
     if (q.ok && !segs && isSelfCast(skill)) {
       html = '<b>' + skill.name + '</b> · 作用于自身' + (locked ? ' · <b>再点发动</b>' : '');
     } else if (q.ok && q.disclosureTargetIds.length) {
       const t0 = unitById(q.disclosureTargetIds[0]);
-      const pc = Math.round(hitChance(me.ref, t0.ref, skill) * 100);
-      html = '<b>' + skill.name + '</b> · ' + (q.disclosureTargetIds.length > 1 ? q.disclosureTargetIds.length + ' 名目标 · ' : '') + '命中 <b>' + pc + '%</b> · 伤害 ' + expectedDamage(me.ref, t0.ref, skill) + (segs > 1 ? ' ×' + segs + ' 段' : '') + ammo + (locked ? ' · <b>再点发动</b>' : '');
+      const pred = prediction;
+      const estimate = pred?.targets?.find(t => t.targetId === t0.id) || pred;
+      const summary = estimate?.hitChance != null && estimate?.expectedDamage != null
+        ? '命中 <b>' + Math.round(estimate.hitChance * 100) + '%</b> · 预计伤害 ' + estimate.expectedDamage
+        : (pred?.effects || []).map(e => esc(e.tag) + ' ' + e.power).join(' / ');
+      html = '<b>' + skill.name + '</b> · ' + (q.disclosureTargetIds.length > 1 ? q.disclosureTargetIds.length + ' 名目标 · ' : '') + summary + (segs > 1 ? ' · ' + segs + ' 段' : '') + ammo + (locked ? ' · <b>再点发动</b>' : '');
     } else html = q.ok ? '<b>' + skill.name + '</b> · 范围内无敌人' + (locked ? ' · <b>再点发动</b>' : '') : q.reason;
     sandbox.setHint({ x: a.x, y: a.y }, html, q.ok ? (locked ? 'lock' : null) : 'bad');
     return { ok: q.ok, aim: a, query: q, reason: q.reason };
   }
-  function hitKey(skill, hit) { return skill.range.type === '单体' ? (hit.targetId ? 'u:' + hit.targetId : null) : hit.col + ',' + hit.row; }
+  function hitKey(skill, hit) { return (skill.range.type === '单体' || skill.range.type === '自身') ? (hit.targetId ? 'u:' + hit.targetId : null) : hit.col + ',' + hit.row; }
   const isEnemyHit = hit => hit && hit.targetId && unitById(hit.targetId) && unitById(hit.targetId).side !== 'hero';
 
   sandbox.onHover(hit => {
@@ -606,6 +636,14 @@ export function createApp(rootEl, opts = {}) {
       shell.showLog('冲刺 · 移动额度 +' + currentUnit().ref.moveDistance + 'm', 'act');
       refreshBattle(); fullReach = findReachable(battle.ctx, battle.snapshot().currentId, Infinity); idleOverlay(); return;
     }
+    if (kind === 'defend') {
+      const result = battle.defend();
+      if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return; }
+      ui('confirm'); fxAtUnit(battle.snapshot().currentId, 't-heal-pulse', 700);
+      const log = battle.snapshot().log;
+      shell.showLog(log[log.length - 1] || '进入防御姿态', 'act');
+      refreshBattle(); afterHeroAction(); return;
+    }
     if (kind === 'drop') { runDrop(); return; }
     if (!kind || !['jump', 'push', 'carry'].includes(kind)) return;
     rpgCloseMenus();
@@ -617,6 +655,25 @@ export function createApp(rootEl, opts = {}) {
     renderCommand();
   }
   function rpgCloseMenus() { shell.rpgUi.closeAllSubMenus(); }
+  // 物品入口：菜单卡转发到此；contract v3：battle.beginUseItem(item, aim, options) generator（与攻击同一驱动）
+  function handleItemEntry(idx) {
+    const u = currentUnit();
+    const it = u && (u.items || [])[idx];
+    if (!it) return;
+    const valid = battle.canUseItem(it);
+    if (!valid.ok) { ui('deny'); shell.showLog(valid.reason, 'warn'); return; }
+    const skill = battle.itemSkill(it);
+    pending = null; fieldAction = null;
+    aim = { key: 'item:' + idx, skill, item: it };
+    sandbox.setHint(null); sandbox.refreshHover();
+    sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill, query: null });
+    if (isSelfCast(skill)) {
+      const me = battle.snapshot().currentId, c = sandbox.unitWorldCenter(me);
+      const ev = attackPreview(aim, { x: c.x, y: c.y, col: Math.floor(c.x), row: Math.floor(c.y), targetId: me }, true);
+      if (ev.ok) pending = { key: 'u:' + me, aim: ev.aim };
+    }
+    ui('select'); renderCommand();
+  }
   // 跳跃落点集：八方向逐格询问规则（previewJump 为唯一判定），并受剩余移动额度约束
   function jumpCells() {
     const id = battle.snapshot().currentId, p = currentViewData.placementsById[id], r = battle.snapshot().resources;
@@ -765,7 +822,12 @@ export function createApp(rootEl, opts = {}) {
     setBusy(true);
     sandbox.beginAction();
     ui('confirm');
-    const res = battle.attack(act.skill, p.aim);
+    // 玩家攻击统一走 battle.beginAttack generator（反应弹窗在导演驱动内弹出）；同步 attack 不再用于真实 UI
+    const res = act.item
+      ? await director.driveAttack(battle.beginUseItem(act.item, p.aim))
+      : await director.runAttackLive(act.skill, p.aim);
+    if (myFlow !== flow) return;
+    if (!res) { setBusy(false); return; }
     if (!res.ok) { setBusy(false); ui('deny'); shell.showLog(res.reason, 'warn'); refreshBattle(); return; }
     if (res.preparing) {
       if (myFlow !== flow) return;
@@ -805,7 +867,7 @@ export function createApp(rootEl, opts = {}) {
     if (u.side === 'hero') avHost.sfx('heroTurn', 1, { category: 'M' }); else ui('enemyTurn');
     if (c) await sandbox.guideTo([c], { ms: 420 });
     if (myFlow !== flow) return;
-    if (u.side === 'hero') {
+    if (isPlayerUnit(u)) {
       avHost.playTurnVoice(u, snap.actionSerial);
       fullReach = findReachable(battle.ctx, u.id, Infinity);
       setBusy(false);
@@ -836,8 +898,10 @@ export function createApp(rootEl, opts = {}) {
         await director.playWindup(battle.snapshot().currentId, plan.skill);
         if (!alive()) return;
         sandbox.setPreview(null);
-        const res = battle.attack(plan.skill, plan.aim);
-        if (res.ok) await playAttackResult(res);
+        // 敌方攻击同走 beginAttack generator：我方受击时反应弹窗在驱动内弹出，选择/放弃都会继续结算
+        const res = await director.runAttackLive(plan.skill, plan.aim);
+        if (!alive()) return;
+        if (res && res.ok) await playAttackResult(res);
         if (!alive()) return;
       }
     }
@@ -850,13 +914,13 @@ export function createApp(rootEl, opts = {}) {
 
   async function playAttackResult(res) {
     for (let i = res.logFrom; i < res.logTo; i++) hiddenLog.add(i);
-    shell.showLog(unitName(res.casterId) + ' · ' + res.skill.name, 'act');
+    shell.showLog(unitName(res.casterId) + ' · ' + (res.skill || res.item).name, 'act');
     const caster = currentUnit();
     if (caster) { const s = shownOf(caster); shown.set(caster.id, { hp: s.hp, mp: caster.ref.mp }); }
     // 反应错位（折影步等）：规则站位已更新，显示位置锁在原位，等导演在接触拍点演出位移后再放开
     const view = sandbox.getUnitView();
     for (const h of res.hits) {
-      const sh = h.reaction && h.reaction.shift;
+      const sh = (h.segments || []).find(s => s.reaction?.shift)?.reaction.shift || h.reaction?.shift;
       if (!sh) continue;
       const fp = currentViewData.footprintsById[h.targetId];
       const c = unitCenter(sh.from, fp);
@@ -874,14 +938,14 @@ export function createApp(rootEl, opts = {}) {
     const u = unitById(hit.targetId);
     if (!u) return;
     const prev = shownOf(u);
-    shown.set(u.id, { hp: hit.hpAfter, mp: prev.mp });
+    shown.set(u.id, { hp: hit.hpAfter, mp: hit.heal ? Math.min(u.ref.maxMp || 0, prev.mp + (hit.mpDmg > 0 ? hit.mpDmg : 0)) : prev.mp });
     u.bars = { ...u.bars, hp: hit.hpAfter };
     const rec = sandbox.getUnitView() && sandbox.getUnitView().nodes.get(u.id);
     if (rec) rec.bars = u.bars;
-    if (u.side === 'hero') shell.setHeroBars(u.id, u.bars, { hit: hit.hit });
+    if (u.side === 'hero') shell.setHeroBars(u.id, u.bars, hit.heal ? { heal: true } : { hit: hit.hit });
     for (let i = hit.logIndex; i < hit.logEnd; i++) hiddenLog.delete(i);
     shell.setHistory(visibleLog());
-    shell.showLog(battle.snapshot().log[hit.logIndex], hit.hit ? 'hit' : 'dodge');
+    shell.showLog(battle.snapshot().log[hit.logIndex], hit.hit ? 'hit' : hit.heal ? 'heal' : 'dodge');
     if (hit.down) playDown(u);
   }
   function playDown(u) {
@@ -1125,6 +1189,8 @@ export function createApp(rootEl, opts = {}) {
 
   function destroy() {
     flow++;
+    director.cancelAttack();
+    shell.cancelReactionPrompt();
     rootEl.ownerDocument.removeEventListener('keydown', onKey);
     combatToken = {};
     avHost.destroy();

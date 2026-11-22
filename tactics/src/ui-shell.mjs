@@ -7,6 +7,8 @@
 // ==========================================
 
 import { createRpgUi, RPG_UI_RAIL_HTML, RPG_UI_MENU_HTML, RPG_UI_TIP_HTML, RPG_UI_EDITOR_HTML } from './vendor/rpg-ui/rpg-ui.mjs';
+import { createReactionPrompt } from './reaction-prompt.mjs';
+import { normalizeEffectTag } from './effect-definitions.mjs';
 
 const ESC = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 // 禁用原因短标签（卡面一行可读；完整原因仍写入 title/aria 与点击后的战报）
@@ -82,6 +84,7 @@ export function buildShell(root) {
   const callCmd = (k, ...a) => (state.cmd && state.cmd[k] ? state.cmd[k](...a) : undefined);
   const rpgUi = createRpgUi({
     state: rpgState,
+    normalizeEffectTag,
     isSkillActionable: (hero, skill) => !!callCmd('canUse', skill),
     skillDisabledReason: (skill) => callCmd('skillReason', skill) || '不可用',
     prepareSkillTarget: (idx) => { uiSound('select'); callCmd('onSkill', idx); },
@@ -90,9 +93,9 @@ export function buildShell(root) {
     isSummonBlockedByLimit: () => false,
     getHeroItemBindings: () => new Map(),
     itemBindingKnowledge: new Map(),
-    isItemUsable: () => false,
-    prepareItemTarget: () => showLog('物品使用战棋未迁移', 'warn'),
-    prepareGroupedItemSkill: () => showLog('物品使用战棋未迁移', 'warn'),
+    isItemUsable: (item) => !!callCmd('canUseItem', item),
+    prepareItemTarget: (idx) => { uiSound('select'); callCmd('onItem', idx); },
+    prepareGroupedItemSkill: (idx) => { uiSound('select'); callCmd('onItem', idx); },
     handleBasicAttack: () => { rpgUi.closeBasicMenu(); uiSound('select'); callCmd('onAttack'); },
     handleBasicDefend: () => {},
     handleBasicRetreat: () => {},
@@ -111,12 +114,7 @@ export function buildShell(root) {
   };
   document.addEventListener('mousedown', onComboDown);
   root.addEventListener('change', e => { const s = e.target; if (s.tagName === 'SELECT' && /^edit-.*-type\d?$/.test(s.id)) rpgUi.syncGrantSlotPower(s); });
-  // 物品：战棋未迁移，菜单只供查看（标题常驻提示 + 列表顶部说明，不靠悬停）
-  root.querySelector('#item-menu .text-amber-300')?.insertAdjacentHTML('afterend', '<span class="t-unmig">战棋未迁移·仅查看</span>');
-  new MutationObserver(() => {
-    const list = $('item-list');
-    if (list.firstChild && !list.querySelector('.t-unmig-note')) list.insertAdjacentHTML('afterbegin', '<div class="t-unmig-note">🚧 物品使用与弹药消耗尚未迁移到战棋；这里只展示配置，不能执行。</div>');
-  }).observe($('item-list'), { childList: true });
+  // 物品：入口已接规则通道（isItemUsable/onItem 由 main 注入；具体 useItem 规则接口待规则代理落地）
 
   function faceHtml(u, cls) {
     if (u.emoji) return '<span class="' + cls + ' t-face-emoji">' + ESC(u.emoji) + '</span>';
@@ -149,7 +147,7 @@ export function buildShell(root) {
     markCards();
   }
   function cardOf(id) { return els.heroes.querySelector('.t-hero-card[data-unit-id="' + CSS.escape(id) + '"]'); }
-  function setHeroBars(id, bars, { instant = false, hit = false } = {}) {
+  function setHeroBars(id, bars, { instant = false, hit = false, heal = false } = {}) {
     const card = cardOf(id);
     if (!card) return;
     const fill = card.querySelector('.t-bar-hp .t-bar-fill'), ghost = card.querySelector('.t-bar-hp .t-bar-ghost');
@@ -162,6 +160,7 @@ export function buildShell(root) {
     if (instant) { ghost.style.transition = 'none'; ghost.style.width = w; }
     else { ghost._t = setTimeout(() => { ghost.style.transition = 'width 500ms cubic-bezier(0.3,0,0.2,1)'; ghost.style.width = w; }, 450); }
     if (hit) { card.classList.remove('t-card-hit'); void card.offsetWidth; card.classList.add('t-card-hit'); }
+    if (heal) { card.classList.remove('t-card-heal'); void card.offsetWidth; card.classList.add('t-card-heal'); }
     card.classList.toggle('t-down', bars.hp <= 0);
   }
   function markCards() {
@@ -300,7 +299,7 @@ export function buildShell(root) {
         '<span class="t-bact-ico">' + a.icon + '</span><span class="t-bact-body"><b>' + ESC(a.name) + '</b><i>' + sub + '</i></span></button>';
     };
     const fixed = [
-      { key: 'unmigrated', icon: '🛡️', name: '防御姿态', ok: false, reason: '防御姿态：战棋未迁移（见 P07-MIGRATION）', short: '🚧 战棋未迁移', tone: 'emerald' },
+      // 防御姿态已进 main 的 basicActions（走 onAction('defend') 规则通道）；撤离仍未迁移
       { key: 'unmigrated', icon: '🏃', name: '尝试撤离', ok: false, reason: '尝试撤离：战棋未迁移（见 P07-MIGRATION）', short: '🚧 战棋未迁移', tone: 'purple' },
     ];
     els.basicList.className = 't-bact-grid';
@@ -337,7 +336,8 @@ export function buildShell(root) {
   const ATTR = t => rpgUi.escapeHistoryHtml(t);
   function rangePill(r) {
     let label, num, title, body;
-    if (r.type === '单体') { label = '射程'; num = (r.castRange || 0) + 'm'; title = '【范围·单体】'; body = '选择 ' + (r.castRange || 0) + ' 米内、视线无遮挡的一名敌人；墙体与高障碍会阻挡视线，低矮掩体不阻挡。'; }
+    if (r.type === '自身') { label = '自身'; num = '自身'; title = '【范围·自身】'; body = '只作用于施法者自身；不选择目标，不受射程与视线限制（效果槽可另配「自身覆盖」指向其它对象）。'; }
+    else if (r.type === '单体') { label = '射程'; num = (r.castRange || 0) + 'm'; title = '【范围·单体】'; body = '选择 ' + (r.castRange || 0) + ' 米内、视线无遮挡的一名敌人；墙体与高障碍会阻挡视线，低矮掩体不阻挡。'; }
     else if (r.type === '直线') { label = '直线'; num = r.length + '×' + (r.width || 1) + 'm'; title = '【范围·直线】'; body = '自施法者向瞄准方向延伸 ' + r.length + ' 米、宽 ' + (r.width || 1) + ' 米，命中路径上所有敌人；遇墙截断。'; }
     else if (r.type === '扇形') { label = '扇形'; num = r.castRange + 'm·' + r.angle + '°'; title = '【范围·扇形】'; body = '以施法者为圆心、半径 ' + r.castRange + ' 米、张角 ' + r.angle + '° 的扇形，命中其中所有敌人；遇墙截断。'; }
     else if (r.type === '圆形') { label = '圆形'; num = (r.castRange ?? 0) + 'm·r' + r.radius; title = '【范围·圆形】'; body = '在 ' + (r.castRange ?? 0) + ' 米内选择落点，命中半径 ' + r.radius + ' 米圆内所有敌人；墙后格不受影响。'; }
@@ -516,6 +516,9 @@ export function buildShell(root) {
   $('chat-send-btn').addEventListener('click', sendChat);
   els.chatInput.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') sendChat(); });
 
+  // ---------- 反应弹窗（FX02）：独立全屏 overlay，宿主 main 经 shell.promptReaction 供攻击驱动 await ----------
+  const reactionPrompt = createReactionPrompt({ root, onUiSound: (k) => uiSound(k) });
+
   function getSafeRect() {
     const rail = $('turn-order-rail').getBoundingClientRect();
     const topbar = $('tactics-topbar').getBoundingClientRect();
@@ -536,9 +539,10 @@ export function buildShell(root) {
   function markRoundStart() { rpgUi.markRoundStart(); }
 
   return {
-    destroy: () => { clearTimeout(showLog._t); clearTimeout(showBanner._t); rpgUi.hideTagTip(); document.removeEventListener('mousedown', onComboDown); state.onReset = null; state.onUnitClick = null; root.replaceChildren(); },
+    destroy: () => { clearTimeout(showLog._t); clearTimeout(showBanner._t); rpgUi.hideTagTip(); document.removeEventListener('mousedown', onComboDown); reactionPrompt.cancel(); state.onReset = null; state.onUnitClick = null; root.replaceChildren(); },
     els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
     previewMoveCost, openModal, closeModal,
+    promptReaction: (req) => reactionPrompt.prompt(req), cancelReactionPrompt: () => reactionPrompt.cancel(),
     getSafeRect, showLog, openPanel, closePanel, openResult, clearBattle, closeSubmenu: () => {},
     set onUnitClick(fn) { state.onUnitClick = fn; },
     set onReset(fn) { state.onReset = fn; },

@@ -18,7 +18,7 @@ function unit(id, side, opts = {}) {
 function makeBattle(m, heroes, enemies, placements, random = () => 0) {
   return m.battle.createBattle({ units: [...heroes, ...enemies], placementsById: placements, scene: scene(), random });
 }
-function attackAt(b, skill, id, p) { return b.attack(skill, { x: p.col + 0.5, y: p.row + 0.5, targetId: id }); }
+function attackAt(b, skill, id, p, opts) { return b.attack(skill, { x: p.col + 0.5, y: p.row + 0.5, targetId: id }, opts); }
 
 async function p07(m) {
   const cases = [];
@@ -40,7 +40,7 @@ async function p07(m) {
   const limitEnemy = unit('le', 'enemy', { hp: 100, spd: 50 });
   const limitBattle = makeBattle(m, [limitHero], [limitEnemy], { lh: { col: 2, row: 4 }, le: { col: 6, row: 4 } }, rng([0, 0]));
   limitBattle.start();
-  const limited = { ...shot, name: 'limited', cost: 1, maxUses: 1, delay: 100 };
+  const limited = { ...shot, name: 'limited', cost: 1, maxUses: 1, cooldownTurns: 2 }; // [延迟] 现为准备式；绝对CD改独立 [冷却:N]（turns×100）
   const first = attackAt(limitBattle, limited, 'le', { col: 6, row: 4 });
   const second = limitBattle.previewAttack(limited, { x: 6.5, y: 4.5, targetId: 'le' });
   cases.push(ok('T07-09 限次与绝对CD由战斗态阻止重复施放', first.ok && !second.ok && /限次|冷却/.test(second.reason || ''), JSON.stringify({ first: first.ok, second: second.reason, battleState: limitBattle.battleState })));
@@ -68,7 +68,8 @@ async function p07(m) {
   }, rng([0, 0, 0, 0]));
   b2.start();
   const grouped = { ...multi, power: 20 };
-  const submitted = b2.attack(grouped, { x: 8.5, y: 4.5 });
+  // 反应链需显式 policy:auto（离线测试自动应答）；同步缺省 policy:none 不代玩家
+  const submitted = b2.attack(grouped, { x: 8.5, y: 4.5 }, { policy: 'auto' });
   cases.push(ok('T07-07 反应导致施术者倒地后仍完成已提交群体名单', submitted.ok && submitted.hits.some(h => h.targetId === 'rear') && b2.battleState.combatState.clock.units.caster.status === 'down', JSON.stringify({ hits: submitted.hits.map(h => h.targetId), caster: b2.battleState.combatState.clock.units.caster } )));
 
   const chargeHero = unit('ch', 'hero', { mp: 12, spd: 200 });
@@ -116,7 +117,7 @@ async function p07(m) {
   const downCharge = { ...shot, name: 'downCharge', charge: 1, cost: 0, delay: 0 };
   downBattle.attack(downCharge, { x: 5.5, y: 4.5, targetId: 'de' });
   downBattle.endAction();
-  downBattle.attack(downCharge, { x: 5.5, y: 4.5, targetId: 'de' });
+  downBattle.attack(downCharge, { x: 5.5, y: 4.5, targetId: 'de' }, { policy: 'auto' });
   cases.push(ok('T07-05 施术者倒地清除蓄力准备态', downBattle.battleState.combatState.clock.units.ah.status === 'down' && downBattle.battleState.combatState.charges.ah.preparing === null,
     JSON.stringify({ status: downBattle.battleState.combatState.clock.units.ah.status, charge: downBattle.battleState.combatState.charges.ah })));
 
@@ -162,7 +163,8 @@ async function p07(m) {
   for (let i = 0; i < 4 && allyBattle.snapshot().currentId !== 'receiver'; i++) allyBattle.endAction();
   const delivered = allyBattle.snapshot();
   cases.push(ok('T07-06 队友再动真实提交、待领取并在自然行动交付，不刷新移动辅助',
-    extraAlly.ok && pendingAfter.some(p => p.targetId === 'receiver' && p.sourceKey === 'giver:grantAlly') && giverAfter.main === 0 && giverAfter.aux === 1 && giverAfter.moveRemaining === 4 && delivered.currentId === 'receiver' && delivered.resources.main === 2 && delivered.resources.aux === 1 && delivered.resources.moveRemaining === 4,
+    // sourceKey 现带 ':mp0' 后缀标记，按前缀匹配同源
+    extraAlly.ok && pendingAfter.some(p => p.targetId === 'receiver' && p.sourceKey.indexOf('giver:grantAlly') === 0) && giverAfter.main === 0 && giverAfter.aux === 1 && giverAfter.moveRemaining === 4 && delivered.currentId === 'receiver' && delivered.resources.main === 2 && delivered.resources.aux === 1 && delivered.resources.moveRemaining === 4,
     JSON.stringify({ extraAlly: extraAlly.ok, pendingAfter, giverAfter, delivered: { currentId: delivered.currentId, resources: delivered.resources } })));
 
   const speedHero = unit('speed-caster', 'hero', { spd: 1000 });
@@ -177,7 +179,7 @@ async function p07(m) {
   const spdBefore = speedAlly.ref.spd;
   const evasionBefore = speedAlly.ref.evasion;
   const speedApplied = speedBattle.attack(speedSkill, { x: 2.5, y: 7.5, targetId: 'speed-ally' });
-  const speedAfter = speedAlly.ref.spd;
+  const speedAfter = speedBattle.getEffectiveUnit('speed-ally').spd;
   const clockSpeedAfter = speedBattle.battleState.combatState.clock.units['speed-ally'].speed;
   const evasionAfter = speedAlly.ref.evasion;
 
@@ -215,7 +217,6 @@ async function p07(m) {
   inventoryBattle.battleState.combatState.charges = { inventory: { inventory: 2, preparing: null } };
   inventoryBattle.battleState.combatState.clock.currentAction.resources.main = 2;
   const inventorySkill = { ...charged, name: 'inventorySkill', charge: 4, haste: 3 };
-  const inventoryStartAt = inventoryBattle.snapshot().now;
   const inventoryStart = attackAt(inventoryBattle, inventorySkill, 'inventoryEnemy', { col: 7, row: 4 });
   const inventoryBefore = inventoryBattle.snapshot();
   const premature = attackAt(inventoryBattle, inventorySkill, 'inventoryEnemy', { col: 7, row: 4 });
@@ -226,7 +227,8 @@ async function p07(m) {
   const remainingMain = inventoryBattle.snapshot().resources.main;
   const inventoryReleased = attackAt(inventoryBattle, inventorySkill, 'inventoryEnemy', { col: 7, row: 4 });
   cases.push(ok('T07-02/03/04 库存先抵准备、剩余主点自动投入、未满拒绝、显式准备与释放后加速入账',
-    inventoryStart.preparing && inventoryBefore.preparation.remaining === 1 && inventoryBefore.preparation.invested === 3 && inventoryBefore.chargeInventory === 0 && inventoryBefore.resources.main === 0 && inventoryBattle.battleState.cooldowns.inventory.inventorySkill === inventoryStartAt + 300 && !premature.ok && /未就绪/.test(premature.reason) && !otherCharge.ok && explicitlyPrepared.ok && explicitlyPrepared.invested === 1 && remainingMain === 1 && inventoryReleased.ok && inventoryBattle.snapshot().chargeInventory === 3 && inventoryBattle.snapshot().resources.main === 1,
+    inventoryStart.preparing && inventoryBefore.preparation.remaining === 1 && inventoryBefore.preparation.invested === 3 && // [延迟:N] 准备不再登记冷却（battle.mjs 冷却改为独立 [冷却:N] 字段，准备开始不进冷却）
+    inventoryBefore.chargeInventory === 0 && inventoryBefore.resources.main === 0 && !inventoryBattle.battleState.cooldowns.inventory && !premature.ok && /未就绪/.test(premature.reason) && !otherCharge.ok && explicitlyPrepared.ok && explicitlyPrepared.invested === 1 && remainingMain === 1 && inventoryReleased.ok && inventoryBattle.snapshot().chargeInventory === 3 && inventoryBattle.snapshot().resources.main === 1,
     JSON.stringify({ inventoryBefore, premature: premature.reason, otherCharge: otherCharge.reason, explicitlyPrepared, inventoryReleased: inventoryReleased.ok, inventoryAfter: inventoryBattle.snapshot().chargeInventory })));
 
   const counterSkill = { name: 'onceCounter', isReaction: true, reactionTarget: 'all', isOthers: true, cost: 2, power: 3, type: '[反击]', range: { type: '单体', castRange: 10 } };
@@ -234,16 +236,17 @@ async function p07(m) {
   const counterEnemy = unit('counterEnemy', 'enemy', { hp: 100, mp: 10, spd: 20, skills: [counterSkill] });
   const counterBattle = makeBattle(m, [counterHero], [counterEnemy], { counterHero: { col: 2, row: 4 }, counterEnemy: { col: 6, row: 4 } });
   counterBattle.start();
-  const counterResult = attackAt(counterBattle, shot, 'counterEnemy', { col: 6, row: 4 });
-  cases.push(ok('T07-08 同一目标同次攻击反应只执行一次并扣费一次', counterResult.ok && counterHero.ref.hp === 97 && counterEnemy.ref.mp === 8 && counterBattle.snapshot().log.filter(s => s.includes(' 反击 ')).length === 1, JSON.stringify({ hp: counterHero.ref.hp, mp: counterEnemy.ref.mp, log: counterBattle.snapshot().log })));
+  // 反击需显式 policy:auto；反击伤害＝反击槽 power 3＋自身攻击 10＝13（battle.mjs counterStrike 原版口径），恰好执行一次
+  const counterResult = attackAt(counterBattle, shot, 'counterEnemy', { col: 6, row: 4 }, { policy: 'auto' });
+  cases.push(ok('T07-08 同一目标同次攻击反应只执行一次并扣费一次', counterResult.ok && counterHero.ref.hp === 87 && counterEnemy.ref.mp === 8 && counterBattle.snapshot().log.filter(s => s.includes('趁势反击')).length === 1, JSON.stringify({ hp: counterHero.ref.hp, mp: counterEnemy.ref.mp, log: counterBattle.snapshot().log })));
   const rejected = [
     { ...shot, kanpoTarget: 'all' }, { ...shot, sheshenTarget: 'all' },
-    { ...shot, type: '[中毒]' }, { ...shot, type: '[单降]' },
   ];
-  cases.push(ok('P07 未迁移看破舍身和纯减益明确拒绝', rejected.every(s => !m.battle.skillSupport(s).ok) && !counterBattle.canUseReaction(counterEnemy, { ...counterSkill, kanpoTarget: 'all' }, 'counterHero').ok, JSON.stringify(rejected.map(s => m.battle.skillSupport(s)))));
+  // 看破经 canUseReaction（反应链入口）现应可用，旧"反应路径也拒绝"负例随 RULES02 失效
+  cases.push(ok('P07 看破舍身仍拒绝（中毒/降防减益槽已按 RULES02 迁移为真实支持）', rejected.every(s => !m.battle.skillSupport(s).ok), JSON.stringify(rejected.map(s => m.battle.skillSupport(s)))));
   speedBattle.battleState.combatState.clock.currentAction.resources.main = 1;
   const speedRefresh = speedBattle.attack({ ...speedSkill, power: 30 }, { x: 2.5, y: 7.5, targetId: 'speed-ally' });
-  const refreshedSpeed = speedAlly.ref.spd;
+  const refreshedSpeed = speedBattle.getEffectiveUnit('speed-ally').spd;
   for (let i = 0; i < 32 && speedBattle.snapshot().now < 210; i++) speedBattle.endAction();
   cases.push(ok('T07-10 同源速度刷新不叠强度，到期回滚角色与跑圈速度', speedRefresh.ok && refreshedSpeed === 130 && speedBattle.snapshot().now >= 210 && speedAlly.ref.spd === 100 && speedBattle.battleState.combatState.clock.units['speed-ally'].speed === 100, JSON.stringify({ refreshedSpeed, now: speedBattle.snapshot().now, refSpeed: speedAlly.ref.spd, clockSpeed: speedBattle.battleState.combatState.clock.units['speed-ally'].speed })));
   const dotHero = unit('dotHero', 'hero', { hp: 3, spd: 200 });
@@ -261,8 +264,8 @@ async function p07(m) {
   const highEva = m.damage.resolveHit({}, { evasion: 100 }, { hit: 100 }, rng([0.99, 0.1]));
   cases.push(ok('T07-10 独立闪避参与命闪而非敏捷', lowEva.hit && !highEva.hit, JSON.stringify({ lowEva, highEva })));
 
-  const unsupported = { ...shot, name: 'heal', type: '[单回]', type2: '[无]', type3: '[无]' };
-  cases.push(ok('P07+ 治疗槽不会静默部分结算', !m.battle.skillSupport(unsupported).ok, JSON.stringify(m.battle.skillSupport(unsupported))));
+  const healSkill = { ...shot, name: 'heal', type: '[单回]', type2: '[无]', type3: '[无]' };
+  cases.push(ok('P07+ 治疗槽已迁移支持（RULES02 恢复共用规则入口，不再静默拒绝）', m.battle.skillSupport(healSkill).ok, JSON.stringify(m.battle.skillSupport(healSkill))));
 
   return { cases };
 }

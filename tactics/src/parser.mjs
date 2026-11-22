@@ -6,6 +6,7 @@
 
 import { PROTOCOL_VERSION, PROTOTYPES, PROTOTYPE_NAMES, TACTICS_TAG_FIELDS,
          RANGE_TYPES, RANGE_PARAM_FIELDS, ACTION_COST_MAIN, ACTION_COST_AUX, ACTION_COST_DEFAULT } from './protocol.mjs';
+import { slotTagOf, normalizeEffectTag, isLegacySlotTag, LEGACY_SELF_MIGRATE_TAGS } from './effect-definitions.mjs';
 import { jsyaml } from './vendor/js-yaml-4.1.0.mjs';
 
 // ---------- 原版解析资产（index.html L3103-3136 / L18609-18641 移植） ----------
@@ -17,12 +18,17 @@ export function getGrantedVariantName(tag) {
   return m && VARIANT_GRANT_NAMES.includes(m[1].trim()) ? m[1].trim() : null;
 }
 
-// 白名单取自 SKILL_TYPES；[驱散]/[群驱散]/[肃正] 自带冒号语义须排除（原版口径）。
+// 白名单取自 SKILL_TYPES（旧别名）＋ 规范标签基础名；[驱散]/[群驱散]/[肃正] 自带冒号语义须排除（原版口径）。
 let _slotTagNamesCache = null;
 export function normalizeColonPowerTags(str) {
   if (!_slotTagNamesCache) {
     const EXCLUDE = new Set(['驱散', '群驱散', '肃正']);
-    _slotTagNamesCache = new Set(SKILL_TYPES.map(t => t.replace(/[\[\]]/g, '')).filter(n => !EXCLUDE.has(n)));
+    const CANONICAL_BASES = ['伤害', '穿透', '眩晕', '散射', '治疗', '回蓝', '充能', '加攻', '加防', '加盾', '加瞄',
+      '降防', '致盲', '迟滞', '虚弱', '减速', '中毒', '燃烧', '麻痹', '吸蓝', '嘲讽', '再动', '回避', '闪避', '免伤', '反击'];
+    _slotTagNamesCache = new Set([
+      ...SKILL_TYPES.map(t => t.replace(/[\[\]]/g, '')).filter(n => !EXCLUDE.has(n)),
+      ...CANONICAL_BASES,
+    ]);
   }
   return String(str || '').replace(/\[赋予[:：]\s*([^\[\];]+?)\s*(?=;|\])/g, (m, name) => `[赋予:${name.trim()}`)
     .replace(/\[([^\[\]:;]+)[:：](-?\d+)\]/g,
@@ -229,6 +235,10 @@ export function parseSkill(skillStr) {
   let limitMatch = skillStr.match(/\[限(\d+)次?\]/i);
   let maxUses = limitMatch ? parseInt(limitMatch[1]) : 0;
 
+  // [冷却:N]：独立冷却字段（提交施放后 N×100 绝对到期；与 [延迟:N] 准备式延迟无关）
+  let cooldownMatch = skillStr.match(/\[(?:冷却|CD)[:：](\d+)\]/i);
+  let cooldownTurns = cooldownMatch ? parseInt(cooldownMatch[1]) : 0;
+
   let dispelMatch = skillStr.match(/\[(群驱散|驱散)(?::(\d+))?\]/i);
   let dispelRaw = dispelMatch ? dispelMatch[1] : null;
   let dispelCount = dispelRaw ? (dispelMatch[2] ? parseInt(dispelMatch[2]) : 1) : 0;
@@ -288,18 +298,20 @@ export function parseSkill(skillStr) {
   const nonSlots = new Set(['[无]', '[必中]', '[转火]', '[突进]', '[众召]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]', '[自盲]', '[自降]', '[自弱]', '[自滞]', '[自缓]']);
   let typeMatches = [...skillStr.matchAll(/\[([^\[\];]+?)(?:;power:(-?\d+))?(?:;turns:(\d+))?\]/gi)].filter(m => {
     if (m[2] !== undefined) return true;
-    return !nonSlots.has('[' + m[1] + ']') && (SKILL_TYPES.includes('[' + m[1] + ']') || /^(?:群攻|单体)[(（]/.test(m[1]));
+    return !nonSlots.has('[' + m[1] + ']') && !!slotTagOf(m[1]);
   });
+  // 槽位输出规范标签（旧单群写法只作别名读入，本函数输出不再保留）；子型括号保留
   let types = ['[无]', '[无]', '[无]']; let powers = [0, 0, 0]; let slotTurnsArr = [null, null, null];
   for (let i = 0; i < Math.min(typeMatches.length, 3); i++) {
-    types[i] = '[' + typeMatches[i][1] + ']';
-    powers[i] = getGrantedVariantName(types[i]) ? 0 : (typeMatches[i][2] !== undefined ? parseInt(typeMatches[i][2]) : (types[i] === '[再动]' || types[i].includes('驱散') ? 1 : 50));
+    types[i] = '[' + normalizeEffectTag(typeMatches[i][1]) + ']';
+    const normTag = normalizeEffectTag(typeMatches[i][1]);
+    powers[i] = getGrantedVariantName(types[i]) ? 0 : (typeMatches[i][2] !== undefined ? parseInt(typeMatches[i][2]) : (/^(?:再动|驱散)$/.test(normTag) ? 1 : normTag === '伤害' ? 20 : 50));
     if (typeMatches[i][3] !== undefined) slotTurnsArr[i] = parseInt(typeMatches[i][3]);
   }
-  if (!typeMatches.length) { types[0] = '[单体]'; powers[0] = 20; }
+  if (!typeMatches.length) { types[0] = '[伤害]'; powers[0] = 20; }
 
   if (dispelRaw && !types.some(t => t.includes('驱散'))) {
-    const dispelTag = dispelRaw === '群驱散' ? '[群驱散]' : '[驱散]';
+    const dispelTag = '[驱散]';
     if (!typeMatches.length) {
       types[0] = dispelTag; powers[0] = dispelCount;
     } else {
@@ -331,6 +343,7 @@ export function parseSkill(skillStr) {
   if (delayMatch) _explicit.push('delay');
   if (hasteMatch) _explicit.push('haste');
   if (limitMatch) _explicit.push('maxUses');
+  if (cooldownMatch) _explicit.push('cooldownTurns');
   if (critMatch) _explicit.push('critRate');
   if (hitMatch) _explicit.push('hit');
   if (barrierArmorMatch) _explicit.push('barrierArmor');
@@ -350,7 +363,20 @@ export function parseSkill(skillStr) {
   // 显式范围缺尺寸按 S14 补齐（补齐值不标记 explicit）；补齐后 range 是唯一空间信息来源
   const range = ext.range ? fillRangeDefaults(ext.range) : null;
 
-  return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, sheshenTarget: sheshenTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, isHighTier: _isHighTier, isLegendary: _isLegendary, summonTarget: summonTarget, summonNoLimit: summonNoLimit, range, actionCost: ext.actionCost || ACTION_COST_DEFAULT, evadeShift: ext.shift, _explicit: _explicit };
+  // 旧协议来源识别（contract v3）：无显式 [范围] 输入视为旧写法——[再动]/[赋予:X] 槽迁移期自动标 self；
+  // 新规范输入＋显式范围一律按范围友敌方，不锁 self。自X 代价槽恒 self（定义表 side:'self'）。
+  let slotTargets = null;
+  if (!ext.range) {
+    const marks = [];
+    let marked = false;
+    for (let i = 0; i < 3; i++) {
+      const normTag = types[i] === '[无]' ? null : normalizeEffectTag(types[i]);
+      if (normTag && LEGACY_SELF_MIGRATE_TAGS.some(t => normTag === t || normTag.indexOf(t + ':') === 0)) { marks[i] = 'self'; marked = true; }
+    }
+    if (marked) slotTargets = [marks[0] || null, marks[1] || null, marks[2] || null];
+  }
+
+  return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, cooldownTurns: cooldownTurns, slotTargets: slotTargets, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, sheshenTarget: sheshenTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, isHighTier: _isHighTier, isLegendary: _isLegendary, summonTarget: summonTarget, summonNoLimit: summonNoLimit, range, actionCost: ext.actionCost || ACTION_COST_DEFAULT, evadeShift: ext.shift, _explicit: _explicit };
 }
 
 // S14 缺尺寸预设：显式直线缺长/宽 → 10/1；显式爆炸缺射程/半径 → 15/3。仅补缺失键。
@@ -406,17 +432,18 @@ export function parseItem(itemStr) {
   const nonSlots = new Set(['[无]', '[必中]', '[转火]', '[突进]', '[众召]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]', '[自盲]', '[自降]', '[自弱]', '[自滞]', '[自缓]']);
   let typeMatches = [...raw.matchAll(/\[([^\[\];]+?)(?:;power:(-?\d+))?(?:;turns:(\d+))?\]/gi)].filter(m => {
     if (m[2] !== undefined) return true;
-    return !nonSlots.has('[' + m[1] + ']') && (SKILL_TYPES.includes('[' + m[1] + ']') || /^(?:群攻|单体)[(（]/.test(m[1]));
+    return !nonSlots.has('[' + m[1] + ']') && !!slotTagOf(m[1]);
   });
   let types = ['[无]', '[无]', '[无]']; let powers = [0, 0, 0]; let slotTurnsArr = [null, null, null];
   for (let i = 0; i < Math.min(typeMatches.length, 3); i++) {
-    types[i] = '[' + typeMatches[i][1] + ']';
-    powers[i] = getGrantedVariantName(types[i]) ? 0 : (typeMatches[i][2] !== undefined ? parseInt(typeMatches[i][2]) : (types[i] === '[再动]' || types[i].includes('驱散') ? 1 : 50));
+    types[i] = '[' + normalizeEffectTag(typeMatches[i][1]) + ']';
+    const normTag = normalizeEffectTag(typeMatches[i][1]);
+    powers[i] = getGrantedVariantName(types[i]) ? 0 : (typeMatches[i][2] !== undefined ? parseInt(typeMatches[i][2]) : (/^(?:再动|驱散)$/.test(normTag) ? 1 : normTag === '伤害' ? 20 : 50));
     if (typeMatches[i][3] !== undefined) slotTurnsArr[i] = parseInt(typeMatches[i][3]);
   }
 
   if (dispelRaw && !types.some(t => t.includes('驱散'))) {
-    const dispelTag = dispelRaw === '群驱散' ? '[群驱散]' : '[驱散]';
+    const dispelTag = '[驱散]';
     if ((types[0] === '[无]' && powers[0] === 0) || (!typeMatches.length)) { types[0] = dispelTag; powers[0] = dispelCount; }
     else { for (let i = 1; i < 3; i++) { if (types[i] === '[无]') { types[i] = dispelTag; powers[i] = dispelCount; break; } } }
   }
@@ -478,7 +505,19 @@ export function parseItem(itemStr) {
 
   const range = ext.range ? fillRangeDefaults(ext.range) : null;
 
-  return { isItem: true, name: name, category: category, count: count, maxUses: maxUses, usesRemaining: maxUses, bindings: bindings, cost: cost, hpCost: hpCost, tpCost: tpCost, delay: delay, haste: haste, summonTarget: summonTarget, summonNoLimit: summonNoLimit, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, isHighTier: _isHighTier, isLegendary: _isLegendary, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, range, actionCost: ext.actionCost || ACTION_COST_DEFAULT, _explicit: _explicit };
+  // 物品槽位迁移期 self 标记（口径同 parseSkill）
+  let slotTargets = null;
+  if (!ext.range) {
+    const marks = [];
+    let marked = false;
+    for (let i = 0; i < 3; i++) {
+      const normTag = types[i] === '[无]' ? null : normalizeEffectTag(types[i]);
+      if (normTag && LEGACY_SELF_MIGRATE_TAGS.some(t => normTag === t || normTag.indexOf(t + ':') === 0)) { marks[i] = 'self'; marked = true; }
+    }
+    if (marked) slotTargets = [marks[0] || null, marks[1] || null, marks[2] || null];
+  }
+
+  return { isItem: true, name: name, category: category, count: count, maxUses: maxUses, usesRemaining: maxUses, bindings: bindings, cost: cost, hpCost: hpCost, tpCost: tpCost, delay: delay, haste: haste, summonTarget: summonTarget, summonNoLimit: summonNoLimit, slotTargets: slotTargets, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, isHighTier: _isHighTier, isLegendary: _isLegendary, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, range, actionCost: ext.actionCost || ACTION_COST_DEFAULT, _explicit: _explicit };
 }
 
 // ---------- 组解析（原版 L18952-19061 移植） ----------

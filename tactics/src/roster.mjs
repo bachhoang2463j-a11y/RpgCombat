@@ -6,6 +6,7 @@
 // ==========================================
 
 import { PERSIST_TOGGLE_FIELDS, RUNTIME_RESOURCE_FIELDS, PROTOTYPES } from './protocol.mjs';
+import { normalizeEffectTag } from './effect-definitions.mjs';
 import { parseHeroEntry, parseSkillList, parseItemList, normalizeHeroName, parseSkill, parseItem } from './parser.mjs';
 
 // ---------- 基础工具 ----------
@@ -55,6 +56,7 @@ const GAP_FILL = {
   summonTarget: null, fxTag: null, damageType: null, kanpoTarget: null, sheshenTarget: null,
   type2: '[无]', type3: '[无]', power2: 0, power3: 0,
   barrierArmor: 0, charge: 0, delay: 0, haste: 0, maxUses: 0, critRate: 0, cost: 0, hpCost: 0, tpCost: 0, hit: 100,
+  cooldownTurns: 0, slotTargets: null,
   isReaction: false, isOthers: false, guaranteedHit: false, switchTarget: false,
   isHighTier: false, isLegendary: false, summonNoLimit: false, ignoreRow: false,
   range: null, actionCost: null, evadeShift: null,
@@ -68,7 +70,7 @@ function fieldEmpty(v, empty) {
 export function gapFillSkill(target, saved) {
   if (!target || !saved) return;
   const _slotOf = { slotTurns: 1, type2: 2, power2: 2, slotTurns2: 2, type3: 3, power3: 3, slotTurns3: 3 };
-  const _slotTag = (o, n) => { const v = (n === 1 ? o.type : o['type' + n]); return (v && v !== '[无]') ? String(v) : ''; };
+  const _slotTag = (o, n) => { const v = (n === 1 ? o.type : o['type' + n]); return (v && v !== '[无]') ? normalizeEffectTag(v) : ''; };
   const _exp = Array.isArray(target._explicit) ? new Set(target._explicit) : null;
   const hadYamlReaction = target.isReaction === true;
   Object.keys(GAP_FILL).forEach(k => {

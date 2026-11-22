@@ -77,8 +77,8 @@ export const groups = {
     const cases = [];
     const { view } = demoView(m);
     const { resolveAttackIdentity, resolveWindupKind } = m.director;
-    // 取该单位首个规则可执行技能（埃利奥特首项迅捷愈合法为未迁移治疗，按真实可用技能核对身份）
-    const skillOf = (id) => { const s = view.units.find(u => u.id === id).skills; return s.find(x => m.battle.skillSupport(x).ok) || s[0]; };
+    // 身份回归选取真实攻击槽，治疗等新可用支援技能不冒充枪击身份。
+    const skillOf = (id) => { const s = view.units.find(u => u.id === id).skills; return s.find(x => m.battle.skillSupport(x).ok && [x.type, x.type2, x.type3].some(t => /伤害|穿透|散射|眩晕/.test(t))) || s[0]; };
     const ids = {
       // 砷弹演出改由 fx-registry 按 [特效:砷弹射击] 分发（TFX-01 断言），身份层只按标签+直线范围得面状枪击
       'h:索恩': ['aoe', '枪击'], 'h:埃利奥特': ['single', '枪击'], 'h:玛德琳': ['single', '枪击'], 'h:弗兰克': ['perTarget', '霰弹'],
@@ -94,7 +94,7 @@ export const groups = {
     cases.push(ok('TAV-03 普通攻击 → 近战刀砍单体（不套火球）', rb.mode === 'single' && rb.subtype === '刀砍', j(rb)));
     const kinds = { 'e:守卫': 'red-wide', 'e:弓手': 'amber-single', 'e:邪术师': 'violet-single', 'e:斥候': 'red-single' };
     for (const [id, k] of Object.entries(kinds)) cases.push(ok('TAV-03 前摇 ' + id + ' → ' + k, resolveWindupKind(skillOf(id)) === k, resolveWindupKind(skillOf(id))));
-    cases.push(ok('TAV-03 前摇单群以显式空间范围为准（旧"单体"标签不覆盖扇形）', /单体/.test(skillOf('e:守卫').type) && resolveWindupKind(skillOf('e:守卫')) === 'red-wide', skillOf('e:守卫').type));
+    cases.push(ok('TAV-03 前摇单群以显式空间范围为准（旧"单体"标签不覆盖扇形）', /伤害/.test(skillOf('e:守卫').type) && resolveWindupKind(skillOf('e:守卫')) === 'red-wide', skillOf('e:守卫').type));
     cases.push(ok('TAV-03 普通攻击前摇 → red-single', resolveWindupKind(basic) === 'red-single', resolveWindupKind(basic)));
     return { cases };
   } },

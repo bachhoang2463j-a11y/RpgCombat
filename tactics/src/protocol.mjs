@@ -44,8 +44,8 @@ export const TACTICS_TAG_FIELDS = {
   '感知': 'perception',
 };
 
-// ---------- 六种范围 ----------
-export const RANGE_TYPES = ['单体', '直线', '扇形', '圆形', '全域', '爆炸'];
+// ---------- 七种范围（第六种爆炸之外新增第七种「自身」，S05/七范围段） ----------
+export const RANGE_TYPES = ['单体', '直线', '扇形', '圆形', '全域', '爆炸', '自身'];
 
 // 范围参数中文 → 规范字段。单位：长度米、角度度。
 export const RANGE_PARAM_FIELDS = {

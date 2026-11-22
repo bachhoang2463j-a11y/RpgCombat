@@ -5,6 +5,7 @@
 
 import { cellAt } from './scene.mjs';
 import { occupiedCells, cellKey, unitCenter } from './geometry.mjs';
+import { skillSlots } from './effect-definitions.mjs';
 
 const EPS = 1e-9;
 const SAMPLE_STEP = 0.2;
@@ -148,6 +149,7 @@ export function classifySlotSide(tag) {
 }
 
 function slotScope(tag) {
+  // 旧口径仅保留给 classifySlotSide 的 p06 兼容断言；resolveSlotTargets 已不消费本函数
   const raw = String(tag || '').replace(/[\[\]]/g, '');
   if (!raw || raw === '无' || raw.startsWith('赋予')) return 'none';
   if (raw.startsWith('自')) return 'self';
@@ -156,26 +158,49 @@ function slotScope(tag) {
   return 'none';
 }
 
-function isAttackSlot(tag) {
-  const raw = String(tag || '').replace(/[\[\]]/g, '');
-  return DAMAGE_TAGS.some(part => raw.startsWith(part));
-}
+// 旧 isAttackSlot 已随规范单群合并移除；目标判定统一走 skillSlots（effect-definitions）
 
+// 槽目标判定（规范单群合并）：目标数量一律由范围类型决定——
+// 自身 → 全槽落施法者（敌方侧槽无目标）；单体 → 单点（友方槽无友方瞄准时落施法者）；
+// 其余（直线/扇形/圆形/全域/爆炸）→ 面积内按槽敌我语义取全部。skill.slotTargets 'self' 覆盖。
 export function resolveSlotTargets(ctx, casterId, skill, areaTargetIds, aimTargetId = null) {
   const caster = unitById(ctx, casterId);
   const all = (areaTargetIds || []).map(id => unitById(ctx, id)).filter(isLive);
-  const slots = [skill && skill.type, skill && skill.type2, skill && skill.type3];
-  return slots.map((tag, index) => {
-    const side = classifySlotSide(tag);
-    const rangeType = skill && skill.range && skill.range.type;
-    const scope = isAttackSlot(tag) && rangeType && rangeType !== '单体' ? 'area' : slotScope(tag);
-    const targetIds = scope === 'self' ? (isLive(caster) ? [casterId] : [])
-      : scope === 'single' && !skill.isOthers && side === 'ally' && /^\[(?:再动|单回|单回蓝|单冲|单速|单防|单盾|单瞄|嘲讽|回避|单避|免伤|反击|驱散)\]$/.test(tag || '') ? (isLive(caster) ? [casterId] : [])
-      : scope === 'single' ? all.filter(u => u.id === aimTargetId).map(u => u.id)
-      : scope === 'area' ? all.filter(u => side === 'ally' ? u.side === caster?.side : side === 'enemy' ? u.side !== caster?.side : false).map(u => u.id)
-      : [];
-    return { index, tag: tag || '[无]', side, scope, attack: isAttackSlot(tag), targetIds };
+  const rangeType = skill && skill.range && skill.range.type;
+  const scope = rangeType === '自身' ? 'self' : (rangeType === '单体' ? 'single' : 'area');
+  const aimUnit = all.find(u => u.id === aimTargetId) || null;
+  return skillSlots(skill).map(slot => {
+    const side = slot.definition.side === 'enemy' ? 'enemy' : 'ally';
+    let targetIds = [];
+    if (slot.target === 'self' || slot.definition.side === 'self') {
+      targetIds = isLive(caster) ? [casterId] : [];
+    } else if (scope === 'self') {
+      targetIds = side === 'ally' && isLive(caster) ? [casterId] : [];
+    } else if (scope === 'single') {
+      if (side === 'enemy') targetIds = aimUnit && aimUnit.side !== (caster && caster.side) ? [aimUnit.id] : [];
+      else targetIds = aimUnit && aimUnit.side === (caster && caster.side) ? [aimUnit.id] : (isLive(caster) ? [casterId] : []);
+    } else {
+      targetIds = all.filter(u => side === 'ally' ? u.side === (caster && caster.side) : u.side !== (caster && caster.side)).map(u => u.id);
+    }
+    return { index: slot.index, tag: slot.tag, side, scope, attack: slot.attack, targetIds };
   });
+}
+
+// S14 缺省范围预设（缺显式 [范围] 时按槽位与伤害类型推导，不按技能名字猜）：
+// 攻击槽：旧单群写法带 群 前缀 → 群体预设（近战扇形3m/90°、远程法术圆形15m/半径3m）；
+// 其余攻击槽单体预设（近战2m、远程/法术15m）；纯效果槽无攻击段 → 不补（需显式范围，可用第七种「自身」）。
+export function resolveDefaultRange(skill) {
+  if (!skill) return null;
+  const dt = skill.damageType || '近战';
+  const isGroup = [skill.type, skill.type2, skill.type3]
+    .some(t => t && /^\[群(?:攻|穿透|眩晕|散射|中毒|燃烧|麻痹|降|盲|滞|弱|缓)/.test(String(t)));
+  const hasAttack = skillSlots(skill).some(s => s.attack);
+  if (isGroup) {
+    return dt === '近战' ? { type: '扇形', castRange: 3, angle: 90 } : { type: '圆形', castRange: 15, radius: 3 };
+  }
+  // 纯效果槽（治疗/增益/减益物品等）缺省同样落单体预设（S14 缺省单体技能；自身用 [范围:自身] 显式声明）
+  if (!hasAttack) return dt === '近战' ? { type: '单体', castRange: 2 } : { type: '单体', castRange: 15 };
+  return dt === '近战' ? { type: '单体', castRange: 2 } : { type: '单体', castRange: 15 };
 }
 
 function empty(reason, origin = null, aim = null) {
@@ -193,7 +218,18 @@ export function queryAttack(ctx, casterId, skill, aim) {
   const fail = (reason, blockedBy = null) => Object.assign(empty(reason, origin, normAim), blockedBy ? { blockedBy } : {});
   const range = skill && skill.range;
   if (!range) return fail('技能缺少显式范围');
-  if (!['单体', '直线', '扇形', '圆形', '全域', '爆炸'].includes(range.type)) return fail('范围类型不支持: ' + range.type);
+  if (!['单体', '直线', '扇形', '圆形', '全域', '爆炸', '自身'].includes(range.type)) return fail('范围类型不支持: ' + range.type);
+  // 第七种范围「自身」：只作用于施法者自身占格，无需瞄准点
+  if (range.type === '自身') {
+    const selfCells = occupiedCells(cp, footprintOf(ctx, caster));
+    const selfSlots = resolveSlotTargets(ctx, casterId, skill, [casterId], null);
+    const damageSelf = selfSlots.find(slot => slot.attack)?.targetIds || [];
+    return { ok: true, reason: null, origin, aim: { x: origin.x, y: origin.y, targetId: casterId }, range: null,
+      cells: selfCells, targetIds: [casterId], damageTargetIds: damageSelf, actualTargetIds: [casterId],
+      targets: [{ unitId: casterId, side: caster.side, cells: selfCells }], slotTargets: selfSlots,
+      disclosureTargetIds: [casterId], collisionPoint: null, contact: null, blockedBy: null,
+      shape: { type: '自身' }, blastCenter: null };
+  }
   if (!normAim) return fail('缺少瞄准点');
 
   let cells = [], targetIds = [], shape = null, collisionPoint = null, contact = null, blockedBy = null, blastCenter = null;

@@ -176,16 +176,16 @@ async function t0103(deps) {
   const s3 = parser.parseSkill('【爆弹】[范围:爆炸]');
   cases.push(ok('T01-03 爆炸缺尺寸补15/3', s3.range.castRange === 15 && s3.range.radius === 3, JSON.stringify(s3.range)));
 
-  // 显式范围配旧 [单体]/[群攻] 名称：range 保留，槽位照常（显式范围是唯一空间信息）
+  // 显式范围配旧 [单体]/[群攻] 名称：range 保留，旧标签只作别名读入、输出归一为 [伤害]（显式范围是唯一空间信息）
   const s4 = parser.parseSkill('【贯通】[单体;power:40][范围:直线;长:12;宽:2]');
-  cases.push(ok('T01-03 显式范围配旧单体并存', eq(s4.range, { type: '直线', length: 12, width: 2 }) && s4.type === '[单体]' && s4.power === 40, JSON.stringify({ range: s4.range, type: s4.type, power: s4.power })));
+  cases.push(ok('T01-03 显式范围配旧单体并存', eq(s4.range, { type: '直线', length: 12, width: 2 }) && s4.type === '[伤害]' && s4.power === 40, JSON.stringify({ range: s4.range, type: s4.type, power: s4.power })));
   const s5 = parser.parseSkill('【爆裂】[群攻][范围:圆形;射程:10;半径:5]');
-  cases.push(ok('T01-03 显式范围配旧群攻并存', eq(s5.range, { type: '圆形', castRange: 10, radius: 5 }) && s5.type === '[群攻]', JSON.stringify({ range: s5.range, type: s5.type })));
+  cases.push(ok('T01-03 显式范围配旧群攻并存', eq(s5.range, { type: '圆形', castRange: 10, radius: 5 }) && s5.type === '[伤害]', JSON.stringify({ range: s5.range, type: s5.type })));
 
   // 范围/行动标签不占三效果槽
   const s6 = parser.parseSkill('【辅射】[范围:直线;长:8][行动:辅][群攻(枪击)]');
   cases.push(ok('T01-03 行动辅', eq(s6.actionCost, { main: 0, aux: 1 }), JSON.stringify(s6.actionCost)));
-  cases.push(ok('T01-03 主槽仍为群攻(枪击)', s6.type === '[群攻(枪击)]' && s6.type2 === '[无]', JSON.stringify([s6.type, s6.type2])));
+  cases.push(ok('T01-03 主槽仍为群攻(枪击)', s6.type === '[伤害(枪击)]' && s6.type2 === '[无]', JSON.stringify([s6.type, s6.type2])));
   const s7 = parser.parseSkill('【主射】[行动:主][单体]');
   cases.push(ok('T01-03 行动主', eq(s7.actionCost, { main: 1, aux: 0 }), JSON.stringify(s7.actionCost)));
   const s8 = parser.parseSkill('【默认】[单体]');

@@ -30,7 +30,7 @@ const HOST = [
   'state', 'isSkillActionable', 'prepareSkillTarget', 'teamBarrier', 'skillHasBarrierTag', 'hasEnoughBindings',
   'isSummonBlockedByLimit', 'getHeroItemBindings', 'itemBindingKnowledge', 'isItemUsable', 'prepareItemTarget',
   'handleBasicAttack', 'handleBasicDefend', 'handleBasicRetreat', 'cancelTargeting', 'getSkillGroupChildren',
-  'prepareGroupedItemSkill',
+  'prepareGroupedItemSkill', 'normalizeEffectTag',
 ];
 // 内联 onclick 中出现、需要委托到工厂内函数/宿主的名字
 const ACTS = ['openBasicMenu', 'closeBasicMenu', 'openAttackSkillMenu', 'closeAttackSkillMenu', 'openSupportSkillMenu',
@@ -157,6 +157,58 @@ function build() {
   // 宿主适配补丁（固定命中数）
   js = patch(js, 'if (isEnough) btn.onclick = () => prepareSkillTarget(idx);', 'btn.dataset.skillIdx = idx; if (isEnough) btn.onclick = () => prepareSkillTarget(idx);', 1, '技能卡挂全局索引（宿主补射程胶囊）');
 
+  // —— FX02 规范标签（编辑器下拉去单群）：单/群前缀标签映射为规范标签（单群由空间范围决定，不再进标签）——
+  // 官方规范名以 src/effect-definitions.mjs EFFECT_DEFINITIONS / LEGACY_TAG_ALIASES 为唯一权威（v3）：
+  //   单体/群攻→伤害，单回/群回→治疗，单回蓝/群回蓝→回蓝，单冲/群冲→充能，单增/群增→加攻，单防/群防→加防，
+  //   单盾/群盾→加盾，单瞄/群瞄→加瞄，单降/群降→降防，单盲/群盲→致盲，单滞/群滞→迟滞，单弱/群弱→虚弱，
+  //   单缓/群缓→减速，单速/群速→加速，单避/群避→闪避（持续；[回避] 一次性独立保留），穿透/群穿透→穿透，
+  //   眩晕/群眩晕→眩晕，散射/群散射→散射，中毒/群中毒→中毒，燃烧/群燃烧→燃烧，麻痹/群麻痹→麻痹，
+  //   反击/群反击→反击，驱散/群驱散→驱散；括号子型保留（[单体(枪击)]→[伤害(枪击)]）。
+  const TAG_NORM = [
+    [/^(单体|群攻)$/, '伤害'], [/^单体(?=[（(])/, '伤害'], [/^群攻(?=[（(])/, '伤害'],
+    [/^(单回蓝|群回蓝)$/, '回蓝'], [/^(单回|群回)$/, '治疗'], [/^(单增|群增)$/, '加攻'], [/^(单冲|群冲)$/, '充能'],
+    [/^(单防|群防)$/, '加防'], [/^(单盾|群盾)$/, '加盾'], [/^(单瞄|群瞄)$/, '加瞄'], [/^(单降|群降)$/, '降防'],
+    [/^(单盲|群盲)$/, '致盲'], [/^(单滞|群滞)$/, '迟滞'], [/^(单弱|群弱)$/, '虚弱'], [/^(单速|群速)$/, '加速'],
+    [/^(单缓|群缓)$/, '减速'], [/^(单避|群避)$/, '闪避'], [/^(穿透|群穿透)$/, '穿透'], [/^(眩晕|群眩晕)$/, '眩晕'],
+    [/^(散射|群散射)$/, '散射'], [/^(中毒|群中毒)$/, '中毒'], [/^(燃烧|群燃烧)$/, '燃烧'], [/^(麻痹|群麻痹)$/, '麻痹'],
+    [/^(反击|群反击)$/, '反击'], [/^(驱散|群驱散)$/, '驱散'],
+  ];
+  function normTag(raw) {
+    const m = raw.match(/^[^（(]*/);
+    const base = m ? m[0] : raw;
+    const sub = (raw.match(/[（(]([^）)]*)[）)]$/) || [])[1];
+    for (const [re, name] of TAG_NORM) if (re.test(base)) return name + (sub ? '(' + sub + ')' : '');
+    return null;
+  }
+  const mSk = js.match(/const SKILL_TYPES = \[([\s\S]*?)\];/);
+  if (!mSk) fail('SKILL_TYPES 未找到');
+  {
+    const seen = new Set(); const normed = [];
+    for (let item of mSk[1].split(',')) {
+      const t = item.trim();
+      if (!t) continue;
+      const mm = t.match(/^'\[([^\]]+)\]'$/);
+      let keep = t;
+      if (mm) { const nn = normTag(mm[1]); if (nn) keep = "'[" + nn + "]'"; }
+      if (!seen.has(keep)) { seen.add(keep); normed.push(keep); }
+    }
+    js = js.replace(mSk[0], 'const SKILL_TYPES = [' + normed.join(', ') + '];');
+    PATCH_LOG.push({ what: 'SKILL_TYPES 去单群规范化', hits: 1 });
+  }
+  // 规范标签显示名（只补未有条目；值 = 官方名本身，不另套输出）
+  js = patch(js, "'单体': '单体伤害', '群攻': '群体伤害',",
+    "'伤害': '伤害', '治疗': '治疗', '回蓝': '回蓝', '充能': '充能', '加攻': '加攻', '加防': '加防', '加盾': '加盾', '加瞄': '加瞄', '致盲': '致盲', '迟滞': '迟滞', '虚弱': '虚弱', '加速': '加速', '减速': '减速', '闪避': '闪避', '单体': '单体伤害', '群攻': '群体伤害',", 1, 'TAG_EXPAND_MAP 加规范标签显示名');
+  // 下拉渲染：旧标签当前值经宿主注入的 normalizeEffectTag 规范化后显示/回填（不保留旧群形态）
+  js = patch(js, "function renderSkillTypeOptions(curVal) {\n  const _nonSlot = new Set(['[必中]', '[转火]', '[突进]', '[众召]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]']);",
+    "function renderSkillTypeOptions(curVal) {\n  const _nonSlot = new Set(['[必中]', '[转火]', '[突进]', '[众召]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]']);\n  curVal = (curVal && normalizeEffectTag) ? ('[' + normalizeEffectTag(curVal) + ']') : curVal;", 1, '下拉当前值经 normalizeEffectTag 规范化');
+  // 规范伤害标签参与攻击技能判定（菜单攻击/辅助分组）与卡面胶囊配色、悬浮说明
+  js = patch(js, "const MENU_DAMAGE_TAGS = ['单体','群攻','穿透','群穿透','眩晕','群眩晕'];",
+    "const MENU_DAMAGE_TAGS = ['伤害','单体','群攻','穿透','群穿透','眩晕','群眩晕'];", 1, '攻击技能判定加规范伤害标签');
+  js = patch(js, "else if (cleanTag.includes('攻') || cleanTag.includes('单体') || cleanTag.includes('穿透'))",
+    "else if (cleanTag.includes('伤害') || cleanTag.includes('攻') || cleanTag.includes('单体') || cleanTag.includes('穿透'))", 1, '胶囊配色识别规范伤害标签');
+  js = patch(js, "'单体': '对单一目标造成 {N} 点伤害，受目标护甲减免。',",
+    "'伤害': '按空间范围命中目标，造成 {N} 点伤害，受护甲减免。', '单体': '对单一目标造成 {N} 点伤害，受目标护甲减免。',", 1, '伤害标签悬浮说明');
+
   // HTML：行动条导轨 + 菜单 + 悬浮提示容器
   const railA = L.findIndex(l => l.includes('<!-- 左侧：行动顺序队列与能量导轨 -->'));
   if (railA < 0) fail('行动条注释哨兵未找到');
@@ -219,7 +271,7 @@ export function createRpgUi(host) {
   // ---- 宿主注入（战棋规则判定、瞄准入口、伪 state） ----
   const { state, isSkillActionable, prepareSkillTarget, skillHasBarrierTag, hasEnoughBindings, isSummonBlockedByLimit,
     getHeroItemBindings, itemBindingKnowledge, isItemUsable, prepareItemTarget, handleBasicAttack, handleBasicDefend,
-    handleBasicRetreat, cancelTargeting, getSkillGroupChildren, prepareGroupedItemSkill } = host;
+    handleBasicRetreat, cancelTargeting, getSkillGroupChildren, prepareGroupedItemSkill, normalizeEffectTag } = host;
   const teamBarrier = 0;
 
   // ---- 原版代码（原样） ----

@@ -22,20 +22,20 @@ function pickWhitelist(src, keys) {
 
 // 技能白名单字段（配置与结构分离；不含 usesRemaining/_inGroup/parentName 引用结构）
 const SKILL_PACK_KEYS = [
-  'name', 'cost', 'hpCost', 'tpCost', 'charge', 'delay', 'haste', 'maxUses',
-  'hit', 'turns', 'slotTurns', 'slotTurns2', 'slotTurns3',
+  'name', 'cost', 'hpCost', 'tpCost', 'charge', 'delay', 'haste', 'maxUses', 'cooldownTurns',
+  'hit', 'turns', 'slotTurns', 'slotTurns2', 'slotTurns3', 'slotTargets',
   'type', 'power', 'type2', 'power2', 'type3', 'power3',
   'isReaction', 'reactionTarget', 'kanpoTarget', 'sheshenTarget',
   'damageType', 'isOthers', 'guaranteedHit', 'switchTarget', 'ignoreRow',
   'critRate', 'fxTag', 'barrierSub', 'barrierArmor', 'isHighTier', 'isLegendary',
-  'summonTarget', 'summonNoLimit', 'range', 'actionCost',
+  'summonTarget', 'summonNoLimit', 'range', 'actionCost', 'evadeShift',
 ];
 
 const ITEM_PACK_KEYS = [
   'name', 'category', 'maxUses',
   'bindings',
-  'cost', 'hpCost', 'tpCost', 'delay', 'haste',
-  'hit', 'turns', 'slotTurns', 'slotTurns2', 'slotTurns3',
+  'cost', 'hpCost', 'tpCost', 'delay', 'haste', 'cooldownTurns',
+  'hit', 'turns', 'slotTurns', 'slotTurns2', 'slotTurns3', 'slotTargets',
   'type', 'power', 'type2', 'power2', 'type3', 'power3',
   'isOthers', 'guaranteedHit', 'switchTarget', 'ignoreRow', 'critRate',
   'isHighTier', 'isLegendary', 'fxTag', 'damageType', 'barrierSub', 'barrierArmor',

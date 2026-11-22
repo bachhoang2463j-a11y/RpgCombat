@@ -1,0 +1,12 @@
+{
+  "stage": "RULES02",
+  "sourceBase": "13aacdd",
+  "sourceDirty": true,
+  "finalAll": { "executed": true, "runs": 1, "stages": 13, "passed": 536, "failed": 0, "pending": 0 },
+  "uiIndependent": { "passed": 30, "failed": 0, "note": "Includes six FX01 registry cases; not added again to finalAll." },
+  "artifact": { "path": "tactics/mvp-standalone.html", "bytes": 980801, "sha256": "20bc336ef194c9157ffa8d57d6497ac2f5baba56acb6eea5b26aafc18134d9ad", "bundled": 46, "requiredInputs": 31, "symbols": 35, "scriptSyntax": true, "scriptCloses": 1, "externalBusinessImports": 0 },
+  "browser": { "backend": "iab", "sourceLoaded": true, "artifactLoaded": true, "battleFlowPassed": false, "reactionFlowPassed": false, "blocker": "Opening camera animation stayed busy; button locator and map drag timed out. No Chrome or real Tavern used. No mock frame advancement used to claim production behavior." },
+  "deliveryGatePassed": false,
+  "deferred": ["sacrifice / summon owner interception", "map barrier", "real worldbook summon source for demo", "full P08 perception and later independent systems"],
+  "purposeVsState": "Rule migration and numerical regressions are verified; standalone real battle/reaction page gate remains pending. Do not label full P07 or final delivery complete."
+}

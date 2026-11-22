@@ -22,6 +22,8 @@ const REQUIRED_INPUTS = [
   'src/vendor/rpg-av/rpg-av.mjs', 'src/chapel-scene.mjs', 'src/chapel-art.mjs', 'src/ui-sfx.mjs',
   'src/vendor/rpg-ui/rpg-ui.mjs', 'src/unit-style.mjs', 'src/editor-panel.mjs',
   'src/fx-registry.mjs', 'src/fx-library.mjs', 'src/vfx-host.mjs',
+  'src/effect-definitions.mjs', 'src/effect-handlers.mjs', 'src/class-passives.mjs', 'src/variant-rules.mjs',
+  'src/reaction-prompt.mjs',
 ];
 // 复用模块关键函数必须进入产物（防止 tree-shaking 或误删导致"复用"名不副实）
 const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFeedback', 'classifyHit', 'playArsenicShot', 'CombatAudioMixer', 'HERO_VOICE_LINES', 'playSingleGunshot', 'playSingleShotgun', 'playSingleThunder', 'playSingleSlash', 'playSingleClaw', 'playSingleArrow', 'enemySpellProjectile',

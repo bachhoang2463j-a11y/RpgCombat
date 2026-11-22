@@ -17,7 +17,7 @@ const AOE_SUBTYPES = new Set(['爆炸', '雷', '火焰', '枪击', '毒雾', '�
 const SUBTYPE_RE = /[（(](枪击|霰弹|光|雷|爆炸|刀砍|拳击|爪击|撕咬|毒液|箭矢|冰霜|火焰|毒雾|风)[）)]/;
 export const WINDUP_BEAT_MS = 330;   // 回合制敌方前摇拍点（OMEN_BEAT）：起手后此刻出手
 
-// 攻击身份：显式括号子类优先 → 特效标签 → 伤害类型默认；空间范围决定单体/群体演出
+// 攻击身份：显式括号子类优先 → 特效标签 → 伤害类型默认；空间范围决定单体/群体演出（「自身」不按群体演出）
 export function resolveAttackIdentity(skill, casterSide) {
   const tags = [skill && skill.type, skill && skill.type2, skill && skill.type3].filter(t => t && t !== '[无]').join(' ');
   const m = tags.match(SUBTYPE_RE);
@@ -28,22 +28,24 @@ export function resolveAttackIdentity(skill, casterSide) {
     else if (dt === '法术') return { mode: 'projectile', subtype: casterSide === 'hero' ? 'fire' : 'enemy_spell' };
     else subtype = '刀砍';
   }
-  if (subtype === '火焰' && (!skill.range || skill.range.type === '单体')) return { mode: 'projectile', subtype: 'fire' };
-  const area = !!(skill && skill.range && skill.range.type !== '单体');
+  if (subtype === '火焰' && (!skill.range || skill.range.type === '单体' || skill.range.type === '自身')) return { mode: 'projectile', subtype: 'fire' };
+  const area = !!(skill && skill.range && skill.range.type !== '单体' && skill.range.type !== '自身');
   if (area && AOE_SUBTYPES.has(subtype)) return { mode: 'aoe', subtype };
   return { mode: area ? 'perTarget' : 'single', subtype };
 }
 
-// 前摇分类：颜色按伤害类型，单/群按战棋显式空间范围（不让旧"单体/群攻"标签覆盖）
+// 前摇分类：颜色按伤害类型，单/群按战棋显式空间范围（不让旧"单体/群攻"标签覆盖；「自身」按单体拍点）
 export function resolveWindupKind(skill) {
   const dt = (skill && skill.damageType) || '近战';
   const color = dt === '远程' ? 'amber' : dt === '法术' ? 'violet' : 'red';
-  const wide = !!(skill && skill.range && skill.range.type !== '单体');
+  const wide = !!(skill && skill.range && skill.range.type !== '单体' && skill.range.type !== '自身');
   return color + '-' + (wide ? 'wide' : 'single');
 }
 
 export function createActionDirector(deps) {
   const { sandbox, avHost, getViewData, onReveal, onMoveFeedback, getUnitStyle } = deps;
+  const promptReaction = deps.promptReaction || (() => Promise.resolve(null));
+  const battleOf = deps.battle || (() => null);
   const av = avHost.av;
   const registry = deps.registry || registerDefaultFx(createFxRegistry());
 
@@ -276,7 +278,7 @@ export function createActionDirector(deps) {
     if (!result || !result.ok) return false;
     avHost.syncRoster();
     const vd = getViewData();
-    const skill = result.skill;
+    const skill = result.skill || battleOf().itemSkill(result.item);
     const casterUnit = vd.units.find(u => u.id === result.casterId);
     const identity = resolveAttackIdentity(skill, casterUnit.side);
     const casterEnt = avHost.entity(result.casterId);
@@ -287,7 +289,7 @@ export function createActionDirector(deps) {
     const wave = hits.length > 1 ? av.CombatAudioDirector.beginWave(hits.map(h => h.targetId), actionId) : null;
     const hitWaves = [];
     const incoming = (skill.power || 0) > 0 ? skill.power : (casterUnit.ref.atk || 0);
-    const input = actionInput(result);
+    const input = actionInput({ ...result, skill });
     const entry = registry.resolve(input);
 
     sandbox.getUnitView().setDisplayFacing(result.casterId, null);
@@ -309,18 +311,22 @@ export function createActionDirector(deps) {
       const done = revealed.get(targetId) || new Set();
       if (done.has(i)) return;
       done.add(i); revealed.set(targetId, done);
-      if (done.size === 1 && h.reaction) reactionRuns.push(playReaction(h));
+      const reaction = seg.reaction || (done.size === 1 ? h.reaction : null);
+      if (reaction) reactionRuns.push(playReaction({ ...h, reaction }));
+      // 回复槽段：规则真实标记（seg.heal）优先，回退生命提升推断（events 真实回复结果形态待规则 result 落地后接）
+      const healed = seg.heal != null ? !!seg.heal : (!seg.hit && seg.hpAfter > seg.hpBefore);
       const r = {
         targetId, sourceId: result.casterId, outcome: seg.hit ? 'hit' : 'dodge',
         maxHp: h.maxHp, hpBefore: seg.hpBefore, hpAfter: seg.hpAfter, hpDmg: seg.hpDmg,
-        shieldBefore: 0, shieldAfter: 0, shieldDmg: 0, incomingDmg: incoming,
+        shieldBefore: seg.shieldBefore || 0, shieldAfter: seg.shieldAfter || 0, shieldDmg: seg.shieldDmg || 0, incomingDmg: seg.rawDmg ?? incoming,
         isHero: h.side === 'hero', damageType: skill.damageType || '近战',
         actionId, waveId: wave ? wave.id : null,
       };
-      av.playHitFeedback(r, { wave: hitWaves[i] || (hitWaves[i] = { shook: false, hitStopped: false, classified: [] }) });
-      av.CombatAudioDirector.publish(r);
+      if (healed) playHealPulse(targetId);
+      else av.playHitFeedback(r, { wave: hitWaves[i] || (hitWaves[i] = { shook: false, hitStopped: false, classified: [] }) });
+      if (!healed) av.CombatAudioDirector.publish(r);
       if (wave && done.size === segs.length) av.CombatAudioDirector.completeTarget(wave, targetId);
-      if (onReveal) onReveal({ ...h, hit: seg.hit, hpBefore: seg.hpBefore, hpAfter: seg.hpAfter, hpDmg: seg.hpDmg, down: seg.down,
+      if (onReveal) onReveal({ ...h, hit: seg.hit, heal: healed, hpBefore: seg.hpBefore, hpAfter: seg.hpAfter, hpDmg: seg.hpDmg, down: seg.down,
         logIndex: seg.logIndex, logEnd: seg.logEnd, segmentIndex: i, segmentCount: segs.length }, Object.assign({ result, identity, entryId: entry.id }, meta));
     }
     function reveal(targetId, meta) {
@@ -342,6 +348,70 @@ export function createActionDirector(deps) {
     if (wave) av.CombatAudioDirector.closeWave(wave);
     dropAnchors();
     return ok;
+  }
+
+  // ---------- 攻击驱动（FX02 反应接线）：统一驱动 battle.beginAttack generator（玩家与敌方同一入口） ----------
+  // generator yield {type:'reaction', responderId, casterId, skill, candidates, slotIndex} 时：
+  //   hero 受击者 → await promptReaction(req)（全屏弹窗，玩家选择/放弃/收起）；AI 受击者由宿主在 promptReaction 包装里自动选择。
+  // 选择（skill 对象或 null）喂回 generator.next(choice)；generator 返回 FX01 result（hits 含 segments/events）。
+  // 弹窗等待期间不推进任何虚拟时间：battle 时钟只由规则命令推进，演出定时器在拿到最终 result 前不会启动。
+  // scope 失活（重置/换场）或 cancelAttack() 时等待以 null 结算，旧 generator 已 return、旧弹窗已由宿主关闭。
+  let activeRun = null;
+  async function driveAttack(gen) {
+    const run = { gen, cancelled: false };
+    activeRun = run;
+    try {
+      let step = gen.next();
+      while (!step.done) {
+        const req = step.value;
+        if (run.cancelled) return null;
+        let choice = null;
+        if (req && req.type === 'reaction') {
+          const s = scope();
+          if (!s || !s.isLive) return null;
+          choice = await promptReaction(req);
+          if (run.cancelled) return null;
+          const s2 = scope();
+          if (!s2 || !s2.isLive) return null;
+        }
+        step = gen.next(choice == null ? null : choice);
+      }
+      return step.value;
+    } finally {
+      if (activeRun === run) activeRun = null;
+    }
+  }
+  async function runAttackLive(skill, aim) {
+    const battle = battleOf();
+    if (!battle || typeof battle.beginAttack !== 'function') return { ok: false, reason: '反应接口未接线：battle.beginAttack 待规则代理落地', pending: false };
+    return driveAttack(battle.beginAttack(skill, aim));
+  }
+  // 重置/换场：取消活动驱动（generator.return），弹窗由宿主 shell.cancelReactionPrompt() 关闭
+  function cancelAttack() {
+    const run = activeRun;
+    if (!run) return;
+    run.cancelled = true;
+    activeRun = null;
+    try { if (run.gen && typeof run.gen.return === 'function') run.gen.return(); } catch (_) { /* 旧链作废即可 */ }
+  }
+
+  // ---------- 治疗反馈（通用回复/恢复视觉）：绿色光粒上升 + 周身光环；复用世界层宿主，不按角色硬编码 ----------
+  function playHealPulse(unitId) {
+    const c = centerOf(unitId);
+    if (!c) return;
+    const x = c.x * 50, y = c.y * 50, n = 10;
+    const dots = Array.from({ length: n }, (_, i) => {
+      const a = i / n * Math.PI * 2, d = 10 + (i % 3) * 8;
+      return '<i style="position:absolute;left:' + (x + Math.cos(a) * d) + 'px;top:' + (y + Math.sin(a) * d * 0.6) + 'px;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;' +
+        'background:radial-gradient(circle,#d9f99d 0%,#4ade80 45%,transparent 75%);mix-blend-mode:screen;"></i>';
+    }).join('');
+    const ring = '<i style="position:absolute;left:' + x + 'px;top:' + y + 'px;width:74px;height:74px;margin:-37px 0 0 -37px;border-radius:50%;' +
+      'background:radial-gradient(circle,transparent 52%,rgba(74,222,128,0.7) 61%,rgba(34,197,94,0.4) 69%,transparent 78%);mix-blend-mode:screen;"></i>';
+    const dotsLayer = fxLayers().top.layer(dots, 620);
+    [...dotsLayer.children].forEach((el, i) => {
+      el.animate([{ transform: 'translate(0,6px) scale(0.6)', opacity: 0 }, { transform: 'translate(0,-10px) scale(1)', opacity: 0.95, offset: 0.35 }, { transform: 'translate(0,-30px) scale(0.4)', opacity: 0 }], { duration: 560, delay: i * 34, easing: 'cubic-bezier(0.3,0,0.3,1)', fill: 'both' });
+    });
+    fxLayers().top.layer(ring, 480).firstChild.animate([{ transform: 'scale(0.5)', opacity: 0.9 }, { transform: 'scale(1.25)', opacity: 0 }], { duration: 460, fill: 'forwards' });
   }
 
   // ---------- 反应演出（回避错位等）：在被攻击者的首个接触拍点启动，与攻击演出并行 ----------
@@ -391,5 +461,6 @@ export function createActionDirector(deps) {
   }
   function dropAnchors() { anchors.forEach(d => { const s = scope(); if (s) s.removeNode(d); else d.remove(); }); anchors.clear(); }
 
-  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, wait, resolveAttackIdentity, resolveWindupKind };
+  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, wait, resolveAttackIdentity, resolveWindupKind,
+    runAttackLive, driveAttack, cancelAttack };
 }

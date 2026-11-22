@@ -383,7 +383,7 @@ async function tm02(m) {
     mkUnit('h1', 'hero', { spd: 200, mp: 10 }),
     mkUnit('e1', 'enemy', { hp: 30, def: 5, spd: 100 }),
   ];
-  const b = battle.createBattle({ units: unitsF, placementsById: { h1: { col: 3, row: 3, facing: 0 }, e1: { col: 8, row: 3, facing: 180 } }, scene: open, random: rng(11) });
+  const b = battle.createBattle({ units: unitsF, placementsById: { h1: { col: 3, row: 3, facing: 0 }, e1: { col: 8, row: 3, facing: 180 } }, scene: open, random: () => 0.5 });
   b.start();
   const aim = aimAt(8, 3, 'e1');
   const pq = b.previewAttack(fire, aim);
@@ -476,7 +476,7 @@ async function tm04(m) {
     mkUnit('e1', 'enemy', { spd: 150, hp: 30, def: 5, moveDistance: 3 }),
   ];
   const placements = { h1: { col: 2, row: 2, facing: 0 }, e1: { col: 7, row: 2, facing: 180 } };
-  const b = battle.createBattle({ units: units, placementsById: placements, scene: open, random: rng(23) });
+  const b = battle.createBattle({ units: units, placementsById: placements, scene: open, random: () => 0.5 });
   const aim = aimAt(7, 2, 'e1');
 
   const s0 = b.start();
@@ -591,7 +591,7 @@ async function tm05(m) {
   cases.push(ok('TM-05 AI落位与真实查询可组合（攻击位命中合法）',
     !!combo && combo.ok === true && (combo.targetIds || []).indexOf('h1') >= 0,
     j({ ok: combo && combo.ok, targets: combo && combo.targetIds })));
-  const b = battle.createBattle({ units: unitsA, placementsById: placeA, scene: open, random: rng(31) });
+  const b = battle.createBattle({ units: unitsA, placementsById: placeA, scene: open, random: () => 0.5 });
   b.start();
   const es = b.runEnemyTurn();
   cases.push(ok('TM-05 runEnemyTurn近战接近攻击（普攻位成本5更优：英雄-8血）并推进下一位',
@@ -629,7 +629,7 @@ async function tm05(m) {
     !!planC && !planC.moveTo && !!planC.skill &&
     !!planC.aim && (planC.aim.targetId === 'h1' || (planC.aim.x === 3.5 && planC.aim.y === 3.5)),
     j(planC)));
-  const b3 = battle.createBattle({ units: unitsC, placementsById: placeC, scene: open, random: rng(41) });
+  const b3 = battle.createBattle({ units: unitsC, placementsById: placeC, scene: open, random: () => 0.5 });
   b3.start();
   const es3 = b3.runEnemyTurn();
   cases.push(ok('TM-05 远程原地攻击扣血且敌位不变',

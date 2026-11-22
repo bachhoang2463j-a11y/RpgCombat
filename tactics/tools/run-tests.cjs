@@ -141,6 +141,35 @@ const STAGES = {
     ],
     modules: ['parser', 'battle', 'fixture', 'fxRegistry', 'fxLibrary'],
   },
+  rules02: {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'rules02-node-cases.mjs'),
+    groups: ['TR2-A', 'TR2-B', 'TR2-C', 'TR2-D'],
+    requiredExports: [
+      ['effectDefinitions', 'EFFECT_DEFINITIONS'], ['effectDefinitions', 'normalizeEffectTag'],
+      ['effectDefinitions', 'effectDefinition'], ['effectDefinitions', 'skillSlots'],
+      ['effectHandlers', 'applyEffectSlot'], ['classPassives', 'CLASS_PASSIVES'], ['classPassives', 'getEffectiveStats'],
+      ['variantRules', 'applyTypeResist'], ['battle', 'createBattle'], ['battle', 'skillSupport'], ['battle', 'itemAsSkill'],
+    ],
+    modules: ['protocol', 'parser', 'battle', 'damage', 'range', 'clock', 'scheduler', 'lifecycle', 'scene', 'geometry', 'movement', 'ai',
+      'effectDefinitions', 'effectHandlers', 'classPassives', 'variantRules'],
+  },
+  'rules02-passive': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'rules02-passive-node-cases.mjs'),
+    groups: ['RULES02-PASSIVE'],
+    requiredExports: [['battle', 'createBattle'], ['classPassives', 'getEffectiveStats']],
+    modules: ['battle', 'classPassives', 'variantRules', 'parser', 'clock'],
+  },
+  'rules02-independent': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'rules02-independent-node-cases.mjs'),
+    groups: ['TR2-01', 'TR2-02', 'TR2-03', 'TR2-04'],
+    requiredExports: [
+      ['effectDefinitions', 'EFFECT_DEFINITIONS'], ['effectDefinitions', 'normalizeEffectTag'],
+      ['effectDefinitions', 'effectDefinition'], ['effectDefinitions', 'skillSlots'],
+      ['battle', 'createBattle'], ['parser', 'parseSkill'],
+    ],
+    modules: ['protocol', 'parser', 'battle', 'damage', 'range', 'clock', 'scheduler', 'lifecycle', 'scene', 'geometry', 'movement', 'ai',
+      'effectDefinitions', 'effectHandlers', 'classPassives', 'variantRules'],
+  },
 };
 
 function fail(msg) {
@@ -196,6 +225,10 @@ const MODULE_FILES = {
   motion: 'motion.mjs',
   avHost: 'av-host.mjs',
   vendor: 'vendor/rpg-av/rpg-av.mjs',
+  effectDefinitions: 'effect-definitions.mjs',
+  effectHandlers: 'effect-handlers.mjs',
+  classPassives: 'class-passives.mjs',
+  variantRules: 'variant-rules.mjs',
 };
 
 async function loadModules(stageDef) {
@@ -305,6 +338,7 @@ function assertRequiredExports(modules, required) {
   // 数据常量白名单之外一律要求函数类型（T01-06 依赖该门禁：传不存在函数必须失败）
   const constants = new Set([
     'PROTOTYPES', 'RANGE_TYPES', 'TACTICS_ROSTER_KEY',
+    'EFFECT_DEFINITIONS', 'CLASS_PASSIVES',
     'TEST_ROOM', 'DEFAULT_YAML_A', 'DEFAULT_YAML_B', 'DEFAULT_YAML_C', 'DEFAULT_PLACEMENTS',
   ]);
   for (const [mod, name] of required) {

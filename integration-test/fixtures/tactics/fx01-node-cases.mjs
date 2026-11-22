@@ -79,20 +79,26 @@ export const groups = {
     cases.push(ok('TFX-02 埃利奥特原值属性与技能/物品全量载入（19 技能条目含 2 组头 + 7 物品）',
       ell.maxHp === 100 && ell.maxMp === 110 && ell.atk === 20 && ell.def === 40 && ell.spd === 50 && ell.skills.length === 19 && ell.items.length === 7,
       j({ hp: ell.maxHp, mp: ell.maxMp, atk: ell.atk, def: ell.def, spd: ell.spd, skills: ell.skills.length, items: ell.items.length })));
-    cases.push(ok('TFX-02 主动可用恰为 萨维奇三连发/压缩爆燃/预备咏唱；其余按真实原因拒绝（无"范围未迁移"遮挡）',
-      j(usable) === j(['压缩爆燃', '萨维奇三连发', '预备咏唱'].sort()) && rejected.length === 14 && rejected.every(r => r.reason && r.reason !== '范围未迁移'), j({ usable, rejected })));
+    const rejBy = name => (rejected.find(r => r.name === name) || {}).reason || '';
+    cases.push(ok('TFX-02 主动可用恰为 11 项（RULES02 迁移后）；4 反应与 2 结界暂缓按真实原因拒绝（无"范围未迁移"遮挡）',
+      j(usable) === j(['伊西斯之拥', '压缩爆燃', '召雷术', '归尘礼赞', '拉莱耶造雾术', '提前瞄准', '灵风术', '精准流火', '萨维奇三连发', '迅捷愈合法', '预备咏唱'].sort()) &&
+      rejected.length === 6 && rejected.every(r => r.reason && r.reason !== '范围未迁移') &&
+      rejBy('纳克提特障壁术') === '场地结界（肃正）暂缓' && rejBy('圣域帷幕') === '场地结界（肃正）暂缓' &&
+      rejBy('折影步') === '反应技能只能被动触发' && rejBy('双莲祛煞') === '反应技能只能被动触发' && rejBy('巫师护盾') === '反应技能只能被动触发' &&
+      rejBy('净蚀反冲') === '看破只能由反应链触发', j({ usable, rejected })));
     const zy = skillNamed(ell, '折影步');
     cases.push(ok('TFX-02 折影步：近战回避反应 + 显式侧闪 2m 位移标签', zy.isReaction && zy.reactionTarget === '近战' && zy.evadeShift && zy.evadeShift.mode === 'side' && zy.evadeShift.distance === 2 && zy.fxTag === '折影步', j(zy.evadeShift)));
 
     // 多段攻击槽逐段结算：三段 55，护甲 0；第二段被闪避
     const savage = skillNamed(ell, '萨维奇三连发');
     const h1 = unit('ell', 'hero', { spd: 200 }), t1 = unit('t', 'enemy', { hp: 200, spd: 10, evasion: 20 });
-    const b1 = battle(m, [h1, t1], { ell: { col: 2, row: 4 }, t: { col: 8, row: 4 } }, rng([0, 0.99, 0.99, 0, 0, 0.99]));
+    // 每段消费顺序＝伤害系数 roll（0.8+0.4r）→ 命闪 dodge/attack 两 roll（miss 仍消费系数）；序列逐段固定：段1 系数0→44 命中、段2 命闪落空、段3 系数0.5→55 命中
+    const b1 = battle(m, [h1, t1], { ell: { col: 2, row: 4 }, t: { col: 8, row: 4 } }, rng([0, 0, 0.99, 0.5, 0.99, 0, 0.5, 0, 0.99]));
     const r1 = b1.attack(savage, { x: 8.5, y: 4.5, targetId: 't' });
     const segs1 = r1.hits[0] && r1.hits[0].segments;
     cases.push(ok('TFX-02 多段攻击槽：三段独立命闪与扣血，聚合值=逐段之和，日志逐段',
-      r1.ok && segs1.length === 3 && j(segs1.map(s => s.hit)) === j([true, false, true]) && t1.ref.hp === 90 && r1.hits[0].hpDmg === 110 &&
-      segs1[0].hpAfter === 145 && segs1[2].hpAfter === 90 && b1.snapshot().log.filter(l => /第\d段/.test(l)).length === 3,
+      r1.ok && segs1.length === 3 && j(segs1.map(s => s.hit)) === j([true, false, true]) && t1.ref.hp === 101 && r1.hits[0].hpDmg === 99 &&
+      segs1[0].hpAfter === 156 && segs1[2].hpAfter === 101 && b1.snapshot().log.filter(l => l.includes('萨维奇三连发')).length === 3, // 段日志逐条成行（原版口径，不再写第N段前缀）
       j({ segs: segs1, hp: t1.ref.hp, log: b1.snapshot().log })));
     // 中途击倒：后续段不再结算
     const h2 = unit('ell', 'hero', { spd: 200 }), t2 = unit('t', 'enemy', { hp: 60, spd: 10 });
@@ -120,14 +126,19 @@ export const groups = {
       const units = [hero, foe];
       const placements = { ell: { col: 4, row: 4 }, foe: { col: 5, row: 4 } };
       if (blocker) { units.push(unit('blk', 'hero', { spd: 5 })); placements.blk = { col: 4, row: 5 }; }
-      const b = battle(m, units, placements, rng([0, 0.99]));
-      const r = b.attack(melee, { x: 4.5, y: 4.5, targetId: 'ell' });
+      // 同步 attack() 缺省 policy:none 不代玩家响应反应（battle.mjs 离线包装）；改走 beginAttack 生成器，收到 reaction 请求后显式确认折影步。
+      // 序列：系数0→0.8 → 命闪(1,100)命中 → 反应二次闪避 dodge 0.99×900 vs attack 1 → 回避成功
+      const b = battle(m, units, placements, rng([0, 0, 0.99, 0.99, 0]));
+      const gen = b.beginAttack(melee, { x: 4.5, y: 4.5, targetId: 'ell' });
+      let step = gen.next(), req = null;
+      while (!step.done) { if (step.value && step.value.type === 'reaction') { req = step.value; step = gen.next({ responderId: req.responderId, skill: req.candidates[0].skill }); } else step = gen.next(null); }
+      const r = step.value;
       return { r, hero, b, at: { col: b.ctx.placementsById.ell.col, row: b.ctx.placementsById.ell.row } };
     };
     const free = shiftCase(false), blocked = shiftCase(true);
     const rx = free.r.hits[0] && free.r.hits[0].reaction;
     cases.push(ok('TFX-02 折影步：回避成功即侧闪 2m，规则站位立即更新，结果带 reaction.shift 路径',
-      free.r.ok && rx && rx.canceled && rx.fxTag === '折影步' && rx.shift.distance === 2 && j(free.at) === j({ col: 4, row: 6 }) &&
+      free.r.ok && rx && rx.dodged && rx.fxTag === '折影步' && rx.shift.distance === 2 && j(free.at) === j({ col: 4, row: 6 }) &&
       rx.shift.path.length === 3 && free.hero.ref.hp === 100 && free.hero.ref.mp === 106,
       j({ reaction: rx, at: free.at, hp: free.hero.ref.hp, mp: free.hero.ref.mp })));
     cases.push(ok('TFX-02 折影步：一侧被挡改向另一侧', blocked.r.ok && j(blocked.at) === j({ col: 4, row: 2 }), j({ at: blocked.at, reaction: blocked.r.hits[0] && blocked.r.hits[0].reaction })));

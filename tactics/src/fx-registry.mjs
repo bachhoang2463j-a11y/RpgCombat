@@ -6,6 +6,8 @@
 // 本文件无 DOM 依赖，Node 与浏览器共用。
 // ==========================================
 
+import { normalizeEffectTag } from './effect-definitions.mjs';
+
 // L1 轻量：目标局部 ≤0.6s；L2 中量：周身+地面 0.8–1.2s；L3 重量：全屏 2–2.5s；L4 史诗：全屏+暗场 3–3.5s。
 // 音量：L1 短反馈峰值 0.22–0.38；L2–L4 转折爆发/主攻击峰值 0.50–0.75。'identity' = 沿用回合制已定稿资产，不再分级。
 export const GRADE_BUDGETS = {
@@ -21,7 +23,8 @@ const SLOT_RAW = tag => String(tag || '').replace(/[[\]]/g, '');
 export function actionInput(result) {
   const skill = result.skill || {};
   const slots = (result.query && result.query.slotTargets) || [];
-  const tags = [skill.type, skill.type2, skill.type3].filter(t => t && t !== '[无]');
+  // 槽标签统一走官方规范名（旧单群输入为别名，normalizeEffectTag 吸收；括号子型保留）
+  const tags = [skill.type, skill.type2, skill.type3].filter(t => t && t !== '[无]').map(t => normalizeEffectTag(t) || SLOT_RAW(t));
   const attackSlots = slots.filter(s => s.attack).length;
   const effectSlots = slots.filter(s => !s.attack && s.side !== 'none' && SLOT_RAW(s.tag) !== '无');
   const selfOnly = !attackSlots && effectSlots.length > 0 && effectSlots.every(s => (s.targetIds || []).length === 1 && s.targetIds[0] === result.casterId);
@@ -29,10 +32,10 @@ export function actionInput(result) {
     kind: 'action',
     fxTag: skill.fxTag || null,
     shape: (result.query && result.query.shape && result.query.shape.type) || (skill.range && skill.range.type) || null,
-    slotTags: tags.map(SLOT_RAW),
+    slotTags: tags,
     attackSlots,
     selfOnly,
-    grantsMainPoint: tags.some(t => SLOT_RAW(t) === '再动'),
+    grantsMainPoint: tags.some(t => t === '再动'),
     haste: skill.haste || 0,
     damageType: skill.damageType || null,
   };

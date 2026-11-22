@@ -2,8 +2,8 @@
 // 由 tactics/tools/extract-rpg-ui.cjs 自动生成，请勿手改。
 // 源: index.html  sha256=5c1ab2a1a243bb7d7e79b4aca76026ad1058af2a74bf9dfbf8763ae8b13554e7
 // 入选声明 55 段: VARIANT_GRANT_NAMES@3103, VARIANT_GRANT_TIPS@3104, getGrantedVariantName@3112, SKILL_TYPES@3121, SKILL_TYPE_EDIT_OPTIONS@3139, TAG_EXPAND_MAP@3149, expandTagLabel@3169, tagDisplayLabel@3182, TAG_EFFECT_TIPS@3188, getTagTip@3256, tagTipAttrs@3272, ASSET_ORIGIN@3340, ASSET_BASE@3341, escapeHistoryHtml@3563, RLYEH_FOG_CLOUD_URL@15572, WEBM_FX_REGISTRY@16678, getEffectiveGroupChildren@19073, _queueUidCounter@20543, _prevQueueCurrentUid@20544, _roundStartGlowPending@20545, _recentSpeedChanges@20546, _TURN_QUEUE_ANIM_MS@20547, _TURN_QUEUE_EASE@20548, renderTurnQueue@20550, MENU_DAMAGE_TAGS@26978, isAttackSkill@26979, formatTagPill@26985, createSkillCard@27020, createSkillGroupCard@27156, updateSkillMenus@27199, closeAllSubMenus@27267, openBasicMenu@27272, closeBasicMenu@27273, openAttackSkillMenu@27276, closeAttackSkillMenu@27277, openSupportSkillMenu@27278, closeSupportSkillMenu@27279, ITEM_CATEGORY_META@27284, createItemCard@27290, updateItemMenu@27416, openItemMenu@27433, closeItemMenu@27439, closeSkillMenu@27445, buildEditorSkillTagPreview@27533, buildSkillFormFieldsHtml@27553, syncGrantSlotPower@27616, renderSkillTypeOptions@27627, closeSkillTypeCombo@27639, openSkillTypeCombo@27643, filterSkillTypeCombo@27662, applySkillTypeCombo@27677, togglePillClass@28478, _rcTipTimer@31334, showTagTipFor@31335, hideTagTip@31361
-// 宿主注入: state, isSkillActionable, prepareSkillTarget, teamBarrier, skillHasBarrierTag, hasEnoughBindings, isSummonBlockedByLimit, getHeroItemBindings, itemBindingKnowledge, isItemUsable, prepareItemTarget, handleBasicAttack, handleBasicDefend, handleBasicRetreat, cancelTargeting, getSkillGroupChildren, prepareGroupedItemSkill
-// 宿主适配补丁: 技能卡挂全局索引（宿主补射程胶囊）×1; 行动条外层加 id（宿主安全区）×1; 内联 onclick → 委托×13; 防御/撤退禁用注明×2; 标签下拉浮层挂作用域×1
+// 宿主注入: state, isSkillActionable, prepareSkillTarget, teamBarrier, skillHasBarrierTag, hasEnoughBindings, isSummonBlockedByLimit, getHeroItemBindings, itemBindingKnowledge, isItemUsable, prepareItemTarget, handleBasicAttack, handleBasicDefend, handleBasicRetreat, cancelTargeting, getSkillGroupChildren, prepareGroupedItemSkill, normalizeEffectTag
+// 宿主适配补丁: 技能卡挂全局索引（宿主补射程胶囊）×1; SKILL_TYPES 去单群规范化×1; TAG_EXPAND_MAP 加规范标签显示名×1; 下拉当前值经 normalizeEffectTag 规范化×1; 攻击技能判定加规范伤害标签×1; 胶囊配色识别规范伤害标签×1; 伤害标签悬浮说明×1; 行动条外层加 id（宿主安全区）×1; 内联 onclick → 委托×13; 防御/撤退禁用注明×2; 标签下拉浮层挂作用域×1
 // ==========================================
 /* eslint-disable */
 export const RPG_UI_RAIL_HTML = "    <div id=\"turn-order-rail\" class=\"absolute left-1 sm:left-4 md:left-6 top-16 sm:top-20 bottom-44 sm:bottom-48 w-12 sm:w-14 z-30 pointer-events-auto flex flex-col items-center select-none\">\n      <div class=\"relative w-full h-full flex flex-col items-center\">\n        <div class=\"timeline-rail\">\n          <div class=\"rail-pulse-beam\"></div>\n        </div>\n        <div id=\"turn-order-container\" class=\"relative w-full h-full flex flex-col gap-2 sm:gap-2.5 items-center overflow-y-auto no-scrollbar mask-fade-y py-3 scroll-smooth\"></div>\n      </div>\n    </div>";
@@ -15,7 +15,7 @@ export function createRpgUi(host) {
   // ---- 宿主注入（战棋规则判定、瞄准入口、伪 state） ----
   const { state, isSkillActionable, prepareSkillTarget, skillHasBarrierTag, hasEnoughBindings, isSummonBlockedByLimit,
     getHeroItemBindings, itemBindingKnowledge, isItemUsable, prepareItemTarget, handleBasicAttack, handleBasicDefend,
-    handleBasicRetreat, cancelTargeting, getSkillGroupChildren, prepareGroupedItemSkill } = host;
+    handleBasicRetreat, cancelTargeting, getSkillGroupChildren, prepareGroupedItemSkill, normalizeEffectTag } = host;
   const teamBarrier = 0;
 
   // ---- 原版代码（原样） ----
@@ -35,27 +35,12 @@ function getGrantedVariantName(tag) {
   return m && VARIANT_GRANT_NAMES.includes(m[1].trim()) ? m[1].trim() : null;
 }
 
-const SKILL_TYPES = [
-  '[无]', '[群攻]', '[群攻(爆炸)]', '[群攻(雷)]', '[群攻(火焰)]', '[群攻(枪击)]', '[群攻(毒雾)]', '[群攻(冰霜)]', '[群攻(风)]', '[群攻(光)]',
-  '[单体]', '[单体(枪击)]', '[单体(火焰)]', '[单体(光)]', '[单体(雷)]', '[单体(爆炸)]', '[单体(刀砍)]', '[单体(拳击)]', '[单体(爪击)]', '[单体(撕咬)]', '[单体(毒液)]', '[单体(冰霜)]', '[群回]', '[单回]', '[群增]',
-  '[单增]', '[群防]', '[单防]', '[群盾]', '[单盾]',
-  '[群回蓝]', '[单回蓝]', '[吸蓝]', '[群冲]', '[单冲]', '[群瞄]', '[单瞄]', '[群降]', '[单降]', '[群盲]', '[单盲]', '[群滞]', '[单滞]', '[群弱]', '[单弱]', '[嘲讽]', '[反击]', '[群反击]', '[再动]', '[回避]', '[群避]', '[单避]',
-  '[眩晕]', '[群眩晕]', '[穿透]', '[群穿透]', '[散射]', '[散射(霰弹)]', '[群散射]', '[群散射(霰弹)]', '[免伤]',
-  '[中毒]', '[群中毒]', '[燃烧]', '[群燃烧]', '[麻痹]', '[群麻痹]',
-  '[单速]', '[群速]', '[单缓]', '[群缓]',
-  '[自盲]', '[自降]', '[自弱]', '[自滞]', '[自缓]',
-  '[驱散]', '[群驱散]',
-  '[肃正]', '[肃正:近战]', '[肃正:远程]', '[肃正:法术]',
-  ...VARIANT_GRANT_NAMES.map(name => `[赋予:${name}]`),
-  '[必中]', '[转火]', '[突进]', '[众召]',
-  '[高阶]', '[传奇]', '[神术]',
-  '[近战]', '[远程]', '[法术]'
-];
+const SKILL_TYPES = ['[无]', '[伤害]', '[伤害(爆炸)]', '[伤害(雷)]', '[伤害(火焰)]', '[伤害(枪击)]', '[伤害(毒雾)]', '[伤害(冰霜)]', '[伤害(风)]', '[伤害(光)]', '[伤害(刀砍)]', '[伤害(拳击)]', '[伤害(爪击)]', '[伤害(撕咬)]', '[伤害(毒液)]', '[治疗]', '[加攻]', '[加防]', '[加盾]', '[回蓝]', '[吸蓝]', '[充能]', '[加瞄]', '[降防]', '[致盲]', '[迟滞]', '[虚弱]', '[嘲讽]', '[反击]', '[再动]', '[回避]', '[闪避]', '[眩晕]', '[穿透]', '[散射]', '[散射(霰弹)]', '[免伤]', '[中毒]', '[燃烧]', '[麻痹]', '[加速]', '[减速]', '[自盲]', '[自降]', '[自弱]', '[自滞]', '[自缓]', '[驱散]', '[肃正]', '[肃正:近战]', '[肃正:远程]', '[肃正:法术]', ...VARIANT_GRANT_NAMES.map(name => `[赋予:${name}]`), '[必中]', '[转火]', '[突进]', '[众召]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]'];
 
 const SKILL_TYPE_EDIT_OPTIONS = SKILL_TYPES.filter(t => !['[必中]', '[转火]', '[突进]', '[众召]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]'].includes(t));
 
 const TAG_EXPAND_MAP = {
-  '单体': '单体伤害', '群攻': '群体伤害', '穿透': '单体穿透', '群穿透': '群体穿透',
+  '伤害': '伤害', '治疗': '治疗', '回蓝': '回蓝', '充能': '充能', '加攻': '加攻', '加防': '加防', '加盾': '加盾', '加瞄': '加瞄', '致盲': '致盲', '迟滞': '迟滞', '虚弱': '虚弱', '加速': '加速', '减速': '减速', '闪避': '闪避', '单体': '单体伤害', '群攻': '群体伤害', '穿透': '单体穿透', '群穿透': '群体穿透',
   '散射': '散射伤害', '群散射': '群体散射', '眩晕': '击晕瘫痪', '群眩晕': '群体击晕',
   '单回': '目标回复', '群回': '群体回复', '单回蓝': '目标回蓝', '群回蓝': '群体回蓝',
   '吸蓝': '法力抽取', '单冲': '目标充能', '群冲': '群体充能',
@@ -91,7 +76,7 @@ function tagDisplayLabel(cleanTag, powerNum) {
 }
 
 const TAG_EFFECT_TIPS = {
-  '单体': '对单一目标造成 {N} 点伤害，受目标护甲减免。',
+  '伤害': '按空间范围命中目标，造成 {N} 点伤害，受护甲减免。', '单体': '对单一目标造成 {N} 点伤害，受目标护甲减免。',
   '群攻': '对敌方全体造成 {N} 点伤害，受各自护甲减免。',
   '穿透': '无视目标护甲与护盾，直接造成 {N} 点伤害。',
   '群穿透': '对敌方全体造成无视护甲与护盾的 {N} 点伤害。',
@@ -425,7 +410,7 @@ function renderTurnQueue() {
   _prevQueueCurrentUid = currentUid;
 }
 
-const MENU_DAMAGE_TAGS = ['单体','群攻','穿透','群穿透','眩晕','群眩晕'];
+const MENU_DAMAGE_TAGS = ['伤害','单体','群攻','穿透','群穿透','眩晕','群眩晕'];
 
 function isAttackSkill(skill) {
   const slots = [skill.type, skill.type2, skill.type3];
@@ -437,7 +422,7 @@ function formatTagPill(typeStr, powerNum) {
   let cleanTag = typeStr.replace(/[\[\]]/g, '');
   let colorStyle = 'bg-slate-900/80 text-slate-300 border-slate-700';
   if (getGrantedVariantName(typeStr)) colorStyle = 'bg-cyan-950/80 text-cyan-300 border-cyan-700/70';
-  else if (cleanTag.includes('攻') || cleanTag.includes('单体') || cleanTag.includes('穿透')) colorStyle = 'bg-rose-950/80 text-rose-300 border-rose-800/70';
+  else if (cleanTag.includes('伤害') || cleanTag.includes('攻') || cleanTag.includes('单体') || cleanTag.includes('穿透')) colorStyle = 'bg-rose-950/80 text-rose-300 border-rose-800/70';
   else if (cleanTag.includes('吸蓝')) colorStyle = 'bg-cyan-950/80 text-cyan-300 border-cyan-700/70';
   else if (cleanTag.includes('回') || cleanTag.includes('冲') || cleanTag.includes('驱散')) colorStyle = 'bg-emerald-950/80 text-emerald-300 border-emerald-800/70';
   else if (cleanTag.includes('盾') || cleanTag.includes('防')) colorStyle = 'bg-blue-950/80 text-blue-300 border-blue-800/70';
@@ -929,6 +914,7 @@ function syncGrantSlotPower(select) {
 
 function renderSkillTypeOptions(curVal) {
   const _nonSlot = new Set(['[必中]', '[转火]', '[突进]', '[众召]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]']);
+  curVal = (curVal && normalizeEffectTag) ? ('[' + normalizeEffectTag(curVal) + ']') : curVal;
   const opts = (curVal && _nonSlot.has(curVal)) ? [curVal, ...SKILL_TYPE_EDIT_OPTIONS] : SKILL_TYPE_EDIT_OPTIONS;
   // option 文本「可读名 [原标签]」，value 保持原始标签不变（保存同步零影响）
   return opts.map(t => `<option value="${t}" ${curVal === t ? 'selected' : ''}>${t === '[无]' ? t : tagDisplayLabel(t.replace(/[\[\]]/g, '')) + ' ' + t}</option>`).join('');

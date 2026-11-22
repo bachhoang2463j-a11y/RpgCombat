@@ -11,8 +11,12 @@
 
 import { RANGE_TYPES, CONFIG_PACKAGE_PERSIST_KEYS } from './protocol.mjs';
 import { CLASS_STYLE } from './unit-style.mjs';
+import { normalizeEffectTag } from './effect-definitions.mjs';
 
-const RANGE_FIELDS = { 单体: ['castRange'], 直线: ['length', 'width'], 扇形: ['castRange', 'angle'], 圆形: ['castRange', 'radius'], 全域: [], 爆炸: ['castRange', 'radius'] };
+// 七范围（六范围 + 自身）：protocol.RANGE_TYPES 仍是六范围（协议文件不动），「自身」在编辑器本地扩展；
+// 解析支持（parser/[范围:自身]）待规则代理落地，落地前保存带「自身」的技能会走 parseSkillEntry 校验。
+const RANGE_TYPES_SEVEN = [...RANGE_TYPES, '自身'];
+const RANGE_FIELDS = { 单体: ['castRange'], 直线: ['length', 'width'], 扇形: ['castRange', 'angle'], 圆形: ['castRange', 'radius'], 全域: [], 爆炸: ['castRange', 'radius'], 自身: [] };
 const RANGE_LABEL = { castRange: '射程', length: '长', width: '宽', angle: '角度', radius: '半径' };
 const RANGE_UNIT = { castRange: 'm', length: 'm', width: 'm', angle: '°', radius: 'm' };
 const PERSIST_LABEL = { persistAtk: '攻击', persistDef: '防御', persistSpd: '速度', persistMaxHp: 'HP上限', persistMaxMp: 'MP上限', persistMaxTp: 'TP上限',
@@ -46,9 +50,20 @@ export function createEditorPanel({ rpgUi, shell, globalHtml, validate, onSave, 
   const pill = (id, on, cls, icon, label) => '<label id="pill-' + id + '" class="tag-toggle-pill ' + cls + ' ' + (on ? 'active' : 'inactive') + '"><input type="checkbox" id="edit-' + id + '" ' + (on ? 'checked' : '') +
     ' class="hidden" onchange="togglePillClass(this, \'pill-' + id + '\')"><span>' + icon + '</span> ' + label + '</label>';
   const rangeText = r => !r ? 'S14推导' : r.type === '单体' ? '单体 ' + (r.castRange ?? '') + 'm' : r.type === '直线' ? '直线 ' + r.length + '×' + (r.width || 1) + 'm'
-    : r.type === '扇形' ? '扇形 ' + r.castRange + 'm·' + r.angle + '°' : r.type === '全域' ? '全域' : r.type + ' ' + (r.castRange ?? '') + 'm·r' + r.radius;
+    : r.type === '扇形' ? '扇形 ' + r.castRange + 'm·' + r.angle + '°' : r.type === '全域' ? '全域' : r.type === '自身' ? '自身' : r.type + ' ' + (r.castRange ?? '') + 'm·r' + r.radius;
 
-  // ---------- 模块 G：战棋专有（范围 / 行动 / 蓄力） ----------
+  // ---------- 模块 G：战棋专有（范围 / 行动 / 蓄力 / 槽自身覆盖） ----------
+  // 槽目标覆盖（正式字段 skill.slotTargets[i] = 'self' | 'default'，skillSlots 按 index 读取）：全 default 时不写字段
+  const selfPill = (ns, k, on) => '<label id="pill-' + ns + '-self' + k + '" class="tag-toggle-pill ' + (on ? 'active' : 'inactive') +
+    ' border-violet-500 text-violet-300 bg-violet-950/70" title="覆盖本槽目标为施法者自身（默认按范围几何取目标）"><input type="checkbox" id="edit-' + ns + '-slotself' + k + '"' + (on ? ' checked' : '') +
+    ' class="hidden" onchange="togglePillClass(this, \'pill-' + ns + '-self' + k + '\')"><span>自身</span></label>';
+  const slotSelfOn = (s, i) => Array.isArray(s.slotTargets) && s.slotTargets[i] === 'self';
+  function slotSelfHtml(ns, s) {
+    return '<div class="flex items-center gap-1.5 flex-wrap text-[10px] text-slate-400"><span class="font-bold">槽目标覆盖:</span>' +
+      '<span class="text-slate-500">槽1</span>' + selfPill(ns, '', slotSelfOn(s, 0)) +
+      '<span class="text-slate-500">槽2</span>' + selfPill(ns, '2', slotSelfOn(s, 1)) +
+      '<span class="text-slate-500">槽3</span>' + selfPill(ns, '3', slotSelfOn(s, 2)) + '</div>';
+  }
   function moduleG(ns, s) {
     const r = s.range || null, type = r ? r.type : '';
     const fields = ['castRange', 'length', 'width', 'angle', 'radius'].map(f =>
@@ -57,19 +72,22 @@ export function createEditorPanel({ rpgUi, shell, globalHtml, validate, onSave, 
     const aux = s.actionCost && s.actionCost.aux > 0;
     return '<div class="t-ed-tac"><span class="t-ed-tac-h">🗺️ 战棋</span>' +
       '<label><span>范围</span><select id="edit-' + ns + '-rtype" data-ed-rtype="' + ns + '" class="edit-input-game text-amber-300 font-bold text-[10px] py-0.5">' +
-        '<option value=""' + (!type ? ' selected' : '') + '>按伤害类型推导(S14)</option>' + RANGE_TYPES.map(t => '<option value="' + t + '"' + (t === type ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label>' +
+        '<option value=""' + (!type ? ' selected' : '') + '>按伤害类型推导(S14)</option>' + RANGE_TYPES_SEVEN.map(t => '<option value="' + t + '"' + (t === type ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label>' +
       fields +
       '<label><span>行动</span><select id="edit-' + ns + '-act" class="edit-input-game text-cyan-300 font-bold text-[10px] py-0.5"><option value="main"' + (aux ? '' : ' selected') + '>◆ 主行动</option><option value="aux"' + (aux ? ' selected' : '') + '>◇ 辅助行动</option></select></label>' +
-      '<label title="开始时付一个主行动，之后每投入一个主行动减 1；为 0 即可释放"><span>蓄力</span><input type="number" min="0" id="edit-' + ns + '-charge" value="' + (s.charge || 0) + '" class="edit-input-game w-12 font-mono-num text-right text-cyan-100 text-[10px] py-0.5 px-1"><em>主点</em></label></div>';
+      '<label title="开始时付一个主行动，之后每投入一个主行动减 1；为 0 即可释放"><span>蓄力</span><input type="number" min="0" id="edit-' + ns + '-charge" value="' + (s.charge || 0) + '" class="edit-input-game w-12 font-mono-num text-right text-cyan-100 text-[10px] py-0.5 px-1"><em>主点</em></label></div>' +
+      slotSelfHtml(ns, s);
   }
   function skillBody(ns, s) { return moduleG(ns, s) + rpgUi.buildSkillFormFieldsHtml(ns, s, ''); }
 
+  // 槽标签预览统一走官方规范名（输入别名可接受，显示只规范）：'[单体(枪击)]' → '[伤害(枪击)]'
+  const normSlotTag = t => (t && t !== '[无]' && normalizeEffectTag(t)) ? '[' + normalizeEffectTag(t) + ']' : (t || '[无]');
   function skillHeader(ns, s, tone, foldKey, delHtml, open) {
     const dmgBadge = s.damageType === '近战' ? '🗡️' : s.damageType === '远程' ? '🎯' : s.damageType === '法术' ? '⚡' : '🌀';
     let h = '<div data-ed-fold="' + foldKey + '" data-ed-ns="' + ns + '" class="px-2.5 py-1.5 cursor-pointer bg-slate-900/90 hover:bg-slate-800/90 transition-colors flex items-center justify-between gap-1.5">';
     h += '<div class="flex items-center gap-1.5 flex-wrap min-w-0 flex-1"><span class="text-xs shrink-0">' + dmgBadge + '</span>';
     h += '<span id="' + ns + '-hd-name" class="text-xs font-bold text-slate-100 tracking-wide">' + E(s.name || '新技能') + '</span>';
-    h += '<div class="flex items-center gap-1 flex-wrap">' + rpgUi.buildEditorSkillTagPreview(s.type, s.power, s.type2, s.power2, s.type3, s.power3, tone) + '</div>';
+    h += '<div class="flex items-center gap-1 flex-wrap">' + rpgUi.buildEditorSkillTagPreview(normSlotTag(s.type), s.power, normSlotTag(s.type2), s.power2, normSlotTag(s.type3), s.power3, tone) + '</div>';
     h += chip('bg-amber-950/80 text-amber-200 border-amber-700/70', '🗺 ' + E(rangeText(s.range)));
     if (s.actionCost && s.actionCost.aux > 0) h += chip('bg-sky-950 text-sky-300 border-sky-700', '◇辅助');
     if (s.charge > 0) h += chip('bg-cyan-950 text-cyan-300 border-cyan-700', '⏳蓄力' + s.charge);
@@ -128,7 +146,7 @@ export function createEditorPanel({ rpgUi, shell, globalHtml, validate, onSave, 
 
   function itemsHtml(row, ui, p) {
     let h = '<div class="space-y-1.5 pt-1"><div class="flex items-center justify-between border-b border-amber-900/40 pb-1">';
-    h += '<div class="flex items-center gap-1.5"><span class="text-amber-400 text-xs font-bold">🎒 物品道具</span><span class="text-[10px] text-slate-500">(' + row.items.length + '项)</span>' + unmig('物品使用与弹药消耗尚未迁移到战棋；配置会保存') + '</div>';
+    h += '<div class="flex items-center gap-1.5"><span class="text-amber-400 text-xs font-bold">🎒 物品道具</span><span class="text-[10px] text-slate-500">(' + row.items.length + '项)</span></div>';
     h += '<button data-ed-act="add-item" data-ui="' + ui + '" class="px-2 py-0.5 bg-amber-900/60 hover:bg-amber-800 text-amber-200 text-[10px] font-bold rounded border border-amber-600/50 flex items-center gap-0.5"><span>+</span> 新增物品</button></div><div class="space-y-1.5">';
     const fx = ['特效:无', ...Object.keys(rpgUi.WEBM_FX_REGISTRY)];
     row.items.forEach((it, ii) => {
@@ -287,6 +305,10 @@ export function createEditorPanel({ rpgUi, shell, globalHtml, validate, onSave, 
       s['type' + k] = val(id('type' + k)); s['power' + k] = num(id('power' + k));
       s['slotTurns' + k] = val(id('slot-turns' + k)) !== '' ? Number(val(id('slot-turns' + k))) : null;
     }
+    // 槽目标覆盖（正式字段）：slotTargets[i]='self'|'default'；全 default 不写字段
+    const selfs = [chk(id('slotself')), chk(id('slotself2')), chk(id('slotself3'))];
+    if (selfs.some(Boolean)) s.slotTargets = selfs.map(v => v ? 'self' : 'default');
+    else delete s.slotTargets;
     if ($(id('armor'))) s.barrierArmor = Math.max(0, num(id('armor')));
     if ($(id('dispel'))) { const d = Math.max(0, num(id('dispel'))); const k = ['', '2', '3'].find(x => (s['type' + x] || '').includes('驱散')); if (k !== undefined) s['power' + k] = d; }
     const sz = [s.type, s.type2, s.type3].find(t => t && t.includes('肃正'));
