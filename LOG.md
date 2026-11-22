@@ -3885,3 +3885,11 @@
 
 
 
+
+## 2026-11-22 · 战棋视听切片翻新（0adb0a3）
+- 行为：战棋 Demo 按"最终视听品质"切片整体翻新；回合制视听模块经生成式提取（tools/extract-rpg-av.cjs → src/vendor/rpg-av）宿主适配复用，不加载根 index.html 第二套战斗。
+- 地图：新增 sc-chapel 三层礼拜堂（上层立柱大厅/中殿长椅祭坛/入口厅墓碑，两段窄廊+雕像龛），对齐 doc/tactics/references 缩略图画法；scene 支持 floor 可行走区（区外实心外壁）与 pillar/statue/pew/altar/tomb/banner/rubble 语义物件；chapel-art 由格表派生墙线，以 img 承载 SVG 一次栅格化。
+- 交互：轮到我方直接点地面移动、点敌人用首个可用技能锁定、再点/Enter 发动、右键/Esc 返回；技能栏数字键、Space 结束回合（有剩余行动时二次确认）；悬停给命中率/伤害/目标数；开场全图俯瞰缓推到我方。
+- 视听：WebAudio 合成 UI 音（hover/select/lock/confirm/cancel/deny/turn/enemyTurn/endTurn）与脚步（大型更沉），接 CombatAudioMixer aux 轨；移动加入逐格起落步态与尘土；轮次横幅、当前行动者光环、卡片受击、行动轴过渡；解锁前取得的首次语音在首次交互后补播；枪械采样准备最多等 600ms 不卡演出。
+- 测试：av 49/49、mvp 56/56、p02 69/69；TAV-05/06 与 T02-01 断言按新几何/新面板更新。产物 tactics/mvp-standalone.html 550218 B，sha256 b2126302…a6f2b83bf6a215d。
+- 决策原因：用户授权按自有审美完整翻新、移动无需先选"移动"；原 Demo 结束回合/技能入口不直观导致"无法结束回合/技能无特效"的体感。
