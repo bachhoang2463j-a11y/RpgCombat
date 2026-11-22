@@ -98,43 +98,48 @@ button:disabled { opacity: .42; cursor: default; }
 @keyframes t-dust { 0% { transform: scale(.4); opacity: .9; } 100% { transform: scale(1.7, 1.3); opacity: 0; } }
 
 /* ==========================================
-   职业 / 敌方分级表现（只影响画面）：外层光圈（我方）+ 待机动效（头像层）+ 移动期附加态
-   待机动效挂在头像层（.t-unit-avatar/.t-unit-emoji），与位置（root）、受击（sprite）、步态（medal）分层互不覆盖；
-   移动中暂停待机（步态由 motion 接管）。参考：战术地图待机动效示例.html
+   职业 / 敌方分级表现（只影响画面）：我方头像外圈 = 职业色呼吸光晕（替代统一金色实心圈）+ 待机动效；敌方外圈保持红色
+   光晕与待机同挂头像层（.t-unit-avatar，animation 逗号并列：呼吸改 box-shadow、待机只改 transform/opacity/filter），
+   与位置（root）、受击（sprite）、步态（medal）分层互不覆盖；移动中待机暂停、光晕继续。参考：战术地图待机动效示例.html
    ========================================== */
-.t-unit-medal::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; pointer-events: none; display: none; }
-[class*="t-cls-"] .t-unit-medal::after { display: block; }
-.t-unit-moving .t-unit-avatar, .t-unit-moving .t-unit-emoji, .t-unit-moving .t-unit-shadow, .t-unit-moving .t-unit-medal::after,
+.t-cls-guard   { --cls: #f59e0b; --cls-glow: rgba(245,158,11,.62); }
+.t-cls-berserk { --cls: #f97316; --cls-glow: rgba(249,115,22,.66); }
+.t-cls-swift   { --cls: #2dd4bf; --cls-glow: rgba(45,212,191,.6); }
+.t-cls-blight  { --cls: #84cc16; --cls-glow: rgba(132,204,22,.6); }
+.t-cls-stealth { --cls: #a5b4fc; --cls-glow: rgba(165,180,252,.5); }
+.t-cls-caster  { --cls: #c084fc; --cls-glow: rgba(192,132,252,.68); }
+.t-cls-holy    { --cls: #fde68a; --cls-glow: rgba(253,230,138,.62); }
+.t-cls-conquer { --cls: #60a5fa; --cls-glow: rgba(96,165,250,.62); }
+.t-side-hero[class*="t-cls-"] .t-unit-avatar { border: 2px solid var(--cls); box-shadow: 0 0 0 1.5px rgba(7,9,13,.85), 0 0 8px 1px var(--cls-glow); }
+.t-side-hero[class*="t-cls-"] .t-unit-medal::before { border-color: var(--cls); box-shadow: 0 0 16px var(--cls-glow); }
+@keyframes t-cls-breathe {
+  0%,100% { box-shadow: 0 0 0 1.5px rgba(7,9,13,.85), 0 0 5px 0 var(--cls-glow), 0 4px 10px rgba(0,0,0,.7); }
+  50%     { box-shadow: 0 0 0 1.5px rgba(7,9,13,.85), 0 0 16px 5px var(--cls-glow), 0 4px 10px rgba(0,0,0,.7); }
+}
+.t-unit-moving .t-unit-avatar, .t-unit-moving .t-unit-emoji, .t-unit-moving .t-unit-shadow,
 .t-unit-down .t-unit-avatar, .t-unit-down .t-unit-emoji, .t-unit-down .t-unit-shadow { animation: none !important; }
-.t-unit-down .t-unit-medal::after { display: none; }
+.t-unit-moving.t-side-hero[class*="t-cls-"] .t-unit-avatar { animation: t-cls-breathe 1.4s ease-in-out infinite !important; }
+.t-unit-down.t-side-hero[class*="t-cls-"] .t-unit-avatar { box-shadow: none; border-color: #475569; }
 
-/* 防守者：琥珀厚双环 + 盾形呼吸 */
-.t-cls-guard .t-unit-medal::after { border: 3px double rgba(243,156,18,0.85); box-shadow: 0 0 10px rgba(243,156,18,0.35); }
-.t-cls-guard .t-unit-avatar { animation: t-shield-pulse 2.2s ease-in-out infinite; }
-@keyframes t-shield-pulse { 0%,100% { transform: scale(1); box-shadow: 0 0 0 2px rgba(7,9,13,.9), 0 0 0 0 rgba(243,156,18,.5); } 50% { transform: scale(1.03); box-shadow: 0 0 0 2px rgba(7,9,13,.9), 0 0 14px 3px rgba(243,156,18,.35); } }
-/* 狂战士：血红锯齿环 + 低吼颤动 */
-.t-cls-berserk .t-unit-medal::after { border: 2px dashed rgba(239,68,68,0.9); box-shadow: 0 0 12px rgba(239,68,68,0.4); animation: t-ring-spin 6s linear infinite; }
-.t-cls-berserk .t-unit-avatar { animation: t-shake-soft .7s ease-in-out infinite; }
-/* 风行者：青绿流线弧环（旋转）+ 轻快摆动 */
-.t-cls-swift .t-unit-medal::after { border: 2px solid transparent; border-top-color: rgba(45,212,191,0.95); border-right-color: rgba(45,212,191,0.45); box-shadow: 0 0 8px rgba(45,212,191,0.3); animation: t-ring-spin 2.4s linear infinite; }
-.t-cls-swift .t-unit-avatar { animation: t-agile-bob 2s ease-in-out infinite; }
-/* 灾厄使 / 施毒者：毒绿虚线环（缓转）+ 抽搐 */
-.t-cls-blight .t-unit-medal::after { border: 2px dotted rgba(132,204,22,0.9); box-shadow: 0 0 12px rgba(132,204,22,0.35); animation: t-ring-spin 9s linear infinite reverse; }
-.t-cls-blight .t-unit-avatar { animation: t-twitch 3s ease-in-out infinite; }
-/* 隐匿者：虚线忽明忽暗 + 忽隐忽现（不低于 0.6，保证可读） */
-.t-cls-stealth .t-unit-medal::after { border: 2px dashed rgba(148,163,184,0.75); animation: t-ring-flicker 4s steps(1) infinite; }
-.t-cls-stealth .t-unit-avatar { animation: t-stealth-flicker 4s infinite; }
+/* 防守者：琥珀 · 慢而稳的呼吸 + 盾形起伏 */
+.t-cls-guard .t-unit-avatar { animation: t-cls-breathe 3.2s ease-in-out infinite, t-shield-pulse 2.2s ease-in-out infinite; }
+@keyframes t-shield-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+/* 狂战士：橙红 · 急促呼吸 + 低吼颤动 */
+.t-cls-berserk .t-unit-avatar { animation: t-cls-breathe 1.1s ease-in-out infinite, t-shake-soft .7s ease-in-out infinite; }
+/* 风行者：青绿 · 轻快呼吸 + 摆动 */
+.t-cls-swift .t-unit-avatar { animation: t-cls-breathe 1.9s ease-in-out infinite, t-agile-bob 2s ease-in-out infinite; }
+/* 灾厄使 / 施毒者：毒绿 · 呼吸 + 抽搐 */
+.t-cls-blight .t-unit-avatar { animation: t-cls-breathe 2.6s ease-in-out infinite, t-twitch 3s ease-in-out infinite; }
+/* 隐匿者：雾蓝 · 弱呼吸 + 忽隐忽现（不低于 0.6，保证可读） */
+.t-cls-stealth .t-unit-avatar { animation: t-cls-breathe 3.6s ease-in-out infinite, t-stealth-flicker 4s infinite; }
 .t-unit-moving.t-cls-stealth .t-unit-medal { opacity: .5; filter: saturate(.4); }
-/* 施法者：紫色符文环（缓转）+ 魔力悬浮（影子随高度缩放） */
-.t-cls-caster .t-unit-medal::after { inset: -7px; border: 1.5px dashed rgba(192,132,252,0.95); box-shadow: 0 0 14px rgba(155,89,182,0.55), inset 0 0 8px rgba(155,89,182,0.35); animation: t-ring-spin 12s linear infinite; }
-.t-cls-caster .t-unit-avatar { animation: t-magic-float 3s ease-in-out infinite; }
+/* 施法者：紫 · 呼吸 + 魔力悬浮（影子随高度缩放） */
+.t-cls-caster .t-unit-avatar { animation: t-cls-breathe 2.4s ease-in-out infinite, t-magic-float 3s ease-in-out infinite; }
 .t-cls-caster .t-unit-shadow { animation: t-shadow-float 3s ease-in-out infinite; }
-/* 圣职者 / 支援者：金白光环 + 心跳 */
-.t-cls-holy .t-unit-medal::after { border: 2px solid rgba(253,230,138,0.9); box-shadow: 0 0 14px rgba(253,230,138,0.45); }
-.t-cls-holy .t-unit-avatar { animation: t-medic-beat 1.5s ease-in-out infinite; }
-/* 征伐者：钢蓝环 + 前倾蓄势 */
-.t-cls-conquer .t-unit-medal::after { border: 2px solid rgba(96,165,250,0.85); border-bottom-color: transparent; box-shadow: 0 0 10px rgba(96,165,250,0.35); }
-.t-cls-conquer .t-unit-avatar { animation: t-lean 1.8s ease-in-out infinite; }
+/* 圣职者 / 支援者：金白 · 呼吸 + 心跳 */
+.t-cls-holy .t-unit-avatar { animation: t-cls-breathe 2s ease-in-out infinite, t-medic-beat 1.5s ease-in-out infinite; }
+/* 征伐者：钢蓝 · 呼吸 + 前倾蓄势 */
+.t-cls-conquer .t-unit-avatar { animation: t-cls-breathe 2.2s ease-in-out infinite, t-lean 1.8s ease-in-out infinite; }
 
 /* 敌方分级（外圈保持红色）：杂兵抽搐 / 精英邪光脉冲 + 悬滑 / BOSS 沉重呼吸 + 偶发猛震 */
 .t-tier-fodder .t-unit-emoji { animation: t-twitch 3.2s ease-in-out infinite; }
@@ -142,13 +147,11 @@ button:disabled { opacity: .42; cursor: default; }
 .t-tier-elite .t-unit-shadow { animation: t-shadow-float 2.4s ease-in-out infinite; }
 .t-tier-boss .t-unit-emoji { animation: t-boss-breathe 3.6s ease-in-out infinite; }
 
-@keyframes t-ring-spin { to { transform: rotate(360deg); } }
-@keyframes t-ring-flicker { 0%, 88% { opacity: .9; } 90% { opacity: .2; } 93% { opacity: .8; } 96% { opacity: .3; } }
 @keyframes t-shake-soft { 0%,100% { transform: translate(0,0) rotate(0); } 25% { transform: translate(-1px,1px) rotate(-1deg); } 50% { transform: translate(1px,-1px) rotate(1deg); } 75% { transform: translate(-1px,-1px); } }
 @keyframes t-agile-bob { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-3px) rotate(2deg); } }
 @keyframes t-twitch { 0%, 90%, 100% { transform: rotate(0); } 92% { transform: rotate(5deg); } 94% { transform: rotate(-5deg); } 96% { transform: rotate(2deg); } }
 @keyframes t-stealth-flicker { 0%, 89% { opacity: .78; filter: saturate(.55); transform: none; } 91% { opacity: .6; filter: saturate(.2) blur(.6px); transform: translateX(2px); } 94% { opacity: .85; transform: translateX(-2px); } 97%, 100% { opacity: .78; filter: saturate(.55); transform: none; } }
-@keyframes t-magic-float { 0%,100% { transform: translateY(0); filter: drop-shadow(0 0 5px rgba(155,89,182,.6)); } 50% { transform: translateY(-6px); filter: drop-shadow(0 8px 10px rgba(155,89,182,.35)); } }
+@keyframes t-magic-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 @keyframes t-shadow-float { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.78); opacity: .65; } }
 @keyframes t-medic-beat { 0%, 20%, 100% { transform: scale(1); } 10% { transform: scale(1.08); } }
 @keyframes t-lean { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-2px) scale(1.035); } }
@@ -252,6 +255,17 @@ button:disabled { opacity: .42; cursor: default; }
 /* 指令面板：原版技能栏（vendor/rpg-ui，原样尺寸 260×172）；演出中轻微压暗 */
 #menu-outer { pointer-events: auto; }
 #menu-container.t-busy #main-menu { filter: saturate(.6) brightness(.8); }
+/* 标题栏：原版"XX 的回合"居中文字 + 右侧高频【结束回合】 */
+#active-hero-name { position: relative; display: flex; align-items: center; justify-content: center; min-height: 26px; padding-right: 86px; padding-left: 6px; }
+#active-hero-name .t-turn-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-end-btn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px;
+  border-radius: 6px; font-size: 10px; font-weight: 700; letter-spacing: 0; text-transform: none; color: #fcd34d;
+  background: rgba(15,23,42,.85); border: 1px solid rgba(245,158,11,.45); transition: background .15s, border-color .15s, box-shadow .15s; }
+.t-end-btn:hover { background: rgba(69,26,3,.65); border-color: rgba(245,158,11,.8); box-shadow: 0 0 10px rgba(245,158,11,.3); }
+.t-end-btn kbd { font-family: inherit; font-size: 8px; font-weight: 400; color: rgba(252,211,77,.55); }
+.t-end-btn.t-armed { color: #1a1206; background: #f59e0b; border-color: #fde68a; animation: t-armed .6s ease-in-out infinite alternate; }
+.t-end-btn.t-armed kbd { color: rgba(26,18,6,.6); }
+@keyframes t-armed { to { box-shadow: 0 0 14px rgba(245,158,11,.7); } }
 
 /* ---- 底栏旁白 ---- */
 #chat-input-area { position: fixed; bottom: 0; left: 0; width: 100%; z-index: 90; }

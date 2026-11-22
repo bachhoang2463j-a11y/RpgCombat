@@ -32,7 +32,7 @@ const HOST = [
 // 内联 onclick 中出现、需要委托到工厂内函数/宿主的名字
 const ACTS = ['openBasicMenu', 'closeBasicMenu', 'openAttackSkillMenu', 'closeAttackSkillMenu', 'openSupportSkillMenu',
   'closeSupportSkillMenu', 'openItemMenu', 'closeItemMenu', 'closeSkillMenu', 'handleBasicAttack', 'handleBasicDefend',
-  'handleBasicRetreat', 'cancelTargeting', 'handleEndTurn'];
+  'handleBasicRetreat', 'cancelTargeting'];
 
 function fail(msg) { throw new Error('[extract-rpg-ui] ' + msg); }
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
@@ -168,12 +168,9 @@ function build() {
     if (!ACTS.includes(fn)) fail('未登记的内联 onclick: ' + fn);
     return 'data-rpg-ui-act="' + fn + '"';
   }, 13, '内联 onclick → 委托');
-  // 基础行动：防御/撤退保留原样但战棋未迁移（禁用+注明）；新增第四项【结束回合】（同款按钮样式）
+  // 基础行动：防御/撤退保留原样但战棋未迁移（禁用+注明）；【结束回合】由宿主放在菜单标题栏右侧（高频操作不进二级菜单）
   menuHtml = patch(menuHtml, /<button data-rpg-ui-act="handleBasic(Defend|Retreat)"([^>]*)>([\s\S]*?)<\/button>/g,
     (m, k, attrs, inner) => '<button data-rpg-ui-act="handleBasic' + k + '"' + attrs + ' disabled title="战棋未迁移">' + inner + ' <span class="ml-auto text-[9px] text-slate-500 font-normal">战棋未迁移</span></button>', 2, '防御/撤退禁用注明');
-  menuHtml = patch(menuHtml, /(<button data-rpg-ui-act="handleBasicRetreat"[\s\S]*?<\/button>)/, (m) => m + '\n          <button data-rpg-ui-act="handleEndTurn" id="rpg-ui-end-turn" class="w-full py-1.5 px-3 bg-slate-900/80 hover:bg-amber-950/60 border border-slate-700/80 hover:border-amber-500/60 rounded-lg text-xs font-bold text-slate-200 hover:text-amber-300 transition-all flex items-center gap-2"><span class="text-amber-400">⏳</span> <span id="rpg-ui-end-label">结束回合</span> <span class="ml-auto text-[9px] text-slate-500 font-normal">Space</span></button>', 1, '基础行动新增第四项：结束回合');
-  // 四项容纳进原 172 高：基础行动三项行高 py-2 → py-1.5（与主菜单四项同高）
-  menuHtml = patch(menuHtml, /(<button data-rpg-ui-act="handleBasic(?:Attack|Defend|Retreat)" class="w-full) py-2 /g, (m, head) => head + ' py-1.5 ', 3, '基础行动四项行高对齐主菜单');
   const tipStart = L.findIndex(l => l.startsWith('<div id="rc-tag-tooltip"'));
   const [ts, te] = sliceById(L, 'rc-tag-tooltip', 'tip');
   if (ts !== tipStart) fail('悬浮提示容器位置变化');
@@ -206,7 +203,7 @@ export function createRpgUi(host) {
   // ---- 宿主注入（战棋规则判定、瞄准入口、伪 state） ----
   const { state, isSkillActionable, prepareSkillTarget, skillHasBarrierTag, hasEnoughBindings, isSummonBlockedByLimit,
     getHeroItemBindings, itemBindingKnowledge, isItemUsable, prepareItemTarget, handleBasicAttack, handleBasicDefend,
-    handleBasicRetreat, cancelTargeting, getSkillGroupChildren, prepareGroupedItemSkill, handleEndTurn } = host;
+    handleBasicRetreat, cancelTargeting, getSkillGroupChildren, prepareGroupedItemSkill } = host;
   const teamBarrier = 0;
 
   // ---- 原版代码（原样） ----

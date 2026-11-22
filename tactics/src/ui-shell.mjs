@@ -77,7 +77,6 @@ export function buildShell(root) {
     handleBasicAttack: () => { rpgUi.closeBasicMenu(); uiSound('select'); callCmd('onAttack'); },
     handleBasicDefend: () => {},
     handleBasicRetreat: () => {},
-    handleEndTurn: () => callCmd('onEnd'),
     cancelTargeting: () => callCmd('onCancel'),
     // 原版 getSkillGroupChildren 同口径：按 parentName 从平铺数组现查
     getSkillGroupChildren: (hero, parent) => (!hero || !Array.isArray(hero.skills) || !parent || !parent.isGroup) ? [] : hero.skills.filter(s => s && s._inGroup && s.parentName === parent.name),
@@ -178,10 +177,11 @@ export function buildShell(root) {
     els.enemyOverlay.classList.toggle('pointer-events-none', !enemyTurn);
     if (!u) { els.activeHeroName.textContent = '等待指令'; state.menuKey = ''; rpgUi.closeAllSubMenus(); showTarget(null); return; }
     const r = cmd.resources;
-    els.activeHeroName.innerHTML = rpgUi.escapeHistoryHtml(u.name) + (cmd.terminal ? ' · 战斗结束' : ' 的回合') +
-      (u.side === 'hero' && r && !cmd.terminal ? ' <span class="text-cyan-300">🦶 ' + r.moveRemaining.toFixed(1) + '米 · ' + (r.main > 0 ? '⚔️ 可行动' : '⚔️ 已行动') + '</span>' : '');
-    const endLabel = root.querySelector('#rpg-ui-end-label');
-    if (endLabel) endLabel.textContent = cmd.endArmed ? '再按一次确认结束' : '结束回合';
+    // 标题栏：原版"XX 的回合" + 剩余移动；右侧为高频【结束回合】（原【可行动/已行动】位置）
+    els.activeHeroName.innerHTML = '<span class="t-turn-title">' + rpgUi.escapeHistoryHtml(u.name) + (cmd.terminal ? ' · 战斗结束' : ' 的回合') +
+      (u.side === 'hero' && r && !cmd.terminal ? ' <span class="text-cyan-300">🦶 ' + r.moveRemaining.toFixed(1) + '米</span>' : '') + '</span>' +
+      (cmd.playable ? '<button class="t-end-btn' + (cmd.endArmed ? ' t-armed' : '') + '" data-tactics-end title="结束回合（Space）">' +
+        (cmd.endArmed ? '⚠️ 确认结束' : '⏳ 结束回合') + '<kbd>Space</kbd></button>' : '');
     if (!cmd.playable) { state.menuKey = ''; rpgUi.closeAllSubMenus(); showTarget(null); return; }
     // 技能卡按资源变化重建（原版 updateSkillMenus：每次渲染折叠变体组）；同一资源态不重建，保留展开与滚动
     const menuKey = u.id + '|' + u.ref.mp + '|' + (r ? r.main : '') + '|' + (cmd.serial || 0);
@@ -194,16 +194,30 @@ export function buildShell(root) {
     }
     showTarget(cmd.aimHint || null);
   }
-  // 战棋专有信息：技能卡第二行追加空间范围胶囊（原版卡片模板不变；原版打开子菜单会重建列表，按列表变化补挂）
+  // 战棋专有信息：技能卡第二行末尾追加空间范围胶囊——沿用原版修饰胶囊样式（同 🎯命中值胶囊：灰底细边 + 等宽数值）
+  // 与原版标签悬浮提示引擎（data-tagtip-*）；原版打开子菜单会重建列表，按列表变化补挂
+  const ATTR = t => rpgUi.escapeHistoryHtml(t);
+  function rangePill(r) {
+    let label, num, title, body;
+    if (r.type === '单体') { label = '射程'; num = (r.castRange || 0) + 'm'; title = '【范围·单体】'; body = '选择 ' + (r.castRange || 0) + ' 米内、视线无遮挡的一名敌人；墙体与高障碍会阻挡视线，低矮掩体不阻挡。'; }
+    else if (r.type === '直线') { label = '直线'; num = r.length + '×' + (r.width || 1) + 'm'; title = '【范围·直线】'; body = '自施法者向瞄准方向延伸 ' + r.length + ' 米、宽 ' + (r.width || 1) + ' 米，命中路径上所有敌人；遇墙截断。'; }
+    else if (r.type === '扇形') { label = '扇形'; num = r.castRange + 'm·' + r.angle + '°'; title = '【范围·扇形】'; body = '以施法者为圆心、半径 ' + r.castRange + ' 米、张角 ' + r.angle + '° 的扇形，命中其中所有敌人；遇墙截断。'; }
+    else return '';
+    return '<span class="t-range-pill text-[8px] px-1 py-0.2 rounded border bg-slate-900 text-slate-400 border-slate-700 shrink-0 flex items-center leading-none"' +
+      ' data-tagtip-title="' + ATTR(title) + '" data-tagtip-body="' + ATTR(body) + '" data-tagtip-raw="' + ATTR('[范围:' + r.type + ']') + '">' +
+      label + '<span class="opacity-90 font-mono-num ml-0.5">' + num + '</span></span>';
+  }
   function decorateSkillCards(u) {
     if (!u) return;
     root.querySelectorAll('#attack-skill-list [data-skill-idx], #support-skill-list [data-skill-idx]').forEach(btn => {
       const s = u.skills[Number(btn.dataset.skillIdx)];
       const row = btn.children[1];
       if (!s || !s.range || !row || row.querySelector('.t-range-pill')) return;
-      const r = s.range;
-      const label = r.type === '单体' ? '单体 ' + (r.castRange || 0) + 'm' : r.type === '直线' ? '直线 ' + r.length + 'm' : r.type === '扇形' ? '扇形 ' + r.castRange + 'm·' + r.angle + '°' : r.type;
-      row.insertAdjacentHTML('afterbegin', '<span class="t-range-pill text-[8px] px-1 py-0.2 rounded border bg-sky-950/80 text-sky-300 border-sky-700/70 shrink-0 flex items-center leading-none">📐 ' + rpgUi.escapeHistoryHtml(label) + '</span>');
+      const pill = rangePill(s.range);
+      if (!pill) return;
+      const empty = row.querySelector('span.text-slate-500:only-child');   // 原版"无附加效果"占位
+      if (empty) empty.remove();
+      row.insertAdjacentHTML('beforeend', pill);
     });
   }
   const listObserver = new MutationObserver(() => { const u = cmdHero(); if (u) decorateSkillCards(u); });
@@ -218,6 +232,7 @@ export function buildShell(root) {
     if (b && b !== state.hoverBtn && !b.disabled) { state.hoverBtn = b; uiSound('hover'); }
   });
   els.menuBox.addEventListener('click', e => {
+    if (e.target.closest('[data-tactics-end]')) { e.stopPropagation(); callCmd('onEnd'); return; }
     const b = e.target.closest('button[data-rpg-ui-act]');
     if (!b) return;
     const act = b.getAttribute('data-rpg-ui-act');
