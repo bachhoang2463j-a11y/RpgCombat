@@ -396,13 +396,13 @@ export function createApp(rootEl, opts = {}) {
     if (snap.currentId) queue.unshift({ unitId: snap.currentId, nextActionAt: snap.now });
     return queue;
   }
+  const esc = t => String(t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
   function renderCommand() {
     const snap = battle.snapshot();
     const u = currentUnit();
     if (!u) { shell.renderCommand(null); return; }
     const r = snap.resources;
     const hero = isPlayerUnit(u) && !snap.terminal;
-    const esc = t => String(t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     const carrying = snap.carrying[u.id] || null;
     const basic = hero && r ? basicActions(u, r, carrying) : [];
     const fieldHint = {
@@ -875,6 +875,7 @@ export function createApp(rootEl, opts = {}) {
       idleOverlay();
       return;
     }
+    renderCommand();
     await runEnemyTurn(myFlow);
   }
 

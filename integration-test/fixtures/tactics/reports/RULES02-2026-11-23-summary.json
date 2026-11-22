@@ -4,9 +4,19 @@
   "sourceDirty": true,
   "finalAll": { "executed": true, "runs": 1, "stages": 13, "passed": 536, "failed": 0, "pending": 0 },
   "uiIndependent": { "passed": 30, "failed": 0, "note": "Includes six FX01 registry cases; not added again to finalAll." },
-  "artifact": { "path": "tactics/mvp-standalone.html", "bytes": 980801, "sha256": "20bc336ef194c9157ffa8d57d6497ac2f5baba56acb6eea5b26aafc18134d9ad", "bundled": 46, "requiredInputs": 31, "symbols": 35, "scriptSyntax": true, "scriptCloses": 1, "externalBusinessImports": 0 },
-  "browser": { "backend": "iab", "sourceLoaded": true, "artifactLoaded": true, "battleFlowPassed": false, "reactionFlowPassed": false, "blocker": "Opening camera animation stayed busy; button locator and map drag timed out. No Chrome or real Tavern used. No mock frame advancement used to claim production behavior." },
-  "deliveryGatePassed": false,
+  "artifact": { "path": "tactics/mvp-standalone.html", "bytes": 980818, "sha256": "6d97a5428c54d4b861491e590a6a96ce08a3877ac703fb188c5294fa3a860057", "bundled": 46, "requiredInputs": 31, "symbols": 35, "scriptSyntax": true, "scriptCloses": 1, "externalBusinessImports": 0 },
+  "browser": {
+    "backend": "chrome-devtools real Chrome (排障模式)",
+    "page": "http://127.0.0.1:8126/tactics/mvp-standalone.html",
+    "foundAndFixed": "attackPreview 引用未定义 esc（ReferenceError ×22）导致悬停/锁定/释放全部中断；esc 提升为模块作用域后重打",
+    "battleFlowPassed": true,
+    "battleFlowEvidence": "用户在真页完整打完一局至胜利：移动、柯尔特三连发多次施放、蓄力开始/释放、敌方近战与法术攻击、胜利结算；全程控制台零 JS 错误（仅 2 条既有素材 404）",
+    "reactionFlowPassed": true,
+    "reactionFlowEvidence": "重置局定向验证：守卫横扫近战来袭弹出反应弹窗（折影步/巫师护盾/跳过/收起）→ 选择折影步 MP110→106 恰好一次 → 回避+900 二次判定闪避成功 → 真实侧闪2.0m ((11,35)→(13,35)) → 紧接斥候爪击独立结算、被回避增益自然闪避不再弹窗",
+    "additionalFix": "beginTurn 敌方路径补 renderCommand，消除敌方回合面板残留上一英雄锁定提示"
+  },
+  "relatedStagesAfterFix": { "mvp": 56, "av": 49, "fx01": 16, "rules02Ui": 30, "allGreen": true },
+  "deliveryGatePassed": true,
   "deferred": ["sacrifice / summon owner interception", "map barrier", "real worldbook summon source for demo", "full P08 perception and later independent systems"],
-  "purposeVsState": "Rule migration and numerical regressions are verified; standalone real battle/reaction page gate remains pending. Do not label full P07 or final delivery complete."
+  "purposeVsState": "规则迁移、源码回归、产物专项与真实页面战斗/反应门禁全部通过；P07 普通能力迁移完成。暂缓项与后续阶段照旧列明。"
 }
