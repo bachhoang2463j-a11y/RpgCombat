@@ -3919,3 +3919,7 @@
 - 交接：新增 `doc/tactics/P06-FX-HANDOFF.md`，记录权威动作与逐目标 payload、世界坐标、单群槽语义、典型对局技能所属阶段、可复用导演/音画资产与 P07+ 缺口；更新 `doc/tactics/PLAN.md` 状态。P04/P05 各仅有 T04-01/T05-01 测试组，不标为完整阶段通过。
 - 测试：P04 5、P05 8、P06 9、P02 69、MVP 56、AV 49 定向通过；最终 `node tactics/tools/run-tests.cjs --all` 合计 420 passed、failed=0、pending=0。源码语法检查通过。standalone 重建 716541 B，sha256 `78174877dc847083889574961bbf307cf394c326d004a13337edad3b7372b43f`；构建门禁 36 输入、22 个 required input、20 符号检查通过，零外部业务 import，单个脚本闭合标签。
 - 未验：本地服务返回 200、IAB 产物能加载并显示战局，但用户可见菜单点击未能进入攻击选择，真实页面攻击/扣费/命中流程未完成；因此不宣称满足单文件“真实战斗流程”门禁。真 Chrome rAF/音画拍点未验证。
+
+## 2026-11-22 · 目录整理归档提交：删除项落库 + doc/修仙特效/资源 入库（fd8fa47）
+- 行为：将用户 11-20 手工整理的目录变动提交为 chore 记录——31 个根目录/修仙特效删除项（demo×20、王之军势×2、index-公开版、regex-公开版、Coding rule、审计三文档、导演兜底人格、敌方生成规则）正式落库；新位置 doc/（5 文档 + mp4 战术参考视频）、修仙特效/（xianxia 两张 + 淘汰/）、资源/（misc-sfx、group-attack、windup-sfx-candidates、vfx/xianxia-fire 素材）入库，共 351 文件 +501/-50363；git rename 检测将移动识别为 100% 相似改名，历史可溯源。.gitignore 增补 .DS_Store 并从暂存区剔除素材包内 15 个该类垃圾文件。
+- 原因：用户拍板"将可选内容的变更提交为整理记录"。边界严格排除：另一会话未提交的 tactics/src/ui-shell.mjs 与 tactics.css（M 红线）、其资产 典型对局.txt/战术地图待机动效示例.html、fixtures 历轮遗留、AGENTS.md.bak/.zcodeignore/COC-*.json（非整理范围）。素材体积核验约 40MB、无超 100MB 文件。
