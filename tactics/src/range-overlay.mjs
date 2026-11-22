@@ -1,5 +1,5 @@
 // ==========================================
-// 战棋地图叠加层：移动/单体/直线/扇形的现代战术范围表现（画在 world-root 内 overlay canvas，随相机）
+// 战棋地图叠加层：绘制查询权威返回的完整作用区与可披露目标。
 // 唯一数据来源：findReachable 与 queryAttack 的返回（cells/targetIds/blockedBy/shape），不另立判定。
 // 画法基线（原型）：细边界 + 克制半透明面 + 方向感；射界面只画在真实作用格内（墙后被裁掉），不画穿墙假射界。
 // 多格单位只画一个目标标记。所有坐标为世界美术像素（Q=50/米）。
@@ -34,7 +34,8 @@ function clipCells(g, cells) {
 }
 
 function shapePath(g, shape) {
-  const ox = shape.from.x * Q, oy = shape.from.y * Q;
+  const from = shape.from || shape.center;
+  const ox = from.x * Q, oy = from.y * Q;
   g.beginPath();
   if (shape.type === '直线') {
     const ux = Math.cos(shape.dir), uy = Math.sin(shape.dir), nx = -uy, ny = ux;
@@ -44,11 +45,16 @@ function shapePath(g, shape) {
     g.lineTo(ox + ux * L - nx * W, oy + uy * L - ny * W);
     g.lineTo(ox - nx * W, oy - ny * W);
     g.closePath();
-  } else if (shape.type === '扇形') {
-    const half = shape.angle * Math.PI / 360, R = shape.radius * Q;
-    g.moveTo(ox, oy);
-    g.arc(ox, oy, R, shape.dir - half, shape.dir + half);
-    g.closePath();
+  } else if (shape.type === '扇形' || shape.type === '圆形' || shape.type === '爆炸') {
+    const R = (shape.radius || 0) * Q;
+    if (shape.type === '扇形') {
+      const half = shape.angle * Math.PI / 360;
+      g.moveTo(ox, oy);
+      g.arc(ox, oy, R, shape.dir - half, shape.dir + half);
+      g.closePath();
+    } else {
+      g.arc(ox, oy, R, 0, Math.PI * 2);
+    }
   }
 }
 
@@ -135,7 +141,7 @@ function drawAttack(g, pv, viewData) {
     g.beginPath(); g.arc(o.x * Q, o.y * Q, skillRange.castRange * Q, 0, Math.PI * 2); g.stroke(); g.restore();
   }
   if (!q) return;
-  const shape = q.shape;
+    const shape = q.shape;
   if (q.ok && shape && shape.type !== '单体') {
     // 面：只在真实作用格内填充与描边（墙后格不在 cells，自然被裁掉）
     if (q.cells.length) {
@@ -145,17 +151,19 @@ function drawAttack(g, pv, viewData) {
       g.restore();
       strokeCellOutline(g, q.cells, 'rgba(253,186,116,0.28)', 1);
     }
-    // 方向感：中轴细线 + 末端标记（直线显示宽度端、扇形显示弧端）
-    g.save();
-    const ux = Math.cos(shape.dir), uy = Math.sin(shape.dir);
-    const L = (shape.type === '直线' ? shape.length : shape.radius) * Q;
-    g.strokeStyle = C.atk.guide; g.lineWidth = 1.4; g.setLineDash([6, 6]);
-    g.beginPath(); g.moveTo(o.x * Q, o.y * Q); g.lineTo(o.x * Q + ux * L, o.y * Q + uy * L); g.stroke();
-    g.setLineDash([]);
-    const ex = o.x * Q + ux * L, ey = o.y * Q + uy * L;
-    g.fillStyle = C.atk.edge;
-    g.beginPath(); g.moveTo(ex + ux * 8, ey + uy * 8); g.lineTo(ex - uy * 6, ey + ux * 6); g.lineTo(ex + uy * 6, ey - ux * 6); g.closePath(); g.fill();
-    g.restore();
+    // 方向指引仅适用于具有方向轴的范围；圆形/全域由真实作用区表达。
+    if (shape.type === '直线' || shape.type === '扇形') {
+      g.save();
+      const ux = Math.cos(shape.dir), uy = Math.sin(shape.dir);
+      const L = (shape.type === '直线' ? shape.length : shape.radius) * Q;
+      g.strokeStyle = C.atk.guide; g.lineWidth = 1.4; g.setLineDash([6, 6]);
+      g.beginPath(); g.moveTo(o.x * Q, o.y * Q); g.lineTo(o.x * Q + ux * L, o.y * Q + uy * L); g.stroke();
+      g.setLineDash([]);
+      const ex = o.x * Q + ux * L, ey = o.y * Q + uy * L;
+      g.fillStyle = C.atk.edge;
+      g.beginPath(); g.moveTo(ex + ux * 8, ey + uy * 8); g.lineTo(ex - uy * 6, ey + ux * 6); g.lineTo(ex + uy * 6, ey - ux * 6); g.closePath(); g.fill();
+      g.restore();
+    }
   }
   if (shape && shape.type === '单体' && q.ok) {
     const t = shape.to;
@@ -178,7 +186,7 @@ function drawAttack(g, pv, viewData) {
     g.restore();
     drawBlock(g, bp);
   }
-  for (const id of q.targetIds || []) unitMarker(g, viewData, id, pv.locked ? C.lock : C.atk.edge, pv.locked ? 'lock' : 'hover');
+  for (const id of q.disclosureTargetIds || []) unitMarker(g, viewData, id, pv.locked ? C.lock : C.atk.edge, pv.locked ? 'lock' : 'hover');
 }
 
 // 绘制入口：pv = { kind:'move'|'attack', ... }；actorId 为当前行动者（地面描边由 CSS 负责）

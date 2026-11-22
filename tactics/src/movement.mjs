@@ -22,7 +22,7 @@ function findUnit(ctx, unitId) {
 function buildLiveOcc(ctx) {
   const occ = new Map();
   for (const u of ctx.units) {
-    if (!u.ref || u.ref.hp <= 0) continue;
+    if (!u.ref || u.ref.hp <= 0 || (ctx.carriedUnitIds && ctx.carriedUnitIds.has(u.id))) continue;
     const p = ctx.placementsById[u.id];
     if (!p) continue;
     const fp = ctx.footprintsById[u.id] || u.footprint || { width: 1, height: 1 };
@@ -56,9 +56,99 @@ function regionStandable(ctx, col, row, fp, occ, selfId) {
   return true;
 }
 
+function placementBlocker(ctx, col, row, fp, occ, selfId) {
+  for (const c of occupiedCells({ col, row }, fp)) {
+    const cell = cellAt(ctx.compiled, c.col, c.row);
+    if (!cell || cell.blocksMovement) return { type: 'terrain', col: c.col, row: c.row, cell };
+    const o = occ.get(cellKey(c.col, c.row));
+    if (o && o.id !== selfId) return { type: 'unit', unitId: o.id, side: o.side, col: c.col, row: c.row };
+  }
+  return null;
+}
+
+export function cellsAdjacent(a, afp, b, bfp) {
+  for (let ay = a.row; ay < a.row + afp.height; ay++) for (let ax = a.col; ax < a.col + afp.width; ax++)
+    for (let by = b.row; by < b.row + bfp.height; by++) for (let bx = b.col; bx < b.col + bfp.width; bx++)
+      if (Math.max(Math.abs(ax - bx), Math.abs(ay - by)) === 1) return true;
+  return false;
+}
+
+// 落点必须容纳完整占地；忽略单位只供携带放下等已明确持有的实体使用。
+export function canPlaceAt(ctx, unitId, col, row, ignoreUnitIds = []) {
+  const unit = findUnit(ctx, unitId);
+  const fp = ctx.footprintsById[unitId] || unit.footprint || { width: 1, height: 1 };
+  const ignored = new Set([unitId, ...ignoreUnitIds]);
+  const occ = buildLiveOcc(ctx);
+  for (const [key, o] of occ) if (ignored.has(o.id)) occ.delete(key);
+  const blockedBy = placementBlocker(ctx, col, row, fp, occ, unitId);
+  return blockedBy ? { ok: false, blockedBy } : { ok: true, blockedBy: null };
+}
+
+// 跳跃越过低障碍、缺口与单位；沿八方向直线采样，实墙/关门仍阻断。
+export function findJumpPath(ctx, unitId, col, row, maxDistance = Infinity) {
+  const unit = findUnit(ctx, unitId);
+  const p = ctx.placementsById[unitId];
+  if (!p) throw new Error('单位缺少站位: ' + unitId);
+  const dx = col - p.col, dy = row - p.row;
+  const ax = Math.abs(dx), ay = Math.abs(dy);
+  const distance = Math.hypot(dx, dy);
+  const fail = (reason, blockedBy = null) => ({ ok: false, reason, distance, maxDistance, path: [], blockedBy });
+  if (!Number.isInteger(col) || !Number.isInteger(row) || (!ax && !ay)) return fail('跳跃落点无效');
+  if (ax && ay && ax !== ay) return fail('跳跃必须沿八方向');
+  if (distance > maxDistance + EPS) return fail('超过最大跳跃距离');
+  const fp = ctx.footprintsById[unitId] || unit.footprint || { width: 1, height: 1 };
+  const occ = buildLiveOcc(ctx);
+  const steps = Math.max(ax, ay);
+  const sx = Math.sign(dx), sy = Math.sign(dy);
+  const path = [{ col: p.col, row: p.row }];
+  for (let i = 1; i <= steps; i++) path.push({ col: p.col + sx * i, row: p.row + sy * i });
+
+  const samples = Math.max(1, Math.ceil(distance / 0.2));
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    const x = p.col + dx * t, y = p.row + dy * t;
+    for (const offset of occupiedCells({ col: 0, row: 0 }, fp)) {
+      const c = Math.floor(x + offset.col), r = Math.floor(y + offset.row);
+      const cell = cellAt(ctx.compiled, c, r);
+      if (!cell) return fail('跳跃路径越出地图', { type: 'terrain', col: c, row: r });
+      if (cell.blocksProjectile && !cell.void) return fail('跳跃被实墙或关门阻挡', { type: 'wall', col: c, row: r });
+    }
+  }
+  const blockedBy = placementBlocker(ctx, col, row, fp, occ, unitId);
+  if (blockedBy) return fail('跳跃落点不可站立', blockedBy);
+  return { ok: true, reason: null, distance, maxDistance, path, blockedBy: null };
+}
+
+// 技能强制位移沿离散八方向推进，单位/地形接触点只报告，不在此处做伤害结算。
+export function traceDisplacement(ctx, unitId, direction, distance) {
+  const unit = findUnit(ctx, unitId);
+  const p = ctx.placementsById[unitId];
+  if (!p) throw new Error('单位缺少站位: ' + unitId);
+  const dx = Math.sign(direction && direction.x || 0);
+  const dy = Math.sign(direction && direction.y || 0);
+  if ((!dx && !dy) || !Number.isFinite(distance) || distance < 0) {
+    return { ok: false, reason: '位移方向或距离无效', path: [], distance: 0, blockedBy: null };
+  }
+  const fp = ctx.footprintsById[unitId] || unit.footprint || { width: 1, height: 1 };
+  const occ = buildLiveOcc(ctx);
+  const stepDistance = dx && dy ? SQRT2 : 1;
+  const path = [{ col: p.col, row: p.row }];
+  let traveled = 0;
+  let blockedBy = null;
+  while (traveled + stepDistance <= distance + EPS) {
+    const next = path[path.length - 1];
+    const col = next.col + dx, row = next.row + dy;
+    blockedBy = placementBlocker(ctx, col, row, fp, occ, unitId);
+    if (blockedBy) break;
+    path.push({ col, row });
+    traveled += stepDistance;
+  }
+  return { ok: true, reason: null, path, distance: traveled, requestedDistance: distance, blockedBy };
+}
+
 // 可达合法落点：{ cells: [{col,row,cost,path:[{col,row}]}], byKey: Map<cellKey, cell> }
 // cells 只含可站落点（含起点 cost 0）；path 为锚点完整轨迹（友方格可作中途点）。
-export function findReachable(ctx, unitId, budget = Infinity) {
+export function findReachable(ctx, unitId, budget = Infinity, costMultiplier = 1) {
   const unit = findUnit(ctx, unitId);
   const p = ctx.placementsById[unitId];
   if (!p) throw new Error('单位缺少站位: ' + unitId);
@@ -90,7 +180,7 @@ export function findReachable(ctx, unitId, budget = Infinity) {
         if (!cellAt(ctx.compiled, nc, nr)) continue; // 界外不可走
         // 两实障夹角禁穿：斜步的两个正交邻格均被移动阻挡（地形或敌方）时禁止斜穿
         if (dc && dr && !enterable(cur.col + dc, cur.row) && !enterable(cur.col, cur.row + dr)) continue;
-        const step = (dc && dr) ? SQRT2 : 1;
+        const step = ((dc && dr) ? SQRT2 : 1) * costMultiplier;
         const nCost = cur.cost + step;
         if (nCost > budget + EPS) continue;
         if (!enterable(nc, nr)) continue;

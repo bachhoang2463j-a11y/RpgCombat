@@ -22,6 +22,9 @@ const P01_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p0
 const P02_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p02-node-cases.mjs');
 // P03 用例（跑圈 / 全局事件时钟 / 同刻三阶段 / 隐藏轴过滤）
 const P03_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p03-node-cases.mjs');
+const P04_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p04-node-cases.mjs');
+const P05_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p05-node-cases.mjs');
+const P06_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p06-node-cases.mjs');
 
 // 阶段注册表：只登记真实存在的用例文件；--all 只聚合这里的条目，不虚构未来阶段。
 const STAGES = {
@@ -89,6 +92,34 @@ const STAGES = {
     ],
     modules: ['clock', 'scheduler', 'lifecycle'],
   },
+  p04: {
+    file: P04_CASES,
+    groups: ['T04-01'],
+    requiredExports: [
+      ['movement', 'findReachable'], ['movement', 'findJumpPath'], ['movement', 'canPlaceAt'],
+      ['movement', 'traceDisplacement'], ['movement', 'cellsAdjacent'],
+      ['damage', 'applyCollisionDamage'], ['battle', 'createBattle'],
+    ],
+    modules: ['scene', 'geometry', 'movement', 'damage', 'battle'],
+  },
+  p05: {
+    file: P05_CASES,
+    groups: ['T05-01'],
+    requiredExports: [
+      ['generation', 'generateScene'], ['generation', 'solveFormation'], ['generation', 'generateTacticalScene'],
+      ['scene', 'compileScene'], ['geometry', 'occupiedCells'], ['geometry', 'unitCenter'],
+    ],
+    modules: ['generation', 'scene', 'geometry', 'lifecycle'],
+  },
+  p06: {
+    file: P06_CASES,
+    groups: ['T06-01'],
+    requiredExports: [
+      ['range', 'queryAttack'], ['range', 'resolveSlotTargets'], ['range', 'classifySlotSide'],
+      ['battle', 'createBattle'], ['ai', 'chooseEnemyAction'], ['scene', 'compileScene'], ['parser', 'parseSkill'],
+    ],
+    modules: ['range', 'battle', 'ai', 'scene', 'geometry', 'movement', 'damage', 'clock', 'lifecycle', 'parser'],
+  },
 };
 
 function fail(msg) {
@@ -121,6 +152,7 @@ const MODULE_FILES = {
   configPackage: 'config-package.mjs',
   storage: 'storage.mjs',
   scene: 'scene.mjs',
+  generation: 'generation.mjs',
   geometry: 'geometry.mjs',
   mapArt: 'map-art.mjs',
   camera: 'camera.mjs',

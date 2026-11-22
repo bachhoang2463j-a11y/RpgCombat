@@ -206,6 +206,7 @@ export function createApp(rootEl, opts = {}) {
   let combatToken = {};
   let battle = null;
   let aim = null;            // 瞄准模式 { key, skill }；null = 自由模式（点地面移动、点敌人攻击）
+  let fieldAction = null;    // P04：跳跃/推动/背负/放下目标选择
   let pending = null;        // 已锁定的攻击 { key, aim }
   let fullReach = null;      // 本次行动无额度可达表（区分"超出额度"与"不可达"）
   let currentState = null;
@@ -276,7 +277,7 @@ export function createApp(rootEl, opts = {}) {
     } else sandbox.reset(currentViewData);
 
     if (opts.playable) {
-      aim = null; pending = null; busy = false; endArmedUntil = 0; shown.clear(); hiddenLog.clear();
+      aim = null; pending = null; fieldAction = null; busy = false; endArmedUntil = 0; shown.clear(); hiddenLog.clear();
       shell.setBusy(false);
       if (!unchanged || forceReset || !battle) {
         shell.clearBattle();
@@ -310,9 +311,11 @@ export function createApp(rootEl, opts = {}) {
   function isHeroTurn() { const u = currentUnit(); return !!(u && u.side === 'hero' && !battle.snapshot().terminal); }
   // 技能是否可在战棋中发动：主行动 + MP + 已迁移的空间范围（原版技能栏据此灰显/排序）
   function skillUsable(skill) {
-    const u = currentUnit(); const r = battle.snapshot().resources;
-    return !!(u && r && r.main > 0 && !skill.isGroup && skill.actionCost && skill.actionCost.main === 1
-      && ['单体', '直线', '扇形'].includes(skill.range && skill.range.type) && u.ref.mp >= (skill.cost || 0));
+    const u = currentUnit();
+    const r = battle.snapshot().resources;
+    const cost = skill.actionCost || { main: 1, aux: 0 };
+    return !!(u && r && r.main >= (cost.main || 0) && r.aux >= (cost.aux || 0) && !skill.isGroup &&
+      ['单体', '直线', '扇形', '圆形', '全域', '爆炸'].includes(skill.range && skill.range.type) && u.ref.mp >= (skill.cost || 0));
   }
   function skillOfKey(key) {
     if (key === 'attack') return BASIC_ATTACK;
@@ -339,10 +342,11 @@ export function createApp(rootEl, opts = {}) {
     const r = snap.resources;
     const hero = u.side === 'hero' && !snap.terminal;
     const esc = t => String(t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    const carrying = battle.snapshot().carrying[u.id] || null;
     shell.renderCommand({
       unit: u, terminal: !!snap.terminal, playable: hero, serial: snap.actionSerial,
-      resources: r ? { moveRemaining: r.moveRemaining, moveMax: u.ref.moveDistance, main: r.main, mp: u.ref.mp } : null,
-      endArmed: performance.now() < endArmedUntil,
+      resources: r ? { moveRemaining: r.moveRemaining, moveMax: u.ref.moveDistance, sprintRemaining: r.sprintRemaining || 0, main: r.main, aux: r.aux, mp: u.ref.mp } : null,
+      carrying, endArmed: performance.now() < endArmedUntil,
       aimHint: !hero || !aim ? null : pending
         ? '【' + esc(aim.skill.name) + '】已锁定<br>再次点击目标或 Enter 发动'
         : '【' + esc(aim.skill.name) + '】请在地图上选择目标',
@@ -350,6 +354,7 @@ export function createApp(rootEl, opts = {}) {
       onSkill: (idx) => handleCommand('sk:' + idx),
       onAttack: () => handleCommand('attack'),
       onEnd: () => handleCommand('end'),
+      onAction: handleFieldAction,
       onCancel: () => { if (pending) cancelStep(); cancelStep(); },
     });
   }
@@ -418,11 +423,11 @@ export function createApp(rootEl, opts = {}) {
     const q = battle.previewAttack(skill, a);
     sandbox.setPreview({ kind: 'attack', casterId: id, skill, query: q, locked });
     let html;
-    if (q.ok && q.targetIds.length) {
+    if (q.ok && q.disclosureTargetIds.length) {
       const me = currentUnit();
-      const t0 = unitById(q.targetIds[0]);
+      const t0 = unitById(q.disclosureTargetIds[0]);
       const pc = Math.round(hitChance(me.ref, t0.ref, skill) * 100);
-      html = '<b>' + skill.name + '</b> · ' + (q.targetIds.length > 1 ? q.targetIds.length + ' 名目标 · ' : '') + '命中 <b>' + pc + '%</b> · 伤害 ' + expectedDamage(me.ref, t0.ref, skill) + (locked ? ' · <b>再点发动</b>' : '');
+      html = '<b>' + skill.name + '</b> · ' + (q.disclosureTargetIds.length > 1 ? q.disclosureTargetIds.length + ' 名目标 · ' : '') + '命中 <b>' + pc + '%</b> · 伤害 ' + expectedDamage(me.ref, t0.ref, skill) + (locked ? ' · <b>再点发动</b>' : '');
     } else html = q.ok ? '<b>' + skill.name + '</b> · 范围内无敌人' + (locked ? ' · <b>再点发动</b>' : '') : q.reason;
     sandbox.setHint({ x: a.x, y: a.y }, html, q.ok ? (locked ? 'lock' : null) : 'bad');
     return { ok: q.ok, aim: a, query: q, reason: q.reason };
@@ -434,6 +439,22 @@ export function createApp(rootEl, opts = {}) {
     if (!battle || busy || !isHeroTurn()) { sandbox.setHint(null); return; }
     if (pending) return;
     if (!hit) { sandbox.setHint(null); idleOverlay(); return; }
+    if (fieldAction === 'jump') {
+      const q = battle.previewJump(hit.col, hit.row);
+      const r = battle.snapshot().resources;
+      const ok = q.ok && q.distance <= r.moveRemaining + 1e-9;
+      const hint = ok ? '跳跃 <b>' + q.distance.toFixed(1) + 'm</b> · 落点可用 · 再点确认' : (q.ok ? '移动额度不足' : q.reason);
+      sandbox.setPreview({ kind: 'move', unitId: battle.snapshot().currentId, cells: battle.reachable().cells, hover: ok ? { col: hit.col, row: hit.row, cost: q.distance, path: q.path } : null, invalid: ok ? null : { col: hit.col, row: hit.row } });
+      sandbox.setHint({ x: hit.x, y: hit.y }, hint, ok ? null : 'bad');
+      return;
+    }
+    if (fieldAction === 'push' || fieldAction === 'carry') {
+      const target = hit.targetId ? unitById(hit.targetId) : null;
+      const res = battle.snapshot().resources;
+      const valid = !!target && (fieldAction === 'push' ? target.ref.hp > 0 && target.id !== battle.snapshot().currentId : target.ref.hp <= 0 && target.side === 'hero');
+      sandbox.setHint({ x: hit.x, y: hit.y }, valid ? (fieldAction === 'push' ? '推动 ' : '背起 ') + esc(target.name) + ' · 点选确认' : (fieldAction === 'push' ? '选择相邻单位' : '选择倒地友方'), valid ? null : 'bad');
+      return;
+    }
     if (aim) { attackPreview(aim, hit, false); return; }
     if (isEnemyHit(hit)) {
       const act = defaultAction();
@@ -449,6 +470,7 @@ export function createApp(rootEl, opts = {}) {
   sandbox.onMapClick(hit => {
     if (!battle || !isHeroTurn()) return false;
     if (busy) { ui('deny'); return true; }
+    if (fieldAction) return handleFieldTarget(hit);
     if (aim) {
       const key = hitKey(aim.skill, hit);
       if (pending && key && pending.key === key) { firePending(); return true; }
@@ -476,14 +498,50 @@ export function createApp(rootEl, opts = {}) {
 
   function cancelStep() {
     if (!battle || !isHeroTurn()) return;
-    if (pending) { pending = null; ui('cancel'); sandbox.setHint(null); sandbox.refreshHover(); if (aim) sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: aim.skill, query: null }); renderCommand(); return; }
+    if (pending) { pending = null; fieldAction = null; ui('cancel'); sandbox.setHint(null); sandbox.refreshHover(); if (aim) sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: aim.skill, query: null }); renderCommand(); return; }
+    if (fieldAction) { fieldAction = null; ui('cancel'); sandbox.setPreview(null); renderCommand(); return; }
     if (aim) { aim = null; ui('cancel'); sandbox.setHint(null); sandbox.refreshHover(); idleOverlay(); renderCommand(); }
+  }
+
+  function handleFieldAction(kind) {
+    if (!battle || !isHeroTurn() || busy) return;
+    if (kind === 'sprint') {
+      const result = battle.sprint();
+      if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return; }
+      ui('confirm'); refreshBattle(); idleOverlay(); return;
+    }
+    if (kind === 'drop') {
+      const result = battle.drop();
+      if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return; }
+      ui('confirm'); refreshBattle(); idleOverlay(); return;
+    }
+    if (!kind || !['jump', 'push', 'carry'].includes(kind)) return;
+    fieldAction = kind;
+    aim = null; pending = null;
+    sandbox.setPreview(kind === 'jump' ? { kind: 'move', unitId: battle.snapshot().currentId, cells: battle.reachable().cells } : null);
+    shell.showLog((kind === 'jump' ? '选择跳跃落点' : kind === 'push' ? '选择相邻推动目标' : '选择相邻倒地友方') + ' · Esc取消');
+    renderCommand();
+  }
+
+  function handleFieldTarget(hit) {
+    if (!fieldAction) return false;
+    const kind = fieldAction;
+    let result;
+    if (kind === 'jump') result = battle.jump(hit.col, hit.row);
+    else if (kind === 'push') result = hit.targetId ? battle.push(hit.targetId) : { ok: false, reason: '请选择单位目标' };
+    else result = hit.targetId ? battle.carry(hit.targetId) : { ok: false, reason: '请选择倒地友方' };
+    if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return true; }
+    fieldAction = null;
+    sandbox.setPreview(null);
+    ui('confirm'); refreshBattle(); afterHeroAction();
+    return true;
   }
 
   function handleCommand(key) {
     if (!battle || !isHeroTurn()) return;
     if (busy) { ui('deny'); return; }
     if (key === 'end') { requestEnd(); return; }
+    fieldAction = null;
     const skill = skillOfKey(key);
     if (!skill) return;
     if (!skillUsable(skill)) { ui('deny'); shell.showLog(battle.snapshot().resources.main <= 0 ? '主行动已用完' : 'MP 不足或范围未迁移', 'warn'); return; }
@@ -495,10 +553,11 @@ export function createApp(rootEl, opts = {}) {
   }
   function requestEnd() {
     const r = battle.snapshot().resources;
-    const left = r && (r.main > 0 || r.moveRemaining > 0.999);
+    const left = r && (r.main > 0 || r.aux > 0 || r.moveRemaining > 0.999);
     if (left && performance.now() > endArmedUntil) {
       endArmedUntil = performance.now() + 2200;
-      ui('select'); shell.showLog('还有' + (r.main > 0 ? '主行动' : '移动额度') + '未用 · 再按一次结束回合', 'warn');
+      const unused = [r.main > 0 && '主行动', r.aux > 0 && '辅助行动', r.moveRemaining > 0.999 && '移动额度'].filter(Boolean);
+      ui('select'); shell.showLog('还有' + unused.join('、') + '未用 · 再按一次结束回合', 'warn');
       renderCommand();
       setTimeout(() => { if (performance.now() >= endArmedUntil && battle && isHeroTurn()) renderCommand(); }, 2300);
       return;

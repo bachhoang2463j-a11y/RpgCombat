@@ -21,6 +21,12 @@ const KIND_RULES = {
   // 纯装饰（不进规则）
   banner:     { blocksMovement: false, blocksProjectile: false, blocksVision: false, lowObstacle: false, decor: true },
   rubble:     { blocksMovement: false, blocksProjectile: false, blocksVision: false, lowObstacle: false, decor: true },
+  tree:       { blocksMovement: true,  blocksProjectile: true,  blocksVision: true,  lowObstacle: false, artOnly: true },
+  boulder:    { blocksMovement: true,  blocksProjectile: true,  blocksVision: true,  lowObstacle: false, artOnly: true },
+  crystal:    { blocksMovement: true,  blocksProjectile: true,  blocksVision: true,  lowObstacle: false, artOnly: true },
+  campfire:   { blocksMovement: false, blocksProjectile: false, blocksVision: false, lowObstacle: false, artOnly: true },
+  table:      { blocksMovement: true,  blocksProjectile: false, blocksVision: false, lowObstacle: true, artOnly: true },
+  shelf:      { blocksMovement: true,  blocksProjectile: true,  blocksVision: true,  lowObstacle: false, artOnly: true },
 };
 
 // ---------- 固定测试房间（石造大厅：隔墙+门洞+低柜+长红毯+四处暖灯） ----------
@@ -91,9 +97,25 @@ export function compileScene(scene) {
     if (!rule) throw new Error('未知物件 kind: ' + obj.kind);
     objectsIndex.set(obj.id, { id: obj.id, kind: obj.kind, bounds: obj.bounds ? { ...obj.bounds } : null, at: obj.at ? { ...obj.at } : null, open: obj.open });
 
-    if (obj.kind === 'light') {
-      // 灯：中心锚点图元，纯美术暖光
-      artJson.features.push({ type: 'lantern', at: [Math.round(obj.at.col * q), Math.round(obj.at.row * q)] });
+    const artKind = obj.artType || obj.kind;
+    if (obj.kind === 'light' || ['tree', 'boulder', 'crystal', 'campfire', 'table', 'shelf'].includes(artKind)) {
+      const type = obj.kind === 'light' ? 'lantern' : artKind;
+      const defaultAt = obj.bounds
+        ? (type === 'shelf' ? { col: obj.bounds.col, row: obj.bounds.row } : { col: obj.bounds.col + obj.bounds.width / 2, row: obj.bounds.row + obj.bounds.height / 2 })
+        : obj.at;
+      const at = obj.at || defaultAt;
+      const feature = { type, at: [Math.round(at.col * q), Math.round(at.row * q)] };
+      if (obj.bounds && (type === 'table' || type === 'shelf')) feature.size = [obj.bounds.width * q, obj.bounds.height * q];
+      artJson.features.push(feature);
+      if (rule.artOnly && rule.blocksMovement && obj.bounds) {
+        for (const c of boundsCells(obj.bounds)) {
+          if (c.col < 0 || c.col >= columns || c.row < 0 || c.row >= rows) throw new Error('物件越出网格: ' + obj.id);
+          const cell = cells[c.row * columns + c.col];
+          cell.objectIds.push(obj.id);
+          cell.blocksMovement = true; cell.blocksProjectile = rule.blocksProjectile; cell.blocksVision = rule.blocksVision;
+          if (rule.lowObstacle) cell.lowObstacle = true;
+        }
+      }
       continue;
     }
     if (rule.decor) continue;   // 装饰物只进 objectsIndex 供画法使用

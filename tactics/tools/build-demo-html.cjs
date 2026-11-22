@@ -16,7 +16,7 @@ const { build: buildRpgUi } = require('./extract-rpg-ui.cjs');
 // 产物专项断言：本轮新增与核心模块必须真实入包（存在性，不是仅字符串出现）
 const REQUIRED_INPUTS = [
   'src/main.mjs', 'src/battle.mjs', 'src/movement.mjs', 'src/range.mjs',
-  'src/damage.mjs', 'src/ai.mjs', 'src/demo-fixture.mjs', 'src/clock.mjs',
+  'src/damage.mjs', 'src/ai.mjs', 'src/generation.mjs', 'src/demo-fixture.mjs', 'src/clock.mjs',
   'src/scheduler.mjs', 'src/parser.mjs', 'src/vendor/js-yaml-4.1.0.mjs',
   'src/av-host.mjs', 'src/action-director.mjs', 'src/motion.mjs', 'src/range-overlay.mjs',
   'src/vendor/rpg-av/rpg-av.mjs', 'src/chapel-scene.mjs', 'src/chapel-art.mjs', 'src/ui-sfx.mjs',
@@ -29,12 +29,14 @@ const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFee
 const entry = [
   "import { createApp } from './src/main.mjs';",
   "import { DEMO_YAML, DEMO_PLACEMENTS } from './src/demo-fixture.mjs';",
+  "import { generateTacticalScene } from './src/generation.mjs';",
   'const app = createApp(document.getElementById("tactics-app"), {',
   '  defaultYaml: DEMO_YAML, defaultPlacements: DEMO_PLACEMENTS, playable: true,',
   '});',
   'app.boot();',
   'window.__TACTICS_APP__ = { app, snapshot: () => app.sandbox.getSnapshot(),',
   '  loadYaml: (t, o) => app.loadYaml(t, o), playProjectile: (a, b, c) => app.playProjectile(a, b, c),',
+  '  generateScene: options => generateTacticalScene(options),',
   '  resources: () => app.resources() };',
 ].join('\n');
 

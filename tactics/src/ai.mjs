@@ -6,7 +6,7 @@
 // ==========================================
 
 import { findReachable } from './movement.mjs';
-import { queryAttack } from './range.mjs';
+import { queryAttack, classifySlotSide } from './range.mjs';
 import { cellKey, unitCenter } from './geometry.mjs';
 
 const EPS = 1e-9;
@@ -24,7 +24,8 @@ function footprintOf(ctx, u) {
 // 瞄准点取目标占格中心：直线/扇形按同一 queryAttack 求交，候选只在真实 targetIds 含该目标时成立。
 function attackCandidates(skills) {
   return (skills || []).filter(s =>
-    !s.isReaction && !s.isOthers && (s.type === '[单体]' || (s.range && ['单体', '直线', '扇形'].includes(s.range.type))));
+    !s.isReaction && !s.isOthers && (s.actionCost?.main ?? 1) > 0 && s.range && ['单体', '直线', '扇形', '圆形', '全域', '爆炸'].includes(s.range.type) &&
+    [s.type, s.type2, s.type3].some(tag => classifySlotSide(tag) === 'enemy' && /(?:群攻|单体|穿透|散射|眩晕|中毒|燃烧|降|盲|滞|弱|缓)/.test(tag || '')));
 }
 
 // 假设单位移动到 (col,row) 后的查询视图：浅复制 placementsById，不改原 ctx
@@ -47,7 +48,7 @@ function collectHits(ctx, reach, unitId, cands, enemies) {
       const aim = { x: ec.x, y: ec.y, targetId: e.id };
       for (let si = 0; si < cands.length; si++) {
         const res = queryAttack(ctx2, unitId, cands[si], aim);
-        if (res.ok && res.targetIds.includes(e.id)) {
+        if (res.ok && res.damageTargetIds.includes(e.id)) {
           hits.push({
             cost: cell.cost,
             dist: Math.hypot(ec.x - from.x, ec.y - from.y),
