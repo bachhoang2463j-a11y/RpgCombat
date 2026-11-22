@@ -23,6 +23,8 @@ import { createActionDirector } from './action-director.mjs';
 import { createUiSfx } from './ui-sfx.mjs';
 import { CHAPEL_SCENE } from './chapel-scene.mjs';
 import { resolveUnitStyles } from './unit-style.mjs';
+import { createEditorPanel } from './editor-panel.mjs';
+import { unitCenter } from './geometry.mjs';
 // ---------- P02 固定图库（同一张权威几何，两个 sceneId 身份；不做生成器） ----------
 const SCENE_LIBRARY = {
   'sc-test-room': TEST_ROOM,
@@ -223,6 +225,7 @@ export function createApp(rootEl, opts = {}) {
   const hiddenLog = new Set();
   let editorDraft = null;
   let editorOverrides = new Map();
+  const carriedShown = new Set(); // 正在被背负、显示位置跟随背负者的单位
 
   shell.onUiSound = (kind) => ui(kind);
   shell.onUnitClick = (unitId) => {
@@ -232,7 +235,12 @@ export function createApp(rootEl, opts = {}) {
     shell.setSelected(unitId);
   };
   shell.onReset = () => restart();
-  shell.settings = { html: settingsHtml, bind: bindSettings };
+  const editor = createEditorPanel({
+    rpgUi: shell.rpgUi, shell, globalHtml: () => soundSettingsHtml(), validate: validateEditorDraft,
+    onSave: (d) => { editorDraft = d; persistEditorDraft(); editorDraft = null; restart(); },
+    onCancel: () => { editorDraft = null; },
+  });
+  shell.settings = { open: () => { if (!currentViewData) return false; editorDraft = makeEditorDraft(); editor.open(editorDraft); return true; } };
   sandbox.onSelect((unit) => { shell.setSelected(unit ? unit.id : null); });
   sandbox.onCancel(() => cancelStep());
 
@@ -271,10 +279,11 @@ export function createApp(rootEl, opts = {}) {
         if (!patch) continue;
         if (u.side === 'enemy' && patch.ref) {
           Object.assign(u.ref, structuredClone(patch.ref));
-          u.name = patch.displayName || u.name;
-          const display = splitEmojiName(u.name);
-          u.emoji = display.emoji;
-          u.avatarUrl = display.emoji ? null : resolveAvatarUrl({ img: u.ref.img, name: display.name }, heroAvatarUrl);
+          // 显示名只改称呼：身份 emoji（名字前缀）保留，除非新显示名自带 emoji；纯技能编辑不改变敌方显示身份
+          const display = splitEmojiName(patch.displayName || u.name);
+          u.name = display.name || u.name;
+          u.emoji = display.emoji || u.emoji;
+          u.avatarUrl = u.emoji ? null : resolveAvatarUrl({ img: u.ref.img, name: u.name }, heroAvatarUrl);
           u.skills = u.ref.skills || [];
           u.items = u.ref.items || [];
           u.footprint = u.ref.footprint || u.footprint;
@@ -368,12 +377,18 @@ export function createApp(rootEl, opts = {}) {
     const r = snap.resources;
     const hero = u.side === 'hero' && !snap.terminal;
     const esc = t => String(t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-    const carrying = battle.snapshot().carrying[u.id] || null;
+    const carrying = snap.carrying[u.id] || null;
+    const basic = hero && r ? basicActions(u, r, carrying) : [];
+    const fieldHint = {
+      jump: '【跳跃】在地图上选择落点<br><small>八方向直线 · 最远 ' + jumpReach(u, r).toFixed(1) + 'm · 越过低矮障碍与单位</small>',
+      push: '【推动】选择相邻单位<br><small>力量对抗 · 撞墙按剩余距离受伤</small>',
+      carry: '【背起】选择相邻的倒地友方<br><small>背负中移动消耗加倍</small>',
+    };
     shell.renderCommand({
       unit: u, terminal: !!snap.terminal, playable: hero, serial: snap.actionSerial,
       resources: r ? { moveRemaining: r.moveRemaining, moveMax: u.ref.moveDistance, sprintRemaining: r.sprintRemaining || 0, main: r.main, aux: r.aux, mp: u.ref.mp } : null,
-      carrying, preparation: snap.preparation, chargeInventory: snap.chargeInventory, endArmed: performance.now() < endArmedUntil,
-      aimHint: !hero || !aim ? null : pending
+      carrying, preparation: snap.preparation, chargeInventory: snap.chargeInventory, endArmed: performance.now() < endArmedUntil, basic,
+      aimHint: !hero ? null : fieldAction ? fieldHint[fieldAction] : !aim ? null : pending
         ? '【' + esc(aim.skill.name) + '】已锁定<br>再次点击目标或 Enter 发动'
         : '【' + esc(aim.skill.name) + '】请在地图上选择目标',
       canUse: skillUsable,
@@ -385,6 +400,26 @@ export function createApp(rootEl, opts = {}) {
       onCancel: () => { if (pending) cancelStep(); cancelStep(); },
     });
   }
+  function jumpReach(u, r) { return r ? Math.min((Math.max(0, u.ref.spd) + Math.max(0, u.ref.strength || 0)) / 20, r.moveRemaining) : 0; }
+  // 基础行动格数据：资格只读规则已有的资源与状态；最终判定仍以 battle.* 返回为准
+  function basicActions(u, r, carrying) {
+    const atkReason = skillReason(BASIC_ATTACK);
+    const reach = jumpReach(u, r);
+    const downAlly = currentViewData.units.some(x => x.side === 'hero' && x.id !== u.id && x.ref.hp <= 0 && !Object.values(battle.snapshot().carrying).includes(x.id));
+    const carried = carrying ? unitById(carrying) : null;
+    return [
+      { key: 'attack', icon: '⚔️', name: '普通攻击', cost: { main: 1 }, mode: 'target', tone: 'rose', ok: !atkReason, reason: atkReason, short: atkReason && shortLabel(atkReason) },
+      { key: 'sprint', icon: '💨', name: '冲刺', cost: { main: 1 }, mode: 'instant', tone: 'sky', note: '+' + u.ref.moveDistance + 'm', ok: r.main >= 1, reason: '主行动已用完', short: '◆ 主行动已用完', desc: '消耗主行动，立即追加一份移动额度' },
+      { key: 'jump', icon: '🦘', name: '跳跃', cost: { aux: 1 }, mode: 'target', tone: 'violet', note: '≤' + (+reach.toFixed(1)) + 'm', ok: r.aux >= 1 && reach >= 1,
+        reason: r.aux < 1 ? '辅助行动不足' : '移动额度不足以起跳（至少 1m）', short: r.aux < 1 ? '◇ 辅助行动已用完' : '🦶 移动额度不足', desc: '沿八方向直线跳跃，越过低矮障碍；距离计入移动额度' },
+      { key: 'push', icon: '✋', name: '推动', cost: { aux: 1 }, mode: 'target', tone: 'amber', ok: r.aux >= 1, reason: '辅助行动不足', short: '◇ 辅助行动已用完', desc: '与相邻单位力量对抗，推开数米；撞墙造成伤害' },
+      carried
+        ? { key: 'drop', icon: '⬇️', name: '放下', cost: null, mode: 'instant', tone: 'emerald', note: carried.name, ok: true, desc: '把背负的友方放到身边空格' }
+        : { key: 'carry', icon: '⛑️', name: '背起', cost: { main: 1 }, mode: 'target', tone: 'emerald', ok: r.main >= 1 && downAlly,
+          reason: r.main < 1 ? '主行动不足' : '没有可背起的倒地友方', short: r.main < 1 ? '◆ 主行动已用完' : '无倒地友方', desc: '背起相邻倒地友方，背负中移动消耗加倍' },
+    ];
+  }
+  function shortLabel(reason) { return /主行动/.test(reason) ? '◆ 主行动已用完' : reason; }
   function refreshBattle() {
     const snap = battle.snapshot();
     for (const u of currentViewData.units) { const s = shownOf(u); u.bars = { ...u.bars, hp: s.hp, mp: s.mp }; }
@@ -395,6 +430,7 @@ export function createApp(rootEl, opts = {}) {
       view.setFlag(u.id, 't-unit-current', u.id === snap.currentId && !snap.terminal);
       if (unitStyles[u.id]) view.setFlag(u.id, unitStyles[u.id].cls, true);
     }
+    syncCarried(snap);
     shell.renderHeroes(currentViewData.units);
     shell.setCurrent(snap.terminal ? null : snap.currentId);
     const qc = shell.renderQueue(queueRows(snap), snap.currentId);
@@ -463,23 +499,24 @@ export function createApp(rootEl, opts = {}) {
   const isEnemyHit = hit => hit && hit.targetId && unitById(hit.targetId) && unitById(hit.targetId).side !== 'hero';
 
   sandbox.onHover(hit => {
-    if (!battle || busy || !isHeroTurn()) { sandbox.setHint(null); return; }
+    if (!battle || busy || !isHeroTurn()) { sandbox.setHint(null); shell.previewMoveCost(null); return; }
     if (pending) return;
-    if (!hit) { sandbox.setHint(null); idleOverlay(); return; }
+    if (!hit) { sandbox.setHint(null); shell.previewMoveCost(null); if (fieldAction === 'jump') sandbox.setPreview({ kind: 'jump', unitId: battle.snapshot().currentId, cells: jumpCells() }); else idleOverlay(); return; }
     if (fieldAction === 'jump') {
       const q = battle.previewJump(hit.col, hit.row);
       const r = battle.snapshot().resources;
       const ok = q.ok && q.distance <= r.moveRemaining + 1e-9;
-      const hint = ok ? '跳跃 <b>' + q.distance.toFixed(1) + 'm</b> · 落点可用 · 再点确认' : (q.ok ? '移动额度不足' : q.reason);
-      sandbox.setPreview({ kind: 'move', unitId: battle.snapshot().currentId, cells: battle.reachable().cells, hover: ok ? { col: hit.col, row: hit.row, cost: q.distance, path: q.path } : null, invalid: ok ? null : { col: hit.col, row: hit.row } });
+      const hint = ok ? '🦘 跳跃 <b>' + q.distance.toFixed(1) + 'm</b> · 余 ' + (r.moveRemaining - q.distance).toFixed(1) + 'm · 点击起跳' : (q.ok ? '移动额度不足（需 ' + q.distance.toFixed(1) + 'm）' : q.reason);
+      sandbox.setPreview({ kind: 'jump', unitId: battle.snapshot().currentId, cells: jumpCells(), hover: ok ? { col: hit.col, row: hit.row, cost: q.distance } : null, invalid: ok ? null : { col: hit.col, row: hit.row } });
       sandbox.setHint({ x: hit.x, y: hit.y }, hint, ok ? null : 'bad');
+      shell.previewMoveCost(ok ? q.distance : null);
       return;
     }
     if (fieldAction === 'push' || fieldAction === 'carry') {
       const target = hit.targetId ? unitById(hit.targetId) : null;
       const res = battle.snapshot().resources;
       const valid = !!target && (fieldAction === 'push' ? target.ref.hp > 0 && target.id !== battle.snapshot().currentId : target.ref.hp <= 0 && target.side === 'hero');
-      sandbox.setHint({ x: hit.x, y: hit.y }, valid ? (fieldAction === 'push' ? '推动 ' : '背起 ') + esc(target.name) + ' · 点选确认' : (fieldAction === 'push' ? '选择相邻单位' : '选择倒地友方'), valid ? null : 'bad');
+      sandbox.setHint({ x: hit.x, y: hit.y }, valid ? (fieldAction === 'push' ? '推动 ' : '背起 ') + escapeText(target.name) + ' · 点选确认' : (fieldAction === 'push' ? '选择相邻单位' : '选择倒地友方'), valid ? null : 'bad');
       return;
     }
     if (aim) { attackPreview(aim, hit, false); return; }
@@ -492,6 +529,7 @@ export function createApp(rootEl, opts = {}) {
     const r = battle.snapshot().resources;
     sandbox.setPreview(r.moveRemaining > 0.999 ? { kind: 'move', unitId: battle.snapshot().currentId, cells: battle.reachable().cells, hover: ev.ok ? ev.cell : null, invalid: ev.ok || ev.quiet ? null : { col: hit.col, row: hit.row } } : null);
     sandbox.setHint(ev.ok || !ev.quiet ? { x: hit.col + 0.5, y: hit.row + 0.5 } : null, ev.ok ? ev.html : ev.reason, ev.ok ? null : 'bad');
+    shell.previewMoveCost(ev.ok ? ev.cell.cost : null);
   });
 
   sandbox.onMapClick(hit => {
@@ -526,47 +564,129 @@ export function createApp(rootEl, opts = {}) {
   function cancelStep() {
     if (!battle || !isHeroTurn()) return;
     if (pending) { pending = null; fieldAction = null; ui('cancel'); sandbox.setHint(null); sandbox.refreshHover(); if (aim) sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: aim.skill, query: null }); renderCommand(); return; }
-    if (fieldAction) { fieldAction = null; ui('cancel'); sandbox.setPreview(null); renderCommand(); return; }
+    if (fieldAction) { fieldAction = null; ui('cancel'); sandbox.setPreview(null); sandbox.setHint(null); shell.previewMoveCost(null); idleOverlay(); renderCommand(); return; }
     if (aim) { aim = null; ui('cancel'); sandbox.setHint(null); sandbox.refreshHover(); idleOverlay(); renderCommand(); }
   }
 
   function handleFieldAction(kind) {
     if (!battle || !isHeroTurn() || busy) return;
+    if (kind === 'release') {
+      const prep = battle.snapshot().preparation;
+      const idx = prep ? (currentUnit()?.skills || []).findIndex(s => s.name === prep.skill.name) : -1;
+      if (idx < 0) { ui('deny'); shell.showLog('找不到待释放的蓄力技能', 'warn'); return; }
+      handleCommand('sk:' + idx); return;
+    }
     if (kind === 'prepare' || kind === 'cancel-charge') {
       const result = kind === 'prepare' ? battle.advancePreparation() : battle.cancelPreparation();
       if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return; }
-      ui('confirm'); refreshBattle(); idleOverlay(); return;
+      ui(kind === 'prepare' ? 'charge' : 'cancel');
+      const log = battle.snapshot().log;
+      shell.showLog(log[log.length - 1], 'act');
+      if (kind === 'prepare') fxAtUnit(battle.snapshot().currentId, 't-charge-pulse', 900);
+      refreshBattle(); idleOverlay(); return;
     }
     if (kind === 'sprint') {
       const result = battle.sprint();
       if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return; }
-      ui('confirm'); refreshBattle(); idleOverlay(); return;
+      ui('sprint'); fxAtUnit(battle.snapshot().currentId, 't-sprint-burst', 760);
+      shell.showLog('冲刺 · 移动额度 +' + currentUnit().ref.moveDistance + 'm', 'act');
+      refreshBattle(); fullReach = findReachable(battle.ctx, battle.snapshot().currentId, Infinity); idleOverlay(); return;
     }
-    if (kind === 'drop') {
-      const result = battle.drop();
-      if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return; }
-      ui('confirm'); refreshBattle(); idleOverlay(); return;
-    }
+    if (kind === 'drop') { runDrop(); return; }
     if (!kind || !['jump', 'push', 'carry'].includes(kind)) return;
+    rpgCloseMenus();
     fieldAction = kind;
     aim = null; pending = null;
-    sandbox.setPreview(kind === 'jump' ? { kind: 'move', unitId: battle.snapshot().currentId, cells: battle.reachable().cells } : null);
-    shell.showLog((kind === 'jump' ? '选择跳跃落点' : kind === 'push' ? '选择相邻推动目标' : '选择相邻倒地友方') + ' · Esc取消');
+    sandbox.setHint(null);
+    sandbox.setPreview(kind === 'jump' ? { kind: 'jump', unitId: battle.snapshot().currentId, cells: jumpCells() } : null);
+    ui('select');
     renderCommand();
   }
+  function rpgCloseMenus() { shell.rpgUi.closeAllSubMenus(); }
+  // 跳跃落点集：八方向逐格询问规则（previewJump 为唯一判定），并受剩余移动额度约束
+  function jumpCells() {
+    const id = battle.snapshot().currentId, p = currentViewData.placementsById[id], r = battle.snapshot().resources;
+    const reach = jumpReach(unitById(id), r), out = [];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      for (let k = 1; k * Math.hypot(dx, dy) <= reach + 1e-9; k++) {
+        const q = battle.previewJump(p.col + dx * k, p.row + dy * k);
+        if (q.ok && q.distance <= r.moveRemaining + 1e-9) out.push({ col: p.col + dx * k, row: p.row + dy * k, cost: q.distance });
+      }
+    }
+    return out;
+  }
+  function fxAtUnit(id, cls, ms) { const c = sandbox.unitWorldCenter(id); if (c) fxNode(cls, c.x, c.y, ms); }
 
   function handleFieldTarget(hit) {
     if (!fieldAction) return false;
-    const kind = fieldAction;
-    let result;
-    if (kind === 'jump') result = battle.jump(hit.col, hit.row);
-    else if (kind === 'push') result = hit.targetId ? battle.push(hit.targetId) : { ok: false, reason: '请选择单位目标' };
-    else result = hit.targetId ? battle.carry(hit.targetId) : { ok: false, reason: '请选择倒地友方' };
-    if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return true; }
-    fieldAction = null;
-    sandbox.setPreview(null);
-    ui('confirm'); refreshBattle(); afterHeroAction();
+    runFieldTarget(fieldAction, hit);
     return true;
+  }
+  // 场地动作：规则命令一次结算 → 演出层按结果播放（跳跃抛物线 / 推动冲撞滑移 / 背起抬升）→ 交还控制
+  async function runFieldTarget(kind, hit) {
+    const myFlow = flow;
+    const view = sandbox.getUnitView();
+    const me = battle.snapshot().currentId;
+    if ((kind === 'push' || kind === 'carry') && !hit.targetId) { ui('deny'); shell.showLog(kind === 'push' ? '请选择相邻单位' : '请选择相邻的倒地友方', 'warn'); return; }
+    const lockId = kind === 'jump' ? me : hit.targetId;
+    view.lockMotion(lockId, true);
+    if (kind === 'push') view.lockMotion(me, true);
+    const result = kind === 'jump' ? battle.jump(hit.col, hit.row) : kind === 'push' ? battle.push(hit.targetId) : battle.carry(hit.targetId);
+    if (!result.ok) { view.lockMotion(lockId, false); view.lockMotion(me, false); ui('deny'); shell.showLog(result.reason, 'warn'); return; }
+    fieldAction = null;
+    sandbox.setPreview(null); sandbox.setHint(null); shell.previewMoveCost(null);
+    setBusy(true);
+    sandbox.beginAction();
+    ui('confirm');
+    refreshBattle();
+    if (kind === 'jump') await director.playJump(result);
+    else if (kind === 'push') {
+      await director.playShove(me, result);
+      if (myFlow !== flow) return;
+      const log = battle.snapshot().log;
+      shell.showLog(log[log.length - 1], result.success ? (result.collision ? 'hit' : 'act') : 'dodge');
+      if (result.collision) { const t = unitById(result.targetId); if (t && t.side === 'hero') shell.setHeroBars(t.id, { ...t.bars, hp: result.hpAfter }, { hit: true }); }
+      if (result.down) playDown(unitById(result.targetId));
+    } else {
+      await director.playTransfer(result.targetId, sandbox.unitWorldCenter(result.targetId), carryAnchor(me), { lift: true });
+      if (myFlow !== flow) return;
+      shell.showLog(unitName(me) + ' 背起 ' + unitName(result.targetId), 'act');
+    }
+    if (myFlow !== flow) return;
+    afterHeroAction();
+  }
+  async function runDrop() {
+    const myFlow = flow;
+    const me = battle.snapshot().currentId;
+    const from = carryAnchor(me);
+    const res = battle.drop();
+    if (!res.ok) { ui('deny'); shell.showLog(res.reason, 'warn'); return; }
+    setBusy(true);
+    ui('drop');
+    const fp = currentViewData.footprintsById[res.targetId] || { width: 1, height: 1 };
+    await director.playTransfer(res.targetId, from, unitCenter(res.placement, fp), { lift: false });
+    if (myFlow !== flow) return;
+    shell.showLog(unitName(me) + ' 放下 ' + unitName(res.targetId), 'act');
+    afterHeroAction();
+  }
+  function carryAnchor(carrierId) { const c = sandbox.unitWorldCenter(carrierId); return c ? { x: c.x, y: c.y - 0.32 } : null; }
+  // 背负：被背者显示位置跟随背负者（规则站位不变）；放下后交还权威站位
+  const carryOf = new Map();
+  function syncCarried(snap) {
+    const view = sandbox.getUnitView();
+    const now = snap.carrying || {};
+    const held = new Set(Object.values(now));
+    for (const id of [...carriedShown]) if (!held.has(id)) {
+      carriedShown.delete(id); view.setFlag(id, 't-unit-carried', false); view.lockMotion(id, false);
+      view.updateUnit(id, { placement: currentViewData.placementsById[id] });
+    }
+    carryOf.clear();
+    for (const [carrier, id] of Object.entries(now)) {
+      carryOf.set(carrier, id); carriedShown.add(id);
+      view.setFlag(id, 't-unit-carried', true); view.lockMotion(id, true);
+      const rec = view.nodes.get(carrier), a = carryAnchor(carrier);
+      if (a && rec && !rec.motionLock) view.setDisplayPos(id, a.x, a.y);
+    }
   }
 
   function handleCommand(key) {
@@ -763,7 +883,23 @@ export function createApp(rootEl, opts = {}) {
     if (kind === 'start') { if (st.glide) ui(st.glide); return; }
     if (kind === 'stop') { if (st.glide) ui('glideStop'); return; }
     if (!p) return;
+    const stomp = () => { const d = sandbox.getDom(); if (d && d.shake) { d.shake.classList.remove('t-stomp'); void d.shake.offsetWidth; d.shake.classList.add('t-stomp'); } };
+    const bigUnit = u && (u.footprint.width > 1 || u.footprint.height > 1);
+    if (kind === 'jump-crouch') { ui('jumpCrouch'); return; }
+    if (kind === 'jump-takeoff') { ui('jumpTakeoff'); fxNode('t-dust t-dust-light', p.x, p.y + 0.28, 520); fxNode('t-jump-gust', p.x, p.y + 0.2, 480); return; }
+    if (kind === 'jump-land') {
+      ui(bigUnit || st.shake ? 'bossStomp' : 'jumpLand');
+      fxNode('t-land-ring', p.x, p.y + 0.22, 640);
+      fxNode('t-dust t-dust-big', p.x, p.y + (bigUnit ? 0.6 : 0.3), 620);
+      stomp(); return;
+    }
+    if (kind === 'shove') { ui('shove'); fxNode('t-shove-burst', p.x, p.y, 460); return; }
+    if (kind === 'impact') { ui('impact'); fxNode('t-impact', p.x, p.y, 620); stomp(); return; }
+    if (kind === 'lift') { ui('lift'); return; }
+    if (kind === 'set-down') { ui('drop'); return; }
     if (kind === 'frame') {
+      const held = carryOf.get(id);
+      if (held) sandbox.getUnitView().setDisplayPos(held, p.x, p.y - 0.32);
       if (!st.trail) return;
       const now = performance.now();
       if (now - (trailAt.get(id) || 0) < (st.trail === 'ghost' ? 70 : 55)) return;
@@ -846,120 +982,46 @@ export function createApp(rootEl, opts = {}) {
   function makeEditorDraft() {
     const saved = readTacticsRoster();
     const persistByName = new Map((saved?.heroes || []).map(h => [h.name, h.persist || {}]));
+    const TIER = { legend: ['首领', 'bg-amber-950 text-amber-300 border-amber-700/60'], elite: ['精英', 'bg-violet-950 text-violet-300 border-violet-700/60'], fodder: ['杂兵', 'bg-slate-800 text-slate-300 border-slate-600/60'] };
     return {
-      selectedId: currentViewData.units[0]?.id || '',
-      units: currentViewData.units.map(u => ({
-        id: u.id, side: u.side, name: u.ref.name, displayName: u.ref.displayName || u.name,
-        config: editorConfig(u), persist: structuredClone(persistByName.get(u.ref.name) || u.ref.persist || {}),
-        skills: editorSkillRows(u.skills), items: editorItemRows(u.items),
-        resources: { hp: u.ref.hp, mp: u.ref.mp, tp: u.ref.tp },
-      })),
+      tab: 'hero', open: new Set(),
+      units: currentViewData.units.map(u => {
+        const explicit = Array.isArray(u.ref._explicit) ? u.ref._explicit.filter(k => CONFIG_PACKAGE_CONFIG_KEYS.includes(k)) : [];
+        const tier = TIER[(unitStyles[u.id] || {}).tier] || TIER.fodder;
+        return {
+          id: u.id, side: u.side, name: u.ref.name, displayName: u.ref.displayName || u.name, emoji: u.emoji, avatarUrl: u.avatarUrl,
+          badge: u.side === 'hero' ? (u.ref.classType || '无职业') : tier[0], tierClass: tier[1],
+          config: editorConfig(u), persist: structuredClone(persistByName.get(u.ref.name) || u.ref.persist || {}),
+          skills: editorSkillRows(u.skills), items: editorItemRows(u.items),
+          resources: { hp: u.ref.hp, mp: u.ref.mp, tp: u.ref.tp },
+          sourceText: u.side === 'hero'
+            ? (explicit.length ? 'YAML 显式字段：' + explicit.join('、') + '（以 YAML 为准；在此修改只写入持久档，YAML 未写的字段才采用持久档）' : '配置来源：持久档 / 缺省值')
+            : '敌方配置只在本场内存生效，保存后立即重置本场',
+        };
+      }),
       existingHeroes: (saved?.heroes || []).map(h => structuredClone(h)),
     };
   }
-  function selectedEditorUnit() {
-    return editorDraft && editorDraft.units.find(u => u.id === editorDraft.selectedId);
+  // 保存前校验：数值与每条技能/物品逐条走解析器，错误定位到「角色 · 技能 #n」
+  function validateEditorDraft(d) {
+    for (const row of d.units) {
+      const who = (row.side === 'hero' ? '我方 ' : '敌方 ') + row.displayName;
+      if (!Number.isFinite(row.resources.hp) || row.resources.hp < 0 || !Number.isFinite(row.resources.mp) || row.resources.mp < 0) throw new Error(who + ' · 本场 HP/MP 必须为非负数');
+      for (const [k, v] of Object.entries(row.config)) if (typeof v === 'number' && !Number.isFinite(v)) throw new Error(who + ' · 属性 ' + k + ' 不是有效数字');
+      const fp = row.config.footprint;
+      if (fp && !(fp.width >= 1 && fp.height >= 1)) throw new Error(who + ' · 占格宽高至少为 1');
+      row.skills.forEach((s, i) => { try { parseSkillEntry(s); } catch (err) { throw new Error(who + ' · 技能 #' + (i + 1) + '「' + (s && s.name) + '」：' + err.message); } });
+      row.items.forEach((it, i) => { try { parseItemEntry(it); } catch (err) { throw new Error(who + ' · 物品 #' + (i + 1) + '「' + (it && it.name) + '」：' + err.message); } });
+    }
   }
-  function editorConfigFields(row) {
-    const fields = ['maxHp', 'maxMp', 'maxTp', 'atk', 'def', 'spd', 'evasion', 'strength', 'totalWeight', 'moveDistance', 'perception'];
-    const numbers = fields.map(k => '<label>' + escapeText(k) + '<input data-editor-config="' + k + '" type="number" value="' + (row.config[k] == null ? '' : escapeText(row.config[k])) + '"></label>').join('');
-    const fp = row.config.footprint || { width: 1, height: 1 };
-    const prototype = ['标准人形', '轻型生物', '大型生物'].map(p => '<option value="' + p + '"' + (row.config.prototype === p ? ' selected' : '') + '>' + p + '</option>').join('');
-    return '<div class="t-editor-stats">' + numbers +
-      '<label>原型<select data-editor-config="prototype"><option value="">不指定</option>' + prototype + '</select></label>' +
-      '<label>职业<input data-editor-config="classType" type="text" value="' + escapeText(row.config.classType || '') + '"></label>' +
-      '<label>头像<input data-editor-config="img" type="text" value="' + escapeText(row.config.img || '') + '"></label>' +
-      '<label>占格宽<input data-editor-config="footprint.width" type="number" value="' + escapeText(fp.width) + '"></label>' +
-      '<label>占格高<input data-editor-config="footprint.height" type="number" value="' + escapeText(fp.height) + '"></label>' +
-      '<label class="t-editor-check"><input data-editor-config="isWise" type="checkbox"' + (row.config.isWise ? ' checked' : '') + '>智慧</label></div>';
-  }
-  function editorPersistFields(row) {
-    return '<div class="t-editor-persist">' + CONFIG_PACKAGE_PERSIST_KEYS.map(k => '<label><input data-editor-persist="' + k + '" type="checkbox"' + (row.persist[k] !== false ? ' checked' : '') + '>' + escapeText(k.replace(/^persist/, '')) + '</label>').join('') + '</div>';
-  }
-  function captureEditorForm(body) {
-    const row = selectedEditorUnit();
-    if (!row) return;
-    const json = id => JSON.parse(body.querySelector('#' + id).value);
-    row.displayName = body.querySelector('#t-editor-display-name').value.trim() || row.name;
-    const cfg = {};
-    body.querySelectorAll('[data-editor-config]').forEach(el => {
-      const key = el.dataset.editorConfig;
-      if (key === 'isWise') { cfg.isWise = el.checked; return; }
-      if (key === 'footprint.width' || key === 'footprint.height') return;
-      if (el.value === '') return;
-      cfg[key] = el.type === 'number' ? Number(el.value) : el.value;
-    });
-    const width = body.querySelector('[data-editor-config="footprint.width"]').value;
-    const height = body.querySelector('[data-editor-config="footprint.height"]').value;
-    if (width !== '' && height !== '') cfg.footprint = { width: Number(width), height: Number(height) };
-    row.config = cfg;
-    row.persist = {};
-    body.querySelectorAll('[data-editor-persist]').forEach(el => { row.persist[el.dataset.editorPersist] = el.checked; });
-    row.skills = json('t-editor-skills');
-    row.items = json('t-editor-items');
-    row.resources.hp = Number(body.querySelector('#t-editor-hp').value);
-    row.resources.mp = Number(body.querySelector('#t-editor-mp').value);
-    if (!Number.isFinite(row.resources.hp) || row.resources.hp < 0 || !Number.isFinite(row.resources.mp) || row.resources.mp < 0) throw new Error('本场 HP/MP 必须为非负数');
-    if (!Array.isArray(row.skills) || !Array.isArray(row.items)) throw new Error('技能和物品必须填写 JSON 数组');
-  }
-  function settingsHtml() {
-    if (!currentViewData) return soundSettingsHtml();
-    editorDraft = makeEditorDraft();
-    const options = editorDraft.units.map(u => '<option value="' + escapeText(u.id) + '">' + escapeText((u.side === 'hero' ? '我方 · ' : '敌方 · ') + u.displayName) + '</option>').join('');
-    return soundSettingsHtml() + '<h4 class="t-panel-h">角色与技能配置</h4>' +
-      '<div class="t-editor-form"><label>角色<select id="t-editor-unit">' + options + '</select></label>' +
-      '<label>显示名称<input id="t-editor-display-name" type="text"></label>' +
-      '<div class="t-editor-resources"><label>本场 HP<input id="t-editor-hp" type="number" min="0"></label><label>本场 MP<input id="t-editor-mp" type="number" min="0"></label></div>' +
-      '<h5 class="t-panel-h">角色属性</h5><div id="t-editor-config-fields"></div>' +
-      '<h5 class="t-panel-h">持久化属性</h5><div id="t-editor-persist-fields"></div>' +
-      '<label>技能与组内子技能 JSON<textarea id="t-editor-skills" spellcheck="false"></textarea></label>' +
-      '<label>物品定义、绑定与变体用法 JSON<textarea id="t-editor-items" spellcheck="false"></textarea></label>' +
-      '<div id="t-editor-source" class="t-editor-source"></div><div id="t-editor-error" role="status" class="t-editor-error"></div>' +
-      '<div class="t-editor-actions"><button type="button" id="t-editor-cancel">取消</button><button type="button" id="t-editor-save">保存并重置本场</button></div>' +
-      '<div class="t-editor-note">HP/MP 与敌方配置仅留在当前本场内存；限次、冷却和行动进度会在保存后重置。YAML 显式配置仍优先于持久档。配置包导入/导出留在 P11。</div></div>';
-  }
-  function fillEditorForm(body) {
-    const row = selectedEditorUnit();
-    if (!row) return;
-    body.querySelector('#t-editor-display-name').value = row.displayName;
-    body.querySelector('#t-editor-hp').value = row.resources.hp;
-    body.querySelector('#t-editor-mp').value = row.resources.mp;
-    body.querySelector('#t-editor-config-fields').innerHTML = editorConfigFields(row);
-    body.querySelector('#t-editor-persist-fields').innerHTML = editorPersistFields(row);
-    body.querySelector('#t-editor-skills').value = JSON.stringify(row.skills, null, 2);
-    body.querySelector('#t-editor-items').value = JSON.stringify(row.items, null, 2);
-    const live = currentViewData.units.find(u => u.id === row.id);
-    const explicit = live && Array.isArray(live.ref._explicit) ? live.ref._explicit.filter(k => CONFIG_PACKAGE_CONFIG_KEYS.includes(k)) : [];
-    body.querySelector('#t-editor-source').textContent = explicit.length ? 'YAML 显式字段：' + explicit.join('、') + '（保存仍可应用于本场；后续载入时 YAML 优先）' : '当前配置来源：本场/持久配置或缺省值';
-    body.querySelector('#t-editor-error').textContent = '';
-  }
-  function bindSettings(body) {
-    if (!body.querySelector('#t-editor-unit')) return;
-    const saveCurrent = () => captureEditorForm(body);
-    fillEditorForm(body);
-    body.querySelector('#t-editor-unit').addEventListener('change', e => {
-      const oldId = editorDraft.selectedId;
-      try {
-        saveCurrent();
-        editorDraft.selectedId = e.target.value;
-        fillEditorForm(body);
-      } catch (err) {
-        e.target.value = oldId;
-        body.querySelector('#t-editor-error').textContent = String(err.message || err);
-      }
-    });
-    body.querySelector('#t-editor-cancel').addEventListener('click', () => { editorDraft = null; shell.closePanel(); });
-    body.querySelector('#t-editor-save').addEventListener('click', () => {
-      try {
-        saveCurrent();
-        persistEditorDraft();
-        editorDraft = null;
-        shell.closePanel();
-        restart();
-      } catch (err) {
-        body.querySelector('#t-editor-error').textContent = String(err.message || err);
-      }
-    });
+  // 组父 children → 平铺子技能行（与 parseSkillList 同构：_inGroup + parentName 紧随组父），菜单组卡据此展开
+  function flattenSkills(list) {
+    const out = [];
+    for (const s of list) {
+      out.push(s);
+      if (s.isGroup && Array.isArray(s.children)) s.children.forEach(c => { c._inGroup = true; c.parentName = s.name; out.push(c); });
+    }
+    return out;
   }
   function persistEditorDraft() {
     const selected = editorDraft.units;
@@ -990,7 +1052,7 @@ export function createApp(rootEl, opts = {}) {
       ref.displayName = row.displayName;
       if (row.side === 'hero') Object.assign(ref, structuredClone(row.config), { persist: structuredClone(row.persist) });
       else Object.assign(ref, structuredClone(row.config));
-      const parsedSkills = skills(row);
+      const parsedSkills = flattenSkills(skills(row));
       const parsedItems = items(row);
       const counts = new Map((live.items || []).map(it => [it.name, it.count]));
       parsedItems.forEach(it => { if (counts.has(it.name)) it.count = counts.get(it.name); });
@@ -1053,3 +1115,5 @@ export function createApp(rootEl, opts = {}) {
     endTurn: () => requestEnd(),
   };
 }
+
+

@@ -1,14 +1,15 @@
 // ==========================================
 // 由 tactics/tools/extract-rpg-ui.cjs 自动生成，请勿手改。
 // 源: index.html  sha256=6a7b72f3c58ec1eab918839113b30a7ff4dff2569b31684d89126556e8c72e53
-// 入选声明 40 段: VARIANT_GRANT_NAMES@3103, VARIANT_GRANT_TIPS@3104, getGrantedVariantName@3112, TAG_EXPAND_MAP@3149, expandTagLabel@3169, tagDisplayLabel@3182, TAG_EFFECT_TIPS@3188, getTagTip@3256, tagTipAttrs@3272, escapeHistoryHtml@3563, getEffectiveGroupChildren@19073, _queueUidCounter@20543, _prevQueueCurrentUid@20544, _roundStartGlowPending@20545, _recentSpeedChanges@20546, _TURN_QUEUE_ANIM_MS@20547, _TURN_QUEUE_EASE@20548, renderTurnQueue@20550, MENU_DAMAGE_TAGS@26978, isAttackSkill@26979, formatTagPill@26985, createSkillCard@27020, createSkillGroupCard@27156, updateSkillMenus@27199, closeAllSubMenus@27267, openBasicMenu@27272, closeBasicMenu@27273, openAttackSkillMenu@27276, closeAttackSkillMenu@27277, openSupportSkillMenu@27278, closeSupportSkillMenu@27279, ITEM_CATEGORY_META@27284, createItemCard@27290, updateItemMenu@27416, openItemMenu@27433, closeItemMenu@27439, closeSkillMenu@27445, _rcTipTimer@31334, showTagTipFor@31335, hideTagTip@31361
+// 入选声明 55 段: VARIANT_GRANT_NAMES@3103, VARIANT_GRANT_TIPS@3104, getGrantedVariantName@3112, SKILL_TYPES@3121, SKILL_TYPE_EDIT_OPTIONS@3139, TAG_EXPAND_MAP@3149, expandTagLabel@3169, tagDisplayLabel@3182, TAG_EFFECT_TIPS@3188, getTagTip@3256, tagTipAttrs@3272, ASSET_ORIGIN@3340, ASSET_BASE@3341, escapeHistoryHtml@3563, RLYEH_FOG_CLOUD_URL@15572, WEBM_FX_REGISTRY@16678, getEffectiveGroupChildren@19073, _queueUidCounter@20543, _prevQueueCurrentUid@20544, _roundStartGlowPending@20545, _recentSpeedChanges@20546, _TURN_QUEUE_ANIM_MS@20547, _TURN_QUEUE_EASE@20548, renderTurnQueue@20550, MENU_DAMAGE_TAGS@26978, isAttackSkill@26979, formatTagPill@26985, createSkillCard@27020, createSkillGroupCard@27156, updateSkillMenus@27199, closeAllSubMenus@27267, openBasicMenu@27272, closeBasicMenu@27273, openAttackSkillMenu@27276, closeAttackSkillMenu@27277, openSupportSkillMenu@27278, closeSupportSkillMenu@27279, ITEM_CATEGORY_META@27284, createItemCard@27290, updateItemMenu@27416, openItemMenu@27433, closeItemMenu@27439, closeSkillMenu@27445, buildEditorSkillTagPreview@27533, buildSkillFormFieldsHtml@27553, syncGrantSlotPower@27616, renderSkillTypeOptions@27627, closeSkillTypeCombo@27639, openSkillTypeCombo@27643, filterSkillTypeCombo@27662, applySkillTypeCombo@27677, togglePillClass@28478, _rcTipTimer@31334, showTagTipFor@31335, hideTagTip@31361
 // 宿主注入: state, isSkillActionable, prepareSkillTarget, teamBarrier, skillHasBarrierTag, hasEnoughBindings, isSummonBlockedByLimit, getHeroItemBindings, itemBindingKnowledge, isItemUsable, prepareItemTarget, handleBasicAttack, handleBasicDefend, handleBasicRetreat, cancelTargeting, getSkillGroupChildren, prepareGroupedItemSkill
-// 宿主适配补丁: 技能卡挂全局索引（宿主补射程胶囊）×1; 行动条外层加 id（宿主安全区）×1; 内联 onclick → 委托×13; 防御/撤退禁用注明×2
+// 宿主适配补丁: 技能卡挂全局索引（宿主补射程胶囊）×1; 行动条外层加 id（宿主安全区）×1; 内联 onclick → 委托×13; 防御/撤退禁用注明×2; 标签下拉浮层挂作用域×1
 // ==========================================
 /* eslint-disable */
 export const RPG_UI_RAIL_HTML = "    <div id=\"turn-order-rail\" class=\"absolute left-1 sm:left-4 md:left-6 top-16 sm:top-20 bottom-44 sm:bottom-48 w-12 sm:w-14 z-30 pointer-events-auto flex flex-col items-center select-none\">\n      <div class=\"relative w-full h-full flex flex-col items-center\">\n        <div class=\"timeline-rail\">\n          <div class=\"rail-pulse-beam\"></div>\n        </div>\n        <div id=\"turn-order-container\" class=\"relative w-full h-full flex flex-col gap-2 sm:gap-2.5 items-center overflow-y-auto no-scrollbar mask-fade-y py-3 scroll-smooth\"></div>\n      </div>\n    </div>";
 export const RPG_UI_MENU_HTML = "      <div id=\"menu-container\" class=\"w-[260px] h-[172px] bg-slate-950/95 backdrop-blur-xl rounded-xl border border-slate-700/80 border-t-2 border-t-cyan-500/80 flex flex-col overflow-hidden transition-all duration-300 relative shadow-[0_15px_35px_rgba(0,0,0,0.9)] pointer-events-auto self-end mb-1 sm:mb-0\">\n      <div id=\"active-hero-name\" class=\"text-center text-[10px] sm:text-xs py-1 text-white/80 bg-white/5 tracking-widest uppercase border-b border-white/10 font-bold\">等待指令</div>\n      <div id=\"main-menu\" class=\"flex-1 flex flex-col p-1.5 gap-1 justify-center relative bg-slate-900/50\">\n        <button data-rpg-ui-act=\"openBasicMenu\" class=\"w-full py-1.5 px-3 bg-slate-900/80 hover:bg-cyan-950/60 border border-slate-700/80 hover:border-cyan-500/60 rounded-lg text-xs font-bold text-slate-200 hover:text-cyan-300 transition-all flex items-center gap-2 shadow-sm\"><span>📦</span> 基础行动</button>\n        <button data-rpg-ui-act=\"openAttackSkillMenu\" class=\"w-full py-1.5 px-3 bg-gradient-to-r from-rose-950/90 to-slate-900 border border-rose-500/50 rounded-lg text-xs font-bold text-white shadow-[0_0_12px_rgba(244,63,94,0.18)] hover:scale-[1.01] transition-all flex items-center gap-2\"><span class=\"text-rose-300\">🗡️</span> 攻击技能</button>\n        <button data-rpg-ui-act=\"openSupportSkillMenu\" class=\"w-full py-1.5 px-3 bg-gradient-to-r from-emerald-950/90 to-slate-900 border border-emerald-500/50 rounded-lg text-xs font-bold text-white shadow-[0_0_12px_rgba(16,185,129,0.18)] hover:scale-[1.01] transition-all flex items-center gap-2\"><span class=\"text-emerald-300\">✨</span> 辅助技能</button>\n        <button data-rpg-ui-act=\"openItemMenu\" class=\"w-full py-1.5 px-3 bg-slate-900/80 hover:bg-amber-950/60 border border-slate-700/80 hover:border-amber-500/60 rounded-lg text-xs font-bold text-slate-200 hover:text-amber-300 transition-all flex items-center gap-2\"><span>🎒</span> 物品道具</button>\n      </div>\n      <div id=\"charge-menu\" class=\"flex-1 flex-col p-2 gap-1 justify-center relative\" style=\"display:none\"></div>\n      <div id=\"basic-menu\" class=\"absolute inset-0 bg-slate-950/95 flex flex-col transform translate-x-full transition-transform duration-300 z-10 min-h-0\">\n        <div class=\"px-2.5 py-1 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 border-b border-slate-800 flex justify-between items-center shrink-0\">\n          <div class=\"flex items-center gap-1.5 min-w-0\">\n            <span class=\"w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shrink-0\"></span>\n            <span class=\"text-xs font-bold text-cyan-300\">基础行动</span>\n          </div>\n          <button data-rpg-ui-act=\"closeBasicMenu\" class=\"text-[9px] text-slate-400 hover:text-white transition-colors flex items-center gap-1 bg-slate-800/80 px-1.5 py-0.2 rounded border border-slate-700\"><span>↩</span> 返回</button>\n        </div>\n        <div class=\"flex-1 flex flex-col gap-1 p-1.5 justify-center\">\n          <button data-rpg-ui-act=\"handleBasicAttack\" class=\"w-full py-2 px-3 bg-slate-900/80 hover:bg-cyan-950/60 border border-slate-700/80 hover:border-cyan-500/60 rounded-lg text-xs font-bold text-slate-200 hover:text-cyan-300 transition-all flex items-center gap-2\"><span class=\"text-rose-400\">⚔️</span> 普攻攻击</button>\n          <button data-rpg-ui-act=\"handleBasicDefend\" class=\"w-full py-2 px-3 bg-slate-900/80 hover:bg-emerald-950/60 border border-slate-700/80 hover:border-emerald-500/60 rounded-lg text-xs font-bold text-slate-200 hover:text-emerald-300 transition-all flex items-center gap-2\" disabled title=\"战棋未迁移\"><span class=\"text-emerald-400\">🛡️</span> 防御姿态 <span class=\"ml-auto text-[9px] text-slate-500 font-normal\">战棋未迁移</span></button>\n          <button data-rpg-ui-act=\"handleBasicRetreat\" class=\"w-full py-2 px-3 bg-slate-900/80 hover:bg-purple-950/60 border border-slate-700/80 hover:border-purple-500/60 rounded-lg text-xs font-bold text-slate-200 hover:text-purple-300 transition-all flex items-center gap-2\" disabled title=\"战棋未迁移\"><span class=\"text-purple-400\">💨</span> 尝试撤离 <span class=\"ml-auto text-[9px] text-slate-500 font-normal\">战棋未迁移</span></button>\n        </div>\n      </div>\n      <div id=\"attack-skill-menu\" class=\"absolute inset-0 bg-slate-950/95 flex flex-col transform translate-x-full transition-transform duration-300 z-10 min-h-0\">\n        <div class=\"px-2.5 py-1 bg-gradient-to-r from-rose-950/60 via-slate-900/90 to-slate-950 border-b border-rose-900/40 flex justify-between items-center shrink-0\">\n          <div class=\"flex items-center gap-1.5 min-w-0\">\n            <span class=\"w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse shrink-0\"></span>\n            <span class=\"text-xs font-bold text-rose-300\">攻击技能</span>\n          </div>\n          <button data-rpg-ui-act=\"closeAttackSkillMenu\" class=\"text-[9px] text-slate-400 hover:text-white transition-colors flex items-center gap-1 bg-slate-800/80 px-1.5 py-0.2 rounded border border-slate-700\"><span>↩</span> 返回</button>\n        </div>\n        <div id=\"attack-skill-list\" class=\"flex-1 flex flex-col gap-1 p-1 overflow-y-auto custom-scrollbar\"></div>\n      </div>\n      <div id=\"support-skill-menu\" class=\"absolute inset-0 bg-slate-950/95 flex flex-col transform translate-x-full transition-transform duration-300 z-10 min-h-0\">\n        <div class=\"px-2.5 py-1 bg-gradient-to-r from-emerald-950/60 via-slate-900/90 to-slate-950 border-b border-emerald-900/40 flex justify-between items-center shrink-0\">\n          <div class=\"flex items-center gap-1.5 min-w-0\">\n            <span class=\"w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0\"></span>\n            <span class=\"text-xs font-bold text-emerald-300\">辅助技能</span>\n          </div>\n          <button data-rpg-ui-act=\"closeSupportSkillMenu\" class=\"text-[9px] text-slate-400 hover:text-white transition-colors flex items-center gap-1 bg-slate-800/80 px-1.5 py-0.2 rounded border border-slate-700\"><span>↩</span> 返回</button>\n        </div>\n        <div id=\"support-skill-list\" class=\"flex-1 flex flex-col gap-1 p-1 overflow-y-auto custom-scrollbar\"></div>\n      </div>\n      <div id=\"item-menu\" class=\"absolute inset-0 bg-slate-950/95 flex flex-col transform translate-x-full transition-transform duration-300 z-10 min-h-0\">\n        <div class=\"px-2.5 py-1 bg-gradient-to-r from-amber-950/60 via-slate-900/90 to-slate-950 border-b border-amber-900/40 flex justify-between items-center shrink-0\">\n          <div class=\"flex items-center gap-1.5 min-w-0\">\n            <span class=\"w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0\"></span>\n            <span class=\"text-xs font-bold text-amber-300\">物品道具</span>\n          </div>\n          <button data-rpg-ui-act=\"closeItemMenu\" class=\"text-[9px] text-slate-400 hover:text-white transition-colors flex items-center gap-1 bg-slate-800/80 px-1.5 py-0.2 rounded border border-slate-700\"><span>↩</span> 返回</button>\n        </div>\n        <div id=\"item-list\" class=\"flex-1 flex flex-col gap-1 p-1 overflow-y-auto custom-scrollbar\"></div>\n      </div>\n      <div id=\"skill-menu\" class=\"absolute inset-0 bg-slate-950/95 hidden flex-col transform translate-x-full transition-transform duration-300 z-10 min-h-0\">\n        <div class=\"px-2.5 py-1 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 border-b border-slate-800 flex justify-between items-center shrink-0\">\n          <div class=\"flex items-center gap-1.5 min-w-0\">\n            <span class=\"w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shrink-0\"></span>\n            <span class=\"text-xs font-bold text-cyan-300\">选择技能</span>\n          </div>\n          <button data-rpg-ui-act=\"closeSkillMenu\" class=\"text-[9px] text-slate-400 hover:text-white transition-colors flex items-center gap-1 bg-slate-800/80 px-1.5 py-0.2 rounded border border-slate-700\"><span>↩</span> 返回</button>\n        </div>\n        <div id=\"skill-list\" class=\"flex-1 flex flex-col gap-1 p-1 overflow-y-auto custom-scrollbar\"></div>\n      </div>\n      <div id=\"target-menu\" class=\"absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center p-2 transform translate-y-full transition-transform duration-300 z-20\">\n        <div id=\"target-hint\" class=\"text-rose-300 text-[10px] sm:text-xs font-bold tracking-widest mb-2 sm:mb-3 animate-pulse text-center leading-relaxed\">请选择目标</div>\n        <button data-rpg-ui-act=\"cancelTargeting\" class=\"px-3 sm:px-4 py-1 sm:py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded text-[10px] sm:text-xs border border-white/10 transition-colors\">取消</button>\n      </div>\n      <div id=\"enemy-turn-overlay\" class=\"absolute inset-0 bg-black/60 backdrop-blur-sm z-30 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300\"><span class=\"text-xs sm:text-sm text-rose-500/80 font-bold tracking-widest animate-pulse\">非玩家回合</span></div>\n    </div>";
 export const RPG_UI_TIP_HTML = "<div id=\"rc-tag-tooltip\" aria-hidden=\"true\">\n  <div class=\"rc-tip-card\">\n    <div class=\"rc-tip-head\">\n      <span id=\"rc-tip-title\" class=\"rc-tip-title\"></span>\n      <span id=\"rc-tip-raw\" class=\"rc-tip-raw\"></span>\n    </div>\n    <div id=\"rc-tip-body\" class=\"rc-tip-body\"></div>\n  </div>\n</div>";
+export const RPG_UI_EDITOR_HTML = "<div id=\"editor-modal\" class=\"fixed inset-0 bg-black/80 backdrop-blur-md z-[100] hidden items-center justify-center p-2 sm:p-4 overflow-y-auto\"></div>";
 
 export function createRpgUi(host) {
   // ---- 宿主注入（战棋规则判定、瞄准入口、伪 state） ----
@@ -33,6 +34,25 @@ function getGrantedVariantName(tag) {
   const m = String(tag || '').match(/^\[赋予[:：]([^\[\];]+)\]$/);
   return m && VARIANT_GRANT_NAMES.includes(m[1].trim()) ? m[1].trim() : null;
 }
+
+const SKILL_TYPES = [
+  '[无]', '[群攻]', '[群攻(爆炸)]', '[群攻(雷)]', '[群攻(火焰)]', '[群攻(枪击)]', '[群攻(毒雾)]', '[群攻(冰霜)]', '[群攻(风)]', '[群攻(光)]',
+  '[单体]', '[单体(枪击)]', '[单体(火焰)]', '[单体(光)]', '[单体(雷)]', '[单体(爆炸)]', '[单体(刀砍)]', '[单体(拳击)]', '[单体(爪击)]', '[单体(撕咬)]', '[单体(毒液)]', '[单体(冰霜)]', '[群回]', '[单回]', '[群增]',
+  '[单增]', '[群防]', '[单防]', '[群盾]', '[单盾]',
+  '[群回蓝]', '[单回蓝]', '[吸蓝]', '[群冲]', '[单冲]', '[群瞄]', '[单瞄]', '[群降]', '[单降]', '[群盲]', '[单盲]', '[群滞]', '[单滞]', '[群弱]', '[单弱]', '[嘲讽]', '[反击]', '[群反击]', '[再动]', '[回避]', '[群避]', '[单避]',
+  '[眩晕]', '[群眩晕]', '[穿透]', '[群穿透]', '[散射]', '[散射(霰弹)]', '[群散射]', '[群散射(霰弹)]', '[免伤]',
+  '[中毒]', '[群中毒]', '[燃烧]', '[群燃烧]', '[麻痹]', '[群麻痹]',
+  '[单速]', '[群速]', '[单缓]', '[群缓]',
+  '[自盲]', '[自降]', '[自弱]', '[自滞]', '[自缓]',
+  '[驱散]', '[群驱散]',
+  '[肃正]', '[肃正:近战]', '[肃正:远程]', '[肃正:法术]',
+  ...VARIANT_GRANT_NAMES.map(name => `[赋予:${name}]`),
+  '[必中]', '[转火]', '[突进]', '[众召]',
+  '[高阶]', '[传奇]', '[神术]',
+  '[近战]', '[远程]', '[法术]'
+];
+
+const SKILL_TYPE_EDIT_OPTIONS = SKILL_TYPES.filter(t => !['[必中]', '[转火]', '[突进]', '[众召]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]'].includes(t));
 
 const TAG_EXPAND_MAP = {
   '单体': '单体伤害', '群攻': '群体伤害', '穿透': '单体穿透', '群穿透': '群体穿透',
@@ -160,9 +180,63 @@ function tagTipAttrs(cleanTag, powerNum, rawType) {
   return ` data-tagtip-title="【${expandTagLabel(core)}】" data-tagtip-body="${_tip}" data-tagtip-raw="${rawType || ''}"`;
 }
 
+const ASSET_ORIGIN = window.__RPG_ASSET_BASE__ || 'http://192.168.110.83:8766';
+
+const ASSET_BASE = ASSET_ORIGIN;
+
 function escapeHistoryHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+
+const RLYEH_FOG_CLOUD_URL = `${ASSET_BASE}/fog.mp3`;
+
+const WEBM_FX_REGISTRY = {
+    '火焰01': { url: `${ASSET_BASE}/fire.webm`,                                              scale: 1.4, particles: 'fire_aoe',    audioUrl: `${ASSET_BASE}/fire01.mp3` },
+    '冰霜01': { url: `${ASSET_BASE}/ice.webm`,                                              scale: 1.4, particles: 'frost',       audioUrl: `${ASSET_BASE}/freeze01.mp3` },
+    '雷击01': { url: `${ASSET_BASE}/450.webm`,               scale: 1.4, particles: 'thunder_aoe', audioUrl: `${ASSET_BASE}/thunder01.mp3` },
+    '圣光01': { url: `${ASSET_BASE}/414.webm`,               scale: 1.4, particles: 'holy_light',  audioUrl: `${ASSET_BASE}/light01.mp3` },
+    '双枪扫射': { url: `${ASSET_BASE}/strafe-ezremove05.mp4`, scale: 0.9, particles: 'gunshot',    audioUrl: 'none', delay: 0.5 },
+    '克虏伯重狙': { url: `${ASSET_BASE}/snipe-ezremove.mp4`,  scale: 1.5, particles: 'gunshot',    audioUrl: 'none' },
+    '异种坏死雾': { url: `${ASSET_BASE}/fog.mp4`, scale: 0.8, particles: 'poison',     audioUrl: 'none', delay: 0.2 },
+    '生体流转': { url: `${ASSET_BASE}/heart.mp4`, scale: 0.4, particles: 'fire_aoe',     audioUrl: 'none' },
+    '近战重击': { url: '', scale: 1.0, particles: 'melee_heavy', audioUrl: `${ASSET_BASE}/parry_Weapon_GuardBreak.wav` },
+    '远程重击': { url: '', scale: 1.0, particles: 'ranged_heavy', audioUrl: 'none' },
+    '枪击穿透': { url: '', scale: 1.0, particles: 'gunshot_pierce', audioUrl: `${ASSET_BASE}/gunshot_pierce.mp3` },
+    '连续扫射': { url: '', scale: 1.0, particles: 'strafe_burst', audioUrl: 'none' },
+    '造雾术': { url: '', scale: 1.0, particles: 'rlyeh_sediment', audioUrl: RLYEH_FOG_CLOUD_URL },
+    '高阶召唤术': { url: '', scale: 1.0, particles: 'titan_gaze', audioUrl: 'none', delay: 1.0 },
+    '障壁术': { url: '', scale: 1.0, particles: 'nak_aegis', audioUrl: 'none', delay: 0.8 },
+    '灵风术': { url: '', scale: 1.0, particles: 'arcane', delay: 1.0 },
+    '纳克提特障壁术': { url: '', scale: 1.0, particles: 'arcane', delay: 1.2 },
+    '伊西丝之拥': { url: '', scale: 1.0, particles: 'arcane', delay: 1.1 },
+    '折影步': { url: '', scale: 1.0, particles: 'arcane', delay: 0 },
+    '巫师护盾': { url: '', scale: 1.0, particles: 'arcane', delay: 0 },
+    '飞沙化甲': { url: '', scale: 1.0, particles: 'arcane', delay: 0.28 },
+    '蝎眼钥匙': { url: '', scale: 1.0, particles: 'arcane', delay: 1.15 },
+    '谐律之庇': { url: '', scale: 1.0, particles: 'arcane', delay: 0.90 },
+    '静默之域': { url: '', scale: 1.0, particles: 'arcane', delay: 0.95 },
+    '碎裂之响': { url: '', scale: 1.0, particles: 'arcane', delay: 0.95 },
+    '塞赫美特之愠': { url: '', scale: 1.0, particles: 'arcane', delay: 1.45 },
+    '逆咒归源镜': { url: '', scale: 1.0, particles: 'arcane', delay: 0.45 },
+    '芭斯特的猫眼石': { url: '', scale: 1.0, particles: 'arcane', delay: 0.92 },
+    '奇异海螺': { url: '', scale: 1.0, particles: 'arcane', delay: 0.50 },
+    '砷弹射击': { url: '', scale: 1.0, particles: 'arcane', delay: 0.50 },
+    'group:melee': { url: '', scale: 1.0, particles: 'arcane', delay: 0.35 },
+    'group:ranged': { url: '', scale: 1.0, particles: 'arcane', delay: 0.35 },
+    'group:spell': { url: '', scale: 1.0, particles: 'arcane', delay: 0.35 },
+    // 用户新增三组（my_assets 实测核名：miaozhun/ranshao 为 .mp3+.webm，weimu 音效为 .wav）；开镜瞄准/燃烧弹无 delay（立即结算），圣域帷幕 delay 1（演出后结算）、均不放大音量
+    // 开镜瞄准/燃烧弹 scale 0.42：用户实测原 1.4 过大，降至 30%（1.4×0.3）
+    '开镜瞄准': { url: `${ASSET_BASE}/miaozhun.webm`, scale: 0.42, audioUrl: `${ASSET_BASE}/miaozhun.mp3` },
+    '燃烧弹': { url: `${ASSET_BASE}/ranshao.webm`, scale: 0.42, particles: 'fire_aoe', audioUrl: `${ASSET_BASE}/ranshao.mp3` },
+    '圣域帷幕': { url: `${ASSET_BASE}/weimu.webm`, scale: 1.4, particles: 'holy_light', audioUrl: `${ASSET_BASE}/weimu.wav`, delay: 1 },
+    // 在此继续添加：
+    // delay 可选（单位：秒）：特效播放后、伤害结算前的等待时长，用于长特效演出与伤害数字同步；未配置则立即结算
+    // '火焰02': { url: 'https://...', scale: 1.2, particles: 'fire_aoe',    audioUrl: 'https://...' },
+    // '冰霜02': { url: 'https://...', scale: 1.6, particles: 'frost',        audioUrl: 'https://...' },
+    // '雷击02': { url: 'https://...', scale: 1.0, particles: 'thunder_aoe',  audioUrl: 'https://...' },
+    // '圣光02': { url: 'https://...', scale: 1.4, particles: 'holy_light',   audioUrl: 'https://...' },
+    // '爆炸01': { url: null,          scale: 0,   particles: 'explosion'                             },
+};
 
 function getEffectiveGroupChildren(hero, parent) {
     const paired = getSkillGroupChildren(hero, parent);
@@ -776,6 +850,153 @@ function closeItemMenu() { const el=document.getElementById('item-menu'); if(el)
 
 function closeSkillMenu() { closeAllSubMenus(); }
 
+function buildEditorSkillTagPreview(type, power, type2, power2, type3, power3, tone) {
+  var slots = [[type, power], [type2, power2], [type3, power3]];
+  var colorClass = tone === 'enemy' ? 'text-rose-300' : 'text-cyan-300';
+  return slots.filter(function(slot) { return slot[0] && slot[0] !== '[无]'; }).map(function(slot) {
+    var powerText = !getGrantedVariantName(slot[0]) && Number(slot[1]) ? ' ' + slot[1] : '';
+    var _core = String(slot[0]).replace(/[\[\]]/g, '');
+    return `<span${tagTipAttrs(_core, slot[1], slot[0])} class="px-1.5 py-0.2 rounded text-[9px] font-mono-num font-semibold bg-slate-800 ${colorClass} border border-slate-700 shrink-0 whitespace-nowrap">${tagDisplayLabel(_core, slot[1])}${powerText}</span>`;
+  }).join('');
+}
+
+function buildSkillFormFieldsHtml(idNS, s, onInputJs) {
+  let html = '';
+  // 模块 A：基础设定与修饰开关
+  html += `<div class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 text-xs items-center">`;
+  html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">名称</span><input type="text" id="edit-${idNS}-name" value="${escapeHistoryHtml(s.name)}" oninput="${onInputJs}" class="edit-input-game w-full font-bold text-slate-100 py-1 text-xs" placeholder="技能名"></div>`;
+  html += `<div class="sm:col-span-2 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">属性</span><select id="edit-${idNS}-dmgType" onchange="${onInputJs}" class="edit-input-game w-full text-orange-300 font-bold py-1 text-xs"><option value="" ${!s.damageType ? 'selected' : ''}>无(近战)</option><option value="近战" ${s.damageType === '近战' ? 'selected' : ''}>🗡️ 近战</option><option value="远程" ${s.damageType === '远程' ? 'selected' : ''}>🎯 远程</option><option value="法术" ${s.damageType === '法术' ? 'selected' : ''}>⚡ 法术</option></select></div>`;
+  html += `<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">特效</span><select id="edit-${idNS}-fxTag" class="edit-input-game w-full text-yellow-300 font-bold py-1 text-xs">${['特效:无', ...Object.keys(WEBM_FX_REGISTRY)].map(f => { const val = f === '特效:无' ? '' : f; const isSel = (s.fxTag || '') === val; return `<option value="${val}" ${isSel ? 'selected' : ''}>${f}</option>`; }).join('')}</select></div>`;
+
+  // 药丸修饰开关
+  html += `<div class="sm:col-span-4 flex items-center gap-1.5 flex-wrap">`;
+  html += `<label id="pill-${idNS}-others" class="tag-toggle-pill border-emerald-500 text-emerald-300 bg-emerald-950/70 ${s.isOthers ? 'active' : 'inactive'}"><input type="checkbox" id="edit-${idNS}-others" ${s.isOthers ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-${idNS}-others')"><span>👥</span> 他人</label>`;
+  html += `<label id="pill-${idNS}-guaranteed" class="tag-toggle-pill border-rose-500 text-rose-300 bg-rose-950/70 ${s.guaranteedHit ? 'active' : 'inactive'}"><input type="checkbox" id="edit-${idNS}-guaranteed" ${s.guaranteedHit ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-${idNS}-guaranteed')"><span>🎯</span> 必中</label>`;
+  html += `<label id="pill-${idNS}-switch" class="tag-toggle-pill border-orange-500 text-orange-300 bg-orange-950/70 ${s.switchTarget ? 'active' : 'inactive'}"><input type="checkbox" id="edit-${idNS}-switch" ${s.switchTarget ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-${idNS}-switch')"><span>🔥</span> 转火</label>`;
+  html += `<label id="pill-${idNS}-highTier" class="tag-toggle-pill border-violet-500 text-violet-300 bg-violet-950/70 ${s.isHighTier ? 'active' : 'inactive'}"><input type="checkbox" id="edit-${idNS}-highTier" ${s.isHighTier ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-${idNS}-highTier')"><span>⬥</span> 高阶</label>`;
+  html += `<label id="pill-${idNS}-legendary" class="tag-toggle-pill border-amber-500 text-amber-300 bg-amber-950/70 ${s.isLegendary ? 'active' : 'inactive'}"><input type="checkbox" id="edit-${idNS}-legendary" ${s.isLegendary ? 'checked' : ''} class="hidden" onchange="togglePillClass(this, 'pill-${idNS}-legendary')"><span>✦</span> 传奇</label>`;
+  html += `</div></div>`;
+
+  // 模块 B：反制策略
+  html += `<div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-xs bg-slate-900/70 p-1.5 rounded border border-slate-800 grid-reactions-responsive">`;
+  html += `<div class="flex items-center gap-1"><span class="text-indigo-400 text-[10px] whitespace-nowrap font-bold">反应</span><select id="edit-${idNS}-reaction" class="edit-input-game w-full text-indigo-300 text-[10px] py-1 font-semibold"><option value="none" ${!s.isReaction ? 'selected' : ''}>非反应</option><option value="all" ${s.isReaction && s.reactionTarget === 'all' ? 'selected' : ''}>反应(全能)</option><option value="近战" ${s.isReaction && s.reactionTarget === '近战' ? 'selected' : ''}>反应(近战)</option><option value="远程" ${s.isReaction && s.reactionTarget === '远程' ? 'selected' : ''}>反应(远程)</option><option value="法术" ${s.isReaction && s.reactionTarget === '法术' ? 'selected' : ''}>反应(法术)</option></select></div>`;
+  html += `<div class="flex items-center gap-1"><span class="text-amber-400 text-[10px] whitespace-nowrap font-bold">看破</span><select id="edit-${idNS}-kanpo" class="edit-input-game w-full text-amber-300 text-[10px] py-1 font-semibold"><option value="none" ${!s.kanpoTarget ? 'selected' : ''}>无看破</option><option value="all" ${s.kanpoTarget === 'all' ? 'selected' : ''}>看破(全能)</option><option value="近战" ${s.kanpoTarget === '近战' ? 'selected' : ''}>看破(近战)</option><option value="远程" ${s.kanpoTarget === '远程' ? 'selected' : ''}>看破(远程)</option><option value="法术" ${s.kanpoTarget === '法术' ? 'selected' : ''}>看破(法术)</option></select></div>`;
+  html += `<div class="flex items-center gap-1"><span class="text-sky-400 text-[10px] whitespace-nowrap font-bold">舍身</span><select id="edit-${idNS}-sheshen" class="edit-input-game w-full text-sky-300 text-[10px] py-1 font-semibold"><option value="none" ${!s.sheshenTarget ? 'selected' : ''}>无舍身</option><option value="all" ${s.sheshenTarget === 'all' ? 'selected' : ''}>舍身(全能)</option><option value="近战" ${s.sheshenTarget === '近战' ? 'selected' : ''}>舍身(近战)</option><option value="远程" ${s.sheshenTarget === '远程' ? 'selected' : ''}>舍身(远程)</option><option value="法术" ${s.sheshenTarget === '法术' ? 'selected' : ''}>舍身(法术)</option></select></div>`;
+  html += `</div>`;
+
+  // 模块 C：消耗与节奏数值矩阵
+  html += `<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 text-[10px] grid-costs-responsive">`;
+  html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-sky-400 whitespace-nowrap text-[9px] font-semibold shrink-0">💧 MP耗</span><input type="number" id="edit-${idNS}-cost" value="${s.cost || 0}" oninput="${onInputJs}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-sky-200 text-[10px] py-0.5 px-1"></div>`;
+  html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-rose-400 whitespace-nowrap text-[9px] font-semibold shrink-0">🩸 HP耗</span><input type="number" id="edit-${idNS}-hpCost" value="${s.hpCost || 0}" oninput="${onInputJs}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-rose-200 text-[10px] py-0.5 px-1"></div>`;
+  html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-emerald-400 whitespace-nowrap text-[9px] font-semibold shrink-0">🔥 TP耗</span><input type="number" id="edit-${idNS}-tpCost" value="${s.tpCost || 0}" oninput="${onInputJs}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-emerald-200 text-[10px] py-0.5 px-1"></div>`;
+  html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-yellow-400 whitespace-nowrap text-[9px] font-semibold shrink-0">🎯 Aim</span><input type="number" id="edit-${idNS}-hit" value="${s.hit != null ? s.hit : 100}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-yellow-200 text-[10px] py-0.5 px-1"></div>`;
+  html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-purple-400 whitespace-nowrap text-[9px] font-semibold shrink-0">⏱️ 持续</span><input type="number" id="edit-${idNS}-turns" value="${s.turns || ''}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-purple-200 text-[10px] py-0.5 px-1" placeholder="默认"></div>`;
+  html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-yellow-300 whitespace-nowrap text-[9px] font-semibold shrink-0">⏳ 延迟</span><input type="number" id="edit-${idNS}-delay" value="${s.delay || 0}" oninput="${onInputJs}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-yellow-200 text-[10px] py-0.5 px-1"></div>`;
+  html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-cyan-300 whitespace-nowrap text-[9px] font-semibold shrink-0">⚡ 加速</span><input type="number" id="edit-${idNS}-haste" value="${s.haste || 0}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-cyan-200 text-[10px] py-0.5 px-1"></div>`;
+  html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-fuchsia-300 whitespace-nowrap text-[9px] font-semibold shrink-0">🚫 限次</span><input type="number" id="edit-${idNS}-limit" value="${s.maxUses || 0}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-fuchsia-200 text-[10px] py-0.5 px-1" placeholder="0"></div>`;
+  html += `<div class="bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between gap-1 min-w-0"><span class="text-orange-300 whitespace-nowrap text-[9px] font-semibold shrink-0">💥 暴击%</span><input type="number" min="0" max="100" id="edit-${idNS}-crit" value="${s.critRate || 0}" oninput="${onInputJs}" class="edit-input-game flex-1 min-w-0 font-mono-num text-right text-orange-200 text-[10px] py-0.5 px-1" placeholder="0"></div>`;
+  html += `</div>`;
+
+  // 模块 D：三重复合标签槽位与威力配置（带屏障护甲与驱散量并排）
+  var _dispVal = (() => { if ((s.type||'').includes('驱散')) return s.power; if ((s.type2||'').includes('驱散')) return s.power2; if ((s.type3||'').includes('驱散')) return s.power3; return 0; })();
+  html += `<div class="space-y-1">`;
+  html += `<div class="text-[10px] text-slate-400 font-bold flex items-center justify-between flex-wrap gap-1">`;
+  html += `<span>三重复合标签槽位:</span>`;
+  html += `<div class="flex items-center gap-3 text-[10px]">`;
+  html += `<span class="text-cyan-400 font-semibold flex items-center gap-1">🛡️ 屏障护甲: <input type="number" id="edit-${idNS}-armor" value="${s.barrierArmor||0}" class="edit-input-game w-12 font-mono-num text-right text-cyan-200 py-0.5 text-[10px]" min="0"> 点</span>`;
+  html += `<span class="text-emerald-400 font-semibold flex items-center gap-1">✨ 驱散量: <input type="number" id="edit-${idNS}-dispel" value="${_dispVal}" class="edit-input-game w-12 font-mono-num text-right text-emerald-200 py-0.5 text-[10px]" min="0"> 层</span>`;
+  html += `</div>`;
+  html += `</div>`;
+
+  html += `<div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 grid-tags-responsive">`;
+  html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-${idNS}-type', this)" class="edit-input-game skill-type-combo w-full text-cyan-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${s.type && s.type !== '[无]' ? tagDisplayLabel(String(s.type).replace(/[\[\]]/g, ''), s.power) : '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-${idNS}-type" onchange="${onInputJs}" class="hidden">${renderSkillTypeOptions(s.type)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-${idNS}-power" value="${s.power}" oninput="${onInputJs}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-${idNS}-slot-turns" value="${s.slotTurns ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
+  html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-${idNS}-type2', this)" class="edit-input-game skill-type-combo w-full text-slate-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${s.type2 && s.type2 !== '[无]' ? tagDisplayLabel(String(s.type2).replace(/[\[\]]/g, ''), s.power2) : '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-${idNS}-type2" onchange="${onInputJs}" class="hidden">${renderSkillTypeOptions(s.type2)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-${idNS}-power2" value="${s.power2}" oninput="${onInputJs}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-${idNS}-slot-turns2" value="${s.slotTurns2 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
+  html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-slate-700/60"><button type="button" onclick="openSkillTypeCombo('edit-${idNS}-type3', this)" class="edit-input-game skill-type-combo w-full text-slate-300 font-bold text-[10px] py-1 flex items-center justify-between gap-1"><span class="truncate">${s.type3 && s.type3 !== '[无]' ? tagDisplayLabel(String(s.type3).replace(/[\[\]]/g, ''), s.power3) : '[无]'}</span><span class="text-slate-500 shrink-0">▾</span></button><select id="edit-${idNS}-type3" onchange="${onInputJs}" class="hidden">${renderSkillTypeOptions(s.type3)}</select><span class="text-[10px] text-slate-500 whitespace-nowrap">威力</span><input type="number" id="edit-${idNS}-power3" value="${s.power3}" oninput="${onInputJs}" class="edit-input-game w-14 font-mono-num text-right text-emerald-200 text-[10px] py-1"><span class="text-[10px] text-slate-500 whitespace-nowrap">回</span><input type="number" id="edit-${idNS}-slot-turns3" value="${s.slotTurns3 ?? ''}" class="edit-input-game w-12 font-mono-num text-right text-purple-200 text-[10px] py-1" placeholder="默认"></div>`;
+  html += `</div>`;
+  // 模块 E：召唤对象（世界书词条名；支持 `A*4；B` 多只清单与 *N 数量，留空=无召唤）
+  html += `<div class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded border border-sky-700/40"><span class="text-[10px] text-sky-300 font-bold whitespace-nowrap">召唤对象</span><input type="text" id="edit-${idNS}-summon" value="${escapeHistoryHtml(s.summonTarget||'')}" class="edit-input-game w-full text-sky-200 font-mono-num text-[10px] py-1" placeholder="词条名[*N]；词条名…（如 幻影*4；暗影），留空=无召唤"></div>`;
+  html += `</div>`; // close module D space-y-1
+  return html;
+}
+
+function syncGrantSlotPower(select) {
+  const powerId = select.id.replace(/-type(\d?)$/, (_, suffix) => '-power' + suffix);
+  const power = document.getElementById(powerId);
+  if (!power) return;
+  power.disabled = !!getGrantedVariantName(select.value);
+  if (power.disabled) power.value = 0;
+}
+
+function renderSkillTypeOptions(curVal) {
+  const _nonSlot = new Set(['[必中]', '[转火]', '[突进]', '[众召]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]']);
+  const opts = (curVal && _nonSlot.has(curVal)) ? [curVal, ...SKILL_TYPE_EDIT_OPTIONS] : SKILL_TYPE_EDIT_OPTIONS;
+  // option 文本「可读名 [原标签]」，value 保持原始标签不变（保存同步零影响）
+  return opts.map(t => `<option value="${t}" ${curVal === t ? 'selected' : ''}>${t === '[无]' ? t : tagDisplayLabel(t.replace(/[\[\]]/g, '')) + ' ' + t}</option>`).join('');
+}
+
+function closeSkillTypeCombo() {
+  const pop = document.getElementById('skill-type-combo-popup');
+  if (pop) pop.remove();
+}
+
+function openSkillTypeCombo(selectId, btn) {
+  const existing = document.getElementById('skill-type-combo-popup');
+  if (existing && existing.__comboBtn === btn) { existing.remove(); return; } // 同一按钮再点 = 收起
+  if (existing) existing.remove();
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const pop = document.createElement('div');
+  pop.id = 'skill-type-combo-popup';
+  pop.className = 'skill-type-combo-popup';
+  pop.innerHTML = `<input type="text" class="edit-input-game w-full text-cyan-200 text-[10px] py-1" placeholder="🔍 搜索标签…" oninput="filterSkillTypeCombo(this.value)" onkeydown="if(event.key==='Enter'){const _f=document.querySelectorAll('#skill-type-combo-popup .skill-type-combo-opt');if(_f.length)_f[0].click();}else if(event.key==='Escape'){closeSkillTypeCombo();}"><div class="skill-type-combo-list"></div>`;
+  pop.__comboSelect = sel; pop.__comboBtn = btn;
+  (document.querySelector('[data-rpg-ui-scope]') || document.body).appendChild(pop);
+  const rect = btn.getBoundingClientRect();
+  pop.style.minWidth = Math.max(rect.width, 160) + 'px';
+  pop.style.left = Math.max(4, Math.min(rect.left, window.innerWidth - 270)) + 'px';
+  pop.style.top = Math.max(4, Math.min(rect.bottom + 4, window.innerHeight - 300)) + 'px';
+  filterSkillTypeCombo('');
+  pop.querySelector('input').focus();
+}
+
+function filterSkillTypeCombo(q) {
+  const pop = document.getElementById('skill-type-combo-popup');
+  if (!pop) return;
+  const sel = pop.__comboSelect;
+  const kw = String(q || '').trim().toLowerCase().replace(/[\[\]]/g, '');
+  const list = pop.querySelector('.skill-type-combo-list');
+  const opts = [...sel.options].map(o => o.value).filter(v => {
+    if (!kw) return true;
+    const _clean = v.replace(/[\[\]]/g, '');
+    return _clean.toLowerCase().includes(kw) || tagDisplayLabel(_clean).toLowerCase().includes(kw);
+  });
+  list.innerHTML = opts.length
+    ? opts.map(v => `<div class="skill-type-combo-opt ${v === sel.value ? 'sel' : ''}" data-val="${v}" onclick="applySkillTypeCombo(this.dataset.val)"><span class="skill-type-combo-name">${v === '[无]' ? v : tagDisplayLabel(v.replace(/[\[\]]/g, ''))}</span><span class="skill-type-combo-code">${v}</span></div>`).join('')
+    : `<div class="skill-type-combo-empty">无匹配标签</div>`;
+}
+
+function applySkillTypeCombo(val) {
+  const pop = document.getElementById('skill-type-combo-popup');
+  if (!pop) return;
+  const sel = pop.__comboSelect, btn = pop.__comboBtn;
+  if (sel) { sel.value = val; syncGrantSlotPower(sel); sel.dispatchEvent(new Event('change', { bubbles: true })); }
+  if (btn) { const label = btn.querySelector('span'); if (label) label.textContent = val; }
+  closeSkillTypeCombo();
+}
+
+function togglePillClass(inputEl, pillId) {
+  var pill = document.getElementById(pillId);
+  if (pill && inputEl) {
+    if (inputEl.checked) {
+      pill.classList.add('active');
+      pill.classList.remove('inactive');
+    } else {
+      pill.classList.remove('active');
+      pill.classList.add('inactive');
+    }
+  }
+}
+
 let _rcTipTimer = null;
 
 function showTagTipFor(el) {
@@ -838,7 +1059,7 @@ function hideTagTip() {
       if (fn) { e.stopPropagation(); fn(); }
     });
   }
-  return { bind, tagDisplayLabel, tagTipAttrs, escapeHistoryHtml, renderTurnQueue, formatTagPill, updateSkillMenus, closeAllSubMenus, openBasicMenu, closeBasicMenu, openAttackSkillMenu, openSupportSkillMenu, updateItemMenu, openItemMenu, hideTagTip,
+  return { bind, tagDisplayLabel, tagTipAttrs, escapeHistoryHtml, WEBM_FX_REGISTRY, renderTurnQueue, formatTagPill, updateSkillMenus, closeAllSubMenus, openBasicMenu, closeBasicMenu, openAttackSkillMenu, openSupportSkillMenu, updateItemMenu, openItemMenu, buildEditorSkillTagPreview, buildSkillFormFieldsHtml, syncGrantSlotPower, renderSkillTypeOptions, closeSkillTypeCombo, openSkillTypeCombo, filterSkillTypeCombo, applySkillTypeCombo, togglePillClass, hideTagTip,
     markRoundStart() { _roundStartGlowPending = true; },
     resetQueue() { _prevQueueCurrentUid = null; } };
 }

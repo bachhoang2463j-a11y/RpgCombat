@@ -6,9 +6,23 @@
 // 本层只做展示与输入转发，不做规则判断（可用/禁用原因由 main 传入）。
 // ==========================================
 
-import { createRpgUi, RPG_UI_RAIL_HTML, RPG_UI_MENU_HTML, RPG_UI_TIP_HTML } from './vendor/rpg-ui/rpg-ui.mjs';
+import { createRpgUi, RPG_UI_RAIL_HTML, RPG_UI_MENU_HTML, RPG_UI_TIP_HTML, RPG_UI_EDITOR_HTML } from './vendor/rpg-ui/rpg-ui.mjs';
 
 const ESC = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+// 禁用原因短标签（卡面一行可读；完整原因仍写入 title/aria 与点击后的战报）
+export function shortReason(reason) {
+  const r = String(reason || '');
+  if (!r) return '';
+  if (/未迁移/.test(r)) return '🚧 战棋未迁移';
+  if (/冷却/.test(r)) return '⏳ 冷却中';
+  if (/限次/.test(r)) return '🚫 限次已用完';
+  if (/蓄力|准备/.test(r)) return '⌛ ' + r;
+  if (/数值资源|MP|HP|TP/.test(r)) return '💧 资源不足';
+  if (/主行动/.test(r)) return '◆ 主行动已用完';
+  if (/辅助行动/.test(r)) return '◇ 辅助行动已用完';
+  if (/反应/.test(r)) return '🛡 反应技能·被动触发';
+  return '⛔ ' + r;
+}
 
 export function buildShell(root) {
   root.setAttribute('data-rpg-ui-scope', '');
@@ -28,7 +42,7 @@ export function buildShell(root) {
     '</div>',
     '<div id="tactics-float-ui">' +
       '<div id="heroes-container"></div>' +
-      '<div id="menu-outer" class="relative self-end">' + RPG_UI_MENU_HTML + '</div>' +
+      '<div id="menu-outer" class="relative self-end"><div id="t-res-strip" class="t-res" hidden></div>' + RPG_UI_MENU_HTML + '</div>' +
     '</div>',
     '<div id="chat-input-area"><div id="chat-input-bar">' +
       '<input type="text" id="chat-text-input" placeholder="说点什么... (Enter发送)" maxlength="200">' +
@@ -43,6 +57,7 @@ export function buildShell(root) {
       '</div>' +
     '</div>',
     RPG_UI_TIP_HTML,
+    RPG_UI_EDITOR_HTML,
   ].join('');
 
   const $ = (id) => root.querySelector('#' + id);
@@ -52,9 +67,12 @@ export function buildShell(root) {
     activeHeroName: $('active-hero-name'), chatInput: $('chat-text-input'), banner: $('turn-banner'),
     overlay: $('panel-overlay'), panelBox: $('panel-box'), panelTitle: $('panel-title'), panelBody: $('panel-body'),
     targetMenu: $('target-menu'), targetHint: $('target-hint'), enemyOverlay: $('enemy-turn-overlay'),
+    strip: $('t-res-strip'), chargeMenu: $('charge-menu'), basicList: root.querySelector('#basic-menu > div:last-child'),
+    editorModal: $('editor-modal'),
   };
   const state = { units: [], selectedId: null, allySpeak: true, enemySpeak: true, onUnitClick: null, onReset: null, history: [],
-    settings: null, onUiSound: null, busy: false, currentId: null, cmd: null, menuKey: '' };
+    settings: null, onUiSound: null, busy: false, currentId: null, cmd: null, menuKey: '',
+    pipKey: '', pipMax: { main: 0, aux: 0 }, pipPrev: null, moveCap: 0, basicKey: '', chargeKey: '', chargeAside: false, moveCost: null };
   const uiSound = (kind) => { if (state.onUiSound) state.onUiSound(kind); };
   const pct = (v, max) => (max ? Math.max(0, Math.min(100, v / max * 100)) : 100).toFixed(1);
 
@@ -83,6 +101,22 @@ export function buildShell(root) {
     getSkillGroupChildren: (hero, parent) => (!hero || !Array.isArray(hero.skills) || !parent || !parent.isGroup) ? [] : hero.skills.filter(s => s && s._inGroup && s.parentName === parent.name),
   });
   rpgUi.bind(root);
+  // 编辑器模板（原版提取）内联处理器按原版口径调用全局函数；下拉浮层外按下即收起、标签槽联动威力禁用（原版顶层监听同口径）
+  for (const n of ['openSkillTypeCombo', 'filterSkillTypeCombo', 'applySkillTypeCombo', 'closeSkillTypeCombo', 'togglePillClass']) window[n] = rpgUi[n];
+  const onComboDown = e => {
+    const pop = document.getElementById('skill-type-combo-popup');
+    if (!pop || pop.contains(e.target)) return;
+    if (e.target.closest && e.target.closest('.skill-type-combo') === pop.__comboBtn) return;
+    rpgUi.closeSkillTypeCombo();
+  };
+  document.addEventListener('mousedown', onComboDown);
+  root.addEventListener('change', e => { const s = e.target; if (s.tagName === 'SELECT' && /^edit-.*-type\d?$/.test(s.id)) rpgUi.syncGrantSlotPower(s); });
+  // 物品：战棋未迁移，菜单只供查看（标题常驻提示 + 列表顶部说明，不靠悬停）
+  root.querySelector('#item-menu .text-amber-300')?.insertAdjacentHTML('afterend', '<span class="t-unmig">战棋未迁移·仅查看</span>');
+  new MutationObserver(() => {
+    const list = $('item-list');
+    if (list.firstChild && !list.querySelector('.t-unmig-note')) list.insertAdjacentHTML('afterbegin', '<div class="t-unmig-note">🚧 物品使用与弹药消耗尚未迁移到战棋；这里只展示配置，不能执行。</div>');
+  }).observe($('item-list'), { childList: true });
 
   function faceHtml(u, cls) {
     if (u.emoji) return '<span class="' + cls + ' t-face-emoji">' + ESC(u.emoji) + '</span>';
@@ -176,36 +210,127 @@ export function buildShell(root) {
     const enemyTurn = !!(u && u.side !== 'hero' && !cmd.terminal);
     els.enemyOverlay.classList.toggle('opacity-0', !enemyTurn);
     els.enemyOverlay.classList.toggle('pointer-events-none', !enemyTurn);
-    if (!u) { els.activeHeroName.textContent = '等待指令'; state.menuKey = ''; rpgUi.closeAllSubMenus(); showTarget(null); return; }
+    if (!u) { els.activeHeroName.textContent = '等待指令'; state.menuKey = ''; rpgUi.closeAllSubMenus(); showTarget(null); renderStrip(null); renderCharge(null); return; }
     const r = cmd.resources;
-    const actionRow = u.side === 'hero' && r && !cmd.terminal
-      ? '<div class="t-action-balances"><span>🦶 ' + r.moveRemaining.toFixed(1) + 'm</span><span>主 ' + r.main + '</span><span>辅 ' + r.aux + '</span></div>' +
-        '<div class="t-action-tools">' +
-        (cmd.preparation ? '<button data-tactics-action="prepare"' + (r.main < 1 ? ' disabled' : '') + '>准备 (' + cmd.preparation.remaining + ')</button><button data-tactics-action="cancel-charge">取消蓄力</button>' : '') +
-        '<button data-tactics-action="sprint"' + (r.main < 1 ? ' disabled' : '') + '>冲刺</button>' +
-        '<button data-tactics-action="jump"' + (r.aux < 1 ? ' disabled' : '') + '>跳跃</button>' +
-        '<button data-tactics-action="push"' + (r.aux < 1 ? ' disabled' : '') + '>推动</button>' +
-        '<button data-tactics-action="carry"' + (r.main < 1 ? ' disabled' : '') + '>背起</button>' +
-        '<button data-tactics-action="drop"' + (!cmd.carrying ? ' disabled' : '') + '>放下</button>' +
-        '</div>'
-      : '';
-    // 标题栏保留原版尺寸；余额与动作仍在同一指令面板内，作为标题后的独立行。
+    // 标题栏保留原版尺寸：只放回合名与结束回合；资源条贴在菜单卡外沿上方，动作并入「基础行动」二级菜单，菜单内零挤压
     els.activeHeroName.innerHTML = '<span class="t-turn-title">' + rpgUi.escapeHistoryHtml(u.name) + (cmd.terminal ? ' · 战斗结束' : ' 的回合') + '</span>' +
       (cmd.playable ? '<button class="t-end-btn' + (cmd.endArmed ? ' t-armed' : '') + '" data-tactics-end title="结束回合（Space）">' +
         (cmd.endArmed ? '⚠️ 确认结束' : '⏳ 结束回合') + '<kbd>Space</kbd></button>' : '');
-    els.menuBox.querySelector('.t-action-extra')?.remove();
-    if (actionRow) els.activeHeroName.insertAdjacentHTML('afterend', '<div class="t-action-extra">' + actionRow + '</div>');
-    if (!cmd.playable) { state.menuKey = ''; rpgUi.closeAllSubMenus(); showTarget(null); return; }
+    renderStrip(cmd);
+    if (!cmd.playable) { state.menuKey = ''; rpgUi.closeAllSubMenus(); showTarget(null); renderCharge(null); return; }
     // 技能卡按资源变化重建（原版 updateSkillMenus：每次渲染折叠变体组）；同一资源态不重建，保留展开与滚动
-    const menuKey = u.id + '|' + u.ref.mp + '|' + (r ? r.main + ':' + r.aux : '') + '|' + (cmd.serial || 0) + '|' + u.skills.map(s => s.usesRemaining + ':' + s.maxUses).join(',');
+    const prep = cmd.preparation;
+    const menuKey = u.id + '|' + u.ref.mp + '|' + (r ? r.main + ':' + r.aux : '') + '|' + (cmd.serial || 0) + '|' + (prep ? prep.remaining + ':' + prep.invested : '') + '|' + u.skills.map(s => s.usesRemaining + ':' + s.maxUses).join(',');
     const hero = Object.assign(refOf(u), { skills: u.skills, items: u.items || [], mp: u.ref.mp, hp: u.ref.hp, tp: 0, burstActivated: false });
     if (menuKey !== state.menuKey) {
-      if (state.menuKey.split('|')[0] !== u.id) rpgUi.closeAllSubMenus();
+      if (state.menuKey.split('|')[0] !== u.id) { rpgUi.closeAllSubMenus(); state.chargeAside = false; }
       state.menuKey = menuKey;
       rpgUi.updateSkillMenus(hero);
       decorateSkillCards(u);
     }
+    renderBasic(cmd);
+    renderCharge(cmd);
     showTarget(cmd.aimHint || null);
+  }
+  // ---------- 资源条：移动额度（冲刺追加段异色）+ 主/辅点数格 + 蓄力入口；悬停技能/动作/落点时预告花费 ----------
+  function renderStrip(cmd) {
+    const u = cmd && cmd.unit, r = cmd && cmd.resources;
+    if (!u || u.side !== 'hero' || !r || cmd.terminal) { els.strip.hidden = true; state.pipKey = ''; return; }
+    els.strip.hidden = false;
+    const key = u.id + '|' + (cmd.serial || 0);
+    if (state.pipKey !== key) {
+      state.pipKey = key; state.pipPrev = null;
+      state.pipMax = { main: Math.max(1, r.main), aux: Math.max(1, r.aux) };
+      state.moveCap = Math.max(r.moveMax || 0, r.moveRemaining);
+    }
+    state.pipMax.main = Math.max(state.pipMax.main, r.main);
+    state.pipMax.aux = Math.max(state.pipMax.aux, r.aux);
+    state.moveCap = Math.max(state.moveCap, r.moveRemaining);
+    const prev = state.pipPrev || { main: r.main, aux: r.aux };
+    const pips = (kind, max, now, was) => {
+      let h = '';
+      for (let i = 0; i < max; i++) h += '<i class="t-pip t-pip-' + kind + (i < now ? ' t-on' : '') + (i >= now && i < was ? ' t-pip-break' : '') + '"></i>';
+      return h;
+    };
+    state.pipPrev = { main: r.main, aux: r.aux };
+    const cap = state.moveCap || 1, sprint = Math.min(r.sprintRemaining || 0, r.moveRemaining), base = r.moveRemaining - sprint;
+    const prep = cmd.preparation;
+    const charge = prep ? '<button class="t-res-charge' + (prep.ready ? ' t-ready' : '') + '" data-tactics-charge title="蓄力面板">' +
+      (prep.ready ? '⚡ ' : '⏳ ') + ESC(prep.skill && prep.skill.name) + ' <b>' + (prep.ready ? '就绪' : prep.invested + '/' + (prep.invested + prep.remaining)) + '</b></button>' : '';
+    els.strip.innerHTML =
+      '<div class="t-res-move" title="剩余移动额度' + (sprint > 0 ? '（含冲刺 ' + sprint.toFixed(1) + 'm）' : '') + '">' +
+        '<span class="t-res-ico">🦶</span><span class="t-res-track"><i class="t-res-base" style="width:' + (base / cap * 100).toFixed(1) + '%"></i>' +
+        '<i class="t-res-sprint" style="width:' + (sprint / cap * 100).toFixed(1) + '%"></i><i class="t-res-cost"></i></span>' +
+        '<b class="t-res-num">' + r.moveRemaining.toFixed(1) + '<small>/' + (+cap.toFixed(1)) + 'm</small></b></div>' +
+      '<div class="t-res-pips"><span class="t-res-lab" title="主行动：攻击技能、冲刺、背起">主</span>' + pips('main', state.pipMax.main, r.main, prev.main) +
+        '<span class="t-res-lab t-aux" title="辅助行动：跳跃、推动、[行动:辅] 技能">辅</span>' + pips('aux', state.pipMax.aux, r.aux, prev.aux) + charge + '</div>';
+    if (state.moveCost != null) previewMoveCost(state.moveCost);
+  }
+  function previewMoveCost(cost) {
+    state.moveCost = cost;
+    const r = state.cmd && state.cmd.resources, el = els.strip.querySelector('.t-res-cost');
+    if (!el || !r) return;
+    if (cost == null || !(cost > 0)) { el.style.width = '0'; els.strip.classList.remove('t-previewing'); return; }
+    const cap = state.moveCap || 1, c = Math.min(cost, r.moveRemaining);
+    el.style.left = ((r.moveRemaining - c) / cap * 100).toFixed(1) + '%';
+    el.style.width = (c / cap * 100).toFixed(1) + '%';
+    els.strip.classList.add('t-previewing');
+  }
+  function previewPips(main, aux) {
+    els.strip.querySelectorAll('.t-pip-will').forEach(p => p.classList.remove('t-pip-will'));
+    const mark = (kind, n) => { const on = [...els.strip.querySelectorAll('.t-pip-' + kind + '.t-on')]; on.slice(Math.max(0, on.length - n)).forEach(p => p.classList.add('t-pip-will')); };
+    if (main > 0) mark('main', main);
+    if (aux > 0) mark('aux', aux);
+  }
+  // ---------- 基础行动：原版二级菜单内改两列格子（普攻 + 战棋动作 + 未迁移的防御/撤离）；每格写明花费与「立即/选目标」 ----------
+  function renderBasic(cmd) {
+    const list = cmd.basic || [];
+    const key = JSON.stringify(list);
+    if (key === state.basicKey) return;
+    state.basicKey = key;
+    const costText = c => !c ? '免费' : [c.main ? '主' + c.main : '', c.aux ? '辅' + c.aux : ''].filter(Boolean).join('+');
+    const tile = a => {
+      const off = !a.ok;
+      const attr = a.key === 'attack' ? 'data-rpg-ui-act="handleBasicAttack"' : a.key === 'unmigrated' ? 'data-tactics-unmigrated="' + ESC(a.name) + '"' : 'data-tactics-action="' + ESC(a.key) + '"';
+      const sub = off ? ESC(a.short || a.reason || '不可用')
+        : (a.mode === 'instant' ? '⚡立即 ' : '🎯选目标 ') + costText(a.cost) + (a.note ? '·' + ESC(a.note) : '');
+      return '<button class="t-bact t-bact-' + ESC(a.tone || 'cyan') + (off ? ' t-bact-off' : '') + '" ' + attr +
+        (off ? ' aria-disabled="true"' : '') + ' title="' + ESC(off ? a.reason || '' : a.desc || a.name) + '"' +
+        ' data-cost-main="' + ((a.cost && a.cost.main) || 0) + '" data-cost-aux="' + ((a.cost && a.cost.aux) || 0) + '">' +
+        '<span class="t-bact-ico">' + a.icon + '</span><span class="t-bact-body"><b>' + ESC(a.name) + '</b><i>' + sub + '</i></span></button>';
+    };
+    const fixed = [
+      { key: 'unmigrated', icon: '🛡️', name: '防御姿态', ok: false, reason: '防御姿态：战棋未迁移（见 P07-MIGRATION）', short: '🚧 战棋未迁移', tone: 'emerald' },
+      { key: 'unmigrated', icon: '🏃', name: '尝试撤离', ok: false, reason: '尝试撤离：战棋未迁移（见 P07-MIGRATION）', short: '🚧 战棋未迁移', tone: 'purple' },
+    ];
+    els.basicList.className = 't-bact-grid';
+    els.basicList.innerHTML = list.concat(fixed).map(tile).join('');
+  }
+  // ---------- 蓄力：复用原版 #charge-menu 槽（准备中替换四个主项）；可暂离去做移动/其他动作，资源条蓄力徽章随时回来 ----------
+  function renderCharge(cmd) {
+    const prep = cmd && cmd.playable ? cmd.preparation : null;
+    const key = prep ? [cmd.unit.id, cmd.serial, prep.skill && prep.skill.name, prep.remaining, prep.ready, cmd.resources.main].join('|') : '';
+    if (!prep) state.chargeAside = false;
+    const show = !!prep && !state.chargeAside;
+    els.menuMain.style.display = show ? 'none' : '';
+    els.chargeMenu.style.display = show ? 'flex' : 'none';
+    if (!show || key === state.chargeKey) { if (!show) state.chargeKey = ''; return; }
+    state.chargeKey = key;
+    const name = ESC(prep.skill && prep.skill.name);
+    const main = cmd.resources.main;
+    const btnA = 'w-full py-1.5 px-2.5 bg-gradient-to-r border rounded-lg text-xs font-bold text-white flex items-center justify-center gap-1.5 transition-all';
+    const btnB = 'w-full py-1.5 px-2.5 bg-slate-800/90 hover:bg-slate-700/90 border border-slate-600/80 rounded-lg text-xs font-bold text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-all';
+    els.chargeMenu.innerHTML = prep.ready
+      ? '<div class="text-center text-[10px] font-bold text-cyan-300 bg-cyan-950/80 border border-cyan-500/50 py-1 px-2 rounded-lg shadow-inner flex items-center justify-center gap-1.5 animate-pulse mb-1"><span>⚡</span> 【' + name + '】蓄力已完成！</div>' +
+        '<button data-tactics-action="release" class="' + btnA + ' from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 border-cyan-400 shadow-lg"><span>1.</span> 释放蓄力 (进入目标选择)</button>' +
+        '<button data-tactics-action="cancel-charge" class="' + btnB + '"><span>2.</span> 终止蓄力 (已付资源不退)</button>' +
+        '<button data-tactics-charge-aside class="t-charge-aside">↩ 先做其他行动（移动/跳跃…）</button>'
+      : '<div class="text-center text-[10px] font-bold text-cyan-300 bg-cyan-950/80 border border-cyan-500/50 py-1 px-2 rounded-lg shadow-inner flex items-center justify-center gap-1.5 mb-1"><span class="animate-spin">⏳</span> 【' + name + '】蓄力中 (还需 ' + prep.remaining + ' 主行动)</div>' +
+        '<button data-tactics-action="prepare" class="' + btnA + ' from-cyan-700 to-blue-700 hover:from-cyan-600 hover:to-blue-600 border-cyan-500 shadow-md' + (main < 1 ? ' t-bact-off' : '') + '"' +
+          (main < 1 ? ' aria-disabled="true" title="本次行动的主行动已用完；下次自然行动会自动投入"' : '') + ' data-cost-main="' + Math.min(main, prep.remaining) + '">' +
+          '<span>1.</span> ' + (main < 1 ? '继续准备 (下次行动自动投入)' : '继续准备 (投入主行动 ×' + Math.min(main, prep.remaining) + ')') + '</button>' +
+        '<button data-tactics-action="cancel-charge" class="' + btnB + '"><span>2.</span> 终止蓄力 (已付资源不退)</button>' +
+        '<button data-tactics-charge-aside class="t-charge-aside">↩ 先做其他行动（移动/跳跃…）</button>';
   }
   // 战棋专有信息：技能卡第二行末尾追加空间范围胶囊——沿用原版修饰胶囊样式（同 🎯命中值胶囊：灰底细边 + 等宽数值）
   // 与原版标签悬浮提示引擎（data-tagtip-*）；原版打开子菜单会重建列表，按列表变化补挂
@@ -215,6 +340,9 @@ export function buildShell(root) {
     if (r.type === '单体') { label = '射程'; num = (r.castRange || 0) + 'm'; title = '【范围·单体】'; body = '选择 ' + (r.castRange || 0) + ' 米内、视线无遮挡的一名敌人；墙体与高障碍会阻挡视线，低矮掩体不阻挡。'; }
     else if (r.type === '直线') { label = '直线'; num = r.length + '×' + (r.width || 1) + 'm'; title = '【范围·直线】'; body = '自施法者向瞄准方向延伸 ' + r.length + ' 米、宽 ' + (r.width || 1) + ' 米，命中路径上所有敌人；遇墙截断。'; }
     else if (r.type === '扇形') { label = '扇形'; num = r.castRange + 'm·' + r.angle + '°'; title = '【范围·扇形】'; body = '以施法者为圆心、半径 ' + r.castRange + ' 米、张角 ' + r.angle + '° 的扇形，命中其中所有敌人；遇墙截断。'; }
+    else if (r.type === '圆形') { label = '圆形'; num = (r.castRange ?? 0) + 'm·r' + r.radius; title = '【范围·圆形】'; body = '在 ' + (r.castRange ?? 0) + ' 米内选择落点，命中半径 ' + r.radius + ' 米圆内所有敌人；墙后格不受影响。'; }
+    else if (r.type === '全域') { label = '全域'; num = '全图'; title = '【范围·全域】'; body = '覆盖整张地图，命中所有敌人；不受射程与视线限制。'; }
+    else if (r.type === '爆炸') { label = '爆炸'; num = r.castRange + 'm·r' + r.radius; title = '【范围·爆炸】'; body = '向 ' + r.castRange + ' 米内瞄准点发射，途中撞到墙或单位即提前引爆；以引爆点为圆心、半径 ' + r.radius + ' 米范围内的敌人受击。'; }
     else return '';
     return '<span class="t-range-pill text-[8px] px-1 py-0.2 rounded border bg-slate-900 text-slate-400 border-slate-700 shrink-0 flex items-center leading-none"' +
       ' data-tagtip-title="' + ATTR(title) + '" data-tagtip-body="' + ATTR(body) + '" data-tagtip-raw="' + ATTR('[范围:' + r.type + ']') + '">' +
@@ -226,11 +354,16 @@ export function buildShell(root) {
       const s = u.skills[Number(btn.dataset.skillIdx)];
       const row = btn.children[1];
       if (!s || !row) return;
+      const cost = s.actionCost || { main: 1, aux: 0 };
+      btn.dataset.costMain = cost.main || 0; btn.dataset.costAux = cost.aux || 0;
       if (state.cmd && state.cmd.skillReason) {
         const reason = state.cmd.skillReason(s);
         btn.title = reason || '';
         if (reason) btn.setAttribute('aria-description', reason);
         else btn.removeAttribute('aria-description');
+        // 原因常驻卡底一行（不悬停也可读；不覆盖名字/数值/范围行）
+        btn.querySelector('.t-skill-reason')?.remove();
+        if (reason) btn.insertAdjacentHTML('beforeend', '<div class="t-skill-reason">' + ESC(shortReason(reason)) + (shortReason(reason).includes(reason) ? '' : '<small>' + ESC(reason) + '</small>') + '</div>');
       }
       if (!s.range || row.querySelector('.t-range-pill')) return;
       const pill = rangePill(s.range);
@@ -250,9 +383,27 @@ export function buildShell(root) {
   els.menuBox.addEventListener('pointerover', e => {
     const b = e.target.closest('button');
     if (b && b !== state.hoverBtn && !b.disabled) { state.hoverBtn = b; uiSound('hover'); }
+    const c = e.target.closest('[data-cost-main]');
+    if (c && c.getAttribute('aria-disabled') !== 'true' && !c.classList.contains('disabled-card')) previewPips(+c.dataset.costMain, +c.dataset.costAux);
+    else previewPips(0, 0);
+  });
+  els.menuBox.addEventListener('pointerleave', () => previewPips(0, 0));
+  els.strip.addEventListener('click', e => {
+    if (!e.target.closest('[data-tactics-charge]')) return;
+    state.chargeAside = false; state.chargeKey = ''; uiSound('select'); rpgUi.closeAllSubMenus();
+    if (state.cmd) renderCharge(state.cmd);
   });
   els.menuBox.addEventListener('click', e => {
     if (e.target.closest('[data-tactics-end]')) { e.stopPropagation(); callCmd('onEnd'); return; }
+    if (e.target.closest('[data-tactics-charge-aside]')) { e.stopPropagation(); state.chargeAside = true; uiSound('cancel'); renderCharge(state.cmd); return; }
+    // 不可用入口（未迁移/资源不足）：点击或触屏同样给出完整原因，战报条持久显示
+    const off = e.target.closest('[aria-disabled="true"]');
+    if (off) { e.stopPropagation(); uiSound('deny'); showLog(off.dataset.tacticsUnmigrated ? off.title : (off.title || '当前不可用'), 'warn', 5200); return; }
+    const card = e.target.closest('[data-skill-idx]');
+    if (card && card.classList.contains('disabled-card') || card && card.classList.contains('exhausted-card')) {
+      const s = cmdHero() && cmdHero().skills[Number(card.dataset.skillIdx)];
+      uiSound('deny'); showLog((s ? '【' + s.name + '】' : '') + (s && callCmd('skillReason', s) || '当前不可用'), 'warn', 5200); return;
+    }
     const action = e.target.closest('[data-tactics-action]');
     if (action) { e.stopPropagation(); callCmd('onAction', action.dataset.tacticsAction); return; }
     const b = e.target.closest('button[data-rpg-ui-act]');
@@ -303,7 +454,7 @@ export function buildShell(root) {
   function showEditor() {
     const rows = state.units.map(u => '<tr><td>' + ESC((u.emoji ? u.emoji + ' ' : '') + u.name) + '</td><td>' + ESC(u.side === 'hero' ? '我方' : '敌方') + '</td><td>' +
       (u.footprint ? u.footprint.width + '×' + u.footprint.height : '1×1') + '</td><td>' + (u.bars.hp == null ? '-' : Math.max(0, u.bars.hp) + '/' + u.bars.maxHp) + '</td></tr>').join('');
-    const extra = state.settings ? state.settings.html() : '';
+    const extra = state.settings && state.settings.html ? state.settings.html() : '';
     openPanel('⚙️ 设置', extra + '<h4 class="t-panel-h">角色概览</h4><table class="t-roster-table"><tr><th>名字</th><th>阵营</th><th>体型</th><th>HP</th></tr>' + rows + '</table>');
     if (state.settings && state.settings.bind) state.settings.bind(els.panelBody);
   }
@@ -334,16 +485,26 @@ export function buildShell(root) {
     els.chatInput.value = '';
     showLog('已记录发言（旁白与 LLM 在后续阶段接线）');
   }
-  function showLog(msg, tone) {
+  function showLog(msg, tone, ms) {
     if (!msg) return;
     els.battleLog.textContent = msg;
     els.battleLog.className = 't-visible' + (tone ? ' t-log-' + tone : '');
     clearTimeout(showLog._t);
-    showLog._t = setTimeout(() => els.battleLog.classList.remove('t-visible'), 2600);
+    showLog._t = setTimeout(() => els.battleLog.classList.remove('t-visible'), ms || 2600);
+  }
+  // ---------- 设置编辑器：原版 #editor-modal 容器（多层手风琴由 main 的编辑器模块拼装） ----------
+  function openModal(html) {
+    els.editorModal.innerHTML = html;
+    els.editorModal.classList.remove('hidden'); els.editorModal.classList.add('flex');
+  }
+  function closeModal() {
+    rpgUi.closeSkillTypeCombo(); rpgUi.hideTagTip();
+    els.editorModal.classList.add('hidden'); els.editorModal.classList.remove('flex');
+    els.editorModal.innerHTML = '';
   }
 
   $('btn-history').addEventListener('click', showHistory);
-  $('btn-editor').addEventListener('click', showEditor);
+  $('btn-editor').addEventListener('click', () => { uiSound('select'); if (!(state.settings && state.settings.open && state.settings.open())) showEditor(); });
   $('btn-dialogue').addEventListener('click', showDialogue);
   $('btn-worldbook').addEventListener('click', showWorldbook);
   $('btn-fullscreen').addEventListener('click', toggleFullScreen);
@@ -375,8 +536,9 @@ export function buildShell(root) {
   function markRoundStart() { rpgUi.markRoundStart(); }
 
   return {
-    destroy: () => { clearTimeout(showLog._t); clearTimeout(showBanner._t); rpgUi.hideTagTip(); state.onReset = null; state.onUnitClick = null; root.replaceChildren(); },
+    destroy: () => { clearTimeout(showLog._t); clearTimeout(showBanner._t); rpgUi.hideTagTip(); document.removeEventListener('mousedown', onComboDown); state.onReset = null; state.onUnitClick = null; root.replaceChildren(); },
     els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
+    previewMoveCost, openModal, closeModal,
     getSafeRect, showLog, openPanel, closePanel, openResult, clearBattle, closeSubmenu: () => {},
     set onUnitClick(fn) { state.onUnitClick = fn; },
     set onReset(fn) { state.onReset = fn; },
@@ -385,3 +547,4 @@ export function buildShell(root) {
     get state() { return state; },
   };
 }
+

@@ -146,8 +146,11 @@ function drawAttack(g, pv, viewData) {
     // 面：只在真实作用格内填充与描边（墙后格不在 cells，自然被裁掉）
     if (q.cells.length) {
       g.save(); clipCells(g, q.cells);
-      shapePath(g, shape); g.fillStyle = C.atk.fill; g.fill();
-      shapePath(g, shape); g.strokeStyle = C.atk.edge; g.lineWidth = 1.8; g.stroke();
+      if (shape.type === '全域') { g.fillStyle = C.atk.fill; g.fillRect(0, 0, 1e5, 1e5); }
+      else {
+        shapePath(g, shape); g.fillStyle = C.atk.fill; g.fill();
+        shapePath(g, shape); g.strokeStyle = C.atk.edge; g.lineWidth = 1.8; g.stroke();
+      }
       g.restore();
       strokeCellOutline(g, q.cells, 'rgba(253,186,116,0.28)', 1);
     }
@@ -189,11 +192,59 @@ function drawAttack(g, pv, viewData) {
   for (const id of q.disclosureTargetIds || []) unitMarker(g, viewData, id, pv.locked ? C.lock : C.atk.edge, pv.locked ? 'lock' : 'hover');
 }
 
+// 跳跃：可落点（紫）+ 悬停落点的抛物线预告（虚线弧 + 地面投影 + 落点环）
+function drawJump(g, pv, viewData) {
+  const fp = viewData.footprintsById[pv.unitId] || { width: 1, height: 1 };
+  const p = viewData.placementsById[pv.unitId];
+  const cells = pv.cells || [];
+  if (cells.length) {
+    g.fillStyle = 'rgba(196,181,253,0.13)';
+    for (const c of cells) for (const o of occupiedCells(c, fp)) g.fillRect(o.col * Q + 3, o.row * Q + 3, Q - 6, Q - 6);
+    g.save(); g.fillStyle = 'rgba(221,214,254,0.55)';
+    for (const c of cells) { const m = unitCenter(c, fp); g.beginPath(); g.arc(m.x * Q, m.y * Q, 2.4, 0, Math.PI * 2); g.fill(); }
+    g.restore();
+  }
+  const h = pv.hover;
+  if (h && p) {
+    const a = unitCenter(p, fp), b = unitCenter(h, fp);
+    const ax = a.x * Q, ay = a.y * Q, bx = b.x * Q, by = b.y * Q;
+    const dist = Math.hypot(b.x - a.x, b.y - a.y);
+    const lift = Math.min(2.2, 0.55 + dist * 0.22) * Q;
+    const mx = (ax + bx) / 2, my = (ay + by) / 2 - lift * 2;
+    g.save();
+    g.lineCap = 'round';
+    g.strokeStyle = 'rgba(167,139,250,0.35)'; g.lineWidth = 1.4; g.setLineDash([3, 6]);
+    g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke();
+    g.setLineDash([]);
+    g.strokeStyle = 'rgba(139,92,246,0.45)'; g.lineWidth = 9;
+    g.beginPath(); g.moveTo(ax, ay); g.quadraticCurveTo(mx, my, bx, by); g.stroke();
+    g.strokeStyle = '#ede9fe'; g.lineWidth = 2.4; g.setLineDash([9, 6]);
+    g.beginPath(); g.moveTo(ax, ay); g.quadraticCurveTo(mx, my, bx, by); g.stroke();
+    g.setLineDash([]);
+    // 弧顶方向小箭头（指向落点）
+    const k = 0.85, tx = 2 * (1 - k) * (mx - ax) + 2 * k * (bx - mx), ty = 2 * (1 - k) * (my - ay) + 2 * k * (by - my);
+    const px = (1 - k) * (1 - k) * ax + 2 * (1 - k) * k * mx + k * k * bx, py = (1 - k) * (1 - k) * ay + 2 * (1 - k) * k * my + k * k * by;
+    const ang = Math.atan2(ty, tx);
+    g.fillStyle = '#ede9fe';
+    g.beginPath(); g.moveTo(px + Math.cos(ang) * 8, py + Math.sin(ang) * 8); g.lineTo(px + Math.cos(ang + 2.5) * 7, py + Math.sin(ang + 2.5) * 7); g.lineTo(px + Math.cos(ang - 2.5) * 7, py + Math.sin(ang - 2.5) * 7); g.closePath(); g.fill();
+    g.strokeStyle = '#c4b5fd'; g.lineWidth = 2.2;
+    for (const c of occupiedCells(h, fp)) g.strokeRect(c.col * Q + 3, c.row * Q + 3, Q - 6, Q - 6);
+    g.beginPath(); g.arc(bx, by, 9, 0, Math.PI * 2); g.stroke();
+    g.restore();
+  }
+  if (pv.invalid) {
+    g.save(); g.strokeStyle = C.bad; g.lineWidth = 2; g.setLineDash([5, 4]);
+    g.strokeRect(pv.invalid.col * Q + 4, pv.invalid.row * Q + 4, Q - 8, Q - 8); g.restore();
+    drawBlock(g, { x: pv.invalid.col + 0.5, y: pv.invalid.row + 0.5 });
+  }
+}
+
 // 绘制入口：pv = { kind:'move'|'attack', ... }；actorId 为当前行动者（地面描边由 CSS 负责）
 export function drawOverlay(g, pv, viewData, selectedId) {
   if (pv && viewData) {
     if (pv.kind === 'move') drawMove(g, pv, viewData);
     else if (pv.kind === 'attack') drawAttack(g, pv, viewData);
+    else if (pv.kind === 'jump') drawJump(g, pv, viewData);
   }
   if (selectedId && viewData && viewData.placementsById[selectedId]) {
     const p = viewData.placementsById[selectedId], fp = viewData.footprintsById[selectedId];

@@ -167,6 +167,43 @@ export function createUiSfx(mixer) {
       tone(c, t, { type: 'triangle', f0: 660, f1: 1320, dur: 0.18, vol: 0.04 });
       tone(c, t + 0.14, { type: 'sine', f0: 1760, dur: 0.25, vol: 0.03 });
     },
+    // ---- 战棋场地动作 ----
+    sprint(c, t) {              // 冲刺：风压掠过 + 上扬
+      tick(c, t, { freq: 900, q: 0.5, dur: 0.32, vol: 0.09 });
+      tone(c, t, { type: 'triangle', f0: 330, f1: 880, dur: 0.24, vol: 0.05 });
+    },
+    charge(c, t) {              // 蓄力投入：低鸣汇聚
+      tone(c, t, { type: 'sine', f0: 196, f1: 392, dur: 0.45, vol: 0.06, attack: 0.05 });
+      tone(c, t + 0.08, { type: 'triangle', f0: 784, f1: 1175, dur: 0.35, vol: 0.025, attack: 0.04 });
+    },
+    jumpCrouch(c, t) { tick(c, t, { freq: 320, q: 0.9, dur: 0.08, vol: 0.10, type: 'lowpass' }); },
+    jumpTakeoff(c, t) {         // 起跳：蹬地 + 风声上扫
+      tick(c, t, { freq: 160, q: 0.8, dur: 0.09, vol: 0.24, type: 'lowpass' });
+      tick(c, t + 0.02, { freq: 1400, q: 0.5, dur: 0.30, vol: 0.06 });
+      tone(c, t, { type: 'sine', f0: 260, f1: 620, dur: 0.22, vol: 0.035 });
+    },
+    jumpLand(c, t) {            // 落地：闷击 + 碎石
+      tick(c, t, { freq: 110, q: 0.8, dur: 0.20, vol: 0.34, type: 'lowpass' });
+      tone(c, t, { type: 'sine', f0: 80, f1: 48, dur: 0.20, vol: 0.12 });
+      tick(c, t + 0.03, { freq: 2600, q: 1.2, dur: 0.08, vol: 0.04 });
+    },
+    shove(c, t) {               // 推：布料与身体撞击
+      tick(c, t, { freq: 240, q: 0.7, dur: 0.12, vol: 0.26, type: 'lowpass' });
+      tick(c, t + 0.01, { freq: 900, q: 0.6, dur: 0.12, vol: 0.06 });
+    },
+    impact(c, t) {              // 撞墙：重击 + 石屑
+      tick(c, t, { freq: 90, q: 0.7, dur: 0.30, vol: 0.42, type: 'lowpass' });
+      tone(c, t, { type: 'sine', f0: 60, f1: 34, dur: 0.30, vol: 0.16 });
+      tick(c, t + 0.02, { freq: 3200, q: 0.9, dur: 0.14, vol: 0.06 });
+    },
+    lift(c, t) {                // 背起：用力 + 布料
+      tick(c, t, { freq: 700, q: 0.6, dur: 0.20, vol: 0.06 });
+      tone(c, t, { type: 'triangle', f0: 220, f1: 330, dur: 0.18, vol: 0.03 });
+    },
+    drop(c, t) {                // 放下：轻放落地
+      tone(c, t, { type: 'triangle', f0: 330, f1: 220, dur: 0.16, vol: 0.03 });
+      tick(c, t + 0.12, { freq: 200, q: 0.9, dur: 0.08, vol: 0.14, type: 'lowpass' });
+    },
   };
   const RATE = { hover: 60, select: 50, step: 40, heavyStep: 60, sparkle: 60 };
 

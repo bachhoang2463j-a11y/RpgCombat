@@ -21,6 +21,9 @@ const ENTRIES = [
   'closeAllSubMenus', 'openBasicMenu', 'closeBasicMenu', 'openAttackSkillMenu', 'closeAttackSkillMenu',
   'openSupportSkillMenu', 'closeSupportSkillMenu', 'openItemMenu', 'closeItemMenu', 'closeSkillMenu',
   '_rcTipTimer',
+  // 设置编辑器：原版技能表单模板（模块 A-E）、标签预览、可搜索标签下拉、药丸开关（多层手风琴外壳由宿主按原版结构拼装）
+  'buildSkillFormFieldsHtml', 'buildEditorSkillTagPreview', 'openSkillTypeCombo', 'filterSkillTypeCombo',
+  'applySkillTypeCombo', 'closeSkillTypeCombo', 'syncGrantSlotPower', 'togglePillClass',
 ];
 // 宿主注入（战棋规则/状态；不从原版带入）
 const HOST = [
@@ -175,10 +178,21 @@ function build() {
   const [ts, te] = sliceById(L, 'rc-tag-tooltip', 'tip');
   if (ts !== tipStart) fail('悬浮提示容器位置变化');
   const tipHtml = L.slice(ts, te + 1).join('\n');
+  // 编辑器模态容器（原版 #editor-modal 原样）；手风琴外壳样式词元取自原版 openEditor 与折叠函数（只扫词元，不带入代码）
+  const [es, ee] = sliceById(L, 'editor-modal', 'editor');
+  const editorHtml = L.slice(es, ee + 1).join('\n').trim();
+  const edA = decl.get('openEditor'), edB = decl.get('toggleItemFold');
+  if (edA == null || edB == null) fail('openEditor / toggleItemFold 未找到');
+  // 蓄力专用菜单（原版 updateChargeMenu）由宿主按原版标记重绘 #charge-menu，同样只取词元
+  const chA = decl.get('updateChargeMenu');
+  if (chA == null) fail('updateChargeMenu 未找到');
+  const editorShellText = L.slice(edA, blockAt(L, edB, b)[1] + 1).join('\n') + '\n' + L.slice(chA, blockAt(L, chA, b)[1] + 1).join('\n');
+  // 可搜索下拉浮层挂到界面作用域内（生成 CSS 带 [data-rpg-ui-scope] 前缀，挂 body 会失去样式）
+  js = patch(js, 'document.body.appendChild(pop);', "(document.querySelector('[data-rpg-ui-scope]') || document.body).appendChild(pop);", 1, '标签下拉浮层挂作用域');
 
   // CSS 词元：入选 JS + HTML 的全部空白/引号分隔词元（含 Tailwind 任意值类）
   const used = new Set();
-  const tokText = js + '\n' + railHtml + '\n' + menuHtml + '\n' + tipHtml;
+  const tokText = js + '\n' + railHtml + '\n' + menuHtml + '\n' + tipHtml + '\n' + editorHtml + '\n' + editorShellText;
   for (const t of tokText.split(/[\s"'`<>=]+/)) if (t) { used.add(t); used.add(t.replace(/[;,)]+$/, '')); }
   for (const m of tokText.matchAll(/[A-Za-z_][\w-]*/g)) used.add(m[0]);
   const css = extractCss(html, used);
@@ -198,6 +212,7 @@ function build() {
 export const RPG_UI_RAIL_HTML = ${JSON.stringify(railHtml)};
 export const RPG_UI_MENU_HTML = ${JSON.stringify(menuHtml)};
 export const RPG_UI_TIP_HTML = ${JSON.stringify(tipHtml)};
+export const RPG_UI_EDITOR_HTML = ${JSON.stringify(editorHtml)};
 
 export function createRpgUi(host) {
   // ---- 宿主注入（战棋规则判定、瞄准入口、伪 state） ----
@@ -220,7 +235,7 @@ ${tipInit}
       if (fn) { e.stopPropagation(); fn(); }
     });
   }
-  return { bind, ${names.filter(n => /^[a-zA-Z]/.test(n) && /^(renderTurnQueue|updateSkillMenus|updateItemMenu|closeAllSubMenus|openBasicMenu|closeBasicMenu|openAttackSkillMenu|openSupportSkillMenu|openItemMenu|hideTagTip|formatTagPill|tagTipAttrs|tagDisplayLabel|escapeHistoryHtml)$/.test(n)).join(', ')},
+  return { bind, ${names.filter(n => /^[a-zA-Z]/.test(n) && /^(renderTurnQueue|updateSkillMenus|updateItemMenu|closeAllSubMenus|openBasicMenu|closeBasicMenu|openAttackSkillMenu|openSupportSkillMenu|openItemMenu|hideTagTip|formatTagPill|tagTipAttrs|tagDisplayLabel|escapeHistoryHtml|buildSkillFormFieldsHtml|buildEditorSkillTagPreview|renderSkillTypeOptions|WEBM_FX_REGISTRY|openSkillTypeCombo|filterSkillTypeCombo|applySkillTypeCombo|closeSkillTypeCombo|syncGrantSlotPower|togglePillClass)$/.test(n)).join(', ')},
     markRoundStart() { _roundStartGlowPending = true; },
     resetQueue() { _prevQueueCurrentUid = null; } };
 }

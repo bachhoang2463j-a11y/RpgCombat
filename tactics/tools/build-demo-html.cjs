@@ -20,11 +20,12 @@ const REQUIRED_INPUTS = [
   'src/scheduler.mjs', 'src/parser.mjs', 'src/vendor/js-yaml-4.1.0.mjs',
   'src/av-host.mjs', 'src/action-director.mjs', 'src/motion.mjs', 'src/range-overlay.mjs',
   'src/vendor/rpg-av/rpg-av.mjs', 'src/chapel-scene.mjs', 'src/chapel-art.mjs', 'src/ui-sfx.mjs',
-  'src/vendor/rpg-ui/rpg-ui.mjs', 'src/unit-style.mjs',
+  'src/vendor/rpg-ui/rpg-ui.mjs', 'src/unit-style.mjs', 'src/editor-panel.mjs',
 ];
 // 复用模块关键函数必须进入产物（防止 tree-shaking 或误删导致"复用"名不副实）
 const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFeedback', 'classifyHit', 'playArsenicShot', 'CombatAudioMixer', 'HERO_VOICE_LINES', 'playSingleGunshot', 'playSingleShotgun', 'playSingleThunder', 'playSingleSlash', 'playSingleClaw', 'playSingleArrow', 'enemySpellProjectile',
-  'renderTurnQueue', 'updateSkillMenus', 'createSkillCard', 'createSkillGroupCard', 'createItemCard', 'showTagTipFor'];
+  'renderTurnQueue', 'updateSkillMenus', 'createSkillCard', 'createSkillGroupCard', 'createItemCard', 'showTagTipFor',
+  'buildSkillFormFieldsHtml', 'openSkillTypeCombo', 'createEditorPanel', 'playJump', 'playShove', 'playTransfer', 'drawJump'];
 
 const entry = [
   "import { createApp } from './src/main.mjs';",

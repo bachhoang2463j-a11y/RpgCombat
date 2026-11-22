@@ -6,7 +6,8 @@
 // 特效函数不负责扣血；动画时长不推进虚拟时间。scope 失活（重置/换场）时所有等待以 false 结算。
 // ==========================================
 
-import { playPathMotion } from './motion.mjs';
+import { playPathMotion, pathSegments, pointAtDistance } from './motion.mjs';
+import { unitCenter } from './geometry.mjs';
 
 const AOE_SUBTYPES = new Set(['爆炸', '雷', '火焰', '枪击', '毒雾', '冰霜', '风', '光']);
 const SUBTYPE_RE = /[（(](枪击|霰弹|光|雷|爆炸|刀砍|拳击|爪击|撕咬|毒液|箭矢|冰霜|火焰|毒雾|风)[）)]/;
@@ -67,6 +68,119 @@ export function createActionDirector(deps) {
     });
   }
   const centerOf = id => sandbox.unitWorldCenter(id);
+  // 逐帧补间：t∈[0,1]；scope 失活即以 false 结算
+  function tween(ms, fn) {
+    const s = scope();
+    if (!s || !s.isLive) return Promise.resolve(false);
+    return new Promise(resolve => {
+      let done = false;
+      const t0 = performance.now();
+      const finish = ok => { if (done) return; done = true; resolve(ok); };
+      const stop = s.settleOnDispose(() => finish(false));
+      s.loop(now => {
+        const t = Math.min(1, (now - t0) / ms);
+        fn(t);
+        if (t >= 1) { if (stop) stop(); finish(true); return false; }
+      });
+    });
+  }
+  const feedback = (id, kind, p) => { if (onMoveFeedback) onMoveFeedback(id, kind, p); };
+  const facingOf = (a, b) => ((Math.atan2(b.x - a.x, -(b.y - a.y)) * 180 / Math.PI) + 360) % 360;
+
+  // ---------- 跳跃：下蹲蓄势 → 起跳拉伸 → 抛物线飞行（弧高随距离，地影缩小，镜头跟随）→ 落地压扁 + 尘环 ----------
+  async function playJump(res) {
+    if (!res || !res.ok) return false;
+    const vd = getViewData(), id = res.unitId, view = sandbox.getUnitView();
+    const fp = vd.footprintsById[id] || { width: 1, height: 1 };
+    const a = unitCenter(res.from, fp), b = unitCenter(res.to, fp);
+    await sandbox.guideTo([a, b]);
+    view.lockMotion(id, true);
+    view.setFlag(id, 't-unit-jumping', true);
+    view.setDisplayFacing(id, facingOf(a, b));
+    const H = Math.min(96, 28 + res.distance * 11), T = Math.min(920, 340 + res.distance * 75);
+    feedback(id, 'jump-crouch', a);
+    let ok = await tween(150, t => view.setHop(id, 0, 1 - 0.24 * Math.sin(t * Math.PI / 2)));
+    if (ok) {
+      feedback(id, 'jump-takeoff', a);
+      ok = await tween(T, t => {
+        const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+        view.setDisplayPos(id, x, y);
+        view.setHop(id, 4 * H * t * (1 - t), t < 0.5 ? 1.14 - 0.14 * t * 2 : 1 + 0.07 * (t - 0.5) * 2);
+        sandbox.followWorld(x, y);
+        feedback(id, 'frame', { x, y });
+      });
+    }
+    view.setDisplayPos(id, b.x, b.y);
+    if (ok) {
+      feedback(id, 'jump-land', b);
+      ok = await tween(230, t => view.setHop(id, 0, t < 0.3 ? 1 - 0.28 * (t / 0.3) : 0.72 + 0.28 * ((t - 0.3) / 0.7)));
+    }
+    view.setHop(id, 0, 1);
+    view.setFlag(id, 't-unit-jumping', false);
+    view.lockMotion(id, false);
+    view.setDisplayFacing(id, null);
+    view.updateUnit(id, { placement: vd.placementsById[id] });
+    return ok;
+  }
+
+  // ---------- 推动：后撤蓄力 → 前冲接触 → 目标沿规则路径减速滑移（撞墙震屏）/ 抵抗晃动；推动者回位 ----------
+  async function playShove(pusherId, res) {
+    const vd = getViewData(), view = sandbox.getUnitView();
+    const tid = res.targetId;
+    const pfp = vd.footprintsById[pusherId] || { width: 1, height: 1 }, tfp = vd.footprintsById[tid] || { width: 1, height: 1 };
+    const pa = unitCenter(vd.placementsById[pusherId], pfp);
+    const ta = res.from ? unitCenter(res.from, tfp) : unitCenter(vd.placementsById[tid], tfp);
+    const len = Math.hypot(ta.x - pa.x, ta.y - pa.y) || 1, dx = (ta.x - pa.x) / len, dy = (ta.y - pa.y) / len;
+    const at = k => view.setDisplayPos(pusherId, pa.x + dx * k, pa.y + dy * k);
+    await sandbox.guideTo([pa, res.to ? unitCenter(res.to, tfp) : ta]);
+    view.lockMotion(pusherId, true); view.lockMotion(tid, true);
+    view.setDisplayFacing(pusherId, facingOf(pa, ta));
+    let ok = await tween(130, t => at(-0.16 * Math.sin(t * Math.PI / 2)));
+    if (ok) ok = await tween(90, t => at(-0.16 + 0.5 * t));
+    feedback(pusherId, 'shove', ta);
+    if (ok && res.success && res.path && res.path.length > 1) {
+      const segs = pathSegments(res.path, tfp), total = segs.reduce((s, g) => s + g.len, 0);
+      ok = await tween(Math.min(900, 220 + total * 130), t => {
+        const e = 1 - Math.pow(1 - t, 3);
+        const p = pointAtDistance(segs, total * e);
+        view.setDisplayPos(tid, p.x, p.y);
+        view.setHop(tid, Math.sin(Math.min(1, t * 3) * Math.PI) * 5, 1);
+        at(0.34 * (1 - Math.min(1, t * 2.2)));
+        sandbox.followWorld(p.x, p.y);
+      });
+      if (res.collision) feedback(tid, 'impact', unitCenter(res.to, tfp));
+    } else if (ok) {
+      view.setFlag(tid, 't-unit-resist', true);
+      ok = await tween(300, t => at(0.34 * (1 - t)));
+      view.setFlag(tid, 't-unit-resist', false);
+    }
+    at(0);
+    view.setHop(tid, 0, 1);
+    view.setDisplayFacing(pusherId, null);
+    view.lockMotion(pusherId, false); view.lockMotion(tid, false);
+    view.updateUnit(pusherId, { placement: vd.placementsById[pusherId] });
+    view.updateUnit(tid, { placement: vd.placementsById[tid] });
+    return ok;
+  }
+
+  // ---------- 背起 / 放下：被背者沿弧线在地面与背负者肩上之间转移 ----------
+  async function playTransfer(id, from, to, { lift } = {}) {
+    const view = sandbox.getUnitView();
+    if (!from || !to) return true;
+    view.lockMotion(id, true);
+    if (!lift) view.setFlag(id, 't-unit-carried', false);
+    feedback(id, lift ? 'lift' : 'set-down', from);
+    const ok = await tween(lift ? 420 : 380, t => {
+      const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      view.setDisplayPos(id, from.x + (to.x - from.x) * e, from.y + (to.y - from.y) * e);
+      view.setHop(id, Math.sin(t * Math.PI) * 26, 1);
+    });
+    view.setHop(id, 0, 1);
+    view.setDisplayPos(id, to.x, to.y);
+    if (lift) view.setFlag(id, 't-unit-carried', true);
+    else feedback(id, 'jump-land', to);
+    return ok;
+  }
 
   // ---------- 移动：消费真实 cell.path ----------
   async function playMove(moveResult) {
@@ -236,5 +350,5 @@ export function createActionDirector(deps) {
   }
   function dropAnchors() { anchors.forEach(d => { const s = scope(); if (s) s.removeNode(d); else d.remove(); }); anchors.clear(); }
 
-  return { playMove, playWindup, playAttack, wait, resolveAttackIdentity, resolveWindupKind };
+  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, wait, resolveAttackIdentity, resolveWindupKind };
 }
