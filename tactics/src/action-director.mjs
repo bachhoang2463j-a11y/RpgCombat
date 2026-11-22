@@ -84,6 +84,7 @@ export function createActionDirector(deps) {
       onFeedback: (kind, seg, p) => { if (onMoveFeedback) onMoveFeedback(id, kind, p); },
     });
     // 显示位置交还权威落点（placement 已由规则命令更新；插值从不回写）
+    sandbox.getUnitView().lockMotion(id, false);
     sandbox.getUnitView().updateUnit(id, { placement: vd.placementsById[id] });
     return ok;
   }

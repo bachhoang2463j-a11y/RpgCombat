@@ -508,8 +508,10 @@ export function createApp(rootEl, opts = {}) {
     sandbox.setPreview(null); sandbox.setHint(null);
     sandbox.beginAction();
     ui('confirm');
+    const mover = battle.snapshot().currentId;
+    sandbox.getUnitView().lockMotion(mover, true);   // 显示位置留在起点，直到路径演出接管（否则刷新会先闪到终点）
     const res = battle.move(col, row);
-    if (!res.ok) { setBusy(false); ui('deny'); shell.showLog(res.reason, 'warn'); return; }
+    if (!res.ok) { sandbox.getUnitView().lockMotion(mover, false); setBusy(false); ui('deny'); shell.showLog(res.reason, 'warn'); return; }
     refreshBattle();
     await director.playMove(res);
     if (myFlow !== flow) return;
@@ -571,7 +573,10 @@ export function createApp(rootEl, opts = {}) {
     if (!(await director.wait(380)) || !alive()) return;
     const plan = battle.planEnemyAction();
     if (plan && plan.moveTo) {
+      const mover = battle.snapshot().currentId;
+      sandbox.getUnitView().lockMotion(mover, true);
       const mv = battle.move(plan.moveTo.col, plan.moveTo.row);
+      if (!mv.ok) sandbox.getUnitView().lockMotion(mover, false);
       refreshBattle();
       if (mv.ok) await director.playMove(mv);
       if (!alive()) return;
