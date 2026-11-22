@@ -1,18 +1,33 @@
 {
   "stage": "MVP-standalone-artifact",
   "executed": true,
-  "executedAt": "2026-11-22T14:20:32.199Z",
-  "sourceHead": "08d7fbe",
+  "executedAt": "2026-11-22T16:08:11.568Z",
+  "sourceHead": "eb4789c",
   "sourceDirty": true,
   "artifact": "tactics/mvp-standalone.html",
+  "bytes": 750360,
+  "sha256": "301678794504cc86e6e53cf651da88e4477d37590e726cdc02748846f4512238",
   "scriptCloseCount": 1,
-  "bytes": 749374,
-  "sha256": "0fdb0e6ed8ea622dda0202074c7a2cb580698f0909750e23f969717c6eef3344",
   "zeroExternalBusinessImport": true,
   "scriptCloseCountPass": true,
+  "newRulesBundled": true,
   "buildAssertions": {
     "requiredInputs": 22,
     "bundledInputs": 37,
     "requiredSymbols": 20
-  }
+  },
+  "newRuleChecks": [
+    {
+      "text": "蓄力尚未就绪",
+      "found": true
+    },
+    {
+      "text": "纯控制／减益技能尚未迁移",
+      "found": true
+    },
+    {
+      "text": "反应效果尚未迁移",
+      "found": true
+    }
+  ]
 }

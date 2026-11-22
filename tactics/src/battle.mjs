@@ -41,7 +41,10 @@ export function skillSupport(skill) {
   if ([skill.slotTurns, skill.slotTurns2, skill.slotTurns3].some(turns => turns != null)) return { ok: false, reason: '槽位独立持续时间尚未迁移' };
   const tags = [skill.type, skill.type2, skill.type3].filter(Boolean);
   const unsupported = tags.find(tag => skillTagKind(tag) === 'unsupported');
-  return unsupported ? { ok: false, reason: '效果尚未迁移：' + unsupported } : { ok: true, reason: null };
+  if (unsupported) return { ok: false, reason: '效果尚未迁移：' + unsupported };
+  if (skill.kanpoTarget || skill.sheshenTarget) return { ok: false, reason: '看破／舍身尚未迁移' };
+  if (!tags.some(tag => skillTagKind(tag) === 'attack') && tags.some(tag => ['stun', 'poison', 'burn', 'spd-down', 'def'].includes(skillTagKind(tag)))) return { ok: false, reason: '纯控制／减益技能尚未迁移' };
+  return { ok: true, reason: null };
 }
 
 export function createBattle({ units, placementsById, scene, battleState, visibleUnitIds = null, random = Math.random }) {
@@ -134,9 +137,15 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   function prepareAtActionStart(u) {
     const prep = state.combatState.charges?.[u.id]?.preparing;
     if (!prep || prep.remaining <= 0) return;
+    const charge = state.combatState.charges[u.id];
+    const inventory = Math.min(charge.inventory, prep.remaining);
+    charge.inventory -= inventory;
+    prep.remaining -= inventory;
+    prep.invested += inventory;
+    prep.ready = prep.remaining <= 0;
     const r = state.combatState.clock.currentAction.resources;
     const amount = Math.min(r.main, prep.remaining);
-    if (!amount) return;
+    if (!amount && !inventory) return;
     r.main -= amount;
     prep.remaining -= amount;
     prep.invested += amount;
@@ -367,6 +376,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       if (!valid) return { ok: false, reason: '没有距离与视线合法的反应目标' };
     }
     const ready = preparing && charge.preparing.remaining <= 0;
+    if (preparing && !ready) return { ok: false, reason: '蓄力尚未就绪，请继续准备' };
+    if (skill.charge > 0 && charge.preparing && !preparing) return { ok: false, reason: '请先释放或取消当前蓄力' };
     const mainCost = skill.charge > 0 ? (preparing ? (ready ? 0 : 1) : 1) : (cost.main || 0);
     const auxCost = skill.charge > 0 ? 0 : (cost.aux || 0);
     if (r.main < mainCost || r.aux < auxCost) return { ok: false, reason: r.main < mainCost ? '主行动已用完' : '辅助行动已用完' };
@@ -402,6 +413,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
   function canUseReaction(responder, skill, sourceId) {
     const source = byId.get(sourceId);
+    if (skill && (skill.kanpoTarget || skill.sheshenTarget || [skill.type, skill.type2, skill.type3].some(tag => tag && !/^\[(?:无|回避|单避|群避|反击)\]$/.test(tag)))) return { ok: false, reason: '反应效果尚未迁移' };
     if (!responder || !source || !skill.isReaction || responder.ref.hp <= 0 || source.ref.hp <= 0) return { ok: false, reason: '反应技能不可用' };
     if (skill.reactionTarget && skill.reactionTarget !== 'all' && skill.reactionTarget !== source.ref.damageType) return { ok: false, reason: '反应类型不匹配' };
     const key = skillKey(skill);
@@ -411,7 +423,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       const a = unitCenter(placementsById[responder.id], responder.footprint), b = unitCenter(placementsById[source.id], source.footprint);
       if (Math.hypot(a.x - b.x, a.y - b.y) > (skill.range.castRange ?? 2) + 1e-9) return { ok: false, reason: '反应目标超出技能距离' };
     }
-    const target = skill.isOthers ? responder : source;
+    const target = source;
     const check = queryAttack(ctx, responder.id, skill, { ...unitCenter(placementsById[target.id], target.footprint), targetId: target.id });
     return check.ok ? { ok: true, query: check, responder, source } : { ok: false, reason: check.reason, query: check };
   }
@@ -445,8 +457,12 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   function advancePreparation() {
     const u = actor(), charge = u && chargeState(u.id);
     if (!u || !charge.preparing || charge.preparing.remaining <= 0 || !resources) return { ok: false, reason: '当前没有待准备技能' };
+    const inventory = Math.min(charge.inventory, charge.preparing.remaining);
+    charge.inventory -= inventory;
+    charge.preparing.remaining -= inventory;
+    charge.preparing.invested += inventory;
     const amount = Math.min(resources.main, charge.preparing.remaining);
-    if (!amount) return { ok: false, reason: '主行动不足' };
+    if (!amount && !inventory) return { ok: false, reason: '主行动不足' };
     resources.main -= amount;
     charge.preparing.remaining -= amount;
     charge.preparing.invested += amount;
@@ -494,6 +510,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       charge.inventory -= charge.preparing.invested;
       if (skill.delay > 0) dispatchClock(state, { type: 'applyCooldown', unitId: u.id, skillKey: key, duration: skill.delay });
       if (charge.preparing.remaining === 0) charge.preparing.ready = true;
+      prepareAtActionStart(u);
       addLog(u.name + ' 开始蓄力 ' + skill.name + ' · 需投入 ' + charge.preparing.remaining + ' 主行动');
       return { ok: true, preparing: true, hits: [], query, casterId: u.id, skill, aim: { ...aim }, mpCost: skill.cost || 0, actionCost: { main: 1, aux: 0 }, logFrom: log.length - 1, logTo: log.length };
     }
@@ -530,12 +547,6 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
             if (down) { dispatchBattleClock({ type: 'exitUnit', unitId: id, cause: 'down' }); addLog(target.name + (target.side === 'hero' ? ' 倒地' : ' 死亡')); }
             resolvedHits.set(id, { targetId: id, ...result, hpBefore: before, hpAfter: target.ref.hp, maxHp: target.ref.maxHp, down, side: target.side, logIndex, logEnd: log.length });
             slotHitById.set(id, !!result.hit);
-            if (result.hit && target.ref.hp > 0 && !skill.isReaction) {
-              for (const reaction of target.skills.filter(s => s.isReaction)) {
-                const rr = applyReaction(target, reaction, u.id);
-                if (rr.canceled) break;
-              }
-            }
           } else {
             resolvedHits.set(id, { targetId: id, hit: false, hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, maxHp: target.ref.maxHp, down: target.ref.hp <= 0, side: target.side, logIndex: log.length, logEnd: log.length });
           }
@@ -551,9 +562,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         else if (kind === 'spd' || kind === 'spd-down' || kind === 'def' || kind === 'def-up' || kind === 'evasion') {
           const field = kind.startsWith('spd') ? 'spd' : kind.startsWith('def') ? 'def' : 'evaBonus';
           const delta = (kind.endsWith('down') ? -1 : 1) * Math.abs(slot.index === 0 ? skill.power : (skill['power' + (slot.index + 1)] || 0));
-          target.ref[field] = (target.ref[field] || 0) + delta;
-          const statusKind = field === 'spd' ? 'spd' : field === 'def' ? 'def' : 'evasion';
           const source = statusSource(id, { casterId: u.id, skillId: key }, slot.index);
+          const previous = statusOf(id, source);
+          target.ref[field] = (target.ref[field] || 0) + delta - (previous?.strength || 0);
+          const statusKind = field === 'spd' ? 'spd' : field === 'def' ? 'def' : 'evasion';
           dispatchClock(state, { type: 'applyStatus', unitId: id, source, kind: statusKind, strength: delta, duration: ((slot.index === 0 ? skill.slotTurns : skill['slotTurns' + (slot.index + 1)]) || skill.turns || 1) * 100 }, { speedOf: uid => Math.max(0, byId.get(uid).ref.spd) });
         }
       }

@@ -576,7 +576,7 @@ export function createApp(rootEl, opts = {}) {
     fieldAction = null;
     const skill = skillOfKey(key);
     if (!skill) return;
-    if (!skillUsable(skill)) { ui('deny'); shell.showLog(battle.snapshot().resources.main <= 0 ? '主行动已用完' : 'MP 不足或范围未迁移', 'warn'); return; }
+    if (!skillUsable(skill)) { ui('deny'); shell.showLog(skillReason(skill), 'warn'); return; }
     pending = null;
     aim = { key, skill };
     sandbox.setHint(null); sandbox.refreshHover();

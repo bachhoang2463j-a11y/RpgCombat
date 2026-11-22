@@ -1,19 +1,19 @@
 {
   "stage": "P07",
   "executed": true,
-  "started": "2026-11-22T14:18:31.947Z",
-  "ended": "2026-11-22T14:18:32.188Z",
-  "command": "node tactics/tools/run-tests.cjs --stage=p07",
-  "sourceHead": "08d7fbe",
+  "started": "2026-11-22T15:55:01.722Z",
+  "ended": "2026-11-22T15:55:04.246Z",
+  "command": "node tactics/tools/run-tests.cjs --all",
+  "sourceHead": "eb4789c",
   "sourceDirty": true,
   "exitCode": 0,
-  "passed": 14,
+  "passed": 21,
   "failed": 0,
   "pending": 0,
   "groups": [
     {
       "id": "T07-01",
-      "passed": 14,
+      "passed": 21,
       "failed": 0,
       "pending": 0,
       "cases": [
@@ -65,12 +65,17 @@
         {
           "id": "T07-08 反应射程外拒绝、墙后拒绝、有效距离与视线通过",
           "pass": true,
-          "detail": "{\"far\":\"反应目标超出技能距离\",\"blocked\":\"反应目标超出技能距离\",\"near\":true}"
+          "detail": "{\"far\":\"反应目标超出技能距离\",\"blocked\":\"视线被墙阻挡\",\"near\":true}"
         },
         {
-          "id": "T07-06 当前再动点可继续消费且同源不重发，队友再动转待领取",
+          "id": "T07-06 当前再动点可继续消费且同源不重发",
           "pass": true,
-          "detail": "{\"current\":true,\"afterImmediate\":1,\"repeated\":true,\"afterRepeated\":0,\"ally\":\"主行动已用完\",\"pendingAfter\":[]}"
+          "detail": "{\"current\":true,\"afterImmediate\":1,\"repeated\":true,\"afterRepeated\":0}"
+        },
+        {
+          "id": "T07-06 队友再动真实提交、待领取并在自然行动交付，不刷新移动辅助",
+          "pass": true,
+          "detail": "{\"extraAlly\":true,\"pendingAfter\":[{\"targetId\":\"receiver\",\"sourceKey\":\"giver:grantAlly\"}],\"giverAfter\":{\"moveRemaining\":4,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1},\"delivered\":{\"currentId\":\"receiver\",\"resources\":{\"moveRemaining\":4,\"sprintRemaining\":0,\"main\":2,\"aux\":1,\"moveMultiplier\":1}}}"
         },
         {
           "id": "T07-10 速度状态只改跑圈速度不改闪避，固定命闪不因敏捷不同改变",
@@ -81,6 +86,36 @@
           "id": "T07-09 续载同battle保留限次与冷却，同scene新battle清空",
           "pass": true,
           "detail": "{\"resume\":{\"sceneId\":\"reload-scene\",\"battleId\":\"same-battle\",\"progress\":{},\"perBattleUses\":{\"caster\":{\"limited\":1}},\"cooldowns\":{\"caster\":{\"limited\":500}},\"combatState\":{}},\"fresh\":{\"sceneId\":\"reload-scene\",\"battleId\":\"new-battle\",\"progress\":{},\"perBattleUses\":{},\"cooldowns\":{},\"combatState\":{}}}"
+        },
+        {
+          "id": "T07-02/03/04 库存先抵准备、剩余主点自动投入、未满拒绝、显式准备与释放后加速入账",
+          "pass": true,
+          "detail": "{\"inventoryBefore\":{\"now\":50,\"currentId\":\"inventory\",\"actionSerial\":1,\"resources\":{\"moveRemaining\":4,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1},\"terminal\":null,\"preparation\":{\"skillKey\":\"inventorySkill\",\"skill\":{\"name\":\"inventorySkill\",\"cost\":5,\"hit\":100,\"power\":20,\"type\":\"[单体]\",\"type2\":\"[无]\",\"type3\":\"[无]\",\"range\":{\"type\":\"单体\",\"castRange\":10},\"actionCost\":{\"main\":1,\"aux\":0},\"charge\":4,\"delay\":300,\"maxUses\":1,\"haste\":3},\"remaining\":1,\"invested\":3,\"ready\":false},\"chargeInventory\":0,\"units\":[{\"id\":\"inventory\",\"hp\":100,\"mp\":25,\"status\":\"active\"},{\"id\":\"inventoryEnemy\",\"hp\":100,\"mp\":30,\"status\":\"active\"}],\"carrying\":{},\"positions\":{\"inventory\":{\"col\":2,\"row\":4},\"inventoryEnemy\":{\"col\":7,\"row\":4}},\"log\":[\"t=50.00 · inventory 行动\",\"inventory 准备 inventorySkill · 剩余 1\",\"inventory 开始蓄力 inventorySkill · 需投入 1 主行动\"]},\"premature\":\"蓄力尚未就绪，请继续准备\",\"otherCharge\":\"请先释放或取消当前蓄力\",\"explicitlyPrepared\":{\"ok\":true,\"invested\":1,\"remaining\":0,\"ready\":true},\"inventoryReleased\":true,\"inventoryAfter\":3}"
+        },
+        {
+          "id": "T07-08 同一目标同次攻击反应只执行一次并扣费一次",
+          "pass": true,
+          "detail": "{\"hp\":97,\"mp\":8,\"log\":[\"t=50.00 · counterHero 行动\",\"counterEnemy 反击 counterHero -3 HP\",\"counterHero · shot → counterEnemy -12 HP\"]}"
+        },
+        {
+          "id": "P07 未迁移看破舍身和纯减益明确拒绝",
+          "pass": true,
+          "detail": "[{\"ok\":false,\"reason\":\"看破／舍身尚未迁移\"},{\"ok\":false,\"reason\":\"看破／舍身尚未迁移\"},{\"ok\":false,\"reason\":\"纯控制／减益技能尚未迁移\"},{\"ok\":false,\"reason\":\"纯控制／减益技能尚未迁移\"}]"
+        },
+        {
+          "id": "T07-10 同源速度刷新不叠强度，到期回滚角色与跑圈速度",
+          "pass": true,
+          "detail": "{\"refreshedSpeed\":130,\"now\":210,\"refSpeed\":100,\"clockSpeed\":100}"
+        },
+        {
+          "id": "T07-05/07 毒首次周期前不扣血，周期致死清空蓄力",
+          "pass": true,
+          "detail": "{\"beforeTickHp\":3,\"hp\":0,\"now\":200,\"source\":{\"casterId\":\"dotEnemy\",\"skillId\":\"dot\",\"effectId\":\"dotHero:0\"}}"
+        },
+        {
+          "id": "T07-10 独立闪避参与命闪而非敏捷",
+          "pass": true,
+          "detail": "{\"lowEva\":{\"hit\":true,\"attackRoll\":11,\"dodgeRoll\":1},\"highEva\":{\"hit\":false,\"attackRoll\":11,\"dodgeRoll\":100}}"
         },
         {
           "id": "P07+ 治疗槽不会静默部分结算",

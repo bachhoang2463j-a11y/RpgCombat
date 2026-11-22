@@ -1,0 +1,18 @@
+{
+  "stage": "P07-standalone-browser",
+  "executed": true,
+  "passed": false,
+  "artifact": "tactics/mvp-standalone.html",
+  "artifactSha256": "301678794504cc86e6e53cf651da88e4477d37590e726cdc02748846f4512238",
+  "backend": "IAB",
+  "viewport": {"width": 1280, "height": 720},
+  "steps": [
+    {"name": "刷新新单文件", "pass": true},
+    {"name": "设置角色玛德琳并填写毒针JSON", "pass": true},
+    {"name": "保存重置后毒针卡出现", "pass": true},
+    {"name": "攻击菜单选择毒针进入地图瞄准", "pass": true},
+    {"name": "锁定、Enter发动及费用HP状态闭环", "pass": null, "detail": "目标斥候投影视口外 y=-157.113，整装待发/动画调度未正常完成；未执行，不以规则直调替代页面验证"}
+  ],
+  "issues": ["设置按钮常规locator一次超时，改用实际DOM按钮click事件打开", "截图一次30000ms超时", "保存后敌方emoji变为头像缺失", "物品按钮y约677.7至707，菜单裁切底边670"],
+  "completeP07": false
+}
