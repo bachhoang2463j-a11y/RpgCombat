@@ -3898,3 +3898,10 @@
 - 行为：移动命令前先锁住单位显示位置（lockMotion），刷新视图不再把头像瞬移到终点；路径演出结束后解锁并交还权威落点。我方与敌方移动同改。
 - 涉及文件：tactics/src/main.mjs、tactics/src/action-director.mjs、tactics/mvp-standalone.html（550513 B，sha256 e98254f1…cbd149f93e）。
 - 原因：battle.move 后 refreshBattle 立即按新 placement 摆位，而 playPathMotion 在镜头引导（约 400ms）之后才上锁回放，形成"闪到终点→退回起点再走"。实测显示坐标从起点单调走向终点；av 49/49、mvp 56/56。
+
+## 2026-11-22 · 复用原版行动条/技能栏 + 职业与敌方分级表现（8b5f40f）
+- 行为：新增 tools/extract-rpg-ui.cjs（只读根 index.html，sha256 6a7b72f3…）按名字闭包切出原版 40 段声明：renderTurnQueue（导轨流光带/FLIP/聚焦冲击/回合光晕/再动爆闪/变速角标）、updateSkillMenus/createSkillCard/createSkillGroupCard（父子技能组）/createItemCard、标签悬浮提示 tagTip 全套，以及菜单 HTML（四主项/子菜单/目标面板/非玩家回合遮罩）与所用 Tailwind/自定义 CSS（430 规则 + 13 关键帧，作用域 [data-rpg-ui-scope]），生成 src/vendor/rpg-ui/；构建前 --check 过期即失败。
+- 宿主适配补丁 6 项：内联 onclick→委托×13、技能卡挂全局索引、行动条外层加 id、防御/撤退禁用注明“战棋未迁移”、基础行动新增第四项【结束回合】、基础行动四项行高对齐主菜单。战棋侧注入伪 state、技能可用判定（主行动+MP+已迁移范围）、瞄准入口；技能卡补“📐 范围”胶囊；目标面板显示瞄准提示/取消；敌方回合显示原版遮罩；我方回合播原版 heroTurn，插队播合成音。
+- 职业/分级：新增 src/unit-style.mjs。我方职业取《典型对局.txt》（埃利奥特施法者/弗兰克防守者/玛德琳隐匿者/索恩风行者），八职业各有外层光圈、待机动效（参考 战术地图待机动效示例.html）、步态参数（motion gait：起落/压扁/速度/悬浮/冲锋）、步伐合成音、拖尾（残影/星屑/毒迹/微光）。敌方无职业、外圈保持红色，按原版 getEnemyTier 相对倍数分级：杂兵抽搐+碎步、精英邪光+悬滑+暗影拖尾、BOSS 沉重呼吸+偶发猛震+踏步震屏。夹具：守卫 HP 90→400（BOSS）、邪术师 Atk 9→18（精英）。
+- 测试：--all 398（p01 166 / p02 69 / mvp 56 / av 49 / p03 58）全绿；T02-01 槽位与 260×172 断言改读生成文件。浏览器实测：子菜单技能卡/父子组/悬浮标签、目标面板取消、结束回合二次确认、敌方遮罩、隐匿者移动半透明无尘、风行者残影。产物 tactics/mvp-standalone.html 673537 B，sha256 9a7832f7632f8ea4dccb6ab2f6cecdce8ae6dc4a6ba12a5155f949304c6d9a19。
+- 原因：用户要求行动条严格复刻原版、技能栏直接移植以免重复造轮子、按职业/敌人分级区分外圈与动效音效。
