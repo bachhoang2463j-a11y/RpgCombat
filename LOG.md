@@ -3893,3 +3893,8 @@
 - 视听：WebAudio 合成 UI 音（hover/select/lock/confirm/cancel/deny/turn/enemyTurn/endTurn）与脚步（大型更沉），接 CombatAudioMixer aux 轨；移动加入逐格起落步态与尘土；轮次横幅、当前行动者光环、卡片受击、行动轴过渡；解锁前取得的首次语音在首次交互后补播；枪械采样准备最多等 600ms 不卡演出。
 - 测试：av 49/49、mvp 56/56、p02 69/69；TAV-05/06 与 T02-01 断言按新几何/新面板更新。产物 tactics/mvp-standalone.html 550218 B，sha256 b2126302…a6f2b83bf6a215d。
 - 决策原因：用户授权按自有审美完整翻新、移动无需先选"移动"；原 Demo 结束回合/技能入口不直观导致"无法结束回合/技能无特效"的体感。
+
+## 2026-11-22 · 修复点击移动先闪现到终点（e1e64e8）
+- 行为：移动命令前先锁住单位显示位置（lockMotion），刷新视图不再把头像瞬移到终点；路径演出结束后解锁并交还权威落点。我方与敌方移动同改。
+- 涉及文件：tactics/src/main.mjs、tactics/src/action-director.mjs、tactics/mvp-standalone.html（550513 B，sha256 e98254f1…cbd149f93e）。
+- 原因：battle.move 后 refreshBattle 立即按新 placement 摆位，而 playPathMotion 在镜头引导（约 400ms）之后才上锁回放，形成"闪到终点→退回起点再走"。实测显示坐标从起点单调走向终点；av 49/49、mvp 56/56。
