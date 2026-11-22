@@ -3923,3 +3923,11 @@
 ## 2026-11-22 · 目录整理归档提交：删除项落库 + doc/修仙特效/资源 入库（fd8fa47）
 - 行为：将用户 11-20 手工整理的目录变动提交为 chore 记录——31 个根目录/修仙特效删除项（demo×20、王之军势×2、index-公开版、regex-公开版、Coding rule、审计三文档、导演兜底人格、敌方生成规则）正式落库；新位置 doc/（5 文档 + mp4 战术参考视频）、修仙特效/（xianxia 两张 + 淘汰/）、资源/（misc-sfx、group-attack、windup-sfx-candidates、vfx/xianxia-fire 素材）入库，共 351 文件 +501/-50363；git rename 检测将移动识别为 100% 相似改名，历史可溯源。.gitignore 增补 .DS_Store 并从暂存区剔除素材包内 15 个该类垃圾文件。
 - 原因：用户拍板"将可选内容的变更提交为整理记录"。边界严格排除：另一会话未提交的 tactics/src/ui-shell.mjs 与 tactics.css（M 红线）、其资产 典型对局.txt/战术地图待机动效示例.html、fixtures 历轮遗留、AGENTS.md.bak/.zcodeignore/COC-*.json（非整理范围）。素材体积核验约 40MB、无超 100MB 文件。
+
+## 2026-11-22 · 战棋 P07 行动提交/蓄力/反应规则闭环与 UI 门禁交付（9cfb2db）
+- 行为：①蓄力生命周期收口——battle.endAction 对就绪蓄力强制取消（资源不退、不能跨行动藏就绪大招），新增 dispatchBattleClock 包装器统一处理 exitUnit 清 preparing（覆盖 DoT/反击/推动/攻击/开场倒地全部来源）与 grantMainPoint immediate:true 时同步 currentAction.resources.main（即时再动点并入可消费余额，同源每次自然行动至多一次）；②效果槽命中门控精确化——仅当技能无伤害槽时，main-point/spd/def-up/evasion 纯增益免命中直接生效，有伤害槽的附带效果仍须命中；③range.resolveSlotTargets 增加 SPEC 4.3 目标取向——非[他人]的单体友方增益槽（再动/单回/单速等 14 标签）映射施术者本人，[他人] 仍按 aim 选友方；④main.mjs handleFieldAction 接线 prepare/cancel-charge 按钮；⑤P07 定向夹具扩至 14 条（取消不退款/一次扣费投入释放/行动末取消/反击倒地清蓄力/反应距离墙阻/续载限次保留/再动消费闭环/单速只改跑圈不改命闪），p06 治疗夹具补 isOthers 标志；⑥新建 doc/tactics/P07-MIGRATION.md 逐项标 保留/替换/未验证（职业被动/看破/舍身/召唤/治疗增益/肃正/物品/slotTurns 均未验证且保持 skillSupport 拒绝），PLAN.md P04-P07 状态与 T07 表按实际覆盖改写；⑦报告落盘 P04(8)/P05(10)/P06(9)/P07(14)-2026-11-22.json 与 MVP-2026-11-22-standalone.json。
+- 测试：定向 p02 69/p03 58/mvp 56/av 49/p04 8/p05 10/p06 9/p07 14 全绿；唯一一次 --all 合计 440 passed/0 failed；standalone 重建 749374 B，sha256 0fdb0e6ed8ea622dda0202074c7a2cb580698f0909750e23f969717c6eef3344，构建断言 37 输入/22 必需/20 符号/零外链/单闭合标签。
+- UI 门禁（真实页面 IAB 全链）：设置面板存毒针技能（[单体]+[中毒] power2:4 turns:2）→ roster 落档 → 攻击技能菜单出毒针卡 → 瞄准/锁定（预览命中 88% 伤害 9）→ Enter 发动 → 主行动 1→0、战报"毒针 → 斥候 -9 HP"、血条 100%→77.5% → 时钟推进 t≈195 全局周期 → 战报"斥候 · 中毒 -4 HP"。毒不在提交时提前跳伤，与 P03 周期契约一致。
+- 过程发现：①源码版页面加载后不刷新则运行旧模块（保存链按旧 main.mjs 执行导致首两次保存丢毒针），刷新后复测通过；②1280×720 下右下面板 h-[172px] overflow:hidden 将标题栏（含结束回合按钮）裁出可视区，用户确认按钮不可见，键盘 Space 为页面正式入口可完成回合推进——该面板高度缺陷已记录，未在本轮修复；③clock.mjs 全程零改动（蓄力清理全在 battle 包装器，P03 契约不破）。
+- 未验/边界：P04/P05/P06 仍为定向组通过、未满足完整阶段退出条件；看破/舍身/召唤/治疗增益/肃正/物品使用未迁移保持拒绝；IAB locator 点击多次超时改用截图坐标+键盘路径，真 Chrome 排障模式未使用（用户未授权）；README 待用户确认本轮有效后更新。
+- 原因：P07 退出条件要求用户配置技能在战棋前端有可验证实际效果；蓄力/再动/目标取向规则按 SPEC S03/S06 与 P03 时钟契约实现，未验证能力不伪装可用。
