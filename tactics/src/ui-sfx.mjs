@@ -105,8 +105,70 @@ export function createUiSfx(mixer) {
       tick(c, t, { freq: 90, q: 0.8, dur: 0.16, vol: 0.32, type: 'lowpass' });
       tone(c, t, { type: 'sine', f0: 62, f1: 45, dur: 0.18, vol: 0.10 });
     },
+    // ---- 职业/分级步伐 ----
+    armorStep(c, t, o) {        // 防守者：重靴 + 甲片轻响
+      const pan = (o && o.pan) || 0;
+      tick(c, t, { freq: 140, q: 0.8, dur: 0.11, vol: 0.30, type: 'lowpass', pan });
+      tick(c, t + 0.012, { freq: 4200 + Math.random() * 900, q: 9, dur: 0.07, vol: 0.05, pan });
+      tone(c, t + 0.01, { type: 'triangle', f0: 2900 + Math.random() * 300, dur: 0.06, vol: 0.012, pan });
+    },
+    berserkStep(c, t, o) {      // 狂战士：重踏 + 粗重喘息
+      const pan = (o && o.pan) || 0;
+      tick(c, t, { freq: 160, q: 0.9, dur: 0.09, vol: 0.28, type: 'lowpass', pan });
+      if (Math.random() < 0.45) tick(c, t + 0.04, { freq: 700, q: 0.6, dur: 0.22, vol: 0.05, pan });
+    },
+    windStep(c, t, o) {         // 风行者：轻点地 + 风声掠过
+      const pan = (o && o.pan) || 0;
+      tick(c, t, { freq: 260, q: 1, dur: 0.04, vol: 0.10, type: 'lowpass', pan });
+      tick(c, t, { freq: 1800 + Math.random() * 1200, q: 0.7, dur: 0.16, vol: 0.035, pan });
+    },
+    softStep(c, t, o) {         // 隐匿者：极轻布料擦声
+      tick(c, t, { freq: 3200 + Math.random() * 1500, q: 1.4, dur: 0.05, vol: 0.018, pan: (o && o.pan) || 0 });
+    },
+    poisonDrag(c, t, o) {       // 灾厄使：湿滑拖步 + 气泡
+      const pan = (o && o.pan) || 0;
+      tick(c, t, { freq: 500, q: 0.8, dur: 0.14, vol: 0.06, pan });
+      tone(c, t + 0.03, { type: 'sine', f0: 520 + Math.random() * 260, f1: 900, dur: 0.05, vol: 0.02, pan });
+    },
+    holyStep(c, t, o) {         // 圣职者：柔和脚步 + 轻铃
+      const pan = (o && o.pan) || 0;
+      tick(c, t, { freq: 200, q: 0.9, dur: 0.06, vol: 0.12, type: 'lowpass', pan });
+      tone(c, t + 0.01, { type: 'sine', f0: 1760 + (Math.random() < 0.5 ? 0 : 220), dur: 0.22, vol: 0.012, pan });
+    },
+    marchStep(c, t, o) {        // 征伐者：军靴 + 金属扣件
+      const pan = (o && o.pan) || 0;
+      tick(c, t, { freq: 170, q: 1, dur: 0.08, vol: 0.26, type: 'lowpass', pan });
+      tick(c, t + 0.008, { freq: 5200, q: 6, dur: 0.04, vol: 0.04, pan });
+    },
+    scuttle(c, t, o) {          // 杂兵：小碎步
+      const pan = (o && o.pan) || 0;
+      tick(c, t, { freq: 320 + Math.random() * 120, q: 1.2, dur: 0.035, vol: 0.12, type: 'lowpass', pan });
+      tick(c, t + 0.06, { freq: 360 + Math.random() * 120, q: 1.2, dur: 0.03, vol: 0.08, type: 'lowpass', pan });
+    },
+    bossStomp(c, t) {           // BOSS：沉重踏地 + 低频冲击
+      tick(c, t, { freq: 70, q: 0.7, dur: 0.28, vol: 0.42, type: 'lowpass' });
+      tone(c, t, { type: 'sine', f0: 55, f1: 32, dur: 0.34, vol: 0.18 });
+      tick(c, t + 0.02, { freq: 900, q: 0.6, dur: 0.18, vol: 0.04 });
+    },
+    arcaneGlide(c, t) {         // 施法者：起飞嗡鸣（无脚步）
+      tone(c, t, { type: 'sine', f0: 220, f1: 330, dur: 0.6, vol: 0.035, attack: 0.08 });
+      tone(c, t, { type: 'sine', f0: 660, f1: 990, dur: 0.5, vol: 0.012, attack: 0.08 });
+    },
+    shadowGlide(c, t) {         // 精英：暗影滑行低吟
+      tone(c, t, { type: 'sawtooth', f0: 110, f1: 82, dur: 0.6, vol: 0.03, attack: 0.08, lp: 500 });
+      tick(c, t, { freq: 400, q: 0.6, dur: 0.4, vol: 0.03 });
+    },
+    glideStop(c, t) { tone(c, t, { type: 'sine', f0: 440, f1: 260, dur: 0.18, vol: 0.02 }); },
+    sparkle(c, t, o) {          // 悬浮行进的细碎闪光
+      tone(c, t, { type: 'sine', f0: 2600 + Math.random() * 1400, dur: 0.07, vol: 0.012, pan: (o && o.pan) || 0 });
+    },
+    queueInsert(c, t) {         // 行动条插队：上扬掠过 + 叮
+      tick(c, t, { freq: 1200, q: 0.6, dur: 0.22, vol: 0.05 });
+      tone(c, t, { type: 'triangle', f0: 660, f1: 1320, dur: 0.18, vol: 0.04 });
+      tone(c, t + 0.14, { type: 'sine', f0: 1760, dur: 0.25, vol: 0.03 });
+    },
   };
-  const RATE = { hover: 60, select: 50, step: 40, heavyStep: 60 };
+  const RATE = { hover: 60, select: 50, step: 40, heavyStep: 60, sparkle: 60 };
 
   return function play(kind, opts) {
     const fn = SFX[kind];

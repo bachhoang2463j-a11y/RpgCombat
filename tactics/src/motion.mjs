@@ -9,7 +9,6 @@
 import { unitCenter } from './geometry.mjs';
 
 export const MOVE_SPEED = 4.6;      // 米/秒（表现参数）
-const HOP_PX = 7;                   // 每步起落高度（屏幕像素，billboard 内）
 const EASE_MS = 140;                // 首末段缓起缓停额外时长
 
 export function pathSegments(path, footprint) {
@@ -61,12 +60,20 @@ export function pointAtDistance(segs, dist) {
   return { x: last.b.x, y: last.b.y, seg: segs.length - 1, facing: last.facing };
 }
 
-// play(unitView, scope, { unitId, path, footprint, onFrame(x,y), onFeedback(kind,seg) }) → Promise<boolean>
+// 默认步态（无职业/未分级）：每格一次起落
+export const DEFAULT_GAIT = { hop: 7, squash: 0.06, speed: 1, float: 0, accel: false };
+
+// play(unitView, scope, { unitId, path, footprint, gait, onFrame(x,y), onFeedback(kind,seg,p) }) → Promise<boolean>
+// gait：{ hop 起落像素, squash 落地压扁, speed 速度倍率, float 悬浮高度(>0 则滑行不起落、轻微浮动), accel 冲锋式先慢后快 }
 export function playPathMotion(unitView, scope, opts) {
-  const { unitId, path, footprint, onFrame, onFeedback, speed = MOVE_SPEED } = opts;
+  const { unitId, path, footprint, onFrame, onFeedback } = opts;
+  const gait = Object.assign({}, DEFAULT_GAIT, opts.gait || {});
+  const speed = (opts.speed || MOVE_SPEED) * gait.speed;
   const segs = pathSegments(path || [], footprint);
   if (!segs.length || !scope || !scope.isLive) return Promise.resolve(true);
   const totalMs = pathDuration(segs, speed);
+  const total = segs.reduce((s, g) => s + g.len, 0);
+  const dist = t => gait.accel ? total * (t * t * (3 - 2 * t) * 0.35 + t * t * 0.65) : distanceAt(t, segs, totalMs);
   unitView.lockMotion(unitId, true);
   unitView.setFlag(unitId, 't-unit-moving', true);
   if (onFeedback) onFeedback('start', 0);
@@ -83,13 +90,19 @@ export function playPathMotion(unitView, scope, opts) {
     const stopCancel = scope.settleOnDispose(() => finish(false));
     scope.loop(now => {
       const t = Math.min(1, (now - t0) / totalMs);
-      const p = pointAtDistance(segs, distanceAt(t, segs, totalMs));
+      const d = dist(t);
+      const p = pointAtDistance(segs, d);
       unitView.setDisplayPos(unitId, p.x, p.y);
-      // 步态：每段一次起落（落地瞬间轻微压扁），落地拍点发 step 反馈（脚步声/尘土）
+      // 步态：每段一次起落（落地瞬间轻微压扁），落地拍点发 step 反馈（脚步声/尘土）；悬浮单位改为恒定离地 + 缓慢浮动
       const segStart = segs.slice(0, p.seg).reduce((s, g) => s + g.len, 0);
-      const k = Math.max(0, Math.min(1, (distanceAt(t, segs, totalMs) - segStart) / segs[p.seg].len));
-      const hop = Math.sin(Math.PI * k);
-      unitView.setHop(unitId, hop * HOP_PX, 1 - (1 - hop) * 0.06);
+      const k = Math.max(0, Math.min(1, (d - segStart) / segs[p.seg].len));
+      if (gait.float > 0) {
+        const lift = Math.min(1, t * 6, (1 - t) * 6);
+        unitView.setHop(unitId, gait.float * lift + Math.sin(now / 180) * 1.5 * lift, 1);
+      } else {
+        const hop = Math.sin(Math.PI * k);
+        unitView.setHop(unitId, hop * gait.hop, 1 - (1 - hop) * gait.squash);
+      }
       if (p.seg !== lastSeg) {
         if (onFeedback) onFeedback('step', p.seg, p);
         if (lastSeg >= 0 && Math.abs(((segs[p.seg].facing - segs[lastSeg].facing + 540) % 360) - 180) > 1 && onFeedback) onFeedback('turn', p.seg);
@@ -97,6 +110,7 @@ export function playPathMotion(unitView, scope, opts) {
         unitView.setDisplayFacing(unitId, p.facing);
       }
       if (onFrame) onFrame(p.x, p.y);
+      if (onFeedback) onFeedback('frame', p.seg, p);
       if (t >= 1) { unitView.setHop(unitId, 0, 1); if (onFeedback) onFeedback('step', segs.length, p); if (stopCancel) stopCancel(); finish(true); return false; }
     });
   });

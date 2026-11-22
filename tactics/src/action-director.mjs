@@ -41,7 +41,7 @@ export function resolveWindupKind(skill) {
 }
 
 export function createActionDirector(deps) {
-  const { sandbox, avHost, getViewData, onReveal, onMoveFeedback } = deps;
+  const { sandbox, avHost, getViewData, onReveal, onMoveFeedback, getUnitStyle } = deps;
   const av = avHost.av;
 
   function scope() { return sandbox.getScope(); }
@@ -79,7 +79,7 @@ export function createActionDirector(deps) {
     const end = centerOf(id);
     if (start && end) await sandbox.guideTo([start, end]);
     const ok = await playPathMotion(sandbox.getUnitView(), scope(), {
-      unitId: id, path, footprint: fp,
+      unitId: id, path, footprint: fp, gait: getUnitStyle && getUnitStyle(id) ? getUnitStyle(id).gait : null,
       onFrame: (x, y) => sandbox.followWorld(x, y),
       onFeedback: (kind, seg, p) => { if (onMoveFeedback) onMoveFeedback(id, kind, p); },
     });

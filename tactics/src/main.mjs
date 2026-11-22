@@ -20,6 +20,7 @@ import { createAvHost, heroAvatarUrl } from './av-host.mjs';
 import { createActionDirector } from './action-director.mjs';
 import { createUiSfx } from './ui-sfx.mjs';
 import { CHAPEL_SCENE } from './chapel-scene.mjs';
+import { resolveUnitStyles } from './unit-style.mjs';
 // ---------- P02 固定图库（同一张权威几何，两个 sceneId 身份；不做生成器） ----------
 const SCENE_LIBRARY = {
   'sc-test-room': TEST_ROOM,
@@ -184,14 +185,6 @@ function expectedDamage(caster, target, skill) {
   const raw = skill.power === 0 ? caster.atk : skill.power;
   return raw <= 0 ? 0 : Math.max(1, raw - Math.floor(target.def || 0));
 }
-function rangeLabel(r) {
-  if (!r) return '';
-  if (r.type === '单体') return '单体 ' + (r.castRange || 0) + 'm';
-  if (r.type === '直线') return '直线 ' + r.length + 'm';
-  if (r.type === '扇形') return '扇形 ' + r.castRange + 'm·' + r.angle + '°';
-  return r.type;
-}
-
 export function createApp(rootEl, opts = {}) {
   ensureMemoryVarHost();
   const shell = buildShell(rootEl);
@@ -208,6 +201,7 @@ export function createApp(rootEl, opts = {}) {
     sandbox, avHost, getViewData: () => currentViewData,
     onReveal: (hit, meta) => revealHit(hit, meta),
     onMoveFeedback: (id, kind, p) => moveFeedback(id, kind, p),
+    getUnitStyle: (id) => unitStyles[id] || null,
   });
   let combatToken = {};
   let battle = null;
@@ -221,6 +215,7 @@ export function createApp(rootEl, opts = {}) {
   let endArmedUntil = 0;
   let booted = false;
   const shown = new Map();   // 显示态资源（接触拍点前保持旧值）
+  let unitStyles = {};       // 单位表现风格：我方职业 / 敌方分级（只影响画面与声音）
   const hiddenLog = new Set();
 
   shell.onUiSound = (kind) => ui(kind);
@@ -289,6 +284,7 @@ export function createApp(rootEl, opts = {}) {
         lastResult = null;
         battle = createBattle({ units: currentViewData.units, placementsById: currentViewData.placementsById, scene, battleState: result.battleState, random: opts.random });
         battle.start();
+        unitStyles = resolveUnitStyles(currentViewData.units);
       }
       syncShown();
       refreshBattle();
@@ -312,23 +308,24 @@ export function createApp(rootEl, opts = {}) {
   function unitById(id) { return currentViewData.units.find(u => u.id === id) || null; }
   function currentUnit() { return battle && currentViewData ? unitById(battle.snapshot().currentId) : null; }
   function isHeroTurn() { const u = currentUnit(); return !!(u && u.side === 'hero' && !battle.snapshot().terminal); }
-  function availableSkills() {
-    return (currentUnit()?.skills || []).filter(s => s.actionCost.main === 1 && ['单体', '直线', '扇形'].includes(s.range?.type));
+  // 技能是否可在战棋中发动：主行动 + MP + 已迁移的空间范围（原版技能栏据此灰显/排序）
+  function skillUsable(skill) {
+    const u = currentUnit(); const r = battle.snapshot().resources;
+    return !!(u && r && r.main > 0 && !skill.isGroup && skill.actionCost && skill.actionCost.main === 1
+      && ['单体', '直线', '扇形'].includes(skill.range && skill.range.type) && u.ref.mp >= (skill.cost || 0));
   }
-  function actionList() {
-    const u = currentUnit();
-    const r = battle.snapshot().resources;
-    const list = availableSkills().map((s, i) => ({ key: 'skill-' + i, skill: s }));
-    list.push({ key: 'attack', skill: BASIC_ATTACK });
-    return list.map((a, i) => {
-      const s = a.skill;
-      const off = !r || r.main <= 0 ? '主行动已用完' : u.ref.mp < (s.cost || 0) ? 'MP 不足（需 ' + s.cost + '）' : null;
-      const id = director.resolveAttackIdentity(s, u.side);
-      return { ...a, label: s.name, subtype: id.subtype, sub: rangeLabel(s.range), cost: s.cost ? 'MP ' + s.cost : '', hotkey: String(i + 1),
-        disabled: !!off, reason: off || '', active: !!(aim && aim.key === a.key) };
-    });
+  function skillOfKey(key) {
+    if (key === 'attack') return BASIC_ATTACK;
+    const m = /^sk:(\d+)$/.exec(key || '');
+    return m ? (currentUnit()?.skills || [])[Number(m[1])] || null : null;
   }
-  function defaultAction() { return actionList().find(a => !a.disabled) || null; }
+  // 点敌人直接攻击：首个可用技能（原版技能栏的排序口径：可用者在前），否则普攻
+  function defaultAction() {
+    const skills = currentUnit()?.skills || [];
+    const i = skills.findIndex(s => !s._inGroup && skillUsable(s));
+    if (i >= 0) return { key: 'sk:' + i, skill: skills[i] };
+    return skillUsable(BASIC_ATTACK) ? { key: 'attack', skill: BASIC_ATTACK } : null;
+  }
   function queueRows(snap) {
     const visibleUnitIds = currentViewData.units.filter(u => shownOf(u).hp > 0 || u.id === snap.currentId).map(u => u.id);
     const queue = getVisibleTurnQueue(battle.battleState, 'hero', { visibleUnitIds }).filter(r => r.unitId !== snap.currentId);
@@ -341,13 +338,19 @@ export function createApp(rootEl, opts = {}) {
     if (!u) { shell.renderCommand(null); return; }
     const r = snap.resources;
     const hero = u.side === 'hero' && !snap.terminal;
+    const esc = t => String(t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     shell.renderCommand({
-      unit: u, terminal: !!snap.terminal, playable: hero,
+      unit: u, terminal: !!snap.terminal, playable: hero, serial: snap.actionSerial,
       resources: r ? { moveRemaining: r.moveRemaining, moveMax: u.ref.moveDistance, main: r.main, mp: u.ref.mp } : null,
-      actions: hero ? actionList() : [],
       endArmed: performance.now() < endArmedUntil,
-      tip: !hero ? '' : pending ? '再次点击目标或按 Enter 发动 · 右键取消' : aim ? '点击目标锁定 · 右键/Esc 返回' : '点击地面移动 · 点击敌人攻击 · 数字键选技能',
-      onCommand: handleCommand,
+      aimHint: !hero || !aim ? null : pending
+        ? '【' + esc(aim.skill.name) + '】已锁定<br>再次点击目标或 Enter 发动'
+        : '【' + esc(aim.skill.name) + '】请在地图上选择目标',
+      canUse: skillUsable,
+      onSkill: (idx) => handleCommand('sk:' + idx),
+      onAttack: () => handleCommand('attack'),
+      onEnd: () => handleCommand('end'),
+      onCancel: () => { if (pending) cancelStep(); cancelStep(); },
     });
   }
   function refreshBattle() {
@@ -358,10 +361,17 @@ export function createApp(rootEl, opts = {}) {
     for (const u of currentViewData.units) {
       view.setFlag(u.id, 't-unit-down', shownOf(u).hp <= 0);
       view.setFlag(u.id, 't-unit-current', u.id === snap.currentId && !snap.terminal);
+      if (unitStyles[u.id]) view.setFlag(u.id, unitStyles[u.id].cls, true);
     }
     shell.renderHeroes(currentViewData.units);
     shell.setCurrent(snap.terminal ? null : snap.currentId);
-    shell.renderQueue(queueRows(snap), snap.currentId);
+    const qc = shell.renderQueue(queueRows(snap), snap.currentId);
+    // 插队：除换人外，其余单位相对次序改变（加速/再动等）→ 插入音
+    if (qc) {
+      const keep = id => id !== qc.prev[0] && qc.next.includes(id);
+      const a = qc.prev.filter(keep), b = qc.next.filter(id => a.includes(id));
+      if (a.join('|') !== b.join('|')) ui('queueInsert');
+    }
     shell.setHistory(visibleLog());
     renderCommand();
     currentState.scenes[currentViewData.sceneId].positions = structuredClone(currentViewData.placementsById);
@@ -470,17 +480,15 @@ export function createApp(rootEl, opts = {}) {
     if (aim) { aim = null; ui('cancel'); sandbox.setHint(null); sandbox.refreshHover(); idleOverlay(); renderCommand(); }
   }
 
-  function handleCommand(key, off) {
+  function handleCommand(key) {
     if (!battle || !isHeroTurn()) return;
     if (busy) { ui('deny'); return; }
     if (key === 'end') { requestEnd(); return; }
-    const act = actionList().find(a => a.key === key);
-    if (!act) return;
-    if (off || act.disabled) { ui('deny'); shell.showLog(act.reason, 'warn'); return; }
-    if (aim && aim.key === key) { cancelStep(); if (aim) cancelStep(); return; }
+    const skill = skillOfKey(key);
+    if (!skill) return;
+    if (!skillUsable(skill)) { ui('deny'); shell.showLog(battle.snapshot().resources.main <= 0 ? '主行动已用完' : 'MP 不足或范围未迁移', 'warn'); return; }
     pending = null;
-    aim = { key, skill: act.skill };
-    ui('select');
+    aim = { key, skill };
     sandbox.setHint(null); sandbox.refreshHover();
     sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: aim.skill, query: null });
     renderCommand();
@@ -521,6 +529,7 @@ export function createApp(rootEl, opts = {}) {
     const myFlow = flow;
     const p = pending, act = aim;
     pending = null; aim = null;
+    shell.closeMenus();
     sandbox.setPreview(null); sandbox.setHint(null);
     setBusy(true);
     sandbox.beginAction();
@@ -554,7 +563,7 @@ export function createApp(rootEl, opts = {}) {
     if (intro) { await sandbox.introSweep(1600); if (myFlow !== flow) return; }
     const c = sandbox.unitWorldCenter(u.id);
     shell.showBanner(u, u.side === 'hero' ? '我方行动' : '敌方行动');
-    ui(u.side === 'hero' ? 'turn' : 'enemyTurn');
+    if (u.side === 'hero') avHost.sfx('heroTurn', 1, { category: 'M' }); else ui('enemyTurn');
     if (c) await sandbox.guideTo([c], { ms: 420 });
     if (myFlow !== flow) return;
     if (u.side === 'hero') {
@@ -635,22 +644,53 @@ export function createApp(rootEl, opts = {}) {
       scope.after(620, () => { view.setFlag(u.id, 't-unit-falling', false); view.setFlag(u.id, 't-unit-down', true); });
     });
   }
-  // 步伐：每段落地一次脚步声 + 地面尘土（大型单位更沉）
-  function moveFeedback(id, kind, p) {
-    if (kind !== 'step' || !p) return;
-    const u = unitById(id);
-    const big = u && (u.footprint.width > 1 || u.footprint.height > 1);
-    const s = sandbox.worldToScreenClient(p.x, p.y);
-    const pan = Math.max(-0.6, Math.min(0.6, (s.x / window.innerWidth - 0.5) * 1.2));
-    ui(big ? 'heavyStep' : 'step', { pan });
+  // 步伐：按职业/分级的步伐音、落地尘土、移动拖尾；BOSS 每步轻震镜头
+  const trailAt = new Map();
+  function fxNode(cls, x, y, ms, style) {
     const d = sandbox.getDom();
-    if (!d) return;
+    if (!d) return null;
     const el = document.createElement('i');
-    el.className = 't-dust' + (big ? ' t-dust-big' : '');
-    el.style.left = (p.x * 50) + 'px'; el.style.top = (p.y * 50 + (big ? 30 : 14)) + 'px';
+    el.className = cls;
+    el.style.left = (x * 50) + 'px'; el.style.top = (y * 50) + 'px';
+    if (style) Object.assign(el.style, style);
     d.unitLayer.appendChild(el);
     sandbox.getScope().addNode(el);
-    sandbox.getScope().after(520, () => sandbox.getScope().removeNode(el));
+    sandbox.getScope().after(ms, () => sandbox.getScope().removeNode(el));
+    return el;
+  }
+  function moveFeedback(id, kind, p) {
+    const st = unitStyles[id] || {};
+    const u = unitById(id);
+    if (kind === 'start') { if (st.glide) ui(st.glide); return; }
+    if (kind === 'stop') { if (st.glide) ui('glideStop'); return; }
+    if (!p) return;
+    if (kind === 'frame') {
+      if (!st.trail) return;
+      const now = performance.now();
+      if (now - (trailAt.get(id) || 0) < (st.trail === 'ghost' ? 70 : 55)) return;
+      trailAt.set(id, now);
+      if (st.trail === 'ghost') {
+        // 风行者残影：复制徽章（含反缩放 billboard），原地淡出
+        const rec = sandbox.getUnitView().nodes.get(id);
+        const bb = rec && rec.root.querySelector('.t-unit-billboard');
+        const g = fxNode('t-ghost', p.x, p.y, 360);
+        if (g && bb) { const c = bb.cloneNode(true); c.querySelectorAll('.t-unit-name,.t-unit-bars,.t-unit-direction').forEach(n => n.remove()); g.appendChild(c); }
+        return;
+      }
+      const jitter = () => (Math.random() - 0.5) * 0.5;
+      fxNode('t-trail t-trail-' + st.trail, p.x + jitter(), p.y + jitter() + 0.15, 900);
+      return;
+    }
+    if (kind !== 'step') return;
+    const s = sandbox.worldToScreenClient(p.x, p.y);
+    const pan = Math.max(-0.6, Math.min(0.6, (s.x / window.innerWidth - 0.5) * 1.2));
+    if (st.step) ui(st.step, { pan }); else if (st.glide) ui('sparkle', { pan });
+    const big = u && (u.footprint.width > 1 || u.footprint.height > 1);
+    if (st.dust) fxNode('t-dust' + (st.dust === 'heavy' || big ? ' t-dust-big' : st.dust === 'light' ? ' t-dust-light' : ''), p.x, p.y + (big ? 0.6 : 0.28), 520);
+    if (st.shake) {
+      const d = sandbox.getDom();
+      if (d && d.shake) { d.shake.classList.remove('t-stomp'); void d.shake.offsetWidth; d.shake.classList.add('t-stomp'); }
+    }
   }
 
   // ---------- 胜负收束 ----------
@@ -699,7 +739,6 @@ export function createApp(rootEl, opts = {}) {
     if (!battle || !isHeroTurn()) return;
     if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); if (busy) { ui('deny'); return; } requestEnd(); return; }
     if (e.key === 'Enter' && pending) { e.preventDefault(); if (!busy) firePending(); return; }
-    if (/^[1-9]$/.test(e.key)) { const a = actionList()[Number(e.key) - 1]; if (a) handleCommand(a.key, a.disabled); }
   };
   rootEl.ownerDocument.addEventListener('keydown', onKey);
 
@@ -727,7 +766,7 @@ export function createApp(rootEl, opts = {}) {
     getBattle: () => battle,
     isBusy: () => busy,
     resources: () => avHost.resourceReport(),
-    command: (key) => handleCommand(key, false),
+    command: (key) => handleCommand(key),
     endTurn: () => requestEnd(),
   };
 }

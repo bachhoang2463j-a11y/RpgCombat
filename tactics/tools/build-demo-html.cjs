@@ -11,6 +11,7 @@ const { createRequire } = require('node:module');
 const tacticsDir = path.resolve(__dirname, '..');
 const esbuild = createRequire(path.join(tacticsDir, 'p00-probe', 'package.json'))('esbuild');
 const { build: buildRpgAv } = require('./extract-rpg-av.cjs');
+const { build: buildRpgUi } = require('./extract-rpg-ui.cjs');
 
 // 产物专项断言：本轮新增与核心模块必须真实入包（存在性，不是仅字符串出现）
 const REQUIRED_INPUTS = [
@@ -19,9 +20,11 @@ const REQUIRED_INPUTS = [
   'src/scheduler.mjs', 'src/parser.mjs', 'src/vendor/js-yaml-4.1.0.mjs',
   'src/av-host.mjs', 'src/action-director.mjs', 'src/motion.mjs', 'src/range-overlay.mjs',
   'src/vendor/rpg-av/rpg-av.mjs', 'src/chapel-scene.mjs', 'src/chapel-art.mjs', 'src/ui-sfx.mjs',
+  'src/vendor/rpg-ui/rpg-ui.mjs', 'src/unit-style.mjs',
 ];
 // 复用模块关键函数必须进入产物（防止 tree-shaking 或误删导致"复用"名不副实）
-const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFeedback', 'classifyHit', 'playArsenicShot', 'CombatAudioMixer', 'HERO_VOICE_LINES', 'playSingleGunshot', 'playSingleShotgun', 'playSingleThunder', 'playSingleSlash', 'playSingleClaw', 'playSingleArrow', 'enemySpellProjectile'];
+const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFeedback', 'classifyHit', 'playArsenicShot', 'CombatAudioMixer', 'HERO_VOICE_LINES', 'playSingleGunshot', 'playSingleShotgun', 'playSingleThunder', 'playSingleSlash', 'playSingleClaw', 'playSingleArrow', 'enemySpellProjectile',
+  'renderTurnQueue', 'updateSkillMenus', 'createSkillCard', 'createSkillGroupCard', 'createItemCard', 'showTagTipFor'];
 
 const entry = [
   "import { createApp } from './src/main.mjs';",
@@ -42,6 +45,11 @@ const entry = [
   for (const [name, text] of [['rpg-av.mjs', av.js], ['rpg-av.css', av.css]]) {
     if (readFileSync(path.join(avDir, name), 'utf8') !== text) throw new Error('视听底座生成物过期: ' + name + '（先运行 node tactics/tools/extract-rpg-av.cjs）');
   }
+  const ui = buildRpgUi();
+  const uiDir = path.join(tacticsDir, 'src', 'vendor', 'rpg-ui');
+  for (const [name, text] of [['rpg-ui.mjs', ui.js], ['rpg-ui.css', ui.css]]) {
+    if (readFileSync(path.join(uiDir, name), 'utf8') !== text) throw new Error('原版界面生成物过期: ' + name + '（先运行 node tactics/tools/extract-rpg-ui.cjs）');
+  }
   const result = await esbuild.build({
     absWorkingDir: tacticsDir,
     stdin: { contents: entry, resolveDir: tacticsDir, sourcefile: 'demo-entry.mjs' },
@@ -53,7 +61,8 @@ const entry = [
   if (missing.length) throw new Error('新代码未入包: ' + missing.join(', '));
   if (Object.values(result.metafile.outputs).some(o => o.imports.length)) throw new Error('产物仍含外部 import');
 
-  const css = readFileSync(path.join(tacticsDir, 'tactics.css'), 'utf8').replace(/^\uFEFF/, '') + '\n' + readFileSync(path.join(avDir, 'rpg-av.css'), 'utf8');
+  // 顺序：原版界面（含 Tailwind 预置）在前，战棋样式同权重时覆盖；回合制特效样式最后
+  const css = readFileSync(path.join(uiDir, 'rpg-ui.css'), 'utf8') + '\n' + readFileSync(path.join(tacticsDir, 'tactics.css'), 'utf8').replace(/^\uFEFF/, '') + '\n' + readFileSync(path.join(avDir, 'rpg-av.css'), 'utf8');
   // </script 只可能出现在字符串字面量内；转义斜杠不改变字符串值，防止提前闭合脚本
   const bundle = result.outputFiles[0].text.split('</script').join('<\\/script');
   const lostSymbols = REQUIRED_SYMBOLS.filter(s => !new RegExp('\\b' + s + '\\b').test(bundle));

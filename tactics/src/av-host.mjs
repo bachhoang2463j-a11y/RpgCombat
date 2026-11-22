@@ -18,6 +18,7 @@ let STAGE_H = 1000 / FX_SCALE;
 
 // 本 Demo 实际用到的采样（按复用演出逐项核对；不预载整个素材库）
 export const DEMO_AUDIO_KEYS = [
+  'heroTurn',                                                                 // 原版我方回合开始
   'gunshot1', 'gunshot2', 'gunshot3', 'xiandan', 'gunshot_pierce',            // 枪械：玛德琳/弗兰克/索恩
   'thunder_charge', 'thunder_single_hit',                                     // 法术：埃利奥特召雷
   'slash_whoosh_hit_fs434873', 'claw_bloody_blade_fs323526', 'swish_3',       // 近战刀砍/爪击、箭矢

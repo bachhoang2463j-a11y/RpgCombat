@@ -1,35 +1,22 @@
 // ==========================================
 // 战棋界面壳（视听切片翻新版）
 // 槽位沿用原 RPG 组织：左侧行动轴 / 右上入口 / 底部我方卡片 / 右下指令面板（原菜单槽）/ 战报条 / 面板 / 底栏旁白。
-// 指令面板改为现代技能栏：当前行动者 + 资源读数 + 技能格（数字键）+ 结束回合（空格）；地面直接点击移动由 main 负责。
+// 左侧行动条与右下技能栏（子菜单/父子技能组卡/物品卡/标签悬浮提示）直接复用原版 index（vendor/rpg-ui 生成文件），
+// 本层只做宿主适配：伪 state、规则判定与瞄准入口转交 main；地面直接点击移动由 main 负责。
 // 本层只做展示与输入转发，不做规则判断（可用/禁用原因由 main 传入）。
 // ==========================================
 
+import { createRpgUi, RPG_UI_RAIL_HTML, RPG_UI_MENU_HTML, RPG_UI_TIP_HTML } from './vendor/rpg-ui/rpg-ui.mjs';
+
 const ESC = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 
-// 技能图标（线稿，currentColor）
-const ICONS = {
-  '枪击': '<path d="M4 15h11l2-3h3v-3H6L4 11z"/><path d="M8 15l-1 4h3l1-4"/><path d="M17 9V7"/>',
-  '霰弹': '<path d="M2 14h12l1-2h7v-2H4L2 12z"/><path d="M6 14l-1 4h3l1-4"/><path d="M15 10V8M18 10V8"/>',
-  '雷': '<path d="M13 2L5 13h6l-2 9 9-12h-6z"/>',
-  '砷弹': '<path d="M5 12h9a4 4 0 010 0l3-2v4l-3-2"/><path d="M3 12h2"/><path d="M19 17c0 1.7-1.3 3-2.5 3S14 18.7 14 17c0-1.5 2.5-4 2.5-4s2.5 2.5 2.5 4z"/>',
-  '刀砍': '<path d="M5 19L18 6l1-3-3 1L3 17z"/><path d="M7 15l2 2M3 21l2-2"/>',
-  '爪击': '<path d="M6 4c1 5 1 9-1 15M11 3c1 6 1 11-1 17M16 4c1 5 1 9-1 15"/>',
-  '箭矢': '<path d="M4 20L20 4M20 4h-6M20 4v6M4 20l3-1M4 20l1-3"/>',
-  'enemy_spell': '<circle cx="12" cy="12" r="5"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>',
-  'fire': '<path d="M12 3c3 4 5 6 5 10a5 5 0 01-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z"/>',
-  end: '<path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9"/>',
-};
-export function skillIcon(subtype) {
-  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[subtype] || ICONS['刀砍']) + '</svg>';
-}
-
 export function buildShell(root) {
+  root.setAttribute('data-rpg-ui-scope', '');
   root.innerHTML = [
     '<div id="battle-scene"><div id="tactics-map-slot"></div></div>',
     '<div id="battle-log-wrap"><div id="battle-log">整装待发...</div></div>',
     '<div id="turn-banner" aria-hidden="true"><div class="tb-inner"><div class="tb-face"></div><div class="tb-text"><b class="tb-name"></b><i class="tb-sub"></i></div></div></div>',
-    '<div id="turn-order-rail"><div class="t-rail-head">行动序</div><div id="turn-order-container"></div></div>',
+    RPG_UI_RAIL_HTML,
     '<div id="tactics-topbar">' +
       '<div id="field-badge" class="t-topbtn" style="display:none">🏟️ <span id="field-badge-name">场地</span></div>' +
       '<button id="btn-worldbook" class="t-topbtn" title="世界书">📚<span class="t-toplabel">世界书</span></button>' +
@@ -41,12 +28,7 @@ export function buildShell(root) {
     '</div>',
     '<div id="tactics-float-ui">' +
       '<div id="heroes-container"></div>' +
-      '<div id="menu-outer"><div id="menu-container">' +
-        '<div id="active-hero-name"></div>' +
-        '<div id="main-menu"></div>' +
-        '<div id="menu-foot"></div>' +
-        '<div id="menu-busy" aria-hidden="true"><span>行动中</span></div>' +
-      '</div></div>' +
+      '<div id="menu-outer" class="relative self-end">' + RPG_UI_MENU_HTML + '</div>' +
     '</div>',
     '<div id="chat-input-area"><div id="chat-input-bar">' +
       '<input type="text" id="chat-text-input" placeholder="说点什么... (Enter发送)" maxlength="200">' +
@@ -60,19 +42,47 @@ export function buildShell(root) {
         '<div id="panel-body"></div>' +
       '</div>' +
     '</div>',
+    RPG_UI_TIP_HTML,
   ].join('');
 
   const $ = (id) => root.querySelector('#' + id);
   const els = {
     mapSlot: $('tactics-map-slot'), battleLog: $('battle-log'), turnOrder: $('turn-order-container'),
-    heroes: $('heroes-container'), menuBox: $('menu-container'), menuMain: $('main-menu'), menuFoot: $('menu-foot'),
+    heroes: $('heroes-container'), menuBox: $('menu-container'), menuMain: $('main-menu'),
     activeHeroName: $('active-hero-name'), chatInput: $('chat-text-input'), banner: $('turn-banner'),
     overlay: $('panel-overlay'), panelBox: $('panel-box'), panelTitle: $('panel-title'), panelBody: $('panel-body'),
+    targetMenu: $('target-menu'), targetHint: $('target-hint'), enemyOverlay: $('enemy-turn-overlay'),
   };
   const state = { units: [], selectedId: null, allySpeak: true, enemySpeak: true, onUnitClick: null, onReset: null, history: [],
-    settings: null, onUiSound: null, busy: false, currentId: null, cmd: null };
+    settings: null, onUiSound: null, busy: false, currentId: null, cmd: null, menuKey: '' };
   const uiSound = (kind) => { if (state.onUiSound) state.onUiSound(kind); };
   const pct = (v, max) => (max ? Math.max(0, Math.min(100, v / max * 100)) : 100).toFixed(1);
+
+  // ---------- 原版界面宿主（伪 state + 规则/瞄准回调转交 main） ----------
+  const rpgState = { actionQueue: [], queueIndex: 0, isGameStarted: true, isAnimating: false, usedExtraTurnSkillsThisRound: new Set() };
+  const cmdHero = () => state.cmd && state.cmd.unit;
+  const callCmd = (k, ...a) => (state.cmd && state.cmd[k] ? state.cmd[k](...a) : undefined);
+  const rpgUi = createRpgUi({
+    state: rpgState,
+    isSkillActionable: (hero, skill) => !!callCmd('canUse', skill),
+    prepareSkillTarget: (idx) => { uiSound('select'); callCmd('onSkill', idx); },
+    skillHasBarrierTag: () => false,
+    hasEnoughBindings: () => true,
+    isSummonBlockedByLimit: () => false,
+    getHeroItemBindings: () => new Map(),
+    itemBindingKnowledge: new Map(),
+    isItemUsable: () => false,
+    prepareItemTarget: () => showLog('物品使用战棋未迁移', 'warn'),
+    prepareGroupedItemSkill: () => showLog('物品使用战棋未迁移', 'warn'),
+    handleBasicAttack: () => { rpgUi.closeBasicMenu(); uiSound('select'); callCmd('onAttack'); },
+    handleBasicDefend: () => {},
+    handleBasicRetreat: () => {},
+    handleEndTurn: () => callCmd('onEnd'),
+    cancelTargeting: () => callCmd('onCancel'),
+    // 原版 getSkillGroupChildren 同口径：按 parentName 从平铺数组现查
+    getSkillGroupChildren: (hero, parent) => (!hero || !Array.isArray(hero.skills) || !parent || !parent.isGroup) ? [] : hero.skills.filter(s => s && s._inGroup && s.parentName === parent.name),
+  });
+  rpgUi.bind(root);
 
   function faceHtml(u, cls) {
     if (u.emoji) return '<span class="' + cls + ' t-face-emoji">' + ESC(u.emoji) + '</span>';
@@ -128,69 +138,96 @@ export function buildShell(root) {
     });
   }
 
-  // ---------- 行动轴 ----------
-  function renderQueue(queue, currentId) {
-    const prev = els.turnOrder.dataset.key || '';
-    const key = queue.map(r => r.unitId).join('|');
-    if (prev === key && els.turnOrder.dataset.cur === currentId) return;
-    els.turnOrder.innerHTML = queue.map((row, i) => {
-      const u = state.units.find(x => x.id === row.unitId);
-      if (!u) return '';
-      return '<div class="t-queue-item ' + (u.side === 'hero' ? 't-q-hero' : 't-q-enemy') + (row.unitId === currentId ? ' t-queue-current' : '') +
-        '" data-unit-id="' + ESC(u.id) + '" title="' + ESC(u.name) + ' · t=' + row.nextActionAt.toFixed(1) + '" style="--i:' + i + '">' +
-        faceHtml(u, 't-q-face') + (row.unitId === currentId ? '' : '<em>' + row.nextActionAt.toFixed(0) + '</em>') + '</div>';
-    }).join('');
-    if (prev && prev !== key) { els.turnOrder.classList.remove('t-queue-shift'); void els.turnOrder.offsetWidth; els.turnOrder.classList.add('t-queue-shift'); }
-    els.turnOrder.dataset.key = key; els.turnOrder.dataset.cur = currentId || '';
-    els.turnOrder.querySelectorAll('.t-queue-item').forEach(q => q.addEventListener('click', () => { uiSound('select'); if (state.onUnitClick) state.onUnitClick(q.dataset.unitId); }));
+  // ---------- 行动条：原版 renderTurnQueue（伪 state.actionQueue；uid = 单位 ID，FLIP/聚焦冲击按单位稳定） ----------
+  // 队列项 ref 按单位持久：原版子菜单（openAttackSkillMenu 等）从 state.actionQueue[queueIndex].ref 取当前角色的技能/资源
+  const refs = new Map();
+  function refOf(u) {
+    let r = refs.get(u.id);
+    if (!r) { r = { id: u.id, isSummon: false }; refs.set(u.id, r); }
+    return Object.assign(r, { name: u.name, img: u.avatarUrl || null, emoji: u.emoji || null, isAlive: true });
   }
+  function renderQueue(queue, currentId) {
+    const key = queue.map(r => r.unitId).join('|');
+    if (els.turnOrder.dataset.key === key && els.turnOrder.dataset.cur === (currentId || '')) return false;
+    const prevKey = els.turnOrder.dataset.key || '';
+    rpgState.actionQueue = queue.map(row => {
+      const u = state.units.find(x => x.id === row.unitId);
+      if (!u) return null;
+      return { uid: u.id, type: u.side === 'hero' ? 'hero' : 'enemy', ref: refOf(u) };
+    }).filter(Boolean);
+    rpgState.queueIndex = 0;
+    rpgState.isGameStarted = !!currentId;
+    rpgUi.renderTurnQueue();
+    els.turnOrder.querySelectorAll('.turn-queue-item').forEach(q => q.setAttribute('data-unit-id', q.getAttribute('data-item-uid')));
+    els.turnOrder.dataset.key = key; els.turnOrder.dataset.cur = currentId || '';
+    return prevKey && prevKey !== key ? { prev: prevKey.split('|'), next: key.split('|') } : false;
+  }
+  els.turnOrder.addEventListener('click', e => {
+    const q = e.target.closest('.turn-queue-item');
+    if (q && state.onUnitClick) { uiSound('select'); state.onUnitClick(q.getAttribute('data-item-uid')); }
+  });
   function renderTurnOrder(units) { renderQueue(units.map(u => ({ unitId: u.id, nextActionAt: 0 })), units[0] && units[0].id); }
 
-  // ---------- 指令面板：资源 + 技能格 + 结束回合 ----------
-  // cmd = { unit, playable, terminal, resources:{moveRemaining,moveMax,main,mp,maxMp}, actions:[{key,label,subtype,sub,cost,hotkey,disabled,reason,active}], endArmed }
+  // ---------- 技能栏：原版菜单（四主项/子菜单/技能卡/父子组卡/物品卡/目标面板/非玩家回合遮罩） ----------
+  // cmd = { unit, playable, terminal, resources, canUse(skill), onSkill(idx), onAttack(), onEnd(), onCancel(), aimHint, endArmed }
   function renderCommand(cmd) {
     state.cmd = cmd;
     const u = cmd && cmd.unit;
-    if (!u) { els.activeHeroName.innerHTML = '<span class="t-cmd-idle">等待指令</span>'; els.menuMain.innerHTML = ''; els.menuFoot.innerHTML = ''; return; }
+    const enemyTurn = !!(u && u.side !== 'hero' && !cmd.terminal);
+    els.enemyOverlay.classList.toggle('opacity-0', !enemyTurn);
+    els.enemyOverlay.classList.toggle('pointer-events-none', !enemyTurn);
+    if (!u) { els.activeHeroName.textContent = '等待指令'; state.menuKey = ''; rpgUi.closeAllSubMenus(); showTarget(null); return; }
     const r = cmd.resources;
-    els.menuBox.classList.toggle('t-menu-enemy', u.side !== 'hero');
-    els.menuBox.classList.toggle('t-menu-terminal', !!cmd.terminal);
-    const moveFrac = r && r.moveMax ? Math.max(0, r.moveRemaining / r.moveMax) : 0;
-    els.activeHeroName.innerHTML = faceHtml(u, 't-cmd-face') +
-      '<span class="t-cmd-id"><b>' + ESC(u.name) + '</b><i>' + (cmd.terminal ? '战斗结束' : u.side === 'hero' ? '我方行动' : '敌方行动') + '</i></span>' +
-      (u.side === 'hero' && r && !cmd.terminal ? '<span class="t-cmd-res">' +
-        '<span class="t-res-move" title="移动额度"><i style="width:' + (moveFrac * 100).toFixed(1) + '%"></i><em>' + r.moveRemaining.toFixed(1) + 'm</em></span>' +
-        '<span class="t-res-pips" title="主行动">' + '<i class="' + (r.main > 0 ? 'on' : '') + '"></i>'.repeat(1) + '</span>' +
-        '<span class="t-res-mp" title="MP">MP <b>' + r.mp + '</b></span>' +
-      '</span>' : '');
-    if (!cmd.playable) {
-      els.menuMain.innerHTML = cmd.terminal ? '' : '<div class="t-cmd-wait">' + (u.side === 'hero' ? '' : '敌方正在行动…') + '</div>';
-      els.menuFoot.innerHTML = '';
-      return;
+    els.activeHeroName.innerHTML = rpgUi.escapeHistoryHtml(u.name) + (cmd.terminal ? ' · 战斗结束' : ' 的回合') +
+      (u.side === 'hero' && r && !cmd.terminal ? ' <span class="text-cyan-300">🦶 ' + r.moveRemaining.toFixed(1) + '米 · ' + (r.main > 0 ? '⚔️ 可行动' : '⚔️ 已行动') + '</span>' : '');
+    const endLabel = root.querySelector('#rpg-ui-end-label');
+    if (endLabel) endLabel.textContent = cmd.endArmed ? '再按一次确认结束' : '结束回合';
+    if (!cmd.playable) { state.menuKey = ''; rpgUi.closeAllSubMenus(); showTarget(null); return; }
+    // 技能卡按资源变化重建（原版 updateSkillMenus：每次渲染折叠变体组）；同一资源态不重建，保留展开与滚动
+    const menuKey = u.id + '|' + u.ref.mp + '|' + (r ? r.main : '') + '|' + (cmd.serial || 0);
+    const hero = Object.assign(refOf(u), { skills: u.skills, items: u.items || [], mp: u.ref.mp, hp: u.ref.hp, tp: 0, burstActivated: false });
+    if (menuKey !== state.menuKey) {
+      if (state.menuKey.split('|')[0] !== u.id) rpgUi.closeAllSubMenus();
+      state.menuKey = menuKey;
+      rpgUi.updateSkillMenus(hero);
+      decorateSkillCards(u);
     }
-    els.menuMain.innerHTML = cmd.actions.map(a =>
-      '<button class="t-skill' + (a.active ? ' t-active' : '') + (a.disabled ? ' t-off' : '') + '" data-skill="' + ESC(a.key) + '" title="' + ESC(a.label + (a.disabled ? ' · ' + a.reason : '')) + '">' +
-        '<span class="t-skill-key">' + a.hotkey + '</span>' +
-        '<span class="t-skill-icon">' + skillIcon(a.subtype) + '</span>' +
-        '<span class="t-skill-name">' + ESC(a.label) + '</span>' +
-        '<span class="t-skill-sub">' + ESC(a.disabled ? a.reason : a.sub) + '</span>' +
-        (a.cost ? '<span class="t-skill-cost">' + a.cost + '</span>' : '') +
-      '</button>').join('');
-    els.menuFoot.innerHTML =
-      '<span class="t-cmd-tip">' + ESC(cmd.tip || '') + '</span>' +
-      '<button class="t-end' + (cmd.endArmed ? ' t-armed' : '') + '" data-skill="end">' + skillIcon('end') + '<b>' + (cmd.endArmed ? '再按确认结束' : '结束回合') + '</b><span class="t-skill-key">Space</span></button>';
+    showTarget(cmd.aimHint || null);
   }
-  els.menuBox.addEventListener('click', e => {
-    const b = e.target.closest('button[data-skill]');
-    if (!b || !state.cmd || !state.cmd.onCommand) return;
-    state.cmd.onCommand(b.dataset.skill, b.classList.contains('t-off'));
-  });
+  // 战棋专有信息：技能卡第二行追加空间范围胶囊（原版卡片模板不变；原版打开子菜单会重建列表，按列表变化补挂）
+  function decorateSkillCards(u) {
+    if (!u) return;
+    root.querySelectorAll('#attack-skill-list [data-skill-idx], #support-skill-list [data-skill-idx]').forEach(btn => {
+      const s = u.skills[Number(btn.dataset.skillIdx)];
+      const row = btn.children[1];
+      if (!s || !s.range || !row || row.querySelector('.t-range-pill')) return;
+      const r = s.range;
+      const label = r.type === '单体' ? '单体 ' + (r.castRange || 0) + 'm' : r.type === '直线' ? '直线 ' + r.length + 'm' : r.type === '扇形' ? '扇形 ' + r.castRange + 'm·' + r.angle + '°' : r.type;
+      row.insertAdjacentHTML('afterbegin', '<span class="t-range-pill text-[8px] px-1 py-0.2 rounded border bg-sky-950/80 text-sky-300 border-sky-700/70 shrink-0 flex items-center leading-none">📐 ' + rpgUi.escapeHistoryHtml(label) + '</span>');
+    });
+  }
+  const listObserver = new MutationObserver(() => { const u = cmdHero(); if (u) decorateSkillCards(u); });
+  ['attack-skill-list', 'support-skill-list'].forEach(id => listObserver.observe($(id), { childList: true }));
+  // 原版目标面板：瞄准中显示提示 + 取消（地图上点选目标）
+  function showTarget(hint) {
+    els.targetMenu.classList.toggle('translate-y-full', !hint);
+    if (hint) els.targetHint.innerHTML = hint;
+  }
   els.menuBox.addEventListener('pointerover', e => {
-    const b = e.target.closest('button[data-skill]');
-    if (b && b !== state.hoverBtn) { state.hoverBtn = b; uiSound('hover'); }
+    const b = e.target.closest('button');
+    if (b && b !== state.hoverBtn && !b.disabled) { state.hoverBtn = b; uiSound('hover'); }
   });
+  els.menuBox.addEventListener('click', e => {
+    const b = e.target.closest('button[data-rpg-ui-act]');
+    if (!b) return;
+    const act = b.getAttribute('data-rpg-ui-act');
+    if (b.disabled) { uiSound('deny'); return; }
+    if (/^open/.test(act)) uiSound(rpgState.isAnimating ? 'deny' : 'select');
+    else if (/^close/.test(act)) uiSound('cancel');
+  }, true);
 
-  function setBusy(on) { state.busy = !!on; els.menuBox.classList.toggle('t-busy', state.busy); }
+  function setBusy(on) { state.busy = !!on; rpgState.isAnimating = state.busy; els.menuBox.classList.toggle('t-busy', state.busy); }
+  function closeMenus() { rpgUi.closeAllSubMenus(); showTarget(null); }
   function setCurrent(id) { state.currentId = id; markCards(); }
 
   // ---------- 轮次横幅 ----------
@@ -207,8 +244,9 @@ export function buildShell(root) {
   }
 
   function clearBattle() {
-    state.history = []; state.currentId = null; state.cmd = null;
+    state.history = []; state.currentId = null; state.cmd = null; state.menuKey = '';
     els.heroes.dataset.key = ''; els.turnOrder.dataset.key = '';
+    refs.clear(); rpgUi.resetQueue(); rpgUi.markRoundStart(); closeMenus();
     closePanel(); setBusy(false);
   }
 
@@ -297,10 +335,11 @@ export function buildShell(root) {
   function setSelected(unitId) { state.selectedId = unitId; markCards(); }
   // 非可玩模式（P02 展示）兼容：静态菜单
   function bindMenus() { renderCommand(null); }
+  function markRoundStart() { rpgUi.markRoundStart(); }
 
   return {
-    destroy: () => { clearTimeout(showLog._t); clearTimeout(showBanner._t); state.onReset = null; state.onUnitClick = null; root.replaceChildren(); },
-    els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setBusy, setCurrent, renderCommand, showBanner, setHistory,
+    destroy: () => { clearTimeout(showLog._t); clearTimeout(showBanner._t); rpgUi.hideTagTip(); state.onReset = null; state.onUnitClick = null; root.replaceChildren(); },
+    els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
     getSafeRect, showLog, openPanel, closePanel, openResult, clearBattle, closeSubmenu: () => {},
     set onUnitClick(fn) { state.onUnitClick = fn; },
     set onReset(fn) { state.onReset = fn; },

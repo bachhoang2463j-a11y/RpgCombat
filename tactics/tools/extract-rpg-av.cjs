@@ -389,4 +389,4 @@ if (require.main === module) {
   }
   console.log(JSON.stringify(Object.assign({ check }, out.report, { patches: out.report.patches.length })));
 }
-module.exports = { build };
+module.exports = { build, splitCss };

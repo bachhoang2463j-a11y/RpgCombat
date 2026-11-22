@@ -25,7 +25,10 @@ async function t0201(deps) {
   // 1. 原槽位结构（槽位 DOM 由 ui-shell.buildShell 生成；真实 DOM 唯一性由浏览器组验证）
   const html = readFileSync(join(ROOT, 'tactics', 'index.html'), 'utf8');
   const css = readFileSync(join(ROOT, 'tactics', 'tactics.css'), 'utf8');
-  const shell = readFileSync(join(ROOT, 'tactics', 'src', 'ui-shell.mjs'), 'utf8');
+  // 行动条/技能栏槽位由原版界面生成文件提供（vendor/rpg-ui，HTML 以 JSON 字符串内嵌）
+  const vendorUi = readFileSync(join(ROOT, 'tactics', 'src', 'vendor', 'rpg-ui', 'rpg-ui.mjs'), 'utf8').replace(/\\"/g, '"');
+  const vendorCss = readFileSync(join(ROOT, 'tactics', 'src', 'vendor', 'rpg-ui', 'rpg-ui.css'), 'utf8');
+  const shell = readFileSync(join(ROOT, 'tactics', 'src', 'ui-shell.mjs'), 'utf8') + '\n' + vendorUi;
   const slots = ['battle-scene', 'tactics-map-slot', 'turn-order-container', 'heroes-container',
     'menu-container', 'chat-input-area', 'chat-input-bar', 'tactics-topbar'];
   for (const id of slots) {
@@ -42,8 +45,8 @@ async function t0201(deps) {
   cases.push(ok('T02-01 无 CDN/字体外链', externalLinks.length === 0 && cdnRefs.length === 0,
     JSON.stringify(externalLinks.concat(cdnRefs).slice(0, 3))));
 
-  // 3. 指令面板（视听切片翻新：原菜单槽改为技能栏，340 宽）与四列我方区
-  cases.push(ok('T02-01 指令面板 340 宽', css.includes('width: 340px'), ''));
+  // 3. 原版技能栏 260×172（Tailwind 任意值类随生成 CSS）与四列我方区
+  cases.push(ok('T02-01 菜单 260×172', vendorUi.includes('w-[260px] h-[172px]') && vendorCss.includes('{width:260px}') && vendorCss.includes('{height:172px}'), ''));
   cases.push(ok('T02-01 我方四列 grid', css.includes('grid-template-columns: repeat(4,'), ''));
   cases.push(ok('T02-01 顶栏入口顺序（世界书/记录/全屏/对话/设置/重置）',
     shell.indexOf('btn-worldbook') < shell.indexOf('btn-history') &&
