@@ -224,7 +224,8 @@ function extractCss(html, jsText) {
 
 function build() {
   PATCH_LOG.length = 0;
-  const html = fs.readFileSync(SRC, 'utf8');
+  // 统一按 LF 解析：core.autocrlf 检出的工作区为 CRLF，仓库对象为 LF；生成物与源指纹不随检出方式变化
+  const html = fs.readFileSync(SRC, 'utf8').replace(/\r\n/g, '\n');
   const L = html.split('\n');
   // 0) 资源基址配置（原样沿用 window.__RPG_ASSET_BASE__ 覆盖方式）
   const originIdx = lineIndex(L, l => l.startsWith('const ASSET_ORIGIN = '), 0, 'ASSET_ORIGIN');

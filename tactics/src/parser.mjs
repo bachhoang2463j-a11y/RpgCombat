@@ -50,6 +50,8 @@ export const SKILL_TYPES = [
 
 const RANGE_TAG_RE = /\[\s*范围\s*[:：]\s*([^\[\]]+)\]/i;
 const ACTION_TAG_RE = /\[\s*行动\s*[:：]\s*(主|辅)\s*\]/i;
+// [位移:侧闪;距离:2] / [位移:后撤;距离:2]：回避反应成功后的真实错位（战棋扩展，不占效果槽）
+const SHIFT_TAG_RE = /\[\s*位移\s*[:：]\s*(侧闪|后撤)\s*(?:[;；]\s*距离\s*[:：]\s*(\d+(?:\.\d+)?)\s*)?\]/;
 
 // [范围:直线;长:10;宽:1] → { type:'直线', length:10, width:1, _explicit:['type','length','width'] }
 function parseRangeTag(body) {
@@ -71,9 +73,9 @@ function parseRangeTag(body) {
 }
 
 function extractExtendedTags(str) {
-  // 返回 { text(摘除后), range, rangeExplicit, actionCost, actionExplicit }
+  // 返回 { text(摘除后), range, rangeExplicit, actionCost, actionExplicit, shift }
   let text = String(str || '');
-  let range = null, rangeExplicit = null, actionCost = null, actionExplicit = null;
+  let range = null, rangeExplicit = null, actionCost = null, actionExplicit = null, shift = null;
   const rangeMatch = text.match(RANGE_TAG_RE);
   if (rangeMatch) {
     const parsed = parseRangeTag(rangeMatch[1]);
@@ -88,7 +90,12 @@ function extractExtendedTags(str) {
     actionExplicit = ['main', 'aux'];
     text = text.replace(actionMatch[0], '');
   }
-  return { text, range, rangeExplicit, actionCost, actionExplicit };
+  const shiftMatch = text.match(SHIFT_TAG_RE);
+  if (shiftMatch) {
+    shift = { mode: shiftMatch[1] === '后撤' ? 'back' : 'side', distance: shiftMatch[2] ? parseFloat(shiftMatch[2]) : 2 };
+    text = text.replace(shiftMatch[0], '');
+  }
+  return { text, range, rangeExplicit, actionCost, actionExplicit, shift };
 }
 
 // ---------- 属性解析（原版 L18609 扩展：规范对象形态 + 新属性标签 + 显式追踪） ----------
@@ -337,12 +344,13 @@ export function parseSkill(skillStr) {
   if (fxTagMatch) _explicit.push('fxTag');
   // 扩展字段显式追踪
   if (ext.range) { _explicit.push('range'); ext.rangeExplicit.forEach(f => _explicit.push('range.' + f)); }
+  if (ext.shift) _explicit.push('evadeShift');
   if (ext.actionExplicit) _explicit.push('actionCost');
 
   // 显式范围缺尺寸按 S14 补齐（补齐值不标记 explicit）；补齐后 range 是唯一空间信息来源
   const range = ext.range ? fillRangeDefaults(ext.range) : null;
 
-  return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, sheshenTarget: sheshenTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, isHighTier: _isHighTier, isLegendary: _isLegendary, summonTarget: summonTarget, summonNoLimit: summonNoLimit, range, actionCost: ext.actionCost || ACTION_COST_DEFAULT, _explicit: _explicit };
+  return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, sheshenTarget: sheshenTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, isHighTier: _isHighTier, isLegendary: _isLegendary, summonTarget: summonTarget, summonNoLimit: summonNoLimit, range, actionCost: ext.actionCost || ACTION_COST_DEFAULT, evadeShift: ext.shift, _explicit: _explicit };
 }
 
 // S14 缺尺寸预设：显式直线缺长/宽 → 10/1；显式爆炸缺射程/半径 → 15/3。仅补缺失键。

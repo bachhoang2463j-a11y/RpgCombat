@@ -234,11 +234,17 @@ export function queryAttack(ctx, casterId, skill, aim) {
     cells = collectArea(ctx, '圆形', blastAim, blastAim, { radius: range.radius }, caster.side, blastAim);
     shape = { type: '爆炸', from: origin, center: blastCenter, radius: range.radius, contact: contact || null };
     collisionPoint = blastCenter;
-    if (contact && contact.type === 'unit') cells = cells.filter(c => cellKey(c.col, c.row) !== cellKey(contact.cell.col, contact.cell.row));
+    // 接触单位（被投射物撞上的那一个）按爆心距离天然计入一次；不再剔除其中心格，也不额外加一次接触命中
     targetIds = cellsToTargets(ctx, cells).filter(t => t.side !== caster.side).map(t => t.unitId);
+    if (contact && contact.type === 'unit' && contact.side !== caster.side && !targetIds.includes(contact.unitId)) targetIds.push(contact.unitId);
   }
 
   const actualTargets = cellsToTargets(ctx, cells).filter(t => t.unitId !== casterId);
+  const blastContact = range.type === '爆炸' && shape && shape.contact && shape.contact.type === 'unit' ? shape.contact : null;
+  if (blastContact && !actualTargets.some(t => t.unitId === blastContact.unitId)) {
+    const cu = unitById(ctx, blastContact.unitId);
+    actualTargets.push({ unitId: cu.id, side: cu.side, cells: occupiedCells(ctx.placementsById[cu.id], footprintOf(ctx, cu)) });
+  }
   const visible = ctx.visibleUnitIds ? new Set(ctx.visibleUnitIds) : null;
   const disclosureTargetIds = actualTargets.filter(t => t.side === caster.side || !visible || visible.has(t.unitId)).map(t => t.unitId);
   const slotTargets = resolveSlotTargets(ctx, casterId, skill, actualTargets.map(t => t.unitId), normAim.targetId);

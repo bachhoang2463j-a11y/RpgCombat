@@ -57,7 +57,7 @@ const GAP_FILL = {
   barrierArmor: 0, charge: 0, delay: 0, haste: 0, maxUses: 0, critRate: 0, cost: 0, hpCost: 0, tpCost: 0, hit: 100,
   isReaction: false, isOthers: false, guaranteedHit: false, switchTarget: false,
   isHighTier: false, isLegendary: false, summonNoLimit: false, ignoreRow: false,
-  range: null, actionCost: null,
+  range: null, actionCost: null, evadeShift: null,
 };
 
 function fieldEmpty(v, empty) {

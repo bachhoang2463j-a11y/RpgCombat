@@ -77,9 +77,11 @@ export const groups = {
     const cases = [];
     const { view } = demoView(m);
     const { resolveAttackIdentity, resolveWindupKind } = m.director;
-    const skillOf = (id) => view.units.find(u => u.id === id).skills[0];
+    // 取该单位首个规则可执行技能（埃利奥特首项迅捷愈合法为未迁移治疗，按真实可用技能核对身份）
+    const skillOf = (id) => { const s = view.units.find(u => u.id === id).skills; return s.find(x => m.battle.skillSupport(x).ok) || s[0]; };
     const ids = {
-      'h:索恩': ['arsenic', '砷弹'], 'h:埃利奥特': ['single', '雷'], 'h:玛德琳': ['single', '枪击'], 'h:弗兰克': ['perTarget', '霰弹'],
+      // 砷弹演出改由 fx-registry 按 [特效:砷弹射击] 分发（TFX-01 断言），身份层只按标签+直线范围得面状枪击
+      'h:索恩': ['aoe', '枪击'], 'h:埃利奥特': ['single', '枪击'], 'h:玛德琳': ['single', '枪击'], 'h:弗兰克': ['perTarget', '霰弹'],
       'e:守卫': ['perTarget', '刀砍'], 'e:弓手': ['single', '箭矢'], 'e:邪术师': ['projectile', 'enemy_spell'], 'e:斥候': ['single', '爪击'],
     };
     for (const [id, [mode, sub]] of Object.entries(ids)) {

@@ -4,20 +4,21 @@
 //   各目标在各自接触拍点展示结果（血条/浮字/受击或闪避/倒地） → 收尾 → 交还控制
 // 规则命令（battle.move/attack）已先一次性结算：本层只把确定结果在对应拍点"揭示"，不重掷骰、不重复扣费。
 // 特效函数不负责扣血；动画时长不推进虚拟时间。scope 失活（重置/换场）时所有等待以 false 结算。
+// 攻击演出统一经 fx-registry 分发（fxTag → 形状/效果槽谓词 → 兜底身份演出），本层不再为任何单个技能写特判。
 // ==========================================
 
 import { playPathMotion, pathSegments, pointAtDistance } from './motion.mjs';
 import { unitCenter } from './geometry.mjs';
+import { createFxRegistry, actionInput, reactionInput } from './fx-registry.mjs';
+import { registerDefaultFx } from './fx-library.mjs';
+import { createVfxHost } from './vfx-host.mjs';
 
 const AOE_SUBTYPES = new Set(['爆炸', '雷', '火焰', '枪击', '毒雾', '冰霜', '风', '光']);
 const SUBTYPE_RE = /[（(](枪击|霰弹|光|雷|爆炸|刀砍|拳击|爪击|撕咬|毒液|箭矢|冰霜|火焰|毒雾|风)[）)]/;
 export const WINDUP_BEAT_MS = 330;   // 回合制敌方前摇拍点（OMEN_BEAT）：起手后此刻出手
-// 与回合制 playSingleAttackFx 同口径：枪械身份在出手前先备好采样（演出以实际起音为拍点）
-const PREPARE_KEYS = { '枪击': ['gunshot1', 'gunshot2', 'gunshot3'], '霰弹': ['xiandan'], '砷弹': ['gunshot_pierce'] };
 
 // 攻击身份：显式括号子类优先 → 特效标签 → 伤害类型默认；空间范围决定单体/群体演出
 export function resolveAttackIdentity(skill, casterSide) {
-  if (skill && skill.fxTag === '砷弹射击') return { mode: 'arsenic', subtype: '砷弹' };
   const tags = [skill && skill.type, skill && skill.type2, skill && skill.type3].filter(t => t && t !== '[无]').join(' ');
   const m = tags.match(SUBTYPE_RE);
   let subtype = m ? m[1] : null;
@@ -44,6 +45,7 @@ export function resolveWindupKind(skill) {
 export function createActionDirector(deps) {
   const { sandbox, avHost, getViewData, onReveal, onMoveFeedback, getUnitStyle } = deps;
   const av = avHost.av;
+  const registry = deps.registry || registerDefaultFx(createFxRegistry());
 
   function scope() { return sandbox.getScope(); }
   function wait(ms) {
@@ -213,7 +215,63 @@ export function createActionDirector(deps) {
     return { kind, ok, handle };
   }
 
-  // ---------- 攻击：身份演出 + 接触拍点逐目标揭示 ----------
+  // ---------- 演出世界层（每个 scope 一组：地面层在单位层之下、顶层在最上；均挂世界根，随相机变换） ----------
+  let layersFor = null, fxUid = 0;
+  function fxLayers() {
+    const s = scope(), dom = sandbox.getDom();
+    if (layersFor && layersFor.scope === s) return layersFor;
+    const mk = name => {
+      const d = document.createElement('div');
+      d.setAttribute('data-tactics-fx', 'world-' + name);
+      d.style.cssText = 'position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; overflow:visible;';
+      s.addNode(d);
+      return d;
+    };
+    const ground = mk('ground'), top = mk('top');
+    dom.world.insertBefore(ground, dom.unitLayer);
+    dom.world.appendChild(top);
+    const vd = () => getViewData();
+    const hostDeps = { getPlacement: id => vd().placementsById[id], getFootprint: id => vd().footprintsById[id], getFacing: id => vd().placementsById[id].facing, scope: s, metersPerArtPx: 1 / 50 };
+    layersFor = { scope: s, dom, top: createVfxHost({ anchorLayer: top, domLayer: top, canvasHolder: null }, hostDeps), ground: createVfxHost({ anchorLayer: ground, domLayer: ground, canvasHolder: null }, hostDeps) };
+    return layersFor;
+  }
+  const SHAKE = { light: [180, 3], heavy: [320, 7], quake: [500, 10] };
+  function makeFx(category) {
+    const L = fxLayers();
+    return {
+      uid: () => ++fxUid,
+      top: (html, ms) => L.top.layer(html, ms),
+      ground: (html, ms) => L.ground.layer(html, ms),
+      // 视口层：只放与位置无关的闪屏（屏幕坐标只在这一层）
+      screen: (html, ms) => {
+        const d = document.createElement('div');
+        d.style.cssText = 'position:absolute; inset:0; pointer-events:none;';
+        d.innerHTML = html;
+        L.dom.viewport.appendChild(d);
+        L.scope.addNode(d);
+        L.scope.after(ms, () => L.scope.removeNode(d));
+        return d;
+      },
+      shake: level => {
+        const [ms, amp] = SHAKE[level];
+        const frames = [];
+        for (let i = 0; i <= 8; i++) { const k = amp * (1 - i / 8); frames.push({ transform: i === 8 ? 'translate3d(0,0,0)' : 'translate3d(' + ((i % 2 ? -1 : 1) * k).toFixed(1) + 'px,' + ((i % 3 - 1) * k * 0.6).toFixed(1) + 'px,0)' }); }
+        L.dom.shake.animate(frames, { duration: ms });
+      },
+      sfx: (key, vol) => av.playSound(key, vol, 1, { track: 'skill', category }),
+    };
+  }
+  function prepareAudio(keys) {
+    const urls = keys.map(k => av.audioUrls[k]).filter(Boolean);
+    if (!urls.length) return Promise.resolve(true);
+    // 采样通常已在预载中：即时完成；资源服务未响应时最多等一拍，之后照常演出
+    return Promise.race([Promise.all(urls.map(u => av.CombatAudioMixer.prepare(u))), wait(600)]).then(async () => {
+      const ctx = av.CombatAudioMixer.context(); if (ctx && ctx.state === 'suspended') await ctx.resume();
+      return !!(scope() && scope().isLive);
+    });
+  }
+
+  // ---------- 攻击：注册表分发演出 + 接触拍点逐段揭示 ----------
   async function playAttack(result) {
     if (!result || !result.ok) return false;
     avHost.syncRoster();
@@ -224,100 +282,83 @@ export function createActionDirector(deps) {
     const casterEnt = avHost.entity(result.casterId);
     const hits = result.hits || [];
     const byId = new Map(hits.map(h => [h.targetId, h]));
-    const revealed = new Set();
     const audioContext = { category: av.CombatAudioMixer.classify(skill) };
     const actionId = av.CombatAudioDirector.beginAction();
     const wave = hits.length > 1 ? av.CombatAudioDirector.beginWave(hits.map(h => h.targetId), actionId) : null;
-    const hitWave = { shook: false, hitStopped: false, classified: [] };
+    const hitWaves = [];
     const incoming = (skill.power || 0) > 0 ? skill.power : (casterUnit.ref.atk || 0);
+    const input = actionInput(result);
+    const entry = registry.resolve(input);
 
     sandbox.getUnitView().setDisplayFacing(result.casterId, null);
     sandbox.getUnitView().updateUnit(result.casterId, { placement: vd.placementsById[result.casterId] });
     const pts = [centerOf(result.casterId), ...hits.map(h => centerOf(h.targetId))].filter(Boolean);
+    if (result.query && result.query.blastCenter) pts.push(result.query.blastCenter);
     if (!hits.length && result.aim) pts.push({ x: result.aim.x, y: result.aim.y });
     await sandbox.guideTo(pts);
-    const prep = PREPARE_KEYS[identity.subtype];
-    if (prep) {
-      // 采样已在预载中：通常即时完成；资源服务未响应时不让演出卡死（最多等一拍，之后照常演出）
-      await Promise.race([Promise.all(prep.map(k => av.CombatAudioMixer.prepare(av.audioUrls[k]))), wait(600)]);
-      const ctx = av.CombatAudioMixer.context(); if (ctx && ctx.state === 'suspended') await ctx.resume();
-      if (!scope() || !scope().isLive) return false;
-    }
+    if (!(await prepareAudio(entry.prepareKeys ? entry.prepareKeys({ identity }) : []))) return false;
 
-    function reveal(targetId, meta = {}) {
+    const revealed = new Map();      // targetId → 已揭示段序号集合
+    const reactionRuns = [];
+    function revealSegment(targetId, i, meta = {}) {
       const h = byId.get(targetId);
-      if (!h || revealed.has(targetId)) return;
-      revealed.add(targetId);
+      if (!h) return;
+      const segs = h.segments || [h];
+      const seg = segs[i];
+      if (!seg) return;
+      const done = revealed.get(targetId) || new Set();
+      if (done.has(i)) return;
+      done.add(i); revealed.set(targetId, done);
+      if (done.size === 1 && h.reaction) reactionRuns.push(playReaction(h));
       const r = {
-        targetId, sourceId: result.casterId, outcome: h.hit ? 'hit' : 'dodge',
-        maxHp: h.maxHp, hpBefore: h.hpBefore, hpAfter: h.hpAfter, hpDmg: h.hpDmg,
+        targetId, sourceId: result.casterId, outcome: seg.hit ? 'hit' : 'dodge',
+        maxHp: h.maxHp, hpBefore: seg.hpBefore, hpAfter: seg.hpAfter, hpDmg: seg.hpDmg,
         shieldBefore: 0, shieldAfter: 0, shieldDmg: 0, incomingDmg: incoming,
         isHero: h.side === 'hero', damageType: skill.damageType || '近战',
         actionId, waveId: wave ? wave.id : null,
       };
-      av.playHitFeedback(r, { wave: hitWave });
+      av.playHitFeedback(r, { wave: hitWaves[i] || (hitWaves[i] = { shook: false, hitStopped: false, classified: [] }) });
       av.CombatAudioDirector.publish(r);
-      if (wave) av.CombatAudioDirector.completeTarget(wave, targetId);
-      if (onReveal) onReveal(h, Object.assign({ result, identity }, meta));
+      if (wave && done.size === segs.length) av.CombatAudioDirector.completeTarget(wave, targetId);
+      if (onReveal) onReveal({ ...h, hit: seg.hit, hpBefore: seg.hpBefore, hpAfter: seg.hpAfter, hpDmg: seg.hpDmg, down: seg.down,
+        logIndex: seg.logIndex, logEnd: seg.logEnd, segmentIndex: i, segmentCount: segs.length }, Object.assign({ result, identity, entryId: entry.id }, meta));
     }
-    const revealAll = () => hits.forEach(h => reveal(h.targetId, { late: true }));
-
-    let handle = null, ok = true;
-    const outcomeMap = new Map(hits.map(h => [h.targetId, h.hit ? 'hit' : 'dodge']));
-    const ent = id => avHost.entity(id);
-    const anchorFor = () => aimAnchor(result.aim);
-
-    if (identity.mode === 'single') {
-      const h = hits[0];
-      const target = h ? ent(h.targetId) : anchorFor();
-      handle = av.playAttackIdentityFx({ scope: 'single', subtype: identity.subtype, caster: casterEnt, targets: [target],
-        outcomes: h ? outcomeMap : (() => 'dodge'), audioContext, onImpact: (visual) => reveal(visual && (visual.id || visual.dataset && visual.dataset.arcaneTargetId)) });
-      ok = await awaitHandle(handle, 900);
-    } else if (identity.mode === 'perTarget') {
-      const list = hits.length ? hits.map(h => ent(h.targetId)) : [anchorFor()];
-      const handles = [];
-      for (let i = 0; i < list.length; i++) {
-        if (i) { const alive = await wait(70); if (!alive) return false; }
-        const t = list[i];
-        handles.push(av.playAttackIdentityFx({ scope: 'single', subtype: identity.subtype, caster: casterEnt, targets: [t],
-          outcomes: hits.length ? outcomeMap : (() => 'dodge'), audioContext, onImpact: (visual) => reveal(visual && visual.id) }));
-      }
-      const results = await Promise.all(handles.map(hd => awaitHandle(hd, 900)));
-      ok = results.every(Boolean);
-    } else if (identity.mode === 'aoe') {
-      const list = hits.length ? hits.map(h => ent(h.targetId)) : [anchorFor()];
-      handle = av.playAttackIdentityFx({ scope: 'aoe', subtype: identity.subtype, caster: casterEnt, targets: list,
-        outcomes: hits.length ? outcomeMap : (() => 'dodge'), audioContext, onImpact: (visual) => reveal(visual && visual.id) });
-      ok = await awaitHandle(handle, 1400);
-    } else if (identity.mode === 'projectile') {
-      const h = hits[0];
-      const fromDom = avHost.host.spriteOf(result.casterId);
-      const toDom = h ? avHost.host.spriteOf(h.targetId) : avHost.host.spriteOf(anchorFor());
-      ok = await av.CombatAudioMixer.withContext(audioContext, () => av.playArcaneProjectile(identity.subtype, fromDom, toDom, h ? !h.hit : true));
-      if (h) reveal(h.targetId);
-      await wait(260);
-    } else if (identity.mode === 'arsenic') {
-      // 定稿砷弹：黑弹飞向最远的命中目标（全闪避则飞向射界末端）；途经目标在弹头经过时揭示，闪避者不播命中爆点
-      const origin = centerOf(result.casterId);
-      const dist = h => { const c = centerOf(h.targetId); return Math.hypot(c.x - origin.x, c.y - origin.y); };
-      const landed = hits.filter(h => h.hit).sort((a, b) => dist(b) - dist(a));
-      const endTarget = landed.length ? ent(landed[0].targetId) : lineEndAnchor(result);
-      const endDist = landed.length ? dist(landed[0]) : (result.skill.range.length || 10);
-      handle = av.CombatAudioMixer.withContext(audioContext, () => av.playArsenicShot(casterEnt, [endTarget]));
-      const CHARGE = 340, FLIGHT = 160;
-      for (const h of hits) {
-        const k = Math.min(1, dist(h) / Math.max(0.5, endDist));
-        const at = CHARGE + FLIGHT * Math.pow(k, 1 / 0.88);
-        scope().after(at, () => reveal(h.targetId));
-      }
-      ok = await awaitHandle(handle, 1300);
+    function reveal(targetId, meta) {
+      const h = byId.get(targetId);
+      if (h) (h.segments || [h]).forEach((_, i) => revealSegment(targetId, i, meta));
     }
-    revealAll();
+
+    const ctx = {
+      result, skill, hits, identity, input, casterId: result.casterId, casterEnt, av, avHost, sandbox,
+      audioContext, outcomeMap: new Map(hits.map(h => [h.targetId, h.hit ? 'hit' : 'dodge'])),
+      fx: makeFx(audioContext.category),
+      wait, tween, awaitHandle, after: (ms, fn) => scope().after(ms, fn),
+      reveal, revealSegment, ent: id => avHost.entity(id), centerOf,
+      anchorAt: (x, y) => makeAnchor(x, y), aimAnchor: () => aimAnchor(result.aim), lineEndAnchor: () => lineEndAnchor(result),
+    };
+    const ok = await entry.play(ctx);
+    hits.forEach(h => reveal(h.targetId, { late: true }));
+    await Promise.all(reactionRuns);
     if (wave) av.CombatAudioDirector.closeWave(wave);
     dropAnchors();
     return ok;
   }
 
+  // ---------- 反应演出（回避错位等）：在被攻击者的首个接触拍点启动，与攻击演出并行 ----------
+  async function playReaction(h) {
+    const reaction = h.reaction;
+    const entry = registry.resolve(reactionInput(reaction));
+    if (!entry) return true;
+    const view = sandbox.getUnitView();
+    const fp = getViewData().footprintsById[h.targetId];
+    if (!(await prepareAudio(entry.prepareKeys ? entry.prepareKeys({}) : []))) return false;
+    return entry.play({
+      hitTargetId: h.targetId, reaction, shift: reaction.shift, footprint: fp, view, sandbox, av,
+      fx: makeFx('B'), wait, tween,
+      cameraScale: () => sandbox.getPose().scale,
+      placement: () => getViewData().placementsById[h.targetId],
+    });
+  }
   // ---------- 空目标演出锚点（瞄准点/射界末端；只是视觉落点，不是规则目标） ----------
   const anchors = new Set();
   function makeAnchor(x, y) {

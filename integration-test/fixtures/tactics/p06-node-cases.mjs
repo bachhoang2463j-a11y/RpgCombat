@@ -77,13 +77,18 @@ async function p06(m) {
     h: { col: 1, row: 4 }, blastFriend: { col: 4, row: 4 }, blastEnemy: { col: 5, row: 4 },
   });
   const blastQuery = range.queryAttack(blastMap, 'h', blast, aim(10, 4));
-  const expectedBlastTargets = blastQuery.actualTargetIds.slice();
+  // 敌方直接被撞：接触单位计入伤害名单恰好一次（旧实现剔除其中心格，1×1 被撞者反而不受伤）
+  const hitMap = ctx(m, open, [caster, blastEnemy], { h: { col: 1, row: 4 }, blastEnemy: { col: 5, row: 4 } });
+  const hitQuery = range.queryAttack(hitMap, 'h', blast, aim(10, 4));
+  const hitCount = hitQuery.damageTargetIds.filter(id => id === 'blastEnemy').length;
   const wallBlast = range.queryAttack(ctx(m, wall, [caster, blastEnemy], { h: { col: 1, row: 4 }, blastEnemy: { col: 9, row: 4 } }), 'h', blast, aim(10, 4));
   const freeBlast = range.queryAttack(ctx(m, open, [caster, blastEnemy], { h: { col: 1, row: 4 }, blastEnemy: { col: 9, row: 8 } }), 'h', blast, aim(10, 4));
-  cases.push(ok('T06-04 爆炸按首次接触或瞄准点起爆，接触单位只列为一个目标',
-    blastQuery.contact?.type === 'unit' && j(blastQuery.actualTargetIds) === j(expectedBlastTargets) && !has(blastQuery.damageTargetIds, 'h') &&
+  cases.push(ok('T06-04 爆炸按首次接触或瞄准点起爆，被撞敌人计入伤害恰好一次，被撞友方只起爆不受伤',
+    hitQuery.contact?.type === 'unit' && hitQuery.contact.unitId === 'blastEnemy' && hitCount === 1 &&
+    blastQuery.contact?.type === 'unit' && blastQuery.contact.unitId === 'blastFriend' &&
+    !has(blastQuery.damageTargetIds, 'blastFriend') && has(blastQuery.damageTargetIds, 'blastEnemy') && !has(blastQuery.damageTargetIds, 'h') &&
     wallBlast.contact?.type === 'wall' && freeBlast.contact === null && freeBlast.shape.center.x === 10.5,
-    j({ unit: { contact: blastQuery.contact, targets: blastQuery.actualTargetIds }, wall: wallBlast.contact, free: freeBlast.shape.center })));
+    j({ enemyHit: { contact: hitQuery.contact, damage: hitQuery.damageTargetIds }, friend: { contact: blastQuery.contact, damage: blastQuery.damageTargetIds }, wall: wallBlast.contact, free: freeBlast.shape.center })));
 
   const giant = unit('giant', 'enemy', { footprint: { width: 2, height: 2 } });
   const byCenter = skill(m, '【中心爆】[群攻;power:5][范围:圆形;半径:0.8;射程:12]');

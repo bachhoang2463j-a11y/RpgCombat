@@ -411,11 +411,12 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     }
     return query;
   }
-  function canUseReaction(responder, skill, sourceId) {
+  // incomingType：来袭技能的伤害类型（近战/远程/法术）；反应类型按来袭技能匹配，不按来源单位
+  function canUseReaction(responder, skill, sourceId, incomingType = null) {
     const source = byId.get(sourceId);
     if (skill && (skill.kanpoTarget || skill.sheshenTarget || [skill.type, skill.type2, skill.type3].some(tag => tag && !/^\[(?:无|回避|单避|群避|反击)\]$/.test(tag)))) return { ok: false, reason: '反应效果尚未迁移' };
     if (!responder || !source || !skill.isReaction || responder.ref.hp <= 0 || source.ref.hp <= 0) return { ok: false, reason: '反应技能不可用' };
-    if (skill.reactionTarget && skill.reactionTarget !== 'all' && skill.reactionTarget !== source.ref.damageType) return { ok: false, reason: '反应类型不匹配' };
+    if (skill.reactionTarget && skill.reactionTarget !== 'all' && skill.reactionTarget !== (incomingType || source.ref.damageType)) return { ok: false, reason: '反应类型不匹配' };
     const key = skillKey(skill);
     if (usesLeft(responder.id, skill) <= 0 || skillCooldown(state, responder.id, key) > state.combatState.clock.now + 1e-9) return { ok: false, reason: '反应限次或冷却未就绪' };
     if (responder.ref.mp < (skill.cost || 0) || responder.ref.hp <= (skill.hpCost || 0) || (responder.ref.tp || 0) < (skill.tpCost || 0)) return { ok: false, reason: '反应资源不足' };
@@ -427,8 +428,27 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const check = queryAttack(ctx, responder.id, skill, { ...unitCenter(placementsById[target.id], target.footprint), targetId: target.id });
     return check.ok ? { ok: true, query: check, responder, source } : { ok: false, reason: check.reason, query: check };
   }
-  function applyReaction(responder, skill, sourceId) {
-    const check = canUseReaction(responder, skill, sourceId);
+  // 回避成功后的真实错位：侧闪沿攻击线垂直方向（先左后右，八方向量化），后撤沿来源→自身方向；
+  // 复用推动同一位移追踪（墙/单位阻挡即停），不消耗移动额度，不触发新的反应链。
+  function evadeShift(responder, source, shift) {
+    const fp = responder.footprint || { width: 1, height: 1 };
+    const a = unitCenter(placementsById[source.id], source.footprint), b = unitCenter(placementsById[responder.id], fp);
+    const base = Math.atan2(b.y - a.y, b.x - a.x);
+    const angles = shift.mode === 'back' ? [base] : [base - Math.PI / 2, base + Math.PI / 2];
+    const from = { col: placementsById[responder.id].col, row: placementsById[responder.id].row };
+    for (const ang of angles) {
+      const q = Math.round(ang / (Math.PI / 4)) * (Math.PI / 4);
+      const dir = { x: Math.round(Math.cos(q)), y: Math.round(Math.sin(q)) };
+      const traced = traceDisplacement(ctx, responder.id, dir, shift.distance);
+      if (traced.distance <= 1e-9) continue;
+      const last = traced.path[traced.path.length - 1];
+      placementsById[responder.id].col = last.col; placementsById[responder.id].row = last.row;
+      return { from, to: { col: last.col, row: last.row }, path: traced.path, distance: traced.distance };
+    }
+    return null;
+  }
+  function applyReaction(responder, skill, sourceId, incomingType = null) {
+    const check = canUseReaction(responder, skill, sourceId, incomingType);
     if (!check.ok) return { ok: false, reason: check.reason };
     const source = check.source, key = skillKey(skill);
     responder.ref.mp -= skill.cost || 0; responder.ref.hp -= skill.hpCost || 0; responder.ref.tp = (responder.ref.tp || 0) - (skill.tpCost || 0);
@@ -441,7 +461,11 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const evade = [skill.type, skill.type2, skill.type3].some(tag => /避|看破/.test(tag || ''));
     if (evade) {
       const result = resolveHit(source.ref, responder.ref, { hit: 100 }, random);
-      if (result.hit) { addLog(responder.name + ' 反应闪避 ' + source.name + ' 的攻击'); return { ok: true, canceled: true, result }; }
+      if (result.hit) {
+        const shift = skill.evadeShift ? evadeShift(responder, source, skill.evadeShift) : null;
+        addLog(responder.name + ' 反应闪避 ' + source.name + ' 的攻击' + (shift ? ' · ' + skill.name + ' 错位 ' + shift.distance.toFixed(1) + 'm' : ''));
+        return { ok: true, canceled: true, result, shift };
+      }
     }
     const counter = [skill.type, skill.type2, skill.type3].some(tag => /反击/.test(tag || ''));
     if (counter) {
@@ -526,33 +550,44 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const resolvedHits = new Map();
     const sourceKey = u.id + ':' + key;
     const slotHitById = new Map();
+    let segNo = 0;
     for (const slot of slots) {
       const kind = skillTagKind(slot.tag);
+      if (kind === 'attack') segNo++;
       for (const id of slot.targetIds || []) {
         const target = byId.get(id);
         if (!target || target.ref.hp <= 0) continue;
-        if (kind === 'attack' && !resolvedHits.has(id)) {
-          let canceled = false;
-          const reactions = target.skills.filter(s => s.isReaction && (!s.reactionTarget || s.reactionTarget === 'all' || s.reactionTarget === skill.damageType));
-          for (const reaction of reactions) {
-            const rr = applyReaction(target, reaction, u.id);
-            if (rr.canceled) { canceled = true; break; }
+        if (kind === 'attack') {
+          // 多段攻击槽逐段独立命闪与扣血（各段威力取本槽 power）；同一目标的反应只在首段前执行一次，回避成功则整次攻击落空
+          const prev = resolvedHits.get(id);
+          if (prev && prev.reaction) continue;
+          if (!prev) {
+            const reactLog = log.length;
+            const reactions = target.skills.filter(s => s.isReaction && (!s.reactionTarget || s.reactionTarget === 'all' || s.reactionTarget === skill.damageType));
+            let reaction = null;
+            for (const rs of reactions) {
+              const rr = applyReaction(target, rs, u.id, skill.damageType);
+              if (rr.canceled) { reaction = { responderId: id, skillName: rs.name, fxTag: rs.fxTag || null, canceled: true, shift: rr.shift || null }; break; }
+            }
+            if (reaction) {
+              const seg = { index: slot.index, hit: false, hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, logIndex: reactLog, logEnd: log.length };
+              resolvedHits.set(id, { targetId: id, hit: false, hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, maxHp: target.ref.maxHp, down: false, side: target.side, logIndex: reactLog, logEnd: log.length, segments: [seg], reaction });
+              continue;
+            }
           }
-          if (!canceled && target.ref.hp > 0) {
-            const before = target.ref.hp;
-            const result = applyAttackDamage(u.ref, target.ref, skill, random);
-            const logIndex = log.length;
-            addLog(u.name + ' · ' + skill.name + ' → ' + target.name + (result.hit ? ' -' + result.hpDmg + ' HP' : ' 闪避'));
-            const down = target.ref.hp <= 0;
-            if (down) { dispatchBattleClock({ type: 'exitUnit', unitId: id, cause: 'down' }); addLog(target.name + (target.side === 'hero' ? ' 倒地' : ' 死亡')); }
-            resolvedHits.set(id, { targetId: id, ...result, hpBefore: before, hpAfter: target.ref.hp, maxHp: target.ref.maxHp, down, side: target.side, logIndex, logEnd: log.length });
-            slotHitById.set(id, !!result.hit);
-          } else {
-            resolvedHits.set(id, { targetId: id, hit: false, hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, maxHp: target.ref.maxHp, down: target.ref.hp <= 0, side: target.side, logIndex: log.length, logEnd: log.length });
-          }
+          const slotSkill = slot.index === 0 ? skill : { ...skill, power: skill['power' + (slot.index + 1)] || 0 };
+          const before = target.ref.hp;
+          const result = applyAttackDamage(u.ref, target.ref, slotSkill, random);
+          const logIndex = log.length;
+          addLog(u.name + ' · ' + skill.name + (damageSlots.length > 1 ? ' 第' + segNo + '段' : '') + ' → ' + target.name + (result.hit ? ' -' + result.hpDmg + ' HP' : ' 闪避'));
+          const down = target.ref.hp <= 0;
+          if (down) { dispatchBattleClock({ type: 'exitUnit', unitId: id, cause: 'down' }); addLog(target.name + (target.side === 'hero' ? ' 倒地' : ' 死亡')); }
+          const seg = { index: slot.index, ...result, hpBefore: before, hpAfter: target.ref.hp, down, logIndex, logEnd: log.length };
+          if (!prev) resolvedHits.set(id, { targetId: id, ...result, hpBefore: before, hpAfter: target.ref.hp, maxHp: target.ref.maxHp, down, side: target.side, logIndex, logEnd: log.length, segments: [seg] });
+          else Object.assign(prev, { hit: prev.hit || result.hit, hpDmg: prev.hpDmg + result.hpDmg, hpAfter: target.ref.hp, down, logEnd: log.length, segments: [...prev.segments, seg] });
+          slotHitById.set(id, slotHitById.get(id) === true || !!result.hit);
           continue;
         }
-        if (kind === 'attack') continue;
         const beneficial = kind === 'main-point' || kind === 'spd' || kind === 'def-up' || kind === 'evasion';
         if (slotHitById.get(id) !== true && !(beneficial && !damageSlots.length)) continue;
         if (kind === 'none') continue;

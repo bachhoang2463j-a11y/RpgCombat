@@ -26,6 +26,8 @@ const P04_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p0
 const P05_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p05-node-cases.mjs');
 const P06_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p06-node-cases.mjs');
 const P07_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p07-node-cases.mjs');
+// FX01 角色技能移植（埃利奥特首位）：演出注册表 + 规则接线
+const FX01_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'fx01-node-cases.mjs');
 
 // 阶段注册表：只登记真实存在的用例文件；--all 只聚合这里的条目，不虚构未来阶段。
 const STAGES = {
@@ -130,6 +132,15 @@ const STAGES = {
     ],
     modules: ['battle', 'clock', 'scheduler', 'lifecycle', 'range', 'scene', 'geometry', 'movement', 'damage', 'ai', 'parser'],
   },
+  fx01: {
+    file: FX01_CASES,
+    groups: ['TFX-01', 'TFX-02'],
+    requiredExports: [
+      ['fxRegistry', 'createFxRegistry'], ['fxRegistry', 'actionInput'], ['fxRegistry', 'reactionInput'], ['fxRegistry', 'checkBudget'],
+      ['fxLibrary', 'registerDefaultFx'], ['battle', 'createBattle'], ['battle', 'skillSupport'], ['parser', 'parseYamlText'], ['parser', 'parseSkill'],
+    ],
+    modules: ['parser', 'battle', 'fixture', 'fxRegistry', 'fxLibrary'],
+  },
 };
 
 function fail(msg) {
@@ -180,6 +191,8 @@ const MODULE_FILES = {
   battle: 'battle.mjs',
   fixture: 'demo-fixture.mjs',
   director: 'action-director.mjs',
+  fxRegistry: 'fx-registry.mjs',
+  fxLibrary: 'fx-library.mjs',
   motion: 'motion.mjs',
   avHost: 'av-host.mjs',
   vendor: 'vendor/rpg-av/rpg-av.mjs',

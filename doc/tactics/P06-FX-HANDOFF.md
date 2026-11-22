@@ -38,7 +38,7 @@
 
 ## 前端待办
 
-- 建立通用 `fxTag` 分发注册，删除砷弹单技能标签特判；演出身份输入必须同时包含空间形状与效果槽标签。
+- ~~建立通用 `fxTag` 分发注册，删除砷弹单技能标签特判~~：FX01 已完成（`fx-registry.mjs`/`fx-library.mjs`，见 [FX01-ELLIOTT.md](FX01-ELLIOTT.md)）。
 - 统一全部 SVG/CSS/Canvas/WebAudio 技能效果挂载到战棋世界坐标宿主；屏幕坐标只在最后一层换算。
 - 复用 `playAttackIdentityFx`、`playArcaneProjectile`、`CombatAudioMixer`、`playHitFeedback` 和 `createActionDirector` 的逐目标揭示/波次音效；避免重复实现既有枪械、斩击、爪击、箭矢、法术弹道、砷弹资产。
 - 旧版缺口需盘点后分批适配：连续扫射/重击、WebM、蓄力雷电、召唤/治疗/增益/反应特效；这些是 P07+ 任务，不得因 P06 query 返回槽候选而声称可播放。

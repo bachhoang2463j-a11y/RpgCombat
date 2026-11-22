@@ -1,4 +1,4 @@
-/* 由 extract-rpg-av.cjs 自动生成，请勿手改。源 sha256=6a7b72f3c58ec1eab918839113b30a7ff4dff2569b31684d89126556e8c72e53 */
+/* 由 extract-rpg-av.cjs 自动生成，请勿手改。源 sha256=5c1ab2a1a243bb7d7e79b4aca76026ad1058af2a74bf9dfbf8763ae8b13554e7 */
 [data-rpg-av-scope] .breathe { animation: breathe 4s ease-in-out infinite alternate; filter: drop-shadow(0 10px 20px rgba(255,255,255,0.15)); }
 [data-rpg-av-scope] .arcane-fs-layer { position:absolute; inset: 0; pointer-events: none; z-index: 52; overflow: hidden; }
 [data-rpg-av-scope] .arcane-fs-anchor { position: absolute; transform: translate(-50%, -50%); }

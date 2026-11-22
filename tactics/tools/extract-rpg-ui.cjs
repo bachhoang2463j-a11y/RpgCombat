@@ -141,7 +141,8 @@ function extractCss(html, used) {
 
 function build() {
   PATCH_LOG.length = 0;
-  const html = fs.readFileSync(SRC, 'utf8');
+  // 统一按 LF 解析（同 extract-rpg-av：工作区 CRLF 检出不影响生成物与指纹）
+  const html = fs.readFileSync(SRC, 'utf8').replace(/\r\n/g, '\n');
   const L = html.split('\n');
   const [a, b] = scriptRange(L);
   const decl = declIndex(L, a, b);

@@ -21,11 +21,13 @@ const REQUIRED_INPUTS = [
   'src/av-host.mjs', 'src/action-director.mjs', 'src/motion.mjs', 'src/range-overlay.mjs',
   'src/vendor/rpg-av/rpg-av.mjs', 'src/chapel-scene.mjs', 'src/chapel-art.mjs', 'src/ui-sfx.mjs',
   'src/vendor/rpg-ui/rpg-ui.mjs', 'src/unit-style.mjs', 'src/editor-panel.mjs',
+  'src/fx-registry.mjs', 'src/fx-library.mjs', 'src/vfx-host.mjs',
 ];
 // 复用模块关键函数必须进入产物（防止 tree-shaking 或误删导致"复用"名不副实）
 const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFeedback', 'classifyHit', 'playArsenicShot', 'CombatAudioMixer', 'HERO_VOICE_LINES', 'playSingleGunshot', 'playSingleShotgun', 'playSingleThunder', 'playSingleSlash', 'playSingleClaw', 'playSingleArrow', 'enemySpellProjectile',
   'renderTurnQueue', 'updateSkillMenus', 'createSkillCard', 'createSkillGroupCard', 'createItemCard', 'showTagTipFor',
-  'buildSkillFormFieldsHtml', 'openSkillTypeCombo', 'createEditorPanel', 'playJump', 'playShove', 'playTransfer', 'drawJump'];
+  'buildSkillFormFieldsHtml', 'openSkillTypeCombo', 'createEditorPanel', 'playJump', 'playShove', 'playTransfer', 'drawJump',
+  'createFxRegistry', 'registerDefaultFx', 'actionInput', 'reactionInput', 'createVfxHost', 'playReaction', 'revealSegment', 'evadeShift'];
 
 const entry = [
   "import { createApp } from './src/main.mjs';",
@@ -46,12 +48,12 @@ const entry = [
   const av = buildRpgAv();
   const avDir = path.join(tacticsDir, 'src', 'vendor', 'rpg-av');
   for (const [name, text] of [['rpg-av.mjs', av.js], ['rpg-av.css', av.css]]) {
-    if (readFileSync(path.join(avDir, name), 'utf8') !== text) throw new Error('视听底座生成物过期: ' + name + '（先运行 node tactics/tools/extract-rpg-av.cjs）');
+    if (readFileSync(path.join(avDir, name), 'utf8').replace(/\r\n/g, '\n') !== text) throw new Error('视听底座生成物过期: ' + name + '（先运行 node tactics/tools/extract-rpg-av.cjs）');
   }
   const ui = buildRpgUi();
   const uiDir = path.join(tacticsDir, 'src', 'vendor', 'rpg-ui');
   for (const [name, text] of [['rpg-ui.mjs', ui.js], ['rpg-ui.css', ui.css]]) {
-    if (readFileSync(path.join(uiDir, name), 'utf8') !== text) throw new Error('原版界面生成物过期: ' + name + '（先运行 node tactics/tools/extract-rpg-ui.cjs）');
+    if (readFileSync(path.join(uiDir, name), 'utf8').replace(/\r\n/g, '\n') !== text) throw new Error('原版界面生成物过期: ' + name + '（先运行 node tactics/tools/extract-rpg-ui.cjs）');
   }
   const result = await esbuild.build({
     absWorkingDir: tacticsDir,

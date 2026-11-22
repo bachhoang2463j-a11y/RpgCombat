@@ -351,7 +351,17 @@ export function createApp(rootEl, opts = {}) {
   function currentUnit() { return battle && currentViewData ? unitById(battle.snapshot().currentId) : null; }
   function isHeroTurn() { const u = currentUnit(); return !!(u && u.side === 'hero' && !battle.snapshot().terminal); }
   function skillUsable(skill) { return !!(battle && battle.skillStatus(skill).ok); }
-  function skillReason(skill) { return battle ? battle.skillStatus(skill).reason || '' : '当前不能使用技能'; }
+  function skillReason(skill) {
+    if (!battle) return '当前不能使用技能';
+    // 变体组父项无自身行动语义：有可用子项即不标原因，否则报首个子项的真实原因
+    if (skill.isGroup) {
+      const kids = (currentUnit()?.skills || []).filter(s => s._inGroup && s.parentName === skill.name);
+      if (kids.some(skillUsable)) return '';
+      return kids.length ? '变体均不可用：' + (battle.skillStatus(kids[0]).reason || '') : '无变体';
+    }
+    return battle.skillStatus(skill).reason || '';
+  }
+  const isSelfCast = skill => !!(skill.range && skill.range.type === '单体' && skill.range.castRange === 0);
   function skillOfKey(key) {
     if (key === 'attack') return BASIC_ATTACK;
     const m = /^sk:(\d+)$/.exec(key || '');
@@ -486,11 +496,15 @@ export function createApp(rootEl, opts = {}) {
     const q = battle.previewAttack(skill, a);
     sandbox.setPreview({ kind: 'attack', casterId: id, skill, query: q, locked });
     let html;
-    if (q.ok && q.disclosureTargetIds.length) {
-      const me = currentUnit();
+    const segs = q.ok ? (q.slotTargets || []).filter(s => s.attack).length : 0;
+    const me = currentUnit();
+    const ammo = (me.items || []).some(it => (it.bindings || []).some(b => b.skillName === skill.name)) ? ' · <small>弹药未扣减（物品未迁移）</small>' : '';
+    if (q.ok && !segs && isSelfCast(skill)) {
+      html = '<b>' + skill.name + '</b> · 作用于自身' + (locked ? ' · <b>再点发动</b>' : '');
+    } else if (q.ok && q.disclosureTargetIds.length) {
       const t0 = unitById(q.disclosureTargetIds[0]);
       const pc = Math.round(hitChance(me.ref, t0.ref, skill) * 100);
-      html = '<b>' + skill.name + '</b> · ' + (q.disclosureTargetIds.length > 1 ? q.disclosureTargetIds.length + ' 名目标 · ' : '') + '命中 <b>' + pc + '%</b> · 伤害 ' + expectedDamage(me.ref, t0.ref, skill) + (locked ? ' · <b>再点发动</b>' : '');
+      html = '<b>' + skill.name + '</b> · ' + (q.disclosureTargetIds.length > 1 ? q.disclosureTargetIds.length + ' 名目标 · ' : '') + '命中 <b>' + pc + '%</b> · 伤害 ' + expectedDamage(me.ref, t0.ref, skill) + (segs > 1 ? ' ×' + segs + ' 段' : '') + ammo + (locked ? ' · <b>再点发动</b>' : '');
     } else html = q.ok ? '<b>' + skill.name + '</b> · 范围内无敌人' + (locked ? ' · <b>再点发动</b>' : '') : q.reason;
     sandbox.setHint({ x: a.x, y: a.y }, html, q.ok ? (locked ? 'lock' : null) : 'bad');
     return { ok: q.ok, aim: a, query: q, reason: q.reason };
@@ -701,6 +715,12 @@ export function createApp(rootEl, opts = {}) {
     aim = { key, skill };
     sandbox.setHint(null); sandbox.refreshHover();
     sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: aim.skill, query: null });
+    // 自身技能（单体·射程 0）：直接锁定自己，再点自己或 Enter 发动
+    if (isSelfCast(skill)) {
+      const me = battle.snapshot().currentId, c = sandbox.unitWorldCenter(me);
+      const ev = attackPreview(aim, { x: c.x, y: c.y, col: Math.floor(c.x), row: Math.floor(c.y), targetId: me }, true);
+      if (ev.ok) { pending = { key: 'u:' + me, aim: ev.aim }; ui('lock'); }
+    }
     renderCommand();
   }
   function requestEnd() {
@@ -833,6 +853,15 @@ export function createApp(rootEl, opts = {}) {
     shell.showLog(unitName(res.casterId) + ' · ' + res.skill.name, 'act');
     const caster = currentUnit();
     if (caster) { const s = shownOf(caster); shown.set(caster.id, { hp: s.hp, mp: caster.ref.mp }); }
+    // 反应错位（折影步等）：规则站位已更新，显示位置锁在原位，等导演在接触拍点演出位移后再放开
+    const view = sandbox.getUnitView();
+    for (const h of res.hits) {
+      const sh = h.reaction && h.reaction.shift;
+      if (!sh) continue;
+      const fp = currentViewData.footprintsById[h.targetId];
+      const c = unitCenter(sh.from, fp);
+      view.lockMotion(h.targetId, true); view.setDisplayPos(h.targetId, c.x, c.y);
+    }
     refreshBattle();
     await director.playAttack(res);
     for (let i = res.logFrom; i < res.logTo; i++) hiddenLog.delete(i);

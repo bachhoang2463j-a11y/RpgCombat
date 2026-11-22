@@ -20,7 +20,8 @@ let STAGE_H = 1000 / FX_SCALE;
 export const DEMO_AUDIO_KEYS = [
   'heroTurn',                                                                 // 原版我方回合开始
   'gunshot1', 'gunshot2', 'gunshot3', 'xiandan', 'gunshot_pierce',            // 枪械：玛德琳/弗兰克/索恩
-  'thunder_charge', 'thunder_single_hit',                                     // 法术：埃利奥特召雷
+  'explosion_aoe_charge', 'explosion_aoe_blast', 'fire01', 'ranshao',          // 埃利奥特：压缩爆燃（萨维奇三连发复用上行枪械）
+  'herocharge', 'link_chime', 'hide', 'link_dash',                            // 埃利奥特：预备咏唱 / 折影步
   'slash_whoosh_hit_fs434873', 'claw_bloody_blade_fs323526', 'swish_3',       // 近战刀砍/爪击、箭矢
   'monsterAttack', 'enemySwingGroup', 'enemyRanged', 'enemyMagic',            // 敌方前摇
   'hit_1a', 'hit_1b', 'hit_1c', 'hit_2a', 'hit_2b', 'hit_2c', 'hit_3a', 'hit_3b', 'hit_3c', // 受击三档
