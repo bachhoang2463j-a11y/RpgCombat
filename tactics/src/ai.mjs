@@ -69,14 +69,14 @@ function cmpHit(a, b) {
 }
 
 // chooseEnemyAction(ctx, unitId, moveBudget, skills) -> { moveTo:{col,row}|null, skill|null, aim|null }
-export function chooseEnemyAction(ctx, unitId, moveBudget, skills) {
+export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill = null) {
   const unit = ctx.units.find(u => u.id === unitId);
   if (!unit || !isLive(unit)) return IDLE;
   const p = ctx.placementsById[unitId];
   if (!p) return IDLE;
   const enemies = ctx.units.filter(u => isLive(u) && u.side !== unit.side);
   if (!enemies.length) return IDLE;
-  const cands = attackCandidates(skills);
+  const cands = attackCandidates(skills).filter(skill => !canUseSkill || canUseSkill(skill).ok);
 
   // 一、额度内落点找最近可攻击位置
   const reach = findReachable(ctx, unitId, moveBudget);

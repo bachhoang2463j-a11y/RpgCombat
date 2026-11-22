@@ -104,6 +104,35 @@ async function p05(m) {
     resume.sceneState.layout.seed === scene.seed && resume.sceneState.doors['door-n'] === false,
     JSON.stringify({ first: loaded.branch, second: newBattle.branch, resume: resume.branch, seed: resume.sceneState.layout.seed, doors: resume.sceneState.doors })));
 
+  const openPlacement = { h1: { col: 3, row: 3, facing: 90 } };
+  const edited = generation.solveFormation(scene, units, {
+    regions: [], landmarks: [], groups: [{ id: 'all', unitIds: ['h1', 'h2', 'e1', 'e2'], placement: { regionId: 'region-0' } }],
+    overrides: [{ unitId: 'h1', placement: openPlacement.h1 }], relations: [],
+  }, { seed: 402 });
+  const illegal = generation.solveFormation(scene, units, {
+    regions: [], landmarks: [], groups: [],
+    overrides: [{ unitId: 'h1', placement: { col: 0, row: 0 } }], relations: [],
+  }, { seed: 402 });
+  cases.push(ok('T05-06 开场个体覆盖可落合法格，非法覆盖被拒并返回冲突',
+    edited.ok && edited.placementsById.h1.col === 3 && edited.placementsById.h1.row === 3 &&
+    !illegal.ok && illegal.report.status === 'hard-conflict' && illegal.report.conflicts[0].reason === 'blocked-terrain',
+    JSON.stringify({ edited: edited.placementsById.h1, illegal: illegal.report })));
+
+  const compactSpec = { regions: [], landmarks: [], relations: [],
+    groups: [{ id: 'hero-group', unitIds: ['h1', 'h2'], placement: { regionId: 'region-0' } },
+      { id: 'enemy-group', unitIds: ['e1', 'e2'], placement: { regionId: 'region-2' } }],
+    overrides: [{ unitId: 'h1', placement: { col: 4, row: 4, facing: 90 } }] };
+  const compact = generation.solveFormation(scene, units, compactSpec, { seed: 99 });
+  const coordinateSpec = { regions: [], landmarks: [], relations: [], groups: [],
+    overrides: units.map(u => ({ unitId: u.id, placement: compact.placementsById[u.id] })) };
+  const cellByCell = generation.solveFormation(scene, units, coordinateSpec, { seed: 99 });
+  const compactTokens = JSON.stringify(compactSpec).length;
+  const cellTokens = JSON.stringify(coordinateSpec).length;
+  cases.push(ok('T05-07 语义布阵与逐人坐标均可解并记录输入长度',
+    compact.ok && cellByCell.ok && compactTokens > 0 && cellTokens > 0 &&
+    units.every(u => JSON.stringify(compact.placementsById[u.id]) === JSON.stringify(cellByCell.placementsById[u.id])),
+    JSON.stringify({ compactTokens, cellTokens, compact: compact.placementsById, cellByCell: cellByCell.placementsById })));
+
   return { cases };
 }
 

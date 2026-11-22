@@ -1,0 +1,69 @@
+{
+  "stage": "P06",
+  "executed": true,
+  "started": "2026-11-22T14:18:31.727Z",
+  "ended": "2026-11-22T14:18:31.946Z",
+  "command": "node tactics/tools/run-tests.cjs --stage=p06",
+  "sourceHead": "08d7fbe",
+  "sourceDirty": true,
+  "exitCode": 0,
+  "passed": 9,
+  "failed": 0,
+  "pending": 0,
+  "groups": [
+    {
+      "id": "T06-01",
+      "passed": 9,
+      "failed": 0,
+      "pending": 0,
+      "cases": [
+        {
+          "id": "T06-01 显式直线按范围选中三名敌人且友方不挡不受伤",
+          "pass": true,
+          "detail": "{\"targets\":[\"e1\",\"e2\",\"e3\"],\"actual\":[\"e1\",\"e2\",\"e3\",\"a\"],\"slot\":[{\"index\":0,\"tag\":\"[单体]\",\"side\":\"enemy\",\"scope\":\"area\",\"attack\":true,\"targetIds\":[\"e1\",\"e2\",\"e3\"]},{\"index\":1,\"tag\":\"[无]\",\"side\":\"none\",\"scope\":\"none\",\"attack\":false,\"targetIds\":[]},{\"index\":2,\"tag\":\"[无]\",\"side\":\"none\",\"scope\":\"none\",\"attack\":false,\"targetIds\":[]}],\"cells\":[{\"col\":1,\"row\":4},{\"col\":2,\"row\":4},{\"col\":3,\"row\":4},{\"col\":4,\"row\":4},{\"col\":5,\"row\":4},{\"col\":6,\"row\":4},{\"col\":7,\"row\":4},{\"col\":8,\"row\":4},{\"col\":9,\"row\":4},{\"col\":10,\"row\":4},{\"col\":11,\"row\":4}],\"contact\":{\"type\":\"unit\",\"unitId\":\"e1\",\"side\":\"enemy\",\"point\":{\"x\":5.1,\"y\":4.5},\"cell\":{\"col\":5,\"row\":4}}}"
+        },
+        {
+          "id": "T06-02 单体攻击被前方友方阻挡，单体治疗不被角色截走",
+          "pass": true,
+          "detail": "{\"attack\":{\"type\":\"unit\",\"unitId\":\"blocker\",\"side\":\"hero\",\"point\":{\"x\":4.1,\"y\":4.5},\"cell\":{\"col\":4,\"row\":4}},\"heal\":[{\"index\":0,\"tag\":\"[单回]\",\"side\":\"ally\",\"scope\":\"single\",\"attack\":false,\"targetIds\":[\"healed\"]},{\"index\":1,\"tag\":\"[无]\",\"side\":\"none\",\"scope\":\"none\",\"attack\":false,\"targetIds\":[]},{\"index\":2,\"tag\":\"[无]\",\"side\":\"none\",\"scope\":\"none\",\"attack\":false,\"targetIds\":[]}]}"
+        },
+        {
+          "id": "T06-03 低障碍不挡远程、穿透不穿墙且必中不绕墙",
+          "pass": true,
+          "detail": "{\"low\":true,\"wall\":{\"type\":\"wall\",\"point\":{\"x\":5.1,\"y\":4.5},\"cell\":{\"col\":5,\"row\":4},\"objectIds\":[\"wall\"]},\"penetrate\":{\"type\":\"wall\",\"point\":{\"x\":5.1,\"y\":4.5},\"cell\":{\"col\":5,\"row\":4},\"objectIds\":[\"wall\"]}}"
+        },
+        {
+          "id": "T06-04 爆炸按首次接触或瞄准点起爆，接触单位只列为一个目标",
+          "pass": true,
+          "detail": "{\"unit\":{\"contact\":{\"type\":\"unit\",\"unitId\":\"blastFriend\",\"side\":\"hero\",\"point\":{\"x\":4.1,\"y\":4.5},\"cell\":{\"col\":4,\"row\":4}},\"targets\":[\"blastEnemy\"]},\"wall\":{\"type\":\"wall\",\"point\":{\"x\":5.1,\"y\":4.5},\"cell\":{\"col\":5,\"row\":4},\"objectIds\":[\"wall\"]},\"free\":{\"x\":10.5,\"y\":4.5}}"
+        },
+        {
+          "id": "T06-05 2×2单位按中心纳入范围并作为单一目标",
+          "pass": true,
+          "detail": "{\"targets\":[\"giant\"],\"occupied\":[{\"col\":6,\"row\":3},{\"col\":7,\"row\":3},{\"col\":6,\"row\":4},{\"col\":7,\"row\":4}]}"
+        },
+        {
+          "id": "T06-06 锁定目标闪避后不转火后方单位",
+          "pass": true,
+          "detail": "{\"hits\":[{\"id\":\"dodger\",\"hit\":false}],\"rearHp\":30,\"dice\":2}"
+        },
+        {
+          "id": "T06-07 圆形受墙体遮挡，全域忽略普通墙与视距",
+          "pass": true,
+          "detail": "{\"area\":[],\"global\":[\"e1\"]}"
+        },
+        {
+          "id": "T06 槽级空间上下文区分单体敌方、群体友方治疗和群体敌方减益",
+          "pass": true,
+          "detail": "[{\"index\":0,\"tag\":\"[单体]\",\"side\":\"enemy\",\"scope\":\"area\",\"attack\":true,\"targetIds\":[\"e1\"]},{\"index\":1,\"tag\":\"[群回]\",\"side\":\"ally\",\"scope\":\"area\",\"attack\":false,\"targetIds\":[\"a\"]},{\"index\":2,\"tag\":\"[群降]\",\"side\":\"enemy\",\"scope\":\"area\",\"attack\":false,\"targetIds\":[\"e1\"]}]"
+        },
+        {
+          "id": "T06-08 预览不扣费不泄露隐藏目标，真实结算同查询且AI可消费六范围",
+          "pass": true,
+          "detail": "{\"disclosed\":[\"visible\"],\"actual\":[\"visible\",\"hidden\"],\"rolls\":4,\"ai\":\"火线\"}"
+        }
+      ]
+    }
+  ],
+  "errors": null
+}

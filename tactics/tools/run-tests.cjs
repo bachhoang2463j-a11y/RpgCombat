@@ -25,6 +25,7 @@ const P03_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p0
 const P04_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p04-node-cases.mjs');
 const P05_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p05-node-cases.mjs');
 const P06_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p06-node-cases.mjs');
+const P07_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p07-node-cases.mjs');
 
 // 阶段注册表：只登记真实存在的用例文件；--all 只聚合这里的条目，不虚构未来阶段。
 const STAGES = {
@@ -119,6 +120,15 @@ const STAGES = {
       ['battle', 'createBattle'], ['ai', 'chooseEnemyAction'], ['scene', 'compileScene'], ['parser', 'parseSkill'],
     ],
     modules: ['range', 'battle', 'ai', 'scene', 'geometry', 'movement', 'damage', 'clock', 'lifecycle', 'parser'],
+  },
+  p07: {
+    file: P07_CASES,
+    groups: ['T07-01'],
+    requiredExports: [
+      ['battle', 'createBattle'], ['battle', 'skillSupport'],
+      ['clock', 'dispatchClock'], ['range', 'queryAttack'], ['scene', 'compileScene'],
+    ],
+    modules: ['battle', 'clock', 'scheduler', 'lifecycle', 'range', 'scene', 'geometry', 'movement', 'damage', 'ai', 'parser'],
   },
 };
 

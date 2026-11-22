@@ -115,7 +115,7 @@ export const CONFIG_PACKAGE_FORMAT = 'rpg-tactics-config';
 export const CONFIG_PACKAGE_VERSION = 1;
 
 // 配置包角色条目白名单：序列化与导入只认这些键（白名单生成，禁止黑名单删键）。
-export const CONFIG_PACKAGE_HERO_KEYS = ['name', 'config', 'persist', 'skills', 'items'];
+export const CONFIG_PACKAGE_HERO_KEYS = ['name', 'displayName', 'config', 'persist', 'skills', 'items'];
 
 // config 内白名单（含新属性；不含当前 hp/mp/tp 与任何实时字段）
 export const CONFIG_PACKAGE_CONFIG_KEYS = [

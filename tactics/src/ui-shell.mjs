@@ -65,6 +65,7 @@ export function buildShell(root) {
   const rpgUi = createRpgUi({
     state: rpgState,
     isSkillActionable: (hero, skill) => !!callCmd('canUse', skill),
+    skillDisabledReason: (skill) => callCmd('skillReason', skill) || '不可用',
     prepareSkillTarget: (idx) => { uiSound('select'); callCmd('onSkill', idx); },
     skillHasBarrierTag: () => false,
     hasEnoughBindings: () => true,
@@ -177,14 +178,26 @@ export function buildShell(root) {
     els.enemyOverlay.classList.toggle('pointer-events-none', !enemyTurn);
     if (!u) { els.activeHeroName.textContent = '等待指令'; state.menuKey = ''; rpgUi.closeAllSubMenus(); showTarget(null); return; }
     const r = cmd.resources;
-    // 标题栏：原版"XX 的回合" + 剩余移动；右侧为高频【结束回合】（原【可行动/已行动】位置）
-    els.activeHeroName.innerHTML = '<span class="t-turn-title">' + rpgUi.escapeHistoryHtml(u.name) + (cmd.terminal ? ' · 战斗结束' : ' 的回合') +
-      (u.side === 'hero' && r && !cmd.terminal ? ' <span class="text-cyan-300">🦶 ' + r.moveRemaining.toFixed(1) + '米</span>' : '') + '</span>' +
+    const actionRow = u.side === 'hero' && r && !cmd.terminal
+      ? '<div class="t-action-balances"><span>🦶 ' + r.moveRemaining.toFixed(1) + 'm</span><span>主 ' + r.main + '</span><span>辅 ' + r.aux + '</span></div>' +
+        '<div class="t-action-tools">' +
+        (cmd.preparation ? '<button data-tactics-action="prepare"' + (r.main < 1 ? ' disabled' : '') + '>准备 (' + cmd.preparation.remaining + ')</button><button data-tactics-action="cancel-charge">取消蓄力</button>' : '') +
+        '<button data-tactics-action="sprint"' + (r.main < 1 ? ' disabled' : '') + '>冲刺</button>' +
+        '<button data-tactics-action="jump"' + (r.aux < 1 ? ' disabled' : '') + '>跳跃</button>' +
+        '<button data-tactics-action="push"' + (r.aux < 1 ? ' disabled' : '') + '>推动</button>' +
+        '<button data-tactics-action="carry"' + (r.main < 1 ? ' disabled' : '') + '>背起</button>' +
+        '<button data-tactics-action="drop"' + (!cmd.carrying ? ' disabled' : '') + '>放下</button>' +
+        '</div>'
+      : '';
+    // 标题栏保留原版尺寸；余额与动作仍在同一指令面板内，作为标题后的独立行。
+    els.activeHeroName.innerHTML = '<span class="t-turn-title">' + rpgUi.escapeHistoryHtml(u.name) + (cmd.terminal ? ' · 战斗结束' : ' 的回合') + '</span>' +
       (cmd.playable ? '<button class="t-end-btn' + (cmd.endArmed ? ' t-armed' : '') + '" data-tactics-end title="结束回合（Space）">' +
         (cmd.endArmed ? '⚠️ 确认结束' : '⏳ 结束回合') + '<kbd>Space</kbd></button>' : '');
+    els.menuBox.querySelector('.t-action-extra')?.remove();
+    if (actionRow) els.activeHeroName.insertAdjacentHTML('afterend', '<div class="t-action-extra">' + actionRow + '</div>');
     if (!cmd.playable) { state.menuKey = ''; rpgUi.closeAllSubMenus(); showTarget(null); return; }
     // 技能卡按资源变化重建（原版 updateSkillMenus：每次渲染折叠变体组）；同一资源态不重建，保留展开与滚动
-    const menuKey = u.id + '|' + u.ref.mp + '|' + (r ? r.main : '') + '|' + (cmd.serial || 0);
+    const menuKey = u.id + '|' + u.ref.mp + '|' + (r ? r.main + ':' + r.aux : '') + '|' + (cmd.serial || 0) + '|' + u.skills.map(s => s.usesRemaining + ':' + s.maxUses).join(',');
     const hero = Object.assign(refOf(u), { skills: u.skills, items: u.items || [], mp: u.ref.mp, hp: u.ref.hp, tp: 0, burstActivated: false });
     if (menuKey !== state.menuKey) {
       if (state.menuKey.split('|')[0] !== u.id) rpgUi.closeAllSubMenus();
@@ -212,10 +225,17 @@ export function buildShell(root) {
     root.querySelectorAll('#attack-skill-list [data-skill-idx], #support-skill-list [data-skill-idx]').forEach(btn => {
       const s = u.skills[Number(btn.dataset.skillIdx)];
       const row = btn.children[1];
-      if (!s || !s.range || !row || row.querySelector('.t-range-pill')) return;
+      if (!s || !row) return;
+      if (state.cmd && state.cmd.skillReason) {
+        const reason = state.cmd.skillReason(s);
+        btn.title = reason || '';
+        if (reason) btn.setAttribute('aria-description', reason);
+        else btn.removeAttribute('aria-description');
+      }
+      if (!s.range || row.querySelector('.t-range-pill')) return;
       const pill = rangePill(s.range);
       if (!pill) return;
-      const empty = row.querySelector('span.text-slate-500:only-child');   // 原版"无附加效果"占位
+      const empty = row.querySelector('span.text-slate-500:only-child');
       if (empty) empty.remove();
       row.insertAdjacentHTML('beforeend', pill);
     });
@@ -233,6 +253,8 @@ export function buildShell(root) {
   });
   els.menuBox.addEventListener('click', e => {
     if (e.target.closest('[data-tactics-end]')) { e.stopPropagation(); callCmd('onEnd'); return; }
+    const action = e.target.closest('[data-tactics-action]');
+    if (action) { e.stopPropagation(); callCmd('onAction', action.dataset.tacticsAction); return; }
     const b = e.target.closest('button[data-rpg-ui-act]');
     if (!b) return;
     const act = b.getAttribute('data-rpg-ui-act');

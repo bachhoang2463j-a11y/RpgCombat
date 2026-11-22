@@ -1,0 +1,94 @@
+{
+  "stage": "P07",
+  "executed": true,
+  "started": "2026-11-22T14:18:31.947Z",
+  "ended": "2026-11-22T14:18:32.188Z",
+  "command": "node tactics/tools/run-tests.cjs --stage=p07",
+  "sourceHead": "08d7fbe",
+  "sourceDirty": true,
+  "exitCode": 0,
+  "passed": 14,
+  "failed": 0,
+  "pending": 0,
+  "groups": [
+    {
+      "id": "T07-01",
+      "passed": 14,
+      "failed": 0,
+      "pending": 0,
+      "cases": [
+        {
+          "id": "T07-01 预览不扣费，合法确认一次扣主点与MP",
+          "pass": true,
+          "detail": "{\"preview\":true,\"fired\":true,\"resources\":{\"moveRemaining\":4,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1},\"mp\":26,\"hp\":88}"
+        },
+        {
+          "id": "T07-09 限次与绝对CD由战斗态阻止重复施放",
+          "pass": true,
+          "detail": "{\"first\":true,\"second\":\"限次已用完\",\"battleState\":{\"sceneId\":\"p07\",\"battleId\":\"demo\",\"progress\":{\"lh\":{\"distance\":0,\"lap\":1},\"le\":{\"distance\":2500,\"lap\":0}},\"perBattleUses\":{\"lh\":{\"limited\":1}},\"cooldowns\":{\"lh\":{\"limited\":150}},\"combatState\":{\"carrying\":{},\"clock\":{\"now\":50,\"order\":[\"le\",\"lh\"],\"units\":{\"lh\":{\"id\":\"lh\",\"side\":\"hero\",\"name\":\"lh\",\"baseSpd\":200,\"speed\":200,\"status\":\"active\",\"lastSync\":50,\"spawnedAt\":0,\"stun\":null,\"hitSinceWindow\":false,\"extraMain\":0,\"mainPointSources\":[]},\"le\":{\"id\":\"le\",\"side\":\"enemy\",\"name\":\"le\",\"baseSpd\":50,\"speed\":50,\"status\":\"active\",\"lastSync\":50,\"spawnedAt\":0,\"stun\":null,\"hitSinceWindow\":false,\"extraMain\":0,\"mainPointSources\":[]}},\"statuses\":{},\"rescues\":{},\"opportunityGates\":{},\"pendingMainPoints\":[],\"currentAction\":{\"unitId\":\"lh\",\"resources\":{\"moveQuota\":1,\"main\":0,\"aux\":1,\"deliveredMainSources\":[],\"moveRemaining\":4,\"moveMultiplier\":1}},\"terminal\":null,\"log\":[{\"seq\":1,\"t\":0,\"type\":\"clock-created\",\"order\":[\"le\",\"lh\"]},{\"seq\":2,\"t\":50,\"type\":\"action-granted\",\"unitId\":\"lh\",\"main\":1,\"aux\":1,\"lap\":1},{\"seq\":3,\"t\":50,\"type\":\"cooldown-applied\",\"unitId\":\"lh\",\"skillKey\":\"limited\",\"endAt\":150}],\"seq\":3},\"charges\":{\"lh\":{\"inventory\":0,\"preparing\":null}}}}}"
+        },
+        {
+          "id": "T07-07/09 命中后毒槽登记唯一来源与期限",
+          "pass": true,
+          "detail": "{\"ok\":true,\"statusRows\":[{\"key\":\"pe\\u0000ph\\u0000poison\\u0000pe:1\",\"unitId\":\"pe\",\"source\":{\"casterId\":\"ph\",\"skillId\":\"poison\",\"effectId\":\"pe:1\"},\"kind\":\"poison\",\"strength\":4,\"interval\":100,\"appliedAt\":50,\"endAt\":250,\"nextTickAt\":150}]}"
+        },
+        {
+          "id": "T07-07 毒燃等待下一全局周期，不在提交时提前跳伤",
+          "pass": true,
+          "detail": "{\"hpBeforePoison\":100,\"hp\":90,\"now\":100}"
+        },
+        {
+          "id": "T07-07 反应导致施术者倒地后仍完成已提交群体名单",
+          "pass": true,
+          "detail": "{\"hits\":[\"r\",\"rear\"],\"caster\":{\"id\":\"caster\",\"side\":\"hero\",\"name\":\"caster\",\"baseSpd\":100,\"speed\":100,\"status\":\"down\",\"lastSync\":100,\"spawnedAt\":0,\"stun\":null,\"hitSinceWindow\":false,\"extraMain\":0,\"mainPointSources\":[]}}"
+        },
+        {
+          "id": "T07-05 主动取消蓄力不退资源或限次",
+          "pass": true,
+          "detail": "{\"cancel\":{\"ok\":true},\"mp\":7,\"uses\":1}"
+        },
+        {
+          "id": "T07-02/03/04 蓄力开始付费一次，后续自然行动投入准备点，释放不重复扣费",
+          "pass": true,
+          "detail": "{\"start\":true,\"startedState\":{\"mp\":7,\"uses\":1},\"next\":\"ch2\",\"prep\":{\"skillKey\":\"charge1\",\"skill\":{\"name\":\"charge1\",\"cost\":5,\"hit\":100,\"power\":20,\"type\":\"[单体]\",\"type2\":\"[无]\",\"type3\":\"[无]\",\"range\":{\"type\":\"单体\",\"castRange\":10},\"actionCost\":{\"main\":1,\"aux\":0},\"charge\":1,\"delay\":300,\"maxUses\":1},\"remaining\":0,\"invested\":1,\"ready\":true},\"beforeRelease\":{\"mp\":7,\"uses\":1,\"resources\":{\"moveRemaining\":4,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1}},\"release\":true,\"mp\":7}"
+        },
+        {
+          "id": "T07-05 就绪蓄力结束行动时强制取消且不退款",
+          "pass": true,
+          "detail": "{\"ready\":true,\"prepAfterEnd\":null}"
+        },
+        {
+          "id": "T07-05 施术者倒地清除蓄力准备态",
+          "pass": true,
+          "detail": "{\"status\":\"down\",\"charge\":{\"inventory\":0,\"preparing\":null}}"
+        },
+        {
+          "id": "T07-08 反应射程外拒绝、墙后拒绝、有效距离与视线通过",
+          "pass": true,
+          "detail": "{\"far\":\"反应目标超出技能距离\",\"blocked\":\"反应目标超出技能距离\",\"near\":true}"
+        },
+        {
+          "id": "T07-06 当前再动点可继续消费且同源不重发，队友再动转待领取",
+          "pass": true,
+          "detail": "{\"current\":true,\"afterImmediate\":1,\"repeated\":true,\"afterRepeated\":0,\"ally\":\"主行动已用完\",\"pendingAfter\":[]}"
+        },
+        {
+          "id": "T07-10 速度状态只改跑圈速度不改闪避，固定命闪不因敏捷不同改变",
+          "pass": true,
+          "detail": "{\"speedApplied\":true,\"slots\":[{\"index\":0,\"tag\":\"[单速]\",\"side\":\"ally\",\"scope\":\"single\",\"attack\":false,\"targetIds\":[\"speed-ally\"]},{\"index\":1,\"tag\":\"[无]\",\"side\":\"none\",\"scope\":\"none\",\"attack\":false,\"targetIds\":[]},{\"index\":2,\"tag\":\"[无]\",\"side\":\"none\",\"scope\":\"none\",\"attack\":false,\"targetIds\":[]}],\"hits\":[],\"spdBefore\":100,\"speedAfter\":150,\"clockSpeedAfter\":150,\"evasionBefore\":100,\"evasionAfter\":100,\"statuses\":{\"speed-ally\\u0000speed-caster\\u0000speedBuff\\u0000speed-ally:0\":{\"key\":\"speed-ally\\u0000speed-caster\\u0000speedBuff\\u0000speed-ally:0\",\"unitId\":\"speed-ally\",\"source\":{\"casterId\":\"speed-caster\",\"skillId\":\"speedBuff\",\"effectId\":\"speed-ally:0\"},\"kind\":\"spd\",\"strength\":50,\"interval\":100,\"appliedAt\":10,\"endAt\":210}},\"hit100\":true,\"hit300\":true}"
+        },
+        {
+          "id": "T07-09 续载同battle保留限次与冷却，同scene新battle清空",
+          "pass": true,
+          "detail": "{\"resume\":{\"sceneId\":\"reload-scene\",\"battleId\":\"same-battle\",\"progress\":{},\"perBattleUses\":{\"caster\":{\"limited\":1}},\"cooldowns\":{\"caster\":{\"limited\":500}},\"combatState\":{}},\"fresh\":{\"sceneId\":\"reload-scene\",\"battleId\":\"new-battle\",\"progress\":{},\"perBattleUses\":{},\"cooldowns\":{},\"combatState\":{}}}"
+        },
+        {
+          "id": "P07+ 治疗槽不会静默部分结算",
+          "pass": true,
+          "detail": "{\"ok\":false,\"reason\":\"效果尚未迁移：[单回]\"}"
+        }
+      ]
+    }
+  ],
+  "errors": null
+}

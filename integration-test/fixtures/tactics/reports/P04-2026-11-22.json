@@ -1,0 +1,64 @@
+{
+  "stage": "P04",
+  "executed": true,
+  "started": "2026-11-22T14:18:31.270Z",
+  "ended": "2026-11-22T14:18:31.500Z",
+  "command": "node tactics/tools/run-tests.cjs --stage=p04",
+  "sourceHead": "08d7fbe",
+  "sourceDirty": true,
+  "exitCode": 0,
+  "passed": 8,
+  "failed": 0,
+  "pending": 0,
+  "groups": [
+    {
+      "id": "T04-01",
+      "passed": 8,
+      "failed": 0,
+      "pending": 0,
+      "cases": [
+        {
+          "id": "T04-01 敏捷100力量40跳距上限7m，可越低障不可越实墙",
+          "pass": true,
+          "detail": "{\"lowJump\":{\"ok\":true,\"reason\":null,\"distance\":2,\"maxDistance\":12,\"path\":[{\"col\":2,\"row\":2},{\"col\":3,\"row\":2},{\"col\":4,\"row\":2}],\"blockedBy\":null},\"wallJump\":{\"ok\":false,\"reason\":\"跳跃被实墙或关门阻挡\",\"distance\":4,\"maxDistance\":12,\"path\":[],\"blockedBy\":{\"type\":\"wall\",\"col\":5,\"row\":2}}}"
+        },
+        {
+          "id": "T04-02 冲刺消耗1主行动并追加1份基础移动额度",
+          "pass": true,
+          "detail": "{\"beforeSprint\":{\"moveRemaining\":6,\"sprintRemaining\":0,\"main\":1,\"aux\":1,\"moveMultiplier\":1},\"afterSprint\":{\"moveRemaining\":12,\"sprintRemaining\":6,\"main\":0,\"aux\":1,\"moveMultiplier\":1}}"
+        },
+        {
+          "id": "T04-03 力量40推动重量50距离2m，实墙阻挡并按剩余距离结算碰撞",
+          "pass": true,
+          "detail": "{\"pushedResult\":{\"ok\":true,\"success\":true,\"targetId\":\"q\",\"from\":{\"col\":4,\"row\":2},\"to\":{\"col\":5,\"row\":2},\"requestedDistance\":2,\"movedDistance\":1,\"path\":[{\"col\":4,\"row\":2},{\"col\":5,\"row\":2}],\"blockedBy\":{\"type\":\"terrain\",\"col\":6,\"row\":2,\"cell\":{\"col\":6,\"row\":2,\"blocksMovement\":true,\"blocksProjectile\":true,\"blocksVision\":true,\"lowObstacle\":false,\"void\":false,\"material\":\"brick\",\"objectIds\":[\"block\"]}},\"collision\":{\"rawDmg\":10,\"mitigated\":1,\"shieldDmg\":1,\"hpDmg\":0},\"hpAfter\":100,\"down\":false,\"rollPush\":40,\"rollResist\":1},\"resources\":{\"moveRemaining\":6,\"sprintRemaining\":0,\"main\":1,\"aux\":0,\"moveMultiplier\":1},\"hp\":100,\"shield\":9}"
+        },
+        {
+          "id": "T04-06 碰撞伤害按护甲、护盾、HP顺序结算且不掷命闪",
+          "pass": true,
+          "detail": "{\"collision\":{\"rawDmg\":10,\"mitigated\":5,\"shieldDmg\":3,\"hpDmg\":2},\"hp\":8,\"shield\":0}"
+        },
+        {
+          "id": "T04-04 推动重量等于力量×1.5失败但消耗辅助行动",
+          "pass": true,
+          "detail": "{\"ok\":true,\"success\":false,\"targetId\":\"f\",\"rollPush\":1,\"rollResist\":1,\"moveDistance\":0}"
+        },
+        {
+          "id": "T04-05 背起消耗主行动、清占位；合法放下免费并从零恢复行动资格",
+          "pass": true,
+          "detail": "{\"carried\":{\"ok\":true,\"carrierId\":\"c\",\"targetId\":\"d\",\"totalWeight\":60},\"carrying\":{\"c\":\"d\"},\"dropped\":{\"ok\":true,\"carrierId\":\"c\",\"targetId\":\"d\",\"placement\":{\"col\":3,\"row\":4}},\"pos\":{\"col\":3,\"row\":4},\"status\":\"active\",\"resources\":{\"moveRemaining\":6,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1},\"canPlaceThroughCarried\":true}"
+        },
+        {
+          "id": "T04-07 背负移动每米消耗2米额度且可达域按同倍率收缩",
+          "pass": true,
+          "detail": "{\"reachable\":{\"col\":4,\"row\":2,\"cost\":4,\"path\":[{\"col\":2,\"row\":2},{\"col\":3,\"row\":2},{\"col\":4,\"row\":2}]},\"move\":{\"ok\":true,\"cell\":{\"col\":4,\"row\":2,\"cost\":4,\"path\":[{\"col\":2,\"row\":2},{\"col\":3,\"row\":2},{\"col\":4,\"row\":2}],\"budgetCost\":4},\"from\":{\"col\":2,\"row\":2},\"unitId\":\"m\",\"moveBefore\":6,\"moveAfter\":2},\"resources\":{\"moveRemaining\":2,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1}}"
+        },
+        {
+          "id": "T04-08 越界落点拒绝且不消耗行动与移动额度",
+          "pass": true,
+          "detail": "{\"invalidJump\":{\"ok\":false,\"reason\":\"跳跃必须沿八方向\",\"distance\":24.08318915758459,\"maxDistance\":10,\"path\":[],\"blockedBy\":null},\"resources\":{\"moveRemaining\":2,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1}}"
+        }
+      ]
+    }
+  ],
+  "errors": null
+}

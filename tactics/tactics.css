@@ -267,6 +267,21 @@ button:disabled { opacity: .42; cursor: default; }
 .t-end-btn.t-armed kbd { color: rgba(26,18,6,.6); }
 @keyframes t-armed { to { box-shadow: 0 0 14px rgba(245,158,11,.7); } }
 
+.t-action-balances { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 3px 0 1px; color: #cbd5e1; font-size: 10px; line-height: 1.2; }
+.t-action-balances span { white-space: nowrap; }
+.t-action-tools { display: flex; gap: 4px; flex-wrap: wrap; margin: 2px 0 4px; }
+.t-action-tools button { min-height: 22px; padding: 2px 7px; border: 1px solid #475569; border-radius: 4px; color: #e2e8f0; background: rgba(15,23,42,.86); font-size: 10px; line-height: 1.2; cursor: pointer; }
+.t-action-tools button:hover:not(:disabled) { border-color: #fbbf24; color: #fde68a; }
+.t-action-tools button:disabled { opacity: .42; cursor: default; }
+
+.t-action-extra { padding: 3px 4px 2px; border-bottom: 1px solid rgba(148,163,184,.18); }
+.t-action-balances { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0 0 2px; color: #cbd5e1; font-size: 10px; line-height: 1.2; }
+.t-action-balances span { white-space: nowrap; }
+.t-action-tools { display: flex; gap: 4px; flex-wrap: wrap; }
+.t-action-tools button { min-height: 22px; padding: 2px 7px; border: 1px solid #475569; border-radius: 4px; color: #e2e8f0; background: rgba(15,23,42,.86); font-size: 10px; line-height: 1.2; cursor: pointer; }
+.t-action-tools button:hover:not(:disabled) { border-color: #fbbf24; color: #fde68a; }
+.t-action-tools button:disabled { opacity: .42; cursor: default; }
+
 /* ---- 底栏旁白 ---- */
 #chat-input-area { position: fixed; bottom: 0; left: 0; width: 100%; z-index: 90; }
 #chat-input-bar { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: linear-gradient(to top, rgba(5,6,9,0.96), rgba(5,6,9,0.7)); border-top: 1px solid var(--line); }
@@ -295,6 +310,22 @@ button:disabled { opacity: .42; cursor: default; }
 .t-res-report { font-size: 12px; color: #cbd5e1; display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; user-select: text; }
 .t-res-report code { color: var(--gold-2); }
 .t-res-bad { color: #fca5a5; word-break: break-all; }
+.t-editor-form { display: flex; flex-direction: column; gap: 8px; }
+.t-editor-form label { display: flex; flex-direction: column; gap: 3px; color: var(--mute); font-size: 11px; }
+.t-editor-form input, .t-editor-form select, .t-editor-form textarea { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; color: var(--text); background: #10141c; font: 11px/1.4 ui-monospace, monospace; }
+.t-editor-form textarea { min-height: 104px; resize: vertical; white-space: pre; }
+.t-editor-resources { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.t-editor-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.t-editor-check { display: flex !important; flex-direction: row !important; align-items: center; gap: 6px !important; }
+.t-editor-check input, .t-editor-persist input { width: auto; accent-color: #5eead4; }
+.t-editor-persist { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px 8px; }
+.t-editor-persist label { display: flex; flex-direction: row; align-items: center; gap: 5px; font-size: 10px; }
+.t-editor-source { color: #93c5fd; font-size: 10px; }
+.t-editor-error { min-height: 15px; color: #fca5a5; font-size: 11px; }
+.t-editor-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.t-editor-actions button { border: 1px solid var(--line); border-radius: 5px; padding: 6px 10px; color: var(--text); background: #17202d; font-size: 11px; }
+.t-editor-actions #t-editor-save { border-color: rgba(74,222,128,.55); color: #bbf7d0; }
+.t-editor-note { color: var(--dim); font-size: 10px; line-height: 1.45; }
 .t-result { text-align: center; padding: 6px 0 2px; }
 .t-result-title { font-size: 30px; font-weight: 900; letter-spacing: 10px; animation: t-result-rise .7s var(--ease); }
 .t-result-victory .t-result-title { color: var(--gold-2); text-shadow: 0 0 24px var(--gold-glow); }

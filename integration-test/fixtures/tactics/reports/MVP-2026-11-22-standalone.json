@@ -1,22 +1,18 @@
 {
-  "stage": "mvp-standalone",
+  "stage": "MVP-standalone-artifact",
   "executed": true,
-  "date": "2026-11-22",
+  "executedAt": "2026-11-22T14:20:32.199Z",
+  "sourceHead": "08d7fbe",
+  "sourceDirty": true,
   "artifact": "tactics/mvp-standalone.html",
-  "bytes": 176763,
-  "sha256": "63789a3cb2b114a16c9b3cf395b868ba9713ea35f54c7edaff406820a9a5d0a2",
-  "builder": "tactics/tools/build-demo-html.cjs（esbuild IIFE + CSS 内联；函数式 replacer 防 $ 污染）",
-  "buildAssertions": {"passed": 3, "failed": 0, "cases": [
-    {"id": "bundle-inputs", "pass": true, "actual": "27 模块入包，11 个关键模块（battle/movement/range/damage/ai/demo-fixture/clock/scheduler/parser/main/js-yaml）存在性断言通过"},
-    {"id": "no-external-import", "pass": true, "actual": "产物零外部 import（IIFE 自包含）"},
-    {"id": "script-close-count", "pass": true, "actual": "全文恰 1 个 </script 闭合（内容内 </script 已转义）"}
-  ]},
-  "browser": {"mode": "IAB-http", "url": "http://127.0.0.1:8126/tactics/mvp-standalone.html", "passed": 4, "failed": 0, "pending": 0, "cases": [
-    {"id": "boot", "pass": true, "actual": "5 单位载入，先锋 t=83.33 现行，主1/移动6"},
-    {"id": "self-contained", "pass": true, "actual": "外链引用 0、子资源请求 0（完全自包含）"},
-    {"id": "inline-css", "pass": true, "actual": "document.styleSheets=1，界面正常渲染"},
-    {"id": "attack-flow", "pass": true, "actual": "火舌预览→确认：main 1→0、MP 30→27；本次掷骰守卫闪避（双骰命闪正常结算）"}
-  ]},
-  "notVerified": ["file:// 双击直接打开：IAB 不能导航 file: 协议，未验证；单文件无模块加载/无外链，预期可用，异常时用启动Demo.bat"],
-  "boundary": "本地 Demo 单文件分发；不是酒馆正则产物，正式 build-regex.cjs 契约 A/B 仍归后置阶段"
+  "scriptCloseCount": 1,
+  "bytes": 749374,
+  "sha256": "0fdb0e6ed8ea622dda0202074c7a2cb580698f0909750e23f969717c6eef3344",
+  "zeroExternalBusinessImport": true,
+  "scriptCloseCountPass": true,
+  "buildAssertions": {
+    "requiredInputs": 22,
+    "bundledInputs": 37,
+    "requiredSymbols": 20
+  }
 }

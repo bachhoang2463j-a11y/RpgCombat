@@ -6,8 +6,10 @@
 // 独立页模式：酒馆变量 API 缺失时装内存宿主（真实 storage 路径不变）。
 // ==========================================
 
-import { parseYamlText } from './parser.mjs';
-import { loadTacticsRoster, readTacticsState, saveTacticsState } from './storage.mjs';
+import { parseYamlText, parseSkillEntry, parseItemEntry } from './parser.mjs';
+import { loadTacticsRoster, readTacticsRoster, readTacticsState, saveTacticsRoster, saveTacticsState } from './storage.mjs';
+import { buildConfigPackage, finalizeImportDraft } from './config-package.mjs';
+import { CONFIG_PACKAGE_CONFIG_KEYS, CONFIG_PACKAGE_PERSIST_KEYS } from './protocol.mjs';
 import { applyLoad, emptyBattleState } from './lifecycle.mjs';
 import { createSandbox } from './sandbox.mjs';
 import { buildShell } from './ui-shell.mjs';
@@ -140,26 +142,27 @@ export function buildViewData(block, resolvedHeroes, scene, positions, combatTok
   const units = [];
   const footprintsById = {};
   const occ = new Map();
-  const addUnit = (src, side) => {
-    const sp = splitEmojiName(src.name);
-    const key = side + ':' + sp.name;
-    const n = (occ.get(key) || 0) + 1;
-    occ.set(key, n);
-    const id = deriveUnitId(side, sp.name, n);
-    const fpIn = src.footprint;
-    const fp = fpIn && fpIn.width > 0 && fpIn.height > 0
-      ? { width: Math.round(fpIn.width), height: Math.round(fpIn.height) }
-      : { width: 1, height: 1 };
-    footprintsById[id] = fp;
-    units.push({
-      id, side, name: sp.name, emoji: sp.emoji, footprint: fp, img: src.img || null,
-      avatarUrl: sp.emoji ? null : resolveAvatarUrl({ img: src.img, name: sp.name }, heroAvatarUrl),
-      bars: { hp: src.hp == null ? src.maxHp : src.hp, maxHp: src.maxHp || 0, mp: src.mp == null ? src.maxMp : src.mp, maxMp: src.maxMp || 0 },
-      skills: Array.isArray(src.skills) ? src.skills : [],
-      items: Array.isArray(src.items) ? src.items : [],
-      ref: src,
-    });
-  };
+    const addUnit = (src, side) => {
+      const identity = splitEmojiName(src.name);
+      const display = splitEmojiName(src.displayName || identity.name);
+      const key = side + ':' + identity.name;
+      const n = (occ.get(key) || 0) + 1;
+      occ.set(key, n);
+      const id = deriveUnitId(side, identity.name, n);
+      const fpIn = src.footprint;
+      const fp = fpIn && fpIn.width > 0 && fpIn.height > 0
+        ? { width: Math.round(fpIn.width), height: Math.round(fpIn.height) }
+        : { width: 1, height: 1 };
+      footprintsById[id] = fp;
+      units.push({
+        id, side, name: display.name || identity.name, emoji: display.emoji || identity.emoji, footprint: fp, img: src.img || null,
+        avatarUrl: display.emoji ? null : (src.avatarUrl || resolveAvatarUrl({ img: src.img, name: identity.name }, heroAvatarUrl)),
+        bars: { hp: src.hp == null ? src.maxHp : src.hp, maxHp: src.maxHp || 0, mp: src.mp == null ? src.maxMp : src.mp, maxMp: src.maxMp || 0 },
+        skills: Array.isArray(src.skills) ? src.skills : [],
+        items: Array.isArray(src.items) ? src.items : [],
+        ref: src,
+      });
+    };
   (resolvedHeroes || []).forEach(h => addUnit(h, 'hero'));
   (block.enemies || []).forEach(e => addUnit(e, 'enemy'));
 
@@ -218,6 +221,8 @@ export function createApp(rootEl, opts = {}) {
   const shown = new Map();   // 显示态资源（接触拍点前保持旧值）
   let unitStyles = {};       // 单位表现风格：我方职业 / 敌方分级（只影响画面与声音）
   const hiddenLog = new Set();
+  let editorDraft = null;
+  let editorOverrides = new Map();
 
   shell.onUiSound = (kind) => ui(kind);
   shell.onUnitClick = (unitId) => {
@@ -227,7 +232,7 @@ export function createApp(rootEl, opts = {}) {
     shell.setSelected(unitId);
   };
   shell.onReset = () => restart();
-  shell.settings = { html: () => soundSettingsHtml(), bind: () => {} };
+  shell.settings = { html: settingsHtml, bind: bindSettings };
   sandbox.onSelect((unit) => { shell.setSelected(unit ? unit.id : null); });
   sandbox.onCancel(() => cancelStep());
 
@@ -257,7 +262,34 @@ export function createApp(rootEl, opts = {}) {
     const nextToken = {};
     buildViewData(block, block.heroes, scene, result.sceneState.positions, nextToken);
     const roster = loadTacticsRoster(block, []);
-    const nextView = buildViewData(block, roster.heroes, scene, result.sceneState.positions, nextToken);
+    let nextView = buildViewData(block, roster.heroes, scene, result.sceneState.positions, nextToken);
+    const overrideKey = block.sceneId + '\u0000' + block.battleId;
+    const localOverrides = editorOverrides.get(overrideKey);
+    if (localOverrides) {
+      for (const u of nextView.units) {
+        const patch = localOverrides[u.id];
+        if (!patch) continue;
+        if (u.side === 'enemy' && patch.ref) {
+          Object.assign(u.ref, structuredClone(patch.ref));
+          u.name = patch.displayName || u.name;
+          const display = splitEmojiName(u.name);
+          u.emoji = display.emoji;
+          u.avatarUrl = display.emoji ? null : resolveAvatarUrl({ img: u.ref.img, name: display.name }, heroAvatarUrl);
+          u.skills = u.ref.skills || [];
+          u.items = u.ref.items || [];
+          u.footprint = u.ref.footprint || u.footprint;
+          nextView.footprintsById[u.id] = u.footprint;
+        }
+        if (patch.resources) {
+          u.ref.hp = patch.resources.hp;
+          u.ref.mp = patch.resources.mp;
+          u.ref.tp = patch.resources.tp;
+          u.bars = { hp: patch.resources.hp, maxHp: u.ref.maxHp || 0, mp: patch.resources.mp, maxMp: u.ref.maxMp || 0 };
+        }
+        (u.skills || []).forEach(sk => { if (sk.maxUses > 0) sk.usesRemaining = sk.maxUses; });
+        (u.items || []).forEach(it => { if (it.maxUses > 0) it.usesRemaining = it.maxUses; });
+      }
+    }
     saveTacticsState(result.state);
     if (!openingStates.has(block.sceneId)) openingStates.set(block.sceneId, structuredClone(result.sceneState));
     currentYamlText = text;
@@ -309,14 +341,8 @@ export function createApp(rootEl, opts = {}) {
   function unitById(id) { return currentViewData.units.find(u => u.id === id) || null; }
   function currentUnit() { return battle && currentViewData ? unitById(battle.snapshot().currentId) : null; }
   function isHeroTurn() { const u = currentUnit(); return !!(u && u.side === 'hero' && !battle.snapshot().terminal); }
-  // 技能是否可在战棋中发动：主行动 + MP + 已迁移的空间范围（原版技能栏据此灰显/排序）
-  function skillUsable(skill) {
-    const u = currentUnit();
-    const r = battle.snapshot().resources;
-    const cost = skill.actionCost || { main: 1, aux: 0 };
-    return !!(u && r && r.main >= (cost.main || 0) && r.aux >= (cost.aux || 0) && !skill.isGroup &&
-      ['单体', '直线', '扇形', '圆形', '全域', '爆炸'].includes(skill.range && skill.range.type) && u.ref.mp >= (skill.cost || 0));
-  }
+  function skillUsable(skill) { return !!(battle && battle.skillStatus(skill).ok); }
+  function skillReason(skill) { return battle ? battle.skillStatus(skill).reason || '' : '当前不能使用技能'; }
   function skillOfKey(key) {
     if (key === 'attack') return BASIC_ATTACK;
     const m = /^sk:(\d+)$/.exec(key || '');
@@ -346,11 +372,12 @@ export function createApp(rootEl, opts = {}) {
     shell.renderCommand({
       unit: u, terminal: !!snap.terminal, playable: hero, serial: snap.actionSerial,
       resources: r ? { moveRemaining: r.moveRemaining, moveMax: u.ref.moveDistance, sprintRemaining: r.sprintRemaining || 0, main: r.main, aux: r.aux, mp: u.ref.mp } : null,
-      carrying, endArmed: performance.now() < endArmedUntil,
+      carrying, preparation: snap.preparation, chargeInventory: snap.chargeInventory, endArmed: performance.now() < endArmedUntil,
       aimHint: !hero || !aim ? null : pending
         ? '【' + esc(aim.skill.name) + '】已锁定<br>再次点击目标或 Enter 发动'
         : '【' + esc(aim.skill.name) + '】请在地图上选择目标',
       canUse: skillUsable,
+      skillReason,
       onSkill: (idx) => handleCommand('sk:' + idx),
       onAttack: () => handleCommand('attack'),
       onEnd: () => handleCommand('end'),
@@ -505,6 +532,11 @@ export function createApp(rootEl, opts = {}) {
 
   function handleFieldAction(kind) {
     if (!battle || !isHeroTurn() || busy) return;
+    if (kind === 'prepare' || kind === 'cancel-charge') {
+      const result = kind === 'prepare' ? battle.advancePreparation() : battle.cancelPreparation();
+      if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return; }
+      ui('confirm'); refreshBattle(); idleOverlay(); return;
+    }
     if (kind === 'sprint') {
       const result = battle.sprint();
       if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return; }
@@ -595,6 +627,14 @@ export function createApp(rootEl, opts = {}) {
     ui('confirm');
     const res = battle.attack(act.skill, p.aim);
     if (!res.ok) { setBusy(false); ui('deny'); shell.showLog(res.reason, 'warn'); refreshBattle(); return; }
+    if (res.preparing) {
+      if (myFlow !== flow) return;
+      setBusy(false);
+      refreshBattle();
+      shell.showLog(res.logTo > res.logFrom ? battle.snapshot().log[res.logTo - 1] : act.skill.name + ' 正在准备', 'act');
+      sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: act.skill, query: null });
+      return;
+    }
     await playAttackResult(res);
     if (myFlow !== flow) return;
     afterHeroAction();
@@ -775,6 +815,190 @@ export function createApp(rootEl, opts = {}) {
   }
 
   function setBusy(on) { busy = !!on; shell.setBusy(busy); }
+
+  function editorSkillRows(skills) {
+    return (skills || []).filter(s => s && !s._inGroup).map(s => {
+      const row = structuredClone(s);
+      delete row.usesRemaining; delete row._explicit; delete row._inGroup; delete row.parentName;
+      const clean = child => {
+        delete child.usesRemaining; delete child._explicit; delete child._inGroup; delete child.parentName;
+        (child.children || []).forEach(clean);
+      };
+      (row.children || []).forEach(clean);
+      return row;
+    });
+  }
+  function editorItemRows(items) {
+    return (items || []).map(it => {
+      const row = structuredClone(it);
+      delete row.count; delete row.usesRemaining; delete row._explicit; delete row._sbMissing;
+      (row.children || []).forEach(child => { delete child.usesRemaining; delete child._explicit; delete child._inGroup; delete child.parentName; });
+      return row;
+    });
+  }
+  function editorConfig(unit) {
+    const cfg = {};
+    CONFIG_PACKAGE_CONFIG_KEYS.filter(k => k !== 'actCount').forEach(k => {
+      if (Object.prototype.hasOwnProperty.call(unit.ref, k)) cfg[k] = structuredClone(unit.ref[k]);
+    });
+    return cfg;
+  }
+  function makeEditorDraft() {
+    const saved = readTacticsRoster();
+    const persistByName = new Map((saved?.heroes || []).map(h => [h.name, h.persist || {}]));
+    return {
+      selectedId: currentViewData.units[0]?.id || '',
+      units: currentViewData.units.map(u => ({
+        id: u.id, side: u.side, name: u.ref.name, displayName: u.ref.displayName || u.name,
+        config: editorConfig(u), persist: structuredClone(persistByName.get(u.ref.name) || u.ref.persist || {}),
+        skills: editorSkillRows(u.skills), items: editorItemRows(u.items),
+        resources: { hp: u.ref.hp, mp: u.ref.mp, tp: u.ref.tp },
+      })),
+      existingHeroes: (saved?.heroes || []).map(h => structuredClone(h)),
+    };
+  }
+  function selectedEditorUnit() {
+    return editorDraft && editorDraft.units.find(u => u.id === editorDraft.selectedId);
+  }
+  function editorConfigFields(row) {
+    const fields = ['maxHp', 'maxMp', 'maxTp', 'atk', 'def', 'spd', 'evasion', 'strength', 'totalWeight', 'moveDistance', 'perception'];
+    const numbers = fields.map(k => '<label>' + escapeText(k) + '<input data-editor-config="' + k + '" type="number" value="' + (row.config[k] == null ? '' : escapeText(row.config[k])) + '"></label>').join('');
+    const fp = row.config.footprint || { width: 1, height: 1 };
+    const prototype = ['标准人形', '轻型生物', '大型生物'].map(p => '<option value="' + p + '"' + (row.config.prototype === p ? ' selected' : '') + '>' + p + '</option>').join('');
+    return '<div class="t-editor-stats">' + numbers +
+      '<label>原型<select data-editor-config="prototype"><option value="">不指定</option>' + prototype + '</select></label>' +
+      '<label>职业<input data-editor-config="classType" type="text" value="' + escapeText(row.config.classType || '') + '"></label>' +
+      '<label>头像<input data-editor-config="img" type="text" value="' + escapeText(row.config.img || '') + '"></label>' +
+      '<label>占格宽<input data-editor-config="footprint.width" type="number" value="' + escapeText(fp.width) + '"></label>' +
+      '<label>占格高<input data-editor-config="footprint.height" type="number" value="' + escapeText(fp.height) + '"></label>' +
+      '<label class="t-editor-check"><input data-editor-config="isWise" type="checkbox"' + (row.config.isWise ? ' checked' : '') + '>智慧</label></div>';
+  }
+  function editorPersistFields(row) {
+    return '<div class="t-editor-persist">' + CONFIG_PACKAGE_PERSIST_KEYS.map(k => '<label><input data-editor-persist="' + k + '" type="checkbox"' + (row.persist[k] !== false ? ' checked' : '') + '>' + escapeText(k.replace(/^persist/, '')) + '</label>').join('') + '</div>';
+  }
+  function captureEditorForm(body) {
+    const row = selectedEditorUnit();
+    if (!row) return;
+    const json = id => JSON.parse(body.querySelector('#' + id).value);
+    row.displayName = body.querySelector('#t-editor-display-name').value.trim() || row.name;
+    const cfg = {};
+    body.querySelectorAll('[data-editor-config]').forEach(el => {
+      const key = el.dataset.editorConfig;
+      if (key === 'isWise') { cfg.isWise = el.checked; return; }
+      if (key === 'footprint.width' || key === 'footprint.height') return;
+      if (el.value === '') return;
+      cfg[key] = el.type === 'number' ? Number(el.value) : el.value;
+    });
+    const width = body.querySelector('[data-editor-config="footprint.width"]').value;
+    const height = body.querySelector('[data-editor-config="footprint.height"]').value;
+    if (width !== '' && height !== '') cfg.footprint = { width: Number(width), height: Number(height) };
+    row.config = cfg;
+    row.persist = {};
+    body.querySelectorAll('[data-editor-persist]').forEach(el => { row.persist[el.dataset.editorPersist] = el.checked; });
+    row.skills = json('t-editor-skills');
+    row.items = json('t-editor-items');
+    row.resources.hp = Number(body.querySelector('#t-editor-hp').value);
+    row.resources.mp = Number(body.querySelector('#t-editor-mp').value);
+    if (!Number.isFinite(row.resources.hp) || row.resources.hp < 0 || !Number.isFinite(row.resources.mp) || row.resources.mp < 0) throw new Error('本场 HP/MP 必须为非负数');
+    if (!Array.isArray(row.skills) || !Array.isArray(row.items)) throw new Error('技能和物品必须填写 JSON 数组');
+  }
+  function settingsHtml() {
+    if (!currentViewData) return soundSettingsHtml();
+    editorDraft = makeEditorDraft();
+    const options = editorDraft.units.map(u => '<option value="' + escapeText(u.id) + '">' + escapeText((u.side === 'hero' ? '我方 · ' : '敌方 · ') + u.displayName) + '</option>').join('');
+    return soundSettingsHtml() + '<h4 class="t-panel-h">角色与技能配置</h4>' +
+      '<div class="t-editor-form"><label>角色<select id="t-editor-unit">' + options + '</select></label>' +
+      '<label>显示名称<input id="t-editor-display-name" type="text"></label>' +
+      '<div class="t-editor-resources"><label>本场 HP<input id="t-editor-hp" type="number" min="0"></label><label>本场 MP<input id="t-editor-mp" type="number" min="0"></label></div>' +
+      '<h5 class="t-panel-h">角色属性</h5><div id="t-editor-config-fields"></div>' +
+      '<h5 class="t-panel-h">持久化属性</h5><div id="t-editor-persist-fields"></div>' +
+      '<label>技能与组内子技能 JSON<textarea id="t-editor-skills" spellcheck="false"></textarea></label>' +
+      '<label>物品定义、绑定与变体用法 JSON<textarea id="t-editor-items" spellcheck="false"></textarea></label>' +
+      '<div id="t-editor-source" class="t-editor-source"></div><div id="t-editor-error" role="status" class="t-editor-error"></div>' +
+      '<div class="t-editor-actions"><button type="button" id="t-editor-cancel">取消</button><button type="button" id="t-editor-save">保存并重置本场</button></div>' +
+      '<div class="t-editor-note">HP/MP 与敌方配置仅留在当前本场内存；限次、冷却和行动进度会在保存后重置。YAML 显式配置仍优先于持久档。配置包导入/导出留在 P11。</div></div>';
+  }
+  function fillEditorForm(body) {
+    const row = selectedEditorUnit();
+    if (!row) return;
+    body.querySelector('#t-editor-display-name').value = row.displayName;
+    body.querySelector('#t-editor-hp').value = row.resources.hp;
+    body.querySelector('#t-editor-mp').value = row.resources.mp;
+    body.querySelector('#t-editor-config-fields').innerHTML = editorConfigFields(row);
+    body.querySelector('#t-editor-persist-fields').innerHTML = editorPersistFields(row);
+    body.querySelector('#t-editor-skills').value = JSON.stringify(row.skills, null, 2);
+    body.querySelector('#t-editor-items').value = JSON.stringify(row.items, null, 2);
+    const live = currentViewData.units.find(u => u.id === row.id);
+    const explicit = live && Array.isArray(live.ref._explicit) ? live.ref._explicit.filter(k => CONFIG_PACKAGE_CONFIG_KEYS.includes(k)) : [];
+    body.querySelector('#t-editor-source').textContent = explicit.length ? 'YAML 显式字段：' + explicit.join('、') + '（保存仍可应用于本场；后续载入时 YAML 优先）' : '当前配置来源：本场/持久配置或缺省值';
+    body.querySelector('#t-editor-error').textContent = '';
+  }
+  function bindSettings(body) {
+    if (!body.querySelector('#t-editor-unit')) return;
+    const saveCurrent = () => captureEditorForm(body);
+    fillEditorForm(body);
+    body.querySelector('#t-editor-unit').addEventListener('change', e => {
+      const oldId = editorDraft.selectedId;
+      try {
+        saveCurrent();
+        editorDraft.selectedId = e.target.value;
+        fillEditorForm(body);
+      } catch (err) {
+        e.target.value = oldId;
+        body.querySelector('#t-editor-error').textContent = String(err.message || err);
+      }
+    });
+    body.querySelector('#t-editor-cancel').addEventListener('click', () => { editorDraft = null; shell.closePanel(); });
+    body.querySelector('#t-editor-save').addEventListener('click', () => {
+      try {
+        saveCurrent();
+        persistEditorDraft();
+        editorDraft = null;
+        shell.closePanel();
+        restart();
+      } catch (err) {
+        body.querySelector('#t-editor-error').textContent = String(err.message || err);
+      }
+    });
+  }
+  function persistEditorDraft() {
+    const selected = editorDraft.units;
+    const skills = row => row.skills.map(parseSkillEntry);
+    const items = row => row.items.map(parseItemEntry);
+    const saved = editorDraft.existingHeroes.slice();
+    const byName = new Map(saved.map((h, i) => [h.name, i]));
+    const persistent = [];
+    for (const row of selected.filter(u => u.side === 'hero')) {
+      const cfg = {};
+      CONFIG_PACKAGE_CONFIG_KEYS.filter(k => k !== 'actCount').forEach(k => {
+        if (Object.prototype.hasOwnProperty.call(row.config, k)) cfg[k] = row.config[k];
+      });
+      persistent.push({ name: row.name, displayName: row.displayName, config: cfg,
+        persist: row.persist, skills: skills(row), items: items(row) });
+    }
+    const packageData = buildConfigPackage(persistent, 'all');
+    const clean = finalizeImportDraft(packageData.heroes);
+    clean.forEach(h => {
+      if (byName.has(h.name)) saved[byName.get(h.name)] = h;
+      else { byName.set(h.name, saved.length); saved.push(h); }
+    });
+    saveTacticsRoster({ version: 1, heroes: saved });
+    const overrides = {};
+    for (const row of selected) {
+      const live = currentViewData.units.find(u => u.id === row.id);
+      const ref = structuredClone(live.ref);
+      ref.displayName = row.displayName;
+      if (row.side === 'hero') Object.assign(ref, structuredClone(row.config), { persist: structuredClone(row.persist) });
+      else Object.assign(ref, structuredClone(row.config));
+      const parsedSkills = skills(row);
+      const parsedItems = items(row);
+      const counts = new Map((live.items || []).map(it => [it.name, it.count]));
+      parsedItems.forEach(it => { if (counts.has(it.name)) it.count = counts.get(it.name); });
+      ref.skills = parsedSkills; ref.items = parsedItems;
+      overrides[row.id] = { ref, displayName: row.displayName, resources: structuredClone(row.resources) };
+    }
+    editorOverrides.set(currentViewData.sceneId + '\u0000' + currentViewData.battleId, overrides);
+  }
 
   function soundSettingsHtml() {
     const rep = avHost.resourceReport();

@@ -131,6 +131,7 @@ export function resolveHero(yamlHero, opts = {}) {
   const { persistedHero = null, mmsHero = null, hasProtocolVersion = null } = opts;
   const hero = deepClone(yamlHero);
   const sources = {};
+  if (persistedHero && persistedHero.displayName) hero.displayName = persistedHero.displayName;
 
   const cfg = persistedHero && persistedHero.config || null;
   const yamlHeroExplicit = f => yamlFieldExplicit(yamlHero, f);

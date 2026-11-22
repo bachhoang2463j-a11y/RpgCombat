@@ -70,6 +70,7 @@ export function buildConfigPackage(heroes, scope = 'all') {
   const list = Array.isArray(heroes) ? heroes : [heroes];
   const packed = list.map(h => {
     const entry = { name: h.name };
+    if (h.displayName != null) entry.displayName = h.displayName;
     entry.config = pickWhitelist(h.config || h, CONFIG_PACKAGE_CONFIG_KEYS);
     if (h.persist) entry.persist = pickWhitelist(h.persist, CONFIG_PACKAGE_PERSIST_KEYS);
     // 技能：平铺子行（_inGroup）随组父 children 走（原版口径，防组结构丢失）
@@ -99,6 +100,7 @@ export function validateConfigPackage(pkg) {
 // 导入文件 → 草稿角色形态（白名单投影；不引入未知扩展键）
 function unpackHero(h) {
   const entry = { name: h.name };
+  if (hasOwn(h, 'displayName')) entry.displayName = h.displayName;
   if (hasOwn(h, 'config')) entry.config = pickWhitelist(h.config || {}, CONFIG_PACKAGE_CONFIG_KEYS);
   if (hasOwn(h, 'persist')) entry.persist = pickWhitelist(h.persist || {}, CONFIG_PACKAGE_PERSIST_KEYS);
   if (hasOwn(h, 'skills')) entry.skills = (Array.isArray(h.skills) ? h.skills : []).map(unpackSkill);

@@ -461,6 +461,7 @@ async function t0108(deps) {
   // 构造含组子技能/绑定/显式0/persist 开关的角色（对象形态技能保证显式0）
   const heroA = parser.parseHeroEntry({
     '名字': 'A',
+    '显示名称': 'A·别名',
     '原型': '标准人形',
     '属性': { maxHp: 100, atk: 0, evasion: 0, spd: 100 },
     '技能': [
@@ -477,6 +478,7 @@ async function t0108(deps) {
     ],
     '持久化': { persistAtk: true, persistSpd: false },
   });
+  heroA.displayName = 'A·别名';
   const heroB = parser.parseHeroEntry({ '名字': 'B', '属性': '[Speed:80]', '技能': [], '物品': [] });
 
   // 对象形态限次：usesRemaining 初始 = maxUses（H2 回归锁）
@@ -489,6 +491,7 @@ async function t0108(deps) {
   const pkg = configPackage.buildConfigPackage([heroA, heroB], 'all');
   cases.push(ok('T01-08 包结构', pkg.format === 'rpg-tactics-config' && pkg.version === 1 && pkg.scope === 'all' && pkg.heroes.length === 2, JSON.stringify([pkg.format, pkg.version, pkg.scope])));
   const a = pkg.heroes[0];
+  cases.push(ok('T01-08 显示别名保留', a.displayName === 'A·别名', JSON.stringify(a.displayName)));
   cases.push(ok('T01-08 显式0保留', a.config.atk === 0 && a.config.evasion === 0, JSON.stringify([a.config.atk, a.config.evasion])));
   cases.push(ok('T01-08 persist开关保留', a.persist.persistAtk === true && a.persist.persistSpd === false, JSON.stringify(a.persist)));
   const group = a.skills.find(s => s.isGroup);

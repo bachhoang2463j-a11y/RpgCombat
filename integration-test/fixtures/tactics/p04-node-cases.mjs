@@ -54,6 +54,14 @@ async function p04(m) {
     pSnap.resources.aux === 0 && pSnap.positions.q.col === 5,
     JSON.stringify({ pushedResult, resources: pSnap.resources, hp: pushed.ref.hp, shield: pushed.ref.shield })));
 
+  const collisionTarget = unit('collision', 'enemy', { hp: 10, def: 5, shield: 3 });
+  collisionTarget.ref.shield = 3;
+  const collision = m.damage.applyCollisionDamage(10, collisionTarget.ref);
+  cases.push(ok('T04-06 碰撞伤害按护甲、护盾、HP顺序结算且不掷命闪',
+    collision.rawDmg === 10 && collision.mitigated === 5 && collision.shieldDmg === 3 &&
+    collision.hpDmg === 2 && collisionTarget.ref.hp === 8 && collisionTarget.ref.shield === 0,
+    JSON.stringify({ collision, hp: collisionTarget.ref.hp, shield: collisionTarget.ref.shield })));
+
   const failTarget = unit('f', 'enemy', { hp: 30, strength: 40, totalWeight: 60 });
   const bf = createBattle(m, [unit('p', 'hero', { hp: 30, spd: 200, strength: 40 }), failTarget, unit('e2', 'enemy', { hp: 30, spd: 50 })], { p: { col: 2, row: 2 }, f: { col: 3, row: 2 }, e2: { col: 10, row: 8 } }, room());
   bf.start();
@@ -76,6 +84,26 @@ async function p04(m) {
     droppedSnap.resources.aux === 1 && bc.battleState.combatState.clock.units.d.status === 'active' &&
     droppedSnap.positions.d.col === 3 && droppedSnap.positions.d.row === 4,
     JSON.stringify({ carried, carrying: carriedSnap.carrying, dropped, pos: droppedSnap.positions.d, status: bc.battleState.combatState.clock.units.d.status, resources: droppedSnap.resources, canPlaceThroughCarried })));
+
+  const mover = unit('m', 'hero', { hp: 30, moveDistance: 6, strength: 100, totalWeight: 20 });
+  const downAlly = unit('fallen', 'hero', { hp: 0, totalWeight: 20 });
+  const bm = createBattle(m, [mover, downAlly, unit('foe', 'enemy', { hp: 30, spd: 50 })],
+    { m: { col: 2, row: 2 }, fallen: { col: 3, row: 2 }, foe: { col: 10, row: 8 } }, room());
+  bm.start();
+  const beforeCarryMove = bm.snapshot().resources.moveRemaining;
+  const carryMove = bm.carry('fallen');
+  const reachableWhileCarrying = bm.reachable().byKey.get('4,2');
+  const movedWhileCarrying = bm.move(4, 2);
+  cases.push(ok('T04-07 背负移动每米消耗2米额度且可达域按同倍率收缩',
+    carryMove.ok && reachableWhileCarrying?.cost === 4 && movedWhileCarrying.ok &&
+    movedWhileCarrying.cell.cost === 4 && bm.snapshot().resources.moveRemaining === beforeCarryMove - 4,
+    JSON.stringify({ reachable: reachableWhileCarrying, move: movedWhileCarrying, resources: bm.snapshot().resources })));
+
+  const invalidJump = bm.previewJump(20, 20);
+  cases.push(ok('T04-08 越界落点拒绝且不消耗行动与移动额度',
+    !invalidJump.ok && bm.snapshot().resources.main === 0 && bm.snapshot().resources.aux === 1 &&
+    bm.snapshot().resources.moveRemaining === beforeCarryMove - 4,
+    JSON.stringify({ invalidJump, resources: bm.snapshot().resources })));
 
   return { cases };
 }

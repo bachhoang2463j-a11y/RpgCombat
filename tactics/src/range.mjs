@@ -170,6 +170,7 @@ export function resolveSlotTargets(ctx, casterId, skill, areaTargetIds, aimTarge
     const rangeType = skill && skill.range && skill.range.type;
     const scope = isAttackSlot(tag) && rangeType && rangeType !== '单体' ? 'area' : slotScope(tag);
     const targetIds = scope === 'self' ? (isLive(caster) ? [casterId] : [])
+      : scope === 'single' && !skill.isOthers && side === 'ally' && /^\[(?:再动|单回|单回蓝|单冲|单速|单防|单盾|单瞄|嘲讽|回避|单避|免伤|反击|驱散)\]$/.test(tag || '') ? (isLive(caster) ? [casterId] : [])
       : scope === 'single' ? all.filter(u => u.id === aimTargetId).map(u => u.id)
       : scope === 'area' ? all.filter(u => side === 'ally' ? u.side === caster?.side : side === 'enemy' ? u.side !== caster?.side : false).map(u => u.id)
       : [];

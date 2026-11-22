@@ -49,7 +49,7 @@ async function p06(m) {
   const blockedPositions = { h: { col: 1, row: 4 }, blocker: { col: 4, row: 4 }, locked: { col: 8, row: 4 }, healed: { col: 8, row: 7 } };
   const blockedCtx = ctx(m, open, [caster, blocker, lockedEnemy, lockedAlly], blockedPositions);
   const attack = skill(m, '【点射】[单体;power:5][范围:单体;射程:12]');
-  const heal = skill(m, '【治疗】[单回;power:5][范围:单体;射程:12]');
+  const heal = { ...skill(m, '【治疗】[单回;power:5][范围:单体;射程:12]'), isOthers: true };
   const blockedAttack = range.queryAttack(blockedCtx, 'h', attack, aim(8, 4, 'locked'));
   const healCtx = ctx(m, open, [caster, blocker, lockedAlly], blockedPositions);
   const throughAllyHeal = range.queryAttack(healCtx, 'h', heal, aim(8, 7, 'healed'));

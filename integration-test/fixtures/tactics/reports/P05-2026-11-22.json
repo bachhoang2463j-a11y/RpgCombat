@@ -1,0 +1,74 @@
+{
+  "stage": "P05",
+  "executed": true,
+  "started": "2026-11-22T14:18:31.502Z",
+  "ended": "2026-11-22T14:18:31.726Z",
+  "command": "node tactics/tools/run-tests.cjs --stage=p05",
+  "sourceHead": "08d7fbe",
+  "sourceDirty": true,
+  "exitCode": 0,
+  "passed": 10,
+  "failed": 0,
+  "pending": 0,
+  "groups": [
+    {
+      "id": "T05-01",
+      "passed": 10,
+      "failed": 0,
+      "pending": 0,
+      "cases": [
+        {
+          "id": "T05-stone 同seed完全复现、三种结构可选、双输出由同场景派生",
+          "pass": true,
+          "detail": "{\"theme\":\"stone\",\"structure\":1,\"structureCount\":3,\"art\":8,\"cells\":528,\"objectBoundsOnFloor\":true,\"doorsTouchFloor\":true}"
+        },
+        {
+          "id": "T05-wild 同seed完全复现、三种结构可选、双输出由同场景派生",
+          "pass": true,
+          "detail": "{\"theme\":\"wild\",\"structure\":1,\"structureCount\":3,\"art\":8,\"cells\":528,\"objectBoundsOnFloor\":true,\"doorsTouchFloor\":true}"
+        },
+        {
+          "id": "T05-courtyard 同seed完全复现、三种结构可选、双输出由同场景派生",
+          "pass": true,
+          "detail": "{\"theme\":\"courtyard\",\"structure\":1,\"structureCount\":3,\"art\":7,\"cells\":528,\"objectBoundsOnFloor\":true,\"doorsTouchFloor\":true}"
+        },
+        {
+          "id": "T05 野外主题图元来自现有R13近景类型且逻辑障碍同源",
+          "pass": true,
+          "detail": "[\"wall\",\"wall\",\"wall\",\"wall\",\"tree\",\"boulder\",\"crystal\",\"campfire\"]"
+        },
+        {
+          "id": "T05 语义组布阵支持大型footprint/个体覆盖/硬区域与软约束松弛报告",
+          "pass": true,
+          "detail": "{\"ok\":true,\"placements\":{\"h2\":{\"col\":13,\"row\":3,\"facing\":0},\"e1\":{\"col\":21,\"row\":20,\"facing\":0},\"e2\":{\"col\":19,\"row\":19,\"facing\":0},\"h1\":{\"col\":4,\"row\":4,\"facing\":90}},\"report\":{\"status\":\"ok-with-relaxed-soft-constraints\",\"seed\":99,\"placed\":[\"e1\",\"e2\",\"h1\",\"h2\"],\"relaxed\":[{\"id\":\"r3\",\"relation\":\"adjacent\",\"reason\":\"not-adjacent\",\"subject\":\"h1\",\"object\":\"h2\"},{\"id\":\"r4\",\"relation\":\"surround\",\"reason\":\"not-surrounded\",\"subject\":\"h1\",\"object\":\"e1\"}],\"conflicts\":[]}}"
+        },
+        {
+          "id": "T05 2×2无法进入窄区时返回可诊断硬冲突且不删单位",
+          "pass": true,
+          "detail": "{\"ok\":false,\"placementsById\":{},\"report\":{\"status\":\"hard-conflict\",\"seed\":1,\"placed\":[],\"relaxed\":[],\"conflicts\":[{\"id\":\"locked\",\"reason\":\"no-legal-placement\",\"unitId\":\"giant\",\"anchor\":{\"col\":3,\"row\":3,\"width\":3,\"height\":1}}]}}"
+        },
+        {
+          "id": "T05 trapped-in 检查封闭边界和显式硬出口；near 缺距离拒绝",
+          "pass": true,
+          "detail": "{\"trapped\":{\"ok\":true,\"placementsById\":{\"prisoner\":{\"col\":4,\"row\":4}},\"report\":{\"status\":\"ok\",\"seed\":7,\"placed\":[\"prisoner\"],\"relaxed\":[],\"conflicts\":[]}},\"missingNear\":{\"ok\":false,\"placementsById\":{},\"report\":{\"status\":\"invalid-spec\",\"seed\":3,\"placed\":[],\"relaxed\":[],\"conflicts\":[{\"id\":\"near-required\",\"reason\":\"near-requires-distance\"}]}}}"
+        },
+        {
+          "id": "T05 生成layout/positions存入scene状态，新battle与续载保留地图和物件变化",
+          "pass": true,
+          "detail": "{\"first\":\"new-scene\",\"second\":\"new-battle\",\"resume\":\"resume\",\"seed\":71,\"doors\":{\"door-n\":false}}"
+        },
+        {
+          "id": "T05-06 开场个体覆盖可落合法格，非法覆盖被拒并返回冲突",
+          "pass": true,
+          "detail": "{\"edited\":{\"col\":3,\"row\":3,\"facing\":90},\"illegal\":{\"status\":\"hard-conflict\",\"seed\":402,\"placed\":[],\"relaxed\":[],\"conflicts\":[{\"id\":\"override:h1\",\"reason\":\"blocked-terrain\",\"unitId\":\"h1\",\"placement\":{\"col\":0,\"row\":0},\"conflict\":null}]}}"
+        },
+        {
+          "id": "T05-07 语义布阵与逐人坐标均可解并记录输入长度",
+          "pass": true,
+          "detail": "{\"compactTokens\":284,\"cellTokens\":304,\"compact\":{\"h2\":{\"col\":13,\"row\":3,\"facing\":0},\"e1\":{\"col\":21,\"row\":20,\"facing\":0},\"e2\":{\"col\":19,\"row\":19,\"facing\":0},\"h1\":{\"col\":4,\"row\":4,\"facing\":90}},\"cellByCell\":{\"h1\":{\"col\":4,\"row\":4,\"facing\":90},\"h2\":{\"col\":13,\"row\":3,\"facing\":0},\"e1\":{\"col\":21,\"row\":20,\"facing\":0},\"e2\":{\"col\":19,\"row\":19,\"facing\":0}}}"
+        }
+      ]
+    }
+  ],
+  "errors": null
+}
