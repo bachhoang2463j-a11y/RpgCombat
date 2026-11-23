@@ -335,3 +335,18 @@
 - 未完成门禁：IAB 截图超时，全部基础特效目视比对、完整动画时序、相机缩放和节点回收未验；最终 guard 增补后的完整真实战斗流程仍待补验。内置浏览器没有擅自切换真 Chrome。只读独立审查发现问题后已修复，最后复核无新增明确阻断；页面发现的身份/范围保存问题另作真实验证。
 - 文件：tactics/src/{battle,main,action-director,fx-registry,fx-library,demo-fixture,editor-panel}.mjs、vendor/rpg-av/rpg-av.mjs、tools/{extract-rpg-av,list-fx-tags,verify-demo,verify-typical-artifact}、重建单文件；典型 YAML/契约/计划/INDEX；规则与 FX/AV 定向夹具及测试报告。无关未跟踪文件、根 index/README 未修改，未推送。
 - 目的 vs 现状：规则修复、唯一标签与原版基础调用已落地，相关回归及产物专项通过；视觉和最终完整真页门禁仍待验，因此本提交是可追溯业务备份，不宣称全部验收完成。业务 c5c6e1a，日志单向回填。
+
+## 2026-11-24 · 原版通用增益/回复 SVG、粒子与真实采样移植（ce19776）
+- 核心目的：将根 index.html 已有辅助反馈完整复用到战棋真实受益单位，不重设计光环、不以同名注册或飘字代替原版主体；唯一身份协议仍为 `[特效:xxx] → fxTag → 注册表 → 动画`。
+- 原版核对：真实入口 playSVGEffect（index.html:18146）；heal/buff/shield/mpHeal 四模板（18172—18176）和 anim-heal/anim-buff/anim-shield/anim-mp、spawnHealParticles 原样提取。攻击/速度为 buff+atkUp，瞄准 buff+hitUp，闪避及普通净化 buff+defUp，防御 shield+defUp，HP heal+hpHeal，MP/TP共用 mpHeal+mpHeal，护盾 shield+shieldUp。原版没有上述每个属性的独立图形，普通净化无负面也播共用反馈；不引入专属净化中的合成音效。
+- 实现：提取器新增 playGenericSupportFx 实体宿主入口并同步生成 vendor JS/CSS；屏幕锚点换成既有 rectSymbol 世界舞台坐标，使用原版粒子及真实音频管理器，音量恢复原版默认0.5。原版余韵并行等待，句柄自然完成true/取消false，换代清场收回SVG/粒子/音频。
+- 通用条目：升级单体回复、群体回复、群体增益及再动加速的增益槽，选中显式标签后只读取真实effects；每个受益目标一拍、间隔200ms，同拍按图形及音频键去重，原效果对象只揭示一次。先启动回复及溢出盾反馈再同拍揭示；飘字消费后端value/crit/overheal，不重新掷骰或算暴击。
+- 接线：导演镜头名单包含真实effects目标；捕获原scope，在回调及演出结束检查代际，取消后不补揭旧效果到同ID新单位，scope不存在时直接拒绝演出。显示层逐条推进HP/MP/TP/盾后端增量，施法者MP/TP费用与待揭回复分开。典型对局重建从持久roster按名字回读英雄技能及道具子技能fxTag，不覆写其他规则字段；编辑器及合法名清单仍使用getFxTagOptions，无新增UI入口。
+- 样本：现有受影响技能、道具子技能、敌方和召唤辅助已有合法显式标签，因此没有修改其伤害、费用、持续时间或库存。新增support-live.yaml仅为可重复导入的验收对局，覆盖九项明确标签技能，不作为生产技能更改。
+- 验证：相关FX01最终48/48（含真实导演取消/无scope及持久重建行为）通过，语法与提取器--check通过。源码--all严格只执行一次，审查修正前841项通过；修正后只复跑相关测试，不冒称841为最终代码指纹。git diff --check因原样提取的粒子函数6处空白行尾空格返回2，未改根原版或为了格式检查改变提取内容。
+- 独立审查：发现旧scope串写、句柄取消未通知、典型标签刷新回退和音量偏差，均修复；复核确认主要修正并指出无scope空值边界，已补拒绝演出及行为测试通过。未将审查的静态复核当作浏览器运行证据。
+- 产物：tactics/mvp-standalone.html由最终源码重建，1,186,141 B，sha256 `6a2749810787805b2abc0dc69eb43e0a89e8e74a5c80dcee4fb16595e10b3d65`；打包52关键符号/36输入断言，产物专项21/21含原版四模板、粒子、真实增量、持久回读、代际隔离及零外部import/单脚本闭合。没有调用内部会再跑全量的verify-demo.cjs。
+- 真页证据：源码IAB实际loadYaml→正常菜单处理器/地图选点/Enter→beginAttack/导演：自增和他增分别buff/atkUp定位真实受益目标；单回目标20→35HP；群回真实两目标各一次heal/hpHeal，显示及后端35/50；暴击单回+20HP/盾+16，后端及显示55HP/16盾；增攻增防瞄准三效果共享buff/shield图形，后端5/6/7。截图已捕获阶段图形，但IAB旧粒子残留/调度受限，不能代替完整视觉对照。证据在SUPPORT-FX-2026-11-24-browser.json。
+- 未验门禁：IAB跨次调用回退旧源码页/出现about:blank，最终单文件虽可加载但开场持续busy，未成功完成至少一条最终产物战斗流程；编辑器实际保存再刷新未完成；MP/TP/速度/闪避/净化逐项真页流程未完成；原版与战棋完整动画/相机缩放/粒子消退和真实采样可用性/实际听感未完成；真Chrome与安卓模拟器未测。未擅自切换外部浏览器或启动模拟器，未将产物专项冒充真实页面门禁。
+- 文件：tactics/src/{fx-library,action-director,main}.mjs、vendor/rpg-av JS/CSS、tools/{extract-rpg-av,build-demo-html,verify-typical-artifact}.cjs、重建单文件、FX01定向夹具、support-live.yaml及两项验证报告。根index.html仅只读参照，README和无关未跟踪文件未动，无推送。
+- 目的 vs 现状：原版通用辅助表现与真实受益结果接线已落地，定向与产物专项通过；完整视觉、编辑真页和最终单文件交互仍待验，因此本轮为明确带未验门禁的业务备份，不报告全部验收完成。业务ce19776，日志单向回填。
