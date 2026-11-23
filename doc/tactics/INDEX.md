@@ -24,7 +24,7 @@
 | [references/SOURCE.md](references/SOURCE.md) | 视频来源、抽样方式、四张缩略图、校验值、视觉验收目标 | 图片已保存 |
 | [VERIFICATION.md](VERIFICATION.md) | 2026-11-20 首版文档与图片静态校验记录（历史存档） | 历史记录原样保留 |
 | [STATUS.md](STATUS.md) | 战棋现状总览（进度/运行/源码结构/能力边界/特效契约/技能移植入口），独立于回合制 README | 2026-11-23 新增；随 P 阶段推进维护 |
-| [TYPICAL-BATTLE-DEMO-PLAN.md](TYPICAL-BATTLE-DEMO-PLAN.md) | 典型对局战棋 Demo 全技能完整复刻逐项实现文档（D0–D5 样本/后端/前端接线/通用模板/27显式特效/门禁） | 2026-11-23 定稿；待批准后按阶段施工 |
+| [TYPICAL-BATTLE-DEMO-PLAN.md](TYPICAL-BATTLE-DEMO-PLAN.md) | 典型对局战棋 Demo 修订计划，含规则修复、显式 `fxTag`、原版基础 SVG 复用和单文件验收门禁 | 2026-11-24 修订，验证中 |
 
 ## 工时口径（第二轮复核候选估算，非已核定工程量）
 

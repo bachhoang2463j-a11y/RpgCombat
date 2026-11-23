@@ -7,6 +7,7 @@
 // ==========================================
 
 import { pathSegments, pointAtDistance } from './motion.mjs';
+import { FX_SCALE } from './av-host.mjs';
 import { unitCenter } from './geometry.mjs';
 
 const TAU = Math.PI * 2;
@@ -134,41 +135,115 @@ function grow(el, { ms, s0 = 0.4, s1 = 1, hold = 0.7, s2 = s1 * 1.05, o = 1 }) {
 // 条目
 // ==========================================
 
-// 兜底：回合制攻击身份演出（单体/逐目标/面状/法术弹），时长与音量沿用定稿资产
-const identity = {
-  id: 'identity', grade: 'identity', fallback: true,
-  prepareKeys: ctx => PREPARE_KEYS[ctx.identity.subtype] || [],
+// 未知或缺失标签只揭示战斗真值，由导演播放统一命中反馈。
+const neutralImpact = {
+  id: 'neutral-impact', grade: 'identity', fallback: true,
   async play(ctx) {
-    const { av, identity: idn, hits, outcomeMap, audioContext, casterEnt } = ctx;
-    const targetsOrAim = () => hits.length ? hits.map(h => ctx.ent(h.targetId)) : [ctx.aimAnchor()];
-    const outcomes = hits.length ? outcomeMap : (() => 'dodge');
-    const onImpact = visual => ctx.reveal(visual && (visual.id || (visual.dataset && visual.dataset.arcaneTargetId)));
-    if (idn.mode === 'single') {
-      const handle = av.playAttackIdentityFx({ scope: 'single', subtype: idn.subtype, caster: casterEnt, targets: [targetsOrAim()[0]], outcomes, audioContext, onImpact });
-      return ctx.awaitHandle(handle, 900);
-    }
-    if (idn.mode === 'perTarget') {
-      const list = targetsOrAim(), handles = [];
-      for (let i = 0; i < list.length; i++) {
-        if (i && !(await ctx.wait(70))) return false;
-        handles.push(av.playAttackIdentityFx({ scope: 'single', subtype: idn.subtype, caster: casterEnt, targets: [list[i]], outcomes, audioContext, onImpact }));
-      }
-      return (await Promise.all(handles.map(hd => ctx.awaitHandle(hd, 900)))).every(Boolean);
-    }
-    if (idn.mode === 'aoe') {
-      const handle = av.playAttackIdentityFx({ scope: 'aoe', subtype: idn.subtype, caster: casterEnt, targets: targetsOrAim(), outcomes, audioContext, onImpact });
-      return ctx.awaitHandle(handle, 1400);
-    }
-    // projectile
-    const h = hits[0];
-    const fromDom = ctx.avHost.host.spriteOf(ctx.casterId);
-    const toDom = h ? ctx.avHost.host.spriteOf(h.targetId) : ctx.avHost.host.spriteOf(ctx.aimAnchor());
-    const ok = await av.CombatAudioMixer.withContext(audioContext, () => av.playArcaneProjectile(idn.subtype, fromDom, toDom, h ? !h.hit : true));
-    if (h) ctx.reveal(h.targetId);
-    await ctx.wait(260);
-    return ok;
+    for (const h of ctx.hits) ctx.reveal(h.targetId);
+    return true;
   },
 };
+
+// 全局发序负责分组和排序；目标内下标仅传给导演的揭示接口。
+function attackShots(ctx) {
+  const shots = new Map((ctx.result.shots || []).map(shot => [shot.shotIndex, { ...shot, impacts: [] }]));
+  for (const h of ctx.hits) {
+    (h.segments || [h]).forEach((segment, index) => {
+      const shotIndex = segment.shotIndex ?? 0;
+      if (!shots.has(shotIndex)) shots.set(shotIndex, { shotIndex, aim: segment.aim || ctx.result.aim, impacts: [] });
+      shots.get(shotIndex).impacts.push({ targetId: h.targetId, hit: segment.hit, index });
+    });
+  }
+  if (!shots.size && !ctx.result.shots) return [{ aim: ctx.result.aim, impacts: [] }];
+  return [...shots.values()].sort((a, b) => a.shotIndex - b.shotIndex);
+}
+
+// vendor 舞台单位与世界层相差 FX_SCALE，区域锚点独立于真实受击对象。
+function attackAreaBounds(result, shot, range) {
+  const shape = result.query?.shape;
+  const cells = shot.cells || result.query?.cells;
+  const initialAim = result.query?.aim || result.aim;
+  const retargeted = shot.aim && initialAim && (shot.aim.x !== initialAim.x || shot.aim.y !== initialAim.y);
+  const center = !retargeted && (result.query?.blastCenter || shape?.center);
+  const radius = shape?.radius ?? range.radius;
+  let l, r, t, b;
+  if (center && radius != null) {
+    l = center.x - radius; r = center.x + radius;
+    t = center.y - radius; b = center.y + radius;
+  } else if (cells?.length) {
+    l = Math.min(...cells.map(c => c.col)); r = Math.max(...cells.map(c => c.col)) + 1;
+    t = Math.min(...cells.map(c => c.row)); b = Math.max(...cells.map(c => c.row)) + 1;
+  } else return null;
+  const k = PX / FX_SCALE;
+  return { x: (l + r) / 2 * k, y: (t + b) / 2 * k, w: (r - l) * k, h: (b - t) * k,
+    l: l * k, r: r * k, t: t * k, b: b * k };
+}
+
+function basicAttack(name, { subtype = name, area = false, projectile, directional, gap = 0 } = {}) {
+  return {
+    id: 'basic-' + name, grade: 'identity', fxTags: [name],
+    prepareKeys: () => PREPARE_KEYS[name] || [],
+    async play(ctx) {
+      const { av, casterEnt, audioContext } = ctx;
+      const range = ctx.skill?.range;
+      const isArea = ['直线', '扇形', '圆形', '全域', '爆炸'].includes(range?.type);
+      const scope = area === 'only' || (area && isArea) ? 'aoe' : 'single';
+      const reveal = ({ targetId, index }) => ctx.revealSegment(targetId, index);
+      const identity = (targets, outcomes, onImpact, options) => {
+        const handle = av.playAttackIdentityFx({ scope, subtype, caster: casterEnt, targets, outcomes, audioContext, onImpact, ...options });
+        return ctx.awaitHandle(handle, scope === 'aoe' ? 1400 : 900);
+      };
+      const runs = [];
+      for (const [i, shot] of attackShots(ctx).entries()) {
+        const { aim, impacts } = shot;
+        if (i && gap && !(await ctx.wait(gap))) return false;
+        const aimAnchor = () => ctx.anchorAt(aim.x, aim.y);
+        if (directional && range?.type === '扇形') {
+          const origin = ctx.centerOf(ctx.casterId);
+          const dx = aim.x - origin.x, dy = aim.y - origin.y;
+          const scale = range.castRange / (Math.hypot(dx, dy) || 1);
+          const endpoint = ctx.anchorAt(origin.x + dx * scale, origin.y + dy * scale);
+          // 方向锚点固定在射界末端，命闪由各目标的真实结算独立揭示。
+          runs.push(identity([endpoint], () => 'hit', () => impacts.forEach(reveal), { suppressImpact: true }));
+        } else if (projectile && scope === 'single') {
+          const spriteOf = id => ctx.avHost.host.spriteOf(id);
+          for (const impact of impacts.length ? impacts : [null]) {
+            const to = impact ? spriteOf(impact.targetId) : aimAnchor();
+            runs.push(av.CombatAudioMixer.withContext(audioContext, () => av.playArcaneProjectile(projectile, spriteOf(ctx.casterId), to, !impact?.hit)).then(ok => {
+              if (ok && impact) reveal(impact);
+              return ok;
+            }));
+          }
+        } else if (scope === 'aoe') {
+          const byId = new Map(impacts.map(p => [p.targetId, p]));
+          const getImpact = target => byId.get(target?.id || target?.dataset?.arcaneTargetId);
+          const areaBounds = ['爆炸', '火焰', '冰霜', '雷'].includes(subtype) ? attackAreaBounds(ctx.result, shot, range) : null;
+          runs.push(identity(impacts.length || areaBounds ? impacts.map(p => ctx.ent(p.targetId)) : [aimAnchor()],
+            target => getImpact(target)?.hit ? 'hit' : 'dodge', target => {
+              const impact = getImpact(target);
+              if (impact) reveal(impact);
+            }, { areaBounds }));
+        } else {
+          for (const impact of impacts.length ? impacts : [null]) {
+            runs.push(identity([impact ? ctx.ent(impact.targetId) : aimAnchor()],
+              () => impact?.hit ? 'hit' : 'dodge', () => { if (impact) reveal(impact); }));
+          }
+        }
+      }
+      return (await Promise.all(runs)).every(Boolean);
+    },
+  };
+}
+
+const basicAttacks = [
+  basicAttack('枪击', { area: true, gap: 200 }),
+  basicAttack('霰弹', { directional: true, gap: 220 }),
+  basicAttack('火焰', { area: true, projectile: 'fire' }),
+  basicAttack('冰霜', { area: true }), basicAttack('雷击', { area: true, subtype: '雷' }),
+  basicAttack('爆炸', { area: true }), basicAttack('光', { area: true }),
+  basicAttack('毒液'), basicAttack('毒雾', { area: 'only' }), basicAttack('风', { area: 'only' }),
+  basicAttack('刀砍'), basicAttack('拳击'), basicAttack('爪击'), basicAttack('撕咬'), basicAttack('箭矢'),
+];
 
 // 砷弹射击（索恩定稿）：黑弹飞向最远命中目标（全闪避则到射界末端），途经目标在弹头经过时揭示
 const arsenicShot = {
@@ -191,42 +266,18 @@ const arsenicShot = {
   },
 };
 
-// 连发（多段攻击槽 × 单体）：每段一发 L1 身份演出，间隔 200ms，逐段揭示（三连发等通用）
-const volley = {
-  id: 'volley', grade: 'L1', reuseAudio: true,
-  timeline: { totalMs: 500, gapMs: 200 },   // 单发预算；段间 200ms 错拍
-  match: i => i.attackSlots > 1 && i.shape === '单体',
-  prepareKeys: ctx => PREPARE_KEYS[ctx.identity.subtype] || [],
-  async play(ctx) {
-    const { av, hits, audioContext, casterEnt, identity: idn } = ctx;
-    const h = hits[0];
-    if (!h) return identity.play(ctx);
-    const target = ctx.ent(h.targetId);
-    const segs = h.segments || [h];
-    const shots = h.reaction ? ctx.input.attackSlots : segs.length;
-    const handles = [];
-    for (let i = 0; i < shots; i++) {
-      if (i && !(await ctx.wait(this.timeline.gapMs))) return false;
-      const seg = segs[i];
-      handles.push(av.playAttackIdentityFx({ scope: 'single', subtype: idn.subtype, caster: casterEnt, targets: [target],
-        outcomes: () => (seg && seg.hit ? 'hit' : 'dodge'), audioContext, onImpact: () => ctx.revealSegment(h.targetId, i) }));
-    }
-    return (await Promise.all(handles.map(hd => ctx.awaitHandle(hd, 900)))).every(Boolean);
-  },
-};
-
-// 火焰爆炸（[特效:火焰01] × 爆炸范围）L3：蓄势法阵 → 火弹射向接触点 → 收 → 接触点爆燃（fire.webm）→ 余烬/燃烧挂载
+// 火焰爆炸（[特效:火焰01]）L3：蓄势法阵 → 火弹射向接触点 → 收 → 接触点爆燃（fire.webm）→ 余烬/燃烧挂载
 const fireBlast = {
   id: 'fire-blast', grade: 'L3', fxTags: ['火焰01'],
-  match: i => i.shape === '爆炸',
   timeline: { chargeMs: 890, totalMs: 2430, fullscreen: true },   // 650 蓄势 + 240 火弹聚能 + 340 飞行 + 100 收 + 300 爆发 + 800 余韵
   cues: [{ key: 'explosion_aoe_charge', vol: 0.45 }, { key: 'explosion_aoe_blast', vol: 0.70 }, { key: 'fire01', vol: 0.62 }, { key: 'ranshao', vol: 0.30 }],
   prepareKeys() { return this.cues.map(c => c.key); },
   async play(ctx) {
     const { fx, hits, result } = ctx;
     const shape = result.query.shape;
-    const c = worldPx(ctx.centerOf(ctx.casterId)), b = worldPx(shape.center);
-    const R = shape.radius * PX, uid = fx.uid();
+    const center = shape.center || result.aim;
+    const c = worldPx(ctx.centerOf(ctx.casterId)), b = worldPx(center);
+    const radius = shape.radius || 3, R = radius * PX, uid = fx.uid();
     // ① 蓄势：施法者脚下火纹法阵 + 火核压缩 + 火星吸入；爆心预告环
     fx.sfx('explosion_aoe_charge', 0.45);
     const rune = fx.ground(runeHtml(uid, c.x, c.y, 1.5 * PX, '#f97316', '#fde68a', 'ᚲᚨᚢᚾᛟᛋ'), 1500);
@@ -243,7 +294,7 @@ const fireBlast = {
     ctx.after(360, () => fx.shake('light'));
     if (!(await ctx.wait(650))) return false;
     // ② 火弹射向接触点（复用回合制通用火焰弹；dodged=true 只保留弹道，不播其小型命中，爆炸由本条目承担）
-    const anchor = ctx.anchorAt(shape.center.x, shape.center.y);
+    const anchor = ctx.anchorAt(center.x, center.y);
     const flown = await ctx.av.CombatAudioMixer.withContext(ctx.audioContext, () => ctx.av.playArcaneProjectile('fire', ctx.avHost.host.spriteOf(ctx.casterId), anchor, true));
     if (!flown) return false;
     // ③ 收：预告环向爆心坍缩
@@ -266,8 +317,8 @@ const fireBlast = {
       return { x: b.x, y: b.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d - rnd(0, 20), size: rnd(10, 22), color: pick(['#fde047', '#fb923c', '#ef4444']), core: '#fff7d6', s0: 1, s1: 0.25, dur: rnd(480, 820) };
     }), 1000);
     // 逐目标揭示：按到爆心距离错拍（真实受击名单来自提交结果）
-    const order = hits.map(h => { const p = ctx.centerOf(h.targetId); return { h, d: Math.hypot(p.x - shape.center.x, p.y - shape.center.y) }; }).sort((a, z) => a.d - z.d);
-    for (const { h, d } of order) ctx.after(30 + Math.min(1, d / shape.radius) * 180, () => ctx.reveal(h.targetId));
+    const order = hits.map(h => { const p = ctx.centerOf(h.targetId); return { h, d: Math.hypot(p.x - center.x, p.y - center.y) }; }).sort((a, z) => a.d - z.d);
+    for (const { h, d } of order) ctx.after(30 + Math.min(1, d / radius) * 180, () => ctx.reveal(h.targetId));
     // ⑤ 余韵：余烬上飘、烟尘（同色系中心，不用亮白核）、燃烧挂载
     ctx.after(300, () => {
       particles(fx, Array.from({ length: 26 }, () => ({ x: b.x + rnd(-R, R), y: b.y + rnd(-R * 0.6, R * 0.6), dx: rnd(-14, 14), dy: rnd(-70, -30), size: rnd(4, 8), color: pick(['#fde047', '#fb923c']), core: '#fef9c3', s0: 1, s1: 0.4, dur: rnd(600, 800), delay: rnd(0, 160) })), 1000);
@@ -284,8 +335,7 @@ const fireBlast = {
 
 // 自身再动/加速（无伤害、只作用自身）L2：脚下时针法阵展开 → 加速光点汇入 → 收束闪光 + 徽记飘字
 const selfBoost = {
-  id: 'self-boost', grade: 'L2',
-  match: i => i.selfOnly && (i.grantsMainPoint || i.haste > 0),
+  id: 'self-boost', grade: 'L2', fxTags: ['再动加速'],
   timeline: { totalMs: 950 },
   cues: [{ key: 'herocharge', vol: 0.45 }, { key: 'link_chime', vol: 0.55 }],
   prepareKeys() { return this.cues.map(c => c.key); },
@@ -340,12 +390,12 @@ async function glide(rctx, { ghosts, ms }) {
 
 const zheYing = {
   id: 'evade-shift-ghost', kind: 'reaction', grade: 'L1', fxTags: ['折影步'],
-  match: i => i.canceled && !!i.shift,
   timeline: { totalMs: 600 },
   cues: [{ key: 'hide', vol: 0.32 }, { key: 'link_dash', vol: 0.26 }],
   prepareKeys() { return this.cues.map(c => c.key); },
   async play(rctx) {
     const { fx, shift } = rctx;
+    if (!shift) return true;
     const from = worldPx(unitCenter(shift.from, rctx.footprint)), to = worldPx(unitCenter(shift.to, rctx.footprint));
     fx.sfx('hide', 0.32);
     fx.top(orbHtml(from.x, from.y, 90, 'rgba(129,140,248,0.7)', '#e0e7ff'), 260).firstChild.animate([{ transform: 'scale(0.5)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 240, fill: 'forwards' });
@@ -358,14 +408,14 @@ const zheYing = {
     return ok;
   },
 };
-// 通用回避错位（无专属特效标签）：只滑步，不加残影
+// 回避错位：只滑步，不加残影
 const evadeGlide = {
-  id: 'evade-shift', kind: 'reaction', grade: 'L1', fallback: true,
-  match: i => i.canceled && !!i.shift,
+  id: 'evade-shift', kind: 'reaction', grade: 'L1', fxTags: ['回避错位'],
   timeline: { totalMs: 360 },
   cues: [{ key: 'link_dash', vol: 0.26 }],
   prepareKeys() { return this.cues.map(c => c.key); },
   async play(rctx) {
+    if (!rctx.shift) return true;
     rctx.fx.sfx('link_dash', 0.26);
     return glide(rctx, { ghosts: false, ms: 300 });
   },
@@ -377,8 +427,7 @@ const evadeGlide = {
 
 // 单体即时回复（规则 effects.kind='heal'）L2：掌心光核 → 三缕光丝沿共享贝塞尔飞抵 → 目标绽光 + 回复揭示 → 光粒上浮
 const healMend = {
-  id: 'heal-mend', grade: 'L2',
-  match: i => i.healOnly && i.shape === '单体',
+  id: 'heal-mend', grade: 'L2', fxTags: ['单体回复'],
   timeline: { totalMs: 1000 },   // 260 凝光 + 260 光丝 + 100 绽放 + 380 余韵
   cues: [{ key: 'regen_hum', vol: 0.40 }, { key: 'hpHeal', vol: 0.58 }],
   prepareKeys() { return this.cues.map(c => c.key); },
@@ -423,11 +472,10 @@ const healMend = {
   },
 };
 
-// 浓雾（显式区域 {类型:浓雾}，不按技能名/特效名判断，敌我造雾共用）L3：
+// 浓雾 L3（敌我共用，区域数据提供落点与半径）：
 // 暗场色罩 + 深渊符文阵 + 雾丝吸入 → 雾核抛物线投向接触点 → 收 → 雾毯按真实半径铺开（揭示常驻雾区）→ 雾内单位浮现致盲
 const fogBurst = {
-  id: 'abyss-fog', grade: 'L3',
-  match: i => i.region === 'fog',
+  id: 'abyss-fog', grade: 'L3', fxTags: ['浓雾'],
   timeline: { chargeMs: 900, totalMs: 2350, fullscreen: true },   // 900 蓄势 + 300 投放 + 100 收 + 350 爆发 + 700 余韵
   cues: [{ key: 'mx_vacuum', vol: 0.45 }, { key: 'fog', vol: 0.62 }, { key: 'mx_deep_impact', vol: 0.52 }],
   prepareKeys() { return this.cues.map(c => c.key); },
@@ -573,7 +621,6 @@ const stormGather = {
 // 通天光柱 + 414 圣焰 + 十字光痕 + 全屏闪白 + 重震（揭示伤害）→ 光羽雨落 + 降防碎印 + 暗场渐退
 const holyJudgment = {
   id: 'holy-judgment', grade: 'L4', fxTags: ['圣光01'],
-  match: i => i.attackSlots > 0,
   timeline: { chargeMs: 1300, totalMs: 3300, fullscreen: true, darken: true },   // 1300 蓄势 + 450 爆发 + 1550 余韵
   cues: [{ key: 'light_charge', vol: 0.55 }, { key: 'light01', vol: 0.72 }, { key: 'light_impact', vol: 0.60 }],
   prepareKeys() { return this.cues.map(c => c.key); },
@@ -638,14 +685,14 @@ const holyJudgment = {
 // 主雷 450.webm + 逐目标落雷（按距爆心错拍揭示）+ 地面冲击环 + 闪屏重震 → 麻痹电弧余韵
 const thunderStorm = {
   id: 'thunder-storm', grade: 'L3', fxTags: ['雷击01'],
-  match: i => i.shape === '爆炸',
   timeline: { chargeMs: 900, totalMs: 2400, fullscreen: true },   // 800 汇聚 + 100 收 + 500 落雷 + 1000 余韵
   cues: [{ key: 'thunder_charge', vol: 0.50 }, { key: 'thunder01', vol: 0.72 }, { key: 'thunder_aoe_hit', vol: 0.60 }],
   prepareKeys() { return this.cues.map(c => c.key); },
   async play(ctx) {
     const { fx, hits, result } = ctx;
     const shape = result.query.shape;
-    const b = worldPx(shape.center), R = shape.radius * PX, c = worldPx(ctx.centerOf(ctx.casterId));
+    const center = shape.center || result.aim;
+    const b = worldPx(center), R = (shape.radius || 3) * PX, c = worldPx(ctx.centerOf(ctx.casterId));
     const cloud = { x: b.x, y: b.y - Math.min(R * 0.9, 3 * PX) - 40 };
     // ① 汇聚
     fx.sfx('thunder_charge', 0.50);
@@ -676,7 +723,7 @@ const thunderStorm = {
     webm(ctx, '450.webm', b.x, b.y - 60, Math.max(R * 1.5, 4 * PX), { ms: 1300 });
     fx.top(ringHtml(b.x, b.y, R * 2.1, 'rgba(237,233,254,0.85)', 'rgba(139,92,246,0.6)'), 560).firstChild
       .animate([{ transform: 'scale(0.1)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 540, easing: 'cubic-bezier(0.1,0.8,0.3,1)', fill: 'forwards' });
-    const order = hits.map(hh => { const p = ctx.centerOf(hh.targetId); return { hh, p: worldPx(p), d: Math.hypot(p.x - shape.center.x, p.y - shape.center.y) }; }).sort((u, v) => u.d - v.d);
+    const order = hits.map(hh => { const p = ctx.centerOf(hh.targetId); return { hh, p: worldPx(p), d: Math.hypot(p.x - center.x, p.y - center.y) }; }).sort((u, v) => u.d - v.d);
     order.forEach((o, k) => {
       const delay = Math.min(360, 40 + k * 90);
       ctx.after(delay, () => {
@@ -703,8 +750,7 @@ const thunderStorm = {
 
 // ---------- D3 通用非攻击槽与敌方/召唤空间模板 ----------
 const aoeHeal = {
-  id: 'aoe-heal', grade: 'L2',
-  match: i => i.healOnly && i.shape !== '单体',
+  id: 'aoe-heal', grade: 'L2', fxTags: ['群体回复'],
   timeline: { totalMs: 1000, fullscreen: false, darken: false },
   cues: [{ key: 'hpHeal', vol: 0.55 }],
   prepareKeys() { return ['hpHeal']; },
@@ -728,8 +774,7 @@ const aoeHeal = {
 };
 
 const allyBuff = {
-  id: 'ally-buff', grade: 'L2',
-  match: i => !i.attackSlots && !i.healOnly && !i.barrierSub && i.region !== 'fog' && i.isAllyOnly && !(i.selfOnly && (i.grantsMainPoint || i.haste > 0)),
+  id: 'ally-buff', grade: 'L2', fxTags: ['群体增益'],
   timeline: { totalMs: 900, fullscreen: false, darken: false },
   cues: [{ key: 'atkUp', vol: 0.52 }],
   prepareKeys() { return ['atkUp']; },
@@ -750,8 +795,7 @@ const allyBuff = {
 };
 
 const pureDebuff = {
-  id: 'pure-debuff', grade: 'L2',
-  match: i => !i.attackSlots && i.region !== 'fog' && i.isDebuffOnly,
+  id: 'pure-debuff', grade: 'L2', fxTags: ['群体减益'],
   timeline: { totalMs: 900, fullscreen: false, darken: false },
   cues: [{ key: 'enemyDebuff', vol: 0.52 }],
   prepareKeys() { return ['enemyDebuff']; },
@@ -771,8 +815,7 @@ const pureDebuff = {
 };
 
 const chargeDash = {
-  id: 'charge-dash', grade: 'L2',
-  match: i => i.hasChargeDash,
+  id: 'charge-dash', grade: 'L2', fxTags: ['冲锋'],
   timeline: { totalMs: 980, fullscreen: false, darken: false },
   cues: [{ key: 'enemyMeleeGroupHit', vol: 0.62 }],
   prepareKeys() { return ['enemyMeleeGroupHit']; },
@@ -788,8 +831,7 @@ const chargeDash = {
 };
 
 const roarWave = {
-  id: 'roar-wave', grade: 'L2',
-  match: i => i.isMixedSlots && i.shape === '圆形',
+  id: 'roar-wave', grade: 'L2', fxTags: ['咆哮'],
   timeline: { totalMs: 1000, fullscreen: false, darken: false },
   cues: [{ key: 'taunt', vol: 0.58 }],
   prepareKeys() { return ['taunt']; },
@@ -806,13 +848,12 @@ const roarWave = {
 };
 
 const frostBlast = {
-  id: 'frost-blast', grade: 'L3',
-  match: i => i.damageCategories.includes('冰霜') && i.shape === '爆炸',
+  id: 'frost-blast', grade: 'L3', fxTags: ['冰霜爆炸'],
   timeline: { chargeMs: 820, totalMs: 2150, fullscreen: true, darken: false },
   cues: [{ key: 'frost_crystal_impact_fs550267', vol: 0.68 }],
   prepareKeys() { return ['frost_crystal_impact_fs550267']; },
   async play(ctx) {
-    const { fx, hits, result } = ctx, shape = result.query.shape, b = worldPx(shape.center), R = (shape.radius || 5) * PX;
+    const { fx, hits, result } = ctx, shape = result.query.shape, b = worldPx(shape.center || result.aim), R = (shape.radius || 5) * PX;
     fx.ground(ringHtml(b.x, b.y, R * 2, 'rgba(125,211,252,0.55)', 'rgba(56,189,248,0.25)'), 900)
       .firstChild.animate([{ transform: 'scale(1.1)', opacity: 0 }, { transform: 'scale(0.9)', opacity: 0.9, offset: 0.7 }, { transform: 'scale(0.2)', opacity: 1 }], { duration: 820, fill: 'forwards' });
     if (!(await ctx.wait(820))) return false;
@@ -828,13 +869,12 @@ const frostBlast = {
 };
 
 const voidQuake = {
-  id: 'void-quake', grade: 'L2',
-  match: i => i.shape === '爆炸' && i.damageType === '法术' && i.damageCategories.includes('钝击'),
+  id: 'void-quake', grade: 'L2', fxTags: ['虚空震荡'],
   timeline: { totalMs: 1150, fullscreen: false, darken: false },
   cues: [{ key: 'enemyMagicGroup', vol: 0.60 }],
   prepareKeys() { return ['enemyMagicGroup']; },
   async play(ctx) {
-    const { fx, hits, result } = ctx, shape = result.query.shape, b = worldPx(shape.center), R = (shape.radius || 4) * PX;
+    const { fx, hits, result } = ctx, shape = result.query.shape, b = worldPx(shape.center || result.aim), R = (shape.radius || 4) * PX;
     fx.sfx('enemyMagicGroup', 0.60); fx.shake('medium');
     fx.top(ringHtml(b.x, b.y, R * 2.2, 'rgba(192,132,252,0.85)', 'rgba(88,28,135,0.55)'), 620)
       .firstChild.animate([{ transform: 'scale(0.2)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 600, fill: 'forwards' });
@@ -845,8 +885,7 @@ const voidQuake = {
 };
 
 const lineRift = {
-  id: 'line-rift', grade: 'L2',
-  match: i => i.shape === '直线' && i.damageType === '法术',
+  id: 'line-rift', grade: 'L2', fxTags: ['直线裂隙'],
   timeline: { totalMs: 960, fullscreen: false, darken: false },
   cues: [{ key: 'magicKill', vol: 0.58 }],
   prepareKeys() { return ['magicKill']; },
@@ -863,8 +902,7 @@ const lineRift = {
 };
 
 const waterBolt = {
-  id: 'water-bolt', grade: 'L1',
-  match: i => i.damageCategories.includes('水流'),
+  id: 'water-bolt', grade: 'L1', fxTags: ['水流'],
   timeline: { totalMs: 520, fullscreen: false, darken: false },
   cues: [{ key: 'enemyMagic', vol: 0.34 }],
   prepareKeys() { return ['enemyMagic']; },
@@ -878,8 +916,7 @@ const waterBolt = {
 };
 
 const curseBeam = {
-  id: 'curse-beam', grade: 'L1',
-  match: i => i.damageCategories.includes('诅咒'),
+  id: 'curse-beam', grade: 'L1', fxTags: ['诅咒'],
   timeline: { totalMs: 520, fullscreen: false, darken: false },
   cues: [{ key: 'enemyDebuff', vol: 0.34 }],
   prepareKeys() { return ['enemyDebuff']; },
@@ -892,36 +929,8 @@ const curseBeam = {
   },
 };
 
-const sectorVolley = {
-  id: 'sector-volley', grade: 'L1', reuseAudio: true,
-  match: i => i.shape === '扇形' && i.damageCategories.includes('霰弹'),
-  timeline: { totalMs: 560, fullscreen: false, darken: false },
-  cues: [{ key: 'xiandan', vol: 0.55 }],
-  prepareKeys() { return ['xiandan']; },
-  async play(ctx) {
-    const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
-    const segs = hits.flatMap(h => (h.segments || [h]).map((s, idx) => ({ h, s, idx })));
-    const segCount = Math.max(1, ...hits.map(h => (h.segments || [h]).length));
-    for (let si = 0; si < segCount; si++) {
-      const refSeg = segs.find(x => x.idx === si)?.s;
-      const aimPt = worldPx(refSeg?.aim || result.aim);
-      const ang = Math.atan2(aimPt.y - c.y, aimPt.x - c.x);
-      ctx.after(si * 220, () => {
-        fx.sfx('xiandan', 0.55); fx.shake('light');
-        particles(fx, Array.from({ length: 12 }, () => {
-          const a = ang + rnd(-0.45, 0.45), d = rnd(140, 260);
-          return { x: c.x, y: c.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(6, 11), color: '#fb923c', core: '#fffbeb', s0: 1, s1: 0.3, dur: 220 };
-        }), 260);
-        for (const h of hits) ctx.revealSegment(h.targetId, si);
-      });
-    }
-    return ctx.wait(Math.min(560, segCount * 240));
-  },
-};
-
 const reactionKanpo = {
-  id: 'reaction-kanpo', kind: 'reaction', grade: 'L1',
-  match: r => r.kanpo,
+  id: 'reaction-kanpo', kind: 'reaction', grade: 'L1', fxTags: ['看破'],
   timeline: { totalMs: 420, fullscreen: false, darken: false },
   cues: [{ key: 'kanpo', vol: 0.34 }],
   prepareKeys() { return ['kanpo']; },
@@ -937,8 +946,7 @@ const reactionKanpo = {
 };
 
 const reactionSheshen = {
-  id: 'reaction-sheshen', kind: 'reaction', grade: 'L1',
-  match: r => r.sheshen,
+  id: 'reaction-sheshen', kind: 'reaction', grade: 'L1', fxTags: ['舍身'],
   timeline: { totalMs: 420, fullscreen: false, darken: false },
   cues: [{ key: 'sheshen_armor_step', vol: 0.34 }],
   prepareKeys() { return ['sheshen_armor_step']; },
@@ -954,8 +962,7 @@ const reactionSheshen = {
 };
 
 const reactionGuard = {
-  id: 'reaction-guard', kind: 'reaction', grade: 'L1',
-  match: r => r.isGuard,
+  id: 'reaction-guard', kind: 'reaction', grade: 'L1', fxTags: ['格挡'],
   timeline: { totalMs: 400, fullscreen: false, darken: false },
   cues: [{ key: 'shieldUp', vol: 0.30 }],
   prepareKeys() { return ['shieldUp']; },
@@ -1365,7 +1372,7 @@ const xenonBlightFog = {
   cues: [{ key: 'aoe_poison_spell_fs219566', vol: 0.65 }],
   prepareKeys() { return ['aoe_poison_spell_fs219566']; },
   async play(ctx) {
-    const { fx, hits, result } = ctx, shape = result.query.shape, c = worldPx(ctx.centerOf(ctx.casterId)), b = worldPx(shape.center), R = (shape.radius || 8) * PX;
+    const { fx, hits, result } = ctx, shape = result.query.shape, c = worldPx(ctx.centerOf(ctx.casterId)), b = worldPx(shape.center || result.aim), R = (shape.radius || 8) * PX;
     flyOrb(fx, c, { x: (c.x + b.x) / 2, y: Math.min(c.y, b.y) - 90 }, b, { size: 22, color: '#22c55e', core: '#dcfce7', ms: 420, fade: true });
     if (!(await ctx.wait(820))) return false;
     fx.sfx('aoe_poison_spell_fs219566', 0.65); fx.shake('medium');
@@ -1398,8 +1405,7 @@ const vitalFlow = {
 };
 
 const sanctumVeil = {
-  id: 'sanctum-veil', grade: 'L4',
-  match: i => i.fxTag === '圣域帷幕' || (!i.fxTag && i.barrierSub === '法术'),
+  id: 'sanctum-veil', grade: 'L4', fxTags: ['圣域帷幕'],
   timeline: { chargeMs: 1220, totalMs: 3200, fullscreen: true, darken: true },
   cues: [{ key: 'weimu', vol: 0.70 }, { key: 'light_charge', vol: 0.52 }],
   prepareKeys() { return ['weimu', 'light_charge']; },
@@ -1420,7 +1426,11 @@ const sanctumVeil = {
   },
 };
 
-export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, vitalFlow, sanctumVeil, volley, healMend, fogBurst, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, frostBlast, voidQuake, lineRift, waterBolt, curseBeam, sectorVolley, identity, zheYing, mirrorCounter, wizardShield, reactionKanpo, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, kruppAim, sekhmetVow];
+export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, vitalFlow, sanctumVeil, healMend, fogBurst, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, frostBlast, voidQuake, lineRift, waterBolt, curseBeam, ...basicAttacks, neutralImpact, zheYing, mirrorCounter, wizardShield, reactionKanpo, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, kruppAim, sekhmetVow];
+export function getFxTagOptions() {
+  return [...new Set(DEFAULT_FX_ENTRIES.flatMap(entry => entry.fxTags || []))].map(name => ({ name, label: name }));
+}
+
 export function registerDefaultFx(registry) {
   for (const e of DEFAULT_FX_ENTRIES) registry.register(e);
   return registry;

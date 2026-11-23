@@ -27,6 +27,17 @@ import { createEditorPanel } from './editor-panel.mjs';
 import { autoPickChoice } from './reaction-prompt.mjs';
 import { unitCenter } from './geometry.mjs';
 import { createScenarioData, createSeededRandom } from './scenario-data.mjs';
+// 同名 YAML 技能仍保留规则字段，本场编辑仅覆写显式演出标签。
+export function applyEditorFxTags(rows, editedRows) {
+  const byName = new Map((editedRows || []).map(row => [row.name, row]));
+  for (const row of rows || []) {
+    const edited = byName.get(row.name);
+    if (!edited) continue;
+    row.fxTag = edited.fxTag || null;
+    if (row.children) applyEditorFxTags(row.children, edited.children);
+  }
+}
+
 // ---------- P02 固定图库（同一张权威几何，两个 sceneId 身份；不做生成器） ----------
 const SCENE_LIBRARY = {
   'sc-test-room': TEST_ROOM,
@@ -59,7 +70,7 @@ export const DEFAULT_YAML_A = [
   '        原型: 标准人形',
   '        属性: "[HP:30] [MP:20] [Atk:12] [Speed:100]"',
   '        技能:',
-  '          - "【火舌】【远程】[MP:6] [power:18] [单体] [射程:15]"',
+  '          - "【火舌】【远程】[MP:6] [power:18] [单体] [射程:15] [特效:火焰]"',
   '        物品: []',
   '    - 角色:',
   '        名字: 书采',
@@ -322,6 +333,10 @@ export function createApp(rootEl, opts = {}) {
       for (const u of nextView.units) {
         const patch = localOverrides[u.id];
         if (!patch) continue;
+        if (u.side === 'hero' && patch.ref) {
+          applyEditorFxTags(u.skills, patch.ref.skills);
+          applyEditorFxTags(u.items, patch.ref.items);
+        }
         if (u.side === 'enemy' && patch.ref) {
           Object.assign(u.ref, structuredClone(patch.ref));
           // 显示名只改称呼：身份 emoji（名字前缀）保留，除非新显示名自带 emoji；纯技能编辑不改变敌方显示身份
@@ -350,6 +365,7 @@ export function createApp(rootEl, opts = {}) {
     const unchanged = !forceReset && currentViewData && result.branch === 'resume' && currentViewData.sceneId === nextView.sceneId && currentViewData.battleId === nextView.battleId && JSON.stringify([currentViewData.scene, currentViewData.units, currentViewData.placementsById]) === JSON.stringify([nextView.scene, nextView.units, nextView.placementsById]);
     if (!unchanged) {
       flow++;
+      cancelRetargetPrompt();
       director.cancelAttack();          // 旧攻击 generator 作废（generator.return）
       shell.cancelReactionPrompt();     // 旧反应弹窗/收起胶囊立即关闭并以 null 结算
       avHost.clear({ resetVoices: true });
@@ -607,6 +623,9 @@ export function createApp(rootEl, opts = {}) {
   const isEnemyHit = hit => hit && hit.targetId && unitById(hit.targetId) && unitById(hit.targetId).side !== 'hero';
 
   let retargetPrompt = null;
+  function cancelRetargetPrompt() {
+    if (retargetPrompt) retargetPrompt.finish(null);
+  }
   function beginRetargetPrompt(req) {
     if (retargetPrompt) retargetPrompt.finish(null);
     return new Promise(resolve => {
@@ -633,7 +652,7 @@ export function createApp(rootEl, opts = {}) {
       const r = retargetPrompt.req;
       const a = aimFor(r.skill, hit);
       if (a) {
-        const q = battle.previewAttack(r.skill, a);
+        const q = battle.previewRetarget(r.skill, a, r.casterId, r.slotIndex);
         sandbox.setPreview({ kind: 'attack', casterId: r.casterId, skill: r.skill, query: q, locked: false });
         sandbox.setHint({ x: a.x, y: a.y }, q.ok ? '第 ' + r.shotIndex + ' 段转火 · 点击确认' : q.reason, q.ok ? null : 'bad');
       } else {
@@ -678,7 +697,7 @@ export function createApp(rootEl, opts = {}) {
       const r = retargetPrompt.req;
       const a = aimFor(r.skill, hit);
       if (!a) { ui('deny'); return true; }
-      const q = battle.previewAttack(r.skill, a);
+      const q = battle.previewRetarget(r.skill, a, r.casterId, r.slotIndex);
       if (!q.ok) { ui('deny'); shell.showLog(q.reason, 'warn'); return true; }
       ui('lock');
       retargetPrompt.finish(a);
@@ -1220,7 +1239,7 @@ export function createApp(rootEl, opts = {}) {
   function editorItemRows(items) {
     return (items || []).map(it => {
       const row = structuredClone(it);
-      delete row.count; delete row.usesRemaining; delete row._explicit; delete row._sbMissing;
+      delete row.usesRemaining; delete row._explicit; delete row._sbMissing;
       (row.children || []).forEach(child => { delete child.usesRemaining; delete child._explicit; delete child._inGroup; delete child.parentName; });
       return row;
     });
@@ -1242,9 +1261,9 @@ export function createApp(rootEl, opts = {}) {
         const explicit = Array.isArray(u.ref._explicit) ? u.ref._explicit.filter(k => CONFIG_PACKAGE_CONFIG_KEYS.includes(k)) : [];
         const tier = TIER[(unitStyles[u.id] || {}).tier] || TIER.fodder;
         return {
-          id: u.id, side: u.side, name: u.ref.name, displayName: u.ref.displayName || u.name, emoji: u.emoji, avatarUrl: u.avatarUrl,
+          id: u.id, side: u.side, name: u.ref.name || u.name, displayName: u.ref.displayName || u.name, emoji: u.emoji, avatarUrl: u.avatarUrl,
           badge: u.side === 'hero' ? (u.ref.classType || '无职业') : tier[0], tierClass: tier[1],
-          config: editorConfig(u), persist: structuredClone(persistByName.get(u.ref.name) || u.ref.persist || {}),
+          config: editorConfig(u), persist: structuredClone(persistByName.get(u.ref.name || u.name) || u.ref.persist || {}),
           skills: editorSkillRows(u.skills), items: editorItemRows(u.items),
           resources: { hp: u.ref.hp, mp: u.ref.mp, tp: u.ref.tp },
           sourceText: u.side === 'hero'
@@ -1350,6 +1369,7 @@ export function createApp(rootEl, opts = {}) {
 
   function destroy() {
     flow++;
+    cancelRetargetPrompt();
     director.cancelAttack();
     shell.cancelReactionPrompt();
     rootEl.ownerDocument.removeEventListener('keydown', onKey);
@@ -1368,7 +1388,12 @@ export function createApp(rootEl, opts = {}) {
     isBusy: () => busy,
     resources: () => avHost.resourceReport(),
     command: (key) => handleCommand(key),
-    endTurn: () => { endArmedUntil = performance.now() + 5000; requestEnd(); },
+    endTurn: () => {
+      if (!battle || busy || !isHeroTurn()) return false;
+      endArmedUntil = performance.now() + 5000;
+      requestEnd();
+      return true;
+    },
   };
 }
 

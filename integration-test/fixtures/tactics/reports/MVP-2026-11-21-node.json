@@ -1,16 +1,1459 @@
 {
   "stage": "MVP-final-node",
   "executed": true,
-  "started": "2026-11-21T02:22:49.375Z",
-  "ended": "2026-11-21T02:22:51.426Z",
-  "sourceHead": "d195c1a",
+  "started": "2026-11-23T19:30:34.149Z",
+  "ended": "2026-11-23T19:30:38.085Z",
+  "sourceHead": "7354d97",
   "sourceDirty": true,
   "command": "node tactics/tools/run-tests.cjs --all",
   "exitCode": 0,
-  "passed": 349,
+  "passed": 834,
   "failed": 0,
   "pending": 0,
   "stages": [
+    {
+      "stage": "feedback05",
+      "groups": [
+        {
+          "id": "TFB-05",
+          "passed": 30,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TFB 埃利奥特造雾半径5射程12",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 深潜者造雾数值不变",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类伤害 伤害",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类伤害 钝击",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类伤害 切割",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类伤害 枪击",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类伤害 霰弹",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类伤害 火焰",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类伤害 圣光",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类伤害 雷电",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类伤害 水流",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类伤害 冰霜",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类伤害 诅咒",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类伤害 穿透",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类伤害 散射",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类非伤害 回复",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类非伤害 致盲",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类非伤害 瞄准",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类非伤害 再动",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 分类非伤害 眩晕",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 混合槽按伤害分类",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 直线可穿友军",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 不能停在友军格",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 不能停在敌军格",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 斜线可穿友军",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 不为只有友军受盲的造雾计正收益",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 敌方受盲仍可施放造雾",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 敌友各一受盲净收益零不施放",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 不奖励仅伤友军的无差别攻击",
+              "pass": true,
+              "detail": "\"\""
+            },
+            {
+              "id": "TFB 不奖励为敌方治疗",
+              "pass": true,
+              "detail": "\"\""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": "typical-skills",
+      "groups": [
+        {
+          "id": "TT-SKILLS",
+          "passed": 108,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·迅捷愈合法",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·拉莱耶造雾术",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·萨维奇三连发",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·火舞术-精准流火",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·火舞术-压缩爆燃",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·归尘礼赞",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·召雷术",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·灵风术",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·纳克提特障壁术",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·圣域帷幕",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·伊西斯之拥",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·早有准备-预备咏唱",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·早有准备-提前瞄准",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[反应专项] 折影步·回避",
+              "pass": true,
+              "detail": "{\"seen\":true,\"selected\":\"折影步\",\"kind\":\"回避\",\"mpDelta\":4,\"uses\":\"0->0\",\"event\":true,\"outcome\":true,\"guardianId\":null}"
+            },
+            {
+              "id": "TT-SKILL[反应专项] 双莲祛煞·减伤/护盾",
+              "pass": true,
+              "detail": "{\"seen\":true,\"selected\":\"双莲祛煞\",\"kind\":\"减伤/护盾\",\"mpDelta\":0,\"uses\":\"0->1\",\"event\":true,\"outcome\":true,\"guardianId\":null}"
+            },
+            {
+              "id": "TT-SKILL[反应专项] 巫师护盾·减伤/护盾",
+              "pass": true,
+              "detail": "{\"seen\":true,\"selected\":\"巫师护盾\",\"kind\":\"减伤/护盾\",\"mpDelta\":4,\"uses\":\"0->0\",\"event\":true,\"outcome\":true,\"guardianId\":null}"
+            },
+            {
+              "id": "TT-SKILL[反应专项] 净蚀反冲·看破",
+              "pass": true,
+              "detail": "{\"seen\":true,\"selected\":\"净蚀反冲\",\"kind\":\"看破\",\"mpDelta\":5,\"uses\":\"0->1\",\"event\":true,\"outcome\":true,\"guardianId\":null}"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·精华秘酿",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·瓶中之物",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·飞沙化甲",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·谐律之庇",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·静默之域",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·碎裂之响",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·蝎眼钥匙",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 埃利奥特·塞赫美特之愠",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 弗兰克·碎骨连打",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 弗兰克·重击推撞",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 弗兰克·掩体包扎",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 弗兰克·柯尔特三连发",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 弗兰克·温切斯特M1897-鹿弹二连发",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 弗兰克·温切斯特M1897-独头二连发",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 弗兰克·屏息瞄准",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 弗兰克·皇家猎象枪",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 弗兰克·克虏伯1918型",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 弗兰克·早有准备-提前装填",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 弗兰克·早有准备-提前瞄准",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[反应专项] 战壕格斗术·回避",
+              "pass": true,
+              "detail": "{\"seen\":true,\"selected\":\"战壕格斗术\",\"kind\":\"回避\",\"mpDelta\":1,\"uses\":\"0->0\",\"event\":true,\"outcome\":true,\"guardianId\":null}"
+            },
+            {
+              "id": "TT-SKILL[反应专项] 紧急格挡·舍身",
+              "pass": true,
+              "detail": "{\"seen\":true,\"selected\":\"紧急格挡\",\"kind\":\"舍身\",\"mpDelta\":1,\"uses\":\"0->0\",\"event\":true,\"outcome\":true,\"guardianId\":\"responder\"}"
+            },
+            {
+              "id": "TT-SKILL[反应专项] 掩体躲避·回避",
+              "pass": true,
+              "detail": "{\"seen\":true,\"selected\":\"掩体躲避\",\"kind\":\"回避\",\"mpDelta\":1,\"uses\":\"0->0\",\"event\":true,\"outcome\":true,\"guardianId\":null}"
+            },
+            {
+              "id": "TT-SKILL[反应专项] 双生回响牌·减伤/护盾",
+              "pass": true,
+              "detail": "{\"seen\":true,\"selected\":\"双生回响牌\",\"kind\":\"减伤/护盾\",\"mpDelta\":0,\"uses\":\"0->1\",\"event\":true,\"outcome\":true,\"guardianId\":null}"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 玛德琳·无迹可寻",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 玛德琳·寂静指令",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 玛德琳·关节锁",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 玛德琳·从西班牙射击",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 玛德琳·柯尔特三连发",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 玛德琳·死亡编织-双枪扫射",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 玛德琳·早有准备-身形隐匿",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 玛德琳·早有准备-提前瞄准",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[反应专项] 唯快不破·回避",
+              "pass": true,
+              "detail": "{\"seen\":true,\"selected\":\"唯快不破\",\"kind\":\"回避\",\"mpDelta\":1,\"uses\":\"0->0\",\"event\":true,\"outcome\":true,\"guardianId\":null}"
+            },
+            {
+              "id": "TT-SKILL[反应专项] 掩体躲避·回避",
+              "pass": true,
+              "detail": "{\"seen\":true,\"selected\":\"掩体躲避\",\"kind\":\"回避\",\"mpDelta\":1,\"uses\":\"0->0\",\"event\":true,\"outcome\":true,\"guardianId\":null}"
+            },
+            {
+              "id": "TT-SKILL[反应专项] 光与暗之眼·减伤/护盾",
+              "pass": true,
+              "detail": "{\"seen\":true,\"selected\":\"光与暗之眼\",\"kind\":\"减伤/护盾\",\"mpDelta\":0,\"uses\":\"0->1\",\"event\":true,\"outcome\":true,\"guardianId\":null}"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 玛德琳·芭斯特的猫眼石",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 玛德琳·奇异海螺",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 索恩·共生体质",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 索恩·生体流转",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 索恩·“清算”三连发",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 索恩·跟腱切割",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 索恩·砷弹射击",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 索恩·异种坏死雾",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 索恩·早有准备-提前瞄准",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[反应专项] 战斗本能·回避",
+              "pass": true,
+              "detail": "{\"seen\":true,\"selected\":\"战斗本能\",\"kind\":\"回避\",\"mpDelta\":1,\"uses\":\"0->0\",\"event\":true,\"outcome\":true,\"guardianId\":null}"
+            },
+            {
+              "id": "TT-SKILL[反应专项] 声波干扰雷·看破",
+              "pass": true,
+              "detail": "{\"seen\":true,\"selected\":\"声波干扰雷\",\"kind\":\"看破\",\"mpDelta\":0,\"uses\":\"0->1\",\"event\":true,\"outcome\":true,\"guardianId\":null}"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 索恩·铝热投剂",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 索恩·战斗兴奋剂",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 深潜者A·深渊之息",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 深潜者A·拉莱耶造雾术",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 深潜者A·河童之息",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 深潜者B·深渊之息",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 深潜者B·拉莱耶造雾术",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 深潜者B·河童之息",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 伊塔库亚的眷族·极寒利爪撕裂",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 伊塔库亚的眷族·极地暴风雪",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[反应专项] 乘风隐没之影·回避",
+              "pass": true,
+              "detail": "{\"seen\":true,\"selected\":\"乘风隐没之影\",\"kind\":\"回避\",\"mpDelta\":0,\"uses\":\"0->0\",\"event\":true,\"outcome\":true,\"guardianId\":null}"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 伊塔库亚的眷族·风雪狂暴",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 犹格索托斯之子·不可视之重击",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 犹格索托斯之子·时空扭曲震荡",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 犹格索托斯之子·万物归一之触",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 犹格索托斯之子·维度撕裂",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 食尸鬼A·撕裂利爪",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 食尸鬼A·死缠啃咬",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 食尸鬼A·幽暗凝视",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 食尸鬼B·撕裂利爪",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 食尸鬼B·死缠啃咬",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 食尸鬼B·幽暗凝视",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 幻梦行军兽·爪击",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 幻梦行军兽·冲撞",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 幻梦行军兽·咆哮",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 化尘者·沙矛",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[专项夹具] 主动执行 化尘者·卷尘",
+              "pass": true,
+              "detail": "专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改"
+            },
+            {
+              "id": "TT-SKILL[反应专项] 飞沙流体·减伤/护盾",
+              "pass": true,
+              "detail": "{\"seen\":true,\"selected\":\"飞沙流体\",\"kind\":\"减伤/护盾\",\"mpDelta\":2,\"uses\":\"0->0\",\"event\":true,\"outcome\":true,\"guardianId\":null}"
+            },
+            {
+              "id": "TT-SKILL[D1-1] 碎裂之响暴击降防翻倍(-40)",
+              "pass": true,
+              "detail": "{\"crit\":true,\"defEff\":{\"kind\":\"buff\",\"targetId\":\"target\",\"tag\":\"降防\",\"field\":\"def\",\"value\":-40,\"turns\":3,\"crit\":true}}"
+            },
+            {
+              "id": "TT-SKILL[D1-1] 巫师护盾暴击护盾翻倍(360)",
+              "pass": true,
+              "detail": "{\"react2\":{\"responderId\":\"res\",\"skillName\":\"巫师护盾\",\"fxTag\":\"巫师护盾\",\"canceled\":false,\"dodged\":false,\"shift\":null,\"countered\":false,\"kanpo\":false,\"crit\":true,\"drained\":0,\"guardianId\":null},\"shieldLeft\":320,\"shieldDmg2\":40}"
+            },
+            {
+              "id": "TT-SKILL[D1-1] 克虏伯暴击但自盲固定代价不翻倍(-120)",
+              "pass": true,
+              "detail": "{\"crit\":true,\"selfBlind\":{\"kind\":\"buff\",\"targetId\":\"caster\",\"tag\":\"自盲\",\"field\":\"hit\",\"value\":-120,\"turns\":2,\"crit\":false}}"
+            },
+            {
+              "id": "TT-SKILL[D1-2] 净蚀反冲实际抽取敌方5 MP",
+              "pass": true,
+              "detail": "{\"reaction\":{\"responderId\":\"responder\",\"skillName\":\"净蚀反冲\",\"fxTag\":\"逆咒归源镜\",\"canceled\":true,\"dodged\":false,\"shift\":null,\"countered\":false,\"kanpo\":true,\"crit\":false,\"drained\":5,\"guardianId\":null},\"attackerMpLoss\":5}"
+            },
+            {
+              "id": "TT-SKILL[D1-2] 净蚀反冲独立消耗归源镜一次库存",
+              "pass": true,
+              "detail": "{\"mirrorBefore\":3,\"mirrorAfter\":2}"
+            },
+            {
+              "id": "TT-SKILL[D1-1] 主动反击暴击前置于减伤并翻倍",
+              "pass": true,
+              "detail": "{\"reaction\":{\"responderId\":\"responder\",\"skillName\":\"反击探针\",\"fxTag\":null,\"canceled\":false,\"dodged\":false,\"shift\":null,\"countered\":true,\"kanpo\":false,\"crit\":true,\"drained\":0,\"guardianId\":null},\"attackerHpLoss\":80,\"normal\":40}"
+            },
+            {
+              "id": "TT-SKILL[D1-2] 逆咒归源镜纯载体不可主动施放",
+              "pass": true,
+              "detail": "{\"ok\":false,\"reason\":\"仅作为绑定技能的次数载体\"}"
+            },
+            {
+              "id": "TT-SKILL[D1-3] 碎骨连打交互两段转火切换目标",
+              "pass": true,
+              "detail": "{\"seenRetarget1\":true,\"hits\":[\"e1\",\"e2\"]}"
+            },
+            {
+              "id": "TT-SKILL[D1-3] AI默认连续出手不产生转火请求",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-SKILL[D1-3] 首段击杀自动补选同步两段索引及瞄准格",
+              "pass": true,
+              "detail": "[{\"shotIndex\":1,\"aim\":{\"x\":5.5,\"y\":4.5,\"targetId\":\"e1\"},\"facing\":0,\"cells\":[{\"col\":5,\"row\":4}]},{\"shotIndex\":2,\"aim\":{\"x\":6.5,\"y\":5.5,\"targetId\":\"e2\"},\"facing\":90,\"cells\":[{\"col\":6,\"row\":5}]}]"
+            },
+            {
+              "id": "TT-SKILL[D1-3] 已付行动费用仍可预览转火",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-SKILL 死于反击中止当前段和余槽",
+              "pass": true,
+              "detail": "{\"done\":true,\"hp\":500}"
+            },
+            {
+              "id": "TT-SKILL 群攻反击致死仍完成整发，停止第二发及转火",
+              "pass": true,
+              "detail": "{\"done\":true,\"hits\":[[\"e1\",80],[\"e2\",80]]}"
+            },
+            {
+              "id": "TT-SKILL 侧闪离射程后重查并补选",
+              "pass": true,
+              "detail": "[{\"shotIndex\":1,\"aim\":{\"x\":5.5,\"y\":4.5,\"targetId\":\"e1\"},\"facing\":0,\"cells\":[{\"col\":5,\"row\":4}]},{\"shotIndex\":2,\"aim\":{\"x\":6.5,\"y\":5.5,\"targetId\":\"e2\"},\"facing\":90,\"cells\":[{\"col\":6,\"row\":5}]}]"
+            },
+            {
+              "id": "TT-SKILL 转火请求与预览精确指定当前槽",
+              "pass": true,
+              "detail": "{\"slots\":[{\"index\":0,\"tag\":\"钝击\",\"side\":\"enemy\",\"scope\":\"single\",\"attack\":true,\"targetIds\":[\"e2\"]},{\"index\":1,\"tag\":\"降防\",\"side\":\"enemy\",\"scope\":\"single\",\"attack\":false,\"targetIds\":[\"e2\"]}],\"generic\":true,\"exact\":false,\"slotIndex\":1}"
+            },
+            {
+              "id": "TT-SKILL[D1-3] 鹿弹二连发交互两段扇形转火重调朝向",
+              "pass": true,
+              "detail": "{\"seenRetarget2\":true,\"hits\":[\"n1\",\"s1\"]}"
+            },
+            {
+              "id": "TT-SKILL[D1-3] 空扇形仍记录第二次开火且只付一次行动费",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-SKILL[D1-4] [智慧]特性对象路径回填 isWise",
+              "pass": true,
+              "detail": "{\"deepA\":true,\"ith\":true,\"yog\":false}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": "typical-battle",
+      "groups": [
+        {
+          "id": "TT-BATTLE",
+          "passed": 33,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TT-B 开场四英雄六敌，资源原值TP0",
+              "pass": true,
+              "detail": "[[\"埃利奥特\",100,110],[\"弗兰克\",180,17],[\"玛德琳\",140,14],[\"索恩\",140,20],[\"深潜者A\",140,16],[\"深潜者B\",140,16],[\"伊塔库亚的眷族\",550,16],[\"犹格索托斯之子\",300,25],[\"食尸鬼A\",130,13],[\"食尸鬼B\",130,13]]"
+            },
+            {
+              "id": "TT-B 权威样本包含巫师护盾",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B reset同种子恢复状态",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 跳跃ceil(8/3)=3且不耗移动",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 一行动只能跳一次",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 飞行下自然移动9米跳距仍2米",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 整技免伤按甲后逐段扣120",
+              "pass": true,
+              "detail": "[{\"index\":0,\"shotIndex\":1,\"segmentIndex\":1,\"targetId\":\"e\",\"logIndex\":1,\"hit\":true,\"hpDmg\":0,\"shieldDmg\":0,\"guardDmg\":50,\"hpBefore\":1000,\"hpAfter\":1000,\"down\":false,\"reaction\":{\"responderId\":\"e\",\"skillName\":\"免\",\"fxTag\":null,\"canceled\":false,\"dodged\":false,\"shift\":null,\"countered\":false,\"kanpo\":false,\"crit\":false,\"drained\":0,\"guardianId\":null},\"logEnd\":5,\"aim\":{\"x\":5.5,\"y\":4.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":5,\"row\":4}]},{\"index\":1,\"shotIndex\":2,\"segmentIndex\":2,\"targetId\":\"e\",\"logIndex\":5,\"hit\":true,\"hpDmg\":0,\"shieldDmg\":0,\"guardDmg\":50,\"hpBefore\":1000,\"hpAfter\":1000,\"down\":false,\"logEnd\":7,\"aim\":{\"x\":5.5,\"y\":4.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":5,\"row\":4}]},{\"index\":2,\"shotIndex\":3,\"segmentIndex\":3,\"targetId\":\"e\",\"logIndex\":7,\"hit\":true,\"hpDmg\":10,\"shieldDmg\":20,\"guardDmg\":20,\"hpBefore\":1000,\"hpAfter\":990,\"down\":false,\"logEnd\":9,\"aim\":{\"x\":5.5,\"y\":4.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":5,\"row\":4}]}]"
+            },
+            {
+              "id": "TT-B 整技结束免伤无残留",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 三段均可反应，护盾仅剩余伤害扣",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 巫师护盾逐段加总不单段清空",
+              "pass": true,
+              "detail": "{\"shield\":390,\"mp\":98}"
+            },
+            {
+              "id": "TT-B 单避本段化解后侧闪3米",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 后两段重查射程并不再弹反应",
+              "pass": true,
+              "detail": "[{\"index\":0,\"shotIndex\":1,\"segmentIndex\":1,\"targetId\":\"e\",\"logIndex\":1,\"hit\":false,\"hpDmg\":0,\"hpBefore\":1000,\"hpAfter\":1000,\"down\":false,\"reaction\":{\"responderId\":\"e\",\"skillName\":\"侧闪\",\"fxTag\":null,\"canceled\":false,\"dodged\":true,\"shift\":{\"from\":{\"col\":5,\"row\":4},\"to\":{\"col\":5,\"row\":1},\"path\":[{\"col\":5,\"row\":4},{\"col\":5,\"row\":3},{\"col\":5,\"row\":2},{\"col\":5,\"row\":1}],\"distance\":3},\"countered\":false,\"kanpo\":false,\"crit\":false,\"drained\":0,\"guardianId\":null},\"logEnd\":4,\"aim\":{\"x\":5.5,\"y\":4.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":5,\"row\":4}]},{\"index\":1,\"shotIndex\":2,\"segmentIndex\":2,\"targetId\":\"e\",\"logIndex\":4,\"hit\":false,\"hpDmg\":0,\"hpBefore\":1000,\"hpAfter\":1000,\"down\":false,\"reason\":\"目标超出射程\",\"logEnd\":5,\"aim\":{\"x\":5.5,\"y\":4.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":5,\"row\":4}]},{\"index\":2,\"shotIndex\":3,\"segmentIndex\":3,\"targetId\":\"e\",\"logIndex\":5,\"hit\":false,\"hpDmg\":0,\"hpBefore\":1000,\"hpAfter\":1000,\"down\":false,\"reason\":\"目标超出射程\",\"logEnd\":6,\"aim\":{\"x\":5.5,\"y\":4.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":5,\"row\":4}]}]"
+            },
+            {
+              "id": "TT-B 瓶正常召唤在选中落点并扣共享次数",
+              "pass": true,
+              "detail": "{\"ok\":true,\"hits\":[],\"shots\":[],\"effects\":[{\"kind\":\"mainPoint\",\"targetId\":\"h:埃利奥特\",\"tag\":\"再动\",\"points\":1}],\"events\":[{\"seq\":1,\"at\":200,\"type\":\"attack-start\",\"id\":\"attack:1\",\"casterId\":\"h:埃利奥特\",\"skillKey\":\"化尘者之瓶\\u0000瓶中之物\",\"attackId\":\"attack:1\"}],\"ammoEvents\":[],\"summons\":[\"sum_1_化尘者\"],\"query\":{\"ok\":true,\"reason\":null,\"origin\":{\"x\":2.5,\"y\":4.5},\"aim\":{\"x\":4.5,\"y\":4.5},\"range\":12,\"cells\":[{\"col\":4,\"row\":4}],\"targetIds\":[],\"damageTargetIds\":[],\"actualTargetIds\":[],\"targets\":[],\"slotTargets\":[{\"index\":0,\"tag\":\"再动\",\"side\":\"ally\",\"scope\":\"area\",\"attack\":false,\"targetIds\":[\"h:埃利奥特\"]}],\"disclosureTargetIds\":[],\"collisionPoint\":null,\"contact\":null,\"blockedBy\":null,\"shape\":{\"type\":\"召唤\",\"anchor\":{\"col\":4,\"row\":4},\"footprint\":{\"width\":1,\"height\":1}},\"blastCenter\":null,\"summon\":{\"anchor\":{\"col\":4,\"row\":4},\"footprint\":{\"width\":1,\"height\":1}},\"summonPlacements\":[{\"col\":4,\"row\":4}]},\"casterId\":\"h:埃利奥特\",\"skill\":{\"name\":\"瓶中之物\",\"cost\":5,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":0,\"haste\":0,\"maxUses\":0,\"usesRemaining\":0,\"cooldownTurns\":0,\"slotTargets\":[\"self\",null,null],\"hit\":100,\"turns\":null,\"slotTurns\":null,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[再动]\",\"power\":1,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":\"法术\",\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":\"高阶召唤术\",\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"isPierce\":false,\"summonTarget\":\"化尘者\",\"summonNoLimit\":false,\"range\":{\"type\":\"召唤\",\"castRange\":12},\"actionCost\":{\"main\":1,\"aux\":0},\"evadeShift\":null,\"displacements\":[],\"regionEffect\":null,\"affectsAll\":false,\"reactionSource\":false,\"deathTag\":null,\"_explicit\":[\"cost\",\"type\",\"power\",\"fxTag\",\"actionCost\",\"range\",\"range.castRange\"],\"note\":\"选择空闲合法格，召唤必须在空地使用\",\"parentItemName\":\"化尘者之瓶\",\"isItem\":true},\"aim\":{\"x\":4.5,\"y\":4.5},\"facing\":90,\"incomingType\":\"法术\",\"canceled\":false,\"crit\":false,\"costSummary\":{\"main\":1,\"aux\":0,\"mp\":5,\"hp\":0,\"tp\":0,\"uses\":0,\"bindings\":null,\"ammoShots\":0,\"item\":{\"name\":\"化尘者之瓶\",\"remaining\":0}},\"charge\":{\"preparing\":false,\"ready\":null,\"kind\":null},\"logFrom\":1,\"logTo\":3,\"attackId\":\"attack:1\",\"isItem\":true,\"item\":{\"isItem\":true,\"name\":\"化尘者之瓶\",\"category\":\"道具\",\"count\":1,\"maxUses\":1,\"usesRemaining\":0,\"bindings\":[],\"cost\":0,\"hpCost\":0,\"tpCost\":0,\"delay\":0,\"haste\":0,\"summonTarget\":null,\"summonNoLimit\":false,\"slotTargets\":null,\"hit\":100,\"turns\":null,\"slotTurns\":null,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[无]\",\"power\":0,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"damageType\":null,\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":null,\"isHighTier\":false,\"isLegendary\":false,\"isPierce\":false,\"barrierSub\":null,\"barrierArmor\":0,\"range\":null,\"actionCost\":{\"main\":1,\"aux\":0},\"evadeShift\":null,\"displacements\":[],\"regionEffect\":null,\"affectsAll\":false,\"reactionSource\":false,\"deathTag\":null,\"_explicit\":[\"maxUses\",\"children\"],\"children\":[{\"name\":\"瓶中之物\",\"cost\":5,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":0,\"haste\":0,\"maxUses\":0,\"usesRemaining\":0,\"cooldownTurns\":0,\"slotTargets\":[\"self\",null,null],\"hit\":100,\"turns\":null,\"slotTurns\":null,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[再动]\",\"power\":1,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":\"法术\",\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":\"高阶召唤术\",\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"isPierce\":false,\"summonTarget\":\"化尘者\",\"summonNoLimit\":false,\"range\":{\"type\":\"召唤\",\"castRange\":12},\"actionCost\":{\"main\":1,\"aux\":0},\"evadeShift\":null,\"displacements\":[],\"regionEffect\":null,\"affectsAll\":false,\"reactionSource\":false,\"deathTag\":null,\"_explicit\":[\"cost\",\"type\",\"power\",\"fxTag\",\"actionCost\",\"range\",\"range.castRange\"],\"note\":\"选择空闲合法格，召唤必须在空地使用\",\"parentItemName\":\"化尘者之瓶\"},{\"name\":\"飞沙化甲\",\"cost\":8,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":0,\"haste\":0,\"maxUses\":0,\"usesRemaining\":0,\"cooldownTurns\":0,\"slotTargets\":[null,null,\"self\"],\"hit\":100,\"turns\":5,\"slotTurns\":null,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[增防]\",\"power\":50,\"type2\":\"[瞄准]\",\"power2\":30,\"type3\":\"[再动]\",\"power3\":1,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":\"法术\",\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":\"飞沙化甲\",\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"isPierce\":false,\"summonTarget\":null,\"summonNoLimit\":false,\"range\":{\"type\":\"单体\",\"castRange\":8},\"actionCost\":{\"main\":0,\"aux\":1},\"evadeShift\":null,\"displacements\":[],\"regionEffect\":null,\"affectsAll\":false,\"reactionSource\":false,\"deathTag\":null,\"_explicit\":[\"cost\",\"type\",\"power\",\"type2\",\"power2\",\"type3\",\"power3\",\"turns\",\"fxTag\",\"actionCost\",\"range\",\"range.castRange\"],\"parentItemName\":\"化尘者之瓶\"}]}}"
+            },
+            {
+              "id": "TT-B 共享瓶次数耗尽阻止另一用法",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 化尘者继承流体虚形",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 召唤物从零跑圈",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 冲撞6米路径逐敌一次",
+              "pass": true,
+              "detail": "[{\"targetId\":\"e1\",\"hit\":true,\"hpDmg\":160,\"hpBefore\":1000,\"hpAfter\":840,\"down\":false,\"segments\":[{\"index\":0,\"shotIndex\":1,\"segmentIndex\":1,\"targetId\":\"e1\",\"logIndex\":1,\"hit\":true,\"hpDmg\":160,\"shieldDmg\":0,\"guardDmg\":0,\"hpBefore\":1000,\"hpAfter\":840,\"down\":false,\"logEnd\":2}],\"displacement\":{\"seq\":3,\"at\":50,\"type\":\"unit-displaced\",\"attackId\":\"attack:1\",\"casterId\":\"h\",\"unitId\":\"e1\",\"mode\":\"击退\",\"from\":{\"col\":5,\"row\":4},\"to\":{\"col\":8,\"row\":4},\"requestedDistance\":3,\"distance\":3,\"path\":[{\"col\":5,\"row\":4},{\"col\":6,\"row\":4},{\"col\":7,\"row\":4},{\"col\":8,\"row\":4}],\"blockedBy\":null,\"collision\":null}},{\"targetId\":\"e2\",\"hit\":true,\"hpDmg\":160,\"hpBefore\":1000,\"hpAfter\":840,\"down\":false,\"segments\":[{\"index\":0,\"shotIndex\":2,\"segmentIndex\":2,\"targetId\":\"e2\",\"logIndex\":3,\"hit\":true,\"hpDmg\":160,\"shieldDmg\":0,\"guardDmg\":0,\"hpBefore\":1000,\"hpAfter\":840,\"down\":false,\"logEnd\":4}],\"displacement\":{\"seq\":5,\"at\":50,\"type\":\"unit-displaced\",\"attackId\":\"attack:1\",\"casterId\":\"h\",\"unitId\":\"e2\",\"mode\":\"击退\",\"from\":{\"col\":8,\"row\":5},\"to\":{\"col\":11,\"row\":5},\"requestedDistance\":3,\"distance\":3,\"path\":[{\"col\":8,\"row\":5},{\"col\":9,\"row\":5},{\"col\":10,\"row\":5},{\"col\":11,\"row\":5}],\"blockedBy\":null,\"collision\":null}}]"
+            },
+            {
+              "id": "TT-B 冲撞击退3米后继续，再遇已攻击目标则停止",
+              "pass": true,
+              "detail": "{\"h\":{\"col\":6,\"row\":4,\"facing\":90},\"e1\":{\"col\":8,\"row\":4},\"e2\":{\"col\":11,\"row\":5}}"
+            },
+            {
+              "id": "TT-B 护盾全吸收不触发击退",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 浓雾施放建立5回合区域无挂个人盲状态",
+              "pass": true,
+              "detail": "[{\"id\":\"fog:h:埃利奥特:拉莱耶造雾术\",\"type\":\"fog\",\"casterId\":\"h:埃利奥特\",\"sourceKey\":\"fog:h:埃利奥特:拉莱耶造雾术\",\"center\":{\"x\":5.5,\"y\":4.5},\"radius\":5,\"strength\":40,\"endAt\":700,\"cells\":[{\"col\":2,\"row\":0},{\"col\":3,\"row\":0},{\"col\":4,\"row\":0},{\"col\":5,\"row\":0},{\"col\":6,\"row\":0},{\"col\":7,\"row\":0},{\"col\":8,\"row\":0},{\"col\":1,\"row\":1},{\"col\":2,\"row\":1},{\"col\":3,\"row\":1},{\"col\":4,\"row\":1},{\"col\":5,\"row\":1},{\"col\":6,\"row\":1},{\"col\":7,\"row\":1},{\"col\":8,\"row\":1},{\"col\":9,\"row\":1},{\"col\":1,\"row\":2},{\"col\":2,\"row\":2},{\"col\":3,\"row\":2},{\"col\":4,\"row\":2},{\"col\":5,\"row\":2},{\"col\":6,\"row\":2},{\"col\":7,\"row\":2},{\"col\":8,\"row\":2},{\"col\":9,\"row\":2},{\"col\":1,\"row\":3},{\"col\":2,\"row\":3},{\"col\":3,\"row\":3},{\"col\":4,\"row\":3},{\"col\":5,\"row\":3},{\"col\":6,\"row\":3},{\"col\":7,\"row\":3},{\"col\":8,\"row\":3},{\"col\":9,\"row\":3},{\"col\":0,\"row\":4},{\"col\":1,\"row\":4},{\"col\":2,\"row\":4},{\"col\":3,\"row\":4},{\"col\":4,\"row\":4},{\"col\":5,\"row\":4},{\"col\":6,\"row\":4},{\"col\":7,\"row\":4},{\"col\":8,\"row\":4},{\"col\":9,\"row\":4},{\"col\":10,\"row\":4},{\"col\":1,\"row\":5},{\"col\":2,\"row\":5},{\"col\":3,\"row\":5},{\"col\":4,\"row\":5},{\"col\":5,\"row\":5},{\"col\":6,\"row\":5},{\"col\":7,\"row\":5},{\"col\":8,\"row\":5},{\"col\":9,\"row\":5},{\"col\":1,\"row\":6},{\"col\":2,\"row\":6},{\"col\":3,\"row\":6},{\"col\":4,\"row\":6},{\"col\":5,\"row\":6},{\"col\":6,\"row\":6},{\"col\":7,\"row\":6},{\"col\":8,\"row\":6},{\"col\":9,\"row\":6},{\"col\":1,\"row\":7},{\"col\":2,\"row\":7},{\"col\":3,\"row\":7},{\"col\":4,\"row\":7},{\"col\":5,\"row\":7},{\"col\":6,\"row\":7},{\"col\":7,\"row\":7},{\"col\":8,\"row\":7},{\"col\":9,\"row\":7},{\"col\":2,\"row\":8},{\"col\":3,\"row\":8},{\"col\":4,\"row\":8},{\"col\":5,\"row\":8},{\"col\":6,\"row\":8},{\"col\":7,\"row\":8},{\"col\":8,\"row\":8},{\"col\":5,\"row\":9}]}]"
+            },
+            {
+              "id": "TT-B 入雾命中-40离雾恢复",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 结界只承伤一次且击破当次不溢出",
+              "pass": true,
+              "detail": "[{\"targetId\":\"h\",\"side\":\"hero\",\"hit\":false,\"hpDmg\":0,\"hpBefore\":1000,\"hpAfter\":1000,\"maxHp\":1000,\"down\":false,\"logIndex\":3,\"logEnd\":4,\"segments\":[{\"index\":0,\"shotIndex\":1,\"segmentIndex\":1,\"targetId\":\"h\",\"logIndex\":3,\"hit\":false,\"hpDmg\":0,\"hpBefore\":1000,\"hpAfter\":1000,\"barrierId\":\"barrier:h\",\"down\":false,\"logEnd\":4,\"aim\":{\"x\":6.5,\"y\":4.5},\"facing\":90,\"cells\":[{\"col\":4,\"row\":2},{\"col\":5,\"row\":2},{\"col\":6,\"row\":2},{\"col\":7,\"row\":2},{\"col\":3,\"row\":3},{\"col\":4,\"row\":3},{\"col\":5,\"row\":3},{\"col\":6,\"row\":3},{\"col\":7,\"row\":3},{\"col\":8,\"row\":3},{\"col\":3,\"row\":4},{\"col\":4,\"row\":4},{\"col\":5,\"row\":4},{\"col\":6,\"row\":4},{\"col\":7,\"row\":4},{\"col\":8,\"row\":4},{\"col\":3,\"row\":5},{\"col\":4,\"row\":5},{\"col\":5,\"row\":5},{\"col\":6,\"row\":5},{\"col\":7,\"row\":5},{\"col\":8,\"row\":5},{\"col\":4,\"row\":6},{\"col\":5,\"row\":6},{\"col\":6,\"row\":6},{\"col\":7,\"row\":6}]}]},{\"targetId\":\"a\",\"side\":\"hero\",\"hit\":false,\"hpDmg\":0,\"hpBefore\":1000,\"hpAfter\":1000,\"maxHp\":1000,\"down\":false,\"logIndex\":4,\"logEnd\":5,\"segments\":[{\"index\":0,\"shotIndex\":1,\"segmentIndex\":1,\"targetId\":\"a\",\"logIndex\":4,\"hit\":false,\"hpDmg\":0,\"hpBefore\":1000,\"hpAfter\":1000,\"barrierId\":\"barrier:h\",\"down\":false,\"logEnd\":5,\"aim\":{\"x\":6.5,\"y\":4.5},\"facing\":90,\"cells\":[{\"col\":4,\"row\":2},{\"col\":5,\"row\":2},{\"col\":6,\"row\":2},{\"col\":7,\"row\":2},{\"col\":3,\"row\":3},{\"col\":4,\"row\":3},{\"col\":5,\"row\":3},{\"col\":6,\"row\":3},{\"col\":7,\"row\":3},{\"col\":8,\"row\":3},{\"col\":3,\"row\":4},{\"col\":4,\"row\":4},{\"col\":5,\"row\":4},{\"col\":6,\"row\":4},{\"col\":7,\"row\":4},{\"col\":8,\"row\":4},{\"col\":3,\"row\":5},{\"col\":4,\"row\":5},{\"col\":5,\"row\":5},{\"col\":6,\"row\":5},{\"col\":7,\"row\":5},{\"col\":8,\"row\":5},{\"col\":4,\"row\":6},{\"col\":5,\"row\":6},{\"col\":6,\"row\":6},{\"col\":7,\"row\":6}]}]}]"
+            },
+            {
+              "id": "TT-B 单体回复可救起倒地友军并零跑圈",
+              "pass": true,
+              "detail": "{\"ok\":true,\"hits\":[],\"shots\":[],\"effects\":[{\"kind\":\"heal\",\"targetId\":\"a\",\"tag\":\"回复\",\"value\":30,\"burning\":false,\"overheal\":null,\"crit\":false}],\"events\":[{\"seq\":1,\"at\":50,\"type\":\"attack-start\",\"id\":\"attack:1\",\"casterId\":\"h\",\"skillKey\":\"救\",\"attackId\":\"attack:1\"}],\"ammoEvents\":[],\"summons\":[],\"query\":{\"ok\":true,\"reason\":null,\"origin\":{\"x\":2.5,\"y\":4.5},\"aim\":{\"x\":3.5,\"y\":4.5,\"targetId\":\"a\"},\"range\":4,\"cells\":[{\"col\":3,\"row\":4}],\"targetIds\":[\"a\"],\"damageTargetIds\":[],\"actualTargetIds\":[\"a\"],\"targets\":[{\"unitId\":\"a\",\"side\":\"hero\",\"cells\":[{\"col\":3,\"row\":4}]}],\"slotTargets\":[{\"index\":0,\"tag\":\"回复\",\"side\":\"ally\",\"scope\":\"single\",\"attack\":false,\"targetIds\":[\"a\"]}],\"disclosureTargetIds\":[\"a\"],\"collisionPoint\":{\"x\":3.5,\"y\":4.5},\"contact\":null,\"blockedBy\":null,\"shape\":{\"type\":\"单体\",\"from\":{\"x\":2.5,\"y\":4.5},\"to\":{\"x\":3.5,\"y\":4.5},\"castRange\":4},\"blastCenter\":null},\"casterId\":\"h\",\"skill\":{\"name\":\"救\",\"cost\":0,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":0,\"haste\":0,\"maxUses\":0,\"usesRemaining\":0,\"cooldownTurns\":0,\"slotTargets\":null,\"hit\":100,\"turns\":null,\"slotTurns\":null,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[回复]\",\"power\":30,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":null,\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":null,\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"isPierce\":false,\"summonTarget\":null,\"summonNoLimit\":false,\"range\":{\"type\":\"单体\",\"castRange\":4},\"actionCost\":{\"main\":0,\"aux\":1},\"evadeShift\":null,\"displacements\":[],\"regionEffect\":null,\"affectsAll\":false,\"reactionSource\":false,\"deathTag\":null,\"_explicit\":[\"type\",\"power\",\"range\",\"range.type\",\"range.castRange\",\"actionCost\"]},\"aim\":{\"x\":3.5,\"y\":4.5,\"targetId\":\"a\"},\"facing\":90,\"incomingType\":\"近战\",\"canceled\":false,\"crit\":false,\"costSummary\":{\"main\":0,\"aux\":1,\"mp\":0,\"hp\":0,\"tp\":0,\"uses\":0,\"bindings\":null,\"ammoShots\":0},\"charge\":{\"preparing\":false,\"ready\":null,\"kind\":null},\"logFrom\":1,\"logTo\":2,\"attackId\":\"attack:1\"}"
+            },
+            {
+              "id": "TT-B 非耗尽免伤池也在整技finally清理",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 蓄力枪准备扣弹药一次释放不重复",
+              "pass": true,
+              "detail": "{\"ok\":true,\"hits\":[{\"targetId\":\"e\",\"side\":\"enemy\",\"hit\":true,\"hpDmg\":50,\"hpBefore\":1000,\"hpAfter\":950,\"maxHp\":1000,\"down\":false,\"logIndex\":4,\"logEnd\":5,\"segments\":[{\"index\":0,\"shotIndex\":1,\"segmentIndex\":1,\"targetId\":\"e\",\"logIndex\":4,\"hit\":true,\"hpDmg\":50,\"shieldDmg\":0,\"guardDmg\":0,\"hpBefore\":1000,\"hpAfter\":950,\"down\":false,\"logEnd\":5,\"aim\":{\"x\":4.5,\"y\":4.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":4,\"row\":4}]}]}],\"shots\":[{\"shotIndex\":1,\"aim\":{\"x\":4.5,\"y\":4.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":4,\"row\":4}]}],\"effects\":[],\"events\":[{\"seq\":3,\"at\":100,\"type\":\"attack-start\",\"id\":\"attack:2\",\"casterId\":\"h\",\"skillKey\":\"蓄力枪\",\"attackId\":\"attack:2\"},{\"seq\":4,\"at\":100,\"type\":\"segment-resolved\",\"attackId\":\"attack:2\",\"casterId\":\"h\",\"targetId\":\"e\",\"slotIndex\":0,\"hpDmg\":50,\"shieldDmg\":0,\"guardDmg\":0,\"down\":false,\"damageCategory\":\"枪击\"}],\"ammoEvents\":[],\"summons\":[],\"query\":{\"ok\":true,\"reason\":null,\"origin\":{\"x\":2.5,\"y\":4.5},\"aim\":{\"x\":4.5,\"y\":4.5,\"targetId\":\"e\"},\"range\":12,\"cells\":[{\"col\":4,\"row\":4}],\"targetIds\":[\"e\"],\"damageTargetIds\":[\"e\"],\"actualTargetIds\":[\"e\"],\"targets\":[{\"unitId\":\"e\",\"side\":\"enemy\",\"cells\":[{\"col\":4,\"row\":4}]}],\"slotTargets\":[{\"index\":0,\"tag\":\"枪击\",\"side\":\"enemy\",\"scope\":\"single\",\"attack\":true,\"targetIds\":[\"e\"]}],\"disclosureTargetIds\":[\"e\"],\"collisionPoint\":{\"x\":4.5,\"y\":4.5},\"contact\":null,\"blockedBy\":null,\"shape\":{\"type\":\"单体\",\"from\":{\"x\":2.5,\"y\":4.5},\"to\":{\"x\":4.5,\"y\":4.5},\"castRange\":12},\"blastCenter\":null},\"casterId\":\"h\",\"skill\":{\"name\":\"蓄力枪\",\"cost\":0,\"hpCost\":0,\"tpCost\":0,\"charge\":1,\"delay\":0,\"haste\":0,\"maxUses\":0,\"usesRemaining\":0,\"cooldownTurns\":0,\"slotTargets\":null,\"hit\":100,\"turns\":null,\"slotTurns\":null,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[枪击]\",\"power\":50,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":\"远程\",\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":null,\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"isPierce\":false,\"summonTarget\":null,\"summonNoLimit\":false,\"range\":{\"type\":\"单体\",\"castRange\":12},\"actionCost\":{\"main\":1,\"aux\":0},\"evadeShift\":null,\"displacements\":[],\"regionEffect\":null,\"affectsAll\":false,\"reactionSource\":false,\"deathTag\":null,\"_explicit\":[\"charge\",\"type\",\"power\",\"range\",\"range.type\",\"range.castRange\"]},\"aim\":{\"x\":4.5,\"y\":4.5,\"targetId\":\"e\"},\"facing\":90,\"incomingType\":\"远程\",\"canceled\":false,\"crit\":false,\"costSummary\":{\"main\":0,\"aux\":0,\"mp\":0,\"hp\":0,\"tp\":0,\"uses\":0,\"bindings\":null,\"ammoShots\":0},\"charge\":{\"preparing\":true,\"ready\":true,\"kind\":\"charge\"},\"logFrom\":4,\"logTo\":5,\"attackId\":\"attack:2\"}"
+            },
+            {
+              "id": "TT-B 不分敌友普通致盲三方都生效",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 周期回调清除后续状态不会崩溃或继续跳伤",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 同源免伤重用替换而不追加，第三段HP20",
+              "pass": true,
+              "detail": "[{\"index\":0,\"shotIndex\":1,\"segmentIndex\":1,\"targetId\":\"e\",\"logIndex\":1,\"hit\":true,\"hpDmg\":0,\"shieldDmg\":0,\"guardDmg\":50,\"hpBefore\":1000,\"hpAfter\":1000,\"down\":false,\"reaction\":{\"responderId\":\"e\",\"skillName\":\"反复免伤\",\"fxTag\":null,\"canceled\":false,\"dodged\":false,\"shift\":null,\"countered\":false,\"kanpo\":false,\"crit\":false,\"drained\":0,\"guardianId\":null},\"logEnd\":5,\"aim\":{\"x\":4.5,\"y\":4.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":4,\"row\":4}]},{\"index\":1,\"shotIndex\":2,\"segmentIndex\":2,\"targetId\":\"e\",\"logIndex\":5,\"hit\":true,\"hpDmg\":0,\"shieldDmg\":0,\"guardDmg\":50,\"hpBefore\":1000,\"hpAfter\":1000,\"down\":false,\"reaction\":{\"responderId\":\"e\",\"skillName\":\"反复免伤\",\"fxTag\":null,\"canceled\":false,\"dodged\":false,\"shift\":null,\"countered\":false,\"kanpo\":false,\"crit\":false,\"drained\":0,\"guardianId\":null},\"logEnd\":9,\"aim\":{\"x\":4.5,\"y\":4.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":4,\"row\":4}]},{\"index\":2,\"shotIndex\":3,\"segmentIndex\":3,\"targetId\":\"e\",\"logIndex\":9,\"hit\":true,\"hpDmg\":20,\"shieldDmg\":0,\"guardDmg\":30,\"hpBefore\":1000,\"hpAfter\":980,\"down\":false,\"logEnd\":11,\"aim\":{\"x\":4.5,\"y\":4.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":4,\"row\":4}]}]"
+            },
+            {
+              "id": "TT-B 敌我入雾致盲取40，不写个人状态",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 离雾解除且区域位置不跟随",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 雾区到期恢复命中",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 食尸鬼首次归零复活且不自爆",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT-B 真正死亡按半径3自爆燃烧而不可主动",
+              "pass": true,
+              "detail": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": "typical-data",
+      "groups": [
+        {
+          "id": "TT-DATA",
+          "passed": 57,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TT 英雄4",
+              "pass": true,
+              "detail": "4"
+            },
+            {
+              "id": "TT 敌方6",
+              "pass": true,
+              "detail": "6"
+            },
+            {
+              "id": "TT 召唤模板2",
+              "pass": true,
+              "detail": "2"
+            },
+            {
+              "id": "TT sceneId",
+              "pass": true,
+              "detail": "sc-chapel"
+            },
+            {
+              "id": "TT 固定种子",
+              "pass": true,
+              "detail": "20261123"
+            },
+            {
+              "id": "TT 埃利奥特HP原值",
+              "pass": true,
+              "detail": "100/100"
+            },
+            {
+              "id": "TT 埃利奥特MP原值",
+              "pass": true,
+              "detail": "110/110"
+            },
+            {
+              "id": "TT 埃利奥特数值",
+              "pass": true,
+              "detail": "{\"atk\":20,\"def\":40,\"spd\":50,\"evasion\":50}"
+            },
+            {
+              "id": "TT 占格1x1",
+              "pass": true,
+              "detail": "{\"width\":1,\"height\":1}"
+            },
+            {
+              "id": "TT 职业",
+              "pass": true,
+              "detail": "施法者"
+            },
+            {
+              "id": "TT 玛德琳敏捷80",
+              "pass": true,
+              "detail": "80"
+            },
+            {
+              "id": "TT 特性带方括号",
+              "pass": true,
+              "detail": "[\"[破法]\",\"[钢体]\",\"[再生]\"]"
+            },
+            {
+              "id": "TT 占格2x2",
+              "pass": true,
+              "detail": "{\"width\":2,\"height\":2}"
+            },
+            {
+              "id": "TT 敌方特性",
+              "pass": true,
+              "detail": "[\"[要害]\",\"[智慧]\"]"
+            },
+            {
+              "id": "TT 圆形只半径无射程",
+              "pass": true,
+              "detail": "{\"type\":\"圆形\",\"radius\":6}"
+            },
+            {
+              "id": "TT 直线长宽",
+              "pass": true,
+              "detail": "{\"type\":\"直线\",\"length\":12,\"width\":2}"
+            },
+            {
+              "id": "TT 扇形长度角度",
+              "pass": true,
+              "detail": "{\"type\":\"扇形\",\"length\":6,\"angle\":60,\"castRange\":6}"
+            },
+            {
+              "id": "TT 召唤范围",
+              "pass": true,
+              "detail": "{\"type\":\"召唤\",\"castRange\":12}"
+            },
+            {
+              "id": "TT 召唤道具范围",
+              "pass": true,
+              "detail": "{\"type\":\"召唤\",\"castRange\":8}"
+            },
+            {
+              "id": "TT 攻击来源→自身+reactionSource",
+              "pass": true,
+              "detail": "{\"range\":{\"type\":\"自身\"},\"rs\":true}"
+            },
+            {
+              "id": "TT 浓雾区域",
+              "pass": true,
+              "detail": "{\"type\":\"fog\"}"
+            },
+            {
+              "id": "TT 动作辅",
+              "pass": true,
+              "detail": "{\"main\":0,\"aux\":1}"
+            },
+            {
+              "id": "TT 动作主",
+              "pass": true,
+              "detail": "{\"main\":1,\"aux\":0}"
+            },
+            {
+              "id": "TT 反应近战",
+              "pass": true,
+              "detail": "{\"r\":true,\"t\":\"近战\"}"
+            },
+            {
+              "id": "TT 看破法术",
+              "pass": true,
+              "detail": "{\"rt\":\"法术\",\"k\":\"法术\"}"
+            },
+            {
+              "id": "TT 舍身近战",
+              "pass": true,
+              "detail": "{\"s\":\"近战\"}"
+            },
+            {
+              "id": "TT 侧闪3",
+              "pass": true,
+              "detail": "[{\"type\":\"侧闪\",\"distance\":3}]"
+            },
+            {
+              "id": "TT evadeShift兼容派生",
+              "pass": true,
+              "detail": "{\"mode\":\"side\",\"distance\":3}"
+            },
+            {
+              "id": "TT 击退3",
+              "pass": true,
+              "detail": "[{\"type\":\"击退\",\"distance\":3}]"
+            },
+            {
+              "id": "TT 冲锋6+击退3方向",
+              "pass": true,
+              "detail": "[{\"type\":\"冲锋\",\"distance\":6},{\"type\":\"击退\",\"distance\":3,\"direction\":\"冲锋方向\"}]"
+            },
+            {
+              "id": "TT 爆心向外",
+              "pass": true,
+              "detail": "[{\"type\":\"击退\",\"distance\":2,\"direction\":\"爆心向外\"}]"
+            },
+            {
+              "id": "TT 裸穿透整技bool不占槽",
+              "pass": true,
+              "detail": "{\"p\":true,\"s\":[\"[火焰]\",30,\"[燃烧]\",10]}"
+            },
+            {
+              "id": "TT 旧穿透power保槽",
+              "pass": true,
+              "detail": "[\"[穿透]\",60,false]"
+            },
+            {
+              "id": "TT 眩晕无power纯减益",
+              "pass": true,
+              "detail": "[\"[钝击]\",80,\"[眩晕]\",0]"
+            },
+            {
+              "id": "TT 旧眩晕拆伤害+眩晕",
+              "pass": true,
+              "detail": "[\"[伤害]\",40,\"[眩晕]\",0]"
+            },
+            {
+              "id": "TT 纯召唤不fallback伤害",
+              "pass": true,
+              "detail": "[\"[无]\",0,\"化尘者\"]"
+            },
+            {
+              "id": "TT 瓶父次数",
+              "pass": true,
+              "detail": "{\"u\":1,\"c\":1}"
+            },
+            {
+              "id": "TT 瓶子技能两名",
+              "pass": true,
+              "detail": "[\"瓶中之物\",\"飞沙化甲\"]"
+            },
+            {
+              "id": "TT 子父名稳定无循环引用",
+              "pass": true,
+              "detail": "[\"化尘者之瓶\",\"化尘者之瓶\"]"
+            },
+            {
+              "id": "TT 音叉3次三子",
+              "pass": true,
+              "detail": "{\"u\":3,\"n\":3}"
+            },
+            {
+              "id": "TT 弹药绑定",
+              "pass": true,
+              "detail": "[{\"skillName\":\"萨维奇三连发\",\"cost\":3}]"
+            },
+            {
+              "id": "TT 配置往返父子结构",
+              "pass": true,
+              "detail": "[\"瓶中之物\",\"飞沙化甲\"]"
+            },
+            {
+              "id": "TT 配置往返范围/动作/穿透",
+              "pass": true,
+              "detail": "{\"r\":{\"type\":\"单体\",\"castRange\":15},\"a\":{\"main\":1,\"aux\":0},\"p\":true}"
+            },
+            {
+              "id": "TT 配置往返位移",
+              "pass": true,
+              "detail": "[{\"type\":\"侧闪\",\"distance\":3}]"
+            },
+            {
+              "id": "TT 配置往返区域",
+              "pass": true,
+              "detail": "{\"type\":\"fog\"}"
+            },
+            {
+              "id": "TT 单位10",
+              "pass": true,
+              "detail": "10"
+            },
+            {
+              "id": "TT 站位10",
+              "pass": true,
+              "detail": "10"
+            },
+            {
+              "id": "TT 种子透传",
+              "pass": true,
+              "detail": "20261123"
+            },
+            {
+              "id": "TT 2x2左上锚点",
+              "pass": true,
+              "detail": "{\"fp\":{\"width\":2,\"height\":2},\"p\":{\"col\":2,\"row\":5,\"facing\":180}}"
+            },
+            {
+              "id": "TT 单位字段完整",
+              "pass": true,
+              "detail": "{\"hp\":100,\"tp\":0,\"maxTp\":100}"
+            },
+            {
+              "id": "TT 敌方controller ai",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT createBattle字段齐全",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT 召唤provider数值",
+              "pass": true,
+              "detail": "{\"hp\":420,\"atk\":140}"
+            },
+            {
+              "id": "TT 化尘者provider别名",
+              "pass": true,
+              "detail": "{\"hp\":90,\"tags\":[\"[流体]\",\"[虚形]\"]}"
+            },
+            {
+              "id": "TT provider精确别名不模糊",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT 同种子同序列",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TT reset复现",
+              "pass": true,
+              "detail": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": "typical-space",
+      "groups": [
+        {
+          "id": "TT-SPACE",
+          "passed": 30,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TT-SPACE fog 创建：strength=致盲power、endAt=Turns*100、cells 取实际爆心",
+              "pass": true,
+              "detail": "{\"strength\":25,\"endAt\":500,\"cells\":80}"
+            },
+            {
+              "id": "TT-SPACE fog 同源重施替换：仅保留一座并刷新到期",
+              "pass": true,
+              "detail": "[600]"
+            },
+            {
+              "id": "TT-SPACE fog 到期移除并返回 removed",
+              "pass": true,
+              "detail": "[\"fog:caster:拉莱耶造雾术\"]"
+            },
+            {
+              "id": "TT-SPACE fogAt：大型单位任一占格入雾即取最高雾贡献",
+              "pass": true,
+              "detail": "{\"strength\":30,\"regionIds\":[\"f1\"]}"
+            },
+            {
+              "id": "TT-SPACE fogAt：雾外单位 strength=0",
+              "pass": true,
+              "detail": "{\"strength\":0,\"regionIds\":[]}"
+            },
+            {
+              "id": "TT-SPACE perception 视距=感知/5：近可见、远不可见",
+              "pass": true,
+              "detail": "{\"near\":true,\"far\":false}"
+            },
+            {
+              "id": "TT-SPACE perceptionSnapshot 不泄漏：visible 仅可见，lastKnown 为空",
+              "pass": true,
+              "detail": "{\"observerId\":\"obs\",\"visibleUnits\":[\"obs\",\"near\"],\"lastKnown\":{}}"
+            },
+            {
+              "id": "TT-SPACE perception 实墙 blocksVision 遮挡视线",
+              "pass": true,
+              "detail": "wall between"
+            },
+            {
+              "id": "TT-SPACE perception 雾内：仅八邻边缘相邻+自己可见",
+              "pass": true,
+              "detail": "{\"adj\":true,\"far\":false}"
+            },
+            {
+              "id": "TT-SPACE perception 雾外：不能看雾内、不能穿雾看另一侧",
+              "pass": true,
+              "detail": "{\"inFog\":false,\"across\":false}"
+            },
+            {
+              "id": "TT-SPACE barrier 预检：integrity/armor/protectType/cells 就绪",
+              "pass": true,
+              "detail": "{\"integrity\":200,\"armor\":40}"
+            },
+            {
+              "id": "TT-SPACE barrier 每施术者一座：成功创建并替换旧座",
+              "pass": true,
+              "detail": "{\"len\":1}"
+            },
+            {
+              "id": "TT-SPACE barrier 不同施术者不得重叠",
+              "pass": true,
+              "detail": "{\"ok\":false,\"reason\":\"结界与既有结界重叠\",\"barrier\":null}"
+            },
+            {
+              "id": "TT-SPACE barrier 不得切过大型单位占地（部分重叠拒绝）",
+              "pass": true,
+              "detail": "{\"ok\":false,\"reason\":\"结界不能切过大型单位占地\",\"barrier\":null}"
+            },
+            {
+              "id": "TT-SPACE barrierAt：按单位完整占格定位结界",
+              "pass": true,
+              "detail": "{\"ally\":true,\"foe\":false}"
+            },
+            {
+              "id": "TT-SPACE barrierBlocksMove：敌跨界阻断、内部/友方放行",
+              "pass": true,
+              "detail": "cross/internal/ally"
+            },
+            {
+              "id": "TT-SPACE interception：外敌攻击被拦、内部与友方不拦",
+              "pass": true,
+              "detail": "external/internal/ally"
+            },
+            {
+              "id": "TT-SPACE damageBarrier：护甲先减、不盾、击破无溢出并移除",
+              "pass": true,
+              "detail": "{\"first\":{\"integrityBefore\":100,\"integrityAfter\":40,\"damage\":60,\"broken\":false,\"barrier\":{\"id\":\"barrier:caster\",\"casterId\":\"caster\",\"side\":\"hero\",\"center\":{\"x\":5.5,\"y\":5.5},\"radius\":3,\"cells\":[{\"col\":5,\"row\":2},{\"col\":3,\"row\":3},{\"col\":4,\"row\":3},{\"col\":5,\"row\":3},{\"col\":6,\"row\":3},{\"col\":7,\"row\":3},{\"col\":3,\"row\":4},{\"col\":4,\"row\":4},{\"col\":5,\"row\":4},{\"col\":6,\"row\":4},{\"col\":7,\"row\":4},{\"col\":2,\"row\":5},{\"col\":3,\"row\":5},{\"col\":4,\"row\":5},{\"col\":5,\"row\":5},{\"col\":6,\"row\":5},{\"col\":7,\"row\":5},{\"col\":8,\"row\":5},{\"col\":3,\"row\":6},{\"col\":4,\"row\":6},{\"col\":5,\"row\":6},{\"col\":6,\"row\":6},{\"col\":7,\"row\":6},{\"col\":3,\"row\":7},{\"col\":4,\"row\":7},{\"col\":5,\"row\":7},{\"col\":6,\"row\":7},{\"col\":7,\"row\":7},{\"col\":5,\"row\":8}],\"integrity\":0,\"maxIntegrity\":100,\"armor\":40,\"protectType\":\"all\",\"endAt\":null}},\"second\":{\"damage\":960,\"after\":0,\"broken\":true}}"
+            },
+            {
+              "id": "TT-SPACE flying：跨低障碍，普通单位不可入低障碍格",
+              "pass": true,
+              "detail": "{\"fly\":true,\"walk\":false}"
+            },
+            {
+              "id": "TT-SPACE flying canPlaceAt：可落在低障碍上",
+              "pass": true,
+              "detail": "{\"fly\":{\"ok\":true,\"blockedBy\":null},\"walk\":{\"ok\":false,\"blockedBy\":{\"type\":\"terrain\",\"col\":4,\"row\":2,\"cell\":{\"col\":4,\"row\":2,\"blocksMovement\":true,\"blocksProjectile\":false,\"blocksVision\":false,\"lowObstacle\":true,\"void\":false,\"material\":\"brick\",\"objectIds\":[\"low\"]}}}}"
+            },
+            {
+              "id": "TT-SPACE findJumpPath：敌方跨越结界轨迹被阻断",
+              "pass": true,
+              "detail": "{\"ok\":false,\"reason\":\"跳跃不能跨过结界\",\"distance\":2,\"maxDistance\":4,\"path\":[],\"blockedBy\":{\"type\":\"barrier\",\"barrierId\":\"b\"}}"
+            },
+            {
+              "id": "TT-SPACE traceDisplacement：距离量化剩余不算撞墙，真实阻挡才 blocked",
+              "pass": true,
+              "detail": "{\"quant\":{\"actual\":1,\"blocked\":false},\"blocked\":{\"actual\":1,\"blocked\":true}}"
+            },
+            {
+              "id": "TT-SPACE chargePath：八向量化、记录敌方结算点、实墙前停止",
+              "pass": true,
+              "detail": "{\"direction\":{\"x\":1,\"y\":0},\"path\":[{\"col\":2,\"row\":2},{\"col\":3,\"row\":2},{\"col\":4,\"row\":2}],\"entries\":[{\"type\":\"unit\",\"unitId\":\"foe\",\"side\":\"enemy\",\"col\":4,\"row\":2},{\"type\":\"unit\",\"unitId\":\"foe\",\"side\":\"enemy\",\"col\":4,\"row\":2},{\"type\":\"terrain\",\"col\":6,\"row\":2}]}"
+            },
+            {
+              "id": "TT-SPACE range 圆形自身为圆心无需瞄准，治疗含施法者本人",
+              "pass": true,
+              "detail": "{\"ok\":true,\"center\":{\"x\":2.5,\"y\":2.5},\"healSlots\":[\"caster\",\"ally\"]}"
+            },
+            {
+              "id": "TT-SPACE range 全域无需瞄准且覆盖全图",
+              "pass": true,
+              "detail": "{\"ok\":true,\"cells\":396}"
+            },
+            {
+              "id": "TT-SPACE range 区域目标按任意占格命中（大型中心不在范围仍选中）",
+              "pass": true,
+              "detail": "{\"targetIds\":[\"big\"]}"
+            },
+            {
+              "id": "TT-SPACE range affectsAll 不分敌友：含施法者/友方/敌方",
+              "pass": true,
+              "detail": "[\"caster\",\"ally\",\"foe\"]"
+            },
+            {
+              "id": "TT-SPACE range slotTargets override enemy/ally 覆盖默认敌我",
+              "pass": true,
+              "detail": "{\"enemy\":[\"foe\"],\"ally\":[\"caster\",\"ally\"]}"
+            },
+            {
+              "id": "TT-SPACE range 召唤：射程内个人视野 + 完整模板 footprint 落点合法",
+              "pass": true,
+              "detail": "{\"ok\":true,\"summon\":{\"anchor\":{\"col\":6,\"row\":2},\"footprint\":{\"width\":2,\"height\":2}}}"
+            },
+            {
+              "id": "TT-SPACE range 召唤：占用/超出个人视野拒绝",
+              "pass": true,
+              "detail": "{\"occupied\":\"召唤落点已被占用\",\"outVision\":\"召唤落点超出个人视野\"}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": "typical-ai",
+      "groups": [
+        {
+          "id": "TT-AI",
+          "passed": 15,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TT-AI-01 AI落位与真实查询可组合（攻击位命中合法）",
+              "pass": true,
+              "detail": "{\"plan\":{\"moveTo\":{\"col\":4,\"row\":3},\"skill\":{\"name\":\"claw\",\"type\":\"[伤害]\",\"power\":8,\"range\":{\"type\":\"单体\",\"castRange\":1},\"actionCost\":{\"main\":1,\"aux\":0}},\"aim\":{\"x\":3.5,\"y\":3.5,\"targetId\":\"h\"},\"action\":null},\"ok\":true,\"dmg\":[\"h\"]}"
+            },
+            {
+              "id": "TT-AI-02 不可见近敌不评分，AI改打可见远敌",
+              "pass": true,
+              "detail": "{\"moveTo\":{\"col\":9,\"row\":3},\"skill\":{\"name\":\"claw\",\"type\":\"[伤害]\",\"power\":8,\"range\":{\"type\":\"单体\",\"castRange\":1},\"actionCost\":{\"main\":1,\"aux\":0}},\"aim\":{\"x\":8.5,\"y\":3.5,\"targetId\":\"far\"},\"action\":null}"
+            },
+            {
+              "id": "TT-AI-02 全不可见时守位等待，不追踪隐藏目标",
+              "pass": true,
+              "detail": "{\"moveTo\":null,\"skill\":null,\"aim\":null,\"action\":\"wait\"}"
+            },
+            {
+              "id": "TT-AI-03 浓雾无邻接敌人且出口跨预算时请求冲刺",
+              "pass": true,
+              "detail": "{\"moveTo\":null,\"skill\":null,\"aim\":null,\"action\":\"sprint\"}"
+            },
+            {
+              "id": "TT-AI-03 预算足够时移动到雾外合法落点",
+              "pass": true,
+              "detail": "{\"moveTo\":{\"col\":1,\"row\":3},\"skill\":null,\"aim\":null,\"action\":null}"
+            },
+            {
+              "id": "TT-AI-03 出雾后剩余主行动可再攻击邻接敌人",
+              "pass": true,
+              "detail": "{\"exit\":{\"col\":1,\"row\":3},\"attack\":{\"moveTo\":null,\"skill\":{\"name\":\"claw\",\"type\":\"[伤害]\",\"power\":8,\"range\":{\"type\":\"单体\",\"castRange\":1},\"actionCost\":{\"main\":1,\"aux\":0}},\"aim\":{\"x\":0.5,\"y\":3.5,\"targetId\":\"h\"},\"action\":null}}"
+            },
+            {
+              "id": "TT-AI-03 主行动为0时不得冲刺",
+              "pass": true,
+              "detail": "{\"moveTo\":{\"col\":2,\"row\":5},\"skill\":null,\"aim\":null,\"action\":null}"
+            },
+            {
+              "id": "TT-AI-04 纯减益技能按实际槽目标生成候选（damageTargetIds为空）",
+              "pass": true,
+              "detail": "{\"plan\":{\"moveTo\":null,\"skill\":{\"name\":\"sunder\",\"type\":\"[降防]\",\"power\":30,\"range\":{\"type\":\"单体\",\"castRange\":10},\"actionCost\":{\"main\":1,\"aux\":0}},\"aim\":{\"x\":6.5,\"y\":3.5,\"targetId\":\"h\"},\"action\":null},\"dmg\":[],\"slots\":[{\"index\":0,\"tag\":\"降防\",\"side\":\"enemy\",\"scope\":\"single\",\"attack\":false,\"targetIds\":[\"h\"]}]}"
+            },
+            {
+              "id": "TT-AI-05 队友缺血时优先治疗",
+              "pass": true,
+              "detail": "{\"moveTo\":null,\"skill\":{\"name\":\"mend\",\"type\":\"[回复]\",\"power\":40,\"range\":{\"type\":\"单体\",\"castRange\":10},\"actionCost\":{\"main\":1,\"aux\":0}},\"aim\":{\"x\":3.5,\"y\":5.5,\"targetId\":\"a\"},\"action\":null}"
+            },
+            {
+              "id": "TT-AI-05 满血时不刷治疗",
+              "pass": true,
+              "detail": "{\"moveTo\":null,\"skill\":null,\"aim\":null,\"action\":\"wait\"}"
+            },
+            {
+              "id": "TT-AI-06 无增益时给出增益候选",
+              "pass": true,
+              "detail": "{\"moveTo\":null,\"skill\":{\"name\":\"might\",\"type\":\"[增攻]\",\"power\":20,\"range\":{\"type\":\"单体\",\"castRange\":10},\"actionCost\":{\"main\":1,\"aux\":0}},\"aim\":{\"x\":3.5,\"y\":5.5,\"targetId\":\"a\"},\"action\":null}"
+            },
+            {
+              "id": "TT-AI-06 同源增益已生效时不再施放（父道具前缀同源）",
+              "pass": true,
+              "detail": "{\"moveTo\":null,\"skill\":null,\"aim\":null,\"action\":\"wait\"}"
+            },
+            {
+              "id": "TT-AI-07 蓄力技能生成候选并声明 prepare",
+              "pass": true,
+              "detail": "{\"moveTo\":null,\"skill\":{\"name\":\"cannon\",\"type\":\"[伤害]\",\"power\":30,\"range\":{\"type\":\"单体\",\"castRange\":10},\"actionCost\":{\"main\":1,\"aux\":0},\"charge\":2},\"aim\":{\"x\":6.5,\"y\":5.5,\"targetId\":\"h\"},\"action\":\"prepare\"}"
+            },
+            {
+              "id": "TT-AI-08 空regions无perception时保持旧接近（额度内前进不攻击）",
+              "pass": true,
+              "detail": "{\"moveTo\":{\"col\":8,\"row\":3},\"skill\":null,\"aim\":null,\"action\":null}"
+            },
+            {
+              "id": "TT-AI-09 贴身无可用技能时选择防御",
+              "pass": true,
+              "detail": "{\"moveTo\":null,\"skill\":null,\"aim\":null,\"action\":\"defend\"}"
+            }
+          ]
+        }
+      ]
+    },
     {
       "stage": "p01",
       "groups": [
@@ -311,9 +1754,9 @@
               "detail": "{\"type\":\"扇形\",\"castRange\":3,\"angle\":90}"
             },
             {
-              "id": "T01-03 range 圆形",
+              "id": "T01-03 range 爆炸",
               "pass": true,
-              "detail": "{\"type\":\"圆形\",\"castRange\":15,\"radius\":3}"
+              "detail": "{\"type\":\"爆炸\",\"castRange\":15,\"radius\":3}"
             },
             {
               "id": "T01-03 range 全域",
@@ -343,12 +1786,12 @@
             {
               "id": "T01-03 显式范围配旧单体并存",
               "pass": true,
-              "detail": "{\"range\":{\"type\":\"直线\",\"length\":12,\"width\":2},\"type\":\"[单体]\",\"power\":40}"
+              "detail": "{\"range\":{\"type\":\"直线\",\"length\":12,\"width\":2},\"type\":\"[伤害]\",\"power\":40}"
             },
             {
               "id": "T01-03 显式范围配旧群攻并存",
               "pass": true,
-              "detail": "{\"range\":{\"type\":\"圆形\",\"castRange\":10,\"radius\":5},\"type\":\"[群攻]\"}"
+              "detail": "{\"range\":{\"type\":\"爆炸\",\"castRange\":10,\"radius\":5},\"type\":\"[伤害]\"}"
             },
             {
               "id": "T01-03 行动辅",
@@ -356,9 +1799,9 @@
               "detail": "{\"main\":0,\"aux\":1}"
             },
             {
-              "id": "T01-03 主槽仍为群攻(枪击)",
+              "id": "T01-03 旧括号枪击保留演出子型且不恢复人数语义",
               "pass": true,
-              "detail": "[\"[群攻(枪击)]\",\"[无]\"]"
+              "detail": "[\"[伤害(枪击)]\",\"[无]\"]"
             },
             {
               "id": "T01-03 行动主",
@@ -908,7 +2351,7 @@
         },
         {
           "id": "T01-08",
-          "passed": 27,
+          "passed": 28,
           "failed": 0,
           "pending": 0,
           "cases": [
@@ -928,6 +2371,11 @@
               "detail": "[\"rpg-tactics-config\",1,\"all\"]"
             },
             {
+              "id": "T01-08 显示别名保留",
+              "pass": true,
+              "detail": "\"A·别名\""
+            },
+            {
               "id": "T01-08 显式0保留",
               "pass": true,
               "detail": "[0,0]"
@@ -940,7 +2388,7 @@
             {
               "id": "T01-08 组子技能保留",
               "pass": true,
-              "detail": "[{\"name\":\"霰弹\",\"cost\":2,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":0,\"haste\":0,\"maxUses\":0,\"hit\":100,\"turns\":null,\"slotTurns\":2,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[单体(枪击)]\",\"power\":25,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":null,\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":null,\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"summonTarget\":null,\"summonNoLimit\":false,\"range\":null,\"actionCost\":{\"main\":1,\"aux\":0}}]"
+              "detail": "[{\"name\":\"霰弹\",\"cost\":2,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":0,\"haste\":0,\"maxUses\":0,\"cooldownTurns\":0,\"hit\":100,\"turns\":null,\"slotTurns\":2,\"slotTurns2\":null,\"slotTurns3\":null,\"slotTargets\":null,\"type\":\"[单体(枪击)]\",\"power\":25,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":null,\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":null,\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"summonTarget\":null,\"summonNoLimit\":false,\"range\":null,\"actionCost\":{\"main\":1,\"aux\":0},\"evadeShift\":null,\"isPierce\":false,\"affectsAll\":false,\"deathTag\":null,\"displacements\":[],\"regionEffect\":null,\"reactionSource\":false}]"
             },
             {
               "id": "T01-08 范围/成本保留",
@@ -970,7 +2418,7 @@
             {
               "id": "T01-08 物品children白名单往返",
               "pass": true,
-              "detail": "[{\"name\":\"爆射\",\"cost\":3,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":0,\"haste\":0,\"maxUses\":0,\"hit\":100,\"turns\":null,\"slotTurns\":null,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[单体(枪击)]\",\"power\":35,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":null,\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":null,\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"summonTarget\":null,\"summonNoLimit\":false,\"range\":null,\"actionCost\":{\"main\":1,\"aux\":0}}]"
+              "detail": "[{\"name\":\"爆射\",\"cost\":3,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":0,\"haste\":0,\"maxUses\":0,\"cooldownTurns\":0,\"hit\":100,\"turns\":null,\"slotTurns\":null,\"slotTurns2\":null,\"slotTurns3\":null,\"slotTargets\":null,\"type\":\"[单体(枪击)]\",\"power\":35,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":null,\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":null,\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"summonTarget\":null,\"summonNoLimit\":false,\"range\":null,\"actionCost\":{\"main\":1,\"aux\":0},\"evadeShift\":null,\"isPierce\":false,\"affectsAll\":false,\"deathTag\":null,\"displacements\":[],\"regionEffect\":null,\"reactionSource\":false}]"
             },
             {
               "id": "T01-08 无API密钥",
@@ -990,7 +2438,7 @@
             {
               "id": "T01-08 导入children不走私键",
               "pass": true,
-              "detail": "[\"name\",\"cost\",\"hpCost\",\"tpCost\",\"charge\",\"delay\",\"haste\",\"maxUses\",\"hit\",\"turns\",\"slotTurns\",\"slotTurns2\",\"slotTurns3\",\"type\",\"power\",\"type2\",\"power2\",\"type3\",\"power3\",\"isReaction\",\"reactionTarget\",\"kanpoTarget\",\"sheshenTarget\",\"damageType\",\"isOthers\",\"guaranteedHit\",\"switchTarget\",\"ignoreRow\",\"critRate\",\"fxTag\",\"barrierSub\",\"barrierArmor\",\"isHighTier\",\"isLegendary\",\"summonTarget\",\"summonNoLimit\",\"range\",\"actionCost\"]"
+              "detail": "[\"name\",\"cost\",\"hpCost\",\"tpCost\",\"charge\",\"delay\",\"haste\",\"maxUses\",\"cooldownTurns\",\"hit\",\"turns\",\"slotTurns\",\"slotTurns2\",\"slotTurns3\",\"slotTargets\",\"type\",\"power\",\"type2\",\"power2\",\"type3\",\"power3\",\"isReaction\",\"reactionTarget\",\"kanpoTarget\",\"sheshenTarget\",\"damageType\",\"isOthers\",\"guaranteedHit\",\"switchTarget\",\"ignoreRow\",\"critRate\",\"fxTag\",\"barrierSub\",\"barrierArmor\",\"isHighTier\",\"isLegendary\",\"summonTarget\",\"summonNoLimit\",\"range\",\"actionCost\",\"evadeShift\",\"isPierce\",\"affectsAll\",\"deathTag\",\"displacements\",\"regionEffect\",\"reactionSource\"]"
             },
             {
               "id": "T01-08 单角色包一项",
@@ -1630,22 +3078,22 @@
             {
               "id": "TM-01 首行动领取移动余额=moveDistance与1主1辅",
               "pass": true,
-              "detail": "now=50 res={\"moveRemaining\":3,\"main\":1,\"aux\":1}"
+              "detail": "now=50 res={\"moveRemaining\":3,\"sprintRemaining\":0,\"main\":1,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":1}"
             },
             {
               "id": "TM-01 previewMove可达返回格、超预算返回null",
               "pass": true,
-              "detail": "pv={\"col\":3,\"row\":2,\"cost\":1,\"path\":[{\"col\":2,\"row\":2},{\"col\":3,\"row\":2}]}"
+              "detail": "pv={\"col\":3,\"row\":2,\"cost\":1,\"path\":[{\"col\":2,\"row\":2},{\"col\":3,\"row\":2}],\"budgetCost\":1}"
             },
             {
               "id": "TM-01 move成功扣余额1且落位",
               "pass": true,
-              "detail": "mv={\"ok\":true} res={\"moveRemaining\":2,\"main\":1,\"aux\":1}"
+              "detail": "mv={\"ok\":true} res={\"moveRemaining\":2,\"sprintRemaining\":0,\"main\":1,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":1}"
             },
             {
               "id": "TM-01 余量移动扣减至0（预算累计口径）",
               "pass": true,
-              "detail": "pv5={\"col\":5,\"cost\":2} pv6=null mv2={\"ok\":true} res={\"moveRemaining\":0,\"main\":1,\"aux\":1}"
+              "detail": "pv5={\"col\":5,\"cost\":2} pv6=null mv2={\"ok\":true} res={\"moveRemaining\":0,\"sprintRemaining\":0,\"main\":1,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":1}"
             },
             {
               "id": "TM-01 余额耗尽后移动被拒并给reason",
@@ -1688,7 +3136,7 @@
             {
               "id": "TM-02 实墙挡传播（目标不可选中）",
               "pass": true,
-              "detail": "{\"ok\":false,\"reason\":\"视线被墙阻挡\",\"blockedBy\":{\"type\":\"wall\"}}"
+              "detail": "{\"ok\":false,\"reason\":\"视线被墙阻挡\",\"blockedBy\":{\"type\":\"wall\",\"point\":{\"x\":6.1,\"y\":3.5},\"cell\":{\"col\":6,\"row\":3},\"objectIds\":[\"w0\"]}}"
             },
             {
               "id": "TM-02 低障碍不挡直线（目标可选中且低障碍格在cells）",
@@ -1703,7 +3151,7 @@
             {
               "id": "TM-02 友方挡弹截断目标且友方不入目标",
               "pass": true,
-              "detail": "{\"ok\":false,\"reason\":\"友方挡弹\",\"blockedBy\":{\"type\":\"unit\",\"unitId\":\"a1\"}}"
+              "detail": "{\"ok\":false,\"reason\":\"友方挡弹\",\"blockedBy\":{\"type\":\"unit\",\"unitId\":\"a1\",\"side\":\"hero\",\"point\":{\"x\":5.1,\"y\":3.5},\"cell\":{\"col\":5,\"row\":3}}}"
             },
             {
               "id": "TM-02 预览与执行查询一致且伤害按护甲落地",
@@ -1736,7 +3184,7 @@
             {
               "id": "TM-03 护甲减伤下限1、零伤为0、不改hp且shieldDmg=0",
               "pass": true,
-              "detail": "{\"d1\":{\"hpDmg\":7,\"shieldDmg\":0},\"d2\":{\"hpDmg\":1,\"shieldDmg\":0},\"d3\":{\"hpDmg\":0,\"shieldDmg\":0}}"
+              "detail": "{\"d1\":{\"hpDmg\":7,\"shieldDmg\":0,\"guardDmg\":0},\"d2\":{\"hpDmg\":1,\"shieldDmg\":0,\"guardDmg\":0},\"d3\":{\"hpDmg\":0,\"shieldDmg\":0,\"guardDmg\":0}}"
             },
             {
               "id": "TM-03 命中扣血=power-护甲（12-5=7）",
@@ -1769,27 +3217,27 @@
             {
               "id": "TM-04 首行动领取余额（移动3/主1/辅1）且速度200首行动t=50",
               "pass": true,
-              "detail": "now=50 res={\"moveRemaining\":3,\"main\":1,\"aux\":1}"
+              "detail": "now=50 res={\"moveRemaining\":3,\"sprintRemaining\":0,\"main\":1,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":1}"
             },
             {
               "id": "TM-04 移动只扣移动余额不扣主辅",
               "pass": true,
-              "detail": "res={\"moveRemaining\":2,\"main\":1,\"aux\":1}"
+              "detail": "res={\"moveRemaining\":2,\"sprintRemaining\":0,\"main\":1,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":1}"
             },
             {
               "id": "TM-04 攻击付1主与MP3且敌方按护甲扣血",
               "pass": true,
-              "detail": "at={\"ok\":true} res={\"moveRemaining\":2,\"main\":0,\"aux\":1}"
+              "detail": "at={\"ok\":true} res={\"moveRemaining\":2,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":1}"
             },
             {
               "id": "TM-04 同一行动内重复start幂等（余额不重发）",
               "pass": true,
-              "detail": "res={\"moveRemaining\":2,\"main\":0,\"aux\":1} now=50"
+              "detail": "res={\"moveRemaining\":2,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":1} now=50"
             },
             {
               "id": "TM-04 battleState克隆恢复保留已扣余额（main=0且移动余额不变）",
               "pass": true,
-              "detail": "res={\"moveRemaining\":2,\"main\":0,\"aux\":1} now=50 cur=h1"
+              "detail": "res={\"moveRemaining\":2,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":1} now=50 cur=h1"
             },
             {
               "id": "TM-04 主行动已用再攻击被拒且不重复扣费",
@@ -1799,12 +3247,12 @@
             {
               "id": "TM-04 可移动—攻击—余量移动组合",
               "pass": true,
-              "detail": "res={\"moveRemaining\":1,\"main\":0,\"aux\":1}"
+              "detail": "res={\"moveRemaining\":1,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":1}"
             },
             {
               "id": "TM-04 endAction仅推进一位且不自动跑AI（敌方余额全新、未行动）",
               "pass": true,
-              "detail": "now=66.66666666666667 cur=e1 res={\"moveRemaining\":3,\"main\":1,\"aux\":1}"
+              "detail": "now=66.66666666666667 cur=e1 res={\"moveRemaining\":3,\"sprintRemaining\":0,\"main\":1,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":1}"
             },
             {
               "id": "TM-04 再推进回到我方且时钟继续计息（t=100）",
@@ -1814,7 +3262,7 @@
             {
               "id": "TM-04 MP不足拒绝声明且不扣MP不扣敌血",
               "pass": true,
-              "detail": "at={\"ok\":false,\"reason\":\"MP 不足\"}"
+              "detail": "at={\"ok\":false,\"reason\":\"数值资源不足\"}"
             }
           ]
         },
@@ -1827,7 +3275,7 @@
             {
               "id": "TM-05 近战AI moveTo攻击位（距英雄1格）并声明爪击",
               "pass": true,
-              "detail": "{\"moveTo\":{\"col\":4,\"row\":3},\"skill\":{\"name\":\"爪击\",\"cost\":0,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":0,\"haste\":0,\"maxUses\":0,\"usesRemaining\":0,\"hit\":100,\"turns\":null,\"slotTurns\":null,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[单体]\",\"power\":8,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":null,\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":null,\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"summonTarget\":null,\"summonNoLimit\":false,\"range\":{\"type\":\"单体\",\"castRange\":1},\"actionCost\":{\"main\":1,\"aux\":0},\"_explicit\":[\"type\",\"power\",\"range\",\"range.type\",\"range.castRange\"]},\"aim\":{\"x\":3.5,\"y\":3.5,\"targetId\":\"h1\"}}"
+              "detail": "{\"moveTo\":{\"col\":4,\"row\":3},\"skill\":{\"name\":\"爪击\",\"cost\":0,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":0,\"haste\":0,\"maxUses\":0,\"usesRemaining\":0,\"cooldownTurns\":0,\"slotTargets\":null,\"hit\":100,\"turns\":null,\"slotTurns\":null,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[伤害]\",\"power\":8,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":null,\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":null,\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"isPierce\":false,\"summonTarget\":null,\"summonNoLimit\":false,\"range\":{\"type\":\"单体\",\"castRange\":1},\"actionCost\":{\"main\":1,\"aux\":0},\"evadeShift\":null,\"displacements\":[],\"regionEffect\":null,\"affectsAll\":false,\"reactionSource\":false,\"deathTag\":null,\"_explicit\":[\"type\",\"power\",\"range\",\"range.type\",\"range.castRange\"]},\"aim\":{\"x\":3.5,\"y\":3.5,\"targetId\":\"h1\"},\"action\":null}"
             },
             {
               "id": "TM-05 AI落位与真实查询可组合（攻击位命中合法）",
@@ -1835,14 +3283,14 @@
               "detail": "{\"ok\":true,\"targets\":[\"h1\"]}"
             },
             {
-              "id": "TM-05 runEnemyTurn近战接近攻击（普攻位成本5更优：英雄-8血）并推进下一位",
+              "id": "TM-05 runEnemyTurn按实际伤害选择普攻并用余量接近",
               "pass": true,
-              "detail": "hp=12 cur=h1 now=200 pos={\"col\":5,\"row\":3,\"facing\":270}"
+              "detail": "hp=12 cur=h1 now=200 pos={\"col\":4,\"row\":3,\"facing\":270}"
             },
             {
               "id": "TM-05 预算不够接近到射程时只前进不攻击（skill空）",
               "pass": true,
-              "detail": "{\"moveTo\":{\"col\":8,\"row\":3},\"skill\":null,\"aim\":null}"
+              "detail": "{\"moveTo\":{\"col\":8,\"row\":3},\"skill\":null,\"aim\":null,\"action\":null}"
             },
             {
               "id": "TM-05 够不着时runEnemyTurn不造成伤害且照常推进",
@@ -1852,17 +3300,17 @@
             {
               "id": "TM-05 远程在射程内原地攻击（moveTo空、瞄准英雄）",
               "pass": true,
-              "detail": "{\"moveTo\":null,\"skill\":{\"name\":\"火舌\",\"cost\":3,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":0,\"haste\":0,\"maxUses\":0,\"usesRemaining\":0,\"hit\":100,\"turns\":null,\"slotTurns\":null,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[单体]\",\"power\":12,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":null,\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":null,\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"summonTarget\":null,\"summonNoLimit\":false,\"range\":{\"type\":\"单体\",\"castRange\":15},\"actionCost\":{\"main\":1,\"aux\":0},\"_explicit\":[\"cost\",\"type\",\"power\",\"range\",\"range.type\",\"range.castRange\"]},\"aim\":{\"x\":3.5,\"y\":3.5,\"targetId\":\"h1\"}}"
+              "detail": "{\"moveTo\":null,\"skill\":{\"name\":\"火舌\",\"cost\":3,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":0,\"haste\":0,\"maxUses\":0,\"usesRemaining\":0,\"cooldownTurns\":0,\"slotTargets\":null,\"hit\":100,\"turns\":null,\"slotTurns\":null,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[伤害]\",\"power\":12,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":null,\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":null,\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"isPierce\":false,\"summonTarget\":null,\"summonNoLimit\":false,\"range\":{\"type\":\"单体\",\"castRange\":15},\"actionCost\":{\"main\":1,\"aux\":0},\"evadeShift\":null,\"displacements\":[],\"regionEffect\":null,\"affectsAll\":false,\"reactionSource\":false,\"deathTag\":null,\"_explicit\":[\"cost\",\"type\",\"power\",\"range\",\"range.type\",\"range.castRange\"]},\"aim\":{\"x\":3.5,\"y\":3.5,\"targetId\":\"h1\"},\"action\":null}"
             },
             {
-              "id": "TM-05 远程原地攻击扣血且敌位不变",
+              "id": "TM-05 远程攻击后可用余量接近且仅扣一次技能费用",
               "pass": true,
-              "detail": "hp=10 pos={\"col\":10,\"row\":3,\"facing\":270}"
+              "detail": "hp=10 pos={\"col\":6,\"row\":3,\"facing\":270}"
             },
             {
               "id": "TM-05 封死敌人无法行动（moveTo与skill皆空）",
               "pass": true,
-              "detail": "{\"moveTo\":null,\"skill\":null,\"aim\":null}"
+              "detail": "{\"moveTo\":null,\"skill\":null,\"aim\":null,\"action\":\"wait\"}"
             },
             {
               "id": "TM-05 无法行动时runEnemyTurn结束行动且不产生伤害",
@@ -1895,12 +3343,320 @@
             {
               "id": "TM-06 重置恢复位置/HP/MP/余额/时钟/日志并清除终局",
               "pass": true,
-              "detail": "pre={\"pos\":{\"col\":3,\"row\":2,\"facing\":104.03624346792651},\"e1hp\":0} rs={\"cur\":\"h1\",\"now\":50,\"res\":{\"moveRemaining\":3,\"main\":1,\"aux\":1},\"log\":1}"
+              "detail": "pre={\"pos\":{\"col\":3,\"row\":2,\"facing\":104.03624346792651},\"e1hp\":0} rs={\"cur\":\"h1\",\"now\":50,\"res\":{\"moveRemaining\":3,\"sprintRemaining\":0,\"main\":1,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":1},\"log\":1}"
             },
             {
               "id": "TM-06 重开后可重新行动（移动扣余额且落位）",
               "pass": true,
-              "detail": "mv={\"ok\":true} res={\"moveRemaining\":2,\"main\":1,\"aux\":1}"
+              "detail": "mv={\"ok\":true} res={\"moveRemaining\":2,\"sprintRemaining\":0,\"main\":1,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":1}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": "av",
+      "groups": [
+        {
+          "id": "TAV-01",
+          "passed": 6,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TAV-01 四名正式玩家（无先锋/术士占位）",
+              "pass": true,
+              "detail": "[\"索恩\",\"埃利奥特\",\"玛德琳\",\"弗兰克\"]"
+            },
+            {
+              "id": "TAV-01 头像为 AVATAR_MAP 正确 URL（非首字/默认人像）",
+              "pass": true,
+              "detail": "[[\"索恩\",\"https://imgur.la/images/2026/08/13/77fcdf0fd006c4ff1ccae30774322270.png\"],[\"埃利奥特\",\"https://imgur.la/images/2026/06/25/31a4dd84a831e3f76082542bf12fcf19.png\"],[\"玛德琳\",\"https://imgur.la/images/2026/06/25/585bf7f2f1559168b419b8be56da36a6.png\"],[\"弗兰克\",\"https://imgur.la/images/2026/06/25/26f001dbe399876cd74978bbe12a265b.png\"]]"
+            },
+            {
+              "id": "TAV-01 敌方使用 emoji 且无头像外链",
+              "pass": true,
+              "detail": "[[\"e:守卫\",\"👹\"],[\"e:弓手\",\"💀\"],[\"e:邪术师\",\"🧙\"],[\"e:斥候\",\"🐺\"]]"
+            },
+            {
+              "id": "TAV-01 敌方 ID 去 emoji 派生，与站位键对齐",
+              "pass": true,
+              "detail": "[\"e:守卫\",\"e:弓手\",\"e:邪术师\",\"e:斥候\"]"
+            },
+            {
+              "id": "TAV-01 大型敌人保留 2×2 真实占地",
+              "pass": true,
+              "detail": "{\"width\":2,\"height\":2}"
+            },
+            {
+              "id": "TAV-01 单位视图未引入首字兜底",
+              "pass": true,
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "id": "TAV-02",
+          "passed": 5,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TAV-02 四人语音表完整（first + turn×3 + low×3）",
+              "pass": true,
+              "detail": "[\"索恩\",\"埃利奥特\",\"玛德琳\",\"弗兰克\"]"
+            },
+            {
+              "id": "TAV-02 埃利奥特 first = 开始回合.wav（不存在\"第一回合\"文件）",
+              "pass": true,
+              "detail": "埃利奥特/埃利奥特_开始回合.wav"
+            },
+            {
+              "id": "TAV-02 显式预载清单全部是回合制 audioUrls 已有键",
+              "pass": true,
+              "detail": "[]"
+            },
+            {
+              "id": "TAV-02 预载清单有界（不预载整库）",
+              "pass": true,
+              "detail": "40"
+            },
+            {
+              "id": "TAV-02 语音文件在 my_assets 中实际存在",
+              "pass": true,
+              "detail": "[]"
+            }
+          ]
+        },
+        {
+          "id": "TAV-03",
+          "passed": 17,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TAV-03 攻击身份仅由显式特效标签决定 h:索恩",
+              "pass": true,
+              "detail": "{\"mode\":\"tag\",\"subtype\":\"砷弹射击\"}"
+            },
+            {
+              "id": "TAV-03 攻击身份仅由显式特效标签决定 h:埃利奥特",
+              "pass": true,
+              "detail": "{\"mode\":\"tag\",\"subtype\":\"枪击\"}"
+            },
+            {
+              "id": "TAV-03 攻击身份仅由显式特效标签决定 h:玛德琳",
+              "pass": true,
+              "detail": "{\"mode\":\"tag\",\"subtype\":\"枪击\"}"
+            },
+            {
+              "id": "TAV-03 攻击身份仅由显式特效标签决定 h:弗兰克",
+              "pass": true,
+              "detail": "{\"mode\":\"tag\",\"subtype\":\"霰弹\"}"
+            },
+            {
+              "id": "TAV-03 攻击身份仅由显式特效标签决定 e:守卫",
+              "pass": true,
+              "detail": "{\"mode\":\"tag\",\"subtype\":\"刀砍\"}"
+            },
+            {
+              "id": "TAV-03 攻击身份仅由显式特效标签决定 e:弓手",
+              "pass": true,
+              "detail": "{\"mode\":\"tag\",\"subtype\":\"箭矢\"}"
+            },
+            {
+              "id": "TAV-03 攻击身份仅由显式特效标签决定 e:邪术师",
+              "pass": true,
+              "detail": "{\"mode\":\"tag\",\"subtype\":\"诅咒\"}"
+            },
+            {
+              "id": "TAV-03 攻击身份仅由显式特效标签决定 e:斥候",
+              "pass": true,
+              "detail": "{\"mode\":\"tag\",\"subtype\":\"爪击\"}"
+            },
+            {
+              "id": "TAV-03 无标签不根据伤害或旧括号猜测演出",
+              "pass": true,
+              "detail": "{\"mode\":\"tag\",\"subtype\":null}"
+            },
+            {
+              "id": "TAV-03 特效标签覆盖旧括号且与伤害类型无关",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TAV-03 普通攻击显式指定刀砍特效",
+              "pass": true,
+              "detail": "{\"mode\":\"tag\",\"subtype\":\"刀砍\"}"
+            },
+            {
+              "id": "TAV-03 前摇 e:守卫 → red-wide",
+              "pass": true,
+              "detail": "red-wide"
+            },
+            {
+              "id": "TAV-03 前摇 e:弓手 → amber-single",
+              "pass": true,
+              "detail": "amber-single"
+            },
+            {
+              "id": "TAV-03 前摇 e:邪术师 → violet-single",
+              "pass": true,
+              "detail": "violet-single"
+            },
+            {
+              "id": "TAV-03 前摇 e:斥候 → red-single",
+              "pass": true,
+              "detail": "red-single"
+            },
+            {
+              "id": "TAV-03 前摇单群以显式空间范围为准（旧\"单体\"标签不覆盖扇形）",
+              "pass": true,
+              "detail": "[伤害(刀砍)]"
+            },
+            {
+              "id": "TAV-03 普通攻击前摇 → red-single",
+              "pass": true,
+              "detail": "red-single"
+            }
+          ]
+        },
+        {
+          "id": "TAV-04",
+          "passed": 6,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TAV-04 路径逐段（3 段，不只终点）",
+              "pass": true,
+              "detail": "3"
+            },
+            {
+              "id": "TAV-04 斜段长度 √2，直段 1",
+              "pass": true,
+              "detail": "[1,1.4142135623730951,1]"
+            },
+            {
+              "id": "TAV-04 经过转角格中心（不直线穿墙）",
+              "pass": true,
+              "detail": "{\"x\":3.5,\"y\":2.5,\"seg\":0,\"facing\":90}"
+            },
+            {
+              "id": "TAV-04 缓起缓停曲线单调且端点 0/1",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TAV-04 时长随路程增长（按段长保持速度）",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TAV-04 每段独立朝向（右→右下→下）",
+              "pass": true,
+              "detail": "[90,135,180]"
+            }
+          ]
+        },
+        {
+          "id": "TAV-05",
+          "passed": 12,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TAV-05 开场玩家先手（玛德琳敏捷 120）",
+              "pass": true,
+              "detail": "h:玛德琳"
+            },
+            {
+              "id": "TAV-05 actionSerial 首次自然行动 = 1",
+              "pass": true,
+              "detail": "1"
+            },
+            {
+              "id": "TAV-05 move返回实际路径与扣费（发现新敌人可提前停止）",
+              "pass": true,
+              "detail": "{\"len\":4,\"b\":6,\"a\":3}"
+            },
+            {
+              "id": "TAV-05 移动不推进虚拟时间",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TAV-05 预览不扣 MP/主行动",
+              "pass": true,
+              "detail": "{\"ok\":true,\"r\":null}"
+            },
+            {
+              "id": "TAV-05 攻击结果含揭示所需字段且只结算一次",
+              "pass": true,
+              "detail": "{\"targetId\":\"e:守卫\",\"side\":\"enemy\",\"hit\":true,\"hpDmg\":9,\"hpBefore\":400,\"hpAfter\":391,\"maxHp\":400,\"down\":false,\"logIndex\":1,\"logEnd\":2,\"segments\":[{\"index\":0,\"shotIndex\":1,\"segmentIndex\":1,\"targetId\":\"e:守卫\",\"logIndex\":1,\"hit\":true,\"hpDmg\":9,\"shieldDmg\":0,\"guardDmg\":0,\"hpBefore\":400,\"hpAfter\":391,\"down\":false,\"logEnd\":2,\"aim\":{\"x\":12,\"y\":26,\"targetId\":\"e:守卫\"},\"facing\":351.86989764584405,\"cells\":[{\"col\":11,\"row\":25},{\"col\":12,\"row\":25},{\"col\":11,\"row\":26},{\"col\":12,\"row\":26}]}]}"
+            },
+            {
+              "id": "TAV-05 攻击扣 MP 与主行动各一次",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TAV-05 战报行索引可供拍点揭示",
+              "pass": true,
+              "detail": "{\"li\":1,\"le\":2,\"lt\":2}"
+            },
+            {
+              "id": "TAV-05 攻击后撤回只扣实际路程（额度不刷新不丢失）",
+              "pass": true,
+              "detail": "{\"mvRest\":6,\"cost\":2.414213562373095,\"left\":3.585786437626905}"
+            },
+            {
+              "id": "TAV-05 轮转到敌方行动",
+              "pass": true,
+              "detail": "e:斥候"
+            },
+            {
+              "id": "TAV-05 planEnemyAction 只读（位置/资源/HP 不变）",
+              "pass": true,
+              "detail": "{\"moveTo\":{\"col\":11,\"row\":33},\"skill\":null}"
+            },
+            {
+              "id": "TAV-05 敌方结束后进入下一次自然行动（actionSerial+1）",
+              "pass": true,
+              "detail": "3"
+            }
+          ]
+        },
+        {
+          "id": "TAV-06",
+          "passed": 5,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TAV-06 直线返回 shape（长/宽/方向）",
+              "pass": true,
+              "detail": "{\"type\":\"直线\",\"from\":{\"x\":9.5,\"y\":37.5},\"dir\":-1.5707963267948966,\"length\":10,\"width\":1}"
+            },
+            {
+              "id": "TAV-06 直线作用格不越过外壁（入口厅北墙后无格，窄廊除外）",
+              "pass": true,
+              "detail": "[]"
+            },
+            {
+              "id": "TAV-06 扇形返回 shape（半径/角度/方向）",
+              "pass": true,
+              "detail": "{\"type\":\"扇形\",\"from\":{\"x\":12.5,\"y\":36.5},\"dir\":-1.5707963267948966,\"radius\":5,\"angle\":60}"
+            },
+            {
+              "id": "TAV-06 单体被墙阻挡时给出阻挡点（同一次查询）",
+              "pass": true,
+              "detail": "{\"r\":\"视线被墙阻挡\",\"b\":{\"type\":\"wall\",\"point\":{\"x\":13.869565217391305,\"y\":31.82608695652174},\"cell\":{\"col\":13,\"row\":31},\"objectIds\":[\"statue-ba-e\"]}}"
+            },
+            {
+              "id": "TAV-06 多格单位在作用区只算一个目标",
+              "pass": true,
+              "detail": "[\"e:守卫\"]"
             }
           ]
         }
@@ -2264,33 +4020,1022 @@
           ]
         }
       ]
+    },
+    {
+      "stage": "p04",
+      "groups": [
+        {
+          "id": "T04-01",
+          "passed": 8,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "T04-01 跳距=ceil(基础移动/3)=2m，可越低障不可越实墙",
+              "pass": true,
+              "detail": "{\"lowJump\":{\"ok\":true,\"reason\":null,\"distance\":2,\"maxDistance\":2,\"path\":[{\"col\":2,\"row\":2},{\"col\":3,\"row\":2},{\"col\":4,\"row\":2}],\"blockedBy\":null},\"wallJump\":{\"ok\":false,\"reason\":\"跳跃被实墙或关门阻挡\",\"distance\":2,\"maxDistance\":2,\"path\":[],\"blockedBy\":{\"type\":\"wall\",\"col\":5,\"row\":2}}}"
+            },
+            {
+              "id": "T04-02 冲刺消耗1主行动并追加1份基础移动额度",
+              "pass": true,
+              "detail": "{\"beforeSprint\":{\"moveRemaining\":6,\"sprintRemaining\":0,\"main\":1,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":2},\"afterSprint\":{\"moveRemaining\":12,\"sprintRemaining\":6,\"main\":0,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":2}}"
+            },
+            {
+              "id": "T04-03 力量40推动重量50距离2m，实墙阻挡并按剩余距离结算碰撞",
+              "pass": true,
+              "detail": "{\"pushedResult\":{\"ok\":true,\"success\":true,\"targetId\":\"q\",\"from\":{\"col\":4,\"row\":2},\"to\":{\"col\":5,\"row\":2},\"requestedDistance\":2,\"movedDistance\":1,\"path\":[{\"col\":4,\"row\":2},{\"col\":5,\"row\":2}],\"blockedBy\":{\"type\":\"terrain\",\"col\":6,\"row\":2,\"cell\":{\"col\":6,\"row\":2,\"blocksMovement\":true,\"blocksProjectile\":true,\"blocksVision\":true,\"lowObstacle\":false,\"void\":false,\"material\":\"brick\",\"objectIds\":[\"block\"]}},\"collision\":{\"rawDmg\":10,\"mitigated\":1,\"shieldDmg\":1,\"hpDmg\":0},\"hpAfter\":100,\"down\":false,\"rollPush\":40,\"rollResist\":1},\"resources\":{\"moveRemaining\":6,\"sprintRemaining\":0,\"main\":1,\"aux\":0,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":2},\"hp\":100,\"shield\":9}"
+            },
+            {
+              "id": "T04-06 碰撞伤害按护甲、护盾、HP顺序结算且不掷命闪",
+              "pass": true,
+              "detail": "{\"collision\":{\"rawDmg\":10,\"mitigated\":5,\"shieldDmg\":3,\"hpDmg\":2},\"hp\":8,\"shield\":0}"
+            },
+            {
+              "id": "T04-04 推动重量等于力量×1.5失败但消耗辅助行动",
+              "pass": true,
+              "detail": "{\"ok\":true,\"success\":false,\"targetId\":\"f\",\"rollPush\":1,\"rollResist\":1,\"moveDistance\":0}"
+            },
+            {
+              "id": "T04-05 背起消耗主行动、清占位；合法放下免费并从零恢复行动资格",
+              "pass": true,
+              "detail": "{\"carried\":{\"ok\":true,\"carrierId\":\"c\",\"targetId\":\"d\",\"totalWeight\":60},\"carrying\":{\"c\":\"d\"},\"dropped\":{\"ok\":true,\"carrierId\":\"c\",\"targetId\":\"d\",\"placement\":{\"col\":3,\"row\":4}},\"pos\":{\"col\":3,\"row\":4},\"status\":\"active\",\"resources\":{\"moveRemaining\":6,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":2},\"canPlaceThroughCarried\":true}"
+            },
+            {
+              "id": "T04-07 背负移动每米消耗2米额度且可达域按同倍率收缩",
+              "pass": true,
+              "detail": "{\"reachable\":{\"col\":4,\"row\":2,\"cost\":4,\"path\":[{\"col\":2,\"row\":2},{\"col\":3,\"row\":2},{\"col\":4,\"row\":2}]},\"move\":{\"ok\":true,\"stoppedOnDiscovery\":false,\"cell\":{\"col\":4,\"row\":2,\"cost\":4,\"path\":[{\"col\":2,\"row\":2},{\"col\":3,\"row\":2},{\"col\":4,\"row\":2}],\"budgetCost\":4},\"from\":{\"col\":2,\"row\":2},\"unitId\":\"m\",\"moveBefore\":6,\"moveAfter\":2},\"resources\":{\"moveRemaining\":2,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":2}}"
+            },
+            {
+              "id": "T04-08 越界落点拒绝且不消耗行动与移动额度",
+              "pass": true,
+              "detail": "{\"invalidJump\":{\"ok\":false,\"reason\":\"跳跃必须沿八方向\",\"distance\":24.08318915758459,\"maxDistance\":2,\"path\":[],\"blockedBy\":null},\"resources\":{\"moveRemaining\":2,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":2}}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": "p05",
+      "groups": [
+        {
+          "id": "T05-01",
+          "passed": 10,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "T05-stone 同seed完全复现、三种结构可选、双输出由同场景派生",
+              "pass": true,
+              "detail": "{\"theme\":\"stone\",\"structure\":1,\"structureCount\":3,\"art\":8,\"cells\":528,\"objectBoundsOnFloor\":true,\"doorsTouchFloor\":true}"
+            },
+            {
+              "id": "T05-wild 同seed完全复现、三种结构可选、双输出由同场景派生",
+              "pass": true,
+              "detail": "{\"theme\":\"wild\",\"structure\":1,\"structureCount\":3,\"art\":8,\"cells\":528,\"objectBoundsOnFloor\":true,\"doorsTouchFloor\":true}"
+            },
+            {
+              "id": "T05-courtyard 同seed完全复现、三种结构可选、双输出由同场景派生",
+              "pass": true,
+              "detail": "{\"theme\":\"courtyard\",\"structure\":1,\"structureCount\":3,\"art\":7,\"cells\":528,\"objectBoundsOnFloor\":true,\"doorsTouchFloor\":true}"
+            },
+            {
+              "id": "T05 野外主题图元来自现有R13近景类型且逻辑障碍同源",
+              "pass": true,
+              "detail": "[\"wall\",\"wall\",\"wall\",\"wall\",\"tree\",\"boulder\",\"crystal\",\"campfire\"]"
+            },
+            {
+              "id": "T05 语义组布阵支持大型footprint/个体覆盖/硬区域与软约束松弛报告",
+              "pass": true,
+              "detail": "{\"ok\":true,\"placements\":{\"h2\":{\"col\":13,\"row\":3,\"facing\":0},\"e1\":{\"col\":21,\"row\":20,\"facing\":0},\"e2\":{\"col\":19,\"row\":19,\"facing\":0},\"h1\":{\"col\":4,\"row\":4,\"facing\":90}},\"report\":{\"status\":\"ok-with-relaxed-soft-constraints\",\"seed\":99,\"placed\":[\"e1\",\"e2\",\"h1\",\"h2\"],\"relaxed\":[{\"id\":\"r3\",\"relation\":\"adjacent\",\"reason\":\"not-adjacent\",\"subject\":\"h1\",\"object\":\"h2\"},{\"id\":\"r4\",\"relation\":\"surround\",\"reason\":\"not-surrounded\",\"subject\":\"h1\",\"object\":\"e1\"}],\"conflicts\":[]}}"
+            },
+            {
+              "id": "T05 2×2无法进入窄区时返回可诊断硬冲突且不删单位",
+              "pass": true,
+              "detail": "{\"ok\":false,\"placementsById\":{},\"report\":{\"status\":\"hard-conflict\",\"seed\":1,\"placed\":[],\"relaxed\":[],\"conflicts\":[{\"id\":\"locked\",\"reason\":\"no-legal-placement\",\"unitId\":\"giant\",\"anchor\":{\"col\":3,\"row\":3,\"width\":3,\"height\":1}}]}}"
+            },
+            {
+              "id": "T05 trapped-in 检查封闭边界和显式硬出口；near 缺距离拒绝",
+              "pass": true,
+              "detail": "{\"trapped\":{\"ok\":true,\"placementsById\":{\"prisoner\":{\"col\":4,\"row\":4}},\"report\":{\"status\":\"ok\",\"seed\":7,\"placed\":[\"prisoner\"],\"relaxed\":[],\"conflicts\":[]}},\"missingNear\":{\"ok\":false,\"placementsById\":{},\"report\":{\"status\":\"invalid-spec\",\"seed\":3,\"placed\":[],\"relaxed\":[],\"conflicts\":[{\"id\":\"near-required\",\"reason\":\"near-requires-distance\"}]}}}"
+            },
+            {
+              "id": "T05 生成layout/positions存入scene状态，新battle与续载保留地图和物件变化",
+              "pass": true,
+              "detail": "{\"first\":\"new-scene\",\"second\":\"new-battle\",\"resume\":\"resume\",\"seed\":71,\"doors\":{\"door-n\":false}}"
+            },
+            {
+              "id": "T05-06 开场个体覆盖可落合法格，非法覆盖被拒并返回冲突",
+              "pass": true,
+              "detail": "{\"edited\":{\"col\":3,\"row\":3,\"facing\":90},\"illegal\":{\"status\":\"hard-conflict\",\"seed\":402,\"placed\":[],\"relaxed\":[],\"conflicts\":[{\"id\":\"override:h1\",\"reason\":\"blocked-terrain\",\"unitId\":\"h1\",\"placement\":{\"col\":0,\"row\":0},\"conflict\":null}]}}"
+            },
+            {
+              "id": "T05-07 语义布阵与逐人坐标均可解并记录输入长度",
+              "pass": true,
+              "detail": "{\"compactTokens\":284,\"cellTokens\":304,\"compact\":{\"h2\":{\"col\":13,\"row\":3,\"facing\":0},\"e1\":{\"col\":21,\"row\":20,\"facing\":0},\"e2\":{\"col\":19,\"row\":19,\"facing\":0},\"h1\":{\"col\":4,\"row\":4,\"facing\":90}},\"cellByCell\":{\"h1\":{\"col\":4,\"row\":4,\"facing\":90},\"h2\":{\"col\":13,\"row\":3,\"facing\":0},\"e1\":{\"col\":21,\"row\":20,\"facing\":0},\"e2\":{\"col\":19,\"row\":19,\"facing\":0}}}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": "p06",
+      "groups": [
+        {
+          "id": "T06-01",
+          "passed": 9,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "T06-01 显式直线按范围选中三名敌人且友方不挡不受伤",
+              "pass": true,
+              "detail": "{\"targets\":[\"e1\",\"e2\",\"e3\"],\"actual\":[\"h\",\"e1\",\"e2\",\"e3\",\"a\"],\"slot\":[{\"index\":0,\"tag\":\"伤害\",\"side\":\"enemy\",\"scope\":\"area\",\"attack\":true,\"targetIds\":[\"e1\",\"e2\",\"e3\"]}],\"cells\":[{\"col\":1,\"row\":4},{\"col\":2,\"row\":4},{\"col\":3,\"row\":4},{\"col\":4,\"row\":4},{\"col\":5,\"row\":4},{\"col\":6,\"row\":4},{\"col\":7,\"row\":4},{\"col\":8,\"row\":4},{\"col\":9,\"row\":4},{\"col\":10,\"row\":4},{\"col\":11,\"row\":4}],\"contact\":{\"type\":\"unit\",\"unitId\":\"e1\",\"side\":\"enemy\",\"point\":{\"x\":5.1,\"y\":4.5},\"cell\":{\"col\":5,\"row\":4}}}"
+            },
+            {
+              "id": "T06-02 单体攻击被前方友方阻挡，单体治疗不被角色截走",
+              "pass": true,
+              "detail": "{\"attack\":{\"type\":\"unit\",\"unitId\":\"blocker\",\"side\":\"hero\",\"point\":{\"x\":4.1,\"y\":4.5},\"cell\":{\"col\":4,\"row\":4}},\"heal\":[{\"index\":0,\"tag\":\"回复\",\"side\":\"ally\",\"scope\":\"single\",\"attack\":false,\"targetIds\":[\"healed\"]}]}"
+            },
+            {
+              "id": "T06-03 低障碍不挡远程、穿透不穿墙且必中不绕墙",
+              "pass": true,
+              "detail": "{\"low\":true,\"wall\":{\"type\":\"wall\",\"point\":{\"x\":5.1,\"y\":4.5},\"cell\":{\"col\":5,\"row\":4},\"objectIds\":[\"wall\"]},\"penetrate\":{\"type\":\"wall\",\"point\":{\"x\":5.1,\"y\":4.5},\"cell\":{\"col\":5,\"row\":4},\"objectIds\":[\"wall\"]}}"
+            },
+            {
+              "id": "T06-04 爆炸按首次接触或瞄准点起爆，被撞敌人计入伤害恰好一次，被撞友方只起爆不受伤",
+              "pass": true,
+              "detail": "{\"enemyHit\":{\"contact\":{\"type\":\"unit\",\"unitId\":\"blastEnemy\",\"side\":\"enemy\",\"point\":{\"x\":5.1,\"y\":4.5},\"cell\":{\"col\":5,\"row\":4}},\"damage\":[\"blastEnemy\"]},\"friend\":{\"contact\":{\"type\":\"unit\",\"unitId\":\"blastFriend\",\"side\":\"hero\",\"point\":{\"x\":4.1,\"y\":4.5},\"cell\":{\"col\":4,\"row\":4}},\"damage\":[\"blastEnemy\"]},\"wall\":{\"type\":\"wall\",\"point\":{\"x\":5.1,\"y\":4.5},\"cell\":{\"col\":5,\"row\":4},\"objectIds\":[\"wall\"]},\"free\":{\"x\":10.5,\"y\":4.5}}"
+            },
+            {
+              "id": "T06-05 2×2单位按中心纳入范围并作为单一目标",
+              "pass": true,
+              "detail": "{\"targets\":[\"giant\"],\"occupied\":[{\"col\":6,\"row\":3},{\"col\":7,\"row\":3},{\"col\":6,\"row\":4},{\"col\":7,\"row\":4}]}"
+            },
+            {
+              "id": "T06-06 锁定目标闪避后不转火后方单位",
+              "pass": true,
+              "detail": "{\"hits\":[{\"id\":\"dodger\",\"hit\":false}],\"rearHp\":30,\"dice\":3}"
+            },
+            {
+              "id": "T06-07 圆形受墙体遮挡，全域忽略普通墙与视距",
+              "pass": true,
+              "detail": "{\"area\":[\"h\"],\"global\":[\"h\",\"e1\"]}"
+            },
+            {
+              "id": "T06 槽级空间上下文区分单体敌方、群体友方治疗和群体敌方减益",
+              "pass": true,
+              "detail": "[{\"index\":0,\"tag\":\"伤害\",\"side\":\"enemy\",\"scope\":\"area\",\"attack\":true,\"targetIds\":[\"e1\"]},{\"index\":1,\"tag\":\"回复\",\"side\":\"ally\",\"scope\":\"area\",\"attack\":false,\"targetIds\":[\"h\",\"a\"]},{\"index\":2,\"tag\":\"降防\",\"side\":\"enemy\",\"scope\":\"area\",\"attack\":false,\"targetIds\":[\"e1\"]}]"
+            },
+            {
+              "id": "T06-08 预览不扣费不泄露隐藏目标，真实结算同查询且AI可消费六范围",
+              "pass": true,
+              "detail": "{\"disclosed\":[\"h\",\"visible\"],\"actual\":[\"visible\",\"hidden\"],\"rolls\":6,\"ai\":\"火线\"}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": "p07",
+      "groups": [
+        {
+          "id": "T07-01",
+          "passed": 21,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "T07-01 预览不扣费，合法确认一次扣主点与MP",
+              "pass": true,
+              "detail": "{\"preview\":true,\"fired\":true,\"resources\":{\"moveRemaining\":4,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":2},\"mp\":26,\"hp\":91}"
+            },
+            {
+              "id": "T07-09 限次与绝对CD由战斗态阻止重复施放",
+              "pass": true,
+              "detail": "{\"first\":true,\"second\":\"限次已用完\",\"battleState\":{\"sceneId\":\"p07\",\"battleId\":\"demo\",\"progress\":{\"lh\":{\"distance\":0,\"lap\":1},\"le\":{\"distance\":2500,\"lap\":0}},\"perBattleUses\":{\"lh\":{\"limited\":1}},\"cooldowns\":{\"lh\":{\"limited\":250}},\"combatState\":{\"regions\":[],\"barriers\":[],\"carrying\":{},\"clock\":{\"now\":50,\"order\":[\"le\",\"lh\"],\"units\":{\"lh\":{\"id\":\"lh\",\"side\":\"hero\",\"name\":\"lh\",\"baseSpd\":200,\"speed\":200,\"status\":\"active\",\"lastSync\":50,\"spawnedAt\":0,\"stun\":null,\"hitSinceWindow\":false,\"extraMain\":0,\"mainPointSources\":[]},\"le\":{\"id\":\"le\",\"side\":\"enemy\",\"name\":\"le\",\"baseSpd\":50,\"speed\":50,\"status\":\"active\",\"lastSync\":50,\"spawnedAt\":0,\"stun\":null,\"hitSinceWindow\":false,\"extraMain\":0,\"mainPointSources\":[]}},\"statuses\":{},\"rescues\":{},\"opportunityGates\":{},\"pendingMainPoints\":[],\"currentAction\":{\"unitId\":\"lh\",\"resources\":{\"moveQuota\":1,\"main\":0,\"aux\":1,\"deliveredMainSources\":[],\"moveRemaining\":4,\"moveMultiplier\":1,\"jumped\":false}},\"terminal\":null,\"log\":[{\"seq\":1,\"t\":0,\"type\":\"clock-created\",\"order\":[\"le\",\"lh\"]},{\"seq\":2,\"t\":50,\"type\":\"action-granted\",\"unitId\":\"lh\",\"main\":1,\"aux\":1,\"lap\":1},{\"seq\":3,\"t\":50,\"type\":\"cooldown-applied\",\"unitId\":\"lh\",\"skillKey\":\"limited\",\"endAt\":250}],\"seq\":3},\"buffs\":{\"lh\":[],\"le\":[]},\"charges\":{\"lh\":{\"inventory\":0,\"preparing\":null}}}}}"
+            },
+            {
+              "id": "T07-07/09 命中后毒槽登记唯一来源与期限",
+              "pass": true,
+              "detail": "{\"ok\":true,\"statusRows\":[{\"key\":\"pe\\u0000ph\\u0000poison\\u0000pe:中毒#1\",\"unitId\":\"pe\",\"source\":{\"casterId\":\"ph\",\"skillId\":\"poison\",\"effectId\":\"pe:中毒#1\"},\"kind\":\"poison\",\"strength\":4,\"interval\":100,\"appliedAt\":50,\"endAt\":250,\"nextTickAt\":150}]}"
+            },
+            {
+              "id": "T07-07 毒燃等待下一全局周期，不在提交时提前跳伤",
+              "pass": true,
+              "detail": "{\"hpBeforePoison\":100,\"hp\":92,\"now\":100}"
+            },
+            {
+              "id": "T07-07 反应导致施术者倒地后仍完成已提交群体名单",
+              "pass": true,
+              "detail": "{\"hits\":[\"r\",\"rear\"],\"caster\":{\"id\":\"caster\",\"side\":\"hero\",\"name\":\"caster\",\"baseSpd\":100,\"speed\":100,\"status\":\"down\",\"lastSync\":100,\"spawnedAt\":0,\"stun\":null,\"hitSinceWindow\":false,\"extraMain\":0,\"mainPointSources\":[]}}"
+            },
+            {
+              "id": "T07-05 主动取消蓄力不退资源或限次",
+              "pass": true,
+              "detail": "{\"cancel\":{\"ok\":true},\"mp\":7,\"uses\":1}"
+            },
+            {
+              "id": "T07-02/03/04 蓄力开始付费一次，后续自然行动投入准备点，释放不重复扣费",
+              "pass": true,
+              "detail": "{\"start\":true,\"startedState\":{\"mp\":7,\"uses\":1},\"next\":\"ch2\",\"prep\":{\"skillKey\":\"charge1\",\"skill\":{\"name\":\"charge1\",\"cost\":5,\"hit\":100,\"power\":20,\"type\":\"[单体]\",\"type2\":\"[无]\",\"type3\":\"[无]\",\"range\":{\"type\":\"单体\",\"castRange\":10},\"actionCost\":{\"main\":1,\"aux\":0},\"charge\":1,\"delay\":300,\"maxUses\":1},\"remaining\":0,\"invested\":1,\"source\":\"charge\",\"aim\":{\"x\":7.5,\"y\":4.5,\"targetId\":\"ce2\"},\"ready\":true},\"beforeRelease\":{\"mp\":7,\"uses\":1,\"resources\":{\"moveRemaining\":4,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":2}},\"release\":true,\"mp\":7}"
+            },
+            {
+              "id": "T07-05 就绪蓄力结束行动时强制取消且不退款",
+              "pass": true,
+              "detail": "{\"ready\":true,\"prepAfterEnd\":null}"
+            },
+            {
+              "id": "T07-05 施术者倒地清除蓄力准备态",
+              "pass": true,
+              "detail": "{\"status\":\"down\",\"charge\":{\"inventory\":0,\"preparing\":null}}"
+            },
+            {
+              "id": "T07-08 反应射程外拒绝、墙后拒绝、有效距离与视线通过",
+              "pass": true,
+              "detail": "{\"far\":\"目标超出射程\",\"blocked\":\"视线被墙阻挡\",\"near\":true}"
+            },
+            {
+              "id": "T07-06 当前再动点可继续消费且同源不重发",
+              "pass": true,
+              "detail": "{\"current\":true,\"afterImmediate\":1,\"repeated\":true,\"afterRepeated\":0}"
+            },
+            {
+              "id": "T07-06 队友再动真实提交、待领取并在自然行动交付，不刷新移动辅助",
+              "pass": true,
+              "detail": "{\"extraAlly\":true,\"pendingAfter\":[{\"targetId\":\"receiver\",\"sourceKey\":\"giver:grantAlly:mp0\"}],\"giverAfter\":{\"moveRemaining\":4,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":2},\"delivered\":{\"currentId\":\"receiver\",\"resources\":{\"moveRemaining\":4,\"sprintRemaining\":0,\"main\":2,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":2}}}"
+            },
+            {
+              "id": "T07-10 速度状态只改跑圈速度不改闪避，固定命闪不因敏捷不同改变",
+              "pass": true,
+              "detail": "{\"speedApplied\":true,\"slots\":[{\"index\":0,\"tag\":\"增速\",\"side\":\"ally\",\"scope\":\"single\",\"attack\":false,\"targetIds\":[\"speed-ally\"]}],\"hits\":[],\"spdBefore\":100,\"speedAfter\":150,\"clockSpeedAfter\":150,\"evasionBefore\":100,\"evasionAfter\":100,\"statuses\":{\"speed-ally\\u0000speed-caster\\u0000speedBuff\\u0000speed-ally:增速:0\":{\"key\":\"speed-ally\\u0000speed-caster\\u0000speedBuff\\u0000speed-ally:增速:0\",\"unitId\":\"speed-ally\",\"source\":{\"casterId\":\"speed-caster\",\"skillId\":\"speedBuff\",\"effectId\":\"speed-ally:增速:0\"},\"kind\":\"spd\",\"strength\":50,\"interval\":100,\"appliedAt\":10,\"endAt\":210}},\"hit100\":true,\"hit300\":true}"
+            },
+            {
+              "id": "T07-09 续载同battle保留限次与冷却，同scene新battle清空",
+              "pass": true,
+              "detail": "{\"resume\":{\"sceneId\":\"reload-scene\",\"battleId\":\"same-battle\",\"progress\":{},\"perBattleUses\":{\"caster\":{\"limited\":1}},\"cooldowns\":{\"caster\":{\"limited\":500}},\"combatState\":{}},\"fresh\":{\"sceneId\":\"reload-scene\",\"battleId\":\"new-battle\",\"progress\":{},\"perBattleUses\":{},\"cooldowns\":{},\"combatState\":{}}}"
+            },
+            {
+              "id": "T07-02/03/04 库存先抵准备、剩余主点自动投入、未满拒绝、显式准备与释放后加速入账",
+              "pass": true,
+              "detail": "{\"inventoryBefore\":{\"now\":50,\"currentId\":\"inventory\",\"actionSerial\":1,\"resources\":{\"moveRemaining\":4,\"sprintRemaining\":0,\"main\":0,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":2},\"terminal\":null,\"preparation\":{\"skillKey\":\"inventorySkill\",\"skill\":{\"name\":\"inventorySkill\",\"cost\":5,\"hit\":100,\"power\":20,\"type\":\"[单体]\",\"type2\":\"[无]\",\"type3\":\"[无]\",\"range\":{\"type\":\"单体\",\"castRange\":10},\"actionCost\":{\"main\":1,\"aux\":0},\"charge\":4,\"delay\":300,\"maxUses\":1,\"haste\":3},\"remaining\":1,\"invested\":3,\"source\":\"charge\",\"aim\":{\"x\":7.5,\"y\":4.5,\"targetId\":\"inventoryEnemy\"},\"ready\":false},\"chargeInventory\":0,\"units\":[{\"id\":\"inventory\",\"name\":\"inventory\",\"side\":\"hero\",\"controller\":\"player\",\"hp\":100,\"mp\":25,\"tp\":0,\"status\":\"active\",\"atk\":10,\"def\":0,\"hit\":0,\"eva\":0,\"taunt\":100,\"spd\":200,\"shield\":0,\"buffs\":[]},{\"id\":\"inventoryEnemy\",\"name\":\"inventoryEnemy\",\"side\":\"enemy\",\"controller\":\"ai\",\"hp\":100,\"mp\":30,\"tp\":0,\"status\":\"active\",\"atk\":10,\"def\":0,\"hit\":0,\"eva\":0,\"taunt\":100,\"spd\":20,\"shield\":0,\"buffs\":[]}],\"carrying\":{},\"positions\":{\"inventory\":{\"col\":2,\"row\":4},\"inventoryEnemy\":{\"col\":7,\"row\":4}},\"regions\":[],\"barriers\":[],\"events\":[{\"seq\":1,\"at\":50,\"type\":\"attack-start\",\"id\":\"attack:1\",\"casterId\":\"inventory\",\"skillKey\":\"inventorySkill\",\"attackId\":\"attack:1\"},{\"seq\":2,\"at\":50,\"type\":\"attack-end\",\"id\":\"attack:1\",\"casterId\":\"inventory\",\"skillKey\":\"inventorySkill\",\"attackId\":\"attack:1\"}],\"log\":[\"t=50.00 · inventory 行动\",\"inventory 准备 inventorySkill · 剩余 1\",\"inventory 开始蓄力 inventorySkill · 需投入 1\"]},\"premature\":\"准备尚未就绪，请继续准备\",\"otherCharge\":\"请先释放或取消当前准备\",\"explicitlyPrepared\":{\"ok\":true,\"invested\":1,\"remaining\":0,\"ready\":true},\"inventoryReleased\":true,\"inventoryAfter\":3}"
+            },
+            {
+              "id": "T07-08 同一目标同次攻击反应只执行一次并扣费一次",
+              "pass": true,
+              "detail": "{\"hp\":87,\"mp\":8,\"log\":[\"t=50.00 · counterHero 行动\",\"counterEnemy 反应 · onceCounter\",\"⚔️ counterEnemy 闪避并趁势反击！counterHero -13 HP\",\"counterHero · shot → counterEnemy -9 HP\"]}"
+            },
+            {
+              "id": "P07 看破舍身仍拒绝（中毒/降防减益槽已按 RULES02 迁移为真实支持）",
+              "pass": true,
+              "detail": "[{\"ok\":false,\"reason\":\"反应技能只能被动触发\"},{\"ok\":false,\"reason\":\"反应技能只能被动触发\"}]"
+            },
+            {
+              "id": "T07-10 同源速度刷新不叠强度，到期回滚角色与跑圈速度",
+              "pass": true,
+              "detail": "{\"refreshedSpeed\":130,\"now\":210,\"refSpeed\":100,\"clockSpeed\":100}"
+            },
+            {
+              "id": "T07-05/07 毒首次周期前不扣血，周期致死清空蓄力",
+              "pass": true,
+              "detail": "{\"beforeTickHp\":3,\"hp\":0,\"now\":200,\"source\":{\"casterId\":\"dotEnemy\",\"skillId\":\"dot\",\"effectId\":\"dotHero:0\"}}"
+            },
+            {
+              "id": "T07-10 独立闪避参与命闪而非敏捷",
+              "pass": true,
+              "detail": "{\"lowEva\":{\"hit\":true,\"attackRoll\":11,\"dodgeRoll\":1},\"highEva\":{\"hit\":false,\"attackRoll\":11,\"dodgeRoll\":100}}"
+            },
+            {
+              "id": "P07+ 治疗槽已迁移支持（RULES02 恢复共用规则入口，不再静默拒绝）",
+              "pass": true,
+              "detail": "{\"ok\":true,\"reason\":null}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": "fx01",
+      "groups": [
+        {
+          "id": "TFX-01",
+          "passed": 19,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TFX-01 动作和反应通道仅按标签分发；范围和效果槽不会改选演出",
+              "pass": true,
+              "detail": "{\"savage\":\"basic-枪击\",\"blast\":\"fire-blast\",\"chant\":\"self-boost\",\"arsenic\":\"arsenic-shot\",\"plain\":\"neutral-impact\",\"fireSingle\":\"fire-blast\",\"zheYing\":\"evade-shift-ghost\",\"glide\":\"evade-shift\",\"noTagShift\":null,\"unknown\":\"neutral-impact\",\"noShift\":null}"
+            },
+            {
+              "id": "TFX-01 标签选项来自同一注册表，覆盖基础标签且跨通道去重",
+              "pass": true,
+              "detail": "[\"砷弹射击\",\"圣光01\",\"雷击01\",\"火焰01\",\"灵风术\",\"纳克提特障壁术\",\"伊西丝之拥\",\"伊西斯之拥\",\"飞沙化甲\",\"近战重击\",\"远程重击\",\"枪击穿透\",\"连续扫射\",\"克虏伯重狙\",\"谐律之庇\",\"静默之域\",\"碎裂之响\",\"塞赫美特之愠\",\"芭斯特的猫眼石\",\"奇异海螺\",\"高阶召唤术\",\"蝎眼钥匙\",\"异种坏死雾\",\"生体流转\",\"圣域帷幕\",\"单体回复\",\"浓雾\",\"再动加速\",\"群体回复\",\"群体增益\",\"群体减益\",\"冲锋\",\"咆哮\",\"冰霜爆炸\",\"虚空震荡\",\"直线裂隙\",\"水流\",\"诅咒\",\"枪击\",\"霰弹\",\"火焰\",\"冰霜\",\"雷击\",\"爆炸\",\"光\",\"毒液\",\"毒雾\",\"风\",\"刀砍\",\"拳击\",\"爪击\",\"撕咬\",\"箭矢\",\"折影步\",\"逆咒归源镜\",\"巫师护盾\",\"看破\",\"舍身\",\"格挡\",\"回避错位\"]"
+            },
+            {
+              "id": "TFX-01 枪击依真实发序和转火逐发播放，命中回调揭示目标内对应段",
+              "pass": true,
+              "detail": "[[\"single\",\"枪击\",\"e\",\"dodge\"],[\"e\",1],200,[\"single\",\"枪击\",\"f\",\"hit\"],[\"f\",0],200,[\"single\",\"枪击\",\"e\",\"hit\"],[\"e\",0]]"
+            },
+            {
+              "id": "TFX-01 霰弹按每发实际瞄向播放，保留无目标段并逐段揭示",
+              "pass": true,
+              "detail": "[[\"single\",\"霰弹\",[5,4],\"hit\"],[\"e\",1],220,[\"single\",\"霰弹\",[0,9],\"hit\"],220,[\"single\",\"霰弹\",[5,4],\"hit\"],[\"e\",0]]"
+            },
+            {
+              "id": "TFX-01 火焰复用原版弹道，未知和缺失标签只揭示命中",
+              "pass": true,
+              "detail": "[[\"fire\",\"c\",\"e\",false],[\"e\",0],\"e\",\"e\"]"
+            },
+            {
+              "id": "TFX-01 原版播放接口按范围适配 火焰",
+              "pass": true,
+              "detail": "{\"first\":[[\"aoe\",\"火焰\",\"e\",\"hit\"],[\"e\",0]],\"events\":[[\"aoe\",\"火焰\",\"e\",\"hit\"],[\"e\",0],[\"aoe\",\"火焰\",\"f\",\"dodge\"],[\"f\",0]]}"
+            },
+            {
+              "id": "TFX-01 原版播放接口按范围适配 枪击",
+              "pass": true,
+              "detail": "{\"first\":[[\"single\",\"枪击\",\"e\",\"hit\"],[\"e\",0]],\"events\":[[\"aoe\",\"枪击\",\"e\",\"hit\"],[\"e\",0],[\"aoe\",\"枪击\",\"f\",\"dodge\"],[\"f\",0]]}"
+            },
+            {
+              "id": "TFX-01 原版播放接口按范围适配 冰霜",
+              "pass": true,
+              "detail": "{\"first\":[[\"single\",\"冰霜\",\"e\",\"hit\"],[\"e\",0]],\"events\":[[\"aoe\",\"冰霜\",\"e\",\"hit\"],[\"e\",0],[\"aoe\",\"冰霜\",\"f\",\"dodge\"],[\"f\",0]]}"
+            },
+            {
+              "id": "TFX-01 原版播放接口按范围适配 雷击",
+              "pass": true,
+              "detail": "{\"first\":[[\"single\",\"雷\",\"e\",\"hit\"],[\"e\",0]],\"events\":[[\"aoe\",\"雷\",\"e\",\"hit\"],[\"e\",0],[\"aoe\",\"雷\",\"f\",\"dodge\"],[\"f\",0]]}"
+            },
+            {
+              "id": "TFX-01 原版播放接口按范围适配 爆炸",
+              "pass": true,
+              "detail": "{\"first\":[[\"single\",\"爆炸\",\"e\",\"hit\"],[\"e\",0]],\"events\":[[\"aoe\",\"爆炸\",\"e\",\"hit\"],[\"e\",0],[\"aoe\",\"爆炸\",\"f\",\"dodge\"],[\"f\",0]]}"
+            },
+            {
+              "id": "TFX-01 原版播放接口按范围适配 光",
+              "pass": true,
+              "detail": "{\"first\":[[\"single\",\"光\",\"e\",\"hit\"],[\"e\",0]],\"events\":[[\"aoe\",\"光\",\"e\",\"hit\"],[\"e\",0],[\"aoe\",\"光\",\"f\",\"dodge\"],[\"f\",0]]}"
+            },
+            {
+              "id": "TFX-01 原版播放接口按范围适配 霰弹",
+              "pass": true,
+              "detail": "{\"first\":[[\"single\",\"霰弹\",\"e\",\"hit\"],[\"e\",0]],\"events\":[[\"single\",\"霰弹\",\"e\",\"hit\"],[\"e\",0],[\"single\",\"霰弹\",\"f\",\"dodge\"],[\"f\",0]]}"
+            },
+            {
+              "id": "TFX-01 边缘单目标保留目标回调，爆心和直径取规则区域",
+              "pass": true,
+              "detail": "{\"edge\":{\"targets\":[{\"id\":\"e\"}],\"areaBounds\":{\"x\":347.22222222222223,\"y\":347.22222222222223,\"w\":277.77777777777777,\"h\":277.77777777777777,\"l\":208.33333333333331,\"r\":486.1111111111111,\"t\":208.33333333333331,\"b\":486.1111111111111}},\"events\":[[\"aoe\",\"爆炸\",\"e\",\"hit\"],[\"e\",0]]}"
+            },
+            {
+              "id": "TFX-01 vendor 空方向锚保留枪口与弹道、回调到拍，无弹坑或命中粒子",
+              "pass": true,
+              "detail": "[115,115]"
+            },
+            {
+              "id": "TFX-01 分级预算：全部分级条目时长/蓄势/全屏/暗场/峰值音量落在本级区间",
+              "pass": true,
+              "detail": "[{\"id\":\"holy-judgment\",\"grade\":\"L4\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"thunder-storm\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"fire-blast\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.7},{\"id\":\"ling-feng-shu\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.6},{\"id\":\"nak-tith-barrier\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.62},{\"id\":\"isis-embrace\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.65},{\"id\":\"sand-armor\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.54},{\"id\":\"melee-heavy\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.65},{\"id\":\"ranged-heavy\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.7},{\"id\":\"gunshot-pierce\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.65},{\"id\":\"strafe-burst\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.68},{\"id\":\"krupp-snipe\",\"grade\":\"L4\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"harmony-ward\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.62},{\"id\":\"silence-field\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.62},{\"id\":\"shatter-echo\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.64},{\"id\":\"sekhmet-wrath\",\"grade\":\"L4\",\"ok\":true,\"reasons\":[],\"peak\":0.7},{\"id\":\"bastet-opal\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.55},{\"id\":\"strange-conch\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.62},{\"id\":\"high-summon\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.62},{\"id\":\"scorpion-key\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.65},{\"id\":\"xenon-blight-fog\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.65},{\"id\":\"vital-flow\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.56},{\"id\":\"sanctum-veil\",\"grade\":\"L4\",\"ok\":true,\"reasons\":[],\"peak\":0.7},{\"id\":\"heal-mend\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.58},{\"id\":\"abyss-fog\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.62},{\"id\":\"self-boost\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.55},{\"id\":\"aoe-heal\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.55},{\"id\":\"ally-buff\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.52},{\"id\":\"pure-debuff\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.52},{\"id\":\"charge-dash\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.62},{\"id\":\"roar-wave\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.58},{\"id\":\"frost-blast\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.68},{\"id\":\"void-quake\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.6},{\"id\":\"line-rift\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.58},{\"id\":\"water-bolt\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.34},{\"id\":\"curse-beam\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.34},{\"id\":\"evade-shift-ghost\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.32},{\"id\":\"mirror-counter\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.36},{\"id\":\"wizard-shield\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.34},{\"id\":\"reaction-kanpo\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.34},{\"id\":\"reaction-sheshen\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.34},{\"id\":\"reaction-guard\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.3},{\"id\":\"evade-shift\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.26},{\"id\":\"holy-vow\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.55},{\"id\":\"storm-gather\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.55},{\"id\":\"krupp-aim\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.52},{\"id\":\"sekhmet-vow\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.54}]"
+            },
+            {
+              "id": "TFX-01 预算核对能抓出违规（防假绿）",
+              "pass": true,
+              "detail": "{\"ok\":false,\"reasons\":[\"时长 1000ms 超出 L3 区间 2000–2500\",\"蓄势 200ms 不足 800\",\"全屏使用与 L3 不符\",\"峰值音量 0.95 超出 0.5–0.75\"],\"peak\":0.95}"
+            },
+            {
+              "id": "TFX-01 重复 id 与未知分级注册即失败",
+              "pass": true,
+              "detail": "{\"dup\":\"演出条目重复注册: basic-枪击\",\"bad\":\"未知演出分级: L9（x）\"}"
+            },
+            {
+              "id": "TFX-01 导演层无单技能特判（无 fxTag === / 砷弹 字样）",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TFX-01 L1–L4 预算表完整",
+              "pass": true,
+              "detail": "[\"L1\",\"L2\",\"L3\",\"L4\"]"
+            }
+          ]
+        },
+        {
+          "id": "TFX-02",
+          "passed": 10,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TFX-02 埃利奥特原值属性与技能/物品全量载入（19 技能条目含 2 组头 + 7 物品）",
+              "pass": true,
+              "detail": "{\"hp\":100,\"mp\":110,\"atk\":20,\"def\":40,\"spd\":50,\"skills\":19,\"items\":7}"
+            },
+            {
+              "id": "TFX-02 主动可用恰为 13 项（含 2 结界）；4 反应按真实原因拒绝（无\"范围未迁移\"遮挡）",
+              "pass": true,
+              "detail": "{\"usable\":[\"伊西斯之拥\",\"压缩爆燃\",\"召雷术\",\"圣域帷幕\",\"归尘礼赞\",\"拉莱耶造雾术\",\"提前瞄准\",\"灵风术\",\"精准流火\",\"纳克提特障壁术\",\"萨维奇三连发\",\"迅捷愈合法\",\"预备咏唱\"],\"rejected\":[{\"name\":\"折影步\",\"reason\":\"反应技能只能被动触发\"},{\"name\":\"双莲祛煞\",\"reason\":\"反应技能只能被动触发\"},{\"name\":\"巫师护盾\",\"reason\":\"反应技能只能被动触发\"},{\"name\":\"净蚀反冲\",\"reason\":\"反应技能只能被动触发\"}]}"
+            },
+            {
+              "id": "TFX-02 折影步：近战回避反应 + 显式侧闪 2m 位移标签",
+              "pass": true,
+              "detail": "{\"mode\":\"side\",\"distance\":2}"
+            },
+            {
+              "id": "TFX-02 多段攻击槽：三段独立命闪与扣血，聚合值=逐段之和，日志逐段",
+              "pass": true,
+              "detail": "{\"segs\":[{\"index\":0,\"shotIndex\":1,\"segmentIndex\":1,\"targetId\":\"t\",\"logIndex\":1,\"hit\":true,\"hpDmg\":44,\"shieldDmg\":0,\"guardDmg\":0,\"hpBefore\":200,\"hpAfter\":156,\"down\":false,\"logEnd\":2,\"aim\":{\"x\":8.5,\"y\":4.5,\"targetId\":\"t\"},\"facing\":90,\"cells\":[{\"col\":8,\"row\":4}]},{\"index\":1,\"shotIndex\":2,\"segmentIndex\":2,\"targetId\":\"t\",\"logIndex\":2,\"hit\":false,\"hpDmg\":0,\"hpBefore\":156,\"hpAfter\":156,\"down\":false,\"logEnd\":3,\"aim\":{\"x\":8.5,\"y\":4.5,\"targetId\":\"t\"},\"facing\":90,\"cells\":[{\"col\":8,\"row\":4}]},{\"index\":2,\"shotIndex\":3,\"segmentIndex\":3,\"targetId\":\"t\",\"logIndex\":3,\"hit\":true,\"hpDmg\":55,\"shieldDmg\":0,\"guardDmg\":0,\"hpBefore\":156,\"hpAfter\":101,\"down\":false,\"logEnd\":4,\"aim\":{\"x\":8.5,\"y\":4.5,\"targetId\":\"t\"},\"facing\":90,\"cells\":[{\"col\":8,\"row\":4}]}],\"hp\":101,\"log\":[\"t=50.00 · ell 行动\",\"ell · 萨维奇三连发 → t -44 HP\",\"ell · 萨维奇三连发 → t 闪避\",\"ell · 萨维奇三连发 → t -55 HP\"]}"
+            },
+            {
+              "id": "TFX-02 多段攻击槽：目标倒地后剩余段不结算",
+              "pass": true,
+              "detail": "{\"targetId\":\"t\",\"side\":\"enemy\",\"hit\":true,\"hpDmg\":60,\"hpBefore\":60,\"hpAfter\":0,\"maxHp\":60,\"down\":true,\"logIndex\":1,\"logEnd\":4,\"segments\":[{\"index\":0,\"shotIndex\":1,\"segmentIndex\":1,\"targetId\":\"t\",\"logIndex\":1,\"hit\":true,\"hpDmg\":55,\"shieldDmg\":0,\"guardDmg\":0,\"hpBefore\":60,\"hpAfter\":5,\"down\":false,\"logEnd\":2,\"aim\":{\"x\":8.5,\"y\":4.5,\"targetId\":\"t\"},\"facing\":90,\"cells\":[{\"col\":8,\"row\":4}]},{\"index\":1,\"shotIndex\":2,\"segmentIndex\":2,\"targetId\":\"t\",\"logIndex\":2,\"hit\":true,\"hpDmg\":5,\"shieldDmg\":0,\"guardDmg\":0,\"hpBefore\":5,\"hpAfter\":0,\"down\":true,\"logEnd\":4,\"aim\":{\"x\":8.5,\"y\":4.5,\"targetId\":\"t\"},\"facing\":90,\"cells\":[{\"col\":8,\"row\":4}]}]}"
+            },
+            {
+              "id": "TFX-02 压缩爆燃：接触点起爆，被撞者恰好结算一次，半径外不受伤，命中者挂燃烧",
+              "pass": true,
+              "detail": "{\"contact\":{\"type\":\"unit\",\"unitId\":\"front\",\"side\":\"enemy\",\"point\":{\"x\":6.1,\"y\":4.5},\"cell\":{\"col\":6,\"row\":4}},\"ids3\":[\"front\",\"side\"],\"hp\":[130,130,200],\"burns\":[\"front\",\"side\"]}"
+            },
+            {
+              "id": "TFX-02 折影步：回避成功即侧闪 2m，规则站位立即更新，结果带 reaction.shift 路径",
+              "pass": true,
+              "detail": "{\"reaction\":{\"responderId\":\"ell\",\"skillName\":\"折影步\",\"fxTag\":\"折影步\",\"canceled\":false,\"dodged\":true,\"shift\":{\"from\":{\"col\":4,\"row\":4},\"to\":{\"col\":4,\"row\":6},\"path\":[{\"col\":4,\"row\":4},{\"col\":4,\"row\":5},{\"col\":4,\"row\":6}],\"distance\":2},\"countered\":false,\"kanpo\":false,\"crit\":false,\"drained\":0,\"guardianId\":null},\"at\":{\"col\":4,\"row\":6},\"hp\":100,\"mp\":106}"
+            },
+            {
+              "id": "TFX-02 折影步：一侧被挡改向另一侧",
+              "pass": true,
+              "detail": "{\"at\":{\"col\":4,\"row\":2},\"reaction\":{\"responderId\":\"ell\",\"skillName\":\"折影步\",\"fxTag\":\"折影步\",\"canceled\":false,\"dodged\":true,\"shift\":{\"from\":{\"col\":4,\"row\":4},\"to\":{\"col\":4,\"row\":2},\"path\":[{\"col\":4,\"row\":4},{\"col\":4,\"row\":3},{\"col\":4,\"row\":2}],\"distance\":2},\"countered\":false,\"kanpo\":false,\"crit\":false,\"drained\":0,\"guardianId\":null}}"
+            },
+            {
+              "id": "TFX-02 折影步只响应近战（反应类型按来袭技能匹配），远程来袭不位移不扣蓝",
+              "pass": true,
+              "detail": "{\"hit\":{\"targetId\":\"ell\",\"side\":\"hero\",\"hit\":true,\"hpDmg\":10,\"hpBefore\":100,\"hpAfter\":90,\"maxHp\":100,\"down\":false,\"logIndex\":1,\"logEnd\":2,\"segments\":[{\"index\":0,\"shotIndex\":1,\"segmentIndex\":1,\"targetId\":\"ell\",\"logIndex\":1,\"hit\":true,\"hpDmg\":10,\"shieldDmg\":0,\"guardDmg\":0,\"hpBefore\":100,\"hpAfter\":90,\"down\":false,\"logEnd\":2,\"aim\":{\"x\":4.5,\"y\":4.5,\"targetId\":\"ell\"},\"facing\":270,\"cells\":[{\"col\":4,\"row\":4}]}]},\"mp\":110}"
+            },
+            {
+              "id": "TFX-02 预备咏唱：只作用自身，再动返还主行动，加速 +3 入库存",
+              "pass": true,
+              "detail": "{\"before6\":1,\"after\":{\"moveRemaining\":6,\"sprintRemaining\":0,\"main\":1,\"aux\":1,\"moveMultiplier\":1,\"jumped\":false,\"jumpDistance\":2},\"inv\":3,\"hits\":[]}"
+            }
+          ]
+        },
+        {
+          "id": "TFX-03",
+          "passed": 10,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TFX-03 页面入口识别典型对局对象格式（站位表）且旧切片数据不误判",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TFX-03 迅捷愈合法：规则 effects 回复真值 → heal-mend(L2)，不走受击揭示",
+              "pass": true,
+              "detail": "{\"ok\":true,\"effects\":[{\"kind\":\"heal\",\"targetId\":\"h:埃利奥特\",\"tag\":\"回复\",\"value\":30,\"burning\":false,\"overheal\":null,\"crit\":false}],\"cost\":{\"main\":0,\"aux\":1,\"mp\":3,\"hp\":0,\"tp\":0,\"uses\":1,\"bindings\":null,\"ammoShots\":0},\"id\":\"heal-mend\"}"
+            },
+            {
+              "id": "TFX-03 拉莱耶造雾术：region-created 真值（半径5·接触点）→ abyss-fog(L3)；由显式特效标签指定",
+              "pass": true,
+              "detail": "{\"ok\":true,\"region\":{\"r\":5,\"c\":{\"x\":11.5,\"y\":29.9}},\"id\":\"abyss-fog\"}"
+            },
+            {
+              "id": "TFX-03 深潜者造雾显式浓雾标签同走 abyss-fog",
+              "pass": true,
+              "detail": "\"none\""
+            },
+            {
+              "id": "TFX-03 归尘礼赞起手：延迟准备结果（未结算槽位、已扣 HP/MP/TP）→ holy-vow(L2)",
+              "pass": true,
+              "detail": "{\"ok\":true,\"cost\":{\"main\":1,\"aux\":0,\"mp\":10,\"hp\":10,\"tp\":10,\"uses\":1,\"bindings\":null,\"ammoShots\":0},\"id\":\"holy-vow\"}"
+            },
+            {
+              "id": "TFX-03 归尘礼赞释放：必中穿透 + 降防效果真值 → holy-judgment(L4)",
+              "pass": true,
+              "detail": "{\"ok\":true,\"hits\":[[\"e:食尸鬼B\",true]],\"id\":\"holy-judgment\"}"
+            },
+            {
+              "id": "TFX-03 召雷术：延迟2起手 → storm-gather(L2)；后续自然行动自动投入（含加速库存）就绪后释放 → thunder-storm(L3)，麻痹效果真值",
+              "pass": true,
+              "detail": "{\"waited\":2,\"release\":true,\"hits\":2,\"id\":\"thunder-storm\"}"
+            },
+            {
+              "id": "TFX-03 首批新条目分级预算（L2/L3/L4 时长、蓄势、全屏/暗场、峰值音量）全部达标",
+              "pass": true,
+              "detail": "[{\"id\":\"holy-judgment\",\"grade\":\"L4\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"thunder-storm\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"heal-mend\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.58},{\"id\":\"abyss-fog\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.62},{\"id\":\"holy-vow\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.55},{\"id\":\"storm-gather\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.55}]"
+            },
+            {
+              "id": "TFX-03 反应请求携带本段只读承伤预览（min≤max、0.8/1.2 两端）与候选绑定存量",
+              "pass": true,
+              "detail": "{\"n\":2,\"sample\":{\"tag\":\"伤害\",\"power\":0,\"baseAtk\":80,\"atkBonus\":0,\"rawMin\":64,\"rawMax\":96,\"resistMin\":64,\"resistMax\":96,\"def\":40,\"armorMult\":1,\"pierce\":false,\"defending\":false,\"shield\":55,\"guard\":0,\"hpMin\":0,\"hpMax\":1,\"shieldMin\":24,\"shieldMax\":55,\"guardMin\":0,\"guardMax\":0,\"targetHp\":90,\"fatal\":false}}"
+            },
+            {
+              "id": "TFX-03 反应弹窗候选分类（反应/看破/舍身）与自动选择回传候选自身 responderId",
+              "pass": true,
+              "detail": "{\"kinds\":[\"reaction\",\"kanpo\",\"sheshen\"],\"auto\":{\"responderId\":\"guard\",\"skill\":{\"name\":\"g\"}}}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": "rules02",
+      "groups": [
+        {
+          "id": "TR2-A",
+          "passed": 8,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TR2-A normalizeEffectTag：单群合并+子型保留+别名吸收",
+              "pass": true,
+              "detail": "{\"a\":\"伤害(火焰)\",\"b\":\"单避\"}"
+            },
+            {
+              "id": "TR2-A effectDefinition：精确→剥子型回退，赋予走 variant",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TR2-A parser 槽位输出规范标签（旧写法只作别名读入）",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TR2-A [冷却:N] 独立字段、[延迟:N] 仍为 delay 且不相混",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TR2-A 第七范围「自身」入 RANGE_TYPES 且 parseRangeTag 接受",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TR2-A 旧协议来源（无显式范围）[再动] 迁移标 self；显式范围不标",
+              "pass": true,
+              "detail": "{\"legacy\":true}"
+            },
+            {
+              "id": "TR2-A skillSlots：power/turns/target/attack/debuff 视图正确",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "TR2-A 槽结算顺序：攻击槽先于减益槽（稳定排序）",
+              "pass": true,
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "id": "TR2-B",
+          "passed": 10,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TR2-B 三伤害槽逐段独立判定：3段各按本槽威力、聚合=逐段之和",
+              "pass": true,
+              "detail": "{\"segs\":[2,5,8],\"total\":15}"
+            },
+            {
+              "id": "TR2-B 减益随攻击命中落地（至少一次命中共享）",
+              "pass": true,
+              "detail": "{\"effects\":[{\"kind\":\"dot\",\"targetId\":\"e\",\"tag\":\"中毒\",\"dot\":\"poison\",\"strength\":5,\"turns\":3,\"crit\":false}]}"
+            },
+            {
+              "id": "TR2-B 纯减益首槽独立掷骰、后续槽共享结论；有效属性不写 ref",
+              "pass": true,
+              "detail": "{\"effDef\":-10,\"refDef\":0}"
+            },
+            {
+              "id": "TR2-B 穿透无视护甲护盾直扣HP",
+              "pass": true,
+              "detail": "{\"pierce\":80}"
+            },
+            {
+              "id": "TR2-B 散射每弹丸吃3倍护甲（30×3）且护盾先吸收",
+              "pass": true,
+              "detail": "{\"hpDmg\":60,\"shield\":0}"
+            },
+            {
+              "id": "TR2-B 变种【流体】远程伤害减半",
+              "pass": true,
+              "detail": "{\"dmg\":10}"
+            },
+            {
+              "id": "TR2-B 【耐毒】目标免疫中毒",
+              "pass": true,
+              "detail": "[{\"kind\":\"dot\",\"targetId\":\"f3\",\"tag\":\"中毒\",\"immune\":true}]"
+            },
+            {
+              "id": "TR2-B 免伤一次性：下一次受击防御+120 归零并消耗，随后恢复正常",
+              "pass": true,
+              "detail": "{\"a\":0,\"b\":20}"
+            },
+            {
+              "id": "TR2-B 防御姿态：MP+20% TP+25% 命中+30（原版参数）",
+              "pass": true,
+              "detail": "{\"mp\":70,\"tp\":25,\"hit\":30}"
+            },
+            {
+              "id": "TR2-B 防守者【毅力留存】致命保留1HP（每场一次）",
+              "pass": true,
+              "detail": "{\"hp\":1}"
+            }
+          ]
+        },
+        {
+          "id": "TR2-C",
+          "passed": 7,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TR2-C reaction 请求 shape 完整（含 shotIndex/slotIndex/usesLeft）",
+              "pass": true,
+              "detail": "{\"type\":\"reaction\",\"attackId\":\"attack:1\",\"responderId\":\"re\",\"casterId\":\"h\",\"skill\":{\"name\":\"直击\",\"cost\":0,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":0,\"haste\":0,\"maxUses\":0,\"usesRemaining\":0,\"cooldownTurns\":0,\"slotTargets\":null,\"hit\":100,\"turns\":null,\"slotTurns\":null,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[伤害]\",\"power\":6,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":null,\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":null,\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"isPierce\":false,\"summonTarget\":null,\"summonNoLimit\":false,\"range\":{\"type\":\"单体\",\"castRange\":12},\"actionCost\":{\"main\":1,\"aux\":0},\"evadeShift\":null,\"displacements\":[],\"regionEffect\":null,\"affectsAll\":false,\"reactionSource\":false,\"deathTag\":null,\"_explicit\":[\"type\",\"power\",\"range\",\"range.type\",\"range.castRange\"]},\"incomingType\":\"近战\",\"candidates\":[{\"skill\":{\"name\":\"折影步\",\"cost\":4,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":0,\"haste\":0,\"maxUses\":1,\"usesRemaining\":1,\"cooldownTurns\":0,\"slotTargets\":null,\"hit\":100,\"turns\":null,\"slotTurns\":null,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[单避]\",\"power\":900,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":true,\"reactionTarget\":\"近战\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":null,\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":null,\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"isPierce\":false,\"summonTarget\":null,\"summonNoLimit\":false,\"range\":{\"type\":\"自身\"},\"actionCost\":{\"main\":1,\"aux\":0},\"evadeShift\":{\"mode\":\"side\",\"distance\":2},\"displacements\":[{\"type\":\"侧闪\",\"distance\":2}],\"regionEffect\":null,\"affectsAll\":false,\"reactionSource\":false,\"deathTag\":null,\"_explicit\":[\"cost\",\"maxUses\",\"type\",\"power\",\"range\",\"range.type\",\"evadeShift\",\"displacements\"]},\"responderId\":\"re\",\"usesLeft\":1,\"cost\":4,\"bindings\":[]}],\"slotIndex\":0,\"segmentIndex\":1,\"targetId\":\"re\",\"shotIndex\":1,\"totalShots\":1,\"preview\":{\"tag\":\"伤害\",\"power\":6,\"baseAtk\":10,\"atkBonus\":0,\"rawMin\":4,\"rawMax\":7,\"resistMin\":4,\"resistMax\":7,\"def\":0,\"armorMult\":1,\"pierce\":false,\"defending\":false,\"shield\":0,\"guard\":0,\"hpMin\":4,\"hpMax\":7,\"shieldMin\":0,\"shieldMax\":0,\"guardMin\":0,\"guardMax\":0,\"targetHp\":50,\"fatal\":false}}"
+            },
+            {
+              "id": "TR2-C 折影步：确认后该发落空、侧闪2m错位、反应方恰好扣一次费、攻击零伤害",
+              "pass": true,
+              "detail": "{\"seg\":{\"index\":0,\"shotIndex\":1,\"segmentIndex\":1,\"targetId\":\"re\",\"logIndex\":1,\"hit\":false,\"hpDmg\":0,\"hpBefore\":50,\"hpAfter\":50,\"down\":false,\"reaction\":{\"responderId\":\"re\",\"skillName\":\"折影步\",\"fxTag\":null,\"canceled\":false,\"dodged\":true,\"shift\":{\"from\":{\"col\":5,\"row\":4},\"to\":{\"col\":5,\"row\":2},\"path\":[{\"col\":5,\"row\":4},{\"col\":5,\"row\":3},{\"col\":5,\"row\":2}],\"distance\":2},\"countered\":false,\"kanpo\":false,\"crit\":false,\"drained\":0,\"guardianId\":null},\"logEnd\":4,\"aim\":{\"x\":5.5,\"y\":4.5,\"targetId\":\"re\"},\"facing\":90,\"cells\":[{\"col\":5,\"row\":4}]},\"mp\":16,\"at\":{\"col\":5,\"row\":2}}"
+            },
+            {
+              "id": "TR2-C 看破：整段来袭技能无效化（canceled 且零伤害）",
+              "pass": true,
+              "detail": "{\"canceled\":true,\"mp\":40}"
+            },
+            {
+              "id": "TR2-C 费用整次一次（MP 5 不乘段数）+ 弹药按发扣 3 发",
+              "pass": true,
+              "detail": "{\"mp\":105,\"ammo\":7}"
+            },
+            {
+              "id": "TR2-C [延迟:1] 进入准备（source=delay 不写冷却），就绪手动释放当下目标",
+              "pass": true,
+              "detail": "{\"prepOk\":true,\"readyOk\":true,\"noCd\":true}"
+            },
+            {
+              "id": "TR2-C [冷却:2] 提交后写绝对冷却 now+200",
+              "pass": true,
+              "detail": "{\"cdAt\":350}"
+            },
+            {
+              "id": "TR2-C predictAttack：costs/ammoPlan/effects/damagePreview，盾在预测副本上逐槽消耗",
+              "pass": true,
+              "detail": "{\"preview\":[3,8]}"
+            }
+          ]
+        },
+        {
+          "id": "TR2-D",
+          "passed": 7,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "TR2-D beginUseItem：回蓝+10、消耗品数量6→5、isItem 结果",
+              "pass": true,
+              "detail": "{\"mp\":30,\"count\":5}"
+            },
+            {
+              "id": "TR2-D 召唤*2 真实生成：controller=ai、owner 绑定、HP>0 且入快照",
+              "pass": true,
+              "detail": "{\"spawned\":[\"sum_1_幽灵\",\"sum_2_幽灵\"]}"
+            },
+            {
+              "id": "TR2-D 职业被动：施法者盾=maxMp/2、风行者闪避+TP、防守者嘲讽200",
+              "pass": true,
+              "detail": "{\"shield\":50,\"eva\":40,\"taunt\":200}"
+            },
+            {
+              "id": "TR2-D 单群合并：[单体]+显式直线 → 直线内两敌皆结算",
+              "pass": true,
+              "detail": "{\"hits\":[\"e1\",\"e2\"]}"
+            },
+            {
+              "id": "TR2-D TP 经济：施法+5 / 受击+10 / 普攻+20",
+              "pass": true,
+              "detail": "{\"casterTp\":5,\"targetTp\":10}"
+            },
+            {
+              "id": "TR2-D 第七范围[范围:自身]：预览与结算均落自身",
+              "pass": true,
+              "detail": "{\"effects\":[{\"kind\":\"buff\",\"targetId\":\"h\",\"tag\":\"增防\",\"field\":\"def\",\"value\":30,\"turns\":3,\"crit\":false}]}"
+            },
+            {
+              "id": "TR2-D reset 回本战斗基线：召唤退场、物品数量/TP 还原",
+              "pass": true,
+              "detail": "{\"units\":[\"h\",\"e\"],\"tp\":10,\"count\":5}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": "rules02-passive",
+      "groups": [
+        {
+          "id": "RULES02-PASSIVE",
+          "passed": 24,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "R02-P1 征伐者 modifyCritRate：正向速度buff→+10%，无→0",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-P2 征伐者 modifyDodgeCap：闪避分母=自身−攻击者速度差（反向/无攻击者为0）",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-P3 征伐者 动能冲踏：速度差≥10每10点+5%，<10为0（原版门槛）",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-P4 征伐者 开场 spd+20（复用[单速]机制 duration1）",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-P5 风行者多重施法：cost50→概率min(0.3,1.0)，掷中 grantMainPoint",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-P6 风行者多重施法：概率上限0.3、反应技不触发、零耗不触发",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-P7 隐匿者隐匿值=100−有效嘲讽（初始−50→50）",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-P8 隐匿者累积30→80 触发再动（grantMainPoint）并锁循环",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-P9 隐匿者破百急袭：攻+50一次性buff、隐匿值回归50、解锁新循环",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-P10 隐匿者跌回80以下解锁再动锁",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-P11 隐匿者击杀+30累积（baseTauntBonus −50→−80）",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-P12 moltAtkMultiplier：敌方觉醒×1.5；我方/未觉醒×1",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-P13 getEffectiveStats 合成蜕皮攻击加成（20→30）",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-B1 自爆收口：e1毒杀后仅半径3内我方受伤",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-B2 蜕皮：e3 跌破50%觉醒（molted标记+永久攻×1.5）",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-B3 敌方充能库存周期：首个100时间+1",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-B4 复活：致死消耗次数以30%血站起（原版 tryReviveEnemy 口径）",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-B5 再生每100：自爆后 HP 随周期回升",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-B6 隐匿窗口：未受击+10累积→80再动→100急袭后回归50",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-B7 连动：HP≤30%一次性额外行动点（grantMainPoint）",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-B8 敌方充能库存：5个周期到 cap=5（e3 存活不中断）",
+              "pass": true,
+              "detail": ""
+            },
+            {
+              "id": "R02-B9 准备带[加速:3]技能：开始不入账，释放后入库存3",
+              "pass": true,
+              "detail": "begin=0 after=3 r1preparing=true r2ok=true r2reason= preparingNull=true"
+            },
+            {
+              "id": "R02-B10 召唤无 provider：canUseSkill 提前拒绝（不扣费）",
+              "pass": true,
+              "detail": "召唤词条缺失：未接入 summonProvider，无法召唤「史莱姆」"
+            },
+            {
+              "id": "R02-B11 召唤 provider 查无词条：明确拒绝不造标准人形",
+              "pass": true,
+              "detail": "召唤词条缺失：史莱姆（名册/图鉴查无此词条）"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": "rules02-independent",
+      "groups": [
+        {
+          "id": "TR2-01",
+          "passed": 5,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "R2-01 单群别名归一为规范标签，单避/群避归持续闪避不并回避，子型保留",
+              "pass": true,
+              "detail": "{\"单体\":\"伤害\",\"群攻\":\"伤害\",\"单避\":\"单避\",\"群避\":\"回避\",\"回避\":\"回避\",\"回避一次性\":false,\"子型\":\"伤害(火焰)\"}"
+            },
+            {
+              "id": "R2-02 parser 槽位输出规范标签且不保留单群写法",
+              "pass": true,
+              "detail": "{\"甲\":\"[伤害(火焰)]\",\"乙\":\"[伤害(火焰)]\",\"丙\":\"[单避]\"}"
+            },
+            {
+              "id": "R2-03 skillSlots 规范视图：slotTargets 按下标覆盖 self、自X 恒 self",
+              "pass": true,
+              "detail": "{\"base\":[[0,\"伤害\",\"default\"],[1,\"回复\",\"default\"]],\"覆盖\":[\"self\",\"default\"],\"自降\":[\"self\"]}"
+            },
+            {
+              "id": "R2-04 七自身范围与自用slotTargets覆盖接入目标解析",
+              "pass": true,
+              "detail": "{\"自身槽\":[\"h\"],\"覆盖槽\":[\"h\"],\"RANGE_TYPES\":[\"单体\",\"直线\",\"扇形\",\"圆形\",\"全域\",\"爆炸\",\"自身\",\"召唤\"]}"
+            },
+            {
+              "id": "R2-05 再动/赋予显式范围可作用范围队友",
+              "pass": true,
+              "detail": "{\"再动\":[\"a\"],\"赋予\":[\"a\"]}"
+            }
+          ]
+        },
+        {
+          "id": "TR2-02",
+          "passed": 3,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "R2-06 三伤害槽逐段独立判定且各段按本槽威力结算",
+              "pass": true,
+              "detail": "{\"段\":[[0,true,1],[1,true,4],[2,true,6]],\"总扣血\":11}"
+            },
+            {
+              "id": "R2-07 加盾吸收普通伤害而穿透无视护盾直扣HP",
+              "pass": true,
+              "detail": "{\"吸收后\":false,\"穿透后扣血\":4}"
+            },
+            {
+              "id": "R2-08 降防不写 ref.def 且 getEffectiveUnit 查得有效值下降",
+              "pass": true,
+              "detail": "{\"refDef\":5,\"effDef\":2}"
+            }
+          ]
+        },
+        {
+          "id": "TR2-03",
+          "passed": 3,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "R2-09 reaction 请求含技能候选，放弃后攻击照常且反应方不扣费",
+              "pass": true,
+              "detail": "{\"候选含技能\":true,\"命中\":true,\"反应方MP\":20,\"扣前\":20}"
+            },
+            {
+              "id": "R2-10 确认反应后攻击落空且反应方恰好扣一次费",
+              "pass": true,
+              "detail": "{\"命中\":false,\"HP\":50,\"MP\":17,\"生成器完结\":true}"
+            },
+            {
+              "id": "R2-11 自然闪避无请求且同步 attack 同判闪避",
+              "pass": true,
+              "detail": "{\"生成器命中\":false,\"同步命中\":false}"
+            }
+          ]
+        },
+        {
+          "id": "TR2-04",
+          "passed": 6,
+          "failed": 0,
+          "pending": 0,
+          "cases": [
+            {
+              "id": "R2-12 旧delay进入准备而非CD且不自动执行",
+              "pass": true,
+              "detail": "{\"preparation\":{\"skillKey\":\"蓄力斩\",\"skill\":{\"name\":\"蓄力斩\",\"cost\":0,\"hpCost\":0,\"tpCost\":0,\"charge\":0,\"delay\":2,\"haste\":0,\"maxUses\":0,\"usesRemaining\":0,\"cooldownTurns\":0,\"slotTargets\":null,\"hit\":100,\"turns\":null,\"slotTurns\":null,\"slotTurns2\":null,\"slotTurns3\":null,\"type\":\"[伤害]\",\"power\":9,\"type2\":\"[无]\",\"power2\":0,\"type3\":\"[无]\",\"power3\":0,\"isReaction\":false,\"reactionTarget\":\"all\",\"kanpoTarget\":null,\"sheshenTarget\":null,\"damageType\":null,\"isOthers\":false,\"guaranteedHit\":false,\"switchTarget\":false,\"ignoreRow\":false,\"critRate\":0,\"fxTag\":null,\"barrierSub\":null,\"barrierArmor\":0,\"isHighTier\":false,\"isLegendary\":false,\"isPierce\":false,\"summonTarget\":null,\"summonNoLimit\":false,\"range\":{\"type\":\"单体\",\"castRange\":12},\"actionCost\":{\"main\":1,\"aux\":0},\"evadeShift\":null,\"displacements\":[],\"regionEffect\":null,\"affectsAll\":false,\"reactionSource\":false,\"deathTag\":null,\"_explicit\":[\"delay\",\"type\",\"power\",\"range\",\"range.type\",\"range.castRange\"]},\"remaining\":2,\"invested\":0,\"source\":\"delay\",\"aim\":{\"x\":5.5,\"y\":4.5,\"targetId\":\"e\"},\"ready\":false},\"目标HP\":100}"
+            },
+            {
+              "id": "R2-13 准备就绪后手动释放当下目标，不自动执行旧瞄准",
+              "pass": true,
+              "detail": "{\"命中\":\"e2\",\"e1HP\":100}"
+            },
+            {
+              "id": "R2-14 弹药物品解析：分类弹药、数量按发、次数额度",
+              "pass": true,
+              "detail": "{\"category\":\"弹药\",\"count\":30,\"maxUses\":3,\"usesRemaining\":3}"
+            },
+            {
+              "id": "R2-15 弹药按发消耗且额度归零后拒绝",
+              "pass": true,
+              "detail": "{\"序列\":[{\"done\":true,\"ok\":true,\"before\":3,\"after\":2},{\"done\":true,\"ok\":true,\"before\":2,\"after\":1},{\"done\":true,\"ok\":true,\"before\":1,\"after\":0}],\"终值\":0,\"拒绝第四次\":true}"
+            },
+            {
+              "id": "R2-16 赋予variant：定义表识别为 variant 槽且白名单识别生效",
+              "pass": true,
+              "detail": "{\"def\":{\"kind\":\"variant\",\"variant\":\"再生\",\"side\":\"default\",\"defaultPower\":0,\"defaultTurns\":3},\"槽\":[\"伤害\",\"赋予:再生\"],\"grant\":true}"
+            },
+            {
+              "id": "R2-17 施放召唤生成召唤物单位",
+              "pass": true,
+              "detail": "{\"新增\":[\"sum_1_幽灵\"],\"总数\":3}"
+            }
+          ]
+        }
+      ]
     }
   ],
   "errors": null,
   "files": {
-    "tactics/src/ai.mjs": "5426507515b00e16c07f69895e581c1bc10a04aaaa41fdd2c18b2b35a7d298b8",
+    "tactics/src/action-director.mjs": "91204d19f8d764cf7e55e62e54d0b06a6e9ddd049a695d1a39e259772ee826c3",
+    "tactics/src/ai.mjs": "ee1988fc686e6a1612258a5493adf1d56338bfb191a7efad4205b308b4674311",
     "tactics/src/arcane-vfx.mjs": "bc9c1e6c85a157ad320669b0e91a021102c6df543c778c09aaaee27174daae12",
-    "tactics/src/battle.mjs": "975309b43211072ef5cc268712e140ca2dd1518c36008c0079bc416f6a425c7c",
-    "tactics/src/camera.mjs": "d5312b04557600699c3ef88a6051cea2f9e3ca9a9a0d501a95dfd3b24236c295",
-    "tactics/src/clock.mjs": "b55091649371e8099d185474bfd2724e4a26ca2acb74200566e34fca46889bcd",
-    "tactics/src/config-package.mjs": "11d811c2805e240ce8eecb206463df4307f32ec580fe25cd167188e7ba57bf8c",
-    "tactics/src/damage.mjs": "1ce8beffe617b437175db36b74731ee2751829d5efa2fd5176ef59c1c7df8193",
-    "tactics/src/demo-fixture.mjs": "53e36e2c899bc21e0455ac1ecff104649cc5633f1e57ec3c784ae90871e6bdee",
-    "tactics/src/geometry.mjs": "a4724043baa7b2360d7456bc1954993f6d3c87aafe162f6443731e6b5d78da86",
-    "tactics/src/lifecycle.mjs": "076c65cd118a7c326bbb6cf4df4312926c734a3185fc4a6c08fb841cb669c794",
-    "tactics/src/main.mjs": "93c3de136da13ad6b5a2a70044d7a15875c2e0d73025e308e75950f67703b964",
-    "tactics/src/map-art.mjs": "4dfe1bfb3eee1a0b782de5329664f5b54bbca111b5a4ba5221d7d85ecf2105e7",
-    "tactics/src/movement.mjs": "305693c91f11f2461cee3202c1064981213dcd86883aec32165f7707983e488a",
-    "tactics/src/parser.mjs": "a6df63c3cd5d31a6bd3178fbd974a044efe3812525db6cc95d3713f06c7595dc",
-    "tactics/src/protocol.mjs": "ade9b9a71124fe95bcd6a878af9c2c8f6080ff6b09531a314f359168e0000ee8",
-    "tactics/src/range.mjs": "aedd4aea8c2c59c22b135f4f2d0fd9db43d83b0348dfb7975cf141695bcf0c16",
-    "tactics/src/roster.mjs": "2dd32c3bdc427afa8da15d5caabd9d8e1e8eb175fd539030f671cabddea3d18b",
-    "tactics/src/sandbox.mjs": "e2271d696132d8d7d2d76fb982d30bcf4fc1e6394ef9b3bd4475cead91d305b8",
-    "tactics/src/scene.mjs": "a7368627131095541e105cb98b50a75d979183508b233a7a594b58ff3eea4daf",
-    "tactics/src/scheduler.mjs": "18f19185d6bb65d6d4f9ced6592b076561b7dae73f383de0b689e361c0b5c115",
-    "tactics/src/storage.mjs": "56598e8156a8ea1d385b34487dedc69c6781388d1fab279720acf3009c4a4be3",
-    "tactics/src/ui-shell.mjs": "09e4f28c3d13e0442d5e50ea2696ee1d86b5d30019b6ea5d247842e82ed04a9b",
-    "tactics/src/unit-view.mjs": "0848899a0195958ed8f182cbfb9a3cbb013900440205dd75ef4d85dbd64759fc",
+    "tactics/src/av-host.mjs": "de1af98ee51d15303eed0d4298aff9d6c8c393eb3fb494c35bc8f2edc463b83b",
+    "tactics/src/barriers.mjs": "0a8fc3e590e1122fd01cd760df19e99a875a28693bcba0e180da78b28da21518",
+    "tactics/src/battle.mjs": "a714836a4aa690ceb50ce61f7d5f240c33ae8dd370a75b921de935a54eefafc4",
+    "tactics/src/camera.mjs": "6b3ff258be146ef54345f1fefb6e4e1129c1f6a65079e11a9739de5b6abbe488",
+    "tactics/src/chapel-art.mjs": "c589bdaa04cd4660f81b9120c8553e2fc01983c442d0ea90bb95a37f25994f70",
+    "tactics/src/chapel-scene.mjs": "436f264b3a36a9ae12e5c308502781f6a895be8bc95262209e6112afaa2d9a77",
+    "tactics/src/class-passives.mjs": "275192b268d61077801fb0038b5718f06fe055d3203e495f9991414a595af504",
+    "tactics/src/clock.mjs": "9239bf958a8cc98c1ef86b398e6fa930c9e392861c05f9332bd9a0c9d5d67de9",
+    "tactics/src/config-package.mjs": "67857ac2d337286a396b86b3710826a9e3e60544b2676ddd32735bee0bcb6fde",
+    "tactics/src/damage.mjs": "167ad26ca411dc38ad90a1cfebb199837c676c98a824bbad5473ae88142c25f6",
+    "tactics/src/demo-fixture.mjs": "90cf142ae919d270e8765eba40e814e303b9e568c436d79b257889b60ee613ea",
+    "tactics/src/editor-panel.mjs": "57e51ca5d4acf08700046ccd879fdb33e7b1492f138600e156366568b72ff0bc",
+    "tactics/src/effect-definitions.mjs": "38f70b89be0b61048d48b450503109ae84e39a9988dce575a68bffb4448a9419",
+    "tactics/src/effect-handlers.mjs": "d9f57dd5e7abd66bf4c7040f0a1fd09393573569c084d84adb36106cc22f2eed",
+    "tactics/src/fx-library.mjs": "cfe6f5f67c26c183f82b4e53ff8698180024e8d0cff4cfd394fbff4452cd52de",
+    "tactics/src/fx-registry.mjs": "66980600927d4a861f2d01a6b42615f46a6884350df4995523cd6be74d593955",
+    "tactics/src/generation.mjs": "5ce38296d83ca089995ebf5762f19eb95efaacbd7fb683cd631911f80d24cd4b",
+    "tactics/src/geometry.mjs": "c9caef1f6c7c7c0b79b1d7022a2848f490ed1fe003ff2f0dcd18280a038f439b",
+    "tactics/src/lifecycle.mjs": "0acd63967469695a4809a6b421077d03eda6790f10b6e785ac9703cd6f5cc8ff",
+    "tactics/src/main.mjs": "b0f8a4960b63f31b999f30e2ddfb451abf07fba9191c3eac601dd5f0108a8783",
+    "tactics/src/map-art.mjs": "07e734d6cc41e7ad6b6a708cfbcdb38f8319f99208d566347e9e6eaff48eb330",
+    "tactics/src/motion.mjs": "69baee624c33caaea1d400dac814a6c05e2b5ea21ad8be8cbde529b7ffffe447",
+    "tactics/src/movement.mjs": "9a5f455185eb51e4acb4c9d9a58d51596a7c1cf1bfe5014e3d639bf6211e5e45",
+    "tactics/src/parser.mjs": "3aeb096e2254ce9a8125811211ed100e2c4dea52c2693bbcac991aaf0ec58faf",
+    "tactics/src/perception.mjs": "79aa1213bf01ab2b07459769c49aa18159c3965beff819125866d96f4af1bfcf",
+    "tactics/src/protocol.mjs": "168fe856fb68f7b92ccdfbd5b9ca9311e932c122947b8bebccb8e9a5b43b2ce9",
+    "tactics/src/range-overlay.mjs": "6023a7e01091f63d5eae8180db5e08800334de618618e1bb7165855c8b2bf8c7",
+    "tactics/src/range.mjs": "a207ffe7bd077b139596d6f930fa0c4ca087d053d7de97f1efdcf04ddeb7cece",
+    "tactics/src/reaction-prompt.mjs": "e9ad1f9c22a93c596941fd3fc8d50d82ccf9f98db6dc7e9af3d3871d1d626155",
+    "tactics/src/regions.mjs": "3c57cc1cc2bc68795c18bcc1f5dec8176af48e88de94cf387bf5ba2e7126a2c2",
+    "tactics/src/roster.mjs": "365570162142d73a8186e126e6793b189dc12b427dcf7d23e01c57f2cccb822f",
+    "tactics/src/sandbox.mjs": "b4107650d387711fbefa365063247fde2c378534c6c99c8b2fbfe8e4d7411815",
+    "tactics/src/scenario-data.mjs": "4337130c8242b960a97d4eb7f1f0f49a6a8b7211a3106734610d75e6be322d88",
+    "tactics/src/scene.mjs": "a3be69298076e66ea9d3bbe5a768ea67736bdbdabe0655b79a08b271ae20c113",
+    "tactics/src/scheduler.mjs": "db5d7be033c6dbfc207caa032d783938c2cdde4ebac5f2515231b2a6123363d0",
+    "tactics/src/storage.mjs": "14d7d6022199618684d90aee9eeab796d37b12a8de624364b8854418ca05cb65",
+    "tactics/src/ui-sfx.mjs": "a82bd555e4ed654c257e13594a0b3828b6bc719544b23c58b03fda52540c9a92",
+    "tactics/src/ui-shell.mjs": "9643584e8d6006d15236e17fd51fcf90a3543bb60b71abb51606fb43a6340ac9",
+    "tactics/src/unit-style.mjs": "e2a727a1751e5140cbedb3961b0c8f4a323f850931d9ffdd4e6e7ee75316889e",
+    "tactics/src/unit-view.mjs": "06013694942fbb4bb9d976029e3cec948a2184cae393dbefefa014c2a1cdc883",
+    "tactics/src/variant-rules.mjs": "dce086e1d65acee132cd84a055598b0cef7f5cc8a019f61babeff4e74ec8e7fe",
     "tactics/src/vfx-host.mjs": "a052515c357435cedc36f8f01cea4c7237128347ba848c1e59654ee2410f4901",
     "tactics/src/view-scope.mjs": "b941ab63b4801bd0f0f9154877d41dace3b9d837a70d6f038e8a8a7211bb2084"
   }

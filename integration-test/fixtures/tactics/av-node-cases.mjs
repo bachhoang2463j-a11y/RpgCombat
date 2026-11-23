@@ -79,19 +79,27 @@ export const groups = {
     const { resolveAttackIdentity, resolveWindupKind } = m.director;
     // 身份回归选取真实攻击槽，治疗等新可用支援技能不冒充枪击身份。
     const skillOf = (id) => { const s = view.units.find(u => u.id === id).skills; return s.find(x => m.battle.skillSupport(x).ok && [x.type, x.type2, x.type3].some(t => /伤害|穿透|散射|眩晕/.test(t))) || s[0]; };
-    const ids = {
-      // 砷弹演出改由 fx-registry 按 [特效:砷弹射击] 分发（TFX-01 断言），身份层只按标签+直线范围得面状枪击
-      'h:索恩': ['aoe', '枪击'], 'h:埃利奥特': ['single', '枪击'], 'h:玛德琳': ['single', '枪击'], 'h:弗兰克': ['perTarget', '霰弹'],
-      'e:守卫': ['perTarget', '刀砍'], 'e:弓手': ['single', '箭矢'], 'e:邪术师': ['projectile', 'enemy_spell'], 'e:斥候': ['single', '爪击'],
-    };
-    for (const [id, [mode, sub]] of Object.entries(ids)) {
-      const u = view.units.find(x => x.id === id);
-      const r = resolveAttackIdentity(skillOf(id), u.side);
-      cases.push(ok('TAV-03 攻击身份 ' + id + ' → ' + mode + '/' + sub, r.mode === mode && r.subtype === sub, j(r)));
+    for (const u of view.units) {
+      const sk = skillOf(u.id);
+      const r = resolveAttackIdentity(sk, u.side);
+      cases.push(ok('TAV-03 攻击身份仅由显式特效标签决定 ' + u.id,
+        !!sk.fxTag && r.mode === 'tag' && r.subtype === sk.fxTag, j(r)));
     }
+    const legacy = { type: '[伤害(枪击)]', damageType: '法术', range: { type: '扇形' } };
+    cases.push(ok('TAV-03 无标签不根据伤害或旧括号猜测演出',
+      resolveAttackIdentity(legacy, 'hero').subtype === null, j(resolveAttackIdentity(legacy, 'hero'))));
+    cases.push(ok('TAV-03 特效标签覆盖旧括号且与伤害类型无关',
+      resolveAttackIdentity({ ...legacy, fxTag: '冰霜' }, 'hero').subtype === '冰霜', ''));
+    const editedRows = [{ name: '枪击', fxTag: '枪击', type: '[枪击]', power: 75, cost: 2 },
+      { name: '父道具', count: 3, children: [{ name: '用法', fxTag: '火焰', power: 20 }] }];
+    m.main.applyEditorFxTags(editedRows, [{ name: '枪击', fxTag: '冰霜', type: '[诅咒]', power: 999, cost: 999 },
+      { name: '父道具', count: 0, children: [{ name: '用法', fxTag: null, power: 999 }] }]);
+    cases.push(ok('TAV-03 本场特效编辑仅覆写标签，规则与道具库存不变',
+      editedRows[0].fxTag === '冰霜' && editedRows[0].type === '[枪击]' && editedRows[0].power === 75 && editedRows[0].cost === 2 &&
+      editedRows[1].count === 3 && editedRows[1].children[0].fxTag === null && editedRows[1].children[0].power === 20, j(editedRows)));
     const basic = m.battle.BASIC_ATTACK;
     const rb = resolveAttackIdentity(basic, 'hero');
-    cases.push(ok('TAV-03 普通攻击 → 近战刀砍单体（不套火球）', rb.mode === 'single' && rb.subtype === '刀砍', j(rb)));
+    cases.push(ok('TAV-03 普通攻击显式指定刀砍特效', basic.fxTag === '刀砍' && rb.mode === 'tag' && rb.subtype === '刀砍', j(rb)));
     const kinds = { 'e:守卫': 'red-wide', 'e:弓手': 'amber-single', 'e:邪术师': 'violet-single', 'e:斥候': 'red-single' };
     for (const [id, k] of Object.entries(kinds)) cases.push(ok('TAV-03 前摇 ' + id + ' → ' + k, resolveWindupKind(skillOf(id)) === k, resolveWindupKind(skillOf(id))));
     cases.push(ok('TAV-03 前摇单群以显式空间范围为准（旧"单体"标签不覆盖扇形）', /伤害/.test(skillOf('e:守卫').type) && resolveWindupKind(skillOf('e:守卫')) === 'red-wide', skillOf('e:守卫').type));

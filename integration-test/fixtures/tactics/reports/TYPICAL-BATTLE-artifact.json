@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "7283e44155fee92e073c3f480571bbe4cb19f2f38b978781cbdea4ec1d420e80",
-  "bytes": 1176495,
+  "sha256": "2dbb6536679521d745813f10c4b38138e39ffd447f9b41181863aecb2f116d5f",
+  "bytes": 1179975,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -22,6 +22,26 @@
     },
     {
       "id": "伤害槽菜单分类与阵营收益修复入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "唯一显式特效协议与中性反馈入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "原版逐发记录与转火专用预览入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "编辑器特效清单来自注册表",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "空霰弹与群体规则区域适配入包",
       "pass": true,
       "detail": ""
     },
@@ -76,6 +96,6 @@
       "detail": ""
     }
   ],
-  "passed": 14,
+  "passed": 18,
   "failed": 0
 }

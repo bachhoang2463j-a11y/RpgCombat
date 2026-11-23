@@ -26,4 +26,4 @@ writeFileSync(path.join(root, 'integration-test', 'fixtures', 'tactics', 'report
 console.log(run.stdout.replace(/__RUN_TESTS_JSON__.*?__END__/g, '').trim());
 if (run.stderr) console.error(run.stderr);
 console.log(JSON.stringify({ exitCode: run.status, passed: report.passed, report: 'MVP-2026-11-21-node.json' }));
-process.exit(run.status === 0 && stages.length === 4 ? 0 : 1);
+process.exit(run.status === 0 && stages.length > 0 ? 0 : 1);

@@ -12,11 +12,12 @@
 import { RANGE_TYPES, CONFIG_PACKAGE_PERSIST_KEYS } from './protocol.mjs';
 import { CLASS_STYLE } from './unit-style.mjs';
 import { normalizeEffectTag } from './effect-definitions.mjs';
+import { getFxTagOptions } from './fx-library.mjs';
 
 // 七范围（六范围 + 自身）：protocol.RANGE_TYPES 仍是六范围（协议文件不动），「自身」在编辑器本地扩展；
 // 解析支持（parser/[范围:自身]）待规则代理落地，落地前保存带「自身」的技能会走 parseSkillEntry 校验。
 const RANGE_TYPES_SEVEN = [...RANGE_TYPES, '自身'];
-const RANGE_FIELDS = { 单体: ['castRange'], 直线: ['length', 'width'], 扇形: ['castRange', 'angle'], 圆形: ['castRange', 'radius'], 全域: [], 爆炸: ['castRange', 'radius'], 自身: [] };
+const RANGE_FIELDS = { 单体: ['castRange'], 直线: ['length', 'width'], 扇形: ['castRange', 'angle'], 圆形: ['castRange', 'radius'], 全域: [], 爆炸: ['castRange', 'radius'], 自身: [], 召唤: ['castRange'] };
 const RANGE_LABEL = { castRange: '射程', length: '长', width: '宽', angle: '角度', radius: '半径' };
 const RANGE_UNIT = { castRange: 'm', length: 'm', width: 'm', angle: '°', radius: 'm' };
 const PERSIST_LABEL = { persistAtk: '攻击', persistDef: '防御', persistSpd: '速度', persistMaxHp: 'HP上限', persistMaxMp: 'MP上限', persistMaxTp: 'TP上限',
@@ -78,7 +79,19 @@ export function createEditorPanel({ rpgUi, shell, globalHtml, validate, onSave, 
       '<label title="开始时付一个主行动，之后每投入一个主行动减 1；为 0 即可释放"><span>蓄力</span><input type="number" min="0" id="edit-' + ns + '-charge" value="' + (s.charge || 0) + '" class="edit-input-game w-12 font-mono-num text-right text-cyan-100 text-[10px] py-0.5 px-1"><em>主点</em></label></div>' +
       slotSelfHtml(ns, s);
   }
-  function skillBody(ns, s) { return moduleG(ns, s) + rpgUi.buildSkillFormFieldsHtml(ns, s, ''); }
+  function fxOptions(value) {
+    const options = [...getFxTagOptions()];
+    if (value && !options.some(({ name }) => name === value)) {
+      options.push({ name: value, label: value + '（未知特效）' });
+    }
+    return [{ name: '', label: '特效:无' }, ...options].map(({ name, label }) =>
+      '<option value="' + E(name) + '"' + ((value || '') === name ? ' selected' : '') + '>' + E(label) + '</option>').join('');
+  }
+  function skillBody(ns, s) {
+    const fields = rpgUi.buildSkillFormFieldsHtml(ns, s, '');
+    const fxSelect = /(<select id="edit-[^"]+-fxTag"[^>]*>)[\s\S]*?(<\/select>)/;
+    return moduleG(ns, s) + fields.replace(fxSelect, (_, open, close) => open + fxOptions(s.fxTag) + close);
+  }
 
   // 槽标签预览统一走官方规范名（输入别名可接受，显示只规范）：'[单体(枪击)]' → '[伤害(枪击)]'
   const normSlotTag = t => (t && t !== '[无]' && normalizeEffectTag(t)) ? '[' + normalizeEffectTag(t) + ']' : (t || '[无]');
@@ -118,7 +131,7 @@ export function createEditorPanel({ rpgUi, shell, globalHtml, validate, onSave, 
     const tone = row.side === 'hero' ? 'hero' : 'enemy';
     let h = '<div class="space-y-1.5 pt-1"><div class="flex items-center justify-between border-b border-cyan-900/40 pb-1">';
     h += '<div class="flex items-center gap-1.5"><span class="text-cyan-400 text-xs font-bold">⚡ 技能列表</span><span class="text-[10px] text-slate-500">(' + row.skills.length + '项)</span></div>';
-    const skillRule = row.side === 'hero' ? '与 YAML 同名的技能以 YAML 为准（修改只写入持久档）；新增或改名的技能会追加到本场' : '敌方修改只在本场内存生效';
+    const skillRule = row.side === 'hero' ? '同名技能的规则以 YAML 为准，特效选择在本场生效；新增或改名的技能会追加到本场' : '敌方修改只在本场内存生效';
     h = h.replace(/(\(\d+项\)<\/span>)/, '$1<span class="text-[9px] text-slate-500 ml-1">' + skillRule + '</span>');
     h += '<div class="flex items-center gap-2"><button data-ed-act="fold-all" data-ui="' + ui + '" data-open="1" class="text-[10px] text-slate-400 hover:text-cyan-300">展开全部</button><span class="text-slate-600 text-[10px]">|</span>' +
       '<button data-ed-act="fold-all" data-ui="' + ui + '" data-open="" class="text-[10px] text-slate-400 hover:text-cyan-300">收起全部</button>' +
@@ -148,7 +161,6 @@ export function createEditorPanel({ rpgUi, shell, globalHtml, validate, onSave, 
     let h = '<div class="space-y-1.5 pt-1"><div class="flex items-center justify-between border-b border-amber-900/40 pb-1">';
     h += '<div class="flex items-center gap-1.5"><span class="text-amber-400 text-xs font-bold">🎒 物品道具</span><span class="text-[10px] text-slate-500">(' + row.items.length + '项)</span></div>';
     h += '<button data-ed-act="add-item" data-ui="' + ui + '" class="px-2 py-0.5 bg-amber-900/60 hover:bg-amber-800 text-amber-200 text-[10px] font-bold rounded border border-amber-600/50 flex items-center gap-0.5"><span>+</span> 新增物品</button></div><div class="space-y-1.5">';
-    const fx = ['特效:无', ...Object.keys(rpgUi.WEBM_FX_REGISTRY)];
     row.items.forEach((it, ii) => {
       const ns = p + '-it-' + ii, key = 'i:' + ui + ':' + ii, open = draft.open.has(key);
       const cat = it.category || '道具', stockLabel = cat === '道具' ? '次数' : '数量', stock = cat === '道具' ? (it.maxUses || 0) : (it.count || 0);
@@ -167,7 +179,7 @@ export function createEditorPanel({ rpgUi, shell, globalHtml, validate, onSave, 
       h += '<div class="sm:col-span-2 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">属性</span><select id="edit-' + ns + '-dmgType" class="edit-input-game w-full text-orange-300 font-bold py-1 text-xs">' +
         [['', '无(近战)'], ['近战', '🗡️ 近战'], ['远程', '🎯 远程'], ['法术', '⚡ 法术']].map(([v, l]) => '<option value="' + v + '"' + ((it.damageType || '') === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></div>';
       h += '<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">特效</span><select id="edit-' + ns + '-fxTag" class="edit-input-game w-full text-yellow-300 font-bold py-1 text-xs">' +
-        fx.map(f => { const v = f === '特效:无' ? '' : f; return '<option value="' + E(v) + '"' + ((it.fxTag || '') === v ? ' selected' : '') + '>' + E(f) + '</option>'; }).join('') + '</select></div>';
+        fxOptions(it.fxTag) + '</select></div>';
       h += '<div class="sm:col-span-12 flex items-center gap-1.5 flex-wrap">' + pill(ns + '-others', it.isOthers, 'border-emerald-500 text-emerald-300 bg-emerald-950/70', '👥', '他人') +
         pill(ns + '-guaranteed', it.guaranteedHit, 'border-rose-500 text-rose-300 bg-rose-950/70', '🎯', '必中') + pill(ns + '-legendary', it.isLegendary, 'border-amber-500 text-amber-300 bg-amber-950/70', '✦', '传奇') +
         pill(ns + '-highTier', !it.isLegendary && it.isHighTier, 'border-violet-500 text-violet-300 bg-violet-950/70', '⬥', '高阶') +

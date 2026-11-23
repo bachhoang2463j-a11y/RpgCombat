@@ -33,7 +33,7 @@ function createCase(source, skill) {
 
 // 反应专项夹具：攻击者用匹配伤害类型的单体攻击，真实驱动 beginAttack 生成器；固定种子+零闪避保证将命中可重复。
 // 普通反应：受击者本人持有反应技；舍身：守护者持有舍身，攻击者打其邻近友军。
-function createReactionCase(source, skill) {
+function createReactionCase(source, skill, observe = () => {}) {
   const responder = structuredClone(source);
   responder.id = 'responder'; responder.side = 'hero'; responder.controller = 'player'; responder.classType = null;
   responder.ref.evasion = 0;
@@ -67,6 +67,9 @@ function createReactionCase(source, skill) {
   const hpBefore = responder.ref.hp;
   const mpBefore = responder.ref.mp;
   const attackerHpBefore = attacker.ref.hp;
+  const attackerMpBefore = attacker.ref.mp;
+  const mirror = responder.items.find(i => i.name === '逆咒归源镜');
+  const mirrorBefore = mirror?.usesRemaining;
   const usesBefore = usesOf(b, responder.id);
   let seen = null, selected = null;
   const r = drive(b.beginAttack(attack, aim, {
@@ -100,6 +103,7 @@ function createReactionCase(source, skill) {
   else if (kinds.has('damageGuard') || kinds.has('shield')) { kind = '减伤/护盾'; outcome = !!reaction && (hit.guardDmg > 0 || hit.shieldDmg > 0 || hit.hit !== undefined); }
   else { outcome = !!reaction; }
   const pass = !!seen && !!selected && !!r && r.ok !== false && !!reaction && econOk && eventOk && outcome;
+  observe({ reaction, attackerHpLoss: attackerHpBefore - attacker.ref.hp, attackerMpLoss: attackerMpBefore - attacker.ref.mp, mirrorBefore, mirrorAfter: mirror?.usesRemaining });
   return result('TT-SKILL[反应专项] ' + skill.name + '·' + kind, pass, JSON.stringify({
     seen: !!seen, selected: selected && selected.skill.name, kind, mpDelta, uses: usesBefore + '->' + usesAfter,
     event: eventOk, outcome, guardianId: reaction && reaction.guardianId, reason: r && r.reason,
@@ -193,6 +197,17 @@ function run() {
     const elliott = data.units.find(u => u.name === '埃利奥特');
     const mirror = elliott.items.find(i => i.name === '逆咒归源镜');
     const sup = skillSupport(itemAsSkill(mirror));
+    const recoil = elliott.skills.find(s => s.name === '净蚀反冲');
+    createReactionCase(elliott, recoil, ({ reaction, attackerMpLoss, mirrorBefore, mirrorAfter }) => {
+      cases.push(result('TT-SKILL[D1-2] 净蚀反冲实际抽取敌方5 MP', reaction?.canceled && attackerMpLoss === 5, JSON.stringify({ reaction, attackerMpLoss })));
+      cases.push(result('TT-SKILL[D1-2] 净蚀反冲独立消耗归源镜一次库存', mirrorBefore === 3 && mirrorAfter === 2, JSON.stringify({ mirrorBefore, mirrorAfter })));
+    });
+    const counter = { name: '反击探针', type: '[反击]', power: 20, isReaction: true, reactionTarget: '近战', range: { type: '单体', castRange: 1 } };
+    let normal;
+    createReactionCase(elliott, counter, value => { normal = value; });
+    createReactionCase(elliott, { ...counter, critRate: 100 }, ({ reaction, attackerHpLoss }) => {
+      cases.push(result('TT-SKILL[D1-1] 主动反击暴击前置于减伤并翻倍', reaction?.crit && reaction?.countered && normal.attackerHpLoss > 0 && attackerHpLoss === normal.attackerHpLoss * 2, JSON.stringify({ reaction, attackerHpLoss, normal: normal.attackerHpLoss })));
+    });
     cases.push(result('TT-SKILL[D1-2] 逆咒归源镜纯载体不可主动施放', sup.ok === false && sup.reason === '仅作为绑定技能的次数载体', JSON.stringify(sup)));
   }
 
@@ -222,6 +237,63 @@ function run() {
     const hitE1 = rSw1.hits.some(h => h.targetId === 'e1'), hitE2 = rSw1.hits.some(h => h.targetId === 'e2');
     cases.push(result('TT-SKILL[D1-3] 碎骨连打交互两段转火切换目标', seenRetarget1 && rSw1.ok && hitE1 && hitE2, JSON.stringify({ seenRetarget1, hits: rSw1.hits.map(h => h.targetId) })));
 
+    const north = { x: 5.5, y: 4.5, targetId: 'e1' };
+    const east = { x: 6.5, y: 5.5, targetId: 'e2' };
+    const makeSwitch = kill => {
+      const caster = { ...structuredClone(hero), controller: 'ai' };
+      const first = makeEnemy('e1', '北敌');
+      if (kill) first.ref.hp = 1;
+      const b = createBattle({ units: [caster, first, makeEnemy('e2', '东敌')],
+        placementsById: { caster: { col: 5, row: 5, facing: 180 }, e1: { col: 5, row: 4 }, e2: { col: 6, row: 5 } },
+        scene, random: createSeededRandom(SEED) });
+      b.start();
+      return b;
+    };
+    const aiStep = makeSwitch(false).beginAttack(suigu, north).next();
+    cases.push(result('TT-SKILL[D1-3] AI默认连续出手不产生转火请求', aiStep.done && aiStep.value.hits[0]?.segments.length === 2 && aiStep.value.shots.length === 2));
+    const bAuto = makeSwitch(true);
+    const auto = drive(bAuto.beginAttack(suigu, north));
+    const first = auto.hits[0]?.segments[0], second = auto.hits[1]?.segments[0];
+    const eastQuery = bAuto.previewRetarget(suigu, east, 'caster');
+    const sync = shot => shot?.aim.targetId === 'e2' && shot.facing === 90 && JSON.stringify(shot.cells) === JSON.stringify(eastQuery.cells);
+    cases.push(result('TT-SKILL[D1-3] 首段击杀自动补选同步两段索引及瞄准格', auto.hits[0]?.down && first?.shotIndex === 1 && first.facing === 0 && second?.shotIndex === 2 && second.segmentIndex === 2 && sync(second) && sync(auto.shots[1]) && auto.facing === 90, JSON.stringify(auto.shots)));
+    cases.push(result('TT-SKILL[D1-3] 已付行动费用仍可预览转火', !bAuto.previewAttack(suigu, east).ok && eastQuery.ok && sync(eastQuery)));
+
+    const counter = { name: '致死反击', type: '[反击]', power: 20, isReaction: true, reactionTarget: '近战', range: { type: '单体', castRange: 1 } };
+    const evade = { ...counter, name: '测试侧闪', type: '[回避]', power: 1000, evadeShift: { mode: 'side', distance: 2 } };
+    const makeInterrupted = (reaction, hp) => {
+      const caster = structuredClone(hero);
+      caster.ref.hp = hp;
+      const first = makeEnemy('e1', '北敌');
+      first.skills = [reaction];
+      const b = createBattle({ units: [caster, first, makeEnemy('e2', '东敌')],
+        placementsById: { caster: { col: 5, row: 5 }, e1: { col: 5, row: 4 }, e2: { col: 6, row: 5 } }, scene, random: () => 0.5 });
+      b.start();
+      return { b, caster, first };
+    };
+    const fatal = makeInterrupted(counter, 1);
+    const fatalStep = fatal.b.beginAttack({ ...suigu, cost: 3, guaranteedHit: true }, north, { autoAnswer: req => req.candidates[0] }).next();
+    cases.push(result('TT-SKILL 死于反击中止当前段和余槽', fatalStep.done && fatal.caster.ref.hp === 0 && fatal.first.ref.hp === 500 && fatalStep.value.costSummary.mp === 3 && fatalStep.value.shots.length === 1, JSON.stringify({ done: fatalStep.done, hp: fatal.first.ref.hp, request: fatalStep.value.type })));
+    const grouped = makeInterrupted({ ...counter, range: { type: '单体', castRange: 2 } }, 1);
+    grouped.b.ctx.placementsById.e2.col = 5;
+    grouped.b.ctx.placementsById.e2.row = 3;
+    const groupedSkill = { ...suigu, guaranteedHit: true, range: { type: '直线', length: 4, width: 1 } };
+    const groupedStep = grouped.b.beginAttack(groupedSkill, north, { autoAnswer: req => req.candidates[0] }).next();
+    const groupedResult = groupedStep.done ? groupedStep.value : null;
+    cases.push(result('TT-SKILL 群攻反击致死仍完成整发，停止第二发及转火', grouped.caster.ref.hp === 0 && groupedResult?.shots.length === 1 &&
+      ['e1', 'e2'].every(id => groupedResult.hits.some(h => h.targetId === id && h.hpDmg > 0 && h.segments.length === 1)),
+    JSON.stringify({ done: groupedStep.done, hits: groupedResult?.hits.map(h => [h.targetId, h.hpDmg]) })));
+    const shift = makeInterrupted(evade, 500);
+    const narrow = { ...suigu, guaranteedHit: true, range: { type: '单体', castRange: 1 } };
+    const shifted = drive(shift.b.beginAttack(narrow, north, { autoAnswer: req => req.candidates[0], interactiveRetarget: false }));
+    cases.push(result('TT-SKILL 侧闪离射程后重查并补选', shifted.hits[0]?.reaction?.shift && shifted.hits[1]?.targetId === 'e2' && shifted.shots[1]?.aim.targetId === 'e2', JSON.stringify(shifted.shots)));
+    const mixed = { ...narrow, type2: '[降防]' };
+    const precise = makeInterrupted(counter, 500).b;
+    const generic = precise.previewRetarget(mixed, east, 'caster');
+    const exact = precise.previewRetarget(mixed, east, 'caster', 1);
+    const prompt = makeSwitch(false).beginAttack(suigu, north, { interactiveRetarget: true }).next();
+    cases.push(result('TT-SKILL 转火请求与预览精确指定当前槽', generic.ok && !exact.ok && prompt.value.slotIndex === 1, JSON.stringify({ slots: generic.slotTargets, generic: generic.ok, exact: exact.ok, slotIndex: prompt.value.slotIndex })));
+
     const bSec = createBattle({
       units: [structuredClone(hero), makeEnemy('n1', '北敌'), makeEnemy('s1', '南敌')],
       placementsById: { caster: { col: 5, row: 5 }, n1: { col: 5, row: 3 }, s1: { col: 5, row: 7 } },
@@ -240,6 +312,14 @@ function run() {
     const rSw2 = s2.value;
     cases.push(result('TT-SKILL[D1-3] 鹿弹二连发交互两段扇形转火重调朝向', seenRetarget2 && rSw2.ok && rSw2.hits.some(h => h.targetId === 'n1') && rSw2.hits.some(h => h.targetId === 's1'),
       JSON.stringify({ seenRetarget2, hits: rSw2.hits.map(h => h.targetId) })));
+    const bEmpty = createBattle({
+      units: [structuredClone(hero), makeEnemy('n1', '北敌')],
+      placementsById: { caster: { col: 5, row: 5 }, n1: { col: 5, row: 3 } },
+      scene, random: createSeededRandom(SEED),
+    });
+    bEmpty.start();
+    const empty = drive(bEmpty.beginAttack(ludan, { x: 5.5, y: 3.5 }), () => ({ x: 5.5, y: 7.5 }));
+    cases.push(result('TT-SKILL[D1-3] 空扇形仍记录第二次开火且只付一次行动费', empty.shots?.length === 2 && empty.shots[1].facing === 180 && empty.hits[0]?.segments.length === 1 && empty.costSummary.main === 1 && empty.ammoEvents.length === 2));
   }
 
   // D1-4 [智慧] 对象路径回填 isWise

@@ -4,7 +4,7 @@
 // arcaneVfxModule 行区间(源 5729–14230): 5730–5730, 5733–5791, 5800–5841, 5849–5913, 5923–5924, 5932–6302, 6642–6850, 7016–7037, 7351–7376, 7383–7584, 7596–9869, 10067–10097, 10102–10107, 10748–10757, 11103–11133, 11142–11240, 11917–12083, 12201–12214, 14179–14208
 // 入选语句 157 段 / 3661 行；入口: playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar, CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx
 // 显式存根: clearSummonState, clearStatusLayers, clearSelfDestructState, clearRescueState, clearVariantState
-// 宿主适配补丁: fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 屏幕矩形 → 特效舞台坐标×11; innerWidth → 舞台宽×7; innerHeight → 舞台高×3; body 挂载 → 特效舞台×5; JS position:fixed → absolute×0; arcane canvas resize 走舞台×1; 舞台震动独立层×2; window.* 声音函数改为工厂内本地×14; 去环境氛围清理×1; CSS position:fixed → absolute×6; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1
+// 宿主适配补丁: fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 屏幕矩形 → 特效舞台坐标×11; innerWidth → 舞台宽×7; innerHeight → 舞台高×3; body 挂载 → 特效舞台×5; JS position:fixed → absolute×0; arcane canvas resize 走舞台×1; 舞台震动独立层×2; window.* 声音函数改为工厂内本地×14; 去环境氛围清理×1; CSS position:fixed → absolute×6; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1
 // ==========================================
 /* eslint-disable */
 // ---- 纯数据导出（原样，供宿主在工厂创建前解析人物头像/语音与预载清单） ----
@@ -1868,7 +1868,7 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
     }
 
     // ===== ② 单体(霰弹)：高速扇面多射线（0ms 扇面爆焰 → 115ms 扇面弹道抵达 → 620ms 硝烟收尾） =====
-    function playSingleShotgun(caster, target, outcome = 'hit', onImpact) {
+    function playSingleShotgun(caster, target, outcome = 'hit', onImpact, suppressImpact) {
         const fromRect = entityVisualRect(caster), toRect = entityVisualRect(target);
         if (!fromRect || !toRect) return null;
         const dodged = outcome === 'dodge';
@@ -1956,6 +1956,7 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
         // 3. 主接触拍点（115ms）：以霰弹实际输出起点计时，仅通知一次。
         owner.audioAt(T.impactMs, () => {
             if (onImpact) onImpact(target, { subtype: '霰弹', scope: 'single', outcome, point: baseCenter, beatMs: T.impactMs });
+            if (suppressImpact) return;
             if (dodged) {
                 owner.burst(5, () => ({ x: g.missPt.x + rnd(-18, 18), y: g.missPt.y + rnd(-18, 18), vx: g.ux * rnd(3, 6), vy: g.uy * rnd(3, 6), drag: 0.9, decay: 0.08, size: 1.5, shape: 'streak', color: '#fde68a' }));
                 return;
@@ -2300,23 +2301,23 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
     }
 
     // ===== ⑥ 群体(爆炸)：蓄势与跨阵冲击波（350ms 聚能坍缩 → 510ms 几何中心起爆横扫 → 1320ms 烟尘余韵） =====
-    function playAoeExplosion(caster, targets, outcomes, onImpact) {
+    function playAoeExplosion(caster, targets, outcomes, onImpact, areaBounds) {
         const fromRect = entityVisualRect(caster);
         const getOutcome = normalizeOutcomes(outcomes);
         const entries = (targets || []).map(t => {
             const rect = entityVisualRect(t);
             return rect ? { entity: t, rect, outcome: getOutcome(t) } : null;
         }).filter(Boolean);
-        if (!fromRect || !entries.length) return null;
+        if (!fromRect || (!entries.length && !areaBounds)) return null;
 
         const T = IDENTITY_TIMINGS.aoeExplosion;
         const owner = identityRun(T.totalMs, 1);
         const uid = ++S.uid;
-        const area = unionRect(entries.map(e => e.rect.dom)) || {
+        const area = areaBounds || unionRect(entries.map(e => e.rect.dom)) || {
             x: entries[0].rect.x, y: entries[0].rect.y, w: entries[0].rect.w, h: entries[0].rect.h,
             l: entries[0].rect.left, r: entries[0].rect.right, t: entries[0].rect.top, b: entries[0].rect.bottom
         };
-        const stageW = Math.max(area.w * 1.42, 320), stageH = Math.max(area.h * 1.9, 220);
+        const stageW = areaBounds ? area.w : Math.max(area.w * 1.42, 320), stageH = areaBounds ? area.h : Math.max(area.h * 1.9, 220);
 
         // 第一幕（0~350ms）：施法者侧爆核聚能压缩，火星向心吸入，爆前急剧坍缩“收”
         idSample(owner, 'explosion_aoe_charge', 0.85, 1.08) || idSfx(owner, () => {
@@ -2431,23 +2432,23 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
     }
 
     // ===== ⑦ 群体(雷)：蓄势与分叉电网（350ms 电荷环聚能 → 430ms 主干甩出与分叉电网接通 → 780~1280ms 逐段断裂残弧） =====
-    function playAoeThunder(caster, targets, outcomes, onImpact) {
+    function playAoeThunder(caster, targets, outcomes, onImpact, areaBounds) {
         const fromRect = entityVisualRect(caster);
         const getOutcome = normalizeOutcomes(outcomes);
         const entries = (targets || []).map(t => {
             const rect = entityVisualRect(t);
             return rect ? { entity: t, rect, outcome: getOutcome(t) } : null;
         }).filter(Boolean);
-        if (!fromRect || !entries.length) return null;
+        if (!fromRect || (!entries.length && !areaBounds)) return null;
 
         const T = IDENTITY_TIMINGS.aoeThunder;
         const owner = identityRun(T.totalMs, 1);
-        const area = unionRect(entries.map(e => e.rect.dom)) || {
+        const area = areaBounds || unionRect(entries.map(e => e.rect.dom)) || {
             x: entries[0].rect.x, y: entries[0].rect.y, w: entries[0].rect.w, h: entries[0].rect.h
         };
         const dx = area.x - fromRect.x, dy = area.y - fromRect.y, dist = Math.hypot(dx, dy) || 1;
         const ux = dx / dist, uy = dy / dist;
-        const hub = {
+        const hub = areaBounds || {
             x: area.x - ux * Math.min(46, Math.max(20, dist * 0.16)),
             y: area.y - uy * Math.min(46, Math.max(20, dist * 0.16))
         };
@@ -2601,7 +2602,8 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
                 [0, 1].forEach(k => {
                     owner.at(120 + k * 140, () => {
                         const n = hitNodesSorted[k % Math.max(1, hitNodesSorted.length)] || nodes[0];
-                        const p0 = { x: n.dest.x + rnd(-24, 24), y: n.dest.y + rnd(-20, 20) };
+                        const dest = n ? n.dest : hub;
+                        const p0 = { x: dest.x + rnd(-24, 24), y: dest.y + rnd(-20, 20) };
                         const p1 = { x: p0.x + rnd(-34, 34), y: p0.y + rnd(-22, 22) };
                         const wisp = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                         wisp.setAttribute('d', ptsToD(makeBoltPoints(p0, p1, 4, 9)));
@@ -3115,7 +3117,7 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
         });
         return owner.handle;
     }
-    function prepareAoeEntries(caster, targets, outcomes) {
+    function prepareAoeEntries(caster, targets, outcomes, areaBounds) {
         const fromRect = entityVisualRect(caster);
         const getOutcome = normalizeOutcomes(outcomes);
         const raw = (targets || []).map(t => {
@@ -3125,17 +3127,17 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
             const g = fromRect ? computeLineGeom(fromRect, rect, dodged, 0.68) : null;
             return { entity: t, rect, outcome, dodged, dest: dodged && g ? g.missPt : { x: rect.x, y: rect.y }, g };
         }).filter(Boolean);
-        if (!fromRect || !raw.length) return null;
-        const area = unionRect(raw.map(e => e.rect.dom)) || { x: raw[0].rect.x, y: raw[0].rect.y, w: raw[0].rect.w, h: raw[0].rect.h, l: raw[0].rect.left, r: raw[0].rect.right, t: raw[0].rect.top, b: raw[0].rect.bottom };
+        if (!fromRect || (!raw.length && !areaBounds)) return null;
+        const area = areaBounds || unionRect(raw.map(e => e.rect.dom)) || { x: raw[0].rect.x, y: raw[0].rect.y, w: raw[0].rect.w, h: raw[0].rect.h, l: raw[0].rect.left, r: raw[0].rect.right, t: raw[0].rect.top, b: raw[0].rect.bottom };
         const sorted = raw.slice().sort((a, b) => a.rect.x - b.rect.x);
         const spanX = Math.max(1, area.r - area.l);
         sorted.forEach(e => { e.tFrac = (e.rect.x - area.l) / spanX; });
-        return { fromRect, entries: sorted, area, stageW: Math.max(area.w * 1.36, 280), stageH: Math.max(area.h * 1.48, 168) };
+        return { fromRect, entries: sorted, area, stageW: areaBounds ? area.w : Math.max(area.w * 1.36, 280), stageH: areaBounds ? area.h : Math.max(area.h * 1.48, 168) };
     }
 
     // ===== 8. 群攻(火焰)补齐：施法侧火流收束压缩 → 扇形/横向火浪横扫目标区 + 错峰小爆点 → 贴地残焰 =====
-    function playAoeFire(caster, targets, outcomes, onImpact) {
-        const ctx = prepareAoeEntries(caster, targets, outcomes);
+    function playAoeFire(caster, targets, outcomes, onImpact, areaBounds) {
+        const ctx = prepareAoeEntries(caster, targets, outcomes, areaBounds);
         if (!ctx) return null;
         const { fromRect, entries, area, stageW, stageH } = ctx;
         const T = IDENTITY_TIMINGS.aoeFire, owner = identityRun(T.totalMs, 2), uid = ++S.uid;
@@ -3163,7 +3165,7 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
                 whoosh(0, { type: 'lowpass', f0: 1400, f1: 280, q: 0.9, dur: 0.58, vol: 0.55 });
                 boom(0.05, { f0: 1800, f1: 120, dur: 0.65, vol: 0.42, wet: 0.25 });
             });
-            const waveW = Math.max(stageW * 1.15, 360), waveH = Math.max(stageH * 0.92, 136);
+            const waveW = areaBounds ? stageW : Math.max(stageW * 1.15, 360), waveH = areaBounds ? stageH : Math.max(stageH * 0.92, 136);
             const waveLayer = owner.layer(`
               <div class="arcane-identity-anchor" style="left:${area.x}px;top:${area.y}px;width:${waveW}px;height:${waveH}px;transform:translate(-50%,-50%);">
                 <svg viewBox="${-waveW / 2} ${-waveH / 2} ${waveW} ${waveH}" class="w-full h-full arcane-identity-glow-fire" style="overflow:visible;">
@@ -3336,8 +3338,8 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
     }
 
     // ===== 11. 群攻(冰霜)新增：上方多枚冰晶阵列蓄势 → 冰锥雨错峰砸落 + 横向冻结波结霜微光 → 晶簇崩裂沉降 =====
-    function playAoeFrost(caster, targets, outcomes, onImpact) {
-        const ctx = prepareAoeEntries(caster, targets, outcomes);
+    function playAoeFrost(caster, targets, outcomes, onImpact, areaBounds) {
+        const ctx = prepareAoeEntries(caster, targets, outcomes, areaBounds);
         if (!ctx) return null;
         const { fromRect, entries, area, stageW, stageH } = ctx;
         const T = IDENTITY_TIMINGS.aoeFrost, owner = identityRun(T.totalMs, 2), uid = ++S.uid;
@@ -3363,7 +3365,7 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
             });
             // 横向冻结波扫过目标矩形区
             const fWave = owner.layer(`
-              <div class="arcane-identity-anchor" style="left:${area.x}px;top:${area.y}px;width:${stageW}px;height:${Math.max(88, stageH * 0.68)}px;transform:translate(-50%,-50%);">
+              <div class="arcane-identity-anchor" style="left:${area.x}px;top:${area.y}px;width:${stageW}px;height:${areaBounds ? stageH : Math.max(88, stageH * 0.68)}px;transform:translate(-50%,-50%);">
                 <svg viewBox="${-stageW / 2} -44 ${stageW} 88" class="w-full h-full arcane-identity-glow-frost" style="overflow:visible;">
                   <defs><linearGradient id="id-afr-w-${uid}" x1="0%" y1="50%" x2="100%" y2="50%"><stop offset="0%" stop-color="#38bdf8" stop-opacity="0"/><stop offset="45%" stop-color="#bae6fd" stop-opacity="0.72"/><stop offset="80%" stop-color="#ffffff" stop-opacity="0.9"/><stop offset="100%" stop-color="#7dd3fc" stop-opacity="0"/></linearGradient></defs>
                   <path class="id-afr-sweep" d="M${-stageW * 0.48},0 Q0,-36 ${stageW * 0.48},0 Q0,36 ${-stageW * 0.48},0 Z" fill="url(#id-afr-w-${uid})"/>
@@ -4008,24 +4010,24 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
         H.handles.forEach(h => h.cancel()); H.handles.clear();
         document.querySelectorAll('.arcane-hit-recoil').forEach(el => el.classList.remove('arcane-hit-recoil'));
     }
-    function playAttackIdentityFx({ scope = 'single', subtype, caster, targets = [], outcomes = null, onImpact = null, audioContext = null } = {}) {
+    function playAttackIdentityFx({ scope = 'single', subtype, caster, targets = [], outcomes = null, onImpact = null, audioContext = null, areaBounds = null, suppressImpact = false } = {}) {
         return CombatAudioMixer.withContext(audioContext || CombatAudioMixer.capture('D'), () => {
             const list = Array.isArray(targets) ? targets.filter(Boolean) : (targets ? [targets] : []);
             const first = list[0];
             if (scope === 'aoe') {
-                if (subtype === '爆炸') return playAoeExplosion(caster, list, outcomes, onImpact);
-                if (subtype === '雷') return playAoeThunder(caster, list, outcomes, onImpact);
-                if (subtype === '火焰') return playAoeFire(caster, list, outcomes, onImpact);
+                if (subtype === '爆炸') return playAoeExplosion(caster, list, outcomes, onImpact, areaBounds);
+                if (subtype === '雷') return playAoeThunder(caster, list, outcomes, onImpact, areaBounds);
+                if (subtype === '火焰') return playAoeFire(caster, list, outcomes, onImpact, areaBounds);
                 if (subtype === '枪击') return playAoeGunshot(caster, list, outcomes, onImpact);
                 if (subtype === '毒雾') return playAoePoison(caster, list, outcomes, onImpact);
-                if (subtype === '冰霜') return playAoeFrost(caster, list, outcomes, onImpact);
+                if (subtype === '冰霜') return playAoeFrost(caster, list, outcomes, onImpact, areaBounds);
                 if (subtype === '风') return playAoeWind(caster, list, outcomes, onImpact);
                 if (subtype === '光') return playAoeLight(caster, list, outcomes, onImpact);
                 return null;
             }
             const outcome = first ? normalizeOutcomes(outcomes)(first) : 'hit';
             if (subtype === '枪击') return playSingleGunshot(caster, first, outcome, onImpact);
-            if (subtype === '霰弹') return playSingleShotgun(caster, first, outcome, onImpact);
+            if (subtype === '霰弹') return playSingleShotgun(caster, first, outcome, onImpact, suppressImpact);
             if (subtype === '光') return playSingleLight(caster, first, outcome, onImpact);
             if (subtype === '雷') return playSingleThunder(caster, first, outcome, onImpact);
             if (subtype === '爆炸') return playSingleExplosion(caster, first, outcome, onImpact);

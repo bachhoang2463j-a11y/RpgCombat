@@ -31,7 +31,7 @@ function battle(m, units, placements, random) { const b = m.battle.createBattle(
 function fakeResult(skill, shapeType, slotTargets, casterId = 'c') { return { ok: true, casterId, skill, query: { shape: { type: shapeType }, slotTargets }, hits: [] }; }
 
 export const groups = {
-  'TFX-01': { run({ modules: m }) {
+  'TFX-01': { async run({ modules: m }) {
     const cases = [];
     const { createFxRegistry, actionInput, reactionInput, checkBudget, GRADE_BUDGETS } = m.fxRegistry;
     const reg = m.fxLibrary.registerDefaultFx(createFxRegistry());
@@ -49,19 +49,114 @@ export const groups = {
       plain: reg.resolve(actionInput(fakeResult(plain, '单体', [atkSlot(0, plain.type)]))).id,
       fireSingle: reg.resolve(actionInput(fakeResult(fireSingle, '单体', [atkSlot(0, fireSingle.type)]))).id,
       zheYing: reg.resolve(reactionInput({ skillName: '折影步', fxTag: '折影步', canceled: true, shift: { distance: 2 } })).id,
-      glide: reg.resolve(reactionInput({ skillName: '战壕格斗术', fxTag: null, canceled: true, shift: { distance: 2 } })).id,
+      glide: reg.resolve(reactionInput({ fxTag: '回避错位', canceled: true, shift: { distance: 2 } })).id,
+      noTagShift: reg.resolve(reactionInput({ canceled: true, shift: { distance: 2 }, kanpo: true })),
+      unknown: reg.resolve(actionInput(fakeResult({ ...savage, fxTag: '未知特效' }, '单体', [atkSlot(0, savage.type)]))).id,
       noShift: reg.resolve(reactionInput({ skillName: '战壕格斗术', fxTag: null, canceled: true, shift: null })),
     };
-    cases.push(ok('TFX-01 分发：fxTag 精确优先，形状谓词收窄，效果槽谓词次之，兜底身份演出',
-      resolved.savage === 'volley' && resolved.blast === 'fire-blast' && resolved.chant === 'self-boost' && resolved.arsenic === 'arsenic-shot' &&
-      resolved.plain === 'identity' && resolved.fireSingle === 'identity' && resolved.zheYing === 'evade-shift-ghost' && resolved.glide === 'evade-shift' && resolved.noShift === null, j(resolved)));
+    cases.push(ok('TFX-01 动作和反应通道仅按标签分发；范围和效果槽不会改选演出',
+      resolved.savage === 'basic-枪击' && resolved.blast === 'fire-blast' && resolved.chant === 'self-boost' && resolved.arsenic === 'arsenic-shot' &&
+      resolved.plain === 'neutral-impact' && resolved.unknown === 'neutral-impact' && resolved.fireSingle === 'fire-blast' &&
+      resolved.zheYing === 'evade-shift-ghost' && resolved.glide === 'evade-shift' && resolved.noTagShift === null && resolved.noShift === null, j(resolved)));
+    const basicNames = ['枪击', '霰弹', '火焰', '冰霜', '雷击', '爆炸', '光', '毒液', '毒雾', '风', '刀砍', '拳击', '爪击', '撕咬', '箭矢'];
+    const options = m.fxLibrary.getFxTagOptions();
+    const names = options.map(x => x.name);
+    const registered = new Set(reg.list().flatMap(e => e.fxTags || []));
+    cases.push(ok('TFX-01 标签选项来自同一注册表，覆盖基础标签且跨通道去重',
+      names.length === registered.size && new Set(names).size === names.length && names.every(n => registered.has(n)) &&
+      basicNames.every(n => reg.resolve({ kind: 'action', fxTag: n }).id === 'basic-' + n) &&
+      reg.resolve({ kind: 'prepare', fxTag: '圣光01' }).id === 'holy-vow' && reg.resolve({ kind: 'action', fxTag: '圣光01' }).id === 'holy-judgment', j(names)));
+
+    const events = [], calls = [];
+    const hits = [
+      { targetId: 'e', segments: [{ shotIndex: 2, hit: true }, { shotIndex: 0, hit: false }] },
+      { targetId: 'f', segments: [{ shotIndex: 1, hit: true }] },
+    ];
+    const shots = [2, 0, 1].map(shotIndex => ({ shotIndex, aim: { x: shotIndex + 1, y: 4 } }));
+    const ctx = {
+      hits, result: { shots }, skill: { range: { type: '单体' } }, centerOf: () => ({ x: 0, y: 4 }), casterId: 'c', ent: id => ({ id }), anchorAt: (x, y) => ({ x, y }),
+      revealSegment: (id, index) => events.push([id, index]), reveal: id => events.push(id),
+      wait: async ms => { events.push(ms); return true; }, awaitHandle: async () => true,
+      avHost: { host: { spriteOf: id => id } },
+      av: {
+        playAttackIdentityFx({ scope, subtype, targets, outcomes, onImpact, areaBounds, suppressImpact }) {
+          calls.push({ targets, areaBounds, suppressImpact });
+          for (const target of targets) {
+            events.push([scope, subtype, target.id ?? [target.x, target.y], outcomes(target)]);
+            onImpact(target);
+          }
+        },
+        CombatAudioMixer: { withContext: (_, play) => play() },
+        async playArcaneProjectile(type, from, to, dodge) { events.push([type, from, to, dodge]); return true; },
+      },
+    };
+    const play = fxTag => reg.resolve({ kind: 'action', fxTag }).play(ctx);
+    const gunOk = await play('枪击');
+    cases.push(ok('TFX-01 枪击依真实发序和转火逐发播放，命中回调揭示目标内对应段', gunOk &&
+      j(events) === j([['single', '枪击', 'e', 'dodge'], ['e', 1], 200, ['single', '枪击', 'f', 'hit'], ['f', 0], 200, ['single', '枪击', 'e', 'hit'], ['e', 0]]), j(events)));
+    events.length = 0;
+    ctx.hits = [hits[0]];
+    ctx.skill.range = { type: '扇形', castRange: 5 };
+    shots.find(s => s.shotIndex === 1).aim = { x: 0, y: 6 };
+    const shotgunOk = await play('霰弹');
+    const directionalCalls = calls.slice(-3);
+    cases.push(ok('TFX-01 霰弹按每发实际瞄向播放，保留无目标段并逐段揭示', shotgunOk && directionalCalls.every(c => c.suppressImpact) &&
+      j(events) === j([['single', '霰弹', [5, 4], 'hit'], ['e', 1], 220, ['single', '霰弹', [0, 9], 'hit'], 220, ['single', '霰弹', [5, 4], 'hit'], ['e', 0]]), j(events)));
+    events.length = 0;
+    ctx.result = { aim: { x: 1, y: 4 } };
+    ctx.hits = [{ targetId: 'e', hit: true }];
+    ctx.skill.range = { type: '单体' };
+    const fireOk = await play('火焰');
+    const neutralOk = await play('未知特效') && await play(null);
+    cases.push(ok('TFX-01 火焰复用原版弹道，未知和缺失标签只揭示命中', fireOk && neutralOk &&
+      j(events) === j([['fire', 'c', 'e', false], ['e', 0], 'e', 'e']), j(events)));
+    for (const [tag, subtype] of [['火焰', '火焰'], ['枪击', '枪击'], ['冰霜', '冰霜'], ['雷击', '雷'], ['爆炸', '爆炸'], ['光', '光'], ['霰弹', '霰弹']]) {
+      events.length = 0;
+      ctx.skill.range = { type: tag === '火焰' ? '圆形' : '单体' };
+      const firstOk = await play(tag);
+      const first = events.slice();
+      events.length = 0;
+      ctx.skill.range = { type: '圆形' };
+      ctx.hits = [{ targetId: 'e', hit: true }, { targetId: 'f', hit: false }];
+      const secondOk = await play(tag);
+      const areaScope = tag === '霰弹' ? 'single' : 'aoe';
+      cases.push(ok('TFX-01 原版播放接口按范围适配 ' + tag, firstOk && secondOk &&
+        j(first) === j([[tag === '火焰' ? 'aoe' : 'single', subtype, 'e', 'hit'], ['e', 0]]) &&
+        j(events) === j([[areaScope, subtype, 'e', 'hit'], ['e', 0], [areaScope, subtype, 'f', 'dodge'], ['f', 0]]), j({ first, events })));
+      ctx.hits = [{ targetId: 'e', hit: true }];
+    }
+    events.length = 0;
+    ctx.skill.range = { type: '爆炸', radius: 2 };
+    ctx.result = { aim: { x: 9, y: 5 }, query: { blastCenter: { x: 5, y: 5 } } };
+    const edgeOk = await play('爆炸');
+    const edge = calls.at(-1);
+    cases.push(ok('TFX-01 边缘单目标保留目标回调，爆心和直径取规则区域', edgeOk &&
+      j(edge.targets) === j([{ id: 'e' }]) && Math.abs(edge.areaBounds.x - 250 / 0.72) < 1e-8 && Math.abs(edge.areaBounds.w - 200 / 0.72) < 1e-8 &&
+      j(events) === j([['aoe', '爆炸', 'e', 'hit'], ['e', 0]]), j({ edge, events })));
+
+    const vendor = readFileSync(path.join(ROOT, 'tactics', 'src', 'vendor', 'rpg-av', 'rpg-av.mjs'), 'utf8');
+    const shotgunSource = vendor.slice(vendor.indexOf('    function playSingleShotgun('), vendor.indexOf('    // ===== ③ 单体(光)'));
+    const layers = [], beats = [];
+    const owner = { handle: {}, layer(html) { layers.push(html); return { querySelector() {}, querySelectorAll: () => [] }; },
+      anim() {}, burst() { layers.push('impact burst'); }, audioAt: (_, callback) => callback() };
+    const shotgun = new Function('entityVisualRect', 'IDENTITY_TIMINGS', 'identityRun', 'S', 'computeLineGeom', 'idSfx', 'rnd',
+      shotgunSource + '\nreturn playSingleShotgun;')((rect) => rect, { shotgun: { impactMs: 115 } }, () => owner, { uid: 0 },
+        () => ({ muzzle: { x: 0, y: 0 }, angleDeg: 0, ux: 1, uy: 0, nx: 0, ny: 1 }), () => {}, (a, b) => (a + b) / 2);
+    const caster = { x: 0, y: 0, h: 28 }, endpoint = { x: 250, y: 0, h: 28 };
+    shotgun(caster, endpoint, 'hit', (_, beat) => beats.push(beat.beatMs), true);
+    const emptyLayers = layers.slice();
+    layers.length = 0;
+    shotgun(caster, endpoint, 'hit', (_, beat) => beats.push(beat.beatMs));
+    cases.push(ok('TFX-01 vendor 空方向锚保留枪口与弹道、回调到拍，无弹坑或命中粒子',
+      j(beats) === j([115, 115]) && emptyLayers.length === 2 && emptyLayers[1].includes('id-sg-pellet') &&
+      layers.slice(2).some(html => html.includes('arcane-identity-puncture')) && layers.includes('impact burst'), j(beats)));
     const graded = reg.list().filter(e => e.grade !== 'identity');
     const budgets = graded.map(e => ({ id: e.id, grade: e.grade, ...checkBudget(e) }));
     cases.push(ok('TFX-01 分级预算：全部分级条目时长/蓄势/全屏/暗场/峰值音量落在本级区间', graded.length >= 5 && budgets.every(b => b.ok), j(budgets)));
     const fake = checkBudget({ id: 'fake', grade: 'L3', timeline: { totalMs: 1000, chargeMs: 200 }, cues: [{ key: 'x', vol: 0.95 }] });
     cases.push(ok('TFX-01 预算核对能抓出违规（防假绿）', !fake.ok && fake.reasons.length >= 3, j(fake)));
     let dup = null, bad = null;
-    try { reg.register({ id: 'volley', grade: 'L1', play() {} }); } catch (e) { dup = e.message; }
+    try { reg.register({ id: 'basic-枪击', grade: 'L1', play() {} }); } catch (e) { dup = e.message; }
     try { createFxRegistry().register({ id: 'x', grade: 'L9', play() {} }); } catch (e) { bad = e.message; }
     cases.push(ok('TFX-01 重复 id 与未知分级注册即失败', /重复/.test(dup || '') && /未知演出分级/.test(bad || ''), j({ dup, bad })));
     const src = readFileSync(path.join(ROOT, 'tactics', 'src', 'action-director.mjs'), 'utf8');
@@ -199,11 +294,11 @@ export const groups = {
     const fogAim = ['e:食尸鬼A', 'e:食尸鬼B', 'e:深潜者A'].map(center).find(c => b.previewAttack(sk('拉莱耶造雾术'), c).ok);
     const fog = drive(b.beginAttack(sk('拉莱耶造雾术'), fogAim));
     const fogEv = (fog.events || []).find(ev => ev.type === 'region-created');
-    cases.push(ok('TFX-03 拉莱耶造雾术：region-created 真值（半径5·接触点）→ abyss-fog(L3)；按显式区域匹配而非技能名',
+    cases.push(ok('TFX-03 拉莱耶造雾术：region-created 真值（半径5·接触点）→ abyss-fog(L3)；由显式特效标签指定',
       fog.ok && fogEv && fogEv.region.type === 'fog' && fogEv.region.radius === 5 && pick(fog) === 'abyss-fog' && (b.snapshot().regions || []).length >= fogBefore,
       j({ ok: fog.ok, reason: fog.reason, region: fogEv && { r: fogEv.region.radius, c: fogEv.region.center }, id: pick(fog) })));
     const enemyFog = enemyResults.find(r => (r.events || []).some(ev => ev.type === 'region-created'));
-    cases.push(ok('TFX-03 深潜者造雾（YAML 无特效标签）同走 abyss-fog', !enemyFog || pick(enemyFog) === 'abyss-fog', j(enemyFog ? { skill: enemyFog.skill.name, id: pick(enemyFog) } : 'none')));
+    cases.push(ok('TFX-03 深潜者造雾显式浓雾标签同走 abyss-fog', !enemyFog || pick(enemyFog) === 'abyss-fog', j(enemyFog ? { skill: enemyFog.skill.name, id: pick(enemyFog) } : 'none')));
     // 蓄力分发单独验证：敌人等待，避免 AI 决策变化导致施法者在释放前死亡。
     fresh(); toEl(true);
     el.ref.tp = 80; el.ref.mp = 100;

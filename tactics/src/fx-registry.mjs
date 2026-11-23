@@ -1,7 +1,6 @@
 // ==========================================
-// 战棋演出注册表：fxTag / 空间形状 / 效果槽 → 演出条目（通用，可扩展；不为单个角色写特例）
-// 分发顺序：① fxTag 精确匹配（条目可再附形状/槽谓词）→ ② 无 fxTag 的谓词条目（按注册序）→ ③ 兜底条目。
-// 演出身份输入同时包含空间形状与效果槽标签（P06-FX-HANDOFF 契约 3）；只读 battle.attack() 提交结果，不查命中、不掷骰。
+// 战棋演出注册表：按通道和 fxTag 精确匹配，未匹配时使用该通道的兜底条目。
+// 只读已提交的战斗结果，不查命中、不掷骰。
 // 分级纪律（.agents/skills/svg-skill-vfx/SKILL.md）：每个条目声明 grade 与 timeline/cues，由 checkBudget 断言量级、时长、音量。
 // 本文件无 DOM 依赖，Node 与浏览器共用。
 // ==========================================
@@ -18,57 +17,23 @@ export const GRADE_BUDGETS = {
 };
 
 const SLOT_RAW = tag => String(tag || '').replace(/[[\]]/g, '');
-const DMG_CATS = ['钝击', '切割', '枪击', '霰弹', '火焰', '雷电', '水流', '冰霜', '圣光', '诅咒'];
 
 // 动作演出输入：result = battle.attack() 的 ok 结果
 export function actionInput(result) {
   const skill = result.skill || {};
-  const slots = (result.query && result.query.slotTargets) || [];
-  // 槽标签统一走官方规范名（旧单群输入为别名，normalizeEffectTag 吸收；括号子型保留）
-  const tags = [skill.type, skill.type2, skill.type3].filter(t => t && t !== '[无]').map(t => normalizeEffectTag(t) || SLOT_RAW(t));
-  const attackSlots = slots.filter(s => s.attack).length;
-  const effectSlots = slots.filter(s => !s.attack && s.side !== 'none' && SLOT_RAW(s.tag) !== '无');
-  const selfOnly = !attackSlots && effectSlots.length > 0 && effectSlots.every(s => (s.targetIds || []).length === 1 && s.targetIds[0] === result.casterId);
-  // 即时回复（规则 effects 中 kind:'heal'）：纯回复技能不走受击揭示
-  const heals = (result.effects || []).filter(e => e.kind === 'heal');
-  const damageCategories = tags.filter(t => DMG_CATS.includes(t));
-  const sides = new Set(slots.filter(s => s.side && s.side !== 'none' && SLOT_RAW(s.tag) !== '无').map(s => s.side));
-  return {
-    kind: 'action',
-    fxTag: skill.fxTag || null,
-    shape: (result.query && result.query.shape && result.query.shape.type) || (skill.range && skill.range.type) || null,
-    slotTags: tags,
-    attackSlots,
-    selfOnly,
-    grantsMainPoint: tags.some(t => t === '再动'),
-    haste: skill.haste || 0,
-    damageType: skill.damageType || null,
-    damageCategories,
-    hasChargeDash: !!(skill.displacements && skill.displacements.some(d => d.type === '冲锋')),
-    isMixedSlots: sides.size > 1,
-    barrierSub: skill.barrierSub || null,
-    isAllyOnly: !attackSlots && effectSlots.length > 0 && effectSlots.every(s => s.side === 'ally' || s.side === 'self'),
-    isDebuffOnly: !attackSlots && effectSlots.length > 0 && effectSlots.every(s => s.side === 'enemy'),
-    region: (skill.regionEffect && skill.regionEffect.type) || null,   // 显式区域（浓雾等），不按技能名判断
-    heals: heals.length,
-    healOnly: !attackSlots && heals.length > 0,
-  };
+  const tags = [skill.type, skill.type2, skill.type3].filter(Boolean).map(t => normalizeEffectTag(t) || SLOT_RAW(t));
+  return { kind: 'action', fxTag: skill.fxTag || null, grantsMainPoint: tags.includes('再动'), haste: skill.haste || 0 };
 }
 
 // 起手演出输入：result = 蓄力/延迟开始的提交结果（preparing:true，未结算槽位）
 export function prepareInput(result) {
   const skill = result.skill || {};
-  return { kind: 'prepare', fxTag: skill.fxTag || null, shape: (skill.range && skill.range.type) || null, source: (result.charge && result.charge.kind) || null };
+  return { kind: 'prepare', fxTag: skill.fxTag || null };
 }
 
-// 反应演出输入：hit.reaction = { responderId, skillName, fxTag, canceled, shift }
+// 反应通道也只消费显式标签。
 export function reactionInput(reaction) {
-  return {
-    kind: 'reaction', fxTag: reaction.fxTag || null, skillName: reaction.skillName,
-    canceled: !!reaction.canceled, shift: reaction.shift || null,
-    kanpo: !!reaction.kanpo, sheshen: !!reaction.guardianId,
-    isGuard: !reaction.canceled && !reaction.dodged && !reaction.countered && !reaction.shift,
-  };
+  return { kind: 'reaction', fxTag: reaction.fxTag || null };
 }
 
 export function createFxRegistry() {
@@ -82,10 +47,8 @@ export function createFxRegistry() {
   }
   function resolve(input) {
     const pool = entries.filter(e => e.kind === input.kind);
-    const ok = e => !e.match || e.match(input);
-    return pool.find(e => e.fxTags && input.fxTag && e.fxTags.includes(input.fxTag) && ok(e))
-      || pool.find(e => !e.fxTags && !e.fallback && e.match && e.match(input))
-      || pool.find(e => e.fallback && ok(e))
+    return pool.find(e => e.fxTags?.includes(input.fxTag))
+      || pool.find(e => e.fallback)
       || null;
   }
   const api = { register, resolve, list: () => entries.slice() };

@@ -276,6 +276,59 @@ function build() {
   let busText = patch(bus.text, 'const _actionToken = combatToken;', 'const _actionToken = combatToken;', 1, '事件总线读宿主 combatToken');
 
   let mod = arc.body;
+  // 战棋提供规则区域与纯发射锚点，保留原版目标接触回调。
+  mod = patch(mod, "function playSingleShotgun(caster, target, outcome = 'hit', onImpact)",
+    "function playSingleShotgun(caster, target, outcome = 'hit', onImpact, suppressImpact)", 1, '战棋攻击身份适配');
+  mod = patch(mod, "            if (onImpact) onImpact(target, { subtype: '霰弹', scope: 'single', outcome, point: baseCenter, beatMs: T.impactMs });",
+    "            if (onImpact) onImpact(target, { subtype: '霰弹', scope: 'single', outcome, point: baseCenter, beatMs: T.impactMs });\n            if (suppressImpact) return;", 1, '战棋攻击身份适配');
+  mod = patch(mod, "outcomes = null, onImpact = null, audioContext = null } = {})",
+    "outcomes = null, onImpact = null, audioContext = null, areaBounds = null, suppressImpact = false } = {})", 1, '战棋攻击身份适配');
+  mod = patch(mod, "return playSingleShotgun(caster, first, outcome, onImpact);",
+    "return playSingleShotgun(caster, first, outcome, onImpact, suppressImpact);", 1, '战棋攻击身份适配');
+  mod = patch(mod, "function playAoeExplosion(caster, targets, outcomes, onImpact)",
+    "function playAoeExplosion(caster, targets, outcomes, onImpact, areaBounds)", 1, '战棋攻击身份适配');
+  mod = patch(mod, "return playAoeExplosion(caster, list, outcomes, onImpact);",
+    "return playAoeExplosion(caster, list, outcomes, onImpact, areaBounds);", 1, '战棋攻击身份适配');
+  mod = patch(mod, "function playAoeFire(caster, targets, outcomes, onImpact)",
+    "function playAoeFire(caster, targets, outcomes, onImpact, areaBounds)", 1, '战棋攻击身份适配');
+  mod = patch(mod, "return playAoeFire(caster, list, outcomes, onImpact);",
+    "return playAoeFire(caster, list, outcomes, onImpact, areaBounds);", 1, '战棋攻击身份适配');
+  mod = patch(mod, "function playAoeFire(caster, targets, outcomes, onImpact, areaBounds) {\n        const ctx = prepareAoeEntries(caster, targets, outcomes);",
+    "function playAoeFire(caster, targets, outcomes, onImpact, areaBounds) {\n        const ctx = prepareAoeEntries(caster, targets, outcomes, areaBounds);", 1, '战棋攻击身份适配');
+  mod = patch(mod, "function playAoeFrost(caster, targets, outcomes, onImpact)",
+    "function playAoeFrost(caster, targets, outcomes, onImpact, areaBounds)", 1, '战棋攻击身份适配');
+  mod = patch(mod, "return playAoeFrost(caster, list, outcomes, onImpact);",
+    "return playAoeFrost(caster, list, outcomes, onImpact, areaBounds);", 1, '战棋攻击身份适配');
+  mod = patch(mod, "function playAoeFrost(caster, targets, outcomes, onImpact, areaBounds) {\n        const ctx = prepareAoeEntries(caster, targets, outcomes);",
+    "function playAoeFrost(caster, targets, outcomes, onImpact, areaBounds) {\n        const ctx = prepareAoeEntries(caster, targets, outcomes, areaBounds);", 1, '战棋攻击身份适配');
+  mod = patch(mod, "function playAoeThunder(caster, targets, outcomes, onImpact)",
+    "function playAoeThunder(caster, targets, outcomes, onImpact, areaBounds)", 1, '战棋攻击身份适配');
+  mod = patch(mod, "return playAoeThunder(caster, list, outcomes, onImpact);",
+    "return playAoeThunder(caster, list, outcomes, onImpact, areaBounds);", 1, '战棋攻击身份适配');
+  mod = patch(mod, "if (!fromRect || !entries.length) return null;\n\n        const T = IDENTITY_TIMINGS.aoeExplosion;",
+    "if (!fromRect || (!entries.length && !areaBounds)) return null;\n\n        const T = IDENTITY_TIMINGS.aoeExplosion;", 1, '战棋攻击身份适配');
+  mod = patch(mod, "if (!fromRect || !entries.length) return null;\n\n        const T = IDENTITY_TIMINGS.aoeThunder;",
+    "if (!fromRect || (!entries.length && !areaBounds)) return null;\n\n        const T = IDENTITY_TIMINGS.aoeThunder;", 1, '战棋攻击身份适配');
+  mod = patch(mod, "const uid = ++S.uid;\n        const area = unionRect(entries.map(e => e.rect.dom)) || {",
+    "const uid = ++S.uid;\n        const area = areaBounds || unionRect(entries.map(e => e.rect.dom)) || {", 1, '战棋攻击身份适配');
+  mod = patch(mod, "const owner = identityRun(T.totalMs, 1);\n        const area = unionRect(entries.map(e => e.rect.dom)) || {",
+    "const owner = identityRun(T.totalMs, 1);\n        const area = areaBounds || unionRect(entries.map(e => e.rect.dom)) || {", 1, '战棋攻击身份适配');
+  mod = patch(mod, "const stageW = Math.max(area.w * 1.42, 320), stageH = Math.max(area.h * 1.9, 220);",
+    "const stageW = areaBounds ? area.w : Math.max(area.w * 1.42, 320), stageH = areaBounds ? area.h : Math.max(area.h * 1.9, 220);", 1, '战棋攻击身份适配');
+  mod = patch(mod, "const hub = {\n            x: area.x",
+    "const hub = areaBounds || {\n            x: area.x", 1, '战棋攻击身份适配');
+  mod = patch(mod, "const p0 = { x: n.dest.x + rnd(-24, 24), y: n.dest.y + rnd(-20, 20) };",
+    "const dest = n ? n.dest : hub;\n                        const p0 = { x: dest.x + rnd(-24, 24), y: dest.y + rnd(-20, 20) };", 1, '战棋攻击身份适配');
+  mod = patch(mod, "function prepareAoeEntries(caster, targets, outcomes)",
+    "function prepareAoeEntries(caster, targets, outcomes, areaBounds)", 1, '战棋攻击身份适配');
+  mod = patch(mod, "if (!fromRect || !raw.length) return null;\n        const area = unionRect(raw.map(e => e.rect.dom))",
+    "if (!fromRect || (!raw.length && !areaBounds)) return null;\n        const area = areaBounds || unionRect(raw.map(e => e.rect.dom))", 1, '战棋攻击身份适配');
+  mod = patch(mod, "stageW: Math.max(area.w * 1.36, 280), stageH: Math.max(area.h * 1.48, 168)",
+    "stageW: areaBounds ? area.w : Math.max(area.w * 1.36, 280), stageH: areaBounds ? area.h : Math.max(area.h * 1.48, 168)", 1, '战棋攻击身份适配');
+  mod = patch(mod, "const waveW = Math.max(stageW * 1.15, 360), waveH = Math.max(stageH * 0.92, 136);",
+    "const waveW = areaBounds ? stageW : Math.max(stageW * 1.15, 360), waveH = areaBounds ? stageH : Math.max(stageH * 0.92, 136);", 1, '战棋攻击身份适配');
+  mod = patch(mod, "${Math.max(88, stageH * 0.68)}px;transform:translate(-50%,-50%);",
+    "${areaBounds ? stageH : Math.max(88, stageH * 0.68)}px;transform:translate(-50%,-50%);", 1, '战棋攻击身份适配');
   mod = patch(mod, /\.getBoundingClientRect\(\)/g, '[__GBCR]()', 11, '屏幕矩形 → 特效舞台坐标');
   mod = patch(mod, /\b(?:window\.)?innerWidth\b/g, '__STAGE.w', 7, 'innerWidth → 舞台宽');
   mod = patch(mod, /\b(?:window\.)?innerHeight\b/g, '__STAGE.h', 3, 'innerHeight → 舞台高');

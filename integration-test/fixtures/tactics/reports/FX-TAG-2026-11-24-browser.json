@@ -1,0 +1,80 @@
+{
+  "date": "2026-11-24",
+  "browser": "ZCode IAB",
+  "verificationKind": "real-page-public-commands-and-DOM-events",
+  "finalArtifact": {
+    "path": "tactics/mvp-standalone.html",
+    "sha256": "2dbb6536679521d745813f10c4b38138e39ffd447f9b41181863aecb2f116d5f",
+    "bytes": 1179975,
+    "artifactAssertions": { "passed": 18, "failed": 0 }
+  },
+  "cases": [
+    {
+      "id": "multi-file-original-gunshot-three-shots",
+      "page": "tactics/index.html",
+      "input": "Authority scenario loaded through app.loadYaml with explicit nearby enemy positions; unchanged Madeline skill rules",
+      "pass": true,
+      "observed": {
+        "originalIdentityCalls": ["single/枪击", "single/枪击", "single/枪击"],
+        "ammoBefore": 30,
+        "ammoAfter": 27,
+        "mainAfter": 0,
+        "targetHpAfter": 53,
+        "busyAfter": false,
+        "uncaughtPageErrors": []
+      }
+    },
+    {
+      "id": "standalone-map-retarget-after-main-exhausted",
+      "testedArtifactSha256": "d5dece7b183cda60cf096bdcbfccea5855862cd8ce33f91f224a7db2d52f5287",
+      "page": "tactics/mvp-standalone.html",
+      "input": "Authority scenario with Frank initiative increased for test order and two nearby enemies; real skill menu command, map pointer events, Enter, then map retarget",
+      "pass": true,
+      "observed": {
+        "mainAtRetarget": 0,
+        "retargetPromptRemoved": true,
+        "firstTargetHp": 38,
+        "secondTargetHp": 72,
+        "originalIdentityCalls": ["single/拳击", "single/拳击"],
+        "busyAfter": false,
+        "uncaughtPageErrors": []
+      },
+      "scopeNote": "Subsequent source changes concern editor serialization and tag overrides; battle/retarget code was unchanged after this page case."
+    },
+    {
+      "id": "final-standalone-editor-fx-save-preserves-rules",
+      "testedArtifactSha256": "895c2c87908495be886061b7abe2555b8a0888d586f9d99902dd0617812acbb6",
+      "scopeNote": "Only the public endTurn busy/player guard changed after this successful editor page case.",
+      "page": "tactics/mvp-standalone.html",
+      "pass": true,
+      "observed": {
+        "registeredOptionsPlusNone": 61,
+        "selectedFx": "冰霜",
+        "savedFx": "冰霜",
+        "damageType": "远程",
+        "damageSlot": "[枪击]",
+        "power": 75,
+        "ammo": 45,
+        "modalRemoved": true,
+        "validationErrors": [],
+        "uncaughtPageErrors": []
+      }
+    }
+  ],
+  "pending": [
+    "Full visual comparison and animation timing for all basic and dedicated FX",
+    "Final-artifact complete battle flow after the last editor serialization fix",
+    "Manual visual inspection of camera scaling and particle cleanup"
+  ],
+  "limitations": [
+    "IAB screenshot request timed out; no screenshot evidence is claimed.",
+    "DOM clicks/public commands and synthetic map pointer events validate actual page wiring, not a purely physical GUI test.",
+    "An attempted shell.settings.open call was invalid; the actual settings button was subsequently used.",
+    "An endTurn probe ran during an enemy/busy state and is not counted as a successful player end-turn case."
+  ],
+  "testExecutionDiscipline": {
+    "firstAllRun": "Failed at existing P07 committed-AoE rule; repaired without changing that assertion and reran affected groups.",
+    "extraAllRun": "verify-demo.cjs unexpectedly invoked --all again: 834 passed, 0 failed. Wrapper returned nonzero because of obsolete four-stage check; fixed without executing another all run.",
+    "afterFinalEditorChanges": "Only affected mvp/av groups and artifact assertions rerun; no claim that 834-run fingerprint covers final editor changes."
+  }
+}

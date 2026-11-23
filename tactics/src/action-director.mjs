@@ -13,25 +13,11 @@ import { createFxRegistry, actionInput, reactionInput, prepareInput } from './fx
 import { registerDefaultFx, EXTRA_AUDIO, fogFieldHtml, animateFogField } from './fx-library.mjs';
 import { createVfxHost } from './vfx-host.mjs';
 
-const AOE_SUBTYPES = new Set(['爆炸', '雷', '火焰', '枪击', '毒雾', '冰霜', '风', '光']);
-const SUBTYPE_RE = /[（(](枪击|霰弹|光|雷|爆炸|刀砍|拳击|爪击|撕咬|毒液|箭矢|冰霜|火焰|毒雾|风)[）)]/;
 export const WINDUP_BEAT_MS = 330;   // 回合制敌方前摇拍点（OMEN_BEAT）：起手后此刻出手
 
-// 攻击身份：显式括号子类优先 → 特效标签 → 伤害类型默认；空间范围决定单体/群体演出（「自身」不按群体演出）
-export function resolveAttackIdentity(skill, casterSide) {
-  const tags = [skill && skill.type, skill && skill.type2, skill && skill.type3].filter(t => t && t !== '[无]').join(' ');
-  const m = tags.match(SUBTYPE_RE);
-  let subtype = m ? m[1] : null;
-  const dt = (skill && skill.damageType) || '近战';
-  if (!subtype) {
-    if (dt === '远程') subtype = '箭矢';
-    else if (dt === '法术') return { mode: 'projectile', subtype: casterSide === 'hero' ? 'fire' : 'enemy_spell' };
-    else subtype = '刀砍';
-  }
-  if (subtype === '火焰' && (!skill.range || skill.range.type === '单体' || skill.range.type === '自身')) return { mode: 'projectile', subtype: 'fire' };
-  const area = !!(skill && skill.range && skill.range.type !== '单体' && skill.range.type !== '自身');
-  if (area && AOE_SUBTYPES.has(subtype)) return { mode: 'aoe', subtype };
-  return { mode: area ? 'perTarget' : 'single', subtype };
+// 演出身份只来自显式特效标签；伤害类型与旧括号不参与选择。
+export function resolveAttackIdentity(skill) {
+  return { mode: 'tag', subtype: skill?.fxTag || null };
 }
 
 // 前摇分类：颜色按伤害类型，单/群按战棋显式空间范围（不让旧"单体/群攻"标签覆盖；「自身」按单体拍点）
@@ -318,6 +304,8 @@ export function createActionDirector(deps) {
       done.add(i); revealed.set(targetId, done);
       const reaction = seg.reaction || (done.size === 1 ? h.reaction : null);
       if (reaction) reactionRuns.push(playReaction({ ...h, reaction }));
+      const guardianReaction = seg.guardianReaction || reaction?.guardianReaction;
+      if (guardianReaction) reactionRuns.push(playReaction({ ...h, targetId: guardianReaction.responderId || h.targetId, reaction: guardianReaction }));
       // 回复槽段：规则真实标记（seg.heal）优先，回退生命提升推断（events 真实回复结果形态待规则 result 落地后接）
       const healed = seg.heal != null ? !!seg.heal : (!seg.hit && seg.hpAfter > seg.hpBefore);
       const r = {
@@ -515,7 +503,8 @@ export function createActionDirector(deps) {
   // scope 失活（重置/换场）或 cancelAttack() 时等待以 null 结算，旧 generator 已 return、旧弹窗已由宿主关闭。
   let activeRun = null;
   async function driveAttack(gen) {
-    const run = { gen, cancelled: false };
+    const run = { gen, cancelled: false, cancelWait: null };
+    const cancelled = new Promise(resolve => { run.cancelWait = resolve; });
     activeRun = run;
     try {
       let step = gen.next();
@@ -526,14 +515,14 @@ export function createActionDirector(deps) {
         if (req && req.type === 'reaction') {
           const s = scope();
           if (!s || !s.isLive) return null;
-          choice = await promptReaction(req);
+          choice = await Promise.race([promptReaction(req), cancelled]);
           if (run.cancelled) return null;
           const s2 = scope();
           if (!s2 || !s2.isLive) return null;
         } else if (req && req.type === 'retarget-request' && typeof promptRetarget === 'function') {
           const s = scope();
           if (!s || !s.isLive) return null;
-          choice = await promptRetarget(req);
+          choice = await Promise.race([promptRetarget(req), cancelled]);
           if (run.cancelled) return null;
           const s2 = scope();
           if (!s2 || !s2.isLive) return null;
@@ -555,6 +544,7 @@ export function createActionDirector(deps) {
     const run = activeRun;
     if (!run) return;
     run.cancelled = true;
+    run.cancelWait(null);
     activeRun = null;
     try { if (run.gen && typeof run.gen.return === 'function') run.gen.return(); } catch (_) { /* 旧链作废即可 */ }
   }
@@ -582,8 +572,14 @@ export function createActionDirector(deps) {
   async function playReaction(h) {
     const reaction = h.reaction;
     const entry = registry.resolve(reactionInput(reaction));
-    if (!entry) return true;
     const view = sandbox.getUnitView();
+    if (!entry) {
+      if (reaction.shift) {
+        view.setDisplayCenter(h.targetId, null);
+        view.updateUnit(h.targetId, { placement: getViewData().placementsById[h.targetId] });
+      }
+      return true;
+    }
     const fp = getViewData().footprintsById[h.targetId];
     if (!(await prepareAudio(entry.prepareKeys ? entry.prepareKeys({}) : []))) return false;
     return entry.play({

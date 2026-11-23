@@ -14,6 +14,10 @@ check('单个脚本及闭合标签', scripts.length === 1 && (html.match(/<\/scr
 check('零外部业务脚本或样式', !/<script[^>]+src=|<link[^>]+stylesheet/i.test(html));
 check('零外部import', !/\bimport\s*(?:\(|[{*'"\w])/.test(scripts[0][1]));
 check('伤害槽菜单分类与阵营收益修复入包', /function isAttackSkill\(skill\)\s*\{\s*return skillSlots\(skill\)\.some/.test(html) && /\bbeneficial\s*=\s*def\.debuff/.test(html));
+check('唯一显式特效协议与中性反馈入包', /id:\s*["']neutral-impact["']/.test(html) && /pool\.find\(e\s*=>\s*e\.fxTags\?\.includes\(input\.fxTag\)\)/.test(html) && !html.includes('SUBTYPE_RE'));
+check('原版逐发记录与转火专用预览入包', html.includes('result.shots') && /previewRetarget\(r\.skill,\s*a,\s*r\.casterId,\s*r\.slotIndex\)/.test(html) && html.includes('segment.shotIndex'));
+check('编辑器特效清单来自注册表', html.includes('function getFxTagOptions()') && html.includes('[...getFxTagOptions()]') && html.includes('fxOptions(s.fxTag)'));
+check('空霰弹与群体规则区域适配入包', html.includes('suppressImpact') && html.includes('areaBounds'));
 const context = { console, structuredClone, URL, setTimeout, clearTimeout };
 context.window = context;
 vm.createContext(context);

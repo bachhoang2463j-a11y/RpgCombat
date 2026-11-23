@@ -98,9 +98,29 @@ export const groups = {
     const pRun = dir3.driveAttack((function* () { yield req1; return { ok: true }; })());
     await new Promise(r => setTimeout(r, 5));
     dir3.cancelAttack();
+    const outC = await Promise.race([pRun, new Promise(r => setTimeout(() => r('pending'), 100))]);
+    cases.push(ok('TRU-02e cancelAttack：不等待弹窗回调即返回 null', outC === null, j(outC)));
     releaseGate(null);
-    const outC = await pRun;
-    cases.push(ok('TRU-02e cancelAttack：活动驱动取消并返回 null', outC === null, j(outC)));
+    let returned = false;
+    const dirRetarget = m.director.createActionDirector({
+      sandbox: { getScope: () => live }, avHost: { av: { CombatAudioMixer: {} } }, getViewData: () => null,
+      promptRetarget: () => new Promise(() => {}), battle: () => null,
+    });
+    const retargetRun = dirRetarget.driveAttack((function* () {
+      try { yield { type: 'retarget-request' }; return { ok: true }; }
+      finally { returned = true; }
+    })());
+    dirRetarget.cancelAttack();
+    const retargetOut = await Promise.race([retargetRun, new Promise(r => setTimeout(() => r('pending'), 100))]);
+    cases.push(ok('TRU-02g 转火取消：生成器退出且驱动等待结清', retargetOut === null && returned, j({ retargetOut, returned })));
+    const mainSrc = readFileSync(path.join(SRC, 'main.mjs'), 'utf8');
+    cases.push(ok('TRU-02h 转火地图悬停与点击不重新校验施放费用',
+      (mainSrc.match(/battle\.previewRetarget\(r\.skill, a, r\.casterId, r\.slotIndex\)/g) || []).length === 2 &&
+      !mainSrc.includes('battle.previewAttack(r.skill, a)'), ''));
+    cases.push(ok('TRU-02i 换场与销毁关闭转火浮层',
+      (mainSrc.match(/cancelRetargetPrompt\(\);/g) || []).length === 2, ''));
+    cases.push(ok('TRU-02j 公开结束回合入口拒绝忙状态与非玩家回合',
+      /endTurn: \(\) => \{\s*if \(!battle \|\| busy \|\| !isHeroTurn\(\)\) return false;/.test(mainSrc), ''));
     // runAttackLive：规则接口未落地时给待对齐结果（不静默吞掉）
     const notReady = await m.director.createActionDirector({
       sandbox: { getScope: () => ({ isLive: true }) }, avHost: { av: { CombatAudioMixer: {} } }, getViewData: () => null,
@@ -123,7 +143,8 @@ export const groups = {
       !/['\[](单体|群攻|单回|群回|单回蓝|群回蓝|单增|群增|单防|群防|单盾|群盾|单瞄|群瞄|单降|群降|单盲|群盲|单滞|群滞|单弱|群弱|单速|群速|单缓|群缓|单避|群避|群穿透|群眩晕|群散射|群中毒|群燃烧|群麻痹|群反击|群驱散)['\]]/.test(sk), ''));
     cases.push(ok('TRU-03c 回避（一次性）与闪避（持续）两项独立', sk.includes("'[回避]'") && sk.includes("'[闪避]'"), ''));
     cases.push(ok('TRU-03d 攻击技能判定/胶囊配色/悬浮说明识别规范伤害标签',
-      line(/const MENU_DAMAGE_TAGS = \[[^\n]*\];/).includes("'伤害'") && /includes\('伤害'\)/.test(vendorSrc) && /'伤害': '按空间范围命中目标/.test(vendorSrc), ''));
+      /function isAttackSkill\(skill\)\s*\{\s*return skillSlots\(skill\)\.some\(slot => slot\.attack\);/.test(vendorSrc) &&
+      /'伤害': '按空间范围命中目标/.test(vendorSrc), ''));
     cases.push(ok('TRU-03e 下拉当前值经 normalizeEffectTag 规范化（旧标签不再作为当前值保留）', /curVal = \(curVal && normalizeEffectTag\)/.test(vendorSrc), ''));
     return cases;
   } },
@@ -161,9 +182,9 @@ export const groups = {
   } },
   'TRU-06': { run({ modules: m }) {
     const cases = [];
-    // fx-registry 槽标签统一走官方规范名（旧输入别名吸收）
-    const inp = m.fxRegistry.actionInput({ ok: true, casterId: 'c', skill: { type: '[群攻(火焰)]', type2: '[单回]', type3: '[无]', power: 30, power2: 10 }, query: { shape: { type: '爆炸' }, slotTargets: [] }, hits: [] });
-    cases.push(ok('TRU-06a actionInput.slotTags 官方规范名 + 子型保留', j(inp.slotTags) === j(['伤害(火焰)', '治疗']), j(inp.slotTags)));
+    // 演出输入仅传显式标签，旧规则子型不参与选择。
+    const inp = m.fxRegistry.actionInput({ ok: true, casterId: 'c', skill: { type: '[群攻(火焰)]', type2: '[单回]', fxTag: '冰霜', power: 30, power2: 10 }, query: { shape: { type: '爆炸' }, slotTargets: [] }, hits: [] });
+    cases.push(ok('TRU-06a actionInput 仅传显式特效标签', inp.fxTag === '冰霜' && !Object.hasOwn(inp, 'slotTags'), j(inp)));
     // 编辑器写入的 skill.slotTargets 由 skillSlots 正式读取（联动）
     const slots = m.effectDefs.skillSlots({ name: 'x', type: '[治疗]', power: 30, slotTargets: ['self'] });
     cases.push(ok('TRU-06b skillSlots 读 slotTargets[0]="self" → target self', slots.length === 1 && slots[0].target === 'self', j(slots)));
@@ -178,7 +199,7 @@ export const groups = {
     const zheYing = ell.skills.find(s => s.name === '折影步');
     const heal = ell.skills.find(s => s.name === '迅捷愈合法');
     cases.push(ok('TRU-04a demo 反应技能（折影步）可解析：isReaction + 反应类型', zheYing && zheYing.isReaction === true && zheYing.reactionTarget === '近战', j(zheYing && { isReaction: zheYing.isReaction, rt: zheYing.reactionTarget })));
-    cases.push(ok('TRU-04b demo 治疗技能（迅捷愈合法）已解析为官方规范名 [治疗] + 他人目标', heal && heal.type === '[治疗]' && heal.isOthers === true, j(heal && { type: heal.type, others: heal.isOthers })));
+    cases.push(ok('TRU-04b demo 治疗技能解析为规范回复槽且有明确特效', heal && heal.type === '[回复]' && heal.isOthers === true && heal.fxTag === '单体回复', j(heal && { type: heal.type, others: heal.isOthers, fxTag: heal.fxTag })));
     cases.push(ok('TRU-04c 反应候选技能存在多个（弹窗选择有意义）', ell.skills.filter(s => s.isReaction).length >= 3, String(ell.skills.filter(s => s.isReaction).length)));
     return cases;
   } },
