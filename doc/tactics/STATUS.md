@@ -23,6 +23,13 @@
 | P07 前端 | 资源条/基础行动格/蓄力槽/禁用原因可读化/手风琴编辑器/跳跃推动动效；产物页面流程已过门禁 | `0ab4fe3` |
 | FX01 | 通用 fxTag 演出注册表（L1—L4 预算）＋埃利奥特：萨维奇三连发/压缩爆燃/预备咏唱/折影步；多段攻击槽逐段结算、爆炸接触单位计入、回避真实错位 | 见 [LOG-INDEX](LOG-INDEX.md) |
 
+## 典型对局后端增量（2026-11-23）
+
+- 权威样本与实施计划：[典型对局-战棋版.yaml](典型对局-战棋版.yaml)、[TYPICAL-BATTLE-CONTRACT.md](TYPICAL-BATTLE-CONTRACT.md)、[TYPICAL-BATTLE-BACKEND-PLAN.md](TYPICAL-BATTLE-BACKEND-PLAN.md)。已写入4英雄、6敌、2召唤词条、固定出生点、TP0、严格资源与固定种子。
+- 新后端模块：`scenario-data`、`regions`、`perception`、`barriers`；生产中文对象解析、8范围、单避/回避归一、整技免伤池、累计盾、跳跃/飞行、冲锋、共享父道具、召唤/结界已接线。既有RULES02能力边界以本条及交接契约为新口径。
+- 定向组 `typical-data/space/ai/battle/skills`，90个技能/用法条目均有专项调用；反应是生成器实际执行，不用存在性冒充生效。正式主棋盘完整对局证据与源码全量/产物结果另见本轮报告。
+- 前端 `main.mjs`、UI、镜头和特效未动；权威样本页面、浓雾视野、结界与冲锋表现、正式发布链仍需前端模型接线及联合门禁。不能将专项夹具视为完整典型局。
+
 ## 运行方式
 
 - **单文件版（推荐）**：双击 `tactics/mvp-standalone.html`，JS/CSS 全内联、零网络请求。

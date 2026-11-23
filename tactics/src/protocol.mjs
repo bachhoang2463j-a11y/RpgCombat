@@ -40,18 +40,21 @@ export const TACTICS_TAG_FIELDS = {
   '闪避': 'evasion',
   '力量': 'strength',
   '总重': 'totalWeight',
+  '总重量kg': 'totalWeight',
   '移动': 'moveDistance',
   '感知': 'perception',
 };
 
 // ---------- 七种范围（第六种爆炸之外新增第七种「自身」，S05/七范围段） ----------
-export const RANGE_TYPES = ['单体', '直线', '扇形', '圆形', '全域', '爆炸', '自身'];
+export const RANGE_TYPES = ['单体', '直线', '扇形', '圆形', '全域', '爆炸', '自身', '召唤'];
 
 // 范围参数中文 → 规范字段。单位：长度米、角度度。
 export const RANGE_PARAM_FIELDS = {
   '射程': 'castRange',
   '长': 'length',
+  '长度': 'length',
   '宽': 'width',
+  '宽度': 'width',
   '角度': 'angle',
   '半径': 'radius',
 };
@@ -61,9 +64,11 @@ export const RANGE_PARAMS_BY_TYPE = {
   '单体': [],
   '直线': ['length', 'width'],
   '扇形': ['castRange', 'angle'],
-  '圆形': ['castRange', 'radius'],
+  '圆形': ['radius'],
   '全域': [],
   '爆炸': ['castRange', 'radius'],
+  '自身': [],
+  '召唤': ['castRange'],
 };
 
 // ---------- 行动成本 ----------
@@ -77,7 +82,7 @@ export const S14_RANGE_PRESETS = {
   单体近战: { type: '单体', castRange: 2 },
   单体远程: { type: '单体', castRange: 15 },
   群体近战: { type: '扇形', castRange: 3, angle: 90 },
-  群体远程: { type: '圆形', castRange: 15, radius: 3 },
+  群体远程: { type: '爆炸', castRange: 15, radius: 3 },
   显式直线缺尺寸: { length: 10, width: 1 },
   显式爆炸缺尺寸: { castRange: 15, radius: 3 },
 };

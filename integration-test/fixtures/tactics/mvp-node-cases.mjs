@@ -594,9 +594,9 @@ async function tm05(m) {
   const b = battle.createBattle({ units: unitsA, placementsById: placeA, scene: open, random: () => 0.5 });
   b.start();
   const es = b.runEnemyTurn();
-  cases.push(ok('TM-05 runEnemyTurn近战接近攻击（普攻位成本5更优：英雄-8血）并推进下一位',
+  cases.push(ok('TM-05 runEnemyTurn按实际伤害选择普攻并用余量接近',
     !!es && hpOf(es, 'h1') === 12 && es.currentId === 'h1' && near(es.now, 200) &&
-    posOf(es, 'e1') && posOf(es, 'e1').col === 5 && posOf(es, 'e1').row === 3,
+    posOf(es, 'e1') && posOf(es, 'e1').col === 4 && posOf(es, 'e1').row === 3,
     'hp=' + hpOf(es, 'h1') + ' cur=' + (es && es.currentId) + ' now=' + (es && es.now) +
     ' pos=' + j(posOf(es, 'e1'))));
 
@@ -632,9 +632,9 @@ async function tm05(m) {
   const b3 = battle.createBattle({ units: unitsC, placementsById: placeC, scene: open, random: () => 0.5 });
   b3.start();
   const es3 = b3.runEnemyTurn();
-  cases.push(ok('TM-05 远程原地攻击扣血且敌位不变',
+  cases.push(ok('TM-05 远程攻击后可用余量接近且仅扣一次技能费用',
     !!es3 && hpOf(es3, 'h1') === 10 && posOf(es3, 'e2') &&
-    posOf(es3, 'e2').col === 10 && posOf(es3, 'e2').row === 3 &&
+    posOf(es3, 'e2').col === 6 && posOf(es3, 'e2').row === 3 &&
     es3.currentId === 'h1' && near(es3.now, 200),
     'hp=' + hpOf(es3, 'h1') + ' pos=' + j(posOf(es3, 'e2'))));
 

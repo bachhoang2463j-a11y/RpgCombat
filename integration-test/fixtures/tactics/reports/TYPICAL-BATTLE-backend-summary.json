@@ -1,0 +1,53 @@
+{
+  "kind": "TYPICAL-BATTLE-backend",
+  "executed": true,
+  "sourceRegression": {
+    "command": "node tactics/tools/run-tests.cjs --all",
+    "runs": 1,
+    "passed": 761,
+    "failed": 0,
+    "stages": 18,
+    "scope": "已注册源码回归；完整对局胜利路线单独记账，不计入761",
+    "typicalStages": { "data": 57, "space": 30, "ai": 15, "battle": 33, "skills": 90 }
+  },
+  "artifact": {
+    "path": "tactics/mvp-standalone.html",
+    "bytes": 1036668,
+    "sha256": "4886a31c8ce6df2195f12e2985439cd480664004fbf5429149394c044dde9ae2",
+    "bundledModules": 50,
+    "requiredModules": 35,
+    "requiredSymbols": 41,
+    "checksPassed": 11,
+    "checksFailed": 0,
+    "report": "TYPICAL-BATTLE-artifact.json"
+  },
+  "playthrough": {
+    "report": "TYPICAL-BATTLE-playthrough.json",
+    "seed": 20261123,
+    "route": "baseline-no-hero-reactions",
+    "actions": 112,
+    "result": "lose",
+    "enemiesAlive": 2,
+    "heroesAlive": 0,
+    "resourceInvariant": "pass",
+    "replay": "pass",
+    "victoryGate": "failed",
+    "summonsAndReactionsRoute": "停止：超过本次30秒检查时限，未验证完成"
+  },
+  "browser": {
+    "backend": "iab",
+    "artifactLoaded": true,
+    "defendResourceCheck": "pass：主行动1→0、TP0→25",
+    "jumpText": "旧前端显示≤6m，后端实际2m，待前端接线",
+    "endTurn": "failed：页面按钮与公开app.endTurn未推进",
+    "pageGate": "pending-frontend",
+    "cleanup": "本轮标签与本地8128测试服务均已关闭"
+  },
+  "review": {
+    "blockingIssuesReported": 0,
+    "note": "只读复审，无确证阻断；完整流程查出调度回调移除状态空引用，已修复并追加回归"
+  },
+  "delivery": "后端已验证；正式版未通过完整典型对局胜利与前端联合页面门禁",
+  "READMEUpdated": false,
+  "pushed": false
+}

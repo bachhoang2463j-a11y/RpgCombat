@@ -1,0 +1,2666 @@
+{
+  "seed": 20261123,
+  "route": "baseline-no-hero-reactions",
+  "scene": "sc-chapel",
+  "sample": "doc/tactics/典型对局-战棋版.yaml",
+  "startedAt": "2026-11-23T03:21:47.094Z",
+  "actions": [
+    {
+      "n": 1,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 550,
+        "mp": 16,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 550,
+        "mp": 13,
+        "tp": 5,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 2,
+      "actor": "h:玛德琳",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 30
+      },
+      "before": {
+        "hp": 140,
+        "mp": 14,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 140,
+        "mp": 14,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 1.1715728752538102
+      }
+    },
+    {
+      "n": 3,
+      "actor": "h:玛德琳",
+      "action": "attack",
+      "skill": "柯尔特三连发",
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 14,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 1.1715728752538102
+      },
+      "after": {
+        "hp": 140,
+        "mp": 14,
+        "tp": 5,
+        "main": 1,
+        "aux": 1,
+        "move": 1.1715728752538102
+      }
+    },
+    {
+      "n": 4,
+      "actor": "h:玛德琳",
+      "action": "attack",
+      "skill": "死亡编织-双枪扫射",
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 14,
+        "tp": 5,
+        "main": 1,
+        "aux": 1,
+        "move": 1.1715728752538102
+      },
+      "after": {
+        "hp": 140,
+        "mp": 12,
+        "tp": 5,
+        "main": 0,
+        "aux": 1,
+        "move": 1.1715728752538102
+      }
+    },
+    {
+      "n": 5,
+      "actor": "h:玛德琳",
+      "action": "attack",
+      "skill": "寂静指令",
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 12,
+        "tp": 5,
+        "main": 0,
+        "aux": 1,
+        "move": 1.1715728752538102
+      },
+      "after": {
+        "hp": 140,
+        "mp": 10,
+        "tp": 10,
+        "main": 0,
+        "aux": 0,
+        "move": 1.1715728752538102
+      }
+    },
+    {
+      "n": 6,
+      "actor": "h:玛德琳",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 30
+      },
+      "before": {
+        "hp": 140,
+        "mp": 10,
+        "tp": 10,
+        "main": 0,
+        "aux": 0,
+        "move": 1.1715728752538102
+      },
+      "after": {
+        "hp": 140,
+        "mp": 10,
+        "tp": 10,
+        "main": 0,
+        "aux": 0,
+        "move": 0.17157287525381015
+      }
+    },
+    {
+      "n": 7,
+      "actor": "h:玛德琳",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 10,
+        "tp": 10,
+        "main": 0,
+        "aux": 0,
+        "move": 0.17157287525381015
+      },
+      "after": null
+    },
+    {
+      "n": 8,
+      "actor": "h:索恩",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 11,
+        "row": 38
+      },
+      "before": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 5.585786437626905
+      }
+    },
+    {
+      "n": 9,
+      "actor": "h:索恩",
+      "action": "attack",
+      "skill": "“清算”三连发",
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 5.585786437626905
+      },
+      "after": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 5,
+        "main": 0,
+        "aux": 1,
+        "move": 5.585786437626905
+      }
+    },
+    {
+      "n": 10,
+      "actor": "h:索恩",
+      "action": "attack",
+      "skill": "早有准备-提前瞄准",
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 5,
+        "main": 0,
+        "aux": 1,
+        "move": 5.585786437626905
+      },
+      "after": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 10,
+        "main": 1,
+        "aux": 0,
+        "move": 5.585786437626905
+      }
+    },
+    {
+      "n": 11,
+      "actor": "h:索恩",
+      "action": "attack",
+      "skill": "“清算”三连发",
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 10,
+        "main": 1,
+        "aux": 0,
+        "move": 5.585786437626905
+      },
+      "after": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 15,
+        "main": 0,
+        "aux": 0,
+        "move": 5.585786437626905
+      }
+    },
+    {
+      "n": 12,
+      "actor": "h:索恩",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 33
+      },
+      "before": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 15,
+        "main": 0,
+        "aux": 0,
+        "move": 5.585786437626905
+      },
+      "after": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 15,
+        "main": 0,
+        "aux": 0,
+        "move": 0.17157287525381015
+      }
+    },
+    {
+      "n": 13,
+      "actor": "h:索恩",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 15,
+        "main": 0,
+        "aux": 0,
+        "move": 0.17157287525381015
+      },
+      "after": null
+    },
+    {
+      "n": 14,
+      "actor": "e:犹格索托斯之子",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 300,
+        "mp": 25,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 300,
+        "mp": 25,
+        "tp": 0,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 15,
+      "actor": "e:食尸鬼A",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 34,
+        "mp": 13,
+        "tp": 30,
+        "main": 1,
+        "aux": 1,
+        "move": 7
+      },
+      "after": {
+        "hp": 34,
+        "mp": 13,
+        "tp": 50,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 16,
+      "actor": "e:食尸鬼B",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 70,
+        "mp": 13,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 7
+      },
+      "after": {
+        "hp": 70,
+        "mp": 13,
+        "tp": 30,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 17,
+      "actor": "h:弗兰克",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 35
+      },
+      "before": {
+        "hp": 180,
+        "mp": 17,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 180,
+        "mp": 17,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 4
+      }
+    },
+    {
+      "n": 18,
+      "actor": "h:弗兰克",
+      "action": "attack",
+      "skill": "温切斯特M1897-鹿弹二连发",
+      "move": null,
+      "before": {
+        "hp": 180,
+        "mp": 17,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 4
+      },
+      "after": {
+        "hp": 180,
+        "mp": 17,
+        "tp": 5,
+        "main": 0,
+        "aux": 1,
+        "move": 4
+      }
+    },
+    {
+      "n": 19,
+      "actor": "h:弗兰克",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 31
+      },
+      "before": {
+        "hp": 180,
+        "mp": 17,
+        "tp": 5,
+        "main": 0,
+        "aux": 1,
+        "move": 4
+      },
+      "after": {
+        "hp": 180,
+        "mp": 17,
+        "tp": 5,
+        "main": 0,
+        "aux": 1,
+        "move": 0
+      }
+    },
+    {
+      "n": 20,
+      "actor": "h:弗兰克",
+      "action": "attack",
+      "skill": "掩体包扎",
+      "move": null,
+      "before": {
+        "hp": 180,
+        "mp": 17,
+        "tp": 5,
+        "main": 0,
+        "aux": 1,
+        "move": 0
+      },
+      "after": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 0,
+        "aux": 0,
+        "move": 0
+      }
+    },
+    {
+      "n": 21,
+      "actor": "h:弗兰克",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 0,
+        "aux": 0,
+        "move": 0
+      },
+      "after": null
+    },
+    {
+      "n": 22,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 550,
+        "mp": 13,
+        "tp": 5,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 550,
+        "mp": 13,
+        "tp": 5,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 23,
+      "actor": "e:深潜者B",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 83,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 6
+      },
+      "after": {
+        "hp": 83,
+        "mp": 14,
+        "tp": 15,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 24,
+      "actor": "h:埃利奥特",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 11,
+        "row": 34
+      },
+      "before": {
+        "hp": 100,
+        "mp": 110,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 6
+      },
+      "after": {
+        "hp": 100,
+        "mp": 110,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 0
+      }
+    },
+    {
+      "n": 25,
+      "actor": "h:埃利奥特",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 100,
+        "mp": 110,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 0
+      },
+      "after": null
+    },
+    {
+      "n": 26,
+      "actor": "h:玛德琳",
+      "action": "attack",
+      "skill": "柯尔特三连发",
+      "move": null,
+      "before": {
+        "hp": 80,
+        "mp": 10,
+        "tp": 30,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 80,
+        "mp": 10,
+        "tp": 35,
+        "main": 0,
+        "aux": 1,
+        "move": 8
+      }
+    },
+    {
+      "n": 27,
+      "actor": "h:玛德琳",
+      "action": "attack",
+      "skill": "寂静指令",
+      "move": null,
+      "before": {
+        "hp": 80,
+        "mp": 10,
+        "tp": 35,
+        "main": 0,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 80,
+        "mp": 8,
+        "tp": 40,
+        "main": 0,
+        "aux": 0,
+        "move": 8
+      }
+    },
+    {
+      "n": 28,
+      "actor": "h:玛德琳",
+      "action": "defend",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 80,
+        "mp": 8,
+        "tp": 40,
+        "main": 0,
+        "aux": 0,
+        "move": 8
+      },
+      "after": {
+        "hp": 80,
+        "mp": 8,
+        "tp": 40,
+        "main": 0,
+        "aux": 0,
+        "move": 8
+      }
+    },
+    {
+      "n": 29,
+      "actor": "h:玛德琳",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 80,
+        "mp": 8,
+        "tp": 40,
+        "main": 0,
+        "aux": 0,
+        "move": 8
+      },
+      "after": null
+    },
+    {
+      "n": 30,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 550,
+        "mp": 13,
+        "tp": 5,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 550,
+        "mp": 9,
+        "tp": 5,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 31,
+      "actor": "h:索恩",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 29
+      },
+      "before": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 15,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 15,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      }
+    },
+    {
+      "n": 32,
+      "actor": "h:索恩",
+      "action": "attack",
+      "skill": "“清算”三连发",
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 15,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 20,
+        "main": 0,
+        "aux": 1,
+        "move": 5
+      }
+    },
+    {
+      "n": 33,
+      "actor": "h:索恩",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 25
+      },
+      "before": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 20,
+        "main": 0,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 20,
+        "main": 0,
+        "aux": 1,
+        "move": 0
+      }
+    },
+    {
+      "n": 34,
+      "actor": "h:索恩",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 20,
+        "main": 0,
+        "aux": 1,
+        "move": 0
+      },
+      "after": null
+    },
+    {
+      "n": 35,
+      "actor": "e:犹格索托斯之子",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 300,
+        "mp": 25,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 300,
+        "mp": 25,
+        "tp": 0,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 36,
+      "actor": "h:弗兰克",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 29
+      },
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 3
+      }
+    },
+    {
+      "n": 37,
+      "actor": "h:弗兰克",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 26
+      },
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 3
+      },
+      "after": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 0
+      }
+    },
+    {
+      "n": 38,
+      "actor": "h:弗兰克",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 0
+      },
+      "after": null
+    },
+    {
+      "n": 39,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 550,
+        "mp": 9,
+        "tp": 5,
+        "main": 0,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 550,
+        "mp": 9,
+        "tp": 5,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 40,
+      "actor": "e:深潜者B",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 83,
+        "mp": 14,
+        "tp": 15,
+        "main": 1,
+        "aux": 1,
+        "move": 6
+      },
+      "after": {
+        "hp": 83,
+        "mp": 8,
+        "tp": 20,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 41,
+      "actor": "h:玛德琳",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 22
+      },
+      "before": {
+        "hp": 30,
+        "mp": 8,
+        "tp": 40,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 30,
+        "mp": 8,
+        "tp": 40,
+        "main": 1,
+        "aux": 1,
+        "move": 2
+      }
+    },
+    {
+      "n": 42,
+      "actor": "h:玛德琳",
+      "action": "attack",
+      "skill": "柯尔特三连发",
+      "move": null,
+      "before": {
+        "hp": 30,
+        "mp": 8,
+        "tp": 40,
+        "main": 1,
+        "aux": 1,
+        "move": 2
+      },
+      "after": {
+        "hp": 30,
+        "mp": 8,
+        "tp": 45,
+        "main": 1,
+        "aux": 1,
+        "move": 2
+      }
+    },
+    {
+      "n": 43,
+      "actor": "h:玛德琳",
+      "action": "attack",
+      "skill": "柯尔特三连发",
+      "move": null,
+      "before": {
+        "hp": 30,
+        "mp": 8,
+        "tp": 45,
+        "main": 1,
+        "aux": 1,
+        "move": 2
+      },
+      "after": {
+        "hp": 30,
+        "mp": 8,
+        "tp": 50,
+        "main": 0,
+        "aux": 1,
+        "move": 2
+      }
+    },
+    {
+      "n": 44,
+      "actor": "h:玛德琳",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 22
+      },
+      "before": {
+        "hp": 30,
+        "mp": 8,
+        "tp": 50,
+        "main": 0,
+        "aux": 1,
+        "move": 2
+      },
+      "after": {
+        "hp": 30,
+        "mp": 8,
+        "tp": 50,
+        "main": 0,
+        "aux": 1,
+        "move": 0
+      }
+    },
+    {
+      "n": 45,
+      "actor": "h:玛德琳",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 30,
+        "mp": 8,
+        "tp": 50,
+        "main": 0,
+        "aux": 1,
+        "move": 0
+      },
+      "after": null
+    },
+    {
+      "n": 46,
+      "actor": "h:索恩",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 21
+      },
+      "before": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 20,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 20,
+        "main": 1,
+        "aux": 1,
+        "move": 4
+      }
+    },
+    {
+      "n": 47,
+      "actor": "h:索恩",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 10,
+        "row": 18
+      },
+      "before": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 20,
+        "main": 1,
+        "aux": 1,
+        "move": 4
+      },
+      "after": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 20,
+        "main": 1,
+        "aux": 1,
+        "move": 0.17157287525381015
+      }
+    },
+    {
+      "n": 48,
+      "actor": "h:索恩",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 20,
+        "main": 1,
+        "aux": 1,
+        "move": 0.17157287525381015
+      },
+      "after": null
+    },
+    {
+      "n": 49,
+      "actor": "h:埃利奥特",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 30
+      },
+      "before": {
+        "hp": 100,
+        "mp": 110,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 6
+      },
+      "after": {
+        "hp": 100,
+        "mp": 110,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 1.585786437626905
+      }
+    },
+    {
+      "n": 50,
+      "actor": "h:埃利奥特",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 29
+      },
+      "before": {
+        "hp": 100,
+        "mp": 110,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 1.585786437626905
+      },
+      "after": {
+        "hp": 100,
+        "mp": 110,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 0.5857864376269051
+      }
+    },
+    {
+      "n": 51,
+      "actor": "h:埃利奥特",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 100,
+        "mp": 110,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 0.5857864376269051
+      },
+      "after": null
+    },
+    {
+      "n": 52,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 550,
+        "mp": 9,
+        "tp": 5,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 550,
+        "mp": 5,
+        "tp": 5,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 53,
+      "actor": "e:犹格索托斯之子",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 300,
+        "mp": 25,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 300,
+        "mp": 25,
+        "tp": 0,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 54,
+      "actor": "h:弗兰克",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 21
+      },
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 3
+      }
+    },
+    {
+      "n": 55,
+      "actor": "h:弗兰克",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 11,
+        "row": 24
+      },
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 3
+      },
+      "after": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 2
+      }
+    },
+    {
+      "n": 56,
+      "actor": "h:弗兰克",
+      "action": "attack",
+      "skill": "克虏伯1918型",
+      "move": null,
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 2
+      },
+      "after": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 0,
+        "aux": 1,
+        "move": 2
+      }
+    },
+    {
+      "n": 57,
+      "actor": "h:弗兰克",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 0,
+        "aux": 1,
+        "move": 2
+      },
+      "after": null
+    },
+    {
+      "n": 58,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 550,
+        "mp": 5,
+        "tp": 5,
+        "main": 0,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 550,
+        "mp": 5,
+        "tp": 5,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 59,
+      "actor": "h:索恩",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 14
+      },
+      "before": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 20,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 20,
+        "main": 1,
+        "aux": 1,
+        "move": 4.585786437626905
+      }
+    },
+    {
+      "n": 60,
+      "actor": "h:索恩",
+      "action": "attack",
+      "skill": "异种坏死雾",
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 20,
+        "tp": 20,
+        "main": 1,
+        "aux": 1,
+        "move": 4.585786437626905
+      },
+      "after": {
+        "hp": 140,
+        "mp": 15,
+        "tp": 5,
+        "main": 1,
+        "aux": 1,
+        "move": 4.585786437626905
+      }
+    },
+    {
+      "n": 61,
+      "actor": "h:索恩",
+      "action": "attack",
+      "skill": "“清算”三连发",
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 15,
+        "tp": 5,
+        "main": 1,
+        "aux": 1,
+        "move": 4.585786437626905
+      },
+      "after": {
+        "hp": 140,
+        "mp": 15,
+        "tp": 10,
+        "main": 0,
+        "aux": 1,
+        "move": 4.585786437626905
+      }
+    },
+    {
+      "n": 62,
+      "actor": "h:索恩",
+      "action": "attack",
+      "skill": "早有准备-提前瞄准",
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 15,
+        "tp": 10,
+        "main": 0,
+        "aux": 1,
+        "move": 4.585786437626905
+      },
+      "after": {
+        "hp": 140,
+        "mp": 15,
+        "tp": 15,
+        "main": 1,
+        "aux": 0,
+        "move": 4.585786437626905
+      }
+    },
+    {
+      "n": 63,
+      "actor": "h:索恩",
+      "action": "attack",
+      "skill": "“清算”三连发",
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 15,
+        "tp": 15,
+        "main": 1,
+        "aux": 0,
+        "move": 4.585786437626905
+      },
+      "after": {
+        "hp": 140,
+        "mp": 15,
+        "tp": 20,
+        "main": 0,
+        "aux": 0,
+        "move": 4.585786437626905
+      }
+    },
+    {
+      "n": 64,
+      "actor": "h:索恩",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 11,
+        "row": 11
+      },
+      "before": {
+        "hp": 140,
+        "mp": 15,
+        "tp": 20,
+        "main": 0,
+        "aux": 0,
+        "move": 4.585786437626905
+      },
+      "after": {
+        "hp": 140,
+        "mp": 15,
+        "tp": 20,
+        "main": 0,
+        "aux": 0,
+        "move": 3.585786437626905
+      }
+    },
+    {
+      "n": 65,
+      "actor": "h:索恩",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 11,
+        "row": 11
+      },
+      "before": {
+        "hp": 140,
+        "mp": 15,
+        "tp": 20,
+        "main": 0,
+        "aux": 0,
+        "move": 3.585786437626905
+      },
+      "after": {
+        "hp": 140,
+        "mp": 15,
+        "tp": 20,
+        "main": 0,
+        "aux": 0,
+        "move": 0.5857864376269051
+      }
+    },
+    {
+      "n": 66,
+      "actor": "h:索恩",
+      "action": "defend",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 15,
+        "tp": 20,
+        "main": 0,
+        "aux": 0,
+        "move": 0.5857864376269051
+      },
+      "after": {
+        "hp": 140,
+        "mp": 15,
+        "tp": 20,
+        "main": 0,
+        "aux": 0,
+        "move": 0.5857864376269051
+      }
+    },
+    {
+      "n": 67,
+      "actor": "h:索恩",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 140,
+        "mp": 15,
+        "tp": 20,
+        "main": 0,
+        "aux": 0,
+        "move": 0.5857864376269051
+      },
+      "after": null
+    },
+    {
+      "n": 68,
+      "actor": "h:埃利奥特",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 23
+      },
+      "before": {
+        "hp": 100,
+        "mp": 110,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 6
+      },
+      "after": {
+        "hp": 100,
+        "mp": 110,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 0
+      }
+    },
+    {
+      "n": 69,
+      "actor": "h:埃利奥特",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 100,
+        "mp": 110,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 0
+      },
+      "after": null
+    },
+    {
+      "n": 70,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 464,
+        "mp": 5,
+        "tp": 35,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 40,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 71,
+      "actor": "e:犹格索托斯之子",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 300,
+        "mp": 25,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 300,
+        "mp": 21,
+        "tp": 5,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 72,
+      "actor": "h:弗兰克",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 0,
+        "aux": 1,
+        "move": 5
+      },
+      "after": null
+    },
+    {
+      "n": 73,
+      "actor": "h:索恩",
+      "action": "attack",
+      "skill": "“清算”三连发",
+      "move": null,
+      "before": {
+        "hp": 32,
+        "mp": 15,
+        "tp": 40,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 32,
+        "mp": 15,
+        "tp": 45,
+        "main": 0,
+        "aux": 1,
+        "move": 8
+      }
+    },
+    {
+      "n": 74,
+      "actor": "h:索恩",
+      "action": "attack",
+      "skill": "共生体质",
+      "move": null,
+      "before": {
+        "hp": 32,
+        "mp": 15,
+        "tp": 45,
+        "main": 0,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 92,
+        "mp": 15,
+        "tp": 50,
+        "main": 0,
+        "aux": 0,
+        "move": 8
+      }
+    },
+    {
+      "n": 75,
+      "actor": "h:索恩",
+      "action": "defend",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 92,
+        "mp": 15,
+        "tp": 50,
+        "main": 0,
+        "aux": 0,
+        "move": 8
+      },
+      "after": {
+        "hp": 92,
+        "mp": 15,
+        "tp": 50,
+        "main": 0,
+        "aux": 0,
+        "move": 8
+      }
+    },
+    {
+      "n": 76,
+      "actor": "h:索恩",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 92,
+        "mp": 15,
+        "tp": 50,
+        "main": 0,
+        "aux": 0,
+        "move": 8
+      },
+      "after": null
+    },
+    {
+      "n": 77,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 40,
+        "main": 0,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 40,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 78,
+      "actor": "e:犹格索托斯之子",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 265,
+        "mp": 21,
+        "tp": 15,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 265,
+        "mp": 17,
+        "tp": 20,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 79,
+      "actor": "h:弗兰克",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 0,
+        "aux": 1,
+        "move": 5
+      },
+      "after": null
+    },
+    {
+      "n": 80,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 40,
+        "main": 0,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 40,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 81,
+      "actor": "h:埃利奥特",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 22
+      },
+      "before": {
+        "hp": 100,
+        "mp": 110,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 6
+      },
+      "after": {
+        "hp": 100,
+        "mp": 110,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      }
+    },
+    {
+      "n": 82,
+      "actor": "h:埃利奥特",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 10,
+        "row": 18
+      },
+      "before": {
+        "hp": 100,
+        "mp": 110,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 100,
+        "mp": 110,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 1.585786437626905
+      }
+    },
+    {
+      "n": 83,
+      "actor": "h:埃利奥特",
+      "action": "attack",
+      "skill": "火舞术-压缩爆燃",
+      "move": null,
+      "before": {
+        "hp": 100,
+        "mp": 110,
+        "tp": 0,
+        "main": 1,
+        "aux": 1,
+        "move": 1.585786437626905
+      },
+      "after": {
+        "hp": 100,
+        "mp": 105,
+        "tp": 5,
+        "main": 0,
+        "aux": 1,
+        "move": 1.585786437626905
+      }
+    },
+    {
+      "n": 84,
+      "actor": "h:埃利奥特",
+      "action": "attack",
+      "skill": "拉莱耶造雾术",
+      "move": null,
+      "before": {
+        "hp": 100,
+        "mp": 105,
+        "tp": 5,
+        "main": 0,
+        "aux": 1,
+        "move": 1.585786437626905
+      },
+      "after": {
+        "hp": 100,
+        "mp": 103,
+        "tp": 10,
+        "main": 0,
+        "aux": 0,
+        "move": 1.585786437626905
+      }
+    },
+    {
+      "n": 85,
+      "actor": "h:埃利奥特",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 10,
+        "row": 18
+      },
+      "before": {
+        "hp": 100,
+        "mp": 103,
+        "tp": 10,
+        "main": 0,
+        "aux": 0,
+        "move": 1.585786437626905
+      },
+      "after": {
+        "hp": 100,
+        "mp": 103,
+        "tp": 10,
+        "main": 0,
+        "aux": 0,
+        "move": 0.17157287525380993
+      }
+    },
+    {
+      "n": 86,
+      "actor": "h:埃利奥特",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 100,
+        "mp": 103,
+        "tp": 10,
+        "main": 0,
+        "aux": 0,
+        "move": 0.17157287525380993
+      },
+      "after": null
+    },
+    {
+      "n": 87,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 40,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 40,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 88,
+      "actor": "e:犹格索托斯之子",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 284,
+        "mp": 17,
+        "tp": 30,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 284,
+        "mp": 17,
+        "tp": 30,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 89,
+      "actor": "h:弗兰克",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 0,
+        "aux": 1,
+        "move": 5
+      },
+      "after": null
+    },
+    {
+      "n": 90,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 40,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 40,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 91,
+      "actor": "h:埃利奥特",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 11,
+        "row": 14
+      },
+      "before": {
+        "hp": 100,
+        "mp": 103,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 6
+      },
+      "after": {
+        "hp": 100,
+        "mp": 103,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 1.585786437626905
+      }
+    },
+    {
+      "n": 92,
+      "actor": "h:埃利奥特",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 11,
+        "row": 13
+      },
+      "before": {
+        "hp": 100,
+        "mp": 103,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 1.585786437626905
+      },
+      "after": {
+        "hp": 100,
+        "mp": 103,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 0.5857864376269051
+      }
+    },
+    {
+      "n": 93,
+      "actor": "h:埃利奥特",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 100,
+        "mp": 103,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 0.5857864376269051
+      },
+      "after": null
+    },
+    {
+      "n": 94,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 40,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 40,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 95,
+      "actor": "e:犹格索托斯之子",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 290,
+        "mp": 17,
+        "tp": 30,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 290,
+        "mp": 10,
+        "tp": 30,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 96,
+      "actor": "h:弗兰克",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 12,
+        "row": 22
+      },
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 2.585786437626905
+      }
+    },
+    {
+      "n": 97,
+      "actor": "h:弗兰克",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 11,
+        "row": 20
+      },
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 2.585786437626905
+      },
+      "after": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 0.17157287525381015
+      }
+    },
+    {
+      "n": 98,
+      "actor": "h:弗兰克",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 0.17157287525381015
+      },
+      "after": null
+    },
+    {
+      "n": 99,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 40,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 40,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 100,
+      "actor": "h:埃利奥特",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 11,
+        "row": 8
+      },
+      "before": {
+        "hp": 100,
+        "mp": 103,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 6
+      },
+      "after": {
+        "hp": 100,
+        "mp": 103,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 1
+      }
+    },
+    {
+      "n": 101,
+      "actor": "h:埃利奥特",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 11,
+        "row": 7
+      },
+      "before": {
+        "hp": 100,
+        "mp": 103,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 1
+      },
+      "after": {
+        "hp": 100,
+        "mp": 103,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 0
+      }
+    },
+    {
+      "n": 102,
+      "actor": "h:埃利奥特",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 100,
+        "mp": 103,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 0
+      },
+      "after": null
+    },
+    {
+      "n": 103,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 40,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 40,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 104,
+      "actor": "e:犹格索托斯之子",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 300,
+        "mp": 10,
+        "tp": 30,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 300,
+        "mp": 10,
+        "tp": 30,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 105,
+      "actor": "h:弗兰克",
+      "action": "move",
+      "skill": null,
+      "move": {
+        "col": 11,
+        "row": 16
+      },
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 0.17157287525381015
+      }
+    },
+    {
+      "n": 106,
+      "actor": "h:弗兰克",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 0.17157287525381015
+      },
+      "after": null
+    },
+    {
+      "n": 107,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 40,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 45,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 108,
+      "actor": "e:犹格索托斯之子",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 300,
+        "mp": 10,
+        "tp": 30,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 300,
+        "mp": 2,
+        "tp": 35,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    },
+    {
+      "n": 109,
+      "actor": "h:弗兰克",
+      "action": "attack",
+      "skill": "克虏伯1918型",
+      "move": null,
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 1,
+        "aux": 1,
+        "move": 5
+      },
+      "after": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 0,
+        "aux": 1,
+        "move": 5
+      }
+    },
+    {
+      "n": 110,
+      "actor": "h:弗兰克",
+      "action": "endAction",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 180,
+        "mp": 16,
+        "tp": 10,
+        "main": 0,
+        "aux": 1,
+        "move": 5
+      },
+      "after": null
+    },
+    {
+      "n": 111,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 45,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 50,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      }
+    },
+    {
+      "n": 112,
+      "actor": "e:伊塔库亚的眷族",
+      "action": "enemyTurn",
+      "skill": null,
+      "move": null,
+      "before": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 50,
+        "main": 1,
+        "aux": 1,
+        "move": 8
+      },
+      "after": {
+        "hp": 464,
+        "mp": 1,
+        "tp": 55,
+        "main": null,
+        "aux": null,
+        "move": null
+      }
+    }
+  ],
+  "opening": {
+    "units": 10,
+    "heroes": 4,
+    "enemies": 6,
+    "tpAllZero": true,
+    "seed": 20261123
+  },
+  "summary": {
+    "terminal": true,
+    "result": "lose",
+    "heroesAlive": 0,
+    "enemiesAlive": 2,
+    "heroes": [
+      {
+        "id": "h:埃利奥特",
+        "name": "埃利奥特",
+        "hp": 0,
+        "mp": 103,
+        "tp": 30,
+        "status": "down"
+      },
+      {
+        "id": "h:弗兰克",
+        "name": "弗兰克",
+        "hp": 0,
+        "mp": 16,
+        "tp": 30,
+        "status": "down"
+      },
+      {
+        "id": "h:玛德琳",
+        "name": "玛德琳",
+        "hp": 0,
+        "mp": 8,
+        "tp": 50,
+        "status": "down"
+      },
+      {
+        "id": "h:索恩",
+        "name": "索恩",
+        "hp": 0,
+        "mp": 15,
+        "tp": 60,
+        "status": "down"
+      }
+    ],
+    "enemies": [
+      {
+        "id": "e:深潜者A",
+        "name": "深潜者A",
+        "hp": 0,
+        "status": "dead"
+      },
+      {
+        "id": "e:深潜者B",
+        "name": "深潜者B",
+        "hp": 0,
+        "status": "dead"
+      },
+      {
+        "id": "e:伊塔库亚的眷族",
+        "name": "伊塔库亚的眷族",
+        "hp": 464,
+        "status": "active"
+      },
+      {
+        "id": "e:犹格索托斯之子",
+        "name": "犹格索托斯之子",
+        "hp": 300,
+        "status": "active"
+      },
+      {
+        "id": "e:食尸鬼A",
+        "name": "食尸鬼A",
+        "hp": 0,
+        "status": "dead"
+      },
+      {
+        "id": "e:食尸鬼B",
+        "name": "食尸鬼B",
+        "hp": 0,
+        "status": "dead"
+      }
+    ],
+    "positions": {
+      "h:埃利奥特": {
+        "col": 11,
+        "row": 9,
+        "facing": 0
+      },
+      "h:弗兰克": {
+        "col": 11,
+        "row": 17,
+        "facing": 45
+      },
+      "h:玛德琳": {
+        "col": 12,
+        "row": 22,
+        "facing": 0
+      },
+      "h:索恩": {
+        "col": 12,
+        "row": 12,
+        "facing": 108.43494882292202
+      },
+      "e:深潜者A": {
+        "col": 6,
+        "row": 19,
+        "facing": 180
+      },
+      "e:深潜者B": {
+        "col": 17,
+        "row": 22,
+        "facing": 209.05460409907712
+      },
+      "e:伊塔库亚的眷族": {
+        "col": 11,
+        "row": 15,
+        "facing": 198.43494882292202
+      },
+      "e:犹格索托斯之子": {
+        "col": 19,
+        "row": 12,
+        "facing": 292.38013505195954
+      },
+      "e:食尸鬼A": {
+        "col": 12,
+        "row": 29,
+        "facing": 180
+      },
+      "e:食尸鬼B": {
+        "col": 13,
+        "row": 30,
+        "facing": 180
+      }
+    },
+    "regions": 0
+  },
+  "turns": 112,
+  "resourceIssues": [],
+  "replayConsistent": true,
+  "errors": [],
+  "elapsedMs": 1676
+}

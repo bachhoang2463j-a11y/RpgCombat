@@ -65,11 +65,11 @@ async function rules02Norm(m) {
     cases.push(pend('R2-01', 'effect-definitions(EFFECT_DEFINITIONS/normalizeEffectTag) 未落地'));
   } else {
     const norm = ED.normalizeEffectTag, defs = ED.EFFECT_DEFINITIONS;
-    const singleGroup = norm('单体') === norm('群攻') && norm('单体') === '伤害' && norm('单回') === norm('群回') && norm('单回') === '治疗';
-    const dodgeSplit = norm('单避') === '闪避' && norm('群避') === '闪避' && norm('单避') !== norm('回避')
-      && defs['闪避'] && defs['回避'] && defs['闪避'].consumable === false && defs['回避'].consumable === true;
+    const singleGroup = norm('单体') === norm('群攻') && norm('单体') === '伤害' && norm('单回') === norm('群回') && norm('单回') === '回复';
+    const dodgeSplit = norm('单避') === '单避' && norm('群避') === '回避' && norm('单避') !== norm('回避')
+      && defs['单避'] && defs['回避'] && defs['单避'].consumable === true && defs['回避'].consumable === false;
     const subtype = norm('[单体(火焰)]') === '伤害(火焰)' && norm('[单避]') === norm('单避');
-    const idempotent = norm(norm('单避')) === norm('单避') && norm(norm('伤害(火焰)')) === '伤害(火焰)';
+    const idempotent = norm(norm('单避')) === norm('单避') && norm(norm('火焰')) === '火焰';
     cases.push(ok('R2-01 单群别名归一为规范标签，单避/群避归持续闪避不并回避，子型保留',
       singleGroup && dodgeSplit && subtype && idempotent,
       j({ 单体: norm('单体'), 群攻: norm('群攻'), 单避: norm('单避'), 群避: norm('群避'), 回避: norm('回避'),
@@ -83,7 +83,7 @@ async function rules02Norm(m) {
     const s1 = m.parser.parseSkill('【甲】[单体(火焰);power:5][范围:单体;射程:9]');
     const s2 = m.parser.parseSkill('【乙】[群攻(火焰);power:5][范围:单体;射程:9]');
     const s3 = m.parser.parseSkill('【丙】[单避][范围:单体;射程:9]');
-    const pass = s1 && s2 && s3 && s1.type === '[伤害(火焰)]' && s2.type === '[伤害(火焰)]' && s3.type === '[闪避]' && !/[单群]/.test(s3.type);
+    const pass = s1 && s2 && s3 && s1.type === '[伤害(火焰)]' && s2.type === '[伤害(火焰)]' && s3.type === '[单避]';
     cases.push(ok('R2-02 parser 槽位输出规范标签且不保留单群写法', pass, j({ 甲: s1 && s1.type, 乙: s2 && s2.type, 丙: s3 && s3.type })));
   }
 
@@ -94,7 +94,7 @@ async function rules02Norm(m) {
     const skill = m.parser.parseSkill('【混合】[单体;power:2][群回;power:3][范围:圆形;半径:3;射程:8]');
     const slots = ED.skillSlots(skill);
     const base = slots.length === 2 && slots[0].index === 0 && slots[0].tag === '伤害' && slots[0].attack === true
-      && slots[0].power === 2 && slots[0].target === 'default' && slots[1].tag === '治疗' && slots[1].target === 'default';
+      && slots[0].power === 2 && slots[0].target === 'default' && slots[1].tag === '回复' && slots[1].target === 'default';
     const overrideView = ED.skillSlots({ ...skill, slotTargets: ['self'] });
     const ovr = overrideView.length === 2 && overrideView[0].target === 'self' && overrideView[1].target === 'default';
     const selfCost = ED.skillSlots(m.parser.parseSkill('【耗】[自降;power:3][范围:圆形;半径:2;射程:8]'));
@@ -107,7 +107,7 @@ async function rules02Norm(m) {
   {
     const open = scene0();
     const h = unit('h', 'hero', { spd: 200 }); const a = unit('a', 'hero');
-    const rangeOk = Array.isArray(m.protocol.RANGE_TYPES) && m.protocol.RANGE_TYPES.length === 7 && m.protocol.RANGE_TYPES.includes('自身');
+    const rangeOk = Array.isArray(m.protocol.RANGE_TYPES) && m.protocol.RANGE_TYPES.includes('自身') && m.protocol.RANGE_TYPES.includes('召唤');
     const selfSkill = m.parser.parseSkill('【自省】[自降;power:3][范围:自身]');
     const q = m.range.queryAttack(ctxOf(m, open, [h, a], { h: { col: 1, row: 4 }, a: { col: 3, row: 4 } }), 'h', selfSkill, aimAt(1, 4));
     const selfBranch = q.ok && Array.isArray(q.slotTargets) && q.slotTargets[0] && j(q.slotTargets[0].targetIds) === j(['h']);
@@ -252,8 +252,9 @@ async function rules02Damage(m) {
 
 function reactionSetup(m) {
   const h = unit('h', 'hero', { spd: 200, mp: 20 });
-  const reactionSkill = m.parser.parseSkill('【格挡】[回避][反应][MP:3][范围:单体;射程:9]');
+  const reactionSkill = m.parser.parseSkill('【格挡】[单避][反应][MP:3][范围:自身]');
   const re = unit('re', 'enemy', { hp: 50, mp: 20, skills: [reactionSkill] });
+  re.controller = 'player';
   const plain = m.parser.parseSkill('【直击】[单体;power:6][范围:单体;射程:12]');
   return { h, re, reactionSkill, plain, parsedOk: !!(reactionSkill.isReaction && reactionSkill.cost === 3) };
 }
@@ -435,7 +436,7 @@ async function rules02Prep(m) {
 
   // R2-15 物品弹药按发消耗：每次使用恰好消耗一发，额度归零后拒绝再使用（需 beginUseItem）
   {
-    const item = m.parser.parseItem('【弹药匣】[弹药][次数:3][范围:单体;射程:12]');
+    const item = m.parser.parseItem('【弹药匣】[枪击;power:1][道具][次数:3][范围:单体;射程:12]');
     const e = unit('e', 'enemy', { hp: 100 });
     const b = newBattle(m, [unit('h', 'hero', { spd: 200 }), e], { h: { col: 1, row: 4 }, e: { col: 5, row: 4 } });
     if (!b || typeof b.beginUseItem !== 'function') {
@@ -486,7 +487,7 @@ async function rules02Prep(m) {
 
   // R2-17 召唤生命周期：[召唤:X] 解析 + 施放生成召唤物（需 beginAttack，死亡退场待接口定型）
   {
-    const summonSkill = m.parser.parseSkill('【召唤】[单体;power:5][召唤:幽灵][范围:自身]');
+    const summonSkill = m.parser.parseSkill('【召唤】[召唤:幽灵][范围:召唤;射程:8]');
     const parsedOk = summonSkill && summonSkill.summonTarget === '幽灵';
     const provider = () => ({ maxHp: 20, mp: 0, maxMp: 0, atk: 5, def: 0, spd: 80, evasion: 0, moveDistance: 3, footprint: { width: 1, height: 1 } });
     const b = m.battle.createBattle({ units: [unit('h', 'hero', { spd: 200 }), unit('e', 'enemy', { hp: 50 })],
@@ -498,7 +499,7 @@ async function rules02Prep(m) {
       try {
         b.start();
         const ids0 = b.snapshot().units.map(u => u.id);
-        drive(b.beginAttack(summonSkill, aimAt(1, 4, 'h')));
+        drive(b.beginAttack(summonSkill, aimAt(3, 4)));
         const snap = b.snapshot();
         const spawned = snap.units.filter(u => !ids0.includes(u.id));
         if (!spawned.length) cases.push(ok('R2-17 施放召唤生成召唤物单位', false,

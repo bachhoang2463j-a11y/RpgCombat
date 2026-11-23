@@ -160,7 +160,7 @@ async function t0103(deps) {
     ['【刺击】[范围:单体]', { type: '单体' }],
     ['【扫射】[范围:直线;长:10;宽:1]', { type: '直线', length: 10, width: 1 }],
     ['【横斩】[范围:扇形;射程:3;角度:90]', { type: '扇形', castRange: 3, angle: 90 }],
-    ['【火球】[范围:圆形;射程:15;半径:3]', { type: '圆形', castRange: 15, radius: 3 }],
+    ['【火球】[范围:圆形;射程:15;半径:3]', { type: '爆炸', castRange: 15, radius: 3 }],
     ['【天罚】[范围:全域]', { type: '全域' }],
     ['【榴弹】[范围:爆炸;射程:12;半径:4]', { type: '爆炸', castRange: 12, radius: 4 }],
   ];
@@ -180,12 +180,12 @@ async function t0103(deps) {
   const s4 = parser.parseSkill('【贯通】[单体;power:40][范围:直线;长:12;宽:2]');
   cases.push(ok('T01-03 显式范围配旧单体并存', eq(s4.range, { type: '直线', length: 12, width: 2 }) && s4.type === '[伤害]' && s4.power === 40, JSON.stringify({ range: s4.range, type: s4.type, power: s4.power })));
   const s5 = parser.parseSkill('【爆裂】[群攻][范围:圆形;射程:10;半径:5]');
-  cases.push(ok('T01-03 显式范围配旧群攻并存', eq(s5.range, { type: '圆形', castRange: 10, radius: 5 }) && s5.type === '[伤害]', JSON.stringify({ range: s5.range, type: s5.type })));
+  cases.push(ok('T01-03 显式范围配旧群攻并存', eq(s5.range, { type: '爆炸', castRange: 10, radius: 5 }) && s5.type === '[伤害]', JSON.stringify({ range: s5.range, type: s5.type })));
 
   // 范围/行动标签不占三效果槽
   const s6 = parser.parseSkill('【辅射】[范围:直线;长:8][行动:辅][群攻(枪击)]');
   cases.push(ok('T01-03 行动辅', eq(s6.actionCost, { main: 0, aux: 1 }), JSON.stringify(s6.actionCost)));
-  cases.push(ok('T01-03 主槽仍为群攻(枪击)', s6.type === '[伤害(枪击)]' && s6.type2 === '[无]', JSON.stringify([s6.type, s6.type2])));
+  cases.push(ok('T01-03 旧括号枪击保留演出子型且不恢复人数语义', s6.type === '[伤害(枪击)]' && s6.type2 === '[无]', JSON.stringify([s6.type, s6.type2])));
   const s7 = parser.parseSkill('【主射】[行动:主][单体]');
   cases.push(ok('T01-03 行动主', eq(s7.actionCost, { main: 1, aux: 0 }), JSON.stringify(s7.actionCost)));
   const s8 = parser.parseSkill('【默认】[单体]');

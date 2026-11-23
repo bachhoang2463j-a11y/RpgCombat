@@ -24,14 +24,18 @@ async function p04(m) {
   const cases = [];
   const low = { id: 'low', kind: 'lowCounter', bounds: { col: 3, row: 2, width: 1, height: 1 } };
   const wall = { id: 'wall', kind: 'wall', bounds: { col: 5, row: 2, width: 1, height: 1 } };
-  const map = room([low, wall]);
+  const map = room([low]);
   const h = unit('h', 'hero', { spd: 200, strength: 40, moveDistance: 6 });
   const e = unit('e', 'enemy', { hp: 100, spd: 100, strength: 20, totalWeight: 30 });
   const b = createBattle(m, [h, e], { h: { col: 2, row: 2 }, e: { col: 7, row: 2 } }, map);
   b.start();
   const lowJump = b.previewJump(4, 2);
-  const wallJump = b.previewJump(6, 2);
-  cases.push(ok('T04-01 敏捷100力量40跳距上限7m，可越低障不可越实墙',
+  const hw = unit('hw', 'hero', { spd: 200, strength: 40, moveDistance: 6 });
+  const ew = unit('ew', 'enemy', { hp: 100, spd: 100, strength: 20, totalWeight: 30 });
+  const bw = createBattle(m, [hw, ew], { hw: { col: 3, row: 2 }, ew: { col: 7, row: 2 } }, room([wall]));
+  bw.start();
+  const wallJump = bw.previewJump(5, 2);
+  cases.push(ok('T04-01 跳距=ceil(基础移动/3)=2m，可越低障不可越实墙',
     lowJump.ok && lowJump.distance === 2 && !wallJump.ok && wallJump.reason.includes('实墙'),
     JSON.stringify({ lowJump, wallJump })));
   const beforeSprint = b.snapshot().resources;

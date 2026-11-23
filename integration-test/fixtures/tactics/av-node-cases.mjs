@@ -128,7 +128,7 @@ export const groups = {
       cases.push(ok('TAV-05 actionSerial 首次自然行动 = 1', s0.actionSerial === 1, String(s0.actionSerial)));
       const target = b.reachable().cells.filter(c => c.cost > 0).sort((a, c) => c.cost - a.cost)[0];
       const mv = b.move(target.col, target.row);
-      cases.push(ok('TAV-05 move 返回 cell.path 与额度前后值', mv.ok && mv.cell.path.length >= 2 && Math.abs(mv.moveBefore - mv.moveAfter - target.cost) < 1e-9, j({ len: mv.cell.path.length, b: mv.moveBefore, a: mv.moveAfter })));
+      cases.push(ok('TAV-05 move返回实际路径与扣费（发现新敌人可提前停止）', mv.ok && mv.cell.path.length >= 2 && Math.abs(mv.moveBefore - mv.moveAfter - mv.cell.cost) < 1e-9, j({ len: mv.cell.path.length, b: mv.moveBefore, a: mv.moveAfter })));
       cases.push(ok('TAV-05 移动不推进虚拟时间', b.snapshot().now === s0.now, ''));
       void hero;
     }
@@ -155,7 +155,7 @@ export const groups = {
       const mvRest = b.snapshot().resources.moveRemaining;
       const back = b.reachable().cells.find(c => c.cost > 0 && c.cost <= mvRest);
       const mv = b.move(back.col, back.row);
-      cases.push(ok('TAV-05 攻击后撤回只扣实际路程（额度不刷新不丢失）', mv.ok && Math.abs(mvRest - back.cost - b.snapshot().resources.moveRemaining) < 1e-9, j({ mvRest, cost: back.cost, left: b.snapshot().resources.moveRemaining })));
+      cases.push(ok('TAV-05 攻击后撤回只扣实际路程（额度不刷新不丢失）', mv.ok && Math.abs(mvRest - mv.cell.cost - b.snapshot().resources.moveRemaining) < 1e-9, j({ mvRest, cost: mv.cell.cost, left: b.snapshot().resources.moveRemaining })));
     }
     // C. 敌方决策只读；runEnemyTurn 与 plan+move+attack 同一命令链
     {

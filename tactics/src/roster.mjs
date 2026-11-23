@@ -60,6 +60,7 @@ const GAP_FILL = {
   isReaction: false, isOthers: false, guaranteedHit: false, switchTarget: false,
   isHighTier: false, isLegendary: false, summonNoLimit: false, ignoreRow: false,
   range: null, actionCost: null, evadeShift: null,
+  isPierce: false, affectsAll: false, displacements: null, regionEffect: null, reactionSource: false, parentItemName: null,
 };
 
 function fieldEmpty(v, empty) {

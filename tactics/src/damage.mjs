@@ -1,7 +1,7 @@
 // ==========================================
 // 战棋 FX02 伤害管线（原版 index.html calculateDamage L22998 / computeSegmentRawDamage L23018 迁移）
 // 计算与扣血分开；随机入口可注入；独立闪避（防御侧只读 evasion，不读敏捷，S05）。
-// 管线顺序（原版 L23031 口径）：〔全队屏障——场地结界暂缓〕→ 变种类型抗性（调用方）→ 护甲/免伤/防御姿态 → 护盾 → HP。
+// 场地结界与变种减伤由调用方处理，再走护甲／防御姿态、整技免伤池、护盾和 HP。
 // ==========================================
 
 // 命闪判定：攻击方掷 1..(skill.hit + hitBonus)，防御侧掷 1..(evasion + evaBonus)，攻击 ≥ 防御即命中。
@@ -27,22 +27,18 @@ export function computeSegmentRawDamage(casterStats, baseAtk, tagPower, multipli
   return Math.floor(rawDamage * dmgMultiplier);
 }
 
-// 护甲→免伤→防御姿态→护盾→HP（原版 calculateDamage L22998）。
-// target 视图 {def, shield, hp}；opts = { isPierce, armorMult=1, hasDamageGuard=false, defending=false }。
-// 【免伤】允许防御值把本次伤害降为 0；普通防御仍保留至少 1 点；穿透无视护甲与护盾。
+// 护甲／防御姿态→整技免伤池→护盾→HP；纯计算，不扣真实护盾或免伤额度。
+// 穿透无视护甲和个人盾，不绕过整技免伤；普通护甲仍保留至少1点。
 export function calculateDamage(rawDmg, target, opts = {}) {
-  if (rawDmg <= 0) return { hpDmg: 0, shieldDmg: 0 };
+  if (rawDmg <= 0) return { hpDmg: 0, shieldDmg: 0, guardDmg: 0 };
   const isPierce = !!opts.isPierce;
   const armorMult = opts.armorMult === undefined ? 1 : opts.armorMult;
-  const hasDamageGuard = !!opts.hasDamageGuard;
-  let dmg = Math.max(hasDamageGuard ? 0 : 1, rawDmg - (isPierce ? 0 : Math.floor((target.def || 0) * armorMult)));
+  let dmg = Math.max(opts.hasDamageGuard ? 0 : 1, rawDmg - (isPierce ? 0 : Math.floor((target.def || 0) * armorMult)));
   if (opts.defending) dmg = Math.ceil(dmg / 2);
-  let shieldDmg = 0;
-  if ((target.shield || 0) > 0 && !isPierce) {
-    if (target.shield >= dmg) { shieldDmg = dmg; dmg = 0; }
-    else { shieldDmg = target.shield; dmg -= target.shield; }
-  }
-  return { hpDmg: dmg, shieldDmg };
+  const guardDmg = Math.min(Math.max(0, opts.guardRemaining || 0), dmg);
+  dmg -= guardDmg;
+  const shieldDmg = isPierce ? 0 : Math.min(Math.max(0, target.shield || 0), dmg);
+  return { hpDmg: dmg - shieldDmg, shieldDmg, guardDmg };
 }
 
 // ---------- 兼容旧测试的直扣入口（battle 主链不再使用） ----------

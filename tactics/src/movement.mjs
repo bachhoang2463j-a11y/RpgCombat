@@ -1,13 +1,16 @@
 // ==========================================
 // 战棋 P04/M2 基础移动寻路（八向 Dijkstra，1/√2 成本，两实障夹角禁穿）
-// ctx = { compiled, units, placementsById, footprintsById }；live = ref.hp > 0。
+// ctx = { compiled, units, placementsById, footprintsById, buffsOf? }；live = ref.hp > 0。
 // 敌方站立单位/实墙/关门/低障碍阻挡移动；友方可穿行但不可落其占地；
 // 多格 footprint 每步全路径容纳；budget=Infinity 供 AI 全图查询（有限格网必然终止）。
+// 飞行（unit.ref.flying 或 buffsOf variant 飞行）：普通移动可跨低障碍，不越实墙/关门。
+// 结界：敌方跨边界（普通移动/跳跃/强制位移/冲锋）一律阻断。
 // 本模块不改 ctx、不做表现层；移动额度（米）由调用方作为 budget 传入。
 // ==========================================
 
 import { cellAt } from './scene.mjs';
-import { occupiedCells, cellKey } from './geometry.mjs';
+import { occupiedCells, cellKey, unitCenter } from './geometry.mjs';
+import { barrierCrossing } from './barriers.mjs';
 
 const SQRT2 = Math.SQRT2;
 const EPS = 1e-9;
@@ -16,6 +19,13 @@ function findUnit(ctx, unitId) {
   const u = ctx.units.find(x => x.id === unitId);
   if (!u) throw new Error('单位不存在: ' + unitId);
   return u;
+}
+
+// 飞行：ref.flying 或 buffsOf 中出现 variant 飞行
+function hasFlying(ctx, unit) {
+  if (unit.ref && unit.ref.flying) return true;
+  const buffs = typeof ctx.buffsOf === 'function' ? (ctx.buffsOf(unit.id) || []) : [];
+  return buffs.some(b => b && (b.type === '飞行' || b.type === 'flying' || b.variant === '飞行'));
 }
 
 // live 单位占位索引：cellKey → { id, side }（倒地/死亡不挡路）
@@ -31,18 +41,26 @@ function buildLiveOcc(ctx) {
   return occ;
 }
 
-// 单格移动阻挡：界外/地形（实墙+关门+低障碍）/敌方站立单位；友方与自身不算
-function cellBlocked(ctx, col, row, occ, selfId, selfSide) {
+// 地形是否阻挡：飞行忽略低障碍，但实墙/关门（非 lowObstacle）仍阻挡
+function terrainBlocks(cell, flying) {
+  if (!cell) return true;
+  if (!cell.blocksMovement) return false;
+  if (flying && cell.lowObstacle && !cell.blocksProjectile) return false;
+  return true;
+}
+
+// 单格移动阻挡：界外/地形/敌方站立单位；友方与自身不算
+function cellBlocked(ctx, col, row, occ, selfId, selfSide, flying) {
   const cell = cellAt(ctx.compiled, col, row);
-  if (!cell || cell.blocksMovement) return true;
+  if (terrainBlocks(cell, flying)) return true;
   const o = occ.get(cellKey(col, row));
   return !!(o && o.id !== selfId && o.side !== selfSide);
 }
 
 // 新锚点整个 footprint 区域可进入（友方占格允许穿行）
-function regionEnterable(ctx, col, row, fp, occ, selfId, selfSide) {
+function regionEnterable(ctx, col, row, fp, occ, selfId, selfSide, flying) {
   for (const c of occupiedCells({ col, row }, fp)) {
-    if (cellBlocked(ctx, c.col, c.row, occ, selfId, selfSide)) return false;
+    if (cellBlocked(ctx, c.col, c.row, occ, selfId, selfSide, flying)) return false;
   }
   return true;
 }
@@ -56,10 +74,10 @@ function regionStandable(ctx, col, row, fp, occ, selfId) {
   return true;
 }
 
-function placementBlocker(ctx, col, row, fp, occ, selfId) {
+function placementBlocker(ctx, col, row, fp, occ, selfId, flying) {
   for (const c of occupiedCells({ col, row }, fp)) {
     const cell = cellAt(ctx.compiled, c.col, c.row);
-    if (!cell || cell.blocksMovement) return { type: 'terrain', col: c.col, row: c.row, cell };
+    if (terrainBlocks(cell, flying)) return { type: 'terrain', col: c.col, row: c.row, cell };
     const o = occ.get(cellKey(c.col, c.row));
     if (o && o.id !== selfId) return { type: 'unit', unitId: o.id, side: o.side, col: c.col, row: c.row };
   }
@@ -73,18 +91,19 @@ export function cellsAdjacent(a, afp, b, bfp) {
   return false;
 }
 
-// 落点必须容纳完整占地；忽略单位只供携带放下等已明确持有的实体使用。
+// 落点必须容纳完整占地；飞行允许落在低障碍；忽略单位只供携带放下等已明确持有的实体使用。
 export function canPlaceAt(ctx, unitId, col, row, ignoreUnitIds = []) {
   const unit = findUnit(ctx, unitId);
   const fp = ctx.footprintsById[unitId] || unit.footprint || { width: 1, height: 1 };
+  const flying = hasFlying(ctx, unit);
   const ignored = new Set([unitId, ...ignoreUnitIds]);
   const occ = buildLiveOcc(ctx);
   for (const [key, o] of occ) if (ignored.has(o.id)) occ.delete(key);
-  const blockedBy = placementBlocker(ctx, col, row, fp, occ, unitId);
+  const blockedBy = placementBlocker(ctx, col, row, fp, occ, unitId, flying);
   return blockedBy ? { ok: false, blockedBy } : { ok: true, blockedBy: null };
 }
 
-// 跳跃越过低障碍、缺口与单位；沿八方向直线采样，实墙/关门仍阻断。
+// 跳跃越过低障碍、缺口与单位；沿八方向直线采样，实墙/关门/结界仍阻断。
 export function findJumpPath(ctx, unitId, col, row, maxDistance = Infinity) {
   const unit = findUnit(ctx, unitId);
   const p = ctx.placementsById[unitId];
@@ -114,12 +133,24 @@ export function findJumpPath(ctx, unitId, col, row, maxDistance = Infinity) {
       if (cell.blocksProjectile && !cell.void) return fail('跳跃被实墙或关门阻挡', { type: 'wall', col: c, row: r });
     }
   }
-  const blockedBy = placementBlocker(ctx, col, row, fp, occ, unitId);
+  // 结界：敌方起落点跨界，或起落都在外但轨迹穿过结界，均阻断
+  for (const b of ctx.barriers || []) {
+    if (unit.side === b.side) continue;
+    const s = new Set(b.cells.map(c => cellKey(c.col, c.row)));
+    const startIn = s.has(cellKey(p.col, p.row));
+    const endIn = s.has(cellKey(col, row));
+    const midIn = path.slice(1, -1).some(c => s.has(cellKey(c.col, c.row)));
+    if (startIn !== endIn || (!startIn && !endIn && midIn)) {
+      return fail('跳跃不能跨过结界', { type: 'barrier', barrierId: b.id });
+    }
+  }
+  const blockedBy = placementBlocker(ctx, col, row, fp, occ, unitId, false);
   if (blockedBy) return fail('跳跃落点不可站立', blockedBy);
   return { ok: true, reason: null, distance, maxDistance, path, blockedBy: null };
 }
 
-// 技能强制位移沿离散八方向推进，单位/地形接触点只报告，不在此处做伤害结算。
+// 技能强制位移沿离散八方向推进，单位/地形/结界接触点只报告，不在此处做伤害结算。
+// 距离量化剩余不足一步不算撞墙；只有真实阻挡才置 blocked。
 export function traceDisplacement(ctx, unitId, direction, distance) {
   const unit = findUnit(ctx, unitId);
   const p = ctx.placementsById[unitId];
@@ -127,7 +158,7 @@ export function traceDisplacement(ctx, unitId, direction, distance) {
   const dx = Math.sign(direction && direction.x || 0);
   const dy = Math.sign(direction && direction.y || 0);
   if ((!dx && !dy) || !Number.isFinite(distance) || distance < 0) {
-    return { ok: false, reason: '位移方向或距离无效', path: [], distance: 0, blockedBy: null };
+    return { ok: false, reason: '位移方向或距离无效', path: [], distance: 0, actual: 0, requested: distance, blocked: false, blockedBy: null };
   }
   const fp = ctx.footprintsById[unitId] || unit.footprint || { width: 1, height: 1 };
   const occ = buildLiveOcc(ctx);
@@ -136,14 +167,22 @@ export function traceDisplacement(ctx, unitId, direction, distance) {
   let traveled = 0;
   let blockedBy = null;
   while (traveled + stepDistance <= distance + EPS) {
-    const next = path[path.length - 1];
-    const col = next.col + dx, row = next.row + dy;
-    blockedBy = placementBlocker(ctx, col, row, fp, occ, unitId);
+    const cur = path[path.length - 1];
+    const col = cur.col + dx, row = cur.row + dy;
+    blockedBy = placementBlocker(ctx, col, row, fp, occ, unitId, false);
+    if (!blockedBy) {
+      const crossing = barrierCrossing(ctx, unitId, cur, { col, row });
+      if (crossing) blockedBy = { type: 'barrier', barrierId: crossing.id, col, row };
+    }
     if (blockedBy) break;
     path.push({ col, row });
     traveled += stepDistance;
   }
-  return { ok: true, reason: null, path, distance: traveled, requestedDistance: distance, blockedBy };
+  return {
+    ok: true, reason: null, path, distance: traveled,
+    actual: traveled, requested: distance, requestedDistance: distance,
+    blocked: !!blockedBy, blockedBy,
+  };
 }
 
 // 可达合法落点：{ cells: [{col,row,cost,path:[{col,row}]}], byKey: Map<cellKey, cell> }
@@ -153,8 +192,9 @@ export function findReachable(ctx, unitId, budget = Infinity, costMultiplier = 1
   const p = ctx.placementsById[unitId];
   if (!p) throw new Error('单位缺少站位: ' + unitId);
   const fp = ctx.footprintsById[unitId] || unit.footprint || { width: 1, height: 1 };
+  const flying = hasFlying(ctx, unit);
   const occ = buildLiveOcc(ctx);
-  const enterable = (col, row) => regionEnterable(ctx, col, row, fp, occ, unitId, unit.side);
+  const enterable = (col, row) => regionEnterable(ctx, col, row, fp, occ, unitId, unit.side, flying);
 
   const dist = new Map();
   const prev = new Map();
@@ -184,6 +224,7 @@ export function findReachable(ctx, unitId, budget = Infinity, costMultiplier = 1
         const nCost = cur.cost + step;
         if (nCost > budget + EPS) continue;
         if (!enterable(nc, nr)) continue;
+        if (barrierCrossing(ctx, unitId, { col: cur.col, row: cur.row }, { col: nc, row: nr })) continue;
         const nk = cellKey(nc, nr);
         const old = dist.get(nk);
         if (old !== undefined && old <= nCost + EPS) continue;
@@ -214,4 +255,58 @@ export function findReachable(ctx, unitId, budget = Infinity, costMultiplier = 1
   }
   cells.sort((a, b) => a.row - b.row || a.col - b.col);
   return { cells, byKey };
+}
+
+// 冲锋路径原语：沿八方向（aim 量化）推进 distance 米，返回几何路径与阻挡条目。
+// 不扣资源、不推人；主代理逐步对 enemy 结算。实墙/友军/结界在抵达前停止；
+// enemy 记录为 blockingEntries 后继续（由 battle 处理击退与继续推进）。
+export function chargePath(ctx, unitId, aim, distance) {
+  const unit = findUnit(ctx, unitId);
+  const p = ctx.placementsById[unitId];
+  if (!p) throw new Error('单位缺少站位: ' + unitId);
+  const fp = ctx.footprintsById[unitId] || unit.footprint || { width: 1, height: 1 };
+  const origin = unitCenter(p, fp);
+  let dx = aim && Number.isFinite(aim.x) ? aim.x - origin.x : 0;
+  let dy = aim && Number.isFinite(aim.y) ? aim.y - origin.y : 0;
+  if (Math.abs(dx) < EPS && Math.abs(dy) < EPS) {
+    return { ok: false, reason: '冲锋方向无效', path: [], from: { col: p.col, row: p.row }, direction: { x: 0, y: 0 }, distance: 0, stepDistance: 0, blockingEntries: [] };
+  }
+  if (!dx && !dy) {
+    return { ok: false, reason: '冲锋方向无效', path: [], from: { col: p.col, row: p.row }, direction: { x: 0, y: 0 }, distance: 0, stepDistance: 0, blockingEntries: [] };
+  }
+  const angle = Math.atan2(dy, dx);
+  const q = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+  const dir = { x: Math.round(Math.cos(q)), y: Math.round(Math.sin(q)) };
+  const stepDistance = dir.x && dir.y ? SQRT2 : 1;
+  const occ = buildLiveOcc(ctx);
+  const path = [{ col: p.col, row: p.row }];
+  const blockingEntries = [];
+  let traveled = 0;
+  let stopped = false;
+  while (!stopped && traveled + stepDistance <= distance + EPS) {
+    const cur = path[path.length - 1];
+    const col = cur.col + dir.x, row = cur.row + dir.y;
+    let terrainHit = null;
+    for (const c of occupiedCells({ col, row }, fp)) {
+      const cell = cellAt(ctx.compiled, c.col, c.row);
+      if (!cell || cell.blocksMovement) { terrainHit = { type: 'terrain', col: c.col, row: c.row }; break; }
+    }
+    if (terrainHit) { blockingEntries.push(terrainHit); stopped = true; break; }
+    const crossing = barrierCrossing(ctx, unitId, cur, { col, row });
+    if (crossing) { blockingEntries.push({ type: 'barrier', barrierId: crossing.id, col, row }); stopped = true; break; }
+    const seen = new Set();
+    let allyHit = null;
+    for (const c of occupiedCells({ col, row }, fp)) {
+      const o = occ.get(cellKey(c.col, c.row));
+      if (!o || o.id === unitId || seen.has(o.id)) continue;
+      seen.add(o.id);
+      const entry = { type: 'unit', unitId: o.id, side: o.side, col: c.col, row: c.row };
+      blockingEntries.push(entry);
+      if (o.side === unit.side) allyHit = entry;
+    }
+    path.push({ col, row });
+    traveled += stepDistance;
+    if (allyHit) stopped = true;
+  }
+  return { ok: true, reason: null, path, from: { col: p.col, row: p.row }, direction: dir, distance: traveled, stepDistance, blockingEntries };
 }

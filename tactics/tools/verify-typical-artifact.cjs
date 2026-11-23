@@ -1,0 +1,53 @@
+'use strict';
+// 直接检查重建单文件中的真实后端；不把离线规则验证冒充页面交互门禁。
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const { createHash } = require('node:crypto');
+const root = path.resolve(__dirname, '..', '..');
+const artifact = path.join(root, 'tactics', 'mvp-standalone.html');
+const html = fs.readFileSync(artifact, 'utf8');
+const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+const cases = [];
+function check(id, pass, detail = '') { cases.push({ id, pass: !!pass, detail }); }
+check('单个脚本及闭合标签', scripts.length === 1 && (html.match(/<\/script>/g) || []).length === 1);
+check('零外部业务脚本或样式', !/<script[^>]+src=|<link[^>]+stylesheet/i.test(html));
+const context = { console, structuredClone, URL, setTimeout, clearTimeout };
+context.window = context;
+vm.createContext(context);
+let hostError = null;
+try { new vm.Script(scripts[0][1]).runInContext(context, { timeout: 5000 }); }
+catch (error) { hostError = error.message; }
+check('无DOM离线宿主停在应用启动而非后端加载', hostError === 'document is not defined', hostError);
+const backend = context.__TACTICS_BACKEND__;
+check('真实产物导出纯后端接口', backend && ['parseYamlText', 'createScenarioData', 'createSeededRandom', 'createBattle'].every(k => typeof backend[k] === 'function'));
+if (backend) {
+  const yaml = fs.readFileSync(path.join(root, 'doc', 'tactics', '典型对局-战棋版.yaml'), 'utf8');
+  const block = backend.parseYamlText(yaml);
+  const data = backend.createScenarioData(block);
+  check('权威样本四英雄六敌两召唤词条入产物', block.heroes.length === 4 && block.enemies.length === 6 && block.summonTemplates.length === 2);
+  check('中文原值与独立属性保真', data.units[0].ref.hp === 100 && data.units[0].ref.mp === 110 && data.units[0].ref.perception === 50);
+  check('浓雾、冲锋与反应字段实际入包', block.heroes[0].skills.find(s => s.name === '拉莱耶造雾术').regionEffect.type === 'fog'
+    && data.summonProvider('幻梦行军兽').skills.find(s => s.name === '冲撞').displacements.some(d => d.type === '冲锋')
+    && block.heroes[0].skills.find(s => s.name === '巫师护盾').isReaction);
+  const battle = backend.createBattle({ ...data, scene: backend.scene, random: backend.createSeededRandom(data.seed) });
+  const opening = battle.start();
+  check('产物创建真实对局并发放自然行动', opening.units.length === 10 && opening.currentId === 'e:伊塔库亚的眷族' && opening.resources.main === 1 && opening.resources.aux === 1);
+  const caster = data.units.find(u => u.id === opening.currentId);
+  const rage = caster.skills.find(s => s.name === '风雪狂暴');
+  const action = battle.attack(rage);
+  check('产物真实技能结算扣费与增攻', action.ok && caster.ref.mp === 13 && battle.getEffectiveUnit(caster.id).atk === 150 && battle.snapshot().resources.main === 0);
+  check('产物完整重试还原随机种子和资源', JSON.stringify(battle.reset()) === JSON.stringify(opening));
+  const before = JSON.stringify(battle.snapshot());
+  battle.previewAttack(rage);
+  check('产物预览不扣HP/MP/主辅资源', JSON.stringify(battle.snapshot()) === before);
+}
+const report = {
+  artifact: 'tactics/mvp-standalone.html', sha256: createHash('sha256').update(html).digest('hex'), bytes: Buffer.byteLength(html),
+  kind: 'artifact-backend-only', pageGate: 'pending-frontend', cases,
+  passed: cases.filter(c => c.pass).length, failed: cases.filter(c => !c.pass).length,
+};
+const out = path.join(root, 'integration-test', 'fixtures', 'tactics', 'reports', 'TYPICAL-BATTLE-artifact.json');
+fs.writeFileSync(out, JSON.stringify(report, null, 2) + '\n');
+console.log(JSON.stringify(report));
+if (report.failed) process.exitCode = 1;

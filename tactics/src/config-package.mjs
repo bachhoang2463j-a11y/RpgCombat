@@ -29,6 +29,7 @@ const SKILL_PACK_KEYS = [
   'damageType', 'isOthers', 'guaranteedHit', 'switchTarget', 'ignoreRow',
   'critRate', 'fxTag', 'barrierSub', 'barrierArmor', 'isHighTier', 'isLegendary',
   'summonTarget', 'summonNoLimit', 'range', 'actionCost', 'evadeShift',
+  'isPierce', 'affectsAll', 'deathTag', 'displacements', 'regionEffect', 'reactionSource', 'isDeathTrigger', 'parentItemName',
 ];
 
 const ITEM_PACK_KEYS = [
@@ -40,6 +41,7 @@ const ITEM_PACK_KEYS = [
   'isOthers', 'guaranteedHit', 'switchTarget', 'ignoreRow', 'critRate',
   'isHighTier', 'isLegendary', 'fxTag', 'damageType', 'barrierSub', 'barrierArmor',
   'summonTarget', 'summonNoLimit', 'range', 'actionCost',
+  'isPierce', 'affectsAll', 'displacements', 'regionEffect', 'reactionSource',
   'children',
 ];
 

@@ -31,6 +31,31 @@ const FX01_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'f
 
 // 阶段注册表：只登记真实存在的用例文件；--all 只聚合这里的条目，不虚构未来阶段。
 const STAGES = {
+  'typical-skills': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'typical-skills-node-cases.mjs'),
+    groups: ['TT-SKILLS'], modules: ['battle', 'parser', 'scenarioData'],
+    requiredExports: [['battle', 'createBattle']],
+  },
+  'typical-battle': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'typical-battle-node-cases.mjs'),
+    groups: ['TT-BATTLE'], modules: ['battle', 'parser', 'scenarioData'],
+    requiredExports: [['battle', 'createBattle']],
+  },
+  'typical-data': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'typical-data-node-cases.mjs'),
+    groups: ['TT-DATA'], modules: ['parser', 'protocol', 'roster', 'configPackage', 'scenarioData'],
+    requiredExports: [['scenarioData', 'createScenarioData'], ['scenarioData', 'createSeededRandom']],
+  },
+  'typical-space': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'typical-space-node-cases.mjs'),
+    groups: ['TT-SPACE'], modules: ['scene', 'geometry', 'movement', 'range', 'regions', 'perception', 'barriers'],
+    requiredExports: [['perception', 'canSeeUnit'], ['regions', 'fogAt'], ['barriers', 'previewBarrier']],
+  },
+  'typical-ai': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'typical-ai-node-cases.mjs'),
+    groups: ['TT-AI'], modules: ['ai', 'range', 'movement', 'geometry', 'scene'],
+    requiredExports: [['ai', 'chooseEnemyAction']],
+  },
   p01: {
     file: P01_CASES,
     groups: ['T01-01', 'T01-02', 'T01-03', 'T01-04', 'T01-05', 'T01-06', 'T01-07', 'T01-08'],
@@ -195,6 +220,10 @@ function parseArgs(argv) {
 
 // 模块文件名 → 加载键（stageDef.modules 列出该阶段真正需要的模块）
 const MODULE_FILES = {
+  scenarioData: 'scenario-data.mjs',
+  regions: 'regions.mjs',
+  perception: 'perception.mjs',
+  barriers: 'barriers.mjs',
   protocol: 'protocol.mjs',
   parser: 'parser.mjs',
   roster: 'roster.mjs',

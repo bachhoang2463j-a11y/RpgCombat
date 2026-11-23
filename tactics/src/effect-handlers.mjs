@@ -1,12 +1,12 @@
 // ==========================================
 // 战棋 FX02 效果槽结算器（原版 index.html registerTagHandler L21117-21470 的战棋迁移）
 // 输入 rt = battle 注入的运行时（buffs/时钟/日志/随机），输出结算描述数组；不读 DOM。
-// 数值口径：治疗/增益/减益 power 默认 50、毒燃 max(1,floor(power))、燃烧减半治疗、
-// 免伤一次性消耗、回避一次性消耗、闪避持续、吸蓝以目标当前 MP 为上限——全部原值迁移。
+// 数值沿原版：即时恢复、属性点数增减、毒燃与麻痹叠层。
+// 单避只化解本段；免伤由攻击实例持有整技累计池；护盾累加至耗尽。
 // ==========================================
 
 import { isImmuneToPoison, isImmuneToBurn } from './variant-rules.mjs';
-import { hasVariantTag } from './variant-rules.mjs';
+import { isImmuneToStun } from './variant-rules.mjs';
 
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
 
@@ -58,15 +58,16 @@ function applyToTarget(rt, { caster, target, slot, def, power, turns, skill, ski
       // 减益为负值；自X 固定代价不做倍率放大（power 原值）、始终落地（上游已保证）
       const negative = !!def.debuff || slot.target === 'self' && def.selfCost;
       const value = negative ? -Math.abs(power) : Math.abs(power);
-      const buff = { type: def.field, value, duration: turns, sourceKey: source.effectId };
+      const buff = { type: def.field, value, duration: def.consumable ? Infinity : turns, isConsumable: !!def.consumable, sourceKey: source.effectId };
       rt.registerBuff(target, buff, source);
       rt.addLog(target.name + ' ' + (negative ? '' : '') + slot.tag.replace(/\[|\]/g, '') + ' ' + (negative ? '-' : '+') + Math.abs(power) + ' · ' + turns + '回');
       return { kind: 'buff', targetId: target.id, tag: slot.tag, field: def.field, value, turns };
     }
     case 'shield': {
-      ref.shield = (ref.shield || 0) + power;
-      rt.addLog('为 ' + target.name + ' 附加 ' + power + ' 点护盾');
-      return { kind: 'shield', targetId: target.id, tag: slot.tag, value: power };
+      const bonus = skill.critRate > 0 && rt.random() * 100 < skill.critRate ? 2 : 1;
+      ref.shield = (ref.shield || 0) + power * bonus;
+      rt.addLog('为 ' + target.name + ' 附加 ' + power * bonus + ' 点护盾');
+      return { kind: 'shield', targetId: target.id, tag: slot.tag, value: power * bonus, crit: bonus === 2 };
     }
     case 'dot': {
       const immune = def.dot === 'poison' ? isImmuneToPoison(target, rt.buffsOf(target.id)) : isImmuneToBurn(target, rt.buffsOf(target.id));
@@ -105,9 +106,17 @@ function applyToTarget(rt, { caster, target, slot, def, power, turns, skill, ski
       return { kind: 'mainPoint', targetId: target.id, tag: slot.tag, points: n };
     }
     case 'damageGuard': {
-      rt.registerBuff(target, { type: 'damageGuard', value: power, duration: Infinity, isConsumable: true, sourceKey: source.effectId }, source);
-      rt.addLog(target.name + ' 免伤：下一次受击防御+' + power + '（一次性）');
-      return { kind: 'damageGuard', targetId: target.id, tag: slot.tag, value: power };
+      const attackId = skill.isReaction ? rt.currentAttackId() : null;
+      const guardSource = { ...source, effectId: source.effectId + ':' + (attackId || 'pending') };
+      rt.registerBuff(target, { type: 'damageGuard', value: power, duration: Infinity, attackId, sourceKey: source.effectId }, guardSource);
+      rt.addLog(target.name + ' 免伤：当前整技累计额度 ' + power);
+      return { kind: 'damageGuard', targetId: target.id, tag: slot.tag, value: power, attackId };
+    }
+    case 'stun': {
+      const immune = isImmuneToStun(target, rt.buffsOf(target.id));
+      if (!immune) rt.dispatchBattleClock({ type: 'applyStun', unitId: target.id });
+      rt.addLog(target.name + (immune ? ' 免疫眩晕（钢体）' : ' 被击晕，将跳过下一次自然行动'));
+      return { kind: 'stun', targetId: target.id, tag: slot.tag, immune };
     }
     case 'counter': {
       rt.registerBuff(target, { type: 'counter', value: power, duration: turns, sourceKey: source.effectId }, source);

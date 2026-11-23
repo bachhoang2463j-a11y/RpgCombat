@@ -40,7 +40,7 @@ export function getEffectiveStats(unit, buffs = []) {
   for (const b of buffs) {
     if (!b || !Number.isFinite(b.value)) continue;
     if (b.type === 'atk') atk += b.value;
-    else if (b.type === 'def' || b.type === 'damageGuard') def += b.value; // 免伤：预存一次性防御加成计入有效 def（原版 L22965）
+    else if (b.type === 'def') def += b.value;
     else if (b.type === 'hit') hit += b.value;
     else if (b.type === 'eva' || b.type === 'paralyze') eva += b.value;
     else if (b.type === 'taunt') taunt += b.value;

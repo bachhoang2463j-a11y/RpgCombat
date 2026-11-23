@@ -119,7 +119,7 @@ function battleClockCases() {
     mkUnit('e1', 'enemy', null, { attrTags: ['[自爆:群伤;power:20]'], spd: 90 }),
     mkUnit('e3', 'enemy', null, { attrTags: ['[蜕皮]', '[连动]'], spd: 80, skills: [{ name: '蓄能炮', charge: 5 }] }),
   ];
-  const placements = { h1: { col: 2, row: 2 }, h2: { col: 2, row: 3 }, h3: { col: 3, row: 2 }, e1: { col: 6, row: 2 }, e3: { col: 6, row: 3 } };
+  const placements = { h1: { col: 2, row: 2 }, h2: { col: 2, row: 3 }, h3: { col: 3, row: 2 }, e1: { col: 4, row: 2 }, e3: { col: 6, row: 3 } };
   const b = createBattle({ units, placementsById: placements, scene: mkScene(), random: mulberry(20261123) });
   b.start();
   const st = b.battleState;
@@ -129,7 +129,7 @@ function battleClockCases() {
   poison(st, 'e3', 'b', 30, 200);   // 两跳：75→45→15（≤30% → 连动），endAt 后不再跳
   runTo(b, 200);
   const bLog = () => JSON.stringify(b.snapshot().log);
-  out.push(ok('R02-B1 自爆收口：e1 毒杀后死亡自爆，我方全员受伤', (() => {
+  out.push(ok('R02-B1 自爆收口：e1毒杀后仅半径3内我方受伤', (() => {
     return u('e1').ref.hp <= 0 && u('h2').ref.hp < 100 && u('h2').ref.hp > 0 && u('h1').ref.hp < 60 && bLog().indexOf('自爆·群伤') >= 0;
   })()));
   const h1AfterBoom = u('h1').ref.hp;

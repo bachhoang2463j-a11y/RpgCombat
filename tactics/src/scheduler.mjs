@@ -129,7 +129,8 @@ export function settlePhase12(battleState, t, hooks = {}) {
   // 阶段①：排在 t 的周期效果（含末跳——与到期同刻时先跳后移）
   for (const key of Object.keys(clock.statuses)) {
     const s = clock.statuses[key];
-    if (s.nextTickAt === undefined || Math.abs(s.nextTickAt - t) >= EPS) continue;
+    // 上一个周期回调可能通过复活／驱散移除后续状态。
+    if (!s || s.nextTickAt === undefined || Math.abs(s.nextTickAt - t) >= EPS) continue;
     let ev;
     if (s.kind === 'stealth-window') {
       const u = clock.units[s.unitId];
@@ -145,13 +146,14 @@ export function settlePhase12(battleState, t, hooks = {}) {
     }
     events.push(ev);
     hooks.onEvent && hooks.onEvent(ev);
+    if (clock.statuses[key] !== s) continue;
     s.nextTickAt += s.interval;
     if (s.endAt != null && s.nextTickAt > s.endAt + EPS) delete s.nextTickAt; // 节拍被期限截断
   }
   // 阶段②：状态到期（'spd' 到期触发重算）→ 冷却解除 → 救援截止
   for (const key of Object.keys(clock.statuses)) {
     const s = clock.statuses[key];
-    if (s.endAt == null || s.endAt > t + EPS) continue;
+    if (!s || s.endAt == null || s.endAt > t + EPS) continue;
     const type = s.kind === 'spd' ? 'spd-expired' : (s.kind === 'defend' ? 'defend-expired' : 'status-expired');
     const ev = pushLog(clock, t, type, { key, unitId: s.unitId, source: s.source, kind: s.kind, strength: s.strength });
     delete clock.statuses[key];

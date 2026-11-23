@@ -1,0 +1,150 @@
+import fs from 'node:fs';
+import { parseYamlText } from '../../../tactics/src/parser.mjs';
+import { createScenarioData, createSeededRandom } from '../../../tactics/src/scenario-data.mjs';
+import { createBattle, itemAsSkill } from '../../../tactics/src/battle.mjs';
+import { skillSlots } from '../../../tactics/src/effect-definitions.mjs';
+import { unitCenter } from '../../../tactics/src/geometry.mjs';
+
+const text = fs.readFileSync(new URL('../../../doc/tactics/典型对局-战棋版.yaml', import.meta.url), 'utf8');
+const scene = { sceneId: 'skill-coverage', grid: { columns: 30, rows: 20, metersPerCell: 1 }, objects: [] };
+const result = (id, pass, detail) => ({ id, pass: !!pass, detail: detail || '' });
+const SEED = 20261123;
+const data = createScenarioData(parseYamlText(text));
+
+function drive(gen, choose = () => null) { let s = gen.next(); while (!s.done) s = gen.next(choose(s.value)); return s.value; }
+function actUntil(b, id) { for (let i = 0; i < 60 && b.snapshot().currentId !== id; i++) b.endAction(); }
+function usesOf(b, id) { return Object.values(b.battleState.perBattleUses?.[id] || {}).reduce((n, v) => n + (v || 0), 0); }
+function buffsOf(b, id) { return (b.battleState.combatState.buffs?.[id]) || []; }
+
+// 专用主动技夹具：30x20 测试场 + 克隆施术者 + 木桩目标；非正式主棋盘，原技能成本/属性/次数不变。
+function createCase(source, skill) {
+  const caster = structuredClone(source);
+  caster.id = 'caster'; caster.side = 'hero'; caster.controller = 'player'; caster.classType = null;
+  const target = { id: 'target', name: '验证目标', side: 'enemy', controller: 'player', footprint: { width: 1, height: 1 },
+    ref: { hp: 1000, maxHp: 1000, mp: 100, maxMp: 100, tp: 0, maxTp: 100, atk: 20, def: 0, spd: 50, evasion: 0, moveDistance: 6, perception: 50 }, skills: [], items: [] };
+  const targetCol = skill.range?.castRange === 1 ? 5 : 6;
+  const b = createBattle({ units: [caster, target], placementsById: { caster: { col: 4, row: 4, facing: 90 }, target: { col: targetCol, row: 4 } }, scene,
+    random: createSeededRandom(SEED), summonProvider: data.summonProvider });
+  b.start(); actUntil(b, 'caster');
+  // 专项夹具保留原技能成本与次数；所需TP通过正常防御积累，不直接注入余额。
+  for (let i = 0; caster.ref.tp < (skill.tpCost || 0) && i < 6; i++) { b.defend(); b.endAction(); actUntil(b, 'caster'); }
+  return { b, caster, target };
+}
+
+// 反应专项夹具：攻击者用匹配伤害类型的单体攻击，真实驱动 beginAttack 生成器；固定种子+零闪避保证将命中可重复。
+// 普通反应：受击者本人持有反应技；舍身：守护者持有舍身，攻击者打其邻近友军。
+function createReactionCase(source, skill) {
+  const responder = structuredClone(source);
+  responder.id = 'responder'; responder.side = 'hero'; responder.controller = 'player'; responder.classType = null;
+  responder.ref.evasion = 0;
+  responder.skills = [skill]; // 反应专项：隔离为唯一反应技，避免随绑定/道具子技能不在候选或相互干扰
+  const incoming = (skill.sheshenTarget && skill.sheshenTarget !== 'all') ? skill.sheshenTarget
+    : (skill.kanpoTarget && skill.kanpoTarget !== 'all') ? skill.kanpoTarget
+      : (skill.reactionTarget && skill.reactionTarget !== 'all') ? skill.reactionTarget : '近战';
+  const attack = { name: 'reaction-probe', type: '[伤害]', power: 60, hit: 100, cost: 0, damageType: incoming,
+    range: { type: '单体', castRange: 10 }, actionCost: { main: 1, aux: 0 } };
+  const attacker = { id: 'attacker', name: '攻击者', side: 'enemy', controller: 'player', footprint: { width: 1, height: 1 },
+    ref: { hp: 500, maxHp: 500, mp: 100, maxMp: 100, tp: 0, maxTp: 100, atk: 10, def: 0, spd: 300, evasion: 0, moveDistance: 6, perception: 50 }, skills: [], items: [] };
+  const sheshen = !!skill.sheshenTarget;
+  const units = [attacker, responder];
+  const placements = { attacker: { col: 5, row: 5, facing: 90 }, responder: { col: 6, row: sheshen ? 6 : 5 } };
+  let targetId = 'responder';
+  if (sheshen) {
+    const ally = { id: 'ally', name: '被保护友军', side: 'hero', controller: 'player', footprint: { width: 1, height: 1 },
+      ref: { hp: 500, maxHp: 500, mp: 100, maxMp: 100, tp: 0, maxTp: 100, atk: 10, def: 0, spd: 50, evasion: 0, moveDistance: 6, perception: 50 }, skills: [], items: [] };
+    units.push(ally); placements.ally = { col: 6, row: 5 }; targetId = 'ally';
+  }
+  const b = createBattle({ units, placementsById: placements, scene, random: createSeededRandom(SEED), summonProvider: data.summonProvider });
+  b.start();
+  for (let i = 0; responder.ref.tp < (skill.tpCost || 0) && i < 6; i++) {
+    actUntil(b, 'responder');
+    b.defend();
+    b.endAction();
+  }
+  actUntil(b, 'attacker');
+  const target = b.ctx.units.find(u => u.id === targetId);
+  const aim = { ...unitCenter(placements[targetId], target.footprint), targetId };
+  const hpBefore = responder.ref.hp;
+  const mpBefore = responder.ref.mp;
+  const attackerHpBefore = attacker.ref.hp;
+  const usesBefore = usesOf(b, responder.id);
+  let seen = null, selected = null;
+  const r = drive(b.beginAttack(attack, aim, {
+    autoAnswer: req => {
+      seen = req;
+      const cand = (req.candidates || []).find(c => c.skill.name === skill.name
+        && (!!c.skill.sheshenTarget) === sheshen && (sheshen ? c.responderId === responder.id : true));
+      if (!cand) return null;
+      selected = cand;
+      return { responderId: cand.responderId, skill: cand.skill };
+    },
+  }));
+  const hit = (r.hits || [])[0] || {};
+  const reaction = hit.reaction || null;
+  const mpDelta = mpBefore - responder.ref.mp;
+  const usesAfter = usesOf(b, responder.id);
+  const cost = skill.cost || 0;
+  const maxUses = skill.maxUses || 0;
+  const econOk = (cost > 0 ? mpDelta === cost : true) && (maxUses > 0 ? usesAfter === usesBefore + 1 : true);
+  const eventOk = (b.snapshot().log || []).some(l => l.includes('反应 · ' + skill.name));
+  const slots = skillSlots(skill);
+  const kinds = new Set(slots.map(s => s.definition.kind));
+  const hasEva = slots.some(s => s.definition.field === 'eva');
+  let kind = '其他', outcome = false;
+  if (sheshen) { kind = '舍身'; outcome = !!reaction && reaction.guardianId === responder.id && responder.ref.hp < hpBefore; }
+  else if (skill.kanpoTarget) { kind = '看破'; outcome = !!reaction && reaction.canceled === true; }
+  else if (kinds.has('counter')) { kind = '反击'; outcome = !!reaction && reaction.countered === true && attacker.ref.hp < attackerHpBefore; }
+  else if (hasEva) { kind = '回避'; outcome = !!reaction && (reaction.dodged === true || buffsOf(b, responder.id).some(x => x.type === 'eva')); }
+  else if (kinds.has('damageGuard') || kinds.has('shield')) { kind = '减伤/护盾'; outcome = !!reaction && (hit.guardDmg > 0 || hit.shieldDmg > 0 || hit.hit !== undefined); }
+  else { outcome = !!reaction; }
+  const pass = !!seen && !!selected && !!r && r.ok !== false && !!reaction && econOk && eventOk && outcome;
+  return result('TT-SKILL[反应专项] ' + skill.name + '·' + kind, pass, JSON.stringify({
+    seen: !!seen, selected: selected && selected.skill.name, kind, mpDelta, uses: usesBefore + '->' + usesAfter,
+    event: eventOk, outcome, guardianId: reaction && reaction.guardianId, reason: r && r.reason,
+  }));
+}
+
+function run() {
+  const cases = [];
+  const templates = ['幻梦行军兽', '化尘者'].map(name => {
+    const d = data.summonProvider(name);
+    return { id: name, name, ref: { ...d, hp: d.maxHp, mp: d.maxMp, tp: 0 }, footprint: d.footprint, skills: d.skills, items: [], attrTags: d.attrTags };
+  });
+  for (const source of [...data.units, ...templates]) {
+    const entries = [...source.skills, ...source.items.filter(i => i.category !== '弹药' && !i.bindings?.length)
+      .flatMap(item => item.children?.length ? item.children.map(child => itemAsSkill(item, child)) : [itemAsSkill(item)])];
+    for (const skill of entries) {
+      if (skill.isGroup || skill.isDeathTrigger) continue;
+      if (skill.isReaction || skill.kanpoTarget || skill.sheshenTarget) {
+        cases.push(createReactionCase(source, skill));
+        continue;
+      }
+      const name = source.name + '·' + skill.name;
+      const { b, caster, target } = createCase(source, skill);
+      const slots = skillSlots(skill);
+      const ally = slots.some(s => !s.debuff && !s.attack && s.definition.side === 'ally');
+      const aim = skill.range.type === '召唤' ? { x: 8.5, y: 4.5 } : { ...unitCenter(b.ctx.placementsById[ally ? 'caster' : 'target'], ally ? caster.footprint : target.footprint), targetId: ally ? 'caster' : 'target' };
+      let r = drive(b.beginAttack(skill, aim));
+      for (let i = 0; r.preparing && i < 10; i++) {
+        b.endAction(); actUntil(b, 'caster');
+        const prep = b.snapshot().preparation;
+        if (prep?.ready) r = drive(b.beginAttack(skill, aim));
+      }
+      const meaningful = r.ok && !r.preparing && (r.hits?.length || r.effects?.length || r.summons?.length || skill.barrierSub || skill.regionEffect);
+      cases.push(result('TT-SKILL[专项夹具] 主动执行 ' + name, meaningful,
+        meaningful ? '专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改' : JSON.stringify({ ok: r.ok, reason: r.reason, prep: b.snapshot().preparation })));
+    }
+  }
+  return { cases };
+}
+
+export const groups = { 'TT-SKILLS': { run } };
+
+if (typeof process !== 'undefined' && process.argv && process.argv[1]
+  && process.argv[1].replace(/\\/g, '/').endsWith('typical-skills-node-cases.mjs')) {
+  const { cases } = run();
+  for (const c of cases) console.log((c.pass ? 'PASS ' : 'FAIL ') + c.id + (c.pass ? '' : ' :: ' + c.detail));
+  const failed = cases.filter(c => c.pass !== true).length;
+  console.log('[TT-SKILLS] cases=' + cases.length + ' passed=' + (cases.length - failed) + ' failed=' + failed);
+  if (!cases.length || failed > 0) process.exit(1);
+}

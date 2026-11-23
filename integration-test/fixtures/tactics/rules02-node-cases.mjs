@@ -31,9 +31,9 @@ export const groups = {
     const ED = m.effectDefinitions;
     cases.push(ok('TR2-A normalizeEffectTag：单群合并+子型保留+别名吸收',
       ED.normalizeEffectTag('[群攻(火焰)]') === '伤害(火焰)' && ED.normalizeEffectTag('[单体]') === '伤害'
-      && ED.normalizeEffectTag('[单避]') === '闪避' && ED.normalizeEffectTag('[回避]') === '回避'
-      && ED.normalizeEffectTag('[群回]') === '治疗' && ED.normalizeEffectTag('[单防]') === '加防'
-      && ED.normalizeEffectTag('[回复]') === '治疗' && ED.normalizeEffectTag('[增攻]') === '加攻',
+      && ED.normalizeEffectTag('[单避]') === '单避' && ED.normalizeEffectTag('[回避]') === '回避'
+      && ED.normalizeEffectTag('[群回]') === '回复' && ED.normalizeEffectTag('[单防]') === '增防'
+      && ED.normalizeEffectTag('[回复]') === '回复' && ED.normalizeEffectTag('[增攻]') === '增攻',
       j({ a: ED.normalizeEffectTag('[群攻(火焰)]'), b: ED.normalizeEffectTag('[单避]') })));
     cases.push(ok('TR2-A effectDefinition：精确→剥子型回退，赋予走 variant', (() => {
       const d1 = ED.effectDefinition('[伤害(火焰)]'), d2 = ED.effectDefinition('[散射(霰弹)]'), d3 = ED.effectDefinition('[赋予:流体]');
@@ -42,7 +42,7 @@ export const groups = {
     cases.push(ok('TR2-A parser 槽位输出规范标签（旧写法只作别名读入）', (() => {
       const s = m.parser.parseSkill('【爆】[群攻;power:70][群燃烧;power:10][范围:爆炸;射程:10;半径:2]');
       const s2 = m.parser.parseSkill('【雾】[单避;power:50][范围:单体;射程:6]');
-      return s.type === '[伤害]' && s.type2 === '[燃烧]' && s2.type === '[闪避]';
+      return s.type === '[伤害]' && s.type2 === '[燃烧]' && s2.type === '[单避]';
     })(), ''));
     cases.push(ok('TR2-A [冷却:N] 独立字段、[延迟:N] 仍为 delay 且不相混', (() => {
       const s = m.parser.parseSkill('【斩】[伤害;power:9][冷却:2][延迟:1][范围:单体;射程:12]');
@@ -58,11 +58,11 @@ export const groups = {
       return legacy.slotTargets && legacy.slotTargets[0] === 'self' && (!modern.slotTargets || modern.slotTargets[0] !== 'self');
     })(), j({ legacy: true })));
     cases.push(ok('TR2-A skillSlots：power/turns/target/attack/debuff 视图正确', (() => {
-      const s = m.parser.parseSkill('【混】[伤害;power:55][中毒;power:5][回避;power:50][Turns:4][范围:单体;射程:9]');
+      const s = m.parser.parseSkill('【混】[伤害;power:55][中毒;power:5][单避;power:50][Turns:4][范围:单体;射程:9]');
       const slots = ED.skillSlots(s);
       return slots.length === 3 && slots[0].attack === true && slots[0].power === 55
         && slots[1].debuff === true && slots[1].turns === 4
-        && slots[2].tag === '回避' && slots[2].definition.consumable === true && slots[2].target === 'default';
+        && slots[2].tag === '单避' && slots[2].definition.consumable === true && slots[2].target === 'default';
     })(), ''));
     cases.push(ok('TR2-A 槽结算顺序：攻击槽先于减益槽（稳定排序）', (() => {
       const s = m.parser.parseSkill('【序】[中毒;power:5][伤害;power:6][范围:单体;射程:9]');
@@ -178,11 +178,12 @@ export const groups = {
   // ---------- TR2-C 反应 generator / 费用一次 / 弹药 / 延迟冷却 / 预测 ----------
   'TR2-C': { run({ modules: m }) {
     const cases = [];
-    const zhey = () => m.parser.parseSkill('【折影步】[回避;power:900][MP:4][反应:近战][限1次][位移:侧闪;距离:2][范围:单体;射程:3]');
+    const zhey = () => m.parser.parseSkill('【折影步】[单避;power:900][MP:4][反应:近战][限1次][位移:侧闪;距离:2][范围:自身]');
     // C1 反应 generator：yield 请求 → 采纳 → 二次闪避（纯回避值900）成功 → 该发落空 + 侧闪错位；恰好扣一次费
     {
       const attacker = unit('h', 'hero', { spd: 200, atk: 10 });
       const defender = unit('re', 'enemy', { hp: 50, mp: 20, skills: [zhey()] });
+      defender.controller = 'player';
       const plain = m.parser.parseSkill('【直击】[伤害;power:6][范围:单体;射程:12]');
       const b = battle(m, [attacker, defender], { h: { col: 3, row: 4 }, re: { col: 5, row: 4 } }, rng([0.5, 0.5, 0.9, 0.1, 0.5, 0.5, 0.5]));
       const gen = b.beginAttack(plain, aim(5, 4, 're'));
@@ -208,6 +209,7 @@ export const groups = {
       const kanpo = m.parser.parseSkill('【净蚀反冲】[看破:法术][MP:10][限3次][范围:单体;射程:12]');
       const attacker = unit('h', 'hero', { spd: 200, atk: 10 });
       const defender = unit('re', 'enemy', { hp: 50, mp: 50, skills: [kanpo] });
+      defender.controller = 'player';
       const spell = m.parser.parseSkill('【魔弹】[伤害;power:6][法术][范围:单体;射程:12]');
       const b = battle(m, [attacker, defender], { h: { col: 1, row: 4 }, re: { col: 5, row: 4 } }, rng([0.5, 0.5, 0.5, 0.5, 0.5]));
       const gen = b.beginAttack(spell, aim(5, 4, 're'));
@@ -284,13 +286,13 @@ export const groups = {
     }
     // D2 召唤：由明确模板生成单位（controller=ai、owner 绑定），不虚构缺失词条
     {
-      const summonSkill = m.parser.parseSkill('【召】[召唤:幽灵*2][范围:自身]');
+      const summonSkill = m.parser.parseSkill('【召】[召唤:幽灵*2][范围:召唤;射程:8]');
       const enemy = unit('e', 'enemy', { hp: 100 });
       const h = unit('h', 'hero', { spd: 200 });
       const b = battle(m, [h, enemy], { h: { col: 1, row: 4 }, e: { col: 12, row: 8 } }, rng([0.5, 0.5, 0.5, 0.5]), {
-        summonProvider: name => name === '幽灵' ? unit('template', 'hero', { hp: 60, mp: 20, atk: 8, spd: 80 }) : null,
+        summonProvider: name => name === '幽灵' ? { ...unit('template', 'hero', { hp: 60, mp: 20, atk: 8, spd: 80 }).ref, skills: [], footprint: { width: 1, height: 1 } } : null,
       });
-      const r = b.attack(summonSkill, aim(1, 4));
+      const r = b.attack(summonSkill, aim(3, 4));
       const snap = b.snapshot();
       const spawned = snap.units.filter(u => u.id.startsWith('sum_'));
       cases.push(ok('TR2-D 召唤*2 真实生成：controller=ai、owner 绑定、HP>0 且入快照',

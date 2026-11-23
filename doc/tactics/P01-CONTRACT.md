@@ -44,12 +44,15 @@
 ## 4. YAML 字段与空值
 
 - 中文外层保留：`战斗数据栏 / 协议版本 / 场景ID / 战斗ID / 我方列表 / 敌方列表 / 角色 / 名字 / 原型 / 属性 / 技能 / 物品 / 持久化`。
-- `属性` 支持旧标签串与规范对象；规范字段：`hp/maxHp/mp/maxMp/tp/maxTp/atk/def/spd/evasion/strength/totalWeight/moveDistance/perception/footprint/classType/isWise`。不增加第二套结构化别名。
+- `属性` 支持旧标签串与规范对象；内部规范字段为 `hp/maxHp/mp/maxMp/tp/maxTp/atk/def/spd/evasion/strength/totalWeight/moveDistance/perception/footprint/classType/isWise`。权威样本中文对象映射同一生产解析器：HP/MP同时给当前与最大值，Atk/Armor/敏捷/闪避/力量/总重量kg/移动/感知/占格/特性分别落为对应规范字段。
 - 新属性标签：`[闪避:N] [力量:N] [总重:N] [移动:N] [感知:N] [体型:1x1]`。
-- 六范围：单体/直线/扇形/圆形/全域/爆炸。`[范围:直线;长:10;宽:1]` → `range:{type:'直线',length:10,width:1}`；参数映射 射程→castRange、长→length、宽→width、角度→angle（度）、半径→radius（米）。
+- 八范围：自身/单体/直线/扇形/圆形/全域/爆炸/召唤。圆形仅半径、自身圆心；旧带射程圆形迁为爆炸。`[范围:直线;长:10;宽:1]` → `range:{type:'直线',length:10,width:1}`；中文对象长度/宽度与长/宽对应同一字段，扇形长度对应castRange。
 - 行动成本：`[行动:主]`→`actionCost:{main:1,aux:0}`；`[行动:辅]`→`{main:0,aux:1}`；普通主动缺省主行动；不新增通用零行动主动技。
 - 合法空值（必须保留，不算缺失）：`classType:null`、`fxTag:''`、`skills/items/children/bindings:[]`；数值字段 null 不凭空解释为 0。
 - 非空集合沿用同名字段优先、缺字段补齐、持久化独有项补入；显式空集合表示清空，不补回旧项。
+- 新版顶层 `meta/我方/敌方/召唤物` 由 `parseYamlCombatBlock` 与旧 `战斗数据栏` 同入口处理，不建立测试专用解析器；meta显式场景、战斗ID、种子和站位，召唤词条不计入开场名册。
+- 位移标签解析为 `displacements[]`（侧闪/后撤/击退/拉近/冲锋、distance/direction），evadeShift只作兼容派生。区域浓雾由 `区域:{类型:浓雾}` 显式配置。`槽目标:[友军,敌人,自身]` 对应 `slotTargets:['ally','enemy','self']`；父道具子用法用稳定 `parentItemName` 引用共享次数，不建循环对象。
+- 裸【穿透】为整技isPierce，不占伤害槽；【眩晕】为无power附带控制，旧带power写法迁为伤害槽＋眩晕。伤害类别与近战/远程/法术攻击方式独立。
 - 显式范围是唯一空间信息来源；旧 `[单体]/[群攻]` 名称不覆盖它。
 
 ## 5. 资源优先级链

@@ -24,17 +24,24 @@ const REQUIRED_INPUTS = [
   'src/fx-registry.mjs', 'src/fx-library.mjs', 'src/vfx-host.mjs',
   'src/effect-definitions.mjs', 'src/effect-handlers.mjs', 'src/class-passives.mjs', 'src/variant-rules.mjs',
   'src/reaction-prompt.mjs',
+  'src/scenario-data.mjs', 'src/regions.mjs', 'src/perception.mjs', 'src/barriers.mjs',
 ];
 // 复用模块关键函数必须进入产物（防止 tree-shaking 或误删导致"复用"名不副实）
 const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFeedback', 'classifyHit', 'playArsenicShot', 'CombatAudioMixer', 'HERO_VOICE_LINES', 'playSingleGunshot', 'playSingleShotgun', 'playSingleThunder', 'playSingleSlash', 'playSingleClaw', 'playSingleArrow', 'enemySpellProjectile',
   'renderTurnQueue', 'updateSkillMenus', 'createSkillCard', 'createSkillGroupCard', 'createItemCard', 'showTagTipFor',
   'buildSkillFormFieldsHtml', 'openSkillTypeCombo', 'createEditorPanel', 'playJump', 'playShove', 'playTransfer', 'drawJump',
-  'createFxRegistry', 'registerDefaultFx', 'actionInput', 'reactionInput', 'createVfxHost', 'playReaction', 'revealSegment', 'evadeShift'];
+  'createFxRegistry', 'registerDefaultFx', 'actionInput', 'reactionInput', 'createVfxHost', 'playReaction', 'revealSegment', 'evadeShift',
+  'createScenarioData', 'createSeededRandom', 'createFogRegion', 'canSeeUnit', 'previewBarrier', 'resolveCharge'];
 
 const entry = [
   "import { createApp } from './src/main.mjs';",
   "import { DEMO_YAML, DEMO_PLACEMENTS } from './src/demo-fixture.mjs';",
   "import { generateTacticalScene } from './src/generation.mjs';",
+  "import { createBattle } from './src/battle.mjs';",
+  "import { parseYamlText } from './src/parser.mjs';",
+  "import { createScenarioData, createSeededRandom } from './src/scenario-data.mjs';",
+  "import { CHAPEL_SCENE } from './src/chapel-scene.mjs';",
+  'window.__TACTICS_BACKEND__ = { parseYamlText, createScenarioData, createSeededRandom, createBattle, scene: CHAPEL_SCENE };',
   'const app = createApp(document.getElementById("tactics-app"), {',
   '  defaultYaml: DEMO_YAML, defaultPlacements: DEMO_PLACEMENTS, playable: true,',
   '});',

@@ -80,12 +80,11 @@ export const groups = {
       ell.maxHp === 100 && ell.maxMp === 110 && ell.atk === 20 && ell.def === 40 && ell.spd === 50 && ell.skills.length === 19 && ell.items.length === 7,
       j({ hp: ell.maxHp, mp: ell.maxMp, atk: ell.atk, def: ell.def, spd: ell.spd, skills: ell.skills.length, items: ell.items.length })));
     const rejBy = name => (rejected.find(r => r.name === name) || {}).reason || '';
-    cases.push(ok('TFX-02 主动可用恰为 11 项（RULES02 迁移后）；4 反应与 2 结界暂缓按真实原因拒绝（无"范围未迁移"遮挡）',
-      j(usable) === j(['伊西斯之拥', '压缩爆燃', '召雷术', '归尘礼赞', '拉莱耶造雾术', '提前瞄准', '灵风术', '精准流火', '萨维奇三连发', '迅捷愈合法', '预备咏唱'].sort()) &&
-      rejected.length === 6 && rejected.every(r => r.reason && r.reason !== '范围未迁移') &&
-      rejBy('纳克提特障壁术') === '场地结界（肃正）暂缓' && rejBy('圣域帷幕') === '场地结界（肃正）暂缓' &&
+    cases.push(ok('TFX-02 主动可用恰为 13 项（含 2 结界）；4 反应按真实原因拒绝（无"范围未迁移"遮挡）',
+      j(usable) === j(['伊西斯之拥', '压缩爆燃', '召雷术', '圣域帷幕', '归尘礼赞', '拉莱耶造雾术', '提前瞄准', '灵风术', '精准流火', '纳克提特障壁术', '萨维奇三连发', '迅捷愈合法', '预备咏唱'].sort()) &&
+      rejected.length === 4 && rejected.every(r => r.reason && r.reason !== '范围未迁移') &&
       rejBy('折影步') === '反应技能只能被动触发' && rejBy('双莲祛煞') === '反应技能只能被动触发' && rejBy('巫师护盾') === '反应技能只能被动触发' &&
-      rejBy('净蚀反冲') === '看破只能由反应链触发', j({ usable, rejected })));
+      rejBy('净蚀反冲') === '反应技能只能被动触发', j({ usable, rejected })));
     const zy = skillNamed(ell, '折影步');
     cases.push(ok('TFX-02 折影步：近战回避反应 + 显式侧闪 2m 位移标签', zy.isReaction && zy.reactionTarget === '近战' && zy.evadeShift && zy.evadeShift.mode === 'side' && zy.evadeShift.distance === 2 && zy.fxTag === '折影步', j(zy.evadeShift)));
 

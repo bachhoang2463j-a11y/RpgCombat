@@ -1,20 +1,44 @@
 // ==========================================
 // 战棋 P06 六范围统一查询：预览、执行与 AI 使用同一套空间结果。
 // ctx = { compiled, units, placementsById, footprintsById, visibleUnitIds? }；距离为世界米。
+// 圆形：仅有半径、以自身为圆心，无需瞄准点；全域：无需瞄准点；
+// 召唤：射程内空闲合法格 + 个人视野 + 完整模板 footprint（skill.summonFootprint，battle 先解析模板）。
+// 区域目标按任意占格命中，且不剔除施法者（治疗/不分敌友需包含本人）。
 // ==========================================
 
 import { cellAt } from './scene.mjs';
 import { occupiedCells, cellKey, unitCenter } from './geometry.mjs';
 import { skillSlots } from './effect-definitions.mjs';
+import { canSeeUnit, canSeePoint, sightRadius } from './perception.mjs';
 
 const EPS = 1e-9;
 const SAMPLE_STEP = 0.2;
 const ALLY_TAGS = ['回', '回蓝', '冲', '增', '防', '盾', '瞄', '嘲讽', '再动', '避', '免伤', '反击', '驱散', '肃正', '速'];
 const ENEMY_TAGS = ['降', '盲', '滞', '弱', '缓', '麻痹', '眩晕', '中毒', '燃烧', '穿透'];
 const DAMAGE_TAGS = ['群攻', '单体', '群散射', '散射'];
+const RANGE_TYPES = ['单体', '直线', '扇形', '圆形', '全域', '爆炸', '自身', '召唤'];
 
 function unitById(ctx, id) { return ctx.units.find(u => u.id === id) || null; }
 function isLive(u) { return !!(u && u.ref && u.ref.hp > 0); }
+// 倒地：HP<=0；正式我方英雄可被治疗救起，召唤物/敌方归零不救
+function isDowned(u) { return !!(u && u.ref && u.ref.hp <= 0); }
+function isSummon(u) {
+  if (!u) return false;
+  if (u.summon === true || u.isSummon === true || u.kind === 'summon') return true;
+  if (u.ref && (u.ref.summon === true || u.ref.isSummon === true)) return true;
+  return Array.isArray(u.attrTags) && u.attrTags.includes('召唤物');
+}
+function isRevivable(u) {
+  return isDowned(u) && (u.side === 'hero' || u.side === 'ally') && !isSummon(u)
+    && !(u.ref && (u.ref.dead === true || u.ref.permanentlyDead === true));
+}
+// 含治疗/复活语义的槽：允许把可救起倒地英雄纳入候选
+function skillHasHeal(skill) {
+  return skillSlots(skill).some(s => {
+    const tag = String(s.tag || '').replace(/[(（].*$/, '');
+    return tag.startsWith('回复') || tag.startsWith('复活') || tag.startsWith('治疗');
+  });
+}
 function footprintOf(ctx, u) { return ctx.footprintsById[u.id] || u.footprint || { width: 1, height: 1 }; }
 function inBounds(ctx, c, r) { return c >= 0 && r >= 0 && c < ctx.compiled.grid.columns && r < ctx.compiled.grid.rows; }
 
@@ -57,16 +81,17 @@ function segmentCells(ctx, x0, y0, x1, y1) {
   return cells;
 }
 
-function cellsToTargets(ctx, cells, { side = null } = {}) {
+// 区域目标：任意真实占格落在区域内即命中（大型单位不再只看中心格）
+function cellsToTargets(ctx, cells, { side = null, includeDowned = false } = {}) {
   const keys = new Set(cells.map(c => cellKey(c.col, c.row)));
   const result = [];
   for (const u of ctx.units) {
-    if (!isLive(u) || (side && u.side !== side)) continue;
+    const selectable = isLive(u) || (includeDowned && isRevivable(u));
+    if (!selectable || (side && u.side !== side)) continue;
     const p = ctx.placementsById[u.id];
     if (!p) continue;
-    const center = unitCenter(p, footprintOf(ctx, u));
-    const centerCell = { col: Math.floor(center.x), row: Math.floor(center.y) };
-    if (keys.has(cellKey(centerCell.col, centerCell.row))) result.push({ unitId: u.id, side: u.side, cells: occupiedCells(p, footprintOf(ctx, u)) });
+    const occ = occupiedCells(p, footprintOf(ctx, u));
+    if (occ.some(c => keys.has(cellKey(c.col, c.row)))) result.push({ unitId: u.id, side: u.side, cells: occ });
   }
   return result;
 }
@@ -86,7 +111,8 @@ function inAreaCell(type, c, r, origin, aim, range) {
     return t >= -EPS && t <= range.length + EPS && lateral <= range.width / 2 + EPS;
   }
   const d = Math.hypot(rx, ry);
-  if (d > range.castRange + EPS) return false;
+    const length = range.length ?? range.castRange;
+    if (d > length + EPS) return false;
   if (d <= EPS) return true;
   const halfRad = range.angle * Math.PI / 360;
   return Math.acos(clamp((rx * ux + ry * uy) / d, -1, 1)) <= halfRad + EPS;
@@ -122,12 +148,18 @@ function collectLine(ctx, casterId, origin, aim, range) {
   return { ok: true, cells, shape: { type: '直线', from: origin, dir: Math.atan2(dir.y, dir.x), length: range.length, width: range.width }, collisionPoint: collision && collision.point, contact: collision };
 }
 
-function collectSingle(ctx, caster, origin, aim, range, guaranteedHit) {
+// 单体重查：调用方传入新 unitCenter 作为 aim；skipSpatialRecheck 供冲锋接触复用，
+// 只验目标身份/可选性，不再按技能射程与线遮挡重查（避免 6m 冲锋接触被射程/墙体误判）。
+function collectSingle(ctx, caster, origin, aim, range, guaranteedHit, includeDowned, skipSpatialRecheck) {
   if (!aim.targetId) return { ok: false, reason: '单体技能需锁定目标', cells: [], targetIds: [], blockedBy: null };
   const target = unitById(ctx, aim.targetId);
   if (!target) return { ok: false, reason: '目标不存在', cells: [], targetIds: [], blockedBy: null };
-  if (!isLive(target)) return { ok: false, reason: '目标已倒地', cells: [], targetIds: [], blockedBy: null };
+  const selectable = isLive(target) || (includeDowned && isRevivable(target) && target.side === caster.side);
+  if (!selectable) return { ok: false, reason: '目标已倒地', cells: [], targetIds: [], blockedBy: null };
   const tp = ctx.placementsById[target.id], fp = footprintOf(ctx, target), tc = unitCenter(tp, fp);
+  if (skipSpatialRecheck) {
+    return { ok: true, cells: occupiedCells(tp, fp), targetIds: [target.id], shape: { type: '单体', from: origin, to: tc, castRange: range.castRange }, collisionPoint: tc };
+  }
   const dist = centerDistance(origin, tc);
   if (range.castRange !== undefined && dist > range.castRange + EPS) return { ok: false, reason: '目标超出射程', cells: [], targetIds: [], blockedBy: { type: 'range', point: tc } };
   const wall = rayFirst(ctx, origin.x, origin.y, tc.x, tc.y, {
@@ -135,6 +167,7 @@ function collectSingle(ctx, caster, origin, aim, range, guaranteedHit) {
   });
   if (wall && wall.type === 'wall') return { ok: false, reason: '视线被墙阻挡', cells: [], targetIds: [], blockedBy: wall };
   if (wall && wall.type === 'boundary') return { ok: false, reason: '目标路径越出地图', cells: [], targetIds: [], blockedBy: wall };
+  if (ctx.enforcePerception && !canSeeUnit(ctx, caster.id, target.id)) return { ok: false, reason: '目标不在本人视野内', cells: [], targetIds: [], blockedBy: { type: 'vision' } };
   if (wall && wall.type === 'unit' && !guaranteedHit) return { ok: false, reason: wall.side === caster.side ? '友方挡弹' : '被其他敌人阻挡', cells: [], targetIds: [], blockedBy: wall };
   return { ok: true, cells: occupiedCells(tp, fp), targetIds: [target.id], shape: { type: '单体', from: origin, to: tc, castRange: range.castRange }, collisionPoint: tc };
 }
@@ -161,19 +194,27 @@ function slotScope(tag) {
 // 旧 isAttackSlot 已随规范单群合并移除；目标判定统一走 skillSlots（effect-definitions）
 
 // 槽目标判定（规范单群合并）：目标数量一律由范围类型决定——
-// 自身 → 全槽落施法者（敌方侧槽无目标）；单体 → 单点（友方槽无友方瞄准时落施法者）；
-// 其余（直线/扇形/圆形/全域/爆炸）→ 面积内按槽敌我语义取全部。skill.slotTargets 'self' 覆盖。
+// 自身 → 全槽落施法者（敌方侧槽无目标）；单体 → 单点；其余 → 面积内按槽敌我语义取全部。
+// skill.slotTargets override 支持 'self' | 'enemy' | 'ally'；skill.affectsAll（不分敌友）
+// 覆盖默认敌我，对范围内所有单位（含施法者）同等生效。
 export function resolveSlotTargets(ctx, casterId, skill, areaTargetIds, aimTargetId = null) {
   const caster = unitById(ctx, casterId);
-  const all = (areaTargetIds || []).map(id => unitById(ctx, id)).filter(isLive);
+  const all = (areaTargetIds || []).map(id => unitById(ctx, id)).filter(u => isLive(u) || isRevivable(u));
   const rangeType = skill && skill.range && skill.range.type;
   const scope = rangeType === '自身' ? 'self' : (rangeType === '单体' ? 'single' : 'area');
   const aimUnit = all.find(u => u.id === aimTargetId) || null;
+  const affectsAll = !!skill?.affectsAll;
+  const overrides = skill && Array.isArray(skill.slotTargets) ? skill.slotTargets : [];
   return skillSlots(skill).map(slot => {
-    const side = slot.definition.side === 'enemy' ? 'enemy' : 'ally';
+    const override = overrides[slot.index] || null;
+    const side = override === 'enemy' ? 'enemy' : override === 'ally' ? 'ally' : (slot.definition.side === 'enemy' ? 'enemy' : 'ally');
     let targetIds = [];
-    if (slot.target === 'self' || slot.definition.side === 'self') {
+    if (override === 'self' || slot.target === 'self' || slot.definition.side === 'self') {
       targetIds = isLive(caster) ? [casterId] : [];
+    } else if (affectsAll) {
+      if (scope === 'single') targetIds = aimUnit ? [aimUnit.id] : [];
+      else if (scope === 'self') targetIds = isLive(caster) ? [casterId] : [];
+      else targetIds = all.map(u => u.id);
     } else if (scope === 'self') {
       targetIds = side === 'ally' && isLive(caster) ? [casterId] : [];
     } else if (scope === 'single') {
@@ -196,7 +237,7 @@ export function resolveDefaultRange(skill) {
     .some(t => t && /^\[群(?:攻|穿透|眩晕|散射|中毒|燃烧|麻痹|降|盲|滞|弱|缓)/.test(String(t)));
   const hasAttack = skillSlots(skill).some(s => s.attack);
   if (isGroup) {
-    return dt === '近战' ? { type: '扇形', castRange: 3, angle: 90 } : { type: '圆形', castRange: 15, radius: 3 };
+    return dt === '近战' ? { type: '扇形', castRange: 3, angle: 90 } : { type: '爆炸', castRange: 15, radius: 3 };
   }
   // 纯效果槽（治疗/增益/减益物品等）缺省同样落单体预设（S14 缺省单体技能；自身用 [范围:自身] 显式声明）
   if (!hasAttack) return dt === '近战' ? { type: '单体', castRange: 2 } : { type: '单体', castRange: 15 };
@@ -207,7 +248,29 @@ function empty(reason, origin = null, aim = null) {
   return { ok: false, reason, origin, aim, range: null, cells: [], targetIds: [], actualTargetIds: [], slotTargets: [], disclosureTargetIds: [], collisionPoint: null, blockedBy: null, shape: null };
 }
 
-export function queryAttack(ctx, casterId, skill, aim) {
+function querySummon(ctx, caster, origin, aim, range, skill, fail) {
+  const dist = centerDistance(origin, aim);
+  if (range.castRange !== undefined && dist > range.castRange + EPS) return fail('召唤落点超出射程');
+  if (dist > sightRadius(ctx, caster) + EPS || !canSeePoint(ctx, caster.id, aim)) return fail('召唤落点超出个人视野');
+  const fp = (skill && skill.summonFootprint) || { width: 1, height: 1 };
+  const anchor = { col: Math.floor(aim.x), row: Math.floor(aim.y) };
+  const occ = buildLiveOcc(ctx);
+  for (const c of occupiedCells(anchor, fp)) {
+    const cell = cellAt(ctx.compiled, c.col, c.row);
+    if (!cell || cell.blocksMovement) return fail('召唤落点不可站立');
+    if (occ.get(cellKey(c.col, c.row))) return fail('召唤落点已被占用');
+  }
+  const summonCells = occupiedCells(anchor, fp);
+  return {
+    ok: true, reason: null, origin, aim: { x: aim.x, y: aim.y, targetId: aim.targetId }, range: range.castRange ?? null,
+    cells: summonCells, targetIds: [], damageTargetIds: [], actualTargetIds: [], targets: [],
+    slotTargets: resolveSlotTargets(ctx, caster.id, skill, [], null), disclosureTargetIds: [],
+    collisionPoint: null, contact: null, blockedBy: null, shape: { type: '召唤', anchor, footprint: fp }, blastCenter: null,
+    summon: { anchor, footprint: fp },
+  };
+}
+
+export function queryAttack(ctx, casterId, skill, aim, options = {}) {
   const caster = unitById(ctx, casterId);
   if (!caster) return empty('施法者不存在');
   if (!isLive(caster)) return empty('施法者已倒地');
@@ -218,7 +281,9 @@ export function queryAttack(ctx, casterId, skill, aim) {
   const fail = (reason, blockedBy = null) => Object.assign(empty(reason, origin, normAim), blockedBy ? { blockedBy } : {});
   const range = skill && skill.range;
   if (!range) return fail('技能缺少显式范围');
-  if (!['单体', '直线', '扇形', '圆形', '全域', '爆炸', '自身'].includes(range.type)) return fail('范围类型不支持: ' + range.type);
+  if (!RANGE_TYPES.includes(range.type)) return fail('范围类型不支持: ' + range.type);
+  const includeDowned = skillHasHeal(skill);
+  const skipSpatialRecheck = !!(options.skipSpatialRecheck || (aim && aim.skipSpatialRecheck));
   // 第七种范围「自身」：只作用于施法者自身占格，无需瞄准点
   if (range.type === '自身') {
     const selfCells = occupiedCells(cp, footprintOf(ctx, caster));
@@ -230,11 +295,34 @@ export function queryAttack(ctx, casterId, skill, aim) {
       disclosureTargetIds: [casterId], collisionPoint: null, contact: null, blockedBy: null,
       shape: { type: '自身' }, blastCenter: null };
   }
+  if (range.type === '召唤') {
+    if (!normAim) return fail('召唤需选择落点');
+    return querySummon(ctx, caster, origin, normAim, range, skill, fail);
+  }
+  // 圆形：仅有半径、以自身为圆心，无需瞄准点
+  if (range.type === '圆形') {
+    if (!(Number(range.radius) > 0)) return fail('圆形缺少半径');
+    const center = { x: origin.x, y: origin.y, targetId: null };
+    const cells = collectArea(ctx, '圆形', origin, center, range, caster.side);
+    const targetIds = cellsToTargets(ctx, cells).filter(t => t.side !== caster.side).map(t => t.unitId);
+    const actualTargets = cellsToTargets(ctx, cells, { includeDowned });
+    return finishQuery(ctx, caster, skill, origin, center, cells, targetIds, actualTargets,
+      { type: '圆形', center: { x: origin.x, y: origin.y }, radius: range.radius }, null, null, range, null, null);
+  }
+  // 全域：无需瞄准点
+  if (range.type === '全域') {
+    const cells = [];
+    const { columns, rows } = ctx.compiled.grid;
+    for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) cells.push({ col, row });
+    const targetIds = cellsToTargets(ctx, cells).filter(t => t.side !== caster.side).map(t => t.unitId);
+    const actualTargets = cellsToTargets(ctx, cells, { includeDowned });
+    return finishQuery(ctx, caster, skill, origin, normAim, cells, targetIds, actualTargets, { type: '全域' }, null, null, range, null, null);
+  }
   if (!normAim) return fail('缺少瞄准点');
 
   let cells = [], targetIds = [], shape = null, collisionPoint = null, contact = null, blockedBy = null, blastCenter = null;
   if (range.type === '单体') {
-    const single = collectSingle(ctx, caster, origin, normAim, range, !!skill.guaranteedHit);
+    const single = collectSingle(ctx, caster, origin, normAim, range, !!skill.guaranteedHit, includeDowned, skipSpatialRecheck);
     if (!single.ok) return Object.assign(fail(single.reason, single.blockedBy), { range });
     cells = single.cells; targetIds = single.targetIds; shape = single.shape; collisionPoint = single.collisionPoint;
   } else if (range.type === '直线') {
@@ -249,21 +337,10 @@ export function queryAttack(ctx, casterId, skill, aim) {
     cells = collectArea(ctx, '扇形', origin, normAim, range, caster.side);
     shape = { type: '扇形', from: origin, dir: Math.atan2(normAim.y - origin.y, normAim.x - origin.x), radius: range.castRange, angle: range.angle };
     targetIds = cellsToTargets(ctx, cells).filter(t => t.side !== caster.side).map(t => t.unitId);
-  } else if (range.type === '圆形') {
-    if (centerDistance(origin, normAim) > (range.castRange ?? Infinity) + EPS) return Object.assign(fail('瞄准点超出射程'), { range });
-    cells = collectArea(ctx, '圆形', origin, normAim, range, caster.side);
-    shape = { type: '圆形', center: normAim, radius: range.radius };
-    targetIds = cellsToTargets(ctx, cells).filter(t => t.side !== caster.side).map(t => t.unitId);
-  } else if (range.type === '全域') {
-    cells = [];
-    const { columns, rows } = ctx.compiled.grid;
-    for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) cells.push({ col, row });
-    shape = { type: '全域' };
-    targetIds = cellsToTargets(ctx, cells).filter(t => t.side !== caster.side).map(t => t.unitId);
   } else if (range.type === '爆炸') {
     const dist = centerDistance(origin, normAim);
     if (range.castRange !== undefined && dist > range.castRange + EPS) return Object.assign(fail('瞄准点超出射程'), { range });
-  const contact = rayFirst(ctx, origin.x, origin.y, normAim.x, normAim.y, { skipUnitIds: [casterId], blockUnits: true });
+    contact = rayFirst(ctx, origin.x, origin.y, normAim.x, normAim.y, { skipUnitIds: [casterId], blockUnits: true });
     blockedBy = contact && contact.type === 'wall' ? contact : null;
     blastCenter = contact ? contact.point : normAim;
     const blastAim = { x: blastCenter.x, y: blastCenter.y };
@@ -275,17 +352,29 @@ export function queryAttack(ctx, casterId, skill, aim) {
     if (contact && contact.type === 'unit' && contact.side !== caster.side && !targetIds.includes(contact.unitId)) targetIds.push(contact.unitId);
   }
 
-  const actualTargets = cellsToTargets(ctx, cells).filter(t => t.unitId !== casterId);
+  const actualTargets = cellsToTargets(ctx, cells, { includeDowned });
   const blastContact = range.type === '爆炸' && shape && shape.contact && shape.contact.type === 'unit' ? shape.contact : null;
   if (blastContact && !actualTargets.some(t => t.unitId === blastContact.unitId)) {
     const cu = unitById(ctx, blastContact.unitId);
     actualTargets.push({ unitId: cu.id, side: cu.side, cells: occupiedCells(ctx.placementsById[cu.id], footprintOf(ctx, cu)) });
   }
-  const visible = ctx.visibleUnitIds ? new Set(ctx.visibleUnitIds) : null;
-  const disclosureTargetIds = actualTargets.filter(t => t.side === caster.side || !visible || visible.has(t.unitId)).map(t => t.unitId);
-  const slotTargets = resolveSlotTargets(ctx, casterId, skill, actualTargets.map(t => t.unitId), normAim.targetId);
+  return finishQuery(ctx, caster, skill, origin, normAim, cells, targetIds, actualTargets, shape, collisionPoint, contact, range, blockedBy, blastCenter);
+}
+
+// 统一收尾：计算 disclosure（敌人只有 visible）、槽目标与返回结构
+function finishQuery(ctx, caster, skill, origin, aim, cells, targetIds, actualTargets, shape, collisionPoint, contact, range, blockedBy, blastCenter) {
+  let visible = ctx.visibleUnitIds ? new Set(ctx.visibleUnitIds) : null;
+  if (!visible) {
+    visible = new Set();
+    for (const u of ctx.units) if (isLive(u) && canSeeUnit(ctx, caster.id, u.id)) visible.add(u.id);
+  }
+  const disclosureTargetIds = actualTargets.filter(t => t.side === caster.side || visible.has(t.unitId)).map(t => t.unitId);
+  const aimTargetId = aim && aim.targetId != null ? aim.targetId : null;
+  const slotTargets = resolveSlotTargets(ctx, caster.id, skill, actualTargets.map(t => t.unitId), aimTargetId);
   const damageSlotTargets = slotTargets.find(slot => slot.attack)?.targetIds || [];
-  return { ok: true, reason: null, origin, aim: normAim, range: range.castRange ?? range.length ?? null,
+  return {
+    ok: true, reason: null, origin, aim, range: range.castRange ?? range.length ?? null,
     cells, targetIds, damageTargetIds: damageSlotTargets, actualTargetIds: actualTargets.map(t => t.unitId), targets: actualTargets, slotTargets,
-    disclosureTargetIds, collisionPoint, contact: contact || (shape && shape.contact) || null, blockedBy, shape, blastCenter };
+    disclosureTargetIds, collisionPoint, contact: contact || (shape && shape.contact) || null, blockedBy, shape, blastCenter,
+  };
 }
