@@ -28,6 +28,8 @@ export function actionInput(result) {
   const attackSlots = slots.filter(s => s.attack).length;
   const effectSlots = slots.filter(s => !s.attack && s.side !== 'none' && SLOT_RAW(s.tag) !== '无');
   const selfOnly = !attackSlots && effectSlots.length > 0 && effectSlots.every(s => (s.targetIds || []).length === 1 && s.targetIds[0] === result.casterId);
+  // 即时回复（规则 effects 中 kind:'heal'）：纯回复技能不走受击揭示
+  const heals = (result.effects || []).filter(e => e.kind === 'heal');
   return {
     kind: 'action',
     fxTag: skill.fxTag || null,
@@ -38,7 +40,16 @@ export function actionInput(result) {
     grantsMainPoint: tags.some(t => t === '再动'),
     haste: skill.haste || 0,
     damageType: skill.damageType || null,
+    region: (skill.regionEffect && skill.regionEffect.type) || null,   // 显式区域（浓雾等），不按技能名判断
+    heals: heals.length,
+    healOnly: !attackSlots && heals.length > 0,
   };
+}
+
+// 起手演出输入：result = 蓄力/延迟开始的提交结果（preparing:true，未结算槽位）
+export function prepareInput(result) {
+  const skill = result.skill || {};
+  return { kind: 'prepare', fxTag: skill.fxTag || null, shape: (skill.range && skill.range.type) || null, source: (result.charge && result.charge.kind) || null };
 }
 
 // 反应演出输入：hit.reaction = { responderId, skillName, fxTag, canceled, shift }

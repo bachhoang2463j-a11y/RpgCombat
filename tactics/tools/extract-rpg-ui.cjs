@@ -202,8 +202,9 @@ function build() {
   js = patch(js, "function renderSkillTypeOptions(curVal) {\n  const _nonSlot = new Set(['[必中]', '[转火]', '[突进]', '[众召]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]']);",
     "function renderSkillTypeOptions(curVal) {\n  const _nonSlot = new Set(['[必中]', '[转火]', '[突进]', '[众召]', '[高阶]', '[传奇]', '[神术]', '[近战]', '[远程]', '[法术]']);\n  curVal = (curVal && normalizeEffectTag) ? ('[' + normalizeEffectTag(curVal) + ']') : curVal;", 1, '下拉当前值经 normalizeEffectTag 规范化');
   // 规范伤害标签参与攻击技能判定（菜单攻击/辅助分组）与卡面胶囊配色、悬浮说明
-  js = patch(js, "const MENU_DAMAGE_TAGS = ['单体','群攻','穿透','群穿透','眩晕','群眩晕'];",
-    "const MENU_DAMAGE_TAGS = ['伤害','单体','群攻','穿透','群穿透','眩晕','群眩晕'];", 1, '攻击技能判定加规范伤害标签');
+  js = patch(js, "function isAttackSkill(skill) {\n  const slots = [skill.type, skill.type2, skill.type3];\n  return MENU_DAMAGE_TAGS.some(t => slots.some(s => s && s.includes(t)));\n}",
+    "function isAttackSkill(skill) {\n  return skillSlots(skill).some(slot => slot.attack);\n}", 1, '攻击技能判定复用规则伤害槽');
+  js = patch(js, "const MENU_DAMAGE_TAGS = ['单体','群攻','穿透','群穿透','眩晕','群眩晕'];", '', 1, '移除不再使用的旧分类标签表');
   js = patch(js, "else if (cleanTag.includes('攻') || cleanTag.includes('单体') || cleanTag.includes('穿透'))",
     "else if (cleanTag.includes('伤害') || cleanTag.includes('攻') || cleanTag.includes('单体') || cleanTag.includes('穿透'))", 1, '胶囊配色识别规范伤害标签');
   js = patch(js, "'单体': '对单一目标造成 {N} 点伤害，受目标护甲减免。',",
@@ -262,6 +263,7 @@ function build() {
   ].join('\n');
   const out = header + `
 /* eslint-disable */
+import { skillSlots } from '../../effect-definitions.mjs';
 export const RPG_UI_RAIL_HTML = ${JSON.stringify(railHtml)};
 export const RPG_UI_MENU_HTML = ${JSON.stringify(menuHtml)};
 export const RPG_UI_TIP_HTML = ${JSON.stringify(tipHtml)};

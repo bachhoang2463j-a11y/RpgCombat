@@ -158,4 +158,88 @@ export const groups = {
       j({ before6, after: after6.resources, inv: after6.chargeInventory, hits: r6.hits })));
     return { cases };
   } },
+  // ---------- 典型对局权威样本首批（迅捷愈合 / 浓雾 / 归尘礼赞 / 召雷术 + 复验）：真实后端提交结果 → 注册表分发 ----------
+  'TFX-03': { run({ modules: m }) {
+    const cases = [];
+    const { createFxRegistry, actionInput, prepareInput, checkBudget } = m.fxRegistry;
+    const reg = m.fxLibrary.registerDefaultFx(createFxRegistry());
+    const yaml = readFileSync(path.join(ROOT, 'doc', 'tactics', '典型对局-战棋版.yaml'), 'utf8');
+    const block = m.parser.parseYamlText(yaml);
+    const EL = 'h:埃利奥特';
+    let data, b, el;
+    // 每段独立开局（只有 AI 行动的模拟会消耗我方血量；长链会导致埃利奥特倒地而准备被规则清除）
+    const fresh = () => {
+      data = m.scenarioData.createScenarioData(m.parser.parseYamlText(yaml));
+      data.placementsById[EL] = { col: 11, row: 31, facing: 0 };   // 推进到中殿，使首批目标处于射程/视野内
+      b = m.battle.createBattle({ ...data, scene: m.chapelScene.CHAPEL_SCENE, random: m.scenarioData.createSeededRandom(data.seed) });
+      b.start();
+      el = data.units.find(u => u.id === EL);
+    };
+    fresh();
+    const sk = n => el.skills.find(s => s.name === n);
+    const reqs = [];
+    const drive = (gen, answer = () => null) => { let s = gen.next(); while (!s.done) { reqs.push(s.value); s = gen.next(answer(s.value)); } return s.value; };
+    const enemyTurn = () => { const plan = b.planEnemyAction(); if (plan && plan.moveTo) b.move(plan.moveTo.col, plan.moveTo.row); if (plan && plan.skill && b.snapshot().resources.main > 0) return drive(b.beginAttack(plan.skill, plan.aim)); return null; };
+    const enemyResults = [];
+    const toEl = (waitEnemies = false) => { let g = 0; while (b.snapshot().currentId !== EL && g++ < 60) { if (!waitEnemies && b.snapshot().currentId.startsWith('e:')) { const r = enemyTurn(); if (r) enemyResults.push(r); } b.endAction(); } };
+    const center = id => { const p = b.snapshot().positions[id], u = data.units.find(x => x.id === id); return { x: p.col + u.footprint.width / 2, y: p.row + u.footprint.height / 2 }; };
+    const prep = () => b.state.combatState.charges?.[EL]?.preparing || null;
+    const pick = r => { const e = reg.resolve(actionInput(r)); return e && e.id; };
+
+    toEl();
+    cases.push(ok('TFX-03 页面入口识别典型对局对象格式（站位表）且旧切片数据不误判',
+      m.main.isTypicalBlock(block) && !m.main.isTypicalBlock(m.parser.parseYamlText(m.fixture.DEMO_YAML)), ''));
+    el.ref.hp -= 40;
+    const heal = drive(b.beginAttack(sk('迅捷愈合法'), { ...center(EL), targetId: EL }));
+    const healFx = heal.effects.find(e => e.kind === 'heal');
+    cases.push(ok('TFX-03 迅捷愈合法：规则 effects 回复真值 → heal-mend(L2)，不走受击揭示',
+      heal.ok && !heal.hits.length && healFx && healFx.value === 30 && heal.costSummary.aux === 1 && heal.costSummary.mp === 3 && pick(heal) === 'heal-mend', j({ ok: heal.ok, effects: heal.effects, cost: heal.costSummary, id: pick(heal) })));
+    b.endAction(); toEl();   // 愈合与造雾同为辅助行动：分两次自然行动
+    const fogBefore = (b.snapshot().regions || []).length;
+    const fogAim = ['e:食尸鬼A', 'e:食尸鬼B', 'e:深潜者A'].map(center).find(c => b.previewAttack(sk('拉莱耶造雾术'), c).ok);
+    const fog = drive(b.beginAttack(sk('拉莱耶造雾术'), fogAim));
+    const fogEv = (fog.events || []).find(ev => ev.type === 'region-created');
+    cases.push(ok('TFX-03 拉莱耶造雾术：region-created 真值（半径5·接触点）→ abyss-fog(L3)；按显式区域匹配而非技能名',
+      fog.ok && fogEv && fogEv.region.type === 'fog' && fogEv.region.radius === 5 && pick(fog) === 'abyss-fog' && (b.snapshot().regions || []).length >= fogBefore,
+      j({ ok: fog.ok, reason: fog.reason, region: fogEv && { r: fogEv.region.radius, c: fogEv.region.center }, id: pick(fog) })));
+    const enemyFog = enemyResults.find(r => (r.events || []).some(ev => ev.type === 'region-created'));
+    cases.push(ok('TFX-03 深潜者造雾（YAML 无特效标签）同走 abyss-fog', !enemyFog || pick(enemyFog) === 'abyss-fog', j(enemyFog ? { skill: enemyFog.skill.name, id: pick(enemyFog) } : 'none')));
+    // 蓄力分发单独验证：敌人等待，避免 AI 决策变化导致施法者在释放前死亡。
+    fresh(); toEl(true);
+    el.ref.tp = 80; el.ref.mp = 100;
+    const target = ['e:食尸鬼B', 'e:食尸鬼A'].find(id => b.previewAttack(sk('归尘礼赞'), { ...center(id), targetId: id }).ok);
+    const gs = drive(b.beginAttack(sk('归尘礼赞'), { ...center(target), targetId: target }));
+    const gsEntry = reg.resolve(prepareInput(gs));
+    cases.push(ok('TFX-03 归尘礼赞起手：延迟准备结果（未结算槽位、已扣 HP/MP/TP）→ holy-vow(L2)',
+      gs.ok && gs.preparing && !gs.hits.length && gs.costSummary.hp === 10 && gs.costSummary.tp === 10 && gsEntry && gsEntry.id === 'holy-vow', j({ ok: gs.ok, reason: gs.reason, cost: gs.costSummary, id: gsEntry && gsEntry.id })));
+    b.endAction(); toEl(true);
+    const gr = drive(b.beginAttack(sk('归尘礼赞'), prep() ? prep().aim : { ...center(target), targetId: target }));
+    cases.push(ok('TFX-03 归尘礼赞释放：必中穿透 + 降防效果真值 → holy-judgment(L4)',
+      gr.ok && !gr.preparing && gr.hits.length === 1 && gr.hits[0].hit && gr.effects.some(e => e.tag === '降防') && pick(gr) === 'holy-judgment', j({ ok: gr.ok, reason: gr.reason, hits: gr.hits.map(h => [h.targetId, h.hit]), id: pick(gr) })));
+    fresh(); toEl(true);
+    el.ref.tp = 80; el.ref.mp = 100;
+    const ts = drive(b.beginAttack(sk('召雷术'), center('e:食尸鬼A')));
+    const tsEntry = ts.ok && reg.resolve(prepareInput(ts));
+    let waited = 0;
+    while (prep() && !prep().ready && waited++ < 3) { b.endAction(); toEl(true); }
+    const tr = prep() ? drive(b.beginAttack(sk('召雷术'), prep().aim)) : { ok: false, reason: '准备丢失', hp: el.ref.hp, cur: b.snapshot().currentId, log: b.snapshot().log.slice(-8) };
+    cases.push(ok('TFX-03 召雷术：延迟2起手 → storm-gather(L2)；后续自然行动自动投入（含加速库存）就绪后释放 → thunder-storm(L3)，麻痹效果真值',
+      ts.ok && ts.preparing && tsEntry && tsEntry.id === 'storm-gather' && waited >= 1 && waited <= 2 && tr.ok && tr.hits.length > 0 && tr.effects.some(e => e.tag === '麻痹') && pick(tr) === 'thunder-storm',
+      j({ start: ts.ok && ts.reason, waited, release: tr.ok, reason: tr.reason, hits: (tr.hits || []).length, id: tr.ok && pick(tr), hp: tr.hp, cur: tr.cur, log: tr.log })));
+    const graded = reg.list().filter(e => ['heal-mend', 'abyss-fog', 'holy-vow', 'storm-gather', 'holy-judgment', 'thunder-storm'].includes(e.id));
+    const budgets = graded.map(e => ({ id: e.id, grade: e.grade, ...checkBudget(e) }));
+    cases.push(ok('TFX-03 首批新条目分级预算（L2/L3/L4 时长、蓄势、全屏/暗场、峰值音量）全部达标', graded.length === 6 && budgets.every(x => x.ok), j(budgets)));
+    // 反应请求：规则只读承伤预览与候选绑定（弹窗只显示不计算）
+    const withPreview = reqs.filter(r => r && r.type === 'reaction');
+    const pv = withPreview.map(r => r.preview).filter(Boolean);
+    cases.push(ok('TFX-03 反应请求携带本段只读承伤预览（min≤max、0.8/1.2 两端）与候选绑定存量',
+      withPreview.length > 0 && pv.length === withPreview.length && pv.every(p => p.hpMin <= p.hpMax && p.rawMin <= p.rawMax) && withPreview.every(r => r.candidates.every(c => Array.isArray(c.bindings))),
+      j({ n: withPreview.length, sample: pv[0] })));
+    const rp = m.reactionPrompt;
+    const kinds = [rp.candidateKind({ skill: { name: 'a' } }), rp.candidateKind({ skill: { name: 'b', kanpoTarget: '法术' } }), rp.candidateKind({ guardian: true, skill: { name: 'c', sheshenTarget: 'all' } })];
+    const auto = rp.autoPickChoice({ responderId: 't', candidates: [{ skill: { name: 'g' }, responderId: 'guard', guardian: true }] });
+    cases.push(ok('TFX-03 反应弹窗候选分类（反应/看破/舍身）与自动选择回传候选自身 responderId',
+      j(kinds) === j(['reaction', 'kanpo', 'sheshen']) && auto && auto.responderId === 'guard', j({ kinds, auto })));
+    return { cases };
+  } },
 };

@@ -889,7 +889,9 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const candidates = collectReactionCandidates(target, skill, incomingType, caster.id, isAttack, allowGuardian);
     if (!candidates.length || options.suppressReactions) return null;
     const request = { type: 'reaction', attackId: currentAttackId(), responderId: target.id, casterId: caster.id, skill, incomingType,
-      candidates: candidates.map(c => ({ ...c, usesLeft: usesLeft(c.responderId, c.skill), cost: c.skill.cost || 0 })), ...segment };
+      candidates: candidates.map(c => ({ ...c, usesLeft: usesLeft(c.responderId, c.skill), cost: c.skill.cost || 0,
+        bindings: itemBindingsFor(byId.get(c.responderId), c.skill).map(b => ({ item: b.item.name, category: b.item.category, cost: b.cost,
+          remaining: b.item.category === '道具' ? (b.item.usesRemaining ?? b.item.maxUses ?? 0) : (b.item.count || 0) })) })), ...segment };
     emit('reaction-request', { attackId: currentAttackId(), targetId: target.id, slotIndex: segment.slotIndex });
     let choice;
     if (options.autoAnswer) choice = options.autoAnswer(request);
@@ -1384,6 +1386,28 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
 
   // 单段攻击：命闪 →（将命中才）反应拦截 yield → 伤害管线 → 附带效果
+  // 反应弹窗承伤预览（只读、不掷骰、不改状态）：与本段结算同一条管线（原始伤害→变种抗性→护甲/防御→免伤池→护盾），
+  // 随机系数取 0.8 / 1.2 两端；暴击与致死保命被动不计（原版 buildReactionDamagePreview 同口径）
+  function segmentPreview(caster, target, slot, skill, incomingType, isAoE, pierce, cStats) {
+    const passive = CLASS_PASSIVES[caster.classType] || null;
+    const hooks = {
+      modifyDamageMultiplier: args => (passive && passive.modifyDamageMultiplier ? passive.modifyDamageMultiplier(args.caster, args.target, buffsOf(args.target.id), statsOf(args.caster), statsOf(args.target)) : 0),
+      modifyDamageDealt: args => (passive && passive.modifyDamageDealt ? passive.modifyDamageDealt(args.caster, args.skill, statsOf(args.caster)) : 0),
+    };
+    const tStats = statsOf(target);
+    const guard = buffsOf(target.id).filter(b => b.type === 'damageGuard' && (b.attackId === currentAttackId() || b.attackId == null)).reduce((n, b) => n + b.value, 0);
+    const armorMult = slot.definition.scatter ? 3 : 1, defending = isDefending(target), shield = target.ref.shield || 0;
+    const at = roll => {
+      const raw = computeSegmentRawDamage(cStats, caster.ref.atk, slot.power, 1, roll, hooks, { caster, target, skill });
+      const resisted = applyTypeResist(raw, incomingType, isAoE, target, buffsOf(target.id));
+      return { raw, resisted, ...calculateDamage(resisted, { def: tStats.def, shield, hp: target.ref.hp }, { isPierce: pierce, armorMult, guardRemaining: guard, defending }) };
+    };
+    const lo = at(0.8), hi = at(1.2);
+    return { tag: slot.tag, power: slot.power, baseAtk: cStats.atk, atkBonus: cStats.atk - (caster.ref.atk || 0),
+      rawMin: lo.raw, rawMax: hi.raw, resistMin: lo.resisted, resistMax: hi.resisted, def: tStats.def, armorMult, pierce, defending, shield, guard,
+      hpMin: lo.hpDmg, hpMax: hi.hpDmg, shieldMin: lo.shieldDmg, shieldMax: hi.shieldDmg, guardMin: lo.guardDmg, guardMax: hi.guardDmg,
+      targetHp: target.ref.hp, fatal: hi.hpDmg >= target.ref.hp };
+  }
   function* resolveAttackSegment({ caster, target, slot, skill, baseSkill, slotIndex, segmentIndex, shotIndex, totalShots, bdg, canceled, incomingType, isAoE, options }) {
     const cStats = statsOf(caster);
     let tStats = statsOf(target);
@@ -1434,7 +1458,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     }
     // 确认将命中 → 反应拦截（只对该发；选择由调用方 next() 给出或 policy 自动）
     let reaction = yield* selectReaction(target, caster, skill, incomingType, options,
-      { slotIndex, segmentIndex, targetId: target.id, shotIndex, totalShots });
+      { slotIndex, segmentIndex, targetId: target.id, shotIndex, totalShots, preview: segmentPreview(caster, target, slot, skill, incomingType, isAoE, pierce, cStats) });
     if (reaction?.canceled) {
       canceled.value = true;
       if (!bdg.targetResolved[target.id]) { bdg.targetResolved[target.id] = true; bdg.targetHit[target.id] = false; }
@@ -1449,7 +1473,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       target = byId.get(reaction.guardianId);
       segBase.originalTargetId = segBase.targetId; segBase.targetId = target.id;
       const guardReaction = yield* selectReaction(target, caster, skill, incomingType, options,
-        { slotIndex, segmentIndex, targetId: target.id, shotIndex, totalShots }, true, false);
+        { slotIndex, segmentIndex, targetId: target.id, shotIndex, totalShots, preview: segmentPreview(caster, target, slot, skill, incomingType, isAoE, pierce, cStats) }, true, false);
       if (guardReaction?.canceled) canceled.value = true;
       if (guardReaction?.canceled || guardReaction?.dodged) return Object.assign(segBase, { hit: false, hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reaction, guardianReaction: guardReaction, logEnd: log.length });
       reaction.guardianReaction = guardReaction;

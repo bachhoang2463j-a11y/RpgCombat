@@ -1,0 +1,49 @@
+{
+  "date": "2026-11-24",
+  "artifact": "tactics/mvp-standalone.html",
+  "sha256": "9285cbd0061a10e8d5525b03d810bef6b874db64ee3b5e37af2d6b141e5bca9a",
+  "browser": "chrome-devtools",
+  "fixture": "current authoritative scene, no roster or resource overrides",
+  "sourceRegression": { "passed": 801, "failed": 0, "fullRuns": 1 },
+  "artifactAssertions": { "passed": 14, "failed": 0 },
+  "movement": {
+    "unitId": "h:玛德琳",
+    "firstRequestedPath": [[14,37],[13,37],[12,36],[11,35]],
+    "firstActualPath": [[14,37],[13,37]],
+    "stoppedOnDiscovery": true,
+    "secondActualPath": [[13,37],[12,36],[11,35]],
+    "crossedAllyId": "h:弗兰克",
+    "allyPlacement": [12,36],
+    "allyLandingPreview": null,
+    "hopSamples": 160,
+    "peakHopPx": 1.9999731161487795,
+    "finishedBusy": false,
+    "movementCodeChanged": false
+  },
+  "classification": {
+    "attack": ["关节锁", "从西班牙射击", "柯尔特三连发", "死亡编织-双枪扫射"],
+    "support": ["无迹可寻", "寂静指令", "早有准备-身形隐匿", "早有准备-提前瞄准"],
+    "verifiedMenuClick": true
+  },
+  "battleFlow": {
+    "skill": "从西班牙射击",
+    "casterId": "h:玛德琳",
+    "targetId": "e:食尸鬼B",
+    "hpBefore": 130,
+    "hpAfter": 81,
+    "mainAfter": 0,
+    "casterMpAfter": 13,
+    "effect": "缓速 -10 · 2回",
+    "nextIdAfterConfirmedEnd": "h:索恩",
+    "nextActionSerial": 3,
+    "finishedBusy": false
+  },
+  "runtimeErrorsCollected": [],
+  "consoleResourceErrors": ["favicon.ico 404 (two requests)"],
+  "largeEnemyReachability": [
+    { "id": "e:伊塔库亚的眷族", "sightMeters": 16, "moveMeters": 8, "reachableCells": 115, "maxReachableRow": 16, "openingVisibleHeroes": [] },
+    { "id": "e:犹格索托斯之子", "sightMeters": 18, "moveMeters": 5, "reachableCells": 115, "maxReachableRow": 16, "openingVisibleHeroes": [] }
+  ],
+  "remainingPreviousRoundGates": ["four new skill full visual acceptance", "reaction/guardian/kanpo visual acceptance"],
+  "scope": "feedback05 page flow passed; previous-round complete visual acceptance not claimed"
+}

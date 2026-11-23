@@ -31,6 +31,11 @@ const FX01_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'f
 
 // 阶段注册表：只登记真实存在的用例文件；--all 只聚合这里的条目，不虚构未来阶段。
 const STAGES = {
+  feedback05: {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'feedback05-node-cases.mjs'),
+    groups: ['TFB-05'], modules: ['ai', 'movement', 'scene', 'effectDefinitions'],
+    requiredExports: [['ai', 'chooseEnemyAction'], ['effectDefinitions', 'skillSlots']],
+  },
   'typical-skills': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'typical-skills-node-cases.mjs'),
     groups: ['TT-SKILLS'], modules: ['battle', 'parser', 'scenarioData'],
@@ -159,12 +164,13 @@ const STAGES = {
   },
   fx01: {
     file: FX01_CASES,
-    groups: ['TFX-01', 'TFX-02'],
+    groups: ['TFX-01', 'TFX-02', 'TFX-03'],
     requiredExports: [
       ['fxRegistry', 'createFxRegistry'], ['fxRegistry', 'actionInput'], ['fxRegistry', 'reactionInput'], ['fxRegistry', 'checkBudget'],
       ['fxLibrary', 'registerDefaultFx'], ['battle', 'createBattle'], ['battle', 'skillSupport'], ['parser', 'parseYamlText'], ['parser', 'parseSkill'],
+      ['fxRegistry', 'prepareInput'], ['scenarioData', 'createScenarioData'], ['main', 'isTypicalBlock'], ['reactionPrompt', 'candidateKind'],
     ],
-    modules: ['parser', 'battle', 'fixture', 'fxRegistry', 'fxLibrary'],
+    modules: ['parser', 'battle', 'fixture', 'fxRegistry', 'fxLibrary', 'scenarioData', 'chapelScene', 'main', 'reactionPrompt'],
   },
   rules02: {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'rules02-node-cases.mjs'),
@@ -248,6 +254,8 @@ const MODULE_FILES = {
   ai: 'ai.mjs',
   battle: 'battle.mjs',
   fixture: 'demo-fixture.mjs',
+  chapelScene: 'chapel-scene.mjs',
+  reactionPrompt: 'reaction-prompt.mjs',
   director: 'action-director.mjs',
   fxRegistry: 'fx-registry.mjs',
   fxLibrary: 'fx-library.mjs',

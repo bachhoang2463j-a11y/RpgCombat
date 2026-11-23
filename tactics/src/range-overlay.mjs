@@ -35,8 +35,9 @@ function clipCells(g, cells) {
 
 function shapePath(g, shape) {
   const from = shape.from || shape.center;
-  const ox = from.x * Q, oy = from.y * Q;
   g.beginPath();
+  if (!from) return;   // 「自身」/「全域」无空间轮廓：只画目标标记
+  const ox = from.x * Q, oy = from.y * Q;
   if (shape.type === '直线') {
     const ux = Math.cos(shape.dir), uy = Math.sin(shape.dir), nx = -uy, ny = ux;
     const L = shape.length * Q, W = shape.width * Q / 2;

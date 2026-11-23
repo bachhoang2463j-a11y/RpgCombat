@@ -154,15 +154,15 @@ function evaluateQuery(ctx, unit, skill, query) {
     if (def.kind === 'attack') {
       for (const tid of targets) {
         const t = ctx.units.find(u => u.id === tid);
-        if (!t || t.side === unit.side) continue;
-        score += Math.max(1, (slot.power || unit.ref.atk || 0) - (t.ref.def || 0));
+        if (!t) continue;
+        score += (t.side === unit.side ? -1 : 1) * Math.max(1, (slot.power || unit.ref.atk || 0) - (t.ref.def || 0));
       }
     } else if (def.kind === 'heal') {
       for (const tid of targets) {
         const t = ctx.units.find(u => u.id === tid);
         if (!t || !isLive(t)) continue;
         const miss = Math.max(0, (t.ref.maxHp || t.ref.hp) - (t.ref.hp || 0));
-        score += Math.min(miss, slot.power || 0);
+        score += (t.side === unit.side ? 1 : -1) * Math.min(miss, slot.power || 0);
       }
     } else if (def.kind === 'healMp' || def.kind === 'healTp') {
       if (targets.length) score += Math.min(slot.power || 0, 10);
@@ -176,7 +176,10 @@ function evaluateQuery(ctx, unit, skill, query) {
           const t = ctx.units.find(u => u.id === tid);
           if (t && (t.ref.shield || 0) >= (slot.power || 0)) continue;
         }
-        score += (def.debuff ? 6 : 5) + (slot.power || 0) * 0.1;
+        const target = ctx.units.find(u => u.id === tid);
+        if (!target) continue;
+        const beneficial = def.debuff ? target.side !== unit.side : target.side === unit.side;
+        score += (beneficial ? 1 : -1) * ((def.debuff ? 6 : 5) + (slot.power || 0) * 0.1);
       }
     } else if (def.kind === 'drainMp' || def.kind === 'dispel') {
       if (targets.length) score += 4;

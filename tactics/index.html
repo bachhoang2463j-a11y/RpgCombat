@@ -14,10 +14,14 @@
 import { createApp, DEFAULT_YAML_A } from './src/main.mjs';
 import { DEMO_YAML, DEMO_PLACEMENTS } from './src/demo-fixture.mjs';
 
-const p02 = new URLSearchParams(location.search).get('stage') === 'p02';
+const qs = new URLSearchParams(location.search);
+const p02 = qs.get('stage') === 'p02';
+// 默认载入典型对局权威样本（doc/tactics/典型对局-战棋版.yaml）；?demo=slice 回到旧视听切片演示数据
+const slice = qs.get('demo') === 'slice';
+const typicalYaml = p02 || slice ? null : await (await fetch('../doc/tactics/' + encodeURIComponent('典型对局-战棋版.yaml'))).text();
 const app = createApp(document.getElementById('tactics-app'), {
-  defaultYaml: p02 ? DEFAULT_YAML_A : DEMO_YAML,
-  defaultPlacements: p02 ? undefined : DEMO_PLACEMENTS,
+  defaultYaml: p02 ? DEFAULT_YAML_A : slice ? DEMO_YAML : typicalYaml,
+  defaultPlacements: p02 || !slice ? undefined : DEMO_PLACEMENTS,
   playable: !p02,
 });
 app.boot();

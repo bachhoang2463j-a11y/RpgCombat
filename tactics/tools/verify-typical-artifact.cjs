@@ -12,6 +12,8 @@ const cases = [];
 function check(id, pass, detail = '') { cases.push({ id, pass: !!pass, detail }); }
 check('单个脚本及闭合标签', scripts.length === 1 && (html.match(/<\/script>/g) || []).length === 1);
 check('零外部业务脚本或样式', !/<script[^>]+src=|<link[^>]+stylesheet/i.test(html));
+check('零外部import', !/\bimport\s*(?:\(|[{*'"\w])/.test(scripts[0][1]));
+check('伤害槽菜单分类与阵营收益修复入包', /function isAttackSkill\(skill\)\s*\{\s*return skillSlots\(skill\)\.some/.test(html) && /\bbeneficial\s*=\s*def\.debuff/.test(html));
 const context = { console, structuredClone, URL, setTimeout, clearTimeout };
 context.window = context;
 vm.createContext(context);
@@ -27,6 +29,9 @@ if (backend) {
   const data = backend.createScenarioData(block);
   check('权威样本四英雄六敌两召唤词条入产物', block.heroes.length === 4 && block.enemies.length === 6 && block.summonTemplates.length === 2);
   check('中文原值与独立属性保真', data.units[0].ref.hp === 100 && data.units[0].ref.mp === 110 && data.units[0].ref.perception === 50);
+  const fog = block.heroes[0].skills.find(s => s.name === '拉莱耶造雾术');
+  check('埃利奥特造雾半径5射程12且深潜者不变', fog.range.radius === 5 && fog.range.castRange === 12
+    && block.enemies.filter(e => e.name.startsWith('深潜者')).every(e => e.skills.find(s => s.name === '拉莱耶造雾术').range.castRange === 15));
   check('浓雾、冲锋与反应字段实际入包', block.heroes[0].skills.find(s => s.name === '拉莱耶造雾术').regionEffect.type === 'fog'
     && data.summonProvider('幻梦行军兽').skills.find(s => s.name === '冲撞').displacements.some(d => d.type === '冲锋')
     && block.heroes[0].skills.find(s => s.name === '巫师护盾').isReaction);

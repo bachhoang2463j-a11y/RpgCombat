@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "4886a31c8ce6df2195f12e2985439cd480664004fbf5429149394c044dde9ae2",
-  "bytes": 1036668,
+  "sha256": "9285cbd0061a10e8d5525b03d810bef6b874db64ee3b5e37af2d6b141e5bca9a",
+  "bytes": 1127296,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -12,6 +12,16 @@
     },
     {
       "id": "零外部业务脚本或样式",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "零外部import",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "伤害槽菜单分类与阵营收益修复入包",
       "pass": true,
       "detail": ""
     },
@@ -32,6 +42,11 @@
     },
     {
       "id": "中文原值与独立属性保真",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "埃利奥特造雾半径5射程12且深潜者不变",
       "pass": true,
       "detail": ""
     },
@@ -61,6 +76,6 @@
       "detail": ""
     }
   ],
-  "passed": 11,
+  "passed": 14,
   "failed": 0
 }

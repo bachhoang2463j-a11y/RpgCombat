@@ -58,6 +58,10 @@ button:disabled { opacity: .42; cursor: default; }
 .t-side-enemy .t-unit-medal::before { border-color: #ff8a94; box-shadow: 0 0 18px var(--crim-glow), inset 0 0 10px rgba(224,82,94,0.35); }
 .t-unit-current .t-unit-medal::before { opacity: 1; animation: t-halo 1.5s ease-in-out infinite; }
 @keyframes t-halo { 0%,100% { transform: scale(.96); opacity: .65; } 50% { transform: scale(1.08); opacity: 1; } }
+/* 延迟/蓄力准备中（规则 charges.preparing）：脚下金色咏唱光晕，纯渐变无硬边，释放或取消即撤 */
+.t-unit-channel .t-unit-ground::after { content: ''; position: absolute; left: -34px; top: -34px; width: 68px; height: 68px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(254,243,199,.28) 0%, rgba(251,191,36,.18) 42%, rgba(251,191,36,.42) 58%, transparent 72%); animation: t-channel 1.8s ease-in-out infinite; }
+@keyframes t-channel { 0%,100% { transform: scale(.9); opacity: .55; } 50% { transform: scale(1.08); opacity: 1; } }
 
 .t-unit-billboard { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
 .t-unit-sprite { position: absolute; left: calc(var(--d) / -2); top: calc(var(--d) / -2); width: var(--d); height: var(--d); }
@@ -419,27 +423,101 @@ button:disabled { opacity: .42; cursor: default; }
 
 /* ============ FX02：反应弹窗（原版 promptReaction 同风格）+ 收起胶囊 + 治疗反馈 ============ */
 .t-reaction-overlay { position: fixed; inset: 0; z-index: 90; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center; transition: opacity 0.18s ease; pointer-events: auto; }
-.t-reaction-box { position: relative; overflow: hidden; width: 91.666%; max-width: 420px; border-radius: 16px; padding: 18px;
-  background: rgba(2,6,23,0.72); backdrop-filter: blur(16px); border: 1px solid rgba(99,102,241,0.4);
-  box-shadow: 0 0 45px rgba(79,70,229,0.35); animation: t-reaction-in .3s ease both; }
-@keyframes t-reaction-in { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-.t-reaction-beam { position: absolute; top: 0; left: 0; right: 0; height: 2px; opacity: 0.8;
-  background: linear-gradient(90deg, transparent, #818cf8, transparent); }
-.t-reaction-face { width: 36px; height: 36px; border-radius: 9999px; border: 2px solid #6366f1; overflow: hidden; display: flex;
+  display: flex; align-items: center; justify-content: center; transition: opacity 0.2s ease; pointer-events: auto; }
+/* 主框：原版 bg-slate-950/40 + backdrop-blur-xl + 色调描边辉光；enter-hero 0.3s 入场 */
+.t-reaction-box { position: relative; overflow: hidden; width: 91.666%; max-width: 420px; border-radius: 16px; padding: 16px 18px;
+  background: rgba(2,6,23,0.42); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); color: #e2e8f0;
+  border: 1px solid rgba(99,102,241,0.4); box-shadow: 0 0 45px rgba(79,70,229,0.35); animation: t-rx-enter .3s forwards; transform: scale(.95); }
+.t-reaction-box-sky { border-color: rgba(14,165,233,0.4); box-shadow: 0 0 45px rgba(56,189,248,0.3); }
+.t-reaction-box-amber { max-width: 430px; border-color: rgba(245,158,11,0.45); box-shadow: 0 0 50px rgba(245,158,11,0.3); }
+@keyframes t-rx-enter { 0% { opacity: 0; transform: translateX(-40px) scale(0.95); } 100% { opacity: 1; transform: translateX(0) scale(1); } }
+.t-reaction-beam { position: absolute; top: 0; left: 0; right: 0; height: 2px; opacity: 0.8; background: linear-gradient(90deg, transparent, #818cf8, transparent); }
+.t-reaction-beam-amber { opacity: .9; background: linear-gradient(90deg, transparent, #fbbf24, transparent); }
+.t-rx-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.t-reaction-box-amber .t-rx-head { border-bottom-color: rgba(245,158,11,0.3); }
+.t-rx-head-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.t-reaction-face { width: 36px; height: 36px; border-radius: 9999px; border: 2px solid #818cf8; overflow: hidden; display: flex;
   align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 0 10px rgba(99,102,241,0.5); background: rgba(0,0,0,0.4); }
-.t-reaction-face img { width: 100%; height: 100%; object-fit: cover; }
-.t-reaction-candidate { width: 100%; padding: 8px 12px; margin-bottom: 6px; border-radius: 12px; display: flex; align-items: center;
-  justify-content: space-between; gap: 8px; font-weight: 700; font-size: 12px; color: #fff; text-align: left; cursor: pointer;
-  background: linear-gradient(90deg, rgba(30,27,75,0.7), rgba(59,7,100,0.6), rgba(15,23,42,0.8));
-  border: 1px solid rgba(99,102,241,0.4); transition: all .15s ease; }
-.t-reaction-candidate:hover { background: linear-gradient(90deg, #4f46e5, #9333ea); border-color: #c7d2fe; }
-.t-reaction-skip { width: 100%; padding: 8px; margin-top: 8px; border-radius: 10px; font-size: 12px; font-weight: 700;
-  color: #94a3b8; background: rgba(15,23,42,0.7); border: 1px solid #1e293b; cursor: pointer; transition: colors .15s ease; }
+.t-reaction-face-sky { border-color: #38bdf8; }
+.t-reaction-face img, .t-rx-mini img { width: 100%; height: 100%; object-fit: cover; }
+.t-rx-eye { width: 36px; height: 36px; border-radius: 9999px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 18px;
+  background: rgba(69,26,3,0.8); border: 2px solid #fbbf24; box-shadow: 0 0 12px rgba(245,158,11,0.5); }
+.t-rx-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.t-rx-gap { gap: 8px; }
+.t-rx-title { margin: 0; font-weight: 700; font-size: 13px; letter-spacing: .05em; color: #a5b4fc; }
+.t-rx-title-sky { color: #7dd3fc; } .t-rx-title-amber { color: #fcd34d; }
+.t-rx-tag { font-size: 9px; padding: 1px 6px; border-radius: 4px; background: rgba(99,102,241,0.2); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); font-family: ui-monospace, monospace; }
+.t-rx-tag-amber { background: rgba(245,158,11,0.2); color: #fcd34d; border-color: rgba(245,158,11,0.4); }
+.t-rx-sub { font-size: 10px; display: flex; align-items: center; gap: 4px; margin-top: 2px; min-width: 0; }
+.t-rx-trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.t-rx-dim { color: #94a3b8; } .t-rx-faint { color: #64748b; } .t-rx-white { color: #fff; } .t-rx-black { font-weight: 900; }
+.t-rx-gold { color: #fcd34d; font-weight: 700; flex-shrink: 0; } .t-rx-rose { color: #fb7185; font-weight: 700; flex-shrink: 0; }
+.t-rx-cyan { color: #67e8f9; } .t-rx-cyan-lab { color: #22d3ee; font-size: 9px; } .t-rx-indigo { color: #a5b4fc; }
+.t-rx-amber { color: #fcd34d; } .t-rx-amber-lab { color: #fbbf24; font-size: 9px; } .t-rx-crit { color: #fdba74; font-weight: 700; }
+.t-reaction-shelve { flex-shrink: 0; font-size: 10px; padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(129,140,248,0.4); color: #c7d2fe; background: transparent; cursor: pointer; transition: background .15s ease; }
+.t-reaction-shelve:hover { background: rgba(129,140,248,0.2); }
+.t-reaction-shelve-amber { border-color: rgba(245,158,11,0.4); color: #fde68a; } .t-reaction-shelve-amber:hover { background: rgba(245,158,11,0.2); }
+/* 来袭技能详情行（原版 buildSkillDetailHTML） */
+.t-rx-detail { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; font-size: 10px; font-family: ui-monospace, monospace;
+  padding: 4px 10px; margin-bottom: 8px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); }
+.t-rx-chip { font-size: 9px; padding: 1px 6px; border-radius: 4px; background: rgba(30,41,59,0.8); color: #cbd5e1; }
+.t-rx-chip-type { font-weight: 700; background: rgba(244,63,94,0.2); color: #fda4af; border: 1px solid rgba(244,63,94,0.3); }
+.t-rx-seg { font-size: 9px; padding: 1px 6px; border-radius: 4px; background: rgba(99,102,241,0.18); color: #c7d2fe; border: 1px solid rgba(99,102,241,0.3); }
+/* 承伤预览三胶囊（原版 buildReactionDamagePreview） */
+.t-rx-dmg { margin-bottom: 8px; border-radius: 12px; padding: 8px; background: rgba(0,0,0,0.4); border: 1px solid rgba(99,102,241,0.3); font-size: 10px; }
+.t-rx-dmg-amber { border-color: rgba(245,158,11,0.3); }
+.t-rx-caps { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px; font-weight: 700; }
+.t-rx-cap { display: flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(15,23,42,0.8); border: 1px solid #334155; }
+.t-rx-cap-lab { font-size: 9px; color: #94a3b8; }
+.t-rx-buff { font-size: 8px; color: #34d399; }
+.t-rx-final { padding: 2px 8px; color: #fda4af; } .t-rx-final b { font-weight: 900; font-size: 12px; }
+.t-rx-fatal { background: rgba(76,5,25,0.8); border-color: rgba(244,63,94,0.8); color: #fecdd3; } .t-rx-fatal .t-rx-cap-lab { color: #fecdd3; }
+.t-rx-pierce { background: rgba(69,26,3,0.8); border-color: rgba(245,158,11,0.8); color: #fde68a; } .t-rx-pierce .t-rx-cap-lab { color: #fde68a; }
+.t-rx-cap-amber { background: rgba(69,26,3,0.8); border-color: rgba(245,158,11,0.7); color: #fde68a; } .t-rx-cap-amber .t-rx-cap-lab { color: #fde68a; }
+.t-rx-cap-amber b { font-weight: 900; }
+.t-rx-notes { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; font-size: 9px; color: #94a3b8; margin-top: 6px; padding: 0 2px; }
+.t-rx-shield { color: #7dd3fc; } .t-rx-guard { color: #f0abfc; } .t-rx-resist { color: #93c5fd; }
+.t-rx-alert-fatal { color: #fb7185; font-weight: 700; animation: t-rx-pulse 2s cubic-bezier(.4,0,.6,1) infinite; }
+.t-rx-alert-pierce { color: #fcd34d; font-weight: 700; } .t-rx-alert-safe { color: #34d399; font-weight: 500; }
+@keyframes t-rx-pulse { 50% { opacity: .5; } }
+.tag-fx-fatal { animation: fx-pulse-fatal 1.8s infinite ease-in-out; }
+.tag-fx-molt { animation: fx-molt 2s infinite ease-in-out; }
+.tag-fx-amber { animation: fx-pulse-amber 2s infinite ease-in-out; }
+@keyframes fx-molt { 0%, 100% { box-shadow: 0 0 5px rgba(245,158,11,0.35); } 50% { box-shadow: 0 0 18px rgba(245,158,11,0.9), inset 0 0 6px rgba(245,158,11,0.45); } }
+@keyframes fx-pulse-amber { 0%, 100% { box-shadow: 0 0 4px rgba(245,158,11,0.35); border-color: rgba(245,158,11,0.6); } 50% { box-shadow: 0 0 14px rgba(245,158,11,0.9), inset 0 0 4px rgba(245,158,11,0.3); border-color: rgba(251,191,36,1); } }
+@keyframes fx-pulse-fatal { 0%, 100% { box-shadow: 0 0 4px rgba(244,63,94,0.4); border-color: rgba(244,63,94,0.7); } 50% { box-shadow: 0 0 14px rgba(244,63,94,0.9), inset 0 0 4px rgba(244,63,94,0.3); border-color: rgba(251,113,133,1); } }
+.t-rx-sheshen-hint { margin-bottom: 8px; padding: 4px 10px; border-radius: 8px; background: rgba(8,47,73,0.5); border: 1px solid rgba(14,165,233,0.4);
+  font-size: 10px; color: #bae6fd; display: flex; align-items: center; gap: 6px; } .t-rx-sheshen-hint strong { color: #7dd3fc; }
+/* 候选：反应紫 / 舍身钢蓝 / 看破琥珀 */
+.t-rx-list { max-height: 230px; overflow-y: auto; padding-right: 2px; }
+.t-rx-cand { width: 100%; padding: 8px 12px; margin-bottom: 6px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-weight: 700; font-size: 12px; color: #fff; text-align: left; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); transition: all .15s ease;
+  background: linear-gradient(90deg, rgba(30,27,75,0.7), rgba(59,7,100,0.6), rgba(15,23,42,0.8)); border: 1px solid rgba(99,102,241,0.4); }
+.t-rx-cand:hover { background: linear-gradient(90deg, #4f46e5, #9333ea); border-color: #a5b4fc; }
+.t-rx-cand-sheshen { background: linear-gradient(90deg, rgba(8,47,73,0.8), rgba(23,37,84,0.7), rgba(15,23,42,0.8)); border-color: rgba(14,165,233,0.5); }
+.t-rx-cand-sheshen:hover { background: linear-gradient(90deg, #0284c7, #2563eb); border-color: #7dd3fc; }
+.t-rx-cand-kanpo { background: linear-gradient(90deg, rgba(69,26,3,0.8), rgba(67,20,7,0.7), rgba(15,23,42,0.9)); border-color: rgba(245,158,11,0.5); }
+.t-rx-cand-kanpo:hover { background: linear-gradient(90deg, #d97706, #ea580c); border-color: #fcd34d; }
+.t-rx-cand-main { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.t-rx-cand-text { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.t-rx-bolt { color: #818cf8; font-size: 14px; flex-shrink: 0; } .t-rx-cand:hover .t-rx-bolt { color: #fff; }
+.t-rx-mini { width: 22px; height: 22px; border-radius: 9999px; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); font-size: 13px; }
+.t-rx-mini-sky { border: 1px solid #38bdf8; } .t-rx-mini-amber { border: 1px solid #fcd34d; }
+.t-rx-sky-name { color: #7dd3fc; font-weight: 900; } .t-rx-amber-name { color: #fcd34d; font-weight: 900; }
+.t-rx-badge { font-size: 8px; padding: 0 4px; border-radius: 4px; flex-shrink: 0; }
+.t-rx-badge-sky { background: rgba(56,189,248,0.2); color: #bae6fd; border: 1px solid rgba(56,189,248,0.3); }
+.t-rx-badge-amber { background: rgba(251,191,36,0.2); color: #fde68a; border: 1px solid rgba(251,191,36,0.3); }
+.t-rx-limit { color: #fda4af; padding: 0 2px; }
+.t-rx-bind { font-size: 8px; padding: 0 4px; border-radius: 4px; background: rgba(69,26,3,0.8); color: #fcd34d; border: 1px solid rgba(217,119,6,0.5); font-family: ui-monospace, monospace; flex-shrink: 0; }
+.t-rx-cost { font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; color: #a5b4fc; background: rgba(0,0,0,0.4); padding: 2px 8px; border-radius: 4px;
+  border: 1px solid rgba(99,102,241,0.3); display: flex; gap: 4px; flex-shrink: 0; }
+.t-rx-cand:hover .t-rx-cost { background: rgba(49,46,129,0.6); }
+.t-rx-cost-sky { color: #7dd3fc; border-color: rgba(14,165,233,0.3); } .t-rx-cand-sheshen:hover .t-rx-cost { background: rgba(12,74,110,0.6); }
+.t-rx-cost-amber { color: #fcd34d; border-color: rgba(245,158,11,0.3); } .t-rx-cand-kanpo:hover .t-rx-cost { background: rgba(120,53,15,0.6); }
+.t-rx-mp { color: #c7d2fe; padding: 0 2px; } .t-rx-hp { color: #fca5a5; padding: 0 2px; } .t-rx-tp { color: #86efac; padding: 0 2px; }
+.t-reaction-skip { width: 100%; padding: 8px; margin-top: 8px; border-radius: 12px; font-size: 12px; font-weight: 700; color: #94a3b8;
+  background: rgba(15,23,42,0.7); border: 1px solid #1e293b; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); transition: color .15s ease, background .15s ease; }
 .t-reaction-skip:hover { color: #e2e8f0; background: rgba(30,41,59,0.9); }
-.t-reaction-shelve { flex-shrink: 0; font-size: 10px; padding: 2px 8px; border-radius: 6px;
-  border: 1px solid rgba(129,140,248,0.4); color: #c7d2fe; background: transparent; cursor: pointer; transition: all .15s ease; }
-.t-reaction-shelve:hover { background: rgba(99,102,241,0.2); }
 .t-reaction-reopen { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 64px); transform: translateX(-50%);
   z-index: 89; padding: 10px 18px; border-radius: 9999px; background: rgba(20,25,40,0.95);
   border: 1px solid rgba(255,255,255,0.25); color: #fff; font-size: 13px; font-weight: 700;

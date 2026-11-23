@@ -9,8 +9,8 @@
 
 import { playPathMotion, pathSegments, pointAtDistance } from './motion.mjs';
 import { unitCenter } from './geometry.mjs';
-import { createFxRegistry, actionInput, reactionInput } from './fx-registry.mjs';
-import { registerDefaultFx } from './fx-library.mjs';
+import { createFxRegistry, actionInput, reactionInput, prepareInput } from './fx-registry.mjs';
+import { registerDefaultFx, EXTRA_AUDIO, fogFieldHtml, animateFogField } from './fx-library.mjs';
 import { createVfxHost } from './vfx-host.mjs';
 
 const AOE_SUBTYPES = new Set(['爆炸', '雷', '火焰', '枪击', '毒雾', '冰霜', '风', '光']);
@@ -44,6 +44,7 @@ export function resolveWindupKind(skill) {
 
 export function createActionDirector(deps) {
   const { sandbox, avHost, getViewData, onReveal, onMoveFeedback, getUnitStyle } = deps;
+  const onEffectReveal = deps.onEffectReveal || null;
   const promptReaction = deps.promptReaction || (() => Promise.resolve(null));
   const battleOf = deps.battle || (() => null);
   const av = avHost.av;
@@ -264,6 +265,8 @@ export function createActionDirector(deps) {
     };
   }
   function prepareAudio(keys) {
+    // 演出库扩展采样：首次用到时补登未登记键（同一资源基址），不改视听底座
+    for (const k of keys) if (EXTRA_AUDIO[k] && !av.audioUrls[k]) av.audioUrls[k] = av.ASSET_BASE + '/' + EXTRA_AUDIO[k];
     const urls = keys.map(k => av.audioUrls[k]).filter(Boolean);
     if (!urls.length) return Promise.resolve(true);
     // 采样通常已在预载中：即时完成；资源服务未响应时最多等一拍，之后照常演出
@@ -333,21 +336,94 @@ export function createActionDirector(deps) {
       const h = byId.get(targetId);
       if (h) (h.segments || [h]).forEach((_, i) => revealSegment(targetId, i, meta));
     }
+    // 非伤害效果（即时回复等，规则 result.effects）：条目在接触拍点揭示；quiet=条目已自带视觉，不再叠通用光效
+    const effects = result.effects || [];
+    const effectsShown = new Set();
+    function revealEffect(e, quiet) {
+      if (!e || effectsShown.has(e)) return null;
+      effectsShown.add(e);
+      if (e.kind === 'heal' && !quiet) playHealPulse(e.targetId);
+      return onEffectReveal ? onEffectReveal(e, { result }) : null;
+    }
+    // 本次创建的区域（浓雾）：常驻层在条目爆发拍点才出现
+    const regions = (result.events || []).filter(ev => ev.type === 'region-created').map(ev => ev.region);
+    regions.forEach(r => heldRegions.add(r.id));
+    function revealRegion(id) { if (heldRegions.delete(id)) syncRegions(); }
 
     const ctx = {
       result, skill, hits, identity, input, casterId: result.casterId, casterEnt, av, avHost, sandbox,
       audioContext, outcomeMap: new Map(hits.map(h => [h.targetId, h.hit ? 'hit' : 'dodge'])),
       fx: makeFx(audioContext.category),
       wait, tween, awaitHandle, after: (ms, fn) => scope().after(ms, fn),
-      reveal, revealSegment, ent: id => avHost.entity(id), centerOf,
+      reveal, revealSegment, revealEffect, revealRegion, regions, unitsInCells, ent: id => avHost.entity(id), centerOf,
       anchorAt: (x, y) => makeAnchor(x, y), aimAnchor: () => aimAnchor(result.aim), lineEndAnchor: () => lineEndAnchor(result),
     };
     const ok = await entry.play(ctx);
     hits.forEach(h => reveal(h.targetId, { late: true }));
+    effects.forEach(e => revealEffect(e));
+    regions.forEach(r => revealRegion(r.id));
     await Promise.all(reactionRuns);
     if (wave) av.CombatAudioDirector.closeWave(wave);
     dropAnchors();
     return ok;
+  }
+
+  // ---------- 起手（蓄力/延迟开始：preparing 提交结果，未结算槽位）：注册表 kind:'prepare' 分发，无条目则不演 ----------
+  async function playPrepare(result) {
+    if (!result || !result.ok || !result.preparing) return false;
+    const entry = registry.resolve(prepareInput(result));
+    if (!entry) return true;
+    avHost.syncRoster();
+    const c = centerOf(result.casterId);
+    if (c) await sandbox.guideTo([c], { ms: 320 });
+    if (!(await prepareAudio(entry.prepareKeys ? entry.prepareKeys({}) : []))) return false;
+    return entry.play({
+      result, skill: result.skill, casterId: result.casterId, av, fx: makeFx(av.CombatAudioMixer.classify(result.skill)),
+      wait, after: (ms, fn) => scope().after(ms, fn), centerOf,
+    });
+  }
+
+  // 规则雾区格内的单位（占地任一格落入即算；只读规则站位）
+  function unitsInCells(cells) {
+    const vd = getViewData(), set = new Set((cells || []).map(k => k.col + ',' + k.row));
+    return vd.units.filter(u => u.ref.hp > 0 && vd.placementsById[u.id]).filter(u => {
+      const p = vd.placementsById[u.id], fp = vd.footprintsById[u.id] || { width: 1, height: 1 };
+      for (let dx = 0; dx < fp.width; dx++) for (let dy = 0; dy < fp.height; dy++) if (set.has((p.col + dx) + ',' + (p.row + dy))) return true;
+      return false;
+    }).map(u => u.id);
+  }
+
+  // ---------- 常驻区域层（浓雾）：只消费规则雾区快照；新建/同源重施替换/到期淡出；演出持有期间暂不显示 ----------
+  const heldRegions = new Set();
+  let regionNodes = new Map(), regionScope = null, lastRegions = [];
+  function fadeOutRegion(rec) {
+    for (const layer of [rec.ground, rec.top]) {
+      const svg = layer && layer.firstChild;
+      if (svg) svg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 700, fill: 'forwards' });
+      if (layer) scope().after(720, () => { layer.remove(); scope().removeNode(layer); });
+    }
+  }
+  function syncRegions(regions) {
+    if (regions) lastRegions = regions;
+    const s = scope();
+    if (!s || !s.isLive) return;
+    if (regionScope !== s) { regionNodes = new Map(); regionScope = s; }
+    const L = fxLayers();
+    const live = new Set();
+    for (const r of lastRegions) {
+      if (!r || r.type !== 'fog') continue;
+      live.add(r.id);
+      if (heldRegions.has(r.id)) continue;
+      const sig = r.center.x + ',' + r.center.y + '|' + r.radius + '|' + r.endAt;
+      const cur = regionNodes.get(r.id);
+      if (cur && cur.sig === sig) continue;
+      if (cur) fadeOutRegion(cur);
+      const html = fogFieldHtml(r, 'r' + (++fxUid));
+      const rec = { sig, ground: L.ground.layer(html.ground), top: L.top.layer(html.top) };
+      animateFogField(rec.ground); animateFogField(rec.top);
+      regionNodes.set(r.id, rec);
+    }
+    for (const [id, rec] of regionNodes) if (!live.has(id)) { fadeOutRegion(rec); regionNodes.delete(id); }
   }
 
   // ---------- 攻击驱动（FX02 反应接线）：统一驱动 battle.beginAttack generator（玩家与敌方同一入口） ----------
@@ -461,6 +537,10 @@ export function createActionDirector(deps) {
   }
   function dropAnchors() { anchors.forEach(d => { const s = scope(); if (s) s.removeNode(d); else d.remove(); }); anchors.clear(); }
 
-  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, wait, resolveAttackIdentity, resolveWindupKind,
+  // 提交结果刚到、演出未开始前调用：本次新建区域先持有，避免刷新时抢在爆发拍点前出现
+  function holdRegions(result) {
+    for (const ev of (result && result.events) || []) if (ev.type === 'region-created') heldRegions.add(ev.region.id);
+  }
+  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, playPrepare, syncRegions, holdRegions, wait, resolveAttackIdentity, resolveWindupKind,
     runAttackLive, driveAttack, cancelAttack };
 }

@@ -26,6 +26,7 @@ import { resolveUnitStyles } from './unit-style.mjs';
 import { createEditorPanel } from './editor-panel.mjs';
 import { autoPickChoice } from './reaction-prompt.mjs';
 import { unitCenter } from './geometry.mjs';
+import { createScenarioData, createSeededRandom } from './scenario-data.mjs';
 // ---------- P02 固定图库（同一张权威几何，两个 sceneId 身份；不做生成器） ----------
 const SCENE_LIBRARY = {
   'sc-test-room': TEST_ROOM,
@@ -178,6 +179,27 @@ export function buildViewData(block, resolvedHeroes, scene, positions, combatTok
   return { sceneId: scene.sceneId, battleId: block.battleId, scene, units, footprintsById, placementsById, combatToken };
 }
 
+// ---------- 典型对局权威样本（中文对象格式：meta/站位/召唤物）→ 视图数据 ----------
+// 单位、ID、站位、种子与召唤模板一律来自契约入口 createScenarioData；本层只补头像/emoji/显示条。
+export function isTypicalBlock(block) { return !!(block && block.placements && Object.keys(block.placements).length); }
+export function buildTypicalViewData(block, scenario, scene, positions, combatToken) {
+  const srcs = [...(block.heroes || []), ...(block.enemies || [])];
+  const footprintsById = {}, placementsById = {};
+  const units = scenario.units.map((u, i) => {
+    const src = srcs[i] || {};
+    const emoji = splitEmojiName(src.name || u.name).emoji || null;
+    footprintsById[u.id] = { ...u.footprint };
+    const p = positions[u.id] || scenario.placementsById[u.id];
+    placementsById[u.id] = { col: p.col, row: p.row, facing: p.facing || 0 };
+    return Object.assign(u, {
+      emoji, img: src.img || null,
+      avatarUrl: emoji ? null : resolveAvatarUrl({ img: src.img, name: u.name }, heroAvatarUrl),
+      bars: { hp: u.ref.hp, maxHp: u.ref.maxHp || 0, mp: u.ref.mp, maxMp: u.ref.maxMp || 0 },
+    });
+  });
+  return { sceneId: scene.sceneId, battleId: block.battleId, scene, units, footprintsById, placementsById, combatToken };
+}
+
 // ---------- App ----------
 export function createApp(rootEl, opts = {}) {
   ensureMemoryVarHost();
@@ -194,6 +216,7 @@ export function createApp(rootEl, opts = {}) {
   const director = createActionDirector({
     sandbox, avHost, getViewData: () => currentViewData,
     onReveal: (hit, meta) => revealHit(hit, meta),
+    onEffectReveal: (e) => revealEffect(e),
     onMoveFeedback: (id, kind, p) => moveFeedback(id, kind, p),
     getUnitStyle: (id) => unitStyles[id] || null,
     // FX02 反应接线（contract v2/v3）：玩家控制的单位（controller 优先，缺省按 side）受击弹全屏反应弹窗；
@@ -216,6 +239,11 @@ export function createApp(rootEl, opts = {}) {
       responderAvatarUrl: responder ? responder.avatarUrl : null,
       casterName: caster ? caster.name : (req.casterId || '敌人'),
       casterEmoji: caster ? caster.emoji : null,
+      // 候选归属者（舍身者/看破者可能不是受击者本人）的显示身份
+      candidates: (req.candidates || []).map(c => {
+        const owner = unitById(c.responderId || req.responderId);
+        return Object.assign({}, c, { faceName: owner ? owner.name : '', faceEmoji: owner ? owner.emoji : null, faceAvatarUrl: owner ? owner.avatarUrl : null });
+      }),
     });
   }
   let combatToken = {};
@@ -261,10 +289,11 @@ export function createApp(rootEl, opts = {}) {
       return { branch: 'resume', viewData: currentViewData };
     }
     const block = parseYamlText(text);
+    const scenario = isTypicalBlock(block) ? createScenarioData(block) : null;
     const state = readTacticsState();
     const incoming = { sceneId: block.sceneId, battleId: block.battleId };
     const knownScene = state?.scenes?.[block.sceneId];
-    const defaults = opts.defaultPlacements || DEFAULT_PLACEMENTS;
+    const defaults = scenario ? scenario.placementsById : (opts.defaultPlacements || DEFAULT_PLACEMENTS);
     const explicit = { ...sceneOverrides, positions: { ...positions } };
     for (const [id, p] of Object.entries(defaults)) {
       if (!Object.hasOwn(knownScene?.positions || {}, id) && !Object.hasOwn(positions, id)) explicit.positions[id] = p;
@@ -278,9 +307,13 @@ export function createApp(rootEl, opts = {}) {
     }
     const scene = sceneForState(block.sceneId, result.sceneState);
     const nextToken = {};
-    buildViewData(block, block.heroes, scene, result.sceneState.positions, nextToken);
-    const roster = loadTacticsRoster(block, []);
-    let nextView = buildViewData(block, roster.heroes, scene, result.sceneState.positions, nextToken);
+    let roster = null, nextView;
+    if (scenario) nextView = buildTypicalViewData(block, scenario, scene, result.sceneState.positions, nextToken);
+    else {
+      buildViewData(block, block.heroes, scene, result.sceneState.positions, nextToken);
+      roster = loadTacticsRoster(block, []);
+      nextView = buildViewData(block, roster.heroes, scene, result.sceneState.positions, nextToken);
+    }
     const overrideKey = block.sceneId + '\u0000' + block.battleId;
     const localOverrides = editorOverrides.get(overrideKey);
     if (localOverrides) {
@@ -339,7 +372,8 @@ export function createApp(rootEl, opts = {}) {
         shell.clearBattle();
         currentState = result.state;
         lastResult = null;
-        battle = createBattle({ units: currentViewData.units, placementsById: currentViewData.placementsById, scene, battleState: result.battleState, random: opts.random, summonProvider: opts.summonProvider });
+        battle = createBattle({ units: currentViewData.units, placementsById: currentViewData.placementsById, scene, battleState: result.battleState,
+          random: scenario ? createSeededRandom(scenario.seed) : opts.random, summonProvider: scenario ? scenario.summonProvider : opts.summonProvider });
         battle.start();
         unitStyles = resolveUnitStyles(currentViewData.units);
       }
@@ -406,7 +440,7 @@ export function createApp(rootEl, opts = {}) {
     const carrying = snap.carrying[u.id] || null;
     const basic = hero && r ? basicActions(u, r, carrying) : [];
     const fieldHint = {
-      jump: '【跳跃】在地图上选择落点<br><small>八方向直线 · 最远 ' + jumpReach(u, r).toFixed(1) + 'm · 越过低矮障碍与单位</small>',
+      jump: '【跳跃】在地图上选择落点<br><small>八方向直线 · 最远 ' + jumpReach(u, r) + 'm · 越过低矮障碍与单位 · 不扣移动额度</small>',
       push: '【推动】选择相邻单位<br><small>力量对抗 · 撞墙按剩余距离受伤</small>',
       carry: '【背起】选择相邻的倒地友方<br><small>背负中移动消耗加倍</small>',
     };
@@ -428,7 +462,8 @@ export function createApp(rootEl, opts = {}) {
       onCancel: () => { if (pending) cancelStep(); cancelStep(); },
     });
   }
-  function jumpReach(u, r) { return r ? Math.min((Math.max(0, u.ref.spd) + Math.max(0, u.ref.strength || 0)) / 20, r.moveRemaining) : 0; }
+  // 跳距由规则给出（契约：ceil(基础移动÷3)，不扣移动额度、每次自然行动一次）
+  function jumpReach(u, r) { return r ? r.jumpDistance : 0; }
   // 基础行动格数据：资格只读规则已有的资源与状态；最终判定仍以 battle.* 返回为准
   function basicActions(u, r, carrying) {
     const atkReason = skillReason(BASIC_ATTACK);
@@ -442,8 +477,8 @@ export function createApp(rootEl, opts = {}) {
         reason: typeof battle.defend !== 'function' ? '防御姿态：规则接口待对齐' : '主行动已用完',
         short: typeof battle.defend !== 'function' ? '⏳ 待规则接入' : '◆ 主行动已用完', desc: '恢复 MP／TP 并进入防御姿态，持续 100 虚拟时间' },
       { key: 'sprint', icon: '💨', name: '冲刺', cost: { main: 1 }, mode: 'instant', tone: 'sky', note: '+' + u.ref.moveDistance + 'm', ok: r.main >= 1, reason: '主行动已用完', short: '◆ 主行动已用完', desc: '消耗主行动，立即追加一份移动额度' },
-      { key: 'jump', icon: '🦘', name: '跳跃', cost: { aux: 1 }, mode: 'target', tone: 'violet', note: '≤' + (+reach.toFixed(1)) + 'm', ok: r.aux >= 1 && reach >= 1,
-        reason: r.aux < 1 ? '辅助行动不足' : '移动额度不足以起跳（至少 1m）', short: r.aux < 1 ? '◇ 辅助行动已用完' : '🦶 移动额度不足', desc: '沿八方向直线跳跃，越过低矮障碍；距离计入移动额度' },
+      { key: 'jump', icon: '🦘', name: '跳跃', cost: { aux: 1 }, mode: 'target', tone: 'violet', note: '≤' + reach + 'm', ok: r.aux >= 1 && !r.jumped && reach >= 1,
+        reason: r.aux < 1 ? '辅助行动不足' : r.jumped ? '本次自然行动已经跳跃' : '无法起跳', short: r.aux < 1 ? '◇ 辅助行动已用完' : r.jumped ? '🦘 本次已跳跃' : '无法起跳', desc: '沿八方向直线跳跃，越过低矮障碍；不扣移动额度，每次自然行动一次' },
       { key: 'push', icon: '✋', name: '推动', cost: { aux: 1 }, mode: 'target', tone: 'amber', ok: r.aux >= 1, reason: '辅助行动不足', short: '◇ 辅助行动已用完', desc: '与相邻单位力量对抗，推开数米；撞墙造成伤害' },
       carried
         ? { key: 'drop', icon: '⬇️', name: '放下', cost: null, mode: 'instant', tone: 'emerald', note: carried.name, ok: true, desc: '把背负的友方放到身边空格' }
@@ -464,8 +499,10 @@ export function createApp(rootEl, opts = {}) {
     for (const u of currentViewData.units) {
       view.setFlag(u.id, 't-unit-down', shownOf(u).hp <= 0);
       view.setFlag(u.id, 't-unit-current', u.id === snap.currentId && !snap.terminal);
+      view.setFlag(u.id, 't-unit-channel', !!battle.battleState.combatState.charges?.[u.id]?.preparing);
       if (unitStyles[u.id]) view.setFlag(u.id, unitStyles[u.id].cls, true);
     }
+    director.syncRegions(snap.regions || []);
     syncCarried(snap);
     shell.renderHeroes(currentViewData.units);
     shell.setCurrent(snap.terminal ? null : snap.currentId);
@@ -548,12 +585,11 @@ export function createApp(rootEl, opts = {}) {
     if (!hit) { sandbox.setHint(null); shell.previewMoveCost(null); if (fieldAction === 'jump') sandbox.setPreview({ kind: 'jump', unitId: battle.snapshot().currentId, cells: jumpCells() }); else idleOverlay(); return; }
     if (fieldAction === 'jump') {
       const q = battle.previewJump(hit.col, hit.row);
-      const r = battle.snapshot().resources;
-      const ok = q.ok && q.distance <= r.moveRemaining + 1e-9;
-      const hint = ok ? '🦘 跳跃 <b>' + q.distance.toFixed(1) + 'm</b> · 余 ' + (r.moveRemaining - q.distance).toFixed(1) + 'm · 点击起跳' : (q.ok ? '移动额度不足（需 ' + q.distance.toFixed(1) + 'm）' : q.reason);
+      const ok = q.ok;
+      const hint = ok ? '🦘 跳跃 <b>' + q.distance.toFixed(1) + 'm</b> · 不扣移动额度 · 点击起跳' : q.reason;
       sandbox.setPreview({ kind: 'jump', unitId: battle.snapshot().currentId, cells: jumpCells(), hover: ok ? { col: hit.col, row: hit.row, cost: q.distance } : null, invalid: ok ? null : { col: hit.col, row: hit.row } });
       sandbox.setHint({ x: hit.x, y: hit.y }, hint, ok ? null : 'bad');
-      shell.previewMoveCost(ok ? q.distance : null);
+      shell.previewMoveCost(null);
       return;
     }
     if (fieldAction === 'push' || fieldAction === 'carry') {
@@ -674,14 +710,14 @@ export function createApp(rootEl, opts = {}) {
     }
     ui('select'); renderCommand();
   }
-  // 跳跃落点集：八方向逐格询问规则（previewJump 为唯一判定），并受剩余移动额度约束
+  // 跳跃落点集：八方向逐格询问规则（previewJump 为唯一判定，含跳距上限）
   function jumpCells() {
     const id = battle.snapshot().currentId, p = currentViewData.placementsById[id], r = battle.snapshot().resources;
     const reach = jumpReach(unitById(id), r), out = [];
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
       for (let k = 1; k * Math.hypot(dx, dy) <= reach + 1e-9; k++) {
         const q = battle.previewJump(p.col + dx * k, p.row + dy * k);
-        if (q.ok && q.distance <= r.moveRemaining + 1e-9) out.push({ col: p.col + dx * k, row: p.row + dy * k, cost: q.distance });
+        if (q.ok) out.push({ col: p.col + dx * k, row: p.row + dy * k, cost: q.distance });
       }
     }
     return out;
@@ -831,6 +867,10 @@ export function createApp(rootEl, opts = {}) {
     if (!res.ok) { setBusy(false); ui('deny'); shell.showLog(res.reason, 'warn'); refreshBattle(); return; }
     if (res.preparing) {
       if (myFlow !== flow) return;
+      syncShown();   // 起手已付 HP/MP/TP（规则真值），显示条同步
+      refreshBattle();
+      await director.playPrepare(res);
+      if (myFlow !== flow) return;
       setBusy(false);
       refreshBattle();
       shell.showLog(res.logTo > res.logFrom ? battle.snapshot().log[res.logTo - 1] : act.skill.name + ' 正在准备', 'act');
@@ -902,7 +942,8 @@ export function createApp(rootEl, opts = {}) {
         // 敌方攻击同走 beginAttack generator：我方受击时反应弹窗在驱动内弹出，选择/放弃都会继续结算
         const res = await director.runAttackLive(plan.skill, plan.aim);
         if (!alive()) return;
-        if (res && res.ok) await playAttackResult(res);
+        if (res && res.ok && res.preparing) { refreshBattle(); await director.playPrepare(res); }
+        else if (res && res.ok) await playAttackResult(res);
         if (!alive()) return;
       }
     }
@@ -915,6 +956,7 @@ export function createApp(rootEl, opts = {}) {
 
   async function playAttackResult(res) {
     for (let i = res.logFrom; i < res.logTo; i++) hiddenLog.add(i);
+    director.holdRegions(res);
     shell.showLog(unitName(res.casterId) + ' · ' + (res.skill || res.item).name, 'act');
     const caster = currentUnit();
     if (caster) { const s = shownOf(caster); shown.set(caster.id, { hp: s.hp, mp: caster.ref.mp }); }
@@ -933,6 +975,19 @@ export function createApp(rootEl, opts = {}) {
     if (!res.hits.length) shell.showLog(battle.snapshot().log[res.logTo - 1] || '', 'miss');
   }
   function unitName(id) { const u = unitById(id); return u ? (u.emoji ? u.emoji + ' ' : '') + u.name : id; }
+
+  // ---------- 非伤害效果揭示（即时回复）：显示条在演出拍点推进到规则真值；返回显示增量（封顶后的实际回复量） ----------
+  function revealEffect(e) {
+    if (!e || e.kind !== 'heal') return null;
+    const u = unitById(e.targetId);
+    if (!u) return null;
+    const gained = u.ref.hp - shownOf(u).hp;
+    shown.set(u.id, { hp: u.ref.hp, mp: shownOf(u).mp });
+    u.bars = { ...u.bars, hp: u.ref.hp };
+    sandbox.getUnitView().updateUnit(u.id, { bars: u.bars, syncGhost: true });
+    if (u.side === 'hero') shell.setHeroBars(u.id, u.bars, { heal: true });
+    return gained;
+  }
 
   // ---------- 接触拍点揭示 ----------
   function revealHit(hit) {
