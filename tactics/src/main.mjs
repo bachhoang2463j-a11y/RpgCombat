@@ -962,6 +962,7 @@ export function createApp(rootEl, opts = {}) {
     refreshBattle();
     await director.playMove(res);
     if (myFlow !== flow) return;
+    if (res.stoppedOnDiscovery) shell.showLog(battle.snapshot().log.at(-1), 'warn');
     afterHeroAction();
   }
   async function firePending() {

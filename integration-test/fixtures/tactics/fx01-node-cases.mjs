@@ -176,10 +176,16 @@ export const groups = {
       { targetId: 'f', segments: [{ shotIndex: 1, hit: true }] },
     ];
     const shots = [2, 0, 1].map(shotIndex => ({ shotIndex, aim: { x: shotIndex + 1, y: 4 } }));
+    let activeHandles = 0, maxActiveHandles = 0;
     const ctx = {
       hits, result: { shots }, skill: { range: { type: '单体' } }, centerOf: () => ({ x: 0, y: 4 }), casterId: 'c', ent: id => ({ id }), anchorAt: (x, y) => ({ x, y }),
       revealSegment: (id, index) => events.push([id, index]), reveal: id => events.push(id),
-      wait: async ms => { events.push(ms); return true; }, awaitHandle: async () => true,
+      wait: async ms => { events.push(ms); return true; }, awaitHandle: async handle => {
+        activeHandles++; maxActiveHandles = Math.max(maxActiveHandles, activeHandles);
+        await Promise.resolve();
+        activeHandles--;
+        return true;
+      },
       avHost: { host: { spriteOf: id => id } },
       av: {
         playAttackIdentityFx({ scope, subtype, targets, outcomes, onImpact, areaBounds, suppressImpact }) {
@@ -195,8 +201,8 @@ export const groups = {
     };
     const play = fxTag => reg.resolve({ kind: 'action', fxTag }).play(ctx);
     const gunOk = await play('枪击');
-    cases.push(ok('TFX-01 枪击依真实发序和转火逐发播放，命中回调揭示目标内对应段', gunOk &&
-      j(events) === j([['single', '枪击', 'e', 'dodge'], ['e', 1], 200, ['single', '枪击', 'f', 'hit'], ['f', 0], 200, ['single', '枪击', 'e', 'hit'], ['e', 0]]), j(events)));
+    cases.push(ok('TFX-01 枪击真实身份句柄串行等待；原版接触/完成后再按200ms间隔发下一发', gunOk && maxActiveHandles === 1 &&
+      j(events) === j([['single', '枪击', 'e', 'dodge'], ['e', 1], 200, ['single', '枪击', 'f', 'hit'], ['f', 0], 200, ['single', '枪击', 'e', 'hit'], ['e', 0]]), j({ events, maxActiveHandles })));
     events.length = 0;
     ctx.hits = [hits[0]];
     ctx.skill.range = { type: '扇形', castRange: 5 };
@@ -238,6 +244,10 @@ export const groups = {
       j(events) === j([['aoe', '爆炸', 'e', 'hit'], ['e', 0]]), j({ edge, events })));
 
     const vendor = readFileSync(path.join(ROOT, 'tactics', 'src', 'vendor', 'rpg-av', 'rpg-av.mjs'), 'utf8');
+    const gunSource = vendor.slice(vendor.indexOf('function playRandomStandardGunshot('), vendor.indexOf('function playShotgunSound('));
+    const gunSamples = new Function('playSound', 'CombatAudioMixer', 'Math', gunSource + '\nreturn () => [playRandomStandardGunshot(), playRandomStandardGunshot(), playRandomStandardGunshot()];')(
+      key => key, { capture: () => null }, { floor: Math.floor, random: () => 0 })();
+    cases.push(ok('TFX-01 真实 vendor 枪击采样排除上一声后从剩余两项随机抽', j(gunSamples) === j(['gunshot1', 'gunshot2', 'gunshot1']), j(gunSamples)));
     const shotgunSource = vendor.slice(vendor.indexOf('    function playSingleShotgun('), vendor.indexOf('    // ===== ③ 单体(光)'));
     const layers = [], beats = [];
     const owner = { handle: {}, layer(html) { layers.push(html); return { querySelector() {}, querySelectorAll: () => [] }; },

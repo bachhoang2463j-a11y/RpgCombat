@@ -178,6 +178,9 @@ export function createActionDirector(deps) {
   // ---------- 移动：消费真实 cell.path ----------
   async function playMove(moveResult) {
     if (!moveResult || !moveResult.ok) return false;
+    const moveScope = scope(), view = sandbox.getUnitView();
+    if (!moveScope || !moveScope.isLive) return false;
+    const isCurrent = () => moveScope === scope() && moveScope.isLive;
     const vd = getViewData();
     const id = moveResult.unitId;
     const fp = vd.footprintsById[id];
@@ -185,14 +188,16 @@ export function createActionDirector(deps) {
     const start = centerOf(id) && path.length ? { x: path[0].col + fp.width / 2, y: path[0].row + fp.height / 2 } : null;
     const end = centerOf(id);
     if (start && end) await sandbox.guideTo([start, end]);
-    const ok = await playPathMotion(sandbox.getUnitView(), scope(), {
+    if (!isCurrent()) return false;
+    const ok = await playPathMotion(view, moveScope, {
       unitId: id, path, footprint: fp, gait: getUnitStyle && getUnitStyle(id) ? getUnitStyle(id).gait : null,
-      onFrame: (x, y) => sandbox.followWorld(x, y),
-      onFeedback: (kind, seg, p) => { if (onMoveFeedback) onMoveFeedback(id, kind, p); },
+      onFrame: (x, y) => { if (isCurrent()) sandbox.followWorld(x, y); },
+      onFeedback: (kind, seg, p) => { if (isCurrent() && onMoveFeedback) onMoveFeedback(id, kind, p); },
     });
+    if (!ok || !isCurrent()) return false;
     // 显示位置交还权威落点（placement 已由规则命令更新；插值从不回写）
-    sandbox.getUnitView().lockMotion(id, false);
-    sandbox.getUnitView().updateUnit(id, { placement: vd.placementsById[id] });
+    view.lockMotion(id, false);
+    view.updateUnit(id, { placement: vd.placementsById[id] });
     return ok;
   }
 
@@ -214,7 +219,7 @@ export function createActionDirector(deps) {
     const mk = name => {
       const d = document.createElement('div');
       d.setAttribute('data-tactics-fx', 'world-' + name);
-      d.style.cssText = 'position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; overflow:visible;';
+      d.style.cssText = 'position:absolute; left:0; top:0; width:100%; height:100%; z-index:' + (name === 'top' ? 4 : 1) + '; pointer-events:none; overflow:visible;';
       s.addNode(d);
       return d;
     };
@@ -226,7 +231,7 @@ export function createActionDirector(deps) {
     layersFor = { scope: s, dom, top: createVfxHost({ anchorLayer: top, domLayer: top, canvasHolder: null }, hostDeps), ground: createVfxHost({ anchorLayer: ground, domLayer: ground, canvasHolder: null }, hostDeps) };
     return layersFor;
   }
-  const SHAKE = { light: [180, 3], heavy: [320, 7], quake: [500, 10] };
+  const SHAKE = { light: [180, 3], medium: [250, 5], heavy: [320, 7], quake: [500, 10] };
   function makeFx(category) {
     const L = fxLayers();
     return {

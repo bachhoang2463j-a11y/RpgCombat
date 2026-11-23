@@ -202,4 +202,59 @@ export const groups = {
     cases.push(ok('TAV-06 多格单位在作用区只算一个目标', qG.targetIds.filter(x => x === 'e:守卫').length <= 1, j(qG.targetIds)));
     return { cases };
   } },
+
+  'TAV-07': { async run({ modules: m }) {
+    const cases = [];
+    const { createScenarioData, createSeededRandom } = await import('../../../tactics/src/scenario-data.mjs');
+    const data = createScenarioData(m.parser.parseYamlText(readFileSync(path.join(ROOT, 'doc', 'tactics', '典型对局-战棋版.yaml'), 'utf8')));
+    const battle = m.battle.createBattle({ ...data, scene: m.main.sceneForState('sc-chapel'), random: createSeededRandom(data.seed) });
+    battle.start();
+    for (let i = 0; i < 12 && battle.snapshot().currentId !== 'h:玛德琳'; i++) battle.endAction();
+    const moved = battle.move(11, 34);
+    cases.push(ok('TAV-07 权威左上路径在弗兰克旁发现食尸鬼A截停且说明余量', moved.ok && moved.stoppedOnDiscovery &&
+      moved.cell.col === 13 && moved.cell.row === 36 && j(moved.discoveredIds) === j(['e:食尸鬼A']) &&
+      Math.abs(moved.moveAfter - (8 - Math.SQRT2)) < 1e-9 && battle.snapshot().log.at(-1).includes('暂停移动'), j(moved)));
+
+    const { CLASS_STYLE } = await import('../../../tactics/src/unit-style.mjs');
+    const hops = [], flags = [], previousPerformance = globalThis.performance;
+    let frame;
+    globalThis.performance = { now: () => 0 };
+    try {
+      const gait = CLASS_STYLE['隐匿者'].gait, route = [{ col: 14, row: 37 }, { col: 13, row: 36 }];
+      const run = m.motion.playPathMotion({ lockMotion() {}, setFlag: (_, cls, on) => flags.push([cls, on]),
+        setDisplayPos() {}, setDisplayFacing() {}, setHop: (_, px) => hops.push(px) },
+      { isLive: true, settleOnDispose: () => () => {}, loop: fn => { frame = fn; } },
+      { unitId: 'h:玛德琳', path: route, footprint: { width: 1, height: 1 }, speed: 4, gait });
+      const duration = m.motion.pathDuration(m.motion.pathSegments(route, { width: 1, height: 1 }), 4 * gait.speed);
+      frame(0); frame(duration / 2); frame(duration);
+      const finished = await run;
+      cases.push(ok('TAV-07 真实隐匿者步态有2px起伏并正常落地，不是纯平移', finished && Math.max(...hops) > 1.9 && hops.at(-1) === 0 && flags.at(-1)[1] === false, j(hops)));
+    } finally { globalThis.performance = previousPerformance; }
+
+    const prevDoc = globalThis.document, shakes = [], sounds = [], revealed = [], updates = [];
+    const oldScope = { isLive: true, addNode() {}, removeNode() {}, settleOnDispose: () => () => {}, after: (_, fn) => fn() };
+    let activeScope = oldScope, swapOnGuide = false;
+    const view = { setDisplayFacing() {}, updateUnit: (...args) => updates.push(args), lockMotion() {} };
+    const dom = { world: { insertBefore() {}, appendChild() {} }, unitLayer: {}, shake: { animate: (frames, options) => shakes.push({ frames, options }) } };
+    globalThis.document = { createElement: () => ({ style: {}, setAttribute() {}, appendChild() {}, remove() {}, firstChild: { animate() {} } }) };
+    try {
+      const director = m.director.createActionDirector({
+        sandbox: { getScope: () => activeScope, getUnitView: () => view, getDom: () => dom,
+          unitWorldCenter: () => ({ x: 12.5, y: 32.5 }), async guideTo() { if (swapOnGuide) { activeScope.isLive = false; activeScope = { ...oldScope, isLive: true }; } } },
+        getViewData: () => ({ units: [{ id: 'h:弗兰克', side: 'hero', ref: { atk: 1 } }], placementsById: { 'h:弗兰克': { col: 12, row: 32 } }, footprintsById: { 'h:弗兰克': { width: 1, height: 1 } } }),
+        avHost: { syncRoster() {}, entity: id => ({ id }), av: {
+          CombatAudioMixer: { classify: () => 'B', context: () => null }, CombatAudioDirector: { beginAction: () => 1 },
+          playSound: key => sounds.push(key) } }, registry: { resolve: () => ({ prepareKeys: () => [], play: async () => true }) },
+        onSelfDestruct: event => revealed.push(event),
+      });
+      const event = { type: 'self-destruct', center: { x: 12.5, y: 26.5 }, radius: 2 };
+      const completed = await director.playAttack({ ok: true, casterId: 'h:弗兰克', skill: { name: '鹿弹击杀', fxTag: '霰弹' }, hits: [], effects: [], events: [event] });
+      cases.push(ok('TAV-07 鹿弹击杀自爆medium震动可完成并揭示，不抛解构异常', completed && revealed[0] === event && sounds.includes('explosion_aoe_blast') && shakes[0]?.options.duration === 250, j(shakes.map(s => s.options))));
+      const before = updates.length;
+      swapOnGuide = true;
+      const stale = await director.playMove({ ok: true, unitId: 'h:弗兰克', cell: { path: [{ col: 12, row: 32 }, { col: 12, row: 31 }] } });
+      cases.push(ok('TAV-07 已取消移动不吸附权威终点', stale === false && updates.length === before));
+    } finally { globalThis.document = prevDoc; }
+    return { cases };
+  } },
 };

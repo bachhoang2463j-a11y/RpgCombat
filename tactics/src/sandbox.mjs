@@ -70,7 +70,7 @@ export function createSandbox(rootEl, deps = {}) {
     overlay.width = Math.round(worldW * dpr); overlay.height = Math.round(worldH * dpr);
     const unitLayer = document.createElement('div');
     unitLayer.setAttribute('data-tactics-layer', 'units');
-    unitLayer.style.cssText = 'position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;';
+    unitLayer.style.cssText = 'position:absolute; left:0; top:0; width:100%; height:100%; z-index:2; pointer-events:none;';
     const avStage = document.createElement('div');
     avStage.setAttribute('data-tactics-layer', 'rpg-av-stage');
 

@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-24",
+  "browser": "chrome-devtools / real Chrome",
+  "page": "file:///D:/Project/RpgCombat/tactics/mvp-standalone.html",
+  "artifactSha256": "abeed4f68d1b602334c84b8ddd64c0d5c1a7c2ca284dfdd0ed94e6cd66657678",
+  "method": "同一自包含产物和权威典型对局；正常菜单处理器、地图选点、Enter、实际转火/不反应按钮及自然回合推进。仅包装移动/生成器/步态函数记录结果，未改HP、位置、随机种子、资源或库存，未替换规则实现。",
+  "beforeFix": {
+    "move": { "unitId": "h:玛德琳", "from": [14, 37], "requested": [11, 34], "actual": [13, 36], "stoppedOnDiscovery": true, "remainingMeters": 6.585786437626905, "newlyVisibleInRuleReplay": ["e:食尸鬼A"] },
+    "gait": { "class": "t-cls-stealth", "originalHopPx": 2, "observedNonzeroHopCalls": true, "busyAfterMove": false },
+    "shotgun": { "skill": "温切斯特M1897-鹿弹二连发", "waitingBeforeSecondShot": "retarget-request", "afterChoosingReuse": "Uncaught (in promise) TypeError: undefined is not iterable (cannot read property Symbol(Symbol.iterator))", "stack": ["shake", "playAttack", "playAttackResult", "firePending"], "cause": "自爆调用medium，但导演SHAKE表缺此档位" }
+  },
+  "afterFix": {
+    "move": { "requested": [11, 34], "actual": [13, 36], "discoveredIds": ["e:食尸鬼A"], "log": "玛德琳 移动 1.41m · 发现 食尸鬼A，暂停移动（剩余 6.59m）", "passed": true },
+    "shotgun": { "firstShotTargets": ["e:食尸鬼A", "e:食尸鬼B"], "secondShotConfirmedViaExistingReuseButton": true, "ghoulAFirstShotDamage": 130, "ghoulARevivedHp": 39, "ghoulASecondShotDamage": 39, "ghoulADead": true, "selfDestructTriggered": true, "ammoBefore": 12, "ammoAfter": 10, "mainBefore": 1, "mainAfter": 0, "busyAfter": false, "consoleErrorsOrWarnings": 0, "passed": true },
+    "computedLayers": { "units": 2, "originalRpgFx": 3, "topFx": 4, "passed": true },
+    "gait": "保留历史职业参数，隐匿者为轻微2px起伏；没有改为另一套动画或擅自提高幅度。"
+  },
+  "tests": { "sourceAllRuns": 1, "sourceAllPassed": 849, "relatedAvPassed": 56, "relatedFx01Passed": 49, "artifactSpecializedPassed": 25, "artifactSpecializedFailed": 0 },
+  "notes": [
+    "原版枪声随机函数没有相邻去重；战棋按用户要求在三采样中排除上一声后随机，实际源函数行为回归通过。",
+    "枪击/霰弹按上一发身份句柄完成再进入下一发，保留200/220ms段间等待；霰弹仍使用真实xiandan采样。",
+    "产物专项首次因ASCII转义导致直接中文includes失败；改用产物真实后端移动日志检查，未删除语义验收。",
+    "初次Chrome工具连接profile占用；用户关闭测试浏览器并授权重启后连通。",
+    "截图写项目路径被MCP拒绝，使用工具默认临时路径取得截图，没有绕过目录限制。",
+    "未进行安卓模拟器测试，未覆盖全部职业及所有技能的完整视觉组合。"
+  ]
+}

@@ -251,6 +251,9 @@ function build() {
   const playSound = L.slice(playSoundA, playSoundA + 4).join('\n');
   if (!/^\};$/.test(L[playSoundA + 3])) fail('window.playSound 结构变化');
   const gun = topBlock(L, l => l.startsWith('function playRandomStandardGunshot('), 'playRandomStandardGunshot');
+  const gunText = patch(gun.text,
+    "const chosen = candidates[Math.floor(Math.random() * candidates.length)];",
+    "const previous = playRandomStandardGunshot.last;\n    const available = candidates.filter(key => key !== previous);\n    const chosen = available[Math.floor(Math.random() * available.length)];\n    playRandomStandardGunshot.last = chosen;", 1, '枪击采样相邻去重') + '\nplayRandomStandardGunshot.last = null;';
   const shotgun = topBlock(L, l => l.startsWith('function playShotgunSound('), 'playShotgunSound');
   // 3) 粒子引擎与事件总线
   const fxClass = topBlock(L, l => l.startsWith('class CanvasFxEngine {'), 'CanvasFxEngine');
@@ -306,7 +309,7 @@ ${supportBranches.join('\n').replace('else if', 'if')}
   const arc = sliceArcane(L);
 
   let soundText = [applyVol.text, playCustom.text, audioUrls.text,
-    playSound.replace('window.playSound = (key', 'const playSound = (key'), gun.text, shotgun.text].join('\n\n');
+    playSound.replace('window.playSound = (key', 'const playSound = (key'), gunText, shotgun.text].join('\n\n');
 
   let fx = fxClass.text;
   fx = patch(fx, "this.canvas = document.getElementById('fx-canvas');", 'this.canvas = null;', 1, 'fxEngine 不复用页面全局 canvas');
@@ -463,8 +466,8 @@ ${busOn.map(l => l.replace('CombatAudioDirector.consume', 'arcane.CombatAudioDir
     CombatAudioMixer, audioUrls, playSound, playCustomAudio, HERO_VOICE_LINES, pickHeroVoice, AVATAR_MAP, fxEngine,
     ASSET_BASE, HERO_VOICE_BASE, itemFxAssetUrl,
     playGenericSupportFx,
-    clearArcaneFx() { supportHandles.forEach(handle => handle.cancel()); arcane.clearArcaneFx(); },
-    setToken(t) { if (t !== combatToken) supportHandles.forEach(handle => handle.cancel()); combatToken = t; },
+    clearArcaneFx() { supportHandles.forEach(handle => handle.cancel()); arcane.clearArcaneFx(); playRandomStandardGunshot.last = null; },
+    setToken(t) { if (t !== combatToken) { supportHandles.forEach(handle => handle.cancel()); playRandomStandardGunshot.last = null; } combatToken = t; },
     getToken() { return combatToken; },
     setRoster(h, e) { heroesData = h; enemiesData = e; },
   });

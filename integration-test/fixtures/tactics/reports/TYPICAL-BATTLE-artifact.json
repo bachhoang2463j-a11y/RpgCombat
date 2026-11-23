@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "6a2749810787805b2abc0dc69eb43e0a89e8e74a5c80dcee4fb16595e10b3d65",
-  "bytes": 1186141,
+  "sha256": "abeed4f68d1b602334c84b8ddd64c0d5c1a7c2ca284dfdd0ed94e6cd66657678",
+  "bytes": 1187053,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -61,6 +61,21 @@
       "detail": ""
     },
     {
+      "id": "击杀自爆medium震动档位入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "原版特效与角色独立堆叠层入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "发现敌人记录字段及枪声去重入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
       "id": "无DOM离线宿主停在应用启动而非后端加载",
       "pass": true,
       "detail": "document is not defined"
@@ -109,8 +124,13 @@
       "id": "产物预览不扣HP/MP/主辅资源",
       "pass": true,
       "detail": ""
+    },
+    {
+      "id": "产物实际移动发现食尸鬼并显示暂停原因",
+      "pass": true,
+      "detail": ""
     }
   ],
-  "passed": 21,
+  "passed": 25,
   "failed": 0
 }

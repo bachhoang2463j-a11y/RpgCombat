@@ -564,9 +564,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const before = resources.moveRemaining;
     resources.moveRemaining = Math.max(0, resources.moveRemaining - travel);
     if (resources.sprintRemaining) resources.sprintRemaining = Math.max(0, resources.sprintRemaining - travel);
-    emit('unit-moved', { unitId: currentId(), from, to: { col, row }, path: cell.path, distance: travel, stoppedOnDiscovery });
-    addLog(actor().name + ' 移动 ' + travel.toFixed(2) + 'm');
-    return { ok: true, stoppedOnDiscovery, cell: { ...cell, cost: travel, budgetCost: cell.cost }, from, unitId: currentId(), moveBefore: before, moveAfter: resources.moveRemaining };
+    const discoveredIds = stoppedOnDiscovery ? queryVisibleUnitIds(ctx, currentId()).filter(id => !seen.has(id) && byId.get(id).side !== actor().side) : [];
+    emit('unit-moved', { unitId: currentId(), from, to: { col, row }, path: cell.path, distance: travel, stoppedOnDiscovery, discoveredIds });
+    addLog(actor().name + ' 移动 ' + travel.toFixed(2) + 'm' + (stoppedOnDiscovery ? ' · 发现 ' + discoveredIds.map(id => byId.get(id).name).join('、') + '，暂停移动（剩余 ' + resources.moveRemaining.toFixed(2) + 'm）' : ''));
+    return { ok: true, stoppedOnDiscovery, discoveredIds, cell: { ...cell, cost: travel, budgetCost: cell.cost }, from, unitId: currentId(), moveBefore: before, moveAfter: resources.moveRemaining };
   }
   function sprint() {
     if (!resources || resources.main < 1) return { ok: false, reason: '主行动已用完' };

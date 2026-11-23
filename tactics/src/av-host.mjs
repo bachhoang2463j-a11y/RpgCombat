@@ -87,7 +87,7 @@ export function createAvHost({ getUnitView, getUnits }) {
     stageEl = stage; shakeEl = shake;
     STAGE_W = worldW / FX_SCALE; STAGE_H = worldH / FX_SCALE;
     stage.setAttribute('data-tactics-fx', 'rpg-av-stage');
-    stage.style.cssText = 'position:absolute; left:0; top:0; width:' + STAGE_W + 'px; height:' + STAGE_H + 'px; transform-origin:0 0; transform:scale(' + FX_SCALE + '); pointer-events:none; overflow:visible;';
+    stage.style.cssText = 'position:absolute; left:0; top:0; width:' + STAGE_W + 'px; height:' + STAGE_H + 'px; z-index:3; transform-origin:0 0; transform:scale(' + FX_SCALE + '); pointer-events:none; overflow:visible;';
     if (av.fxEngine.canvas && av.fxEngine.canvas.parentNode !== stage) { stage.appendChild(av.fxEngine.canvas); av.fxEngine.resize(); }
     resizeFns.forEach(fn => { try { fn(); } catch (e) { /* 尺寸恒定，回调仅为兼容 */ } });
   }

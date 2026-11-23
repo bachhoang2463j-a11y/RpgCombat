@@ -189,48 +189,45 @@ function basicAttack(name, { subtype = name, area = false, projectile, direction
       const isArea = ['直线', '扇形', '圆形', '全域', '爆炸'].includes(range?.type);
       const scope = area === 'only' || (area && isArea) ? 'aoe' : 'single';
       const reveal = ({ targetId, index }) => ctx.revealSegment(targetId, index);
-      const identity = (targets, outcomes, onImpact, options) => {
-        const handle = av.playAttackIdentityFx({ scope, subtype, caster: casterEnt, targets, outcomes, audioContext, onImpact, ...options });
-        return ctx.awaitHandle(handle, scope === 'aoe' ? 1400 : 900);
-      };
-      const runs = [];
+      const identity = (targets, outcomes, onImpact, options) =>
+        av.playAttackIdentityFx({ scope, subtype, caster: casterEnt, targets, outcomes, audioContext, onImpact, ...options });
       for (const [i, shot] of attackShots(ctx).entries()) {
         const { aim, impacts } = shot;
         if (i && gap && !(await ctx.wait(gap))) return false;
         const aimAnchor = () => ctx.anchorAt(aim.x, aim.y);
+        const playIdentity = async (...args) => ctx.awaitHandle(identity(...args), scope === 'aoe' ? 1400 : 900);
         if (directional && range?.type === '扇形') {
           const origin = ctx.centerOf(ctx.casterId);
           const dx = aim.x - origin.x, dy = aim.y - origin.y;
           const scale = range.castRange / (Math.hypot(dx, dy) || 1);
           const endpoint = ctx.anchorAt(origin.x + dx * scale, origin.y + dy * scale);
           // 方向锚点固定在射界末端，命闪由各目标的真实结算独立揭示。
-          runs.push(identity([endpoint], () => 'hit', () => impacts.forEach(reveal), { suppressImpact: true }));
+          if (!(await playIdentity([endpoint], () => 'hit', () => impacts.forEach(reveal), { suppressImpact: true }))) return false;
         } else if (projectile && scope === 'single') {
           const spriteOf = id => ctx.avHost.host.spriteOf(id);
           for (const impact of impacts.length ? impacts : [null]) {
             const to = impact ? spriteOf(impact.targetId) : aimAnchor();
-            runs.push(av.CombatAudioMixer.withContext(audioContext, () => av.playArcaneProjectile(projectile, spriteOf(ctx.casterId), to, !impact?.hit)).then(ok => {
-              if (ok && impact) reveal(impact);
-              return ok;
-            }));
+            const ok = await av.CombatAudioMixer.withContext(audioContext, () => av.playArcaneProjectile(projectile, spriteOf(ctx.casterId), to, !impact?.hit));
+            if (!ok) return false;
+            if (impact) reveal(impact);
           }
         } else if (scope === 'aoe') {
           const byId = new Map(impacts.map(p => [p.targetId, p]));
           const getImpact = target => byId.get(target?.id || target?.dataset?.arcaneTargetId);
           const areaBounds = ['爆炸', '火焰', '冰霜', '雷'].includes(subtype) ? attackAreaBounds(ctx.result, shot, range) : null;
-          runs.push(identity(impacts.length || areaBounds ? impacts.map(p => ctx.ent(p.targetId)) : [aimAnchor()],
+          if (!(await playIdentity(impacts.length || areaBounds ? impacts.map(p => ctx.ent(p.targetId)) : [aimAnchor()],
             target => getImpact(target)?.hit ? 'hit' : 'dodge', target => {
               const impact = getImpact(target);
               if (impact) reveal(impact);
-            }, { areaBounds }));
+            }, { areaBounds }))) return false;
         } else {
           for (const impact of impacts.length ? impacts : [null]) {
-            runs.push(identity([impact ? ctx.ent(impact.targetId) : aimAnchor()],
-              () => impact?.hit ? 'hit' : 'dodge', () => { if (impact) reveal(impact); }));
+            if (!(await playIdentity([impact ? ctx.ent(impact.targetId) : aimAnchor()],
+              () => impact?.hit ? 'hit' : 'dodge', () => { if (impact) reveal(impact); }))) return false;
           }
         }
       }
-      return (await Promise.all(runs)).every(Boolean);
+      return true;
     },
   };
 }

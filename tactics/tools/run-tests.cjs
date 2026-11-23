@@ -103,7 +103,7 @@ const STAGES = {
   },
   av: {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'av-node-cases.mjs'),
-    groups: ['TAV-01', 'TAV-02', 'TAV-03', 'TAV-04', 'TAV-05', 'TAV-06'],
+    groups: ['TAV-01', 'TAV-02', 'TAV-03', 'TAV-04', 'TAV-05', 'TAV-06', 'TAV-07'],
     requiredExports: [
       ['director', 'resolveAttackIdentity'], ['director', 'resolveWindupKind'], ['director', 'createActionDirector'],
       ['motion', 'pathSegments'], ['motion', 'pathDuration'], ['motion', 'travelFraction'], ['motion', 'pointAtDistance'], ['motion', 'playPathMotion'],

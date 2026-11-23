@@ -21,6 +21,9 @@ check('空霰弹与群体规则区域适配入包', html.includes('suppressImpac
 check('原版辅助SVG及四类动画入包', ['playGenericSupportFx', 'spawnHealParticles', 'anim-heal', 'anim-buff', 'anim-shield', 'anim-mp', '35,15 L65,15', '50,5 85,25'].every(s => html.includes(s)));
 check('辅助真实结果与持久标签回读入包', ['playSupportEffects', 'supportResourceDelta', 'applyPersistentFxTags', 'SUPPORT_BUFF', 'SUPPORT_EFFECT'].every(s => html.includes(s)));
 check('辅助取消通知与动作代际隔离入包', html.includes('supportHandles') && html.includes('actionScope') && html.includes('isCurrent()'));
+check('击杀自爆medium震动档位入包', html.includes('medium:[250,5]'));
+check('原版特效与角色独立堆叠层入包', html.includes('z-index:2;') && html.includes('z-index:3;'));
+check('发现敌人记录字段及枪声去重入包', html.includes('discoveredIds') && html.includes('playRandomStandardGunshot.last'));
 const context = { console, structuredClone, URL, setTimeout, clearTimeout };
 context.window = context;
 vm.createContext(context);
@@ -53,6 +56,13 @@ if (backend) {
   const before = JSON.stringify(battle.snapshot());
   battle.previewAttack(rage);
   check('产物预览不扣HP/MP/主辅资源', JSON.stringify(battle.snapshot()) === before);
+  const moveData = backend.createScenarioData(backend.parseYamlText(yaml));
+  const moveBattle = backend.createBattle({ ...moveData, scene: backend.scene, random: backend.createSeededRandom(moveData.seed) });
+  moveBattle.start();
+  for (let i = 0; i < 12 && moveBattle.snapshot().currentId !== 'h:玛德琳'; i++) moveBattle.endAction();
+  const move = moveBattle.move(11, 34);
+  check('产物实际移动发现食尸鬼并显示暂停原因', move.ok && move.stoppedOnDiscovery && move.cell.col === 13 && move.cell.row === 36 &&
+    move.discoveredIds.includes('e:食尸鬼A') && moveBattle.snapshot().log.at(-1).includes('暂停移动'));
 }
 const report = {
   artifact: 'tactics/mvp-standalone.html', sha256: createHash('sha256').update(html).digest('hex'), bytes: Buffer.byteLength(html),

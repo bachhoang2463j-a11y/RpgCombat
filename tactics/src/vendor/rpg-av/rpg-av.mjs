@@ -4,7 +4,7 @@
 // arcaneVfxModule 行区间(源 5729–14230): 5730–5730, 5733–5791, 5800–5841, 5849–5913, 5923–5924, 5932–6302, 6642–6850, 7016–7037, 7351–7376, 7383–7584, 7596–9869, 10067–10097, 10102–10107, 10748–10757, 11103–11133, 11142–11240, 11917–12083, 12201–12214, 14179–14208
 // 入选语句 157 段 / 3661 行；入口: playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar, CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx
 // 显式存根: clearSummonState, clearStatusLayers, clearSelfDestructState, clearRescueState, clearVariantState
-// 宿主适配补丁: 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 屏幕矩形 → 特效舞台坐标×11; innerWidth → 舞台宽×7; innerHeight → 舞台高×3; body 挂载 → 特效舞台×5; JS position:fixed → absolute×0; arcane canvas resize 走舞台×1; 舞台震动独立层×2; window.* 声音函数改为工厂内本地×14; 去环境氛围清理×1; CSS position:fixed → absolute×6; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1
+// 宿主适配补丁: 枪击采样相邻去重×1; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 屏幕矩形 → 特效舞台坐标×11; innerWidth → 舞台宽×7; innerHeight → 舞台高×3; body 挂载 → 特效舞台×5; JS position:fixed → absolute×0; arcane canvas resize 走舞台×1; 舞台震动独立层×2; window.* 声音函数改为工厂内本地×14; 去环境氛围清理×1; CSS position:fixed → absolute×6; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1
 // ==========================================
 /* eslint-disable */
 // ---- 纯数据导出（原样，供宿主在工厂创建前解析人物头像/语音与预载清单） ----
@@ -542,11 +542,15 @@ const playSound = (key, volume = 1, rate = 1, opts = {}) => {
 
 function playRandomStandardGunshot(owner = null) {
     const candidates = ['gunshot1', 'gunshot2', 'gunshot3'];
-    const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+    const previous = playRandomStandardGunshot.last;
+    const available = candidates.filter(key => key !== previous);
+    const chosen = available[Math.floor(Math.random() * available.length)];
+    playRandomStandardGunshot.last = chosen;
     const cue = playSound(chosen, 0.95, 1, { track:'skill', sync:true, owner, audioContext:owner?.audioContext || CombatAudioMixer.capture('D') });
     if (owner) owner.attackCue = cue;
     return chosen;
 }
+playRandomStandardGunshot.last = null;
 
 function playShotgunSound(owner = null) {
     const cue = playSound('xiandan', 0.95, 1, { track:'skill', sync:true, owner, audioContext:owner?.audioContext || CombatAudioMixer.capture('D') });
@@ -4515,8 +4519,8 @@ CombatEvents.on(EVENTS.DODGE_RESOLVED, arcane.CombatAudioDirector.consume);
     CombatAudioMixer, audioUrls, playSound, playCustomAudio, HERO_VOICE_LINES, pickHeroVoice, AVATAR_MAP, fxEngine,
     ASSET_BASE, HERO_VOICE_BASE, itemFxAssetUrl,
     playGenericSupportFx,
-    clearArcaneFx() { supportHandles.forEach(handle => handle.cancel()); arcane.clearArcaneFx(); },
-    setToken(t) { if (t !== combatToken) supportHandles.forEach(handle => handle.cancel()); combatToken = t; },
+    clearArcaneFx() { supportHandles.forEach(handle => handle.cancel()); arcane.clearArcaneFx(); playRandomStandardGunshot.last = null; },
+    setToken(t) { if (t !== combatToken) { supportHandles.forEach(handle => handle.cancel()); playRandomStandardGunshot.last = null; } combatToken = t; },
     getToken() { return combatToken; },
     setRoster(h, e) { heroesData = h; enemiesData = e; },
   });
