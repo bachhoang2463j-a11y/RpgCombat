@@ -312,3 +312,14 @@
 - 验证：相关组收口后唯一一次全量19阶段801/0；单文件重建1,127,296B、sha256 9285cbd0061a10e8d5525b03d810bef6b874db64ee3b5e37af2d6b141e5bca9a，产物专项14/14。IAB镜头/rAF停滞后经用户批准进入排障模式，同一权威单文件在Chrome完成穿友军→菜单选择从西班牙射击→食尸鬼B扣49HP并缓速→确认结束到索恩；运行时异常0，控制台仅favicon.ico两次404。
 - 文件：tactics/src/ai.mjs、vendor/rpg-ui/rpg-ui.mjs、tools/extract-rpg-ui.cjs/run-tests.cjs/verify-typical-artifact.cjs；权威YAML/契约；feedback05与FX01夹具、FEEDBACK05-page/TYPICAL-BATTLE-artifact报告；当前重建单文件。用户另明确授权将上一轮已在工作区的main/战斗/特效/反应弹窗/样式/打包相关施工一并备份，未触碰无关未跟踪文件、根index与README，未推送。
 - 目的 vs 现状：本轮反馈的分类/AI/数值修复及单文件战斗流程通过；移动核对无确证回归。上一轮四新技能完整三阶段视觉/时长音量、反应/舍身/看破外观验收仍未完成，完整状态备份不等于上一轮验收通过或正式发布。业务ea89071，日志单向回填。
+
+## 2026-11-24 · 典型对局战棋 Demo D0–D4 全技能规则/前端/特效实施（6b77ecf）
+- 核心目的：按 `TYPICAL-BATTLE-DEMO-PLAN.md` 落地 D0–D4，使《典型对局-战棋版.yaml》全量技能规则、Demo 前端接线与 27 项显式特效（+通用兜底/敌方/召唤模板）接入战棋生产链与单文件产物。
+- 行为：
+  - D0 样本与契约：`典型对局-战棋版.yaml` 将 `[吸蓝;power:5]`/`[特效:逆咒归源镜]` 合并至 `净蚀反冲`、`逆咒归源镜` 仅留绑定次数载体、声波信标 2→3、补录 `meta.决策记录`；同步 `TYPICAL-BATTLE-CONTRACT.md`。
+  - D1 后端：`effect-handlers`/`battle` 实现整技暴击倍率（覆盖非自盲减益/治疗/护盾/吸蓝等）、`净蚀反冲` 看破吸蓝结果透传与纯载体道具拦截、`beginAttack` 交互式两段 `[转火]`（`retarget-request` 支持单体切目标与扇形重调朝向，传 `null` 向后兼容）、`parser` 对象路径 `[智慧]` 回填 `isWise`、`doEnemySelfDestruct` emit `self-destruct` 事件与 `beginAttack` 透传 `events`。
+  - D2 前端：`ui-shell` 接入 `getHeroItemBindings`/`skillHasBarrierTag`/`prepareGroupedItemSkill` 与 `召唤` 范围胶囊；`range-overlay` 支持召唤落点轮廓预览；`main` 新增 `syncDynamicUnits`（召唤实时入场）、父子道具传子技能、冲锋/击退显示锁、两段转火浮层与悬停/点击交互、修复重复 `endTurn` 键；`action-director` 新增 `syncBarriers`、`syncPreparations`、冲锋/击退补间与自爆火环演出。
+  - D3/D4 特效：`fx-registry` 扩展 `damageCategories`/`hasChargeDash`/`isMixedSlots`/`barrierSub`/`isAllyOnly`/`isDebuffOnly` 与反应分类；`fx-library` 补齐 14 项通用兜底/敌方/召唤/反应条目及 21 项待移植显式特效 + `圣域帷幕` + 3 个延迟起手（合计 51 条目，`webm` 加异常兜底）。
+- 文件：`doc/tactics/典型对局-战棋版.yaml`、`TYPICAL-BATTLE-CONTRACT.md`、`tactics/src/{parser,effect-handlers,battle,fx-registry,fx-library,action-director,range-overlay,ui-shell,main}.mjs`、`integration-test/fixtures/tactics/typical-skills-node-cases.mjs`、`tactics/mvp-standalone.html`、`integration-test/fixtures/tactics/reports/TYPICAL-BATTLE-artifact.json`。未触碰根目录回合制文件与无关未跟踪文件。
+- 验证：唯一一次源码全量 `node tactics/tools/run-tests.cjs --all` 19 阶段 **808 passed / 0 failed**（含 D1 7 项新单测与全部 51 个特效条目 `TFX-01` 预算断言）；重建 `tactics/mvp-standalone.html`（1,176,495 B，51 模块，0 warning，sha256 `7283e44155fee92e073c3f480571bbe4cb19f2f38b978781cbdea4ec1d420e80`），产物专项断言 **14/14 passed**。真页交互门禁：内置浏览器子代理完成页面 200 加载与玛德琳攻击菜单打开，随后因服务器 `503 No capacity` 中断，完整真页全流程（召唤/结界/转火/自爆等实机目视）留待实机补验，不冒充通过。
+- 目的 vs 现状：D0–D4 代码、全量源码回归与单文件产物断言全部达成；完整真页交互门禁受上游模型 503 容量不足影响尚未闭环。
