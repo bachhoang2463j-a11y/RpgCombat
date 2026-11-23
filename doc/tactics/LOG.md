@@ -323,3 +323,15 @@
 - 文件：`doc/tactics/典型对局-战棋版.yaml`、`TYPICAL-BATTLE-CONTRACT.md`、`tactics/src/{parser,effect-handlers,battle,fx-registry,fx-library,action-director,range-overlay,ui-shell,main}.mjs`、`integration-test/fixtures/tactics/typical-skills-node-cases.mjs`、`tactics/mvp-standalone.html`、`integration-test/fixtures/tactics/reports/TYPICAL-BATTLE-artifact.json`。未触碰根目录回合制文件与无关未跟踪文件。
 - 验证：唯一一次源码全量 `node tactics/tools/run-tests.cjs --all` 19 阶段 **808 passed / 0 failed**（含 D1 7 项新单测与全部 51 个特效条目 `TFX-01` 预算断言）；重建 `tactics/mvp-standalone.html`（1,176,495 B，51 模块，0 warning，sha256 `7283e44155fee92e073c3f480571bbe4cb19f2f38b978781cbdea4ec1d420e80`），产物专项断言 **14/14 passed**。真页交互门禁：内置浏览器子代理完成页面 200 加载与玛德琳攻击菜单打开，随后因服务器 `503 No capacity` 中断，完整真页全流程（召唤/结界/转火/自爆等实机目视）留待实机补验，不冒充通过。
 - 目的 vs 现状：D0–D4 代码、全量源码回归与单文件产物断言全部达成；完整真页交互门禁受上游模型 503 容量不足影响尚未闭环。
+
+## 2026-11-24 · 转火规则修复与唯一显式特效标签、原版基础 SVG 接线（c5c6e1a）
+- 核心目的：先修已确证的战斗 bug，再采用用户确认的唯一演出协议 `[特效:xxx] → 注册表 → 动画`；保留伤害结算分类，不保留旧括号演出识别或属性/范围猜测路线，不重做全部传奇美术。
+- 规则：新增不验费用的 `previewRetarget(skill, aim, casterId, slotIndex)`，地图悬停/点击使用当前段校验；AI 默认不等待玩家转火，续段按实时位置重新查询并同步 aim/facing/cells；结果记录真实 shots/shotIndex，包括空发。取消驱动以独立取消信号结清等待，换场/销毁清转火浮层。反击接入整技暴击；单体致死反击中止，群体已提交同一发保留目标名单、后续发停止。公开 endTurn 拒绝忙状态与非玩家回合。
+- 演出：fxTag 成为动作/准备/反应唯一分发依据；缺失/未知动作标签使用中性命中反馈。15 类基础 SVG 复用 vendor 原版函数，枪击按真实发序，霰弹方向读取每段实际瞄准且空方向锚不造命中；群体爆炸/火焰/冰霜/雷击按规则爆心/半径/作用格定位。vendor 必要宿主参数补丁同步提取器，根 index.html 只读。补接舍身内部第二次反应的显式标签。
+- 数据与编辑：典型样本 93 条、演示 32 条有效 fxTag，纯绑定载体不加演出；合法标签共 60 项，由 getFxTagOptions 同时供编辑器现有下拉与 list-fx-tags 脚本，更新契约与用户要求改写的计划。编辑保存补齐召唤射程字段、典型单位外层名字路径、库存 count 保真；同名 YAML 技能仅在本场覆写 fxTag，不改伤害/费用等规则。
+- 定向验证：典型技能 108、典型战斗 33、数据 57、FX01 39、AV 最终 52、MVP 56、P07 21、rules02-ui 最终 47 等相关组通过。第一次 --all 在旧 P07 已提交群攻名单断言失败；按原规则收窄致死修复后只复跑相关组。执行失误：verify-demo.cjs 被当作产物检查调用，实际内部额外执行 --all，834 passed/0 failed，但包装器因硬编码四阶段错误返回非零；已移除过时阶段数条件且未再次全量。后续编辑器/结束回合增补仅定向验证，不能把 834 报告视为最终源码指纹。
+- 产物：最终自包含单文件 1,179,975 B，sha256 `2dbb6536679521d745813f10c4b38138e39ffd447f9b41181863aecb2f116d5f`；打包门禁与新增显式协议/逐发/编辑器/区域适配专项共 18/18 通过。
+- 真页证据：IAB 多文件实际菜单→地图选点→Enter，原版枪击调用三次、弹药30→27、main=0、busy=false；单文件转火在 main=0 时点击第二目标，两段分别扣92/58HP、提示回收、busy=false、未捕获页面异常为空。最后一次结束回合 guard 增补前的产物实际编辑保存得到冰霜标签，远程/枪击槽/威力75/弹药45保持不变。各用例测试版本与限制记录在 FX-TAG-2026-11-24-browser.json，不把较早产物用例冒充最终产物全流程。
+- 未完成门禁：IAB 截图超时，全部基础特效目视比对、完整动画时序、相机缩放和节点回收未验；最终 guard 增补后的完整真实战斗流程仍待补验。内置浏览器没有擅自切换真 Chrome。只读独立审查发现问题后已修复，最后复核无新增明确阻断；页面发现的身份/范围保存问题另作真实验证。
+- 文件：tactics/src/{battle,main,action-director,fx-registry,fx-library,demo-fixture,editor-panel}.mjs、vendor/rpg-av/rpg-av.mjs、tools/{extract-rpg-av,list-fx-tags,verify-demo,verify-typical-artifact}、重建单文件；典型 YAML/契约/计划/INDEX；规则与 FX/AV 定向夹具及测试报告。无关未跟踪文件、根 index/README 未修改，未推送。
+- 目的 vs 现状：规则修复、唯一标签与原版基础调用已落地，相关回归及产物专项通过；视觉和最终完整真页门禁仍待验，因此本提交是可追溯业务备份，不宣称全部验收完成。业务 c5c6e1a，日志单向回填。
