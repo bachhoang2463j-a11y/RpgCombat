@@ -67,14 +67,20 @@ function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1 } = {})
   v.src = ctx.av.ASSET_BASE + '/' + file;
   v.playbackRate = rate;
   v.onended = () => v.remove();
+  v.onerror = () => v.remove();
   layer.appendChild(v);
-  v.play();
+  const p = v.play();
+  if (p && typeof p.catch === 'function') p.catch(() => {});
   return v;
 }
 const worldPx = p => ({ x: p.x * PX, y: p.y * PX });
 
 // 本库新增条目用到、回合制视听底座未登记键名的真实采样（文件已在既有资源服务中，键名对齐回合制 WEBM_FX_REGISTRY 音轨）
-export const EXTRA_AUDIO = { light01: 'light01.mp3', thunder01: 'thunder01.mp3' };
+export const EXTRA_AUDIO = {
+  light01: 'light01.mp3', thunder01: 'thunder01.mp3',
+  weimu: 'weimu.wav', sheshen_armor_step: 'sheshen_armor_step.mp3',
+  parry_heavy: 'parry_Weapon_GuardBreak.wav',
+};
 
 // 二次贝塞尔：SVG 光轨与粒子飞行共用同一控制点（防轨道分离）
 function bez(a, c, b, t) { const u = 1 - t; return { x: u * u * a.x + 2 * u * t * c.x + t * t * b.x, y: u * u * a.y + 2 * u * t * c.y + t * t * b.y }; }
@@ -695,7 +701,726 @@ const thunderStorm = {
   },
 };
 
-export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, volley, healMend, fogBurst, selfBoost, identity, zheYing, evadeGlide, holyVow, stormGather];
+// ---------- D3 通用非攻击槽与敌方/召唤空间模板 ----------
+const aoeHeal = {
+  id: 'aoe-heal', grade: 'L2',
+  match: i => i.healOnly && i.shape !== '单体',
+  timeline: { totalMs: 1000, fullscreen: false, darken: false },
+  cues: [{ key: 'hpHeal', vol: 0.55 }],
+  prepareKeys() { return ['hpHeal']; },
+  async play(ctx) {
+    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), rM = result.query?.shape?.radius || 6, R = rM * PX;
+    fx.sfx('hpHeal', 0.55);
+    fx.ground(ringHtml(c.x, c.y, R * 2, 'rgba(134,239,172,0.55)', 'rgba(74,222,128,0.28)'), 900)
+      .firstChild.animate([{ transform: 'scale(0.25)', opacity: 0.9 }, { transform: 'scale(1)', opacity: 0 }], { duration: 860, fill: 'forwards' });
+    const heals = (result.effects || []).filter(e => e.kind === 'heal' || e.kind === 'dispel');
+    const seen = new Set();
+    heals.forEach((e, idx) => ctx.after(140 + idx * 45, () => {
+      ctx.revealEffect(e, false);
+      if (e.kind === 'heal' && !seen.has(e.targetId)) {
+        seen.add(e.targetId);
+        const tp = worldPx(ctx.centerOf(e.targetId));
+        floatText(fx, tp.x, tp.y - 34, '+' + e.value + ' HP', '#bbf7d0', '#166534', { ms: 760, size: 13 });
+      }
+    }));
+    return ctx.wait(950);
+  },
+};
+
+const allyBuff = {
+  id: 'ally-buff', grade: 'L2',
+  match: i => !i.attackSlots && !i.healOnly && !i.barrierSub && i.region !== 'fog' && i.isAllyOnly && !(i.selfOnly && (i.grantsMainPoint || i.haste > 0)),
+  timeline: { totalMs: 900, fullscreen: false, darken: false },
+  cues: [{ key: 'atkUp', vol: 0.52 }],
+  prepareKeys() { return ['atkUp']; },
+  async play(ctx) {
+    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
+    fx.sfx('atkUp', 0.52);
+    fx.ground(runeHtml(fx.uid(), c.x, c.y, 1.4 * PX, '#38bdf8', '#bae6fd', ''), 850)
+      .firstChild.animate([{ transform: 'translate(-50%,-50%) scale(0.4)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 0.9, offset: 0.4 }, { transform: 'translate(-50%,-50%) scale(1.1)', opacity: 0 }], { duration: 850, fill: 'forwards' });
+    const effs = result.effects || [];
+    effs.forEach((e, idx) => ctx.after(180 + idx * 50, () => {
+      ctx.revealEffect(e, true);
+      const tp = worldPx(ctx.centerOf(e.targetId));
+      const label = e.kind === 'healMp' ? '+' + e.value + ' MP' : e.kind === 'healTp' ? '+' + e.value + ' TP' : (e.tag || '').replace(/\[|\]/g, '') + (e.value ? ' +' + Math.abs(e.value) : '');
+      if (label) floatText(fx, tp.x, tp.y - 32 - (idx % 2) * 16, label, '#e0f2fe', '#075985', { ms: 720, size: 12 });
+    }));
+    return ctx.wait(880);
+  },
+};
+
+const pureDebuff = {
+  id: 'pure-debuff', grade: 'L2',
+  match: i => !i.attackSlots && i.region !== 'fog' && i.isDebuffOnly,
+  timeline: { totalMs: 900, fullscreen: false, darken: false },
+  cues: [{ key: 'enemyDebuff', vol: 0.52 }],
+  prepareKeys() { return ['enemyDebuff']; },
+  async play(ctx) {
+    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), a = worldPx(result.aim);
+    fx.sfx('enemyDebuff', 0.52);
+    const isBurn = (result.effects || []).some(e => e.dot === 'burn');
+    const col = isBurn ? '#fb923c' : '#a78bfa';
+    flyOrb(fx, c, { x: (c.x + a.x) / 2, y: Math.min(c.y, a.y) - 55 }, a, { size: 22, color: col, core: '#ffffff', ms: 320, fade: true });
+    ctx.after(320, () => {
+      fx.top(ringHtml(a.x, a.y, 2.2 * PX, col, 'transparent'), 450)
+        .firstChild.animate([{ transform: 'scale(0.2)', opacity: 0.9 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 420, fill: 'forwards' });
+      (result.effects || []).forEach(e => ctx.revealEffect(e, true));
+    });
+    return ctx.wait(860);
+  },
+};
+
+const chargeDash = {
+  id: 'charge-dash', grade: 'L2',
+  match: i => i.hasChargeDash,
+  timeline: { totalMs: 980, fullscreen: false, darken: false },
+  cues: [{ key: 'enemyMeleeGroupHit', vol: 0.62 }],
+  prepareKeys() { return ['enemyMeleeGroupHit']; },
+  async play(ctx) {
+    const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
+    const ev = (result.events || []).find(e => e.type === 'unit-charged');
+    const dest = ev ? worldPx(ev.to) : worldPx(result.aim);
+    fx.sfx('enemyMeleeGroupHit', 0.62); fx.shake('medium');
+    particles(fx, Array.from({ length: 16 }, () => ({ x: c.x + rnd(-20, 20), y: c.y + rnd(-20, 20), dx: (dest.x - c.x) * 0.5 + rnd(-18, 18), dy: (dest.y - c.y) * 0.5 + rnd(-18, 18), size: rnd(14, 24), color: '#fbbf24', core: '#fef3c7', s0: 1, s1: 0.3, dur: 460 })), 520, 'ground');
+    hits.forEach((h, idx) => ctx.after(180 + idx * 90, () => ctx.reveal(h.targetId)));
+    return ctx.wait(900);
+  },
+};
+
+const roarWave = {
+  id: 'roar-wave', grade: 'L2',
+  match: i => i.isMixedSlots && i.shape === '圆形',
+  timeline: { totalMs: 1000, fullscreen: false, darken: false },
+  cues: [{ key: 'taunt', vol: 0.58 }],
+  prepareKeys() { return ['taunt']; },
+  async play(ctx) {
+    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), R = (result.query?.shape?.radius || 6) * PX;
+    fx.sfx('taunt', 0.58); fx.shake('medium');
+    for (let k = 0; k < 3; k++) ctx.after(k * 160, () => {
+      fx.top(ringHtml(c.x, c.y, R * 2, 'rgba(251,191,36,0.7)', 'rgba(234,88,12,0.3)'), 540)
+        .firstChild.animate([{ transform: 'scale(0.15)', opacity: 0.95 }, { transform: 'scale(1)', opacity: 0 }], { duration: 520, fill: 'forwards' });
+    });
+    ctx.after(260, () => (result.effects || []).forEach(e => ctx.revealEffect(e, true)));
+    return ctx.wait(960);
+  },
+};
+
+const frostBlast = {
+  id: 'frost-blast', grade: 'L3',
+  match: i => i.damageCategories.includes('冰霜') && i.shape === '爆炸',
+  timeline: { chargeMs: 820, totalMs: 2150, fullscreen: true, darken: false },
+  cues: [{ key: 'frost_crystal_impact_fs550267', vol: 0.68 }],
+  prepareKeys() { return ['frost_crystal_impact_fs550267']; },
+  async play(ctx) {
+    const { fx, hits, result } = ctx, shape = result.query.shape, b = worldPx(shape.center), R = (shape.radius || 5) * PX;
+    fx.ground(ringHtml(b.x, b.y, R * 2, 'rgba(125,211,252,0.55)', 'rgba(56,189,248,0.25)'), 900)
+      .firstChild.animate([{ transform: 'scale(1.1)', opacity: 0 }, { transform: 'scale(0.9)', opacity: 0.9, offset: 0.7 }, { transform: 'scale(0.2)', opacity: 1 }], { duration: 820, fill: 'forwards' });
+    if (!(await ctx.wait(820))) return false;
+    fx.sfx('frost_crystal_impact_fs550267', 0.68); fx.shake('heavy');
+    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(224,242,254,0.6),rgba(56,189,248,0.22));"></i>', 320)
+      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 320, fill: 'forwards' });
+    fx.top(ringHtml(b.x, b.y, R * 2.4, 'rgba(186,230,253,0.9)', 'rgba(14,165,233,0.4)'), 600)
+      .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: 580, fill: 'forwards' });
+    particles(fx, Array.from({ length: 28 }, () => { const a = rnd(0, TAU), d = rnd(0.5, 1.15) * R; return { x: b.x, y: b.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(8, 16), color: '#7dd3fc', core: '#f0f9ff', s0: 1, s1: 0.2, dur: 680 }; }), 800);
+    hits.forEach((h, k) => ctx.after(30 + k * 55, () => ctx.reveal(h.targetId)));
+    return ctx.wait(1280);
+  },
+};
+
+const voidQuake = {
+  id: 'void-quake', grade: 'L2',
+  match: i => i.shape === '爆炸' && i.damageType === '法术' && i.damageCategories.includes('钝击'),
+  timeline: { totalMs: 1150, fullscreen: false, darken: false },
+  cues: [{ key: 'enemyMagicGroup', vol: 0.60 }],
+  prepareKeys() { return ['enemyMagicGroup']; },
+  async play(ctx) {
+    const { fx, hits, result } = ctx, shape = result.query.shape, b = worldPx(shape.center), R = (shape.radius || 4) * PX;
+    fx.sfx('enemyMagicGroup', 0.60); fx.shake('medium');
+    fx.top(ringHtml(b.x, b.y, R * 2.2, 'rgba(192,132,252,0.85)', 'rgba(88,28,135,0.55)'), 620)
+      .firstChild.animate([{ transform: 'scale(0.2)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 600, fill: 'forwards' });
+    particles(fx, Array.from({ length: 20 }, () => { const a = rnd(0, TAU), d = rnd(0.4, 1) * R; return { x: b.x, y: b.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(10, 18), color: '#a855f7', core: '#f3e8ff', s0: 1, s1: 0.2, dur: 560 }; }), 640);
+    hits.forEach((h, k) => ctx.after(50 + k * 60, () => ctx.reveal(h.targetId)));
+    return ctx.wait(1080);
+  },
+};
+
+const lineRift = {
+  id: 'line-rift', grade: 'L2',
+  match: i => i.shape === '直线' && i.damageType === '法术',
+  timeline: { totalMs: 960, fullscreen: false, darken: false },
+  cues: [{ key: 'magicKill', vol: 0.58 }],
+  prepareKeys() { return ['magicKill']; },
+  async play(ctx) {
+    const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), a = worldPx(result.aim);
+    const dx = a.x - c.x, dy = a.y - c.y, len = Math.max(1, Math.hypot(dx, dy)), ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    fx.sfx('magicKill', 0.58); fx.shake('medium');
+    const L = Math.min(len, (result.query?.shape?.length || 12) * PX);
+    fx.top('<i style="position:absolute;left:' + c.x + 'px;top:' + (c.y - 12) + 'px;width:' + L + 'px;height:24px;transform-origin:0 50%;transform:rotate(' + ang + 'deg);background:linear-gradient(90deg,rgba(168,85,247,0.85),#f3e8ff,rgba(56,189,248,0.65));mix-blend-mode:screen;border-radius:12px;"></i>', 480)
+      .firstChild.animate([{ transform: 'rotate(' + ang + 'deg) scaleX(0.1)', opacity: 1 }, { transform: 'rotate(' + ang + 'deg) scaleX(1)', opacity: 0.9, offset: 0.35 }, { transform: 'rotate(' + ang + 'deg) scaleX(1)', opacity: 0 }], { duration: 460, fill: 'forwards' });
+    hits.forEach((h, k) => ctx.after(80 + k * 70, () => ctx.reveal(h.targetId)));
+    return ctx.wait(900);
+  },
+};
+
+const waterBolt = {
+  id: 'water-bolt', grade: 'L1',
+  match: i => i.damageCategories.includes('水流'),
+  timeline: { totalMs: 520, fullscreen: false, darken: false },
+  cues: [{ key: 'enemyMagic', vol: 0.34 }],
+  prepareKeys() { return ['enemyMagic']; },
+  async play(ctx) {
+    const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), a = worldPx(result.aim);
+    fx.sfx('enemyMagic', 0.34);
+    flyOrb(fx, c, { x: (c.x + a.x) / 2, y: (c.y + a.y) / 2 - 24 }, a, { size: 22, color: '#22d3ee', core: '#ecfeff', ms: 260, fade: true });
+    ctx.after(250, () => hits.forEach(h => ctx.reveal(h.targetId)));
+    return ctx.wait(480);
+  },
+};
+
+const curseBeam = {
+  id: 'curse-beam', grade: 'L1',
+  match: i => i.damageCategories.includes('诅咒'),
+  timeline: { totalMs: 520, fullscreen: false, darken: false },
+  cues: [{ key: 'enemyDebuff', vol: 0.34 }],
+  prepareKeys() { return ['enemyDebuff']; },
+  async play(ctx) {
+    const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), a = worldPx(result.aim);
+    fx.sfx('enemyDebuff', 0.34);
+    trail(fx, c, { x: (c.x + a.x) / 2, y: (c.y + a.y) / 2 - 12 }, a, { color: '#9333ea', width: 5, ms: 260 });
+    ctx.after(240, () => hits.forEach(h => ctx.reveal(h.targetId)));
+    return ctx.wait(480);
+  },
+};
+
+const sectorVolley = {
+  id: 'sector-volley', grade: 'L1', reuseAudio: true,
+  match: i => i.shape === '扇形' && i.damageCategories.includes('霰弹'),
+  timeline: { totalMs: 560, fullscreen: false, darken: false },
+  cues: [{ key: 'xiandan', vol: 0.55 }],
+  prepareKeys() { return ['xiandan']; },
+  async play(ctx) {
+    const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
+    const segs = hits.flatMap(h => (h.segments || [h]).map((s, idx) => ({ h, s, idx })));
+    const segCount = Math.max(1, ...hits.map(h => (h.segments || [h]).length));
+    for (let si = 0; si < segCount; si++) {
+      const refSeg = segs.find(x => x.idx === si)?.s;
+      const aimPt = worldPx(refSeg?.aim || result.aim);
+      const ang = Math.atan2(aimPt.y - c.y, aimPt.x - c.x);
+      ctx.after(si * 220, () => {
+        fx.sfx('xiandan', 0.55); fx.shake('light');
+        particles(fx, Array.from({ length: 12 }, () => {
+          const a = ang + rnd(-0.45, 0.45), d = rnd(140, 260);
+          return { x: c.x, y: c.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(6, 11), color: '#fb923c', core: '#fffbeb', s0: 1, s1: 0.3, dur: 220 };
+        }), 260);
+        for (const h of hits) ctx.revealSegment(h.targetId, si);
+      });
+    }
+    return ctx.wait(Math.min(560, segCount * 240));
+  },
+};
+
+const reactionKanpo = {
+  id: 'reaction-kanpo', kind: 'reaction', grade: 'L1',
+  match: r => r.kanpo,
+  timeline: { totalMs: 420, fullscreen: false, darken: false },
+  cues: [{ key: 'kanpo', vol: 0.34 }],
+  prepareKeys() { return ['kanpo']; },
+  async play(ctx) {
+    const p = ctx.placement(); if (!p) return true;
+    const c = worldPx(unitCenter(p, ctx.footprint));
+    ctx.fx.sfx('kanpo', 0.34);
+    ctx.fx.top(ringHtml(c.x, c.y, 96, 'rgba(253,224,71,0.9)', 'rgba(245,158,11,0.45)'), 380)
+      .firstChild.animate([{ transform: 'scale(0.3)', opacity: 1 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: 360, fill: 'forwards' });
+    floatText(ctx.fx, c.x, c.y - 36, '⛔ 看破!', '#fef08a', '#92400e', { ms: 420, size: 14 });
+    return ctx.wait(380);
+  },
+};
+
+const reactionSheshen = {
+  id: 'reaction-sheshen', kind: 'reaction', grade: 'L1',
+  match: r => r.sheshen,
+  timeline: { totalMs: 420, fullscreen: false, darken: false },
+  cues: [{ key: 'sheshen_armor_step', vol: 0.34 }],
+  prepareKeys() { return ['sheshen_armor_step']; },
+  async play(ctx) {
+    const p = ctx.placement(); if (!p) return true;
+    const c = worldPx(unitCenter(p, ctx.footprint));
+    ctx.fx.sfx('sheshen_armor_step', 0.34);
+    ctx.fx.top(ringHtml(c.x, c.y, 88, 'rgba(56,189,248,0.9)', 'rgba(2,132,199,0.45)'), 380)
+      .firstChild.animate([{ transform: 'scale(0.4)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 360, fill: 'forwards' });
+    floatText(ctx.fx, c.x, c.y - 34, '🛡️ 舍身承伤', '#bae6fd', '#0c4a6e', { ms: 420, size: 13 });
+    return ctx.wait(380);
+  },
+};
+
+const reactionGuard = {
+  id: 'reaction-guard', kind: 'reaction', grade: 'L1',
+  match: r => r.isGuard,
+  timeline: { totalMs: 400, fullscreen: false, darken: false },
+  cues: [{ key: 'shieldUp', vol: 0.30 }],
+  prepareKeys() { return ['shieldUp']; },
+  async play(ctx) {
+    const p = ctx.placement(); if (!p) return true;
+    const c = worldPx(unitCenter(p, ctx.footprint));
+    ctx.fx.sfx('shieldUp', 0.30);
+    ctx.fx.top(ringHtml(c.x, c.y, 84, 'rgba(167,139,250,0.85)', 'rgba(109,40,217,0.4)'), 360)
+      .firstChild.animate([{ transform: 'scale(0.45)', opacity: 0.95 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 340, fill: 'forwards' });
+    return ctx.wait(360);
+  },
+};
+
+// ---------- D4-A 埃利奥特奥术核心（5项） ----------
+const lingFengShu = {
+  id: 'ling-feng-shu', grade: 'L2', fxTags: ['灵风术'],
+  timeline: { totalMs: 1050, fullscreen: false, darken: false },
+  cues: [{ key: 'aoe_wind_spin_fs772867', vol: 0.60 }],
+  prepareKeys() { return ['aoe_wind_spin_fs772867']; },
+  async play(ctx) {
+    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
+    fx.sfx('aoe_wind_spin_fs772867', 0.60);
+    const rune = fx.ground(runeHtml(fx.uid(), c.x, c.y, 1.8 * PX, '#34d399', '#a7f3d0', 'ᚠᛖᚺᚢ'), 1000);
+    grow(rune.firstChild, { ms: 1000, s0: 0.3, s1: 1.05, hold: 0.7, s2: 1.25 });
+    spin(rune.querySelector('[data-fx=spin]'), 240, 1000);
+    particles(fx, Array.from({ length: 18 }, (_, i) => {
+      const a = (i / 18) * TAU;
+      return { x: c.x + Math.cos(a) * 44, y: c.y + Math.sin(a) * 28, dx: Math.cos(a + 1.2) * 38, dy: -46, size: rnd(6, 12), color: '#6ee7b7', core: '#ecfdf5', s0: 1, s1: 0.2, dur: 760, delay: i * 25 };
+    }), 960);
+    ctx.after(260, () => {
+      (result.effects || []).forEach(e => ctx.revealEffect(e, true));
+      floatText(fx, c.x, c.y - 38, '🕊️ 飞行 · 疾风', '#a7f3d0', '#065f46', { ms: 750, size: 13 });
+    });
+    return ctx.wait(1000);
+  },
+};
+
+const nakTithBarrier = {
+  id: 'nak-tith-barrier', grade: 'L3', fxTags: ['纳克提特障壁术'],
+  timeline: { chargeMs: 820, totalMs: 2100, fullscreen: true, darken: false },
+  cues: [{ key: 'herochargedone', vol: 0.62 }, { key: 'shieldUp', vol: 0.56 }],
+  prepareKeys() { return ['herochargedone', 'shieldUp']; },
+  async play(ctx) {
+    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), R = (result.query?.shape?.radius || 6) * PX;
+    fx.sfx('shieldUp', 0.56);
+    const rune = fx.ground(runeHtml(fx.uid(), c.x, c.y, 2.4 * PX, '#f59e0b', '#fef3c7', 'ᛒᛖᚱᚲᚨᚾᛟ'), 1500);
+    grow(rune.firstChild, { ms: 1500, s0: 0.2, s1: 1, hold: 0.75, s2: 1.1 });
+    spin(rune.querySelector('[data-fx=spin]'), 160, 1500);
+    if (!(await ctx.wait(820))) return false;
+    fx.sfx('herochargedone', 0.62); fx.shake('medium');
+    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(254,243,199,0.45),rgba(245,158,11,0.18));"></i>', 280)
+      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 280, fill: 'forwards' });
+    fx.top(ringHtml(c.x, c.y, R * 2, 'rgba(253,230,138,0.85)', 'rgba(217,119,6,0.4)'), 680)
+      .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 640, fill: 'forwards' });
+    return ctx.wait(1220);
+  },
+};
+
+const isisEmbrace = {
+  id: 'isis-embrace', grade: 'L3', fxTags: ['伊西丝之拥', '伊西斯之拥'],
+  timeline: { chargeMs: 820, totalMs: 2150, fullscreen: true, darken: false },
+  cues: [{ key: 'hpHeal', vol: 0.65 }],
+  prepareKeys() { return ['hpHeal']; },
+  async play(ctx) {
+    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), R = (result.query?.shape?.radius || 8) * PX;
+    const rune = fx.ground(runeHtml(fx.uid(), c.x, c.y, 2.8 * PX, '#fbbf24', '#fffbeb', 'ᛁᛊᛁᛊ'), 1800);
+    grow(rune.firstChild, { ms: 1800, s0: 0.2, s1: 1, hold: 0.78, s2: 1.15 });
+    spin(rune.querySelector('[data-fx=spin]'), -140, 1800);
+    if (!(await ctx.wait(820))) return false;
+    fx.sfx('hpHeal', 0.65);
+    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(255,251,235,0.55),rgba(251,191,36,0.16));"></i>', 300)
+      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+    fx.top(ringHtml(c.x, c.y, R * 2, 'rgba(254,240,138,0.85)', 'rgba(74,222,128,0.35)'), 760)
+      .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 720, fill: 'forwards' });
+    (result.effects || []).forEach((e, i) => ctx.after(60 + i * 50, () => ctx.revealEffect(e, false)));
+    return ctx.wait(1260);
+  },
+};
+
+const wizardShield = {
+  id: 'wizard-shield', kind: 'reaction', grade: 'L1', fxTags: ['巫师护盾'],
+  timeline: { totalMs: 460, fullscreen: false, darken: false },
+  cues: [{ key: 'shieldUp', vol: 0.34 }],
+  prepareKeys() { return ['shieldUp']; },
+  async play(ctx) {
+    const p = ctx.placement(); if (!p) return true;
+    const c = worldPx(unitCenter(p, ctx.footprint)), crit = !!ctx.reaction?.crit;
+    ctx.fx.sfx('shieldUp', 0.34);
+    ctx.fx.top(ringHtml(c.x, c.y, 92, crit ? 'rgba(253,224,71,0.95)' : 'rgba(96,165,250,0.9)', 'rgba(139,92,246,0.45)'), 420)
+      .firstChild.animate([{ transform: 'scale(0.35)', opacity: 1 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: 400, fill: 'forwards' });
+    floatText(ctx.fx, c.x, c.y - 36, crit ? '💥 巫师护盾×2!' : '🛡️ 巫师护盾', crit ? '#fef08a' : '#bfdbfe', '#1e3a8a', { ms: 440, size: 13 });
+    return ctx.wait(420);
+  },
+};
+
+const sandArmor = {
+  id: 'sand-armor', grade: 'L2', fxTags: ['飞沙化甲'],
+  timeline: { totalMs: 960, fullscreen: false, darken: false },
+  cues: [{ key: 'defUp', vol: 0.54 }],
+  prepareKeys() { return ['defUp']; },
+  async play(ctx) {
+    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), a = worldPx(result.aim);
+    fx.sfx('defUp', 0.54);
+    flyOrb(fx, c, { x: (c.x + a.x) / 2, y: Math.min(c.y, a.y) - 42 }, a, { size: 22, color: '#f59e0b', core: '#fef3c7', ms: 320, fade: true });
+    ctx.after(300, () => {
+      fx.ground(runeHtml(fx.uid(), a.x, a.y, 1.3 * PX, '#d97706', '#fde68a', ''), 620)
+        .firstChild.animate([{ transform: 'translate(-50%,-50%) scale(0.4)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1.1)', opacity: 0 }], { duration: 600, fill: 'forwards' });
+      (result.effects || []).forEach(e => ctx.revealEffect(e, true));
+    });
+    return ctx.wait(920);
+  },
+};
+
+// ---------- D4-B 弗兰克 / 玛德琳枪械与近战重击（5项 + 克虏伯起手） ----------
+const meleeHeavy = {
+  id: 'melee-heavy', grade: 'L2', fxTags: ['近战重击'],
+  timeline: { totalMs: 920, fullscreen: false, darken: false },
+  cues: [{ key: 'parry_heavy', vol: 0.65 }],
+  prepareKeys() { return ['parry_heavy']; },
+  async play(ctx) {
+    const { fx, hits, result } = ctx, t = worldPx(hits[0] ? ctx.centerOf(hits[0].targetId) : result.aim);
+    fx.sfx('parry_heavy', 0.65); fx.shake('heavy');
+    fx.top(ringHtml(t.x, t.y, 2.8 * PX, 'rgba(251,191,36,0.9)', 'rgba(234,88,12,0.5)'), 480)
+      .firstChild.animate([{ transform: 'scale(0.2)', opacity: 1 }, { transform: 'scale(1.2)', opacity: 0 }], { duration: 460, fill: 'forwards' });
+    ctx.after(80, () => hits.forEach(h => ctx.reveal(h.targetId)));
+    return ctx.wait(880);
+  },
+};
+
+const rangedHeavy = {
+  id: 'ranged-heavy', grade: 'L2', fxTags: ['远程重击'], reuseAudio: true,
+  timeline: { totalMs: 900, fullscreen: false, darken: false },
+  cues: [{ key: 'gunshot_pierce', vol: 0.7 }],
+  prepareKeys() { return ['gunshot_pierce']; },
+  async play(ctx) {
+    const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), t = worldPx(hits[0] ? ctx.centerOf(hits[0].targetId) : result.aim);
+    fx.sfx('gunshot_pierce', 0.7); fx.shake('medium');
+    trail(fx, c, { x: (c.x + t.x) / 2, y: (c.y + t.y) / 2 }, t, { color: '#fbbf24', width: 6, ms: 200 });
+    ctx.after(160, () => hits.forEach(h => ctx.reveal(h.targetId)));
+    return ctx.wait(860);
+  },
+};
+
+const gunshotPierce = {
+  id: 'gunshot-pierce', grade: 'L2', fxTags: ['枪击穿透'], reuseAudio: true,
+  timeline: { totalMs: 880, fullscreen: false, darken: false },
+  cues: [{ key: 'gunshot_pierce', vol: 0.65 }],
+  prepareKeys() { return ['gunshot_pierce']; },
+  async play(ctx) {
+    const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), t = worldPx(hits[0] ? ctx.centerOf(hits[0].targetId) : result.aim);
+    const dx = t.x - c.x, dy = t.y - c.y, len = Math.max(1, Math.hypot(dx, dy));
+    const over = { x: t.x + (dx / len) * 65, y: t.y + (dy / len) * 65 };
+    fx.sfx('gunshot_pierce', 0.65); fx.shake('light');
+    trail(fx, c, t, over, { color: '#38bdf8', width: 4, ms: 240 });
+    ctx.after(140, () => hits.forEach(h => ctx.reveal(h.targetId)));
+    return ctx.wait(840);
+  },
+};
+
+const strafeBurst = {
+  id: 'strafe-burst', grade: 'L3', fxTags: ['连续扫射'],
+  timeline: { chargeMs: 800, totalMs: 2150, fullscreen: true, darken: false },
+  cues: [{ key: 'aoe_gun_burst_fs482122', vol: 0.68 }],
+  prepareKeys() { return ['aoe_gun_burst_fs482122']; },
+  async play(ctx) {
+    const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), a = worldPx(result.aim);
+    const baseAng = Math.atan2(a.y - c.y, a.x - c.x);
+    const rune = fx.ground(ringHtml(c.x, c.y, 1.8 * PX, 'rgba(251,146,60,0.55)', 'transparent'), 850);
+    rune.firstChild.animate([{ transform: 'scale(0.5)', opacity: 0.3 }, { transform: 'scale(1.1)', opacity: 0.9 }], { duration: 800, fill: 'forwards' });
+    if (!(await ctx.wait(800))) return false;
+    fx.sfx('aoe_gun_burst_fs482122', 0.68); fx.shake('medium');
+    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(254,240,138,0.35),transparent 65%);"></i>', 240)
+      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 0 }], { duration: 240, fill: 'forwards' });
+    for (let k = 0; k < 14; k++) ctx.after(k * 55, () => {
+      const ang = baseAng + rnd(-0.72, 0.72), dist = rnd(260, 520);
+      const end = { x: c.x + Math.cos(ang) * dist, y: c.y + Math.sin(ang) * dist };
+      trail(fx, c, { x: (c.x + end.x) / 2, y: (c.y + end.y) / 2 }, end, { color: k % 2 ? '#fde047' : '#fb923c', width: 3, ms: 160 });
+    });
+    hits.forEach((h, i) => ctx.after(140 + i * 70, () => ctx.reveal(h.targetId)));
+    return ctx.wait(1300);
+  },
+};
+
+const kruppSnipe = {
+  id: 'krupp-snipe', grade: 'L4', fxTags: ['克虏伯重狙'],
+  timeline: { chargeMs: 1220, totalMs: 3150, fullscreen: true, darken: true },
+  cues: [{ key: 'gunshot_pierce', vol: 0.72 }, { key: 'explosion_aoe_blast', vol: 0.62 }],
+  prepareKeys() { return ['gunshot_pierce', 'explosion_aoe_blast']; },
+  async play(ctx) {
+    const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), t = worldPx(hits[0] ? ctx.centerOf(hits[0].targetId) : result.aim);
+    worldDarken(fx, t, { holeR: 68, inMs: 420, holdMs: 1900, outMs: 650, peak: 0.85 });
+    trail(fx, c, { x: (c.x + t.x) / 2, y: (c.y + t.y) / 2 }, t, { color: '#ef4444', width: 2, ms: 1180 });
+    if (!(await ctx.wait(1220))) return false;
+    fx.sfx('gunshot_pierce', 0.72); fx.sfx('explosion_aoe_blast', 0.62); fx.shake('quake');
+    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(255,255,255,0.85),rgba(249,115,22,0.3) 60%);"></i>', 340)
+      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 0 }], { duration: 340, fill: 'forwards' });
+    webm(ctx, 'snipe-ezremove.mp4', t.x, t.y, 4 * PX, { ms: 1200 });
+    trail(fx, c, { x: (c.x + t.x) / 2, y: (c.y + t.y) / 2 }, t, { color: '#fef08a', width: 9, ms: 260 });
+    ctx.after(60, () => hits.forEach(h => ctx.reveal(h.targetId)));
+    return ctx.wait(1850);
+  },
+};
+
+const kruppAim = {
+  id: 'krupp-aim', kind: 'prepare', grade: 'L2', fxTags: ['克虏伯重狙'],
+  timeline: { totalMs: 900, fullscreen: false, darken: false },
+  cues: [{ key: 'herocharge', vol: 0.52 }],
+  prepareKeys() { return ['herocharge']; },
+  async play(ctx) {
+    const c = worldPx(ctx.centerOf(ctx.casterId));
+    ctx.fx.sfx('herocharge', 0.52);
+    floatText(ctx.fx, c.x, c.y - 38, '🎯 架枪瞄准', '#fca5a5', '#7f1d1d', { ms: 850, size: 13 });
+    return ctx.wait(860);
+  },
+};
+
+// ---------- D4-C 奇物与音叉混合 WebM（7项 + 塞赫美特起手） ----------
+const harmonyWard = {
+  id: 'harmony-ward', grade: 'L3', fxTags: ['谐律之庇'],
+  timeline: { chargeMs: 820, totalMs: 2100, fullscreen: true, darken: false },
+  cues: [{ key: 'hpHeal', vol: 0.62 }],
+  prepareKeys() { return ['hpHeal']; },
+  async play(ctx) {
+    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
+    const rune = fx.ground(runeHtml(fx.uid(), c.x, c.y, 2.2 * PX, '#38bdf8', '#e0f2fe', 'ᚺᚨᚱᛗᛟ'), 1400);
+    grow(rune.firstChild, { ms: 1400, s0: 0.3, s1: 1, hold: 0.7, s2: 1.15 });
+    if (!(await ctx.wait(820))) return false;
+    fx.sfx('hpHeal', 0.62);
+    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(224,242,254,0.45),rgba(56,189,248,0.18));"></i>', 280)
+      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 280, fill: 'forwards' });
+    webm(ctx, 'vfx_harmony_ripple.webm', c.x, c.y, 5 * PX, { ms: 1300 });
+    fx.top(ringHtml(c.x, c.y, 8 * PX, 'rgba(186,230,253,0.85)', 'rgba(56,189,248,0.3)'), 720)
+      .firstChild.animate([{ transform: 'scale(0.1)', opacity: 1 }, { transform: 'scale(1.2)', opacity: 0 }], { duration: 700, fill: 'forwards' });
+    (result.effects || []).forEach(e => ctx.revealEffect(e, false));
+    return ctx.wait(1220);
+  },
+};
+
+const silenceField = {
+  id: 'silence-field', grade: 'L3', fxTags: ['静默之域'],
+  timeline: { chargeMs: 820, totalMs: 2100, fullscreen: true, darken: false },
+  cues: [{ key: 'enemyDebuff', vol: 0.62 }],
+  prepareKeys() { return ['enemyDebuff']; },
+  async play(ctx) {
+    const { fx, hits } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
+    fx.ground(ringHtml(c.x, c.y, 3 * PX, 'rgba(148,163,184,0.6)', 'transparent'), 840)
+      .firstChild.animate([{ transform: 'scale(0.4)', opacity: 0.3 }, { transform: 'scale(1)', opacity: 0.9 }], { duration: 800, fill: 'forwards' });
+    if (!(await ctx.wait(820))) return false;
+    fx.sfx('enemyDebuff', 0.62); fx.shake('light');
+    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(148,163,184,0.4),rgba(15,23,42,0.2));"></i>', 280)
+      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 280, fill: 'forwards' });
+    webm(ctx, 'vfx_silence_ripple.webm', c.x, c.y, 6 * PX, { ms: 1300 });
+    hits.forEach((h, i) => ctx.after(60 + i * 50, () => ctx.reveal(h.targetId)));
+    return ctx.wait(1220);
+  },
+};
+
+const shatterEcho = {
+  id: 'shatter-echo', grade: 'L3', fxTags: ['碎裂之响'],
+  timeline: { chargeMs: 820, totalMs: 2150, fullscreen: true, darken: false },
+  cues: [{ key: 'defDown', vol: 0.64 }],
+  prepareKeys() { return ['defDown']; },
+  async play(ctx) {
+    const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
+    fx.ground(runeHtml(fx.uid(), c.x, c.y, 2 * PX, '#f43f5e', '#fecdd3', ''), 840)
+      .firstChild.animate([{ transform: 'translate(-50%,-50%) scale(0.4)', opacity: 0.4 }, { transform: 'translate(-50%,-50%) scale(1.05)', opacity: 0.9 }], { duration: 800, fill: 'forwards' });
+    if (!(await ctx.wait(820))) return false;
+    fx.sfx('defDown', 0.64); fx.shake('medium');
+    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(254,205,211,0.5),rgba(225,29,72,0.2));"></i>', 280)
+      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 280, fill: 'forwards' });
+    webm(ctx, 'vfx_shatter_arc.webm', c.x, c.y, 6 * PX, { ms: 1300 });
+    if (result.crit) floatText(fx, c.x, c.y - 42, '💥 碎裂暴击×2!', '#fecdd3', '#881337', { ms: 900, size: 15 });
+    hits.forEach((h, i) => ctx.after(60 + i * 50, () => ctx.reveal(h.targetId)));
+    return ctx.wait(1260);
+  },
+};
+
+const sekhmetWrath = {
+  id: 'sekhmet-wrath', grade: 'L4', fxTags: ['塞赫美特之愠'],
+  timeline: { chargeMs: 1220, totalMs: 3200, fullscreen: true, darken: true },
+  cues: [{ key: 'fire01', vol: 0.70 }, { key: 'explosion_aoe_blast', vol: 0.65 }],
+  prepareKeys() { return ['fire01', 'explosion_aoe_blast']; },
+  async play(ctx) {
+    const { fx, hits, result } = ctx, t = worldPx(hits[0] ? ctx.centerOf(hits[0].targetId) : result.aim);
+    worldDarken(fx, t, { holeR: 70, inMs: 420, holdMs: 1950, outMs: 650, peak: 0.86 });
+    const rune = fx.ground(runeHtml(fx.uid(), t.x, t.y, 3.2 * PX, '#f97316', '#fde047', 'ᛊᛖᚲᚺ'), 2200);
+    grow(rune.firstChild, { ms: 2200, s0: 0.25, s1: 1.05, hold: 0.8, s2: 1.2 });
+    if (!(await ctx.wait(1220))) return false;
+    fx.sfx('fire01', 0.70); fx.sfx('explosion_aoe_blast', 0.65); fx.shake('quake');
+    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(255,237,213,0.9),rgba(234,88,12,0.4) 55%);"></i>', 380)
+      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 0 }], { duration: 380, fill: 'forwards' });
+    webm(ctx, 'vfx_sekhmet_pillar.webm', t.x, t.y - 40, 4.5 * PX, { ms: 1500 });
+    particles(fx, Array.from({ length: 30 }, () => { const a = rnd(0, TAU), d = rnd(1, 2.5) * PX; return { x: t.x, y: t.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d - 20, size: rnd(10, 18), color: '#fb923c', core: '#fff7ed', s0: 1, s1: 0.25, dur: 740 }; }), 850);
+    ctx.after(60, () => hits.forEach(h => ctx.reveal(h.targetId)));
+    return ctx.wait(1900);
+  },
+};
+
+const sekhmetVow = {
+  id: 'sekhmet-vow', kind: 'prepare', grade: 'L2', fxTags: ['塞赫美特之愠'],
+  timeline: { totalMs: 920, fullscreen: false, darken: false },
+  cues: [{ key: 'explosion_aoe_charge', vol: 0.54 }],
+  prepareKeys() { return ['explosion_aoe_charge']; },
+  async play(ctx) {
+    const c = worldPx(ctx.centerOf(ctx.casterId));
+    ctx.fx.sfx('explosion_aoe_charge', 0.54);
+    floatText(ctx.fx, c.x, c.y - 38, '🦁 太阳神火蓄势', '#fed7aa', '#9a3412', { ms: 860, size: 13 });
+    return ctx.wait(880);
+  },
+};
+
+const mirrorCounter = {
+  id: 'mirror-counter', kind: 'reaction', grade: 'L1', fxTags: ['逆咒归源镜'],
+  timeline: { totalMs: 560, fullscreen: false, darken: false },
+  cues: [{ key: 'kanpo', vol: 0.36 }],
+  prepareKeys() { return ['kanpo']; },
+  async play(ctx) {
+    const p = ctx.placement(); if (!p) return true;
+    const c = worldPx(unitCenter(p, ctx.footprint)), drained = ctx.reaction?.drained || 0;
+    ctx.fx.sfx('kanpo', 0.36);
+    webm(ctx, 'vfx_mirror_cage.webm', c.x, c.y, 2.5 * PX, { ms: 540 });
+    ctx.fx.top(ringHtml(c.x, c.y, 108, 'rgba(56,189,248,0.9)', 'rgba(168,85,247,0.5)'), 460)
+      .firstChild.animate([{ transform: 'scale(0.3)', opacity: 1 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: 440, fill: 'forwards' });
+    floatText(ctx.fx, c.x, c.y - 38, drained > 0 ? '🪞 逆咒吸蓝 +' + drained : '🪞 逆咒看破!', '#bae6fd', '#312e81', { ms: 520, size: 13 });
+    return ctx.wait(500);
+  },
+};
+
+const bastetOpal = {
+  id: 'bastet-opal', grade: 'L2', fxTags: ['芭斯特的猫眼石'],
+  timeline: { totalMs: 960, fullscreen: false, darken: false },
+  cues: [{ key: 'hpHeal', vol: 0.55 }],
+  prepareKeys() { return ['hpHeal']; },
+  async play(ctx) {
+    const { fx, result } = ctx, a = worldPx(result.aim);
+    fx.sfx('hpHeal', 0.55);
+    webm(ctx, 'vfx_bastet_spiral.webm', a.x, a.y, 3 * PX, { ms: 900 });
+    fx.ground(runeHtml(fx.uid(), a.x, a.y, 1.4 * PX, '#f59e0b', '#fef08a', ''), 850)
+      .firstChild.animate([{ transform: 'translate(-50%,-50%) scale(0.4)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1.1)', opacity: 0 }], { duration: 820, fill: 'forwards' });
+    ctx.after(260, () => (result.effects || []).forEach(e => ctx.revealEffect(e, false)));
+    return ctx.wait(900);
+  },
+};
+
+const strangeConch = {
+  id: 'strange-conch', grade: 'L3', fxTags: ['奇异海螺'],
+  timeline: { chargeMs: 820, totalMs: 2150, fullscreen: true, darken: false },
+  cues: [{ key: 'enemyDebuff', vol: 0.62 }],
+  prepareKeys() { return ['enemyDebuff']; },
+  async play(ctx) {
+    const { fx, hits } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
+    fx.ground(ringHtml(c.x, c.y, 4 * PX, 'rgba(34,211,238,0.55)', 'rgba(15,23,42,0.3)'), 840)
+      .firstChild.animate([{ transform: 'scale(0.3)', opacity: 0.3 }, { transform: 'scale(1)', opacity: 0.9 }], { duration: 800, fill: 'forwards' });
+    if (!(await ctx.wait(820))) return false;
+    fx.sfx('enemyDebuff', 0.62); fx.shake('medium');
+    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(34,211,238,0.35),rgba(15,23,42,0.28));"></i>', 300)
+      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+    webm(ctx, 'vfx_conch_vortex.webm', c.x, c.y, 6 * PX, { ms: 1300 });
+    hits.forEach((h, i) => ctx.after(50 + i * 40, () => ctx.reveal(h.targetId)));
+    return ctx.wait(1260);
+  },
+};
+
+// ---------- D4-D 召唤 / 索恩 / 圣域帷幕收尾 ----------
+const highSummon = {
+  id: 'high-summon', grade: 'L3', fxTags: ['高阶召唤术'],
+  timeline: { chargeMs: 820, totalMs: 2100, fullscreen: true, darken: false },
+  cues: [{ key: 'herochargedone', vol: 0.62 }],
+  prepareKeys() { return ['herochargedone']; },
+  async play(ctx) {
+    const { fx, result } = ctx, a = worldPx(result.aim);
+    const rune = fx.ground(runeHtml(fx.uid(), a.x, a.y, 2 * PX, '#f59e0b', '#fef08a', 'ᛊᚢᛗᛗᛟᚾ'), 1600);
+    grow(rune.firstChild, { ms: 1600, s0: 0.25, s1: 1.05, hold: 0.78, s2: 1.15 });
+    spin(rune.querySelector('[data-fx=spin]'), 180, 1600);
+    if (!(await ctx.wait(820))) return false;
+    fx.sfx('herochargedone', 0.62); fx.shake('medium');
+    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(254,240,138,0.45),rgba(217,119,6,0.18));"></i>', 280)
+      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 280, fill: 'forwards' });
+    particles(fx, Array.from({ length: 20 }, () => { const ang = rnd(0, TAU), d = rnd(0.5, 1.4) * PX; return { x: a.x, y: a.y, dx: Math.cos(ang) * d, dy: Math.sin(ang) * d - 25, size: rnd(8, 14), color: '#fbbf24', core: '#fffbeb', s0: 1, s1: 0.2, dur: 640 }; }), 760);
+    return ctx.wait(1220);
+  },
+};
+
+const scorpionKey = {
+  id: 'scorpion-key', grade: 'L3', fxTags: ['蝎眼钥匙'],
+  timeline: { chargeMs: 820, totalMs: 2150, fullscreen: true, darken: false },
+  cues: [{ key: 'herochargedone', vol: 0.65 }],
+  prepareKeys() { return ['herochargedone']; },
+  async play(ctx) {
+    const { fx, result } = ctx, a = worldPx(result.aim);
+    const rune = fx.ground(runeHtml(fx.uid(), a.x, a.y, 2.8 * PX, '#a855f7', '#f3e8ff', 'ᚴᛖᛁ'), 1800);
+    grow(rune.firstChild, { ms: 1800, s0: 0.2, s1: 1.1, hold: 0.8, s2: 1.2 });
+    spin(rune.querySelector('[data-fx=spin]'), -210, 1800);
+    if (!(await ctx.wait(820))) return false;
+    fx.sfx('herochargedone', 0.65); fx.shake('heavy');
+    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(243,232,255,0.5),rgba(147,51,234,0.22));"></i>', 300)
+      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+    fx.top(ringHtml(a.x, a.y, 4 * PX, 'rgba(216,180,254,0.9)', 'rgba(126,34,206,0.45)'), 680)
+      .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 640, fill: 'forwards' });
+    return ctx.wait(1260);
+  },
+};
+
+const xenonBlightFog = {
+  id: 'xenon-blight-fog', grade: 'L3', fxTags: ['异种坏死雾'],
+  timeline: { chargeMs: 820, totalMs: 2150, fullscreen: true, darken: false },
+  cues: [{ key: 'aoe_poison_spell_fs219566', vol: 0.65 }],
+  prepareKeys() { return ['aoe_poison_spell_fs219566']; },
+  async play(ctx) {
+    const { fx, hits, result } = ctx, shape = result.query.shape, c = worldPx(ctx.centerOf(ctx.casterId)), b = worldPx(shape.center), R = (shape.radius || 8) * PX;
+    flyOrb(fx, c, { x: (c.x + b.x) / 2, y: Math.min(c.y, b.y) - 90 }, b, { size: 22, color: '#22c55e', core: '#dcfce7', ms: 420, fade: true });
+    if (!(await ctx.wait(820))) return false;
+    fx.sfx('aoe_poison_spell_fs219566', 0.65); fx.shake('medium');
+    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(134,239,172,0.35),rgba(20,83,45,0.22));"></i>', 300)
+      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+    webm(ctx, 'fog.mp4', b.x, b.y, R * 2.2, { ms: 1300, opacity: 0.85 });
+    particles(fx, Array.from({ length: 24 }, () => { const a = rnd(0, TAU), d = rnd(0.4, 1) * R; return { x: b.x, y: b.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(12, 22), color: '#16a34a', core: '#86efac', s0: 0.8, s1: 0.2, dur: 760 }; }), 860);
+    hits.forEach((h, i) => ctx.after(50 + i * 45, () => ctx.reveal(h.targetId)));
+    return ctx.wait(1260);
+  },
+};
+
+const vitalFlow = {
+  id: 'vital-flow', grade: 'L2', fxTags: ['生体流转'],
+  timeline: { totalMs: 960, fullscreen: false, darken: false },
+  cues: [{ key: 'herocharge', vol: 0.56 }],
+  prepareKeys() { return ['herocharge']; },
+  async play(ctx) {
+    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
+    fx.sfx('herocharge', 0.56);
+    webm(ctx, 'heart.mp4', c.x, c.y - 16, 2.2 * PX, { ms: 900 });
+    fx.ground(runeHtml(fx.uid(), c.x, c.y, 1.5 * PX, '#ef4444', '#fecaca', ''), 880)
+      .firstChild.animate([{ transform: 'translate(-50%,-50%) scale(0.35)', opacity: 0.9 }, { transform: 'translate(-50%,-50%) scale(1.1)', opacity: 0 }], { duration: 840, fill: 'forwards' });
+    ctx.after(260, () => {
+      (result.effects || []).forEach(e => ctx.revealEffect(e, true));
+      floatText(fx, c.x, c.y - 42, '💓 生体流转 · 再动 +1', '#fecaca', '#7f1d1d', { ms: 720, size: 13 });
+    });
+    return ctx.wait(920);
+  },
+};
+
+const sanctumVeil = {
+  id: 'sanctum-veil', grade: 'L4',
+  match: i => i.fxTag === '圣域帷幕' || (!i.fxTag && i.barrierSub === '法术'),
+  timeline: { chargeMs: 1220, totalMs: 3200, fullscreen: true, darken: true },
+  cues: [{ key: 'weimu', vol: 0.70 }, { key: 'light_charge', vol: 0.52 }],
+  prepareKeys() { return ['weimu', 'light_charge']; },
+  async play(ctx) {
+    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), R = (result.query?.shape?.radius || 10) * PX;
+    fx.sfx('light_charge', 0.52);
+    worldDarken(fx, c, { holeR: 80, inMs: 420, holdMs: 2000, outMs: 650, peak: 0.85 });
+    const rune = fx.ground(runeHtml(fx.uid(), c.x, c.y, 3.6 * PX, '#38bdf8', '#fef9c3', 'ᛊᚨᚾᚲᛏᚢᛗ'), 2200);
+    grow(rune.firstChild, { ms: 2200, s0: 0.25, s1: 1.05, hold: 0.8, s2: 1.15 });
+    if (!(await ctx.wait(1220))) return false;
+    fx.sfx('weimu', 0.70); fx.shake('heavy');
+    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(224,242,254,0.75),rgba(56,189,248,0.28));"></i>', 380)
+      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.16 }, { opacity: 0 }], { duration: 380, fill: 'forwards' });
+    webm(ctx, 'weimu.webm', c.x, c.y, Math.min(R * 2, 10 * PX), { ms: 1600 });
+    fx.top(ringHtml(c.x, c.y, R * 2, 'rgba(186,230,253,0.9)', 'rgba(56,189,248,0.35)'), 900)
+      .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 860, fill: 'forwards' });
+    return ctx.wait(1900);
+  },
+};
+
+export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, vitalFlow, sanctumVeil, volley, healMend, fogBurst, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, frostBlast, voidQuake, lineRift, waterBolt, curseBeam, sectorVolley, identity, zheYing, mirrorCounter, wizardShield, reactionKanpo, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, kruppAim, sekhmetVow];
 export function registerDefaultFx(registry) {
   for (const e of DEFAULT_FX_ENTRIES) registry.register(e);
   return registry;

@@ -82,20 +82,35 @@ export function buildShell(root) {
   const rpgState = { actionQueue: [], queueIndex: 0, isGameStarted: true, isAnimating: false, usedExtraTurnSkillsThisRound: new Set() };
   const cmdHero = () => state.cmd && state.cmd.unit;
   const callCmd = (k, ...a) => (state.cmd && state.cmd[k] ? state.cmd[k](...a) : undefined);
+  const getHeroItemBindings = (hero) => {
+    const map = new Map();
+    for (const it of (hero && hero.items) || []) {
+      for (const b of (it && it.bindings) || []) {
+        if (!b || !b.skillName) continue;
+        if (!map.has(b.skillName)) map.set(b.skillName, []);
+        map.get(b.skillName).push({ item: it, cost: b.cost || 1 });
+      }
+    }
+    return map;
+  };
   const rpgUi = createRpgUi({
     state: rpgState,
     normalizeEffectTag,
     isSkillActionable: (hero, skill) => !!callCmd('canUse', skill),
     skillDisabledReason: (skill) => callCmd('skillReason', skill) || '不可用',
     prepareSkillTarget: (idx) => { uiSound('select'); callCmd('onSkill', idx); },
-    skillHasBarrierTag: () => false,
-    hasEnoughBindings: () => true,
+    skillHasBarrierTag: (skill) => !!(skill && skill.barrierSub),
+    hasEnoughBindings: (hero, skill) => {
+      const binds = getHeroItemBindings(hero).get(skill && skill.name);
+      if (!binds) return true;
+      return binds.every(({ item, cost }) => item.category === '道具' ? (item.maxUses <= 0 || (item.usesRemaining ?? 0) >= cost) : (item.count || 0) >= cost);
+    },
     isSummonBlockedByLimit: () => false,
-    getHeroItemBindings: () => new Map(),
+    getHeroItemBindings,
     itemBindingKnowledge: new Map(),
     isItemUsable: (item) => !!callCmd('canUseItem', item),
     prepareItemTarget: (idx) => { uiSound('select'); callCmd('onItem', idx); },
-    prepareGroupedItemSkill: (idx) => { uiSound('select'); callCmd('onItem', idx); },
+    prepareGroupedItemSkill: (idx, childIdx) => { uiSound('select'); callCmd('onItem', idx, childIdx); },
     handleBasicAttack: () => { rpgUi.closeBasicMenu(); uiSound('select'); callCmd('onAttack'); },
     handleBasicDefend: () => {},
     handleBasicRetreat: () => {},
@@ -343,6 +358,7 @@ export function buildShell(root) {
     else if (r.type === '圆形') { label = '圆形'; num = (r.castRange ?? 0) + 'm·r' + r.radius; title = '【范围·圆形】'; body = '在 ' + (r.castRange ?? 0) + ' 米内选择落点，命中半径 ' + r.radius + ' 米圆内所有敌人；墙后格不受影响。'; }
     else if (r.type === '全域') { label = '全域'; num = '全图'; title = '【范围·全域】'; body = '覆盖整张地图，命中所有敌人；不受射程与视线限制。'; }
     else if (r.type === '爆炸') { label = '爆炸'; num = r.castRange + 'm·r' + r.radius; title = '【范围·爆炸】'; body = '向 ' + r.castRange + ' 米内瞄准点发射，途中撞到墙或单位即提前引爆；以引爆点为圆心、半径 ' + r.radius + ' 米范围内的敌人受击。'; }
+    else if (r.type === '召唤') { label = '召唤'; num = (r.castRange ?? 8) + 'm'; title = '【范围·召唤】'; body = '在 ' + (r.castRange ?? 8) + ' 米内选择空闲合法空地召唤单位入场（需容纳召唤物体型）。'; }
     else return '';
     return '<span class="t-range-pill text-[8px] px-1 py-0.2 rounded border bg-slate-900 text-slate-400 border-slate-700 shrink-0 flex items-center leading-none"' +
       ' data-tagtip-title="' + ATTR(title) + '" data-tagtip-body="' + ATTR(body) + '" data-tagtip-raw="' + ATTR('[范围:' + r.type + ']') + '">' +

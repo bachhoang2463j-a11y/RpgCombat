@@ -218,6 +218,8 @@ export function createApp(rootEl, opts = {}) {
     onReveal: (hit, meta) => revealHit(hit, meta),
     onEffectReveal: (e) => revealEffect(e),
     onMoveFeedback: (id, kind, p) => moveFeedback(id, kind, p),
+    onSelfDestruct: () => { syncShown(); refreshBattle(); },
+    promptRetarget: (req) => beginRetargetPrompt(req),
     getUnitStyle: (id) => unitStyles[id] || null,
     // FX02 反应接线（contract v2/v3）：玩家控制的单位（controller 优先，缺省按 side）受击弹全屏反应弹窗；
     // AI 控制的（敌方/召唤物/AI 侧 hero）不弹窗，自动选首个可用候选（原版敌方口径）
@@ -454,7 +456,7 @@ export function createApp(rootEl, opts = {}) {
       canUse: skillUsable,
       skillReason,
       canUseItem: (it) => battle.canUseItem(it).ok,
-      onItem: (idx) => handleItemEntry(idx),
+      onItem: (idx, childIdx) => handleItemEntry(idx, childIdx),
       onSkill: (idx) => handleCommand('sk:' + idx),
       onAttack: () => handleCommand('attack'),
       onEnd: () => handleCommand('end'),
@@ -487,8 +489,31 @@ export function createApp(rootEl, opts = {}) {
     ];
   }
   function shortLabel(reason) { return /主行动/.test(reason) ? '◆ 主行动已用完' : reason; }
+  function syncDynamicUnits(snap) {
+    if (!currentViewData || !snap || !Array.isArray(snap.units)) return;
+    const known = new Set(currentViewData.units.map(u => u.id));
+    for (const su of snap.units) {
+      if (known.has(su.id)) continue;
+      const full = battle.ctx.units.find(x => x.id === su.id);
+      if (!full) continue;
+      const styled = styleOfUnit(full);
+      unitStyles[full.id] = styled;
+      const viewUnit = Object.assign({}, full, {
+        avatarUrl: styled.avatarUrl, emoji: styled.emoji, color: styled.color,
+        bars: { hp: full.ref.hp, maxHp: full.ref.maxHp, mp: full.ref.mp, maxMp: full.ref.maxMp },
+        effective: battle.getEffectiveUnit(full.id),
+      });
+      currentViewData.units.push(viewUnit);
+      currentViewData.footprintsById[full.id] = full.footprint || { width: 1, height: 1 };
+      const pos = snap.positions?.[full.id] || battle.ctx.placementsById[full.id];
+      if (pos) currentViewData.placementsById[full.id] = { col: pos.col, row: pos.row, facing: pos.facing || 0 };
+      shown.set(full.id, { hp: full.ref.hp, mp: full.ref.mp });
+      known.add(full.id);
+    }
+  }
   function refreshBattle() {
     const snap = battle.snapshot();
+    syncDynamicUnits(snap);
     for (const u of currentViewData.units) {
       const s = shownOf(u);
       u.effective = battle.getEffectiveUnit(u.id);
@@ -503,6 +528,8 @@ export function createApp(rootEl, opts = {}) {
       if (unitStyles[u.id]) view.setFlag(u.id, unitStyles[u.id].cls, true);
     }
     director.syncRegions(snap.regions || []);
+    director.syncBarriers(snap.barriers || []);
+    director.syncPreparations(battle.battleState.combatState.charges || {});
     syncCarried(snap);
     shell.renderHeroes(currentViewData.units);
     shell.setCurrent(snap.terminal ? null : snap.currentId);
@@ -579,7 +606,41 @@ export function createApp(rootEl, opts = {}) {
   function hitKey(skill, hit) { return (skill.range.type === '单体' || skill.range.type === '自身') ? (hit.targetId ? 'u:' + hit.targetId : null) : hit.col + ',' + hit.row; }
   const isEnemyHit = hit => hit && hit.targetId && unitById(hit.targetId) && unitById(hit.targetId).side !== 'hero';
 
+  let retargetPrompt = null;
+  function beginRetargetPrompt(req) {
+    if (retargetPrompt) retargetPrompt.finish(null);
+    return new Promise(resolve => {
+      const bar = rootEl.ownerDocument.createElement('div');
+      bar.style.cssText = 'position:fixed;left:50%;bottom:112px;transform:translateX(-50%);z-index:960;display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:10px;background:rgba(15,23,42,0.92);border:1px solid rgba(251,146,60,0.75);color:#fef3c7;font:600 12px/1.4 system-ui;box-shadow:0 8px 24px rgba(0,0,0,0.45);';
+      bar.innerHTML = '<span>🔥 <b>' + esc(req.skill.name) + '</b> 第 ' + req.shotIndex + ' 段转火：请在地图选择新目标/方向</span>' +
+        '<button type="button" style="padding:4px 10px;border-radius:6px;background:#ea580c;color:#fff;border:0;cursor:pointer;font-weight:700;">沿用首段 (Enter)</button>';
+      const finish = (choice) => {
+        if (!retargetPrompt) return;
+        retargetPrompt = null;
+        bar.remove();
+        sandbox.setPreview(null); sandbox.setHint(null);
+        resolve(choice);
+      };
+      bar.querySelector('button').addEventListener('click', () => finish(null));
+      rootEl.ownerDocument.body.appendChild(bar);
+      retargetPrompt = { req, finish };
+      sandbox.setPreview({ kind: 'attack', casterId: req.casterId, skill: req.skill, query: null });
+    });
+  }
   sandbox.onHover(hit => {
+    if (retargetPrompt) {
+      if (!hit) { sandbox.setHint(null); return; }
+      const r = retargetPrompt.req;
+      const a = aimFor(r.skill, hit);
+      if (a) {
+        const q = battle.previewAttack(r.skill, a);
+        sandbox.setPreview({ kind: 'attack', casterId: r.casterId, skill: r.skill, query: q, locked: false });
+        sandbox.setHint({ x: a.x, y: a.y }, q.ok ? '第 ' + r.shotIndex + ' 段转火 · 点击确认' : q.reason, q.ok ? null : 'bad');
+      } else {
+        sandbox.setHint({ x: hit.x, y: hit.y }, '指向新目标', 'bad');
+      }
+      return;
+    }
     if (!battle || busy || !isHeroTurn()) { sandbox.setHint(null); shell.previewMoveCost(null); return; }
     if (pending) return;
     if (!hit) { sandbox.setHint(null); shell.previewMoveCost(null); if (fieldAction === 'jump') sandbox.setPreview({ kind: 'jump', unitId: battle.snapshot().currentId, cells: jumpCells() }); else idleOverlay(); return; }
@@ -613,6 +674,16 @@ export function createApp(rootEl, opts = {}) {
   });
 
   sandbox.onMapClick(hit => {
+    if (retargetPrompt) {
+      const r = retargetPrompt.req;
+      const a = aimFor(r.skill, hit);
+      if (!a) { ui('deny'); return true; }
+      const q = battle.previewAttack(r.skill, a);
+      if (!q.ok) { ui('deny'); shell.showLog(q.reason, 'warn'); return true; }
+      ui('lock');
+      retargetPrompt.finish(a);
+      return true;
+    }
     if (!battle || !isHeroTurn()) return false;
     if (busy) { ui('deny'); return true; }
     if (fieldAction) return handleFieldTarget(hit);
@@ -691,16 +762,19 @@ export function createApp(rootEl, opts = {}) {
     renderCommand();
   }
   function rpgCloseMenus() { shell.rpgUi.closeAllSubMenus(); }
-  // 物品入口：菜单卡转发到此；contract v3：battle.beginUseItem(item, aim, options) generator（与攻击同一驱动）
-  function handleItemEntry(idx) {
+  // 物品入口：菜单卡转发到此；contract v3：battle.beginUseItem(item, aim, options) generator（支持父子道具子技能）
+  function handleItemEntry(idx, childIdx = null) {
     const u = currentUnit();
     const it = u && (u.items || [])[idx];
     if (!it) return;
+    const child = childIdx != null && Array.isArray(it.children) ? it.children[childIdx] : null;
     const valid = battle.canUseItem(it);
     if (!valid.ok) { ui('deny'); shell.showLog(valid.reason, 'warn'); return; }
-    const skill = battle.itemSkill(it);
+    const skill = battle.itemSkill(it, child);
+    const sup = battle.skillStatus(skill);
+    if (!sup.ok) { ui('deny'); shell.showLog(sup.reason, 'warn'); return; }
     pending = null; fieldAction = null;
-    aim = { key: 'item:' + idx, skill, item: it };
+    aim = { key: 'item:' + idx + (child ? ':' + childIdx : ''), skill, item: it, child };
     sandbox.setHint(null); sandbox.refreshHover();
     sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill, query: null });
     if (isSelfCast(skill)) {
@@ -860,7 +934,7 @@ export function createApp(rootEl, opts = {}) {
     ui('confirm');
     // 玩家攻击统一走 battle.beginAttack generator（反应弹窗在导演驱动内弹出）；同步 attack 不再用于真实 UI
     const res = act.item
-      ? await director.driveAttack(battle.beginUseItem(act.item, p.aim))
+      ? await director.driveAttack(battle.beginUseItem(act.item, p.aim, act.child ? { child: act.child } : {}))
       : await director.runAttackLive(act.skill, p.aim);
     if (myFlow !== flow) return;
     if (!res) { setBusy(false); return; }
@@ -922,7 +996,7 @@ export function createApp(rootEl, opts = {}) {
   async function runEnemyTurn(myFlow) {
     const alive = () => myFlow === flow;
     if (!(await director.wait(380)) || !alive()) return;
-    const plan = battle.planEnemyAction();
+    let plan = battle.planEnemyAction();
     if (plan && plan.moveTo) {
       const mover = battle.snapshot().currentId;
       sandbox.getUnitView().lockMotion(mover, true);
@@ -931,8 +1005,31 @@ export function createApp(rootEl, opts = {}) {
       refreshBattle();
       if (mv.ok) await director.playMove(mv);
       if (!alive()) return;
+      if (mv.ok && mv.stoppedOnDiscovery) plan = battle.planEnemyAction();
     }
-    if (plan && plan.skill && battle.snapshot().resources.main > 0) {
+    if (plan && plan.action === 'sprint') {
+      const sp = battle.sprint();
+      if (sp.ok) {
+        ui('sprint'); fxAtUnit(battle.snapshot().currentId, 't-sprint-burst', 760);
+        refreshBattle();
+        plan = battle.planEnemyAction();
+        if (plan && plan.moveTo) {
+          const mover = battle.snapshot().currentId;
+          sandbox.getUnitView().lockMotion(mover, true);
+          const mv2 = battle.move(plan.moveTo.col, plan.moveTo.row);
+          if (!mv2.ok) sandbox.getUnitView().lockMotion(mover, false);
+          refreshBattle();
+          if (mv2.ok) await director.playMove(mv2);
+          if (!alive()) return;
+        }
+      }
+    }
+    if (plan && plan.action === 'defend') {
+      battle.defend(); refreshBattle();
+    } else if (plan && plan.action === 'prepare' && !plan.skill) {
+      const pr = battle.advancePreparation();
+      if (pr.ok) { fxAtUnit(battle.snapshot().currentId, 't-charge-pulse', 900); refreshBattle(); }
+    } else if (plan && plan.skill && (battle.snapshot().resources.main > 0 || battle.snapshot().preparation?.ready)) {
       const q = battle.previewAttack(plan.skill, plan.aim);
       if (q.ok) {
         sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: plan.skill, query: q, locked: true });
@@ -960,7 +1057,7 @@ export function createApp(rootEl, opts = {}) {
     shell.showLog(unitName(res.casterId) + ' · ' + (res.skill || res.item).name, 'act');
     const caster = currentUnit();
     if (caster) { const s = shownOf(caster); shown.set(caster.id, { hp: s.hp, mp: caster.ref.mp }); }
-    // 反应错位（折影步等）：规则站位已更新，显示位置锁在原位，等导演在接触拍点演出位移后再放开
+    // 反应错位（折影步等）与冲锋/击退位移：规则站位已更新，显示位置锁在原位，等导演在接触拍点演出位移后再放开
     const view = sandbox.getUnitView();
     for (const h of res.hits) {
       const sh = (h.segments || []).find(s => s.reaction?.shift)?.reaction.shift || h.reaction?.shift;
@@ -968,6 +1065,13 @@ export function createApp(rootEl, opts = {}) {
       const fp = currentViewData.footprintsById[h.targetId];
       const c = unitCenter(sh.from, fp);
       view.lockMotion(h.targetId, true); view.setDisplayPos(h.targetId, c.x, c.y);
+    }
+    for (const ev of (res.events || [])) {
+      if ((ev.type === 'unit-charged' || ev.type === 'unit-displaced') && ev.from) {
+        const fp = currentViewData.footprintsById[ev.unitId] || { width: 1, height: 1 };
+        const c = unitCenter(ev.from, fp);
+        view.lockMotion(ev.unitId, true); view.setDisplayPos(ev.unitId, c.x, c.y);
+      }
     }
     refreshBattle();
     await director.playAttack(res);
@@ -1229,7 +1333,8 @@ export function createApp(rootEl, opts = {}) {
   // ---------- 键盘：数字键选技能 / Space 结束回合 / Enter 发动 / Esc 返回 ----------
   const onKey = e => {
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
-    if (e.key === 'Escape') { cancelStep(); return; }
+    if (e.key === 'Escape') { if (retargetPrompt) { retargetPrompt.finish(null); return; } cancelStep(); return; }
+    if (e.key === 'Enter' && retargetPrompt) { e.preventDefault(); retargetPrompt.finish(null); return; }
     if (!battle || !isHeroTurn()) return;
     if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); if (busy) { ui('deny'); return; } requestEnd(); return; }
     if (e.key === 'Enter' && pending) { e.preventDefault(); if (!busy) firePending(); return; }
@@ -1263,7 +1368,7 @@ export function createApp(rootEl, opts = {}) {
     isBusy: () => busy,
     resources: () => avHost.resourceReport(),
     command: (key) => handleCommand(key),
-    endTurn: () => requestEnd(),
+    endTurn: () => { endArmedUntil = performance.now() + 5000; requestEnd(); },
   };
 }
 

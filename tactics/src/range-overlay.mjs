@@ -142,7 +142,22 @@ function drawAttack(g, pv, viewData) {
     g.beginPath(); g.arc(o.x * Q, o.y * Q, skillRange.castRange * Q, 0, Math.PI * 2); g.stroke(); g.restore();
   }
   if (!q) return;
-    const shape = q.shape;
+  if (skillRange && skillRange.type === '召唤') {
+    const sfp = pv.skill.summonFootprint || { width: 1, height: 1 };
+    const pt = q.aim;
+    if (pt) {
+      const col = Math.floor(pt.x - (sfp.width - 1) / 2), row = Math.floor(pt.y - (sfp.height - 1) / 2);
+      g.save();
+      g.fillStyle = q.ok ? (pv.locked ? C.lock : 'rgba(52,211,153,0.22)') : 'rgba(248,113,113,0.22)';
+      g.strokeStyle = q.ok ? (pv.locked ? C.lock : '#34d399') : C.bad;
+      g.lineWidth = pv.locked ? 2.4 : 1.8;
+      g.fillRect(col * Q + 2, row * Q + 2, sfp.width * Q - 4, sfp.height * Q - 4);
+      g.strokeRect(col * Q + 2, row * Q + 2, sfp.width * Q - 4, sfp.height * Q - 4);
+      g.restore();
+    }
+    return;
+  }
+  const shape = q.shape;
   if (q.ok && shape && shape.type !== '单体') {
     // 面：只在真实作用格内填充与描边（墙后格不在 cells，自然被裁掉）
     if (q.cells.length) {

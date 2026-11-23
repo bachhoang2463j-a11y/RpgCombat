@@ -189,6 +189,9 @@ export function parseAttributes(attrInput) {
     if (Array.isArray(src.attrTags)) {
       explicit.push('attrTags');
       r.attrTags = src.attrTags.map(t => String(t));
+      if (!Object.prototype.hasOwnProperty.call(src, 'isWise') && r.attrTags.some(t => t === '[智慧]')) {
+        r.isWise = true;
+      }
     }
     r._explicit = explicit;
     return r;

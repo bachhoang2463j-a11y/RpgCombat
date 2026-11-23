@@ -18,6 +18,7 @@ export const GRADE_BUDGETS = {
 };
 
 const SLOT_RAW = tag => String(tag || '').replace(/[[\]]/g, '');
+const DMG_CATS = ['钝击', '切割', '枪击', '霰弹', '火焰', '雷电', '水流', '冰霜', '圣光', '诅咒'];
 
 // 动作演出输入：result = battle.attack() 的 ok 结果
 export function actionInput(result) {
@@ -30,6 +31,8 @@ export function actionInput(result) {
   const selfOnly = !attackSlots && effectSlots.length > 0 && effectSlots.every(s => (s.targetIds || []).length === 1 && s.targetIds[0] === result.casterId);
   // 即时回复（规则 effects 中 kind:'heal'）：纯回复技能不走受击揭示
   const heals = (result.effects || []).filter(e => e.kind === 'heal');
+  const damageCategories = tags.filter(t => DMG_CATS.includes(t));
+  const sides = new Set(slots.filter(s => s.side && s.side !== 'none' && SLOT_RAW(s.tag) !== '无').map(s => s.side));
   return {
     kind: 'action',
     fxTag: skill.fxTag || null,
@@ -40,6 +43,12 @@ export function actionInput(result) {
     grantsMainPoint: tags.some(t => t === '再动'),
     haste: skill.haste || 0,
     damageType: skill.damageType || null,
+    damageCategories,
+    hasChargeDash: !!(skill.displacements && skill.displacements.some(d => d.type === '冲锋')),
+    isMixedSlots: sides.size > 1,
+    barrierSub: skill.barrierSub || null,
+    isAllyOnly: !attackSlots && effectSlots.length > 0 && effectSlots.every(s => s.side === 'ally' || s.side === 'self'),
+    isDebuffOnly: !attackSlots && effectSlots.length > 0 && effectSlots.every(s => s.side === 'enemy'),
     region: (skill.regionEffect && skill.regionEffect.type) || null,   // 显式区域（浓雾等），不按技能名判断
     heals: heals.length,
     healOnly: !attackSlots && heals.length > 0,
@@ -54,7 +63,12 @@ export function prepareInput(result) {
 
 // 反应演出输入：hit.reaction = { responderId, skillName, fxTag, canceled, shift }
 export function reactionInput(reaction) {
-  return { kind: 'reaction', fxTag: reaction.fxTag || null, skillName: reaction.skillName, canceled: !!reaction.canceled, shift: reaction.shift || null };
+  return {
+    kind: 'reaction', fxTag: reaction.fxTag || null, skillName: reaction.skillName,
+    canceled: !!reaction.canceled, shift: reaction.shift || null,
+    kanpo: !!reaction.kanpo, sheshen: !!reaction.guardianId,
+    isGuard: !reaction.canceled && !reaction.dodged && !reaction.countered && !reaction.shift,
+  };
 }
 
 export function createFxRegistry() {

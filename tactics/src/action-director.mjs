@@ -46,6 +46,8 @@ export function createActionDirector(deps) {
   const { sandbox, avHost, getViewData, onReveal, onMoveFeedback, getUnitStyle } = deps;
   const onEffectReveal = deps.onEffectReveal || null;
   const promptReaction = deps.promptReaction || (() => Promise.resolve(null));
+  const promptRetarget = deps.promptRetarget || null;
+  const onSelfDestruct = deps.onSelfDestruct || null;
   const battleOf = deps.battle || (() => null);
   const av = avHost.av;
   const registry = deps.registry || registerDefaultFx(createFxRegistry());
@@ -363,6 +365,34 @@ export function createActionDirector(deps) {
     effects.forEach(e => revealEffect(e));
     regions.forEach(r => revealRegion(r.id));
     await Promise.all(reactionRuns);
+    // 冲锋与受击击退位移补间（解锁规则站位前先在视图平滑滑移）
+    const moveEvs = (result.events || []).filter(ev => ev.type === 'unit-charged' || ev.type === 'unit-displaced');
+    if (moveEvs.length) {
+      const view = sandbox.getUnitView();
+      await Promise.all(moveEvs.map(async ev => {
+        const fp = vd.footprintsById[ev.unitId] || { width: 1, height: 1 };
+        const fromC = unitCenter(ev.from, fp), toC = unitCenter(ev.to, fp);
+        const dist = Math.hypot(toC.x - fromC.x, toC.y - fromC.y);
+        if (dist > 0.05) {
+          const dur = Math.min(420, Math.max(160, Math.round(dist * 75)));
+          await tween(dur, t => {
+            const k = 1 - Math.pow(1 - t, 3);
+            view.setDisplayPos(ev.unitId, fromC.x + (toC.x - fromC.x) * k, fromC.y + (toC.y - fromC.y) * k);
+          });
+        }
+        view.lockMotion(ev.unitId, false);
+        view.updateUnit(ev.unitId, { placement: vd.placementsById[ev.unitId] });
+        if (ev.collided) { makeFx('B').shake('light'); }
+      }));
+    }
+    // 死亡自爆领域事件演出（食尸鬼等）
+    for (const sd of (result.events || []).filter(ev => ev.type === 'self-destruct')) {
+      const fx = makeFx('B'), px = sd.center.x * 50, py = sd.center.y * 50, rPx = (sd.radius || 3) * 50;
+      fx.sfx('explosion_aoe_blast', 0.65); fx.shake('medium');
+      const ring = '<i style="position:absolute;left:' + px + 'px;top:' + py + 'px;width:' + (rPx * 2) + 'px;height:' + (rPx * 2) + 'px;margin:' + (-rPx) + 'px 0 0 ' + (-rPx) + 'px;border-radius:50%;background:radial-gradient(circle,rgba(251,146,60,0.45),rgba(239,68,68,0.6) 60%,transparent 75%);mix-blend-mode:screen;"></i>';
+      fx.top(ring, 560).firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 540, fill: 'forwards' });
+      if (onSelfDestruct) onSelfDestruct(sd);
+    }
     if (wave) av.CombatAudioDirector.closeWave(wave);
     dropAnchors();
     return ok;
@@ -426,6 +456,57 @@ export function createActionDirector(deps) {
     for (const [id, rec] of regionNodes) if (!live.has(id)) { fadeOutRegion(rec); regionNodes.delete(id); }
   }
 
+  // ---------- 场地结界常驻层（纳克提特障壁术 / 圣域帷幕） ----------
+  let barrierNodes = new Map(), barrierScope = null;
+  function syncBarriers(barriers = []) {
+    const s = scope();
+    if (!s || !s.isLive) return;
+    if (barrierScope !== s) { barrierNodes = new Map(); barrierScope = s; }
+    const L = fxLayers(), live = new Set();
+    for (const b of barriers) {
+      if (!b || b.hp <= 0) continue;
+      live.add(b.id);
+      const sig = b.center.x + ',' + b.center.y + '|' + b.radius + '|' + b.hp + '|' + b.armor;
+      const cur = barrierNodes.get(b.id);
+      if (cur && cur.sig === sig) continue;
+      if (cur) { cur.node.remove(); s.removeNode(cur.node); }
+      const cx = b.center.x * 50, cy = b.center.y * 50, r = (b.radius || 6) * 50;
+      const isSpell = b.sub === '法术';
+      const stroke = isSpell ? 'rgba(56,189,248,0.75)' : 'rgba(251,191,36,0.75)';
+      const fill = isSpell ? 'rgba(56,189,248,0.08)' : 'rgba(251,191,36,0.08)';
+      const html = '<div style="position:absolute;left:' + (cx - r) + 'px;top:' + (cy - r) + 'px;width:' + (r * 2) + 'px;height:' + (r * 2) + 'px;border-radius:50%;border:2px dashed ' + stroke + ';background:' + fill + ';box-shadow:0 0 18px ' + fill + ';pointer-events:none;">' +
+        '<span style="position:absolute;left:50%;top:4px;transform:translateX(-50%);padding:1px 6px;border-radius:999px;background:rgba(15,23,42,0.86);border:1px solid ' + stroke + ';color:#f8fafc;font:600 10px/1.3 system-ui;white-space:nowrap;">' +
+        '🛡️ ' + (b.sub || '肃正') + '结界 ' + b.hp + '/' + b.maxHp + ' · 甲' + (b.armor || 0) + '</span></div>';
+      barrierNodes.set(b.id, { sig, node: L.ground.layer(html) });
+    }
+    for (const [id, rec] of barrierNodes) if (!live.has(id)) { rec.node.remove(); s.removeNode(rec.node); barrierNodes.delete(id); }
+  }
+
+  // ---------- 延迟/蓄力地上警戒圈（preparing 中单位） ----------
+  let prepNodes = new Map(), prepScope = null;
+  function syncPreparations(charges = {}) {
+    const s = scope();
+    if (!s || !s.isLive) return;
+    if (prepScope !== s) { prepNodes = new Map(); prepScope = s; }
+    const L = fxLayers(), live = new Set();
+    for (const [uid, ch] of Object.entries(charges || {})) {
+      const p = ch && ch.preparing;
+      if (!p || !p.aim) continue;
+      live.add(uid);
+      const rM = p.skill?.range?.radius || (p.skill?.range?.type === '爆炸' ? 3 : 1.2);
+      const sig = p.skillKey + '|' + p.aim.x + ',' + p.aim.y + '|' + p.remaining;
+      const cur = prepNodes.get(uid);
+      if (cur && cur.sig === sig) continue;
+      if (cur) { cur.node.remove(); s.removeNode(cur.node); }
+      const cx = p.aim.x * 50, cy = p.aim.y * 50, r = rM * 50;
+      const html = '<div style="position:absolute;left:' + (cx - r) + 'px;top:' + (cy - r) + 'px;width:' + (r * 2) + 'px;height:' + (r * 2) + 'px;border-radius:50%;border:2px dotted rgba(248,113,113,0.8);background:rgba(239,68,68,0.09);pointer-events:none;">' +
+        '<span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:1px 6px;border-radius:4px;background:rgba(127,29,29,0.88);color:#fecaca;font:700 10px/1.3 system-ui;white-space:nowrap;">' +
+        '⏳ ' + (p.skill?.name || '蓄力') + (p.remaining > 0 ? ' (' + p.remaining + ')' : ' (就绪)') + '</span></div>';
+      prepNodes.set(uid, { sig, node: L.ground.layer(html) });
+    }
+    for (const [uid, rec] of prepNodes) if (!live.has(uid)) { rec.node.remove(); s.removeNode(rec.node); prepNodes.delete(uid); }
+  }
+
   // ---------- 攻击驱动（FX02 反应接线）：统一驱动 battle.beginAttack generator（玩家与敌方同一入口） ----------
   // generator yield {type:'reaction', responderId, casterId, skill, candidates, slotIndex} 时：
   //   hero 受击者 → await promptReaction(req)（全屏弹窗，玩家选择/放弃/收起）；AI 受击者由宿主在 promptReaction 包装里自动选择。
@@ -446,6 +527,13 @@ export function createActionDirector(deps) {
           const s = scope();
           if (!s || !s.isLive) return null;
           choice = await promptReaction(req);
+          if (run.cancelled) return null;
+          const s2 = scope();
+          if (!s2 || !s2.isLive) return null;
+        } else if (req && req.type === 'retarget-request' && typeof promptRetarget === 'function') {
+          const s = scope();
+          if (!s || !s.isLive) return null;
+          choice = await promptRetarget(req);
           if (run.cancelled) return null;
           const s2 = scope();
           if (!s2 || !s2.isLive) return null;
@@ -541,6 +629,6 @@ export function createActionDirector(deps) {
   function holdRegions(result) {
     for (const ev of (result && result.events) || []) if (ev.type === 'region-created') heldRegions.add(ev.region.id);
   }
-  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, playPrepare, syncRegions, holdRegions, wait, resolveAttackIdentity, resolveWindupKind,
+  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, playPrepare, syncRegions, syncBarriers, syncPreparations, holdRegions, wait, resolveAttackIdentity, resolveWindupKind,
     runAttackLive, driveAttack, cancelAttack };
 }
