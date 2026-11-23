@@ -67,6 +67,109 @@ export const groups = {
       basicNames.every(n => reg.resolve({ kind: 'action', fxTag: n }).id === 'basic-' + n) &&
       reg.resolve({ kind: 'prepare', fxTag: '圣光01' }).id === 'holy-vow' && reg.resolve({ kind: 'action', fxTag: '圣光01' }).id === 'holy-judgment', j(names)));
 
+    const directorSource = readFileSync(path.join(ROOT, 'tactics', 'src', 'action-director.mjs'), 'utf8');
+    const playAttackSource = directorSource.slice(directorSource.indexOf('  async function playAttack(result)'), directorSource.indexOf('  async function playPrepare(result)'));
+    const { createActionDirector } = await import('../../../tactics/src/action-director.mjs');
+    const oldScope = { isLive: true, addNode() {}, after() {}, settleOnDispose() { return () => {}; } }, newScope = { isLive: true, addNode() {}, after() {}, settleOnDispose() { return () => {}; } };
+    let activeScope = oldScope;
+    const revealsAfterSwap = [];
+    const stubSandbox = {
+      getScope: () => activeScope, getUnitView: () => ({ setDisplayFacing() {}, updateUnit() {} }),
+      unitWorldCenter: () => ({ x: 2, y: 2 }), async guideTo() {},
+      getDom: () => ({ world: { insertBefore() {}, appendChild() {} }, unitLayer: {} }),
+    };
+    const silentMixer = { classify: () => 'B', prepare: async () => true, context: () => null };
+    const prevDoc = globalThis.document;
+    globalThis.document = { createElement: () => ({ setAttribute() {}, style: {}, firstChild: { animate() {} } }) };
+    try {
+      const director = createActionDirector({
+      sandbox: stubSandbox, getViewData: () => ({ units: [{ id: 'same', side: 'hero', ref: { atk: 1 } }], placementsById: { same: {} }, footprintsById: { same: { width: 1, height: 1 } } }),
+      avHost: { av: { CombatAudioMixer: silentMixer, CombatAudioDirector: { beginAction: () => 1, beginWave: () => null }, playHitFeedback() {} }, syncRoster() {}, entity: id => ({ id }) },
+      registry: { resolve: () => ({ prepareKeys: () => [], async play() { activeScope = newScope; return false; } }) },
+      onEffectReveal: effect => revealsAfterSwap.push(effect.targetId),
+    });
+    const isolatedResult = { ok: true, casterId: 'same', skill: { name: 'cancel', fxTag: 'x' }, hits: [], effects: [{ kind: 'heal', targetId: 'same', value: 1 }] };
+      await director.playAttack(isolatedResult);
+      cases.push(ok('TFX-01 entry.play 期间旧 scope 失活、同 ID 新 scope 上线后不补揭旧 effects', activeScope === newScope && revealsAfterSwap.length === 0, j(revealsAfterSwap)));
+      activeScope = null;
+      const noScope = await director.playAttack(isolatedResult);
+      cases.push(ok('TFX-01 已销毁舞台没有 scope 时拒绝演出，不崩溃也不揭示', noScope === false && revealsAfterSwap.length === 0));
+    } finally { globalThis.document = prevDoc; }
+
+    const namesBeforePatch = ell.skills.map(s => s.name + ':' + s.fxTag).join('|');
+    const persistedUnit = { side: 'hero', name: ell.name, ref: { name: ell.name }, skills: structuredClone(ell.skills), items: structuredClone(ell.items) };
+    const untouchedEnemy = { side: 'enemy', name: ell.name, ref: { name: ell.name }, skills: [{ name: '迅捷愈合法', fxTag: '单体回复', cost: 9 }], items: [] };
+    const resourceCost = persistedUnit.skills.find(s => s.name === '迅捷愈合法').cost;
+    const patchedRoster = { heroes: [{ name: ell.name,
+      skills: [{ name: '迅捷愈合法', fxTag: '群体回复' }],
+      items: [{ name: '化尘者之瓶', children: [{ name: '飞沙化甲', fxTag: '群体增益' }] }],
+    }] };
+    m.main.applyPersistentFxTags([persistedUnit, untouchedEnemy], patchedRoster);
+    const restoredHeal = persistedUnit.skills.find(s => s.name === '迅捷愈合法');
+    const restoredSand = persistedUnit.items.find(i => i.name === '化尘者之瓶').children.find(s => s.name === '飞沙化甲');
+    const enemyHeal = untouchedEnemy.skills[0];
+    cases.push(ok('TFX-01 新建典型 roster 按角色名恢复技能/道具子技能标签，不改规则字段或敌方内存技能',
+      restoredHeal.fxTag === '群体回复' && restoredSand.fxTag === '群体增益' && enemyHeal.fxTag === '单体回复' &&
+      restoredHeal.cost === resourceCost && restoredHeal.power === ell.skills.find(s => s.name === restoredHeal.name).power &&
+      namesBeforePatch === ell.skills.map(s => s.name + ':' + s.fxTag).join('|'),
+      j({ heal: restoredHeal.fxTag, sand: restoredSand.fxTag, enemy: enemyHeal.fxTag, cost: restoredHeal.cost })));
+
+    const sampleCases = [
+      ['迅捷愈合法', '单体回复'], ['精华秘酿', '单体回复'], ['预备咏唱', '再动加速'],
+      ['提前瞄准', '再动加速'], ['伊西斯之拥', '伊西丝之拥'], ['飞沙化甲', '飞沙化甲'], ['谐律之庇', '谐律之庇'],
+    ];
+    const sampleRows = [...ell.skills, ...ell.items.flatMap(item => [item, ...(item.children || [])])];
+    const invalidSamples = sampleCases.filter(([name, tag]) =>
+      !names.includes(tag) || !sampleRows.some(row => row.name === name && row.fxTag === tag));
+    cases.push(ok('TFX-01 切片主动辅助样本和道具子技能使用注册表合法标签', !invalidSamples.length, j(invalidSamples)));
+
+    const supportEffects = [
+      { kind: 'heal', targetId: 'recipient', value: 5, crit: true, overheal: 15 },
+      { kind: 'heal', targetId: 'recipient', value: 2 },
+      { kind: 'healMp', targetId: 'second', value: 3, crit: true },
+      { kind: 'healTp', targetId: 'second', value: 4 },
+      { kind: 'dispel', targetId: 'untouched', removed: [] },
+    ];
+    const supportTrace = [], supportReveals = [];
+    const entities = new Map(['caster', 'recipient', 'second', 'untouched'].map(id => [id, { id }]));
+    const supportResult = { casterId: 'caster', aim: { x: 3, y: 3 }, query: { shape: { type: '圆形', radius: 2 } }, effects: [...supportEffects, supportEffects[0]], hits: [] };
+    const supportEntry = reg.resolve({ kind: 'action', fxTag: '群体回复' });
+    const supportOk = await supportEntry.play({
+      result: supportResult, input: actionInput(supportResult), hits: [], casterId: 'caster',
+      ent: id => entities.get(id), avHost: { entity: id => entities.get(id) },
+      centerOf: id => ({ x: [...entities.keys()].indexOf(id) + 1, y: 3 }),
+      fx: { top: () => ({ firstChild: { animate() {} } }) },
+      av: { playGenericSupportFx(entity, type, { soundKey, onImpact }) {
+        supportTrace.push(['play', entity, type, soundKey]);
+        onImpact?.();
+        return { cancel() {}, doneAt: 0 };
+      }, CombatAudioMixer: { withContext: (_, play) => play() } },
+      wait: async ms => { supportTrace.push(['wait', ms]); return true; },
+      awaitHandle: async () => true,
+      revealEffect(effect, quiet) {
+        supportReveals.push({ effect, quiet });
+        supportTrace.push(['reveal', effect.targetId]);
+        return effect.value;
+      },
+    });
+    const supportCalls = supportTrace.filter(row => row[0] === 'play');
+    const [hp, , mp] = supportEffects;
+    const recipientCall = supportTrace.findIndex(row => row[0] === 'play' && row[1] === entities.get('recipient'));
+    const hpReveal = supportTrace.findIndex(row => row[0] === 'reveal' && row[1] === hp.targetId);
+    const secondCall = supportTrace.findIndex(row => row[0] === 'play' && row[1] === entities.get('second'));
+    const mpReveal = supportTrace.findIndex(row => row[0] === 'reveal' && row[1] === mp.targetId);
+    cases.push(ok('TFX-01 群体回复调用原版目标实体与原音，溢出转盾和同类反馈各播放一次', supportOk &&
+      supportCalls.length === 4 && ['heal', 'shield'].every(type => supportCalls.some(row => row[1] === entities.get('recipient') && row[2] === type)) &&
+      supportCalls.some(row => row[1] === entities.get('second') && row[2] === 'mpHeal' && row[3] === 'mpHeal') &&
+      supportCalls.some(row => row[1] === entities.get('untouched') && row[2] === 'buff' && row[3] === 'defUp') &&
+      supportCalls.filter(row => row[3] === 'hpHeal').length === 1 && supportCalls.filter(row => row[3] === 'shieldUp').length === 1,
+      j(supportTrace)));
+    cases.push(ok('TFX-01 原版接触揭示真实对象，目标间隔一拍，空驱散保留原版反馈',
+      recipientCall < hpReveal && hpReveal < secondCall && secondCall < mpReveal &&
+      supportTrace.slice(hpReveal, secondCall).some(row => row[0] === 'wait' && row[1] === 200) &&
+      supportReveals.length === supportEffects.length && supportEffects.every(effect =>
+        supportReveals.filter(reveal => reveal.effect === effect && reveal.quiet === true).length === 1), j(supportTrace)));
+
     const events = [], calls = [];
     const hits = [
       { targetId: 'e', segments: [{ shotIndex: 2, hit: true }, { shotIndex: 0, hit: false }] },
@@ -168,6 +271,28 @@ export const groups = {
   'TFX-02': { run({ modules: m }) {
     const cases = [];
     const ell = elliott(m);
+    const caster = unit('caster', 'hero', { spd: 200 });
+    caster.classType = '圣职者';
+    const recipient = unit('recipient', 'hero', { hp: 95, maxHp: 100, mp: 107, tp: 96 });
+    const enemy = unit('enemy', 'enemy');
+    const resourceSkill = m.parser.parseSkill('【定向资源回复】[回复;power:10][回蓝;power:10][充能;power:10][暴击:100%][他人][范围:单体;射程:6][特效:单体回复]');
+    const resourceBattle = battle(m, [caster, recipient, enemy], {
+      caster: { col: 2, row: 4 }, recipient: { col: 4, row: 4 }, enemy: { col: 10, row: 4 },
+    }, () => 0);
+    const resourceResult = resourceBattle.attack(resourceSkill, { x: 4.5, y: 4.5, targetId: recipient.id });
+    const resourceEffects = resourceResult.effects.filter(e => ['heal', 'healMp', 'healTp'].includes(e.kind));
+    const resourceDeltas = resourceEffects.map(m.main.supportResourceDelta);
+    const summed = Object.assign({}, ...resourceDeltas);
+    cases.push(ok('TFX-02 真实暴击回复封顶，HP/MP/TP 与溢出盾按后端每条增量投影',
+      resourceResult.ok && resourceEffects.length === 3 && resourceEffects.every(e => e.crit && e.targetId === recipient.id) &&
+      summed.hp === 5 && summed.mp === 3 && summed.tp === 4 && summed.shield === 15 &&
+      recipient.ref.hp === 100 && recipient.ref.mp === 110 && recipient.ref.tp === 100 && recipient.ref.shield === 15,
+      j({ effects: resourceResult.effects, deltas: resourceDeltas })));
+    const mainSource = readFileSync(path.join(ROOT, 'tactics', 'src', 'main.mjs'), 'utf8');
+    const effectRevealSource = mainSource.slice(mainSource.indexOf('  function revealEffect(e)'), mainSource.indexOf('  function revealHit('));
+    cases.push(ok('TFX-02 显示揭示按结果增量推进，不读取最终 HP',
+      effectRevealSource.includes('supportResourceDelta(e)') && !/\bu\.ref\.hp\b/.test(effectRevealSource), effectRevealSource));
+
     const sup = s => m.battle.skillSupport(s);
     const usable = ell.skills.filter(s => sup(s).ok).map(s => s.name).sort();
     const rejected = ell.skills.filter(s => !s.isGroup && !sup(s).ok).map(s => ({ name: s.name, reason: sup(s).reason }));
@@ -260,6 +385,11 @@ export const groups = {
     const reg = m.fxLibrary.registerDefaultFx(createFxRegistry());
     const yaml = readFileSync(path.join(ROOT, 'doc', 'tactics', '典型对局-战棋版.yaml'), 'utf8');
     const block = m.parser.parseYamlText(yaml);
+    const validFxTags = new Set(m.fxLibrary.getFxTagOptions().map(({ name }) => name));
+    const missingSupportTags = [...block.enemies, ...block.summonTemplates].flatMap(unit => unit.skills
+      .filter(skill => [skill.type, skill.type2, skill.type3].some(tag => /回复|回蓝|充能|增速|增攻|增防|瞄准|护盾|驱散|再动/.test(tag || '')) && !validFxTags.has(skill.fxTag))
+      .map(skill => `${unit.name}·${skill.name}`));
+    cases.push(ok('TFX-03 典型对局敌方和召唤辅助槽有合法显式标签', missingSupportTags.length === 0, j(missingSupportTags)));
     const EL = 'h:埃利奥特';
     let data, b, el;
     // 每段独立开局（只有 AI 行动的模拟会消耗我方血量；长链会导致埃利奥特倒地而准备被规则清除）

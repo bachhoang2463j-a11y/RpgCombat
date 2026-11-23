@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-24",
+  "backend": "IAB",
+  "sourcePage": "http://127.0.0.1:8123/tactics/index.html?demo=slice",
+  "artifact": "tactics/mvp-standalone.html",
+  "artifactSha256": "6a2749810787805b2abc0dc69eb43e0a89e8e74a5c80dcee4fb16595e10b3d65",
+  "method": "真实createApp.loadYaml导入验证对局，菜单处理器command、地图selectAt和Enter走正常beginAttack及导演；包装原版播放函数只记录调用，不替换实现、不写规则状态。",
+  "sourceCases": [
+    { "case": "给自己加攻", "status": "passed", "targetId": "h:验证施法者", "template": "buff", "audioKey": "atkUp", "volume": 0.5 },
+    { "case": "给别人加攻", "status": "passed", "targetId": "h:验证受益者", "template": "buff", "audioKey": "atkUp", "volume": 0.5 },
+    { "case": "单体回血", "status": "passed", "targetId": "h:验证受益者", "template": "heal", "audioKey": "hpHeal", "hpBefore": 20, "hpAfter": 35, "displayHp": 35 },
+    { "case": "群体回血", "status": "passed", "targets": ["h:验证施法者", "h:验证受益者"], "callsPerTarget": 1, "template": "heal", "audioKey": "hpHeal", "backendAndDisplayHp": [35, 50] },
+    { "case": "回复及护盾暴击", "status": "passed", "targetId": "h:验证施法者", "backendHeal": 20, "backendShield": 16, "backendAndDisplayHp": 55, "backendAndDisplayShield": 16, "templates": ["heal", "shield"], "audioKeys": ["hpHeal", "shieldUp"] },
+    { "case": "增攻增防瞄准三效果", "status": "passed", "targetId": "h:验证施法者", "backendValues": [5, 6, 7], "observedVisualCalls": ["buff/atkUp", "shield/defUp"], "note": "瞄准共用buff图形；hitUp另由真实playSound补播，键及去重由定向行为测试覆盖，真页未单独记录补播调用。" }
+  ],
+  "artifactPageGate": "pending",
+  "artifactAttempt": "最终单文件可加载且有真实app，但开场持续busy，未成功进入战斗行动；早一次导入对局后下一次调用回退旧源码页。未把加载成功当作交互成功。",
+  "unverified": [
+    "最终单文件至少一条完整战斗流程及辅助演出流程",
+    "编辑器实际下拉保存后刷新页面重载（持久标签回读及规则保真仅有定向测试）",
+    "MP回复、TP充能、速度/闪避提升与普通净化的逐项真页流程（定向行为测试覆盖映射）",
+    "原版真实播放与战棋全程逐帧视觉对照、相机缩放及粒子消退时序",
+    "真实采样媒体可用性、实际出声和听感对照",
+    "安卓模拟器与真Chrome视觉终验"
+  ],
+  "limitations": "IAB出现about:blank和恢复旧页，动画调度受限且截图有前动作粒子残留；没有切换外部Chrome、没有自行启动模拟器，没有伪造单文件交互通过。",
+  "tests": { "sourceAllBeforeReviewFixes": 841, "sourceAllRuns": 1, "relatedFx01AfterFinalFixes": 48, "artifactSpecialized": 21, "artifactSpecializedFailed": 0 }
+}

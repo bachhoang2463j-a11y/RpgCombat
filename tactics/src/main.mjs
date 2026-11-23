@@ -38,6 +38,26 @@ export function applyEditorFxTags(rows, editedRows) {
   }
 }
 
+export function applyPersistentFxTags(units, roster) {
+  const byName = new Map((roster?.heroes || []).map(hero => [hero.name, hero]));
+  for (const unit of units) {
+    if (unit.side !== 'hero') continue;
+    const saved = byName.get(unit.ref.name || unit.name);
+    if (!saved) continue;
+    applyEditorFxTags(unit.skills, saved.skills);
+    applyEditorFxTags(unit.items, saved.items);
+  }
+}
+
+// 仅映射规则已结算的资源增量，暴击、封顶与溢出护盾均由后端提供。
+export function supportResourceDelta(effect) {
+  if (effect.kind === 'heal') return { hp: effect.value, ...(effect.overheal ? { shield: effect.overheal } : {}) };
+  if (effect.kind === 'healMp') return { mp: effect.value };
+  if (effect.kind === 'healTp') return { tp: effect.value };
+  if (effect.kind === 'shield') return { shield: effect.value };
+  return {};
+}
+
 // ---------- P02 固定图库（同一张权威几何，两个 sceneId 身份；不做生成器） ----------
 const SCENE_LIBRARY = {
   'sc-test-room': TEST_ROOM,
@@ -321,8 +341,10 @@ export function createApp(rootEl, opts = {}) {
     const scene = sceneForState(block.sceneId, result.sceneState);
     const nextToken = {};
     let roster = null, nextView;
-    if (scenario) nextView = buildTypicalViewData(block, scenario, scene, result.sceneState.positions, nextToken);
-    else {
+    if (scenario) {
+      nextView = buildTypicalViewData(block, scenario, scene, result.sceneState.positions, nextToken);
+      applyPersistentFxTags(nextView.units, readTacticsRoster());
+    } else {
       buildViewData(block, block.heroes, scene, result.sceneState.positions, nextToken);
       roster = loadTacticsRoster(block, []);
       nextView = buildViewData(block, roster.heroes, scene, result.sceneState.positions, nextToken);
@@ -411,8 +433,8 @@ export function createApp(rootEl, opts = {}) {
   function restart() { loadYaml(currentYamlText || opts.defaultYaml || DEFAULT_YAML_A, { forceReset: true }); }
 
   // ---------- 显示态（规则真值在 ref；画面只在接触拍点推进） ----------
-  function syncShown() { if (currentViewData) for (const u of currentViewData.units) shown.set(u.id, { hp: u.ref.hp, mp: u.ref.mp }); }
-  function shownOf(u) { return shown.get(u.id) || { hp: u.ref.hp, mp: u.ref.mp }; }
+  function syncShown() { if (currentViewData) for (const u of currentViewData.units) shown.set(u.id, { hp: u.ref.hp, mp: u.ref.mp, tp: u.ref.tp || 0, shield: u.ref.shield || 0 }); }
+  function shownOf(u) { return shown.get(u.id) || { hp: u.ref.hp, mp: u.ref.mp, tp: u.ref.tp || 0, shield: u.ref.shield || 0 }; }
   function visibleLog() { return battle.snapshot().log.filter((_, i) => !hiddenLog.has(i)); }
   function unitById(id) { return currentViewData.units.find(u => u.id === id) || null; }
   function currentUnit() { return battle && currentViewData ? unitById(battle.snapshot().currentId) : null; }
@@ -523,7 +545,7 @@ export function createApp(rootEl, opts = {}) {
       currentViewData.footprintsById[full.id] = full.footprint || { width: 1, height: 1 };
       const pos = snap.positions?.[full.id] || battle.ctx.placementsById[full.id];
       if (pos) currentViewData.placementsById[full.id] = { col: pos.col, row: pos.row, facing: pos.facing || 0 };
-      shown.set(full.id, { hp: full.ref.hp, mp: full.ref.mp });
+      shown.set(full.id, { hp: full.ref.hp, mp: full.ref.mp, tp: full.ref.tp || 0, shield: full.ref.shield || 0 });
       known.add(full.id);
     }
   }
@@ -533,7 +555,7 @@ export function createApp(rootEl, opts = {}) {
     for (const u of currentViewData.units) {
       const s = shownOf(u);
       u.effective = battle.getEffectiveUnit(u.id);
-      u.bars = { ...u.bars, hp: s.hp, mp: s.mp };
+      u.bars = { ...u.bars, hp: s.hp, mp: s.mp, tp: s.tp, shield: s.shield };
     }
     sandbox.update(currentViewData);
     const view = sandbox.getUnitView();
@@ -1071,11 +1093,19 @@ export function createApp(rootEl, opts = {}) {
   }
 
   async function playAttackResult(res) {
+    const myFlow = flow;
     for (let i = res.logFrom; i < res.logTo; i++) hiddenLog.add(i);
     director.holdRegions(res);
     shell.showLog(unitName(res.casterId) + ' · ' + (res.skill || res.item).name, 'act');
-    const caster = currentUnit();
-    if (caster) { const s = shownOf(caster); shown.set(caster.id, { hp: s.hp, mp: caster.ref.mp }); }
+    const caster = unitById(res.casterId);
+    if (caster) {
+      const s = shownOf(caster), gains = { mp: 0, tp: 0 };
+      for (const e of res.effects || []) if (e.targetId === caster.id) {
+        const delta = supportResourceDelta(e);
+        gains.mp += delta.mp || 0; gains.tp += delta.tp || 0;
+      }
+      shown.set(caster.id, { ...s, mp: caster.ref.mp - gains.mp, tp: (caster.ref.tp || 0) - gains.tp });
+    }
     // 反应错位（折影步等）与冲锋/击退位移：规则站位已更新，显示位置锁在原位，等导演在接触拍点演出位移后再放开
     const view = sandbox.getUnitView();
     for (const h of res.hits) {
@@ -1094,22 +1124,26 @@ export function createApp(rootEl, opts = {}) {
     }
     refreshBattle();
     await director.playAttack(res);
+    if (myFlow !== flow) return;
     for (let i = res.logFrom; i < res.logTo; i++) hiddenLog.delete(i);
     if (!res.hits.length) shell.showLog(battle.snapshot().log[res.logTo - 1] || '', 'miss');
   }
   function unitName(id) { const u = unitById(id); return u ? (u.emoji ? u.emoji + ' ' : '') + u.name : id; }
 
-  // ---------- 非伤害效果揭示（即时回复）：显示条在演出拍点推进到规则真值；返回显示增量（封顶后的实际回复量） ----------
+  // ---------- 非伤害效果揭示：每拍仅推进该条后端增量，不抢后续效果的最终值 ----------
   function revealEffect(e) {
-    if (!e || e.kind !== 'heal') return null;
+    if (!e) return null;
     const u = unitById(e.targetId);
     if (!u) return null;
-    const gained = u.ref.hp - shownOf(u).hp;
-    shown.set(u.id, { hp: u.ref.hp, mp: shownOf(u).mp });
-    u.bars = { ...u.bars, hp: u.ref.hp };
+    const delta = supportResourceDelta(e);
+    if (!Object.keys(delta).length) return null;
+    const next = { ...shownOf(u) };
+    for (const [key, value] of Object.entries(delta)) next[key] = (next[key] || 0) + value;
+    shown.set(u.id, next);
+    u.bars = { ...u.bars, ...next };
     sandbox.getUnitView().updateUnit(u.id, { bars: u.bars, syncGhost: true });
     if (u.side === 'hero') shell.setHeroBars(u.id, u.bars, { heal: true });
-    return gained;
+    return e.value;
   }
 
   // ---------- 接触拍点揭示 ----------
@@ -1117,7 +1151,7 @@ export function createApp(rootEl, opts = {}) {
     const u = unitById(hit.targetId);
     if (!u) return;
     const prev = shownOf(u);
-    shown.set(u.id, { hp: hit.hpAfter, mp: hit.heal ? Math.min(u.ref.maxMp || 0, prev.mp + (hit.mpDmg > 0 ? hit.mpDmg : 0)) : prev.mp });
+    shown.set(u.id, { ...prev, hp: hit.hpAfter, mp: hit.heal ? Math.min(u.ref.maxMp || 0, prev.mp + (hit.mpDmg > 0 ? hit.mpDmg : 0)) : prev.mp });
     u.bars = { ...u.bars, hp: hit.hpAfter };
     const rec = sandbox.getUnitView() && sandbox.getUnitView().nodes.get(u.id);
     if (rec) rec.bars = u.bars;

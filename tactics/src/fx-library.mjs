@@ -338,7 +338,7 @@ const selfBoost = {
   id: 'self-boost', grade: 'L2', fxTags: ['再动加速'],
   timeline: { totalMs: 950 },
   cues: [{ key: 'herocharge', vol: 0.45 }, { key: 'link_chime', vol: 0.55 }],
-  prepareKeys() { return this.cues.map(c => c.key); },
+  prepareKeys() { return [...this.cues.map(c => c.key), ...SUPPORT_KEYS]; },
   async play(ctx) {
     const { fx, input } = ctx;
     const c = worldPx(ctx.centerOf(ctx.casterId)), uid = fx.uid(), R = 1.2 * PX;
@@ -358,7 +358,9 @@ const selfBoost = {
       const tag = fx.top('<b style="position:absolute;left:' + c.x + 'px;top:' + (c.y - 34) + 'px;transform:translate(-50%,-50%);white-space:nowrap;font:700 15px/1 system-ui,sans-serif;color:#eef2ff;text-shadow:0 0 6px #6366f1,0 0 12px #4338ca;">' + label + '</b>', 460);
       tag.firstChild.animate([{ transform: 'translate(-50%,-30%)', opacity: 0 }, { transform: 'translate(-50%,-70%)', opacity: 1, offset: 0.25 }, { transform: 'translate(-50%,-110%)', opacity: 0 }], { duration: 460, fill: 'forwards' });
     });
-    return ctx.wait(950);
+    const support = playSupportEffects(ctx, effect => effect.kind === 'buff');
+    const [ok, finished] = await Promise.all([support, ctx.wait(950)]);
+    return ok && finished;
   },
 };
 
@@ -425,51 +427,86 @@ const evadeGlide = {
 // 埃利奥特首批（典型对局权威样本）：单体回复 / 浓雾 / 归尘礼赞（延迟·传奇）/ 召雷术（延迟·高阶）
 // ==========================================
 
-// 单体即时回复（规则 effects.kind='heal'）L2：掌心光核 → 三缕光丝沿共享贝塞尔飞抵 → 目标绽光 + 回复揭示 → 光粒上浮
+const SUPPORT_BUFF = {
+  atk: ['buff', 'atkUp'], spd: ['buff', 'atkUp'], hit: ['buff', 'hitUp'],
+  def: ['shield', 'defUp'], eva: ['buff', 'defUp'],
+};
+const SUPPORT_EFFECT = {
+  heal: ['heal', 'hpHeal'], healMp: ['mpHeal', 'mpHeal'], healTp: ['mpHeal', 'mpHeal'],
+  shield: ['shield', 'shieldUp'], dispel: ['buff', 'defUp'], damageGuard: ['shield', 'defUp'],
+};
+const SUPPORT_KEYS = [...new Set([...Object.values(SUPPORT_BUFF), ...Object.values(SUPPORT_EFFECT)].map(([, key]) => key))];
+const SUPPORT_VOLUME = 0.5;
+const SUPPORT_CUES = SUPPORT_KEYS.map(key => ({ key, vol: SUPPORT_VOLUME }));
+const SUPPORT_NUMBERS = {
+  heal: ['HP', '#dcfce7', '#16a34a'], healMp: ['MP', '#e0f2fe', '#0369a1'],
+  healTp: ['TP', '#e0f2fe', '#0369a1'], shield: ['护盾', '#e2e8f0', '#475569'],
+};
+
+async function playSupportEffects(ctx, accept = () => true) {
+  const byTarget = new Map();
+  const seenEffects = new Set();
+  for (const effect of ctx.result.effects || []) {
+    if (seenEffects.has(effect) || !accept(effect)) continue;
+    seenEffects.add(effect);
+    const feedback = effect.kind === 'buff' && effect.value > 0 ? SUPPORT_BUFF[effect.field] : SUPPORT_EFFECT[effect.kind];
+    if (!feedback) continue;
+    if (!byTarget.has(effect.targetId)) byTarget.set(effect.targetId, []);
+    byTarget.get(effect.targetId).push({ effect, feedback });
+  }
+  const pending = [];
+  let first = true;
+  for (const [targetId, batch] of byTarget) {
+    if (!first && !(await ctx.wait(200))) return false;
+    first = false;
+    const playedKeys = new Set(), playedTypes = new Set();
+    const entity = ctx.ent(targetId);
+    let numberIndex = 0;
+    const showNumber = (kind, value, crit) => {
+      const style = SUPPORT_NUMBERS[kind];
+      if (!style) return;
+      const [unit, color, glow] = style;
+      const { x, y } = worldPx(ctx.centerOf(targetId));
+      floatText(ctx.fx, x, y - 30 - numberIndex++ * 20, (crit ? '暴击 ' : '') + '+' + value + ' ' + unit, color, glow, { size: 14 });
+    };
+    const play = ([type, key], onImpact) => {
+      if (playedTypes.has(type) && playedKeys.has(key)) { onImpact?.(); return; }
+      const soundKey = playedKeys.has(key) ? null : key;
+      playedKeys.add(key);
+      if (playedTypes.has(type)) {
+        if (soundKey) ctx.av.playSound(soundKey, SUPPORT_VOLUME);
+        onImpact?.();
+        return;
+      }
+      playedTypes.add(type);
+      const handle = ctx.av.playGenericSupportFx(entity, type, { soundKey, volume: SUPPORT_VOLUME, onImpact });
+      if (handle) pending.push(ctx.awaitHandle(handle).then(ok => {
+        if (!ok) handle.cancel();
+        return ok;
+      }));
+    };
+    ctx.av.CombatAudioMixer.withContext(ctx.audioContext, () => {
+      for (const { effect, feedback } of batch) {
+        const show = () => {
+          ctx.revealEffect(effect, true);
+          showNumber(effect.kind, effect.value, effect.crit);
+          if (effect.kind === 'heal' && effect.overheal > 0) showNumber('shield', effect.overheal, effect.crit);
+        };
+        if (playedTypes.has(feedback[0]) && playedKeys.has(feedback[1])) { show(); continue; }
+        play(feedback, show);
+        if (effect.kind === 'heal' && effect.overheal > 0) play(SUPPORT_EFFECT.shield);
+      }
+    });
+  }
+  return (await Promise.all(pending)).every(Boolean);
+}
+
 const healMend = {
   id: 'heal-mend', grade: 'L2', fxTags: ['单体回复'],
-  timeline: { totalMs: 1000 },   // 260 凝光 + 260 光丝 + 100 绽放 + 380 余韵
-  cues: [{ key: 'regen_hum', vol: 0.40 }, { key: 'hpHeal', vol: 0.58 }],
-  prepareKeys() { return this.cues.map(c => c.key); },
-  async play(ctx) {
-    const { fx, result } = ctx;
-    const heals = (result.effects || []).filter(e => e.kind === 'heal');
-    const c = worldPx(ctx.centerOf(ctx.casterId)), hand = { x: c.x, y: c.y - 16 };
-    // ① 凝光：掌心金绿光核 + 光点吸入；受术者脚下生命符文
-    fx.sfx('regen_hum', 0.40);
-    fx.top(orbHtml(hand.x, hand.y, 44, '#86efac', '#fefce8'), 560).firstChild.animate([{ transform: 'scale(0.2)', opacity: 0 }, { transform: 'scale(1.2)', opacity: 1, offset: 0.45 }, { transform: 'scale(0.7)', opacity: 0.9, offset: 0.8 }, { transform: 'scale(0.3)', opacity: 0 }], { duration: 560, fill: 'forwards' });
-    particles(fx, Array.from({ length: 9 }, () => { const a = rnd(0, TAU), d = rnd(28, 46); return { x: hand.x + Math.cos(a) * d, y: hand.y + Math.sin(a) * d, dx: -Math.cos(a) * d, dy: -Math.sin(a) * d, size: rnd(6, 10), color: pick(['#86efac', '#fde68a']), core: '#ffffff', s0: 1, s1: 0.3, dur: 240, delay: rnd(0, 60) }; }), 360);
-    const spots = heals.map(e => ({ e, p: worldPx(ctx.centerOf(e.targetId)), self: e.targetId === ctx.casterId }));
-    for (const s of spots) {
-      const rune = fx.ground(runeHtml(fx.uid(), s.p.x, s.p.y + 8, 0.85 * PX, '#4ade80', '#fef08a', ''), 1000);
-      grow(rune.firstChild, { ms: 1000, s0: 0.4, s1: 1, hold: 0.75, o: 0.9 });
-      spin(rune.querySelector('[data-fx=spin]'), 100, 1000);
-    }
-    if (!(await ctx.wait(260))) return false;
-    // ② 光丝：三缕光沿共享控制点飞抵（自疗时由脚边螺旋上升）
-    for (const s of spots) {
-      const end = { x: s.p.x, y: s.p.y - 10 };
-      const len = Math.hypot(end.x - hand.x, end.y - hand.y) || 1, nx = -(end.y - hand.y) / len, ny = (end.x - hand.x) / len;
-      for (const k of [-1, 0, 1]) {
-        const a = s.self ? { x: s.p.x + k * 26, y: s.p.y + 24 } : hand;
-        const ctrl = s.self ? { x: s.p.x + k * 46, y: s.p.y - 4 } : { x: (hand.x + end.x) / 2 + nx * k * len * 0.28, y: (hand.y + end.y) / 2 + ny * k * len * 0.28 - 26 };
-        trail(fx, a, ctrl, end, { color: '#86efac', width: 5, ms: 260, delay: Math.abs(k) * 40 });
-        flyOrb(fx, a, ctrl, end, { size: 16, color: '#bbf7d0', core: '#ffffff', ms: 260, delay: Math.abs(k) * 40, s0: 0.5, s1: 1, fade: true });
-      }
-    }
-    if (!(await ctx.wait(260))) return false;
-    // ③ 绽放：音画同帧揭示回复值（规则真值）
-    fx.sfx('hpHeal', 0.58);
-    for (const s of spots) {
-      fx.top(orbHtml(s.p.x, s.p.y - 6, 96, '#bbf7d0', '#ffffff'), 300).firstChild.animate([{ transform: 'scale(0.3)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 280, fill: 'forwards' });
-      fx.top(ringHtml(s.p.x, s.p.y, 92, 'rgba(187,247,208,0.9)', 'rgba(74,222,128,0.6)'), 440).firstChild.animate([{ transform: 'scale(0.3)', opacity: 1 }, { transform: 'scale(1.2)', opacity: 0 }], { duration: 420, easing: 'cubic-bezier(0.1,0.8,0.3,1)', fill: 'forwards' });
-      const gained = ctx.revealEffect(s.e, true);   // 宿主返回封顶后的实际回复量
-      floatText(fx, s.p.x, s.p.y - 30, '+' + (gained == null ? s.e.value : gained), '#dcfce7', '#16a34a', { ms: 880, size: 17 });
-      // ④ 余韵：光粒上浮淡出
-      particles(fx, Array.from({ length: 12 }, () => ({ x: s.p.x + rnd(-20, 20), y: s.p.y + rnd(-6, 14), dx: rnd(-8, 8), dy: rnd(-70, -36), size: rnd(5, 9), color: pick(['#86efac', '#fef08a', '#bbf7d0']), core: '#ffffff', s0: 1, s1: 0.3, dur: rnd(420, 560), delay: rnd(0, 120) })), 760);
-    }
-    return ctx.wait(480);
-  },
+  timeline: { totalMs: 1100 },
+  cues: SUPPORT_CUES,
+  prepareKeys: () => SUPPORT_KEYS,
+  play: ctx => playSupportEffects(ctx),
 };
 
 // 浓雾 L3（敌我共用，区域数据提供落点与半径）：
@@ -751,47 +788,18 @@ const thunderStorm = {
 // ---------- D3 通用非攻击槽与敌方/召唤空间模板 ----------
 const aoeHeal = {
   id: 'aoe-heal', grade: 'L2', fxTags: ['群体回复'],
-  timeline: { totalMs: 1000, fullscreen: false, darken: false },
-  cues: [{ key: 'hpHeal', vol: 0.55 }],
-  prepareKeys() { return ['hpHeal']; },
-  async play(ctx) {
-    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), rM = result.query?.shape?.radius || 6, R = rM * PX;
-    fx.sfx('hpHeal', 0.55);
-    fx.ground(ringHtml(c.x, c.y, R * 2, 'rgba(134,239,172,0.55)', 'rgba(74,222,128,0.28)'), 900)
-      .firstChild.animate([{ transform: 'scale(0.25)', opacity: 0.9 }, { transform: 'scale(1)', opacity: 0 }], { duration: 860, fill: 'forwards' });
-    const heals = (result.effects || []).filter(e => e.kind === 'heal' || e.kind === 'dispel');
-    const seen = new Set();
-    heals.forEach((e, idx) => ctx.after(140 + idx * 45, () => {
-      ctx.revealEffect(e, false);
-      if (e.kind === 'heal' && !seen.has(e.targetId)) {
-        seen.add(e.targetId);
-        const tp = worldPx(ctx.centerOf(e.targetId));
-        floatText(fx, tp.x, tp.y - 34, '+' + e.value + ' HP', '#bbf7d0', '#166534', { ms: 760, size: 13 });
-      }
-    }));
-    return ctx.wait(950);
-  },
+  timeline: { totalMs: 1100, fullscreen: false, darken: false },
+  cues: SUPPORT_CUES,
+  prepareKeys: () => SUPPORT_KEYS,
+  play: ctx => playSupportEffects(ctx),
 };
 
 const allyBuff = {
   id: 'ally-buff', grade: 'L2', fxTags: ['群体增益'],
-  timeline: { totalMs: 900, fullscreen: false, darken: false },
-  cues: [{ key: 'atkUp', vol: 0.52 }],
-  prepareKeys() { return ['atkUp']; },
-  async play(ctx) {
-    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
-    fx.sfx('atkUp', 0.52);
-    fx.ground(runeHtml(fx.uid(), c.x, c.y, 1.4 * PX, '#38bdf8', '#bae6fd', ''), 850)
-      .firstChild.animate([{ transform: 'translate(-50%,-50%) scale(0.4)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 0.9, offset: 0.4 }, { transform: 'translate(-50%,-50%) scale(1.1)', opacity: 0 }], { duration: 850, fill: 'forwards' });
-    const effs = result.effects || [];
-    effs.forEach((e, idx) => ctx.after(180 + idx * 50, () => {
-      ctx.revealEffect(e, true);
-      const tp = worldPx(ctx.centerOf(e.targetId));
-      const label = e.kind === 'healMp' ? '+' + e.value + ' MP' : e.kind === 'healTp' ? '+' + e.value + ' TP' : (e.tag || '').replace(/\[|\]/g, '') + (e.value ? ' +' + Math.abs(e.value) : '');
-      if (label) floatText(fx, tp.x, tp.y - 32 - (idx % 2) * 16, label, '#e0f2fe', '#075985', { ms: 720, size: 12 });
-    }));
-    return ctx.wait(880);
-  },
+  timeline: { totalMs: 1100, fullscreen: false, darken: false },
+  cues: SUPPORT_CUES,
+  prepareKeys: () => SUPPORT_KEYS,
+  play: ctx => playSupportEffects(ctx),
 };
 
 const pureDebuff = {

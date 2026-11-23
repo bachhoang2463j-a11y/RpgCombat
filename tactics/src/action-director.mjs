@@ -267,6 +267,9 @@ export function createActionDirector(deps) {
   // ---------- 攻击：注册表分发演出 + 接触拍点逐段揭示 ----------
   async function playAttack(result) {
     if (!result || !result.ok) return false;
+    const actionScope = scope();
+    if (!actionScope || !actionScope.isLive) return false;
+    const isCurrent = () => actionScope === scope() && actionScope.isLive;
     avHost.syncRoster();
     const vd = getViewData();
     const skill = result.skill || battleOf().itemSkill(result.item);
@@ -285,15 +288,17 @@ export function createActionDirector(deps) {
 
     sandbox.getUnitView().setDisplayFacing(result.casterId, null);
     sandbox.getUnitView().updateUnit(result.casterId, { placement: vd.placementsById[result.casterId] });
-    const pts = [centerOf(result.casterId), ...hits.map(h => centerOf(h.targetId))].filter(Boolean);
+    const targetIds = new Set([result.casterId, ...hits.map(h => h.targetId), ...(result.effects || []).map(e => e.targetId)]);
+    const pts = [...targetIds].map(centerOf).filter(Boolean);
     if (result.query && result.query.blastCenter) pts.push(result.query.blastCenter);
     if (!hits.length && result.aim) pts.push({ x: result.aim.x, y: result.aim.y });
     await sandbox.guideTo(pts);
-    if (!(await prepareAudio(entry.prepareKeys ? entry.prepareKeys({ identity }) : []))) return false;
+    if (!isCurrent() || !(await prepareAudio(entry.prepareKeys ? entry.prepareKeys({ identity }) : [])) || !isCurrent()) return false;
 
     const revealed = new Map();      // targetId → 已揭示段序号集合
     const reactionRuns = [];
     function revealSegment(targetId, i, meta = {}) {
+      if (!isCurrent()) return;
       const h = byId.get(targetId);
       if (!h) return;
       const segs = h.segments || [h];
@@ -330,7 +335,7 @@ export function createActionDirector(deps) {
     const effects = result.effects || [];
     const effectsShown = new Set();
     function revealEffect(e, quiet) {
-      if (!e || effectsShown.has(e)) return null;
+      if (!isCurrent() || !e || effectsShown.has(e)) return null;
       effectsShown.add(e);
       if (e.kind === 'heal' && !quiet) playHealPulse(e.targetId);
       return onEffectReveal ? onEffectReveal(e, { result }) : null;
@@ -349,6 +354,7 @@ export function createActionDirector(deps) {
       anchorAt: (x, y) => makeAnchor(x, y), aimAnchor: () => aimAnchor(result.aim), lineEndAnchor: () => lineEndAnchor(result),
     };
     const ok = await entry.play(ctx);
+    if (!isCurrent() || ok === false) return false;
     hits.forEach(h => reveal(h.targetId, { late: true }));
     effects.forEach(e => revealEffect(e));
     regions.forEach(r => revealRegion(r.id));

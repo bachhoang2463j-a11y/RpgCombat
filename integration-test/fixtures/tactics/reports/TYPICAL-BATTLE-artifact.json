@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "2dbb6536679521d745813f10c4b38138e39ffd447f9b41181863aecb2f116d5f",
-  "bytes": 1179975,
+  "sha256": "6a2749810787805b2abc0dc69eb43e0a89e8e74a5c80dcee4fb16595e10b3d65",
+  "bytes": 1186141,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -42,6 +42,21 @@
     },
     {
       "id": "空霰弹与群体规则区域适配入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "原版辅助SVG及四类动画入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "辅助真实结果与持久标签回读入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "辅助取消通知与动作代际隔离入包",
       "pass": true,
       "detail": ""
     },
@@ -96,6 +111,6 @@
       "detail": ""
     }
   ],
-  "passed": 18,
+  "passed": 21,
   "failed": 0
 }

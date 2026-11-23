@@ -57,6 +57,10 @@
 [data-rpg-av-scope] .arcane-hit-core { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
 [data-rpg-av-scope] .arcane-hit-recoil { will-change: translate, rotate; }
 [data-rpg-av-scope] .shake { animation: shake 0.4s ease-in-out; }
+[data-rpg-av-scope] .anim-heal { animation: svg-heal 0.8s ease-out forwards; }
+[data-rpg-av-scope] .anim-buff { animation: svg-buff 0.6s ease-out forwards; }
+[data-rpg-av-scope] .anim-shield { animation: svg-shield 0.6s ease-out forwards; }
+[data-rpg-av-scope] .anim-mp { animation: svg-mp 0.8s ease-out forwards; }
 [data-rpg-av-scope] .enemy-omen { animation: enemyOmenCombo 600ms cubic-bezier(0.25, 1, 0.5, 1) forwards; }
 [data-rpg-av-scope] .omen-red-wide { animation: omenRedWide 600ms cubic-bezier(0.25,1,0.5,1) forwards; }
 [data-rpg-av-scope] .omen-amber-single { animation: omenAmberSingle 600ms cubic-bezier(0.25,1,0.5,1) forwards; }
@@ -211,6 +215,10 @@
 @keyframes arcane-identity-frost-flash { 0% { filter: brightness(1.38) hue-rotate(-14deg) saturate(1.4); } 65% { filter: none; } }
 @keyframes arcane-hit-fill-blink { 0% { filter: brightness(2.2); } 100% { filter: none; } }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px) rotate(-1deg); } 50% { transform: translateX(3px) rotate(1deg); } 75% { transform: translateX(-3px) rotate(-0.5deg); } }
+@keyframes svg-heal { 0% { transform: translate(-50%, -30%) scale(0.5); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; filter: drop-shadow(0 0 10px rgba(52,211,153,0.8)); } 100% { transform: translate(-50%, -70%) scale(1); opacity: 0; } }
+@keyframes svg-buff { 0% { transform: translate(-50%, -50%) scale(0.2) rotate(0deg); opacity: 0; } 30% { transform: translate(-50%, -50%) scale(1.5) rotate(45deg); opacity: 0.8; filter: drop-shadow(0 0 15px #fbbf24); stroke-width: 4; } 100% { transform: translate(-50%, -50%) scale(2) rotate(90deg); opacity: 0; stroke-width: 1; } }
+@keyframes svg-shield { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.9; filter: drop-shadow(0 0 12px #94a3b8); } 100% { transform: translate(-50%, -50%) scale(1.2); opacity: 0; } }
+@keyframes svg-mp { 0% { transform: translate(-50%, -20%) scale(0.6); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; filter: drop-shadow(0 0 15px #38bdf8); } 100% { transform: translate(-50%, -80%) scale(1); opacity: 0; } }
 @keyframes enemyOmenCombo {
       /* 快速颤抖闪烁第 1 下 */
       0% {

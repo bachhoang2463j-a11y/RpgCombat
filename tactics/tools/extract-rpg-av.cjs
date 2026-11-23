@@ -254,6 +254,50 @@ function build() {
   const shotgun = topBlock(L, l => l.startsWith('function playShotgunSound('), 'playShotgunSound');
   // 3) 粒子引擎与事件总线
   const fxClass = topBlock(L, l => l.startsWith('class CanvasFxEngine {'), 'CanvasFxEngine');
+  const supportSvg = topBlock(L, l => l.startsWith('function playSVGEffect('), 'playSVGEffect');
+  const supportBranches = supportSvg.text.split('\n').filter(l => /^    else if \(type === '(heal|buff|shield|mpHeal)'\)/.test(l));
+  if (supportBranches.length !== 4) fail('通用辅助 SVG 分支数变化');
+  const supportParticles = topBlock(L, l => l.startsWith('function spawnHealParticles('), 'spawnHealParticles');
+  const support = `
+${patch(supportParticles.text, 'function spawnHealParticles(x, y, colorTheme', 'function spawnHealParticles(addParticle, x, y, colorTheme', 1, '辅助粒子注入所属句柄').replace('fxEngine.addParticle({', 'addParticle({')}
+  const supportHandles = new Set();
+  function playGenericSupportFx(entity, type, { soundKey = null, volume = 0.5, onImpact } = {}) {
+    const theme = { heal:'green', buff:'gold', shield:'shield', mpHeal:'blue' }[type];
+    const dom = getEntitySpriteDom(entity);
+    if (!theme || !dom) { onImpact?.(); return null; }
+    const rect = dom[__GBCR]();
+    const x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+    const svgWrapper = document.createElement('div');
+    svgWrapper.style.cssText = 'position:absolute;pointer-events:none;z-index:95;left:' + x + 'px;top:' + y + 'px;';
+    let innerHTML, duration;
+${supportBranches.join('\n').replace('else if', 'if')}
+    svgWrapper.innerHTML = innerHTML;
+    svgWrapper.firstElementChild.style.position = 'absolute';
+    __STAGE.el.appendChild(svgWrapper);
+    const particles = new Set();
+    spawnHealParticles(p => { particles.add(p); fxEngine.addParticle(p); }, x, y, theme);
+    const cue = soundKey ? playSound(soundKey, volume) : null;
+    const onFinish = new Set();
+    const finish = ok => {
+      supportHandles.delete(handle);
+      onFinish.forEach(fn => fn(ok));
+      onFinish.clear();
+    };
+    const handle = { doneAt: Date.now() + 1100, onFinish, cancel() {
+      clearTimeout(svgTimer);
+      clearTimeout(endTimer);
+      svgWrapper.remove();
+      fxEngine.particles = fxEngine.particles.filter(p => !particles.has(p));
+      cue?.stop?.();
+      finish(false);
+    } };
+    const svgTimer = setTimeout(() => svgWrapper.remove(), duration);
+    const endTimer = setTimeout(() => finish(true), 1100);
+    supportHandles.add(handle);
+    onImpact?.();
+    return handle;
+  }
+`;
   const events = topBlock(L, l => l.startsWith('const EVENTS = {'), 'EVENTS', /^\};\s*$/);
   const bus = topBlock(L, l => l.startsWith('const CombatEvents = {'), 'CombatEvents', /^\};\s*$/);
   const busOn = L.filter(l => /^CombatEvents\.on\(EVENTS\.(DAMAGE|DODGE)_RESOLVED, CombatAudioDirector\.consume\);/.test(l));
@@ -341,7 +385,7 @@ function build() {
   mod = patch(mod, 'arcaneAtmoModule.stopAmbientAudio(true);', '/* 环境氛围模块未迁移（战棋背景声由宿主 ambient 管理） */', 1, '去环境氛围清理');
 
   const stubText = STUBS.map(n => 'function ' + n + '() { /* 未迁移段：本 Demo 不产生该状态 */ }').join('\n');
-  const css = extractCss(html, mod + '\n' + soundText);
+  const css = extractCss(html, mod + '\n' + soundText + support);
   // 入选代码真实引用到的 audioUrls 键（显式预载清单来源；不预载整个素材库）
   const urlKeys = [...audioUrls.text.matchAll(/^\s*'([^']+)'\s*:/gm)].map(m => m[1]);
   if (urlKeys.length < 40) fail('audioUrls 键数异常: ' + urlKeys.length);
@@ -400,6 +444,7 @@ ${soundText}
   // ---- 粒子引擎（原样，仅换挂载层） ----
 ${fx}
   const fxEngine = new CanvasFxEngine();
+${support}
 
   // ---- 事件总线（原样） ----
 ${events.text}
@@ -417,7 +462,9 @@ ${busOn.map(l => l.replace('CombatAudioDirector.consume', 'arcane.CombatAudioDir
   return Object.assign({}, arcane, {
     CombatAudioMixer, audioUrls, playSound, playCustomAudio, HERO_VOICE_LINES, pickHeroVoice, AVATAR_MAP, fxEngine,
     ASSET_BASE, HERO_VOICE_BASE, itemFxAssetUrl,
-    setToken(t) { combatToken = t; },
+    playGenericSupportFx,
+    clearArcaneFx() { supportHandles.forEach(handle => handle.cancel()); arcane.clearArcaneFx(); },
+    setToken(t) { if (t !== combatToken) supportHandles.forEach(handle => handle.cancel()); combatToken = t; },
     getToken() { return combatToken; },
     setRoster(h, e) { heroesData = h; enemiesData = e; },
   });

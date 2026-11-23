@@ -4,7 +4,7 @@
 // arcaneVfxModule 行区间(源 5729–14230): 5730–5730, 5733–5791, 5800–5841, 5849–5913, 5923–5924, 5932–6302, 6642–6850, 7016–7037, 7351–7376, 7383–7584, 7596–9869, 10067–10097, 10102–10107, 10748–10757, 11103–11133, 11142–11240, 11917–12083, 12201–12214, 14179–14208
 // 入选语句 157 段 / 3661 行；入口: playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar, CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx
 // 显式存根: clearSummonState, clearStatusLayers, clearSelfDestructState, clearRescueState, clearVariantState
-// 宿主适配补丁: fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 屏幕矩形 → 特效舞台坐标×11; innerWidth → 舞台宽×7; innerHeight → 舞台高×3; body 挂载 → 特效舞台×5; JS position:fixed → absolute×0; arcane canvas resize 走舞台×1; 舞台震动独立层×2; window.* 声音函数改为工厂内本地×14; 去环境氛围清理×1; CSS position:fixed → absolute×6; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1
+// 宿主适配补丁: 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 屏幕矩形 → 特效舞台坐标×11; innerWidth → 舞台宽×7; innerHeight → 舞台高×3; body 挂载 → 特效舞台×5; JS position:fixed → absolute×0; arcane canvas resize 走舞台×1; 舞台震动独立层×2; window.* 声音函数改为工厂内本地×14; 去环境氛围清理×1; CSS position:fixed → absolute×6; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1
 // ==========================================
 /* eslint-disable */
 // ---- 纯数据导出（原样，供宿主在工厂创建前解析人物头像/语音与预载清单） ----
@@ -669,6 +669,113 @@ class CanvasFxEngine {
     }
 }
   const fxEngine = new CanvasFxEngine();
+
+function spawnHealParticles(addParticle, x, y, colorTheme = 'green') {
+    let colorMain, colorGlow;
+    if (colorTheme === 'green') { colorMain = '#34d399'; colorGlow = '#059669'; }
+    else if (colorTheme === 'blue') { colorMain = '#38bdf8'; colorGlow = '#0284c7'; }
+    else if (colorTheme === 'gold') { colorMain = '#fbbf24'; colorGlow = '#d97706'; }
+    else if (colorTheme === 'purple') { colorMain = '#c084fc'; colorGlow = '#7c3aed'; }
+    else if (colorTheme === 'shield') { colorMain = '#cbd5e1'; colorGlow = '#64748b'; }
+    else if (colorTheme === 'taunt') { colorMain = '#f87171'; colorGlow = '#dc2626'; }
+    
+    const count = colorTheme === 'purple' ? 20 : 25;
+    const directionY = colorTheme === 'purple' ? 1.5 : -2; // debuff往下飘，heal/buff往上飘
+    
+    for (let i = 0; i < count; i++) {
+        const vx = (Math.random() - 0.5) * 2;
+        const vy = directionY * (0.6 + Math.random() * 0.8);
+        const size = 3 + Math.random() * 3.5;
+        const life = 700 + Math.random() * 400;
+        
+        addParticle({
+            x: x + (Math.random() - 0.5) * 40,
+            y: y + (colorTheme === 'purple' ? -30 : 20),
+            vx: vx,
+            vy: vy,
+            age: 0,
+            life: life,
+            size: size,
+            type: Math.random() > 0.45 ? 'cross' : 'star',
+            draw(ctx, pct) {
+                const alpha = Math.sin(pct * Math.PI) * 0.9;
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = colorMain;
+                
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(pct * Math.PI * 1.5);
+                
+                if (colorTheme === 'green' && this.type === 'cross') {
+                    // 绿色治愈十字
+                    const w = this.size;
+                    const h = this.size * 3;
+                    ctx.fillRect(-w/2, -h/2, w, h);
+                    ctx.fillRect(-h/2, -w/2, h, w);
+                } else {
+                    // 亮晶晶的四角星
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.size * 2);
+                    ctx.quadraticCurveTo(0, 0, this.size * 2, 0);
+                    ctx.quadraticCurveTo(0, 0, 0, this.size * 2);
+                    ctx.quadraticCurveTo(0, 0, -this.size * 2, 0);
+                    ctx.quadraticCurveTo(0, 0, 0, -this.size * 2);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                ctx.restore();
+                
+                // 外圈光晕
+                ctx.fillStyle = colorGlow;
+                ctx.globalAlpha = alpha * 0.35;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 1.8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
+    }
+}
+  const supportHandles = new Set();
+  function playGenericSupportFx(entity, type, { soundKey = null, volume = 0.5, onImpact } = {}) {
+    const theme = { heal:'green', buff:'gold', shield:'shield', mpHeal:'blue' }[type];
+    const dom = getEntitySpriteDom(entity);
+    if (!theme || !dom) { onImpact?.(); return null; }
+    const rect = dom[__GBCR]();
+    const x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+    const svgWrapper = document.createElement('div');
+    svgWrapper.style.cssText = 'position:absolute;pointer-events:none;z-index:95;left:' + x + 'px;top:' + y + 'px;';
+    let innerHTML, duration;
+    if (type === 'heal') { svgWrapper.className = 'anim-heal'; innerHTML = `<svg class="absolute" style="width: 60px; height: 60px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><path d="M35,15 L65,15 L65,35 L85,35 L85,65 L65,65 L65,85 L35,85 L35,65 L15,65 L15,35 L35,35 Z" fill="#34d399" opacity="0.8" style="filter: drop-shadow(0 0 10px #10b981);" /><circle cx="50" cy="50" r="45" stroke="#6ee7b7" stroke-width="2" fill="none" opacity="0.5" /></svg>`; duration = 800; }
+    else if (type === 'buff') { svgWrapper.className = 'anim-buff'; innerHTML = `<svg class="absolute" style="width: 80px; height: 80px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><polygon points="50,5 85,25 85,75 50,95 15,75 15,25" stroke="#fbbf24" stroke-width="3" fill="none" /><circle cx="50" cy="50" r="30" stroke="#fef08a" stroke-width="1" fill="none" stroke-dasharray="5,5" /></svg>`; duration = 600; }
+    else if (type === 'shield') { svgWrapper.className = 'anim-shield'; innerHTML = `<svg class="absolute" style="width: 80px; height: 80px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><path d="M50,10 L90,30 L90,60 C90,80 50,95 50,95 C50,95 10,80 10,60 L10,30 Z" fill="#cbd5e1" opacity="0.8" stroke="#f8fafc" stroke-width="3" style="filter: drop-shadow(0 0 10px #e2e8f0);" /></svg>`; duration = 600; }
+    else if (type === 'mpHeal') { svgWrapper.className = 'anim-mp'; innerHTML = `<svg class="absolute" style="width: 60px; height: 60px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><path d="M50,15 C50,15 25,50 25,70 C25,85 35,95 50,95 C65,95 75,85 75,70 C75,50 50,15 50,15 Z" fill="#38bdf8" opacity="0.8" style="filter: drop-shadow(0 0 10px #7dd3fc);" /><circle cx="50" cy="50" r="45" stroke="#bae6fd" stroke-width="2" fill="none" opacity="0.5" /></svg>`; duration = 800; }
+    svgWrapper.innerHTML = innerHTML;
+    svgWrapper.firstElementChild.style.position = 'absolute';
+    __STAGE.el.appendChild(svgWrapper);
+    const particles = new Set();
+    spawnHealParticles(p => { particles.add(p); fxEngine.addParticle(p); }, x, y, theme);
+    const cue = soundKey ? playSound(soundKey, volume) : null;
+    const onFinish = new Set();
+    const finish = ok => {
+      supportHandles.delete(handle);
+      onFinish.forEach(fn => fn(ok));
+      onFinish.clear();
+    };
+    const handle = { doneAt: Date.now() + 1100, onFinish, cancel() {
+      clearTimeout(svgTimer);
+      clearTimeout(endTimer);
+      svgWrapper.remove();
+      fxEngine.particles = fxEngine.particles.filter(p => !particles.has(p));
+      cue?.stop?.();
+      finish(false);
+    } };
+    const svgTimer = setTimeout(() => svgWrapper.remove(), duration);
+    const endTimer = setTimeout(() => finish(true), 1100);
+    supportHandles.add(handle);
+    onImpact?.();
+    return handle;
+  }
+
 
   // ---- 事件总线（原样） ----
 const EVENTS = {
@@ -4407,7 +4514,9 @@ CombatEvents.on(EVENTS.DODGE_RESOLVED, arcane.CombatAudioDirector.consume);
   return Object.assign({}, arcane, {
     CombatAudioMixer, audioUrls, playSound, playCustomAudio, HERO_VOICE_LINES, pickHeroVoice, AVATAR_MAP, fxEngine,
     ASSET_BASE, HERO_VOICE_BASE, itemFxAssetUrl,
-    setToken(t) { combatToken = t; },
+    playGenericSupportFx,
+    clearArcaneFx() { supportHandles.forEach(handle => handle.cancel()); arcane.clearArcaneFx(); },
+    setToken(t) { if (t !== combatToken) supportHandles.forEach(handle => handle.cancel()); combatToken = t; },
     getToken() { return combatToken; },
     setRoster(h, e) { heroesData = h; enemiesData = e; },
   });
