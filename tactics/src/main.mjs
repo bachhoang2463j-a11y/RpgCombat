@@ -245,7 +245,7 @@ export function createApp(rootEl, opts = {}) {
   const shell = buildShell(rootEl);
   let currentYamlText = null;
   let currentViewData = null;
-  const avHost = createAvHost({ getUnitView: () => sandbox.getUnitView(), getUnits: () => (currentViewData ? currentViewData.units : []) });
+  const avHost = createAvHost({ getUnitView: () => sandbox.getUnitView(), getUnits: () => (currentViewData ? currentViewData.units : []), getEffectiveUnit: id => battle?.getEffectiveUnit(id) });
   const ui = createUiSfx(avHost.av.CombatAudioMixer);
   const sandbox = createSandbox(shell.els.mapSlot, {
     getSafeRect: () => shell.getSafeRect(),
@@ -576,6 +576,8 @@ export function createApp(rootEl, opts = {}) {
       view.setFlag(u.id, 't-unit-channel', !!battle.battleState.combatState.charges?.[u.id]?.preparing);
       if (unitStyles[u.id]) view.setFlag(u.id, unitStyles[u.id].cls, true);
     }
+    avHost.consumeVisualEvents(snap.events.filter(ev => !ev.attackId));
+    avHost.syncVisualState();
     director.syncRegions(snap.regions || []);
     director.syncBarriers(snap.barriers || []);
     director.syncPreparations(battle.battleState.combatState.charges || {});

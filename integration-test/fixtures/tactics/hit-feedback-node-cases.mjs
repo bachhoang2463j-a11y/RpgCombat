@@ -25,7 +25,7 @@ function node(tag = 'div') {
     animate(frames, options) { const a = { frames, options, cancel() { this.cancelled = true; } }; this.animations.push(a); return a; },
   };
 }
-function originalHitHarness(scale = 1) {
+function originalHitHarness(scale = 1, locked = false) {
   const layers = node(), dom = node(), rect = { x: 300, y: 250, w: 60, h: 60, left: 270, top: 220, right: 330, bottom: 280, width: 60, height: 60 };
   const rectKey = Symbol('rect'); dom[rectKey] = () => rect;
   const particles = [], timers = new Map(), shakes = [];
@@ -36,7 +36,7 @@ function originalHitHarness(scale = 1) {
   const names = ['document', 'host', 'domOf', 'entityVisualRect', 'ctr', 'S', '__STAGE', '__GBCR', 'heroesData', 'enemiesData', 'isEntityVariantLocked', 'burst', 'rnd', 'pick', 'getComputedStyle', 'after', 'clearTimeout', 'shake', 'fxEngine', 'releaseIdleCanvas'];
   const api = new Function(...names, hitSource + '\nreturn { classifyHit, playHitFeedback, hitVisual, emitBloodMist };')(
     { createElement: () => node(), createElementNS: (_, tag) => node(tag), getElementById: () => null, querySelectorAll: () => [] },
-    { hitNumberScale: () => scale }, () => dom, () => rect, () => rect, S, { el: layers }, rectKey, [], [], () => false,
+    { hitNumberScale: () => scale }, () => dom, () => rect, () => rect, S, { el: layers }, rectKey, [], [], () => locked,
     (count, factory) => { for (let i = 0; i < count; i++) particles.push(factory()); }, (a, b) => (a + b) / 2, list => list[0],
     () => ({ fontSize: '42px' }), after, id => timers.delete(id), kind => shakes.push(kind), engine, () => {});
   return { ...api, layers, dom, particles, timers, shakes, engine, stopCount: () => stopCount,
@@ -61,6 +61,10 @@ function resolved(tags, shield = 20) {
 export const groups = {
   'THIT-01': { run() {
     const cases = [], h = originalHitHarness();
+    const locked = originalHitHarness(1, true);
+    locked.playHitFeedback(result(20, { shieldDmg: 10, shieldBefore: 10, shieldAfter: 0 }));
+    cases.push(ok('THIT 变种锁仍保留真实血盾数字', locked.layers.children.some(layer => layer.children.some(n => n.textContent === '-20'))));
+    cases.push(ok('THIT 变种锁不施加实体后坐', locked.dom.animations.length === 0));
     for (const [damage, tier] of [[9, 1], [10, 2], [49, 2], [50, 3], [100, 3]])
       cases.push(ok('THIT 三档真实比例边界 ' + damage, h.classifyHit(result(damage)).tier === tier));
     const crit = resolved('[枪击;power:40][暴击:100%]');

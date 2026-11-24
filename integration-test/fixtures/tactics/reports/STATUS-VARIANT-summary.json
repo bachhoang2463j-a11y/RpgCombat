@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-24",
+  "purpose": "复用原版燃烧/中毒/麻痹持续、tick/解除与蜕皮/狂暴/复活生命周期及受击锁，不改规则算值、不增加专有技能或UI",
+  "deliveryStatus": "implemented-and-backed-up; real-page-gate-pending",
+  "sourceAll": {"runs": 1, "passed": 912, "failed": 0, "note": "全量发生在末次狂暴标记透传和4条真实锁断言补充之前；之后只复跑相关，未运行verify-demo或第二次全量"},
+  "finalRelated": {"statusVariantPassed": 19, "hitFeedbackPassed": 45, "failed": 0},
+  "artifact": {"path": "tactics/mvp-standalone.html", "bytes": 1270442, "sha256": "c3d7719ea6c239d0ca2b78378e83d29e5adb26c47caa1942b271602013f338fc", "buildInputs": 36, "symbols": 57, "specialAssertionsPassed": 31, "failed": 0},
+  "browser": {
+    "iabUrl": "http://127.0.0.1:8123/tactics/mvp-standalone.html",
+    "apiProbe": {"persistentStatusLayers": 3, "burnTickHandle": true, "reviveHandle": true, "reviveLocked": true, "hitNumbersWhileLocked": 1, "statusCleared": true, "variantUnlockedAfterClear": true},
+    "apiProbeNote": "在实际产物页面使用真实DOM与原版函数直接调用，状态参数为定向探针；不是自然战斗触发，也不代替完整动画目视。探针对应前一个打包指纹288cf9d68c2614f52b8b820d67ec6bd853916832647896733ed9b3d459f9202c，最终改动只增加狂暴标记透传。",
+    "realBattleFlow": "pending: 默认首个敌方回合busy持续，IAB真实基础行动按钮点击超时，未修改rAF或替造环境",
+    "chromeAnimation": "blocked: chrome-devtools MCP list_pages返回已有chrome-profile浏览器占用；没有关闭重启或新开隔离浏览器",
+    "manualActionNeeded": "解除既有chrome-devtools连接占用后，在当前战棋产物页继续真实战斗与完整动画验证",
+    "android": "not-run: 用户未启动或提供模拟器"
+  },
+  "independentReview": {"channel": "agy/claude-sonnet-4-6", "modelNote": "本机models列表没有指南中的Gemini4Hydrogen，使用实际可用模型", "initial": "STATUS-VARIANT-review.json", "followup": "STATUS-VARIANT-review-followup.json", "verdict": "复读真实函数后撤销两项P0与永久状态映射误报，无确定阻断", "remainingGaps": ["实际自然战斗全生命周期与完整动画未验", "状态DOM重建迁移尚无独立行为断言", "复活清buff有实际代码，定向未加带旧buff的复活专项", "狂暴视觉结果收口保留snapshot幂等副作用；不改规则算值"]},
+  "scope": {"rootIndexModified": false, "readmeModified": false, "unrelatedUntrackedTouched": false, "newUi": false, "pushed": false}
+}

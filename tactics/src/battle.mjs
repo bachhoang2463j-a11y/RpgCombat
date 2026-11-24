@@ -19,7 +19,7 @@ import { chooseEnemyAction } from './ai.mjs';
 import { skillSlots, sortSlotsForResolve, normalizeEffectTag, effectDefinition } from './effect-definitions.mjs';
 import { applyEffectSlot } from './effect-handlers.mjs';
 import { CLASS_PASSIVES, getEffectiveStats } from './class-passives.mjs';
-import { applyTypeResist, hasVariantTag, isImmuneToStun, lifestealRatio, hasThorns, thornsRawReflect } from './variant-rules.mjs';
+import { rageAtkMultiplier, applyTypeResist, hasVariantTag, isImmuneToStun, lifestealRatio, hasThorns, thornsRawReflect } from './variant-rules.mjs';
 import { statusKeyOf, ROUND_TIME } from './scheduler.mjs';
 
 export const BASIC_ATTACK = {
@@ -93,6 +93,14 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   };
   let log = [];
   let domainEvents = [];
+  const rageVisualActive = new Set();
+  function syncRageResult(u) {
+    const active = u.ref.hp > 0 && rageAtkMultiplier(u, buffsOf(u.id)) > 1;
+    if (active === rageVisualActive.has(u.id)) return;
+    if (active) { rageVisualActive.add(u.id); u.ref.hasRageNarrated = true; }
+    else rageVisualActive.delete(u.id);
+    emit('variant-trigger', { attackId: currentAttackId(), unitId: u.id, trigger: active ? 'rage' : 'rageExit' });
+  }
   let attackSerial = 0;
   const attackStack = [];
   let actionSerial = 0;
@@ -158,13 +166,16 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
   // 敌方变种阈值收口（原版 tryTriggerEnemyMolt L31033 / tryTriggerEnemyLink L31080）：受击/DoT/入场后调用
   function runEnemyThresholdVariants(u) {
-    if (!u || u.side !== 'enemy' || u.ref.hp <= 0) return;
+    if (!u) return;
+    syncRageResult(u);
+    if (u.side !== 'enemy' || u.ref.hp <= 0) return;
     const buffs = buffsOf(u.id);
     if (!u.ref.molted && hasVariantTag(u, '蜕皮', buffs) && u.ref.maxHp > 0 && u.ref.hp / u.ref.maxHp < 0.5) {
       u.ref.molted = true; // 一次性标记；+50% 攻击由 class-passives moltAtkMultiplier 被动读取（不被驱散、跨复活永久）
       const cleared = dispelNegatives(u, Infinity);
       const before = u.ref.hp;
       u.ref.hp = Math.min(u.ref.maxHp, u.ref.hp + Math.max(1, Math.floor(u.ref.maxHp * 0.3)));
+      emit('variant-trigger', { attackId: currentAttackId(), unitId: u.id, trigger: 'molt', healed: u.ref.hp - before });
       addLog('💥 [' + u.name + '] 触发【绝境爆发】（蜕皮觉醒）！' + (cleared.length ? '强行排除 ' + cleared.length + ' 个负面状态，' : '') + '回复 ' + (u.ref.hp - before) + ' HP，永久攻击+50%');
     }
     if (!u.ref.linked && hasVariantTag(u, '连动', buffs) && u.ref.maxHp > 0 && u.ref.hp / u.ref.maxHp <= 0.3) {
@@ -254,7 +265,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   function removeBuffRecord(unitId, rec) {
     const list = buffsOf(unitId);
     const i = list.indexOf(rec);
-    if (i >= 0) list.splice(i, 1);
+    if (i >= 0) {
+      list.splice(i, 1);
+      emit('status-removed', { attackId: currentAttackId(), unitId, kind: rec.type });
+    }
     if (rec._source) dispatchClock(state, { type: 'removeStatus', unitId, source: rec._source }, { speedOf });
   }
   // 同源刷新（S06）：同名来源更新强度/期限，不叠层；无限期（免伤/反击架势永久）不进时钟。
@@ -301,6 +315,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       if (target && target.ref.hp > 0) {
         const damage = Math.min(target.ref.hp, Math.max(1, Number(ev.strength) || 1));
         target.ref.hp -= damage;
+        emit('status-tick', { unitId: target.id, kind: ev.kind, damage, hpAfter: target.ref.hp,
+          layers: buffsOf(target.id).filter(b => b.type === ev.kind).length });
         addLog(target.name + ' · ' + (ev.kind === 'poison' ? '中毒' : '燃烧') + ' -' + damage + ' HP');
         if (target.ref.hp <= 0) handleDown(target, 'dot');
         else runEnemyThresholdVariants(target);
@@ -333,7 +349,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       const key = statusKeyOf(ev.unitId, ev.source);
       const list = buffsOf(ev.unitId);
       const i = list.findIndex(b => b._key === key);
-      if (i >= 0) list.splice(i, 1);
+      if (i >= 0) {
+        const [removed] = list.splice(i, 1);
+        emit('status-removed', { unitId: ev.unitId, kind: removed.type });
+      }
     }
   }
   function speedOf(unitId) {
@@ -385,6 +404,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       target.ref.shield = 0;
       buffsOf(target.id).splice(0).forEach(b => { if (b._source) dispatchClock(state, { type: 'removeStatus', unitId: target.id, source: b._source }); });
       dispatchBattleClock({ type: 'reenterUnit', unitId: target.id });
+      emit('variant-trigger', { attackId: currentAttackId(), unitId: target.id, trigger: 'revive', cause, hpAfter: target.ref.hp });
       addLog(target.name + ' 触发【复活】！以 30% 生命重新站起（剩余 ' + target.ref.reviveCount + ' 次）');
       return false;
     }
@@ -438,6 +458,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (!layers.length) return false;
     const chance = Math.min(20, layers.length * 5);
     if (random() * 100 >= chance) return false;
+    emit('status-proc', { unitId: u.id, kind: 'paralyze', layers: layers.length, triggered: true });
     removeBuffRecord(u.id, layers[0]);
     addLog(u.name + ' 麻痹僵直，跳过本次行动（消耗 1 层）');
     return true;
@@ -486,6 +507,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
 
   function snapshot(viewerId = null) {
+    units.forEach(syncRageResult);
     const clock = state.combatState.clock;
     const visible = viewerId ? new Set(queryVisibleUnitIds(ctx, viewerId)) : null;
     const viewer = viewerId ? byId.get(viewerId) : null;
@@ -1874,6 +1896,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     }
     for (const id of Object.keys(placementsById)) Object.assign(placementsById[id], opening.positions[id]);
     Object.assign(state, emptyBattleState(state.sceneId, state.battleId));
+    rageVisualActive.clear();
     resources = null; log = []; domainEvents = []; actionSerial = 0; attackSerial = 0; summonSerial = 0;
     attackStack.length = 0;
     ctx.regions = state.combatState.regions = [];

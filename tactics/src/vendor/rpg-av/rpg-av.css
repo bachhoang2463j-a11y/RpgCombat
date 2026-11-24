@@ -21,6 +21,95 @@
 [data-rpg-av-scope] .arcane-flash-melee { animation: arcane-f-melee 0.34s steps(1) both !important; }
 [data-rpg-av-scope] .arcane-flash-ranged { animation: arcane-f-ranged 0.34s steps(1) both !important; }
 [data-rpg-av-scope] .arcane-flash-spell { animation: arcane-f-spell 0.38s steps(1) both !important; }
+[data-rpg-av-scope] .arcane-variant-anchor { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; }
+[data-rpg-av-scope] .arcane-variant-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+[data-rpg-av-scope] .arcane-variant-svg .v-shard, [data-rpg-av-scope] .arcane-variant-svg .v-ground, [data-rpg-av-scope] .arcane-variant-svg .v-core, [data-rpg-av-scope] .arcane-variant-svg .v-outline, [data-rpg-av-scope] .arcane-variant-svg .v-shell-frag, [data-rpg-av-scope] .arcane-variant-svg .v-shell-whole, [data-rpg-av-scope] .arcane-variant-svg .v-molt-flash, [data-rpg-av-scope] .arcane-variant-svg .v-aura-sweep, [data-rpg-av-scope] .arcane-variant-svg .v-pulse-1, [data-rpg-av-scope] .arcane-variant-svg .v-pulse-2, [data-rpg-av-scope] .arcane-variant-svg .v-blast, [data-rpg-av-scope] .arcane-variant-svg .v-link-halo, [data-rpg-av-scope] .arcane-variant-svg .v-leech-g, [data-rpg-av-scope] .arcane-variant-svg .v-leech-p, [data-rpg-av-scope] .arcane-variant-svg .v-regen-scan, [data-rpg-av-scope] .arcane-variant-svg .v-regen-mesh, [data-rpg-av-scope] .arcane-variant-svg .v-regen-vp { will-change: transform, opacity; }
+[data-rpg-av-scope] .arcane-variant-host-rel { position: relative !important; }
+[data-rpg-av-scope] .arcane-variant-revive-desat { filter: grayscale(0.88) brightness(0.8) contrast(1.06) drop-shadow(0 0 10px rgba(186, 230, 253, 0.32)) !important; transition: filter 0.18s ease-out !important; }
+[data-rpg-av-scope] .arcane-variant-molt-sprite { filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.72)) drop-shadow(0 0 16px rgba(245, 158, 11, 0.42)) drop-shadow(0 10px 10px rgba(0, 0, 0, 0.5)); }
+[data-rpg-av-scope] .arcane-variant-rage-sprite { filter: drop-shadow(0 0 7px rgba(239, 68, 68, 0.85)) drop-shadow(0 0 18px rgba(185, 28, 28, 0.58)) drop-shadow(0 10px 10px rgba(0, 0, 0, 0.5)); transition: filter 0.45s ease-out; }
+[data-rpg-av-scope] .arcane-variant-molt-sprite.arcane-variant-rage-sprite { filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.8)) drop-shadow(0 0 12px rgba(239, 68, 68, 0.85)) drop-shadow(0 0 22px rgba(185, 28, 28, 0.55)) drop-shadow(0 10px 10px rgba(0, 0, 0, 0.5)); }
+[data-rpg-av-scope] .arcane-variant-molted-fx {
+        position: absolute; inset: -3px; border-radius: 8px; pointer-events: none; z-index: 18;
+        box-shadow: inset 0 0 14px rgba(245, 158, 11, 0.32), 0 0 14px rgba(251, 191, 36, 0.34);
+        background: radial-gradient(ellipse at 50% 85%, rgba(251, 191, 36, 0.18) 0%, transparent 68%);
+        animation: arcane-variant-molt-idle 3.4s ease-in-out infinite;
+    }
+[data-rpg-av-scope] .arcane-variant-molted-fx.is-sprite {
+        inset: -24px -28px; box-shadow: none; border-radius: 50%; z-index: -1;
+        background: radial-gradient(ellipse closest-side at 50% 70%, rgba(251, 191, 36, 0.42) 0%, rgba(217, 119, 6, 0.16) 54%, transparent 100%);
+    }
+[data-rpg-av-scope] .arcane-variant-molted-fx::after {
+        content: '蜕'; position: absolute; right: 4px; bottom: 4px; padding: 0 4px;
+        font-size: 9px; font-weight: 900; line-height: 1.35; color: #fef3c7;
+        background: linear-gradient(135deg, rgba(146, 64, 14, 0.9), rgba(69, 26, 3, 0.92));
+        box-shadow: 0 0 6px rgba(251, 191, 36, 0.45); border-radius: 4px;
+    }
+[data-rpg-av-scope] .arcane-variant-molted-fx.is-sprite::after { right: 22px; bottom: 22px; }
+[data-rpg-av-scope] .arcane-variant-rage-fx {
+        position: absolute; inset: -3px; border-radius: 8px; pointer-events: none; z-index: 19; overflow: hidden;
+        box-shadow: inset 0 0 18px rgba(220, 38, 38, 0.42), 0 0 16px rgba(220, 38, 38, 0.4);
+        transition: opacity 0.45s ease-out, transform 0.45s ease-out;
+    }
+[data-rpg-av-scope] .arcane-variant-rage-fx.is-sprite {
+        inset: -26px -30px; box-shadow: none; border-radius: 50%; z-index: -1; overflow: visible;
+        background: radial-gradient(ellipse closest-side at 50% 56%, rgba(220, 38, 38, 0.34) 0%, rgba(127, 29, 29, 0.14) 58%, transparent 100%);
+    }
+[data-rpg-av-scope] .arcane-variant-rage-fx::before {
+        content: ''; position: absolute; left: 0; right: 0; top: 8%; bottom: -6%;
+        background: radial-gradient(ellipse closest-side at 50% 62%, rgba(239, 68, 68, 0.34) 0%, rgba(127, 29, 29, 0.14) 55%, transparent 100%);
+        animation: arcane-variant-rage-heat 2.2s linear infinite;
+    }
+[data-rpg-av-scope] .arcane-variant-rage-fx.exiting { opacity: 0 !important; transform: scale(0.95); }
+[data-rpg-av-scope] .arcane-status-anchor { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; }
+[data-rpg-av-scope] .arcane-status-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+[data-rpg-av-scope] .arcane-status-host-rel { position: relative !important; }
+[data-rpg-av-scope] .arcane-status-persist-layer {
+    position: absolute; inset: 0; pointer-events: none; z-index: 8; overflow: visible;
+    transition: opacity 0.26s ease-out; will-change: opacity;
+}
+[data-rpg-av-scope] .arcane-status-persist-layer.exiting { opacity: 0 !important; }
+[data-rpg-av-scope] .arcane-status-flame-chip {
+    position: absolute; pointer-events: none; transform-origin: 50% 92%;
+    will-change: transform, opacity;
+}
+[data-rpg-av-scope] .arcane-status-flame-chip.f1 { left: 15%; bottom: 1px; width: 11px; height: 16px; animation: arcane-status-flame-flicker 1.25s ease-in-out infinite; }
+[data-rpg-av-scope] .arcane-status-flame-chip.f2 { left: 42%; bottom: -1px; width: 9px; height: 13px; animation: arcane-status-flame-flicker 1.05s ease-in-out -0.45s infinite; }
+[data-rpg-av-scope] .arcane-status-flame-chip.f3 { right: 15%; bottom: 2px; width: 10px; height: 15px; animation: arcane-status-flame-flicker 1.42s ease-in-out -0.78s infinite; }
+[data-rpg-av-scope] .arcane-status-ember-dot {
+    position: absolute; width: 2.5px; height: 2.5px; border-radius: 50%; pointer-events: none;
+    background: #fde047; box-shadow: 0 0 4px #f97316; will-change: transform, opacity;
+}
+[data-rpg-av-scope] .arcane-status-ember-dot.e1 { left: 26%; bottom: 10%; animation: arcane-status-ember-float 1.6s ease-out infinite; }
+[data-rpg-av-scope] .arcane-status-ember-dot.e2 { right: 24%; bottom: 12%; animation: arcane-status-ember-float 1.85s ease-out -0.82s infinite; }
+[data-rpg-av-scope] .arcane-status-bubble-dot {
+    position: absolute; border-radius: 50%; pointer-events: none;
+    border: 1px solid rgba(216, 180, 254, 0.82);
+    background: radial-gradient(circle at 32% 30%, rgba(243, 232, 255, 0.88) 0%, rgba(168, 85, 247, 0.48) 55%, rgba(107, 33, 168, 0.75) 100%);
+    will-change: transform, opacity;
+}
+[data-rpg-av-scope] .arcane-status-bubble-dot.b1 { right: 12%; top: 44%; width: 6px; height: 6px; animation: arcane-status-bubble-drift 2.1s ease-out infinite; }
+[data-rpg-av-scope] .arcane-status-bubble-dot.b2 { right: 25%; top: 34%; width: 5px; height: 5px; animation: arcane-status-bubble-drift 2.45s ease-out -0.85s infinite; }
+[data-rpg-av-scope] .arcane-status-bubble-dot.b3 { right: 17%; top: 24%; width: 7px; height: 7px; animation: arcane-status-bubble-drift 1.95s ease-out -1.45s infinite; }
+[data-rpg-av-scope] .arcane-status-spark-star { position: absolute; pointer-events: none; transform-origin: 50% 50%; will-change: transform, opacity; }
+[data-rpg-av-scope] .arcane-status-spark-star.s1 { left: 20%; top: 10%; width: 9px; height: 9px; animation: arcane-status-para-spark 1.24s ease-out infinite; }
+[data-rpg-av-scope] .arcane-status-spark-star.s2 { left: 49%; top: 5%; width: 10px; height: 10px; animation: arcane-status-para-spark 1.46s ease-out -0.52s infinite; }
+[data-rpg-av-scope] .arcane-status-spark-star.s3 { right: 17%; top: 14%; width: 8px; height: 8px; animation: arcane-status-para-spark 1.12s ease-out -0.84s infinite; }
+[data-rpg-av-scope] .arcane-status-spark-dot {
+    position: absolute; border-radius: 50%; pointer-events: none;
+    background: #fef9c3; border: 0.8px solid rgba(180, 83, 9, 0.75);
+    box-shadow: 0 0 4px #facc15, 0 0 7px rgba(245, 158, 11, 0.7);
+    will-change: transform, opacity;
+}
+[data-rpg-av-scope] .arcane-status-spark-dot.d1 { left: 34%; top: 18%; width: 3.5px; height: 3.5px; animation: arcane-status-para-dot 1.32s ease-out -0.26s infinite; }
+[data-rpg-av-scope] .arcane-status-spark-dot.d2 { right: 27%; top: 9%; width: 3px; height: 3px; animation: arcane-status-para-dot 1.54s ease-out -0.96s infinite; }
+[data-rpg-av-scope] .arcane-status-persist-layer.is-hero .arcane-status-spark-star.s1 { left: 16%; top: 25%; }
+[data-rpg-av-scope] .arcane-status-persist-layer.is-hero .arcane-status-spark-star.s2 { left: 32%; top: 20%; }
+[data-rpg-av-scope] .arcane-status-persist-layer.is-hero .arcane-status-spark-star.s3 { left: 45%; right: auto; top: 32%; }
+[data-rpg-av-scope] .arcane-status-persist-layer.is-hero .arcane-status-spark-dot.d1 { left: 23%; top: 34%; }
+[data-rpg-av-scope] .arcane-status-persist-layer.is-hero .arcane-status-spark-dot.d2 { left: 52%; right: auto; top: 25%; }
+[data-rpg-av-scope] .arcane-selfdestruct-sprite-subdued { filter: saturate(0.32) brightness(0.76) !important; transform: translateY(10px) scale(1.08, 0.7) !important; opacity: 0.78; transition: transform 0.25s ease, filter 0.25s ease, opacity 0.25s ease; }
+[data-rpg-av-scope] .arcane-rescue-blood-wrap { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 12; border-radius: inherit; }
 [data-rpg-av-scope] .arcane-identity-anchor { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; }
 [data-rpg-av-scope] .arcane-identity-svg-full { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 [data-rpg-av-scope] .arcane-identity-glow-amber { filter: drop-shadow(0 0 8px #f59e0b) drop-shadow(0 0 18px #ea580c); }
@@ -56,6 +145,8 @@
 [data-rpg-av-scope] .arcane-hit-tag.burst { color: #fef08a; }
 [data-rpg-av-scope] .arcane-hit-core { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
 [data-rpg-av-scope] .arcane-hit-recoil { will-change: translate, rotate; }
+[data-rpg-av-scope] .arcane-hit-track { position: relative; }
+[data-rpg-av-scope] .floating-text { position: absolute; animation: float-up 1s ease-out forwards; pointer-events: none; z-index: 60; text-shadow: 0 2px 4px rgba(0,0,0,0.8); white-space: nowrap; }
 [data-rpg-av-scope] .shake { animation: shake 0.4s ease-in-out; }
 [data-rpg-av-scope] .anim-heal { animation: svg-heal 0.8s ease-out forwards; }
 [data-rpg-av-scope] .anim-buff { animation: svg-buff 0.6s ease-out forwards; }
@@ -69,6 +160,7 @@
 [data-rpg-av-scope] .omen-violet-wide { animation: omenVioletWide 600ms cubic-bezier(0.25,1,0.5,1) forwards; }
 [data-rpg-av-scope] .omen-rose-self { animation: omenRoseSelf 600ms cubic-bezier(0.25,1,0.5,1) forwards; }
 [data-rpg-av-scope] .omen-gloom-foe { animation: omenGloomFoe 600ms cubic-bezier(0.25,1,0.5,1) forwards; }
+[data-rpg-av-scope] .charge-full-danger { animation: danger-shake 0.15s infinite linear; filter: drop-shadow(0 0 22px rgba(244, 63, 94, 0.9)); }
 [data-rpg-av-scope] .team-barrier-wrapper {
       /* 金色（法术·默认） */
       --br-dome-bg: radial-gradient(ellipse at center, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.04) 65%, rgba(217, 119, 6, 0.15) 100%);
@@ -157,6 +249,7 @@
       pointer-events: none;
     }
 [data-rpg-av-scope] .visible {visibility:visible}
+[data-rpg-av-scope] .static {position:static}
 [data-rpg-av-scope] .absolute {position:absolute}
 [data-rpg-av-scope] .relative {position:relative}
 [data-rpg-av-scope] .inset-0 {inset:0}
@@ -198,6 +291,7 @@
 [data-rpg-av-scope] .ease-in {transition-timing-function:cubic-bezier(.4,0,1,1)}
 [data-rpg-av-scope] .ease-out {transition-timing-function:cubic-bezier(0,0,.2,1)}
 @keyframes breathe { 0% { transform: translateY(0px); } 100% { transform: translateY(-10px); } }
+@keyframes float-up { 0% { opacity: 0; transform: translateY(5px) scale(0.8); } 20% { opacity: 1; transform: translateY(-10px) scale(1.2); } 80% { opacity: 1; transform: translateY(-20px) scale(1); } 100% { opacity: 0; transform: translateY(-30px) scale(0.8); } }
 @keyframes arcane-f-cold { 0% { filter: brightness(1.6) hue-rotate(180deg) saturate(2.5); } 60% { filter: none; } }
 @keyframes arcane-f-heal { 0% { filter: brightness(1.8) drop-shadow(0 0 18px #34d399); } 100% { filter: none; } }
 @keyframes arcane-s-light { 25% { transform: translate3d(-3px, 2px, 0); } 60% { transform: translate3d(3px, -2px, 0); } }
@@ -212,6 +306,45 @@
 @keyframes arcane-f-melee { 0%, 45% { filter: brightness(2.4) saturate(1.9) drop-shadow(0 0 18px #ff2938); } 46%, 100% { filter: none; } }
 @keyframes arcane-f-ranged { 0%, 45% { filter: brightness(2.6) saturate(1.6) drop-shadow(0 0 20px #facc15); } 46%, 100% { filter: none; } }
 @keyframes arcane-f-spell { 0%, 45% { filter: brightness(2.7) saturate(1.4) drop-shadow(0 0 20px #e0f2fe) drop-shadow(0 0 34px #38bdf8); } 46%, 100% { filter: none; } }
+@keyframes arcane-variant-molt-idle {
+        0%, 100% { opacity: 0.78; transform: scale(1); }
+        50% { opacity: 0.96; transform: scale(1.02); }
+    }
+@keyframes arcane-variant-rage-heat {
+        0% { transform: translateY(8%) scaleX(0.96); opacity: 0.65; }
+        50% { transform: translateY(-7%) scaleX(1.04); opacity: 0.9; }
+        100% { transform: translateY(8%) scaleX(0.96); opacity: 0.65; }
+    }
+@keyframes arcane-status-flame-flicker {
+    0%, 100% { transform: translateY(0) scale(0.92, 0.9) skewX(-3deg); opacity: 0.72; }
+    35% { transform: translateY(-2px) scale(1.06, 1.12) skewX(3deg); opacity: 0.94; }
+    70% { transform: translateY(-1px) scale(0.96, 1.02) skewX(-2deg); opacity: 0.8; }
+}
+@keyframes arcane-status-ember-float {
+    0% { transform: translate3d(0, 2px, 0) scale(0.6); opacity: 0; }
+    25% { opacity: 0.92; }
+    100% { transform: translate3d(3px, -16px, 0) scale(0.35); opacity: 0; }
+}
+@keyframes arcane-status-bubble-drift {
+    0% { opacity: 0; transform: translate3d(0, 6px, 0) scale(0.5); }
+    22% { opacity: 0.92; transform: translate3d(1px, 1px, 0) scale(0.95); }
+    76% { opacity: 0.86; transform: translate3d(-1.5px, -10px, 0) scale(1.08); }
+    90% { opacity: 0.9; transform: translate3d(-1px, -13px, 0) scale(1.24); }
+    100% { opacity: 0; transform: translate3d(-1px, -15px, 0) scale(0.35); }
+}
+@keyframes arcane-status-para-spark {
+    0%, 100% { opacity: 0.15; transform: translate3d(0, 1px, 0) scale(0.55) rotate(-8deg); }
+    22% { opacity: 0.98; transform: translate3d(0.5px, -2px, 0) scale(1.12) rotate(10deg); }
+    46% { opacity: 0.42; transform: translate3d(-0.5px, -3px, 0) scale(0.72) rotate(-4deg); }
+    68% { opacity: 0.92; transform: translate3d(1px, -4px, 0) scale(0.96) rotate(14deg); }
+    88% { opacity: 0; transform: translate3d(0, -6px, 0) scale(0.4) rotate(20deg); }
+}
+@keyframes arcane-status-para-dot {
+    0%, 100% { opacity: 0; transform: translate3d(0, 2px, 0) scale(0.5); }
+    28% { opacity: 0.95; transform: translate3d(-1px, -2px, 0) scale(1.15); }
+    70% { opacity: 0.75; transform: translate3d(1px, -6px, 0) scale(0.85); }
+    94% { opacity: 0; transform: translate3d(1.5px, -9px, 0) scale(0.35); }
+}
 @keyframes arcane-identity-frost-flash { 0% { filter: brightness(1.38) hue-rotate(-14deg) saturate(1.4); } 65% { filter: none; } }
 @keyframes arcane-hit-fill-blink { 0% { filter: brightness(2.2); } 100% { filter: none; } }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px) rotate(-1deg); } 50% { transform: translateX(3px) rotate(1deg); } 75% { transform: translateX(-3px) rotate(-0.5deg); } }
@@ -316,6 +449,12 @@
       55% { transform: scale(1.02,0.96) translateY(0.035em) rotate(2deg); filter: grayscale(0.22) brightness(0.92) drop-shadow(0 0 30px rgba(15,23,42,1)) drop-shadow(0 0 50px rgba(71,85,105,0.9)); }
       80% { transform: scale(1.01,0.99) translateY(0.01em) rotate(0.5deg); filter: grayscale(0.1) brightness(0.98) drop-shadow(0 0 50px rgba(30,41,59,0.5)) drop-shadow(0 0 80px rgba(71,85,105,0.25)); }
       100% { transform: scale(1) translateY(0) rotate(0deg); filter: grayscale(0) brightness(1) drop-shadow(0 0 0 rgba(30,41,59,0)); }
+    }
+@keyframes danger-shake {
+        0%, 100% { transform: scale(1.05) translate(0, 0); }
+        25% { transform: scale(1.05) translate(-2px, 2px); }
+        50% { transform: scale(1.05) translate(2px, -2px); }
+        75% { transform: scale(1.05) translate(-2px, -2px); }
     }
 @keyframes barrier-border-flow {
       0% { background-position: 0% 50%; }

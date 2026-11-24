@@ -347,6 +347,7 @@ export function createActionDirector(deps) {
       const healed = seg.heal != null ? !!seg.heal : (!seg.hit && seg.hpAfter > seg.hpBefore);
       const waveIndex = seg.shotIndex ?? i, wave = waves.get(waveIndex);
       const r = { ...buildHitFeedback({ ...result, skill }, h, seg, incoming), actionId, waveId: wave ? wave.id : null };
+      avHost.consumeVisualEvents?.((result.events || []).filter(ev => ev.unitId === targetId && ev.type === 'variant-trigger'));
       if (healed) playHealPulse(targetId);
       else av.playHitFeedback(r, { wave: hitWaves[waveIndex] || (hitWaves[waveIndex] = { shook: false, hitStopped: false, classified: [] }) });
       if (!healed) av.CombatAudioDirector.publish(r);
@@ -383,6 +384,8 @@ export function createActionDirector(deps) {
     if (!isCurrent() || ok === false) return false;
     hits.forEach(h => reveal(h.targetId, { late: true }));
     effects.forEach(e => revealEffect(e));
+    avHost.consumeVisualEvents?.(result.events || []);
+    avHost.syncVisualState?.();
     regions.forEach(r => revealRegion(r.id));
     await Promise.all(reactionRuns);
     // 冲锋与受击击退位移补间（解锁规则站位前先在视图平滑滑移）

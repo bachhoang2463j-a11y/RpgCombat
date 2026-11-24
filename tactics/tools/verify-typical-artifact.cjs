@@ -26,6 +26,8 @@ check('原版特效与角色独立堆叠层入包', html.includes('z-index:2;') 
 check('发现敌人记录字段及枪声去重入包', html.includes('discoveredIds') && html.includes('playRandomStandardGunshot.last'));
 check('原版受击数字及真实结果接线入包', ['buildHitFeedback', 'prepareHitNumbers', 'animateHitNumber', 'HIT_NUMBER_THEMES', 'data-hit-type', '--hit-scale'].every(s => html.includes(s)));
 check('头像远景底线及父子引用修复入包', html.includes('avatarScaleForZoom') && html.includes('linkSkillGroupRows'));
+check('原版状态变种真实入口与常量入包', ['syncStatusLayers', 'clearStatusLayers', 'playStatusTickFx', 'syncVariantState', 'clearVariantState', 'playVariantTriggerFx', 'isEntityVariantLocked', 'STATUS_COLORS', 'arcane-status-flame-chip', 'arcane-variant-molted-fx'].every(s => html.includes(s)));
+check('实际结果事件和视觉消费入包', ['variant-trigger', 'status-tick', 'status-proc', 'status-removed', 'consumeVisualEvents', 'syncVisualState'].every(s => html.includes(s)));
 const context = { console, structuredClone, URL, setTimeout, clearTimeout };
 context.window = context;
 vm.createContext(context);

@@ -10,6 +10,7 @@
 // 不在这里做任何规则结算；特效函数也不负责扣血。
 // ==========================================
 
+import { hasVariantTag } from './variant-rules.mjs';
 import { createRpgAv, RPG_AVATAR_MAP, RPG_HERO_VOICE_LINES } from './vendor/rpg-av/rpg-av.mjs';
 
 export const FX_SCALE = 0.72;            // 卡片尺寸特效 → 地图尺度（舞台整体 scale，坐标同步换算）
@@ -38,7 +39,7 @@ export function heroHasVoice(name) {
   return Object.prototype.hasOwnProperty.call(RPG_HERO_VOICE_LINES, name);
 }
 
-export function createAvHost({ getUnitView, getUnits }) {
+export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => null }) {
   const rectSymbol = Symbol('tacticsStageRect');
   let stageEl = document.createElement('div');   // 初始占位；sandbox 挂载后 attachStage 换成真实舞台
   let shakeEl = null;
@@ -80,6 +81,7 @@ export function createAvHost({ getUnitView, getUnits }) {
     hitNumberScale(dom) { return dom[rectSymbol]().width / dom.offsetWidth; },
     isHero(e) { const u = unitById(idOf(e)); return u ? u.side === 'hero' : false; },
     isActive(e) { const u = unitById(idOf(e)); return !!(u && u.ref.hp > 0); },
+    hasVariantTag(e, name) { const u = unitById(idOf(e)); return hasVariantTag(u, name, getEffectiveUnit(idOf(e))?.buffs || []); },
     report(kind, detail) { reports.missing.push({ kind, detail }); },
   };
 
@@ -99,11 +101,36 @@ export function createAvHost({ getUnitView, getUnits }) {
   function entity(id) {
     const u = unitById(id);
     if (!u) return null;
-    return { id: u.id, name: u.name, isAlive: u.ref.hp > 0, isHero: u.side === 'hero', side: u.side, hp: u.ref.hp, maxHp: u.ref.maxHp };
+    const effective = getEffectiveUnit(id);
+    return { id: u.id, name: u.name, isAlive: u.ref.hp > 0, isHero: u.side === 'hero', side: u.side, hp: u.ref.hp, maxHp: u.ref.maxHp,
+      molted: !!u.ref.molted, hasRageNarrated: !!u.ref.hasRageNarrated,
+      buffs: (effective?.buffs || []).map(b => ({ ...b, permanent: b.duration === null })) };
   }
   function syncRoster() {
     const units = getUnits() || [];
     av.setRoster(units.filter(u => u.side === 'hero').map(u => entity(u.id)), units.filter(u => u.side !== 'hero').map(u => entity(u.id)));
+  }
+
+  const consumedEvents = new Set();
+  function consumeVisualEvents(events) {
+    for (const ev of events) {
+      if (consumedEvents.has(ev.seq)) continue;
+      consumedEvents.add(ev.seq);
+      const ent = entity(ev.unitId);
+      if (!ent) continue;
+      if (ev.type === 'variant-trigger') av.playVariantTriggerFx({ trigger: ev.trigger, entity: ent, meta: ev });
+      else if (ev.type === 'status-tick') av.playStatusTickFx({ event: ev.kind === 'poison' ? 'poisonTick' : 'burnTick', entity: ent, meta: ev });
+      else if (ev.type === 'status-proc') av.playStatusTickFx({ event: 'paraProc', entity: ent, meta: ev });
+      else if (ev.type === 'status-removed' && ['burn', 'poison', 'paralyze'].includes(ev.kind))
+        av.playStatusTickFx({ event: 'expire', entity: ent, meta: { expiredType: ev.kind } });
+    }
+  }
+  function syncVisualState() {
+    for (const u of getUnits()) {
+      const ent = entity(u.id);
+      av.syncStatusLayers(ent);
+      av.syncVariantState(ent);
+    }
   }
 
   // ---------- 声音：首次真实交互解锁 + 显式预载 + 加载报告 ----------
@@ -170,6 +197,7 @@ export function createAvHost({ getUnitView, getUnits }) {
   // ---------- 换代与清场 ----------
   function setToken(token) { av.setToken(token); }
   function clear({ resetVoices = false } = {}) {
+    consumedEvents.clear();
     av.clearArcaneFx();             // 原清场：演出层/粒子/定时/采样/混音器上下文一并关闭
     if (resetVoices) { voiceState.clear(); queuedVoice = null; }
     preloaded = false;              // 混音器 clear 关闭了上下文与解码缓冲；已解锁则在下一拍重建并重新预载
@@ -206,5 +234,5 @@ export function createAvHost({ getUnitView, getUnits }) {
     delete Element.prototype[rectSymbol];
   }
 
-  return { av, host, attachStage, entity, syncRoster, unlockAudio, playTurnVoice, sfx, setToken, clear, trackImage, resourceReport, destroy, voiceUrl };
+  return { av, host, attachStage, entity, syncRoster, consumeVisualEvents, syncVisualState, unlockAudio, playTurnVoice, sfx, setToken, clear, trackImage, resourceReport, destroy, voiceUrl };
 }

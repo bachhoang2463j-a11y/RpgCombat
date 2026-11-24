@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "ed907290ea5429aab9bf5db190402e367d0922a833b935dbdca9d9bac98e4c3f",
-  "bytes": 1194003,
+  "sha256": "c3d7719ea6c239d0ca2b78378e83d29e5adb26c47caa1942b271602013f338fc",
+  "bytes": 1270442,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -86,6 +86,16 @@
       "detail": ""
     },
     {
+      "id": "原版状态变种真实入口与常量入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "实际结果事件和视觉消费入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
       "id": "无DOM离线宿主停在应用启动而非后端加载",
       "pass": true,
       "detail": "document is not defined"
@@ -151,6 +161,6 @@
       "detail": ""
     }
   ],
-  "passed": 29,
+  "passed": 31,
   "failed": 0
 }

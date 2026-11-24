@@ -17,12 +17,13 @@ const OUT = process.env.RPG_AV_OUT || path.join(ROOT, 'tactics', 'src', 'vendor'
 const ENTRIES = [
   'playEnemyWindup', 'playAttackIdentityFx', 'playArcaneProjectile', 'playHitFeedback', 'classifyHit',
   'syncHitBar', 'CombatAudioDirector', 'clearHitFeedback', 'warmIdentitySample', 'playArsenicShot',
-  'clearArcaneFx',
+  'clearArcaneFx', 'syncStatusLayers', 'clearStatusLayers', 'playStatusTickFx',
+  'syncVariantState', 'clearVariantState', 'playVariantTriggerFx', 'isEntityVariantLocked',
 ];
 // 不入口：敌方兜底群攻 playMeleeGroup/RangedGroup/SpellGroup 按全队卡片头像取帧（portraitFrame），
 // 与空间范围"只作用真实受影响目标"冲突；战棋敌方范围攻击改走攻击身份 aoe（逐目标 onImpact）。
 // 闭包内被 clearArcaneFx 等引用、但属于本 Demo 不产生状态的未迁移段：生成显式空实现
-const STUBS = ['clearSummonState', 'clearStatusLayers', 'clearSelfDestructState', 'clearRescueState', 'clearVariantState'];
+const STUBS = ['clearSummonState', 'clearSelfDestructState', 'clearRescueState'];
 // 需要原样带入的段（未入闭包也带入）：语法上属于前一语句的续行
 const MESSY_SECTIONS = ['抗性与免疫演出 BEGIN', 'v12.10 状态发作', 'v12.10 状态 END', '救援时刻 v12.10 BEGIN', '召唤三瞬默认演出 v12.12 BEGIN'];
 
@@ -124,7 +125,7 @@ function sliceArcane(L) {
   };
   const byName = new Map();
   merged.forEach((sg, idx) => {
-    sg.decl = !sg.head ? [] : sg.messy ? (/^(async\s+)?function/.test(sg.head) ? declNames(sg.head) : []) : declNames(sg.head);
+    sg.decl = !sg.head ? [] : declNames(sg.head);
     sg.decl.forEach(n => byName.set(n, idx));
   });
   const strip = t => t.replace(/\/\/[^\n]*/g, '').replace(/'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"/g, "''");
@@ -418,9 +419,9 @@ ${supportBranches.join('\n').replace('else if', 'if')}
     "const waveW = areaBounds ? stageW : Math.max(stageW * 1.15, 360), waveH = areaBounds ? stageH : Math.max(stageH * 0.92, 136);", 1, '战棋攻击身份适配');
   mod = patch(mod, "${Math.max(88, stageH * 0.68)}px;transform:translate(-50%,-50%);",
     "${areaBounds ? stageH : Math.max(88, stageH * 0.68)}px;transform:translate(-50%,-50%);", 1, '战棋攻击身份适配');
-  mod = patch(mod, /\.getBoundingClientRect\(\)/g, '[__GBCR]()', 10, '屏幕矩形 → 特效舞台坐标');
-  mod = patch(mod, /\b(?:window\.)?innerWidth\b/g, '__STAGE.w', 5, 'innerWidth → 舞台宽');
-  mod = patch(mod, /\b(?:window\.)?innerHeight\b/g, '__STAGE.h', 3, 'innerHeight → 舞台高');
+  mod = patch(mod, /\.getBoundingClientRect\(\)/g, '[__GBCR]()', 11, '屏幕矩形 → 特效舞台坐标');
+  mod = patch(mod, /\b(?:window\.)?innerWidth\b/g, '__STAGE.w', 10, 'innerWidth → 舞台宽');
+  mod = patch(mod, /\b(?:window\.)?innerHeight\b/g, '__STAGE.h', 5, 'innerHeight → 舞台高');
   mod = patch(mod, 'document.body.appendChild(', '__STAGE.el.appendChild(', 5, 'body 挂载 → 特效舞台');
   mod = patch(mod, /position\s*:\s*fixed/g, 'position:absolute', 0, 'JS position:fixed → absolute');
   mod = patch(mod, "window.addEventListener('resize', resizeCanvas);", '__STAGE.onResize(resizeCanvas);', 1, 'arcane canvas resize 走舞台');
@@ -489,6 +490,7 @@ export function createRpgAv(host) {
   const getEntitySpriteDom = e => host.spriteOf(e);
   const isHeroSideEntity = e => host.isHero(e);
   const isCombatActive = e => host.isActive(e);
+  const hasVariantTag = (e, name) => host.hasVariantTag(e, name);
 
   // ---- 人物与语音表（原样） ----
   ${heroVoice.text}
@@ -516,7 +518,8 @@ ${busText}
 ${stubText}
 ${mod}
     return { playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar,
-      CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx };
+      CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx,
+      syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked };
   })();
 ${busOn.map(l => l.replace('CombatAudioDirector.consume', 'arcane.CombatAudioDirector.consume')).join('\n')}
 

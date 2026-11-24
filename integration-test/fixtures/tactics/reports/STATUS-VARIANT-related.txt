@@ -1,0 +1,10 @@
+  ✓ TSV-01 passed=14 (2ms)
+  ✓ TSV-02 passed=5 (15ms)
+[stage:status-variant] groups=2 passed=19 failed=0 pending=0
+
+  ✓ THIT-01 passed=13 (14ms)
+  ✓ THIT-02 passed=14 (2ms)
+  ✓ THIT-03 passed=16 (2ms)
+  ✓ THIT-04 passed=2 (2ms)
+[stage:hit-feedback] groups=4 passed=45 failed=0 pending=0
+
