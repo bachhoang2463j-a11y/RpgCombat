@@ -5298,6 +5298,25 @@ button:disabled { opacity: .42; cursor: default; }
   }
 
   // src/unit-view.mjs
+  var EMOJI_RE2 = /^((?:\p{Extended_Pictographic}|\p{Emoji_Presentation})(?:\uFE0F|\u200D(?:\p{Extended_Pictographic}|\p{Emoji_Presentation}))*)\s*/u;
+  function splitEmojiName(raw) {
+    const s = String(raw || "").trim();
+    const m = s.match(EMOJI_RE2);
+    return m ? { emoji: m[1], name: s.slice(m[0].length).trim() || s } : { emoji: null, name: s };
+  }
+  function resolveAvatarUrl(unit, avatarOf) {
+    if (unit.img) return unit.img;
+    if (typeof avatarOf === "function") {
+      const url = avatarOf(unit.name);
+      if (url) return url;
+    }
+    const mms = typeof window !== "undefined" ? window.MMSImages : null;
+    if (mms && typeof mms.resolveAvatar === "function") {
+      const url = mms.resolveAvatar(unit.name);
+      if (url) return url;
+    }
+    return null;
+  }
   function escapeHtml(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
   }
@@ -18487,12 +18506,18 @@ button:disabled { opacity: .42; cursor: default; }
     const units = [];
     const placementsById = {};
     const footprintsById = {};
+    const srcs = [...parsed.heroes || [], ...parsed.enemies || []];
     const styles = resolveUnitStyles(scenario.units);
-    for (const u of scenario.units) {
+    for (let i = 0; i < scenario.units.length; i++) {
+      const u = scenario.units[i];
       const p = VFX_STAGE_PLACEMENTS[u.id];
       if (!p) continue;
+      const src = srcs[i] || {};
+      const emoji = splitEmojiName(src.name || u.name).emoji || null;
       const clone = JSON.parse(JSON.stringify(u));
-      if (u.side === "hero") clone.avatarUrl = heroAvatarUrl(u.name) || void 0;
+      clone.emoji = emoji;
+      clone.img = src.img || null;
+      clone.avatarUrl = emoji ? null : resolveAvatarUrl({ img: src.img, name: u.name }, heroAvatarUrl);
       clone.style = styles[u.id] || {};
       clone.bars = { hp: clone.ref.hp, maxHp: clone.ref.maxHp, mp: clone.ref.mp, maxMp: clone.ref.maxMp, tp: clone.ref.tp || 0, maxTp: clone.ref.maxTp || 100, shield: 0 };
       units.push(clone);

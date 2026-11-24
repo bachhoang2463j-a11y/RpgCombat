@@ -14,6 +14,7 @@ import { createActionDirector } from './action-director.mjs';
 import { createFxRegistry, checkBudget, GRADE_BUDGETS } from './fx-registry.mjs';
 import { createUiSfx } from './ui-sfx.mjs';
 import { resolveUnitStyles } from './unit-style.mjs';
+import { splitEmojiName, resolveAvatarUrl } from './unit-view.mjs';
 import { unitCenter } from './geometry.mjs';
 import { queryAttack } from './range.mjs';
 import { compileScene } from './scene.mjs';
@@ -73,12 +74,18 @@ function buildStageData(yamlText) {
   const units = [];
   const placementsById = {};
   const footprintsById = {};
+  const srcs = [...(parsed.heroes || []), ...(parsed.enemies || [])];
   const styles = resolveUnitStyles(scenario.units);
-  for (const u of scenario.units) {
+  for (let i = 0; i < scenario.units.length; i++) {
+    const u = scenario.units[i];
     const p = VFX_STAGE_PLACEMENTS[u.id];
     if (!p) continue;
+    const src = srcs[i] || {};
+    const emoji = splitEmojiName(src.name || u.name).emoji || null;
     const clone = JSON.parse(JSON.stringify(u));
-    if (u.side === 'hero') clone.avatarUrl = heroAvatarUrl(u.name) || undefined;
+    clone.emoji = emoji;
+    clone.img = src.img || null;
+    clone.avatarUrl = emoji ? null : resolveAvatarUrl({ img: src.img, name: u.name }, heroAvatarUrl);
     clone.style = styles[u.id] || {};
     clone.bars = { hp: clone.ref.hp, maxHp: clone.ref.maxHp, mp: clone.ref.mp, maxMp: clone.ref.maxMp, tp: clone.ref.tp || 0, maxTp: clone.ref.maxTp || 100, shield: 0 };
     units.push(clone);
