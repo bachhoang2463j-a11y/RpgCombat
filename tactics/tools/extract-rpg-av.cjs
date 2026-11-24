@@ -271,6 +271,7 @@ function build() {
   // 召唤三瞬引用的回合制顶层集合（arcane 模块外，原样带入）
   const summonPending = topBlock(L, l => l.startsWith('const summonEnterPending = new Set();'), 'summonEnterPending');
   let moments = [execAnim.text, cutin.text].join('\n\n');
+  moments = patch(moments, '                        <div class="absolute top-1 left-2 text-[9px] font-bold text-amber-400 tracking-wider">档案: ${hero.name}</div>\n', '', 1, '远程击杀隐藏我方名称');
   moments = patch(moments, 'document.body.appendChild(overlay);', '__SCREEN().appendChild(overlay); __MOMENTS.add(overlay);', 2, '特写挂屏幕宿主');
   moments = patch(moments, 'overlay.remove();', 'overlay.remove(); __MOMENTS.delete(overlay);', 2, '特写收尾登记');
   moments = patch(moments, "document.getElementById('battle-scene')", '__STAGE.shakeEl()', 1, '特写震屏走舞台震动层');

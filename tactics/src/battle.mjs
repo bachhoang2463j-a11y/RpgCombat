@@ -10,7 +10,7 @@ import { emptyBattleState } from './lifecycle.mjs';
 import { compileScene } from './scene.mjs';
 import { findReachable, findJumpPath, canPlaceAt, traceDisplacement, cellsAdjacent, chargePath } from './movement.mjs';
 import { unitCenter, occupiedCells } from './geometry.mjs';
-import { fogAt, createFogRegion, expireRegions } from './regions.mjs';
+import { fogAt, fogAffects, createRegion, expireRegions, moveMultiplier } from './regions.mjs';
 import { canSeeUnit, visibleUnitIds as queryVisibleUnitIds } from './perception.mjs';
 import { previewBarrier, createBarrier, interception, damageBarrier, expireBarriers, clearBarriers, barrierContact } from './barriers.mjs';
 import { previewGuard } from './guard.mjs';
@@ -365,6 +365,62 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     for (const effect of result.applied) emit('effect-resolved', effect);
     return result;
   }
+  // 领域标签：失败即挂独立 3 回合 debuff，同源刷新；离场/区域消失保留。
+  function applyDomainTag(region, casterUnit, target, tag) {
+    const def = effectDefinition(tag.tag);
+    if (!def) return;
+    const turns = 3;
+    const skill = { name: region.sourceKey, isReaction: false };
+    if (def.kind === 'dot' || def.kind === 'paralyze') {
+      const immunity = immunityReason(target, def.dot || 'paralyze', buffsOf(target.id));
+      if (immunity) {
+        emit('effect-resolved', { kind: def.kind, targetId: target.id, tag: tag.tag, immune: true, immunity, reason: immunity.reason });
+        return;
+      }
+      const source = statusSource(target.id, { casterId: casterUnit.id, skillId: region.sourceKey }, region.sourceKey + ':' + tag.tag);
+      const type = def.kind === 'dot' ? def.dot : 'paralyze';
+      const value = Math.max(1, Math.floor(tag.power || 0)) * (def.kind === 'paralyze' ? -1 : 1);
+      registerBuff(target, { type, value, duration: turns }, source);
+      const effect = { kind: def.kind, targetId: target.id, tag: tag.tag, value, turns, casterId: casterUnit.id };
+      emit('effect-resolved', effect);
+      addLog(target.name + ' 受领域【' + tag.tag + '】影响 · ' + turns + '回');
+      return;
+    }
+    const slot = { index: tag.index, tag: tag.tag, power: tag.power, turns, target: 'default', definition: def };
+    applyBattleEffect({ caster: casterUnit, slot, targets: [target], skill, skillKey: region.sourceKey, multiplier: 1 });
+  }
+  // 共享闪避对抗：每领域每次只掷一次攻击骰，各目标分别掷闪避骰；进入不额外触发。
+  function runRegionContest(region, casterUnit) {
+    if (!region || !casterUnit || casterUnit.ref.hp <= 0) return [];
+    const targets = units.filter(t => t.ref.hp > 0 && t.side !== region.source.side && fogAffects(ctx, region, t.id)
+      && occupiedCells(placementsById[t.id], t.footprint).some(c => region.cells.some(rc => rc.col === c.col && rc.row === c.row)));
+    if (!targets.length) return [];
+    const cs = statsOf(casterUnit);
+    const atkCap = Math.max(1, Math.floor((region.hit ?? 100) + cs.hit));
+    const sharedAttack = Math.floor(random() * atkCap) + 1;
+    const applied = [];
+    for (const target of targets) {
+      const ts = statsOf(target);
+      const dodgeCap = Math.max(1, Math.floor((target.ref.evasion || 0) + (ts.eva || 0)));
+      const dodgeRoll = Math.floor(random() * dodgeCap) + 1;
+      let calls = 0;
+      const roll = resolveHit({ hitBonus: 0 }, { evasion: target.ref.evasion || 0, evaBonus: ts.eva || 0 }, { hit: atkCap }, () => {
+        calls += 1;
+        return calls === 1 ? (dodgeRoll - 1) / dodgeCap : (sharedAttack - 1) / atkCap;
+      });
+      const hit = roll.attackRoll >= roll.dodgeRoll;
+      emit('region-contest', { regionId: region.id, regionType: region.type, targetId: target.id,
+        hit, attackRoll: sharedAttack, dodgeRoll });
+      if (!hit) continue;
+      for (const tag of region.tags || []) {
+        const def = effectDefinition(tag.tag);
+        if (!def?.debuff || def.side === 'self' || region.type === 'fog' && tag.tag === '致盲') continue;
+        applyDomainTag(region, casterUnit, target, tag);
+      }
+      applied.push(target.id);
+    }
+    return applied;
+  }
   function blockEffect(caster, target, slot, barrier = interception(ctx, caster.id, target.id)) {
     if (!barrier) return null;
     return emit('barrier-blocked', { barrierId: barrier.id, barrier: structuredClone(barrier), reason: 'barrier-debuff',
@@ -379,13 +435,22 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     dispatchClock(state, { type: 'removeStatus', unitId: barrier.casterId, source: barrierClockSource(barrier) });
     emit('barrier-removed', { barrierId: barrier.id, reason, barrier: structuredClone(barrier) });
   }
+  function clearRegions() {
+    for (const region of ctx.regions.splice(0)) {
+      dispatchClock(state, { type: 'removeStatus', unitId: region.casterId,
+        source: { casterId: region.casterId, skillId: 'area:' + region.type, effectId: 'region:' + region.type } });
+      emit('region-expired', { regionId: region.id });
+    }
+  }
   function finishBattle(reason = 'battle-ended') {
+    clearRegions();
     clearBarriers(ctx).forEach(barrier => removeBarrierResult(barrier, reason));
     if (state.combatState.clock && !state.combatState.clock.terminal) state.combatState.clock.terminal = { type: 'ended', at: ctx.now() };
     resources = null;
     return snapshot();
   }
   function destroy() {
+    clearRegions();
     const removed = clearBarriers(ctx);
     removed.forEach(barrier => removeBarrierResult(barrier, 'destroyed'));
     generation++; runId = 'battle:' + instanceId + ':' + generation;
@@ -408,6 +473,11 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         if (target.ref.hp <= 0) handleDown(target, 'dot');
         else runEnemyThresholdVariants(target);
       }
+    } else if (ev.type === 'periodic-tick' && ev.kind === 'region' && !ev.suppressed) {
+      const type = String(ev.source?.skillId || '').replace(/^area:/, '');
+      const casterUnit = byId.get(ev.unitId);
+      const region = (ctx.regions || []).find(r => r.casterId === ev.unitId && r.type === type && (r.endAt == null || r.endAt > (ev.t ?? ctx.now())));
+      if (region && casterUnit) runRegionContest(region, casterUnit);
     } else if (ev.type === 'periodic-tick' && ev.kind === 'periodic' && !ev.suppressed) {
       const target = byId.get(ev.unitId);
       if (target && target.ref.hp > 0) {
@@ -672,12 +742,13 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const p = placementsById[currentId()];
     const from = { col: p.col, row: p.row, facing: p.facing };
     const seen = new Set(queryVisibleUnitIds(ctx, currentId()));
+    const multiplier = resources.moveMultiplier || 1;
     let stoppedOnDiscovery = false;
     let cost = 0;
     const path = [cell.path[0]];
     for (const next of cell.path.slice(1)) {
       const previous = path[path.length - 1];
-      cost += Math.hypot(next.col - previous.col, next.row - previous.row) * ((state.combatState.carrying || {})[currentId()] ? 2 : 1);
+      cost += Math.hypot(next.col - previous.col, next.row - previous.row) * ((state.combatState.carrying || {})[currentId()] ? 2 : 1) / moveMultiplier(ctx, currentId(), previous);
       p.col = next.col; p.row = next.row; path.push(next);
       if (ctx.enforcePerception && units.some(u => u.side !== actor().side && u.ref.hp > 0 && !seen.has(u.id) && canSeeUnit(ctx, currentId(), u.id))) {
         if (canPlaceAt(ctx, currentId(), next.col, next.row).ok) { stoppedOnDiscovery = true; break; }
@@ -687,7 +758,6 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     cell = { ...cell, col, row, cost, path };
     const last = path[path.length - 2] || from;
     p.facing = ((Math.atan2(col - last.col, -(row - last.row)) * 180 / Math.PI) + 360) % 360;
-    const multiplier = resources.moveMultiplier || 1;
     const travel = cell.cost / multiplier;
     const before = resources.moveRemaining;
     resources.moveRemaining = Math.max(0, resources.moveRemaining - travel);
@@ -1495,11 +1565,16 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
 
     // 召唤（召唤物立即占位、可被选为目标，从零跑完整圈；临时 AI 不进玩家弹窗）
     const summons = skill.summonTarget ? spawnSummons(eff, u, {}, query) : [];
-    if (skill.regionEffect?.type === 'fog') {
-      const region = createFogRegion(ctx, { caster: u, skill: eff, query, now: ctx.now() });
-      dispatchBattleClock({ type: 'applyStatus', unitId: u.id, source: { casterId: u.id, skillId: 'area:fog', effectId: 'region:fog' },
-        kind: 'region', duration: (region.endAt - ctx.now()) });
-      emit('region-created', { attackId: currentAttackId(), region: structuredClone(region) });
+    let createdRegion = null;
+    if (skill.regionEffect) {
+      const type = skill.regionEffect.type || 'fog';
+      const clockSource = { casterId: u.id, skillId: 'area:' + type, effectId: 'region:' + type };
+      dispatchClock(state, { type: 'removeStatus', unitId: u.id, source: clockSource });
+      createdRegion = createRegion(ctx, { caster: u, skill: eff, query, now: ctx.now(), type });
+      dispatchBattleClock({ type: 'applyStatus', unitId: u.id, source: clockSource,
+        kind: 'region', duration: (createdRegion.endAt - ctx.now()) });
+      emit('region-created', { attackId: currentAttackId(), region: structuredClone(createdRegion) });
+      runRegionContest(createdRegion, u);
     }
     if (slots.some(s => s.definition.kind === 'barrier')) {
       const result = createBarrier(ctx, u.id, eff, query);
@@ -1543,7 +1618,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       activeSegment = { slotIndex: slot.index, segmentIndex: shotIdx + (slot.attack ? 1 : 0),
         segmentId: runId + ':' + currentAttackId() + ':slot:' + slot.index + ':segment:' + (shotIdx + (slot.attack ? 1 : 0)) };
       bdg.barrierTargets = Object.fromEntries([...new Set(slot.targetIds || [])].map(id => [id, interception(ctx, u.id, id)]).filter(([, barrier]) => barrier));
-      if (def.kind === 'barrier' || skill.regionEffect?.type === 'fog' && slot.tag === '致盲') continue;
+      if (def.kind === 'barrier' || createdRegion && (createdRegion.tags || []).some(tg => tg.tag === slot.tag)) continue;
       let targets = [];
       if (slot.target === 'self' || def.side === 'self') targets = u.ref.hp > 0 ? [u] : [];
       else targets = (slot.targetIds || []).map(id => byId.get(id)).filter(t => t && (t.ref.hp > 0 || def.kind === 'heal' && t.side === u.side && !t.isSummon));
@@ -1768,7 +1843,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       return { ...segBase, hit: false, outcome: 'prevented', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, barrierId: guard.id, down: false, logEnd: log.length };
     }
     // 初次命闪（【必中】跳过被动闪避；仍可被反应化解）；征伐者 modifyDodgeCap：闪避分母按自身−攻击者速度差提升（原版 L21976）
-    const dodgeCapBonus = passive && passive.modifyDodgeCap ? Math.max(0, passive.modifyDodgeCap(target, caster, tStats, cStats) || 0) : 0;
+    const targetPassive = CLASS_PASSIVES[target.classType] || null;
+    const dodgeCapBonus = targetPassive && targetPassive.modifyDodgeCap ? Math.max(0, targetPassive.modifyDodgeCap(target, caster, tStats, cStats) || 0) : 0;
     const hitResult = baseSkill.guaranteedHit ? { hit: true, attackRoll: null, dodgeRoll: null }
       : resolveHit({ hitBonus: cStats.hit }, { evasion: target.ref.evasion || 0, evaBonus: tStats.eva + dodgeCapBonus }, baseSkill, random);
     if (!hitResult.hit) {
@@ -2059,13 +2135,14 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const preparing = chargeState(u.id).preparing;
     if (preparing && !preparing.ready) return { moveTo: null, skill: null, aim: null, action: resources.main > 0 ? 'prepare' : 'wait' };
     const aiRes = { ...resources, preparing, moveDistance: moveDistanceOf(u) };
+    const aiBudget = resources.moveRemaining;
     // 充能已满：本次正常行动优先尝试大招（原版 isChargeFull 优先）；额度内放不出则保留充能，按常规行动
     if (!preparing && chargeFull(u)) {
-      const ult = chooseEnemyAction(ctx, currentId(), resources.moveRemaining, [chargeSkillOf(u)], skill => skillStatus(skill), aiRes);
+      const ult = chooseEnemyAction(ctx, currentId(), aiBudget, [chargeSkillOf(u)], skill => skillStatus(skill), aiRes);
       if (ult.skill) return ult;
     }
     const skills = preparing?.ready ? [preparing.skill] : enemySkills();
-    return chooseEnemyAction(ctx, currentId(), resources.moveRemaining, skills, skill => skillStatus(skill), aiRes);
+    return chooseEnemyAction(ctx, currentId(), aiBudget, skills, skill => skillStatus(skill), aiRes);
   }
   function* beginEnemyTurn(options = {}) {
     const id = currentId();

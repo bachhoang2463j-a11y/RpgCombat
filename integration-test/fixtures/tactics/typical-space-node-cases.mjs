@@ -172,8 +172,8 @@ function runAll() {
     const ctx = makeCtx([caster, big], { caster: { col: 5, row: 5 }, big: { col: 8, row: 5 } }, map);
     const skill = { power: 100, range: { type: '圆形', radius: 3 } };
     const preview = barriers.previewBarrier(ctx, 'caster', skill, null);
-    cases.push(ok('TT-SPACE barrier 不得切过大型单位占地（部分重叠拒绝）',
-      !preview.ok && /大型单位/.test(preview.reason), JSON.stringify(preview)));
+    cases.push(ok('TT-SPACE barrier 可切过大型敌方单位占地',
+      preview.ok, JSON.stringify(preview)));
   }
   {
     const map = room();

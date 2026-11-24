@@ -285,7 +285,7 @@ export function applyStatusRecord(battleState, cmd, now) {
     appliedAt: now,
     endAt: cmd.duration !== undefined ? now + cmd.duration : null,
   };
-  if (cmd.kind === 'poison' || cmd.kind === 'burn' || cmd.kind === 'periodic' || cmd.kind === 'stealth-window') {
+  if (cmd.kind === 'poison' || cmd.kind === 'burn' || cmd.kind === 'periodic' || cmd.kind === 'stealth-window' || cmd.kind === 'region') {
     rec.nextTickAt = now + interval; // 首跳 = 施加时刻 + 100（SPEC S06 L120）
   }
   clock.statuses[key] = rec;

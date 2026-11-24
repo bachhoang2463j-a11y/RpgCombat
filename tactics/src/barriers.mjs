@@ -65,19 +65,6 @@ export function previewBarrier(ctx, casterId, skill, query) {
     const s = cellSet(b.cells);
     if (cells.some(c => s.has(cellKey(c.col, c.row)))) return { ok: false, reason: '结界与既有结界重叠', barrier: null };
   }
-  // 不得切过大型单位占地：大型单位要么完整在内，要么完全在外
-  const probe = { cells };
-  for (const u of ctx.units) {
-    if (!isLive(u) || u.side === caster.side) continue;
-    const fp = fpOf(ctx, u);
-    if (fp.width * fp.height <= 1) continue;
-    const uc = cellsOfUnit(ctx, u);
-    if (!uc.length) continue;
-    if (anyInside(probe, uc) && !allInside(probe, uc)) {
-      return { ok: false, reason: '结界不能切过大型单位占地', barrier: null };
-    }
-  }
-
   const slot = skillSlots(skill).find(s => s.definition.kind === 'barrier');
   const rawIntegrity = slot ? slot.power : skill?.barrierIntegrity ?? skill?.power;
   const integrity = Math.max(0, Number(rawIntegrity) || 0);

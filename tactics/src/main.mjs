@@ -263,7 +263,10 @@ export function createApp(rootEl, opts = {}) {
     onEffectReveal: (e) => revealEffect(e),
     onMoveFeedback: (id, kind, p) => moveFeedback(id, kind, p),
     onSelfDestruct: () => { syncShown(); refreshBattle(); },
-    promptRetarget: (req) => beginRetargetPrompt(req),
+    promptRetarget: (req) => {
+      const caster = unitById(req.casterId);
+      return isPlayerUnit(caster) ? beginRetargetPrompt(req) : Promise.resolve(null);
+    },
     getUnitStyle: (id) => unitStyles[id] || null,
     // FX02 反应接线（contract v2/v3）：玩家控制的单位（controller 优先，缺省按 side）受击弹全屏反应弹窗；
     // AI 控制的（敌方/召唤物/AI 侧 hero）不弹窗，自动选首个可用候选（原版敌方口径）
@@ -308,7 +311,7 @@ export function createApp(rootEl, opts = {}) {
   const shownEff = new Map(); // 显示态状态（有效属性视图快照；效果揭示拍点才更新该单位）
   let sprintArm = null;      // 冲刺移动待确认格 'col,row'
   let jumpArm = null;        // 右键跳跃待确认格 'col,row'
-  let inspectHover = null, inspectPinned = null;
+  let inspectHover = null;
   let unitStyles = {};       // 单位表现风格：我方职业 / 敌方分级（只影响画面与声音）
   const hiddenLog = new Set();
   let editorDraft = null;
@@ -321,7 +324,7 @@ export function createApp(rootEl, opts = {}) {
     const c = sandbox.unitWorldCenter(unitId);
     if (c) sandbox.focusWorld(c.x, c.y);
     shell.setSelected(unitId);
-    inspectPinned = unitId; inspectHover = null; renderInspector();
+    renderInspector();
   };
   shell.onReset = () => restart();
   const editor = createEditorPanel({
@@ -330,7 +333,7 @@ export function createApp(rootEl, opts = {}) {
     onCancel: () => { editorDraft = null; },
   });
   shell.settings = { open: () => { if (!currentViewData) return false; editorDraft = makeEditorDraft(); editor.open(editorDraft); return true; } };
-  sandbox.onSelect((unit) => { shell.setSelected(unit ? unit.id : null); inspectPinned = unit ? unit.id : null; renderInspector(); });
+  sandbox.onSelect((unit) => { shell.setSelected(unit ? unit.id : null); renderInspector(); });
   sandbox.onCancel(() => cancelStep());
   sandbox.onContext(hit => {
     if (!battle || !isHeroTurn() || retargetPrompt || !hit) return false;
@@ -495,7 +498,7 @@ export function createApp(rootEl, opts = {}) {
     renderInspector();
   }
   function renderInspector() {
-    const id = inspectHover || inspectPinned;
+    const id = inspectHover;
     const u = id && battle && unitById(id);
     if (!u) { shell.showInspector(null); return; }
     const eff = battle.getEffectiveUnit(u.id);

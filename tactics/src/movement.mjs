@@ -11,6 +11,7 @@
 import { cellAt } from './scene.mjs';
 import { occupiedCells, cellKey, unitCenter } from './geometry.mjs';
 import { barrierCrossing } from './barriers.mjs';
+import { moveMultiplier } from './regions.mjs';
 
 const SQRT2 = Math.SQRT2;
 const EPS = 1e-9;
@@ -212,7 +213,7 @@ export function findReachable(ctx, unitId, budget = Infinity, costMultiplier = 1
         if (!cellAt(ctx.compiled, nc, nr)) continue; // 界外不可走
         // 两实障夹角禁穿：斜步的两个正交邻格均被移动阻挡（地形或敌方）时禁止斜穿
         if (dc && dr && !enterable(cur.col + dc, cur.row) && !enterable(cur.col, cur.row + dr)) continue;
-        const step = ((dc && dr) ? SQRT2 : 1) * costMultiplier;
+        const step = ((dc && dr) ? SQRT2 : 1) * costMultiplier / moveMultiplier(ctx, unitId, cur);
         const nCost = cur.cost + step;
         if (nCost > budget + EPS) continue;
         if (!enterable(nc, nr)) continue;

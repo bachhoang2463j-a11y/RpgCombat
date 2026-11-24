@@ -33,7 +33,7 @@ const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFee
   'renderTurnQueue', 'updateSkillMenus', 'createSkillCard', 'createSkillGroupCard', 'createItemCard', 'showTagTipFor',
   'buildSkillFormFieldsHtml', 'openSkillTypeCombo', 'createEditorPanel', 'playJump', 'playShove', 'playTransfer', 'drawJump',
   'createFxRegistry', 'registerDefaultFx', 'actionInput', 'reactionInput', 'createVfxHost', 'playReaction', 'revealSegment', 'evadeShift',
-  'createScenarioData', 'createSeededRandom', 'createFogRegion', 'canSeeUnit', 'previewBarrier', 'resolveCharge',
+  'createScenarioData', 'createSeededRandom', 'createRegion', 'runRegionContest', 'effectiveCastRange', 'moveMultiplier', 'canSeeUnit', 'previewBarrier', 'resolveCharge',
   'buildTypicalViewData', 'playPrepare', 'syncRegions', 'fogFieldHtml', 'prepareInput', 'revealEffect',
   'playGenericSupportFx', 'spawnHealParticles', 'playSupportEffects', 'supportResourceDelta', 'applyPersistentFxTags',
   'buildHitFeedback', 'avatarScaleForZoom', 'linkSkillGroupRows', 'prepareHitNumbers', 'animateHitNumber',

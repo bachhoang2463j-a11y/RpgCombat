@@ -208,6 +208,9 @@ function killAndSummonCases() {
     /const summonIds = result\.summons \|\| \[\]/.test(dsrc) && /av\.playSummonEnter\(casterEnt, ents/.test(dsrc) && /av\.playSummonExit\(ent, \{ exitCause: 'killed'/.test(dsrc)));
 
   const av = readFileSync(new URL('../../../tactics/src/vendor/rpg-av/rpg-av.mjs', import.meta.url), 'utf8');
+  const rangedExecution = av.slice(av.indexOf("} else if (type === '远程')"), av.indexOf('// Style 2（近战，默认）'));
+  out.push(ok('TP7AV-X 远程击杀隐藏我方名称，保留头像、敌方名称和原版5朵血花', !/档案:|hero\.name/.test(rangedExecution)
+    && /hero\.img/.test(rangedExecution) && /enemy\.name/.test(rangedExecution) && /createBloodSplatterHtml\(5\)/.test(rangedExecution)));
   out.push(ok('TP7AV-X 原版击杀特写/Cut-in/召唤三瞬入包（非桩）', /async function playExecutionAnimation\(hero, killedEnemies, damageType\)/.test(av) && /async function playEnemyUltimateCutin\(enemy, skillName\)/.test(av)
     && /function playSummonEnter\(caster, targets/.test(av) && /function playSummonGuard\(guardian/.test(av) && !/function clearSummonState\(\) \{ \/\* 未迁移段/.test(av)));
   out.push(ok('TP7AV-X 特写挂 iframe 屏幕宿主、计时可清理，重开/换代清除', (av.match(/__SCREEN\(\)\.appendChild\(overlay\); __MOMENTS\.add\(overlay\)/g) || []).length === 2

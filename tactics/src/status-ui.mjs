@@ -136,7 +136,7 @@ export function inspectorHtml({ unit, eff, base, badges, charge, preparing, show
   const sideBadge = unit.isSummon ? '<span class="t-insp-badge t-summon">召唤物</span>' : '<span class="t-insp-badge ' + (ally ? 't-ally' : 't-foe') + '">' + (ally ? '我方' : '敌方') + '</span>';
   const tags = (unit.attrTags || []).filter(Boolean);
   const moveD = +(eff.effectiveMoveDistance - eff.moveDistance).toFixed(1);
-  return '<div class="t-insp-glass"><i class="t-insp-corner t-tl"></i><i class="t-insp-corner t-tr"></i><i class="t-insp-corner t-bl"></i><i class="t-insp-corner t-br"></i>' +
+  return '<div class="t-insp-glass">' +
     '<div class="t-insp-head"><span class="t-insp-emoji">' + ESC(unit.emoji || (ally ? '🛡️' : '☠️')) + '</span><div class="t-insp-title"><b>' + ESC(unit.name) + '</b>' +
       '<div class="t-insp-badges-row">' + sideBadge + (unit.classType ? '<span class="t-insp-badge">' + ESC(unit.classType) + '</span>' : '') +
       (unit.isWise || unit.ref?.isWise ? '<span class="t-insp-badge t-wise">🧠 智慧单位</span>' : '') + '<span class="t-insp-badge t-mono">TARGET INSPECT</span></div></div></div>' +
@@ -151,5 +151,5 @@ export function inspectorHtml({ unit, eff, base, badges, charge, preparing, show
     '<div class="t-insp-sec"><div class="t-insp-sec-h"><span>✨ 当前状态</span></div><div class="t-insp-badges">' + (badges.length ? fullStatusHtml(badges) : '<span class="t-insp-none">无增益 / 减益</span>') + '</div></div>' +
     (lore ? '<div class="t-insp-lore"><div class="t-insp-lore-h"><span>📚 世界书图鉴档案</span><em>' + (lore.sample ? 'SAMPLE' : 'LORE ENTRY') + '</em></div>' +
       '<p>' + ESC(lore.desc || '词条无描述文字') + '</p><div class="t-insp-lore-src">' + ESC(lore.wbName || '') + (lore.entryName ? ' · ' + ESC(lore.entryName) : '') + '</div></div>' : '') +
-    '<div class="t-insp-foot"><span>悬停查看 · 点选钉住</span><span class="t-mono">20% 超透光战术目镜</span></div></div>';
+    '<div class="t-insp-foot"><span>悬停查看</span><span class="t-mono">20% 超透光战术目镜</span></div></div>';
 }

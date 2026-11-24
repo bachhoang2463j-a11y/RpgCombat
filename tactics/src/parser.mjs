@@ -449,7 +449,7 @@ export function parseSkill(skillStr) {
     if (marked) slotTargets = [marks[0] || null, marks[1] || null, marks[2] || null];
   }
 
-  return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, cooldownTurns: cooldownTurns, slotTargets: slotTargets, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, sheshenTarget: sheshenTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, isHighTier: _isHighTier, isLegendary: _isLegendary, isPierce: isPierce, summonTarget: summonTarget, summonNoLimit: summonNoLimit, range, actionCost: ext.actionCost || ACTION_COST_DEFAULT, evadeShift: ext.shift, displacements: ext.displacements, regionEffect: null, affectsAll, reactionSource: false, deathTag: null, _explicit: _explicit };
+  return { name: name, cost: cost, hpCost: hpCost, tpCost: tpCost, charge: charge, delay: delay, haste: haste, maxUses: maxUses, usesRemaining: maxUses, cooldownTurns: cooldownTurns, slotTargets: slotTargets, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], isReaction: isReaction, reactionTarget: reactionTarget, kanpoTarget: kanpoTarget, sheshenTarget: sheshenTarget, damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, isHighTier: _isHighTier, isLegendary: _isLegendary, isPierce: isPierce, summonTarget: summonTarget, summonNoLimit: summonNoLimit, range, actionCost: ext.actionCost || ACTION_COST_DEFAULT, evadeShift: ext.shift, displacements: ext.displacements, regionEffect: parseRegionTag(ext.text), affectsAll, reactionSource: false, deathTag: null, _explicit: _explicit };
 }
 
 // S14 缺尺寸预设：显式直线缺长/宽 → 10/1；显式爆炸缺射程/半径 → 15/3。仅补缺失键。
@@ -608,7 +608,7 @@ export function parseItem(itemStr) {
     if (marked) slotTargets = [marks[0] || null, marks[1] || null, marks[2] || null];
   }
 
-  return { isItem: true, name: name, category: category, count: count, maxUses: maxUses, usesRemaining: maxUses, bindings: bindings, cost: cost, hpCost: hpCost, tpCost: tpCost, delay: delay, haste: haste, summonTarget: summonTarget, summonNoLimit: summonNoLimit, slotTargets: slotTargets, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, isHighTier: _isHighTier, isLegendary: _isLegendary, isPierce: isPierce, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, range, actionCost: ext.actionCost || ACTION_COST_DEFAULT, evadeShift: ext.shift, displacements: ext.displacements, regionEffect: null, affectsAll, reactionSource: false, deathTag: null, _explicit: _explicit };
+  return { isItem: true, name: name, category: category, count: count, maxUses: maxUses, usesRemaining: maxUses, bindings: bindings, cost: cost, hpCost: hpCost, tpCost: tpCost, delay: delay, haste: haste, summonTarget: summonTarget, summonNoLimit: summonNoLimit, slotTargets: slotTargets, hit: hit, turns: turns, slotTurns: slotTurnsArr[0], slotTurns2: slotTurnsArr[1], slotTurns3: slotTurnsArr[2], type: types[0], power: powers[0], type2: types[1], power2: powers[1], type3: types[2], power3: powers[2], damageType: damageType, isOthers: isOthers, guaranteedHit: guaranteedHit, switchTarget: switchTarget, ignoreRow: ignoreRow, critRate: critRate, fxTag: fxTag, isHighTier: _isHighTier, isLegendary: _isLegendary, isPierce: isPierce, barrierSub: barrierSub || (barrierMatch && damageType && ['近战', '远程', '法术'].includes(damageType) ? damageType : null), barrierArmor: barrierArmor, range, actionCost: ext.actionCost || ACTION_COST_DEFAULT, evadeShift: ext.shift, displacements: ext.displacements, regionEffect: parseRegionTag(ext.text), affectsAll, reactionSource: false, deathTag: null, _explicit: _explicit };
 }
 
 // ---------- 组解析（原版 L18952-19061 移植） ----------
@@ -762,7 +762,11 @@ function parseItemObject(obj) {
 // ---------- 中文配置对象形态（典型对局样本）：名字/动作/标签/范围/区域/子技能 ----------
 
 const CN_RANGE_PARAM = { '射程': 'castRange', '半径': 'radius', '长度': 'length', '长': 'length', '宽度': 'width', '宽': 'width', '角度': 'angle' };
-const CN_REGION_TYPE = { '浓雾': 'fog' };
+const CN_REGION_TYPE = { '浓雾': 'fog', '火焰': 'fire', '中毒': 'poison', '坏死雾': 'poison' };
+function parseRegionTag(text) {
+  const m = text.match(/\[区域[:：](浓雾|火焰|中毒|坏死雾)\]/);
+  return m ? { type: CN_REGION_TYPE[m[1]] } : null;
+}
 
 function isChineseSkillObject(el) {
   return !!el && typeof el === 'object' && !Array.isArray(el) &&

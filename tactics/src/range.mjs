@@ -11,6 +11,7 @@ import { occupiedCells, cellKey, unitCenter } from './geometry.mjs';
 import { skillSlots } from './effect-definitions.mjs';
 import { barrierContact } from './barriers.mjs';
 import { canSeeUnit, canSeePoint, sightRadius } from './perception.mjs';
+import { effectiveCastRange } from './regions.mjs';
 
 const EPS = 1e-9;
 const SAMPLE_STEP = 0.2;
@@ -280,7 +281,7 @@ export function queryAttack(ctx, casterId, skill, aim, options = {}) {
   const origin = unitCenter(cp, footprintOf(ctx, caster));
   const normAim = aim && Number.isFinite(aim.x) && Number.isFinite(aim.y) ? { x: aim.x, y: aim.y, targetId: aim.targetId } : null;
   const fail = (reason, blockedBy = null) => Object.assign(empty(reason, origin, normAim), blockedBy ? { blockedBy } : {});
-  const range = skill && skill.range;
+  const range = skill && skill.range ? effectiveCastRange(ctx, casterId, skill.range, skill) : null;
   if (!range) return fail('技能缺少显式范围');
   if (!RANGE_TYPES.includes(range.type)) return fail('范围类型不支持: ' + range.type);
   if (aim?.barrierId) {
@@ -361,7 +362,8 @@ export function queryAttack(ctx, casterId, skill, aim, options = {}) {
   } else if (range.type === '爆炸') {
     const dist = centerDistance(origin, normAim);
     if (range.castRange !== undefined && dist > range.castRange + EPS) return Object.assign(fail('瞄准点超出射程'), { range });
-    contact = rayFirst(ctx, origin.x, origin.y, normAim.x, normAim.y, { skipUnitIds: [casterId], blockUnits: true });
+    contact = skillSlots(skill).some(s => s.definition.kind === 'barrier') ? null
+      : rayFirst(ctx, origin.x, origin.y, normAim.x, normAim.y, { skipUnitIds: [casterId], blockUnits: true });
     blockedBy = contact && contact.type === 'wall' ? contact : null;
     blastCenter = contact ? contact.point : normAim;
     const blastAim = { x: blastCenter.x, y: blastCenter.y };

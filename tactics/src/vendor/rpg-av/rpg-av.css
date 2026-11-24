@@ -283,7 +283,6 @@
 [data-rpg-av-scope] .inset-0 {inset:0}
 [data-rpg-av-scope] .left-1 {left:.25rem}
 [data-rpg-av-scope] .left-1\/2 {left:50%}
-[data-rpg-av-scope] .left-2 {left:.5rem}
 [data-rpg-av-scope] .left-\[12vw\] {left:12vw}
 [data-rpg-av-scope] .left-\[25\%\] {left:25%}
 [data-rpg-av-scope] .left-\[8vw\] {left:8vw}
@@ -410,7 +409,6 @@
 [data-rpg-av-scope] .text-\[4rem\] {font-size:4rem}
 [data-rpg-av-scope] .text-\[5\.5rem\] {font-size:5.5rem}
 [data-rpg-av-scope] .text-\[8rem\] {font-size:8rem}
-[data-rpg-av-scope] .text-\[9px\] {font-size:9px}
 [data-rpg-av-scope] .text-\[clamp\(3\.5rem\2c 9vw\2c 9rem\)\] {font-size:clamp(3.5rem,9vw,9rem)}
 [data-rpg-av-scope] .text-\[clamp\(3\.8rem\2c 9\.5vw\2c 9rem\)\] {font-size:clamp(3.8rem,9.5vw,9rem)}
 [data-rpg-av-scope] .text-\[clamp\(4\.5rem\2c 12vw\2c 12rem\)\] {font-size:clamp(4.5rem,12vw,12rem)}
@@ -426,7 +424,6 @@
 [data-rpg-av-scope] .tracking-\[0\.8em\] {letter-spacing:.8em}
 [data-rpg-av-scope] .tracking-wider {letter-spacing:.05em}
 [data-rpg-av-scope] .tracking-widest {letter-spacing:.1em}
-[data-rpg-av-scope] .text-amber-400 {--tw-text-opacity:1;color:rgb(251 191 36/var(--tw-text-opacity,1))}
 [data-rpg-av-scope] .text-amber-500 {--tw-text-opacity:1;color:rgb(245 158 11/var(--tw-text-opacity,1))}
 [data-rpg-av-scope] .text-purple-300 {--tw-text-opacity:1;color:rgb(216 180 254/var(--tw-text-opacity,1))}
 [data-rpg-av-scope] .text-rose-200 {--tw-text-opacity:1;color:rgb(254 205 211/var(--tw-text-opacity,1))}
