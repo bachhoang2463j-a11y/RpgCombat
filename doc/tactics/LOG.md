@@ -438,3 +438,17 @@
 - 核心目的：修复在完整工作台选中「自身」目标播放增益/回复/护盾/辅助类特效时，因 mock `result.hits` 固定附带 120 点伤害导致自身掉血的问题。
 - 变更文件：`tactics/src/vfx-template-host.mjs`、`tactics/vfx-stage.mjs`、同步重打 `tactics/demo-skill-vfx-template.html`（`fxLibraryIncluded: false`）。
 - 决策原因：`buildMockResult` 支持 `card.noDamage`（置空 `hits`）；`vfx-stage.mjs` 按 `SUPPORT_FX_KINDS` 识别治疗/护盾/增益/减益/召唤结界类条目并传 `noDamage: true` 与对应 `extraEffects`。内置浏览器实测选中「自身」连续播放 `群体增益` 与 `再动加速` 后埃利奥特血量保持 100/100，零 JS 报错。
+
+## 2026-11-25 · 守护/结界后端合入 + P07 视听第二轮：击杀特写置顶、逐标签串行 buff、18 套 L3/L4 屏幕主演出、生体流转、圣光/雷击/重狙 WebM、原版灵风术（9b4223a）
+- 核心目的：按用户逐项反馈打磨视听，并与另一施工者已完成但未提交的守护/结界后端（guard.mjs、barriers、battle 等及 guard-* 测试，见 GUARD-BARRIER-FRONTEND-HANDOFF.md）一并提交（用户确认合并提交，因两边同改 action-director/build-demo-html/run-tests/产物）。
+- 击杀特写/Cut-in：av-host 屏幕宿主改为 iframe body 末尾 position:fixed z-index 2147483000、pointer-events:none，对齐原版 body 级 z-[200] 压住全部 UI；destroy 移除。
+- buff：playSupportEffects 改为原版 executeSkillAction 口径——后端 effects 按槽→目标顺序，每个真实效果条目独立播一次原版 SVG/音色并在接触拍点揭示，句柄完成后隔 60ms 播下一条（寂静指令＝增攻 A→B、瞄准 A→B 两轮）；溢出转盾单独一拍。TFX-01 与 TP7AV-S 断言随之更新。
+- 屏幕主演出：新增 screen-showpiece.mjs，18 个 fullscreen L3/L4 条目各一套独立 SVG 构图（外缘 ~30% 环带、中心留阅读窗、渐变辉光无硬线框、uid 防冲突），蓄势→条目真实冲击拍点 ctx.atmos.burst()（替代原通用径向闪屏，压缩爆燃实测 1368ms 同拍）→首个揭示降透明→余韵外撤；有主演出时边带只留暗场；发光构图 screen 混合，暗色 normal；screen-atmos 去 z-index 叠放上下文。火舌由粗描边改为贴边渐变火苗。
+- 生体流转：两拍心搏（心核收缩、八道血管描画、∞ 血珠环流、心电迹线、四道冲击环），第二拍揭示再动；压到 1180ms 守 L2 预算。
+- 用户截图反馈：圣光01 去屏幕中央光柱/十字/中央光束（避免双重攻击假象），原版 414.webm 以 min(视口)×1.4 锚目标于命中后 60ms 掀起（实测数字后 ~30ms）；雷击01 主雷 450.webm 同火焰01 口径 R×3.4 覆盖范围（实测 411px 覆盖 242px 范围环）；克虏伯重狙准星（镜孔/十字/密位/冲击环）以真实受击目标视口点为心，snipe-ezremove.mp4 全段 2.1s、max(min(视口)×1.5, 50% 屏面积)（实测 51%），awaitHandle 等视频播完，totalMs 3400。webm() 增加播完句柄（doneAt 取真实时长，释放只通知一次）。
+- 灵风术：Demo「A 圣洁羽翼」即根 index playLingFeng 定稿，extract-rpg-av 原样入口提取（innerWidth/innerHeight 补丁计数 10→11、5→7），条目改 identity 直调，双翼拍点 quiet 揭示规则结果；B/C 对比音组为落选项未移植。工作台实测风玫瑰 535ms→疾风 1539ms→双翼 1898ms，四段原版音频加载，零错零残留。
+- 调试事故：为抓爆发峰值帧在页面内劫持 setTimeout/rAF 冻结，导致浏览器操作队列卡死，停止调用浏览器工具并请用户重启 AWS Quick；之后改为只读采样。未截到的 0.7s 视频帧以采样数据为证。
+- 测试：p07-av-fx 42（新增置顶宿主、18 套主演出与爆发同拍、构图互异、圣光无中柱、准星对目标、三段 WebM 口径、播完句柄、灵风原版入包与 CSS）、fx01 49 等相关通过；唯一全量 --all 1033 passed（含 guard-* 59），之后源码无改动。
+- 产物：tactics/mvp-standalone.html 1,438,894 B，sha256 `e212c63bda9322059ad477b07d0956225eb8bc26aac85aa07e1fb5246fb5c3cd`；专项 31/31，守护结界产物 13/13。
+- 未验：其余 15 套主演出只做挂载/零错/零残留采样，未逐一截图审美；所有声音听感待验。README 未改，不 push。
+- 目的 vs 现状：用户确认三技能与灵风术“很完美”，本轮反馈全部落地；下一步舍身格挡与【肃正】结界前端演出及工作台演示按钮。
