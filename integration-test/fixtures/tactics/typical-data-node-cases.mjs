@@ -68,8 +68,21 @@ async function runTTData(deps = {}) {
   ok('TT 圆形只半径无射程', wall && wall.range && wall.range.type === '圆形' && wall.range.radius === 6 && !('castRange' in wall.range), JSON.stringify(wall && wall.range));
   const dim = skill(yug, '维度撕裂');
   ok('TT 直线长宽', dim && dim.range && dim.range.type === '直线' && dim.range.length === 12 && dim.range.width === 2, JSON.stringify(dim && dim.range));
-  const deer = skill(hero('弗兰克'), '温切斯特M1897-鹿弹二连发');
+  const deer = skill(hero('弗兰克'), '鹿弹二连发');
   ok('TT 扇形长度角度', deer && deer.range && deer.range.type === '扇形' && deer.range.length === 6 && deer.range.angle === 60, JSON.stringify(deer && deer.range));
+  {
+    const frank = hero('弗兰克');
+    const group = frank && frank.skills.find(s => s.name === '温切斯特');
+    const kids = group && group.children ? group.children.map(c => c.name) : [];
+    const slug = frank && frank.skills.find(s => s.name === '独头二连发');
+    const ammo = frank && frank.items.filter(it => /12号/.test(it.name)).map(it => it.bindings);
+    ok('TT 温切斯特纯父组+鹿弹/独头两子同引用，弹药绑定子技能名',
+      group && group.isGroup && group.groupOnly && kids.join(',') === '鹿弹二连发,独头二连发'
+      && group.children.every(c => frank.skills.includes(c) && c._inGroup && c.parentName === '温切斯特')
+      && deer && slug && !frank.skills.some(s => /温切斯特M1897/.test(s.name))
+      && JSON.stringify(ammo).includes('鹿弹二连发') && JSON.stringify(ammo).includes('独头二连发'),
+      JSON.stringify({ kids, group: group && { isGroup: group.isGroup, groupOnly: group.groupOnly }, ammo }));
+  }
   const bottle = item(el, '化尘者之瓶');
   const bottleChild = bottle && bottle.children.find(c => c.name === '瓶中之物');
   ok('TT 召唤范围', bottleChild && bottleChild.range && bottleChild.range.type === '召唤' && bottleChild.range.castRange === 12, JSON.stringify(bottleChild && bottleChild.range));

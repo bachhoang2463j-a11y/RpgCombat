@@ -215,7 +215,7 @@ function run() {
   {
     const frank = data.units.find(u => u.name === '弗兰克');
     const suigu = frank.skills.find(s => s.name === '碎骨连打');
-    const ludan = frank.skills.find(s => s.name === '温切斯特M1897-鹿弹二连发');
+    const ludan = frank.skills.find(s => s.name === '鹿弹二连发');
     const makeEnemy = (id, name) => ({ id, name, side: 'enemy', controller: 'player', footprint: { width: 1, height: 1 }, ref: { hp: 500, maxHp: 500, mp: 50, maxMp: 50, tp: 0, maxTp: 100, atk: 10, def: 0, spd: 50, evasion: 0, moveDistance: 6, perception: 50 }, skills: [], items: [] });
     const hero = { ...structuredClone(frank), id: 'caster', side: 'hero', controller: 'player', ref: { ...frank.ref, hp: 500, maxHp: 500, tp: 100, maxTp: 100 } };
     const bSw = createBattle({

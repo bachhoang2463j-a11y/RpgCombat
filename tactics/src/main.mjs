@@ -574,6 +574,8 @@ export function createApp(rootEl, opts = {}) {
       view.setFlag(u.id, 't-unit-down', shownOf(u).hp <= 0);
       view.setFlag(u.id, 't-unit-current', u.id === snap.currentId && !snap.terminal);
       view.setFlag(u.id, 't-unit-channel', !!battle.battleState.combatState.charges?.[u.id]?.preparing);
+      const ch = snap.units.find(x => x.id === u.id)?.charge;
+      view.setFlag(u.id, 't-unit-charge-full', !!(ch && ch.current >= ch.max && shownOf(u).hp > 0));
       if (unitStyles[u.id]) view.setFlag(u.id, unitStyles[u.id].cls, true);
     }
     avHost.consumeVisualEvents(snap.events.filter(ev => !ev.attackId));
@@ -1088,6 +1090,12 @@ export function createApp(rootEl, opts = {}) {
       const q = battle.previewAttack(plan.skill, plan.aim);
       if (q.ok) {
         sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: plan.skill, query: q, locked: true });
+        // 满充能大招：Cut-in → 原技能前摇/演出 → 命中与结果（未满不站桩；普通攻击与[延迟]准备照旧）
+        const cur = battle.snapshot().units.find(u => u.id === battle.snapshot().currentId);
+        if (plan.skill.charge > 0 && cur && cur.charge && cur.charge.current >= cur.charge.max) {
+          await director.playChargeCutin(cur.id, plan.skill);
+          if (!alive()) return;
+        }
         await director.playWindup(battle.snapshot().currentId, plan.skill);
         if (!alive()) return;
         sandbox.setPreview(null);
@@ -1138,6 +1146,8 @@ export function createApp(rootEl, opts = {}) {
     }
     refreshBattle();
     await director.playAttack(res);
+    if (myFlow !== flow) return;
+    await director.playExecution(res);   // 技能演出、反应与自爆全部完成后统一收尾一次；胜利弹窗在其后
     if (myFlow !== flow) return;
     for (let i = res.logFrom; i < res.logTo; i++) hiddenLog.delete(i);
     if (!res.hits.length) shell.showLog(battle.snapshot().log[res.logTo - 1] || '', 'miss');

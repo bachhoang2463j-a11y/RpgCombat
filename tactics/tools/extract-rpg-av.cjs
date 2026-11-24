@@ -19,11 +19,12 @@ const ENTRIES = [
   'syncHitBar', 'CombatAudioDirector', 'clearHitFeedback', 'warmIdentitySample', 'playArsenicShot',
   'clearArcaneFx', 'syncStatusLayers', 'clearStatusLayers', 'playStatusTickFx',
   'syncVariantState', 'clearVariantState', 'playVariantTriggerFx', 'isEntityVariantLocked',
+  'playSummonEnter', 'playSummonExit', 'playSummonGuard', 'clearSummonState',
 ];
 // 不入口：敌方兜底群攻 playMeleeGroup/RangedGroup/SpellGroup 按全队卡片头像取帧（portraitFrame），
 // 与空间范围"只作用真实受影响目标"冲突；战棋敌方范围攻击改走攻击身份 aoe（逐目标 onImpact）。
 // 闭包内被 clearArcaneFx 等引用、但属于本 Demo 不产生状态的未迁移段：生成显式空实现
-const STUBS = ['clearSummonState', 'clearSelfDestructState', 'clearRescueState'];
+const STUBS = ['clearSelfDestructState', 'clearRescueState'];
 // 需要原样带入的段（未入闭包也带入）：语法上属于前一语句的续行
 const MESSY_SECTIONS = ['抗性与免疫演出 BEGIN', 'v12.10 状态发作', 'v12.10 状态 END', '救援时刻 v12.10 BEGIN', '召唤三瞬默认演出 v12.12 BEGIN'];
 
@@ -185,12 +186,15 @@ function extractCss(html, jsText) {
   const used = new Set();
   for (const m of jsText.matchAll(/[A-Za-z_][\w-]*/g)) used.add(m[0]);
   for (const m of jsText.matchAll(/[A-Za-z_][\w-]*(?:[./:][\w-]+)+/g)) used.add(m[0]); // tailwind 小数/分数类：w-1.5、left-1/2
+  for (const m of jsText.matchAll(/(?:[a-z]+:)*-?[A-Za-z_][\w-]*-\[[^\]\s"'`]+\](?:\/\d+)?/g)) used.add(m[0]); // tailwind 任意值类：z-[200]、sm:text-[8rem]
+  for (const m of jsText.matchAll(/(?<![\w-])-[a-z][\w-]*\d/g)) used.add(m[0]); // tailwind 负值类：-mt-3
   for (const c of ['red', 'amber', 'violet']) for (const w of ['single', 'wide']) used.add('omen-' + c + '-' + w);
   used.add('omen-rose-self'); used.add('omen-gloom-foe');
   const rules = splitCss(styles);
   const keep = []; const anims = new Set(); const vars = new Set();
   // 单个选择器：至少含一个类/ID，且其中所有类/ID 都在词元集合中（避免把旧卡片 DOM 限定规则带入）
-  const oneSel = s => { const parts = [...s.matchAll(/[.#]((?:\\.|[\w-])+)/g)].map(m => m[1].replace(/\\(.)/g, '$1')); return parts.length > 0 && parts.every(p => used.has(p)); };
+  const unesc = p => p.replace(/\\([0-9a-fA-F]{1,6}) ?/g, (_, h) => String.fromCodePoint(parseInt(h, 16))).replace(/\\(.)/g, '$1');
+  const oneSel = s => { const parts = [...s.matchAll(/[.#]((?:\\[0-9a-fA-F]{1,6} ?|\\.|[\w-])+)/g)].map(m => unesc(m[1])); return parts.length > 0 && parts.every(p => used.has(p)); };
   const splitSel = prelude => { const out = []; let d = 0, cur = ''; for (const ch of prelude) { if (ch === '(') d++; else if (ch === ')') d--; if (ch === ',' && d === 0) { out.push(cur); cur = ''; } else cur += ch; } out.push(cur); return out.map(s => s.trim()).filter(Boolean); };
   // 作用域：所有规则限定在战棋地图视口 [data-rpg-av-scope] 内，旧页面的通用工具类（.hidden/.flex 等）不外溢到战棋 UI
   const SCOPE = '[data-rpg-av-scope]';
@@ -210,14 +214,18 @@ function extractCss(html, jsText) {
   };
   walk(rules);
   for (const m of jsText.matchAll(/animation(?:Name)?\s*[:=]\s*['"`]([^'"`]+)/g)) for (const t of m[1].split(/[\s,]+/)) if (/^[a-zA-Z_][\w-]*$/.test(t)) anims.add(t);
+  // 模板字符串内联 style 的 animation 简写（击杀特写等）：每个逗号分段的首词为动画名
+  for (const m of jsText.matchAll(/animation\s*:\s*([^;"`]+)/g)) for (const part of m[1].split(',')) { const t = part.trim().split(/\s+/)[0]; if (/^[a-zA-Z_][\w-]*$/.test(t)) anims.add(t); }
   const kfs = rules.filter(r => /^@keyframes\s+/.test(r.prelude));
   let added = true; const kfKeep = new Map();
   while (added) { added = false; for (const k of kfs) { const name = k.prelude.replace(/^@keyframes\s+/, '').trim(); if (anims.has(name) && !kfKeep.has(name)) { kfKeep.set(name, k.text); collect(k.block); added = true; } } }
-  let css = keep.join('\n') + '\n' + [...kfKeep.values()].join('\n');
-  // 宿主适配：全屏层改为战棋特效舞台内绝对定位（舞台在 world-root 内随相机变换）
-  css = patch(css, /position\s*:\s*fixed/g, 'position:absolute', 6, 'CSS position:fixed → absolute');
+  let css = keep.join('\n');
+  // 宿主适配：全屏层改为战棋特效舞台内绝对定位（舞台在 world-root 内随相机变换）；
+  // 关键帧不改写：击杀特写/Cut-in 位于 iframe 屏幕宿主，其 translate(±100vw) 等以视口为基准属原版语义
+  css = patch(css, /position\s*:\s*fixed/g, 'position:absolute', 8, 'CSS position:fixed → absolute');
   css = patch(css, /\b100vw\b/g, '100%', 1, 'CSS 100vw → 舞台宽');
   css = patch(css, /\b100d?vh\b/g, '100%', 1, 'CSS 100vh/dvh → 舞台高');
+  css += '\n' + [...kfKeep.values()].join('\n');
   const leftVp = (css.match(/\d+(?:\.\d+)?d?v[wh]\b/g) || []);
   if (leftVp.length) PATCH_LOG.push({ what: 'CSS 残留视口单位(按舞台尺度保留)', hits: leftVp.length });
   return { css, rules: keep.length, keyframes: kfKeep.size, classes: used.size };
@@ -256,11 +264,19 @@ function build() {
     "const chosen = candidates[Math.floor(Math.random() * candidates.length)];",
     "const previous = playRandomStandardGunshot.last;\n    const available = candidates.filter(key => key !== previous);\n    const chosen = available[Math.floor(Math.random() * available.length)];\n    playRandomStandardGunshot.last = chosen;", 1, '枪击采样相邻去重') + '\nplayRandomStandardGunshot.last = null;';
   const shotgun = topBlock(L, l => l.startsWith('function playShotgunSound('), 'playShotgunSound');
+  // 2b) 英雄击杀特写 / 敌方满充能大招 Cut-in（回合制顶层原版函数，原样；只改挂载到 iframe 内屏幕宿主与可清理计时）
+  const execAnim = topBlock(L, l => l.startsWith('async function playExecutionAnimation('), 'playExecutionAnimation');
+  const cutin = topBlock(L, l => l.startsWith('async function playEnemyUltimateCutin('), 'playEnemyUltimateCutin');
+  let moments = [execAnim.text, cutin.text].join('\n\n');
+  moments = patch(moments, 'document.body.appendChild(overlay);', '__SCREEN().appendChild(overlay); __MOMENTS.add(overlay);', 2, '特写挂屏幕宿主');
+  moments = patch(moments, 'overlay.remove();', 'overlay.remove(); __MOMENTS.delete(overlay);', 2, '特写收尾登记');
+  moments = patch(moments, "document.getElementById('battle-scene')", '__STAGE.shakeEl()', 1, '特写震屏走舞台震动层');
+  moments = patch(moments, /\bsetTimeout\(/g, '__momentTimeout(', 6, '特写计时可随重开清理');
   // 3) 粒子引擎与事件总线
   const fxClass = topBlock(L, l => l.startsWith('class CanvasFxEngine {'), 'CanvasFxEngine');
   const supportSvg = topBlock(L, l => l.startsWith('function playSVGEffect('), 'playSVGEffect');
-  const supportBranches = supportSvg.text.split('\n').filter(l => /^    else if \(type === '(heal|buff|shield|mpHeal)'\)/.test(l));
-  if (supportBranches.length !== 4) fail('通用辅助 SVG 分支数变化');
+  const supportBranches = supportSvg.text.split('\n').filter(l => /^    else if \(type === '(heal|buff|debuff|shield|mpHeal|taunt)'\)/.test(l));
+  if (supportBranches.length !== 6) fail('通用辅助 SVG 分支数变化');
   const supportParticles = topBlock(L, l => l.startsWith('function spawnHealParticles('), 'spawnHealParticles');
   const support = `
 ${patch(supportParticles.text, 'function spawnHealParticles(x, y, colorTheme', 'function spawnHealParticles(addParticle, x, y, colorTheme', 1, '辅助粒子注入所属句柄').replace('fxEngine.addParticle({', 'addParticle({')}
@@ -268,7 +284,7 @@ ${patch(supportParticles.text, 'function spawnHealParticles(x, y, colorTheme', '
   function playGenericSupportFx(entity, type, { soundKey = null, volume = 0.5, onImpact } = {}) {
     const theme = { heal:'green', buff:'gold', shield:'shield', mpHeal:'blue' }[type];
     const dom = getEntitySpriteDom(entity);
-    if (!theme || !dom) { onImpact?.(); return null; }
+    if (!dom) { onImpact?.(); return null; }
     const rect = dom[__GBCR]();
     const x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
     const svgWrapper = document.createElement('div');
@@ -279,7 +295,7 @@ ${supportBranches.join('\n').replace('else if', 'if')}
     svgWrapper.firstElementChild.style.position = 'absolute';
     __STAGE.el.appendChild(svgWrapper);
     const particles = new Set();
-    spawnHealParticles(p => { particles.add(p); fxEngine.addParticle(p); }, x, y, theme);
+    if (theme) spawnHealParticles(p => { particles.add(p); fxEngine.addParticle(p); }, x, y, theme);
     const cue = soundKey ? playSound(soundKey, volume) : null;
     const onFinish = new Set();
     const finish = ok => {
@@ -431,7 +447,7 @@ ${supportBranches.join('\n').replace('else if', 'if')}
   mod = patch(mod, 'arcaneAtmoModule.stopAmbientAudio(true);', '/* 环境氛围模块未迁移（战棋背景声由宿主 ambient 管理） */', 1, '去环境氛围清理');
 
   const stubText = STUBS.map(n => 'function ' + n + '() { /* 未迁移段：本 Demo 不产生该状态 */ }').join('\n');
-  const css = extractCss(html, mod + '\n' + soundText + support);
+  const css = extractCss(html, mod + '\n' + soundText + support + '\n' + moments);
   const hitCss = `
 /* 战棋数字：原版分档时间轴，数值主导、实际伤害性质点缀。 */
 .arcane-hit-num-layer[data-hit-type] .arcane-hit-num,.arcane-hit-num-layer[data-hit-type] .arcane-hit-tag { font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; font-variant-numeric:tabular-nums lining-nums; font-style:normal; }
@@ -492,6 +508,13 @@ export function createRpgAv(host) {
   const isCombatActive = e => host.isActive(e);
   const hasVariantTag = (e, name) => host.hasVariantTag(e, name);
 
+  // ---- 击杀特写 / 大招 Cut-in（原版顶层函数；屏幕宿主由战棋提供，重开/清场统一取消计时与遮罩） ----
+  const __MOMENTS = new Set(), __momentTimers = new Set();
+  const __SCREEN = () => (host.screen ? host.screen() : __STAGE.el);
+  function __momentTimeout(fn, ms) { const id = setTimeout(() => { __momentTimers.delete(id); fn(); }, ms); __momentTimers.add(id); return id; }
+  function clearMoments() { __momentTimers.forEach(clearTimeout); __momentTimers.clear(); __MOMENTS.forEach(o => o.remove()); __MOMENTS.clear(); }
+${moments}
+
   // ---- 人物与语音表（原样） ----
   ${heroVoice.text}
   ${pickVoice.text}
@@ -519,16 +542,17 @@ ${stubText}
 ${mod}
     return { playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar,
       CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx,
-      syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked };
+      syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked,
+      playSummonEnter, playSummonExit, playSummonGuard, clearSummonState };
   })();
 ${busOn.map(l => l.replace('CombatAudioDirector.consume', 'arcane.CombatAudioDirector.consume')).join('\n')}
 
   return Object.assign({}, arcane, {
     CombatAudioMixer, audioUrls, playSound, playCustomAudio, HERO_VOICE_LINES, pickHeroVoice, AVATAR_MAP, fxEngine,
     ASSET_BASE, HERO_VOICE_BASE, itemFxAssetUrl,
-    playGenericSupportFx,
-    clearArcaneFx() { supportHandles.forEach(handle => handle.cancel()); arcane.clearArcaneFx(); playRandomStandardGunshot.last = null; },
-    setToken(t) { if (t !== combatToken) { supportHandles.forEach(handle => handle.cancel()); playRandomStandardGunshot.last = null; } combatToken = t; },
+    playGenericSupportFx, playExecutionAnimation, playEnemyUltimateCutin, clearMoments,
+    clearArcaneFx() { supportHandles.forEach(handle => handle.cancel()); clearMoments(); arcane.clearArcaneFx(); playRandomStandardGunshot.last = null; },
+    setToken(t) { if (t !== combatToken) { supportHandles.forEach(handle => handle.cancel()); clearMoments(); playRandomStandardGunshot.last = null; } combatToken = t; },
     getToken() { return combatToken; },
     setRoster(h, e) { heroesData = h; enemiesData = e; },
   });

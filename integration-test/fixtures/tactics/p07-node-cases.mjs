@@ -76,7 +76,7 @@ async function p07(m) {
   const chargeEnemy = unit('ce', 'enemy', { hp: 100, spd: 20 });
   const b3 = makeBattle(m, [chargeHero], [chargeEnemy], { ch: { col: 2, row: 4 }, ce: { col: 7, row: 4 } });
   b3.start();
-  const charged = { ...shot, name: 'charge1', cost: 5, charge: 1, delay: 300, maxUses: 1, power: 20 };
+  const charged = { ...shot, name: 'charge1', cost: 5, delay: 1, maxUses: 1, power: 20 };
   const chargeStart = attackAt(b3, charged, 'ce', { col: 7, row: 4 });
   const afterStart = { mp: chargeHero.ref.mp, uses: b3.battleState.perBattleUses.ch?.charge1 || 0, resources: b3.snapshot().resources };
   const cancelResult = b3.cancelPreparation();
@@ -99,7 +99,7 @@ async function p07(m) {
     repeatStart.ok && startedState.mp === 7 && startedState.uses === 1 && afterNextNatural.currentId === 'ch2' && prep?.ready && beforeRelease.mp === 7 && beforeRelease.uses === 1 && release.ok && !release.preparing && chargeHero2.ref.mp === 7,
     JSON.stringify({ start: repeatStart.ok, startedState, next: afterNextNatural.currentId, prep, beforeRelease, release: release.ok, mp: chargeHero2.ref.mp })));
 
-  const readyStartSkill = { ...shot, name: 'readyCharge', cost: 1, charge: 1, delay: 1 };
+  const readyStartSkill = { ...shot, name: 'readyCharge', cost: 1, delay: 1 };
   const readyBattle = makeBattle(m, [unit('rh', 'hero', { spd: 200 })], [unit('re', 'enemy', { hp: 100, spd: 20 })], { rh: { col: 2, row: 4 }, re: { col: 7, row: 4 } });
   readyBattle.start();
   const readyStart = attackAt(readyBattle, readyStartSkill, 're', { col: 7, row: 4 });
@@ -114,7 +114,7 @@ async function p07(m) {
   const downEnemy = unit('de', 'enemy', { hp: 100, atk: 10, spd: 1000, skills: [{ name: 'counter', isReaction: true, reactionTarget: 'all', isOthers: true, type: '[反击]', type2: '[无]', type3: '[无]', range: { type: '单体', castRange: 5 }, actionCost: { main: 0, aux: 0 } }] });
   const downBattle = makeBattle(m, [downHero], [downEnemy], { ah: { col: 2, row: 4 }, de: { col: 5, row: 4 } }, rng([0, 0]));
   downBattle.start();
-  const downCharge = { ...shot, name: 'downCharge', charge: 1, cost: 0, delay: 0 };
+  const downCharge = { ...shot, name: 'downCharge', cost: 0, delay: 1 };
   downBattle.attack(downCharge, { x: 5.5, y: 4.5, targetId: 'de' });
   downBattle.endAction();
   downBattle.attack(downCharge, { x: 5.5, y: 4.5, targetId: 'de' }, { policy: 'auto' });
@@ -216,7 +216,7 @@ async function p07(m) {
   inventoryBattle.start();
   inventoryBattle.battleState.combatState.charges = { inventory: { inventory: 2, preparing: null } };
   inventoryBattle.battleState.combatState.clock.currentAction.resources.main = 2;
-  const inventorySkill = { ...charged, name: 'inventorySkill', charge: 4, haste: 3 };
+  const inventorySkill = { ...charged, name: 'inventorySkill', delay: 4, haste: 3 };
   const inventoryStart = attackAt(inventoryBattle, inventorySkill, 'inventoryEnemy', { col: 7, row: 4 });
   const inventoryBefore = inventoryBattle.snapshot();
   const premature = attackAt(inventoryBattle, inventorySkill, 'inventoryEnemy', { col: 7, row: 4 });
@@ -252,7 +252,7 @@ async function p07(m) {
   const dotHero = unit('dotHero', 'hero', { hp: 3, spd: 200 });
   const dotBattle = makeBattle(m, [dotHero, unit('dotAlly', 'hero', { spd: 50 })], [unit('dotEnemy', 'enemy', { spd: 20 })], { dotHero: { col: 2, row: 4 }, dotAlly: { col: 2, row: 7 }, dotEnemy: { col: 7, row: 4 } });
   dotBattle.start();
-  attackAt(dotBattle, { ...charged, name: 'dotCharge', cost: 0, charge: 10 }, 'dotEnemy', { col: 7, row: 4 });
+  attackAt(dotBattle, { ...charged, name: 'dotCharge', cost: 0, delay: 10 }, 'dotEnemy', { col: 7, row: 4 });
   const dotAt = dotBattle.snapshot().now;
   const dotSource = { casterId: 'dotEnemy', skillId: 'dot', effectId: 'dotHero:0' };
   m.clock.dispatchClock(dotBattle.battleState, { type: 'applyStatus', unitId: 'dotHero', source: dotSource, kind: 'poison', strength: 4, duration: 200 });

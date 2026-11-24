@@ -529,3 +529,9 @@ button:disabled { opacity: .42; cursor: default; }
 #battle-log.t-log-heal { color: #bbf7d0; }
 .t-heal-pulse { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; pointer-events: none;
   background: radial-gradient(circle, rgba(216,249,157,0.85) 0%, rgba(74,222,128,0.4) 55%, transparent 75%); mix-blend-mode: screen; }
+
+/* 敌方满充能（原版 .charge-full-danger 的红色威压辉光；不占 sprite/medal 的 transform 通道） */
+.t-unit-charge-full .t-unit-sprite { filter: drop-shadow(0 0 14px rgba(244, 63, 94, 0.9)); }
+.t-unit-charge-full .t-unit-ground::before { content: ''; position: absolute; left: -30px; top: -30px; width: 60px; height: 60px; border-radius: 50%; pointer-events: none;
+  box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.85), 0 0 22px rgba(244, 63, 94, 0.7); animation: t-charge-full-pulse 0.9s ease-in-out infinite alternate; }
+@keyframes t-charge-full-pulse { from { transform: scale(0.92); opacity: 0.7; } to { transform: scale(1.08); opacity: 1; } }

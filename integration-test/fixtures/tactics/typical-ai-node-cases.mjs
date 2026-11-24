@@ -77,6 +77,7 @@ async function run(deps) {
   const mend = skill({ name: 'mend', type: '[回复]', power: 40, range: { type: '单体', castRange: 10 } });
   const might = skill({ name: 'might', type: '[增攻]', power: 20, range: { type: '单体', castRange: 10 } });
   const cannon = skill({ name: 'cannon', type: '[伤害]', power: 30, range: { type: '单体', castRange: 10 }, extra: { charge: 2 } });
+  const chant = skill({ name: 'chant', type: '[伤害]', power: 30, range: { type: '单体', castRange: 10 }, extra: { delay: 2 } });
 
   // 01 合法性复用：AI 落点 + 声明技能经真实 queryAttack 可组合命中
   {
@@ -192,14 +193,17 @@ async function run(deps) {
       !itemPlan.skill && itemPlan.action === 'wait', j(itemPlan)));
   }
 
-  // 07 蓄力技能 → prepare 动作
+  // 07 [延迟]准备技能 → prepare；满充能大招 → 正常攻击执行链（不站桩准备）
   {
     const scene = sceneOf(16, 10);
     const units = [mkUnit('h', 'hero', { hp: 100 }), mkUnit('e', 'enemy', { hp: 100 })];
     const ctx = makeCtx(m, scene, units, { h: { col: 6, row: 5 }, e: { col: 2, row: 5 } });
-    const plan = ai.chooseEnemyAction(ctx, 'e', 0, [cannon], null, { main: 1, aux: 1, preparing: null });
-    cases.push(ok('TT-AI-07 蓄力技能生成候选并声明 prepare',
-      !!plan.skill && plan.skill.name === 'cannon' && plan.action === 'prepare', j(plan)));
+    const plan = ai.chooseEnemyAction(ctx, 'e', 0, [chant], null, { main: 1, aux: 1, preparing: null });
+    cases.push(ok('TT-AI-07 延迟准备技能生成候选并声明 prepare',
+      !!plan.skill && plan.skill.name === 'chant' && plan.action === 'prepare', j(plan)));
+    const ult = ai.chooseEnemyAction(ctx, 'e', 0, [cannon], null, { main: 1, aux: 1, preparing: null });
+    cases.push(ok('TT-AI-07 充能大招候选按普通攻击执行，不声明 prepare',
+      !!ult.skill && ult.skill.name === 'cannon' && ult.action === null, j(ult)));
   }
 
   // 08 无感知/空 regions 兼容：旧接近行为不变

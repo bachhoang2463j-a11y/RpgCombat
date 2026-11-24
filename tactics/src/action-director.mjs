@@ -13,6 +13,7 @@ import { createFxRegistry, actionInput, reactionInput, prepareInput } from './fx
 import { registerDefaultFx, EXTRA_AUDIO, fogFieldHtml, animateFogField } from './fx-library.mjs';
 import { createVfxHost } from './vfx-host.mjs';
 import { skillSlots } from './effect-definitions.mjs';
+import { startAtmos, atmosStyleOf } from './screen-atmos.mjs';
 
 export const WINDUP_BEAT_MS = 330;   // 回合制敌方前摇拍点（OMEN_BEAT）：起手后此刻出手
 
@@ -327,6 +328,16 @@ export function createActionDirector(deps) {
     await sandbox.guideTo(pts);
     if (!isCurrent() || !(await prepareAudio(entry.prepareKeys ? entry.prepareKeys({ identity }) : [])) || !isCurrent()) return false;
 
+    // L3/L4 屏幕氛围层（视口宿主）：与条目同风格的边缘围压；首个真实揭示即降低遮挡，条目结束即外撤
+    const grade = entry.grade;
+    const shape = result.query && result.query.shape;
+    const atmos = (grade === 'L3' || grade === 'L4') ? startAtmos(makeFx(audioContext.category), {
+      style: atmosStyleOf(entry, skill), grade, chargeMs: entry.timeline?.chargeMs || 600, totalMs: entry.timeline?.totalMs || 2000,
+      skillName: skill.name, casterName: casterUnit?.name || '',
+      shape: shape && shape.radius > 0 ? { center: shape.center || result.aim, radius: shape.radius } : null,
+      after: (ms, fn) => scope().after(ms, fn),
+    }) : null;
+
     const revealed = new Map();      // targetId → 已揭示段序号集合
     const reactionRuns = [];
     function revealSegment(targetId, i, meta = {}) {
@@ -339,6 +350,7 @@ export function createActionDirector(deps) {
       const done = revealed.get(targetId) || new Set();
       if (done.has(i)) return;
       done.add(i); revealed.set(targetId, done);
+      if (atmos) atmos.lower();
       const reaction = seg.reaction || (done.size === 1 ? h.reaction : null);
       if (reaction) reactionRuns.push(playReaction({ ...h, reaction }));
       const guardianReaction = seg.guardianReaction || reaction?.guardianReaction;
@@ -364,6 +376,7 @@ export function createActionDirector(deps) {
     function revealEffect(e, quiet) {
       if (!isCurrent() || !e || effectsShown.has(e)) return null;
       effectsShown.add(e);
+      if (atmos) atmos.lower();
       if (e.kind === 'heal' && !quiet) playHealPulse(e.targetId);
       return onEffectReveal ? onEffectReveal(e, { result }) : null;
     }
@@ -381,6 +394,7 @@ export function createActionDirector(deps) {
       anchorAt: (x, y) => makeAnchor(x, y), aimAnchor: () => aimAnchor(result.aim), lineEndAnchor: () => lineEndAnchor(result),
     };
     const ok = await entry.play(ctx);
+    if (atmos) atmos.end();
     if (!isCurrent() || ok === false) return false;
     hits.forEach(h => reveal(h.targetId, { late: true }));
     effects.forEach(e => revealEffect(e));
@@ -408,17 +422,74 @@ export function createActionDirector(deps) {
         if (ev.collided) { makeFx('B').shake('light'); }
       }));
     }
+    // 召唤入场：消费规则真实生成的 summons（单位 ID 与落点），原版 playSummonEnter 在实际落点逐个显形
+    const summonIds = result.summons || [];
+    if (summonIds.length) {
+      avHost.syncRoster();
+      const ents = summonIds.map(id => avHost.entity(id)).filter(Boolean);
+      const enter = ents.length ? av.playSummonEnter(casterEnt, ents, { side: ents[0].side, fxTag: skill.fxTag || null }) : null;
+      if (enter && !enter.skipped && !(await awaitHandle(enter, 1400))) return false;
+    }
+    // 召唤物真实死亡：原版 playSummonExit 消散（复活拦截/自爆由原版函数自身旁路）
+    for (const id of [...new Set(hits.map(h => h.targetId))]) {
+      const eu = battleOf()?.getEffectiveUnit(id);
+      if (!eu || !eu.isSummon || eu.hp > 0) continue;
+      const ent = avHost.entity(id);
+      const exit = ent && av.playSummonExit(ent, { exitCause: 'killed', side: ent.side });
+      if (exit && !(await awaitHandle(exit, 900))) return false;
+    }
     // 死亡自爆领域事件演出（食尸鬼等）
-    for (const sd of (result.events || []).filter(ev => ev.type === 'self-destruct')) {
+    const selfDestructs = (result.events || []).filter(ev => ev.type === 'self-destruct');
+    for (const sd of selfDestructs) {
       const fx = makeFx('B'), px = sd.center.x * 50, py = sd.center.y * 50, rPx = (sd.radius || 3) * 50;
       fx.sfx('explosion_aoe_blast', 0.65); fx.shake('medium');
       const ring = '<i style="position:absolute;left:' + px + 'px;top:' + py + 'px;width:' + (rPx * 2) + 'px;height:' + (rPx * 2) + 'px;margin:' + (-rPx) + 'px 0 0 ' + (-rPx) + 'px;border-radius:50%;background:radial-gradient(circle,rgba(251,146,60,0.45),rgba(239,68,68,0.6) 60%,transparent 75%);mix-blend-mode:screen;"></i>';
       fx.top(ring, 560).firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 540, fill: 'forwards' });
       if (onSelfDestruct) onSelfDestruct(sd);
     }
+    if (selfDestructs.length && !(await wait(620))) return false;   // 击杀特写/结算严格在自爆演出之后
     waves.forEach(wave => { if (wave) av.CombatAudioDirector.closeWave(wave); });
     dropAnchors();
     return ok;
+  }
+
+  // ---------- 原版英雄击杀特写 / 敌方满充能大招 Cut-in（iframe 屏幕宿主；按时序串行，不与世界演出互盖） ----------
+  function portraitOf(id) {
+    const u = getViewData().units.find(x => x.id === id);
+    if (!u) return null;
+    const emoji = u.emoji || (u.side === 'hero' ? '🛡️' : '☠️');
+    const img = u.avatarUrl || (u.side === 'hero' ? 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#0f172a"/><text x="50" y="66" font-size="58" text-anchor="middle">' + emoji + '</text></svg>') : null);
+    return { id, name: u.name, emoji, img, side: u.side };
+  }
+  function untilScope(p) {
+    const s = scope();
+    if (!s || !s.isLive) return Promise.resolve(false);
+    return new Promise(resolve => {
+      const cancel = s.settleOnDispose(() => resolve(false));
+      Promise.resolve(p).then(() => { if (cancel) cancel(); resolve(s.isLive); }, () => { if (cancel) cancel(); resolve(false); });
+    });
+  }
+  let momentChain = Promise.resolve(true);
+  function serialMoment(run) { const next = momentChain.then(run, run); momentChain = next.catch(() => false); return next; }
+  // 满充能大招宣告（原版 playEnemyUltimateCutin：压暗/撕裂色带/头像/技能名/警告音）；之后才进入原技能前摇
+  function playChargeCutin(unitId, skill) {
+    const ent = portraitOf(unitId);
+    if (!ent || !skill) return Promise.resolve(true);
+    return serialMoment(() => untilScope(av.playEnemyUltimateCutin(ent, skill.name)));
+  }
+  // 整技能聚合真实死亡（原版 _pendingKills + caster 为英雄）：本技能命中前存活、此刻真实 HP≤0 的敌方单位；
+  // 保命/复活拦截者 HP>0 自然不计；多段/群攻只收尾一次。类型按原版 skill.damageType || '近战'。
+  function executionKills(result) {
+    const b = battleOf(), caster = b && b.getEffectiveUnit(result.casterId);
+    if (!caster || caster.side !== 'hero' || caster.isSummon) return [];
+    const ids = [...new Set((result.hits || []).filter(h => (h.segments || [h]).some(s => (s.hpBefore ?? 1) > 0)).map(h => h.targetId))];
+    return ids.filter(id => { const u = b.getEffectiveUnit(id); return u && u.side !== 'hero' && u.hp <= 0; });
+  }
+  function playExecution(result) {
+    const kills = result && result.ok ? executionKills(result) : [];
+    if (!kills.length) return Promise.resolve(true);
+    const hero = portraitOf(result.casterId), skill = result.skill || {};
+    return serialMoment(() => untilScope(av.playExecutionAnimation(hero, kills.map(portraitOf).filter(Boolean), skill.damageType || '近战')));
   }
 
   // ---------- 起手（蓄力/延迟开始：preparing 提交结果，未结算槽位）：注册表 kind:'prepare' 分发，无条目则不演 ----------
@@ -661,5 +732,5 @@ export function createActionDirector(deps) {
     for (const ev of (result && result.events) || []) if (ev.type === 'region-created') heldRegions.add(ev.region.id);
   }
   return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, playPrepare, syncRegions, syncBarriers, syncPreparations, holdRegions, wait, resolveAttackIdentity, resolveWindupKind,
-    runAttackLive, driveAttack, cancelAttack };
+    runAttackLive, driveAttack, cancelAttack, playChargeCutin, playExecution, executionKills };
 }

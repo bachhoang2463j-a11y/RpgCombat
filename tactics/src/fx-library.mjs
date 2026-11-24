@@ -59,20 +59,72 @@ function ringHtml(x, y, d, inner, outer) {
   return '<i style="position:absolute;left:' + x + 'px;top:' + y + 'px;width:' + d + 'px;height:' + d + 'px;margin:' + (-d / 2) + 'px 0 0 ' + (-d / 2) + 'px;border-radius:50%;' +
     'background:radial-gradient(circle,transparent 52%,' + inner + ' 61%,' + outer + ' 69%,transparent 78%);mix-blend-mode:screen;will-change:transform,opacity;"></i>';
 }
-// WebM（VP9 透明通道）挂世界层，宽度定尺寸、等比；播完即收
-function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1 } = {}) {
+// WebM 视频特效：原版 playWebMFX 黑底转透明（index.html playWebMFX / FX_WEBM_SCREEN_MODE=false 默认路径）移植到世界层。
+// 隐藏 video 逐帧绘制到 Canvas：RGB 最大通道 <12 全透明、12–80 渐进、更亮保留，尾段 0.35s 渐隐；
+// 像素读取失败（跨域污染）才按原版降级 screen 混合。宽度定尺寸、按真实分辨率等比；
+// cover=D（世界像素直径）：范围类效果短边覆盖真实直径，不按 16:9 帧宽误报范围。层收回即停帧、释放解码。
+const FX_WEBM_KEY_MAX = 960;
+function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1, cover = 0 } = {}) {
   const layer = ctx.fx.top('', ms);
   const v = document.createElement('video');
-  v.muted = true; v.playsInline = true; v.preload = 'auto'; v.crossOrigin = 'anonymous';
-  v.style.cssText = 'position:absolute;left:' + x + 'px;top:' + y + 'px;width:' + width + 'px;transform:translate(-50%,-50%);mix-blend-mode:screen;opacity:' + opacity + ';pointer-events:none;';
+  v.muted = true; v.playsInline = true; v.preload = 'auto'; v.crossOrigin = 'anonymous'; v.loop = false;
+  v.style.display = 'none';
+  const cv = document.createElement('canvas');
+  cv.setAttribute('data-fx', 'webm');
+  cv.setAttribute('data-webm', file);
+  cv.style.cssText = 'position:absolute;left:' + x + 'px;top:' + y + 'px;width:' + (cover || width) + 'px;transform:translate(-50%,-50%);opacity:' + opacity + ';pointer-events:none;';
+  const g = cv.getContext('2d', { willReadFrequently: true });
+  let screenMode = false, raf = 0;
+  v.onloadedmetadata = () => {
+    const aspect = (v.videoWidth || 1920) / (v.videoHeight || 1080);
+    const cssW = cover ? cover * Math.max(1, aspect) : width;
+    cv.width = Math.min(FX_WEBM_KEY_MAX, Math.round(cssW * 2));
+    cv.height = Math.round(cv.width / aspect);
+    cv.style.width = cssW + 'px';
+    cv.style.height = Math.round(cssW / aspect) + 'px';
+  };
+  const release = () => {
+    if (raf) cancelAnimationFrame(raf);
+    cv.remove(); v.pause(); v.removeAttribute('src'); v.load(); v.remove();
+  };
+  const next = () => {
+    if (typeof v.requestVideoFrameCallback === 'function') v.requestVideoFrameCallback(frame);
+    else raf = requestAnimationFrame(frame);
+  };
+  function frame() {
+    if (!cv.isConnected || v.paused || v.ended) { release(); return; }
+    const cw = cv.width, ch = cv.height;
+    if (!cw || !ch) { next(); return; }
+    let fade = 1;
+    if (v.duration && v.currentTime > v.duration - 0.35) fade = Math.max(0, (v.duration - v.currentTime) / 0.35);
+    g.clearRect(0, 0, cw, ch);
+    g.drawImage(v, 0, 0, cw, ch);
+    if (!screenMode) {
+      try {
+        const img = g.getImageData(0, 0, cw, ch), d = img.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const m = Math.max(d[i], d[i + 1], d[i + 2]);
+          if (m < 12) d[i + 3] = 0;
+          else if (m < 80) d[i + 3] = Math.floor(d[i + 3] * ((m - 12) / 68) * fade);
+          else d[i + 3] = Math.floor(d[i + 3] * fade);
+        }
+        g.putImageData(img, 0, 0);
+      } catch (e) {
+        screenMode = true; cv.style.mixBlendMode = 'screen';
+      }
+    } else cv.style.opacity = String(opacity * fade);
+    next();
+  }
+  v.onended = release;
+  v.onerror = release;
   v.src = ctx.av.ASSET_BASE + '/' + file;
   v.playbackRate = rate;
-  v.onended = () => v.remove();
-  v.onerror = () => v.remove();
   layer.appendChild(v);
+  layer.appendChild(cv);
   const p = v.play();
-  if (p && typeof p.catch === 'function') p.catch(() => {});
-  return v;
+  if (p && typeof p.then === 'function') p.then(next, () => release());
+  else next();
+  return cv;
 }
 const worldPx = p => ({ x: p.x * PX, y: p.y * PX });
 
@@ -424,15 +476,19 @@ const evadeGlide = {
 // 埃利奥特首批（典型对局权威样本）：单体回复 / 浓雾 / 归尘礼赞（延迟·传奇）/ 召雷术（延迟·高阶）
 // ==========================================
 
+// 原版标签处理器的 playSVGEffect 类型与音色（index.html registerTagHandler：增/速/瞄/防/避/反击/嘲/再动/驱散/回/回蓝/冲/盾/免伤；盲/降/滞/弱/缓）
 const SUPPORT_BUFF = {
   atk: ['buff', 'atkUp'], spd: ['buff', 'atkUp'], hit: ['buff', 'hitUp'],
   def: ['shield', 'defUp'], eva: ['buff', 'defUp'],
 };
+const SUPPORT_DEBUFF = { hit: ['debuff', 'hitDown'] };
+const SUPPORT_DEBUFF_DEFAULT = ['debuff', 'defDown'];
 const SUPPORT_EFFECT = {
   heal: ['heal', 'hpHeal'], healMp: ['mpHeal', 'mpHeal'], healTp: ['mpHeal', 'mpHeal'],
   shield: ['shield', 'shieldUp'], dispel: ['buff', 'defUp'], damageGuard: ['shield', 'defUp'],
+  counter: ['buff', 'defUp'], taunt: ['taunt', null], mainPoint: ['buff', null], drainMp: ['debuff', 'mpHeal'],
 };
-const SUPPORT_KEYS = [...new Set([...Object.values(SUPPORT_BUFF), ...Object.values(SUPPORT_EFFECT)].map(([, key]) => key))];
+const SUPPORT_KEYS = [...new Set([...Object.values(SUPPORT_BUFF), ...Object.values(SUPPORT_DEBUFF), SUPPORT_DEBUFF_DEFAULT, ...Object.values(SUPPORT_EFFECT)].map(([, key]) => key).filter(Boolean))];
 const SUPPORT_VOLUME = 0.5;
 const SUPPORT_CUES = SUPPORT_KEYS.map(key => ({ key, vol: SUPPORT_VOLUME }));
 const SUPPORT_NUMBERS = {
@@ -440,22 +496,28 @@ const SUPPORT_NUMBERS = {
   healTp: ['TP', '#e0f2fe', '#0369a1'], shield: ['护盾', '#e2e8f0', '#475569'],
 };
 
+// 多目标串行：名单与顺序来自后端 result.effects（同一目标多个效果槽保持各自真实条目）；
+// 目标 A 的原版 SVG/音色在接触拍点揭示变化，A 的句柄全部完成后才开始 B。只串行演出与揭示，不重新结算。
+function supportFeedbackOf(effect) {
+  if (effect.kind === 'buff') return effect.value > 0 ? SUPPORT_BUFF[effect.field] : (SUPPORT_DEBUFF[effect.field] || SUPPORT_DEBUFF_DEFAULT);
+  return SUPPORT_EFFECT[effect.kind];
+}
 async function playSupportEffects(ctx, accept = () => true) {
   const byTarget = new Map();
   const seenEffects = new Set();
   for (const effect of ctx.result.effects || []) {
     if (seenEffects.has(effect) || !accept(effect)) continue;
     seenEffects.add(effect);
-    const feedback = effect.kind === 'buff' && effect.value > 0 ? SUPPORT_BUFF[effect.field] : SUPPORT_EFFECT[effect.kind];
+    const feedback = supportFeedbackOf(effect);
     if (!feedback) continue;
     if (!byTarget.has(effect.targetId)) byTarget.set(effect.targetId, []);
     byTarget.get(effect.targetId).push({ effect, feedback });
   }
-  const pending = [];
   let first = true;
   for (const [targetId, batch] of byTarget) {
-    if (!first && !(await ctx.wait(200))) return false;
+    if (!first && !(await ctx.wait(60))) return false;
     first = false;
+    const pending = [];
     const playedKeys = new Set(), playedTypes = new Set();
     const entity = ctx.ent(targetId);
     let numberIndex = 0;
@@ -494,8 +556,9 @@ async function playSupportEffects(ctx, accept = () => true) {
         if (effect.kind === 'heal' && effect.overheal > 0) play(SUPPORT_EFFECT.shield);
       }
     });
+    if (!(await Promise.all(pending)).every(Boolean)) return false;
   }
-  return (await Promise.all(pending)).every(Boolean);
+  return true;
 }
 
 const healMend = {
@@ -1383,7 +1446,7 @@ const xenonBlightFog = {
     fx.sfx('aoe_poison_spell_fs219566', 0.65); fx.shake('medium');
     fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(134,239,172,0.35),rgba(20,83,45,0.22));"></i>', 300)
       .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
-    webm(ctx, 'fog.mp4', b.x, b.y, R * 2.2, { ms: 1300, opacity: 0.85 });
+    webm(ctx, 'fog.mp4', b.x, b.y, R * 2, { ms: 1300, opacity: 0.85, cover: R * 2 });
     particles(fx, Array.from({ length: 24 }, () => { const a = rnd(0, TAU), d = rnd(0.4, 1) * R; return { x: b.x, y: b.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(12, 22), color: '#16a34a', core: '#86efac', s0: 0.8, s1: 0.2, dur: 760 }; }), 860);
     hits.forEach((h, i) => ctx.after(50 + i * 45, () => ctx.reveal(h.targetId)));
     return ctx.wait(1260);
@@ -1398,7 +1461,7 @@ const vitalFlow = {
   async play(ctx) {
     const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
     fx.sfx('herocharge', 0.56);
-    webm(ctx, 'heart.mp4', c.x, c.y - 16, 2.2 * PX, { ms: 900 });
+    webm(ctx, 'heart.mp4', c.x, c.y - 24, 4.4 * PX, { ms: 900 });
     fx.ground(runeHtml(fx.uid(), c.x, c.y, 1.5 * PX, '#ef4444', '#fecaca', ''), 880)
       .firstChild.animate([{ transform: 'translate(-50%,-50%) scale(0.35)', opacity: 0.9 }, { transform: 'translate(-50%,-50%) scale(1.1)', opacity: 0 }], { duration: 840, fill: 'forwards' });
     ctx.after(260, () => {
@@ -1424,7 +1487,7 @@ const sanctumVeil = {
     fx.sfx('weimu', 0.70); fx.shake('heavy');
     fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(224,242,254,0.75),rgba(56,189,248,0.28));"></i>', 380)
       .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.16 }, { opacity: 0 }], { duration: 380, fill: 'forwards' });
-    webm(ctx, 'weimu.webm', c.x, c.y, Math.min(R * 2, 10 * PX), { ms: 1600 });
+    webm(ctx, 'weimu.webm', c.x, c.y, R * 2, { ms: 1600, cover: R * 2 });
     fx.top(ringHtml(c.x, c.y, R * 2, 'rgba(186,230,253,0.9)', 'rgba(56,189,248,0.35)'), 900)
       .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 860, fill: 'forwards' });
     return ctx.wait(1900);

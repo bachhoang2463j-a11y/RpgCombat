@@ -324,14 +324,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     } else if (ev.type === 'periodic-tick' && ev.kind === 'periodic' && !ev.suppressed) {
       const target = byId.get(ev.unitId);
       if (target && target.ref.hp > 0) {
-        if (ev.source && ev.source.skillId === 'charge-cycle') {
-          // 敌方充能库存周期：每 100 时间 +1，封顶充能技能需求（原版 executeEnemyTurn 回合末+1 的时钟映射）
-          const charge = chargeState(target.id);
-          const next = Math.min(ev.strength || 0, charge.inventory + 1);
-          if (next > charge.inventory) { charge.inventory = next; addLog('⏳ ' + target.name + ' 充能库存 +1（' + charge.inventory + '/' + (ev.strength || 0) + '）'); }
-        } else {
-          target.ref.hp = Math.min(target.ref.maxHp, target.ref.hp + (ev.strength || 0));
-        }
+        target.ref.hp = Math.min(target.ref.maxHp, target.ref.hp + (ev.strength || 0));
       }
     } else if (ev.type === 'stealth-window' && !ev.suppressed) {
       // 隐匿窗口：每 100 时间未受击 +10（P03 映射；受击经 markHit 记录，wasHit=true 本窗口不累积）
@@ -374,18 +367,13 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         granted.forEach(b => registerBuff(u, b, source));
       }
     }
-    // 周期收口注册（P03 映射表）：【再生】每100回血10%、敌方充能库存每100+1、隐匿者窗口每100（未受击+10）
+    // 周期收口注册（P03 映射表）：【再生】每100回血10%、隐匿者窗口每100（未受击+10）；敌方大招充能改由自然行动末结算（gainNaturalCharge）
     for (const u of units) {
       if (u.ref.hp <= 0) continue;
       const buffs = buffsOf(u.id);
       if (hasVariantTag(u, '再生', buffs)) {
         dispatchBattleClock({ type: 'applyStatus', unitId: u.id, source: statusSource(u.id, { casterId: u.id, skillId: 'variant:再生' }, 'regen'),
           kind: 'periodic', strength: Math.max(1, Math.floor(u.ref.maxHp * 0.1)), interval: ROUND_TIME });
-      }
-      if (u.side === 'enemy') {
-        const cap = Math.max(0, ...(u.skills || []).filter(s => s && s.charge > 0).map(s => s.charge));
-        if (cap > 0) dispatchBattleClock({ type: 'applyStatus', unitId: u.id, source: statusSource(u.id, { casterId: u.id, skillId: 'charge-cycle' }, 'cycle'),
-          kind: 'periodic', strength: cap, interval: ROUND_TIME });
       }
       if (u.classType === '隐匿者') {
         dispatchBattleClock({ type: 'applyStatus', unitId: u.id, source: statusSource(u.id, { casterId: u.id, skillId: 'stealth-cycle' }, 'window'),
@@ -463,6 +451,23 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     addLog(u.name + ' 麻痹僵直，跳过本次行动（消耗 1 层）');
     return true;
   }
+  // 敌方大招充能（原版 executeEnemyTurn）：只认首个 [Charge:N] 技能；AI 单位每个自然行动末 +1，
+  // 本次行动开始时已满（应释放大招）则不增长；再动/额外主点/多段/刷新不经过此处，不会重复充能。
+  function chargeSkillOf(u) { return (u && u.skills || []).find(s => s && s.charge > 0) || null; }
+  function chargeFull(u) {
+    const cs = chargeSkillOf(u);
+    return !!cs && (chargeState(u.id).current || 0) >= cs.charge;
+  }
+  function gainNaturalCharge(u) {
+    const cs = chargeSkillOf(u);
+    if (!cs || !isAiControlled(u) || u.ref.hp <= 0 || !resources || resources.chargeFullAtStart) return;
+    const c = chargeState(u.id);
+    const next = Math.min((c.current || 0) + 1, cs.charge);
+    if (next === (c.current || 0)) return;
+    c.current = next;
+    emit('charge-gained', { unitId: u.id, skillName: cs.name, current: next, max: cs.charge, full: next >= cs.charge });
+    addLog('⏳ ' + u.name + ' 充能 ' + next + '/' + cs.charge + (next >= cs.charge ? '（已满，下次行动释放【' + cs.name + '】）' : ''));
+  }
   function advance() {
     resources = null;
     for (;;) {
@@ -478,10 +483,12 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         resources.moveRemaining = moveDistanceOf(u) * resources.moveQuota;
         resources.moveMultiplier = 1;
         resources.jumped = false;
+        resources.chargeFullAtStart = chargeFull(u);
         prepareAtActionStart(u);
         actionSerial++;
         addLog('t=' + next.time.toFixed(2) + ' · ' + u.name + ' 行动');
         if (tryParalyzeSkip(u)) {
+          gainNaturalCharge(u);
           dispatchClock(state, { type: 'endAction', unitId: u.id });
           resources = null;
           continue; // 跳过本次行动，重跑一圈
@@ -520,9 +527,11 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       chargeInventory: showCurrent && clock?.currentAction ? (state.combatState.charges?.[clock.currentAction.unitId]?.inventory || 0) : 0,
       units: shownUnits.map(u => {
         const st = statsOf(u);
+        const cs = chargeSkillOf(u);
         return { id: u.id, name: u.name, side: u.side, controller: u.controller || (u.side === 'hero' ? 'player' : 'ai'),
           hp: u.ref.hp, mp: u.ref.mp, tp: u.ref.tp || 0, status: u.ref.hp > 0 ? 'active' : u.side === 'hero' ? 'down' : 'dead',
           atk: st.atk, def: st.def, hit: st.hit, eva: st.eva, taunt: st.taunt, spd: st.spd, shield: u.ref.shield || 0,
+          charge: cs && isAiControlled(u) ? { current: chargeState(u.id).current || 0, max: cs.charge, skillName: cs.name } : null,
           buffs: buffsOf(u.id).map(b => ({ type: b.type, value: b.value, variant: b.variant || null, duration: Number.isFinite(b.duration) ? b.duration : null, isConsumable: !!b.isConsumable })) };
       }),
       carrying: structuredClone(state.combatState.carrying || {}),
@@ -706,7 +715,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
   function chargeState(unitId) {
     const charges = state.combatState.charges || (state.combatState.charges = {});
-    return charges[unitId] || (charges[unitId] = { inventory: 0, preparing: null });
+    return charges[unitId] || (charges[unitId] = { inventory: 0, preparing: null, current: 0 });
   }
   function usesLeft(unitId, skill) {
     if (!(skill.maxUses > 0)) return Infinity;
@@ -800,6 +809,12 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const key = skillKey(skill), cost = skill.actionCost || { main: 1, aux: 0 };
     const charge = chargeState(u.id), preparing = charge.preparing && charge.preparing.skillKey === key;
     if (skill.isItem && skill.children?.length) return { ok: false, reason: '请选择道具子用法' };
+    // 大招充能门槛（原版 validSkills 排除未满 charge 技能，满时只放首个 charge 技能）；玩家操控单位不走自然充能
+    if (skill.charge > 0 && isAiControlled(u)) {
+      const cs = chargeSkillOf(u);
+      if (!cs || skillKey(cs) !== key) return { ok: false, reason: '非主充能技能' };
+      if ((charge.current || 0) < cs.charge) return { ok: false, reason: '充能未满（' + (charge.current || 0) + '/' + cs.charge + '）' };
+    }
     if (!preparing) {
       const stock = itemStockStatus(u, skill);
       if (!stock.ok) return stock;
@@ -819,8 +834,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (!preparing && !hasEnoughBindings(u, skill)) return { ok: false, reason: '绑定物品存量不足' };
     const ready = preparing && charge.preparing.remaining <= 0;
     if (preparing && !ready) return { ok: false, reason: '准备尚未就绪，请继续准备' };
-    if ((skill.charge > 0 || skill.delay > 0) && charge.preparing && !preparing) return { ok: false, reason: '请先释放或取消当前准备' };
-    const prepSkill = skill.charge > 0 || skill.delay > 0;
+    if (skill.delay > 0 && charge.preparing && !preparing) return { ok: false, reason: '请先释放或取消当前准备' };
+    const prepSkill = skill.delay > 0;
     const mainCost = prepSkill ? (preparing ? (ready ? 0 : 1) : 1) : (cost.main || 0);
     const auxCost = prepSkill ? 0 : (cost.aux || 0);
     if (r.main < mainCost || r.aux < auxCost) return { ok: false, reason: r.main < mainCost ? '主行动已用完' : '辅助行动已用完' };
@@ -1271,8 +1286,9 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const charge = chargeState(u.id);
     const preparing = charge.preparing && charge.preparing.skillKey === key;
     const prepReady = preparing && charge.preparing.remaining <= 0;
-    const prepKind = skill.charge > 0 ? 'charge' : (skill.delay > 0 ? 'delay' : null);
+    const prepKind = skill.delay > 0 ? 'delay' : null;
     const chargeInfo = { preparing: !!preparing, ready: prepReady, kind: prepKind };
+    const chargeRelease = skill.charge > 0 && isAiControlled(u);
     const costSummary = { main: 0, aux: 0, mp: 0, hp: 0, tp: 0, uses: 0, bindings: null, ammoShots: 0 };
 
     // 蓄力/延迟开始：支付基础 1 主行动 + MP/HP/TP/限次/绑定，登记 preparing，不进冷却、不结算槽位
@@ -1289,14 +1305,14 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       costSummary.bindings = consumeBindings(u, skill);
       consumeParentItem(u, skill, costSummary);
       if (skill.cooldownTurns > 0) dispatchClock(state, { type: 'applyCooldown', unitId: u.id, skillKey: key, duration: skill.cooldownTurns * ROUND_TIME });
-      const remaining = Math.max(0, (prepKind === 'charge' ? skill.charge : skill.delay) - charge.inventory);
-      const invested = Math.min(skill.charge > 0 ? skill.charge : skill.delay, charge.inventory);
+      const remaining = Math.max(0, skill.delay - charge.inventory);
+      const invested = Math.min(skill.delay, charge.inventory);
       charge.inventory -= invested;
       charge.preparing = { skillKey: key, skill: structuredClone(skill), remaining, invested, source: prepKind, aim: { ...aim }, ready: remaining === 0 };
       if (charge.preparing.remaining === 0) charge.preparing.ready = true;
       prepareAtActionStart(u);
       notifyManaSpent(u, skill.cost || 0);
-      addLog(u.name + ' 开始' + (prepKind === 'charge' ? '蓄力' : '准备') + ' ' + skill.name + ' · 需投入 ' + charge.preparing.remaining);
+      addLog(u.name + ' 开始准备 ' + skill.name + ' · 需投入 ' + charge.preparing.remaining);
       return { ok: true, preparing: true, charge: chargeInfo, hits: [], effects: [], events: [], ammoEvents: [], query, casterId: u.id, skill, aim: { ...aim }, costSummary, logFrom, logTo: log.length };
     }
 
@@ -1329,6 +1345,12 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       costSummary.bindings = consumeBindings(u, skill, { excludeAmmo: damageSlots.length > 0 });
       consumeParentItem(u, skill, costSummary);
       if (costSummary.bindings) addLog('施展材料：' + costSummary.bindings);
+    }
+    // 大招释放：预检通过并付费后才清空充能（原版释放前清槽）；Cut-in 由前端读 chargeRelease
+    if (chargeRelease) {
+      charge.current = 0;
+      emit('charge-released', { attackId: currentAttackId(), unitId: u.id, skillName: skill.name, max: skill.charge });
+      addLog('⚠️ ' + u.name + ' 释放致命一击！【' + skill.name + '】');
     }
     // 冷却（独立字段 [冷却:N]，延迟不再当冷却）
     if (skill.cooldownTurns > 0 && !preparing) dispatchClock(state, { type: 'applyCooldown', unitId: u.id, skillKey: key, duration: skill.cooldownTurns * ROUND_TIME });
@@ -1488,7 +1510,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     // 施法 TP：普通攻击 +20，其余技能 +5（原版口径）
     if (u.ref.hp > 0) u.ref.tp = Math.min(u.ref.maxTp || 100, (u.ref.tp || 0) + (skill === BASIC_ATTACK ? 20 : 5));
     return { ok: true, hits, shots, effects, events: domainEvents.slice(eventStart), ammoEvents, summons: summons.map(s => s.id), query, casterId: u.id, skill, aim: { ...aim },
-      facing: p.facing, incomingType, canceled: canceled.value, crit: skillCrit.crit, costSummary, charge: chargeInfo, logFrom, logTo: log.length };
+      facing: p.facing, incomingType, canceled: canceled.value, crit: skillCrit.crit, costSummary, charge: chargeInfo, chargeRelease, logFrom, logTo: log.length };
   }
 
   // 单段攻击：命闪 →（将命中才）反应拦截 yield → 伤害管线 → 附带效果
@@ -1813,6 +1835,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (!id) return state.combatState.clock ? advance() : snapshot();
     const charge = state.combatState.charges?.[id];
     if (charge?.preparing?.ready) cancelPreparation(id);
+    gainNaturalCharge(byId.get(id));
     dispatchClock(state, { type: 'endAction', unitId: id });
     return advance();
   }
@@ -1830,9 +1853,14 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (resources.main < 1 && resources.aux < 1 && resources.moveRemaining <= 1e-9 && !chargeState(u.id).preparing?.ready) return { moveTo: null, skill: null, aim: null, action: 'wait' };
     const preparing = chargeState(u.id).preparing;
     if (preparing && !preparing.ready) return { moveTo: null, skill: null, aim: null, action: resources.main > 0 ? 'prepare' : 'wait' };
+    const aiRes = { ...resources, preparing, moveDistance: moveDistanceOf(u) };
+    // 充能已满：本次正常行动优先尝试大招（原版 isChargeFull 优先）；额度内放不出则保留充能，按常规行动
+    if (!preparing && chargeFull(u)) {
+      const ult = chooseEnemyAction(ctx, currentId(), resources.moveRemaining, [chargeSkillOf(u)], skill => skillStatus(skill), aiRes);
+      if (ult.skill) return ult;
+    }
     const skills = preparing?.ready ? [preparing.skill] : enemySkills();
-    return chooseEnemyAction(ctx, currentId(), resources.moveRemaining, skills, skill => skillStatus(skill),
-      { ...resources, preparing, moveDistance: moveDistanceOf(u) });
+    return chooseEnemyAction(ctx, currentId(), resources.moveRemaining, skills, skill => skillStatus(skill), aiRes);
   }
   function* beginEnemyTurn(options = {}) {
     const id = currentId();

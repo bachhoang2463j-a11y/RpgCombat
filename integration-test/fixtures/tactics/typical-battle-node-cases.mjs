@@ -139,7 +139,7 @@ function run() {
     check('TT-B 非耗尽免伤池也在整技finally清理',r.ok&&!b.buffsOf('e').some(x=>x.type==='damageGuard'));
   }
   {
-    const shot=parseSkill('【蓄力枪】[枪击;power:50][远程][Charge:1][范围:单体;射程:12]');
+    const shot=parseSkill('【蓄力枪】[枪击;power:50][远程][延迟:1][范围:单体;射程:12]');
     const ammo=parseItem('【子弹】[弹药][数量:2][绑定:蓄力枪*1]');
     const h=unit('h','hero',{spd:200,items:[ammo]}),e=unit('e','enemy',{spd:1});
     const b=make([h,e],{h:{col:2,row:4},e:{col:4,row:4}});

@@ -31,6 +31,10 @@ const FX01_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'f
 
 // 阶段注册表：只登记真实存在的用例文件；--all 只聚合这里的条目，不虚构未来阶段。
 const STAGES = {
+  'p07-av': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p07av-node-cases.mjs'),
+    groups: ['TP7AV-A', 'TP7AV-W'], modules: [], requiredExports: [],
+  },
   'status-variant': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'status-variant-node-cases.mjs'),
     groups: ['TSV-01', 'TSV-02'], modules: [], requiredExports: [],

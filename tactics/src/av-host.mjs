@@ -43,6 +43,7 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
   const rectSymbol = Symbol('tacticsStageRect');
   let stageEl = document.createElement('div');   // 初始占位；sandbox 挂载后 attachStage 换成真实舞台
   let shakeEl = null;
+  let screenEl = null;                            // iframe 内屏幕宿主：视口子层（不随相机变换），击杀特写/大招 Cut-in 用
   const resizeFns = [];
   const reports = { images: new Map(), audio: new Map(), missing: [] };
 
@@ -68,6 +69,17 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
       get w() { return STAGE_W; }, get h() { return STAGE_H; },
       onResize(fn) { resizeFns.push(fn); },
       shakeEl() { return shakeEl; },
+    },
+    screen() {
+      const viewport = shakeEl && shakeEl.parentNode;
+      if (!viewport) return stageEl;
+      if (!screenEl || screenEl.parentNode !== viewport) {
+        screenEl = document.createElement('div');
+        screenEl.setAttribute('data-tactics-fx', 'rpg-av-screen');
+        screenEl.style.cssText = 'position:absolute; inset:0; z-index:8; pointer-events:none; overflow:hidden;';
+        viewport.appendChild(screenEl);
+      }
+      return screenEl;
     },
     rectSymbol,
     initialToken: {},

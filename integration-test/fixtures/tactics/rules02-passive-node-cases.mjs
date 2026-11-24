@@ -134,7 +134,7 @@ function battleClockCases() {
   })()));
   const h1AfterBoom = u('h1').ref.hp;
   out.push(ok('R02-B2 蜕皮：e3 跌破50%觉醒（molted标记+永久攻×1.5）', u('e3').ref.molted === true && b.statsOf(u('e3')).atk === Math.floor(20 * 1.5)));
-  out.push(ok('R02-B3 敌方充能库存周期：首个100时间+1', (st.combatState.charges['e3']?.inventory || 0) >= 1));
+  out.push(ok('R02-B3 敌方大招充能：自然行动末+1，不再占用加速库存', (st.combatState.charges['e3']?.current || 0) >= 1 && (st.combatState.charges['e3']?.inventory || 0) === 0));
   poison(st, 'h3', 'a', 999, 300);  // h3 致死 → 复活 30%
   runTo(b, 550);
   out.push(ok('R02-B4 复活：致死消耗次数以30%血站起（原版 tryReviveEnemy 口径）',
@@ -145,8 +145,9 @@ function battleClockCases() {
     && JSON.stringify(st.combatState.clock.log).indexOf('隐匿者-再动') >= 0));
   out.push(ok('R02-B7 连动：HP≤30%一次性额外行动点（grantMainPoint）',
     u('e3').ref.linked === true && JSON.stringify(st.combatState.clock.log).indexOf('连动:e3') >= 0));
-  out.push(ok('R02-B8 敌方充能库存：5个周期到 cap=5（e3 存活不中断）',
-    u('e3').ref.hp > 0 && (st.combatState.charges['e3']?.inventory || 0) === 5));
+  runTo(b, 700); // spd80 自然行动约每125时间一次：到 t≈625 第5次行动末封顶
+  out.push(ok('R02-B8 敌方大招充能：自然行动累积封顶 cap=5（e3 存活不中断）',
+    u('e3').ref.hp > 0 && (st.combatState.charges['e3']?.current || 0) === 5));
   return out;
 }
 

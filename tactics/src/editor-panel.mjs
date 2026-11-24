@@ -76,7 +76,7 @@ export function createEditorPanel({ rpgUi, shell, globalHtml, validate, onSave, 
         '<option value=""' + (!type ? ' selected' : '') + '>按伤害类型推导(S14)</option>' + RANGE_TYPES_SEVEN.map(t => '<option value="' + t + '"' + (t === type ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label>' +
       fields +
       '<label><span>行动</span><select id="edit-' + ns + '-act" class="edit-input-game text-cyan-300 font-bold text-[10px] py-0.5"><option value="main"' + (aux ? '' : ' selected') + '>◆ 主行动</option><option value="aux"' + (aux ? ' selected' : '') + '>◇ 辅助行动</option></select></label>' +
-      '<label title="开始时付一个主行动，之后每投入一个主行动减 1；为 0 即可释放"><span>蓄力</span><input type="number" min="0" id="edit-' + ns + '-charge" value="' + (s.charge || 0) + '" class="edit-input-game w-12 font-mono-num text-right text-cyan-100 text-[10px] py-0.5 px-1"><em>主点</em></label></div>' +
+      '<label title="敌方大招充能：每个自然行动末 +1，满后下次行动优先释放；与[延迟]准备无关"><span>充能</span><input type="number" min="0" id="edit-' + ns + '-charge" value="' + (s.charge || 0) + '" class="edit-input-game w-12 font-mono-num text-right text-cyan-100 text-[10px] py-0.5 px-1"><em>回合</em></label></div>' +
       slotSelfHtml(ns, s);
   }
   function fxOptions(value) {
@@ -103,7 +103,7 @@ export function createEditorPanel({ rpgUi, shell, globalHtml, validate, onSave, 
     h += '<div class="flex items-center gap-1 flex-wrap">' + rpgUi.buildEditorSkillTagPreview(normSlotTag(s.type), s.power, normSlotTag(s.type2), s.power2, normSlotTag(s.type3), s.power3, tone) + '</div>';
     h += chip('bg-amber-950/80 text-amber-200 border-amber-700/70', '🗺 ' + E(rangeText(s.range)));
     if (s.actionCost && s.actionCost.aux > 0) h += chip('bg-sky-950 text-sky-300 border-sky-700', '◇辅助');
-    if (s.charge > 0) h += chip('bg-cyan-950 text-cyan-300 border-cyan-700', '⏳蓄力' + s.charge);
+    if (s.charge > 0) h += chip('bg-cyan-950 text-cyan-300 border-cyan-700', '⏳充能' + s.charge);
     if (s.isReaction) h += chip('bg-indigo-950 text-indigo-300 border-indigo-700', '反应');
     if (s.guaranteedHit) h += chip('bg-rose-950 text-rose-300 border-rose-700', '必中');
     if (s.maxUses > 0) h += chip('bg-fuchsia-950 text-fuchsia-300 border-fuchsia-700', '限' + s.maxUses);

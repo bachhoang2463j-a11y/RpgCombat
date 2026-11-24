@@ -24,6 +24,7 @@ const REQUIRED_INPUTS = [
   'src/fx-registry.mjs', 'src/fx-library.mjs', 'src/vfx-host.mjs',
   'src/effect-definitions.mjs', 'src/effect-handlers.mjs', 'src/class-passives.mjs', 'src/variant-rules.mjs',
   'src/reaction-prompt.mjs',
+  'src/screen-atmos.mjs',
   'src/scenario-data.mjs', 'src/regions.mjs', 'src/perception.mjs', 'src/barriers.mjs',
   '典型对局-战棋版.yaml',
 ];
@@ -35,7 +36,8 @@ const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFee
   'createScenarioData', 'createSeededRandom', 'createFogRegion', 'canSeeUnit', 'previewBarrier', 'resolveCharge',
   'buildTypicalViewData', 'playPrepare', 'syncRegions', 'fogFieldHtml', 'prepareInput', 'revealEffect',
   'playGenericSupportFx', 'spawnHealParticles', 'playSupportEffects', 'supportResourceDelta', 'applyPersistentFxTags',
-  'buildHitFeedback', 'avatarScaleForZoom', 'linkSkillGroupRows', 'prepareHitNumbers', 'animateHitNumber'];
+  'buildHitFeedback', 'avatarScaleForZoom', 'linkSkillGroupRows', 'prepareHitNumbers', 'animateHitNumber',
+  'startAtmos', 'atmosStyleOf', 'FX_WEBM_KEY_MAX'];
 
 const entry = [
   "import { createApp } from './src/main.mjs';",

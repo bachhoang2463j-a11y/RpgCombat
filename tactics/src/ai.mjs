@@ -344,7 +344,7 @@ function planFogExit(ctx, unit, moveBudget, res) {
 }
 
 function toResult(hit, res) {
-  const preparing = hit.skill && (hit.skill.charge > 0 || hit.skill.delay > 0) && !(res && res.preparing);
+  const preparing = hit.skill && hit.skill.delay > 0 && !(res && res.preparing);
   return {
     moveTo: hit.cost > EPS ? { col: hit.cell.col, row: hit.cell.row } : null,
     skill: hit.skill,

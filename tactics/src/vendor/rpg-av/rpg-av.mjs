@@ -1,10 +1,10 @@
 // ==========================================
 // 由 tactics/tools/extract-rpg-av.cjs 自动生成，请勿手改。
 // 源: index.html  sha256=5c1ab2a1a243bb7d7e79b4aca76026ad1058af2a74bf9dfbf8763ae8b13554e7
-// arcaneVfxModule 行区间(源 5729–14230): 5730–5730, 5733–5791, 5800–5841, 5849–5913, 5923–5924, 5932–6302, 6642–6850, 7016–7037, 7351–7376, 7383–7584, 7596–9869, 10067–10183, 10189–10718, 10748–10757, 11103–11133, 11142–11240, 11917–12083, 12201–12214, 12535–12562, 12565–12951, 14179–14208
-// 入选语句 206 段 / 4686 行；入口: playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar, CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx, syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked
-// 显式存根: clearSummonState, clearSelfDestructState, clearRescueState
-// 宿主适配补丁: 枪击采样相邻去重×1; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 屏幕矩形 → 特效舞台坐标×11; innerWidth → 舞台宽×10; innerHeight → 舞台高×5; body 挂载 → 特效舞台×5; JS position:fixed → absolute×0; arcane canvas resize 走舞台×1; 舞台震动独立层×2; window.* 声音函数改为工厂内本地×14; 去环境氛围清理×1; CSS position:fixed → absolute×6; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1
+// arcaneVfxModule 行区间(源 5729–14230): 5730–5791, 5800–5841, 5849–5913, 5923–5924, 5932–6302, 6642–6850, 7016–7037, 7348–7376, 7383–7584, 7596–9869, 10067–10183, 10189–10718, 10748–10757, 11103–11133, 11142–11240, 11917–12083, 12201–12214, 12535–12562, 12565–12951, 13471–13477, 13840–14208
+// 入选语句 223 段 / 5037 行；入口: playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar, CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx, syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked, playSummonEnter, playSummonExit, playSummonGuard, clearSummonState
+// 显式存根: clearSelfDestructState, clearRescueState
+// 宿主适配补丁: 枪击采样相邻去重×1; 特写挂屏幕宿主×2; 特写收尾登记×2; 特写震屏走舞台震动层×1; 特写计时可随重开清理×6; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 屏幕矩形 → 特效舞台坐标×11; innerWidth → 舞台宽×10; innerHeight → 舞台高×5; body 挂载 → 特效舞台×5; JS position:fixed → absolute×0; arcane canvas resize 走舞台×1; 舞台震动独立层×2; window.* 声音函数改为工厂内本地×14; 去环境氛围清理×1; CSS position:fixed → absolute×8; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1; CSS 残留视口单位(按舞台尺度保留)×39
 // ==========================================
 /* eslint-disable */
 // ---- 纯数据导出（原样，供宿主在工厂创建前解析人物头像/语音与预载清单） ----
@@ -55,6 +55,293 @@ export function createRpgAv(host) {
   const isHeroSideEntity = e => host.isHero(e);
   const isCombatActive = e => host.isActive(e);
   const hasVariantTag = (e, name) => host.hasVariantTag(e, name);
+
+  // ---- 击杀特写 / 大招 Cut-in（原版顶层函数；屏幕宿主由战棋提供，重开/清场统一取消计时与遮罩） ----
+  const __MOMENTS = new Set(), __momentTimers = new Set();
+  const __SCREEN = () => (host.screen ? host.screen() : __STAGE.el);
+  function __momentTimeout(fn, ms) { const id = setTimeout(() => { __momentTimers.delete(id); fn(); }, ms); __momentTimers.add(id); return id; }
+  function clearMoments() { __momentTimers.forEach(clearTimeout); __momentTimers.clear(); __MOMENTS.forEach(o => o.remove()); __MOMENTS.clear(); }
+async function playExecutionAnimation(hero, killedEnemies, damageType) {
+    return new Promise(resolve => {
+        const type = damageType || '近战';
+        const n = killedEnemies.length;
+        // 多敌时敌人单元尺寸/字号动态收缩，避免竖屏溢出
+        const sizeCls = n > 2 ? 'text-[3rem] sm:text-[4.5rem]' : n > 1 ? 'text-[4rem] sm:text-[6rem]' : 'text-[5.5rem] sm:text-[8rem]';
+        const unitSize = n > 2 ? 'clamp(38px,10vh,110px)' : n > 1 ? 'clamp(58px,15vh,150px)' : 'clamp(80px,18vh,170px)';
+        const enemyVisual = enemy => enemy.img
+            ? `<img src="${enemy.img}" class="w-full h-full object-contain rounded-xl" />`
+            : `<div class="${sizeCls} drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">${enemy.emoji || '☠️'}</div>`;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 z-[200] flex items-center justify-center overflow-hidden transition-opacity duration-300 pointer-events-none';
+
+        let html = '';
+        let killDelay = 280; // kill 音效 + 重震屏触发时刻
+
+        function createBloodSplatterHtml(count = 5) {
+            const splatters = [
+                `M20,10 C35,2 50,15 45,30 C55,40 60,60 45,70 C30,80 15,65 10,50 C5,35 10,18 20,10 Z`,
+                `M30,5 C45,5 55,20 50,35 C65,30 75,45 70,60 C55,75 40,70 30,80 C15,75 10,55 15,40 C5,25 20,10 30,5 Z`,
+                `M15,20 C30,10 50,10 40,30 C55,35 60,55 45,65 C35,75 20,80 15,60 C5,45 5,30 15,20 Z`,
+                `M25,12 C40,4 55,18 48,32 C60,42 62,65 48,72 C32,82 18,68 12,52 C8,38 12,20 25,12 Z`
+            ];
+            let splatItems = '';
+            const positions = [
+                { top: '16%', left: '18%', scale: 1.35, rot: -25, delay: '0.18s' },
+                { top: '66%', left: '24%', scale: 1.15, rot: 45, delay: '0.22s' },
+                { top: '24%', right: '18%', scale: 1.45, rot: 15, delay: '0.20s' },
+                { top: '60%', right: '22%', scale: 1.25, rot: -60, delay: '0.24s' },
+                { top: '44%', left: '48%', scale: 1.65, rot: 10, delay: '0.16s' },
+                { top: '12%', left: '42%', scale: 1.1, rot: 75, delay: '0.25s' },
+                { top: '78%', right: '35%', scale: 1.3, rot: -40, delay: '0.26s' },
+                { top: '38%', left: '10%', scale: 1.2, rot: -15, delay: '0.21s' }
+            ];
+            for (let i = 0; i < Math.min(count, positions.length); i++) {
+                const p = positions[i];
+                const path = splatters[i % splatters.length];
+                splatItems += `
+                    <div class="absolute pointer-events-none opacity-0 z-40"
+                         style="${p.top ? `top:${p.top};` : ''} ${p.left ? `left:${p.left};` : ''} ${p.right ? `right:${p.right};` : ''} width:140px; height:140px; --splat-rot:${p.rot}deg; animation: blood-splat-burst 1.1s ${p.delay} cubic-bezier(0.12, 0.85, 0.25, 1) both; will-change: transform, opacity;">
+                        <svg viewBox="0 0 100 100" class="w-full h-full fill-red-800" style="filter: drop-shadow(0 0 8px #3f0000);">
+                            <path d="${path}" />
+                            <circle cx="85" cy="20" r="4.5" class="fill-red-700"/>
+                            <circle cx="15" cy="88" r="4" class="fill-red-900"/>
+                            <circle cx="90" cy="75" r="5" class="fill-red-800"/>
+                            <circle cx="5" cy="15" r="3.5" class="fill-red-700"/>
+                        </svg>
+                    </div>`;
+            }
+            const drips = `
+                <div class="absolute top-0 right-[28%] w-1 bg-gradient-to-b from-red-700 via-red-900 to-transparent rounded-full opacity-0 z-40 pointer-events-none"
+                     style="height:140px; animation: blood-drip-flow 1.25s 0.22s ease-out both;"></div>
+                <div class="absolute top-0 left-[25%] w-1.5 bg-gradient-to-b from-red-800 via-red-950 to-transparent rounded-full opacity-0 z-40 pointer-events-none"
+                     style="height:170px; animation: blood-drip-flow 1.35s 0.18s ease-out both;"></div>`;
+            return splatItems + drips;
+        }
+
+        if (type === '法术') {
+            // Style 3：次元裂隙·空间碎镜
+            overlay.className += ' bg-slate-950/85';
+            overlay.style.setProperty('--hero-ox', '0px');
+            overlay.style.setProperty('--hero-oy', '0px');
+            killDelay = 250;
+            const enemiesHtml = killedEnemies.map(enemy => `
+                <div class="flex flex-col items-center gap-1 shrink-0">
+                    <div style="width:${unitSize};height:${unitSize};" class="relative flex items-center justify-center">
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(0 0, 50% 0, 50% 50%, 0 50%); animation: s3-shard-1 0.85s 0.25s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(50% 0, 100% 0, 100% 50%, 50% 50%); animation: s3-shard-2 0.85s 0.25s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(0 50%, 50% 50%, 50% 100%, 0 100%); animation: s3-shard-3 0.85s 0.25s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(50% 50%, 100% 50%, 100% 100%, 50% 100%); animation: s3-shard-4 0.85s 0.25s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+                    </div>
+                    <div class="text-purple-300 text-[10px] sm:text-xs font-bold tracking-widest whitespace-nowrap">${enemy.name}</div>
+                </div>`).join('');
+
+            html = `
+                <!-- 紫红高能空间裂隙光带（h-40 为 scaleY 动画基准高，will-change 提示 GPU 合成） -->
+                <div class="absolute h-40 w-[160vw] bg-gradient-to-r from-transparent via-purple-600/50 to-transparent left-1/2 top-1/2 opacity-0 z-10"
+                     style="animation: s3-rift-beam 1.2s 0.2s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;"></div>
+                <div class="absolute h-40 w-[160vw] bg-fuchsia-300 left-1/2 top-1/2 opacity-0 z-20 shadow-[0_0_30px_#c084fc,0_0_60px_#a855f7]"
+                     style="animation: s3-rift-beam 1.2s 0.2s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;"></div>
+
+                <!-- 左侧英雄入场 -->
+                <div class="absolute left-[12vw] top-1/2 -translate-y-1/2 opacity-0 z-20"
+                     style="animation: s1-hero-in 0.3s cubic-bezier(0.12, 0.8, 0.3, 1) both; will-change: transform, opacity;">
+                    <div class="w-28 h-28 sm:w-40 sm:h-40 rounded-full border-4 border-purple-400 overflow-hidden shadow-[0_0_40px_#a855f7] bg-gray-900">
+                        <img src="${hero.img}" class="w-full h-full object-cover">
+                    </div>
+                </div>
+
+                <!-- 空间湮灭文字 -->
+                <div class="text-[clamp(3.5rem,9vw,9rem)] italic font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-fuchsia-300 to-rose-400 text-outline-thick absolute left-1/2 top-1/2 opacity-0 z-30 tracking-[0.3em] whitespace-nowrap"
+                     style="animation: s1-vs-anim 1.1s 0.25s ease-out both; will-change: transform, opacity;">
+                    ${n > 1 ? '全灭' : '湮灭'}
+                </div>
+
+                <!-- 右侧敌人区：每敌四象限晶体碎片崩解 -->
+                <div class="absolute right-[10vw] top-1/2 -translate-y-1/2 z-20 flex items-center gap-2 sm:gap-3">
+                    ${enemiesHtml}
+                </div>`;
+        } else if (type === '远程') {
+            // Style 4：1920年代芝加哥打字机（.45 ACP 弹幕与屏幕溅血）
+            overlay.className += ' bg-black/80';
+            overlay.style.setProperty('--hero-ox', '0px');
+            overlay.style.setProperty('--hero-oy', '0px');
+            killDelay = 220;
+            const enemiesHtml = killedEnemies.map(enemy => `
+                <div class="flex flex-col items-center gap-1.5 shrink-0">
+                    <div style="width:${unitSize};height:${unitSize};" class="relative flex items-center justify-center">
+                        <!-- 老式黄铜转盘准星（SVG 硬件加速） -->
+                        <div class="absolute left-1/2 top-1/2 opacity-0 z-30 pointer-events-none"
+                             style="width:125%; height:125%; animation: v1-tommy-scope 1.1s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;">
+                            <svg viewBox="0 0 100 100" class="w-full h-full text-amber-500 stroke-current fill-none" style="filter: drop-shadow(0 0 8px #f59e0b);">
+                                <circle cx="50" cy="50" r="44" stroke-width="1.8" stroke-dasharray="10 4" opacity="0.85"/>
+                                <circle cx="50" cy="50" r="32" stroke-width="1" opacity="0.7"/>
+                                <line x1="50" y1="4" x2="50" y2="30" stroke-width="2.5" stroke="#ef4444"/>
+                                <line x1="50" y1="70" x2="50" y2="96" stroke-width="2.5" stroke="#ef4444"/>
+                                <line x1="4" y1="50" x2="30" y2="50" stroke-width="2.5" stroke="#ef4444"/>
+                                <line x1="70" y1="50" x2="96" y2="50" stroke-width="2.5" stroke="#ef4444"/>
+                                <circle cx="50" cy="50" r="4" fill="#dc2626" stroke="none"/>
+                            </svg>
+                        </div>
+                        <!-- 敌人被密集弹雨打成四象限崩碎 -->
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(0 0, 50% 0, 50% 50%, 0 50%); animation: v1-enemy-shatter-tl 0.8s 0.22s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(50% 0, 100% 0, 100% 50%, 50% 50%); animation: v1-enemy-shatter-tr 0.8s 0.22s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(0 50%, 50% 50%, 50% 100%, 0 100%); animation: v1-enemy-shatter-bl 0.8s 0.22s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(50% 50%, 100% 50%, 100% 100%, 50% 100%); animation: v1-enemy-shatter-br 0.8s 0.22s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+                    </div>
+                    <div class="text-rose-400 font-mono text-[10px] sm:text-xs font-bold tracking-widest whitespace-nowrap drop-shadow">${enemy.name}</div>
+                </div>`).join('');
+
+            html = `
+                <!-- 镜头暗红血圈 (Lens Vignette) -->
+                <div class="absolute inset-0 pointer-events-none z-10 opacity-0"
+                     style="background: radial-gradient(circle, transparent 35%, rgba(136,8,8,0.4) 65%, rgba(63,0,0,0.85) 100%); animation: blood-vignette-pulse 1.1s cubic-bezier(0.1, 0.8, 0.2, 1) both;"></div>
+
+                <!-- 左侧 1920s 怀旧档案相框 -->
+                <div class="absolute left-[8vw] top-1/2 -translate-y-1/2 opacity-0 z-20"
+                     style="animation: v-hero-in 0.28s cubic-bezier(0.12, 0.8, 0.3, 1) both; will-change: transform, opacity;">
+                    <div class="w-32 h-32 sm:w-40 sm:h-40 rounded-xl border-2 border-amber-600/80 bg-stone-900/95 shadow-[0_0_30px_rgba(217,119,6,0.4)] p-1.5 relative overflow-hidden">
+                        <div class="absolute top-1 left-2 text-[9px] font-bold text-amber-400 tracking-wider">档案: ${hero.name}</div>
+                        <img src="${hero.img}" class="w-full h-full object-cover rounded filter contrast-125 sepia-[0.25]">
+                    </div>
+                </div>
+
+                <!-- 居中 1920s 血印大字 -->
+                <div class="absolute left-1/2 top-1/2 opacity-0 z-30 flex flex-col items-center"
+                     style="animation: v-stamp-text 1.15s 0.2s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;">
+                    <div class="font-cinzel text-[clamp(3.8rem,9.5vw,9rem)] font-black text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-red-500 to-rose-900 text-outline-crimson tracking-wider whitespace-nowrap">
+                        ${n > 1 ? '歼 灭' : '处 决'}
+                    </div>
+                </div>
+
+                <!-- 右侧目标区 -->
+                <div class="absolute right-[8vw] top-1/2 -translate-y-1/2 z-20 flex items-center gap-3">
+                    ${enemiesHtml}
+                </div>
+
+                <!-- 金红弹道贯穿火光 -->
+                <div class="absolute left-1/2 top-1/2 w-[160vw] h-2 bg-gradient-to-r from-transparent via-amber-300 to-red-600 opacity-0 z-30 shadow-[0_0_25px_#dc2626]"
+                     style="animation: v1-tracer-fire 0.65s 0.2s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;"></div>
+
+                <!-- 屏幕真实喷溅血液 -->
+                ${createBloodSplatterHtml(5)}`;
+        } else {
+            // Style 2（近战，默认）：⚔️ 居合一闪·血溅镜头（8朵血花 + 镜头深暗红暗角）
+            overlay.className += ' bg-black/85';
+            killDelay = 280;
+
+            const enemiesHtml = killedEnemies.map(enemy => `
+                <div class="flex flex-col items-center gap-1 shrink-0">
+                    <div style="width:${unitSize};height:${unitSize};" class="relative flex items-center justify-center">
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(0 0, 100% 0, 100% 44%, 0 56%); animation: s1-top-shatter 0.8s 0.28s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0" style="clip-path: polygon(0 56%, 100% 44%, 100% 100%, 0 100%); animation: s1-bottom-shatter 0.8s 0.28s cubic-bezier(0.1, 0.8, 0.2, 1) both; will-change: transform, opacity;">${enemyVisual(enemy)}</div>
+                    </div>
+                    <div class="text-rose-300 text-[10px] sm:text-xs font-bold tracking-widest whitespace-nowrap drop-shadow">${enemy.name}</div>
+                </div>`).join('');
+
+            html = `
+                <!-- 1. 镜头深暗红暗角 (Lens Vignette) 与 8 朵飞溅血花 (彻底替代刺眼白闪) -->
+                <div class="absolute inset-0 pointer-events-none z-10 opacity-0"
+                     style="background: radial-gradient(circle, transparent 25%, rgba(160,10,10,0.55) 60%, rgba(80,0,0,0.92) 100%); animation: blood-vignette-pulse 1.15s cubic-bezier(0.1, 0.8, 0.2, 1) both;"></div>
+                ${createBloodSplatterHtml(8)}
+
+                <!-- 2. 全屏撕裂光带与锐利刀光核心 (GPU scaleY 驱动) -->
+                <div class="absolute h-24 w-[180vw] bg-gradient-to-r from-transparent via-rose-600/50 to-transparent left-1/2 top-1/2 opacity-0 z-10"
+                     style="animation: s2-blade-flash 0.9s 0.25s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;"></div>
+                <div class="absolute h-1.5 bg-rose-400 w-[180vw] left-1/2 top-1/2 opacity-0 z-20 shadow-[0_0_30px_#f43f5e,0_0_60px_#fff]"
+                     style="animation: s2-blade-flash 0.9s 0.25s cubic-bezier(0.1, 0.9, 0.2, 1) both; will-change: transform, opacity;"></div>
+
+                <!-- 3. 英雄残影极速瞬步穿梭 (从左侧穿刺至右侧定格) -->
+                <div class="absolute left-1/2 top-1/2 opacity-0 z-30" 
+                     style="animation: s2-hero-blur-dash 1.2s cubic-bezier(0.14, 1, 0.28, 1) both; will-change: transform, opacity, filter;">
+                    <div class="w-32 h-32 sm:w-44 sm:h-44 rounded-full border-4 border-rose-500 overflow-hidden shadow-[0_0_40px_#f43f5e] bg-black">
+                        <img src="${hero.img}" class="w-full h-full object-cover">
+                    </div>
+                </div>
+
+                <!-- 4. 居中金石水墨印章大字「斬」/「全滅」-->
+                <div class="absolute left-1/2 top-1/2 opacity-0 z-30 flex flex-col items-center pointer-events-none" 
+                     style="animation: s2-ink-stamp 1.2s 0.28s cubic-bezier(0.14, 1, 0.28, 1) both; will-change: transform, opacity;">
+                    <div class="font-cinzel text-[clamp(4.5rem,12vw,12rem)] font-black text-rose-500 text-outline-crimson tracking-wider drop-shadow-[0_0_50px_#e11d48]">
+                        ${n > 1 ? '全 滅' : '斬'}
+                    </div>
+                    <div class="text-rose-200 text-xs sm:text-base font-bold tracking-[0.8em] -mt-3 sm:-mt-5 uppercase drop-shadow">
+                        ${n > 1 ? 'ALL TARGETS NEUTRALIZED' : 'EXECUTION COMPLETE'}
+                    </div>
+                </div>
+
+                <!-- 5. 右侧被斩敌人碎裂区 (支持单体与多目标 flex 排布) -->
+                <div class="absolute right-[12vw] top-1/2 -translate-y-1/2 z-20 flex items-center gap-2 sm:gap-4">
+                    ${enemiesHtml}
+                </div>`;
+        }
+
+        overlay.innerHTML = html;
+        __SCREEN().appendChild(overlay); __MOMENTS.add(overlay);
+
+        // 风格开场音效（击杀相关 2 倍音量）
+        if (type === '法术') playSound('burst', 2, 1, { category:'M' });
+        else if (type === '远程') playSound('shot', 2, 1, { category:'M' });
+        else if (type === '近战') playSound('atk1', 2, 1, { category:'M' });
+
+        __momentTimeout(() => {
+            playSound('kill', 2, 1, { category:'M' });
+            if (type === '近战') playSound('combatKill', 2, 1, { category:'M' });
+            else if (type === '法术') playSound('magicKill', 2, 1, { category:'M' });
+            const scene = __STAGE.shakeEl();
+            if (scene) { scene.classList.add('heavy-shake'); __momentTimeout(() => scene.classList.remove('heavy-shake'), 500); }
+        }, killDelay);
+
+        __momentTimeout(() => { overlay.style.opacity = '0'; __momentTimeout(() => { overlay.remove(); __MOMENTS.delete(overlay); resolve(); }, 300); }, 1450);
+    });
+}
+
+async function playEnemyUltimateCutin(enemy, skillName) {
+    return new Promise(resolve => {
+        // 创建全屏遮罩
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 z-[200] bg-black/70 flex items-center justify-center overflow-hidden anim-cutin-overlay pointer-events-none';
+        
+        // 判断是使用图片还是 Emoji
+        const visualContent = enemy.img 
+            ? `<img src="${enemy.img}" class="w-48 h-48 sm:w-80 sm:h-80 object-cover rounded-full border-4 border-rose-500 shadow-[0_0_50px_rgba(244,63,94,0.8)]" />` 
+            : `<div class="text-[8rem] sm:text-[12rem] drop-shadow-[0_0_30px_rgba(244,63,94,1)]">${enemy.emoji}</div>`;
+
+        overlay.innerHTML = `
+            <!-- 背后压暗的撕裂色带 -->
+            <div class="absolute top-1/2 left-1/2 w-[150vw] bg-gradient-to-r from-transparent via-rose-950/80 to-transparent anim-cutin-slash z-0"></div>
+            
+            <div class="relative w-full max-w-6xl h-full flex items-center justify-between px-4 sm:px-20 z-10 overflow-visible">
+                <!-- 左侧滑入技能名 -->
+                <div class="anim-cutin-text flex-1 text-left relative z-20">
+                    <div class="text-rose-500 font-black text-outline text-5xl sm:text-8xl tracking-widest italic whitespace-nowrap mb-2">
+                        ${skillName}
+                    </div>
+                    <div class="text-rose-300/80 font-bold text-xl sm:text-3xl tracking-[0.5em] uppercase">
+                        CRITICAL THREAT
+                    </div>
+                </div>
+                
+                <!-- 右侧滑入敌人视觉体 -->
+                <div class="anim-cutin-avatar flex-shrink-0 z-10 relative">
+                    ${visualContent}
+                </div>
+            </div>
+        `;
+
+        __SCREEN().appendChild(overlay); __MOMENTS.add(overlay);
+
+        // 播放警告音效
+        playSound('taunt', 1, 1, { category:'L' });
+        __momentTimeout(() => playSound('burst', 1, 1, { category:'L' }), 200);
+
+        // 1.6秒动画结束后清理 DOM 并释放 Promise
+        __momentTimeout(() => {
+            overlay.remove(); __MOMENTS.delete(overlay);
+            resolve();
+        }, 1600);
+    });
+}
 
   // ---- 人物与语音表（原样） ----
   const HERO_VOICE_LINES = {
@@ -744,7 +1031,7 @@ function spawnHealParticles(addParticle, x, y, colorTheme = 'green') {
   function playGenericSupportFx(entity, type, { soundKey = null, volume = 0.5, onImpact } = {}) {
     const theme = { heal:'green', buff:'gold', shield:'shield', mpHeal:'blue' }[type];
     const dom = getEntitySpriteDom(entity);
-    if (!theme || !dom) { onImpact?.(); return null; }
+    if (!dom) { onImpact?.(); return null; }
     const rect = dom[__GBCR]();
     const x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
     const svgWrapper = document.createElement('div');
@@ -752,13 +1039,15 @@ function spawnHealParticles(addParticle, x, y, colorTheme = 'green') {
     let innerHTML, duration;
     if (type === 'heal') { svgWrapper.className = 'anim-heal'; innerHTML = `<svg class="absolute" style="width: 60px; height: 60px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><path d="M35,15 L65,15 L65,35 L85,35 L85,65 L65,65 L65,85 L35,85 L35,65 L15,65 L15,35 L35,35 Z" fill="#34d399" opacity="0.8" style="filter: drop-shadow(0 0 10px #10b981);" /><circle cx="50" cy="50" r="45" stroke="#6ee7b7" stroke-width="2" fill="none" opacity="0.5" /></svg>`; duration = 800; }
     else if (type === 'buff') { svgWrapper.className = 'anim-buff'; innerHTML = `<svg class="absolute" style="width: 80px; height: 80px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><polygon points="50,5 85,25 85,75 50,95 15,75 15,25" stroke="#fbbf24" stroke-width="3" fill="none" /><circle cx="50" cy="50" r="30" stroke="#fef08a" stroke-width="1" fill="none" stroke-dasharray="5,5" /></svg>`; duration = 600; }
+    else if (type === 'debuff') { svgWrapper.className = 'anim-debuff'; innerHTML = `<svg class="absolute" style="width: 100px; height: 100px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><path d="M50,10 L60,40 L90,50 L60,60 L50,90 L40,60 L10,50 L40,40 Z" fill="#c084fc" opacity="0.7" filter="url(#bloom-purple)" /><circle cx="50" cy="50" r="40" stroke="#d8b4fe" stroke-width="4" fill="none" opacity="0.5" /></svg>`; duration = 500; }
     else if (type === 'shield') { svgWrapper.className = 'anim-shield'; innerHTML = `<svg class="absolute" style="width: 80px; height: 80px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><path d="M50,10 L90,30 L90,60 C90,80 50,95 50,95 C50,95 10,80 10,60 L10,30 Z" fill="#cbd5e1" opacity="0.8" stroke="#f8fafc" stroke-width="3" style="filter: drop-shadow(0 0 10px #e2e8f0);" /></svg>`; duration = 600; }
     else if (type === 'mpHeal') { svgWrapper.className = 'anim-mp'; innerHTML = `<svg class="absolute" style="width: 60px; height: 60px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><path d="M50,15 C50,15 25,50 25,70 C25,85 35,95 50,95 C65,95 75,85 75,70 C75,50 50,15 50,15 Z" fill="#38bdf8" opacity="0.8" style="filter: drop-shadow(0 0 10px #7dd3fc);" /><circle cx="50" cy="50" r="45" stroke="#bae6fd" stroke-width="2" fill="none" opacity="0.5" /></svg>`; duration = 800; }
+    else if (type === 'taunt') { svgWrapper.className = 'anim-taunt'; innerHTML = `<svg class="absolute" style="width: 80px; height: 80px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><path d="M25,25 L45,45 M75,25 L55,45 M35,75 Q50,60 65,75" stroke="#ef4444" stroke-width="6" stroke-linecap="round" fill="none" filter="url(#bloom-red)" /><circle cx="50" cy="50" r="45" stroke="#fca5a5" stroke-width="3" fill="none" stroke-dasharray="10,10" opacity="0.8" /></svg>`; duration = 700; }
     svgWrapper.innerHTML = innerHTML;
     svgWrapper.firstElementChild.style.position = 'absolute';
     __STAGE.el.appendChild(svgWrapper);
     const particles = new Set();
-    spawnHealParticles(p => { particles.add(p); fxEngine.addParticle(p); }, x, y, theme);
+    if (theme) spawnHealParticles(p => { particles.add(p); fxEngine.addParticle(p); }, x, y, theme);
     const cue = soundKey ? playSound(soundKey, volume) : null;
     const onFinish = new Set();
     const finish = ok => {
@@ -842,10 +1131,11 @@ const CombatEvents = {
 
   // ---- arcaneVfxModule 入选段（原样 + 坐标/挂载补丁） ----
   const arcane = (function () {
-function clearSummonState() { /* 未迁移段：本 Demo 不产生该状态 */ }
 function clearSelfDestructState() { /* 未迁移段：本 Demo 不产生该状态 */ }
 function clearRescueState() { /* 未迁移段：本 Demo 不产生该状态 */ }
     'use strict';
+    // 精确特效名；group:* 为敌方兜底群攻的内部演出键
+    const ARCANE_TAGS = ['灵风术', '纳克提特障壁术', '伊西丝之拥', '折影步', '巫师护盾', 'group:melee', 'group:ranged', 'group:spell', '飞沙化甲', '蝎眼钥匙', '谐律之庇', '静默之域', '碎裂之响', '塞赫美特之愠', '逆咒归源镜', '芭斯特的猫眼石', '奇异海螺', '砷弹射击'];
     const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
     const GROUP_COLORS = {
         melee: ['#fff1dc', '#ff916d', '#e53532'],
@@ -1616,6 +1906,9 @@ function clearRescueState() { /* 未迁移段：本 Demo 不产生该状态 */ }
             g.fillStyle = gr; g.scale(2, .55); g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill();
         }
     };
+    // ===== 对外接口 =====
+    function isArcaneSkillFx(fxTag) { return ARCANE_TAGS.indexOf(fxTag) !== -1; }
+
     // ===== 攻击身份与同拍命中反馈（两期统合） BEGIN =====
     const IDENTITY_TIMINGS = {
         gunshot: { chargeMs: 0, impactMs: 90, totalMs: 460 },
@@ -5520,6 +5813,352 @@ function clearRescueState() { /* 未迁移段：本 Demo 不产生该状态 */ }
         syncStatusLayers, clearStatusLayers, setStatusSfx
     };
 
+function dropOwnedLayer(owner, layer) {
+    if (!layer) return;
+    owner.layers.delete(layer);
+    S.layers.delete(layer);
+    if (layer.isConnected) layer.remove();
+}
+
+/* ===== 救援时刻 v12.10 END ===== */
+
+    // ===== 召唤三瞬默认演出 v12.12 BEGIN =====
+    const SUMMON_DEDICATED_TAGS = new Set(['高阶召唤术', '蝎眼钥匙', '圣域帷幕', '塞赫美特之愠', '逆咒归源镜', '谐律之庇', '静默之域', '碎裂之响']);
+    const SUMMON_ACTIVE = new Map();
+    const SUMMON_STYLE_MEMO = new WeakMap();
+    function isSummonDedicatedFx(fxTag) {
+        return !!fxTag && (SUMMON_DEDICATED_TAGS.has(fxTag) || !!WEBM_FX_REGISTRY[fxTag] || isArcaneSkillFx(fxTag));
+    }
+    function summonWrapOf(entity) {
+        if (!entity) return null;
+        if (entity.nodeType === 1) return entity.closest('[id^="hero-wrap-"],[id^="enemy-box-"]') || entity;
+        const id = entity.id || String(entity);
+        return document.getElementById('hero-wrap-' + id) || document.getElementById('enemy-box-' + id) || entity.dom || null;
+    }
+    function summonSaveStyle(el, props) {
+        if (!el) return () => {};
+        let entry = SUMMON_STYLE_MEMO.get(el);
+        if (!entry) { entry = { count: 0, base: {} }; SUMMON_STYLE_MEMO.set(el, entry); }
+        props.forEach(p => { if (!(p in entry.base)) entry.base[p] = el.style[p]; });
+        entry.count++;
+        let released = false;
+        return () => {
+            if (released) return;
+            released = true;
+            if (--entry.count) return;
+            Object.keys(entry.base).forEach(p => { el.style[p] = entry.base[p]; });
+            SUMMON_STYLE_MEMO.delete(el);
+        };
+    }
+    function cloneSummonVisual(dom) { return cloneVisualOnly(dom); }
+    function summonGhost(owner, rect, color, tag) {
+        const layer = owner.layer('', 44, tag), ghost = document.createElement('div');
+        ghost.className = 'arcane-summon-ghost';
+        ghost.style.cssText = `left:${rect.left}px;top:${rect.top}px;width:${rect.w}px;height:${rect.h}px;filter:drop-shadow(0 0 10px ${color});`;
+        ghost.innerHTML = cloneSummonVisual(rect.dom);
+        const visual = rect.visualDom || rect.dom;
+        ghost.style.fontSize = (parseFloat(getComputedStyle(visual).fontSize) * rect.w / (visual.offsetWidth || rect.w)) + 'px';
+        layer.appendChild(ghost);
+        return { layer, ghost };
+    }
+    function summonRun(totalMs, lockKeys) {
+        const keys = (lockKeys || []).filter(Boolean).map(String);
+        keys.forEach(k => { const old = SUMMON_ACTIVE.get(k); if (old) old.handle.cancel(); });
+        const owner = identityRun(totalMs, 1), layer = owner.layer;
+        owner.fixedLife = true;
+        owner.valid = () => !owner.cancelled && !owner.finished && owner.token === combatToken && !_pipelineFrozen;
+        owner.layer = (html, z = 54, tag = 'summon') => {
+            const d = layer(html); d.style.zIndex = String(z); d.dataset.summonTag = tag;
+            return d;
+        };
+        owner.dropLayer = d => dropOwnedLayer(owner, d);
+        owner.cancel = () => owner.handle.cancel();
+        owner.sound = (key, opts = {}) => {
+            const clips = {
+                armor_step_1: { key: 'sheshen_armor_step', offsetSec: 0.34 },
+                armor_step_2: { key: 'sheshen_armor_step', offsetSec: 0.92 },
+                parry: { key: 'parry_perfect' }, avoid_dash2: { key: 'avoid_dash_perfect' }
+            };
+            const clip = clips[key];
+            return playSampleClip(owner, clip ? clip.key : key, Object.assign({ category: 'B', rate: 1 }, clip, opts));
+        };
+        keys.forEach(k => SUMMON_ACTIVE.set(k, owner));
+        owner.onClean(() => keys.forEach(k => { if (SUMMON_ACTIVE.get(k) === owner) SUMMON_ACTIVE.delete(k); }));
+        owner.handle.done = new Promise(resolve => owner.handle.onFinish.add(resolve));
+        return owner;
+    }
+    function clearSummonState(entity) {
+        const id = entity == null ? '' : (typeof entity === 'object' ? entity.id : String(entity));
+        const seen = new Set();
+        [...SUMMON_ACTIVE.entries()].forEach(([key, owner]) => {
+            if (id && !key.endsWith(':' + id)) return;
+            if (seen.has(owner)) return;
+            seen.add(owner); owner.handle.cancel();
+        });
+        if (id) summonEnterPending.delete(id); else summonEnterPending.clear();
+        document.querySelectorAll('.arcane-summon-pending').forEach(el => {
+            if (!id || el.id === 'hero-wrap-' + id || el.id === 'enemy-box-' + id) el.classList.remove('arcane-summon-pending');
+        });
+    }
+    function buildSummonCircleHtml(uid, w, h, cx, cy, isEnemy) {
+        const ringA = isEnemy ? '#c026d3' : '#22d3ee', ringB = isEnemy ? '#a78bfa' : '#818cf8';
+        const edgeGlow = isEnemy ? 'rgba(217,70,239,0.52)' : 'rgba(34,211,238,0.48)';
+        return `<div class="arcane-summon-anchor summon-circle-wrap" style="left:${cx}px;top:${cy}px;width:${w}px;height:${h}px;">
+          <svg viewBox="-120 -60 240 120" class="w-full h-full" style="overflow:visible;">
+            <defs>
+              <radialGradient id="summon-disc-${uid}" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#e0f2fe" stop-opacity="0.48"/><stop offset="42%" stop-color="${ringB}" stop-opacity="0.28"/><stop offset="78%" stop-color="${ringA}" stop-opacity="0.16"/><stop offset="100%" stop-color="${ringA}" stop-opacity="0"/></radialGradient>
+              <linearGradient id="summon-ring-grad-${uid}" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="${ringA}" stop-opacity="0.2"/><stop offset="50%" stop-color="#e0f2fe" stop-opacity="0.95"/><stop offset="100%" stop-color="${ringB}" stop-opacity="0.25"/></linearGradient>
+              <filter id="summon-circle-blur-${uid}" x="-25%" y="-25%" width="150%" height="150%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <ellipse cx="0" cy="0" rx="114" ry="52" fill="url(#summon-disc-${uid})"/>
+            <g transform="scale(1,0.46)" filter="url(#summon-circle-blur-${uid})">
+              <g class="summon-ring-outer" style="transform-origin:0 0;"><circle cx="0" cy="0" r="102" fill="none" stroke="url(#summon-ring-grad-${uid})" stroke-width="2.6" stroke-dasharray="28 12 8 12" stroke-linecap="round"/><circle cx="0" cy="0" r="90" fill="none" stroke="${ringA}" stroke-width="1.4" stroke-opacity="0.65" stroke-dasharray="16 14" stroke-linecap="round"/></g>
+              <g class="summon-ring-inner" style="transform-origin:0 0;"><polygon points="0,-78 68,39 -68,39" fill="none" stroke="${ringB}" stroke-width="1.6" stroke-opacity="0.58" stroke-linejoin="round"/><polygon points="0,78 68,-39 -68,-39" fill="none" stroke="${ringA}" stroke-width="1.4" stroke-opacity="0.52" stroke-linejoin="round"/><circle cx="0" cy="0" r="46" fill="none" stroke="#e0f2fe" stroke-width="1.5" stroke-opacity="0.72" style="filter:drop-shadow(0 0 6px ${edgeGlow});"/></g>
+            </g>
+          </svg>
+        </div>`;
+    }
+    function playSummonEnter(caster, targets, meta = {}, onBeat) {
+        if (isSummonDedicatedFx(meta.fxTag)) {
+            if (onBeat) onBeat({ phase: 'skippedByFxTag', fxTag: meta.fxTag });
+            return { doneAt: Date.now(), done: Promise.resolve(true), skipped: true, fxTag: meta.fxTag, cancel() {} };
+        }
+        const list = (Array.isArray(targets) ? targets : [targets]).filter(Boolean);
+        const rects = list.map(entity => ({ entity, rect: entityVisualRect(entity) })).filter(x => x.rect && x.rect.dom.isConnected);
+        if (!rects.length) return null;
+        const isEnemy = meta.side === 'enemy' || list[0].side === 'enemy';
+        const colCore = '#e0f2fe', colArc = isEnemy ? '#e879f9' : '#22d3ee', colViolet = '#a78bfa', uid = ++S.uid;
+        const createdAt = Date.now();
+        const owner = summonRun(1800 + 350 + rects.length * 110, list.flatMap(t => ['summon:' + t.id, 'enter:' + t.id]));
+        owner.hold();
+        const beat = (phase, extra = {}) => { if (onBeat) onBeat(Object.assign({ phase, side: isEnemy ? 'enemy' : 'hero' }, extra)); };
+        rects.forEach(({ entity, rect }) => {
+            const box = summonWrapOf(entity) || rect.dom;
+            const restore = summonSaveStyle(box, ['opacity', 'transform', 'transition']);
+            box.classList.remove('anim-enter-hero', 'anim-enter-enemy');
+            box.style.opacity = '0'; box.style.transition = 'none';
+            owner.onClean(() => { restore(); summonEnterPending.delete(entity.id); box.classList.remove('arcane-summon-pending'); });
+        });
+        const cRect = caster && entityVisualRect(caster);
+        if (cRect) {
+            const size = Math.round(Math.max(54, Math.min(92, cRect.w * 0.72)));
+            const pulse = owner.layer(`<div class="arcane-summon-anchor" style="left:${cRect.x}px;top:${cRect.y}px;width:${size}px;height:${size}px;border-radius:50%;background:radial-gradient(circle,rgba(224,242,254,0.72) 0%,rgba(167,139,250,0.45) 45%,transparent 72%);"></div>`, 53, 'summon-caster-pulse');
+            owner.anim(pulse.firstElementChild, [{ transform: 'translate(-50%,-50%) scale(0.45)', opacity: 0.7 }, { transform: 'translate(-50%,-50%) scale(1.15)', opacity: 0 }], { duration: 210, easing: 'ease-out', fill: 'forwards' });
+            owner.at(220, () => owner.dropLayer(pulse));
+            owner.burst(6, () => {
+                const a = rnd(0, 6.283), d = rnd(20, size * 0.45);
+                return { x: cRect.x + Math.cos(a) * d, y: cRect.y + Math.sin(a) * d, vx: -Math.cos(a) * d / 10, vy: -Math.sin(a) * d / 10, drag: 0.86, decay: 0.085, size: 2.4, shape: 'glowOrb', color: colViolet, core: colCore };
+            });
+        }
+        const left = Math.min(...rects.map(x => x.rect.left)), right = Math.max(...rects.map(x => x.rect.right));
+        const top = Math.min(...rects.map(x => x.rect.top)), bottom = Math.max(...rects.map(x => x.rect.bottom));
+        const anchorPt = { x: (left + right) * 0.5, y: bottom - Math.min(18, rects[0].rect.h * 0.16) };
+        const fW = Math.round(Math.max(rects[0].rect.w * 1.7, Math.min(right - left + rects[0].rect.w * 0.72, 540)));
+        const fH = Math.round(Math.max(66, Math.min(138, (bottom - top) * 0.48 + 44)));
+        const circle = owner.layer(buildSummonCircleHtml(uid, fW, fH, anchorPt.x, anchorPt.y, isEnemy), 52, 'summon-circle');
+        const circleWrap = circle.querySelector('.summon-circle-wrap');
+        owner.anim(circleWrap, [{ opacity: 0, transform: 'translate(-50%,-50%) scale(0.55)' }, { opacity: 1, transform: 'translate(-50%,-50%) scale(1)' }], { duration: 340, easing: 'cubic-bezier(0.2,0.86,0.3,1)', fill: 'forwards' });
+        owner.anim(circle.querySelector('.summon-ring-outer'), [{ transform: 'rotate(0deg)' }, { transform: 'rotate(180deg)' }], { duration: 1800, easing: 'linear', iterations: Infinity });
+        owner.anim(circle.querySelector('.summon-ring-inner'), [{ transform: 'rotate(0deg)' }, { transform: 'rotate(-180deg)' }], { duration: 1500, easing: 'linear', iterations: Infinity });
+        owner.sound('light_charge', { vol: 0.72, pan: panOf(anchorPt.x) });
+        beat('circle', { anchorPt, count: rects.length });
+        const gather = owner.every(55, () => {
+            const a = rnd(0, 6.283), rx = rnd(fW * 0.34, fW * 0.54), ry = rnd(fH * 0.3, fH * 0.52);
+            const x = anchorPt.x + Math.cos(a) * rx, y = anchorPt.y + Math.sin(a) * ry;
+            owner.addP({ x, y, vx: (anchorPt.x - x) / 11, vy: (anchorPt.y - y) / 11, drag: 0.88, decay: 0.068, size: rnd(2.2, 3.6), shape: 'glowOrb', color: pick([colArc, colViolet]), core: colCore });
+        });
+        let revealed = false, minDone = false, dataReady = !(meta.beforeEnter && typeof meta.beforeEnter.then === 'function');
+        function reveal() {
+            if (revealed || !owner.valid()) return;
+            revealed = true;
+            stopEvery(gather); owner.intervals.delete(gather);
+            owner.sound('light_impact', { vol: 0.88, pan: panOf(anchorPt.x) });
+            beat('riftOpen', { count: rects.length });
+            const beamW = Math.round(Math.max(46, Math.min(110, rects[0].rect.w * 0.92)));
+            const beamH = Math.round(Math.max(130, Math.min(240, rects[0].rect.h * 2.1)));
+            const beam = owner.layer(`<div class="arcane-summon-beam" style="left:${anchorPt.x}px;top:${anchorPt.y + 8}px;width:${beamW}px;height:${beamH}px;background:radial-gradient(ellipse at 50% 85%,rgba(224,242,254,0.92) 0%,rgba(34,211,238,0.52) 32%,rgba(167,139,250,0.28) 62%,transparent 85%);border-radius:50% 50% 30% 30%;"></div><div class="arcane-summon-beam" style="left:${anchorPt.x}px;top:${anchorPt.y + 6}px;width:${Math.round(beamW * 0.28)}px;height:${Math.round(beamH * 0.9)}px;background:linear-gradient(180deg,transparent 0%,#ffffff 38%,#e0f2fe 78%,transparent 100%);"></div>`, 55, 'summon-rift');
+            beam.querySelectorAll('.arcane-summon-beam').forEach((b, idx) => owner.anim(b, [{ transform: 'translate(-50%,-100%) scaleX(0.28) scaleY(0.18)', opacity: 0 }, { transform: `translate(-50%,-100%) scaleX(${idx ? 1.15 : 1.08}) scaleY(1.04)`, opacity: 1, offset: 0.34 }, { transform: 'translate(-50%,-100%) scaleX(0.32) scaleY(1.12)', opacity: 0 }], { duration: 280, easing: 'cubic-bezier(0.18,0.88,0.3,1)', fill: 'forwards' }));
+            owner.at(295, () => owner.dropLayer(beam));
+            owner.burst(2, i => ({ x: anchorPt.x, y: anchorPt.y, shape: 'gradRing', r0: 12, r1: fW * (0.42 + i * 0.12), w: 3 - i, decay: 0.055 - i * 0.015, color: i ? colArc : colCore }));
+            let endMs = 0;
+            rects.forEach(({ entity, rect }, index) => {
+                const fast = index >= 4, delay = fast ? 330 + (index - 3) * 75 : index * 110, formMs = fast ? 200 : 350;
+                endMs = Math.max(endMs, delay + formMs);
+                owner.at(delay, () => {
+                    const box = summonWrapOf(entity) || rect.dom, base = box.style.transform;
+                    const size = Math.round(Math.max(66, Math.max(rect.w, rect.h) * (fast ? 1.18 : 1.42)));
+                    const glow = owner.layer(`<div class="arcane-summon-anchor" style="left:${rect.x}px;top:${rect.y}px;width:${size}px;height:${size}px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.92) 0%,${isEnemy ? 'rgba(232,121,249,0.52)' : 'rgba(34,211,238,0.58)'} 42%,rgba(167,139,250,0.22) 68%,transparent 82%);"></div>`, 56, 'summon-manifest');
+                    owner.anim(glow.firstElementChild, [{ transform: 'translate(-50%,-50%) scale(0.35)', opacity: 0.95 }, { transform: 'translate(-50%,-50%) scale(1.22)', opacity: 0 }], { duration: formMs, easing: 'ease-out', fill: 'forwards' });
+                    owner.at(formMs + 20, () => owner.dropLayer(glow));
+                    summonEnterPending.delete(entity.id); box.classList.remove('arcane-summon-pending'); box.style.opacity = '1';
+                    owner.anim(box, [{ transform: `translate3d(0,8px,0) scale(0.76) ${base}`, opacity: 0 }, { transform: `translate3d(0,-2px,0) scale(1.04) ${base}`, opacity: 1, offset: 0.62 }, { transform: base || 'none', opacity: 1 }], { duration: formMs, easing: 'cubic-bezier(0.22,0.88,0.34,1)', fill: 'forwards' });
+                    owner.burst(fast ? 3 : 10, () => ({ x: rect.x + rnd(-rect.w * 0.34, rect.w * 0.34), y: rect.y + rnd(-rect.h * 0.25, rect.h * 0.3), vx: rnd(-0.6, 0.6), vy: rnd(-2.2, -0.8), grav: -0.02, drag: 0.95, decay: rnd(0.055, 0.085), size: rnd(2.2, 4), shape: 'glowOrb', color: pick([colArc, colViolet]), core: colCore }));
+                    if (!index) owner.sound('link_chime', { vol: 0.32, pan: panOf(rect.x) });
+                    beat('manifest', { entity, index, fast, rect });
+                });
+            });
+            owner.at(endMs, () => {
+                owner.anim(circleWrap, [{ opacity: 1, transform: 'translate(-50%,-50%) scale(1)' }, { opacity: 0, transform: 'translate(-50%,-50%) scale(1.08)' }], { duration: 220, easing: 'ease-out', fill: 'forwards' });
+                beat('settled', { count: rects.length }); owner.resume(230);
+            });
+        }
+        owner.at(400, () => { minDone = true; if (dataReady) reveal(); else beat('waitingData', { elapsed: 400 }); });
+        let waitTimer = null;
+        if (!dataReady) {
+            const ready = () => {
+                if (!owner.valid()) return;
+                if (waitTimer != null) { clearTimeout(waitTimer); owner.timers.delete(waitTimer); S.timers.delete(waitTimer); waitTimer = null; }
+                dataReady = true; if (minDone) reveal();
+            };
+            Promise.resolve(meta.beforeEnter).then(ready, ready);
+            waitTimer = owner.at(1800, ready); // 只放行视觉，不取消资料读取或合法召唤。
+        }
+        const lastIndex = rects.length - 1, lastDelay = lastIndex < 4 ? lastIndex * 110 : 330 + (lastIndex - 3) * 75;
+        owner.handle.doneAt = createdAt + (dataReady ? 400 : 1800) + Math.max(680, lastDelay + (lastIndex >= 4 ? 200 : 350)) + 230;
+        return owner.handle;
+    }
+    function playSummonExit(entity, meta = {}, onBeat) {
+        if (!entity) return null;
+        if (meta.exitCause === 'reviveIntercept' || meta.exitCause === 'explode' || entity.explode) {
+            if (onBeat) onBeat({ phase: 'exitBypassed', reason: meta.exitCause || 'explode', entity });
+            return null;
+        }
+        const id = entity.id || String(entity), active = SUMMON_ACTIVE.get('summon:' + id);
+        if (!meta.fromGuard && active && active.handle.exit && !active.handle.isReleased()) { active.handle.exit(meta, onBeat); return active.handle; }
+        if (active && active.handle.isSummonExit) return active.handle;
+        const preRect = meta.anchorRect || entityVisualRect(entity);
+        if (!preRect || !preRect.dom.isConnected) return null;
+        if (active && active.handle.exit) meta = Object.assign({}, meta, { anchorRect: preRect, holdTransform: (summonWrapOf(entity) || preRect.dom).style.transform });
+        const owner = summonRun(840, ['summon:' + id, 'exit:' + id]);
+        const rect = meta.anchorRect || entityVisualRect(entity), dom = rect.dom, box = summonWrapOf(dom) || dom;
+        const restoreBox = summonSaveStyle(box, ['opacity', 'transform', 'transition', 'filter']);
+        const restoreDom = dom !== box ? summonSaveStyle(dom, ['opacity', 'transform', 'transition', 'filter']) : () => {};
+        owner.onClean(() => { restoreDom(); restoreBox(); });
+        box.classList.remove('arcane-summon-pending', 'anim-enter-hero', 'anim-enter-enemy');
+        dom.classList.remove('breathe'); box.style.transition = 'none';
+        if (meta.holdTransform) box.style.transform = meta.holdTransform;
+        const base = dom.style.transform;
+        const beat = (phase, extra = {}) => { if (onBeat) onBeat(Object.assign({ phase, entity }, extra)); };
+        const isEnemy = meta.side === 'enemy' || entity.side === 'enemy';
+        const colCore = '#e0f2fe', colArc = isEnemy ? '#e879f9' : '#22d3ee', colViolet = '#a78bfa';
+        const uid = ++S.uid, footY = rect.bottom - Math.min(12, rect.h * 0.1);
+        const rW = Math.round(Math.max(76, rect.w * 1.45)), rH = Math.round(Math.max(32, rW * 0.44));
+        owner.sound('resist_phantom', { vol: 0.38, rate: 0.94, pan: panOf(rect.x) });
+        beat('destabilize', { rect });
+        const glow = owner.layer(`<div class="arcane-summon-anchor" style="left:${rect.x}px;top:${rect.y}px;width:${Math.round(rect.w * 1.25)}px;height:${Math.round(rect.h * 1.25)}px;border-radius:50%;background:radial-gradient(circle,rgba(224,242,254,0.68) 0%,rgba(167,139,250,0.34) 46%,transparent 76%);"></div>`, 55, 'summon-exit-glow');
+        owner.anim(glow.firstElementChild, [{ transform: 'translate(-50%,-50%) scale(0.7)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1.06)', opacity: 0.85, offset: 0.32 }, { transform: 'translate(-50%,-50%) scale(1.18)', opacity: 0 }], { duration: 480, easing: 'ease-out', fill: 'forwards' });
+        owner.at(490, () => owner.dropLayer(glow));
+        owner.anim(dom, [{ transform: base || 'none', opacity: 1 }, { transform: `translate3d(-3px,-1px,0) scale(1.02,0.98) ${base}`, opacity: 0.88, offset: 0.35 }, { transform: `translate3d(3px,-3px,0) scale(0.98,1.03) ${base}`, opacity: 0.95, offset: 0.72 }, { transform: `translate3d(0,-5px,0) scale(0.96,1.04) ${base}`, opacity: 0.75 }], { duration: 190, easing: 'ease-in-out', fill: 'forwards' });
+        const ring = owner.layer(`<div class="arcane-summon-anchor" style="left:${rect.x}px;top:${footY}px;width:${rW}px;height:${rH}px;"><svg viewBox="-60 -26 120 52" class="w-full h-full" style="overflow:visible;"><defs><radialGradient id="summon-rem-${uid}" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="${colArc}" stop-opacity="0.45"/><stop offset="65%" stop-color="${colViolet}" stop-opacity="0.22"/><stop offset="100%" stop-color="${colViolet}" stop-opacity="0"/></radialGradient></defs><ellipse cx="0" cy="0" rx="54" ry="20" fill="url(#summon-rem-${uid})" stroke="${colArc}" stroke-opacity="0.55" stroke-width="1.2" stroke-dasharray="10 7"/></svg></div>`, 52, 'summon-exit-remnant');
+        owner.anim(ring.firstElementChild, [{ opacity: 0, transform: 'translate(-50%,-50%) scale(0.85)' }, { opacity: 0.72, transform: 'translate(-50%,-50%) scale(1)', offset: 0.25 }, { opacity: 0.45, transform: 'translate(-50%,-50%) scale(0.92)', offset: 0.72 }, { opacity: 0, transform: 'translate(-50%,-50%) scale(0.45)' }], { duration: 740, easing: 'ease-out', fill: 'forwards' });
+        owner.at(160, () => {
+            owner.sound('rage_exit', { vol: 0.30, rate: 1.08, maxDurSec: 0.48, fadeOutSec: 0.2, pan: panOf(rect.x) });
+            beat('unravel', { rect });
+            owner.anim(dom, [{ transform: `translate3d(0,-5px,0) scale(0.96,1.04) ${base}`, opacity: 0.75 }, { transform: `translate3d(4px,-14px,0) scale(0.76,1.08) ${base}`, opacity: 0.22, offset: 0.65 }, { transform: `translate3d(8px,-22px,0) scale(0.56,1.12) ${base}`, opacity: 0 }], { duration: 380, easing: 'ease-in', fill: 'forwards' });
+            owner.burst(Math.max(18, Math.min(28, Math.round(rect.w * 0.28))), () => ({ x: rect.x + rnd(-rect.w * 0.38, rect.w * 0.38), y: rect.y + rnd(-rect.h * 0.35, rect.h * 0.32), vx: rnd(0.25, 1.45), vy: rnd(-2.5, -0.9), grav: -0.04, drag: 0.96, decay: rnd(0.032, 0.056), size: rnd(2.2, 4.4), shape: 'glowOrb', color: pick([colArc, colViolet, colCore]), core: colCore }));
+        });
+        owner.at(560, () => beat('extinguish'));
+        owner.at(750, () => { owner.dropLayer(ring); beat('vacated'); });
+        owner.handle.isSummonExit = true;
+        return owner.handle;
+    }
+    function playSummonGuard(guardian, ownerEntity, meta = {}, onBeat) {
+        if (!guardian || !ownerEntity || meta.incomingLethal === false) return null;
+        const gRect = entityVisualRect(guardian), oRect = entityVisualRect(ownerEntity);
+        if (!gRect || !oRect) return null;
+        const gId = guardian.id || String(guardian), oId = ownerEntity.id || String(ownerEntity);
+        const shoulderSide = oRect.x >= gRect.x ? -1 : 1;
+        const interceptX = oRect.x + shoulderSide * Math.min(20, oRect.w * 0.16), interceptY = oRect.y - Math.min(30, oRect.h * 0.26);
+        const dashX = interceptX - gRect.x, dashY = interceptY - gRect.y, dir = dashX >= 0 ? 1 : -1;
+        const blockPt = { x: interceptX, y: interceptY - Math.min(10, gRect.h * 0.12) };
+        const gDom = gRect.dom, gWrap = summonWrapOf(guardian) || gDom, base = gWrap.style.transform;
+        const dashTransform = `translate3d(${dashX.toFixed(1)}px,${dashY.toFixed(1)}px,0) ${base}`;
+        const owner = summonRun(920, ['summon:' + gId, 'guard:' + oId]), uid = ++S.uid;
+        owner.hold();
+        const restoreWrap = summonSaveStyle(gWrap, ['zIndex', 'transition', 'transform']);
+        const restoreDom = summonSaveStyle(gDom, ['transform', 'transition', 'filter']);
+        owner.onClean(() => { restoreDom(); restoreWrap(); });
+        gWrap.style.zIndex = '46'; gWrap.style.transition = 'none'; gDom.style.filter = 'drop-shadow(0 0 12px rgba(56,189,248,0.8))';
+        let settled = false, released = false, impactAt = 0, outcome = meta.guardOutcome || 'survived', chaining = false, exitHandle = null;
+        let resolveReady, resolveDone;
+        const ready = new Promise(resolve => { resolveReady = resolve; });
+        const done = new Promise(resolve => { resolveDone = resolve; });
+        const exitBeats = [], exitMeta = {};
+        const cancelRun = owner.handle.cancel;
+        owner.handle.cancel = () => { cancelRun(); if (exitHandle) exitHandle.cancel(); resolveDone(false); };
+        owner.handle.onFinish.add(ok => { resolveReady({ ok: !!ok, blockPt }); if (!chaining) resolveDone(!!ok); });
+        const beat = (phase, extra = {}) => { if (onBeat) onBeat(Object.assign({}, extra, { phase, guardian, owner: ownerEntity, guardOutcome: outcome })); };
+        const shieldSize = Math.round(Math.max(94, Math.min(118, gRect.w * 1.4)));
+        function impact(finalOutcome = 'hit', opts = {}) {
+            if (settled || !owner.valid()) return;
+            settled = true; impactAt = Date.now();
+            if (finalOutcome === 'secondDodge') {
+                outcome = 'secondDodge';
+                if (!opts.suppressDodgeFx) {
+                    const live = entityVisualRect(guardian) || gRect, ghost = summonGhost(owner, live, '#67e8f9', 'summon-dodge-ghost');
+                    owner.anim(ghost.ghost, [{ transform: 'scale(1)', opacity: 0.7 }, { transform: 'translate3d(0,4px,0) scale(0.92)', opacity: 0 }], { duration: 280, easing: 'ease-out', fill: 'forwards' });
+                    owner.at(300, () => owner.dropLayer(ghost.layer));
+                    owner.anim(gDom, [{ transform: 'translate3d(0,0,0)' }, { transform: `translate3d(${-dir * 26}px,-7px,0) scale(1.03)`, offset: 0.32 }, { transform: 'translate3d(0,0,0)' }], { duration: 320, easing: 'cubic-bezier(0.2,0.88,0.32,1)' });
+                    owner.burst(12, () => ({ x: blockPt.x + rnd(-10, 10), y: blockPt.y, vx: rnd(-2.5, 2.5), vy: rnd(-2.2, 0.8), drag: 0.9, decay: 0.07, size: rnd(2.2, 4), shape: 'glowOrb', color: '#67e8f9', core: '#ffffff' }));
+                }
+                if (!opts.silentDodge) { owner.sound('avoid_dash2', { vol: 0.72, pan: panOf(blockPt.x) }); owner.at(100, () => owner.sound('hide', { vol: 0.65, maxDurSec: 0.35, pan: panOf(blockPt.x) })); }
+                beat('secondDodge', { blockPt });
+                return;
+            }
+            const tilt = -dir * 5;
+            const shield = owner.layer(`<div class="arcane-summon-anchor" style="left:${blockPt.x}px;top:${blockPt.y}px;width:${shieldSize}px;height:${shieldSize}px;transform:translate(-50%,-50%) rotate(${tilt}deg);"><svg viewBox="0 0 120 120" class="w-full h-full" style="overflow:visible;"><defs><linearGradient id="summon-shd-${uid}" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#0284c7" stop-opacity="0.14"/><stop offset="50%" stop-color="#bae6fd" stop-opacity="0.96"/><stop offset="100%" stop-color="#0284c7" stop-opacity="0.14"/></linearGradient><radialGradient id="summon-shd-core-${uid}" cx="50%" cy="48%" r="50%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.92"/><stop offset="40%" stop-color="#38bdf8" stop-opacity="0.52"/><stop offset="100%" stop-color="#0369a1" stop-opacity="0"/></radialGradient><filter id="summon-shd-glow-${uid}" x="-35%" y="-35%" width="170%" height="170%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><circle cx="60" cy="56" r="44" fill="url(#summon-shd-core-${uid})" class="s-shd-bloom"/><g filter="url(#summon-shd-glow-${uid})" class="s-shd-arc"><path d="M16 74 Q60 12 104 74 Q60 32 16 74 Z" fill="url(#summon-shd-${uid})"/><path d="M22 68 Q60 18 98 68" fill="none" stroke="#e0f2fe" stroke-width="3.6" stroke-linecap="round"/></g></svg></div>`, 59, 'summon-guard-shield');
+            owner.anim(shield.querySelector('.s-shd-arc'), [{ transform: 'scale(0.55)', opacity: 0 }, { transform: 'scale(1.12)', opacity: 1, offset: 0.18 }, { transform: 'scale(1.02)', opacity: 0.92, offset: 0.72 }, { transform: 'scale(1.14)', opacity: 0 }], { duration: 360, easing: 'cubic-bezier(0.16,0.88,0.3,1)', fill: 'forwards' });
+            owner.anim(shield.querySelector('.s-shd-bloom'), [{ transform: 'scale(0.3)', opacity: 0.95 }, { transform: 'scale(1.32)', opacity: 0 }], { duration: 310, easing: 'ease-out', fill: 'forwards' });
+            owner.at(370, () => owner.dropLayer(shield));
+            owner.sound('parry', { vol: 0.84, pan: panOf(blockPt.x) });
+            owner.burst(16, () => { const a = rnd(-2.7, -0.45), sp = rnd(2.6, 6.8); return { x: blockPt.x + rnd(-8, 8), y: blockPt.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, grav: 0.14, drag: 0.91, decay: rnd(0.048, 0.082), size: rnd(1.8, 2.8), shape: 'spark', color: pick(['#ffffff', '#bae6fd', '#38bdf8', '#7dd3fc']) }; });
+            owner.burst(2, i => ({ x: blockPt.x, y: blockPt.y, shape: 'gradRing', r0: 8, r1: 52 + i * 20, w: 3.2 - i, decay: 0.068 - i * 0.018, color: i ? 'rgba(56,189,248,0.72)' : 'rgba(224,242,254,0.9)' }));
+            beat('blockImpact', { blockPt, finalOutcome }); beat('guardHold', { blockPt });
+        }
+        function doReturn() {
+            gDom.style.filter = '';
+            gWrap.style.transform = base;
+            owner.anim(gWrap, [{ transform: dashTransform }, { transform: base || 'none' }], { duration: 320, easing: 'cubic-bezier(0.26,0.82,0.36,1)', fill: 'forwards' });
+            const aura = owner.layer(`<div class="arcane-summon-aura" style="left:${oRect.x}px;top:${oRect.y}px;width:${oRect.w + 10}px;height:${oRect.h + 10}px;"></div>`, 51, 'summon-owner-aura');
+            owner.anim(aura.firstElementChild, [{ opacity: 0, transform: 'translate(-50%,-50%) scale(0.95)' }, { opacity: 0.88, transform: 'translate(-50%,-50%) scale(1.01)', offset: 0.28 }, { opacity: 0, transform: 'translate(-50%,-50%) scale(1.04)' }], { duration: 420, easing: 'ease-out', fill: 'forwards' });
+            owner.at(430, () => owner.dropLayer(aura));
+            owner.sound('armor_step_1', { vol: 0.38, rate: 1.08, maxDurSec: 0.28, pan: panOf(gRect.x) });
+            beat('return', { blockPt });
+        }
+        function release(finalOutcome = outcome) {
+            if (released || !owner.valid()) return done;
+            released = true; outcome = finalOutcome;
+            if (finalOutcome === 'explode') { cancelRun(); return done; }
+            impact(finalOutcome === 'secondDodge' ? 'secondDodge' : 'hit');
+            if (finalOutcome === 'guardianDown') {
+                owner.at(210, () => {
+                    const rect = entityVisualRect(guardian);
+                    chaining = true; cancelRun();
+                    exitHandle = playSummonExit(guardian, Object.assign({}, exitMeta, { exitCause: 'killed', fromGuard: true, anchorRect: rect, holdTransform: dashTransform }), ev => { beat('exitChain:' + ev.phase, ev); exitBeats.forEach(fn => fn(ev)); });
+                    if (exitHandle) exitHandle.done.then(resolveDone); else resolveDone(true);
+                });
+                return done;
+            }
+            const delay = Math.max(0, impactAt + (finalOutcome === 'secondDodge' ? 330 : 360) - Date.now());
+            owner.at(delay, doReturn); owner.resume(delay + 450);
+            return done;
+        }
+        const ghost = summonGhost(owner, gRect, '#38bdf8', 'summon-guard-ghost');
+        owner.anim(ghost.ghost, [{ transform: 'scale(1)', opacity: 0.62 }, { transform: 'scale(0.9)', opacity: 0 }], { duration: 290, easing: 'ease-out', fill: 'forwards' });
+        owner.at(300, () => owner.dropLayer(ghost.layer));
+        owner.anim(gWrap, [{ transform: base || 'none' }, { transform: dashTransform }], { duration: 180, easing: 'cubic-bezier(0.22,0.88,0.32,1)', fill: 'forwards' });
+        gWrap.style.transform = dashTransform;
+        owner.sound('armor_step_2', { vol: 0.68, rate: 1.08, maxDurSec: 0.34, pan: panOf((gRect.x + blockPt.x) * 0.5) });
+        owner.burst(8, i => ({ x: gRect.x + dashX * (i / 8), y: gRect.y + dashY * (i / 8) + rnd(-6, 6), vx: -dashX * 0.015 + rnd(-0.6, 0.6), vy: -dashY * 0.015 + rnd(-0.5, 0.5), drag: 0.9, decay: 0.08, size: rnd(2.2, 4.2), shape: 'glowOrb', color: '#38bdf8', core: '#e0f2fe' }));
+        beat('dash', { dashX, dashY, blockPt });
+        owner.at(180, () => {
+            resolveReady({ ok: true, blockPt }); beat('reactionReady', { blockPt, release });
+            if (!meta.deferredRelease) release(outcome);
+        });
+        Object.assign(owner.handle, { ready, done, impact, release, blockPt, dashX, dashY, guardian, isReleased: () => released,
+            exit(meta2, cb) { Object.assign(exitMeta, meta2); if (cb) exitBeats.push(cb); release('guardianDown'); } });
+        return owner.handle;
+    }
     // ===== 召唤三瞬默认演出 v12.12 END =====
 
     function clearArcaneFx() {
@@ -5552,7 +6191,8 @@ function clearRescueState() { /* 未迁移段：本 Demo 不产生该状态 */ }
     }
     return { playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar,
       CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx,
-      syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked };
+      syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked,
+      playSummonEnter, playSummonExit, playSummonGuard, clearSummonState };
   })();
 CombatEvents.on(EVENTS.DAMAGE_RESOLVED, arcane.CombatAudioDirector.consume);
 CombatEvents.on(EVENTS.DODGE_RESOLVED, arcane.CombatAudioDirector.consume);
@@ -5560,9 +6200,9 @@ CombatEvents.on(EVENTS.DODGE_RESOLVED, arcane.CombatAudioDirector.consume);
   return Object.assign({}, arcane, {
     CombatAudioMixer, audioUrls, playSound, playCustomAudio, HERO_VOICE_LINES, pickHeroVoice, AVATAR_MAP, fxEngine,
     ASSET_BASE, HERO_VOICE_BASE, itemFxAssetUrl,
-    playGenericSupportFx,
-    clearArcaneFx() { supportHandles.forEach(handle => handle.cancel()); arcane.clearArcaneFx(); playRandomStandardGunshot.last = null; },
-    setToken(t) { if (t !== combatToken) { supportHandles.forEach(handle => handle.cancel()); playRandomStandardGunshot.last = null; } combatToken = t; },
+    playGenericSupportFx, playExecutionAnimation, playEnemyUltimateCutin, clearMoments,
+    clearArcaneFx() { supportHandles.forEach(handle => handle.cancel()); clearMoments(); arcane.clearArcaneFx(); playRandomStandardGunshot.last = null; },
+    setToken(t) { if (t !== combatToken) { supportHandles.forEach(handle => handle.cancel()); clearMoments(); playRandomStandardGunshot.last = null; } combatToken = t; },
     getToken() { return combatToken; },
     setRoster(h, e) { heroesData = h; enemiesData = e; },
   });
