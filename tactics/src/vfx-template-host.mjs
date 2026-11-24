@@ -248,6 +248,7 @@ export function installVfxTemplateStage(rootEl, { yamlText }) {
     }
   }
 
+  let onResetHook = null;
   function resetStage(cards = []) {
     combatToken++;
     playing = false;
@@ -258,11 +259,12 @@ export function installVfxTemplateStage(rootEl, { yamlText }) {
     shell.renderHeroes(stageData.units);
     shell.renderTurnOrder(stageData.units);
     shell.showLog('靶场已就绪（立柱大厅 20m×13m · 6 敌 4 友）');
-    renderCards(cards);
+    if (onResetHook) onResetHook();
+    else renderCards(cards);
   }
 
   function setCardsDisabled(disabled) {
-    listWrap.querySelectorAll('button.vfx-demo-card').forEach(b => { b.disabled = disabled; });
+    listWrap.querySelectorAll('button').forEach(b => { b.disabled = disabled; });
   }
 
   async function playCard(card) {
@@ -271,10 +273,26 @@ export function installVfxTemplateStage(rootEl, { yamlText }) {
     setCardsDisabled(true);
     restoreTargets();
     avHost.unlockAudio();
-    const res = buildMockResult(stageData, card);
     shell.showLog(`▶ 演练：${card.name} [${card.fxTag || '无fxTag'}]`);
     try {
-      await director.playAttack(res);
+      if (card.kind === 'prepare') {
+        await director.playPrepare({
+          ok: true, preparing: true, casterId: card.casterId || 'h:埃利奥特',
+          skill: { name: card.name || '蓄力起手', fxTag: card.fxTag || null, damageType: card.damageType || '法术' },
+        });
+      } else {
+        const res = buildMockResult(stageData, card);
+        if (card.kind === 'reaction') {
+          const h0 = res.hits[0];
+          const p0 = stageData.placementsById[h0.targetId];
+          h0.reaction = {
+            fxTag: card.fxTag, type: card.fxTag || '回避错位', success: true,
+            shift: card.shift || (p0 ? { col: Math.max(2, p0.col - 1), row: p0.row } : null),
+          };
+        }
+        await director.playAttack(res);
+        if (card.fatal && String(res.casterId).startsWith('h:')) await director.playExecution(res);
+      }
       shell.showLog(`✔ 完成：${card.name}`);
     } catch (err) {
       shell.showLog(`❌ 演出异常：${err?.message || err}`);
@@ -306,7 +324,7 @@ export function installVfxTemplateStage(rootEl, { yamlText }) {
     }
   }
 
-  function boot({ customEntries = [], cards = [] } = {}) {
+  function boot({ customEntries = [], cards = [], registerExtra = null, onReady = null } = {}) {
     const unitIds = new Set(stageData.units.map(u => u.id));
     const errs = validateWorkbench(customEntries, cards, unitIds);
     for (const entry of customEntries) {
@@ -314,17 +332,26 @@ export function installVfxTemplateStage(rootEl, { yamlText }) {
         try { registry.register(entry); } catch (e) { errs.push(e.message); }
       }
     }
+    if (typeof registerExtra === 'function') registerExtra(registry);
     sandbox.mount(viewData());
     fitHall();
     shell.renderHeroes(stageData.units);
     shell.renderTurnOrder(stageData.units);
     shell.onReset = () => resetStage(cards);
     renderCards(cards);
+    if (typeof onReady === 'function') onReady(stageApi);
     if (errs.length) shell.showLog('⚠️ 工作台预检：' + errs[0]);
     else shell.showLog('战棋特效空白母版就绪（立柱大厅 · 上 6 敌 / 下 4 友）');
   }
 
-  const stageApi = { ...primitives, checkBudget, GRADE_BUDGETS, boot, reset: resetStage };
+  const stageApi = {
+    ...primitives, checkBudget, GRADE_BUDGETS, boot, reset: resetStage, playCard, renderCards, fitHall,
+    setResetHook: fn => { onResetHook = fn; },
+    getRegistry: () => registry,
+    getUnits: () => stageData.units,
+    els: { menuBox, listWrap, subLabel, activeHeroName: shell.els.activeHeroName },
+    shell, director,
+  };
   window.__TACTICS_VFX_STAGE__ = stageApi;
   return stageApi;
 }

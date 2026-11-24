@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>战棋特效完整工作台（实时引用原版源码与资源）</title>
+<link rel="stylesheet" href="./src/vendor/rpg-ui/rpg-ui.css">
+<link rel="stylesheet" href="./tactics.css">
+<link rel="stylesheet" href="./src/vendor/rpg-av/rpg-av.css">
+<style>
+  /* 仅工作台局部适配右下角控制面板，防止窄屏下被左侧英雄栏挤出视口 */
+  #heroes-container { min-width: 0 !important; flex: 1 1 0 !important; }
+  #menu-container.vfx-stage-panel { width: 290px !important; height: 265px !important; }
+  .vfx-bar-row { display: flex; flex-wrap: wrap; gap: 3px; padding: 4px 6px; border-bottom: 1px solid rgba(51,65,85,0.55); background: rgba(15,23,42,0.85); }
+  .vfx-chip { font-size: 10px; line-height: 1.2; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(71,85,105,0.75); color: #cbd5e1; background: rgba(30,41,59,0.7); cursor: pointer; }
+  .vfx-chip.active { border-color: #22d3ee; color: #67e8f9; background: rgba(8,145,178,0.28); font-weight: 700; }
+  .vfx-chip.warn.active { border-color: #f43f5e; color: #fda4af; background: rgba(190,18,60,0.3); }
+</style>
+</head>
+<body>
+<div id="tactics-app"></div>
+<script type="module" src="./vfx-stage.mjs"></script>
+</body>
+</html>

@@ -17719,6 +17719,7 @@ button:disabled { opacity: .42; cursor: default; }
   }
 
   // src/barriers.mjs
+  var EPS = 1e-9;
   function unitById(ctx, id) {
     return ctx.units.find((u) => u.id === id) || null;
   }
@@ -17777,6 +17778,28 @@ button:disabled { opacity: .42; cursor: default; }
     if (attackerCells.length && allInside(b, attackerCells)) return null;
     return b;
   }
+  function barrierContact(ctx, barrier, origin, aim) {
+    const from = origin?.placement ? unitCenter(origin.placement, origin.footprint || { width: 1, height: 1 }) : origin;
+    if (!from || !barrier?.center) return null;
+    const to = Number.isFinite(aim?.x) && Number.isFinite(aim?.y) ? aim : barrier.center;
+    let dx = to.x - from.x, dy = to.y - from.y;
+    if (Math.hypot(dx, dy) <= EPS) {
+      dx = 1;
+      dy = 0;
+    }
+    const len = Math.hypot(dx, dy);
+    dx /= len;
+    dy /= len;
+    const x = from.x - barrier.center.x, y = from.y - barrier.center.y;
+    const projection = x * dx + y * dy;
+    const disc = projection * projection - (x * x + y * y - barrier.radius * barrier.radius);
+    if (disc < -EPS) return null;
+    const root = Math.sqrt(Math.max(0, disc));
+    const hits = [-projection - root, -projection + root].filter((t2) => t2 >= -EPS);
+    if (!hits.length) return null;
+    const t = Math.max(0, hits[0]);
+    return { x: from.x + dx * t, y: from.y + dy * t };
+  }
 
   // src/movement.mjs
   function cellsAdjacent(a, afp, b, bfp) {
@@ -17801,6 +17824,18 @@ button:disabled { opacity: .42; cursor: default; }
     const s = /* @__PURE__ */ new Set();
     for (const c of cells) s.add(cellKey(c.col, c.row));
     return s;
+  }
+  function fogAffects(ctx, region, unitOrPoint) {
+    if (typeof unitOrPoint === "string") return !interception(ctx, region.casterId, unitOrPoint, region.source);
+    const placement = { col: Math.floor(unitOrPoint.x), row: Math.floor(unitOrPoint.y) };
+    const barrier = barrierAt(ctx, placement);
+    if (!barrier) return true;
+    const caster = unitById2(ctx, region.casterId);
+    const source = region.source || { side: caster?.side, placement: ctx.placementsById[region.casterId], footprint: caster && fpOf2(ctx, caster) };
+    if (source.side === barrier.side) return true;
+    if (!source.placement) return false;
+    const keys = keySet(barrier.cells);
+    return occupiedCells(source.placement, source.footprint || { width: 1, height: 1 }).every((c) => keys.has(cellKey(c.col, c.row)));
   }
   function fogAt(ctx, unitId) {
     const unit = unitById2(ctx, unitId);
@@ -17827,7 +17862,7 @@ button:disabled { opacity: .42; cursor: default; }
   }
 
   // src/perception.mjs
-  var EPS = 1e-9;
+  var EPS2 = 1e-9;
   var SAMPLE_STEP = 0.2;
   function unitById3(ctx, id) {
     return ctx.units.find((u) => u.id === id) || null;
@@ -17871,7 +17906,7 @@ button:disabled { opacity: .42; cursor: default; }
     for (let i = 1; i <= steps; i++) {
       const t = i / steps;
       const key = cellKey(Math.floor(a.x + dx * t), Math.floor(a.y + dy * t));
-      if (sets.some((s) => s.has(key))) return true;
+      if (sets.some((s, index) => s.has(key) && fogAffects(ctx, regions[index], { x: a.x + dx * t, y: a.y + dy * t }))) return true;
     }
     return false;
   }
@@ -17892,7 +17927,7 @@ button:disabled { opacity: .42; cursor: default; }
     if (observerInFog) {
       return footprintsEdgeAdjacent(ctx, observer, target);
     }
-    if (Math.hypot(oc.x - tc.x, oc.y - tc.y) > sightRadius(ctx, observer) + EPS) return false;
+    if (Math.hypot(oc.x - tc.x, oc.y - tc.y) > sightRadius(ctx, observer) + EPS2) return false;
     if (fogAt(ctx, targetId).strength > 0) return false;
     if (segmentTouchesFog(ctx, oc, tc)) return false;
     return true;
@@ -17905,11 +17940,11 @@ button:disabled { opacity: .42; cursor: default; }
     if (fogAt(ctx, observerId).regionIds.length) {
       return occupiedCells(ctx.placementsById[observerId], fpOf3(ctx, observer)).some((c) => Math.max(Math.abs(c.col - Math.floor(point.x)), Math.abs(c.row - Math.floor(point.y))) <= 1);
     }
-    return Math.hypot(point.x - origin.x, point.y - origin.y) <= sightRadius(ctx, observer) + EPS && !segmentTouchesFog(ctx, origin, point);
+    return Math.hypot(point.x - origin.x, point.y - origin.y) <= sightRadius(ctx, observer) + EPS2 && !segmentTouchesFog(ctx, origin, point);
   }
 
   // src/range.mjs
-  var EPS2 = 1e-9;
+  var EPS3 = 1e-9;
   var SAMPLE_STEP2 = 0.2;
   var RANGE_TYPES2 = ["\u5355\u4F53", "\u76F4\u7EBF", "\u6247\u5F62", "\u5706\u5F62", "\u5168\u57DF", "\u7206\u70B8", "\u81EA\u8EAB", "\u53EC\u5524"];
   function unitById4(ctx, id) {
@@ -17986,21 +18021,21 @@ button:disabled { opacity: .42; cursor: default; }
   function inAreaCell(type, c, r, origin, aim, range2) {
     const x = c + 0.5, y = r + 0.5, rx = x - origin.x, ry = y - origin.y;
     if (type === "\u5168\u57DF") return true;
-    if (type === "\u5706\u5F62") return Math.hypot(x - aim.x, y - aim.y) <= range2.radius + EPS2;
+    if (type === "\u5706\u5F62") return Math.hypot(x - aim.x, y - aim.y) <= range2.radius + EPS3;
     const vx = aim.x - origin.x, vy = aim.y - origin.y, vlen = Math.hypot(vx, vy);
-    if (vlen <= EPS2) return false;
+    if (vlen <= EPS3) return false;
     const ux = vx / vlen, uy = vy / vlen;
     const t = rx * ux + ry * uy;
     if (type === "\u76F4\u7EBF") {
       const lateral = Math.abs(rx * -uy + ry * ux);
-      return t >= -EPS2 && t <= range2.length + EPS2 && lateral <= range2.width / 2 + EPS2;
+      return t >= -EPS3 && t <= range2.length + EPS3 && lateral <= range2.width / 2 + EPS3;
     }
     const d = Math.hypot(rx, ry);
     const length = range2.length ?? range2.castRange;
-    if (d > length + EPS2) return false;
-    if (d <= EPS2) return true;
+    if (d > length + EPS3) return false;
+    if (d <= EPS3) return true;
     const halfRad = range2.angle * Math.PI / 360;
-    return Math.acos(clamp((rx * ux + ry * uy) / d, -1, 1)) <= halfRad + EPS2;
+    return Math.acos(clamp((rx * ux + ry * uy) / d, -1, 1)) <= halfRad + EPS3;
   }
   function collectArea(ctx, type, origin, aim, range2, casterSide, rayOrigin = origin) {
     const { columns, rows } = ctx.compiled.grid, cells = [];
@@ -18013,16 +18048,16 @@ button:disabled { opacity: .42; cursor: default; }
   }
   function collectLine(ctx, casterId, origin, aim, range2) {
     const dx = aim.x - origin.x, dy = aim.y - origin.y, len = Math.hypot(dx, dy);
-    if (len <= EPS2) return { ok: false, reason: "\u7784\u51C6\u65B9\u5411\u65E0\u6548", cells: [], shape: null, collisionPoint: null, contact: null };
+    if (len <= EPS3) return { ok: false, reason: "\u7784\u51C6\u65B9\u5411\u65E0\u6548", cells: [], shape: null, collisionPoint: null, contact: null };
     const dir = { x: dx / len, y: dy / len };
     const to = { x: origin.x + dir.x * range2.length, y: origin.y + dir.y * range2.length };
     const cells = [], seen = /* @__PURE__ */ new Set();
-    const maxLateral = range2.width / 2 + EPS2;
+    const maxLateral = range2.width / 2 + EPS3;
     const { columns, rows } = ctx.compiled.grid;
     for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
       const rx = col + 0.5 - origin.x, ry = row + 0.5 - origin.y;
       const t = rx * dir.x + ry * dir.y, lateral = Math.abs(rx * -dir.y + ry * dir.x);
-      if (t < -EPS2 || t > range2.length + EPS2 || lateral > maxLateral) continue;
+      if (t < -EPS3 || t > range2.length + EPS3 || lateral > maxLateral) continue;
       const wall = rayFirst(ctx, origin.x, origin.y, col + 0.5, row + 0.5, { skipUnitIds: [casterId], passSide: unitById4(ctx, casterId)?.side });
       if (wall && wall.type !== "unit") continue;
       const k = cellKey(col, row);
@@ -18045,7 +18080,7 @@ button:disabled { opacity: .42; cursor: default; }
       return { ok: true, cells: occupiedCells(tp, fp), targetIds: [target.id], shape: { type: "\u5355\u4F53", from: origin, to: tc, castRange: range2.castRange }, collisionPoint: tc };
     }
     const dist = centerDistance(origin, tc);
-    if (range2.castRange !== void 0 && dist > range2.castRange + EPS2) return { ok: false, reason: "\u76EE\u6807\u8D85\u51FA\u5C04\u7A0B", cells: [], targetIds: [], blockedBy: { type: "range", point: tc } };
+    if (range2.castRange !== void 0 && dist > range2.castRange + EPS3) return { ok: false, reason: "\u76EE\u6807\u8D85\u51FA\u5C04\u7A0B", cells: [], targetIds: [], blockedBy: { type: "range", point: tc } };
     const wall = rayFirst(ctx, origin.x, origin.y, tc.x, tc.y, {
       skipUnitIds: [caster.id, target.id],
       blockUnits: target.side !== caster.side
@@ -18090,8 +18125,8 @@ button:disabled { opacity: .42; cursor: default; }
   }
   function querySummon(ctx, caster, origin, aim, range2, skill, fail) {
     const dist = centerDistance(origin, aim);
-    if (range2.castRange !== void 0 && dist > range2.castRange + EPS2) return fail("\u53EC\u5524\u843D\u70B9\u8D85\u51FA\u5C04\u7A0B");
-    if (dist > sightRadius(ctx, caster) + EPS2 || !canSeePoint(ctx, caster.id, aim)) return fail("\u53EC\u5524\u843D\u70B9\u8D85\u51FA\u4E2A\u4EBA\u89C6\u91CE");
+    if (range2.castRange !== void 0 && dist > range2.castRange + EPS3) return fail("\u53EC\u5524\u843D\u70B9\u8D85\u51FA\u5C04\u7A0B");
+    if (dist > sightRadius(ctx, caster) + EPS3 || !canSeePoint(ctx, caster.id, aim)) return fail("\u53EC\u5524\u843D\u70B9\u8D85\u51FA\u4E2A\u4EBA\u89C6\u91CE");
     const fp = skill && skill.summonFootprint || { width: 1, height: 1 };
     const anchor = { col: Math.floor(aim.x), row: Math.floor(aim.y) };
     const occ = buildLiveOcc(ctx);
@@ -18134,6 +18169,42 @@ button:disabled { opacity: .42; cursor: default; }
     const range2 = skill && skill.range;
     if (!range2) return fail("\u6280\u80FD\u7F3A\u5C11\u663E\u5F0F\u8303\u56F4");
     if (!RANGE_TYPES2.includes(range2.type)) return fail("\u8303\u56F4\u7C7B\u578B\u4E0D\u652F\u6301: " + range2.type);
+    if (aim?.barrierId) {
+      const barrier = (ctx.barriers || []).find((b) => b.id === aim.barrierId);
+      if (!barrier) return fail("\u7ED3\u754C\u4E0D\u5B58\u5728");
+      if (barrier.side === caster.side) return fail("\u4E0D\u80FD\u653B\u51FB\u53CB\u65B9\u7ED3\u754C");
+      if (!skillSlots(skill).some((s) => s.attack)) return fail("\u6280\u80FD\u6CA1\u6709\u653B\u51FB\u69FD");
+      if (range2.type === "\u81EA\u8EAB" || range2.type === "\u53EC\u5524") return fail("\u8303\u56F4\u4E0D\u80FD\u76F4\u63A5\u653B\u51FB\u7ED3\u754C");
+      const point = barrierContact(ctx, barrier, origin, aim);
+      if (!point) return fail("\u7784\u51C6\u5C04\u7EBF\u672A\u63A5\u89E6\u7ED3\u754C");
+      const limit = range2.type === "\u5706\u5F62" ? range2.radius : range2.castRange ?? range2.length;
+      if (limit != null && centerDistance(origin, point) > limit + EPS3) return fail("\u7ED3\u754C\u8D85\u51FA\u5C04\u7A0B");
+      const blocked = rayFirst(ctx, origin.x, origin.y, point.x, point.y, { skipUnitIds: [casterId], blockUnits: true });
+      if (blocked && (blocked.type !== "unit" || !skill.guaranteedHit)) return fail("\u7ED3\u754C\u653B\u51FB\u8DEF\u5F84\u88AB\u963B\u6321", blocked);
+      if (ctx.enforcePerception && !canSeePoint(ctx, casterId, point)) return fail("\u7ED3\u754C\u4E0D\u5728\u672C\u4EBA\u89C6\u91CE\u5185");
+      const slotTargets = resolveSlotTargets(ctx, casterId, skill, [], null).map((slot) => ({ ...slot, barrierIds: slot.attack ? [barrier.id] : [] }));
+      return {
+        ok: true,
+        reason: null,
+        origin,
+        aim: { barrierId: barrier.id, ...point },
+        range: limit ?? null,
+        cells: [],
+        targetIds: [],
+        damageTargetIds: [],
+        actualTargetIds: [],
+        targets: [],
+        slotTargets,
+        barrierTargetIds: [barrier.id],
+        barrierTargets: [{ barrierId: barrier.id, point }],
+        disclosureTargetIds: [],
+        collisionPoint: point,
+        contact: { type: "barrier", barrierId: barrier.id, point },
+        blockedBy: null,
+        shape: { type: range2.type, from: origin, to: point },
+        blastCenter: range2.type === "\u7206\u70B8" ? point : null
+      };
+    }
     const includeDowned = skillHasHeal(skill);
     const skipSpatialRecheck = !!(options.skipSpatialRecheck || aim && aim.skipSpatialRecheck);
     if (range2.type === "\u81EA\u8EAB") {
@@ -18215,14 +18286,14 @@ button:disabled { opacity: .42; cursor: default; }
       targetIds = cellsToTargets(ctx, cells).filter((t) => t.unitId !== casterId && t.side !== caster.side).map((t) => t.unitId);
     } else if (range2.type === "\u6247\u5F62") {
       const d = centerDistance(origin, normAim);
-      if (range2.castRange !== void 0 && d > range2.castRange + EPS2) return Object.assign(fail("\u7784\u51C6\u70B9\u8D85\u51FA\u5C04\u7A0B"), { range: range2 });
-      if (d <= EPS2) return Object.assign(fail("\u7784\u51C6\u65B9\u5411\u65E0\u6548"), { range: range2 });
+      if (range2.castRange !== void 0 && d > range2.castRange + EPS3) return Object.assign(fail("\u7784\u51C6\u70B9\u8D85\u51FA\u5C04\u7A0B"), { range: range2 });
+      if (d <= EPS3) return Object.assign(fail("\u7784\u51C6\u65B9\u5411\u65E0\u6548"), { range: range2 });
       cells = collectArea(ctx, "\u6247\u5F62", origin, normAim, range2, caster.side);
       shape = { type: "\u6247\u5F62", from: origin, dir: Math.atan2(normAim.y - origin.y, normAim.x - origin.x), radius: range2.castRange, angle: range2.angle };
       targetIds = cellsToTargets(ctx, cells).filter((t) => t.side !== caster.side).map((t) => t.unitId);
     } else if (range2.type === "\u7206\u70B8") {
       const dist = centerDistance(origin, normAim);
-      if (range2.castRange !== void 0 && dist > range2.castRange + EPS2) return Object.assign(fail("\u7784\u51C6\u70B9\u8D85\u51FA\u5C04\u7A0B"), { range: range2 });
+      if (range2.castRange !== void 0 && dist > range2.castRange + EPS3) return Object.assign(fail("\u7784\u51C6\u70B9\u8D85\u51FA\u5C04\u7A0B"), { range: range2 });
       contact = rayFirst(ctx, origin.x, origin.y, normAim.x, normAim.y, { skipUnitIds: [casterId], blockUnits: true });
       blockedBy = contact && contact.type === "wall" ? contact : null;
       blastCenter = contact ? contact.point : normAim;
@@ -18688,6 +18759,7 @@ button:disabled { opacity: .42; cursor: default; }
         }
       }
     }
+    let onResetHook = null;
     function resetStage(cards = []) {
       combatToken++;
       playing = false;
@@ -18698,10 +18770,11 @@ button:disabled { opacity: .42; cursor: default; }
       shell.renderHeroes(stageData.units);
       shell.renderTurnOrder(stageData.units);
       shell.showLog("\u9776\u573A\u5DF2\u5C31\u7EEA\uFF08\u7ACB\u67F1\u5927\u5385 20m\xD713m \xB7 6 \u654C 4 \u53CB\uFF09");
-      renderCards(cards);
+      if (onResetHook) onResetHook();
+      else renderCards(cards);
     }
     function setCardsDisabled(disabled) {
-      listWrap.querySelectorAll("button.vfx-demo-card").forEach((b) => {
+      listWrap.querySelectorAll("button").forEach((b) => {
         b.disabled = disabled;
       });
     }
@@ -18711,10 +18784,30 @@ button:disabled { opacity: .42; cursor: default; }
       setCardsDisabled(true);
       restoreTargets();
       avHost.unlockAudio();
-      const res = buildMockResult(stageData, card);
       shell.showLog(`\u25B6 \u6F14\u7EC3\uFF1A${card.name} [${card.fxTag || "\u65E0fxTag"}]`);
       try {
-        await director.playAttack(res);
+        if (card.kind === "prepare") {
+          await director.playPrepare({
+            ok: true,
+            preparing: true,
+            casterId: card.casterId || "h:\u57C3\u5229\u5965\u7279",
+            skill: { name: card.name || "\u84C4\u529B\u8D77\u624B", fxTag: card.fxTag || null, damageType: card.damageType || "\u6CD5\u672F" }
+          });
+        } else {
+          const res = buildMockResult(stageData, card);
+          if (card.kind === "reaction") {
+            const h0 = res.hits[0];
+            const p0 = stageData.placementsById[h0.targetId];
+            h0.reaction = {
+              fxTag: card.fxTag,
+              type: card.fxTag || "\u56DE\u907F\u9519\u4F4D",
+              success: true,
+              shift: card.shift || (p0 ? { col: Math.max(2, p0.col - 1), row: p0.row } : null)
+            };
+          }
+          await director.playAttack(res);
+          if (card.fatal && String(res.casterId).startsWith("h:")) await director.playExecution(res);
+        }
         shell.showLog(`\u2714 \u5B8C\u6210\uFF1A${card.name}`);
       } catch (err) {
         shell.showLog(`\u274C \u6F14\u51FA\u5F02\u5E38\uFF1A${err?.message || err}`);
@@ -18744,7 +18837,7 @@ button:disabled { opacity: .42; cursor: default; }
         listWrap.appendChild(btn);
       }
     }
-    function boot({ customEntries = [], cards = [] } = {}) {
+    function boot({ customEntries = [], cards = [], registerExtra = null, onReady = null } = {}) {
       const unitIds = new Set(stageData.units.map((u) => u.id));
       const errs = validateWorkbench(customEntries, cards, unitIds);
       for (const entry of customEntries) {
@@ -18756,16 +18849,35 @@ button:disabled { opacity: .42; cursor: default; }
           }
         }
       }
+      if (typeof registerExtra === "function") registerExtra(registry);
       sandbox.mount(viewData());
       fitHall();
       shell.renderHeroes(stageData.units);
       shell.renderTurnOrder(stageData.units);
       shell.onReset = () => resetStage(cards);
       renderCards(cards);
+      if (typeof onReady === "function") onReady(stageApi);
       if (errs.length) shell.showLog("\u26A0\uFE0F \u5DE5\u4F5C\u53F0\u9884\u68C0\uFF1A" + errs[0]);
       else shell.showLog("\u6218\u68CB\u7279\u6548\u7A7A\u767D\u6BCD\u7248\u5C31\u7EEA\uFF08\u7ACB\u67F1\u5927\u5385 \xB7 \u4E0A 6 \u654C / \u4E0B 4 \u53CB\uFF09");
     }
-    const stageApi = { ...vfx_primitives_exports, checkBudget, GRADE_BUDGETS, boot, reset: resetStage };
+    const stageApi = {
+      ...vfx_primitives_exports,
+      checkBudget,
+      GRADE_BUDGETS,
+      boot,
+      reset: resetStage,
+      playCard,
+      renderCards,
+      fitHall,
+      setResetHook: (fn) => {
+        onResetHook = fn;
+      },
+      getRegistry: () => registry,
+      getUnits: () => stageData.units,
+      els: { menuBox, listWrap, subLabel, activeHeroName: shell.els.activeHeroName },
+      shell,
+      director
+    };
     window.__TACTICS_VFX_STAGE__ = stageApi;
     return stageApi;
   }
