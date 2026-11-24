@@ -24,7 +24,7 @@ const REQUIRED_INPUTS = [
   'src/fx-registry.mjs', 'src/fx-library.mjs', 'src/vfx-host.mjs',
   'src/effect-definitions.mjs', 'src/effect-handlers.mjs', 'src/class-passives.mjs', 'src/variant-rules.mjs',
   'src/reaction-prompt.mjs',
-  'src/screen-atmos.mjs', 'src/screen-showpiece.mjs',
+  'src/screen-atmos.mjs', 'src/screen-showpiece.mjs', 'src/guard-barrier-fx.mjs',
   'src/scenario-data.mjs', 'src/regions.mjs', 'src/perception.mjs', 'src/barriers.mjs',
   '典型对局-战棋版.yaml',
 ];
@@ -39,7 +39,8 @@ const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFee
   'buildHitFeedback', 'avatarScaleForZoom', 'linkSkillGroupRows', 'prepareHitNumbers', 'animateHitNumber',
   'startAtmos', 'atmosStyleOf', 'FX_WEBM_KEY_MAX', 'mountShowpiece', 'SHOWPIECES',
   'previewGuard', 'commitGuard', 'autoSummonGuard', 'segmentDamage', 'resolveBarrierDamage', 'expireBarriers',
-  'barrierCrossing', 'barrierContact', 'holdGuards', 'revealGuard', 'immunityReason'];
+  'barrierCrossing', 'barrierContact', 'holdGuards', 'revealGuard', 'immunityReason',
+  'playGuardDash', 'playGuardBlock', 'mountBarrierDome', 'playBarrierHit', 'playBarrierBlocked', 'playBarrierShatter', 'playRuleFx'];
 
 const entry = [
   "import { createApp } from './src/main.mjs';",

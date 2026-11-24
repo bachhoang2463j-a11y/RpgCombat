@@ -31,6 +31,10 @@ const FX01_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'f
 
 // 阶段注册表：只登记真实存在的用例文件；--all 只聚合这里的条目，不虚构未来阶段。
 const STAGES = {
+  'guard-barrier-fx': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'guard-barrier-fx-node-cases.mjs'),
+    groups: ['TGB-G', 'TGB-B', 'TGB-W'], modules: [], requiredExports: [],
+  },
   'guard-director': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'guard-director-node-cases.mjs'),
     groups: ['TG-DIRECTOR'], modules: [], requiredExports: [],

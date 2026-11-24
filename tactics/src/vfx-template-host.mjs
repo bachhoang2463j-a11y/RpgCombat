@@ -18,6 +18,8 @@ import { splitEmojiName, resolveAvatarUrl } from './unit-view.mjs';
 import { unitCenter } from './geometry.mjs';
 import { queryAttack } from './range.mjs';
 import { compileScene } from './scene.mjs';
+import { previewGuard } from './guard.mjs';
+import { previewBarrier, damageBarrier, barrierContact } from './barriers.mjs';
 import * as primitives from './vfx-primitives.mjs';
 
 const R = (col, row, width, height) => ({ col, row, width, height });
@@ -238,10 +240,12 @@ export function installVfxTemplateStage(rootEl, { yamlText }) {
   function restoreTargets() {
     const view = sandbox.getUnitView();
     for (const u of stageData.units) {
+      stageData.placementsById[u.id] = { ...VFX_STAGE_PLACEMENTS[u.id] };
       u.bars.hp = u.ref.maxHp;
       u.bars.shield = 0;
       if (view) {
         const c = unitCenter(stageData.placementsById[u.id], stageData.footprintsById[u.id]);
+        view.lockMotion(u.id, false);
         view.setDisplayPos(u.id, c.x, c.y);
         view.updateUnit(u.id, { bars: { ...u.bars }, placement: stageData.placementsById[u.id] });
       }
@@ -252,6 +256,7 @@ export function installVfxTemplateStage(rootEl, { yamlText }) {
   function resetStage(cards = []) {
     combatToken++;
     playing = false;
+    stageBarriers.length = 0;
     avHost.clear({ resetVoices: true });
     restoreTargets();
     sandbox.reset(viewData());
@@ -303,6 +308,118 @@ export function installVfxTemplateStage(rootEl, { yamlText }) {
     }
   }
 
+  // ---------- 守护 / 结界演示（舍身落点、结界范围与耐久取真实规则模块 previewGuard / previewBarrier / damageBarrier） ----------
+  const stageBarriers = [];
+  let barrierSerial = 0, evSeq = 0, attackSeq = 0;
+  const ruleCtx = () => ({ units: stageData.units, placementsById: stageData.placementsById, footprintsById: stageData.footprintsById,
+    compiled: stageData.compiled, barriers: stageBarriers, runId: 'vfx', _barrierSerial: barrierSerial });
+  const skillOf = (unitId, name) => stageData.units.find(u => u.id === unitId).skills.find(s => s.name === name);
+  const centerOfUnit = id => unitCenter(stageData.placementsById[id], stageData.footprintsById[id]);
+  const ruleEvent = (type, body) => ({ type, eventId: 'vfx:event:' + (++evSeq), runId: 'vfx', ...body });
+  function castBarrier() {
+    const ctx = ruleCtx(), skill = skillOf('h:埃利奥特', '纳克提特障壁术');
+    const pre = previewBarrier(ctx, 'h:埃利奥特', skill, null);
+    barrierSerial++;
+    const events = stageBarriers.splice(0).map(old => ruleEvent('barrier-removed', { barrierId: old.id, reason: 'replaced', barrier: old }));
+    stageBarriers.push(pre.barrier);
+    events.push(ruleEvent('barrier-created', { barrierId: pre.barrier.id, reason: 'created', barrier: pre.barrier }));
+    return { skill, events };
+  }
+  // 敌方对结界内目标一段伤害：同段共享一次 barrier-damaged，受保护目标 HP 不变
+  function barrierStrike(casterId, targetIds, raw, incomingType) {
+    const ctx = ruleCtx(), b = stageBarriers[0], origin = centerOfUnit(casterId);
+    const segmentId = 'vfx:attack:' + (++attackSeq) + ':slot:0:segment:1';
+    const dmg = damageBarrier(ctx, b.id, raw, { incomingType });
+    const hit = ruleEvent('barrier-damaged', { barrierId: b.id, segmentId, slotIndex: 0, segmentIndex: 1, reason: 'damage', casterId, origin, incomingType,
+      contactPoint: barrierContact(ctx, b, origin, centerOfUnit(targetIds[0])), protectedTargetIds: targetIds, ...dmg });
+    const events = [hit];
+    if (dmg.broken) events.push(ruleEvent('barrier-removed', { barrierId: b.id, reason: 'broken', barrier: dmg.barrierAfter }));
+    return { hit, events, segmentId };
+  }
+  // 受击类演示前若无结界：先静默立起（直接常驻显示，不播展开）
+  function ensureBarrier() {
+    if (stageBarriers.length) return;
+    castBarrier();
+    director.syncBarriers(stageBarriers.map(b => structuredClone(b)));
+  }
+  const SCENARIOS = {
+    'enemy-hit': () => {
+      stageBarriers.length = 0;
+      return buildMockResult(stageData, { name: '撕裂利爪', fxTag: '爪击', damageType: '近战', casterId: 'e:食尸鬼A', targetIds: ['h:玛德琳'], dmg: 42, range: { type: '单体', castRange: 18 } });
+    },
+    'frank-guard': () => {
+      stageBarriers.length = 0;
+      const frank = stageData.units.find(u => u.id === 'h:弗兰克');
+      const pre = previewGuard(ruleCtx(), 'h:弗兰克', 'h:玛德琳', 'e:食尸鬼A', frank.ref.moveDistance / 2);
+      if (!pre.ok) throw new Error('舍身不可执行：' + pre.reason);
+      stageData.placementsById['h:弗兰克'] = { ...pre.to };   // 后端已提交落点：守护者权威站位 = 拦截点（不归位）
+      const segmentId = 'vfx:attack:' + (++attackSeq) + ':slot:0:segment:1';
+      const guard = { ...pre, segmentId, attackId: 'attack:' + attackSeq, reason: 'guard', finalTargetId: 'h:弗兰克', committed: true };
+      const res = buildMockResult(stageData, { name: '撕裂利爪', fxTag: '爪击', damageType: '近战', casterId: 'e:食尸鬼A', targetIds: ['h:弗兰克'], dmg: 34, range: { type: '单体', castRange: 18 } });
+      Object.assign(res.hits[0].segments[0], { segmentId, originalTargetId: 'h:玛德琳', finalTargetId: 'h:弗兰克', reaction: { guardianId: 'h:弗兰克', skillName: '紧急格挡', guard } });
+      res.events = [ruleEvent('guard-committed', guard)];
+      return res;
+    },
+    'barrier-raise': () => {
+      const { skill, events } = castBarrier();
+      const res = buildMockResult(stageData, { name: skill.name, fxTag: skill.fxTag, casterId: 'h:埃利奥特', targetIds: ['h:埃利奥特'], noDamage: true, range: skill.range });
+      res.skill = { ...res.skill, ...skill };
+      res.events = events;
+      return res;
+    },
+    'barrier-hit': () => {
+      ensureBarrier();
+      const res = buildMockResult(stageData, { name: '深渊之息', fxTag: '水流', damageType: '法术', casterId: 'e:深潜者A', targetIds: ['h:埃利奥特'], dmg: 90, range: { type: '单体', castRange: 18 } });
+      const { hit, events, segmentId } = barrierStrike('e:深潜者A', ['h:埃利奥特'], 90, '法术');
+      for (const h of res.hits) for (const s of h.segments) Object.assign(s, { segmentId, hpAfter: s.hpBefore, hpDmg: 0, barrierHitId: hit.eventId });
+      res.events = events;
+      return res;
+    },
+    'barrier-break': () => {
+      ensureBarrier();
+      const ids = ['h:索恩', 'h:弗兰克', 'h:玛德琳'];
+      const res = buildMockResult(stageData, { name: '时空扭曲震荡', fxTag: '虚空震荡', damageType: '法术', casterId: 'e:犹格索托斯之子', targetIds: ids, dmg: 400,
+        aim: { ...centerOfUnit('h:弗兰克') }, range: { type: '爆炸', castRange: 30, radius: 4 } });
+      const b = stageBarriers[0];
+      const { hit, events, segmentId } = barrierStrike('e:犹格索托斯之子', ids, b.integrity + b.armor + 60, '法术');
+      for (const h of res.hits) for (const s of h.segments) Object.assign(s, { segmentId, hpAfter: s.hpBefore, hpDmg: 0, barrierHitId: hit.eventId });
+      res.events = events;
+      return res;
+    },
+    'barrier-debuff': () => {
+      ensureBarrier();
+      const b = stageBarriers[0];
+      const aim = barrierContact(ruleCtx(), b, centerOfUnit('e:食尸鬼A'), centerOfUnit('h:玛德琳'));
+      const res = buildMockResult(stageData, { name: '幽暗凝视', fxTag: '诅咒', damageType: '法术', casterId: 'e:食尸鬼A', targetIds: ['h:玛德琳'], noDamage: true, aim, range: { type: '单体', castRange: 18 } });
+      res.events = [ruleEvent('barrier-blocked', { barrierId: b.id, barrier: structuredClone(b), reason: 'barrier-debuff', casterId: 'e:食尸鬼A', targetId: 'h:玛德琳',
+        slotIndex: 1, blockedTag: '致盲', blockedKind: 'buff', origin: centerOfUnit('e:食尸鬼A') })];
+      return res;
+    },
+  };
+  async function playScenario(key, label) {
+    if (playing) return;
+    playing = true;
+    setCardsDisabled(true);
+    restoreTargets();
+    avHost.unlockAudio();
+    shell.showLog('▶ 演示：' + label);
+    try {
+      const res = SCENARIOS[key]();
+      director.holdRegions(res);
+      director.holdGuards(res);
+      director.syncBarriers(stageBarriers.map(b => structuredClone(b)));
+      await director.playAttack(res);
+      director.syncBarriers(stageBarriers.map(b => structuredClone(b)));
+      shell.showLog('✔ 完成：' + label);
+    } catch (err) {
+      shell.showLog('❌ 演出异常：' + (err?.message || err));
+      console.error('[vfx-template] scenario error:', err);
+    } finally {
+      playing = false;
+      setCardsDisabled(false);
+    }
+  }
+
   function renderCards(cards) {
     listWrap.replaceChildren();
     if (subLabel) subLabel.textContent = cards.length ? `已配置 ${cards.length} 项` : '尚未配置';
@@ -345,7 +462,7 @@ export function installVfxTemplateStage(rootEl, { yamlText }) {
   }
 
   const stageApi = {
-    ...primitives, checkBudget, GRADE_BUDGETS, boot, reset: resetStage, playCard, renderCards, fitHall,
+    ...primitives, checkBudget, GRADE_BUDGETS, boot, reset: resetStage, playCard, playScenario, renderCards, fitHall,
     setResetHook: fn => { onResetHook = fn; },
     getRegistry: () => registry,
     getUnits: () => stageData.units,

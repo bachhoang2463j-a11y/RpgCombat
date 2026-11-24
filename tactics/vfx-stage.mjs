@@ -44,6 +44,16 @@ const FILTERS = [
   { key: 'identity', label: '身份' }, { key: 'prepare', label: '起手' }, { key: 'reaction', label: '反应' },
 ];
 
+// 守护 / 结界演示：舍身落点、结界范围与耐久由真实规则模块计算（previewGuard / previewBarrier / damageBarrier）
+const SCENARIO_BUTTONS = [
+  { key: 'enemy-hit', label: '敌攻·直击玛德琳' },
+  { key: 'frank-guard', label: '弗兰克舍身·护玛德琳', cls: 'warn' },
+  { key: 'barrier-raise', label: '结界释放' },
+  { key: 'barrier-hit', label: '敌攻·结界受击' },
+  { key: 'barrier-break', label: '群攻·击破结界' },
+  { key: 'barrier-debuff', label: '减益·结界隔绝' },
+];
+
 // 识别非直接伤害类的增益/回复/护盾/减益/场地/召唤条目，避免 mock 伤害打在自身或友军身上
 const SUPPORT_FX_KINDS = {
   'heal-mend': 'heal', 'aoe-heal': 'heal', 'vital-flow': 'heal',
@@ -120,7 +130,17 @@ function buildWorkbenchUi() {
       row3.appendChild(b);
     }
 
-    ctrlWrap.append(row1, row2, row3);
+    const row4 = document.createElement('div');
+    row4.className = 'vfx-bar-row';
+    for (const s of SCENARIO_BUTTONS) {
+      const b = document.createElement('button');
+      b.className = 'vfx-chip' + (s.cls ? ' ' + s.cls : '');
+      b.textContent = s.label;
+      b.onclick = () => stage.playScenario(s.key, s.label);
+      row4.appendChild(b);
+    }
+
+    ctrlWrap.append(row1, row2, row3, row4);
   }
 
   function renderEntryList() {

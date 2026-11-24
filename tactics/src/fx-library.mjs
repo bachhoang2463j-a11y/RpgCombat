@@ -1060,6 +1060,11 @@ const lingFengShu = {
   },
 };
 
+// 【肃正】结界在条目爆发拍点展开（真实 barrier-created 事件；导演按 eventId 去重，条目后统一揭示时不重复）
+function revealBarriers(ctx) {
+  for (const ev of ctx.result.events || []) if (ev.type === 'barrier-created') ctx.revealRule(ev, 'barrier-created');
+}
+
 const nakTithBarrier = {
   id: 'nak-tith-barrier', grade: 'L3', fxTags: ['纳克提特障壁术'],
   timeline: { chargeMs: 820, totalMs: 2100, fullscreen: true, darken: false },
@@ -1074,6 +1079,7 @@ const nakTithBarrier = {
     if (!(await ctx.wait(820))) return false;
     fx.sfx('herochargedone', 0.62); fx.shake('medium');
     ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
+    revealBarriers(ctx);
     fx.top(ringHtml(c.x, c.y, R * 2, 'rgba(253,230,138,0.85)', 'rgba(217,119,6,0.4)'), 680)
       .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 640, fill: 'forwards' });
     return ctx.wait(1220);
@@ -1507,6 +1513,7 @@ const sanctumVeil = {
     if (!(await ctx.wait(1220))) return false;
     fx.sfx('weimu', 0.70); fx.shake('heavy');
     ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
+    revealBarriers(ctx);
     webm(ctx, 'weimu.webm', c.x, c.y, R * 2, { ms: 1600, cover: R * 2 });
     fx.top(ringHtml(c.x, c.y, R * 2, 'rgba(186,230,253,0.9)', 'rgba(56,189,248,0.35)'), 900)
       .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 860, fill: 'forwards' });

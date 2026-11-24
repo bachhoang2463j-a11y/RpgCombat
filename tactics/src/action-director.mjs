@@ -14,6 +14,8 @@ import { registerDefaultFx, EXTRA_AUDIO, fogFieldHtml, animateFogField } from '.
 import { createVfxHost } from './vfx-host.mjs';
 import { skillSlots } from './effect-definitions.mjs';
 import { startAtmos, atmosStyleOf } from './screen-atmos.mjs';
+import { GUARD_AUDIO_KEYS, BARRIER_AUDIO_KEYS, playGuardDash, playGuardBlock, mountBarrierDome, updateBarrierBadge,
+  playBarrierRaise, playBarrierHit, playBarrierBlocked, playBarrierShatter, fadeBarrierDome } from './guard-barrier-fx.mjs';
 
 export const WINDUP_BEAT_MS = 330;   // 回合制敌方前摇拍点（OMEN_BEAT）：起手后此刻出手
 
@@ -324,10 +326,14 @@ export function createActionDirector(deps) {
     sandbox.getUnitView().updateUnit(result.casterId, { placement: vd.placementsById[result.casterId] });
     const targetIds = new Set([result.casterId, ...hits.map(h => h.targetId), ...(result.effects || []).map(e => e.targetId)]);
     const pts = [...targetIds].map(centerOf).filter(Boolean);
+    const guardEvents = (result.events || []).filter(ev => ev.type === 'guard-committed');
+    guardEvents.forEach(ev => pts.push(ev.startPosition));
+    (result.events || []).forEach(ev => { if (ev.type === 'barrier-created') barrierNames.set(ev.barrier.id, skill.name); });
     if (result.query && result.query.blastCenter) pts.push(result.query.blastCenter);
     if (!hits.length && result.aim) pts.push({ x: result.aim.x, y: result.aim.y });
     await sandbox.guideTo(pts);
-    if (!isCurrent() || !(await prepareAudio(entry.prepareKeys ? entry.prepareKeys({ identity }) : [])) || !isCurrent()) return false;
+    const ruleKeys = [...(guardEvents.length && !deps.presentGuard ? GUARD_AUDIO_KEYS : []), ...((result.events || []).some(ev => ev.type.startsWith('barrier-')) ? BARRIER_AUDIO_KEYS : [])];
+    if (!isCurrent() || !(await prepareAudio([...(entry.prepareKeys ? entry.prepareKeys({ identity }) : []), ...ruleKeys])) || !isCurrent()) return false;
 
     // L3/L4 屏幕氛围层（视口宿主）：与条目同风格的边缘围压；首个真实揭示即降低遮挡，条目结束即外撤
     const grade = entry.grade;
@@ -349,16 +355,19 @@ export function createActionDirector(deps) {
       const key = kind + ':' + id + ':' + (value.targetId || value.unitId || value.barrierId || value.guardianId || '');
       if (ruleRevealed.has(key)) return;
       ruleRevealed.add(key);
+      playRuleFx(value, kind);
       deps.onRuleReveal?.(value, { kind, result });
     }
+    // 舍身冲刺：与攻击条目并行起跑（原版决意/突进先于来袭落点），受击揭示拍点等其到位后才格挡结算
     async function revealGuard(guard) {
       const key = guard.segmentId + ':' + guard.guardianId;
       if (!guardRuns.has(key)) guardRuns.set(key, (async () => {
-        if (deps.presentGuard) {
+        const present = deps.presentGuard || (g => playGuardDash({ fx: makeFx('B'), view: sandbox.getUnitView(), tween, wait, footprint: vd.footprintsById[g.guardianId] }, g));
+        {
           const s = scope();
           const ok = await new Promise(resolve => {
             const stop = s.settleOnDispose(() => resolve(false));
-            Promise.resolve(deps.presentGuard(guard, { result, sandbox, av, wait })).then(value => {
+            Promise.resolve(present(guard, { result, sandbox, av, wait })).then(value => {
               if (stop) stop();
               resolve(value);
             });
@@ -369,7 +378,6 @@ export function createActionDirector(deps) {
         const view = sandbox.getUnitView();
         view.setDisplayPos(guard.guardianId, guard.contactPoint.x, guard.contactPoint.y);
         view.lockMotion(guard.guardianId, false);
-        revealRule(guard, 'guard');
         return true;
       })());
       return guardRuns.get(key);
@@ -390,8 +398,9 @@ export function createActionDirector(deps) {
       if (done.has(i)) return;
       done.add(i); revealed.set(targetId, done);
       if (atmos) atmos.lower();
+      if (guard) revealRule(guard, 'guard');
       const reaction = seg.reaction || (done.size === 1 ? h.reaction : null);
-      if (reaction) reactionRuns.push(playReaction({ ...h, reaction }));
+      if (reaction && !reaction.guard) reactionRuns.push(playReaction({ ...h, reaction }));
       const guardianReaction = seg.guardianReaction || reaction?.guardianReaction;
       if (guardianReaction) reactionRuns.push(playReaction({ ...h, targetId: guardianReaction.responderId || h.targetId, reaction: guardianReaction }));
       // 回复槽段：规则真实标记（seg.heal）优先，回退生命提升推断（events 真实回复结果形态待规则 result 落地后接）
@@ -405,8 +414,8 @@ export function createActionDirector(deps) {
       }
       avHost.consumeVisualEvents?.((result.events || []).filter(ev => ev.unitId === targetId && ev.type === 'variant-trigger'));
       if (healed) playHealPulse(targetId);
-      else av.playHitFeedback(r, { wave: hitWaves[waveIndex] || (hitWaves[waveIndex] = { shook: false, hitStopped: false, classified: [] }) });
-      if (!healed) av.CombatAudioDirector.publish(r);
+      else if (!seg.barrierHitId) av.playHitFeedback(r, { wave: hitWaves[waveIndex] || (hitWaves[waveIndex] = { shook: false, hitStopped: false, classified: [] }) });
+      if (!healed && !seg.barrierHitId) av.CombatAudioDirector.publish(r);
       if (wave) av.CombatAudioDirector.completeTarget(wave, targetId);
       if (onReveal) onReveal({ ...h, ...seg, targetId, heal: healed, segmentIndex: i, segmentCount: segs.length }, Object.assign({ result, identity, entryId: entry.id }, meta));
     }
@@ -440,6 +449,7 @@ export function createActionDirector(deps) {
       reveal, revealSegment, revealEffect, revealGuard, revealRule, revealRegion, regions, unitsInCells, ent: id => avHost.entity(id), centerOf, atmos,
       anchorAt: (x, y) => makeAnchor(x, y), aimAnchor: () => aimAnchor(result.aim), lineEndAnchor: () => lineEndAnchor(result),
     };
+    guardEvents.forEach(ev => revealGuard(ev));
     const ok = await entry.play(ctx);
     if (atmos) atmos.end();
     if (!isCurrent() || ok === false) return false;
@@ -603,30 +613,69 @@ export function createActionDirector(deps) {
     for (const [id, rec] of regionNodes) if (!live.has(id)) { fadeOutRegion(rec); regionNodes.delete(id); }
   }
 
-  // ---------- 场地结界常驻层（纳克提特障壁术 / 圣域帷幕） ----------
-  let barrierNodes = new Map(), barrierScope = null;
+  // ---------- 【肃正】场地结界常驻穹顶（center/radius/visualIdentity 全取后端；本次新建先持有到揭示拍点，受击前锁定显示耐久） ----------
+  let barrierNodes = new Map(), barrierScope = null, lastBarriers = [];
+  const heldBarriers = new Set(), lockedBarriers = new Map(), barrierNames = new Map();
+  function barrierLayers() {
+    const L = fxLayers();
+    return { ground: html => L.ground.layer(html), top: html => L.top.layer(html) };
+  }
+  function dropBarrier(rec) {
+    const s = scope();
+    for (const n of [rec.ground, rec.top]) { n.remove(); if (s) s.removeNode(n); }
+  }
+  function barrierName(b) {
+    if (barrierNames.has(b.id)) return barrierNames.get(b.id);
+    const caster = getViewData().units.find(u => u.id === b.casterId);
+    const sk = caster && (caster.skills || []).find(x => [x.type, x.type2, x.type3].some(t => /肃正/.test(t || '')));
+    return sk ? sk.name : '肃正结界';
+  }
+  function mountBarrier(b) {
+    const rec = mountBarrierDome(barrierLayers(), b, barrierName(b));
+    barrierNodes.set(b.id, rec);
+    return rec;
+  }
   function syncBarriers(barriers = []) {
     const s = scope();
     if (!s || !s.isLive) return;
-    if (barrierScope !== s) { barrierNodes = new Map(); barrierScope = s; }
-    const L = fxLayers(), live = new Set();
+    if (barrierScope !== s) { barrierNodes = new Map(); barrierScope = s; lockedBarriers.clear(); heldBarriers.clear(); }
+    lastBarriers = barriers;
+    const live = new Set();
     for (const b of barriers) {
-      if (!b || b.hp <= 0) continue;
+      if (!b || heldBarriers.has(b.id)) continue;
       live.add(b.id);
-      const sig = b.center.x + ',' + b.center.y + '|' + b.radius + '|' + b.hp + '|' + b.armor;
-      const cur = barrierNodes.get(b.id);
-      if (cur && cur.sig === sig) continue;
-      if (cur) { cur.node.remove(); s.removeNode(cur.node); }
-      const cx = b.center.x * 50, cy = b.center.y * 50, r = (b.radius || 6) * 50;
-      const isSpell = b.sub === '法术';
-      const stroke = isSpell ? 'rgba(56,189,248,0.75)' : 'rgba(251,191,36,0.75)';
-      const fill = isSpell ? 'rgba(56,189,248,0.08)' : 'rgba(251,191,36,0.08)';
-      const html = '<div style="position:absolute;left:' + (cx - r) + 'px;top:' + (cy - r) + 'px;width:' + (r * 2) + 'px;height:' + (r * 2) + 'px;border-radius:50%;border:2px dashed ' + stroke + ';background:' + fill + ';box-shadow:0 0 18px ' + fill + ';pointer-events:none;">' +
-        '<span style="position:absolute;left:50%;top:4px;transform:translateX(-50%);padding:1px 6px;border-radius:999px;background:rgba(15,23,42,0.86);border:1px solid ' + stroke + ';color:#f8fafc;font:600 10px/1.3 system-ui;white-space:nowrap;">' +
-        '🛡️ ' + (b.sub || '肃正') + '结界 ' + b.hp + '/' + b.maxHp + ' · 甲' + (b.armor || 0) + '</span></div>';
-      barrierNodes.set(b.id, { sig, node: L.ground.layer(html) });
+      const rec = barrierNodes.get(b.id) || mountBarrier(b);
+      rec.barrier = b;
+      if (!lockedBarriers.has(b.id)) updateBarrierBadge(rec, b.integrity, b.maxIntegrity);
     }
-    for (const [id, rec] of barrierNodes) if (!live.has(id)) { rec.node.remove(); s.removeNode(rec.node); barrierNodes.delete(id); }
+    for (const [id, rec] of barrierNodes) if (!live.has(id) && !lockedBarriers.has(id) && !rec.leaving) { rec.leaving = true; barrierNodes.delete(id); fadeBarrierDome(rec, dropBarrier, (ms, fn) => s.after(ms, fn)); }
+  }
+  // 规则原因驱动的演出：舍身格挡 / 结界展开·受击·隔绝·破碎·移除（各事件 eventId 唯一，由 revealRule 去重）
+  function playRuleFx(value, kind) {
+    const s = scope(), fx = makeFx('D'), after = (ms, fn) => s.after(ms, fn);
+    // 宿主自带 presentGuard 时由其承担整段舍身演出（冲刺→格挡）；默认实现：冲刺并行起跑，格挡在受击揭示拍点
+    if (kind === 'guard') return deps.presentGuard ? undefined : playGuardBlock({ fx, view: sandbox.getUnitView(), tween }, value);
+    if (kind === 'barrier-created') {
+      heldBarriers.delete(value.barrier.id);
+      const b = lastBarriers.find(x => x.id === value.barrier.id) || value.barrier;
+      if (barrierNodes.has(b.id)) return;
+      return playBarrierRaise(fx, mountBarrier(b));
+    }
+    if (kind === 'barrier-damage') {
+      const left = (lockedBarriers.get(value.barrierId) || 1) - 1;
+      if (left > 0) lockedBarriers.set(value.barrierId, left); else lockedBarriers.delete(value.barrierId);
+      const rec = barrierNodes.get(value.barrierId);
+      if (!rec) return;
+      playBarrierHit(fx, rec, value);
+      if (value.broken) { rec.leaving = true; barrierNodes.delete(value.barrierId); lockedBarriers.delete(value.barrierId); playBarrierShatter(fx, rec, dropBarrier, after); }
+      return;
+    }
+    if (kind === 'barrier-blocked') {
+      const rec = barrierNodes.get(value.barrierId);
+      if (rec) playBarrierBlocked(fx, rec, value);
+      return;
+    }
+    if (kind === 'barrier-removed' && value.reason !== 'broken') syncBarriers(lastBarriers.filter(b => b.id !== value.barrierId));
   }
 
   // ---------- 延迟/蓄力地上警戒圈（preparing 中单位） ----------
@@ -790,9 +839,14 @@ export function createActionDirector(deps) {
     }
   }
 
-  // 提交结果刚到、演出未开始前调用：本次新建区域先持有，避免刷新时抢在爆发拍点前出现
+  // 提交结果刚到、演出未开始前调用：本次新建区域/结界先持有，避免刷新时抢在爆发拍点前出现；
+  // 本次受击的结界锁定显示耐久（按受击事件计数），击破的结界在破碎演出前保留穹顶
   function holdRegions(result) {
-    for (const ev of (result && result.events) || []) if (ev.type === 'region-created') heldRegions.add(ev.region.id);
+    for (const ev of (result && result.events) || []) {
+      if (ev.type === 'region-created') heldRegions.add(ev.region.id);
+      if (ev.type === 'barrier-created') heldBarriers.add(ev.barrier.id);
+      if (ev.type === 'barrier-damaged') lockedBarriers.set(ev.barrierId, (lockedBarriers.get(ev.barrierId) || 0) + 1);
+    }
   }
   return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, playPrepare, syncRegions, syncBarriers, syncPreparations, holdRegions, holdGuards, wait, resolveAttackIdentity, resolveWindupKind,
     runAttackLive, driveAttack, cancelAttack, playChargeCutin, playExecution, executionKills };
