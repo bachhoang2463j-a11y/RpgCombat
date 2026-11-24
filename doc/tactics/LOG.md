@@ -476,3 +476,10 @@
 - 验证：新 stage ui-readability（UIR-S/F/P/W 19 项）；唯一全量 --all 31 stages 1072 passed 0 failed；产物 1,489,176 B sha256 `6e60e6d112deae9bf2da906be44adf885771e8662299282431f6afaf84b623e6`，专项 31/31、守护结界 13/13。源码页真实操作：辅过滤只留 5 张辅卡并自动打开辅助栏；寂静指令飘「攻+10 3回」、两人出现攻+10/命+20 徽章；检视卡显示敌人特性与满属性；右键两次跳跃上移 2 格扣辅；冲刺移动扣主、额度 8→16m 并按规则因发现食尸鬼A暂停；攻击预测 84% / -43 / 血条 33% 预计段（测试时临时改了规则站位以获得视线）。产物页启动、主过滤、徽章零错误。
 - 未验：可击杀红框的视觉、AoE 多目标逐个命中率的实际画面、敌方回合对我方施加减益的徽章时机仅代码与单测覆盖。README 未改，不 push。
 - 目的 vs 现状：一致；剩余候选（敌方威胁区、快捷键联动）用户本轮未选。
+
+## 2026-11-25 · 检视卡改原版毛玻璃 + 世界书图鉴档案（示例简介）（17d8a58）
+- 核心目的：单位检视卡与原版 index showEnemyInfo「20% 超透光战术目镜」同观感，并为未来世界书接入预留档案位与示例简介。
+- 样式：.t-insp-glass = 原版 .cyber-modal-enemy（L2340）径向 20%–28% 透明渐变 + backdrop-filter blur(14px) + 青色描边与外发光 + 四角 cyber-corner；头部 emoji + 名字 + 阵营/职业/智慧单位/TARGET INSPECT 徽章；生命/法力/战意仪表沿用原版配色与发光；ATK/DEF/SPD/命中/回避/移动胶囊带增减量；🧬 变种特质用原版 VARIANT_TAG_CONFIG 图标、说明（data-tagtip）与主色；当前状态徽章；底栏「20% 超透光战术目镜」。
+- 档案：新模块 tactics/src/lore.mjs，契约与原版一致 unit.wbSource = { wbName, entryName, desc }（原版 L19618/L19801 写入、showEnemyInfo 渲染「📚 世界书图鉴档案」）；接入世界书后宿主写 wbSource 即生效并标 LORE ENTRY，未接入前按去装饰名（剥 emoji/◈〖〗⸨⸩♱、A/B/·N 编号）取 SAMPLE_LORE 示例并标 SAMPLE。示例覆盖典型对局 4 英雄、6 敌（4 类）与 2 召唤模板。
+- 验证：ui-readability 22 项（新增毛玻璃 CSS 断言、wbSource 优先于示例、全部单位/模板有档案）；唯一全量 --all 31 stages 1075 passed；产物 1,501,753 B sha256 `3c842085b58f723591d216d8f84d66716ddd76cb350852389e5353bfd22a3c46`，专项 31/31、守护结界 13/13。真页：食尸鬼A 检视卡 computed backdrop-filter blur(14px)，截图可见背后红毯/木椅被模糊透出，复活/流体特质、示例档案正常，零错误（截图工具在 DPR 2.25 下只截左上区域，临时挪卡片位置截图后已还原）。
+- 目的 vs 现状：一致。README 未改，不 push。
