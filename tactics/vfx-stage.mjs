@@ -44,6 +44,22 @@ const FILTERS = [
   { key: 'identity', label: '身份' }, { key: 'prepare', label: '起手' }, { key: 'reaction', label: '反应' },
 ];
 
+// 识别非直接伤害类的增益/回复/护盾/减益/场地/召唤条目，避免 mock 伤害打在自身或友军身上
+const SUPPORT_FX_KINDS = {
+  'heal-mend': 'heal', 'aoe-heal': 'heal', 'vital-flow': 'heal',
+  'self-boost': 'buff', 'ally-buff': 'buff', 'harmony-ward': 'buff', 'holy-vow': 'buff',
+  'sand-armor': 'shield', 'isis-embrace': 'shield', 'nak-tith-barrier': 'shield', 'sanctum-veil': 'shield',
+  'pure-debuff': 'debuff', 'abyss-fog': 'debuff', 'xenon-blight-fog': 'debuff', 'silence-field': 'debuff',
+  'high-summon': 'field', 'scorpion-key': 'field', 'sekhmet-vow': 'buff', 'strange-conch': 'buff',
+};
+function buildSupportEffects(kind, targetIds) {
+  if (kind === 'heal') return targetIds.map(id => ({ kind: 'heal', targetId: id, value: 35, crit: cfg.outcome === 'crit' }));
+  if (kind === 'shield') return targetIds.map(id => ({ kind: 'shield', targetId: id, value: 40 }));
+  if (kind === 'buff') return targetIds.map(id => ({ kind: 'buff', targetId: id, field: 'atk', value: 15, tag: '增攻' }));
+  if (kind === 'debuff') return targetIds.map(id => ({ kind: 'buff', targetId: id, field: 'def', value: -15, tag: '降防' }));
+  return [];
+}
+
 // 自定义对比条目可按需追加到此处
 const CUSTOM_FX_ENTRIES = [];
 
@@ -131,9 +147,12 @@ function buildWorkbenchUi() {
       btn.onclick = () => {
         const preset = TARGET_PRESETS[cfg.targetPreset];
         const targetIds = preset.ids || [cfg.casterId];
+        const supportKind = SUPPORT_FX_KINDS[entry.id] || null;
+        const noDamage = !!supportKind;
         stage.playCard({
           name: tag, fxTag: tag, kind: entry.kind || 'action', level: entry.grade,
           casterId: cfg.casterId, targetIds, range: preset.range,
+          noDamage, extraEffects: noDamage ? buildSupportEffects(supportKind, targetIds) : [],
           hit: cfg.outcome !== 'dodge', crit: cfg.outcome === 'crit', fatal: cfg.outcome === 'fatal',
           segments: tag === '枪击' ? 3 : 1,
         });

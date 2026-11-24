@@ -16911,7 +16911,17 @@ button:disabled { opacity: .42; cursor: default; }
       async function revealGuard(guard) {
         const key = guard.segmentId + ":" + guard.guardianId;
         if (!guardRuns.has(key)) guardRuns.set(key, (async () => {
-          if (deps.presentGuard) await deps.presentGuard(guard, { result, sandbox, av, wait });
+          if (deps.presentGuard) {
+            const s = scope();
+            const ok2 = await new Promise((resolve) => {
+              const stop = s.settleOnDispose(() => resolve(false));
+              Promise.resolve(deps.presentGuard(guard, { result, sandbox, av, wait })).then((value) => {
+                if (stop) stop();
+                resolve(value);
+              });
+            });
+            if (ok2 === false) return false;
+          }
           if (!isCurrent()) return false;
           const view = sandbox.getUnitView();
           view.setDisplayPos(guard.guardianId, guard.contactPoint.x, guard.contactPoint.y);
@@ -17018,6 +17028,7 @@ button:disabled { opacity: .42; cursor: default; }
       await Promise.all(reactionRuns);
       hits.forEach((h) => reveal(h.targetId, { late: true }));
       await Promise.all(reactionRuns);
+      if ((await Promise.all(guardRuns.values())).some((ok2) => ok2 === false) || !isCurrent()) return false;
       effects.forEach((e) => revealEffect(e));
       for (const ev of result.events || []) {
         if (ev.type.startsWith("barrier-")) revealRule(ev, ev.type === "barrier-damaged" ? "barrier-damage" : ev.type);
@@ -18639,12 +18650,12 @@ button:disabled { opacity: .42; cursor: default; }
       name: card.name || "\u6F14\u7EC3\u6280\u80FD",
       fxTag: card.fxTag || null,
       damageType: card.damageType || "\u6CD5\u672F",
-      power: card.dmg ?? 120,
+      power: card.noDamage ? 0 : card.dmg ?? 120,
       range: range2
     };
     const query = queryAttack({ compiled, units, placementsById, footprintsById, visibleUnitIds: units.map((u) => u.id) }, casterId, skill, aim);
     const segCount = Math.max(1, card.segments || 1);
-    const hits = targetIds.map((tid) => {
+    const hits = card.noDamage && !card.fatal ? [] : targetIds.map((tid) => {
       const u = units.find((x) => x.id === tid);
       const maxHp = u ? u.ref.maxHp : 100;
       const isHit = card.hit !== false;

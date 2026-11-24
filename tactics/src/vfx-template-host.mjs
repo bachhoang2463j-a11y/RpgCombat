@@ -137,12 +137,12 @@ function buildMockResult(stageData, card) {
     name: card.name || '演练技能',
     fxTag: card.fxTag || null,
     damageType: card.damageType || '法术',
-    power: card.dmg ?? 120,
+    power: card.noDamage ? 0 : (card.dmg ?? 120),
     range,
   };
   const query = queryAttack({ compiled, units, placementsById, footprintsById, visibleUnitIds: units.map(u => u.id) }, casterId, skill, aim);
   const segCount = Math.max(1, card.segments || 1);
-  const hits = targetIds.map((tid) => {
+  const hits = (card.noDamage && !card.fatal) ? [] : targetIds.map((tid) => {
     const u = units.find(x => x.id === tid);
     const maxHp = u ? u.ref.maxHp : 100;
     const isHit = card.hit !== false;
