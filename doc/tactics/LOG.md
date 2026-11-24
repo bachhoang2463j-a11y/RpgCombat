@@ -428,3 +428,8 @@
 - 核心目的：解决特效空白母版中 6 名敌方靶子显示“头像缺失”的问题。
 - 变更文件：`tactics/src/vfx-template-host.mjs`、`tactics/demo-skill-vfx-template.html`。
 - 决策原因：`createScenarioData` 会剥离单位名前缀装饰符生成纯文本 `u.name`，导致宿主漏传 `emoji` 被 `unit-view.mjs` 误判为缺图片头像；已对齐 `main.mjs` 的 `buildTypicalViewData` 从原始 YAML 条目拆出 `emoji`/`img`/`avatarUrl`。重打单文件后内置浏览器实机刷新确认：6 名敌方棋子与行动轴均正确显示 `🦈/❄️/🌌/🧟`，`.t-avatar-missing` 计数为 0，零 JS 报错、零 404，标签页保留开启。
+
+## 2026-11-25 · 战棋完整特效工作台与双母版分工指南（48d9b37）
+- 核心目的：在不要求单文件内联的前提下，建立直接引用原版最新源码、CSS 与视听资源的完整特效工作台，并明确其与纯净单文件空白母版的分工边界。
+- 变更文件：扩展 `tactics/src/vfx-template-host.mjs`（支持 `registerExtra`、`prepare/reaction/fatal` 通道与 `fitHall` 导出），新增 `tactics/vfx-stage.html`、`tactics/vfx-stage.mjs`（接入 `fx-library.mjs` 全部 63 条 `DEFAULT_FX_ENTRIES`，提供命中/闪避/暴击/处决、施法者/单群目标预设与 L1–L4/身份/起手/反应分级筛选）、`tactics/启动工作台.bat`、`tactics/VFX-WORKBENCH.md`，更新 `doc/tactics/INDEX.md` 并重打 `tactics/demo-skill-vfx-template.html`（确认 `fxLibraryIncluded: false`）。
+- 决策原因：多文件工作台直连原版源码与资源，原版改动后免打包刷新即生效；纯净单文件母版专注新特效零干扰研发与独立归档。内置浏览器实机复查通过（零 JS 报错、零 404、开场全览居中、63 条 fxTag 列出、L3 筛选 14 条与 `火焰01` 实播 4 群聚杂兵正常、面板无右侧溢出、重置按钮正常）并留页交付。
