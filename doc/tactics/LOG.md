@@ -433,3 +433,8 @@
 - 核心目的：在不要求单文件内联的前提下，建立直接引用原版最新源码、CSS 与视听资源的完整特效工作台，并明确其与纯净单文件空白母版的分工边界。
 - 变更文件：扩展 `tactics/src/vfx-template-host.mjs`（支持 `registerExtra`、`prepare/reaction/fatal` 通道与 `fitHall` 导出），新增 `tactics/vfx-stage.html`、`tactics/vfx-stage.mjs`（接入 `fx-library.mjs` 全部 63 条 `DEFAULT_FX_ENTRIES`，提供命中/闪避/暴击/处决、施法者/单群目标预设与 L1–L4/身份/起手/反应分级筛选）、`tactics/启动工作台.bat`、`tactics/VFX-WORKBENCH.md`，更新 `doc/tactics/INDEX.md` 并重打 `tactics/demo-skill-vfx-template.html`（确认 `fxLibraryIncluded: false`）。
 - 决策原因：多文件工作台直连原版源码与资源，原版改动后免打包刷新即生效；纯净单文件母版专注新特效零干扰研发与独立归档。内置浏览器实机复查通过（零 JS 报错、零 404、开场全览居中、63 条 fxTag 列出、L3 筛选 14 条与 `火焰01` 实播 4 群聚杂兵正常、面板无右侧溢出、重置按钮正常）并留页交付。
+
+## 2026-11-25 · 修复特效工作台增益/辅助类点自身误扣 120 伤害（9eee25f）
+- 核心目的：修复在完整工作台选中「自身」目标播放增益/回复/护盾/辅助类特效时，因 mock `result.hits` 固定附带 120 点伤害导致自身掉血的问题。
+- 变更文件：`tactics/src/vfx-template-host.mjs`、`tactics/vfx-stage.mjs`、同步重打 `tactics/demo-skill-vfx-template.html`（`fxLibraryIncluded: false`）。
+- 决策原因：`buildMockResult` 支持 `card.noDamage`（置空 `hits`）；`vfx-stage.mjs` 按 `SUPPORT_FX_KINDS` 识别治疗/护盾/增益/减益/召唤结界类条目并传 `noDamage: true` 与对应 `extraEffects`。内置浏览器实测选中「自身」连续播放 `群体增益` 与 `再动加速` 后埃利奥特血量保持 100/100，零 JS 报错。
