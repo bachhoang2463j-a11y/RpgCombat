@@ -504,3 +504,10 @@
 - 验证：新增嘲讽27项（固定轮盘/4:2:1抽样、真实攻击、负值下限、智慧、不可见/倒地/制服/超射程、辅助不掷骰、AoE、追击、临时到期、永久值/重开及底部展示范围），典型AI16/职业反击28/UIR-P9/结界空间5相关测试通过；独立只读审查无阻断。本轮唯一全量1143通过。产物58模块/42必需输入/95关键符号，语法/单script闭合/零外部script及嘲讽随机源、底部标签、悬停接线8项检查通过；产物1,508,253 B，sha256 1f0bd278d761ad7bb2413cc6a2cf21e729315b0e906712b8dc36876438e24e28。
 - 真页：IAB刷新新单文件，底部弗兰克仇恨+100/总200，玛德琳隐匿-50/总50；首敌行动后隐匿随未受击窗口累计到-60/总40，标签同步。用户手动测试确认敌人优先攻击弗兰克，无问题并要求直接提交，后续页面操作停止。
 - 目的 vs 现状：一致——嘲讽已进入实际选敌而非仅属性显示；用户已确认真实敌方攻击行为。未操作酒馆或外部浏览器，不纳入无关未跟踪资源，不push；先前偶发卡死与远程视觉待验不在本轮扩展。
+## 2026-11-25 · 6档真实步态音效、三块原版通用音频补齐与毅力/致命回避被动特效移植（82bf9cd）
+- 核心目的：接入6档19个真实步态MP3；补齐战棋相对原版index缺失的三块通用级音频；原样移植毅力与致命回避职业被动特效。
+- 文件：tactics/tools/extract-rpg-av.cjs、build-demo-html.cjs、run-tests.cjs；tactics/src/unit-style.mjs、motion.mjs、av-host.mjs、action-director.mjs、battle.mjs、fx-library.mjs、guard-barrier-fx.mjs、main.mjs；tactics/src/vendor/rpg-av/rpg-av.{mjs,css}；integration-test/fixtures/tactics/{audio-gait-passive-node-cases.mjs,av-node-cases.mjs}；tactics/mvp-standalone.html（并同步19个move_*.mp3至D:\Project\my_assets\）。
+- 步态：6档真实采样池（我方重装/常装/轻敏8职业步距与音高调参+敌方BOSS/精英滑行&步行/杂兵），motion支持连续路程stride步频并兼容无stride单测，相邻去重/立体声pan/音高抖动/stop停音滑行，走skill:C轨免受语音N轨压制。
+- 被动：extract-rpg-av原样提取playRescueGrit/playRescueAvoidFatal/clearRescueState及圆形棋子血幕裁剪/残影--d适配；battle自爆结算补传fatalResult；action-director在揭示拍点对接毅力血幕怒吼与致命回避错位碎散。
+- 通用音频：原样提取playVariantResistFx（7类抗性）、playCounterAttackL1（反击居合斩）、playSelfDestructWindup/Burst/Interrupt（自爆三幕四形态）、atmoAudio（4种环境氛围音）及4路音效开关；补齐禁疗healSuppressed、结界shieldUp/atk2/atk1、防御defUp、辅助taunt/hide/atkUp、无标签neutralImpact、蓄力herocharge/herochargedone、混合治疗脉冲hpHeal，去重DEMO_AUDIO_KEYS并在设置面板暴露6项开关+主题下拉。
+- 验证：extract-rpg-av --check通过（73补丁）；p04(8)/av(56)/audio-gait-passive(7)与其余27个阶段全绿（TAV-02预载有界阈值因通用键扩充由<60调至<90）；build-demo-html单文件打包通过（1,615,832 B，58模块/42输入/105符号）；IAB打开HTTP单文件0 JS报错，解锁AudioContext并实测玛德琳移动（4.2→1.8m）与防御姿态成功（设置面板⚙️在重排后点击因旧ref触发OP_TIMEOUT超时未读回，资源服实机听感待用户确认）。
