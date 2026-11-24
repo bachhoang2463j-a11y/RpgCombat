@@ -377,3 +377,14 @@
 - 最终页面门禁：切片父卡火舞术展开两子，实际子卡进入压缩爆燃，父卡/仅选择子卡不扣费，发动仅MP110→105/main1→0。真实设置保存并重置→重载，原子名称/费用/全局4/5及13/14索引保留。首次最终版切片战斗轻伤12、中档57/57/44，新数字worldY分别1830.56/1769.44/1891.67，busy=false。最后补齐三英雄样本后再加载最终默认产物，四英雄组真实可见、玛德琳展开并用辅子提前瞄准→main2/aux0，再真实三连发46/39/38、弹药30→27、busy=false。无运行时JS异常；仅favicon.ico 404，不改无关图标来抹掉报错。
 - 范围与未验：源码{battle,action-director,main,parser,unit-view,av-host}、tactics.css、两vendor/两提取器、样本YAML、定向测试/runner/构建专项及报告；根index只读、README/无关未跟踪文件未改，未推送。未为凑覆盖伪造召唤物，实际我方召唤新实体八类全技能实战、所有纯盾/破盾/暴击/爆发与颜色组合/伤害旁路及安卓模拟器仍未逐项目视或听感验收。相关逻辑/原函数已测，不报告所有组合全验。
 - 目的 vs 现状：原版基础受击链和实际数据分档已完整接线，数字/八档前摇/显式父子/头像比例已实现并有真实页面与产物证据；保留上述组合未验边界，业务6626013单向日志回填。
+
+## 2026-11-24 · 原版状态/变种生命周期迁移与实际结果事件（8c20066）
+- 核心目的：原样复用燃烧/中毒/麻痹持续及tick/解除、蜕皮/狂暴/复活全生命周期与受击锁，不增加专有角色技能、UI或规则算值改动。
+- 变更：extract-rpg-av去除clearStatusLayers/clearVariantState空桩，补七入口与messy段常量闭包，保留原版SVG/CSS/owner/采样/锁；舞台矩形与宽高补丁随真实扩大闭包精确核对命中数。av-host用getEffectiveUnit活跃buff/永久期限映射，实际原版函数同步持久层并按事件去重消费；main刷新及导演接触/收尾接线，清场仍走原版取消链。
+- 结果事件：battle实际蜕皮回血、复活致死拦截、clock毒燃tick、麻痹跳行动、移除/到期处补纯结果emit；蜕皮/复活不按HP变化猜触发。狂暴依据现有rageAtkMultiplier规则输出进入/退出，Set幂等；保留snapshot视觉结果收口副作用，首次进入透传hasRageNarrated标记，不改倍率和结算。
+- 涉及文件：tactics/src/{battle,main,action-director,av-host}.mjs、vendor/rpg-av两生成文件、tactics/tools/{extract-rpg-av,run-tests,verify-typical-artifact}.cjs、tactics/mvp-standalone.html、integration-test/fixtures/tactics/status-variant-node-cases.mjs与hit-feedback-node-cases.mjs及reports/STATUS-VARIANT-*、TYPICAL-BATTLE-artifact.json。根index只读，README及无关未跟踪文件未动。
+- 测试：唯一源码--all 912 passed（末次狂暴标记透传与4条真实锁断言补充前）；之后仅相关状态19、受击45通过。单行真实函数提取原先长度断言误判已修正，不掩盖失败；没有verify-demo或第二次全量。最终构建36输入/57符号门禁，产物专项31/31，diff --check通过。
+- 独立审查：使用可用agy/claude-sonnet-4-6（模型列表没有指南Hydrogen）；首轮仅读部分源码产生两个错误P0。按真实函数反证并同会话要求小段复读，复审明确撤销并给出无阻断结论；不按误报增加防御代码。保留状态DOM重建迁移、带旧buff复活专项和完整自然战斗覆盖缺口。JSON及stderr原样保存。
+- 浏览器：已有8123服务IAB载入产物；真实DOM原版函数定向探针创建3持久层、burnTick/revive返回handle、复活锁true、锁内伤害数字1个、清层0/解锁false成功。探针对应前一产物288cf9d6指纹；最终标记透传后重新打包并仅相关与产物专项验证，未冒称最终页面重验。默认真实敌方首回合busy持续，真实按钮点击超时，未造替代对局或修改rAF；完整页面战斗门禁未完成。chrome-devtools连接返回已有chrome-profile占用，未关闭重启/新开隔离浏览器；需用户解除现有连接占用后补完整动画与真实战斗。安卓未测。
+- 最终产物：1,270,442 B，sha256 `c3d7719ea6c239d0ca2b78378e83d29e5adb26c47caa1942b271602013f338fc`；完整真实报告见reports/STATUS-VARIANT-summary.json。两步git备份，业务8c20066；不amend、不push。
+- 目的 vs 现状：原版生命周期代码和实际结果接线已实施且离线/定向探针通过，但最终真实浏览器战斗与完整视觉仍阻塞，明确不报告交付门禁全绿。
