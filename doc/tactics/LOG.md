@@ -404,3 +404,17 @@
 - private来源核对：仅列文件名元数据private/我想说的话.txt，3134 bytes，mtime 2026-11-24 09:49；未读取私有内容。元数据不能确定创建者/来源，不归因于MCP报告写入失败，不改动该目录。
 - 校验/备份：JSON有效、diff --check通过；稳定报告提交7f4c121后单向日志提交，不amend、不push，不改源码/产物。
 - 目的 vs 现状：404归因已确认，状态变异视觉仍未验；来源不明明确保留，不作推断。
+
+## 2026-11-25 · P07 敌方自然充能分离、温切斯特父子、WebM 抠黑底、L3/L4 屏幕氛围、buff 串行、击杀特写/Cut-in/召唤接线（5107706）
+- 核心目的：推进新玩法前尽量还原原版战斗规则与视听；视听优先但不牺牲施术者/目标/范围/反应/命中/伤害/位移/死亡可读性。用户中途选择跳过阶段 E（召唤自动守护、抗性/抑疗/结界专用反馈），直接全量与验收。
+- A 规则：敌方 [Charge:N] 改独立 charges[id].current，只认首个 charge 技能、仅 AI 单位；自然行动末（endAction/麻痹跳过）+1，行动起手已满不增长，再动/额外主点/多段不重复；未满 AI 不可用（不进 preparing、不占加速库存），满后 planEnemyAction 优先尝试大招、放不出则保留；预检与付费后才清空并 emit charge-released。删去 charge-cycle 时钟周期（原 inventory 混用）。普通 [延迟] 准备不变；编辑器文案“蓄力”→“充能”。按用户口径每自然回合增长一次，不照搬原版低蓝回蓝漏增。
+- A 温切斯特：样本 YAML 改纯父组「温切斯特」+ 子技能 鹿弹二连发/独头二连发，弹药绑定改子名；典型对局.txt:49 同步（未跟踪文件，不入 git）。父组 isGroup 既有施放拦截保留，转火/fxTag/槽序未动。
+- B：fx-library webm() 移植原版 playWebMFX 逐帧抠黑底（<12 透明/12–80 渐进/尾 0.35s 渐隐，像素读取失败才 screen），播完释放；坏死雾/圣域帷幕短边=真实直径（cover），生体流转 2.2→4.4m。新增 screen-atmos.mjs：L3/L4 四边围压（22%/28%）+ 同风格母题 SVG + 真实半径范围环；蓄势→爆发→首个揭示即降透明→余韵外撤；L4 蓄势期技能身份卡、爆发前退场。导演仅 L3/L4 启动。
+- C：playSupportEffects 按后端 effects 顺序逐目标串行（A 句柄完成才播 B，保持原 200ms 拍点），补原版 debuff/taunt SVG 与 hitDown/defDown 音色；提取器辅助 SVG 分支 4→6。
+- D：提取器原样带入 playExecutionAnimation/playEnemyUltimateCutin（挂 iframe 视口屏幕宿主、计时登记可随 clearArcaneFx/setToken 清理）及召唤三瞬与 clearSummonState；CSS 补模板内联 animation 简写与 Tailwind 任意值/负值类。导演：result.summons 真实落点 playSummonEnter、召唤物真实死亡 playSummonExit、自爆后再等 620ms；英雄施术整技能聚合真实死亡（复活存活不计）只播一次击杀特写，排在攻击演出/反应/自爆之后、胜利弹窗之前；main 满充能 Cut-in → 原前摇 → 结算。满充能红色威压辉光。
+- 真实页面发现并修复：首版产物启动白屏 ReferenceError summonEnterPending（召唤段引用 arcane 外顶层集合未带入，Node 回归无工厂实例化未覆盖）；extract-rpg-av 原样 topBlock 带入并加 TP7AV-X 断言。
+- 测试：新增 p07-av 13 + p07-av-fx 32（WebM 阈值/渐隐/降级/释放、氛围结构与降透明、buff 串行顺序与同目标多槽、击杀聚合、召唤结果、提取入包与清理）；旧用例按新语义调整（p07 charge→delay、typical-ai/typical-battle、rules02-passive B3/B8、typical-data/skills 子技能名），并恢复一处自己误改的 200ms 拍点。唯一全量 --all 962 passed（summonEnterPending 修复前）；修复后仅复跑相关 p07-av-fx 32/p07-av 13/av 56/status-variant 19/hit-feedback 45/fx01 49 与产物专项。
+- 产物：tactics/mvp-standalone.html 1,365,116 B，sha256 `c00b68981523be1ec4b46f34a4023895f332d1072c09351d467d3dd406919f2b`；专项 31/31，单脚本闭合、零外部 import，新模块与符号入包。
+- 真 Chrome（用户授权，本地 8123，验收后已停服务）：两精英自然充能 1/4→4/4、1/2→2/2，inventory 始终 0；因墙/雾视野不可达满充能保持不白耗；定向探针仅移位犹格（自然 2/2）后：Cut-in→前摇→反应×2→埃利奥特-87/弗兰克-90→充能 2→0、释放 1 次。温切斯特父卡展开两子、独头两段 -68/-57+降防、独头弹 12→10 鹿弹不动。压缩爆燃范围环=2R×镜头缩放居中瞄点，边带 0→0.78→0.25→外撤，fire.webm Canvas 抠黑底未降级。寂静指令弗兰克→玛德琳 SVG 串行 ≈1.3s。柯尔特三连发：复活不计→真正死亡→自爆→远程“处决”特写 1 次。重开零残留；全程零运行时异常。证据 reports/P07AV-2026-11-25-browser.json。
+- 未完成/未验：阶段 E 全部（召唤自动守护入口、抗性/抑疗/结界专用反馈）；听觉效果待验（仅调用链）；L4 身份卡、近战/法术/多目标击杀特写、生体流转尺寸、坏死雾缩放平移、召唤三瞬未在页面实测；边缘压缩峰值帧缺清晰截图。README 未改，不 push。
+- 目的 vs 现状：A–D 规则与视听主链已实现并有源码、产物与真实页面证据，E 与若干视听组合留待下轮，不报告全部视听完成。
