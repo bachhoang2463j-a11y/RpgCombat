@@ -423,3 +423,8 @@
 - 核心目的：对标回合制 `demo-skill-vfx-template.html`，提供战棋版独立单文件空白特效演练母版及配套明文工作台（分两轮交付：本轮为不含 50+ 既有 fxTag 条目的纯净前置版）。
 - 变更文件：新增 `tactics/src/vfx-primitives.mjs`（与 `fx-library.mjs` 同名同参纯画法原语）、`tactics/src/vfx-template-host.mjs`（裁剪上层立柱大厅 20m×13m 闭合四面墙单房间、上半场 6 敌含 2 个 2×2 精英+下半场 4 友站位、空白演练面板与契约预检、`fitHall()` 全览居中）、`tactics/vfx-workbench.mjs`、`tactics/vfx-template.html`、`tactics/tools/build-vfx-template.cjs`（`strip-fx-library` 插件剥离 50+ 条目且关闭行号/标识符压缩，拼接底部明文 `<style id="vfx-custom-css">` 与 `<script id="vfx-workbench">`），生成单文件产物 `tactics/demo-skill-vfx-template.html`（1,247,995 B，39 模块，`fxLibraryIncluded: false`）。
 - 决策原因：采用“IIFE 底座（保留换行与原函数名）+ 底部明文工作台”双段式单文件架构，零修改现有正式源码；内置浏览器实机复查通过（零 JS 报错、零 404、开场全览居中、10 名单位站位无重叠、空白面板与重置按钮正常）并留页交付。
+
+## 2026-11-25 · 修复特效空白母版敌方靶子头像缺失（250b204）
+- 核心目的：解决特效空白母版中 6 名敌方靶子显示“头像缺失”的问题。
+- 变更文件：`tactics/src/vfx-template-host.mjs`、`tactics/demo-skill-vfx-template.html`。
+- 决策原因：`createScenarioData` 会剥离单位名前缀装饰符生成纯文本 `u.name`，导致宿主漏传 `emoji` 被 `unit-view.mjs` 误判为缺图片头像；已对齐 `main.mjs` 的 `buildTypicalViewData` 从原始 YAML 条目拆出 `emoji`/`img`/`avatarUrl`。重打单文件后内置浏览器实机刷新确认：6 名敌方棋子与行动轴均正确显示 `🦈/❄️/🌌/🧟`，`.t-avatar-missing` 计数为 0，零 JS 报错、零 404，标签页保留开启。
