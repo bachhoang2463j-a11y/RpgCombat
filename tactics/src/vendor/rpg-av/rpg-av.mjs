@@ -1,10 +1,10 @@
 // ==========================================
 // 由 tactics/tools/extract-rpg-av.cjs 自动生成，请勿手改。
 // 源: index.html  sha256=5c1ab2a1a243bb7d7e79b4aca76026ad1058af2a74bf9dfbf8763ae8b13554e7
-// arcaneVfxModule 行区间(源 5729–14230): 5730–5791, 5800–5841, 5849–5913, 5923–5924, 5932–6302, 6642–6850, 7016–7037, 7348–7376, 7383–7584, 7596–9869, 10067–10183, 10189–10718, 10748–10757, 11103–11133, 11142–11240, 11917–12083, 12201–12214, 12535–12562, 12565–12951, 13471–13477, 13840–14208
-// 入选语句 223 段 / 5037 行；入口: playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar, CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx, syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked, playSummonEnter, playSummonExit, playSummonGuard, clearSummonState
+// arcaneVfxModule 行区间(源 5729–14230): 5730–5791, 5800–5841, 5849–5913, 5923–5924, 5932–6302, 6431–6485, 6642–6850, 7016–7037, 7348–7376, 7383–7584, 7596–9869, 10067–10183, 10189–10718, 10748–10757, 11103–11133, 11142–11240, 11917–12083, 12201–12214, 12535–12562, 12565–12951, 13471–13477, 13840–14208
+// 入选语句 224 段 / 5092 行；入口: playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar, CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx, syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked, playSummonEnter, playSummonExit, playSummonGuard, clearSummonState, playLingFeng
 // 显式存根: clearSelfDestructState, clearRescueState
-// 宿主适配补丁: 枪击采样相邻去重×1; 特写挂屏幕宿主×2; 特写收尾登记×2; 特写震屏走舞台震动层×1; 特写计时可随重开清理×6; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 屏幕矩形 → 特效舞台坐标×11; innerWidth → 舞台宽×10; innerHeight → 舞台高×5; body 挂载 → 特效舞台×5; JS position:fixed → absolute×0; arcane canvas resize 走舞台×1; 舞台震动独立层×2; window.* 声音函数改为工厂内本地×14; 去环境氛围清理×1; CSS position:fixed → absolute×8; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1; CSS 残留视口单位(按舞台尺度保留)×39
+// 宿主适配补丁: 枪击采样相邻去重×1; 特写挂屏幕宿主×2; 特写收尾登记×2; 特写震屏走舞台震动层×1; 特写计时可随重开清理×6; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 屏幕矩形 → 特效舞台坐标×11; innerWidth → 舞台宽×11; innerHeight → 舞台高×7; body 挂载 → 特效舞台×5; JS position:fixed → absolute×0; arcane canvas resize 走舞台×1; 舞台震动独立层×2; window.* 声音函数改为工厂内本地×14; 去环境氛围清理×1; CSS position:fixed → absolute×8; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1; CSS 残留视口单位(按舞台尺度保留)×41
 // ==========================================
 /* eslint-disable */
 // ---- 纯数据导出（原样，供宿主在工厂创建前解析人物头像/语音与预载清单） ----
@@ -1685,6 +1685,61 @@ function clearRescueState() { /* 未迁移段：本 Demo 不产生该状态 */ }
             idSample(null, 'light_impact', 0.92);
             burst(24, () => { const an = Math.random() * 6.283, s = rnd(1.5, 5); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.93, decay: 0.04, size: rnd(1, 2.4), color: pick(['#e9d5ff', '#c084fc', '#7c3aed']) }; });
         }, k => k);
+    }
+
+    // ===== ⑤ 灵风术（L3，蓄势 1000ms）：风玫瑰阵 + 羽毛绕场 → 全屏疾风 → 翼纹加身 =====
+    function playLingFeng(caster) {
+        const el = domOf(caster); if (!el) return null;
+        const token = combatToken;
+        ensureCanvas(); ensureDriver();
+        const CHARGE = 1000;
+        const c = ctr(el), vmax = Math.max(__STAGE.w, __STAGE.h), SZ = vmax * 0.55;
+        const owner = fixedItemSkillRun(CHARGE + 2200), handle = owner.handle;
+        Object.assign(handle, { impactDom:null, dodge:null, hit:null });
+        const after = owner.at, every = owner.every, fsLayer = (markup, ms) => skillLayer(owner, markup, ms), burst = owner.burst;
+        const orbitCharge = (c, n, dur, mk, rx, ry, shrink) => orbitItemCharge(owner, c, n, dur, mk, rx, ry, shrink);
+        const darken = opacity => itemDarken(owner, opacity), flash = (dom, cls) => flashOwned(owner, dom, cls);
+        const playSfxSample = (key, delay, opts) => playItemSample(owner, key, delay, opts);
+        darken(0.75);
+        playSfxSample('windHum', 0.02, { volume:0.62, offset:0.15, durCap:0.94, fadeIn:0.18, fadeOut:0.14, pan:-0.3 });
+        playSfxSample('crystalChime', 0.12, { volume:0.36, rate:1.25, durCap:0.85, fadeOut:0.3, pan:0.25 });
+        const winds = ['BOREAS', 'EURUS', 'NOTUS', 'ZEPHYRUS'];
+        const rose = fsLayer(`<div style="position:absolute; inset:0; perspective:900px;">
+          <div class="arcane-fs-anchor" data-arcane-part="rose" style="left:${c.x}px; top:${c.bottom - 6}px; width:${SZ}px; height:${SZ}px; animation: arcane-rose-in ${CHARGE}ms cubic-bezier(0.2,0.8,0.2,1) both; filter: drop-shadow(0 0 12px rgba(52,211,153,0.8));">
+            <svg viewBox="-500 -500 1000 1000" style="width:100%;height:100%">
+              <circle r="480" fill="none" stroke="#d4af37" stroke-width="4"/><circle r="440" fill="none" stroke="#6ee7b7" stroke-width="2" stroke-dasharray="4 14"/><circle r="300" fill="none" stroke="#d4af37" stroke-width="2"/>
+              ${Array.from({ length: 72 }, (_, i) => `<line x1="0" y1="-480" x2="0" y2="${i % 6 ? -462 : -440}" stroke="#d4af37" stroke-width="2" transform="rotate(${i * 5})"/>`).join('')}
+              ${winds.map((w, i) => `<text x="0" y="-360" font-family="Cinzel" font-size="44" fill="#fde68a" text-anchor="middle" transform="rotate(${i * 90})">${w}</text>`).join('')}
+              ${[0, 45, 90, 135, 180, 225, 270, 315].map((d, i) => `<path d="M0,0 L${i % 2 ? 26 : 40},-${i % 2 ? 60 : 90} L0,-${i % 2 ? 210 : 290} L-${i % 2 ? 26 : 40},-${i % 2 ? 60 : 90} Z" fill="${i % 2 ? 'rgba(110,231,183,0.35)' : 'rgba(212,175,55,0.4)'}" stroke="#fde68a" stroke-width="2" transform="rotate(${d})"/>`).join('')}
+              <circle r="38" fill="none" stroke="#fde68a" stroke-width="3"/><circle r="10" fill="#fff4c2"/>
+            </svg></div></div>`, CHARGE + 600);
+        orbitCharge({ x: c.x, y: c.y }, 70, CHARGE, o => ({ size: 6 + o.k * 5, shape: 'feather', rot: o.a + 1.57, color: o.k < 0.5 ? '#fef3c7' : '#a7f3d0' }), vmax * 0.5, vmax * 0.3);
+        const rumble = every(320, () => shake('light'));
+        function release() {
+            if (owner.cancelled || owner.finished || token !== combatToken) return;
+            stopEvery(rumble);
+            const ra = rose.querySelector('[data-arcane-part="rose"]'); if (ra) ra.style.animation = 'arcane-rose-out 0.5s ease-out both';
+            playSfxSample('aoe_wind_spin_fs772867', 0, { volume:0.78, durCap:1.0, fadeOut:0.28, pan:-0.2 });
+            playSfxSample('dodgeWind', 0.04, { volume:0.62, durCap:1.15, fadeOut:0.35, pan:0.25 });
+            playSfxSample('crystalChime', 0.34, { volume:0.58, durCap:1.5, fadeOut:0.5 });
+            shake('heavy'); flash(el, 'arcane-flash-heal');
+            const streaks = Array.from({ length: 14 }, (_, i) => `<div style="position:absolute; left:0; top:${rnd(5, 95)}%; width:40vw; height:${rnd(2, 5)}px; background: linear-gradient(90deg, transparent, rgba(167,243,208,0.8), #fffbe8, transparent); filter: drop-shadow(0 0 8px #34d399); animation: arcane-streak ${rnd(0.45, 0.8)}s ${rnd(0, 0.45)}s cubic-bezier(0.2,0.7,0.3,1) both;"></div>`).join('');
+            const tw = [0, 1, 2, 3].map(i => `<div class="arcane-fs-anchor" style="left:${c.x}px; top:${c.y + 40 - i * 46}px; width:${140 + i * 70}px; height:${36 + i * 14}px; border-radius:50%; border:3px solid ${i % 2 ? '#a7f3d0' : '#fde68a'}; box-shadow:0 0 18px #10b981; animation: arcane-twister 1.1s ${i * 0.05}s cubic-bezier(0.2,0.8,0.3,1) both;"></div>`).join('');
+            fsLayer(`<div style="position:absolute;inset:0;background:radial-gradient(circle at ${c.x}px ${c.y}px, rgba(255,251,232,0.9), rgba(52,211,153,0.35) 35%, transparent 70%); animation: arcane-fs-flash 0.5s ease-out both;"></div>${streaks}${tw}`, 1400);
+            burst(90, () => { const an = Math.random() * 6.283, s = rnd(5, 16); return { x: c.x, y: c.y, vx: Math.cos(an) * s + 4, vy: Math.sin(an) * s * 0.6, drag: 0.965, decay: rnd(0.008, 0.016), size: rnd(6, 11), shape: 'feather', rot: an, vr: rnd(-0.15, 0.15), color: pick(['#fef3c7', '#a7f3d0', '#fde68a', '#ffffff']) }; });
+            const gust = every(45, () => burst(6, () => ({ x: -20, y: rnd(0, __STAGE.h), vx: rnd(14, 24), vy: rnd(-1, 1), drag: 1, decay: 0.014, size: rnd(5, 9), shape: 'feather', rot: 0, vr: rnd(-0.1, 0.1), color: pick(['#fef3c7', '#a7f3d0']) })));
+            after(700, () => stopEvery(gust));
+            after(350, () => {
+                if (owner.cancelled || owner.finished || token !== combatToken) return;
+                const feather = (rx, ry, rot, L, wd, op) => `<path d="M0,0 Q${wd},${-L * 0.55} 0,${-L} Q${-wd},${-L * 0.55} 0,0 Z" transform="translate(${rx},${ry}) rotate(${rot})" fill="rgba(255,255,255,${op})" stroke="rgba(255,255,255,0.85)" stroke-width="1"/>`;
+                const side = [[0, 11, 135, 13, 0.22], [1, 9, 95, 12, 0.3], [2, 7, 60, 10, 0.42]].map(([row, n, Lmax, wd, op]) => Array.from({ length: n }, (_, i) => { const k = i / (n - 1); return feather(12 + k * (30 - row * 6), -row * 6 - k * 14, 8 + k * 72, Lmax * (1 - k * 0.38), wd, op); }).join('')).join('');
+                fsLayer(`<div class="arcane-fs-anchor" style="left:${c.x}px; top:${c.y - 6}px; width:330px; height:200px; animation: arcane-wing-glyph 1.7s ease both; filter: drop-shadow(0 0 10px rgba(255,255,255,0.9)) drop-shadow(0 0 22px rgba(186,230,253,0.6));">
+                  <svg viewBox="-165 -150 330 200" style="width:100%;height:100%;overflow:visible">${[-1, 1].map(sg => `<g transform="scale(${sg},1)"><g style="transform-origin: 12px 0px; animation: arcane-angel-flap 0.8s 0.1s ease-in-out 2 both;">${side}</g></g>`).join('')}</svg></div>`, 1750);
+                darken(0);
+            });
+        }
+        after(CHARGE, release);
+        return handle;
     }
 
     // ===== 敌方攻击前摇：一级（普通行动起手） =====
@@ -6204,7 +6259,7 @@ function dropOwnedLayer(owner, layer) {
     return { playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar,
       CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx,
       syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked,
-      playSummonEnter, playSummonExit, playSummonGuard, clearSummonState };
+      playSummonEnter, playSummonExit, playSummonGuard, clearSummonState, playLingFeng };
   })();
 CombatEvents.on(EVENTS.DAMAGE_RESOLVED, arcane.CombatAudioDirector.consume);
 CombatEvents.on(EVENTS.DODGE_RESOLVED, arcane.CombatAudioDirector.consume);

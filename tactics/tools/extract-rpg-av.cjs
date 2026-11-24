@@ -20,6 +20,7 @@ const ENTRIES = [
   'clearArcaneFx', 'syncStatusLayers', 'clearStatusLayers', 'playStatusTickFx',
   'syncVariantState', 'clearVariantState', 'playVariantTriggerFx', 'isEntityVariantLocked',
   'playSummonEnter', 'playSummonExit', 'playSummonGuard', 'clearSummonState',
+  'playLingFeng',
 ];
 // 不入口：敌方兜底群攻 playMeleeGroup/RangedGroup/SpellGroup 按全队卡片头像取帧（portraitFrame），
 // 与空间范围"只作用真实受影响目标"冲突；战棋敌方范围攻击改走攻击身份 aoe（逐目标 onImpact）。
@@ -438,8 +439,8 @@ ${supportBranches.join('\n').replace('else if', 'if')}
   mod = patch(mod, "${Math.max(88, stageH * 0.68)}px;transform:translate(-50%,-50%);",
     "${areaBounds ? stageH : Math.max(88, stageH * 0.68)}px;transform:translate(-50%,-50%);", 1, '战棋攻击身份适配');
   mod = patch(mod, /\.getBoundingClientRect\(\)/g, '[__GBCR]()', 11, '屏幕矩形 → 特效舞台坐标');
-  mod = patch(mod, /\b(?:window\.)?innerWidth\b/g, '__STAGE.w', 10, 'innerWidth → 舞台宽');
-  mod = patch(mod, /\b(?:window\.)?innerHeight\b/g, '__STAGE.h', 5, 'innerHeight → 舞台高');
+  mod = patch(mod, /\b(?:window\.)?innerWidth\b/g, '__STAGE.w', 11, 'innerWidth → 舞台宽');
+  mod = patch(mod, /\b(?:window\.)?innerHeight\b/g, '__STAGE.h', 7, 'innerHeight → 舞台高');
   mod = patch(mod, 'document.body.appendChild(', '__STAGE.el.appendChild(', 5, 'body 挂载 → 特效舞台');
   mod = patch(mod, /position\s*:\s*fixed/g, 'position:absolute', 0, 'JS position:fixed → absolute');
   mod = patch(mod, "window.addEventListener('resize', resizeCanvas);", '__STAGE.onResize(resizeCanvas);', 1, 'arcane canvas resize 走舞台');
@@ -546,7 +547,7 @@ ${mod}
     return { playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar,
       CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx,
       syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked,
-      playSummonEnter, playSummonExit, playSummonGuard, clearSummonState };
+      playSummonEnter, playSummonExit, playSummonGuard, clearSummonState, playLingFeng };
   })();
 ${busOn.map(l => l.replace('CombatAudioDirector.consume', 'arcane.CombatAudioDirector.consume')).join('\n')}
 

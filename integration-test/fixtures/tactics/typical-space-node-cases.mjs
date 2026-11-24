@@ -198,8 +198,9 @@ function runAll() {
       ctx.placementsById.foe = from;
       return outside && inside && barriers.interception(ctx, 'caster', 'ally') === null;
     })(), 'external/internal/ally'));
-    const first = barriers.damageBarrier(ctx, 'barrier:caster', 100);
-    const second = barriers.damageBarrier(ctx, 'barrier:caster', 1000);
+    const barrierId = barriers.barrierAt(ctx, 'ally').id;
+    const first = barriers.damageBarrier(ctx, barrierId, 100);
+    const second = barriers.damageBarrier(ctx, barrierId, 1000);
     cases.push(ok('TT-SPACE damageBarrier：护甲先减、不盾、击破无溢出并移除',
       first.damage === 60 && first.integrityAfter === 40 && !first.broken &&
       second.integrityAfter === 0 && second.broken && ctx.barriers.length === 0,

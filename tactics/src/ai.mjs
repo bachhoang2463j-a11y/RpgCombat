@@ -11,6 +11,8 @@ import { findReachable, cellsAdjacent } from './movement.mjs';
 import { queryAttack, resolveDefaultRange } from './range.mjs';
 import { cellKey, unitCenter, cellCenter, occupiedCells } from './geometry.mjs';
 import { skillSlots } from './effect-definitions.mjs';
+import { interception } from './barriers.mjs';
+import { fogAffects } from './regions.mjs';
 
 const EPS = 1e-9;
 const IDLE = { moveTo: null, skill: null, aim: null, action: 'wait' };
@@ -76,7 +78,7 @@ function inFogAt(ctx, col, row) {
 function unitInFog(ctx, unit) {
   const p = ctx.placementsById[unit.id];
   if (!p) return false;
-  return occupiedCells(p, footprintOf(ctx, unit)).some(c => inFogAt(ctx, c.col, c.row));
+  return fogRegions(ctx).some(r => fogAffects(ctx, r, unit.id) && occupiedCells(p, footprintOf(ctx, unit)).some(c => cellInRegion(r, c.col, c.row)));
 }
 
 function hasAdjacentEnemy(ctx, unit, enemies) {
@@ -147,15 +149,22 @@ function evaluateQuery(ctx, unit, skill, query) {
   const slots = skillSlots(skill);
   let score = 0;
   for (const st of (query.slotTargets || [])) {
-    const slot = slots[st.index];
+    const slot = slots.find(s => s.index === st.index);
     if (!slot) continue;
     const def = slot.definition || {};
     const targets = st.targetIds || [];
     if (def.kind === 'attack') {
+      const barrierIds = new Set(st.barrierIds || []);
       for (const tid of targets) {
+        const guard = interception(ctx, unit.id, tid);
+        if (guard) { barrierIds.add(guard.id); continue; }
         const t = ctx.units.find(u => u.id === tid);
         if (!t) continue;
         score += (t.side === unit.side ? -1 : 1) * Math.max(1, (slot.power || unit.ref.atk || 0) - (t.ref.def || 0));
+      }
+      for (const id of barrierIds) {
+        const barrier = (ctx.barriers || []).find(b => b.id === id);
+        if (barrier) score += barrierBenefit(unit, slot, skill, barrier);
       }
     } else if (def.kind === 'heal') {
       for (const tid of targets) {
@@ -170,6 +179,7 @@ function evaluateQuery(ctx, unit, skill, query) {
       || def.kind === 'dot' || def.kind === 'paralyze' || def.kind === 'taunt'
       || def.kind === 'damageGuard' || def.kind === 'counter' || def.kind === 'variant') {
       for (const tid of targets) {
+        if (slot.debuff && interception(ctx, unit.id, tid)) continue;
         if (sameSourceActive(ctx, tid, skill, slot)) continue;
         if (def.kind === 'buff' && buffAtLeast(ctx, tid, slot)) continue;
         if (def.kind === 'shield') {
@@ -186,6 +196,15 @@ function evaluateQuery(ctx, unit, skill, query) {
     }
   }
   return score;
+}
+
+// 不变更结界的纯收益估值；执行伤害仍由 battle 共用结算。
+export function barrierBenefit(unit, slot, skill, barrier) {
+  if (barrier.side === unit.side) return 0;
+  const raw = slot.power || unit.ref.atk || 0;
+  const incomingType = slot.definition.damageCategory || skill.damageType;
+  const resisted = incomingType === barrier.protectType ? Math.floor(raw * 0.5) : raw;
+  return Math.min(barrier.integrity, Math.max(0, resisted - barrier.armor * (slot.definition.scatter ? 3 : 1)));
 }
 
 // ---------- 候选搜索 ----------
@@ -253,19 +272,22 @@ function searchBest(ctx, unit, skills, budget, enemies, allies) {
       : (eff.range.castRange != null ? eff.range.castRange
         : (eff.range.length != null ? eff.range.length : Infinity));
     const pool = aimPool(eff, enemies, allies, unit);
+    if (skillSlots(eff).some(s => s.attack)) for (const b of ctx.barriers || []) {
+      if (b.side !== unit.side && b.center) pool.push({ id: b.id, barrier: b });
+    }
 
     for (const target of pool) {
       const tp = ctx.placementsById[target.id];
-      if (!tp) continue;
-      const tc = unitCenter(tp, footprintOf(ctx, target));
+      if (!tp && !target.barrier) continue;
+      const tc = target.barrier ? target.barrier.center : unitCenter(tp, footprintOf(ctx, target));
       if (budget !== Infinity && Number.isFinite(maxReach)) {
-        const lower = Math.hypot(tc.x - startCenter.x, tc.y - startCenter.y) - maxReach;
+        const lower = Math.hypot(tc.x - startCenter.x, tc.y - startCenter.y) - maxReach - (target.barrier?.radius || 0);
         if (lower > budget + 1 + EPS) continue; // 理论上无法进入射程，跳过
       }
       let found = null;
       for (const cell of cells) {
         const ctx2 = withPlacement(ctx, unit.id, cell.col, cell.row);
-        const aim = { x: tc.x, y: tc.y, targetId: target.id };
+        const aim = target.barrier ? { barrierId: target.id } : { x: tc.x, y: tc.y, targetId: target.id };
         const q = queryAttack(ctx2, unit.id, eff, aim);
         if (!q.ok) continue;
         const score = evaluateQuery(ctx2, unit, eff, q);

@@ -76,7 +76,11 @@ function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1, cover 
   cv.style.cssText = 'position:absolute;left:' + x + 'px;top:' + y + 'px;width:' + (cover || width) + 'px;transform:translate(-50%,-50%);opacity:' + opacity + ';pointer-events:none;';
   const g = cv.getContext('2d', { willReadFrequently: true });
   let screenMode = false, raf = 0;
+  // 播完句柄（导演 awaitHandle）：元数据到达后按真实时长更新 doneAt，释放时通知
+  const t0 = Date.now();
+  cv.handle = { onFinish: new Set(), doneAt: t0 + ms };
   v.onloadedmetadata = () => {
+    if (v.duration) cv.handle.doneAt = t0 + v.duration * 1000 / rate;
     const aspect = (v.videoWidth || 1920) / (v.videoHeight || 1080);
     const cssW = cover ? cover * Math.max(1, aspect) : width;
     cv.width = Math.min(FX_WEBM_KEY_MAX, Math.round(cssW * 2));
@@ -84,9 +88,12 @@ function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1, cover 
     cv.style.width = cssW + 'px';
     cv.style.height = Math.round(cssW / aspect) + 'px';
   };
+  let released = false;
   const release = () => {
+    if (released) return; released = true;
     if (raf) cancelAnimationFrame(raf);
     cv.remove(); v.pause(); v.removeAttribute('src'); v.load(); v.remove();
+    cv.handle.onFinish.forEach(fn => fn(true));
   };
   const next = () => {
     if (typeof v.requestVideoFrameCallback === 'function') v.requestVideoFrameCallback(frame);
@@ -128,6 +135,16 @@ function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1, cover 
   return cv;
 }
 const worldPx = p => ({ x: p.x * PX, y: p.y * PX });
+// 原版 playWebMFX 尺寸口径：targetSize = min(视口宽, 视口高) × scale（屏幕像素）；换算为世界美术像素（÷ 相机缩放）
+function screenSpanPx(ctx, k) {
+  const vp = ctx.sandbox.getDom().viewport;
+  return Math.min(vp.clientWidth, vp.clientHeight) * k / ctx.sandbox.getPose().scale;
+}
+// 视口面积占比下限对应的世界宽度（aspect = 视频宽/高）
+function screenCoverPx(ctx, fraction, aspect) {
+  const vp = ctx.sandbox.getDom().viewport;
+  return Math.sqrt(fraction * vp.clientWidth * vp.clientHeight * aspect) / ctx.sandbox.getPose().scale;
+}
 
 // 本库新增条目用到、回合制视听底座未登记键名的真实采样（文件已在既有资源服务中，键名对齐回合制 WEBM_FX_REGISTRY 音轨）
 export const EXTRA_AUDIO = {
@@ -354,8 +371,7 @@ const fireBlast = {
     // ④ 爆发：音画震同帧
     fx.sfx('explosion_aoe_blast', 0.70); fx.sfx('fire01', 0.62);
     fx.shake('heavy');
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(255,247,214,0.7),rgba(251,146,60,0.25) 60%,rgba(124,45,18,0.1));"></i>', 320)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 320, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     fx.top('<i style="position:absolute;left:' + b.x + 'px;top:' + b.y + 'px;width:' + R * 8 + 'px;height:' + R * 8 + 'px;margin:' + (-R * 4) + 'px 0 0 ' + (-R * 4) + 'px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,0.42),rgba(220,38,38,0.16) 40%,transparent 70%);mix-blend-mode:screen;"></i>', 1200)
       .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 0 }], { duration: 1200, fill: 'forwards' });
     webm(ctx, 'fire.webm', b.x, b.y - R * 0.3, Math.max(R * 3.4, 220), { ms: 1500 });
@@ -504,60 +520,44 @@ function supportFeedbackOf(effect) {
   return SUPPORT_EFFECT[effect.kind];
 }
 async function playSupportEffects(ctx, accept = () => true) {
-  const byTarget = new Map();
+  // 原版 executeSkillAction：外层逐标签槽、内层逐目标顺序 await（群体间隔一拍）。后端 effects 已按槽→目标排序，
+  // 每个真实效果条目各播一次自己的原版 SVG/音色（增攻与瞄准各自独立），播完一个再隔 60ms 播下一个。
+  const steps = [];
   const seenEffects = new Set();
   for (const effect of ctx.result.effects || []) {
     if (seenEffects.has(effect) || !accept(effect)) continue;
     seenEffects.add(effect);
     const feedback = supportFeedbackOf(effect);
-    if (!feedback) continue;
-    if (!byTarget.has(effect.targetId)) byTarget.set(effect.targetId, []);
-    byTarget.get(effect.targetId).push({ effect, feedback });
+    if (feedback) steps.push({ effect, feedback });
   }
-  let first = true;
-  for (const [targetId, batch] of byTarget) {
-    if (!first && !(await ctx.wait(200))) return false;
-    first = false;
-    const pending = [];
-    const playedKeys = new Set(), playedTypes = new Set();
-    const entity = ctx.ent(targetId);
-    let numberIndex = 0;
-    const showNumber = (kind, value, crit) => {
-      const style = SUPPORT_NUMBERS[kind];
-      if (!style) return;
-      const [unit, color, glow] = style;
-      const { x, y } = worldPx(ctx.centerOf(targetId));
-      floatText(ctx.fx, x, y - 30 - numberIndex++ * 20, (crit ? '暴击 ' : '') + '+' + value + ' ' + unit, color, glow, { size: 14 });
-    };
-    const play = ([type, key], onImpact) => {
-      if (playedTypes.has(type) && playedKeys.has(key)) { onImpact?.(); return; }
-      const soundKey = playedKeys.has(key) ? null : key;
-      playedKeys.add(key);
-      if (playedTypes.has(type)) {
-        if (soundKey) ctx.av.playSound(soundKey, SUPPORT_VOLUME);
-        onImpact?.();
-        return;
-      }
-      playedTypes.add(type);
-      const handle = ctx.av.playGenericSupportFx(entity, type, { soundKey, volume: SUPPORT_VOLUME, onImpact });
-      if (handle) pending.push(ctx.awaitHandle(handle).then(ok => {
-        if (!ok) handle.cancel();
-        return ok;
-      }));
-    };
-    ctx.av.CombatAudioMixer.withContext(ctx.audioContext, () => {
-      for (const { effect, feedback } of batch) {
-        const show = () => {
-          ctx.revealEffect(effect, true);
-          showNumber(effect.kind, effect.value, effect.crit);
-          if (effect.kind === 'heal' && effect.overheal > 0) showNumber('shield', effect.overheal, effect.crit);
-        };
-        if (playedTypes.has(feedback[0]) && playedKeys.has(feedback[1])) { show(); continue; }
-        play(feedback, show);
-        if (effect.kind === 'heal' && effect.overheal > 0) play(SUPPORT_EFFECT.shield);
-      }
+  const numberIndex = new Map();
+  const showNumber = (targetId, kind, value, crit) => {
+    const style = SUPPORT_NUMBERS[kind];
+    if (!style) return;
+    const [unit, color, glow] = style;
+    const { x, y } = worldPx(ctx.centerOf(targetId));
+    const n = numberIndex.get(targetId) || 0;
+    numberIndex.set(targetId, n + 1);
+    floatText(ctx.fx, x, y - 30 - n * 20, (crit ? '暴击 ' : '') + '+' + value + ' ' + unit, color, glow, { size: 14 });
+  };
+  const playOne = ([type, key], targetId, onImpact) => {
+    const handle = ctx.av.CombatAudioMixer.withContext(ctx.audioContext,
+      () => ctx.av.playGenericSupportFx(ctx.ent(targetId), type, { soundKey: key, volume: SUPPORT_VOLUME, onImpact }));
+    if (!handle) return Promise.resolve(true);
+    return ctx.awaitHandle(handle).then(ok => { if (!ok) handle.cancel(); return ok; });
+  };
+  for (let i = 0; i < steps.length; i++) {
+    if (i > 0 && !(await ctx.wait(60))) return false;
+    const { effect, feedback } = steps[i];
+    const ok = await playOne(feedback, effect.targetId, () => {
+      ctx.revealEffect(effect, true);
+      showNumber(effect.targetId, effect.kind, effect.value, effect.crit);
+      if (effect.kind === 'heal' && effect.overheal > 0) showNumber(effect.targetId, 'shield', effect.overheal, effect.crit);
     });
-    if (!(await Promise.all(pending)).every(Boolean)) return false;
+    if (!ok) return false;
+    if (effect.kind === 'heal' && effect.overheal > 0) {
+      if (!(await ctx.wait(60)) || !(await playOne(SUPPORT_EFFECT.shield, effect.targetId))) return false;
+    }
   }
   return true;
 }
@@ -610,8 +610,7 @@ const fogBurst = {
     tele.remove();
     // ④ 爆发：雾毯按真实半径铺开，常驻雾区在此刻揭示
     fx.sfx('fog', 0.62); fx.sfx('mx_deep_impact', 0.52); fx.shake('heavy');
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(165,243,252,.32),rgba(14,40,52,.18) 60%,transparent);"></i>', 300)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     fx.top(ringHtml(b.x, b.y, R * 2.2, 'rgba(165,243,252,0.75)', 'rgba(45,212,191,0.5)'), 560).firstChild
       .animate([{ transform: 'scale(0.1)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 540, easing: 'cubic-bezier(0.1,0.8,0.3,1)', fill: 'forwards' });
     particles(fx, Array.from({ length: 30 }, () => { const a = rnd(0, TAU), d = rnd(0.3, 0.95) * R; return { x: b.x, y: b.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(70, 130), color: MIST, core: MIST_CORE, o0: 0.9, s0: 0.3, s1: 1.4, dur: rnd(700, 1000), ease: 'cubic-bezier(0.1,0.7,0.3,1)' }; }), 1100);
@@ -750,8 +749,7 @@ const holyJudgment = {
     if (!(await ctx.wait(1300))) return false;
     // ② 爆发（音画震同帧）
     fx.sfx('light01', 0.72); fx.sfx('light_impact', 0.60); fx.shake('quake');
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(255,255,255,.95),rgba(254,243,199,.75) 55%,rgba(251,191,36,.35));"></i>', 440)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.14 }, { opacity: 0 }], { duration: 440, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     const H = 16 * PX;
     const beam = (width, alpha, ms) => fx.top('<i style="position:absolute;left:' + t.x + 'px;top:' + (t.y - H + 14) + 'px;width:' + width + 'px;height:' + H + 'px;margin-left:' + (-width / 2) + 'px;transform-origin:50% 100%;' +
       'background:linear-gradient(90deg,transparent,rgba(251,191,36,' + alpha * 0.6 + ') 22%,rgba(255,251,235,' + alpha + ') 50%,rgba(251,191,36,' + alpha * 0.6 + ') 78%,transparent);mix-blend-mode:screen;will-change:transform,opacity;"></i>', ms).firstChild;
@@ -759,12 +757,12 @@ const holyJudgment = {
     beam(1.8 * PX, 1, 900).animate([{ transform: 'scaleX(0)', opacity: 1 }, { transform: 'scaleX(1.35)', opacity: 1, offset: 0.09 }, { transform: 'scaleX(1)', opacity: 1, offset: 0.45 }, { transform: 'scaleX(0.15)', opacity: 0 }], { duration: 900, fill: 'forwards' });
     fx.top('<i style="position:absolute;left:' + t.x + 'px;top:' + t.y + 'px;width:' + 10 * PX + 'px;height:22px;margin:-11px 0 0 ' + (-5 * PX) + 'px;background:linear-gradient(90deg,transparent,rgba(251,191,36,.55) 30%,#fffbeb 50%,rgba(251,191,36,.55) 70%,transparent);mix-blend-mode:screen;"></i>', 520)
       .firstChild.animate([{ transform: 'scaleX(0)', opacity: 1 }, { transform: 'scaleX(1)', opacity: 1, offset: 0.25 }, { transform: 'scaleX(1.1)', opacity: 0 }], { duration: 500, fill: 'forwards' });
-    const flame = webm(ctx, '414.webm', t.x, t.y - 62, 4 * PX, { ms: 1000 });
-    flame.style.filter = 'sepia(.35) saturate(.75) brightness(1.55)';
     fx.top(ringHtml(t.x, t.y, 4.6 * PX, 'rgba(255,251,235,0.9)', 'rgba(251,191,36,0.7)'), 620).firstChild
       .animate([{ transform: 'scale(0.12)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 600, easing: 'cubic-bezier(0.1,0.8,0.3,1)', fill: 'forwards' });
     particles(fx, Array.from({ length: 36 }, () => { const a = rnd(0, TAU), d = rnd(1.2, 2.6) * PX; return { x: t.x, y: t.y - 10, dx: Math.cos(a) * d, dy: Math.sin(a) * d - rnd(10, 40), size: rnd(8, 18), color: pick(['#fde68a', '#fef3c7', '#fbbf24']), core: '#ffffff', s0: 1, s1: 0.25, dur: rnd(520, 820) }; }), 900);
     if (h) ctx.after(40, () => ctx.reveal(h.targetId));
+    // 命中即掀起原版 414.webm 三道光柱（原版尺寸 min(视口)×1.4、锚定目标），延续为余韵
+    ctx.after(60, () => webm(ctx, '414.webm', t.x, t.y, screenSpanPx(ctx, 1.4), { ms: 1200 }));
     if (!(await ctx.wait(450))) return false;
     // ③ 余韵：光羽雨落、降防碎印（规则 effects 真值）、暗场渐退
     particles(fx, Array.from({ length: 32 }, () => ({ x: t.x + rnd(-2.4, 2.4) * PX, y: t.y - rnd(1.2, 3.4) * PX, dx: rnd(-16, 16), dy: rnd(60, 120), size: rnd(6, 11), color: pick(['#fef3c7', '#fde68a', '#ffffff']), core: '#ffffff', s0: 1, s1: 0.5, dur: rnd(900, 1300), delay: rnd(0, 520), ease: 'cubic-bezier(0.3,0.2,0.6,1)' })), 1550);
@@ -813,12 +811,11 @@ const thunderStorm = {
     // ② 落雷
     fx.sfx('thunder01', 0.72); fx.shake('heavy');
     ctx.after(40, () => fx.sfx('thunder_aoe_hit', 0.60));
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(245,243,255,.85),rgba(167,139,250,.35) 60%,rgba(46,16,101,.15));"></i>', 300)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     const strikeH = b.y - cloud.y + 20;
     fx.top('<i style="position:absolute;left:' + b.x + 'px;top:' + cloud.y + 'px;width:56px;height:' + strikeH + 'px;margin-left:-28px;background:linear-gradient(90deg,transparent,rgba(167,139,250,.6) 25%,#f5f3ff 50%,rgba(167,139,250,.6) 75%,transparent);mix-blend-mode:screen;"></i>', 280)
       .firstChild.animate([{ opacity: 1, transform: 'scaleX(1.3)' }, { opacity: 0.8, transform: 'scaleX(0.6)', offset: 0.5 }, { opacity: 0, transform: 'scaleX(0.2)' }], { duration: 260, fill: 'forwards' });
-    webm(ctx, '450.webm', b.x, b.y - 60, Math.max(R * 1.5, 4 * PX), { ms: 1300 });
+    webm(ctx, '450.webm', b.x, b.y - R * 0.3, Math.max(R * 3.4, 220), { ms: 1500 });   // 同火焰01口径：画幅覆盖整个爆炸半径
     fx.top(ringHtml(b.x, b.y, R * 2.1, 'rgba(237,233,254,0.85)', 'rgba(139,92,246,0.6)'), 560).firstChild
       .animate([{ transform: 'scale(0.1)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 540, easing: 'cubic-bezier(0.1,0.8,0.3,1)', fill: 'forwards' });
     const order = hits.map(hh => { const p = ctx.centerOf(hh.targetId); return { hh, p: worldPx(p), d: Math.hypot(p.x - center.x, p.y - center.y) }; }).sort((u, v) => u.d - v.d);
@@ -927,8 +924,7 @@ const frostBlast = {
       .firstChild.animate([{ transform: 'scale(1.1)', opacity: 0 }, { transform: 'scale(0.9)', opacity: 0.9, offset: 0.7 }, { transform: 'scale(0.2)', opacity: 1 }], { duration: 820, fill: 'forwards' });
     if (!(await ctx.wait(820))) return false;
     fx.sfx('frost_crystal_impact_fs550267', 0.68); fx.shake('heavy');
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(224,242,254,0.6),rgba(56,189,248,0.22));"></i>', 320)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 320, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     fx.top(ringHtml(b.x, b.y, R * 2.4, 'rgba(186,230,253,0.9)', 'rgba(14,165,233,0.4)'), 600)
       .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: 580, fill: 'forwards' });
     particles(fx, Array.from({ length: 28 }, () => { const a = rnd(0, TAU), d = rnd(0.5, 1.15) * R; return { x: b.x, y: b.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(8, 16), color: '#7dd3fc', core: '#f0f9ff', s0: 1, s1: 0.2, dur: 680 }; }), 800);
@@ -1046,26 +1042,21 @@ const reactionGuard = {
 };
 
 // ---------- D4-A 埃利奥特奥术核心（5项） ----------
+// 灵风术（埃利奥特定稿，demo-bastet-conch-arsenic-vfx「A 圣洁羽翼」= 根 index.html playLingFeng 原样提取）：
+// 风玫瑰罗盘阵 + 羽毛绕场蓄势 1000ms → 全屏疾风流光/旋风环/羽毛爆散 → 圣洁双翼加身；真音 windHum/crystalChime → aoe_wind_spin/dodgeWind/crystalChime。
+// 规则结果（单避/单速/赋予虚形）在双翼展开拍点揭示；原版标签处理器对 arcane 特效不叠通用 buff SVG，故 quiet 揭示。
 const lingFengShu = {
-  id: 'ling-feng-shu', grade: 'L2', fxTags: ['灵风术'],
-  timeline: { totalMs: 1050, fullscreen: false, darken: false },
-  cues: [{ key: 'aoe_wind_spin_fs772867', vol: 0.60 }],
-  prepareKeys() { return ['aoe_wind_spin_fs772867']; },
+  id: 'ling-feng-shu', grade: 'identity', fxTags: ['灵风术'],
+  prepareKeys: () => ['windHum', 'crystalChime', 'aoe_wind_spin_fs772867', 'dodgeWind'],
   async play(ctx) {
-    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
-    fx.sfx('aoe_wind_spin_fs772867', 0.60);
-    const rune = fx.ground(runeHtml(fx.uid(), c.x, c.y, 1.8 * PX, '#34d399', '#a7f3d0', 'ᚠᛖᚺᚢ'), 1000);
-    grow(rune.firstChild, { ms: 1000, s0: 0.3, s1: 1.05, hold: 0.7, s2: 1.25 });
-    spin(rune.querySelector('[data-fx=spin]'), 240, 1000);
-    particles(fx, Array.from({ length: 18 }, (_, i) => {
-      const a = (i / 18) * TAU;
-      return { x: c.x + Math.cos(a) * 44, y: c.y + Math.sin(a) * 28, dx: Math.cos(a + 1.2) * 38, dy: -46, size: rnd(6, 12), color: '#6ee7b7', core: '#ecfdf5', s0: 1, s1: 0.2, dur: 760, delay: i * 25 };
-    }), 960);
-    ctx.after(260, () => {
+    const { av, result, audioContext, casterEnt } = ctx, CHARGE = 1000;
+    const handle = av.CombatAudioMixer.withContext(audioContext, () => av.playLingFeng(casterEnt));
+    ctx.after(CHARGE + 350, () => {
       (result.effects || []).forEach(e => ctx.revealEffect(e, true));
-      floatText(fx, c.x, c.y - 38, '🕊️ 飞行 · 疾风', '#a7f3d0', '#065f46', { ms: 750, size: 13 });
+      const c = worldPx(ctx.centerOf(ctx.casterId));
+      floatText(ctx.fx, c.x, c.y - 44, '🕊️ 灵风 · 疾行', '#a7f3d0', '#065f46', { ms: 900, size: 13 });
     });
-    return ctx.wait(1000);
+    return ctx.awaitHandle(handle, CHARGE + 2200);
   },
 };
 
@@ -1082,8 +1073,7 @@ const nakTithBarrier = {
     spin(rune.querySelector('[data-fx=spin]'), 160, 1500);
     if (!(await ctx.wait(820))) return false;
     fx.sfx('herochargedone', 0.62); fx.shake('medium');
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(254,243,199,0.45),rgba(245,158,11,0.18));"></i>', 280)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 280, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     fx.top(ringHtml(c.x, c.y, R * 2, 'rgba(253,230,138,0.85)', 'rgba(217,119,6,0.4)'), 680)
       .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 640, fill: 'forwards' });
     return ctx.wait(1220);
@@ -1102,8 +1092,7 @@ const isisEmbrace = {
     spin(rune.querySelector('[data-fx=spin]'), -140, 1800);
     if (!(await ctx.wait(820))) return false;
     fx.sfx('hpHeal', 0.65);
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(255,251,235,0.55),rgba(251,191,36,0.16));"></i>', 300)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     fx.top(ringHtml(c.x, c.y, R * 2, 'rgba(254,240,138,0.85)', 'rgba(74,222,128,0.35)'), 760)
       .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 720, fill: 'forwards' });
     (result.effects || []).forEach((e, i) => ctx.after(60 + i * 50, () => ctx.revealEffect(e, false)));
@@ -1203,8 +1192,7 @@ const strafeBurst = {
     rune.firstChild.animate([{ transform: 'scale(0.5)', opacity: 0.3 }, { transform: 'scale(1.1)', opacity: 0.9 }], { duration: 800, fill: 'forwards' });
     if (!(await ctx.wait(800))) return false;
     fx.sfx('aoe_gun_burst_fs482122', 0.68); fx.shake('medium');
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(254,240,138,0.35),transparent 65%);"></i>', 240)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 0 }], { duration: 240, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     for (let k = 0; k < 14; k++) ctx.after(k * 55, () => {
       const ang = baseAng + rnd(-0.72, 0.72), dist = rnd(260, 520);
       const end = { x: c.x + Math.cos(ang) * dist, y: c.y + Math.sin(ang) * dist };
@@ -1217,7 +1205,7 @@ const strafeBurst = {
 
 const kruppSnipe = {
   id: 'krupp-snipe', grade: 'L4', fxTags: ['克虏伯重狙'],
-  timeline: { chargeMs: 1220, totalMs: 3150, fullscreen: true, darken: true },
+  timeline: { chargeMs: 1220, totalMs: 3400, fullscreen: true, darken: true },   // 1220 瞄准 + 2100 原版视频全段 + 收尾
   cues: [{ key: 'gunshot_pierce', vol: 0.72 }, { key: 'explosion_aoe_blast', vol: 0.62 }],
   prepareKeys() { return ['gunshot_pierce', 'explosion_aoe_blast']; },
   async play(ctx) {
@@ -1226,12 +1214,11 @@ const kruppSnipe = {
     trail(fx, c, { x: (c.x + t.x) / 2, y: (c.y + t.y) / 2 }, t, { color: '#ef4444', width: 2, ms: 1180 });
     if (!(await ctx.wait(1220))) return false;
     fx.sfx('gunshot_pierce', 0.72); fx.sfx('explosion_aoe_blast', 0.62); fx.shake('quake');
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(255,255,255,0.85),rgba(249,115,22,0.3) 60%);"></i>', 340)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 0 }], { duration: 340, fill: 'forwards' });
-    webm(ctx, 'snipe-ezremove.mp4', t.x, t.y, 4 * PX, { ms: 1200 });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
+    const shot = webm(ctx, 'snipe-ezremove.mp4', t.x, t.y, Math.max(screenSpanPx(ctx, 1.5), screenCoverPx(ctx, 0.5, 16 / 9)), { ms: 2600 });
     trail(fx, c, { x: (c.x + t.x) / 2, y: (c.y + t.y) / 2 }, t, { color: '#fef08a', width: 9, ms: 260 });
     ctx.after(60, () => hits.forEach(h => ctx.reveal(h.targetId)));
-    return ctx.wait(1850);
+    return ctx.awaitHandle(shot.handle, 1850);
   },
 };
 
@@ -1260,8 +1247,7 @@ const harmonyWard = {
     grow(rune.firstChild, { ms: 1400, s0: 0.3, s1: 1, hold: 0.7, s2: 1.15 });
     if (!(await ctx.wait(820))) return false;
     fx.sfx('hpHeal', 0.62);
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(224,242,254,0.45),rgba(56,189,248,0.18));"></i>', 280)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 280, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     webm(ctx, 'vfx_harmony_ripple.webm', c.x, c.y, 5 * PX, { ms: 1300 });
     fx.top(ringHtml(c.x, c.y, 8 * PX, 'rgba(186,230,253,0.85)', 'rgba(56,189,248,0.3)'), 720)
       .firstChild.animate([{ transform: 'scale(0.1)', opacity: 1 }, { transform: 'scale(1.2)', opacity: 0 }], { duration: 700, fill: 'forwards' });
@@ -1281,8 +1267,7 @@ const silenceField = {
       .firstChild.animate([{ transform: 'scale(0.4)', opacity: 0.3 }, { transform: 'scale(1)', opacity: 0.9 }], { duration: 800, fill: 'forwards' });
     if (!(await ctx.wait(820))) return false;
     fx.sfx('enemyDebuff', 0.62); fx.shake('light');
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(148,163,184,0.4),rgba(15,23,42,0.2));"></i>', 280)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 280, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     webm(ctx, 'vfx_silence_ripple.webm', c.x, c.y, 6 * PX, { ms: 1300 });
     hits.forEach((h, i) => ctx.after(60 + i * 50, () => ctx.reveal(h.targetId)));
     return ctx.wait(1220);
@@ -1300,8 +1285,7 @@ const shatterEcho = {
       .firstChild.animate([{ transform: 'translate(-50%,-50%) scale(0.4)', opacity: 0.4 }, { transform: 'translate(-50%,-50%) scale(1.05)', opacity: 0.9 }], { duration: 800, fill: 'forwards' });
     if (!(await ctx.wait(820))) return false;
     fx.sfx('defDown', 0.64); fx.shake('medium');
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(254,205,211,0.5),rgba(225,29,72,0.2));"></i>', 280)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 280, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     webm(ctx, 'vfx_shatter_arc.webm', c.x, c.y, 6 * PX, { ms: 1300 });
     if (result.crit) floatText(fx, c.x, c.y - 42, '💥 碎裂暴击×2!', '#fecdd3', '#881337', { ms: 900, size: 15 });
     hits.forEach((h, i) => ctx.after(60 + i * 50, () => ctx.reveal(h.targetId)));
@@ -1321,8 +1305,7 @@ const sekhmetWrath = {
     grow(rune.firstChild, { ms: 2200, s0: 0.25, s1: 1.05, hold: 0.8, s2: 1.2 });
     if (!(await ctx.wait(1220))) return false;
     fx.sfx('fire01', 0.70); fx.sfx('explosion_aoe_blast', 0.65); fx.shake('quake');
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(255,237,213,0.9),rgba(234,88,12,0.4) 55%);"></i>', 380)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 0 }], { duration: 380, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     webm(ctx, 'vfx_sekhmet_pillar.webm', t.x, t.y - 40, 4.5 * PX, { ms: 1500 });
     particles(fx, Array.from({ length: 30 }, () => { const a = rnd(0, TAU), d = rnd(1, 2.5) * PX; return { x: t.x, y: t.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d - 20, size: rnd(10, 18), color: '#fb923c', core: '#fff7ed', s0: 1, s1: 0.25, dur: 740 }; }), 850);
     ctx.after(60, () => hits.forEach(h => ctx.reveal(h.targetId)));
@@ -1387,8 +1370,7 @@ const strangeConch = {
       .firstChild.animate([{ transform: 'scale(0.3)', opacity: 0.3 }, { transform: 'scale(1)', opacity: 0.9 }], { duration: 800, fill: 'forwards' });
     if (!(await ctx.wait(820))) return false;
     fx.sfx('enemyDebuff', 0.62); fx.shake('medium');
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(34,211,238,0.35),rgba(15,23,42,0.28));"></i>', 300)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     webm(ctx, 'vfx_conch_vortex.webm', c.x, c.y, 6 * PX, { ms: 1300 });
     hits.forEach((h, i) => ctx.after(50 + i * 40, () => ctx.reveal(h.targetId)));
     return ctx.wait(1260);
@@ -1408,8 +1390,7 @@ const highSummon = {
     spin(rune.querySelector('[data-fx=spin]'), 180, 1600);
     if (!(await ctx.wait(820))) return false;
     fx.sfx('herochargedone', 0.62); fx.shake('medium');
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(254,240,138,0.45),rgba(217,119,6,0.18));"></i>', 280)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 280, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     particles(fx, Array.from({ length: 20 }, () => { const ang = rnd(0, TAU), d = rnd(0.5, 1.4) * PX; return { x: a.x, y: a.y, dx: Math.cos(ang) * d, dy: Math.sin(ang) * d - 25, size: rnd(8, 14), color: '#fbbf24', core: '#fffbeb', s0: 1, s1: 0.2, dur: 640 }; }), 760);
     return ctx.wait(1220);
   },
@@ -1427,8 +1408,7 @@ const scorpionKey = {
     spin(rune.querySelector('[data-fx=spin]'), -210, 1800);
     if (!(await ctx.wait(820))) return false;
     fx.sfx('herochargedone', 0.65); fx.shake('heavy');
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(243,232,255,0.5),rgba(147,51,234,0.22));"></i>', 300)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     fx.top(ringHtml(a.x, a.y, 4 * PX, 'rgba(216,180,254,0.9)', 'rgba(126,34,206,0.45)'), 680)
       .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 640, fill: 'forwards' });
     return ctx.wait(1260);
@@ -1445,8 +1425,7 @@ const xenonBlightFog = {
     flyOrb(fx, c, { x: (c.x + b.x) / 2, y: Math.min(c.y, b.y) - 90 }, b, { size: 22, color: '#22c55e', core: '#dcfce7', ms: 420, fade: true });
     if (!(await ctx.wait(820))) return false;
     fx.sfx('aoe_poison_spell_fs219566', 0.65); fx.shake('medium');
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(134,239,172,0.35),rgba(20,83,45,0.22));"></i>', 300)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     webm(ctx, 'fog.mp4', b.x, b.y, R * 2, { ms: 1300, opacity: 0.85, cover: R * 2 });
     particles(fx, Array.from({ length: 24 }, () => { const a = rnd(0, TAU), d = rnd(0.4, 1) * R; return { x: b.x, y: b.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(12, 22), color: '#16a34a', core: '#86efac', s0: 0.8, s1: 0.2, dur: 760 }; }), 860);
     hits.forEach((h, i) => ctx.after(50 + i * 45, () => ctx.reveal(h.targetId)));
@@ -1456,20 +1435,61 @@ const xenonBlightFog = {
 
 const vitalFlow = {
   id: 'vital-flow', grade: 'L2', fxTags: ['生体流转'],
-  timeline: { totalMs: 960, fullscreen: false, darken: false },
+  timeline: { totalMs: 1180, fullscreen: false, darken: false },
   cues: [{ key: 'herocharge', vol: 0.56 }],
   prepareKeys() { return ['herocharge']; },
+  // 心搏两拍（lub-dub ×2）：脚下血脉法阵 → 胸前心核随拍收缩、八道血管自心核描向周身 → 血珠沿 ∞ 环流 →
+  // 心电迹线横扫 → 第二拍揭示再动。全部锚定施术者世界坐标、半径 ≤2.6m，不遮邻格。
   async play(ctx) {
-    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
+    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), u = fx.uid();
+    const hx = c.x, hy = c.y - 30, R = 2.6 * PX;
     fx.sfx('herocharge', 0.56);
-    webm(ctx, 'heart.mp4', c.x, c.y - 24, 4.4 * PX, { ms: 900 });
-    fx.ground(runeHtml(fx.uid(), c.x, c.y, 1.5 * PX, '#ef4444', '#fecaca', ''), 880)
-      .firstChild.animate([{ transform: 'translate(-50%,-50%) scale(0.35)', opacity: 0.9 }, { transform: 'translate(-50%,-50%) scale(1.1)', opacity: 0 }], { duration: 840, fill: 'forwards' });
-    ctx.after(260, () => {
-      (result.effects || []).forEach(e => ctx.revealEffect(e, true));
-      floatText(fx, c.x, c.y - 42, '💓 生体流转 · 再动 +1', '#fecaca', '#7f1d1d', { ms: 720, size: 13 });
+    webm(ctx, 'heart.mp4', hx, hy, 4.4 * PX, { ms: 1150, opacity: 0.9 });
+    const rune = fx.ground(runeHtml(u, c.x, c.y, 1.8 * PX, '#ef4444', '#fecaca', 'ᛒᛚᛟᛞ'), 1180).firstChild;
+    rune.animate([{ transform: 'translate(-50%,-50%) scale(0.3)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 1, offset: 0.3 }, { transform: 'translate(-50%,-50%) scale(1.06)', opacity: 0.9, offset: 0.7 }, { transform: 'translate(-50%,-50%) scale(1.2)', opacity: 0 }], { duration: 1160, fill: 'forwards' });
+    spin(rune.querySelector('[data-fx=spin]'), 90, 1160);
+    // 心核 + 血管（共用 viewBox 以心核为原点）
+    const veins = Array.from({ length: 8 }, (_, i) => {
+      const a = i / 8 * TAU + 0.2, L = R * (0.75 + (i % 3) * 0.1), m = L * 0.5;
+      return '<path d="M0,0 Q' + (Math.cos(a + 0.5) * m).toFixed(1) + ',' + (Math.sin(a + 0.5) * m).toFixed(1) + ' ' + (Math.cos(a) * L).toFixed(1) + ',' + (Math.sin(a) * L).toFixed(1) + '" fill="none" stroke="url(#vv' + u + ')" stroke-width="' + (3.4 - (i % 2)) + '" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" data-fx="vein"/>';
+    }).join('');
+    const heart = 'M0,14 C-26,-6 -24,-30 -10,-32 C-2,-33 0,-26 0,-22 C0,-26 2,-33 10,-32 C24,-30 26,-6 0,14Z';
+    const S = R * 2.4;
+    const svg = '<svg width="' + S + '" height="' + S + '" viewBox="' + (-S / 2) + ' ' + (-S / 2) + ' ' + S + ' ' + S + '" style="position:absolute;left:' + hx + 'px;top:' + hy + 'px;transform:translate(-50%,-50%);overflow:visible;pointer-events:none;">' +
+      '<defs><radialGradient id="hc' + u + '"><stop offset="0" stop-color="#fff1f2"/><stop offset="0.45" stop-color="#fb7185"/><stop offset="1" stop-color="#9f1239"/></radialGradient>' +
+      '<linearGradient id="vv' + u + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fecdd3"/><stop offset="1" stop-color="#be123c" stop-opacity="0.2"/></linearGradient>' +
+      '<filter id="hg' + u + '" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>' +
+      '<g filter="url(#hg' + u + ')">' + veins + '<g data-fx="heart"><path d="' + heart + '" fill="url(#hc' + u + ')" transform="scale(1.3)"/></g></g></svg>';
+    const layer = fx.top(svg, 1180);
+    const hEl = layer.querySelector('[data-fx=heart]');
+    const beat = [{ transform: 'scale(0.6)', opacity: 0 }, { transform: 'scale(1.25)', opacity: 1, offset: 0.12 }, { transform: 'scale(0.95)', offset: 0.22 }, { transform: 'scale(1.15)', offset: 0.32 }, { transform: 'scale(1)', offset: 0.45 },
+      { transform: 'scale(1.28)', offset: 0.56 }, { transform: 'scale(0.95)', offset: 0.64 }, { transform: 'scale(1.18)', offset: 0.72 }, { transform: 'scale(1)', opacity: 1, offset: 0.85 }, { transform: 'scale(0.7)', opacity: 0 }];
+    hEl.animate(beat, { duration: 1150, fill: 'forwards', easing: 'ease-out' });
+    layer.querySelectorAll('[data-fx=vein]').forEach((v, i) => {
+      v.animate([{ strokeDashoffset: 1, opacity: 1 }, { strokeDashoffset: 0, opacity: 1, offset: 0.35 }, { strokeDashoffset: 0, opacity: 0.25, offset: 0.55 }, { strokeDashoffset: -1, opacity: 0 }], { duration: 600, delay: (i % 2) * 40, fill: 'forwards' });
+      v.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 520, delay: 560 + (i % 2) * 40, fill: 'forwards' });
     });
-    return ctx.wait(920);
+    // 每拍一圈血色冲击环
+    [0, 100, 560, 660].forEach((t, k) => ctx.after(t, () => fx.top(ringHtml(hx, hy, R * (k % 2 ? 1.4 : 2), 'rgba(254,205,211,0.85)', 'rgba(225,29,72,0.45)'), 560)
+      .firstChild.animate([{ transform: 'scale(0.2)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 520, easing: 'cubic-bezier(0.1,0.8,0.3,1)', fill: 'forwards' })));
+    // 血珠沿 ∞ 字环流（伯努利双纽线，同一组采样点保证首尾相接）
+    const lem = t => { const s = Math.sin(t), k = 1 + s * s; return { x: hx + R * 0.9 * Math.cos(t) / k, y: c.y + R * 0.45 * Math.sin(t) * Math.cos(t) / k }; };
+    for (let n = 0; n < 10; n++) {
+      const l = fx.top(orbHtml(0, 0, 10 - (n % 3) * 2, '#e11d48', '#ffe4e6'), 1180);
+      const frames = Array.from({ length: 17 }, (_, k) => { const p = lem((k / 16) * TAU + n * 0.63); return { transform: 'translate(' + p.x.toFixed(1) + 'px,' + p.y.toFixed(1) + 'px)', opacity: k === 0 || k === 16 ? 0 : 1 }; });
+      l.firstChild.animate(frames, { duration: 900, delay: 100 + n * 24, easing: 'linear', fill: 'both' });
+    }
+    // 心电迹线：头顶横扫（描边推进）
+    let ecg = 'M' + (-R) + ',0';
+    [[-0.55, 0], [-0.42, -8], [-0.34, 0], [-0.22, 0], [-0.16, 14], [-0.1, -46], [-0.03, 22], [0.04, 0], [0.22, 0], [0.32, -12], [0.42, 0], [R / R, 0]].forEach(([x, y]) => { ecg += ' L' + (x * R).toFixed(1) + ',' + y; });
+    const ecgL = fx.top('<svg width="' + (R * 2) + '" height="80" viewBox="' + (-R) + ' -50 ' + (R * 2) + ' 80" style="position:absolute;left:' + hx + 'px;top:' + (hy - R * 0.95) + 'px;transform:translate(-50%,-50%);overflow:visible;"><path d="' + ecg + '" fill="none" stroke="#fda4af" stroke-width="3" stroke-linejoin="round" pathLength="1" stroke-dasharray="0.35 1" stroke-dashoffset="0.35" filter="url(#hg' + u + ')"/></svg>', 1150);
+    ecgL.querySelector('path').animate([{ strokeDashoffset: 0.35, opacity: 1 }, { strokeDashoffset: -1, opacity: 1, offset: 0.9 }, { strokeDashoffset: -1, opacity: 0 }], { duration: 980, delay: 80, fill: 'forwards' });
+    // 第二拍揭示再动（规则结果）
+    ctx.after(580, () => {
+      (result.effects || []).forEach(e => ctx.revealEffect(e, true));
+      floatText(fx, hx, hy - R * 0.55, '💓 生体流转 · 再动 +1', '#fecaca', '#7f1d1d', { ms: 580, size: 14 });
+    });
+    return ctx.wait(1160);
   },
 };
 
@@ -1486,8 +1506,7 @@ const sanctumVeil = {
     grow(rune.firstChild, { ms: 2200, s0: 0.25, s1: 1.05, hold: 0.8, s2: 1.15 });
     if (!(await ctx.wait(1220))) return false;
     fx.sfx('weimu', 0.70); fx.shake('heavy');
-    fx.screen('<i style="position:absolute;inset:0;background:radial-gradient(circle,rgba(224,242,254,0.75),rgba(56,189,248,0.28));"></i>', 380)
-      .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.16 }, { opacity: 0 }], { duration: 380, fill: 'forwards' });
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     webm(ctx, 'weimu.webm', c.x, c.y, R * 2, { ms: 1600, cover: R * 2 });
     fx.top(ringHtml(c.x, c.y, R * 2, 'rgba(186,230,253,0.9)', 'rgba(56,189,248,0.35)'), 900)
       .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 860, fill: 'forwards' });
@@ -1504,3 +1523,4 @@ export function registerDefaultFx(registry) {
   for (const e of DEFAULT_FX_ENTRIES) registry.register(e);
   return registry;
 }
+

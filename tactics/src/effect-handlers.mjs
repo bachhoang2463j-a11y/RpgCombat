@@ -5,8 +5,7 @@
 // 单避只化解本段；免伤由攻击实例持有整技累计池；护盾累加至耗尽。
 // ==========================================
 
-import { isImmuneToPoison, isImmuneToBurn } from './variant-rules.mjs';
-import { isImmuneToStun } from './variant-rules.mjs';
+import { immunityReason } from './variant-rules.mjs';
 
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
 
@@ -19,21 +18,26 @@ export function applyEffectSlot(rt, { caster, slot, targets, skill, skillKey, mu
   const turns = slot.turns;
   const mult = multiplier > 1 ? multiplier : 1;
   for (const target of targets) {
-    const r = applyToTarget(rt, { caster, target, slot, def, power, turns, skill, skillKey, multiplier: mult });
-    if (r) applied.push(r);
+    const source = rt.statusSource(target.id, { casterId: caster.id, skillId: skillKey }, slot.tag + ':' + slot.index);
+    const barrier = def.debuff && !def.selfCost ? rt.interceptEffect?.(caster, target, slot) : null;
+    const r = barrier
+      ? { kind: 'blocked', targetId: target.id, tag: slot.tag, reason: 'barrier-debuff', barrierId: barrier.barrierId, blockedTag: barrier.blockedTag ?? slot.tag }
+      : applyToTarget(rt, { caster, target, slot, def, power, turns, skill, skillKey, source, multiplier: mult });
+    if (r) applied.push({ ...r, casterId: caster.id, slotIndex: slot.index, attackId: rt.currentAttackId(), effectId: source.effectId });
   }
   return { applied };
 }
 
-function applyToTarget(rt, { caster, target, slot, def, power, turns, skill, skillKey, multiplier = 1 }) {
+function applyToTarget(rt, { caster, target, slot, def, power, turns, skill, skillKey, source, multiplier = 1 }) {
   const ref = target.ref;
   const effPower = (slot.target === 'self' && def.selfCost) ? power : power * (multiplier > 1 ? multiplier : 1);
-  const source = rt.statusSource(target.id, { casterId: caster.id, skillId: skillKey }, slot.tag + ':' + slot.index);
   switch (def.kind) {
     case 'heal': {
-      const burning = rt.buffsOf(target.id).some(b => b.type === 'burn');
+      const burns = rt.buffsOf(target.id).filter(b => b.type === 'burn');
+      const burning = burns.length > 0;
       const amount = burning ? Math.floor(effPower / 2) : effPower;
       const oldHp = ref.hp;
+      const shieldBefore = ref.shield || 0;
       ref.hp = clamp(ref.hp + amount, 0, ref.maxHp);
       let overheal = null;
       const passive = rt.passiveOf(caster);
@@ -42,7 +46,12 @@ function applyToTarget(rt, { caster, target, slot, def, power, turns, skill, ski
         if (o && o.shield > 0) { ref.shield = (ref.shield || 0) + o.shield; overheal = o.shield; }
       }
       rt.addLog(caster.name + ' 治疗 ' + target.name + ' +' + (ref.hp - oldHp) + ' HP' + (burning ? '（燃烧下治疗减半）' : '') + (overheal ? ' · 溢出转盾+' + overheal : ''));
-      return { kind: 'heal', targetId: target.id, tag: slot.tag, value: ref.hp - oldHp, burning, overheal, crit: multiplier > 1 };
+      return { kind: 'heal', targetId: target.id, tag: slot.tag, value: ref.hp - oldHp, burning, overheal, crit: multiplier > 1,
+        healBeforeSuppression: effPower, healAfterSuppression: amount, healSuppressed: effPower - amount,
+        hpBefore: oldHp, hpAfter: ref.hp, hpCapped: Math.max(0, oldHp + amount - ref.maxHp),
+        shieldBefore, shieldAfter: ref.shield || 0, reason: burning ? 'burn-heal-suppressed' : null,
+        suppressionSources: burns.map(b => structuredClone(b._source)),
+      };
     }
     case 'healMp': {
       const before = ref.mp;
@@ -71,8 +80,8 @@ function applyToTarget(rt, { caster, target, slot, def, power, turns, skill, ski
       return { kind: 'shield', targetId: target.id, tag: slot.tag, value: effPower, crit: multiplier > 1 };
     }
     case 'dot': {
-      const immune = def.dot === 'poison' ? isImmuneToPoison(target, rt.buffsOf(target.id)) : isImmuneToBurn(target, rt.buffsOf(target.id));
-      if (immune) { rt.addLog(target.name + ' 免疫了' + (def.dot === 'poison' ? '中毒' : '灼烧')); return { kind: 'dot', targetId: target.id, tag: slot.tag, immune: true }; }
+      const immunity = immunityReason(target, def.dot === 'poison' ? 'poison' : 'burn', rt.buffsOf(target.id));
+      if (immunity) { rt.addLog(target.name + ' 免疫了' + (def.dot === 'poison' ? '中毒' : '灼烧')); return { kind: 'dot', targetId: target.id, tag: slot.tag, immune: true, immunity, reason: immunity.reason }; }
       const strength = Math.max(1, Math.floor(effPower));
       rt.registerDot(target, def.dot, { strength, turns, casterId: caster.id, skillKey, slotTag: slot.tag });
       rt.addLog(target.name + (def.dot === 'poison' ? ' 中毒(可叠加) ' : ' 燃烧 ') + strength + ' · ' + turns + '回');
@@ -114,10 +123,11 @@ function applyToTarget(rt, { caster, target, slot, def, power, turns, skill, ski
       return { kind: 'damageGuard', targetId: target.id, tag: slot.tag, value: power, attackId };
     }
     case 'stun': {
-      const immune = isImmuneToStun(target, rt.buffsOf(target.id));
+      const immunity = immunityReason(target, 'stun', rt.buffsOf(target.id));
+      const immune = !!immunity;
       if (!immune) rt.dispatchBattleClock({ type: 'applyStun', unitId: target.id });
       rt.addLog(target.name + (immune ? ' 免疫眩晕（钢体）' : ' 被击晕，将跳过下一次自然行动'));
-      return { kind: 'stun', targetId: target.id, tag: slot.tag, immune };
+      return { kind: 'stun', targetId: target.id, tag: slot.tag, immune, immunity, reason: immunity?.reason ?? null };
     }
     case 'counter': {
       rt.registerBuff(target, { type: 'counter', value: power, duration: turns, sourceKey: source.effectId }, source);

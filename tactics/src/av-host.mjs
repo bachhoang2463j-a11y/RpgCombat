@@ -71,13 +71,13 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
       shakeEl() { return shakeEl; },
     },
     screen() {
-      const viewport = shakeEl && shakeEl.parentNode;
-      if (!viewport) return stageEl;
-      if (!screenEl || screenEl.parentNode !== viewport) {
+      // 原版击杀特写/大招 Cut-in 为 body 级 fixed z-[200]，压住全部 UI：宿主挂 iframe body 最顶层（不随相机变换，不挡输入）
+      if (!screenEl || !screenEl.isConnected) {
         screenEl = document.createElement('div');
         screenEl.setAttribute('data-tactics-fx', 'rpg-av-screen');
-        screenEl.style.cssText = 'position:absolute; inset:0; z-index:8; pointer-events:none; overflow:hidden;';
-        viewport.appendChild(screenEl);
+        screenEl.setAttribute('data-rpg-av-scope', '');
+        screenEl.style.cssText = 'position:fixed; inset:0; z-index:2147483000; pointer-events:none; overflow:hidden;';
+        document.body.appendChild(screenEl);
       }
       return screenEl;
     },
@@ -243,6 +243,7 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
     document.removeEventListener('click', docUnlock, { capture: true });
     document.removeEventListener('keydown', docUnlock, { capture: true });
     clear({ resetVoices: true });
+    if (screenEl) { screenEl.remove(); screenEl = null; }
     delete Element.prototype[rectSymbol];
   }
 

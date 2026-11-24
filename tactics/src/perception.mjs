@@ -10,7 +10,7 @@
 import { occupiedCells, cellKey, unitCenter } from './geometry.mjs';
 import { cellAt } from './scene.mjs';
 import { cellsAdjacent } from './movement.mjs';
-import { fogAt } from './regions.mjs';
+import { fogAt, fogAffects } from './regions.mjs';
 
 const EPS = 1e-9;
 const SAMPLE_STEP = 0.2;
@@ -57,7 +57,7 @@ function segmentTouchesFog(ctx, a, b) {
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
     const key = cellKey(Math.floor(a.x + dx * t), Math.floor(a.y + dy * t));
-    if (sets.some(s => s.has(key))) return true;
+    if (sets.some((s, index) => s.has(key) && fogAffects(ctx, regions[index], { x: a.x + dx * t, y: a.y + dy * t }))) return true;
   }
   return false;
 }

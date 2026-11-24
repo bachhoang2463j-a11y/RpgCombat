@@ -31,6 +31,30 @@ const FX01_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'f
 
 // 阶段注册表：只登记真实存在的用例文件；--all 只聚合这里的条目，不虚构未来阶段。
 const STAGES = {
+  'guard-director': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'guard-director-node-cases.mjs'),
+    groups: ['TG-DIRECTOR'], modules: [], requiredExports: [],
+  },
+  'guard-path': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'guard-path-node-cases.mjs'),
+    groups: ['TG-PATH'], modules: [], requiredExports: [],
+  },
+  'guard-battle': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'guard-battle-node-cases.mjs'),
+    groups: ['TG-BATTLE'], modules: [], requiredExports: [],
+  },
+  'guard-reasons': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'guard-barrier-reasons-node-cases.mjs'),
+    groups: ['TG-REASONS'], modules: [], requiredExports: [],
+  },
+  'guard-barrier-flow': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'guard-barrier-flow-node-cases.mjs'),
+    groups: ['TG-FLOW'], modules: [], requiredExports: [],
+  },
+  'guard-barrier-space': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'guard-barrier-space-node-cases.mjs'),
+    groups: ['TG-SPACE'], modules: [], requiredExports: [],
+  },
   'p07-av': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p07av-node-cases.mjs'),
     groups: ['TP7AV-A', 'TP7AV-W'], modules: [], requiredExports: [],

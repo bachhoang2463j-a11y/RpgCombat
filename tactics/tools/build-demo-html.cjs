@@ -15,7 +15,7 @@ const { build: buildRpgUi } = require('./extract-rpg-ui.cjs');
 
 // 产物专项断言：本轮新增与核心模块必须真实入包（存在性，不是仅字符串出现）
 const REQUIRED_INPUTS = [
-  'src/main.mjs', 'src/battle.mjs', 'src/movement.mjs', 'src/range.mjs',
+  'src/main.mjs', 'src/battle.mjs', 'src/guard.mjs', 'src/movement.mjs', 'src/range.mjs',
   'src/damage.mjs', 'src/ai.mjs', 'src/generation.mjs', 'src/demo-fixture.mjs', 'src/clock.mjs',
   'src/scheduler.mjs', 'src/parser.mjs', 'src/vendor/js-yaml-4.1.0.mjs',
   'src/av-host.mjs', 'src/action-director.mjs', 'src/motion.mjs', 'src/range-overlay.mjs',
@@ -24,7 +24,7 @@ const REQUIRED_INPUTS = [
   'src/fx-registry.mjs', 'src/fx-library.mjs', 'src/vfx-host.mjs',
   'src/effect-definitions.mjs', 'src/effect-handlers.mjs', 'src/class-passives.mjs', 'src/variant-rules.mjs',
   'src/reaction-prompt.mjs',
-  'src/screen-atmos.mjs',
+  'src/screen-atmos.mjs', 'src/screen-showpiece.mjs',
   'src/scenario-data.mjs', 'src/regions.mjs', 'src/perception.mjs', 'src/barriers.mjs',
   '典型对局-战棋版.yaml',
 ];
@@ -37,7 +37,9 @@ const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFee
   'buildTypicalViewData', 'playPrepare', 'syncRegions', 'fogFieldHtml', 'prepareInput', 'revealEffect',
   'playGenericSupportFx', 'spawnHealParticles', 'playSupportEffects', 'supportResourceDelta', 'applyPersistentFxTags',
   'buildHitFeedback', 'avatarScaleForZoom', 'linkSkillGroupRows', 'prepareHitNumbers', 'animateHitNumber',
-  'startAtmos', 'atmosStyleOf', 'FX_WEBM_KEY_MAX'];
+  'startAtmos', 'atmosStyleOf', 'FX_WEBM_KEY_MAX', 'mountShowpiece', 'SHOWPIECES',
+  'previewGuard', 'commitGuard', 'autoSummonGuard', 'segmentDamage', 'resolveBarrierDamage', 'expireBarriers',
+  'barrierCrossing', 'barrierContact', 'holdGuards', 'revealGuard', 'immunityReason'];
 
 const entry = [
   "import { createApp } from './src/main.mjs';",

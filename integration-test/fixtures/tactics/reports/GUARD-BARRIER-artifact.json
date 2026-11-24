@@ -1,0 +1,923 @@
+{
+  "kind": "guard-barrier-artifact-backend",
+  "artifact": "tactics/mvp-standalone.html",
+  "bytes": 1438894,
+  "sha256": "e212c63bda9322059ad477b07d0956225eb8bc26aac85aa07e1fb5246fb5c3cd",
+  "cases": [
+    {
+      "id": "单脚本与闭合",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "零外部业务JS/CSS/import",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "守护、隔绝、原因与揭示模块真实入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "真实后端已加载且仅因无DOM停止页面启动",
+      "pass": true,
+      "detail": "document is not defined"
+    },
+    {
+      "id": "真实后端createBattle导出",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "产物自动致死守护真实留位、同段关联与主人零伤",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "产物非致死不自动守护",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "产物副槽肃正取值与时长、稳定金色",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "产物群攻两人共享一次整体承伤",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "产物空结界可以正式攻击",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "产物实际抗性原因与数值对应",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "产物燃烧减疗原因与实际回血",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "产物期限、重开与销毁清理",
+      "pass": true,
+      "detail": ""
+    }
+  ],
+  "passed": 13,
+  "failed": 0,
+  "examples": {
+    "summonGuard": {
+      "event": {
+        "seq": 3,
+        "eventId": "battle:1:0:event:3",
+        "runId": "battle:1:0",
+        "actionId": "battle:1:0:action:1",
+        "at": 33.333333333333336,
+        "attackId": "attack:1",
+        "segmentId": "battle:1:0:attack:1:slot:0:segment:1",
+        "slotIndex": 0,
+        "segmentIndex": 1,
+        "shotIndex": 1,
+        "type": "guard-committed",
+        "ok": true,
+        "guardianId": "g",
+        "originalTargetId": "h",
+        "casterId": "e",
+        "from": {
+          "col": 3,
+          "row": 4
+        },
+        "to": {
+          "col": 5,
+          "row": 4,
+          "facing": 90
+        },
+        "path": [
+          {
+            "col": 3,
+            "row": 4
+          },
+          {
+            "col": 4,
+            "row": 4
+          },
+          {
+            "col": 5,
+            "row": 4
+          }
+        ],
+        "distance": 2,
+        "maxDistance": 3,
+        "origin": {
+          "x": 10.5,
+          "y": 4.5
+        },
+        "startPosition": {
+          "x": 3.5,
+          "y": 4.5
+        },
+        "protectedPosition": {
+          "x": 4.5,
+          "y": 4.5
+        },
+        "contactPoint": {
+          "x": 5.5,
+          "y": 4.5
+        },
+        "pathDistance": 2,
+        "reason": "summon-lethal-guard",
+        "finalTargetId": "g",
+        "committed": true,
+        "reactionUsed": {
+          "seq": 2,
+          "eventId": "battle:1:0:event:2",
+          "runId": "battle:1:0",
+          "actionId": "battle:1:0:action:1",
+          "at": 33.333333333333336,
+          "attackId": "attack:1",
+          "segmentId": "battle:1:0:attack:1:slot:0:segment:1",
+          "slotIndex": 0,
+          "segmentIndex": 1,
+          "shotIndex": 1,
+          "type": "reaction-used",
+          "responderId": "g",
+          "skillName": "召唤守护",
+          "costs": {
+            "mp": 0,
+            "hp": 0,
+            "tp": 0
+          },
+          "bindings": null,
+          "usesLeft": null,
+          "cooldownAt": 0
+        },
+        "lethalCheck": {
+          "targetId": "h",
+          "hpBefore": 20,
+          "hpDmg": 50,
+          "shieldDmg": 0,
+          "rawDmg": 50,
+          "lethal": true
+        }
+      },
+      "segment": {
+        "runId": "battle:1:0",
+        "attackId": "attack:1",
+        "segmentId": "battle:1:0:attack:1:slot:0:segment:1",
+        "slotIndex": 0,
+        "segmentIndex": 1,
+        "shotIndex": 1,
+        "index": 0,
+        "origin": {
+          "x": 10.5,
+          "y": 4.5
+        },
+        "originalTargetId": "h",
+        "contactPoint": {
+          "x": 5.5,
+          "y": 4.5
+        },
+        "targetId": "g",
+        "logIndex": 1,
+        "side": "hero",
+        "maxHp": 100,
+        "damageType": "法术",
+        "damageCategory": null,
+        "isCrit": false,
+        "isPierce": false,
+        "hit": true,
+        "outcome": "hit",
+        "hpDmg": 50,
+        "shieldDmg": 0,
+        "guardDmg": 0,
+        "shieldBefore": 0,
+        "shieldAfter": 0,
+        "rawBeforeResist": 50,
+        "rawDmg": 50,
+        "resistance": {
+          "before": 50,
+          "after": 50,
+          "layers": []
+        },
+        "fatalResult": null,
+        "finalTargetId": "g",
+        "hpBefore": 100,
+        "hpAfter": 50,
+        "down": false,
+        "reaction": {
+          "responderId": "g",
+          "guardianId": "g",
+          "skillName": "召唤守护",
+          "fxTag": null,
+          "canceled": false,
+          "dodged": false,
+          "shift": null,
+          "guard": {
+            "ok": true,
+            "guardianId": "g",
+            "originalTargetId": "h",
+            "casterId": "e",
+            "from": {
+              "col": 3,
+              "row": 4
+            },
+            "to": {
+              "col": 5,
+              "row": 4,
+              "facing": 90
+            },
+            "path": [
+              {
+                "col": 3,
+                "row": 4
+              },
+              {
+                "col": 4,
+                "row": 4
+              },
+              {
+                "col": 5,
+                "row": 4
+              }
+            ],
+            "distance": 2,
+            "maxDistance": 3,
+            "origin": {
+              "x": 10.5,
+              "y": 4.5
+            },
+            "startPosition": {
+              "x": 3.5,
+              "y": 4.5
+            },
+            "protectedPosition": {
+              "x": 4.5,
+              "y": 4.5
+            },
+            "contactPoint": {
+              "x": 5.5,
+              "y": 4.5
+            },
+            "pathDistance": 2,
+            "reason": "summon-lethal-guard",
+            "finalTargetId": "g",
+            "committed": true,
+            "reactionUsed": {
+              "seq": 2,
+              "eventId": "battle:1:0:event:2",
+              "runId": "battle:1:0",
+              "actionId": "battle:1:0:action:1",
+              "at": 33.333333333333336,
+              "attackId": "attack:1",
+              "segmentId": "battle:1:0:attack:1:slot:0:segment:1",
+              "slotIndex": 0,
+              "segmentIndex": 1,
+              "shotIndex": 1,
+              "type": "reaction-used",
+              "responderId": "g",
+              "skillName": "召唤守护",
+              "costs": {
+                "mp": 0,
+                "hp": 0,
+                "tp": 0
+              },
+              "bindings": null,
+              "usesLeft": null,
+              "cooldownAt": 0
+            },
+            "runId": "battle:1:0",
+            "attackId": "attack:1",
+            "segmentId": "battle:1:0:attack:1:slot:0:segment:1",
+            "slotIndex": 0,
+            "segmentIndex": 1,
+            "shotIndex": 1,
+            "lethalCheck": {
+              "targetId": "h",
+              "hpBefore": 20,
+              "hpDmg": 50,
+              "shieldDmg": 0,
+              "rawDmg": 50,
+              "lethal": true
+            }
+          },
+          "reactionUsed": {
+            "seq": 2,
+            "eventId": "battle:1:0:event:2",
+            "runId": "battle:1:0",
+            "actionId": "battle:1:0:action:1",
+            "at": 33.333333333333336,
+            "attackId": "attack:1",
+            "segmentId": "battle:1:0:attack:1:slot:0:segment:1",
+            "slotIndex": 0,
+            "segmentIndex": 1,
+            "shotIndex": 1,
+            "type": "reaction-used",
+            "responderId": "g",
+            "skillName": "召唤守护",
+            "costs": {
+              "mp": 0,
+              "hp": 0,
+              "tp": 0
+            },
+            "bindings": null,
+            "usesLeft": null,
+            "cooldownAt": 0
+          },
+          "guardianReaction": null
+        },
+        "logEnd": 2,
+        "aim": {
+          "x": 4.5,
+          "y": 4.5,
+          "targetId": "h"
+        },
+        "facing": 270,
+        "cells": [
+          {
+            "col": 4,
+            "row": 4
+          }
+        ]
+      }
+    },
+    "created": {
+      "seq": 2,
+      "eventId": "battle:3:0:event:2",
+      "runId": "battle:3:0",
+      "actionId": "battle:3:0:action:1",
+      "at": 33.333333333333336,
+      "attackId": "attack:1",
+      "type": "barrier-created",
+      "barrierId": "battle:3:0:barrier:h:1",
+      "reason": "created",
+      "barrier": {
+        "id": "battle:3:0:barrier:h:1",
+        "casterId": "h",
+        "side": "hero",
+        "center": {
+          "x": 4.5,
+          "y": 4.5
+        },
+        "radius": 2,
+        "cells": [
+          {
+            "col": 4,
+            "row": 2
+          },
+          {
+            "col": 3,
+            "row": 3
+          },
+          {
+            "col": 4,
+            "row": 3
+          },
+          {
+            "col": 5,
+            "row": 3
+          },
+          {
+            "col": 2,
+            "row": 4
+          },
+          {
+            "col": 3,
+            "row": 4
+          },
+          {
+            "col": 4,
+            "row": 4
+          },
+          {
+            "col": 5,
+            "row": 4
+          },
+          {
+            "col": 6,
+            "row": 4
+          },
+          {
+            "col": 3,
+            "row": 5
+          },
+          {
+            "col": 4,
+            "row": 5
+          },
+          {
+            "col": 5,
+            "row": 5
+          },
+          {
+            "col": 4,
+            "row": 6
+          }
+        ],
+        "integrity": 90,
+        "maxIntegrity": 90,
+        "armor": 0,
+        "protectType": "法术",
+        "visualIdentity": "gold",
+        "createdAt": 33.333333333333336,
+        "endAt": 233.33333333333334,
+        "shape": {
+          "type": "圆形",
+          "center": {
+            "x": 4.5,
+            "y": 4.5
+          },
+          "radius": 2
+        },
+        "boundary": {
+          "type": "circle",
+          "center": {
+            "x": 4.5,
+            "y": 4.5
+          },
+          "radius": 2
+        }
+      }
+    },
+    "groupHit": {
+      "seq": 5,
+      "eventId": "battle:4:0:event:5",
+      "runId": "battle:4:0",
+      "actionId": "battle:4:0:action:4",
+      "at": 100,
+      "attackId": "attack:2",
+      "segmentId": "battle:4:0:attack:2:slot:0:segment:1",
+      "slotIndex": 0,
+      "segmentIndex": 1,
+      "shotIndex": 1,
+      "type": "barrier-damaged",
+      "barrierId": "battle:4:0:barrier:h:1",
+      "reason": "damage",
+      "casterId": "e",
+      "origin": {
+        "x": 10.5,
+        "y": 4.5
+      },
+      "incomingType": "法术",
+      "contactPoint": {
+        "x": 6.5,
+        "y": 4.5
+      },
+      "protectedTargetIds": [
+        "h",
+        "a"
+      ],
+      "integrityBefore": 60,
+      "integrityAfter": 35,
+      "damage": 25,
+      "rawDamage": 50,
+      "resistedDamage": 25,
+      "armorDamage": 0,
+      "actualLoss": 25,
+      "noOverflow": true,
+      "broken": false,
+      "barrier": {
+        "id": "battle:4:0:barrier:h:1",
+        "casterId": "h",
+        "side": "hero",
+        "center": {
+          "x": 4.5,
+          "y": 4.5
+        },
+        "radius": 2,
+        "cells": [
+          {
+            "col": 4,
+            "row": 2
+          },
+          {
+            "col": 3,
+            "row": 3
+          },
+          {
+            "col": 4,
+            "row": 3
+          },
+          {
+            "col": 5,
+            "row": 3
+          },
+          {
+            "col": 2,
+            "row": 4
+          },
+          {
+            "col": 3,
+            "row": 4
+          },
+          {
+            "col": 4,
+            "row": 4
+          },
+          {
+            "col": 5,
+            "row": 4
+          },
+          {
+            "col": 6,
+            "row": 4
+          },
+          {
+            "col": 3,
+            "row": 5
+          },
+          {
+            "col": 4,
+            "row": 5
+          },
+          {
+            "col": 5,
+            "row": 5
+          },
+          {
+            "col": 4,
+            "row": 6
+          }
+        ],
+        "integrity": 35,
+        "maxIntegrity": 60,
+        "armor": 0,
+        "protectType": "法术",
+        "visualIdentity": "gold",
+        "createdAt": 33.333333333333336,
+        "endAt": 233.33333333333334,
+        "shape": {
+          "type": "圆形",
+          "center": {
+            "x": 4.5,
+            "y": 4.5
+          },
+          "radius": 2
+        },
+        "boundary": {
+          "type": "circle",
+          "center": {
+            "x": 4.5,
+            "y": 4.5
+          },
+          "radius": 2
+        }
+      },
+      "barrierBefore": {
+        "id": "battle:4:0:barrier:h:1",
+        "casterId": "h",
+        "side": "hero",
+        "center": {
+          "x": 4.5,
+          "y": 4.5
+        },
+        "radius": 2,
+        "cells": [
+          {
+            "col": 4,
+            "row": 2
+          },
+          {
+            "col": 3,
+            "row": 3
+          },
+          {
+            "col": 4,
+            "row": 3
+          },
+          {
+            "col": 5,
+            "row": 3
+          },
+          {
+            "col": 2,
+            "row": 4
+          },
+          {
+            "col": 3,
+            "row": 4
+          },
+          {
+            "col": 4,
+            "row": 4
+          },
+          {
+            "col": 5,
+            "row": 4
+          },
+          {
+            "col": 6,
+            "row": 4
+          },
+          {
+            "col": 3,
+            "row": 5
+          },
+          {
+            "col": 4,
+            "row": 5
+          },
+          {
+            "col": 5,
+            "row": 5
+          },
+          {
+            "col": 4,
+            "row": 6
+          }
+        ],
+        "integrity": 60,
+        "maxIntegrity": 60,
+        "armor": 0,
+        "protectType": "法术",
+        "visualIdentity": "gold",
+        "createdAt": 33.333333333333336,
+        "endAt": 233.33333333333334,
+        "shape": {
+          "type": "圆形",
+          "center": {
+            "x": 4.5,
+            "y": 4.5
+          },
+          "radius": 2
+        },
+        "boundary": {
+          "type": "circle",
+          "center": {
+            "x": 4.5,
+            "y": 4.5
+          },
+          "radius": 2
+        }
+      },
+      "barrierAfter": {
+        "id": "battle:4:0:barrier:h:1",
+        "casterId": "h",
+        "side": "hero",
+        "center": {
+          "x": 4.5,
+          "y": 4.5
+        },
+        "radius": 2,
+        "cells": [
+          {
+            "col": 4,
+            "row": 2
+          },
+          {
+            "col": 3,
+            "row": 3
+          },
+          {
+            "col": 4,
+            "row": 3
+          },
+          {
+            "col": 5,
+            "row": 3
+          },
+          {
+            "col": 2,
+            "row": 4
+          },
+          {
+            "col": 3,
+            "row": 4
+          },
+          {
+            "col": 4,
+            "row": 4
+          },
+          {
+            "col": 5,
+            "row": 4
+          },
+          {
+            "col": 6,
+            "row": 4
+          },
+          {
+            "col": 3,
+            "row": 5
+          },
+          {
+            "col": 4,
+            "row": 5
+          },
+          {
+            "col": 5,
+            "row": 5
+          },
+          {
+            "col": 4,
+            "row": 6
+          }
+        ],
+        "integrity": 35,
+        "maxIntegrity": 60,
+        "armor": 0,
+        "protectType": "法术",
+        "visualIdentity": "gold",
+        "createdAt": 33.333333333333336,
+        "endAt": 233.33333333333334,
+        "shape": {
+          "type": "圆形",
+          "center": {
+            "x": 4.5,
+            "y": 4.5
+          },
+          "radius": 2
+        },
+        "boundary": {
+          "type": "circle",
+          "center": {
+            "x": 4.5,
+            "y": 4.5
+          },
+          "radius": 2
+        }
+      }
+    },
+    "directTarget": {
+      "barrierId": "battle:5:0:barrier:h:1",
+      "point": {
+        "x": 6.5,
+        "y": 4.5
+      },
+      "query": {
+        "ok": true,
+        "reason": null,
+        "origin": {
+          "x": 10.5,
+          "y": 4.5
+        },
+        "aim": {
+          "barrierId": "battle:5:0:barrier:h:1",
+          "x": 6.5,
+          "y": 4.5
+        },
+        "range": 15,
+        "cells": [],
+        "targetIds": [],
+        "damageTargetIds": [],
+        "actualTargetIds": [],
+        "targets": [],
+        "slotTargets": [
+          {
+            "index": 0,
+            "tag": "伤害",
+            "side": "enemy",
+            "scope": "single",
+            "attack": true,
+            "targetIds": [],
+            "barrierIds": [
+              "battle:5:0:barrier:h:1"
+            ]
+          }
+        ],
+        "barrierTargetIds": [
+          "battle:5:0:barrier:h:1"
+        ],
+        "barrierTargets": [
+          {
+            "barrierId": "battle:5:0:barrier:h:1",
+            "point": {
+              "x": 6.5,
+              "y": 4.5
+            }
+          }
+        ],
+        "disclosureTargetIds": [],
+        "collisionPoint": {
+          "x": 6.5,
+          "y": 4.5
+        },
+        "contact": {
+          "type": "barrier",
+          "barrierId": "battle:5:0:barrier:h:1",
+          "point": {
+            "x": 6.5,
+            "y": 4.5
+          }
+        },
+        "blockedBy": null,
+        "shape": {
+          "type": "单体",
+          "from": {
+            "x": 10.5,
+            "y": 4.5
+          },
+          "to": {
+            "x": 6.5,
+            "y": 4.5
+          }
+        },
+        "blastCenter": null
+      }
+    },
+    "resistance": {
+      "runId": "battle:6:0",
+      "attackId": "attack:1",
+      "segmentId": "battle:6:0:attack:1:slot:0:segment:1",
+      "slotIndex": 0,
+      "segmentIndex": 1,
+      "shotIndex": 1,
+      "index": 0,
+      "origin": {
+        "x": 10.5,
+        "y": 4.5
+      },
+      "originalTargetId": "h",
+      "contactPoint": {
+        "x": 4.5,
+        "y": 4.5
+      },
+      "targetId": "h",
+      "logIndex": 1,
+      "side": "hero",
+      "maxHp": 100,
+      "damageType": "近战",
+      "damageCategory": null,
+      "isCrit": false,
+      "isPierce": false,
+      "hit": true,
+      "outcome": "hit",
+      "hpDmg": 25,
+      "shieldDmg": 0,
+      "guardDmg": 0,
+      "shieldBefore": 0,
+      "shieldAfter": 0,
+      "rawBeforeResist": 50,
+      "rawDmg": 25,
+      "resistance": {
+        "before": 50,
+        "after": 25,
+        "layers": [
+          {
+            "reason": "phantom",
+            "sourceKind": "native-variant",
+            "damageType": "近战",
+            "multiplier": 0.5,
+            "before": 50,
+            "after": 25
+          }
+        ]
+      },
+      "fatalResult": null,
+      "finalTargetId": "h",
+      "hpBefore": 100,
+      "hpAfter": 75,
+      "down": false,
+      "logEnd": 2,
+      "aim": {
+        "x": 4.5,
+        "y": 4.5,
+        "targetId": "h"
+      },
+      "facing": 270,
+      "cells": [
+        {
+          "col": 4,
+          "row": 4
+        }
+      ]
+    },
+    "healSuppressed": {
+      "kind": "heal",
+      "targetId": "h",
+      "tag": "回复",
+      "value": 20,
+      "burning": true,
+      "overheal": null,
+      "crit": false,
+      "healBeforeSuppression": 40,
+      "healAfterSuppression": 20,
+      "healSuppressed": 20,
+      "hpBefore": 20,
+      "hpAfter": 40,
+      "hpCapped": 0,
+      "shieldBefore": 0,
+      "shieldAfter": 0,
+      "reason": "burn-heal-suppressed",
+      "suppressionSources": [
+        {
+          "casterId": "e",
+          "skillId": "fire",
+          "effectId": "burn:1"
+        }
+      ],
+      "casterId": "h",
+      "slotIndex": 0,
+      "attackId": "attack:1",
+      "effectId": "h:回复:0"
+    }
+  },
+  "pageGate": "not-tested-by-this-script",
+  "visuals": "pending-frontend"
+}

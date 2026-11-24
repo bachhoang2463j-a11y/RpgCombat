@@ -7,6 +7,8 @@
 // ==========================================
 
 import { occupiedCells, cellKey, unitCenter } from './geometry.mjs';
+import { skillSlots } from './effect-definitions.mjs';
+import { ROUND_TIME } from './scheduler.mjs';
 
 const EPS = 1e-9;
 
@@ -76,12 +78,16 @@ export function previewBarrier(ctx, casterId, skill, query) {
     }
   }
 
-  const rawIntegrity = skill ? (skill.barrierIntegrity != null ? skill.barrierIntegrity : skill.power) : 0;
+  const slot = skillSlots(skill).find(s => s.definition.kind === 'barrier');
+  const rawIntegrity = slot ? slot.power : skill?.barrierIntegrity ?? skill?.power;
   const integrity = Math.max(0, Number(rawIntegrity) || 0);
   const armor = Math.max(0, Number(skill && skill.barrierArmor) || 0);
-  const protectType = (skill && skill.barrierSub) || 'all';
+  const protectType = slot?.definition.damageCategory || slot?.tag.match(/肃正[:：](近战|远程|法术)/)?.[1] || skill?.barrierSub || 'all';
+  const visualIdentity = protectType === '法术' ? 'gold' : protectType === '远程' ? 'blue' : 'white';
+  const createdAt = typeof ctx.now === 'function' ? ctx.now() : 0;
+  const endAt = !slot || slot.turns === Infinity ? null : createdAt + slot.turns * ROUND_TIME;
   const barrier = {
-    id: 'barrier:' + casterId,
+    id: (ctx.runId ? ctx.runId + ':' : '') + 'barrier:' + casterId + ':' + ((ctx._barrierSerial || 0) + 1),
     casterId,
     side: caster.side,
     center: { x: center.x, y: center.y },
@@ -91,7 +97,11 @@ export function previewBarrier(ctx, casterId, skill, query) {
     maxIntegrity: integrity,
     armor,
     protectType,
-    endAt: null,
+    visualIdentity,
+    createdAt,
+    endAt,
+    shape: { type: '圆形', center: { x: center.x, y: center.y }, radius },
+    boundary: { type: 'circle', center: { x: center.x, y: center.y }, radius },
   };
   return { ok: true, reason: null, barrier };
 }
@@ -101,12 +111,27 @@ export function createBarrier(ctx, casterId, skill, query) {
   const preview = previewBarrier(ctx, casterId, skill, query);
   if (!preview.ok) return { ok: false, reason: preview.reason, barrier: null };
   if (!ctx.barriers) ctx.barriers = [];
+  ctx._barrierSerial = (ctx._barrierSerial || 0) + 1;
   const barriers = ctx.barriers;
+  const replaced = [];
   for (let i = barriers.length - 1; i >= 0; i--) {
-    if (barriers[i].casterId === casterId) barriers.splice(i, 1);
+    if (barriers[i].casterId === casterId) replaced.unshift(structuredClone(barriers.splice(i, 1)[0]));
   }
   barriers.push(preview.barrier);
-  return { ok: true, reason: null, barrier: preview.barrier };
+  return { ok: true, reason: null, barrier: preview.barrier, replaced };
+}
+
+export function expireBarriers(ctx, now) {
+  const removed = [];
+  const barriers = ctx.barriers || [];
+  for (let i = barriers.length - 1; i >= 0; i--) {
+    if (barriers[i].endAt != null && barriers[i].endAt <= now + EPS) removed.unshift(structuredClone(barriers.splice(i, 1)[0]));
+  }
+  return removed;
+}
+
+export function clearBarriers(ctx) {
+  return (ctx.barriers || []).splice(0).map(b => structuredClone(b));
 }
 
 // 查询某单位/站位所在的结界：
@@ -137,11 +162,29 @@ export function barrierCrossing(ctx, unitId, from, to) {
   const toCells = occupiedCells(to, fp);
   for (const b of ctx.barriers || []) {
     if (unit.side === b.side) continue; // 友方可进出
-    const s = cellSet(b.cells);
-    const fromIn = fromCells.some(c => s.has(cellKey(c.col, c.row)));
-    const toIn = toCells.some(c => s.has(cellKey(c.col, c.row)));
-    const toFull = toCells.every(c => s.has(cellKey(c.col, c.row)));
-    if (fromIn !== toIn || toIn && !toFull) return b;
+    const fromIn = anyInside(b, fromCells);
+    const toIn = anyInside(b, toCells);
+    if (fromIn !== toIn || fromIn && (!allInside(b, fromCells) || !allInside(b, toCells))) return b;
+    // 每个占格中心的连续轨迹按网格交点切分，避免斜线/长距离跳过薄边界。
+    for (const offset of occupiedCells({ col: 0, row: 0 }, fp)) {
+      const x = from.col + offset.col + 0.5, y = from.row + offset.row + 0.5;
+      const dx = to.col - from.col, dy = to.row - from.row;
+      const cuts = [0, 1];
+      for (const [a, d] of [[x, dx], [y, dy]]) {
+        if (!d) continue;
+        for (let k = Math.ceil(Math.min(a, a + d)); k <= Math.floor(Math.max(a, a + d)); k++) {
+          const t = (k - a) / d;
+          if (t > 0 && t < 1) cuts.push(t);
+        }
+      }
+      cuts.sort((a, c) => a - c);
+      const s = cellSet(b.cells);
+      for (let i = 1; i < cuts.length; i++) {
+        const t = (cuts[i - 1] + cuts[i]) / 2;
+        const inside = s.has(cellKey(Math.floor(x + dx * t), Math.floor(y + dy * t)));
+        if (inside !== fromIn) return b;
+      }
+    }
   }
   return null;
 }
@@ -160,17 +203,38 @@ export function interception(ctx, casterId, targetId, origin) {
   if (!target) return null;
   const b = barrierAt(ctx, targetId);
   if (!b) return null;
-  const attackerSide = attacker ? attacker.side : null;
+  const attackerSide = origin?.side ?? (attacker ? attacker.side : null);
   if (attackerSide === b.side) return null; // 结界友方攻击不被拦
   let attackerCells = [];
-  if (attacker) {
-    const p = ctx.placementsById[attacker.id];
-    if (p) attackerCells = occupiedCells(p, fpOf(ctx, attacker));
+  if (origin?.placement) {
+    attackerCells = occupiedCells(origin.placement, origin.footprint || { width: 1, height: 1 });
   } else if (origin && Number.isFinite(origin.col) && Number.isFinite(origin.row)) {
     attackerCells = occupiedCells(origin, { width: 1, height: 1 });
+  } else if (attacker) {
+    const p = ctx.placementsById[attacker.id];
+    if (p) attackerCells = occupiedCells(p, fpOf(ctx, attacker));
   }
   if (attackerCells.length && allInside(b, attackerCells)) return null; // 内部对内部不拦
   return b;
+}
+
+// 射线与圆形边界的首次接触；内部来源取离开边界，外部来源取进入边界。
+export function barrierContact(ctx, barrier, origin, aim) {
+  const from = origin?.placement ? unitCenter(origin.placement, origin.footprint || { width: 1, height: 1 }) : origin;
+  if (!from || !barrier?.center) return null;
+  const to = Number.isFinite(aim?.x) && Number.isFinite(aim?.y) ? aim : barrier.center;
+  let dx = to.x - from.x, dy = to.y - from.y;
+  if (Math.hypot(dx, dy) <= EPS) { dx = 1; dy = 0; }
+  const len = Math.hypot(dx, dy); dx /= len; dy /= len;
+  const x = from.x - barrier.center.x, y = from.y - barrier.center.y;
+  const projection = x * dx + y * dy;
+  const disc = projection * projection - (x * x + y * y - barrier.radius * barrier.radius);
+  if (disc < -EPS) return null;
+  const root = Math.sqrt(Math.max(0, disc));
+  const hits = [-projection - root, -projection + root].filter(t => t >= -EPS);
+  if (!hits.length) return null;
+  const t = Math.max(0, hits[0]);
+  return { x: from.x + dx * t, y: from.y + dy * t };
 }
 
 // 结界承伤：护甲先减（armorMult 可放大/缩小护甲），不消耗个人护盾，击破当次无溢出。
@@ -180,12 +244,18 @@ export function damageBarrier(ctx, id, rawDamage, opts = {}) {
   const idx = barriers.findIndex(b => b.id === id);
   if (idx < 0) return { integrityBefore: 0, integrityAfter: 0, damage: 0, broken: false, barrier: null };
   const b = barriers[idx];
+  const barrierBefore = structuredClone(b);
   const before = b.integrity;
-  const raw = b.protectType === opts.incomingType ? Math.floor(Math.max(0, rawDamage) * 0.5) : Math.max(0, rawDamage);
-  const damage = Math.max(0, raw - Math.max(0, b.armor * armorMult));
+  const raw = Math.max(0, rawDamage);
+  const resistedDamage = b.protectType === opts.incomingType ? Math.floor(raw * 0.5) : raw;
+  const armorDamage = Math.min(resistedDamage, Math.max(0, b.armor * armorMult));
+  const damage = resistedDamage - armorDamage;
   const after = Math.max(0, before - damage);
   b.integrity = after;
   const broken = after <= 0;
   if (broken) barriers.splice(idx, 1);
-  return { integrityBefore: before, integrityAfter: after, damage, broken, barrier: b };
+  const barrierAfter = structuredClone(b);
+  return { integrityBefore: before, integrityAfter: after, damage, rawDamage: raw, resistedDamage,
+    armorDamage, actualLoss: before - after, noOverflow: true, broken,
+    barrier: barrierAfter, barrierBefore, barrierAfter };
 }

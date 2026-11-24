@@ -56,7 +56,12 @@ if (backend) {
   const rage = caster.skills.find(s => s.name === '风雪狂暴');
   const action = battle.attack(rage);
   check('产物真实技能结算扣费与增攻', action.ok && caster.ref.mp === 13 && battle.getEffectiveUnit(caster.id).atk === 150 && battle.snapshot().resources.main === 0);
-  check('产物完整重试还原随机种子和资源', JSON.stringify(battle.reset()) === JSON.stringify(opening));
+  const ruleState = snap => {
+    const { runId, resetEvents, events, ...state } = snap;
+    return JSON.stringify({ ...state, events: events.map(({ runId, eventId, actionId, ...event }) => event) });
+  };
+  const reset = battle.reset();
+  check('产物完整重试还原随机种子和资源并切换事件代际', ruleState(reset) === ruleState(opening) && reset.runId !== opening.runId);
   const before = JSON.stringify(battle.snapshot());
   battle.previewAttack(rage);
   check('产物预览不扣HP/MP/主辅资源', JSON.stringify(battle.snapshot()) === before);

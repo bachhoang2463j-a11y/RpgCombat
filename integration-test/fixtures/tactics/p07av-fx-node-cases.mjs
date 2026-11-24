@@ -7,6 +7,7 @@ import { unitCenter } from '../../../tactics/src/geometry.mjs';
 import { playWebmFx, playSupportEffects, FX_WEBM_KEY_MAX } from '../../../tactics/src/fx-library.mjs';
 import { startAtmos, atmosStyleOf, ATMOS_STYLES } from '../../../tactics/src/screen-atmos.mjs';
 import { createActionDirector } from '../../../tactics/src/action-director.mjs';
+import { SHOWPIECES } from '../../../tactics/src/screen-showpiece.mjs';
 
 const ok = (id, pass, detail = '') => ({ id, pass: !!pass, detail: typeof detail === 'string' ? detail : JSON.stringify(detail) });
 
@@ -63,8 +64,10 @@ function webmCases() {
       pixels = null;   // 像素读取抛错（等同跨域污染）：按原版降级 screen
       frameCb();
       out.push(ok('TP7AV-B 像素读取失败才降级 screen', cv3.style.mixBlendMode === 'screen', cv3.style.mixBlendMode));
+      let finished = 0; cv3.handle.onFinish.add(() => finished++);
       v3.ended = true; frameCb();
       out.push(ok('TP7AV-B 播完即释放 canvas/video', cv3.removed && v3.removed && v3.paused, { cv: cv3.removed, v: v3.removed }));
+      out.push(ok('TP7AV-B 播完句柄：doneAt 取真实时长、释放只通知一次（重狙等全段播完）', finished === 1 && Math.abs(cv3.handle.doneAt - Date.now() - 2000) < 1500 && (v3.onended(), finished === 1), { finished, doneIn: cv3.handle.doneAt - Date.now() }));
       return out;
     });
   });
@@ -121,15 +124,17 @@ function atmosCases() {
   return out;
 }
 
-// ---------- 多目标 buff 串行 ----------
+// ---------- 多目标 buff：原版逐标签逐目标串行（寂静指令 增攻→瞄准 两轮） ----------
 async function serialCases() {
   const out = [];
   const log = [];
   const handles = [];
+  const waits = [];
   const effects = [
-    { kind: 'buff', field: 'atk', value: 20, targetId: 'A' },
-    { kind: 'buff', field: 'def', value: 10, targetId: 'A' },
-    { kind: 'buff', field: 'atk', value: 20, targetId: 'B' },
+    { kind: 'buff', field: 'atk', value: 10, targetId: 'A' },
+    { kind: 'buff', field: 'atk', value: 10, targetId: 'B' },
+    { kind: 'buff', field: 'hit', value: 20, targetId: 'A' },
+    { kind: 'buff', field: 'hit', value: 20, targetId: 'B' },
     { kind: 'buff', field: 'hit', value: -20, targetId: 'C' },
   ];
   const ctx = {
@@ -149,25 +154,21 @@ async function serialCases() {
     centerOf: () => ({ x: 1, y: 1 }),
     fx: { top: () => ({ firstChild: el('b') }) },
     revealEffect: e => log.push('reveal:' + e.targetId + ':' + e.field),
-    wait: () => Promise.resolve(true),
+    wait: ms => { waits.push(ms); return Promise.resolve(true); },
     awaitHandle: h => new Promise(res => h.onFinish.add(res)),
   };
+  const finish = () => { const h = handles.at(-1); [...h.onFinish].forEach(fn => fn(true)); return new Promise(r => setTimeout(r, 0)); };
   const run = playSupportEffects(ctx);
   await new Promise(r => setTimeout(r, 0));
-  const beforeA = log.slice();
-  out.push(ok('TP7AV-S A 的原版 SVG 播放并在接触拍点揭示，B 尚未开始', beforeA.some(s => s.startsWith('start:A:buff')) && beforeA.includes('reveal:A:atk') && beforeA.includes('reveal:A:def')
-    && !beforeA.some(s => s.startsWith('start:B')), beforeA));
-  handles.filter(h => h.id === 'A').forEach(h => [...h.onFinish].forEach(fn => fn(true)));
-  await new Promise(r => setTimeout(r, 0));
-  out.push(ok('TP7AV-S A 完成后才播 B，C 仍等待', log.some(s => s.startsWith('start:B')) && !log.some(s => s.startsWith('start:C')), log));
-  handles.filter(h => h.id === 'B').forEach(h => [...h.onFinish].forEach(fn => fn(true)));
-  await new Promise(r => setTimeout(r, 0));
-  handles.filter(h => h.id === 'C').forEach(h => [...h.onFinish].forEach(fn => fn(true)));
+  out.push(ok('TP7AV-S 第一条（A 增攻）播放并在接触拍点揭示，未完成前不播下一条', log.join('|') === 'start:A:buff:atkUp|reveal:A:atk', log));
+  for (let i = 0; i < 5; i++) await finish();
   const done = await run;
-  const order = log.filter(s => s.startsWith('start:')).map(s => s.split(':')[1]);
-  out.push(ok('TP7AV-S 顺序=后端 effects 顺序（A 增攻/增防两种原版 SVG 各一次）', done === true && order.join('') === 'AABC', order));
-  out.push(ok('TP7AV-S 同目标两个真实效果槽各自揭示、不合并', log.filter(s => s.startsWith('reveal:A')).length === 2, log));
-  out.push(ok('TP7AV-S 减益走原版 debuff SVG 与 hitDown 音色', log.includes('start:C:debuff:hitDown'), log));
+  const order = log.filter(s => s.startsWith('start:')).map(s => s.split(':').slice(1).join(':'));
+  out.push(ok('TP7AV-S 两轮串行：增攻 A→B，再瞄准 A→B（标签独立，不合并），顺序=后端 effects', done === true &&
+    order.slice(0, 4).join(',') === 'A:buff:atkUp,B:buff:atkUp,A:buff:hitUp,B:buff:hitUp', order));
+  out.push(ok('TP7AV-S 同目标两个标签各自一次原版 SVG 与揭示', log.filter(s => s.startsWith('start:A')).length === 2 && log.filter(s => s.startsWith('reveal:A')).length === 2, log));
+  out.push(ok('TP7AV-S 条目间隔 60ms（4 个间隔）', waits.length === 4 && waits.every(ms => ms === 60), waits));
+  out.push(ok('TP7AV-S 减益走原版 debuff SVG 与 hitDown 音色', order.at(-1) === 'C:debuff:hitDown', order));
   return out;
 }
 
@@ -213,8 +214,37 @@ function killAndSummonCases() {
     && !/playExecutionAnimation[\s\S]{0,9000}?\bsetTimeout\(/.test(av.slice(av.indexOf('async function playExecutionAnimation'), av.indexOf('async function playEnemyUltimateCutin')))
     && /clearArcaneFx\(\) \{ supportHandles\.forEach\(handle => handle\.cancel\(\)\); clearMoments\(\);/.test(av) && /setToken\(t\) \{ if \(t !== combatToken\) \{[^}]*clearMoments\(\);/.test(av)));
   // 真实页面启动崩溃回归：clearSummonState（清场/重开必经）引用的回合制顶层集合必须在工厂内声明
+  const hostSrc = readFileSync(new URL('../../../tactics/src/av-host.mjs', import.meta.url), 'utf8');
+  out.push(ok('TP7AV-X 击杀特写/Cut-in 屏幕宿主挂 iframe body 最顶层（压住全部 UI、不挡输入）',
+    /document\.body\.appendChild\(screenEl\)/.test(hostSrc) && /position:fixed; inset:0; z-index:2147483000; pointer-events:none/.test(hostSrc) && /screenEl\.setAttribute\('data-rpg-av-scope', ''\)/.test(hostSrc)));
+  const libSrc = readFileSync(new URL('../../../tactics/src/fx-library.mjs', import.meta.url), 'utf8');
+  const fsIds = [...libSrc.matchAll(/id: '([\w-]+)', grade: 'L[34]'[^\n]*\n\s*timeline: \{[^}]*fullscreen: true/g)].map(m => m[1]);
+  out.push(ok('TP7AV-L 每个全屏 L3/L4 条目都有独立屏幕主演出，并在真实冲击拍点 ctx.atmos.burst()', fsIds.length === 18 && fsIds.every(id => SHOWPIECES[id])
+    && (libSrc.match(/ctx\.atmos\?\.burst\(\);/g) || []).length === 18 && !/fx\.screen\('<i style="position:absolute;inset:0;background:radial-gradient/.test(libSrc), fsIds));
+  let seed = 3; const rr = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const built = fsIds.map(id => SHOWPIECES[id].build(9, rr));
+  out.push(ok('TP7AV-L 主演出构图互不相同、渐变辉光滤镜带 uid、无 NaN/undefined', new Set(built).size === 18 && built.every(h => /<filter id="g9"/.test(h) && !/NaN|undefined/.test(h))));
+  const holyBuilt = SHOWPIECES['holy-judgment'].build(9, rr, { x: 800, y: 450 });
+  out.push(ok('TP7AV-L 圣光01 屏幕层无中心光柱/十字/中央光束（真实光柱只在目标处）', !/data-k="pillar"|data-k="cross"/.test(holyBuilt) && (holyBuilt.match(/data-k="ray"/g) || []).length === 8));
+  const k1 = SHOWPIECES['krupp-snipe'].build(9, rr, { x: 300, y: 200 });
+  out.push(ok('TP7AV-L 重狙准星中心=真实目标视口点（镜孔/十字/冲击环均以 F 为心）', /<circle data-k="hole" cx="300" cy="200" r="330"/.test(k1) && /data-k="sw" cx="300" cy="200"/.test(k1) && /M-20,200 L260,200/.test(k1)));
+  out.push(ok('TP7AV-L 原版尺寸口径：圣光命中即起 414 min(视口)×1.4；雷击主雷同火焰01覆盖范围；重狙全段视频≥50%屏幕并等播完',
+    /ctx\.reveal\(h\.targetId\)\);\n[^\n]*\n\s*ctx\.after\(60, \(\) => webm\(ctx, '414\.webm', t\.x, t\.y, screenSpanPx\(ctx, 1\.4\)/.test(libSrc) && !/webm\(ctx, '414\.webm', t\.x, t\.y - 62/.test(libSrc)
+    && /webm\(ctx, '450\.webm', b\.x, b\.y - R \* 0\.3, Math\.max\(R \* 3\.4, 220\)/.test(libSrc)
+    && /webm\(ctx, 'snipe-ezremove\.mp4', t\.x, t\.y, Math\.max\(screenSpanPx\(ctx, 1\.5\), screenCoverPx\(ctx, 0\.5, 16 \/ 9\)\)/.test(libSrc) && /return ctx\.awaitHandle\(shot\.handle, 1850\);/.test(libSrc)));
   out.push(ok('TP7AV-X 召唤段引用的 summonEnterPending 已在工厂内声明（启动/清场不抛 ReferenceError）',
     /^\s*const summonEnterPending = new Set\(\);/m.test(av) && av.indexOf('const summonEnterPending') < av.indexOf('function clearSummonState(')));
+  out.push(ok('TP7AV-X 灵风术=根 index playLingFeng 原样入包（风玫瑰/疾风/双翼 + windHum/crystalChime/aoe_wind_spin/dodgeWind 真音）',
+    /function playLingFeng\(caster\) \{/.test(av) && /playSfxSample\('windHum', 0\.02, \{ volume:0\.62/.test(av) && /playSfxSample\('aoe_wind_spin_fs772867', 0, \{ volume:0\.78/.test(av)
+    && /playSfxSample\('dodgeWind', 0\.04/.test(av) && /arcane-angel-flap/.test(av) && /clearSummonState, playLingFeng \}/.test(av)));
+  {
+    const libSrc2 = readFileSync(new URL('../../../tactics/src/fx-library.mjs', import.meta.url), 'utf8');
+    const lf = libSrc2.slice(libSrc2.indexOf('const lingFengShu = {'), libSrc2.indexOf('\n};', libSrc2.indexOf('const lingFengShu = {')));
+    out.push(ok('TP7AV-X 灵风术条目直调原版、双翼拍点 quiet 揭示规则结果、等原版句柄结束', /grade: 'identity'/.test(lf) && /av\.playLingFeng\(casterEnt\)/.test(lf)
+      && /ctx\.after\(CHARGE \+ 350, \(\) => \{\s*\(result\.effects \|\| \[\]\)\.forEach\(e => ctx\.revealEffect\(e, true\)\)/.test(lf) && /return ctx\.awaitHandle\(handle, CHARGE \+ 2200\)/.test(lf)));
+    const css2 = readFileSync(new URL('../../../tactics/src/vendor/rpg-av/rpg-av.css', import.meta.url), 'utf8');
+    out.push(ok('TP7AV-X 灵风术关键帧与类入 CSS', ['arcane-rose-in', 'arcane-rose-out', 'arcane-twister', 'arcane-streak', 'arcane-wing-glyph', 'arcane-angel-flap', 'arcane-flash-heal'].every(k => css2.includes(k))));
+  }
   out.push(ok('TP7AV-X 原版击杀三类音效与震屏保留', /playSound\('kill', 2, 1/.test(av) && /playSound\('combatKill'/.test(av) && /playSound\('magicKill'/.test(av) && /__STAGE\.shakeEl\(\)/.test(av) && /playSound\('taunt', 1, 1, \{ category:'L' \}\)/.test(av)));
   const css = readFileSync(new URL('../../../tactics/src/vendor/rpg-av/rpg-av.css', import.meta.url), 'utf8');
   out.push(ok('TP7AV-X 特写关键帧与任意值类入 CSS', ['s2-ink-stamp', 's3-shard-1', 'v1-tommy-scope', 'blood-splat-burst', 'anim-cutin-slash', 'anim-debuff', 'anim-taunt'].every(k => css.includes(k)) && css.includes('z-\\[200\\]')));

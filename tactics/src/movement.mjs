@@ -134,16 +134,8 @@ export function findJumpPath(ctx, unitId, col, row, maxDistance = Infinity) {
     }
   }
   // 结界：敌方起落点跨界，或起落都在外但轨迹穿过结界，均阻断
-  for (const b of ctx.barriers || []) {
-    if (unit.side === b.side) continue;
-    const s = new Set(b.cells.map(c => cellKey(c.col, c.row)));
-    const startIn = s.has(cellKey(p.col, p.row));
-    const endIn = s.has(cellKey(col, row));
-    const midIn = path.slice(1, -1).some(c => s.has(cellKey(c.col, c.row)));
-    if (startIn !== endIn || (!startIn && !endIn && midIn)) {
-      return fail('跳跃不能跨过结界', { type: 'barrier', barrierId: b.id });
-    }
-  }
+  const crossing = barrierCrossing(ctx, unitId, p, { col, row });
+  if (crossing) return fail('跳跃不能跨过结界', { type: 'barrier', barrierId: crossing.id });
   const blockedBy = placementBlocker(ctx, col, row, fp, occ, unitId, false);
   if (blockedBy) return fail('跳跃落点不可站立', blockedBy);
   return { ok: true, reason: null, distance, maxDistance, path, blockedBy: null };

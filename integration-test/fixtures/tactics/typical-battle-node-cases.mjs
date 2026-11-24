@@ -34,8 +34,13 @@ function run() {
     const s = b.start();
     check('TT-B 开场四英雄六敌，资源原值TP0', s.units.length === 10 && d.units.every(u => u.ref.tp === 0), s.units.map(u => [u.name, u.hp, u.mp]));
     check('TT-B 权威样本包含巫师护盾', d.units[0].skills.some(s => s.name === '巫师护盾'));
-    const first = JSON.stringify(s);
-    check('TT-B reset同种子恢复状态', JSON.stringify(b.reset()) === first);
+    const ruleState = snap => {
+      const { runId, resetEvents, events, ...state } = snap;
+      return JSON.stringify({ ...state, events: events.map(({ runId, eventId, actionId, ...event }) => event) });
+    };
+    const reset = b.reset();
+    check('TT-B reset同种子恢复状态', ruleState(reset) === ruleState(s));
+    check('TT-B reset切换展示代际，不重用旧事件身份', reset.runId !== s.runId);
   }
   {
     const h = unit('h', 'hero', { spd: 200, moveDistance: 8 }); const e = unit('e', 'enemy');

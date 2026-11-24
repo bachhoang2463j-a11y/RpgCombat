@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "c00b68981523be1ec4b46f34a4023895f332d1072c09351d467d3dd406919f2b",
-  "bytes": 1365116,
+  "sha256": "e212c63bda9322059ad477b07d0956225eb8bc26aac85aa07e1fb5246fb5c3cd",
+  "bytes": 1438894,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -136,7 +136,7 @@
       "detail": ""
     },
     {
-      "id": "产物完整重试还原随机种子和资源",
+      "id": "产物完整重试还原随机种子和资源并切换事件代际",
       "pass": true,
       "detail": ""
     },

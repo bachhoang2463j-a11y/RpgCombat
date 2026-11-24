@@ -45,7 +45,8 @@ export function buildHitFeedback(result, hit, segment = hit, incomingDmg = resul
     blockedDmg: segment.guardDmg > 0 ? segment.guardDmg : undefined, incomingDmg: segment.rawDmg ?? incomingDmg,
     isHero: (segment.side || hit.side) === 'hero', isCrit: segment.isCrit ?? !!result.crit, isBurst: segment.isBurst ?? !!result.isBurst,
     isPierce: !!segment.isPierce, damageType: segment.damageType || result.incomingType || result.skill?.damageType || null,
-    damageCategory: segment.damageCategory || null,
+    damageCategory: segment.damageCategory || null, segmentId: segment.segmentId || null,
+    resistance: segment.resistance || null, fatalResult: segment.fatalResult || null,
   };
 }
 
@@ -335,11 +336,44 @@ export function createActionDirector(deps) {
       style: atmosStyleOf(entry, skill), grade, chargeMs: entry.timeline?.chargeMs || 600, totalMs: entry.timeline?.totalMs || 2000,
       skillName: skill.name, casterName: casterUnit?.name || '',
       shape: shape && shape.radius > 0 ? { center: shape.center || result.aim, radius: shape.radius } : null,
-      after: (ms, fn) => scope().after(ms, fn),
+      after: (ms, fn) => scope().after(ms, fn), entryId: entry.id,
+      focus: (() => { const p = hits[0] ? centerOf(hits[0].targetId) : result.aim; const vp = sandbox.getDom().viewport.getBoundingClientRect(), s = p && sandbox.worldToScreenClient(p.x, p.y); return s ? { x: s.x - vp.left, y: s.y - vp.top } : null; })(),
     }) : null;
 
     const revealed = new Map();      // targetId → 已揭示段序号集合
     const reactionRuns = [];
+    const guardRuns = new Map();
+    const ruleRevealed = new Set();
+    function revealRule(value, kind) {
+      const id = value.eventId || value.segmentId || value.effectId;
+      const key = kind + ':' + id + ':' + (value.targetId || value.unitId || value.barrierId || value.guardianId || '');
+      if (ruleRevealed.has(key)) return;
+      ruleRevealed.add(key);
+      deps.onRuleReveal?.(value, { kind, result });
+    }
+    async function revealGuard(guard) {
+      const key = guard.segmentId + ':' + guard.guardianId;
+      if (!guardRuns.has(key)) guardRuns.set(key, (async () => {
+        if (deps.presentGuard) {
+          const s = scope();
+          const ok = await new Promise(resolve => {
+            const stop = s.settleOnDispose(() => resolve(false));
+            Promise.resolve(deps.presentGuard(guard, { result, sandbox, av, wait })).then(value => {
+              if (stop) stop();
+              resolve(value);
+            });
+          });
+          if (ok === false) return false;
+        }
+        if (!isCurrent()) return false;
+        const view = sandbox.getUnitView();
+        view.setDisplayPos(guard.guardianId, guard.contactPoint.x, guard.contactPoint.y);
+        view.lockMotion(guard.guardianId, false);
+        revealRule(guard, 'guard');
+        return true;
+      })());
+      return guardRuns.get(key);
+    }
     function revealSegment(targetId, i, meta = {}) {
       if (!isCurrent()) return;
       const h = byId.get(targetId);
@@ -347,6 +381,11 @@ export function createActionDirector(deps) {
       const segs = h.segments || [h];
       const seg = segs[i];
       if (!seg) return;
+      const guard = seg.reaction?.guard;
+      if (guard && !meta.guardReady) {
+        reactionRuns.push(revealGuard(guard).then(ok => { if (ok) revealSegment(targetId, i, { ...meta, guardReady: true }); }));
+        return;
+      }
       const done = revealed.get(targetId) || new Set();
       if (done.has(i)) return;
       done.add(i); revealed.set(targetId, done);
@@ -359,6 +398,11 @@ export function createActionDirector(deps) {
       const healed = seg.heal != null ? !!seg.heal : (!seg.hit && seg.hpAfter > seg.hpBefore);
       const waveIndex = seg.shotIndex ?? i, wave = waves.get(waveIndex);
       const r = { ...buildHitFeedback({ ...result, skill }, h, seg, incoming), actionId, waveId: wave ? wave.id : null };
+      if (seg.resistance?.layers?.length) revealRule({ ...seg.resistance, segmentId: seg.segmentId, targetId }, 'resistance');
+      if (seg.barrierHitId) {
+        const event = (result.events || []).find(ev => ev.eventId === seg.barrierHitId);
+        if (event) revealRule(event, 'barrier-damage');
+      }
       avHost.consumeVisualEvents?.((result.events || []).filter(ev => ev.unitId === targetId && ev.type === 'variant-trigger'));
       if (healed) playHealPulse(targetId);
       else av.playHitFeedback(r, { wave: hitWaves[waveIndex] || (hitWaves[waveIndex] = { shook: false, hitStopped: false, classified: [] }) });
@@ -377,6 +421,9 @@ export function createActionDirector(deps) {
       if (!isCurrent() || !e || effectsShown.has(e)) return null;
       effectsShown.add(e);
       if (atmos) atmos.lower();
+      if (e.reason === 'burn-heal-suppressed') revealRule(e, 'heal-suppressed');
+      if (e.immune) revealRule(e, 'immunity');
+      if (e.kind === 'blocked') revealRule(e, 'barrier-blocked');
       if (e.kind === 'heal' && !quiet) playHealPulse(e.targetId);
       return onEffectReveal ? onEffectReveal(e, { result }) : null;
     }
@@ -390,14 +437,20 @@ export function createActionDirector(deps) {
       audioContext, outcomeMap: new Map(hits.map(h => [h.targetId, h.hit ? 'hit' : 'dodge'])),
       fx: makeFx(audioContext.category),
       wait, tween, awaitHandle, after: (ms, fn) => scope().after(ms, fn),
-      reveal, revealSegment, revealEffect, revealRegion, regions, unitsInCells, ent: id => avHost.entity(id), centerOf,
+      reveal, revealSegment, revealEffect, revealGuard, revealRule, revealRegion, regions, unitsInCells, ent: id => avHost.entity(id), centerOf, atmos,
       anchorAt: (x, y) => makeAnchor(x, y), aimAnchor: () => aimAnchor(result.aim), lineEndAnchor: () => lineEndAnchor(result),
     };
     const ok = await entry.play(ctx);
     if (atmos) atmos.end();
     if (!isCurrent() || ok === false) return false;
+    await Promise.all(reactionRuns);
     hits.forEach(h => reveal(h.targetId, { late: true }));
+    await Promise.all(reactionRuns);
+    if ((await Promise.all(guardRuns.values())).some(ok => ok === false) || !isCurrent()) return false;
     effects.forEach(e => revealEffect(e));
+    for (const ev of result.events || []) {
+      if (ev.type.startsWith('barrier-')) revealRule(ev, ev.type === 'barrier-damaged' ? 'barrier-damage' : ev.type);
+    }
     avHost.consumeVisualEvents?.(result.events || []);
     avHost.syncVisualState?.();
     regions.forEach(r => revealRegion(r.id));
@@ -727,10 +780,20 @@ export function createActionDirector(deps) {
   }
   function dropAnchors() { anchors.forEach(d => { const s = scope(); if (s) s.removeNode(d); else d.remove(); }); anchors.clear(); }
 
+  function holdGuards(result) {
+    const view = sandbox.getUnitView(), held = new Set();
+    for (const ev of result.events || []) {
+      if (ev.type !== 'guard-committed' || held.has(ev.guardianId)) continue;
+      held.add(ev.guardianId);
+      view.lockMotion(ev.guardianId, true);
+      view.setDisplayPos(ev.guardianId, ev.startPosition.x, ev.startPosition.y);
+    }
+  }
+
   // 提交结果刚到、演出未开始前调用：本次新建区域先持有，避免刷新时抢在爆发拍点前出现
   function holdRegions(result) {
     for (const ev of (result && result.events) || []) if (ev.type === 'region-created') heldRegions.add(ev.region.id);
   }
-  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, playPrepare, syncRegions, syncBarriers, syncPreparations, holdRegions, wait, resolveAttackIdentity, resolveWindupKind,
+  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, playPrepare, syncRegions, syncBarriers, syncPreparations, holdRegions, holdGuards, wait, resolveAttackIdentity, resolveWindupKind,
     runAttackLive, driveAttack, cancelAttack, playChargeCutin, playExecution, executionKills };
 }

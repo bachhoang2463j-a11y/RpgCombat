@@ -9,6 +9,7 @@
 import { cellAt } from './scene.mjs';
 import { occupiedCells, cellKey, unitCenter } from './geometry.mjs';
 import { skillSlots } from './effect-definitions.mjs';
+import { barrierContact } from './barriers.mjs';
 import { canSeeUnit, canSeePoint, sightRadius } from './perception.mjs';
 
 const EPS = 1e-9;
@@ -282,6 +283,26 @@ export function queryAttack(ctx, casterId, skill, aim, options = {}) {
   const range = skill && skill.range;
   if (!range) return fail('技能缺少显式范围');
   if (!RANGE_TYPES.includes(range.type)) return fail('范围类型不支持: ' + range.type);
+  if (aim?.barrierId) {
+    const barrier = (ctx.barriers || []).find(b => b.id === aim.barrierId);
+    if (!barrier) return fail('结界不存在');
+    if (barrier.side === caster.side) return fail('不能攻击友方结界');
+    if (!skillSlots(skill).some(s => s.attack)) return fail('技能没有攻击槽');
+    if (range.type === '自身' || range.type === '召唤') return fail('范围不能直接攻击结界');
+    const point = barrierContact(ctx, barrier, origin, aim);
+    if (!point) return fail('瞄准射线未接触结界');
+    const limit = range.type === '圆形' ? range.radius : range.castRange ?? range.length;
+    if (limit != null && centerDistance(origin, point) > limit + EPS) return fail('结界超出射程');
+    const blocked = rayFirst(ctx, origin.x, origin.y, point.x, point.y, { skipUnitIds: [casterId], blockUnits: true });
+    if (blocked && (blocked.type !== 'unit' || !skill.guaranteedHit)) return fail('结界攻击路径被阻挡', blocked);
+    if (ctx.enforcePerception && !canSeePoint(ctx, casterId, point)) return fail('结界不在本人视野内');
+    const slotTargets = resolveSlotTargets(ctx, casterId, skill, [], null).map(slot => ({ ...slot, barrierIds: slot.attack ? [barrier.id] : [] }));
+    return { ok: true, reason: null, origin, aim: { barrierId: barrier.id, ...point }, range: limit ?? null,
+      cells: [], targetIds: [], damageTargetIds: [], actualTargetIds: [], targets: [], slotTargets,
+      barrierTargetIds: [barrier.id], barrierTargets: [{ barrierId: barrier.id, point }],
+      disclosureTargetIds: [], collisionPoint: point, contact: { type: 'barrier', barrierId: barrier.id, point },
+      blockedBy: null, shape: { type: range.type, from: origin, to: point }, blastCenter: range.type === '爆炸' ? point : null };
+  }
   const includeDowned = skillHasHeal(skill);
   const skipSpatialRecheck = !!(options.skipSpatialRecheck || (aim && aim.skipSpatialRecheck));
   // 第七种范围「自身」：只作用于施法者自身占格，无需瞄准点

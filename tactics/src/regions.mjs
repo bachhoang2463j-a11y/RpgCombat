@@ -9,6 +9,7 @@
 import { occupiedCells, cellKey } from './geometry.mjs';
 import { skillSlots } from './effect-definitions.mjs';
 import { ROUND_TIME } from './scheduler.mjs';
+import { barrierAt, interception } from './barriers.mjs';
 
 const EPS = 1e-9;
 
@@ -31,6 +32,20 @@ function blindSlot(skill) {
   }) || null;
 }
 
+// 场地按受影响目标局部隔绝，不裁剪原雾区；来源快照优先于施术者当前状态。
+export function fogAffects(ctx, region, unitOrPoint) {
+  if (typeof unitOrPoint === 'string') return !interception(ctx, region.casterId, unitOrPoint, region.source);
+  const placement = { col: Math.floor(unitOrPoint.x), row: Math.floor(unitOrPoint.y) };
+  const barrier = barrierAt(ctx, placement);
+  if (!barrier) return true;
+  const caster = unitById(ctx, region.casterId);
+  const source = region.source || { side: caster?.side, placement: ctx.placementsById[region.casterId], footprint: caster && fpOf(ctx, caster) };
+  if (source.side === barrier.side) return true;
+  if (!source.placement) return false;
+  const keys = keySet(barrier.cells);
+  return occupiedCells(source.placement, source.footprint || { width: 1, height: 1 }).every(c => keys.has(cellKey(c.col, c.row)));
+}
+
 // 单位所处雾况：取覆盖其完整占格（任一格）的雾区最高 strength
 export function fogAt(ctx, unitId) {
   const unit = unitById(ctx, unitId);
@@ -39,15 +54,21 @@ export function fogAt(ctx, unitId) {
   if (!cells.length) return { strength: 0, regionIds: [] };
   let strength = 0;
   const regionIds = [];
+  const blockedRegions = [];
   for (const r of ctx.regions || []) {
     if (!r || r.type !== 'fog' || r.endAt != null && r.endAt <= (ctx.now?.() || 0)) continue;
     const s = keySet(r.cells || []);
     if (cells.some(c => s.has(cellKey(c.col, c.row)))) {
+      const barrier = interception(ctx, r.casterId, unitId, r.source);
+      if (barrier) {
+        blockedRegions.push({ regionId: r.id, barrierId: barrier.id, reason: 'barrier-field', source: r.source });
+        continue;
+      }
       regionIds.push(r.id);
       if (Number(r.strength) > strength) strength = Number(r.strength);
     }
   }
-  return { strength, regionIds };
+  return { strength, regionIds, blockedRegions };
 }
 
 // 创建浓雾：cells 取 range 实际爆心落格（query.cells），strength 取致盲槽 power，
@@ -71,6 +92,8 @@ export function createFogRegion(ctx, { caster, skill, query, now } = {}) {
     id: sourceKey,
     type: 'fog',
     casterId: casterUnit.id,
+    source: { casterId: casterUnit.id, side: casterUnit.side,
+      placement: { ...ctx.placementsById[casterUnit.id] }, footprint: { ...fpOf(ctx, casterUnit) } },
     sourceKey,
     center: { x: center.x, y: center.y },
     radius,

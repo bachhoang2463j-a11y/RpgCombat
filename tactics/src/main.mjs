@@ -397,6 +397,7 @@ export function createApp(rootEl, opts = {}) {
       flow++;
       cancelRetargetPrompt();
       director.cancelAttack();          // 旧攻击 generator 作废（generator.return）
+      battle?.destroy();
       shell.cancelReactionPrompt();     // 旧反应弹窗/收起胶囊立即关闭并以 null 结算
       avHost.clear({ resetVoices: true });
     }
@@ -1118,6 +1119,7 @@ export function createApp(rootEl, opts = {}) {
     const myFlow = flow;
     for (let i = res.logFrom; i < res.logTo; i++) hiddenLog.add(i);
     director.holdRegions(res);
+    director.holdGuards(res);
     shell.showLog(unitName(res.casterId) + ' · ' + (res.skill || res.item).name, 'act');
     const caster = unitById(res.casterId);
     if (caster) {

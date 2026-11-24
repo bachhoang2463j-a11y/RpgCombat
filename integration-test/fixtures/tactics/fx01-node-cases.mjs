@@ -158,15 +158,17 @@ export const groups = {
     const hpReveal = supportTrace.findIndex(row => row[0] === 'reveal' && row[1] === hp.targetId);
     const secondCall = supportTrace.findIndex(row => row[0] === 'play' && row[1] === entities.get('second'));
     const mpReveal = supportTrace.findIndex(row => row[0] === 'reveal' && row[1] === mp.targetId);
-    cases.push(ok('TFX-01 群体回复调用原版目标实体与原音，溢出转盾和同类反馈各播放一次', supportOk &&
-      supportCalls.length === 4 && ['heal', 'shield'].every(type => supportCalls.some(row => row[1] === entities.get('recipient') && row[2] === type)) &&
-      supportCalls.some(row => row[1] === entities.get('second') && row[2] === 'mpHeal' && row[3] === 'mpHeal') &&
+    // 原版逐标签逐目标：每个真实效果条目各播一次原版 SVG（同目标两条回复也各播一次），溢出转盾随后单独一拍
+    cases.push(ok('TFX-01 群体回复调用原版目标实体与原音，每个效果条目独立播放，溢出转盾单独一次', supportOk &&
+      supportCalls.length === 6 && ['heal', 'shield'].every(type => supportCalls.some(row => row[1] === entities.get('recipient') && row[2] === type)) &&
+      supportCalls.filter(row => row[1] === entities.get('second') && row[2] === 'mpHeal' && row[3] === 'mpHeal').length === 2 &&
       supportCalls.some(row => row[1] === entities.get('untouched') && row[2] === 'buff' && row[3] === 'defUp') &&
-      supportCalls.filter(row => row[3] === 'hpHeal').length === 1 && supportCalls.filter(row => row[3] === 'shieldUp').length === 1,
+      supportCalls.filter(row => row[3] === 'hpHeal').length === 2 && supportCalls.filter(row => row[3] === 'shieldUp').length === 1,
       j(supportTrace)));
-    cases.push(ok('TFX-01 原版接触揭示真实对象，目标间隔一拍，空驱散保留原版反馈',
+    cases.push(ok('TFX-01 原版接触揭示真实对象，条目间隔 60ms 串行，空驱散保留原版反馈',
       recipientCall < hpReveal && hpReveal < secondCall && secondCall < mpReveal &&
-      supportTrace.slice(hpReveal, secondCall).some(row => row[0] === 'wait' && row[1] === 200) &&
+      supportTrace.slice(hpReveal, secondCall).some(row => row[0] === 'wait' && row[1] === 60) &&
+      supportTrace.filter(row => row[0] === 'wait').every(row => row[1] === 60) &&
       supportReveals.length === supportEffects.length && supportEffects.every(effect =>
         supportReveals.filter(reveal => reveal.effect === effect && reveal.quiet === true).length === 1), j(supportTrace)));
 

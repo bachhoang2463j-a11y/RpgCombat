@@ -6,6 +6,7 @@
 // L4 额外：蓄势期在左边带内短暂打出技能身份（技能名/施术者），爆发前退场，把空间信息交还战场。
 // 风格取自各条目已有的配色与母题（火纹、冰晶、雷弧、圣光、毒雾、裂隙、准星、符文、水纹、脉动）。
 // ==========================================
+import { mountShowpiece, SHOWPIECES } from './screen-showpiece.mjs';
 
 export const ATMOS_STYLES = {
   fire:    { c1: '#f97316', c2: '#fde68a', dark: 'rgba(67,20,7,', motif: 'flame' },
@@ -82,22 +83,28 @@ function bandSvg(side, motif, st, seed) {
 function esc(s) { return String(s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
 // fx: 导演 makeFx 句柄（screen/ground/after）；返回 { burst, lower, end }，均幂等
-export function startAtmos(fx, { style, grade, chargeMs = 600, totalMs = 2000, skillName = '', casterName = '', shape = null, after }) {
+export function startAtmos(fx, { style, grade, chargeMs = 600, totalMs = 2000, skillName = '', casterName = '', shape = null, after, entryId = null, focus = null }) {
   const st = ATMOS_STYLES[style] || ATMOS_STYLES.arcane;
   const L4 = grade === 'L4';
   const depth = L4 ? 28 : 22, peak = L4 ? 1 : 0.82;
   const life = totalMs + chargeMs + 2400;
+  const uid = Math.floor(Math.random() * 1e9);
+  // 有专属主演出的条目：边带只保留暗场渐变，母题纹理交给主演出（不重复堆叠通用纹理）
+  const hasShow = !!(entryId && SHOWPIECES[entryId]);
   const bands = BANDS.map((side, i) => '<div data-atmos-band="' + side + '" style="position:absolute;' + bandBox(side, depth) + 'background:' + bandGradient(side, st, peak) + ';transform:scale(0.08);opacity:0;">' +
-    bandSvg(side, st.motif, st, 17 + i * 31) + '</div>').join('');
+    (hasShow ? '' : bandSvg(side, st.motif, st, 17 + i * 31)) + '</div>').join('');
   const card = L4 && skillName ? '<div data-atmos-card style="position:absolute;left:2.5%;top:50%;transform:translate(-40px,-50%);opacity:0;padding:10px 18px 10px 14px;border-left:3px solid ' + st.c1 + ';' +
     'background:linear-gradient(90deg,' + st.dark + '0.86),' + st.dark + '0));font:900 clamp(20px,3.4vw,40px)/1.05 system-ui,sans-serif;letter-spacing:.08em;color:' + st.c2 + ';text-shadow:0 0 18px ' + st.c1 + ',0 2px 2px #000;white-space:nowrap;">' +
     esc(skillName) + '<div style="font:700 11px/1.4 system-ui,sans-serif;letter-spacing:.42em;color:' + st.c1 + ';opacity:.9;">' + esc(casterName) + '</div></div>' : '';
-  const root = fx.screen('<div data-atmos="' + style + '" data-grade="' + grade + '" style="position:absolute;inset:0;pointer-events:none;z-index:6;">' + bands + card + '</div>', life).firstChild;
+  const root = fx.screen('<div data-atmos="' + style + '" data-grade="' + grade + '" style="position:absolute;inset:0;pointer-events:none;">' + bands + card + '</div>', life).firstChild;
+  const show = hasShow ? mountShowpiece(root, entryId, uid, focus) : null;
+  if (card && show) root.appendChild(root.querySelector('[data-atmos-card]'));   // 身份卡压在主演出之上
   const els = [...root.querySelectorAll('[data-atmos-band]')];
   const svgs = [...root.querySelectorAll('[data-atmos-svg]')];
   const anim = (el, frames, ms, easing = 'cubic-bezier(0.3,0.7,0.2,1)') => el.animate(frames, { duration: ms, easing, fill: 'forwards' });
   // ① 蓄势聚拢：边带从屏幕边缘推入，纹理向内流动
   const gather = Math.max(280, chargeMs);
+  if (show) show.gather(gather);
   els.forEach(el => anim(el, [{ transform: 'scale(0.08)', opacity: 0 }, { transform: 'scale(0.72)', opacity: 0.75 * peak }], gather, 'cubic-bezier(0.55,0,0.85,0.5)'));
   svgs.forEach(s => anim(s, [{ opacity: 0.2 }, { opacity: 0.95 }], gather));
   const card$ = root.querySelector('[data-atmos-card]');
@@ -117,12 +124,14 @@ export function startAtmos(fx, { style, grade, chargeMs = 600, totalMs = 2000, s
     // ② 爆发：一次边缘闪压到最深，纹理收暗，主冲击交给世界效果与震屏
     burst() {
       if (state !== 'gather' || !root.isConnected) return; state = 'burst';
+      if (show) show.burst();
       els.forEach(el => anim(el, [{ transform: 'scale(0.72)', opacity: 0.75 * peak }, { transform: 'scale(1)', opacity: peak, offset: 0.25 }, { transform: 'scale(0.86)', opacity: 0.62 * peak }], 420));
       svgs.forEach(s => anim(s, [{ opacity: 0.95 }, { opacity: 0.35 }], 300));
     },
     // ③ 结果：降低遮挡，突出受击变化
     lower() {
       if (state === 'lower' || state === 'end' || !root.isConnected) return; if (state === 'gather') h.burst(); state = 'lower';
+      if (show) show.lower();
       els.forEach(el => anim(el, [{ opacity: 0.62 * peak }, { opacity: 0.3 * peak }], 260));
       svgs.forEach(s => anim(s, [{ opacity: 0.35 }, { opacity: 0.18 }], 260));
     },
@@ -130,11 +139,13 @@ export function startAtmos(fx, { style, grade, chargeMs = 600, totalMs = 2000, s
     end() {
       if (state === 'end') return; state = 'end';
       if (!root.isConnected) return;
+      if (show) show.end();
       els.forEach(el => anim(el, [{ transform: 'scale(0.86)' }, { transform: 'scale(0.05)', opacity: 0 }], 460, 'ease-in'));
       if (ring) anim(ring, [{ opacity: 0.9 }, { opacity: 0 }], 520);
-      after(520, () => { root.remove(); if (ring) ring.remove(); });
+      after(show ? 1300 : 520, () => { root.remove(); if (ring) ring.remove(); });
     },
   };
-  after(gather, () => h.burst());
+  // 条目在真实冲击拍点调用 burst()；未调用时兜底于蓄势结束后
+  after(show ? gather + 1000 : gather, () => h.burst());
   return h;
 }
