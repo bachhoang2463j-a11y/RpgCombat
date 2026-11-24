@@ -98,6 +98,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     now: () => state.combatState.clock?.now || 0,
     enforcePerception: units.every(u => Number.isFinite(u.ref.perception)),
     buffsOf,
+    random,
     canSeeUnit(observerId, targetId) { return canSeeUnit(this, observerId, targetId); },
   };
   let log = [];
@@ -710,7 +711,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (!u) return null;
     const st = statsOf(u);
     return { id: u.id, name: u.name, side: u.side, controller: u.controller || (u.side === 'hero' ? 'player' : 'ai'),
-      classType: u.classType || null, isSummon: !!u.isSummon, summonOwnerId: u.summonOwnerId || null,
+      classType: u.classType || null, baseTauntBonus: u.ref.baseTauntBonus || 0, isSummon: !!u.isSummon, summonOwnerId: u.summonOwnerId || null,
       hp: u.ref.hp, maxHp: u.ref.maxHp, mp: u.ref.mp, maxMp: u.ref.maxMp, tp: u.ref.tp || 0, maxTp: u.ref.maxTp || 0,
       moveDistance: u.ref.moveDistance, effectiveMoveDistance: moveDistanceOf(u), jumpDistance: Math.ceil(u.ref.moveDistance / 3),
       perception: u.ref.perception, footprint: { ...u.footprint },

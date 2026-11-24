@@ -27,7 +27,7 @@ import { createEditorPanel } from './editor-panel.mjs';
 import { autoPickChoice } from './reaction-prompt.mjs';
 import { unitCenter } from './geometry.mjs';
 import { createScenarioData, createSeededRandom } from './scenario-data.mjs';
-import { statusBadges, compactStatusHtml, fullStatusHtml, inspectorHtml } from './status-ui.mjs';
+import { statusBadges, passiveTauntBadges, compactStatusHtml, fullStatusHtml, inspectorHtml } from './status-ui.mjs';
 import { resolveLore } from './lore.mjs';
 import { getEffectiveStats } from './class-passives.mjs';
 import { hitChance } from './damage.mjs';
@@ -493,7 +493,10 @@ export function createApp(rootEl, opts = {}) {
       if (only && u.id !== only) continue;
       const list = shownOf(u).hp > 0 ? badgesOf(u) : [];
       view.setStatus(u.id, compactStatusHtml(list));
-      if (u.side === 'hero') shell.setHeroStatus(u.id, fullStatusHtml(list));
+      if (u.side === 'hero') {
+        const passive = shownOf(u).hp > 0 ? passiveTauntBadges(shownEff.get(u.id) || u.effective) : [];
+        shell.setHeroStatus(u.id, fullStatusHtml([...passive, ...list]));
+      }
     }
     renderInspector();
   }

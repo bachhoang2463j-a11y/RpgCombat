@@ -1,8 +1,8 @@
 // ==========================================
 // 战棋 P09/M4 敌方基础 AI（追打最近可攻击位置，够不到则沿路径前进，再否则接近或等待）
 // 与玩家共用 findReachable/queryAttack 同一套合法性查询（预览=执行=AI）。
-// 只读：不改 ctx（落点经浅复制 placementsById 传入查询）、不掷骰、不调用异步、不碰表现层。
-// 选位排序：真实收益 → 移动成本 → 目标稳定 ID → 技能候选序，全程确定性。
+// 不改 ctx（落点经浅复制 placementsById 传入查询）、不调用异步、不碰表现层。
+// 选位排序：真实收益 → 移动成本 → 目标稳定 ID → 技能候选序；攻击目标按有效嘲讽抽选一次。
 // 感知：优先用 ctx.canSeeUnit?.() 过滤敌方；无该回调时保持旧行为（全可见），空 regions 兼容老测试。
 // 浓雾：无八邻接可见敌人时优先离雾，出口路径跨预算且主行动>0 时请求冲刺；出雾后下一轮再攻击。
 // ==========================================
@@ -13,6 +13,7 @@ import { cellKey, unitCenter, cellCenter, occupiedCells } from './geometry.mjs';
 import { skillSlots } from './effect-definitions.mjs';
 import { interception } from './barriers.mjs';
 import { fogAffects } from './regions.mjs';
+import { getEffectiveStats } from './class-passives.mjs';
 
 const EPS = 1e-9;
 const IDLE = { moveTo: null, skill: null, aim: null, action: 'wait' };
@@ -42,7 +43,7 @@ function buffsOf(ctx, id) {
 // ---------- 感知与浓雾 ----------
 
 function visibleEnemies(ctx, unit) {
-  return ctx.units.filter(u => isLive(u) && u.side !== unit.side
+  return ctx.units.filter(u => isLive(u) && u.side !== unit.side && !u.isSubdued && !u.ref.isSubdued
     && (!ctx.canSeeUnit || ctx.canSeeUnit(unit.id, u.id)));
 }
 
@@ -236,12 +237,30 @@ function cmpBetter(a, b) {
   return a.si - b.si;
 }
 
+export function chooseTauntTarget(ctx, unit, targets, random = ctx.random || Math.random) {
+  if (!targets.length) return null;
+  if (unit.isWise || unit.ref.isWise) {
+    const low = targets.filter(t => t.ref.maxHp > 0 && t.ref.hp / t.ref.maxHp <= 0.3)
+      .sort((a, b) => a.ref.hp / a.ref.maxHp - b.ref.hp / b.ref.maxHp || a.id.localeCompare(b.id));
+    if (low.length) return low[0];
+  }
+  if (targets.length === 1) return targets[0];
+  const weights = targets.map(t => Math.max(1, getEffectiveStats(t, buffsOf(ctx, t.id)).taunt));
+  let point = random() * weights.reduce((n, w) => n + w, 0);
+  for (let i = 0; i < targets.length; i++) {
+    point -= weights[i];
+    if (point < 0) return targets[i];
+  }
+  return targets[targets.length - 1];
+}
+
 function searchBest(ctx, unit, skills, budget, enemies, allies) {
   const reach = findReachable(ctx, unit.id, budget);
   const cells = reach.cells.slice().sort(cmpCell);
   const start = ctx.placementsById[unit.id];
   const startCenter = unitCenter(start, footprintOf(ctx, unit));
   let best = null;
+  const attacksByTarget = new Map();
 
   for (let si = 0; si < skills.length; si++) {
     const raw = skills[si];
@@ -292,11 +311,23 @@ function searchBest(ctx, unit, skills, budget, enemies, allies) {
         if (!q.ok) continue;
         const score = evaluateQuery(ctx2, unit, eff, q);
         if (score <= EPS) continue;
-        found = { score, cost: cell.cost, cell, skill: raw, aim, targetId: target.id, si };
+        found = { score, cost: cell.cost, cell, skill: raw, aim, targetId: target.id, si,
+          attackTarget: (q.damageTargetIds || []).includes(target.id) };
         break; // 该 (技能,目标) 取最省移动的合法落点
       }
       if (found && (!best || cmpBetter(found, best) < 0)) best = found;
+      if (found && found.attackTarget && !target.barrier && target.side !== unit.side) {
+        const previous = attacksByTarget.get(target.id);
+        if (!previous || cmpBetter(found, previous) < 0) attacksByTarget.set(target.id, found);
+      }
     }
+  }
+  if (best && attacksByTarget.get(best.targetId) === best) {
+    const area = (best.skill.range || resolveDefaultRange(best.skill)).type !== '单体';
+    const targets = enemies.filter(t => attacksByTarget.has(t.id)
+      && (!area || attacksByTarget.get(t.id).score >= best.score - EPS)).sort((a, b) => a.id.localeCompare(b.id));
+    const chosen = chooseTauntTarget(ctx, unit, targets);
+    best = chosen ? attacksByTarget.get(chosen.id) : null;
   }
   return { best, reach };
 }
