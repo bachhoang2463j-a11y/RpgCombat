@@ -78,7 +78,8 @@ export function playPathMotion(unitView, scope, opts) {
   unitView.setFlag(unitId, 't-unit-moving', true);
   if (onFeedback) onFeedback('start', 0);
   return new Promise(resolve => {
-    let done = false, lastSeg = -1;
+    let done = false, lastSeg = -1, lastStepIdx = -1, lastStepDist = -Infinity;
+    const stride = gait.stride > 0 ? gait.stride : 0;
     const t0 = performance.now();
     const finish = ok => {
       if (done) return; done = true;
@@ -103,15 +104,30 @@ export function playPathMotion(unitView, scope, opts) {
         const hop = Math.sin(Math.PI * k);
         unitView.setHop(unitId, hop * gait.hop, 1 - (1 - hop) * gait.squash);
       }
-      if (p.seg !== lastSeg) {
+      if (stride > 0 && !(gait.float > 0)) {
+        const stepIdx = Math.floor(d / stride);
+        if (stepIdx > lastStepIdx) {
+          lastStepIdx = stepIdx;
+          lastStepDist = d;
+          if (onFeedback) onFeedback('step', p.seg, p);
+        }
+      } else if (!(gait.float > 0) && p.seg !== lastSeg) {
         if (onFeedback) onFeedback('step', p.seg, p);
+      }
+      if (p.seg !== lastSeg) {
         if (lastSeg >= 0 && Math.abs(((segs[p.seg].facing - segs[lastSeg].facing + 540) % 360) - 180) > 1 && onFeedback) onFeedback('turn', p.seg);
         lastSeg = p.seg;
         unitView.setDisplayFacing(unitId, p.facing);
       }
       if (onFrame) onFrame(p.x, p.y);
       if (onFeedback) onFeedback('frame', p.seg, p);
-      if (t >= 1) { unitView.setHop(unitId, 0, 1); if (onFeedback) onFeedback('step', segs.length, p); if (stopCancel) stopCancel(); finish(true); return false; }
+      if (t >= 1) {
+        unitView.setHop(unitId, 0, 1);
+        if (!(gait.float > 0) && onFeedback && (!stride || (d - lastStepDist) >= stride * 0.45)) onFeedback('step', segs.length, p);
+        if (stopCancel) stopCancel();
+        finish(true);
+        return false;
+      }
     });
   });
 }

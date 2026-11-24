@@ -255,12 +255,13 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         const resistance = {};
         const raw = applyTypeResist(raw0, '法术', true, hero, buffsOf(hero.id), resistance);
         const calc = calculateDamage(raw, { def: tStats.def, shield: hero.ref.shield || 0, hp: hero.ref.hp }, { isPierce: sub === '群穿', defending: isDefending(hero) });
-        let hpDmg = calc.hpDmg, shieldDmg = calc.shieldDmg;
+        let hpDmg = calc.hpDmg, shieldDmg = calc.shieldDmg, sdFatalResult = null;
         if (hero.ref.hp - hpDmg <= 0) {
           const fatalCtx = { unit: hero, hpDmg, shieldDmg };
           const tp = CLASS_PASSIVES[hero.classType];
           if (tp && tp.onFatalDamage && tp.onFatalDamage(fatalCtx)) {
             hpDmg = fatalCtx.hpDmg; shieldDmg = fatalCtx.shieldDmg;
+            sdFatalResult = { reason: fatalCtx.hpDmg === 0 ? 'avoid-fatal' : 'grit', hpDmgBefore: calc.hpDmg, hpDmgAfter: fatalCtx.hpDmg };
             addLog(hero.name + ' 触发职业被动【' + (fatalCtx.hpDmg === 0 ? '回避致命' : '毅力留存') + '】躲过了自爆致命伤！');
           }
         }
@@ -268,7 +269,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         const dealt = Math.min(hero.ref.hp, hpDmg);
         hero.ref.hp = Math.max(0, hero.ref.hp - hpDmg);
         addLog('☠️ 自爆命中 ' + hero.name + ' -' + dealt + ' HP' + (shieldDmg ? '（破盾' + shieldDmg + '）' : ''));
-        affectedTargets.push({ targetId: hero.id, hit: true, hpDmg: dealt, shieldDmg, rawDmg: raw, resistance,
+        affectedTargets.push({ targetId: hero.id, hit: true, hpDmg: dealt, shieldDmg, rawDmg: raw, resistance, fatalResult: sdFatalResult,
           segmentId: runId + ':' + currentAttackId() + ':slot:self-destruct:segment:' + deathSegment,
           hpAfter: hero.ref.hp, down: hero.ref.hp <= 0 });
         if (hero.ref.hp <= 0) handleDown(hero, 'selfdestruct');

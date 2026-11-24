@@ -62,7 +62,7 @@ export const groups = {
     const vendorText = readFileSync(path.join(ROOT, 'tactics', 'src', 'vendor', 'rpg-av', 'rpg-av.mjs'), 'utf8');
     const missingKeys = m.avHost.DEMO_AUDIO_KEYS.filter(k => !new RegExp("^\\s*'" + k + "'\\s*:", 'm').test(vendorText));
     cases.push(ok('TAV-02 显式预载清单全部是回合制 audioUrls 已有键', missingKeys.length === 0, j(missingKeys)));
-    cases.push(ok('TAV-02 预载清单有界（不预载整库）', m.avHost.DEMO_AUDIO_KEYS.length < 60, String(m.avHost.DEMO_AUDIO_KEYS.length)));
+    cases.push(ok('TAV-02 预载清单有界（不预载整库）', m.avHost.DEMO_AUDIO_KEYS.length < 90, String(m.avHost.DEMO_AUDIO_KEYS.length)));
     // 语音文件确实存在于 my_assets（本地权威目录）
     const assets = path.resolve(ROOT, '..', 'my_assets');
     let missingFiles = [];

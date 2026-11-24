@@ -262,6 +262,7 @@ export function createApp(rootEl, opts = {}) {
     onReveal: (hit, meta) => revealHit(hit, meta),
     onEffectReveal: (e) => revealEffect(e),
     onMoveFeedback: (id, kind, p) => moveFeedback(id, kind, p),
+    onRuleReveal: (_v, { kind }) => { if (kind === 'reaction-damage') { syncShown(); refreshBattle(); } },
     onSelfDestruct: () => { syncShown(); refreshBattle(); },
     promptRetarget: (req) => {
       const caster = unitById(req.casterId);
@@ -908,6 +909,7 @@ export function createApp(rootEl, opts = {}) {
       const result = kind === 'prepare' ? battle.advancePreparation() : battle.cancelPreparation();
       if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return; }
       ui(kind === 'prepare' ? 'charge' : 'cancel');
+      if (kind === 'prepare') avHost.sfx(result.ready ? 'herochargedone' : 'herocharge', 0.65, { category: 'K' });
       const log = battle.snapshot().log;
       shell.showLog(log[log.length - 1], 'act');
       if (kind === 'prepare') fxAtUnit(battle.snapshot().currentId, 't-charge-pulse', 900);
@@ -923,7 +925,7 @@ export function createApp(rootEl, opts = {}) {
     if (kind === 'defend') {
       const result = battle.defend();
       if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return; }
-      ui('confirm'); fxAtUnit(battle.snapshot().currentId, 't-heal-pulse', 700);
+      avHost.sfx('defUp', 0.62, { category: 'K' }); fxAtUnit(battle.snapshot().currentId, 't-heal-pulse', 700);
       const log = battle.snapshot().log;
       shell.showLog(log[log.length - 1] || '进入防御姿态', 'act');
       refreshBattle(); afterHeroAction(); return;
@@ -1091,7 +1093,6 @@ export function createApp(rootEl, opts = {}) {
     setBusy(true);
     sandbox.setPreview(null); sandbox.setHint(null);
     sandbox.beginAction();
-    ui('confirm');
     const mover = battle.snapshot().currentId;
     sandbox.getUnitView().lockMotion(mover, true);   // 显示位置留在起点，直到路径演出接管（否则刷新会先闪到终点）
     const res = battle.move(col, row);
@@ -1206,10 +1207,10 @@ export function createApp(rootEl, opts = {}) {
       }
     }
     if (plan && plan.action === 'defend') {
-      battle.defend(); refreshBattle();
+      battle.defend(); avHost.sfx('defUp', 0.55, { category: 'K' }); fxAtUnit(battle.snapshot().currentId, 't-heal-pulse', 700); refreshBattle();
     } else if (plan && plan.action === 'prepare' && !plan.skill) {
       const pr = battle.advancePreparation();
-      if (pr.ok) { fxAtUnit(battle.snapshot().currentId, 't-charge-pulse', 900); refreshBattle(); }
+      if (pr.ok) { avHost.sfx(pr.ready ? 'herochargedone' : 'herocharge', 0.58, { category: 'K' }); fxAtUnit(battle.snapshot().currentId, 't-charge-pulse', 900); refreshBattle(); }
     } else if (plan && plan.skill && (battle.snapshot().resources.main > 0 || battle.snapshot().preparation?.ready)) {
       const q = battle.previewAttack(plan.skill, plan.aim);
       if (q.ok) {
@@ -1322,8 +1323,27 @@ export function createApp(rootEl, opts = {}) {
       scope.after(620, () => { view.setFlag(u.id, 't-unit-falling', false); view.setFlag(u.id, 't-unit-down', true); });
     });
   }
-  // 步伐：按职业/分级的步伐音、落地尘土、移动拖尾；BOSS 每步轻震镜头
+  // 步伐：6 档真实采样（相邻去重 + 立体声 pan + 音高抖动）、落地尘土、移动拖尾；BOSS 每步轻震镜头
   const trailAt = new Map();
+  const lastMoveClip = new Map();
+  const activeGlides = new Map();
+  let moveSfxOn = true;
+  function stopActiveGlide(id) {
+    const h = activeGlides.get(id);
+    if (h) { try { h.stop?.(); } catch (_) {} activeGlides.delete(id); }
+  }
+  function pickStepClip(id, pool) {
+    if (!pool || !pool.length) return null;
+    const prev = lastMoveClip.get(id);
+    const avail = pool.length > 1 ? pool.filter(k => k !== prev) : pool;
+    const chosen = avail[Math.floor(Math.random() * avail.length)];
+    lastMoveClip.set(id, chosen);
+    return chosen;
+  }
+  function randRate(range) {
+    if (!Array.isArray(range) || range.length < 2) return 1;
+    return range[0] + Math.random() * (range[1] - range[0]);
+  }
   function fxNode(cls, x, y, ms, style) {
     const d = sandbox.getDom();
     if (!d) return null;
@@ -1339,8 +1359,15 @@ export function createApp(rootEl, opts = {}) {
   function moveFeedback(id, kind, p) {
     const st = unitStyles[id] || {};
     const u = unitById(id);
-    if (kind === 'start') { if (st.glide) ui(st.glide); return; }
-    if (kind === 'stop') { if (st.glide) ui('glideStop'); return; }
+    if (kind === 'start') {
+      stopActiveGlide(id);
+      if (moveSfxOn && st.glideSfx) {
+        const h = avHost.sfx(st.glideSfx.key, st.glideSfx.vol, { rate: randRate(st.glideSfx.rate), track: 'skill', category: 'C' });
+        if (h) activeGlides.set(id, h);
+      } else if (st.glide) ui(st.glide);
+      return;
+    }
+    if (kind === 'stop') { stopActiveGlide(id); if (st.glide && !st.glideSfx) ui('glideStop'); return; }
     if (!p) return;
     const stomp = () => { const d = sandbox.getDom(); if (d && d.shake) { d.shake.classList.remove('t-stomp'); void d.shake.offsetWidth; d.shake.classList.add('t-stomp'); } };
     const bigUnit = u && (u.footprint.width > 1 || u.footprint.height > 1);
@@ -1378,7 +1405,12 @@ export function createApp(rootEl, opts = {}) {
     if (kind !== 'step') return;
     const s = sandbox.worldToScreenClient(p.x, p.y);
     const pan = Math.max(-0.6, Math.min(0.6, (s.x / window.innerWidth - 0.5) * 1.2));
-    if (st.step) ui(st.step, { pan }); else if (st.glide) ui('sparkle', { pan });
+    if (moveSfxOn) {
+      if (st.stepSfx && st.stepSfx.pool && !(st.gait && st.gait.float > 0)) {
+        const clip = pickStepClip(id, st.stepSfx.pool);
+        if (clip) avHost.sfx(clip, st.stepSfx.vol, { rate: randRate(st.stepSfx.rate), pan, track: 'skill', category: 'C' });
+      } else if (st.step) ui(st.step, { pan });
+    }
     const big = u && (u.footprint.width > 1 || u.footprint.height > 1);
     if (st.dust) fxNode('t-dust' + (st.dust === 'heavy' || big ? ' t-dust-big' : st.dust === 'light' ? ' t-dust-light' : ''), p.x, p.y + (big ? 0.6 : 0.28), 520);
     if (st.shake) {
@@ -1521,10 +1553,38 @@ export function createApp(rootEl, opts = {}) {
     editorOverrides.set(currentViewData.sceneId + '\u0000' + currentViewData.battleId, overrides);
   }
 
+  const AUDIO_PREF_KEY = 'tactics.audioPrefs.v1';
+  const audioPrefs = (() => {
+    const def = { move: true, identity: true, variant: true, status: true, selfDestruct: true, atmoSound: false, atmoTheme: 'rain' };
+    try { return Object.assign(def, JSON.parse(localStorage.getItem(AUDIO_PREF_KEY) || '{}')); } catch (_) { return def; }
+  })();
+  function applyAudioPrefs() {
+    moveSfxOn = !!audioPrefs.move;
+    if (!moveSfxOn) activeGlides.forEach((_h, uid) => stopActiveGlide(uid));
+    avHost.av.setIdentitySfx?.(!!audioPrefs.identity);
+    avHost.av.setVariantSfx?.(!!audioPrefs.variant);
+    avHost.av.setStatusSfx?.(!!audioPrefs.status);
+    avHost.av.setSelfDestructSfx?.(!!audioPrefs.selfDestruct);
+    avHost.setAtmoTheme(audioPrefs.atmoTheme);
+    avHost.setAtmoSound(!!audioPrefs.atmoSound);
+  }
+  applyAudioPrefs();
+  const onAudioPrefChange = (e) => {
+    const t = e.target;
+    const key = t && t.dataset && t.dataset.audioPref;
+    if (!key) return;
+    audioPrefs[key] = t.type === 'checkbox' ? !!t.checked : String(t.value || 'baseline');
+    try { localStorage.setItem(AUDIO_PREF_KEY, JSON.stringify(audioPrefs)); } catch (_) {}
+    applyAudioPrefs();
+  };
+  shell.els.editorModal?.addEventListener('change', onAudioPrefChange);
+
   function soundSettingsHtml() {
     const rep = avHost.resourceReport();
     const count = (list, st) => list.filter(r => r.status === st).length;
     const bad = rep.audio.filter(r => r.status === 'error').concat(rep.images.filter(r => r.status === 'error'));
+    const chk = (k, label) => '<label class="flex items-center justify-between gap-2 text-[11px] text-slate-200 cursor-pointer py-0.5"><span>' + label + '</span><input type="checkbox" data-audio-pref="' + k + '"' + (audioPrefs[k] ? ' checked' : '') + '></label>';
+    const themes = [['baseline', '默认静音'], ['rain', '夜雨'], ['mist', '冷雾'], ['ruins', '废墟尘埃'], ['eldritch', '异界低光']];
     return '<h4 class="t-panel-h">声音与资源</h4>' +
       '<div class="t-res-report"><div>资源基址：<code>' + escapeText(rep.assetBase) + '</code></div>' +
       '<div>音频上下文：' + (rep.unlocked ? '已解锁（' + rep.audioState + '）' : '未解锁（首次点击/按键后解锁）') + '</div>' +
@@ -1532,7 +1592,17 @@ export function createApp(rootEl, opts = {}) {
       '<div>头像：成功 ' + count(rep.images, 'ok') + ' · 失败 ' + count(rep.images, 'error') + '</div>' +
       (bad.length ? '<div class="t-res-bad">加载失败：<br>' + bad.map(r => escapeText(r.url)).join('<br>') + '</div>' : '') +
       (rep.missing.length ? '<div class="t-res-bad">缺失：' + rep.missing.map(m => escapeText(m.kind + ':' + m.detail)).join('，') + '</div>' : '') +
-      '<div class="t-submenu-empty">背景环境声：尚未选定素材，本轮不播放。</div></div>';
+      '<div class="mt-2 pt-2 border-t border-slate-700/60">' +
+      chk('move', '步态移动音效（6 档真实采样）') +
+      chk('identity', '攻击身份音效') +
+      chk('variant', '怪物变体与抗性音效') +
+      chk('status', '异常状态发作音效') +
+      chk('selfDestruct', '死亡自爆音效') +
+      chk('atmoSound', '战场环境氛围音') +
+      '<label class="flex items-center justify-between gap-2 text-[11px] text-slate-200 mt-1"><span>环境音主题</span>' +
+      '<select data-audio-pref="atmoTheme" class="edit-input-game text-[11px] px-1.5 py-0.5">' +
+      themes.map(([v, n]) => '<option value="' + v + '"' + (audioPrefs.atmoTheme === v ? ' selected' : '') + '>' + n + '</option>').join('') +
+      '</select></label></div></div>';
   }
   function escapeText(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
 
@@ -1556,6 +1626,8 @@ export function createApp(rootEl, opts = {}) {
 
   function destroy() {
     flow++;
+    activeGlides.forEach((_h, uid) => stopActiveGlide(uid));
+    shell.els.editorModal?.removeEventListener('change', onAudioPrefChange);
     cancelRetargetPrompt();
     director.cancelAttack();
     shell.cancelReactionPrompt();

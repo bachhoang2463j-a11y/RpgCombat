@@ -21,11 +21,15 @@ const ENTRIES = [
   'syncVariantState', 'clearVariantState', 'playVariantTriggerFx', 'isEntityVariantLocked',
   'playSummonEnter', 'playSummonExit', 'playSummonGuard', 'clearSummonState',
   'playLingFeng',
+  'playRescueGrit', 'playRescueAvoidFatal', 'clearRescueState',
+  'playVariantResistFx', 'playCounterAttackL1',
+  'playSelfDestructWindup', 'playSelfDestructBurst', 'playSelfDestructInterrupt', 'clearSelfDestructState', 'syncSelfDestructWarning',
+  'setIdentitySfx', 'setVariantSfx', 'setStatusSfx', 'setSelfDestructSfx',
 ];
 // 不入口：敌方兜底群攻 playMeleeGroup/RangedGroup/SpellGroup 按全队卡片头像取帧（portraitFrame），
 // 与空间范围"只作用真实受影响目标"冲突；战棋敌方范围攻击改走攻击身份 aoe（逐目标 onImpact）。
-// 闭包内被 clearArcaneFx 等引用、但属于本 Demo 不产生状态的未迁移段：生成显式空实现
-const STUBS = ['clearSelfDestructState', 'clearRescueState'];
+// 所有状态与救援段均已进入真实提取闭包，不再使用空存根
+const STUBS = [];
 // 需要原样带入的段（未入闭包也带入）：语法上属于前一语句的续行
 const MESSY_SECTIONS = ['抗性与免疫演出 BEGIN', 'v12.10 状态发作', 'v12.10 状态 END', '救援时刻 v12.10 BEGIN', '召唤三瞬默认演出 v12.12 BEGIN'];
 
@@ -223,7 +227,7 @@ function extractCss(html, jsText) {
   let css = keep.join('\n');
   // 宿主适配：全屏层改为战棋特效舞台内绝对定位（舞台在 world-root 内随相机变换）；
   // 关键帧不改写：击杀特写/Cut-in 位于 iframe 屏幕宿主，其 translate(±100vw) 等以视口为基准属原版语义
-  css = patch(css, /position\s*:\s*fixed/g, 'position:absolute', 8, 'CSS position:fixed → absolute');
+  css = patch(css, /position\s*:\s*fixed/g, 'position:absolute', 10, 'CSS position:fixed → absolute');
   css = patch(css, /\b100vw\b/g, '100%', 1, 'CSS 100vw → 舞台宽');
   css = patch(css, /\b100d?vh\b/g, '100%', 1, 'CSS 100vh/dvh → 舞台高');
   css += '\n' + [...kfKeep.values()].join('\n');
@@ -276,6 +280,25 @@ function build() {
   moments = patch(moments, 'overlay.remove();', 'overlay.remove(); __MOMENTS.delete(overlay);', 2, '特写收尾登记');
   moments = patch(moments, "document.getElementById('battle-scene')", '__STAGE.shakeEl()', 1, '特写震屏走舞台震动层');
   moments = patch(moments, /\bsetTimeout\(/g, '__momentTimeout(', 6, '特写计时可随重开清理');
+  // 2c) 战场环境氛围音（仅提取原版粉红噪/LFO 合成引擎，不依赖 #battle-scene DOM）
+  const atmoPink = topBlock(L, l => l.startsWith('    function getPinkNoise(ctx)'), 'getPinkNoise', /^    \}\s*$/);
+  const atmoStop = topBlock(L, l => l.startsWith('    function stopAmbientAudio('), 'stopAmbientAudio', /^    \}\s*$/);
+  let atmoSync = topBlock(L, l => l.startsWith('    function syncAmbientAudio('), 'syncAmbientAudio', /^    \}\s*$/);
+  const atmoSyncText = patch(atmoSync.text, "if (!state.ambientSound || state.theme === 'baseline' || !state.rootEl?.isConnected)", "if (!state.ambientSound || state.theme === 'baseline')", 1, '环境音脱离#battle-scene DOM');
+  const atmoAudioCode = `  const atmoState = { theme: 'baseline', ambientSound: false, pinkNoiseBuf: null, audioSession: null };
+  const atmoAudio = (function () {
+    const state = atmoState;
+${atmoPink.text}
+${atmoStop.text}
+${atmoSyncText}
+    return {
+      setTheme(theme) { state.theme = ['baseline', 'rain', 'mist', 'ruins', 'eldritch'].includes(theme) ? theme : 'baseline'; syncAmbientAudio(); return state.theme; },
+      getTheme() { return state.theme; },
+      setAmbientSound(on) { state.ambientSound = !!on; syncAmbientAudio(); return state.ambientSound; },
+      getAmbientSound() { return state.ambientSound; },
+      stop(immediate = false) { stopAmbientAudio(immediate); },
+    };
+  })();`;
   // 3) 粒子引擎与事件总线
   const fxClass = topBlock(L, l => l.startsWith('class CanvasFxEngine {'), 'CanvasFxEngine');
   const supportSvg = topBlock(L, l => l.startsWith('function playSVGEffect('), 'playSVGEffect');
@@ -439,16 +462,20 @@ ${supportBranches.join('\n').replace('else if', 'if')}
     "const waveW = areaBounds ? stageW : Math.max(stageW * 1.15, 360), waveH = areaBounds ? stageH : Math.max(stageH * 0.92, 136);", 1, '战棋攻击身份适配');
   mod = patch(mod, "${Math.max(88, stageH * 0.68)}px;transform:translate(-50%,-50%);",
     "${areaBounds ? stageH : Math.max(88, stageH * 0.68)}px;transform:translate(-50%,-50%);", 1, '战棋攻击身份适配');
-  mod = patch(mod, /\.getBoundingClientRect\(\)/g, '[__GBCR]()', 11, '屏幕矩形 → 特效舞台坐标');
-  mod = patch(mod, /\b(?:window\.)?innerWidth\b/g, '__STAGE.w', 11, 'innerWidth → 舞台宽');
-  mod = patch(mod, /\b(?:window\.)?innerHeight\b/g, '__STAGE.h', 7, 'innerHeight → 舞台高');
+  mod = patch(mod, /\.getBoundingClientRect\(\)/g, '[__GBCR]()', 12, '屏幕矩形 → 特效舞台坐标');
+  mod = patch(mod, /\b(?:window\.)?innerWidth\b/g, '__STAGE.w', 16, 'innerWidth → 舞台宽');
+  mod = patch(mod, /\b(?:window\.)?innerHeight\b/g, '__STAGE.h', 10, 'innerHeight → 舞台高');
   mod = patch(mod, 'document.body.appendChild(', '__STAGE.el.appendChild(', 5, 'body 挂载 → 特效舞台');
   mod = patch(mod, /position\s*:\s*fixed/g, 'position:absolute', 0, 'JS position:fixed → absolute');
   mod = patch(mod, "window.addEventListener('resize', resizeCanvas);", '__STAGE.onResize(resizeCanvas);', 1, 'arcane canvas resize 走舞台');
   mod = patch(mod, "document.getElementById('battle-scene')", '__STAGE.shakeEl()', 2, '舞台震动独立层');
   mod = patch(mod, /window\.(playSound|playRandomStandardGunshot|playShotgunSound|AudioContext|webkitAudioContext)\b/g,
     (m, n) => (n.endsWith('AudioContext') ? m : n), 14, 'window.* 声音函数改为工厂内本地');
-  mod = patch(mod, 'arcaneAtmoModule.stopAmbientAudio(true);', '/* 环境氛围模块未迁移（战棋背景声由宿主 ambient 管理） */', 1, '去环境氛围清理');
+  mod = patch(mod, 'arcaneAtmoModule.stopAmbientAudio(true);', 'atmoAudio.stop(true);', 1, '环境氛围音随清场停止');
+  mod = patch(mod, 'window.playVariantResistFx = playVariantResistFx;', '', 1, '去抗性全局挂载');
+  mod = patch(mod, "return dom.querySelector('.portrait')", "return dom.querySelector('.t-unit-avatar') || dom.querySelector('.t-unit-medal') || dom.querySelector('.portrait')", 1, '毅力血幕挂圆形棋子内框');
+  mod = patch(mod, 'ghost.innerHTML = cloneVisualOnly(dom);', "ghost.innerHTML = cloneVisualOnly(dom);\n        ghost.style.setProperty('--d', rect.w + 'px'); ghost.style.borderRadius = '50%';", 1, '致命回避残影保留圆形尺度');
+  mod = patch(mod, 'g.innerHTML = fromDom.innerHTML.replace(/ id="[^"]*"/g, \'\');', "g.innerHTML = fromDom.innerHTML.replace(/ id=\"[^\"]*\"/g, '');\n                    g.style.setProperty('--d', fromRect.w + 'px'); g.style.borderRadius = '50%';", 1, '反击残影保留圆形尺度');
 
   const stubText = STUBS.map(n => 'function ' + n + '() { /* 未迁移段：本 Demo 不产生该状态 */ }').join('\n');
   const css = extractCss(html, mod + '\n' + soundText + support + '\n' + moments);
@@ -467,6 +494,7 @@ ${supportBranches.join('\n').replace('else if', 'if')}
 .arcane-hit-num-layer[data-hit-type] .arcane-hit-num::before { display:block; font-size:calc(9px * var(--hit-scale,1)); font-weight:650; line-height:1.1; letter-spacing:.08em; opacity:.9; }
 .arcane-hit-num-layer[data-hit-type] .arcane-hit-num:not(.word):not(.shield)::before { content:attr(data-hit-type); }
 .arcane-hit-num-layer[data-hit-type] .arcane-hit-num.shield:not(.sub)::before { content:"护盾"; }
+[data-rpg-av-scope] .t-unit-medal .arcane-rescue-blood-wrap, [data-rpg-av-scope] .t-unit-avatar .arcane-rescue-blood-wrap { border-radius: 50%; overflow: hidden; }
 `;
   // 入选代码真实引用到的 audioUrls 键（显式预载清单来源；不预载整个素材库）
   const urlKeys = [...audioUrls.text.matchAll(/^\s*'([^']+)'\s*:/gm)].map(m => m[1]);
@@ -535,6 +563,7 @@ ${soundText}
   // ---- 粒子引擎（原样，仅换挂载层） ----
 ${fx}
   const fxEngine = new CanvasFxEngine();
+${atmoAudioCode}
 ${support}
 
   // ---- 事件总线（原样） ----
@@ -548,12 +577,16 @@ ${mod}
     return { playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar,
       CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx,
       syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked,
-      playSummonEnter, playSummonExit, playSummonGuard, clearSummonState, playLingFeng };
+      playSummonEnter, playSummonExit, playSummonGuard,
+      playRescueGrit, playRescueAvoidFatal, clearRescueState,
+      playVariantResistFx, playCounterAttackL1,
+      playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, clearSelfDestructState, syncSelfDestructWarning,
+      setIdentitySfx, setVariantSfx, setStatusSfx, setSelfDestructSfx, clearSummonState, playLingFeng };
   })();
 ${busOn.map(l => l.replace('CombatAudioDirector.consume', 'arcane.CombatAudioDirector.consume')).join('\n')}
 
   return Object.assign({}, arcane, {
-    CombatAudioMixer, audioUrls, playSound, playCustomAudio, HERO_VOICE_LINES, pickHeroVoice, AVATAR_MAP, fxEngine,
+    CombatAudioMixer, audioUrls, playSound, playCustomAudio, HERO_VOICE_LINES, pickHeroVoice, AVATAR_MAP, fxEngine, atmoAudio,
     ASSET_BASE, HERO_VOICE_BASE, itemFxAssetUrl,
     playGenericSupportFx, playExecutionAnimation, playEnemyUltimateCutin, clearMoments,
     clearArcaneFx() { supportHandles.forEach(handle => handle.cancel()); clearMoments(); arcane.clearArcaneFx(); playRandomStandardGunshot.last = null; },

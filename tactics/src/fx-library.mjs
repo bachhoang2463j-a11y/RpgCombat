@@ -151,6 +151,13 @@ export const EXTRA_AUDIO = {
   light01: 'light01.mp3', thunder01: 'thunder01.mp3',
   weimu: 'weimu.wav', sheshen_armor_step: 'sheshen_armor_step.mp3',
   parry_heavy: 'parry_Weapon_GuardBreak.wav',
+  move_hero_heavy_1: 'move_hero_heavy_1.mp3', move_hero_heavy_2: 'move_hero_heavy_2.mp3', move_hero_heavy_3: 'move_hero_heavy_3.mp3',
+  move_hero_normal_1: 'move_hero_normal_1.mp3', move_hero_normal_2: 'move_hero_normal_2.mp3', move_hero_normal_3: 'move_hero_normal_3.mp3',
+  move_hero_light_1: 'move_hero_light_1.mp3', move_hero_light_2: 'move_hero_light_2.mp3', move_hero_light_3: 'move_hero_light_3.mp3',
+  move_enemy_boss_1: 'move_enemy_boss_1.mp3', move_enemy_boss_2: 'move_enemy_boss_2.mp3', move_enemy_boss_3: 'move_enemy_boss_3.mp3',
+  move_enemy_elite_glide: 'move_enemy_elite_glide.mp3',
+  move_enemy_elite_step_1: 'move_enemy_elite_step_1.mp3', move_enemy_elite_step_2: 'move_enemy_elite_step_2.mp3', move_enemy_elite_step_3: 'move_enemy_elite_step_3.mp3',
+  move_enemy_fodder_1: 'move_enemy_fodder_1.mp3', move_enemy_fodder_2: 'move_enemy_fodder_2.mp3', move_enemy_fodder_3: 'move_enemy_fodder_3.mp3',
 };
 
 // 二次贝塞尔：SVG 光轨与粒子飞行共用同一控制点（防轨道分离）
@@ -205,10 +212,15 @@ function grow(el, { ms, s0 = 0.4, s1 = 1, hold = 0.7, s2 = s1 * 1.05, o = 1 }) {
 // 条目
 // ==========================================
 
-// 未知或缺失标签只揭示战斗真值，由导演播放统一命中反馈。
+// 未知或缺失标签：按伤害类型与范围补通用出手音，由导演播放统一命中反馈。
 const neutralImpact = {
   id: 'neutral-impact', grade: 'identity', fallback: true,
+  prepareKeys: () => ['atk1', 'atk2', 'light_impact'],
   async play(ctx) {
+    const sk = ctx.skill || {};
+    const wide = !!(sk.range && sk.range.type !== '单体' && sk.range.type !== '自身');
+    const cue = sk.damageType === '法术' ? 'light_impact' : (wide ? 'atk1' : 'atk2');
+    ctx.fx.sfx(cue, 0.55);
     for (const h of ctx.hits) ctx.reveal(h.targetId);
     return true;
   },
@@ -503,16 +515,19 @@ const SUPPORT_DEBUFF_DEFAULT = ['debuff', 'defDown'];
 const SUPPORT_EFFECT = {
   heal: ['heal', 'hpHeal'], healMp: ['mpHeal', 'mpHeal'], healTp: ['mpHeal', 'mpHeal'],
   shield: ['shield', 'shieldUp'], dispel: ['buff', 'defUp'], damageGuard: ['shield', 'defUp'],
-  counter: ['buff', 'defUp'], taunt: ['taunt', null], mainPoint: ['buff', null], drainMp: ['debuff', 'mpHeal'],
+  counter: ['buff', 'defUp'], taunt: ['taunt', 'taunt'], mainPoint: ['buff', 'atkUp'], drainMp: ['debuff', 'mpHeal'],
 };
-const SUPPORT_KEYS = [...new Set([...Object.values(SUPPORT_BUFF), ...Object.values(SUPPORT_DEBUFF), SUPPORT_DEBUFF_DEFAULT, ...Object.values(SUPPORT_EFFECT)].map(([, key]) => key).filter(Boolean))];
+const SUPPORT_KEYS = [...new Set([...Object.values(SUPPORT_BUFF), ...Object.values(SUPPORT_DEBUFF), SUPPORT_DEBUFF_DEFAULT, ...Object.values(SUPPORT_EFFECT), ['buff', 'hide']].map(([, key]) => key).filter(Boolean))];
 const SUPPORT_VOLUME = 0.5;
 const SUPPORT_CUES = SUPPORT_KEYS.map(key => ({ key, vol: SUPPORT_VOLUME }));
 
 // 多目标串行：名单与顺序来自后端 result.effects（同一目标多个效果槽保持各自真实条目）；
 // 目标 A 的原版 SVG/音色在接触拍点揭示变化，A 的句柄全部完成后才开始 B。只串行演出与揭示，不重新结算。
 function supportFeedbackOf(effect) {
-  if (effect.kind === 'buff') return effect.value > 0 ? SUPPORT_BUFF[effect.field] : (SUPPORT_DEBUFF[effect.field] || SUPPORT_DEBUFF_DEFAULT);
+  if (effect.kind === 'buff') {
+    if (effect.field === 'taunt') return effect.value < 0 ? ['buff', 'hide'] : ['taunt', 'taunt'];
+    return effect.value > 0 ? SUPPORT_BUFF[effect.field] : (SUPPORT_DEBUFF[effect.field] || SUPPORT_DEBUFF_DEFAULT);
+  }
   return SUPPORT_EFFECT[effect.kind];
 }
 async function playSupportEffects(ctx, accept = () => true) {

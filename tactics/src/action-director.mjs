@@ -357,7 +357,7 @@ export function createActionDirector(deps) {
       const key = kind + ':' + id + ':' + (value.targetId || value.unitId || value.barrierId || value.guardianId || '');
       if (ruleRevealed.has(key)) return;
       ruleRevealed.add(key);
-      playRuleFx(value, kind);
+      playRuleFx(value, kind, result);
       deps.onRuleReveal?.(value, { kind, result });
     }
     // 舍身冲刺：与攻击条目并行起跑（原版决意/突进先于来袭落点），受击揭示拍点等其到位后才格挡结算
@@ -415,8 +415,22 @@ export function createActionDirector(deps) {
         if (event) revealRule(event, 'barrier-damage');
       }
       avHost.consumeVisualEvents?.((result.events || []).filter(ev => ev.unitId === targetId && ev.type === 'variant-trigger'));
+      const fatalReason = seg.fatalResult && seg.fatalResult.reason;
       if (healed) playHealPulse(targetId);
-      else if (!seg.barrierHitId) av.playHitFeedback(r, { wave: hitWaves[waveIndex] || (hitWaves[waveIndex] = { shook: false, hitStopped: false, classified: [] }) });
+      else if (fatalReason === 'avoid-fatal' && !seg.barrierHitId) {
+        const ent = avHost.entity(targetId);
+        const rescue = ent && av.playRescueAvoidFatal ? av.playRescueAvoidFatal(ent) : null;
+        if (rescue?.handle) reactionRuns.push(awaitHandle(rescue.handle, 950));
+        const c = centerOf(targetId);
+        if (c) { const p = worldPx(c); floatText(makeFx('B'), p.x, p.y - 34, '⚡ 致命回避!', '#a5b4fc', '#312e81', { ms: 900, size: 14 }); }
+      } else if (!seg.barrierHitId) av.playHitFeedback(r, { wave: hitWaves[waveIndex] || (hitWaves[waveIndex] = { shook: false, hitStopped: false, classified: [] }) });
+      if (!healed && !seg.barrierHitId && fatalReason === 'grit') {
+        const ent = avHost.entity(targetId);
+        const rescue = ent && av.playRescueGrit ? av.playRescueGrit(ent) : null;
+        if (rescue?.handle) reactionRuns.push(awaitHandle(rescue.handle, 1360));
+        const c = centerOf(targetId);
+        if (c) { const p = worldPx(c); floatText(makeFx('B'), p.x, p.y - 36, '🩸 毅力 · 1HP!', '#fca5a5', '#7f1d1d', { ms: 1000, size: 14 }); }
+      }
       if (!healed && !seg.barrierHitId) av.CombatAudioDirector.publish(r);
       if (wave) av.CombatAudioDirector.completeTarget(wave, targetId);
       if (onReveal) onReveal({ ...h, ...seg, targetId, heal: healed, segmentIndex: i, segmentCount: segs.length }, Object.assign({ result, identity, entryId: entry.id }, meta));
@@ -478,6 +492,23 @@ export function createActionDirector(deps) {
     avHost.syncVisualState?.();
     regions.forEach(r => revealRegion(r.id));
     await Promise.all(reactionRuns);
+    // 普通/强力反击 L1 原版居合斩演出与音效（reaction-damage 事件）
+    const counterEvs = (result.events || []).filter(ev => ev.type === 'reaction-damage');
+    for (const cev of counterEvs) {
+      const cFrom = avHost.entity(cev.casterId), cTo = avHost.entity(cev.targetId);
+      if (cFrom && cTo && av.playCounterAttackL1) {
+        const ch = av.playCounterAttackL1(cFrom, cTo, () => {
+          const p = centerOf(cev.targetId);
+          if (p) {
+            const wp = worldPx(p);
+            const label = cev.hpDmg > 0 ? '-' + cev.hpDmg : (cev.shieldDmg > 0 ? '破盾 ' + cev.shieldDmg : '格挡');
+            floatText(makeFx('E'), wp.x, wp.y - 30, '⚔️ 反击 ' + label, '#fef08a', '#92400e', { ms: 850, size: 14 });
+          }
+          deps.onRuleReveal?.(cev, { kind: 'reaction-damage', result });
+        });
+        if (ch && ch.done && !(await untilScope(ch.done))) return false;
+      }
+    }
     // 冲锋与受击击退位移补间（解锁规则站位前先在视图平滑滑移）
     const moveEvs = (result.events || []).filter(ev => ev.type === 'unit-charged' || ev.type === 'unit-displaced');
     if (moveEvs.length) {
@@ -514,16 +545,37 @@ export function createActionDirector(deps) {
       const exit = ent && av.playSummonExit(ent, { exitCause: 'killed', side: ent.side });
       if (exit && !(await awaitHandle(exit, 900))) return false;
     }
-    // 死亡自爆领域事件演出（食尸鬼等）
+    // 死亡自爆领域事件演出（食尸鬼等：原版三幕四形态 + 世界层范围环）
     const selfDestructs = (result.events || []).filter(ev => ev.type === 'self-destruct');
     for (const sd of selfDestructs) {
       const fx = makeFx('B'), px = sd.center.x * 50, py = sd.center.y * 50, rPx = (sd.radius || 3) * 50;
-      fx.sfx('explosion_aoe_blast', 0.65); fx.shake('medium');
-      const ring = '<i style="position:absolute;left:' + px + 'px;top:' + py + 'px;width:' + (rPx * 2) + 'px;height:' + (rPx * 2) + 'px;margin:' + (-rPx) + 'px 0 0 ' + (-rPx) + 'px;border-radius:50%;background:radial-gradient(circle,rgba(251,146,60,0.45),rgba(239,68,68,0.6) 60%,transparent 75%);mix-blend-mode:screen;"></i>';
+      const sdEnt = avHost.entity(sd.unitId);
+      const sdForm = sd.sub || '群伤';
+      const wHandle = sdEnt && av.playSelfDestructWindup
+        ? av.playSelfDestructWindup(sdEnt, { form: sdForm, windupMs: { unstable: 260, gather: 360, critical: 180 } })
+        : null;
+      if (wHandle) {
+        wHandle.release?.();
+        if (!(await untilScope(wHandle.burstReady || wait(820)))) return false;
+      }
+      const ring = '<i style="position:absolute;left:' + px + 'px;top:' + py + 'px;width:' + (rPx * 2) + 'px;height:' + (rPx * 2) + 'px;margin:' + (-rPx) + 'px 0 0 ' + (-rPx) + 'px;border-radius:50%;background:radial-gradient(circle,rgba(251,146,60,0.35),rgba(239,68,68,0.45) 60%,transparent 75%);mix-blend-mode:screen;"></i>';
       fx.top(ring, 560).firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 540, fill: 'forwards' });
+      const targetList = (sd.targets || []).map(t => avHost.entity(t.targetId)).filter(Boolean);
+      const outcomes = Object.fromEntries((sd.targets || []).map(t => [t.targetId, t.hit ? 'hit' : 'dodge']));
+      const bHandle = sdEnt && av.playSelfDestructBurst
+        ? av.playSelfDestructBurst(sdEnt, targetList, { form: sdForm, outcomes }, (beat, meta) => {
+          if (beat === 'target_hit' || beat === 'target_attach') {
+            const tInfo = (sd.targets || []).find(x => x.targetId === meta?.target?.id);
+            if (tInfo?.fatalResult?.reason === 'grit' && av.playRescueGrit) av.playRescueGrit(meta.target);
+            else if (tInfo?.fatalResult?.reason === 'avoid-fatal' && av.playRescueAvoidFatal) av.playRescueAvoidFatal(meta.target);
+          }
+        }, wHandle?.stageCtx || null)
+        : null;
+      if (!bHandle) { fx.sfx('explosion_aoe_blast', 0.65); fx.shake('medium'); }
       if (onSelfDestruct) onSelfDestruct(sd);
+      if (bHandle && !(await awaitHandle(bHandle, 950))) return false;
+      else if (!bHandle && !(await wait(620))) return false;
     }
-    if (selfDestructs.length && !(await wait(620))) return false;   // 击杀特写/结算严格在自爆演出之后
     waves.forEach(wave => { if (wave) av.CombatAudioDirector.closeWave(wave); });
     dropAnchors();
     return ok;
@@ -568,11 +620,15 @@ export function createActionDirector(deps) {
     return serialMoment(() => untilScope(av.playExecutionAnimation(hero, kills.map(portraitOf).filter(Boolean), skill.damageType || '近战')));
   }
 
-  // ---------- 起手（蓄力/延迟开始：preparing 提交结果，未结算槽位）：注册表 kind:'prepare' 分发，无条目则不演 ----------
+  // ---------- 起手（蓄力/延迟开始：preparing 提交结果，未结算槽位）：注册表 kind:'prepare' 分发，无条目播通用蓄力音 ----------
   async function playPrepare(result) {
     if (!result || !result.ok || !result.preparing) return false;
     const entry = registry.resolve(prepareInput(result));
-    if (!entry) return true;
+    if (!entry) {
+      await prepareAudio(['herocharge']);
+      av.playSound('herocharge', 0.62, 1, { track: 'skill', category: 'K' });
+      return true;
+    }
     avHost.syncRoster();
     const c = centerOf(result.casterId);
     if (c) await sandbox.guideTo([c], { ms: 320 });
@@ -663,16 +719,33 @@ export function createActionDirector(deps) {
     }
     for (const [id, rec] of barrierNodes) if (!live.has(id) && !lockedBarriers.has(id) && !rec.leaving) { rec.leaving = true; barrierNodes.delete(id); fadeBarrierDome(rec, dropBarrier, (ms, fn) => s.after(ms, fn)); }
   }
-  // 规则原因驱动的演出：舍身格挡 / 结界展开·受击·隔绝·破碎·移除（各事件 eventId 唯一，由 revealRule 去重）
-  function playRuleFx(value, kind) {
+  // 规则原因驱动的演出：舍身格挡 / 结界展开·受击·隔绝·破碎·移除 / 变体抗性 / 燃烧禁疗（各事件 eventId 唯一，由 revealRule 去重）
+  function playRuleFx(value, kind, result = null) {
     const s = scope(), fx = makeFx('D'), after = (ms, fn) => s.after(ms, fn);
     // 宿主自带 presentGuard 时由其承担整段舍身演出（冲刺→格挡）；默认实现：冲刺并行起跑，格挡在受击揭示拍点
     if (kind === 'guard') return deps.presentGuard ? undefined : playGuardBlock({ fx, view: sandbox.getUnitView(), tween }, value);
+    if (kind === 'resistance') {
+      const ent = avHost.entity(value.targetId);
+      if (!ent || !av.playVariantResistFx) return null;
+      return av.playVariantResistFx({
+        entity: ent,
+        layers: value.layers,
+        from: result ? avHost.entity(result.casterId) : null,
+        incomingType: result?.incomingType || result?.skill?.damageType,
+        isAoE: !!(result?.skill?.range && result.skill.range.type !== '单体' && result.skill.range.type !== '自身'),
+        meta: { delayMs: 70 },
+      });
+    }
+    if (kind === 'heal-suppressed') {
+      const ent = avHost.entity(value.targetId);
+      return ent && av.playStatusTickFx ? av.playStatusTickFx({ event: 'healSuppressed', entity: ent, meta: value }) : null;
+    }
     if (kind === 'barrier-created') {
       heldBarriers.delete(value.barrier.id);
       const b = lastBarriers.find(x => x.id === value.barrier.id) || value.barrier;
       if (barrierNodes.has(b.id)) return;
-      return playBarrierRaise(fx, mountBarrier(b));
+      const silent = result?.skill?.fxTag === '圣域帷幕';
+      return playBarrierRaise(fx, mountBarrier(b), { silent });
     }
     if (kind === 'barrier-damage') {
       const left = (lockedBarriers.get(value.barrierId) || 1) - 1;
@@ -770,10 +843,16 @@ export function createActionDirector(deps) {
     try { if (run.gen && typeof run.gen.return === 'function') run.gen.return(); } catch (_) { /* 旧链作废即可 */ }
   }
 
-  // ---------- 治疗反馈（通用回复/恢复视觉）：绿色光粒上升 + 周身光环；复用世界层宿主，不按角色硬编码 ----------
+  // ---------- 治疗反馈（通用回复/恢复视觉）：绿色光粒上升 + 周身光环 + 真实 hpHeal 脉冲音 ----------
+  let lastHealPulseSfxAt = 0;
   function playHealPulse(unitId) {
     const c = centerOf(unitId);
     if (!c) return;
+    const now = performance.now();
+    if (now - lastHealPulseSfxAt >= 60) {
+      lastHealPulseSfxAt = now;
+      av.playSound('hpHeal', 0.52, 1, { track: 'aux', category: 'K' });
+    }
     const x = c.x * 50, y = c.y * 50, n = 10;
     const dots = Array.from({ length: n }, (_, i) => {
       const a = i / n * Math.PI * 2, d = 10 + (i % 3) * 8;

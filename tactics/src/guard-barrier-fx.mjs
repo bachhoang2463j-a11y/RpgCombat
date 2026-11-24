@@ -10,7 +10,7 @@ import { PX, worldPx, floatText } from './vfx-primitives.mjs';
 import { unitCenter } from './geometry.mjs';
 
 export const GUARD_AUDIO_KEYS = ['sheshen_armor_step', 'parry_perfect'];
-export const BARRIER_AUDIO_KEYS = ['atk1', 'atk2'];
+export const BARRIER_AUDIO_KEYS = ['atk1', 'atk2', 'shieldUp'];
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -210,13 +210,14 @@ export function updateBarrierBadge(rec, integrity, maxIntegrity) {
 }
 
 // 展开：穹顶由中心张开 + 中心蜂窝聚光
-export function playBarrierRaise(fx, rec) {
+export function playBarrierRaise(fx, rec, opts = {}) {
   const kf = [{ transform: 'scale(0.15)', opacity: 0 }, { transform: 'scale(1.04)', opacity: 1, offset: 0.62 }, { transform: 'scale(1)', opacity: 1 }];
   rec.dome.animate(kf, { duration: 620, easing: 'cubic-bezier(0.2,0.85,0.3,1)' });
   rec.rim.animate(kf, { duration: 620, easing: 'cubic-bezier(0.2,0.85,0.3,1)' });
   rec.top.querySelector('[data-barrier-dome=badge]').animate([{ opacity: 0 }, { opacity: 0, offset: 0.5 }, { opacity: 1 }], { duration: 620 });
   const c = worldPx(rec.barrier.center), d = rec.barrier.radius * PX * 1.2;
   spotlight(fx, rec.theme, c, d, 760);
+  if (!opts.silent) fx.sfx('shieldUp', 0.68);
   floatText(fx, c.x, c.y - 30, '🛡️ ' + rec.top.querySelector('[data-br=name]').textContent + ' +' + rec.barrier.integrity, rec.theme.text, rec.theme.fillShadow, { ms: 1100, size: 14 });
 }
 function spotlight(fx, t, p, d, ms) {
@@ -249,7 +250,10 @@ export function playBarrierHit(fx, rec, ev) {
   updateBarrierBadge(rec, ev.integrityAfter, rec.barrier.maxIntegrity);
   const label = ev.actualLoss > 0 ? '-' + ev.actualLoss : (rec.barrier.armor > 0 ? '🛡️ 护甲格挡' : '🛡️ 克制格挡');
   floatText(fx, p.x, p.y - 18, label, t.text, t.fillShadow, { ms: 900, size: ev.actualLoss > 0 ? 16 : 13 });
-  if (!ev.broken) fx.shake(ev.actualLoss >= rec.barrier.maxIntegrity * 0.5 ? 'medium' : 'light');
+  if (!ev.broken) {
+    fx.sfx(group ? 'atk1' : 'atk2', group ? 0.62 : 0.58);
+    fx.shake(ev.actualLoss >= rec.barrier.maxIntegrity * 0.5 ? 'medium' : 'light');
+  }
 }
 // 减益/场地隔绝：轻量受击（不扣耐久）+ atk2
 export function playBarrierBlocked(fx, rec, ev) {

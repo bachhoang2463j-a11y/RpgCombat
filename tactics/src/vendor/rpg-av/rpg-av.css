@@ -76,6 +76,10 @@
         animation: arcane-variant-rage-heat 2.2s linear infinite;
     }
 [data-rpg-av-scope] .arcane-variant-rage-fx.exiting { opacity: 0 !important; transform: scale(0.95); }
+[data-rpg-av-scope] .arcane-resist-anchor { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; }
+[data-rpg-av-scope] .arcane-resist-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+[data-rpg-av-scope] .arcane-resist-shard { transform-box: fill-box; transform-origin: center; }
+[data-rpg-av-scope] .arcane-resist-ghost { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 [data-rpg-av-scope] .arcane-status-anchor { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; }
 [data-rpg-av-scope] .arcane-status-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 [data-rpg-av-scope] .arcane-status-host-rel { position: relative !important; }
@@ -123,8 +127,20 @@
 [data-rpg-av-scope] .arcane-status-persist-layer.is-hero .arcane-status-spark-star.s3 { left: 45%; right: auto; top: 32%; }
 [data-rpg-av-scope] .arcane-status-persist-layer.is-hero .arcane-status-spark-dot.d1 { left: 23%; top: 34%; }
 [data-rpg-av-scope] .arcane-status-persist-layer.is-hero .arcane-status-spark-dot.d2 { left: 52%; right: auto; top: 25%; }
+[data-rpg-av-scope] .arcane-sd-additive { mix-blend-mode: screen; }
+[data-rpg-av-scope] .arcane-selfdestruct-warn { position: absolute; left: 50%; top: 50%; pointer-events: none; z-index: 3; will-change: transform, opacity; animation: arcane-sd-warn-pulse 3.4s ease-in-out infinite; }
+[data-rpg-av-scope] .arcane-selfdestruct-warn-cracks { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+[data-rpg-av-scope] .arcane-selfdestruct-host-corpse .arcane-hit-track { opacity: 0.14 !important; transition: opacity 0.25s ease; }
 [data-rpg-av-scope] .arcane-selfdestruct-sprite-subdued { filter: saturate(0.32) brightness(0.76) !important; transform: translateY(10px) scale(1.08, 0.7) !important; opacity: 0.78; transition: transform 0.25s ease, filter 0.25s ease, opacity 0.25s ease; }
+[data-rpg-av-scope] .arcane-selfdestruct-stage { position:absolute; transform: translate(-50%,-50%); pointer-events: none; z-index: 54; will-change: transform, opacity; }
+[data-rpg-av-scope] .arcane-selfdestruct-dying-visual { filter: saturate(0.28) brightness(0.84); transition: filter 0.32s ease; }
+[data-rpg-av-scope] .arcane-selfdestruct-crit-flash { animation: arcane-sd-crit-flicker 0.11s steps(1) infinite !important; }
+[data-rpg-av-scope] .arcane-rescue-anchor { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
+[data-rpg-av-scope] .arcane-rescue-ghost { position:absolute; pointer-events: none; will-change: transform, opacity; overflow: hidden; border-radius: 6px; }
 [data-rpg-av-scope] .arcane-rescue-blood-wrap { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 12; border-radius: inherit; }
+[data-rpg-av-scope] .arcane-rescue-blood-wash { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 42%, rgba(127,29,29,0.08) 18%, rgba(153,27,27,0.52) 74%, rgba(69,10,10,0.88) 100%); box-shadow: inset 0 0 18px rgba(220,38,38,0.65); will-change: opacity; }
+[data-rpg-av-scope] .arcane-rescue-blood-trail { position: absolute; top: -6px; border-radius: 999px; background: linear-gradient(180deg, rgba(69,10,10,0.45) 0%, #991b1b 42%, #dc2626 78%, #fca5a5 96%, #7f1d1d 100%); box-shadow: 0 0 6px rgba(220,38,38,0.75); transform-origin: 50% 0%; will-change: transform, opacity; }
+[data-rpg-av-scope] .arcane-rescue-blood-trail::after { content: ''; position: absolute; left: 50%; bottom: -3px; width: 150%; height: 6px; transform: translateX(-50%); border-radius: 50% 50% 50% 50% / 38% 38% 62% 62%; background: radial-gradient(circle at 38% 36%, #fecaca 0%, #dc2626 55%, #7f1d1d 100%); }
 [data-rpg-av-scope] .arcane-identity-anchor { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity; }
 [data-rpg-av-scope] .arcane-identity-svg-full { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 [data-rpg-av-scope] .arcane-identity-glow-amber { filter: drop-shadow(0 0 8px #f59e0b) drop-shadow(0 0 18px #ea580c); }
@@ -455,7 +471,8 @@
 [data-rpg-av-scope] .drop-shadow-\[0_0_50px_\#e11d48\] {--tw-drop-shadow:drop-shadow(0 0 50px #e11d48)}
 [data-rpg-av-scope] .drop-shadow-\[0_0_50px_\#e11d48\] {filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}
 [data-rpg-av-scope] .grayscale {--tw-grayscale:grayscale(100%)}
-[data-rpg-av-scope] .grayscale {filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}
+[data-rpg-av-scope] .grayscale, [data-rpg-av-scope] .sepia {filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}
+[data-rpg-av-scope] .sepia {--tw-sepia:sepia(100%)}
 [data-rpg-av-scope] .sepia-\[0\.25\] {--tw-sepia:sepia(0.25)}
 [data-rpg-av-scope] .filter, [data-rpg-av-scope] .sepia-\[0\.25\] {filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}
 [data-rpg-av-scope] .transition {transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,-webkit-backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter,-webkit-backdrop-filter;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}
@@ -641,6 +658,7 @@
 @keyframes arcane-wing-glyph { 0% { opacity: 0; transform: translate(-50%,-50%) scale(0.6); } 20% { opacity: 1; transform: translate(-50%,-50%) scale(1.08); } 30% { transform: translate(-50%,-50%) scale(1); } 75% { opacity: 0.9; } 100% { opacity: 0; transform: translate(-50%,-50%) translateY(-14px); } }
 @keyframes arcane-angel-flap { 0%, 100% { transform: rotate(0deg); } 40% { transform: rotate(-9deg); } 70% { transform: rotate(4deg); } }
 @keyframes arcane-fs-flash { 0% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes arcane-fade-life { 0% { opacity: 0; } 15% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes arcane-s-light { 25% { transform: translate3d(-3px, 2px, 0); } 60% { transform: translate3d(3px, -2px, 0); } }
 @keyframes arcane-s-heavy { 15% { transform: translate3d(-8px, 4px, 0); } 35% { transform: translate3d(7px, -5px, 0); } 60% { transform: translate3d(-4px, 3px, 0); } 85% { transform: translate3d(2px, -1px, 0); } }
 @keyframes arcane-s-quake { 10% { transform: translate3d(-14px, 8px, 0); } 25% { transform: translate3d(12px, -10px, 0); } 40% { transform: translate3d(-9px, 6px, 0); } 60% { transform: translate3d(6px, -4px, 0); } 80% { transform: translate3d(-3px, 2px, 0); } }
@@ -692,6 +710,15 @@
     70% { opacity: 0.75; transform: translate3d(1px, -6px, 0) scale(0.85); }
     94% { opacity: 0; transform: translate3d(1.5px, -9px, 0) scale(0.35); }
 }
+@keyframes arcane-sd-warn-pulse { 0%,100% { opacity: 0.24; transform: translate(-50%,-50%) scale(0.95); } 50% { opacity: 0.62; transform: translate(-50%,-50%) scale(1.04); } }
+@keyframes arcane-sd-dying-tremble { 0%,100% { transform: translate(-50%,-50%) translate3d(0,1px,0) rotate(0deg); } 25% { transform: translate(-50%,-50%) translate3d(-2.5px,2px,0) rotate(-1.5deg); } 70% { transform: translate(-50%,-50%) translate3d(2px,3px,0) rotate(1.4deg); } }
+@keyframes arcane-sd-gather-pulse { 0%,100% { transform: translate(-50%,-50%) scale(0.98); opacity: 0.92; } 50% { transform: translate(-50%,-50%) scale(1.04); opacity: 1; } }
+@keyframes arcane-sd-crit-flicker { 0%,49% { opacity: 1; filter: brightness(1.45) contrast(1.2); } 50%,100% { opacity: 0.72; filter: brightness(2.05) contrast(1.35); } }
+@keyframes arcane-sd-crit-snap { 0% { transform: translate(-50%,-50%) scale(1.05); } 65% { transform: translate(-50%,-50%) scale(0.84); } 100% { transform: translate(-50%,-50%) scale(0.96); } }
+@keyframes arcane-sd-kanpo-fall { 0% { transform: translate(-50%,-50%) scale(1); opacity: 1; } 35% { transform: translate(-50%,-50%) scale(0.92,0.88); opacity: 0.95; } 100% { transform: translate(-50%,-50%) translateY(20px) scale(1.12,0.34); opacity: 0; } }
+@keyframes arcane-sd-subdue-press { 0% { transform: translate(-50%,-50%) translateY(-10px) scale(1.06,1.06); } 45% { transform: translate(-50%,-50%) translateY(14px) scale(1.14,0.62); } 100% { transform: translate(-50%,-50%) translateY(11px) scale(1.1,0.68); } }
+@keyframes arcane-sd-shock-ellipse { 0% { transform: translate(-50%,-50%) scale(0.2,0.16); opacity: 0.95; } 100% { transform: translate(-50%,-50%) scale(4.8,1.55); opacity: 0; } }
+@keyframes arcane-sd-venom-pulse { 0%,100% { transform: scale(0.96); opacity: 0.78; } 50% { transform: scale(1.08); opacity: 0.98; } }
 @keyframes arcane-identity-gun-flash {
         0% { transform: translate(-50%,-50%) scale(0.18) rotate(0deg); opacity: 0; }
         18% { transform: translate(-50%,-50%) scale(1.18) rotate(12deg); opacity: 1; }
@@ -732,6 +759,7 @@
     }
 @keyframes arcane-identity-frost-flash { 0% { filter: brightness(1.38) hue-rotate(-14deg) saturate(1.4); } 65% { filter: none; } }
 @keyframes arcane-identity-slash-spark { 0% { transform: translate(-50%,-50%) scale(0.25); opacity: 1; } 35% { transform: translate(-50%,-50%) scale(1.15); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.45); opacity: 0; } }
+@keyframes arcane-counter-charge-ring { 0% { transform: translate(-50%,-50%) scale(1.35) rotate(0deg); opacity: 0; } 35% { opacity: 0.95; } 100% { transform: translate(-50%,-50%) scale(0.32) rotate(54deg); opacity: 0.25; } }
 @keyframes arcane-hit-fill-blink { 0% { filter: brightness(2.2); } 100% { filter: none; } }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px) rotate(-1deg); } 50% { transform: translateX(3px) rotate(1deg); } 75% { transform: translateX(-3px) rotate(-0.5deg); } }
 @keyframes svg-heal { 0% { transform: translate(-50%, -30%) scale(0.5); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; filter: drop-shadow(0 0 10px rgba(52,211,153,0.8)); } 100% { transform: translate(-50%, -70%) scale(1); opacity: 0; } }
@@ -862,3 +890,4 @@
 .arcane-hit-num-layer[data-hit-type] .arcane-hit-num::before { display:block; font-size:calc(9px * var(--hit-scale,1)); font-weight:650; line-height:1.1; letter-spacing:.08em; opacity:.9; }
 .arcane-hit-num-layer[data-hit-type] .arcane-hit-num:not(.word):not(.shield)::before { content:attr(data-hit-type); }
 .arcane-hit-num-layer[data-hit-type] .arcane-hit-num.shield:not(.sub)::before { content:"护盾"; }
+[data-rpg-av-scope] .t-unit-medal .arcane-rescue-blood-wrap, [data-rpg-av-scope] .t-unit-avatar .arcane-rescue-blood-wrap { border-radius: 50%; overflow: hidden; }

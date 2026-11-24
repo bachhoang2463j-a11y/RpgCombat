@@ -87,6 +87,10 @@ const STAGES = {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'p07av-fx-node-cases.mjs'),
     groups: ['TP7AV-B', 'TP7AV-L', 'TP7AV-S', 'TP7AV-K'], modules: [], requiredExports: [],
   },
+  'audio-gait-passive': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'audio-gait-passive-node-cases.mjs'),
+    groups: ['AGP-G', 'AGP-I'], modules: [], requiredExports: [],
+  },
   'status-variant': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'status-variant-node-cases.mjs'),
     groups: ['TSV-01', 'TSV-02'], modules: [], requiredExports: [],

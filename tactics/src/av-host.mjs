@@ -17,7 +17,20 @@ export const FX_SCALE = 0.72;            // 卡片尺寸特效 → 地图尺度�
 let STAGE_W = 1000 / FX_SCALE;            // 舞台尺寸 = 世界尺寸 / FX_SCALE（随场景网格变化）
 let STAGE_H = 1000 / FX_SCALE;
 
-// 本 Demo 实际用到的采样（按复用演出逐项核对；不预载整个素材库）
+// 扩展步态采样文件（需在 preload 前注入 av.audioUrls）
+const MOVE_AUDIO_FILES = {
+  move_hero_heavy_1: 'move_hero_heavy_1.mp3', move_hero_heavy_2: 'move_hero_heavy_2.mp3', move_hero_heavy_3: 'move_hero_heavy_3.mp3',
+  move_hero_normal_1: 'move_hero_normal_1.mp3', move_hero_normal_2: 'move_hero_normal_2.mp3', move_hero_normal_3: 'move_hero_normal_3.mp3',
+  move_hero_light_1: 'move_hero_light_1.mp3', move_hero_light_2: 'move_hero_light_2.mp3', move_hero_light_3: 'move_hero_light_3.mp3',
+  move_enemy_boss_1: 'move_enemy_boss_1.mp3', move_enemy_boss_2: 'move_enemy_boss_2.mp3', move_enemy_boss_3: 'move_enemy_boss_3.mp3',
+  move_enemy_elite_glide: 'move_enemy_elite_glide.mp3',
+  move_enemy_elite_step_1: 'move_enemy_elite_step_1.mp3', move_enemy_elite_step_2: 'move_enemy_elite_step_2.mp3', move_enemy_elite_step_3: 'move_enemy_elite_step_3.mp3',
+  move_enemy_fodder_1: 'move_enemy_fodder_1.mp3', move_enemy_fodder_2: 'move_enemy_fodder_2.mp3', move_enemy_fodder_3: 'move_enemy_fodder_3.mp3',
+};
+
+export const MOVE_AUDIO_KEYS = Object.keys(MOVE_AUDIO_FILES);
+
+// 本 Demo 实际用到的回合制底座采样（按复用演出逐项核对；不预载整个素材库）
 export const DEMO_AUDIO_KEYS = [
   'heroTurn',                                                                 // 原版我方回合开始
   'gunshot1', 'gunshot2', 'gunshot3', 'xiandan', 'gunshot_pierce',            // 枪械：玛德琳/弗兰克/索恩
@@ -29,7 +42,11 @@ export const DEMO_AUDIO_KEYS = [
   'hit_1a', 'hit_1b', 'hit_1c', 'hit_2a', 'hit_2b', 'hit_2c', 'hit_3a', 'hit_3b', 'hit_3c', // 受击三档
   'dodge_1', 'dodge_2', 'dodge_3',                                            // 闪避
   'parry_1', 'parry_2', 'parry_3',                                            // 格挡与破盾
-  'heroTurn', 'avatarClick', 'kill', 'combatKill', 'magicKill', 'herochargedone', 'defDown', // 轮次/界面/收束
+  'avatarClick', 'kill', 'combatKill', 'magicKill', 'herochargedone', 'defDown', // 轮次/界面/收束
+  'atkUp', 'defUp', 'hitUp', 'hitDown', 'hpHeal', 'mpHeal', 'shieldUp', 'taunt', // 通用辅助与兜底
+  'atk1', 'atk2', 'light_impact', 'kanpo', 'parry_perfect', 'avoid_dash_perfect', 'sheshen_armor_step',
+  'creature_slime_01', 'thunder_charge', 'fog',                               // 异常状态发作
+  'resist_fluid', 'resist_phantom', 'resist_antimagic', 'resist_vital', 'resist_fireproof', 'resist_poisonproof', 'resist_ironbody', // 变体抗性
 ];
 
 export function heroAvatarUrl(name) {
@@ -98,6 +115,9 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
   };
 
   const av = createRpgAv(host);
+  for (const [k, file] of Object.entries(MOVE_AUDIO_FILES)) {
+    if (!av.audioUrls[k]) av.audioUrls[k] = av.ASSET_BASE + '/' + file;
+  }
 
   // ---------- 舞台挂载（sandbox 每次 buildDom 后调用） ----------
   function attachStage({ stage, shake, worldW = 1000, worldH = 1000 }) {
@@ -176,7 +196,7 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
   let preloaded = false;
   function preload() {
     if (preloaded) return; preloaded = true;
-    for (const key of DEMO_AUDIO_KEYS) {
+    for (const key of [...DEMO_AUDIO_KEYS, ...MOVE_AUDIO_KEYS]) {
       const url = av.audioUrls[key];
       if (!url) { reports.missing.push({ kind: 'audio-key', detail: key }); continue; }
       trackLoad(key, url, 'sfx');
@@ -204,7 +224,10 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
     return file;
   }
 
-  function sfx(key, vol = 1, opts = {}) { return av.playSound(key, vol, 1, Object.assign({ category: 'K' }, opts)); }
+  function sfx(key, vol = 1, opts = {}) {
+    const rate = opts && Number.isFinite(opts.rate) ? opts.rate : 1;
+    return av.playSound(key, vol, rate, Object.assign({ category: 'K' }, opts));
+  }
 
   // ---------- 换代与清场 ----------
   function setToken(token) { av.setToken(token); }
@@ -247,5 +270,8 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
     delete Element.prototype[rectSymbol];
   }
 
-  return { av, host, attachStage, entity, syncRoster, consumeVisualEvents, syncVisualState, unlockAudio, playTurnVoice, sfx, setToken, clear, trackImage, resourceReport, destroy, voiceUrl };
+  function setAtmoTheme(theme) { return av.atmoAudio ? av.atmoAudio.setTheme(theme) : 'baseline'; }
+  function setAtmoSound(on) { return av.atmoAudio ? av.atmoAudio.setAmbientSound(on) : false; }
+
+  return { av, host, attachStage, entity, syncRoster, consumeVisualEvents, syncVisualState, unlockAudio, playTurnVoice, sfx, setToken, clear, trackImage, resourceReport, destroy, voiceUrl, setAtmoTheme, setAtmoSound };
 }
