@@ -267,6 +267,8 @@ function build() {
   // 2b) 英雄击杀特写 / 敌方满充能大招 Cut-in（回合制顶层原版函数，原样；只改挂载到 iframe 内屏幕宿主与可清理计时）
   const execAnim = topBlock(L, l => l.startsWith('async function playExecutionAnimation('), 'playExecutionAnimation');
   const cutin = topBlock(L, l => l.startsWith('async function playEnemyUltimateCutin('), 'playEnemyUltimateCutin');
+  // 召唤三瞬引用的回合制顶层集合（arcane 模块外，原样带入）
+  const summonPending = topBlock(L, l => l.startsWith('const summonEnterPending = new Set();'), 'summonEnterPending');
   let moments = [execAnim.text, cutin.text].join('\n\n');
   moments = patch(moments, 'document.body.appendChild(overlay);', '__SCREEN().appendChild(overlay); __MOMENTS.add(overlay);', 2, '特写挂屏幕宿主');
   moments = patch(moments, 'overlay.remove();', 'overlay.remove(); __MOMENTS.delete(overlay);', 2, '特写收尾登记');
@@ -507,6 +509,7 @@ export function createRpgAv(host) {
   const isHeroSideEntity = e => host.isHero(e);
   const isCombatActive = e => host.isActive(e);
   const hasVariantTag = (e, name) => host.hasVariantTag(e, name);
+  ${summonPending.text}
 
   // ---- 击杀特写 / 大招 Cut-in（原版顶层函数；屏幕宿主由战棋提供，重开/清场统一取消计时与遮罩） ----
   const __MOMENTS = new Set(), __momentTimers = new Set();

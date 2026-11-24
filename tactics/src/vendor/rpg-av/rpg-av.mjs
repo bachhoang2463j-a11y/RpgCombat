@@ -55,6 +55,18 @@ export function createRpgAv(host) {
   const isHeroSideEntity = e => host.isHero(e);
   const isCombatActive = e => host.isActive(e);
   const hasVariantTag = (e, name) => host.hasVariantTag(e, name);
+  const summonEnterPending = new Set(); // 仅隐藏本批尚未显象的占位，不参与名额、存档或结算。
+
+// 【召唤】名额与硬闸（调参点集中在这里）
+const SUMMON_SIDE_LIMIT = 4;    // 每阵营（我方/敌方各自）存活召唤物名额；带 [众召] 的技能不受此限
+const SUMMON_CAST_MAX = 12;     // 单次释放（一个技能/物品）的召唤总数硬闸，防 *N 手滑把界面冻住
+const ENEMY_TOTAL_HARD_CAP = 12; // 敌方阵营总数硬闸（含非召唤物）；[众召] 不绕过它（性能/UI 安全阀）
+
+// 占用名额的召唤物数：[众召] 召唤出来的（summonNoLimit）不计入
+function countLimitedSummons(side) {
+    const arr = side === 'hero' ? heroesData : enemiesData;
+    return (arr || []).filter(e => e.isAlive && !e.isSubdued && e.isSummon && !e.summonNoLimit).length;
+}
 
   // ---- 击杀特写 / 大招 Cut-in（原版顶层函数；屏幕宿主由战棋提供，重开/清场统一取消计时与遮罩） ----
   const __MOMENTS = new Set(), __momentTimers = new Set();

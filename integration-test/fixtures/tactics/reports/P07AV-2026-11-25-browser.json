@@ -1,0 +1,35 @@
+{
+  "round": "P07 原版还原/规则修复/L3L4 视听（2026-11-25 真实页面验收）",
+  "artifact": { "path": "tactics/mvp-standalone.html", "bytes": 1365116, "sha256": "c00b68981523be1ec4b46f34a4023895f332d1072c09351d467d3dd406919f2b" },
+  "browser": "Chrome（AWS Quick 浏览器工具，chrome_profile 副本），http://127.0.0.1:8123/tactics/mvp-standalone.html",
+  "bugFoundOnRealPage": {
+    "symptom": "首个 1d2d80e/64c7e1d 产物启动白屏：__TACTICS_APP__ 未建立",
+    "error": "ReferenceError: summonEnterPending is not defined at clearSummonState ← clearArcaneFx ← avHost.clear ← loadYaml ← boot",
+    "cause": "提取召唤三瞬时未带入 arcane 模块外的回合制顶层集合 const summonEnterPending = new Set()（index.html:18451）；Node 回归无 DOM 工厂实例化，未覆盖",
+    "fix": "extract-rpg-av.cjs 原样 topBlock 带入；新增 TP7AV-X 静态断言；修复后零运行时异常"
+  },
+  "natural": {
+    "chargeGrowth": ["伊塔库亚的眷族 极地暴风雪 1/4→2/4→3/4→4/4，每次自然行动末 +1", "犹格索托斯之子 维度撕裂 1/2→2/2"],
+    "fullChargeHeld": "两精英满充能后因视野（墙/雾，距英雄 >30 行）看不到目标，行动无攻击，充能保持不被白耗（规则正确，非本轮改动）",
+    "inventoryUntouched": "精英 charges.inventory 全程 0、preparing=null",
+    "l3AtmosNatural": "深潜者A 自然 L3 技能触发 atmos:void:L3，玛德琳真实受伤 140→111"
+  },
+  "probes": [
+    { "id": "PROBE/PROBE2", "what": "仅把犹格索托斯之子移位到 12,34（看得见弗兰克），充能为其自然积累的 2/2，未改任何数值", "why": "原站位视野不可达，验证满充能释放链路" }
+  ],
+  "verified": {
+    "chargeCutin": "212812ms cutin(维度撕裂 CRITICAL THREAT 🌌) → 前摇 → 反应弹窗×2(跳过) → 埃利奥特-87/弗兰克-90 → charge 2→0，charge-released 恰 1 次",
+    "winchester": "温切斯特父卡展开 鹿弹二连发/独头二连发（弹药角标），选独头锁定犹格→Enter：-68/-57 两段+降防，12号独头弹 12→10，12号鹿弹 12 未动，main 1→0",
+    "compressedBurst": "火舞术-压缩爆燃（r=3）：范围环 144×144 屏幕像素居中于瞄点(466,140)=2R×镜头缩放；边带蓄势 opacity 0→0.78（~900ms）→爆发→首个揭示降至 0.25→余韵外撤；fire.webm Canvas 抠黑底(blend=none，未降级)、ranshao.webm 逐中燃目标；伤害名单 食尸鬼A -76、犹格 -1（均在圈内）",
+    "serialBuff": "寂静指令（r4）：弗兰克 anim-buff @589548ms → 玛德琳 anim-buff @590853ms（间隔≈1.3s，A 完成后才 B；索恩距 5.0 不在 r4 内未播）",
+    "reviveAndKill": "柯尔特三连发打食尸鬼A：第1发致死→【复活】（不计击杀）→第2发闪避→第3发 -39 真正死亡→自爆·群火→远程击杀特写『档案: 弗兰克 · 处 决 · 食尸鬼A』仅 1 次，在自爆之后",
+    "restart": "重开后 [data-atmos]/范围环/webm canvas/video/Cut-in/击杀遮罩/屏幕宿主子节点均 0，世界 fx 层清空，charges 归零，HP 复原",
+    "errors": "全程 window error/unhandledrejection 0 条（修复后）"
+  },
+  "notVerified": [
+    "听觉效果待验：Cut-in 警告音、击杀 kill/combatKill/magicKill、爆燃与 WebM 音色均仅确认调用链，未真实听音",
+    "L4 短暂接管（技能身份卡）未在页面自然触发；近战/法术击杀特写、多目标 歼灭/全滅 未自然发生",
+    "生体流转尺寸、异种坏死雾缩放/平移、召唤入场/消散/守护未在本页面实测",
+    "边缘压缩与 SVG 纹理的主观观感仅有数值采样，截图时机落在爆发后低透明阶段，缺清晰峰值帧"
+  ]
+}

@@ -212,6 +212,9 @@ function killAndSummonCases() {
   out.push(ok('TP7AV-X 特写挂 iframe 屏幕宿主、计时可清理，重开/换代清除', (av.match(/__SCREEN\(\)\.appendChild\(overlay\); __MOMENTS\.add\(overlay\)/g) || []).length === 2
     && !/playExecutionAnimation[\s\S]{0,9000}?\bsetTimeout\(/.test(av.slice(av.indexOf('async function playExecutionAnimation'), av.indexOf('async function playEnemyUltimateCutin')))
     && /clearArcaneFx\(\) \{ supportHandles\.forEach\(handle => handle\.cancel\(\)\); clearMoments\(\);/.test(av) && /setToken\(t\) \{ if \(t !== combatToken\) \{[^}]*clearMoments\(\);/.test(av)));
+  // 真实页面启动崩溃回归：clearSummonState（清场/重开必经）引用的回合制顶层集合必须在工厂内声明
+  out.push(ok('TP7AV-X 召唤段引用的 summonEnterPending 已在工厂内声明（启动/清场不抛 ReferenceError）',
+    /^\s*const summonEnterPending = new Set\(\);/m.test(av) && av.indexOf('const summonEnterPending') < av.indexOf('function clearSummonState(')));
   out.push(ok('TP7AV-X 原版击杀三类音效与震屏保留', /playSound\('kill', 2, 1/.test(av) && /playSound\('combatKill'/.test(av) && /playSound\('magicKill'/.test(av) && /__STAGE\.shakeEl\(\)/.test(av) && /playSound\('taunt', 1, 1, \{ category:'L' \}\)/.test(av)));
   const css = readFileSync(new URL('../../../tactics/src/vendor/rpg-av/rpg-av.css', import.meta.url), 'utf8');
   out.push(ok('TP7AV-X 特写关键帧与任意值类入 CSS', ['s2-ink-stamp', 's3-shard-1', 'v1-tommy-scope', 'blood-splat-burst', 'anim-cutin-slash', 'anim-debuff', 'anim-taunt'].every(k => css.includes(k)) && css.includes('z-\\[200\\]')));
