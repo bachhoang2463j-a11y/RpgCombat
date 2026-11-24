@@ -1,7 +1,30 @@
 {
   "date": "2026-11-24",
   "purpose": "复用原版燃烧/中毒/麻痹持续、tick/解除与蜕皮/狂暴/复活生命周期及受击锁，不改规则算值、不增加专有技能或UI",
-  "deliveryStatus": "implemented-and-backed-up; real-page-gate-pending",
+  "deliveryStatus": "implemented-and-backed-up; chrome-real-action-flow-passed; full-status-visual-gate-pending",
+  "chromeFollowup": {
+    "date": "2026-11-24",
+    "pageId": 1,
+    "url": "http://127.0.0.1:8123/tactics/mvp-standalone.html",
+    "artifactSha256": "c3d7719ea6c239d0ca2b78378e83d29e5adb26c47caa1942b271602013f338fc",
+    "busyFinding": "玩家回合busy=false；非玩家回合文本仍在a11y snapshot中，但computed opacity=0、pointerEvents=none，不是遮罩卡死。食尸鬼B攻击时busy=true伴随真实REACTION弹窗，点击跳过后AI继续至埃利奥特，busy=false。未修改提示或代码。",
+    "naturalFlow": [
+      "t125玛德琳：普通GUI选技能；地图pointer事件移动6.83m，发现四敌自然截停，剩1.17m。视线被墙阻挡的首次目标拒绝后，正常锁定食尸鬼B，Enter发动从西班牙射击，attack2起止完整、hpDmg48、shieldDmg0、isCrit=false、isPierce=true，食尸鬼B HP130→82，缓速-10持续2回，弹药30→29，busy=false。",
+      "t133.33索恩：真实移动4.83m及2m；砷弹射击锁定食尸鬼A并Enter，真实闪避，停滞与中毒随攻击落空，未施加。不能将本次射击计为中毒持续层或tick验证。",
+      "结束回合须2200ms内二次确认，工具逐次调用超过该窗口；通过重新查询实际结束按钮连续两次DOM click完成正常确认（原按钮被render替换，不能复用旧DOM节点）。",
+      "AI犹格索托斯之子、食尸鬼A、弗兰克回合后，食尸鬼B移动并攻击，真实反应弹窗选择跳过：玛德琳-43HP（140→97）。伊塔库亚及深潜者A/B自然AI继续、河童之息增速与增防，返回t200埃利奥特玩家回合，busy=false。",
+      "埃利奥特选择火舞术-精准流火，但地图目标尝试未锁定或发动，未产生燃烧状态；没有修改roster或强行调用battle施加状态。"
+    ],
+    "interactionClassification": "按钮由chrome-devtools click或实际DOM click；地图使用截图/真实单位位置校准的pointerdown/up事件，缩放使用实际wheel事件；未直接调用battle行动、未伪造数据、未新建服务或harness。",
+    "cameraVisual": "真实wheel从scale1.06976198缩至0.40216315，截图目视圆标、血条与固定菜单正常。未完成状态变异叠加时的缩放专项。",
+    "audio": "audioState=running、unlocked=true，真实资源报告全部audio status=ok、missing=[]。只证实解锁和加载，不冒称声音听感或变异音效已听验。",
+    "console": "排查初始真实error仅Failed to load resource 404（2次）；未取得失败URL，不能认定favicon，也不能报告控制台零错。",
+    "unverified": ["完整对局胜利", "燃烧施加/持续/tick/解除", "中毒施加/持续/tick/解除（本次自然射击闪避）", "麻痹施加/持续/proc/解除（召雷TP10，当前0）", "蜕壳/狂暴/复活自然生命周期", "变异过渡受击、数字、盾和暴击的完整目视", "变异期间缩放", "音频听感"],
+    "directFunctionProbesThisFollowup": "none；保留上一轮IAB探针原记录，不挪作本轮Chrome自然证据。",
+    "manualHandoff": "当前真实页面t200埃利奥特、已选择火舞术-精准流火。请用户在地图选可见食尸鬼并确认发动以完成燃烧；中毒需索恩下一自然回合砷弹命中；麻痹需真实积累10TP。变异若默认真实角色没有相应标签，须用户提供既有真实可触发对局，不能伪造roster替代。",
+    "sourceChanged": false,
+    "fullRegressionRerun": false
+  },
   "sourceAll": {"runs": 1, "passed": 912, "failed": 0, "note": "全量发生在末次狂暴标记透传和4条真实锁断言补充之前；之后只复跑相关，未运行verify-demo或第二次全量"},
   "finalRelated": {"statusVariantPassed": 19, "hitFeedbackPassed": 45, "failed": 0},
   "artifact": {"path": "tactics/mvp-standalone.html", "bytes": 1270442, "sha256": "c3d7719ea6c239d0ca2b78378e83d29e5adb26c47caa1942b271602013f338fc", "buildInputs": 36, "symbols": 57, "specialAssertionsPassed": 31, "failed": 0},
