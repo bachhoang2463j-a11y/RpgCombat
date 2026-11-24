@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "abeed4f68d1b602334c84b8ddd64c0d5c1a7c2ca284dfdd0ed94e6cd66657678",
-  "bytes": 1187053,
+  "sha256": "ed907290ea5429aab9bf5db190402e367d0922a833b935dbdca9d9bac98e4c3f",
+  "bytes": 1194003,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -21,7 +21,7 @@
       "detail": ""
     },
     {
-      "id": "伤害槽菜单分类与阵营收益修复入包",
+      "id": "伤害槽与父子菜单分类及阵营收益修复入包",
       "pass": true,
       "detail": ""
     },
@@ -72,6 +72,16 @@
     },
     {
       "id": "发现敌人记录字段及枪声去重入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "原版受击数字及真实结果接线入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "头像远景底线及父子引用修复入包",
       "pass": true,
       "detail": ""
     },
@@ -129,8 +139,18 @@
       "id": "产物实际移动发现食尸鬼并显示暂停原因",
       "pass": true,
       "detail": ""
+    },
+    {
+      "id": "产物显式技能组保留原名及全局子引用",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "产物实际受击段保留原伤盾值暴击和性质",
+      "pass": true,
+      "detail": ""
     }
   ],
-  "passed": 25,
+  "passed": 29,
   "failed": 0
 }

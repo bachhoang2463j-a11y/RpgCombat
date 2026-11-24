@@ -414,6 +414,7 @@ function renderTurnQueue() {
 
 
 function isAttackSkill(skill) {
+  if (skill.isGroup) return (skill.children || []).some(isAttackSkill);
   return skillSlots(skill).some(slot => slot.attack);
 }
 

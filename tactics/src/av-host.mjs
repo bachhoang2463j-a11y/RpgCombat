@@ -23,9 +23,11 @@ export const DEMO_AUDIO_KEYS = [
   'explosion_aoe_charge', 'explosion_aoe_blast', 'fire01', 'ranshao',          // 埃利奥特：压缩爆燃（萨维奇三连发复用上行枪械）
   'herocharge', 'link_chime', 'hide', 'link_dash',                            // 埃利奥特：预备咏唱 / 折影步
   'slash_whoosh_hit_fs434873', 'claw_bloody_blade_fs323526', 'swish_3',       // 近战刀砍/爪击、箭矢
-  'monsterAttack', 'enemySwingGroup', 'enemyRanged', 'enemyMagic',            // 敌方前摇
+  'monsterAttack', 'enemySwingGroup', 'enemyRanged', 'enemyRangedGroup',     // 敌方/召唤前摇八档
+  'enemyMagic', 'enemyMagicGroup', 'enemyBuff', 'enemyDebuff',
   'hit_1a', 'hit_1b', 'hit_1c', 'hit_2a', 'hit_2b', 'hit_2c', 'hit_3a', 'hit_3b', 'hit_3c', // 受击三档
   'dodge_1', 'dodge_2', 'dodge_3',                                            // 闪避
+  'parry_1', 'parry_2', 'parry_3',                                            // 格挡与破盾
   'heroTurn', 'avatarClick', 'kill', 'combatKill', 'magicKill', 'herochargedone', 'defDown', // 轮次/界面/收束
 ];
 
@@ -75,6 +77,7 @@ export function createAvHost({ getUnitView, getUnits }) {
       const rec = id && view && view.nodes.get(id);
       return rec ? rec.sprite : null;
     },
+    hitNumberScale(dom) { return dom[rectSymbol]().width / dom.offsetWidth; },
     isHero(e) { const u = unitById(idOf(e)); return u ? u.side === 'hero' : false; },
     isActive(e) { const u = unitById(idOf(e)); return !!(u && u.ref.hp > 0); },
     report(kind, detail) { reports.missing.push({ kind, detail }); },

@@ -626,48 +626,40 @@ export function isFlatGroupHead(el) {
 }
 
 export function parseSkillList(arr) {
-  const out = [];
-  arr.forEach(el => {
+  const rows = [];
+  for (let i = 0; i < arr.length; i++) {
+    const el = arr[i];
+    let skill;
     if (isNestedGroup(el)) {
       const key = Object.keys(el)[0];
-      const parent = parseSkill(key);
-      parent.isGroup = true;
-      if (!/\[[^\]]+\]/.test(key)) { parent.groupOnly = true; parent.type = '[无]'; parent.power = 0; }
-      parent.children = el[key].map(childStr => {
-        const c = parseSkill(childStr);
-        c._inGroup = true; c.parentName = parent.name;
-        return c;
-      });
-      out.push(parent);
-      parent.children.forEach(c => out.push(c));
-    } else if (isFlatGroupHead(el)) {
-      out.push(el);
+      skill = parseSkill(key);
+      skill.isGroup = true;
+      if (!/\[[^\]]+\]/.test(key)) { skill.groupOnly = true; skill.type = '[无]'; skill.power = 0; }
+      skill.children = el[key].map(parseSkillEntry);
+    } else if (isFlatGroupHead(el) && typeof arr[i + 1] === 'string' && !isFlatGroupHead(arr[i + 1])) {
+      skill = parseSkill(el);
+      skill.isGroup = true; skill.groupOnly = true; skill.type = '[无]'; skill.power = 0;
+      skill.children = [];
+      while (typeof arr[i + 1] === 'string' && !isFlatGroupHead(arr[i + 1])) skill.children.push(parseSkillEntry(arr[++i]));
     } else {
-      out.push(parseSkillEntry(el));
+      skill = parseSkillEntry(el);
+      if (Array.isArray(skill.children)) skill.isGroup = true;
+      if (el && typeof el === 'object' && el._inGroup) { skill._inGroup = true; skill.parentName = el.parentName; }
     }
-  });
-  const paired = [];
-  for (let k = 0; k < out.length; k++) {
-    const cur = out[k];
-    if (isFlatGroupHead(cur) && k + 1 < out.length && typeof out[k + 1] === 'string' && !isFlatGroupHead(out[k + 1])) {
-      const parent = parseSkill(cur);
-      parent.isGroup = true; parent.groupOnly = true; parent.type = '[无]'; parent.power = 0;
-      let j = k + 1;
-      const childStrs = [];
-      while (j < out.length && typeof out[j] === 'string' && !isFlatGroupHead(out[j])) { childStrs.push(out[j]); j++; }
-      parent.children = childStrs.map(childStr => {
-        const c = parseSkill(childStr);
-        c._inGroup = true; c.parentName = parent.name;
-        return c;
-      });
-      paired.push(parent);
-      parent.children.forEach(c => paired.push(c));
-      k = j - 1;
-    } else {
-      paired.push(cur);
-    }
+    rows.push(skill);
   }
-  return paired;
+  const groupNames = new Set(rows.filter(s => s.isGroup).map(s => s.name));
+  const output = [];
+  for (const skill of rows) {
+    if (skill._inGroup && groupNames.has(skill.parentName)) continue;
+    if (skill._inGroup) { delete skill._inGroup; delete skill.parentName; }
+    output.push(skill);
+    if (!skill.isGroup) continue;
+    skill.children = Array.isArray(skill.children) ? skill.children : rows.filter(s => s._inGroup && s.parentName === skill.name);
+    skill.children.forEach(child => { child._inGroup = true; child.parentName = skill.name; });
+    output.push(...skill.children);
+  }
+  return output;
 }
 
 export function parseItemList(arr) {
@@ -723,20 +715,24 @@ function parseSkillObject(obj) {
   const explicit = [];
   const STRUCT_KEYS = ['isGroup', 'groupOnly'];
   Object.keys(obj).forEach(k => {
-    if (k === '_explicit' || k === 'usesRemaining') return; // 运行态不从配置读
+    if (k === '_explicit' || k === 'usesRemaining') return;
     if (k === 'children') {
       out.children = (Array.isArray(obj.children) ? obj.children : []).map(parseSkillEntry);
       explicit.push('children');
       return;
     }
-    if (STRUCT_KEYS.includes(k)) { out[k] = !!obj[k]; return; } // 结构键不标 explicit
-    if (!_hasOwn(out, k)) return; // 未知键不带入（own-property，防原型链/扩展键带禁项）
+    if (k === 'isGroup' || k === 'groupOnly') { out[k] = !!obj[k]; return; }
+    if (!_hasOwn(out, k)) return;
     explicit.push(k);
     out[k] = typeof obj[k] === 'object' && obj[k] !== null ? JSON.parse(JSON.stringify(obj[k])) : obj[k];
   });
   // usesRemaining 为运行态初始值 = 满额度；必须在 obj 合并后取 maxUses（对象形态显式 maxUses>0 不锁死）
   out.usesRemaining = out.maxUses;
   out._explicit = explicit;
+  if (out.children && out.children.length) {
+    out.isGroup = true;
+    out.children.forEach(child => { child._inGroup = true; child.parentName = out.name; });
+  }
   return out;
 }
 
@@ -770,7 +766,7 @@ const CN_REGION_TYPE = { '浓雾': 'fog' };
 
 function isChineseSkillObject(el) {
   return !!el && typeof el === 'object' && !Array.isArray(el) &&
-    (Object.prototype.hasOwnProperty.call(el, '标签') || Object.prototype.hasOwnProperty.call(el, '范围') || Object.prototype.hasOwnProperty.call(el, '动作'));
+    (Object.prototype.hasOwnProperty.call(el, '子技能') || Object.prototype.hasOwnProperty.call(el, '标签') || Object.prototype.hasOwnProperty.call(el, '动作'));
 }
 
 function isChineseItemObject(el) {
@@ -888,7 +884,16 @@ function parseSkillConfigObject(obj) {
     if (st) { skill.slotTargets = st; if (!skill._explicit.includes('slotTargets')) skill._explicit.push('slotTargets'); }
   }
   if (/\[不分敌友\]/.test(tags)) { skill.affectsAll = true; skill._explicit.push('affectsAll'); }
+  if (/\[穿透\]/.test(tags)) { skill.isPierce = true; skill._explicit.push('isPierce'); }
   if (obj['说明'] != null) skill.note = String(obj['说明']);
+  if (Array.isArray(obj['子技能'])) {
+    skill.children = obj['子技能'].map(parseSkillEntry);
+    skill.isGroup = true;
+    skill.groupOnly = true;
+    skill.type = '[无]'; skill.power = 0;
+    skill.children.forEach(child => { child._inGroup = true; child.parentName = skill.name; });
+    skill._explicit.push('children');
+  }
   return skill;
 }
 

@@ -323,6 +323,48 @@ ${supportBranches.join('\n').replace('else if', 'if')}
   let busText = patch(bus.text, 'const _actionToken = combatToken;', 'const _actionToken = combatToken;', 1, '事件总线读宿主 combatToken');
 
   let mod = arc.body;
+  mod = patch(mod, 'return { dx: [0, 8, -10, 12, -6][k % 5], dy: -Math.min(k, 4) * 24 };',
+    'return { dx: [0, 12, 24, 36, 48][k % 5], dy: [0, -44, 44, -88, 88][k % 5] };', 1, '连续数字上下错位保留可读');
+  const hitAnchorStart = mod.indexOf('    function hitAnchor(dom, slot) {');
+  const hitAnchorEnd = mod.indexOf('    function hitNumEl(', hitAnchorStart);
+  if (hitAnchorStart < 0 || hitAnchorEnd < 0) fail('受击数字锚点结构变化');
+  mod = patch(mod, mod.slice(hitAnchorStart, hitAnchorEnd), `    const HIT_NUMBER_THEMES = {
+        '钝击': ['钝击', '#fbbf24'], '切割': ['切割', '#fb7185'], '枪击': ['枪击', '#f8fafc'], '霰弹': ['霰弹', '#fed7aa'],
+        '火焰': ['火焰', '#fb923c'], '圣光': ['圣光', '#fef08a'], '雷电': ['雷电', '#c4b5fd'], '水流': ['水流', '#67e8f9'],
+        '冰霜': ['冰霜', '#bae6fd'], '诅咒': ['诅咒', '#d8b4fe'], '近战': ['近战', '#fda4af'], '远程': ['远程', '#f8fafc'], '法术': ['法术', '#a5b4fc']
+    };
+    function hitNumberScale(dom) { return host.hitNumberScale ? host.hitNumberScale(dom) : 1; }
+    function prepareHitNumbers(layer, result, dom) {
+        const theme = HIT_NUMBER_THEMES[result.damageCategory] || HIT_NUMBER_THEMES[result.damageType] || ['伤害', '#f8fafc'];
+        const scale = hitNumberScale(dom);
+        layer.setAttribute('data-hit-type', theme[0] + (result.isPierce ? '·穿透' : ''));
+        layer.style.setProperty('--hit-scale', scale);
+        layer.style.setProperty('--hit-color', theme[1]);
+        return scale;
+    }
+    function animateHitNumber(el, frames, options, scale) {
+        return el.animate(frames.map(f => ({ ...f, transform: f.transform.replace(/(-?\\d+(?:\\.\\d+)?)px/g, (_, n) => (Number(n) * scale) + 'px') })), options);
+    }
+    function hitAnchor(dom, slot) {
+        const r = entityVisualRect(dom) || ctr(dom), c = ctr(dom), scale = hitNumberScale(dom);
+        return { x: r.right + (8 + slot.dx) * scale, y: r.top + (-4 + slot.dy) * scale, c };
+    }
+`, 1, '受击数字世界锚点与类型格式');
+  mod = patch(mod, 'el.className = cls; el.textContent = text;', "el.className = cls; el.textContent = text;\n        el.setAttribute('data-hit-type', layer.getAttribute('data-hit-type') || '');", 2, '受击数字类型标记');
+  mod = patch(mod, "TN = 'translate(-100%,-18%) ', TT = 'translate(-100%,-50%) '", "TN = 'translate(0,-18%) ', TT = 'translate(0,-50%) '", 1, '受击数字贴身右侧对齐');
+  mod = patch(mod, "g.innerHTML = dom.innerHTML.replace(/ id=\"[^\"]*\"/g, '');", "g.innerHTML = dom.innerHTML.replace(/ id=\"[^\"]*\"/g, '');\n        g.style.setProperty('--d', r.width + 'px');", 1, '闪避残影保留主体尺度');
+  const visualStart = mod.indexOf('    function hitVisual(layer, r, h, anims, timers) {');
+  const visualEnd = mod.indexOf('    // ===== 受击三档', visualStart);
+  if (visualStart < 0 || visualEnd < 0) fail('受击视觉结构变化');
+  const originalVisual = mod.slice(visualStart, visualEnd);
+  let visual = patch(originalVisual, 'const dom = domOf(r.targetId); if (!dom) return;', 'const dom = domOf(r.targetId); if (!dom) return;\n        const scale = prepareHitNumbers(layer, r, dom);', 1, '受击数字宿主缩放');
+  visual = patch(visual, /anims\.push\((el|b|t|s)\.animate\(([^\n]+)\)\);/g, (_, el, args) => 'anims.push(animateHitNumber(' + el + ', ' + args + ', scale));', 8, '受击数字保持原版时序与远景可读');
+  visual = patch(visual, 'const fs = [0, 24, 27, 32][h.tier];', 'const fs = [0, 24, 27, 32][h.tier] * scale;', 1, '受击数字分层间距');
+  visual = patch(visual, 'p.y - 22)', 'p.y - 22 * scale)', 1, '破盾词牌间距');
+  visual = patch(visual, 'p.y - fs * 0.25 - 12)', 'p.y - fs * 0.25 - 12 * scale)', 1, '暴击词牌间距');
+  visual = patch(visual, 'p.y + fs * 0.92 + 5;', 'p.y + fs * 1.15 + 14 * scale;', 1, '护盾副数字间距');
+  visual = patch(visual, 'sy + 20)', 'sy + 28 * scale)', 1, '混合破盾词牌间距');
+  mod = patch(mod, originalVisual, visual, 1, '受击视觉数字适配');
   // 战棋提供规则区域与纯发射锚点，保留原版目标接触回调。
   mod = patch(mod, "function playSingleShotgun(caster, target, outcome = 'hit', onImpact)",
     "function playSingleShotgun(caster, target, outcome = 'hit', onImpact, suppressImpact)", 1, '战棋攻击身份适配');
@@ -376,8 +418,8 @@ ${supportBranches.join('\n').replace('else if', 'if')}
     "const waveW = areaBounds ? stageW : Math.max(stageW * 1.15, 360), waveH = areaBounds ? stageH : Math.max(stageH * 0.92, 136);", 1, '战棋攻击身份适配');
   mod = patch(mod, "${Math.max(88, stageH * 0.68)}px;transform:translate(-50%,-50%);",
     "${areaBounds ? stageH : Math.max(88, stageH * 0.68)}px;transform:translate(-50%,-50%);", 1, '战棋攻击身份适配');
-  mod = patch(mod, /\.getBoundingClientRect\(\)/g, '[__GBCR]()', 11, '屏幕矩形 → 特效舞台坐标');
-  mod = patch(mod, /\b(?:window\.)?innerWidth\b/g, '__STAGE.w', 7, 'innerWidth → 舞台宽');
+  mod = patch(mod, /\.getBoundingClientRect\(\)/g, '[__GBCR]()', 10, '屏幕矩形 → 特效舞台坐标');
+  mod = patch(mod, /\b(?:window\.)?innerWidth\b/g, '__STAGE.w', 5, 'innerWidth → 舞台宽');
   mod = patch(mod, /\b(?:window\.)?innerHeight\b/g, '__STAGE.h', 3, 'innerHeight → 舞台高');
   mod = patch(mod, 'document.body.appendChild(', '__STAGE.el.appendChild(', 5, 'body 挂载 → 特效舞台');
   mod = patch(mod, /position\s*:\s*fixed/g, 'position:absolute', 0, 'JS position:fixed → absolute');
@@ -389,6 +431,22 @@ ${supportBranches.join('\n').replace('else if', 'if')}
 
   const stubText = STUBS.map(n => 'function ' + n + '() { /* 未迁移段：本 Demo 不产生该状态 */ }').join('\n');
   const css = extractCss(html, mod + '\n' + soundText + support);
+  const hitCss = `
+/* 战棋数字：原版分档时间轴，数值主导、实际伤害性质点缀。 */
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num,.arcane-hit-num-layer[data-hit-type] .arcane-hit-tag { font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; font-variant-numeric:tabular-nums lining-nums; font-style:normal; }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num { font-size:calc(24px * var(--hit-scale,1)); font-weight:850; line-height:1.05; letter-spacing:-.025em; color:var(--hit-color,#f8fafc); -webkit-text-stroke:.65px rgba(9,12,18,.9); paint-order:stroke fill; text-shadow:0 2px 3px #020617,0 0 7px rgba(2,6,23,.8); transform:translate(0,-18%); }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num.l2 { font-size:calc(27px * var(--hit-scale,1)); }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num.l3 { font-size:calc(32px * var(--hit-scale,1)); }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num.word { font-size:calc(16px * var(--hit-scale,1)); font-weight:750; color:#e2e8f0; }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num.shield { font-size:calc(22px * var(--hit-scale,1)); color:#7dd3fc; }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num.shield.sub { font-size:calc(16px * var(--hit-scale,1)); }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num.crit { color:#fde68a; }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num.burst { color:#fffbeb; }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-tag { font-size:calc(12px * var(--hit-scale,1)); font-weight:800; }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num::before { display:block; font-size:calc(9px * var(--hit-scale,1)); font-weight:650; line-height:1.1; letter-spacing:.08em; opacity:.9; }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num:not(.word):not(.shield)::before { content:attr(data-hit-type); }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num.shield:not(.sub)::before { content:"护盾"; }
+`;
   // 入选代码真实引用到的 audioUrls 键（显式预载清单来源；不预载整个素材库）
   const urlKeys = [...audioUrls.text.matchAll(/^\s*'([^']+)'\s*:/gm)].map(m => m[1]);
   if (urlKeys.length < 40) fail('audioUrls 键数异常: ' + urlKeys.length);
@@ -473,7 +531,7 @@ ${busOn.map(l => l.replace('CombatAudioDirector.consume', 'arcane.CombatAudioDir
   });
 }
 `;
-  return { js, css: '/* 由 extract-rpg-av.cjs 自动生成，请勿手改。源 sha256=' + sha(html) + ' */\n' + css.css, report: {
+  return { js, css: '/* 由 extract-rpg-av.cjs 自动生成，请勿手改。源 sha256=' + sha(html) + ' */\n' + css.css + hitCss, report: {
     source: SRC, sourceSha: sha(html), arcaneRanges: arc.ranges, arcaneSegments: arc.count, arcaneLines: arc.lines,
     cssRules: css.rules, cssKeyframes: css.keyframes, patches: PATCH_LOG.slice(), jsBytes: Buffer.byteLength(js),
     usedAudioKeys: usedKeys.length,

@@ -1,7 +1,7 @@
 // ==========================================
 // 战棋单位视图：圆形头像（正立）/ 敌方 emoji + 阵营外环 + 独立朝向箭头 + 名字/资源条 + 接地阴影
 // 分层（自外向内，各层 transform 互不覆盖）：
-//   root(left/top = 显示位置，世界美术 px，随相机) → billboard(反向缩放，屏幕尺寸恒定)
+//   root(left/top = 显示位置，世界美术 px，随相机) → billboard(近景随地图放大，远景反缩放保可读)
 //     → sprite(受击后坐力/前摇/闪光，供视听底座 domOf 使用) → medal(外环) → avatar/emoji + direction(只转朝向)
 // 规则位置与显示位置分离：placement 是权威落点；motion 期间 lockMotion 后只由插值驱动 left/top，不回写规则。
 // 头像链：P01 明确 img → 回合制 AVATAR_MAP（四名正式角色）→ 无则显示"头像缺失"并上报，不用首字/默认人像代替。
@@ -37,6 +37,8 @@ function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
 
+export function avatarScaleForZoom(scale) { return 1 / Math.min(1, scale); }
+
 export function createUnitView(parent, deps) {
   const { scope, metersPerArtPx, onAvatarStatus } = deps;
   const Q = 1 / metersPerArtPx;
@@ -66,7 +68,7 @@ export function createUnitView(parent, deps) {
 
     const billboard = document.createElement('div');
     billboard.className = 't-unit-billboard';
-    billboard.style.transform = 'translate(-50%,-50%) scale(' + (1 / cameraScale) + ')';
+    billboard.style.transform = 'translate(-50%,-50%) scale(' + avatarScaleForZoom(cameraScale) + ')';
     billboard.style.setProperty('--d', d + 'px');
     const face = unit.emoji
       ? '<div class="t-unit-emoji" aria-hidden="true">' + escapeHtml(unit.emoji) + '</div>'
@@ -208,7 +210,7 @@ export function createUnitView(parent, deps) {
 
   function onCameraChange(pose) {
     cameraScale = pose.scale;
-    const t = 'translate(-50%,-50%) scale(' + (1 / cameraScale) + ')';
+    const t = 'translate(-50%,-50%) scale(' + avatarScaleForZoom(cameraScale) + ')';
     for (const rec of nodes.values()) rec.billboard.style.transform = t;
   }
 

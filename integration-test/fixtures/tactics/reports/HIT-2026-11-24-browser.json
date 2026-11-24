@@ -1,0 +1,66 @@
+{
+  "date": "2026-11-24",
+  "browser": "real Chrome / chrome-devtools",
+  "page": "http://127.0.0.1:8123/tactics/mvp-standalone.html?demo=slice",
+  "artifactSha256": "ed907290ea5429aab9bf5db190402e367d0922a833b935dbdca9d9bac98e4c3f",
+  "finalDefaultScene": { "page": "http://127.0.0.1:8123/tactics/mvp-standalone.html", "status": "passed", "fourHeroesHaveExplicitPreparationGroup": true, "groupChildClicked": "早有准备-提前瞄准", "afterChildResources": { "main": 2, "aux": 0 }, "actualGunDamage": [46, 39, 38], "hitTiers": [2, 2, 2], "ammoAfter": 27, "busyAfter": false },
+  "method": "使用用户当前真实切片和原有应用：正常菜单/父卡展开/子卡选择/地图选点/Enter/自然回合及反应按钮。不造roster、不修改HP或随机种子。包装原版播放函数只记录真实结果，测试结束恢复；录像由工具记录，主模型不支持视频直读，改用本机ffmpeg提取有限图片帧目视检查。",
+  "portrait": {
+    "status": "passed",
+    "samples": [
+      { "zoom": 0.5, "normalAvatarPx": 42, "normalGridPx": 25, "largeAvatarPx": 56, "largeFootprintPx": 50 },
+      { "zoom": 1, "normalAvatarPx": 42, "normalGridPx": 50, "largeAvatarPx": 56, "largeFootprintPx": 100 },
+      { "zoom": 2, "normalAvatarPx": 84, "normalGridPx": 100, "largeAvatarPx": 112, "largeFootprintPx": 200 }
+    ],
+    "note": "近景比例固定；远景只保持原42/56px最小主体尺寸。"
+  },
+  "hitFeedback": {
+    "initialDebugArtifactSha256": "ac237a0f631189c3a1ddf8944c803c4c7f996432e5d3a42d99443365b35eb14b",
+    "light": { "actualDamage": 8, "maxHp": 400, "tier": 1, "category": "枪击", "audio": "hit_1a", "status": "passed" },
+    "medium": { "actualDamage": [48, 49, 49], "maxHp": 400, "tier": 2, "hitAudio": ["hit_2b", "hit_2c", "hit_2b"], "gunAudio": ["gunshot1", "gunshot2", "gunshot1"], "status": "passed" },
+    "heavy": { "actualDamage": 40, "maxHp": 40, "tier": 3, "engineHitStopMsAtImpact": 60, "audio": "hit_3a", "skill": "压缩爆燃", "status": "passed" },
+    "decodedSamples": ["hit_1a", "hit_1b", "hit_1c", "hit_2a", "hit_2b", "hit_2c", "hit_3a", "hit_3b", "hit_3c", "parry_1", "parry_2", "parry_3"],
+    "visual": "轻伤和中档真实录像抽帧已目视：类型标记、实际数值、原版核心闪光/飘血/后仰；初版连发标签略拥挤，后续只修数字错位。重创实际接触结果、60ms卡肉及三档采样已记录，完整重创逐帧未留图。",
+    "finalArtifactCombat": { "status": "passed", "lightDamage": 12, "mediumDamage": [57, 57, 44], "busyAfter": false,
+      "mediumNumberWorldPositions": [
+        { "x": 883.333, "y": 1830.56 }, { "x": 900, "y": 1769.44 }, { "x": 916.667, "y": 1891.67 }
+      ]
+    }
+  },
+  "windup": {
+    "status": "passed-real-node-playback",
+    "target": "e:守卫",
+    "fontPx": 56,
+    "cases": [
+      { "kind": "red-single", "animation": "enemyOmenCombo", "frames": 9 },
+      { "kind": "red-wide", "animation": "omenRedWide", "frames": 7 },
+      { "kind": "amber-single", "animation": "omenAmberSingle", "frames": 7 },
+      { "kind": "amber-wide", "animation": "omenAmberWide", "frames": 7 },
+      { "kind": "violet-single", "animation": "omenVioletSingle", "frames": 7 },
+      { "kind": "violet-wide", "animation": "omenVioletWide", "frames": 7 },
+      { "kind": "rose-self", "animation": "omenRoseSelf", "frames": 7 },
+      { "kind": "gloom-foe", "animation": "omenGloomFoe", "frames": 7 }
+    ],
+    "audioKeys": ["monsterAttack", "enemySwingGroup", "enemyRanged", "enemyRangedGroup", "enemyMagic", "enemyMagicGroup", "enemyBuff", "enemyDebuff"],
+    "note": "八档原版演出在真实现存emoji节点单项播放，真实AI行动另记录斥候red-single/font42px；不冒称八种均由八次AI技能自动发生。"
+  },
+  "groups": {
+    "status": "passed",
+    "realMenu": "火舞术父卡展开出现精准流火/压缩爆燃，子卡选择进入压缩爆燃；父卡及仅选择子卡不扣MP/主行动，真实发动仅MP110→105、main1→0。",
+    "saveAndReload": "实际设置按钮→保存并重置本场→全页重新加载，分组和全局子索引保留；未修改技能配置。",
+    "legacySliceRows": [
+      { "parent": "火舞术", "children": [{ "name": "精准流火", "index": 4, "cost": 2, "power": 30 }, { "name": "压缩爆燃", "index": 5, "cost": 5, "power": 70 }] },
+      { "parent": "早有准备", "children": [{ "name": "预备咏唱", "index": 13, "cost": 0, "power": 1 }, { "name": "提前瞄准", "index": 14, "cost": 0, "power": 30 }] }
+    ],
+    "canonicalNames": "默认典型样本的火舞术-/早有准备-完整子技能名称、绑定及父子引用由源码和产物真实后端回归验证，未裁名前缀。"
+  },
+  "tests": { "newHitFeedback": 43, "sourceAllRuns": 1, "sourceAllPassed": 894, "sourceAllTiming": "发生于最后三英雄早有准备样本结构补齐之前；之后仅相关技能108/配置60/受击43及产物29复验，不把894冒报为最终数据指纹", "finalTypicalSkills": 108, "finalTypicalData": 60, "artifactSpecializedPassed": 29, "independentReview": "用户授权Gemini3.8FlashMedium只读审查及错位复核：无阻断" },
+  "console": { "runtimeExceptions": 0, "resource404": "仅favicon.ico，两次；受击与前摇采样请求成功/缓存命中" },
+  "unverified": [
+    "我方召唤物新增实体的全套八种技能实战；已接同一自动行动/前摇入口，未为测试伪造召唤数据",
+    "纯护盾、破盾、暴击、爆发及全部伤害性质颜色的逐项真页目视/听感组合；真实字段和原版函数有定向行为回归",
+    "所有伤害旁路（持续伤害、反伤、碰撞等）与所有职业/缩放中途变化的组合",
+    "安卓模拟器验证"
+  ],
+  "boundaries": "根index只读；保留原版已有合成点缀经用户明确授权，不新增替代音效。未更改伤害数值/费用/持续时间/库存规则或新增UI入口。"
+}

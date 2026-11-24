@@ -12,6 +12,7 @@ import { unitCenter } from './geometry.mjs';
 import { createFxRegistry, actionInput, reactionInput, prepareInput } from './fx-registry.mjs';
 import { registerDefaultFx, EXTRA_AUDIO, fogFieldHtml, animateFogField } from './fx-library.mjs';
 import { createVfxHost } from './vfx-host.mjs';
+import { skillSlots } from './effect-definitions.mjs';
 
 export const WINDUP_BEAT_MS = 330;   // 回合制敌方前摇拍点（OMEN_BEAT）：起手后此刻出手
 
@@ -20,12 +21,31 @@ export function resolveAttackIdentity(skill) {
   return { mode: 'tag', subtype: skill?.fxTag || null };
 }
 
-// 前摇分类：颜色按伤害类型，单/群按战棋显式空间范围（不让旧"单体/群攻"标签覆盖；「自身」按单体拍点）
+// 原版出手反馈八档；空间只读显式范围，不改变已经选定的 fxTag 身份。
 export function resolveWindupKind(skill) {
-  const dt = (skill && skill.damageType) || '近战';
-  const color = dt === '远程' ? 'amber' : dt === '法术' ? 'violet' : 'red';
-  const wide = !!(skill && skill.range && skill.range.type !== '单体' && skill.range.type !== '自身');
-  return color + '-' + (wide ? 'wide' : 'single');
+  if (!skill) return 'red-single';
+  const slots = skillSlots(skill);
+  if (slots.some(s => s.attack || ['dot', 'stun', 'paralyze'].includes(s.definition.kind))) {
+    const color = skill.damageType === '远程' ? 'amber' : skill.damageType === '法术' ? 'violet' : 'red';
+    const wide = !!(skill.range && skill.range.type !== '单体' && skill.range.type !== '自身');
+    return color + '-' + (wide ? 'wide' : 'single');
+  }
+  if (slots.some(s => !s.debuff && ['heal', 'healMp', 'healTp', 'buff', 'shield', 'taunt', 'mainPoint', 'damageGuard', 'counter', 'dispel', 'barrier'].includes(s.definition.kind))) return 'rose-self';
+  if (slots.some(s => s.debuff && !s.definition.selfCost)) return 'gloom-foe';
+  return null;
+}
+
+// 只映射已结算字段，原版 classifyHit 决定分档；不在演出端重算伤害或暴击。
+export function buildHitFeedback(result, hit, segment = hit, incomingDmg = result.skill?.power || 0) {
+  return {
+    targetId: hit.targetId, sourceId: result.casterId, outcome: segment.outcome || (segment.hit ? 'hit' : 'dodge'),
+    maxHp: segment.maxHp ?? hit.maxHp, hpBefore: segment.hpBefore, hpAfter: segment.hpAfter, hpDmg: segment.hpDmg,
+    shieldBefore: segment.shieldBefore || 0, shieldAfter: segment.shieldAfter || 0, shieldDmg: segment.shieldDmg || 0,
+    blockedDmg: segment.guardDmg > 0 ? segment.guardDmg : undefined, incomingDmg: segment.rawDmg ?? incomingDmg,
+    isHero: (segment.side || hit.side) === 'hero', isCrit: segment.isCrit ?? !!result.crit, isBurst: segment.isBurst ?? !!result.isBurst,
+    isPierce: !!segment.isPierce, damageType: segment.damageType || result.incomingType || result.skill?.damageType || null,
+    damageCategory: segment.damageCategory || null,
+  };
 }
 
 export function createActionDirector(deps) {
@@ -205,6 +225,7 @@ export function createActionDirector(deps) {
   async function playWindup(unitId, skill) {
     avHost.syncRoster();
     const kind = resolveWindupKind(skill);
+    if (!kind) return { kind, ok: true, handle: null };
     const handle = av.playEnemyWindup(avHost.entity(unitId), kind);
     if (!handle) return { kind, ok: false };
     const ok = await wait(WINDUP_BEAT_MS);
@@ -279,13 +300,19 @@ export function createActionDirector(deps) {
     const vd = getViewData();
     const skill = result.skill || battleOf().itemSkill(result.item);
     const casterUnit = vd.units.find(u => u.id === result.casterId);
-    const identity = resolveAttackIdentity(skill, casterUnit.side);
+    const identity = resolveAttackIdentity(skill);
     const casterEnt = avHost.entity(result.casterId);
     const hits = result.hits || [];
     const byId = new Map(hits.map(h => [h.targetId, h]));
     const audioContext = { category: av.CombatAudioMixer.classify(skill) };
     const actionId = av.CombatAudioDirector.beginAction();
-    const wave = hits.length > 1 ? av.CombatAudioDirector.beginWave(hits.map(h => h.targetId), actionId) : null;
+    const waveTargets = new Map();
+    hits.forEach(h => (h.segments || [h]).forEach((seg, i) => {
+      const key = seg.shotIndex ?? i;
+      if (!waveTargets.has(key)) waveTargets.set(key, new Set());
+      waveTargets.get(key).add(h.targetId);
+    }));
+    const waves = new Map([...waveTargets].map(([key, targets]) => [key, targets.size > 1 ? av.CombatAudioDirector.beginWave([...targets], actionId) : null]));
     const hitWaves = [];
     const incoming = (skill.power || 0) > 0 ? skill.power : (casterUnit.ref.atk || 0);
     const input = actionInput({ ...result, skill });
@@ -318,19 +345,13 @@ export function createActionDirector(deps) {
       if (guardianReaction) reactionRuns.push(playReaction({ ...h, targetId: guardianReaction.responderId || h.targetId, reaction: guardianReaction }));
       // 回复槽段：规则真实标记（seg.heal）优先，回退生命提升推断（events 真实回复结果形态待规则 result 落地后接）
       const healed = seg.heal != null ? !!seg.heal : (!seg.hit && seg.hpAfter > seg.hpBefore);
-      const r = {
-        targetId, sourceId: result.casterId, outcome: seg.hit ? 'hit' : 'dodge',
-        maxHp: h.maxHp, hpBefore: seg.hpBefore, hpAfter: seg.hpAfter, hpDmg: seg.hpDmg,
-        shieldBefore: seg.shieldBefore || 0, shieldAfter: seg.shieldAfter || 0, shieldDmg: seg.shieldDmg || 0, incomingDmg: seg.rawDmg ?? incoming,
-        isHero: h.side === 'hero', damageType: skill.damageType || '近战',
-        actionId, waveId: wave ? wave.id : null,
-      };
+      const waveIndex = seg.shotIndex ?? i, wave = waves.get(waveIndex);
+      const r = { ...buildHitFeedback({ ...result, skill }, h, seg, incoming), actionId, waveId: wave ? wave.id : null };
       if (healed) playHealPulse(targetId);
-      else av.playHitFeedback(r, { wave: hitWaves[i] || (hitWaves[i] = { shook: false, hitStopped: false, classified: [] }) });
+      else av.playHitFeedback(r, { wave: hitWaves[waveIndex] || (hitWaves[waveIndex] = { shook: false, hitStopped: false, classified: [] }) });
       if (!healed) av.CombatAudioDirector.publish(r);
-      if (wave && done.size === segs.length) av.CombatAudioDirector.completeTarget(wave, targetId);
-      if (onReveal) onReveal({ ...h, hit: seg.hit, heal: healed, hpBefore: seg.hpBefore, hpAfter: seg.hpAfter, hpDmg: seg.hpDmg, down: seg.down,
-        logIndex: seg.logIndex, logEnd: seg.logEnd, segmentIndex: i, segmentCount: segs.length }, Object.assign({ result, identity, entryId: entry.id }, meta));
+      if (wave) av.CombatAudioDirector.completeTarget(wave, targetId);
+      if (onReveal) onReveal({ ...h, ...seg, targetId, heal: healed, segmentIndex: i, segmentCount: segs.length }, Object.assign({ result, identity, entryId: entry.id }, meta));
     }
     function reveal(targetId, meta) {
       const h = byId.get(targetId);
@@ -392,7 +413,7 @@ export function createActionDirector(deps) {
       fx.top(ring, 560).firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 540, fill: 'forwards' });
       if (onSelfDestruct) onSelfDestruct(sd);
     }
-    if (wave) av.CombatAudioDirector.closeWave(wave);
+    waves.forEach(wave => { if (wave) av.CombatAudioDirector.closeWave(wave); });
     dropAnchors();
     return ok;
   }

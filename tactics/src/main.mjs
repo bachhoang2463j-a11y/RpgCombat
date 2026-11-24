@@ -38,6 +38,14 @@ export function applyEditorFxTags(rows, editedRows) {
   }
 }
 
+export function linkSkillGroupRows(skills) {
+  for (const parent of skills) if (parent.isGroup) {
+    const children = skills.filter(s => s._inGroup && s.parentName === parent.name);
+    if (children.length) parent.children = children;
+  }
+  return skills;
+}
+
 export function applyPersistentFxTags(units, roster) {
   const byName = new Map((roster?.heroes || []).map(hero => [hero.name, hero]));
   for (const unit of units) {
@@ -193,7 +201,7 @@ export function buildViewData(block, resolvedHeroes, scene, positions, combatTok
         id, side, name: display.name || identity.name, emoji: display.emoji || identity.emoji, footprint: fp, img: src.img || null,
         avatarUrl: display.emoji ? null : (src.avatarUrl || resolveAvatarUrl({ img: src.img, name: identity.name }, heroAvatarUrl)),
         bars: { hp: src.hp == null ? src.maxHp : src.hp, maxHp: src.maxHp || 0, mp: src.mp == null ? src.maxMp : src.mp, maxMp: src.maxMp || 0 },
-        skills: Array.isArray(src.skills) ? src.skills : [],
+        skills: linkSkillGroupRows(Array.isArray(src.skills) ? src.skills : []),
         items: Array.isArray(src.items) ? src.items : [],
         ref: src,
       });
@@ -440,7 +448,10 @@ export function createApp(rootEl, opts = {}) {
   function currentUnit() { return battle && currentViewData ? unitById(battle.snapshot().currentId) : null; }
   function isPlayerUnit(u) { return !!(u && (u.controller || (u.side === 'hero' ? 'player' : 'ai')) === 'player'); }
   function isHeroTurn() { return isPlayerUnit(currentUnit()) && !battle.snapshot().terminal; }
-  function skillUsable(skill) { return !!(battle && battle.skillStatus(skill).ok); }
+  function skillUsable(skill) {
+    if (skill.isGroup) return (skill.children || []).some(skillUsable);
+    return !!(battle && battle.skillStatus(skill).ok);
+  }
   function skillReason(skill) {
     if (!battle) return '当前不能使用技能';
     // 变体组父项无自身行动语义：有可用子项即不标原因，否则报首个子项的真实原因
@@ -460,7 +471,7 @@ export function createApp(rootEl, opts = {}) {
   // 点敌人直接攻击：首个可用技能（原版技能栏的排序口径：可用者在前），否则普攻
   function defaultAction() {
     const skills = currentUnit()?.skills || [];
-    const i = skills.findIndex(s => !s._inGroup && skillUsable(s));
+    const i = skills.findIndex(s => !s._inGroup && !s.isGroup && skillUsable(s));
     if (i >= 0) return { key: 'sk:' + i, skill: skills[i] };
     return skillUsable(BASIC_ATTACK) ? { key: 'attack', skill: BASIC_ATTACK } : null;
   }
@@ -917,7 +928,7 @@ export function createApp(rootEl, opts = {}) {
     if (key === 'end') { requestEnd(); return; }
     fieldAction = null;
     const skill = skillOfKey(key);
-    if (!skill) return;
+    if (!skill || skill.isGroup) return;
     if (!skillUsable(skill)) { ui('deny'); shell.showLog(skillReason(skill), 'warn'); return; }
     pending = null;
     aim = { key, skill };
@@ -1152,8 +1163,10 @@ export function createApp(rootEl, opts = {}) {
     const u = unitById(hit.targetId);
     if (!u) return;
     const prev = shownOf(u);
-    shown.set(u.id, { ...prev, hp: hit.hpAfter, mp: hit.heal ? Math.min(u.ref.maxMp || 0, prev.mp + (hit.mpDmg > 0 ? hit.mpDmg : 0)) : prev.mp });
-    u.bars = { ...u.bars, hp: hit.hpAfter };
+    const next = { ...prev, hp: hit.hpAfter, mp: hit.heal ? Math.min(u.ref.maxMp || 0, prev.mp + (hit.mpDmg > 0 ? hit.mpDmg : 0)) : prev.mp };
+    if (hit.shieldAfter !== undefined) next.shield = hit.shieldAfter;
+    shown.set(u.id, next);
+    u.bars = { ...u.bars, hp: hit.hpAfter, shield: next.shield };
     const rec = sandbox.getUnitView() && sandbox.getUnitView().nodes.get(u.id);
     if (rec) rec.bars = u.bars;
     if (u.side === 'hero') shell.setHeroBars(u.id, u.bars, hit.heal ? { heal: true } : { hit: hit.hit });

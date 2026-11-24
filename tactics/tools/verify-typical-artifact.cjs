@@ -13,7 +13,7 @@ function check(id, pass, detail = '') { cases.push({ id, pass: !!pass, detail })
 check('单个脚本及闭合标签', scripts.length === 1 && (html.match(/<\/script>/g) || []).length === 1);
 check('零外部业务脚本或样式', !/<script[^>]+src=|<link[^>]+stylesheet/i.test(html));
 check('零外部import', !/\bimport\s*(?:\(|[{*'"\w])/.test(scripts[0][1]));
-check('伤害槽菜单分类与阵营收益修复入包', /function isAttackSkill\(skill\)\s*\{\s*return skillSlots\(skill\)\.some/.test(html) && /\bbeneficial\s*=\s*def\.debuff/.test(html));
+check('伤害槽与父子菜单分类及阵营收益修复入包', html.includes('some(isAttackSkill)') && html.includes('skillSlots(skill).some') && /\bbeneficial\s*=\s*def\.debuff/.test(html));
 check('唯一显式特效协议与中性反馈入包', /id:\s*["']neutral-impact["']/.test(html) && /pool\.find\(e\s*=>\s*e\.fxTags\?\.includes\(input\.fxTag\)\)/.test(html) && !html.includes('SUBTYPE_RE'));
 check('原版逐发记录与转火专用预览入包', html.includes('result.shots') && /previewRetarget\(r\.skill,\s*a,\s*r\.casterId,\s*r\.slotIndex\)/.test(html) && html.includes('segment.shotIndex'));
 check('编辑器特效清单来自注册表', html.includes('function getFxTagOptions()') && html.includes('[...getFxTagOptions()]') && html.includes('fxOptions(s.fxTag)'));
@@ -24,6 +24,8 @@ check('辅助取消通知与动作代际隔离入包', html.includes('supportHan
 check('击杀自爆medium震动档位入包', html.includes('medium:[250,5]'));
 check('原版特效与角色独立堆叠层入包', html.includes('z-index:2;') && html.includes('z-index:3;'));
 check('发现敌人记录字段及枪声去重入包', html.includes('discoveredIds') && html.includes('playRandomStandardGunshot.last'));
+check('原版受击数字及真实结果接线入包', ['buildHitFeedback', 'prepareHitNumbers', 'animateHitNumber', 'HIT_NUMBER_THEMES', 'data-hit-type', '--hit-scale'].every(s => html.includes(s)));
+check('头像远景底线及父子引用修复入包', html.includes('avatarScaleForZoom') && html.includes('linkSkillGroupRows'));
 const context = { console, structuredClone, URL, setTimeout, clearTimeout };
 context.window = context;
 vm.createContext(context);
@@ -63,6 +65,15 @@ if (backend) {
   const move = moveBattle.move(11, 34);
   check('产物实际移动发现食尸鬼并显示暂停原因', move.ok && move.stoppedOnDiscovery && move.cell.col === 13 && move.cell.row === 36 &&
     move.discoveredIds.includes('e:食尸鬼A') && moveBattle.snapshot().log.at(-1).includes('暂停移动'));
+  const el = block.heroes.find(h => h.name === '埃利奥特'), fireGroup = el.skills.find(s => s.name === '火舞术' && s.isGroup);
+  check('产物显式技能组保留原名及全局子引用', fireGroup && fireGroup.children.length === 2 && el.skills.includes(fireGroup.children[0]) && fireGroup.children[0].name === '火舞术-精准流火' && block.heroes.every(h => {
+    const parent = h.skills.find(s => s.name === '早有准备' && s.isGroup);
+    return parent && parent.children.length > 0 && parent.children.every(c => h.skills.includes(c) && c.parentName === parent.name);
+  }));
+  const shooter = moveData.units.find(u => u.id === 'h:玛德琳'), ghoul = moveData.units.find(u => u.id === 'e:食尸鬼A');
+  const shotResult = moveBattle.attack(shooter.skills.find(s => s.name === '柯尔特三连发'), { x: moveData.placementsById[ghoul.id].col + 0.5, y: moveData.placementsById[ghoul.id].row + 0.5, targetId: ghoul.id });
+  const landed = (shotResult.hits || []).flatMap(h => h.segments || [h]).filter(s => s.hit);
+  check('产物实际受击段保留原伤盾值暴击和性质', shotResult.ok && landed.length > 0 && landed.every(s => Number.isFinite(s.rawDmg) && Number.isFinite(s.shieldBefore) && Number.isFinite(s.shieldAfter) && typeof s.isCrit === 'boolean' && s.damageCategory === '枪击' && s.outcome === 'hit'));
 }
 const report = {
   artifact: 'tactics/mvp-standalone.html', sha256: createHash('sha256').update(html).digest('hex'), bytes: Buffer.byteLength(html),

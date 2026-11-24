@@ -1499,13 +1499,15 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const roll = 0.8 + random() * 0.4;
     const pierce = !!skill.isPierce || !!slot.definition.pierce || !!(passive && passive.checkPierce && passive.checkPierce(caster));
     const logStart = log.length;
-    const segBase = { index: slotIndex, shotIndex, segmentIndex, targetId: target.id, logIndex: logStart };
+    const segBase = { index: slotIndex, shotIndex, segmentIndex, targetId: target.id, logIndex: logStart,
+      side: target.side, maxHp: target.ref.maxHp, damageType: incomingType, damageCategory: slot.definition.damageCategory || null,
+      isCrit: skillMultiplier > 1, isPierce: pierce };
     if (!options.skipSpatialRecheck && skill.range.type === '单体') {
       const aim = { ...unitCenter(placementsById[target.id], target.footprint), targetId: target.id };
       const check = queryAttack(ctx, caster.id, skill, aim);
       if (!check.ok) {
         addLog(skill.name + ' 后续段目标不合法：' + check.reason);
-        return { ...segBase, hit: false, hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reason: check.reason, logEnd: log.length };
+        return { ...segBase, hit: false, outcome: 'prevented', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reason: check.reason, logEnd: log.length };
       }
     }
     const guard = bdg.barrierTargets?.[target.id] || interception(ctx, caster.id, target.id);
@@ -1520,7 +1522,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       bdg.targetResolved[target.id] = true;
       if (!bdg.targetHit[target.id]) bdg.targetHit[target.id] = false;
       addLog(target.name + ' 的攻击被场地结界拦截');
-      return { ...segBase, hit: false, hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, barrierId: guard.id, down: false, logEnd: log.length };
+      return { ...segBase, hit: false, outcome: 'prevented', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, barrierId: guard.id, down: false, logEnd: log.length };
     }
     // 初次命闪（【必中】跳过被动闪避；仍可被反应化解）；征伐者 modifyDodgeCap：闪避分母按自身−攻击者速度差提升（原版 L21976）
     const dodgeCapBonus = passive && passive.modifyDodgeCap ? Math.max(0, passive.modifyDodgeCap(target, caster, tStats, cStats) || 0) : 0;
@@ -1538,7 +1540,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
           counterStrike(target, caster, counterBuff ? counterBuff.value : 0);
         }
       }
-      return Object.assign(segBase, { hit: false, hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: target.ref.hp <= 0, logEnd: log.length });
+      return Object.assign(segBase, { hit: false, outcome: 'dodge', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: target.ref.hp <= 0, logEnd: log.length });
     }
     // 确认将命中 → 反应拦截（只对该发；选择由调用方 next() 给出或 policy 自动）
     let reaction = yield* selectReaction(target, caster, skill, incomingType, options,
@@ -1546,20 +1548,21 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (reaction?.canceled || (!isAoE && caster.ref.hp <= 0)) {
       canceled.value = true;
       if (!bdg.targetResolved[target.id]) { bdg.targetResolved[target.id] = true; bdg.targetHit[target.id] = false; }
-      return Object.assign(segBase, { hit: false, hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reaction, logEnd: log.length });
+      return Object.assign(segBase, { hit: false, outcome: 'prevented', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reaction, logEnd: log.length });
     }
     if (reaction?.dodged) {
       if (!bdg.targetResolved[target.id]) { bdg.targetResolved[target.id] = true; bdg.targetHit[target.id] = false; }
-      return Object.assign(segBase, { hit: false, hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reaction, logEnd: log.length });
+      return Object.assign(segBase, { hit: false, outcome: 'dodge', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reaction, logEnd: log.length });
     }
     if (reaction?.guardianId) {
       bdg.targetResolved[target.id] = true; bdg.targetHit[target.id] = false;
       target = byId.get(reaction.guardianId);
       segBase.originalTargetId = segBase.targetId; segBase.targetId = target.id;
+      segBase.side = target.side; segBase.maxHp = target.ref.maxHp;
       const guardReaction = yield* selectReaction(target, caster, skill, incomingType, options,
         { slotIndex, segmentIndex, targetId: target.id, shotIndex, totalShots, preview: segmentPreview(caster, target, slot, skill, incomingType, isAoE, pierce, cStats) }, true, false);
       if (guardReaction?.canceled || (!isAoE && caster.ref.hp <= 0)) canceled.value = true;
-      if (canceled.value || guardReaction?.dodged) return Object.assign(segBase, { hit: false, hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reaction, guardianReaction: guardReaction, logEnd: log.length });
+      if (canceled.value || guardReaction?.dodged) return Object.assign(segBase, { hit: false, outcome: canceled.value ? 'prevented' : 'dodge', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reaction, guardianReaction: guardReaction, logEnd: log.length });
       reaction.guardianReaction = guardReaction;
     }
     tStats = statsOf(target);
@@ -1597,8 +1600,9 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         addLog(target.name + ' 触发职业被动【' + (fatalCtx.hpDmg === 0 ? '回避致命' : '毅力留存') + '】躲过了死亡！');
       }
     }
-    const hpBefore = target.ref.hp;
+    const hpBefore = target.ref.hp, maxHp = target.ref.maxHp, shieldBefore = target.ref.shield || 0;
     if (shieldDmg > 0) target.ref.shield = Math.max(0, (target.ref.shield || 0) - shieldDmg);
+    const shieldAfter = target.ref.shield || 0;
     const dealt = Math.min(target.ref.hp, hpDmg);
     target.ref.hp = Math.max(0, target.ref.hp - hpDmg);
     target.ref.tp = Math.min(target.ref.maxTp || 100, (target.ref.tp || 0) + 10);
@@ -1644,8 +1648,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       if (res && res.rush) addLog('🎯 ' + caster.name + ' 隐匿值突破 100，下一次非反应攻击 +50（隐匿值回归 50）');
     }
     emit('segment-resolved', { attackId: currentAttackId(), casterId: caster.id, targetId: target.id,
-      slotIndex, hpDmg: dealt, shieldDmg, guardDmg, down, damageCategory: slot.definition.damageCategory || null });
-    return Object.assign(segBase, { hit: true, hpDmg: dealt, shieldDmg, guardDmg, hpBefore, hpAfter: target.ref.hp, down, reaction: reaction || undefined, logEnd: log.length });
+      slotIndex, maxHp, hpDmg: dealt, shieldDmg, guardDmg, shieldBefore, shieldAfter, rawDmg: raw, isCrit: crit, isPierce: pierce,
+      damageType: incomingType, down, damageCategory: slot.definition.damageCategory || null });
+    return Object.assign(segBase, { hit: true, outcome: 'hit', maxHp, hpDmg: dealt, shieldDmg, guardDmg, shieldBefore, shieldAfter, rawDmg: raw,
+      hpBefore, hpAfter: target.ref.hp, down, reaction: reaction || undefined, logEnd: log.length });
   }
   function aStats0(u) { return u.ref; }
 

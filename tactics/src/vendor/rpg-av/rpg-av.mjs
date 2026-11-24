@@ -4,7 +4,7 @@
 // arcaneVfxModule 行区间(源 5729–14230): 5730–5730, 5733–5791, 5800–5841, 5849–5913, 5923–5924, 5932–6302, 6642–6850, 7016–7037, 7351–7376, 7383–7584, 7596–9869, 10067–10097, 10102–10107, 10748–10757, 11103–11133, 11142–11240, 11917–12083, 12201–12214, 14179–14208
 // 入选语句 157 段 / 3661 行；入口: playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar, CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx
 // 显式存根: clearSummonState, clearStatusLayers, clearSelfDestructState, clearRescueState, clearVariantState
-// 宿主适配补丁: 枪击采样相邻去重×1; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 屏幕矩形 → 特效舞台坐标×11; innerWidth → 舞台宽×7; innerHeight → 舞台高×3; body 挂载 → 特效舞台×5; JS position:fixed → absolute×0; arcane canvas resize 走舞台×1; 舞台震动独立层×2; window.* 声音函数改为工厂内本地×14; 去环境氛围清理×1; CSS position:fixed → absolute×6; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1
+// 宿主适配补丁: 枪击采样相邻去重×1; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 屏幕矩形 → 特效舞台坐标×10; innerWidth → 舞台宽×5; innerHeight → 舞台高×3; body 挂载 → 特效舞台×5; JS position:fixed → absolute×0; arcane canvas resize 走舞台×1; 舞台震动独立层×2; window.* 声音函数改为工厂内本地×14; 去环境氛围清理×1; CSS position:fixed → absolute×6; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1
 // ==========================================
 /* eslint-disable */
 // ---- 纯数据导出（原样，供宿主在工厂创建前解析人物头像/语音与预载清单） ----
@@ -3729,7 +3729,7 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
         const now = Date.now(), s = H.stacks.get(id);
         const k = s && now - s.at < 750 ? s.k + 1 : 0;
         H.stacks.set(id, { k, at: now });
-        return { dx: [0, 8, -10, 12, -6][k % 5], dy: -Math.min(k, 4) * 24 };
+        return { dx: [0, 12, 24, 36, 48][k % 5], dy: [0, -44, 44, -88, 88][k % 5] };
     }
     function hitNumLayer() {
         const d = document.createElement('div');
@@ -3739,17 +3739,31 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
         S.layers.add(d);
         return d;
     }
+    const HIT_NUMBER_THEMES = {
+        '钝击': ['钝击', '#fbbf24'], '切割': ['切割', '#fb7185'], '枪击': ['枪击', '#f8fafc'], '霰弹': ['霰弹', '#fed7aa'],
+        '火焰': ['火焰', '#fb923c'], '圣光': ['圣光', '#fef08a'], '雷电': ['雷电', '#c4b5fd'], '水流': ['水流', '#67e8f9'],
+        '冰霜': ['冰霜', '#bae6fd'], '诅咒': ['诅咒', '#d8b4fe'], '近战': ['近战', '#fda4af'], '远程': ['远程', '#f8fafc'], '法术': ['法术', '#a5b4fc']
+    };
+    function hitNumberScale(dom) { return host.hitNumberScale ? host.hitNumberScale(dom) : 1; }
+    function prepareHitNumbers(layer, result, dom) {
+        const theme = HIT_NUMBER_THEMES[result.damageCategory] || HIT_NUMBER_THEMES[result.damageType] || ['伤害', '#f8fafc'];
+        const scale = hitNumberScale(dom);
+        layer.setAttribute('data-hit-type', theme[0] + (result.isPierce ? '·穿透' : ''));
+        layer.style.setProperty('--hit-scale', scale);
+        layer.style.setProperty('--hit-color', theme[1]);
+        return scale;
+    }
+    function animateHitNumber(el, frames, options, scale) {
+        return el.animate(frames.map(f => ({ ...f, transform: f.transform.replace(/(-?\d+(?:\.\d+)?)px/g, (_, n) => (Number(n) * scale) + 'px') })), options);
+    }
     function hitAnchor(dom, slot) {
-        const r = entityVisualRect(dom) || ctr(dom), c = ctr(dom);
-        let x = r.right - 8 + slot.dx, y = r.top + 12 + slot.dy;
-        const menu = document.getElementById('menu-container');
-        if (menu) { const m = menu[__GBCR](); if (y > m.top - 28 && x > m.left - 14) x = m.left - 14; }
-        const topSafe = x > __STAGE.w - 360 ? 58 : 34;
-        return { x: Math.max(100, Math.min(__STAGE.w - 18, x)), y: Math.max(topSafe, y), c };
+        const r = entityVisualRect(dom) || ctr(dom), c = ctr(dom), scale = hitNumberScale(dom);
+        return { x: r.right + (8 + slot.dx) * scale, y: r.top + (-4 + slot.dy) * scale, c };
     }
     function hitNumEl(layer, cls, text, x, y) {
         const el = document.createElement('div');
         el.className = cls; el.textContent = text;
+        el.setAttribute('data-hit-type', layer.getAttribute('data-hit-type') || '');
         el.style.left = x + 'px'; el.style.top = y + 'px';
         layer.appendChild(el);
         return el;
@@ -3757,11 +3771,12 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
     function hitTagEl(layer, cls, text, x, y) {
         const el = document.createElement('div');
         el.className = cls; el.textContent = text;
+        el.setAttribute('data-hit-type', layer.getAttribute('data-hit-type') || '');
         el.style.left = x + 'px'; el.style.top = y + 'px';
         layer.appendChild(el);
         return el;
     }
-    const T = 'translate(-50%,-50%) ', TN = 'translate(-100%,-18%) ', TT = 'translate(-100%,-50%) ';
+    const T = 'translate(-50%,-50%) ', TN = 'translate(0,-18%) ', TT = 'translate(0,-50%) ';
     const NUM_KF = {
         1: [{ transform: TN + 'translateY(4px) scale(0.92)', opacity: 0 }, { transform: TN + 'translateY(-3px) scale(1)', opacity: 1, offset: 0.16 }, { transform: TN + 'translateY(-6px) scale(1)', opacity: 1, offset: 0.72 }, { transform: TN + 'translateY(-14px) scale(0.96)', opacity: 0 }],
         2: [{ transform: TN + 'translateY(6px) scale(0.84)', opacity: 0 }, { transform: TN + 'translateY(-4px) scale(1.10)', opacity: 1, offset: 0.14 }, { transform: TN + 'translateY(-6px) scale(1)', opacity: 1, offset: 0.28 }, { transform: TN + 'translateY(-8px) scale(1)', opacity: 1, offset: 0.76 }, { transform: TN + 'translateY(-18px) scale(0.96)', opacity: 0 }],
@@ -3872,11 +3887,13 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
         const g = document.createElement('div');
         g.style.cssText = 'position:absolute; left:' + r.left + 'px; top:' + r.top + 'px; width:' + r.width + 'px; height:' + r.height + 'px; opacity:0.45; filter:grayscale(1) brightness(1.5); overflow:hidden;' + (isCard ? 'display:block; border-radius:0.25rem;' : 'display:flex; align-items:center; justify-content:center; font-size:' + getComputedStyle(dom).fontSize + ';');
         g.innerHTML = dom.innerHTML.replace(/ id="[^"]*"/g, '');
+        g.style.setProperty('--d', r.width + 'px');
         layer.appendChild(g);
         anims.push(g.animate([{ opacity: 0.45, transform: 'none' }, { opacity: 0, transform: 'scale(1.06)' }], { duration: 380, easing: 'ease-out', fill: 'forwards' }));
     }
     function hitVisual(layer, r, h, anims, timers) {
         const dom = domOf(r.targetId); if (!dom) return;
+        const scale = prepareHitNumbers(layer, r, dom);
         const entity = [...heroesData, ...enemiesData].find(e => e.id === r.targetId);
         const isHero = r.isHero !== undefined ? r.isHero : (entity ? isHeroSideEntity(entity) : String(r.targetId).startsWith('h'));
         const slot = stackSlot(r.targetId), p = hitAnchor(dom, slot), c = p.c;
@@ -3888,7 +3905,7 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
             if (!r.suppressDodgeFx) burst(8, () => ({ x: c.x + rnd(-20, 20), y: c.bottom - 10, vx: rnd(-1.2, 1.2), vy: rnd(-0.8, -0.2), drag: 0.96, decay: 0.03, size: rnd(10, 18), shape: 'smoke', blend: 'source-over', color: 'rgba(148,163,184,0.35)' }));
             if (!r.suppressRecoil && !r.suppressDodgeFx) hitRecoil(dom, isHero, 'dodge', 0, anims);
             const el = hitNumEl(layer, 'arcane-hit-num word dodge', '闪避', p.x, p.y);
-            anims.push(el.animate(NUM_KF.dodge, { duration: NUM_MS.dodge, easing: 'ease-out', fill: 'forwards' }));
+            anims.push(animateHitNumber(el, NUM_KF.dodge, { duration: NUM_MS.dodge, easing: 'ease-out', fill: 'forwards' }, scale));
             return;
         }
         if (h.kind === 'block') {
@@ -3896,7 +3913,7 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
             burst(7, () => { const a = rnd(0, 6.283), s = rnd(3, 6.2); return { x: c.x, y: cy, vx: Math.cos(a) * s, vy: Math.sin(a) * s, drag: 0.86, decay: 0.085, size: 1.8, shape: 'streak', color: '#f1f5f9' }; });
             if (!r.suppressRecoil) hitRecoil(dom, isHero, 'block', 0, anims);
             const el = hitNumEl(layer, 'arcane-hit-num word block', '格挡', p.x, p.y);
-            anims.push(el.animate(NUM_KF.block, { duration: NUM_MS.block, easing: 'ease-out', fill: 'forwards' }));
+            anims.push(animateHitNumber(el, NUM_KF.block, { duration: NUM_MS.block, easing: 'ease-out', fill: 'forwards' }, scale));
             return;
         }
         if (h.shieldDmg > 0) {
@@ -3907,10 +3924,10 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
         if (h.kind === 'shield') {
             if (!r.suppressRecoil) hitRecoil(dom, isHero, 'shield', 0, anims);
             const el = hitNumEl(layer, 'arcane-hit-num shield', '-' + h.shieldDmg, p.x, p.y);
-            anims.push(el.animate(NUM_KF.shield, { duration: NUM_MS.shield, easing: 'ease-out', fill: 'forwards' }));
+            anims.push(animateHitNumber(el, NUM_KF.shield, { duration: NUM_MS.shield, easing: 'ease-out', fill: 'forwards' }, scale));
             if (h.shieldBroken) {
-                const b = hitTagEl(layer, 'arcane-hit-num word break', '破盾', p.x, p.y - 22);
-                anims.push(b.animate(NUM_KF.tag, { duration: NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }));
+                const b = hitTagEl(layer, 'arcane-hit-num word break', '破盾', p.x, p.y - 22 * scale);
+                anims.push(animateHitNumber(b, NUM_KF.tag, { duration: NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }, scale));
             }
             return;
         }
@@ -3931,19 +3948,19 @@ function clearVariantState() { /* 未迁移段：本 Demo 不产生该状态 */ 
             const el = hitNumEl(layer, cls, '-' + h.hpDmg, p.x, p.y);
             let kf = NUM_KF[h.tier];
             if (h.crit && !h.burst) kf = kf.map((f, idx) => idx === 1 ? Object.assign({}, f, { transform: f.transform + ' scale(1.14)' }) : f);
-            anims.push(el.animate(kf, { duration: h.burst ? 1200 : NUM_MS[h.tier], easing: 'cubic-bezier(0.2,0.8,0.3,1)', fill: 'forwards' }));
-            const fs = [0, 24, 27, 32][h.tier];
+            anims.push(animateHitNumber(el, kf, { duration: h.burst ? 1200 : NUM_MS[h.tier], easing: 'cubic-bezier(0.2,0.8,0.3,1)', fill: 'forwards' }, scale));
+            const fs = [0, 24, 27, 32][h.tier] * scale;
             if (h.crit || h.burst) {
-                const t = hitTagEl(layer, 'arcane-hit-tag ' + (h.burst ? 'burst' : 'crit'), h.burst ? '爆发' : '暴击', p.x, p.y - fs * 0.25 - 12);
-                anims.push(t.animate(NUM_KF.tag, { duration: h.burst ? 1200 : NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }));
+                const t = hitTagEl(layer, 'arcane-hit-tag ' + (h.burst ? 'burst' : 'crit'), h.burst ? '爆发' : '暴击', p.x, p.y - fs * 0.25 - 12 * scale);
+                anims.push(animateHitNumber(t, NUM_KF.tag, { duration: h.burst ? 1200 : NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }, scale));
             }
             if (h.shieldDmg > 0) {
-                const sy = p.y + fs * 0.92 + 5;
+                const sy = p.y + fs * 1.15 + 14 * scale;
                 const s = hitNumEl(layer, 'arcane-hit-num shield sub', '盾-' + h.shieldDmg, p.x, sy);
-                anims.push(s.animate(NUM_KF.shield, { duration: NUM_MS.shield, easing: 'ease-out', fill: 'forwards' }));
+                anims.push(animateHitNumber(s, NUM_KF.shield, { duration: NUM_MS.shield, easing: 'ease-out', fill: 'forwards' }, scale));
                 if (h.shieldBroken) {
-                    const b = hitTagEl(layer, 'arcane-hit-num word break', '破盾', p.x, sy + 20);
-                    anims.push(b.animate(NUM_KF.tag, { duration: NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }));
+                    const b = hitTagEl(layer, 'arcane-hit-num word break', '破盾', p.x, sy + 28 * scale);
+                    anims.push(animateHitNumber(b, NUM_KF.tag, { duration: NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }, scale));
                 }
             }
         };

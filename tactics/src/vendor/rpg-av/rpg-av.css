@@ -321,3 +321,17 @@
       0% { background-position: 0% 50%; }
       100% { background-position: 200% 50%; }
     }
+/* 战棋数字：原版分档时间轴，数值主导、实际伤害性质点缀。 */
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num,.arcane-hit-num-layer[data-hit-type] .arcane-hit-tag { font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; font-variant-numeric:tabular-nums lining-nums; font-style:normal; }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num { font-size:calc(24px * var(--hit-scale,1)); font-weight:850; line-height:1.05; letter-spacing:-.025em; color:var(--hit-color,#f8fafc); -webkit-text-stroke:.65px rgba(9,12,18,.9); paint-order:stroke fill; text-shadow:0 2px 3px #020617,0 0 7px rgba(2,6,23,.8); transform:translate(0,-18%); }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num.l2 { font-size:calc(27px * var(--hit-scale,1)); }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num.l3 { font-size:calc(32px * var(--hit-scale,1)); }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num.word { font-size:calc(16px * var(--hit-scale,1)); font-weight:750; color:#e2e8f0; }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num.shield { font-size:calc(22px * var(--hit-scale,1)); color:#7dd3fc; }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num.shield.sub { font-size:calc(16px * var(--hit-scale,1)); }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num.crit { color:#fde68a; }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num.burst { color:#fffbeb; }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-tag { font-size:calc(12px * var(--hit-scale,1)); font-weight:800; }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num::before { display:block; font-size:calc(9px * var(--hit-scale,1)); font-weight:650; line-height:1.1; letter-spacing:.08em; opacity:.9; }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num:not(.word):not(.shield)::before { content:attr(data-hit-type); }
+.arcane-hit-num-layer[data-hit-type] .arcane-hit-num.shield:not(.sub)::before { content:"护盾"; }

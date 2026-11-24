@@ -34,7 +34,8 @@ const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFee
   'createFxRegistry', 'registerDefaultFx', 'actionInput', 'reactionInput', 'createVfxHost', 'playReaction', 'revealSegment', 'evadeShift',
   'createScenarioData', 'createSeededRandom', 'createFogRegion', 'canSeeUnit', 'previewBarrier', 'resolveCharge',
   'buildTypicalViewData', 'playPrepare', 'syncRegions', 'fogFieldHtml', 'prepareInput', 'revealEffect',
-  'playGenericSupportFx', 'spawnHealParticles', 'playSupportEffects', 'supportResourceDelta', 'applyPersistentFxTags'];
+  'playGenericSupportFx', 'spawnHealParticles', 'playSupportEffects', 'supportResourceDelta', 'applyPersistentFxTags',
+  'buildHitFeedback', 'avatarScaleForZoom', 'linkSkillGroupRows', 'prepareHitNumbers', 'animateHitNumber'];
 
 const entry = [
   "import { createApp } from './src/main.mjs';",

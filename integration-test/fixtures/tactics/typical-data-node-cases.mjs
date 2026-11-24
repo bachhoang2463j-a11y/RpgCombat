@@ -126,12 +126,21 @@ async function runTTData(deps = {}) {
   ok('TT 弹药绑定', bullet && bullet.category === '弹药' && bullet.bindings.length === 1 && bullet.bindings[0].skillName === '萨维奇三连发' && bullet.bindings[0].cost === 3, JSON.stringify(bullet && bullet.bindings));
 
   // 九、配置包往返
+  ok('TT 四英雄早有准备均显式父子且保持全局索引', block.heroes.every(h => {
+    const parent = h.skills.find(s => s.name === '早有准备' && s.isGroup);
+    return parent && parent.children.length > 0 && parent.children.every(c => c.name.startsWith('早有准备-') && h.skills.includes(c) && c._inGroup && c.parentName === parent.name);
+  }));
   const pkg = m.configPackage.buildConfigPackage(block.heroes, 'all');
   const draft = m.configPackage.createImportDraft([], pkg);
   const dEl = draft.draft.find(h => h.name === '埃利奥特');
   const dBottle = dEl && dEl.items.find(i => i.name === '化尘者之瓶');
   ok('TT 配置往返父子结构', dBottle && Array.isArray(dBottle.children) && dBottle.children.length === 2 && dBottle.children[0].name === '瓶中之物' && dBottle.children[0].parentItemName === '化尘者之瓶', JSON.stringify(dBottle && dBottle.children && dBottle.children.map(c => c.name)));
-  const dFire = dEl && dEl.skills.find(s => s.name === '火舞术-精准流火');
+  const dFireGroup = dEl && dEl.skills.find(s => s.name === '火舞术' && s.isGroup);
+  const dFire = dFireGroup && dFireGroup.children.find(s => s.name === '火舞术-精准流火');
+  ok('TT 配置往返技能父子结构且不重复平铺', dFireGroup && dFireGroup.children.length === 2 && !dEl.skills.some(s => s.name === '火舞术-精准流火'), JSON.stringify(dFireGroup && dFireGroup.children.map(s => s.name)));
+  const restoredSkills = dEl && m.parser.parseSkillList(dEl.skills);
+  const restoredGroup = restoredSkills && restoredSkills.find(s => s.name === '火舞术' && s.isGroup);
+  ok('TT 配置读回父子同引用及全局索引', restoredGroup && restoredSkills.includes(restoredGroup.children[0]) && restoredGroup.children[0].name === '火舞术-精准流火');
   ok('TT 配置往返范围/动作/穿透', dFire && dFire.range && dFire.range.type === '单体' && dFire.range.castRange === 15 && dFire.actionCost && dFire.actionCost.main === 1 && dFire.isPierce === true, JSON.stringify(dFire && { r: dFire.range, a: dFire.actionCost, p: dFire.isPierce }));
   const dZhe = dEl && dEl.skills.find(s => s.name === '折影步');
   ok('TT 配置往返位移', dZhe && Array.isArray(dZhe.displacements) && dZhe.displacements[0] && dZhe.displacements[0].type === '侧闪' && dZhe.displacements[0].distance === 3, JSON.stringify(dZhe && dZhe.displacements));

@@ -31,6 +31,10 @@ const FX01_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'f
 
 // 阶段注册表：只登记真实存在的用例文件；--all 只聚合这里的条目，不虚构未来阶段。
 const STAGES = {
+  'hit-feedback': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'hit-feedback-node-cases.mjs'),
+    groups: ['THIT-01', 'THIT-02', 'THIT-03', 'THIT-04'], modules: [], requiredExports: [],
+  },
   feedback05: {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'feedback05-node-cases.mjs'),
     groups: ['TFB-05'], modules: ['ai', 'movement', 'scene', 'effectDefinitions'],
