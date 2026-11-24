@@ -1,0 +1,229 @@
+// P07 原版还原轮 B–D：WebM 抠黑底 / L3·L4 屏幕氛围 / 多目标 buff 串行 / 击杀聚合 / 召唤结果 / 特写提取与清理。
+// 只用最小 DOM 桩驱动真实函数，不复制被测逻辑。
+import { readFileSync } from 'node:fs';
+import { parseSkill } from '../../../tactics/src/parser.mjs';
+import { createBattle } from '../../../tactics/src/battle.mjs';
+import { unitCenter } from '../../../tactics/src/geometry.mjs';
+import { playWebmFx, playSupportEffects, FX_WEBM_KEY_MAX } from '../../../tactics/src/fx-library.mjs';
+import { startAtmos, atmosStyleOf, ATMOS_STYLES } from '../../../tactics/src/screen-atmos.mjs';
+import { createActionDirector } from '../../../tactics/src/action-director.mjs';
+
+const ok = (id, pass, detail = '') => ({ id, pass: !!pass, detail: typeof detail === 'string' ? detail : JSON.stringify(detail) });
+
+function el(tag) {
+  const attrs = {}, kids = [];
+  const e = { tag, attrs, kids, style: {}, animations: [], isConnected: true, parentNode: null,
+    setAttribute(k, v) { attrs[k] = String(v); }, getAttribute: k => attrs[k] ?? null, removeAttribute(k) { delete attrs[k]; },
+    appendChild(c) { kids.push(c); c.parentNode = e; c.isConnected = true; return c; },
+    remove() { e.isConnected = false; e.removed = true; },
+    animate(frames, options) { const a = { frames, options }; e.animations.push(a); return a; } };
+  Object.defineProperty(e, 'style', { value: { setProperty(k, v) { this[k] = v; } } });
+  return e;
+}
+
+// ---------- WebM：原版黑底转透明 ----------
+function webmCases() {
+  const out = [];
+  const created = [];
+  let frameCb = null, pixels = null;
+  globalThis.document = { createElement(tag) {
+    const e = el(tag); created.push(e);
+    if (tag === 'video') Object.assign(e, { paused: false, ended: false, duration: 2, currentTime: 0.5, videoWidth: 1920, videoHeight: 1080,
+      play() { return Promise.resolve(); }, pause() { e.paused = true; }, load() {}, requestVideoFrameCallback(fn) { frameCb = fn; } });
+    if (tag === 'canvas') e.getContext = () => ({ clearRect() {}, drawImage() {},
+      getImageData: (x, y, w, h) => ({ data: pixels }), putImageData(img) { e.put = Array.from(img.data); } });
+    return e;
+  } };
+  globalThis.requestAnimationFrame = fn => { frameCb = fn; return 1; };
+  globalThis.cancelAnimationFrame = () => {};
+  const layer = el('div');
+  const ctx = { fx: { top: () => layer }, av: { ASSET_BASE: 'https://assets' } };
+  const cv = playWebmFx(ctx, 'heart.mp4', 100, 200, 220, { ms: 900 });
+  const v = created.find(e => e.tag === 'video');
+  v.onloadedmetadata();
+  out.push(ok('TP7AV-B WebM 走 Canvas 抠图：隐藏 video、默认不加 screen 混合', cv.tag === 'canvas' && v.style.display === 'none' && !cv.style.mixBlendMode && /mix-blend-mode/.test(cv.style.cssText || '') === false
+    && cv.attrs['data-webm'] === 'heart.mp4' && v.src === 'https://assets/heart.mp4', { css: cv.style.cssText, display: v.style.display }));
+  out.push(ok('TP7AV-B 抠图画布按原分辨率等比、宽度封顶 960', cv.width === Math.min(FX_WEBM_KEY_MAX, 440) && cv.height === Math.round(cv.width / (16 / 9)) && cv.style.width === '220px', { w: cv.width, h: cv.height, cssW: cv.style.width }));
+  return Promise.resolve().then(() => {
+    // 黑(5)、暗(46)、亮(200) 三像素；原 alpha 255
+    pixels = new Uint8ClampedArray([5, 5, 5, 255, 46, 10, 10, 255, 200, 180, 90, 255]);
+    frameCb && frameCb();
+    const a = cv.put ? [cv.put[3], cv.put[7], cv.put[11]] : null;
+    out.push(ok('TP7AV-B 原版阈值：<12 全透明、12–80 渐进、亮部保留', a && a[0] === 0 && a[1] === Math.floor(255 * ((46 - 12) / 68)) && a[2] === 255, a));
+    v.currentTime = 1.825;   // 尾段 0.35s 内：fade=(2-1.825)/0.35=0.5
+    pixels = new Uint8ClampedArray([200, 180, 90, 255]);
+    frameCb();
+    out.push(ok('TP7AV-B 尾段 0.35s 渐隐', cv.put && cv.put[3] === Math.floor(255 * 0.5), cv.put && cv.put[3]));
+    const cv2 = playWebmFx(ctx, 'fog.mp4', 0, 0, 400, { cover: 400 });
+    const v2 = created.filter(e => e.tag === 'video').pop(); v2.onloadedmetadata();
+    out.push(ok('TP7AV-B 范围类 cover：短边=真实直径（16:9 宽按比例外扩）', cv2.style.height === '400px' && parseFloat(cv2.style.width) > 700, { w: cv2.style.width, h: cv2.style.height }));
+    const cv3 = playWebmFx(ctx, 'x.webm', 0, 0, 100);
+    const v3 = created.filter(e => e.tag === 'video').pop(); v3.onloadedmetadata();
+    return Promise.resolve().then(() => {
+      pixels = null;   // 像素读取抛错（等同跨域污染）：按原版降级 screen
+      frameCb();
+      out.push(ok('TP7AV-B 像素读取失败才降级 screen', cv3.style.mixBlendMode === 'screen', cv3.style.mixBlendMode));
+      v3.ended = true; frameCb();
+      out.push(ok('TP7AV-B 播完即释放 canvas/video', cv3.removed && v3.removed && v3.paused, { cv: cv3.removed, v: v3.removed }));
+      return out;
+    });
+  });
+}
+
+// ---------- L3/L4 屏幕氛围 ----------
+function atmosCases() {
+  const out = [];
+  const timers = [];
+  const made = [];
+  const fx = {
+    screen(html, ms) {
+      const root = el('div'); root.html = html; root.life = ms;
+      const count = re => (html.match(re) || []).length;
+      const bands = Array.from({ length: count(/data-atmos-band=/g) }, () => el('div'));
+      const svgs = Array.from({ length: count(/data-atmos-svg=/g) }, () => el('svg'));
+      const card = /data-atmos-card/.test(html) ? el('div') : null;
+      root.querySelectorAll = sel => sel.includes('band') ? bands : svgs;
+      root.querySelector = () => card;
+      root.bands = bands; root.svgs = svgs; root.card = card;
+      made.push(root);
+      return { firstChild: root };
+    },
+    ground(html, ms) { const r = el('i'); r.html = html; made.push(r); return { firstChild: r }; },
+  };
+  const after = (ms, fn) => timers.push({ ms, fn });
+  const h3 = startAtmos(fx, { style: 'fire', grade: 'L3', chargeMs: 650, totalMs: 2430, skillName: '压缩爆燃', shape: { center: { x: 10, y: 6 }, radius: 3 }, after });
+  const root3 = made[0], ring3 = made[1];
+  out.push(ok('TP7AV-L L3：四边边带 + 同风格 SVG，挂视口屏幕层，无技能名卡', root3.bands.length === 4 && root3.svgs.length === 4 && !root3.card && /data-grade="L3"/.test(root3.html)
+    && root3.html.includes(ATMOS_STYLES.fire.c1) && /pointer-events:none/.test(root3.html), { bands: root3.bands.length }));
+  const depth = Math.max(...[...root3.html.matchAll(/data-atmos-band="\w+" style="position:absolute;[^"]*?(?:height|width):(\d+)%/g)].map(m => +m[1]));
+  out.push(ok('TP7AV-L 中心保留阅读窗口：L3 边带深度≤22%', depth === 22, depth));
+  out.push(ok('TP7AV-L 真实范围环：世界层、半径=规则半径×50', ring3 && /left:500px;top:300px;width:300px/.test(ring3.html), ring3 && ring3.html.slice(0, 120)));
+  const gatherFrames = root3.bands[0].animations[0].frames;
+  out.push(ok('TP7AV-L 蓄势：边带自屏幕边缘推入（scale 0.08→0.72），未到最深', gatherFrames[0].transform === 'scale(0.08)' && gatherFrames[1].transform === 'scale(0.72)', gatherFrames));
+  h3.lower();
+  const lowerOpacity = root3.bands[0].animations.at(-1).frames.at(-1).opacity;
+  out.push(ok('TP7AV-L 首个真实揭示即降低遮挡（≤0.3）', lowerOpacity <= 0.3 && root3.bands[0].animations.length === 3, lowerOpacity));
+  h3.end(); h3.end();
+  timers.filter(t => t.ms === 520).forEach(t => t.fn());
+  out.push(ok('TP7AV-L 余韵外撤后节点移除、幂等', root3.removed && ring3.removed && root3.bands[0].animations.at(-1).frames.at(-1).opacity === 0, { root: root3.removed, ring: ring3.removed }));
+  made.length = 0;
+  startAtmos(fx, { style: 'holy', grade: 'L4', chargeMs: 1220, totalMs: 3200, skillName: '圣域帷幕', casterName: '埃利奥特', after });
+  const root4 = made[0];
+  const depth4 = Math.max(...[...root4.html.matchAll(/data-atmos-band="\w+" style="position:absolute;[^"]*?(?:height|width):(\d+)%/g)].map(m => +m[1]));
+  const cardFrames = root4.card && root4.card.animations[0].frames;
+  out.push(ok('TP7AV-L L4：更深边压(28%)+技能身份卡，爆发前退场', depth4 === 28 && root4.card && cardFrames.at(-1).opacity === 0 && root4.card.animations[0].options.duration <= 1220
+    && /圣域帷幕/.test(root4.html) && /埃利奥特/.test(root4.html), { depth4, dur: root4.card && root4.card.animations[0].options.duration }));
+  out.push(ok('TP7AV-L 风格按条目身份，未登记按伤害类型兜底', atmosStyleOf({ id: 'fire-blast' }) === 'fire' && atmosStyleOf({ id: 'xenon-blight-fog' }) === 'poison'
+    && atmosStyleOf({ id: 'x' }, { damageType: '远程' }) === 'gun' && atmosStyleOf({ id: 'x' }, { damageType: '近战' }) === 'blood'));
+  const src = readFileSync(new URL('../../../tactics/src/action-director.mjs', import.meta.url), 'utf8');
+  out.push(ok('TP7AV-L 导演只对 L3/L4 启动氛围，揭示即 lower、条目结束即 end',
+    /grade === 'L3' \|\| grade === 'L4'\) \? startAtmos/.test(src) && (src.match(/if \(atmos\) atmos\.lower\(\);/g) || []).length === 2 && /await entry\.play\(ctx\);\s*\n\s*if \(atmos\) atmos\.end\(\);/.test(src)));
+  return out;
+}
+
+// ---------- 多目标 buff 串行 ----------
+async function serialCases() {
+  const out = [];
+  const log = [];
+  const handles = [];
+  const effects = [
+    { kind: 'buff', field: 'atk', value: 20, targetId: 'A' },
+    { kind: 'buff', field: 'def', value: 10, targetId: 'A' },
+    { kind: 'buff', field: 'atk', value: 20, targetId: 'B' },
+    { kind: 'buff', field: 'hit', value: -20, targetId: 'C' },
+  ];
+  const ctx = {
+    result: { effects }, audioContext: {},
+    av: {
+      CombatAudioMixer: { withContext: (_, fn) => fn() },
+      playSound: (k) => log.push('sound:' + k),
+      playGenericSupportFx(entity, type, { soundKey, onImpact }) {
+        log.push('start:' + entity.id + ':' + type + ':' + soundKey);
+        onImpact();
+        const h = { onFinish: new Set(), cancel() {}, id: entity.id };
+        handles.push(h);
+        return h;
+      },
+    },
+    ent: id => ({ id }),
+    centerOf: () => ({ x: 1, y: 1 }),
+    fx: { top: () => ({ firstChild: el('b') }) },
+    revealEffect: e => log.push('reveal:' + e.targetId + ':' + e.field),
+    wait: () => Promise.resolve(true),
+    awaitHandle: h => new Promise(res => h.onFinish.add(res)),
+  };
+  const run = playSupportEffects(ctx);
+  await new Promise(r => setTimeout(r, 0));
+  const beforeA = log.slice();
+  out.push(ok('TP7AV-S A 的原版 SVG 播放并在接触拍点揭示，B 尚未开始', beforeA.some(s => s.startsWith('start:A:buff')) && beforeA.includes('reveal:A:atk') && beforeA.includes('reveal:A:def')
+    && !beforeA.some(s => s.startsWith('start:B')), beforeA));
+  handles.filter(h => h.id === 'A').forEach(h => [...h.onFinish].forEach(fn => fn(true)));
+  await new Promise(r => setTimeout(r, 0));
+  out.push(ok('TP7AV-S A 完成后才播 B，C 仍等待', log.some(s => s.startsWith('start:B')) && !log.some(s => s.startsWith('start:C')), log));
+  handles.filter(h => h.id === 'B').forEach(h => [...h.onFinish].forEach(fn => fn(true)));
+  await new Promise(r => setTimeout(r, 0));
+  handles.filter(h => h.id === 'C').forEach(h => [...h.onFinish].forEach(fn => fn(true)));
+  const done = await run;
+  const order = log.filter(s => s.startsWith('start:')).map(s => s.split(':')[1]);
+  out.push(ok('TP7AV-S 顺序=后端 effects 顺序（A 增攻/增防两种原版 SVG 各一次）', done === true && order.join('') === 'AABC', order));
+  out.push(ok('TP7AV-S 同目标两个真实效果槽各自揭示、不合并', log.filter(s => s.startsWith('reveal:A')).length === 2, log));
+  out.push(ok('TP7AV-S 减益走原版 debuff SVG 与 hitDown 音色', log.includes('start:C:debuff:hitDown'), log));
+  return out;
+}
+
+// ---------- 击杀聚合 / 召唤结果 / 特写提取 ----------
+function killAndSummonCases() {
+  const out = [];
+  const eff = { h: { side: 'hero', hp: 100 }, e1: { side: 'enemy', hp: 0 }, e2: { side: 'enemy', hp: 0 }, e3: { side: 'enemy', hp: 12 }, s1: { side: 'hero', hp: 0, isSummon: true } };
+  const director = createActionDirector({
+    sandbox: { getScope: () => null }, avHost: { av: {} }, getViewData: () => ({ units: [] }),
+    battle: () => ({ getEffectiveUnit: id => eff[id] ? { id, ...eff[id] } : null }),
+    registry: { resolve: () => null },
+  });
+  const res = { ok: true, casterId: 'h', skill: { damageType: '法术' }, hits: [
+    { targetId: 'e1', segments: [{ hpBefore: 30, hpAfter: 10 }, { hpBefore: 10, hpAfter: 0 }] },   // 多段击杀
+    { targetId: 'e2', hpBefore: 20, hpAfter: 0 },
+    { targetId: 'e3', hpBefore: 20, hpAfter: 12 },                                                 // 复活/保命后存活
+    { targetId: 'e1', hpBefore: 10, hpAfter: 0 },                                                 // 同目标重复
+  ] };
+  const kills = director.executionKills(res);
+  out.push(ok('TP7AV-K 整技能聚合真实死亡，多段/重复只计一次、存活(复活)不计', kills.join(',') === 'e1,e2', kills));
+  out.push(ok('TP7AV-K 敌方/召唤物施术不播英雄击杀特写', director.executionKills({ ...res, casterId: 'e3' }).length === 0 && director.executionKills({ ...res, casterId: 's1' }).length === 0));
+  out.push(ok('TP7AV-K 开场前已死亡的目标不计入', director.executionKills({ ...res, hits: [{ targetId: 'e2', hpBefore: 0, hpAfter: 0 }] }).length === 0));
+
+  const summonSkill = parseSkill('【召唤阵】[召唤:石像][法术][范围:召唤;射程:8]');
+  const provider = name => ({ name, maxHp: 80, maxMp: 0, atk: 10, def: 0, spd: 60, evasion: 0, strength: 40, totalWeight: 60, moveDistance: 4, perception: 50, footprint: { width: 1, height: 1 }, skills: [] });
+  const mk = (id, side) => ({ id, name: id, side, controller: 'player', footprint: { width: 1, height: 1 }, attrTags: [], skills: [], items: [],
+    ref: { hp: 100, maxHp: 100, mp: 50, maxMp: 50, tp: 0, maxTp: 100, atk: 20, def: 0, spd: side === 'hero' ? 200 : 20, evasion: 0, strength: 50, totalWeight: 70, perception: 100, moveDistance: 6, shield: 0 } });
+  const b = createBattle({ units: [mk('c', 'hero'), mk('z', 'enemy')], placementsById: { c: { col: 3, row: 3 }, z: { col: 12, row: 3 } },
+    scene: { sceneId: 's', grid: { columns: 20, rows: 12, metersPerCell: 1 }, ground: {}, objects: [] }, random: () => 0.5, summonProvider: provider });
+  b.start();
+  const r = b.attack(summonSkill, { x: 5.5, y: 3.5 });
+  const ev = b.snapshot().events.find(e => e.type === 'unit-summoned');
+  out.push(ok('TP7AV-M 召唤结果携带真实单位 ID 与实际落点（导演据此在落点入场）', r.ok && r.summons && r.summons.length === 1 && ev && ev.unitId === r.summons[0] && b.ctx.placementsById[r.summons[0]].col === ev.placement.col,
+    { ok: r.ok, reason: r.reason, summons: r.summons, ev }));
+  const dsrc = readFileSync(new URL('../../../tactics/src/action-director.mjs', import.meta.url), 'utf8');
+  out.push(ok('TP7AV-M 导演入场消费 result.summons、召唤物真实死亡走 playSummonExit',
+    /const summonIds = result\.summons \|\| \[\]/.test(dsrc) && /av\.playSummonEnter\(casterEnt, ents/.test(dsrc) && /av\.playSummonExit\(ent, \{ exitCause: 'killed'/.test(dsrc)));
+
+  const av = readFileSync(new URL('../../../tactics/src/vendor/rpg-av/rpg-av.mjs', import.meta.url), 'utf8');
+  out.push(ok('TP7AV-X 原版击杀特写/Cut-in/召唤三瞬入包（非桩）', /async function playExecutionAnimation\(hero, killedEnemies, damageType\)/.test(av) && /async function playEnemyUltimateCutin\(enemy, skillName\)/.test(av)
+    && /function playSummonEnter\(caster, targets/.test(av) && /function playSummonGuard\(guardian/.test(av) && !/function clearSummonState\(\) \{ \/\* 未迁移段/.test(av)));
+  out.push(ok('TP7AV-X 特写挂 iframe 屏幕宿主、计时可清理，重开/换代清除', (av.match(/__SCREEN\(\)\.appendChild\(overlay\); __MOMENTS\.add\(overlay\)/g) || []).length === 2
+    && !/playExecutionAnimation[\s\S]{0,9000}?\bsetTimeout\(/.test(av.slice(av.indexOf('async function playExecutionAnimation'), av.indexOf('async function playEnemyUltimateCutin')))
+    && /clearArcaneFx\(\) \{ supportHandles\.forEach\(handle => handle\.cancel\(\)\); clearMoments\(\);/.test(av) && /setToken\(t\) \{ if \(t !== combatToken\) \{[^}]*clearMoments\(\);/.test(av)));
+  out.push(ok('TP7AV-X 原版击杀三类音效与震屏保留', /playSound\('kill', 2, 1/.test(av) && /playSound\('combatKill'/.test(av) && /playSound\('magicKill'/.test(av) && /__STAGE\.shakeEl\(\)/.test(av) && /playSound\('taunt', 1, 1, \{ category:'L' \}\)/.test(av)));
+  const css = readFileSync(new URL('../../../tactics/src/vendor/rpg-av/rpg-av.css', import.meta.url), 'utf8');
+  out.push(ok('TP7AV-X 特写关键帧与任意值类入 CSS', ['s2-ink-stamp', 's3-shard-1', 'v1-tommy-scope', 'blood-splat-burst', 'anim-cutin-slash', 'anim-debuff', 'anim-taunt'].every(k => css.includes(k)) && css.includes('z-\\[200\\]')));
+  const msrc = readFileSync(new URL('../../../tactics/src/main.mjs', import.meta.url), 'utf8');
+  out.push(ok('TP7AV-X 满充能才 Cut-in，且在原技能前摇之前；击杀特写在攻击演出之后',
+    /cur\.charge\.current >= cur\.charge\.max\) \{\s*\n\s*await director\.playChargeCutin[\s\S]{0,120}await director\.playWindup/.test(msrc) && /await director\.playAttack\(res\);\s*\n\s*if \(myFlow !== flow\) return;\s*\n\s*await director\.playExecution\(res\);/.test(msrc)));
+  return out;
+}
+
+export const groups = {
+  'TP7AV-B': { run: async () => ({ cases: await webmCases() }) },
+  'TP7AV-L': { run: () => ({ cases: atmosCases() }) },
+  'TP7AV-S': { run: async () => ({ cases: await serialCases() }) },
+  'TP7AV-K': { run: () => ({ cases: killAndSummonCases() }) },
+};

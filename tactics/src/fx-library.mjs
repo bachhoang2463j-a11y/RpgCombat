@@ -64,6 +64,7 @@ function ringHtml(x, y, d, inner, outer) {
 // 像素读取失败（跨域污染）才按原版降级 screen 混合。宽度定尺寸、按真实分辨率等比；
 // cover=D（世界像素直径）：范围类效果短边覆盖真实直径，不按 16:9 帧宽误报范围。层收回即停帧、释放解码。
 const FX_WEBM_KEY_MAX = 960;
+export { FX_WEBM_KEY_MAX, webm as playWebmFx, playSupportEffects };
 function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1, cover = 0 } = {}) {
   const layer = ctx.fx.top('', ms);
   const v = document.createElement('video');
@@ -515,7 +516,7 @@ async function playSupportEffects(ctx, accept = () => true) {
   }
   let first = true;
   for (const [targetId, batch] of byTarget) {
-    if (!first && !(await ctx.wait(60))) return false;
+    if (!first && !(await ctx.wait(200))) return false;
     first = false;
     const pending = [];
     const playedKeys = new Set(), playedTypes = new Set();
