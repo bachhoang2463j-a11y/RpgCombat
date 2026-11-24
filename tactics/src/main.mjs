@@ -28,6 +28,7 @@ import { autoPickChoice } from './reaction-prompt.mjs';
 import { unitCenter } from './geometry.mjs';
 import { createScenarioData, createSeededRandom } from './scenario-data.mjs';
 import { statusBadges, compactStatusHtml, fullStatusHtml, inspectorHtml } from './status-ui.mjs';
+import { resolveLore } from './lore.mjs';
 import { getEffectiveStats } from './class-passives.mjs';
 import { hitChance } from './damage.mjs';
 import { skillSlots } from './effect-definitions.mjs';
@@ -500,7 +501,7 @@ export function createApp(rootEl, opts = {}) {
     const eff = battle.getEffectiveUnit(u.id);
     const snapU = battle.snapshot().units.find(x => x.id === u.id);
     const prep = battle.battleState.combatState.charges?.[u.id]?.preparing;
-    shell.showInspector(inspectorHtml({ unit: u, eff: { ...eff, shield: shownOf(u).shield }, base: getEffectiveStats(u, []), badges: badgesOf(u), shown: shownOf(u),
+    shell.showInspector(inspectorHtml({ unit: u, eff: { ...eff, shield: shownOf(u).shield }, base: getEffectiveStats(u, []), badges: badgesOf(u), shown: shownOf(u), lore: resolveLore(u),
       charge: snapU?.charge, preparing: prep ? { name: prep.skill?.name || '蓄力', remaining: prep.remaining } : null }));
   }
   function shownOf(u) { return shown.get(u.id) || { hp: u.ref.hp, mp: u.ref.mp, tp: u.ref.tp || 0, shield: u.ref.shield || 0 }; }

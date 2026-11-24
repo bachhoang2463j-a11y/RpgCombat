@@ -106,24 +106,50 @@ export function effectFloat(e) {
   }
 }
 
-// 单位检视卡：base = 无增益基础属性（getEffectiveStats(unit, [])），eff = 有效属性视图
-export function inspectorHtml({ unit, eff, base, badges, charge, preparing, shown }) {
+// 原版 showEnemyInfo VARIANT_TAG_CONFIG（index.html L26424）：名称 / 说明 / 图标 / 主色
+const VARIANT_TAGS = {
+  复活: ['✨', '死后以 30% 生命值复活一次', '#6ee7b7'], 智慧: ['🧠', '三档智慧旁白（回合开始/低血/死亡）', '#fda4af'],
+  蜕皮: ['🐍', '首次跌破50%：清除全部debuff + 回血30% + 永久攻击+50%', '#fcd34d'], 荆棘: ['🌵', '被近战命中反弹 50% 实际伤害（护甲减免后保底10）', '#86efac'],
+  连动: ['⚡', 'HP≤30% 时立刻额外行动一次（一次性）', '#f0abfc'], 狂暴: ['🩸', 'HP≤30% 时攻击力 +50%', '#fca5a5'],
+  吸血: ['🧛', '造成实际伤害时吸取 30% 转化为自身生命', '#fda4af'], 再生: ['🌿', '每回合开始回复 10% 最大生命值', '#6ee7b7'],
+  流体: ['💧', '受到的远程伤害 -50%', '#7dd3fc'], 虚形: ['👻', '受到的近战伤害 -50%', '#a5b4fc'], 破法: ['🔮', '受到的法术伤害 -50%', '#d8b4fe'],
+  要害: ['💠', '受到的群攻伤害 -50%', '#5eead4'], 防火: ['🔥', '免疫点燃（燃烧）状态施加', '#fdba74'], 耐毒: ['🧪', '免疫中毒状态施加', '#d8b4fe'],
+  钢体: ['⛓️', '免疫眩晕控制状态', '#cbd5e1'], 飞行: ['🕊️', '基础移动额度 +50%，普通移动可跨低障碍', '#a7f3d0'],
+};
+function tagChip(raw) {
+  const name = String(raw).replace(/^\[|\]$/g, ''), ex = /^自爆[:：](.+)$/.exec(name);
+  const [icon, tip, color] = ex ? ['💥', '死亡自爆（' + ex[1] + '）：对周围我方造成伤害或状态', '#fca5a5'] : (VARIANT_TAGS[name] || ['🔹', name, '#cbd5e1']);
+  return '<span class="t-insp-tag" style="--c:' + color + '" data-tagtip-title="【' + ESC(ex ? '自爆·' + ex[1] : name) + '】" data-tagtip-body="' + ESC(tip) + '"><i>' + icon + '</i>' + ESC(ex ? '自爆·' + ex[1] : name) + '</span>';
+}
+
+// 单位检视卡（原版 showEnemyInfo「20% 超透光战术目镜」样式）：base = 无增益基础属性（getEffectiveStats(unit, [])），eff = 有效属性视图，lore = resolveLore(unit)
+export function inspectorHtml({ unit, eff, base, badges, charge, preparing, shown, lore }) {
   if (!unit || !eff) return '';
   const hp = shown ? shown.hp : eff.hp, mp = shown ? shown.mp : eff.mp, tp = shown ? shown.tp : eff.tp;
-  const bar = (cls, v, max, label) => max > 0 ? '<div class="t-insp-bar ' + cls + '"><i style="width:' + Math.max(0, Math.min(100, v / max * 100)).toFixed(1) + '%"></i><span>' + label + ' ' + Math.max(0, Math.round(v)) + '/' + max + '</span></div>' : '';
-  const stat = (label, now, b) => {
-    const d = now - b;
-    return '<div class="t-insp-stat"><span>' + label + '</span><b>' + now + '</b>' + (d ? '<em class="' + (d > 0 ? 't-up' : 't-down') + '">' + sign(d) + '</em>' : '') + '</div>';
+  const gauge = (cls, icon, label, v, max) => max > 0 ? '<div class="t-insp-gauge ' + cls + '"><div class="t-insp-gauge-row"><span>' + icon + ' ' + label + '</span><b>' + Math.max(0, Math.floor(v)) + ' / ' + max + '</b></div>' +
+    '<div class="t-insp-gauge-track"><i style="width:' + Math.max(0, Math.min(100, v / max * 100)).toFixed(1) + '%"></i></div></div>' : '';
+  const chip = (cls, icon, label, now, b) => {
+    const d = b == null ? 0 : now - b;
+    return '<span class="t-insp-chip ' + cls + '"><i>' + icon + '</i>' + label + ':<b>' + now + '</b>' + (d ? '<em class="' + (d > 0 ? 't-up' : 't-down') + '">' + sign(d) + '</em>' : '') + '</span>';
   };
-  const side = unit.side === 'hero' ? (unit.isSummon ? '召唤物' : '我方') : '敌方';
-  const traits = (unit.attrTags || []).filter(Boolean).map(t => String(t).replace(/^\[|\]$/g, ''));
-  return '<div class="t-insp-head"><b>' + ESC((unit.emoji ? unit.emoji + ' ' : '') + unit.name) + '</b><span class="t-insp-side t-' + (unit.side === 'hero' ? 'ally' : 'foe') + '">' + side + (unit.classType ? ' · ' + ESC(unit.classType) : '') + '</span></div>' +
-    bar('t-hp', hp, eff.maxHp, 'HP') + (eff.shield > 0 ? '<div class="t-insp-shield">🔰 护盾 ' + eff.shield + '</div>' : '') + bar('t-mp', mp, eff.maxMp, 'MP') + bar('t-tp', tp, eff.maxTp, 'TP') +
-    '<div class="t-insp-stats">' + stat('攻击', eff.atk, base.atk) + stat('防御', eff.def, base.def) + stat('命中', eff.hit, base.hit) +
-      stat('回避', (eff.evasion || 0) + eff.eva, (eff.evasion || 0) + base.eva) + stat('速度', eff.spd, base.spd) +
-      '<div class="t-insp-stat"><span>移动</span><b>' + (+eff.effectiveMoveDistance.toFixed(1)) + 'm</b>' + (eff.effectiveMoveDistance !== eff.moveDistance ? '<em class="t-up">' + sign(+(eff.effectiveMoveDistance - eff.moveDistance).toFixed(1)) + '</em>' : '') + '</div></div>' +
+  const ally = unit.side === 'hero';
+  const sideBadge = unit.isSummon ? '<span class="t-insp-badge t-summon">召唤物</span>' : '<span class="t-insp-badge ' + (ally ? 't-ally' : 't-foe') + '">' + (ally ? '我方' : '敌方') + '</span>';
+  const tags = (unit.attrTags || []).filter(Boolean);
+  const moveD = +(eff.effectiveMoveDistance - eff.moveDistance).toFixed(1);
+  return '<div class="t-insp-glass"><i class="t-insp-corner t-tl"></i><i class="t-insp-corner t-tr"></i><i class="t-insp-corner t-bl"></i><i class="t-insp-corner t-br"></i>' +
+    '<div class="t-insp-head"><span class="t-insp-emoji">' + ESC(unit.emoji || (ally ? '🛡️' : '☠️')) + '</span><div class="t-insp-title"><b>' + ESC(unit.name) + '</b>' +
+      '<div class="t-insp-badges-row">' + sideBadge + (unit.classType ? '<span class="t-insp-badge">' + ESC(unit.classType) + '</span>' : '') +
+      (unit.isWise || unit.ref?.isWise ? '<span class="t-insp-badge t-wise">🧠 智慧单位</span>' : '') + '<span class="t-insp-badge t-mono">TARGET INSPECT</span></div></div></div>' +
+    '<div class="t-insp-panel">' + gauge('t-hp', '❤️', '生命 HP', hp, eff.maxHp) + (eff.shield > 0 ? '<div class="t-insp-shield">🔰 护盾 ' + eff.shield + '</div>' : '') +
+      gauge('t-mp', '💧', '法力 MP', mp, eff.maxMp) + gauge('t-tp', '🔥', '战意 TP', tp, eff.maxTp) + '</div>' +
+    '<div class="t-insp-chips">' + chip('t-atk', '⚔️', 'ATK', eff.atk, base.atk) + chip('t-def', '🛡️', 'DEF', eff.def, base.def) + chip('t-spd', '⚡', 'SPD', eff.spd, base.spd) +
+      chip('t-hit', '🎯', '命中', eff.hit, base.hit) + chip('t-eva', '💨', '回避', (eff.evasion || 0) + eff.eva, (eff.evasion || 0) + base.eva) +
+      '<span class="t-insp-chip t-mov"><i>🦶</i>移动:<b>' + (+eff.effectiveMoveDistance.toFixed(1)) + 'm</b>' + (moveD ? '<em class="t-up">' + sign(moveD) + '</em>' : '') + '</span></div>' +
     (charge && charge.max ? '<div class="t-insp-row">⚡ 充能 ' + charge.current + '/' + charge.max + (charge.current >= charge.max ? ' · <b class="t-warn">大招就绪</b>' : '') + '</div>' : '') +
     (preparing ? '<div class="t-insp-row">⏳ 蓄力【' + ESC(preparing.name) + '】' + (preparing.remaining > 0 ? '还需 ' + preparing.remaining + ' 主行动' : '已就绪') + '</div>' : '') +
-    (traits.length ? '<div class="t-insp-row t-insp-traits">' + traits.map(t => '<span>' + ESC(t) + '</span>').join('') + '</div>' : '') +
-    '<div class="t-insp-badges">' + (badges.length ? fullStatusHtml(badges) : '<span class="t-insp-none">无增益 / 减益</span>') + '</div>';
+    (tags.length ? '<div class="t-insp-sec"><div class="t-insp-sec-h"><span>🧬 变种特质与被动</span></div><div class="t-insp-tags">' + tags.map(tagChip).join('') + '</div></div>' : '') +
+    '<div class="t-insp-sec"><div class="t-insp-sec-h"><span>✨ 当前状态</span></div><div class="t-insp-badges">' + (badges.length ? fullStatusHtml(badges) : '<span class="t-insp-none">无增益 / 减益</span>') + '</div></div>' +
+    (lore ? '<div class="t-insp-lore"><div class="t-insp-lore-h"><span>📚 世界书图鉴档案</span><em>' + (lore.sample ? 'SAMPLE' : 'LORE ENTRY') + '</em></div>' +
+      '<p>' + ESC(lore.desc || '词条无描述文字') + '</p><div class="t-insp-lore-src">' + ESC(lore.wbName || '') + (lore.entryName ? ' · ' + ESC(lore.entryName) : '') + '</div></div>' : '') +
+    '<div class="t-insp-foot"><span>悬停查看 · 点选钉住</span><span class="t-mono">20% 超透光战术目镜</span></div></div>';
 }

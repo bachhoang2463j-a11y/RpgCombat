@@ -6,6 +6,9 @@ import { unitCenter } from '../../../tactics/src/geometry.mjs';
 import { resolveHit, hitChance } from '../../../tactics/src/damage.mjs';
 import { getEffectiveStats } from '../../../tactics/src/class-passives.mjs';
 import { statusBadges, compactStatusHtml, fullStatusHtml, effectFloat, inspectorHtml } from '../../../tactics/src/status-ui.mjs';
+import { resolveLore, loreKey, SAMPLE_LORE } from '../../../tactics/src/lore.mjs';
+import { parseYamlText } from '../../../tactics/src/parser.mjs';
+import { createScenarioData } from '../../../tactics/src/scenario-data.mjs';
 
 const ok = (id, pass, detail = '') => ({ id, pass: !!pass, detail: typeof detail === 'string' ? detail : JSON.stringify(detail) });
 const src = p => readFileSync(new URL('../../../tactics/' + p, import.meta.url), 'utf8');
@@ -67,8 +70,19 @@ function previewCases() {
   const m = src('src/main.mjs');
   out.push(ok('UIR-P 攻击预览：血条预计扣除段 + 命中率 + 击杀标记，用规则 damagePreview 与显示态 HP', /view\.setPredict\(id, \{ from: hp \/ max, to: Math\.max\(0, hp - dmg\) \/ max, kill/.test(m) && /hitChance\(mine\[0\]\.attackCap, mine\[0\]\.dodgeCap\)/.test(m) && /skill\.guaranteedHit \? 1/.test(m)));
   const html = inspectorHtml({ unit: { id: 'e', name: '深潜者', side: 'enemy', attrTags: ['[流体]'] }, eff: { hp: 50, maxHp: 100, mp: 0, maxMp: 0, tp: 0, maxTp: 0, shield: 0, atk: 70, def: 10, hit: 0, eva: 0, spd: 90, evasion: 30, moveDistance: 6, effectiveMoveDistance: 6, buffs: [] },
-    base: { atk: 50, def: 10, hit: 0, eva: 0, spd: 100 }, badges: [], charge: { current: 4, max: 4 } });
-  out.push(ok('UIR-P 检视卡：加减成标注、特性去括号、满充能提示', /<b>70<\/b><em class="t-up">\+20<\/em>/.test(html) && /<b>90<\/b><em class="t-down">-10<\/em>/.test(html) && /<span>流体<\/span>/.test(html) && /大招就绪/.test(html)));
+    base: { atk: 50, def: 10, hit: 0, eva: 0, spd: 100 }, badges: [], charge: { current: 4, max: 4 }, lore: resolveLore({ name: '🦈深潜者A' }) });
+  out.push(ok('UIR-P 检视卡：加减成标注、原版变种特质图标与说明、满充能提示', /ATK:<b>70<\/b><em class="t-up">\+20<\/em>/.test(html) && /SPD:<b>90<\/b><em class="t-down">-10<\/em>/.test(html)
+    && /data-tagtip-body="受到的远程伤害 -50%"><i>💧<\/i>流体<\/span>/.test(html) && /大招就绪/.test(html)));
+  out.push(ok('UIR-P 检视卡为原版 cyber-modal-enemy 毛玻璃：20% 透明渐变 + blur(14px) + 青色四角', /t-insp-glass/.test(html) && (html.match(/t-insp-corner/g) || []).length === 4
+    && /\.t-insp-glass \{[^}]*rgba\(30,41,59,0\.20\)[^}]*backdrop-filter: blur\(14px\)[^}]*border: 1px solid rgba\(6,182,212,0\.4\)/.test(src('tactics.css'))));
+  out.push(ok('UIR-P 世界书档案块：示例标 SAMPLE，接入后 unit.wbSource（原版契约）优先并标 LORE ENTRY', /📚 世界书图鉴档案<\/span><em>SAMPLE<\/em>/.test(html) && html.includes(SAMPLE_LORE['深潜者'])
+    && resolveLore({ name: '食尸鬼B', wbSource: { wbName: '澳洲篇', entryName: '食尸鬼', desc: '真值' } }).desc === '真值' && !resolveLore({ name: '食尸鬼B', wbSource: { wbName: '澳洲篇', entryName: '食尸鬼', desc: '真值' } }).sample));
+  {
+    const d = createScenarioData(parseYamlText(readFileSync(new URL('../../../doc/tactics/典型对局-战棋版.yaml', import.meta.url), 'utf8')));
+    const tpl = parseYamlText(readFileSync(new URL('../../../doc/tactics/典型对局-战棋版.yaml', import.meta.url), 'utf8')).summonTemplates || [];
+    const miss = [...d.units, ...tpl].filter(u => !resolveLore(u)).map(u => u.name);
+    out.push(ok('UIR-P 典型对局全部单位与召唤模板都有示例档案（装饰名/编号归一）', !miss.length && loreKey('❄️♱⸨伊塔库亚的眷族⸩♱') === '伊塔库亚的眷族' && loreKey('🦏◈幻梦行军兽◈') === '幻梦行军兽', miss));
+  }
   return out;
 }
 
