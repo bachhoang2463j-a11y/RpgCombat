@@ -508,10 +508,6 @@ const SUPPORT_EFFECT = {
 const SUPPORT_KEYS = [...new Set([...Object.values(SUPPORT_BUFF), ...Object.values(SUPPORT_DEBUFF), SUPPORT_DEBUFF_DEFAULT, ...Object.values(SUPPORT_EFFECT)].map(([, key]) => key).filter(Boolean))];
 const SUPPORT_VOLUME = 0.5;
 const SUPPORT_CUES = SUPPORT_KEYS.map(key => ({ key, vol: SUPPORT_VOLUME }));
-const SUPPORT_NUMBERS = {
-  heal: ['HP', '#dcfce7', '#16a34a'], healMp: ['MP', '#e0f2fe', '#0369a1'],
-  healTp: ['TP', '#e0f2fe', '#0369a1'], shield: ['护盾', '#e2e8f0', '#475569'],
-};
 
 // 多目标串行：名单与顺序来自后端 result.effects（同一目标多个效果槽保持各自真实条目）；
 // 目标 A 的原版 SVG/音色在接触拍点揭示变化，A 的句柄全部完成后才开始 B。只串行演出与揭示，不重新结算。
@@ -530,16 +526,7 @@ async function playSupportEffects(ctx, accept = () => true) {
     const feedback = supportFeedbackOf(effect);
     if (feedback) steps.push({ effect, feedback });
   }
-  const numberIndex = new Map();
-  const showNumber = (targetId, kind, value, crit) => {
-    const style = SUPPORT_NUMBERS[kind];
-    if (!style) return;
-    const [unit, color, glow] = style;
-    const { x, y } = worldPx(ctx.centerOf(targetId));
-    const n = numberIndex.get(targetId) || 0;
-    numberIndex.set(targetId, n + 1);
-    floatText(ctx.fx, x, y - 30 - n * 20, (crit ? '暴击 ' : '') + '+' + value + ' ' + unit, color, glow, { size: 14 });
-  };
+  // 数值飘字由导演 revealEffect 统一按效果条目产生（含增攻/瞄准等全部效果），此处只负责原版 SVG/音色与拍点
   const playOne = ([type, key], targetId, onImpact) => {
     const handle = ctx.av.CombatAudioMixer.withContext(ctx.audioContext,
       () => ctx.av.playGenericSupportFx(ctx.ent(targetId), type, { soundKey: key, volume: SUPPORT_VOLUME, onImpact }));
@@ -549,11 +536,7 @@ async function playSupportEffects(ctx, accept = () => true) {
   for (let i = 0; i < steps.length; i++) {
     if (i > 0 && !(await ctx.wait(60))) return false;
     const { effect, feedback } = steps[i];
-    const ok = await playOne(feedback, effect.targetId, () => {
-      ctx.revealEffect(effect, true);
-      showNumber(effect.targetId, effect.kind, effect.value, effect.crit);
-      if (effect.kind === 'heal' && effect.overheal > 0) showNumber(effect.targetId, 'shield', effect.overheal, effect.crit);
-    });
+    const ok = await playOne(feedback, effect.targetId, () => ctx.revealEffect(effect, true));
     if (!ok) return false;
     if (effect.kind === 'heal' && effect.overheal > 0) {
       if (!(await ctx.wait(60)) || !(await playOne(SUPPORT_EFFECT.shield, effect.targetId))) return false;

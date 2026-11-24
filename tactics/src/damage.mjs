@@ -13,6 +13,11 @@ export function resolveHit(caster, target, skill, random = Math.random) {
   const attackRoll = Math.floor(random() * attackCap) + 1;
   return { hit: attackRoll >= dodgeRoll, attackRoll, dodgeRoll };
 }
+// resolveHit 的精确命中概率（攻击骰 1..A ≥ 防御骰 1..D）：供 UI 预览，不掷骰
+export function hitChance(attackCap, dodgeCap) {
+  const A = Math.max(1, Math.floor(attackCap)), D = Math.max(1, Math.floor(dodgeCap)), m = Math.min(A, D);
+  return (m * (m + 1) / 2 + Math.max(0, A - D) * D) / (A * D);
+}
 
 // 单段原始伤害（护甲/抗性之前）：含 0.8–1.2 随机值与职业倍率，与主管线同式（原版 L23018）。
 // casterStats = getEffectiveStats 视图；baseAtk = ref.atk（算 buffAtkBonus）。

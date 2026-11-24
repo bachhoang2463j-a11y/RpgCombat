@@ -143,7 +143,22 @@ export function buildShell(root) {
       '<span class="t-hero-info"><span class="t-hero-row"><b>' + ESC(u.name) + '</b><em class="t-hero-hpnum"></em></span>' +
         '<i class="t-bar t-bar-hp"><i class="t-bar-ghost"></i><i class="t-bar-fill"></i></i>' +
         '<i class="t-bar t-bar-mp"><i class="t-bar-fill"></i></i>' +
-      '</span><span class="t-card-turn">行动中</span></button>';
+      '</span><span class="t-card-turn">行动中</span><span class="t-hero-status"></span></button>';
+  }
+  // 英雄卡状态徽章（卡片上沿外侧一行，完整文案）
+  function setHeroStatus(id, html) {
+    const el = cardOf(id)?.querySelector('.t-hero-status');
+    if (el && el.innerHTML !== html) el.innerHTML = html;
+  }
+  // 单位检视卡（右上浮层；html 为空即隐藏）
+  const inspector = document.createElement('div');
+  inspector.className = 't-inspector';
+  inspector.hidden = true;
+  root.appendChild(inspector);
+  function showInspector(html) {
+    if (!html) { inspector.hidden = true; return; }
+    if (inspector.innerHTML !== html) inspector.innerHTML = html;
+    inspector.hidden = false;
   }
   function renderHeroes(units) {
     state.units = units;
@@ -235,9 +250,9 @@ export function buildShell(root) {
     // 技能卡按资源变化重建（原版 updateSkillMenus：每次渲染折叠变体组）；同一资源态不重建，保留展开与滚动
     const prep = cmd.preparation;
     const menuKey = u.id + '|' + u.ref.mp + '|' + (r ? r.main + ':' + r.aux : '') + '|' + (cmd.serial || 0) + '|' + (prep ? prep.remaining + ':' + prep.invested : '') + '|' + u.skills.map(s => s.usesRemaining + ':' + s.maxUses).join(',');
-    const hero = Object.assign(refOf(u), { skills: u.skills, items: u.items || [], mp: u.ref.mp, hp: u.ref.hp, tp: 0, burstActivated: false });
+    const hero = Object.assign(refOf(u), { skills: u.skills, items: u.items || [], mp: u.ref.mp, hp: u.ref.hp, tp: u.ref.tp || 0, burstActivated: false });
     if (menuKey !== state.menuKey) {
-      if (state.menuKey.split('|')[0] !== u.id) { rpgUi.closeAllSubMenus(); state.chargeAside = false; }
+      if (state.menuKey.split('|')[0] !== u.id) { rpgUi.closeAllSubMenus(); state.chargeAside = false; state.costFilter = null; }
       state.menuKey = menuKey;
       rpgUi.updateSkillMenus(hero);
       decorateSkillCards(u);
@@ -276,8 +291,8 @@ export function buildShell(root) {
         '<span class="t-res-ico">🦶</span><span class="t-res-track"><i class="t-res-base" style="width:' + (base / cap * 100).toFixed(1) + '%"></i>' +
         '<i class="t-res-sprint" style="width:' + (sprint / cap * 100).toFixed(1) + '%"></i><i class="t-res-cost"></i></span>' +
         '<b class="t-res-num">' + r.moveRemaining.toFixed(1) + '<small>/' + (+cap.toFixed(1)) + 'm</small></b></div>' +
-      '<div class="t-res-pips"><span class="t-res-lab" title="主行动：攻击技能、冲刺、背起">主</span>' + pips('main', state.pipMax.main, r.main, prev.main) +
-        '<span class="t-res-lab t-aux" title="辅助行动：跳跃、推动、[行动:辅] 技能">辅</span>' + pips('aux', state.pipMax.aux, r.aux, prev.aux) + charge + '</div>';
+      '<div class="t-res-pips"><button class="t-res-lab' + (state.costFilter === 'main' ? ' t-filter-on' : '') + '" data-cost-filter="main" title="主行动：攻击技能、冲刺、背起 · 点击只看消耗主行动的技能">主</button>' + pips('main', state.pipMax.main, r.main, prev.main) +
+        '<button class="t-res-lab t-aux' + (state.costFilter === 'aux' ? ' t-filter-on' : '') + '" data-cost-filter="aux" title="辅助行动：跳跃、推动、[行动:辅] 技能 · 点击只看消耗辅助行动的技能">辅</button>' + pips('aux', state.pipMax.aux, r.aux, prev.aux) + charge + '</div>';
     if (state.moveCost != null) previewMoveCost(state.moveCost);
   }
   function previewMoveCost(cost) {
@@ -366,12 +381,27 @@ export function buildShell(root) {
   }
   function decorateSkillCards(u) {
     if (!u) return;
+    const costOf = s => s.actionCost || { main: 1, aux: 0 };
+    const kidsOf = s => s.isGroup ? u.skills.filter(c => c._inGroup && c.parentName === s.name) : [];
+    const matches = s => { const k = kidsOf(s); if (k.length) return k.some(matches); const c = costOf(s); return state.costFilter === 'main' ? c.main > 0 : state.costFilter === 'aux' ? c.aux > 0 : true; };
     root.querySelectorAll('#attack-skill-list [data-skill-idx], #support-skill-list [data-skill-idx]').forEach(btn => {
       const s = u.skills[Number(btn.dataset.skillIdx)];
       const row = btn.children[1];
       if (!s || !row) return;
-      const cost = s.actionCost || { main: 1, aux: 0 };
+      const cost = costOf(s);
       btn.dataset.costMain = cost.main || 0; btn.dataset.costAux = cost.aux || 0;
+      // 主/辅行动消耗角标（变体组父项取子项并集）：放在原版消耗行最前
+      const costRow = btn.children[2] && btn.children[2].firstElementChild;
+      if (costRow && !costRow.querySelector('.t-act-cost')) {
+        const kids = kidsOf(s), list = kids.length ? kids.map(costOf) : [cost];
+        const main = list.some(c => c.main > 0), aux = list.some(c => c.aux > 0);
+        costRow.insertAdjacentHTML('afterbegin', (main ? '<span class="t-act-cost t-main" title="消耗主行动">◆主' + (!kids.length && cost.main > 1 ? '×' + cost.main : '') + '</span>' : '') +
+          (aux ? '<span class="t-act-cost t-aux" title="消耗辅助行动">◇辅' + (!kids.length && cost.aux > 1 ? '×' + cost.aux : '') + '</span>' : '') +
+          (!main && !aux ? '<span class="t-act-cost" title="不消耗主/辅行动">免行动</span>' : ''));
+      }
+      // 主/辅过滤：不匹配的卡（组父按子项）隐藏；组内子卡单独判定
+      const hide = !!state.costFilter && !matches(s);
+      (s.isGroup ? btn.parentElement : btn).style.display = hide ? 'none' : '';
       if (state.cmd && state.cmd.skillReason) {
         const reason = state.cmd.skillReason(s);
         btn.title = reason || '';
@@ -388,6 +418,33 @@ export function buildShell(root) {
       if (empty) empty.remove();
       row.insertAdjacentHTML('beforeend', pill);
     });
+    // 空列表提示：只在需要变化时增删（列表有 childList 监听，避免自触发循环）
+    root.querySelectorAll('#attack-skill-list, #support-skill-list').forEach(list => {
+      const tip = list.querySelector('.t-filter-empty'), want = state.costFilter && !listHas(list.id)
+        ? '没有消耗' + (state.costFilter === 'main' ? '◆主行动' : '◇辅助行动') + '的技能 · 再点「' + (state.costFilter === 'main' ? '主' : '辅') + '」取消过滤' : '';
+      if (tip && tip.textContent === want) return;
+      if (tip) tip.remove();
+      if (want) list.insertAdjacentHTML('beforeend', '<div class="t-filter-empty">' + want + '</div>');
+    });
+  }
+  const cardVisible = b => b.style.display !== 'none' && !(b.parentElement && b.parentElement.style.display === 'none');
+  const listHas = id => [...root.querySelectorAll('#' + id + ' [data-skill-idx]')].some(cardVisible);
+  // 点击资源条「主」「辅」：切换过滤并打开有匹配技能的技能栏
+  function toggleCostFilter(kind) {
+    state.costFilter = state.costFilter === kind ? null : kind;
+    uiSound(state.costFilter ? 'select' : 'cancel');
+    els.strip.querySelectorAll('[data-cost-filter]').forEach(b => b.classList.toggle('t-filter-on', b.dataset.costFilter === state.costFilter));
+    const u = cmdHero();
+    if (!u) return;
+    decorateSkillCards(u);
+    if (!state.costFilter) return;
+    const has = listHas;
+    const open = id => !$(id).classList.contains('translate-x-full');
+    if ((open('attack-skill-menu') && has('attack-skill-list')) || (open('support-skill-menu') && has('support-skill-list'))) return;
+    const target = has('attack-skill-list') ? 'openAttackSkillMenu' : has('support-skill-list') ? 'openSupportSkillMenu' : null;
+    if (!target) { showLog('没有消耗' + (state.costFilter === 'main' ? '◆主行动' : '◇辅助行动') + '的可见技能', 'warn'); return; }
+    rpgUi.closeAllSubMenus();
+    els.menuBox.querySelector('[data-rpg-ui-act="' + target + '"]')?.click();
   }
   const listObserver = new MutationObserver(() => { const u = cmdHero(); if (u) decorateSkillCards(u); });
   ['attack-skill-list', 'support-skill-list'].forEach(id => listObserver.observe($(id), { childList: true }));
@@ -405,6 +462,8 @@ export function buildShell(root) {
   });
   els.menuBox.addEventListener('pointerleave', () => previewPips(0, 0));
   els.strip.addEventListener('click', e => {
+    const f = e.target.closest('[data-cost-filter]');
+    if (f) { toggleCostFilter(f.dataset.costFilter); return; }
     if (!e.target.closest('[data-tactics-charge]')) return;
     state.chargeAside = false; state.chargeKey = ''; uiSound('select'); rpgUi.closeAllSubMenus();
     if (state.cmd) renderCharge(state.cmd);
@@ -556,8 +615,8 @@ export function buildShell(root) {
 
   return {
     destroy: () => { clearTimeout(showLog._t); clearTimeout(showBanner._t); rpgUi.hideTagTip(); document.removeEventListener('mousedown', onComboDown); reactionPrompt.cancel(); state.onReset = null; state.onUnitClick = null; root.replaceChildren(); },
-    els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
-    previewMoveCost, openModal, closeModal,
+    els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setHeroStatus, showInspector, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
+    previewMoveCost, previewPips, openModal, closeModal,
     promptReaction: (req) => reactionPrompt.prompt(req), cancelReactionPrompt: () => reactionPrompt.cancel(),
     getSafeRect, showLog, openPanel, closePanel, openResult, clearBattle, closeSubmenu: () => {},
     set onUnitClick(fn) { state.onUnitClick = fn; },

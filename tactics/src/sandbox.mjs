@@ -41,7 +41,7 @@ export function createSandbox(rootEl, deps = {}) {
   let hoverKey = null;
   let userCamTouched = false;     // 本次动作内玩家是否拖拽/缩放过（中断自动跟随）
   let worldW = 1000, worldH = 1000;
-  let onCancelCb = null;
+  let onCancelCb = null, onContextCb = null;
   const cameraListeners = new Set();
 
   // ---------- DOM 构建 ----------
@@ -133,7 +133,12 @@ export function createSandbox(rootEl, deps = {}) {
       if (r.type === 'click') handleSelect(r.x, r.y);
     });
     scope.listen(dom.viewport, 'pointerleave', () => { if (gesture.state === 'idle') setHover(null); });
-    scope.listen(dom.viewport, 'contextmenu', (e) => { e.preventDefault(); if (onCancelCb) onCancelCb(); });
+    // 右键：宿主可消费（跳跃模式）；未消费则视为取消
+    scope.listen(dom.viewport, 'contextmenu', (e) => {
+      e.preventDefault();
+      if (onContextCb && compiled && onContextCb(hitAt(e.clientX, e.clientY))) return;
+      if (onCancelCb) onCancelCb();
+    });
     scope.listen(dom.viewport, 'pointercancel', (e) => gesture.cancel(e));
     scope.listen(dom.viewport, 'lostpointercapture', (e) => gesture.cancel(e));
     scope.listen(dom.viewport, 'wheel', (e) => {
@@ -373,6 +378,7 @@ export function createSandbox(rootEl, deps = {}) {
     focusWorld, guideTo, followWorld,
     introSweep,
     onCancel: (cb) => { onCancelCb = cb; },
+    onContext: (cb) => { onContextCb = cb; },
     getWorldSize: () => ({ w: worldW, h: worldH }),
     beginAction: () => { userCamTouched = false; },
     setCamera: (p) => { pose = { ...p }; applyCamera(); },

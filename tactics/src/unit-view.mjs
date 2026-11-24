@@ -82,9 +82,10 @@ export function createUnitView(parent, deps) {
         '</div>' +
       '</div>' +
       '<div class="t-unit-bars">' +
-        '<div class="t-bar t-bar-hp"><i class="t-bar-ghost" id="' + escapeHtml(unit.id) + '-hp-ghost"></i><i class="t-bar-fill" id="' + escapeHtml(unit.id) + '-hp-bar"></i></div>' +
+        '<div class="t-bar t-bar-hp"><i class="t-bar-ghost" id="' + escapeHtml(unit.id) + '-hp-ghost"></i><i class="t-bar-fill" id="' + escapeHtml(unit.id) + '-hp-bar"></i><i class="t-bar-predict"></i></div>' +
         (unit.bars && unit.bars.maxMp ? '<div class="t-bar t-bar-mp"><i class="t-bar-fill"></i></div>' : '') +
-      '</div>';
+      '</div>' +
+      '<div class="t-unit-status"></div><div class="t-unit-predict-tag"></div>';
 
     const img = billboard.querySelector('img');
     if (img) {
@@ -114,6 +115,8 @@ export function createUnitView(parent, deps) {
       hpBar: billboard.querySelector('.t-bar-hp .t-bar-fill'),
       hpGhost: billboard.querySelector('.t-bar-ghost'),
       mpBar: billboard.querySelector('.t-bar-mp .t-bar-fill'),
+      status: billboard.querySelector('.t-unit-status'), statusHtml: '',
+      predictBar: billboard.querySelector('.t-bar-predict'), predictTag: billboard.querySelector('.t-unit-predict-tag'),
       unit, placement, bars: unit.bars || null, motionLock: false, displayFacing: null,
     };
     nodes.set(unit.id, rec);
@@ -206,6 +209,24 @@ export function createUnitView(parent, deps) {
     rec.shadow.style.transform = 'scale(' + (1 - px / 40).toFixed(3) + ')';
   }
   function clearFlag(cls) { for (const rec of nodes.values()) rec.root.classList.remove(cls); }
+  // 状态徽章行（血条下方，宿主给 HTML；同内容不重写）
+  function setStatus(id, html) {
+    const rec = nodes.get(id);
+    if (!rec || rec.statusHtml === html) return;
+    rec.statusHtml = html; rec.status.innerHTML = html;
+  }
+  // 攻击预览：血条上标出预计扣除段（from→to 为 HP 比例），头顶标签写命中率/击杀
+  function setPredict(id, p) {
+    const rec = nodes.get(id);
+    if (!rec) return;
+    if (!p) { rec.predictBar.style.width = '0'; rec.predictTag.textContent = ''; rec.root.classList.remove('t-unit-predicting', 't-unit-lethal'); return; }
+    rec.predictBar.style.left = (p.to * 100).toFixed(1) + '%';
+    rec.predictBar.style.width = (Math.max(0, p.from - p.to) * 100).toFixed(1) + '%';
+    rec.predictTag.textContent = p.tag || '';
+    rec.root.classList.add('t-unit-predicting');
+    rec.root.classList.toggle('t-unit-lethal', !!p.kill);
+  }
+  function clearPredict() { for (const id of nodes.keys()) setPredict(id, null); }
   function setFacing(id, deg) { setDisplayFacing(id, deg); }
 
   function onCameraChange(pose) {
@@ -221,5 +242,5 @@ export function createUnitView(parent, deps) {
   }
 
   return { setUnits, syncUnits, updateUnit, setFacing, onCameraChange, getEntitySpriteDom, nodes,
-    lockMotion, setDisplayPos, setDisplayFacing, setFlag, clearFlag, setHop };
+    lockMotion, setDisplayPos, setDisplayFacing, setFlag, clearFlag, setHop, setStatus, setPredict, clearPredict };
 }

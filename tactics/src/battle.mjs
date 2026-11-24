@@ -645,7 +645,11 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       moveDistance: u.ref.moveDistance, effectiveMoveDistance: moveDistanceOf(u), jumpDistance: Math.ceil(u.ref.moveDistance / 3),
       perception: u.ref.perception, footprint: { ...u.footprint },
       shield: u.ref.shield || 0, atk: st.atk, def: st.def, hit: st.hit, eva: st.eva, taunt: st.taunt, spd: st.spd,
-      evasion: u.ref.evasion || 0, buffs: buffsOf(u.id).map(b => ({ type: b.type, value: b.value, variant: b.variant || null, duration: Number.isFinite(b.duration) ? b.duration : null, isConsumable: !!b.isConsumable })) };
+      evasion: u.ref.evasion || 0, stunned: !!state.combatState.clock?.units?.[u.id]?.stun,
+      // remaining：时钟真实到期剩余回合（向上取整）；null = 无时限（消耗型/永久）
+      buffs: buffsOf(u.id).map(b => { const st = state.combatState.clock?.statuses?.[b._key];
+        return { type: b.type, value: b.value, variant: b.variant || null, duration: Number.isFinite(b.duration) ? b.duration : null, isConsumable: !!b.isConsumable,
+          remaining: st && st.endAt != null ? Math.max(0, Math.ceil((st.endAt - ctx.now()) / ROUND_TIME - 1e-9)) : null }; }) };
   }
 
   function reachable() {

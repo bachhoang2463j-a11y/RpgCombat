@@ -16,6 +16,8 @@ import { skillSlots } from './effect-definitions.mjs';
 import { startAtmos, atmosStyleOf } from './screen-atmos.mjs';
 import { GUARD_AUDIO_KEYS, BARRIER_AUDIO_KEYS, playGuardDash, playGuardBlock, mountBarrierDome, updateBarrierBadge,
   playBarrierRaise, playBarrierHit, playBarrierBlocked, playBarrierShatter, fadeBarrierDome } from './guard-barrier-fx.mjs';
+import { effectFloat } from './status-ui.mjs';
+import { floatText, worldPx } from './vfx-primitives.mjs';
 
 export const WINDUP_BEAT_MS = 330;   // 回合制敌方前摇拍点（OMEN_BEAT）：起手后此刻出手
 
@@ -426,10 +428,21 @@ export function createActionDirector(deps) {
     // 非伤害效果（即时回复等，规则 result.effects）：条目在接触拍点揭示；quiet=条目已自带视觉，不再叠通用光效
     const effects = result.effects || [];
     const effectsShown = new Set();
+    // 效果飘字：每个真实效果条目在揭示拍点飘一条（增攻/瞄准/降防/护盾/驱散…），同目标逐条上叠
+    const floatIdx = new Map();
+    function floatEffect(targetId, lab) {
+      const c = lab && centerOf(targetId);
+      if (!c) return;
+      const n = floatIdx.get(targetId) || 0, p = worldPx(c);
+      floatIdx.set(targetId, n + 1);
+      floatText(makeFx(audioContext.category), p.x, p.y - 30 - n * 20, lab.text, lab.color, lab.glow, { size: 14, delay: Math.min(n, 3) * 90 });
+    }
     function revealEffect(e, quiet) {
       if (!isCurrent() || !e || effectsShown.has(e)) return null;
       effectsShown.add(e);
       if (atmos) atmos.lower();
+      floatEffect(e.targetId, effectFloat(e));
+      if (e.kind === 'heal' && e.overheal > 0) floatEffect(e.targetId, effectFloat({ kind: 'shield', value: e.overheal, crit: e.crit }));
       if (e.reason === 'burn-heal-suppressed') revealRule(e, 'heal-suppressed');
       if (e.immune) revealRule(e, 'immunity');
       if (e.kind === 'blocked') revealRule(e, 'barrier-blocked');

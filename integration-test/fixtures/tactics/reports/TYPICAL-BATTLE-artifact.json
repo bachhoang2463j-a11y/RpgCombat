@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "b2a0f8acf06db11d407e7ea9960965fe592c6701b0d7707007cfece9cd835c10",
-  "bytes": 1463404,
+  "sha256": "6e60e6d112deae9bf2da906be44adf885771e8662299282431f6afaf84b623e6",
+  "bytes": 1489176,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
