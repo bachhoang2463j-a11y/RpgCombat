@@ -1268,16 +1268,20 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       return { hpDmg: 0, shieldDmg: 0, barrierId: counterReflection.id, barrierHitId: hit.barrierHitId };
     }
     const aStats = statsOf(attacker);
-    const { hpDmg, shieldDmg } = calculateDamage(raw, { def: aStats.def, shield: attacker.ref.shield || 0 }, { defending: isDefending(attacker) });
-    if (shieldDmg > 0) attacker.ref.shield = Math.max(0, (attacker.ref.shield || 0) - shieldDmg);
-    attacker.ref.hp = Math.max(0, attacker.ref.hp - hpDmg);
+    const hpBefore = attacker.ref.hp, maxHp = attacker.ref.maxHp, shieldBefore = attacker.ref.shield || 0;
+    const { hpDmg, shieldDmg } = calculateDamage(raw, { def: aStats.def, shield: shieldBefore }, { defending: isDefending(attacker) });
+    if (shieldDmg > 0) attacker.ref.shield = Math.max(0, shieldBefore - shieldDmg);
+    const shieldAfter = attacker.ref.shield || 0;
+    attacker.ref.hp = Math.max(0, hpBefore - hpDmg);
+    const hpAfter = attacker.ref.hp;
     addLog('⚔️ ' + defender.name + ' 闪避并趁势反击！' + attacker.name + ' -' + hpDmg + ' HP' + (shieldDmg ? '（破盾' + shieldDmg + '）' : ''));
     if (defender.classType === '防守者' && (hpDmg > 0 || shieldDmg > 0)) {
       defender.ref.baseTauntBonus = (defender.ref.baseTauntBonus || 0) + 20;
       addLog('🛡️ ' + defender.name + ' 的防守反击吸引了更多仇恨（嘲讽值永久+20）');
     }
     if (attacker.ref.hp <= 0) handleDown(attacker, 'counter');
-    const result = { targetId: attacker.id, casterId: defender.id, hpDmg, shieldDmg, rawDmg: raw, resistance, reason: 'counter' };
+    const result = { targetId: attacker.id, casterId: defender.id, maxHp, hpBefore, hpAfter, shieldBefore, shieldAfter,
+      incomingDmg: raw, hpDmg, shieldDmg, rawDmg: raw, resistance, reason: 'counter' };
     emit('reaction-damage', result);
     return result;
   }
@@ -1299,9 +1303,12 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       return { hpDmg: 0, shieldDmg: 0, barrierId: counterReflection.id, barrierHitId: hit.barrierHitId };
     }
     const aStats = statsOf(attacker);
-    const { hpDmg, shieldDmg } = calculateDamage(raw, { def: aStats.def, shield: attacker.ref.shield || 0 }, { defending: isDefending(attacker) });
-    if (shieldDmg > 0) attacker.ref.shield = Math.max(0, (attacker.ref.shield || 0) - shieldDmg);
-    attacker.ref.hp = Math.max(0, attacker.ref.hp - hpDmg);
+    const hpBefore = attacker.ref.hp, maxHp = attacker.ref.maxHp, shieldBefore = attacker.ref.shield || 0;
+    const { hpDmg, shieldDmg } = calculateDamage(raw, { def: aStats.def, shield: shieldBefore }, { defending: isDefending(attacker) });
+    if (shieldDmg > 0) attacker.ref.shield = Math.max(0, shieldBefore - shieldDmg);
+    const shieldAfter = attacker.ref.shield || 0;
+    attacker.ref.hp = Math.max(0, hpBefore - hpDmg);
+    const hpAfter = attacker.ref.hp;
     addLog('⚔️ ' + defender.name + ' 发动【强力反击】！' + attacker.name + ' -' + hpDmg + ' HP');
     const granted = passive.onPowerCounter ? passive.onPowerCounter(defender) : null;
     if (granted && granted.resetTaunt) {
@@ -1310,7 +1317,16 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       defender.ref.baseTauntBonus = 100;
     }
     if (attacker.ref.hp <= 0) handleDown(attacker, 'counter');
-    emit('reaction-damage', { targetId: attacker.id, casterId: defender.id, hpDmg, shieldDmg, rawDmg: raw, resistance, reason: 'power-counter' });
+    emit('reaction-damage', { targetId: attacker.id, casterId: defender.id, maxHp, hpBefore, hpAfter, shieldBefore, shieldAfter,
+      incomingDmg: raw, hpDmg, shieldDmg, rawDmg: raw, resistance, reason: 'power-counter' });
+    return true;
+  }
+  function resolveDodgeCounter(defender, attacker, incomingType) {
+    if (tryPowerCounter(defender, attacker)) return true;
+    if (incomingType !== '近战') return false;
+    const counterBuff = buffsOf(defender.id).find(b => b.type === 'counter');
+    if (!counterBuff) return false;
+    counterStrike(defender, attacker, counterBuff.value);
     return true;
   }
 
@@ -1854,13 +1870,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       // 命中结论账本：已判定即 resolved（miss 不覆写此前 targetHit=true，多段至少一次命中共享）
       if (!bdg.targetResolved[target.id]) { bdg.targetResolved[target.id] = true; bdg.targetHit[target.id] = false; }
       if (target.side === 'hero') target.ref.tp = Math.min(target.ref.maxTp || 100, (target.ref.tp || 0) + 5);
-      if (incomingType === '近战') {
-        const hasCounter = buffsOf(target.id).some(b => b.type === 'counter');
-        if (hasCounter && !tryPowerCounter(target, caster)) {
-          const counterBuff = buffsOf(target.id).find(b => b.type === 'counter');
-          counterStrike(target, caster, counterBuff ? counterBuff.value : 0);
-        }
-      }
+      resolveDodgeCounter(target, caster, incomingType);
       return Object.assign(segBase, { hit: false, outcome: 'dodge', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: target.ref.hp <= 0, logEnd: log.length });
     }
     // 确认将命中 → 反应拦截（只对该发；选择由调用方 next() 给出或 policy 自动）
@@ -1876,6 +1886,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       return Object.assign(segBase, { hit: false, outcome: 'prevented', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reaction, logEnd: log.length });
     }
     if (reaction?.dodged) {
+      resolveDodgeCounter(target, caster, incomingType);
       if (!bdg.targetResolved[target.id]) { bdg.targetResolved[target.id] = true; bdg.targetHit[target.id] = false; }
       return Object.assign(segBase, { hit: false, outcome: 'dodge', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reaction, logEnd: log.length });
     }
@@ -1889,7 +1900,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         { slotIndex, segmentIndex, targetId: target.id, shotIndex, totalShots, preview: segmentPreview(caster, target, slot, skill, incomingType, isAoE, pierce, cStats) }, true, false);
       if (segmentRun !== runId) return null;
       if (guardReaction?.canceled || (!isAoE && caster.ref.hp <= 0)) canceled.value = true;
-      if (canceled.value || guardReaction?.dodged) return Object.assign(segBase, { hit: false, outcome: canceled.value ? 'prevented' : 'dodge', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reaction, guardianReaction: guardReaction, logEnd: log.length });
+      if (canceled.value || guardReaction?.dodged) {
+        if (guardReaction?.dodged) resolveDodgeCounter(target, caster, incomingType);
+        return Object.assign(segBase, { hit: false, outcome: canceled.value ? 'prevented' : 'dodge', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reaction, guardianReaction: guardReaction, logEnd: log.length });
+      }
       reaction.guardianReaction = guardReaction;
     }
     tStats = statsOf(target);

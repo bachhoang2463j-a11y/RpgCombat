@@ -308,6 +308,7 @@ function basicAttack(name, { subtype = name, area = false, projectile, direction
               () => impact?.hit ? 'hit' : 'dodge', () => { if (impact) reveal(impact); }))) return false;
           }
         }
+        if (ctx.awaitCounters && !(await ctx.awaitCounters())) return false;
       }
       return true;
     },
@@ -532,7 +533,7 @@ function supportFeedbackOf(effect) {
 }
 async function playSupportEffects(ctx, accept = () => true) {
   // 原版 executeSkillAction：外层逐标签槽、内层逐目标顺序 await（群体间隔一拍）。后端 effects 已按槽→目标排序，
-  // 每个真实效果条目各播一次自己的原版 SVG/音色（增攻与瞄准各自独立），播完一个再隔 60ms 播下一个。
+  // 每个真实效果条目各播一次自己的原版 SVG/音色（增攻与瞄准各自独立），播完一个再隔 1ms 播下一个。
   const steps = [];
   const seenEffects = new Set();
   for (const effect of ctx.result.effects || []) {
@@ -549,12 +550,12 @@ async function playSupportEffects(ctx, accept = () => true) {
     return ctx.awaitHandle(handle).then(ok => { if (!ok) handle.cancel(); return ok; });
   };
   for (let i = 0; i < steps.length; i++) {
-    if (i > 0 && !(await ctx.wait(60))) return false;
+    if (i > 0 && !(await ctx.wait(1))) return false;
     const { effect, feedback } = steps[i];
     const ok = await playOne(feedback, effect.targetId, () => ctx.revealEffect(effect, true));
     if (!ok) return false;
     if (effect.kind === 'heal' && effect.overheal > 0) {
-      if (!(await ctx.wait(60)) || !(await playOne(SUPPORT_EFFECT.shield, effect.targetId))) return false;
+      if (!(await ctx.wait(1)) || !(await playOne(SUPPORT_EFFECT.shield, effect.targetId))) return false;
     }
   }
   return true;

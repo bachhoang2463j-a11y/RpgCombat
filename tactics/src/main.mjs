@@ -262,7 +262,7 @@ export function createApp(rootEl, opts = {}) {
     onReveal: (hit, meta) => revealHit(hit, meta),
     onEffectReveal: (e) => revealEffect(e),
     onMoveFeedback: (id, kind, p) => moveFeedback(id, kind, p),
-    onRuleReveal: (_v, { kind }) => { if (kind === 'reaction-damage') { syncShown(); refreshBattle(); } },
+    onRuleReveal: (value, { kind }) => { if (kind === 'reaction-damage') revealCounter(value); },
     onSelfDestruct: () => { syncShown(); refreshBattle(); },
     promptRetarget: (req) => {
       const caster = unitById(req.casterId);
@@ -1296,6 +1296,20 @@ export function createApp(rootEl, opts = {}) {
     sandbox.getUnitView().updateUnit(u.id, { bars: u.bars, syncGhost: true });
     if (u.side === 'hero') shell.setHeroBars(u.id, u.bars, { heal: true });
     return e.value;
+  }
+
+  // 反击只揭示当前命中快照，不提前同步后续段的最终资源值。
+  function revealCounter(value) {
+    const u = unitById(value.targetId);
+    const next = { ...shownOf(u), hp: value.hpAfter, shield: value.shieldAfter };
+    shown.set(u.id, next);
+    u.bars = { ...u.bars, ...next };
+    sandbox.getUnitView().updateUnit(u.id, { bars: u.bars, syncGhost: true });
+    if (u.side === 'hero') shell.setHeroBars(u.id, u.bars, { hit: true });
+    const source = unitById(value.casterId);
+    shownEff.set(source.id, battle.getEffectiveUnit(source.id));
+    renderStatus(source.id);
+    if (value.hpAfter <= 0) playDown(u);
   }
 
   // ---------- 接触拍点揭示 ----------

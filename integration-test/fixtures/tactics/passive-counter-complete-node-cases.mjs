@@ -9,8 +9,11 @@
 
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
+import fs from 'node:fs';
 import { createBattle } from '../../../tactics/src/battle.mjs';
-import { parseSkill } from '../../../tactics/src/parser.mjs';
+import { parseYamlText, parseSkill } from '../../../tactics/src/parser.mjs';
+import { createScenarioData } from '../../../tactics/src/scenario-data.mjs';
+import { dispatchClock } from '../../../tactics/src/clock.mjs';
 import { unitCenter } from '../../../tactics/src/geometry.mjs';
 
 function ok(id, pass, detail) { return { id, pass: !!pass, detail: detail || '' }; }
@@ -302,6 +305,35 @@ function counterCases() {
       JSON.stringify({ hp: sh.ref.hp, shield: sh.ref.shield, ev })));
   }
   {
+    const counter = { name: '紧急闪避', isReaction: true, reactionTarget: 'all', isOthers: true,
+      type: '[单避]', power: 10000, range: { type: '自身' }, damageType: '近战' };
+    const b = make([unit('rh2', 'hero', null, { spd: 300, atk: 10 }),
+      unit('rd2', 'enemy', '防守者', { spd: 50, atk: 20, skills: [counter] })],
+      { rh2: { col: 2, row: 3 }, rd2: { col: 4, row: 3 } }, () => 0.99);
+    const attacker = b.ctx.units.find(u => u.id === 'rh2');
+    const r = b.attack(atkSkill(), aimOf(b, 'rd2'), { policy: 'auto' });
+    const events = evs(r, 'reaction-damage');
+    out.push(ok('PC-R6 本人反应闪避：成功后一次普通反击并保留伤害快照',
+      r.ok && r.hits[0].reaction?.dodged && events.length === 1 && events[0].reason === 'counter'
+      && events[0].casterId === 'rd2' && events[0].targetId === 'rh2'
+      && events[0].maxHp === 100 && events[0].hpBefore === 100 && events[0].hpAfter === attacker.ref.hp
+      && events[0].shieldBefore === 0 && events[0].shieldAfter === 0 && events[0].incomingDmg === events[0].rawDmg,
+      JSON.stringify({ reactions: events.map(e => e.reason), event: events[0] })));
+  }
+  {
+    const b = make([unit('ch', 'hero', null, { spd: 300, atk: 10 }),
+      unit('gh', 'enemy', '防守者', { spd: 50, atk: 20, evasion: 10000 })],
+      { ch: { col: 2, row: 3 }, gh: { col: 4, row: 3 } }, () => 0.5);
+    const skill = atkSkill({ actionCost: { main: 0, aux: 0 } });
+    const first = b.attack(skill, aimOf(b, 'gh'));
+    const second = b.attack(skill, aimOf(b, 'gh'));
+    const events = [...evs(first, 'reaction-damage'), ...evs(second, 'reaction-damage')];
+    out.push(ok('PC-R7 连续两次闪避：每次各反击一次且两次独立结算',
+      first.ok && second.ok && events.length === 2 && events.every(e => e.reason === 'counter')
+      && b.ctx.units.find(u => u.id === 'ch').ref.hp === 60,
+      JSON.stringify({ reactions: events.map(e => e.reason), attackerHp: b.ctx.units.find(u => u.id === 'ch').ref.hp })));
+  }
+  {
     // 致死中断：双段技能第一段被反击致死，第二段不再结算
     const two = { name: '双击', type: '[伤害]', type2: '[伤害]', power: 0, power2: 0, hit: 100, damageType: '近战',
       cost: 0, range: { type: '单体', castRange: 10 }, actionCost: { main: 1, aux: 0 } };
@@ -345,9 +377,80 @@ function counterCases() {
   return out;
 }
 
+function stormAndReactionCases() {
+  const out = [];
+  const data = createScenarioData(parseYamlText(fs.readFileSync(new URL('../../../doc/tactics/典型对局-战棋版.yaml', import.meta.url), 'utf8')));
+  const wind = data.units.find(u => u.name === '索恩');
+  const caster = data.units.find(u => u.name.includes('伊塔库亚的眷族'));
+  const storm = caster.skills.find(s => s.name === '极地暴风雪');
+  const target = structuredClone(wind);
+  const enemy = structuredClone(caster);
+  target.id = 'wind'; target.controller = 'player'; target.ref.hp = target.ref.maxHp;
+  enemy.id = 'storm'; enemy.controller = 'player';
+  const b = createBattle({ units: [target, enemy], placementsById: {
+    wind: { col: 6, row: 6 }, storm: { col: 8, row: 6, facing: 180 },
+  }, scene: scene(), random: () => 0.99 });
+  b.start();
+  const charges = b.battleState.combatState.charges;
+  charges.storm = { inventory: 0, preparing: null, current: 4 };
+  dispatchClock(b.battleState, { type: 'grantMainPoint', targetId: 'storm', sourceKey: 'passive-counter-test-charge' });
+  b.battleState.combatState.clock.currentAction.resources.main = 1;
+  const r = b.attack(storm, { x: 7.5, y: 7.5 }, { policy: 'none' });
+  const fatal = (r.hits || []).flatMap(h => h.segments || [h]).find(s => s.targetId === 'wind')?.fatalResult || null;
+  const flagsAfterAttack = { grit: target.ref.hasTriggeredGrit, avoidFatal: target.ref.hasTriggeredAvoidFatal };
+  const afterAttack = { hp: target.ref.hp, classType: target.classType, fatalResult: fatal, ...flagsAfterAttack };
+  const eventStart = b.snapshot().events.length, logStart = b.snapshot().log.length;
+  b.endAction();
+  const afterEnd = { hp: target.ref.hp, classType: target.classType,
+    events: b.snapshot().events.slice(eventStart), log: b.snapshot().log.slice(logStart).slice(-8),
+    grit: target.ref.hasTriggeredGrit, avoidFatal: target.ref.hasTriggeredAvoidFatal };
+  out.push(ok('PC-R8 真实样本暴风雪扣139：剩1血不触发保命，干净回合末不倒地',
+    r.ok && afterAttack.hp === 1 && afterEnd.hp === 1 && afterAttack.classType === '风行者' && !afterAttack.avoidFatal
+      && !afterEnd.events.some(e => e.type === 'unit-down'),
+    JSON.stringify({ storm: { name: storm.name, charge: storm.charge, damageType: storm.damageType,
+      range: storm.range, casterClass: caster.classType }, afterAttack, afterEnd })));
+  {
+    const windTarget = structuredClone(wind), stormCaster = structuredClone(caster);
+    windTarget.id = 'lethal-wind'; windTarget.controller = 'player';
+    stormCaster.id = 'lethal-storm'; stormCaster.controller = 'player';
+    const lethal = make([windTarget, stormCaster], { 'lethal-wind': { col: 6, row: 6 }, 'lethal-storm': { col: 8, row: 6 } }, () => 0.99);
+    lethal.battleState.combatState.charges['lethal-storm'] = { inventory: 0, preparing: null, current: 4 };
+    const result = lethal.attack({ ...storm, power: 1000 }, { x: 7.5, y: 7.5 }, { policy: 'none' });
+    const segment = segs(result).find(s => s.targetId === windTarget.id);
+    lethal.endAction();
+    out.push(ok('PC-R10 暴风雪提高至致死威力：风行者完整回避必中爆炸段且保留满血',
+      result.ok && segment?.hpDmg === 0 && segment.fatalResult?.reason === 'avoid-fatal'
+      && windTarget.ref.hasTriggeredAvoidFatal && windTarget.ref.hp === 140,
+      JSON.stringify({ hp: windTarget.ref.hp, fatal: segment?.fatalResult })));
+  }
+  const types = ['近战', '远程', '法术'];
+  for (const type of types) {
+    const counter = { name: type + '紧急闪避', isReaction: true, reactionTarget: type, isOthers: true,
+      type: '[单避]', power: 10000, range: { type: '自身' }, damageType: type };
+    const defender = unit('pc-' + type, 'enemy', '防守者', { spd: 50, atk: 20, skills: [counter] });
+    const attacker = unit('at-' + type, 'hero', null, { spd: 300, atk: 10 });
+    const battle = make([attacker, defender], { [attacker.id]: { col: 2, row: 3 }, [defender.id]: { col: 4, row: 3 } }, () => 0.99);
+    const skill = atkSkill({ damageType: type, actionCost: { main: 0, aux: 0 } });
+    // 每次明确把概率升至100%以上；强力反击会真实重置嘲讽，不依赖随机消费顺序。
+    defender.ref.baseTauntBonus = 600;
+    const first = battle.attack(skill, aimOf(battle, defender.id), { policy: 'auto' });
+    const firstReset = defender.ref.baseTauntBonus === 100;
+    defender.ref.baseTauntBonus = 600;
+    const second = battle.attack(skill, aimOf(battle, defender.id), { policy: 'auto' });
+    const events = [...evs(first, 'reaction-damage'), ...evs(second, 'reaction-damage')];
+    out.push(ok('PC-R9 ' + type + '连续反应闪避：强力反击各结算一次',
+      first.ok && second.ok && first.hits[0].reaction?.dodged && second.hits[0].reaction?.dodged
+      && events.length === 2 && events.every(e => e.reason === 'power-counter')
+      && firstReset && defender.ref.baseTauntBonus === 100
+      && battle.ctx.units.find(u => u.id === attacker.id).ref.hp === 20,
+      JSON.stringify({ reactions: events.map(e => e.reason), attackerHp: battle.ctx.units.find(u => u.id === attacker.id).ref.hp })));
+  }
+  return out;
+}
+
 function allCases() {
   return [...defenderCases(), ...berserkerCases(), ...windCases(), ...stealthCases(), ...casterCases(),
-    ...clericCases(), ...corruptorCases(), ...vanguardCases(), ...counterCases()];
+    ...clericCases(), ...corruptorCases(), ...vanguardCases(), ...counterCases(), ...stormAndReactionCases()];
 }
 
 export const groups = { 'PASSIVE-COUNTER-COMPLETE': { run() { return { cases: allCases() }; } } };

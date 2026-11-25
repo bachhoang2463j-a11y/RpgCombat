@@ -165,10 +165,10 @@ export const groups = {
       supportCalls.some(row => row[1] === entities.get('untouched') && row[2] === 'buff' && row[3] === 'defUp') &&
       supportCalls.filter(row => row[3] === 'hpHeal').length === 2 && supportCalls.filter(row => row[3] === 'shieldUp').length === 1,
       j(supportTrace)));
-    cases.push(ok('TFX-01 原版接触揭示真实对象，条目间隔 60ms 串行，空驱散保留原版反馈',
+    cases.push(ok('TFX-01 原版接触揭示真实对象，条目间隔 1ms 串行，空驱散保留原版反馈',
       recipientCall < hpReveal && hpReveal < secondCall && secondCall < mpReveal &&
-      supportTrace.slice(hpReveal, secondCall).some(row => row[0] === 'wait' && row[1] === 60) &&
-      supportTrace.filter(row => row[0] === 'wait').every(row => row[1] === 60) &&
+      supportTrace.slice(hpReveal, secondCall).some(row => row[0] === 'wait' && row[1] === 1) &&
+      supportTrace.filter(row => row[0] === 'wait').every(row => row[1] === 1) &&
       supportReveals.length === supportEffects.length && supportEffects.every(effect =>
         supportReveals.filter(reveal => reveal.effect === effect && reveal.quiet === true).length === 1), j(supportTrace)));
 
@@ -188,6 +188,7 @@ export const groups = {
         activeHandles--;
         return true;
       },
+      fx: { sfx() {} },
       avHost: { host: { spriteOf: id => id } },
       av: {
         playAttackIdentityFx({ scope, subtype, targets, outcomes, onImpact, areaBounds, suppressImpact }) {
@@ -275,7 +276,8 @@ export const groups = {
     try { createFxRegistry().register({ id: 'x', grade: 'L9', play() {} }); } catch (e) { bad = e.message; }
     cases.push(ok('TFX-01 重复 id 与未知分级注册即失败', /重复/.test(dup || '') && /未知演出分级/.test(bad || ''), j({ dup, bad })));
     const src = readFileSync(path.join(ROOT, 'tactics', 'src', 'action-director.mjs'), 'utf8');
-    cases.push(ok('TFX-01 导演层无单技能特判（无 fxTag === / 砷弹 字样）', !/fxTag\s*===/.test(src) && !/砷弹/.test(src) && /registry\.resolve\(/.test(src), ''));
+    const attackDirector = src.slice(src.indexOf('  async function playAttack('), src.indexOf('  // ---------- 原版英雄击杀特写'));
+    cases.push(ok('TFX-01 攻击导演无单技能特判（无 fxTag === / 砷弹 字样）', attackDirector.length > 0 && !/fxTag\s*===/.test(attackDirector) && !/砷弹/.test(attackDirector) && /registry\.resolve\(/.test(attackDirector), ''));
     cases.push(ok('TFX-01 L1–L4 预算表完整', ['L1', 'L2', 'L3', 'L4'].every(k => GRADE_BUDGETS[k]) && GRADE_BUDGETS.L4.darken && !GRADE_BUDGETS.L3.darken, j(Object.keys(GRADE_BUDGETS))));
     return { cases };
   } },

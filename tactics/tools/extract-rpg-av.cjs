@@ -227,7 +227,7 @@ function extractCss(html, jsText) {
   let css = keep.join('\n');
   // 宿主适配：全屏层改为战棋特效舞台内绝对定位（舞台在 world-root 内随相机变换）；
   // 关键帧不改写：击杀特写/Cut-in 位于 iframe 屏幕宿主，其 translate(±100vw) 等以视口为基准属原版语义
-  css = patch(css, /position\s*:\s*fixed/g, 'position:absolute', 10, 'CSS position:fixed → absolute');
+  css = patch(css, /position\s*:\s*fixed/g, 'position:absolute', 12, 'CSS position:fixed → absolute');
   css = patch(css, /\b100vw\b/g, '100%', 1, 'CSS 100vw → 舞台宽');
   css = patch(css, /\b100d?vh\b/g, '100%', 1, 'CSS 100vh/dvh → 舞台高');
   css += '\n' + [...kfKeep.values()].join('\n');
@@ -241,6 +241,12 @@ function build() {
   // 统一按 LF 解析：core.autocrlf 检出的工作区为 CRLF，仓库对象为 LF；生成物与源指纹不随检出方式变化
   const html = fs.readFileSync(SRC, 'utf8').replace(/\r\n/g, '\n');
   const L = html.split('\n');
+  // 强力反击专属动效及其两个显式粒子依赖；不扩展到相邻普通重击段。
+  const powerBurst = topBlock(L, l => l.startsWith('function spawnPowerBurst('), 'spawnPowerBurst');
+  const chargeParticles = topBlock(L, l => l.startsWith('window.spawnChargeUpParticles = function('), 'spawnChargeUpParticles', /^};\s*$/);
+  const powerCounter = topBlock(L, l => l.startsWith('async function playPowerCounterEffect('), 'playPowerCounterEffect');
+  const powerSoundLine = L.filter(l => l.startsWith('const POWER_COUNTER_SOUND_URL = '));
+  if (powerSoundLine.length !== 1) fail('POWER_COUNTER_SOUND_URL 定义数 ' + powerSoundLine.length);
   // 0) 资源基址配置（原样沿用 window.__RPG_ASSET_BASE__ 覆盖方式）
   const originIdx = lineIndex(L, l => l.startsWith('const ASSET_ORIGIN = '), 0, 'ASSET_ORIGIN');
   const originLine = L[originIdx].trim();
@@ -478,7 +484,107 @@ ${supportBranches.join('\n').replace('else if', 'if')}
   mod = patch(mod, 'g.innerHTML = fromDom.innerHTML.replace(/ id="[^"]*"/g, \'\');', "g.innerHTML = fromDom.innerHTML.replace(/ id=\"[^\"]*\"/g, '');\n                    g.style.setProperty('--d', fromRect.w + 'px'); g.style.borderRadius = '50%';", 1, '反击残影保留圆形尺度');
 
   const stubText = STUBS.map(n => 'function ' + n + '() { /* 未迁移段：本 Demo 不产生该状态 */ }').join('\n');
-  const css = extractCss(html, mod + '\n' + soundText + support + '\n' + moments);
+  // 2d) 强力反击专属音效 URL 与精确演出源段（不连带近/远程重击函数）
+
+  const shakeSource = topBlock(L, l => l.startsWith('window.triggerScreenShake = function('), 'triggerScreenShake');
+  let powerShake = patch(shakeSource.text, 'window.triggerScreenShake = function(intensity = 6, duration = 300)', 'function playPowerCounterShake(run, intensity = 6, duration = 300)', 1, '强力反击原版震屏函数');
+  powerShake = patch(powerShake, "document.getElementById('battle-scene')", '__STAGE.shakeEl()', 1, '强力反击震屏宿主');
+  powerShake = patch(powerShake, '    const startTime = Date.now();', '    run.shakeScene = scene;\n    const startTime = Date.now();', 1, '强力反击震屏清理登记');
+  powerShake = patch(powerShake, '        const elapsed = Date.now() - startTime;', "        if (!run.active) { scene.style.transform = ''; return; }\n        const elapsed = Date.now() - startTime;", 1, '强力反击震屏代际');
+  powerShake = patch(powerShake, 'requestAnimationFrame(shakeLoop)', 'powerFrame(run, shakeLoop)', 2, '强力反击震屏帧登记');
+  const powerUrl = powerSoundLine[0].trim();
+  if (!/^const POWER_COUNTER_SOUND_URL = `\$\{ASSET_BASE\}\/shot01\.mp3`;$/.test(powerUrl)) fail('POWER_COUNTER_SOUND_URL 源定义变化');
+  let powerParticles = patch(powerBurst.text, 'function spawnPowerBurst(x, y, dirAngle = 0)', 'function spawnPowerBurst(addParticle, x, y, dirAngle = 0)', 1, '强力反击爆发粒子注入');
+  powerParticles = powerParticles.replaceAll('fxEngine.addParticle({', 'addParticle({');
+  let chargeFx = patch(chargeParticles.text, 'window.spawnChargeUpParticles = function(cx, cy, color = \'#a78bfa\', duration = 320)', 'function spawnChargeUpParticles(addParticle, schedule, cx, cy, color = \'#a78bfa\', duration = 320)', 1, '强力反击蓄力粒子注入');
+  chargeFx = chargeFx.replaceAll('setTimeout(() => {', 'schedule(() => {').replaceAll('fxEngine.addParticle({', 'addParticle({');
+  let powerEffect = powerCounter.text;
+  powerEffect = patch(powerEffect, 'async function playPowerCounterEffect(counter, victim, counterDom)', 'async function playPowerCounterEffect(counter, victim, counterDom, onImpact)', 1, '强力反击回调契约');
+  powerEffect = patch(powerEffect, '    const _actionToken = combatToken;', '    const _actionToken = combatToken;\n    const run = powerCounterRun();\n    const alive = () => run.active && _actionToken === combatToken && !_pipelineFrozen;', 1, '强力反击代际句柄');
+  powerEffect = patch(powerEffect, '    if (_pipelineFrozen) return;', '    if (!alive()) return false;', 1, '强力反击取消结果');
+  powerEffect = patch(powerEffect, 'await sleep(500); if (_actionToken !== combatToken || _pipelineFrozen) return;', 'await powerWait(run, 500); if (!alive()) return false;', 1, '强力反击闪避缓冲可取消');
+  powerEffect = patch(powerEffect, 'await sleep(350); if (_actionToken !== combatToken || _pipelineFrozen) return;', 'await powerWait(run, 350); if (!alive()) return false;', 1, '强力反击蓄力可取消');
+  powerEffect = patch(powerEffect, 'await shotReady; if (_actionToken !== combatToken || _pipelineFrozen) return;', 'await powerAwait(run, shotReady); if (!alive()) return false;', 1, '强力反击预载取消');
+  powerEffect = patch(powerEffect, 'if (cue && cue.started) await cue.started;', 'if (cue && cue.started) await powerAwait(run, cue.started);', 1, '强力反击起播等待可取消');
+  powerEffect = patch(powerEffect, 'if (heroCard) {\n        heroCard.classList.remove', 'if (heroCard) {\n        run.glow = heroCard;\n        heroCard.classList.remove', 1, '强力反击登记蓄力光');
+  powerEffect = patch(powerEffect, 'const cue = playCustomAudio(POWER_COUNTER_SOUND_URL, undefined, 1, { track:', 'const cue = run.cue = playCustomAudio(POWER_COUNTER_SOUND_URL, undefined, 1, { track:', 1, '强力反击音效取消登记');
+  powerEffect = patch(powerEffect, '    if (_actionToken !== combatToken || _pipelineFrozen) return;', '    if (!alive()) return false;', 1, '强力反击阶段取消结果');
+  powerEffect = patch(powerEffect, 'const victimCenter = getDomCenter(victimDom);', 'const victimCenter = powerCenter(victimDom);', 1, '强力反击舞台坐标');
+  powerEffect = patch(powerEffect, 'const heroCard = counterDom.closest ? counterDom.closest(\'.hero-card-inner\') : null;', 'const heroCard = counterDom;', 1, '强力反击实体DOM蓄力光');
+  powerEffect = patch(powerEffect, 'const counterDomEl2 = getEntitySpriteDom(counter) || (counter.id.startsWith(\'h\') ? document.getElementById(`hero-card-${counter.id}`) : document.getElementById(`${counter.id}-sprite`));', 'const counterDomEl2 = counterDom || getEntitySpriteDom(counter);', 1, '强力反击实体DOM');
+  powerEffect = patch(powerEffect, 'window.spawnChargeUpParticles(cc.x, cc.y, \'#ff4040\', 210);', 'spawnChargeUpParticles(p => powerParticle(run, p), (fn, ms) => powerSchedule(run, fn, ms), cc.x, cc.y, \'#ff4040\', 210);', 1, '强力反击蓄力粒子');
+  powerEffect = patch(powerEffect, 'counterDomEl2 && window.spawnChargeUpParticles', 'counterDomEl2', 1, '强力反击聚气使用本地函数');
+  powerEffect = patch(powerEffect, 'getDomCenter(counterDomEl2)', 'powerCenter(counterDomEl2)', 1, '强力反击蓄力坐标');
+  powerEffect = patch(powerEffect, 'getDomCenter(counterDomEl)', 'powerCenter(counterDomEl)', 1, '强力反击方向坐标');
+  powerEffect = patch(powerEffect, 'isEntityVariantLocked(victimDom)', 'arcane.isEntityVariantLocked(victimDom)', 1, '强力反击锁定读取本地模块');
+  powerEffect = patch(powerEffect, 'document.body.appendChild(flash);', '__STAGE.el.appendChild(flash); run.nodes.add(flash);', 1, '强力反击白闪舞台挂载');
+  powerEffect = patch(powerEffect, 'setTimeout(() => flash.remove(), 240);', 'powerSchedule(run, () => { flash.remove(); run.nodes.delete(flash); }, 240);', 1, '强力反击白闪计时');
+  powerEffect = patch(powerEffect, 'const rect = victimDom ? victimDom.getBoundingClientRect() : { left: victimCenter.x, top: victimCenter.y, width: 0, height: 0 };', 'const rect = victimDom ? victimDom[__GBCR]() : { left: victimCenter.x, top: victimCenter.y, width: 0, height: 0 };', 1, '强力反击准星舞台坐标');
+  powerEffect = patch(powerEffect, 'document.body.appendChild(ch);', '__STAGE.el.appendChild(ch); run.nodes.add(ch);', 1, '强力反击准星舞台挂载');
+  powerEffect = patch(powerEffect, 'setTimeout(() => ch.remove(), 340);', 'powerSchedule(run, () => { ch.remove(); run.nodes.delete(ch); }, 340);', 1, '强力反击准星计时');
+  powerEffect = patch(powerEffect, 'spawnPowerBurst(victimCenter.x, victimCenter.y, dirAngle);', 'spawnPowerBurst(p => powerParticle(run, p), victimCenter.x, victimCenter.y, dirAngle); onImpact?.();', 1, '强力反击爆发与命中回调');
+  powerEffect = patch(powerEffect, 'const counterDomEl = getEntitySpriteDom(counter) || (counter.id.startsWith(\'h\') ? document.getElementById(`hero-card-${counter.id}`) : document.getElementById(`${counter.id}-sprite`));', 'const counterDomEl = counterDom || getEntitySpriteDom(counter);', 1, '强力反击攻击方向实体');
+  powerEffect = patch(powerEffect, 'if (victimDom && !arcane.isEntityVariantLocked(victimDom)) { victimDom.classList.add(\'shake\'); setTimeout(() => { if (_actionToken !== combatToken) return;  if (victimDom) victimDom.classList.remove(\'shake\'); }, 300); }', 'if (victimDom && !arcane.isEntityVariantLocked(victimDom)) { run.shaking = victimDom; victimDom.classList.add(\'shake\'); powerSchedule(run, () => { victimDom.classList.remove(\'shake\'); run.shaking = null; }, 300); }', 1, '强力反击目标震动清理');
+  powerEffect = patch(powerEffect, 'if (window.triggerScreenShake) window.triggerScreenShake(20, 180);', 'playPowerCounterShake(run, 20, 180);', 1, '强力反击原版震屏调用');
+  powerEffect = patch(powerEffect, 'await sleep(220); if (_actionToken !== combatToken || _pipelineFrozen) return;', 'await powerWait(run, 220); if (!alive()) return false;', 1, '强力反击余波等待可取消');
+  powerEffect = patch(powerEffect, 'if (heroCard) heroCard.classList.remove(\'power-glow\');', 'if (heroCard) heroCard.classList.remove(\'power-glow\');\n    powerSchedule(run, () => powerFinish(run, false), 900);\n    return true;', 1, '强力反击保留余波并返回成功');
+  const powerCode = `
+  ${powerUrl}
+  const powerRuns = new Set();
+  function powerCounterRun() {
+    const run = { active: true, timers: new Set(), frames: new Set(), nodes: new Set(), waits: new Set(), particles: new Set(), cue: null, glow: null, shaking: null, shakeScene: null };
+    powerRuns.add(run);
+    return run;
+  }
+  function powerSchedule(run, fn, ms) {
+    const id = setTimeout(() => { run.timers.delete(id); if (run.active) fn(); }, ms);
+    run.timers.add(id);
+    return id;
+  }
+  function powerWait(run, ms) {
+    return new Promise(resolve => {
+      run.waits.add(resolve);
+      powerSchedule(run, () => { run.waits.delete(resolve); resolve(true); }, ms);
+    });
+  }
+  function powerFrame(run, fn) {
+    const id = requestAnimationFrame(() => { run.frames.delete(id); if (run.active) fn(); });
+    run.frames.add(id);
+  }
+  function powerAwait(run, promise) {
+    return new Promise((resolve, reject) => {
+      run.waits.add(resolve);
+      Promise.resolve(promise).then(value => { run.waits.delete(resolve); resolve(value); }, error => { run.waits.delete(resolve); reject(error); });
+    });
+  }
+  function powerParticle(run, particle) { run.particles.add(particle); fxEngine.addParticle(particle); }
+  function powerCenter(dom) {
+    const r = dom ? dom[__GBCR]() : { left: __STAGE.w / 2, top: __STAGE.h / 2, width: 0, height: 0 };
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+  function powerFinish(run, cancelled = true) {
+    run.active = false;
+    run.timers.forEach(clearTimeout); run.timers.clear();
+    run.frames.forEach(cancelAnimationFrame); run.frames.clear();
+    if (run.shakeScene) run.shakeScene.style.transform = '';
+    run.waits.forEach(resolve => resolve(false)); run.waits.clear();
+    run.nodes.forEach(n => n.remove()); run.nodes.clear();
+    run.glow?.classList.remove('power-glow');
+    run.shaking?.classList.remove('shake');
+    if (cancelled) {
+      run.cue?.stop?.();
+      fxEngine.particles = fxEngine.particles.filter(p => !run.particles.has(p));
+    }
+    run.particles.clear();
+    powerRuns.delete(run);
+  }
+  function clearPowerCounterEffects() { for (const run of [...powerRuns]) powerFinish(run); }
+${powerShake}
+${powerParticles}
+${chargeFx}
+${powerEffect}
+`.replace(/[ \t]+$/gm, '');
+  const css = extractCss(html, mod + '\n' + soundText + support + '\n' + moments + '\n' + powerParticles + '\n' + chargeFx + '\n' + powerEffect);
   const hitCss = `
 /* 战棋数字：原版分档时间轴，数值主导、实际伤害性质点缀。 */
 .arcane-hit-num-layer[data-hit-type] .arcane-hit-num,.arcane-hit-num-layer[data-hit-type] .arcane-hit-tag { font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; font-variant-numeric:tabular-nums lining-nums; font-style:normal; }
@@ -560,6 +666,7 @@ ${mixer}
 
 ${soundText}
 
+${powerCode}
   // ---- 粒子引擎（原样，仅换挂载层） ----
 ${fx}
   const fxEngine = new CanvasFxEngine();
@@ -588,9 +695,9 @@ ${busOn.map(l => l.replace('CombatAudioDirector.consume', 'arcane.CombatAudioDir
   return Object.assign({}, arcane, {
     CombatAudioMixer, audioUrls, playSound, playCustomAudio, HERO_VOICE_LINES, pickHeroVoice, AVATAR_MAP, fxEngine, atmoAudio,
     ASSET_BASE, HERO_VOICE_BASE, itemFxAssetUrl,
-    playGenericSupportFx, playExecutionAnimation, playEnemyUltimateCutin, clearMoments,
-    clearArcaneFx() { supportHandles.forEach(handle => handle.cancel()); clearMoments(); arcane.clearArcaneFx(); playRandomStandardGunshot.last = null; },
-    setToken(t) { if (t !== combatToken) { supportHandles.forEach(handle => handle.cancel()); clearMoments(); playRandomStandardGunshot.last = null; } combatToken = t; },
+    playGenericSupportFx, playExecutionAnimation, playEnemyUltimateCutin, clearMoments, playPowerCounterEffect,
+    clearArcaneFx() { clearPowerCounterEffects(); supportHandles.forEach(handle => handle.cancel()); clearMoments(); arcane.clearArcaneFx(); playRandomStandardGunshot.last = null; },
+    setToken(t) { if (t !== combatToken) { clearPowerCounterEffects(); supportHandles.forEach(handle => handle.cancel()); clearMoments(); playRandomStandardGunshot.last = null; } combatToken = t; },
     getToken() { return combatToken; },
     setRoster(h, e) { heroesData = h; enemiesData = e; },
   });

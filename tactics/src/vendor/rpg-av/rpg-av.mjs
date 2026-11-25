@@ -4,7 +4,7 @@
 // arcaneVfxModule 行区间(源 5729–14230): 5730–5791, 5800–5841, 5849–5913, 5923–5924, 5932–6302, 6431–6485, 6642–6850, 7016–7037, 7348–7584, 7596–10718, 10748–10757, 11103–11133, 11142–11240, 11917–12083, 12201–12562, 12565–14208
 // 入选语句 281 段 / 6501 行；入口: playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar, CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx, syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked, playSummonEnter, playSummonExit, playSummonGuard, clearSummonState, playLingFeng, playRescueGrit, playRescueAvoidFatal, clearRescueState, playVariantResistFx, playCounterAttackL1, playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, clearSelfDestructState, syncSelfDestructWarning, setIdentitySfx, setVariantSfx, setStatusSfx, setSelfDestructSfx
 // 显式存根: 
-// 宿主适配补丁: 枪击采样相邻去重×1; 远程击杀隐藏我方名称×1; 特写挂屏幕宿主×2; 特写收尾登记×2; 特写震屏走舞台震动层×1; 特写计时可随重开清理×6; 环境音脱离#battle-scene DOM×1; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 屏幕矩形 → 特效舞台坐标×12; innerWidth → 舞台宽×16; innerHeight → 舞台高×10; body 挂载 → 特效舞台×5; JS position:fixed → absolute×0; arcane canvas resize 走舞台×1; 舞台震动独立层×2; window.* 声音函数改为工厂内本地×14; 环境氛围音随清场停止×1; 去抗性全局挂载×1; 毅力血幕挂圆形棋子内框×1; 致命回避残影保留圆形尺度×1; 反击残影保留圆形尺度×1; CSS position:fixed → absolute×10; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1; CSS 残留视口单位(按舞台尺度保留)×41
+// 宿主适配补丁: 枪击采样相邻去重×1; 远程击杀隐藏我方名称×1; 特写挂屏幕宿主×2; 特写收尾登记×2; 特写震屏走舞台震动层×1; 特写计时可随重开清理×6; 环境音脱离#battle-scene DOM×1; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 屏幕矩形 → 特效舞台坐标×12; innerWidth → 舞台宽×16; innerHeight → 舞台高×10; body 挂载 → 特效舞台×5; JS position:fixed → absolute×0; arcane canvas resize 走舞台×1; 舞台震动独立层×2; window.* 声音函数改为工厂内本地×14; 环境氛围音随清场停止×1; 去抗性全局挂载×1; 毅力血幕挂圆形棋子内框×1; 致命回避残影保留圆形尺度×1; 反击残影保留圆形尺度×1; 强力反击原版震屏函数×1; 强力反击震屏宿主×1; 强力反击震屏清理登记×1; 强力反击震屏代际×1; 强力反击震屏帧登记×2; 强力反击爆发粒子注入×1; 强力反击蓄力粒子注入×1; 强力反击回调契约×1; 强力反击代际句柄×1; 强力反击取消结果×1; 强力反击闪避缓冲可取消×1; 强力反击蓄力可取消×1; 强力反击预载取消×1; 强力反击起播等待可取消×1; 强力反击登记蓄力光×1; 强力反击音效取消登记×1; 强力反击阶段取消结果×1; 强力反击舞台坐标×1; 强力反击实体DOM蓄力光×1; 强力反击实体DOM×1; 强力反击蓄力粒子×1; 强力反击聚气使用本地函数×1; 强力反击蓄力坐标×1; 强力反击方向坐标×1; 强力反击锁定读取本地模块×1; 强力反击白闪舞台挂载×1; 强力反击白闪计时×1; 强力反击准星舞台坐标×1; 强力反击准星舞台挂载×1; 强力反击准星计时×1; 强力反击爆发与命中回调×1; 强力反击攻击方向实体×1; 强力反击目标震动清理×1; 强力反击原版震屏调用×1; 强力反击余波等待可取消×1; 强力反击保留余波并返回成功×1; CSS position:fixed → absolute×12; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1; CSS 残留视口单位(按舞台尺度保留)×41
 // ==========================================
 /* eslint-disable */
 // ---- 纯数据导出（原样，供宿主在工厂创建前解析人物头像/语音与预载清单） ----
@@ -855,6 +855,347 @@ function playShotgunSound(owner = null) {
     const cue = playSound('xiandan', 0.95, 1, { track:'skill', sync:true, owner, audioContext:owner?.audioContext || CombatAudioMixer.capture('D') });
     if (owner) owner.attackCue = cue;
     return cue;
+}
+
+
+  const POWER_COUNTER_SOUND_URL = `${ASSET_BASE}/shot01.mp3`;
+  const powerRuns = new Set();
+  function powerCounterRun() {
+    const run = { active: true, timers: new Set(), frames: new Set(), nodes: new Set(), waits: new Set(), particles: new Set(), cue: null, glow: null, shaking: null, shakeScene: null };
+    powerRuns.add(run);
+    return run;
+  }
+  function powerSchedule(run, fn, ms) {
+    const id = setTimeout(() => { run.timers.delete(id); if (run.active) fn(); }, ms);
+    run.timers.add(id);
+    return id;
+  }
+  function powerWait(run, ms) {
+    return new Promise(resolve => {
+      run.waits.add(resolve);
+      powerSchedule(run, () => { run.waits.delete(resolve); resolve(true); }, ms);
+    });
+  }
+  function powerFrame(run, fn) {
+    const id = requestAnimationFrame(() => { run.frames.delete(id); if (run.active) fn(); });
+    run.frames.add(id);
+  }
+  function powerAwait(run, promise) {
+    return new Promise((resolve, reject) => {
+      run.waits.add(resolve);
+      Promise.resolve(promise).then(value => { run.waits.delete(resolve); resolve(value); }, error => { run.waits.delete(resolve); reject(error); });
+    });
+  }
+  function powerParticle(run, particle) { run.particles.add(particle); fxEngine.addParticle(particle); }
+  function powerCenter(dom) {
+    const r = dom ? dom[__GBCR]() : { left: __STAGE.w / 2, top: __STAGE.h / 2, width: 0, height: 0 };
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+  function powerFinish(run, cancelled = true) {
+    run.active = false;
+    run.timers.forEach(clearTimeout); run.timers.clear();
+    run.frames.forEach(cancelAnimationFrame); run.frames.clear();
+    if (run.shakeScene) run.shakeScene.style.transform = '';
+    run.waits.forEach(resolve => resolve(false)); run.waits.clear();
+    run.nodes.forEach(n => n.remove()); run.nodes.clear();
+    run.glow?.classList.remove('power-glow');
+    run.shaking?.classList.remove('shake');
+    if (cancelled) {
+      run.cue?.stop?.();
+      fxEngine.particles = fxEngine.particles.filter(p => !run.particles.has(p));
+    }
+    run.particles.clear();
+    powerRuns.delete(run);
+  }
+  function clearPowerCounterEffects() { for (const run of [...powerRuns]) powerFinish(run); }
+function playPowerCounterShake(run, intensity = 6, duration = 300) {
+    const scene = __STAGE.shakeEl();
+    if (!scene) return;
+    run.shakeScene = scene;
+    const startTime = Date.now();
+
+    const shakeLoop = () => {
+        if (!run.active) { scene.style.transform = ''; return; }
+        const elapsed = Date.now() - startTime;
+        if (elapsed < duration) {
+            const decay = 1 - (elapsed / duration);
+            const dx = (Math.random() - 0.5) * intensity * decay;
+            const dy = (Math.random() - 0.5) * intensity * decay;
+            scene.style.transform = `translate(${dx}px, ${dy}px)`;
+            powerFrame(run, shakeLoop);
+        } else {
+            scene.style.transform = '';
+        }
+    };
+    powerFrame(run, shakeLoop);
+};
+function spawnPowerBurst(addParticle, x, y, dirAngle = 0) {
+    // ── 强力反击三层粒子：冲击波环 + 定向碎片 + 余波血雾 ──
+
+    // 【第一层】白→红双环冲击波，极速扩散消散（≈80ms 扩至最大）
+    addParticle({
+        x, y, vx: 0, vy: 0, age: 0, life: 90, maxR: 70,
+        draw(ctx, pct) {
+            const r = this.maxR * Math.pow(pct, 0.45); // 先快后慢
+            const a = 1 - pct;
+            ctx.lineWidth = 7 * (1 - pct) + 1;
+            ctx.strokeStyle = '#ffffff';
+            ctx.globalAlpha = a * 0.9;
+            ctx.beginPath(); ctx.arc(this.x, this.y, r, 0, Math.PI * 2); ctx.stroke();
+            ctx.strokeStyle = '#ff4040';
+            ctx.lineWidth = 4 * (1 - pct) + 1;
+            ctx.globalAlpha = a * 0.7;
+            ctx.beginPath(); ctx.arc(this.x, this.y, r * 1.18, 0, Math.PI * 2); ctx.stroke();
+        }
+    });
+    // 辅助小环（稍慢，增加层次感）
+    addParticle({
+        x, y, vx: 0, vy: 0, age: 0, life: 160, maxR: 48,
+        draw(ctx, pct) {
+            const r = this.maxR * pct;
+            ctx.strokeStyle = '#ff8060';
+            ctx.lineWidth = 3 * (1 - pct);
+            ctx.globalAlpha = (1 - pct) * 0.55;
+            ctx.beginPath(); ctx.arc(this.x, this.y, r, 0, Math.PI * 2); ctx.stroke();
+        }
+    });
+
+    // 【第二层】定向碎片：以 dirAngle 为主轴，120° 扇形内高速喷射，红/白双色
+    const SHARD_COUNT = 52;
+    for (let i = 0; i < SHARD_COUNT; i++) {
+        const isFront = i < SHARD_COUNT * 0.65; // 65% 沿攻击方向集中
+        const spread = isFront ? (Math.random() - 0.5) * Math.PI * 0.7 : Math.random() * Math.PI * 2;
+        const angle = isFront ? dirAngle + spread : spread;
+        const speed = isFront ? (14 + Math.random() * 26) : (6 + Math.random() * 12);
+        const isWhite = Math.random() < 0.28; // 28% 为白色高光碎片
+        const color = isWhite ? '#ffffff' : (['#ff1a1a', '#cc0000', '#e03020', '#8b0000'])[Math.floor(Math.random() * 4)];
+        const sz = isWhite ? (1.5 + Math.random() * 3) : (3 + Math.random() * 7);
+        addParticle({
+            x, y,
+            vx: speed * Math.cos(angle), vy: speed * Math.sin(angle),
+            gravity: 0.38, drag: 0.90, age: 0,
+            life: isWhite ? (60 + Math.random() * 80) : (180 + Math.random() * 180),
+            size: sz, color, isWhite,
+            draw(ctx, pct) {
+                const alpha = this.isWhite ? (1 - pct) * 0.95 : 1 - Math.pow(pct, 1.6);
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size * (1 - pct * 0.4), 0, Math.PI * 2); ctx.fill();
+                // 白色粒子额外绘制十字高光
+                if (this.isWhite && pct < 0.4) {
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1;
+                    ctx.globalAlpha = alpha * 0.6;
+                    const r = this.size * 2.5;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x - r, this.y); ctx.lineTo(this.x + r, this.y);
+                    ctx.moveTo(this.x, this.y - r); ctx.lineTo(this.x, this.y + r);
+                    ctx.stroke();
+                }
+            }
+        });
+    }
+
+    // 【第三层】余波血雾：低速、持续时间长、向下飘落，模拟残留血气
+    for (let i = 0; i < 18; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1 + Math.random() * 3.5;
+        addParticle({
+            x: x + (Math.random() - 0.5) * 30,
+            y: y + (Math.random() - 0.5) * 20,
+            vx: speed * Math.cos(angle), vy: speed * Math.sin(angle) - 0.5,
+            gravity: -0.04, drag: 0.97, age: 0,
+            life: 400 + Math.random() * 300,
+            size: 5 + Math.random() * 9,
+            color: '#6b0000',
+            draw(ctx, pct) {
+                const alpha = Math.sin(pct * Math.PI) * 0.45;
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size * (1 - pct * 0.6), 0, Math.PI * 2); ctx.fill();
+            }
+        });
+    }
+}
+function spawnChargeUpParticles(addParticle, schedule, cx, cy, color = '#a78bfa', duration = 320) {
+    // duration 为真实毫秒（粒子引擎已 delta-time 化，动画速度与 FPS 解耦）
+    // 校准基准：高刷屏 165fps 下的历史观感 ≈ 320ms，故主调用点从 490 收敛到 320
+    const count = 28;
+    for (let i = 0; i < count; i++) {
+        const spawnRadius = 90 + Math.random() * 60;
+        const angle = Math.random() * Math.PI * 2;
+        const startX = cx + spawnRadius * Math.cos(angle);
+        const startY = cy + spawnRadius * Math.sin(angle);
+        // 粒子最大延迟也等比压缩（0.6→0.42），让聚拢感更紧凑有力
+        const spawnDelay = Math.random() * (duration * 0.42);
+
+        schedule(() => {
+            const life = duration - spawnDelay + 35;
+
+            addParticle({
+                x: startX, y: startY,
+                vx: 0, vy: 0,
+                age: 0, life: life,
+                cx: cx, cy: cy,
+                color: color,
+                size: 2.5 + Math.random() * 2.5,
+                startX: startX, startY: startY,
+                draw(ctx, pct) {
+                    this.x = this.startX + (this.cx - this.startX) * pct;
+                    this.y = this.startY + (this.cy - this.startY) * pct;
+
+                    const alpha = Math.sin(pct * Math.PI);
+                    ctx.fillStyle = this.color;
+                    ctx.globalAlpha = alpha * 0.9;
+
+                    const trailLen = 1 - pct;
+                    if (trailLen > 0.1) {
+                        ctx.strokeStyle = this.color;
+                        ctx.lineWidth = this.size * 0.8;
+                        ctx.globalAlpha = alpha * 0.5;
+                        ctx.beginPath();
+                        const trailX = this.startX + (this.cx - this.startX) * Math.max(0, pct - 0.08);
+                        const trailY = this.startY + (this.cy - this.startY) * Math.max(0, pct - 0.08);
+                        ctx.moveTo(trailX, trailY);
+                        ctx.lineTo(this.x, this.y);
+                        ctx.stroke();
+                    }
+
+                    ctx.globalAlpha = alpha;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size * (1 - pct * 0.5), 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+        }, spawnDelay);
+    }
+
+    // 旋转光环（随duration加快，旋转圈数不变，但速度更快）
+    addParticle({
+        x: cx, y: cy, vx: 0, vy: 0, age: 0, life: duration,
+        draw(ctx, pct) {
+            const alpha = Math.sin(pct * Math.PI) * 0.7;
+            const radius = 30 + pct * 25;
+            const rotation = pct * Math.PI * 3;
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2.5;
+            ctx.globalAlpha = alpha;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, rotation, rotation + Math.PI * 1.5);
+            ctx.stroke();
+
+            ctx.lineWidth = 1.2;
+            ctx.globalAlpha = alpha * 0.5;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius * 0.65, -rotation * 1.3, -rotation * 1.3 + Math.PI);
+            ctx.stroke();
+        }
+    });
+};
+async function playPowerCounterEffect(counter, victim, counterDom, onImpact) {
+    const _actionToken = combatToken;
+    const run = powerCounterRun();
+    const alive = () => run.active && _actionToken === combatToken && !_pipelineFrozen;
+    const shotReady = CombatAudioMixer.prepare(POWER_COUNTER_SOUND_URL);
+    if (!alive()) return false;
+    const victimDom = getEntitySpriteDom(victim) || (victim.id.startsWith('h') ? document.getElementById(`hero-card-${victim.id}`) : document.getElementById(`${victim.id}-sprite`));
+    const victimCenter = powerCenter(victimDom);
+
+    // ── 立即清除瞄准框（targeting-mode-enemy 会让敌方精灵上留有准星 CSS 动画）──
+    document.getElementById('enemies-container')?.classList.remove('targeting-mode-enemy');
+    document.getElementById('heroes-container')?.classList.remove('targeting-mode-hero');
+
+    // ── 观感缓冲：先让"闪避"特效（烟雾 + 抖动，约 500ms）完整呈现，再开始聚气 ──
+    // 避免强力反击的聚气红光/粒子立刻盖过闪避演出，导致角色看起来"径直打了敌人一下"
+    await powerWait(run, 500); if (!alive()) return false;
+
+    // ── 阶段1：蓄力前摇（350ms）── 聚气光效 + 蓄力音效 + 聚气粒子
+    playSound('atkUp', 1, 1, { category:'C' });
+    const heroCard = counterDom;
+    if (heroCard) {
+        run.glow = heroCard;
+        heroCard.classList.remove('burst-active', 'burst-ready');
+        heroCard.classList.add('power-glow');
+    }
+    // 在反击者位置生成红色聚气粒子，让蓄力阶段可见
+    const counterDomEl2 = counterDom || getEntitySpriteDom(counter);
+    if (counterDomEl2) {
+        const cc = powerCenter(counterDomEl2);
+        spawnChargeUpParticles(p => powerParticle(run, p), (fn, ms) => powerSchedule(run, fn, ms), cc.x, cc.y, '#ff4040', 210);
+    }
+    await powerWait(run, 350); if (!alive()) return false;
+
+    // ── 阶段2：命中瞬间 ──
+    await powerAwait(run, shotReady); if (!alive()) return false;
+    const cue = run.cue = playCustomAudio(POWER_COUNTER_SOUND_URL, undefined, 1, { track:'skill', sync:true, profile:'special', category:'C' });
+    if (cue && cue.started) await powerAwait(run, cue.started);
+    if (!alive()) return false;
+    // 2a. 径向白闪（以受击者为圆心）
+    const flash = document.createElement('div');
+    flash.className = 'pc-radial-flash';
+    flash.style.left = `${victimCenter.x}px`;
+    flash.style.top  = `${victimCenter.y}px`;
+    __STAGE.el.appendChild(flash); run.nodes.add(flash);
+    powerSchedule(run, () => { flash.remove(); run.nodes.delete(flash); }, 240);
+
+    // 2b. 主音已在命中拍点起播。
+
+    // 2c. 命中准星（圆形+十字线+辉光，替换有方块渲染问题的刀光）
+    (() => {
+        const rect = victimDom ? victimDom[__GBCR]() : { left: victimCenter.x, top: victimCenter.y, width: 0, height: 0 };
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top  + rect.height / 2;
+        const ch = document.createElement('div');
+        ch.className = 'pc-crosshair';
+        ch.style.left = `${cx}px`;
+        ch.style.top  = `${cy}px`;
+        ch.innerHTML = `<svg style="width:90px;height:90px;" viewBox="0 0 100 100"
+            xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="ch-glow" x="-40%" y="-40%" width="180%" height="180%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <!-- 圆形 -->
+          <circle cx="50" cy="50" r="34" fill="none" stroke="#ff3030" stroke-width="3"
+            stroke-dasharray="14 7" filter="url(#ch-glow)" opacity="0.95"/>
+          <circle cx="50" cy="50" r="8" fill="none" stroke="#ff6060" stroke-width="2.5"
+            filter="url(#ch-glow)"/>
+          <!-- 十字长臂 -->
+          <line x1="50" y1="4"  x2="50" y2="30" stroke="#ff3030" stroke-width="3.5" stroke-linecap="round" filter="url(#ch-glow)"/>
+          <line x1="50" y1="70" x2="50" y2="96" stroke="#ff3030" stroke-width="3.5" stroke-linecap="round" filter="url(#ch-glow)"/>
+          <line x1="4"  y1="50" x2="30" y2="50" stroke="#ff3030" stroke-width="3.5" stroke-linecap="round" filter="url(#ch-glow)"/>
+          <line x1="70" y1="50" x2="96" y2="50" stroke="#ff3030" stroke-width="3.5" stroke-linecap="round" filter="url(#ch-glow)"/>
+          <!-- 内短臂（白色高光） -->
+          <line x1="50" y1="38" x2="50" y2="45" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+          <line x1="50" y1="55" x2="50" y2="62" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+          <line x1="38" y1="50" x2="45" y2="50" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+          <line x1="55" y1="50" x2="62" y2="50" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+        </svg>`;
+        __STAGE.el.appendChild(ch); run.nodes.add(ch);
+        powerSchedule(run, () => { ch.remove(); run.nodes.delete(ch); }, 340);
+    })();
+
+    // 2d. 顿帧（仅粒子层）
+    fxEngine.hitStop = 80;
+
+    // 2e. 三层爆发粒子：计算攻击方向角（counter → victim）
+    const counterDomEl = counterDom || getEntitySpriteDom(counter);
+    const counterCenter = counterDomEl ? powerCenter(counterDomEl) : { x: victimCenter.x - 100, y: victimCenter.y };
+    const dirAngle = Math.atan2(victimCenter.y - counterCenter.y, victimCenter.x - counterCenter.x);
+    spawnPowerBurst(p => powerParticle(run, p), victimCenter.x, victimCenter.y, dirAngle); onImpact?.();
+
+    // 2f. 受击方抖动 + 屏幕震动（短促高强度）
+    if (victimDom && !arcane.isEntityVariantLocked(victimDom)) { run.shaking = victimDom; victimDom.classList.add('shake'); powerSchedule(run, () => { victimDom.classList.remove('shake'); run.shaking = null; }, 300); }
+    playPowerCounterShake(run, 20, 180);
+
+    // ── 阶段3：余波等待 ──
+    await powerWait(run, 220); if (!alive()) return false;
+    if (heroCard) heroCard.classList.remove('power-glow');
+    powerSchedule(run, () => powerFinish(run, false), 900);
+    return true;
 }
 
   // ---- 粒子引擎（原样，仅换挂载层） ----
@@ -7775,9 +8116,9 @@ CombatEvents.on(EVENTS.DODGE_RESOLVED, arcane.CombatAudioDirector.consume);
   return Object.assign({}, arcane, {
     CombatAudioMixer, audioUrls, playSound, playCustomAudio, HERO_VOICE_LINES, pickHeroVoice, AVATAR_MAP, fxEngine, atmoAudio,
     ASSET_BASE, HERO_VOICE_BASE, itemFxAssetUrl,
-    playGenericSupportFx, playExecutionAnimation, playEnemyUltimateCutin, clearMoments,
-    clearArcaneFx() { supportHandles.forEach(handle => handle.cancel()); clearMoments(); arcane.clearArcaneFx(); playRandomStandardGunshot.last = null; },
-    setToken(t) { if (t !== combatToken) { supportHandles.forEach(handle => handle.cancel()); clearMoments(); playRandomStandardGunshot.last = null; } combatToken = t; },
+    playGenericSupportFx, playExecutionAnimation, playEnemyUltimateCutin, clearMoments, playPowerCounterEffect,
+    clearArcaneFx() { clearPowerCounterEffects(); supportHandles.forEach(handle => handle.cancel()); clearMoments(); arcane.clearArcaneFx(); playRandomStandardGunshot.last = null; },
+    setToken(t) { if (t !== combatToken) { clearPowerCounterEffects(); supportHandles.forEach(handle => handle.cancel()); clearMoments(); playRandomStandardGunshot.last = null; } combatToken = t; },
     getToken() { return combatToken; },
     setRoster(h, e) { heroesData = h; enemiesData = e; },
   });

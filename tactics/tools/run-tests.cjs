@@ -43,6 +43,10 @@ const STAGES = {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'domain-region-node-cases.mjs'),
     groups: ['DR-DOMAIN'], modules: ['parser', 'regions', 'range', 'battle', 'scheduler', 'barriers', 'scene', 'movement'], requiredExports: [],
   },
+  'counter-av': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'counter-av-node-cases.mjs'),
+    groups: ['COUNTER-AV'], modules: [], requiredExports: [],
+  },
   'passive-counter-complete': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'passive-counter-complete-node-cases.mjs'),
     groups: ['PASSIVE-COUNTER-COMPLETE'], modules: [], requiredExports: [],

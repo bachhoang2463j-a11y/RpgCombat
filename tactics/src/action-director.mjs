@@ -350,6 +350,44 @@ export function createActionDirector(deps) {
 
     const revealed = new Map();      // targetId → 已揭示段序号集合
     const reactionRuns = [];
+    const counterEvs = (result.events || []).filter(ev => ev.type === 'reaction-damage');
+    const countersStarted = new Set();
+    let counterRun = Promise.resolve(true);
+    function queueCounters(segmentId, reactionReady = Promise.resolve(true)) {
+      for (const cev of counterEvs) {
+        if (segmentId && cev.segmentId !== segmentId) continue;
+        if (countersStarted.has(cev)) continue;
+        countersStarted.add(cev);
+        counterRun = counterRun.then(async ok => {
+          if (ok === false || !(await untilScope(reactionReady)) || !isCurrent()) return false;
+          const cFrom = avHost.entity(cev.casterId), cTo = avHost.entity(cev.targetId);
+          const power = cev.reason === 'power-counter';
+          const counterActionId = av.CombatAudioDirector.beginAction();
+          const impact = () => {
+            if (!isCurrent()) return;
+            const r = { ...cev, sourceId: cev.casterId, source: 'counter', damageType: '近战',
+              outcome: 'hit', actionId: counterActionId, isHero: cTo.side === 'hero' };
+            av.playHitFeedback(r, { suppressShake: true });
+            av.CombatAudioDirector.publish(r);
+            const p = centerOf(cev.targetId);
+            if (p) {
+              const wp = worldPx(p);
+              const label = cev.hpDmg > 0 ? '-' + cev.hpDmg : (cev.shieldDmg > 0 ? '破盾 ' + cev.shieldDmg : '格挡');
+              floatText(makeFx(power ? 'C' : 'E'), wp.x, wp.y - 30, '⚔️ ' + (power ? '强力反击 ' : '反击 ') + label,
+                power ? '#ff6060' : '#fef08a', power ? '#991b1b' : '#92400e', { ms: 850, size: 14 });
+            }
+            deps.onRuleReveal?.(cev, { kind: 'reaction-damage', result });
+          };
+          if (power) {
+            const dom = sandbox.getUnitView().nodes.get(cev.casterId)?.sprite;
+            return untilScope(av.playPowerCounterEffect(cFrom, cTo, dom, impact));
+          }
+          if (!(await wait(300)) || !isCurrent()) return false;
+          return untilScope(av.playCounterAttackL1(cFrom, cTo, impact).done);
+        });
+        reactionRuns.push(counterRun);
+      }
+    }
     const guardRuns = new Map();
     const ruleRevealed = new Set();
     function revealRule(value, kind) {
@@ -401,10 +439,12 @@ export function createActionDirector(deps) {
       done.add(i); revealed.set(targetId, done);
       if (atmos) atmos.lower();
       if (guard) revealRule(guard, 'guard');
+      const segmentReactions = [];
       const reaction = seg.reaction || (done.size === 1 ? h.reaction : null);
-      if (reaction && !reaction.guard) reactionRuns.push(playReaction({ ...h, reaction }));
+      if (reaction && !reaction.guard) segmentReactions.push(playReaction({ ...h, reaction }));
       const guardianReaction = seg.guardianReaction || reaction?.guardianReaction;
-      if (guardianReaction) reactionRuns.push(playReaction({ ...h, targetId: guardianReaction.responderId || h.targetId, reaction: guardianReaction }));
+      if (guardianReaction) segmentReactions.push(playReaction({ ...h, targetId: guardianReaction.responderId || h.targetId, reaction: guardianReaction }));
+      reactionRuns.push(...segmentReactions);
       // 回复槽段：规则真实标记（seg.heal）优先，回退生命提升推断（events 真实回复结果形态待规则 result 落地后接）
       const healed = seg.heal != null ? !!seg.heal : (!seg.hit && seg.hpAfter > seg.hpBefore);
       const waveIndex = seg.shotIndex ?? i, wave = waves.get(waveIndex);
@@ -434,6 +474,7 @@ export function createActionDirector(deps) {
       if (!healed && !seg.barrierHitId) av.CombatAudioDirector.publish(r);
       if (wave) av.CombatAudioDirector.completeTarget(wave, targetId);
       if (onReveal) onReveal({ ...h, ...seg, targetId, heal: healed, segmentIndex: i, segmentCount: segs.length }, Object.assign({ result, identity, entryId: entry.id }, meta));
+      if (seg.segmentId) queueCounters(seg.segmentId, Promise.all(segmentReactions).then(values => values.every(value => value !== false)));
     }
     function reveal(targetId, meta) {
       const h = byId.get(targetId);
@@ -473,7 +514,8 @@ export function createActionDirector(deps) {
       audioContext, outcomeMap: new Map(hits.map(h => [h.targetId, h.hit ? 'hit' : 'dodge'])),
       fx: makeFx(audioContext.category),
       wait, tween, awaitHandle, after: (ms, fn) => scope().after(ms, fn),
-      reveal, revealSegment, revealEffect, revealGuard, revealRule, revealRegion, regions, unitsInCells, ent: id => avHost.entity(id), centerOf, atmos,
+      reveal, revealSegment, revealEffect, revealGuard, revealRule, revealRegion, awaitCounters: () => counterRun,
+      regions, unitsInCells, ent: id => avHost.entity(id), centerOf, atmos,
       anchorAt: (x, y) => makeAnchor(x, y), aimAnchor: () => aimAnchor(result.aim), lineEndAnchor: () => lineEndAnchor(result),
     };
     guardEvents.forEach(ev => revealGuard(ev));
@@ -492,23 +534,9 @@ export function createActionDirector(deps) {
     avHost.syncVisualState?.();
     regions.forEach(r => revealRegion(r.id));
     await Promise.all(reactionRuns);
-    // 普通/强力反击 L1 原版居合斩演出与音效（reaction-damage 事件）
-    const counterEvs = (result.events || []).filter(ev => ev.type === 'reaction-damage');
-    for (const cev of counterEvs) {
-      const cFrom = avHost.entity(cev.casterId), cTo = avHost.entity(cev.targetId);
-      if (cFrom && cTo && av.playCounterAttackL1) {
-        const ch = av.playCounterAttackL1(cFrom, cTo, () => {
-          const p = centerOf(cev.targetId);
-          if (p) {
-            const wp = worldPx(p);
-            const label = cev.hpDmg > 0 ? '-' + cev.hpDmg : (cev.shieldDmg > 0 ? '破盾 ' + cev.shieldDmg : '格挡');
-            floatText(makeFx('E'), wp.x, wp.y - 30, '⚔️ 反击 ' + label, '#fef08a', '#92400e', { ms: 850, size: 14 });
-          }
-          deps.onRuleReveal?.(cev, { kind: 'reaction-damage', result });
-        });
-        if (ch && ch.done && !(await untilScope(ch.done))) return false;
-      }
-    }
+    // 未携带段标识的反应事件在本次攻击收尾串行播放；已按段调度的反击不重复。
+    queueCounters(null);
+    if (!(await counterRun) || !isCurrent()) return false;
     // 冲锋与受击击退位移补间（解锁规则站位前先在视图平滑滑移）
     const moveEvs = (result.events || []).filter(ev => ev.type === 'unit-charged' || ev.type === 'unit-displaced');
     if (moveEvs.length) {

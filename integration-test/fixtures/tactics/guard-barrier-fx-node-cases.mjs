@@ -115,7 +115,7 @@ function wiringCases() {
   const out = [], d = src('src/action-director.mjs'), lib = src('src/fx-library.mjs'), host = src('src/vfx-template-host.mjs'), stage = src('vfx-stage.mjs');
   out.push(ok('TGB-W 舍身冲刺与攻击条目并行起跑；格挡在受击揭示拍点（守护已到位后）', /guardEvents\.forEach\(ev => revealGuard\(ev\)\);\s*\n\s*const ok = await entry\.play\(ctx\);/.test(d) && /if \(guard\) revealRule\(guard, 'guard'\);/.test(d)
     && /kind === 'guard'\) return deps\.presentGuard \? undefined : playGuardBlock/.test(d)));
-  out.push(ok('TGB-W 舍身段不再叠旧「舍身承伤」反应条目；结界整体吸收的段不播目标受击', /if \(reaction && !reaction\.guard\) reactionRuns\.push/.test(d) && /else if \(!seg\.barrierHitId\) av\.playHitFeedback/.test(d)));
+  out.push(ok('TGB-W 舍身段不再叠旧「舍身承伤」反应条目；结界整体吸收的段不播目标受击', /if \(reaction && !reaction\.guard\) segmentReactions\.push/.test(d) && /reactionRuns\.push\(\.\.\.segmentReactions\)/.test(d) && /else if \(!seg\.barrierHitId\) av\.playHitFeedback/.test(d)));
   out.push(ok('TGB-W 新建结界持有到条目爆发拍点；受击结界锁定显示耐久直到揭示；击破先破碎再移除', /if \(ev\.type === 'barrier-created'\) heldBarriers\.add/.test(d) && /if \(ev\.type === 'barrier-damaged'\) lockedBarriers\.set/.test(d)
     && /if \(value\.broken\) \{[^\n]*playBarrierShatter/.test(d) && (lib.match(/revealBarriers\(ctx\);/g) || []).length === 2));
   out.push(ok('TGB-W 旧临时结界圈（读 hp/sub 字段）已替换', !/b\.sub === '法术'/.test(d) && !/结界 ' \+ b\.hp/.test(d)));

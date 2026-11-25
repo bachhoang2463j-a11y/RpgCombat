@@ -167,7 +167,7 @@ async function serialCases() {
   out.push(ok('TP7AV-S 两轮串行：增攻 A→B，再瞄准 A→B（标签独立，不合并），顺序=后端 effects', done === true &&
     order.slice(0, 4).join(',') === 'A:buff:atkUp,B:buff:atkUp,A:buff:hitUp,B:buff:hitUp', order));
   out.push(ok('TP7AV-S 同目标两个标签各自一次原版 SVG 与揭示', log.filter(s => s.startsWith('start:A')).length === 2 && log.filter(s => s.startsWith('reveal:A')).length === 2, log));
-  out.push(ok('TP7AV-S 条目间隔 60ms（4 个间隔）', waits.length === 4 && waits.every(ms => ms === 60), waits));
+  out.push(ok('TP7AV-S 条目间隔 1ms（4 个间隔）', waits.length === 4 && waits.every(ms => ms === 1), waits));
   out.push(ok('TP7AV-S 减益走原版 debuff SVG 与 hitDown 音色', order.at(-1) === 'C:debuff:hitDown', order));
   return out;
 }
@@ -215,7 +215,7 @@ function killAndSummonCases() {
     && /function playSummonEnter\(caster, targets/.test(av) && /function playSummonGuard\(guardian/.test(av) && !/function clearSummonState\(\) \{ \/\* 未迁移段/.test(av)));
   out.push(ok('TP7AV-X 特写挂 iframe 屏幕宿主、计时可清理，重开/换代清除', (av.match(/__SCREEN\(\)\.appendChild\(overlay\); __MOMENTS\.add\(overlay\)/g) || []).length === 2
     && !/playExecutionAnimation[\s\S]{0,9000}?\bsetTimeout\(/.test(av.slice(av.indexOf('async function playExecutionAnimation'), av.indexOf('async function playEnemyUltimateCutin')))
-    && /clearArcaneFx\(\) \{ supportHandles\.forEach\(handle => handle\.cancel\(\)\); clearMoments\(\);/.test(av) && /setToken\(t\) \{ if \(t !== combatToken\) \{[^}]*clearMoments\(\);/.test(av)));
+    && /clearArcaneFx\(\) \{ clearPowerCounterEffects\(\); supportHandles\.forEach\(handle => handle\.cancel\(\)\); clearMoments\(\);/.test(av) && /setToken\(t\) \{ if \(t !== combatToken\) \{[^}]*clearMoments\(\);/.test(av)));
   // 真实页面启动崩溃回归：clearSummonState（清场/重开必经）引用的回合制顶层集合必须在工厂内声明
   const hostSrc = readFileSync(new URL('../../../tactics/src/av-host.mjs', import.meta.url), 'utf8');
   out.push(ok('TP7AV-X 击杀特写/Cut-in 屏幕宿主挂 iframe body 最顶层（压住全部 UI、不挡输入）',
