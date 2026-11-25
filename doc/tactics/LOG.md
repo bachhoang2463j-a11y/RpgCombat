@@ -511,3 +511,14 @@
 - 被动：extract-rpg-av原样提取playRescueGrit/playRescueAvoidFatal/clearRescueState及圆形棋子血幕裁剪/残影--d适配；battle自爆结算补传fatalResult；action-director在揭示拍点对接毅力血幕怒吼与致命回避错位碎散。
 - 通用音频：原样提取playVariantResistFx（7类抗性）、playCounterAttackL1（反击居合斩）、playSelfDestructWindup/Burst/Interrupt（自爆三幕四形态）、atmoAudio（4种环境氛围音）及4路音效开关；补齐禁疗healSuppressed、结界shieldUp/atk2/atk1、防御defUp、辅助taunt/hide/atkUp、无标签neutralImpact、蓄力herocharge/herochargedone、混合治疗脉冲hpHeal，去重DEMO_AUDIO_KEYS并在设置面板暴露6项开关+主题下拉。
 - 验证：extract-rpg-av --check通过（73补丁）；p04(8)/av(56)/audio-gait-passive(7)与其余27个阶段全绿（TAV-02预载有界阈值因通用键扩充由<60调至<90）；build-demo-html单文件打包通过（1,615,832 B，58模块/42输入/105符号）；IAB打开HTTP单文件0 JS报错，解锁AudioContext并实测玛德琳移动（4.2→1.8m）与防御姿态成功（设置面板⚙️在重排后点击因旧ref触发OP_TIMEOUT超时未读回，资源服实机听感待用户确认）。
+
+## 2026-11-25 · 反应闪避反击修复、原版强力反击视听与buff间隔1ms（6c12e42）
+- 核心目的：解决弗兰克连续遭近战攻击、反应闪避成功却没有普通/强力反击；对齐最新本地master/index原版两种反击动效与音效；按用户追加要求把辅助动效间的60ms空档降为1ms，并核实风行者与上一轮音频清单。
+- 文件：tactics/src/{battle,action-director,main,fx-library}.mjs；tactics/tools/{extract-rpg-av,build-demo-html,run-tests}.cjs；tactics/src/vendor/rpg-av/rpg-av.{mjs,css}；tactics/mvp-standalone.html；integration-test/fixtures/tactics/{counter-av,passive-counter-complete,fx01,guard-barrier-fx,p07av-fx}-node-cases.mjs。
+- 规则：基础闪避、本人反应闪避和舍身者二次反应闪避统一进入反击结算；职业强力反击不再被近战门限拦截，未触发时才按近战+counter架势普通反击，保持互斥。事件补真实HP/护盾前后快照，保留伤害/嘲讽/结界规则；导演按segmentId串行衔接，各发结束等待对应反击，不在首个拍点同步后续段最终HP。
+- 视听：提取原版playPowerCounterEffect、spawnPowerBurst、聚气粒子、shot01.mp3常量、triggerScreenShake及power-glow/准星/白闪CSS；仅适配实体、舞台坐标、命中回调与取消清理。保留500/350/220ms阶段、atkUp→shot01起播同步、80ms粒子顿帧与20/180震屏；普通反击补300ms衔接、playHitFeedback及CombatAudioDirector。清场/换代清理新增DOM、光效、音效、粒子、帧与等待；正常余波不被提前截断。
+- 辅助动效：保留await前一个真实句柄结束的串行规则，条目与溢出转盾的额外间隔60→1ms；不压缩SVG本身时长。
+- 验证：相关反击导演9、职业/反击35、FX01 49通过。仅启动一次--all，遇到旧数组名硬编码断言中断；修正该组后只补跑未执行阶段，另修正buff60ms及清场函数顺序的两条旧断言并仅复跑失败组。最终全部注册组覆盖1166用例通过，未再次执行--all，不把最初中断写为一次全量全绿。独立只读复审与补审均无确切阻断。extract-rpg-av --check、源码/底座语法、diff --check通过。
+- 产物：重新构建1,632,340 B，58模块/42必需输入/110关键符号、零外部业务import与单script闭合门禁通过；sha256 0d1aeeca4b5c93f45ec88b55453967c8e4ad6a3ac351602a0ed86f036d2d1a1c。IAB在该单文件加载受控双人夹具：食尸鬼两次近战、玩家选择紧急闪避；首次普通反击-20HP、MP100→99、总嘲讽200→220；第二次测试调高仇恨确保强力反击，-40HP、MP99→98、总嘲讽重置200，两次各一事件且弗兰克HP保持180。原版强力函数探针约1144ms、命中一次/72粒子；蓄力取消及命中拍点取消等待结束，新增DOM/红光清除、相对原粒子基线增量0。19个move音频在真实资源基址均报告ok。IAB定位器一次超时后改用同一按钮的DOM点击完成，不为环境改生产代码；临时页面与本轮测试服务已关闭。
+- 风行者核实：真实样本暴风雪高伤骰确实扣139，索恩140→1，尚未致死所以不触发回避；干净样本endAction后仍1HP无倒地。提高同技能威力至1000的确定致死回归触发avoid-fatal并完整保留140HP。原版毅力/致命回避函数、导演接线及六档步态/6项设置/四环境音均存在且本轮重新入包；用户实战回合末倒地尚未复现，需该刻战报/状态，未擅改职业或DoT规则。
+- 目的 vs 现状：反击断链及原版视听已修复并通过单文件交互，buff空档已降至1ms；风行者139伤害原因已复现解释，但实际回合末倒地与真Chrome动画/最终听感仍待用户实战反馈。README/SPEC未改，未纳入无关未跟踪资源。
