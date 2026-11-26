@@ -237,11 +237,12 @@ function gunFlash(fx, p, ang, { size = 32, ms = 150, smoke = true } = {}) {
   sm.firstChild.animate([{ transform: 'translate(0,0) scale(.5)', opacity: 0.9 }, { transform: 'translate(' + (Math.cos(ang) * 10 + rnd(-6, 6)).toFixed(1) + 'px,' + (-14 - rnd(0, 12)).toFixed(1) + 'px) scale(1.7)', opacity: 0 }], { duration: 600, easing: 'ease-out', fill: 'both' });
 }
 // 曳光弹：亮芯短包沿直线急速推进（回合制 _spawnStrafeTracer：~110ms 彗尾 + 白炽弹头）
-function tracer(fx, a, b, { width = 3, ms = 110, len = 64, delay = 0, sky = false } = {}) {
+const TRACER_RED = ['linear-gradient(90deg,rgba(127,29,29,0),rgba(220,38,38,.85) 50%,#fca5a5 88%,#fff)', '#ef4444'];
+function tracer(fx, a, b, { width = 3, ms = 110, len = 64, delay = 0, sky = false, tint = null } = {}) {
   const dx = b.x - a.x, dy = b.y - a.y, L = Math.max(1, Math.hypot(dx, dy)), k = Math.min(len, L * 0.6);
-  const grad = sky ? 'linear-gradient(90deg,rgba(14,165,233,0),rgba(56,189,248,.8) 55%,#e0f2fe 88%,#fff)' : 'linear-gradient(90deg,rgba(245,158,11,0),rgba(251,191,36,.78) 50%,#fef08a 88%,#fff)';
+  const grad = tint ? tint[0] : sky ? 'linear-gradient(90deg,rgba(14,165,233,0),rgba(56,189,248,.8) 55%,#e0f2fe 88%,#fff)' : 'linear-gradient(90deg,rgba(245,158,11,0),rgba(251,191,36,.78) 50%,#fef08a 88%,#fff)';
   const l = fx.top('<div style="position:absolute;left:' + a.x + 'px;top:' + a.y + 'px;width:0;height:0;transform:rotate(' + deg(Math.atan2(dy, dx)).toFixed(1) + 'deg);">' +
-    '<i style="position:absolute;left:0;top:' + (-width / 2) + 'px;width:' + k.toFixed(1) + 'px;height:' + width + 'px;border-radius:' + width + 'px;transform-origin:100% 50%;background:' + grad + ';box-shadow:0 0 ' + (width * 3) + 'px ' + (sky ? '#38bdf8' : '#f59e0b') + ';mix-blend-mode:screen;"></i></div>', ms + delay + 40);
+    '<i style="position:absolute;left:0;top:' + (-width / 2) + 'px;width:' + k.toFixed(1) + 'px;height:' + width + 'px;border-radius:' + width + 'px;transform-origin:100% 50%;background:' + grad + ';box-shadow:0 0 ' + (width * 3) + 'px ' + (tint ? tint[1] : sky ? '#38bdf8' : '#f59e0b') + ';mix-blend-mode:screen;"></i></div>', ms + delay + 40);
   l.firstChild.firstChild.animate([{ transform: 'translateX(0) scaleX(.4)', opacity: 1 }, { transform: 'translateX(' + (L - k).toFixed(1) + 'px) scaleX(1)', opacity: 1, offset: 0.85 }, { transform: 'translateX(' + (L - k).toFixed(1) + 'px) scaleX(.1)', opacity: 0 }], { duration: ms, delay, easing: 'linear', fill: 'both' });
 }
 // 喷溅：gore = 暗红血滴（正常混合，抛物下坠）；spark = 金色跳弹火星条（screen 混合）
@@ -473,15 +474,6 @@ const RANGED_SPLAT_POS = [
   { top: '38%', left: '46%', size: 150, rot: 8, delay: 50 },
 ];
 const RANGED_SPLAT_DRIPS = [['right:25%', 6, 140, 150, 1250], ['left:22%', 8, 180, 100, 1350]];
-// 巨弹（.600 Nitro Express 式）：黄铜弹壳 + 底缘 + 收口 + 铜被甲尖头 + 高光
-function bigBulletHtml(uid) {
-  return '<svg viewBox="0 0 100 30" width="100%" height="100%" style="overflow:visible;"><defs>' +
-    '<linearGradient id="bb' + uid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fef3c7"/><stop offset=".35" stop-color="#fbbf24"/><stop offset=".7" stop-color="#b45309"/><stop offset="1" stop-color="#78350f"/></linearGradient>' +
-    '<linearGradient id="bc' + uid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fed7aa"/><stop offset=".4" stop-color="#ea580c"/><stop offset=".75" stop-color="#9a3412"/><stop offset="1" stop-color="#431407"/></linearGradient></defs>' +
-    '<rect x="3" y="4" width="55" height="22" rx="2" fill="url(#bb' + uid + ')"/><rect x="0" y="2.5" width="5" height="25" rx="1.5" fill="url(#bb' + uid + ')"/>' +
-    '<rect x="51" y="4" width="7" height="22" fill="#78350f" opacity=".45"/><path d="M58,4.5 L72,4.5 Q100,9 100,15 Q100,21 72,25.5 L58,25.5 Z" fill="url(#bc' + uid + ')"/>' +
-    '<path d="M60,8 L72,8 Q91,11 96,14" stroke="#fff7ed" stroke-opacity=".75" stroke-width="1.5" fill="none" stroke-linecap="round"/><rect x="7" y="7" width="42" height="2.6" rx="1.3" fill="#fffbeb" opacity=".6"/></svg>';
-}
 
 // ==========================================
 // 条目
@@ -1839,56 +1831,42 @@ const meleeHeavy = {
   },
 };
 
-// 远程重击（弗兰克【皇家猎象枪】）：镜头推近弗兰克，枪口凝出一颗巨弹（热浪聚能 + 火星吸入 + 颤动）→ 击发重枪口焰 + 后坐，
-// 镜头追弹甩到目标 → 命中拍（顿帧 ATTACK_HIT_MS）：白闪 + 原版双管重爆 + 低频冲击；解冻后原版重震屏 + 屏幕血块（无论命中/闪避都溅）+ 目标后仰 → 镜头回位
-// 音效沿用原版：shot01 击发、hitDown + 低频冲击命中
+// 远程重击（弗兰克【皇家猎象枪】，移植回合制 spawnRangedHeavyParticles）：枪口红光快速聚能 → shot01 击发 + 重枪口焰 + 后坐，
+// 粗红色弹道直射目标 → 命中拍 hitDown + 低频冲击 + 白闪 + 原版双管重爆、原版重震屏、屏幕血花（无论命中/闪避都溅，闪避在目标身后炸开）+ 目标后仰
 const rangedHeavy = {
   id: 'ranged-heavy', grade: 'L2', fxTags: ['远程重击'], reuseAudio: true,
-  timeline: { totalMs: 1180, fullscreen: false, darken: false },
-  cues: [{ key: 'herocharge', vol: 0.45 }, { key: 'shot', vol: 0.8 }, { key: 'hitDown', vol: 0.75 }],
+  timeline: { totalMs: 980, fullscreen: false, darken: false },
+  cues: [{ key: 'herocharge', vol: 0.4 }, { key: 'shot', vol: 0.8 }, { key: 'hitDown', vol: 0.75 }],
   prepareKeys() { return ['herocharge', 'shot', 'hitDown']; },
   async play(ctx) {
-    const { fx, hits, result } = ctx, sb = ctx.sandbox;
-    const CHARGE = 380, FLY = 200, STOP = ATTACK_HIT_MS;
+    const { fx, hits, result } = ctx;
+    const CHARGE = 260, FLY = 110;
     const cm = ctx.centerOf(ctx.casterId), tm = hits[0] ? ctx.centerOf(hits[0].targetId) : result.aim;
     const c = worldPx(cm), t = worldPx(tm), ang = Math.atan2(t.y - c.y, t.x - c.x), ux = Math.cos(ang), uy = Math.sin(ang);
-    const m = { x: c.x + ux * 30, y: c.y + uy * 30 }, landed = hits.filter(h => h.hit);
-    const ip = landed.length ? t : { x: t.x + ux * 45, y: t.y + uy * 45 };   // 闪避：擦过目标在其身后炸开
-    const home = sb.getPose();
-    // ① 特写蓄力：推近弗兰克；巨弹在枪口凝形颤动，热浪聚能、火星吸入
-    const Z = k => zoomAt(home.scale, home.scale * k);
-    sb.cameraTo(sb.poseAt(cm.x + ux * 0.8, cm.y + uy * 0.8, Z(1.8)), 240);
-    fx.sfx('herocharge', 0.45);
-    const L = 1.9 * PX, W = L * 0.3, uid = fx.uid();
-    const glow = fx.top(orbHtml(m.x, m.y, 1.6 * PX, 'rgba(249,115,22,0.55)', 'rgba(254,243,199,0.95)'), CHARGE + 60).firstChild;
-    glow.animate([{ transform: 'scale(.3)', opacity: 0.4 }, { transform: 'scale(1.1)', opacity: 1, offset: 0.7 }, { transform: 'scale(.8)', opacity: 0.9 }], { duration: CHARGE, fill: 'forwards' });
-    fx.top(ringHtml(m.x, m.y, 2.4 * PX, 'rgba(253,186,116,0.8)', 'rgba(234,88,12,0.35)'), CHARGE).firstChild
-      .animate([{ transform: 'scale(1.5)', opacity: 0 }, { transform: 'scale(.35)', opacity: 0.95 }], { duration: CHARGE, easing: 'ease-in', fill: 'forwards' });
-    particles(fx, Array.from({ length: 14 }, () => { const a = rnd(0, TAU), r = rnd(50, 80); return { x: m.x + Math.cos(a) * r, y: m.y + Math.sin(a) * r, dx: -Math.cos(a) * r, dy: -Math.sin(a) * r, size: rnd(5, 9), color: '#fdba74', core: '#fff7ed', s0: 1, s1: 0.4, dur: rnd(240, CHARGE), ease: 'ease-in' }; }), CHARGE);
-    const bl = fx.top('<div style="position:absolute;left:' + m.x + 'px;top:' + m.y + 'px;width:0;height:0;transform:rotate(' + deg(ang).toFixed(1) + 'deg);">' +
-      '<div style="position:absolute;left:' + (-L * 0.35) + 'px;top:' + (-W / 2) + 'px;width:' + L + 'px;height:' + W + 'px;filter:drop-shadow(0 0 6px rgba(251,146,60,.9));">' + bigBulletHtml(uid) + '</div></div>', CHARGE + FLY + 20).firstChild;
-    const shell = bl.firstChild;
-    shell.animate([{ transform: 'scale(.25)', opacity: 0 }, { transform: 'scale(1.08)', opacity: 1, offset: 0.55 }, { transform: 'translate(1px,-1px) scale(1)', offset: 0.7 }, { transform: 'translate(-1px,1px) scale(1.02)', offset: 0.85 }, { transform: 'scale(1)', opacity: 1 }], { duration: CHARGE, fill: 'forwards' });
+    const m = { x: c.x + ux * 24, y: c.y + uy * 24 }, landed = hits.filter(h => h.hit);
+    const ip = landed.length ? t : { x: t.x + ux * 45, y: t.y + uy * 45 };
+    // ① 快速蓄力：枪口红光收束 + 火星吸入
+    fx.sfx('herocharge', 0.4);
+    fx.top(orbHtml(m.x, m.y, 0.9 * PX, 'rgba(220,38,38,0.6)', 'rgba(254,226,226,0.95)'), CHARGE + 40).firstChild
+      .animate([{ transform: 'scale(.3)', opacity: 0.4 }, { transform: 'scale(1.15)', opacity: 1, offset: 0.75 }, { transform: 'scale(.7)', opacity: 0.9 }], { duration: CHARGE, fill: 'forwards' });
+    particles(fx, Array.from({ length: 10 }, () => { const a = rnd(0, TAU), r = rnd(34, 56); return { x: m.x + Math.cos(a) * r, y: m.y + Math.sin(a) * r, dx: -Math.cos(a) * r, dy: -Math.sin(a) * r, size: rnd(4, 7), color: '#f87171', core: '#fee2e2', s0: 1, s1: 0.4, dur: rnd(180, CHARGE), ease: 'ease-in' }; }), CHARGE);
     if (!(await ctx.wait(CHARGE))) return false;
-    // ② 击发：重枪口焰 + 后坐；巨弹拖曳光直飞，镜头追弹甩向目标
+    // ② 击发：重枪口焰 + 后坐 + 粗红色弹道
     fx.sfx('shot', 0.8); fx.shake('heavy');
-    gunFlash(fx, { x: m.x + ux * L * 0.2, y: m.y + uy * L * 0.2 }, ang, { size: 70, ms: 220 });
-    jolt(ctx, ctx.casterId, { amp: 6, ms: 60, glow: '#fb923c' });
-    tracer(fx, m, ip, { width: W * 0.55, ms: FLY, len: L * 1.4 });
-    const dx = ip.x - m.x, dy = ip.y - m.y;
-    bl.animate([{ translate: '0 0' }, { translate: dx.toFixed(1) + 'px ' + dy.toFixed(1) + 'px' }], { duration: FLY, easing: 'cubic-bezier(.5,0,.9,.6)', fill: 'forwards' });
-    sb.cameraTo(sb.poseAt(tm.x - ux * 0.6, tm.y - uy * 0.6, Z(1.5)), FLY + 40);
+    gunFlash(fx, m, ang, { size: 52, ms: 200 });
+    jolt(ctx, ctx.casterId, { amp: 5, ms: 55, glow: '#ef4444' });
+    tracer(fx, m, ip, { width: 9, ms: FLY, len: 150, tint: TRACER_RED });
     if (!(await ctx.wait(FLY))) return false;
-    // ③ 命中拍：顿帧中白闪 + 双管重爆；解冻后重震屏、血块、后仰、回位
+    // ③ 命中拍：原版双管重爆 + 白闪 + 重震屏 + 屏幕血花 + 后仰
     hits.forEach(h => ctx.reveal(h.targetId));
     fx.sfx('hitDown', 0.75); subBass(ctx, RANGED_SUB_BASS);
-    if (!(await holdOr(ctx.hold, STOP, () => { screenFlash(fx, '#fff', 0.45, 300); rangedHeavyBurst(fx, ip); }))) return false;
+    screenFlash(fx, '#fff', 0.45, 300);
+    rangedHeavyBurst(fx, ip);
     heavyShake(ctx, RANGED_HEAVY_SHAKE, 480);
     screenBlood(fx, 1400, { pos: RANGED_SPLAT_POS, drips: RANGED_SPLAT_DRIPS, each: 1150 });
     landed.forEach(h => heavyFlinch(ctx, h.targetId, RECOIL_FLINCH, ang));
     if (landed.length) spray(fx, t, 14, { kind: 'gore', ang, spread: 1.4, dist: [24, 96], size: [3, 7] });
-    sb.cameraTo(sb.poseAt((cm.x + tm.x) / 2, (cm.y + tm.y) / 2, Z(1.05)), 160).then(ok => { if (ok) ctx.after(220, () => sb.cameraTo(home, 300)); });
-    return ctx.wait(520);
+    return ctx.wait(560);
   },
 };
 
@@ -2232,7 +2210,7 @@ const scorpionKey = {
 // 视频帧内碎裂点约在 (0.5, 0.83)、首帧瓶位约在 (0.47, 0.17)，据此把碎裂点对准规则落点
 const FOG_SHATTER_Y = 0.83, FOG_BOTTLE = { x: 0.47, y: 0.17 }, FOG_SHATTER_MS = 950;
 const xenonBlightFog = {
-  id: 'xenon-blight-fog', grade: 'L4', fxTags: ['异种坏死雾'], reuseAudio: true, cine: 'projectile', cineHold: false,
+  id: 'xenon-blight-fog', grade: 'L4', fxTags: ['异种坏死雾'], reuseAudio: true, cine: false,
   timeline: { chargeMs: 1400, totalMs: 3250, fullscreen: true, darken: true },   // ≈450 投瓶 + 950 瓶落至碎裂 + 1770 雾起与余韵
   cues: [{ key: 'fog.mp4 原声', vol: 2.5 }],
   prepareKeys() { return []; },
@@ -2246,8 +2224,8 @@ const xenonBlightFog = {
     worldDarken(fx, b, { holeR: Math.max(R * 0.8, W * 0.45), inMs: 380, holdMs: 2300, outMs: 520, peak: 0.55 });
     const flyMs = Math.round(Math.min(560, Math.max(360, Math.hypot(hand.x - head.x, hand.y - head.y) * 0.9)));
     throwVial(fx, head, hand, { kind: 'poison', ms: flyMs, s0: 0.5, s1: W * 0.2 / 34 });
-    // 先看索恩出手，瓶子飞到 60% 时甩到落点与视频中心之间，瓶落轨迹与碎裂点同时入画；视频自然播放不定格（未手动操作镜头时才跟）
-    ctx.cine?.launch(400, Math.round(flyMs * 0.6), { at: { x: bm.x, y: (bm.y + vy / PX) / 2 }, k: 1.25 });
+    // 镜头随瓶跟到落点：视频在落点上方展开，远投时开场构图会裁掉上半段（未手动操作镜头时才跟）
+    ctx.sandbox.guideTo([{ x: bm.x, y: (vy - H / 2) / PX }, bm, { x: bm.x, y: bm.y + 1 }], { ms: flyMs });
     if (!(await ctx.wait(flyMs))) return false;
     const cv = webm(ctx, 'fog.mp4', b.x, vy, W, { ms: 3400, audio: 2.5 });
     ctx.after(FOG_SHATTER_MS, () => { fx.shake('medium'); ctx.atmos?.burst(); });
