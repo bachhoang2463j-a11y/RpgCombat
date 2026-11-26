@@ -28,7 +28,7 @@ const ENTRIES = [
 // 宿主注入（战棋规则/状态；不从原版带入）
 const HOST = [
   'state', 'isSkillActionable', 'prepareSkillTarget', 'teamBarrier', 'skillHasBarrierTag', 'hasEnoughBindings',
-  'isSummonBlockedByLimit', 'getHeroItemBindings', 'itemBindingKnowledge', 'isItemUsable', 'prepareItemTarget',
+  'isSummonBlockedByLimit', 'getHeroItemBindings', 'itemBindingKnowledge', 'itemStatus', 'prepareItemTarget',
   'handleBasicAttack', 'handleBasicDefend', 'handleBasicRetreat', 'cancelTargeting', 'getSkillGroupChildren',
   'prepareGroupedItemSkill', 'normalizeEffectTag',
 ];
@@ -156,6 +156,37 @@ function build() {
 
   // 宿主适配补丁（固定命中数）
   js = patch(js, 'if (isEnough) btn.onclick = () => prepareSkillTarget(idx);', 'btn.dataset.skillIdx = idx; if (isEnough) btn.onclick = () => prepareSkillTarget(idx);', 1, '技能卡挂全局索引（宿主补射程胶囊）');
+  js = patch(js, /function createItemCard\(hero, item, idx\) \{[\s\S]*?(?=    let cardStateClass)/,
+    `function createItemCard(hero, entry, idx, childIdx = null) {
+    const children = childIdx == null && entry.children?.length ? entry.children : null;
+    const child = childIdx == null ? null : entry.children[childIdx];
+    const item = child ? { ...entry, ...child, category: entry.category, bindings: entry.bindings,
+        count: entry.count, maxUses: entry.maxUses, usesRemaining: entry.usesRemaining } : entry;
+    const meta = ITEM_CATEGORY_META[item.category] || ITEM_CATEGORY_META['道具'];
+    const isAmmo = item.category === '弹药';
+    const status = itemStatus(entry, child);
+    const isBlocked = !status.ok;
+    const isExhausted = isBlocked && !isAmmo && (item.category === '道具'
+        ? item.maxUses > 0 && (item.usesRemaining ?? item.maxUses) <= 0 : !(item.count > 0));
+    const isMpShort = status.reason === 'MP不足';
+`, 1, '物品父子卡共用物品判定与库存视图');
+  js = patch(js, '    if (isBlocked) btn.disabled = true;', `    if (isBlocked && !children) btn.setAttribute('aria-disabled', 'true');
+    btn.title = status.reason || (children ? '展开道具子用法' : item.category + (status.auxCost ? ' · 消耗1辅助行动' : ' · 已就绪'));
+    if (!isBlocked && !children) {
+        btn.dataset.costMain = status.mainCost;
+        btn.dataset.costAux = status.auxCost;
+    }`, 1, '物品按实际费用悬停、灰态原因可读');
+  js = patch(js, /    let noticeHtml = '';\n    if \(isAmmo\)[\s\S]*?(?=    let row3Html)/,
+    `    const noticeHtml = status.reason ? '<span class="text-[8px] text-rose-400 font-bold leading-none">' + escapeHistoryHtml(status.reason) + '</span>' : '';
+`, 1, '物品显示真实不可用原因');
+  js = patch(js, /    \/\/ 普通道具：点击进目标选择\/使用[\s\S]*?(?=        let _arrow)/, `    if (!isBlocked && !children) btn.onclick = () => child
+        ? prepareGroupedItemSkill(idx, childIdx) : prepareItemTarget(idx);
+    if (children) {
+`, 1, '物品子项不进普通技能索引');
+  js = patch(js, "'⇅ 变体×' + _children.length", "'⇅ 变体×' + children.length", 1, '物品变体数');
+  js = patch(js, /        _children\.forEach\(\(c, cIdx\) => \{[\s\S]*?\n        \}\);/,
+    '        children.forEach((c, cIdx) => wrap.appendChild(createItemCard(hero, entry, idx, cIdx)));', 1, '子用法复用物品卡而非技能卡');
+  js = patch(js, '        if (!isExhausted) btn.onclick = _toggle;', '        btn.onclick = _toggle;', 1, '库存耗尽仍可展开查看子项');
 
   // —— FX02 规范标签（编辑器下拉去单群）：单/群前缀标签映射为规范标签（单群由空间范围决定，不再进标签）——
   // 官方规范名以 src/effect-definitions.mjs EFFECT_DEFINITIONS / LEGACY_TAG_ALIASES 为唯一权威（v3）：
@@ -272,7 +303,7 @@ export const RPG_UI_EDITOR_HTML = ${JSON.stringify(editorHtml)};
 export function createRpgUi(host) {
   // ---- 宿主注入（战棋规则判定、瞄准入口、伪 state） ----
   const { state, isSkillActionable, prepareSkillTarget, skillHasBarrierTag, hasEnoughBindings, isSummonBlockedByLimit,
-    getHeroItemBindings, itemBindingKnowledge, isItemUsable, prepareItemTarget, handleBasicAttack, handleBasicDefend,
+    getHeroItemBindings, itemBindingKnowledge, itemStatus, prepareItemTarget, handleBasicAttack, handleBasicDefend,
     handleBasicRetreat, cancelTargeting, getSkillGroupChildren, prepareGroupedItemSkill, normalizeEffectTag } = host;
   const teamBarrier = 0;
 

@@ -1,9 +1,9 @@
 // ==========================================
 // 由 tactics/tools/extract-rpg-ui.cjs 自动生成，请勿手改。
 // 源: index.html  sha256=5c1ab2a1a243bb7d7e79b4aca76026ad1058af2a74bf9dfbf8763ae8b13554e7
-// 入选声明 55 段: VARIANT_GRANT_NAMES@3103, VARIANT_GRANT_TIPS@3104, getGrantedVariantName@3112, SKILL_TYPES@3121, SKILL_TYPE_EDIT_OPTIONS@3139, TAG_EXPAND_MAP@3149, expandTagLabel@3169, tagDisplayLabel@3182, TAG_EFFECT_TIPS@3188, getTagTip@3256, tagTipAttrs@3272, ASSET_ORIGIN@3340, ASSET_BASE@3341, escapeHistoryHtml@3563, RLYEH_FOG_CLOUD_URL@15572, WEBM_FX_REGISTRY@16678, getEffectiveGroupChildren@19073, _queueUidCounter@20543, _prevQueueCurrentUid@20544, _roundStartGlowPending@20545, _recentSpeedChanges@20546, _TURN_QUEUE_ANIM_MS@20547, _TURN_QUEUE_EASE@20548, renderTurnQueue@20550, MENU_DAMAGE_TAGS@26978, isAttackSkill@26979, formatTagPill@26985, createSkillCard@27020, createSkillGroupCard@27156, updateSkillMenus@27199, closeAllSubMenus@27267, openBasicMenu@27272, closeBasicMenu@27273, openAttackSkillMenu@27276, closeAttackSkillMenu@27277, openSupportSkillMenu@27278, closeSupportSkillMenu@27279, ITEM_CATEGORY_META@27284, createItemCard@27290, updateItemMenu@27416, openItemMenu@27433, closeItemMenu@27439, closeSkillMenu@27445, buildEditorSkillTagPreview@27533, buildSkillFormFieldsHtml@27553, syncGrantSlotPower@27616, renderSkillTypeOptions@27627, closeSkillTypeCombo@27639, openSkillTypeCombo@27643, filterSkillTypeCombo@27662, applySkillTypeCombo@27677, togglePillClass@28478, _rcTipTimer@31334, showTagTipFor@31335, hideTagTip@31361
-// 宿主注入: state, isSkillActionable, prepareSkillTarget, teamBarrier, skillHasBarrierTag, hasEnoughBindings, isSummonBlockedByLimit, getHeroItemBindings, itemBindingKnowledge, isItemUsable, prepareItemTarget, handleBasicAttack, handleBasicDefend, handleBasicRetreat, cancelTargeting, getSkillGroupChildren, prepareGroupedItemSkill, normalizeEffectTag
-// 宿主适配补丁: 技能卡挂全局索引（宿主补射程胶囊）×1; SKILL_TYPES 去单群规范化×1; TAG_EXPAND_MAP 加规范标签显示名×1; 下拉当前值经 normalizeEffectTag 规范化×1; 攻击技能判定复用规则伤害槽×1; 移除不再使用的旧分类标签表×1; 胶囊配色识别规范伤害标签×1; 伤害标签悬浮说明×1; 行动条外层加 id（宿主安全区）×1; 内联 onclick → 委托×13; 防御/撤退禁用注明×2; 标签下拉浮层挂作用域×1
+// 入选声明 56 段: VARIANT_GRANT_NAMES@3103, VARIANT_GRANT_TIPS@3104, getGrantedVariantName@3112, SKILL_TYPES@3121, SKILL_TYPE_EDIT_OPTIONS@3139, TAG_EXPAND_MAP@3149, expandTagLabel@3169, tagDisplayLabel@3182, TAG_EFFECT_TIPS@3188, getTagTip@3256, tagTipAttrs@3272, ASSET_ORIGIN@3340, ASSET_BASE@3341, escapeHistoryHtml@3563, RLYEH_FOG_CLOUD_URL@15572, WEBM_FX_REGISTRY@16678, getEffectiveGroupChildren@19073, _queueUidCounter@20543, _prevQueueCurrentUid@20544, _roundStartGlowPending@20545, _recentSpeedChanges@20546, _TURN_QUEUE_ANIM_MS@20547, _TURN_QUEUE_EASE@20548, renderTurnQueue@20550, isItemUsable@26818, MENU_DAMAGE_TAGS@26978, isAttackSkill@26979, formatTagPill@26985, createSkillCard@27020, createSkillGroupCard@27156, updateSkillMenus@27199, closeAllSubMenus@27267, openBasicMenu@27272, closeBasicMenu@27273, openAttackSkillMenu@27276, closeAttackSkillMenu@27277, openSupportSkillMenu@27278, closeSupportSkillMenu@27279, ITEM_CATEGORY_META@27284, createItemCard@27290, updateItemMenu@27416, openItemMenu@27433, closeItemMenu@27439, closeSkillMenu@27445, buildEditorSkillTagPreview@27533, buildSkillFormFieldsHtml@27553, syncGrantSlotPower@27616, renderSkillTypeOptions@27627, closeSkillTypeCombo@27639, openSkillTypeCombo@27643, filterSkillTypeCombo@27662, applySkillTypeCombo@27677, togglePillClass@28478, _rcTipTimer@31334, showTagTipFor@31335, hideTagTip@31361
+// 宿主注入: state, isSkillActionable, prepareSkillTarget, teamBarrier, skillHasBarrierTag, hasEnoughBindings, isSummonBlockedByLimit, getHeroItemBindings, itemBindingKnowledge, itemStatus, prepareItemTarget, handleBasicAttack, handleBasicDefend, handleBasicRetreat, cancelTargeting, getSkillGroupChildren, prepareGroupedItemSkill, normalizeEffectTag
+// 宿主适配补丁: 技能卡挂全局索引（宿主补射程胶囊）×1; 物品父子卡共用物品判定与库存视图×1; 物品按实际费用悬停、灰态原因可读×1; 物品显示真实不可用原因×1; 物品子项不进普通技能索引×1; 物品变体数×1; 子用法复用物品卡而非技能卡×1; 库存耗尽仍可展开查看子项×1; SKILL_TYPES 去单群规范化×1; TAG_EXPAND_MAP 加规范标签显示名×1; 下拉当前值经 normalizeEffectTag 规范化×1; 攻击技能判定复用规则伤害槽×1; 移除不再使用的旧分类标签表×1; 胶囊配色识别规范伤害标签×1; 伤害标签悬浮说明×1; 行动条外层加 id（宿主安全区）×1; 内联 onclick → 委托×13; 防御/撤退禁用注明×2; 标签下拉浮层挂作用域×1
 // ==========================================
 /* eslint-disable */
 import { skillSlots } from '../../effect-definitions.mjs';
@@ -15,7 +15,7 @@ export const RPG_UI_EDITOR_HTML = "<div id=\"editor-modal\" class=\"fixed inset-
 export function createRpgUi(host) {
   // ---- 宿主注入（战棋规则判定、瞄准入口、伪 state） ----
   const { state, isSkillActionable, prepareSkillTarget, skillHasBarrierTag, hasEnoughBindings, isSummonBlockedByLimit,
-    getHeroItemBindings, itemBindingKnowledge, isItemUsable, prepareItemTarget, handleBasicAttack, handleBasicDefend,
+    getHeroItemBindings, itemBindingKnowledge, itemStatus, prepareItemTarget, handleBasicAttack, handleBasicDefend,
     handleBasicRetreat, cancelTargeting, getSkillGroupChildren, prepareGroupedItemSkill, normalizeEffectTag } = host;
   const teamBarrier = 0;
 
@@ -411,6 +411,14 @@ function renderTurnQueue() {
   _prevQueueCurrentUid = currentUid;
 }
 
+function isItemUsable(item) {
+    if (!item || item.category === '弹药') return false;
+    if (item._sbMissing) return false;
+    if (isSummonBlockedByLimit(item)) return false;   // 召唤类道具与召唤技能同规则：名额满则不可用
+    if (item.category === '道具') return !(item.maxUses > 0 && (item.usesRemaining ?? item.maxUses) <= 0);
+    return (item.count || 0) > 0;
+}
+
 
 
 function isAttackSkill(skill) {
@@ -682,22 +690,29 @@ const ITEM_CATEGORY_META = {
   '弹药':   { icon: '🔹', badgeClass: 'bg-amber-950/90 text-amber-300 border-amber-600/60' }
 };
 
-function createItemCard(hero, item, idx) {
+function createItemCard(hero, entry, idx, childIdx = null) {
+    const children = childIdx == null && entry.children?.length ? entry.children : null;
+    const child = childIdx == null ? null : entry.children[childIdx];
+    const item = child ? { ...entry, ...child, category: entry.category, bindings: entry.bindings,
+        count: entry.count, maxUses: entry.maxUses, usesRemaining: entry.usesRemaining } : entry;
     const meta = ITEM_CATEGORY_META[item.category] || ITEM_CATEGORY_META['道具'];
     const isAmmo = item.category === '弹药';
-    const isExhausted = !isAmmo && !isItemUsable(item);
-    // [再动] 物品每回合限用一次（与再动技能同规则）
-    const isExtraTurnItem = [item.type, item.type2, item.type3].some(t => t && t.includes('再动'));
-    const isUsedExtraTurn = isExtraTurnItem && state.usedExtraTurnSkillsThisRound && state.usedExtraTurnSkillsThisRound.has(item.name);
-    // [MP:N] 物品资源不足与技能卡同口径灰显（缺省/0 = 零消耗不受影响）
-    const isMpShort = !isAmmo && (item.cost || 0) > 0 && hero.mp < (item.cost || 0);
-    const isBlocked = isAmmo || isExhausted || isUsedExtraTurn || isMpShort;
+    const status = itemStatus(entry, child);
+    const isBlocked = !status.ok;
+    const isExhausted = isBlocked && !isAmmo && (item.category === '道具'
+        ? item.maxUses > 0 && (item.usesRemaining ?? item.maxUses) <= 0 : !(item.count > 0));
+    const isMpShort = status.reason === 'MP不足';
     let cardStateClass = 'skill-card-default';
     if (isExhausted) cardStateClass = 'exhausted-card';
     else if (isBlocked) cardStateClass = 'disabled-card';
     const btn = document.createElement('button');
     btn.className = `w-full p-1.5 rounded-lg border border-slate-800/80 text-left shrink-0 flex flex-col gap-1 relative overflow-hidden transition-all duration-200 group ${cardStateClass}`;
-    if (isBlocked) btn.disabled = true;
+    if (isBlocked && !children) btn.setAttribute('aria-disabled', 'true');
+    btn.title = status.reason || (children ? '展开道具子用法' : item.category + (status.auxCost ? ' · 消耗1辅助行动' : ' · 已就绪'));
+    if (!isBlocked && !children) {
+        btn.dataset.costMain = status.mainCost;
+        btn.dataset.costAux = status.auxCost;
+    }
     let row1Html = `
       <div class="flex items-center justify-between gap-1.5 w-full shrink-0">
         <div class="flex items-center gap-1 min-w-0">
@@ -751,11 +766,7 @@ function createItemCard(hero, item, idx) {
     // 绑定信息徽章（弹药/道具/消耗品通用：绑定物品即对应技能的施展材料）
     const _bindStr = (item.bindings || []).map(b => `${b.skillName}×${b.cost}`).join('、');
     if (_bindStr) stockBadgesHtml += `<span class="text-[8px] px-1 py-0.2 rounded border bg-slate-900 text-slate-400 border-slate-700 leading-none truncate max-w-full">🔗 ${_bindStr}</span>`;
-    let noticeHtml = '';
-    if (isAmmo) noticeHtml = `<span class="text-[8px] text-slate-500 leading-none">技能弹药 · 不可主动使用</span>`;
-    else if (isExhausted) noticeHtml = `<span class="text-[8px] text-rose-400 font-bold leading-none">🚫 已耗尽</span>`;
-    else if (isUsedExtraTurn) noticeHtml = `<span class="text-[8px] text-rose-400 font-bold leading-none">🚫 本轮已用</span>`;
-    else if (isMpShort) noticeHtml = `<span class="text-[8px] text-rose-400 font-bold leading-none">🚫 MP不足</span>`;
+    const noticeHtml = status.reason ? '<span class="text-[8px] text-rose-400 font-bold leading-none">' + escapeHistoryHtml(status.reason) + '</span>' : '';
     let row3Html = `
       <div class="flex items-center justify-between gap-1 w-full shrink-0 pt-0.5 border-t border-slate-800/80">
         <div class="flex items-center gap-1 flex-wrap min-w-0">
@@ -767,19 +778,15 @@ function createItemCard(hero, item, idx) {
       </div>
     `;
     btn.innerHTML = row1Html + row2Html + row3Html;
-    // 普通道具：点击进目标选择/使用
-    if (!isBlocked) btn.onclick = () => prepareItemTarget(idx);
-    // 变体组道具（嵌套子技能）：父卡点击 = 展开子技能列表（覆盖上面的普通 onclick）；
-    // 父道具耗尽（isExhausted）时整组灰显不可展开。展开范式与技能组卡同构（isGroupExpanded + hidden 切换，
-    // DOM 节点闭包引用防同名冲突）。子技能卡 onclick 重绑到道具组执行入口（组内序号，不进技能全局索引）。
-    const _children = (item.children && item.children.length) ? item.children : null;
-    if (_children) {
+    if (!isBlocked && !children) btn.onclick = () => child
+        ? prepareGroupedItemSkill(idx, childIdx) : prepareItemTarget(idx);
+    if (children) {
         let _arrow = null;
         const nameSpan = btn.querySelector('span.text-xs');
         if (nameSpan) {
             const badge = document.createElement('span');
             badge.className = 'text-[8px] bg-slate-800 text-slate-300 border border-slate-600/60 px-1 py-0.2 rounded shrink-0 leading-tight';
-            badge.textContent = '⇅ 变体×' + _children.length;
+            badge.textContent = '⇅ 变体×' + children.length;
             _arrow = document.createElement('span');
             _arrow.className = 'text-slate-400 text-[10px] transition-transform duration-200 shrink-0' + (item.isGroupExpanded ? ' rotate-180' : '');
             _arrow.textContent = '▼';
@@ -787,18 +794,13 @@ function createItemCard(hero, item, idx) {
         }
         const wrap = document.createElement('div');
         wrap.className = 'pl-2 flex flex-col gap-1 border-l border-slate-800 ml-1' + (item.isGroupExpanded ? '' : ' hidden');
-        _children.forEach((c, cIdx) => {
-            const card = createSkillCard(hero, c, cIdx);
-            // 子技能卡 onclick 重绑到道具组执行入口（组内序号 + 父物品索引，不进技能全局索引）
-            card.onclick = () => prepareGroupedItemSkill(idx, cIdx);
-            wrap.appendChild(card);
-        });
+        children.forEach((c, cIdx) => wrap.appendChild(createItemCard(hero, entry, idx, cIdx)));
         const _toggle = () => {
             item.isGroupExpanded = !item.isGroupExpanded;
             wrap.classList.toggle('hidden', !item.isGroupExpanded);
             if (_arrow) _arrow.classList.toggle('rotate-180', item.isGroupExpanded);
         };
-        if (!isExhausted) btn.onclick = _toggle;
+        btn.onclick = _toggle;
         const _outer = document.createElement('div');
         _outer.className = 'flex flex-col gap-1 shrink-0';
         _outer.appendChild(btn);

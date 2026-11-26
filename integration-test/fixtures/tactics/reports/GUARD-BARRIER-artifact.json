@@ -1,8 +1,8 @@
 {
   "kind": "guard-barrier-artifact-backend",
   "artifact": "tactics/mvp-standalone.html",
-  "bytes": 1761298,
-  "sha256": "57a72fbbffa93a94e8ccee91a8f4c117144017659b957de8f45c767156fc557c",
+  "bytes": 1762435,
+  "sha256": "fa5f7bf0980b14614048de093126dab7a8988524f8f60459f728e3578f8a26e1",
   "cases": [
     {
       "id": "单脚本与闭合",
@@ -16,6 +16,11 @@
     },
     {
       "id": "守护、隔绝、原因与揭示模块真实入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "手动舍身无脚步、召唤守护仅保留一次脚步",
       "pass": true,
       "detail": ""
     },
@@ -75,7 +80,7 @@
       "detail": ""
     }
   ],
-  "passed": 14,
+  "passed": 15,
   "failed": 0,
   "examples": {
     "summonGuard": {

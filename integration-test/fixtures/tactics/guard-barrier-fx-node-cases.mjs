@@ -56,12 +56,13 @@ async function guardCases() {
   out.push(ok('TGB-G 冲刺：决意 335ms 后沿 path 从 startPosition 插值到 contactPoint（只动显示位置），终点精确停在落点',
     done === true && waits[0] === 335 && Math.abs(first[1] - g.startPosition.x) < 1e-6 && Math.abs(first[2] - g.startPosition.y) < 1e-6
     && last[1] === g.contactPoint.x && last[2] === g.contactPoint.y && view.pos.every(p => p[0] === 'h:弗兰克'), { first, last, waits }));
-  out.push(ok('TGB-G 冲刺：面朝攻击来源、两段重甲步伐（决意轻/突进重）、到位挂守护虚线环', view.facing[0] && Math.abs(view.facing[0][1] - Math.atan2(g.origin.x - g.contactPoint.x, -(g.origin.y - g.contactPoint.y)) * 180 / Math.PI) < 1e-6
-    && fx.log.sfx.map(s => s[0]).join() === 'sheshen_armor_step,sheshen_armor_step' && fx.log.sfx[0][1] < fx.log.sfx[1][1] && fx.log.top.some(t => /dashed/.test(t.html)), fx.log.sfx));
+  out.push(ok('TGB-G 冲刺：面朝攻击来源、手动格挡无脚步声、到位挂守护虚线环', view.facing[0] && Math.abs(view.facing[0][1] - Math.atan2(g.origin.x - g.contactPoint.x, -(g.origin.y - g.contactPoint.y)) * 180 / Math.PI) < 1e-6
+    && fx.log.sfx.length === 0 && fx.log.top.some(t => /dashed/.test(t.html)), fx.log.sfx));
 
   const fx2 = stubFx(), view2 = stubView(), w2 = [];
   await playGuardDash({ fx: fx2, view: view2, tween, wait: async ms => { w2.push(ms); return true; } }, { ...guard, reason: 'summon-lethal-guard' });
-  out.push(ok('TGB-G 召唤自动守护：无决意蓄势直接冲刺', w2.length === 0 && view2.pos.length > 0));
+  out.push(ok('TGB-G 召唤自动守护：无决意蓄势直接冲刺且仅播一次脚步', w2.length === 0 && view2.pos.length > 0
+    && fx2.log.sfx.map(s => s[0]).join() === 'sheshen_armor_step'));
 
   const fx3 = stubFx(), view3 = stubView();
   playGuardBlock({ fx: fx3, view: view3, tween }, guard);

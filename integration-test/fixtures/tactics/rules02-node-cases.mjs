@@ -148,13 +148,14 @@ export const groups = {
       const g = b.attack(guard, aim(5, 4)); // e 先手（spd 300）自上免伤
       b.endAction(); // e 行动结束 → h 到轴
       const r1 = b.attack(hit20, aim(5, 4, 'e')); // h 行动：免伤计入有效 def（120）→ 20-120 → 0 并消耗
-      b.endAction(); // h 结束 → e 到轴（t≈66.7）
-      b.endAction(); // e 结束 → e 再次到轴（t=100 同刻 spd 高者先）
-      b.endAction(); // e 结束 → h 到轴（t=100）
+      for (let i = 0; i < 4; i++) {
+        b.endAction();
+        if (b.snapshot().currentId === 'h') break;
+      }
       const r2 = b.attack(hit20, aim(5, 4, 'e')); // 免伤已消耗 → 正常 20
       cases.push(ok('TR2-B 免伤一次性：下一次受击防御+120 归零并消耗，随后恢复正常',
         g.ok && r1.ok && r1.hits[0].hpDmg === 0 && r2.ok && r2.hits[0].hpDmg === 20,
-        j({ a: r1.hits[0].hpDmg, b: r2.hits[0].hpDmg })));
+        j({ a: r1.hits[0]?.hpDmg, b: r2.hits[0]?.hpDmg, reason: r2.reason })));
     }
     // B6 防御姿态（原版 actionDefend：MP+20%、TP+25%、命中+30、defend 状态）+ 毅力保命
     {

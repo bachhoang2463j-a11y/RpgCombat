@@ -46,7 +46,11 @@ export function distanceOf(battleState, unitId) {
   return p ? p.distance : 0;
 }
 
-// 把全部参跑单位的有效距离结算到 now（按各自 speed 计息）；到轴者封顶本圈，等待行动资格
+function lapSpeed(u) {
+  return u.speed / (1 + (u.repeatActions || 0));
+}
+
+// 把全部参跑单位按排轴速度结算到 now；到轴者封顶本圈，等待行动资格
 export function creditDistance(battleState, now) {
   const clock = clockOf(battleState);
   for (const id in clock.units) {
@@ -54,7 +58,7 @@ export function creditDistance(battleState, now) {
     if (u.status !== 'active' || !(u.speed > 0)) continue;
     if (now <= u.lastSync + EPS) continue;
     const p = ensureProgress(battleState, id);
-    p.distance += (now - u.lastSync) * u.speed;
+    p.distance += (now - u.lastSync) * lapSpeed(u);
     u.lastSync = now;
     if (p.distance > LAP_DISTANCE) p.distance = LAP_DISTANCE; // 只会在到达事件点时触顶
   }
@@ -66,7 +70,7 @@ export function nextArrivalTimeOf(battleState, unitId) {
   const u = clock.units[unitId];
   if (!u || u.status !== 'active' || !(u.speed > 0)) return Infinity;
   const d = distanceOf(battleState, unitId);
-  return u.lastSync + (LAP_DISTANCE - d) / u.speed;
+  return u.lastSync + (LAP_DISTANCE - d) / lapSpeed(u);
 }
 
 // ---------- 资格与终局预检 ----------

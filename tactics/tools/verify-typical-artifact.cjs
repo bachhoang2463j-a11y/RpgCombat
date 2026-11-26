@@ -36,6 +36,8 @@ check('实际结果事件和视觉消费入包', ['variant-trigger', 'status-tic
 check('冲锋扫掠、逐段闪避和周期扣血飘字入包', ['chargePath', 'queueReaction', 'awaitShotFeedback', 'suppressDodgeFx', 'onStatusTick', 'playStatusTick'].every(s => html.includes(s)));
 check('路径接触揭示、双击转火、自身直放和加速/燃烧展示入包', ['chargeStep', 'playCharge', 'reuseTarget', 'fireSelf', 'chargeInventory', '.t-unit-sprite .arcane-status-persist-burn'].every(s => html.includes(s)));
 check('自动跳跃、避雾、物品辅助耗费和整备入包', ['planJump', 'fogRouteFilter', 'ITEM_ACTION_COST', 'previewReady', 'battle.ready()', 'tauntDelta'].every(s => html.includes(s)));
+check('物品父子状态与敌方递减入包', /itemStatus\(entry,\s*child\)/.test(html) && /createItemCard\(hero,\s*entry,\s*idx,\s*cIdx\)/.test(html)
+  && ['repeatActions', 'recordPacingAction'].every(s => html.includes(s)));
 const context = { console, structuredClone, URL, setTimeout, clearTimeout };
 context.window = context;
 vm.createContext(context);
@@ -102,6 +104,28 @@ if (backend) {
   const moveData = backend.createScenarioData(backend.parseYamlText(yaml));
   const moveBattle = backend.createBattle({ ...moveData, scene: backend.scene, random: backend.createSeededRandom(moveData.seed) });
   moveBattle.start();
+  const openingIds = [];
+  for (let i = 0; i < 6; i++) {
+    const id = moveBattle.snapshot().currentId;
+    if (!id || id.startsWith('h:')) break;
+    openingIds.push(id);
+    moveBattle.endAction();
+  }
+  check('产物高敏怪开场仍多动但只在首位玩家前行动三次', openingIds.length === 3 && openingIds[0] === monsterId && openingIds[2] === monsterId
+    && moveBattle.snapshot().currentId === 'h:玛德琳', openingIds);
+  const gear = { name: '无限补给', isItem: true, category: '道具', type: '[回蓝]', power: 5, count: 0,
+    actionCost: { main: 1, aux: 0 }, range: { type: '自身' } };
+  const hero = unit('h', 'hero', 200), enemy = unit('e', 'enemy', 10);
+  hero.items.push(gear);
+  const itemBattle = backend.createBattle({ units: [hero, enemy], placementsById: { h: { col: 2, row: 3 }, e: { col: 7, row: 3 } },
+    scene: { sceneId: 'item-artifact', grid: { columns: 16, rows: 10, metersPerCell: 1 }, objects: [] } });
+  itemBattle.start();
+  itemBattle.defend();
+  const firstUse = itemBattle.useItem(gear);
+  const lackAux = itemBattle.canUseItem(gear).reason;
+  itemBattle.endAction();
+  check('产物不限次物品无需主行动、只耗辅助行动且跨行动可复用', firstUse.ok && firstUse.costSummary.aux === 1
+    && lackAux === '辅助行动已用完' && itemBattle.useItem(gear).ok && gear.count === 0);
   for (let i = 0; i < 12 && moveBattle.snapshot().currentId !== 'h:玛德琳'; i++) moveBattle.endAction();
   const move = moveBattle.move(11, 34);
   check('产物实际移动遇到队友已发现食尸鬼不重复截停', move.ok && !move.stoppedOnDiscovery && move.cell.col === 11 && move.cell.row === 34 &&

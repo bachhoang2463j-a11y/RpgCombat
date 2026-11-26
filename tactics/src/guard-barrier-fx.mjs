@@ -66,7 +66,7 @@ export async function playGuardDash(env, guard) {
   const s = worldPx(guard.startPosition), c = worldPx(guard.contactPoint);
   view.setDisplayFacing(id, facingToward(guard.contactPoint, guard.origin));
   if (!summon) {
-    // 1. 决意蓄势（0–340ms）：蓝色决意光环 + 16 颗光点向身收拢 + 重甲顿步
+    // 1. 决意蓄势（0–340ms）：蓝色决意光环 + 16 颗光点向身收拢
     const ring = fx.top('<i style="position:absolute;left:' + s.x + 'px;top:' + s.y + 'px;width:96px;height:96px;margin:-48px 0 0 -48px;border-radius:50%;border:2px solid rgba(56,189,248,0.85);box-shadow:0 0 20px rgba(56,189,248,0.6),inset 0 0 16px rgba(56,189,248,0.35);"></i>', 420);
     ring.firstChild.animate([{ transform: 'scale(0.7)', opacity: 0 }, { transform: 'scale(1.05)', opacity: 0.95, offset: 0.5 }, { transform: 'scale(0.92)', opacity: 0 }], { duration: 400, easing: 'cubic-bezier(0.28,0.82,0.34,1)', fill: 'forwards' });
     let orbs = '';
@@ -76,7 +76,6 @@ export async function playGuardDash(env, guard) {
     }
     const orbLayer = fx.top(orbs, 380);
     [...orbLayer.children].forEach(el => el.animate([{ transform: 'translate(' + el.dataset.dx + 'px,' + el.dataset.dy + 'px) scale(1)', opacity: 0 }, { opacity: 1, offset: 0.3 }, { transform: 'translate(0,0) scale(0.4)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(0.4,0,0.6,1)', fill: 'forwards' }));
-    fx.sfx('sheshen_armor_step', 0.38);
     if (!(await wait(335))) return false;
   }
   // 2. 重甲突进（335–630ms；召唤 180ms）：出发点残影 + 沿路径光点拖尾
@@ -86,7 +85,7 @@ export async function playGuardDash(env, guard) {
     gl.appendChild(ghost);
     ghost.animate([{ transform: 'scale(1)', opacity: 0.68 }, { transform: 'scale(0.95)', opacity: 0 }], { duration: 420, easing: 'ease-out', fill: 'forwards' });
   }
-  fx.sfx('sheshen_armor_step', summon ? 0.68 : 0.9);
+  if (summon) fx.sfx('sheshen_armor_step', 0.68);
   let trail = '';
   for (let i = 0; i < 10; i++) {
     const p = worldPx(pointOnPolyline(pts, i / 10));

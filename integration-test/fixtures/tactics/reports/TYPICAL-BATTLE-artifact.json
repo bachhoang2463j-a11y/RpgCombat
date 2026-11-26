@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "57a72fbbffa93a94e8ccee91a8f4c117144017659b957de8f45c767156fc557c",
-  "bytes": 1761298,
+  "sha256": "fa5f7bf0980b14614048de093126dab7a8988524f8f60459f728e3578f8a26e1",
+  "bytes": 1762435,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -131,6 +131,11 @@
       "detail": ""
     },
     {
+      "id": "物品父子状态与敌方递减入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
       "id": "无DOM离线宿主停在应用启动而非后端加载",
       "pass": true,
       "detail": "document is not defined"
@@ -196,6 +201,20 @@
       "detail": ""
     },
     {
+      "id": "产物高敏怪开场仍多动但只在首位玩家前行动三次",
+      "pass": true,
+      "detail": [
+        "e:伊塔库亚的眷族",
+        "e:犹格索托斯之子",
+        "e:伊塔库亚的眷族"
+      ]
+    },
+    {
+      "id": "产物不限次物品无需主行动、只耗辅助行动且跨行动可复用",
+      "pass": true,
+      "detail": ""
+    },
+    {
       "id": "产物实际移动遇到队友已发现食尸鬼不重复截停",
       "pass": true,
       "detail": ""
@@ -233,7 +252,7 @@
     {
       "id": "TT-ALERTS 预览不触发；超出敌人感知的攻击即使闪避也预警",
       "pass": true,
-      "detail": "[\"idle\",[{\"targetId\":\"e\",\"side\":\"enemy\",\"hit\":false,\"hpDmg\":0,\"hpBefore\":100,\"hpAfter\":100,\"maxHp\":100,\"down\":false,\"logIndex\":1,\"logEnd\":2,\"segments\":[{\"runId\":\"battle:7:0\",\"attackId\":\"attack:1\",\"segmentId\":\"battle:7:0:attack:1:slot:0:segment:1\",\"slotIndex\":0,\"segmentIndex\":1,\"shotIndex\":1,\"index\":0,\"origin\":{\"x\":1.5,\"y\":2.5},\"originalTargetId\":\"e\",\"contactPoint\":{\"x\":15.5,\"y\":2.5},\"targetId\":\"e\",\"logIndex\":1,\"side\":\"enemy\",\"maxHp\":100,\"damageType\":\"近战\",\"damageCategory\":null,\"isCrit\":false,\"isPierce\":false,\"hit\":false,\"outcome\":\"dodge\",\"hpDmg\":0,\"hpBefore\":100,\"hpAfter\":100,\"down\":false,\"logEnd\":2,\"aim\":{\"x\":15.5,\"y\":2.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":15,\"row\":2}]}]}],\"pending\"]"
+      "detail": "[\"idle\",[{\"targetId\":\"e\",\"side\":\"enemy\",\"hit\":false,\"hpDmg\":0,\"hpBefore\":100,\"hpAfter\":100,\"maxHp\":100,\"down\":false,\"logIndex\":1,\"logEnd\":2,\"segments\":[{\"runId\":\"battle:8:0\",\"attackId\":\"attack:1\",\"segmentId\":\"battle:8:0:attack:1:slot:0:segment:1\",\"slotIndex\":0,\"segmentIndex\":1,\"shotIndex\":1,\"index\":0,\"origin\":{\"x\":1.5,\"y\":2.5},\"originalTargetId\":\"e\",\"contactPoint\":{\"x\":15.5,\"y\":2.5},\"targetId\":\"e\",\"logIndex\":1,\"side\":\"enemy\",\"maxHp\":100,\"damageType\":\"近战\",\"damageCategory\":null,\"isCrit\":false,\"isPierce\":false,\"hit\":false,\"outcome\":\"dodge\",\"hpDmg\":0,\"hpBefore\":100,\"hpAfter\":100,\"down\":false,\"logEnd\":2,\"aim\":{\"x\":15.5,\"y\":2.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":15,\"row\":2}]}]}],\"pending\"]"
     },
     {
       "id": "TT-ALERTS 重置清掉由攻击引发的预警",
@@ -253,7 +272,7 @@
     {
       "id": "TT-ALERTS 广播发出一条警报事件：报警者、规则半径与实际收报名单（前端波纹据此播放）",
       "pass": true,
-      "detail": "[{\"seq\":1,\"eventId\":\"battle:8:0:event:1\",\"runId\":\"battle:8:0\",\"actionId\":\"battle:8:0:action:1\",\"at\":62.5,\"attackId\":null,\"type\":\"enemy-alarm\",\"unitId\":\"sender\",\"center\":{\"x\":7.5,\"y\":5.5},\"radius\":6,\"recipientIds\":[\"receiver\"]}]"
+      "detail": "[{\"seq\":1,\"eventId\":\"battle:9:0:event:1\",\"runId\":\"battle:9:0\",\"actionId\":\"battle:9:0:action:1\",\"at\":62.5,\"attackId\":null,\"type\":\"enemy-alarm\",\"unitId\":\"sender\",\"center\":{\"x\":7.5,\"y\":5.5},\"radius\":6,\"recipientIds\":[\"receiver\"]}]"
     },
     {
       "id": "TT-ALERTS 收报敌人按自身回合追击，不用范围技盲打也不自动接力",
@@ -263,7 +282,7 @@
     {
       "id": "TT-ALERTS 雾外预览和实战都可锁定雾内，普通视野不变",
       "pass": true,
-      "detail": "[true,null,[{\"targetId\":\"e\",\"side\":\"enemy\",\"hit\":true,\"hpDmg\":10,\"hpBefore\":100,\"hpAfter\":90,\"maxHp\":100,\"down\":false,\"logIndex\":1,\"logEnd\":2,\"segments\":[{\"runId\":\"battle:9:0\",\"attackId\":\"attack:1\",\"segmentId\":\"battle:9:0:attack:1:slot:0:segment:1\",\"slotIndex\":0,\"segmentIndex\":1,\"shotIndex\":1,\"index\":0,\"origin\":{\"x\":2.5,\"y\":2.5},\"originalTargetId\":\"e\",\"contactPoint\":{\"x\":6.5,\"y\":2.5},\"targetId\":\"e\",\"logIndex\":1,\"side\":\"enemy\",\"maxHp\":100,\"damageType\":\"近战\",\"damageCategory\":null,\"isCrit\":false,\"isPierce\":false,\"hit\":true,\"outcome\":\"hit\",\"hpDmg\":10,\"shieldDmg\":0,\"guardDmg\":0,\"shieldBefore\":0,\"shieldAfter\":0,\"rawBeforeResist\":10,\"rawDmg\":10,\"resistance\":{\"before\":10,\"after\":10,\"layers\":[]},\"fatalResult\":null,\"finalTargetId\":\"e\",\"hpBefore\":100,\"hpAfter\":90,\"down\":false,\"logEnd\":2,\"aim\":{\"x\":6.5,\"y\":2.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":6,\"row\":2}]}]}]]"
+      "detail": "[true,null,[{\"targetId\":\"e\",\"side\":\"enemy\",\"hit\":true,\"hpDmg\":10,\"hpBefore\":100,\"hpAfter\":90,\"maxHp\":100,\"down\":false,\"logIndex\":1,\"logEnd\":2,\"segments\":[{\"runId\":\"battle:10:0\",\"attackId\":\"attack:1\",\"segmentId\":\"battle:10:0:attack:1:slot:0:segment:1\",\"slotIndex\":0,\"segmentIndex\":1,\"shotIndex\":1,\"index\":0,\"origin\":{\"x\":2.5,\"y\":2.5},\"originalTargetId\":\"e\",\"contactPoint\":{\"x\":6.5,\"y\":2.5},\"targetId\":\"e\",\"logIndex\":1,\"side\":\"enemy\",\"maxHp\":100,\"damageType\":\"近战\",\"damageCategory\":null,\"isCrit\":false,\"isPierce\":false,\"hit\":true,\"outcome\":\"hit\",\"hpDmg\":10,\"shieldDmg\":0,\"guardDmg\":0,\"shieldBefore\":0,\"shieldAfter\":0,\"rawBeforeResist\":10,\"rawDmg\":10,\"resistance\":{\"before\":10,\"after\":10,\"layers\":[]},\"fatalResult\":null,\"finalTargetId\":\"e\",\"hpBefore\":100,\"hpAfter\":90,\"down\":false,\"logEnd\":2,\"aim\":{\"x\":6.5,\"y\":2.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":6,\"row\":2}]}]}]]"
     },
     {
       "id": "TT-ALERTS 雾外锁定仍挡墙、友方挡弹及射程",
@@ -298,7 +317,7 @@
     {
       "id": "TT-ALERTS 巡走途中发现敌人即暂停并预警",
       "pass": true,
-      "detail": "[{\"moveTo\":{\"col\":3,\"row\":0},\"skill\":null,\"aim\":null,\"action\":null},{\"seq\":1,\"eventId\":\"battle:16:0:event:1\",\"runId\":\"battle:16:0\",\"actionId\":\"battle:16:0:action:3\",\"at\":100,\"attackId\":null,\"type\":\"unit-moved\",\"unitId\":\"e\",\"from\":{\"col\":8,\"row\":0},\"to\":{\"col\":4,\"row\":0},\"path\":[{\"col\":8,\"row\":0},{\"col\":7,\"row\":0},{\"col\":6,\"row\":0},{\"col\":5,\"row\":0},{\"col\":4,\"row\":0}],\"distance\":4,\"stoppedOnDiscovery\":true,\"discoveredIds\":[\"h\"]},\"pending\"]"
+      "detail": "[{\"moveTo\":{\"col\":3,\"row\":0},\"skill\":null,\"aim\":null,\"action\":null},{\"seq\":1,\"eventId\":\"battle:17:0:event:1\",\"runId\":\"battle:17:0\",\"actionId\":\"battle:17:0:action:3\",\"at\":100,\"attackId\":null,\"type\":\"unit-moved\",\"unitId\":\"e\",\"from\":{\"col\":8,\"row\":0},\"to\":{\"col\":4,\"row\":0},\"path\":[{\"col\":8,\"row\":0},{\"col\":7,\"row\":0},{\"col\":6,\"row\":0},{\"col\":5,\"row\":0},{\"col\":4,\"row\":0}],\"distance\":4,\"stoppedOnDiscovery\":true,\"discoveredIds\":[\"h\"]},\"pending\"]"
     },
     {
       "id": "TT-ALERTS 空闲召唤物跨轮走到多格主人八邻接并停下",
@@ -306,6 +325,6 @@
       "detail": "[{\"moveTo\":{\"col\":6,\"row\":3},\"skill\":null,\"aim\":null,\"action\":null},6,{\"moveTo\":{\"col\":5,\"row\":3},\"skill\":null,\"aim\":null,\"action\":null},{\"col\":5,\"row\":3,\"facing\":270},{\"moveTo\":null,\"skill\":null,\"aim\":null,\"action\":\"wait\"}]"
     }
   ],
-  "passed": 60,
+  "passed": 63,
   "failed": 0
 }

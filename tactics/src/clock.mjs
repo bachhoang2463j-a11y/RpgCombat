@@ -128,6 +128,16 @@ export function dispatchClock(battleState, command, rulesContext = {}) {
   if (!clock) throw new Error('时钟未初始化（先调用 createClock）');
   const t = clock.now;
   switch (command.type) {
+    case 'recordPacingAction': {
+      // 此时所有单位已计距到行动发放点；只改变后续推进，不挪动已跑距离。
+      if (command.player) {
+        for (const u of Object.values(clock.units)) if (u.repeatActions) u.repeatActions = 0;
+      } else {
+        const u = clock.units[command.unitId];
+        u.repeatActions = (u.repeatActions || 0) + 1;
+      }
+      return { ok: true, events: [] };
+    }
     case 'speedChange': {
       const u = clock.units[command.unitId];
       if (!u) return { ok: false, events: [] };

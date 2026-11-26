@@ -21,7 +21,8 @@ battleState.combatState.clock = {
   now,                                                // 全局虚拟时间
   order: [unitId...],                                 // 稳定平局序（首建冻结，恢复忽略输入数组顺序，新单位追加）
   units: { [unitId]: {
-    id, side, name?, baseSpd, speed,                  // baseSpd 为同刻平局排序用的基础敏捷；speed 为当前计距用的有效敏捷
+    id, side, name?, baseSpd, speed,                  // baseSpd 为同刻平局排序用的基础敏捷；speed 为当前有效敏捷
+    repeatActions?,                                    // AI 敌人自上一玩家自然行动以来实际行动数（未设置按 0）
     status: 'active'|'down'|'out',
     lastSync, spawnedAt,                              // 计距基准时刻；注册时刻
     stun: null|{permanent},                           // 眩晕：消耗下一次自然行动
@@ -44,7 +45,7 @@ battleState.combatState.clock = {
 
 规则：
 
-1. `progress[unitId].distance` 是唯一距离真值；下一到轴时刻一律由 `剩余距离 ÷ 有效敏捷` 现算，不另存预测真值。
+1. `progress[unitId].distance` 是唯一距离真值；下一到轴时刻由 `剩余距离 ÷ 排轴速度` 现算，不另存预测真值。排轴速度等于 `speed ÷ (1 + repeatActions)`；`battle` 在玩家实际取得自然行动或 AI 敌人实际行动时提交 `recordPacingAction`，清除敌方计数或累加当前敌人计数，保持计距不变。
 2. `combatState.clock` 是全局时间与调度元数据的唯一家；HP/MP/TP/库存真值仍不进战术档（P01 契约 §3）。
 3. 周期事件携带 `{source, kind, strength, t}` 交给调用方同步结算；`dot-tick` 额外携带 `suppressed`：倒地/离场目标为 `true`（状态照计时但禁止下游扣持续伤害），存活目标为 `false`；时钟不存资源真值、不异步补账。
 

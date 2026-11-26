@@ -109,7 +109,7 @@ export function buildShell(root) {
     isSummonBlockedByLimit: () => false,
     getHeroItemBindings,
     itemBindingKnowledge: new Map(),
-    isItemUsable: (item) => !!callCmd('canUseItem', item),
+    itemStatus: (item, child) => callCmd('itemStatus', item, child),
     prepareItemTarget: (idx) => { uiSound('select'); callCmd('onItem', idx); },
     prepareGroupedItemSkill: (idx, childIdx) => { uiSound('select'); callCmd('onItem', idx, childIdx); },
     handleBasicAttack: () => { rpgUi.closeBasicMenu(); uiSound('select'); callCmd('onAttack'); },
@@ -130,7 +130,7 @@ export function buildShell(root) {
   };
   document.addEventListener('mousedown', onComboDown);
   root.addEventListener('change', e => { const s = e.target; if (s.tagName === 'SELECT' && /^edit-.*-type\d?$/.test(s.id)) rpgUi.syncGrantSlotPower(s); });
-  // 物品：入口已接规则通道（isItemUsable/onItem 由 main 注入；具体 useItem 规则接口待规则代理落地）
+  // 物品与技能各走宿主的状态和瞄准入口。
 
   function faceHtml(u, cls) {
     if (u.emoji) return '<span class="' + cls + ' t-face-emoji">' + ESC(u.emoji) + '</span>';

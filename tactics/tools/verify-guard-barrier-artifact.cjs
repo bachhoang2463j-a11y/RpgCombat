@@ -13,6 +13,9 @@ function check(id, pass, detail = '') { cases.push({ id, pass: !!pass, detail })
 check('单脚本与闭合', scripts.length === 1 && (html.match(/<\/script>/g) || []).length === 1);
 check('零外部业务JS/CSS/import', !/<script[^>]+src=|<link[^>]+stylesheet/i.test(html) && !/\bimport\s*(?:\(|[{*'"\w])/.test(scripts[0]?.[1] || ''));
 check('守护、隔绝、原因与揭示模块真实入包', ['previewGuard', 'autoSummonGuard', 'resolveBarrierDamage', 'expireBarriers', 'immunityReason', 'burn-heal-suppressed', 'holdGuards', 'revealGuard'].every(s => html.includes(s)));
+const guardDash = html.slice(html.indexOf('async function playGuardDash('), html.indexOf('function playGuardBlock('));
+check('手动舍身无脚步、召唤守护仅保留一次脚步', (guardDash.match(/fx\.sfx\(["']sheshen_armor_step["']/g) || []).length === 1
+  && /(?:if\s*\(summon\)\s*|summon&&)fx\.sfx\(["']sheshen_armor_step["'],\s*0?\.68\)/.test(guardDash));
 const context = { console, structuredClone, URL, setTimeout, clearTimeout };
 context.window = context;
 vm.createContext(context);

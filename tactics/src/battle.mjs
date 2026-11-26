@@ -36,7 +36,7 @@ const ITEM_ACTION_COST = { main: 0, aux: 1 };
 // 物品 → 技能形态（规范 range/slots/isItem，供 attackPreview / aim 复用；不回写原物品）
 export function itemAsSkill(item, child = null) {
   if (!item || !item.isItem) return null;
-  const selected = child ? { ...child, isItem: true, parentItemName: item.name } : item;
+  const selected = child ? { ...child, isItem: true, category: item.category, parentItemName: item.name } : item;
   const range = selected.range || resolveDefaultRange(selected);
   const view = { ...selected, range, actionCost: ITEM_ACTION_COST };
   Object.defineProperty(view, '_itemSource', { value: item });
@@ -45,6 +45,7 @@ export function itemAsSkill(item, child = null) {
 
 // 技能可用性（结构级）：反应与死亡技能不可主动使用；纯绑定载体道具不可主动施放；召唤词条由运行时 provider 校验。
 export function skillSupport(skill) {
+  if (skill?.isItem && skill.category === '弹药') return { ok: false, reason: '弹药不能主动使用' };
   if (skill && skill.isItem && !(skill.children && skill.children.length) && skill.bindings && skill.bindings.length
     && (!skill.type || skill.type === '[无]') && !skill.summonTarget && !skill.regionEffect && !skill.barrierSub) {
     return { ok: false, reason: '仅作为绑定技能的次数载体' };
@@ -704,6 +705,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
           resources = null;
           continue; // 跳过本次行动，重跑一圈
         }
+        const ai = isAiControlled(u);
+        if ((u.side === 'hero' && !ai) || (u.side === 'enemy' && ai)) {
+          dispatchClock(state, { type: 'recordPacingAction', unitId: u.id, player: !ai });
+        }
         return snapshot();
       } else if (next.status === 'terminal') {
         clearBarriers(ctx).forEach(barrier => removeBarrierResult(barrier, 'battle-ended'));
@@ -1022,16 +1027,19 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const item = parentItemFor(unit, skill);
     if (!item) return skill.parentItemName ? { ok: false, reason: '父道具不在场' } : { ok: true };
     if (item._sbMissing) return { ok: false, reason: '道具不在场' };
-    if (item.maxUses > 0 && item.usesRemaining <= 0) return { ok: false, reason: '物品次数已用完' };
-    if (!(item.maxUses > 0) && !(item.count > 0)) return { ok: false, reason: '物品数量不足' };
+    if (item.category === '道具') {
+      if (item.maxUses > 0 && (item.usesRemaining ?? item.maxUses) <= 0) return { ok: false, reason: '物品次数已用完' };
+    } else if (!(item.count > 0)) return { ok: false, reason: '物品数量不足' };
     return { ok: true };
   }
   function consumeParentItem(unit, skill, costSummary) {
     const item = parentItemFor(unit, skill);
     if (!item) return;
-    if (item.maxUses > 0) item.usesRemaining--;
-    else item.count--;
-    costSummary.item = { name: item.name, remaining: item.maxUses > 0 ? item.usesRemaining : item.count };
+    if (item.category === '道具') {
+      if (!(item.maxUses > 0)) return;
+      item.usesRemaining = (item.usesRemaining ?? item.maxUses) - 1;
+    } else item.count--;
+    costSummary.item = { name: item.name, remaining: item.category === '道具' ? item.usesRemaining : item.count };
     emit('item-consumed', { unitId: unit.id, ...costSummary.item });
   }
   function canUseSkill(skill) {
@@ -1078,7 +1086,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const mainCost = prepSkill ? (preparing || skill.isItem ? 0 : 1) : (cost.main || 0);
     const auxCost = prepSkill && (preparing || !skill.isItem) ? 0 : (cost.aux || 0);
     if (r.main < mainCost || r.aux < auxCost) return { ok: false, reason: r.main < mainCost ? '主行动已用完' : '辅助行动已用完' };
-    if (u.ref.mp < (preparing ? 0 : (skill.cost || 0)) || u.ref.hp <= (preparing ? 0 : (skill.hpCost || 0)) || (u.ref.tp || 0) < (preparing ? 0 : (skill.tpCost || 0))) return { ok: false, reason: '数值资源不足' };
+    const mpShort = u.ref.mp < (preparing ? 0 : (skill.cost || 0));
+    const hpShort = u.ref.hp <= (preparing ? 0 : (skill.hpCost || 0));
+    const tpShort = (u.ref.tp || 0) < (preparing ? 0 : (skill.tpCost || 0));
+    if (mpShort || hpShort || tpShort) return { ok: false, reason: skill.isItem ? (mpShort ? 'MP不足' : hpShort ? 'HP不足' : 'TP不足') : '数值资源不足' };
     return { ok: true, eff: effectiveSkill(skill), preparing: !!preparing, ready, mainCost, auxCost };
   }
   function skillCooldownAt(unitId, key) {
@@ -2132,6 +2143,11 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
 
   // ---------- 物品：与技能共用确认、准备、反应和资源事务 ----------
   function canUseItem(item, child = null) {
+    if (!item?.isItem) return { ok: false, reason: '物品不可用' };
+    if (!child && item.children?.length) {
+      const statuses = item.children.map(use => canUseItem(item, use));
+      return statuses.some(s => s.ok) ? { ok: true } : { ok: false, reason: statuses[0].reason };
+    }
     return canUseSkill(itemAsSkill(item, child));
   }
   function* beginUseItem(item, aim, options = {}) {

@@ -613,7 +613,7 @@ export function createApp(rootEl, opts = {}) {
         : '【' + esc(aim.skill.name) + '】请在地图上选择目标',
       canUse: skillUsable,
       skillReason,
-      canUseItem: (it) => it.children?.length ? it.children.some(child => battle.canUseItem(it, child).ok) : battle.canUseItem(it).ok,
+      itemStatus: (it, child) => battle.canUseItem(it, child),
       onItem: (idx, childIdx) => handleItemEntry(idx, childIdx),
       onSkill: (idx) => handleCommand('sk:' + idx),
       onAttack: () => handleCommand('attack'),
@@ -1029,8 +1029,6 @@ export function createApp(rootEl, opts = {}) {
     const valid = battle.canUseItem(it, child);
     if (!valid.ok) { ui('deny'); shell.showLog(valid.reason, 'warn'); return; }
     const skill = battle.itemSkill(it, child);
-    const sup = battle.skillStatus(skill);
-    if (!sup.ok) { ui('deny'); shell.showLog(sup.reason, 'warn'); return; }
     pending = null; fieldAction = null;
     aim = { key: 'item:' + idx + (child ? ':' + childIdx : ''), skill, item: it, child };
     sandbox.setHint(null); sandbox.refreshHover();

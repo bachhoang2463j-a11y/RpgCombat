@@ -8,7 +8,7 @@ import { queryAttack } from '../../../tactics/src/range.mjs';
 import { chooseEnemyAction } from '../../../tactics/src/ai.mjs';
 import { CHAPEL_SCENE } from '../../../tactics/src/chapel-scene.mjs';
 import { unitCenter } from '../../../tactics/src/geometry.mjs';
-import { createClock, dispatchClock } from '../../../tactics/src/clock.mjs';
+import { advanceToNextAction, createClock, dispatchClock, getUnitNextActionAt } from '../../../tactics/src/clock.mjs';
 import { settlePhase12 } from '../../../tactics/src/scheduler.mjs';
 import { emptyBattleState } from '../../../tactics/src/lifecycle.mjs';
 
@@ -160,14 +160,69 @@ function run() {
     check('TT-B 重击推撞不扣移动与跳跃额度',before&&after&&after.moveRemaining===before.moveRemaining&&after.jumped===before.jumped,{before,after});
   }
   {
-    // 原版[行动次数:4]/[行动次数:3]：按样本真实敏捷跑圈，眷族/犹格的自然行动次数约为我方平均的4倍/3倍
-    const d=sample(); const spdOf=n=>d.units.find(u=>u.name.includes(n)).ref.spd;
-    const names=['埃利奥特','弗兰克','玛德琳','索恩','伊塔库亚的眷族','犹格索托斯之子'];
-    const us=names.map((n,i)=>unit('u'+i,i<4?'hero':'enemy',{spd:spdOf(n)}));
-    const b=make(us,Object.fromEntries(us.map((u,i)=>[u.id,{col:2+i*4,row:3}])));
-    const n={}; for(let k=0;k<240;k++){const id=b.snapshot().currentId; if(!id)break; n[id]=(n[id]||0)+1; b.endAction();}
-    const avg=(n.u0+n.u1+n.u2+n.u3)/4, r4=n.u4/avg, r3=n.u5/avg;
-    check('TT-B 眷族约4动、犹格索托斯之子约3动（相对我方平均）',Math.abs(r4-4)<0.3&&Math.abs(r3-3)<0.3,{n,r4,r3});
+    const us = sample().units.map((u, i) => unit('u' + i, u.side, { spd: u.ref.spd, controller: u.controller }));
+    const pos = Object.fromEntries(us.map((u, i) => [u.id, { col: 2 + i * 2, row: 3 }]));
+    const b = make(us, pos);
+    const plain = emptyBattleState('tt-battle', 'plain');
+    createClock(plain, us.map(u => ({ id: u.id, side: u.side, baseSpd: u.ref.spd })));
+    const plainNext = () => {
+      const r = advanceToNextAction(plain);
+      dispatchClock(plain, { type: 'endAction', unitId: r.unitId });
+      return [r.unitId, r.time];
+    };
+    const actualNext = () => {
+      const point = [b.snapshot().currentId, b.ctx.now()];
+      b.endAction();
+      return point;
+    };
+    const measure = next => {
+      const counts = {};
+      let opening = null, streak = 0, longest = 0;
+      for (let i = 0; i < 240; i++) {
+        const [id, time] = next();
+        if (!id || time > 1000) break;
+        counts[id] = (counts[id] || 0) + 1;
+        if (us.find(u => u.id === id).side === 'enemy') longest = Math.max(longest, ++streak);
+        else { opening ??= streak; streak = 0; }
+      }
+      return { opening, longest, counts };
+    };
+    const before = measure(plainNext), after = measure(actualNext);
+    const heroMax = Math.max(...us.filter(u => u.side === 'hero').map(u => after.counts[u.id]));
+    const bosses = us.filter(u => u.ref.spd === 270 || u.ref.spd === 203);
+    check('TT-B 典型对局从开场5连动降为3、敌阵最长连动降低、高敏双怪各自仍多于任一玩家',
+      before.opening === 5 && after.opening === 3 && after.longest < before.longest
+      && bosses.length === 2 && bosses.every(u => after.counts[u.id] > heroMax), { before, after });
+  }
+  {
+    const us = [unit('h', 'hero', { spd: 50 }), unit('s', 'hero', { spd: 200, controller: 'ai' }), unit('e', 'enemy', { spd: 400, controller: 'ai' })];
+    const pos = { h: { col: 2, row: 3 }, s: { col: 6, row: 3 }, e: { col: 10, row: 3 } };
+    const b = make(us, structuredClone(pos));
+    const clock = b.battleState.combatState.clock;
+    const advanceTo = (battle, time) => { for (let i = 0; i < 20 && battle.ctx.now() < time; i++) battle.endAction(); };
+    const first = b.ctx.now(), next = getUnitNextActionAt(b.battleState, 'e');
+    advanceTo(b, 75);
+    const second = b.ctx.now(), thirdPredicted = getUnitNextActionAt(b.battleState, 'e');
+    const resume = make(structuredClone(us), structuredClone(pos), { battleState: structuredClone(b.battleState) });
+    check('TT-B 连动间隔25→50→75，友方AI不重置，存档续接不重复计数', first === 25 && next === 75
+      && second === 75 && thirdPredicted === 150 && clock.units.e.repeatActions === 2
+      && getUnitNextActionAt(resume.battleState, 'e') === 150, { first, next, second, thirdPredicted });
+    advanceTo(b, 200);
+    advanceTo(resume, 200);
+    if (b.snapshot().currentId === 's') b.endAction();
+    if (resume.snapshot().currentId === 's') resume.endAction();
+    check('TT-B 玩家实际行动后恢复排轴速度、不清已有距离，续接与原局一致', b.snapshot().currentId === 'h'
+      && b.battleState.progress.e.distance === 5000 && getUnitNextActionAt(b.battleState, 'e') === 212.5
+      && getUnitNextActionAt(resume.battleState, 'e') === 212.5 && b.statsOf(us[2]).spd === 400);
+  }
+  for (const kind of ['stun', 'paralyze']) {
+    const us = [unit('h', 'hero', { spd: 100 }), unit('e', 'enemy', { spd: 200, controller: 'ai' })];
+    const b = make(us, { h: { col: 2, row: 3 }, e: { col: 10, row: 3 } }, { random: () => 0 });
+    if (kind === 'stun') dispatchClock(b.battleState, { type: 'applyStun', unitId: 'h' });
+    else b.buffsOf('h').push({ type: 'paralyze', value: 1 });
+    b.endAction();
+    check('TT-B 玩家跳过不重置敌方递减：' + kind, b.snapshot().currentId === 'e' && b.ctx.now() === 150
+      && b.battleState.combatState.clock.units.e.repeatActions === 2 && getUnitNextActionAt(b.battleState, 'e') === 300);
   }
   {
     const hit=parseSkill('【击】[钝击;power:40][近战][位移:击退;距离:3][范围:单体;射程:2]');

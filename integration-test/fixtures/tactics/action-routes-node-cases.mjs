@@ -82,10 +82,32 @@ const items = casesFor(check => {
   }
   {
     const child = { ...heal, name: '子用法', actionCost: { main: 3, aux: 0 } };
-    const item = { ...heal, children: [child] };
+    const item = { ...heal, category: '道具', maxUses: 1, usesRemaining: 1, children: [child] };
     const b = battle(item);
+    b.defend();
+    const status = b.canUseItem(item, child);
     const used = b.useItem(item, null, { child });
-    check('子用法实扣一辅且消耗父物品库存', used.ok && item.count === 1 && b.snapshot().resources.main === 1 && b.snapshot().resources.aux === 0);
+    check('主行动已用完仍可用子用法，只扣辅助点与父道具次数', status.ok && status.mainCost === 0 && status.auxCost === 1 && used.ok
+      && item.usesRemaining === 0 && item.count === 2 && b.snapshot().resources.main === 0 && b.snapshot().resources.aux === 0
+      && b.canUseItem(item).reason === '物品次数已用完');
+  }
+  {
+    const item = { ...heal, category: '道具', count: 0, maxUses: 0 };
+    const b = battle(item);
+    const first = b.useItem(item);
+    const aux = b.canUseItem(item).reason;
+    b.endAction();
+    const second = b.useItem(item);
+    check('不限次数道具可跨自然行动重复使用，缺辅与库存分开', first.ok && aux === '辅助行动已用完' && second.ok && item.count === 0);
+  }
+  {
+    const mp = { ...heal, cost: 21 };
+    const ammo = { ...heal, category: '弹药' };
+    const carrier = { ...heal, category: '道具', type: '[无]', bindings: [{ skillName: '用镜', cost: 1 }] };
+    check('物品独立报告 MP、弹药、纯绑定材料和耗尽', battle(mp).canUseItem(mp).reason === 'MP不足'
+      && battle(ammo).canUseItem(ammo).reason === '弹药不能主动使用'
+      && /绑定技能/.test(battle(carrier).canUseItem(carrier).reason)
+      && battle({ ...heal, count: 0 }).canUseItem({ ...heal, count: 0 }).reason === '物品数量不足');
   }
   {
     const item = { ...heal, delay: 3 };
