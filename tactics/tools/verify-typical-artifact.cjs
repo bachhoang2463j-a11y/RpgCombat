@@ -26,6 +26,7 @@ check('原版特效与角色独立堆叠层入包', html.includes('z-index:2;') 
 check('发现敌人记录字段及枪声去重入包', html.includes('discoveredIds') && html.includes('discoveredBySide') && html.includes('playRandomStandardGunshot.last'));
 check('本轮辅助1.5倍速、隐匿音色、滑行续播及急袭消费入包', ['duration/=1.5', 'totalMs=1100/1.5', 'p.life/=1.5', 'effect.kind==="taunt"?effect.value<0?["buff","hide"]', 'glideSfx.loop', 'cue?.()', 'concealBefore=', 'hits.some(hit=>hit.hit)', 'consumed.forEach(b=>removeBuffRecord'].every(s => html.includes(s)));
 check('即时隐匿阈值、急袭次数徽章及错峰并行收尾入包', ['checkStealthThresholds(target)', 'isConcealAtk:', 'conceal-atk', '200/1.5', 'Promise.all(pending)'].every(s => html.includes(s)));
+check('跳跃多变体池、飞行动态音效及技能记忆快捷连放入包', ['jump_takeoff_light_1', 'move_flight_wind', 'resolveFlightStyle', 'resolveEnemyQuickAction', 'lastAttackByUnit'].every(s => html.includes(s)));
 check('原版受击数字及真实结果接线入包', ['buildHitFeedback', 'prepareHitNumbers', 'animateHitNumber', 'HIT_NUMBER_THEMES', 'data-hit-type', '--hit-scale'].every(s => html.includes(s)));
 check('头像远景底线及父子引用修复入包', html.includes('avatarScaleForZoom') && html.includes('linkSkillGroupRows'));
 check('原版状态变种真实入口与常量入包', ['syncStatusLayers', 'clearStatusLayers', 'playStatusTickFx', 'syncVariantState', 'clearVariantState', 'playVariantTriggerFx', 'isEntityVariantLocked', 'STATUS_COLORS', 'arcane-status-flame-chip', 'arcane-variant-molted-fx'].every(s => html.includes(s)));

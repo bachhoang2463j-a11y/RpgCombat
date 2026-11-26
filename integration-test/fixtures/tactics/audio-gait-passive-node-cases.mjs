@@ -1,8 +1,8 @@
 // 6 档真实步态音效 + 三块原版通用音频 + 毅力/致命回避被动特效接线专项回归
 import { readFileSync } from 'node:fs';
-import { CLASS_STYLE, TIER_STYLE, resolveUnitStyles } from '../../../tactics/src/unit-style.mjs';
+import { CLASS_STYLE, TIER_STYLE, resolveUnitStyles, isUnitFlying, resolveFlightStyle } from '../../../tactics/src/unit-style.mjs';
 import { EXTRA_AUDIO } from '../../../tactics/src/fx-library.mjs';
-import { DEMO_AUDIO_KEYS, MOVE_AUDIO_KEYS } from '../../../tactics/src/av-host.mjs';
+import { DEMO_AUDIO_KEYS, MOVE_AUDIO_KEYS, JUMP_AUDIO_KEYS } from '../../../tactics/src/av-host.mjs';
 import { playPathMotion } from '../../../tactics/src/motion.mjs';
 import { BARRIER_AUDIO_KEYS } from '../../../tactics/src/guard-barrier-fx.mjs';
 
@@ -11,7 +11,11 @@ const ok = (id, pass, detail = '') => ({ id, pass: !!pass, detail: typeof detail
 function gaitCases() {
   const out = [];
   const moveKeys = Object.keys(EXTRA_AUDIO).filter(k => k.startsWith('move_'));
-  out.push(ok('AGP-G 19个真实步态采样已在 EXTRA_AUDIO 与 MOVE_AUDIO_KEYS 登记', moveKeys.length === 19 && moveKeys.every(k => MOVE_AUDIO_KEYS.includes(k)), moveKeys.length));
+  const jumpKeys = Object.keys(EXTRA_AUDIO).filter(k => k.startsWith('jump_'));
+  out.push(ok('AGP-G 20个真实移动/飞行采样与18个跳跃采样已在 EXTRA_AUDIO 与 av-host 登记',
+    moveKeys.length === 20 && moveKeys.every(k => MOVE_AUDIO_KEYS.includes(k))
+    && jumpKeys.length === 18 && jumpKeys.every(k => JUMP_AUDIO_KEYS.includes(k)),
+    { move: moveKeys.length, jump: jumpKeys.length }));
   out.push(ok('AGP-G DEMO_AUDIO_KEYS 无重复键', new Set(DEMO_AUDIO_KEYS).size === DEMO_AUDIO_KEYS.length, DEMO_AUDIO_KEYS.length));
 
   const styles = resolveUnitStyles([
@@ -23,15 +27,17 @@ function gaitCases() {
     { id: 'e2', side: 'enemy', ref: { maxHp: 260, atk: 35, def: 15, actCount: 2 } },
     { id: 'e3', side: 'enemy', ref: { maxHp: 90, atk: 12, def: 3, actCount: 1 } },
   ]);
-  out.push(ok('AGP-G 我方8职业与敌方3分级步态池映射正确',
+  const flyingCaster = resolveFlightStyle(styles.h4, isUnitFlying({}, { buffs: [{ type: 'variant', variant: '飞行' }] }));
+  out.push(ok('AGP-G 施法者默认轻敏步态且获得飞行才切换显性飞行音效',
     styles.h1.stepSfx.pool[0].startsWith('move_hero_heavy_')
     && styles.h2.stepSfx.pool[0].startsWith('move_hero_light_') && styles.h2.gait.stride < styles.h3.gait.stride && styles.h2.stepSfx.vol > styles.h3.stepSfx.vol
-    && styles.h4.glideSfx.key === 'move_enemy_elite_glide'
+    && styles.h4.stepSfx.pool[0].startsWith('move_hero_light_') && !styles.h4.glideSfx && styles.h4.gait.hop > 0
+    && flyingCaster.gait.float > 0 && flyingCaster.glideSfx.key === 'move_flight_wind' && flyingCaster.glideSfx.vol >= 0.85
     && styles.e1.stepSfx.pool[0].startsWith('move_enemy_boss_')
     && styles.e2.glideSfx.key === 'move_enemy_elite_glide'
     && styles.e3.stepSfx.pool[0].startsWith('move_enemy_fodder_')));
 
-  // 验证 motion.mjs 连续路程步距与悬浮单位静步
+  // 验证 motion.mjs 连续路程步距与飞行单位静步
   const runMotion = gait => new Promise(resolve => {
     const steps = [];
     let raf = null;
@@ -51,10 +57,11 @@ function gaitCases() {
     runMotion(CLASS_STYLE['风行者'].gait),
     runMotion(TIER_STYLE.legend.gait),
     runMotion(CLASS_STYLE['施法者'].gait),
+    runMotion(flyingCaster.gait),
     runMotion(null),
-  ]).then(([swiftSteps, bossSteps, casterSteps, legacySteps]) => {
-    out.push(ok('AGP-G 连续步距：风行者(0.72m)步频高于BOSS(1.35m)，悬浮施法者0步音，无stride保持每格1步向下兼容',
-      swiftSteps > bossSteps && casterSteps === 0 && legacySteps >= 3, { swiftSteps, bossSteps, casterSteps, legacySteps }));
+  ]).then(([swiftSteps, bossSteps, casterSteps, flySteps, legacySteps]) => {
+    out.push(ok('AGP-G 连续步距：风行者(0.72m)步频高于BOSS(1.35m)，施法者常态有步音、飞行态0步音，无stride向下兼容',
+      swiftSteps > bossSteps && casterSteps >= 3 && flySteps === 0 && legacySteps >= 3, { swiftSteps, bossSteps, casterSteps, flySteps, legacySteps }));
     return out;
   });
 }

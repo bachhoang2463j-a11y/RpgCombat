@@ -26,9 +26,20 @@ const MOVE_AUDIO_FILES = {
   move_enemy_elite_glide: 'move_enemy_elite_glide.mp3',
   move_enemy_elite_step_1: 'move_enemy_elite_step_1.mp3', move_enemy_elite_step_2: 'move_enemy_elite_step_2.mp3', move_enemy_elite_step_3: 'move_enemy_elite_step_3.mp3',
   move_enemy_fodder_1: 'move_enemy_fodder_1.mp3', move_enemy_fodder_2: 'move_enemy_fodder_2.mp3', move_enemy_fodder_3: 'move_enemy_fodder_3.mp3',
+  move_flight_wind: 'move_flight_wind.mp3',
+};
+
+const JUMP_AUDIO_FILES = {
+  jump_crouch_1: 'jump_crouch_1.mp3', jump_crouch_2: 'jump_crouch_2.mp3', jump_crouch_3: 'jump_crouch_3.mp3',
+  jump_takeoff_light_1: 'jump_takeoff_light_1.mp3', jump_takeoff_light_2: 'jump_takeoff_light_2.mp3', jump_takeoff_light_3: 'jump_takeoff_light_3.mp3',
+  jump_takeoff_heavy_1: 'jump_takeoff_heavy_1.mp3', jump_takeoff_heavy_2: 'jump_takeoff_heavy_2.mp3', jump_takeoff_heavy_3: 'jump_takeoff_heavy_3.mp3',
+  jump_land_light_1: 'jump_land_light_1.mp3', jump_land_light_2: 'jump_land_light_2.mp3', jump_land_light_3: 'jump_land_light_3.mp3',
+  jump_land_normal_1: 'jump_land_normal_1.mp3', jump_land_normal_2: 'jump_land_normal_2.mp3', jump_land_normal_3: 'jump_land_normal_3.mp3',
+  jump_land_heavy_1: 'jump_land_heavy_1.mp3', jump_land_heavy_2: 'jump_land_heavy_2.mp3', jump_land_heavy_3: 'jump_land_heavy_3.mp3',
 };
 
 export const MOVE_AUDIO_KEYS = Object.keys(MOVE_AUDIO_FILES);
+export const JUMP_AUDIO_KEYS = Object.keys(JUMP_AUDIO_FILES);
 
 // 本 Demo 实际用到的回合制底座采样（按复用演出逐项核对；不预载整个素材库）
 export const DEMO_AUDIO_KEYS = [
@@ -115,7 +126,7 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
   };
 
   const av = createRpgAv(host);
-  for (const [k, file] of Object.entries(MOVE_AUDIO_FILES)) {
+  for (const [k, file] of Object.entries({ ...MOVE_AUDIO_FILES, ...JUMP_AUDIO_FILES })) {
     if (!av.audioUrls[k]) av.audioUrls[k] = av.ASSET_BASE + '/' + file;
   }
 
@@ -196,11 +207,13 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
   let preloaded = false;
   function preload() {
     if (preloaded) return; preloaded = true;
-    for (const key of [...DEMO_AUDIO_KEYS, ...MOVE_AUDIO_KEYS]) {
+    const decodeSet = new Set([...MOVE_AUDIO_KEYS, ...JUMP_AUDIO_KEYS]);
+    for (const key of [...DEMO_AUDIO_KEYS, ...MOVE_AUDIO_KEYS, ...JUMP_AUDIO_KEYS]) {
       const url = av.audioUrls[key];
       if (!url) { reports.missing.push({ kind: 'audio-key', detail: key }); continue; }
       trackLoad(key, url, 'sfx');
-      av.warmIdentitySample(key);
+      if (decodeSet.has(key)) av.CombatAudioMixer.prepare(url);
+      else av.warmIdentitySample(key);
     }
     for (const f of voiceFiles()) trackLoad(f, voiceUrl(f), 'voice');
   }

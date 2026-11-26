@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "5113acaef535014f96ea3e1ea845e60271eb65837f153e60221ebda9a2e3fead",
-  "bytes": 1635427,
+  "sha256": "4ed2239686e9664e121d5c903174775d6de1f2235da086c022cb8d454993dd5a",
+  "bytes": 1641728,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -82,6 +82,11 @@
     },
     {
       "id": "即时隐匿阈值、急袭次数徽章及错峰并行收尾入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "跳跃多变体池、飞行动态音效及技能记忆快捷连放入包",
       "pass": true,
       "detail": ""
     },
@@ -171,6 +176,6 @@
       "detail": ""
     }
   ],
-  "passed": 33,
+  "passed": 34,
   "failed": 0
 }

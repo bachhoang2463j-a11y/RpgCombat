@@ -65,7 +65,9 @@ async function runTTData(deps = {}) {
 
   // 三、范围
   const wall = skill(el, '纳克提特障壁术');
-  ok('TT 圆形只半径无射程', wall && wall.range && wall.range.type === '圆形' && wall.range.radius === 6 && !('castRange' in wall.range), JSON.stringify(wall && wall.range));
+  ok('TT 圆形只半径无射程', wall && wall.range && wall.range.type === '圆形' && wall.range.radius === 3 && !('castRange' in wall.range), JSON.stringify(wall && wall.range));
+  const veil = skill(el, '圣域帷幕');
+  ok('TT 圣域帷幕圆形半径5无射程', veil && veil.range && veil.range.type === '圆形' && veil.range.radius === 5 && !('castRange' in veil.range), JSON.stringify(veil && veil.range));
   const dim = skill(yug, '维度撕裂');
   ok('TT 直线长宽', dim && dim.range && dim.range.type === '直线' && dim.range.length === 12 && dim.range.width === 2, JSON.stringify(dim && dim.range));
   const deer = skill(hero('弗兰克'), '鹿弹二连发');

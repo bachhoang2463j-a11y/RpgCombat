@@ -1,6 +1,6 @@
 // 真实视听代码的小宿主回归：辅助提速、隐匿音色、浮空采样续播与停止。
 import { readFileSync } from 'node:fs';
-import { CLASS_STYLE } from '../../../tactics/src/unit-style.mjs';
+import { CLASS_STYLE, resolveFlightStyle } from '../../../tactics/src/unit-style.mjs';
 
 const read = name => readFileSync(new URL('../../../tactics/src/' + name, import.meta.url), 'utf8');
 const ok = (id, pass, detail = '') => ({ id, pass: !!pass, detail });
@@ -37,27 +37,91 @@ export function runCases() {
   cases.push(ok('FB-AV03 取消辅助同时清SVG/粒子/定时器/声音并通知取消', wrappers[0].removed
     && engine.particles.length === 0 && timers.every(t => t.cleared) && stoppedAudio === 1 && finished === false));
 
-  const activeGlides = new Map(), cues = [];
+  const activeGlides = new Map(), lastMoveClip = new Map(), cues = [];
   let stopped = 0;
-  const stopCode = main.slice(main.indexOf('  function stopActiveGlide('), main.indexOf('  function pickStepClip('));
+  const effCode = main.slice(main.indexOf('  function effectiveUnitStyle('), main.indexOf('  function stopActiveGlide('));
+  const stopCode = main.slice(main.indexOf('  function stopActiveGlide('), main.indexOf('  function pickClip('));
+  const clipCode = main.slice(main.indexOf('  function pickClip('), main.indexOf('  function randRate('));
   const moveCode = main.slice(main.indexOf('  function moveFeedback('), main.indexOf('  // ---------- 胜负收束'));
-  const moveFeedback = new Function('unitStyles', 'unitById', 'moveSfxOn', 'avHost', 'activeGlides', 'randRate', 'ui',
-    stopCode + moveCode + '\nreturn moveFeedback;')({ h: CLASS_STYLE['施法者'] }, () => ({}), true,
-    { sfx(key, vol) { const cue = () => { stopped++; }; cue.done = { then(fn) { cue.finish = fn; } }; cues.push({ cue, key, vol }); return cue; } },
-    activeGlides, () => 1, () => {});
+  let flying = false;
+  const moveFeedback = new Function('unitStyles', 'unitById', 'battle', 'isUnitFlying', 'resolveFlightStyle', 'sandbox', 'window', 'moveSfxOn', 'avHost', 'activeGlides', 'lastMoveClip', 'randRate', 'ui', 'fxNode',
+    effCode + stopCode + clipCode + moveCode + '\nreturn moveFeedback;')(
+    { h: CLASS_STYLE['施法者'] }, () => ({ footprint: { width: 1, height: 1 } }),
+    { getEffectiveUnit: () => ({ buffs: flying ? [{ type: 'variant', variant: '飞行' }] : [] }) },
+    (_u, eff) => !!(eff?.buffs?.some(b => b.variant === '飞行')),
+    resolveFlightStyle,
+    { worldToScreenClient: () => ({ x: 400, y: 300 }), getDom: () => null },
+    { innerWidth: 1000 },
+    true,
+    { sfx(key, vol, opts) { const cue = () => { stopped++; }; cue.done = { then(fn) { cue.finish = fn; } }; cues.push({ cue, key, vol, opts }); return cue; } },
+    activeGlides, lastMoveClip, () => 1, () => {}, () => {});
+
+  // 施法者常态步行：step 走轻敏池且无滑行
   moveFeedback('h', 'start');
-  cues[0].cue.finish(true);
-  const repeated = cues.length === 2;
-  moveFeedback('h', 'stop');
+  moveFeedback('h', 'step', { x: 1, y: 1 });
+  cases.push(ok('FB-AV04 施法者常态轻敏步态出步音、不触发飞行滑行',
+    cues.length === 1 && cues[0].key.startsWith('move_hero_light_') && activeGlides.size === 0));
+
+  // 获得飞行效果后动态切换飞行音效与续播
+  flying = true;
+  moveFeedback('h', 'start');
   cues[1].cue.finish(true);
-  cases.push(ok('FB-AV04 施法者浮空有可闻采样，自然结束续播，停止调用真实句柄且不再续播',
-    CLASS_STYLE['施法者'].gait.float > 0 && cues[0].vol === 0.72 && repeated
-    && stopped === 1 && activeGlides.size === 0 && cues.length === 2));
+  const repeated = cues.length === 3;
   moveFeedback('h', 'start');
-  moveFeedback('h', 'start');
-  cues[2].cue.finish(true);
-  cases.push(ok('FB-AV05 重复起步先停止旧滑行，不产生重复续播', stopped === 2 && cues.length === 4));
   moveFeedback('h', 'stop');
+  cases.push(ok('FB-AV05 获得飞行效果切换显性飞行音、自然结束续播且重复起步先停旧滑行',
+    cues[1].key === 'move_flight_wind' && cues[1].vol >= 0.85 && repeated && stopped >= 1 && cues.length === 4));
+
+  // 跳跃三段多变体与相邻去重
+  const jumpBefore = cues.length;
+  for (let i = 0; i < 3; i++) {
+    moveFeedback('h', 'jump-crouch', { x: 2, y: 2 });
+    moveFeedback('h', 'jump-takeoff', { x: 2, y: 2 });
+    moveFeedback('h', 'jump-land', { x: 3, y: 3 });
+  }
+  const jCues = cues.slice(jumpBefore);
+  const crouchKeys = jCues.filter((_, i) => i % 3 === 0).map(c => c.key);
+  const takeoffKeys = jCues.filter((_, i) => i % 3 === 1).map(c => c.key);
+  const landKeys = jCues.filter((_, i) => i % 3 === 2).map(c => c.key);
+  cases.push(ok('FB-AV06 跳跃三段均播放独立 MP3 池且连续跳跃相邻去重',
+    jCues.length === 9
+    && crouchKeys.every(k => k.startsWith('jump_crouch_')) && crouchKeys[0] !== crouchKeys[1] && crouchKeys[1] !== crouchKeys[2]
+    && takeoffKeys.every(k => k.startsWith('jump_takeoff_light_')) && takeoffKeys[0] !== takeoffKeys[1]
+    && landKeys.every(k => k.startsWith('jump_land_light_')) && landKeys[0] !== landKeys[1]));
+
+  // 记住上一次攻击技能：不静默切招、不满足条件明确提醒、蓄力排除
+  const qaCode = main.slice(main.indexOf('  function resolveEnemyQuickAction('), main.indexOf('  function queueRows('));
+  const lastAttackByUnit = new Map([['m1', { key: 'sk:1', name: '柯尔特三连发' }]]);
+  const s1 = { name: '从西班牙射击', range: { type: '单体', castRange: 25 }, actionCost: { main: 1, aux: 0 }, effects: [{ attack: true }] };
+  const s2 = { name: '柯尔特三连发', range: { type: '单体', castRange: 20 }, actionCost: { main: 1, aux: 0 }, effects: [{ attack: true }] };
+  const sCharge = { name: '蓄力炮', charge: 1, range: { type: '单体', castRange: 20 }, actionCost: { main: 1, aux: 0 }, effects: [{ attack: true }] };
+  let s2Ok = true, s2Reason = '', s2HitOk = true;
+  const resolveQuick = new Function(
+    'currentUnit', 'lastAttackByUnit', 'BASIC_ATTACK', 'skillUsable', 'skillReason', 'aimFor', 'battle', 'isSelfCast', 'skillSlots',
+    qaCode + '\nreturn resolveEnemyQuickAction;'
+  )(
+    () => ({ id: 'm1', skills: [s1, s2, sCharge] }),
+    lastAttackByUnit,
+    { name: '普通攻击', range: { type: '单体', castRange: 1 } },
+    sk => sk === s2 ? s2Ok : true,
+    sk => sk === s2 ? s2Reason : '',
+    (sk, hit) => ({ x: hit.x, y: hit.y, targetId: 'e1' }),
+    { previewAttack: () => ({ ok: s2HitOk, reason: s2HitOk ? '' : '超出射程' }) },
+    () => false,
+    sk => sk.effects || []
+  );
+  const q1 = resolveQuick({ x: 5, y: 5, targetId: 'e1' });
+  s2Ok = false; s2Reason = '弹药不足';
+  const q2 = resolveQuick({ x: 5, y: 5, targetId: 'e1' });
+  s2Ok = true; s2HitOk = false;
+  const q3 = resolveQuick({ x: 5, y: 5, targetId: 'e1' });
+  lastAttackByUnit.set('m1', { key: 'sk:2', name: '蓄力炮' });
+  s2HitOk = true;
+  const q4 = resolveQuick({ x: 5, y: 5, targetId: 'e1' });
+  cases.push(ok('FB-AV07 记住上次攻击技能：优先保留三连发，不满足条件不切招并报原因，蓄力技能不走快捷交互',
+    q1.ok && q1.skill === s2 && !q2.ok && q2.skill === s2 && q2.reason === '弹药不足'
+    && !q3.ok && q3.skill === s2 && q3.reason === '超出射程'
+    && q4.ok && q4.skill === s1));
   return { cases };
 }
 

@@ -22,7 +22,7 @@ import { createAvHost, heroAvatarUrl } from './av-host.mjs';
 import { createActionDirector } from './action-director.mjs';
 import { createUiSfx } from './ui-sfx.mjs';
 import { CHAPEL_SCENE } from './chapel-scene.mjs';
-import { resolveUnitStyles } from './unit-style.mjs';
+import { resolveUnitStyles, isUnitFlying, resolveFlightStyle, JUMP_LAND_HEAVY_POOL } from './unit-style.mjs';
 import { createEditorPanel } from './editor-panel.mjs';
 import { autoPickChoice } from './reaction-prompt.mjs';
 import { unitCenter } from './geometry.mjs';
@@ -268,7 +268,7 @@ export function createApp(rootEl, opts = {}) {
       const caster = unitById(req.casterId);
       return isPlayerUnit(caster) ? beginRetargetPrompt(req) : Promise.resolve(null);
     },
-    getUnitStyle: (id) => unitStyles[id] || null,
+    getUnitStyle: (id) => effectiveUnitStyle(id),
     // FX02 反应接线（contract v2/v3）：玩家控制的单位（controller 优先，缺省按 side）受击弹全屏反应弹窗；
     // AI 控制的（敌方/召唤物/AI 侧 hero）不弹窗，自动选首个可用候选（原版敌方口径）
     promptReaction: (req) => {
@@ -314,6 +314,7 @@ export function createApp(rootEl, opts = {}) {
   let jumpArm = null;        // 右键跳跃待确认格 'col,row'
   let inspectHover = null;
   let unitStyles = {};       // 单位表现风格：我方职业 / 敌方分级（只影响画面与声音）
+  const lastAttackByUnit = new Map(); // unitId → { key, name }（记住最近一次非蓄力攻击技能）
   const hiddenLog = new Set();
   let editorDraft = null;
   let editorOverrides = new Map();
@@ -450,6 +451,7 @@ export function createApp(rootEl, opts = {}) {
       aim = null; pending = null; fieldAction = null; busy = false; endArmedUntil = 0; shown.clear(); hiddenLog.clear();
       shell.setBusy(false);
       if (!unchanged || forceReset || !battle) {
+        lastAttackByUnit.clear();
         shell.clearBattle();
         currentState = result.state;
         lastResult = null;
@@ -537,16 +539,37 @@ export function createApp(rootEl, opts = {}) {
     const m = /^sk:(\d+)$/.exec(key || '');
     return m ? (currentUnit()?.skills || [])[Number(m[1])] || null : null;
   }
-  // 点敌人直接攻击：优先「可用且规则预检能打到该目标」的首个攻击技能（技能栏顺序），再试普攻；都打不到时回退首个可用技能（给出真实原因）
-  function defaultAction(hit) {
-    const skills = currentUnit()?.skills || [];
-    const usable = skills.map((s, i) => ({ key: 'sk:' + i, skill: s })).filter(a => !a.skill._inGroup && !a.skill.isGroup && !isSelfCast(a.skill) && skillUsable(a.skill) && skillSlots(a.skill).some(x => x.attack));
+  // 点敌人直接攻击：若该单位已有记忆的非蓄力攻击技能，优先沿用（不静默切换，不满足条件返回真实原因）；
+  // 否则按技能栏顺序取首个可达的非蓄力攻击技能，再回退普攻；蓄力技能不走此快捷交互。
+  function resolveEnemyQuickAction(hit) {
+    const u = currentUnit();
+    if (!u) return null;
+    const skills = u.skills || [];
+    const mem = lastAttackByUnit.get(u.id);
+    if (mem) {
+      const memSkill = mem.key === 'attack' ? BASIC_ATTACK : skills.find(s => !s.isGroup && s.name === mem.name);
+      const memIdx = memSkill && memSkill !== BASIC_ATTACK ? skills.indexOf(memSkill) : -1;
+      const memKey = memSkill === BASIC_ATTACK ? 'attack' : (memIdx >= 0 ? 'sk:' + memIdx : null);
+      if (memSkill && memKey && !(memSkill.charge > 0)) {
+        if (!skillUsable(memSkill)) return { ok: false, remembered: true, key: memKey, skill: memSkill, reason: skillReason(memSkill) || '条件不满足' };
+        if (hit) {
+          const p = aimFor(memSkill, hit);
+          const q = p ? battle.previewAttack(memSkill, p) : null;
+          if (!p || !q || !q.ok) return { ok: false, remembered: true, key: memKey, skill: memSkill, reason: (q && q.reason) || '无法以该敌人为目标' };
+        }
+        return { ok: true, remembered: true, key: memKey, skill: memSkill };
+      }
+    }
+    const usable = skills.map((s, i) => ({ key: 'sk:' + i, skill: s }))
+      .filter(a => !a.skill._inGroup && !a.skill.isGroup && !(a.skill.charge > 0) && !isSelfCast(a.skill) && skillUsable(a.skill) && skillSlots(a.skill).some(x => x.attack));
     if (skillUsable(BASIC_ATTACK)) usable.push({ key: 'attack', skill: BASIC_ATTACK });
+    if (!usable.length) return { ok: false, remembered: false, reason: skillReason(BASIC_ATTACK) || '主行动已用完' };
     if (hit) {
       const reach = usable.find(a => { const p = aimFor(a.skill, hit); return p && battle.previewAttack(a.skill, p).ok; });
-      if (reach) return reach;
+      if (reach) return { ok: true, ...reach };
     }
-    return usable.slice().sort((a, b) => (b.skill.range?.castRange || 0) - (a.skill.range?.castRange || 0))[0] || null;
+    const best = usable.slice().sort((a, b) => (b.skill.range?.castRange || 0) - (a.skill.range?.castRange || 0))[0];
+    return best ? { ok: true, ...best } : null;
   }
   function queueRows(snap) {
     const visibleUnitIds = currentViewData.units.filter(u => shownOf(u).hp > 0 || u.id === snap.currentId).map(u => u.id);
@@ -618,7 +641,7 @@ export function createApp(rootEl, opts = {}) {
       if (known.has(su.id)) continue;
       const full = battle.ctx.units.find(x => x.id === su.id);
       if (!full) continue;
-      const styled = styleOfUnit(full);
+      const styled = resolveUnitStyles([full])[full.id];
       unitStyles[full.id] = styled;
       const viewUnit = Object.assign({}, full, {
         avatarUrl: styled.avatarUrl, emoji: styled.emoji, color: styled.color,
@@ -819,9 +842,11 @@ export function createApp(rootEl, opts = {}) {
     }
     if (aim) { attackPreview(aim, hit, false); return; }
     if (isEnemyHit(hit)) {
-      const act = defaultAction(hit);
-      if (act) { attackPreview(act, hit, false); return; }
-      sandbox.setHint({ x: hit.x, y: hit.y }, '主行动已用完', 'bad'); return;
+      const act = resolveEnemyQuickAction(hit);
+      if (act && act.ok) { attackPreview(act, hit, false); return; }
+      const msg = act && act.skill ? '【' + esc(act.skill.name) + '】' + esc(act.reason) : esc((act && act.reason) || '主行动已用完');
+      sandbox.setPreview(null);
+      sandbox.setHint({ x: hit.x, y: hit.y }, msg, 'bad'); return;
     }
     const ev = moveEval(hit);
     const r = battle.snapshot().resources;
@@ -861,8 +886,13 @@ export function createApp(rootEl, opts = {}) {
       return true;
     }
     if (isEnemyHit(hit)) {
-      const act = defaultAction(hit);
-      if (!act) { ui('deny'); shell.showLog('主行动已用完', 'warn'); return true; }
+      const act = resolveEnemyQuickAction(hit);
+      if (!act || !act.ok) {
+        ui('deny');
+        const msg = act && act.skill ? '【' + act.skill.name + '】无法释放：' + act.reason : ((act && act.reason) || '主行动已用完');
+        shell.showLog(msg, 'warn');
+        return true;
+      }
       aim = { key: act.key, skill: act.skill };
       const ev = attackPreview(aim, hit, true);
       const key = hitKey(aim.skill, hit);
@@ -1105,6 +1135,7 @@ export function createApp(rootEl, opts = {}) {
   }
   async function firePending() {
     const myFlow = flow;
+    const casterId = battle.snapshot().currentId;
     const p = pending, act = aim;
     sandbox.getUnitView()?.clearPredict();
     pending = null; aim = null;
@@ -1131,6 +1162,9 @@ export function createApp(rootEl, opts = {}) {
       shell.showLog(res.logTo > res.logFrom ? battle.snapshot().log[res.logTo - 1] : act.skill.name + ' 正在准备', 'act');
       sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: act.skill, query: null });
       return;
+    }
+    if (!act.item && act.skill && !(act.skill.charge > 0) && (act.key === 'attack' || skillSlots(act.skill).some(x => x.attack))) {
+      lastAttackByUnit.set(casterId, { key: act.key, name: act.skill.name });
     }
     await playAttackResult(res);
     if (myFlow !== flow) return;
@@ -1342,16 +1376,21 @@ export function createApp(rootEl, opts = {}) {
   const lastMoveClip = new Map();
   const activeGlides = new Map();
   let moveSfxOn = true;
+  function effectiveUnitStyle(id) {
+    const base = unitStyles[id] || null;
+    if (!base) return null;
+    return resolveFlightStyle(base, isUnitFlying(unitById(id), battle?.getEffectiveUnit(id)));
+  }
   function stopActiveGlide(id) {
     const h = activeGlides.get(id);
     if (h) { try { h.stop?.(); } catch (_) {} activeGlides.delete(id); }
   }
-  function pickStepClip(id, pool) {
+  function pickClip(slotKey, pool) {
     if (!pool || !pool.length) return null;
-    const prev = lastMoveClip.get(id);
+    const prev = lastMoveClip.get(slotKey);
     const avail = pool.length > 1 ? pool.filter(k => k !== prev) : pool;
     const chosen = avail[Math.floor(Math.random() * avail.length)];
-    lastMoveClip.set(id, chosen);
+    lastMoveClip.set(slotKey, chosen);
     return chosen;
   }
   function randRate(range) {
@@ -1371,29 +1410,54 @@ export function createApp(rootEl, opts = {}) {
     return el;
   }
   function moveFeedback(id, kind, p) {
-    const st = unitStyles[id] || {};
+    const st = effectiveUnitStyle(id) || {};
     const u = unitById(id);
     if (kind === 'start') {
       stopActiveGlide(id);
       if (moveSfxOn && st.glideSfx) {
-        let stopped = false, cue = null;
+        let stopped = false, cue = null, stopTimer = null;
         const play = () => {
-          cue = avHost.sfx(st.glideSfx.key, st.glideSfx.vol, { rate: randRate(st.glideSfx.rate), track: 'skill', category: 'C' });
+          const sfxOpts = { rate: randRate(st.glideSfx.rate), track: 'skill', category: 'C' };
+          if (st.glideSfx.offsetSec) sfxOpts.offsetSec = st.glideSfx.offsetSec;
+          cue = avHost.sfx(st.glideSfx.key, st.glideSfx.vol, sfxOpts);
           cue?.done.then(natural => { if (natural && !stopped && st.glideSfx.loop) play(); });
         };
-        activeGlides.set(id, { stop() { stopped = true; cue?.(); } });
+        activeGlides.set(id, {
+          stop() { if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; } stopped = true; cue?.(); },
+          fadeStop() { stopped = true; if (!stopTimer) stopTimer = setTimeout(() => stopActiveGlide(id), 90); },
+        });
         play();
       } else if (st.glide) ui(st.glide);
       return;
     }
-    if (kind === 'stop') { stopActiveGlide(id); if (st.glide && !st.glideSfx) ui('glideStop'); return; }
+    if (kind === 'stop') {
+      const h = activeGlides.get(id);
+      if (h && typeof h.fadeStop === 'function') h.fadeStop(); else stopActiveGlide(id);
+      if (st.glide) ui('glideStop');
+      return;
+    }
     if (!p) return;
+    const s = sandbox.worldToScreenClient(p.x, p.y);
+    const pan = Math.max(-0.6, Math.min(0.6, (s.x / window.innerWidth - 0.5) * 1.2));
+    const playJumpPool = (phase, pool, vol, rateRange, fallbackUi) => {
+      if (moveSfxOn && pool && pool.length) {
+        const clip = pickClip(id + ':' + phase, pool);
+        if (clip && avHost.sfx(clip, vol, { rate: randRate(rateRange), pan, track: 'skill', category: 'C' })) return true;
+      }
+      ui(fallbackUi);
+      return false;
+    };
     const stomp = () => { const d = sandbox.getDom(); if (d && d.shake) { d.shake.classList.remove('t-stomp'); void d.shake.offsetWidth; d.shake.classList.add('t-stomp'); } };
     const bigUnit = u && (u.footprint.width > 1 || u.footprint.height > 1);
-    if (kind === 'jump-crouch') { ui('jumpCrouch'); return; }
-    if (kind === 'jump-takeoff') { ui('jumpTakeoff'); fxNode('t-dust t-dust-light', p.x, p.y + 0.28, 520); fxNode('t-jump-gust', p.x, p.y + 0.2, 480); return; }
+    const js = st.jumpSfx || {};
+    if (kind === 'jump-crouch') { playJumpPool('jc', js.crouchPool, js.crouchVol ?? 0.6, js.rate, 'jumpCrouch'); return; }
+    if (kind === 'jump-takeoff') {
+      playJumpPool('jt', js.takeoffPool, js.takeoffVol ?? 0.8, js.rate, 'jumpTakeoff');
+      fxNode('t-dust t-dust-light', p.x, p.y + 0.28, 520); fxNode('t-jump-gust', p.x, p.y + 0.2, 480); return;
+    }
     if (kind === 'jump-land') {
-      ui(bigUnit || st.shake ? 'bossStomp' : 'jumpLand');
+      const heavyLand = bigUnit || st.shake;
+      playJumpPool('jl', heavyLand ? JUMP_LAND_HEAVY_POOL : js.landPool, heavyLand ? Math.max(0.92, js.landVol ?? 0.88) : (js.landVol ?? 0.82), heavyLand ? [0.85, 0.94] : js.rate, heavyLand ? 'bossStomp' : 'jumpLand');
       fxNode('t-land-ring', p.x, p.y + 0.22, 640);
       fxNode('t-dust t-dust-big', p.x, p.y + (bigUnit ? 0.6 : 0.3), 620);
       stomp(); return;
@@ -1422,11 +1486,9 @@ export function createApp(rootEl, opts = {}) {
       return;
     }
     if (kind !== 'step') return;
-    const s = sandbox.worldToScreenClient(p.x, p.y);
-    const pan = Math.max(-0.6, Math.min(0.6, (s.x / window.innerWidth - 0.5) * 1.2));
     if (moveSfxOn) {
       if (st.stepSfx && st.stepSfx.pool && !(st.gait && st.gait.float > 0)) {
-        const clip = pickStepClip(id, st.stepSfx.pool);
+        const clip = pickClip(id + ':step', st.stepSfx.pool);
         if (clip) avHost.sfx(clip, st.stepSfx.vol, { rate: randRate(st.stepSfx.rate), pan, track: 'skill', category: 'C' });
       } else if (st.step) ui(st.step, { pan });
     }
