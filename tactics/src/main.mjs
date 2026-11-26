@@ -600,7 +600,7 @@ export function createApp(rootEl, opts = {}) {
         : '【' + esc(aim.skill.name) + '】请在地图上选择目标',
       canUse: skillUsable,
       skillReason,
-      canUseItem: (it) => battle.canUseItem(it).ok,
+      canUseItem: (it) => it.children?.length ? it.children.some(child => battle.canUseItem(it, child).ok) : battle.canUseItem(it).ok,
       onItem: (idx, childIdx) => handleItemEntry(idx, childIdx),
       onSkill: (idx) => handleCommand('sk:' + idx),
       onAttack: () => handleCommand('attack'),
@@ -977,7 +977,7 @@ export function createApp(rootEl, opts = {}) {
     const it = u && (u.items || [])[idx];
     if (!it) return;
     const child = childIdx != null && Array.isArray(it.children) ? it.children[childIdx] : null;
-    const valid = battle.canUseItem(it);
+    const valid = battle.canUseItem(it, child);
     if (!valid.ok) { ui('deny'); shell.showLog(valid.reason, 'warn'); return; }
     const skill = battle.itemSkill(it, child);
     const sup = battle.skillStatus(skill);
