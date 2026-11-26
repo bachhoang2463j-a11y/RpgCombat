@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "3c842085b58f723591d216d8f84d66716ddd76cb350852389e5353bfd22a3c46",
-  "bytes": 1501753,
+  "sha256": "2085022064ee5b99d0e83e32e52ad748050747dbc2d381106908883952b680a5",
+  "bytes": 1633733,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -76,6 +76,11 @@
       "detail": ""
     },
     {
+      "id": "本轮辅助1.5倍速、隐匿音色、滑行续播及急袭消费入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
       "id": "原版受击数字及真实结果接线入包",
       "pass": true,
       "detail": ""
@@ -146,7 +151,7 @@
       "detail": ""
     },
     {
-      "id": "产物实际移动发现食尸鬼并显示暂停原因",
+      "id": "产物实际移动遇到队友已发现食尸鬼不重复截停",
       "pass": true,
       "detail": ""
     },
@@ -161,6 +166,6 @@
       "detail": ""
     }
   ],
-  "passed": 31,
+  "passed": 32,
   "failed": 0
 }

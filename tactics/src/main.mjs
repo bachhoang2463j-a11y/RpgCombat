@@ -1376,8 +1376,13 @@ export function createApp(rootEl, opts = {}) {
     if (kind === 'start') {
       stopActiveGlide(id);
       if (moveSfxOn && st.glideSfx) {
-        const h = avHost.sfx(st.glideSfx.key, st.glideSfx.vol, { rate: randRate(st.glideSfx.rate), track: 'skill', category: 'C' });
-        if (h) activeGlides.set(id, h);
+        let stopped = false, cue = null;
+        const play = () => {
+          cue = avHost.sfx(st.glideSfx.key, st.glideSfx.vol, { rate: randRate(st.glideSfx.rate), track: 'skill', category: 'C' });
+          cue?.done.then(natural => { if (natural && !stopped && st.glideSfx.loop) play(); });
+        };
+        activeGlides.set(id, { stop() { stopped = true; cue?.(); } });
+        play();
       } else if (st.glide) ui(st.glide);
       return;
     }

@@ -19,7 +19,7 @@ export const CLASS_STYLE = {
   '风行者': { key: 'swift',   gait: { hop: 10, squash: 0.04, speed: 1.4, stride: 0.72 }, step: 'windStep',    stepSfx: { pool: HERO_LIGHT_POOL,  vol: 0.80, rate: [1.06, 1.14] }, dust: 'light', trail: 'ghost' },
   '灾厄使': { key: 'blight',  gait: { hop: 1, squash: 0.02, speed: 0.9, stride: 1.05 },  step: 'poisonDrag',  stepSfx: { pool: HERO_NORMAL_POOL, vol: 0.68, rate: [0.90, 0.96] }, dust: null,    trail: 'poison' },
   '隐匿者': { key: 'stealth', gait: { hop: 2, squash: 0.03, speed: 1.12, stride: 1.05 }, step: 'softStep',    stepSfx: { pool: HERO_LIGHT_POOL,  vol: 0.40, rate: [0.94, 1.00] }, dust: null },
-  '施法者': { key: 'caster',  gait: { hop: 0, float: 9, speed: 0.95 },     step: null,          glideSfx: { key: 'move_enemy_elite_glide', vol: 0.36, rate: [1.15, 1.22] }, dust: null,    trail: 'arcane', glide: 'arcaneGlide' },
+  '施法者': { key: 'caster',  gait: { hop: 0, float: 9, speed: 0.95 },     step: null,          glideSfx: { key: 'move_enemy_elite_glide', vol: 0.72, rate: [1.15, 1.22], loop: true }, dust: null,    trail: 'arcane', glide: 'arcaneGlide' },
   '圣职者': { key: 'holy',    gait: { hop: 4, squash: 0.05, speed: 1, stride: 1.00 },    step: 'holyStep',    stepSfx: { pool: HERO_NORMAL_POOL, vol: 0.76, rate: [0.97, 1.04] }, dust: 'light', trail: 'holy' },
   '征伐者': { key: 'conquer', gait: { hop: 5, squash: 0.08, speed: 1.05, accel: true, stride: 1.00 }, step: 'marchStep', stepSfx: { pool: HERO_HEAVY_POOL, vol: 0.82, rate: [0.97, 1.04] }, dust: 'normal' },
 };

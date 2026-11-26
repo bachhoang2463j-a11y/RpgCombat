@@ -525,6 +525,7 @@ const SUPPORT_CUES = SUPPORT_KEYS.map(key => ({ key, vol: SUPPORT_VOLUME }));
 // 多目标串行：名单与顺序来自后端 result.effects（同一目标多个效果槽保持各自真实条目）；
 // 目标 A 的原版 SVG/音色在接触拍点揭示变化，A 的句柄全部完成后才开始 B。只串行演出与揭示，不重新结算。
 function supportFeedbackOf(effect) {
+  if (effect.kind === 'taunt') return effect.value < 0 ? ['buff', 'hide'] : ['taunt', 'taunt'];
   if (effect.kind === 'buff') {
     if (effect.field === 'taunt') return effect.value < 0 ? ['buff', 'hide'] : ['taunt', 'taunt'];
     return effect.value > 0 ? SUPPORT_BUFF[effect.field] : (SUPPORT_DEBUFF[effect.field] || SUPPORT_DEBUFF_DEFAULT);

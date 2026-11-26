@@ -211,9 +211,10 @@ export const groups = {
     battle.start();
     for (let i = 0; i < 12 && battle.snapshot().currentId !== 'h:玛德琳'; i++) battle.endAction();
     const moved = battle.move(11, 34);
-    cases.push(ok('TAV-07 权威左上路径在弗兰克旁发现食尸鬼A截停且说明余量', moved.ok && moved.stoppedOnDiscovery &&
-      moved.cell.col === 13 && moved.cell.row === 36 && j(moved.discoveredIds) === j(['e:食尸鬼A']) &&
-      Math.abs(moved.moveAfter - (8 - Math.SQRT2)) < 1e-9 && battle.snapshot().log.at(-1).includes('暂停移动'), j(moved)));
+    cases.push(ok('TAV-07 权威左上路径遇到队友已发现的食尸鬼A不重复截停', moved.ok && !moved.stoppedOnDiscovery &&
+      moved.cell.col === 11 && moved.cell.row === 34 && moved.discoveredIds.length === 0 &&
+      battle.battleState.combatState.discoveredBySide.hero.includes('e:食尸鬼A') &&
+      Math.abs(moved.moveAfter - (8 - 3 * Math.SQRT2)) < 1e-9 && !battle.snapshot().log.at(-1).includes('暂停移动'), j(moved)));
 
     const { CLASS_STYLE } = await import('../../../tactics/src/unit-style.mjs');
     const hops = [], flags = [], previousPerformance = globalThis.performance;

@@ -1490,11 +1490,13 @@ function spawnHealParticles(addParticle, x, y, colorTheme = 'green') {
     else if (type === 'shield') { svgWrapper.className = 'anim-shield'; innerHTML = `<svg class="absolute" style="width: 80px; height: 80px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><path d="M50,10 L90,30 L90,60 C90,80 50,95 50,95 C50,95 10,80 10,60 L10,30 Z" fill="#cbd5e1" opacity="0.8" stroke="#f8fafc" stroke-width="3" style="filter: drop-shadow(0 0 10px #e2e8f0);" /></svg>`; duration = 600; }
     else if (type === 'mpHeal') { svgWrapper.className = 'anim-mp'; innerHTML = `<svg class="absolute" style="width: 60px; height: 60px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><path d="M50,15 C50,15 25,50 25,70 C25,85 35,95 50,95 C65,95 75,85 75,70 C75,50 50,15 50,15 Z" fill="#38bdf8" opacity="0.8" style="filter: drop-shadow(0 0 10px #7dd3fc);" /><circle cx="50" cy="50" r="45" stroke="#bae6fd" stroke-width="2" fill="none" opacity="0.5" /></svg>`; duration = 800; }
     else if (type === 'taunt') { svgWrapper.className = 'anim-taunt'; innerHTML = `<svg class="absolute" style="width: 80px; height: 80px; transform: translate(-50%, -50%);" viewBox="0 0 100 100"><path d="M25,25 L45,45 M75,25 L55,45 M35,75 Q50,60 65,75" stroke="#ef4444" stroke-width="6" stroke-linecap="round" fill="none" filter="url(#bloom-red)" /><circle cx="50" cy="50" r="45" stroke="#fca5a5" stroke-width="3" fill="none" stroke-dasharray="10,10" opacity="0.8" /></svg>`; duration = 700; }
+    duration /= 1.5;
+    svgWrapper.style.animationDuration = duration + 'ms';
     svgWrapper.innerHTML = innerHTML;
     svgWrapper.firstElementChild.style.position = 'absolute';
     __STAGE.el.appendChild(svgWrapper);
     const particles = new Set();
-    if (theme) spawnHealParticles(p => { particles.add(p); fxEngine.addParticle(p); }, x, y, theme);
+    if (theme) spawnHealParticles(p => { p.life /= 1.5; p.vx *= 1.5; p.vy *= 1.5; particles.add(p); fxEngine.addParticle(p); }, x, y, theme);
     const cue = soundKey ? playSound(soundKey, volume) : null;
     const onFinish = new Set();
     const finish = ok => {
@@ -1502,7 +1504,8 @@ function spawnHealParticles(addParticle, x, y, colorTheme = 'green') {
       onFinish.forEach(fn => fn(ok));
       onFinish.clear();
     };
-    const handle = { doneAt: Date.now() + 1100, onFinish, cancel() {
+    const totalMs = 1100 / 1.5;
+    const handle = { doneAt: Date.now() + totalMs, onFinish, cancel() {
       clearTimeout(svgTimer);
       clearTimeout(endTimer);
       svgWrapper.remove();
@@ -1511,7 +1514,7 @@ function spawnHealParticles(addParticle, x, y, colorTheme = 'green') {
       finish(false);
     } };
     const svgTimer = setTimeout(() => svgWrapper.remove(), duration);
-    const endTimer = setTimeout(() => finish(true), 1100);
+    const endTimer = setTimeout(() => finish(true), totalMs);
     supportHandles.add(handle);
     onImpact?.();
     return handle;

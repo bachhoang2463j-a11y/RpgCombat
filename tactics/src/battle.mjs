@@ -187,7 +187,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     return {
       random, buffsOf, nextSeq: () => passiveSeq(),
       grantMainPoint: (targetId, sourceKey) => dispatchBattleClock({ type: 'grantMainPoint', targetId, sourceKey }),
-      addBuff: (u, buff, effectKey) => registerBuff(u, buff, statusSource(u.id, { casterId: u.id, skillId: 'class:' + (u.classType || '') }, effectKey)),
+      addBuff: (u, buff, effectKey) => {
+        if (buff.isConcealAtk) buffsOf(u.id).filter(b => b.isConcealAtk).forEach(b => removeBuffRecord(u.id, b));
+        return registerBuff(u, buff, statusSource(u.id, { casterId: u.id, skillId: 'class:' + (u.classType || '') }, effectKey));
+      },
       clearTempNegativeTaunt: u => buffsOf(u.id).filter(b => b.type === 'taunt' && b.value < 0).forEach(b => removeBuffRecord(u.id, b)),
       log: addLog,
     };
@@ -678,8 +681,20 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     return advance();
   }
 
+  function syncDiscovered(side) {
+    const discovered = state.combatState.discoveredBySide || (state.combatState.discoveredBySide = {});
+    const known = new Set(discovered[side] || []);
+    for (const observer of units.filter(u => u.side === side && u.ref.hp > 0)) {
+      for (const id of queryVisibleUnitIds(ctx, observer.id)) {
+        if (byId.get(id).side !== side) known.add(id);
+      }
+    }
+    discovered[side] = [...known];
+    return known;
+  }
   function snapshot(viewerId = null) {
     units.forEach(syncRageResult);
+    if (ctx.enforcePerception) new Set(units.map(u => u.side)).forEach(syncDiscovered);
     const clock = state.combatState.clock;
     const visible = viewerId ? new Set(queryVisibleUnitIds(ctx, viewerId)) : null;
     const viewer = viewerId ? byId.get(viewerId) : null;
@@ -743,7 +758,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (!cell || cell.cost === 0) return { ok: false, reason: '落点不可达' };
     const p = placementsById[currentId()];
     const from = { col: p.col, row: p.row, facing: p.facing };
-    const seen = new Set(queryVisibleUnitIds(ctx, currentId()));
+    const seen = ctx.enforcePerception ? syncDiscovered(actor().side) : new Set(queryVisibleUnitIds(ctx, currentId()));
     const multiplier = resources.moveMultiplier || 1;
     let stoppedOnDiscovery = false;
     let cost = 0;
@@ -765,6 +780,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     resources.moveRemaining = Math.max(0, resources.moveRemaining - travel);
     if (resources.sprintRemaining) resources.sprintRemaining = Math.max(0, resources.sprintRemaining - travel);
     const discoveredIds = stoppedOnDiscovery ? queryVisibleUnitIds(ctx, currentId()).filter(id => !seen.has(id) && byId.get(id).side !== actor().side) : [];
+    if (ctx.enforcePerception) syncDiscovered(actor().side);
     emit('unit-moved', { unitId: currentId(), from, to: { col, row }, path: cell.path, distance: travel, stoppedOnDiscovery, discoveredIds });
     addLog(actor().name + ' 移动 ' + travel.toFixed(2) + 'm' + (stoppedOnDiscovery ? ' · 发现 ' + discoveredIds.map(id => byId.get(id).name).join('、') + '，暂停移动（剩余 ' + resources.moveRemaining.toFixed(2) + 'm）' : ''));
     return { ok: true, stoppedOnDiscovery, discoveredIds, cell: { ...cell, cost: travel, budgetCost: cell.cost }, from, unitId: currentId(), moveBefore: before, moveAfter: resources.moveRemaining };
@@ -1507,6 +1523,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (!query.ok) return failAttack(query.reason, { query });
     // 规范槽视图（skillSlots）合并空间结果（query.slotTargets 提供各槽 targetIds）
     const slots = skillSlots(eff).map(s => Object.assign({}, s, { targetIds: query.slotTargets.find(slot => slot.index === s.index)?.targetIds || [] }));
+    const concealBefore = skill.isReaction || options.isReactionTrigger ? [] : buffsOf(u.id).filter(b => b.isConcealAtk);
     const key = skillKey(skill);
     const charge = chargeState(u.id);
     const preparing = charge.preparing && charge.preparing.skillKey === key;
@@ -1745,6 +1762,11 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       }
     }
 
+    if (damageSlots.length && hits.some(hit => hit.hit) && concealBefore.length) {
+      const consumed = concealBefore.filter(b => buffsOf(u.id).includes(b));
+      consumed.forEach(b => removeBuffRecord(u.id, b));
+      if (consumed.length) addLog('🎯 ' + u.name + ' 的隐匿急袭已释放，攻击力加成消失。');
+    }
     if (preparing) charge.preparing = null;
     if (u.ref.hp > 0 && skill.displacements?.some(d => d.type === '击退' || d.type === '拉近') && !skill.displacements.some(d => d.type === '冲锋')) {
       applySkillDisplacements(u, eff, query, hits);

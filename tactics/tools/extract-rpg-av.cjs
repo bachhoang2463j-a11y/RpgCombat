@@ -324,11 +324,13 @@ ${patch(supportParticles.text, 'function spawnHealParticles(x, y, colorTheme', '
     svgWrapper.style.cssText = 'position:absolute;pointer-events:none;z-index:95;left:' + x + 'px;top:' + y + 'px;';
     let innerHTML, duration;
 ${supportBranches.join('\n').replace('else if', 'if')}
+    duration /= 1.5;
+    svgWrapper.style.animationDuration = duration + 'ms';
     svgWrapper.innerHTML = innerHTML;
     svgWrapper.firstElementChild.style.position = 'absolute';
     __STAGE.el.appendChild(svgWrapper);
     const particles = new Set();
-    if (theme) spawnHealParticles(p => { particles.add(p); fxEngine.addParticle(p); }, x, y, theme);
+    if (theme) spawnHealParticles(p => { p.life /= 1.5; p.vx *= 1.5; p.vy *= 1.5; particles.add(p); fxEngine.addParticle(p); }, x, y, theme);
     const cue = soundKey ? playSound(soundKey, volume) : null;
     const onFinish = new Set();
     const finish = ok => {
@@ -336,7 +338,8 @@ ${supportBranches.join('\n').replace('else if', 'if')}
       onFinish.forEach(fn => fn(ok));
       onFinish.clear();
     };
-    const handle = { doneAt: Date.now() + 1100, onFinish, cancel() {
+    const totalMs = 1100 / 1.5;
+    const handle = { doneAt: Date.now() + totalMs, onFinish, cancel() {
       clearTimeout(svgTimer);
       clearTimeout(endTimer);
       svgWrapper.remove();
@@ -345,7 +348,7 @@ ${supportBranches.join('\n').replace('else if', 'if')}
       finish(false);
     } };
     const svgTimer = setTimeout(() => svgWrapper.remove(), duration);
-    const endTimer = setTimeout(() => finish(true), 1100);
+    const endTimer = setTimeout(() => finish(true), totalMs);
     supportHandles.add(handle);
     onImpact?.();
     return handle;

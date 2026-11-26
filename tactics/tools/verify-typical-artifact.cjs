@@ -23,7 +23,8 @@ check('辅助真实结果与持久标签回读入包', ['playSupportEffects', 's
 check('辅助取消通知与动作代际隔离入包', html.includes('supportHandles') && html.includes('actionScope') && html.includes('isCurrent()'));
 check('击杀自爆medium震动档位入包', html.includes('medium:[250,5]'));
 check('原版特效与角色独立堆叠层入包', html.includes('z-index:2;') && html.includes('z-index:3;'));
-check('发现敌人记录字段及枪声去重入包', html.includes('discoveredIds') && html.includes('playRandomStandardGunshot.last'));
+check('发现敌人记录字段及枪声去重入包', html.includes('discoveredIds') && html.includes('discoveredBySide') && html.includes('playRandomStandardGunshot.last'));
+check('本轮辅助1.5倍速、隐匿音色、滑行续播及急袭消费入包', ['duration/=1.5', 'totalMs=1100/1.5', 'p.life/=1.5', 'effect.kind==="taunt"?effect.value<0?["buff","hide"]', 'glideSfx.loop', 'cue?.()', 'concealBefore=', 'hits.some(hit=>hit.hit)', 'consumed.forEach(b=>removeBuffRecord'].every(s => html.includes(s)));
 check('原版受击数字及真实结果接线入包', ['buildHitFeedback', 'prepareHitNumbers', 'animateHitNumber', 'HIT_NUMBER_THEMES', 'data-hit-type', '--hit-scale'].every(s => html.includes(s)));
 check('头像远景底线及父子引用修复入包', html.includes('avatarScaleForZoom') && html.includes('linkSkillGroupRows'));
 check('原版状态变种真实入口与常量入包', ['syncStatusLayers', 'clearStatusLayers', 'playStatusTickFx', 'syncVariantState', 'clearVariantState', 'playVariantTriggerFx', 'isEntityVariantLocked', 'STATUS_COLORS', 'arcane-status-flame-chip', 'arcane-variant-molted-fx'].every(s => html.includes(s)));
@@ -70,8 +71,8 @@ if (backend) {
   moveBattle.start();
   for (let i = 0; i < 12 && moveBattle.snapshot().currentId !== 'h:玛德琳'; i++) moveBattle.endAction();
   const move = moveBattle.move(11, 34);
-  check('产物实际移动发现食尸鬼并显示暂停原因', move.ok && move.stoppedOnDiscovery && move.cell.col === 13 && move.cell.row === 36 &&
-    move.discoveredIds.includes('e:食尸鬼A') && moveBattle.snapshot().log.at(-1).includes('暂停移动'));
+  check('产物实际移动遇到队友已发现食尸鬼不重复截停', move.ok && !move.stoppedOnDiscovery && move.cell.col === 11 && move.cell.row === 34 &&
+    move.discoveredIds.length === 0 && moveBattle.battleState.combatState.discoveredBySide.hero.includes('e:食尸鬼A') && !moveBattle.snapshot().log.at(-1).includes('暂停移动'));
   const el = block.heroes.find(h => h.name === '埃利奥特'), fireGroup = el.skills.find(s => s.name === '火舞术' && s.isGroup);
   check('产物显式技能组保留原名及全局子引用', fireGroup && fireGroup.children.length === 2 && el.skills.includes(fireGroup.children[0]) && fireGroup.children[0].name === '火舞术-精准流火' && block.heroes.every(h => {
     const parent = h.skills.find(s => s.name === '早有准备' && s.isGroup);

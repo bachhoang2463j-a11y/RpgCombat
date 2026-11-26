@@ -31,6 +31,14 @@ const FX01_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'f
 
 // 阶段注册表：只登记真实存在的用例文件；--all 只聚合这里的条目，不虚构未来阶段。
 const STAGES = {
+  'feedback-av': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'feedback-av-node-cases.mjs'),
+    groups: ['FEEDBACK-AV'], modules: [], requiredExports: [],
+  },
+  'feedback-fixes': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'feedback-fixes-node-cases.mjs'),
+    groups: ['FEEDBACK-FIXES'], modules: [], requiredExports: [],
+  },
   'taunt-ai': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'taunt-ai-node-cases.mjs'),
     groups: ['TAUNT-AI'], modules: [], requiredExports: [],
