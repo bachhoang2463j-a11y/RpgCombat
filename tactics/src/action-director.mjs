@@ -595,7 +595,7 @@ export function createActionDirector(deps) {
         const ok = await playDisplacement(charge, vd.footprintsById[charge.unitId], step => {
           if (!isCurrent()) return;
           chargeStep = step;
-          if (impacts.has(step)) onContact?.();
+          if (impacts.has(step)) onContact?.(step);
           for (const [targetId, i] of impacts.get(step) || []) revealSegment(targetId, i);
           for (const ev of moved) if (ev.chargeStep === step) {
             const slide = () => {

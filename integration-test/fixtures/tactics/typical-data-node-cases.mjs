@@ -113,6 +113,7 @@ async function runTTData(deps = {}) {
   ok('TT evadeShift兼容派生', zhe && zhe.evadeShift && zhe.evadeShift.mode === 'side' && zhe.evadeShift.distance === 3, JSON.stringify(zhe && zhe.evadeShift));
   const push = skill(hero('弗兰克'), '重击推撞');
   ok('TT 击退3', push && push.displacements && push.displacements.some(d => d.type === '击退' && d.distance === 3), JSON.stringify(push && push.displacements));
+  ok('TT 重击推撞冲锋4+击退3方向+直线4', push && push.displacements.some(d => d.type === '冲锋' && d.distance === 4) && push.displacements.some(d => d.type === '击退' && d.direction === '冲锋方向') && push.range.type === '直线' && push.range.length === 4, JSON.stringify(push && { d: push.displacements, r: push.range }));
   const beast = block.summonTemplates.find(t => t.name.includes('幻梦行军兽'));
   const charge = skill(beast, '冲撞');
   ok('TT 冲锋6+击退3方向', charge && Array.isArray(charge.displacements) && charge.displacements.length === 2 && charge.displacements[0].type === '冲锋' && charge.displacements[0].distance === 6 && charge.displacements[1].type === '击退' && charge.displacements[1].distance === 3 && charge.displacements[1].direction === '冲锋方向', JSON.stringify(charge && charge.displacements));

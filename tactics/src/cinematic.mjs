@@ -49,6 +49,14 @@ export function hitFlash(fx, m, { ms = 260, color = 'rgba(254,202,202,.55)' } = 
     .animate([{ transform: 'scale(.55)', opacity: 1 }, { transform: 'scale(1)', opacity: 0.8, offset: 0.4 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: ms, fill: 'forwards' });
 }
 
+// 攻击类（单体/范围/锁定/弹道）时停与命中顿帧时长：0 = 不冻结、不出时停画面（白闪与震屏保留）；守护/领域类仍按原时长定格
+export const ATTACK_STOP_MS = 0, ATTACK_HIT_MS = 0;
+// 运镜缩放幅度：所有推近/拉远相对出手前缩放的偏移量 × ZOOM_AMP（下方倍数均为设计值，实际按此比例收敛）
+export const ZOOM_AMP = 1 / 3;
+export const zoomAt = (homeScale, s) => homeScale + (s - homeScale) * ZOOM_AMP;
+// 演出时钟冻结：ms ≤ 0 时直接执行 during，不暂停
+export function holdOr(hold, ms, during) { if (ms > 0) return hold(ms, during); if (during) during(); return Promise.resolve(true); }
+
 // 类型模板：push=蓄势推近倍数，cap=构图缩放上限（相对出手前），frameMs=爆发后构图时长，hitStop=首次命中顿帧
 const KINDS = {
   single:  { push: 1.6, cap: 1.7, tight: 1.1, pad: 2.2, frameMs: 220, bias: 0.25, hitStop: true,  stop: { tint: 'rgba(254,243,199,.95)' } },
@@ -70,24 +78,26 @@ export function startCine(env) {
   const kind = cineKind(result, hits, env.regions), K = KINDS[kind], epic = grade === 'L4';
   const style = env.style, strike = style === 'lock' || style === 'projectile';
   const home = sb.getPose();
+  const P = (x, y, k) => sb.poseAt(x, y, zoomAt(home.scale, k));   // k 为绝对设计缩放
   const cm = centerOf(result.casterId);
   const tgtIds = [...new Set([...hits.map(h => h.targetId), ...(result.effects || []).map(e => e.targetId)])].filter(id => id !== result.casterId);
   const tpts = tgtIds.map(centerOf).filter(Boolean);
   const focus = tpts[0] || result.aim || cm;
   const box = env.shape ? [{ x: env.shape.center.x - env.shape.radius, y: env.shape.center.y - env.shape.radius }, { x: env.shape.center.x + env.shape.radius, y: env.shape.center.y + env.shape.radius }] : [];
   const I = env.shape ? env.shape.center : focus;   // 打击点：范围取爆心，单体取首个目标
-  const stopMs = strike ? (epic ? 200 : 140) : (epic ? 180 : 120), hitMs = epic ? 130 : 90;
+  const attack = strike || kind === 'single' || kind === 'area';
+  const stopMs = attack ? ATTACK_STOP_MS : (epic ? 180 : 120), hitMs = ATTACK_HIT_MS;
   let bursted = false, hitDone = false, framed = null;
 
   // ① 蓄势：遮幅入场 + 推近出手者（略偏向目标方向）；锁定打击在蓄力末 480ms 自动甩到打击点
   letterbox(fx, env.totalMs + stopMs + hitMs + 700, { h: epic ? 11 : 8 });
   const dx = focus.x - cm.x, dy = focus.y - cm.y, L = Math.hypot(dx, dy) || 1, b = Math.min(1.2, L * 0.3);
   const casterMs = style === 'lock' ? Math.max(300, env.chargeMs - 480) : Math.min(700, env.chargeMs * 0.8);
-  sb.cameraTo(sb.poseAt(cm.x + dx / L * b, cm.y + dy / L * b, home.scale * (strike ? 1.45 : K.push) * (epic ? 1.12 : 1)), Math.min(casterMs, 620));
+  sb.cameraTo(P(cm.x + dx / L * b, cm.y + dy / L * b, home.scale * (strike ? 1.45 : K.push) * (epic ? 1.12 : 1)), Math.min(casterMs, 620));
   // 甩镜到打击点：whipMs 内急甩推近，到位后余下蓄力缓推 1.1 倍（压迫感），爆发即被拉远打断
   function whip(at, k, whipMs, untilMs) {
-    sb.cameraTo(sb.poseAt(at.x, at.y, home.scale * k), whipMs).then(ok => {
-      if (ok && !bursted && untilMs > whipMs + 80) sb.cameraTo(sb.poseAt(at.x, at.y, home.scale * k * 1.1), untilMs - whipMs);
+    sb.cameraTo(P(at.x, at.y, home.scale * k), whipMs).then(ok => {
+      if (ok && !bursted && untilMs > whipMs + 80) sb.cameraTo(P(at.x, at.y, home.scale * k * 1.1), untilMs - whipMs);
     });
   }
   if (style === 'lock') env.after(casterMs, () => { if (!bursted) whip(I, epic ? 1.8 : 1.65, 240, env.chargeMs - casterMs); });
@@ -99,12 +109,12 @@ export function startCine(env) {
     const pts = [I, ...box, ...tpts], fr = sb.poseFrame(pts, { pad: 3.5, tight: 0.95 });
     const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
     framed = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2, scale: Math.min(fr.scale, home.scale * 1.05) };
-    sb.cameraTo(sb.poseAt(framed.x, framed.y, framed.scale * 0.8), 140).then(ok2 => { if (ok2) sb.cameraTo(sb.poseAt(framed.x, framed.y, framed.scale), 480); });
+    sb.cameraTo(P(framed.x, framed.y, framed.scale * 0.8), 140).then(ok2 => { if (ok2) sb.cameraTo(P(framed.x, framed.y, framed.scale), 480); });
   }
   function strikeBurst() {
     if (env.freeze === false) { pullBack(false); return; }
-    hold(stopMs, () => {
-      timeStop(sb, fx, stopMs, I, { tint: 'rgba(255,255,255,.95)', lines: 36 });
+    holdOr(hold, stopMs, () => {
+      if (stopMs > 0) timeStop(sb, fx, stopMs, I, { tint: 'rgba(255,255,255,.95)', lines: 36 });
       hitFlash(fx, I, { ms: stopMs + 220 });
     }).then(ok => { if (ok) pullBack(true); });
   }
@@ -122,7 +132,7 @@ export function startCine(env) {
     burst() {
       if (bursted) return; bursted = true;
       if (strike) { strikeBurst(); return; }
-      hold(stopMs, () => timeStop(sb, fx, stopMs, cm, K.stop)).then(ok => {
+      holdOr(hold, stopMs, () => { if (stopMs > 0) timeStop(sb, fx, stopMs, cm, K.stop); }).then(ok => {
         if (!ok) return;
         const pts = [cm, ...(kind === 'domain' ? [] : tpts), ...box];
         if (!tpts.length && !box.length && result.aim) pts.push(result.aim);
@@ -130,17 +140,17 @@ export function startCine(env) {
         const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
         const C = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
         framed = { x: C.x + (focus.x - C.x) * K.bias, y: C.y + (focus.y - C.y) * K.bias, scale: Math.min(fr.scale, home.scale * K.cap) };
-        sb.cameraTo(sb.poseAt(framed.x, framed.y, framed.scale), K.frameMs);
+        sb.cameraTo(P(framed.x, framed.y, framed.scale), K.frameMs);
       });
     },
-    // ③ 首次命中：顿帧 + 镜头向命中点急推 + 白闪（仅攻击类）
+    // ③ 首次命中：（顿帧）+ 镜头向命中点急推 + 白闪（仅攻击类）
     firstHit(targetId) {
       if (strike || !K.hitStop || !bursted || hitDone || !framed) return;
       hitDone = true;
       const m = centerOf(targetId) || focus;
-      hold(hitMs, () => {
+      holdOr(hold, hitMs, () => {
         hitFlash(fx, m);
-        sb.cameraTo(sb.poseAt(framed.x + (m.x - framed.x) * 0.3, framed.y + (m.y - framed.y) * 0.3, framed.scale * 1.08), 50);
+        sb.cameraTo(P(framed.x + (m.x - framed.x) * 0.3, framed.y + (m.y - framed.y) * 0.3, framed.scale * 1.08), 50);
       });
     },
     // ④ 回位：镜头缓回出手前构图

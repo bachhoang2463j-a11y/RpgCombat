@@ -149,6 +149,17 @@ function run() {
       && r.events.find(e=>e.type==='unit-charged').path.some(p=>p.col===8),b.ctx.placementsById);
   }
   {
+    // 弗兰克【重击推撞】= 4米直线冲撞：不占移动/跳跃额度，撞到即结算并沿冲撞方向击退
+    const d=sample(); const frank=d.units.find(u=>u.name==='弗兰克'); const push=frank.skills.find(s=>s.name==='重击推撞');
+    const h=unit('h','hero',{spd:200,tp:100,skills:[push]}); const e1=unit('e1','enemy');
+    const b=make([h,e1],{h:{col:2,row:4},e1:{col:4,row:4}});
+    const before=b.snapshot().resources;
+    const r=b.attack(push,{x:12,y:4.5});
+    const after=b.snapshot().resources, ev=r.events.find(e=>e.type==='unit-charged');
+    check('TT-B 重击推撞4米冲撞命中路径敌人并击退',r.ok&&r.hits.length===1&&r.hits[0].targetId==='e1'&&ev&&ev.requestedDistance===4&&b.ctx.placementsById.h.col===6,{hits:r.hits.map(x=>x.targetId),reason:r.reason,ev,pos:b.ctx.placementsById});
+    check('TT-B 重击推撞不扣移动与跳跃额度',before&&after&&after.moveRemaining===before.moveRemaining&&after.jumped===before.jumped,{before,after});
+  }
+  {
     const hit=parseSkill('【击】[钝击;power:40][近战][位移:击退;距离:3][范围:单体;射程:2]');
     const h=unit('h','hero',{spd:200});const e=unit('e','enemy',{shield:100});
     const b=make([h,e],{h:{col:2,row:4},e:{col:3,row:4}});

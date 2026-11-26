@@ -3,13 +3,13 @@
 // 每个条目只消费导演给的 ctx（battle.attack() 提交结果 + 揭示回调），不查询命中、不掷骰、不扣费。
 // 坐标：世界美术像素（米 × 50）挂战棋世界层（vfx-host），镜头平移/缩放自然一致；
 //       仅与位置无关的闪屏挂视口层（屏幕坐标只在这最后一层）。
-// 声音：全部为项目已有真实采样（audioUrls 键），禁用振荡器/白噪合成。
+// 声音：以项目已有真实采样（audioUrls 键）为主；原版用 Web Audio 合成的层（如重击低频冲击）按原版移植。
 // ==========================================
 
 import { pathSegments, pointAtDistance } from './motion.mjs';
 import { FX_SCALE } from './av-host.mjs';
 import { unitCenter } from './geometry.mjs';
-import { letterbox, timeStop, hitFlash } from './cinematic.mjs';
+import { letterbox, timeStop, hitFlash, ATTACK_STOP_MS, ATTACK_HIT_MS, zoomAt, holdOr } from './cinematic.mjs';
 
 const TAU = Math.PI * 2;
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -309,31 +309,32 @@ const SPLAT_POS = [
   { top: '48%', left: '4%', size: 115, rot: -55, delay: 850 }, { top: '52%', right: '5%', size: 120, rot: 40, delay: 1050 },
 ];
 const SPLAT_DRIPS = [['right:25%', 6, 150, 250], ['left:22%', 8, 180, 450], ['right:42%', 4, 120, 650]];
-function screenBlood(fx, ms) {
+// opt：pos/drips 覆盖血块与血泪布局，each 为每团时长（默认铺满 ms），drip 第 5 项为该道时长
+function screenBlood(fx, ms, { pos: P = SPLAT_POS, drips: DR = SPLAT_DRIPS, each = 0 } = {}) {
   const pos = s => (s.top ? 'top:' + s.top + ';' : '') + (s.bottom ? 'bottom:' + s.bottom + ';' : '') + (s.left ? 'left:' + s.left + ';' : '') + (s.right ? 'right:' + s.right + ';' : '');
-  const splats = SPLAT_POS.map((s, i) => {
+  const splats = P.map((s, i) => {
     const d = SPLAT_PATHS[i % SPLAT_PATHS.length];
     return '<div data-splat style="position:absolute;' + pos(s) + 'width:' + s.size + 'px;height:' + s.size + 'px;opacity:0;filter:drop-shadow(0 0 8px #7f1d1d);">' +
       '<svg viewBox="0 0 100 100" width="100%" height="100%"><path d="' + d + '" fill="#7f1d1d"/><path d="' + d + '" fill="#991b1b" transform="translate(8,8) scale(.85)" opacity=".9"/>' +
       '<circle cx="85" cy="18" r="4.5" fill="#991b1b"/><circle cx="15" cy="85" r="3.5" fill="#7f1d1d"/><circle cx="92" cy="72" r="5" fill="#881337"/><circle cx="6" cy="16" r="3" fill="#991b1b"/><circle cx="70" cy="92" r="2.5" fill="#dc2626"/>' +
       '<circle cx="35" cy="28" r="1.8" fill="#fff" opacity=".6"/><circle cx="58" cy="45" r="1.5" fill="#fff" opacity=".5"/></svg></div>';
   }).join('');
-  const drips = SPLAT_DRIPS.map(([x, w, h]) => '<i data-drip style="position:absolute;top:0;' + x + ';width:' + w + 'px;height:' + h + 'px;border-radius:' + w + 'px;transform-origin:50% 0;opacity:0;' +
+  const drips = DR.map(([x, w, h]) => '<i data-drip style="position:absolute;top:0;' + x + ';width:' + w + 'px;height:' + h + 'px;border-radius:' + w + 'px;transform-origin:50% 0;opacity:0;' +
     'background:linear-gradient(#b91c1c,#7f1d1d 55%,transparent);filter:drop-shadow(0 0 6px #450a0a);"></i>').join('');
   const root = fx.screen('<i data-vig style="position:absolute;inset:0;opacity:0;background:radial-gradient(circle,transparent 32%,rgba(136,8,8,.45) 70%,rgba(65,8,8,.95) 100%);"></i>' + splats + drips, ms);
   root.style.overflow = 'hidden';
   root.querySelector('[data-vig]').animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'scale(1)', offset: 0.12 }, { opacity: 0.9, transform: 'scale(1.02)', offset: 0.85 }, { opacity: 0, transform: 'scale(1.05)' }],
     { duration: ms, easing: 'cubic-bezier(0.1,0.8,0.2,1)', fill: 'forwards' });
   root.querySelectorAll('[data-splat]').forEach((el, i) => {
-    const s = SPLAT_POS[i], rr = ' rotate(' + s.rot + 'deg)';
+    const s = P[i], rr = ' rotate(' + s.rot + 'deg)';
     el.animate([{ transform: 'scale(.12)' + rr, opacity: 0 }, { transform: 'scale(1.12)' + rr, opacity: 1, offset: 0.22 }, { transform: 'scale(1)' + rr, opacity: 0.96, offset: 0.38 },
       { transform: 'translateY(4px) scale(1.01)' + rr, opacity: 0.88, offset: 0.75 }, { transform: 'translateY(12px) scale(1.04)' + rr, opacity: 0 }],
-      { duration: ms - s.delay, delay: s.delay, easing: 'cubic-bezier(0.12,0.85,0.25,1)', fill: 'both' });
+      { duration: each || ms - s.delay, delay: s.delay, easing: 'cubic-bezier(0.12,0.85,0.25,1)', fill: 'both' });
   });
   root.querySelectorAll('[data-drip]').forEach((el, i) => {
-    const dl = SPLAT_DRIPS[i][3];
+    const dl = DR[i][3];
     el.animate([{ transform: 'scaleY(0)', opacity: 0 }, { transform: 'scaleY(1)', opacity: 0.95, offset: 0.25 }, { transform: 'translateY(8px) scaleY(1.06)', opacity: 0.85, offset: 0.7 }, { transform: 'translateY(18px) scaleY(1.12)', opacity: 0 }],
-      { duration: ms - dl, delay: dl, easing: 'ease-out', fill: 'both' });
+      { duration: DR[i][4] || ms - dl, delay: dl, easing: 'ease-out', fill: 'both' });
   });
 }
 // 弱点锁定准星（回合制 pierce-weakpoint-lock）：菱形虚线框 + 内圈 + 十字分划，由大旋入收紧
@@ -367,6 +368,119 @@ function gunHit(ctx, impact) {
   spray(ctx.fx, t, 8, { kind: 'gore', ang, spread: 1.7, dist: [14, 52] });
   jolt(ctx, impact.targetId, { amp: 4, ms: 55, times: 2 });
   ctx.fx.shake('medium');
+}
+
+// ---------- 重击共用（移植回合制 index 远程重击 / 近战重击方案1） ----------
+// 原版震屏关键帧：位移 + 缩放 + 旋转（比通用 shake 档位更重），直接驱动沙盘震屏层
+const HEAVY_SHAKE_AT = [0, 0.12, 0.25, 0.4, 0.55, 0.7, 0.85, 1];
+const MELEE_HEAVY_SHAKE = [[0, 0, 1, 0], [-16, 14, 1.035, -2], [18, -12, 1.045, 2.2], [-14, 8, 1.025, -1.5], [10, -6, 1.015, 1], [-6, 4, 1.008, -0.5], [3, -2, 1.003, 0.2], [0, 0, 1, 0]];
+const RANGED_HEAVY_SHAKE = [[0, 0, 1, 0], [-18, 12, 1.04, -2], [20, -14, 1.05, 2.2], [-15, 9, 1.03, -1.5], [12, -7, 1.02, 1], [-7, 4, 1.01, -0.5], [4, -2, 1.005, 0.2], [0, 0, 1, 0]];
+function heavyShake(ctx, rows, ms) {
+  ctx.sandbox.getDom().shake.animate(rows.map(([x, y, s, r], i) => ({ transform: 'translate3d(' + x + 'px,' + y + 'px,0) scale(' + s + ') rotate(' + r + 'deg)', offset: HEAVY_SHAKE_AT[i] })),
+    { duration: ms, easing: 'cubic-bezier(0.36,0.07,0.19,0.97)' });
+}
+// 原版受击后仰（近战 ram = 被推撞横移踉跄，远程 recoil = 中弹后仰）；位移沿攻击方向旋转，独立 translate/scale/rotate/filter 不覆盖单位既有动画
+const RAM_FLINCH = { at: [0, 0.12, 0.3, 0.55, 0.8, 1], rows: [[0, 0, 1, 0], [38, -12, 0.88, 9], [20, 8, 1.08, -5], [8, -4, 0.96, 2], [-2, 1, 1.02, -1], [0, 0, 1, 0]],
+  flash: ['none', 'brightness(3) contrast(1.5) drop-shadow(0 0 35px #f59e0b)', 'brightness(1.8) drop-shadow(0 0 20px #fbbf24)', 'brightness(1.2)', 'none', 'none'] };
+const RECOIL_FLINCH = { at: [0, 0.1, 0.28, 0.5, 0.75, 1], rows: [[0, 0, 1, 0], [14, 0, 0.88, -6], [-16, 0, 1.1, 4], [6, 0, 0.96, -2], [-2, 0, 1.02, 1], [0, 0, 1, 0]],
+  flash: ['none', 'brightness(3) contrast(1.5) drop-shadow(0 0 30px #ef4444)', 'brightness(1.8) drop-shadow(0 0 20px #f97316)', 'brightness(1.2)', 'none', 'none'] };
+function heavyFlinch(ctx, id, F, ang) {
+  const el = ctx.sandbox.getUnitView().nodes.get(id)?.sprite;
+  if (!el) return;
+  const c = Math.cos(ang), s = Math.sin(ang);
+  el.animate(F.rows.map(([a, b, k, r], i) => ({ translate: (a * c - b * s).toFixed(1) + 'px ' + (a * s + b * c).toFixed(1) + 'px', scale: String(k), rotate: r + 'deg', filter: F.flash[i], offset: F.at[i] })),
+    { duration: 550, easing: 'cubic-bezier(0.15,0.85,0.35,1)' });
+}
+// 视口平色闪（原版 melee/ranged-heavy-screen-flash）
+function screenFlash(fx, color, peak, ms) {
+  fx.screen('<i style="position:absolute;inset:0;background:' + color + ';"></i>', ms + 40).firstChild
+    .animate([{ opacity: 0 }, { opacity: peak, offset: 0.12 }, { opacity: 0 }], { duration: ms, easing: 'ease-out', fill: 'forwards' });
+}
+// 8 向火星束：沿各自方向外喷（原版 *-spark-jet）
+function sparkJets(D, w, h, color, glow) {
+  return [0, 45, 90, 135, 180, 225, 270, 315].map(d => '<i data-jet="' + d + '" style="position:absolute;left:' + (-w / 2) + 'px;top:' + (-h / 2) + 'px;width:' + w + 'px;height:' + h + 'px;border-radius:' + w + 'px;opacity:0;' +
+    'background:linear-gradient(0deg,transparent,' + color + ' 55%,#fff);filter:drop-shadow(0 0 6px ' + glow + ');"></i>').join('');
+}
+function animateJets(root, ms, d0, d1) {
+  root.querySelectorAll('[data-jet]').forEach(el => {
+    const r = el.dataset.jet + 'deg';
+    el.animate([{ transform: 'rotate(' + r + ') translateY(0) scale(.2)', opacity: 1 }, { transform: 'rotate(' + r + ') translateY(' + (-d0) + 'px) scale(1.2)', opacity: 1, offset: 0.38 },
+      { transform: 'rotate(' + r + ') translateY(' + (-d1) + 'px) scale(1.5)', opacity: 0 }], { duration: ms, easing: 'cubic-bezier(0.15,0.85,0.35,1)', fill: 'both' });
+  });
+}
+const kf5 = (s, r, o) => s.map((v, i) => ({ transform: 'scale(' + v + ') rotate(' + r[i] + 'deg)', opacity: o[i] }));
+// 原版重击低频冲击（playMeleeHeavySubBass / playRangedHeavySubBass）：振荡器 f0→f1 指数滑落 + 增益衰减，经混音器技能总线输出
+function subBass(ctx, { type = 'sine', f0, f1, gain, ms }) {
+  const M = ctx.av.CombatAudioMixer, ac = M.skillContext();
+  if (!ac) return;
+  const now = ac.currentTime, osc = ac.createOscillator(), g = ac.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(f0, now); osc.frequency.exponentialRampToValueAtTime(f1, now + ms / 1000);
+  g.gain.setValueAtTime(gain, now); g.gain.exponentialRampToValueAtTime(0.01, now + ms / 1000);
+  osc.connect(g); g.connect(M.output('skill', ctx.audioContext?.category));
+  osc.start(now); osc.stop(now + ms / 1000);
+}
+const MELEE_SUB_BASS = { type: 'triangle', f0: 160, f1: 36, gain: 0.75, ms: 300 };
+const RANGED_SUB_BASS = { type: 'sine', f0: 140, f1: 32, gain: 0.8, ms: 350 };
+// 近战重击·盾击推撞（原版 createMeleeHeavyHtml，原尺寸 240px）：双圈冲击环 + 沿冲撞方向的推撞新月波 + 碎裂线 + 8 向火星 + 金色爆核 + 眩晕星环
+function meleeHeavyBurst(fx, p, ang, { D = 2.6 * PX, stun = true } = {}) {
+  const k = D / 240, uid = fx.uid(), box = 'position:absolute;left:' + (-D / 2) + 'px;top:' + (-D / 2) + 'px;width:' + D + 'px;height:' + D + 'px;overflow:visible;';
+  const root = fx.top('<div style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:0;height:0;">' +
+    '<svg data-k="ring" viewBox="0 0 200 200" style="' + box + 'filter:drop-shadow(0 0 8px #f59e0b);"><circle cx="100" cy="100" r="48" fill="none" stroke="#fef08a" stroke-width="6"/><circle cx="100" cy="100" r="38" fill="none" stroke="#f97316" stroke-width="3.5" stroke-dasharray="10 5" opacity=".85"/></svg>' +
+    '<div style="position:absolute;left:0;top:0;width:0;height:0;transform:rotate(' + deg(ang).toFixed(1) + 'deg);"><svg data-k="wave" viewBox="0 0 200 200" style="' + box + '">' +
+      '<defs><linearGradient id="mw' + uid + '" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#fef08a" stop-opacity=".9"/><stop offset="50%" stop-color="#f59e0b" stop-opacity=".7"/><stop offset="100%" stop-color="#ea580c" stop-opacity="0"/></linearGradient></defs>' +
+      '<path d="M60,20 Q140,100 60,180 Q100,100 60,20 Z" fill="url(#mw' + uid + ')" style="filter:drop-shadow(0 0 10px #f59e0b);"/><path d="M75,40 Q135,100 75,160 Q105,100 75,40 Z" fill="#fff" opacity=".8"/></svg></div>' +
+    '<svg data-k="crack" viewBox="0 0 200 200" style="' + box + 'filter:drop-shadow(0 0 6px #f59e0b);"><path d="M100,100 L40,60 M100,100 L60,150 M100,100 L160,50 M100,100 L150,160 M100,100 L170,105 M100,100 L30,110 M100,100 L100,30 M100,100 L95,175" stroke="#fcd34d" stroke-width="3" stroke-linecap="round" fill="none"/><circle cx="100" cy="100" r="12" fill="#fff"/></svg>' +
+    sparkJets(D, 8 * k, 56 * k, '#fde047', '#f59e0b') +
+    '<svg data-k="core" viewBox="0 0 200 200" style="' + box + 'filter:drop-shadow(0 0 14px #f59e0b);"><defs><radialGradient id="mc' + uid + '" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#fff"/><stop offset="35%" stop-color="#fef08a"/><stop offset="70%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#b45309" stop-opacity="0"/></radialGradient></defs>' +
+      '<polygon points="100,15 118,72 175,55 130,98 180,140 122,128 110,185 88,132 25,155 70,108 20,70 78,72" fill="url(#mc' + uid + ')"/><circle cx="100" cy="100" r="30" fill="#fff"/><circle cx="100" cy="100" r="44" fill="#fde047" opacity=".65"/></svg>' +
+    (stun ? '<svg data-k="stun" viewBox="0 0 140 60" style="position:absolute;left:' + (-70 * k) + 'px;top:' + (-D * 0.62) + 'px;width:' + (140 * k) + 'px;height:' + (60 * k) + 'px;overflow:visible;opacity:0;filter:drop-shadow(0 0 6px #f59e0b);">' +
+      '<ellipse cx="70" cy="30" rx="55" ry="18" fill="none" stroke="#fef08a" stroke-width="2.5" stroke-dasharray="8 6" opacity=".85"/><polygon points="20,25 24,30 20,35 16,30" fill="#fff"/><polygon points="120,25 124,30 120,35 116,30" fill="#fff"/>' +
+      '<polygon points="70,10 75,15 70,20 65,15" fill="#fef08a"/><polygon points="70,42 75,47 70,52 65,47" fill="#fef08a"/></svg>' : '') +
+    '</div>', 1050).firstChild;
+  const q = s => root.querySelector('[data-k="' + s + '"]'), E = 'cubic-bezier(0.12,0.9,0.25,1)';
+  q('ring').animate([{ transform: 'scale(.2)', opacity: 1 }, { transform: 'scale(1.8)', opacity: 0.85, offset: 0.4 }, { transform: 'scale(2.8)', opacity: 0 }], { duration: 380, easing: 'cubic-bezier(0.1,0.8,0.2,1)', fill: 'forwards' });
+  q('wave').animate([{ transform: 'translateX(0) scale(.2,.5)', opacity: 0 }, { transform: 'translateX(' + (D * 0.4) + 'px) scale(1.4,1.3)', opacity: 1, offset: 0.2 },
+    { transform: 'translateX(' + (D * 0.75) + 'px) scale(1.8,1.5)', opacity: 0.75, offset: 0.5 }, { transform: 'translateX(' + (D * 1.15) + 'px) scale(2.3,1.7)', opacity: 0 }], { duration: 420, easing: 'cubic-bezier(0.15,0.9,0.25,1)', fill: 'forwards' });
+  q('crack').animate([{ transform: 'scale(.3)', opacity: 0 }, { transform: 'scale(1.05)', opacity: 1, offset: 0.22 }, { transform: 'scale(1.15)', opacity: 0.8, offset: 0.6 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 500, easing: E, fill: 'forwards' });
+  q('core').animate(kf5([0.1, 1.3, 1.1, 1.22, 1.45], [0, 10, 18, 25, 35], [0, 1, 0.95, 0.6, 0]).map((f, i) => ({ ...f, offset: [0, 0.15, 0.35, 0.7, 1][i] })), { duration: 480, easing: E, fill: 'forwards' });
+  if (stun) q('stun').animate([{ transform: 'translateY(' + (D * 0.12) + 'px) scale(.2) rotate(0deg)', opacity: 0 }, { transform: 'translateY(-' + (D * 0.04) + 'px) scale(1.1) rotate(90deg)', opacity: 1, offset: 0.25 },
+    { transform: 'translateY(-' + (D * 0.07) + 'px) scale(1) rotate(180deg)', opacity: 0.95, offset: 0.5 }, { transform: 'translateY(-' + (D * 0.1) + 'px) scale(1.05) rotate(270deg)', opacity: 0.9, offset: 0.75 },
+    { transform: 'translateY(-' + (D * 0.16) + 'px) scale(1.15) rotate(360deg)', opacity: 0 }], { duration: 900, delay: 100, easing: 'cubic-bezier(0.12,0.85,0.25,1)', fill: 'both' });
+  animateJets(root, 380, 28 * k, 58 * k);
+}
+// 远程重击·双管重爆（原版 createRangedHeavyMuzzleHtml，原尺寸 270px）：冲击双环 + 硝烟团 + 8 向火星 + 十二芒爆核
+function rangedHeavyBurst(fx, p, { D = 2.9 * PX } = {}) {
+  const k = D / 270, uid = fx.uid(), box = 'position:absolute;left:' + (-D / 2) + 'px;top:' + (-D / 2) + 'px;width:' + D + 'px;height:' + D + 'px;overflow:visible;';
+  const root = fx.top('<div style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:0;height:0;">' +
+    '<svg data-k="ring" viewBox="0 0 200 200" style="' + box + 'filter:drop-shadow(0 0 10px #f59e0b);"><circle cx="100" cy="100" r="50" fill="none" stroke="#fef08a" stroke-width="5"/><circle cx="100" cy="100" r="42" fill="none" stroke="#ef4444" stroke-width="3" stroke-dasharray="10 6" opacity=".8"/></svg>' +
+    '<svg data-k="smoke" viewBox="0 0 200 200" style="' + box + 'opacity:0;"><g fill="#1c1917" fill-opacity=".8"><circle cx="90" cy="95" r="45"/><circle cx="115" cy="90" r="38"/><circle cx="100" cy="115" r="40"/></g></svg>' +
+    sparkJets(D, 10 * k, 64 * k, '#fcd34d', '#f97316') +
+    '<svg data-k="core" viewBox="0 0 200 200" style="' + box + 'filter:drop-shadow(0 0 18px #ea580c);"><defs><radialGradient id="rc' + uid + '" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#fff"/><stop offset="25%" stop-color="#fef08a"/><stop offset="55%" stop-color="#f97316"/><stop offset="85%" stop-color="#dc2626"/><stop offset="100%" stop-color="#7f1d1d" stop-opacity="0"/></radialGradient></defs>' +
+      '<polygon points="100,10 120,70 185,45 135,95 190,140 125,130 115,190 90,135 20,160 65,110 10,75 75,70" fill="url(#rc' + uid + ')"/><polygon points="100,25 115,80 165,65 125,105 160,145 115,130 100,175 85,125 35,140 75,100 30,65 85,75" fill="#fef08a" opacity=".85"/>' +
+      '<circle cx="92" cy="98" r="28" fill="#fff"/><circle cx="108" cy="102" r="28" fill="#fff"/><circle cx="100" cy="100" r="48" fill="#fde047" opacity=".7"/></svg>' +
+    '</div>', 850).firstChild;
+  const q = s => root.querySelector('[data-k="' + s + '"]');
+  q('ring').animate([{ transform: 'scale(.2)', opacity: 1 }, { transform: 'scale(2)', opacity: 0.85, offset: 0.4 }, { transform: 'scale(3.2)', opacity: 0 }], { duration: 450, easing: 'cubic-bezier(0.1,0.8,0.2,1)', fill: 'forwards' });
+  q('smoke').animate(kf5([0.3, 1.1, 1.5, 1.9], [0, -15, -35, -50], [0, 0.75, 0.4, 0]).map((f, i) => ({ ...f, offset: [0, 0.25, 0.7, 1][i] })), { duration: 750, delay: 50, easing: 'ease-out', fill: 'both' });
+  q('core').animate(kf5([0.1, 1.35, 1.15, 1.25, 1.45], [0, 15, 25, 40, 55], [0, 1, 0.95, 0.6, 0]).map((f, i) => ({ ...f, offset: [0, 0.12, 0.3, 0.7, 1][i] })), { duration: 550, easing: 'cubic-bezier(0.12,0.9,0.25,1)', fill: 'forwards' });
+  animateJets(root, 420, 30 * k, 65 * k);
+}
+// 远程重击屏幕血块（原版 createRangedHeavyBloodHtml：5 团 1.15s + 2 道血泪）
+const RANGED_SPLAT_POS = [
+  { top: '16%', left: '18%', size: 150, rot: -25, delay: 80 }, { top: '65%', left: '22%', size: 150, rot: 45, delay: 120 },
+  { top: '20%', right: '16%', size: 150, rot: 15, delay: 100 }, { top: '60%', right: '18%', size: 150, rot: -55, delay: 140 },
+  { top: '38%', left: '46%', size: 150, rot: 8, delay: 50 },
+];
+const RANGED_SPLAT_DRIPS = [['right:25%', 6, 140, 150, 1250], ['left:22%', 8, 180, 100, 1350]];
+// 巨弹（.600 Nitro Express 式）：黄铜弹壳 + 底缘 + 收口 + 铜被甲尖头 + 高光
+function bigBulletHtml(uid) {
+  return '<svg viewBox="0 0 100 30" width="100%" height="100%" style="overflow:visible;"><defs>' +
+    '<linearGradient id="bb' + uid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fef3c7"/><stop offset=".35" stop-color="#fbbf24"/><stop offset=".7" stop-color="#b45309"/><stop offset="1" stop-color="#78350f"/></linearGradient>' +
+    '<linearGradient id="bc' + uid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fed7aa"/><stop offset=".4" stop-color="#ea580c"/><stop offset=".75" stop-color="#9a3412"/><stop offset="1" stop-color="#431407"/></linearGradient></defs>' +
+    '<rect x="3" y="4" width="55" height="22" rx="2" fill="url(#bb' + uid + ')"/><rect x="0" y="2.5" width="5" height="25" rx="1.5" fill="url(#bb' + uid + ')"/>' +
+    '<rect x="51" y="4" width="7" height="22" fill="#78350f" opacity=".45"/><path d="M58,4.5 L72,4.5 Q100,9 100,15 Q100,21 72,25.5 L58,25.5 Z" fill="url(#bc' + uid + ')"/>' +
+    '<path d="M60,8 L72,8 Q91,11 96,14" stroke="#fff7ed" stroke-opacity=".75" stroke-width="1.5" fill="none" stroke-linecap="round"/><rect x="7" y="7" width="42" height="2.6" rx="1.3" fill="#fffbeb" opacity=".6"/></svg>';
 }
 
 // ==========================================
@@ -1678,32 +1792,103 @@ const sandArmor = {
 };
 
 // ---------- D4-B 弗兰克 / 玛德琳枪械与近战重击（5项 + 克虏伯起手） ----------
+// 近战重击（移植回合制 spawnMeleeHeavyParticles，弗兰克【重击推撞】）：蓄力下压 → 沿直线冲撞（冲锋路径真值，逐接触步结算）→
+// 每次命中：破防音 parry_heavy + 80ms 后 hitDown，原版重震屏、金色平闪、盾击推撞爆发（新月波沿冲撞方向）、目标推撞踉跄 + 眩晕星环；落空只擦出火星
 const meleeHeavy = {
   id: 'melee-heavy', grade: 'L2', fxTags: ['近战重击'],
-  timeline: { totalMs: 920, fullscreen: false, darken: false },
-  cues: [{ key: 'parry_heavy', vol: 0.65 }],
-  prepareKeys() { return ['parry_heavy']; },
+  timeline: { totalMs: 1100, fullscreen: false, darken: false },
+  cues: [{ key: 'parry_heavy', vol: 0.72 }, { key: 'hitDown', vol: 0.6 }],
+  prepareKeys() { return ['parry_heavy', 'hitDown', 'swish_3']; },
   async play(ctx) {
-    const { fx, hits, result } = ctx, t = worldPx(hits[0] ? ctx.centerOf(hits[0].targetId) : result.aim);
-    fx.sfx('parry_heavy', 0.65); fx.shake('heavy');
-    fx.top(ringHtml(t.x, t.y, 2.8 * PX, 'rgba(251,191,36,0.9)', 'rgba(234,88,12,0.5)'), 480)
-      .firstChild.animate([{ transform: 'scale(0.2)', opacity: 1 }, { transform: 'scale(1.2)', opacity: 0 }], { duration: 460, fill: 'forwards' });
-    ctx.after(80, () => hits.forEach(h => ctx.reveal(h.targetId)));
-    return ctx.wait(880);
+    const { fx, hits, result, charge } = ctx;
+    const from = charge ? unitCenter(charge.from, charge.footprint) : ctx.centerOf(ctx.casterId);
+    const toM = charge ? unitCenter(charge.path.at(-1), charge.footprint) : (hits[0] ? ctx.centerOf(hits[0].targetId) : result.aim);
+    const c = worldPx(from), e = worldPx(toM), ang = Math.atan2(e.y - c.y, e.x - c.x) || 0, ux = Math.cos(ang), uy = Math.sin(ang);
+    const strike = (p, list) => {
+      const landed = list.filter(t => t.hit);
+      if (!landed.length) { spray(fx, p, 6, { kind: 'spark', ang: ang + Math.PI, spread: 2.4, dist: [16, 46], size: [2, 3], ms: [220, 320] }); return; }
+      fx.sfx('parry_heavy', 0.72); subBass(ctx, MELEE_SUB_BASS); ctx.after(80, () => fx.sfx('hitDown', 0.6));
+      heavyShake(ctx, MELEE_HEAVY_SHAKE, 440);
+      screenFlash(fx, 'rgba(251,191,36,0.9)', 0.22, 300);
+      meleeHeavyBurst(fx, p, ang);
+      landed.forEach(t => heavyFlinch(ctx, t.id, RAM_FLINCH, ang));
+    };
+    // ① 蓄力：重心后压 + 脚下尘环
+    const me = ctx.sandbox.getUnitView().nodes.get(ctx.casterId)?.sprite;
+    me?.animate([{ translate: '0 0', scale: '1' }, { translate: (-ux * 6).toFixed(1) + 'px ' + (-uy * 6).toFixed(1) + 'px', scale: '0.9 1.06', offset: 0.8 }, { translate: '0 0', scale: '1' }], { duration: 240, easing: 'ease-in' });
+    fx.ground(ringHtml(c.x, c.y, 1.6 * PX, 'rgba(251,191,36,0.55)', 'rgba(120,53,15,0.25)'), 300).firstChild
+      .animate([{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(.6)', opacity: 0.9 }], { duration: 240, fill: 'forwards' });
+    if (!(await ctx.wait(220))) return false;
+    fx.sfx('swish_3', 0.5);
+    if (!charge) {
+      const t = hits[0] ? worldPx(ctx.centerOf(hits[0].targetId)) : e;
+      strike(t, hits.map(h => ({ id: h.targetId, hit: h.hit })));
+      hits.forEach(h => ctx.reveal(h.targetId));
+      return ctx.wait(860);
+    }
+    // ② 冲撞：沿路径扬尘；接触步 = 规则结算的 chargeStep，爆点取弗兰克当时的前沿
+    particles(fx, Array.from({ length: 18 }, () => ({ x: c.x + rnd(-14, 14), y: c.y + rnd(-14, 14), dx: (e.x - c.x) * rnd(0.3, 0.8) + rnd(-16, 16), dy: (e.y - c.y) * rnd(0.3, 0.8) + rnd(-16, 16), size: rnd(12, 22), color: 'rgba(214,190,150,.55)', core: 'rgba(255,247,237,.6)', s0: 0.6, s1: 1.4, dur: rnd(380, 560) })), 600, 'ground');
+    const byStep = new Map();
+    hits.forEach(h => (h.segments || [h]).forEach(sg => { if (sg.chargeStep == null) return; if (!byStep.has(sg.chargeStep)) byStep.set(sg.chargeStep, []); byStep.get(sg.chargeStep).push({ id: h.targetId, hit: sg.hit }); }));
+    const onContact = step => {
+      const at = charge.path[Math.min(step, charge.path.length - 1)], m = unitCenter(at, charge.footprint);
+      strike(worldPx({ x: m.x + ux * 0.7, y: m.y + uy * 0.7 }), byStep.get(step) || []);
+    };
+    const [ok, finished] = await Promise.all([ctx.playCharge(onContact), ctx.wait(860)]);
+    return ok && finished;
   },
 };
 
+// 远程重击（弗兰克【皇家猎象枪】）：镜头推近弗兰克，枪口凝出一颗巨弹（热浪聚能 + 火星吸入 + 颤动）→ 击发重枪口焰 + 后坐，
+// 镜头追弹甩到目标 → 命中拍（顿帧 ATTACK_HIT_MS）：白闪 + 原版双管重爆 + 低频冲击；解冻后原版重震屏 + 屏幕血块（无论命中/闪避都溅）+ 目标后仰 → 镜头回位
+// 音效沿用原版：shot01 击发、hitDown + 低频冲击命中
 const rangedHeavy = {
   id: 'ranged-heavy', grade: 'L2', fxTags: ['远程重击'], reuseAudio: true,
-  timeline: { totalMs: 900, fullscreen: false, darken: false },
-  cues: [{ key: 'gunshot_pierce', vol: 0.7 }],
-  prepareKeys() { return ['gunshot_pierce']; },
+  timeline: { totalMs: 1180, fullscreen: false, darken: false },
+  cues: [{ key: 'herocharge', vol: 0.45 }, { key: 'shot', vol: 0.8 }, { key: 'hitDown', vol: 0.75 }],
+  prepareKeys() { return ['herocharge', 'shot', 'hitDown']; },
   async play(ctx) {
-    const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), t = worldPx(hits[0] ? ctx.centerOf(hits[0].targetId) : result.aim);
-    fx.sfx('gunshot_pierce', 0.7); fx.shake('medium');
-    trail(fx, c, { x: (c.x + t.x) / 2, y: (c.y + t.y) / 2 }, t, { color: '#fbbf24', width: 6, ms: 200 });
-    ctx.after(160, () => hits.forEach(h => ctx.reveal(h.targetId)));
-    return ctx.wait(860);
+    const { fx, hits, result } = ctx, sb = ctx.sandbox;
+    const CHARGE = 380, FLY = 200, STOP = ATTACK_HIT_MS;
+    const cm = ctx.centerOf(ctx.casterId), tm = hits[0] ? ctx.centerOf(hits[0].targetId) : result.aim;
+    const c = worldPx(cm), t = worldPx(tm), ang = Math.atan2(t.y - c.y, t.x - c.x), ux = Math.cos(ang), uy = Math.sin(ang);
+    const m = { x: c.x + ux * 30, y: c.y + uy * 30 }, landed = hits.filter(h => h.hit);
+    const ip = landed.length ? t : { x: t.x + ux * 45, y: t.y + uy * 45 };   // 闪避：擦过目标在其身后炸开
+    const home = sb.getPose();
+    // ① 特写蓄力：推近弗兰克；巨弹在枪口凝形颤动，热浪聚能、火星吸入
+    const Z = k => zoomAt(home.scale, home.scale * k);
+    sb.cameraTo(sb.poseAt(cm.x + ux * 0.8, cm.y + uy * 0.8, Z(1.8)), 240);
+    fx.sfx('herocharge', 0.45);
+    const L = 1.9 * PX, W = L * 0.3, uid = fx.uid();
+    const glow = fx.top(orbHtml(m.x, m.y, 1.6 * PX, 'rgba(249,115,22,0.55)', 'rgba(254,243,199,0.95)'), CHARGE + 60).firstChild;
+    glow.animate([{ transform: 'scale(.3)', opacity: 0.4 }, { transform: 'scale(1.1)', opacity: 1, offset: 0.7 }, { transform: 'scale(.8)', opacity: 0.9 }], { duration: CHARGE, fill: 'forwards' });
+    fx.top(ringHtml(m.x, m.y, 2.4 * PX, 'rgba(253,186,116,0.8)', 'rgba(234,88,12,0.35)'), CHARGE).firstChild
+      .animate([{ transform: 'scale(1.5)', opacity: 0 }, { transform: 'scale(.35)', opacity: 0.95 }], { duration: CHARGE, easing: 'ease-in', fill: 'forwards' });
+    particles(fx, Array.from({ length: 14 }, () => { const a = rnd(0, TAU), r = rnd(50, 80); return { x: m.x + Math.cos(a) * r, y: m.y + Math.sin(a) * r, dx: -Math.cos(a) * r, dy: -Math.sin(a) * r, size: rnd(5, 9), color: '#fdba74', core: '#fff7ed', s0: 1, s1: 0.4, dur: rnd(240, CHARGE), ease: 'ease-in' }; }), CHARGE);
+    const bl = fx.top('<div style="position:absolute;left:' + m.x + 'px;top:' + m.y + 'px;width:0;height:0;transform:rotate(' + deg(ang).toFixed(1) + 'deg);">' +
+      '<div style="position:absolute;left:' + (-L * 0.35) + 'px;top:' + (-W / 2) + 'px;width:' + L + 'px;height:' + W + 'px;filter:drop-shadow(0 0 6px rgba(251,146,60,.9));">' + bigBulletHtml(uid) + '</div></div>', CHARGE + FLY + 20).firstChild;
+    const shell = bl.firstChild;
+    shell.animate([{ transform: 'scale(.25)', opacity: 0 }, { transform: 'scale(1.08)', opacity: 1, offset: 0.55 }, { transform: 'translate(1px,-1px) scale(1)', offset: 0.7 }, { transform: 'translate(-1px,1px) scale(1.02)', offset: 0.85 }, { transform: 'scale(1)', opacity: 1 }], { duration: CHARGE, fill: 'forwards' });
+    if (!(await ctx.wait(CHARGE))) return false;
+    // ② 击发：重枪口焰 + 后坐；巨弹拖曳光直飞，镜头追弹甩向目标
+    fx.sfx('shot', 0.8); fx.shake('heavy');
+    gunFlash(fx, { x: m.x + ux * L * 0.2, y: m.y + uy * L * 0.2 }, ang, { size: 70, ms: 220 });
+    jolt(ctx, ctx.casterId, { amp: 6, ms: 60, glow: '#fb923c' });
+    tracer(fx, m, ip, { width: W * 0.55, ms: FLY, len: L * 1.4 });
+    const dx = ip.x - m.x, dy = ip.y - m.y;
+    bl.animate([{ translate: '0 0' }, { translate: dx.toFixed(1) + 'px ' + dy.toFixed(1) + 'px' }], { duration: FLY, easing: 'cubic-bezier(.5,0,.9,.6)', fill: 'forwards' });
+    sb.cameraTo(sb.poseAt(tm.x - ux * 0.6, tm.y - uy * 0.6, Z(1.5)), FLY + 40);
+    if (!(await ctx.wait(FLY))) return false;
+    // ③ 命中拍：顿帧中白闪 + 双管重爆；解冻后重震屏、血块、后仰、回位
+    hits.forEach(h => ctx.reveal(h.targetId));
+    fx.sfx('hitDown', 0.75); subBass(ctx, RANGED_SUB_BASS);
+    if (!(await holdOr(ctx.hold, STOP, () => { screenFlash(fx, '#fff', 0.45, 300); rangedHeavyBurst(fx, ip); }))) return false;
+    heavyShake(ctx, RANGED_HEAVY_SHAKE, 480);
+    screenBlood(fx, 1400, { pos: RANGED_SPLAT_POS, drips: RANGED_SPLAT_DRIPS, each: 1150 });
+    landed.forEach(h => heavyFlinch(ctx, h.targetId, RECOIL_FLINCH, ang));
+    if (landed.length) spray(fx, t, 14, { kind: 'gore', ang, spread: 1.4, dist: [24, 96], size: [3, 7] });
+    sb.cameraTo(sb.poseAt((cm.x + tm.x) / 2, (cm.y + tm.y) / 2, Z(1.05)), 160).then(ok => { if (ok) ctx.after(220, () => sb.cameraTo(home, 300)); });
+    return ctx.wait(520);
   },
 };
 
@@ -1742,15 +1927,15 @@ const gunshotPierce = {
 
 // 连续扫射（移植回合制 startStrafeBurst，2600ms = 52 发 × 50ms 对齐原版）：双枪左右交替超密连发，扇形往返扫过全部目标；
 // 每发：枪口焰 + 曳光 + 抛壳 + 跳弹火星 + 血雾，偶数发副枪交叉射向相邻目标；施法者后坐 / 目标弹雨硬直 / 持续后坐震屏；全程屏幕血块覆盖。
-// 运镜：遮幅入场 + 推近玛德琳（偏向射向）→ 时停定格（去色 + 速度线）→ 拉开框住全部目标并随扫射摆镜 → 末击顿帧急推 → 回位
+// 运镜：遮幅入场 + 推近玛德琳（偏向射向）→（时停 ATTACK_STOP_MS）→ 拉开框住全部目标并随扫射摆镜 → 末击（顿帧 ATTACK_HIT_MS）急推 + 白闪 → 回位
 const strafeBurst = {
   id: 'strafe-burst', grade: 'L3', fxTags: ['连续扫射'], cine: false,
-  timeline: { chargeMs: 800, totalMs: 4120, fullscreen: true, darken: false },
+  timeline: { chargeMs: 800, totalMs: 3830, fullscreen: true, darken: false },   // 800 蓄势 + 2600 扫射 + 60 + 360 回位（攻击类时停/顿帧为 0）
   cues: [{ key: 'aoe_gun_burst_fs482122', vol: 0.68 }],
   prepareKeys() { return ['aoe_gun_burst_fs482122', 'gunshot1', 'gunshot2', 'gunshot3']; },
   async play(ctx) {
     const { fx, hits, result } = ctx, sb = ctx.sandbox;
-    const CHARGE_MS = 800, STOP_MS = 140, TICK = 50, N = 52, FIRE_MS = N * TICK, HIT_MS = 150, BACK_MS = 360;
+    const CHARGE_MS = 800, STOP_MS = ATTACK_STOP_MS, TICK = 50, N = 52, FIRE_MS = N * TICK, HIT_MS = ATTACK_HIT_MS, BACK_MS = 360;
     const cm = ctx.centerOf(ctx.casterId), am = result.aim, c = worldPx(cm), a = worldPx(am);
     const baseAng = Math.atan2(a.y - c.y, a.x - c.x);
     const home = sb.getPose();
@@ -1758,14 +1943,15 @@ const strafeBurst = {
 
     // ① 蓄势：遮幅入场，镜头推近出手者并略偏射向；脚下火环 + 出手者金色辉光
     letterbox(fx, CHARGE_MS + STOP_MS + FIRE_MS + 60 + HIT_MS + BACK_MS);
-    sb.cameraTo(sb.poseAt(cm.x + Math.cos(baseAng) * 1.2, cm.y + Math.sin(baseAng) * 1.2, home.scale * 1.6), 720);
+    const Z = k => zoomAt(home.scale, k);   // 绝对设计缩放 → 收敛后缩放
+    sb.cameraTo(sb.poseAt(cm.x + Math.cos(baseAng) * 1.2, cm.y + Math.sin(baseAng) * 1.2, Z(home.scale * 1.6)), 720);
     const rune = fx.ground(ringHtml(c.x, c.y, 1.8 * PX, 'rgba(251,146,60,0.55)', 'transparent'), CHARGE_MS + 50);
     rune.firstChild.animate([{ transform: 'scale(0.5)', opacity: 0.3 }, { transform: 'scale(1.1)', opacity: 0.9 }], { duration: CHARGE_MS, fill: 'forwards' });
     sb.getUnitView().nodes.get(ctx.casterId)?.sprite.animate([{ filter: 'none' }, { filter: 'brightness(1.35) drop-shadow(0 0 14px #fbbf24)' }], { duration: CHARGE_MS, easing: 'ease-in' });
     if (!(await ctx.wait(CHARGE_MS))) return false;
 
     // ② 时停：整场定格去色，以出手者为焦点放射速度线 + 白闪
-    if (!(await ctx.hold(STOP_MS, () => timeStop(sb, fx, STOP_MS, cm)))) return false;
+    if (!(await holdOr(ctx.hold, STOP_MS, () => { if (STOP_MS > 0) timeStop(sb, fx, STOP_MS, cm); }))) return false;
 
     // ③ 开火：镜头拉开框住出手者与全部目标，随扫射主目标缓摆；持续高频后坐震屏
     fx.sfx('aoe_gun_burst_fs482122', 0.68); fx.shake('heavy');
@@ -1774,7 +1960,7 @@ const strafeBurst = {
     const pts = [cm, ...(targets.length ? targets.map(t => t.m) : [am])];
     const C = { x: (Math.min(...pts.map(p => p.x)) + Math.max(...pts.map(p => p.x))) / 2, y: (Math.min(...pts.map(p => p.y)) + Math.max(...pts.map(p => p.y))) / 2 };
     const S = Math.min(sb.poseFrame(pts, { pad: 2.4, tight: 1.08 }).scale, home.scale * 1.5);
-    sb.cameraTo(sb.poseAt(C.x, C.y, S), 260);
+    sb.cameraTo(sb.poseAt(C.x, C.y, Z(S)), 260);
     const rumble = sb.getDom().shake.animate([{ transform: 'translate3d(-4px,3px,0)' }, { transform: 'translate3d(4px,-3px,0)' }, { transform: 'translate3d(-3px,-4px,0)' }],
       { duration: 120, iterations: Math.ceil((FIRE_MS + 60) / 120), direction: 'alternate' });
     const fwd = { x: Math.cos(baseAng) * 18, y: Math.sin(baseAng) * 18 }, side = { x: -Math.sin(baseAng) * 13, y: Math.cos(baseAng) * 13 };
@@ -1810,7 +1996,7 @@ const strafeBurst = {
       if (k % 2 === 0) fx.sfx(pick(['gunshot1', 'gunshot2', 'gunshot3']), 0.42);
       if (k % 2 === 1) jolt(ctx, ctx.casterId, { amp: 2.5, ms: 30, glow: '#fbbf24' });
       // 摆镜：每 0.5s 把镜头中心向当前主目标偏 18%
-      if (tg && k >= 8 && k % 10 === 0) sb.cameraTo(sb.poseAt(C.x + (tg.m.x - C.x) * 0.18, C.y + (tg.m.y - C.y) * 0.18, S), 460);
+      if (tg && k >= 8 && k % 10 === 0) sb.cameraTo(sb.poseAt(C.x + (tg.m.x - C.x) * 0.18, C.y + (tg.m.y - C.y) * 0.18, Z(S)), 460);
     });
     ctx.after(FIRE_MS, () => hits.forEach(h => show(h.targetId)));
     if (!(await ctx.wait(FIRE_MS + 60))) { rumble.cancel(); return false; }
@@ -1818,7 +2004,7 @@ const strafeBurst = {
     // ④ 末击顿帧：整场冻结，镜头急推最后一发命中的目标 + 白闪
     const last = targets[sweep[(N - 1) % Math.max(1, sweep.length)]];
     const fm = last ? last.m : am;
-    if (!(await ctx.hold(HIT_MS, () => { sb.cameraTo(sb.poseAt(C.x + (fm.x - C.x) * 0.4, C.y + (fm.y - C.y) * 0.4, S * 1.12), 40); hitFlash(fx, fm); }))) { rumble.cancel(); return false; }
+    if (!(await holdOr(ctx.hold, HIT_MS, () => { sb.cameraTo(sb.poseAt(C.x + (fm.x - C.x) * 0.4, C.y + (fm.y - C.y) * 0.4, Z(S * 1.12)), 40); hitFlash(fx, fm); }))) { rumble.cancel(); return false; }
     rumble.cancel();
     fx.shake('quake');
     if (last && last.hit) spray(fx, last.p, 16, { kind: 'gore', ang: Math.atan2(last.p.y - c.y, last.p.x - c.x), spread: 1.6, dist: [30, 110], size: [3, 7.5] });
