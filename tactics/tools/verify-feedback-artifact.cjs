@@ -27,9 +27,9 @@ const root = path.resolve(__dirname, '..', '..');
     .replace('export function runCases()', 'function runCases()')
     .replace("new URL('../../../tactics/src/ui-shell.mjs', import.meta.url)", 'uiShellPath');
   const assert = require('node:assert/strict');
-  const { statusBadges, passiveTauntBadges } = await import(pathToFileURL(path.join(root, 'tactics', 'src', 'status-ui.mjs')).href);
-  const thresholdRun = new Function('assert', 'readFileSync', 'createBattle', 'statusBadges', 'passiveTauntBadges', 'uiShellPath', thresholdCode + '\nreturn runCases;')(
-    assert, fs.readFileSync, backend.createBattle, statusBadges, passiveTauntBadges, path.join(root, 'tactics', 'src', 'ui-shell.mjs'));
+  const { statusBadges } = await import(pathToFileURL(path.join(root, 'tactics', 'src', 'status-ui.mjs')).href);
+  const thresholdRun = new Function('assert', 'readFileSync', 'createBattle', 'statusBadges', 'uiShellPath', thresholdCode + '\nreturn runCases;')(
+    assert, fs.readFileSync, backend.createBattle, statusBadges, path.join(root, 'tactics', 'src', 'ui-shell.mjs'));
   // UI模板另在源码回归及IAB实测，这里只计真实产物后端的阈值/行动/消费用例。
   cases.push(...thresholdRun().cases.filter(c => !/statusBadges|急袭独立atk|renderStrip/.test(c.id)));
   if (!cases.length) throw new Error('反馈用例提取为空');

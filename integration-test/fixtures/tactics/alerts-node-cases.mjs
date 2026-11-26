@@ -3,7 +3,7 @@ function unit(id, side, perception, spd, extra = {}) {
   return { id, name: id, side, controller: side === 'hero' ? 'player' : 'ai',
     footprint: { width: 1, height: 1 }, skills: [], ...extra,
     ref: { hp: 100, maxHp: 100, mp: 30, maxMp: 30, atk: 10, def: 0, spd, evasion: 100,
-      moveDistance: 6, perception } };
+      moveDistance: 6, perception, ...extra.ref } };
 }
 function aim(col, row, targetId) { return { x: col + 0.5, y: row + 0.5, targetId }; }
 const shot = { name: '远击', type: '[伤害]', power: 10, hit: 1,
@@ -15,10 +15,10 @@ const wall = { id: 'wall', kind: 'wall', bounds: { col: 4, row: 2, width: 1, hei
 export function runAlertsCases(api) {
   const cases = [];
   const check = (id, pass, details) => cases.push({ id, pass: !!pass, detail: details == null ? '' : JSON.stringify(details) });
-  const make = (units, coords, { objects = [], summonProvider } = {}) => {
-    const scene = { sceneId: 'tt-alerts', grid: { columns: 24, rows: 16, metersPerCell: 1 }, ground: {}, objects };
+  const make = (units, coords, { objects = [], rows = 16, random = () => 0.5, summonProvider } = {}) => {
+    const scene = { sceneId: 'tt-alerts', grid: { columns: 24, rows, metersPerCell: 1 }, ground: {}, objects };
     const placementsById = Object.fromEntries(units.map((u, i) => [u.id, { col: coords[i][0], row: coords[i][1] }]));
-    const battle = api.createBattle({ units, placementsById, scene, random: () => 0.5, summonProvider });
+    const battle = api.createBattle({ units, placementsById, scene, random, summonProvider });
     battle.start(); return battle;
   };
   const state = (battle, id) => battle.getEffectiveUnit(id).alertState;
@@ -89,6 +89,55 @@ export function runAlertsCases(api) {
     const isolated = unit('sum', 'hero', 5, 200, { isSummon: true, controller: 'ai' });
     const blind = make([isolated, unit('unseen', 'enemy', 0, 100)], [[1, 4], [4, 4]]);
     check('TT-ALERTS 没有我方发现记录的敌人不作为追踪目标', blind.planEnemyAction()?.action === 'wait');
+  }
+  {
+    const quiet = make([unit('h', 'hero', 0, 200), unit('e', 'enemy', 0, 100, { ref: { moveDistance: 0.5 } })], [[2, 2], [18, 2]]);
+    advanceTo(quiet, 'e');
+    const plan = quiet.planEnemyAction();
+    const result = quiet.runEnemyTurn();
+    check('TT-ALERTS 无警报敌人没有一步额度时不冲刺也不移动', plan?.action === 'wait' && !plan.moveTo && !plan.skill
+      && result.currentId !== 'e' && !result.events.some(event => event.type === 'unit-moved' && event.unitId === 'e'), plan);
+  }
+  {
+    const buff = { name: '自我强化', type: '[增攻]', power: 10, range: { type: '自身' }, actionCost: { main: 1, aux: 0 } };
+    const b = make([unit('h', 'hero', 0, 200), unit('e', 'enemy', 0, 100, { skills: [buff] })], [[2, 2], [18, 2]]);
+    advanceTo(b, 'e');
+    const before = b.snapshot().resources.moveRemaining;
+    const buffUsable = b.skillStatus(buff).ok;
+    const plan = b.planEnemyAction();
+    const result = b.runEnemyTurn();
+    const travelled = result.events.filter(event => event.type === 'unit-moved' && event.unitId === 'e').reduce((sum, event) => sum + event.distance, 0);
+    check('TT-ALERTS 无敌时随机走完正常移动额度，不自施可用增攻', buffUsable && plan?.moveTo && !plan.skill
+      && travelled <= before + 1e-9 && before - travelled < 1 && !result.events.some(event => event.casterId === 'e')
+      && b.getEffectiveUnit('e').atk === 10 && state(b, 'e') === 'idle', [plan, before, travelled]);
+  }
+  {
+    const b = make([unit('h', 'hero', 0, 200), unit('e', 'enemy', 10, 100)], [[2, 0], [8, 0]],
+      { rows: 1, random: () => 0, objects: [{ ...wall, bounds: { ...wall.bounds, col: 9, row: 0 } }] });
+    advanceTo(b, 'e');
+    const plan = b.planEnemyAction();
+    const result = b.runEnemyTurn();
+    const discovery = result.events.find(event => event.type === 'unit-moved' && event.unitId === 'e' && event.stoppedOnDiscovery);
+    check('TT-ALERTS 巡走途中发现敌人即暂停并预警', plan?.moveTo?.col < 8 && !plan.skill && result.currentId !== 'e'
+      && discovery?.discoveredIds.includes('h') && state(b, 'e') === 'pending', [plan, discovery, state(b, 'e')]);
+  }
+  {
+    const owner = unit('owner', 'hero', 0, 200, { footprint: { width: 2, height: 1 } });
+    const companion = unit('companion', 'hero', 0, 100, { isSummon: true, summonOwnerId: 'owner', controller: 'ai' });
+    const b = make([owner, companion, unit('enemy', 'enemy', 0, 80)], [[3, 3], [12, 3], [20, 12]]);
+    advanceTo(b, 'companion');
+    const first = b.planEnemyAction();
+    b.runEnemyTurn();
+    const firstCol = b.ctx.placementsById.companion.col;
+    advanceTo(b, 'companion');
+    const second = b.planEnemyAction();
+    b.runEnemyTurn();
+    advanceTo(b, 'companion');
+    const idle = b.planEnemyAction();
+    const position = b.ctx.placementsById.companion;
+    check('TT-ALERTS 空闲召唤物跨轮走到多格主人八邻接并停下', first?.moveTo && firstCol === 6 && second?.moveTo
+      && position.col === 5 && Math.abs(position.row - 3) <= 1 && idle?.action === 'wait' && !idle.moveTo && !idle.skill,
+      [first, firstCol, second, position, idle]);
   }
   return { cases };
 }

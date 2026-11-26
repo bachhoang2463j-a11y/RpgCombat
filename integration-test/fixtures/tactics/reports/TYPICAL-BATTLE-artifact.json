@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "d20766f0f9da37ec491cdf8bd0d2bd278246c55d7790edb2875f0d11a32f357f",
-  "bytes": 1645768,
+  "sha256": "88201f8e6c5a353972cb6fe1ac71d4747d53bec59d3075de6f16b3ff89f6df8b",
+  "bytes": 1645342,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -76,7 +76,12 @@
       "detail": ""
     },
     {
-      "id": "本轮辅助1.5倍速、隐匿音色、滑行续播及急袭消费入包",
+      "id": "辅助1.5倍速、隐匿音色及滑行续播入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "巡走跟随、整技锁定急袭与合并状态入包",
       "pass": true,
       "detail": ""
     },
@@ -233,14 +238,34 @@
     {
       "id": "TT-ALERTS 我方召唤物追全队失视的已知敌人而非未发现敌人",
       "pass": true,
-      "detail": "{\"moveTo\":{\"col\":4,\"row\":2},\"skill\":{\"name\":\"普通攻击\",\"type\":\"[伤害]\",\"fxTag\":\"刀砍\",\"power\":0,\"hit\":100,\"cost\":0,\"range\":{\"type\":\"单体\",\"castRange\":2},\"actionCost\":{\"main\":1,\"aux\":0}},\"aim\":{\"x\":5.5,\"y\":2.5,\"targetId\":\"known\"},\"action\":null}"
+      "detail": "{\"moveTo\":{\"col\":4,\"row\":2},\"skill\":null,\"aim\":null,\"action\":null}"
     },
     {
       "id": "TT-ALERTS 没有我方发现记录的敌人不作为追踪目标",
       "pass": true,
       "detail": ""
+    },
+    {
+      "id": "TT-ALERTS 无警报敌人没有一步额度时不冲刺也不移动",
+      "pass": true,
+      "detail": "{\"moveTo\":null,\"skill\":null,\"aim\":null,\"action\":\"wait\"}"
+    },
+    {
+      "id": "TT-ALERTS 无敌时随机走完正常移动额度，不自施可用增攻",
+      "pass": true,
+      "detail": "[{\"moveTo\":{\"col\":19,\"row\":3},\"skill\":null,\"aim\":null,\"action\":null},6,5.414213562373095]"
+    },
+    {
+      "id": "TT-ALERTS 巡走途中发现敌人即暂停并预警",
+      "pass": true,
+      "detail": "[{\"moveTo\":{\"col\":3,\"row\":0},\"skill\":null,\"aim\":null,\"action\":null},{\"seq\":1,\"eventId\":\"battle:14:0:event:1\",\"runId\":\"battle:14:0\",\"actionId\":\"battle:14:0:action:3\",\"at\":100,\"attackId\":null,\"type\":\"unit-moved\",\"unitId\":\"e\",\"from\":{\"col\":8,\"row\":0},\"to\":{\"col\":4,\"row\":0},\"path\":[{\"col\":8,\"row\":0},{\"col\":7,\"row\":0},{\"col\":6,\"row\":0},{\"col\":5,\"row\":0},{\"col\":4,\"row\":0}],\"distance\":4,\"stoppedOnDiscovery\":true,\"discoveredIds\":[\"h\"]},\"pending\"]"
+    },
+    {
+      "id": "TT-ALERTS 空闲召唤物跨轮走到多格主人八邻接并停下",
+      "pass": true,
+      "detail": "[{\"moveTo\":{\"col\":6,\"row\":3},\"skill\":null,\"aim\":null,\"action\":null},6,{\"moveTo\":{\"col\":5,\"row\":3},\"skill\":null,\"aim\":null,\"action\":null},{\"col\":5,\"row\":3,\"facing\":270},{\"moveTo\":null,\"skill\":null,\"aim\":null,\"action\":\"wait\"}]"
     }
   ],
-  "passed": 47,
+  "passed": 52,
   "failed": 0
 }

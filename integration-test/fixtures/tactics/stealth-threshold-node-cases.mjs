@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createBattle } from '../../../tactics/src/battle.mjs';
-import { statusBadges, passiveTauntBadges } from '../../../tactics/src/status-ui.mjs';
+import { statusBadges } from '../../../tactics/src/status-ui.mjs';
 
 function unit(id, side, classType = null, spd = 100) {
   return { id, name: id, side, classType, controller: 'player',
@@ -186,17 +186,13 @@ export function runCases() {
     assert.equal(b.snapshot().currentId, 'a');
     assert.equal(main(b), 1, '待领主点不得下次自然行动重复领取');
   });
-  check('statusBadges/passiveTauntBadges区分临时与永久隐匿', () => {
+  check('statusBadges 只显示合并后的当前值和名称', () => {
     const b = make();
     castTaunt(b, -29);
-    const eff = b.getEffectiveUnit('h');
-    const temporary = statusBadges(eff).filter(x => x.key === 'taunt');
-    const permanent = passiveTauntBadges(eff);
-    assert.equal(temporary.length, 1);
-    assert.match(temporary[0].text, /^临时隐匿-29·\d+回$/);
-    assert.equal(permanent.length, 1);
-    assert.equal(permanent[0].text, '永久隐匿-50');
-    assert.ok(!/临时/.test(permanent[0].text) && !/永久/.test(temporary[0].text));
+    const badges = statusBadges(b.getEffectiveUnit('h')).filter(x => x.key === 'taunt');
+    assert.deepEqual(badges.map(({ text, title }) => [text, title]), [['隐匿 79', '当前隐匿值 79']]);
+    castTaunt(b, 30);
+    assert.deepEqual(statusBadges(b.getEffectiveUnit('h')).filter(x => x.key === 'taunt').map(x => x.text), ['隐匿 49']);
   });
   check('急袭独立atk徽章+50·1次，不并入普通攻提升', () => {
     const b = make();

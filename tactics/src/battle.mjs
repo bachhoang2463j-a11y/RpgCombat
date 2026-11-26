@@ -16,7 +16,7 @@ import { previewBarrier, createBarrier, interception, damageBarrier, expireBarri
 import { previewGuard } from './guard.mjs';
 import { queryAttack, resolveDefaultRange } from './range.mjs';
 import { resolveHit, calculateDamage, computeSegmentRawDamage, applyCollisionDamage } from './damage.mjs';
-import { chooseEnemyAction } from './ai.mjs';
+import { chooseEnemyAction, visibleEnemies } from './ai.mjs';
 import { skillSlots, sortSlotsForResolve, normalizeEffectTag, effectDefinition } from './effect-definitions.mjs';
 import { applyEffectSlot } from './effect-handlers.mjs';
 import { CLASS_PASSIVES, getEffectiveStats } from './class-passives.mjs';
@@ -325,8 +325,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const b = buffsState();
     return b[unitId] || (b[unitId] = []);
   }
-  function statsOf(unit) {
-    const stats = getEffectiveStats(unit, buffsOf(unit.id));
+  function statsOf(unit, concealAtk) {
+    const stats = getEffectiveStats(unit, buffsOf(unit.id), concealAtk);
     stats.hit -= fogAt(ctx, unit.id).strength;
     return stats;
   }
@@ -1573,7 +1573,6 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (!query.ok) return failAttack(query.reason, { query });
     // 规范槽视图（skillSlots）合并空间结果（query.slotTargets 提供各槽 targetIds）
     const slots = skillSlots(eff).map(s => Object.assign({}, s, { targetIds: query.slotTargets.find(slot => slot.index === s.index)?.targetIds || [] }));
-    const concealBefore = skill.isReaction || options.isReactionTrigger ? [] : buffsOf(u.id).filter(b => b.isConcealAtk);
     const key = skillKey(skill);
     const charge = chargeState(u.id);
     const preparing = charge.preparing && charge.preparing.skillKey === key;
@@ -1648,6 +1647,17 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     // 冷却（独立字段 [冷却:N]，延迟不再当冷却）
     if (skill.cooldownTurns > 0 && !preparing) dispatchClock(state, { type: 'applyCooldown', unitId: u.id, skillKey: key, duration: skill.cooldownTurns * ROUND_TIME });
 
+    const isAoE = ['直线', '扇形', '圆形', '全域', '爆炸'].includes(eff.range.type);
+    const isCharge = eff.displacements?.some(d => d.type === '冲锋');
+    let concealAtk = 0;
+    if (!skill.isReaction && !options.isReactionTrigger && damageSlots.length
+      && (isAoE || isCharge || query.barrierTargetIds?.length || damageSlots.some(s => s.targetIds.length))) {
+      // 释放时锁进本次攻击账本；途中新授急袭不再参与这一击。
+      const pending = buffsOf(u.id).filter(b => b.isConcealAtk);
+      for (const b of pending) { concealAtk += b.value; removeBuffRecord(u.id, b); }
+      if (pending.length) addLog('🎯 ' + u.name + ' 的隐匿急袭已释放，攻击力加成消失。');
+    }
+
     // 召唤（召唤物立即占位、可被选为目标，从零跑完整圈；临时 AI 不进玩家弹窗）
     const summons = skill.summonTarget ? spawnSummons(eff, u, {}, query) : [];
     let createdRegion = null;
@@ -1671,7 +1681,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     }
 
     // 命中结论账本（原版 _bdg）：减益共享"至少一次命中"
-    const bdg = { targetHit: {}, targetResolved: {}, debuffRolled: {} };
+    const bdg = { targetHit: {}, targetResolved: {}, debuffRolled: {}, concealAtk };
     const eventStart = domainEvents.length;
     const hits = [];
     const hitMap = new Map();
@@ -1680,13 +1690,11 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const ammoBinds = itemBindingsFor(u, skill).filter(b => b.item.category === '弹药');
     const canceled = { value: false };
     const incomingType = eff.damageType || '近战';
-    const isAoE = ['直线', '扇形', '圆形', '全域', '爆炸'].includes(eff.range.type);
     let shotIdx = 0;
 
     const originalTargets = [...new Set(slots.flatMap(s => s.targetIds || []))];
     bdg.barrierTargets = Object.fromEntries(originalTargets.map(id => [id, interception(ctx, u.id, id)]).filter(([, barrier]) => barrier));
     const skillCrit = rollSkillCrit(u, eff);
-    const isCharge = eff.displacements?.some(d => d.type === '冲锋');
     for (const id of damageSlots.length ? allTargets : []) for (const guard of buffsOf(id)) {
       if (guard.type === 'damageGuard' && guard.attackId == null) guard.attackId = currentAttackId();
     }
@@ -1812,11 +1820,6 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       }
     }
 
-    if (damageSlots.length && hits.some(hit => hit.hit) && concealBefore.length) {
-      const consumed = concealBefore.filter(b => buffsOf(u.id).includes(b));
-      consumed.forEach(b => removeBuffRecord(u.id, b));
-      if (consumed.length) addLog('🎯 ' + u.name + ' 的隐匿急袭已释放，攻击力加成消失。');
-    }
     if (preparing) charge.preparing = null;
     if (u.ref.hp > 0 && skill.displacements?.some(d => d.type === '击退' || d.type === '拉近') && !skill.displacements.some(d => d.type === '冲锋')) {
       applySkillDisplacements(u, eff, query, hits);
@@ -1838,7 +1841,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const segmentId = runId + ':' + currentAttackId() + ':slot:' + slot.index + ':segment:' + segmentIndex;
     const key = barrier.id + ':' + segmentId;
     if (cache[key]) return cache[key];
-    const raw = rawOverride ?? computeSegmentRawDamage(statsOf(caster), caster.ref.atk, slot.power, multiplier, roll);
+    const raw = rawOverride ?? computeSegmentRawDamage(statsOf(caster, ledger.concealAtk), caster.ref.atk, slot.power, multiplier, roll);
     const origin = unitCenter(placementsById[caster.id], caster.footprint);
     const protectedTargetIds = Object.entries(ledger.barrierTargets || {}).filter(([, b]) => b.id === barrier.id).map(([id]) => id);
     const result = damageBarrier(ctx, barrier.id, raw, { armorMult: slot.definition.scatter ? 3 : 1, incomingType });
@@ -1849,11 +1852,12 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (result.broken) removeBarrierResult(result.barrier, 'broken');
     return cache[key];
   }
-  function segmentDamage(caster, target, slot, skill, incomingType, isAoE, pierce, roll, multiplier) {
+  function segmentDamage(caster, target, slot, skill, incomingType, isAoE, pierce, roll, multiplier, concealAtk) {
     const passive = CLASS_PASSIVES[caster.classType];
-    const raw0 = computeSegmentRawDamage(statsOf(caster), caster.ref.atk, slot.power, multiplier, roll, {
-      modifyDamageMultiplier: args => passive?.modifyDamageMultiplier?.(args.caster, args.target, buffsOf(args.target.id), statsOf(args.caster), statsOf(args.target)) || 0,
-      modifyDamageDealt: args => passive?.modifyDamageDealt?.(args.caster, args.skill, statsOf(args.caster)) || 0,
+    const cStats = statsOf(caster, concealAtk);
+    const raw0 = computeSegmentRawDamage(cStats, caster.ref.atk, slot.power, multiplier, roll, {
+      modifyDamageMultiplier: args => passive?.modifyDamageMultiplier?.(args.caster, args.target, buffsOf(args.target.id), cStats, statsOf(args.target)) || 0,
+      modifyDamageDealt: args => passive?.modifyDamageDealt?.(args.caster, args.skill, cStats) || 0,
     }, { caster, target, skill });
     const resistance = {};
     const raw = applyTypeResist(raw0, incomingType, isAoE, target, buffsOf(target.id), resistance);
@@ -1903,7 +1907,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const segmentRun = runId;
     activeSegment = { segmentId: runId + ':' + currentAttackId() + ':slot:' + slotIndex + ':segment:' + segmentIndex,
       slotIndex, segmentIndex, shotIndex };
-    const cStats = statsOf(caster);
+    const cStats = statsOf(caster, bdg.concealAtk);
     let tStats = statsOf(target);
     const passive = CLASS_PASSIVES[caster.classType] || null;
     const roll = 0.8 + random() * 0.4;
@@ -1948,7 +1952,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     }
     // 确认将命中 → 反应拦截（只对该发；选择由调用方 next() 给出或 policy 自动）
     const lethalDamage = !isAoE && units.some(u => u.isSummon && u.summonOwnerId === target.id && u.ref.hp > 0)
-      ? segmentDamage(caster, target, slot, skill, incomingType, isAoE, pierce, roll, skillMultiplier) : null;
+      ? segmentDamage(caster, target, slot, skill, incomingType, isAoE, pierce, roll, skillMultiplier, bdg.concealAtk) : null;
     let reaction = lethalDamage ? autoSummonGuard(target, caster, skill, lethalDamage) : null;
     if (!reaction) reaction = yield* selectReaction(target, caster, skill, incomingType, options,
       { slotIndex, segmentIndex, targetId: target.id, shotIndex, totalShots, preview: segmentPreview(caster, target, slot, skill, incomingType, isAoE, pierce, cStats) });
@@ -1988,7 +1992,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     // 伤害管线：变种抗性 → 护甲/免伤/防御姿态 → 护盾 → HP（原版顺序）
     // 暴击（原版 [暴击:N%] + 征伐者 modifyCritRate）：整技在释放前统一掷骰，multiplier 透传至全部生效段
     const crit = skillMultiplier > 1;
-    const damage = segmentDamage(caster, target, slot, skill, incomingType, isAoE, pierce, roll, skillMultiplier);
+    const damage = segmentDamage(caster, target, slot, skill, incomingType, isAoE, pierce, roll, skillMultiplier, bdg.concealAtk);
     const { raw0, raw, resistance, guards } = damage;
     guards.forEach(b => { b.attackId = currentAttackId(); });
     let { hpDmg, shieldDmg, guardDmg } = damage;
@@ -2222,21 +2226,21 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (!u || !isAiControlled(u) || state.combatState.clock.terminal || !resources) return null;
     if (resources.main < 1 && resources.aux < 1 && resources.moveRemaining <= 1e-9 && !chargeState(u.id).preparing?.ready) return { moveTo: null, skill: null, aim: null, action: 'wait' };
     const alarm = alarmOf(u.id);
-    if (u.side === 'enemy' && !alarm) return { moveTo: null, skill: null, aim: null, action: 'wait' };
+    const seen = visibleEnemies(ctx, u);
     const preparing = chargeState(u.id).preparing;
-    if (preparing && !preparing.ready) return { moveTo: null, skill: null, aim: null, action: resources.main > 0 ? 'prepare' : 'wait' };
-    const aiRes = { ...resources, preparing, moveDistance: moveDistanceOf(u),
+    if (seen.length && preparing && !preparing.ready && resources.main > 0) return { moveTo: null, skill: null, aim: null, action: 'prepare' };
+    const aiRes = { ...resources, preparing, seen, moveDistance: moveDistanceOf(u),
       trackedTargetIds: u.side === 'hero' && u.isSummon ? syncDiscovered('hero') : null,
       pursuitPoints: Object.entries(alarm?.contacts || {}).filter(([id]) => byId.get(id)?.ref.hp > 0).map(([, point]) => point),
     };
-    const aiBudget = resources.moveRemaining;
-    // 充能已满：本次正常行动优先尝试大招（原版 isChargeFull 优先）；额度内放不出则保留充能，按常规行动
-    if (!preparing && chargeFull(u)) {
-      const ult = chooseEnemyAction(ctx, currentId(), aiBudget, [chargeSkillOf(u)], skill => skillStatus(skill), aiRes);
+    const aiBudget = resources.moveRemaining * (resources.moveMultiplier || 1);
+    // 充能已满：本次正常行动优先尝试大招；没有目击目标时只移动，不主动使用技能。
+    if (seen.length && !preparing && chargeFull(u)) {
+      const ult = chooseEnemyAction(ctx, u.id, aiBudget, [chargeSkillOf(u)], skill => skillStatus(skill), aiRes);
       if (ult.skill) return ult;
     }
-    const skills = preparing?.ready ? [preparing.skill] : enemySkills();
-    return chooseEnemyAction(ctx, currentId(), aiBudget, skills, skill => skillStatus(skill), aiRes);
+    const skills = !seen.length ? [] : preparing ? (preparing.ready ? [preparing.skill] : []) : enemySkills();
+    return chooseEnemyAction(ctx, u.id, aiBudget, skills, skill => skillStatus(skill), { ...aiRes, idleMovement: true });
   }
   function* beginEnemyTurn(options = {}) {
     const id = currentId();

@@ -41,7 +41,7 @@ const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFee
   'previewGuard', 'commitGuard', 'autoSummonGuard', 'segmentDamage', 'resolveBarrierDamage', 'expireBarriers',
   'barrierCrossing', 'barrierContact', 'holdGuards', 'revealGuard', 'immunityReason',
   'playGuardDash', 'playGuardBlock', 'mountBarrierDome', 'playBarrierHit', 'playBarrierBlocked', 'playBarrierShatter', 'playRuleFx',
-  'chooseTauntTarget', 'passiveTauntBadges', 'statusBadges', 'compactStatusHtml', 'effectFloat', 'inspectorHtml', 'hitChance', 'predictTargets', 'toggleCostFilter', 'setPredict', 'resolveLore', 'SAMPLE_LORE',
+  'chooseTauntTarget', 'planIdleMove', 'statusBadges', 'compactStatusHtml', 'effectFloat', 'inspectorHtml', 'hitChance', 'predictTargets', 'toggleCostFilter', 'setPredict', 'resolveLore', 'SAMPLE_LORE',
   'playRescueGrit', 'playRescueAvoidFatal', 'playVariantResistFx', 'playCounterAttackL1', 'playPowerCounterEffect', 'spawnPowerBurst', 'spawnChargeUpParticles', 'queueCounters', 'revealCounter', 'playSelfDestructWindup', 'playSelfDestructBurst', 'setIdentitySfx', 'setVariantSfx', 'setStatusSfx', 'setSelfDestructSfx'];
 
 const entry = [

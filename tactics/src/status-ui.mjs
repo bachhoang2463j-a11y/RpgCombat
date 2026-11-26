@@ -42,7 +42,7 @@ export function statusBadges(eff, extra = {}) {
   if (rush.length) {
     const value = rush.reduce((n, b) => n + b.value, 0);
     push({ key: 'conceal-atk', icon: '🎯', text: '急袭+' + value + '·1次', short: '急袭+' + value + '·1次', color: '#fbbf24',
-      title: '【隐匿急袭】下一次成功命中的非反应攻击 +' + value + '，使用后消耗；未使用时按原期限过期' }, 4);
+      title: '【隐匿急袭】下一次非反应攻击 +' + value + '，出手后消耗；未使用时按原期限过期' }, 4);
   }
   for (const [field, s] of Object.entries(STAT)) {
     const g = group(field).filter(b => !b.isConcealAtk);
@@ -53,11 +53,12 @@ export function statusBadges(eff, extra = {}) {
     push({ key: field, icon: v < 0 && field === 'spd' ? '🐌' : s.icon, text: s.name + sign(v) + (t ? '·' + t : ''), short: s.name + sign(v), color: v < 0 ? NEG : s.color, neg: v < 0,
       expiring: expiring(g), title: '【' + s.title + (v < 0 ? '下降' : '提升') + '】' + sign(v) + (t ? '，剩余 ' + t : '') }, v < 0 ? 3 : 4);
   }
-  const taunt = group('taunt');
-  if (taunt.length) {
-    const v = taunt.reduce((n, b) => n + b.value, 0), rem = maxRem(taunt);
-    if (v) push({ key: 'taunt', icon: v > 0 ? '💢' : '🌫️', text: (v > 0 ? '仇恨' : '临时隐匿') + sign(v) + (rem != null ? '·' + rem + '回' : ''), short: (v > 0 ? '仇' : '匿') + sign(v),
-      color: v > 0 ? '#fca5a5' : '#94a3b8', expiring: expiring(taunt), title: v > 0 ? '【仇恨】更容易被敌人选为目标' : '【临时隐匿】技能降低嘲讽，按自身期限到期；与永久被动合算，当前隐匿值 ' + Math.max(0, 100 - eff.taunt) }, 5);
+  if (eff.baseTauntBonus || group('taunt').length) {
+    const hidden = eff.taunt < 100;
+    const value = hidden ? 100 - eff.taunt : eff.taunt;
+    const name = hidden ? '隐匿' : '嘲讽';
+    push({ key: 'taunt', icon: hidden ? '🌫️' : '💢', text: name + ' ' + value, short: (hidden ? '匿' : '嘲') + value,
+      color: hidden ? '#94a3b8' : '#fca5a5', title: '当前' + name + '值 ' + value }, 5);
   }
   const counter = group('counter');
   if (counter.length) { const v = counter.reduce((n, b) => n + b.value, 0);
@@ -72,7 +73,7 @@ export function statusBadges(eff, extra = {}) {
   return out.sort((a, b) => a.rank - b.rank);
 }
 
-const badgeHtml = (b, full) => '<span class="t-st' + (b.key === 'passive-taunt' ? ' t-st-passive-taunt' : '') + (b.neg ? ' t-st-neg' : '') + (b.expiring ? ' t-st-exp' : '') + '" style="--c:' + b.color + '" title="' + ESC(b.title || b.text) + '">' +
+const badgeHtml = (b, full) => '<span class="t-st' + (b.key === 'taunt' ? ' t-st-taunt' : '') + (b.neg ? ' t-st-neg' : '') + (b.expiring ? ' t-st-exp' : '') + '" style="--c:' + b.color + '" title="' + ESC(b.title || b.text) + '">' +
   '<i>' + b.icon + '</i>' + ESC(full ? b.text : b.short) + '</span>';
 // 地图单位：最多 max 个紧凑徽章，其余折叠为 +N
 export function compactStatusHtml(list, max = 4) {
@@ -80,16 +81,6 @@ export function compactStatusHtml(list, max = 4) {
   return list.slice(0, max).map(b => badgeHtml(b, false)).join('') + (list.length > max ? '<span class="t-st t-st-more" title="' + ESC(list.slice(max).map(b => b.text).join(' / ')) + '">+' + (list.length - max) + '</span>' : '');
 }
 export function fullStatusHtml(list) { return list.map(b => badgeHtml(b, true)).join(''); }
-
-export function passiveTauntBadges(eff) {
-  if (!eff || !['防守者', '隐匿者'].includes(eff.classType) || !eff.baseTauntBonus) return [];
-  const value = eff.baseTauntBonus;
-  const name = value > 0 ? '仇恨' : '永久隐匿';
-  return [{ key: 'passive-taunt', icon: value > 0 ? '💢' : '🌫️', text: name + sign(value),
-    color: value > 0 ? '#fca5a5' : '#94a3b8',
-    title: '【' + eff.classType + '】' + (value > 0 ? '永久' : '') + name + sign(value) + '；当前总嘲讽 ' + eff.taunt
-      + (value < 0 ? '，当前隐匿值 ' + Math.max(0, 100 - eff.taunt) : '') + '，普通敌方选敌权重 ' + Math.max(1, eff.taunt) + '（最低1，不代表不可攻击）' }];
-}
 
 // 单个效果结果 → 飘字（原版 registerTagHandler 文案：攻+50 3回 / 速-20 3回 / +35HP …）；blocked 由结界演出负责
 export function effectFloat(e) {

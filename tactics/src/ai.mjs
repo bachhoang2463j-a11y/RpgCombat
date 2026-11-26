@@ -42,7 +42,7 @@ function buffsOf(ctx, id) {
 
 // ---------- 感知与浓雾 ----------
 
-function visibleEnemies(ctx, unit) {
+export function visibleEnemies(ctx, unit) {
   return ctx.units.filter(u => isLive(u) && u.side !== unit.side && !u.isSubdued && !u.ref.isSubdued
     && (!ctx.canSeeUnit || ctx.canSeeUnit(unit.id, u.id)));
 }
@@ -254,8 +254,12 @@ export function chooseTauntTarget(ctx, unit, targets, random = ctx.random || Mat
   return targets[targets.length - 1];
 }
 
+function moveReach(ctx, unit, budget) {
+  return findReachable(ctx, unit.id, budget, ctx.carrying?.[unit.id] ? 2 : 1);
+}
+
 function searchBest(ctx, unit, skills, budget, enemies, allies, tracking) {
-  const reach = findReachable(ctx, unit.id, budget);
+  const reach = moveReach(ctx, unit, budget);
   const cells = reach.cells.slice().sort(cmpCell);
   const start = ctx.placementsById[unit.id];
   const startCenter = unitCenter(start, footprintOf(ctx, unit));
@@ -368,11 +372,29 @@ function nearestPointCell(ctx, unit, cells, points) {
   return best ? best.cell : null;
 }
 
+// 无战斗动作时：召唤物按占地贴近主人，其它敌人在合法落点中巡走。
+function planIdleMove(ctx, unit, budget, inBudget) {
+  if (budget <= EPS) return null;
+  if (!unit.isSummon) {
+    if (unit.side !== 'enemy') return null;
+    const cells = inBudget.cells.filter(c => c.cost > EPS);
+    const cell = cells.length && cells[Math.floor(ctx.random() * cells.length)];
+    return cell ? { col: cell.col, row: cell.row } : null;
+  }
+  const owner = ctx.units.find(u => u.id === unit.summonOwnerId && isLive(u));
+  if (!owner || ctx.carriedUnitIds.has(owner.id)) return null;
+  const ownerPos = ctx.placementsById[owner.id];
+  const adjacent = p => cellsAdjacent(p, footprintOf(ctx, unit), ownerPos, footprintOf(ctx, owner));
+  if (adjacent(ctx.placementsById[unit.id])) return null;
+  const reach = moveReach(ctx, unit, Infinity);
+  const goal = reach.cells.filter(adjacent).sort(cmpCell)[0];
+  return goal ? stepAlong(ctx, reach, unit, goal.path, budget) : null;
+}
+
 // ---------- 浓雾离场 ----------
 
 function planFogExit(ctx, unit, moveBudget, res) {
-  const p = ctx.placementsById[unit.id];
-  const full = findReachable(ctx, unit.id, Infinity);
+  const full = moveReach(ctx, unit, Infinity);
   let exit = null;
   for (const cell of full.cells) {
     const ctx2 = withPlacement(ctx, unit.id, cell.col, cell.row);
@@ -415,7 +437,7 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
   if (!p) return Object.assign({}, IDLE);
   const res = resources || { main: 1, aux: 1, preparing: null, moveDistance: (unit.ref && unit.ref.moveDistance) || 0 };
 
-  const seen = visibleEnemies(ctx, unit);
+  const seen = res.seen || visibleEnemies(ctx, unit);
   const seenIds = res.trackedTargetIds && new Set(seen.map(u => u.id));
   const enemies = seenIds ? ctx.units.filter(u => isLive(u) && u.side !== unit.side && !u.isSubdued && !u.ref.isSubdued
     && (seenIds.has(u.id) || res.trackedTargetIds.has(u.id))) : seen;
@@ -449,15 +471,19 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
   const points = enemies.filter(e => ctx.placementsById[e.id]).map(e => unitCenter(ctx.placementsById[e.id], footprintOf(ctx, e)));
   points.push(...(res.pursuitPoints || []));
   if (points.length && moveBudget > EPS) {
-    const reach = tracking ? (fullReach || findReachable(ctx, unit.id, Infinity)) : inBudget.reach;
+    const reach = tracking ? (fullReach || moveReach(ctx, unit, Infinity)) : inBudget.reach;
     const best = nearestPointCell(ctx, unit, reach.cells, points);
     const moveTo = best && stepAlong(ctx, reach, unit, best.path, moveBudget);
     if (moveTo) return { moveTo, skill: null, aim: null, action: null };
   }
 
-  // 五、无进展：贴身则防御，否则守位等待。
-  if (seen.length && hasAdjacentEnemy(ctx, unit, seen)) {
-    return { moveTo: null, skill: null, aim: null, action: 'defend' };
+  // 五、贴身且能防御；否则执行空闲移动。
+  if (hasAdjacentEnemy(ctx, unit, seen)) {
+    return res.main > 0 ? { ...IDLE, action: 'defend' } : { ...IDLE };
+  }
+  if (res.idleMovement) {
+    const moveTo = planIdleMove(ctx, unit, moveBudget, inBudget.reach);
+    if (moveTo) return { ...IDLE, moveTo, action: null };
   }
   return Object.assign({}, IDLE);
 }

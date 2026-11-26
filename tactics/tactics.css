@@ -550,7 +550,7 @@ button:disabled { opacity: .42; cursor: default; }
 .t-unit-status .t-st { font-size: 8px; line-height: 11px; padding: 0 2px; }
 .t-unit-down .t-unit-status { display: none; }
 .t-hero-status { position: absolute; left: 2px; right: 2px; bottom: calc(100% + 9px); display: flex; flex-wrap: wrap-reverse; gap: 2px; pointer-events: none; }
-.t-hero-status .t-st-passive-taunt { pointer-events: auto; }
+.t-hero-status .t-st-taunt { pointer-events: auto; }
 .t-bar-predict { position: absolute; top: 0; bottom: 0; width: 0; left: 0; background: repeating-linear-gradient(135deg, rgba(254,226,226,0.95) 0 3px, rgba(248,113,113,0.95) 3px 6px); animation: t-predict 0.8s ease-in-out infinite; }
 @keyframes t-predict { 50% { opacity: 0.45; } }
 .t-unit-predict-tag { position: absolute; left: 50%; bottom: calc(var(--d) / 2 + 19px); transform: translateX(-50%); font: 900 11px/1 system-ui, sans-serif; color: #fde68a; white-space: nowrap;

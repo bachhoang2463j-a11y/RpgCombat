@@ -3,7 +3,7 @@ import { chooseTauntTarget, chooseEnemyAction } from '../../../tactics/src/ai.mj
 import { createBattle } from '../../../tactics/src/battle.mjs';
 import { parseSkill } from '../../../tactics/src/parser.mjs';
 import { getEffectiveStats } from '../../../tactics/src/class-passives.mjs';
-import { passiveTauntBadges, fullStatusHtml, statusBadges } from '../../../tactics/src/status-ui.mjs';
+import { fullStatusHtml, statusBadges } from '../../../tactics/src/status-ui.mjs';
 
 const ok = (id, pass, detail = '') => ({ id, pass: !!pass, detail });
 const scene = { sceneId: 'taunt-test', grid: { columns: 18, rows: 12, metersPerCell: 1 }, ground: { material: 'brick' }, objects: [] };
@@ -111,21 +111,21 @@ function run() {
   aging.start();
   const taunted = aging.attack(parseSkill('【挑衅】[嘲讽:100][Turns:1][范围:自身]'), { x: 6.5, y: 4.5, targetId: 'd' });
   const boosted = aging.getEffectiveUnit('d').taunt;
+  const boostedBadge = statusBadges(aging.getEffectiveUnit('d')).filter(x => x.key === 'taunt');
   for (let i = 0; i < 8 && aging.getEffectiveUnit('d').taunt > 200; i++) aging.endAction();
-  cases.push(ok('TA-23 真实临时嘲讽到期后有效总值恢复，不缓存旧权重', taunted.ok && boosted === 300 && aging.getEffectiveUnit('d').taunt === 200,
-    JSON.stringify({ boosted, expired: aging.getEffectiveUnit('d').taunt, now: aging.snapshot().now })));
+  const restored = aging.getEffectiveUnit('d');
+  cases.push(ok('TA-23 真实临时嘲讽到期后总值与徽章同步恢复', taunted.ok && boosted === 300 && restored.taunt === 200
+    && boostedBadge.map(x => x.text).join() === '嘲讽 300' && statusBadges(restored).filter(x => x.key === 'taunt').map(x => x.text).join() === '嘲讽 200',
+    JSON.stringify({ boosted, expired: restored.taunt, now: aging.snapshot().now })));
 
-  const guardBadge = passiveTauntBadges(b.getEffectiveUnit('d'));
-  const stealthBadge = passiveTauntBadges(b.getEffectiveUnit('s'));
+  const guardBadge = statusBadges(b.getEffectiveUnit('d')).filter(x => x.key === 'taunt');
+  const stealthBadge = statusBadges(b.getEffectiveUnit('s')).filter(x => x.key === 'taunt');
   const html = fullStatusHtml([...guardBadge, ...stealthBadge]);
-  cases.push(ok('TA-UI1 永久标签正确显示+100/-50且无回合期限', /仇恨\+100/.test(html) && /隐匿-50/.test(html) && !/回|t-st-exp/.test(html), html));
-  cases.push(ok('TA-UI2 标签悬停说明当前总嘲讽及最低权重', /总嘲讽 200/.test(html) && /总嘲讽 50/.test(html) && /最低1/.test(html)));
-  const changed = b.getEffectiveUnit('d');
-  changed.baseTauntBonus = 120; changed.taunt = 220;
-  cases.push(ok('TA-UI3 永久值变化同步标签，不叠加进临时buff', passiveTauntBadges(changed)[0].text === '仇恨+120' && !statusBadges(changed).some(x => x.key === 'passive-taunt')));
+  cases.push(ok('TA-UI1 每个单位只展示一个当前值，不显示来源或期限', guardBadge.length === 1 && stealthBadge.length === 1
+    && /嘲讽 200/.test(html) && /隐匿 50/.test(html) && !/永久|临时|回合|t-st-exp/.test(html), html));
   const main = readFileSync(new URL('../../../tactics/src/main.mjs', import.meta.url), 'utf8');
-  cases.push(ok('TA-UI4 仅底部英雄卡并入永久标签，地图维持原状态列表', /view\.setStatus\(u\.id, compactStatusHtml\(list\)\)/.test(main)
-    && /shell\.setHeroStatus\(u\.id, fullStatusHtml\(\[\.\.\.passive, \.\.\.list\]\)\)/.test(main)));
+  cases.push(ok('TA-UI2 地图与英雄卡复用同一份状态列表', /view\.setStatus\(u\.id, compactStatusHtml\(list\)\)/.test(main)
+    && /shell\.setHeroStatus\(u\.id, fullStatusHtml\(list\)\)/.test(main)));
   return { cases };
 }
 export const groups = { 'TAUNT-AI': { run } };

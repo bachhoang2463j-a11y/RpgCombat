@@ -73,18 +73,20 @@ export function runCases() {
     const r = attackChecked(b);
     return { pass: segments(r).some(s => s.hit) && !rushes(b).length && b.buffsOf('h').includes(ordinary) };
   });
-  check('FB-C02 未命中不消费已有急袭', 'conceal', () => {
-    const b = duel({ enemy: { ref: { evasion: 10000 } } }); const [old] = seedRush(b);
+  check('FB-C02 落空也消费本次急袭，紧接着的攻击不加攻', 'conceal', () => {
+    const b = duel({ enemy: { ref: { evasion: 10000 } } }); seedRush(b);
     const r = attackChecked(b, skill({ guaranteedHit: false, hit: 0 }));
-    return { pass: segments(r).every(s => !s.hit) && rushes(b).includes(old) };
+    return { pass: segments(r).every(s => !s.hit) && !rushes(b).length
+      && segments(attackChecked(b, skill(), 'e2'))[0].rawDmg === 20 };
   });
-  check('FB-C03 真实反应反击不消费急袭', 'conceal', () => {
+  check('FB-C03 真实反应反击既不消费也不借用急袭', 'conceal', () => {
     const counter = { name: '反制', isReaction: true, reactionTarget: 'all', isOthers: true,
       type: '[反击]', power: 0, range: { type: '单体', castRange: 10 }, damageType: '近战' };
     const b = duel({ enemy: { skills: [counter] } }); const [old] = seedRush(b, 'e');
     const hp = b.ctx.units.find(u => u.id === 'h').ref.hp;
     const r = attackChecked(b, skill(), 'e', { policy: 'auto' });
-    return { pass: !!r.hits[0]?.reaction?.counterDamage && b.ctx.units.find(u => u.id === 'h').ref.hp < hp && rushes(b, 'e').includes(old) };
+    return { pass: r.hits[0]?.reaction?.counterDamage?.hpDmg === 20
+      && b.ctx.units.find(u => u.id === 'h').ref.hp === hp - 20 && rushes(b, 'e').includes(old) };
   });
   for (const withOld of [false, true]) check('FB-C0' + (withOld ? '5' : '4') + ' 同技能新授急袭保留' + (withOld ? '且消费旧记录' : ''), 'conceal', () => {
     const b = duel({ hero: { classType: '隐匿者' }, enemy: { ref: { hp: 10, maxHp: 10 } } });
@@ -128,6 +130,24 @@ export function runCases() {
     const all = segments(r);
     return { pass: all.length === 2 && all[0].hit && !all[1].hit && all[1].guardianReaction?.dodged && !rushes(b).length,
       detail: JSON.stringify({ segments: all.map(s => ({ targetId: s.targetId, hit: s.hit, guardian: s.reaction?.guardianId, dodge: s.guardianReaction?.dodged })), rush: rushes(b).length }) };
+  });
+  check('FB-C10 第一段击杀获得急袭，不给同一次攻击的后续段或目标加攻', 'conceal', () => {
+    const b = duel({ hero: { classType: '隐匿者' }, enemy: { ref: { hp: 10, maxHp: 10 } } });
+    b.ctx.units.find(u => u.id === 'h').ref.baseTauntBonus = -80;
+    const all = segments(attackChecked(b, skill({ type: '[群攻]', type2: '[群攻]', power2: 0,
+      range: { type: '爆炸', castRange: 10, radius: 3 } })));
+    return { pass: all.some(s => s.targetId === 'e' && s.down) && all.filter(s => s.targetId === 'e2').length === 2
+      && all.every(s => s.hit && s.rawDmg === 20) && rushes(b).length === 1
+      && segments(attackChecked(b, skill(), 'e2'))[0].rawDmg === 70, detail: all.map(s => [s.targetId, s.rawDmg]).join(';') };
+  });
+  check('FB-C11 预览、纯辅助与开始蓄力均保留待用急袭', 'conceal', () => {
+    const b = duel(); const [old] = seedRush(b);
+    const delayed = skill({ delay: 1 });
+    const preview = b.previewAttack(delayed, aim(b));
+    const support = b.attack(skill({ name: '强化', type: '[增攻]', power: 7, range: { type: '自身' } }), aim(b, 'h'));
+    const prepared = b.attack(delayed, aim(b));
+    return { pass: preview.ok && support.ok && prepared.ok && prepared.preparing && rushes(b)[0] === old
+      && b.getEffectiveUnit('h').atk === 27 };
   });
   check('FB-D01 存活队友当前可见敌人不重复截停', 'discovery', () => {
     const b = movement({ allyCol: 6 });

@@ -27,7 +27,7 @@ import { createEditorPanel } from './editor-panel.mjs';
 import { autoPickChoice } from './reaction-prompt.mjs';
 import { unitCenter } from './geometry.mjs';
 import { createScenarioData, createSeededRandom } from './scenario-data.mjs';
-import { statusBadges, passiveTauntBadges, compactStatusHtml, fullStatusHtml, inspectorHtml } from './status-ui.mjs';
+import { statusBadges, compactStatusHtml, fullStatusHtml, inspectorHtml } from './status-ui.mjs';
 import { resolveLore } from './lore.mjs';
 import { getEffectiveStats } from './class-passives.mjs';
 import { hitChance } from './damage.mjs';
@@ -496,10 +496,7 @@ export function createApp(rootEl, opts = {}) {
       if (only && u.id !== only) continue;
       const list = shownOf(u).hp > 0 ? badgesOf(u) : [];
       view.setStatus(u.id, compactStatusHtml(list));
-      if (u.side === 'hero') {
-        const passive = shownOf(u).hp > 0 ? passiveTauntBadges(shownEff.get(u.id) || u.effective) : [];
-        shell.setHeroStatus(u.id, fullStatusHtml([...passive, ...list]));
-      }
+      if (u.side === 'hero') shell.setHeroStatus(u.id, fullStatusHtml(list));
     }
     renderInspector();
   }
@@ -1216,39 +1213,31 @@ export function createApp(rootEl, opts = {}) {
     const alive = () => myFlow === flow;
     if (!(await director.wait(380)) || !alive()) return;
     let plan = battle.planEnemyAction();
-    if (plan && plan.moveTo) {
-      const mover = battle.snapshot().currentId;
-      sandbox.getUnitView().lockMotion(mover, true);
-      const mv = battle.move(plan.moveTo.col, plan.moveTo.row);
-      if (!mv.ok) sandbox.getUnitView().lockMotion(mover, false);
-      refreshBattle();
-      if (mv.ok) await director.playMove(mv);
-      if (!alive()) return;
-      if (mv.ok && mv.stoppedOnDiscovery) plan = battle.planEnemyAction();
-    }
-    if (plan && plan.action === 'sprint') {
-      const sp = battle.sprint();
-      if (sp.ok) {
+    // 巡走有额度就继续；发现敌人截停后，先执行新计划的走位，再决定是否出手。
+    while (plan && (plan.moveTo || plan.action === 'sprint')) {
+      if (plan.action === 'sprint') {
+        const sp = battle.sprint();
+        if (!sp.ok) break;
         ui('sprint'); fxAtUnit(battle.snapshot().currentId, 't-sprint-burst', 760);
         refreshBattle();
-        plan = battle.planEnemyAction();
-        if (plan && plan.moveTo) {
-          const mover = battle.snapshot().currentId;
-          sandbox.getUnitView().lockMotion(mover, true);
-          const mv2 = battle.move(plan.moveTo.col, plan.moveTo.row);
-          if (!mv2.ok) sandbox.getUnitView().lockMotion(mover, false);
-          refreshBattle();
-          if (mv2.ok) await director.playMove(mv2);
-          if (!alive()) return;
-        }
+      } else {
+        const mover = battle.snapshot().currentId;
+        sandbox.getUnitView().lockMotion(mover, true);
+        const mv = battle.move(plan.moveTo.col, plan.moveTo.row);
+        if (!mv.ok) { sandbox.getUnitView().lockMotion(mover, false); plan = null; break; }
+        refreshBattle();
+        await director.playMove(mv);
+        if (!alive()) return;
+        if (!mv.stoppedOnDiscovery && plan.skill) break;
       }
+      plan = battle.planEnemyAction();
     }
     if (plan && plan.action === 'defend') {
       battle.defend(); avHost.sfx('defUp', 0.55, { category: 'K' }); fxAtUnit(battle.snapshot().currentId, 't-heal-pulse', 700); refreshBattle();
     } else if (plan && plan.action === 'prepare' && !plan.skill) {
       const pr = battle.advancePreparation();
       if (pr.ok) { avHost.sfx(pr.ready ? 'herochargedone' : 'herocharge', 0.58, { category: 'K' }); fxAtUnit(battle.snapshot().currentId, 't-charge-pulse', 900); refreshBattle(); }
-    } else if (plan && plan.skill && (battle.snapshot().resources.main > 0 || battle.snapshot().preparation?.ready)) {
+    } else if (plan && plan.skill) {
       const q = battle.previewAttack(plan.skill, plan.aim);
       if (q.ok) {
         sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: plan.skill, query: q, locked: true });

@@ -29,9 +29,9 @@ export function moltAtkMultiplier(unit, buffs = []) {
 // ---------- 有效属性视图 ----------
 // 有效属性 = ref 基值 + 活跃 buff 求和 + 职业被动修正（原版 getEffectiveStats L22959 口径）。
 // 命闪防御侧只读闪避（eva 基值 + eva buff + 职业钩子 modifyDodgeCap 由 battle 注入），不读通用敏捷（S05）。
-export function getEffectiveStats(unit, buffs = []) {
+export function getEffectiveStats(unit, buffs = [], concealAtk = 0) {
   const ref = (unit && unit.ref) || {};
-  let atk = ref.atk || 0;
+  let atk = (ref.atk || 0) + concealAtk;
   let def = ref.def || 0;
   let hit = ref.hitBonus || 0;
   let eva = ref.evaBonus || 0;
@@ -39,7 +39,7 @@ export function getEffectiveStats(unit, buffs = []) {
   let spd = ref.spd || 0;
   for (const b of buffs) {
     if (!b || !Number.isFinite(b.value)) continue;
-    if (b.type === 'atk') atk += b.value;
+    if (b.type === 'atk' && !b.isConcealAtk) atk += b.value;
     else if (b.type === 'def') def += b.value;
     else if (b.type === 'hit') hit += b.value;
     else if (b.type === 'eva' || b.type === 'paralyze') eva += b.value;

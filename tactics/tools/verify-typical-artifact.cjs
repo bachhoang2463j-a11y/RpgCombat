@@ -25,7 +25,8 @@ check('辅助取消通知与动作代际隔离入包', html.includes('supportHan
 check('击杀自爆medium震动档位入包', html.includes('medium:[250,5]'));
 check('原版特效与角色独立堆叠层入包', html.includes('z-index:2;') && html.includes('z-index:3;'));
 check('发现敌人记录字段及枪声去重入包', html.includes('discoveredIds') && html.includes('discoveredBySide') && html.includes('playRandomStandardGunshot.last'));
-check('本轮辅助1.5倍速、隐匿音色、滑行续播及急袭消费入包', ['duration/=1.5', 'totalMs=1100/1.5', 'p.life/=1.5', 'effect.kind==="taunt"?effect.value<0?["buff","hide"]', 'glideSfx.loop', 'cue?.()', 'concealBefore=', 'hits.some(hit=>hit.hit)', 'consumed.forEach(b=>removeBuffRecord'].every(s => html.includes(s)));
+check('辅助1.5倍速、隐匿音色及滑行续播入包', ['duration/=1.5', 'totalMs=1100/1.5', 'p.life/=1.5', 'effect.kind==="taunt"?effect.value<0?["buff","hide"]', 'glideSfx.loop', 'cue?.()'].every(s => html.includes(s)));
+check('巡走跟随、整技锁定急袭与合并状态入包', ['planIdleMove', 'summonOwnerId', 'idleMovement', 'bdg.concealAtk', 't-st-taunt'].every(s => html.includes(s)) && !html.includes('t-st-passive-taunt'));
 check('即时隐匿阈值、急袭次数徽章及错峰并行收尾入包', ['checkStealthThresholds(target)', 'isConcealAtk:', 'conceal-atk', '200/1.5', 'Promise.all(pending)'].every(s => html.includes(s)));
 check('跳跃多变体池、飞行动态音效及技能记忆快捷连放入包', ['jump_takeoff_light_1', 'move_flight_wind', 'resolveFlightStyle', 'resolveEnemyQuickAction', 'lastAttackByUnit'].every(s => html.includes(s)));
 check('原版受击数字及真实结果接线入包', ['buildHitFeedback', 'prepareHitNumbers', 'animateHitNumber', 'HIT_NUMBER_THEMES', 'data-hit-type', '--hit-scale'].every(s => html.includes(s)));
