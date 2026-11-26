@@ -3,6 +3,9 @@ import fs from 'node:fs';
 import { parseYamlText, parseSkill, parseItem } from '../../../tactics/src/parser.mjs';
 import { createScenarioData, createSeededRandom } from '../../../tactics/src/scenario-data.mjs';
 import { createBattle } from '../../../tactics/src/battle.mjs';
+import { chargePath } from '../../../tactics/src/movement.mjs';
+import { queryAttack } from '../../../tactics/src/range.mjs';
+import { chooseEnemyAction } from '../../../tactics/src/ai.mjs';
 import { CHAPEL_SCENE } from '../../../tactics/src/chapel-scene.mjs';
 import { unitCenter } from '../../../tactics/src/geometry.mjs';
 import { createClock, dispatchClock } from '../../../tactics/src/clock.mjs';
@@ -29,6 +32,45 @@ function nextActor(b, id) { for (let i = 0; i < 40 && b.snapshot().currentId !==
 function run() {
   const cases = [];
   const check = (id, pass, detail = '') => cases.push({ id, pass: !!pass, detail: typeof detail === 'string' ? detail : JSON.stringify(detail) });
+  {
+    const charger = unit('charge', 'hero', { spd: 200, footprint: { width: 2, height: 2 } });
+    const foe = unit('foe', 'enemy', { footprint: { width: 2, height: 2 } });
+    const ally = unit('ally', 'hero');
+    const skill = parseSkill('【冲锋】[钝击;power:40][近战][位移:冲锋;距离:6][范围:直线;长度:6;宽度:2]');
+    const positions = { charge: { col: 2, row: 5 }, ally: { col: 4, row: 5 }, foe: { col: 8, row: 6 } };
+    const objects = [{ id: 'counter', kind: 'lowCounter', bounds: { col: 5, row: 5, width: 1, height: 1 } }];
+    const b = make([charger, foe, ally], structuredClone(positions), { objects });
+    const point = { x: 8.5, y: 6.5, targetId: 'foe' };
+    const q = b.previewAttack(skill, point);
+    check('TT-B 2×2 冲锋量化后扫过友军和低障，触及横向边格', q.ok && q.shape.dir === 0
+      && q.damageTargetIds.join(',') === 'foe' && q.cells.some(c => c.col === 8 && c.row === 6), q);
+    const wall = make([charger, foe, ally], structuredClone(positions), { objects: [
+      { id: 'wall', kind: 'wall', bounds: { col: 7, row: 5, width: 1, height: 1 } },
+    ] });
+    const wallPath = chargePath(wall.ctx, 'charge', point, 6);
+    check('TT-B 2×2 冲锋任一占格撞实墙即截停', wallPath.path.at(-1).col === 5
+      && wallPath.blockingEntries.some(e => e.type === 'terrain') && !wall.previewAttack(skill, point).ok, wallPath);
+    const r = b.attack(skill, point);
+    const move = r.events.find(e => e.type === 'unit-charged');
+    check('TT-B 冲过友军，对连续两步扫到的2×2敌人只命中一次，最后落在空位', r.ok
+      && r.hits.map(h => h.targetId).join(',') === q.damageTargetIds.join(',') && r.hits[0].segments.length === 1
+      && move.to.col === 6 && move.path.some(p => p.col === 8) && move.path.at(-1).col === 6, { hits: r.hits, move });
+  }
+  {
+    const beast = sample().summonProvider('幻梦行军兽');
+    const skill = beast.skills.find(s => s.name === '冲撞');
+    const charger = unit('ai-charge', 'enemy', { spd: 100, controller: 'ai', footprint: beast.footprint, skills: [skill] });
+    const target = unit('ai-target', 'hero', { spd: 200 });
+    const b = make([charger, target], { 'ai-charge': { col: 2, row: 5 }, 'ai-target': { col: 7, row: 5 } });
+    const barrier = parseSkill('【障壁】[肃正:近战;power:200;Armor:40][范围:圆形;半径:2]');
+    b.attack(barrier); b.endAction(); nextActor(b, charger.id);
+    const action = chooseEnemyAction(b.ctx, charger.id, 0, [skill]);
+    const q = queryAttack(b.ctx, charger.id, skill, aim(b, target.id));
+    const r = action.skill && b.attack(action.skill, action.aim);
+    check('TT-B AI 读取共享扫掠攻击结界内目标，实际穿界命中而不是打结界', q.damageTargetIds.join(',') === target.id
+      && action.skill === skill && !action.moveTo && r?.hits[0]?.hit && r.hits[0].targetId === target.id
+      && b.ctx.barriers[0].integrity === 200 && r.events.find(e => e.type === 'unit-charged').to.col === 8, { action, hits: r?.hits });
+  }
   {
     const d = sample(); const b = createBattle({ ...d, scene: CHAPEL_SCENE, random: createSeededRandom(d.seed) });
     const s = b.start();
@@ -102,7 +144,8 @@ function run() {
     const b=make([h,e1,e2],{h:{col:2,row:4},e1:{col:5,row:4},e2:{col:8,row:5}});
     const r=b.attack(beast.skills.find(s=>s.name==='冲撞'),{x:12,y:5});
     check('TT-B 冲撞6米路径逐敌一次',r.ok&&r.hits.length===2&&r.hits.every(x=>x.segments.length===1),r.hits);
-    check('TT-B 冲撞击退3米后继续，再遇已攻击目标则停止',b.ctx.placementsById.h.col===6&&b.ctx.placementsById.e1.col===8&&b.ctx.placementsById.e2.col===11,b.ctx.placementsById);
+    check('TT-B 冲撞击退3米后可穿过已攻击目标，末端重叠落前一空位',b.ctx.placementsById.h.col===6&&b.ctx.placementsById.e1.col===8&&b.ctx.placementsById.e2.col===11
+      && r.events.find(e=>e.type==='unit-charged').path.some(p=>p.col===8),b.ctx.placementsById);
   }
   {
     const hit=parseSkill('【击】[钝击;power:40][近战][位移:击退;距离:3][范围:单体;射程:2]');
@@ -160,6 +203,21 @@ function run() {
     all.affectsAll=true;
     b.attack(all);
     check('TT-B 不分敌友普通致盲三方都生效', ['h','a','e'].every(id=>b.statsOf(b.ctx.units.find(u=>u.id===id)).hit===-20));
+  }
+  {
+    const hero = unit('hero', 'hero', { spd: 200 });
+    const foe = unit('foe', 'enemy', { hp: 7 });
+    const b = make([hero, foe], { hero: { col: 2, row: 4 }, foe: { col: 3, row: 4 } });
+    const skill = parseSkill('【毒火】[中毒;power:20][燃烧;power:10][Turns:3][必中][范围:圆形;半径:2]');
+    skill.affectsAll = true;
+    const attack = b.attack(skill);
+    for (let i = 0; i < 12 && b.snapshot().events.filter(e => e.type === 'status-tick').length < 3; i++) b.endAction();
+    const ticks = b.snapshot().events.filter(e => e.type === 'status-tick');
+    check('TT-B 敌我周期伤害事件用实际扣血值，致死一跳只报剩余HP', attack.ok
+      && ticks.some(e => e.unitId === hero.id && e.kind === 'burn' && e.damage === 10)
+      && ticks.some(e => e.unitId === hero.id && e.kind === 'poison' && e.damage === 20)
+      && ticks.filter(e => e.unitId === foe.id).length === 1
+      && ticks.some(e => e.unitId === foe.id && e.damage === 7 && e.hpAfter === 0), ticks);
   }
   {
     const state = emptyBattleState('tick-removal', 'tick-removal');

@@ -8,8 +8,8 @@
 import { createClock, dispatchClock, advanceToNextAction } from './clock.mjs';
 import { emptyBattleState } from './lifecycle.mjs';
 import { compileScene } from './scene.mjs';
-import { findReachable, findJumpPath, canPlaceAt, traceDisplacement, cellsAdjacent, chargePath } from './movement.mjs';
-import { unitCenter, occupiedCells } from './geometry.mjs';
+import { findReachable, findJumpPath, canPlaceAt, traceDisplacement, cellsAdjacent } from './movement.mjs';
+import { unitCenter, occupiedCells, cellKey } from './geometry.mjs';
 import { fogAt, fogAffects, createRegion, expireRegions, moveMultiplier } from './regions.mjs';
 import { canSeeUnit, sightRadius, visibleUnitIds as queryVisibleUnitIds } from './perception.mjs';
 import { previewBarrier, createBarrier, interception, damageBarrier, expireBarriers, clearBarriers, barrierContact } from './barriers.mjs';
@@ -1118,6 +1118,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     return query;
   }
   function aimFacing(query, fallback) {
+    if (query.chargePath) {
+      const { x, y } = query.chargePath.direction;
+      return ((Math.atan2(x, -y) * 180 / Math.PI) + 360) % 360;
+    }
     const { aim, origin } = query;
     if (!aim || Math.hypot(aim.x - origin.x, aim.y - origin.y) <= 1e-9) return fallback;
     return ((Math.atan2(aim.x - origin.x, -(aim.y - origin.y)) * 180 / Math.PI) + 360) % 360;
@@ -1509,16 +1513,17 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
   function* resolveCharge(caster, skill, query, slots, ledger, canceled, options, skillMultiplier = 1) {
     const rule = skill.displacements.find(d => d.type === '冲锋');
-    const pathQuery = chargePath(ctx, caster.id, query.aim, rule.distance);
+    const pathQuery = query.chargePath;
     const visited = new Set(), hits = [], effects = [], path = [pathQuery.from];
     const position = placementsById[caster.id];
-    for (const step of pathQuery.path.slice(1)) {
-      const entering = new Set(occupiedCells(step, caster.footprint).map(c => c.col + ',' + c.row));
-      const contactTargets = units.filter(u => u.id !== caster.id && u.ref.hp > 0 &&
-        occupiedCells(placementsById[u.id], u.footprint).some(c => entering.has(c.col + ',' + c.row)));
-      if (contactTargets.some(u => u.side === caster.side)) break;
+    const stopped = () => canceled.value || caster.ref.hp <= 0 || state.combatState.clock.units[caster.id]?.stun;
+    for (const step of pathQuery.steps) {
+      if (stopped()) break;
+      const entering = new Set(step.cells.map(c => cellKey(c.col, c.row)));
+      const contactTargets = units.filter(u => u.side !== caster.side && u.ref.hp > 0 && !ctx.carriedUnitIds?.has(u.id) &&
+        occupiedCells(placementsById[u.id], ctx.footprintsById[u.id]).some(c => entering.has(cellKey(c.col, c.row))));
       for (const target of contactTargets) {
-        if (visited.has(target.id)) continue;
+        if (visited.has(target.id) || target.ref.hp <= 0) continue;
         visited.add(target.id);
         const contactHits = [];
         for (const slot of sortSlotsForResolve(slots)) {
@@ -1535,15 +1540,21 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         }
         applySkillDisplacements(caster, skill, query, contactHits, pathQuery.direction);
         hits.push(...contactHits);
-        if (caster.ref.hp <= 0 || canceled.value) break;
+        if (stopped()) break;
       }
-      if (caster.ref.hp <= 0 || canceled.value || !canPlaceAt(ctx, caster.id, step.col, step.row).ok) break;
-      position.col = step.col; position.row = step.row; path.push({ ...step });
-      scanEnemyContacts(caster);
+      if (stopped()) break;
+      path.push({ col: step.col, row: step.row });
+      if (canPlaceAt(ctx, caster.id, step.col, step.row).ok) {
+        position.col = step.col; position.row = step.row;
+        scanEnemyContacts(caster);
+      }
     }
+    // 中途允许穿越占格，演出仍扫到最远处，再回到最后可站立的格。
+    const end = path[path.length - 1];
+    if (end.col !== position.col || end.row !== position.row) path.push({ col: position.col, row: position.row });
     emit('unit-charged', { attackId: currentAttackId(), unitId: caster.id, from: pathQuery.from,
       to: { col: position.col, row: position.row }, path, requestedDistance: rule.distance,
-      distance: (path.length - 1) * pathQuery.stepDistance });
+      distance: Math.hypot(position.col - pathQuery.from.col, position.row - pathQuery.from.row) });
     return { hits, effects, path };
   }
 
@@ -1938,7 +1949,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       }
     }
     noteEnemyContact(target, caster);
-    const guard = bdg.barrierTargets?.[target.id] || interception(ctx, caster.id, target.id);
+    const guard = skill.displacements?.some(d => d.type === '冲锋') ? null : bdg.barrierTargets?.[target.id] || interception(ctx, caster.id, target.id);
     if (guard) {
       const barrierHit = resolveBarrierDamage(caster, guard, slot, segmentIndex, roll, skillMultiplier, incomingType, bdg, segBase.contactPoint);
       segBase.barrierHitId = barrierHit.barrierHitId;
@@ -2139,7 +2150,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       // 零掷骰伤害预估（roll=1 中值口径；实际结算带 0.8–1.2 随机）：每目标每攻击槽一条。
       // 护盾/免伤按批准口径在预测副本上逐槽累积消耗（多段不重复吃满盾）。
       damagePreview: (() => {
-        const isAoE0 = ['直线', '扇形', '圆形', '全域', '爆炸'].includes(eff.range.type);
+        const isAoE0 = !!query.chargePath || ['直线', '扇形', '圆形', '全域', '爆炸'].includes(eff.range.type);
         const cStats = statsOf(u);
         const passive = CLASS_PASSIVES[u.classType] || null;
         const views = new Map(); // targetId → {def, shield}（逐槽消耗副本）

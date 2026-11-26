@@ -11,7 +11,7 @@ import { playPathMotion, pathSegments, pointAtDistance } from './motion.mjs';
 import { unitCenter } from './geometry.mjs';
 import { createFxRegistry, actionInput, reactionInput, prepareInput } from './fx-registry.mjs';
 import { registerDefaultFx, EXTRA_AUDIO, fogFieldHtml, animateFogField, elementFieldHtml, animateElementField,
-  playRegionPulse, REGION_PULSE_AUDIO, playPassiveGain, PASSIVE_AUDIO, playEnemyAlarm, ALARM_AUDIO, playJumpDust } from './fx-library.mjs';
+  playRegionPulse, REGION_PULSE_AUDIO, playPassiveGain, PASSIVE_AUDIO, playEnemyAlarm, ALARM_AUDIO, playJumpDust, glide } from './fx-library.mjs';
 import { createVfxHost } from './vfx-host.mjs';
 import { skillSlots } from './effect-definitions.mjs';
 import { startAtmos, atmosStyleOf } from './screen-atmos.mjs';
@@ -354,6 +354,15 @@ export function createActionDirector(deps) {
 
     const revealed = new Map();      // targetId → 已揭示段序号集合
     const reactionRuns = [];
+    const shiftRuns = new Map();
+    function queueReaction(targetId, reaction) {
+      if (!reaction.shift) return playReaction({ targetId, reaction, attackerId: result.casterId });
+      const id = reaction.responderId || targetId;
+      const run = (shiftRuns.get(id) || Promise.resolve(true)).then(ok => ok !== false && isCurrent()
+        && playReaction({ targetId: id, reaction, attackerId: result.casterId }));
+      shiftRuns.set(id, run);
+      return run;
+    }
     const counterEvs = (result.events || []).filter(ev => ev.type === 'reaction-damage');
     const countersStarted = new Set();
     let counterRun = Promise.resolve(true);
@@ -444,10 +453,10 @@ export function createActionDirector(deps) {
       if (atmos) atmos.lower();
       if (guard) revealRule(guard, 'guard');
       const segmentReactions = [];
-      const reaction = seg.reaction || (done.size === 1 ? h.reaction : null);
-      if (reaction && !reaction.guard) segmentReactions.push(playReaction({ ...h, reaction, attackerId: result.casterId }));
+      const reaction = seg.reaction;
+      if (reaction && !reaction.guard) segmentReactions.push(queueReaction(targetId, reaction));
       const guardianReaction = seg.guardianReaction || reaction?.guardianReaction;
-      if (guardianReaction) segmentReactions.push(playReaction({ ...h, targetId: guardianReaction.responderId || h.targetId, reaction: guardianReaction }));
+      if (guardianReaction) segmentReactions.push(queueReaction(guardianReaction.responderId || targetId, guardianReaction));
       reactionRuns.push(...segmentReactions);
       // 回复槽段：规则真实标记（seg.heal）优先，回退生命提升推断（events 真实回复结果形态待规则 result 落地后接）
       const healed = seg.heal != null ? !!seg.heal : (!seg.hit && seg.hpAfter > seg.hpBefore);
@@ -467,7 +476,10 @@ export function createActionDirector(deps) {
         if (rescue?.handle) reactionRuns.push(awaitHandle(rescue.handle, 950));
         const c = centerOf(targetId);
         if (c) { const p = worldPx(c); floatText(makeFx('B'), p.x, p.y - 34, '⚡ 致命回避!', '#a5b4fc', '#312e81', { ms: 900, size: 14 }); }
-      } else if (!seg.barrierHitId) av.playHitFeedback(r, { wave: hitWaves[waveIndex] || (hitWaves[waveIndex] = { shook: false, hitStopped: false, classified: [] }) });
+      } else if (!seg.barrierHitId) av.playHitFeedback(r, {
+        wave: hitWaves[waveIndex] || (hitWaves[waveIndex] = { shook: false, hitStopped: false, classified: [] }),
+        suppressDodgeFx: !!reaction?.shift || !!guardianReaction?.shift,
+      });
       if (!healed && !seg.barrierHitId && fatalReason === 'grit') {
         const ent = avHost.entity(targetId);
         const rescue = ent && av.playRescueGrit ? av.playRescueGrit(ent) : null;
@@ -518,7 +530,12 @@ export function createActionDirector(deps) {
       audioContext, outcomeMap: new Map(hits.map(h => [h.targetId, h.hit ? 'hit' : 'dodge'])),
       fx: makeFx(audioContext.category),
       wait, tween, awaitHandle, after: (ms, fn) => scope().after(ms, fn),
-      reveal, revealSegment, revealEffect, revealGuard, revealRule, revealRegion, awaitCounters: () => counterRun,
+      reveal, revealSegment, revealEffect, revealGuard, revealRule, revealRegion,
+      awaitCounters: () => counterRun,
+      awaitShotFeedback: async () => {
+        await Promise.all(reactionRuns);
+        return (await Promise.all([...shiftRuns.values(), counterRun])).every(ok => ok !== false);
+      },
       regions, unitsInCells, ent: id => avHost.entity(id), centerOf, atmos,
       anchorAt: (x, y) => makeAnchor(x, y), aimAnchor: () => aimAnchor(result.aim), lineEndAnchor: () => lineEndAnchor(result),
     };
@@ -546,20 +563,24 @@ export function createActionDirector(deps) {
     const moveEvs = (result.events || []).filter(ev => ev.type === 'unit-charged' || ev.type === 'unit-displaced');
     if (moveEvs.length) {
       const view = sandbox.getUnitView();
-      await Promise.all(moveEvs.map(async ev => {
-        const fp = vd.footprintsById[ev.unitId] || { width: 1, height: 1 };
-        const fromC = unitCenter(ev.from, fp), toC = unitCenter(ev.to, fp);
-        const dist = Math.hypot(toC.x - fromC.x, toC.y - fromC.y);
-        if (dist > 0.05) {
-          const dur = Math.min(420, Math.max(160, Math.round(dist * 75)));
-          await tween(dur, t => {
-            const k = 1 - Math.pow(1 - t, 3);
-            view.setDisplayPos(ev.unitId, fromC.x + (toC.x - fromC.x) * k, fromC.y + (toC.y - fromC.y) * k);
-          });
+      const movesByUnit = new Map();
+      for (const ev of moveEvs) {
+        if (!movesByUnit.has(ev.unitId)) movesByUnit.set(ev.unitId, []);
+        movesByUnit.get(ev.unitId).push(ev);
+      }
+      await Promise.all([...movesByUnit].map(async ([id, moves]) => {
+        for (const ev of moves) {
+          const segs = pathSegments(ev.path || [ev.from, ev.to], vd.footprintsById[id]);
+          const dist = segs.reduce((sum, seg) => sum + seg.len, 0);
+          if (dist > 0.05) {
+            const dur = Math.min(420, Math.max(160, Math.round(dist * 75)));
+            if (!(await tween(dur, t => {
+              const p = pointAtDistance(segs, dist * (1 - Math.pow(1 - t, 3)));
+              view.setDisplayPos(id, p.x, p.y);
+            }))) break;
+          }
+          if (ev.collided) makeFx('B').shake('light');
         }
-        view.lockMotion(ev.unitId, false);
-        view.updateUnit(ev.unitId, { placement: vd.placementsById[ev.unitId] });
-        if (ev.collided) { makeFx('B').shake('light'); }
       }));
     }
     // 召唤入场：消费规则真实生成的 summons（单位 ID 与落点），原版 playSummonEnter 在实际落点逐个显形
@@ -720,6 +741,14 @@ export function createActionDirector(deps) {
 
   // ---------- 场上反馈（规则事件只读）：领域周期判定脉冲 / 敌方局部警报 / 职业被动资源到账；同一事件只播一次 ----------
   const fieldSeen = new Set();
+  function playStatusTick(ev, index = 0) {
+    const c = centerOf(ev.unitId);
+    if (!c || !scope()?.isLive) return;
+    const p = worldPx(c), poison = ev.kind === 'poison';
+    floatText(makeFx('B'), p.x, p.y - 30 - index * 18, (poison ? '中毒' : '燃烧') + ' -' + ev.damage,
+      poison ? '#bef264' : '#fdba74', poison ? '#365314' : '#7c2d12', { size: 14 });
+  }
+
   const FIELD_EVENTS = ['region-contest', 'enemy-alarm', 'passive-gain'];
   function playFieldFeedback(events) {
     const s = scope();
@@ -936,26 +965,22 @@ export function createActionDirector(deps) {
     fxLayers().top.layer(ring, 480).firstChild.animate([{ transform: 'scale(0.5)', opacity: 0.9 }, { transform: 'scale(1.25)', opacity: 0 }], { duration: 460, fill: 'forwards' });
   }
 
-  // ---------- 反应演出（回避错位等）：在被攻击者的首个接触拍点启动，与攻击演出并行 ----------
+  // ---------- 反应演出：同一单位逐段滑步，缺专用条目时仍播放通用错位 ----------
   async function playReaction(h) {
-    const reaction = h.reaction;
+    const { reaction } = h;
     const entry = registry.resolve(reactionInput(reaction));
-    const view = sandbox.getUnitView();
-    if (!entry) {
-      if (reaction.shift) {
-        view.setDisplayCenter(h.targetId, null);
-        view.updateUnit(h.targetId, { placement: getViewData().placementsById[h.targetId] });
-      }
-      return true;
-    }
-    const fp = getViewData().footprintsById[h.targetId];
-    if (!(await prepareAudio(entry.prepareKeys ? entry.prepareKeys({}) : []))) return false;
-    return entry.play({
-      hitTargetId: h.targetId, reaction, shift: reaction.shift, footprint: fp, view, sandbox, av,
-      fx: makeFx('B'), wait, tween, centerOf, responderId: reaction.responderId || h.targetId, attackerId: h.attackerId || null,
+    if (!entry && !reaction.shift) return true;
+    if (entry && !(await prepareAudio(entry.prepareKeys ? entry.prepareKeys({}) : []))) return false;
+    const rctx = {
+      hitTargetId: h.targetId, reaction, shift: reaction.shift, footprint: getViewData().footprintsById[h.targetId],
+      view: sandbox.getUnitView(), sandbox, av, fx: makeFx('B'), wait, tween, centerOf,
+      responderId: reaction.responderId || h.targetId, attackerId: h.attackerId || null,
       cameraScale: () => sandbox.getPose().scale,
       placement: () => getViewData().placementsById[h.targetId],
-    });
+    };
+    if (entry) return entry.play(rctx);
+    rctx.fx.sfx('link_dash', 0.26);
+    return glide(rctx, { ghosts: false, ms: 300 });
   }
   // ---------- 空目标演出锚点（瞄准点/射界末端；只是视觉落点，不是规则目标） ----------
   const anchors = new Set();
@@ -1008,6 +1033,6 @@ export function createActionDirector(deps) {
       if (ev.type === 'barrier-damaged') lockedBarriers.set(ev.barrierId, (lockedBarriers.get(ev.barrierId) || 0) + 1);
     }
   }
-  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, playPrepare, syncRegions, playFieldFeedback, syncBarriers, syncPreparations, holdRegions, holdGuards, wait, resolveAttackIdentity, resolveWindupKind,
+  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, playPrepare, syncRegions, playFieldFeedback, playStatusTick, syncBarriers, syncPreparations, holdRegions, holdGuards, wait, resolveAttackIdentity, resolveWindupKind,
     runAttackLive, driveAttack, cancelAttack, playChargeCutin, playExecution, executionKills };
 }

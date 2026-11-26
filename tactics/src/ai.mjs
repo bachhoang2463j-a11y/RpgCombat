@@ -167,7 +167,7 @@ function evaluateQuery(ctx, unit, skill, query, disclosed) {
     if (def.kind === 'attack') {
       const barrierIds = new Set(st.barrierIds || []);
       for (const tid of targets) {
-        const guard = interception(ctx, unit.id, tid);
+        const guard = query.chargePath ? null : interception(ctx, unit.id, tid);
         if (guard) { barrierIds.add(guard.id); continue; }
         const t = ctx.units.find(u => u.id === tid);
         if (!t) continue;
@@ -300,11 +300,11 @@ function searchBest(ctx, unit, skills, budget, enemies, allies, tracking, reach 
       continue;
     }
 
-    const maxReach = eff.range.type === '自身' ? 0
-      : (eff.range.castRange != null ? eff.range.castRange
-        : (eff.range.length != null ? eff.range.length : Infinity));
+    const charge = eff.displacements?.find(d => d.type === '冲锋');
+    const maxReach = charge ? charge.distance + Math.hypot(footprintOf(ctx, unit).width, footprintOf(ctx, unit).height) / 2
+      : eff.range.type === '自身' ? 0 : eff.range.castRange ?? eff.range.length ?? Infinity;
     const pool = aimPool(eff, enemies, allies, unit);
-    if (skillSlots(eff).some(s => s.attack)) for (const b of ctx.barriers || []) {
+    if (!charge && skillSlots(eff).some(s => s.attack)) for (const b of ctx.barriers || []) {
       if (b.side !== unit.side && b.center) pool.push({ id: b.id, barrier: b });
     }
 

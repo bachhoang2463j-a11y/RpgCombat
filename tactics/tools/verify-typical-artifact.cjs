@@ -33,6 +33,7 @@ check('原版受击数字及真实结果接线入包', ['buildHitFeedback', 'pre
 check('头像远景底线及父子引用修复入包', html.includes('avatarScaleForZoom') && html.includes('linkSkillGroupRows'));
 check('原版状态变种真实入口与常量入包', ['syncStatusLayers', 'clearStatusLayers', 'playStatusTickFx', 'syncVariantState', 'clearVariantState', 'playVariantTriggerFx', 'isEntityVariantLocked', 'STATUS_COLORS', 'arcane-status-flame-chip', 'arcane-variant-molted-fx'].every(s => html.includes(s)));
 check('实际结果事件和视觉消费入包', ['variant-trigger', 'status-tick', 'status-proc', 'status-removed', 'consumeVisualEvents', 'syncVisualState'].every(s => html.includes(s)));
+check('冲锋扫掠、逐段闪避和周期扣血飘字入包', ['chargePath', 'queueReaction', 'awaitShotFeedback', 'suppressDodgeFx', 'onStatusTick', 'playStatusTick'].every(s => html.includes(s)));
 check('自动跳跃、避雾、物品辅助耗费和整备入包', ['planJump', 'fogRouteFilter', 'ITEM_ACTION_COST', 'previewReady', 'battle.ready()', 'tauntDelta'].every(s => html.includes(s)));
 const context = { console, structuredClone, URL, setTimeout, clearTimeout };
 context.window = context;
@@ -55,6 +56,19 @@ if (backend) {
   check('浓雾、冲锋与反应字段实际入包', block.heroes[0].skills.find(s => s.name === '拉莱耶造雾术').regionEffect.type === 'fog'
     && data.summonProvider('幻梦行军兽').skills.find(s => s.name === '冲撞').displacements.some(d => d.type === '冲锋')
     && block.heroes[0].skills.find(s => s.name === '巫师护盾').isReaction);
+  const beast = data.summonProvider('幻梦行军兽');
+  const charge = beast.skills.find(s => s.name === '冲撞');
+  const unit = (id, side, spd, footprint = { width: 1, height: 1 }) => ({ id, side, name: id, footprint, skills: [], items: [],
+    ref: { hp: 500, maxHp: 500, mp: 50, maxMp: 50, atk: 20, def: 0, spd, evasion: 0, moveDistance: 6 } });
+  const chargeBattle = backend.createBattle({ units: [unit('beast', 'hero', 200, beast.footprint), unit('ally', 'hero', 50), unit('foe', 'enemy', 50)],
+    placementsById: { beast: { col: 2, row: 3 }, ally: { col: 4, row: 3 }, foe: { col: 7, row: 4 } },
+    scene: { sceneId: 'charge-artifact', grid: { columns: 16, rows: 10, metersPerCell: 1 }, objects: [] }, random: () => 0.5 });
+  chargeBattle.start();
+  const chargeAim = { x: 7.5, y: 4.5, targetId: 'foe' };
+  const chargeQuery = chargeBattle.previewAttack(charge, chargeAim), chargeResult = chargeBattle.attack(charge, chargeAim);
+  check('产物冲锋穿过友军，2×2 扫掠预览与实际命中同一敌人', chargeQuery.damageTargetIds?.join(',') === 'foe'
+    && chargeResult.hits[0]?.hit && chargeResult.hits[0].targetId === 'foe' && chargeResult.events.find(e => e.type === 'unit-charged')?.path.some(p => p.col === 8));
+
   const battle = backend.createBattle({ ...data, scene: backend.scene, random: backend.createSeededRandom(data.seed) });
   const opening = battle.start();
   check('产物创建真实对局并发放自然行动', opening.units.length === 10 && opening.currentId === 'e:伊塔库亚的眷族' && opening.resources.main === 1 && opening.resources.aux === 1);

@@ -251,7 +251,8 @@ export function createApp(rootEl, opts = {}) {
   const shell = buildShell(rootEl);
   let currentYamlText = null;
   let currentViewData = null;
-  const avHost = createAvHost({ getUnitView: () => sandbox.getUnitView(), getUnits: () => (currentViewData ? currentViewData.units : []), getEffectiveUnit: id => battle?.getEffectiveUnit(id) });
+  const avHost = createAvHost({ getUnitView: () => sandbox.getUnitView(), getUnits: () => (currentViewData ? currentViewData.units : []),
+    getEffectiveUnit: id => battle?.getEffectiveUnit(id), onStatusTick: (ev, index) => director.playStatusTick(ev, index) });
   const ui = createUiSfx(avHost.av.CombatAudioMixer);
   const sandbox = createSandbox(shell.els.mapSlot, {
     getSafeRect: () => shell.getSafeRect(),
@@ -1330,23 +1331,31 @@ export function createApp(rootEl, opts = {}) {
       shown.set(caster.id, { ...s, mp: caster.ref.mp - gains.mp, tp: (caster.ref.tp || 0) - gains.tp });
     }
     // 反应错位（折影步等）与冲锋/击退位移：规则站位已更新，显示位置锁在原位，等导演在接触拍点演出位移后再放开
-    const view = sandbox.getUnitView();
-    for (const h of res.hits) {
-      const sh = (h.segments || []).find(s => s.reaction?.shift)?.reaction.shift || h.reaction?.shift;
-      if (!sh) continue;
-      const fp = currentViewData.footprintsById[h.targetId];
-      const c = unitCenter(sh.from, fp);
-      view.lockMotion(h.targetId, true); view.setDisplayPos(h.targetId, c.x, c.y);
+    const view = sandbox.getUnitView(), motionIds = new Set();
+    function holdMotion(id, from) {
+      if (!from || motionIds.has(id)) return;
+      motionIds.add(id);
+      const c = unitCenter(from, currentViewData.footprintsById[id]);
+      view.lockMotion(id, true); view.setDisplayPos(id, c.x, c.y);
+    }
+    for (const h of res.hits) for (const segment of h.segments || [h]) {
+      const reaction = segment.reaction;
+      holdMotion(reaction?.responderId || h.targetId, reaction?.shift?.from);
+      const guardian = segment.guardianReaction || reaction?.guardianReaction;
+      holdMotion(guardian?.responderId || h.targetId, guardian?.shift?.from);
     }
     for (const ev of (res.events || [])) {
-      if ((ev.type === 'unit-charged' || ev.type === 'unit-displaced') && ev.from) {
-        const fp = currentViewData.footprintsById[ev.unitId] || { width: 1, height: 1 };
-        const c = unitCenter(ev.from, fp);
-        view.lockMotion(ev.unitId, true); view.setDisplayPos(ev.unitId, c.x, c.y);
-      }
+      if (ev.type === 'unit-charged' || ev.type === 'unit-displaced') holdMotion(ev.unitId, ev.from);
     }
     refreshBattle();
-    await director.playAttack(res);
+    try {
+      await director.playAttack(res);
+    } finally {
+      if (myFlow === flow) for (const id of motionIds) {
+        view.lockMotion(id, false);
+        view.updateUnit(id, { placement: currentViewData.placementsById[id] });
+      }
+    }
     if (myFlow !== flow) return;
     await director.playExecution(res);   // 技能演出、反应与自爆全部完成后统一收尾一次；胜利弹窗在其后
     if (myFlow !== flow) return;

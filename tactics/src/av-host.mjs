@@ -67,7 +67,7 @@ export function heroHasVoice(name) {
   return Object.prototype.hasOwnProperty.call(RPG_HERO_VOICE_LINES, name);
 }
 
-export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => null }) {
+export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => null, onStatusTick }) {
   const rectSymbol = Symbol('tacticsStageRect');
   let stageEl = document.createElement('div');   // 初始占位；sandbox 挂载后 attachStage 换成真实舞台
   let shakeEl = null;
@@ -156,14 +156,19 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
 
   const consumedEvents = new Set();
   function consumeVisualEvents(events) {
+    const ticksByUnit = new Map();
     for (const ev of events) {
       if (consumedEvents.has(ev.seq)) continue;
       consumedEvents.add(ev.seq);
       const ent = entity(ev.unitId);
       if (!ent) continue;
       if (ev.type === 'variant-trigger') av.playVariantTriggerFx({ trigger: ev.trigger, entity: ent, meta: ev });
-      else if (ev.type === 'status-tick') av.playStatusTickFx({ event: ev.kind === 'poison' ? 'poisonTick' : 'burnTick', entity: ent, meta: ev });
-      else if (ev.type === 'status-proc') av.playStatusTickFx({ event: 'paraProc', entity: ent, meta: ev });
+      else if (ev.type === 'status-tick') {
+        av.playStatusTickFx({ event: ev.kind === 'poison' ? 'poisonTick' : 'burnTick', entity: ent, meta: ev });
+        const index = ticksByUnit.get(ev.unitId) || 0;
+        ticksByUnit.set(ev.unitId, index + 1);
+        onStatusTick?.(ev, index);
+      } else if (ev.type === 'status-proc') av.playStatusTickFx({ event: 'paraProc', entity: ent, meta: ev });
       else if (ev.type === 'status-removed' && ['burn', 'poison', 'paralyze'].includes(ev.kind))
         av.playStatusTickFx({ event: 'expire', entity: ent, meta: { expiredType: ev.kind } });
     }

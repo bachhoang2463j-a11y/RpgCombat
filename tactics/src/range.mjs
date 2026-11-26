@@ -12,6 +12,7 @@ import { skillSlots } from './effect-definitions.mjs';
 import { barrierContact } from './barriers.mjs';
 import { canSeeUnit, canSeePoint, sightRadius } from './perception.mjs';
 import { effectiveCastRange } from './regions.mjs';
+import { chargePath } from './movement.mjs';
 
 const EPS = 1e-9;
 const SAMPLE_STEP = 0.2;
@@ -286,6 +287,18 @@ export function queryAttack(ctx, casterId, skill, aim, options = {}) {
   const range = skill && skill.range ? effectiveCastRange(ctx, casterId, skill.range, skill) : null;
   if (!range) return fail('技能缺少显式范围');
   if (!RANGE_TYPES.includes(range.type)) return fail('范围类型不支持: ' + range.type);
+  const charge = skill.displacements?.find(d => d.type === '冲锋');
+  if (charge) {
+    if (!normAim) return fail('缺少瞄准点');
+    const sweep = chargePath(ctx, casterId, normAim, charge.distance);
+    if (!sweep.ok) return fail(sweep.reason);
+    const touched = new Set(sweep.blockingEntries.filter(e => e.type === 'unit' && e.side !== caster.side).map(e => e.unitId));
+    const targets = cellsToTargets(ctx, sweep.cells).filter(t => touched.has(t.unitId));
+    const shape = { type: '直线', from: origin, dir: Math.atan2(sweep.direction.y, sweep.direction.x), length: sweep.distance };
+    const sweptSkill = { ...skill, range: { ...range, type: '直线' } };
+    return { ...finishQuery(ctx, caster, sweptSkill, origin, normAim, sweep.cells, targets.map(t => t.unitId), targets,
+      shape, null, null, range, sweep.blockingEntries.find(e => e.type === 'terrain') || null, null), chargePath: sweep };
+  }
   if (aim?.barrierId) {
     const barrier = (ctx.barriers || []).find(b => b.id === aim.barrierId);
     if (!barrier) return fail('结界不存在');

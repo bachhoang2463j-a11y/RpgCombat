@@ -4,7 +4,7 @@
 // 敌方站立单位/实墙/关门/低障碍阻挡移动；友方可穿行但不可落其占地；
 // 多格 footprint 每步全路径容纳；budget=Infinity 供 AI 全图查询（有限格网必然终止）。
 // 飞行（unit.ref.flying 或 buffsOf variant 飞行）：普通移动可跨低障碍，不越实墙/关门。
-// 结界：敌方跨边界（普通移动/跳跃/强制位移/冲锋）一律阻断。
+// 结界：敌方跨边界（普通移动/跳跃/强制位移）阻断，冲锋除外。
 // 本模块不改 ctx、不做表现层；移动额度（米）由调用方作为 budget 传入。
 // ==========================================
 
@@ -251,56 +251,47 @@ export function findReachable(ctx, unitId, budget = Infinity, costMultiplier = 1
   return { cells, byKey };
 }
 
-// 冲锋路径原语：沿八方向（aim 量化）推进 distance 米，返回几何路径与阻挡条目。
-// 不扣资源、不推人；主代理逐步对 enemy 结算。实墙/友军/结界在抵达前停止；
-// enemy 记录为 blockingEntries 后继续（由 battle 处理击退与继续推进）。
+// 冲锋的扫掠只受实墙（含关门、实心外壁）截停；占格接触不阻断路径。
 export function chargePath(ctx, unitId, aim, distance) {
   const unit = findUnit(ctx, unitId);
   const p = ctx.placementsById[unitId];
   if (!p) throw new Error('单位缺少站位: ' + unitId);
   const fp = ctx.footprintsById[unitId] || unit.footprint || { width: 1, height: 1 };
   const origin = unitCenter(p, fp);
-  let dx = aim && Number.isFinite(aim.x) ? aim.x - origin.x : 0;
-  let dy = aim && Number.isFinite(aim.y) ? aim.y - origin.y : 0;
-  if (Math.abs(dx) < EPS && Math.abs(dy) < EPS) {
-    return { ok: false, reason: '冲锋方向无效', path: [], from: { col: p.col, row: p.row }, direction: { x: 0, y: 0 }, distance: 0, stepDistance: 0, blockingEntries: [] };
+  const dx = aim.x - origin.x, dy = aim.y - origin.y;
+  const from = { col: p.col, row: p.row };
+  if (Math.hypot(dx, dy) <= EPS) {
+    return { ok: false, reason: '冲锋方向无效', path: [], steps: [], cells: [], from, direction: { x: 0, y: 0 }, distance: 0, stepDistance: 0, blockingEntries: [] };
   }
-  if (!dx && !dy) {
-    return { ok: false, reason: '冲锋方向无效', path: [], from: { col: p.col, row: p.row }, direction: { x: 0, y: 0 }, distance: 0, stepDistance: 0, blockingEntries: [] };
-  }
-  const angle = Math.atan2(dy, dx);
-  const q = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+  const q = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
   const dir = { x: Math.round(Math.cos(q)), y: Math.round(Math.sin(q)) };
   const stepDistance = dir.x && dir.y ? SQRT2 : 1;
   const occ = buildLiveOcc(ctx);
-  const path = [{ col: p.col, row: p.row }];
-  const blockingEntries = [];
+  const steps = [], path = [from], cells = new Map(), blockingEntries = [];
+  const seen = new Set([unitId]);
   let traveled = 0;
-  let stopped = false;
-  while (!stopped && traveled + stepDistance <= distance + EPS) {
+  while (traveled + stepDistance <= distance + EPS) {
     const cur = path[path.length - 1];
     const col = cur.col + dir.x, row = cur.row + dir.y;
-    let terrainHit = null;
-    for (const c of occupiedCells({ col, row }, fp)) {
+    const sweep = occupiedCells({ col, row }, fp);
+    const wall = sweep.find(c => {
       const cell = cellAt(ctx.compiled, c.col, c.row);
-      if (!cell || cell.blocksMovement) { terrainHit = { type: 'terrain', col: c.col, row: c.row }; break; }
-    }
-    if (terrainHit) { blockingEntries.push(terrainHit); stopped = true; break; }
-    const crossing = barrierCrossing(ctx, unitId, cur, { col, row });
-    if (crossing) { blockingEntries.push({ type: 'barrier', barrierId: crossing.id, col, row }); stopped = true; break; }
-    const seen = new Set();
-    let allyHit = null;
-    for (const c of occupiedCells({ col, row }, fp)) {
-      const o = occ.get(cellKey(c.col, c.row));
-      if (!o || o.id === unitId || seen.has(o.id)) continue;
+      return !cell || cell.void || cell.objectIds.some(id => {
+        const obj = ctx.compiled.objectsIndex.get(id);
+        return obj.kind === 'wall' || obj.kind === 'door' && !obj.open;
+      });
+    });
+    if (wall) { blockingEntries.push({ type: 'terrain', ...wall }); break; }
+    for (const c of sweep) {
+      const key = cellKey(c.col, c.row), o = occ.get(key);
+      cells.set(key, c);
+      if (!o || seen.has(o.id)) continue;
       seen.add(o.id);
-      const entry = { type: 'unit', unitId: o.id, side: o.side, col: c.col, row: c.row };
-      blockingEntries.push(entry);
-      if (o.side === unit.side) allyHit = entry;
+      blockingEntries.push({ type: 'unit', unitId: o.id, side: o.side, ...c });
     }
+    steps.push({ col, row, cells: sweep });
     path.push({ col, row });
     traveled += stepDistance;
-    if (allyHit) stopped = true;
   }
-  return { ok: true, reason: null, path, from: { col: p.col, row: p.row }, direction: dir, distance: traveled, stepDistance, blockingEntries };
+  return { ok: true, reason: null, path, steps, cells: [...cells.values()], from, direction: dir, distance: traveled, stepDistance, blockingEntries };
 }

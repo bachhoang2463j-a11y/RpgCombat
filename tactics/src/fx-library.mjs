@@ -279,11 +279,16 @@ function basicAttack(name, { subtype = name, area = false, projectile, direction
       const range = ctx.skill?.range;
       const isArea = ['直线', '扇形', '圆形', '全域', '爆炸'].includes(range?.type);
       const scope = area === 'only' || (area && isArea) ? 'aoe' : 'single';
-      const reveal = ({ targetId, index }) => ctx.revealSegment(targetId, index);
       const identity = (targets, outcomes, onImpact, options) =>
         av.playAttackIdentityFx({ scope, subtype, caster: casterEnt, targets, outcomes, audioContext, onImpact, ...options });
       for (const [i, shot] of attackShots(ctx).entries()) {
         const { aim, impacts } = shot;
+        const revealed = new Set();
+        const reveal = impact => {
+          if (revealed.has(impact)) return;
+          revealed.add(impact);
+          ctx.revealSegment(impact.targetId, impact.index);
+        };
         if (i && gap && !(await ctx.wait(gap))) return false;
         const aimAnchor = () => ctx.anchorAt(aim.x, aim.y);
         const playIdentity = async (...args) => ctx.awaitHandle(identity(...args), scope === 'aoe' ? 1400 : 900);
@@ -317,7 +322,9 @@ function basicAttack(name, { subtype = name, area = false, projectile, direction
               () => impact?.hit ? 'hit' : 'dodge', () => { if (impact) reveal(impact); }))) return false;
           }
         }
-        if (ctx.awaitCounters && !(await ctx.awaitCounters())) return false;
+        // 部分演出不会为落空目标回调接触；补揭示仍须在下一发瞄准之前。
+        impacts.forEach(reveal);
+        if (ctx.awaitShotFeedback && !(await ctx.awaitShotFeedback())) return false;
       }
       return true;
     },
@@ -448,8 +455,8 @@ const selfBoost = {
   },
 };
 
-// ---------- 反应：回避成功后的真实错位（规则已改站位；此处把显示从原位滑到新位并放开锁定） ----------
-async function glide(rctx, { ghosts, ms }) {
+// ---------- 反应：回避成功后的真实错位（规则已改站位；只滑到本段终点，导演统一解锁） ----------
+export async function glide(rctx, { ghosts, ms }) {
   const { view, hitTargetId: id, shift, fx } = rctx;
   const fp = rctx.footprint;
   const segs = pathSegments(shift.path, fp), total = segs.reduce((s, g) => s + g.len, 0);
@@ -469,8 +476,6 @@ async function glide(rctx, { ghosts, ms }) {
       wrap.animate([{ opacity: 0.6 }, { opacity: 0 }], { duration: 480, delay: 60, fill: 'both' });
     }
   });
-  view.lockMotion(id, false);
-  view.updateUnit(id, { placement: rctx.placement() });
   return ok;
 }
 

@@ -50,14 +50,16 @@ export const groups = {
       fireSingle: reg.resolve(actionInput(fakeResult(fireSingle, '单体', [atkSlot(0, fireSingle.type)]))).id,
       zheYing: reg.resolve(reactionInput({ skillName: '折影步', fxTag: '折影步', canceled: true, shift: { distance: 2 } })).id,
       glide: reg.resolve(reactionInput({ fxTag: '回避错位', canceled: true, shift: { distance: 2 } })).id,
-      noTagShift: reg.resolve(reactionInput({ canceled: true, shift: { distance: 2 }, kanpo: true })),
+      noTagShift: reg.resolve(reactionInput({ dodged: true, shift: { distance: 2 } })),
+      kanpo: reg.resolve(reactionInput({ canceled: true, kanpo: true, fxTag: '逆咒归源镜' })).id,
       unknown: reg.resolve(actionInput(fakeResult({ ...savage, fxTag: '未知特效' }, '单体', [atkSlot(0, savage.type)]))).id,
       noShift: reg.resolve(reactionInput({ skillName: '战壕格斗术', fxTag: null, canceled: true, shift: null })),
     };
-    cases.push(ok('TFX-01 动作和反应通道仅按标签分发；范围和效果槽不会改选演出',
+    cases.push(ok('TFX-01 显式标签分发不猜范围和效果槽；成功看破优先走看破演出',
       resolved.savage === 'basic-枪击' && resolved.blast === 'fire-blast' && resolved.chant === 'self-boost' && resolved.arsenic === 'arsenic-shot' &&
       resolved.plain === 'neutral-impact' && resolved.unknown === 'neutral-impact' && resolved.fireSingle === 'fire-blast' &&
-      resolved.zheYing === 'evade-shift-ghost' && resolved.glide === 'evade-shift' && resolved.noTagShift === null && resolved.noShift === null, j(resolved)));
+      resolved.zheYing === 'evade-shift-ghost' && resolved.glide === 'evade-shift' && resolved.noTagShift === null
+      && resolved.kanpo === 'reaction-kanpo' && resolved.noShift === null, j(resolved)));
     // 例外（用户确认）：火焰/中毒领域技能未写特效标签时按区域类型取领域演出；显式标签仍优先，浓雾不变
     const domain = {
       fire: reg.resolve(actionInput({ skill: m.parser.parseSkill('【火海】[区域:火焰][燃烧:10][Turns:3][范围:爆炸;射程:10;半径:2]') })).id,

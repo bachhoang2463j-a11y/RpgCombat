@@ -243,7 +243,7 @@ function killAndSummonCases() {
   const hostSrc = readFileSync(new URL('../../../tactics/src/av-host.mjs', import.meta.url), 'utf8');
   out.push(ok('TP7AV-X 击杀特写/Cut-in 屏幕宿主挂 iframe body 最顶层（压住全部 UI、不挡输入）',
     /document\.body\.appendChild\(screenEl\)/.test(hostSrc) && /position:fixed; inset:0; z-index:2147483000; pointer-events:none/.test(hostSrc) && /screenEl\.setAttribute\('data-rpg-av-scope', ''\)/.test(hostSrc)));
-  const libSrc = readFileSync(new URL('../../../tactics/src/fx-library.mjs', import.meta.url), 'utf8');
+  const libSrc = readFileSync(new URL('../../../tactics/src/fx-library.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
   const fsIds = [...libSrc.matchAll(/id: '([\w-]+)', grade: 'L[34]'[^\n]*\n\s*timeline: \{[^}]*fullscreen: true/g)].map(m => m[1]);
   // 火焰/中毒领域两条目共用 playDomainBurst 的同一处爆发拍点：20 条目对应 19 处调用
   out.push(ok('TP7AV-L 每个全屏 L3/L4 条目都有独立屏幕主演出，并在真实冲击拍点 ctx.atmos.burst()', fsIds.length === 20 && fsIds.every(id => SHOWPIECES[id])
@@ -277,7 +277,7 @@ function killAndSummonCases() {
   out.push(ok('TP7AV-X 特写关键帧与任意值类入 CSS', ['s2-ink-stamp', 's3-shard-1', 'v1-tommy-scope', 'blood-splat-burst', 'anim-cutin-slash', 'anim-debuff', 'anim-taunt'].every(k => css.includes(k)) && css.includes('z-\\[200\\]')));
   const msrc = readFileSync(new URL('../../../tactics/src/main.mjs', import.meta.url), 'utf8');
   out.push(ok('TP7AV-X 满充能才 Cut-in，且在原技能前摇之前；击杀特写在攻击演出之后',
-    /cur\.charge\.current >= cur\.charge\.max\) \{\s*\n\s*await director\.playChargeCutin[\s\S]{0,120}await director\.playWindup/.test(msrc) && /await director\.playAttack\(res\);\s*\n\s*if \(myFlow !== flow\) return;\s*\n\s*await director\.playExecution\(res\);/.test(msrc)));
+    /cur\.charge\.current >= cur\.charge\.max\) \{\s*\n\s*await director\.playChargeCutin[\s\S]{0,120}await director\.playWindup/.test(msrc) && /await director\.playAttack\(res\);\s*\} finally \{[\s\S]*?\n\s*if \(myFlow !== flow\) return;\s*\n\s*await director\.playExecution\(res\);/.test(msrc)));
   return out;
 }
 

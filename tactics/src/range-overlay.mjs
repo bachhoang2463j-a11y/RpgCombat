@@ -162,7 +162,7 @@ function drawAttack(g, pv, viewData) {
     // 面：只在真实作用格内填充与描边（墙后格不在 cells，自然被裁掉）
     if (q.cells.length) {
       g.save(); clipCells(g, q.cells);
-      if (shape.type === '全域') { g.fillStyle = C.atk.fill; g.fillRect(0, 0, 1e5, 1e5); }
+      if (shape.type === '全域' || q.chargePath) { g.fillStyle = C.atk.fill; g.fillRect(0, 0, 1e5, 1e5); }
       else {
         shapePath(g, shape); g.fillStyle = C.atk.fill; g.fill();
         shapePath(g, shape); g.strokeStyle = C.atk.edge; g.lineWidth = 1.8; g.stroke();
