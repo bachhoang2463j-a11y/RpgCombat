@@ -34,7 +34,7 @@ function clipCells(g, cells) {
 }
 
 function shapePath(g, shape) {
-  const from = shape.from || shape.center;
+  const from = shape.type === '爆炸' ? shape.center : shape.from || shape.center;
   g.beginPath();
   if (!from) return;   // 「自身」/「全域」无空间轮廓：只画目标标记
   const ox = from.x * Q, oy = from.y * Q;
