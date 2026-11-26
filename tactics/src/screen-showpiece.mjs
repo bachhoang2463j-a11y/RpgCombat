@@ -134,25 +134,69 @@ export const SHOWPIECES = {
     linger(T) { T.fade('cl', 1, 0, 900); T.all('arc', (el, i) => T.a(el, [{ opacity: .8 }, { opacity: 0 }], 260, { delay: i * 60 })); },
   },
 
-  // 冰霜爆炸：四角冰晶分形生长 + 霜缘 → 巨晶花闪现后碎裂外飞 → 细雪
+  // 极地暴风雪：四角冰晶分形生长 + 霜缘 + 上下屏缘横吹风雪带 → 巨晶花闪现后碎裂外飞 → 细雪
   'frost-blast': {
     build(u, r) {
       const flake = (x, y, R, k) => Array.from({ length: 6 }, (_, i) => { const a = i / 6 * TAU, ex = x + Math.cos(a) * R, ey = y + Math.sin(a) * R; let d = 'M' + f1(x) + ',' + f1(y) + ' L' + f1(ex) + ',' + f1(ey); for (const t of [.45, .7]) { const bx = x + Math.cos(a) * R * t, by = y + Math.sin(a) * R * t; for (const s of [-1, 1]) d += ' M' + f1(bx) + ',' + f1(by) + ' L' + f1(bx + Math.cos(a + s * .7) * R * .28) + ',' + f1(by + Math.sin(a + s * .7) * R * .28); } return draw(d, 'url(#ic' + u + ')', 5, k, 'filter="url(#g' + u + ')"'); }).join('');
       const corners = [[60, 60], [W - 60, 60], [W - 60, H - 60], [60, H - 60], [CX, -40], [CX, H + 40]].map(([x, y], i) => flake(x, y, i > 3 ? 160 : 230, 'fk')).join('');
       const shards = Array.from({ length: 20 }, (_, i) => { const a = i / 20 * 360, s = 18 + r() * 26, d = 520 + r() * 260; return '<g transform="rotate(' + f1(a) + ' ' + CX + ' ' + CY + ')"><path data-k="sh" data-d="' + f1(d) + '" d="M' + CX + ',' + (CY - s * 1.6) + ' L' + (CX + s * .4) + ',' + CY + ' L' + CX + ',' + (CY + s) + ' L' + (CX - s * .4) + ',' + CY + 'Z" fill="url(#sh' + u + ')" filter="url(#g' + u + ')" opacity="0"/></g>'; }).join('');
       const snow = Array.from({ length: 30 }, () => orb(r() * W, -10 - r() * 80, 2 + r() * 3.5, 'url(#sn' + u + ')', 'sn')).join('');
+      const wind = Array.from({ length: 22 }, (_, i) => { const y = i % 2 ? H - 30 - r() * 200 : 30 + r() * 200, x = -260 + r() * W, l = 120 + r() * 220; return '<path data-k="wd" d="M' + f1(x) + ',' + f1(y) + ' q' + f1(l * .5) + ',' + f1(-10 - r() * 14) + ' ' + f1(l) + ',' + f1(6 + r() * 10) + '" fill="none" stroke="#e0f2fe" stroke-width="' + f1(1.6 + r() * 3) + '" stroke-linecap="round" filter="url(#g' + u + ')" opacity="0"/>'; }).join('');
       return defs(u, lin('ic' + u, st(0, '#e0f2fe') + st(1, '#38bdf8'), 0, 0, 1, 1) + rad('rim' + u, st(.55, '#e0f2fe', 0) + st(.85, '#7dd3fc', .28) + st(1, '#e0f2fe', .55)) + lin('sh' + u, st(0, '#f0f9ff') + st(.5, '#7dd3fc', .8) + st(1, '#0ea5e9', .3), 0, 0, 1, 1) + rad('sn' + u, st(0, '#ffffff') + st(1, '#bae6fd', 0))) +
-        '<rect data-k="rim" width="' + W + '" height="' + H + '" fill="url(#rim' + u + ')" opacity="0"/>' + corners +
+        '<rect data-k="rim" width="' + W + '" height="' + H + '" fill="url(#rim' + u + ')" opacity="0"/>' + corners + wind +
         '<g data-k="big" opacity="0" style="' + org(CX, CY) + '">' + flake(CX, CY, 330, 'bf') + '</g>' + shards + snow;
     },
-    gather(T, ms) { T.drawIn('fk', ms * .9, 18); T.fade('rim', 0, 1, ms); },
+    gather(T, ms) { T.drawIn('fk', ms * .9, 18); T.fade('rim', 0, 1, ms); T.all('wd', (el, i) => T.a(el, [{ transform: 'translateX(-160px)', opacity: 0 }, { opacity: .8, offset: .3 }, { transform: 'translateX(420px)', opacity: 0 }], ms * 1.1, { delay: (i % 6) * 70, easing: 'linear', iterations: 2 })); },
     burst(T) {
       T.all('big', el => T.a(el, [{ transform: 'scale(.4) rotate(0deg)', opacity: 0 }, { transform: 'scale(1) rotate(20deg)', opacity: .75, offset: .35 }, { transform: 'scale(1.15) rotate(30deg)', opacity: 0 }], 460));
       T.all('bf', el => { el.style.strokeDashoffset = 0; });
       T.all('sh', el => T.a(el, [{ transform: 'translate(0,0)', opacity: 0 }, { opacity: .95, offset: .15 }, { transform: 'translate(0,-' + el.dataset.d + 'px)', opacity: 0 }], 640, { delay: 160, easing: 'cubic-bezier(.1,.8,.3,1)' }));
       T.all('fk', el => T.a(el, [{ opacity: 1 }, { opacity: .35 }], 300));
     },
-    linger(T) { T.all('sn', (el, i) => T.a(el, [{ transform: 'translate(0,0)', opacity: 0 }, { opacity: 1, offset: .2 }, { transform: 'translate(' + ((i % 5) - 2) * 25 + 'px,' + (300 + (i % 6) * 80) + 'px)', opacity: 0 }], 1300, { delay: (i % 10) * 45 })); T.fade('fk', .35, 0, 800); T.fade('rim', 1, 0, 800); },
+    linger(T) { T.all('sn', (el, i) => T.a(el, [{ transform: 'translate(0,0)', opacity: 0 }, { opacity: 1, offset: .2 }, { transform: 'translate(' + (120 + (i % 5) * 40) + 'px,' + (300 + (i % 6) * 80) + 'px)', opacity: 0 }], 1300, { delay: (i % 10) * 45 })); T.all('wd', (el, i) => T.a(el, [{ transform: 'translateX(-200px)', opacity: 0 }, { opacity: .7, offset: .3 }, { transform: 'translateX(600px)', opacity: 0 }], 900, { delay: (i % 6) * 60, easing: 'linear' })); T.fade('fk', .35, 0, 800); T.fade('rim', 1, 0, 800); },
+  },
+
+  // 时空扭曲震荡：四角破碎时轮反向转动 + 屏缘空间裂纹 → 色差冲击环自中心外扩、时轮崩散 → 裂纹淡出
+  'void-quake': {
+    build(u, r) {
+      const dial = (x, y, R, i) => {
+        const ticks = Array.from({ length: 24 }, (_, k) => { const a = k / 24 * TAU, r0 = R * (k % 6 ? .86 : .72); return '<line x1="' + f1(x + Math.cos(a) * r0) + '" y1="' + f1(y + Math.sin(a) * r0) + '" x2="' + f1(x + Math.cos(a) * R) + '" y2="' + f1(y + Math.sin(a) * R) + '" stroke="url(#vq' + u + ')" stroke-width="' + (k % 6 ? 3 : 6) + '" stroke-linecap="round"/>'; }).join('');
+        return '<g data-k="dial" data-i="' + i + '" style="' + org(x, y) + '"><circle cx="' + f1(x) + '" cy="' + f1(y) + '" r="' + R + '" fill="none" stroke="url(#vq' + u + ')" stroke-width="8" stroke-dasharray="' + f1(R * .9) + ' ' + f1(R * .35) + '" filter="url(#g' + u + ')" opacity=".8"/>' + ticks +
+          '<path d="M' + f1(x) + ',' + f1(y) + ' L' + f1(x) + ',' + f1(y - R * .7) + ' M' + f1(x) + ',' + f1(y) + ' L' + f1(x + R * .45) + ',' + f1(y) + '" stroke="#f5d0fe" stroke-width="5" stroke-linecap="round" filter="url(#g' + u + ')"/></g>';
+      };
+      const dials = [[0, 0, 300], [W, 0, 260], [W, H, 300], [0, H, 260]].map(([x, y, R], i) => dial(x, y, R, i)).join('');
+      const cracks = Array.from({ length: 14 }, (_, i) => { const p = edgePt(i / 14 + r() * 0.02), q = toward(p, .18 + r() * .12); return draw(jag(r, p.x, p.y, q.x, q.y, 7, 50), i % 2 ? '#22d3ee' : '#e879f9', 3, 'ck', 'filter="url(#g' + u + ')"'); }).join('');
+      const rings = ['#f472b6', '#22d3ee', '#ffffff'].map((c, i) => { const x = CX + (i === 0 ? -12 : i === 1 ? 12 : 0); return '<circle data-k="cr" cx="' + x + '" cy="' + CY + '" r="110" fill="none" stroke="' + c + '" stroke-width="' + (i === 2 ? 10 : 16) + '" filter="url(#g' + u + ')" opacity="0" style="' + org(x, CY) + '"/>'; }).join('');
+      return defs(u, lin('vq' + u, st(0, '#a855f7') + st(.5, '#f5d0fe') + st(1, '#22d3ee'), 0, 0, 1, 1) + rad('vv' + u, st(.5, '#2e1065', 0) + st(.85, '#4c1d95', .35) + st(1, '#0a0418', .7))) +
+        '<rect data-k="vig" width="' + W + '" height="' + H + '" fill="url(#vv' + u + ')" opacity="0"/>' + dials + cracks + rings;
+    },
+    gather(T, ms) { T.fade('vig', 0, 1, ms); T.all('dial', el => { const s = el.dataset.i % 2 ? -1 : 1; T.a(el, [{ transform: 'rotate(0deg) scale(.6)', opacity: 0 }, { transform: 'rotate(' + s * 150 + 'deg) scale(1)', opacity: 1 }], ms, { easing: 'cubic-bezier(.4,0,.6,1)' }); }); T.drawIn('ck', ms * .8, 40); },
+    burst(T) {
+      T.all('cr', (el, i) => T.a(el, [{ transform: 'scale(.2)', opacity: 1 }, { transform: 'scale(7.5)', opacity: 0 }], 440, { delay: i * 25, easing: 'cubic-bezier(.1,.8,.3,1)' }));
+      T.all('dial', el => { const s = el.dataset.i % 2 ? -1 : 1; T.a(el, [{ transform: 'rotate(' + s * 150 + 'deg) scale(1)', opacity: 1 }, { transform: 'rotate(' + s * 200 + 'deg) scale(1.3)', opacity: 0 }], 440); });
+    },
+    linger(T) { T.fade('ck', 1, 0, 700); T.fade('vig', 1, 0, 800); },
+  },
+
+  // 维度撕裂：上下屏缘撕裂缝描出、缝内星点闪烁 → 一道斜贯屏幕的裂光急闪 + 紫青闪屏 → 缝隙合拢
+  'line-rift': {
+    build(u, r) {
+      const ys = [60, H - 60];
+      const seams = ys.map(y => draw(jag(r, -20, y + (r() - .5) * 30, W + 20, y + (r() - .5) * 30, 22, 70), 'url(#lr' + u + ')', 10, 'sm', 'filter="url(#g' + u + ')"')).join('') +
+        ys.map(y => draw(jag(r, -20, y, W + 20, y, 18, 40), '#f5f3ff', 2.5, 'sc')).join('');
+      const stars = Array.from({ length: 30 }, (_, i) => orb(r() * W, ys[i % 2] + (r() - .5) * 40, 1.5 + r() * 2.5, '#ffffff', 'stz', 'opacity="0"')).join('');
+      const slash = '<g data-k="sl" opacity="0"><path d="' + jag(r, -40, H * .82, W + 40, H * .18, 16, 60) + '" fill="none" stroke="#a855f7" stroke-width="26" filter="url(#g' + u + ')" opacity=".5"/>' +
+        '<path data-k="slc" d="' + jag(r, -40, H * .82, W + 40, H * .18, 16, 30) + '" fill="none" stroke="#ffffff" stroke-width="5" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/></g>';
+      return defs(u, lin('lr' + u, st(0, '#22d3ee', .2) + st(.3, '#a855f7') + st(.7, '#c084fc') + st(1, '#22d3ee', .2), 0, 0, 1, 0) + rad('lf' + u, st(0, '#f5f3ff', .4) + st(.5, '#a855f7', .2) + st(1, '#0a0418', 0))) +
+        seams + stars + slash + '<rect data-k="fl" width="' + W + '" height="' + H + '" fill="url(#lf' + u + ')" opacity="0"/>';
+    },
+    gather(T, ms) { T.drawIn('sm', ms * .85, 80); T.drawIn('sc', ms * .85, 80); T.all('stz', (el, i) => T.a(el, [{ opacity: 0 }, { opacity: 1 }, { opacity: .3 }], ms, { delay: (i % 8) * 60 })); },
+    burst(T) {
+      T.all('sl', el => T.a(el, [{ opacity: 0 }, { opacity: 1, offset: .15 }, { opacity: .7, offset: .6 }, { opacity: 0 }], 440));
+      T.all('slc', el => T.a(el, [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], 140));
+      T.all('fl', el => T.a(el, [{ opacity: 0 }, { opacity: 1, offset: .15 }, { opacity: 0 }], 420));
+    },
+    linger(T) { T.fade('sm', 1, 0, 700); T.fade('sc', 1, 0, 500); T.fade('stz', .3, 0, 500); },
   },
 
   // 纳克提特障壁术：蜂巢晶格自四缘扫入、八芒几何阵描边 → 锁定闪耀 → 晶格由内向外淡出

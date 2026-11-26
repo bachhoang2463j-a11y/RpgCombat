@@ -1,9 +1,9 @@
 {
   "stage": "MVP-final-node",
   "executed": true,
-  "started": "2026-11-26T18:50:46.099Z",
-  "ended": "2026-11-26T18:50:50.176Z",
-  "sourceHead": "bb7391f",
+  "started": "2026-11-26T19:20:18.107Z",
+  "ended": "2026-11-26T19:20:22.654Z",
+  "sourceHead": "638f1ea",
   "sourceDirty": true,
   "command": "node tactics/tools/run-tests.cjs --all",
   "exitCode": 0,
@@ -1472,12 +1472,12 @@
             {
               "id": "UIR-P 命中概率与 resolveHit 实测一致 A=100 D=40",
               "pass": true,
-              "detail": "[0.8034833333333333,0.805]"
+              "detail": "[0.8046,0.805]"
             },
             {
               "id": "UIR-P 命中概率与 resolveHit 实测一致 A=80 D=120",
               "pass": true,
-              "detail": "[0.33621666666666666,0.3375]"
+              "detail": "[0.3408333333333333,0.3375]"
             },
             {
               "id": "UIR-P 命中概率与 resolveHit 实测一致 A=1 D=1",
@@ -1487,7 +1487,7 @@
             {
               "id": "UIR-P 命中概率与 resolveHit 实测一致 A=150 D=150",
               "pass": true,
-              "detail": "[0.5039666666666667,0.5033333333333333]"
+              "detail": "[0.5024333333333333,0.5033333333333333]"
             },
             {
               "id": "UIR-P 攻击预览：血条预计扣除段 + 命中率 + 击杀标记，用规则 damagePreview 与显示态 HP",
@@ -2343,7 +2343,7 @@
             {
               "id": "TP7AV-L 每个全屏 L3/L4 条目都有独立屏幕主演出，并在真实冲击拍点 ctx.atmos.burst()",
               "pass": true,
-              "detail": "[\"fire-blast\",\"abyss-fog\",\"fire-domain\",\"poison-domain\",\"holy-judgment\",\"thunder-storm\",\"frost-blast\",\"nak-tith-barrier\",\"strafe-burst\",\"krupp-snipe\",\"sekhmet-wrath\",\"strange-conch\",\"xenon-blight-fog\",\"sanctum-veil\"]"
+              "detail": "[\"fire-blast\",\"abyss-fog\",\"fire-domain\",\"poison-domain\",\"holy-judgment\",\"thunder-storm\",\"frost-blast\",\"void-quake\",\"line-rift\",\"nak-tith-barrier\",\"strafe-burst\",\"krupp-snipe\",\"sekhmet-wrath\",\"strange-conch\",\"xenon-blight-fog\",\"sanctum-veil\"]"
             },
             {
               "id": "TP7AV-L 主演出构图互不相同、渐变辉光滤镜带 uid、无 NaN/undefined",
@@ -7433,7 +7433,7 @@
             {
               "id": "TFX-01 标签选项来自同一注册表，覆盖基础标签且跨通道去重",
               "pass": true,
-              "detail": "[\"砷弹射击\",\"圣光01\",\"雷击01\",\"火焰01\",\"灵风术\",\"纳克提特障壁术\",\"伊西丝之拥\",\"伊西斯之拥\",\"飞沙化甲\",\"近战重击\",\"远程重击\",\"独头弹\",\"枪击穿透\",\"连续扫射\",\"克虏伯重狙\",\"谐律之庇\",\"静默之域\",\"碎裂之响\",\"塞赫美特之愠\",\"芭斯特的猫眼石\",\"奇异海螺\",\"高阶召唤术\",\"蝎眼钥匙\",\"异种坏死雾\",\"燃烧弹\",\"生体流转\",\"圣域帷幕\",\"单体回复\",\"拉莱耶造雾术\",\"浓雾\",\"造雾术\",\"火焰领域\",\"中毒领域\",\"再动加速\",\"群体回复\",\"群体增益\",\"群体减益\",\"冲锋\",\"咆哮\",\"冰霜爆炸\",\"虚空震荡\",\"直线裂隙\",\"水流\",\"诅咒\",\"枪击\",\"霰弹\",\"火焰\",\"冰霜\",\"雷击\",\"爆炸\",\"光\",\"毒液\",\"毒雾\",\"风\",\"刀砍\",\"拳击\",\"爪击\",\"撕咬\",\"箭矢\",\"group:melee\",\"group:ranged\",\"group:spell\",\"折影步\",\"逆咒归源镜\",\"巫师护盾\",\"看破\",\"舍身\",\"格挡\",\"回避错位\"]"
+              "detail": "[\"砷弹射击\",\"圣光01\",\"雷击01\",\"火焰01\",\"灵风术\",\"纳克提特障壁术\",\"伊西丝之拥\",\"伊西斯之拥\",\"飞沙化甲\",\"近战重击\",\"远程重击\",\"独头弹\",\"枪击穿透\",\"连续扫射\",\"克虏伯重狙\",\"谐律之庇\",\"静默之域\",\"碎裂之响\",\"塞赫美特之愠\",\"芭斯特的猫眼石\",\"奇异海螺\",\"高阶召唤术\",\"蝎眼钥匙\",\"异种坏死雾\",\"燃烧弹\",\"生体流转\",\"圣域帷幕\",\"单体回复\",\"拉莱耶造雾术\",\"浓雾\",\"造雾术\",\"火焰领域\",\"中毒领域\",\"再动加速\",\"群体回复\",\"群体增益\",\"群体减益\",\"冲锋\",\"咆哮\",\"极地暴风雪\",\"冰霜爆炸\",\"时空扭曲震荡\",\"虚空震荡\",\"维度撕裂\",\"直线裂隙\",\"水流\",\"诅咒\",\"枪击\",\"霰弹\",\"火焰\",\"冰霜\",\"雷击\",\"爆炸\",\"光\",\"毒液\",\"毒雾\",\"风\",\"刀砍\",\"拳击\",\"爪击\",\"撕咬\",\"箭矢\",\"group:melee\",\"group:ranged\",\"group:spell\",\"折影步\",\"逆咒归源镜\",\"巫师护盾\",\"看破\",\"舍身\",\"格挡\",\"回避错位\"]"
             },
             {
               "id": "TFX-01 entry.play 期间旧 scope 失活、同 ID 新 scope 上线后不补揭旧 effects",
@@ -7533,7 +7533,7 @@
             {
               "id": "TFX-01 分级预算：全部分级条目时长/蓄势/全屏/暗场/峰值音量落在本级区间",
               "pass": true,
-              "detail": "[{\"id\":\"holy-judgment\",\"grade\":\"L4\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"thunder-storm\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"fire-blast\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"nak-tith-barrier\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.62},{\"id\":\"melee-heavy\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"ranged-heavy\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.8},{\"id\":\"slug-shot\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.75},{\"id\":\"gunshot-pierce\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.75},{\"id\":\"strafe-burst\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.68},{\"id\":\"krupp-snipe\",\"grade\":\"L4\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"sekhmet-wrath\",\"grade\":\"L4\",\"ok\":true,\"reasons\":[],\"peak\":0.7},{\"id\":\"bastet-opal\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.55},{\"id\":\"strange-conch\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.62},{\"id\":\"xenon-blight-fog\",\"grade\":\"L4\",\"ok\":true,\"reasons\":[],\"peak\":2.5},{\"id\":\"vital-flow\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.56},{\"id\":\"sanctum-veil\",\"grade\":\"L4\",\"ok\":true,\"reasons\":[],\"peak\":0.7},{\"id\":\"heal-mend\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.5},{\"id\":\"abyss-fog\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.62},{\"id\":\"fire-domain\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.66},{\"id\":\"poison-domain\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.66},{\"id\":\"self-boost\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.55},{\"id\":\"aoe-heal\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.5},{\"id\":\"ally-buff\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.5},{\"id\":\"pure-debuff\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.52},{\"id\":\"charge-dash\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.62},{\"id\":\"roar-wave\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.58},{\"id\":\"frost-blast\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.68},{\"id\":\"void-quake\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.6},{\"id\":\"line-rift\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.58},{\"id\":\"water-bolt\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.34},{\"id\":\"curse-beam\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.34},{\"id\":\"evade-shift-ghost\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.32},{\"id\":\"mirror-counter\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.36},{\"id\":\"wizard-shield\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.34},{\"id\":\"reaction-sheshen\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.34},{\"id\":\"reaction-guard\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.3},{\"id\":\"evade-shift\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.26},{\"id\":\"holy-vow\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.55},{\"id\":\"storm-gather\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.55},{\"id\":\"krupp-aim\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.52},{\"id\":\"sekhmet-vow\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.54}]"
+              "detail": "[{\"id\":\"holy-judgment\",\"grade\":\"L4\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"thunder-storm\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"fire-blast\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"nak-tith-barrier\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.62},{\"id\":\"melee-heavy\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"ranged-heavy\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.8},{\"id\":\"slug-shot\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.75},{\"id\":\"gunshot-pierce\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.75},{\"id\":\"strafe-burst\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.68},{\"id\":\"krupp-snipe\",\"grade\":\"L4\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"sekhmet-wrath\",\"grade\":\"L4\",\"ok\":true,\"reasons\":[],\"peak\":0.7},{\"id\":\"bastet-opal\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.55},{\"id\":\"strange-conch\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.62},{\"id\":\"xenon-blight-fog\",\"grade\":\"L4\",\"ok\":true,\"reasons\":[],\"peak\":2.5},{\"id\":\"vital-flow\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.56},{\"id\":\"sanctum-veil\",\"grade\":\"L4\",\"ok\":true,\"reasons\":[],\"peak\":0.7},{\"id\":\"heal-mend\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.5},{\"id\":\"abyss-fog\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.62},{\"id\":\"fire-domain\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.66},{\"id\":\"poison-domain\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.66},{\"id\":\"self-boost\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.55},{\"id\":\"aoe-heal\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.5},{\"id\":\"ally-buff\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.5},{\"id\":\"pure-debuff\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.52},{\"id\":\"charge-dash\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.62},{\"id\":\"roar-wave\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.58},{\"id\":\"frost-blast\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.7},{\"id\":\"void-quake\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"line-rift\",\"grade\":\"L3\",\"ok\":true,\"reasons\":[],\"peak\":0.72},{\"id\":\"water-bolt\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.34},{\"id\":\"curse-beam\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.34},{\"id\":\"evade-shift-ghost\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.32},{\"id\":\"mirror-counter\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.36},{\"id\":\"wizard-shield\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.34},{\"id\":\"reaction-sheshen\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.34},{\"id\":\"reaction-guard\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.3},{\"id\":\"evade-shift\",\"grade\":\"L1\",\"ok\":true,\"reasons\":[],\"peak\":0.26},{\"id\":\"holy-vow\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.55},{\"id\":\"storm-gather\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.55},{\"id\":\"frost-gather\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.52},{\"id\":\"rift-gather\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.55},{\"id\":\"krupp-aim\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.52},{\"id\":\"sekhmet-vow\",\"grade\":\"L2\",\"ok\":true,\"reasons\":[],\"peak\":0.54}]"
             },
             {
               "id": "TFX-01 预算核对能抓出违规（防假绿）",
@@ -8150,7 +8150,7 @@
   ],
   "errors": null,
   "files": {
-    "tactics/src/action-director.mjs": "63a53931edce1301dc6c373c711459bfc5c8bc600c887bdc6d0ddfcf895c1dca",
+    "tactics/src/action-director.mjs": "3ee4b09a3cec05cc008d18ac1b2ba02feda48012fabf04f1f89cb4c22a3c0867",
     "tactics/src/ai.mjs": "daaab01f6d0605ceefcd7d8f41a795b4e823c3063b33b6b757b71c235e43a1a1",
     "tactics/src/arcane-vfx.mjs": "bc9c1e6c85a157ad320669b0e91a021102c6df543c778c09aaaee27174daae12",
     "tactics/src/av-host.mjs": "7e54a5bc9e527eae04792e361b38148639de339c9d54a661012ff1f56d964f16",
@@ -8168,7 +8168,7 @@
     "tactics/src/editor-panel.mjs": "74f28f1437e8b20f16f0bde3bbe83d7b4e5fdb921718d29fc32ca006ac18942b",
     "tactics/src/effect-definitions.mjs": "d63f641c0175aab54402c0ad9793d629975f5eda314cfd4dcdaaad6159136c3e",
     "tactics/src/effect-handlers.mjs": "c8cfca077b4a6d77e94b28c4e3f8c0ca9fb7c2d6fae771d297910c0d915e40a1",
-    "tactics/src/fx-library.mjs": "aa8cb92f22a5af0fec4d73a5fc62c7b8f403f5c6bade12cadc152c9cbde3fe56",
+    "tactics/src/fx-library.mjs": "db486a3c5f52695039123ab2a1335c9f9f48271340617e83a53cdb9e1e72e49b",
     "tactics/src/fx-registry.mjs": "d22174967b55f8b74a10e51f36ab7ff7240c0d403dbb1787ce93bb2c18ce3d3c",
     "tactics/src/generation.mjs": "5ce38296d83ca089995ebf5762f19eb95efaacbd7fb683cd631911f80d24cd4b",
     "tactics/src/geometry.mjs": "c9caef1f6c7c7c0b79b1d7022a2848f490ed1fe003ff2f0dcd18280a038f439b",
@@ -8176,7 +8176,7 @@
     "tactics/src/guard.mjs": "4ba0aa3062cccdf020e595a975e1bb86b81cecfa42fc321351c459875dfee909",
     "tactics/src/lifecycle.mjs": "0acd63967469695a4809a6b421077d03eda6790f10b6e785ac9703cd6f5cc8ff",
     "tactics/src/lore.mjs": "e13409d9582f1558d59f4a29b44710a803d3b813f60c9445f18133f7b0f097b0",
-    "tactics/src/main.mjs": "5c1266842a9b4a097848ffbdff693c15d62f5a555e78f4e75f73641ec0c626df",
+    "tactics/src/main.mjs": "749c1042a407e3628d69ce62aef5ade409f64c787366ccb15f8ff105c2279057",
     "tactics/src/map-art.mjs": "07e734d6cc41e7ad6b6a708cfbcdb38f8319f99208d566347e9e6eaff48eb330",
     "tactics/src/motion.mjs": "eb4393adb2e0425f7db284e5efc2dbc0afb2e47613b6df3e0320f10c677e210d",
     "tactics/src/movement.mjs": "c6a3c445933a6ce254bf5c190a841f9049da9bd3645fd81c378450d1ee01cbfd",
@@ -8193,13 +8193,13 @@
     "tactics/src/scene.mjs": "a3be69298076e66ea9d3bbe5a768ea67736bdbdabe0655b79a08b271ae20c113",
     "tactics/src/scheduler.mjs": "9d818ed4d77e62cf3341096aecaa6055e0d6e5a6a31edb6e02594f0d4db06a0c",
     "tactics/src/screen-atmos.mjs": "216a86e86a304e047dc255db6e3cba008a0e06275290ac7b9229ae2d612fa7b8",
-    "tactics/src/screen-showpiece.mjs": "42c31db11ad64cbbb9f90fd20b17d4ee7ca7deadc09c55cd1a86fe8287dc3d85",
-    "tactics/src/status-ui.mjs": "ad6d875f66174b9a441c9e0f137eb445c21f1b79450745a7049c8ceb5ff85ac7",
+    "tactics/src/screen-showpiece.mjs": "9c631d01d1e747eeff02ed5b567edad56fb535591fa48edc4086b77d1f063a54",
+    "tactics/src/status-ui.mjs": "d1b2f51c114675e498a59c8cb9c2cad3d195f5af631f0971165783b59d7339a7",
     "tactics/src/storage.mjs": "14d7d6022199618684d90aee9eeab796d37b12a8de624364b8854418ca05cb65",
     "tactics/src/ui-sfx.mjs": "a82bd555e4ed654c257e13594a0b3828b6bc719544b23c58b03fda52540c9a92",
     "tactics/src/ui-shell.mjs": "ba78494331690406585303a29282b3b77fa6dc6df12ab6d7fac14041d6a03291",
     "tactics/src/unit-style.mjs": "d2a8bd7aa3cbf2725f687a50a25ff760ea46b4b12a753eb1aaa9908de34e3410",
-    "tactics/src/unit-view.mjs": "ee081beb8d1e16b182bfecd277ddf50483b9daab76db538b6160c77c956eebf5",
+    "tactics/src/unit-view.mjs": "4cbcd285f2a6a9e671940dc409406f15f943baf825619628c4bc3ef27f88094c",
     "tactics/src/variant-rules.mjs": "16518c7218b955a741c714c74107b4e28d7dfb501b6072422c04d731ee03d7d4",
     "tactics/src/vfx-host.mjs": "a052515c357435cedc36f8f01cea4c7237128347ba848c1e59654ee2410f4901",
     "tactics/src/vfx-primitives.mjs": "c5c03f763eb30f98cc04653a4a78d30eeecbcbd9f658863ff2f0423c8541f3e5",

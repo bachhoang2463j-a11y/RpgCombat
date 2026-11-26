@@ -11,7 +11,7 @@ import { playPathMotion, pathSegments, pointAtDistance } from './motion.mjs';
 import { unitCenter } from './geometry.mjs';
 import { createFxRegistry, actionInput, reactionInput, prepareInput } from './fx-registry.mjs';
 import { registerDefaultFx, EXTRA_AUDIO, fogFieldHtml, animateFogField, elementFieldHtml, animateElementField,
-  playRegionPulse, REGION_PULSE_AUDIO, playPassiveGain, PASSIVE_AUDIO, playEnemyAlarm, ALARM_AUDIO, playJumpDust, glide } from './fx-library.mjs';
+  playRegionPulse, REGION_PULSE_AUDIO, playPassiveGain, PASSIVE_AUDIO, playEnemyAlarm, ALARM_AUDIO, playJumpDust, glide, READY_AUDIO, playReadyFx } from './fx-library.mjs';
 import { createVfxHost } from './vfx-host.mjs';
 import { skillSlots } from './effect-definitions.mjs';
 import { startAtmos, atmosStyleOf } from './screen-atmos.mjs';
@@ -784,6 +784,15 @@ export function createActionDirector(deps) {
     return ok;
   }
 
+  // 整备演出：规则已祛除负面（battle.ready），本层只在该单位处播放
+  async function playReady(unitId) {
+    const c = centerOf(unitId);
+    if (!c) return true;
+    await sandbox.guideTo([c], { ms: 240 });
+    if (!(await prepareAudio(READY_AUDIO))) return false;
+    return playReadyFx({ fx: makeFx('K'), unitId, centerOf, wait });
+  }
+
   // 规则雾区格内的单位（占地任一格落入即算；只读规则站位）
   function unitsInCells(cells) {
     const vd = getViewData(), set = new Set((cells || []).map(k => k.col + ',' + k.row));
@@ -1122,6 +1131,6 @@ export function createActionDirector(deps) {
       if (ev.type === 'barrier-damaged') lockedBarriers.set(ev.barrierId, (lockedBarriers.get(ev.barrierId) || 0) + 1);
     }
   }
-  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, playPrepare, syncRegions, playFieldFeedback, playStatusTick, syncBarriers, syncPreparations, holdRegions, holdGuards, wait, resolveAttackIdentity, resolveWindupKind,
+  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, playPrepare, playReady, syncRegions, playFieldFeedback, playStatusTick, syncBarriers, syncPreparations, holdRegions, holdGuards, wait, resolveAttackIdentity, resolveWindupKind,
     runAttackLive, driveAttack, cancelAttack, playChargeCutin, playExecution, executionKills };
 }

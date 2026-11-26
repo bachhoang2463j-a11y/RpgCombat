@@ -87,7 +87,7 @@ export const groups = {
     for (const [damage, mist, drops] of [[9, 2, 4], [20, 6, 10], [60, 11, 18]]) {
       const h = originalHitHarness(2), handle = h.playHitFeedback(result(damage));
       if (damage >= 50) {
-        cases.push(ok('THIT 重创数字在原版60ms卡肉后出现', !h.layers.children[0].children.some(n => n.className?.includes('arcane-hit-num')) && h.engine.hitStop === 60));
+        cases.push(ok('THIT 重创数字随命中即刻出现（战棋顿帧恒为 0，不等原版60ms卡肉）', h.layers.children[0].children.some(n => n.className?.includes('arcane-hit-num'))));
         h.beat(60);
       }
       const numbers = h.layers.children[0].children.filter(n => n.className?.includes('arcane-hit-num'));

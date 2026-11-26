@@ -339,12 +339,16 @@ function screenBlood(fx, ms, { pos: P = SPLAT_POS, drips: DR = SPLAT_DRIPS, each
   });
 }
 // 弱点锁定准星（回合制 pierce-weakpoint-lock）：菱形虚线框 + 内圈 + 十字分划，由大旋入收紧
-function pierceLock(fx, p, d, ms) {
+// snap：命中拍点即刻满亮出现（与伤害同帧），只做急速收紧与外扩淡出
+function pierceLock(fx, p, d, ms, { snap = false } = {}) {
   const l = fx.top('<svg viewBox="0 0 120 120" width="' + d + '" height="' + d + '" style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;margin:' + (-d / 2) + 'px 0 0 ' + (-d / 2) + 'px;overflow:visible;filter:drop-shadow(0 0 6px #38bdf8);">' +
     '<polygon points="60,10 110,60 60,110 10,60" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="8 4"/><circle cx="60" cy="60" r="38" fill="none" stroke="#0ea5e9" stroke-width="1.8"/>' +
     '<path d="M60,5 V35 M60,85 V115 M5,60 H35 M85,60 H115" stroke="#f0f9ff" stroke-width="2.5"/><circle cx="60" cy="60" r="6" fill="#38bdf8"/></svg>', ms + 40);
-  l.firstChild.animate([{ transform: 'scale(2.2) rotate(-45deg)', opacity: 0 }, { transform: 'scale(.95) rotate(0deg)', opacity: 1, offset: 0.3 }, { transform: 'scale(1.05) rotate(5deg)', opacity: 1, offset: 0.5 },
-    { transform: 'scale(1.15) rotate(10deg)', opacity: 0.8, offset: 0.72 }, { transform: 'scale(1.4) rotate(20deg)', opacity: 0 }], { duration: ms, easing: 'cubic-bezier(0.15,0.9,0.2,1)', fill: 'forwards' });
+  l.firstChild.animate(snap
+    ? [{ transform: 'scale(1.35) rotate(-20deg)', opacity: 1, filter: 'brightness(2.2)' }, { transform: 'scale(.92) rotate(0deg)', opacity: 1, filter: 'brightness(1.4)', offset: 0.18 },
+      { transform: 'scale(1) rotate(4deg)', opacity: 1, offset: 0.55 }, { transform: 'scale(1.45) rotate(18deg)', opacity: 0 }]
+    : [{ transform: 'scale(2.2) rotate(-45deg)', opacity: 0 }, { transform: 'scale(.95) rotate(0deg)', opacity: 1, offset: 0.3 }, { transform: 'scale(1.05) rotate(5deg)', opacity: 1, offset: 0.5 },
+      { transform: 'scale(1.15) rotate(10deg)', opacity: 0.8, offset: 0.72 }, { transform: 'scale(1.4) rotate(20deg)', opacity: 0 }], { duration: ms, easing: 'cubic-bezier(0.15,0.9,0.2,1)', fill: 'forwards' });
 }
 // 超音速贯穿光束（回合制 pierce-beam-penetrate）：自枪口贯穿目标并向后延伸，横向先胀后收
 function pierceBeam(fx, a, b, { width = 14, ms = 420 } = {}) {
@@ -903,7 +907,7 @@ async function playSupportEffects(ctx, accept = () => true) {
     if (canceled) return false;
     const gap = i > 0 && effect.targetId !== steps[i - 1].effect.targetId ? 200 / 1.5 : 1;
     if (i > 0 && (!(await ctx.wait(gap)) || canceled)) return cancelAll();
-    playOne(feedback, effect.targetId, () => ctx.revealEffect(effect, true));
+    playOne(feedback, effect.targetId, () => { ctx.revealEffect(effect, true); buffFlourish(ctx.fx, buffKindOf(effect), ctx.centerOf(effect.targetId)); });
     if (effect.kind === 'heal' && effect.overheal > 0) {
       if (!(await ctx.wait(1)) || canceled) return cancelAll();
       playOne(SUPPORT_EFFECT.shield, effect.targetId);
@@ -912,6 +916,91 @@ async function playSupportEffects(ctx, accept = () => true) {
   const finished = await Promise.all(pending);
   return !canceled && finished.every(ok => ok);
 
+}
+
+// ---------- 增益/减益施加动效（与原版通用辅助 SVG 同拍叠加，按种类区分构图；配色与头像持续弧光一致） ----------
+const BUFF_FX_COLORS = {
+  atk: ['#fb923c', '#fde68a'], def: ['#60a5fa', '#dbeafe'], hit: ['#facc15', '#fef9c3'], eva: ['#2dd4bf', '#ccfbf1'], spd: ['#22d3ee', '#cffafe'],
+  down: ['#a855f7', '#f3e8ff'], taunt: ['#f87171', '#fee2e2'], hide: ['#94a3b8', '#f1f5f9'], counter: ['#f59e0b', '#fef3c7'], cleanse: ['#34d399', '#ecfdf5'],
+};
+function buffKindOf(e) {
+  if (!e) return null;
+  if (e.kind === 'buff') {
+    if (e.field === 'taunt') return e.value < 0 ? 'hide' : 'taunt';
+    if (e.value < 0) return 'down';
+    return BUFF_FX_COLORS[e.field] ? e.field : null;
+  }
+  if (e.kind === 'taunt') return e.value < 0 ? 'hide' : 'taunt';
+  if (e.kind === 'counter') return 'counter';
+  if (e.kind === 'damageGuard') return 'def';
+  if (e.kind === 'dispel' && e.removed && e.removed.length) return 'cleanse';
+  return null;
+}
+export function buffFlourish(fx, kind, m) {
+  const C = BUFF_FX_COLORS[kind];
+  if (!C || !m) return;
+  const p = worldPx(m), [c, l] = C;
+  const ring = (d, ms, delay = 0) => fx.top(ringHtml(p.x, p.y, d, l, c), ms + delay + 40).firstChild
+    .animate([{ transform: 'scale(.3)', opacity: 1 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: ms, delay, easing: 'cubic-bezier(.1,.8,.3,1)', fill: 'both' });
+  const at = (w, h, css) => '<i style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:' + w + 'px;height:' + h + 'px;margin:' + (-h / 2) + 'px 0 0 ' + (-w / 2) + 'px;' + css + '"></i>';
+  const pieces = (n, html, frames, ms, stagger = 0) => {
+    const lay = fx.top(Array.from({ length: n }, (_, i) => html(i)).join(''), ms + n * stagger + 40);
+    [...lay.children].forEach((el, i) => el.animate(frames(i), { duration: ms, delay: i * stagger, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'both' }));
+  };
+  const svg = (d, inner) => '<svg viewBox="-50 -50 100 100" width="' + d + '" height="' + d + '" style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;margin:' + (-d / 2) + 'px 0 0 ' + (-d / 2) + 'px;overflow:visible;filter:drop-shadow(0 0 5px ' + c + ');">' + inner + '</svg>';
+  if (kind === 'atk') {        // 增攻：三道炽焰刃自脚下升腾
+    pieces(3, () => at(14, 42, 'clip-path:polygon(50% 0,100% 68%,50% 100%,0 68%);background:linear-gradient(#fff7d6,' + c + ' 55%,rgba(220,38,38,0));filter:drop-shadow(0 0 6px ' + c + ');mix-blend-mode:screen;'),
+      i => { const x = (i - 1) * 16; return [{ transform: 'translate(' + x + 'px,30px) scale(.4)', opacity: 0 }, { transform: 'translate(' + x + 'px,0) scale(1.1)', opacity: 1, offset: 0.4 }, { transform: 'translate(' + x + 'px,-36px) scale(.7)', opacity: 0 }]; }, 560, 60);
+    ring(72, 460);
+  } else if (kind === 'def') {  // 增防：六枚六角甲片自外合拢成环
+    pieces(6, () => at(16, 14, 'clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);background:linear-gradient(160deg,' + l + ',' + c + ');filter:drop-shadow(0 0 4px ' + c + ');'),
+      i => { const a = i / 6 * TAU, f = r => 'translate(' + (Math.cos(a) * r).toFixed(1) + 'px,' + (Math.sin(a) * r).toFixed(1) + 'px)'; return [{ transform: f(52) + ' scale(.5)', opacity: 0 }, { transform: f(22) + ' scale(1)', opacity: 1, offset: 0.55 }, { transform: f(26) + ' scale(1.1)', opacity: 0 }]; }, 600, 25);
+    ring(64, 420, 300);
+  } else if (kind === 'hit') {  // 瞄准：金色准星自大收紧锁定
+    pieces(1, () => svg(64, '<circle r="30" fill="none" stroke="' + c + '" stroke-width="3"/><circle r="4" fill="' + l + '"/><path d="M0,-46 V-22 M0,46 V22 M-46,0 H-22 M46,0 H22" stroke="' + l + '" stroke-width="3.5" stroke-linecap="round"/>'),
+      () => [{ transform: 'scale(2.2) rotate(45deg)', opacity: 0 }, { transform: 'scale(1) rotate(0deg)', opacity: 1, offset: 0.45 }, { transform: 'scale(1) rotate(0deg)', opacity: 1, offset: 0.7 }, { transform: 'scale(.8)', opacity: 0 }], 620);
+  } else if (kind === 'eva') {  // 回避：两道疾风弧绕身急旋
+    const v = fx.top(swirlHtml(p.x, p.y, 34, 9, [c, l], { tilt: 0.6, w: [2, 3.5], op: [0.6, 1] }), 640).firstChild.firstChild;
+    v.animate([{ transform: 'rotate(0deg) scale(1.3)', opacity: 0 }, { transform: 'rotate(220deg) scale(1)', opacity: 1, offset: 0.4 }, { transform: 'rotate(420deg) scale(.85)', opacity: 0 }], { duration: 620, fill: 'forwards' });
+  } else if (kind === 'spd') {  // 增速：五道疾光自下而上掠过
+    pieces(5, () => at(4, 34, 'border-radius:4px;background:linear-gradient(transparent,' + c + ',' + l + ');mix-blend-mode:screen;'),
+      i => { const x = (i - 2) * 9; return [{ transform: 'translate(' + x + 'px,34px) scaleY(.4)', opacity: 0 }, { transform: 'translate(' + x + 'px,0) scaleY(1.2)', opacity: 1, offset: 0.35 }, { transform: 'translate(' + x + 'px,-42px) scaleY(.6)', opacity: 0 }]; }, 420, 45);
+    ring(60, 360, 120);
+  } else if (kind === 'down') { // 减益：三道紫色下沉折纹 + 暗雾压身
+    pieces(3, () => svg(34, '<path d="M-22,-10 L0,10 L22,-10" fill="none" stroke="' + l + '" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>'),
+      () => [{ transform: 'translateY(-34px) scale(1.1)', opacity: 0 }, { transform: 'translateY(-6px) scale(1)', opacity: 1, offset: 0.4 }, { transform: 'translateY(22px) scale(.8)', opacity: 0 }], 520, 110);
+    fx.top(orbHtml(p.x, p.y, 70, 'rgba(76,29,149,0.55)', 'rgba(46,16,101,0.6)'), 640).firstChild.animate([{ transform: 'scale(.5)', opacity: 0 }, { transform: 'scale(1)', opacity: 1, offset: 0.4 }, { transform: 'scale(1.2)', opacity: 0 }], { duration: 620, fill: 'forwards' });
+  } else if (kind === 'taunt') { // 嘲讽：两圈赤红怒波外扩
+    ring(80, 420); ring(96, 420, 150);
+  } else if (kind === 'hide') {  // 隐匿：灰雾吐散、身形淡入阴影
+    particles(fx, Array.from({ length: 8 }, () => { const a = rnd(0, TAU), d = rnd(14, 34); return { x: p.x, y: p.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d - 8, size: rnd(26, 40), color: 'rgba(148,163,184,0.45)', core: 'rgba(203,213,225,0.5)', o0: 0.8, s0: 0.6, s1: 1.3, dur: rnd(520, 720) }; }), 760);
+  } else if (kind === 'counter') { // 反击架势：双刃交叉闪光
+    pieces(2, () => at(76, 4, 'border-radius:3px;background:linear-gradient(90deg,transparent,' + c + ' 25%,' + l + ' 50%,' + c + ' 75%,transparent);mix-blend-mode:screen;'),
+      i => { const r = i ? -42 : 42; return [{ transform: 'rotate(' + r + 'deg) scaleX(0)', opacity: 1 }, { transform: 'rotate(' + r + 'deg) scaleX(1.1)', opacity: 1, offset: 0.35 }, { transform: 'rotate(' + r + 'deg) scaleX(1)', opacity: 0 }]; }, 420, 60);
+    ring(66, 380, 120);
+  } else if (kind === 'cleanse') { // 驱散/整备：暗紫负面碎片剥离外飞 + 翠光上扬
+    pieces(8, () => at(9, 7, 'clip-path:polygon(0 30%,60% 0,100% 55%,40% 100%);background:linear-gradient(135deg,#c084fc,#2e1065);filter:drop-shadow(0 0 3px #a855f7);'),
+      i => { const a = i / 8 * TAU + 0.3, d = 30 + (i % 3) * 8; return [{ transform: 'translate(0,0) rotate(0deg)', opacity: 1 }, { transform: 'translate(' + (Math.cos(a) * d).toFixed(0) + 'px,' + (Math.sin(a) * d - 12).toFixed(0) + 'px) rotate(' + (i % 2 ? 260 : -260) + 'deg)', opacity: 0 }]; }, 560, 15);
+    particles(fx, Array.from({ length: 12 }, () => ({ x: p.x + rnd(-18, 18), y: p.y + rnd(-6, 16), dx: rnd(-8, 8), dy: -rnd(30, 60), size: rnd(4, 8), color: c, core: l, s0: 1, s1: 0.3, dur: rnd(520, 760), delay: rnd(80, 220) })), 1000);
+    ring(70, 460, 60);
+  }
+}
+
+// 整备（主行动，规则随机祛除一项负面状态）：翠色扫环自头顶掠下 + 负面碎片剥离 + 整备徽记 + 翠光上扬
+export const READY_AUDIO = ['link_chime', 'defUp'];
+export async function playReadyFx(rctx) {
+  const { fx, unitId } = rctx, m = rctx.centerOf(unitId);
+  if (!m) return true;
+  const p = worldPx(m), C = '#34d399', L = '#ecfdf5';
+  fx.sfx('link_chime', 0.52);
+  const sweep = fx.top('<i style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:78px;height:24px;margin:-12px 0 0 -39px;border-radius:50%;' +
+    'background:radial-gradient(ellipse,transparent 46%,rgba(110,231,183,.85) 60%,rgba(236,253,245,.95) 66%,transparent 74%);filter:drop-shadow(0 0 6px ' + C + ');mix-blend-mode:screen;"></i>', 560);
+  sweep.firstChild.animate([{ transform: 'translateY(-46px) scale(.7)', opacity: 0 }, { transform: 'translateY(-30px) scale(1)', opacity: 1, offset: 0.2 }, { transform: 'translateY(26px) scale(1.05)', opacity: 1, offset: 0.85 }, { transform: 'translateY(30px) scale(1.15)', opacity: 0 }], { duration: 520, easing: 'cubic-bezier(.4,0,.6,1)', fill: 'forwards' });
+  if (!(await rctx.wait(360))) return false;
+  fx.sfx('defUp', 0.55);
+  buffFlourish(fx, 'cleanse', m);
+  floatText(fx, p.x, p.y - 40, '🧹 整备 · 祛除负面', L, '#065f46', { ms: 760, size: 13 });
+  return rctx.wait(520);
 }
 
 const healMend = {
@@ -1610,56 +1699,263 @@ const roarWave = {
   },
 };
 
-const frostBlast = {
-  id: 'frost-blast', grade: 'L3', fxTags: ['冰霜爆炸'],
-  timeline: { chargeMs: 820, totalMs: 2150, fullscreen: true, darken: false },
-  cues: [{ key: 'frost_crystal_impact_fs550267', vol: 0.68 }],
-  prepareKeys() { return ['frost_crystal_impact_fs550267']; },
+// ---------- 精英强力技能专属（伊塔库亚的眷族 / 犹格索托斯之子） ----------
+// 旋涡带：同心椭圆上的短弧（外层容器压扁成地面透视，内层整体旋转，弧段不随旋转变形）
+function swirlHtml(x, y, R, n, colors, { tilt = 0.62, w = [1.6, 4], op = [0.35, 0.9] } = {}) {
+  let arcs = '';
+  for (let i = 0; i < n; i++) {
+    const r = R * rnd(0.16, 1.05), a0 = rnd(0, TAU), a1 = a0 + rnd(0.5, 1.4);
+    arcs += '<path d="M' + (Math.cos(a0) * r).toFixed(1) + ',' + (Math.sin(a0) * r).toFixed(1) + ' A' + r.toFixed(1) + ',' + r.toFixed(1) + ' 0 0 1 ' + (Math.cos(a1) * r).toFixed(1) + ',' + (Math.sin(a1) * r).toFixed(1) +
+      '" fill="none" stroke="' + pick(colors) + '" stroke-width="' + rnd(w[0], w[1]).toFixed(1) + '" stroke-linecap="round" opacity="' + rnd(op[0], op[1]).toFixed(2) + '"/>';
+  }
+  const S = R * 2.2;
+  return '<div style="position:absolute;left:' + x + 'px;top:' + y + 'px;width:0;height:0;transform:scaleY(' + tilt + ');">' +
+    '<svg viewBox="' + (-S / 2) + ' ' + (-S / 2) + ' ' + S + ' ' + S + '" width="' + S + '" height="' + S + '" style="position:absolute;left:' + (-S / 2) + 'px;top:' + (-S / 2) + 'px;overflow:visible;filter:drop-shadow(0 0 5px ' + colors[0] + ');">' + arcs + '</svg></div>';
+}
+// 冰锥：自高空坠落钉入地面（clip-path 菱锥 + 冰蓝渐变）
+function icicle(fx, p, { h = 70, w = 15, fall = 260, ms = 170, delay = 0 } = {}) {
+  const l = fx.top('<i style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:' + w + 'px;height:' + h + 'px;margin:' + (-h) + 'px 0 0 ' + (-w / 2) + 'px;' +
+    'clip-path:polygon(50% 100%,100% 22%,50% 0,0 22%);background:linear-gradient(#f0f9ff,#bae6fd 40%,#38bdf8 80%,#0369a1);filter:drop-shadow(0 0 6px #38bdf8);"></i>', ms + delay + 260);
+  l.firstChild.animate([{ transform: 'translateY(' + (-fall) + 'px) scaleY(1.25)', opacity: 0 }, { transform: 'translateY(' + (-fall * 0.6) + 'px) scaleY(1.2)', opacity: 1, offset: 0.25 },
+    { transform: 'translateY(0) scaleY(1)', opacity: 1, offset: 0.62 }, { transform: 'translateY(4px) scaleY(.85)', opacity: 0 }], { duration: ms + 240, delay, easing: 'cubic-bezier(.55,0,.9,.6)', fill: 'both' });
+}
+// 冰晶封裹：目标周身六枚冰棱刺出 → 迸裂为冰屑
+function iceEncase(fx, p) {
+  const shards = Array.from({ length: 6 }, (_, i) => {
+    const a = i / 6 * 360 + rnd(-12, 12), h = rnd(26, 40);
+    return '<i style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:12px;height:' + h.toFixed(0) + 'px;margin:' + (-h).toFixed(0) + 'px 0 0 -6px;transform-origin:50% 100%;--r:rotate(' + a.toFixed(0) + 'deg);' +
+      'clip-path:polygon(50% 0,100% 70%,50% 100%,0 70%);background:linear-gradient(#ffffff,#bae6fd 45%,#0ea5e9);filter:drop-shadow(0 0 5px #7dd3fc);"></i>';
+  }).join('');
+  const l = fx.top(shards, 720);
+  [...l.children].forEach(el => {
+    const r = el.style.getPropertyValue('--r');
+    el.animate([{ transform: r + ' scale(.1)', opacity: 0 }, { transform: r + ' scale(1.1)', opacity: 1, offset: 0.22 }, { transform: r + ' scale(1)', opacity: 0.95, offset: 0.6 }, { transform: r + ' scale(1.35)', opacity: 0 }], { duration: 680, easing: 'cubic-bezier(.2,.9,.3,1)', fill: 'forwards' });
+  });
+  particles(fx, Array.from({ length: 12 }, () => { const a = rnd(0, TAU), d = rnd(24, 60); return { x: p.x, y: p.y - 10, dx: Math.cos(a) * d, dy: Math.sin(a) * d - 10, size: rnd(4, 8), color: '#bae6fd', core: '#ffffff', s0: 1, s1: 0.3, dur: rnd(380, 560), delay: 380 }; }), 1000);
+}
+
+// 极地暴风雪 L3（伊塔库亚的眷族，[特效:极地暴风雪]；蓄力 4 释放）：
+// 冰原色罩 + 爆心霜纹阵逆旋 + 雪粒三波螺旋卷入 + 预告霜环收紧 → 收 →
+// 双层暴风雪涡旋横扫 + 冰锥群自高空坠落钉地（目标逐个被冰棱封裹并揭示）+ 霜冻地表 → 斜吹飞雪余韵（击退由导演在条目后补间）
+const polarBlizzard = {
+  id: 'frost-blast', grade: 'L3', fxTags: ['极地暴风雪', '冰霜爆炸'],
+  timeline: { chargeMs: 950, totalMs: 2950, fullscreen: true, darken: false },   // 950 蓄势 + 450 冰锥坠落 + 1550 风雪余韵
+  cues: [{ key: 'aoe_wind_spin_fs772867', vol: 0.55 }, { key: 'freeze01', vol: 0.62 }, { key: 'frost_crystal_impact_fs550267', vol: 0.70 }],
+  prepareKeys() { return this.cues.map(c => c.key); },
   async play(ctx) {
-    const { fx, hits, result } = ctx, shape = result.query.shape, b = worldPx(shape.center || result.aim), R = (shape.radius || 5) * PX;
-    fx.ground(ringHtml(b.x, b.y, R * 2, 'rgba(125,211,252,0.55)', 'rgba(56,189,248,0.25)'), 900)
-      .firstChild.animate([{ transform: 'scale(1.1)', opacity: 0 }, { transform: 'scale(0.9)', opacity: 0.9, offset: 0.7 }, { transform: 'scale(0.2)', opacity: 1 }], { duration: 820, fill: 'forwards' });
-    if (!(await ctx.wait(820))) return false;
-    fx.sfx('frost_crystal_impact_fs550267', 0.68); fx.shake('heavy');
+    const { fx, hits, result } = ctx, shape = result.query.shape || {}, center = shape.center || result.aim;
+    const b = worldPx(center), R = (shape.radius || 5) * PX;
+    const SNOW = ['#ffffff', '#e0f2fe', '#bae6fd'];
+    // ① 蓄势
+    fx.sfx('aoe_wind_spin_fs772867', 0.55);
+    tint(fx, 'radial-gradient(circle,rgba(186,230,253,.06),rgba(8,47,73,.9))', { inMs: 600, holdMs: 1800, outMs: 600, peak: 0.44 });
+    const rune = fx.ground(runeHtml(fx.uid(), b.x, b.y, R, '#7dd3fc', '#f0f9ff', 'ᛁᛋᚺᚨᚷᛚ'), 1500);
+    grow(rune.firstChild, { ms: 1500, s0: 0.35, s1: 1, hold: 0.68, o: 0.85 });
+    spin(rune.querySelector('[data-fx=spin]'), -170, 1500);
+    const tele = fx.ground(ringHtml(b.x, b.y, R * 2, 'rgba(224,242,254,0.5)', 'rgba(14,116,144,0.42)'), 1000);
+    tele.firstChild.animate([{ transform: 'scale(1.25)', opacity: 0 }, { transform: 'scale(1)', opacity: 0.85 }], { duration: 900, fill: 'forwards' });
+    for (const w of [0, 280, 560]) ctx.after(w, () => particles(fx, Array.from({ length: 20 }, (_, i) => {
+      const a = i / 20 * TAU + rnd(-0.2, 0.2), d = rnd(1.15, 1.55) * R, a2 = a + 1.7;
+      return { x: b.x + Math.cos(a) * d, y: b.y + Math.sin(a) * d * 0.62, dx: (Math.cos(a2) * 0.3 - Math.cos(a) * 0.92) * d, dy: (Math.sin(a2) * 0.3 - Math.sin(a) * 0.92) * d * 0.62,
+        size: rnd(4, 9), color: pick(SNOW), core: '#ffffff', s0: 1, s1: 0.35, dur: rnd(520, 700), ease: 'cubic-bezier(.4,0,.7,.6)' };
+    }), 760));
+    particles(fx, Array.from({ length: 12 }, () => { const a = rnd(0, TAU), d = rnd(1.1, 1.4) * R; return { x: b.x + Math.cos(a) * d, y: b.y + Math.sin(a) * d * 0.62, dx: -Math.cos(a) * d * 0.7, dy: -Math.sin(a) * d * 0.43, size: rnd(60, 110), color: 'rgba(186,230,253,0.32)', core: 'rgba(224,242,254,0.4)', o0: 0.8, s0: 1, s1: 0.7, dur: rnd(760, 920) }; }), 1000);
+    ctx.after(420, () => fx.shake('light')); ctx.after(760, () => fx.shake('light'));
+    if (!(await ctx.wait(950))) return false;
+    // ② 爆发
+    fx.sfx('freeze01', 0.62); fx.sfx('frost_crystal_impact_fs550267', 0.70); fx.shake('heavy');
     ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
-    fx.top(ringHtml(b.x, b.y, R * 2.4, 'rgba(186,230,253,0.9)', 'rgba(14,165,233,0.4)'), 600)
-      .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: 580, fill: 'forwards' });
-    particles(fx, Array.from({ length: 28 }, () => { const a = rnd(0, TAU), d = rnd(0.5, 1.15) * R; return { x: b.x, y: b.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(8, 16), color: '#7dd3fc', core: '#f0f9ff', s0: 1, s1: 0.2, dur: 680 }; }), 800);
-    hits.forEach((h, k) => ctx.after(30 + k * 55, () => ctx.reveal(h.targetId)));
-    return ctx.wait(1280);
+    tele.remove();
+    for (const [dir, n, ms, op] of [[1, 46, 1500, [0.45, 0.95]], [-1, 28, 1300, [0.25, 0.6]]]) {
+      const v = fx.top(swirlHtml(b.x, b.y, R, n, SNOW, { op }), ms).firstChild.firstChild;
+      v.animate([{ transform: 'rotate(0deg) scale(.55)', opacity: 0 }, { transform: 'rotate(' + dir * 120 + 'deg) scale(1)', opacity: 1, offset: 0.25 }, { transform: 'rotate(' + dir * 360 + 'deg) scale(1.12)', opacity: 0 }], { duration: ms, easing: 'cubic-bezier(.2,.6,.4,1)', fill: 'forwards' });
+    }
+    fx.top(ringHtml(b.x, b.y, R * 2.3, 'rgba(240,249,255,0.9)', 'rgba(56,189,248,0.45)'), 620).firstChild
+      .animate([{ transform: 'scale(0.12)', opacity: 1 }, { transform: 'scale(1.08)', opacity: 0 }], { duration: 600, easing: 'cubic-bezier(0.1,0.8,0.3,1)', fill: 'forwards' });
+    fx.ground(orbHtml(b.x, b.y, R * 2.1, 'rgba(186,230,253,0.26)', 'rgba(240,249,255,0.34)'), 1900).firstChild
+      .animate([{ transform: 'scale(.4)', opacity: 0 }, { transform: 'scale(1)', opacity: 1, offset: 0.15 }, { transform: 'scale(1.04)', opacity: 0 }], { duration: 1900, fill: 'forwards' });
+    const order = hits.map(h => { const p = ctx.centerOf(h.targetId); return { h, p: worldPx(p), d: Math.hypot(p.x - center.x, p.y - center.y) }; }).sort((u, v) => u.d - v.d);
+    order.forEach((o, k) => {
+      const delay = Math.min(380, 40 + k * 80);
+      icicle(fx, o.p, { h: 78, w: 17, delay });
+      ctx.after(delay + 105, () => { ctx.reveal(o.h.targetId); if (o.h.hit) iceEncase(fx, o.p); else particles(fx, Array.from({ length: 8 }, () => ({ x: o.p.x, y: o.p.y + 14, dx: rnd(-30, 30), dy: rnd(-24, -6), size: rnd(5, 9), color: '#e0f2fe', core: '#ffffff', s0: 1, s1: 0.3, dur: 420 })), 500); });
+    });
+    for (let k = 0; k < 7; k++) { const a = rnd(0, TAU), d = rnd(0.25, 0.95) * R; icicle(fx, { x: b.x + Math.cos(a) * d, y: b.y + Math.sin(a) * d * 0.7 }, { h: rnd(40, 62), w: rnd(10, 14), delay: 30 + k * 55 }); }
+    if (!(await ctx.wait(450))) return false;
+    // ③ 余韵：斜吹飞雪掠过爆区
+    particles(fx, Array.from({ length: 42 }, () => ({ x: b.x - R * 1.2 + rnd(-0.3, 0.6) * R, y: b.y + rnd(-1, 0.8) * R, dx: R * rnd(1.4, 2.2), dy: rnd(12, 40), size: rnd(3, 7), color: pick(SNOW), core: '#ffffff', s0: 1, s1: 0.5, dur: rnd(900, 1300), delay: rnd(0, 380), ease: 'linear' })), 1550);
+    return ctx.wait(1550);
   },
 };
 
-const voidQuake = {
-  id: 'void-quake', grade: 'L2', fxTags: ['虚空震荡'],
-  timeline: { totalMs: 1150, fullscreen: false, darken: false },
-  cues: [{ key: 'enemyMagicGroup', vol: 0.60 }],
-  prepareKeys() { return ['enemyMagicGroup']; },
+// 时空扭曲震荡 L3（犹格索托斯之子，[特效:时空扭曲震荡]）：
+// 爆心奇点生成 + 三重扭曲时轮反向旋转并向内坍缩 + 逆走时针 + 紫青粒子被吸入 → 奇点内爆 →
+// 色差三重冲击波 + 破碎空间晶片外飞 + 目标时空残影错位（致盲暗纱）→ 涟漪余震（击退由导演在条目后补间）
+function chromaRing(fx, p, d, ms, delay) {
+  const l = fx.top(ringHtml(p.x - 4, p.y, d, 'rgba(244,114,182,0.75)', 'rgba(190,24,93,0.3)') + ringHtml(p.x + 4, p.y, d, 'rgba(34,211,238,0.75)', 'rgba(14,116,144,0.3)') + ringHtml(p.x, p.y, d, 'rgba(255,255,255,0.85)', 'rgba(168,85,247,0.4)'), ms + delay + 40);
+  [...l.children].forEach((el, i) => el.animate([{ transform: 'scale(0.1)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: ms, delay: delay + i * 18, easing: 'cubic-bezier(0.1,0.8,0.3,1)', fill: 'both' }));
+}
+const temporalQuake = {
+  id: 'void-quake', grade: 'L3', fxTags: ['时空扭曲震荡', '虚空震荡'],
+  timeline: { chargeMs: 900, totalMs: 2550, fullscreen: true, darken: false },   // 900 蓄势 + 100 内爆 + 450 冲击 + 1100 余韵
+  cues: [{ key: 'mx_vacuum', vol: 0.52 }, { key: 'mx_deep_impact', vol: 0.72 }, { key: 'enemyMagicGroup', vol: 0.55 }],
+  prepareKeys() { return this.cues.map(c => c.key); },
   async play(ctx) {
-    const { fx, hits, result } = ctx, shape = result.query.shape, b = worldPx(shape.center || result.aim), R = (shape.radius || 4) * PX;
-    fx.sfx('enemyMagicGroup', 0.60); fx.shake('medium');
-    fx.top(ringHtml(b.x, b.y, R * 2.2, 'rgba(192,132,252,0.85)', 'rgba(88,28,135,0.55)'), 620)
-      .firstChild.animate([{ transform: 'scale(0.2)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 600, fill: 'forwards' });
-    particles(fx, Array.from({ length: 20 }, () => { const a = rnd(0, TAU), d = rnd(0.4, 1) * R; return { x: b.x, y: b.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(10, 18), color: '#a855f7', core: '#f3e8ff', s0: 1, s1: 0.2, dur: 560 }; }), 640);
-    hits.forEach((h, k) => ctx.after(50 + k * 60, () => ctx.reveal(h.targetId)));
-    return ctx.wait(1080);
+    const { fx, hits, result } = ctx, shape = result.query.shape || {}, center = shape.center || result.aim;
+    const b = worldPx(center), R = (shape.radius || 4) * PX, uid = fx.uid();
+    // ① 蓄势
+    fx.sfx('mx_vacuum', 0.52);
+    tint(fx, 'radial-gradient(circle,rgba(88,28,135,.1),rgba(10,4,24,.92))', { inMs: 500, holdMs: 1500, outMs: 600, peak: 0.46 });
+    const rune = fx.ground(runeHtml(uid, b.x, b.y, R * 0.95, '#a855f7', '#f5d0fe', 'ᛃᛟᚷᛋᛟᚦ'), 1300);
+    grow(rune.firstChild, { ms: 1300, s0: 0.3, s1: 1, hold: 0.72, o: 0.9 });
+    spin(rune.querySelector('[data-fx=spin]'), 260, 1300);
+    const wheels = [1.25, 0.95, 0.65].map((k, i) => fx.top(swirlHtml(b.x, b.y - 10, R * k, 14, i === 1 ? ['#22d3ee', '#a5f3fc'] : ['#c084fc', '#f5d0fe'], { tilt: 0.55, w: [2, 3.5], op: [0.5, 0.95] }), 1000).firstChild.firstChild);
+    wheels.forEach((el, i) => el.animate([{ transform: 'rotate(0deg) scale(1.15)', opacity: 0 }, { transform: 'rotate(' + (i % 2 ? -1 : 1) * 200 + 'deg) scale(.85)', opacity: 1, offset: 0.6 }, { transform: 'rotate(' + (i % 2 ? -1 : 1) * 320 + 'deg) scale(.2)', opacity: 0.9 }], { duration: 950, easing: 'cubic-bezier(.45,0,.8,.6)', fill: 'forwards' }));
+    const hands = fx.top('<svg viewBox="-60 -60 120 120" width="' + (R * 1.3).toFixed(0) + '" height="' + (R * 1.3).toFixed(0) + '" style="position:absolute;left:' + b.x + 'px;top:' + (b.y - 10) + 'px;margin:' + (-R * 0.65).toFixed(0) + 'px 0 0 ' + (-R * 0.65).toFixed(0) + 'px;overflow:visible;filter:drop-shadow(0 0 6px #e879f9);">' +
+      '<g><path d="M0,0 L0,-52" stroke="#f5d0fe" stroke-width="3" stroke-linecap="round"/><path d="M0,0 L34,0" stroke="#a5f3fc" stroke-width="4" stroke-linecap="round"/></g></svg>', 960);
+    hands.firstChild.firstChild.animate([{ transform: 'rotate(0deg)', opacity: 0 }, { transform: 'rotate(-540deg)', opacity: 1, offset: 0.4 }, { transform: 'rotate(-1440deg)', opacity: 0.2 }], { duration: 940, easing: 'cubic-bezier(.3,0,.7,1)', fill: 'forwards' });
+    const core = fx.top(orbHtml(b.x, b.y - 10, 90, 'rgba(46,16,101,0.95)', '#05010d'), 1020);
+    core.firstChild.style.mixBlendMode = 'normal';
+    core.firstChild.style.boxShadow = '0 0 26px 6px rgba(192,132,252,.7), inset 0 0 18px rgba(34,211,238,.6)';
+    core.firstChild.animate([{ transform: 'scale(0.1)', opacity: 0 }, { transform: 'scale(1.15)', opacity: 1, offset: 0.85 }, { transform: 'scale(0.25)', opacity: 1 }], { duration: 1000, fill: 'forwards' });
+    particles(fx, Array.from({ length: 26 }, () => { const a = rnd(0, TAU), d = rnd(1.1, 1.6) * R; return { x: b.x + Math.cos(a) * d, y: b.y - 10 + Math.sin(a) * d * 0.6, dx: -Math.cos(a) * d, dy: -Math.sin(a) * d * 0.6, size: rnd(5, 10), color: pick(['#c084fc', '#22d3ee', '#f5d0fe']), core: '#ffffff', s0: 1, s1: 0.2, dur: rnd(560, 820), delay: rnd(0, 200), ease: 'cubic-bezier(.6,0,.9,.5)' }; }), 1100);
+    ctx.after(380, () => fx.shake('light')); ctx.after(700, () => fx.shake('medium'));
+    if (!(await ctx.wait(1000))) return false;   // 末 100ms 奇点内爆
+    // ② 爆发
+    fx.sfx('mx_deep_impact', 0.72); fx.sfx('enemyMagicGroup', 0.55); fx.shake('quake');
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
+    [0, 110, 230].forEach((dl, i) => chromaRing(fx, b, R * (2.5 - i * 0.35), 620, dl));
+    fx.top(orbHtml(b.x, b.y - 10, R * 1.4, 'rgba(216,180,254,0.85)', '#ffffff'), 300).firstChild
+      .animate([{ transform: 'scale(.2)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 280, fill: 'forwards' });
+    const shards = fx.top(Array.from({ length: 14 }, () => { const s = rnd(14, 26); return '<i style="position:absolute;left:' + b.x + 'px;top:' + (b.y - 10) + 'px;width:' + s.toFixed(0) + 'px;height:' + (s * 0.8).toFixed(0) + 'px;margin:' + (-s * 0.4).toFixed(0) + 'px 0 0 ' + (-s / 2).toFixed(0) + 'px;' +
+      'clip-path:polygon(0 30%,60% 0,100% 55%,40% 100%);background:linear-gradient(135deg,rgba(245,208,254,.95),rgba(76,29,149,.9) 55%,rgba(34,211,238,.8));filter:drop-shadow(0 0 4px #c084fc);"></i>'; }).join(''), 900);
+    [...shards.children].forEach(el => { const a = rnd(0, TAU), d = rnd(0.7, 1.3) * R; el.animate([{ transform: 'translate(0,0) rotate(0deg) scale(.4)', opacity: 1 }, { transform: 'translate(' + (Math.cos(a) * d).toFixed(0) + 'px,' + (Math.sin(a) * d * 0.7).toFixed(0) + 'px) rotate(' + rnd(-300, 300).toFixed(0) + 'deg) scale(1)', opacity: 0 }], { duration: rnd(560, 820), easing: 'cubic-bezier(.1,.8,.3,1)', fill: 'forwards' }); });
+    const order = hits.map(h => { const p = ctx.centerOf(h.targetId); return { h, p: worldPx(p), d: Math.hypot(p.x - center.x, p.y - center.y) }; }).sort((u, v) => u.d - v.d);
+    order.forEach((o, k) => ctx.after(Math.min(320, 60 + k * 70), () => {
+      ctx.reveal(o.h.targetId);
+      if (!o.h.hit) return;
+      jolt(ctx, o.h.targetId, { amp: 6, ms: 70, times: 2, glow: '#c084fc' });
+      const ghost = fx.top(orbHtml(o.p.x - 10, o.p.y, 54, 'rgba(244,114,182,0.5)', 'rgba(244,114,182,0.2)') + orbHtml(o.p.x + 10, o.p.y, 54, 'rgba(34,211,238,0.5)', 'rgba(34,211,238,0.2)') + orbHtml(o.p.x, o.p.y - 4, 74, 'rgba(15,5,30,0.7)', 'rgba(30,10,50,0.75)'), 760);
+      [...ghost.children].forEach((el, i) => { if (i === 2) el.style.mixBlendMode = 'normal'; el.animate([{ transform: 'translateX(0) scale(.5)', opacity: 0 }, { transform: 'translateX(' + (i === 2 ? 0 : (i ? 8 : -8)) + 'px) scale(1)', opacity: 1, offset: 0.3 }, { transform: 'translateX(' + (i === 2 ? 0 : (i ? 16 : -16)) + 'px) scale(1.2)', opacity: 0 }], { duration: 740, fill: 'forwards' }); });
+    }));
+    if (!(await ctx.wait(450))) return false;
+    // ③ 余韵：空间涟漪余震
+    for (const dl of [0, 320]) chromaRing(fx, b, R * 1.6, 760, dl);
+    particles(fx, Array.from({ length: 18 }, () => { const a = rnd(0, TAU), d = rnd(0.3, 1) * R; return { x: b.x, y: b.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d * 0.6 - 20, size: rnd(4, 8), color: pick(['#c084fc', '#22d3ee']), core: '#ffffff', s0: 1, s1: 0.3, dur: rnd(700, 1000), delay: rnd(0, 300) }; }), 1100);
+    return ctx.wait(1100);
   },
 };
 
-const lineRift = {
-  id: 'line-rift', grade: 'L2', fxTags: ['直线裂隙'],
-  timeline: { totalMs: 960, fullscreen: false, darken: false },
-  cues: [{ key: 'magicKill', vol: 0.58 }],
-  prepareKeys() { return ['magicKill']; },
+// 维度撕裂 L3（犹格索托斯之子，[特效:维度撕裂]；蓄力 2 释放，直线 12×2 穿透）：
+// 沿射线描出锯齿维度裂缝并频闪 + 地面射界带亮起 → 收 →
+// 裂缝自施法者向远端撕开为虚空裂隙（星点深渊 + 紫青裂缘），沿途目标随裂口推进逐个被斜斩并揭示 + 虚空触丝外溢 → 裂隙闭合白闪 → 余烬
+const dimensionRift = {
+  id: 'line-rift', grade: 'L3', fxTags: ['维度撕裂', '直线裂隙'],
+  timeline: { chargeMs: 850, totalMs: 2450, fullscreen: true, darken: false },   // 850 裂缝描出 + 300 撕开推进 + 500 持续 + 250 闭合 + 550 余烬
+  cues: [{ key: 'mx_rift_charge', vol: 0.55 }, { key: 'mx_rift_tear', vol: 0.72 }, { key: 'magicKill', vol: 0.55 }],
+  prepareKeys() { return this.cues.map(c => c.key); },
   async play(ctx) {
-    const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), a = worldPx(result.aim);
-    const dx = a.x - c.x, dy = a.y - c.y, len = Math.max(1, Math.hypot(dx, dy)), ang = Math.atan2(dy, dx) * 180 / Math.PI;
-    fx.sfx('magicKill', 0.58); fx.shake('medium');
-    const L = Math.min(len, (result.query?.shape?.length || 12) * PX);
-    fx.top('<i style="position:absolute;left:' + c.x + 'px;top:' + (c.y - 12) + 'px;width:' + L + 'px;height:24px;transform-origin:0 50%;transform:rotate(' + ang + 'deg);background:linear-gradient(90deg,rgba(168,85,247,0.85),#f3e8ff,rgba(56,189,248,0.65));mix-blend-mode:screen;border-radius:12px;"></i>', 480)
-      .firstChild.animate([{ transform: 'rotate(' + ang + 'deg) scaleX(0.1)', opacity: 1 }, { transform: 'rotate(' + ang + 'deg) scaleX(1)', opacity: 0.9, offset: 0.35 }, { transform: 'rotate(' + ang + 'deg) scaleX(1)', opacity: 0 }], { duration: 460, fill: 'forwards' });
-    hits.forEach((h, k) => ctx.after(80 + k * 70, () => ctx.reveal(h.targetId)));
-    return ctx.wait(900);
+    const { fx, hits, result } = ctx, shape = result.query.shape || {};
+    const from = shape.from || ctx.centerOf(ctx.casterId), o = worldPx(from), aimP = result.aim || from;
+    const dir = shape.dir != null ? shape.dir : Math.atan2(aimP.y - from.y, aimP.x - from.x);
+    const L = (shape.length || 12) * PX, Wd = (shape.width || 2) * PX, rot = deg(dir).toFixed(2);
+    const band = inner => fx.top('<div style="position:absolute;left:' + o.x + 'px;top:' + o.y + 'px;width:0;height:0;transform:rotate(' + rot + 'deg);">' + inner + '</div>', 2200).firstChild;
+    let seam = 'M0,0';
+    for (let i = 1; i <= 24; i++) seam += ' L' + (L * i / 24).toFixed(1) + ',' + (i === 24 ? 0 : rnd(-0.22, 0.22) * Wd).toFixed(1);
+    // ① 蓄势：射界带 + 锯齿裂缝描出频闪 + 沿途紫青火花
+    fx.sfx('mx_rift_charge', 0.55);
+    tint(fx, 'radial-gradient(circle,rgba(76,29,149,.08),rgba(8,4,20,.9))', { inMs: 500, holdMs: 1500, outMs: 500, peak: 0.42 });
+    const lane = band('<i style="position:absolute;left:0;top:' + (-Wd / 2) + 'px;width:' + L + 'px;height:' + Wd + 'px;background:linear-gradient(90deg,rgba(168,85,247,.28),rgba(34,211,238,.18) 80%,transparent);border-radius:' + (Wd / 2) + 'px;"></i>');
+    lane.firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.4 }, { opacity: 0.6 }], { duration: 850, fill: 'forwards' });
+    const crack = band('<svg width="' + (L + 20) + '" height="' + (Wd * 2) + '" viewBox="0 ' + (-Wd) + ' ' + (L + 20) + ' ' + (Wd * 2) + '" style="position:absolute;left:0;top:' + (-Wd) + 'px;overflow:visible;filter:drop-shadow(0 0 6px #c084fc);">' +
+      '<path d="' + seam + '" fill="none" stroke="#a855f7" stroke-width="7" stroke-linejoin="round" opacity=".55" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>' +
+      '<path d="' + seam + '" fill="none" stroke="#f5f3ff" stroke-width="2.4" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/></svg>');
+    [...crack.firstChild.children].forEach(p => p.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 620, easing: 'cubic-bezier(.3,.6,.4,1)', fill: 'forwards' }));
+    crack.firstChild.animate([{ opacity: 1 }, { opacity: 0.35 }, { opacity: 1 }, { opacity: 0.5 }, { opacity: 1 }], { duration: 850, easing: 'steps(5)', fill: 'forwards' });
+    for (let t = 120; t < 820; t += 70) ctx.after(t, () => { const s = rnd(0.05, Math.min(1, t / 620)) * L; const x = o.x + Math.cos(dir) * s, y = o.y + Math.sin(dir) * s;
+      fx.top(orbHtml(x, y, rnd(12, 22), pick(['#c084fc', '#22d3ee']), '#ffffff'), 150).firstChild.animate([{ opacity: 0, transform: 'scale(.4)' }, { opacity: 1, transform: 'scale(1)', offset: 0.3 }, { opacity: 0, transform: 'scale(.6)' }], { duration: 140, fill: 'forwards' }); });
+    fx.top(orbHtml(o.x, o.y - 6, 60, 'rgba(168,85,247,0.8)', '#f5f3ff'), 900).firstChild.animate([{ transform: 'scale(.2)', opacity: 0 }, { transform: 'scale(1.2)', opacity: 1, offset: 0.85 }, { transform: 'scale(.5)', opacity: 0 }], { duration: 880, fill: 'forwards' });
+    ctx.after(500, () => fx.shake('light'));
+    if (!(await ctx.wait(850))) return false;
+    // ② 撕开：虚空裂隙自施法者向远端推进
+    fx.sfx('mx_rift_tear', 0.72); fx.sfx('magicKill', 0.55); fx.shake('heavy');
+    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
+    const stars = Array.from({ length: 26 }, () => '<i style="position:absolute;left:' + rnd(0, L).toFixed(0) + 'px;top:' + rnd(-Wd * 0.3, Wd * 0.3).toFixed(0) + 'px;width:3px;height:3px;border-radius:50%;background:#fff;box-shadow:0 0 4px #a5f3fc;opacity:' + rnd(0.4, 1).toFixed(2) + ';"></i>').join('');
+    const rift = band('<div style="position:absolute;left:0;top:' + (-Wd * 0.45) + 'px;width:' + L + 'px;height:' + (Wd * 0.9) + 'px;transform-origin:0 50%;border-radius:' + Wd + 'px;' +
+      'background:linear-gradient(180deg,transparent,rgba(192,132,252,.9) 14%,#1e0b3a 30%,#05010d 50%,#1e0b3a 70%,rgba(34,211,238,.9) 86%,transparent);box-shadow:0 0 22px 4px rgba(168,85,247,.55);">' + stars + '</div>');
+    rift.firstChild.animate([{ transform: 'scaleX(0) scaleY(.15)', opacity: 1 }, { transform: 'scaleX(1) scaleY(.6)', opacity: 1, offset: 0.25 }, { transform: 'scaleX(1) scaleY(1)', opacity: 1, offset: 0.4 },
+      { transform: 'scaleX(1) scaleY(.85)', opacity: 1, offset: 0.78 }, { transform: 'scaleX(1) scaleY(0)', opacity: 0.6 }], { duration: 1150, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' });
+    crack.firstChild.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+    const along = p => (p.x - from.x) * Math.cos(dir) + (p.y - from.y) * Math.sin(dir);
+    hits.map(h => ({ h, m: ctx.centerOf(h.targetId) })).sort((u, v) => along(u.m) - along(v.m)).forEach(({ h, m }) => {
+      ctx.after(Math.max(30, Math.min(1, along(m) / (L / PX)) * 290), () => {
+        ctx.reveal(h.targetId);
+        if (!h.hit) return;
+        const p = worldPx(m), cut = fx.top('<i style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:96px;height:5px;margin:-2.5px 0 0 -48px;border-radius:3px;background:linear-gradient(90deg,transparent,#c084fc 25%,#ffffff 50%,#22d3ee 75%,transparent);box-shadow:0 0 10px #a855f7;mix-blend-mode:screen;"></i>' +
+          '<i style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:70px;height:3px;margin:-1.5px 0 0 -35px;border-radius:2px;background:linear-gradient(90deg,transparent,#f5f3ff,transparent);mix-blend-mode:screen;"></i>', 360);
+        [...cut.children].forEach((el, i) => { const r = (i ? -38 : 32) + rnd(-8, 8); el.animate([{ transform: 'rotate(' + r + 'deg) scaleX(0)', opacity: 1 }, { transform: 'rotate(' + r + 'deg) scaleX(1.1)', opacity: 1, offset: 0.35 }, { transform: 'rotate(' + r + 'deg) scaleX(1)', opacity: 0 }], { duration: 340, delay: i * 50, fill: 'both' }); });
+        jolt(ctx, h.targetId, { amp: 5, ms: 60, times: 2, glow: '#a855f7' });
+      });
+    });
+    for (let t = 80; t < 800; t += 90) ctx.after(t, () => particles(fx, Array.from({ length: 5 }, () => { const s = rnd(0.05, 1) * L, side = Math.random() < 0.5 ? -1 : 1, x = o.x + Math.cos(dir) * s, y = o.y + Math.sin(dir) * s, n = dir + side * Math.PI / 2, d = rnd(20, 60);
+      return { x, y, dx: Math.cos(n) * d, dy: Math.sin(n) * d, size: rnd(5, 10), color: pick(['#a855f7', '#22d3ee', '#4c1d95']), core: '#f5f3ff', s0: 1, s1: 0.2, dur: rnd(380, 560) }; }), 600));
+    if (!(await ctx.wait(900))) return false;
+    // ③ 闭合白闪 + 余烬
+    lane.firstChild.animate([{ opacity: 0.6 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+    const flash = band('<i style="position:absolute;left:0;top:-3px;width:' + L + 'px;height:6px;border-radius:3px;background:linear-gradient(90deg,#f5f3ff,#ffffff 50%,rgba(165,243,252,.6));box-shadow:0 0 16px #e9d5ff;mix-blend-mode:screen;"></i>');
+    flash.firstChild.animate([{ transform: 'scaleY(2.4)', opacity: 1 }, { transform: 'scaleY(.2)', opacity: 0 }], { duration: 300, fill: 'forwards' });
+    fx.shake('medium');
+    particles(fx, Array.from({ length: 16 }, () => { const s = rnd(0, 1) * L; return { x: o.x + Math.cos(dir) * s, y: o.y + Math.sin(dir) * s, dx: rnd(-14, 14), dy: rnd(-46, -16), size: rnd(4, 7), color: pick(['#c084fc', '#a5f3fc']), core: '#ffffff', s0: 1, s1: 0.3, dur: rnd(500, 700) }; }), 760);
+    return ctx.wait(700);
+  },
+};
+
+// 蓄力起手（极地暴风雪 Charge:4）L2：周身寒气凝结 + 霜纹阵 + 雪粒螺旋卷入 + 冰晶冠闪
+const frostGather = {
+  id: 'frost-gather', kind: 'prepare', grade: 'L2', fxTags: ['极地暴风雪', '冰霜爆炸'],
+  timeline: { totalMs: 1000 },
+  cues: [{ key: 'aoe_wind_spin_fs772867', vol: 0.52 }],
+  prepareKeys() { return this.cues.map(c => c.key); },
+  async play(pctx) {
+    const { fx } = pctx, c = worldPx(pctx.centerOf(pctx.casterId));
+    fx.sfx('aoe_wind_spin_fs772867', 0.52);
+    const rune = fx.ground(runeHtml(fx.uid(), c.x, c.y + 6, 1.3 * PX, '#7dd3fc', '#f0f9ff', 'ᛁᛋᚺᚨ'), 1000);
+    grow(rune.firstChild, { ms: 1000, s0: 0.4, s1: 1, hold: 0.78 });
+    spin(rune.querySelector('[data-fx=spin]'), -140, 1000);
+    const v = fx.top(swirlHtml(c.x, c.y, 1.2 * PX, 18, ['#ffffff', '#bae6fd', '#e0f2fe'], { op: [0.4, 0.9] }), 980).firstChild.firstChild;
+    v.animate([{ transform: 'rotate(0deg) scale(1.3)', opacity: 0 }, { transform: 'rotate(-200deg) scale(1)', opacity: 1, offset: 0.4 }, { transform: 'rotate(-420deg) scale(.6)', opacity: 0 }], { duration: 960, fill: 'forwards' });
+    particles(fx, Array.from({ length: 18 }, () => { const a = rnd(0, TAU), d = rnd(1.2, 1.8) * PX; return { x: c.x + Math.cos(a) * d, y: c.y + Math.sin(a) * d * 0.62, dx: -Math.cos(a) * d * 0.85, dy: -Math.sin(a) * d * 0.53, size: rnd(4, 8), color: '#e0f2fe', core: '#ffffff', s0: 1, s1: 0.3, dur: rnd(560, 820), delay: rnd(0, 240) }; }), 1000);
+    pctx.after(720, () => {
+      iceEncase(fx, { x: c.x, y: c.y - 6 });
+      floatText(fx, c.x, c.y - 72, '❄️ 暴风雪蓄势 · ' + pctx.skill.name, '#e0f2fe', '#0369a1', { ms: 760, size: 14 });
+    });
+    return pctx.wait(1000);
+  },
+};
+
+// 蓄力起手（维度撕裂 Charge:2）L2：周身空间裂纹频闪 + 紫青微光吸入 + 掌心奇点
+const riftGather = {
+  id: 'rift-gather', kind: 'prepare', grade: 'L2', fxTags: ['维度撕裂', '直线裂隙'],
+  timeline: { totalMs: 1000 },
+  cues: [{ key: 'mx_rift_charge', vol: 0.55 }],
+  prepareKeys() { return this.cues.map(c => c.key); },
+  async play(pctx) {
+    const { fx } = pctx, c = worldPx(pctx.centerOf(pctx.casterId));
+    fx.sfx('mx_rift_charge', 0.55);
+    for (let t = 60; t < 860; t += 110) pctx.after(t, () => {
+      const a = rnd(0, TAU), r0 = rnd(0.7, 1.1) * PX, r1 = r0 + rnd(0.5, 0.9) * PX;
+      let d = 'M' + (Math.cos(a) * r0).toFixed(1) + ',' + (Math.sin(a) * r0).toFixed(1);
+      for (let k = 1; k <= 4; k++) { const rr = r0 + (r1 - r0) * k / 4, aa = a + rnd(-0.18, 0.18); d += ' L' + (Math.cos(aa) * rr).toFixed(1) + ',' + (Math.sin(aa) * rr).toFixed(1); }
+      fx.top('<svg width="2" height="2" style="position:absolute;left:' + c.x + 'px;top:' + c.y + 'px;overflow:visible;filter:drop-shadow(0 0 5px #c084fc);"><path d="' + d + '" fill="none" stroke="' + pick(['#f5f3ff', '#a5f3fc']) + '" stroke-width="2.2" stroke-linejoin="round"/></svg>', 200)
+        .firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0.3, offset: 0.5 }, { opacity: 1, offset: 0.7 }, { opacity: 0 }], { duration: 190, easing: 'steps(4)', fill: 'forwards' });
+    });
+    particles(fx, Array.from({ length: 16 }, () => { const a = rnd(0, TAU), d = rnd(1.3, 1.9) * PX; return { x: c.x + Math.cos(a) * d, y: c.y + Math.sin(a) * d, dx: -Math.cos(a) * d * 0.9, dy: -Math.sin(a) * d * 0.9, size: rnd(5, 9), color: pick(['#a855f7', '#22d3ee']), core: '#ffffff', s0: 1, s1: 0.2, dur: rnd(560, 820), delay: rnd(0, 240) }; }), 1000);
+    const core = fx.top(orbHtml(c.x, c.y - 8, 46, 'rgba(46,16,101,0.95)', '#05010d'), 1000);
+    core.firstChild.style.mixBlendMode = 'normal';
+    core.firstChild.style.boxShadow = '0 0 16px 4px rgba(192,132,252,.7)';
+    core.firstChild.animate([{ transform: 'scale(.1)', opacity: 0 }, { transform: 'scale(1)', opacity: 1, offset: 0.75 }, { transform: 'scale(.4)', opacity: 0 }], { duration: 980, fill: 'forwards' });
+    pctx.after(740, () => floatText(fx, c.x, c.y - 72, '🌌 维度撕裂蓄势 · ' + pctx.skill.name, '#f5f3ff', '#6d28d9', { ms: 760, size: 14 }));
+    return pctx.wait(1000);
   },
 };
 
@@ -2038,8 +2334,8 @@ const rangedHeavy = {
   },
 };
 
-// 枪击穿透（移植回合制 gunshot_pierce）：菱形弱点准星旋入锁定 → 击发：重枪口焰 + 抛壳后坐 + 超音速青色贯穿光束
-// → 命中：双圈激波星芒 + 背部破片锥 + 出口血雾喷溅 + 受击硬直 + 重震（L2 预算内，不用暗场/全屏）
+// 枪击穿透（移植回合制 gunshot_pierce）：枪口青光聚能 → 击发：重枪口焰 + 抛壳后坐 + 超音速青色贯穿光束
+// → 命中：菱形弱点准星与伤害同帧锁定 + 双圈激波星芒 + 背部破片锥 + 出口血雾喷溅 + 受击硬直 + 重震（L2 预算内，不用暗场/全屏）
 const gunshotPierce = {
   id: 'gunshot-pierce', grade: 'L2', fxTags: ['枪击穿透'], reuseAudio: true,
   timeline: { totalMs: 1160, fullscreen: false, darken: false },
@@ -2049,9 +2345,11 @@ const gunshotPierce = {
     const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), t = worldPx(hits[0] ? ctx.centerOf(hits[0].targetId) : result.aim);
     const dx = t.x - c.x, dy = t.y - c.y, len = Math.max(1, Math.hypot(dx, dy)), ux = dx / len, uy = dy / len, ang = Math.atan2(dy, dx);
     const landed = hits.filter(h => h.hit);
-    pierceLock(fx, t, 2.6 * PX, 720);
-    if (!(await ctx.wait(300))) return false;
     const m = { x: c.x + ux * 22, y: c.y + uy * 22 }, over = { x: t.x + ux * 150, y: t.y + uy * 150 };
+    fx.top(orbHtml(m.x, m.y, 34, 'rgba(56,189,248,0.85)', '#f0f9ff'), 320).firstChild
+      .animate([{ transform: 'scale(1.6)', opacity: 0 }, { transform: 'scale(.55)', opacity: 1, offset: 0.85 }, { transform: 'scale(.3)', opacity: 1 }], { duration: 300, easing: 'cubic-bezier(.5,0,.8,.6)', fill: 'forwards' });
+    particles(fx, Array.from({ length: 10 }, () => { const a = rnd(0, TAU), d = rnd(26, 46); return { x: m.x + Math.cos(a) * d, y: m.y + Math.sin(a) * d, dx: -Math.cos(a) * d, dy: -Math.sin(a) * d, size: rnd(4, 7), color: '#7dd3fc', core: '#ffffff', s0: 1, s1: 0.3, dur: rnd(220, 290) }; }), 320);
+    if (!(await ctx.wait(300))) return false;
     fx.sfx('gunshot_pierce', 0.75); fx.shake('heavy');
     gunFlash(fx, m, ang, { size: 48, ms: 210 });
     casing(fx, c, ang);
@@ -2060,6 +2358,7 @@ const gunshotPierce = {
     tracer(fx, m, over, { width: 5, ms: 120, len: 120, sky: true });
     ctx.after(70, () => {
       hits.forEach(h => ctx.reveal(h.targetId));
+      pierceLock(fx, t, 2.6 * PX, 520, { snap: true });
       gunImpact(fx, t, { size: 96, sky: true, ms: 480 });
       spray(fx, t, 10, { kind: 'spark', ang, spread: 0.8, dist: [40, 130], size: [2.5, 4], ms: [260, 420], colors: ['#e0f2fe', '#7dd3fc', '#ffffff'] });
       if (!landed.length) return;
@@ -2541,7 +2840,7 @@ const sanctumVeil = {
   },
 };
 
-export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, slugShot, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, incendiaryBottle, vitalFlow, sanctumVeil, healMend, fogBurst, rlyehSediment, fireDomain, poisonDomain, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, frostBlast, voidQuake, lineRift, waterBolt, curseBeam, ...basicAttacks, enemyGroupAttack, neutralImpact, zheYing, mirrorCounter, wizardShield, reactionKanpo, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, kruppAim, sekhmetVow];
+export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, slugShot, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, incendiaryBottle, vitalFlow, sanctumVeil, healMend, fogBurst, rlyehSediment, fireDomain, poisonDomain, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, polarBlizzard, temporalQuake, dimensionRift, waterBolt, curseBeam, ...basicAttacks, enemyGroupAttack, neutralImpact, zheYing, mirrorCounter, wizardShield, reactionKanpo, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, frostGather, riftGather, kruppAim, sekhmetVow];
 export function getFxTagOptions() {
   return [...new Set(DEFAULT_FX_ENTRIES.flatMap(entry => entry.fxTags || []))].map(name => ({ name, label: name }));
 }

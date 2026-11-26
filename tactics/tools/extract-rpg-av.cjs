@@ -487,6 +487,8 @@ ${supportBranches.join('\n').replace('else if', 'if')}
     "const waveW = areaBounds ? stageW : Math.max(stageW * 1.15, 360), waveH = areaBounds ? stageH : Math.max(stageH * 0.92, 136);", 1, '战棋攻击身份适配');
   mod = patch(mod, "${Math.max(88, stageH * 0.68)}px;transform:translate(-50%,-50%);",
     "${areaBounds ? stageH : Math.max(88, stageH * 0.68)}px;transform:translate(-50%,-50%);", 1, '战棋攻击身份适配');
+  // 战棋顿帧恒为 0：重击（三档）数字不再等原版 60ms 定帧，与条目命中拍点同帧弹出
+  mod = patch(mod, 'const stopMs = h.tier === 3 ? HIT_STOP_MS : 0;', 'const stopMs = 0;', 1, '重击数字不等定帧');
   // 蝎眼钥匙：原版裂隙钉在屏幕中心；战棋舞台=整张地图，改为钉在召唤落点（at，舞台坐标），粒子半径沿用原版基准视口
   mod = patch(mod, 'function playXieYanKey(caster, targets, isReaction = false) {', 'function playXieYanKey(caster, targets, isReaction = false, at = null) {', 1, '蝎眼钥匙落点参数');
   mod = patch(mod, 'const vw = window.innerWidth, vh = window.innerHeight;\n        const cX = vw * 0.5, cY = vh * 0.46;',

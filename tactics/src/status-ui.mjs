@@ -86,6 +86,19 @@ export function compactStatusHtml(list, max = 4) {
   return list.slice(0, max).map(b => badgeHtml(b, false)).join('') + (list.length > max ? '<span class="t-st t-st-more" title="' + ESC(list.slice(max).map(b => b.text).join(' / ')) + '">+' + (list.length - max) + '</span>' : '');
 }
 export function fullStatusHtml(list) { return list.map(b => badgeHtml(b, true)).join(''); }
+// 徽章 → 头像持续弧光种类（同种只一层，按徽章重要度由内向外，最多 max 层）；持续伤害/麻痹/护盾已有独立状态层，不重复
+export function auraList(list, max = 4) {
+  const out = [], seen = new Set();
+  const add = (kind, b) => { if (!seen.has(kind)) { seen.add(kind); out.push({ kind, exp: !!b.expiring }); } };
+  for (const b of list) {
+    if (STAT[b.key]) add(b.neg ? 'down' : b.key, b);
+    else if (b.key === 'conceal-atk') add('atk', b);
+    else if (b.key === 'damageGuard') add('def', b);
+    else if (b.key === 'defend' || b.key === 'counter') add(b.key, b);
+    else if (b.key === 'taunt') add(b.text.startsWith('隐匿') ? 'hide' : 'taunt', b);
+  }
+  return out.slice(0, max);
+}
 
 // 单个效果结果 → 飘字（原版 registerTagHandler 文案：攻+50 3回 / 速-20 3回 / +35HP …）；blocked 由结界演出负责
 export function effectFloat(e) {

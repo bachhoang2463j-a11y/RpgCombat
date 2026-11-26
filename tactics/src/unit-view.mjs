@@ -87,6 +87,7 @@ export function createUnitView(parent, deps) {
       '<div class="t-unit-name">' + escapeHtml(unit.name) + '</div>' +
       '<div class="t-unit-sprite" data-arcane-target-id="' + escapeHtml(unit.id) + '" style="--d:' + d + 'px;">' +
         '<div class="t-unit-medal">' + WINGS_HTML + face +
+          '<b class="t-unit-auras" aria-hidden="true"></b>' +
           '<i class="t-unit-shield" aria-hidden="true"></i>' +
           (unit.side === 'enemy' ? '<b class="t-unit-alert" title="预警" aria-label="预警">' +
             '<svg class="t-alert-ring" viewBox="-50 -50 100 100" aria-hidden="true"><circle class="t-alert-arc" r="46" pathLength="100"/><circle class="t-alert-tick" r="40" pathLength="100"/></svg>' +
@@ -133,6 +134,7 @@ export function createUnitView(parent, deps) {
       predictBar: billboard.querySelector('.t-bar-predict'), predictTag: billboard.querySelector('.t-unit-predict-tag'),
       shield: billboard.querySelector('.t-unit-shield'), shieldShown: (unit.bars && unit.bars.shield) || 0,
       alert: billboard.querySelector('.t-unit-alert'),
+      auras: billboard.querySelector('.t-unit-auras'), auraKey: '',
       unit, placement, bars: unit.bars || null, motionLock: false, displayFacing: null,
     };
     nodes.set(unit.id, rec);
@@ -168,6 +170,19 @@ export function createUnitView(parent, deps) {
     else if (value < prev) rec.shield.animate([{ filter: 'brightness(2)', transform: 'scale(1.06)' }, { filter: 'brightness(1)', transform: 'scale(1)' }], { duration: 320, easing: 'ease-out' });
   }
   function setShield(id, value) { const rec = nodes.get(id); if (rec) syncShield(rec, Math.max(0, value || 0)); }
+  // 增益/减益持续弧光：list=[{kind, exp}]（由内向外错层）；新出现的弧环自外向内收拢显形，种类不变不重建
+  function setAuras(id, list) {
+    const rec = nodes.get(id);
+    if (!rec || !rec.auras) return;
+    const key = list.map(a => a.kind + (a.exp ? '!' : '')).join(',');
+    if (rec.auraKey === key) return;
+    const prev = new Set(rec.auraKey.split(',').filter(Boolean).map(k => k.replace('!', '')));
+    rec.auraKey = key;
+    rec.auras.innerHTML = list.map((a, i) => '<b class="t-aura t-aura-' + a.kind + (a.exp ? ' t-aura-exp' : '') + '" style="--i:' + i + '"><i></i></b>').join('');
+    [...rec.auras.children].forEach((el, i) => {
+      if (!prev.has(list[i].kind)) el.animate([{ scale: '1.6', opacity: 0 }, { scale: '.94', opacity: 1, offset: 0.7 }, { scale: '1', opacity: 1 }], { duration: 460, easing: 'ease-out' });
+    });
+  }
   // 警戒标记弹出（新进入警戒 / 收到警报）：扫描弧环自外向内收紧锁定 + 猎视之眼骤然睁开，收报者临时显示 0.9s
   function pulseAlert(id) {
     const rec = nodes.get(id);
@@ -280,5 +295,5 @@ export function createUnitView(parent, deps) {
   }
 
   return { setUnits, syncUnits, updateUnit, setFacing, onCameraChange, getEntitySpriteDom, nodes,
-    lockMotion, setDisplayPos, setDisplayFacing, setFlag, clearFlag, setHop, setStatus, setPredict, clearPredict, setShield, pulseAlert };
+    lockMotion, setDisplayPos, setDisplayFacing, setFlag, clearFlag, setHop, setStatus, setPredict, clearPredict, setShield, setAuras, pulseAlert };
 }

@@ -58,7 +58,7 @@ function floatCases() {
   out.push(ok('UIR-F 结界拦截不飘效果字（由结界演出负责）', effectFloat({ kind: 'blocked' }) === null));
   const d = src('src/action-director.mjs'), lib = src('src/fx-library.mjs');
   out.push(ok('UIR-F 飘字统一在导演 revealEffect 揭示拍点（攻击附带减益与辅助条目同口径），支援演出不再只覆盖 HP/MP',
-    /floatEffect\(e\.targetId, effectFloat\(e\)\);/.test(d) && !/SUPPORT_NUMBERS/.test(lib) && /playOne\(feedback, effect\.targetId, \(\) => ctx\.revealEffect\(effect, true\)\)/.test(lib)));
+    /floatEffect\(e\.targetId, effectFloat\(e\)\);/.test(d) && !/SUPPORT_NUMBERS/.test(lib) && /playOne\(feedback, effect\.targetId, \(\) => \{ ctx\.revealEffect\(effect, true\); buffFlourish\(/.test(lib)));
   return out;
 }
 

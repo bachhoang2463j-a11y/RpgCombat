@@ -1,8 +1,8 @@
 {
   "kind": "guard-barrier-artifact-backend",
   "artifact": "tactics/mvp-standalone.html",
-  "bytes": 1857447,
-  "sha256": "17b2a29faf86b5d283891ffadb0c9296c8e497b1ad534342c4a5c52e6dd2250d",
+  "bytes": 1892337,
+  "sha256": "47a8807e1bdebd5a1770a0696fe53a8f7a014675adbb6147bc476917eb898a88",
   "cases": [
     {
       "id": "单脚本与闭合",

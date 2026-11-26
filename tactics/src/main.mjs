@@ -27,7 +27,7 @@ import { createEditorPanel } from './editor-panel.mjs';
 import { autoPickChoice } from './reaction-prompt.mjs';
 import { unitCenter } from './geometry.mjs';
 import { createScenarioData, createSeededRandom } from './scenario-data.mjs';
-import { statusBadges, compactStatusHtml, fullStatusHtml, inspectorHtml } from './status-ui.mjs';
+import { statusBadges, compactStatusHtml, fullStatusHtml, inspectorHtml, auraList } from './status-ui.mjs';
 import { passiveGainLabel } from './fx-library.mjs';
 import { resolveLore } from './lore.mjs';
 import { getEffectiveStats } from './class-passives.mjs';
@@ -500,6 +500,7 @@ export function createApp(rootEl, opts = {}) {
       if (only && u.id !== only) continue;
       const list = shownOf(u).hp > 0 ? badgesOf(u) : [];
       view.setStatus(u.id, compactStatusHtml(list));
+      view.setAuras(u.id, auraList(list));
       if (u.side === 'hero') {
         if (currentViewData.heroCardIds.has(u.id)) {
           shell.setHeroStatus(u.id, fullStatusHtml(list.filter(b => b.key !== 'shield')));  // 护盾已写进卡片血条
@@ -1001,14 +1002,7 @@ export function createApp(rootEl, opts = {}) {
       shell.showLog(log[log.length - 1] || '进入防御姿态', 'act');
       refreshBattle(); afterHeroAction(); return;
     }
-    if (kind === 'ready') {
-      const result = battle.ready();
-      if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return; }
-      ui('confirm');
-      const log = battle.snapshot().log;
-      shell.showLog(log[log.length - 1], 'act');
-      refreshBattle(); afterHeroAction(); return;
-    }
+    if (kind === 'ready') { runReady(); return; }
     if (kind === 'drop') { runDrop(); return; }
     if (!kind || !['jump', 'push', 'carry'].includes(kind)) return;
     rpgCloseMenus();
@@ -1085,6 +1079,22 @@ export function createApp(rootEl, opts = {}) {
       if (myFlow !== flow) return;
       shell.showLog(unitName(me) + ' 背起 ' + unitName(result.targetId), 'act');
     }
+    if (myFlow !== flow) return;
+    afterHeroAction();
+  }
+  // 整备：规则先祛除负面，演出在该单位处播放（期间锁定输入），结束后交还
+  async function runReady() {
+    const myFlow = flow;
+    const me = battle.snapshot().currentId;
+    const result = battle.ready();
+    if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return; }
+    setBusy(true);
+    sandbox.beginAction();
+    ui('confirm');
+    const log = battle.snapshot().log;
+    shell.showLog(log[log.length - 1], 'act');
+    refreshBattle();
+    await director.playReady(me);
     if (myFlow !== flow) return;
     afterHeroAction();
   }
