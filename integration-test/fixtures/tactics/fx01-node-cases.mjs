@@ -192,6 +192,8 @@ export const groups = {
     ];
     const shots = [2, 0, 1].map(shotIndex => ({ shotIndex, aim: { x: shotIndex + 1, y: 4 } }));
     let activeHandles = 0, maxActiveHandles = 0;
+    // 世界层桩：枪械叠加画法只需可链式调用的层节点（children / firstChild / animate / querySelector）
+    const stubNode = new Proxy(function () {}, { get: (_, k) => k === 'children' ? [stubNode, stubNode, stubNode] : k === Symbol.iterator ? undefined : stubNode, apply: () => stubNode });
     const ctx = {
       hits, result: { shots }, skill: { range: { type: '单体' } }, centerOf: () => ({ x: 0, y: 4 }), casterId: 'c', ent: id => ({ id }), anchorAt: (x, y) => ({ x, y }),
       revealSegment: (id, index) => events.push([id, index]), reveal: id => events.push(id),
@@ -201,7 +203,8 @@ export const groups = {
         activeHandles--;
         return true;
       },
-      fx: { sfx() {} },
+      fx: { sfx() {}, top: () => stubNode, shake() {} },
+      sandbox: { getUnitView: () => ({ nodes: new Map() }) },
       avHost: { host: { spriteOf: id => id } },
       av: {
         playAttackIdentityFx({ scope, subtype, targets, outcomes, onImpact, areaBounds, suppressImpact }) {

@@ -217,6 +217,204 @@ function grow(el, { ms, s0 = 0.4, s1 = 1, hold = 0.7, s2 = s1 * 1.05, o = 1 }) {
     { transform: 'translate(-50%,-50%) scale(' + s1 + ')', opacity: o, offset: hold }, { transform: 'translate(-50%,-50%) scale(' + s2 + ')', opacity: 0 }], { duration: ms, fill: 'forwards' });
 }
 
+// ---------- 枪械共用画法：移植回合制 gunshot / 枪击穿透 / 连续扫射 原版构图（枪口焰、曳光、激波星芒、血雾、抛壳、屏幕血块） ----------
+const STAR8 = 'polygon(50% 0,59% 41%,100% 50%,59% 59%,50% 100%,41% 59%,0 50%,41% 41%)';
+const deg = r => r * 180 / Math.PI;
+// 枪口焰：沿射向的锥形焰舌 + 8 芒星芯 + 青烟（p 为枪口世界像素，ang 为射向弧度）
+function gunFlash(fx, p, ang, { size = 32, ms = 150, smoke = true } = {}) {
+  const r = deg(ang), s = size, r0 = rnd(0, 45);
+  const l = fx.top(
+    '<i style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:' + (s * 1.7) + 'px;height:' + s + 'px;margin-top:' + (-s / 2) + 'px;transform-origin:0 50%;' +
+      'clip-path:polygon(0 38%,62% 4%,100% 50%,62% 96%,0 62%);background:radial-gradient(ellipse at 18% 50%,#fff 0%,#fef08a 28%,#f97316 62%,rgba(220,38,38,0) 82%);mix-blend-mode:screen;"></i>' +
+    '<i style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:' + s + 'px;height:' + s + 'px;margin:' + (-s / 2) + 'px 0 0 ' + (-s / 2) + 'px;' +
+      'clip-path:' + STAR8 + ';background:radial-gradient(circle,#fff 0%,#fef08a 40%,rgba(249,115,22,0) 74%);mix-blend-mode:screen;"></i>', ms + 40);
+  const [tongue, star] = l.children;
+  tongue.animate([{ transform: 'rotate(' + r + 'deg) scaleX(.25)', opacity: 1 }, { transform: 'rotate(' + r + 'deg) scaleX(1.2)', opacity: 1, offset: 0.3 }, { transform: 'rotate(' + r + 'deg) scaleX(.7)', opacity: 0 }], { duration: ms, easing: 'ease-out', fill: 'forwards' });
+  star.animate([{ transform: 'rotate(' + r0 + 'deg) scale(.3)', opacity: 1 }, { transform: 'rotate(' + (r0 + 12) + 'deg) scale(1.25)', opacity: 1, offset: 0.3 }, { transform: 'rotate(' + (r0 + 20) + 'deg) scale(.9)', opacity: 0 }], { duration: ms, easing: 'ease-out', fill: 'forwards' });
+  if (!smoke) return;
+  const sm = fx.top('<i style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:' + s + 'px;height:' + s + 'px;margin:' + (-s / 2) + 'px 0 0 ' + (-s / 2) + 'px;border-radius:50%;background:radial-gradient(circle,rgba(203,213,225,.42) 0%,rgba(148,163,184,.2) 50%,transparent 72%);"></i>', 640);
+  sm.firstChild.animate([{ transform: 'translate(0,0) scale(.5)', opacity: 0.9 }, { transform: 'translate(' + (Math.cos(ang) * 10 + rnd(-6, 6)).toFixed(1) + 'px,' + (-14 - rnd(0, 12)).toFixed(1) + 'px) scale(1.7)', opacity: 0 }], { duration: 600, easing: 'ease-out', fill: 'both' });
+}
+// 曳光弹：亮芯短包沿直线急速推进（回合制 _spawnStrafeTracer：~110ms 彗尾 + 白炽弹头）
+function tracer(fx, a, b, { width = 3, ms = 110, len = 64, delay = 0, sky = false } = {}) {
+  const dx = b.x - a.x, dy = b.y - a.y, L = Math.max(1, Math.hypot(dx, dy)), k = Math.min(len, L * 0.6);
+  const grad = sky ? 'linear-gradient(90deg,rgba(14,165,233,0),rgba(56,189,248,.8) 55%,#e0f2fe 88%,#fff)' : 'linear-gradient(90deg,rgba(245,158,11,0),rgba(251,191,36,.78) 50%,#fef08a 88%,#fff)';
+  const l = fx.top('<div style="position:absolute;left:' + a.x + 'px;top:' + a.y + 'px;width:0;height:0;transform:rotate(' + deg(Math.atan2(dy, dx)).toFixed(1) + 'deg);">' +
+    '<i style="position:absolute;left:0;top:' + (-width / 2) + 'px;width:' + k.toFixed(1) + 'px;height:' + width + 'px;border-radius:' + width + 'px;transform-origin:100% 50%;background:' + grad + ';box-shadow:0 0 ' + (width * 3) + 'px ' + (sky ? '#38bdf8' : '#f59e0b') + ';mix-blend-mode:screen;"></i></div>', ms + delay + 40);
+  l.firstChild.firstChild.animate([{ transform: 'translateX(0) scaleX(.4)', opacity: 1 }, { transform: 'translateX(' + (L - k).toFixed(1) + 'px) scaleX(1)', opacity: 1, offset: 0.85 }, { transform: 'translateX(' + (L - k).toFixed(1) + 'px) scaleX(.1)', opacity: 0 }], { duration: ms, delay, easing: 'linear', fill: 'both' });
+}
+// 喷溅：gore = 暗红血滴（正常混合，抛物下坠）；spark = 金色跳弹火星条（screen 混合）
+const GORE = ['#dc2626', '#b91c1c', '#991b1b', '#7f1d1d', '#450a0a'];
+function spray(fx, p, n, { kind = 'gore', ang = null, spread = TAU, dist = [16, 60], size = [3, 6.5], ms = [380, 680], colors } = {}) {
+  const gore = kind === 'gore';
+  const list = Array.from({ length: n }, () => ({
+    a: ang == null ? rnd(0, TAU) : ang + rnd(-spread / 2, spread / 2), d: rnd(dist[0], dist[1]), s: rnd(size[0], size[1]),
+    c: pick(colors || (gore ? GORE : ['#fef08a', '#fde047', '#f97316'])), dur: rnd(ms[0], ms[1]), x: p.x + rnd(-6, 6), y: p.y + rnd(-6, 6),
+  }));
+  const layer = fx.top(list.map(q => {
+    const w = gore ? q.s * 1.5 : q.s * 4, h = gore ? q.s : Math.max(1.6, q.s * 0.45);
+    return '<i style="position:absolute;left:' + q.x.toFixed(1) + 'px;top:' + q.y.toFixed(1) + 'px;width:' + w.toFixed(1) + 'px;height:' + h.toFixed(1) + 'px;margin:' + (-h / 2).toFixed(1) + 'px 0 0 ' + (-w / 2).toFixed(1) + 'px;border-radius:' + (gore ? '50%' : h.toFixed(1) + 'px') + ';' +
+      (gore ? 'background:radial-gradient(circle at 35% 35%,' + q.c + ' 0%,' + q.c + ' 55%,#450a0a 100%);box-shadow:0 0 3px rgba(69,10,10,.8);'
+        : 'background:linear-gradient(90deg,transparent,' + q.c + ' 60%,#fff);box-shadow:0 0 6px ' + q.c + ';mix-blend-mode:screen;') + '"></i>';
+  }).join(''), Math.max(...list.map(q => q.dur)) + 40);
+  [...layer.children].forEach((el, i) => {
+    const q = list[i], dx = Math.cos(q.a) * q.d, dy = Math.sin(q.a) * q.d, r = deg(q.a).toFixed(1), fall = gore ? 18 + q.d * 0.25 : 6;
+    el.animate([{ transform: 'translate(0,0) rotate(' + r + 'deg) scale(.6)', opacity: 1 },
+      { transform: 'translate(' + (dx * 0.72).toFixed(1) + 'px,' + (dy * 0.72 - (gore ? 6 : 0)).toFixed(1) + 'px) rotate(' + r + 'deg) scale(1.1)', opacity: 0.95, offset: 0.45 },
+      { transform: 'translate(' + dx.toFixed(1) + 'px,' + (dy + fall).toFixed(1) + 'px) rotate(' + r + 'deg) scale(' + (gore ? 0.75 : 0.3) + ')', opacity: 0 }],
+      { duration: q.dur, easing: 'cubic-bezier(0.2,0.7,0.4,1)', fill: 'both' });
+  });
+}
+// 抛壳：黄铜弹壳向射向侧面翻滚抛出、受重力下坠（side=±1 左右枪）
+function casing(fx, p, ang, side = 1) {
+  const a = ang + side * Math.PI / 2 + rnd(-0.35, 0.35), d = rnd(18, 30), dx = Math.cos(a) * d, dy = Math.sin(a) * d, spin = rnd(360, 900) * (Math.random() < 0.5 ? -1 : 1);
+  const l = fx.top('<i style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:3.5px;height:8px;margin:-4px 0 0 -1.75px;border-radius:1px;background:linear-gradient(90deg,#fde68a,#b45309 55%,#fde68a);box-shadow:0 0 3px #d97706;"></i>', 720);
+  l.firstChild.animate([{ transform: 'translate(0,0) rotate(0deg)', opacity: 1 },
+    { transform: 'translate(' + dx.toFixed(1) + 'px,' + (dy - 16).toFixed(1) + 'px) rotate(' + (spin * 0.45).toFixed(0) + 'deg)', opacity: 1, offset: 0.4 },
+    { transform: 'translate(' + (dx * 1.5).toFixed(1) + 'px,' + (dy * 1.5 + 14).toFixed(1) + 'px) rotate(' + spin.toFixed(0) + 'deg)', opacity: 0 }], { duration: 700, easing: 'cubic-bezier(0.3,0.6,0.6,1)', fill: 'both' });
+}
+// 命中激波：双圈冲击环 + 6 向火星 + 8 芒星芯（回合制 gunshot / gunshot_pierce 命中构图）
+function gunImpact(fx, p, { size = 64, sky = false, ms = 420 } = {}) {
+  const c1 = sky ? 'rgba(56,189,248,.95)' : 'rgba(254,240,138,.95)', c2 = sky ? 'rgba(255,255,255,.75)' : 'rgba(249,115,22,.65)';
+  const core = sky ? 'radial-gradient(circle,#fff 0%,#e0f2fe 30%,#38bdf8 62%,rgba(2,132,199,0) 78%)' : 'radial-gradient(circle,#fff 0%,#fef08a 32%,#f97316 64%,rgba(220,38,38,0) 80%)';
+  const l = fx.top(ringHtml(p.x, p.y, size, c1, c2) + ringHtml(p.x, p.y, size * 0.7, c2, c1) +
+    '<i style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:' + size + 'px;height:' + size + 'px;margin:' + (-size / 2) + 'px 0 0 ' + (-size / 2) + 'px;clip-path:' + STAR8 + ';background:' + core + ';mix-blend-mode:screen;"></i>', ms + 80);
+  const [r1, r2, star] = l.children, r0 = rnd(0, 45);
+  const ring = [{ transform: 'scale(.2)', opacity: 1 }, { transform: 'scale(1.6)', opacity: 0.75, offset: 0.5 }, { transform: 'scale(2.4)', opacity: 0 }];
+  r1.animate(ring, { duration: ms * 0.8, easing: 'cubic-bezier(0.1,0.8,0.2,1)', fill: 'forwards' });
+  r2.animate(ring, { duration: ms * 0.7, delay: 40, easing: 'cubic-bezier(0.1,0.8,0.2,1)', fill: 'both' });
+  star.animate([{ transform: 'rotate(' + r0 + 'deg) scale(.15)', opacity: 0 }, { transform: 'rotate(' + (r0 + 12) + 'deg) scale(1.18)', opacity: 1, offset: 0.18 },
+    { transform: 'rotate(' + (r0 + 20) + 'deg) scale(1.02)', opacity: 0.9, offset: 0.4 }, { transform: 'rotate(' + (r0 + 35) + 'deg) scale(1.35)', opacity: 0 }], { duration: ms * 0.8, easing: 'cubic-bezier(0.12,0.9,0.25,1)', fill: 'forwards' });
+  spray(fx, p, 6, { kind: 'spark', dist: [size * 0.4, size * 0.8], size: [2, 3], ms: [220, 320], colors: sky ? ['#e0f2fe', '#7dd3fc', '#ffffff'] : null });
+}
+// 单位受击/后坐微颤：只动独立 translate/filter 属性，不覆盖既有 transform 动画
+function jolt(ctx, id, { amp = 4, ms = 60, times = 1, glow = '#f59e0b' } = {}) {
+  const el = ctx.sandbox.getUnitView().nodes.get(id)?.sprite;
+  if (!el) return;
+  el.animate([{ translate: '0 0', filter: 'none' }, { translate: amp + 'px ' + (-amp * 0.6) + 'px', filter: 'brightness(1.9) drop-shadow(0 0 12px ' + glow + ')', offset: 0.3 },
+    { translate: (-amp) + 'px ' + (amp * 0.6) + 'px', filter: 'brightness(1.3) drop-shadow(0 0 6px ' + glow + ')', offset: 0.7 }, { translate: '0 0', filter: 'none' }], { duration: ms * 2, iterations: times, easing: 'ease-in-out' });
+}
+// 屏幕血块（视口层，回合制 _createStrafeScreenBloodOverlay）：暗红边缘压暗 + 8 团有机血渍依次溅上镜头 + 顶缘血泪垂落
+const SPLAT_PATHS = [
+  'M22,12 C40,4 68,14 62,35 C75,44 78,68 60,78 C42,86 18,74 12,54 C8,38 12,22 22,12 Z',
+  'M32,6 C48,4 62,18 56,36 C72,32 82,48 76,64 C60,82 42,76 32,86 C16,80 8,58 14,42 C4,26 22,10 32,6 Z',
+  'M18,22 C34,10 56,12 46,34 C62,38 68,60 52,72 C38,82 22,86 16,66 C6,50 6,32 18,22 Z',
+  'M26,14 C44,5 60,20 52,36 C66,46 68,70 52,80 C36,90 20,74 14,56 C9,40 14,22 26,14 Z',
+];
+const SPLAT_POS = [
+  { top: '8%', left: '8%', size: 140, rot: -22, delay: 80 }, { top: '12%', right: '10%', size: 155, rot: 35, delay: 160 },
+  { bottom: '15%', left: '10%', size: 135, rot: 15, delay: 250 }, { bottom: '18%', right: '8%', size: 160, rot: -45, delay: 350 },
+  { top: '4%', left: '38%', size: 110, rot: 65, delay: 480 }, { bottom: '8%', right: '35%', size: 125, rot: -15, delay: 650 },
+  { top: '48%', left: '4%', size: 115, rot: -55, delay: 850 }, { top: '52%', right: '5%', size: 120, rot: 40, delay: 1050 },
+];
+const SPLAT_DRIPS = [['right:25%', 6, 150, 250], ['left:22%', 8, 180, 450], ['right:42%', 4, 120, 650]];
+function screenBlood(fx, ms) {
+  const pos = s => (s.top ? 'top:' + s.top + ';' : '') + (s.bottom ? 'bottom:' + s.bottom + ';' : '') + (s.left ? 'left:' + s.left + ';' : '') + (s.right ? 'right:' + s.right + ';' : '');
+  const splats = SPLAT_POS.map((s, i) => {
+    const d = SPLAT_PATHS[i % SPLAT_PATHS.length];
+    return '<div data-splat style="position:absolute;' + pos(s) + 'width:' + s.size + 'px;height:' + s.size + 'px;opacity:0;filter:drop-shadow(0 0 8px #7f1d1d);">' +
+      '<svg viewBox="0 0 100 100" width="100%" height="100%"><path d="' + d + '" fill="#7f1d1d"/><path d="' + d + '" fill="#991b1b" transform="translate(8,8) scale(.85)" opacity=".9"/>' +
+      '<circle cx="85" cy="18" r="4.5" fill="#991b1b"/><circle cx="15" cy="85" r="3.5" fill="#7f1d1d"/><circle cx="92" cy="72" r="5" fill="#881337"/><circle cx="6" cy="16" r="3" fill="#991b1b"/><circle cx="70" cy="92" r="2.5" fill="#dc2626"/>' +
+      '<circle cx="35" cy="28" r="1.8" fill="#fff" opacity=".6"/><circle cx="58" cy="45" r="1.5" fill="#fff" opacity=".5"/></svg></div>';
+  }).join('');
+  const drips = SPLAT_DRIPS.map(([x, w, h]) => '<i data-drip style="position:absolute;top:0;' + x + ';width:' + w + 'px;height:' + h + 'px;border-radius:' + w + 'px;transform-origin:50% 0;opacity:0;' +
+    'background:linear-gradient(#b91c1c,#7f1d1d 55%,transparent);filter:drop-shadow(0 0 6px #450a0a);"></i>').join('');
+  const root = fx.screen('<i data-vig style="position:absolute;inset:0;opacity:0;background:radial-gradient(circle,transparent 32%,rgba(136,8,8,.45) 70%,rgba(65,8,8,.95) 100%);"></i>' + splats + drips, ms);
+  root.style.overflow = 'hidden';
+  root.querySelector('[data-vig]').animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'scale(1)', offset: 0.12 }, { opacity: 0.9, transform: 'scale(1.02)', offset: 0.85 }, { opacity: 0, transform: 'scale(1.05)' }],
+    { duration: ms, easing: 'cubic-bezier(0.1,0.8,0.2,1)', fill: 'forwards' });
+  root.querySelectorAll('[data-splat]').forEach((el, i) => {
+    const s = SPLAT_POS[i], rr = ' rotate(' + s.rot + 'deg)';
+    el.animate([{ transform: 'scale(.12)' + rr, opacity: 0 }, { transform: 'scale(1.12)' + rr, opacity: 1, offset: 0.22 }, { transform: 'scale(1)' + rr, opacity: 0.96, offset: 0.38 },
+      { transform: 'translateY(4px) scale(1.01)' + rr, opacity: 0.88, offset: 0.75 }, { transform: 'translateY(12px) scale(1.04)' + rr, opacity: 0 }],
+      { duration: ms - s.delay, delay: s.delay, easing: 'cubic-bezier(0.12,0.85,0.25,1)', fill: 'both' });
+  });
+  root.querySelectorAll('[data-drip]').forEach((el, i) => {
+    const dl = SPLAT_DRIPS[i][3];
+    el.animate([{ transform: 'scaleY(0)', opacity: 0 }, { transform: 'scaleY(1)', opacity: 0.95, offset: 0.25 }, { transform: 'translateY(8px) scaleY(1.06)', opacity: 0.85, offset: 0.7 }, { transform: 'translateY(18px) scaleY(1.12)', opacity: 0 }],
+      { duration: ms - dl, delay: dl, easing: 'ease-out', fill: 'both' });
+  });
+}
+// 弱点锁定准星（回合制 pierce-weakpoint-lock）：菱形虚线框 + 内圈 + 十字分划，由大旋入收紧
+function pierceLock(fx, p, d, ms) {
+  const l = fx.top('<svg viewBox="0 0 120 120" width="' + d + '" height="' + d + '" style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;margin:' + (-d / 2) + 'px 0 0 ' + (-d / 2) + 'px;overflow:visible;filter:drop-shadow(0 0 6px #38bdf8);">' +
+    '<polygon points="60,10 110,60 60,110 10,60" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="8 4"/><circle cx="60" cy="60" r="38" fill="none" stroke="#0ea5e9" stroke-width="1.8"/>' +
+    '<path d="M60,5 V35 M60,85 V115 M5,60 H35 M85,60 H115" stroke="#f0f9ff" stroke-width="2.5"/><circle cx="60" cy="60" r="6" fill="#38bdf8"/></svg>', ms + 40);
+  l.firstChild.animate([{ transform: 'scale(2.2) rotate(-45deg)', opacity: 0 }, { transform: 'scale(.95) rotate(0deg)', opacity: 1, offset: 0.3 }, { transform: 'scale(1.05) rotate(5deg)', opacity: 1, offset: 0.5 },
+    { transform: 'scale(1.15) rotate(10deg)', opacity: 0.8, offset: 0.72 }, { transform: 'scale(1.4) rotate(20deg)', opacity: 0 }], { duration: ms, easing: 'cubic-bezier(0.15,0.9,0.2,1)', fill: 'forwards' });
+}
+// 超音速贯穿光束（回合制 pierce-beam-penetrate）：自枪口贯穿目标并向后延伸，横向先胀后收
+function pierceBeam(fx, a, b, { width = 14, ms = 420 } = {}) {
+  const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy);
+  const l = fx.top('<div style="position:absolute;left:' + a.x + 'px;top:' + a.y + 'px;width:0;height:0;transform:rotate(' + deg(Math.atan2(dy, dx)).toFixed(1) + 'deg);">' +
+    '<i style="position:absolute;left:0;top:' + (-width / 2) + 'px;width:' + L.toFixed(1) + 'px;height:' + width + 'px;border-radius:' + width + 'px;transform-origin:0 50%;' +
+    'background:linear-gradient(90deg,rgba(186,230,253,0),#a5f3fc 30%,#e0f2fe 70%,#0ea5e9);box-shadow:0 0 18px #0284c7;mix-blend-mode:screen;"></i></div>', ms + 40);
+  l.firstChild.firstChild.animate([{ transform: 'scaleX(.1) scaleY(2.2)', opacity: 0 }, { transform: 'scaleX(1.05) scaleY(1)', opacity: 1, offset: 0.15 }, { transform: 'scaleX(1) scaleY(.7)', opacity: 0.9, offset: 0.4 }, { transform: 'scaleX(1) scaleY(0)', opacity: 0 }],
+    { duration: ms, easing: 'cubic-bezier(0.1,0.9,0.2,1)', fill: 'forwards' });
+}
+// 普通枪击加强（世界层叠加于视听底座身份演出之上，不改底座）：出膛枪口焰 + 抛壳 + 后坐；命中激波星芒 + 血雾 + 受击颤 + 中震
+function gunFire(ctx, to) {
+  const c = worldPx(ctx.centerOf(ctx.casterId)), t = worldPx(to), ang = Math.atan2(t.y - c.y, t.x - c.x);
+  gunFlash(ctx.fx, { x: c.x + Math.cos(ang) * 20, y: c.y + Math.sin(ang) * 20 }, ang, { size: 30, ms: 150 });
+  casing(ctx.fx, c, ang);
+  jolt(ctx, ctx.casterId, { amp: 2.5, ms: 45 });
+}
+function gunHit(ctx, impact) {
+  if (!impact.hit) return;
+  const c = worldPx(ctx.centerOf(ctx.casterId)), t = worldPx(ctx.centerOf(impact.targetId)), ang = Math.atan2(t.y - c.y, t.x - c.x);
+  gunImpact(ctx.fx, t, { size: 62 });
+  spray(ctx.fx, t, 8, { kind: 'gore', ang, spread: 1.7, dist: [14, 52] });
+  jolt(ctx, impact.targetId, { amp: 4, ms: 55, times: 2 });
+  ctx.fx.shake('medium');
+}
+
+// ---------- 高阶运镜：推近出手者 → 时停定格 → 拉开框住战场 → 末击顿帧 → 回位（镜头被玩家接管即让出） ----------
+// 顿帧/时停：视口内全部运行中的 WAAPI 动画暂停 ms 后续播；during 在暂停之后执行，其中新建的定格画面不受冻结
+async function freeze(ctx, ms, during) {
+  const list = ctx.sandbox.getDom().viewport.getAnimations({ subtree: true }).filter(a => a.playState === 'running');
+  list.forEach(a => a.pause());
+  if (during) during();
+  const ok = await ctx.wait(ms);
+  list.forEach(a => { if (a.playState === 'paused') a.play(); });
+  return ok;
+}
+// 世界米坐标 → 视口内像素
+function viewPt(ctx, m) {
+  const r = ctx.sandbox.getDom().viewport.getBoundingClientRect(), s = ctx.sandbox.worldToScreenClient(m.x, m.y);
+  return { x: s.x - r.left, y: s.y - r.top, w: r.width, h: r.height };
+}
+// 电影遮幅：上下黑边滑入 → 保持 → 滑出（视口层）
+function letterbox(fx, ms, { h = 9, inMs = 280, outMs = 340 } = {}) {
+  const bar = (edge, dir) => '<i style="position:absolute;left:0;right:0;' + edge + ':0;height:' + h + '%;background:linear-gradient(' + dir + ',#000 0%,#000 72%,rgba(0,0,0,.55) 100%);"></i>';
+  const root = fx.screen(bar('top', '180deg') + bar('bottom', '0deg'), ms);
+  [...root.children].forEach((el, i) => {
+    const off = i ? 'translateY(100%)' : 'translateY(-100%)';
+    el.animate([{ transform: off }, { transform: 'translateY(0)', offset: inMs / ms }, { transform: 'translateY(0)', offset: 1 - outMs / ms }, { transform: off }], { duration: ms, easing: 'cubic-bezier(.3,.7,.2,1)', fill: 'forwards' });
+  });
+}
+// 时停定格画面（与 freeze 同拍）：去色高对比 + 焦点放射速度线 + 焦点白闪，解冻后 200ms 褪去
+function timeStop(ctx, ms, m, { tint = 'rgba(254,243,199,.95)', lines = 30 } = {}) {
+  const p = viewPt(ctx, m), R = Math.hypot(p.w, p.h), total = ms + 200;
+  const ls = Array.from({ length: lines }, (_, i) => {
+    const a = i / lines * TAU + rnd(-0.08, 0.08), r0 = R * rnd(0.14, 0.28);
+    return '<line x1="' + (p.x + Math.cos(a) * r0).toFixed(1) + '" y1="' + (p.y + Math.sin(a) * r0).toFixed(1) + '" x2="' + (p.x + Math.cos(a) * R).toFixed(1) + '" y2="' + (p.y + Math.sin(a) * R).toFixed(1) +
+      '" stroke="' + tint + '" stroke-width="' + rnd(1.2, 4.5).toFixed(1) + '" stroke-linecap="round"/>';
+  }).join('');
+  const root = ctx.fx.screen('<i style="position:absolute;inset:0;backdrop-filter:grayscale(1) contrast(1.45) brightness(1.06);-webkit-backdrop-filter:grayscale(1) contrast(1.45) brightness(1.06);"></i>' +
+    '<svg width="100%" height="100%" style="position:absolute;inset:0;overflow:visible;transform-origin:' + p.x.toFixed(0) + 'px ' + p.y.toFixed(0) + 'px;mix-blend-mode:screen;">' + ls + '</svg>' +
+    '<i style="position:absolute;inset:0;background:radial-gradient(circle at ' + p.x.toFixed(0) + 'px ' + p.y.toFixed(0) + 'px,rgba(255,255,255,.9) 0%,rgba(255,251,235,.35) 9%,rgba(255,255,255,0) 24%);mix-blend-mode:screen;"></i>', total);
+  const [gray, svg, flash] = root.children, k = ms / total;
+  gray.animate([{ opacity: 1 }, { opacity: 1, offset: k }, { opacity: 0 }], { duration: total, fill: 'forwards' });
+  svg.animate([{ opacity: 0, transform: 'scale(1.18)' }, { opacity: 1, transform: 'scale(1)', offset: 0.22 }, { opacity: 0.85, offset: k }, { opacity: 0, transform: 'scale(.94)' }], { duration: total, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' });
+  flash.animate([{ opacity: 1 }, { opacity: 0.4, offset: k }, { opacity: 0 }], { duration: total, fill: 'forwards' });
+}
+// 末击白闪（顿帧画面）：世界层锚定目标的白芯红晕大光团，随镜头不漂移
+function hitFlash(ctx, m, ms = 260) {
+  const p = worldPx(m);
+  ctx.fx.top(orbHtml(p.x, p.y, 4.2 * PX, 'rgba(254,202,202,.55)', 'rgba(255,255,255,.98)'), ms).firstChild
+    .animate([{ transform: 'scale(.55)', opacity: 1 }, { transform: 'scale(1)', opacity: 0.8, offset: 0.4 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: ms, fill: 'forwards' });
+}
+
 // ==========================================
 // 条目
 // ==========================================
@@ -270,7 +468,7 @@ function attackAreaBounds(result, shot, range) {
     l: l * k, r: r * k, t: t * k, b: b * k };
 }
 
-function basicAttack(name, { subtype = name, area = false, projectile, directional, gap = 0 } = {}) {
+function basicAttack(name, { subtype = name, area = false, projectile, directional, gap = 0, fire, impactFx } = {}) {
   return {
     id: 'basic-' + name, grade: 'identity', fxTags: [name],
     prepareKeys: () => PREPARE_KEYS[name] || [],
@@ -288,6 +486,7 @@ function basicAttack(name, { subtype = name, area = false, projectile, direction
           if (revealed.has(impact)) return;
           revealed.add(impact);
           ctx.revealSegment(impact.targetId, impact.index);
+          if (impactFx) impactFx(ctx, impact);
         };
         if (i && gap && !(await ctx.wait(gap))) return false;
         const aimAnchor = () => ctx.anchorAt(aim.x, aim.y);
@@ -311,6 +510,7 @@ function basicAttack(name, { subtype = name, area = false, projectile, direction
           const byId = new Map(impacts.map(p => [p.targetId, p]));
           const getImpact = target => byId.get(target?.id || target?.dataset?.arcaneTargetId);
           const areaBounds = ['爆炸', '火焰', '冰霜', '雷'].includes(subtype) ? attackAreaBounds(ctx.result, shot, range) : null;
+          if (fire) fire(ctx, aim);
           if (!(await playIdentity(impacts.length || areaBounds ? impacts.map(p => ctx.ent(p.targetId)) : [aimAnchor()],
             target => getImpact(target)?.hit ? 'hit' : 'dodge', target => {
               const impact = getImpact(target);
@@ -318,6 +518,7 @@ function basicAttack(name, { subtype = name, area = false, projectile, direction
             }, { areaBounds }))) return false;
         } else {
           for (const impact of impacts.length ? impacts : [null]) {
+            if (fire) fire(ctx, impact ? ctx.centerOf(impact.targetId) : aim);
             if (!(await playIdentity([impact ? ctx.ent(impact.targetId) : aimAnchor()],
               () => impact?.hit ? 'hit' : 'dodge', () => { if (impact) reveal(impact); }))) return false;
           }
@@ -332,7 +533,7 @@ function basicAttack(name, { subtype = name, area = false, projectile, direction
 }
 
 const basicAttacks = [
-  basicAttack('枪击', { area: true, gap: 200 }),
+  basicAttack('枪击', { area: true, gap: 200, fire: gunFire, impactFx: gunHit }),
   basicAttack('霰弹', { directional: true, gap: 220 }),
   basicAttack('火焰', { area: true, projectile: 'fire' }),
   basicAttack('冰霜', { area: true }), basicAttack('雷击', { area: true, subtype: '雷' }),
@@ -1551,42 +1752,125 @@ const rangedHeavy = {
   },
 };
 
+// 枪击穿透（移植回合制 gunshot_pierce）：菱形弱点准星旋入锁定 → 击发：重枪口焰 + 抛壳后坐 + 超音速青色贯穿光束
+// → 命中：双圈激波星芒 + 背部破片锥 + 出口血雾喷溅 + 受击硬直 + 重震（L2 预算内，不用暗场/全屏）
 const gunshotPierce = {
   id: 'gunshot-pierce', grade: 'L2', fxTags: ['枪击穿透'], reuseAudio: true,
-  timeline: { totalMs: 880, fullscreen: false, darken: false },
-  cues: [{ key: 'gunshot_pierce', vol: 0.65 }],
+  timeline: { totalMs: 1160, fullscreen: false, darken: false },
+  cues: [{ key: 'gunshot_pierce', vol: 0.75 }],
   prepareKeys() { return ['gunshot_pierce']; },
   async play(ctx) {
     const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), t = worldPx(hits[0] ? ctx.centerOf(hits[0].targetId) : result.aim);
-    const dx = t.x - c.x, dy = t.y - c.y, len = Math.max(1, Math.hypot(dx, dy));
-    const over = { x: t.x + (dx / len) * 65, y: t.y + (dy / len) * 65 };
-    fx.sfx('gunshot_pierce', 0.65); fx.shake('light');
-    trail(fx, c, t, over, { color: '#38bdf8', width: 4, ms: 240 });
-    ctx.after(140, () => hits.forEach(h => ctx.reveal(h.targetId)));
-    return ctx.wait(840);
+    const dx = t.x - c.x, dy = t.y - c.y, len = Math.max(1, Math.hypot(dx, dy)), ux = dx / len, uy = dy / len, ang = Math.atan2(dy, dx);
+    const landed = hits.filter(h => h.hit);
+    pierceLock(fx, t, 2.6 * PX, 720);
+    if (!(await ctx.wait(300))) return false;
+    const m = { x: c.x + ux * 22, y: c.y + uy * 22 }, over = { x: t.x + ux * 150, y: t.y + uy * 150 };
+    fx.sfx('gunshot_pierce', 0.75); fx.shake('heavy');
+    gunFlash(fx, m, ang, { size: 48, ms: 210 });
+    casing(fx, c, ang);
+    jolt(ctx, ctx.casterId, { amp: 4, ms: 60, glow: '#38bdf8' });
+    pierceBeam(fx, m, over, { width: 14, ms: 420 });
+    tracer(fx, m, over, { width: 5, ms: 120, len: 120, sky: true });
+    ctx.after(70, () => {
+      hits.forEach(h => ctx.reveal(h.targetId));
+      gunImpact(fx, t, { size: 96, sky: true, ms: 480 });
+      spray(fx, t, 10, { kind: 'spark', ang, spread: 0.8, dist: [40, 130], size: [2.5, 4], ms: [260, 420], colors: ['#e0f2fe', '#7dd3fc', '#ffffff'] });
+      if (!landed.length) return;
+      fx.shake('quake');
+      spray(fx, t, 14, { kind: 'gore', ang, spread: 0.9, dist: [30, 115], size: [3, 7.5] });
+      landed.forEach(h => jolt(ctx, h.targetId, { amp: 7, ms: 60, times: 2, glow: '#38bdf8' }));
+    });
+    return ctx.wait(860);
   },
 };
 
+// 连续扫射（移植回合制 startStrafeBurst，2600ms = 52 发 × 50ms 对齐原版）：双枪左右交替超密连发，扇形往返扫过全部目标；
+// 每发：枪口焰 + 曳光 + 抛壳 + 跳弹火星 + 血雾，偶数发副枪交叉射向相邻目标；施法者后坐 / 目标弹雨硬直 / 持续后坐震屏；全程屏幕血块覆盖。
+// 运镜：遮幅入场 + 推近玛德琳（偏向射向）→ 时停定格（去色 + 速度线）→ 拉开框住全部目标并随扫射摆镜 → 末击顿帧急推 → 回位
 const strafeBurst = {
   id: 'strafe-burst', grade: 'L3', fxTags: ['连续扫射'],
-  timeline: { chargeMs: 800, totalMs: 2150, fullscreen: true, darken: false },
+  timeline: { chargeMs: 800, totalMs: 4120, fullscreen: true, darken: false },
   cues: [{ key: 'aoe_gun_burst_fs482122', vol: 0.68 }],
-  prepareKeys() { return ['aoe_gun_burst_fs482122']; },
+  prepareKeys() { return ['aoe_gun_burst_fs482122', 'gunshot1', 'gunshot2', 'gunshot3']; },
   async play(ctx) {
-    const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), a = worldPx(result.aim);
+    const { fx, hits, result } = ctx, sb = ctx.sandbox;
+    const CHARGE_MS = 800, STOP_MS = 140, TICK = 50, N = 52, FIRE_MS = N * TICK, HIT_MS = 150, BACK_MS = 360;
+    const cm = ctx.centerOf(ctx.casterId), am = result.aim, c = worldPx(cm), a = worldPx(am);
     const baseAng = Math.atan2(a.y - c.y, a.x - c.x);
-    const rune = fx.ground(ringHtml(c.x, c.y, 1.8 * PX, 'rgba(251,146,60,0.55)', 'transparent'), 850);
-    rune.firstChild.animate([{ transform: 'scale(0.5)', opacity: 0.3 }, { transform: 'scale(1.1)', opacity: 0.9 }], { duration: 800, fill: 'forwards' });
-    if (!(await ctx.wait(800))) return false;
-    fx.sfx('aoe_gun_burst_fs482122', 0.68); fx.shake('medium');
+    const home = sb.getPose();
+    const targets = hits.map(h => { const m = ctx.centerOf(h.targetId); return { id: h.targetId, hit: h.hit, m, p: worldPx(m) }; });
+
+    // ① 蓄势：遮幅入场，镜头推近出手者并略偏射向；脚下火环 + 出手者金色辉光
+    letterbox(fx, CHARGE_MS + STOP_MS + FIRE_MS + 60 + HIT_MS + BACK_MS);
+    sb.cameraTo(sb.poseAt(cm.x + Math.cos(baseAng) * 1.2, cm.y + Math.sin(baseAng) * 1.2, home.scale * 1.6), 720);
+    const rune = fx.ground(ringHtml(c.x, c.y, 1.8 * PX, 'rgba(251,146,60,0.55)', 'transparent'), CHARGE_MS + 50);
+    rune.firstChild.animate([{ transform: 'scale(0.5)', opacity: 0.3 }, { transform: 'scale(1.1)', opacity: 0.9 }], { duration: CHARGE_MS, fill: 'forwards' });
+    sb.getUnitView().nodes.get(ctx.casterId)?.sprite.animate([{ filter: 'none' }, { filter: 'brightness(1.35) drop-shadow(0 0 14px #fbbf24)' }], { duration: CHARGE_MS, easing: 'ease-in' });
+    if (!(await ctx.wait(CHARGE_MS))) return false;
+
+    // ② 时停：整场定格去色，以出手者为焦点放射速度线 + 白闪
+    if (!(await freeze(ctx, STOP_MS, () => timeStop(ctx, STOP_MS, cm)))) return false;
+
+    // ③ 开火：镜头拉开框住出手者与全部目标，随扫射主目标缓摆；持续高频后坐震屏
+    fx.sfx('aoe_gun_burst_fs482122', 0.68); fx.shake('heavy');
     ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
-    for (let k = 0; k < 14; k++) ctx.after(k * 55, () => {
-      const ang = baseAng + rnd(-0.72, 0.72), dist = rnd(260, 520);
-      const end = { x: c.x + Math.cos(ang) * dist, y: c.y + Math.sin(ang) * dist };
-      trail(fx, c, { x: (c.x + end.x) / 2, y: (c.y + end.y) / 2 }, end, { color: k % 2 ? '#fde047' : '#fb923c', width: 3, ms: 160 });
+    screenBlood(fx, 2750);
+    const pts = [cm, ...(targets.length ? targets.map(t => t.m) : [am])];
+    const C = { x: (Math.min(...pts.map(p => p.x)) + Math.max(...pts.map(p => p.x))) / 2, y: (Math.min(...pts.map(p => p.y)) + Math.max(...pts.map(p => p.y))) / 2 };
+    const S = Math.min(sb.poseFrame(pts, { pad: 2.4, tight: 1.08 }).scale, home.scale * 1.5);
+    sb.cameraTo(sb.poseAt(C.x, C.y, S), 260);
+    const rumble = sb.getDom().shake.animate([{ transform: 'translate3d(-4px,3px,0)' }, { transform: 'translate3d(4px,-3px,0)' }, { transform: 'translate3d(-3px,-4px,0)' }],
+      { duration: 120, iterations: Math.ceil((FIRE_MS + 60) / 120), direction: 'alternate' });
+    const fwd = { x: Math.cos(baseAng) * 18, y: Math.sin(baseAng) * 18 }, side = { x: -Math.sin(baseAng) * 13, y: Math.cos(baseAng) * 13 };
+    const guns = [{ x: c.x + fwd.x + side.x, y: c.y + fwd.y + side.y }, { x: c.x + fwd.x - side.x, y: c.y + fwd.y - side.y }];
+    const order = targets.map((_, i) => i), sweep = targets.length > 2 ? [...order, ...order.slice(1, -1).reverse()] : order;
+    const rg = ctx.skill?.range || {}, reach = (rg.length || rg.castRange || 8) * PX, half = (rg.angle || 90) / 2 * Math.PI / 180;
+    const [mainSp, mainGo, altSp, altGo] = targets.length >= 7 ? [5, 3, 2, 1] : targets.length >= 4 ? [6, 4, 3, 2] : [7, 6, 4, 3];
+    const shown = new Set();
+    const show = id => { if (shown.has(id)) return; shown.add(id); ctx.reveal(id); };
+    // 单发：命中目标溅血 + 硬直，闪避则子弹擦过目标后方落空只溅火星；无目标时沿扇面往返扫射
+    const shoot = (g, tg, sp, go, k) => {
+      let end;
+      if (tg) end = tg.hit ? { x: tg.p.x + rnd(-14, 14), y: tg.p.y + rnd(-14, 14) } : { x: tg.p.x + (tg.p.x - g.x) * 0.35 + rnd(-30, 30), y: tg.p.y + (tg.p.y - g.y) * 0.35 + rnd(-30, 30) };
+      else { const an = baseAng + Math.sin(k / N * Math.PI * 3) * half * 0.9 + rnd(-0.06, 0.06), d = reach * rnd(0.7, 1); end = { x: c.x + Math.cos(an) * d, y: c.y + Math.sin(an) * d }; }
+      const ang = Math.atan2(end.y - g.y, end.x - g.x);
+      tracer(fx, g, end, { width: 3.2, ms: 110, len: 60 });
+      ctx.after(100, () => {
+        spray(fx, end, tg && tg.hit ? sp : 3, { kind: 'spark', ang: ang + Math.PI, spread: 2.6, dist: [18, 60], size: [2, 3.2], ms: [260, 420] });
+        if (tg && tg.hit) { spray(fx, end, go, { kind: 'gore', ang, spread: 2.2, dist: [14, 58], size: [2.5, 6] }); if (k % 2 === 0) jolt(ctx, tg.id, { amp: 3, ms: 35 }); }
+        if (tg) show(tg.id);
+      });
+      return ang;
+    };
+    for (let k = 0; k < N; k++) ctx.after(k * TICK, () => {
+      const gi = k % 2, g = guns[gi], tg = targets.length ? targets[sweep[k % sweep.length]] : null;
+      gunFlash(fx, g, shoot(g, tg, mainSp, mainGo, k), { size: 26, ms: 100, smoke: k % 3 === 0 });
+      if (k % 2 === 0) casing(fx, g, baseAng, gi ? -1 : 1);
+      // 偶数发双枪交叉：副枪射向相邻目标（7 敌以上每 4 发一次降峰值）
+      if (targets.length > 1 && k % 2 === 0 && (targets.length < 7 || k % 4 === 0)) {
+        const g2 = guns[1 - gi], alt = targets[(sweep[k % sweep.length] + 1) % targets.length];
+        gunFlash(fx, g2, shoot(g2, alt, altSp, altGo, k), { size: 22, ms: 90, smoke: false });
+      }
+      if (k % 2 === 0) fx.sfx(pick(['gunshot1', 'gunshot2', 'gunshot3']), 0.42);
+      if (k % 2 === 1) jolt(ctx, ctx.casterId, { amp: 2.5, ms: 30, glow: '#fbbf24' });
+      // 摆镜：每 0.5s 把镜头中心向当前主目标偏 18%
+      if (tg && k >= 8 && k % 10 === 0) sb.cameraTo(sb.poseAt(C.x + (tg.m.x - C.x) * 0.18, C.y + (tg.m.y - C.y) * 0.18, S), 460);
     });
-    hits.forEach((h, i) => ctx.after(140 + i * 70, () => ctx.reveal(h.targetId)));
-    return ctx.wait(1300);
+    ctx.after(FIRE_MS, () => hits.forEach(h => show(h.targetId)));
+    if (!(await ctx.wait(FIRE_MS + 60))) { rumble.cancel(); return false; }
+
+    // ④ 末击顿帧：整场冻结，镜头急推最后一发命中的目标 + 白闪
+    const last = targets[sweep[(N - 1) % Math.max(1, sweep.length)]];
+    const fm = last ? last.m : am;
+    if (!(await freeze(ctx, HIT_MS, () => { sb.cameraTo(sb.poseAt(C.x + (fm.x - C.x) * 0.4, C.y + (fm.y - C.y) * 0.4, S * 1.12), 40); hitFlash(ctx, fm); }))) { rumble.cancel(); return false; }
+    rumble.cancel();
+    fx.shake('quake');
+    if (last && last.hit) spray(fx, last.p, 16, { kind: 'gore', ang: Math.atan2(last.p.y - c.y, last.p.x - c.x), spread: 1.6, dist: [30, 110], size: [3, 7.5] });
+
+    // ⑤ 回位：镜头缓回出手前构图，遮幅同步滑出
+    sb.cameraTo(home, BACK_MS);
+    return ctx.wait(BACK_MS);
   },
 };
 

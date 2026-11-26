@@ -88,7 +88,10 @@ export function createUnitView(parent, deps) {
       '<div class="t-unit-sprite" data-arcane-target-id="' + escapeHtml(unit.id) + '" style="--d:' + d + 'px;">' +
         '<div class="t-unit-medal">' + WINGS_HTML + face +
           '<i class="t-unit-shield" aria-hidden="true"></i>' +
-          (unit.side === 'enemy' ? '<b class="t-unit-alert" title="预警" aria-label="预警">!</b>' : '') +
+          (unit.side === 'enemy' ? '<b class="t-unit-alert" title="预警" aria-label="预警">' +
+            '<svg class="t-alert-ring" viewBox="-50 -50 100 100" aria-hidden="true"><circle class="t-alert-arc" r="46" pathLength="100"/><circle class="t-alert-tick" r="40" pathLength="100"/></svg>' +
+            '<svg class="t-alert-eye" viewBox="-16 -9 32 18" aria-hidden="true"><path d="M-15,0 Q0,-11 15,0 Q0,11 -15,0 Z"/><ellipse rx="2.4" ry="6.2"/></svg>' +
+          '</b>' : '') +
           '<svg class="t-unit-direction" viewBox="-30 -30 60 60" aria-hidden="true"><path d="M0,-29 L6.5,-19.5 L0,-22 L-6.5,-19.5 Z"/></svg>' +
         '</div>' +
       '</div>' +
@@ -165,13 +168,14 @@ export function createUnitView(parent, deps) {
     else if (value < prev) rec.shield.animate([{ filter: 'brightness(2)', transform: 'scale(1.06)' }, { filter: 'brightness(1)', transform: 'scale(1)' }], { duration: 320, easing: 'ease-out' });
   }
   function setShield(id, value) { const rec = nodes.get(id); if (rec) syncShield(rec, Math.max(0, value || 0)); }
-  // 警戒感叹号弹出（新进入警戒 / 收到警报）：弹跳 + 摇摆，收报者临时显示 0.9s
+  // 警戒标记弹出（新进入警戒 / 收到警报）：扫描弧环自外向内收紧锁定 + 猎视之眼骤然睁开，收报者临时显示 0.9s
   function pulseAlert(id) {
     const rec = nodes.get(id);
     if (!rec || !rec.alert) return;
     rec.root.classList.add('t-unit-alert-flash');
-    rec.alert.animate([{ transform: 'scale(0) rotate(0deg)' }, { transform: 'scale(1.6) rotate(-14deg)', offset: 0.35 }, { transform: 'scale(0.9) rotate(10deg)', offset: 0.6 },
-      { transform: 'scale(1.12) rotate(-5deg)', offset: 0.8 }, { transform: 'scale(1) rotate(0deg)' }], { duration: 560, easing: 'ease-out' });
+    rec.alert.animate([{ transform: 'scale(1.9)', opacity: 0, filter: 'brightness(2.6)' }, { transform: 'scale(0.92)', opacity: 1, filter: 'brightness(1.9)', offset: 0.45 },
+      { transform: 'scale(1.06)', offset: 0.7 }, { transform: 'scale(1)', opacity: 1, filter: 'brightness(1)' }], { duration: 520, easing: 'cubic-bezier(0.2,0.8,0.3,1)' });
+    rec.alert.querySelector('.t-alert-eye').animate([{ scale: '1.3 0.08' }, { scale: '1.25 1.35', offset: 0.4 }, { scale: '1 1' }], { duration: 520, easing: 'ease-out' });
     clearTimeout(rec.alertTimer);
     rec.alertTimer = setTimeout(() => rec.root.classList.remove('t-unit-alert-flash'), 900);
   }

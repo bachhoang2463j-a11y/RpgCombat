@@ -7,13 +7,13 @@
 
 import { normalizeEffectTag } from './effect-definitions.mjs';
 
-// L1 轻量：目标局部 ≤0.6s；L2 中量：周身+地面 0.8–1.2s；L3 重量：全屏 2–2.5s；L4 史诗：全屏+暗场 3–3.5s。
+// L1 轻量：目标局部 ≤0.6s；L2 中量：周身+地面 0.8–1.2s；L3 重量：全屏 2–4.2s；L4 史诗：全屏+暗场 3–5s（L3/L4 含运镜与时停顿帧）。
 // 音量：L1 短反馈峰值 0.22–0.38；L2–L4 转折爆发/主攻击峰值 0.50–0.75。'identity' = 沿用回合制已定稿资产，不再分级。
 export const GRADE_BUDGETS = {
   L1: { label: '轻量', minMs: 0, maxMs: 600, fullscreen: false, darken: false, peakVol: [0.22, 0.38], minChargeMs: 0 },
   L2: { label: '中量', minMs: 800, maxMs: 1200, fullscreen: false, darken: false, peakVol: [0.50, 0.75], minChargeMs: 0 },
-  L3: { label: '重量', minMs: 2000, maxMs: 2500, fullscreen: true, darken: false, peakVol: [0.50, 0.75], minChargeMs: 800 },
-  L4: { label: '史诗', minMs: 3000, maxMs: 3500, fullscreen: true, darken: true, peakVol: [0.50, 0.75], minChargeMs: 1200 },
+  L3: { label: '重量', minMs: 2000, maxMs: 4200, fullscreen: true, darken: false, peakVol: [0.50, 0.75], minChargeMs: 800 },
+  L4: { label: '史诗', minMs: 3000, maxMs: 5000, fullscreen: true, darken: true, peakVol: [0.50, 0.75], minChargeMs: 1200 },
 };
 
 const SLOT_RAW = tag => String(tag || '').replace(/[[\]]/g, '');

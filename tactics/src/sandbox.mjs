@@ -234,6 +234,17 @@ export function createSandbox(rootEl, deps = {}) {
     applyCamera();
   }
   function focusWorld(wx, wy) { userCamTouched = false; return animateTo(centerPoseFor(wx, wy), 180); }
+  // 运镜构图（高阶技能演出用）：定点定缩放 / 框住点集（pad 米留白，tight>1 更紧）；玩家本次动作已接管镜头则演出不再抢镜
+  function poseAt(wx, wy, scale) {
+    const safe = safeRectClient();
+    return focusPose(wx, wy, clampScale(scale), origin, 50, { x: origin.left + safe.left + safe.width / 2, y: origin.top + safe.top + safe.height / 2 });
+  }
+  function poseFrame(points, { pad = 2.5, tight = 1 } = {}) {
+    const safe = safeRectClient(), xs = points.map(p => p.x), ys = points.map(p => p.y);
+    const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad, minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
+    const scale = Math.min(safe.width / ((maxX - minX) * 50), safe.height / ((maxY - minY) * 50)) * tight;
+    return poseAt((minX + maxX) / 2, (minY + maxY) / 2, scale);
+  }
 
   // 开场构图：框住我方所在区域（含留白），战场成为主视觉；不改网格与几何
   function openingPose(vd) {
@@ -384,6 +395,9 @@ export function createSandbox(rootEl, deps = {}) {
   return {
     mount, update, reset, destroy,
     focusWorld, guideTo, followWorld,
+    poseAt, poseFrame,
+    cameraTo: (p, ms) => (userCamTouched ? Promise.resolve(false) : animateTo(p, ms)),
+    cameraTouched: () => userCamTouched,
     introSweep,
     onCancel: (cb) => { onCancelCb = cb; },
     onContext: (cb) => { onContextCb = cb; },
