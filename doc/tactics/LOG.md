@@ -555,3 +555,12 @@
 - 验证与产物：`node tactics/tools/run-tests.cjs --all` 全量 1207 项通过（0 失败）；`node tactics/tools/build-demo-html.cjs` 重建 `tactics/mvp-standalone.html`（1,641,728 B、58 模块/42 断言/110 符号，sha256 `4ed2239686e9664e121d5c903174775d6de1f2235da086c022cb8d454993dd5a`）；产物专项 `verify-typical-artifact.cjs` 34/34、`verify-feedback-artifact.cjs` 28/28、`verify-guard-barrier-artifact.cjs` 13/13 全通过。
 - 内置浏览器实机验证：`Tactics Standalone Verifier` 在 `http://127.0.0.1:8129/tactics/mvp-standalone.html` 验证开场、新 `jump_*.mp3` 与 `move_flight_wind.mp3` 加载（HTTP 200/206、0 个 4xx/5xx）、玛德琳跳跃扣 `辅` 不扣移动、索恩 `生体流转` 获得 `主 2` 并释放 `“清算”三连发`（首次释放后 HUD 即时保留 `【“清算”三连发】已锁定 · 再次点击目标或 Enter 发动`；第 10 步因视口变窄点偏空地触发移动而未完成第 2 次连发点击，该逻辑已由 1207 全量单测覆盖）。
 - 目的 vs 现状：4 项优化全部落地并通过全量单测与单文件产物门禁；Demo 页保留在内置浏览器供用户直接试听与复核。未改根 index/README/SPEC，无关未跟踪文件未纳入提交。
+
+## 2026-11-26 · 肃正屏障永久持续并验证困敌规则（e813586）
+- 核心目的：屏障不再因回合数到期消失；屏障内敌方不能离开，已有空间规则保留。
+- 文件：tactics/src/{barriers,effect-definitions}.mjs；integration-test/fixtures/tactics/{guard-barrier-flow,guard-barrier-space}-node-cases.mjs；tactics/tools/verify-guard-barrier-artifact.cjs；tactics/mvp-standalone.html；integration-test/fixtures/tactics/reports/GUARD-BARRIER-artifact.json。
+- 决策与变更：previewBarrier统一endAt=null，忽略技能/槽位显式持续回合；肃正默认持续改Infinity，删除失效ROUND_TIME导入。不影响同技能其他效果时长、特防/护甲/耐久结算、击碎、同施术者替换与战斗清理。现有barrierCrossing已接普通移动、跳跃/飞行、冲锋、侧闪与推拉，未重写或加防御性二次校验。
+- 验证：空间6与流程10定向通过；唯一一次全量1208通过、0失败。新增默认/技能/槽位时长均永久、长期推进、敌方内外跨界/内部移动/友方通行、真实ref.flying开关、普通移动/跳跃/推拉受阻及击碎解除断言。git diff --check通过。
+- 产物：重建1,641,675 B、58模块/42输入/110符号，sha256 d128fb286f47d195afe81ef345edf7e6e3a397da148cb9d6f1245e5e5cddec0d；单script闭合/零外部import/关键模块及屏障专项14通过。首轮13通过1失败：速度300夹具推进40次未达到测试要求1000时间；仅延长该测试至80次后定向复跑全绿，未修改业务或重跑全量。
+- IAB验证边界：当前单文件通过公开loadYaml载入定向两人对局；原技能按钮点击两次遮挡/定位超时后用DOM click触发原绑定，进入地图选目标状态。通过当前页面app.getBattle正式attack接口完成创建，endAt=null；正式move外部落点返回不可达，推进2066.67时间（约20.7回合）仍存在。页面jump尝试因距离4大于上限2被拒，不计为页面跳跃屏障验证，跳跃/飞行跨界由源码专项覆盖；未完成纯GUI地图选点施放或真Chrome动画验收，不冒充。临时标签与服务均关闭。
+- 目的 vs 现状：永久持续与既有困敌规则通过源码全量和单文件专项；页面内正式战斗接口存续/移动通过，纯GUI选点与动画保留用户复测。未改README/SPEC/根index，无关未跟踪文件未提交。
