@@ -16,7 +16,7 @@ import { previewBarrier, createBarrier, interception, damageBarrier, expireBarri
 import { previewGuard } from './guard.mjs';
 import { queryAttack, resolveDefaultRange } from './range.mjs';
 import { resolveHit, calculateDamage, computeSegmentRawDamage, applyCollisionDamage } from './damage.mjs';
-import { chooseEnemyAction, visibleEnemies } from './ai.mjs';
+import { chooseEnemyAction, visibleEnemies, fogRouteFilter } from './ai.mjs';
 import { skillSlots, sortSlotsForResolve, normalizeEffectTag, effectDefinition } from './effect-definitions.mjs';
 import { applyEffectSlot } from './effect-handlers.mjs';
 import { CLASS_PASSIVES, getEffectiveStats } from './class-passives.mjs';
@@ -31,14 +31,14 @@ export const BASIC_ATTACK = {
 function skillKey(skill) { return (skill.parentItemName || skill.parentName ? (skill.parentItemName || skill.parentName) + '\u0000' : '') + skill.name; }
 function usedCount(state, unitId, key) { return state.perBattleUses?.[unitId]?.[key] || 0; }
 
+const ITEM_ACTION_COST = { main: 0, aux: 1 };
+
 // 物品 → 技能形态（规范 range/slots/isItem，供 attackPreview / aim 复用；不回写原物品）
 export function itemAsSkill(item, child = null) {
   if (!item || !item.isItem) return null;
-  const selected = child ? Object.assign({}, child, { isItem: true, parentItemName: item.name }) : item;
-  if (selected.range) return selected;
-  const range = resolveDefaultRange(selected);
-  if (!range) return selected;
-  const view = Object.assign({}, selected, { range });
+  const selected = child ? { ...child, isItem: true, parentItemName: item.name } : item;
+  const range = selected.range || resolveDefaultRange(selected);
+  const view = { ...selected, range, actionCost: ITEM_ACTION_COST };
   Object.defineProperty(view, '_itemSource', { value: item });
   return view;
 }
@@ -382,12 +382,13 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const source = statusSource(target.id, { casterId, skillId: sk }, effectId);
     registerBuff(target, { type: kind, value: strength, duration: turns }, source);
   }
-  function dispelNegatives(target, count) {
-    const isNegative = b => (b.type === 'poison' || b.type === 'burn' || b.type === 'paralyze' || b.type === 'stun'
+  function negativeBuffsOf(unitId) {
+    return buffsOf(unitId).filter(b => b.type === 'poison' || b.type === 'burn' || b.type === 'paralyze' || b.type === 'stun'
       || (b.type === 'def' && b.value < 0) || (b.type === 'hit' && b.value < 0)
       || (b.type === 'eva' && b.value < 0) || (b.type === 'atk' && b.value < 0) || (b.type === 'spd' && b.value < 0));
-    const removed = [];
-    buffsOf(target.id).forEach(b => { if (isNegative(b) && removed.length < count) removed.push(b); });
+  }
+  function dispelNegatives(target, count) {
+    const removed = negativeBuffsOf(target.id).slice(0, Math.max(0, Math.ceil(count)));
     removed.forEach(b => removeBuffRecord(target.id, b));
     return removed;
   }
@@ -787,22 +788,23 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
           remaining: st && st.endAt != null ? Math.max(0, Math.ceil((st.endAt - ctx.now()) / ROUND_TIME - 1e-9)) : null }; }) };
   }
 
-  function reachable() {
+  function reachable(avoidFog = false) {
     const resourcesNow = state.combatState.clock?.currentAction?.resources;
     if (resourcesNow && resourcesNow.moveMultiplier === undefined) resourcesNow.moveMultiplier = 1;
-    const carrying = (state.combatState.carrying || {})[currentId()];
-    return actor() && resources ? findReachable(ctx, currentId(), resources.moveRemaining * (resources.moveMultiplier || 1), carrying ? 2 : 1) : { cells: [], byKey: new Map() };
+    const u = actor(), carrying = (state.combatState.carrying || {})[currentId()];
+    return u && resources ? findReachable(ctx, u.id, resources.moveRemaining * (resources.moveMultiplier || 1), carrying ? 2 : 1,
+      avoidFog ? fogRouteFilter(ctx, u) : null) : { cells: [], byKey: new Map() };
   }
-  function previewMove(col, row) {
-    const cell = reachable().cells.find(c => c.col === col && c.row === row) || null;
+  function previewMove(col, row, avoidFog = false) {
+    const cell = reachable(avoidFog).cells.find(c => c.col === col && c.row === row) || null;
     if (!cell) return null;
     const multiplier = resources.moveMultiplier || 1;
     return { ...cell, cost: cell.cost / multiplier, budgetCost: cell.cost };
   }
-  function move(col, row) {
+  function move(col, row, avoidFog = false) {
     if (!resources || state.combatState.clock.terminal) return { ok: false, reason: '当前不能移动' };
     if (resources.moveMultiplier === undefined) resources.moveMultiplier = 1;
-    let cell = previewMove(col, row);
+    let cell = previewMove(col, row, avoidFog);
     if (!cell || cell.cost === 0) return { ok: false, reason: '落点不可达' };
     const p = placementsById[currentId()];
     const from = { col: p.col, row: p.row, facing: p.facing };
@@ -1042,7 +1044,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       if (missing.length) return { ok: false, reason: '召唤词条缺失：' + missing.join('、') + '（名册/图鉴查无此词条）' };
     }
     const eff = effectiveSkill(skill);
-    const key = skillKey(skill), cost = skill.actionCost || { main: 1, aux: 0 };
+    const key = skillKey(skill), cost = skill.isItem ? ITEM_ACTION_COST : skill.actionCost || { main: 1, aux: 0 };
     const charge = chargeState(u.id), preparing = charge.preparing && charge.preparing.skillKey === key;
     if (skill.isItem && skill.children?.length) return { ok: false, reason: '请选择道具子用法' };
     // 大招充能门槛（原版 validSkills 排除未满 charge 技能，满时只放首个 charge 技能）；玩家操控单位不走自然充能
@@ -1072,8 +1074,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (preparing && !ready) return { ok: false, reason: '准备尚未就绪，请继续准备' };
     if (skill.delay > 0 && charge.preparing && !preparing) return { ok: false, reason: '请先释放或取消当前准备' };
     const prepSkill = skill.delay > 0;
-    const mainCost = prepSkill ? (preparing ? (ready ? 0 : 1) : 1) : (cost.main || 0);
-    const auxCost = prepSkill ? 0 : (cost.aux || 0);
+    const mainCost = prepSkill ? (preparing || skill.isItem ? 0 : 1) : (cost.main || 0);
+    const auxCost = prepSkill && (preparing || !skill.isItem) ? 0 : (cost.aux || 0);
     if (r.main < mainCost || r.aux < auxCost) return { ok: false, reason: r.main < mainCost ? '主行动已用完' : '辅助行动已用完' };
     if (u.ref.mp < (preparing ? 0 : (skill.cost || 0)) || u.ref.hp <= (preparing ? 0 : (skill.hpCost || 0)) || (u.ref.tp || 0) < (preparing ? 0 : (skill.tpCost || 0))) return { ok: false, reason: '数值资源不足' };
     return { ok: true, eff: effectiveSkill(skill), preparing: !!preparing, ready, mainCost, auxCost };
@@ -1588,9 +1590,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const chargeRelease = skill.charge > 0 && isAiControlled(u);
     const costSummary = { main: 0, aux: 0, mp: 0, hp: 0, tp: 0, uses: 0, bindings: null, ammoShots: 0 };
 
-    // 蓄力/延迟开始：支付基础 1 主行动 + MP/HP/TP/限次/绑定，登记 preparing，不进冷却、不结算槽位
+    // 准备开始：先支付使用费用；剩余主行动再按原蓄力规则投入。
     if (prepKind && !preparing) {
-      resources.main -= 1; costSummary.main = 1;
+      resources.main -= valid.mainCost; resources.aux -= valid.auxCost;
+      costSummary.main = valid.mainCost; costSummary.aux = valid.auxCost;
       u.ref.mp -= skill.cost || 0; costSummary.mp = skill.cost || 0;
       u.ref.hp -= skill.hpCost || 0; costSummary.hp = skill.hpCost || 0;
       u.ref.tp = (u.ref.tp || 0) - (skill.tpCost || 0); costSummary.tp = skill.tpCost || 0;
@@ -1607,7 +1610,9 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       charge.inventory -= invested;
       charge.preparing = { skillKey: key, skill: structuredClone(skill), remaining, invested, source: prepKind, aim: { ...aim }, ready: remaining === 0 };
       if (charge.preparing.remaining === 0) charge.preparing.ready = true;
+      const mainBeforePreparation = resources.main;
       prepareAtActionStart(u);
+      if (skill.isItem) costSummary.preparationMain = mainBeforePreparation - resources.main;
       notifyManaSpent(u, skill.cost || 0);
       addLog(u.name + ' 开始准备 ' + skill.name + ' · 需投入 ' + charge.preparing.remaining);
       return { ok: true, preparing: true, charge: chargeInfo, hits: [], effects: [], events: [], ammoEvents: [], query, casterId: u.id, skill, aim: { ...aim }, costSummary, logFrom, logTo: log.length };
@@ -2184,6 +2189,24 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     return { ok: true, unitId: u.id };
   }
 
+  function previewReady() {
+    const u = actor(), r = currentResources();
+    if (!u || !r || state.combatState.clock?.terminal) return { ok: false, reason: '当前不能整备' };
+    if (r.main < 1) return { ok: false, reason: '主行动已用完' };
+    if (!negativeBuffsOf(u.id).length) return { ok: false, reason: '没有可驱散的负面状态' };
+    return { ok: true };
+  }
+  function ready() {
+    const check = previewReady();
+    if (!check.ok) return check;
+    const u = actor(), candidates = negativeBuffsOf(u.id);
+    const removed = candidates[Math.floor(random() * candidates.length)];
+    currentResources().main--;
+    removeBuffRecord(u.id, removed);
+    addLog(u.name + ' 整备，祛除一项负面状态');
+    return { ok: true, removed };
+  }
+
   function advancePreparation() {
     const u = actor(), charge = u && chargeState(u.id);
     if (!u || !charge.preparing || charge.preparing.remaining <= 0 || !resources) return { ok: false, reason: '当前没有待准备技能' };
@@ -2256,8 +2279,12 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       const choice = planEnemyAction();
       if (!choice || choice.action === 'wait') break;
       const before = JSON.stringify({ resources, hp: actor().ref.hp, mp: actor().ref.mp, position: placementsById[id], prep: chargeState(id).preparing });
+      if (choice.jumpTo) {
+        if (!jump(choice.jumpTo.col, choice.jumpTo.row).ok) break;
+        continue;
+      }
       if (choice.moveTo) {
-        const moved = move(choice.moveTo.col, choice.moveTo.row);
+        const moved = move(choice.moveTo.col, choice.moveTo.row, choice.avoidFog);
         if (!moved.ok) break;
         if (moved.stoppedOnDiscovery) continue;
       }
@@ -2327,7 +2354,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   return { ctx, battleState: state, get state() { return state; }, start, snapshot, reachable, previewMove, move, sprint, previewJump, jump, push, previewCarry, carry, drop, previewDisplacement,
     setVisibleUnitIds(ids) { visibleIds = ids ? ids.slice() : null; },
     canUseSkill, skillStatus, canUseReaction, canUseItem, itemSkill: itemAsSkill, advancePreparation, cancelPreparation,
-    previewAttack, previewRetarget, beginAttack, attack, beginUseItem, useItem, predictAttack, defend,
+    previewAttack, previewRetarget, beginAttack, attack, beginUseItem, useItem, predictAttack, defend, previewReady, ready,
     getEffectiveUnit, statsOf, buffsOf,
     previewGuardCandidates, queryBarrierTargets(skill) {
       return ctx.barriers.map(barrier => queryAttack(ctx, currentId(), effectiveSkill(skill), { barrierId: barrier.id }))

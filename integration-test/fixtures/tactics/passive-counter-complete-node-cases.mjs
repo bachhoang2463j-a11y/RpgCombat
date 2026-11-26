@@ -58,8 +58,8 @@ function defenderCases() {
     const h = unit('h', 'hero', null, { spd: 300, atk: 10 });
     const d = unit('d', 'enemy', '防守者', { spd: 50, atk: 20 });
     const b = make([h, d], { h: { col: 2, row: 3 }, d: { col: 4, row: 3 } });
-    out.push(ok('PC-D1 开局天生嘲讽：命中+20、有效嘲讽200、永久反击架势入列',
-      b.statsOf(d).taunt === 200 && b.statsOf(d).hit === 20 && d.ref.baseTauntBonus === 100 && counterBuffs(b, d.id).length === 1));
+    out.push(ok('PC-D1 开局天生嘲讽：命中+10、有效嘲讽200、永久反击架势入列',
+      b.statsOf(d).taunt === 200 && b.statsOf(d).hit === 10 && d.ref.baseTauntBonus === 100 && counterBuffs(b, d.id).length === 1));
     d.ref.evasion = 10000;
     d.ref.hp = 100; h.ref.hp = 100;
     const powerless = make([unit('h2', 'hero', null, { spd: 300, atk: 10 }),

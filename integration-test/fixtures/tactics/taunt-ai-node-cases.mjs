@@ -115,17 +115,18 @@ function run() {
   for (let i = 0; i < 8 && aging.getEffectiveUnit('d').taunt > 200; i++) aging.endAction();
   const restored = aging.getEffectiveUnit('d');
   cases.push(ok('TA-23 真实临时嘲讽到期后总值与徽章同步恢复', taunted.ok && boosted === 300 && restored.taunt === 200
-    && boostedBadge.map(x => x.text).join() === '嘲讽 300' && statusBadges(restored).filter(x => x.key === 'taunt').map(x => x.text).join() === '嘲讽 200',
+    && boostedBadge.map(x => x.text).join() === '嘲讽 +200' && statusBadges(restored).filter(x => x.key === 'taunt').map(x => x.text).join() === '嘲讽 +100',
     JSON.stringify({ boosted, expired: restored.taunt, now: aging.snapshot().now })));
 
   const guardBadge = statusBadges(b.getEffectiveUnit('d')).filter(x => x.key === 'taunt');
   const stealthBadge = statusBadges(b.getEffectiveUnit('s')).filter(x => x.key === 'taunt');
   const html = fullStatusHtml([...guardBadge, ...stealthBadge]);
-  cases.push(ok('TA-UI1 每个单位只展示一个当前值，不显示来源或期限', guardBadge.length === 1 && stealthBadge.length === 1
-    && /嘲讽 200/.test(html) && /隐匿 50/.test(html) && !/永久|临时|回合|t-st-exp/.test(html), html));
+  cases.push(ok('TA-UI1 徽章展示净增量，不显示通用底值、来源或期限', guardBadge.length === 1 && stealthBadge.length === 1
+    && !statusBadges(b.getEffectiveUnit('n')).some(x => x.key === 'taunt')
+    && /嘲讽 \+100/.test(html) && /隐匿 50/.test(html) && !/永久|临时|回合|t-st-exp/.test(html), html));
   const main = readFileSync(new URL('../../../tactics/src/main.mjs', import.meta.url), 'utf8');
   cases.push(ok('TA-UI2 地图与英雄卡复用同一份状态列表', /view\.setStatus\(u\.id, compactStatusHtml\(list\)\)/.test(main)
-    && /shell\.setHeroStatus\(u\.id, fullStatusHtml\(list\)\)/.test(main)));
+    && /shell\.setHeroStatus\(u\.id, fullStatusHtml\(list\.filter\(b => b\.key !== 'shield'\)\)\)/.test(main)));
   return { cases };
 }
 export const groups = { 'TAUNT-AI': { run } };

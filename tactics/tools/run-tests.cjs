@@ -31,6 +31,10 @@ const FX01_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'f
 
 // 阶段注册表：只登记真实存在的用例文件；--all 只聚合这里的条目，不虚构未来阶段。
 const STAGES = {
+  'action-routes': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'action-routes-node-cases.mjs'),
+    groups: ['ACTION-ROUTES', 'ITEM-READY'], modules: [], requiredExports: [],
+  },
   'stealth-threshold': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'stealth-threshold-node-cases.mjs'),
     groups: ['STEALTH-THRESHOLD'], modules: [], requiredExports: [],

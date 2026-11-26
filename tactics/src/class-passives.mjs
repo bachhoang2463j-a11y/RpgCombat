@@ -16,6 +16,7 @@
 import { hasVariantTag, rageAtkMultiplier } from './variant-rules.mjs';
 
 export const CLASS_PASSIVES = {};
+export const BASE_TAUNT = 100;
 
 // 【蜕皮】敌方专属攻击加成（原版 getEffectiveStats L22986-22988 口径）：ref.molted 觉醒标记
 // 由 battle 受击/DoT/入场收口置位；标记+被动读取（非 buff），不随回合过期、不被驱散、跨【复活】永久。
@@ -35,7 +36,7 @@ export function getEffectiveStats(unit, buffs = [], concealAtk = 0) {
   let def = ref.def || 0;
   let hit = ref.hitBonus || 0;
   let eva = ref.evaBonus || 0;
-  let taunt = 100 + (ref.baseTauntBonus || 0);
+  let taunt = BASE_TAUNT + (ref.baseTauntBonus || 0);
   let spd = ref.spd || 0;
   for (const b of buffs) {
     if (!b || !Number.isFinite(b.value)) continue;
@@ -65,7 +66,7 @@ CLASS_PASSIVES['防守者'] = {
     return [{ type: 'counter', value: 0, duration: Infinity, permanent: true }]; // 永久反击架势（威力=加成值0，反击走本体攻击）
   },
   modifyStats(unit, stats) {
-    stats.hit += Math.floor(stats.taunt / 10);
+    stats.hit += Math.floor(Math.max(0, stats.taunt - BASE_TAUNT) / 10);
   },
   onFatalDamage(ctx) {
     if (!ctx.unit.ref.hasTriggeredGrit) {

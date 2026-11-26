@@ -33,6 +33,7 @@ check('原版受击数字及真实结果接线入包', ['buildHitFeedback', 'pre
 check('头像远景底线及父子引用修复入包', html.includes('avatarScaleForZoom') && html.includes('linkSkillGroupRows'));
 check('原版状态变种真实入口与常量入包', ['syncStatusLayers', 'clearStatusLayers', 'playStatusTickFx', 'syncVariantState', 'clearVariantState', 'playVariantTriggerFx', 'isEntityVariantLocked', 'STATUS_COLORS', 'arcane-status-flame-chip', 'arcane-variant-molted-fx'].every(s => html.includes(s)));
 check('实际结果事件和视觉消费入包', ['variant-trigger', 'status-tick', 'status-proc', 'status-removed', 'consumeVisualEvents', 'syncVisualState'].every(s => html.includes(s)));
+check('自动跳跃、避雾、物品辅助耗费和整备入包', ['planJump', 'fogRouteFilter', 'ITEM_ACTION_COST', 'previewReady', 'battle.ready()', 'tauntDelta'].every(s => html.includes(s)));
 const context = { console, structuredClone, URL, setTimeout, clearTimeout };
 context.window = context;
 vm.createContext(context);
@@ -70,6 +71,15 @@ if (backend) {
   const before = JSON.stringify(battle.snapshot());
   battle.previewAttack(rage);
   check('产物预览不扣HP/MP/主辅资源', JSON.stringify(battle.snapshot()) === before);
+  const stepData = backend.createScenarioData(block);
+  const monsterId = 'e:伊塔库亚的眷族';
+  Object.assign(stepData.placementsById[monsterId], { col: 11, row: 15 });
+  Object.assign(stepData.placementsById['h:埃利奥特'], { col: 11, row: 22 });
+  const stepBattle = backend.createBattle({ ...stepData, scene: backend.scene, random: backend.createSeededRandom(stepData.seed) });
+  stepBattle.start();
+  const stepTurn = stepBattle.runEnemyTurn();
+  const jump = stepTurn.events.find(e => e.type === 'unit-jumped' && e.unitId === monsterId);
+  check('产物AI真实走到北面台阶并完成大体型跳跃', jump?.from.row === 16 && jump?.to.row === 19 && stepData.placementsById[monsterId].row >= 19);
   const moveData = backend.createScenarioData(backend.parseYamlText(yaml));
   const moveBattle = backend.createBattle({ ...moveData, scene: backend.scene, random: backend.createSeededRandom(moveData.seed) });
   moveBattle.start();

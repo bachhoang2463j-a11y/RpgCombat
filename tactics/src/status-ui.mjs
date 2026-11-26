@@ -4,6 +4,8 @@
 // 文案与配色沿用原版 index.html updateBuffUI（L20390）与 registerTagHandler 飘字。
 // ==========================================
 
+import { BASE_TAUNT } from './class-passives.mjs';
+
 const ESC = s => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const NEG = '#c084fc';
 const STAT = {
@@ -53,12 +55,13 @@ export function statusBadges(eff, extra = {}) {
     push({ key: field, icon: v < 0 && field === 'spd' ? '🐌' : s.icon, text: s.name + sign(v) + (t ? '·' + t : ''), short: s.name + sign(v), color: v < 0 ? NEG : s.color, neg: v < 0,
       expiring: expiring(g), title: '【' + s.title + (v < 0 ? '下降' : '提升') + '】' + sign(v) + (t ? '，剩余 ' + t : '') }, v < 0 ? 3 : 4);
   }
-  if (eff.baseTauntBonus || group('taunt').length) {
-    const hidden = eff.taunt < 100;
-    const value = hidden ? 100 - eff.taunt : eff.taunt;
+  const tauntDelta = eff.taunt - BASE_TAUNT;
+  if (tauntDelta) {
+    const hidden = tauntDelta < 0;
+    const value = hidden ? -tauntDelta : sign(tauntDelta);
     const name = hidden ? '隐匿' : '嘲讽';
     push({ key: 'taunt', icon: hidden ? '🌫️' : '💢', text: name + ' ' + value, short: (hidden ? '匿' : '嘲') + value,
-      color: hidden ? '#94a3b8' : '#fca5a5', title: '当前' + name + '值 ' + value }, 5);
+      color: hidden ? '#94a3b8' : '#fca5a5', title: hidden ? '当前隐匿值 ' + value : '当前嘲讽 ' + value }, 5);
   }
   const counter = group('counter');
   if (counter.length) { const v = counter.reduce((n, b) => n + b.value, 0);

@@ -7,7 +7,7 @@
 // 浓雾：无八邻接可见敌人时优先离雾，出口路径跨预算且主行动>0 时请求冲刺；出雾后下一轮再攻击。
 // ==========================================
 
-import { findReachable, cellsAdjacent } from './movement.mjs';
+import { findReachable, findJumpPath, cellsAdjacent } from './movement.mjs';
 import { queryAttack, resolveDefaultRange } from './range.mjs';
 import { cellKey, unitCenter, cellCenter, occupiedCells } from './geometry.mjs';
 import { skillSlots } from './effect-definitions.mjs';
@@ -72,14 +72,24 @@ function cellInRegion(region, col, row) {
   return false;
 }
 
-function inFogAt(ctx, col, row) {
-  return fogRegions(ctx).some(r => cellInRegion(r, col, row));
+function fogChecker(ctx, unit) {
+  const regions = fogRegions(ctx);
+  if (!regions.length) return null;
+  const fp = footprintOf(ctx, unit), cache = new Map();
+  return (col, row) => {
+    const key = cellKey(col, row);
+    if (!cache.has(key)) {
+      const cells = occupiedCells({ col, row }, fp);
+      cache.set(key, regions.some(r => cells.some(c => cellInRegion(r, c.col, c.row))
+        && fogAffects(withPlacement(ctx, unit.id, col, row), r, unit.id)));
+    }
+    return cache.get(key);
+  };
 }
 
-function unitInFog(ctx, unit) {
-  const p = ctx.placementsById[unit.id];
-  if (!p) return false;
-  return fogRegions(ctx).some(r => fogAffects(ctx, r, unit.id) && occupiedCells(p, footprintOf(ctx, unit)).some(c => cellInRegion(r, c.col, c.row)));
+// 只供 AI 选路：允许沿雾内走到出口，出雾后不再进雾；不改每步的实扣成本。
+export function fogRouteFilter(ctx, unit, inFog = fogChecker(ctx, unit)) {
+  return inFog && ((col, row, nextCol, nextRow) => !inFog(nextCol, nextRow) || inFog(col, row));
 }
 
 function hasAdjacentEnemy(ctx, unit, enemies) {
@@ -254,12 +264,11 @@ export function chooseTauntTarget(ctx, unit, targets, random = ctx.random || Mat
   return targets[targets.length - 1];
 }
 
-function moveReach(ctx, unit, budget) {
-  return findReachable(ctx, unit.id, budget, ctx.carrying?.[unit.id] ? 2 : 1);
+function moveReach(ctx, unit, budget, canStep = null) {
+  return findReachable(ctx, unit.id, budget, ctx.carrying?.[unit.id] ? 2 : 1, canStep);
 }
 
-function searchBest(ctx, unit, skills, budget, enemies, allies, tracking) {
-  const reach = moveReach(ctx, unit, budget);
+function searchBest(ctx, unit, skills, budget, enemies, allies, tracking, reach = moveReach(ctx, unit, budget)) {
   const cells = reach.cells.slice().sort(cmpCell);
   const start = ctx.placementsById[unit.id];
   const startCenter = unitCenter(start, footprintOf(ctx, unit));
@@ -351,17 +360,18 @@ function stepAlong(ctx, reach, unit, path, budget) {
   return null;
 }
 
-function nearestPointCell(ctx, unit, cells, points) {
+function distanceToPoints(ctx, unit, points) {
   const fp = footprintOf(ctx, unit);
+  return cell => {
+    const from = unitCenter(cell, fp);
+    return Math.min(...points.map(p => Math.hypot(p.x - from.x, p.y - from.y)));
+  };
+}
+
+function nearestPointCell(cells, distanceTo) {
   let best = null;
   for (const cell of cells) {
-    const from = unitCenter({ col: cell.col, row: cell.row }, fp);
-    let minDist = Infinity;
-    for (const p of points) {
-      const d = Math.hypot(p.x - from.x, p.y - from.y);
-      if (d < minDist) minDist = d;
-    }
-    const cand = { dist: minDist, cost: cell.cost, key: cellKey(cell.col, cell.row), cell };
+    const cand = { dist: distanceTo(cell), cost: cell.cost, key: cellKey(cell.col, cell.row), cell };
     if (!best
       || cand.dist < best.dist - EPS
       || (Math.abs(cand.dist - best.dist) <= EPS && (cand.cost < best.cost - EPS
@@ -372,33 +382,70 @@ function nearestPointCell(ctx, unit, cells, points) {
   return best ? best.cell : null;
 }
 
+function movePlan(moveTo, avoidFog = false) {
+  return { ...IDLE, moveTo, action: null, ...(avoidFog ? { avoidFog: true } : {}) };
+}
+
+// 只跳到步行全图仍到不了、且比步行目标更接近任务的位置。
+function planJump(ctx, unit, res, budget, reach, walk, distanceTo, walkDistance, canStep) {
+  if (res.aux < 1 || res.jumped) return null;
+  const distance = Math.ceil(unit.ref.moveDistance / 3);
+  let best = null;
+  for (const start of reach.cells) {
+    const approach = start.cost > EPS ? stepAlong(ctx, reach, unit, start.path, budget) : null;
+    if (start.cost > EPS && !approach) continue;
+    const origin = withPlacement(ctx, unit.id, start.col, start.row);
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      const step = Math.hypot(dx, dy);
+      for (let n = 1; n * step <= distance + EPS; n++) {
+        const col = start.col + dx * n, row = start.row + dy * n;
+        if (walk.byKey.has(cellKey(col, row)) || (canStep && !canStep(start.col, start.row, col, row))) continue;
+        const land = { col, row }, dist = distanceTo(land), cost = start.cost + n * step;
+        if (dist >= walkDistance - EPS || (best && (dist > best.dist + EPS || (Math.abs(dist - best.dist) <= EPS && cost >= best.cost - EPS)))) continue;
+        if (findJumpPath(origin, unit.id, col, row, distance).ok) best = { approach, land, dist, cost };
+      }
+    }
+  }
+  if (!best) return null;
+  return best.approach ? movePlan(best.approach, !!canStep) : { ...IDLE, jumpTo: best.land, action: null };
+}
+
 // 无战斗动作时：召唤物按占地贴近主人，其它敌人在合法落点中巡走。
-function planIdleMove(ctx, unit, budget, inBudget) {
-  if (budget <= EPS) return null;
+function planIdleMove(ctx, unit, res, budget, inBudget, fog) {
   if (!unit.isSummon) {
-    if (unit.side !== 'enemy') return null;
-    const cells = inBudget.cells.filter(c => c.cost > EPS);
+    if (unit.side !== 'enemy' || budget <= EPS) return null;
+    const cells = inBudget.cells.filter(c => c.cost > EPS && (!fog || !fog(c.col, c.row)));
     const cell = cells.length && cells[Math.floor(ctx.random() * cells.length)];
-    return cell ? { col: cell.col, row: cell.row } : null;
+    return cell ? movePlan({ col: cell.col, row: cell.row }, !!fog) : null;
   }
   const owner = ctx.units.find(u => u.id === unit.summonOwnerId && isLive(u));
   if (!owner || ctx.carriedUnitIds.has(owner.id)) return null;
   const ownerPos = ctx.placementsById[owner.id];
-  const adjacent = p => cellsAdjacent(p, footprintOf(ctx, unit), ownerPos, footprintOf(ctx, owner));
+  const fp = footprintOf(ctx, unit), ownerFp = footprintOf(ctx, owner);
+  const adjacent = p => cellsAdjacent(p, fp, ownerPos, ownerFp);
   if (adjacent(ctx.placementsById[unit.id])) return null;
   const reach = moveReach(ctx, unit, Infinity);
   const goal = reach.cells.filter(adjacent).sort(cmpCell)[0];
-  return goal ? stepAlong(ctx, reach, unit, goal.path, budget) : null;
+  if (goal) {
+    const moveTo = stepAlong(ctx, reach, unit, goal.path, budget);
+    return moveTo ? movePlan(moveTo) : null;
+  }
+  const distance = distanceToPoints(ctx, unit, [unitCenter(ownerPos, ownerFp)]);
+  const followDistance = p => adjacent(p) ? 0 : distance(p);
+  const near = nearestPointCell(reach.cells, followDistance);
+  const leap = planJump(ctx, unit, res, budget, reach, reach, followDistance, followDistance(near));
+  const moveTo = stepAlong(ctx, reach, unit, near.path, budget);
+  return leap || (moveTo ? movePlan(moveTo) : null);
 }
 
 // ---------- 浓雾离场 ----------
 
-function planFogExit(ctx, unit, moveBudget, res) {
+function planFogExit(ctx, unit, moveBudget, res, inFog) {
   const full = moveReach(ctx, unit, Infinity);
   let exit = null;
   for (const cell of full.cells) {
-    const ctx2 = withPlacement(ctx, unit.id, cell.col, cell.row);
-    if (unitInFog(ctx2, unit)) continue;
+    if (inFog(cell.col, cell.row)) continue;
     if (!exit || cell.cost < exit.cost - EPS
       || (Math.abs(cell.cost - exit.cost) <= EPS && cellKey(cell.col, cell.row) < cellKey(exit.col, exit.row))) {
       exit = cell;
@@ -445,45 +492,65 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
   const usable = (skills || []).filter(s => s && !s.isReaction && s.trigger !== 'death'
     && (!canUseSkill || canUseSkill(s).ok));
 
-  // 一、浓雾且无八邻接可见敌人：优先离雾（可冲刺，出雾后下一轮再攻击）
-  if (unitInFog(ctx, unit) && !hasAdjacentEnemy(ctx, unit, seen)) {
-    const exit = planFogExit(ctx, unit, moveBudget, res);
+  const points = enemies.filter(e => ctx.placementsById[e.id]).map(e => unitCenter(ctx.placementsById[e.id], footprintOf(ctx, e)));
+  points.push(...(res.pursuitPoints || []));
+  const fog = fogChecker(ctx, unit);
+  const avoid = unit.side === 'enemy' ? fogRouteFilter(ctx, unit, fog) : null;
+  const needsExit = fog && fog(p.col, p.row) && !hasAdjacentEnemy(ctx, unit, seen);
+  if (needsExit && (!avoid || !points.length)) {
+    const exit = planFogExit(ctx, unit, moveBudget, res, fog);
     if (exit) return exit;
   }
 
-  // 二、额度内最优真实收益（攻击/减益/治疗/增益/准备/召唤）
   const tracking = !!(seenIds || res.pursuitPoints?.length);
-  const inBudget = searchBest(ctx, unit, usable, moveBudget, enemies, allies, tracking);
-  if (inBudget.best) return toResult(inBudget.best, res);
+  const preferred = moveReach(ctx, unit, moveBudget, avoid);
+  const inBudget = searchBest(ctx, unit, usable, moveBudget, enemies, allies, tracking, preferred);
+  const markRoute = plan => plan.moveTo && avoid ? { ...plan, avoidFog: true } : plan;
+  if (inBudget.best) {
+    const plan = markRoute(toResult(inBudget.best, res));
+    return needsExit && plan.moveTo ? movePlan(plan.moveTo, !!avoid) : plan;
+  }
 
-  // 三、攻击位超出本轮额度时沿路径接近。
   let fullReach;
   if (enemies.length && usable.length && moveBudget > EPS) {
-    const fullBest = searchBest(ctx, unit, usable, Infinity, enemies, allies, tracking);
-    fullReach = fullBest.reach;
+    fullReach = moveReach(ctx, unit, Infinity, avoid);
+    const fullBest = searchBest(ctx, unit, usable, Infinity, enemies, allies, tracking, fullReach);
     if (fullBest.best) {
       const moveTo = stepAlong(ctx, fullReach, unit, fullBest.best.cell.path, moveBudget);
-      if (moveTo) return { moveTo, skill: null, aim: null, action: null };
+      if (moveTo) return movePlan(moveTo, !!avoid);
     }
   }
 
-  // 四、无出手位置则接近追踪目标/警报报告点；先定全路径，绕过局部死角。
-  const points = enemies.filter(e => ctx.placementsById[e.id]).map(e => unitCenter(ctx.placementsById[e.id], footprintOf(ctx, e)));
-  points.push(...(res.pursuitPoints || []));
-  if (points.length && moveBudget > EPS) {
-    const reach = tracking ? (fullReach || moveReach(ctx, unit, Infinity)) : inBudget.reach;
-    const best = nearestPointCell(ctx, unit, reach.cells, points);
-    const moveTo = best && stepAlong(ctx, reach, unit, best.path, moveBudget);
-    if (moveTo) return { moveTo, skill: null, aim: null, action: null };
+  if (points.length) {
+    const reach = fullReach || moveReach(ctx, unit, Infinity, avoid);
+    const walk = avoid ? moveReach(ctx, unit, Infinity) : reach;
+    const distance = distanceToPoints(ctx, unit, points);
+    const near = nearestPointCell(walk.cells, distance);
+    const nearDry = avoid ? nearestPointCell(reach.cells, distance) : near;
+    const jump = planJump(ctx, unit, res, moveBudget, reach, walk, distance, distance(near), avoid);
+    if (jump) return jump;
+    // 同样能接近目标时用避雾路径；否则准许朝目标穿雾，而不是离雾后向原出口折返。
+    const useDry = avoid && distance(nearDry) <= distance(near) + EPS;
+    if (avoid && !useDry) {
+      const closer = searchBest(ctx, unit, usable, moveBudget, enemies, allies, tracking);
+      if (closer.best) return toResult(closer.best, res);
+      const leap = planJump(ctx, unit, res, moveBudget, walk, walk, distance, distance(near));
+      if (leap) return leap;
+    }
+    const moveTo = stepAlong(ctx, useDry ? reach : walk, unit, (useDry ? nearDry : near).path, moveBudget);
+    if (moveTo) return movePlan(moveTo, useDry);
   }
 
-  // 五、贴身且能防御；否则执行空闲移动。
+  if (needsExit && avoid && points.length) {
+    const exit = planFogExit(ctx, unit, moveBudget, res, fog);
+    if (exit) return exit;
+  }
   if (hasAdjacentEnemy(ctx, unit, seen)) {
     return res.main > 0 ? { ...IDLE, action: 'defend' } : { ...IDLE };
   }
-  if (res.idleMovement) {
-    const moveTo = planIdleMove(ctx, unit, moveBudget, inBudget.reach);
-    if (moveTo) return { ...IDLE, moveTo, action: null };
+  if (res.idleMovement && (!points.length || unit.isSummon)) {
+    const idle = planIdleMove(ctx, unit, res, moveBudget, preferred, avoid ? fog : null);
+    if (idle) return idle;
   }
   return Object.assign({}, IDLE);
 }

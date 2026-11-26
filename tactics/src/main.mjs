@@ -619,6 +619,7 @@ export function createApp(rootEl, opts = {}) {
     const reach = jumpReach(u, r);
     const downAlly = currentViewData.units.some(x => x.side === 'hero' && x.id !== u.id && x.ref.hp <= 0 && !Object.values(battle.snapshot().carrying).includes(x.id));
     const carried = carrying ? unitById(carrying) : null;
+    const ready = battle.previewReady();
     return [
       { key: 'attack', icon: '⚔️', name: '普通攻击', cost: { main: 1 }, mode: 'target', tone: 'rose', ok: !atkReason, reason: atkReason, short: atkReason && shortLabel(atkReason) },
       { key: 'defend', icon: '🛡️', name: '防御姿态', cost: { main: 1 }, mode: 'instant', tone: 'emerald',
@@ -633,6 +634,8 @@ export function createApp(rootEl, opts = {}) {
         ? { key: 'drop', icon: '⬇️', name: '放下', cost: null, mode: 'instant', tone: 'emerald', note: carried.name, ok: true, desc: '把背负的友方放到身边空格' }
         : { key: 'carry', icon: '⛑️', name: '背起', cost: { main: 1 }, mode: 'target', tone: 'emerald', ok: r.main >= 1 && downAlly,
           reason: r.main < 1 ? '主行动不足' : '没有可背起的倒地友方', short: r.main < 1 ? '◆ 主行动已用完' : '无倒地友方', desc: '背起相邻倒地友方，背负中移动消耗加倍' },
+      { key: 'ready', icon: '🧹', name: '整备', cost: { main: 1 }, mode: 'instant', tone: 'emerald',
+        ok: ready.ok, reason: ready.reason, short: shortLabel(ready.reason), desc: '随机祛除自身一项可驱散的负面状态' },
     ];
   }
   function shortLabel(reason) { return /主行动/.test(reason) ? '◆ 主行动已用完' : reason; }
@@ -947,6 +950,13 @@ export function createApp(rootEl, opts = {}) {
     if (!battle || !isHeroTurn() || busy) return;
     if (kind === 'release') {
       const prep = battle.snapshot().preparation;
+      if (prep?.skill.isItem) {
+        const items = currentUnit()?.items || [];
+        const idx = items.findIndex(it => it.name === (prep.skill.parentItemName || prep.skill.name));
+        const childIdx = prep.skill.parentItemName ? items[idx]?.children?.findIndex(child => child.name === prep.skill.name) : null;
+        if (idx < 0 || (prep.skill.parentItemName && !(childIdx >= 0))) { ui('deny'); shell.showLog('找不到待释放的蓄力物品', 'warn'); return; }
+        handleItemEntry(idx, childIdx); return;
+      }
       const idx = prep ? (currentUnit()?.skills || []).findIndex(s => s.name === prep.skill.name) : -1;
       if (idx < 0) { ui('deny'); shell.showLog('找不到待释放的蓄力技能', 'warn'); return; }
       handleCommand('sk:' + idx); return;
@@ -974,6 +984,14 @@ export function createApp(rootEl, opts = {}) {
       avHost.sfx('defUp', 0.62, { category: 'K' }); fxAtUnit(battle.snapshot().currentId, 't-heal-pulse', 700);
       const log = battle.snapshot().log;
       shell.showLog(log[log.length - 1] || '进入防御姿态', 'act');
+      refreshBattle(); afterHeroAction(); return;
+    }
+    if (kind === 'ready') {
+      const result = battle.ready();
+      if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return; }
+      ui('confirm');
+      const log = battle.snapshot().log;
+      shell.showLog(log[log.length - 1], 'act');
       refreshBattle(); afterHeroAction(); return;
     }
     if (kind === 'drop') { runDrop(); return; }
@@ -1228,51 +1246,60 @@ export function createApp(rootEl, opts = {}) {
   async function runEnemyTurn(myFlow) {
     const alive = () => myFlow === flow;
     if (!(await director.wait(380)) || !alive()) return;
-    let plan = battle.planEnemyAction();
-    // 巡走有额度就继续；发现敌人截停后，先执行新计划的走位，再决定是否出手。
-    while (plan && (plan.moveTo || plan.action === 'sprint')) {
+    const actorId = battle.snapshot().currentId;
+    const progress = () => {
+      const snap = battle.snapshot();
+      const u = snap.units.find(u => u.id === actorId);
+      return JSON.stringify([snap.resources, snap.preparation, u.hp, u.mp, battle.ctx.placementsById[actorId]]);
+    };
+    for (;;) {
+      const plan = battle.planEnemyAction();
+      if (!plan || plan.action === 'wait') break;
+      if (plan.jumpTo || plan.moveTo) {
+        sandbox.getUnitView().lockMotion(actorId, true);
+        const result = plan.jumpTo ? battle.jump(plan.jumpTo.col, plan.jumpTo.row) : battle.move(plan.moveTo.col, plan.moveTo.row, plan.avoidFog);
+        if (!result.ok) { sandbox.getUnitView().lockMotion(actorId, false); break; }
+        refreshBattle();
+        if (plan.jumpTo) await director.playJump(result);
+        else await director.playMove(result);
+        if (!alive()) return;
+        if (plan.jumpTo || result.stoppedOnDiscovery || !plan.skill) continue;
+      }
       if (plan.action === 'sprint') {
         const sp = battle.sprint();
         if (!sp.ok) break;
-        ui('sprint'); fxAtUnit(battle.snapshot().currentId, 't-sprint-burst', 760);
-        refreshBattle();
-      } else {
-        const mover = battle.snapshot().currentId;
-        sandbox.getUnitView().lockMotion(mover, true);
-        const mv = battle.move(plan.moveTo.col, plan.moveTo.row);
-        if (!mv.ok) { sandbox.getUnitView().lockMotion(mover, false); plan = null; break; }
-        refreshBattle();
-        await director.playMove(mv);
-        if (!alive()) return;
-        if (!mv.stoppedOnDiscovery && plan.skill) break;
-      }
-      plan = battle.planEnemyAction();
-    }
-    if (plan && plan.action === 'defend') {
-      battle.defend(); avHost.sfx('defUp', 0.55, { category: 'K' }); fxAtUnit(battle.snapshot().currentId, 't-heal-pulse', 700); refreshBattle();
-    } else if (plan && plan.action === 'prepare' && !plan.skill) {
-      const pr = battle.advancePreparation();
-      if (pr.ok) { avHost.sfx(pr.ready ? 'herochargedone' : 'herocharge', 0.58, { category: 'K' }); fxAtUnit(battle.snapshot().currentId, 't-charge-pulse', 900); refreshBattle(); }
-    } else if (plan && plan.skill) {
-      const q = battle.previewAttack(plan.skill, plan.aim);
-      if (q.ok) {
-        sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: plan.skill, query: q, locked: true });
+        ui('sprint'); fxAtUnit(actorId, 't-sprint-burst', 760); refreshBattle();
+      } else if (plan.action === 'defend') {
+        if (!battle.defend().ok) break;
+        avHost.sfx('defUp', 0.55, { category: 'K' }); fxAtUnit(actorId, 't-heal-pulse', 700); refreshBattle();
+      } else if (plan.action === 'prepare' && !plan.skill) {
+        const pr = battle.advancePreparation();
+        if (!pr.ok) break;
+        avHost.sfx(pr.ready ? 'herochargedone' : 'herocharge', 0.58, { category: 'K' }); fxAtUnit(actorId, 't-charge-pulse', 900); refreshBattle();
+      } else if (plan.skill) {
+        const q = battle.previewAttack(plan.skill, plan.aim);
+        if (!q.ok) break;
+        const before = progress();
+        sandbox.setPreview({ kind: 'attack', casterId: actorId, skill: plan.skill, query: q, locked: true });
         // 满充能大招：Cut-in → 原技能前摇/演出 → 命中与结果（未满不站桩；普通攻击与[延迟]准备照旧）
-        const cur = battle.snapshot().units.find(u => u.id === battle.snapshot().currentId);
+        const cur = battle.snapshot().units.find(u => u.id === actorId);
         if (plan.skill.charge > 0 && cur && cur.charge && cur.charge.current >= cur.charge.max) {
           await director.playChargeCutin(cur.id, plan.skill);
           if (!alive()) return;
         }
-        await director.playWindup(battle.snapshot().currentId, plan.skill);
+        await director.playWindup(actorId, plan.skill);
         if (!alive()) return;
         sandbox.setPreview(null);
         // 敌方攻击同走 beginAttack generator：我方受击时反应弹窗在驱动内弹出，选择/放弃都会继续结算
         const res = await director.runAttackLive(plan.skill, plan.aim);
         if (!alive()) return;
-        if (res && res.ok && res.preparing) { refreshBattle(); await director.playPrepare(res); }
-        else if (res && res.ok) await playAttackResult(res);
+        if (!res?.ok) break;
+        if (res.preparing) { refreshBattle(); await director.playPrepare(res); }
+        else await playAttackResult(res);
         if (!alive()) return;
-      }
+        const snap = battle.snapshot();
+        if (snap.currentId !== actorId || snap.terminal || progress() === before) break;
+      } else break;
     }
     if (!(await director.wait(420)) || !alive()) return;
     battle.endAction();

@@ -180,7 +180,7 @@ export function traceDisplacement(ctx, unitId, direction, distance) {
 
 // 可达合法落点：{ cells: [{col,row,cost,path:[{col,row}]}], byKey: Map<cellKey, cell> }
 // cells 只含可站落点（含起点 cost 0）；path 为锚点完整轨迹（友方格可作中途点）。
-export function findReachable(ctx, unitId, budget = Infinity, costMultiplier = 1) {
+export function findReachable(ctx, unitId, budget = Infinity, costMultiplier = 1, canStep = null) {
   const unit = findUnit(ctx, unitId);
   const p = ctx.placementsById[unitId];
   if (!p) throw new Error('单位缺少站位: ' + unitId);
@@ -217,6 +217,7 @@ export function findReachable(ctx, unitId, budget = Infinity, costMultiplier = 1
         const nCost = cur.cost + step;
         if (nCost > budget + EPS) continue;
         if (!enterable(nc, nr)) continue;
+        if (canStep && !canStep(cur.col, cur.row, nc, nr)) continue;
         if (barrierCrossing(ctx, unitId, { col: cur.col, row: cur.row }, { col: nc, row: nr })) continue;
         const nk = cellKey(nc, nr);
         const old = dist.get(nk);
