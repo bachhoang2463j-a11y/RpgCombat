@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "2085022064ee5b99d0e83e32e52ad748050747dbc2d381106908883952b680a5",
-  "bytes": 1633733,
+  "sha256": "5113acaef535014f96ea3e1ea845e60271eb65837f153e60221ebda9a2e3fead",
+  "bytes": 1635427,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -77,6 +77,11 @@
     },
     {
       "id": "本轮辅助1.5倍速、隐匿音色、滑行续播及急袭消费入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "即时隐匿阈值、急袭次数徽章及错峰并行收尾入包",
       "pass": true,
       "detail": ""
     },
@@ -166,6 +171,6 @@
       "detail": ""
     }
   ],
-  "passed": 32,
+  "passed": 33,
   "failed": 0
 }

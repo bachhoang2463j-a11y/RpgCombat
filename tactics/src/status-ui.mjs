@@ -38,8 +38,14 @@ export function statusBadges(eff, extra = {}) {
   const para = group('paralyze');
   if (para.length) push({ key: 'paralyze', icon: '⚡', text: '麻' + para.length + '层·' + Math.min(20, para.length * 5) + '%' + (maxRem(para) != null ? '·' + maxRem(para) + '回' : ''), short: '麻' + para.length,
     color: '#fde047', neg: true, expiring: expiring(para), title: '【麻痹】回避 ' + para.reduce((n, b) => n + b.value, 0) + '，行动僵直概率 ' + Math.min(20, para.length * 5) + '%' }, 2);
+  const rush = group('atk').filter(b => b.isConcealAtk);
+  if (rush.length) {
+    const value = rush.reduce((n, b) => n + b.value, 0);
+    push({ key: 'conceal-atk', icon: '🎯', text: '急袭+' + value + '·1次', short: '急袭+' + value + '·1次', color: '#fbbf24',
+      title: '【隐匿急袭】下一次成功命中的非反应攻击 +' + value + '，使用后消耗；未使用时按原期限过期' }, 4);
+  }
   for (const [field, s] of Object.entries(STAT)) {
-    const g = group(field);
+    const g = group(field).filter(b => !b.isConcealAtk);
     if (!g.length) continue;
     const v = g.reduce((n, b) => n + b.value, 0);
     if (!v) continue;
@@ -50,8 +56,8 @@ export function statusBadges(eff, extra = {}) {
   const taunt = group('taunt');
   if (taunt.length) {
     const v = taunt.reduce((n, b) => n + b.value, 0), rem = maxRem(taunt);
-    if (v) push({ key: 'taunt', icon: v > 0 ? '💢' : '🌫️', text: (v > 0 ? '仇恨' : '隐匿') + sign(v) + (rem != null ? '·' + rem + '回' : ''), short: (v > 0 ? '仇' : '匿') + sign(v),
-      color: v > 0 ? '#fca5a5' : '#94a3b8', expiring: expiring(taunt), title: v > 0 ? '【仇恨】更容易被敌人选为目标' : '【隐匿】更不容易被敌人选为目标' }, 5);
+    if (v) push({ key: 'taunt', icon: v > 0 ? '💢' : '🌫️', text: (v > 0 ? '仇恨' : '临时隐匿') + sign(v) + (rem != null ? '·' + rem + '回' : ''), short: (v > 0 ? '仇' : '匿') + sign(v),
+      color: v > 0 ? '#fca5a5' : '#94a3b8', expiring: expiring(taunt), title: v > 0 ? '【仇恨】更容易被敌人选为目标' : '【临时隐匿】技能降低嘲讽，按自身期限到期；与永久被动合算，当前隐匿值 ' + Math.max(0, 100 - eff.taunt) }, 5);
   }
   const counter = group('counter');
   if (counter.length) { const v = counter.reduce((n, b) => n + b.value, 0);
@@ -78,11 +84,11 @@ export function fullStatusHtml(list) { return list.map(b => badgeHtml(b, true)).
 export function passiveTauntBadges(eff) {
   if (!eff || !['防守者', '隐匿者'].includes(eff.classType) || !eff.baseTauntBonus) return [];
   const value = eff.baseTauntBonus;
-  const name = value > 0 ? '仇恨' : '隐匿';
+  const name = value > 0 ? '仇恨' : '永久隐匿';
   return [{ key: 'passive-taunt', icon: value > 0 ? '💢' : '🌫️', text: name + sign(value),
     color: value > 0 ? '#fca5a5' : '#94a3b8',
-    title: '【' + eff.classType + '】永久' + name + sign(value) + '；当前总嘲讽 ' + eff.taunt
-      + '，普通敌方选敌权重 ' + Math.max(1, eff.taunt) + '（最低1，不代表不可攻击）' }];
+    title: '【' + eff.classType + '】' + (value > 0 ? '永久' : '') + name + sign(value) + '；当前总嘲讽 ' + eff.taunt
+      + (value < 0 ? '，当前隐匿值 ' + Math.max(0, 100 - eff.taunt) : '') + '，普通敌方选敌权重 ' + Math.max(1, eff.taunt) + '（最低1，不代表不可攻击）' }];
 }
 
 // 单个效果结果 → 飘字（原版 registerTagHandler 文案：攻+50 3回 / 速-20 3回 / +35HP …）；blocked 由结界演出负责

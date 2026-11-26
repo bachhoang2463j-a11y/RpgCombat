@@ -124,12 +124,13 @@ function atmosCases() {
   return out;
 }
 
-// ---------- 多目标 buff：原版逐标签逐目标串行（寂静指令 增攻→瞄准 两轮） ----------
+// ---------- 多目标 buff：原版逐标签目标错峰，SVG余波重叠（寂静指令 增攻→瞄准 两轮） ----------
 async function serialCases() {
   const out = [];
   const log = [];
   const handles = [];
   const waits = [];
+  let time = 0, settled = false;
   const effects = [
     { kind: 'buff', field: 'atk', value: 10, targetId: 'A' },
     { kind: 'buff', field: 'atk', value: 10, targetId: 'B' },
@@ -145,7 +146,7 @@ async function serialCases() {
       playGenericSupportFx(entity, type, { soundKey, onImpact }) {
         log.push('start:' + entity.id + ':' + type + ':' + soundKey);
         onImpact();
-        const h = { onFinish: new Set(), cancel() {}, id: entity.id };
+        const h = { onFinish: new Set(), cancel() {}, id: entity.id, startedAt: time, doneAt: time + 1100 / 1.5 };
         handles.push(h);
         return h;
       },
@@ -154,21 +155,43 @@ async function serialCases() {
     centerOf: () => ({ x: 1, y: 1 }),
     fx: { top: () => ({ firstChild: el('b') }) },
     revealEffect: e => log.push('reveal:' + e.targetId + ':' + e.field),
-    wait: ms => { waits.push(ms); return Promise.resolve(true); },
+    wait: ms => { waits.push(ms); time += ms; return Promise.resolve(true); },
     awaitHandle: h => new Promise(res => h.onFinish.add(res)),
   };
-  const finish = () => { const h = handles.at(-1); [...h.onFinish].forEach(fn => fn(true)); return new Promise(r => setTimeout(r, 0)); };
-  const run = playSupportEffects(ctx);
+  const run = playSupportEffects(ctx).then(ok => { settled = true; return ok; });
   await new Promise(r => setTimeout(r, 0));
-  out.push(ok('TP7AV-S 第一条（A 增攻）播放并在接触拍点揭示，未完成前不播下一条', log.join('|') === 'start:A:buff:atkUp|reveal:A:atk', log));
-  for (let i = 0; i < 5; i++) await finish();
+  out.push(ok('TP7AV-S 前一SVG未完成时下一目标已启动，末尾统一等待收尾', handles.length === 5 && !settled &&
+    handles[1].startedAt < handles[0].doneAt && handles.at(-1).startedAt < handles[0].doneAt, handles));
+  handles.forEach(h => [...h.onFinish].forEach(fn => fn(true)));
   const done = await run;
   const order = log.filter(s => s.startsWith('start:')).map(s => s.split(':').slice(1).join(':'));
-  out.push(ok('TP7AV-S 两轮串行：增攻 A→B，再瞄准 A→B（标签独立，不合并），顺序=后端 effects', done === true &&
+  out.push(ok('TP7AV-S 两轮错峰：增攻 A→B，再瞄准 A→B（标签独立，不合并），顺序=后端 effects', done === true &&
     order.slice(0, 4).join(',') === 'A:buff:atkUp,B:buff:atkUp,A:buff:hitUp,B:buff:hitUp', order));
   out.push(ok('TP7AV-S 同目标两个标签各自一次原版 SVG 与揭示', log.filter(s => s.startsWith('start:A')).length === 2 && log.filter(s => s.startsWith('reveal:A')).length === 2, log));
-  out.push(ok('TP7AV-S 条目间隔 1ms（4 个间隔）', waits.length === 4 && waits.every(ms => ms === 1), waits));
+  out.push(ok('TP7AV-S 跨目标间隔200/1.5ms（4个间隔），不叠加完整句柄时长', waits.length === 4 && waits.every(ms => ms === 200 / 1.5) && time === 4 * 200 / 1.5, waits));
   out.push(ok('TP7AV-S 减益走原版 debuff SVG 与 hitDown 音色', order.at(-1) === 'C:debuff:hitDown', order));
+  for (const duringGap of [true, false]) {
+    const active = [], canceledHandles = [];
+    const cancelCtx = { ...ctx, result: { effects: effects.slice(0, 2) },
+      wait: () => Promise.resolve(!duringGap),
+      av: { ...ctx.av, playGenericSupportFx(entity, type, { onImpact }) {
+        onImpact();
+        const h = { onFinish: new Set(), canceled: false, cancel() {
+          if (h.canceled) return;
+          h.canceled = true; canceledHandles.push(h);
+          [...h.onFinish].forEach(fn => fn(false)); h.onFinish.clear();
+        } };
+        active.push(h); return h;
+      } } };
+    const cancelRun = playSupportEffects(cancelCtx);
+    if (!duringGap) {
+      await new Promise(r => setTimeout(r, 0));
+      active[0].cancel();
+    }
+    const canceledResult = await cancelRun;
+    out.push(ok('TP7AV-S ' + (duringGap ? '错峰等待取消' : '整组收尾取消') + '停止全部已启动句柄，不继续揭示',
+      canceledResult === false && active.length === (duringGap ? 1 : 2) && canceledHandles.length === active.length));
+  }
   return out;
 }
 

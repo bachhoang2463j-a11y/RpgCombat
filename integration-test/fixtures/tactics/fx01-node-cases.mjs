@@ -165,10 +165,11 @@ export const groups = {
       supportCalls.some(row => row[1] === entities.get('untouched') && row[2] === 'buff' && row[3] === 'defUp') &&
       supportCalls.filter(row => row[3] === 'hpHeal').length === 2 && supportCalls.filter(row => row[3] === 'shieldUp').length === 1,
       j(supportTrace)));
-    cases.push(ok('TFX-01 原版接触揭示真实对象，条目间隔 1ms 串行，空驱散保留原版反馈',
+    cases.push(ok('TFX-01 原版接触揭示真实对象，同目标1ms/跨目标133ms错峰，空驱散保留原版反馈',
       recipientCall < hpReveal && hpReveal < secondCall && secondCall < mpReveal &&
       supportTrace.slice(hpReveal, secondCall).some(row => row[0] === 'wait' && row[1] === 1) &&
-      supportTrace.filter(row => row[0] === 'wait').every(row => row[1] === 1) &&
+      supportTrace.filter(row => row[0] === 'wait').every(row => row[1] === 1 || row[1] === 200 / 1.5) &&
+      supportTrace.filter(row => row[0] === 'wait' && row[1] === 200 / 1.5).length === 2 &&
       supportReveals.length === supportEffects.length && supportEffects.every(effect =>
         supportReveals.filter(reveal => reveal.effect === effect && reveal.quiet === true).length === 1), j(supportTrace)));
 

@@ -363,6 +363,12 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     dispatchBattleClock,
     dispatchClock: (cmd, rc) => dispatchClock(state, cmd, rc),
     passiveOf: unit => CLASS_PASSIVES[unit.classType] || null,
+    checkStealthThresholds(unit) {
+      const res = CLASS_PASSIVES['隐匿者'].checkStealthThresholds(unit, passiveIo(unit));
+      if (res.extraTurn) addLog('⚡ ' + unit.name + ' 隐匿值突破 ' + res.stealthVal + '，触发【再动】！');
+      if (res.rush) addLog('🎯 ' + unit.name + ' 隐匿值突破 100，下一次非反应攻击 +50（隐匿值回归 50）');
+      return res;
+    },
     interceptEffect(caster, target, slot) { return blockEffect(caster, target, slot); },
   };
   function applyBattleEffect(args) {
@@ -735,7 +741,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       evasion: u.ref.evasion || 0, stunned: !!state.combatState.clock?.units?.[u.id]?.stun,
       // remaining：时钟真实到期剩余回合（向上取整）；null = 无时限（消耗型/永久）
       buffs: buffsOf(u.id).map(b => { const st = state.combatState.clock?.statuses?.[b._key];
-        return { type: b.type, value: b.value, variant: b.variant || null, duration: Number.isFinite(b.duration) ? b.duration : null, isConsumable: !!b.isConsumable,
+        return { type: b.type, value: b.value, variant: b.variant || null, duration: Number.isFinite(b.duration) ? b.duration : null, isConsumable: !!b.isConsumable, isConcealAtk: !!b.isConcealAtk,
           remaining: st && st.endAt != null ? Math.max(0, Math.ceil((st.endAt - ctx.now()) / ROUND_TIME - 1e-9)) : null }; }) };
   }
 

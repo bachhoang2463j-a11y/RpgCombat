@@ -107,6 +107,7 @@ function applyToTarget(rt, { caster, target, slot, def, power, turns, skill, ski
     case 'taunt': {
       rt.registerBuff(target, { type: 'taunt', value: effPower, duration: turns, sourceKey: source.effectId }, source);
       rt.addLog(target.name + (effPower >= 0 ? ' 仇恨+' + effPower : ' 隐匿' + effPower) + ' · ' + turns + '回');
+      if (target.classType === '隐匿者') rt.checkStealthThresholds(target);
       return { kind: 'taunt', targetId: target.id, tag: slot.tag, value: effPower, turns, crit: multiplier > 1 };
     }
     case 'mainPoint': {

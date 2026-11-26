@@ -22,6 +22,16 @@ const root = path.resolve(__dirname, '..', '..');
   const { canSeeUnit } = await import(pathToFileURL(path.join(root, 'tactics', 'src', 'perception.mjs')).href);
   const run = new Function('createBattle', 'canSeeUnit', code + '\nreturn runCases;')(backend.createBattle, canSeeUnit);
   const { cases } = run();
+  const thresholdSource = fs.readFileSync(path.join(root, 'integration-test', 'fixtures', 'tactics', 'stealth-threshold-node-cases.mjs'), 'utf8');
+  const thresholdCode = thresholdSource.slice(thresholdSource.indexOf('function unit('), thresholdSource.indexOf('export const groups'))
+    .replace('export function runCases()', 'function runCases()')
+    .replace("new URL('../../../tactics/src/ui-shell.mjs', import.meta.url)", 'uiShellPath');
+  const assert = require('node:assert/strict');
+  const { statusBadges, passiveTauntBadges } = await import(pathToFileURL(path.join(root, 'tactics', 'src', 'status-ui.mjs')).href);
+  const thresholdRun = new Function('assert', 'readFileSync', 'createBattle', 'statusBadges', 'passiveTauntBadges', 'uiShellPath', thresholdCode + '\nreturn runCases;')(
+    assert, fs.readFileSync, backend.createBattle, statusBadges, passiveTauntBadges, path.join(root, 'tactics', 'src', 'ui-shell.mjs'));
+  // UI模板另在源码回归及IAB实测，这里只计真实产物后端的阈值/行动/消费用例。
+  cases.push(...thresholdRun().cases.filter(c => !/statusBadges|急袭独立atk|renderStrip/.test(c.id)));
   if (!cases.length) throw new Error('反馈用例提取为空');
   const failed = cases.filter(c => c.pass !== true);
   console.log(JSON.stringify({ kind: 'artifact-feedback-rules', passed: cases.length - failed.length, failed: failed.length,

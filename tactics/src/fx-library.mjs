@@ -522,8 +522,8 @@ const SUPPORT_KEYS = [...new Set([...Object.values(SUPPORT_BUFF), ...Object.valu
 const SUPPORT_VOLUME = 0.5;
 const SUPPORT_CUES = SUPPORT_KEYS.map(key => ({ key, vol: SUPPORT_VOLUME }));
 
-// 多目标串行：名单与顺序来自后端 result.effects（同一目标多个效果槽保持各自真实条目）；
-// 目标 A 的原版 SVG/音色在接触拍点揭示变化，A 的句柄全部完成后才开始 B。只串行演出与揭示，不重新结算。
+// 多目标错峰：名单与顺序来自后端 result.effects（同一目标多个效果槽保持各自真实条目）；
+// 目标按原版节拍启动，SVG/音色允许余波重叠，接触拍点揭示变化，不重新结算。
 function supportFeedbackOf(effect) {
   if (effect.kind === 'taunt') return effect.value < 0 ? ['buff', 'hide'] : ['taunt', 'taunt'];
   if (effect.kind === 'buff') {
@@ -533,8 +533,8 @@ function supportFeedbackOf(effect) {
   return SUPPORT_EFFECT[effect.kind];
 }
 async function playSupportEffects(ctx, accept = () => true) {
-  // 原版 executeSkillAction：外层逐标签槽、内层逐目标顺序 await（群体间隔一拍）。后端 effects 已按槽→目标排序，
-  // 每个真实效果条目各播一次自己的原版 SVG/音色（增攻与瞄准各自独立），播完一个再隔 1ms 播下一个。
+  // 原版辅助 SVG 启动后自行收尾，群体目标之间只隔 200ms；保留战棋 1.5 倍速，目标错峰约 133ms。
+  // 后端 effects 已按槽→目标排序，各条目独立揭示；不逐项等余波，整组末尾统一收尾。
   const steps = [];
   const seenEffects = new Set();
   for (const effect of ctx.result.effects || []) {
@@ -544,22 +544,33 @@ async function playSupportEffects(ctx, accept = () => true) {
     if (feedback) steps.push({ effect, feedback });
   }
   // 数值飘字由导演 revealEffect 统一按效果条目产生（含增攻/瞄准等全部效果），此处只负责原版 SVG/音色与拍点
+  const handles = [], pending = [];
+  let canceled = false;
+  const cancelAll = () => {
+    if (!canceled) { canceled = true; handles.forEach(handle => handle.cancel()); }
+    return false;
+  };
   const playOne = ([type, key], targetId, onImpact) => {
     const handle = ctx.av.CombatAudioMixer.withContext(ctx.audioContext,
       () => ctx.av.playGenericSupportFx(ctx.ent(targetId), type, { soundKey: key, volume: SUPPORT_VOLUME, onImpact }));
-    if (!handle) return Promise.resolve(true);
-    return ctx.awaitHandle(handle).then(ok => { if (!ok) handle.cancel(); return ok; });
+    if (!handle) return;
+    handles.push(handle);
+    pending.push(ctx.awaitHandle(handle).then(ok => { if (!ok) cancelAll(); return ok; }));
   };
   for (let i = 0; i < steps.length; i++) {
-    if (i > 0 && !(await ctx.wait(1))) return false;
     const { effect, feedback } = steps[i];
-    const ok = await playOne(feedback, effect.targetId, () => ctx.revealEffect(effect, true));
-    if (!ok) return false;
+    if (canceled) return false;
+    const gap = i > 0 && effect.targetId !== steps[i - 1].effect.targetId ? 200 / 1.5 : 1;
+    if (i > 0 && (!(await ctx.wait(gap)) || canceled)) return cancelAll();
+    playOne(feedback, effect.targetId, () => ctx.revealEffect(effect, true));
     if (effect.kind === 'heal' && effect.overheal > 0) {
-      if (!(await ctx.wait(1)) || !(await playOne(SUPPORT_EFFECT.shield, effect.targetId))) return false;
+      if (!(await ctx.wait(1)) || canceled) return cancelAll();
+      playOne(SUPPORT_EFFECT.shield, effect.targetId);
     }
   }
-  return true;
+  const finished = await Promise.all(pending);
+  return !canceled && finished.every(ok => ok);
+
 }
 
 const healMend = {
