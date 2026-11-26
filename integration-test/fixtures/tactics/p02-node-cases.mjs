@@ -360,6 +360,31 @@ async function t0204(deps) {
   fakeEl._ls.slice().forEach(fn => fn());
   cases.push(ok('T02-04 dispose 解绑监听', countsBefore === 1 && hits === 0 && s5.counts().listeners === 0, 'hits=' + hits));
 
+  // 5b. hold：演出时钟暂停期间，已排与新排的 after 都顺延，结束后按剩余时长续跑；heldMs 累计暂停时长
+  const clock5 = (() => {
+    let now = 0, q = [];
+    return {
+      get now() { return now; }, time: () => now,
+      advance(ms) { const end = now + ms; for (;;) { const t = q.filter(x => !x.c && x.at <= end).sort((a, b) => a.at - b.at)[0]; if (!t) break; now = t.at; t.c = true; t.fn(); } now = end; },
+      setTimeout(fn, ms) { const t = { at: now + ms, fn, c: false }; q.push(t); return t; }, clearTimeout(t) { if (t) t.c = true; },
+      setInterval() {}, clearInterval() {}, raf() {}, caf() {},
+    };
+  })();
+  const s5b = viewScope.createViewScope(clock5);
+  const order = [];
+  s5b.after(100, () => order.push('a@' + clock5.now));
+  clock5.advance(40);
+  let resumed = -1;
+  s5b.hold(200, () => { resumed = clock5.now; });
+  s5b.after(30, () => order.push('b@' + clock5.now));
+  clock5.advance(100);                   // 140：暂停中，无触发
+  const quiet = order.length === 0 && s5b.heldMs() === 100;
+  clock5.advance(100);                   // 240：解冻（a 剩 60，b 剩 30）
+  clock5.advance(30); clock5.advance(30); // 270 触发 b，300 触发 a
+  cases.push(ok('T02-04 hold 顺延已排/新排计时并累计暂停时长',
+    quiet && resumed === 240 && order.join(',') === 'b@270,a@300' && s5b.heldMs() === 200 && s5b.counts().timers === 0,
+    JSON.stringify({ quiet, resumed, order, held: s5b.heldMs() })));
+
   // 6. P02 路由口径：三分支 branch 值（sandbox 动作映射的依据）
   const st = lifecycle.applyLoad(null, { sceneId: 'sc-a', battleId: 'bt-1' }, null, {});
   const resume = lifecycle.applyLoad(st.state, { sceneId: 'sc-a', battleId: 'bt-1' }, null, {});

@@ -5,7 +5,7 @@ import { createAvHost } from '../../../tactics/src/av-host.mjs';
 function node() { return { style: {}, setAttribute() {}, appendChild() {}, insertBefore() {}, remove() {} }; }
 function setup(cancel = false, action, onHit) {
   const calls = [];
-  const scope = { isLive: true, addNode() {}, removeNode() {}, after(ms, fn) { fn(); }, settleOnDispose() {},
+  const scope = { isLive: true, addNode() {}, removeNode() {}, after(ms, fn) { fn(); }, settleOnDispose() {}, heldMs: () => 0,
     loop(fn) { const t = performance.now(); fn(t); queueMicrotask(() => fn(t + 1000)); } };
   const positions = { e: { col: 9, row: 4 }, g: { col: 5, row: 4 }, h: { col: 7, row: 4 } };
   const units = Object.keys(positions).map(id => ({ id, ref: { hp: 100, atk: 10 } }));

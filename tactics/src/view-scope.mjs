@@ -14,10 +14,16 @@ export function createViewScope(clock = {}) {
     clearInterval: clock.clearInterval || ((id) => clearInterval(id)),
     raf: clock.raf || ((fn) => requestAnimationFrame(fn)),
     caf: clock.caf || ((id) => cancelAnimationFrame(id)),
+    now: clock.time || (() => performance.now()),
   };
 
   let active = true;
-  const timers = new Set();
+  const timers = new Map();   // 句柄 → { fn, due, cur（真实计时器，暂停中为 null）, left, sys }
+  let timerSeq = 0, holdDepth = 0, holdStart = 0, heldTotal = 0;
+  function arm(key, rec, ms) {
+    rec.due = t.now() + ms;
+    rec.cur = t.setTimeout(() => { timers.delete(key); if (active) rec.fn(); }, ms);
+  }
   const intervals = new Set();
   const rafIds = new Set();
   const loopRafIds = new Set();
@@ -32,13 +38,33 @@ export function createViewScope(clock = {}) {
     get isLive() { return active; },
 
     // ---- 计时 ----
+    // 演出时钟：hold 期间 after 计时（含期间新建的）整体顺延 ms，结束后按剩余时长续跑；heldMs 为累计暂停时长（补间扣除用）
     after(ms, fn) {
       if (!active) return null;
-      const id = t.setTimeout(() => { timers.delete(id); if (active) fn(); }, ms);
-      timers.add(id);
-      return id;
+      const key = ++timerSeq, rec = { fn, due: 0, cur: null, left: ms, sys: false };
+      timers.set(key, rec);
+      if (!holdDepth) arm(key, rec, ms);
+      return key;
     },
-    cancelAfter(id) { t.clearTimeout(id); timers.delete(id); },
+    cancelAfter(id) { const rec = timers.get(id); if (rec) t.clearTimeout(rec.cur); timers.delete(id); },
+    hold(ms, onResume) {
+      if (!active) return;
+      const now = t.now();
+      if (holdDepth++ === 0) {
+        holdStart = now;
+        timers.forEach(rec => { if (!rec.sys && rec.cur != null) { t.clearTimeout(rec.cur); rec.cur = null; rec.left = Math.max(0, rec.due - now); } });
+      }
+      const key = ++timerSeq, rec = { due: 0, cur: null, left: ms, sys: true, fn: () => {
+        if (--holdDepth === 0) {
+          heldTotal += t.now() - holdStart;
+          timers.forEach((r, k) => { if (r.cur == null) arm(k, r, r.left); });
+        }
+        if (onResume) onResume();
+      } };
+      timers.set(key, rec);
+      arm(key, rec, ms);
+    },
+    heldMs() { return heldTotal + (holdDepth ? t.now() - holdStart : 0); },
     every(ms, fn) {
       if (!active) return null;
       const id = t.setInterval(() => { if (!active) { t.clearInterval(id); intervals.delete(id); return; } fn(); }, ms);
@@ -134,7 +160,7 @@ export function createViewScope(clock = {}) {
     dispose() {
       if (!active) return scope.counts();
       active = false;
-      timers.forEach(id => t.clearTimeout(id)); timers.clear();
+      timers.forEach(rec => t.clearTimeout(rec.cur)); timers.clear();
       intervals.forEach(id => t.clearInterval(id)); intervals.clear();
       rafIds.forEach(id => t.caf(id)); rafIds.clear();
       loopRafIds.forEach(id => t.caf(id)); loopRafIds.clear();

@@ -9,6 +9,7 @@
 import { pathSegments, pointAtDistance } from './motion.mjs';
 import { FX_SCALE } from './av-host.mjs';
 import { unitCenter } from './geometry.mjs';
+import { letterbox, timeStop, hitFlash } from './cinematic.mjs';
 
 const TAU = Math.PI * 2;
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -366,53 +367,6 @@ function gunHit(ctx, impact) {
   spray(ctx.fx, t, 8, { kind: 'gore', ang, spread: 1.7, dist: [14, 52] });
   jolt(ctx, impact.targetId, { amp: 4, ms: 55, times: 2 });
   ctx.fx.shake('medium');
-}
-
-// ---------- 高阶运镜：推近出手者 → 时停定格 → 拉开框住战场 → 末击顿帧 → 回位（镜头被玩家接管即让出） ----------
-// 顿帧/时停：视口内全部运行中的 WAAPI 动画暂停 ms 后续播；during 在暂停之后执行，其中新建的定格画面不受冻结
-async function freeze(ctx, ms, during) {
-  const list = ctx.sandbox.getDom().viewport.getAnimations({ subtree: true }).filter(a => a.playState === 'running');
-  list.forEach(a => a.pause());
-  if (during) during();
-  const ok = await ctx.wait(ms);
-  list.forEach(a => { if (a.playState === 'paused') a.play(); });
-  return ok;
-}
-// 世界米坐标 → 视口内像素
-function viewPt(ctx, m) {
-  const r = ctx.sandbox.getDom().viewport.getBoundingClientRect(), s = ctx.sandbox.worldToScreenClient(m.x, m.y);
-  return { x: s.x - r.left, y: s.y - r.top, w: r.width, h: r.height };
-}
-// 电影遮幅：上下黑边滑入 → 保持 → 滑出（视口层）
-function letterbox(fx, ms, { h = 9, inMs = 280, outMs = 340 } = {}) {
-  const bar = (edge, dir) => '<i style="position:absolute;left:0;right:0;' + edge + ':0;height:' + h + '%;background:linear-gradient(' + dir + ',#000 0%,#000 72%,rgba(0,0,0,.55) 100%);"></i>';
-  const root = fx.screen(bar('top', '180deg') + bar('bottom', '0deg'), ms);
-  [...root.children].forEach((el, i) => {
-    const off = i ? 'translateY(100%)' : 'translateY(-100%)';
-    el.animate([{ transform: off }, { transform: 'translateY(0)', offset: inMs / ms }, { transform: 'translateY(0)', offset: 1 - outMs / ms }, { transform: off }], { duration: ms, easing: 'cubic-bezier(.3,.7,.2,1)', fill: 'forwards' });
-  });
-}
-// 时停定格画面（与 freeze 同拍）：去色高对比 + 焦点放射速度线 + 焦点白闪，解冻后 200ms 褪去
-function timeStop(ctx, ms, m, { tint = 'rgba(254,243,199,.95)', lines = 30 } = {}) {
-  const p = viewPt(ctx, m), R = Math.hypot(p.w, p.h), total = ms + 200;
-  const ls = Array.from({ length: lines }, (_, i) => {
-    const a = i / lines * TAU + rnd(-0.08, 0.08), r0 = R * rnd(0.14, 0.28);
-    return '<line x1="' + (p.x + Math.cos(a) * r0).toFixed(1) + '" y1="' + (p.y + Math.sin(a) * r0).toFixed(1) + '" x2="' + (p.x + Math.cos(a) * R).toFixed(1) + '" y2="' + (p.y + Math.sin(a) * R).toFixed(1) +
-      '" stroke="' + tint + '" stroke-width="' + rnd(1.2, 4.5).toFixed(1) + '" stroke-linecap="round"/>';
-  }).join('');
-  const root = ctx.fx.screen('<i style="position:absolute;inset:0;backdrop-filter:grayscale(1) contrast(1.45) brightness(1.06);-webkit-backdrop-filter:grayscale(1) contrast(1.45) brightness(1.06);"></i>' +
-    '<svg width="100%" height="100%" style="position:absolute;inset:0;overflow:visible;transform-origin:' + p.x.toFixed(0) + 'px ' + p.y.toFixed(0) + 'px;mix-blend-mode:screen;">' + ls + '</svg>' +
-    '<i style="position:absolute;inset:0;background:radial-gradient(circle at ' + p.x.toFixed(0) + 'px ' + p.y.toFixed(0) + 'px,rgba(255,255,255,.9) 0%,rgba(255,251,235,.35) 9%,rgba(255,255,255,0) 24%);mix-blend-mode:screen;"></i>', total);
-  const [gray, svg, flash] = root.children, k = ms / total;
-  gray.animate([{ opacity: 1 }, { opacity: 1, offset: k }, { opacity: 0 }], { duration: total, fill: 'forwards' });
-  svg.animate([{ opacity: 0, transform: 'scale(1.18)' }, { opacity: 1, transform: 'scale(1)', offset: 0.22 }, { opacity: 0.85, offset: k }, { opacity: 0, transform: 'scale(.94)' }], { duration: total, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' });
-  flash.animate([{ opacity: 1 }, { opacity: 0.4, offset: k }, { opacity: 0 }], { duration: total, fill: 'forwards' });
-}
-// 末击白闪（顿帧画面）：世界层锚定目标的白芯红晕大光团，随镜头不漂移
-function hitFlash(ctx, m, ms = 260) {
-  const p = worldPx(m);
-  ctx.fx.top(orbHtml(p.x, p.y, 4.2 * PX, 'rgba(254,202,202,.55)', 'rgba(255,255,255,.98)'), ms).firstChild
-    .animate([{ transform: 'scale(.55)', opacity: 1 }, { transform: 'scale(1)', opacity: 0.8, offset: 0.4 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: ms, fill: 'forwards' });
 }
 
 // ==========================================
@@ -1789,7 +1743,7 @@ const gunshotPierce = {
 // 每发：枪口焰 + 曳光 + 抛壳 + 跳弹火星 + 血雾，偶数发副枪交叉射向相邻目标；施法者后坐 / 目标弹雨硬直 / 持续后坐震屏；全程屏幕血块覆盖。
 // 运镜：遮幅入场 + 推近玛德琳（偏向射向）→ 时停定格（去色 + 速度线）→ 拉开框住全部目标并随扫射摆镜 → 末击顿帧急推 → 回位
 const strafeBurst = {
-  id: 'strafe-burst', grade: 'L3', fxTags: ['连续扫射'],
+  id: 'strafe-burst', grade: 'L3', fxTags: ['连续扫射'], cine: false,
   timeline: { chargeMs: 800, totalMs: 4120, fullscreen: true, darken: false },
   cues: [{ key: 'aoe_gun_burst_fs482122', vol: 0.68 }],
   prepareKeys() { return ['aoe_gun_burst_fs482122', 'gunshot1', 'gunshot2', 'gunshot3']; },
@@ -1810,7 +1764,7 @@ const strafeBurst = {
     if (!(await ctx.wait(CHARGE_MS))) return false;
 
     // ② 时停：整场定格去色，以出手者为焦点放射速度线 + 白闪
-    if (!(await freeze(ctx, STOP_MS, () => timeStop(ctx, STOP_MS, cm)))) return false;
+    if (!(await ctx.hold(STOP_MS, () => timeStop(sb, fx, STOP_MS, cm)))) return false;
 
     // ③ 开火：镜头拉开框住出手者与全部目标，随扫射主目标缓摆；持续高频后坐震屏
     fx.sfx('aoe_gun_burst_fs482122', 0.68); fx.shake('heavy');
@@ -1863,7 +1817,7 @@ const strafeBurst = {
     // ④ 末击顿帧：整场冻结，镜头急推最后一发命中的目标 + 白闪
     const last = targets[sweep[(N - 1) % Math.max(1, sweep.length)]];
     const fm = last ? last.m : am;
-    if (!(await freeze(ctx, HIT_MS, () => { sb.cameraTo(sb.poseAt(C.x + (fm.x - C.x) * 0.4, C.y + (fm.y - C.y) * 0.4, S * 1.12), 40); hitFlash(ctx, fm); }))) { rumble.cancel(); return false; }
+    if (!(await ctx.hold(HIT_MS, () => { sb.cameraTo(sb.poseAt(C.x + (fm.x - C.x) * 0.4, C.y + (fm.y - C.y) * 0.4, S * 1.12), 40); hitFlash(fx, fm); }))) { rumble.cancel(); return false; }
     rumble.cancel();
     fx.shake('quake');
     if (last && last.hit) spray(fx, last.p, 16, { kind: 'gore', ang: Math.atan2(last.p.y - c.y, last.p.x - c.x), spread: 1.6, dist: [30, 110], size: [3, 7.5] });

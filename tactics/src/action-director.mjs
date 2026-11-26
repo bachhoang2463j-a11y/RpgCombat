@@ -15,6 +15,7 @@ import { registerDefaultFx, EXTRA_AUDIO, fogFieldHtml, animateFogField, elementF
 import { createVfxHost } from './vfx-host.mjs';
 import { skillSlots } from './effect-definitions.mjs';
 import { startAtmos, atmosStyleOf } from './screen-atmos.mjs';
+import { startCine } from './cinematic.mjs';
 import { GUARD_AUDIO_KEYS, BARRIER_AUDIO_KEYS, playGuardDash, playGuardBlock, mountBarrierDome, updateBarrierBadge,
   playBarrierRaise, playBarrierHit, playBarrierBlocked, playBarrierShatter, fadeBarrierDome } from './guard-barrier-fx.mjs';
 import { effectFloat } from './status-ui.mjs';
@@ -88,17 +89,41 @@ export function createActionDirector(deps) {
     });
   }
   const centerOf = id => sandbox.unitWorldCenter(id);
+  // 时停/顿帧：演出时钟暂停 ms（期间计时与补间整体顺延），同一同步段内新建的视口动画一并冻结（微任务快照），视频零速；
+  // during 在冻结之后执行，其中新建的定格画面照常播放。音频不停（画面定格、声音延续）。
+  function hold(ms, during) {
+    const s = scope();
+    if (!s || !s.isLive) return Promise.resolve(false);
+    return new Promise(resolve => {
+      let frozen = [], vids = [];
+      const cancel = s.settleOnDispose(resolve);
+      s.hold(ms, () => {
+        frozen.forEach(a => { if (a.playState === 'paused') a.play(); });
+        vids.forEach(([v, r]) => { v.playbackRate = r; });
+        if (cancel) cancel();
+        resolve(true);
+      });
+      queueMicrotask(() => {
+        const vp = sandbox.getDom().viewport;
+        frozen = vp.getAnimations({ subtree: true }).filter(a => a.playState === 'running');
+        frozen.forEach(a => a.pause());
+        vids = [...vp.querySelectorAll('video')].filter(v => !v.paused).map(v => [v, v.playbackRate]);
+        vids.forEach(([v]) => { v.playbackRate = 0; });
+        if (during) during();
+      });
+    });
+  }
   // 逐帧补间：t∈[0,1]；scope 失活即以 false 结算
   function tween(ms, fn) {
     const s = scope();
     if (!s || !s.isLive) return Promise.resolve(false);
     return new Promise(resolve => {
       let done = false;
-      const t0 = performance.now();
+      const t0 = performance.now(), h0 = s.heldMs();
       const finish = ok => { if (done) return; done = true; resolve(ok); };
       const stop = s.settleOnDispose(() => finish(false));
       s.loop(now => {
-        const t = Math.min(1, (now - t0) / ms);
+        const t = Math.max(0, Math.min(1, (now - t0 - (s.heldMs() - h0)) / ms));
         fn(t);
         if (t >= 1) { if (stop) stop(); finish(true); return false; }
       });
@@ -375,6 +400,12 @@ export function createActionDirector(deps) {
       after: (ms, fn) => scope().after(ms, fn), entryId: entry.id,
       focus: (() => { const p = hits[0] ? centerOf(hits[0].targetId) : result.aim; const vp = sandbox.getDom().viewport.getBoundingClientRect(), s = p && sandbox.worldToScreenClient(p.x, p.y); return s ? { x: s.x - vp.left, y: s.y - vp.top } : null; })(),
     }) : null;
+    // 高阶运镜：与氛围层同生命周期；条目 cine:false 自行编排。爆发拍时停、首次命中顿帧、收尾回位
+    const cine = atmos && entry.cine !== false ? startCine({
+      sandbox, fx: makeFx(audioContext.category), hold, grade, result, hits, centerOf, shape: shape && shape.radius > 0 ? { center: shape.center || result.aim, radius: shape.radius } : null,
+      regions: (result.events || []).filter(ev => ev.type === 'region-created'), chargeMs: entry.timeline?.chargeMs || 600, totalMs: entry.timeline?.totalMs || 2000,
+    }) : null;
+    if (cine) { const burst = atmos.burst; atmos.burst = () => { burst(); cine.burst(); }; }
 
     const revealed = new Map();      // targetId → 已揭示段序号集合
     const reactionRuns = [];
@@ -475,6 +506,7 @@ export function createActionDirector(deps) {
       if (done.has(i)) return;
       done.add(i); revealed.set(targetId, done);
       if (atmos) atmos.lower();
+      if (cine && !seg.heal) cine.firstHit(targetId);
       if (guard) revealRule(guard, 'guard');
       const segmentReactions = [];
       const reaction = seg.reaction;
@@ -594,7 +626,7 @@ export function createActionDirector(deps) {
       charge: charge && { ...charge, footprint: vd.footprintsById[charge.unitId] }, playCharge,
       audioContext, outcomeMap: new Map(hits.map(h => [h.targetId, h.hit ? 'hit' : 'dodge'])),
       fx: makeFx(audioContext.category),
-      wait, tween, awaitHandle, after: (ms, fn) => scope().after(ms, fn),
+      wait, tween, awaitHandle, hold, after: (ms, fn) => scope().after(ms, fn),
       reveal, revealSegment, revealEffect, revealGuard, revealRule, revealRegion,
       awaitCounters: () => counterRun,
       awaitShotFeedback: async () => {
@@ -607,6 +639,7 @@ export function createActionDirector(deps) {
     guardEvents.forEach(ev => revealGuard(ev));
     const ok = await entry.play(ctx);
     if (atmos) atmos.end();
+    if (cine && isCurrent() && ok !== false) await cine.end();
     if (!isCurrent() || ok === false) return false;
     if (!(await playCharge()) || !isCurrent()) return false;
     await Promise.all(reactionRuns);
