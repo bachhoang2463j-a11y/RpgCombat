@@ -68,23 +68,24 @@ function footprintsEdgeAdjacent(ctx, a, b) {
   return cellsAdjacent(pa, fpOf(ctx, a), pb, fpOf(ctx, b));
 }
 
-export function canSeeUnit(ctx, observerId, targetId, lockAttack = false) {
+export function canSeeUnit(ctx, observerId, targetId, lockAttack = false, knownPosition = false) {
   if (observerId === targetId) return true;
   const observer = unitById(ctx, observerId);
   const target = unitById(ctx, targetId);
   if (!observer || !target || !isLive(observer)) return false;
   const oc = centerOf(ctx, observer), tc = centerOf(ctx, target);
   if (!oc || !tc) return false;
-  if (wallBlocked(ctx, oc, tc)) return false;
+  if ((!ctx.encounter || !knownPosition) && wallBlocked(ctx, oc, tc)) return false;
   const observerInFog = fogAt(ctx, observerId).regionIds.length > 0;
   if (observerInFog) {
     // 雾内：只保留八邻边缘相邻 + 自己
     return footprintsEdgeAdjacent(ctx, observer, target);
   }
   // 雾外：视距不减；但不能看雾内或穿透雾看另一侧
-  if (Math.hypot(oc.x - tc.x, oc.y - tc.y) > sightRadius(ctx, observer) + EPS) return false;
+  const inSightRadius = Math.hypot(oc.x - tc.x, oc.y - tc.y) <= sightRadius(ctx, observer) + EPS;
+  if (!ctx.encounter && !inSightRadius) return false;
   // 单体攻击可从雾外锁定雾内目标；不等于发现，也不放开穿雾看另一侧。
-  if (fogAt(ctx, targetId).strength > 0) return lockAttack;
+  if (fogAt(ctx, targetId).strength > 0) return lockAttack && inSightRadius;
   if (segmentTouchesFog(ctx, oc, tc)) return false;
   return true;
 }
@@ -98,7 +99,7 @@ export function canSeePoint(ctx, observerId, point) {
     return occupiedCells(ctx.placementsById[observerId], fpOf(ctx, observer)).some(c =>
       Math.max(Math.abs(c.col - Math.floor(point.x)), Math.abs(c.row - Math.floor(point.y))) <= 1);
   }
-  return Math.hypot(point.x - origin.x, point.y - origin.y) <= sightRadius(ctx, observer) + EPS
+  return (ctx.encounter || Math.hypot(point.x - origin.x, point.y - origin.y) <= sightRadius(ctx, observer) + EPS)
     && !segmentTouchesFog(ctx, origin, point);
 }
 
@@ -111,7 +112,7 @@ export function visibleCells(ctx, observerId) {
 }
 
 export function visibleUnitIds(ctx, observerId) {
-  return ctx.units.filter(u => isLive(u) && canSeeUnit(ctx, observerId, u.id)).map(u => u.id);
+  return ctx.units.filter(u => isLive(u) && canSeeUnit(ctx, observerId, u.id, false, true)).map(u => u.id);
 }
 
 // 快照：只暴露 visible；lastKnown 留空（不泄漏隐藏单位位置/HP）

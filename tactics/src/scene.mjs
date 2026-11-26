@@ -19,6 +19,7 @@ const KIND_RULES = {
   altar:      { blocksMovement: true,  blocksProjectile: false, blocksVision: false, lowObstacle: true },
   tomb:       { blocksMovement: true,  blocksProjectile: false, blocksVision: false, lowObstacle: true },
   // 纯装饰（不进规则）
+  chapelSteps: { blocksMovement: false, blocksProjectile: false, blocksVision: false, decor: true },
   banner:     { blocksMovement: false, blocksProjectile: false, blocksVision: false, lowObstacle: false, decor: true },
   rubble:     { blocksMovement: false, blocksProjectile: false, blocksVision: false, lowObstacle: false, decor: true },
   tree:       { blocksMovement: true,  blocksProjectile: true,  blocksVision: true,  lowObstacle: false, artOnly: true },
@@ -95,7 +96,7 @@ export function compileScene(scene) {
   for (const obj of scene.objects) {
     const rule = KIND_RULES[obj.kind];
     if (!rule) throw new Error('未知物件 kind: ' + obj.kind);
-    objectsIndex.set(obj.id, { id: obj.id, kind: obj.kind, bounds: obj.bounds ? { ...obj.bounds } : null, at: obj.at ? { ...obj.at } : null, open: obj.open });
+    objectsIndex.set(obj.id, { id: obj.id, kind: obj.kind, bounds: obj.bounds ? { ...obj.bounds } : null, at: obj.at ? { ...obj.at } : null, open: obj.open, cells: obj.cells?.map(c => ({ ...c })), facing: obj.facing });
 
     const artKind = obj.artType || obj.kind;
     if (obj.kind === 'light' || ['tree', 'boulder', 'crystal', 'campfire', 'table', 'shelf'].includes(artKind)) {
@@ -119,7 +120,10 @@ export function compileScene(scene) {
       continue;
     }
     if (rule.decor) continue;   // 装饰物只进 objectsIndex 供画法使用
-    if (obj.kind === 'carpet') {
+    if (obj.cells && ['wall', 'lowCounter', 'pew'].includes(obj.kind)) {
+      const type = obj.kind === 'wall' ? 'wall' : 'counter';
+      for (const c of obj.cells) artJson.features.push({ type, at: [c.col * q, c.row * q], size: [q, q] });
+    } else if (obj.kind === 'carpet') {
       artJson.terrain.push({ type: 'carpet', at: [obj.bounds.col * q, obj.bounds.row * q], size: [obj.bounds.width * q, obj.bounds.height * q] });
     } else if (obj.kind === 'wall') {
       // wall/counter 图元为左上角锚点
@@ -140,7 +144,7 @@ export function compileScene(scene) {
 
     // 规则格表：door.open 决定阻挡，其余按 kind 静态规则；lowObstacle 独立于阻挡标记
     const blocked = obj.kind === 'door' ? !obj.open : rule.blocksMovement;
-    for (const c of boundsCells(obj.bounds)) {
+    for (const c of obj.cells || boundsCells(obj.bounds)) {
       if (c.col < 0 || c.col >= columns || c.row < 0 || c.row >= rows) throw new Error('物件越出网格: ' + obj.id);
       const cell = cells[c.row * columns + c.col];
       cell.objectIds.push(obj.id);

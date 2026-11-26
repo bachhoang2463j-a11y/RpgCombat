@@ -97,10 +97,11 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     regions: state.combatState.regions || (state.combatState.regions = []),
     barriers: state.combatState.barriers || (state.combatState.barriers = []),
     now: () => state.combatState.clock?.now || 0,
-    enforcePerception: units.every(u => Number.isFinite(u.ref.perception)),
+    encounter: scene.encounter === true,
+    enforcePerception: scene.encounter === true || units.every(u => Number.isFinite(u.ref.perception)),
     buffsOf,
     random,
-    canSeeUnit(observerId, targetId) { return canSeeUnit(this, observerId, targetId); },
+    canSeeUnit(observerId, targetId) { return canSeeUnit(this, observerId, targetId, false, true); },
   };
   let log = [];
   let domainEvents = [];
@@ -134,16 +135,16 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     return result;
   }
   function addLog(text) { log.push(text); }
-  function alarmOf(unitId) { return state.combatState.enemyAlarms?.[unitId]; }
+  function alarmOf(unitId) { return ctx.encounter ? undefined : state.combatState.enemyAlarms?.[unitId]; }
   function noteEnemyContact(enemy, hero) {
-    if (enemy.side !== 'enemy' || enemy.ref.hp <= 0 || hero.side !== 'hero') return;
+    if (ctx.encounter || enemy.side !== 'enemy' || enemy.ref.hp <= 0 || hero.side !== 'hero') return;
     const alarms = state.combatState.enemyAlarms || (state.combatState.enemyAlarms = {});
     const record = alarms[enemy.id] || (alarms[enemy.id] = { state: 'pending', contacts: {} });
     if (!record.broadcasted) record.state = 'pending';
     record.contacts[hero.id] = unitCenter(placementsById[hero.id], hero.footprint);
   }
   function scanEnemyContacts(moved = null) {
-    if (moved && moved.ref.hp <= 0) return;
+    if (ctx.encounter || (moved && moved.ref.hp <= 0)) return;
     const heroes = moved?.side === 'hero' ? [moved] : units.filter(u => u.side === 'hero' && u.ref.hp > 0);
     const enemies = moved?.side === 'enemy' ? [moved] : units.filter(u => u.side === 'enemy' && u.ref.hp > 0);
     for (const enemy of enemies) for (const hero of heroes) {
@@ -814,7 +815,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (!cell || cell.cost === 0) return { ok: false, reason: '落点不可达' };
     const p = placementsById[currentId()];
     const from = { col: p.col, row: p.row, facing: p.facing };
-    const seen = ctx.enforcePerception ? syncDiscovered(actor().side) : new Set(queryVisibleUnitIds(ctx, currentId()));
+    const seen = !ctx.encounter && ctx.enforcePerception ? syncDiscovered(actor().side) : null;
     const multiplier = resources.moveMultiplier || 1;
     let stoppedOnDiscovery = false;
     let cost = 0;
@@ -824,7 +825,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       cost += Math.hypot(next.col - previous.col, next.row - previous.row) * ((state.combatState.carrying || {})[currentId()] ? 2 : 1) / moveMultiplier(ctx, currentId(), previous);
       p.col = next.col; p.row = next.row; path.push(next);
       scanEnemyContacts(actor());
-      if (ctx.enforcePerception && units.some(u => u.side !== actor().side && u.ref.hp > 0 && !seen.has(u.id) && canSeeUnit(ctx, currentId(), u.id))) {
+      if (seen && units.some(u => u.side !== actor().side && u.ref.hp > 0 && !seen.has(u.id) && canSeeUnit(ctx, currentId(), u.id))) {
         if (canPlaceAt(ctx, currentId(), next.col, next.row).ok) { stoppedOnDiscovery = true; break; }
       }
     }

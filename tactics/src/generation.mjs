@@ -2,7 +2,7 @@
 // P05 确定性场景生成与语义布阵（scene 是规则与美术的唯一事实源）
 // ==========================================
 
-import { compileScene } from './scene.mjs';
+import { cellAt, compileScene } from './scene.mjs';
 import { occupiedCells, cellKey, unitCenter } from './geometry.mjs';
 
 const THEMES = {
@@ -135,7 +135,7 @@ function getEntityCells(entity) {
 }
 function canPlace(scene, compiled, units, placements, unit, placement) {
   const fp = footprintOf(unit), cells = placementCells(placement, fp);
-  if (cells.some(c => !compiled.cells[c.row * compiled.grid.columns + c.col])) return { ok: false, reason: 'out-of-bounds' };
+  if (cells.some(c => !Number.isInteger(c.col) || !Number.isInteger(c.row) || !cellAt(compiled, c.col, c.row))) return { ok: false, reason: 'out-of-bounds' };
   if (cells.some(c => compiled.cells[c.row * compiled.grid.columns + c.col].blocksMovement)) return { ok: false, reason: 'blocked-terrain' };
   for (const other of units) {
     const id = unitIdOf(other), existing = placements[id];
@@ -240,7 +240,7 @@ function candidateFitsHardRelations(scene, units, placements, relations) {
   return true;
 }
 
-export function solveFormation(scene, units, formationSpec, { seed = scene.seed || 0 } = {}) {
+export function solveFormation(scene, units, formationSpec, { seed = scene.seed || 0, reserveOverrides = false } = {}) {
   const spec = formationSpec || { regions: [], landmarks: [], relations: [], groups: [], overrides: [] };
   const report = { status: 'ok', seed: Number(seed) >>> 0, placed: [], relaxed: [], conflicts: [] };
   const compiled = compileScene(scene);
@@ -261,6 +261,18 @@ export function solveFormation(scene, units, formationSpec, { seed = scene.seed 
   const placements = {};
   const overrideMap = new Map((spec.overrides || []).map(o => [o.unitId, o.placement]));
   const grouped = new Set();
+  function placeOverrides() {
+    for (const [id, placement] of overrideMap) {
+      const unit = unitMap.get(id);
+      if (!unit) return fail('invalid-spec', id, 'missing-override-unit');
+      const check = canPlace(scene, compiled, units, placements, unit, placement);
+      if (!check.ok) return fail('hard-conflict', 'override:' + id, check.reason, { unitId: id, placement, conflict: check.unitId || null });
+      placements[id] = { ...placement };
+      grouped.add(id);
+    }
+    return null;
+  }
+  if (reserveOverrides) { const conflict = placeOverrides(); if (conflict) return conflict; }
   for (const group of spec.groups || []) {
     const anchor = resolveAnchor(scene, group);
     if (!anchor) return fail('invalid-spec', group.id, 'invalid-group-placement');
@@ -281,14 +293,7 @@ export function solveFormation(scene, units, formationSpec, { seed = scene.seed 
       grouped.add(id);
     }
   }
-  for (const [id, placement] of overrideMap) {
-    const unit = unitMap.get(id);
-    if (!unit) return fail('invalid-spec', id, 'missing-override-unit');
-    const check = canPlace(scene, compiled, units, placements, unit, placement);
-    if (!check.ok) return fail('hard-conflict', 'override:' + id, check.reason, { unitId: id, placement, conflict: check.unitId || null });
-    placements[id] = { ...placement };
-    grouped.add(id);
-  }
+  if (!reserveOverrides) { const conflict = placeOverrides(); if (conflict) return conflict; }
   const defaultBounds = scene.regions && scene.regions[0] && scene.regions[0].bounds || { col: 0, row: 0, width: scene.grid.columns, height: scene.grid.rows };
   for (const unit of units) {
     const id = unitIdOf(unit);
@@ -308,6 +313,127 @@ export function solveFormation(scene, units, formationSpec, { seed = scene.seed 
   report.placed = Object.keys(placements).sort();
   report.status = report.relaxed.length ? 'ok-with-relaxed-soft-constraints' : 'ok';
   return { ok: true, placementsById: placements, report };
+}
+
+const ENCOUNTER_SIZES = {
+  small: [16, 14, 2],
+  medium: [24, 20, 3],
+  large: [32, 26, 5],
+};
+
+const OBSTACLE_DIRECTIONS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+
+function obstacleCells(start, [dx, dy], length) {
+  const cells = [{ ...start }];
+  for (let i = 1; i < length; i++) {
+    const col = start.col + dx * i, row = start.row + dy * i;
+    if (dx && dy) cells.push({ col, row: row - dy });
+    cells.push({ col, row });
+  }
+  return cells;
+}
+
+function placeEncounterObstacles(floor, reserved, count, high, chapel, rng) {
+  const points = rectCells(floor);
+  const inside = new Set(points.map(c => cellKey(c.col, c.row)));
+  const objects = [];
+  for (let i = 0; i < count; i++) {
+    const orientation = Math.floor(rng() * OBSTACLE_DIRECTIONS.length);
+    const offset = Math.floor(rng() * points.length);
+    const grouped = high ? i === 0 : i < Math.ceil(count * 0.75);
+    const lengths = grouped ? [3, 2] : [2, 1];
+    let found = false;
+    for (const length of lengths) {
+      for (let ori = 0; ori < OBSTACLE_DIRECTIONS.length && !found; ori++) {
+        const angle = (orientation + ori) % OBSTACLE_DIRECTIONS.length;
+        for (let j = 0; j < points.length; j++) {
+          const cells = obstacleCells(points[(j + offset) % points.length], OBSTACLE_DIRECTIONS[angle], length);
+          if (cells.some(c => !inside.has(cellKey(c.col, c.row)) || reserved.has(cellKey(c.col, c.row)))) continue;
+          const cols = cells.map(c => c.col), rows = cells.map(c => c.row);
+          const bounds = { col: Math.min(...cols), row: Math.min(...rows),
+            width: Math.max(...cols) - Math.min(...cols) + 1, height: Math.max(...rows) - Math.min(...rows) + 1 };
+          objects.push({ id: (high ? 'high-' : 'low-') + i, kind: high ? 'wall' : chapel ? 'pew' : 'lowCounter', bounds, cells, facing: angle * 45 });
+          cells.forEach(c => reserved.add(cellKey(c.col, c.row)));
+          found = true;
+          break;
+        }
+      }
+      if (found) break;
+    }
+    if (!found) return null;
+  }
+  return objects;
+}
+
+export function generateEncounter({ theme = 'stone', size, seed, sceneId = 'generated-encounter', units = [], positions = {} }) {
+  const chapel = theme === 'chapel';
+  const cfg = THEMES[chapel ? 'stone' : theme];
+  if (!cfg || (size != null && !Object.hasOwn(ENCOUNTER_SIZES, size))) throw new Error('未知单房间主题或大小');
+  const overrides = Object.entries(positions).map(([unitId, placement]) => ({ unitId, placement }));
+  let last;
+  for (const key of size == null ? Object.keys(ENCOUNTER_SIZES) : [size]) {
+    const [width, height, highCount] = ENCOUNTER_SIZES[key];
+    const columns = width + 2, rows = height + 2;
+    const rng = makeRng(seed);
+    const floor = { col: 1, row: 1, width, height };
+    const mid = rows / 2;
+    const bandHeight = Math.max(2, ...units.map(u => footprintOf(u).height));
+    const bandWidth = Math.min(width, 10 + (width - 16) / 2);
+    const left = 1 + Math.floor((width - bandWidth) / 2);
+    const bands = {
+      enemy: { col: left, row: mid - 2 - bandHeight, width: bandWidth, height: bandHeight },
+      hero: { col: left, row: mid + 2, width: bandWidth, height: bandHeight },
+    };
+    const scene = {
+      sceneId, theme, size: key, encounter: true, seed: Number(seed) >>> 0,
+      style: chapel ? 'chapel' : 'mini', grid: { columns, rows, metersPerCell: 1 },
+      ground: { material: cfg.ground[Math.floor(rng() * cfg.ground.length)] },
+      floor: [floor], objects: perimeterWalls(columns, rows), regions: [{ id: 'arena', bounds: floor }], landmarks: [],
+    };
+    if (chapel) {
+      for (const [side, col] of [['w', 2], ['e', columns - 4]]) {
+        for (const [end, row] of [['n', 2], ['s', rows - 4]]) {
+          scene.objects.push({ id: 'pillar-' + end + side, kind: 'pillar', bounds: { col, row, width: 2, height: 2 } });
+        }
+      }
+    }
+    const groups = Object.entries(bands).map(([side, bounds]) => ({ id: side,
+      unitIds: units.filter(u => u.side === side).sort((a, b) => {
+        const af = footprintOf(a), bf = footprintOf(b);
+        return bf.width * bf.height - af.width * af.height;
+      }).map(unitIdOf), placement: { bounds, facing: side === 'enemy' ? 180 : 0 },
+    }));
+    const formation = solveFormation(scene, units, { groups, overrides }, { seed, reserveOverrides: true });
+    if (!formation.ok) { last = { ...formation, scene, compiled: compileScene(scene) }; continue; }
+
+    // 开战带和贯穿两带的中央走廊不撒障碍，完整占格的大型单位可以直接接敌。
+    const reserved = new Set([...Object.values(bands).flatMap(rectCells), ...rectCells({
+      col: columns / 2 - 1, row: 1, width: 2, height,
+    })].map(c => cellKey(c.col, c.row)));
+    for (const u of units) {
+      const p = formation.placementsById[unitIdOf(u)], fp = footprintOf(u);
+      const aisle = columns / 2 - 1;
+      for (let col = Math.min(p.col, aisle); col < Math.max(p.col + fp.width, aisle + 2); col++) {
+        for (let row = p.row; row < p.row + fp.height; row++) reserved.add(cellKey(col, row));
+      }
+    }
+    for (const obj of scene.objects) rectCells(obj.bounds).forEach(c => reserved.add(cellKey(c.col, c.row)));
+    const high = placeEncounterObstacles(floor, reserved, highCount, true, chapel, rng);
+    const low = high && placeEncounterObstacles(floor, reserved, highCount * 4, false, chapel, rng);
+    if (!low) {
+      last = { ok: false, scene, compiled: compileScene(scene), placementsById: {}, report: { ...formation.report, status: 'hard-conflict', conflicts: [{ reason: 'no-space-for-obstacles' }] } };
+      continue;
+    }
+    scene.objects.push(...high, ...low);
+    if (chapel) {
+      scene.objects.push({ id: 'aisle-carpet', kind: 'carpet', bounds: { col: columns / 2 - 1, row: 2, width: 2, height: height - 2 } },
+        ...[0, rows - 2].map((row, i) => ({ id: 'threshold-' + i, kind: 'chapelSteps', facing: i * 180,
+          bounds: { col: columns / 2 - 2, row, width: 4, height: 2 } })),
+        ...[2, columns - 2].flatMap(col => [3, rows - 3].map(row => ({ id: 'light-' + col + '-' + row, kind: 'light', at: { col, row } }))));
+    }
+    return { ...formation, scene, compiled: compileScene(scene) };
+  }
+  return last;
 }
 
 export function generateTacticalScene(options) {

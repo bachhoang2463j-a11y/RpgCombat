@@ -165,7 +165,8 @@ export function createSandbox(rootEl, deps = {}) {
     const gridHit = screenToGrid(pose, origin, 50, compiled.grid, sx, sy);
     if (!gridHit) return null;
     const unitId = occupancy ? unitAt(occupancy, gridHit.col, gridHit.row) || null : null;
-    return { ...gridHit, x: gridHit.col + .5, y: gridHit.row + .5, targetId: unitId, client: { x: sx, y: sy } };
+    const hidden = unitId && viewData.visibleEnemies && !viewData.visibleEnemies.has(unitId) && viewData.units.some(u => u.id === unitId && u.side === 'enemy');
+    return { ...gridHit, x: gridHit.col + .5, y: gridHit.row + .5, targetId: hidden ? null : unitId, client: { x: sx, y: sy } };
   }
   function setHover(hit) {
     const key = hit ? hit.col + ',' + hit.row + ',' + (hit.targetId || '') : null;
@@ -249,6 +250,7 @@ export function createSandbox(rootEl, deps = {}) {
   // 开场构图：框住我方所在区域（含留白），战场成为主视觉；不改网格与几何
   function openingPose(vd) {
     const safe = safeRectClient();
+    if (vd.scene.encounter) return fitPose(compiled.grid, 50, origin, safe, 12);
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     const heroes = vd.units.filter(u => u.side === 'hero');
     for (const u of (heroes.length ? heroes : vd.units)) {

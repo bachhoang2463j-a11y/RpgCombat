@@ -134,6 +134,11 @@ const STAGES = {
     groups: ['TT-BATTLE'], modules: ['battle', 'parser', 'scenarioData'],
     requiredExports: [['battle', 'createBattle']],
   },
+  arena: {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'arena-node-cases.mjs'),
+    groups: ['TARENA'], modules: ['generation', 'scenarioData', 'battle'],
+    requiredExports: [['generation', 'generateEncounter'], ['scenarioData', 'createEncounterScenario']],
+  },
   'typical-data': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'typical-data-node-cases.mjs'),
     groups: ['TT-DATA'], modules: ['parser', 'protocol', 'roster', 'configPackage', 'scenarioData'],

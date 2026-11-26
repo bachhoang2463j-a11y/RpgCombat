@@ -51,6 +51,21 @@ if (backend) {
   const yaml = fs.readFileSync(path.join(root, 'doc', 'tactics', '典型对局-战棋版.yaml'), 'utf8');
   const block = backend.parseYamlText(yaml);
   const data = backend.createScenarioData(block);
+  const arena = backend.createEncounterScenario(block, { theme: 'chapel' });
+  const arenaBattle = backend.createBattle({ ...arena, random: backend.createSeededRandom(arena.seed) });
+  const arenaOpening = arenaBattle.start();
+  const arenaTurn = arenaBattle.runEnemyTurn();
+  check('单房间默认入口及技能雾样式入包', html.includes('defaultYaml') && /createApp\([^\n]*:createEncounterDemo\(/.test(html)
+    && html.includes('sc-chapel-encounter') && html.includes('t-unit-fog-hidden'));
+  check('产物真实单间开场保留原阵容、2×2 和高低墙', arena.scene.size === 'small' && arena.scene.floor.length === 1
+    && arena.scene.floor[0].width === 16 && arena.scene.floor[0].height === 14 && arenaOpening.units.length === 10
+    && arena.units.filter(u => u.footprint.width === 2 && u.footprint.height === 2).length === 2
+    && arena.scene.objects.filter(o => o.id.startsWith('high-')).length === 2 && arena.scene.objects.filter(o => o.id.startsWith('low-')).length === 8
+    && arena.scene.objects.filter(o => o.kind === 'pillar').length === 4
+    && arena.scene.objects.filter(o => o.kind === 'chapelSteps').length === 2
+    && arena.scene.objects.some(o => o.kind === 'pew' && o.cells?.length > 2));
+  check('产物默认单间真实接战、不发旧警报且可重置', arenaTurn.events.some(e => e.type === 'attack-start' || e.type === 'unit-moved')
+    && !arenaTurn.events.some(e => e.type === 'enemy-alarm') && JSON.stringify(arenaBattle.reset().positions) === JSON.stringify(arenaOpening.positions));
   check('权威样本四英雄六敌两召唤词条入产物', block.heroes.length === 4 && block.enemies.length === 6 && block.summonTemplates.length === 2);
   check('中文原值与独立属性保真', data.units[0].ref.hp === 100 && data.units[0].ref.mp === 110 && data.units[0].ref.perception === 50);
   const fog = block.heroes[0].skills.find(s => s.name === '拉莱耶造雾术');

@@ -256,7 +256,7 @@ function empty(reason, origin = null, aim = null) {
 function querySummon(ctx, caster, origin, aim, range, skill, fail) {
   const dist = centerDistance(origin, aim);
   if (range.castRange !== undefined && dist > range.castRange + EPS) return fail('召唤落点超出射程');
-  if (dist > sightRadius(ctx, caster) + EPS || !canSeePoint(ctx, caster.id, aim)) return fail('召唤落点超出个人视野');
+  if ((!ctx.encounter && dist > sightRadius(ctx, caster) + EPS) || !canSeePoint(ctx, caster.id, aim)) return fail('召唤落点超出个人视野');
   const fp = (skill && skill.summonFootprint) || { width: 1, height: 1 };
   const anchor = { col: Math.floor(aim.x), row: Math.floor(aim.y) };
   const occ = buildLiveOcc(ctx);
@@ -404,7 +404,7 @@ function finishQuery(ctx, caster, skill, origin, aim, cells, targetIds, actualTa
   let visible = ctx.visibleUnitIds ? new Set(ctx.visibleUnitIds) : null;
   if (!visible) {
     visible = new Set();
-    for (const u of ctx.units) if (isLive(u) && canSeeUnit(ctx, caster.id, u.id)) visible.add(u.id);
+    for (const u of ctx.units) if (isLive(u) && canSeeUnit(ctx, caster.id, u.id, false, true)) visible.add(u.id);
   }
   const aimTargetId = aim && aim.targetId != null ? aim.targetId : null;
   const disclosureTargetIds = actualTargets.filter(t => t.side === caster.side || visible.has(t.unitId) || (fogLock && t.unitId === aimTargetId)).map(t => t.unitId);

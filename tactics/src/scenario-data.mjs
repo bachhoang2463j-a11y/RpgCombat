@@ -4,6 +4,7 @@
 // ==========================================
 
 import { parseYamlCombatBlock, normalizeHeroName } from './parser.mjs';
+import { generateEncounter } from './generation.mjs';
 
 // 展示名去装饰（emoji / 变体选择符 / 装饰符号 ◈〖〗⸨⸩♱❄ 等）；保留原大小写，仅用于 ID 与别名。
 const EMOJI_RE = /[\u200D\uFE0F\u2640\u2642\u26A7\u2600-\u27BF\u25A0-\u25FF\u3016\u3017\p{Extended_Pictographic}]/gu;
@@ -64,7 +65,7 @@ export function createScenarioData(block, options = {}) {
   const parsed = block && Array.isArray(block.heroes) ? block : parseYamlCombatBlock(block);
 
   const placementByKey = new Map();
-  Object.keys(parsed.placements || {}).forEach(k => placementByKey.set(matchKey(k), parsed.placements[k]));
+  if (!options.ignorePlacements) Object.keys(parsed.placements || {}).forEach(k => placementByKey.set(matchKey(k), parsed.placements[k]));
 
   const occ = new Map();
   const units = [];
@@ -78,7 +79,7 @@ export function createScenarioData(block, options = {}) {
     occ.set(baseKey, n);
     const id = (side === 'hero' ? 'h:' : 'e:') + display + (n > 1 ? ':' + n : '');
     const p = placementByKey.get(matchKey(src.name)) || placementByKey.get(matchKey(display));
-    if (!p) throw new Error('单位缺少站位: ' + src.name);
+    if (!p && !options.generatedPlacement) throw new Error('单位缺少站位: ' + src.name);
     const ref = buildRef(src);
     units.push({
       id,
@@ -92,7 +93,7 @@ export function createScenarioData(block, options = {}) {
       classType: src.classType == null ? null : src.classType,
       controller: side === 'hero' ? 'player' : 'ai',
     });
-    placementsById[id] = { col: p.col, row: p.row, facing: p.facing == null ? 0 : p.facing };
+    if (p) placementsById[id] = { col: p.col, row: p.row, facing: p.facing == null ? 0 : p.facing };
   };
 
   (parsed.heroes || []).forEach(h => addUnit(h, 'hero'));
@@ -138,4 +139,24 @@ export function createScenarioData(block, options = {}) {
   const seed = Number.isFinite(+seedRaw) ? +seedRaw : 0;
 
   return { units, placementsById, seed, summonProvider };
+}
+
+export function createEncounterDemo(defaultYaml) {
+  return { defaultYaml, encounter: { theme: 'chapel' } };
+}
+
+const ROOM_SIZES = { 小: 'small', 中: 'medium', 大: 'large' };
+
+export function createEncounterScenario(block, defaults, positions) {
+  // 复用旧样本阵容，不把三层礼拜堂的固定坐标带进生成房间。
+  const demo = defaults && block.sceneId === 'sc-chapel' && block.battleId === 'bt-typical-01';
+  const requested = block.meta?.['房间大小'];
+  const theme = block.meta?.['地图主题'];
+  if (!demo && requested == null && theme == null) return null;
+  const data = createScenarioData(block, { generatedPlacement: true, ignorePlacements: !!demo });
+  const sceneId = demo ? 'sc-chapel-encounter' : block.sceneId;
+  const room = generateEncounter({ theme: theme ?? defaults?.theme, size: ROOM_SIZES[requested] ?? requested ?? defaults?.size,
+    seed: data.seed, sceneId, units: data.units, positions: { ...data.placementsById, ...positions } });
+  if (!room.ok) throw new Error('单房间布阵冲突：' + JSON.stringify(room.report.conflicts));
+  return { ...data, scene: room.scene, placementsById: room.placementsById };
 }

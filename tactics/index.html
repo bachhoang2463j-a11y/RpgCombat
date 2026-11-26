@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>战棋战斗 · 视听切片 Demo</title>
+<title>战棋战斗 · 单房间 Demo</title>
 <link rel="stylesheet" href="./src/vendor/rpg-ui/rpg-ui.css">
 <link rel="stylesheet" href="./tactics.css">
 <link rel="stylesheet" href="./src/vendor/rpg-av/rpg-av.css">
@@ -13,14 +13,16 @@
 <script type="module">
 import { createApp, DEFAULT_YAML_A } from './src/main.mjs';
 import { DEMO_YAML, DEMO_PLACEMENTS } from './src/demo-fixture.mjs';
+import { createEncounterDemo } from './src/scenario-data.mjs';
 
 const qs = new URLSearchParams(location.search);
 const p02 = qs.get('stage') === 'p02';
 // 默认载入典型对局权威样本（doc/tactics/典型对局-战棋版.yaml）；?demo=slice 回到旧视听切片演示数据
 const slice = qs.get('demo') === 'slice';
+const oldChapel = qs.get('demo') === 'chapel';
 const typicalYaml = p02 || slice ? null : await (await fetch('../doc/tactics/' + encodeURIComponent('典型对局-战棋版.yaml'))).text();
 const app = createApp(document.getElementById('tactics-app'), {
-  defaultYaml: p02 ? DEFAULT_YAML_A : slice ? DEMO_YAML : typicalYaml,
+  ...(p02 ? { defaultYaml: DEFAULT_YAML_A } : slice ? { defaultYaml: DEMO_YAML } : oldChapel ? { defaultYaml: typicalYaml } : createEncounterDemo(typicalYaml)),
   defaultPlacements: p02 || !slice ? undefined : DEMO_PLACEMENTS,
   playable: !p02,
 });

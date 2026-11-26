@@ -41,6 +41,7 @@ button:disabled { opacity: .42; cursor: default; }
 
 /* ---- 地图单位：圆形徽章（头像正立）+ 阵营环 + 独立朝向箭头 + 名牌 + 血条 + 接地阴影 ---- */
 .t-unit { z-index: 1; }
+.t-unit.t-unit-fog-hidden { visibility: hidden; }
 .t-unit.t-unit-current, .t-unit.t-unit-moving, .t-unit.t-unit-hover { z-index: 3; }
 .t-unit-ground { position: absolute; pointer-events: none; }
 .t-unit-shadow { position: absolute; left: 14%; right: 14%; top: 60%; height: 30%; border-radius: 50%; transform-origin: 50% 50%;

@@ -26,13 +26,14 @@ import { resolveUnitStyles, isUnitFlying, resolveFlightStyle, JUMP_LAND_HEAVY_PO
 import { createEditorPanel } from './editor-panel.mjs';
 import { autoPickChoice } from './reaction-prompt.mjs';
 import { unitCenter } from './geometry.mjs';
-import { createScenarioData, createSeededRandom } from './scenario-data.mjs';
+import { createEncounterScenario, createScenarioData, createSeededRandom } from './scenario-data.mjs';
 import { statusBadges, compactStatusHtml, fullStatusHtml, inspectorHtml, auraList } from './status-ui.mjs';
 import { passiveGainLabel } from './fx-library.mjs';
 import { resolveLore } from './lore.mjs';
 import { getEffectiveStats } from './class-passives.mjs';
 import { hitChance } from './damage.mjs';
 import { skillSlots } from './effect-definitions.mjs';
+import { visibleUnitIds } from './perception.mjs';
 // 同名 YAML 技能仍保留规则字段，本场编辑仅覆写显式演出标签。
 export function applyEditorFxTags(rows, editedRows) {
   const byName = new Map((editedRows || []).map(row => [row.name, row]));
@@ -80,7 +81,7 @@ const SCENE_LIBRARY = {
 };
 export function sceneForState(sceneId, sceneState = {}) {
   const s = SCENE_LIBRARY[sceneId];
-  if (!s) throw new Error('P02 固定图库无此场景: ' + sceneId);
+  if (!sceneState.layout && !s) throw new Error('无此场景: ' + sceneId);
   const scene = JSON.parse(JSON.stringify(sceneState.layout || s));
   scene.sceneId = sceneId;
   scene.objects = scene.objects.filter(obj => sceneState.objects?.[obj.id] !== null).map(obj => {
@@ -366,12 +367,15 @@ export function createApp(rootEl, opts = {}) {
       return { branch: 'resume', viewData: currentViewData };
     }
     const block = parseYamlText(text);
-    const scenario = isTypicalBlock(block) ? createScenarioData(block) : null;
+    const encounter = createEncounterScenario(block, opts.encounter, positions);
+    if (encounter) block.sceneId = encounter.scene.sceneId;
+    const scenario = encounter || (isTypicalBlock(block) ? createScenarioData(block) : null);
     const state = readTacticsState();
     const incoming = { sceneId: block.sceneId, battleId: block.battleId };
     const knownScene = state?.scenes?.[block.sceneId];
     const defaults = scenario ? scenario.placementsById : (opts.defaultPlacements || DEFAULT_PLACEMENTS);
     const explicit = { ...sceneOverrides, positions: { ...positions } };
+    if (encounter && !knownScene?.layout && !explicit.layout) explicit.layout = encounter.scene;
     for (const [id, p] of Object.entries(defaults)) {
       if (!Object.hasOwn(knownScene?.positions || {}, id) && !Object.hasOwn(positions, id)) explicit.positions[id] = p;
     }
@@ -513,7 +517,7 @@ export function createApp(rootEl, opts = {}) {
   function renderInspector() {
     const id = inspectHover;
     const u = id && battle && unitById(id);
-    if (!u) { shell.showInspector(null); return; }
+    if (!u || (u.side === 'enemy' && currentViewData.visibleEnemies && !currentViewData.visibleEnemies.has(u.id))) { shell.showInspector(null); return; }
     const eff = battle.getEffectiveUnit(u.id);
     const snapU = battle.snapshot().units.find(x => x.id === u.id);
     const prep = battle.battleState.combatState.charges?.[u.id]?.preparing;
@@ -586,9 +590,10 @@ export function createApp(rootEl, opts = {}) {
     return best ? { ok: true, ...best } : null;
   }
   function queueRows(snap) {
-    const visibleUnitIds = currentViewData.units.filter(u => shownOf(u).hp > 0 || u.id === snap.currentId).map(u => u.id);
-    const queue = getVisibleTurnQueue(battle.battleState, 'hero', { visibleUnitIds }).filter(r => r.unitId !== snap.currentId);
-    if (snap.currentId) queue.unshift({ unitId: snap.currentId, nextActionAt: snap.now });
+    const disclosed = u => u.side === 'hero' || !currentViewData.visibleEnemies || currentViewData.visibleEnemies.has(u.id);
+    const ids = currentViewData.units.filter(u => disclosed(u) && (shownOf(u).hp > 0 || u.id === snap.currentId)).map(u => u.id);
+    const queue = getVisibleTurnQueue(battle.battleState, 'hero', { visibleUnitIds: ids }).filter(r => r.unitId !== snap.currentId);
+    if (ids.includes(snap.currentId)) queue.unshift({ unitId: snap.currentId, nextActionAt: snap.now });
     return queue;
   }
   const esc = t => String(t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -685,11 +690,16 @@ export function createApp(rootEl, opts = {}) {
       u.effective = battle.getEffectiveUnit(u.id);
       u.bars = { ...u.bars, hp: s.hp, mp: s.mp, tp: s.tp, shield: s.shield };
     }
+    if (battle.ctx.encounter && snap.regions.some(r => r.type === 'fog')) {
+      currentViewData.visibleEnemies = new Set(currentViewData.units.filter(u => u.side === 'hero' && u.ref.hp > 0)
+        .flatMap(u => visibleUnitIds(battle.ctx, u.id)));
+    } else currentViewData.visibleEnemies = null;
     sandbox.update(currentViewData);
     const view = sandbox.getUnitView();
     let alerted = false;
     for (const u of currentViewData.units) {
       view.setFlag(u.id, 't-unit-down', shownOf(u).hp <= 0);
+      view.setFlag(u.id, 't-unit-fog-hidden', u.side === 'enemy' && currentViewData.visibleEnemies && !currentViewData.visibleEnemies.has(u.id));
       view.setFlag(u.id, 't-unit-current', u.id === snap.currentId && !snap.terminal);
       const pending = u.effective?.alertState === 'pending' && shownOf(u).hp > 0 && !snap.terminal;
       view.setFlag(u.id, 't-unit-alert-pending', pending);

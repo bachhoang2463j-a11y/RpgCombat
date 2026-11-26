@@ -39,6 +39,30 @@ function pew(b) {
       '<rect x="' + r.x + '" y="' + r.y + '" width="7" height="' + r.h + '" rx="2" fill="#3d2417"/><rect x="' + (r.x + r.w - 7) + '" y="' + r.y + '" width="7" height="' + r.h + '" rx="2" fill="#3d2417"/>' : '') +
     '</g>';
 }
+function pewGroup(o) {
+  if (!o.cells || o.bounds.width === 1 || o.bounds.height === 1) return pew(o.bounds);
+  return o.cells.map(c => pew({ ...c, width: 1, height: 1 })).join('');
+}
+
+function wallGroup(o) {
+  return (o.cells || []).map(c => {
+    const r = rect({ ...c, width: 1, height: 1 });
+    return '<rect x="' + r.x + '" y="' + r.y + '" width="' + r.w + '" height="' + r.h + '" fill="#262c34" stroke="#55616f" stroke-width="1.2"/>';
+  }).join('');
+}
+
+function chapelSteps(o) {
+  const { x } = rect(o.bounds);
+  const cx = x + o.bounds.width * Q / 2;
+  const north = o.facing === 0;
+  const edge = (o.bounds.row + 1) * Q;
+  return '<g class="chapel-steps" transform="translate(' + cx + ' ' + edge + ') scale(1 ' + (north ? 1 : -1) + ')">' +
+    '<path d="M-95 2V-20H-75V-41H75V-20H95V2Z" fill="#242b34" stroke="#8a9aaf" stroke-width="2"/>' +
+    '<path d="M-91-3H91M-87-13H87M-72-24H72M-65-35H65" stroke="#5f6a79" stroke-width="2"/>' +
+    '<path d="M-67 2H67" stroke="#b3a18c" stroke-width="2"/>' +
+    '<path d="M-43-1V-18H43V-1Z" fill="#481d25" opacity=".85"/></g>';
+}
+
 function pillar(b) {
   const cx = (b.col + b.width / 2) * Q, cy = (b.row + b.height / 2) * Q, R1 = Math.min(b.width, b.height) * Q * 0.46;
   const oct = (rad) => Array.from({ length: 8 }, (_, i) => { const a = Math.PI / 8 + i * Math.PI / 4; return (cx + Math.cos(a) * rad).toFixed(1) + ',' + (cy + Math.sin(a) * rad).toFixed(1); }).join(' ');
@@ -137,13 +161,15 @@ export function renderChapelArt(compiled) {
     '</g>' +
     by('rubble').map((o, i) => rubble(o.bounds, i + 3)).join('') +
     by('banner').map(banner).join('') +
-    by('pew').map(o => pew(o.bounds)).join('') +
+    by('pew').map(pewGroup).join('') +
+    by('wall').map(wallGroup).join('') +
     by('tomb').map(o => tomb(o.bounds)).join('') +
     by('altar').map(o => altar(o.bounds)).join('') +
     by('statue').map(o => statue(o.bounds)).join('') +
     by('pillar').map(o => pillar(o.bounds)).join('') +
     '<path d="' + wallD + '" stroke="rgba(140,185,235,0.45)" stroke-width="7" fill="none" stroke-linecap="square" filter="url(#f-glow)"/>' +
     '<path d="' + wallD + '" stroke="#d3dde9" stroke-width="2.4" fill="none" stroke-linecap="square"/>' +
+    by('chapelSteps').map(chapelSteps).join('') +
     by('light').map(o => lantern(o.at)).join('') +
     '</svg>';
 }
