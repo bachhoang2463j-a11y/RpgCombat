@@ -42,6 +42,7 @@ export function buildShell(root) {
       '<button id="btn-editor" class="t-topbtn" title="设置">⚙️<span class="t-toplabel">设置</span></button>' +
       '<button id="btn-reset" class="t-topbtn" title="重置">🔄<span class="t-toplabel">重置</span></button>' +
     '</div>',
+    '<div id="tactics-allies" role="group" aria-label="召唤物与临时盟友" hidden></div>',
     '<div id="tactics-float-ui">' +
       '<div id="heroes-container"></div>' +
       '<div id="menu-outer" class="relative self-end"><div id="t-res-strip" class="t-res" hidden></div>' + RPG_UI_MENU_HTML + '</div>' +
@@ -65,7 +66,7 @@ export function buildShell(root) {
   const $ = (id) => root.querySelector('#' + id);
   const els = {
     mapSlot: $('tactics-map-slot'), battleLog: $('battle-log'), turnOrder: $('turn-order-container'),
-    heroes: $('heroes-container'), menuBox: $('menu-container'), menuMain: $('main-menu'),
+    heroes: $('heroes-container'), allies: $('tactics-allies'), menuBox: $('menu-container'), menuMain: $('main-menu'),
     activeHeroName: $('active-hero-name'), chatInput: $('chat-text-input'), banner: $('turn-banner'),
     overlay: $('panel-overlay'), panelBox: $('panel-box'), panelTitle: $('panel-title'), panelBody: $('panel-body'),
     targetMenu: $('target-menu'), targetHint: $('target-hint'), enemyOverlay: $('enemy-turn-overlay'),
@@ -165,9 +166,51 @@ export function buildShell(root) {
     if (inspector.innerHTML !== html) inspector.innerHTML = html;
     inspector.hidden = false;
   }
-  function renderHeroes(units) {
+  // 友方支援单位不占底栏；右侧详情只显示实际使用的资源与简要状态。
+  const allyOf = id => els.allies.querySelector('[data-unit-id="' + CSS.escape(id) + '"]');
+  function renderAllies(allies) {
+    const key = allies.map(u => u.id).join('|');
+    if (els.allies.dataset.key !== key) {
+      const open = new Set(Array.from(els.allies.querySelectorAll('[aria-expanded="true"]'), b => b.parentElement.dataset.unitId));
+      els.allies.innerHTML = allies.map(u => {
+        const id = ESC(u.id), name = ESC(u.name), expanded = open.has(u.id);
+        return '<div class="t-ally-row" data-unit-id="' + id + '">' +
+          '<button type="button" class="t-ally-toggle" aria-label="' + name + '" title="' + name + '" aria-expanded="' + expanded + '" aria-controls="t-ally-' + id + '">' + faceHtml(u, 't-ally-face') + '</button>' +
+          '<div class="t-ally-detail" id="t-ally-' + id + '"' + (expanded ? '' : ' hidden') + '><b>' + name + '</b><small>' + (u.isSummon ? '召唤物' : '盟友') + '</small><span class="t-ally-bars"></span><span class="t-ally-status"></span></div></div>';
+      }).join('');
+      els.allies.dataset.key = key;
+    }
+    els.allies.hidden = !allies.length;
+    for (const u of allies) setAllyBars(u.id, u.bars);
+  }
+  els.allies.addEventListener('click', e => {
+    const btn = e.target.closest('.t-ally-toggle');
+    if (!btn) return;
+    const detail = btn.nextElementSibling;
+    detail.hidden = !detail.hidden;
+    btn.setAttribute('aria-expanded', String(!detail.hidden));
+    uiSound('select');
+  });
+  function setAllyBars(id, bars) {
+    const row = allyOf(id);
+    if (!row) return;
+    const { hp, maxHp, mp, maxMp, shield } = bars;
+    row.classList.toggle('t-down', hp <= 0);
+    const html = 'HP ' + Math.max(0, Math.round(hp)) + '/' + maxHp + (shield > 0 ? ' · 🔰+' + Math.round(shield) : '') +
+      (maxMp > 0 ? '<br>MP ' + Math.max(0, Math.round(mp)) + '/' + maxMp : '');
+    const el = row.querySelector('.t-ally-bars');
+    if (el.innerHTML !== html) el.innerHTML = html;
+  }
+  function setAllyStatus(id, html) {
+    const el = allyOf(id)?.querySelector('.t-ally-status');
+    if (el && el.innerHTML !== html) el.innerHTML = html;
+  }
+  function renderHeroes(units, heroCardIds) {
     state.units = units;
-    const heroes = units.filter(u => u.side === 'hero');
+    const friendlies = units.filter(u => u.side === 'hero');
+    const heroes = friendlies.filter(u => !u.isSummon && (!heroCardIds || heroCardIds.has(u.id))).slice(0, 4);
+    const heroIds = new Set(heroes.map(u => u.id));
+    renderAllies(friendlies.filter(u => !heroIds.has(u.id)));
     const keyNow = heroes.map(u => u.id).join('|');
     if (els.heroes.dataset.key !== keyNow) {
       els.heroes.innerHTML = heroes.map(cardHtml).join('');
@@ -184,7 +227,7 @@ export function buildShell(root) {
   function cardOf(id) { return els.heroes.querySelector('.t-hero-card[data-unit-id="' + CSS.escape(id) + '"]'); }
   function setHeroBars(id, bars, { instant = false, hit = false, heal = false } = {}) {
     const card = cardOf(id);
-    if (!card) return;
+    if (!card) { setAllyBars(id, bars); return; }
     const fill = card.querySelector('.t-bar-hp .t-bar-fill'), ghost = card.querySelector('.t-bar-hp .t-bar-ghost');
     // 护盾叠在 HP 末端；HP+盾超过上限时整条按 (HP+盾) 等比压缩
     const shield = Math.max(0, bars.shield || 0), scale = Math.max(bars.maxHp, Math.max(0, bars.hp) + shield);
@@ -563,6 +606,7 @@ export function buildShell(root) {
   function clearBattle() {
     state.history = []; state.currentId = null; state.cmd = null; state.menuKey = '';
     els.heroes.dataset.key = ''; els.turnOrder.dataset.key = '';
+    els.allies.replaceChildren(); els.allies.dataset.key = ''; els.allies.hidden = true;
     refs.clear(); rpgUi.resetQueue(); rpgUi.markRoundStart(); closeMenus();
     closePanel(); setBusy(false);
   }
@@ -669,7 +713,7 @@ export function buildShell(root) {
 
   return {
     destroy: () => { clearTimeout(showLog._t); clearTimeout(showBanner._t); rpgUi.hideTagTip(); document.removeEventListener('mousedown', onComboDown); reactionPrompt.cancel(); state.onReset = null; state.onUnitClick = null; root.replaceChildren(); },
-    els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setHeroStatus, setHeroStats, flashHeroPassive, showInspector, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
+    els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setHeroStatus, setAllyStatus, setHeroStats, flashHeroPassive, showInspector, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
     previewMoveCost, previewPips, openModal, closeModal,
     promptReaction: (req) => reactionPrompt.prompt(req), cancelReactionPrompt: () => reactionPrompt.cancel(),
     getSafeRect, showLog, openPanel, closePanel, openResult, clearBattle, closeSubmenu: () => {},

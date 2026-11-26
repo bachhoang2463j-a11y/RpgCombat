@@ -439,6 +439,7 @@ export function createApp(rootEl, opts = {}) {
     combatToken = unchanged ? combatToken : nextToken;
     avHost.setToken(combatToken);
     nextView.combatToken = combatToken;
+    nextView.heroCardIds = new Set(nextView.units.filter(u => u.side === 'hero' && !u.isSummon).slice(0, 4).map(u => u.id));
     currentViewData = nextView;
 
     const branch = result.branch;
@@ -463,12 +464,12 @@ export function createApp(rootEl, opts = {}) {
         unitStyles = resolveUnitStyles(currentViewData.units);
       }
       syncShown();
-      refreshBattle();
+      refreshBattle({ deferPassive: true });
       beginTurn({ intro: !booted || forceReset });
       booted = true;
       return { block, roster, result, branch, viewData: currentViewData };
     }
-    shell.renderHeroes(currentViewData.units);
+    shell.renderHeroes(currentViewData.units, currentViewData.heroCardIds);
     shell.renderTurnOrder(currentViewData.units);
     shell.bindMenus(currentViewData.units);
     shell.showLog('已载入 ' + block.sceneId + ' / ' + block.battleId + '（分支 ' + branch + '）');
@@ -499,8 +500,10 @@ export function createApp(rootEl, opts = {}) {
       const list = shownOf(u).hp > 0 ? badgesOf(u) : [];
       view.setStatus(u.id, compactStatusHtml(list));
       if (u.side === 'hero') {
-        shell.setHeroStatus(u.id, fullStatusHtml(list.filter(b => b.key !== 'shield')));   // 护盾已写进卡片血条
-        shell.setHeroStats(u.id, shownEff.get(u.id) || battle.getEffectiveUnit(u.id), getEffectiveStats(u, []));
+        if (currentViewData.heroCardIds.has(u.id)) {
+          shell.setHeroStatus(u.id, fullStatusHtml(list.filter(b => b.key !== 'shield')));  // 护盾已写进卡片血条
+          shell.setHeroStats(u.id, shownEff.get(u.id) || battle.getEffectiveUnit(u.id), getEffectiveStats(u, []));
+        } else shell.setAllyStatus(u.id, compactStatusHtml(list.filter(b => b.key !== 'shield')));
       }
     }
     renderInspector();
@@ -665,7 +668,7 @@ export function createApp(rootEl, opts = {}) {
   }
   const PASSIVE_CARD_COLOR = { taunt: '#f87171', stealth: '#a5b4fc', haste: '#22d3ee' };
   const alertPending = new Set();
-  function refreshBattle() {
+  function refreshBattle({ deferPassive = false } = {}) {
     const snap = battle.snapshot();
     syncDynamicUnits(snap);
     for (const u of currentViewData.units) {
@@ -695,11 +698,11 @@ export function createApp(rootEl, opts = {}) {
     avHost.consumeVisualEvents(snap.events.filter(ev => !ev.attackId));
     avHost.syncVisualState();
     director.syncRegions(snap.regions || []);
-    director.playFieldFeedback(snap.events.filter(ev => !ev.attackId));
     director.syncBarriers(snap.barriers || []);
     director.syncPreparations(battle.battleState.combatState.charges || {});
     syncCarried(snap);
-    shell.renderHeroes(currentViewData.units);
+    shell.renderHeroes(currentViewData.units, currentViewData.heroCardIds);
+    director.playFieldFeedback(snap.events.filter(ev => !ev.attackId && (!deferPassive || ev.type !== 'passive-gain')));
     shell.setCurrent(snap.terminal ? null : snap.currentId);
     const qc = shell.renderQueue(queueRows(snap), snap.currentId);
     // 插队：除换人外，其余单位相对次序改变（加速/再动等）→ 插入音
@@ -1149,7 +1152,7 @@ export function createApp(rootEl, opts = {}) {
     ui('endTurn');
     sandbox.setPreview(null); sandbox.setHint(null);
     setBusy(true);
-    battle.endAction(); syncShown(); refreshBattle(); beginTurn();
+    battle.endAction(); syncShown(); refreshBattle({ deferPassive: true }); beginTurn();
   }
 
   async function doMove(col, row) {
@@ -1219,9 +1222,10 @@ export function createApp(rootEl, opts = {}) {
   async function beginTurn({ intro = false } = {}) {
     const myFlow = flow;
     const snap = battle.snapshot();
-    if (snap.terminal) { finishBattle(snap.terminal); return; }
+    const playTurnGains = () => director.playFieldFeedback(snap.events.filter(ev => !ev.attackId && ev.type === 'passive-gain'));
+    if (snap.terminal) { playTurnGains(); finishBattle(snap.terminal); return; }
     const u = currentUnit();
-    if (!u) return;
+    if (!u) { playTurnGains(); return; }
     aim = null; pending = null; endArmedUntil = 0;
     setBusy(true);
     sandbox.beginAction();
@@ -1231,6 +1235,8 @@ export function createApp(rootEl, opts = {}) {
     if (u.side === 'hero') avHost.sfx('heroTurn', 1, { category: 'M' }); else ui('enemyTurn');
     if (c) await sandbox.guideTo([c], { ms: 420 });
     if (myFlow !== flow) return;
+    // 时钟到账等镜头就位，地图短动效和底栏反馈同时起播。
+    playTurnGains();
     if (isPlayerUnit(u)) {
       avHost.playTurnVoice(u, snap.actionSerial);
       fullReach = findReachable(battle.ctx, u.id, Infinity);
@@ -1304,7 +1310,7 @@ export function createApp(rootEl, opts = {}) {
     if (!(await director.wait(420)) || !alive()) return;
     battle.endAction();
     syncShown();
-    refreshBattle();
+    refreshBattle({ deferPassive: true });
     beginTurn();
   }
 

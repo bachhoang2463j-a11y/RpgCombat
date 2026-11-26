@@ -31,9 +31,9 @@ export function prepareInput(result) {
   return { kind: 'prepare', fxTag: skill.fxTag || null };
 }
 
-// 反应通道也只消费显式标签。
+// 成功看破优先走通用看破演出，其他反应仍按技能显式标签。
 export function reactionInput(reaction) {
-  return { kind: 'reaction', fxTag: reaction.fxTag || null };
+  return { kind: 'reaction', fxTag: reaction.kanpo ? '看破' : reaction.fxTag || null };
 }
 
 export function createFxRegistry() {

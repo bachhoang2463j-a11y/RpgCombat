@@ -41,7 +41,7 @@ function glowDefs(uid, stops) {
     '<filter id="gl' + uid + '" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
 }
 // 地面法阵：渐变光环 + 羽化符文光点（无虚线/硬线框）
-function runeHtml(uid, x, y, r, c1, c2, glyphs) {
+function runeHtml(uid, x, y, r, c1, c2, glyphs, center = '') {
   const g = [];
   for (let i = 0; i < 12; i++) {
     const a = i / 12 * TAU, rr = r * 0.8;
@@ -53,7 +53,7 @@ function runeHtml(uid, x, y, r, c1, c2, glyphs) {
   }).join('') : '';
   return '<svg data-fx="rune" width="' + r * 2 + '" height="' + r * 2 + '" viewBox="' + (-r) + ' ' + (-r) + ' ' + r * 2 + ' ' + r * 2 + '" style="position:absolute;left:' + x + 'px;top:' + y + 'px;transform:translate(-50%,-50%);overflow:visible;will-change:transform,opacity;">' +
     glowDefs(uid, '<stop offset="0%" stop-color="' + c1 + '" stop-opacity="0.18"/><stop offset="62%" stop-color="' + c1 + '" stop-opacity="0.05"/><stop offset="84%" stop-color="' + c2 + '" stop-opacity="0.75"/><stop offset="100%" stop-color="' + c1 + '" stop-opacity="0"/>') +
-    '<g filter="url(#gl' + uid + ')"><circle r="' + r + '" fill="url(#rg' + uid + ')"/><g data-fx="spin">' + g.join('') + txt + '</g></g></svg>';
+    '<g filter="url(#gl' + uid + ')"><circle r="' + r + '" fill="url(#rg' + uid + ')"/><g data-fx="spin">' + g.join('') + txt + center + '</g></g></svg>';
 }
 function ringHtml(x, y, d, inner, outer) {
   return '<i style="position:absolute;left:' + x + 'px;top:' + y + 'px;width:' + d + 'px;height:' + d + 'px;margin:' + (-d / 2) + 'px 0 0 ' + (-d / 2) + 'px;border-radius:50%;' +
@@ -933,9 +933,10 @@ export function passiveGainLabel(ev) {
 }
 export function playPassiveGain(fx, ev, at, sprite) {
   const P = PASSIVE_FX[ev.kind];
-  if (!P || !at) return;
-  const p = worldPx(at);
+  if (!P) return;
   fx.sfx(P.sfx, 0.34);
+  if (!at) return;
+  const p = worldPx(at);
   if (ev.kind === 'taunt') {
     // 嘲讽：两道红色挑衅冲击环外扩 + 怒气碎点迸射
     [0, 120].forEach(d => fx.top(ringHtml(p.x, p.y, 1.8 * PX, P.ring[0], P.ring[1]), 600 + d).firstChild
@@ -948,7 +949,8 @@ export function playPassiveGain(fx, ev, at, sprite) {
     sprite?.animate([{ opacity: 1, filter: 'none' }, { opacity: 0.35, filter: 'blur(1.5px) grayscale(.6)', offset: 0.45 }, { opacity: 1, filter: 'none' }], { duration: 560, easing: 'ease-in-out' });
   } else {
     // 加速：脚下时针环疾转 + 光点上扬
-    const rune = fx.ground(runeHtml(fx.uid(), p.x, p.y, 0.8 * PX, '#22d3ee', '#e0f2fe', ''), 600);
+    const hands = '<path d="M0,-22 L0,0 L15,9" fill="none" stroke="#e0f2fe" stroke-width="3" stroke-linecap="round"/><circle r="3" fill="#fff"/>';
+    const rune = fx.ground(runeHtml(fx.uid(), p.x, p.y, 0.8 * PX, '#22d3ee', '#e0f2fe', '', hands), 600);
     grow(rune.firstChild, { ms: 600, s0: 0.4, s1: 1, hold: 0.6 });
     spin(rune.querySelector('[data-fx=spin]'), 300, 600, 'cubic-bezier(0.3,0,0.2,1)');
     particles(fx, Array.from({ length: 10 }, () => ({ x: p.x + rnd(-16, 16), y: p.y + rnd(-4, 10), dx: rnd(-6, 6), dy: rnd(-56, -34), size: rnd(5, 9), color: pick(P.dots), core: '#ffffff', s0: 1, s1: 0.3, dur: rnd(380, 560), delay: rnd(0, 140) })), 700);
@@ -1355,13 +1357,18 @@ const reactionKanpo = {
       '<circle cx="60" cy="60" r="24" fill="#fde68a" stroke="#fff7ed" stroke-width="3"/><circle cx="60" cy="60" r="8" fill="#fff7ed"/><path d="M38,60 Q48,52 60,52 Q72,52 82,60" stroke="#f59e0b" stroke-width="3" fill="none" opacity=".9"/>', 22);
     pop(eye, 1000, [T(0.4, 0), T(1.15, 1), T(0.95, 1), T(1.15, 0.9), T(1.3, 0)], { easing: 'ease-out' });
     floatText(fx, h.x, h.y - 3.1 * PX, '看破识破！', '#fde68a', '#f59e0b', { ms: 1000, size: 15 });
-    // 金流：看破者 → 来袭者（沿连线带扰动的金屑）
-    particles(fx, Array.from({ length: 28 }, (_, i) => { const t = i / 28, x = h.x + (e.x - h.x) * t + rnd(-17, 17), y = h.y + (e.y - h.y) * t + rnd(-17, 17);
-      return { x, y, dx: (e.x - x) * rnd(0.35, 0.7), dy: (e.y - y) * rnd(0.35, 0.7), size: rnd(6, 11), color: pick(['#fbbf24', '#f59e0b', '#fde68a']), core: '#fff7ed', s0: 1, s1: 0.4, dur: rnd(520, 840), delay: t * 120 }; }), 1000);
+    // 金流：金屑从看破者出发，在来袭者身上汇合。
+    const origin = { x: h.x, y: h.y - 1.2 * PX };
+    for (let i = 0; i < 28; i++) {
+      const a = { x: origin.x + rnd(-0.24, 0.24) * PX, y: origin.y + rnd(-0.24, 0.24) * PX };
+      const b = { x: e.x + rnd(-0.2, 0.2) * PX, y: e.y + rnd(-0.2, 0.2) * PX };
+      const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - rnd(0.3, 1) * PX };
+      flyOrb(fx, a, c, b, { size: rnd(0.12, 0.22) * PX, color: pick(['#fbbf24', '#f59e0b', '#fde68a']), core: '#fff7ed', ms: rnd(270, 340), delay: i * 3, fade: true });
+    }
     if (!(await ctx.wait(430))) return false;
     // ③ 金环汇聚 + 金屑迸射
     pop(svgAt(e.x, e.y, 2.6 * PX, '0 0 100 100', '<circle cx="50" cy="50" r="30" stroke="#fbbf24" stroke-width="4" fill="none"/><circle cx="50" cy="50" r="42" stroke="#fde68a" stroke-width="2" fill="none" stroke-dasharray="6 6"/>', 22),
-      700, [T(0.6, 0.9), T(2.2, 0)], { easing: 'ease-out' });
+      700, [T(1.35, 0), { ...T(0.72, 1), offset: 0.36 }, T(1.65, 0)], { easing: 'ease-out' });
     particles(fx, Array.from({ length: 38 }, () => { const a = rnd(0, TAU), d = rnd(0.6, 2) * PX; return { x: e.x + rnd(-12, 12), y: e.y + rnd(-12, 12), dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(6, 11), color: pick(['#fbbf24', '#f59e0b', '#fde68a']), core: '#fff7ed', s0: 1, s1: 0.3, dur: rnd(420, 800) }; }), 900);
     if (!(await ctx.wait(260))) return false;
     // ④ 斜斩 + 无效化印章 + 暖白闪 + 震屏（原版 playKanpoSound）

@@ -258,6 +258,21 @@ button:disabled { opacity: .42; cursor: default; }
 .t-topbtn:hover { color: var(--text); border-color: var(--line-2); }
 @media (max-width: 1400px) { .t-toplabel { display: none; } }
 
+/* ---- 右侧支援单位：图标独立折叠，不占底栏空间 ---- */
+#tactics-allies { position: absolute; top: 50px; right: 12px; bottom: 218px; z-index: 46; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: calc(100% - 72px); overflow: auto; pointer-events: none; }
+#tactics-allies[hidden], .t-ally-detail[hidden] { display: none; }
+.t-ally-row { display: flex; flex: none; flex-direction: row-reverse; align-items: flex-start; gap: 6px; }
+.t-ally-toggle { padding: 0; border-radius: 50%; pointer-events: auto; }
+.t-ally-face { display: grid; place-items: center; width: 34px; height: 34px; overflow: hidden; border: 1px solid var(--line-2); border-radius: 50%; background: #10141b; box-shadow: 0 2px 8px #0009; }
+.t-ally-face img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; }
+.t-ally-toggle:hover .t-ally-face, .t-ally-toggle[aria-expanded="true"] .t-ally-face { border-color: var(--gold); }
+.t-ally-row.t-down .t-ally-face { filter: grayscale(1); opacity: .6; }
+.t-ally-detail { max-width: 176px; padding: 6px 9px; border: 1px solid var(--line-2); border-radius: 7px; background: var(--panel); color: var(--text); font-size: 11px; pointer-events: auto; }
+.t-ally-detail b { overflow-wrap: anywhere; }
+.t-ally-detail small { margin-left: 6px; color: var(--mute); }
+.t-ally-bars { display: block; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.t-ally-status { display: flex; flex-wrap: wrap; gap: 3px; }
+
 /* ---- 底部悬浮层：我方卡片 + 指令面板 ---- */
 #tactics-float-ui { position: absolute; bottom: 44px; left: 0; width: 100%; padding: 0 12px 6px 80px; z-index: 20; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; pointer-events: none; }
 #heroes-container { display: grid; grid-template-columns: repeat(4, minmax(168px, 204px)); gap: 8px; pointer-events: auto; }

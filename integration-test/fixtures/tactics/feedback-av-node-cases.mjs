@@ -1,5 +1,7 @@
 // 真实视听代码的小宿主回归：辅助提速、隐匿音色、浮空采样续播与停止。
 import { readFileSync } from 'node:fs';
+import { createFxRegistry, reactionInput } from '../../../tactics/src/fx-registry.mjs';
+import { registerDefaultFx, playPassiveGain, PASSIVE_AUDIO } from '../../../tactics/src/fx-library.mjs';
 import { CLASS_STYLE, resolveFlightStyle } from '../../../tactics/src/unit-style.mjs';
 
 const read = name => readFileSync(new URL('../../../tactics/src/' + name, import.meta.url), 'utf8');
@@ -7,6 +9,46 @@ const ok = (id, pass, detail = '') => ({ id, pass: !!pass, detail });
 
 export function runCases() {
   const cases = [];
+  const registry = registerDefaultFx(createFxRegistry());
+  cases.push(ok('FB-AV08 registry看破优先 reaction-kanpo，非看破逆咒标签仍选 mirror-counter',
+    registry.resolve(reactionInput({ kanpo: true, fxTag: '逆咒归源镜' }))?.id === 'reaction-kanpo'
+    && registry.resolve(reactionInput({ kanpo: false, fxTag: '逆咒归源镜' }))?.id === 'mirror-counter'));
+
+  const passiveLayers = [], passiveSounds = [], spriteAnimations = [];
+  const makeElement = () => ({ animate(frames, opts) { this.frames = frames; this.opts = opts; }, style: {} });
+  const makeLayer = html => {
+    const count = [...html.matchAll(/<(?:i|b|svg)(?:\s|>)/g)].length;
+    const children = Array.from({ length: Math.max(1, count) }, makeElement);
+    const layer = { html, children, firstChild: children[0], appendChild() {}, querySelector: makeElement };
+    passiveLayers.push(layer);
+    return layer;
+  };
+  const host = {
+    sfx(key, volume) { passiveSounds.push({ key, volume }); },
+    uid() { return 'passive'; }, top(html) { return makeLayer(html); }, ground(html) { return makeLayer(html); },
+  };
+  for (const kind of ['taunt', 'stealth', 'haste']) {
+    playPassiveGain(host, { kind, value: 2 }, { x: 3, y: 4 }, { animate(frames, opts) { spriteAnimations.push({ kind, frames, opts }); } });
+  }
+  const texts = passiveLayers.map(layer => layer.html).filter(html => /<b\s/.test(html));
+  const byKind = {
+    taunt: passiveLayers.find(layer => layer.html.includes('rgba(254,202,202')),
+    stealth: passiveLayers.find(layer => layer.html.includes('rgba(199,210,254,0.5)')),
+    haste: passiveLayers.find(layer => layer.html.includes('data-fx="rune"')),
+  };
+  cases.push(ok('FB-AV09 真实被动到账三类型分别有头顶文本、差异动效与采样',
+    texts.some(html => html.includes('嘲讽 +2')) && texts.some(html => html.includes('隐匿 +2')) && texts.some(html => html.includes('加速 +2'))
+    && passiveSounds.map(s => s.key).join(',') === 'taunt,hide,link_chime'
+    && PASSIVE_AUDIO.includes('taunt') && PASSIVE_AUDIO.includes('hide') && PASSIVE_AUDIO.includes('link_chime')
+    && spriteAnimations.length === 2
+    && byKind.taunt?.children.some(el => el.opts?.duration === 520)
+    && byKind.stealth?.children.length >= 14
+    && byKind.haste?.children.some(el => el.opts?.duration === 600)
+    && new Set(Object.values(byKind)).size === 3));
+  const beforeMissing = passiveLayers.length + passiveSounds.length;
+  playPassiveGain(host, { kind: 'taunt', value: 1 }, null, null);
+  cases.push(ok('FB-AV10 被动到账缺坐标仍播放对应采样且不创建地图演出',
+    passiveSounds.length === 4 && passiveSounds[3].key === 'taunt' && passiveLayers.length + passiveSounds.length === beforeMissing + 1));
   const av = read('vendor/rpg-av/rpg-av.mjs');
   const fx = read('fx-library.mjs');
   const main = read('main.mjs');
