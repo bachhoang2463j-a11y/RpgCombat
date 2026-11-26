@@ -39,7 +39,7 @@ function makeCase({ live = true } = {}) {
     async guideTo() {},
   };
   const director = createActionDirector({
-    sandbox, avHost: { av, entity, syncRoster() {}, consumeVisualEvents() {}, syncVisualState() {} },
+    sandbox, avHost: { av, entity, syncRoster() {}, consumeVisualEvents(events) { for (const ev of events) if (ev.type === 'variant-trigger') log.push(['variant', ev.trigger, ev.segmentId]); }, syncVisualState() {} },
     getViewData: () => ({ units: [{ id: 'attacker', side: 'hero', ref: { atk: 10 } }, { id: 'defender', side: 'enemy', ref: { atk: 10 } }],
       placementsById: { attacker: { col: 2, row: 2 }, defender: { col: 3, row: 2 } },
       footprintsById: { attacker: { width: 1, height: 1 }, defender: { width: 1, height: 1 } } }),
@@ -104,6 +104,24 @@ async function run() {
     const done = await f.director.playAttack(f.result('power-counter'));
     cases.push(ok('强力反击进行中销毁scope：等待结束且不再揭示伤害', done === false && f.log.some(x => x[0] === 'powerStarted')
       && !f.log.some(x => x[0] === 'ruleReveal'), f.log.map(x => x[0])));
+  }
+  for (const [trigger, segmentIndex] of [['revive', 2], ['molt', 1]]) {
+    const f = makeCase(), res = f.result('counter');
+    res.hits[0].segments = [0, 1, 2].map(i => ({ ...res.hits[0].segments[0], segmentId: 'seg-' + (i + 1), shotIndex: i }));
+    res.events = [{ type: 'variant-trigger', unitId: 'defender', trigger, segmentId: 'seg-' + (segmentIndex + 1) }];
+    await f.director.playAttack(res);
+    const variant = f.log.findIndex(x => x[0] === 'variant');
+    const impact = f.log.findIndex(x => x[0] === 'segment' && x[1] === segmentIndex);
+    const next = f.log.findIndex(x => x[0] === 'segment' && x[1] === segmentIndex + 1);
+    cases.push(ok('连发变种 ' + trigger + ' 只在实际触发段播放', variant > impact && (next < 0 || variant < next), f.log.map(x => x.slice(0, 3))));
+  }
+  {
+    const f = makeCase(), res = f.result('counter');
+    res.events = [{ type: 'variant-trigger', unitId: 'defender', trigger: 'rage' }];
+    await f.director.playAttack(res);
+    const variant = f.log.findIndex(x => x[0] === 'variant');
+    const hit = f.log.findIndex(x => x[0] === 'hitFeedback');
+    cases.push(ok('无伤害段编号的变种事件留到攻击收尾消费', variant > hit, f.log.map(x => x[0])));
   }
   return { cases };
   } finally { globalThis.document = previousDocument; }

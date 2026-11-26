@@ -454,7 +454,7 @@ export function createActionDirector(deps) {
         const event = (result.events || []).find(ev => ev.eventId === seg.barrierHitId);
         if (event) revealRule(event, 'barrier-damage');
       }
-      avHost.consumeVisualEvents?.((result.events || []).filter(ev => ev.unitId === targetId && ev.type === 'variant-trigger'));
+      avHost.consumeVisualEvents?.((result.events || []).filter(ev => ev.unitId === targetId && ev.type === 'variant-trigger' && ev.segmentId && ev.segmentId === seg.segmentId));
       const fatalReason = seg.fatalResult && seg.fatalResult.reason;
       if (healed) playHealPulse(targetId);
       else if (fatalReason === 'avoid-fatal' && !seg.barrierHitId) {
