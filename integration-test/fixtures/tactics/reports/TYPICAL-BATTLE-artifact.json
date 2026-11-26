@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "88201f8e6c5a353972cb6fe1ac71d4747d53bec59d3075de6f16b3ff89f6df8b",
-  "bytes": 1645342,
+  "sha256": "d61c9053e0264ca5d3a9877e49f6530f708f6236a697fa92821dbb51bfb8e591",
+  "bytes": 1675635,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -186,6 +186,11 @@
       "detail": ""
     },
     {
+      "id": "火焰/中毒领域常驻层与施放演出、护盾罩/护盾段、警戒弹出与警报波纹、被动到账反馈入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
       "id": "TT-ALERTS 移动只在途中经过敌人感知也会预警",
       "pass": true,
       "detail": "[\"idle\",{\"col\":5,\"row\":7,\"cost\":5,\"path\":[{\"col\":5,\"row\":2},{\"col\":5,\"row\":3},{\"col\":5,\"row\":4},{\"col\":5,\"row\":5},{\"col\":5,\"row\":6},{\"col\":5,\"row\":7}],\"budgetCost\":5},\"pending\"]"
@@ -214,6 +219,11 @@
       "id": "TT-ALERTS 预警者自然行动时广播到欧氏半径边界，不插队",
       "pass": true,
       "detail": "[\"engaged\",\"engaged\",\"idle\"]"
+    },
+    {
+      "id": "TT-ALERTS 广播发出一条警报事件：报警者、规则半径与实际收报名单（前端波纹据此播放）",
+      "pass": true,
+      "detail": "[{\"seq\":1,\"eventId\":\"battle:6:0:event:1\",\"runId\":\"battle:6:0\",\"actionId\":\"battle:6:0:action:1\",\"at\":62.5,\"attackId\":null,\"type\":\"enemy-alarm\",\"unitId\":\"sender\",\"center\":{\"x\":7.5,\"y\":5.5},\"radius\":6,\"recipientIds\":[\"receiver\"]}]"
     },
     {
       "id": "TT-ALERTS 收报敌人按自身回合追击，不用范围技盲打也不自动接力",
@@ -266,6 +276,6 @@
       "detail": "[{\"moveTo\":{\"col\":6,\"row\":3},\"skill\":null,\"aim\":null,\"action\":null},6,{\"moveTo\":{\"col\":5,\"row\":3},\"skill\":null,\"aim\":null,\"action\":null},{\"col\":5,\"row\":3,\"facing\":270},{\"moveTo\":null,\"skill\":null,\"aim\":null,\"action\":\"wait\"}]"
     }
   ],
-  "passed": 52,
+  "passed": 54,
   "failed": 0
 }

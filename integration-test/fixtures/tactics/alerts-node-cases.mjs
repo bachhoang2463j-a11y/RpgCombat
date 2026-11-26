@@ -50,6 +50,9 @@ export function runAlertsCases(api) {
       unit('receiver', 'enemy', 5, 120, { skills: [area] }), unit('outside', 'enemy', 0, 100)], [[5, 5], [7, 5], [13, 5], [13, 6]]);
     check('TT-ALERTS 看见我方立即预警但不提前通知邻居', state(b, 'sender') === 'pending' && state(b, 'receiver') === 'idle');
     check('TT-ALERTS 预警者自然行动时广播到欧氏半径边界，不插队', advanceTo(b, 'sender') && state(b, 'sender') === 'engaged' && state(b, 'receiver') === 'engaged' && state(b, 'outside') === 'idle', [state(b, 'sender'), state(b, 'receiver'), state(b, 'outside')]);
+    const alarms = b.snapshot().events.filter(e => e.type === 'enemy-alarm');
+    check('TT-ALERTS 广播发出一条警报事件：报警者、规则半径与实际收报名单（前端波纹据此播放）', alarms.length === 1 && alarms[0].unitId === 'sender'
+      && alarms[0].radius > 0 && JSON.stringify(alarms[0].recipientIds) === '["receiver"]' && alarms[0].center, alarms);
     const receiverTurn = advanceTo(b, 'receiver');
     const plan = b.planEnemyAction();
     check('TT-ALERTS 收报敌人按自身回合追击，不用范围技盲打也不自动接力', receiverTurn && plan?.moveTo?.col < 13 && !plan.skill && state(b, 'outside') === 'idle', plan);

@@ -22,7 +22,7 @@ const SLOT_RAW = tag => String(tag || '').replace(/[[\]]/g, '');
 export function actionInput(result) {
   const skill = result.skill || {};
   const tags = [skill.type, skill.type2, skill.type3].filter(Boolean).map(t => normalizeEffectTag(t) || SLOT_RAW(t));
-  return { kind: 'action', fxTag: skill.fxTag || null, grantsMainPoint: tags.includes('再动'), haste: skill.haste || 0 };
+  return { kind: 'action', fxTag: skill.fxTag || null, grantsMainPoint: tags.includes('再动'), haste: skill.haste || 0, regionType: skill.regionEffect?.type || null };
 }
 
 // 起手演出输入：result = 蓄力/延迟开始的提交结果（preparing:true，未结算槽位）
@@ -48,6 +48,7 @@ export function createFxRegistry() {
   function resolve(input) {
     const pool = entries.filter(e => e.kind === input.kind);
     return pool.find(e => e.fxTags?.includes(input.fxTag))
+      || (input.regionType && pool.find(e => e.regionTypes?.includes(input.regionType)))
       || pool.find(e => e.fallback)
       || null;
   }

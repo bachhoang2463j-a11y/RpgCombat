@@ -141,7 +141,7 @@ export function buildShell(root) {
   function cardHtml(u) {
     return '<button class="t-hero-card" data-unit-id="' + ESC(u.id) + '">' + faceHtml(u, 't-hero-avatar') +
       '<span class="t-hero-info"><span class="t-hero-row"><b>' + ESC(u.name) + '</b><em class="t-hero-hpnum"></em></span>' +
-        '<i class="t-bar t-bar-hp"><i class="t-bar-ghost"></i><i class="t-bar-fill"></i></i>' +
+        '<i class="t-bar t-bar-hp"><i class="t-bar-ghost"></i><i class="t-bar-fill"></i><i class="t-bar-shield"></i></i>' +
         '<i class="t-bar t-bar-mp"><i class="t-bar-fill"></i></i>' +
       '</span><span class="t-card-turn">行动中</span><span class="t-hero-status"></span></button>';
   }
@@ -181,10 +181,16 @@ export function buildShell(root) {
     const card = cardOf(id);
     if (!card) return;
     const fill = card.querySelector('.t-bar-hp .t-bar-fill'), ghost = card.querySelector('.t-bar-hp .t-bar-ghost');
-    const w = pct(bars.hp, bars.maxHp) + '%';
+    // 护盾叠在 HP 末端；HP+盾超过上限时整条按 (HP+盾) 等比压缩
+    const shield = Math.max(0, bars.shield || 0), scale = Math.max(bars.maxHp, Math.max(0, bars.hp) + shield);
+    const w = pct(bars.hp, scale) + '%';
     fill.style.width = w;
+    const sh = card.querySelector('.t-bar-shield'), shW = pct(shield, scale) + '%';
+    if (shield < (card._shield || 0)) { sh.classList.remove('t-bar-shield-hit'); void sh.offsetWidth; sh.classList.add('t-bar-shield-hit'); }
+    card._shield = shield;
+    sh.style.left = w; sh.style.width = shW;
     card.querySelector('.t-bar-mp .t-bar-fill').style.width = pct(bars.mp, bars.maxMp) + '%';
-    card.querySelector('.t-hero-hpnum').innerHTML = Math.max(0, Math.round(bars.hp)) + '<small>/' + bars.maxHp + '</small>';
+    card.querySelector('.t-hero-hpnum').innerHTML = Math.max(0, Math.round(bars.hp)) + '<small>/' + bars.maxHp + '</small>' + (shield > 0 ? '<b class="t-hero-shnum">🔰' + Math.round(shield) + '</b>' : '');
     card.classList.toggle('t-low', bars.hp > 0 && bars.hp / bars.maxHp <= 0.3);
     clearTimeout(ghost._t);
     if (instant) { ghost.style.transition = 'none'; ghost.style.width = w; }
@@ -199,6 +205,18 @@ export function buildShell(root) {
       c.classList.toggle('t-selected', id === state.selectedId);
       c.classList.toggle('t-current', id === state.currentId);
     });
+  }
+  // 职业被动资源到账：卡片描边闪职业色 + 卡片上方弹出图标数值
+  function flashHeroPassive(id, text, color) {
+    const card = cardOf(id);
+    if (!card) return;
+    card.style.setProperty('--pc', color);
+    card.classList.remove('t-card-passive'); void card.offsetWidth; card.classList.add('t-card-passive');
+    const pop = document.createElement('span');
+    pop.className = 't-card-pop';
+    pop.textContent = text;
+    card.appendChild(pop);
+    setTimeout(() => pop.remove(), 1200);
   }
 
   // ---------- 行动条：原版 renderTurnQueue（伪 state.actionQueue；uid = 单位 ID，FLIP/聚焦冲击按单位稳定） ----------
@@ -615,7 +633,7 @@ export function buildShell(root) {
 
   return {
     destroy: () => { clearTimeout(showLog._t); clearTimeout(showBanner._t); rpgUi.hideTagTip(); document.removeEventListener('mousedown', onComboDown); reactionPrompt.cancel(); state.onReset = null; state.onUnitClick = null; root.replaceChildren(); },
-    els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setHeroStatus, showInspector, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
+    els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setHeroStatus, flashHeroPassive, showInspector, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
     previewMoveCost, previewPips, openModal, closeModal,
     promptReaction: (req) => reactionPrompt.prompt(req), cancelReactionPrompt: () => reactionPrompt.cancel(),
     getSafeRect, showLog, openPanel, closePanel, openResult, clearBattle, closeSubmenu: () => {},

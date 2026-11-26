@@ -1,8 +1,8 @@
 {
   "kind": "guard-barrier-artifact-backend",
   "artifact": "tactics/mvp-standalone.html",
-  "bytes": 1641675,
-  "sha256": "d128fb286f47d195afe81ef345edf7e6e3a397da148cb9d6f1245e5e5cddec0d",
+  "bytes": 1675635,
+  "sha256": "d61c9053e0264ca5d3a9877e49f6530f708f6236a697fa92821dbb51bfb8e591",
   "cases": [
     {
       "id": "单脚本与闭合",
@@ -80,8 +80,8 @@
   "examples": {
     "summonGuard": {
       "event": {
-        "seq": 3,
-        "eventId": "battle:1:0:event:3",
+        "seq": 4,
+        "eventId": "battle:1:0:event:4",
         "runId": "battle:1:0",
         "actionId": "battle:1:0:action:1",
         "at": 33.333333333333336,
@@ -141,8 +141,8 @@
         "finalTargetId": "g",
         "committed": true,
         "reactionUsed": {
-          "seq": 2,
-          "eventId": "battle:1:0:event:2",
+          "seq": 3,
+          "eventId": "battle:1:0:event:3",
           "runId": "battle:1:0",
           "actionId": "battle:1:0:action:1",
           "at": 33.333333333333336,
@@ -275,8 +275,8 @@
             "finalTargetId": "g",
             "committed": true,
             "reactionUsed": {
-              "seq": 2,
-              "eventId": "battle:1:0:event:2",
+              "seq": 3,
+              "eventId": "battle:1:0:event:3",
               "runId": "battle:1:0",
               "actionId": "battle:1:0:action:1",
               "at": 33.333333333333336,
@@ -313,8 +313,8 @@
             }
           },
           "reactionUsed": {
-            "seq": 2,
-            "eventId": "battle:1:0:event:2",
+            "seq": 3,
+            "eventId": "battle:1:0:event:3",
             "runId": "battle:1:0",
             "actionId": "battle:1:0:action:1",
             "at": 33.333333333333336,
@@ -451,8 +451,8 @@
       }
     },
     "groupHit": {
-      "seq": 5,
-      "eventId": "battle:4:0:event:5",
+      "seq": 6,
+      "eventId": "battle:4:0:event:6",
       "runId": "battle:4:0",
       "actionId": "battle:4:0:action:4",
       "at": 100,

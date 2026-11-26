@@ -28,6 +28,7 @@ import { autoPickChoice } from './reaction-prompt.mjs';
 import { unitCenter } from './geometry.mjs';
 import { createScenarioData, createSeededRandom } from './scenario-data.mjs';
 import { statusBadges, compactStatusHtml, fullStatusHtml, inspectorHtml } from './status-ui.mjs';
+import { passiveGainLabel } from './fx-library.mjs';
 import { resolveLore } from './lore.mjs';
 import { getEffectiveStats } from './class-passives.mjs';
 import { hitChance } from './damage.mjs';
@@ -264,6 +265,7 @@ export function createApp(rootEl, opts = {}) {
     onMoveFeedback: (id, kind, p) => moveFeedback(id, kind, p),
     onRuleReveal: (value, { kind }) => { if (kind === 'reaction-damage') revealCounter(value); },
     onSelfDestruct: () => { syncShown(); refreshBattle(); },
+    onPassiveGain: (ev) => { if (unitById(ev.unitId)?.side === 'hero') shell.flashHeroPassive(ev.unitId, passiveGainLabel(ev), PASSIVE_CARD_COLOR[ev.kind]); },
     promptRetarget: (req) => {
       const caster = unitById(req.casterId);
       return isPlayerUnit(caster) ? beginRetargetPrompt(req) : Promise.resolve(null);
@@ -655,6 +657,8 @@ export function createApp(rootEl, opts = {}) {
       shown.set(full.id, { hp: full.ref.hp, mp: full.ref.mp, tp: full.ref.tp || 0, shield: full.ref.shield || 0 });
     }
   }
+  const PASSIVE_CARD_COLOR = { taunt: '#f87171', stealth: '#a5b4fc', haste: '#22d3ee' };
+  const alertPending = new Set();
   function refreshBattle() {
     const snap = battle.snapshot();
     syncDynamicUnits(snap);
@@ -665,18 +669,25 @@ export function createApp(rootEl, opts = {}) {
     }
     sandbox.update(currentViewData);
     const view = sandbox.getUnitView();
+    let alerted = false;
     for (const u of currentViewData.units) {
       view.setFlag(u.id, 't-unit-down', shownOf(u).hp <= 0);
       view.setFlag(u.id, 't-unit-current', u.id === snap.currentId && !snap.terminal);
-      view.setFlag(u.id, 't-unit-alert-pending', u.effective?.alertState === 'pending' && shownOf(u).hp > 0 && !snap.terminal);
+      const pending = u.effective?.alertState === 'pending' && shownOf(u).hp > 0 && !snap.terminal;
+      view.setFlag(u.id, 't-unit-alert-pending', pending);
+      // 新进入警戒：感叹号弹出 + 警觉音（同一刷新多名敌人只响一次）
+      if (pending && !alertPending.has(u.id)) { view.pulseAlert(u.id); alerted = true; }
+      if (pending) alertPending.add(u.id); else alertPending.delete(u.id);
       view.setFlag(u.id, 't-unit-channel', !!battle.battleState.combatState.charges?.[u.id]?.preparing);
       const ch = snap.units.find(x => x.id === u.id)?.charge;
       view.setFlag(u.id, 't-unit-charge-full', !!(ch && ch.current >= ch.max && shownOf(u).hp > 0));
       if (unitStyles[u.id]) view.setFlag(u.id, unitStyles[u.id].cls, true);
     }
+    if (alerted) avHost.sfx('bellPing', 0.36, { category: 'K' });
     avHost.consumeVisualEvents(snap.events.filter(ev => !ev.attackId));
     avHost.syncVisualState();
     director.syncRegions(snap.regions || []);
+    director.playFieldFeedback(snap.events.filter(ev => !ev.attackId));
     director.syncBarriers(snap.barriers || []);
     director.syncPreparations(battle.battleState.combatState.charges || {});
     syncCarried(snap);
@@ -1348,7 +1359,7 @@ export function createApp(rootEl, opts = {}) {
     shown.set(u.id, next);
     u.bars = { ...u.bars, hp: hit.hpAfter, shield: next.shield };
     const rec = sandbox.getUnitView() && sandbox.getUnitView().nodes.get(u.id);
-    if (rec) rec.bars = u.bars;
+    if (rec) { rec.bars = u.bars; sandbox.getUnitView().setShield(u.id, next.shield || 0); }
     if (u.side === 'hero') shell.setHeroBars(u.id, u.bars, hit.heal ? { heal: true } : { hit: hit.hit });
     for (let i = hit.logIndex; i < hit.logEnd; i++) hiddenLog.delete(i);
     shell.setHistory(visibleLog());

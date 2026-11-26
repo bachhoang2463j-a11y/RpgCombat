@@ -68,7 +68,23 @@ button:disabled { opacity: .42; cursor: default; }
 .t-unit-medal { position: absolute; left: 50%; top: 50%; width: var(--d); height: var(--d); transform: translate(-50%,-50%); }
 .t-unit-alert { display: none; position: absolute; z-index: 2; top: -5px; right: -5px; width: 19px; height: 19px; border-radius: 50%;
   background: #f3c46f; color: #2b1511; border: 1px solid #462821; font-size: 14px; line-height: 17px; text-align: center; pointer-events: none; }
-.t-unit-alert-pending .t-unit-alert { display: block; }
+.t-unit-alert-pending .t-unit-alert, .t-unit-alert-flash .t-unit-alert { display: block; }
+/* 警戒：待报警敌人感叹号呼吸辉光；收到警报的队友临时亮红 */
+.t-unit-alert-pending .t-unit-alert { animation: t-alert-breathe 1.3s ease-in-out infinite; }
+@keyframes t-alert-breathe { 0%,100% { box-shadow: 0 0 5px rgba(243,196,111,.55); } 50% { box-shadow: 0 0 0 4px rgba(243,196,111,.22), 0 0 14px rgba(251,191,36,.95); } }
+.t-unit-alert-flash:not(.t-unit-alert-pending) .t-unit-alert { background: #f87171; color: #fff; border-color: #7f1d1d; }
+/* 护盾罩：头像外一层半透明防护罩（高光 + 外缘流光 + 呼吸）；展开/受击/碎裂由视图 WAAPI 驱动 */
+.t-unit-shield { position: absolute; left: 50%; top: 50%; width: calc(var(--d) + 14px); height: calc(var(--d) + 14px); margin: calc((var(--d) + 14px) / -2) 0 0 calc((var(--d) + 14px) / -2);
+  border-radius: 50%; pointer-events: none; opacity: 0; z-index: 1; transition: opacity .25s;
+  background: radial-gradient(circle at 34% 26%, rgba(255,255,255,.5) 0 7%, transparent 20%), radial-gradient(circle, rgba(186,230,253,0) 54%, rgba(186,230,253,.2) 66%, rgba(224,242,254,.55) 72%, rgba(125,211,252,0) 76%);
+  box-shadow: 0 0 10px rgba(125,211,252,.5), inset 0 0 12px rgba(186,230,253,.4); }
+.t-unit-shield::after { content: ''; position: absolute; inset: 0; border-radius: 50%; animation: t-shield-sheen 3.2s linear infinite;
+  background: conic-gradient(from 0deg, transparent 0 68%, rgba(255,255,255,.7) 80%, transparent 92%);
+  -webkit-mask: radial-gradient(circle, transparent 63%, #000 67%, #000 72%, transparent 75%); mask: radial-gradient(circle, transparent 63%, #000 67%, #000 72%, transparent 75%); }
+.t-unit-shielded .t-unit-shield { opacity: 1; animation: t-shield-breathe 2.4s ease-in-out infinite; }
+.t-unit-down .t-unit-shield { display: none; }
+@keyframes t-shield-sheen { to { transform: rotate(360deg); } }
+@keyframes t-shield-breathe { 50% { box-shadow: 0 0 16px rgba(125,211,252,.75), inset 0 0 16px rgba(186,230,253,.6); } }
 .t-unit-avatar, .t-unit-emoji { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #10141b; }
 .t-unit-avatar img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; display: block; }
 .t-unit-emoji { font-size: calc(var(--d) * 0.56); line-height: 1; background: radial-gradient(circle at 50% 35%, #34181d 0%, #150a0d 75%); }
@@ -248,6 +264,18 @@ button:disabled { opacity: .42; cursor: default; }
 .t-hero-row b { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .t-hero-hpnum { font-style: normal; font-size: 11px; color: var(--text); font-variant-numeric: tabular-nums; }
 .t-hero-hpnum small { color: var(--dim); font-size: 10px; }
+.t-hero-hpnum .t-hero-shnum { margin-left: 4px; font-size: 10px; font-weight: 700; color: #bae6fd; }
+/* 左下卡片护盾段：叠在 HP 末端（银白半透明 + 辉光），宽度随盾值过渡；受击闪亮 */
+.t-bar .t-bar-shield { left: 0; width: 0; border-radius: 0 3px 3px 0; background: linear-gradient(90deg, rgba(226,232,240,.72), rgba(186,230,253,.95));
+  box-shadow: 0 0 6px rgba(186,230,253,.8); transition: left .35s ease, width .35s ease; }
+.t-bar-shield-hit { animation: t-shield-hit .4s ease-out; }
+@keyframes t-shield-hit { 30% { filter: brightness(2.2); } }
+/* 职业被动到账：卡片描边闪职业色 + 上方弹出图标数值 */
+.t-card-passive { animation: t-card-passive .9s ease-out; }
+@keyframes t-card-passive { 25% { border-color: var(--pc); box-shadow: 0 0 16px color-mix(in srgb, var(--pc) 60%, transparent); } }
+.t-card-pop { position: absolute; left: 50%; top: -6px; z-index: 3; font: 800 12px/1 system-ui, sans-serif; color: var(--pc); white-space: nowrap; pointer-events: none;
+  text-shadow: 0 0 6px rgba(0,0,0,.9), 0 1px 2px #000; animation: t-card-pop 1.2s ease-out forwards; }
+@keyframes t-card-pop { 0% { opacity: 0; transform: translate(-50%,6px) scale(.7); } 15% { opacity: 1; transform: translate(-50%,-10px) scale(1.1); } 70% { opacity: 1; transform: translate(-50%,-22px) scale(1); } 100% { opacity: 0; transform: translate(-50%,-34px); } }
 .t-hero-card .t-bar-hp { height: 6px; }
 .t-hero-card .t-bar-mp { height: 3px; }
 .t-card-turn { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); font-size: 9px; letter-spacing: 2px; padding: 1px 8px; border-radius: 999px;

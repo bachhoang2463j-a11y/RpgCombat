@@ -78,6 +78,7 @@ export function createUnitView(parent, deps) {
       '<div class="t-unit-name">' + escapeHtml(unit.name) + '</div>' +
       '<div class="t-unit-sprite" data-arcane-target-id="' + escapeHtml(unit.id) + '" style="--d:' + d + 'px;">' +
         '<div class="t-unit-medal">' + face +
+          '<i class="t-unit-shield" aria-hidden="true"></i>' +
           (unit.side === 'enemy' ? '<b class="t-unit-alert" title="预警" aria-label="预警">!</b>' : '') +
           '<svg class="t-unit-direction" viewBox="-30 -30 60 60" aria-hidden="true"><path d="M0,-29 L6.5,-19.5 L0,-22 L-6.5,-19.5 Z"/></svg>' +
         '</div>' +
@@ -118,6 +119,8 @@ export function createUnitView(parent, deps) {
       mpBar: billboard.querySelector('.t-bar-mp .t-bar-fill'),
       status: billboard.querySelector('.t-unit-status'), statusHtml: '',
       predictBar: billboard.querySelector('.t-bar-predict'), predictTag: billboard.querySelector('.t-unit-predict-tag'),
+      shield: billboard.querySelector('.t-unit-shield'), shieldShown: (unit.bars && unit.bars.shield) || 0,
+      alert: billboard.querySelector('.t-unit-alert'),
       unit, placement, bars: unit.bars || null, motionLock: false, displayFacing: null,
     };
     nodes.set(unit.id, rec);
@@ -141,6 +144,27 @@ export function createUnitView(parent, deps) {
       const mp = b.maxMp ? Math.max(0, Math.min(1, (b.mp || 0) / b.maxMp)) : 1;
       rec.mpBar.style.width = (mp * 100).toFixed(1) + '%';
     }
+    syncShield(rec, b.shield || 0);
+  }
+  // 护盾罩：有盾即在头像外罩一层半透明防护罩；新获得时展开，受击减少时闪亮，归零时碎裂淡出
+  function syncShield(rec, value) {
+    const prev = rec.shieldShown || 0;
+    rec.shieldShown = value;
+    rec.root.classList.toggle('t-unit-shielded', value > 0);
+    if (value > 0 && prev <= 0) rec.shield.animate([{ transform: 'scale(1.45)', opacity: 0 }, { transform: 'scale(0.94)', opacity: 1, offset: 0.6 }, { transform: 'scale(1)', opacity: 1 }], { duration: 460, easing: 'ease-out' });
+    else if (value <= 0 && prev > 0) rec.shield.animate([{ transform: 'scale(1)', opacity: 1, filter: 'brightness(2.2)' }, { transform: 'scale(1.12)', opacity: 0.8, offset: 0.25 }, { transform: 'scale(1.5)', opacity: 0, filter: 'brightness(1)' }], { duration: 520, easing: 'ease-out' });
+    else if (value < prev) rec.shield.animate([{ filter: 'brightness(2)', transform: 'scale(1.06)' }, { filter: 'brightness(1)', transform: 'scale(1)' }], { duration: 320, easing: 'ease-out' });
+  }
+  function setShield(id, value) { const rec = nodes.get(id); if (rec) syncShield(rec, Math.max(0, value || 0)); }
+  // 警戒感叹号弹出（新进入警戒 / 收到警报）：弹跳 + 摇摆，收报者临时显示 0.9s
+  function pulseAlert(id) {
+    const rec = nodes.get(id);
+    if (!rec || !rec.alert) return;
+    rec.root.classList.add('t-unit-alert-flash');
+    rec.alert.animate([{ transform: 'scale(0) rotate(0deg)' }, { transform: 'scale(1.6) rotate(-14deg)', offset: 0.35 }, { transform: 'scale(0.9) rotate(10deg)', offset: 0.6 },
+      { transform: 'scale(1.12) rotate(-5deg)', offset: 0.8 }, { transform: 'scale(1) rotate(0deg)' }], { duration: 560, easing: 'ease-out' });
+    clearTimeout(rec.alertTimer);
+    rec.alertTimer = setTimeout(() => rec.root.classList.remove('t-unit-alert-flash'), 900);
   }
 
   function setUnits(units, placementsById) {
@@ -175,7 +199,7 @@ export function createUnitView(parent, deps) {
     if (!rec) return;
     if (patch.unit) {
       rec.unit = patch.unit;
-      const changed = !rec.bars || rec.bars.hp !== patch.unit.bars.hp || rec.bars.mp !== patch.unit.bars.mp || rec.bars.maxHp !== patch.unit.bars.maxHp;
+      const changed = !rec.bars || rec.bars.hp !== patch.unit.bars.hp || rec.bars.mp !== patch.unit.bars.mp || rec.bars.maxHp !== patch.unit.bars.maxHp || rec.bars.shield !== patch.unit.bars.shield;
       rec.bars = patch.unit.bars;
       if (changed) applyBars(rec, true);
     }
@@ -243,5 +267,5 @@ export function createUnitView(parent, deps) {
   }
 
   return { setUnits, syncUnits, updateUnit, setFacing, onCameraChange, getEntitySpriteDom, nodes,
-    lockMotion, setDisplayPos, setDisplayFacing, setFlag, clearFlag, setHop, setStatus, setPredict, clearPredict };
+    lockMotion, setDisplayPos, setDisplayFacing, setFlag, clearFlag, setHop, setStatus, setPredict, clearPredict, setShield, pulseAlert };
 }

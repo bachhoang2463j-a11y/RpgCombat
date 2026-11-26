@@ -57,7 +57,7 @@ function tools(root) {
   return { q, a, all, drawIn, fade };
 }
 
-// ---------- 18 套构图 ----------
+// ---------- 20 套构图 ----------
 export const SHOWPIECES = {
   // 压缩爆燃：四角炽焰涡旋回卷 → 火环冲击 + 热浪扭曲 → 余烬上浮
   'fire-blast': {
@@ -369,6 +369,60 @@ export const SHOWPIECES = {
       T.all('sp', (el, i) => { const dx = (CX - +el.getAttribute('cx')) * .25, dy = (CY - +el.getAttribute('cy')) * .25; T.a(el, [{ opacity: 0, transform: 'translate(0,0)' }, { opacity: 1, offset: .2 }, { opacity: 0, transform: 'translate(' + f1(dx) + 'px,' + f1(dy - 40) + 'px)' }], 1100, { delay: (i % 10) * 25 }); });
     },
     linger(T) { T.fade('vn', 1, 0, 800); T.fade('bl', 1, 0, 900); },
+  },
+
+  // 火焰领域：屏幕下缘火墙连绵升起、两侧火舌上卷 → 火墙冲高 + 热浪横扫 → 余烬上浮
+  'fire-domain': {
+    build(u, r) {
+      const tongue = (x, y, h, w, k) => { const bend = (r() - 0.5) * w * 1.2;
+        return '<path data-k="' + k + '" d="M' + f1(x - w) + ',' + f1(y) + ' Q' + f1(x - w * 0.4 + bend) + ',' + f1(y - h * 0.55) + ' ' + f1(x + bend * 0.6) + ',' + f1(y - h) + ' Q' + f1(x + w * 0.5 + bend) + ',' + f1(y - h * 0.5) + ' ' + f1(x + w) + ',' + f1(y) + 'Z" fill="url(#ft' + u + ')" filter="url(#t' + u + ')" opacity="0" style="' + org(x, y) + '"/>'; };
+      const wall = Array.from({ length: 30 }, (_, i) => tongue(i / 29 * W + (r() - 0.5) * 30, H + 6, 120 + r() * 150, 34 + r() * 26, 'fw')).join('');
+      const sides = Array.from({ length: 12 }, (_, i) => { const s = i % 2, y = H - 60 - Math.floor(i / 2) * 70; return '<g style="' + org(s ? W : 0, y) + '" data-k="fs"><g transform="rotate(' + (s ? -90 : 90) + ' ' + (s ? W : 0) + ' ' + y + ')">' + tongue(s ? W : 0, y, 90 + r() * 80, 26 + r() * 16, 'fsi') + '</g></g>'; }).join('');
+      const embers = Array.from({ length: 30 }, () => orb(r() * W, H - r() * 60, 3 + r() * 5, 'url(#em' + u + ')', 'em', 'opacity="0"')).join('');
+      return defs(u, rad('ft' + u, st(0, '#fff7d6', 0.95) + st(0.3, '#fbbf24', 0.9) + st(0.7, '#ea580c', 0.6) + st(1, '#7f1d1d', 0), '50%', '90%', '90%') +
+        lin('gb' + u, st(0, '#7c2d12', 0) + st(0.6, '#c2410c', 0.45) + st(1, '#fb923c', 0.75)) + rad('em' + u, st(0, '#fff7d6') + st(0.5, '#fb923c') + st(1, '#7c2d12', 0)) +
+        lin('hw' + u, st(0, '#fb923c', 0) + st(0.5, '#fde68a', 0.55) + st(1, '#fb923c', 0), 0, 0, 1, 0)) +
+        '<rect data-k="gb" x="0" y="' + (H - 380) + '" width="' + W + '" height="380" fill="url(#gb' + u + ')" opacity="0"/>' + wall + sides +
+        '<ellipse data-k="hw" cx="' + CX + '" cy="' + (H - 160) + '" rx="' + (W * 0.6) + '" ry="70" fill="url(#hw' + u + ')" filter="url(#t' + u + ')" opacity="0" style="' + org(CX, H - 160) + '"/>' + embers;
+    },
+    gather(T, ms) {
+      T.fade('gb', 0, 1, ms);
+      T.all('fw', (el, i) => T.a(el, [{ transform: 'scaleY(0)', opacity: 0 }, { transform: 'scaleY(1)', opacity: 0.9 }], ms * 0.85, { delay: (i % 6) * 40, easing: 'cubic-bezier(.4,0,.6,1)' }));
+      T.all('fsi', (el, i) => T.a(el, [{ transform: 'scaleY(0)', opacity: 0 }, { transform: 'scaleY(1)', opacity: 0.8 }], ms * 0.8, { delay: ms * 0.15 + i * 30 }));
+    },
+    burst(T) {
+      T.all('fw', el => T.a(el, [{ transform: 'scaleY(1)', opacity: 0.9 }, { transform: 'scaleY(1.7)', opacity: 1, offset: 0.3 }, { transform: 'scaleY(1)', opacity: 0.85 }], 460));
+      T.all('hw', el => T.a(el, [{ transform: 'scaleX(0.1)', opacity: 0 }, { transform: 'scaleX(1)', opacity: 1, offset: 0.35 }, { transform: 'scaleX(1.2) translateY(-60px)', opacity: 0 }], 440));
+    },
+    linger(T) {
+      T.fade('fw', 0.85, 0, 800); T.fade('fsi', 0.8, 0, 700); T.fade('gb', 1, 0, 900);
+      T.all('em', (el, i) => T.a(el, [{ transform: 'translate(0,0)', opacity: 0 }, { opacity: 1, offset: 0.2 }, { transform: 'translate(' + ((i % 5) - 2) * 26 + 'px,-' + (260 + (i % 7) * 50) + 'px)', opacity: 0 }], 1100, { delay: (i % 9) * 40, easing: 'ease-out' }));
+    },
+  },
+
+  // 中毒领域：四边毒沼泡沫翻涌、上缘毒液垂滴 → 泡群齐爆 + 紫绿瘴气自下漫起 → 孢子飘散
+  'poison-domain': {
+    blend: 'normal',
+    build(u, r) {
+      const bubbles = Array.from({ length: 40 }, (_, i) => { const p = toward(edgePt(i / 40 + r() * 0.02), 0.02 + r() * 0.07), rr = 10 + r() * 22;
+        return '<circle data-k="bb" cx="' + f1(p.x) + '" cy="' + f1(p.y) + '" r="' + f1(rr) + '" fill="url(#bb' + u + ')" stroke="#d9f99d" stroke-width="2" stroke-opacity=".7" opacity="0" style="' + box + '"/>'; }).join('');
+      const drips = Array.from({ length: 16 }, (_, i) => { const x = 40 + i * 100 + r() * 40, len = 80 + r() * 140; return draw('M' + f1(x) + ',0 C' + f1(x - 6) + ',' + f1(len * 0.4) + ' ' + f1(x + 6) + ',' + f1(len * 0.7) + ' ' + f1(x) + ',' + f1(len), 'url(#dp' + u + ')', f1(6 + r() * 6), 'dp', 'filter="url(#g' + u + ')"'); }).join('');
+      const mist = [0, 1, 2].map(i => '<ellipse data-k="mb" cx="' + (CX + (i - 1) * 520) + '" cy="' + (H + 40) + '" rx="520" ry="260" fill="url(#mb' + u + ')" filter="url(#t' + u + ')" opacity="0" style="' + org(CX + (i - 1) * 520, H + 40) + '"/>').join('');
+      const spores = Array.from({ length: 30 }, () => { const p = toward(edgePt(r()), 0.08); return orb(p.x, p.y, 3 + r() * 4, 'url(#sp' + u + ')', 'sp', 'opacity="0"'); }).join('');
+      return defs(u, rad('bb' + u, st(0, '#ecfccb', 0.2) + st(0.7, '#84cc16', 0.5) + st(1, '#581c87', 0.85)) + lin('dp' + u, st(0, '#3b0764', 0.4) + st(0.6, '#a855f7') + st(1, '#bef264'), 0, 0, 0, 1) +
+        rad('mb' + u, st(0, '#a3e635', 0.55) + st(0.5, '#7e22ce', 0.4) + st(1, '#1e1b4b', 0)) + rad('sp' + u, st(0, '#d9f99d') + st(1, '#7e22ce', 0)) + rad('vg' + u, st(0.45, '#1e1b4b', 0) + st(1, '#2e1065', 0.6))) +
+        '<rect data-k="vg" width="' + W + '" height="' + H + '" fill="url(#vg' + u + ')" opacity="0"/>' + mist + drips + bubbles + spores;
+    },
+    gather(T, ms) {
+      T.fade('vg', 0, 1, ms); T.drawIn('dp', ms * 0.9, 30, { easing: 'cubic-bezier(.3,0,.7,1)' });
+      T.all('bb', (el, i) => T.a(el, [{ transform: 'scale(0)', opacity: 0 }, { transform: 'scale(1.1)', opacity: 1, offset: 0.8 }, { transform: 'scale(1)', opacity: 0.95 }], ms * 0.6, { delay: ms * 0.25 + (i % 10) * 30 }));
+    },
+    burst(T) {
+      T.all('bb', el => T.a(el, [{ transform: 'scale(1)', opacity: 0.95 }, { transform: 'scale(1.7)', opacity: 0 }], 260, { easing: 'cubic-bezier(.2,1.4,.4,1)' }));
+      T.all('mb', el => T.a(el, [{ transform: 'translateY(120px) scale(.8)', opacity: 0 }, { transform: 'translateY(0) scale(1)', opacity: 1 }], 520, { easing: 'cubic-bezier(.2,.8,.3,1)' }));
+      T.all('sp', (el, i) => { const dx = (CX - +el.getAttribute('cx')) * 0.2, dy = (CY - +el.getAttribute('cy')) * 0.2; T.a(el, [{ opacity: 0, transform: 'translate(0,0)' }, { opacity: 1, offset: 0.2 }, { opacity: 0, transform: 'translate(' + f1(dx) + 'px,' + f1(dy - 50) + 'px)' }], 1100, { delay: (i % 10) * 25 }); });
+    },
+    linger(T) { T.fade('dp', 1, 0, 700); T.fade('mb', 1, 0, 900); T.fade('vg', 1, 0, 900); },
   },
 
   // 圣域帷幕 L4：发光帷幔自天降下、穹顶玫瑰窗缓转 → 帷幕向两侧拉开、十字圣辉 → 光尘

@@ -683,6 +683,267 @@ export function animateFogField(layer) {
   });
 }
 
+// ---------- 火焰 / 中毒领域：常驻层（与浓雾同口径：只消费规则 cells，羽化边缘；地面层浓、顶层淡，单位始终可辨） ----------
+const FIELD_THEMES = {
+  fire: {
+    base: 'rgb(58,14,6)', baseAlpha: 0.46,
+    blob: ['#fde68a', '#f97316', '#9a1c0c'], blobN: 14, flicker: true,
+    top: { kind: 'flame', n: 10, stops: ['#fff7d6', '#fb923c', '#dc2626'] },
+    motes: { n: 18, colors: ['#fde68a', '#fb923c', '#fbbf24'], r: [1.6, 3.2] },
+  },
+  poison: {
+    base: 'rgb(34,20,52)', baseAlpha: 0.44,
+    blob: ['#bef264', '#65a30d', '#3b0764'], blobN: 12, drift: true,
+    bubbles: { n: 16, stroke: '#d9f99d', fill: 'rgba(163,230,53,0.28)' },
+    top: { kind: 'haze', n: 6, stops: ['#a3e635', '#7e22ce', '#1e1b4b'] },
+    motes: { n: 12, colors: ['#bef264', '#c084fc', '#86efac'], r: [1.4, 2.6] },
+  },
+};
+function fieldFrame(region) {
+  const cells = region.cells || [];
+  if (!cells.length) return null;
+  let c0 = Infinity, r0 = Infinity, c1 = -Infinity, r1 = -Infinity;
+  for (const k of cells) { c0 = Math.min(c0, k.col); r0 = Math.min(r0, k.row); c1 = Math.max(c1, k.col); r1 = Math.max(r1, k.row); }
+  const x0 = (c0 - 1) * PX, y0 = (r0 - 1) * PX, w = (c1 - c0 + 3) * PX, h = (r1 - r0 + 3) * PX;
+  const rects = cells.map(k => '<rect x="' + (k.col - c0 + 1) * PX + '" y="' + (k.row - r0 + 1) * PX + '" width="' + PX + '" height="' + PX + '"/>').join('');
+  const pt = () => { const k = pick(cells); return { x: (k.col - c0 + 1 + rnd(0.12, 0.88)) * PX, y: (k.row - r0 + 1 + rnd(0.12, 0.88)) * PX }; };
+  return { x0, y0, w, h, rects, pt, R: region.radius * PX };
+}
+const BOX = 'transform-box:fill-box;transform-origin:50% 50%;';
+export function elementFieldHtml(region, uid) {
+  const T = FIELD_THEMES[region.type], f = T && fieldFrame(region);
+  if (!f) return { ground: '', top: '' };
+  const open = kind => '<svg data-fx="field-' + region.type + '-' + kind + '" width="' + f.w + '" height="' + f.h + '" style="position:absolute;left:' + f.x0 + 'px;top:' + f.y0 + 'px;overflow:visible;pointer-events:none;opacity:0;">';
+  const mask = id => '<filter id="fm' + id + '" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="14"/></filter>' +
+    '<mask id="mk' + id + '" maskUnits="userSpaceOnUse" x="0" y="0" width="' + f.w + '" height="' + f.h + '"><g fill="#fff" filter="url(#fm' + id + ')">' + f.rects + '</g></mask>';
+  // 地面层：焦土/毒沼底色 + 余烬或毒斑光团（闪烁或漂移）+ 毒泡
+  const g = uid + 'g';
+  let blobs = '';
+  for (let i = 0; i < T.blobN; i++) {
+    const p = f.pt(), r = rnd(0.5, 0.95) * PX;
+    blobs += '<circle ' + (T.flicker ? 'data-flicker="1"' : 'data-drift="1"') + ' cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + r.toFixed(1) + '" fill="url(#bg' + g + ')" style="' + BOX + '"/>';
+  }
+  let bubbles = '';
+  if (T.bubbles) for (let i = 0; i < T.bubbles.n; i++) {
+    const p = f.pt(), r = rnd(3, 7);
+    bubbles += '<circle data-bubble="1" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + r.toFixed(1) + '" fill="' + T.bubbles.fill + '" stroke="' + T.bubbles.stroke + '" stroke-width="1.2" style="' + BOX + 'opacity:0;"/>';
+  }
+  const ground = open('g') + '<defs>' + mask(g) +
+    '<radialGradient id="bg' + g + '"><stop offset="0" stop-color="' + T.blob[0] + '" stop-opacity="0.75"/><stop offset=".45" stop-color="' + T.blob[1] + '" stop-opacity="0.42"/><stop offset="1" stop-color="' + T.blob[2] + '" stop-opacity="0"/></radialGradient></defs>' +
+    '<g mask="url(#mk' + g + ')"><rect width="' + f.w + '" height="' + f.h + '" fill="' + T.base + '" fill-opacity="' + T.baseAlpha + '"/>' + blobs + bubbles + '</g></svg>';
+  // 顶层：火舌或毒雾薄纱 + 上浮火星/孢子（淡，不遮单位）
+  const t = uid + 't', S = T.top.stops;
+  let tops = '';
+  for (let i = 0; i < T.top.n; i++) {
+    const p = f.pt();
+    if (T.top.kind === 'flame') {
+      // 尖顶火舌（外层 g 定位，内层 path 只给 CSS 动画用 transform，互不覆盖）+ 轻羽化
+      const rx = rnd(7, 12), ry = rnd(18, 30);
+      tops += '<g transform="translate(' + p.x.toFixed(1) + ',' + p.y.toFixed(1) + ')"><path data-flame="1" d="M0,0 C' + (-rx).toFixed(1) + ',' + (-ry * 0.25).toFixed(1) + ' ' + (-rx * 0.55).toFixed(1) + ',' + (-ry * 0.75).toFixed(1) + ' 0,' + (-ry).toFixed(1) +
+        ' C' + (rx * 0.55).toFixed(1) + ',' + (-ry * 0.75).toFixed(1) + ' ' + rx.toFixed(1) + ',' + (-ry * 0.25).toFixed(1) + ' 0,0Z" fill="url(#tf' + t + ')" filter="url(#fb' + t + ')" style="transform-box:fill-box;transform-origin:50% 100%;mix-blend-mode:screen;"/></g>';
+    } else {
+      tops += '<g data-drift="1"><circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + (rnd(0.9, 1.5) * PX).toFixed(1) + '" fill="url(#tf' + t + ')"/></g>';
+    }
+  }
+  for (let i = 0; i < T.motes.n; i++) {
+    const p = f.pt();
+    tops += '<circle data-rise="1" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + rnd(T.motes.r[0], T.motes.r[1]).toFixed(1) + '" fill="' + pick(T.motes.colors) + '" style="' + BOX + 'opacity:0;"/>';
+  }
+  const topGrad = T.top.kind === 'flame'
+    ? '<linearGradient id="tf' + t + '" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="' + S[0] + '" stop-opacity="0.85"/><stop offset=".45" stop-color="' + S[1] + '" stop-opacity="0.6"/><stop offset="1" stop-color="' + S[2] + '" stop-opacity="0"/></linearGradient>'
+    : '<radialGradient id="tf' + t + '"><stop offset="0" stop-color="' + S[0] + '" stop-opacity="0.22"/><stop offset=".6" stop-color="' + S[1] + '" stop-opacity="0.12"/><stop offset="1" stop-color="' + S[2] + '" stop-opacity="0"/></radialGradient>';
+  const top = open('t') + '<defs>' + mask(t) + topGrad + '<filter id="fb' + t + '" x="-50%" y="-30%" width="200%" height="160%"><feGaussianBlur stdDeviation="1.6"/></filter></defs><g mask="url(#mk' + t + ')">' + tops + '</g></svg>';
+  return { ground, top };
+}
+export function animateElementField(layer) {
+  const svg = layer.firstChild;
+  if (!svg) return;
+  svg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 700, easing: 'ease-out', fill: 'forwards' });
+  layer.querySelectorAll('[data-drift]').forEach(g => {
+    const dx = rnd(-22, 22), dy = rnd(-14, 14);
+    g.animate([{ transform: 'translate(0px,0px)' }, { transform: 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px)' }], { duration: rnd(4000, 7000), direction: 'alternate', iterations: Infinity, easing: 'ease-in-out' });
+  });
+  layer.querySelectorAll('[data-flicker]').forEach(el => el.animate([{ opacity: 0.5, transform: 'scale(0.88)' }, { opacity: 1, transform: 'scale(1.1)' }],
+    { duration: rnd(420, 900), delay: -rnd(0, 900), direction: 'alternate', iterations: Infinity, easing: 'ease-in-out' }));
+  layer.querySelectorAll('[data-flame]').forEach(el => el.animate([
+    { transform: 'scale(0.9,0.75) skewX(0deg)', opacity: 0.45 }, { transform: 'scale(1.05,1.18) skewX(6deg)', opacity: 0.9, offset: 0.45 }, { transform: 'scale(0.95,0.9) skewX(-5deg)', opacity: 0.6 }],
+    { duration: rnd(520, 860), delay: -rnd(0, 860), direction: 'alternate', iterations: Infinity, easing: 'ease-in-out' }));
+  layer.querySelectorAll('[data-rise]').forEach(el => {
+    const dx = rnd(-14, 14), up = rnd(40, 80);
+    el.animate([{ transform: 'translate(0px,0px) scale(1)', opacity: 0 }, { opacity: 1, offset: 0.2 }, { transform: 'translate(' + dx.toFixed(1) + 'px,' + (-up).toFixed(1) + 'px) scale(0.4)', opacity: 0 }],
+      { duration: rnd(1400, 2400), delay: -rnd(0, 2400), iterations: Infinity, easing: 'ease-out' });
+  });
+  layer.querySelectorAll('[data-bubble]').forEach(el => el.animate([{ transform: 'scale(0.2)', opacity: 0 }, { transform: 'scale(1)', opacity: 0.95, offset: 0.75 }, { transform: 'scale(1.35)', opacity: 0 }],
+    { duration: rnd(1300, 2300), delay: -rnd(0, 2300), iterations: Infinity, easing: 'ease-in' }));
+}
+
+// 领域每回合判定（规则 region-contest，非施放当拍）L1：常驻层增亮一拍 + 边缘脉冲环；命中者脚下爆一团，闪避者飘字
+const PULSE = {
+  fire: { sfx: 'ranshao', ring: ['rgba(253,186,116,0.8)', 'rgba(239,68,68,0.45)'], orb: ['rgba(249,115,22,0.75)', '#fde68a'], label: '🔥 灼烧领域' },
+  poison: { sfx: 'creature_slime_01', ring: ['rgba(190,242,100,0.75)', 'rgba(168,85,247,0.45)'], orb: ['rgba(132,204,22,0.7)', '#ecfccb'], label: '☠️ 毒域侵蚀' },
+};
+export const REGION_PULSE_AUDIO = Object.values(PULSE).map(p => p.sfx);
+export function playRegionPulse(fx, region, contests, centerOf, layers = []) {
+  const P = PULSE[region.type];
+  if (!P) return;
+  for (const layer of layers) layer?.firstChild?.animate([{ filter: 'brightness(1)' }, { filter: 'brightness(1.8) saturate(1.3)', offset: 0.3 }, { filter: 'brightness(1)' }], { duration: 640 });
+  const b = worldPx(region.center), R = region.radius * PX;
+  fx.sfx(P.sfx, 0.34);
+  fx.ground(ringHtml(b.x, b.y, R * 2.1, P.ring[0], P.ring[1]), 640).firstChild
+    .animate([{ transform: 'scale(0.55)', opacity: 0 }, { transform: 'scale(0.9)', opacity: 0.9, offset: 0.35 }, { transform: 'scale(1.04)', opacity: 0 }], { duration: 620, easing: 'cubic-bezier(0.2,0.7,0.3,1)', fill: 'forwards' });
+  contests.forEach((ev, k) => {
+    const c = centerOf(ev.targetId);
+    if (!c) return;
+    const p = worldPx(c), delay = Math.min(300, k * 70);
+    if (!ev.hit) { floatText(fx, p.x, p.y - 48, '闪避', '#e2e8f0', '#334155', { ms: 620, size: 12, delay }); return; }
+    fx.top(orbHtml(p.x, p.y + 4, 64, P.orb[0], P.orb[1]), 560 + delay).firstChild
+      .animate([{ transform: 'scale(0.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1, offset: 0.35 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 520, delay, fill: 'both' });
+    floatText(fx, p.x, p.y - 48, P.label, '#ffffff', P.ring[1], { ms: 700, size: 12, delay });
+  });
+}
+
+// 火焰 / 中毒领域施放 L3（技能未指定特效时按区域类型匹配）：仿浓雾五拍——蓄势 → 投放 → 收 → 按真实半径铺开（揭示常驻层）→ 余韵逐个判定
+const DOMAIN_THEMES = {
+  fire: {
+    charge: 'explosion_aoe_charge', burst: ['fire01', 0.66], tail: ['ranshao', 0.34],
+    tint: 'radial-gradient(circle at 50% 55%,rgba(90,26,8,.5),rgba(22,6,2,.94))',
+    rune: ['#f97316', '#fde68a', 'ᚠᛚᚨᛗᛖ'], palette: ['#f97316', '#ef4444', '#fbbf24'], core: '#fff7d6',
+    orb: 'rgba(234,88,12,0.92)', ring: ['rgba(253,186,116,0.8)', 'rgba(239,68,68,0.5)'],
+    cloud: ['rgba(194,65,12,0.5)', 'rgba(251,146,60,0.55)'], video: ['fire.webm', 0.9],
+  },
+  poison: {
+    charge: 'mx_vacuum', burst: ['aoe_poison_spell_fs219566', 0.66], tail: ['creature_slime_01', 0.36],
+    tint: 'radial-gradient(circle at 50% 55%,rgba(42,20,64,.5),rgba(8,4,16,.94))',
+    rune: ['#a3e635', '#e9d5ff', 'ᛈᛟᛁᛋᚾ'], palette: ['#84cc16', '#a855f7', '#bef264'], core: '#ecfccb',
+    orb: 'rgba(101,163,13,0.92)', ring: ['rgba(190,242,100,0.8)', 'rgba(168,85,247,0.5)'],
+    cloud: ['rgba(77,124,15,0.5)', 'rgba(126,34,206,0.45)'], video: ['fog.mp4', 0.7],
+  },
+};
+async function playDomainBurst(ctx, type) {
+  const T = DOMAIN_THEMES[type], { fx, result, hits } = ctx;
+  const region = (ctx.regions || []).find(r => r.type === type) || null;
+  const shape = result.query.shape || {};
+  const bm = region ? region.center : (shape.center || result.aim);
+  const R = (region ? region.radius : (shape.radius || 3)) * PX;
+  const c = worldPx(ctx.centerOf(ctx.casterId)), b = worldPx(bm);
+  // ① 蓄势：暗场色罩 + 施术者脚下符文阵 + 元素粒子吸入 + 落点预告环
+  fx.sfx(T.charge, 0.45);
+  tint(fx, T.tint, { inMs: 700, holdMs: 1250, outMs: 400, peak: 0.4 });
+  const rune = fx.ground(runeHtml(fx.uid(), c.x, c.y, 1.6 * PX, T.rune[0], T.rune[1], T.rune[2]), 1400);
+  grow(rune.firstChild, { ms: 1400, s0: 0.3, s1: 1, hold: 0.7 });
+  spin(rune.querySelector('[data-fx=spin]'), type === 'fire' ? 160 : -150, 1400, 'cubic-bezier(0.3,0,0.2,1)');
+  particles(fx, Array.from({ length: 22 }, () => { const a = rnd(0, TAU), d = rnd(1.4, 2.4) * PX; return { x: c.x + Math.cos(a) * d, y: c.y - 12 + Math.sin(a) * d, dx: -Math.cos(a) * d, dy: -Math.sin(a) * d, size: rnd(8, 16), color: pick(T.palette), core: T.core, s0: 1, s1: 0.2, o0: 0.9, dur: rnd(480, 760), delay: rnd(0, 260), ease: 'cubic-bezier(0.5,0,0.8,0.6)' }; }), 1000);
+  const tele = fx.ground(ringHtml(b.x, b.y, R * 2, T.ring[0], T.ring[1]), 1300);
+  tele.firstChild.animate([{ transform: 'scale(1.15)', opacity: 0 }, { transform: 'scale(1)', opacity: 0.7 }], { duration: 900, fill: 'forwards' });
+  ctx.after(350, () => fx.shake('light')); ctx.after(650, () => fx.shake('light'));
+  if (!(await ctx.wait(900))) return false;
+  // ② 投放：元素核沿抛物线飞向规则领域中心
+  const from = { x: c.x, y: c.y - 20 }, lift = Math.max(80, Math.hypot(b.x - c.x, b.y - c.y) * 0.25);
+  const ctrl = { x: (from.x + b.x) / 2, y: Math.min(from.y, b.y) - lift };
+  trail(fx, from, ctrl, b, { color: T.palette[0], width: 10, ms: 300 });
+  flyOrb(fx, from, ctrl, b, { size: 60, color: T.orb, core: T.core, ms: 300, s0: 0.5, s1: 1.2 });
+  for (const d of [40, 80]) flyOrb(fx, from, ctrl, b, { size: 34, color: T.cloud[0], core: T.cloud[1], ms: 300, delay: d, s0: 0.5, s1: 1, fade: true });
+  if (!(await ctx.wait(300))) return false;
+  // ③ 收
+  tele.firstChild.animate([{ transform: 'scale(1)', opacity: 0.7 }, { transform: 'scale(0.12)', opacity: 1 }], { duration: 100, fill: 'forwards' });
+  if (!(await ctx.wait(100))) return false;
+  tele.remove();
+  // ④ 爆发：按真实半径铺开，常驻领域层在此刻揭示；伤害段同拍按距中心错拍揭示
+  fx.sfx(T.burst[0], T.burst[1]); fx.sfx('mx_deep_impact', 0.5); fx.shake('heavy');
+  ctx.atmos?.burst();
+  webm(ctx, T.video[0], b.x, b.y, R * 2, { ms: 1300, opacity: T.video[1], cover: R * 2 });
+  fx.top(ringHtml(b.x, b.y, R * 2.2, T.ring[0], T.ring[1]), 560).firstChild
+    .animate([{ transform: 'scale(0.1)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 540, easing: 'cubic-bezier(0.1,0.8,0.3,1)', fill: 'forwards' });
+  particles(fx, Array.from({ length: 26 }, () => { const a = rnd(0, TAU), d = rnd(0.3, 0.95) * R; return { x: b.x, y: b.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(60, 110), color: T.cloud[0], core: T.cloud[1], o0: 0.85, s0: 0.3, s1: 1.3, dur: rnd(700, 1000), ease: 'cubic-bezier(0.1,0.7,0.3,1)' }; }), 1100, 'ground');
+  particles(fx, Array.from({ length: 30 }, () => { const a = rnd(0, TAU), d = rnd(0.5, 1.15) * R; return { x: b.x, y: b.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d - rnd(0, 24), size: rnd(8, 18), color: pick(T.palette), core: T.core, s0: 1, s1: 0.25, dur: rnd(480, 820) }; }), 1000);
+  if (region) ctx.after(60, () => ctx.revealRegion(region.id));
+  const order = hits.map(h => { const p = ctx.centerOf(h.targetId); return { h, d: p ? Math.hypot(p.x - bm.x, p.y - bm.y) : 0 }; }).sort((a, z) => a.d - z.d);
+  for (const { h, d } of order) ctx.after(30 + Math.min(1, d / Math.max(1, R / PX)) * 180, () => ctx.reveal(h.targetId));
+  if (!(await ctx.wait(350))) return false;
+  // ⑤ 余韵：本次判定（规则 region-contest）按距中心远近逐个揭示：命中者脚下爆一团并揭示领域状态，闪避者飘字
+  const contests = (result.events || []).filter(ev => ev.type === 'region-contest' && (!region || ev.regionId === region.id))
+    .map(ev => ({ ev, p: ctx.centerOf(ev.targetId) })).filter(x => x.p)
+    .sort((u, v) => Math.hypot(u.p.x - bm.x, u.p.y - bm.y) - Math.hypot(v.p.x - bm.x, v.p.y - bm.y));
+  if (contests.some(x => x.ev.hit)) ctx.after(40, () => fx.sfx(T.tail[0], T.tail[1]));
+  contests.forEach(({ ev, p }, k) => ctx.after(Math.min(320, k * 70), () => {
+    const w = worldPx(p);
+    if (!ev.hit) { floatText(fx, w.x, w.y - 48, '闪避', '#e2e8f0', '#334155', { ms: 620, size: 12 }); return; }
+    fx.top(orbHtml(w.x, w.y - 4, 72, T.cloud[0], T.cloud[1]), 520).firstChild.animate([{ transform: 'scale(0.4)', opacity: 0 }, { transform: 'scale(1)', opacity: 1, offset: 0.4 }, { transform: 'scale(1.2)', opacity: 0 }], { duration: 500, fill: 'forwards' });
+    (result.effects || []).filter(e => e.targetId === ev.targetId).forEach(e => ctx.revealEffect(e));
+  }));
+  return ctx.wait(700);
+}
+const fireDomain = {
+  id: 'fire-domain', grade: 'L3', fxTags: ['火焰领域'], regionTypes: ['fire'],
+  timeline: { chargeMs: 900, totalMs: 2350, fullscreen: true },   // 900 蓄势 + 300 投放 + 100 收 + 350 爆发 + 700 余韵
+  cues: [{ key: 'explosion_aoe_charge', vol: 0.45 }, { key: 'fire01', vol: 0.66 }, { key: 'mx_deep_impact', vol: 0.5 }, { key: 'ranshao', vol: 0.34 }],
+  prepareKeys() { return this.cues.map(c => c.key); },
+  play: ctx => playDomainBurst(ctx, 'fire'),
+};
+const poisonDomain = {
+  id: 'poison-domain', grade: 'L3', fxTags: ['中毒领域'], regionTypes: ['poison'],
+  timeline: { chargeMs: 900, totalMs: 2350, fullscreen: true },
+  cues: [{ key: 'mx_vacuum', vol: 0.45 }, { key: 'aoe_poison_spell_fs219566', vol: 0.66 }, { key: 'mx_deep_impact', vol: 0.5 }, { key: 'creature_slime_01', vol: 0.36 }],
+  prepareKeys() { return this.cues.map(c => c.key); },
+  play: ctx => playDomainBurst(ctx, 'poison'),
+};
+
+// ---------- 职业被动资源到账（规则 passive-gain）L1：头顶图标飘字 + 职业色短动效 ----------
+const PASSIVE_FX = {
+  taunt: { sfx: 'taunt', icon: '💢', name: '嘲讽', color: '#fca5a5', glow: '#7f1d1d', ring: ['rgba(254,202,202,0.85)', 'rgba(220,38,38,0.55)'], dots: ['#f87171', '#fca5a5', '#ef4444'] },
+  stealth: { sfx: 'hide', icon: '🌫️', name: '隐匿', color: '#e0e7ff', glow: '#312e81', ring: ['rgba(199,210,254,0.6)', 'rgba(67,56,202,0.4)'], dots: ['rgba(165,180,252,0.55)', 'rgba(100,116,139,0.55)'] },
+  haste: { sfx: 'link_chime', icon: '⚡', name: '加速', color: '#a5f3fc', glow: '#155e75', ring: ['rgba(165,243,252,0.85)', 'rgba(8,145,178,0.5)'], dots: ['#67e8f9', '#e0f2fe', '#22d3ee'] },
+};
+export const PASSIVE_AUDIO = Object.values(PASSIVE_FX).map(p => p.sfx);
+export function passiveGainLabel(ev) {
+  const P = PASSIVE_FX[ev.kind];
+  if (!P) return '';
+  const extra = ev.kind === 'haste' ? (ev.tp ? ' · TP+' + ev.tp : '') : ev.kind === 'stealth' ? (ev.rush ? ' · 急袭' : ev.extraTurn ? ' · 再动' : '') : '';
+  return P.icon + ' ' + P.name + ' +' + ev.value + extra;
+}
+export function playPassiveGain(fx, ev, at, sprite) {
+  const P = PASSIVE_FX[ev.kind];
+  if (!P || !at) return;
+  const p = worldPx(at);
+  fx.sfx(P.sfx, 0.34);
+  if (ev.kind === 'taunt') {
+    // 嘲讽：两道红色挑衅冲击环外扩 + 怒气碎点迸射
+    [0, 120].forEach(d => fx.top(ringHtml(p.x, p.y, 1.8 * PX, P.ring[0], P.ring[1]), 600 + d).firstChild
+      .animate([{ transform: 'scale(0.3)', opacity: 1 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: 520, delay: d, easing: 'cubic-bezier(0.1,0.8,0.3,1)', fill: 'both' }));
+    particles(fx, Array.from({ length: 12 }, () => { const a = rnd(0, TAU), d = rnd(0.7, 1.1) * PX; return { x: p.x, y: p.y - 6, dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(6, 10), color: pick(P.dots), core: '#fff1f2', s0: 1, s1: 0.3, dur: rnd(380, 520) }; }), 600);
+    sprite?.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.14)', offset: 0.3 }, { transform: 'scale(1)' }], { duration: 420, easing: 'ease-out' });
+  } else if (ev.kind === 'stealth') {
+    // 隐匿：暗影雾丝向身体收拢，头像一瞬虚化
+    particles(fx, Array.from({ length: 14 }, () => { const a = rnd(0, TAU), d = rnd(0.9, 1.4) * PX; return { x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d, dx: -Math.cos(a) * d, dy: -Math.sin(a) * d, size: rnd(22, 36), color: pick(P.dots), core: 'rgba(199,210,254,0.5)', o0: 0.8, s0: 1, s1: 0.3, dur: rnd(420, 560), delay: rnd(0, 120) }; }), 700);
+    sprite?.animate([{ opacity: 1, filter: 'none' }, { opacity: 0.35, filter: 'blur(1.5px) grayscale(.6)', offset: 0.45 }, { opacity: 1, filter: 'none' }], { duration: 560, easing: 'ease-in-out' });
+  } else {
+    // 加速：脚下时针环疾转 + 光点上扬
+    const rune = fx.ground(runeHtml(fx.uid(), p.x, p.y, 0.8 * PX, '#22d3ee', '#e0f2fe', ''), 600);
+    grow(rune.firstChild, { ms: 600, s0: 0.4, s1: 1, hold: 0.6 });
+    spin(rune.querySelector('[data-fx=spin]'), 300, 600, 'cubic-bezier(0.3,0,0.2,1)');
+    particles(fx, Array.from({ length: 10 }, () => ({ x: p.x + rnd(-16, 16), y: p.y + rnd(-4, 10), dx: rnd(-6, 6), dy: rnd(-56, -34), size: rnd(5, 9), color: pick(P.dots), core: '#ffffff', s0: 1, s1: 0.3, dur: rnd(380, 560), delay: rnd(0, 140) })), 700);
+  }
+  floatText(fx, p.x, p.y - 44, passiveGainLabel(ev), P.color, P.glow, { ms: 900, size: 13 });
+}
+
+// ---------- 敌方局部警报（规则 enemy-alarm）L1：报警者头顶感叹 + 红色波纹按真实警报半径外扩，收报者依距离逐个亮起 ----------
+export const ALARM_AUDIO = ['bowlBronze', 'bellPing'];
+export function playEnemyAlarm(fx, ev, centerOf) {
+  const b = worldPx(ev.center), R = ev.radius * PX;
+  fx.sfx('bowlBronze', 0.36);
+  [0, 160].forEach(d => fx.ground(ringHtml(b.x, b.y, R * 2, 'rgba(254,202,202,0.7)', 'rgba(220,38,38,0.4)'), 900 + d).firstChild
+    .animate([{ transform: 'scale(0.04)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 860, delay: d, easing: 'cubic-bezier(0.15,0.6,0.35,1)', fill: 'both' }));
+  floatText(fx, b.x, b.y - 46, '❗ 警报', '#fecaca', '#991b1b', { ms: 900, size: 14 });
+  for (const id of ev.recipientIds || []) {
+    const c = centerOf(id);
+    if (!c) continue;
+    const p = worldPx(c), delay = Math.min(800, Math.hypot(p.x - b.x, p.y - b.y) / Math.max(1, R) * 860);
+    fx.top(orbHtml(p.x, p.y - 26, 40, 'rgba(248,113,113,0.8)', '#fff1f2'), 520 + delay).firstChild
+      .animate([{ transform: 'scale(0.3)', opacity: 0 }, { transform: 'scale(1.1)', opacity: 1, offset: 0.4 }, { transform: 'scale(1.4)', opacity: 0 }], { duration: 480, delay, fill: 'both' });
+    floatText(fx, p.x, p.y - 44, '❗', '#fecaca', '#991b1b', { ms: 700, size: 15, delay });
+  }
+}
+
 // 起手（延迟·圣光）L2：头顶圣徽光环展开 + 金色符文绕身汇入 + 脚下暖光，之后由常驻咏唱光环接管
 const holyVow = {
   id: 'holy-vow', kind: 'prepare', grade: 'L2', fxTags: ['圣光01'],
@@ -1539,7 +1800,7 @@ const sanctumVeil = {
   },
 };
 
-export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, vitalFlow, sanctumVeil, healMend, fogBurst, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, frostBlast, voidQuake, lineRift, waterBolt, curseBeam, ...basicAttacks, neutralImpact, zheYing, mirrorCounter, wizardShield, reactionKanpo, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, kruppAim, sekhmetVow];
+export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, vitalFlow, sanctumVeil, healMend, fogBurst, fireDomain, poisonDomain, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, frostBlast, voidQuake, lineRift, waterBolt, curseBeam, ...basicAttacks, neutralImpact, zheYing, mirrorCounter, wizardShield, reactionKanpo, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, kruppAim, sekhmetVow];
 export function getFxTagOptions() {
   return [...new Set(DEFAULT_FX_ENTRIES.flatMap(entry => entry.fxTags || []))].map(name => ({ name, label: name }));
 }

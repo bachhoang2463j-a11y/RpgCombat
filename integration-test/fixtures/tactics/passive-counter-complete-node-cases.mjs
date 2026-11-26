@@ -81,6 +81,9 @@ function defenderCases() {
       rn.ok && rn.hits[0].hit === false && nev.length === 1 && nev[0].reason === 'counter'
       && normal.ctx.units.find(u => u.id === 'h3').ref.hp === 80 && nd.ref.baseTauntBonus === 120,
       JSON.stringify({ reactions: nev.map(e => e.reason), taunt: nd.ref.baseTauntBonus })));
+    const tauntGain = normal.snapshot().events.filter(e => e.type === 'passive-gain');
+    out.push(ok('PC-D3 嘲讽到账事件：防守反击发出一条 taunt+20（前端图标/音效据此播放）',
+      tauntGain.length === 1 && tauntGain[0].unitId === 'd3' && tauntGain[0].kind === 'taunt' && tauntGain[0].value === 20, JSON.stringify(tauntGain)));
     const fatal = make([unit('h4', 'hero', null, { spd: 300, atk: 999 }),
       unit('d4', 'enemy', '防守者', { spd: 50, hp: 100 })],
       { h4: { col: 2, row: 3 }, d4: { col: 4, row: 3 } }, () => 0.5);
@@ -160,6 +163,9 @@ function stealthCases() {
     out.push(ok('PC-S1 击杀累积：+30 使隐匿 50→80 并触发再动',
       r.ok && h.ref.baseTauntBonus === -80 && b.snapshot().log.some(s => s.includes('再动')),
       JSON.stringify({ base: h.ref.baseTauntBonus, log: b.snapshot().log.filter(s => s.includes('隐匿') || s.includes('再动')) })));
+    const killGain = b.snapshot().events.filter(e => e.type === 'passive-gain');
+    out.push(ok('PC-S1 隐匿到账事件：击杀发出 stealth+30 且标记再动',
+      killGain.length === 1 && killGain[0].unitId === 's' && killGain[0].kind === 'stealth' && killGain[0].value === 30 && killGain[0].extraTurn === true, JSON.stringify(killGain)));
     const rush = make([unit('s2', 'hero', '隐匿者', { spd: 300, atk: 5 }),
       unit('e2', 'enemy', null, { spd: 50, hp: 10 })],
       { s2: { col: 2, row: 6 }, e2: { col: 4, row: 6 } }, () => 0.5);
@@ -178,6 +184,9 @@ function stealthCases() {
     out.push(ok('PC-S3 未受击窗口：每 100 时间 +10（<310 内累计至少 +30）',
       s3.ref.baseTauntBonus <= -80 && win.snapshot().now >= 100,
       JSON.stringify({ base: s3.ref.baseTauntBonus, now: win.snapshot().now })));
+    const winGain = win.snapshot().events.filter(e => e.type === 'passive-gain' && e.unitId === 's3');
+    out.push(ok('PC-S3 隐匿到账事件：未受击窗口每次 +10 各发一条（无攻击归属）',
+      winGain.length >= 3 && winGain.every(e => e.kind === 'stealth' && e.value === 10 && !e.attackId), JSON.stringify(winGain.map(e => [e.value, e.attackId]))));
     const strike = make([unit('s4', 'hero', '隐匿者', { spd: 300, atk: 5 }),
       unit('e4', 'enemy', null, { spd: 50, hp: 200 })],
       { s4: { col: 2, row: 6 }, e4: { col: 4, row: 6 } }, () => 0.01);
@@ -205,6 +214,9 @@ function casterCases() {
     out.push(ok('PC-C2 法力回响：耗蓝20 触发加速+1、TP+15（另加普攻TP+5）',
       r.ok && inv === 1 && c2.ref.tp === 20 && echo.snapshot().log.some(s => s.includes('法力回响')),
       JSON.stringify({ inventory: inv, tp: c2.ref.tp, cost: r.costSummary && r.costSummary.mp })));
+    const hasteGain = echo.snapshot().events.filter(e => e.type === 'passive-gain');
+    out.push(ok('PC-C2 加速到账事件：法力回响发出 haste+1、TP+15',
+      hasteGain.length === 1 && hasteGain[0].unitId === 'c2' && hasteGain[0].kind === 'haste' && hasteGain[0].value === 1 && hasteGain[0].tp === 15, JSON.stringify(hasteGain)));
   }
   return out;
 }

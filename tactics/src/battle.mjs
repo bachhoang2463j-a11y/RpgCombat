@@ -156,6 +156,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     record.broadcasted = true;
     const center = unitCenter(placementsById[enemy.id], enemy.footprint);
     const radius = sightRadius(ctx, enemy) * 3;
+    const recipientIds = [];
     for (const ally of units) {
       if (ally === enemy || ally.side !== 'enemy' || ally.ref.hp <= 0) continue;
       const p = unitCenter(placementsById[ally.id], ally.footprint);
@@ -163,7 +164,9 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       const alarms = state.combatState.enemyAlarms;
       const recipient = alarms[ally.id] || (alarms[ally.id] = { state: 'engaged', contacts: {} });
       recipient.contacts = { ...record.contacts, ...recipient.contacts };
+      recipientIds.push(ally.id);
     }
+    emit('enemy-alarm', { unitId: enemy.id, center, radius, recipientIds });
   }
   function emit(type, fields = {}) {
     const seq = domainEvents.length + 1;
@@ -208,6 +211,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     chargeState(unit.id).inventory += grant.haste || 0;
     unit.ref.tp = Math.min(unit.ref.maxTp || 100, (unit.ref.tp || 0) + (grant.tp || 0));
     addLog(unit.name + ' 法力回响 · 加速+' + (grant.haste || 0) + ' · TP+' + (grant.tp || 0));
+    emit('passive-gain', { unitId: unit.id, passive: '法力回响', kind: 'haste', value: grant.haste || 0, tp: grant.tp || 0 });
   }
   function passiveSeq() {
     const s = state.combatState;
@@ -532,6 +536,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       if (target && target.ref.hp > 0 && !ev.wasHit) {
         const p = CLASS_PASSIVES['隐匿者'];
         const res = p && p.gainStealth ? p.gainStealth(target, 10, passiveIo(target)) : null;
+        if (res) emit('passive-gain', { unitId: target.id, passive: '潜行', kind: 'stealth', value: 10, stealthVal: res.stealthVal, extraTurn: !!res.extraTurn, rush: !!res.rush });
         if (res && res.extraTurn) addLog('⚡ ' + target.name + ' 隐匿值突破 ' + res.stealthVal + '，触发【再动】！');
         if (res && res.rush) addLog('🎯 ' + target.name + ' 隐匿值突破 100，下一次非反应攻击 +50（隐匿值回归 50）');
       }
@@ -1339,6 +1344,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     addLog('⚔️ ' + defender.name + ' 闪避并趁势反击！' + attacker.name + ' -' + hpDmg + ' HP' + (shieldDmg ? '（破盾' + shieldDmg + '）' : ''));
     if (defender.classType === '防守者' && (hpDmg > 0 || shieldDmg > 0)) {
       defender.ref.baseTauntBonus = (defender.ref.baseTauntBonus || 0) + 20;
+      emit('passive-gain', { unitId: defender.id, passive: '防守反击', kind: 'taunt', value: 20 });
       addLog('🛡️ ' + defender.name + ' 的防守反击吸引了更多仇恨（嘲讽值永久+20）');
     }
     if (attacker.ref.hp <= 0) handleDown(attacker, 'counter');
@@ -2059,6 +2065,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (down && target.side === 'enemy') {
       const kp = CLASS_PASSIVES[caster.classType];
       const res = kp && kp.onKill ? kp.onKill(caster, passiveIo(caster)) : null;
+      if (res) emit('passive-gain', { unitId: caster.id, passive: '猎杀', kind: 'stealth', value: 30, stealthVal: res.stealthVal, extraTurn: !!res.extraTurn, rush: !!res.rush });
       if (res && res.extraTurn) addLog('⚡ ' + caster.name + ' 击杀累积隐匿值 ' + res.stealthVal + '，触发【再动】！');
       if (res && res.rush) addLog('🎯 ' + caster.name + ' 隐匿值突破 100，下一次非反应攻击 +50（隐匿值回归 50）');
     }

@@ -10,7 +10,8 @@
 import { playPathMotion, pathSegments, pointAtDistance } from './motion.mjs';
 import { unitCenter } from './geometry.mjs';
 import { createFxRegistry, actionInput, reactionInput, prepareInput } from './fx-registry.mjs';
-import { registerDefaultFx, EXTRA_AUDIO, fogFieldHtml, animateFogField } from './fx-library.mjs';
+import { registerDefaultFx, EXTRA_AUDIO, fogFieldHtml, animateFogField, elementFieldHtml, animateElementField,
+  playRegionPulse, REGION_PULSE_AUDIO, playPassiveGain, PASSIVE_AUDIO, playEnemyAlarm, ALARM_AUDIO } from './fx-library.mjs';
 import { createVfxHost } from './vfx-host.mjs';
 import { skillSlots } from './effect-definitions.mjs';
 import { startAtmos, atmosStyleOf } from './screen-atmos.mjs';
@@ -533,6 +534,7 @@ export function createActionDirector(deps) {
     avHost.consumeVisualEvents?.(result.events || []);
     avHost.syncVisualState?.();
     regions.forEach(r => revealRegion(r.id));
+    playFieldFeedback(result.events || []);
     await Promise.all(reactionRuns);
     // 未携带段标识的反应事件在本次攻击收尾串行播放；已按段调度的反击不重复。
     queueCounters(null);
@@ -661,10 +663,12 @@ export function createActionDirector(deps) {
     const c = centerOf(result.casterId);
     if (c) await sandbox.guideTo([c], { ms: 320 });
     if (!(await prepareAudio(entry.prepareKeys ? entry.prepareKeys({}) : []))) return false;
-    return entry.play({
+    const ok = await entry.play({
       result, skill: result.skill, casterId: result.casterId, av, fx: makeFx(av.CombatAudioMixer.classify(result.skill)),
       wait, after: (ms, fn) => scope().after(ms, fn), centerOf,
     });
+    if (ok !== false) playFieldFeedback(result.events || []);
+    return ok;
   }
 
   // 规则雾区格内的单位（占地任一格落入即算；只读规则站位）
@@ -677,7 +681,7 @@ export function createActionDirector(deps) {
     }).map(u => u.id);
   }
 
-  // ---------- 常驻区域层（浓雾）：只消费规则雾区快照；新建/同源重施替换/到期淡出；演出持有期间暂不显示 ----------
+  // ---------- 常驻区域层（浓雾/火焰/中毒）：只消费规则区域快照；新建/同源重施替换/到期淡出；演出持有期间暂不显示 ----------
   const heldRegions = new Set();
   let regionNodes = new Map(), regionScope = null, lastRegions = [];
   function fadeOutRegion(rec) {
@@ -695,19 +699,52 @@ export function createActionDirector(deps) {
     const L = fxLayers();
     const live = new Set();
     for (const r of lastRegions) {
-      if (!r || r.type !== 'fog') continue;
+      if (!r || !['fog', 'fire', 'poison'].includes(r.type)) continue;
       live.add(r.id);
       if (heldRegions.has(r.id)) continue;
       const sig = r.center.x + ',' + r.center.y + '|' + r.radius + '|' + r.endAt;
       const cur = regionNodes.get(r.id);
       if (cur && cur.sig === sig) continue;
       if (cur) fadeOutRegion(cur);
-      const html = fogFieldHtml(r, 'r' + (++fxUid));
-      const rec = { sig, ground: L.ground.layer(html.ground), top: L.top.layer(html.top) };
-      animateFogField(rec.ground); animateFogField(rec.top);
+      const fog = r.type === 'fog', html = (fog ? fogFieldHtml : elementFieldHtml)(r, 'r' + (++fxUid));
+      const rec = { sig, region: r, ground: L.ground.layer(html.ground), top: L.top.layer(html.top) };
+      const animate = fog ? animateFogField : animateElementField;
+      animate(rec.ground); animate(rec.top);
       regionNodes.set(r.id, rec);
     }
     for (const [id, rec] of regionNodes) if (!live.has(id)) { fadeOutRegion(rec); regionNodes.delete(id); }
+  }
+
+  // ---------- 场上反馈（规则事件只读）：领域周期判定脉冲 / 敌方局部警报 / 职业被动资源到账；同一事件只播一次 ----------
+  const fieldSeen = new Set();
+  const FIELD_EVENTS = ['region-contest', 'enemy-alarm', 'passive-gain'];
+  function playFieldFeedback(events) {
+    const s = scope();
+    if (!s || !s.isLive) return;
+    const fresh = events.filter(ev => ev && FIELD_EVENTS.includes(ev.type) && !fieldSeen.has(ev.eventId));
+    if (!fresh.length) return;
+    fresh.forEach(ev => fieldSeen.add(ev.eventId));
+    prepareAudio([...REGION_PULSE_AUDIO, ...PASSIVE_AUDIO, ...ALARM_AUDIO]);
+    const fx = makeFx('B'), view = sandbox.getUnitView();
+    // 施放当拍的判定由领域条目自己揭示；这里只播周期判定（按领域分组）
+    const contests = new Map();
+    for (const ev of fresh) if (ev.type === 'region-contest' && !ev.attackId) {
+      if (!contests.has(ev.regionId)) contests.set(ev.regionId, []);
+      contests.get(ev.regionId).push(ev);
+    }
+    for (const [id, list] of contests) {
+      const rec = regionNodes.get(id), region = rec?.region || lastRegions.find(r => r.id === id);
+      if (region) playRegionPulse(fx, region, list, centerOf, rec ? [rec.ground, rec.top] : []);
+    }
+    for (const ev of fresh) {
+      if (ev.type === 'enemy-alarm') {
+        playEnemyAlarm(fx, ev, centerOf);
+        (ev.recipientIds || []).forEach(id => view?.pulseAlert?.(id));
+      } else if (ev.type === 'passive-gain') {
+        playPassiveGain(fx, ev, centerOf(ev.unitId), avHost.host.spriteOf(ev.unitId));
+        deps.onPassiveGain?.(ev);
+      }
+    }
   }
 
   // ---------- 【肃正】场地结界常驻穹顶（center/radius/visualIdentity 全取后端；本次新建先持有到揭示拍点，受击前锁定显示耐久） ----------
@@ -968,6 +1005,6 @@ export function createActionDirector(deps) {
       if (ev.type === 'barrier-damaged') lockedBarriers.set(ev.barrierId, (lockedBarriers.get(ev.barrierId) || 0) + 1);
     }
   }
-  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, playPrepare, syncRegions, syncBarriers, syncPreparations, holdRegions, holdGuards, wait, resolveAttackIdentity, resolveWindupKind,
+  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, playPrepare, syncRegions, playFieldFeedback, syncBarriers, syncPreparations, holdRegions, holdGuards, wait, resolveAttackIdentity, resolveWindupKind,
     runAttackLive, driveAttack, cancelAttack, playChargeCutin, playExecution, executionKills };
 }

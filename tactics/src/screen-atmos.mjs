@@ -23,7 +23,7 @@ export const ATMOS_STYLES = {
 };
 // 条目 → 风格（按条目自身的配色/母题；未登记的 L3/L4 条目按伤害类型兜底）
 export const ENTRY_ATMOS = {
-  'fire-blast': 'fire', 'sekhmet-wrath': 'fire', 'frost-blast': 'frost', 'thunder-storm': 'thunder', 'storm-gather': 'thunder',
+  'fire-blast': 'fire', 'sekhmet-wrath': 'fire', 'fire-domain': 'fire', 'poison-domain': 'poison', 'frost-blast': 'frost', 'thunder-storm': 'thunder', 'storm-gather': 'thunder',
   'holy-judgment': 'holy', 'sanctum-veil': 'holy', 'isis-embrace': 'holy', 'holy-vow': 'holy',
   'xenon-blight-fog': 'poison', 'abyss-fog': 'void', 'void-quake': 'void', 'line-rift': 'void', 'shatter-echo': 'void',
   'krupp-snipe': 'gun', 'strafe-burst': 'gun', 'krupp-aim': 'gun',

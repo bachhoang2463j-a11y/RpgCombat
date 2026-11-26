@@ -58,6 +58,16 @@ export const groups = {
       resolved.savage === 'basic-枪击' && resolved.blast === 'fire-blast' && resolved.chant === 'self-boost' && resolved.arsenic === 'arsenic-shot' &&
       resolved.plain === 'neutral-impact' && resolved.unknown === 'neutral-impact' && resolved.fireSingle === 'fire-blast' &&
       resolved.zheYing === 'evade-shift-ghost' && resolved.glide === 'evade-shift' && resolved.noTagShift === null && resolved.noShift === null, j(resolved)));
+    // 例外（用户确认）：火焰/中毒领域技能未写特效标签时按区域类型取领域演出；显式标签仍优先，浓雾不变
+    const domain = {
+      fire: reg.resolve(actionInput({ skill: m.parser.parseSkill('【火海】[区域:火焰][燃烧:10][Turns:3][范围:爆炸;射程:10;半径:2]') })).id,
+      poison: reg.resolve(actionInput({ skill: m.parser.parseSkill('【毒域】[区域:中毒][中毒:10][Turns:5][范围:爆炸;射程:10;半径:2]') })).id,
+      tagged: reg.resolve(actionInput({ skill: m.parser.parseSkill('【毒域】[区域:中毒][中毒:10][特效:浓雾][范围:爆炸;射程:10;半径:2]') })).id,
+      fog: reg.resolve(actionInput({ skill: m.parser.parseSkill('【迷雾】[区域:浓雾][致盲:10][范围:爆炸;射程:10;半径:2]') })).id,
+    };
+    cases.push(ok('TFX-01 火焰/中毒领域无标签按区域类型取领域演出，显式标签优先、浓雾仍走原路径',
+      domain.fire === 'fire-domain' && domain.poison === 'poison-domain' && domain.tagged === 'abyss-fog' && domain.fog === 'neutral-impact'
+      && checkBudget(reg.list().find(e => e.id === 'fire-domain')).ok && checkBudget(reg.list().find(e => e.id === 'poison-domain')).ok, j(domain)));
     const basicNames = ['枪击', '霰弹', '火焰', '冰霜', '雷击', '爆炸', '光', '毒液', '毒雾', '风', '刀砍', '拳击', '爪击', '撕咬', '箭矢'];
     const options = m.fxLibrary.getFxTagOptions();
     const names = options.map(x => x.name);
