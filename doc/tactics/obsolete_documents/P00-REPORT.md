@@ -11,8 +11,8 @@
 - 推荐的表现底座：**Phaser 3.90.0，Canvas 渲染**。
 - 推荐的 P00 规则候选：**ROT.js 2.2.1 的 AStar + PreciseShadowcasting**；渲染只消费其查询结果，不另建遮挡判定。
 - 八向几何成本不符合 ROT 原生 AStar 的等步成本语义，不能将本探针直接当成 P04 的最终寻路实现。
-- 单 HTML：[probe.html](../../tactics/p00-probe/probe.html)，**1,228,969 字节，约 1.172 MiB**。
-- 浏览器结构化记录：[results.json](../../tactics/p00-probe/evidence/results.json)。
+- 单 HTML：[probe.html](../../../tactics/p00-probe/probe.html)，**1,228,969 字节，约 1.172 MiB**。
+- 浏览器结构化记录：[results.json](../../../tactics/p00-probe/evidence/results.json)。
 - 本地工作目录：`D:\Project\RpgCombat`；分支 `fix/summon-subdue-slot-turns-audit-20261009`；任务起始提交 `4d37aa5`。业务提交哈希按两步法记于 LOG／LOG-INDEX，避免报告自指。
 - 调研及执行跨本地 2026-11-20／21；报告日期 **2026-11-21，Asia/Shanghai**。服务日志使用 UTC，故可见 `2026-11-20T...Z`，不是不同轮次。
 
@@ -79,7 +79,7 @@ Phaser 3.90 的表现、输入和相机足以完成当前验证，版本化文�
 
 **实际：通过**。两个尺寸都返回 `about:srcdoc`，真实 `renderer.type = 1`（Canvas）；首帧对墙中心、起点头像头部、目标头像头部各采样一次，3/3 颜色和 alpha 符合绘制值。IAB 截图确认地图、两个头像及读数可见。每个挂载的 generate／generateRaw 总计数为 **0**。
 
-证据：[1280](../../tactics/p00-probe/evidence/iframe-final-1280-normal.png)、[1600](../../tactics/p00-probe/evidence/iframe-final-1600-normal.png)。
+证据：[1280](../../../tactics/p00-probe/evidence/iframe-final-1280-normal.png)、[1600](../../../tactics/p00-probe/evidence/iframe-final-1600-normal.png)。
 
 ## T00-02：平移／缩放后的世界坐标
 
@@ -100,7 +100,7 @@ Phaser 3.90 的表现、输入和相机足以完成当前验证，版本化文�
 
 相机修改在 scene postupdate 应用，读数在下一次真实 POST_RENDER 后发布，避免修改 zoom 后同一调用中读取上一帧矩阵。没有伪造事件、直接调用点击处理器或靠测试代码预先写入结果。
 
-证据：[1280 平移缩放](../../tactics/p00-probe/evidence/iframe-final-1280-transformed.png)、[1600 平移缩放](../../tactics/p00-probe/evidence/iframe-final-1600-transformed.png)。按钮仅为探针控制，不实现正式地图拖拽、滚轮、跟随或 P02 界面。
+证据：[1280 平移缩放](../../../tactics/p00-probe/evidence/iframe-final-1280-transformed.png)、[1600 平移缩放](../../../tactics/p00-probe/evidence/iframe-final-1600-transformed.png)。按钮仅为探针控制，不实现正式地图拖拽、滚轮、跟随或 P02 界面。
 
 ## T00-03：真实单 HTML、围栏／实体及运行时资源
 
@@ -118,7 +118,7 @@ Phaser 3.90 的表现、输入和相机足以完成当前验证，版本化文�
 - `check-artifact.mjs`实际解析两个内联脚本；对同楼层“本组件＋下一组件”执行围栏保护正对照，并故意加入内部围栏验证下一组件引号会遭污染的反对照。mock 则真实执行实体／围栏处理后的产物。它不是完整复制当前酒馆所有 Markdown／宏／正则管线；真实导入仍待用户。
 - 首次直接页截图使用 `6cb7d7e...`版；第一轮 mock 使用 `fcf94fb0...`版。后两次仅修正许可注释的行尾空白和一处原文转录，脚本／CSS／HTML 结构完全不变，剔除许可注释的 SHA-256 始终为 `2f366b52c403ff74cc49764ee93fd40b4e4d0e849c70e9a1d0b8ada1c8c69a6a`。最终 `ce52e405...`版已重新载入 iframe 并在两尺寸重做点选；final 命名的四张截图对应最终文件。
 
-证据见 T00-01／02 四张 final 截图及 [结构化结果](../../tactics/p00-probe/evidence/results.json)。
+证据见 T00-01／02 四张 final 截图及 [结构化结果](../../../tactics/p00-probe/evidence/results.json)。
 
 ## T00-04：实际寻路、视野／扇形与上游限制
 
@@ -187,7 +187,7 @@ node tactics/p00-probe/serve.mjs 8123
 
 IAB 实际调用：`agent.browsers.get('iab')`；`setViewportSize({width:1280,height:720})`／`{width:1600,height:900}`；`goto`后明确等待 domcontentloaded；读 DOM 与截图；用 CUA 点击上述可见坐标，所有 evaluate 均只读。
 
-测试 URL 为 `http://127.0.0.1:8123/tactics/p00-probe/probe.html`和 `http://127.0.0.1:8123/integration-test/tactics-p00-harness.html`。完整本地 GET／HEAD 记录归档于 [http.log](../../tactics/p00-probe/evidence/http.log)。
+测试 URL 为 `http://127.0.0.1:8123/tactics/p00-probe/probe.html`和 `http://127.0.0.1:8123/integration-test/tactics-p00-harness.html`。完整本地 GET／HEAD 记录归档于 [http.log](../../../tactics/p00-probe/evidence/http.log)。
 
 ### 失败、无效执行与工具限制
 

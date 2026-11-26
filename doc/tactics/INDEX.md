@@ -1,46 +1,31 @@
-# 战棋前端：规则与分步验收入口
+# 战棋前端文档入口
 
 ## 核心目的
 
-在保留原 RpgCombat 的前提下，新建一个独立、桌面浏览器优先、运行于酒馆助手 iframe 的战棋战斗前端。采用圆形头像、二维正交俯视地图和视频原型中的射界／枪械演出；地图与布阵可变，模型只提供紧凑语义，位置、行动轴、技能、感知和敌方决策由本地引擎执行。
+让战棋前端承接酒馆已开战的剧情：单房间、开局即战，直观呈现站位、射界、掩护和技能，不发展成独立的探索型战棋游戏。原回合制前端保持独立。
 
 ## 具体任务
 
-1. 以 [SPEC.md](SPEC.md) 为已经确认的玩法基线，不重新采用访谈中被撤销的方案。
-2. 按 [PLAN.md](PLAN.md) 的依赖顺序施工，每阶段交付可单独验证的结果，不先堆全部 UI 再补规则。
-3. 每阶段从 [RESOURCES.md](RESOURCES.md) 选择已有模块、原项目模板和算法；先验证适配，再决定是否引入，不把现成库当作完整游戏。
-4. 用 [原型参考与缩略图](references/SOURCE.md) 对齐地图、头像、射界、弹道和命中反馈，不模仿视频的自动演播模式。
-5. 本轮（2026-11-21 第二轮复核）仅重构战棋文档并新增 [REVISION-2026-11-21.md](REVISION-2026-11-21.md)；保留已提交的 `ca38c2b` P00 探针与历史报告，不改原业务源码、不删除探针、不执行未来功能测试。
+1. 后续按 [PLAN.md](PLAN.md) 的四阶段顺序推进，第一步迁移单房间和典型对局。
+2. 已确认规则查 [SPEC.md](SPEC.md)，当前实际完成度查 [STATUS.md](STATUS.md)。计划里的能力没有实现和验收就不标记完成。
+3. 优先复用现有规则、MMS 主题底图、头像和技能源；几何、预览、AI 和结算共享规则，演出不另算命中。参考 [RESOURCES.md](RESOURCES.md) 与[视觉原型](references/SOURCE.md)。
 
-## 文档分工
+## 现行文档
 
-| 文档 | 职责 | 状态 |
-| --- | --- | --- |
-| [SPEC.md](SPEC.md) | 最终规则、默认数值、明确排除项、仍需技术验证的接线边界 | 用户已确认规则；冻结不变 |
-| [PLAN.md](PLAN.md) | P00—P12 阶段、依赖、最小适配边界、测试输入与预期、修订工时 | 已按第二轮复用复核修订；P00 探针已提交，P01 已完成验证，P02—P12 未开工 |
-| [RESOURCES.md](RESOURCES.md) | R01—R13 本地与跨项目 MMS 复用表、外部候选边界、复用限制 | 已补录 R13 并更新复用／预测／打包边界 |
-| [P00-REPORT.md](P00-REPORT.md) | P00 Phaser 3.90＋ROT 2.2.1 隔离探针历史实测报告 | 已提交（`ca38c2b`／日志 `f306555`）；历史记录原样保留 |
-| [REVISION-2026-11-21.md](REVISION-2026-11-21.md) | 第二轮跨项目复用与架构收敛修订说明（含 26 处 `$` 序列实测、工时重算与 8 项切口） | 本轮新增 |
-| [references/SOURCE.md](references/SOURCE.md) | 视频来源、抽样方式、四张缩略图、校验值、视觉验收目标 | 图片已保存 |
-| [VERIFICATION.md](VERIFICATION.md) | 2026-11-20 首版文档与图片静态校验记录（历史存档） | 历史记录原样保留 |
-| [STATUS.md](STATUS.md) | 战棋现状总览（进度/运行/源码结构/能力边界/特效契约/技能移植入口），独立于回合制 README | 2026-11-23 新增；随 P 阶段推进维护 |
-| [VFX-WORKBENCH.md](../../tactics/VFX-WORKBENCH.md) | 战棋特效完整工作台（直连原版资源）与纯净单文件空白母版的分工、启动与移植指南 | 2026-11-25 新增 |
-| [TYPICAL-BATTLE-DEMO-PLAN.md](TYPICAL-BATTLE-DEMO-PLAN.md) | 典型对局战棋 Demo 修订计划，含规则修复、显式 `fxTag`、原版基础 SVG 复用和单文件验收门禁 | 2026-11-24 修订，验证中 |
+| 文档 | 职责 |
+| --- | --- |
+| [SPEC.md](SPEC.md) / [PLAN.md](PLAN.md) | 现行规格 / 四阶段施工顺序与验收标准 |
+| [STATUS.md](STATUS.md) / [LOG-INDEX.md](LOG-INDEX.md) | 当前实现进度 / 按提交定位施工记录 |
+| [P01-CONTRACT.md](P01-CONTRACT.md) / [P03-CLOCK-CONTRACT.md](P03-CLOCK-CONTRACT.md) | 输入协议 / 跑圈与事件时钟契约 |
+| [TYPICAL-BATTLE-CONTRACT.md](TYPICAL-BATTLE-CONTRACT.md) | 典型对局数据和交接；现有三层礼拜堂仍供旧 Demo 使用，迁移目标见新路线 |
+| [P07-MIGRATION.md](P07-MIGRATION.md) / [RULES02-MIGRATION.md](RULES02-MIGRATION.md) | 规则迁移及阶段性验证边界 |
+| [GUARD-BARRIER-FRONTEND-HANDOFF.md](GUARD-BARRIER-FRONTEND-HANDOFF.md) / [P06-FX-HANDOFF.md](P06-FX-HANDOFF.md) | 舍身与结界结果契约 / 技能演出接口 |
+| [DEMO.md](../../tactics/DEMO.md) / [VFX-WORKBENCH.md](../../tactics/VFX-WORKBENCH.md) | 现有 Demo 操作 / 特效工作台操作 |
 
-## 工时口径（第二轮复核候选估算，非已核定工程量）
+## 历史归档
 
-- **正式技术路线**：推荐采用 R13 `MiniMapStatus` 近景语义 SVG 底图（`mmsRenderMapArt('mini')`）＋原生 Canvas 2D／DOM＋统一格网几何（可按需单引 ROT 纯算法子模块），默认不修改 `MiniMapStatus` 源码或根目录原 RPG 打包器。
-- **完整首版净工程投入（P00—P12）**：**`128—185 小时`**（已计入独立闪避迁移与全体／单角色配置导入导出，并扣除 P02/P05 重复计费；对比原 `198—298 小时` 净差额 `70—113 小时`，估算降幅约 `35%—38%`）。
-- 加上约 15%—20% 的跨模块联调与返工余量：建议安排 **`147—222 小时`**，约 **`19—28 个 8 小时工作日`**。
-- **当前剩余投入**：扣除已提交的 `ca38c2b` P00 隔离承载探针与已验证的 P01 后，P00 补验（真实 `String.replace` 替换链往返与原生路线视口）为 `1—2 小时`，P02—P12 为 `117—170 小时`，剩余净投入合计 **`118—172 小时`**（含 15%—20% 缓冲约 **`136—206 小时`**）。
-- **最小可玩切片（MVP）**：约 **`28—40 小时`**，覆盖单张 R13 固定测试地图、圆形头像与视口、跑圈、基本主辅行动、八向移动、单体／扇形／直线开火及简易敌人，不等同于完整首版，也不包含三主题可变地图、蓄力／结界／救援和配置导入导出。
-- 工时不是模型生成文字的耗时，也不是可保证的 CLI 运行时长；详见 PLAN.md 的分项及估算假设。
+`obsolete_documents/` 中的材料保留用于复盘，不再指导新功能或代表当前进度：
 
-## 状态与变更纪律
-
-- 当前生产基线仍是根目录 `index.html` / `regex-前端战斗v12_16.json`；本目录不改变根目录 README.md 所描述的现状或根目录 SPEC.md 的原 RPG 目标。
-- 将来正式战棋源码、测试和打包器使用独立目录／命名空间；`tactics/p00-probe/` 与 `integration-test/tactics-p00-harness.html` 为已提交的 P00 承载探针（`ca38c2b`）；`tactics/src/`、`tactics/tools/run-tests.cjs`、`integration-test/tactics-harness.html`、`integration-test/fixtures/tactics/` 已随 P01 交付创建；`tactics/tools/build-regex.cjs` 等打包器仍为**拟建路径**（P12）。
-- 所有功能验收先有实际测试报告，再勾选阶段。不能把本轮的文档检查写成战棋回归全绿。
-- 每阶段结束必须写一句“目的 vs 现状”，并记录真正完成、失败或待验证的内容。
-- 几何、预览、命中与 AI 必须共享规则；渲染和动画不是第二个伤害判定器。
-- 提示词以后若要新增或改写，必须先把完整文本置顶呈送用户确认，本轮没有新增任何生产提示词。
+- [旧 P00—P12 总计划](obsolete_documents/PLAN.md)、[MVP 计划](obsolete_documents/MVP-PLAN.md)、[第二轮修订](obsolete_documents/REVISION-2026-11-21.md)。
+- [三层礼拜堂后端计划](obsolete_documents/TYPICAL-BATTLE-BACKEND-PLAN.md)、[三层礼拜堂 Demo 计划](obsolete_documents/TYPICAL-BATTLE-DEMO-PLAN.md)。
+- [P00 探针报告](obsolete_documents/P00-REPORT.md)、[初始文档校验](obsolete_documents/VERIFICATION.md)。

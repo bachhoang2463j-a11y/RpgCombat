@@ -1,7 +1,7 @@
 # 典型对局 · 战棋版后端实施计划（TYPICAL-BATTLE-BACKEND-PLAN）
 
 > 状态：权威文档与后端阶段1—7已接线，相关测试已运行；最终全量与单文件专项见本轮验证报告。前端模型接线后的权威典型战局页面验收尚待完成，不能称正式版已通过。
-> 配套文件：[典型对局-战棋版.yaml](典型对局-战棋版.yaml)（权威样本）、[TYPICAL-BATTLE-CONTRACT.md](TYPICAL-BATTLE-CONTRACT.md)（交接契约）。
+> 配套文件：[典型对局-战棋版.yaml](../典型对局-战棋版.yaml)（权威样本）、[TYPICAL-BATTLE-CONTRACT.md](../TYPICAL-BATTLE-CONTRACT.md)（交接契约）。
 
 ## 核心目的
 
@@ -50,7 +50,7 @@
 ## 本轮验收结果
 
 - 唯一一次已注册源码全量：761 passed，0 failed（18阶段）；典型data57/space30/ai15/battle33/skills90。
-- 单文件重建1,036,668字节，50模块入包，35必需模块与41符号门禁，真实产物后端专项11项通过。报告：[TYPICAL-BATTLE-backend-summary.json](../../integration-test/fixtures/tactics/reports/TYPICAL-BATTLE-backend-summary.json)。
+- 单文件重建1,036,668字节，50模块入包，35必需模块与41符号门禁，真实产物后端专项11项通过。报告：[TYPICAL-BATTLE-backend-summary.json](../../../integration-test/fixtures/tactics/reports/TYPICAL-BATTLE-backend-summary.json)。
 - 原棋盘、原资源、seed20261123基线自动路线112条操作后失败（剩2敌，4英雄倒地），资源守恒与重放一致通过；胜利门禁失败，不计入761。带召唤与反应的扩展路线超过本轮30秒检查时限已停止，未报告通过。
 - IAB载入产物、页面防御资源验证通过；旧前端跳距文案仍为6m而规则2m，结束回合入口未推进，完整页面门禁未过。前端main/UI/导演等未改，本轮只交付后端及联合验收债。
 - 测试服务与标签已清理，README未更新，不推送远程。
