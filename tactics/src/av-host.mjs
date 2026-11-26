@@ -129,6 +129,8 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
   for (const [k, file] of Object.entries({ ...MOVE_AUDIO_FILES, ...JUMP_AUDIO_FILES })) {
     if (!av.audioUrls[k]) av.audioUrls[k] = av.ASSET_BASE + '/' + file;
   }
+  // 战棋不用顿帧：回合制底座粒子层的定帧（受击 60ms / 强力反击 80ms）恒为 0（底座为抽取生成物，不改其源）
+  if (av.fxEngine) Object.defineProperty(av.fxEngine, 'hitStop', { get: () => 0, set() {}, configurable: true });
 
   // ---------- 舞台挂载（sandbox 每次 buildDom 后调用） ----------
   function attachStage({ stage, shake, worldW = 1000, worldH = 1000 }) {

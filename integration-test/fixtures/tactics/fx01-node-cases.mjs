@@ -203,7 +203,7 @@ export const groups = {
         activeHandles--;
         return true;
       },
-      fx: { sfx() {}, top: () => stubNode, shake() {} },
+      fx: { sfx() {}, top: () => stubNode, shake() {} }, after(ms, fn) { fn(); },
       sandbox: { getUnitView: () => ({ nodes: new Map() }) },
       avHost: { host: { spriteOf: id => id } },
       av: {

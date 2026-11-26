@@ -49,8 +49,8 @@ export function hitFlash(fx, m, { ms = 260, color = 'rgba(254,202,202,.55)' } = 
     .animate([{ transform: 'scale(.55)', opacity: 1 }, { transform: 'scale(1)', opacity: 0.8, offset: 0.4 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: ms, fill: 'forwards' });
 }
 
-// 攻击类（单体/范围/锁定/弹道）时停与命中顿帧时长：0 = 不冻结、不出时停画面（白闪与震屏保留）；守护/领域类仍按原时长定格
-export const ATTACK_STOP_MS = 0, ATTACK_HIT_MS = 0;
+// 时停与命中顿帧时长：0 = 不冻结、不出时停画面（白闪与震屏保留）。攻击类与守护/领域类分开，当前全部为 0
+export const ATTACK_STOP_MS = 0, ATTACK_HIT_MS = 0, SUPPORT_STOP_MS = 0, SUPPORT_STOP_MS_L4 = 0;
 // 运镜缩放幅度：所有推近/拉远相对出手前缩放的偏移量 × ZOOM_AMP（下方倍数均为设计值，实际按此比例收敛）
 export const ZOOM_AMP = 1 / 3;
 export const zoomAt = (homeScale, s) => homeScale + (s - homeScale) * ZOOM_AMP;
@@ -86,7 +86,7 @@ export function startCine(env) {
   const box = env.shape ? [{ x: env.shape.center.x - env.shape.radius, y: env.shape.center.y - env.shape.radius }, { x: env.shape.center.x + env.shape.radius, y: env.shape.center.y + env.shape.radius }] : [];
   const I = env.shape ? env.shape.center : focus;   // 打击点：范围取爆心，单体取首个目标
   const attack = strike || kind === 'single' || kind === 'area';
-  const stopMs = attack ? ATTACK_STOP_MS : (epic ? 180 : 120), hitMs = ATTACK_HIT_MS;
+  const stopMs = attack ? ATTACK_STOP_MS : (epic ? SUPPORT_STOP_MS_L4 : SUPPORT_STOP_MS), hitMs = ATTACK_HIT_MS;
   let bursted = false, hitDone = false, framed = null;
 
   // ① 蓄势：遮幅入场 + 推近出手者（略偏向目标方向）；锁定打击在蓄力末 480ms 自动甩到打击点

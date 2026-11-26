@@ -160,6 +160,16 @@ function run() {
     check('TT-B 重击推撞不扣移动与跳跃额度',before&&after&&after.moveRemaining===before.moveRemaining&&after.jumped===before.jumped,{before,after});
   }
   {
+    // 原版[行动次数:4]/[行动次数:3]：按样本真实敏捷跑圈，眷族/犹格的自然行动次数约为我方平均的4倍/3倍
+    const d=sample(); const spdOf=n=>d.units.find(u=>u.name.includes(n)).ref.spd;
+    const names=['埃利奥特','弗兰克','玛德琳','索恩','伊塔库亚的眷族','犹格索托斯之子'];
+    const us=names.map((n,i)=>unit('u'+i,i<4?'hero':'enemy',{spd:spdOf(n)}));
+    const b=make(us,Object.fromEntries(us.map((u,i)=>[u.id,{col:2+i*4,row:3}])));
+    const n={}; for(let k=0;k<240;k++){const id=b.snapshot().currentId; if(!id)break; n[id]=(n[id]||0)+1; b.endAction();}
+    const avg=(n.u0+n.u1+n.u2+n.u3)/4, r4=n.u4/avg, r3=n.u5/avg;
+    check('TT-B 眷族约4动、犹格索托斯之子约3动（相对我方平均）',Math.abs(r4-4)<0.3&&Math.abs(r3-3)<0.3,{n,r4,r3});
+  }
+  {
     const hit=parseSkill('【击】[钝击;power:40][近战][位移:击退;距离:3][范围:单体;射程:2]');
     const h=unit('h','hero',{spd:200});const e=unit('e','enemy',{shield:100});
     const b=make([h,e],{h:{col:2,row:4},e:{col:3,row:4}});

@@ -102,7 +102,7 @@ function winchesterCases() {
   const r = b.attack(fSlug, { ...unitCenter(b.ctx.placementsById.t, b.ctx.footprintsById.t), targetId: 't' });
   check('TP7AV-W 独头二连发真实执行两段并按子技能名消耗弹药', r.ok && r.shots && r.shots.length === 2 && ammo.count === before - 2, { ok: r.ok, reason: r.reason, shots: r.shots && r.shots.length, before, after: ammo.count });
   const fDeer = fu.skills.find(s => s.name === '鹿弹二连发');
-  check('TP7AV-W 鹿弹二连发保留转火与特效身份', fDeer && fDeer.switchTarget === true && fDeer.fxTag === '霰弹' && slug.fxTag === '枪击' && fDeer.range.type === '扇形', fDeer && { fx: fDeer.fxTag, switchTarget: fDeer.switchTarget });
+  check('TP7AV-W 鹿弹二连发保留转火与特效身份', fDeer && fDeer.switchTarget === true && fDeer.fxTag === '霰弹' && slug.fxTag === '独头弹' && fDeer.range.type === '扇形', fDeer && { fx: fDeer.fxTag, switchTarget: fDeer.switchTarget, slug: slug.fxTag });
   return { cases };
 }
 

@@ -71,7 +71,7 @@ async function runTTData(deps = {}) {
   const dim = skill(yug, '维度撕裂');
   ok('TT 直线长宽', dim && dim.range && dim.range.type === '直线' && dim.range.length === 12 && dim.range.width === 2, JSON.stringify(dim && dim.range));
   const deer = skill(hero('弗兰克'), '鹿弹二连发');
-  ok('TT 扇形长度角度', deer && deer.range && deer.range.type === '扇形' && deer.range.length === 6 && deer.range.angle === 60, JSON.stringify(deer && deer.range));
+  ok('TT 扇形长度角度', deer && deer.range && deer.range.type === '扇形' && deer.range.length === 3 && deer.range.angle === 60, JSON.stringify(deer && deer.range));
   {
     const frank = hero('弗兰克');
     const group = frank && frank.skills.find(s => s.name === '温切斯特');

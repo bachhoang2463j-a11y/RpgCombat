@@ -371,6 +371,48 @@ function gunHit(ctx, impact) {
   ctx.fx.shake('medium');
 }
 
+// ---------- 霰弹与独头弹（弗兰克温切斯特）共用 ----------
+// 红色霰弹壳：塑料壳身 + 黄铜底，翻滚抛出受重力下坠（泵动上膛）
+function shellCasing(fx, p, ang, side = 1) {
+  const a = ang + Math.PI + side * 0.9 + rnd(-0.3, 0.3), d = rnd(22, 34), dx = Math.cos(a) * d, dy = Math.sin(a) * d, spin = rnd(420, 820) * (Math.random() < 0.5 ? -1 : 1);
+  const l = fx.top('<i style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:5px;height:11px;margin:-5.5px 0 0 -2.5px;border-radius:1.5px;' +
+    'background:linear-gradient(180deg,#dc2626 0%,#991b1b 66%,#fbbf24 67%,#b45309 100%);box-shadow:0 0 3px rgba(0,0,0,.6);"></i>', 760);
+  l.firstChild.animate([{ transform: 'translate(0,0) rotate(0deg)', opacity: 1 },
+    { transform: 'translate(' + dx.toFixed(1) + 'px,' + (dy - 20).toFixed(1) + 'px) rotate(' + (spin * 0.45).toFixed(0) + 'deg)', opacity: 1, offset: 0.4 },
+    { transform: 'translate(' + (dx * 1.5).toFixed(1) + 'px,' + (dy * 1.5 + 16).toFixed(1) + 'px) rotate(' + spin.toFixed(0) + 'deg)', opacity: 0 }], { duration: 740, easing: 'cubic-bezier(0.3,0.6,0.6,1)', fill: 'both' });
+}
+// 枪口硝烟环：出膛后向前推出的灰白烟圈
+function smokeRing(fx, p, ang, D = 1.2 * PX) {
+  const l = fx.top('<i style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:' + D + 'px;height:' + D + 'px;margin:' + (-D / 2) + 'px 0 0 ' + (-D / 2) + 'px;border-radius:50%;' +
+    'background:radial-gradient(circle,transparent 36%,rgba(203,213,225,.55) 52%,rgba(148,163,184,.3) 64%,transparent 74%);"></i>', 720);
+  l.firstChild.animate([{ transform: 'translate(0,0) scale(.3)', opacity: 0.9 }, { transform: 'translate(' + (Math.cos(ang) * 26).toFixed(1) + 'px,' + (Math.sin(ang) * 26 - 8).toFixed(1) + 'px) scale(1.6)', opacity: 0 }], { duration: 700, easing: 'ease-out', fill: 'both' });
+}
+// 鹿弹出膛：宽口径扇面枪焰 + 硝烟环 + 泵动抛壳 + 后坐
+function shotgunFire(ctx, to) {
+  const c = worldPx(ctx.centerOf(ctx.casterId)), t = worldPx(to), ang = Math.atan2(t.y - c.y, t.x - c.x);
+  const m = { x: c.x + Math.cos(ang) * 20, y: c.y + Math.sin(ang) * 20 };
+  gunFlash(ctx.fx, m, ang, { size: 46, ms: 170 });
+  gunFlash(ctx.fx, m, ang + 0.32, { size: 28, ms: 140, smoke: false });
+  gunFlash(ctx.fx, m, ang - 0.32, { size: 28, ms: 140, smoke: false });
+  smokeRing(ctx.fx, m, ang);
+  ctx.after(160, () => shellCasing(ctx.fx, c, ang));
+  jolt(ctx, ctx.casterId, { amp: 4, ms: 50, glow: '#fb923c' });
+  ctx.fx.shake('medium');
+}
+// 鹿弹命中：多颗弹丸弹孔散布炸点 + 火星 + 血雾 + 被轰后仰；同一发多目标只震一次
+function shotgunHit(ctx, impact) {
+  if (!impact.hit) return;
+  const c = worldPx(ctx.centerOf(ctx.casterId)), t = worldPx(ctx.centerOf(impact.targetId)), ang = Math.atan2(t.y - c.y, t.x - c.x);
+  for (let k = 0; k < 6; k++) {
+    const q = { x: t.x + rnd(-22, 22), y: t.y + rnd(-22, 22) };
+    ctx.after(k * 14, () => gunImpact(ctx.fx, q, { size: rnd(22, 34), ms: 300 }));
+  }
+  spray(ctx.fx, t, 12, { kind: 'gore', ang, spread: 1.9, dist: [16, 70], size: [2.5, 6.5] });
+  spray(ctx.fx, t, 10, { kind: 'spark', ang, spread: 2.2, dist: [20, 66], size: [2, 3.2], ms: [220, 340] });
+  heavyFlinch(ctx, impact.targetId, RECOIL_FLINCH, ang);
+  if (ctx.__shotgunShook !== ctx.result) { ctx.__shotgunShook = ctx.result; ctx.fx.shake('heavy'); ctx.after(240, () => { ctx.__shotgunShook = null; }); }
+}
+
 // ---------- 重击共用（移植回合制 index 远程重击 / 近战重击方案1） ----------
 // 原版震屏关键帧：位移 + 缩放 + 旋转（比通用 shake 档位更重），直接驱动沙盘震屏层
 const HEAVY_SHAKE_AT = [0, 0.12, 0.25, 0.4, 0.55, 0.7, 0.85, 1];
@@ -556,6 +598,7 @@ function basicAttack(name, { subtype = name, area = false, projectile, direction
           const dx = aim.x - origin.x, dy = aim.y - origin.y;
           const scale = range.castRange / (Math.hypot(dx, dy) || 1);
           const endpoint = ctx.anchorAt(origin.x + dx * scale, origin.y + dy * scale);
+          if (fire) fire(ctx, { x: origin.x + dx * scale, y: origin.y + dy * scale });
           // 方向锚点固定在射界末端，命闪由各目标的真实结算独立揭示。
           if (!(await playIdentity([endpoint], () => 'hit', () => impacts.forEach(reveal), { suppressImpact: true }))) return false;
         } else if (projectile && scope === 'single') {
@@ -594,7 +637,7 @@ function basicAttack(name, { subtype = name, area = false, projectile, direction
 
 const basicAttacks = [
   basicAttack('枪击', { area: true, gap: 200, fire: gunFire, impactFx: gunHit }),
-  basicAttack('霰弹', { directional: true, gap: 220 }),
+  basicAttack('霰弹', { directional: true, gap: 220, fire: shotgunFire, impactFx: shotgunHit }),
   basicAttack('火焰', { area: true, projectile: 'fire' }),
   basicAttack('冰霜', { area: true }), basicAttack('雷击', { area: true, subtype: '雷' }),
   basicAttack('爆炸', { area: true }), basicAttack('光', { area: true }),
@@ -1321,7 +1364,7 @@ const stormGather = {
 // 世界暗场留光孔 + 施法者圣光信标飞升 + 目标脚下巨型圣阵 / 头顶圣徽 + 四方光尘吸入 + 持续轻震 → 收 →
 // 通天光柱 + 414 圣焰 + 十字光痕 + 全屏闪白 + 重震（揭示伤害）→ 光羽雨落 + 降防碎印 + 暗场渐退
 const holyJudgment = {
-  id: 'holy-judgment', grade: 'L4', fxTags: ['圣光01'], cine: 'lock',
+  id: 'holy-judgment', grade: 'L4', fxTags: ['圣光01'], cine: false,
   timeline: { chargeMs: 1300, totalMs: 3300, fullscreen: true, darken: true },   // 1300 蓄势 + 450 爆发 + 1550 余韵
   cues: [{ key: 'light_charge', vol: 0.55 }, { key: 'light01', vol: 0.72 }, { key: 'light_impact', vol: 0.60 }],
   prepareKeys() { return this.cues.map(c => c.key); },
@@ -1384,7 +1427,7 @@ const holyJudgment = {
 // 紫色环境罩 + 爆心雷纹阵 + 施法者引雷光点飞升 + 爆心上空雷云汇聚 + 电火花 → 收 →
 // 主雷 450.webm + 逐目标落雷（按距爆心错拍揭示）+ 地面冲击环 + 闪屏重震 → 麻痹电弧余韵
 const thunderStorm = {
-  id: 'thunder-storm', grade: 'L3', fxTags: ['雷击01'], cine: 'lock',
+  id: 'thunder-storm', grade: 'L3', fxTags: ['雷击01'], cine: false,
   timeline: { chargeMs: 900, totalMs: 2400, fullscreen: true },   // 800 汇聚 + 100 收 + 500 落雷 + 1000 余韵
   cues: [{ key: 'thunder_charge', vol: 0.50 }, { key: 'thunder01', vol: 0.72 }, { key: 'thunder_aoe_hit', vol: 0.60 }],
   prepareKeys() { return this.cues.map(c => c.key); },
@@ -1831,6 +1874,83 @@ const meleeHeavy = {
   },
 };
 
+// 独头弹 L2（弗兰克【独头二连发】，12 号独头重弹）：每发 = 宽口枪焰 + 硝烟环 + 粗短炽白弹头（拖热浪尾迹）直射 →
+// 命中：盘状冲击波（垂直弹道压扁）+ 破甲碎片向后崩飞 + 甲面裂纹贴花（降防）+ 血雾 + 重后仰 + 低频；闪避：擦过目标在其身后掀起尘土。
+// 两发之间泵动上膛（红壳抛出 + 上膛声），第二发更重；每发按全局发序逐段揭示，中间等反应收尾
+const SLUG_TINT = ['linear-gradient(90deg,rgba(234,88,12,0),rgba(249,115,22,.85) 45%,#fed7aa 82%,#fff)', '#f97316'];
+function slugImpact(fx, p, ang, heavy) {
+  const r = deg(ang + Math.PI / 2).toFixed(1), D = (heavy ? 2.1 : 1.7) * PX;
+  // 盘状冲击：沿弹道法向压扁的椭圆双环
+  const l = fx.top('<div style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:0;height:0;transform:rotate(' + r + 'deg);">' +
+    ringHtml(0, 0, D, 'rgba(254,215,170,.95)', 'rgba(234,88,12,.6)') + ringHtml(0, 0, D * 0.7, 'rgba(255,255,255,.8)', 'rgba(251,146,60,.5)') + '</div>', 520).firstChild;
+  [...l.children].forEach((el, i) => el.animate([{ transform: 'scale(.2,.08)', opacity: 1 }, { transform: 'scale(1.3,.5)', opacity: 0.85, offset: 0.4 }, { transform: 'scale(2,.7)', opacity: 0 }],
+    { duration: 420 - i * 60, delay: i * 40, easing: 'cubic-bezier(0.1,0.8,0.2,1)', fill: 'both' }));
+  // 炽白爆心
+  fx.top(orbHtml(p.x, p.y, D * 0.8, 'rgba(251,146,60,.7)', 'rgba(255,255,255,.98)'), 260).firstChild
+    .animate([{ transform: 'scale(.3)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0.9, offset: 0.3 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 240, fill: 'forwards' });
+  // 破甲碎片：灰铁片沿弹道方向崩飞
+  spray(fx, p, heavy ? 10 : 7, { kind: 'spark', ang, spread: 1.3, dist: [30, 96], size: [2.5, 4], ms: [280, 460], colors: ['#e2e8f0', '#94a3b8', '#fde68a'] });
+}
+// 甲面裂纹（降防）：暗橙裂纹放射，停留后淡出
+function armorCrack(fx, p, ang) {
+  const uid = fx.uid(), D = 1.3 * PX, rays = Array.from({ length: 7 }, (_, i) => {
+    const a = i / 7 * TAU + rnd(-0.25, 0.25), L1 = rnd(0.22, 0.32), L2 = rnd(0.38, 0.5), b = a + rnd(-0.4, 0.4);
+    return 'M50,50 L' + (50 + Math.cos(a) * L1 * 100).toFixed(1) + ',' + (50 + Math.sin(a) * L1 * 100).toFixed(1) + ' L' + (50 + Math.cos(b) * L2 * 100).toFixed(1) + ',' + (50 + Math.sin(b) * L2 * 100).toFixed(1);
+  }).join(' ');
+  fx.top('<svg viewBox="0 0 100 100" width="' + D + '" height="' + D + '" style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;margin:' + (-D / 2) + 'px 0 0 ' + (-D / 2) + 'px;overflow:visible;filter:drop-shadow(0 0 4px #ea580c);">' +
+    '<path id="ck' + uid + '" d="' + rays + '" stroke="#fdba74" stroke-width="2.6" fill="none" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/></svg>', 820).firstChild.firstChild
+    .animate([{ strokeDashoffset: 1, opacity: 1 }, { strokeDashoffset: 0, opacity: 1, offset: 0.25 }, { strokeDashoffset: 0, opacity: 0.9, offset: 0.7 }, { strokeDashoffset: 0, opacity: 0 }], { duration: 800, easing: 'ease-out', fill: 'forwards' });
+}
+const slugShot = {
+  id: 'slug-shot', grade: 'L2', fxTags: ['独头弹'], reuseAudio: true,
+  timeline: { totalMs: 1150, fullscreen: false, darken: false },
+  cues: [{ key: 'xiandan', vol: 0.75 }, { key: 'hitDown', vol: 0.6 }, { key: 'mx_gear_lock', vol: 0.5 }],
+  prepareKeys() { return ['xiandan', 'hitDown', 'mx_gear_lock']; },
+  async play(ctx) {
+    const { fx } = ctx, FLY = 90, PUMP = 380;
+    const shots = attackShots(ctx);
+    for (const [i, shot] of shots.entries()) {
+      const heavy = i === shots.length - 1 && shots.length > 1;
+      if (i) {
+        // 泵动上膛：上膛声 + 红壳抛出 + 出手者微后撤
+        const c0 = worldPx(ctx.centerOf(ctx.casterId));
+        fx.sfx('mx_gear_lock', 0.5);
+        shellCasing(fx, c0, Math.atan2((shot.aim?.y ?? 0) * PX - c0.y, (shot.aim?.x ?? 0) * PX - c0.x));
+        if (!(await ctx.wait(PUMP))) return false;
+      }
+      const impact = shot.impacts[0] || null;
+      const cm = ctx.centerOf(ctx.casterId), tm = impact ? ctx.centerOf(impact.targetId) : shot.aim;
+      const c = worldPx(cm), t = worldPx(tm), ang = Math.atan2(t.y - c.y, t.x - c.x), ux = Math.cos(ang), uy = Math.sin(ang);
+      const m = { x: c.x + ux * 22, y: c.y + uy * 22 }, hit = !!impact?.hit;
+      const end = hit ? t : { x: t.x + ux * 70, y: t.y + uy * 70 };
+      // 出膛
+      fx.sfx('xiandan', heavy ? 0.75 : 0.68); fx.shake(heavy ? 'heavy' : 'medium');
+      gunFlash(fx, m, ang, { size: heavy ? 58 : 50, ms: 190 });
+      smokeRing(fx, m, ang, 1.4 * PX);
+      jolt(ctx, ctx.casterId, { amp: heavy ? 6 : 5, ms: 55, glow: '#fb923c' });
+      tracer(fx, m, end, { width: 7, ms: FLY, len: 46, tint: SLUG_TINT });
+      tracer(fx, m, end, { width: 13, ms: FLY + 40, len: 110, tint: ['linear-gradient(90deg,rgba(254,215,170,0),rgba(254,215,170,.22) 60%,rgba(255,237,213,.35))', 'rgba(251,146,60,.35)'] });
+      if (!(await ctx.wait(FLY))) return false;
+      // 命中 / 落空
+      shot.impacts.forEach(p => ctx.revealSegment(p.targetId, p.index));
+      if (hit) {
+        fx.sfx('hitDown', heavy ? 0.6 : 0.52); subBass(ctx, { type: 'sine', f0: 120, f1: 34, gain: heavy ? 0.6 : 0.45, ms: 260 });
+        slugImpact(fx, t, ang, heavy);
+        armorCrack(fx, t, ang);
+        spray(fx, t, heavy ? 14 : 10, { kind: 'gore', ang, spread: 1.2, dist: [24, 92], size: [3, 7] });
+        heavyFlinch(ctx, impact.targetId, RECOIL_FLINCH, ang);
+        if (heavy) heavyShake(ctx, RANGED_HEAVY_SHAKE, 360);
+      } else {
+        particles(fx, Array.from({ length: 10 }, () => ({ x: end.x + rnd(-8, 8), y: end.y + rnd(-8, 8), dx: ux * rnd(10, 40) + rnd(-20, 20), dy: uy * rnd(10, 40) - rnd(6, 26), size: rnd(10, 18), color: 'rgba(168,162,158,.5)', core: 'rgba(231,229,228,.55)', s0: 0.5, s1: 1.5, dur: rnd(380, 560) })), 600, 'ground');
+        spray(fx, end, 5, { kind: 'spark', ang: ang + Math.PI, spread: 2.4, dist: [14, 40], size: [2, 3], ms: [200, 300] });
+      }
+      if (ctx.awaitShotFeedback && !(await ctx.awaitShotFeedback())) return false;
+    }
+    ctx.hits.forEach(h => ctx.reveal(h.targetId));
+    return ctx.wait(420);
+  },
+};
+
 // 远程重击（弗兰克【皇家猎象枪】，移植回合制 spawnRangedHeavyParticles）：枪口红光快速聚能 → shot01 击发 + 重枪口焰 + 后坐，
 // 粗红色弹道直射目标 → 命中拍 hitDown + 低频冲击 + 白闪 + 原版双管重爆、原版重震屏、屏幕血花（无论命中/闪避都溅，闪避在目标身后炸开）+ 目标后仰
 const rangedHeavy = {
@@ -1994,7 +2114,7 @@ const strafeBurst = {
 };
 
 const kruppSnipe = {
-  id: 'krupp-snipe', grade: 'L4', fxTags: ['克虏伯重狙'], cine: 'lock',
+  id: 'krupp-snipe', grade: 'L4', fxTags: ['克虏伯重狙'], cine: false,
   timeline: { chargeMs: 1220, totalMs: 3400, fullscreen: true, darken: true },   // 1220 瞄准 + 2100 原版视频全段 + 收尾
   cues: [{ key: 'gunshot_pierce', vol: 0.72 }, { key: 'explosion_aoe_blast', vol: 0.62 }],
   prepareKeys() { return ['gunshot_pierce', 'explosion_aoe_blast']; },
@@ -2344,7 +2464,7 @@ const sanctumVeil = {
   },
 };
 
-export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, incendiaryBottle, vitalFlow, sanctumVeil, healMend, fogBurst, fireDomain, poisonDomain, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, frostBlast, voidQuake, lineRift, waterBolt, curseBeam, ...basicAttacks, neutralImpact, zheYing, mirrorCounter, wizardShield, reactionKanpo, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, kruppAim, sekhmetVow];
+export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, slugShot, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, incendiaryBottle, vitalFlow, sanctumVeil, healMend, fogBurst, fireDomain, poisonDomain, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, frostBlast, voidQuake, lineRift, waterBolt, curseBeam, ...basicAttacks, neutralImpact, zheYing, mirrorCounter, wizardShield, reactionKanpo, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, kruppAim, sekhmetVow];
 export function getFxTagOptions() {
   return [...new Set(DEFAULT_FX_ENTRIES.flatMap(entry => entry.fxTags || []))].map(name => ({ name, label: name }));
 }
