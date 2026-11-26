@@ -8,7 +8,6 @@
 
 import { occupiedCells, cellKey, unitCenter } from './geometry.mjs';
 import { skillSlots } from './effect-definitions.mjs';
-import { ROUND_TIME } from './scheduler.mjs';
 
 const EPS = 1e-9;
 
@@ -72,7 +71,7 @@ export function previewBarrier(ctx, casterId, skill, query) {
   const protectType = slot?.definition.damageCategory || slot?.tag.match(/肃正[:：](近战|远程|法术)/)?.[1] || skill?.barrierSub || 'all';
   const visualIdentity = protectType === '法术' ? 'gold' : protectType === '远程' ? 'blue' : 'white';
   const createdAt = typeof ctx.now === 'function' ? ctx.now() : 0;
-  const endAt = !slot || slot.turns === Infinity ? null : createdAt + slot.turns * ROUND_TIME;
+  const endAt = null; // 屏障永久持续，不受技能或槽位回合数影响。
   const barrier = {
     id: (ctx.runId ? ctx.runId + ':' : '') + 'barrier:' + casterId + ':' + ((ctx._barrierSerial || 0) + 1),
     casterId,

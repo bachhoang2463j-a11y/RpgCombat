@@ -1,8 +1,8 @@
 {
   "kind": "guard-barrier-artifact-backend",
   "artifact": "tactics/mvp-standalone.html",
-  "bytes": 1641728,
-  "sha256": "4ed2239686e9664e121d5c903174775d6de1f2235da086c022cb8d454993dd5a",
+  "bytes": 1641675,
+  "sha256": "d128fb286f47d195afe81ef345edf7e6e3a397da148cb9d6f1245e5e5cddec0d",
   "cases": [
     {
       "id": "单脚本与闭合",
@@ -65,12 +65,17 @@
       "detail": ""
     },
     {
-      "id": "产物期限、重开与销毁清理",
+      "id": "产物永久持续、重开与销毁清理",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "产物屏障内敌人不能离开，击碎后恢复移动",
       "pass": true,
       "detail": ""
     }
   ],
-  "passed": 13,
+  "passed": 14,
   "failed": 0,
   "examples": {
     "summonGuard": {
@@ -426,7 +431,7 @@
         "protectType": "法术",
         "visualIdentity": "gold",
         "createdAt": 33.333333333333336,
-        "endAt": 233.33333333333334,
+        "endAt": null,
         "shape": {
           "type": "圆形",
           "center": {
@@ -551,7 +556,7 @@
         "protectType": "法术",
         "visualIdentity": "gold",
         "createdAt": 33.333333333333336,
-        "endAt": 233.33333333333334,
+        "endAt": null,
         "shape": {
           "type": "圆形",
           "center": {
@@ -638,7 +643,7 @@
         "protectType": "法术",
         "visualIdentity": "gold",
         "createdAt": 33.333333333333336,
-        "endAt": 233.33333333333334,
+        "endAt": null,
         "shape": {
           "type": "圆形",
           "center": {
@@ -725,7 +730,7 @@
         "protectType": "法术",
         "visualIdentity": "gold",
         "createdAt": 33.333333333333336,
-        "endAt": 233.33333333333334,
+        "endAt": null,
         "shape": {
           "type": "圆形",
           "center": {

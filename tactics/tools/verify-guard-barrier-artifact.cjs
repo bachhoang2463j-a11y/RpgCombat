@@ -57,7 +57,7 @@ if (backend) {
     const { battle } = fixture();
     const result = battle.attack({ ...barrier, type: '[回复]', power: 4, type2: '[肃正:法术]', power2: 90, slotTurns2: 2 });
     const b = battle.ctx.barriers[0]; examples.created = result.events.find(e => e.type === 'barrier-created');
-    return result.ok && b.maxIntegrity === 90 && b.endAt - b.createdAt === 200 && b.visualIdentity === 'gold';
+    return result.ok && b.maxIntegrity === 90 && b.endAt === null && b.visualIdentity === 'gold';
   });
   test('产物群攻两人共享一次整体承伤', () => {
     const { battle, units } = fixture(); battle.attack(barrier); turn(battle, 'e');
@@ -87,13 +87,23 @@ if (backend) {
     const heal = result.effects[0]; examples.healSuppressed = heal;
     return result.ok && heal.reason === 'burn-heal-suppressed' && heal.healBeforeSuppression === 40 && heal.healAfterSuppression === 20 && heal.value === 20 && units[0].ref.hp === 40;
   });
-  test('产物期限、重开与销毁清理', () => {
+  test('产物永久持续、重开与销毁清理', () => {
     const { battle } = fixture(); battle.attack({ ...barrier, slotTurns: 1 }); const b = battle.ctx.barriers[0];
-    for (let i = 0; i < 20 && battle.snapshot().now <= b.endAt; i++) battle.endAction();
-    const expired = battle.ctx.barriers.length === 0 && battle.snapshot().events.some(e => e.reason === 'expired');
+    for (let i = 0; i < 80; i++) battle.endAction();
+    const permanent = b.endAt === null && battle.snapshot().now > b.createdAt + 1000 && battle.ctx.barriers[0]?.id === b.id
+      && !battle.snapshot().events.some(e => e.reason === 'expired');
     turn(battle, 'h'); battle.attack(barrier); const id = battle.snapshot().runId;
     const reset = battle.reset(); battle.attack(barrier); const destroyed = battle.destroy();
-    return expired && reset.runId !== id && reset.resetEvents.some(e => e.reason === 'reset') && battle.ctx.barriers.length === 0 && destroyed.events.some(e => e.reason === 'destroyed');
+    return permanent && reset.runId !== id && reset.resetEvents.some(e => e.reason === 'reset') && battle.ctx.barriers.length === 0 && destroyed.events.some(e => e.reason === 'destroyed');
+  });
+  test('产物屏障内敌人不能离开，击碎后恢复移动', () => {
+    const { battle, placementsById } = fixture();
+    placementsById.e = { col: 4, row: 5 };
+    battle.attack(barrier); turn(battle, 'e');
+    const trapped = !battle.move(4, 8).ok && !battle.jump(4, 8).ok;
+    const b = battle.ctx.barriers[0];
+    const broken = battle.attack({ ...attack, power: 1000 }, { barrierId: b.id });
+    return trapped && broken.ok && battle.ctx.barriers.length === 0 && battle.move(4, 8).ok;
   });
 }
 const report = { kind: 'guard-barrier-artifact-backend', artifact: 'tactics/mvp-standalone.html', bytes: Buffer.byteLength(html),

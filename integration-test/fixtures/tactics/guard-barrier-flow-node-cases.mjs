@@ -36,7 +36,7 @@ function run() {
     assert.equal(result.ok, true);
     const barrier = battle.ctx.barriers[0];
     assert.equal(barrier.maxIntegrity, 90);
-    assert.equal(barrier.endAt - barrier.createdAt, 200);
+    assert.equal(barrier.endAt, null);
     assert.equal(barrier.visualIdentity, 'gold');
     assert.equal(units[0].ref.mp, 97);
     assert.equal(result.events.filter(e => e.type === 'barrier-created').length, 1);
@@ -107,12 +107,14 @@ function run() {
     positions.h.col = 5;
     assert.equal(fogAt(battle.ctx, 'h').strength, 40);
   });
-  test('TG-FLOW-08 到期接时钟并解除空间规则', () => {
+  test('TG-FLOW-08 显式一回合屏障推进时钟后仍永久存在', () => {
     const { battle } = fixture(); const result = battle.attack({ ...barrierSkill, slotTurns: 1 });
     const barrier = battle.ctx.barriers[0];
-    for (let i = 0; i < 12 && battle.snapshot().now <= barrier.endAt; i++) battle.endAction();
-    assert.equal(battle.ctx.barriers.length, 0);
-    assert.ok(battle.snapshot().events.some(e => e.type === 'barrier-removed' && e.reason === 'expired'));
+    for (let i = 0; i < 40; i++) battle.endAction();
+    assert.ok(battle.snapshot().now > barrier.createdAt + 1000);
+    assert.equal(barrier.endAt, null);
+    assert.equal(battle.ctx.barriers[0].id, barrier.id);
+    assert.equal(battle.snapshot().events.some(e => e.type === 'barrier-removed' && e.reason === 'expired'), false);
     assert.equal(result.events.find(e => e.type === 'barrier-created').barrier.integrity, 100);
   });
   test('TG-FLOW-09 同施术者替换身份与旧快照保真', () => {

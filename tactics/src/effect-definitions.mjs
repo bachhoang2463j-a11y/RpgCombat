@@ -62,7 +62,7 @@ export const EFFECT_DEFINITIONS = {
   '自弱': { kind: 'buff', field: 'atk', side: 'self', selfCost: true, debuff: true, defaultPower: 50, defaultTurns: 3 },
   '自滞': { kind: 'buff', field: 'eva', side: 'self', selfCost: true, debuff: true, defaultPower: 50, defaultTurns: 3 },
   '自缓': { kind: 'buff', field: 'spd', side: 'self', selfCost: true, debuff: true, defaultPower: 50, defaultTurns: 3 },
-  '肃正': { kind: 'barrier', side: 'default', defaultPower: 50, defaultTurns: 3 },
+  '肃正': { kind: 'barrier', side: 'default', defaultPower: 50, defaultTurns: Infinity },
 };
 for (const category of DAMAGE_CATEGORIES) {
   EFFECT_DEFINITIONS[category] = { kind: 'attack', side: 'enemy', attack: true, damageCategory: category,

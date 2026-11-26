@@ -5,7 +5,7 @@ import { createFogRegion, fogAt } from '../../../tactics/src/regions.mjs';
 import { canSeePoint } from '../../../tactics/src/perception.mjs';
 import { queryAttack } from '../../../tactics/src/range.mjs';
 import { chooseEnemyAction } from '../../../tactics/src/ai.mjs';
-import { findJumpPath } from '../../../tactics/src/movement.mjs';
+import { findJumpPath, findReachable, traceDisplacement } from '../../../tactics/src/movement.mjs';
 
 function ctxOf() {
   const units = [ ['h', 'hero', 5, 5], ['e', 'enemy', 0, 5], ['a', 'hero', 6, 5] ].map(([id, side]) => ({ id, side, footprint: { width: 1, height: 1 }, ref: { hp: 100, maxHp: 100, atk: 30, def: 0, perception: 100, moveDistance: 0 } }));
@@ -21,13 +21,16 @@ function run() {
   test('GB-SPACE actual slot / stable identity / lifetime', () => {
     const ctx = ctxOf(); const p = previewBarrier(ctx, 'h', ward); assert.equal(ctx._barrierSerial, undefined);
     assert.equal(p.barrier.integrity, 120); assert.equal(p.barrier.protectType, '法术'); assert.equal(p.barrier.visualIdentity, 'gold');
-    assert.equal(p.barrier.createdAt, 200); assert.equal(p.barrier.endAt, 700); assert.equal(p.barrier.boundary.radius, 2);
+    assert.equal(p.barrier.createdAt, 200); assert.equal(p.barrier.endAt, null); assert.equal(p.barrier.boundary.radius, 2);
     const first = createBarrier(ctx, 'h', ward); const second = createBarrier(ctx, 'h', ward);
     assert.notEqual(first.barrier.id, second.barrier.id); assert.equal(second.replaced[0].id, first.barrier.id);
     second.replaced[0].integrity = 1; assert.equal(first.barrier.integrity, 120);
-    assert.equal(expireBarriers(ctx, 699).length, 0); assert.equal(expireBarriers(ctx, 700).length, 1);
-    const forever = createBarrier(ctx, 'h', { ...ward, slotTurns2: Infinity }); assert.equal(forever.barrier.endAt, null);
-    assert.equal(expireBarriers(ctx, Infinity).length, 0); assert.equal(clearBarriers(ctx).length, 1);
+    assert.equal(expireBarriers(ctx, 700).length, 0); assert.equal(expireBarriers(ctx, 1000000).length, 0);
+    for (const turns of [{ slotTurns2: undefined }, { slotTurns2: undefined, turns: 1 }, { slotTurns2: 1 }, { slotTurns2: Infinity }]) {
+      const forever = createBarrier(ctx, 'h', { ...ward, ...turns }); assert.equal(forever.barrier.endAt, null);
+      assert.equal(expireBarriers(ctx, Infinity).length, 0); assert.equal(ctx.barriers.length, 1);
+    }
+    assert.equal(clearBarriers(ctx).length, 1);
     for (const [kind, color] of [['近战', 'white'], ['远程', 'blue']]) assert.equal(previewBarrier(ctx, 'h', { ...ward, type2: `[肃正:${kind}]` }).barrier.visualIdentity, color);
   });
   test('GB-SPACE durable result / no overflow / complete snapshots', () => {
@@ -49,6 +52,26 @@ function run() {
     ctx.footprintsById.e = { width: 2, height: 2 };
     assert.equal(barrierCrossing(ctx, 'e', { col: 0, row: 3 }, { col: 10, row: 3 }).id, b.id);
     ctx.placementsById.e = { col: 0, row: 3 }; assert.equal(findJumpPath(ctx, 'e', 10, 3).blockedBy.barrierId, b.id);
+  });
+  test('GB-SPACE permanent barrier traps enemies until broken', () => {
+    const ctx = ctxOf(); const b = createBarrier(ctx, 'h', ward).barrier;
+    ctx.placementsById.e = { col: 5, row: 6 };
+    const from = ctx.placementsById.e, to = { col: 5, row: 9 };
+    assert.equal(expireBarriers(ctx, 1000000).length, 0);
+    assert.equal(barrierCrossing(ctx, 'e', from, to).id, b.id);
+    assert.equal(barrierCrossing(ctx, 'e', from, { col: 5, row: 7 }), null);
+    assert.equal(barrierCrossing(ctx, 'h', from, to), null);
+    for (const flying of [false, true]) {
+      ctx.units.find(u => u.id === 'e').ref.flying = flying;
+      assert.equal(findReachable(ctx, 'e', 20).byKey.has('5,9'), false);
+      assert.equal(findJumpPath(ctx, 'e', 5, 9).blockedBy.barrierId, b.id);
+      assert.equal(traceDisplacement(ctx, 'e', { x: 0, y: 1 }, 3).blockedBy.barrierId, b.id);
+    }
+    damageBarrier(ctx, b.id, 1000);
+    assert.equal(barrierCrossing(ctx, 'e', from, to), null);
+    assert.equal(findReachable(ctx, 'e', 20).byKey.has('5,9'), true);
+    assert.equal(findJumpPath(ctx, 'e', 5, 9).ok, true);
+    assert.equal(traceDisplacement(ctx, 'e', { x: 0, y: 1 }, 3).blocked, false);
   });
   test('GB-SPACE direct empty barrier / normal query / AI', () => {
     const ctx = ctxOf(); const b = createBarrier(ctx, 'h', ward).barrier;
