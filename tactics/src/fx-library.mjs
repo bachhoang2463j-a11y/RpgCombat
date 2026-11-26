@@ -2046,7 +2046,7 @@ const scorpionKey = {
 // 视频帧内碎裂点约在 (0.5, 0.83)、首帧瓶位约在 (0.47, 0.17)，据此把碎裂点对准规则落点
 const FOG_SHATTER_Y = 0.83, FOG_BOTTLE = { x: 0.47, y: 0.17 }, FOG_SHATTER_MS = 950;
 const xenonBlightFog = {
-  id: 'xenon-blight-fog', grade: 'L4', fxTags: ['异种坏死雾'], reuseAudio: true, cine: 'projectile',
+  id: 'xenon-blight-fog', grade: 'L4', fxTags: ['异种坏死雾'], reuseAudio: true, cine: 'projectile', cineHold: false,
   timeline: { chargeMs: 1400, totalMs: 3250, fullscreen: true, darken: true },   // ≈450 投瓶 + 950 瓶落至碎裂 + 1770 雾起与余韵
   cues: [{ key: 'fog.mp4 原声', vol: 2.5 }],
   prepareKeys() { return []; },
@@ -2060,8 +2060,8 @@ const xenonBlightFog = {
     worldDarken(fx, b, { holeR: Math.max(R * 0.8, W * 0.45), inMs: 380, holdMs: 2300, outMs: 520, peak: 0.55 });
     const flyMs = Math.round(Math.min(560, Math.max(360, Math.hypot(hand.x - head.x, hand.y - head.y) * 0.9)));
     throwVial(fx, head, hand, { kind: 'poison', ms: flyMs, s0: 0.5, s1: W * 0.2 / 34 });
-    // 镜头随瓶甩到落点候碎：取落点与视频中心之间，瓶落轨迹与碎裂点同时入画（未手动操作镜头时才跟）
-    ctx.cine?.launch(flyMs + 700, 0, { at: { x: bm.x, y: (bm.y + vy / PX) / 2 }, k: 1.25 });
+    // 先看索恩出手，瓶子飞到 60% 时甩到落点与视频中心之间，瓶落轨迹与碎裂点同时入画；视频自然播放不定格（未手动操作镜头时才跟）
+    ctx.cine?.launch(400, Math.round(flyMs * 0.6), { at: { x: bm.x, y: (bm.y + vy / PX) / 2 }, k: 1.25 });
     if (!(await ctx.wait(flyMs))) return false;
     const cv = webm(ctx, 'fog.mp4', b.x, vy, W, { ms: 3400, audio: 2.5 });
     ctx.after(FOG_SHATTER_MS, () => { fx.shake('medium'); ctx.atmos?.burst(); });

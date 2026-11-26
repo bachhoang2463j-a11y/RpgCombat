@@ -402,7 +402,7 @@ export function createActionDirector(deps) {
     }) : null;
     // 高阶运镜：与氛围层同生命周期；条目 cine:false 自行编排。爆发拍时停、首次命中顿帧、收尾回位
     const cine = atmos && entry.cine !== false ? startCine({
-      sandbox, fx: makeFx(audioContext.category), hold, after: (ms, fn) => scope().after(ms, fn), style: entry.cine, grade, result, hits, centerOf,
+      sandbox, fx: makeFx(audioContext.category), hold, after: (ms, fn) => scope().after(ms, fn), style: entry.cine, freeze: entry.cineHold, grade, result, hits, centerOf,
       shape: shape && shape.radius > 0 ? { center: shape.center || result.aim, radius: shape.radius } : null,
       regions: (result.events || []).filter(ev => ev.type === 'region-created'), chargeMs: entry.timeline?.chargeMs || 600, totalMs: entry.timeline?.totalMs || 2000,
     }) : null;
