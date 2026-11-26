@@ -239,7 +239,7 @@ export function buildTypicalViewData(block, scenario, scene, positions, combatTo
     return Object.assign(u, {
       emoji, img: src.img || null,
       avatarUrl: emoji ? null : resolveAvatarUrl({ img: src.img, name: u.name }, heroAvatarUrl),
-      bars: { hp: u.ref.hp, maxHp: u.ref.maxHp || 0, mp: u.ref.mp, maxMp: u.ref.maxMp || 0 },
+      bars: { hp: u.ref.hp, maxHp: u.ref.maxHp || 0, mp: u.ref.mp, maxMp: u.ref.maxMp || 0, tp: u.ref.tp || 0 },
     });
   });
   return { sceneId: scene.sceneId, battleId: block.battleId, scene, units, footprintsById, placementsById, combatToken };
@@ -498,7 +498,10 @@ export function createApp(rootEl, opts = {}) {
       if (only && u.id !== only) continue;
       const list = shownOf(u).hp > 0 ? badgesOf(u) : [];
       view.setStatus(u.id, compactStatusHtml(list));
-      if (u.side === 'hero') shell.setHeroStatus(u.id, fullStatusHtml(list));
+      if (u.side === 'hero') {
+        shell.setHeroStatus(u.id, fullStatusHtml(list.filter(b => b.key !== 'shield')));   // 护盾已写进卡片血条
+        shell.setHeroStats(u.id, shownEff.get(u.id) || battle.getEffectiveUnit(u.id), getEffectiveStats(u, []));
+      }
     }
     renderInspector();
   }
@@ -681,6 +684,8 @@ export function createApp(rootEl, opts = {}) {
       view.setFlag(u.id, 't-unit-channel', !!battle.battleState.combatState.charges?.[u.id]?.preparing);
       const ch = snap.units.find(x => x.id === u.id)?.charge;
       view.setFlag(u.id, 't-unit-charge-full', !!(ch && ch.current >= ch.max && shownOf(u).hp > 0));
+      // 灵风术等赋予的飞行状态：头像两侧常驻白色羽翼，飞行到期即收起（天生飞行不显示）
+      view.setFlag(u.id, 't-unit-winged', shownOf(u).hp > 0 && (u.effective?.buffs || []).some(b => b.variant === '飞行' || b.type === '飞行' || b.type === 'flying'));
       if (unitStyles[u.id]) view.setFlag(u.id, unitStyles[u.id].cls, true);
     }
     if (alerted) avHost.sfx('bellPing', 0.36, { category: 'K' });
@@ -1456,13 +1461,12 @@ export function createApp(rootEl, opts = {}) {
     if (kind === 'jump-crouch') { playJumpPool('jc', js.crouchPool, js.crouchVol ?? 0.6, js.rate, 'jumpCrouch'); return; }
     if (kind === 'jump-takeoff') {
       playJumpPool('jt', js.takeoffPool, js.takeoffVol ?? 0.8, js.rate, 'jumpTakeoff');
-      fxNode('t-dust t-dust-light', p.x, p.y + 0.28, 520); fxNode('t-jump-gust', p.x, p.y + 0.2, 480); return;
+      fxNode('t-jump-gust', p.x, p.y + 0.2, 480); return;   // 扬尘由导演 playJumpDust 绘制
     }
     if (kind === 'jump-land') {
       const heavyLand = bigUnit || st.shake;
       playJumpPool('jl', heavyLand ? JUMP_LAND_HEAVY_POOL : js.landPool, heavyLand ? Math.max(0.92, js.landVol ?? 0.88) : (js.landVol ?? 0.82), heavyLand ? [0.85, 0.94] : js.rate, heavyLand ? 'bossStomp' : 'jumpLand');
       fxNode('t-land-ring', p.x, p.y + 0.22, 640);
-      fxNode('t-dust t-dust-big', p.x, p.y + (bigUnit ? 0.6 : 0.3), 620);
       stomp(); return;
     }
     if (kind === 'shove') { ui('shove'); fxNode('t-shove-burst', p.x, p.y, 460); return; }

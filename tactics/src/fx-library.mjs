@@ -958,6 +958,32 @@ export function playPassiveGain(fx, ev, at, sprite) {
 
 // ---------- 敌方局部警报（规则 enemy-alarm）L1：报警者头顶感叹 + 红色波纹按真实警报半径外扩，收报者依距离逐个亮起 ----------
 export const ALARM_AUDIO = ['bowlBronze', 'bellPing'];
+
+// ---------- 起跳 / 落地扬尘（地面层，正常混合：灰土团 + 碎石；落地呈扁平环向外推开） ----------
+function dustPuff(x, y, size, color) {
+  return '<i style="position:absolute;left:' + x.toFixed(1) + 'px;top:' + y.toFixed(1) + 'px;width:' + size.toFixed(1) + 'px;height:' + (size * 0.62).toFixed(1) + 'px;margin:' + (-size * 0.31).toFixed(1) + 'px 0 0 ' + (-size / 2).toFixed(1) + 'px;border-radius:50%;' +
+    'background:radial-gradient(ellipse,' + color + ' 0%,rgba(178,163,136,0.55) 42%,rgba(120,110,95,0.18) 62%,transparent 74%);will-change:transform,opacity;pointer-events:none;"></i>';
+}
+export function playJumpDust(fx, at, { phase, heavy = false, scale = 1 }) {
+  const p = worldPx(at), land = phase === 'land', k = scale * (heavy ? 1.45 : 1);
+  const n = land ? Math.round(14 * (heavy ? 1.4 : 1)) : 8;
+  const puffs = Array.from({ length: n }, (_, i) => {
+    const a = land ? (i / n) * TAU + rnd(-0.2, 0.2) : Math.PI / 2 + rnd(-1.3, 1.3) + (i % 2 ? Math.PI : 0) * 0.5;
+    const d = (land ? rnd(0.55, 1.05) : rnd(0.25, 0.55)) * PX * k;
+    return { x: p.x + Math.cos(a) * 6, y: p.y + Math.sin(a) * 3, dx: Math.cos(a) * d, dy: Math.sin(a) * d * 0.42 - rnd(2, land ? 10 : 6), size: rnd(land ? 26 : 20, land ? 46 : 32) * k, dur: rnd(land ? 600 : 440, land ? 880 : 640), delay: rnd(0, 60) };
+  });
+  // 尘团画在顶层（盖过脚下与地格），碎石留在地面层
+  const layer = fx.top(puffs.map(q => dustPuff(q.x, q.y, q.size, 'rgba(232,220,192,0.95)')).join(''), 960);
+  [...layer.children].forEach((el, i) => { const q = puffs[i];
+    el.animate([{ transform: 'translate(0,0) scale(0.45)', opacity: 1 }, { transform: 'translate(' + (q.dx * 0.6).toFixed(1) + 'px,' + (q.dy * 0.6).toFixed(1) + 'px) scale(1.05)', opacity: 0.9, offset: 0.35 },
+      { transform: 'translate(' + q.dx.toFixed(1) + 'px,' + q.dy.toFixed(1) + 'px) scale(1.45)', opacity: 0 }], { duration: q.dur, delay: q.delay, easing: 'cubic-bezier(0.15,0.7,0.3,1)', fill: 'both' }); });
+  if (!land) return;
+  // 碎石：小颗粒抛起落下
+  const pebbles = Array.from({ length: heavy ? 9 : 6 }, () => { const a = rnd(0, TAU); return { x: p.x, y: p.y, dx: Math.cos(a) * rnd(0.4, 0.9) * PX * k, up: rnd(10, 22) * k, s: rnd(2.5, 4.5) }; });
+  const pl = fx.ground(pebbles.map(q => '<i style="position:absolute;left:' + q.x + 'px;top:' + q.y + 'px;width:' + q.s + 'px;height:' + q.s + 'px;margin:' + (-q.s / 2) + 'px;border-radius:30%;background:#8b7f6a;pointer-events:none;"></i>').join(''), 700);
+  [...pl.children].forEach((el, i) => { const q = pebbles[i];
+    el.animate([{ transform: 'translate(0,0)', opacity: 1 }, { transform: 'translate(' + (q.dx * 0.5).toFixed(1) + 'px,' + (-q.up).toFixed(1) + 'px)', offset: 0.45 }, { transform: 'translate(' + q.dx.toFixed(1) + 'px,2px)', opacity: 0 }], { duration: rnd(460, 620), easing: 'ease-out', fill: 'both' }); });
+}
 export function playEnemyAlarm(fx, ev, centerOf) {
   const b = worldPx(ev.center), R = ev.radius * PX;
   fx.sfx('bowlBronze', 0.36);
@@ -1304,18 +1330,51 @@ const curseBeam = {
 };
 
 const reactionKanpo = {
-  id: 'reaction-kanpo', kind: 'reaction', grade: 'L1', fxTags: ['看破'],
-  timeline: { totalMs: 420, fullscreen: false, darken: false },
-  cues: [{ key: 'kanpo', vol: 0.34 }],
+  // 原版 playKanpoEffect（index.html）移植到世界层：压暗 + 来袭者锁定 → 看破者金色之眼 + 金流射向来袭者 →
+  // 金环汇聚 + 金屑迸射 → 斜斩 + 「无效化」印章 + 暖白闪 + 震屏；尺寸按头像（PX）而非屏幕像素
+  id: 'reaction-kanpo', kind: 'reaction', grade: 'identity', fxTags: ['看破'], reuseAudio: true,
+  timeline: { totalMs: 1410 },
+  cues: [{ key: 'kanpo', vol: 1 }],
   prepareKeys() { return ['kanpo']; },
   async play(ctx) {
-    const p = ctx.placement(); if (!p) return true;
-    const c = worldPx(unitCenter(p, ctx.footprint));
-    ctx.fx.sfx('kanpo', 0.34);
-    ctx.fx.top(ringHtml(c.x, c.y, 96, 'rgba(253,224,71,0.9)', 'rgba(245,158,11,0.45)'), 380)
-      .firstChild.animate([{ transform: 'scale(0.3)', opacity: 1 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: 360, fill: 'forwards' });
-    floatText(ctx.fx, c.x, c.y - 36, '⛔ 看破!', '#fef08a', '#92400e', { ms: 420, size: 14 });
-    return ctx.wait(380);
+    const { fx } = ctx;
+    const hp = ctx.centerOf(ctx.responderId), ep = ctx.attackerId && ctx.centerOf(ctx.attackerId);
+    if (!hp) return true;
+    const h = worldPx(hp), e = ep ? worldPx(ep) : { x: h.x, y: h.y - 2 * PX };
+    const pop = (html, ms, frames, o = {}) => fx.top(html, ms).firstChild.animate(frames, Object.assign({ duration: ms, fill: 'forwards' }, o));
+    const svgAt = (x, y, size, vb, body, glow) => '<svg viewBox="' + vb + '" width="' + size + '" height="' + size + '" style="position:absolute;left:' + x + 'px;top:' + y + 'px;transform:translate(-50%,-50%);overflow:visible;filter:drop-shadow(0 0 ' + glow + 'px rgba(245,158,11,0.9));">' + body + '</svg>';
+    const T = (s, o = 1, extra = '') => ({ transform: 'translate(-50%,-50%) ' + extra + ' scale(' + s + ')', opacity: o });
+    // ① 压暗（锚在来袭者）+ 来袭者锁定环
+    worldDarken(fx, e, { holeR: 1.6 * PX, inMs: 250, holdMs: 900, outMs: 260, peak: 0.5 });
+    const lock = svgAt(e.x, e.y, 3 * PX, '0 0 100 100', '<circle cx="50" cy="50" r="42" stroke="#fbbf24" stroke-width="3" fill="none" stroke-dasharray="10 8"/>' +
+      '<path d="M30,50 L45,50 L45,35 L55,35 L55,50 L70,50 M50,50 L50,62" stroke="#fde68a" stroke-width="7" stroke-linecap="round" fill="none"/><circle cx="50" cy="62" r="8" fill="none" stroke="#fff7ed" stroke-width="2"/>', 18);
+    pop(lock, 900, [T(0.8, 0), T(1.1, 1, 'rotate(20deg)'), T(1.05, 1, 'rotate(60deg)'), T(1.2, 0, 'rotate(80deg)')]);
+    // ② 看破者头顶金色之眼 + 文字
+    const eye = svgAt(h.x, h.y - 1.7 * PX, 2.5 * PX, '0 0 120 120', '<defs><radialGradient id="kpg' + fx.uid() + '"><stop offset="0" stop-color="#fff7ed"/><stop offset=".45" stop-color="#fbbf24" stop-opacity=".85"/><stop offset="1" stop-color="#f59e0b" stop-opacity="0"/></radialGradient></defs>' +
+      '<circle cx="60" cy="60" r="52" fill="#fbbf2433"/><path d="M14,60 Q34,28 60,28 Q86,28 106,60 Q86,92 60,92 Q34,92 14,60 Z" fill="#78350f" stroke="#fbbf24" stroke-width="4"/>' +
+      '<circle cx="60" cy="60" r="24" fill="#fde68a" stroke="#fff7ed" stroke-width="3"/><circle cx="60" cy="60" r="8" fill="#fff7ed"/><path d="M38,60 Q48,52 60,52 Q72,52 82,60" stroke="#f59e0b" stroke-width="3" fill="none" opacity=".9"/>', 22);
+    pop(eye, 1000, [T(0.4, 0), T(1.15, 1), T(0.95, 1), T(1.15, 0.9), T(1.3, 0)], { easing: 'ease-out' });
+    floatText(fx, h.x, h.y - 3.1 * PX, '看破识破！', '#fde68a', '#f59e0b', { ms: 1000, size: 15 });
+    // 金流：看破者 → 来袭者（沿连线带扰动的金屑）
+    particles(fx, Array.from({ length: 28 }, (_, i) => { const t = i / 28, x = h.x + (e.x - h.x) * t + rnd(-17, 17), y = h.y + (e.y - h.y) * t + rnd(-17, 17);
+      return { x, y, dx: (e.x - x) * rnd(0.35, 0.7), dy: (e.y - y) * rnd(0.35, 0.7), size: rnd(6, 11), color: pick(['#fbbf24', '#f59e0b', '#fde68a']), core: '#fff7ed', s0: 1, s1: 0.4, dur: rnd(520, 840), delay: t * 120 }; }), 1000);
+    if (!(await ctx.wait(430))) return false;
+    // ③ 金环汇聚 + 金屑迸射
+    pop(svgAt(e.x, e.y, 2.6 * PX, '0 0 100 100', '<circle cx="50" cy="50" r="30" stroke="#fbbf24" stroke-width="4" fill="none"/><circle cx="50" cy="50" r="42" stroke="#fde68a" stroke-width="2" fill="none" stroke-dasharray="6 6"/>', 22),
+      700, [T(0.6, 0.9), T(2.2, 0)], { easing: 'ease-out' });
+    particles(fx, Array.from({ length: 38 }, () => { const a = rnd(0, TAU), d = rnd(0.6, 2) * PX; return { x: e.x + rnd(-12, 12), y: e.y + rnd(-12, 12), dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(6, 11), color: pick(['#fbbf24', '#f59e0b', '#fde68a']), core: '#fff7ed', s0: 1, s1: 0.3, dur: rnd(420, 800) }; }), 900);
+    if (!(await ctx.wait(260))) return false;
+    // ④ 斜斩 + 无效化印章 + 暖白闪 + 震屏（原版 playKanpoSound）
+    fx.sfx('kanpo', 1); fx.shake('medium');
+    pop('<i style="position:absolute;left:' + e.x + 'px;top:' + e.y + 'px;width:' + 8 * PX + 'px;height:' + 8 * PX + 'px;margin:' + (-4 * PX) + 'px 0 0 ' + (-4 * PX) + 'px;border-radius:50%;background:radial-gradient(circle,rgba(255,237,213,0.9),rgba(251,191,36,0.35) 45%,transparent 75%);mix-blend-mode:screen;"></i>',
+      450, [{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 0 }]);
+    pop(svgAt(e.x, e.y, 3.6 * PX, '0 0 100 100', '<path d="M10,90 L90,10" stroke="#f59e0b" stroke-width="8" stroke-linecap="round" fill="none"/><path d="M22,90 L95,17" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" fill="none" opacity=".9"/>', 18),
+      550, [T(0.2, 1), Object.assign(T(1.15, 1), { offset: 0.35 }), T(1.4, 0)], { easing: 'ease-out' });
+    pop(svgAt(e.x, e.y - 0.9 * PX, 3 * PX, '0 0 100 100', '<path d="M50,12 L58,42 L88,50 L58,58 L50,88 L42,58 L12,50 L42,42 Z" fill="#fbbf24" opacity=".9"/><path d="M42,50 L70,50 L55,65 L50,48 L62,38 Z" fill="#fff7ed" opacity=".95"/>' +
+      '<path d="M24,24 L38,38 M62,62 L76,76 M24,76 L38,62 M62,38 L76,24" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" opacity=".8"/>', 24), 800, [T(0.4, 0), T(1.15, 1), T(1.05, 1), T(1.35, 0)], { easing: 'ease-out' });
+    floatText(fx, e.x, e.y - 2.6 * PX, '无效化', '#fde68a', '#f59e0b', { ms: 800, size: 17 });
+    floatText(fx, e.x, e.y - 1.4 * PX, '技能无效化！', '#fcd34d', '#92400e', { ms: 900, size: 13, delay: 120 });
+    return ctx.wait(720);
   },
 };
 

@@ -138,12 +138,17 @@ export function buildShell(root) {
   }
 
   // ---------- 我方卡片 ----------
+  // 布局：头像 + 名字/职业 + HP 条（数值与护盾写在条内）+ MP/TP 双条（各带数值）；底行五项有效属性（相对基础值着色，悬停看构成）
+  const STAT_KEYS = [['atk', '攻', '攻击'], ['def', '防', '防御'], ['hit', '命', '命中'], ['eva', '避', '回避'], ['spd', '速', '速度']];
   function cardHtml(u) {
+    const res = (cls, label) => '<span class="t-hero-res ' + cls + '"><span class="t-hero-res-h"><em>' + label + '</em><b></b></span><i class="t-bar"><i class="t-bar-fill"></i></i></span>';
     return '<button class="t-hero-card" data-unit-id="' + ESC(u.id) + '">' + faceHtml(u, 't-hero-avatar') +
-      '<span class="t-hero-info"><span class="t-hero-row"><b>' + ESC(u.name) + '</b><em class="t-hero-hpnum"></em></span>' +
-        '<i class="t-bar t-bar-hp"><i class="t-bar-ghost"></i><i class="t-bar-fill"></i><i class="t-bar-shield"></i></i>' +
-        '<i class="t-bar t-bar-mp"><i class="t-bar-fill"></i></i>' +
-      '</span><span class="t-card-turn">行动中</span><span class="t-hero-status"></span></button>';
+      '<span class="t-hero-info"><span class="t-hero-row"><b title="' + ESC(u.name) + '">' + ESC(u.name) + '</b>' + (u.classType ? '<em class="t-hero-cls">' + ESC(u.classType) + '</em>' : '') + '</span>' +
+        '<i class="t-bar t-bar-hp"><i class="t-bar-ghost"></i><i class="t-bar-fill"></i><i class="t-bar-shield"></i><span class="t-hero-hpnum"></span></i>' +
+        '<span class="t-hero-res2">' + res('t-res-mp', 'MP') + res('t-res-tp', 'TP') + '</span>' +
+      '</span>' +
+      '<span class="t-hero-stats">' + STAT_KEYS.map(([k, n]) => '<span class="t-hs" data-k="' + k + '"><em>' + n + '</em><b>-</b></span>').join('') + '</span>' +
+      '<span class="t-card-turn">行动中</span><span class="t-hero-status"></span></button>';
   }
   // 英雄卡状态徽章（卡片上沿外侧一行，完整文案）
   function setHeroStatus(id, html) {
@@ -189,8 +194,17 @@ export function buildShell(root) {
     if (shield < (card._shield || 0)) { sh.classList.remove('t-bar-shield-hit'); void sh.offsetWidth; sh.classList.add('t-bar-shield-hit'); }
     card._shield = shield;
     sh.style.left = w; sh.style.width = shW;
-    card.querySelector('.t-bar-mp .t-bar-fill').style.width = pct(bars.mp, bars.maxMp) + '%';
-    card.querySelector('.t-hero-hpnum').innerHTML = Math.max(0, Math.round(bars.hp)) + '<small>/' + bars.maxHp + '</small>' + (shield > 0 ? '<b class="t-hero-shnum">🔰' + Math.round(shield) + '</b>' : '');
+    // MP / TP：数值随条显示（TP 上限缺省 100）
+    const ref = (state.units || []).find(u => u.id === id)?.ref || {};
+    const setRes = (cls, v, max) => {
+      const box = card.querySelector('.' + cls);
+      box.querySelector('.t-bar-fill').style.width = pct(v, max) + '%';
+      flashNum(box.querySelector('b'), Math.max(0, Math.round(v)), '<small>/' + max + '</small>');
+    };
+    setRes('t-res-mp', bars.mp ?? ref.mp ?? 0, bars.maxMp || 0);
+    setRes('t-res-tp', bars.tp ?? ref.tp ?? 0, ref.maxTp || 100);
+    card.querySelector('.t-hero-hpnum').innerHTML = '<b>' + Math.max(0, Math.round(bars.hp)) + '</b><small>/' + bars.maxHp + '</small>' + (shield > 0 ? '<em class="t-hero-shnum">+' + Math.round(shield) + '</em>' : '');
+    card.classList.toggle('t-shielded', shield > 0);
     card.classList.toggle('t-low', bars.hp > 0 && bars.hp / bars.maxHp <= 0.3);
     clearTimeout(ghost._t);
     if (instant) { ghost.style.transition = 'none'; ghost.style.width = w; }
@@ -198,6 +212,28 @@ export function buildShell(root) {
     if (hit) { card.classList.remove('t-card-hit'); void card.offsetWidth; card.classList.add('t-card-hit'); }
     if (heal) { card.classList.remove('t-card-heal'); void card.offsetWidth; card.classList.add('t-card-heal'); }
     card.classList.toggle('t-down', bars.hp <= 0);
+  }
+  // 数值变化时闪一下（升绿降紫）；首次写入不闪
+  function flashNum(el, value, tail = '') {
+    const prev = el._v;
+    el._v = value;
+    el.innerHTML = value + tail;
+    if (prev == null || prev === value) return;
+    el.classList.remove('t-num-up', 't-num-down'); void el.offsetWidth;
+    el.classList.add(value > prev ? 't-num-up' : 't-num-down');
+  }
+  // 卡片属性行：有效值相对基础值着色；悬停显示 基础 ± 加成
+  function setHeroStats(id, eff, base) {
+    const card = cardOf(id);
+    if (!card || !eff) return;
+    for (const [k, , title] of STAT_KEYS) {
+      const now = k === 'eva' ? (eff.evasion || 0) + eff.eva : eff[k];
+      const b0 = k === 'eva' ? (eff.evasion || 0) + (base?.eva || 0) : base?.[k];
+      const chip = card.querySelector('.t-hs[data-k="' + k + '"]'), d = b0 == null ? 0 : now - b0;
+      flashNum(chip.querySelector('b'), now);
+      chip.classList.toggle('t-up', d > 0); chip.classList.toggle('t-down', d < 0);
+      chip.title = title + ' ' + now + (d ? '（基础 ' + b0 + ' ' + (d > 0 ? '+' : '') + d + '）' : '');
+    }
   }
   function markCards() {
     els.heroes.querySelectorAll('.t-hero-card').forEach(c => {
@@ -633,7 +669,7 @@ export function buildShell(root) {
 
   return {
     destroy: () => { clearTimeout(showLog._t); clearTimeout(showBanner._t); rpgUi.hideTagTip(); document.removeEventListener('mousedown', onComboDown); reactionPrompt.cancel(); state.onReset = null; state.onUnitClick = null; root.replaceChildren(); },
-    els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setHeroStatus, flashHeroPassive, showInspector, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
+    els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setHeroStatus, setHeroStats, flashHeroPassive, showInspector, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
     previewMoveCost, previewPips, openModal, closeModal,
     promptReaction: (req) => reactionPrompt.prompt(req), cancelReactionPrompt: () => reactionPrompt.cancel(),
     getSafeRect, showLog, openPanel, closePanel, openResult, clearBattle, closeSubmenu: () => {},

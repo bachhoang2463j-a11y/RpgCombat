@@ -11,7 +11,7 @@ import { playPathMotion, pathSegments, pointAtDistance } from './motion.mjs';
 import { unitCenter } from './geometry.mjs';
 import { createFxRegistry, actionInput, reactionInput, prepareInput } from './fx-registry.mjs';
 import { registerDefaultFx, EXTRA_AUDIO, fogFieldHtml, animateFogField, elementFieldHtml, animateElementField,
-  playRegionPulse, REGION_PULSE_AUDIO, playPassiveGain, PASSIVE_AUDIO, playEnemyAlarm, ALARM_AUDIO } from './fx-library.mjs';
+  playRegionPulse, REGION_PULSE_AUDIO, playPassiveGain, PASSIVE_AUDIO, playEnemyAlarm, ALARM_AUDIO, playJumpDust } from './fx-library.mjs';
 import { createVfxHost } from './vfx-host.mjs';
 import { skillSlots } from './effect-definitions.mjs';
 import { startAtmos, atmosStyleOf } from './screen-atmos.mjs';
@@ -118,10 +118,12 @@ export function createActionDirector(deps) {
     view.setFlag(id, 't-unit-jumping', true);
     view.setDisplayFacing(id, facingOf(a, b));
     const H = Math.min(96, 28 + res.distance * 11), T = Math.min(920, 340 + res.distance * 75);
+    const heavyDust = fp.width > 1 || fp.height > 1 || !!deps.getUnitStyle?.(id)?.shake, dustK = Math.max(fp.width, fp.height);
     feedback(id, 'jump-crouch', a);
     let ok = await tween(150, t => view.setHop(id, 0, 1 - 0.24 * Math.sin(t * Math.PI / 2)));
     if (ok) {
       feedback(id, 'jump-takeoff', a);
+      playJumpDust(makeFx('C'), { x: a.x, y: a.y + 0.28 * dustK }, { phase: 'takeoff', heavy: heavyDust, scale: dustK });
       ok = await tween(T, t => {
         const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
         view.setDisplayPos(id, x, y);
@@ -133,6 +135,7 @@ export function createActionDirector(deps) {
     view.setDisplayPos(id, b.x, b.y);
     if (ok) {
       feedback(id, 'jump-land', b);
+      playJumpDust(makeFx('C'), { x: b.x, y: b.y + 0.28 * dustK }, { phase: 'land', heavy: heavyDust, scale: dustK });
       ok = await tween(230, t => view.setHop(id, 0, t < 0.3 ? 1 - 0.28 * (t / 0.3) : 0.72 + 0.28 * ((t - 0.3) / 0.7)));
     }
     view.setHop(id, 0, 1);
@@ -442,7 +445,7 @@ export function createActionDirector(deps) {
       if (guard) revealRule(guard, 'guard');
       const segmentReactions = [];
       const reaction = seg.reaction || (done.size === 1 ? h.reaction : null);
-      if (reaction && !reaction.guard) segmentReactions.push(playReaction({ ...h, reaction }));
+      if (reaction && !reaction.guard) segmentReactions.push(playReaction({ ...h, reaction, attackerId: result.casterId }));
       const guardianReaction = seg.guardianReaction || reaction?.guardianReaction;
       if (guardianReaction) segmentReactions.push(playReaction({ ...h, targetId: guardianReaction.responderId || h.targetId, reaction: guardianReaction }));
       reactionRuns.push(...segmentReactions);
@@ -949,7 +952,7 @@ export function createActionDirector(deps) {
     if (!(await prepareAudio(entry.prepareKeys ? entry.prepareKeys({}) : []))) return false;
     return entry.play({
       hitTargetId: h.targetId, reaction, shift: reaction.shift, footprint: fp, view, sandbox, av,
-      fx: makeFx('B'), wait, tween,
+      fx: makeFx('B'), wait, tween, centerOf, responderId: reaction.responderId || h.targetId, attackerId: h.attackerId || null,
       cameraScale: () => sandbox.getPose().scale,
       placement: () => getViewData().placementsById[h.targetId],
     });

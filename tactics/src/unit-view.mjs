@@ -39,6 +39,15 @@ function escapeHtml(s) {
 
 export function avatarScaleForZoom(scale) { return 1 / Math.min(1, scale); }
 
+// 飞行羽翼（灵风术收尾白翼的常驻版）：同原版三排羽片几何，单侧画好后镜像；尺寸随头像（--d），随头像远景反缩放，不随地图形变
+const WINGS_HTML = (() => {
+  const feather = (rx, ry, rot, L, wd, op) => '<path d="M0,0 Q' + wd + ',' + (-L * 0.55).toFixed(1) + ' 0,' + (-L).toFixed(1) + ' Q' + (-wd) + ',' + (-L * 0.55).toFixed(1) + ' 0,0 Z" transform="translate(' + rx.toFixed(1) + ',' + ry.toFixed(1) + ') rotate(' + rot.toFixed(1) + ')" fill="rgba(255,255,255,' + op + ')" stroke="rgba(255,255,255,0.85)" stroke-width="1"/>';
+  const side = [[0, 11, 135, 13, 0.32], [1, 9, 95, 12, 0.42], [2, 7, 60, 10, 0.56]].map(([row, n, Lmax, wd, op]) =>
+    Array.from({ length: n }, (_, i) => { const k = i / (n - 1); return feather(12 + k * (30 - row * 6), -row * 6 - k * 14, 8 + k * 72, Lmax * (1 - k * 0.38), wd, op); }).join('')).join('');
+  return '<i class="t-unit-wings" aria-hidden="true"><svg viewBox="-165 -150 330 200">' +
+    [-1, 1].map(sg => '<g transform="scale(' + sg + ',1)"><g class="t-wing">' + side + '</g></g>').join('') + '</svg></i>';
+})();
+
 export function createUnitView(parent, deps) {
   const { scope, metersPerArtPx, onAvatarStatus } = deps;
   const Q = 1 / metersPerArtPx;
@@ -77,7 +86,7 @@ export function createUnitView(parent, deps) {
     billboard.innerHTML =
       '<div class="t-unit-name">' + escapeHtml(unit.name) + '</div>' +
       '<div class="t-unit-sprite" data-arcane-target-id="' + escapeHtml(unit.id) + '" style="--d:' + d + 'px;">' +
-        '<div class="t-unit-medal">' + face +
+        '<div class="t-unit-medal">' + WINGS_HTML + face +
           '<i class="t-unit-shield" aria-hidden="true"></i>' +
           (unit.side === 'enemy' ? '<b class="t-unit-alert" title="预警" aria-label="预警">!</b>' : '') +
           '<svg class="t-unit-direction" viewBox="-30 -30 60 60" aria-hidden="true"><path d="M0,-29 L6.5,-19.5 L0,-22 L-6.5,-19.5 Z"/></svg>' +

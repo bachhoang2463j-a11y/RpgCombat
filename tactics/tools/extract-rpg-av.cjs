@@ -485,6 +485,14 @@ ${supportBranches.join('\n').replace('else if', 'if')}
   mod = patch(mod, "return dom.querySelector('.portrait')", "return dom.querySelector('.t-unit-avatar') || dom.querySelector('.t-unit-medal') || dom.querySelector('.portrait')", 1, '毅力血幕挂圆形棋子内框');
   mod = patch(mod, 'ghost.innerHTML = cloneVisualOnly(dom);', "ghost.innerHTML = cloneVisualOnly(dom);\n        ghost.style.setProperty('--d', rect.w + 'px'); ghost.style.borderRadius = '50%';", 1, '致命回避残影保留圆形尺度');
   mod = patch(mod, 'g.innerHTML = fromDom.innerHTML.replace(/ id="[^"]*"/g, \'\');', "g.innerHTML = fromDom.innerHTML.replace(/ id=\"[^\"]*\"/g, '');\n                    g.style.setProperty('--d', fromRect.w + 'px'); g.style.borderRadius = '50%';", 1, '反击残影保留圆形尺度');
+  // 灵风术：原版法阵按整屏 vmax 取尺寸、透视原点在容器中心；战棋舞台=整张地图且随镜头缩放，
+  // 改为以施术者头像为尺度（法阵≈4.2 倍头像、羽毛环绕≈3.5/2.1 倍），透视原点钉在法阵自身，收尾羽翼同尺度
+  mod = patch(mod, 'const c = ctr(el), vmax = Math.max(__STAGE.w, __STAGE.h), SZ = vmax * 0.55;',
+    'const c = ctr(el), vmax = c.h * 7, SZ = c.h * 4.2;', 1, '灵风术法阵按头像尺度');
+  mod = patch(mod, 'const rose = fsLayer(`<div style="position:absolute; inset:0; perspective:900px;">',
+    'const rose = fsLayer(`<div style="position:absolute; inset:0; perspective:${SZ * 3}px; perspective-origin:${c.x}px ${c.bottom - 6}px;">', 1, '灵风术法阵透视原点钉在阵心');
+  mod = patch(mod, 'top:${c.y - 6}px; width:330px; height:200px; animation: arcane-wing-glyph',
+    'top:${c.y - 6}px; width:${c.h * 3.3}px; height:${c.h * 2}px; animation: arcane-wing-glyph', 1, '灵风术收尾羽翼按头像尺度');
 
   const stubText = STUBS.map(n => 'function ' + n + '() { /* 未迁移段：本 Demo 不产生该状态 */ }').join('\n');
   // 2d) 强力反击专属音效 URL 与精确演出源段（不连带近/远程重击函数）
