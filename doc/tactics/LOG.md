@@ -793,3 +793,9 @@
 - 决策：三档种子地图与新场景ID隔离旧存档，默认小档礼拜堂；地形连段按种子八向，阶梯形占格与表现一致，保留中央2格通路。四角2×2石柱实挡且另计，南北门阶仅装饰。双方开局已知位置，不跑普通接战警戒及发现停步；保留合法遮挡、技能雾及独立旧夹具（`?demo=chapel`）。
 - 验证：追加连体障碍前唯一源码全量 43 阶段 1293/1293；追加后仅复跑受影响的 arena（139/139）、p02/p05、typical-space/AI/battle 与 alerts，全部通过。当前产物 59 模块、44 入包断言、66/66 产物专项，SHA-256 `0f2125c2b4e95c2a259623b05e2e88363b2ca3446c22c96aa0d626fedd36853c`。IAB 真页实测敌方开战、索恩反应扣费、玛德琳移动2米（8→6）及重置恢复资源，截图核对场景构件。未验真酒馆/安卓或完成整局，不更新根 README。
 - 目的 vs 现状：一致；该单文件是下一阶段的开发基线，友军穿弹、掩护、扩距舍身、借机、双跳、破墙、集火和 Charge 意向仍未接入。
+## 2026-11-27 · 单房间礼拜堂重设计为大档教堂中殿（9a709ce）
+- 核心目的：单房间 Demo 宽松容纳 10 名角色（含两名 2×2），一眼可辨为教堂，障碍错落有战术层次，美术对齐旧三层图。
+- 文件：`tactics/src/{generation,scene,chapel-art,scenario-data}.mjs`、`tactics/{DEMO.md,mvp-standalone.html}`、`tactics/tools/verify-typical-artifact.cjs`、`integration-test/fixtures/tactics/{arena-node-cases.mjs,reports/TYPICAL-BATTLE-artifact.json}`、`doc/tactics/{SPEC,PLAN,STATUS}.md`。
+- 决策：`chapel` 固定大档 32×26 骨架、忽略档位，不再走随机八向连段（stone/wild/courtyard 保持原随机障碍）。北端抬高圣坛（祭坛、双烛台、布道坛+读经台按种子左右互换，后墙三扇彩窗投光）；中殿左右 7 排长椅夹 2 格红毯中道，逐条按种子完整/缩短/外移/推向中道/倾倒/断裂/缺失；侧廊 6 根立柱，靠墙 4 槽位每侧不重复抽取告解亭/圣器柜/圣像/石棺/挂毯；南墙双开大门（装饰，规则仍为墙）、门内圣水池与靠墙长凳。新增 kind：pulpit/lectern/candelabra/font（低）、confessional/cabinet（高）、dais/apse/chapelDoor（装饰），删除 chapelSteps。敌方开战带在圣坛台阶前（行 6–7），我方在中殿后段（行 19–20）。objectsIndex 透传 side/variant（顺带修正旧三层图东侧挂毯贴错墙）。新场景 ID `sc-chapel-nave`，避开本地存档里的旧单房间布局。
+- 验证：相关阶段 arena 140、p02 70、p05 10、typical-space/ai/battle 与 alerts 通过；唯一一次全量 43 阶段 1416/1416。单文件 59 模块/44 入包断言，产物专项 66/66，SHA-256 `51a908fba55b95eadd57262467d5684f4e29cefd9e2eced7be35d8e499896158`。真页实测：大档礼拜堂渲染正确，开局敌方先手与反应窗口正常，玛德琳真实点击移动（列 20→22），雕像格提示无法到达。
+- 目的 vs 现状：一致；开局高敏敌人多动+群攻跨中殿仍能先手重创我方（旧平衡问题，本轮未动）。
