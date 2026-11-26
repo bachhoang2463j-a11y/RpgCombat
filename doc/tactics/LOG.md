@@ -533,3 +533,15 @@
 - 页面：IAB打开本轮HTTP单文件，权威典型对局敌方风雪狂暴完成后进入玛德琳回合；辅助菜单选无迹可寻、Enter确认，MP14→12、aux1→0、TP0→5、嘲讽40→10及回避+10真实落地，busy=false、结束回合按钮可用。AudioContext running；hide与move_enemy_elite_glide在既有资源服均报告ok。未操作真实酒馆、未做真Chrome动画/最终听感或安卓测试，临时标签与本轮服务已关闭。
 - 其他被动核对：暗袭近战/剑/刺候选差异在战棋解析器仅近战/远程/法术的有效输入下不成立；灾厄使未计入时钟眩晕的每项+15%增伤、施法者开场盾缺原版重复初始化去重仍是两项差异（重复调用50%MP盾实测50→100）。按已批准方案仅报告，不夹带扩大规则修复；再动→行动点、回合窗口→时钟、前后排取消保持战棋设计适配。
 - 目的 vs 现状：五项修复已落地并通过单文件规则及真实交互；完整动画观感/最终听感等待用户正常浏览器复测，另两项被动差异待单独决定。README/SPEC未改，无关未跟踪文件未纳入提交。
+
+## 2026-11-26 · 隐匿即时阈值、主行动数字与多目标辅助错峰（add6bdd）
+- 核心目的：解释截图永久/临时隐匿两徽章，确认80额外主点/100单次+50并回50与主点UI正常；对照原版加快多目标SVG整体演出，不再逐个等待完整余波。
+- 文件：tactics/src/{battle,effect-handlers,fx-library,status-ui,ui-shell}.mjs；tactics/tools/{run-tests,verify-feedback-artifact,verify-typical-artifact}.cjs；tactics/mvp-standalone.html；integration-test/fixtures/tactics/{stealth-threshold,p07av-fx,fx01}-node-cases.mjs 与 reports/{TYPICAL-BATTLE,GUARD-BARRIER}-artifact.json。
+- 对照修正：截图永久隐匿60+临时隐匿30应合算90，但战棋effect-handlers漏了原版index L21329临时负嘲讽的即时阈值检查；上一轮将原版辅助SVG误判为等待完整句柄串行，现确认playSVGEffect自行收尾，executeSkillAction L25009仅多目标间隔200ms。
+- 规则/UI：taunt成功注册后经rt.checkStealthThresholds接现有class-passives/passiveIo，涨落统一检查；80每循环只加一次主点，100授予急袭、清负taunt并回50，不改算法或阈值数值。有效buff快照补isConcealAtk；既有徽章明确永久/临时隐匿及合算值，急袭+50·1次独立于普通增攻；既有资源条主按钮显示主N，与pips读取同一余额。14专项覆盖79/80/99/100、跌回79解锁、非当前待领取、同技能新急袭保留、真实两次攻击2→1→0及第三次禁止、徽章和真实renderStrip模板。
+- 演出：playSupportEffects按后端条目次序启动，跨目标200/1.5约133ms、同目标及溢出转盾1ms；句柄余波重叠，整组末尾Promise.all统一等待，不逐项await733ms。任一句柄失败或错峰等待取消均停止全部已启动句柄。旧测试改用非立即完成句柄，验证B在A结束前启动、时长不逐人累加、独立揭示及两类取消。
+- 验证：相关阈值14、错峰7、UI22、职业反击35、前轮反馈17、RULES02-PASSIVE24、P03时钟58及p07-av-fx45通过。只启动一次--all，在FX01旧全1ms串行断言失败中断；按新节奏修正断言后定向复跑FX01 49与未执行RULES02 32/被动24/独立17，全注册组累计覆盖1204通过，未再次--all、不把初次中断写为一次全量全绿。独立只读审查无可确证阻断；语法/diff --check通过。
+- 产物：当前源码重建1,635,427 B、58模块/42必需输入/110关键符号，sha256 5113acaef535014f96ea3e1ea845e60271eb65837f153e60221ebda9a2e3fead；零外部import/单script及专项33+13通过。真实产物createBattle接入前轮17与本轮11个后端用例共28通过；3个UI模板用例只计源码回归，未冒充产物GUI验证。
+- IAB实测：最终单文件权威典型局，辅助菜单选择寂静指令、地图点玛德琳选中2目标、Enter施放；四次真实SVG/音色启动相对首项0/136/276/413ms，各句柄735/739/737/736ms，B确在A结束前启动，整组1149ms完成并busy=false。不是仅测参数。截图显示永久隐匿来源与主1。
+- 验证边界：重开按钮定位器两次超时后按规则改用原有restart回调；之后IAB重开/刷新停在敌方回合busy=true。另用原样本只改玛德琳敏捷为300的玩家先行受控夹具仍未完成入场等待；已恢复原默认单文件。真实点击/既有unlockAudio回调后117音频均ok、unlocked=true，仍未继续，未归因或为此改生产代码。连续主点完整GUI流程及正常Chrome动画待用户复测；不宣称该GUI门禁全绿。本轮临时标签与本机服务已关闭。
+- 目的 vs 现状：隐匿完整生效链路及主点模板通过规则回归，多目标整体节奏已在最终产物实测加快；连续主点GUI和真Chrome观感仍有验证缺口。未改根index/README/SPEC，无关未跟踪文件不提交。
