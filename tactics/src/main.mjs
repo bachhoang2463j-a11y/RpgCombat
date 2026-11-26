@@ -636,24 +636,26 @@ export function createApp(rootEl, opts = {}) {
   function shortLabel(reason) { return /主行动/.test(reason) ? '◆ 主行动已用完' : reason; }
   function syncDynamicUnits(snap) {
     if (!currentViewData || !snap || !Array.isArray(snap.units)) return;
-    const known = new Set(currentViewData.units.map(u => u.id));
+    const existing = new Map(currentViewData.units.map(u => [u.id, u]));
     for (const su of snap.units) {
-      if (known.has(su.id)) continue;
+      if (unitStyles[su.id]) continue;
       const full = battle.ctx.units.find(x => x.id === su.id);
       if (!full) continue;
       const styled = resolveUnitStyles([full])[full.id];
       unitStyles[full.id] = styled;
-      const viewUnit = Object.assign({}, full, {
-        avatarUrl: styled.avatarUrl, emoji: styled.emoji, color: styled.color,
+      const avatarUrl = full.avatarUrl || resolveAvatarUrl(full, heroAvatarUrl);
+      const emoji = full.emoji || splitEmojiName(full.portraitName || full.name).emoji || (full.isSummon && !avatarUrl ? '🔮' : null);
+      const present = existing.get(full.id);
+      const viewUnit = Object.assign(present || {}, full, {
+        avatarUrl, emoji, color: styled.color,
         bars: { hp: full.ref.hp, maxHp: full.ref.maxHp, mp: full.ref.mp, maxMp: full.ref.maxMp },
         effective: battle.getEffectiveUnit(full.id),
       });
-      currentViewData.units.push(viewUnit);
+      if (!present) currentViewData.units.push(viewUnit);
       currentViewData.footprintsById[full.id] = full.footprint || { width: 1, height: 1 };
       const pos = snap.positions?.[full.id] || battle.ctx.placementsById[full.id];
       if (pos) currentViewData.placementsById[full.id] = { col: pos.col, row: pos.row, facing: pos.facing || 0 };
       shown.set(full.id, { hp: full.ref.hp, mp: full.ref.mp, tp: full.ref.tp || 0, shield: full.ref.shield || 0 });
-      known.add(full.id);
     }
   }
   function refreshBattle() {
@@ -669,6 +671,7 @@ export function createApp(rootEl, opts = {}) {
     for (const u of currentViewData.units) {
       view.setFlag(u.id, 't-unit-down', shownOf(u).hp <= 0);
       view.setFlag(u.id, 't-unit-current', u.id === snap.currentId && !snap.terminal);
+      view.setFlag(u.id, 't-unit-alert-pending', u.effective?.alertState === 'pending' && shownOf(u).hp > 0 && !snap.terminal);
       view.setFlag(u.id, 't-unit-channel', !!battle.battleState.combatState.charges?.[u.id]?.preparing);
       const ch = snap.units.find(x => x.id === u.id)?.charge;
       view.setFlag(u.id, 't-unit-charge-full', !!(ch && ch.current >= ch.max && shownOf(u).hp > 0));

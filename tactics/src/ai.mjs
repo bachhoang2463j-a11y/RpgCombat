@@ -146,14 +146,14 @@ function buffAtLeast(ctx, targetId, slot) {
 }
 
 // 任一槽的实际目标（纯减益无 damageTargetIds，必须走 slotTargets）
-function evaluateQuery(ctx, unit, skill, query) {
+function evaluateQuery(ctx, unit, skill, query, disclosed) {
   const slots = skillSlots(skill);
   let score = 0;
   for (const st of (query.slotTargets || [])) {
     const slot = slots.find(s => s.index === st.index);
     if (!slot) continue;
     const def = slot.definition || {};
-    const targets = st.targetIds || [];
+    const targets = disclosed ? (st.targetIds || []).filter(id => disclosed.has(id)) : (st.targetIds || []);
     if (def.kind === 'attack') {
       const barrierIds = new Set(st.barrierIds || []);
       for (const tid of targets) {
@@ -254,7 +254,7 @@ export function chooseTauntTarget(ctx, unit, targets, random = ctx.random || Mat
   return targets[targets.length - 1];
 }
 
-function searchBest(ctx, unit, skills, budget, enemies, allies) {
+function searchBest(ctx, unit, skills, budget, enemies, allies, tracking) {
   const reach = findReachable(ctx, unit.id, budget);
   const cells = reach.cells.slice().sort(cmpCell);
   const start = ctx.placementsById[unit.id];
@@ -309,7 +309,10 @@ function searchBest(ctx, unit, skills, budget, enemies, allies) {
         const aim = target.barrier ? { barrierId: target.id } : { x: tc.x, y: tc.y, targetId: target.id };
         const q = queryAttack(ctx2, unit.id, eff, aim);
         if (!q.ok) continue;
-        const score = evaluateQuery(ctx2, unit, eff, q);
+        // 警报/追踪只用于接近，不能把不可锁定的隐藏单位当成技能收益。
+        const disclosed = tracking ? new Set(q.disclosureTargetIds) : null;
+        if (disclosed && !target.barrier && target.side !== unit.side && !disclosed.has(target.id)) continue;
+        const score = evaluateQuery(ctx2, unit, eff, q, disclosed);
         if (score <= EPS) continue;
         found = { score, cost: cell.cost, cell, skill: raw, aim, targetId: target.id, si,
           attackTarget: (q.damageTargetIds || []).includes(target.id) };
@@ -344,17 +347,14 @@ function stepAlong(ctx, reach, unit, path, budget) {
   return null;
 }
 
-function nearestEnemyCell(ctx, unit, cells, enemies) {
+function nearestPointCell(ctx, unit, cells, points) {
   const fp = footprintOf(ctx, unit);
   let best = null;
   for (const cell of cells) {
     const from = unitCenter({ col: cell.col, row: cell.row }, fp);
     let minDist = Infinity;
-    for (const e of enemies) {
-      const ep = ctx.placementsById[e.id];
-      if (!ep) continue;
-      const ec = unitCenter(ep, footprintOf(ctx, e));
-      const d = Math.hypot(ec.x - from.x, ec.y - from.y);
+    for (const p of points) {
+      const d = Math.hypot(p.x - from.x, p.y - from.y);
       if (d < minDist) minDist = d;
     }
     const cand = { dist: minDist, cost: cell.cost, key: cellKey(cell.col, cell.row), cell };
@@ -415,41 +415,48 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
   if (!p) return Object.assign({}, IDLE);
   const res = resources || { main: 1, aux: 1, preparing: null, moveDistance: (unit.ref && unit.ref.moveDistance) || 0 };
 
-  const enemies = visibleEnemies(ctx, unit);
+  const seen = visibleEnemies(ctx, unit);
+  const seenIds = res.trackedTargetIds && new Set(seen.map(u => u.id));
+  const enemies = seenIds ? ctx.units.filter(u => isLive(u) && u.side !== unit.side && !u.isSubdued && !u.ref.isSubdued
+    && (seenIds.has(u.id) || res.trackedTargetIds.has(u.id))) : seen;
   const allies = ctx.units.filter(u => isLive(u) && u.side === unit.side);
   const usable = (skills || []).filter(s => s && !s.isReaction && s.trigger !== 'death'
     && (!canUseSkill || canUseSkill(s).ok));
 
   // 一、浓雾且无八邻接可见敌人：优先离雾（可冲刺，出雾后下一轮再攻击）
-  if (unitInFog(ctx, unit) && !hasAdjacentEnemy(ctx, unit, enemies)) {
+  if (unitInFog(ctx, unit) && !hasAdjacentEnemy(ctx, unit, seen)) {
     const exit = planFogExit(ctx, unit, moveBudget, res);
     if (exit) return exit;
   }
 
   // 二、额度内最优真实收益（攻击/减益/治疗/增益/准备/召唤）
-  const inBudget = searchBest(ctx, unit, usable, moveBudget, enemies, allies);
+  const tracking = !!(seenIds || res.pursuitPoints?.length);
+  const inBudget = searchBest(ctx, unit, usable, moveBudget, enemies, allies, tracking);
   if (inBudget.best) return toResult(inBudget.best, res);
 
-  // 三、只有可见敌方及可用技能时才搜索跨本轮预算的攻击位。
-  if (enemies.length && usable.length) {
-    const fullBest = searchBest(ctx, unit, usable, Infinity, enemies, allies);
+  // 三、攻击位超出本轮额度时沿路径接近。
+  let fullReach;
+  if (enemies.length && usable.length && moveBudget > EPS) {
+    const fullBest = searchBest(ctx, unit, usable, Infinity, enemies, allies, tracking);
+    fullReach = fullBest.reach;
     if (fullBest.best) {
-      const moveTo = stepAlong(ctx, fullBest.reach, unit, fullBest.best.cell.path, moveBudget);
+      const moveTo = stepAlong(ctx, fullReach, unit, fullBest.best.cell.path, moveBudget);
       if (moveTo) return { moveTo, skill: null, aim: null, action: null };
     }
   }
 
-  // 四、无可执行收益：额度内向最近可见敌人接近
-  if (enemies.length) {
-    const reach = findReachable(ctx, unit.id, moveBudget);
-    const bestCell = nearestEnemyCell(ctx, unit, reach.cells, enemies);
-    if (bestCell && bestCell.cost > EPS) {
-      return { moveTo: { col: bestCell.col, row: bestCell.row }, skill: null, aim: null, action: null };
-    }
+  // 四、无出手位置则接近追踪目标/警报报告点；先定全路径，绕过局部死角。
+  const points = enemies.filter(e => ctx.placementsById[e.id]).map(e => unitCenter(ctx.placementsById[e.id], footprintOf(ctx, e)));
+  points.push(...(res.pursuitPoints || []));
+  if (points.length && moveBudget > EPS) {
+    const reach = tracking ? (fullReach || findReachable(ctx, unit.id, Infinity)) : inBudget.reach;
+    const best = nearestPointCell(ctx, unit, reach.cells, points);
+    const moveTo = best && stepAlong(ctx, reach, unit, best.path, moveBudget);
+    if (moveTo) return { moveTo, skill: null, aim: null, action: null };
   }
 
-  // 五、无进展：贴身则防御，否则守位等待（不追踪不可见目标）
-  if (enemies.length && hasAdjacentEnemy(ctx, unit, enemies)) {
+  // 五、无进展：贴身则防御，否则守位等待。
+  if (seen.length && hasAdjacentEnemy(ctx, unit, seen)) {
     return { moveTo: null, skill: null, aim: null, action: 'defend' };
   }
   return Object.assign({}, IDLE);

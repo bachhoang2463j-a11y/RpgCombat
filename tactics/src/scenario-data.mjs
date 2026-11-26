@@ -112,6 +112,7 @@ export function createScenarioData(block, options = {}) {
     const ref = buildRef(t);
     return {
       name: stripNameDecoration(t.name),
+      portraitName: t.name, emoji: t.emoji, img: t.img, avatarUrl: t.avatarUrl,
       hp: ref.hp, maxHp: ref.maxHp, mp: ref.mp, maxMp: ref.maxMp, tp: 0, maxTp: ref.maxTp,
       atk: ref.atk, def: ref.def, spd: ref.spd,
       evasion: ref.evasion, strength: ref.strength, totalWeight: ref.totalWeight,

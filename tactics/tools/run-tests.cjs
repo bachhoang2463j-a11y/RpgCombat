@@ -140,6 +140,11 @@ const STAGES = {
     groups: ['TT-SPACE'], modules: ['scene', 'geometry', 'movement', 'range', 'regions', 'perception', 'barriers'],
     requiredExports: [['perception', 'canSeeUnit'], ['regions', 'fogAt'], ['barriers', 'previewBarrier']],
   },
+  alerts: {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'alerts-node-cases.mjs'),
+    groups: ['TT-ALERTS'], modules: ['battle', 'scenarioData'],
+    requiredExports: [['battle', 'createBattle'], ['scenarioData', 'createScenarioData']],
+  },
   'typical-ai': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'typical-ai-node-cases.mjs'),
     groups: ['TT-AI'], modules: ['ai', 'range', 'movement', 'geometry', 'scene'],

@@ -78,6 +78,7 @@ export function createUnitView(parent, deps) {
       '<div class="t-unit-name">' + escapeHtml(unit.name) + '</div>' +
       '<div class="t-unit-sprite" data-arcane-target-id="' + escapeHtml(unit.id) + '" style="--d:' + d + 'px;">' +
         '<div class="t-unit-medal">' + face +
+          (unit.side === 'enemy' ? '<b class="t-unit-alert" title="预警" aria-label="预警">!</b>' : '') +
           '<svg class="t-unit-direction" viewBox="-30 -30 60 60" aria-hidden="true"><path d="M0,-29 L6.5,-19.5 L0,-22 L-6.5,-19.5 Z"/></svg>' +
         '</div>' +
       '</div>' +

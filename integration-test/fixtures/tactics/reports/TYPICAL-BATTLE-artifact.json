@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "80bd963255543639c348fc23a56888679f4f6ce283e7337114f0147c4dc1f4b2",
-  "bytes": 1641842,
+  "sha256": "d20766f0f9da37ec491cdf8bd0d2bd278246c55d7790edb2875f0d11a32f357f",
+  "bytes": 1645768,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -174,8 +174,73 @@
       "id": "产物实际受击段保留原伤盾值暴击和性质",
       "pass": true,
       "detail": ""
+    },
+    {
+      "id": "预警头像角标与召唤头像解析入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "TT-ALERTS 移动只在途中经过敌人感知也会预警",
+      "pass": true,
+      "detail": "[\"idle\",{\"col\":5,\"row\":7,\"cost\":5,\"path\":[{\"col\":5,\"row\":2},{\"col\":5,\"row\":3},{\"col\":5,\"row\":4},{\"col\":5,\"row\":5},{\"col\":5,\"row\":6},{\"col\":5,\"row\":7}],\"budgetCost\":5},\"pending\"]"
+    },
+    {
+      "id": "TT-ALERTS 墙遮住感知时不预警",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "TT-ALERTS 预览不触发；超出敌人感知的攻击即使闪避也预警",
+      "pass": true,
+      "detail": "[\"idle\",[{\"targetId\":\"e\",\"side\":\"enemy\",\"hit\":false,\"hpDmg\":0,\"hpBefore\":100,\"hpAfter\":100,\"maxHp\":100,\"down\":false,\"logIndex\":1,\"logEnd\":2,\"segments\":[{\"runId\":\"battle:5:0\",\"attackId\":\"attack:1\",\"segmentId\":\"battle:5:0:attack:1:slot:0:segment:1\",\"slotIndex\":0,\"segmentIndex\":1,\"shotIndex\":1,\"index\":0,\"origin\":{\"x\":1.5,\"y\":2.5},\"originalTargetId\":\"e\",\"contactPoint\":{\"x\":15.5,\"y\":2.5},\"targetId\":\"e\",\"logIndex\":1,\"side\":\"enemy\",\"maxHp\":100,\"damageType\":\"近战\",\"damageCategory\":null,\"isCrit\":false,\"isPierce\":false,\"hit\":false,\"outcome\":\"dodge\",\"hpDmg\":0,\"hpBefore\":100,\"hpAfter\":100,\"down\":false,\"logEnd\":2,\"aim\":{\"x\":15.5,\"y\":2.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":15,\"row\":2}]}]}],\"pending\"]"
+    },
+    {
+      "id": "TT-ALERTS 重置清掉由攻击引发的预警",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "TT-ALERTS 看见我方立即预警但不提前通知邻居",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "TT-ALERTS 预警者自然行动时广播到欧氏半径边界，不插队",
+      "pass": true,
+      "detail": "[\"engaged\",\"engaged\",\"idle\"]"
+    },
+    {
+      "id": "TT-ALERTS 收报敌人按自身回合追击，不用范围技盲打也不自动接力",
+      "pass": true,
+      "detail": "{\"moveTo\":{\"col\":8,\"row\":5},\"skill\":null,\"aim\":null,\"action\":null}"
+    },
+    {
+      "id": "TT-ALERTS 雾外预览和实战都可锁定雾内，普通视野不变",
+      "pass": true,
+      "detail": "[true,null,[{\"targetId\":\"e\",\"side\":\"enemy\",\"hit\":true,\"hpDmg\":10,\"hpBefore\":100,\"hpAfter\":90,\"maxHp\":100,\"down\":false,\"logIndex\":1,\"logEnd\":2,\"segments\":[{\"runId\":\"battle:7:0\",\"attackId\":\"attack:1\",\"segmentId\":\"battle:7:0:attack:1:slot:0:segment:1\",\"slotIndex\":0,\"segmentIndex\":1,\"shotIndex\":1,\"index\":0,\"origin\":{\"x\":2.5,\"y\":2.5},\"originalTargetId\":\"e\",\"contactPoint\":{\"x\":6.5,\"y\":2.5},\"targetId\":\"e\",\"logIndex\":1,\"side\":\"enemy\",\"maxHp\":100,\"damageType\":\"近战\",\"damageCategory\":null,\"isCrit\":false,\"isPierce\":false,\"hit\":true,\"outcome\":\"hit\",\"hpDmg\":10,\"shieldDmg\":0,\"guardDmg\":0,\"shieldBefore\":0,\"shieldAfter\":0,\"rawBeforeResist\":10,\"rawDmg\":10,\"resistance\":{\"before\":10,\"after\":10,\"layers\":[]},\"fatalResult\":null,\"finalTargetId\":\"e\",\"hpBefore\":100,\"hpAfter\":90,\"down\":false,\"logEnd\":2,\"aim\":{\"x\":6.5,\"y\":2.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":6,\"row\":2}]}]}]]"
+    },
+    {
+      "id": "TT-ALERTS 雾外锁定仍挡墙、友方挡弹及射程",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "TT-ALERTS 召唤正常入场并保留模板的头像源与纯名",
+      "pass": true,
+      "detail": "[null,\"行军兽\",\"🦏◈行军兽◈\"]"
+    },
+    {
+      "id": "TT-ALERTS 我方召唤物追全队失视的已知敌人而非未发现敌人",
+      "pass": true,
+      "detail": "{\"moveTo\":{\"col\":4,\"row\":2},\"skill\":{\"name\":\"普通攻击\",\"type\":\"[伤害]\",\"fxTag\":\"刀砍\",\"power\":0,\"hit\":100,\"cost\":0,\"range\":{\"type\":\"单体\",\"castRange\":2},\"actionCost\":{\"main\":1,\"aux\":0}},\"aim\":{\"x\":5.5,\"y\":2.5,\"targetId\":\"known\"},\"action\":null}"
+    },
+    {
+      "id": "TT-ALERTS 没有我方发现记录的敌人不作为追踪目标",
+      "pass": true,
+      "detail": ""
     }
   ],
-  "passed": 34,
+  "passed": 47,
   "failed": 0
 }

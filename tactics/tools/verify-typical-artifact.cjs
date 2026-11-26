@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { createHash } = require('node:crypto');
+const { pathToFileURL } = require('node:url');
 const root = path.resolve(__dirname, '..', '..');
 const artifact = path.join(root, 'tactics', 'mvp-standalone.html');
 const html = fs.readFileSync(artifact, 'utf8');
@@ -85,12 +86,21 @@ if (backend) {
   const landed = (shotResult.hits || []).flatMap(h => h.segments || [h]).filter(s => s.hit);
   check('产物实际受击段保留原伤盾值暴击和性质', shotResult.ok && landed.length > 0 && landed.every(s => Number.isFinite(s.rawDmg) && Number.isFinite(s.shieldBefore) && Number.isFinite(s.shieldAfter) && typeof s.isCrit === 'boolean' && s.damageCategory === '枪击' && s.outcome === 'hit'));
 }
-const report = {
-  artifact: 'tactics/mvp-standalone.html', sha256: createHash('sha256').update(html).digest('hex'), bytes: Buffer.byteLength(html),
-  kind: 'artifact-backend-only', pageGate: 'pending-frontend', cases,
-  passed: cases.filter(c => c.pass).length, failed: cases.filter(c => !c.pass).length,
-};
-const out = path.join(root, 'integration-test', 'fixtures', 'tactics', 'reports', 'TYPICAL-BATTLE-artifact.json');
-fs.writeFileSync(out, JSON.stringify(report, null, 2) + '\n');
-console.log(JSON.stringify(report));
-if (report.failed) process.exitCode = 1;
+async function reportResult() {
+  check('预警头像角标与召唤头像解析入包', ['t-unit-alert-pending', 'portraitName', 'syncDynamicUnits'].every(s => html.includes(s)));
+  if (backend) {
+    const fixture = path.join(root, 'integration-test', 'fixtures', 'tactics', 'alerts-node-cases.mjs');
+    const { runAlertsCases } = await import(pathToFileURL(fixture).href);
+    cases.push(...runAlertsCases(backend).cases);
+  }
+  const report = {
+    artifact: 'tactics/mvp-standalone.html', sha256: createHash('sha256').update(html).digest('hex'), bytes: Buffer.byteLength(html),
+    kind: 'artifact-backend-only', pageGate: 'pending-frontend', cases,
+    passed: cases.filter(c => c.pass).length, failed: cases.filter(c => !c.pass).length,
+  };
+  const out = path.join(root, 'integration-test', 'fixtures', 'tactics', 'reports', 'TYPICAL-BATTLE-artifact.json');
+  fs.writeFileSync(out, JSON.stringify(report, null, 2) + '\n');
+  console.log(JSON.stringify(report));
+  if (report.failed) process.exitCode = 1;
+}
+reportResult().catch(error => { console.error(error); process.exitCode = 1; });

@@ -68,7 +68,7 @@ function footprintsEdgeAdjacent(ctx, a, b) {
   return cellsAdjacent(pa, fpOf(ctx, a), pb, fpOf(ctx, b));
 }
 
-export function canSeeUnit(ctx, observerId, targetId) {
+export function canSeeUnit(ctx, observerId, targetId, lockAttack = false) {
   if (observerId === targetId) return true;
   const observer = unitById(ctx, observerId);
   const target = unitById(ctx, targetId);
@@ -83,7 +83,8 @@ export function canSeeUnit(ctx, observerId, targetId) {
   }
   // 雾外：视距不减；但不能看雾内或穿透雾看另一侧
   if (Math.hypot(oc.x - tc.x, oc.y - tc.y) > sightRadius(ctx, observer) + EPS) return false;
-  if (fogAt(ctx, targetId).strength > 0) return false;
+  // 单体攻击可从雾外锁定雾内目标；不等于发现，也不放开穿雾看另一侧。
+  if (fogAt(ctx, targetId).strength > 0) return lockAttack;
   if (segmentTouchesFog(ctx, oc, tc)) return false;
   return true;
 }

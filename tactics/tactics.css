@@ -66,6 +66,9 @@ button:disabled { opacity: .42; cursor: default; }
 .t-unit-billboard { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
 .t-unit-sprite { position: absolute; left: calc(var(--d) / -2); top: calc(var(--d) / -2); width: var(--d); height: var(--d); font-size:var(--d); }
 .t-unit-medal { position: absolute; left: 50%; top: 50%; width: var(--d); height: var(--d); transform: translate(-50%,-50%); }
+.t-unit-alert { display: none; position: absolute; z-index: 2; top: -5px; right: -5px; width: 19px; height: 19px; border-radius: 50%;
+  background: #f3c46f; color: #2b1511; border: 1px solid #462821; font-size: 14px; line-height: 17px; text-align: center; pointer-events: none; }
+.t-unit-alert-pending .t-unit-alert { display: block; }
 .t-unit-avatar, .t-unit-emoji { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #10141b; }
 .t-unit-avatar img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; display: block; }
 .t-unit-emoji { font-size: calc(var(--d) * 0.56); line-height: 1; background: radial-gradient(circle at 50% 35%, #34181d 0%, #150a0d 75%); }

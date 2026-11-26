@@ -152,7 +152,7 @@ function collectLine(ctx, casterId, origin, aim, range) {
 
 // 单体重查：调用方传入新 unitCenter 作为 aim；skipSpatialRecheck 供冲锋接触复用，
 // 只验目标身份/可选性，不再按技能射程与线遮挡重查（避免 6m 冲锋接触被射程/墙体误判）。
-function collectSingle(ctx, caster, origin, aim, range, guaranteedHit, includeDowned, skipSpatialRecheck) {
+function collectSingle(ctx, caster, origin, aim, range, guaranteedHit, includeDowned, skipSpatialRecheck, attack) {
   if (!aim.targetId) return { ok: false, reason: '单体技能需锁定目标', cells: [], targetIds: [], blockedBy: null };
   const target = unitById(ctx, aim.targetId);
   if (!target) return { ok: false, reason: '目标不存在', cells: [], targetIds: [], blockedBy: null };
@@ -169,9 +169,11 @@ function collectSingle(ctx, caster, origin, aim, range, guaranteedHit, includeDo
   });
   if (wall && wall.type === 'wall') return { ok: false, reason: '视线被墙阻挡', cells: [], targetIds: [], blockedBy: wall };
   if (wall && wall.type === 'boundary') return { ok: false, reason: '目标路径越出地图', cells: [], targetIds: [], blockedBy: wall };
-  if (ctx.enforcePerception && !canSeeUnit(ctx, caster.id, target.id)) return { ok: false, reason: '目标不在本人视野内', cells: [], targetIds: [], blockedBy: { type: 'vision' } };
+  const visible = !ctx.enforcePerception || canSeeUnit(ctx, caster.id, target.id);
+  const fogLock = !visible && attack && target.side !== caster.side && canSeeUnit(ctx, caster.id, target.id, true);
+  if (!visible && !fogLock) return { ok: false, reason: '目标不在本人视野内', cells: [], targetIds: [], blockedBy: { type: 'vision' } };
   if (wall && wall.type === 'unit' && !guaranteedHit) return { ok: false, reason: wall.side === caster.side ? '友方挡弹' : '被其他敌人阻挡', cells: [], targetIds: [], blockedBy: wall };
-  return { ok: true, cells: occupiedCells(tp, fp), targetIds: [target.id], shape: { type: '单体', from: origin, to: tc, castRange: range.castRange }, collisionPoint: tc };
+  return { ok: true, cells: occupiedCells(tp, fp), targetIds: [target.id], shape: { type: '单体', from: origin, to: tc, castRange: range.castRange }, collisionPoint: tc, fogLock };
 }
 
 export function classifySlotSide(tag) {
@@ -342,11 +344,11 @@ export function queryAttack(ctx, casterId, skill, aim, options = {}) {
   }
   if (!normAim) return fail('缺少瞄准点');
 
-  let cells = [], targetIds = [], shape = null, collisionPoint = null, contact = null, blockedBy = null, blastCenter = null;
+  let cells = [], targetIds = [], shape = null, collisionPoint = null, contact = null, blockedBy = null, blastCenter = null, fogLock = false;
   if (range.type === '单体') {
-    const single = collectSingle(ctx, caster, origin, normAim, range, !!skill.guaranteedHit, includeDowned, skipSpatialRecheck);
+    const single = collectSingle(ctx, caster, origin, normAim, range, !!skill.guaranteedHit, includeDowned, skipSpatialRecheck, skillSlots(skill).some(s => s.attack));
     if (!single.ok) return Object.assign(fail(single.reason, single.blockedBy), { range });
-    cells = single.cells; targetIds = single.targetIds; shape = single.shape; collisionPoint = single.collisionPoint;
+    cells = single.cells; targetIds = single.targetIds; shape = single.shape; collisionPoint = single.collisionPoint; fogLock = single.fogLock;
   } else if (range.type === '直线') {
     const line = collectLine(ctx, casterId, origin, normAim, range);
     if (!line.ok) return Object.assign(fail(line.reason), { range });
@@ -381,18 +383,18 @@ export function queryAttack(ctx, casterId, skill, aim, options = {}) {
     const cu = unitById(ctx, blastContact.unitId);
     actualTargets.push({ unitId: cu.id, side: cu.side, cells: occupiedCells(ctx.placementsById[cu.id], footprintOf(ctx, cu)) });
   }
-  return finishQuery(ctx, caster, skill, origin, normAim, cells, targetIds, actualTargets, shape, collisionPoint, contact, range, blockedBy, blastCenter);
+  return finishQuery(ctx, caster, skill, origin, normAim, cells, targetIds, actualTargets, shape, collisionPoint, contact, range, blockedBy, blastCenter, fogLock);
 }
 
-// 统一收尾：计算 disclosure（敌人只有 visible）、槽目标与返回结构
-function finishQuery(ctx, caster, skill, origin, aim, cells, targetIds, actualTargets, shape, collisionPoint, contact, range, blockedBy, blastCenter) {
+// 统一收尾：普通预览只揭示可见敌人，雾外单体锁定仅揭示指定的雾内目标。
+function finishQuery(ctx, caster, skill, origin, aim, cells, targetIds, actualTargets, shape, collisionPoint, contact, range, blockedBy, blastCenter, fogLock = false) {
   let visible = ctx.visibleUnitIds ? new Set(ctx.visibleUnitIds) : null;
   if (!visible) {
     visible = new Set();
     for (const u of ctx.units) if (isLive(u) && canSeeUnit(ctx, caster.id, u.id)) visible.add(u.id);
   }
-  const disclosureTargetIds = actualTargets.filter(t => t.side === caster.side || visible.has(t.unitId)).map(t => t.unitId);
   const aimTargetId = aim && aim.targetId != null ? aim.targetId : null;
+  const disclosureTargetIds = actualTargets.filter(t => t.side === caster.side || visible.has(t.unitId) || (fogLock && t.unitId === aimTargetId)).map(t => t.unitId);
   const slotTargets = resolveSlotTargets(ctx, caster.id, skill, actualTargets.map(t => t.unitId), aimTargetId);
   const damageSlotTargets = slotTargets.find(slot => slot.attack)?.targetIds || [];
   return {

@@ -25,7 +25,7 @@ const REQUIRED_INPUTS = [
   'src/effect-definitions.mjs', 'src/effect-handlers.mjs', 'src/class-passives.mjs', 'src/variant-rules.mjs',
   'src/reaction-prompt.mjs',
   'src/screen-atmos.mjs', 'src/screen-showpiece.mjs', 'src/guard-barrier-fx.mjs', 'src/status-ui.mjs', 'src/lore.mjs',
-  'src/scenario-data.mjs', 'src/regions.mjs', 'src/perception.mjs', 'src/barriers.mjs',
+  'src/scenario-data.mjs', 'src/regions.mjs', 'src/perception.mjs', 'src/barriers.mjs', 'src/unit-view.mjs',
   '典型对局-战棋版.yaml',
 ];
 // 复用模块关键函数必须进入产物（防止 tree-shaking 或误删导致"复用"名不副实）
@@ -34,7 +34,7 @@ const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFee
   'buildSkillFormFieldsHtml', 'openSkillTypeCombo', 'createEditorPanel', 'playJump', 'playShove', 'playTransfer', 'drawJump',
   'createFxRegistry', 'registerDefaultFx', 'actionInput', 'reactionInput', 'createVfxHost', 'playReaction', 'revealSegment', 'evadeShift',
   'createScenarioData', 'createSeededRandom', 'createRegion', 'runRegionContest', 'effectiveCastRange', 'moveMultiplier', 'canSeeUnit', 'previewBarrier', 'resolveCharge',
-  'buildTypicalViewData', 'playPrepare', 'syncRegions', 'fogFieldHtml', 'prepareInput', 'revealEffect',
+  'buildTypicalViewData', 'syncDynamicUnits', 'scanEnemyContacts', 'broadcastEnemyAlarm', 'playPrepare', 'syncRegions', 'fogFieldHtml', 'prepareInput', 'revealEffect',
   'playGenericSupportFx', 'spawnHealParticles', 'playSupportEffects', 'supportResourceDelta', 'applyPersistentFxTags',
   'buildHitFeedback', 'avatarScaleForZoom', 'linkSkillGroupRows', 'prepareHitNumbers', 'animateHitNumber',
   'startAtmos', 'atmosStyleOf', 'FX_WEBM_KEY_MAX', 'mountShowpiece', 'SHOWPIECES',
