@@ -21,13 +21,14 @@ const ENTRIES = [
   'syncVariantState', 'clearVariantState', 'playVariantTriggerFx', 'isEntityVariantLocked',
   'playSummonEnter', 'playSummonExit', 'playSummonGuard', 'clearSummonState',
   'playLingFeng',
+  'playIsis', 'playFeiShaHuaJia', 'playXieYanKey', 'playHarmonyShelter', 'playSilenceDomain', 'playShatterResonance',
+  'playMeleeGroup', 'playRangedGroup', 'playSpellGroup',
   'playRescueGrit', 'playRescueAvoidFatal', 'clearRescueState',
   'playVariantResistFx', 'playCounterAttackL1',
   'playSelfDestructWindup', 'playSelfDestructBurst', 'playSelfDestructInterrupt', 'clearSelfDestructState', 'syncSelfDestructWarning',
   'setIdentitySfx', 'setVariantSfx', 'setStatusSfx', 'setSelfDestructSfx',
 ];
-// 不入口：敌方兜底群攻 playMeleeGroup/RangedGroup/SpellGroup 按全队卡片头像取帧（portraitFrame），
-// 与空间范围"只作用真实受影响目标"冲突；战棋敌方范围攻击改走攻击身份 aoe（逐目标 onImpact）。
+// 敌方兜底群攻 playMeleeGroup/RangedGroup/SpellGroup：战棋只传真实受击目标，portraitFrame 按各目标棋子取帧（不走全队/结界分支）。
 // 所有状态与救援段均已进入真实提取闭包，不再使用空存根
 const STUBS = [];
 // 需要原样带入的段（未入闭包也带入）：语法上属于前一语句的续行
@@ -227,7 +228,7 @@ function extractCss(html, jsText) {
   let css = keep.join('\n');
   // 宿主适配：全屏层改为战棋特效舞台内绝对定位（舞台在 world-root 内随相机变换）；
   // 关键帧不改写：击杀特写/Cut-in 位于 iframe 屏幕宿主，其 translate(±100vw) 等以视口为基准属原版语义
-  css = patch(css, /position\s*:\s*fixed/g, 'position:absolute', 12, 'CSS position:fixed → absolute');
+  css = patch(css, /position\s*:\s*fixed/g, 'position:absolute', 13, 'CSS position:fixed → absolute');
   css = patch(css, /\b100vw\b/g, '100%', 1, 'CSS 100vw → 舞台宽');
   css = patch(css, /\b100d?vh\b/g, '100%', 1, 'CSS 100vh/dvh → 舞台高');
   css += '\n' + [...kfKeep.values()].join('\n');
@@ -280,6 +281,21 @@ function build() {
   const cutin = topBlock(L, l => l.startsWith('async function playEnemyUltimateCutin('), 'playEnemyUltimateCutin');
   // 召唤三瞬引用的回合制顶层集合（arcane 模块外，原样带入）
   const summonPending = topBlock(L, l => l.startsWith('const summonEnterPending = new Set();'), 'summonEnterPending');
+  // 2b') 造雾术 / 高阶召唤术全屏 SVG 构件（回合制顶层原版函数，原样；挂载与对侧缠绕由战棋演出条目按视口层承担）
+  const oneLine = (start, what) => {
+    const hit = L.filter(l => l.startsWith(start));
+    if (hit.length !== 1) fail(what + ' 定义数 ' + hit.length);
+    return hit[0];
+  };
+  const screenSvg = [
+    oneLine('const RLYEH_FOG_CLOUD_URL = ', 'RLYEH_FOG_CLOUD_URL'),
+    oneLine('function getEldritchAudioContext() {', 'getEldritchAudioContext'),
+    topBlock(L, l => l.startsWith('function playEldritchWhisper('), 'playEldritchWhisper').text,
+    topBlock(L, l => l.startsWith('function buildRlyehSedimentFxHtml('), 'buildRlyehSedimentFxHtml').text,
+    topBlock(L, l => l.startsWith('function buildTitanGazeFxHtml('), 'buildTitanGazeFxHtml').text,
+  ].join('\n');
+  // 原版 _spawnFullscreenSvgFx 的震屏类与对侧缠绕动画名（条目侧施加，CSS 需随包提取）
+  const screenSvgCssRefs = "fog-shake-std san-shake-dread; animation: target-fog-shroud; animation: target-enshrouded-wobble;";
   let moments = [execAnim.text, cutin.text].join('\n\n');
   moments = patch(moments, '                        <div class="absolute top-1 left-2 text-[9px] font-bold text-amber-400 tracking-wider">档案: ${hero.name}</div>\n', '', 1, '远程击杀隐藏我方名称');
   moments = patch(moments, 'document.body.appendChild(overlay);', '__SCREEN().appendChild(overlay); __MOMENTS.add(overlay);', 2, '特写挂屏幕宿主');
@@ -471,13 +487,21 @@ ${supportBranches.join('\n').replace('else if', 'if')}
     "const waveW = areaBounds ? stageW : Math.max(stageW * 1.15, 360), waveH = areaBounds ? stageH : Math.max(stageH * 0.92, 136);", 1, '战棋攻击身份适配');
   mod = patch(mod, "${Math.max(88, stageH * 0.68)}px;transform:translate(-50%,-50%);",
     "${areaBounds ? stageH : Math.max(88, stageH * 0.68)}px;transform:translate(-50%,-50%);", 1, '战棋攻击身份适配');
-  mod = patch(mod, /\.getBoundingClientRect\(\)/g, '[__GBCR]()', 12, '屏幕矩形 → 特效舞台坐标');
-  mod = patch(mod, /\b(?:window\.)?innerWidth\b/g, '__STAGE.w', 16, 'innerWidth → 舞台宽');
-  mod = patch(mod, /\b(?:window\.)?innerHeight\b/g, '__STAGE.h', 10, 'innerHeight → 舞台高');
+  // 蝎眼钥匙：原版裂隙钉在屏幕中心；战棋舞台=整张地图，改为钉在召唤落点（at，舞台坐标），粒子半径沿用原版基准视口
+  mod = patch(mod, 'function playXieYanKey(caster, targets, isReaction = false) {', 'function playXieYanKey(caster, targets, isReaction = false, at = null) {', 1, '蝎眼钥匙落点参数');
+  mod = patch(mod, 'const vw = window.innerWidth, vh = window.innerHeight;\n        const cX = vw * 0.5, cY = vh * 0.46;',
+    'const vw = 1280, vh = 720;\n        const cX = at ? at.x : __STAGE.w * 0.5, cY = at ? at.y : __STAGE.h * 0.46;', 1, '蝎眼钥匙裂隙钉召唤落点');
+  mod = patch(mod, '<div class="arcane-marcher-rift-stage is-vertical">', '<div class="arcane-marcher-rift-stage is-vertical" style="left:${cX}px; top:${cY}px;">', 1, '蝎眼钥匙裂隙舞台定位');
+  // 谐律之庇：原版音叉悬在屏幕上方正中；战棋改悬在受益者包围盒上方（原版约 0.38 屏高 ≈ 260px）
+  mod = patch(mod, 'const forkPos = { x: window.innerWidth * 0.5, y: Math.max(150, window.innerHeight * 0.34) };',
+    'const forkPos = { x: box.x, y: box.y - 260 };', 1, '谐律之庇音叉悬于受益者上方');
+  mod = patch(mod, /\.getBoundingClientRect\(\)/g, '[__GBCR]()', 13, '屏幕矩形 → 特效舞台坐标');
+  mod = patch(mod, /\b(?:window\.)?innerWidth\b/g, '__STAGE.w', 22, 'innerWidth → 舞台宽');
+  mod = patch(mod, /\b(?:window\.)?innerHeight\b/g, '__STAGE.h', 15, 'innerHeight → 舞台高');
   mod = patch(mod, 'document.body.appendChild(', '__STAGE.el.appendChild(', 5, 'body 挂载 → 特效舞台');
-  mod = patch(mod, /position\s*:\s*fixed/g, 'position:absolute', 0, 'JS position:fixed → absolute');
+  mod = patch(mod, /position\s*:\s*fixed/g, 'position:absolute', 1, 'JS position:fixed → absolute');
   mod = patch(mod, "window.addEventListener('resize', resizeCanvas);", '__STAGE.onResize(resizeCanvas);', 1, 'arcane canvas resize 走舞台');
-  mod = patch(mod, "document.getElementById('battle-scene')", '__STAGE.shakeEl()', 2, '舞台震动独立层');
+  mod = patch(mod, "document.getElementById('battle-scene')", '__STAGE.shakeEl()', 3, '舞台震动独立层');
   mod = patch(mod, /window\.(playSound|playRandomStandardGunshot|playShotgunSound|AudioContext|webkitAudioContext)\b/g,
     (m, n) => (n.endsWith('AudioContext') ? m : n), 14, 'window.* 声音函数改为工厂内本地');
   mod = patch(mod, 'arcaneAtmoModule.stopAmbientAudio(true);', 'atmoAudio.stop(true);', 1, '环境氛围音随清场停止');
@@ -595,7 +619,7 @@ ${powerParticles}
 ${chargeFx}
 ${powerEffect}
 `.replace(/[ \t]+$/gm, '');
-  const css = extractCss(html, mod + '\n' + soundText + support + '\n' + moments + '\n' + powerParticles + '\n' + chargeFx + '\n' + powerEffect);
+  const css = extractCss(html, mod + '\n' + soundText + support + '\n' + moments + '\n' + powerParticles + '\n' + chargeFx + '\n' + powerEffect + '\n' + screenSvg + '\n' + screenSvgCssRefs);
   const hitCss = `
 /* 战棋数字：原版分档时间轴，数值主导、实际伤害性质点缀。 */
 .arcane-hit-num-layer[data-hit-type] .arcane-hit-num,.arcane-hit-num-layer[data-hit-type] .arcane-hit-tag { font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; font-variant-numeric:tabular-nums lining-nums; font-style:normal; }
@@ -678,6 +702,8 @@ ${mixer}
 ${soundText}
 
 ${powerCode}
+  // ---- 造雾术 / 高阶召唤术全屏 SVG 构件（原样） ----
+${screenSvg}
   // ---- 粒子引擎（原样，仅换挂载层） ----
 ${fx}
   const fxEngine = new CanvasFxEngine();
@@ -699,7 +725,9 @@ ${mod}
       playRescueGrit, playRescueAvoidFatal, clearRescueState,
       playVariantResistFx, playCounterAttackL1,
       playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, clearSelfDestructState, syncSelfDestructWarning,
-      setIdentitySfx, setVariantSfx, setStatusSfx, setSelfDestructSfx, clearSummonState, playLingFeng };
+      setIdentitySfx, setVariantSfx, setStatusSfx, setSelfDestructSfx, clearSummonState, playLingFeng,
+      playIsis, playFeiShaHuaJia, playXieYanKey, playHarmonyShelter, playSilenceDomain, playShatterResonance,
+      playMeleeGroup, playRangedGroup, playSpellGroup };
   })();
 ${busOn.map(l => l.replace('CombatAudioDirector.consume', 'arcane.CombatAudioDirector.consume')).join('\n')}
 
@@ -707,6 +735,7 @@ ${busOn.map(l => l.replace('CombatAudioDirector.consume', 'arcane.CombatAudioDir
     CombatAudioMixer, audioUrls, playSound, playCustomAudio, HERO_VOICE_LINES, pickHeroVoice, AVATAR_MAP, fxEngine, atmoAudio,
     ASSET_BASE, HERO_VOICE_BASE, itemFxAssetUrl,
     playGenericSupportFx, playExecutionAnimation, playEnemyUltimateCutin, clearMoments, playPowerCounterEffect,
+    RLYEH_FOG_CLOUD_URL, playEldritchWhisper, buildRlyehSedimentFxHtml, buildTitanGazeFxHtml,
     clearArcaneFx() { clearPowerCounterEffects(); supportHandles.forEach(handle => handle.cancel()); clearMoments(); arcane.clearArcaneFx(); playRandomStandardGunshot.last = null; },
     setToken(t) { if (t !== combatToken) { clearPowerCounterEffects(); supportHandles.forEach(handle => handle.cancel()); clearMoments(); playRandomStandardGunshot.last = null; } combatToken = t; },
     getToken() { return combatToken; },

@@ -245,12 +245,12 @@ function killAndSummonCases() {
     /document\.body\.appendChild\(screenEl\)/.test(hostSrc) && /position:fixed; inset:0; z-index:2147483000; pointer-events:none/.test(hostSrc) && /screenEl\.setAttribute\('data-rpg-av-scope', ''\)/.test(hostSrc)));
   const libSrc = readFileSync(new URL('../../../tactics/src/fx-library.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
   const fsIds = [...libSrc.matchAll(/id: '([\w-]+)', grade: 'L[34]'[^\n]*\n\s*timeline: \{[^}]*fullscreen: true/g)].map(m => m[1]);
-  // 火焰/中毒领域两条目共用 playDomainBurst 的同一处爆发拍点：20 条目对应 19 处调用
-  out.push(ok('TP7AV-L 每个全屏 L3/L4 条目都有独立屏幕主演出，并在真实冲击拍点 ctx.atmos.burst()', fsIds.length === 20 && fsIds.every(id => SHOWPIECES[id])
-    && (libSrc.match(/ctx\.atmos\?\.burst\(\);/g) || []).length === 19 && !/fx\.screen\('<i style="position:absolute;inset:0;background:radial-gradient/.test(libSrc), fsIds));
+  // 火焰/中毒领域两条目共用 playDomainBurst 的同一处爆发拍点：14 条目对应 13 处调用（伊西丝/音叉三件/高阶召唤/蝎眼钥匙改为原版 identity 直调）
+  out.push(ok('TP7AV-L 每个全屏 L3/L4 条目都有独立屏幕主演出，并在真实冲击拍点 ctx.atmos.burst()', fsIds.length === 14 && fsIds.every(id => SHOWPIECES[id])
+    && (libSrc.match(/ctx\.atmos\?\.burst\(\);/g) || []).length === 13 && !/fx\.screen\('<i style="position:absolute;inset:0;background:radial-gradient/.test(libSrc), fsIds));
   let seed = 3; const rr = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
   const built = fsIds.map(id => SHOWPIECES[id].build(9, rr));
-  out.push(ok('TP7AV-L 主演出构图互不相同、渐变辉光滤镜带 uid、无 NaN/undefined', new Set(built).size === 20 && built.every(h => /<filter id="g9"/.test(h) && !/NaN|undefined/.test(h))));
+  out.push(ok('TP7AV-L 主演出构图互不相同、渐变辉光滤镜带 uid、无 NaN/undefined', new Set(built).size === 14 && built.every(h => /<filter id="g9"/.test(h) && !/NaN|undefined/.test(h))));
   const holyBuilt = SHOWPIECES['holy-judgment'].build(9, rr, { x: 800, y: 450 });
   out.push(ok('TP7AV-L 圣光01 屏幕层无中心光柱/十字/中央光束（真实光柱只在目标处）', !/data-k="pillar"|data-k="cross"/.test(holyBuilt) && (holyBuilt.match(/data-k="ray"/g) || []).length === 8));
   const k1 = SHOWPIECES['krupp-snipe'].build(9, rr, { x: 300, y: 200 });
@@ -263,7 +263,7 @@ function killAndSummonCases() {
     /^\s*const summonEnterPending = new Set\(\);/m.test(av) && av.indexOf('const summonEnterPending') < av.indexOf('function clearSummonState(')));
   out.push(ok('TP7AV-X 灵风术=根 index playLingFeng 原样入包（风玫瑰/疾风/双翼 + windHum/crystalChime/aoe_wind_spin/dodgeWind 真音）',
     /function playLingFeng\(caster\) \{/.test(av) && /playSfxSample\('windHum', 0\.02, \{ volume:0\.62/.test(av) && /playSfxSample\('aoe_wind_spin_fs772867', 0, \{ volume:0\.78/.test(av)
-    && /playSfxSample\('dodgeWind', 0\.04/.test(av) && /arcane-angel-flap/.test(av) && /clearSummonState, playLingFeng \}/.test(av)));
+    && /playSfxSample\('dodgeWind', 0\.04/.test(av) && /arcane-angel-flap/.test(av) && /clearSummonState, playLingFeng[,\s}]/.test(av)));
   {
     const libSrc2 = readFileSync(new URL('../../../tactics/src/fx-library.mjs', import.meta.url), 'utf8');
     const lf = libSrc2.slice(libSrc2.indexOf('const lingFengShu = {'), libSrc2.indexOf('\n};', libSrc2.indexOf('const lingFengShu = {')));
@@ -271,6 +271,12 @@ function killAndSummonCases() {
       && /ctx\.after\(CHARGE \+ 350, \(\) => \{\s*\(result\.effects \|\| \[\]\)\.forEach\(e => ctx\.revealEffect\(e, true\)\)/.test(lf) && /return ctx\.awaitHandle\(handle, CHARGE \+ 2200\)/.test(lf)));
     const css2 = readFileSync(new URL('../../../tactics/src/vendor/rpg-av/rpg-av.css', import.meta.url), 'utf8');
     out.push(ok('TP7AV-X 灵风术关键帧与类入 CSS', ['arcane-rose-in', 'arcane-rose-out', 'arcane-twister', 'arcane-streak', 'arcane-wing-glyph', 'arcane-angel-flap', 'arcane-flash-heal'].every(k => css2.includes(k))));
+    const ported = ['playIsis', 'playFeiShaHuaJia', 'playXieYanKey', 'playHarmonyShelter', 'playSilenceDomain', 'playShatterResonance',
+      'playMeleeGroup', 'playRangedGroup', 'playSpellGroup', 'playEldritchWhisper', 'buildRlyehSedimentFxHtml', 'buildTitanGazeFxHtml'];
+    out.push(ok('TP7AV-X 原版伊西丝/飞沙化甲/蝎眼钥匙/三音叉/兜底群攻/造雾术/巨神凝视原样入包并由条目直调',
+      ported.every(n => new RegExp('function ' + n + '\\(').test(av) && libSrc2.includes('av.' + n))
+      && ['arcane-marcher-rift-stage', 'arcane-stygian-shield-wrap', 'arcane-group-stage', 'mist-obsidian-carpet', 'titan-shadow-loom', 'target-fog-shroud', 'san-shake-dread-anim'].every(k => css2.includes(k)),
+      ported.filter(n => !libSrc2.includes('av.' + n))));
   }
   out.push(ok('TP7AV-X 原版击杀三类音效与震屏保留', /playSound\('kill', 2, 1/.test(av) && /playSound\('combatKill'/.test(av) && /playSound\('magicKill'/.test(av) && /__STAGE\.shakeEl\(\)/.test(av) && /playSound\('taunt', 1, 1, \{ category:'L' \}\)/.test(av)));
   const css = readFileSync(new URL('../../../tactics/src/vendor/rpg-av/rpg-av.css', import.meta.url), 'utf8');

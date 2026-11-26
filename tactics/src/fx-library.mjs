@@ -522,16 +522,42 @@ const RANGED_SPLAT_DRIPS = [['right:25%', 6, 140, 150, 1250], ['left:22%', 8, 18
 // ==========================================
 
 // 未知或缺失标签：按伤害类型与范围补通用出手音，由导演播放统一命中反馈。
+// 敌方无专属特效的范围攻击按原版 resolveEnemyGroupAttackFx 走兜底群攻（近战/远程/法术）。
 const neutralImpact = {
   id: 'neutral-impact', grade: 'identity', fallback: true,
-  prepareKeys: () => ['atk1', 'atk2', 'light_impact'],
+  prepareKeys: () => ['atk1', 'atk2', 'light_impact', 'enemyMeleeGroupHit', 'enemyRangedGroupHit'],
   async play(ctx) {
     const sk = ctx.skill || {};
     const wide = !!(sk.range && sk.range.type !== '单体' && sk.range.type !== '自身');
+    if (wide && !sk.fxTag && ctx.hits.length && ctx.casterEnt && ctx.casterEnt.side !== 'hero') return enemyGroupAttack.play(ctx);
     const cue = sk.damageType === '法术' ? 'light_impact' : (wide ? 'atk1' : 'atk2');
     ctx.fx.sfx(cue, 0.55);
     for (const h of ctx.hits) ctx.reveal(h.targetId);
     return true;
+  },
+};
+
+// 敌方兜底群攻（原版 playMeleeGroup / playRangedGroup / playSpellGroup）：350ms 同色蓄势 →
+// 近战：三道血刃自左向右横扫目标区，刃尖掠过即受击（175ms）；远程：14 枚金晶齐射，主晶按目标分组命中；法术：冰蓝法阵与十字棱光同拍爆开。
+// 只传真实受击目标；按原版各自的接触拍点揭示命中/闪避。
+const GROUP_KIND = { '法术': 'spell', '远程': 'ranged' };
+const enemyGroupAttack = {
+  id: 'enemy-group-attack', grade: 'identity', fxTags: ['group:melee', 'group:ranged', 'group:spell'],
+  prepareKeys: () => ['enemyMeleeGroupHit', 'enemyRangedGroupHit', 'atk1'],
+  async play(ctx) {
+    const { av, hits } = ctx, sk = ctx.skill || {};
+    const kind = sk.fxTag && sk.fxTag.startsWith('group:') ? sk.fxTag.slice(6) : (GROUP_KIND[sk.damageType] || 'melee');
+    const list = hits.map(h => ({ id: h.targetId, p: ctx.centerOf(h.targetId) })).filter(t => t.p).sort((a, b) => a.p.x - b.p.x);
+    const play = { melee: av.playMeleeGroup, ranged: av.playRangedGroup, spell: av.playSpellGroup }[kind];
+    const handle = arcaneRun(ctx, () => play(ctx.casterEnt, list.map(t => ctx.ent(t.id)).filter(Boolean)));
+    const x0 = list.length ? list[0].p.x : 0, span = list.length ? Math.max(0.01, list[list.length - 1].p.x - x0) : 1;
+    list.forEach((t, i) => {
+      const at = kind === 'melee' ? 350 + 175 * (1 - Math.pow(0.9 - 0.8 * (t.p.x - x0) / span, 0.625))
+        : kind === 'ranged' ? 350 + Math.round(i * 14 / list.length) * 22 + 235
+        : 350 + (i === Math.floor((list.length - 1) / 2) || i === Math.ceil((list.length - 1) / 2) ? 0 : 35);
+      ctx.after(at, () => ctx.reveal(t.id));
+    });
+    return ctx.awaitHandle(handle, 1340);
   },
 };
 
@@ -896,10 +922,10 @@ const healMend = {
   play: ctx => playSupportEffects(ctx),
 };
 
-// 浓雾 L3（敌我共用，区域数据提供落点与半径）：
+// 拉莱耶造雾术 L3（敌方深潜者，特效标签【拉莱耶造雾术】；旧标签【浓雾】同指此条，区域数据提供落点与半径）：
 // 暗场色罩 + 深渊符文阵 + 雾丝吸入 → 雾核抛物线投向接触点 → 收 → 雾毯按真实半径铺开（揭示常驻雾区）→ 雾内单位浮现致盲
 const fogBurst = {
-  id: 'abyss-fog', grade: 'L3', fxTags: ['浓雾'],
+  id: 'abyss-fog', grade: 'L3', fxTags: ['拉莱耶造雾术', '浓雾'],
   timeline: { chargeMs: 900, totalMs: 2350, fullscreen: true },   // 900 蓄势 + 300 投放 + 100 收 + 350 爆发 + 700 余韵
   cues: [{ key: 'mx_vacuum', vol: 0.45 }, { key: 'fog', vol: 0.62 }, { key: 'mx_deep_impact', vol: 0.52 }],
   prepareKeys() { return this.cues.map(c => c.key); },
@@ -954,6 +980,21 @@ const fogBurst = {
     });
     particles(fx, Array.from({ length: 10 }, () => { const a = rnd(0, TAU), d = rnd(0.2, 0.8) * R; return { x: b.x + Math.cos(a) * d, y: b.y + Math.sin(a) * d, dx: Math.cos(a + 1.4) * 30, dy: Math.sin(a + 1.4) * 30, size: rnd(60, 100), color: MIST, core: MIST_CORE, o0: 0.55, s0: 1, s1: 1.3, dur: rnd(560, 700) }; }), 740);
     return ctx.wait(700);
+  },
+};
+
+// 造雾术（我方埃利奥特【拉莱耶造雾术】，原版 spawnRlyehSedimentFx「黑曜沉潮·重水沉积冷雾」）：fog.mp3 ×2 + 雾震屏 +
+// 视口层贴地翻滚黑曜雾浪与双柱冷蒸气（1.35s）；雾浪铺满时揭示常驻雾区，雾内单位缠绕虚化
+const rlyehSediment = {
+  id: 'rlyeh-sediment', grade: 'identity', fxTags: ['造雾术'],
+  prepareKeys: () => [],
+  async play(ctx) {
+    const { av } = ctx, region = (ctx.regions || [])[0] || null;
+    arcaneRun(ctx, () => av.playCustomAudio(av.RLYEH_FOG_CLOUD_URL, 2, 1, { track: 'skill', profile: 'special', audioContext: av.CombatAudioMixer.capture('B') }));
+    const inside = region ? ctx.unitsInCells(region.cells) : [];
+    screenSvgFx(ctx, av.buildRlyehSedimentFxHtml(), { shakeClass: 'fog-shake-std', shakeMs: 700, shroud: 'target-fog-shroud 1.1s cubic-bezier(0.2, 0.8, 0.3, 1) both', shroudMs: 1200, ids: inside });
+    if (region) ctx.after(300, () => ctx.revealRegion(region.id));
+    return ctx.wait(1500);
   },
 };
 
@@ -1426,17 +1467,22 @@ const holyJudgment = {
 // 召雷术（[特效:雷击01] × 爆炸范围，高阶·延迟释放）L3：
 // 紫色环境罩 + 爆心雷纹阵 + 施法者引雷光点飞升 + 爆心上空雷云汇聚 + 电火花 → 收 →
 // 主雷 450.webm + 逐目标落雷（按距爆心错拍揭示）+ 地面冲击环 + 闪屏重震 → 麻痹电弧余韵
+// 运镜（条目自编排，不走通用 cine、无时停顿帧）：蓄力全程缓缓微推 → 落雷瞬间急拉远 → 余韵末回位
+const THUNDER_PUSH = 1.35, THUNDER_PULL = 0.66;   // 设计倍数（实际偏移 × ZOOM_AMP）
 const thunderStorm = {
   id: 'thunder-storm', grade: 'L3', fxTags: ['雷击01'], cine: false,
   timeline: { chargeMs: 900, totalMs: 2400, fullscreen: true },   // 800 汇聚 + 100 收 + 500 落雷 + 1000 余韵
   cues: [{ key: 'thunder_charge', vol: 0.50 }, { key: 'thunder01', vol: 0.72 }, { key: 'thunder_aoe_hit', vol: 0.60 }],
   prepareKeys() { return this.cues.map(c => c.key); },
   async play(ctx) {
-    const { fx, hits, result } = ctx;
+    const { fx, hits, result, sandbox: sb } = ctx;
     const shape = result.query.shape;
     const center = shape.center || result.aim;
     const b = worldPx(center), R = (shape.radius || 3) * PX, c = worldPx(ctx.centerOf(ctx.casterId));
     const cloud = { x: b.x, y: b.y - Math.min(R * 0.9, 3 * PX) - 40 };
+    const home = sb.getPose(), cm = ctx.centerOf(ctx.casterId);
+    const mid = { x: (cm.x + center.x) / 2, y: (cm.y + center.y) / 2 };
+    sb.cameraTo(sb.poseAt(mid.x, mid.y, zoomAt(home.scale, home.scale * THUNDER_PUSH)), 900);
     // ① 汇聚
     fx.sfx('thunder_charge', 0.50);
     tint(fx, 'radial-gradient(circle,rgba(46,16,101,.28),rgba(8,4,26,.9))', { inMs: 600, holdMs: 1300, outMs: 500, peak: 0.46 });
@@ -1457,6 +1503,7 @@ const thunderStorm = {
     if (!(await ctx.wait(900))) return false;   // 末 100ms 为收（雷核压缩到最小）
     // ② 落雷
     fx.sfx('thunder01', 0.72); fx.shake('heavy');
+    sb.cameraTo(sb.poseAt(center.x, center.y, zoomAt(home.scale, home.scale * THUNDER_PULL)), 90);
     ctx.after(40, () => fx.sfx('thunder_aoe_hit', 0.60));
     ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     const strikeH = b.y - cloud.y + 20;
@@ -1486,7 +1533,9 @@ const thunderStorm = {
       });
     }
     fx.ground(orbHtml(b.x, b.y, R * 1.6, 'rgba(46,16,101,0.35)', 'rgba(76,29,149,0.4)'), 1000).firstChild.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: 1000, fill: 'forwards' });
-    return ctx.wait(1000);
+    if (!(await ctx.wait(620))) return false;
+    sb.cameraTo(home, 380);
+    return ctx.wait(380);
   },
 };
 
@@ -1772,23 +1821,27 @@ const nakTithBarrier = {
   },
 };
 
+// ---------- 回合制原版秘术 / 奇物演出接入（vendor 原样提取函数；战棋只传真实目标，按原版拍点揭示规则结果） ----------
+// 原版函数自带暗场、全屏层、震屏与合成音色，故按 identity 级接入（不叠通用屏幕氛围/运镜），与灵风术同口径。
+const stagePt = p => ({ x: p.x * PX / FX_SCALE, y: p.y * PX / FX_SCALE });   // 世界米 → 视听底座舞台坐标
+const effectIds = (ctx, accept = () => true) => [...new Set((ctx.result.effects || []).filter(accept).map(e => e.targetId))];
+const revealEffectsOf = (ctx, id) => (ctx.result.effects || []).filter(e => e.targetId === id).forEach(e => ctx.revealEffect(e, true));
+const dispelledIds = ctx => effectIds(ctx, e => e.kind === 'dispel' && e.removed && e.removed.length);
+function arcaneRun(ctx, fn) { return ctx.av.CombatAudioMixer.withContext(ctx.audioContext, fn); }
+
+// 伊西丝之拥（原版 playIsis）：金翼日轮蓄势 1100ms → 双翼合抱 + 翡翠光雨；受益者自释放后 260ms 起按原版 200ms 错峰闪绿并揭示回复，
+// 真实驱散（removed>0）在同拍追加原版驱散尾韵
 const isisEmbrace = {
-  id: 'isis-embrace', grade: 'L3', fxTags: ['伊西丝之拥', '伊西斯之拥'],
-  timeline: { chargeMs: 820, totalMs: 2150, fullscreen: true, darken: false },
-  cues: [{ key: 'hpHeal', vol: 0.65 }],
-  prepareKeys() { return ['hpHeal']; },
+  id: 'isis-embrace', grade: 'identity', fxTags: ['伊西丝之拥', '伊西斯之拥'],
+  prepareKeys: () => [],
   async play(ctx) {
-    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), R = (result.query?.shape?.radius || 8) * PX;
-    const rune = fx.ground(runeHtml(fx.uid(), c.x, c.y, 2.8 * PX, '#fbbf24', '#fffbeb', 'ᛁᛊᛁᛊ'), 1800);
-    grow(rune.firstChild, { ms: 1800, s0: 0.2, s1: 1, hold: 0.78, s2: 1.15 });
-    spin(rune.querySelector('[data-fx=spin]'), -140, 1800);
-    if (!(await ctx.wait(820))) return false;
-    fx.sfx('hpHeal', 0.65);
-    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
-    fx.top(ringHtml(c.x, c.y, R * 2, 'rgba(254,240,138,0.85)', 'rgba(74,222,128,0.35)'), 760)
-      .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 720, fill: 'forwards' });
-    (result.effects || []).forEach((e, i) => ctx.after(60 + i * 50, () => ctx.revealEffect(e, false)));
-    return ctx.wait(1260);
+    const CHARGE = 1100, ids = effectIds(ctx), dispelled = new Set(dispelledIds(ctx));
+    const handle = arcaneRun(ctx, () => ctx.av.playIsis(ctx.casterEnt, ids.map(ctx.ent).filter(Boolean)));
+    ids.forEach((id, i) => ctx.after(CHARGE + 260 + i * 200, () => {
+      revealEffectsOf(ctx, id);
+      if (dispelled.has(id) && handle && handle.dispel) handle.dispel(ctx.avHost.host.spriteOf(id));
+    }));
+    return ctx.awaitHandle(handle, CHARGE + 2000);
   },
 };
 
@@ -1808,21 +1861,16 @@ const wizardShield = {
   },
 };
 
+// 飞沙化甲（原版 playFeiShaHuaJia）：玄武岩瓶启封尘沙 → 瓶雾飞向受益者 → 280ms 哥特盾框 + 冥河铠影（abyss 原采样）→ 660ms 再动流光；
+// 增防/瞄准在盾框成形拍点揭示
 const sandArmor = {
-  id: 'sand-armor', grade: 'L2', fxTags: ['飞沙化甲'],
-  timeline: { totalMs: 960, fullscreen: false, darken: false },
-  cues: [{ key: 'defUp', vol: 0.54 }],
-  prepareKeys() { return ['defUp']; },
+  id: 'sand-armor', grade: 'identity', fxTags: ['飞沙化甲'],
+  prepareKeys: () => ['mx_sand_swish', 'mx_stygian_whoosh', 'mx_sword_metal', 'defUp', 'mx_gear_lock', 'shieldUp'],
   async play(ctx) {
-    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), a = worldPx(result.aim);
-    fx.sfx('defUp', 0.54);
-    flyOrb(fx, c, { x: (c.x + a.x) / 2, y: Math.min(c.y, a.y) - 42 }, a, { size: 22, color: '#f59e0b', core: '#fef3c7', ms: 320, fade: true });
-    ctx.after(300, () => {
-      fx.ground(runeHtml(fx.uid(), a.x, a.y, 1.3 * PX, '#d97706', '#fde68a', ''), 620)
-        .firstChild.animate([{ transform: 'translate(-50%,-50%) scale(0.4)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1.1)', opacity: 0 }], { duration: 600, fill: 'forwards' });
-      (result.effects || []).forEach(e => ctx.revealEffect(e, true));
-    });
-    return ctx.wait(920);
+    const ids = effectIds(ctx), first = ids.find(id => id !== ctx.casterId) || ids[0];
+    const handle = arcaneRun(ctx, () => ctx.av.playFeiShaHuaJia(ctx.casterEnt, first ? [ctx.ent(first)] : []));
+    ctx.after(280, () => ids.forEach(id => revealEffectsOf(ctx, id)));
+    return ctx.awaitHandle(handle, 1320);
   },
 };
 
@@ -2145,61 +2193,49 @@ const kruppAim = {
   },
 };
 
-// ---------- D4-C 奇物与音叉混合 WebM（7项 + 塞赫美特起手） ----------
+// ---------- D4-C 奇物与音叉（原版 playHarmonyShelter / playSilenceDomain / playShatterResonance）+ 塞赫美特等混合 WebM ----------
+// 谐律之庇：暗铁三联音叉悬于受益者上方嗡鸣 → 900ms 青银涟漪 WebM + 逐人脚下光环；驱散在涟漪拍点揭示并追加原版铃音尾韵
 const harmonyWard = {
-  id: 'harmony-ward', grade: 'L3', fxTags: ['谐律之庇'],
-  timeline: { chargeMs: 820, totalMs: 2100, fullscreen: true, darken: false },
-  cues: [{ key: 'hpHeal', vol: 0.62 }],
-  prepareKeys() { return ['hpHeal']; },
+  id: 'harmony-ward', grade: 'identity', fxTags: ['谐律之庇'],
+  prepareKeys: () => ['forkHum', 'bowlClear', 'bellPing'],
   async play(ctx) {
-    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
-    const rune = fx.ground(runeHtml(fx.uid(), c.x, c.y, 2.2 * PX, '#38bdf8', '#e0f2fe', 'ᚺᚨᚱᛗᛟ'), 1400);
-    grow(rune.firstChild, { ms: 1400, s0: 0.3, s1: 1, hold: 0.7, s2: 1.15 });
-    if (!(await ctx.wait(820))) return false;
-    fx.sfx('hpHeal', 0.62);
-    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
-    webm(ctx, 'vfx_harmony_ripple.webm', c.x, c.y, 5 * PX, { ms: 1300 });
-    fx.top(ringHtml(c.x, c.y, 8 * PX, 'rgba(186,230,253,0.85)', 'rgba(56,189,248,0.3)'), 720)
-      .firstChild.animate([{ transform: 'scale(0.1)', opacity: 1 }, { transform: 'scale(1.2)', opacity: 0 }], { duration: 700, fill: 'forwards' });
-    (result.effects || []).forEach(e => ctx.revealEffect(e, false));
-    return ctx.wait(1220);
+    const ids = effectIds(ctx), dispelled = new Set(dispelledIds(ctx));
+    const handle = arcaneRun(ctx, () => ctx.av.playHarmonyShelter(ctx.casterEnt, ids.map(ctx.ent).filter(Boolean)));
+    ids.forEach((id, i) => ctx.after(900 + i * 45, () => {
+      revealEffectsOf(ctx, id);
+      if (dispelled.has(id) && handle && handle.dispel) handle.dispel(ctx.avHost.host.spriteOf(id));
+    }));
+    return ctx.awaitHandle(handle, 2300);
   },
 };
 
+// 静默之域：倒悬音叉 + 低频向心收束 → 840ms 绝对静默（定帧在战棋恒为 0）→ 950ms 紫色静默涟漪/裂纹 WebM，停滞在爆发拍点揭示
 const silenceField = {
-  id: 'silence-field', grade: 'L3', fxTags: ['静默之域'],
-  timeline: { chargeMs: 820, totalMs: 2100, fullscreen: true, darken: false },
-  cues: [{ key: 'enemyDebuff', vol: 0.62 }],
-  prepareKeys() { return ['enemyDebuff']; },
+  id: 'silence-field', grade: 'identity', fxTags: ['静默之域'],
+  prepareKeys: () => ['bowlBronze', 'forkMute', 'sd_ring_blast'],
   async play(ctx) {
-    const { fx, hits } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
-    fx.ground(ringHtml(c.x, c.y, 3 * PX, 'rgba(148,163,184,0.6)', 'transparent'), 840)
-      .firstChild.animate([{ transform: 'scale(0.4)', opacity: 0.3 }, { transform: 'scale(1)', opacity: 0.9 }], { duration: 800, fill: 'forwards' });
-    if (!(await ctx.wait(820))) return false;
-    fx.sfx('enemyDebuff', 0.62); fx.shake('light');
-    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
-    webm(ctx, 'vfx_silence_ripple.webm', c.x, c.y, 6 * PX, { ms: 1300 });
-    hits.forEach((h, i) => ctx.after(60 + i * 50, () => ctx.reveal(h.targetId)));
-    return ctx.wait(1220);
+    const { hits } = ctx;
+    const handle = arcaneRun(ctx, () => ctx.av.playSilenceDomain(ctx.casterEnt, hits.map(h => ctx.ent(h.targetId)).filter(Boolean)));
+    ctx.after(950, () => hits.forEach(h => ctx.reveal(h.targetId)));
+    return ctx.awaitHandle(handle, 2400);
   },
 };
 
+// 碎裂之响：三连音叉高频递进起振 → 950ms 冷银音爆光带 + 碎裂弧 WebM + 逐目标火花，降防在爆发拍点揭示（命中追加原版碎光）
 const shatterEcho = {
-  id: 'shatter-echo', grade: 'L3', fxTags: ['碎裂之响'],
-  timeline: { chargeMs: 820, totalMs: 2150, fullscreen: true, darken: false },
-  cues: [{ key: 'defDown', vol: 0.64 }],
-  prepareKeys() { return ['defDown']; },
+  id: 'shatter-echo', grade: 'identity', fxTags: ['碎裂之响'],
+  prepareKeys: () => ['fork432', 'sd_shatter_blast'],
   async play(ctx) {
     const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
-    fx.ground(runeHtml(fx.uid(), c.x, c.y, 2 * PX, '#f43f5e', '#fecdd3', ''), 840)
-      .firstChild.animate([{ transform: 'translate(-50%,-50%) scale(0.4)', opacity: 0.4 }, { transform: 'translate(-50%,-50%) scale(1.05)', opacity: 0.9 }], { duration: 800, fill: 'forwards' });
-    if (!(await ctx.wait(820))) return false;
-    fx.sfx('defDown', 0.64); fx.shake('medium');
-    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
-    webm(ctx, 'vfx_shatter_arc.webm', c.x, c.y, 6 * PX, { ms: 1300 });
-    if (result.crit) floatText(fx, c.x, c.y - 42, '💥 碎裂暴击×2!', '#fecdd3', '#881337', { ms: 900, size: 15 });
-    hits.forEach((h, i) => ctx.after(60 + i * 50, () => ctx.reveal(h.targetId)));
-    return ctx.wait(1260);
+    const handle = arcaneRun(ctx, () => ctx.av.playShatterResonance(ctx.casterEnt, hits.map(h => ctx.ent(h.targetId)).filter(Boolean)));
+    ctx.after(950, () => {
+      if (result.crit) floatText(fx, c.x, c.y - 42, '💥 碎裂暴击×2!', '#fecdd3', '#881337', { ms: 900, size: 15 });
+      hits.forEach(h => {
+        ctx.reveal(h.targetId);
+        if (h.hit && handle && handle.hit) handle.hit(ctx.avHost.host.spriteOf(h.targetId));
+      });
+    });
+    return ctx.awaitHandle(handle, 2500);
   },
 };
 
@@ -2288,40 +2324,81 @@ const strangeConch = {
 };
 
 // ---------- D4-D 召唤 / 索恩 / 圣域帷幕收尾 ----------
+// 原版 _spawnFullscreenSvgFx（造雾术 / 高阶召唤术共用）：舞台震屏类 + 视口层全屏 SVG（1.5s 回收）+ 受影响单位缠绕动画。
+// 原版缠绕对侧全体卡片；战棋按空间真实范围传入受影响单位。
+function screenSvgFx(ctx, html, { shakeClass, shakeMs, shroud, shroudMs, ids = [] }) {
+  const scene = ctx.avHost.host.stage.shakeEl();
+  if (scene) {
+    scene.classList.remove(shakeClass); void scene.offsetWidth; scene.classList.add(shakeClass);
+    ctx.after(shakeMs, () => scene.classList.remove(shakeClass));
+  }
+  ctx.fx.screen(html, 1500);
+  for (const id of ids) {
+    const sp = ctx.avHost.host.spriteOf(id);
+    if (!sp) continue;
+    sp.style.animation = 'none'; void sp.offsetWidth; sp.style.animation = shroud;
+    ctx.after(shroudMs, () => { sp.style.animation = ''; });
+  }
+}
+// 召唤物出场过渡：专属召唤特效（原版跳过通用召唤三瞬）期间先隐去真实落点上的新单位，
+// 到特效显形拍点再从光核中凝形（缩放回弹 + 高光褪去）并在脚下炸开召唤环与上升光尘；中途被打断即复原可见
+function summonMaterialize(ctx, at, { core, glow, ring }) {
+  const ids = ctx.result.summons || [];
+  const list = ids.map(id => ({ id, el: ctx.avHost.host.spriteOf(id) })).filter(s => s.el);
+  list.forEach(s => { s.prev = s.el.style.opacity; s.el.style.opacity = '0'; });
+  let shown = false;
+  const show = () => {
+    if (shown) return; shown = true;
+    list.forEach((s, i) => {
+      s.el.style.opacity = s.prev;
+      s.el.animate([
+        { opacity: 0, transform: 'translateY(12px) scale(0.55)', filter: 'brightness(3.2) blur(6px)' },
+        { opacity: 1, transform: 'translateY(-4px) scale(1.1)', filter: 'brightness(1.8) blur(0px)', offset: 0.55 },
+        { opacity: 1, transform: 'translateY(0) scale(1)', filter: 'brightness(1) blur(0px)' },
+      ], { duration: 620, delay: i * 110, easing: 'cubic-bezier(0.2,0.85,0.3,1)', fill: 'backwards' });
+      const p = worldPx(ctx.centerOf(s.id)), fx = ctx.fx;
+      ctx.after(i * 110, () => {
+        fx.top(orbHtml(p.x, p.y, 2.4 * PX, glow, core), 520).firstChild
+          .animate([{ transform: 'scale(0.25)', opacity: 1 }, { transform: 'scale(1.25)', opacity: 0 }], { duration: 500, easing: 'ease-out', fill: 'forwards' });
+        fx.ground(ringHtml(p.x, p.y + 0.3 * PX, 2.6 * PX, core, ring), 640).firstChild
+          .animate([{ transform: 'scaleX(0.2) scaleY(0.1)', opacity: 1 }, { transform: 'scaleX(1.15) scaleY(0.5)', opacity: 0 }], { duration: 620, easing: 'cubic-bezier(0.1,0.8,0.3,1)', fill: 'forwards' });
+        particles(fx, Array.from({ length: 14 }, () => ({ x: p.x + rnd(-0.5, 0.5) * PX, y: p.y + rnd(-0.2, 0.4) * PX, dx: rnd(-10, 10), dy: -rnd(40, 90), size: rnd(6, 12), color: glow, core, s0: 1, s1: 0.3, dur: rnd(520, 820), delay: rnd(0, 160) })), 1000);
+      });
+    });
+  };
+  ctx.after(at, show);
+  return ok => { if (!ok) list.forEach(s => { s.el.style.opacity = s.prev; }); return ok; };
+}
+
+// 高阶召唤术（原版 spawnTitanGazeFx「旧日幻影·巨神凝视终局」）：古神三全音低语 + 惊惧震屏 + 巨神暗影/猩红巨瞳/精神海啸（视口层 1.4s），
+// 对侧存活单位缠绕摇晃；召唤物在暗影最盛（约 520ms）时凝形
 const highSummon = {
-  id: 'high-summon', grade: 'L3', fxTags: ['高阶召唤术'],
-  timeline: { chargeMs: 820, totalMs: 2100, fullscreen: true, darken: false },
-  cues: [{ key: 'herochargedone', vol: 0.62 }],
-  prepareKeys() { return ['herochargedone']; },
+  id: 'high-summon', grade: 'identity', fxTags: ['高阶召唤术'],
+  prepareKeys: () => [],
   async play(ctx) {
-    const { fx, result } = ctx, a = worldPx(result.aim);
-    const rune = fx.ground(runeHtml(fx.uid(), a.x, a.y, 2 * PX, '#f59e0b', '#fef08a', 'ᛊᚢᛗᛗᛟᚾ'), 1600);
-    grow(rune.firstChild, { ms: 1600, s0: 0.25, s1: 1.05, hold: 0.78, s2: 1.15 });
-    spin(rune.querySelector('[data-fx=spin]'), 180, 1600);
-    if (!(await ctx.wait(820))) return false;
-    fx.sfx('herochargedone', 0.62); fx.shake('medium');
-    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
-    particles(fx, Array.from({ length: 20 }, () => { const ang = rnd(0, TAU), d = rnd(0.5, 1.4) * PX; return { x: a.x, y: a.y, dx: Math.cos(ang) * d, dy: Math.sin(ang) * d - 25, size: rnd(8, 14), color: '#fbbf24', core: '#fffbeb', s0: 1, s1: 0.2, dur: 640 }; }), 760);
-    return ctx.wait(1220);
+    const { av, casterEnt } = ctx;
+    arcaneRun(ctx, () => av.playEldritchWhisper());
+    const foes = [...ctx.sandbox.getUnitView().nodes.keys()]
+      .filter(id => { const e = ctx.ent(id); return e && e.isAlive && e.side !== casterEnt.side; });
+    screenSvgFx(ctx, av.buildTitanGazeFxHtml(), { shakeClass: 'san-shake-dread', shakeMs: 800, shroud: 'target-enshrouded-wobble 1s cubic-bezier(0.2, 0.8, 0.3, 1) both', shroudMs: 1100, ids: foes });
+    const done = summonMaterialize(ctx, 520, { core: '#fef2f2', glow: 'rgba(239,68,68,0.75)', ring: 'rgba(127,29,29,0.55)' });
+    return done(await ctx.wait(1500));
   },
 };
 
+// 蝎眼钥匙（原版 playXieYanKey「幻梦行军兽」）：钥匙启封暗紫流光向召唤落点收束 → 1150ms 竖裂撕开、行军兽探身（abyss 原采样咆哮/踏地）→
+// 2500ms 齿轮锁合单防回流受益者；召唤物在裂隙消融时（约 1900ms）凝形，单防在回流抵达时揭示
 const scorpionKey = {
-  id: 'scorpion-key', grade: 'L3', fxTags: ['蝎眼钥匙'],
-  timeline: { chargeMs: 820, totalMs: 2150, fullscreen: true, darken: false },
-  cues: [{ key: 'herochargedone', vol: 0.65 }],
-  prepareKeys() { return ['herochargedone']; },
+  id: 'scorpion-key', grade: 'identity', fxTags: ['蝎眼钥匙'],
+  prepareKeys: () => ['mx_tunnel', 'mx_rift_charge', 'mx_stygian_whoosh', 'mx_deep_impact', 'mx_giant_roar', 'mx_dino_roar', 'mx_golem_stomp', 'mx_gear_lock', 'shieldUp'],
   async play(ctx) {
-    const { fx, result } = ctx, a = worldPx(result.aim);
-    const rune = fx.ground(runeHtml(fx.uid(), a.x, a.y, 2.8 * PX, '#a855f7', '#f3e8ff', 'ᚴᛖᛁ'), 1800);
-    grow(rune.firstChild, { ms: 1800, s0: 0.2, s1: 1.1, hold: 0.8, s2: 1.2 });
-    spin(rune.querySelector('[data-fx=spin]'), -210, 1800);
-    if (!(await ctx.wait(820))) return false;
-    fx.sfx('herochargedone', 0.65); fx.shake('heavy');
-    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
-    fx.top(ringHtml(a.x, a.y, 4 * PX, 'rgba(216,180,254,0.9)', 'rgba(126,34,206,0.45)'), 680)
-      .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 640, fill: 'forwards' });
-    return ctx.wait(1260);
+    const { result } = ctx, sid = (result.summons || [])[0];
+    const at = stagePt(sid ? ctx.centerOf(sid) : result.aim);
+    const wards = effectIds(ctx, e => e.kind === 'buff' && e.field === 'def' && e.value > 0);
+    const handle = arcaneRun(ctx, () => ctx.av.playXieYanKey(ctx.casterEnt, wards.map(ctx.ent).filter(Boolean), false, at));
+    const done = summonMaterialize(ctx, 1900, { core: '#f5f3ff', glow: 'rgba(139,112,184,0.8)', ring: 'rgba(56,39,82,0.6)' });
+    ctx.after(2840, () => effectIds(ctx).forEach(id => revealEffectsOf(ctx, id)));
+    return done(await ctx.awaitHandle(handle, 3350));
   },
 };
 
@@ -2464,7 +2541,7 @@ const sanctumVeil = {
   },
 };
 
-export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, slugShot, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, incendiaryBottle, vitalFlow, sanctumVeil, healMend, fogBurst, fireDomain, poisonDomain, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, frostBlast, voidQuake, lineRift, waterBolt, curseBeam, ...basicAttacks, neutralImpact, zheYing, mirrorCounter, wizardShield, reactionKanpo, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, kruppAim, sekhmetVow];
+export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, slugShot, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, incendiaryBottle, vitalFlow, sanctumVeil, healMend, fogBurst, rlyehSediment, fireDomain, poisonDomain, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, frostBlast, voidQuake, lineRift, waterBolt, curseBeam, ...basicAttacks, enemyGroupAttack, neutralImpact, zheYing, mirrorCounter, wizardShield, reactionKanpo, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, kruppAim, sekhmetVow];
 export function getFxTagOptions() {
   return [...new Set(DEFAULT_FX_ENTRIES.flatMap(entry => entry.fxTags || []))].map(name => ({ name, label: name }));
 }

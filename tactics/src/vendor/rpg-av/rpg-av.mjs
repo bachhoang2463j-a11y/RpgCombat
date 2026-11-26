@@ -1,10 +1,10 @@
 // ==========================================
 // 由 tactics/tools/extract-rpg-av.cjs 自动生成，请勿手改。
 // 源: index.html  sha256=5c1ab2a1a243bb7d7e79b4aca76026ad1058af2a74bf9dfbf8763ae8b13554e7
-// arcaneVfxModule 行区间(源 5729–14230): 5730–5791, 5800–5841, 5849–5913, 5923–5924, 5932–6302, 6431–6485, 6642–6850, 7016–7037, 7348–7584, 7596–10718, 10748–10757, 11103–11133, 11142–11240, 11917–12083, 12201–12562, 12565–14208
-// 入选语句 281 段 / 6501 行；入口: playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar, CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx, syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked, playSummonEnter, playSummonExit, playSummonGuard, clearSummonState, playLingFeng, playRescueGrit, playRescueAvoidFatal, clearRescueState, playVariantResistFx, playCounterAttackL1, playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, clearSelfDestructState, syncSelfDestructWarning, setIdentitySfx, setVariantSfx, setStatusSfx, setSelfDestructSfx
+// arcaneVfxModule 行区间(源 5729–14230): 5730–5791, 5800–5924, 5932–6302, 6431–6485, 6565–7584, 7596–11500, 11917–12083, 12201–12562, 12565–14208
+// 入选语句 313 段 / 7711 行；入口: playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar, CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx, syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked, playSummonEnter, playSummonExit, playSummonGuard, clearSummonState, playLingFeng, playIsis, playFeiShaHuaJia, playXieYanKey, playHarmonyShelter, playSilenceDomain, playShatterResonance, playMeleeGroup, playRangedGroup, playSpellGroup, playRescueGrit, playRescueAvoidFatal, clearRescueState, playVariantResistFx, playCounterAttackL1, playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, clearSelfDestructState, syncSelfDestructWarning, setIdentitySfx, setVariantSfx, setStatusSfx, setSelfDestructSfx
 // 显式存根: 
-// 宿主适配补丁: 枪击采样相邻去重×1; 远程击杀隐藏我方名称×1; 特写挂屏幕宿主×2; 特写收尾登记×2; 特写震屏走舞台震动层×1; 特写计时可随重开清理×6; 环境音脱离#battle-scene DOM×1; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 屏幕矩形 → 特效舞台坐标×12; innerWidth → 舞台宽×16; innerHeight → 舞台高×10; body 挂载 → 特效舞台×5; JS position:fixed → absolute×0; arcane canvas resize 走舞台×1; 舞台震动独立层×2; window.* 声音函数改为工厂内本地×14; 环境氛围音随清场停止×1; 去抗性全局挂载×1; 毅力血幕挂圆形棋子内框×1; 致命回避残影保留圆形尺度×1; 反击残影保留圆形尺度×1; 灵风术法阵按头像尺度×1; 灵风术法阵透视原点钉在阵心×1; 灵风术收尾羽翼按头像尺度×1; 强力反击原版震屏函数×1; 强力反击震屏宿主×1; 强力反击震屏清理登记×1; 强力反击震屏代际×1; 强力反击震屏帧登记×2; 强力反击爆发粒子注入×1; 强力反击蓄力粒子注入×1; 强力反击回调契约×1; 强力反击代际句柄×1; 强力反击取消结果×1; 强力反击闪避缓冲可取消×1; 强力反击蓄力可取消×1; 强力反击预载取消×1; 强力反击起播等待可取消×1; 强力反击登记蓄力光×1; 强力反击音效取消登记×1; 强力反击阶段取消结果×1; 强力反击舞台坐标×1; 强力反击实体DOM蓄力光×1; 强力反击实体DOM×1; 强力反击蓄力粒子×1; 强力反击聚气使用本地函数×1; 强力反击蓄力坐标×1; 强力反击方向坐标×1; 强力反击锁定读取本地模块×1; 强力反击白闪舞台挂载×1; 强力反击白闪计时×1; 强力反击准星舞台坐标×1; 强力反击准星舞台挂载×1; 强力反击准星计时×1; 强力反击爆发与命中回调×1; 强力反击攻击方向实体×1; 强力反击目标震动清理×1; 强力反击原版震屏调用×1; 强力反击余波等待可取消×1; 强力反击保留余波并返回成功×1; CSS position:fixed → absolute×12; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1; CSS 残留视口单位(按舞台尺度保留)×41
+// 宿主适配补丁: 枪击采样相邻去重×1; 远程击杀隐藏我方名称×1; 特写挂屏幕宿主×2; 特写收尾登记×2; 特写震屏走舞台震动层×1; 特写计时可随重开清理×6; 环境音脱离#battle-scene DOM×1; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 蝎眼钥匙落点参数×1; 蝎眼钥匙裂隙钉召唤落点×1; 蝎眼钥匙裂隙舞台定位×1; 谐律之庇音叉悬于受益者上方×1; 屏幕矩形 → 特效舞台坐标×13; innerWidth → 舞台宽×22; innerHeight → 舞台高×15; body 挂载 → 特效舞台×5; JS position:fixed → absolute×1; arcane canvas resize 走舞台×1; 舞台震动独立层×3; window.* 声音函数改为工厂内本地×14; 环境氛围音随清场停止×1; 去抗性全局挂载×1; 毅力血幕挂圆形棋子内框×1; 致命回避残影保留圆形尺度×1; 反击残影保留圆形尺度×1; 灵风术法阵按头像尺度×1; 灵风术法阵透视原点钉在阵心×1; 灵风术收尾羽翼按头像尺度×1; 强力反击原版震屏函数×1; 强力反击震屏宿主×1; 强力反击震屏清理登记×1; 强力反击震屏代际×1; 强力反击震屏帧登记×2; 强力反击爆发粒子注入×1; 强力反击蓄力粒子注入×1; 强力反击回调契约×1; 强力反击代际句柄×1; 强力反击取消结果×1; 强力反击闪避缓冲可取消×1; 强力反击蓄力可取消×1; 强力反击预载取消×1; 强力反击起播等待可取消×1; 强力反击登记蓄力光×1; 强力反击音效取消登记×1; 强力反击阶段取消结果×1; 强力反击舞台坐标×1; 强力反击实体DOM蓄力光×1; 强力反击实体DOM×1; 强力反击蓄力粒子×1; 强力反击聚气使用本地函数×1; 强力反击蓄力坐标×1; 强力反击方向坐标×1; 强力反击锁定读取本地模块×1; 强力反击白闪舞台挂载×1; 强力反击白闪计时×1; 强力反击准星舞台坐标×1; 强力反击准星舞台挂载×1; 强力反击准星计时×1; 强力反击爆发与命中回调×1; 强力反击攻击方向实体×1; 强力反击目标震动清理×1; 强力反击原版震屏调用×1; 强力反击余波等待可取消×1; 强力反击保留余波并返回成功×1; CSS position:fixed → absolute×13; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1; CSS 残留视口单位(按舞台尺度保留)×42
 // ==========================================
 /* eslint-disable */
 // ---- 纯数据导出（原样，供宿主在工厂创建前解析人物头像/语音与预载清单） ----
@@ -36,7 +36,7 @@ export const RPG_HERO_VOICE_LINES = {
     low: ['弗兰克/弗兰克_半血1.wav', '弗兰克/弗兰克_半血2.wav', '弗兰克/弗兰克_半血3.wav']
   }
 };
-export const RPG_USED_AUDIO_KEYS = ["defDown","atk2","taunt","hide","hitDown","shieldUp","defUp","burst","shot","monsterAttack","kanpo","gunshot1","gunshot2","gunshot3","gunshot_pierce","xiandan","enemySwingGroup","enemyRanged","enemyRangedGroup","enemyMagic","enemyMagicGroup","enemyBuff","enemyDebuff","light_charge","light_impact","thunder_charge","thunder_single_hit","thunder_aoe_hit","bomb_throw","explosion_single","explosion_aoe_charge","explosion_aoe_blast","slash_whoosh_hit_fs434873","claw_bloody_blade_fs323526","frost_crystal_impact_fs550267","aoe_gun_burst_fs482122","aoe_poison_spell_fs219566","aoe_wind_spin_fs772867","fire01","freeze01","wolfman","creature_slime_01","swish_3","parry_3","dodge_2","hit_1a","hit_1b","hit_1c","hit_2a","hit_2b","hit_2c","hit_3a","hit_3b","hit_3c","mx_sand_swish","mx_stygian_whoosh","mx_sword_metal","mx_gear_lock","mx_tunnel","mx_rift_charge","mx_deep_impact","mx_giant_roar","mx_dino_roar","mx_golem_stomp","revive_gather","revive_bloom","molt_crack","molt_snap","molt_empower","rage_exit","link_dash","link_chime","leech_flow","regen_hum","thorn_parry","resist_fluid","resist_phantom","resist_antimagic","resist_vital","resist_fireproof","resist_poisonproof","resist_ironbody","ranshao","fog","mx_rift_tear","mx_vacuum","mx_armor_strike","sd_ring_blast","sd_shatter_blast","huoyan01","parry_perfect","avoid_dash_perfect","sheshen_armor_step","fork432","forkHum","forkMute","bowlBronze","bowlClear","bellPing","crystalSnap","mirrorRing","mirrorStream","bastetChime","bastetCast","bastetHeal","conchCharge","conchMist","windHum","crystalChime","dodgeWind"];
+export const RPG_USED_AUDIO_KEYS = ["defDown","atk2","atk1","taunt","hide","hitDown","shieldUp","defUp","burst","shot","monsterAttack","kanpo","gunshot1","gunshot2","gunshot3","gunshot_pierce","xiandan","enemySwingGroup","enemyRanged","enemyRangedGroup","enemyMagic","enemyMagicGroup","enemyBuff","enemyDebuff","enemyMeleeGroupHit","enemyRangedGroupHit","light_charge","light_impact","thunder_charge","thunder_single_hit","thunder_aoe_hit","bomb_throw","explosion_single","explosion_aoe_charge","explosion_aoe_blast","slash_whoosh_hit_fs434873","claw_bloody_blade_fs323526","frost_crystal_impact_fs550267","aoe_gun_burst_fs482122","aoe_poison_spell_fs219566","aoe_wind_spin_fs772867","fire01","freeze01","wolfman","creature_slime_01","swish_3","parry_3","dodge_2","hit_1a","hit_1b","hit_1c","hit_2a","hit_2b","hit_2c","hit_3a","hit_3b","hit_3c","mx_sand_swish","mx_stygian_whoosh","mx_sword_metal","mx_gear_lock","mx_tunnel","mx_rift_charge","mx_deep_impact","mx_giant_roar","mx_dino_roar","mx_golem_stomp","revive_gather","revive_bloom","molt_crack","molt_snap","molt_empower","rage_exit","link_dash","link_chime","leech_flow","regen_hum","thorn_parry","resist_fluid","resist_phantom","resist_antimagic","resist_vital","resist_fireproof","resist_poisonproof","resist_ironbody","ranshao","fog","mx_rift_tear","mx_vacuum","mx_armor_strike","sd_ring_blast","sd_shatter_blast","huoyan01","parry_perfect","avoid_dash_perfect","sheshen_armor_step","fork432","forkHum","forkMute","bowlBronze","bowlClear","bellPing","crystalSnap","mirrorRing","mirrorStream","bastetChime","bastetCast","bastetHeal","conchCharge","conchMist","windHum","crystalChime","dodgeWind"];
 
 export function createRpgAv(host) {
   // ---- 宿主注入（战棋舞台、单位视图、代际令牌） ----
@@ -1198,6 +1198,95 @@ async function playPowerCounterEffect(counter, victim, counterDom, onImpact) {
     return true;
 }
 
+  // ---- 造雾术 / 高阶召唤术全屏 SVG 构件（原样） ----
+const RLYEH_FOG_CLOUD_URL = `${ASSET_BASE}/fog.mp3`;
+function getEldritchAudioContext() { const ctx = CombatAudioMixer.skillContext(); if (ctx) CombatAudioMixer.protect('special', ctx.currentTime, null, CombatAudioMixer.capture('B').category); return ctx; }
+function playEldritchWhisper() {
+    try {
+        const ctx = getEldritchAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        [440, 622.25, 880, 1244.5].forEach((freq, idx) => {
+            const osc = ctx.createOscillator(); const gain = ctx.createGain();
+            osc.type = idx % 2 === 0 ? 'sine' : 'triangle';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.05);
+            osc.frequency.linearRampToValueAtTime(freq + (idx % 2 === 0 ? 12 : -12), now + 0.8);
+            gain.gain.setValueAtTime(0.01, now);
+            gain.gain.linearRampToValueAtTime(0.18, now + 0.15);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+            osc.connect(gain); gain.connect(CombatAudioMixer.output('skill', CombatAudioMixer.capture('B').category));
+            osc.start(now); osc.stop(now + 0.95);
+        });
+    } catch(e) {}
+}
+function buildRlyehSedimentFxHtml() {
+    const dur = 1.35.toFixed(2);
+    return `
+        <div class="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden">
+          <div class="absolute left-1/2 bottom-8 pointer-events-none" style="width:720px;height:340px;animation: mist-obsidian-carpet ${dur}s cubic-bezier(0.12, 0.9, 0.25, 1) both;">
+            <svg viewBox="0 0 500 200" class="w-full h-full">
+              <defs>
+                <linearGradient id="fx-rlyeh-obsidian-grad" x1="0%" y1="100%" x2="0%" y2="0%">
+                  <stop offset="0%" stop-color="#020617" stop-opacity="0.98" />
+                  <stop offset="35%" stop-color="#0369a1" stop-opacity="0.85" />
+                  <stop offset="70%" stop-color="#38bdf8" stop-opacity="0.55" />
+                  <stop offset="100%" stop-color="#e0f2fe" stop-opacity="0" />
+                </linearGradient>
+              </defs>
+              <path d="M10,180 Q80,60 170,110 Q260,30 350,90 Q430,40 490,180 Z" fill="url(#fx-rlyeh-obsidian-grad)" style="filter: drop-shadow(0 0 35px #0284c7);" />
+              <path d="M50,190 Q130,100 220,130 Q310,70 400,140 Q450,110 470,190 Z" fill="#38bdf8" opacity="0.45" />
+            </svg>
+          </div>
+          <div class="absolute left-1/2 top-1/2 pointer-events-none" style="width:480px;height:520px;animation: mist-vertical-jet ${dur}s cubic-bezier(0.15, 0.95, 0.25, 1) both;">
+            <svg viewBox="0 0 300 320" class="w-full h-full">
+              <defs>
+                <linearGradient id="fx-rlyeh-steam-grad" x1="0%" y1="100%" x2="0%" y2="0%">
+                  <stop offset="0%" stop-color="#0c4a6e" stop-opacity="0.9" />
+                  <stop offset="50%" stop-color="#38bdf8" stop-opacity="0.7" />
+                  <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+                </linearGradient>
+              </defs>
+              <path d="M80,310 Q60,180 85,90 Q105,20 120,10 Q135,20 145,90 Q155,180 135,310 Z" fill="url(#fx-rlyeh-steam-grad)" style="filter: drop-shadow(0 0 25px #38bdf8);" />
+              <path d="M170,310 Q150,190 175,110 Q195,40 210,30 Q225,40 235,110 Q245,190 225,310 Z" fill="url(#fx-rlyeh-steam-grad)" opacity="0.8" />
+            </svg>
+          </div>
+        </div>
+      `;
+}
+function buildTitanGazeFxHtml() {
+    const dur = 1.4.toFixed(2);
+    return `
+        <div class="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden">
+          <div class="fixed inset-0 pointer-events-none" style="background:radial-gradient(circle at center, transparent 15%, rgba(20,5,10,0.85) 70%, rgba(0,0,0,0.98) 100%);animation: brine-drown-vignette ${dur}s ease-in-out both;"></div>
+          <div class="absolute left-1/2 top-1/2 pointer-events-none" style="width:600px;height:600px;animation: titan-shadow-loom ${dur}s cubic-bezier(0.15, 0.9, 0.25, 1) both;">
+            <svg viewBox="0 0 300 300" class="w-full h-full fill-current text-[#16060c]" style="filter: drop-shadow(0 0 40px #dc2626);">
+              <path d="M150,40 C110,40 80,70 70,110 C50,120 10,130 0,170 C30,175 60,165 75,150 C70,190 90,240 100,280 C115,260 130,220 135,180 C145,210 155,210 165,180 C170,220 185,260 200,280 C210,240 230,190 225,150 C240,165 270,175 300,170 C290,130 250,120 230,110 C220,70 190,40 150,40 Z" />
+            </svg>
+          </div>
+          <div class="absolute left-1/2 top-1/2 pointer-events-none" style="width:192px;height:128px;animation: titan-baleful-glare ${dur}s cubic-bezier(0.12, 0.9, 0.25, 1) both;">
+            <svg viewBox="0 0 120 80" class="w-full h-full">
+              <defs>
+                <radialGradient id="fx-titan-eye-glow" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#ffffff" />
+                  <stop offset="30%" stop-color="#fef08a" />
+                  <stop offset="60%" stop-color="#ef4444" />
+                  <stop offset="100%" stop-color="#7f1d1d" stop-opacity="0" />
+                </radialGradient>
+              </defs>
+              <path d="M10,40 Q60,5 110,40 Q60,75 10,40 Z" fill="#450a0a" stroke="#f87171" stroke-width="3" />
+              <circle cx="60" cy="40" r="22" fill="url(#fx-titan-eye-glow)" />
+              <ellipse cx="60" cy="40" rx="6" ry="18" fill="#1c0505" stroke="#fca5a5" stroke-width="1.5" />
+            </svg>
+          </div>
+          <div class="absolute left-1/2 top-1/2 pointer-events-none" style="width:550px;height:550px;animation: psychic-tsunami-surge ${dur}s cubic-bezier(0.12, 0.85, 0.25, 1) both;">
+            <svg viewBox="0 0 200 200" class="w-full h-full fill-none stroke-current text-rose-500" style="filter: drop-shadow(0 0 25px #ef4444);">
+              <circle cx="100" cy="100" r="45" stroke-width="6" />
+              <circle cx="100" cy="100" r="30" stroke-width="3" stroke-dasharray="8 4" opacity="0.8" />
+            </svg>
+          </div>
+        </div>
+      `;
+}
   // ---- 粒子引擎（原样，仅换挂载层） ----
 class CanvasFxEngine {
     constructor() {
@@ -1686,6 +1775,13 @@ const CombatEvents = {
         const t = Math.min(...rs.map(r => r.top)), b = Math.max(...rs.map(r => r.bottom));
         return { x: (l + rr) / 2, y: (t + b) / 2, l, r: rr, t, b, w: rr - l, h: b - t };
     }
+    // NK：施法者所属全队存活对象（heroesData/enemiesData 含召唤物，isAlive 过滤）
+    function teamSprites(caster) {
+        const isHero = caster && (caster.isSummon ? caster.side === 'hero' : String(caster.id || '').startsWith('h'));
+        const arr = isHero ? heroesData : enemiesData;
+        return arr.filter(e => e.isAlive).map(e => domOf(e)).filter(Boolean);
+    }
+
     // ===== 私有合成音色（demo 原样移植，局部隔离） =====
     function audio() {
         if (!audioCtx || audioCtx !== CombatAudioMixer.context()) {
@@ -1750,6 +1846,15 @@ const CombatEvents = {
         s.frequency.setValueAtTime(o.f0, t); if (o.f1) s.frequency.exponentialRampToValueAtTime(o.f1, t + (o.fd || o.dur));
         let node = s; if (o.lp) { const f = biquad(ctx, 'lowpass', o.lp, o.lp1, o.q || 0.8, t, o.dur); s.connect(f); node = f; }
         s.start(t); s.stop(t + o.dur + 0.05); chain(ctx, node, t, o);
+    }
+    function choir(d, freqs, dur, vol, peakFrac = 0.4, cut = false) {
+        const ctx = audio(), t = ctx.currentTime + d;
+        freqs.forEach((f, i) => [-9, 0, 8].forEach(dt => {
+            const s = ctx.createOscillator(); s.type = 'sawtooth'; s.frequency.value = f; s.detune.value = dt;
+            const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 5 + i * 0.4; lg.gain.value = f * 0.006; lfo.connect(lg); lg.connect(s.frequency);
+            const lp = biquad(ctx, 'lowpass', 900 + i * 200, 0, 0.6, t, dur); s.connect(lp); s.start(t); lfo.start(t); s.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+            chain(ctx, lp, t, { vol: vol / 3, dur, peak: dur * peakFrac, cut, wet: 0.7, pan: (i - 1) * 0.3 });
+        }));
     }
     function chime(d, f, dur = 1.2, vol = 0.1, pan = 0) { [[1, 1], [2.4, 0.4], [3.9, 0.18]].forEach(([m, v]) => tone(d, { f0: f * m, dur: dur / Math.sqrt(m), vol: vol * v, pan, wet: 0.7 })); }
     function crystal(d, f, vol = 0.12, pan = 0) { tone(d, { f0: f, dur: 0.16, vol, pan, wet: 0.5 }); tone(d, { f0: f * 1.5, dur: 0.09, vol: vol * 0.5, pan }); click(d, vol * 1.5, 6000, 0.005, pan); }
@@ -2179,6 +2284,83 @@ const CombatEvents = {
         return handle;
     }
 
+    // ===== ⑦ 伊西丝之拥（L3，蓄势 1100ms）：金翼日轮 → 双翼合抱 + 翡翠光雨（实际 targets） =====
+    // dispel(targetDom)：仅主代理在真实驱散 removed.length>0 时调用，独立短尾韵，可晚至启动后 2.4~3.0s
+    function playIsis(caster, targets) {
+        const el = domOf(caster); if (!el) return null;
+        const token = combatToken;
+        ensureCanvas(); ensureDriver();
+        const CHARGE = 1100;
+        const tDoms = (targets || []).map(t => domOf(t)).filter(Boolean);
+        const pc = unionRect(tDoms.length ? tDoms : [el]) || ctr(el);
+        const Wd = Math.min(__STAGE.w * 0.95, 1300), Hd = Wd * 0.42, ax = pc.x, ay = pc.t - Hd * 0.12;
+        let cancelled = false;
+        const handle = { doneAt: Date.now() + CHARGE + 2000, impactDom: null, dodge: null, hit: null, dispel: null, cancel: null };
+        S.handles.add(handle);
+        darken(0.72);
+        const end = CHARGE / 1000 - 0.12;
+        choir(0, [220, 277, 330], end, 0.09, 0.95, true); choir(0.4, [440, 554, 659], end - 0.4, 0.06, 0.95, true);
+        for (let i = 0; i < 8; i++) chime(rnd(0.1, end - 0.1), rnd(1800, 3200), 0.5, 0.025, rnd(-0.7, 0.7));
+        const uid = ++S.uid;
+        const wfId = 'arcane-wf-' + uid, sunId = 'arcane-sun-' + uid;
+        const feathers = [];
+        for (let r = 0; r < 4; r++) for (let i = 0; i <= 15; i++) {
+            const t = i / 15, bx = 30 + t * 520, by = -150 - Math.sin(t * Math.PI) * 50 + t * 70 + r * 36, L = 70 + t * 130 - r * 18, ang = -(12 + t * 55);
+            feathers.push(`<path d="M0,0 Q-14,${L * 0.5} 0,${L} Q14,${L * 0.5} 0,0 Z" transform="translate(${-bx},${by}) rotate(${-ang})" fill="url(#${wfId})" stroke="#fff4c2" stroke-width="1.2" opacity="${1 - r * 0.15}"/>`);
+        }
+        const wing = `<g style="transform-origin: -30px -150px; animation: arcane-wing-fold 0.6s ${CHARGE}ms cubic-bezier(0.5,0,0.3,1) both;">${feathers.reverse().join('')}</g>`;
+        const layer = fsLayer(`
+          <div class="arcane-fs-anchor" data-arcane-part="wings" style="left:${ax}px; top:${ay}px; width:${Wd}px; height:${Hd * 1.5}px; animation: arcane-wings-in ${CHARGE}ms cubic-bezier(0.2,0.8,0.2,1) both; filter: drop-shadow(0 0 14px rgba(253,230,138,0.7));">
+            <svg viewBox="-600 -300 1200 520" style="width:100%;height:100%;overflow:visible">
+              <defs><linearGradient id="${wfId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fde68a"/><stop offset="0.6" stop-color="#d4af37"/><stop offset="1" stop-color="#059669"/></linearGradient>
+                <radialGradient id="${sunId}"><stop offset="0" stop-color="#fff7d6"/><stop offset="0.6" stop-color="#f59e0b"/><stop offset="1" stop-color="#b45309"/></radialGradient></defs>
+              ${wing}<g transform="scale(-1,1)">${wing}</g>
+              <g style="transform-origin: 0px -200px; animation: arcane-sun-grow ${CHARGE}ms ease-out both;">
+                ${Array.from({ length: 24 }, (_, i) => `<line x1="0" y1="-200" x2="0" y2="-310" stroke="#fde68a" stroke-width="2" opacity="0.6" transform="rotate(${i * 15} 0 -200)"/>`).join('')}
+                <circle cx="0" cy="-200" r="56" fill="url(#${sunId})" stroke="#fff4c2" stroke-width="3"/>
+                <path d="M-30,-130 Q-50,-150 -30,-160 M30,-130 Q50,-150 30,-160" fill="none" stroke="#d4af37" stroke-width="5" stroke-linecap="round"/>
+              </g>
+            </svg></div>`, CHARGE + 1900);
+        const rise = every(40, () => burst(4, () => ({ x: ax + rnd(-Wd / 2, Wd / 2), y: __STAGE.h + 10, vx: 0, vy: rnd(-9, -5), drag: 0.985, decay: 0.02, size: rnd(1.2, 2.4), color: pick(['#fde68a', '#6ee7b7']) })));
+        function release() {
+            if (cancelled || token !== combatToken) return;
+            stopEvery(rise);
+            boom(0, { f0: 900, f1: 150, dur: 0.35, vol: 0.6, peak: 0.05 }); boom(0.18, { f0: 900, f1: 150, dur: 0.35, vol: 0.55, peak: 0.05 }); whoosh(0, { f0: 300, f1: 900, q: 0.7, dur: 0.5, vol: 0.4, peak: 0.15 });
+            kick(0.18, { hi: 140, lo: 45, pd: 0.06, dur: 0.6, vol: 0.8, drive: 2, wet: 0.2 });
+            chime(0.2, 392, 3, 0.15); chime(0.24, 588, 2.6, 0.09); choir(0.15, [523, 659, 784], 2.2, 0.07, 0.15);
+            for (let i = 0; i < 12; i++) chime(0.3 + rnd(0, 1.2), rnd(2600, 4200), 0.4, 0.02, rnd(-0.7, 0.7));
+            shake('heavy');
+            after(700, () => { const w = layer.querySelector('[data-arcane-part="wings"]'); if (w) w.style.animation = 'arcane-wings-out 0.9s ease-in both'; });
+            fsLayer(`<div style="position:absolute;inset:0;background:radial-gradient(ellipse at ${pc.x}px ${pc.y}px, rgba(255,247,214,0.9), rgba(52,211,153,0.4) 35%, transparent 70%); animation: arcane-fs-flash 0.7s 0.15s ease-out both;"></div>`, 1000);
+            const rain = every(40, () => burst(7, () => ({ x: pc.x + rnd(-pc.w / 2 - 80, pc.w / 2 + 80), y: rnd(-20, pc.t - 40), vx: 0, vy: rnd(7, 11), drag: 1, decay: 0.022, size: 1.8, shape: 'streak', color: pick(['#6ee7b7', '#a7f3d0', '#fde68a']) })));
+            after(1100, () => stopEvery(rain));
+            after(260, () => { // 群体真实结算依次 200ms，视觉同步错开；不写数字
+                tDoms.forEach((td, i) => after(i * 200, () => {
+                    if (cancelled || token !== combatToken || !td.isConnected) return;
+                    flash(td, 'arcane-flash-heal');
+                    const tc = ctr(td);
+                    burst(14, () => ({ x: tc.x + rnd(-24, 24), y: tc.y + rnd(-50, 50), vx: rnd(-0.4, 0.4), vy: rnd(-1.6, -0.5), decay: 0.025, size: rnd(1.4, 2.4), color: '#a7f3d0' }));
+                }));
+            });
+            after(1500, () => darken(0));
+        }
+        after(CHARGE, release);
+        handle.dispel = (targetDom) => {
+            if (cancelled || token !== combatToken || !targetDom) return;
+            ensureCanvas(); ensureDriver();
+            const sp = (typeof targetDom.getBoundingClientRect === 'function') ? targetDom : domOf(targetDom);
+            if (!sp) return;
+            const cc = ctr(sp);
+            whoosh(0, { type: 'highpass', f0: 3000, f1: 6000, q: 0.7, dur: 0.5, vol: 0.3, peak: 0.02 });
+            for (let i = 0; i < 10; i++) click(rnd(0, 0.4), 0.12, rnd(2500, 5000), 0.006, rnd(-0.5, 0.5));
+            burst(12, () => { const an = rnd(-2.6, -0.5), s = rnd(2, 5); return { x: cc.x, y: cc.top, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.95, rot: rnd(0, 6), vr: rnd(-0.3, 0.3), decay: 0.035, size: rnd(4, 7), shape: 'shard', blend: 'source-over', color: '#a855f7', fill: 'rgba(20,6,30,0.9)' }; });
+            burst(16, () => ({ x: cc.x + rnd(-20, 20), y: cc.top + rnd(-20, 10), vx: rnd(-1, 1), vy: rnd(-2, -0.6), drag: 0.96, decay: 0.03, size: rnd(1, 2), color: pick(['#fb923c', '#fde68a']) }));
+        };
+        handle.cancel = () => { cancelled = true; stopEvery(rise); S.layers.delete(layer); layer.remove(); darken(0); S.handles.delete(handle); };
+        after(CHARGE + 2000, () => { S.handles.delete(handle); releaseIdleCanvas(); });
+        return handle;
+    }
+
     // ===== 敌方攻击前摇：一级（普通行动起手） =====
     // 统一节奏：0–330ms 预备蓄势，330ms 为出手拍点（正式版以此为结算起点），600ms 完全回位。
     // 七类新增前摇使用贴身渐变粒子；红色单体基线不添加粒子。
@@ -2388,6 +2570,171 @@ const CombatEvents = {
         return handle;
     }
 
+    // ===== 敌方兜底群攻 L2+（350ms 蓄势，纯演出） =====
+    function portraitFrame(target) {
+        if (target.isBarrierTarget) {
+            const frames = heroesData.filter(h => isCombatActive(h) && !h.isSummon).map(portraitFrame).filter(Boolean);
+            const proxy = target.proxyHero && portraitFrame(target.proxyHero);
+            if (!frames.length && !proxy) return null;
+            const bounds = groupBounds(frames.length ? frames : [proxy]);
+            const dom = document.getElementById('team-barrier-dome') || document.getElementById('team-barrier-wrapper') || (proxy && proxy.dom);
+            if (!dom) return null;
+            return Object.assign({ card: null, dom, isBarrier: true, imageTop: bounds.top, imageH: bounds.h }, bounds);
+        }
+        const card = domOf(target);
+        if (!card) return null;
+        const image = card.querySelector('img'), normal = card.classList.contains('hero-card-inner');
+        const dom = image || (normal ? card : (card.firstElementChild || card)), r = ctr(dom);
+        const label = normal && image && image.previousElementSibling;
+        const top = label ? Math.max(r.top, label[__GBCR]().bottom) : r.top;
+        if (!r.w || r.bottom <= top) return null;
+        return { card, dom, x: r.x, y: (top + r.bottom) / 2, left: r.left, right: r.right,
+            top, bottom: r.bottom, w: r.w, h: r.bottom - top, imageTop: r.top, imageH: r.h };
+    }
+    function groupBounds(frames) {
+        const left = Math.min(...frames.map(f => f.left)), right = Math.max(...frames.map(f => f.right));
+        const top = Math.min(...frames.map(f => f.top)), bottom = Math.max(...frames.map(f => f.bottom));
+        return { left, right, top, bottom, x: (left + right) / 2, y: (top + bottom) / 2, w: right - left, h: bottom - top };
+    }
+    function groupRun(ms) {
+        const owner = { cancelled:false, finished:false, audioContext:CombatAudioMixer.capture('D'), audioStoppers:new Set(), onCleanups:new Set(), timers: new Set(), layers: new Set(), animations: new Set(), flights: new Set(), hostParticles: new Set(), flashes: new Map(), soundGates: new Set() };
+        owner.onClean = fn => owner.onCleanups.add(fn);
+        owner.at = (delay, fn) => {
+            const id = after(delay, () => { owner.timers.delete(id); CombatAudioMixer.withContext(owner.audioContext, fn); });
+            owner.timers.add(id); return id;
+        };
+        const finish = () => {
+            if (owner.finished) return;
+            owner.finished = true;
+            owner.onCleanups.forEach(fn => fn()); owner.onCleanups.clear();
+            owner.timers.forEach(id => { clearTimeout(id); S.timers.delete(id); }); owner.timers.clear();
+            owner.animations.forEach(a => a.cancel()); owner.animations.clear();
+            owner.layers.forEach(d => { S.layers.delete(d); d.remove(); }); owner.layers.clear();
+            owner.flights.forEach(f => { clearTimeout(f.timer); S.timers.delete(f.timer); });
+            S.flights = S.flights.filter(f => !owner.flights.has(f)); owner.flights.clear();
+            owner.flashes.forEach((classes, el) => {
+                classes.forEach((record, cls) => { if (!record.wasPresent) el.classList.remove(cls); });
+                if (!Array.from(el.classList).some(cls => cls.startsWith('arcane-flash-'))) S.flashes.delete(el);
+            }); owner.flashes.clear();
+            owner.soundGates.forEach(g => { g.gain.value = 0; g.disconnect(); }); owner.soundGates.clear();
+            S.particles = S.particles.filter(p => p.owner !== owner);
+            fxEngine.particles = fxEngine.particles.filter(p => !owner.hostParticles.has(p)); owner.hostParticles.clear();
+            if (!S.particles.length && !S.flights.length) {
+                clearTimeout(S.particleTimer); S.timers.delete(S.particleTimer); S.particleTimer = null; S.particleUntil = 0;
+                if (S.driver) { fxEngine.particles = fxEngine.particles.filter(p => p !== S.driver); S.driver = null; }
+                if (S.ctx) S.ctx.clearRect(0, 0, S.canvas.width, S.canvas.height);
+            }
+            S.handles.delete(handle); releaseIdleCanvas();
+        };
+        const handle = { doneAt: Date.now() + ms, cancel() { owner.cancelled = true; owner.audioStoppers.forEach(stop => stop()); owner.audioStoppers.clear(); finish(); } };
+        S.handles.add(handle); owner.at(ms, finish); owner.handle = handle;
+        return owner;
+    }
+    function groupLayer(owner, html) {
+        const layer = fsLayer(html); owner.layers.add(layer); return layer;
+    }
+    function groupAnimate(owner, el, frames, duration, easing = 'cubic-bezier(0.16,0.8,0.3,1)') {
+        const animation = el.animate(frames, { duration, easing, fill: 'forwards' });
+        owner.animations.add(animation); return animation;
+    }
+    function groupShake(owner, intensity, duration) {
+        const scene = __STAGE.shakeEl();
+        if (!scene) return;
+        const base = getComputedStyle(scene).transform;
+        const frames = Array.from({ length: 10 }, (_, i) => {
+            const k = 1 - i / 9, dx = i && i < 9 ? rnd(-intensity / 2, intensity / 2) * k : 0, dy = i && i < 9 ? rnd(-intensity / 2, intensity / 2) * k : 0;
+            return { transform: `translate3d(${dx}px,${dy}px,0)${base === 'none' ? '' : ' ' + base}`, offset: i / 9 };
+        });
+        groupAnimate(owner, scene, frames, duration, 'linear');
+    }
+    function groupFlash(owner, el, cls) {
+        let classes = owner.flashes.get(el);
+        if (!classes) { classes = new Map(); owner.flashes.set(el, classes); }
+        const record = classes.get(cls) || { wasPresent: el.classList.contains(cls), timer: null };
+        if (record.timer !== null) { clearTimeout(record.timer); S.timers.delete(record.timer); owner.timers.delete(record.timer); }
+        classes.set(cls, record);
+        el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); S.flashes.add(el);
+        record.timer = owner.at(owner.kind === 'spell' ? 380 : 340, () => {
+            if (!record.wasPresent) el.classList.remove(cls);
+            classes.delete(cls); if (!classes.size) owner.flashes.delete(el);
+            if (!Array.from(el.classList).some(name => name.startsWith('arcane-flash-'))) S.flashes.delete(el);
+        });
+    }
+    function groupCharge(owner, source) {
+        const red = owner.kind === 'melee', spell = owner.kind === 'spell';
+        const color = red ? '#ff2938' : (spell ? '#38bdf8' : '#facc15'), sub = red ? '#ff916d' : (spell ? '#e0f2fe' : '#fef08a');
+        const darkStop = red ? '#7f0924' : (spell ? '#0c4a6e' : '#92400e');
+        const uid = ++S.uid, size = source.h * (spell ? 2.05 : 1.85);
+        const claws = [-22, 0, 22].map((y, i) => `<path d="M-54,${y + 20} Q-14,${y - 24} 48,${y - 14} Q-4,${y - 6} -34,${y + 28} Z" fill="url(#group-charge-${uid})" opacity="${0.95 - i * 0.08}"/><path d="M-42,${y + 16} Q-6,${y - 14} 44,${y - 14}" fill="none" stroke="#fff1dc" stroke-width="1.8"/>`).join('');
+        const stars = [0, 45, 90, 135, 180, 225, 270, 315].map(d => `<path d="M0,0 L-6,-22 L0,-54 L6,-22 Z" fill="url(#group-charge-${uid})" transform="rotate(${d})"/>`).join('');
+        const hexagram = `<polygon points="0,-58 50,29 -50,29" fill="none" stroke="#ffffff" stroke-width="2.2"/><polygon points="0,58 50,-29 -50,-29" fill="none" stroke="${sub}" stroke-width="2.2"/>` + stars;
+        const layer = groupLayer(owner, `<div class="arcane-group-charge" style="left:${source.x}px;top:${source.y}px;width:${size}px;height:${size}px;">
+            <svg viewBox="-80 -80 160 160"><defs><linearGradient id="group-charge-${uid}" x1="0" x2="1"><stop stop-color="${darkStop}"/><stop offset=".55" stop-color="${color}"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs>
+                <g class="arcane-charge-ring" style="transform-box:fill-box;transform-origin:center;" fill="none" stroke="${color}" stroke-width="2"><circle r="66" stroke-dasharray="18 10" opacity=".85"/><circle r="50" stroke="${sub}" stroke-width="1.4" stroke-dasharray="8 8" opacity=".75"/></g>
+                <g class="arcane-charge-ring2" style="transform-box:fill-box;transform-origin:center;" fill="none" stroke="${sub}" stroke-width="1.6"><path d="M-60,-20 A64,50 0 0 1 54,-28 M60,20 A64,50 0 0 1 -54,28"/><circle r="34" stroke="#fff" stroke-width="1.2" opacity=".6"/></g>
+                <g class="arcane-charge-core" style="transform-box:fill-box;transform-origin:center;filter:drop-shadow(0 0 10px ${color}) drop-shadow(0 0 20px ${color});">${red ? claws : (spell ? hexagram : stars)}<circle r="14" fill="#ffffff" opacity=".95"/></g>
+            </svg></div>`);
+        const core = layer.querySelector('.arcane-charge-core');
+        for (let i = 0; i < 32; i++) {
+            const ang = Math.random() * 6.283, dist = rnd(80, 165), spd = dist / 11;
+            groupParticle(owner, null, { x: source.x + Math.cos(ang) * dist, y: source.y + Math.sin(ang) * dist,
+                vx: -Math.cos(ang) * spd, vy: -Math.sin(ang) * spd, rot: ang + 3.1416,
+                size: rnd(2.4, 4.5), texture: red ? 'spark' : 'crystal', tail: 12, decay: 16.7 / 280 });
+        }
+        groupAnimate(owner, core, [
+            { transform: 'scale(.15) rotate(-35deg)', opacity: 0 },
+            { transform: 'scale(.95) rotate(-8deg)', opacity: 1, offset: .55 },
+            { transform: 'scale(1.18) rotate(6deg)', opacity: 1, offset: .82 },
+            { transform: 'scale(.24) rotate(18deg)', opacity: 1 }
+        ], 350, 'cubic-bezier(0.22,0.8,0.25,1)');
+        groupAnimate(owner, layer.querySelector('.arcane-charge-ring'), [
+            { transform: 'scale(1.55) rotate(0deg)', opacity: 0 },
+            { transform: 'scale(1.05) rotate(110deg)', opacity: .95, offset: .45 },
+            { transform: 'scale(.28) rotate(240deg)', opacity: 1 }
+        ], 350);
+        groupAnimate(owner, layer.querySelector('.arcane-charge-ring2'), [
+            { transform: 'scale(1.35) rotate(0deg)', opacity: 0 },
+            { transform: 'scale(.9) rotate(-140deg)', opacity: .9, offset: .5 },
+            { transform: 'scale(.22) rotate(-260deg)', opacity: 0 }
+        ], 350);
+        owner.at(350, () => {
+            addP({ x: source.x, y: source.y, shape: 'ring', size: 2.2, decay: 0.065, color: sub, owner });
+            groupAnimate(owner, core, [{ opacity: 1, transform: 'scale(.28)' }, { opacity: 0, transform: 'scale(1.75)' }], 110);
+        });
+        owner.at(470, () => { layer.remove(); owner.layers.delete(layer); S.layers.delete(layer); });
+        // 前摇复用同一音色库；本组干声门在350ms截断，不让晶鸣/混响叠进命中采样。
+        const ctx = audio(), gate = ctx.createGain(), previous = groupChargeOutput;
+        gate.gain.setValueAtTime(1, ctx.currentTime); gate.gain.setValueAtTime(0, ctx.currentTime + .35);
+        gate.connect(synthBus(CombatAudioMixer.capture('D').category).bus); owner.soundGates.add(gate); groupChargeOutput = gate;
+        try {
+            drone(0, { f0: red ? 85 : (spell ? 130 : 140), f1: red ? 195 : (spell ? 260 : 330), lp0: 280, lp1: 2600, dur: .29, vol: .15 });
+            whoosh(0, { f0: red ? 380 : (spell ? 600 : 900), f1: red ? 2600 : (spell ? 4200 : 4800), q: 1.8, dur: .29, vol: .46, peak: .26, cut: true });
+            tone(0, { type: spell ? 'sine' : 'triangle', f0: red ? 160 : (spell ? 528 : 520), f1: red ? 340 : (spell ? 1056 : 1240), dur: .29, vol: .15, peak: .25, cut: true });
+            if (spell) crystal(.3, 2400, .14, 0);
+            else click(.3, .55, red ? 3200 : 5400, .01);
+        } finally { groupChargeOutput = previous; }
+        owner.at(350, () => { gate.disconnect(); owner.soundGates.delete(gate); });
+    }
+    function groupFlinch(owner, frame, direction) {
+        const k = frame.h / 96, dx = direction * k * 1.45, dy = Math.abs(direction) * k * .65;
+        const flashCls = owner.kind === 'melee' ? 'arcane-flash-melee' : (owner.kind === 'spell' ? 'arcane-flash-spell' : 'arcane-flash-ranged');
+        groupFlash(owner, frame.card || frame.dom, flashCls);
+        const base = getComputedStyle(frame.dom).transform, suffix = base === 'none' ? '' : ' ' + base;
+        groupAnimate(owner, frame.dom, [
+            { transform: 'translate3d(0,0,0) scale(1)' + suffix },
+            { transform: `translate3d(${dx}px,${dy}px,0) scale(.91,.94)${suffix}`, offset: .18 },
+            { transform: `translate3d(${-dx * .45}px,${-dy * .3}px,0) scale(1.03,1.02)${suffix}`, offset: .52 },
+            { transform: 'translate3d(0,0,0) scale(1)' + suffix }
+        ], 280);
+        if (frame.card && frame.card !== frame.dom) {
+            groupAnimate(owner, frame.card, [
+                { transform: 'translate3d(0,0,0)' },
+                { transform: `translate3d(${dx * .65}px,${dy * .7}px,0) scale(.96)`, offset: .2 },
+                { transform: `translate3d(${-dx * .25}px,0,0)`, offset: .55 },
+                { transform: 'translate3d(0,0,0)' }
+            ], 280);
+        }
+    }
     DRAW.group = function(g, p) {
         const [core, color, edge] = GROUP_COLORS[p.kind], r = p.size;
         const alpha = g.globalAlpha;
@@ -2410,6 +2757,316 @@ const CombatEvents = {
             g.fillStyle = gr; g.scale(2, .55); g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill();
         }
     };
+    function groupParticle(owner, _frame, o) {
+        addP(Object.assign({ shape: 'group', kind: owner.kind, owner, blend: 'screen', clip: null, drag: .95 }, o));
+    }
+
+    function playMeleeGroup(caster, targets) {
+        const frames = targets.map(portraitFrame).filter(Boolean).sort((a, b) => a.left - b.left), casterDom = domOf(caster);
+        if (!frames.length || !casterDom) return null;
+        const bounds = groupBounds(frames), rTop = bounds.top, rBottom = bounds.bottom;
+        const padX = 58, padY = 44;
+        const row = { left: bounds.left - padX, top: rTop - padY, w: bounds.w + padX * 2, h: bounds.h + padY * 2 };
+        row.cx = row.left + row.w / 2; row.cy = row.top + row.h / 2;
+        const owner = groupRun(1220); owner.kind = 'melee';
+        const uid = ++S.uid, w = row.w, h = row.h, k = (rBottom - rTop) / 96;
+        groupCharge(owner, ctr(casterDom));
+        const blades = [0, 1, 2].map(i => {
+            const y = h * (.25 + i * .24), thick = (22 - i * 2.2) * k, lift = (28 + i * 6) * k;
+            const center = `M-18,${y + 10 * k} C${w * .26},${y + 18 * k} ${w * .62},${y - lift * .45} ${w + 18},${y - lift}`;
+            const ribbon = `M-18,${y + 10 * k - thick * .12} C${w * .25},${y - thick * .58 + 18 * k} ${w * .62},${y - lift * .45 - thick * .48} ${w + 18},${y - lift} C${w * .62},${y - lift * .45 + thick * .52} ${w * .25},${y + thick * .95 + 18 * k} -18,${y + 10 * k + thick * .18} Z`;
+            const core = `M-18,${y + 10 * k} C${w * .26},${y + 15 * k} ${w * .62},${y - lift * .45 - 3 * k} ${w + 18},${y - lift} C${w * .62},${y - lift * .45 + 3 * k} ${w * .26},${y + 21 * k} -18,${y + 10 * k + .4 * k} Z`;
+            const barbs = [0.22, 0.48, 0.74].map(t => {
+                const bx = w * t, by = y + (1 - t) * 10 * k - t * lift;
+                return `M${bx},${by} L${bx - 18 * k},${by - (i % 2 ? 16 : -16) * k} L${bx - 6 * k},${by}`;
+            }).join(' ');
+            return { y, lift, center, ribbon, core, barbs, thick };
+        });
+        const layer = groupLayer(owner, `<div class="arcane-group-stage" style="left:${row.left}px;top:${row.top}px;width:${w}px;height:${h}px;">
+            <svg viewBox="0 0 ${w} ${h}" style="opacity:0;"><defs>
+                <linearGradient id="group-slash-${uid}"><stop stop-color="#7f0924" stop-opacity=".25"/><stop offset=".15" stop-color="#e11d48"/><stop offset=".65" stop-color="#ff2938"/><stop offset="1" stop-color="#ffe4d6"/></linearGradient>
+                <clipPath id="group-reveal-${uid}"><rect x="-24" y="-40" width="0" height="${h + 80}"/></clipPath>
+            </defs><g clip-path="url(#group-reveal-${uid})">
+                <g class="arcane-slash-cut">${blades.map(b => `<path d="${b.center}" fill="none" stroke="#2a040d" stroke-width="${b.thick * 2.05}" stroke-linecap="round"/><path d="${b.barbs}" fill="none" stroke="#ff2938" stroke-width="${1.8 * k}" opacity=".85"/>`).join('')}</g>
+                <g class="arcane-slash-body">${blades.map(b => `<path class="arcane-group-sweep-glow" d="${b.center}" fill="none" stroke="#ff1e27" stroke-width="${b.thick * 1.45}" opacity=".75"/><path d="${b.ribbon}" fill="url(#group-slash-${uid})"/>`).join('')}</g>
+                <g class="arcane-slash-core arcane-group-sweep-core">${blades.map(b => `<path d="${b.core}" fill="#fff5eb"/>`).join('')}</g>
+            </g><g class="arcane-slash-tip arcane-group-sweep-core" opacity="0">${blades.map(b => `<path d="M-64,${b.y + 12 * k} Q-16,${b.y - 22 * k} 14,${b.y - 18 * k} Q-4,${b.y - 2 * k} -44,${b.y + 14 * k} Z" fill="#ff9e7d"/><path d="M-42,${b.y + 4 * k} Q-6,${b.y - 19 * k} 14,${b.y - 18 * k}" fill="none" stroke="#ffffff" stroke-width="${3 * k}"/>`).join('')}</g>
+            </svg></div>`);
+        const svg = layer.querySelector('svg'), reveal = svg.querySelector('clipPath rect'), tip = svg.querySelector('.arcane-slash-tip');
+        owner.at(350, () => {
+            svg.style.opacity = '1'; tip.setAttribute('opacity', '1');
+            groupShake(owner, 16, 340);
+            groupLayer(owner, `<div class="absolute inset-0" style="background:radial-gradient(ellipse at ${row.cx}px ${row.cy}px, rgba(255,41,56,0.45) 0%, rgba(153,27,27,0.22) 48%, transparent 76%);animation:arcane-fs-flash 0.44s ease-out both;"></div>
+                <div class="arcane-fs-anchor" style="left:${row.cx}px;top:${row.cy}px;width:${w * 1.18}px;height:${42 * k}px;background:linear-gradient(90deg,transparent,rgba(255,41,56,0.75) 20%,#fff1f2 50%,rgba(255,41,56,0.75) 80%,transparent);filter:drop-shadow(0 0 24px #ff2938);animation:arcane-fs-flash 0.36s ease-out both;"></div>`);
+            playSound('enemyMeleeGroupHit', 0.72, 1, { owner });
+            const struck = new Set();
+            const flight = fly({ x: 0, y: 0 }, { x: w + 36, y: 0 }, 0, 175, x => {
+                reveal.setAttribute('width', x + 24);
+                tip.setAttribute('transform', `translate(${x},0)`);
+                blades.forEach(b => {
+                    const px = row.left + x, py = row.top + b.y + 10 * k - (x / w) * b.lift;
+                    groupParticle(owner, null, { x: px, y: py, vx: rnd(3, 7) * k, vy: rnd(-1.8, 1.4) * k, rot: -.18, size: rnd(2.8, 4.8) * k, texture: 'spark', tail: 16 * k, decay: 16.7 / 220 });
+                    addP({ x: px + rnd(-6, 6), y: py + rnd(-6, 6), vx: rnd(1, 3), vy: rnd(-2.2, -.4), size: rnd(8, 14) * k, shape: 'flame', color: '#ff2938', decay: 0.06, owner });
+                });
+                frames.forEach(f => {
+                    if (struck.has(f) || row.left + x < f.x) return;
+                    struck.add(f); groupFlinch(owner, f, 8);
+                    const cutLayer = groupLayer(owner, `<div class="arcane-fs-anchor" style="left:${f.x}px;top:${f.y}px;width:${f.w * 1.45}px;height:${f.h * 1.45}px;">
+                        <svg viewBox="-60 -60 120 120" class="w-full h-full arcane-group-sweep-core"><path d="M-52,-38 L52,38 M-44,44 L44,-44" stroke="#fff1f2" stroke-width="4.5" stroke-linecap="round"/><path d="M-56,-41 L56,41 M-48,48 L48,-48" stroke="#ff2938" stroke-width="2.2"/></svg></div>`);
+                    groupAnimate(owner, cutLayer.firstElementChild, [{ transform: 'translate(-50%,-50%) scale(.35)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1.35)', opacity: 0 }], 240);
+                    burst(2, rIdx => ({ x: f.x, y: f.y, shape: 'ring', size: (1.5 + rIdx * .9) * k, decay: 0.065 - rIdx * 0.015, color: rIdx ? '#ff2938' : '#ffe4d6', owner }));
+                    for (let j = 0; j < 18; j++) groupParticle(owner, null, { x: f.x + rnd(-12, 12), y: f.y + rnd(-f.h * .3, f.h * .3),
+                        vx: rnd(3.5, 11) * k * (j % 3 ? 1 : -.5), vy: rnd(-6.5, 5.5) * k, grav: .12 * k, rot: rnd(-1.2, 1.2), size: rnd(2.8, 5.6) * k,
+                        texture: j % 3 ? 'spark' : 'crystal', tail: 12 * k, decay: 16.7 / rnd(280, 440) });
+                    burst(6, () => ({ x: f.x + rnd(-16, 16), y: f.y + rnd(-12, 12), vx: rnd(-1.5, 2.5), vy: rnd(-3.2, -.8), size: rnd(12, 20) * k, shape: 'flame', color: pick(['#ff2938', '#f97316', '#fde68a']), decay: rnd(0.035, 0.055), owner }));
+                    burst(4, () => ({ x: f.x + rnd(-20, 20), y: f.y + rnd(-14, 14), vx: rnd(-.5, .5), vy: rnd(-1.2, -.4), drag: .99, size: rnd(16, 26) * k, shape: 'smoke', blend: 'source-over', color: 'rgba(45,10,18,0.6)', decay: 0.016, owner }));
+                });
+            }, () => {
+                tip.setAttribute('opacity', '0'); reveal.setAttribute('width', w + 48);
+                groupShake(owner, 6, 180);
+                groupAnimate(owner, svg.querySelector('.arcane-slash-core'), [{ opacity: 1 }, { opacity: 1, offset: .35 }, { opacity: 0 }], 260);
+                groupAnimate(owner, svg.querySelector('.arcane-slash-body'), [{ opacity: 1 }, { opacity: .88, offset: .4 }, { opacity: 0 }], 560);
+                groupAnimate(owner, svg.querySelector('.arcane-slash-cut'), [{ opacity: .95 }, { opacity: .75, offset: .5 }, { opacity: 0 }], 660);
+            }, t => 1 - Math.pow(1 - t, 1.6));
+            owner.flights.add(flight);
+        });
+        return owner.handle;
+    }
+    function shatterPortrait(frame, owner) {
+        if (frame.isBarrier) return;
+        const layer = groupLayer(owner, ''), box = document.createElement('div'); box.className = 'arcane-portrait-fragments';
+        box.style.cssText = `left:${frame.left}px;top:${frame.top}px;width:${frame.w}px;height:${frame.h}px;`;
+        layer.appendChild(box);
+        const rim = [[0, 0], [32, 0], [68, 0], [100, 0], [100, 48], [100, 100], [66, 100], [34, 100], [0, 100], [0, 50]];
+        rim.forEach((point, i) => {
+            const next = rim[(i + 1) % rim.length], fragment = document.createElement('div');
+            fragment.className = 'arcane-portrait-fragment';
+            fragment.style.clipPath = `polygon(50% 55%, ${point[0]}% ${point[1]}%, ${next[0]}% ${next[1]}%)`;
+            const image = frame.dom.cloneNode(true); image.removeAttribute('id');
+            image.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+            image.style.cssText = `position:absolute;left:0;top:${frame.imageTop - frame.top}px;width:100%;height:${frame.imageH}px;`;
+            fragment.appendChild(image); box.appendChild(fragment);
+            const k = frame.h / 96, dx = ((point[0] + next[0]) / 2 - 50) * 0.7 * k, dy = ((point[1] + next[1]) / 2 - 55) * 0.65 * k;
+            groupAnimate(owner, fragment, [
+                { transform: 'translate(0,0) rotate(0)', opacity: 1 },
+                { transform: `translate(${dx}px,${dy}px) rotate(${rnd(-18, 18)}deg)`, opacity: 0 }
+            ], 340 + i * 7, 'cubic-bezier(0.12,0.75,0.3,1)');
+        });
+        const opacity = getComputedStyle(frame.dom).opacity;
+        groupAnimate(owner, frame.dom, [
+            { opacity, offset: 0 }, { opacity: 0, offset: .035 }, { opacity: 0, offset: .42 }, { opacity, offset: 1 }
+        ], 460, 'ease-out');
+        owner.at(480, () => { layer.remove(); S.layers.delete(layer); owner.layers.delete(layer); });
+    }
+    function rangedHit(frame, point, owner, direction, isMain = true, isFinale = false) {
+        const k = frame.h / 96, uid = ++S.uid, stageR = (isMain ? 72 : 44) * k;
+        if (isMain) {
+            shatterPortrait(frame, owner); groupFlinch(owner, frame, 7);
+            groupShake(owner, isFinale ? 16 : 6, isFinale ? 320 : 180);
+        }
+        const spikes = (isMain ? [-52, -24, 4, 30, 56] : [-30, 25]).map((deg, i) => {
+            const a = direction + (deg - 8) * .0174, len = (isMain ? (i % 2 ? 46 : 62) : 34) * k, w = (isMain ? 9 : 6) * k;
+            return `<g transform="rotate(${a * 57.3})"><polygon points="0,${-w} ${len},0 0,${w} ${-w * .8},0" fill="url(#group-spk-${uid})"/><polygon points="0,${-w} ${len},0 0,0" fill="#fffbeb" opacity=".88"/></g>`;
+        }).join('');
+        const cracks = Array.from({ length: isMain ? 8 : 5 }, (_, i) => {
+            const angle = i / (isMain ? 8 : 5) * 6.283 + .25, r = (i % 2 ? 44 : 60) * (isMain ? 1 : .65) * k;
+            const x = Math.cos(angle), y = Math.sin(angle);
+            return `<path d="M0,0 L${x * r * .42},${y * r * .38} L${x * r * .65 - y * 5 * k},${y * r * .65 + x * 5 * k} L${x * r},${y * r}"/>`;
+        }).join('');
+        const layer = groupLayer(owner, `<div class="arcane-group-stage" style="left:${point.x - stageR}px;top:${point.y - stageR}px;width:${stageR * 2}px;height:${stageR * 2}px;">
+            <svg class="arcane-group-impact" viewBox="${-stageR} ${-stageR} ${stageR * 2} ${stageR * 2}"><defs>
+                <radialGradient id="group-hit-${uid}"><stop stop-color="#ffffff"/><stop offset=".28" stop-color="#fef08a"/><stop offset=".6" stop-color="#facc15" stop-opacity=".65"/><stop offset="1" stop-color="#b45309" stop-opacity="0"/></radialGradient>
+                <linearGradient id="group-spk-${uid}" x1="0" x2="1"><stop stop-color="#b45309"/><stop offset=".45" stop-color="#facc15"/><stop offset="1" stop-color="#ffffff"/></linearGradient>
+            </defs><g>
+                <circle class="arcane-crystal-flash" r="${(isMain ? 48 : 28) * k}" fill="url(#group-hit-${uid})"/>
+                <g class="arcane-crystal-cluster" style="transform-box:fill-box;transform-origin:center;filter:drop-shadow(0 0 8px #facc15);">${spikes}</g>
+                <g class="arcane-crystal-ring" fill="none" stroke="#fef08a" stroke-width="${(isMain ? 3 : 1.8) * k}" style="transform-box:fill-box;transform-origin:center;"><circle r="${(isMain ? 32 : 18) * k}"/></g>
+                <g class="arcane-crystal-cracks" fill="none" stroke="#fde047" stroke-width="${(isMain ? 1.8 : 1.2) * k}" stroke-linejoin="bevel">${cracks}</g>
+            </g></svg></div>`);
+        const svg = layer.querySelector('svg');
+        groupAnimate(owner, svg.querySelector('.arcane-crystal-flash'), [{ transform: 'scale(.4)', opacity: 1 }, { transform: 'scale(1.4)', opacity: 0 }], isMain ? 160 : 110);
+        groupAnimate(owner, svg.querySelector('.arcane-crystal-cluster'), [
+            { transform: 'scale(.15)', opacity: 0 }, { transform: 'scale(1.25)', opacity: 1, offset: .28 },
+            { transform: 'scale(1)', opacity: .95, offset: .65 }, { transform: 'scale(1.35)', opacity: 0 }
+        ], isMain ? 360 : 240);
+        groupAnimate(owner, svg.querySelector('.arcane-crystal-ring'), [{ transform: 'scale(.25)', opacity: 1 }, { transform: 'scale(2.1)', opacity: 0 }], isMain ? 260 : 180);
+        groupAnimate(owner, svg.querySelector('.arcane-crystal-cracks'), [{ opacity: 1 }, { opacity: .8, offset: .35 }, { opacity: 0 }], isMain ? 420 : 260);
+        if (isMain) addP({ x: point.x, y: point.y, shape: 'ring', size: 1.8 * k, decay: .06, color: '#fef08a', owner });
+        const pCount = isMain ? 16 : 7;
+        for (let i = 0; i < pCount; i++) {
+            const angle = direction + rnd(-2.2, 2.2), speed = rnd(3, isMain ? 9.5 : 6) * k;
+            groupParticle(owner, null, { x: point.x, y: point.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 1.2 * k,
+                grav: .14 * k, rot: angle, vr: rnd(-.22, .22), size: rnd(3.2, isMain ? 7.2 : 4.8) * k,
+                texture: i % 3 ? 'crystal' : 'spark', tail: 7 * k, decay: 16.7 / rnd(280, 450) });
+        }
+        if (isMain) burst(5, () => {
+            const a = Math.random() * 6.283, s = rnd(2.5, 6.5) * k;
+            return { x: point.x, y: point.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1.5, grav: .16 * k, rot: a, vr: rnd(-.25, .25), size: rnd(5, 8.5) * k, shape: 'shard', fill: 'rgba(254,240,138,0.45)', color: '#facc15', decay: .032, owner };
+        });
+    }
+    function playRangedGroup(caster, targets) {
+        const frames = targets.map(portraitFrame).filter(Boolean).sort((a, b) => a.left - b.left), casterDom = domOf(caster);
+        if (!frames.length || !casterDom) return null;
+        const source = ctr(casterDom), bounds = groupBounds(frames), rowCx = bounds.x, rowCy = bounds.y;
+        const owner = groupRun(1340); owner.kind = 'ranged';
+        groupCharge(owner, source);
+        const layer = groupLayer(owner, '<div class="arcane-group-flight"></div>'), stage = layer.firstElementChild;
+        // 14枚齐射不随人数膨胀；主晶按目标分组，超过14名时同一晶簇覆盖该组。
+        const mainCount = Math.min(frames.length, 14);
+        const mainIndices = new Set(Array.from({ length: mainCount }, (_, i) => Math.ceil((i + 1) * 14 / mainCount) - 1));
+        let mainTargetIdx = 0;
+        for (let idx = 0; idx < 14; idx++) {
+            const isMain = mainIndices.has(idx), first = Math.floor(mainTargetIdx * frames.length / mainCount);
+            const hitFrames = isMain ? frames.slice(first, Math.floor((mainTargetIdx + 1) * frames.length / mainCount)) : [frames[idx % frames.length]];
+            const frameIdx = isMain ? first : idx % frames.length;
+            if (isMain) mainTargetIdx++;
+            const frame = frames[frameIdx], uid = ++S.uid, k = frame.h / 96;
+            const length = frame.h * (isMain ? .82 : .54), fanT = idx / 13 - .5;
+            const a = { x: source.x + fanT * Math.max(source.w * 2.2, 220), y: source.y - source.h * .18 + Math.abs(fanT) * source.h * .55 + (idx % 2 ? -14 : 10) };
+            const b = isMain ? { x: frame.x, y: frame.y } : { x: frame.x + rnd(-frame.w * .36, frame.w * .36), y: frame.y + rnd(-frame.h * .3, frame.h * .3) };
+            const lift = (isMain ? 78 : 52) + (idx % 4) * 14;
+            const cx = (a.x + b.x) / 2, cy = Math.min(a.y, b.y) - lift;
+            const missile = document.createElement('div'); missile.className = 'arcane-group-missile';
+            missile.innerHTML = `<svg viewBox="-86 -24 94 48" style="left:${-length * 86 / 64}px;top:${-length * 24 / 64}px;width:${length * 94 / 64}px;height:${length * 48 / 64}px;"><defs>
+                <linearGradient id="group-crystal-${uid}" gradientUnits="userSpaceOnUse" x1="-72" y1="12" x2="4" y2="-4"><stop stop-color="#92400e"/><stop offset=".3" stop-color="#eab308"/><stop offset=".7" stop-color="#fef08a"/><stop offset="1" stop-color="#ffffff"/></linearGradient>
+                <linearGradient id="group-tail-${uid}"><stop stop-color="#d97706" stop-opacity="0"/><stop offset=".6" stop-color="#facc15" stop-opacity=".45"/><stop offset="1" stop-color="#fef9c3" stop-opacity=".9"/></linearGradient>
+            </defs><g class="arcane-group-missile-body" opacity="0">
+                <path d="M-165,-3 L-58,-6 L-58,6 L-165,3 Z" fill="url(#group-tail-${uid})"/>
+                <path d="M6,0 L-58,-15 L-72,0 L-58,15 Z" fill="url(#group-crystal-${uid})" stroke="#ffffff" stroke-width="1"/>
+                <path d="M6,0 L-58,-15 L-40,0 Z" fill="#fef9c3" opacity=".95"/>
+                <path d="M6,0 L-40,0 L-58,15 Z" fill="#b45309" opacity=".85"/>
+                <path d="M-58,-15 L-40,0 L-72,0 Z" fill="#facc15"/>
+                <circle cx="-12" cy="0" r="${isMain ? 4.5 : 3}" fill="#ffffff"/>
+            </g></svg>`;
+            stage.appendChild(missile);
+            const body = missile.querySelector('.arcane-group-missile-body'), angle = Math.atan2(b.y - a.y, b.x - a.x);
+            missile.style.transform = `translate(${a.x}px,${a.y}px) rotate(${angle}rad)`;
+            groupAnimate(owner, body, [
+                { transform: 'scale(.08)', opacity: 0 }, { transform: 'scale(1.22)', opacity: 1, offset: .65 },
+                { transform: 'scale(.92)', opacity: 1, offset: .85 }, { transform: 'scale(1.08)', opacity: 1 }
+            ], 340, 'cubic-bezier(0.2,0.85,0.25,1)');
+            const launchDelay = 350 + idx * 22, flyDur = isMain ? 235 : 205;
+            owner.at(launchDelay, () => {
+                if (idx === 0) {
+                    playSound('enemyRangedGroupHit', 0.75, 1, { owner });
+                    groupLayer(owner, `<div class="absolute inset-0" style="background:radial-gradient(ellipse at ${rowCx}px ${rowCy}px, rgba(250,204,21,0.32) 0%, rgba(180,83,9,0.14) 50%, transparent 78%);animation:arcane-fs-flash 0.65s ease-out both;"></div>`);
+                }
+                const flight = fly(a, b, lift, flyDur, (x, y, progress) => {
+                    const t = progress * progress;
+                    const direction = Math.atan2((1 - t) * (cy - a.y) + t * (b.y - cy), (1 - t) * (cx - a.x) + t * (b.x - cx));
+                    missile.style.transform = `translate(${x}px,${y}px) rotate(${direction}rad)`;
+                    const tx = x - Math.cos(direction) * length * .75, ty = y - Math.sin(direction) * length * .75;
+                    groupParticle(owner, null, { x: tx + rnd(-3, 3), y: ty + rnd(-3, 3),
+                        vx: -Math.cos(direction) * (isMain ? 1.8 : 1.1) * k, vy: -Math.sin(direction) * (isMain ? 1.8 : 1.1) * k,
+                        rot: direction, size: (isMain ? 3 : 2) * k, texture: isMain ? 'crystal' : 'spark', tail: (isMain ? 14 : 9) * k, decay: 16.7 / 130 });
+                }, () => {
+                    missile.remove();
+                    const direction = Math.atan2(b.y - cy, b.x - cx);
+                    hitFrames.forEach(f => rangedHit(f, f === frame ? b : { x: f.x, y: f.y }, owner, direction, isMain, idx === 13));
+                });
+                owner.flights.add(flight);
+            });
+        }
+        return owner.handle;
+    }
+    function playSpellGroup(caster, targets) {
+        const frames = targets.map(portraitFrame).filter(Boolean).sort((a, b) => a.left - b.left), casterDom = domOf(caster);
+        if (!frames.length || !casterDom) return null;
+        const owner = groupRun(1280); owner.kind = 'spell';
+        const source = ctr(casterDom), bounds = groupBounds(frames), cx = bounds.x, cy = bounds.y, rowW = bounds.w, rowH = bounds.h;
+        function spawnSpellGroupParticles(x, y) {
+            const add = p => { owner.hostParticles.add(p); fxEngine.addParticle(p); };
+            add({ x, y, vx: 0, vy: 0, age: 0, life: 520,
+                draw(ctx, pct) {
+                    const maxR = Math.max(320, rowW * .55), r = pct * maxR, a = Math.max(0, (1 - pct) * .92);
+                    ctx.save(); ctx.globalAlpha = a; ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = Math.max(1.5, 8 * (1 - pct)); ctx.shadowBlur = 22; ctx.shadowColor = '#38bdf8';
+                    ctx.beginPath(); ctx.arc(this.x, this.y, r, 0, Math.PI * 2); ctx.stroke();
+                    if (pct > .08) {
+                        ctx.strokeStyle = '#7dd3fc'; ctx.lineWidth = Math.max(1, 4.5 * (1 - pct)); ctx.setLineDash([14, 10]);
+                        ctx.beginPath(); ctx.arc(this.x, this.y, (pct - .08) * maxR * .82, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+                    }
+                    if (pct > .16) {
+                        ctx.strokeStyle = '#e0f2fe'; ctx.lineWidth = Math.max(1, 3 * (1 - pct));
+                        ctx.beginPath(); ctx.arc(this.x, this.y, (pct - .16) * maxR * .58, 0, Math.PI * 2); ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+            });
+            const palette = ['#ffffff', '#ffffff', '#e0f2fe', '#bae6fd', '#7dd3fc'];
+            for (let i = 0; i < 90; i++) {
+                const angle = Math.random() * Math.PI * 2, speed = rnd(7, 22);
+                add({ x, y, vx: speed * Math.cos(angle), vy: speed * Math.sin(angle), drag: .92, gravity: 0,
+                    age: 0, life: rnd(440, 760), size: rnd(2.2, 6.4), color: palette[i % palette.length],
+                    draw(ctx, pct) {
+                        ctx.save(); ctx.globalAlpha = pct < .08 ? pct / .08 : Math.max(0, 1 - pct);
+                        ctx.beginPath(); ctx.moveTo(this.x, this.y); ctx.lineTo(this.x - this.vx * 4, this.y - this.vy * 4);
+                        ctx.strokeStyle = this.color; ctx.lineWidth = this.size; ctx.lineCap = 'round'; ctx.shadowBlur = 14; ctx.shadowColor = '#38bdf8'; ctx.stroke();
+                        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(this.x, this.y, this.size * .65, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+                    }
+                });
+            }
+            add({ x: 0, y: 0, vx: 0, vy: 0, age: 0, life: 280,
+                draw(ctx, pct) {
+                    if (pct > .45) return;
+                    ctx.fillStyle = '#f0f9ff'; ctx.globalAlpha = (1 - pct / .45) * .48;
+                    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                }
+            });
+        }
+        groupCharge(owner, source);
+        owner.at(350, () => {
+            playSound('atk1', 0.5, 1, { owner }); spawnSpellGroupParticles(cx, cy);
+            groupShake(owner, 28, 550); owner.at(220, () => groupShake(owner, 6, 180));
+            const flashLayer = groupLayer(owner, `<div class="arcane-fs-flash" style="background:radial-gradient(ellipse at ${cx}px ${cy}px, rgba(255,255,255,0.68) 0%, rgba(186,230,253,0.42) 38%, rgba(56,189,248,0.16) 65%, transparent 82%);opacity:0;"></div>`);
+            groupAnimate(owner, flashLayer.firstElementChild, [{ opacity: .98 }, { opacity: .45, offset: .3 }, { opacity: 0 }], 340);
+            const stageW = Math.max(rowW * 1.48, 520), stageH = Math.max(rowH * 2.8, 320), uid = ++S.uid;
+            const rays = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((d, i) => `<line x1="0" y1="${i % 2 ? -95 : -78}" x2="0" y2="${i % 2 ? -138 : -162}" stroke="${i % 2 ? '#bae6fd' : '#ffffff'}" stroke-width="${i % 2 ? 2 : 3.2}" stroke-linecap="round" transform="rotate(${d})"/>`).join('');
+            const stage = groupLayer(owner, `<div class="arcane-group-stage" style="left:${cx - stageW / 2}px;top:${cy - stageH / 2}px;width:${stageW}px;height:${stageH}px;">
+                <svg viewBox="${-stageW / 2} ${-stageH / 2} ${stageW} ${stageH}"><defs>
+                    <radialGradient id="spell-core-${uid}"><stop offset="0%" stop-color="#ffffff"/><stop offset="48%" stop-color="#e0f2fe" stop-opacity=".92"/><stop offset="82%" stop-color="#38bdf8" stop-opacity=".4"/><stop offset="100%" stop-color="#0284c7" stop-opacity="0"/></radialGradient>
+                </defs><g class="arcane-spell-formation" style="transform-box:fill-box;transform-origin:center;filter:drop-shadow(0 0 14px #38bdf8) drop-shadow(0 0 28px #0284c7);">
+                    <circle r="142" fill="url(#spell-core-${uid})"/><circle r="134" fill="none" stroke="#ffffff" stroke-width="3" opacity=".92"/>
+                    <circle r="118" fill="none" stroke="#7dd3fc" stroke-width="2" stroke-dasharray="18 10" opacity=".88"/>
+                    <polygon points="0,-126 109,63 -109,63" fill="rgba(224,242,254,0.12)" stroke="#ffffff" stroke-width="3.2"/>
+                    <polygon points="0,126 109,-63 -109,-63" fill="rgba(56,189,248,0.12)" stroke="#bae6fd" stroke-width="3.2"/>
+                    <circle r="68" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-dasharray="8 6"/>${rays}
+                </g><g class="arcane-spell-prism" style="transform-box:fill-box;transform-origin:center;filter:drop-shadow(0 0 16px #ffffff) drop-shadow(0 0 32px #38bdf8);">
+                    <path d="M${-stageW * .49},0 Q0,-28 ${stageW * .49},0 Q0,28 ${-stageW * .49},0 Z" fill="#e0f2fe" opacity=".92"/>
+                    <path d="M${-stageW * .46},0 Q0,-12 ${stageW * .46},0 Q0,12 ${-stageW * .46},0 Z" fill="#ffffff"/>
+                    <path d="M0,${-stageH * .48} Q-24,0 0,${stageH * .48} Q24,0 0,${-stageH * .48} Z" fill="#bae6fd" opacity=".9"/>
+                    <path d="M0,${-stageH * .44} Q-10,0 0,${stageH * .44} Q10,0 0,${-stageH * .44} Z" fill="#ffffff"/><circle r="44" fill="#ffffff"/>
+                </g></svg></div>`);
+            groupAnimate(owner, stage.querySelector('.arcane-spell-formation'), [
+                { transform: 'scale(.16) rotate(-35deg)', opacity: 0 }, { transform: 'scale(1.06) rotate(12deg)', opacity: 1, offset: .24 },
+                { transform: 'scale(1.24) rotate(32deg)', opacity: .82, offset: .62 }, { transform: 'scale(1.46) rotate(58deg)', opacity: 0 }
+            ], 760, 'cubic-bezier(0.16, 0.84, 0.26, 1)');
+            groupAnimate(owner, stage.querySelector('.arcane-spell-prism'), [
+                { transform: 'scaleX(.12) scaleY(1.8)', opacity: 0 }, { transform: 'scaleX(1.05) scaleY(1.1)', opacity: 1, offset: .18 },
+                { transform: 'scaleX(1.16) scaleY(.28)', opacity: .88, offset: .54 }, { transform: 'scaleX(1.28) scaleY(.04)', opacity: 0 }
+            ], 520, 'cubic-bezier(0.16, 0.84, 0.26, 1)');
+            [0, 1, 2, 3].forEach(k => addP({ x: cx, y: cy, shape: 'ring', size: 3.4 - k * .5, decay: .036 + k * .006, color: k % 2 ? '#7dd3fc' : '#ffffff', owner }));
+            for (let i = 0; i < 28; i++) {
+                const ang = i / 28 * 6.283 + rnd(-.08, .08), spd = rnd(6.5, 16.5);
+                groupParticle(owner, null, { x: cx, y: cy, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+                    rot: ang, vr: rnd(-.08, .08), size: rnd(3.2, 6.2), texture: i % 2 ? 'crystal' : 'spark', tail: rnd(14, 24), decay: 16.7 / rnd(380, 620) });
+            }
+            frames.forEach((f, idx) => {
+                const isInner = idx === Math.floor((frames.length - 1) / 2) || idx === Math.ceil((frames.length - 1) / 2);
+                owner.at(isInner ? 0 : 35, () => {
+                    groupFlinch(owner, f, f.x < cx ? -6.5 : 6.5);
+                    addP({ x: f.x, y: f.y, shape: 'ring', size: 2.2, decay: .055, color: '#e0f2fe', owner });
+                    for (let j = 0; j < 8; j++) {
+                        const a = j / 8 * 6.283 + rnd(-.2, .2), s = rnd(3.8, 9.2);
+                        groupParticle(owner, null, { x: f.x, y: f.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+                            rot: a, size: rnd(2.6, 4.8), texture: 'crystal', tail: 12, decay: 16.7 / rnd(280, 440) });
+                    }
+                });
+            });
+        });
+        return owner.handle;
+    }
+
     // ===== 对外接口 =====
     function isArcaneSkillFx(fxTag) { return ARCANE_TAGS.indexOf(fxTag) !== -1; }
 
@@ -5790,6 +6447,35 @@ const CombatEvents = {
         });
     }
 
+    const SFX_PRESETS = {
+        abyss: {
+            fs_start: [['mx_sand_swish', { vol: 0.54 }], ['mx_stygian_whoosh', { vol: 0.45, offset: 0.12, dur: 1.1 }]],
+            fs_fly: [['mx_stygian_whoosh', { vol: 0.48, dur: 0.7 }]],
+            fs_armor: [['mx_sword_metal', { vol: 0.58 }], ['defUp', { vol: 0.58 }]],
+            fs_shield: [['mx_gear_lock', { vol: 0.55 }]],
+            fs_reac: [['shieldUp', { vol: 0.5 }]],
+            xy_charge: [['mx_tunnel', { vol: 0.56, dur: 1.3 }], ['mx_rift_charge', { vol: 0.64, offset: 0.25, dur: 1.1 }]],
+            xy_fly: [['mx_stygian_whoosh', { vol: 0.4, rate: 1.25 }]],
+            xy_burst: [['mx_deep_impact', { vol: 0.88, dur: 1.7 }]],
+            xy_roar: [['mx_giant_roar', { vol: 0.86, dur: 1.7 }], ['mx_dino_roar', { vol: 0.55, dur: 1.4 }]],
+            xy_stomp: [['mx_golem_stomp', { vol: 0.84 }]],
+            xy_lock: [['mx_gear_lock', { vol: 0.75 }]],
+            xy_ward: [['shieldUp', { vol: 0.52 }]]
+        }
+    };
+    function playSandCue(owner, cue) {
+        SFX_PRESETS.abyss[cue].forEach(([key, opts]) => idSample(owner, key, {
+            sampled: true, vol: opts.vol, rate: opts.rate || 1, offsetSec: opts.offset || 0,
+            maxDurSec: opts.dur, fadeInSec: opts.fadeIn === undefined ? 0.012 : opts.fadeIn,
+            fadeOutSec: opts.fadeOut === undefined ? 0.14 : opts.fadeOut, pan: opts.pan
+        }));
+    }
+    function fixedSkillRun(totalMs) {
+        const owner = identityRun(totalMs, 1), deadline = owner.handle.doneAt;
+        owner.fixedLife = true;
+        Object.defineProperty(owner.handle, 'doneAt', { get: () => deadline, set() {} });
+        return owner;
+    }
     function skillLayer(owner, markup, ms) {
         const layer = owner.layer(markup);
         if (ms) owner.at(ms, () => { owner.layers.delete(layer); S.layers.delete(layer); layer.remove(); });
@@ -5799,6 +6485,351 @@ const CombatEvents = {
         if (!dom || isEntityVariantLocked(dom)) return;
         flash(dom, cls);
         owner.onClean(() => { dom.classList.remove(cls); S.flashes.delete(dom); });
+    }
+    const VFX_IMG_FILES = { stygian: 'vfx_stygian_armor.jpg', marcher: 'vfx_dream_marcher.jpg' };
+    function resolveVfxImg(key) {
+        return window.__RPG_VFX_IMAGES__ && window.__RPG_VFX_IMAGES__[key] || ASSET_BASE + '/' + VFX_IMG_FILES[key];
+    }
+
+    // ===== ① 飞沙化甲（L2，紧凑单卡哥特盾框 + 柔和冥河铠影 + abyss 原采样） =====
+    function playFeiShaHuaJia(caster, targets) {
+        const casterEl = domOf(caster);
+        const el = domOf(targets && targets[0]) || casterEl;
+        if (!el) return null;
+        const token = combatToken;
+        ensureCanvas(); ensureDriver();
+        const CHARGE = 280, LIFE = 1320;
+        const c = ctr(el), cc = casterEl ? ctr(casterEl) : c, uid = ++S.uid;
+        const owner = fixedSkillRun(LIFE), handle = owner.handle;
+        const tokenAlive = () => !owner.cancelled && !owner.finished && token === combatToken;
+        const tAfter = owner.at, tEvery = owner.every;
+        const stopInt = id => { stopEvery(id); owner.intervals.delete(id); };
+        const addLayer = (markup, ms) => skillLayer(owner, markup, ms);
+        const addP = owner.addP, burst = owner.burst, fly = owner.fly;
+        const playPresetCue = cue => playSandCue(owner, cue);
+
+        // 0ms：玄武岩瓶启封 + 冥河死寂尘沙渐起
+        playPresetCue('fs_start');
+        burst(10, () => {
+            const a = Math.random() * 6.283, r = rnd(10, 32);
+            return { x: cc.x + Math.cos(a) * r, y: cc.y - 16 + Math.sin(a) * r * 0.5, vx: Math.cos(a) * 1.5, vy: rnd(-2.2, -0.6), drag: 0.94, decay: 0.036, size: rnd(14, 22), shape: 'gradMist', blend: 'source-over', color: 'rgba(28,36,64,0.68)', fade: 'rgba(13,18,32,0)' };
+        });
+        if (casterEl && casterEl !== el) {
+            flashOwned(owner, casterEl, 'arcane-flash-cold');
+            playPresetCue('fs_fly');
+            fly({ x: cc.x, y: cc.y - 18 }, { x: c.x, y: c.y }, -42, 250, (x, y) => {
+                if (!tokenAlive()) return;
+                addP({ x, y, shape: 'gradMist', size: rnd(10, 15), decay: 0.055, blend: 'source-over', color: 'rgba(42,50,82,0.56)', fade: 'rgba(13,18,32,0)' });
+                burst(2, () => ({ x: x + rnd(-5, 5), y: y + rnd(-5, 5), vx: rnd(-1.0, 1.0), vy: rnd(-1.2, 0.8), drag: 0.92, decay: 0.072, size: rnd(2.2, 3.8), shape: 'gradOrb', trail: 6, core: '#e0f2fe', color: 'rgba(147,197,253,0.88)', edge: 'rgba(99,102,241,0.4)' }));
+            });
+        }
+
+        let stepTick = 0;
+        const swirl = tEvery(30, () => {
+            if (!tokenAlive()) return;
+            const ang = (stepTick++) * 0.92;
+            burst(3, i => {
+                const a = ang + i * 2.09, rad = rnd(24, 54);
+                return {
+                    x: c.x + Math.cos(a) * rad, y: c.bottom - 14 - stepTick * 10,
+                    vx: -Math.sin(a) * 2.0, vy: rnd(-2.4, -1.0), drag: 0.94, decay: 0.042,
+                    size: i === 0 ? rnd(12, 18) : rnd(2.1, 3.5),
+                    shape: i === 0 ? 'gradMist' : 'gradOrb', trail: i === 0 ? 0 : 5,
+                    blend: i === 0 ? 'source-over' : 'lighter',
+                    core: i === 0 ? undefined : '#f1f5f9',
+                    color: i === 0 ? 'rgba(22,30,54,0.65)' : 'rgba(148,184,232,0.85)',
+                    edge: 'rgba(71,85,125,0.38)', fade: 'rgba(13,18,32,0)'
+                };
+            });
+        });
+
+        // 280ms：收束单卡哥特盾牌外框 + 夜影兜帽双眸 + 柔光流转
+        tAfter(CHARGE, () => {
+            stopInt(swirl);
+            if (!tokenAlive()) return;
+            playPresetCue('fs_armor');
+            tAfter(65, () => { if (tokenAlive()) playPresetCue('fs_shield'); });
+            shake('light');
+            flashOwned(owner, el, 'arcane-flash-cold');
+
+            const imgSrc = resolveVfxImg('stygian');
+            const sw = Math.min(186, Math.max(150, Math.round(c.w * 1.16))), sh = Math.round(sw * 1.15);
+            const ay = Math.max(sh * 0.52 + 8, c.y - 10);
+            const clipId = 'arcane-sh-clip-' + uid, maskId = 'arcane-sh-mask-' + uid, mgId = 'arcane-sh-mg-' + uid, rimId = 'arcane-sh-rim-' + uid, sheenId = 'arcane-sh-sheen-' + uid;
+            const shieldPath = 'M 100,12 C 138,12 172,22 184,32 C 186,118 160,174 100,218 C 40,174 14,118 16,32 C 28,22 62,12 100,12 Z';
+            const innerPath  = 'M 100,20 C 134,20 165,28 176,37 C 178,116 154,167 100,208 C 46,167 22,116 24,37 C 35,28 66,20 100,20 Z';
+
+            addLayer(`<div class="arcane-stygian-aura" style="left:${c.x}px; top:${ay}px; width:${Math.round(sw * 1.24)}px; height:${Math.round(sh * 1.14)}px; margin-left:${-Math.round(sw * 0.62)}px; margin-top:${-Math.round(sh * 0.57)}px;"></div>
+              <div class="arcane-stygian-shield-wrap" style="left:${c.x}px; top:${ay}px; width:${sw}px; height:${sh}px; margin-left:${-Math.round(sw / 2)}px; margin-top:${-Math.round(sh / 2)}px;">
+                <svg viewBox="0 0 200 230" style="width:100%;height:100%;overflow:visible">
+                  <defs>
+                    <clipPath id="${clipId}"><path d="${shieldPath}"/></clipPath>
+                    <radialGradient id="${mgId}" cx="50%" cy="44%" r="50%"><stop offset="0" stop-color="#fff"/><stop offset="0.64" stop-color="#fff"/><stop offset="0.88" stop-color="#777"/><stop offset="1" stop-color="#111"/></radialGradient>
+                    <mask id="${maskId}"><rect x="0" y="0" width="200" height="230" fill="url(#${mgId})"/></mask>
+                    <linearGradient id="${rimId}" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0" stop-color="#e0f2fe"/><stop offset="0.45" stop-color="#7dd3fc"/><stop offset="1" stop-color="#64748b"/></linearGradient>
+                    <linearGradient id="${sheenId}" x1="0%" y1="0%" x2="100%" y2="25%"><stop offset="0" stop-color="transparent"/><stop offset="0.5" stop-color="rgba(224,242,254,0.34)"/><stop offset="1" stop-color="transparent"/></linearGradient>
+                  </defs>
+                  <path d="${shieldPath}" fill="#090d1a" fill-opacity="0.9"/>
+                  <g clip-path="url(#${clipId})" mask="url(#${maskId})">
+                    <image href="${imgSrc}" x="0" y="0" width="200" height="230" preserveAspectRatio="xMidYMid slice" onerror="this.style.display='none'"/>
+                    <rect x="-80" y="0" width="120" height="230" fill="url(#${sheenId})" style="animation:arcane-armor-sweep 0.62s 0.08s ease-out both"/>
+                  </g>
+                  <path d="${shieldPath}" fill="none" stroke="url(#${rimId})" stroke-width="2.6" stroke-opacity="0.92"/>
+                  <path d="${innerPath}" fill="none" stroke="#93c5fd" stroke-width="0.95" stroke-opacity="0.48"/>
+                  <circle cx="100" cy="12" r="2.8" fill="#e0f2fe" opacity="0.9"/>
+                  <g class="arcane-stygian-eye">
+                    <circle cx="95.5" cy="43.8" r="4.6" fill="rgba(125,211,252,0.45)"/>
+                    <circle cx="104.5" cy="43.8" r="4.6" fill="rgba(125,211,252,0.45)"/>
+                    <circle cx="95.5" cy="43.8" r="1.9" fill="#e0f2fe"/>
+                    <circle cx="104.5" cy="43.8" r="1.9" fill="#e0f2fe"/>
+                  </g>
+                </svg>
+              </div>`, LIFE - CHARGE);
+
+            addP({ x: c.x, y: c.y, shape: 'gradRing', size: 1.9, decay: 0.044, color: 'rgba(147,197,253,0.46)' });
+            burst(20, () => {
+                const a = Math.random() * 6.283, spd = rnd(2.0, 5.6);
+                return {
+                    x: c.x, y: c.y - 8, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd - 0.5,
+                    drag: 0.93, decay: rnd(0.025, 0.044), size: rnd(2.2, 4.0), shape: 'gradOrb', trail: 6,
+                    core: '#f8fafc', color: pick(['rgba(186,230,253,0.88)', 'rgba(125,211,252,0.82)', 'rgba(129,140,248,0.75)']),
+                    edge: 'rgba(59,75,117,0.35)'
+                };
+            });
+            burst(10, () => {
+                const a = Math.random() * 6.283, spd = rnd(1.2, 3.2);
+                return {
+                    x: c.x + rnd(-18, 18), y: c.y + rnd(-8, 18), vx: Math.cos(a) * spd, vy: Math.sin(a) * spd,
+                    drag: 0.94, decay: rnd(0.026, 0.04), size: rnd(14, 22), shape: 'gradMist', blend: 'source-over',
+                    color: pick(['rgba(20,26,48,0.72)', 'rgba(52,64,98,0.56)']), fade: 'rgba(13,18,32,0)'
+                };
+            });
+            let aimTick = 0;
+            const aimOrbit = tEvery(26, () => {
+                if (!tokenAlive() || aimTick++ > 18) return stopInt(aimOrbit);
+                for (let k = 0; k < 3; k++) {
+                    const ang = aimTick * 0.28 + k * 2.094;
+                    addP({
+                        x: c.x + Math.cos(ang) * 62, y: c.y + Math.sin(ang) * 42,
+                        vx: -Math.sin(ang) * 2.4, vy: Math.cos(ang) * 1.6, drag: 0.92, decay: 0.14,
+                        shape: 'gradOrb', trail: 5, size: 2.9, core: '#e0f2fe', color: 'rgba(125,211,252,0.88)', edge: 'rgba(99,102,241,0.38)'
+                    });
+                }
+            });
+        });
+
+        // 660ms：[再动] 银靛流光升腾
+        tAfter(660, () => {
+            if (!tokenAlive()) return;
+            playPresetCue('fs_reac');
+            addP({ x: c.x, y: c.y - 16, shape: 'gradFlare', size: 16, decay: 0.048, core: '#f0f9ff', color: 'rgba(147,197,253,0.72)' });
+            burst(14, () => ({
+                x: c.x + rnd(-24, 24), y: c.y + rnd(-10, 20), vx: rnd(-1.3, 1.3), vy: rnd(-5.0, -2.0),
+                drag: 0.93, decay: 0.038, size: rnd(2.1, 3.8), shape: 'gradOrb', trail: 7,
+                core: '#ffffff', color: 'rgba(186,230,253,0.88)', edge: 'rgba(129,140,248,0.4)'
+            }));
+        });
+
+        return handle;
+    }
+
+    // ===== ② 蝎眼钥匙 · 幻梦行军兽（L4，竖裂探身 + 零直边双轴消融 + abyss 原采样） =====
+    function playXieYanKey(caster, targets, isReaction = false, at = null) {
+        const casterEl = domOf(caster) || (targets && domOf(targets[0]));
+        let wardTargets = (targets || []).filter(Boolean);
+        const token = combatToken;
+        ensureCanvas(); ensureDriver();
+        const CHARGE = 1150, LIFE = 3350;
+        const vw = 1280, vh = 720;
+        const cX = at ? at.x : __STAGE.w * 0.5, cY = at ? at.y : __STAGE.h * 0.46;
+        const owner = fixedSkillRun(LIFE), handle = owner.handle;
+        const tokenAlive = () => !owner.cancelled && !owner.finished && token === combatToken;
+        const tAfter = owner.at, tEvery = owner.every;
+        const stopInt = id => { stopEvery(id); owner.intervals.delete(id); };
+        const addLayer = (markup, ms) => skillLayer(owner, markup, ms);
+        const addP = owner.addP, burst = owner.burst, fly = owner.fly;
+        const playPresetCue = cue => playSandCue(owner, cue);
+        let resolveBurst, burstSettled = false, holdingHitStop = false;
+        handle.burstReady = new Promise(resolve => { resolveBurst = resolve; });
+        handle.setWardTargets = list => { wardTargets = (list || []).filter(Boolean); };
+        Object.defineProperty(handle, "cancelled", { get: () => owner.cancelled });
+        owner.onClean(() => {
+            if (!burstSettled) { burstSettled = true; resolveBurst(false); }
+            if (holdingHitStop && token === combatToken) fxEngine.hitStop = 0;
+        });
+
+        // Act I (0–1150ms)：钥匙启封蓄压，低饱和暗紫流光与纯无白芯深渊灰雾向裂隙原点收束塌缩
+        darken(0.9);
+        const ownDark = S.dark;
+        owner.onClean(() => { if (S.dark === ownDark) { ownDark.remove(); S.dark = null; } });
+        addLayer('<div class="arcane-marcher-veil"></div>', 3300);
+        playPresetCue('xy_charge');
+
+        if (casterEl) {
+            const csc = ctr(casterEl);
+            tAfter(40, () => {
+                if (!tokenAlive()) return;
+                flashOwned(owner, casterEl, 'arcane-flash-cold');
+                playPresetCue('xy_fly');
+                fly({ x: csc.x, y: csc.y - 12 }, { x: cX, y: cY }, 45, 220, (x, y) => {
+                    if (!tokenAlive()) return;
+                    addP({ x, y, shape: 'gradOrb', trail: 6, size: 4, decay: 0.09, core: '#ede9fe', color: 'rgba(139,112,184,0.85)', edge: 'rgba(56,39,82,0.4)' });
+                });
+            });
+        }
+        const rumble = tEvery(320, () => { if (tokenAlive()) shake('light'); });
+        let orbitTick = 0;
+        const orbitInt = tEvery(36, () => {
+            if (!tokenAlive()) return stopInt(orbitInt);
+            orbitTick++;
+            const pr = Math.min(1, orbitTick / 26), baseR = Math.max(vw, vh) * 0.40 * (1 - pr * 0.82);
+            burst(6, i => {
+                const a = Math.random() * 6.283, r = baseR + rnd(-28, 28), spd = rnd(3.2, 6.4);
+                const isMist = i < 2;
+                return {
+                    x: cX + Math.cos(a) * r, y: cY + Math.sin(a) * r,
+                    vx: -Math.cos(a) * spd - Math.sin(a) * 1.8, vy: -Math.sin(a) * spd + Math.cos(a) * 1.8,
+                    drag: 0.94, decay: isMist ? 0.028 : 0.044,
+                    size: isMist ? rnd(18, 30) : rnd(2.2, 4),
+                    shape: isMist ? 'gradMist' : 'gradOrb', trail: isMist ? 0 : 6,
+                    blend: isMist ? 'source-over' : 'lighter',
+                    core: isMist ? undefined : '#ede9fe',
+                    color: isMist ? pick(['rgba(20,13,34,0.72)', 'rgba(46,32,70,0.54)']) : pick(['rgba(167,154,194,0.82)', 'rgba(124,99,166,0.82)', 'rgba(91,63,128,0.75)']),
+                    edge: 'rgba(56,39,82,0.38)', fade: 'rgba(8,5,14,0)'
+                };
+            });
+        });
+        tAfter(1010, () => { stopInt(orbitInt); stopInt(rumble); });
+        tAfter(1035, () => {
+            if (!tokenAlive()) return;
+            addP({ x: cX, y: cY, shape: 'gradFlare', size: 42, decay: 0.08, core: '#f5f3ff', color: 'rgba(139,112,184,0.75)' });
+            fxEngine.hitStop = 110; holdingHitStop = true;
+        });
+
+        // Act II (1150–2650ms)：空间裂隙撕开 + 零直边双轴渐隐容器 + 裂隙边缘暗紫微光
+        tAfter(CHARGE, () => {
+            if (!tokenAlive()) return;
+            fxEngine.hitStop = 0; holdingHitStop = false;
+            shake('quake');
+            playPresetCue('xy_burst');
+            tAfter(180, () => { if (tokenAlive()) playPresetCue('xy_roar'); });
+            tAfter(410, () => { if (tokenAlive()) playPresetCue('xy_stomp'); });
+
+            const imgSrc = resolveVfxImg('marcher');
+            addLayer(`<div class="arcane-marcher-flash"></div>
+              <div class="arcane-marcher-rift-stage is-vertical" style="left:${cX}px; top:${cY}px;">
+                <div class="arcane-marcher-abyss"></div>
+                <div class="arcane-marcher-rift-rim"></div>
+                <div class="arcane-marcher-beast-clip">
+                  <div class="arcane-marcher-beast-wrap">
+                    <div class="arcane-marcher-cream-back"></div>
+                    <div class="arcane-marcher-edge-y">
+                      <div class="arcane-marcher-edge-x">
+                        <img src="${imgSrc}" alt="" onerror="this.style.display='none'"/>
+                        <div class="arcane-marcher-tint-glaze"></div>
+                        <div class="arcane-marcher-violet-wash"></div>
+                      </div>
+                    </div>
+                    <div class="arcane-marcher-eye-flare">
+                      <div class="arcane-marcher-eye-core"></div>
+                      <div class="arcane-marcher-eye-beam-h"></div>
+                      <div class="arcane-marcher-eye-beam-v"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>`, 1680);
+            burstSettled = true; resolveBurst(true);
+
+            addP({ x: cX, y: cY, shape: 'gradRing', size: 5.5, decay: 0.026, color: 'rgba(139,112,184,0.44)' });
+            addP({ x: cX, y: cY, shape: 'gradFlare', size: 64, decay: 0.052, core: '#f5f3ff', color: 'rgba(124,99,166,0.7)' });
+
+            // 前景暗紫浓雾塑形（外推至裂隙两侧边缘，避开兽首与米白核心区）
+            burst(24, i => {
+                const dir = i % 2 === 0 ? -1 : 1;
+                const vx = dir * rnd(4.5, 10);
+                const vy = rnd(-2.4, 2.2);
+                const sx = cX + dir * rnd(120, 210);
+                const sy = cY + rnd(-120, 115);
+                return {
+                    x: sx, y: sy,
+                    vx, vy, grav: 0.02, drag: 0.92, decay: rnd(0.018, 0.03),
+                    size: rnd(22, 40), sx: 1.45, sy: 0.85, shape: 'gradMist', blend: 'source-over',
+                    color: pick(['rgba(14,9,24,0.68)', 'rgba(34,22,52,0.56)', 'rgba(58,42,84,0.42)']),
+                    fade: 'rgba(6,4,12,0)'
+                };
+            });
+
+            // 裂隙方向特化渐变尾粒（无 stroke 实线）
+            burst(44, () => {
+                const side = Math.random() < 0.5 ? -1 : 1, sp = rnd(5, 14);
+                const vx = side * sp, vy = rnd(-3.5, 3.5);
+                const sx = cX + rnd(-32, 32), sy = cY + rnd(-130, 130);
+                return {
+                    x: sx, y: sy, vx, vy, grav: 0.04, drag: 0.93, decay: rnd(0.02, 0.036),
+                    size: rnd(2.2, 4.4), shape: 'gradOrb', trail: 7,
+                    core: '#f5f3ff',
+                    color: pick(['rgba(167,154,194,0.85)', 'rgba(139,112,184,0.82)', 'rgba(104,85,134,0.78)']),
+                    edge: 'rgba(56,39,82,0.4)'
+                };
+            });
+
+            const riftStream = tEvery(46, () => {
+                if (!tokenAlive()) return stopInt(riftStream);
+                burst(4, i => {
+                    const side = i % 2 === 0 ? -1 : 1;
+                    const vx = side * rnd(6, 12);
+                    const vy = rnd(-1.4, 1.4);
+                    const isMist = i < 2;
+                    return {
+                        x: isMist ? (cX + side * rnd(105, 175)) : (cX + rnd(-95, 95)),
+                        y: cY + rnd(-100, 100),
+                        vx, vy, grav: 0, drag: 0.94, decay: isMist ? 0.024 : 0.036,
+                        size: isMist ? rnd(18, 28) : rnd(2, 3.6), shape: isMist ? 'gradMist' : 'gradOrb', trail: isMist ? 0 : 6,
+                        blend: isMist ? 'source-over' : 'lighter',
+                        core: isMist ? undefined : '#ede9fe',
+                        color: isMist ? 'rgba(24,15,38,0.48)' : 'rgba(152,132,188,0.8)', edge: 'rgba(56,39,82,0.35)', fade: 'rgba(6,4,12,0)'
+                    };
+                });
+            });
+            tAfter(980, () => stopInt(riftStream));
+        });
+
+        // Act III (2500–3350ms)：堡垒鞍齿轮锁合单防回流
+        tAfter(2500, () => {
+            if (!tokenAlive()) return;
+            playPresetCue('xy_lock');
+            wardTargets.forEach(wt => {
+                const wEl = domOf(wt);
+                if (!wEl) return;
+                const wc = ctr(wEl);
+                fly({ x: cX, y: cY }, { x: wc.x, y: wc.y }, -64, 340, (x, y) => {
+                    if (!tokenAlive()) return;
+                    addP({ x, y, shape: 'gradOrb', trail: 6, size: 3.8, decay: 0.08, core: '#fef3c7', color: 'rgba(196,181,253,0.82)', edge: 'rgba(104,85,134,0.4)' });
+                }, () => {
+                    if (!tokenAlive()) return;
+                    flashOwned(owner, wEl, 'arcane-flash-cold');
+                    playPresetCue('xy_ward');
+                    addP({ x: wc.x, y: wc.y, shape: 'gradRing', size: 2.2, decay: 0.04, color: 'rgba(167,139,250,0.48)' });
+                    burst(16, () => {
+                        const a = Math.random() * 6.283, spd = rnd(2.2, 6);
+                        return { x: wc.x, y: wc.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, drag: 0.92, decay: 0.038, size: rnd(2.2, 3.8), shape: 'gradOrb', trail: 5, core: '#f5f3ff', color: 'rgba(167,154,194,0.85)', edge: 'rgba(72,52,102,0.38)' };
+                    });
+                });
+            });
+        });
+        tAfter(2860, () => { if (tokenAlive()) darken(0); });
+        return handle;
+    }
+
+    // ===== 奇物与技能定稿 v12.11 BEGIN =====
+    function visualCtr(el) {
+        return entityVisualRect(el) || { x:__STAGE.w * 0.5, y:__STAGE.h * 0.5, w:96, h:96, top:0, bottom:96, left:0, right:96 };
+    }
+    function tintOverlay(owner, bgGradient, durMs, peakOpacity = 0.72) {
+        const wrap = skillLayer(owner, `<div class="arcane-tint-overlay" style="background:${bgGradient};"></div>`, durMs + 60);
+        wrap.style.zIndex = '41';
+        owner.anim(wrap.firstElementChild, [{ opacity:0 }, { opacity:peakOpacity, offset:0.16 }, { opacity:peakOpacity, offset:0.76 }, { opacity:0 }], { duration:durMs, fill:'both' });
+        return wrap;
     }
     function itemSkillRun(totalMs) {
         const owner = identityRun(totalMs, 1);
@@ -5830,6 +6861,14 @@ const CombatEvents = {
     function itemDarken(owner, opacity) {
         if (opacity) { darken(opacity); S.itemDarkOwner = owner; }
         else if (S.itemDarkOwner === owner) darken(0);
+    }
+    function itemFlash(owner, dom, cls) {
+        if (cls === 'arcane-flash-heal' && dom) {
+            dom.classList.add('arcane-item-heal');
+            owner.at(700, () => dom.classList.remove('arcane-item-heal'));
+            owner.onClean(() => dom.classList.remove('arcane-item-heal'));
+        }
+        flashOwned(owner, dom, cls);
     }
     function playItemSample(owner, key, delaySec = 0, opts = {}) {
         const play = () => {
@@ -5928,6 +6967,266 @@ const CombatEvents = {
         if (opts.delayMs) owner.at(opts.delayMs, startPlay);
         else startPlay();
         return cleanup;
+    }
+
+    function mkTuningForkGroupSvg(uid, mode = 'harmony') {
+        const palette = mode === 'harmony'
+            ? { a: '#e0f2fe', b: '#38bdf8', c: '#0c4a6e', glow: 'rgba(125,211,252,0.85)', rune: '#bae6fd' }
+            : (mode === 'silence'
+                ? { a: '#ddd6fe', b: '#7c3aed', c: '#1e1b4b', glow: 'rgba(139,92,246,0.85)', rune: '#c4b5fd' }
+                : { a: '#f8fafc', b: '#7dd3fc', c: '#0f172a', glow: 'rgba(224,242,254,0.95)', rune: '#e0f2fe' });
+        return `<svg viewBox="0 0 280 260" class="w-full h-full overflow-visible">
+            <defs>
+                <radialGradient id="fk-aura-${uid}" cx="50%" cy="44%" r="50%">
+                    <stop offset="0%" stop-color="${palette.glow}" stop-opacity="0.55"/>
+                    <stop offset="52%" stop-color="${palette.b}" stop-opacity="0.18"/>
+                    <stop offset="100%" stop-color="${palette.c}" stop-opacity="0"/>
+                </radialGradient>
+                <linearGradient id="fk-iron-${uid}" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#475569"/>
+                    <stop offset="32%" stop-color="#1e293b"/>
+                    <stop offset="72%" stop-color="#090d16"/>
+                    <stop offset="100%" stop-color="#334155"/>
+                </linearGradient>
+                <linearGradient id="fk-edge-${uid}" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="${palette.a}" stop-opacity="0.95"/>
+                    <stop offset="65%" stop-color="${palette.b}" stop-opacity="0.72"/>
+                    <stop offset="100%" stop-color="${palette.c}" stop-opacity="0.15"/>
+                </linearGradient>
+                <filter id="fk-soft-${uid}" x="-35%" y="-35%" width="170%" height="170%"><feGaussianBlur stdDeviation="3.5"/></filter>
+            </defs>
+            <circle cx="140" cy="118" r="112" fill="url(#fk-aura-${uid})"/>
+            <g opacity="0.72" style="transform-origin:140px 118px;animation:arcane-slow-rot 18s linear infinite;">
+                <circle cx="140" cy="118" r="88" fill="none" stroke="url(#fk-edge-${uid})" stroke-width="1.4" stroke-dasharray="14 8 3 8"/>
+                <circle cx="140" cy="118" r="68" fill="none" stroke="url(#fk-edge-${uid})" stroke-width="0.9" stroke-dasharray="4 10"/>
+            </g>
+            <!-- 左副短音叉 -->
+            <g transform="translate(82,126) rotate(-14) scale(0.68)">
+                <rect x="-14" y="-88" width="6" height="68" rx="3" fill="url(#fk-iron-${uid})"/>
+                <rect x="8" y="-88" width="6" height="68" rx="3" fill="url(#fk-iron-${uid})"/>
+                <path d="M-11 -22 Q-11 2 0 4 Q11 2 11 -22" fill="none" stroke="url(#fk-iron-${uid})" stroke-width="6.5" stroke-linecap="round"/>
+                <rect x="-3.5" y="2" width="7" height="44" rx="3.5" fill="url(#fk-iron-${uid})"/>
+                <circle cx="0" cy="48" r="5.5" fill="url(#fk-edge-${uid})"/>
+            </g>
+            <!-- 右副中音叉 -->
+            <g transform="translate(198,124) rotate(13) scale(0.78)">
+                <rect x="-15" y="-98" width="6.5" height="76" rx="3" fill="url(#fk-iron-${uid})"/>
+                <rect x="8.5" y="-98" width="6.5" height="76" rx="3" fill="url(#fk-iron-${uid})"/>
+                <path d="M-11.5 -24 Q-11.5 2 0 4 Q11.5 2 11.5 -24" fill="none" stroke="url(#fk-iron-${uid})" stroke-width="7" stroke-linecap="round"/>
+                <rect x="-3.5" y="2" width="7" height="48" rx="3.5" fill="url(#fk-iron-${uid})"/>
+                <circle cx="0" cy="52" r="6" fill="url(#fk-edge-${uid})"/>
+            </g>
+            <!-- 中央主长音叉（密大深海暗铁流物符文） -->
+            <g transform="translate(140,122)">
+                <rect x="-22" y="-110" width="9" height="90" rx="4.5" fill="url(#fk-iron-${uid})"/>
+                <rect x="13" y="-110" width="9" height="90" rx="4.5" fill="url(#fk-iron-${uid})"/>
+                <rect x="-22" y="-110" width="9" height="90" rx="4.5" fill="url(#fk-edge-${uid})" opacity="0.58" filter="url(#fk-soft-${uid})"/>
+                <rect x="13" y="-110" width="9" height="90" rx="4.5" fill="url(#fk-edge-${uid})" opacity="0.58" filter="url(#fk-soft-${uid})"/>
+                <path d="M-17.5 -22 Q-17.5 10 0 12 Q17.5 10 17.5 -22" fill="none" stroke="url(#fk-iron-${uid})" stroke-width="9" stroke-linecap="round"/>
+                <path d="M-17.5 -22 Q-17.5 10 0 12 Q17.5 10 17.5 -22" fill="none" stroke="url(#fk-edge-${uid})" stroke-width="2.4" stroke-linecap="round"/>
+                <rect x="-4.5" y="10" width="9" height="62" rx="4.5" fill="url(#fk-iron-${uid})"/>
+                <circle cx="0" cy="76" r="8" fill="url(#fk-edge-${uid})"/>
+                <path d="M-17.5 -86 L-17.5 -46 M17.5 -86 L17.5 -46 M0 22 L0 58" stroke="${palette.rune}" stroke-width="1.3" stroke-dasharray="3 4" opacity="0.9"/>
+            </g>
+        </svg>`;
+    }
+    function playHarmonyShelter(caster, targets) {
+        const token = combatToken, uid = ++S.uid;
+        const owner = itemSkillRun(2300), handle = owner.handle;
+        const after = owner.at, every = owner.every, fsLayer = (markup, ms) => skillLayer(owner, markup, ms);
+        const addP = p => owner.addP(Object.assign({ itemFx:true }, p)), burst = (n, fn) => { for (let i = 0; i < n; i++) addP(fn(i)); };
+        const playSfxSample = (key, delay, opts) => playItemSample(owner, key, delay, opts);
+        const playWebMFX = (file, x, y, opts) => playArcaneWebM(file, x, y, opts, owner);
+        const darken = opacity => itemDarken(owner, opacity), flash = (dom, cls) => itemFlash(owner, dom, cls);
+        const doms = teamSprites(caster);
+        const rawDoms = (targets || []).map(domOf).filter(Boolean);
+        const allyDoms = doms.length ? doms : rawDoms;
+        const box = unionRect(allyDoms) || { x: __STAGE.w * 0.4, y: __STAGE.h * 0.72, w: 520, h: 160 };
+        const forkPos = { x: box.x, y: box.y - 260 };
+
+        darken(0.55);
+        tintOverlay(owner, 'radial-gradient(ellipse at 50% 60%, rgba(14,116,144,0.34) 0%, rgba(15,23,42,0.58) 72%, rgba(2,6,23,0.82) 100%)', 2300, 0.78);
+        playSfxSample('forkHum', 0.08, { volume: 0.85, fadeOut: 0.5 });
+        playSfxSample('bowlClear', 0.82, { volume: 0.72, fadeOut: 0.6 });
+
+        const propWrap = fsLayer(`<div class="arcane-fs-anchor" style="left:${forkPos.x}px; top:${forkPos.y}px; width:260px; height:240px;">${mkTuningForkGroupSvg(uid, 'harmony')}</div>`, 2250);
+        const propEl = propWrap.firstElementChild;
+        owner.anim(propEl, [
+            { transform: 'translate(-50%, -50%) scale(0.55)', opacity: 0 },
+            { transform: 'translate(-50%, -50%) scale(1)', opacity: 1, offset: 0.14 },
+            { transform: 'translate(-50%, -50%) scale(1.06)', opacity: 1, offset: 0.86 },
+            { transform: 'translate(-50%, -50%) scale(0.85)', opacity: 0 }
+        ], { duration: 2150, fill: 'both' });
+
+        after(120, () => {
+            if (token !== combatToken) return;
+            propEl.style.animation = 'arcane-fork-hum 0.11s linear infinite';
+            burst(16, () => { const a = rnd(0, 6.283), s = rnd(1.5, 4); return { x: forkPos.x + 18, y: forkPos.y - 45, vx: Math.cos(a) * s, vy: Math.sin(a) * s, drag: 0.93, decay: 0.04, size: rnd(10, 18), shape: 'gradOrb', core: '#ffffff', mid: '#7dd3fc', outer: 'rgba(14,165,233,0.12)' }; });
+            addP({ x: forkPos.x + 16, y: forkPos.y - 42, shape: 'gradFlare', rx: 64, ry: 12, decay: 0.06, core: '#fff', mid: '#bae6fd', outer: 'rgba(56,189,248,0.1)' });
+        });
+
+        // 蓄势阶段聚拢光尘与双道青银音律涟漪
+        const cId = every(90, () => {
+            if (token !== combatToken) return;
+            allyDoms.forEach(d => {
+                const c = visualCtr(d), ang = rnd(0, 6.283), rad = rnd(58, 92);
+                addP({ x: c.x + Math.cos(ang) * rad, y: c.y + Math.sin(ang) * rad, vx: -Math.cos(ang) * 2.4, vy: -Math.sin(ang) * 2.2 - 0.5, drag: 0.96, decay: 0.04, size: rnd(6, 12), shape: 'gradOrb', core: '#ffffff', mid: '#38bdf8', outer: 'rgba(186,230,253,0.08)' });
+            });
+        });
+        after(820, () => stopEvery(cId));
+
+        after(900, () => {
+            if (token !== combatToken) return;
+            shake('light');
+            addP({ x: box.x, y: box.y + 12, shape: 'gradRing', sy: 0.36, r0: 45, r1: 380, decay: 0.025, color: 'rgba(186,230,253,0.28)', edge: 'rgba(224,242,254,0.58)' });
+            playWebMFX('vfx_harmony_ripple.webm', box.x, box.y + 18, { width: Math.max(540, box.w * 1.15), height: 210, opacity: 0.94, blend: 'screen', durMs: 1450 });
+            allyDoms.forEach((d, idx) => {
+                const c = visualCtr(d), rw = Math.max(82, c.w * 1.15), rh = Math.max(38, c.h * 0.42);
+                const halo = fsLayer(`<div class="arcane-fs-anchor" style="left:${c.x}px; top:${c.bottom - 6}px; width:${rw}px; height:${rh}px; border-radius:50%; background:radial-gradient(ellipse at 50% 50%, transparent 48%, rgba(56,189,248,0.42) 76%, rgba(186,230,253,0.55) 86%, transparent 100%); box-shadow:0 0 18px rgba(125,211,252,0.45);"></div>`, 1350);
+                owner.anim(halo.firstElementChild, [{ transform: 'translate(-50%,-50%) scale(0.75)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1.06)', opacity: 0.92, offset: 0.25 }, { transform: 'translate(-50%,-50%) scale(1.18)', opacity: 0 }], { duration: 1250, delay: idx * 45, fill: 'both' });
+                flash(d, 'arcane-flash-heal');
+                burst(14, () => ({ x: c.x + rnd(-c.w * 0.42, c.w * 0.42), y: c.y + rnd(-c.h * 0.25, c.h * 0.35), vx: rnd(-0.6, 0.6), vy: rnd(-2.4, -0.8), drag: 0.97, decay: rnd(0.018, 0.03), size: rnd(7, 14), shape: 'gradOrb', core: '#ffffff', mid: '#7dd3fc', outer: 'rgba(186,230,253,0.1)' }));
+                burst(4, () => ({ x: c.x + rnd(-26, 26), y: c.y + rnd(-20, 20), vx: rnd(-0.3, 0.3), vy: rnd(-0.9, -0.3), drag: 0.99, decay: 0.018, size: rnd(26, 40), shape: 'gradMist', blend: 'screen', inner: 'rgba(125,211,252,0.26)', outer: 'rgba(14,116,144,0.08)' }));
+            });
+        });
+
+        after(1950, () => darken(0));
+        handle.dispel = tDom => {
+            if (owner.cancelled || owner.finished || token !== combatToken || !tDom) return;
+            const c = visualCtr(tDom);
+            playSfxSample('bellPing', 0, { volume:0.72, pan:Math.max(-0.8, Math.min(0.8, (c.x / __STAGE.w - 0.5) * 1.4)) });
+            addP({ x:c.x, y:c.y, shape:'gradRing', r0:14, r1:92, decay:0.04, color:'rgba(224,242,254,0.6)', edge:'#fff' });
+            addP({ x:c.x, y:c.y, shape:'gradFlare', rx:78, ry:14, decay:0.05, core:'#ffffff', mid:'#bae6fd', outer:'rgba(56,189,248,0.12)' });
+            burst(18, () => ({ x:c.x + rnd(-24,24), y:c.y + rnd(-12,24), vx:rnd(-1.2,1.2), vy:rnd(-3.2,-1), drag:0.95, decay:rnd(0.025,0.045), size:rnd(8,16), shape:'gradOrb', core:'#ffffff', mid:'#e0f2fe', outer:'rgba(56,189,248,0.1)' }));
+        };
+        return handle;
+    }
+
+    function playSilenceDomain(caster, targets) {
+        const token = combatToken, uid = ++S.uid;
+        const owner = itemSkillRun(2400), handle = owner.handle;
+        const after = owner.at, every = owner.every, fsLayer = (markup, ms) => skillLayer(owner, markup, ms);
+        const addP = p => owner.addP(Object.assign({ itemFx:true }, p)), burst = (n, fn) => { for (let i = 0; i < n; i++) addP(fn(i)); };
+        const playSfxSample = (key, delay, opts) => playItemSample(owner, key, delay, opts);
+        const playWebMFX = (file, x, y, opts) => playArcaneWebM(file, x, y, opts, owner);
+        const darken = opacity => itemDarken(owner, opacity), flash = (dom, cls) => itemFlash(owner, dom, cls);
+        const eDoms = (targets || []).map(domOf).filter(Boolean);
+        const fallbackDoms = enemiesData.filter(e => e.isAlive).map(domOf).filter(Boolean);
+        const activeDoms = eDoms.length ? eDoms : fallbackDoms;
+        const box = unionRect(activeDoms) || { x: __STAGE.w * 0.52, y: __STAGE.h * 0.34, w: 540, h: 180 };
+        const forkPos = { x: box.x, y: Math.max(96, box.y - 68) };
+
+        darken(0.70);
+        tintOverlay(owner, 'radial-gradient(ellipse at 50% 35%, rgba(76,29,149,0.44) 0%, rgba(30,27,75,0.68) 65%, rgba(5,5,18,0.9) 100%)', 2400, 0.85);
+        playSfxSample('bowlBronze', 0.04, { volume: 0.82, rate: 0.88, durCap: 0.82, fadeOut: 0.12 });
+        playSfxSample('forkMute', 0.84, { volume: 0.85 });
+        playSfxSample('sd_ring_blast', 0.95, { volume: 0.82 });
+
+        const propWrap = fsLayer(`<div class="arcane-fs-anchor" style="left:${forkPos.x}px; top:${forkPos.y}px; width:240px; height:220px;">${mkTuningForkGroupSvg(uid, 'silence')}</div>`, 2250);
+        const propEl = propWrap.firstElementChild;
+        owner.anim(propEl, [
+            { transform: 'translate(-50%, -50%) rotate(180deg) scale(0.55)', opacity: 0 },
+            { transform: 'translate(-50%, -50%) rotate(180deg) scale(1)', opacity: 0.98, offset: 0.16 },
+            { transform: 'translate(-50%, -50%) rotate(180deg) scale(1.04)', opacity: 0.96, offset: 0.84 },
+            { transform: 'translate(-50%, -50%) rotate(180deg) scale(0.9)', opacity: 0 }
+        ], { duration: 2150, fill: 'both' });
+
+        // 0-840ms 低频压迫向心收缩；840ms 触发 110ms 绝对静默骤停反差
+        const sId = every(75, () => {
+            if (token !== combatToken) return;
+            const ang = rnd(0, 6.283), rx = rnd(140, 290), ry = rnd(60, 120);
+            addP({ x: box.x + Math.cos(ang) * rx, y: box.y + Math.sin(ang) * ry, vx: -Math.cos(ang) * 3.8, vy: -Math.sin(ang) * 1.9, drag: 0.96, decay: 0.045, size: rnd(18, 30), shape: 'gradMist', blend: 'source-over', inner: 'rgba(109,40,217,0.38)', outer: 'rgba(30,27,75,0.12)' });
+        });
+        after(830, () => {
+            stopEvery(sId);
+            if (token !== combatToken) return;
+            propEl.style.animation = 'none';
+            fxEngine.hitStop = 105; // 110ms "绝对静默" 定帧
+        });
+
+        after(950, () => {
+            if (token !== combatToken) return;
+            shake('heavy');
+            playWebMFX('vfx_silence_ripple.webm', box.x, box.y + 38, { width: Math.max(620, box.w * 1.25), height: 220, opacity: 0.96, blend: 'screen', durMs: 1450 });
+            playWebMFX('vfx_silence_crack.webm', box.x, box.y + 28, { width: Math.max(480, box.w * 0.95), height: 210, opacity: 0.58, blend: 'screen', durMs: 1350 });
+            addP({ x: box.x, y: box.y + 24, shape: 'gradRing', sy: 0.42, r0: 36, r1: 380, decay: 0.022, color: 'rgba(139,92,246,0.32)', edge: 'rgba(221,214,254,0.52)' });
+            activeDoms.forEach(d => {
+                const c = visualCtr(d);
+                flash(d, 'arcane-flash-silence');
+                burst(8, () => ({ x: c.x + rnd(-22, 22), y: c.y + rnd(-16, 20), vx: rnd(-1.4, 1.4), vy: rnd(-0.8, 0.8), drag: 0.95, decay: 0.02, size: rnd(26, 44), shape: 'gradMist', blend: 'source-over', inner: 'rgba(91,33,182,0.42)', outer: 'rgba(17,24,39,0.14)' }));
+                burst(6, () => ({ x: c.x + rnd(-18, 18), y: c.y + rnd(-18, 18), vx: rnd(-1.6, 1.6), vy: rnd(-1.6, 1.6), drag: 0.92, decay: 0.032, size: rnd(5, 10), shape: 'gradOrb', core: '#f5f3ff', mid: '#8b5cf6', outer: 'rgba(76,29,149,0.14)' }));
+            });
+        });
+
+        after(2020, () => darken(0));
+        return handle;
+    }
+
+    function playShatterResonance(caster, targets) {
+        const token = combatToken, uid = ++S.uid;
+        const owner = itemSkillRun(2500), handle = owner.handle;
+        const after = owner.at, every = owner.every, fsLayer = (markup, ms) => skillLayer(owner, markup, ms);
+        const addP = p => owner.addP(Object.assign({ itemFx:true }, p)), burst = (n, fn) => { for (let i = 0; i < n; i++) addP(fn(i)); };
+        const playSfxSample = (key, delay, opts) => playItemSample(owner, key, delay, opts);
+        const playWebMFX = (file, x, y, opts) => playArcaneWebM(file, x, y, opts, owner);
+        const darken = opacity => itemDarken(owner, opacity), flash = (dom, cls) => itemFlash(owner, dom, cls);
+        const eDoms = (targets || []).map(domOf).filter(Boolean);
+        const activeDoms = eDoms.length ? eDoms : enemiesData.filter(e => e.isAlive).map(domOf).filter(Boolean);
+        const box = unionRect(activeDoms) || { x: __STAGE.w * 0.52, y: __STAGE.h * 0.34, w: 540, h: 180 };
+        const forkPos = { x: box.x, y: Math.max(120, box.y - 30) };
+
+        darken(0.70);
+        tintOverlay(owner, 'radial-gradient(ellipse at 50% 35%, rgba(14,165,233,0.22) 0%, rgba(15,23,42,0.72) 64%, rgba(2,6,23,0.92) 100%)', 2500, 0.84);
+        // 三连音叉高频递进起振 + 爆破音
+        [0, 270, 540].forEach((ms, idx) => {
+            after(ms, () => {
+                if (token !== combatToken) return;
+                playSfxSample('fork432', 0, { volume: 0.65 + idx * 0.1, rate: 0.95 + idx * 0.19, durCap: 0.85, fadeOut: 0.25 });
+                addP({ x: box.x, y: box.y, shape: 'gradOrb', size: 22 + idx * 14, decay: 0.08, core: '#fff', mid: '#bae6fd', outer: 'rgba(56,189,248,0.18)' });
+                burst(10 + idx * 6, () => { const a = rnd(0, 6.283), r = rnd(95, 165); return { x: box.x + Math.cos(a) * r, y: box.y + Math.sin(a) * r * 0.65, vx: -Math.cos(a) * (4 + idx), vy: -Math.sin(a) * (2.6 + idx * 0.7), drag: 0.94, decay: 0.08, size: rnd(6, 12), shape: 'gradOrb', core: '#ffffff', mid: '#7dd3fc', outer: 'rgba(14,165,233,0.1)' }; });
+            });
+        });
+        playSfxSample('sd_shatter_blast', 0.95, { volume: 0.9 });
+
+        const propWrap = fsLayer(`<div class="arcane-fs-anchor" style="left:${forkPos.x}px; top:${forkPos.y}px; width:250px; height:230px;">${mkTuningForkGroupSvg(uid, 'shatter')}</div>`, 1900);
+        const propEl = propWrap.firstElementChild;
+        owner.anim(propEl, [
+            { transform: 'translate(-50%, -50%) scale(0.65)', opacity: 0 },
+            { transform: 'translate(-50%, -50%) scale(1.06)', opacity: 1, offset: 0.18 },
+            { transform: 'translate(-50%, -50%) scale(1.18)', opacity: 1, offset: 0.56 },
+            { transform: 'translate(-50%, -50%) scale(1.45)', opacity: 0 }
+        ], { duration: 1080, fill: 'both' });
+        after(300, () => { if (token === combatToken) propEl.style.animation = 'arcane-fork-viol 0.075s linear infinite'; });
+        after(830, () => { if (token === combatToken) fxEngine.hitStop = 105; });
+
+        after(950, () => {
+            if (token !== combatToken) return;
+            shake('quake');
+            // 贯穿全屏的冷银过载音爆撕裂光带
+            fsLayer(`<div style="position:absolute; left:50%; top:${box.y}px; width:130vw; height:58px; transform:translate(-50%,-50%); background:linear-gradient(90deg, transparent 0%, rgba(186,230,253,0.75) 22%, #ffffff 50%, rgba(186,230,253,0.75) 78%, transparent 100%); filter:blur(2px); animation:arcane-beam-slash 0.42s ease-out both;"></div>`, 480);
+            playWebMFX('vfx_shatter_arc.webm', box.x, box.y, { width: Math.max(660, box.w * 1.32), height: 320, opacity: 0.98, blend: 'screen', durMs: 950 });
+            addP({ x: box.x, y: box.y + 10, shape: 'gradRing', sy: 0.44, r0: 25, r1: 420, decay: 0.028, color: 'rgba(186,230,253,0.34)', edge: 'rgba(224,242,254,0.62)' });
+            addP({ x: box.x, y: box.y, shape: 'gradFlare', rx: 320, ry: 22, decay: 0.045, core: '#ffffff', mid: '#e0f2fe', outer: 'rgba(56,189,248,0.12)' });
+            activeDoms.forEach((d, idx) => {
+                const c = visualCtr(d);
+                flash(d, 'arcane-flash-shatter');
+                if (idx % 2 === 0 || idx === activeDoms.length - 1) {
+                    playWebMFX('vfx_shatter_spark.webm', c.x, c.y, { width: 220, height: 220, opacity: 0.95, blend: 'screen', delayMs: idx * 35, durMs: 620 });
+                }
+                burst(14, () => { const an = rnd(0, 6.283), sp = rnd(3, 10.5); return { x: c.x, y: c.y, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp - 1, grav: 0.16, drag: 0.93, decay: rnd(0.025, 0.048), size: rnd(6, 13), shape: 'gradOrb', core: '#ffffff', mid: '#bae6fd', outer: 'rgba(14,165,233,0.12)' }; });
+                burst(7, () => { const an = rnd(0, 6.283), sp = rnd(2.2, 7.5); return { x: c.x, y: c.y, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp - 1.5, grav: 0.22, drag: 0.95, rot: rnd(0, 6.28), vr: rnd(-0.22, 0.22), decay: 0.032, size: rnd(5, 9), shape: 'shard', fill: 'rgba(148,163,184,0.35)', color: '#e0f2fe' }; });
+            });
+        });
+
+        after(2050, () => darken(0));
+        handle.hit = targetOrType => {
+            const tDom = typeof targetOrType === 'string' ? activeDoms[0] : targetOrType;
+            if (owner.cancelled || owner.finished || token !== combatToken || !tDom) return;
+            const c = visualCtr(tDom);
+            addP({ x:c.x, y:c.y, shape:'gradFlare', rx:95, ry:18, decay:0.06, core:'#ffffff', mid:'#bae6fd', outer:'rgba(56,189,248,0.15)' });
+            burst(12, () => { const a = rnd(0,6.283), s = rnd(3,8); return { x:c.x, y:c.y, vx:Math.cos(a)*s, vy:Math.sin(a)*s, drag:0.93, decay:0.04, size:rnd(5,11), shape:'gradOrb', core:'#fff', mid:'#7dd3fc', outer:'rgba(14,165,233,0.1)' }; });
+        };
+        return handle;
     }
 
     // ===== ③ 【砷弹射击】L1+ 枪口蓄力 → 黑弹破甲 → 命中爆炸与毒液溅射 (1180ms / 音效沿用枪击穿透) =====
@@ -8111,7 +9410,9 @@ function playRescueAvoidFatal(entity, meta, onBeat) {
       playRescueGrit, playRescueAvoidFatal, clearRescueState,
       playVariantResistFx, playCounterAttackL1,
       playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, clearSelfDestructState, syncSelfDestructWarning,
-      setIdentitySfx, setVariantSfx, setStatusSfx, setSelfDestructSfx, clearSummonState, playLingFeng };
+      setIdentitySfx, setVariantSfx, setStatusSfx, setSelfDestructSfx, clearSummonState, playLingFeng,
+      playIsis, playFeiShaHuaJia, playXieYanKey, playHarmonyShelter, playSilenceDomain, playShatterResonance,
+      playMeleeGroup, playRangedGroup, playSpellGroup };
   })();
 CombatEvents.on(EVENTS.DAMAGE_RESOLVED, arcane.CombatAudioDirector.consume);
 CombatEvents.on(EVENTS.DODGE_RESOLVED, arcane.CombatAudioDirector.consume);
@@ -8120,6 +9421,7 @@ CombatEvents.on(EVENTS.DODGE_RESOLVED, arcane.CombatAudioDirector.consume);
     CombatAudioMixer, audioUrls, playSound, playCustomAudio, HERO_VOICE_LINES, pickHeroVoice, AVATAR_MAP, fxEngine, atmoAudio,
     ASSET_BASE, HERO_VOICE_BASE, itemFxAssetUrl,
     playGenericSupportFx, playExecutionAnimation, playEnemyUltimateCutin, clearMoments, playPowerCounterEffect,
+    RLYEH_FOG_CLOUD_URL, playEldritchWhisper, buildRlyehSedimentFxHtml, buildTitanGazeFxHtml,
     clearArcaneFx() { clearPowerCounterEffects(); supportHandles.forEach(handle => handle.cancel()); clearMoments(); arcane.clearArcaneFx(); playRandomStandardGunshot.last = null; },
     setToken(t) { if (t !== combatToken) { clearPowerCounterEffects(); supportHandles.forEach(handle => handle.cancel()); clearMoments(); playRandomStandardGunshot.last = null; } combatToken = t; },
     getToken() { return combatToken; },

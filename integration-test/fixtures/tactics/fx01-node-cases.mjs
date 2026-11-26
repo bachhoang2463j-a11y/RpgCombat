@@ -467,11 +467,11 @@ export const groups = {
     const fogAim = ['e:食尸鬼A', 'e:食尸鬼B', 'e:深潜者A'].map(center).find(c => b.previewAttack(sk('拉莱耶造雾术'), c).ok);
     const fog = drive(b.beginAttack(sk('拉莱耶造雾术'), fogAim));
     const fogEv = (fog.events || []).find(ev => ev.type === 'region-created');
-    cases.push(ok('TFX-03 拉莱耶造雾术：region-created 真值（半径5·接触点）→ abyss-fog(L3)；由显式特效标签指定',
-      fog.ok && fogEv && fogEv.region.type === 'fog' && fogEv.region.radius === 5 && pick(fog) === 'abyss-fog' && (b.snapshot().regions || []).length >= fogBefore,
+    cases.push(ok('TFX-03 拉莱耶造雾术（我方）：region-created 真值（半径5·接触点）→ rlyeh-sediment（原版造雾术）；由显式特效标签指定',
+      fog.ok && fogEv && fogEv.region.type === 'fog' && fogEv.region.radius === 5 && pick(fog) === 'rlyeh-sediment' && (b.snapshot().regions || []).length >= fogBefore,
       j({ ok: fog.ok, reason: fog.reason, region: fogEv && { r: fogEv.region.radius, c: fogEv.region.center }, id: pick(fog) })));
     const enemyFog = enemyResults.find(r => (r.events || []).some(ev => ev.type === 'region-created'));
-    cases.push(ok('TFX-03 深潜者造雾显式浓雾标签同走 abyss-fog', !enemyFog || pick(enemyFog) === 'abyss-fog', j(enemyFog ? { skill: enemyFog.skill.name, id: pick(enemyFog) } : 'none')));
+    cases.push(ok('TFX-03 深潜者拉莱耶造雾术独立标签走 abyss-fog（战棋版浓雾演出）', !enemyFog || pick(enemyFog) === 'abyss-fog', j(enemyFog ? { skill: enemyFog.skill.name, id: pick(enemyFog) } : 'none')));
     // 蓄力分发单独验证：敌人等待，避免 AI 决策变化导致施法者在释放前死亡。
     fresh(); toEl(true);
     el.ref.tp = 80; el.ref.mp = 100;
