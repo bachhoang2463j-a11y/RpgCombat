@@ -539,7 +539,14 @@ export function createApp(rootEl, opts = {}) {
     }
     return battle.skillStatus(skill).reason || '';
   }
-  const isSelfCast = skill => !!(skill.range && (skill.range.type === '自身' || (skill.range.type === '单体' && skill.range.castRange === 0)));
+  function isSelfCast(skill) {
+    const range = skill.range;
+    if (range?.type === '自身') return true;
+    if (range?.type !== '单体') return false;
+    const slots = skillSlots(skill);
+    return slots.length > 0 && (slots.every(s => s.target === 'self') ||
+      (range.castRange === 0 && slots.every(s => s.target === 'self' || !s.attack && !s.debuff && s.target !== 'enemy')));
+  }
   function skillOfKey(key) {
     if (key === 'attack') return BASIC_ATTACK;
     const m = /^sk:(\d+)$/.exec(key || '');
@@ -812,7 +819,7 @@ export function createApp(rootEl, opts = {}) {
       const bar = rootEl.ownerDocument.createElement('div');
       bar.style.cssText = 'position:fixed;left:50%;bottom:112px;transform:translateX(-50%);z-index:960;display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:10px;background:rgba(15,23,42,0.92);border:1px solid rgba(251,146,60,0.75);color:#fef3c7;font:600 12px/1.4 system-ui;box-shadow:0 8px 24px rgba(0,0,0,0.45);';
       bar.innerHTML = '<span>🔥 <b>' + esc(req.skill.name) + '</b> 第 ' + req.shotIndex + ' 段转火：请在地图选择新目标/方向</span>' +
-        '<button type="button" style="padding:4px 10px;border-radius:6px;background:#ea580c;color:#fff;border:0;cursor:pointer;font-weight:700;">沿用首段 (Enter)</button>';
+        '<button type="button" style="padding:4px 10px;border-radius:6px;background:#ea580c;color:#fff;border:0;cursor:pointer;font-weight:700;">' + (req.skipPrevious ? '跳过本段' : '沿用首段') + ' (Enter)</button>';
       const finish = (choice) => {
         if (!retargetPrompt) return;
         retargetPrompt = null;
@@ -885,7 +892,7 @@ export function createApp(rootEl, opts = {}) {
     shell.previewMoveCost(ev.ok ? ev.cell.cost : null);
   });
 
-  sandbox.onMapClick(hit => {
+  sandbox.onMapClick((hit, clickCount) => {
     if (retargetPrompt) {
       const r = retargetPrompt.req;
       const a = aimFor(r.skill, hit);
@@ -901,7 +908,11 @@ export function createApp(rootEl, opts = {}) {
     if (fieldAction) return handleFieldTarget(hit);
     if (aim) {
       const key = hitKey(aim.skill, hit);
-      if (pending && key && pending.key === key) { firePending(); return true; }
+      const sameTarget = pending?.aim.targetId && pending.aim.targetId === hit.targetId;
+      const reuseTarget = !!(aim.skill.switchTarget && clickCount === 2 && (pending?.key === key || sameTarget));
+      if (pending && key && (pending.key === key || reuseTarget)) {
+        firePending({ reuseTarget }); return true;
+      }
       const ev = attackPreview(aim, hit, true);
       if (!ev.ok || !key) { pending = null; ui('deny'); renderCommand(); return true; }
       pending = { key, aim: ev.aim };
@@ -1024,11 +1035,7 @@ export function createApp(rootEl, opts = {}) {
     aim = { key: 'item:' + idx + (child ? ':' + childIdx : ''), skill, item: it, child };
     sandbox.setHint(null); sandbox.refreshHover();
     sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill, query: null });
-    if (isSelfCast(skill)) {
-      const me = battle.snapshot().currentId, c = sandbox.unitWorldCenter(me);
-      const ev = attackPreview(aim, { x: c.x, y: c.y, col: Math.floor(c.x), row: Math.floor(c.y), targetId: me }, true);
-      if (ev.ok) pending = { key: 'u:' + me, aim: ev.aim };
-    }
+    if (isSelfCast(skill)) { fireSelf(); return; }
     ui('select'); renderCommand();
   }
   // 跳跃落点集：八方向逐格询问规则（previewJump 为唯一判定，含跳距上限）
@@ -1129,12 +1136,7 @@ export function createApp(rootEl, opts = {}) {
     aim = { key, skill };
     sandbox.setHint(null); sandbox.refreshHover();
     sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: aim.skill, query: null });
-    // 自身技能（单体·射程 0）：直接锁定自己，再点自己或 Enter 发动
-    if (isSelfCast(skill)) {
-      const me = battle.snapshot().currentId, c = sandbox.unitWorldCenter(me);
-      const ev = attackPreview(aim, { x: c.x, y: c.y, col: Math.floor(c.x), row: Math.floor(c.y), targetId: me }, true);
-      if (ev.ok) { pending = { key: 'u:' + me, aim: ev.aim }; ui('lock'); }
-    }
+    if (isSelfCast(skill)) { fireSelf(); return; }
     renderCommand();
   }
   function requestEnd() {
@@ -1171,7 +1173,12 @@ export function createApp(rootEl, opts = {}) {
     if (res.stoppedOnDiscovery) shell.showLog(battle.snapshot().log.at(-1), 'warn');
     afterHeroAction();
   }
-  async function firePending() {
+  function fireSelf() {
+    const me = battle.snapshot().currentId;
+    pending = { aim: { ...sandbox.unitWorldCenter(me), targetId: me } };
+    firePending();
+  }
+  async function firePending({ reuseTarget = false } = {}) {
     const myFlow = flow;
     const casterId = battle.snapshot().currentId;
     const p = pending, act = aim;
@@ -1184,8 +1191,8 @@ export function createApp(rootEl, opts = {}) {
     ui('confirm');
     // 玩家攻击统一走 battle.beginAttack generator（反应弹窗在导演驱动内弹出）；同步 attack 不再用于真实 UI
     const res = act.item
-      ? await director.driveAttack(battle.beginUseItem(act.item, p.aim, act.child ? { child: act.child } : {}))
-      : await director.runAttackLive(act.skill, p.aim);
+      ? await director.driveAttack(battle.beginUseItem(act.item, p.aim, { child: act.child, reuseTarget }))
+      : await director.runAttackLive(act.skill, p.aim, { reuseTarget });
     if (myFlow !== flow) return;
     if (!res) { setBusy(false); return; }
     if (!res.ok) { setBusy(false); ui('deny'); shell.showLog(res.reason, 'warn'); refreshBattle(); return; }

@@ -34,6 +34,7 @@ check('头像远景底线及父子引用修复入包', html.includes('avatarScal
 check('原版状态变种真实入口与常量入包', ['syncStatusLayers', 'clearStatusLayers', 'playStatusTickFx', 'syncVariantState', 'clearVariantState', 'playVariantTriggerFx', 'isEntityVariantLocked', 'STATUS_COLORS', 'arcane-status-flame-chip', 'arcane-variant-molted-fx'].every(s => html.includes(s)));
 check('实际结果事件和视觉消费入包', ['variant-trigger', 'status-tick', 'status-proc', 'status-removed', 'consumeVisualEvents', 'syncVisualState'].every(s => html.includes(s)));
 check('冲锋扫掠、逐段闪避和周期扣血飘字入包', ['chargePath', 'queueReaction', 'awaitShotFeedback', 'suppressDodgeFx', 'onStatusTick', 'playStatusTick'].every(s => html.includes(s)));
+check('路径接触揭示、双击转火、自身直放和加速/燃烧展示入包', ['chargeStep', 'playCharge', 'reuseTarget', 'fireSelf', 'chargeInventory', '.t-unit-sprite .arcane-status-persist-burn'].every(s => html.includes(s)));
 check('自动跳跃、避雾、物品辅助耗费和整备入包', ['planJump', 'fogRouteFilter', 'ITEM_ACTION_COST', 'previewReady', 'battle.ready()', 'tauntDelta'].every(s => html.includes(s)));
 const context = { console, structuredClone, URL, setTimeout, clearTimeout };
 context.window = context;
@@ -66,8 +67,12 @@ if (backend) {
   chargeBattle.start();
   const chargeAim = { x: 7.5, y: 4.5, targetId: 'foe' };
   const chargeQuery = chargeBattle.previewAttack(charge, chargeAim), chargeResult = chargeBattle.attack(charge, chargeAim);
+  const chargePath = chargeResult.events.find(e => e.type === 'unit-charged')?.path;
+  const contactStep = chargeResult.hits[0]?.segments[0]?.chargeStep;
   check('产物冲锋穿过友军，2×2 扫掠预览与实际命中同一敌人', chargeQuery.damageTargetIds?.join(',') === 'foe'
-    && chargeResult.hits[0]?.hit && chargeResult.hits[0].targetId === 'foe' && chargeResult.events.find(e => e.type === 'unit-charged')?.path.some(p => p.col === 8));
+    && chargeResult.hits[0]?.hit && chargeResult.hits[0].targetId === 'foe' && chargePath?.some(p => p.col === 8));
+  check('产物伤害与击退共用冲锋接触步', chargePath?.[contactStep]?.col === 6
+    && chargeResult.events.find(e => e.type === 'unit-displaced')?.chargeStep === contactStep);
 
   const battle = backend.createBattle({ ...data, scene: backend.scene, random: backend.createSeededRandom(data.seed) });
   const opening = battle.start();

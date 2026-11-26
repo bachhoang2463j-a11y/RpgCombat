@@ -54,7 +54,8 @@ function run() {
     const move = r.events.find(e => e.type === 'unit-charged');
     check('TT-B 冲过友军，对连续两步扫到的2×2敌人只命中一次，最后落在空位', r.ok
       && r.hits.map(h => h.targetId).join(',') === q.damageTargetIds.join(',') && r.hits[0].segments.length === 1
-      && move.to.col === 6 && move.path.some(p => p.col === 8) && move.path.at(-1).col === 6, { hits: r.hits, move });
+      && move.to.col === 6 && move.path.some(p => p.col === 8) && move.path.at(-1).col === 6
+      && r.hits[0].segments[0].chargeStep === move.path.findIndex(p => p.col === 7), { hits: r.hits, move });
   }
   {
     const beast = sample().summonProvider('幻梦行军兽');
@@ -238,6 +239,47 @@ function run() {
     let n=0;
     const r=drive(b.beginAttack(tri,aim(b,'e')),req=> ++n<=2 ? {skill:req.candidates[0].skill}:null);
     check('TT-B 同源免伤重用替换而不追加，第三段HP20',r.hits[0].segments.map(s=>s.hpDmg).join(',')==='0,0,20',r.hits[0].segments);
+  }
+  {
+    const h=unit('h','hero',{spd:200}),e1=unit('e1','enemy'),e2=unit('e2','enemy');
+    const b=make([h,e1,e2],{h:{col:2,row:4},e1:{col:4,row:4},e2:{col:6,row:4}});
+    const double=parseSkill('【双击】[钝击;power:20][钝击;power:20][转火][范围:单体;射程:8]');
+    const first = aim(b, 'e1');
+    const valid = b.beginAttack(double, first, { reuseTarget: true }).next();
+    check('TT-B 双击规则侧沿用有效后续目标且不要求第二次选择', valid.done && valid.value.ok && valid.value.hits[0].targetId === 'e1' && valid.value.hits[0].segments.length === 2);
+    const h2 = unit('h2', 'hero', { spd: 200 }), x = unit('x', 'enemy', { hp: 10 }), y = unit('y', 'enemy');
+    const b2 = make([h2, x, y], { h2: { col: 2, row: 4 }, x: { col: 4, row: 4 }, y: { col: 6, row: 4 } });
+    const gen = b2.beginAttack(double, aim(b2, 'x'), { reuseTarget: true });
+    const step = gen.next();
+    check('TT-B 双击沿用目标倒地仍请求重新选目标', !step.done && step.value.type === 'retarget-request');
+    const canceled = gen.next(null);
+    check('TT-B 快捷沿用失效后放弃不会自动伤害其他敌人', canceled.done && canceled.value.ok && y.ref.hp === y.ref.maxHp);
+    const h3 = unit('h3', 'hero', { spd: 200 }), a = unit('a', 'enemy'), z = unit('z', 'enemy');
+    const b3 = make([h3, a, z], { h3: { col: 2, row: 4 }, a: { col: 4, row: 4 }, z: { col: 4, row: 7 } });
+    const manual = b3.beginAttack(double, aim(b3, 'a'));
+    const request = manual.next();
+    const changed = manual.next(aim(b3, 'z'));
+    check('TT-B 非快捷确认依然能手动转火', request.value.type === 'retarget-request' && changed.value.hits.map(h => h.targetId).join(',') === 'a,z');
+  }
+  {
+    const haste=parseSkill('【蓄力】[钝击;power:20][加速:2][范围:单体;射程:8]');
+    const prep=parseSkill('【长准备】[钝击;power:20][延迟:3][范围:单体;射程:8]');
+    const h=unit('h','hero',{spd:200}),e=unit('e','enemy');
+    const b=make([h,e],{h:{col:2,row:4},e:{col:4,row:4}});
+    const gain = b.attack(haste, aim(b, 'e'));
+    const stocked = b.getEffectiveUnit('h').chargeInventory;
+    b.endAction(); nextActor(b, 'h');
+    const started = b.attack(prep, aim(b, 'e'));
+    check('TT-B getEffectiveUnit 加速库存随蓄力消耗递减', gain.ok && stocked === 2 && started.preparing && b.getEffectiveUnit('h').chargeInventory === 0);
+  }
+  {
+    const d=sample(); const beast=d.summonProvider('幻梦行军兽');
+    const h=unit('h','hero',{spd:200,footprint:beast.footprint,skills:beast.skills});
+    const e=unit('e','enemy'); const b=make([h,e],{h:{col:2,row:4},e:{col:5,row:4}});
+    const r=b.attack(beast.skills.find(s=>s.name==='冲撞'),aim(b,'e'));
+    const move=r.events.find(ev=>ev.type==='unit-charged');
+    check('TT-B 2×2 冲撞前缘接触的步号关联伤害与击退', move.path[r.hits[0].segments[0].chargeStep].col === 4
+      && r.events.find(ev => ev.type === 'unit-displaced').chargeStep === r.hits[0].segments[0].chargeStep, r.hits[0].segments[0]);
   }
   {
     const h=unit('h','hero',{spd:200}),e=unit('e','enemy');

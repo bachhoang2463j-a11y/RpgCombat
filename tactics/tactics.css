@@ -101,6 +101,13 @@ button:disabled { opacity: .42; cursor: default; }
 .t-side-hero .t-unit-avatar { border: 2.5px solid var(--gold); box-shadow: 0 0 0 2px rgba(7,9,13,0.9), 0 0 12px var(--gold-glow), 0 4px 10px rgba(0,0,0,0.75); }
 .t-side-enemy .t-unit-emoji { border: 2.5px solid var(--crim); box-shadow: 0 0 0 2px rgba(7,9,13,0.9), 0 0 12px var(--crim-glow), 0 4px 10px rgba(0,0,0,0.75); }
 .t-unit-hover .t-unit-avatar, .t-unit-hover .t-unit-emoji { filter: brightness(1.18); }
+/* 常驻火苗只贴头像下缘；沿圆弧内侧排布，尺寸与头像同步。 */
+[data-rpg-av-scope] .t-unit-sprite .arcane-status-persist-burn .arcane-status-flame-chip { width: 21%; height: 30%; }
+[data-rpg-av-scope] .t-unit-sprite .arcane-status-persist-burn .arcane-status-flame-chip svg { display: block; width: 100%; height: 100%; }
+[data-rpg-av-scope] .t-unit-sprite .arcane-status-persist-burn .f1 { left: 19%; bottom: 13%; }
+[data-rpg-av-scope] .t-unit-sprite .arcane-status-persist-burn .f2 { left: 39.5%; bottom: 6%; }
+[data-rpg-av-scope] .t-unit-sprite .arcane-status-persist-burn .f3 { right: 19%; bottom: 13%; }
+[data-rpg-av-scope] .t-unit-sprite .arcane-status-persist-burn .arcane-status-ember-dot { bottom: 22%; }
 .t-unit-direction { position: absolute; left: 50%; top: 50%; width: calc(var(--d) + 22px); height: calc(var(--d) + 22px);
   margin-left: calc((var(--d) + 22px) / -2); margin-top: calc((var(--d) + 22px) / -2); transform-origin: 50% 50%; pointer-events: none; overflow: visible; transition: transform .12s linear; }
 .t-unit-direction path { fill: var(--gold-2); stroke: #4a3410; stroke-width: 1.2; }

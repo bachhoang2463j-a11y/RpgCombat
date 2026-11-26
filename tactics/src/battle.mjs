@@ -782,6 +782,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       perception: u.ref.perception, footprint: { ...u.footprint },
       shield: u.ref.shield || 0, atk: st.atk, def: st.def, hit: st.hit, eva: st.eva, taunt: st.taunt, spd: st.spd,
       evasion: u.ref.evasion || 0, stunned: !!state.combatState.clock?.units?.[u.id]?.stun,
+      chargeInventory: state.combatState.charges?.[u.id]?.inventory || 0,
       // remaining：时钟真实到期剩余回合（向上取整）；null = 无时限（消耗型/永久）
       buffs: buffsOf(u.id).map(b => { const st = state.combatState.clock?.statuses?.[b._key];
         return { type: b.type, value: b.value, variant: b.variant || null, duration: Number.isFinite(b.duration) ? b.duration : null, isConsumable: !!b.isConsumable, isConcealAtk: !!b.isConcealAtk,
@@ -1465,7 +1466,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     return created;
   }
 
-  function displacement(caster, target, rule, query, direction = null) {
+  function displacement(caster, target, rule, query, direction = null, chargeStep) {
     const p = placementsById[target.id];
     const from = { col: p.col, row: p.row, facing: p.facing };
     const tc = unitCenter(p, target.footprint);
@@ -1476,20 +1477,24 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const traced = traceDisplacement(ctx, target.id, { x: Math.round(Math.cos(angle)), y: Math.round(Math.sin(angle)) }, rule.distance);
     const to = traced.path[traced.path.length - 1] || from;
     p.col = to.col; p.row = to.row;
+    const logIndex = log.length;
     let collision = null;
     if (traced.blockedBy && traced.requestedDistance - traced.distance > 1e-9) {
       const view = { ...target.ref, def: statsOf(target).def };
-      collision = applyCollisionDamage((traced.requestedDistance - traced.distance) * 10, view);
+      collision = { ...applyCollisionDamage((traced.requestedDistance - traced.distance) * 10, view),
+        hpBefore: target.ref.hp, maxHp: target.ref.maxHp, shieldBefore: target.ref.shield || 0 };
       target.ref.hp = view.hp; target.ref.shield = view.shield;
       if (target.ref.hp <= 0) handleDown(target, 'collision');
+      collision.hpAfter = target.ref.hp;
+      collision.shieldAfter = target.ref.shield;
     }
     scanEnemyContacts(target);
-    const event = emit('unit-displaced', { attackId: currentAttackId(), casterId: caster.id, unitId: target.id, mode: rule.type,
-      from, to: { col: p.col, row: p.row }, requestedDistance: rule.distance, distance: traced.distance, path: traced.path, blockedBy: traced.blockedBy, collision });
     addLog(target.name + ' ' + rule.type + ' ' + traced.distance.toFixed(2) + 'm' + (collision ? ' · 碰撞-' + collision.hpDmg : ''));
-    return event;
+    return emit('unit-displaced', { attackId: currentAttackId(), casterId: caster.id, unitId: target.id, mode: rule.type,
+      from, to: { col: p.col, row: p.row }, requestedDistance: rule.distance, distance: traced.distance, path: traced.path,
+      blockedBy: traced.blockedBy, collision, logIndex, logEnd: log.length, ...(chargeStep == null ? {} : { chargeStep }) });
   }
-  function applySkillDisplacements(caster, skill, query, hits, direction = null) {
+  function applySkillDisplacements(caster, skill, query, hits, direction = null, chargeStep) {
     for (const rule of skill.displacements || []) {
       if (rule.type !== '击退' && rule.type !== '拉近') continue;
       const origin = rule.direction === '爆心向外' ? query.blastCenter || query.origin : unitCenter(placementsById[caster.id], caster.footprint);
@@ -1500,7 +1505,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         const order = String(a.targetId) < String(b.targetId) ? -1 : String(a.targetId) > String(b.targetId) ? 1 : 0;
         return (rule.type === '拉近' ? -diff : diff) || order;
       });
-      for (const hit of targets) hit.displacement = displacement(caster, byId.get(hit.targetId), rule, query, direction);
+      for (const hit of targets) hit.displacement = displacement(caster, byId.get(hit.targetId), rule, query, direction, chargeStep);
     }
   }
   function rollSkillCrit(caster, skill) {
@@ -1514,7 +1519,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   function* resolveCharge(caster, skill, query, slots, ledger, canceled, options, skillMultiplier = 1) {
     const rule = skill.displacements.find(d => d.type === '冲锋');
     const pathQuery = query.chargePath;
-    const visited = new Set(), hits = [], effects = [], path = [pathQuery.from];
+    const visited = new Set(), hits = [], hitMap = new Map(), effects = [], path = [pathQuery.from];
     const position = placementsById[caster.id];
     const stopped = () => canceled.value || caster.ref.hp <= 0 || state.combatState.clock.units[caster.id]?.stun;
     for (const step of pathQuery.steps) {
@@ -1522,6 +1527,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       const entering = new Set(step.cells.map(c => cellKey(c.col, c.row)));
       const contactTargets = units.filter(u => u.side !== caster.side && u.ref.hp > 0 && !ctx.carriedUnitIds?.has(u.id) &&
         occupiedCells(placementsById[u.id], ctx.footprintsById[u.id]).some(c => entering.has(cellKey(c.col, c.row))));
+      const chargeStep = path.length;
+      path.push({ col: step.col, row: step.row });
       for (const target of contactTargets) {
         if (visited.has(target.id) || target.ref.hp <= 0) continue;
         visited.add(target.id);
@@ -1532,18 +1539,25 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
               segmentIndex: visited.size, shotIndex: visited.size, totalShots: slots.filter(s => s.attack).length,
               bdg: ledger, canceled, incomingType: skill.damageType || '近战', isAoE: true,
               options: { ...options, skipSpatialRecheck: true }, skillMultiplier });
-            if (seg) contactHits.push({ targetId: seg.targetId, hit: seg.hit, hpDmg: seg.hpDmg, hpBefore: seg.hpBefore, hpAfter: seg.hpAfter, down: seg.down, segments: [seg] });
+            if (seg) contactHits.push({ targetId: seg.targetId, hit: seg.hit, hpDmg: seg.hpDmg, hpBefore: seg.hpBefore, hpAfter: seg.hpAfter, down: seg.down, segments: [{ ...seg, chargeStep }] });
           } else if (!slot.debuff || ledger.targetHit[target.id]) {
             effects.push(...applyBattleEffect({ caster, slot, targets: [target], skill, skillKey: skillKey(skill), multiplier: skillMultiplier }).applied);
           }
           if (canceled.value || caster.ref.hp <= 0) break;
         }
-        applySkillDisplacements(caster, skill, query, contactHits, pathQuery.direction);
-        hits.push(...contactHits);
+        applySkillDisplacements(caster, skill, query, contactHits, pathQuery.direction, chargeStep);
+        for (const hit of contactHits) {
+          const prior = hitMap.get(hit.targetId);
+          if (!prior) { hitMap.set(hit.targetId, hit); hits.push(hit); continue; }
+          prior.hit ||= hit.hit;
+          prior.hpDmg += hit.hpDmg;
+          prior.hpAfter = hit.hpAfter;
+          prior.down = hit.down;
+          prior.segments.push(...hit.segments);
+        }
         if (stopped()) break;
       }
       if (stopped()) break;
-      path.push({ col: step.col, row: step.row });
       if (canPlaceAt(ctx, caster.id, step.col, step.row).ok) {
         position.col = step.col; position.row = step.row;
         scanEnemyContacts(caster);
@@ -1741,18 +1755,24 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         shotIdx++;
         if (skill.switchTarget && shotIdx >= 2) {
           let rq;
-          if (options.interactiveRetarget ?? !isAiControlled(u)) {
+          const previousTarget = byId.get(activeAim?.targetId);
+          const aimAtPreviousTarget = () => ({ ...unitCenter(placementsById[previousTarget.id], previousTarget.footprint), targetId: previousTarget.id });
+          const previousAim = eff.range.type === '单体' && previousTarget ? aimAtPreviousTarget() : activeAim;
+          if (options.reuseTarget && (!activeAim?.targetId || previousTarget?.ref.hp > 0)) {
+            const keep = previewRetarget(eff, previousAim, u.id, slot.index);
+            if (keep.ok && (!previousTarget || keep.slotTargets.find(s => s.index === slot.index)?.targetIds.includes(previousTarget.id))) rq = keep;
+          }
+          if (!rq?.ok && (options.interactiveRetarget ?? !isAiControlled(u))) {
             const nextAim = yield {
               type: 'retarget-request', casterId: u.id, skill: eff, slotIndex: slot.index, shotIndex: shotIdx, totalShots: damageSlots.length,
               range: eff.range, previousAim: { ...activeAim }, previousTargetId: activeAim?.targetId || targets[0]?.id || null,
+              skipPrevious: !!options.reuseTarget,
             };
             if (nextAim) rq = previewRetarget(eff, nextAim, u.id, slot.index);
+            // 快捷沿用失效时由玩家决定；放弃该段不自动挑别人。
+            if (!rq?.ok && options.reuseTarget) continue;
           }
           if (!rq?.ok) {
-            const previousTarget = byId.get(activeAim?.targetId);
-            const previousAim = eff.range.type === '单体' && previousTarget
-              ? { ...unitCenter(placementsById[previousTarget.id], previousTarget.footprint), targetId: previousTarget.id }
-              : activeAim;
             rq = previewRetarget(eff, previousAim, u.id, slot.index);
             targets = [];
           }

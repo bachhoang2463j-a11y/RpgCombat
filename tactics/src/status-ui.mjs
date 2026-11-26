@@ -70,6 +70,8 @@ export function statusBadges(eff, extra = {}) {
   if (guard.length) push({ key: 'damageGuard', icon: '🛡️', text: '免伤+' + guard.reduce((n, b) => n + b.value, 0), short: '免伤', color: '#7dd3fc', title: '【免伤】本次整技累计可抵消的伤害额度' }, 5);
   for (const b of group('variant')) push({ key: 'variant:' + b.variant, icon: '🧬', text: b.variant + (b.remaining != null ? '·' + b.remaining + '回' : ''), short: b.variant, color: '#67e8f9',
     expiring: b.remaining != null && b.remaining <= 1, title: '【' + b.variant + '】获得特性' + (b.remaining != null ? '，剩余 ' + b.remaining + ' 回合' : '') }, 6);
+  if (eff.chargeInventory > 0) push({ key: 'haste', icon: '⚡', text: '加速 ' + eff.chargeInventory,
+    short: '加速 ' + eff.chargeInventory, color: '#67e8f9', title: '【加速】剩余 ' + eff.chargeInventory + ' 点，用于开始或继续蓄力' }, 1);
   if (eff.shield > 0) push({ key: 'shield', icon: '🔰', text: '护盾' + eff.shield, short: '盾' + eff.shield, color: '#e2e8f0', title: '【护盾】先于 HP 承受伤害' }, 6);
   if (extra.preparing) push({ key: 'prep', icon: '⏳', text: '蓄力·' + extra.preparing.name + (extra.preparing.remaining > 0 ? ' 还需' + extra.preparing.remaining : ' 就绪'), short: '蓄力',
     color: '#fde68a', title: '【蓄力】' + extra.preparing.name }, 1);

@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "ccec4ee046ad2ee18cc688dc12828553d3aac04e1b78bc12c7ea7023bcc03cd3",
-  "bytes": 1705770,
+  "sha256": "8f5f9188047873fa5b8bf95cd8cc063429defa9d2d3befd77fa355e912c9e4ce",
+  "bytes": 1710545,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -121,6 +121,11 @@
       "detail": ""
     },
     {
+      "id": "路径接触揭示、双击转火、自身直放和加速/燃烧展示入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
       "id": "自动跳跃、避雾、物品辅助耗费和整备入包",
       "pass": true,
       "detail": ""
@@ -157,6 +162,11 @@
     },
     {
       "id": "产物冲锋穿过友军，2×2 扫掠预览与实际命中同一敌人",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "产物伤害与击退共用冲锋接触步",
       "pass": true,
       "detail": ""
     },
@@ -296,6 +306,6 @@
       "detail": "[{\"moveTo\":{\"col\":6,\"row\":3},\"skill\":null,\"aim\":null,\"action\":null},6,{\"moveTo\":{\"col\":5,\"row\":3},\"skill\":null,\"aim\":null,\"action\":null},{\"col\":5,\"row\":3,\"facing\":270},{\"moveTo\":null,\"skill\":null,\"aim\":null,\"action\":\"wait\"}]"
     }
   ],
-  "passed": 58,
+  "passed": 60,
   "failed": 0
 }

@@ -104,6 +104,26 @@ export function createActionDirector(deps) {
       });
     });
   }
+  // 路径端点和接触拍点共用同一距离游标；掉帧跨过多个端点时依次揭示。
+  function playDisplacement(ev, footprint, onStep) {
+    const segs = pathSegments(ev.path || [ev.from, ev.to], footprint);
+    const dist = segs.reduce((sum, seg) => sum + seg.len, 0);
+    if (!dist) return Promise.resolve(true);
+    const view = sandbox.getUnitView();
+    let step = 0, nextAt = segs[0].len;
+    const dur = Math.min(420, Math.max(160, Math.round(dist * 75)));
+    return tween(dur, t => {
+      const at = dist * (1 - Math.pow(1 - t, 3));
+      while (onStep && step < segs.length && at >= nextAt) {
+        const p = segs[step].b;
+        view.setDisplayPos(ev.unitId, p.x, p.y);
+        onStep(++step);
+        if (step < segs.length) nextAt += segs[step].len;
+      }
+      const p = pointAtDistance(segs, at);
+      view.setDisplayPos(ev.unitId, p.x, p.y);
+    });
+  }
   const feedback = (id, kind, p) => { if (onMoveFeedback) onMoveFeedback(id, kind, p); };
   const facingOf = (a, b) => ((Math.atan2(b.x - a.x, -(b.y - a.y)) * 180 / Math.PI) + 360) % 360;
 
@@ -314,6 +334,9 @@ export function createActionDirector(deps) {
     const casterEnt = avHost.entity(result.casterId);
     const hits = result.hits || [];
     const byId = new Map(hits.map(h => [h.targetId, h]));
+    const moveEvs = (result.events || []).filter(ev => ev.type === 'unit-charged' || ev.type === 'unit-displaced');
+    const charge = moveEvs.find(ev => ev.type === 'unit-charged');
+    let chargeStep = 0;
     const audioContext = { category: av.CombatAudioMixer.classify(skill) };
     const actionId = av.CombatAudioDirector.beginAction();
     const waveTargets = new Map();
@@ -335,6 +358,7 @@ export function createActionDirector(deps) {
     const guardEvents = (result.events || []).filter(ev => ev.type === 'guard-committed');
     guardEvents.forEach(ev => pts.push(ev.startPosition));
     (result.events || []).forEach(ev => { if (ev.type === 'barrier-created') barrierNames.set(ev.barrier.id, skill.name); });
+    if (charge) pts.push(unitCenter(charge.from, vd.footprintsById[charge.unitId]));
     if (result.query && result.query.blastCenter) pts.push(result.query.blastCenter);
     if (!hits.length && result.aim) pts.push({ x: result.aim.x, y: result.aim.y });
     await sandbox.guideTo(pts);
@@ -441,7 +465,7 @@ export function createActionDirector(deps) {
       if (!h) return;
       const segs = h.segments || [h];
       const seg = segs[i];
-      if (!seg) return;
+      if (!seg || (charge && seg.chargeStep > chargeStep)) return;
       const guard = seg.reaction?.guard;
       if (guard && !meta.guardReady) {
         reactionRuns.push(revealGuard(guard).then(ok => { if (ok) revealSegment(targetId, i, { ...meta, guardReady: true }); }));
@@ -525,8 +549,49 @@ export function createActionDirector(deps) {
     regions.forEach(r => heldRegions.add(r.id));
     function revealRegion(id) { if (heldRegions.delete(id)) syncRegions(); }
 
+    let chargeRun;
+    function playCharge(onContact) {
+      if (!charge) return Promise.resolve(true);
+      return chargeRun ||= (async () => {
+        const impacts = new Map(), knockbacks = new Map();
+        for (const h of hits) (h.segments || [h]).forEach((seg, i) => {
+          if (!impacts.has(seg.chargeStep)) impacts.set(seg.chargeStep, []);
+          impacts.get(seg.chargeStep).push([h.targetId, i]);
+        });
+        const moved = moveEvs.filter(ev => ev.type === 'unit-displaced' && ev.chargeStep != null);
+        const ok = await playDisplacement(charge, vd.footprintsById[charge.unitId], step => {
+          if (!isCurrent()) return;
+          chargeStep = step;
+          if (impacts.has(step)) onContact?.();
+          for (const [targetId, i] of impacts.get(step) || []) revealSegment(targetId, i);
+          for (const ev of moved) if (ev.chargeStep === step) {
+            const slide = () => {
+              const fp = vd.footprintsById[ev.unitId], start = unitCenter(ev.from, fp);
+              sandbox.getUnitView().setDisplayPos(ev.unitId, start.x, start.y);
+              return playDisplacement(ev, fp).then(ok => {
+                if (ok && isCurrent() && ev.collision) revealChargeCollision(ev);
+                return ok;
+              });
+            };
+            const previous = knockbacks.get(ev.unitId) || shiftRuns.get(ev.unitId);
+            knockbacks.set(ev.unitId, previous ? previous.then(ok => ok && isCurrent() && slide()) : slide());
+          }
+        });
+        return ok && (await Promise.all(knockbacks.values())).every(Boolean);
+      })();
+    }
+    function revealChargeCollision(ev) {
+      const { collision, unitId } = ev;
+      if (!(collision.hpDmg || collision.shieldDmg)) return;
+      const u = vd.units.find(u => u.id === unitId);
+      const r = { ...collision, targetId: unitId, sourceId: result.casterId, outcome: 'hit', isHero: u?.side === 'hero' };
+      av.playHitFeedback(r);
+      onReveal?.({ ...r, hit: true, logIndex: ev.logIndex, logEnd: ev.logEnd, down: collision.hpAfter <= 0 }, { result, identity, entryId: entry.id });
+    }
+
     const ctx = {
       result, skill, hits, identity, input, casterId: result.casterId, casterEnt, av, avHost, sandbox,
+      charge: charge && { ...charge, footprint: vd.footprintsById[charge.unitId] }, playCharge,
       audioContext, outcomeMap: new Map(hits.map(h => [h.targetId, h.hit ? 'hit' : 'dodge'])),
       fx: makeFx(audioContext.category),
       wait, tween, awaitHandle, after: (ms, fn) => scope().after(ms, fn),
@@ -543,6 +608,7 @@ export function createActionDirector(deps) {
     const ok = await entry.play(ctx);
     if (atmos) atmos.end();
     if (!isCurrent() || ok === false) return false;
+    if (!(await playCharge()) || !isCurrent()) return false;
     await Promise.all(reactionRuns);
     hits.forEach(h => reveal(h.targetId, { late: true }));
     await Promise.all(reactionRuns);
@@ -559,30 +625,19 @@ export function createActionDirector(deps) {
     // 未携带段标识的反应事件在本次攻击收尾串行播放；已按段调度的反击不重复。
     queueCounters(null);
     if (!(await counterRun) || !isCurrent()) return false;
-    // 冲锋与受击击退位移补间（解锁规则站位前先在视图平滑滑移）
-    const moveEvs = (result.events || []).filter(ev => ev.type === 'unit-charged' || ev.type === 'unit-displaced');
-    if (moveEvs.length) {
-      const view = sandbox.getUnitView();
-      const movesByUnit = new Map();
-      for (const ev of moveEvs) {
-        if (!movesByUnit.has(ev.unitId)) movesByUnit.set(ev.unitId, []);
-        movesByUnit.get(ev.unitId).push(ev);
-      }
-      await Promise.all([...movesByUnit].map(async ([id, moves]) => {
-        for (const ev of moves) {
-          const segs = pathSegments(ev.path || [ev.from, ev.to], vd.footprintsById[id]);
-          const dist = segs.reduce((sum, seg) => sum + seg.len, 0);
-          if (dist > 0.05) {
-            const dur = Math.min(420, Math.max(160, Math.round(dist * 75)));
-            if (!(await tween(dur, t => {
-              const p = pointAtDistance(segs, dist * (1 - Math.pow(1 - t, 3)));
-              view.setDisplayPos(id, p.x, p.y);
-            }))) break;
-          }
-          if (ev.collided) makeFx('B').shake('light');
-        }
-      }));
+    // 冲锋关联的击退已在接触拍点起动，只补间其余技能位移。
+    const movesByUnit = new Map();
+    for (const ev of moveEvs) {
+      if (ev.type === 'unit-charged' || (charge && ev.chargeStep != null)) continue;
+      if (!movesByUnit.has(ev.unitId)) movesByUnit.set(ev.unitId, []);
+      movesByUnit.get(ev.unitId).push(ev);
     }
+    await Promise.all([...movesByUnit.values()].map(async moves => {
+      for (const ev of moves) {
+        if (!(await playDisplacement(ev, vd.footprintsById[ev.unitId]))) break;
+        if (ev.collided) makeFx('B').shake('light');
+      }
+    }));
     // 召唤入场：消费规则真实生成的 summons（单位 ID 与落点），原版 playSummonEnter 在实际落点逐个显形
     const summonIds = result.summons || [];
     if (summonIds.length) {
@@ -925,10 +980,10 @@ export function createActionDirector(deps) {
       if (activeRun === run) activeRun = null;
     }
   }
-  async function runAttackLive(skill, aim) {
+  async function runAttackLive(skill, aim, options) {
     const battle = battleOf();
     if (!battle || typeof battle.beginAttack !== 'function') return { ok: false, reason: '反应接口未接线：battle.beginAttack 待规则代理落地', pending: false };
-    return driveAttack(battle.beginAttack(skill, aim));
+    return driveAttack(battle.beginAttack(skill, aim, options));
   }
   // 重置/换场：取消活动驱动（generator.return），弹窗由宿主 shell.cancelReactionPrompt() 关闭
   function cancelAttack() {

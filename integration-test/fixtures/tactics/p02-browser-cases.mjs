@@ -24,6 +24,7 @@ function pointerEvents(win, viewport, seq) {
 
 function clickAt(win, doc, viewport, x, y) {
   pointerEvents(win, viewport, [['pointerdown', x, y], ['pointerup', x, y]]);
+  viewport.dispatchEvent(new win.MouseEvent('click', { bubbles: true, clientX: x, clientY: y, detail: 1 }));
 }
 
 function dragBy(win, viewport, x0, y0, dx, dy) {
@@ -259,6 +260,7 @@ export async function runBrowserCases(frame) {
     // 小幅抖动点击只选中一次（先复位相机，抖动点才有确定世界格）
     app.sandbox.setCamera({ tx: 40, ty: 20, scale: 1 });
     pointerEvents(win, viewport, [['pointerdown', s.x, s.y], ['pointermove', s.x + 2, s.y + 1], ['pointerup', s.x + 2, s.y + 1]]);
+    viewport.dispatchEvent(new win.MouseEvent('click', { bubbles: true, clientX: s.x + 2, clientY: s.y + 1, detail: 1 }));
     cases.push(ok('T02-03-b 抖动仍算点击', app.sandbox.getSelectedId() === 'h:书采', ''));
 
     // 2×2 选取框绘制真实占格（overlay canvas 像素）

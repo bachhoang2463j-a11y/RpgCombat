@@ -110,8 +110,10 @@ export function createSandbox(rootEl, deps = {}) {
   // ---------- 手势（每 mount 绑定一次） ----------
   function bindInput() {
     gesture = createGesture({ threshold: 6 });
+    let clickPoint = null;
     scope.listen(dom.viewport, 'pointerdown', (e) => {
       if (e.button !== 0) return;
+      clickPoint = null;
       gesture.down(e, pose);
       try { dom.viewport.setPointerCapture(e.pointerId); } catch (err) { /* 已释放时忽略 */ }
     });
@@ -129,8 +131,14 @@ export function createSandbox(rootEl, deps = {}) {
     scope.listen(dom.viewport, 'pointerup', (e) => {
       dom.viewport.style.cursor = 'grab';
       const r = gesture.up(e);
-      if (!r) return;
-      if (r.type === 'click') handleSelect(r.x, r.y);
+      if (r?.type !== 'click') return;
+      // 保留手势判定，等浏览器 click 提供原生连击计数再提交选择。
+      clickPoint = r;
+    });
+    scope.listen(dom.viewport, 'click', (e) => {
+      const point = clickPoint;
+      clickPoint = null;
+      if (point) handleSelect(point.x, point.y, e.detail);
     });
     scope.listen(dom.viewport, 'pointerleave', () => { if (gesture.state === 'idle') setHover(null); });
     // 右键：宿主可消费（跳跃模式）；未消费则视为取消
@@ -171,9 +179,9 @@ export function createSandbox(rootEl, deps = {}) {
   }
   function handleHover(sx, sy) { if (compiled) setHover(hitAt(sx, sy)); }
 
-  function handleSelect(sx, sy) {
+  function handleSelect(sx, sy, clickCount) {
     const hit = hitAt(sx, sy);
-    if (onMapClickCb && hit && onMapClickCb(hit)) return;
+    if (onMapClickCb && hit && onMapClickCb(hit, clickCount)) return;
     selectedId = hit ? hit.targetId : null;
     redrawOverlay();
     if (onSelectCb) onSelectCb(selectedId ? viewData.units.find(u => u.id === selectedId) : null);

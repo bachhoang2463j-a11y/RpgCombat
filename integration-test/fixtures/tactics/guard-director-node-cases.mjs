@@ -3,19 +3,19 @@ import { createActionDirector, buildHitFeedback } from '../../../tactics/src/act
 import { createAvHost } from '../../../tactics/src/av-host.mjs';
 
 function node() { return { style: {}, setAttribute() {}, appendChild() {}, insertBefore() {}, remove() {} }; }
-function setup(cancel = false, action) {
+function setup(cancel = false, action, onHit) {
   const calls = [];
   const scope = { isLive: true, addNode() {}, removeNode() {}, after(ms, fn) { fn(); }, settleOnDispose() {},
     loop(fn) { const t = performance.now(); fn(t); queueMicrotask(() => fn(t + 1000)); } };
-  const positions = { e: { col: 9, row: 4 }, g: { col: 5, row: 4 } };
-  const units = ['e', 'g'].map(id => ({ id, ref: { hp: 100, atk: 10 } }));
+  const positions = { e: { col: 9, row: 4 }, g: { col: 5, row: 4 }, h: { col: 7, row: 4 } };
+  const units = Object.keys(positions).map(id => ({ id, ref: { hp: 100, atk: 10 } }));
   const view = { nodes: new Map(), lockMotion(id, locked) { calls.push(['lock', id, locked]); }, setDisplayPos(id, x, y) { calls.push(['pos', id, x, y]); }, setDisplayFacing() {}, updateUnit() {} };
   const sandbox = { getScope: () => scope, getUnitView: () => view, getDom: () => ({ world: node(), unitLayer: node() }),
     unitWorldCenter: id => ({ x: positions[id].col + 0.5, y: positions[id].row + 0.5 }), guideTo: async () => {}, getPose: () => ({ scale: 1 }) };
   const av = { CombatAudioMixer: { classify: () => 'B' }, CombatAudioDirector: {
     beginAction: () => 1, publish() {}, closeWave() {}, completeTarget() {},
   }, playSound(key) { calls.push(['sfx', key]); },
-  playHitFeedback(value, options) { calls.push(['hit', value.outcome, options.suppressDodgeFx]); } };
+  playHitFeedback(value, options = {}) { calls.push(['hit', value.outcome, options.suppressDodgeFx]); onHit?.(value); } };
   const host = { av, syncRoster() {}, entity: id => ({ id }), consumeVisualEvents() {}, syncVisualState() {} };
   const guard = { segmentId: 'segment:1', guardianId: 'g', originalTargetId: 'h', from: { col: 3, row: 4 }, to: positions.g,
     startPosition: { x: 3.5, y: 4.5 }, contactPoint: { x: 5.5, y: 4.5 }, path: [{ col: 3, row: 4 }, { col: 4, row: 4 }, { col: 5, row: 4 }] };
@@ -27,7 +27,7 @@ function setup(cancel = false, action) {
   const registry = { resolve: input => input.kind === 'reaction' ? null : { id: 'test', grade: 'L1',
     play: action || (async ctx => { ctx.revealSegment('g', 0); ctx.revealSegment('g', 0); return true; }) } };
   const director = createActionDirector({ sandbox, avHost: host, registry,
-    getViewData: () => ({ units, placementsById: positions, footprintsById: { e: { width: 1, height: 1 }, g: { width: 1, height: 1 } } }),
+    getViewData: () => ({ units, placementsById: positions, footprintsById: Object.fromEntries(units.map(u => [u.id, { width: 1, height: 1 }])) }),
     async presentGuard(value) { calls.push(['dash', value.segmentId]); await Promise.resolve(); calls.push(['block']); if (cancel) scope.isLive = false; },
     onRuleReveal(value, meta) { calls.push(['rule', meta.kind]); }, onReveal() { calls.push(['hp']); } });
   return { calls, positions, director, result };
@@ -114,6 +114,28 @@ async function run() {
           if (value === undefined) delete globalThis[key]; else globalThis[key] = value;
         }
       }
+    });
+    await test('TG-DIRECTOR-07 冲锋伤害跟随实际接触步，击退撞墙在终点才额外扣血', async () => {
+      const point = col => ({ col, row: 4 });
+      const impacts = [];
+      const { director, result, calls } = setup(false, async ctx => {
+        ctx.reveal('g');
+        assert.equal(impacts.length, 0);
+        return ctx.playCharge(() => calls.push(['contact']));
+      }, hit => impacts.push([hit.targetId, hit.hpDmg, ...calls.filter(c => c[0] === 'pos').at(-1).slice(1, 3)]));
+      result.hits = ['g', 'h'].map((id, i) => ({ targetId: id, segments: [
+        { chargeStep: i + 1, shotIndex: i + 1, hit: true, hpDmg: 25, hpBefore: 100, hpAfter: 75 },
+      ] }));
+      result.events = [
+        { type: 'unit-displaced', unitId: 'g', chargeStep: 1, from: point(4), to: point(5), path: [point(4), point(5)],
+          collision: { hpDmg: 10, hpBefore: 75, hpAfter: 65, maxHp: 100 } },
+        { type: 'unit-charged', unitId: 'e', from: point(1), to: point(3), path: [point(1), point(2), point(3)] },
+      ];
+      assert.equal(await director.playAttack(result), true);
+      assert.deepEqual(impacts, [['g', 25, 'e', 2.5], ['h', 25, 'e', 3.5], ['g', 10, 'g', 5.5]]);
+      assert.equal(calls.filter(c => c[0] === 'contact').length, 2);
+      assert.ok(calls.findIndex(c => c[0] === 'pos' && c[1] === 'g') < calls.findLastIndex(c => c[0] === 'contact'));
+      assert.equal(calls.filter(c => c[0] === 'pos' && c[1] === 'g' && c[2] === 5.5).length, 1);
     });
   } finally { if (original === undefined) delete globalThis.document; else globalThis.document = original; }
   return { cases };

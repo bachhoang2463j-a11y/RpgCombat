@@ -1228,13 +1228,14 @@ const chargeDash = {
   cues: [{ key: 'enemyMeleeGroupHit', vol: 0.62 }],
   prepareKeys() { return ['enemyMeleeGroupHit']; },
   async play(ctx) {
-    const { fx, hits, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
-    const ev = (result.events || []).find(e => e.type === 'unit-charged');
-    const dest = ev ? worldPx(ev.to) : worldPx(result.aim);
-    fx.sfx('enemyMeleeGroupHit', 0.62); fx.shake('medium');
+    const { fx, charge } = ctx;
+    const c = worldPx(charge ? unitCenter(charge.from, charge.footprint) : ctx.centerOf(ctx.casterId));
+    const dest = worldPx(charge ? unitCenter(charge.path.at(-1), charge.footprint) : ctx.result.aim);
+    const impact = () => { fx.sfx('enemyMeleeGroupHit', 0.62); fx.shake('medium'); };
     particles(fx, Array.from({ length: 16 }, () => ({ x: c.x + rnd(-20, 20), y: c.y + rnd(-20, 20), dx: (dest.x - c.x) * 0.5 + rnd(-18, 18), dy: (dest.y - c.y) * 0.5 + rnd(-18, 18), size: rnd(14, 24), color: '#fbbf24', core: '#fef3c7', s0: 1, s1: 0.3, dur: 460 })), 520, 'ground');
-    hits.forEach((h, idx) => ctx.after(180 + idx * 90, () => ctx.reveal(h.targetId)));
-    return ctx.wait(900);
+    if (!charge) { ctx.after(180, () => { impact(); ctx.hits.forEach(h => ctx.reveal(h.targetId)); }); return ctx.wait(900); }
+    const [ok, finished] = await Promise.all([ctx.playCharge(impact), ctx.wait(900)]);
+    return ok && finished;
   },
 };
 

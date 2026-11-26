@@ -39,6 +39,9 @@ function badgeCases() {
   const compact = compactStatusHtml(many);
   out.push(ok('UIR-S 地图紧凑：最多 4 个 + 折叠计数；剩 1 回合闪烁', (compact.match(/class="t-st(?: t-st-neg| t-st-exp)*"/g) || []).length === 4 && />\+3</.test(compact) && /t-st-exp/.test(fullStatusHtml(many)), compact));
   out.push(ok('UIR-S 消耗型回避显示「1次」', statusBadges({ buffs: [{ type: 'eva', value: 50, isConsumable: true, remaining: null }] })[0].text === '避+50·1次'));
+  const loaded = statusBadges({ ...eff, chargeInventory: 3 });
+  out.push(ok('UIR-S 加速库存同步进地图与底栏，不改变速度或标剩余回合', /加速 3/.test(compactStatusHtml(loaded))
+    && /加速 3/.test(fullStatusHtml(loaded)) && !statusBadges({ ...eff, chargeInventory: 0 }).some(x => x.key === 'haste')));
   return out;
 }
 
