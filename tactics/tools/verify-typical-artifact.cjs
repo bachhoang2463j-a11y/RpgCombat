@@ -56,14 +56,14 @@ if (backend) {
   const arenaOpening = arenaBattle.start();
   const arenaTurn = arenaBattle.runEnemyTurn();
   check('单房间默认入口及技能雾样式入包', html.includes('defaultYaml') && /createApp\([^\n]*:createEncounterDemo\(/.test(html)
-    && html.includes('sc-chapel-encounter') && html.includes('t-unit-fog-hidden'));
-  check('产物真实单间开场保留原阵容、2×2 和高低墙', arena.scene.size === 'small' && arena.scene.floor.length === 1
-    && arena.scene.floor[0].width === 16 && arena.scene.floor[0].height === 14 && arenaOpening.units.length === 10
+    && html.includes('sc-chapel-nave') && html.includes('t-unit-fog-hidden'));
+  const kinds = k => arena.scene.objects.filter(o => o.kind === k).length;
+  check('产物真实单间开场：大档礼拜堂保留原阵容、2×2 与教堂陈设', arena.scene.size === 'large' && arena.scene.floor.length === 1
+    && arena.scene.floor[0].width === 32 && arena.scene.floor[0].height === 26 && arenaOpening.units.length === 10
     && arena.units.filter(u => u.footprint.width === 2 && u.footprint.height === 2).length === 2
-    && arena.scene.objects.filter(o => o.id.startsWith('high-')).length === 2 && arena.scene.objects.filter(o => o.id.startsWith('low-')).length === 8
-    && arena.scene.objects.filter(o => o.kind === 'pillar').length === 4
-    && arena.scene.objects.filter(o => o.kind === 'chapelSteps').length === 2
-    && arena.scene.objects.some(o => o.kind === 'pew' && o.cells?.length > 2));
+    && kinds('pillar') === 6 && kinds('altar') === 1 && kinds('pulpit') === 1 && kinds('lectern') === 1 && kinds('dais') === 1 && kinds('chapelDoor') === 1
+    && kinds('pew') >= 12 && !arena.scene.objects.some(o => /^(high|low)-/.test(o.id))
+    && ['class="confessional"', 'class="pulpit"', 'class="chapel-door"', 'class="apse"'].every(s => html.includes(s)));
   check('产物默认单间真实接战、不发旧警报且可重置', arenaTurn.events.some(e => e.type === 'attack-start' || e.type === 'unit-moved')
     && !arenaTurn.events.some(e => e.type === 'enemy-alarm') && JSON.stringify(arenaBattle.reset().positions) === JSON.stringify(arenaOpening.positions));
   check('权威样本四英雄六敌两召唤词条入产物', block.heroes.length === 4 && block.enemies.length === 6 && block.summonTemplates.length === 2);

@@ -154,7 +154,7 @@ export function createEncounterScenario(block, defaults, positions) {
   const theme = block.meta?.['地图主题'];
   if (!demo && requested == null && theme == null) return null;
   const data = createScenarioData(block, { generatedPlacement: true, ignorePlacements: !!demo });
-  const sceneId = demo ? 'sc-chapel-encounter' : block.sceneId;
+  const sceneId = demo ? 'sc-chapel-nave' : block.sceneId;
   const room = generateEncounter({ theme: theme ?? defaults?.theme, size: ROOM_SIZES[requested] ?? requested ?? defaults?.size,
     seed: data.seed, sceneId, units: data.units, positions: { ...data.placementsById, ...positions } });
   if (!room.ok) throw new Error('单房间布阵冲突：' + JSON.stringify(room.report.conflicts));

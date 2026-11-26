@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "0f2125c2b4e95c2a259623b05e2e88363b2ca3446c22c96aa0d626fedd36853c",
-  "bytes": 1900186,
+  "sha256": "51a908fba55b95eadd57262467d5684f4e29cefd9e2eced7be35d8e499896158",
+  "bytes": 1915811,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -151,7 +151,7 @@
       "detail": ""
     },
     {
-      "id": "产物真实单间开场保留原阵容、2×2 和高低墙",
+      "id": "产物真实单间开场：大档礼拜堂保留原阵容、2×2 与教堂陈设",
       "pass": true,
       "detail": ""
     },

@@ -333,7 +333,7 @@ function obstacleCells(start, [dx, dy], length) {
   return cells;
 }
 
-function placeEncounterObstacles(floor, reserved, count, high, chapel, rng) {
+function placeEncounterObstacles(floor, reserved, count, high, rng) {
   const points = rectCells(floor);
   const inside = new Set(points.map(c => cellKey(c.col, c.row)));
   const objects = [];
@@ -352,7 +352,7 @@ function placeEncounterObstacles(floor, reserved, count, high, chapel, rng) {
           const cols = cells.map(c => c.col), rows = cells.map(c => c.row);
           const bounds = { col: Math.min(...cols), row: Math.min(...rows),
             width: Math.max(...cols) - Math.min(...cols) + 1, height: Math.max(...rows) - Math.min(...rows) + 1 };
-          objects.push({ id: (high ? 'high-' : 'low-') + i, kind: high ? 'wall' : chapel ? 'pew' : 'lowCounter', bounds, cells, facing: angle * 45 });
+          objects.push({ id: (high ? 'high-' : 'low-') + i, kind: high ? 'wall' : 'lowCounter', bounds, cells, facing: angle * 45 });
           cells.forEach(c => reserved.add(cellKey(c.col, c.row)));
           found = true;
           break;
@@ -365,13 +365,77 @@ function placeEncounterObstacles(floor, reserved, count, high, chapel, rng) {
   return objects;
 }
 
+// ---------- 礼拜堂单房间：固定大档骨架（北圣坛 / 中殿长椅 / 侧廊列柱 / 南入口），种子只扰动长椅状态与侧廊陈设 ----------
+const CHAPEL_PEW_ROWS = [9, 11, 13, 15, 17, 22, 24];
+const CHAPEL_PEW_STATES = [['full', 3], ['short', 2], ['shift', 2], ['shove', 1.5], ['toppled', 1.5], ['broken', 1.5], ['missing', 1]];
+const CHAPEL_SIDE_ROWS = [3, 10, 14, 22];
+const CHAPEL_SIDE_KINDS = ['confessional', 'cabinet', 'statue', 'tomb', 'banner'];
+
+function pickWeighted(rng, list) {
+  let t = rng() * list.reduce((s, [, w]) => s + w, 0);
+  for (const [k, w] of list) if ((t -= w) < 0) return k;
+  return list[0][0];
+}
+
+function chapelLayout(columns, rows, rng) {
+  const R = (col, row, width, height) => ({ col, row, width, height });
+  const mirror = b => ({ ...b, col: columns - b.col - b.width });
+  const aisle = columns / 2 - 1;
+  const out = [];
+  const pair = (id, kind, b, extra = {}) => out.push({ id: id + '-w', kind, bounds: b, side: 'w', ...extra }, { id: id + '-e', kind, bounds: mirror(b), side: 'e', ...extra });
+  // 北端圣坛：抬高台面 + 后墙彩窗；祭坛居中、烛台分立，布道坛与读经台按种子左右互换
+  out.push({ id: 'apse', kind: 'apse', bounds: R(aisle - 5, 0, 12, 1) },
+    { id: 'dais', kind: 'dais', bounds: R(aisle - 6, 1, 14, 3) },
+    { id: 'aisle-carpet', kind: 'carpet', bounds: R(aisle, 2, 2, rows - 3) },
+    { id: 'altar', kind: 'altar', bounds: R(aisle - 1, 1, 4, 1) });
+  pair('candelabra', 'candelabra', R(aisle - 3, 1, 1, 1));
+  const pulpitWest = rng() < 0.5;
+  const pulpit = R(aisle - 5, 2, 2, 2), lectern = R(aisle - 4, 3, 1, 1);
+  out.push({ id: 'pulpit', kind: 'pulpit', bounds: pulpitWest ? pulpit : mirror(pulpit), side: pulpitWest ? 'w' : 'e' },
+    { id: 'lectern', kind: 'lectern', bounds: pulpitWest ? mirror(lectern) : lectern, side: pulpitWest ? 'e' : 'w' });
+  // 侧廊列柱（高）与墙面挂毯
+  for (const row of [8, 13, 18]) pair('pillar-' + row, 'pillar', R(4, row, 2, 2));
+  for (const row of [6, 18]) pair('banner-' + row, 'banner', R(1, row, 1, 2));
+  // 中殿长椅：前五排 + 门厅前两排，逐条按种子取完整/缩短/外移/推向中道/倾倒/断裂/缺失（中道红毯始终两格）
+  for (const row of CHAPEL_PEW_ROWS) {
+    for (const side of ['w', 'e']) {
+      const state = pickWeighted(rng, CHAPEL_PEW_STATES);
+      const near = state === 'shove' ? 0 : state === 'shift' || state === 'missing' || (state === 'short' && rng() < 0.5) ? 2 : 1;
+      const len = state === 'short' ? 4 : state === 'broken' ? 3 : state === 'missing' ? 2 : 5;
+      const place = b => side === 'w' ? b : mirror(b);
+      const id = 'pew-' + row + '-' + side;
+      if (state !== 'missing') out.push({ id, kind: 'pew', bounds: place(R(aisle - near - len, row, len, 1)), side, variant: state });
+      if (state === 'broken' || state === 'missing') out.push({ id: id + '-rubble', kind: 'rubble', bounds: place(R(aisle - 1 - 5, row, 5 - len, 1)) });
+    }
+  }
+  // 侧廊陈设：每侧四个靠墙槽位，从告解亭/圣器柜/圣像/石棺/挂毯中不重复抽取
+  for (const side of ['w', 'e']) {
+    const kinds = [...CHAPEL_SIDE_KINDS];
+    for (let i = kinds.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [kinds[i], kinds[j]] = [kinds[j], kinds[i]]; }
+    CHAPEL_SIDE_ROWS.forEach((row, i) => {
+      const kind = kinds[i];
+      const b = kind === 'confessional' ? R(1, row, 2, 2) : kind === 'tomb' ? R(2, row, 1, 2) : kind === 'statue' ? R(1, row, 1, 1) : R(1, row, 1, 2);
+      out.push({ id: 'side-' + row + '-' + side, kind, bounds: side === 'w' ? b : mirror(b), side });
+    });
+  }
+  // 南端入口：墙上双开大门（装饰，规则仍为墙）、门内圣水池与靠墙长凳
+  out.push({ id: 'main-door', kind: 'chapelDoor', bounds: R(aisle - 1, rows - 1, 4, 1) });
+  pair('font', 'font', R(aisle - 3, rows - 3, 1, 1));
+  pair('bench', 'pew', R(6, rows - 2, 3, 1), { variant: 'full' });
+  for (const [col, row] of [[2.5, 5.5], [2.5, 12.5], [2.5, 20.5], [9, 2], [12, 25.5]]) {
+    out.push({ id: 'light-' + col + '-' + row, kind: 'light', at: { col, row } }, { id: 'light-' + (columns - col) + '-' + row, kind: 'light', at: { col: columns - col, row } });
+  }
+  return out;
+}
+
 export function generateEncounter({ theme = 'stone', size, seed, sceneId = 'generated-encounter', units = [], positions = {} }) {
   const chapel = theme === 'chapel';
   const cfg = THEMES[chapel ? 'stone' : theme];
   if (!cfg || (size != null && !Object.hasOwn(ENCOUNTER_SIZES, size))) throw new Error('未知单房间主题或大小');
   const overrides = Object.entries(positions).map(([unitId, placement]) => ({ unitId, placement }));
   let last;
-  for (const key of size == null ? Object.keys(ENCOUNTER_SIZES) : [size]) {
+  // 礼拜堂固定大档骨架，忽略请求档位
+  for (const key of chapel ? ['large'] : size == null ? Object.keys(ENCOUNTER_SIZES) : [size]) {
     const [width, height, highCount] = ENCOUNTER_SIZES[key];
     const columns = width + 2, rows = height + 2;
     const rng = makeRng(seed);
@@ -380,9 +444,10 @@ export function generateEncounter({ theme = 'stone', size, seed, sceneId = 'gene
     const bandHeight = Math.max(2, ...units.map(u => footprintOf(u).height));
     const bandWidth = Math.min(width, 10 + (width - 16) / 2);
     const left = 1 + Math.floor((width - bandWidth) / 2);
+    // 礼拜堂：敌方列于圣坛台阶前，我方在入口门厅内侧，中间隔整段中殿
     const bands = {
-      enemy: { col: left, row: mid - 2 - bandHeight, width: bandWidth, height: bandHeight },
-      hero: { col: left, row: mid + 2, width: bandWidth, height: bandHeight },
+      enemy: { col: left, row: chapel ? 6 : mid - 2 - bandHeight, width: bandWidth, height: bandHeight },
+      hero: { col: left, row: chapel ? rows - 7 - bandHeight : mid + 2, width: bandWidth, height: bandHeight },
     };
     const scene = {
       sceneId, theme, size: key, encounter: true, seed: Number(seed) >>> 0,
@@ -390,13 +455,7 @@ export function generateEncounter({ theme = 'stone', size, seed, sceneId = 'gene
       ground: { material: cfg.ground[Math.floor(rng() * cfg.ground.length)] },
       floor: [floor], objects: perimeterWalls(columns, rows), regions: [{ id: 'arena', bounds: floor }], landmarks: [],
     };
-    if (chapel) {
-      for (const [side, col] of [['w', 2], ['e', columns - 4]]) {
-        for (const [end, row] of [['n', 2], ['s', rows - 4]]) {
-          scene.objects.push({ id: 'pillar-' + end + side, kind: 'pillar', bounds: { col, row, width: 2, height: 2 } });
-        }
-      }
-    }
+    if (chapel) scene.objects.push(...chapelLayout(columns, rows, rng));
     const groups = Object.entries(bands).map(([side, bounds]) => ({ id: side,
       unitIds: units.filter(u => u.side === side).sort((a, b) => {
         const af = footprintOf(a), bf = footprintOf(b);
@@ -405,6 +464,7 @@ export function generateEncounter({ theme = 'stone', size, seed, sceneId = 'gene
     }));
     const formation = solveFormation(scene, units, { groups, overrides }, { seed, reserveOverrides: true });
     if (!formation.ok) { last = { ...formation, scene, compiled: compileScene(scene) }; continue; }
+    if (chapel) return { ...formation, scene, compiled: compileScene(scene) };
 
     // 开战带和贯穿两带的中央走廊不撒障碍，完整占格的大型单位可以直接接敌。
     const reserved = new Set([...Object.values(bands).flatMap(rectCells), ...rectCells({
@@ -418,19 +478,13 @@ export function generateEncounter({ theme = 'stone', size, seed, sceneId = 'gene
       }
     }
     for (const obj of scene.objects) rectCells(obj.bounds).forEach(c => reserved.add(cellKey(c.col, c.row)));
-    const high = placeEncounterObstacles(floor, reserved, highCount, true, chapel, rng);
-    const low = high && placeEncounterObstacles(floor, reserved, highCount * 4, false, chapel, rng);
+    const high = placeEncounterObstacles(floor, reserved, highCount, true, rng);
+    const low = high && placeEncounterObstacles(floor, reserved, highCount * 4, false, rng);
     if (!low) {
       last = { ok: false, scene, compiled: compileScene(scene), placementsById: {}, report: { ...formation.report, status: 'hard-conflict', conflicts: [{ reason: 'no-space-for-obstacles' }] } };
       continue;
     }
     scene.objects.push(...high, ...low);
-    if (chapel) {
-      scene.objects.push({ id: 'aisle-carpet', kind: 'carpet', bounds: { col: columns / 2 - 1, row: 2, width: 2, height: height - 2 } },
-        ...[0, rows - 2].map((row, i) => ({ id: 'threshold-' + i, kind: 'chapelSteps', facing: i * 180,
-          bounds: { col: columns / 2 - 2, row, width: 4, height: 2 } })),
-        ...[2, columns - 2].flatMap(col => [3, rows - 3].map(row => ({ id: 'light-' + col + '-' + row, kind: 'light', at: { col, row } }))));
-    }
     return { ...formation, scene, compiled: compileScene(scene) };
   }
   return last;

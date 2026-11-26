@@ -18,8 +18,16 @@ const KIND_RULES = {
   pew:        { blocksMovement: true,  blocksProjectile: false, blocksVision: false, lowObstacle: true },
   altar:      { blocksMovement: true,  blocksProjectile: false, blocksVision: false, lowObstacle: true },
   tomb:       { blocksMovement: true,  blocksProjectile: false, blocksVision: false, lowObstacle: true },
+  pulpit:     { blocksMovement: true,  blocksProjectile: false, blocksVision: false, lowObstacle: true },
+  lectern:    { blocksMovement: true,  blocksProjectile: false, blocksVision: false, lowObstacle: true },
+  candelabra: { blocksMovement: true,  blocksProjectile: false, blocksVision: false, lowObstacle: true },
+  font:       { blocksMovement: true,  blocksProjectile: false, blocksVision: false, lowObstacle: true },
+  confessional: { blocksMovement: true, blocksProjectile: true, blocksVision: true,  lowObstacle: false },
+  cabinet:    { blocksMovement: true,  blocksProjectile: true,  blocksVision: true,  lowObstacle: false },
   // 纯装饰（不进规则）
-  chapelSteps: { blocksMovement: false, blocksProjectile: false, blocksVision: false, decor: true },
+  dais:       { blocksMovement: false, blocksProjectile: false, blocksVision: false, decor: true },
+  apse:       { blocksMovement: false, blocksProjectile: false, blocksVision: false, decor: true },
+  chapelDoor: { blocksMovement: false, blocksProjectile: false, blocksVision: false, decor: true },
   banner:     { blocksMovement: false, blocksProjectile: false, blocksVision: false, lowObstacle: false, decor: true },
   rubble:     { blocksMovement: false, blocksProjectile: false, blocksVision: false, lowObstacle: false, decor: true },
   tree:       { blocksMovement: true,  blocksProjectile: true,  blocksVision: true,  lowObstacle: false, artOnly: true },
@@ -96,7 +104,7 @@ export function compileScene(scene) {
   for (const obj of scene.objects) {
     const rule = KIND_RULES[obj.kind];
     if (!rule) throw new Error('未知物件 kind: ' + obj.kind);
-    objectsIndex.set(obj.id, { id: obj.id, kind: obj.kind, bounds: obj.bounds ? { ...obj.bounds } : null, at: obj.at ? { ...obj.at } : null, open: obj.open, cells: obj.cells?.map(c => ({ ...c })), facing: obj.facing });
+    objectsIndex.set(obj.id, { id: obj.id, kind: obj.kind, bounds: obj.bounds ? { ...obj.bounds } : null, at: obj.at ? { ...obj.at } : null, open: obj.open, cells: obj.cells?.map(c => ({ ...c })), facing: obj.facing, side: obj.side, variant: obj.variant });
 
     const artKind = obj.artType || obj.kind;
     if (obj.kind === 'light' || ['tree', 'boulder', 'crystal', 'campfire', 'table', 'shelf'].includes(artKind)) {
