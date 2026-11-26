@@ -486,8 +486,8 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
 
   const seen = res.seen || visibleEnemies(ctx, unit);
   const seenIds = !ctx.encounter && res.trackedTargetIds && new Set(seen.map(u => u.id));
-  const enemies = seenIds ? ctx.units.filter(u => isLive(u) && u.side !== unit.side && !u.isSubdued && !u.ref.isSubdued
-    && (seenIds.has(u.id) || res.trackedTargetIds.has(u.id))) : seen;
+  const enemies = ctx.encounter || seenIds ? ctx.units.filter(u => isLive(u) && u.side !== unit.side && !u.isSubdued && !u.ref.isSubdued
+    && (ctx.encounter || seenIds.has(u.id) || res.trackedTargetIds.has(u.id))) : seen;
   const allies = ctx.units.filter(u => isLive(u) && u.side === unit.side);
   const usable = (skills || []).filter(s => s && !s.isReaction && s.trigger !== 'death'
     && (!canUseSkill || canUseSkill(s).ok));

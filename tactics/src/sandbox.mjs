@@ -165,8 +165,7 @@ export function createSandbox(rootEl, deps = {}) {
     const gridHit = screenToGrid(pose, origin, 50, compiled.grid, sx, sy);
     if (!gridHit) return null;
     const unitId = occupancy ? unitAt(occupancy, gridHit.col, gridHit.row) || null : null;
-    const hidden = unitId && viewData.visibleEnemies && !viewData.visibleEnemies.has(unitId) && viewData.units.some(u => u.id === unitId && u.side === 'enemy');
-    return { ...gridHit, x: gridHit.col + .5, y: gridHit.row + .5, targetId: hidden ? null : unitId, client: { x: sx, y: sy } };
+    return { ...gridHit, x: gridHit.col + .5, y: gridHit.row + .5, targetId: unitId, client: { x: sx, y: sy } };
   }
   function setHover(hit) {
     const key = hit ? hit.col + ',' + hit.row + ',' + (hit.targetId || '') : null;

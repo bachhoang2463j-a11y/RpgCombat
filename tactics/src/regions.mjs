@@ -114,6 +114,12 @@ export function fogAt(ctx, unitId) {
   return regionAt(ctx, unitId, 'fog');
 }
 
+export function inEnemyFog(ctx, unit, targetId = unit.id) {
+  const ids = fogAt(ctx, targetId).regionIds;
+  return ids.length > 0 && ctx.regions.some(r => ids.includes(r.id)
+    && (r.source?.side ?? unitById(ctx, r.casterId)?.side) !== unit.side);
+}
+
 // 创建区域：cells 取 range 实际爆心落格（query.cells），strength 取标签最高 power，
 // 时长取技能 Turns（浓雾沿用致盲槽 Turns，缺省 3 回合）；同源同类型替换 ctx.regions（显式允许）。
 export function createRegion(ctx, { caster, skill, query, now, type } = {}) {

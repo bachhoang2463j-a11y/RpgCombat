@@ -101,7 +101,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     enforcePerception: scene.encounter === true || units.every(u => Number.isFinite(u.ref.perception)),
     buffsOf,
     random,
-    canSeeUnit(observerId, targetId) { return canSeeUnit(this, observerId, targetId, false, true); },
+    canSeeUnit(observerId, targetId) { return canSeeUnit(this, observerId, targetId, true); },
   };
   let log = [];
   let domainEvents = [];
@@ -2312,12 +2312,13 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       pursuitPoints: Object.entries(alarm?.contacts || {}).filter(([id]) => byId.get(id)?.ref.hp > 0).map(([, point]) => point),
     };
     const aiBudget = resources.moveRemaining * (resources.moveMultiplier || 1);
-    // 充能已满：本次正常行动优先尝试大招；没有目击目标时只移动，不主动使用技能。
-    if (seen.length && !preparing && chargeFull(u)) {
+    // 单房间位置已知：盲投范围技仍由查询判断；旧场景无目击时只移动。
+    const canAim = ctx.encounter || seen.length;
+    if (canAim && !preparing && chargeFull(u)) {
       const ult = chooseEnemyAction(ctx, u.id, aiBudget, [chargeSkillOf(u)], skill => skillStatus(skill), aiRes);
       if (ult.skill) return ult;
     }
-    const skills = !seen.length ? [] : preparing ? (preparing.ready ? [preparing.skill] : []) : enemySkills();
+    const skills = !canAim ? [] : preparing ? (preparing.ready ? [preparing.skill] : []) : enemySkills();
     return chooseEnemyAction(ctx, u.id, aiBudget, skills, skill => skillStatus(skill), { ...aiRes, idleMovement: true });
   }
   function* beginEnemyTurn(options = {}) {

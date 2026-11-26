@@ -33,7 +33,6 @@ import { resolveLore } from './lore.mjs';
 import { getEffectiveStats } from './class-passives.mjs';
 import { hitChance } from './damage.mjs';
 import { skillSlots } from './effect-definitions.mjs';
-import { visibleUnitIds } from './perception.mjs';
 // 同名 YAML 技能仍保留规则字段，本场编辑仅覆写显式演出标签。
 export function applyEditorFxTags(rows, editedRows) {
   const byName = new Map((editedRows || []).map(row => [row.name, row]));
@@ -517,7 +516,7 @@ export function createApp(rootEl, opts = {}) {
   function renderInspector() {
     const id = inspectHover;
     const u = id && battle && unitById(id);
-    if (!u || (u.side === 'enemy' && currentViewData.visibleEnemies && !currentViewData.visibleEnemies.has(u.id))) { shell.showInspector(null); return; }
+    if (!u) { shell.showInspector(null); return; }
     const eff = battle.getEffectiveUnit(u.id);
     const snapU = battle.snapshot().units.find(x => x.id === u.id);
     const prep = battle.battleState.combatState.charges?.[u.id]?.preparing;
@@ -590,8 +589,7 @@ export function createApp(rootEl, opts = {}) {
     return best ? { ok: true, ...best } : null;
   }
   function queueRows(snap) {
-    const disclosed = u => u.side === 'hero' || !currentViewData.visibleEnemies || currentViewData.visibleEnemies.has(u.id);
-    const ids = currentViewData.units.filter(u => disclosed(u) && (shownOf(u).hp > 0 || u.id === snap.currentId)).map(u => u.id);
+    const ids = currentViewData.units.filter(u => shownOf(u).hp > 0 || u.id === snap.currentId).map(u => u.id);
     const queue = getVisibleTurnQueue(battle.battleState, 'hero', { visibleUnitIds: ids }).filter(r => r.unitId !== snap.currentId);
     if (ids.includes(snap.currentId)) queue.unshift({ unitId: snap.currentId, nextActionAt: snap.now });
     return queue;
@@ -690,16 +688,11 @@ export function createApp(rootEl, opts = {}) {
       u.effective = battle.getEffectiveUnit(u.id);
       u.bars = { ...u.bars, hp: s.hp, mp: s.mp, tp: s.tp, shield: s.shield };
     }
-    if (battle.ctx.encounter && snap.regions.some(r => r.type === 'fog')) {
-      currentViewData.visibleEnemies = new Set(currentViewData.units.filter(u => u.side === 'hero' && u.ref.hp > 0)
-        .flatMap(u => visibleUnitIds(battle.ctx, u.id)));
-    } else currentViewData.visibleEnemies = null;
     sandbox.update(currentViewData);
     const view = sandbox.getUnitView();
     let alerted = false;
     for (const u of currentViewData.units) {
       view.setFlag(u.id, 't-unit-down', shownOf(u).hp <= 0);
-      view.setFlag(u.id, 't-unit-fog-hidden', u.side === 'enemy' && currentViewData.visibleEnemies && !currentViewData.visibleEnemies.has(u.id));
       view.setFlag(u.id, 't-unit-current', u.id === snap.currentId && !snap.terminal);
       const pending = u.effective?.alertState === 'pending' && shownOf(u).hp > 0 && !snap.terminal;
       view.setFlag(u.id, 't-unit-alert-pending', pending);

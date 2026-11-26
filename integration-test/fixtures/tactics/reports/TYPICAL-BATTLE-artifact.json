@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "51a908fba55b95eadd57262467d5684f4e29cefd9e2eced7be35d8e499896158",
-  "bytes": 1915811,
+  "sha256": "f484d1951d548c39d1969aef1184078f4b88994486c86b23e64ebc2075180531",
+  "bytes": 1916178,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -146,7 +146,7 @@
       "detail": ""
     },
     {
-      "id": "单房间默认入口及技能雾样式入包",
+      "id": "单房间默认入口、技能雾限制瞄准但不隐藏棋子",
       "pass": true,
       "detail": ""
     },
@@ -295,12 +295,12 @@
       "detail": "{\"moveTo\":{\"col\":8,\"row\":5},\"skill\":null,\"aim\":null,\"action\":null}"
     },
     {
-      "id": "TT-ALERTS 雾外预览和实战都可锁定雾内，普通视野不变",
+      "id": "TT-ALERTS 雾外远距单锁雾内在预览和实战均被拒",
       "pass": true,
-      "detail": "[true,null,[{\"targetId\":\"e\",\"side\":\"enemy\",\"hit\":true,\"hpDmg\":10,\"hpBefore\":100,\"hpAfter\":90,\"maxHp\":100,\"down\":false,\"logIndex\":1,\"logEnd\":2,\"segments\":[{\"runId\":\"battle:11:0\",\"attackId\":\"attack:1\",\"segmentId\":\"battle:11:0:attack:1:slot:0:segment:1\",\"slotIndex\":0,\"segmentIndex\":1,\"shotIndex\":1,\"index\":0,\"origin\":{\"x\":2.5,\"y\":2.5},\"originalTargetId\":\"e\",\"contactPoint\":{\"x\":6.5,\"y\":2.5},\"targetId\":\"e\",\"logIndex\":1,\"side\":\"enemy\",\"maxHp\":100,\"damageType\":\"近战\",\"damageCategory\":null,\"isCrit\":false,\"isPierce\":false,\"hit\":true,\"outcome\":\"hit\",\"hpDmg\":10,\"shieldDmg\":0,\"guardDmg\":0,\"shieldBefore\":0,\"shieldAfter\":0,\"rawBeforeResist\":10,\"rawDmg\":10,\"resistance\":{\"before\":10,\"after\":10,\"layers\":[]},\"fatalResult\":null,\"finalTargetId\":\"e\",\"hpBefore\":100,\"hpAfter\":90,\"down\":false,\"logEnd\":2,\"aim\":{\"x\":6.5,\"y\":2.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":6,\"row\":2}]}]}]]"
+      "detail": "[true,\"无法瞄准：浓雾中只能瞄准相邻目标\",\"无法瞄准：浓雾中只能瞄准相邻目标\"]"
     },
     {
-      "id": "TT-ALERTS 雾外锁定仍挡墙、友方挡弹及射程",
+      "id": "TT-ALERTS 单锁仍受墙、友方挡弹及射程限制",
       "pass": true,
       "detail": ""
     },

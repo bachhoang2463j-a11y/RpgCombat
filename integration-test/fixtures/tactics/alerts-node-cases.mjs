@@ -59,19 +59,17 @@ export function runAlertsCases(api) {
   }
   {
     const b = make([unit('h', 'hero', 100, 200), unit('e', 'enemy', 10, 100)], [[2, 2], [6, 2]]);
-    b.ctx.regions.push({ id: 'fog', type: 'fog', casterId: 'h', strength: 20, endAt: 500, cells: [{ col: 6, row: 2 }] });
+    b.ctx.regions.push({ id: 'fog', type: 'fog', casterId: 'e', strength: 20, endAt: 500, cells: [{ col: 6, row: 2 }] });
     const target = aim(6, 2, 'e');
     const preview = b.previewAttack(shot, target);
     const hidden = !b.ctx.canSeeUnit('h', 'e');
     const attack = b.attack({ ...shot, guaranteedHit: true }, target);
-    check('TT-ALERTS 雾外预览和实战都可锁定雾内，普通视野不变', hidden && preview.ok && preview.disclosureTargetIds.includes('e') && attack.ok && attack.hits[0]?.segments[0]?.hit, [hidden, preview.reason, attack.hits]);
+    check('TT-ALERTS 雾外远距单锁雾内在预览和实战均被拒', hidden && !preview.ok && /无法瞄准/.test(preview.reason) && !attack.ok, [hidden, preview.reason, attack.reason]);
     const blocked = make([unit('h', 'hero', 100, 200), unit('e', 'enemy', 10, 100)], [[2, 2], [6, 2]], { objects: [wall] });
-    blocked.ctx.regions.push(...b.ctx.regions);
     const friend = make([unit('h', 'hero', 100, 200), unit('e', 'enemy', 10, 100), unit('friend', 'hero', 10, 100)], [[2, 2], [6, 2], [4, 2]]);
-    friend.ctx.regions.push(...b.ctx.regions);
-    check('TT-ALERTS 雾外锁定仍挡墙、友方挡弹及射程', blocked.previewAttack(shot, target).blockedBy?.type === 'wall'
+    check('TT-ALERTS 单锁仍受墙、友方挡弹及射程限制', blocked.previewAttack(shot, target).blockedBy?.type === 'wall'
       && friend.previewAttack(shot, target).reason === '友方挡弹'
-      && !b.previewAttack({ ...shot, range: { type: '单体', castRange: 3 } }, target).ok);
+      && !friend.previewAttack({ ...shot, range: { type: '单体', castRange: 3 } }, target).ok);
   }
   {
     const { summonProvider } = api.createScenarioData({ heroes: [], enemies: [], summonTemplates: [

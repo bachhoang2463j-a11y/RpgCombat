@@ -55,8 +55,8 @@ if (backend) {
   const arenaBattle = backend.createBattle({ ...arena, random: backend.createSeededRandom(arena.seed) });
   const arenaOpening = arenaBattle.start();
   const arenaTurn = arenaBattle.runEnemyTurn();
-  check('单房间默认入口及技能雾样式入包', html.includes('defaultYaml') && /createApp\([^\n]*:createEncounterDemo\(/.test(html)
-    && html.includes('sc-chapel-nave') && html.includes('t-unit-fog-hidden'));
+  check('单房间默认入口、技能雾限制瞄准但不隐藏棋子', html.includes('defaultYaml') && /createApp\([^\n]*:createEncounterDemo\(/.test(html)
+    && html.includes('sc-chapel-nave') && html.includes('function inEnemyFog(') && !html.includes('t-unit-fog-hidden'));
   const kinds = k => arena.scene.objects.filter(o => o.kind === k).length;
   check('产物真实单间开场：大档礼拜堂保留原阵容、2×2 与教堂陈设', arena.scene.size === 'large' && arena.scene.floor.length === 1
     && arena.scene.floor[0].width === 32 && arena.scene.floor[0].height === 26 && arenaOpening.units.length === 10
