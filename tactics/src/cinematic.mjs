@@ -1,7 +1,9 @@
 // ==========================================
 // 高阶技能运镜（L3/L4）：遮幅 + 推近出手者 → 爆发拍时停定格 → 按类型构图 → 首次命中顿帧 → 回位。
 // 类型按真实结算判定（不按角色/条目硬编码）：创建区域 = 领域；有伤害段 = 单体/范围；其余 = 守护/召唤/增益。
-// 条目声明 cine:false 则自行编排（如连续扫射）。时停/顿帧由导演 hold（暂停演出时钟 + 冻结视口动画）承担。
+// 条目可声明打击镜头：cine:'lock' 锁定打击（开场即打击点特写、蓄力缓推，释放瞬间时停后猛拉远 + 大震）；
+// cine:'projectile' 弹道打击（蓄力看施法者，条目在发射时调 ctx.cine.launch 甩镜到落点候弹，命中同锁定打击）；
+// cine:false 则自行编排（如连续扫射）。时停/顿帧由导演 hold（暂停演出时钟 + 冻结视口动画）承担。
 // 镜头被玩家本次动作接管（拖拽/缩放）即让出，仅保留画面层。
 // ==========================================
 
@@ -61,29 +63,58 @@ export function cineKind(result, hits, regions) {
   return dmg.length === 1 && (result.skill?.range?.type || '单体') === '单体' ? 'single' : 'area';
 }
 
-// env: { sandbox, fx, hold, grade, totalMs, chargeMs, result, hits, regions, shape, centerOf }
+// env: { sandbox, fx, hold, after, style, grade, totalMs, chargeMs, result, hits, regions, shape, centerOf }
 export function startCine(env) {
   const { sandbox: sb, fx, hold, grade, result, hits, centerOf } = env;
   const kind = cineKind(result, hits, env.regions), K = KINDS[kind], epic = grade === 'L4';
+  const style = env.style, strike = style === 'lock' || style === 'projectile';
   const home = sb.getPose();
   const cm = centerOf(result.casterId);
   const tgtIds = [...new Set([...hits.map(h => h.targetId), ...(result.effects || []).map(e => e.targetId)])].filter(id => id !== result.casterId);
   const tpts = tgtIds.map(centerOf).filter(Boolean);
   const focus = tpts[0] || result.aim || cm;
   const box = env.shape ? [{ x: env.shape.center.x - env.shape.radius, y: env.shape.center.y - env.shape.radius }, { x: env.shape.center.x + env.shape.radius, y: env.shape.center.y + env.shape.radius }] : [];
-  const stopMs = epic ? 180 : 120, hitMs = epic ? 130 : 90;
+  const I = env.shape ? env.shape.center : focus;   // 打击点：范围取爆心，单体取首个目标
+  const stopMs = strike ? (epic ? 200 : 140) : (epic ? 180 : 120), hitMs = epic ? 130 : 90;
   let bursted = false, hitDone = false, framed = null;
 
-  // ① 蓄势：遮幅入场 + 推近出手者（略偏向目标方向）
+  // ① 蓄势：遮幅入场；锁定打击 = 快切到打击点特写后随蓄力缓推，其余 = 推近出手者（略偏向目标方向）
   letterbox(fx, env.totalMs + stopMs + hitMs + 700, { h: epic ? 11 : 8 });
-  const dx = focus.x - cm.x, dy = focus.y - cm.y, L = Math.hypot(dx, dy) || 1, b = Math.min(1.2, L * 0.3);
-  sb.cameraTo(sb.poseAt(cm.x + dx / L * b, cm.y + dy / L * b, home.scale * K.push * (epic ? 1.12 : 1)), Math.min(700, env.chargeMs * 0.8));
+  if (style === 'lock') {
+    const s1 = home.scale * (epic ? 1.85 : 1.7);
+    sb.cameraTo(sb.poseAt(I.x, I.y, s1), 260).then(ok => { if (ok && !bursted) sb.cameraTo(sb.poseAt(I.x, I.y, s1 * 1.12), Math.max(200, env.chargeMs - 260)); });
+  } else {
+    const dx = focus.x - cm.x, dy = focus.y - cm.y, L = Math.hypot(dx, dy) || 1, b = Math.min(1.2, L * 0.3);
+    sb.cameraTo(sb.poseAt(cm.x + dx / L * b, cm.y + dy / L * b, home.scale * (strike ? 1.45 : K.push) * (epic ? 1.12 : 1)), Math.min(700, env.chargeMs * 0.8));
+  }
+
+  // 打击爆发：打击点时停定格（白闪 + 速度线）→ 解冻瞬间大震 + 猛拉远过冲 → 回落到框住爆区的构图
+  function strikeBurst() {
+    hold(stopMs, () => {
+      timeStop(sb, fx, stopMs, I, { tint: 'rgba(255,255,255,.95)', lines: 36 });
+      hitFlash(fx, I, { ms: stopMs + 220 });
+    }).then(ok => {
+      if (!ok) return;
+      fx.shake('quake');
+      const pts = [I, ...box, ...tpts], fr = sb.poseFrame(pts, { pad: 3.5, tight: 0.95 });
+      const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+      framed = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2, scale: Math.min(fr.scale, home.scale * 1.05) };
+      sb.cameraTo(sb.poseAt(framed.x, framed.y, framed.scale * 0.8), 140).then(ok2 => { if (ok2) sb.cameraTo(sb.poseAt(framed.x, framed.y, framed.scale), 480); });
+    });
+  }
 
   return {
     kind,
+    homeScale: home.scale,   // 出手前缩放：条目按屏幕比例定尺寸的视频以此为准，特写/拉远不改变其设计尺寸
+    // 弹道发射：delay 后甩镜到落点（at 可覆盖、k 为相对出手前的推近倍数），于飞行 75% 处完成推近，弹体入画落下
+    launch(flightMs, delay = 0, { at = I, k = epic ? 1.8 : 1.65 } = {}) {
+      if (style !== 'projectile') return;
+      env.after(delay, () => { if (!bursted) sb.cameraTo(sb.poseAt(at.x, at.y, home.scale * k), Math.max(160, Math.min(700, flightMs * 0.75))); });
+    },
     // ② 爆发拍：时停定格 → 解冻后按类型构图
     burst() {
       if (bursted) return; bursted = true;
+      if (strike) { strikeBurst(); return; }
       hold(stopMs, () => timeStop(sb, fx, stopMs, cm, K.stop)).then(ok => {
         if (!ok) return;
         const pts = [cm, ...(kind === 'domain' ? [] : tpts), ...box];
@@ -97,7 +128,7 @@ export function startCine(env) {
     },
     // ③ 首次命中：顿帧 + 镜头向命中点急推 + 白闪（仅攻击类）
     firstHit(targetId) {
-      if (!K.hitStop || !bursted || hitDone || !framed) return;
+      if (strike || !K.hitStop || !bursted || hitDone || !framed) return;
       hitDone = true;
       const m = centerOf(targetId) || focus;
       hold(hitMs, () => {

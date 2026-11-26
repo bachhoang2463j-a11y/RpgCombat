@@ -402,7 +402,8 @@ export function createActionDirector(deps) {
     }) : null;
     // 高阶运镜：与氛围层同生命周期；条目 cine:false 自行编排。爆发拍时停、首次命中顿帧、收尾回位
     const cine = atmos && entry.cine !== false ? startCine({
-      sandbox, fx: makeFx(audioContext.category), hold, grade, result, hits, centerOf, shape: shape && shape.radius > 0 ? { center: shape.center || result.aim, radius: shape.radius } : null,
+      sandbox, fx: makeFx(audioContext.category), hold, after: (ms, fn) => scope().after(ms, fn), style: entry.cine, grade, result, hits, centerOf,
+      shape: shape && shape.radius > 0 ? { center: shape.center || result.aim, radius: shape.radius } : null,
       regions: (result.events || []).filter(ev => ev.type === 'region-created'), chargeMs: entry.timeline?.chargeMs || 600, totalMs: entry.timeline?.totalMs || 2000,
     }) : null;
     if (cine) { const burst = atmos.burst; atmos.burst = () => { burst(); cine.burst(); }; }
@@ -633,7 +634,7 @@ export function createActionDirector(deps) {
         await Promise.all(reactionRuns);
         return (await Promise.all([...shiftRuns.values(), counterRun])).every(ok => ok !== false);
       },
-      regions, unitsInCells, ent: id => avHost.entity(id), centerOf, atmos,
+      regions, unitsInCells, ent: id => avHost.entity(id), centerOf, atmos, cine,
       anchorAt: (x, y) => makeAnchor(x, y), aimAnchor: () => aimAnchor(result.aim), lineEndAnchor: () => lineEndAnchor(result),
     };
     guardEvents.forEach(ev => revealGuard(ev));

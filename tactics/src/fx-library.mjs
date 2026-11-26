@@ -141,12 +141,12 @@ const worldPx = p => ({ x: p.x * PX, y: p.y * PX });
 // 原版 playWebMFX 尺寸口径：targetSize = min(视口宽, 视口高) × scale（屏幕像素）；换算为世界美术像素（÷ 相机缩放）
 function screenSpanPx(ctx, k) {
   const vp = ctx.sandbox.getDom().viewport;
-  return Math.min(vp.clientWidth, vp.clientHeight) * k / ctx.sandbox.getPose().scale;
+  return Math.min(vp.clientWidth, vp.clientHeight) * k / (ctx.cine ? ctx.cine.homeScale : ctx.sandbox.getPose().scale);
 }
 // 视口面积占比下限对应的世界宽度（aspect = 视频宽/高）
 function screenCoverPx(ctx, fraction, aspect) {
   const vp = ctx.sandbox.getDom().viewport;
-  return Math.sqrt(fraction * vp.clientWidth * vp.clientHeight * aspect) / ctx.sandbox.getPose().scale;
+  return Math.sqrt(fraction * vp.clientWidth * vp.clientHeight * aspect) / (ctx.cine ? ctx.cine.homeScale : ctx.sandbox.getPose().scale);
 }
 
 // 本库新增条目用到、回合制视听底座未登记键名的真实采样（文件已在既有资源服务中，键名对齐回合制 WEBM_FX_REGISTRY 音轨）
@@ -519,7 +519,7 @@ const arsenicShot = {
 
 // 火焰爆炸（[特效:火焰01]）L3：蓄势法阵 → 火弹射向接触点 → 收 → 接触点爆燃（fire.webm）→ 余烬/燃烧挂载
 const fireBlast = {
-  id: 'fire-blast', grade: 'L3', fxTags: ['火焰01'],
+  id: 'fire-blast', grade: 'L3', fxTags: ['火焰01'], cine: 'projectile',
   timeline: { chargeMs: 890, totalMs: 2430, fullscreen: true },   // 650 蓄势 + 240 火弹聚能 + 340 飞行 + 100 收 + 300 爆发 + 800 余韵
   // 原版火焰01 = fire.webm + fire01.mp3；ranshao 属于【燃烧弹】，燃烧挂载音由状态层统一播放，此处不再借用
   cues: [{ key: 'explosion_aoe_charge', vol: 0.45 }, { key: 'explosion_aoe_blast', vol: 0.62 }, { key: 'fire01', vol: 0.72 }],
@@ -547,6 +547,7 @@ const fireBlast = {
     if (!(await ctx.wait(650))) return false;
     // ② 火弹射向接触点（复用回合制通用火焰弹；dodged=true 只保留弹道，不播其小型命中，爆炸由本条目承担）
     const anchor = ctx.anchorAt(center.x, center.y);
+    ctx.cine?.launch(340, 240);   // 聚能 240 后火弹出手：镜头甩到爆心候弹
     const flown = await ctx.av.CombatAudioMixer.withContext(ctx.audioContext, () => ctx.av.playArcaneProjectile('fire', ctx.avHost.host.spriteOf(ctx.casterId), anchor, true));
     if (!flown) return false;
     // ③ 收：预告环向爆心坍缩
@@ -1214,7 +1215,7 @@ const stormGather = {
 // 世界暗场留光孔 + 施法者圣光信标飞升 + 目标脚下巨型圣阵 / 头顶圣徽 + 四方光尘吸入 + 持续轻震 → 收 →
 // 通天光柱 + 414 圣焰 + 十字光痕 + 全屏闪白 + 重震（揭示伤害）→ 光羽雨落 + 降防碎印 + 暗场渐退
 const holyJudgment = {
-  id: 'holy-judgment', grade: 'L4', fxTags: ['圣光01'],
+  id: 'holy-judgment', grade: 'L4', fxTags: ['圣光01'], cine: 'lock',
   timeline: { chargeMs: 1300, totalMs: 3300, fullscreen: true, darken: true },   // 1300 蓄势 + 450 爆发 + 1550 余韵
   cues: [{ key: 'light_charge', vol: 0.55 }, { key: 'light01', vol: 0.72 }, { key: 'light_impact', vol: 0.60 }],
   prepareKeys() { return this.cues.map(c => c.key); },
@@ -1277,7 +1278,7 @@ const holyJudgment = {
 // 紫色环境罩 + 爆心雷纹阵 + 施法者引雷光点飞升 + 爆心上空雷云汇聚 + 电火花 → 收 →
 // 主雷 450.webm + 逐目标落雷（按距爆心错拍揭示）+ 地面冲击环 + 闪屏重震 → 麻痹电弧余韵
 const thunderStorm = {
-  id: 'thunder-storm', grade: 'L3', fxTags: ['雷击01'],
+  id: 'thunder-storm', grade: 'L3', fxTags: ['雷击01'], cine: 'lock',
   timeline: { chargeMs: 900, totalMs: 2400, fullscreen: true },   // 800 汇聚 + 100 收 + 500 落雷 + 1000 余韵
   cues: [{ key: 'thunder_charge', vol: 0.50 }, { key: 'thunder01', vol: 0.72 }, { key: 'thunder_aoe_hit', vol: 0.60 }],
   prepareKeys() { return this.cues.map(c => c.key); },
@@ -1829,7 +1830,7 @@ const strafeBurst = {
 };
 
 const kruppSnipe = {
-  id: 'krupp-snipe', grade: 'L4', fxTags: ['克虏伯重狙'],
+  id: 'krupp-snipe', grade: 'L4', fxTags: ['克虏伯重狙'], cine: 'lock',
   timeline: { chargeMs: 1220, totalMs: 3400, fullscreen: true, darken: true },   // 1220 瞄准 + 2100 原版视频全段 + 收尾
   cues: [{ key: 'gunshot_pierce', vol: 0.72 }, { key: 'explosion_aoe_blast', vol: 0.62 }],
   prepareKeys() { return ['gunshot_pierce', 'explosion_aoe_blast']; },
@@ -1919,7 +1920,7 @@ const shatterEcho = {
 };
 
 const sekhmetWrath = {
-  id: 'sekhmet-wrath', grade: 'L4', fxTags: ['塞赫美特之愠'],
+  id: 'sekhmet-wrath', grade: 'L4', fxTags: ['塞赫美特之愠'], cine: 'lock',
   timeline: { chargeMs: 1220, totalMs: 3200, fullscreen: true, darken: true },
   cues: [{ key: 'fire01', vol: 0.70 }, { key: 'explosion_aoe_blast', vol: 0.65 }],
   prepareKeys() { return ['fire01', 'explosion_aoe_blast']; },
@@ -2045,7 +2046,7 @@ const scorpionKey = {
 // 视频帧内碎裂点约在 (0.5, 0.83)、首帧瓶位约在 (0.47, 0.17)，据此把碎裂点对准规则落点
 const FOG_SHATTER_Y = 0.83, FOG_BOTTLE = { x: 0.47, y: 0.17 }, FOG_SHATTER_MS = 950;
 const xenonBlightFog = {
-  id: 'xenon-blight-fog', grade: 'L4', fxTags: ['异种坏死雾'], reuseAudio: true,
+  id: 'xenon-blight-fog', grade: 'L4', fxTags: ['异种坏死雾'], reuseAudio: true, cine: 'projectile',
   timeline: { chargeMs: 1400, totalMs: 3250, fullscreen: true, darken: true },   // ≈450 投瓶 + 950 瓶落至碎裂 + 1770 雾起与余韵
   cues: [{ key: 'fog.mp4 原声', vol: 2.5 }],
   prepareKeys() { return []; },
@@ -2059,8 +2060,8 @@ const xenonBlightFog = {
     worldDarken(fx, b, { holeR: Math.max(R * 0.8, W * 0.45), inMs: 380, holdMs: 2300, outMs: 520, peak: 0.55 });
     const flyMs = Math.round(Math.min(560, Math.max(360, Math.hypot(hand.x - head.x, hand.y - head.y) * 0.9)));
     throwVial(fx, head, hand, { kind: 'poison', ms: flyMs, s0: 0.5, s1: W * 0.2 / 34 });
-    // 镜头随瓶跟到落点：视频在落点上方展开，远投时开场构图会裁掉上半段（未手动操作镜头时才跟）
-    ctx.sandbox.guideTo([{ x: bm.x, y: (vy - H / 2) / PX }, bm, { x: bm.x, y: bm.y + 1 }], { ms: flyMs });
+    // 镜头随瓶甩到落点候碎：取落点与视频中心之间，瓶落轨迹与碎裂点同时入画（未手动操作镜头时才跟）
+    ctx.cine?.launch(flyMs + 700, 0, { at: { x: bm.x, y: (bm.y + vy / PX) / 2 }, k: 1.25 });
     if (!(await ctx.wait(flyMs))) return false;
     const cv = webm(ctx, 'fog.mp4', b.x, vy, W, { ms: 3400, audio: 2.5 });
     ctx.after(FOG_SHATTER_MS, () => { fx.shake('medium'); ctx.atmos?.burst(); });
