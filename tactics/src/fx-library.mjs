@@ -65,10 +65,11 @@ function ringHtml(x, y, d, inner, outer) {
 // cover=D（世界像素直径）：范围类效果短边覆盖真实直径，不按 16:9 帧宽误报范围。层收回即停帧、释放解码。
 const FX_WEBM_KEY_MAX = 960;
 export { FX_WEBM_KEY_MAX, webm as playWebmFx, playSupportEffects };
-function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1, cover = 0 } = {}) {
+// audio>0：按原版 audioUrl:'none' 口径开启视频原声，经混音器以该增益播放（原版 applyAudioVolume(vw, 2.5)）
+function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1, cover = 0, audio = 0 } = {}) {
   const layer = ctx.fx.top('', ms);
   const v = document.createElement('video');
-  v.muted = true; v.playsInline = true; v.preload = 'auto'; v.crossOrigin = 'anonymous'; v.loop = false;
+  v.muted = !audio; v.playsInline = true; v.preload = 'auto'; v.crossOrigin = 'anonymous'; v.loop = false;
   v.style.display = 'none';
   const cv = document.createElement('canvas');
   cv.setAttribute('data-fx', 'webm');
@@ -129,6 +130,7 @@ function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1, cover 
   v.playbackRate = rate;
   layer.appendChild(v);
   layer.appendChild(cv);
+  if (audio) ctx.av.CombatAudioMixer.media(v, audio, 'skill', { category: ctx.audioContext?.category });
   const p = v.play();
   if (p && typeof p.then === 'function') p.then(next, () => release());
   else next();
@@ -357,7 +359,8 @@ const arsenicShot = {
 const fireBlast = {
   id: 'fire-blast', grade: 'L3', fxTags: ['火焰01'],
   timeline: { chargeMs: 890, totalMs: 2430, fullscreen: true },   // 650 蓄势 + 240 火弹聚能 + 340 飞行 + 100 收 + 300 爆发 + 800 余韵
-  cues: [{ key: 'explosion_aoe_charge', vol: 0.45 }, { key: 'explosion_aoe_blast', vol: 0.70 }, { key: 'fire01', vol: 0.62 }, { key: 'ranshao', vol: 0.30 }],
+  // 原版火焰01 = fire.webm + fire01.mp3；ranshao 属于【燃烧弹】，燃烧挂载音由状态层统一播放，此处不再借用
+  cues: [{ key: 'explosion_aoe_charge', vol: 0.45 }, { key: 'explosion_aoe_blast', vol: 0.62 }, { key: 'fire01', vol: 0.72 }],
   prepareKeys() { return this.cues.map(c => c.key); },
   async play(ctx) {
     const { fx, hits, result } = ctx;
@@ -389,7 +392,7 @@ const fireBlast = {
     if (!(await ctx.wait(100))) return false;
     tele.remove();
     // ④ 爆发：音画震同帧
-    fx.sfx('explosion_aoe_blast', 0.70); fx.sfx('fire01', 0.62);
+    fx.sfx('explosion_aoe_blast', 0.62); fx.sfx('fire01', 0.72);
     fx.shake('heavy');
     ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     fx.top('<i style="position:absolute;left:' + b.x + 'px;top:' + b.y + 'px;width:' + R * 8 + 'px;height:' + R * 8 + 'px;margin:' + (-R * 4) + 'px 0 0 ' + (-R * 4) + 'px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,0.42),rgba(220,38,38,0.16) 40%,transparent 70%);mix-blend-mode:screen;"></i>', 1200)
@@ -405,15 +408,10 @@ const fireBlast = {
     // 逐目标揭示：按到爆心距离错拍（真实受击名单来自提交结果）
     const order = hits.map(h => { const p = ctx.centerOf(h.targetId); return { h, d: Math.hypot(p.x - center.x, p.y - center.y) }; }).sort((a, z) => a.d - z.d);
     for (const { h, d } of order) ctx.after(30 + Math.min(1, d / radius) * 180, () => ctx.reveal(h.targetId));
-    // ⑤ 余韵：余烬上飘、烟尘（同色系中心，不用亮白核）、燃烧挂载
+    // ⑤ 余韵：余烬上飘、烟尘（同色系中心，不用亮白核）；燃烧挂载由状态层表现
     ctx.after(300, () => {
       particles(fx, Array.from({ length: 26 }, () => ({ x: b.x + rnd(-R, R), y: b.y + rnd(-R * 0.6, R * 0.6), dx: rnd(-14, 14), dy: rnd(-70, -30), size: rnd(4, 8), color: pick(['#fde047', '#fb923c']), core: '#fef9c3', s0: 1, s1: 0.4, dur: rnd(600, 800), delay: rnd(0, 160) })), 1000);
       particles(fx, Array.from({ length: 8 }, () => ({ x: b.x + rnd(-R * 0.7, R * 0.7), y: b.y + rnd(-R * 0.4, R * 0.4), dx: rnd(-10, 10), dy: rnd(-30, -12), size: rnd(40, 70), color: 'rgba(68,64,60,0.45)', core: 'rgba(68,64,60,0.5)', s0: 0.6, s1: 1.2, o0: 0.6, dur: 780 })), 1000, 'ground');
-    });
-    const burned = hits.filter(h => h.hit);
-    if (burned.length) ctx.after(380, () => {
-      fx.sfx('ranshao', 0.30);
-      for (const h of burned) { const p = worldPx(ctx.centerOf(h.targetId)); webm(ctx, 'ranshao.webm', p.x, p.y - 14, 76, { ms: 900, opacity: 0.9 }); }
     });
     return ctx.wait(1100);
   },
@@ -805,14 +803,14 @@ export function playRegionPulse(fx, region, contests, centerOf, layers = []) {
 // 火焰 / 中毒领域施放 L3（技能未指定特效时按区域类型匹配）：仿浓雾五拍——蓄势 → 投放 → 收 → 按真实半径铺开（揭示常驻层）→ 余韵逐个判定
 const DOMAIN_THEMES = {
   fire: {
-    charge: 'explosion_aoe_charge', burst: ['fire01', 0.66], tail: ['ranshao', 0.34],
+    charge: 'explosion_aoe_charge', burst: ['fire01', 0.66],
     tint: 'radial-gradient(circle at 50% 55%,rgba(90,26,8,.5),rgba(22,6,2,.94))',
     rune: ['#f97316', '#fde68a', 'ᚠᛚᚨᛗᛖ'], palette: ['#f97316', '#ef4444', '#fbbf24'], core: '#fff7d6',
     orb: 'rgba(234,88,12,0.92)', ring: ['rgba(253,186,116,0.8)', 'rgba(239,68,68,0.5)'],
     cloud: ['rgba(194,65,12,0.5)', 'rgba(251,146,60,0.55)'], video: ['fire.webm', 0.9],
   },
   poison: {
-    charge: 'mx_vacuum', burst: ['aoe_poison_spell_fs219566', 0.66], tail: ['creature_slime_01', 0.36],
+    charge: 'mx_vacuum', burst: ['aoe_poison_spell_fs219566', 0.66],
     tint: 'radial-gradient(circle at 50% 55%,rgba(42,20,64,.5),rgba(8,4,16,.94))',
     rune: ['#a3e635', '#e9d5ff', 'ᛈᛟᛁᛋᚾ'], palette: ['#84cc16', '#a855f7', '#bef264'], core: '#ecfccb',
     orb: 'rgba(101,163,13,0.92)', ring: ['rgba(190,242,100,0.8)', 'rgba(168,85,247,0.5)'],
@@ -860,30 +858,62 @@ async function playDomainBurst(ctx, type) {
   const order = hits.map(h => { const p = ctx.centerOf(h.targetId); return { h, d: p ? Math.hypot(p.x - bm.x, p.y - bm.y) : 0 }; }).sort((a, z) => a.d - z.d);
   for (const { h, d } of order) ctx.after(30 + Math.min(1, d / Math.max(1, R / PX)) * 180, () => ctx.reveal(h.targetId));
   if (!(await ctx.wait(350))) return false;
-  // ⑤ 余韵：本次判定（规则 region-contest）按距中心远近逐个揭示：命中者脚下爆一团并揭示领域状态，闪避者飘字
-  const contests = (result.events || []).filter(ev => ev.type === 'region-contest' && (!region || ev.regionId === region.id))
+  // ⑤ 余韵：本次判定（规则 region-contest）按距中心远近逐个揭示；挂载音由状态层播放
+  revealRegionContests(ctx, region, bm, T.cloud);
+  return ctx.wait(700);
+}
+// 施放当拍的领域判定揭示：命中者脚下爆一团并揭示其领域状态（规则 effect-resolved），闪避者飘字
+function revealRegionContests(ctx, region, center, cloud) {
+  const { fx, result } = ctx, events = result.events || [];
+  const contests = events.filter(ev => ev.type === 'region-contest' && (!region || ev.regionId === region.id))
     .map(ev => ({ ev, p: ctx.centerOf(ev.targetId) })).filter(x => x.p)
-    .sort((u, v) => Math.hypot(u.p.x - bm.x, u.p.y - bm.y) - Math.hypot(v.p.x - bm.x, v.p.y - bm.y));
-  if (contests.some(x => x.ev.hit)) ctx.after(40, () => fx.sfx(T.tail[0], T.tail[1]));
+    .sort((u, v) => Math.hypot(u.p.x - center.x, u.p.y - center.y) - Math.hypot(v.p.x - center.x, v.p.y - center.y));
   contests.forEach(({ ev, p }, k) => ctx.after(Math.min(320, k * 70), () => {
     const w = worldPx(p);
     if (!ev.hit) { floatText(fx, w.x, w.y - 48, '闪避', '#e2e8f0', '#334155', { ms: 620, size: 12 }); return; }
-    fx.top(orbHtml(w.x, w.y - 4, 72, T.cloud[0], T.cloud[1]), 520).firstChild.animate([{ transform: 'scale(0.4)', opacity: 0 }, { transform: 'scale(1)', opacity: 1, offset: 0.4 }, { transform: 'scale(1.2)', opacity: 0 }], { duration: 500, fill: 'forwards' });
-    (result.effects || []).filter(e => e.targetId === ev.targetId).forEach(e => ctx.revealEffect(e));
+    fx.top(orbHtml(w.x, w.y - 4, 72, cloud[0], cloud[1]), 520).firstChild.animate([{ transform: 'scale(0.4)', opacity: 0 }, { transform: 'scale(1)', opacity: 1, offset: 0.4 }, { transform: 'scale(1.2)', opacity: 0 }], { duration: 500, fill: 'forwards' });
+    // 领域标签结果只在事件流里（不进 result.effects）；持续伤害补齐飘字字段
+    events.filter(e => e.type === 'effect-resolved' && e.targetId === ev.targetId && e.attackId === ev.attackId)
+      .forEach(e => ctx.revealEffect(e.kind === 'dot' ? { ...e, dot: /毒/.test(e.tag || '') ? 'poison' : 'burn', strength: e.value } : e));
   }));
-  return ctx.wait(700);
+}
+
+// 投掷小瓶（SVG）：自施术者头顶沿抛物线飞向 to，边飞边翻转并放大；fire=燃烧瓶（瓶口火布 + 火星尾迹），poison=毒剂瓶（绿液）
+function throwVial(fx, from, to, { kind, ms, s0 = 0.55, s1 = 1, size = 34 }) {
+  const u = fx.uid(), fire = kind === 'fire';
+  const liquid = fire ? ['#fde68a', '#f97316'] : ['#d9f99d', '#4d7c0f'];
+  const svg = '<svg width="' + size + '" height="' + size * 1.5 + '" viewBox="-20 -34 40 60" style="position:absolute;left:0;top:0;margin:' + (-size * 0.75) + 'px 0 0 ' + (-size / 2) + 'px;overflow:visible;will-change:transform,opacity;">' +
+    '<defs><linearGradient id="vl' + u + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + liquid[0] + '"/><stop offset="1" stop-color="' + liquid[1] + '"/></linearGradient>' +
+    '<filter id="vg' + u + '" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>' +
+    '<g filter="url(#vg' + u + ')">' +
+    (fire ? '<path d="M-3,-30 C-9,-38 -2,-46 0,-52 C3,-45 10,-39 3,-30Z" fill="#fb923c"/><path d="M-1.5,-30 C-4,-35 0,-40 0,-44 C2,-40 5,-35 1.5,-30Z" fill="#fef3c7"/>' : '') +
+    '<rect x="-4" y="-30" width="8" height="9" rx="1.5" fill="' + (fire ? '#a16207' : 'rgba(226,232,240,.75)') + '"/>' +
+    '<path d="M-5,-21 L5,-21 L5,-15 C14,-11 16,-2 16,6 C16,18 9,24 0,24 C-9,24 -16,18 -16,6 C-16,-2 -14,-11 -5,-15Z" fill="rgba(220,252,231,.18)" stroke="rgba(236,253,245,.85)" stroke-width="1.6"/>' +
+    '<path d="M-14,4 C-8,0 8,8 14,3 C15,16 9,22 0,22 C-9,22 -15,16 -14,4Z" fill="url(#vl' + u + ')" opacity=".92"/>' +
+    '<path d="M-10,-6 C-12,0 -12,6 -10,11" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".65"/></g></svg>';
+  const layer = fx.top(svg, ms + 80);
+  const lift = Math.max(70, Math.hypot(to.x - from.x, to.y - from.y) * 0.32);
+  const ctrl = { x: (from.x + to.x) / 2, y: Math.min(from.y, to.y) - lift }, spinDeg = (to.x >= from.x ? 1 : -1) * 540;
+  const frames = [];
+  for (let k = 0; k <= 16; k++) {
+    const t = k / 16, p = bez(from, ctrl, to, t);
+    frames.push({ transform: 'translate(' + p.x.toFixed(1) + 'px,' + p.y.toFixed(1) + 'px) rotate(' + (spinDeg * t).toFixed(0) + 'deg) scale(' + (s0 + (s1 - s0) * t).toFixed(3) + ')', opacity: k === 0 ? 0 : 1 });
+  }
+  layer.firstChild.animate(frames, { duration: ms, easing: 'cubic-bezier(0.35,0,0.65,1)', fill: 'both' });
+  if (fire) particles(fx, Array.from({ length: 14 }, (_, i) => { const p = bez(from, ctrl, to, (i + 1) / 15); return { x: p.x, y: p.y, dx: rnd(-8, 8), dy: rnd(-22, -8), size: rnd(5, 9), color: pick(['#fb923c', '#fbbf24', '#ef4444']), core: '#fff7d6', s0: 1, s1: 0.2, dur: rnd(320, 460), delay: ms * (i + 1) / 15 }; }), ms + 500);
+  return layer;
 }
 const fireDomain = {
   id: 'fire-domain', grade: 'L3', fxTags: ['火焰领域'], regionTypes: ['fire'],
   timeline: { chargeMs: 900, totalMs: 2350, fullscreen: true },   // 900 蓄势 + 300 投放 + 100 收 + 350 爆发 + 700 余韵
-  cues: [{ key: 'explosion_aoe_charge', vol: 0.45 }, { key: 'fire01', vol: 0.66 }, { key: 'mx_deep_impact', vol: 0.5 }, { key: 'ranshao', vol: 0.34 }],
+  cues: [{ key: 'explosion_aoe_charge', vol: 0.45 }, { key: 'fire01', vol: 0.66 }, { key: 'mx_deep_impact', vol: 0.5 }],
   prepareKeys() { return this.cues.map(c => c.key); },
   play: ctx => playDomainBurst(ctx, 'fire'),
 };
 const poisonDomain = {
   id: 'poison-domain', grade: 'L3', fxTags: ['中毒领域'], regionTypes: ['poison'],
   timeline: { chargeMs: 900, totalMs: 2350, fullscreen: true },
-  cues: [{ key: 'mx_vacuum', vol: 0.45 }, { key: 'aoe_poison_spell_fs219566', vol: 0.66 }, { key: 'mx_deep_impact', vol: 0.5 }, { key: 'creature_slime_01', vol: 0.36 }],
+  cues: [{ key: 'mx_vacuum', vol: 0.45 }, { key: 'aoe_poison_spell_fs219566', vol: 0.66 }, { key: 'mx_deep_impact', vol: 0.5 }],
   prepareKeys() { return this.cues.map(c => c.key); },
   play: ctx => playDomainBurst(ctx, 'poison'),
 };
@@ -1700,21 +1730,60 @@ const scorpionKey = {
   },
 };
 
+// 异种坏死雾 L4（对照原版：fog.mp4 scale 0.8×屏幕短边、视频原声 ×2.5、不另配采样）：
+// 索恩投出 SVG 毒剂瓶 → 抵达视频首帧瓶位时交接给视频 → 完整播放（瓶落、碎裂、毒液、白雾漫出，2.7s）→ 雾起时揭示常驻毒域与逐个判定
+// 视频帧内碎裂点约在 (0.5, 0.83)、首帧瓶位约在 (0.47, 0.17)，据此把碎裂点对准规则落点
+const FOG_SHATTER_Y = 0.83, FOG_BOTTLE = { x: 0.47, y: 0.17 }, FOG_SHATTER_MS = 950;
 const xenonBlightFog = {
-  id: 'xenon-blight-fog', grade: 'L3', fxTags: ['异种坏死雾'],
-  timeline: { chargeMs: 820, totalMs: 2150, fullscreen: true, darken: false },
-  cues: [{ key: 'aoe_poison_spell_fs219566', vol: 0.65 }],
-  prepareKeys() { return ['aoe_poison_spell_fs219566']; },
+  id: 'xenon-blight-fog', grade: 'L4', fxTags: ['异种坏死雾'], reuseAudio: true,
+  timeline: { chargeMs: 1400, totalMs: 3250, fullscreen: true, darken: true },   // ≈450 投瓶 + 950 瓶落至碎裂 + 1770 雾起与余韵
+  cues: [{ key: 'fog.mp4 原声', vol: 2.5 }],
+  prepareKeys() { return []; },
   async play(ctx) {
-    const { fx, hits, result } = ctx, shape = result.query.shape, c = worldPx(ctx.centerOf(ctx.casterId)), b = worldPx(shape.center || result.aim), R = (shape.radius || 8) * PX;
-    flyOrb(fx, c, { x: (c.x + b.x) / 2, y: Math.min(c.y, b.y) - 90 }, b, { size: 22, color: '#22c55e', core: '#dcfce7', ms: 420, fade: true });
-    if (!(await ctx.wait(820))) return false;
-    fx.sfx('aoe_poison_spell_fs219566', 0.65); fx.shake('medium');
-    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
-    webm(ctx, 'fog.mp4', b.x, b.y, R * 2, { ms: 1300, opacity: 0.85, cover: R * 2 });
-    particles(fx, Array.from({ length: 24 }, () => { const a = rnd(0, TAU), d = rnd(0.4, 1) * R; return { x: b.x, y: b.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(12, 22), color: '#16a34a', core: '#86efac', s0: 0.8, s1: 0.2, dur: 760 }; }), 860);
-    hits.forEach((h, i) => ctx.after(50 + i * 45, () => ctx.reveal(h.targetId)));
-    return ctx.wait(1260);
+    const { fx, hits, result } = ctx;
+    const region = (ctx.regions || []).find(r => r.type === 'poison') || null, shape = result.query.shape || {};
+    const bm = region ? region.center : (shape.center || result.aim), b = worldPx(bm), R = (region ? region.radius : (shape.radius || 8)) * PX;
+    const c = worldPx(ctx.centerOf(ctx.casterId)), head = { x: c.x, y: c.y - 26 };
+    const W = screenSpanPx(ctx, 0.8), H = W * 720 / 1280, vy = b.y - (FOG_SHATTER_Y - 0.5) * H;
+    const hand = { x: b.x + (FOG_BOTTLE.x - 0.5) * W, y: vy + (FOG_BOTTLE.y - 0.5) * H };
+    worldDarken(fx, b, { holeR: Math.max(R * 0.8, W * 0.45), inMs: 380, holdMs: 2300, outMs: 520, peak: 0.55 });
+    const flyMs = Math.round(Math.min(560, Math.max(360, Math.hypot(hand.x - head.x, hand.y - head.y) * 0.9)));
+    throwVial(fx, head, hand, { kind: 'poison', ms: flyMs, s0: 0.5, s1: W * 0.2 / 34 });
+    // 镜头随瓶跟到落点：视频在落点上方展开，远投时开场构图会裁掉上半段（未手动操作镜头时才跟）
+    ctx.sandbox.guideTo([{ x: bm.x, y: (vy - H / 2) / PX }, bm, { x: bm.x, y: bm.y + 1 }], { ms: flyMs });
+    if (!(await ctx.wait(flyMs))) return false;
+    const cv = webm(ctx, 'fog.mp4', b.x, vy, W, { ms: 3400, audio: 2.5 });
+    ctx.after(FOG_SHATTER_MS, () => { fx.shake('medium'); ctx.atmos?.burst(); });
+    hits.forEach((h, i) => ctx.after(FOG_SHATTER_MS + 40 + i * 45, () => ctx.reveal(h.targetId)));
+    if (region) ctx.after(1250, () => ctx.revealRegion(region.id));
+    ctx.after(1400, () => revealRegionContests(ctx, region, bm, ['rgba(132,204,22,0.55)', 'rgba(236,252,203,0.6)']));
+    return ctx.awaitHandle(cv.handle, 3000);
+  },
+};
+
+// 【燃烧弹】（对照原版：ranshao.webm scale 0.42×屏幕短边、ranshao.mp3）：索恩投出燃烧瓶 → 落点完整播放 ranshao.webm 并同拍原版音效 → 火起时揭示常驻火域与逐个判定
+const incendiaryBottle = {
+  id: 'incendiary-bottle', grade: 'identity', fxTags: ['燃烧弹'], reuseAudio: true,
+  timeline: { totalMs: 1750 },
+  cues: [{ key: 'ranshao', vol: 1 }],
+  prepareKeys() { return ['ranshao']; },
+  async play(ctx) {
+    const { fx, hits, result } = ctx;
+    const region = (ctx.regions || []).find(r => r.type === 'fire') || null, shape = result.query.shape || {};
+    const bm = region ? region.center : (shape.center || result.aim), b = worldPx(bm);
+    const c = worldPx(ctx.centerOf(ctx.casterId)), head = { x: c.x, y: c.y - 26 };
+    const flyMs = Math.round(Math.min(520, Math.max(340, Math.hypot(b.x - head.x, b.y - head.y) * 0.9)));
+    throwVial(fx, head, b, { kind: 'fire', ms: flyMs, s0: 0.55, s1: 0.95 });
+    ctx.sandbox.guideTo([{ x: bm.x, y: bm.y - 3 }, bm, { x: bm.x, y: bm.y + 1.5 }], { ms: flyMs });
+    if (!(await ctx.wait(flyMs))) return false;
+    const W = screenSpanPx(ctx, 0.42);
+    fx.sfx('ranshao', 1); fx.shake('light');
+    fx.top(orbHtml(b.x, b.y, W * 0.5, 'rgba(251,146,60,0.7)', '#fff7d6'), 360).firstChild.animate([{ transform: 'scale(0.3)', opacity: 1 }, { transform: 'scale(1.2)', opacity: 0 }], { duration: 320, fill: 'forwards' });
+    const cv = webm(ctx, 'ranshao.webm', b.x, b.y - W * 0.12, W, { ms: 1500 });
+    hits.forEach((h, i) => ctx.after(60 + i * 45, () => ctx.reveal(h.targetId)));
+    if (region) ctx.after(260, () => ctx.revealRegion(region.id));
+    ctx.after(420, () => revealRegionContests(ctx, region, bm, ['rgba(234,88,12,0.6)', 'rgba(253,230,138,0.6)']));
+    return ctx.awaitHandle(cv.handle, 1400);
   },
 };
 
@@ -1800,7 +1869,7 @@ const sanctumVeil = {
   },
 };
 
-export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, vitalFlow, sanctumVeil, healMend, fogBurst, fireDomain, poisonDomain, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, frostBlast, voidQuake, lineRift, waterBolt, curseBeam, ...basicAttacks, neutralImpact, zheYing, mirrorCounter, wizardShield, reactionKanpo, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, kruppAim, sekhmetVow];
+export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, incendiaryBottle, vitalFlow, sanctumVeil, healMend, fogBurst, fireDomain, poisonDomain, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, frostBlast, voidQuake, lineRift, waterBolt, curseBeam, ...basicAttacks, neutralImpact, zheYing, mirrorCounter, wizardShield, reactionKanpo, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, kruppAim, sekhmetVow];
 export function getFxTagOptions() {
   return [...new Set(DEFAULT_FX_ENTRIES.flatMap(entry => entry.fxTags || []))].map(name => ({ name, label: name }));
 }

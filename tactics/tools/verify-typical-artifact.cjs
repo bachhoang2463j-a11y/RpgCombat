@@ -91,7 +91,7 @@ async function reportResult() {
   check('预警头像角标与召唤头像解析入包', ['t-unit-alert-pending', 'portraitName', 'syncDynamicUnits'].every(s => html.includes(s)));
   check('火焰/中毒领域常驻层与施放演出、护盾罩/护盾段、警戒弹出与警报波纹、被动到账反馈入包',
     ['fire-domain', 'poison-domain', 'regionTypes', 'data-flicker', 'data-bubble', 'region-contest', 't-unit-shield', 't-unit-shielded', 't-bar-shield', 't-unit-alert-flash',
-      'enemy-alarm', 'passive-gain', 't-card-passive', 't-card-pop', 'bowlBronze', 'bellPing'].every(s => html.includes(s)));
+      'enemy-alarm', 'passive-gain', 't-card-passive', 't-card-pop', 'bowlBronze', 'bellPing', 'incendiary-bottle', 'throwVial', 'audio:2.5', 'ranshao.webm'].every(s => html.includes(s)));
   if (backend) {
     const fixture = path.join(root, 'integration-test', 'fixtures', 'tactics', 'alerts-node-cases.mjs');
     const { runAlertsCases } = await import(pathToFileURL(fixture).href);

@@ -415,6 +415,19 @@ export const groups = {
       .filter(skill => [skill.type, skill.type2, skill.type3].some(tag => /回复|回蓝|充能|增速|增攻|增防|瞄准|护盾|驱散|再动/.test(tag || '')) && !validFxTags.has(skill.fxTag))
       .map(skill => `${unit.name}·${skill.name}`));
     cases.push(ok('TFX-03 典型对局敌方和召唤辅助槽有合法显式标签', missingSupportTags.length === 0, j(missingSupportTags)));
+    // 索恩：异种坏死雾=中毒领域（沿用原演出），铝热投剂=燃烧弹·火焰领域；压缩爆燃（火焰01）不再借用燃烧弹采样/视频
+    {
+      const thorne = block.heroes.find(h => h.name === '索恩');
+      const fogSkill = thorne.skills.find(s => s.name === '异种坏死雾'), molotov = thorne.items.find(i => i.name === '铝热投剂');
+      const fogFx = reg.resolve(actionInput({ skill: fogSkill })), molotovFx = reg.resolve(actionInput({ skill: molotov }));
+      const lib = readFileSync(path.join(ROOT, 'tactics', 'src', 'fx-library.mjs'), 'utf8');
+      const fireBlastSrc = lib.slice(lib.indexOf('const fireBlast = {'), lib.indexOf('// 自身再动/加速'));
+      cases.push(ok('TFX-03 坏死雾毒域/燃烧弹火域入样本并分发到对应演出，火焰01去掉燃烧弹音画',
+        fogSkill.regionEffect?.type === 'poison' && molotov.regionEffect?.type === 'fire' && molotov.range.radius === 3
+        && fogFx.id === 'xenon-blight-fog' && checkBudget(fogFx).ok && molotovFx.id === 'incendiary-bottle'
+        && /webm\(ctx, 'fog\.mp4', b\.x, vy, W, \{ ms: 3400, audio: 2\.5 \}\)/.test(lib) && /webm\(ctx, 'ranshao\.webm'/.test(lib)
+        && !/'ranshao(\.webm)?'/.test(fireBlastSrc), j({ fog: fogSkill.regionEffect, molotov: [molotov.regionEffect, molotov.range], fogFx: fogFx.id, molotovFx: molotovFx.id })));
+    }
     const EL = 'h:埃利奥特';
     let data, b, el;
     // 每段独立开局（只有 AI 行动的模拟会消耗我方血量；长链会导致埃利奥特倒地而准备被规则清除）
