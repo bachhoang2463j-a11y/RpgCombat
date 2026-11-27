@@ -17,7 +17,7 @@ const symbols = [
   'playBackstabMark', 'drawBackstabSector', 't-unit-backstab', '🗡背袭',
   'enemy-mp-recovered', 'finishExposureTurn', 'skillMain', '暴露',
   'stationaryStatus', 't-prep-pips', 't-prep-still', '驻足起咏', '驻足继续',
-  'reaction-sonic-jam', '声波干扰雷', '净蚀反冲', 'seerEyeHtml', 'slamSeal', 't-card-still', 't-ally-ring', 't-ally-mini', 't-ab-fill', 'creature_slime_01',
+  'reaction-sonic-jam', '声波干扰雷', '净蚀反冲', 'seerEyeHtml', 'slamSeal', 't-card-still', 't-ally-tab', 'onAllyPin', 'inspectPin', 'creature_slime_01',
 ];
 // 产物经压缩：去空白、非 ASCII 字符转 \uXXXX
 const esc = s => [...s].map(c => c.codePointAt(0) > 0xffff ? '\\u{' + c.codePointAt(0).toString(16).toUpperCase() + '}' : c.charCodeAt(0) > 127 ? '\\u' + c.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0') : c).join('');

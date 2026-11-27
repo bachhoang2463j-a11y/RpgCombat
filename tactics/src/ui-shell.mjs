@@ -156,7 +156,7 @@ export function buildShell(root) {
         '<span class="t-hero-res2">' + res('t-res-mp', 'MP') + res('t-res-tp', 'TP') + '</span>' +
       '</span>' +
       '<span class="t-hero-stats">' + STAT_KEYS.map(([k, n]) => '<span class="t-hs" data-k="' + k + '"><em>' + n + '</em><b>-</b></span>').join('') + '</span>' +
-      '<span class="t-card-turn">行动中</span><span class="t-hero-status"></span></button>';
+      '<span class="t-hero-status"></span></button>';
   }
   // 英雄卡状态徽章（卡片上沿外侧一行，完整文案）
   function setHeroStatus(id, html) {
@@ -173,26 +173,18 @@ export function buildShell(root) {
     if (inspector.innerHTML !== html) inspector.innerHTML = html;
     inspector.hidden = false;
   }
-  // 友方支援单位不占底栏：右侧竖排圆标（召唤物紫环 / 临时友军翠环，外圈血量弧 + 类型角标 + 迷你血条，当前行动金光）；
-  // 点开为详情卡（名字 + 类型签 + 等级/主人、图形化 HP/护盾/MP 条、状态徽章），只显示实际使用的资源。
+  // 友方支援单位不占底栏：贴屏幕右缘的竖排收纳签（单个目标一签，只放 emoji；低血红边 / 倒下灰显 / 当前行动金光）；
+  // 点签 = 把右上检视卡（与敌方同一张图鉴卡）固定到该单位，再点收起；固定期间悬停别的单位仍临时切换查看。
   const allyOf = id => els.allies.querySelector('[data-unit-id="' + CSS.escape(id) + '"]');
   function renderAllies(allies) {
     const key = allies.map(u => u.id).join('|');
     if (els.allies.dataset.key !== key) {
-      const open = new Set(Array.from(els.allies.querySelectorAll('[aria-expanded="true"]'), b => b.parentElement.dataset.unitId));
+      if (state.allyPinned && !allies.some(u => u.id === state.allyPinned)) { state.allyPinned = null; if (state.onAllyPin) state.onAllyPin(null); }
       els.allies.innerHTML = allies.map(u => {
-        const id = ESC(u.id), name = ESC(u.name), expanded = open.has(u.id);
-        const owner = u.isSummon && u.summonOwnerId ? (state.units || []).find(x => x.id === u.summonOwnerId) : null;
-        const level = u.ref && u.ref.level;
-        const sub = [level, owner ? '主人 · ' + owner.name : ''].filter(Boolean).map(ESC).join(' · ');
-        return '<div class="t-ally-row ' + (u.isSummon ? 't-ally-summon' : 't-ally-temp') + '" data-unit-id="' + id + '">' +
-          '<button type="button" class="t-ally-toggle" aria-label="' + name + '" title="' + name + (u.isSummon ? ' · 召唤物' : ' · 临时友军') + '" aria-expanded="' + expanded + '" aria-controls="t-ally-' + id + '">' +
-            '<span class="t-ally-ring">' + faceHtml(u, 't-ally-face') + '</span><i class="t-ally-badge" aria-hidden="true">' + (u.isSummon ? '🐾' : '✦') + '</i>' +
-            '<i class="t-ally-mini" aria-hidden="true"><i></i></i></button>' +
-          '<div class="t-ally-detail" id="t-ally-' + id + '"' + (expanded ? '' : ' hidden') + '>' +
-            '<div class="t-ally-head"><b>' + name + '</b><span class="t-ally-tag">' + (u.isSummon ? '召唤物' : '临时友军') + '</span></div>' +
-            (sub ? '<small class="t-ally-sub">' + sub + '</small>' : '') +
-            '<span class="t-ally-bars"></span><span class="t-ally-status"></span></div></div>';
+        const name = ESC(u.name);
+        return '<div class="t-ally-row ' + (u.isSummon ? 't-ally-summon' : 't-ally-temp') + '" data-unit-id="' + ESC(u.id) + '">' +
+          '<button type="button" class="t-ally-tab" aria-label="' + name + '" title="' + name + (u.isSummon ? ' · 召唤物' : ' · 临时友军') + ' · 点击查看图鉴" aria-pressed="' + (state.allyPinned === u.id) + '">' +
+            faceHtml(u, 't-ally-face') + '</button></div>';
       }).join('');
       els.allies.dataset.key = key;
     }
@@ -201,31 +193,20 @@ export function buildShell(root) {
     markCards();
   }
   els.allies.addEventListener('click', e => {
-    const btn = e.target.closest('.t-ally-toggle');
+    const btn = e.target.closest('.t-ally-tab');
     if (!btn) return;
-    const detail = btn.nextElementSibling;
-    detail.hidden = !detail.hidden;
-    btn.setAttribute('aria-expanded', String(!detail.hidden));
+    const id = btn.parentElement.dataset.unitId;
+    state.allyPinned = state.allyPinned === id ? null : id;
+    els.allies.querySelectorAll('.t-ally-tab').forEach(b => b.setAttribute('aria-pressed', String(b.parentElement.dataset.unitId === state.allyPinned)));
     uiSound('select');
+    if (state.onAllyPin) state.onAllyPin(state.allyPinned);
   });
+  // 收纳签只表达存亡与危机：低血红边 / 倒下灰显（数值看展开的图鉴卡）
   function setAllyBars(id, bars) {
     const row = allyOf(id);
     if (!row) return;
-    const { hp, maxHp, mp, maxMp, shield } = bars;
-    row.classList.toggle('t-down', hp <= 0);
-    const sh = Math.max(0, shield || 0), scale = Math.max(maxHp || 1, Math.max(0, hp) + sh), hpPct = pct(hp, scale), ratio = pct(hp, maxHp || 1);
-    row.style.setProperty('--hp', ratio + '%');
-    row.classList.toggle('t-low', hp > 0 && ratio < 30);
-    const bar = (cls, label, fill, value, extra = '') => '<span class="t-ab ' + cls + '"><span class="t-ab-track"><i class="t-ab-fill" style="width:' + fill + '%"></i>' + extra + '</span><em>' + label + '</em><b>' + value + '</b></span>';
-    const html = bar('t-ab-hp', 'HP', hpPct, Math.max(0, Math.round(hp)) + '/' + maxHp + (sh > 0 ? ' <i class="t-ab-shv">🔰' + Math.round(sh) + '</i>' : ''),
-      sh > 0 ? '<i class="t-ab-sh" style="left:' + hpPct + '%;width:' + pct(sh, scale) + '%"></i>' : '') +
-      (maxMp > 0 ? bar('t-ab-mp', 'MP', pct(mp, maxMp), Math.max(0, Math.round(mp)) + '/' + maxMp) : '');
-    const el = row.querySelector('.t-ally-bars');
-    if (el.innerHTML !== html) el.innerHTML = html;
-  }
-  function setAllyStatus(id, html) {
-    const el = allyOf(id)?.querySelector('.t-ally-status');
-    if (el && el.innerHTML !== html) el.innerHTML = html;
+    row.classList.toggle('t-down', bars.hp <= 0);
+    row.classList.toggle('t-low', bars.hp > 0 && bars.hp / (bars.maxHp || 1) < 0.3);
   }
   function renderHeroes(units, heroCardIds) {
     state.units = units;
@@ -843,12 +824,13 @@ export function buildShell(root) {
   function markRoundStart() { rpgUi.markRoundStart(); }
 
   return {
-    destroy: () => { flames.destroy(); clearTimeout(showLog._t); clearTimeout(showBanner._t); rpgUi.hideTagTip(); document.removeEventListener('mousedown', onComboDown); reactionPrompt.cancel(); state.onReset = null; state.onUnitClick = null; root.replaceChildren(); },
-    els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setHeroStatus, setAllyStatus, setHeroStats, flashHeroPassive, showInspector, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
+    destroy: () => { flames.destroy(); clearTimeout(showLog._t); clearTimeout(showBanner._t); rpgUi.hideTagTip(); document.removeEventListener('mousedown', onComboDown); reactionPrompt.cancel(); state.onReset = null; state.onUnitClick = null; state.onAllyPin = null; root.replaceChildren(); },
+    els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setHeroStatus, setHeroStats, flashHeroPassive, showInspector, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
     previewMoveCost, previewPips, openModal, closeModal,
     promptReaction: (req) => reactionPrompt.prompt(req), cancelReactionPrompt: () => reactionPrompt.cancel(),
     getSafeRect, showLog, openPanel, closePanel, openResult, clearBattle, closeSubmenu: () => {},
     set onUnitClick(fn) { state.onUnitClick = fn; },
+    set onAllyPin(fn) { state.onAllyPin = fn; },
     set onReset(fn) { state.onReset = fn; },
     set onUiSound(fn) { state.onUiSound = fn; },
     set settings(provider) { state.settings = provider; },

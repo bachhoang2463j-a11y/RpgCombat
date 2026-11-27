@@ -326,6 +326,7 @@ export function createApp(rootEl, opts = {}) {
   let sprintArm = null;      // 冲刺移动待确认格 'col,row'
   let jumpArm = null;        // 右键跳跃待确认格 'col,row'
   let inspectHover = null;
+  let inspectPin = null;     // 右侧收纳签固定查看的友方支援单位（悬停他人时临时让位）
   let unitStyles = {};       // 单位表现风格：我方职业 / 敌方分级（只影响画面与声音）
   const lastAttackByUnit = new Map(); // unitId → { key, name }（记住最近一次非蓄力攻击技能）
   const hiddenLog = new Set();
@@ -341,6 +342,7 @@ export function createApp(rootEl, opts = {}) {
     shell.setSelected(unitId);
     renderInspector();
   };
+  shell.onAllyPin = (unitId) => { inspectPin = unitId; renderInspector(); };
   shell.onReset = () => restart();
   const editor = createEditorPanel({
     rpgUi: shell.rpgUi, shell, globalHtml: () => soundSettingsHtml(), validate: validateEditorDraft,
@@ -518,19 +520,19 @@ export function createApp(rootEl, opts = {}) {
         if (currentViewData.heroCardIds.has(u.id)) {
           shell.setHeroStatus(u.id, iconStatusHtml(list.filter(b => b.key !== 'shield')));  // 护盾已写进卡片血条
           shell.setHeroStats(u.id, shownEff.get(u.id) || battle.getEffectiveUnit(u.id), getEffectiveStats(u, []));
-        } else shell.setAllyStatus(u.id, compactStatusHtml(list.filter(b => b.key !== 'shield')));
+        }
       }
     }
     renderInspector();
   }
   function renderInspector() {
-    const id = inspectHover;
+    const id = inspectHover || inspectPin;
     const u = id && battle && unitById(id);
     if (!u) { shell.showInspector(null); return; }
     const eff = battle.getEffectiveUnit(u.id);
     const snapU = battle.snapshot().units.find(x => x.id === u.id);
     const prep = battle.battleState.combatState.charges?.[u.id]?.preparing;
-    shell.showInspector(inspectorHtml({ unit: u, eff: { ...eff, shield: shownOf(u).shield }, base: getEffectiveStats(u, []), badges: badgesOf(u), shown: shownOf(u), lore: resolveLore(u),
+    shell.showInspector(inspectorHtml({ unit: u, eff: { ...eff, shield: shownOf(u).shield }, base: getEffectiveStats(u, []), badges: badgesOf(u), shown: shownOf(u), lore: resolveLore(u), pinned: !inspectHover && id === inspectPin,
       charge: snapU?.charge, preparing: prep ? { name: prep.skill?.name || '蓄力', remaining: prep.remaining } : null }));
   }
   function shownOf(u) { return shown.get(u.id) || { hp: u.ref.hp, mp: u.ref.mp, tp: u.ref.tp || 0, shield: u.ref.shield || 0 }; }

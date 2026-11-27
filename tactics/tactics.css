@@ -311,52 +311,29 @@ button:disabled { opacity: .42; cursor: default; }
 .t-topbtn:hover { color: var(--text); border-color: var(--line-2); }
 @media (max-width: 1400px) { .t-toplabel { display: none; } }
 
-/* ---- 右侧支援单位：图标独立折叠，不占底栏空间；暗金统一（血量弧金色，召唤/友军只走角标与详情左线） ---- */
-#tactics-allies { position: absolute; top: 50px; right: 12px; bottom: 218px; z-index: 46; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: calc(100% - 72px); overflow: auto; pointer-events: none; }
-#tactics-allies[hidden], .t-ally-detail[hidden] { display: none; }
-.t-ally-row { --ac: #a48ad6; --ac-2: #ddd0f4; --hp: 100%; display: flex; flex: none; flex-direction: row-reverse; align-items: flex-start; gap: 8px; }
-.t-ally-row.t-ally-temp { --ac: #5fb892; --ac-2: #c4ecd8; }
-.t-ally-toggle { position: relative; padding: 0; border-radius: 50%; pointer-events: auto; transition: transform .14s; }
-.t-ally-toggle:hover { transform: scale(1.06); }
-.t-ally-ring { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; padding: 2px;
-  background: conic-gradient(var(--g-gold-2) 0 var(--hp), rgba(148,138,115,.22) var(--hp) 100%); box-shadow: 0 3px 10px #000a, 0 0 0 1px rgba(0,0,0,.7); transition: background .3s; }
-.t-ally-face { display: grid; place-items: center; width: 42px; height: 42px; overflow: hidden; border: 2px solid #0d0c0a; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #2a241a, #0d0c0a); font-size: 22px; }
+/* ---- 右侧支援单位：贴屏幕右缘的竖排收纳签（单个目标一签，只放 emoji，不显示血条）；点签展开右上图鉴检视卡 ---- */
+#tactics-allies { position: absolute; top: 52px; right: 0; bottom: 218px; z-index: 46; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  overflow-x: hidden; overflow-y: auto; scrollbar-width: none; pointer-events: none; }
+#tactics-allies::-webkit-scrollbar { display: none; }
+#tactics-allies[hidden] { display: none; }
+.t-ally-row { flex: none; }
+.t-ally-tab { position: relative; display: grid; place-items: center; width: 44px; height: 50px; padding: 0 0 0 2px; pointer-events: auto;
+  border-radius: 12px 0 0 12px; background: linear-gradient(180deg, rgba(24,21,16,.96), rgba(11,10,8,.97)); border: 1px solid var(--g-line-2); border-right: 0;
+  box-shadow: -3px 4px 12px rgba(0,0,0,.6), inset 0 1px 0 rgba(236,210,155,.1); transition: width .16s var(--ease), border-color .16s, box-shadow .16s; }
+.t-ally-tab:hover { width: 50px; border-color: var(--g-gold); }
+.t-ally-face { display: grid; place-items: center; width: 32px; height: 32px; overflow: hidden; border-radius: 50%; font-size: 24px; line-height: 1; }
+.t-ally-face.t-face-emoji { border-radius: 0; overflow: visible; filter: drop-shadow(0 1px 2px #000); }
 .t-ally-face img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; }
-.t-ally-badge { position: absolute; right: -2px; bottom: 4px; display: grid; place-items: center; width: 16px; height: 16px; background: #0d0c0a; border: 1px solid var(--ac);
-  font: 700 9px/1 system-ui, sans-serif; font-style: normal; color: var(--ac-2); box-shadow: 0 1px 4px #000c; }
-.t-ally-mini { position: absolute; left: 7px; right: 7px; bottom: -5px; height: 3px; background: rgba(0,0,0,.85); box-shadow: 0 0 0 1px #000a; overflow: hidden; }
-.t-ally-mini i { display: block; width: var(--hp); height: 100%; background: #4fb877; transition: width .3s; }
-.t-ally-row.t-low .t-ally-mini i { background: #e0525e; }
-.t-ally-toggle:hover .t-ally-ring, .t-ally-toggle[aria-expanded="true"] .t-ally-ring { box-shadow: 0 3px 10px #000a, 0 0 0 2px var(--g-gold), 0 0 12px rgba(201,164,92,.45); }
-.t-ally-row.t-current .t-ally-ring { box-shadow: 0 3px 10px #000a, 0 0 0 2px var(--g-gold-2), 0 0 16px rgba(201,164,92,.5); animation: t-ally-turn 1.2s ease-in-out infinite alternate; }
-@keyframes t-ally-turn { to { box-shadow: 0 3px 10px #000a, 0 0 0 2px var(--g-gold-2), 0 0 24px rgba(236,210,155,.75); } }
-.t-ally-row.t-low:not(.t-down) .t-ally-ring { animation: t-ally-low .9s ease-in-out infinite alternate; }
-@keyframes t-ally-low { to { box-shadow: 0 3px 10px #000a, 0 0 0 1px rgba(248,113,113,.8), 0 0 12px rgba(239,68,68,.6); } }
-.t-ally-row.t-down .t-ally-face { filter: grayscale(1) brightness(.7); }
-.t-ally-row.t-down .t-ally-ring { background: rgba(71,64,52,.5); }
-.t-ally-row.t-down .t-ally-badge::after { content: '💀'; position: absolute; inset: -1px; display: grid; place-items: center; background: #1a1712; }
-.t-ally-detail { position: relative; width: 188px; padding: 8px 10px; border: 1px solid var(--g-line); border-top-color: var(--g-line-2); border-left: 2px solid var(--ac);
-  background: linear-gradient(180deg, rgba(22,19,14,.96), rgba(11,10,8,.97)); color: var(--g-text); font-size: 11px; pointer-events: auto; box-shadow: 0 6px 18px #000b;
-  animation: t-ally-open .16s ease-out; }
-@keyframes t-ally-open { from { opacity: 0; transform: translateX(8px); } }
-.t-ally-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.t-ally-head b { font-size: 12px; font-weight: 800; letter-spacing: .06em; overflow-wrap: anywhere; }
-.t-ally-tag { flex: none; font-size: 9px; font-weight: 700; letter-spacing: .14em; color: var(--ac-2); }
-.t-ally-tag::before { content: '◆'; margin-right: 3px; font-size: 7px; vertical-align: 1px; color: var(--ac); }
-.t-ally-sub { display: block; margin-top: 2px; color: var(--g-mute); font-size: 9.5px; }
-.t-ally-bars { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; font-variant-numeric: tabular-nums; }
-.t-ab { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 5px; }
-.t-ab em { grid-row: 1; grid-column: 1; font: 800 9px/1 system-ui, sans-serif; font-style: normal; color: var(--g-mute); }
-.t-ab-track { grid-row: 1; grid-column: 2; position: relative; height: 6px; background: rgba(0,0,0,.6); box-shadow: inset 0 0 0 1px rgba(201,164,92,.16); overflow: hidden; }
-.t-ab-fill { position: absolute; left: 0; top: 0; bottom: 0; transition: width .3s; }
-.t-ab-hp .t-ab-fill { background: linear-gradient(90deg, #27744a, #4fb877); }
-.t-ally-row.t-low .t-ab-hp .t-ab-fill { background: linear-gradient(90deg, #8f1d2a, #e0525e); }
-.t-ab-mp .t-ab-fill { background: linear-gradient(90deg, #2a62c9, #5aa3f0); }
-.t-ab-sh { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(45deg, #e2e8f0 0 3px, #94a3b8 3px 6px); opacity: .85; }
-.t-ab b { grid-row: 1; grid-column: 3; font-size: 10px; font-weight: 700; color: var(--g-text); white-space: nowrap; }
-.t-ab-shv { font-style: normal; color: #cbd5e1; font-size: 9px; }
-.t-ally-status { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 5px; }
-.t-ally-status:empty { display: none; }
+.t-ally-tab[aria-pressed="true"] { width: 52px; border-color: var(--g-gold-2); box-shadow: -3px 4px 14px rgba(0,0,0,.6), 0 0 12px rgba(201,164,92,.45), inset 0 0 10px rgba(201,164,92,.18); }
+.t-ally-tab[aria-pressed="true"]::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 2px; background: var(--g-gold-2); box-shadow: 0 0 6px var(--g-gold); }
+.t-ally-row.t-current .t-ally-tab { animation: t-ally-turn 1.2s ease-in-out infinite alternate; }
+@keyframes t-ally-turn { from { box-shadow: -3px 4px 12px rgba(0,0,0,.6), 0 0 0 rgba(201,164,92,0); } to { box-shadow: -3px 4px 12px rgba(0,0,0,.6), 0 0 16px rgba(236,210,155,.7); } }
+.t-ally-row.t-low:not(.t-down) .t-ally-tab { border-color: rgba(224,82,94,.85); animation: t-ally-low .9s ease-in-out infinite alternate; }
+@keyframes t-ally-low { to { box-shadow: -3px 4px 12px rgba(0,0,0,.6), 0 0 12px rgba(239,68,68,.6); } }
+.t-ally-row.t-down .t-ally-tab { border-color: rgba(95,88,74,.6); }
+.t-ally-row.t-down .t-ally-face { filter: grayscale(1) brightness(.6); opacity: .7; }
+/* 有支援单位时检视卡左移，让出收纳签列 */
+#tactics-allies:not([hidden]) ~ .t-inspector { right: 60px; }
 
 /* ---- 底部悬浮层：我方角色栏 + 指令面板 ---- */
 #tactics-float-ui { position: absolute; bottom: 44px; left: 0; width: 100%; padding: 0 12px 6px 14px; z-index: 20; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; pointer-events: none; }
@@ -463,9 +440,6 @@ button:disabled { opacity: .42; cursor: default; }
 .t-card-pop { position: absolute; left: 58%; top: -10px; z-index: 5; font: 800 13px/1 system-ui, sans-serif; color: var(--pc); white-space: nowrap; pointer-events: none;
   text-shadow: 0 0 6px rgba(0,0,0,.95), 0 1px 2px #000; animation: t-card-pop 1.2s ease-out forwards; }
 @keyframes t-card-pop { 0% { opacity: 0; transform: translate(-50%,6px) scale(.7); } 15% { opacity: 1; transform: translate(-50%,-10px) scale(1.1); } 70% { opacity: 1; transform: translate(-50%,-22px) scale(1); } 100% { opacity: 0; transform: translate(-50%,-34px); } }
-.t-card-turn { position: absolute; top: 33px; left: 32px; translate: -50% 0; z-index: 2; font-size: 8.5px; font-weight: 800; letter-spacing: .24em; padding: 1px 9px 1px 11px; color: #17120a; background: var(--g-gold-2);
-  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%); opacity: 0; transition: opacity .2s; white-space: nowrap; }
-.t-hero-card.t-current .t-card-turn { opacity: 1; }
 .t-hero-card.t-low .t-bar-hp .t-bar-fill { background: linear-gradient(90deg, #8f1d2a, #e0525e); animation: t-low 1s ease-in-out infinite; }
 @keyframes t-low { 50% { filter: brightness(1.5); } }
 .t-card-hit { animation: t-card-hit .36s ease-out; }
@@ -891,7 +865,7 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
 /* ==========================================
    E33 暗金扁平主题：原版指令面板（vendor/rpg-ui 生成 class 不改源，ID 选择器覆盖）+ 共用四角刻线
    ========================================== */
-.t-insp-glass::before, #menu-container::before, .t-ally-detail::before { content: ''; position: absolute; inset: 0; z-index: 40; pointer-events: none; --k: var(--g-gold-2); opacity: .8;
+.t-insp-glass::before, #menu-container::before { content: ''; position: absolute; inset: 0; z-index: 40; pointer-events: none; --k: var(--g-gold-2); opacity: .8;
   background: linear-gradient(var(--k), var(--k)) left top / 9px 1px no-repeat, linear-gradient(var(--k), var(--k)) left top / 1px 9px no-repeat,
     linear-gradient(var(--k), var(--k)) right top / 9px 1px no-repeat, linear-gradient(var(--k), var(--k)) right top / 1px 9px no-repeat,
     linear-gradient(var(--k), var(--k)) left bottom / 9px 1px no-repeat, linear-gradient(var(--k), var(--k)) left bottom / 1px 9px no-repeat,

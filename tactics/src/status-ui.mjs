@@ -158,7 +158,7 @@ function tagChip(raw) {
 }
 
 // 单位检视卡（原版 showEnemyInfo「20% 超透光战术目镜」样式）：base = 无增益基础属性（getEffectiveStats(unit, [])），eff = 有效属性视图，lore = resolveLore(unit)
-export function inspectorHtml({ unit, eff, base, badges, charge, preparing, shown, lore }) {
+export function inspectorHtml({ unit, eff, base, badges, charge, preparing, shown, lore, pinned }) {
   if (!unit || !eff) return '';
   const hp = shown ? shown.hp : eff.hp, mp = shown ? shown.mp : eff.mp, tp = shown ? shown.tp : eff.tp;
   const gauge = (cls, icon, label, v, max) => max > 0 ? '<div class="t-insp-gauge ' + cls + '"><div class="t-insp-gauge-row"><span>' + icon + ' ' + label + '</span><b>' + Math.max(0, Math.floor(v)) + ' / ' + max + '</b></div>' +
@@ -186,5 +186,5 @@ export function inspectorHtml({ unit, eff, base, badges, charge, preparing, show
     '<div class="t-insp-sec"><div class="t-insp-sec-h"><span>✨ 当前状态</span></div><div class="t-insp-badges">' + (badges.length ? fullStatusHtml(badges) : '<span class="t-insp-none">无增益 / 减益</span>') + '</div></div>' +
     (lore ? '<div class="t-insp-lore"><div class="t-insp-lore-h"><span>📚 世界书图鉴档案</span><em>' + (lore.sample ? 'SAMPLE' : 'LORE ENTRY') + '</em></div>' +
       '<p>' + ESC(lore.desc || '词条无描述文字') + '</p><div class="t-insp-lore-src">' + ESC(lore.wbName || '') + (lore.entryName ? ' · ' + ESC(lore.entryName) : '') + '</div></div>' : '') +
-    '<div class="t-insp-foot"><span>悬停查看</span><span class="t-mono">20% 超透光战术目镜</span></div></div>';
+    '<div class="t-insp-foot"><span>' + (pinned ? '📌 已固定 · 再点右侧收纳签收起' : '悬停查看') + '</span><span class="t-mono">20% 超透光战术目镜</span></div></div>';
 }
