@@ -907,3 +907,12 @@
 - 文件：`tactics/src/{action-director,battle,main,range-overlay,sandbox,status-ui,ui-sfx,ui-shell,unit-view}.mjs`、`tactics/tactics.css`、`integration-test/fixtures/tactics/{guard-director,stealth-threshold,taunt-ai,ui-readability}-node-cases.mjs`（随新口径更新断言）、产物报告、`tactics/mvp-standalone.html`。
 - 验证：唯一一次全量 54 阶段 1514 项全过（此前逐阶段定位并修正 3 处旧口径断言）。单文件 60 模块、45 项模块断言；fx-polish、feedback 25/25、guard-barrier 16/16、phase4 11/11、典型对局 63/63 产物检查通过。无头 Chrome 实页：等到我方回合后截图核对角色栏/悬停属性/三态蓄力卡/斜线危险区/闪现范围/结果环/检视卡，并连续结束 2 个我方回合走完敌方行动，页面零异常；未接入真实酒馆。
 - 目的 vs 现状：一致；召唤物详情需实战召唤后再看，反应弹窗仍为原版靛紫风格未纳入本轮。
+
+## 2026-11-28 · 角色栏方形头像、职业徽记剪影与 HP/TP 状态动效（cb66657）
+- 核心目的：头像回到 1:1 不再怪异截断；底栏借 33号远征队的剪影投影做出层次，并让濒死与爆发蓄满不看数字也一眼可读。
+- 头像与铭牌：64×64 正方形头像（暗金细框 + 左上/右下斜角，呼吸 + 斜向扫光）；铭牌改直角、仅右端斜切并带金边；名字字距收紧、职业去 ◆，四字名不再截断；「行动中」签挂头像下沿；MP 改整条四刻度，TP 加粗到 3px。
+- 职业剪影：8 职业矢量徽记（盾/双刃斧/羽/毒瓶/匕首/星杖/圣十字光环/旗枪，缺省菱形），黑底暗金描边，置于铭牌之下只露上沿与头像右侧形成投影；描边流光 + 按职业节奏漂移（狂战/灾厄抽动、隐匿忽隐）。
+- 状态：当前行动整卡金色外辉；HP≤30% 剪影转暗红心跳 + 头像底部渗红同拍；TP≥50 描边亮金 + 辉光 + 火星上飘；TP 满常驻旋转能量环、TP 条发光，且由未满跨入满值时爆发一次（白闪 + 扩散环 + 剪影弹跳 + 合成音 tpFull）；倒下剪影塌缩褪色、停动效。铭牌受击/治疗/被动闪光改内发光（clip-path 会裁掉外阴影）。
+- 文件：`tactics/src/{ui-shell,ui-sfx}.mjs`、`tactics/tactics.css`、产物报告、`tactics/mvp-standalone.html`。
+- 验证：全量 54 阶段通过（用例数未变，1514）；单文件重打包，fx-polish、feedback 25/25、guard-barrier 16/16、phase4 11/11、典型对局 63/63 通过。无头 Chrome 实页逐态截图：常态、低血红心跳、TP62 火星、TP90→100 爆发瞬间与常驻能量环、倒下褪色，页面零异常；未接入真实酒馆。
+- 目的 vs 现状：一致；动效全部为 transform/opacity 与小尺寸 SVG，未见卡顿，真机长时间运行待用户试玩确认。
