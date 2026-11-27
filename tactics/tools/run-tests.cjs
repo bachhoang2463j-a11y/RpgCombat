@@ -31,6 +31,14 @@ const FX01_CASES = path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'f
 
 // 阶段注册表：只登记真实存在的用例文件；--all 只聚合这里的条目，不虚构未来阶段。
 const STAGES = {
+  'turn-flow': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'turn-flow-node-cases.mjs'),
+    groups: ['TURN-FLOW'], modules: [], requiredExports: [],
+  },
+  'main-point-av': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'main-point-av-node-cases.mjs'),
+    groups: ['MPAV'], modules: [], requiredExports: [],
+  },
   'fog-aim': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'fog-aim-node-cases.mjs'),
     groups: ['FOG-AIM'], modules: [], requiredExports: [],

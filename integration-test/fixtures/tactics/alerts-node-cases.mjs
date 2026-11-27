@@ -27,44 +27,21 @@ export function runAlertsCases(api) {
     return b.snapshot().currentId === id;
   };
   {
-    const b = make([unit('h', 'hero', 0, 200), unit('e', 'enemy', 10, 100)], [[5, 2], [6, 5]]);
-    const before = state(b, 'e');
-    const move = b.move(5, 7);
-    check('TT-ALERTS 移动只在途中经过敌人感知也会预警', before === 'idle' && move.ok && move.cell.row === 7 && state(b, 'e') === 'pending', [before, move.cell, state(b, 'e')]);
-    const blocked = make([unit('h', 'hero', 50, 200), unit('e', 'enemy', 50, 100)], [[2, 2], [6, 2]], { objects: [wall] });
-    check('TT-ALERTS 墙遮住感知时不预警', state(blocked, 'e') === 'idle');
-  }
-  {
-    const b = make([unit('h', 'hero', 100, 200), unit('e', 'enemy', 10, 100)], [[1, 2], [15, 2]]);
-    const target = aim(15, 2, 'e');
-    const preview = b.previewAttack(shot, target);
-    const before = state(b, 'e');
-    const attack = b.attack(shot, target);
-    check('TT-ALERTS 预览不触发；超出敌人感知的攻击即使闪避也预警', preview.ok && before === 'idle' && attack.ok && attack.hits[0]?.segments[0]?.outcome === 'dodge' && state(b, 'e') === 'pending', [before, attack.hits, state(b, 'e')]);
-    b.reset();
-    check('TT-ALERTS 重置清掉由攻击引发的预警', state(b, 'e') === 'idle');
-  }
-  {
-    const area = { ...shot, range: { type: '圆形', radius: 10 } };
-    const b = make([unit('h', 'hero', 0, 200), unit('sender', 'enemy', 10, 160),
-      unit('receiver', 'enemy', 5, 120, { skills: [area] }), unit('outside', 'enemy', 0, 100)], [[5, 5], [7, 5], [13, 5], [13, 6]]);
-    check('TT-ALERTS 看见我方立即预警但不提前通知邻居', state(b, 'sender') === 'pending' && state(b, 'receiver') === 'idle');
-    check('TT-ALERTS 预警者自然行动时广播到欧氏半径边界，不插队', advanceTo(b, 'sender') && state(b, 'sender') === 'engaged' && state(b, 'receiver') === 'engaged' && state(b, 'outside') === 'idle', [state(b, 'sender'), state(b, 'receiver'), state(b, 'outside')]);
-    const alarms = b.snapshot().events.filter(e => e.type === 'enemy-alarm');
-    check('TT-ALERTS 广播发出一条警报事件：报警者、规则半径与实际收报名单（前端波纹据此播放）', alarms.length === 1 && alarms[0].unitId === 'sender'
-      && alarms[0].radius > 0 && JSON.stringify(alarms[0].recipientIds) === '["receiver"]' && alarms[0].center, alarms);
-    const receiverTurn = advanceTo(b, 'receiver');
-    const plan = b.planEnemyAction();
-    check('TT-ALERTS 收报敌人按自身回合追击，不用范围技盲打也不自动接力', receiverTurn && plan?.moveTo?.col < 13 && !plan.skill && state(b, 'outside') === 'idle', plan);
+    const b = make([unit('h', 'hero', 0, 200), unit('e', 'enemy', 10, 100)], [[2, 2], [6, 2]]);
+    const target = aim(6, 2, 'e');
+    check('TT-ALERTS 开战即知全部位置，不受感知值限制', b.snapshot('h').units.some(u => u.id === 'e')
+      && b.ctx.knownPositions === true);
+    const blocked = make([unit('h', 'hero', 0, 200), unit('e', 'enemy', 10, 100)], [[2, 2], [6, 2]], { objects: [wall] });
+    check('TT-ALERTS 已知位置仍受墙阻挡攻击射线', blocked.snapshot('h').units.some(u => u.id === 'e')
+      && blocked.previewAttack(shot, target).blockedBy?.type === 'wall');
   }
   {
     const b = make([unit('h', 'hero', 100, 200), unit('e', 'enemy', 10, 100)], [[2, 2], [6, 2]]);
     b.ctx.regions.push({ id: 'fog', type: 'fog', casterId: 'e', strength: 20, endAt: 500, cells: [{ col: 6, row: 2 }] });
     const target = aim(6, 2, 'e');
     const preview = b.previewAttack(shot, target);
-    const hidden = !b.ctx.canSeeUnit('h', 'e');
-    const attack = b.attack({ ...shot, guaranteedHit: true }, target);
-    check('TT-ALERTS 雾外远距单锁雾内在预览和实战均被拒', hidden && !preview.ok && /无法瞄准/.test(preview.reason) && !attack.ok, [hidden, preview.reason, attack.reason]);
+    check('TT-ALERTS 雾内目标位置已知但预览锁定被拒', b.snapshot('h').units.some(u => u.id === 'e')
+      && !preview.ok && /无法瞄准/.test(preview.reason), preview.reason);
     const blocked = make([unit('h', 'hero', 100, 200), unit('e', 'enemy', 10, 100)], [[2, 2], [6, 2]], { objects: [wall] });
     const friend = make([unit('h', 'hero', 100, 200), unit('e', 'enemy', 10, 100), unit('friend', 'hero', 10, 100)], [[2, 2], [6, 2], [4, 2]]);
     check('TT-ALERTS 单锁仍受墙、友方挡弹及射程限制', blocked.previewAttack(shot, target).blockedBy?.type === 'wall'
@@ -85,42 +62,27 @@ export function runAlertsCases(api) {
     const moved = b.move(0, 2);
     const reached = spawned && advanceTo(b, spawned.id);
     const plan = reached && b.planEnemyAction();
-    check('TT-ALERTS 我方召唤物追全队失视的已知敌人而非未发现敌人', moved.ok && reached && !b.ctx.canSeeUnit('h', 'known')
-      && !b.ctx.canSeeUnit(spawned.id, 'known') && plan?.moveTo?.col > 1 && plan?.aim?.targetId !== 'hidden', plan);
-    const isolated = unit('sum', 'hero', 5, 200, { isSummon: true, controller: 'ai' });
-    const blind = make([isolated, unit('unseen', 'enemy', 0, 100)], [[1, 4], [4, 4]]);
-    check('TT-ALERTS 没有我方发现记录的敌人不作为追踪目标', blind.planEnemyAction()?.action === 'wait');
+    check('TT-ALERTS 无原地攻击时召唤物跟随主人，仍公开双方位置', moved.ok && reached
+      && b.snapshot('h').units.some(u => u.id === 'known') && plan?.moveTo?.row < 4 && !plan?.skill, plan);
+    const isolated = unit('sum', 'hero', 0, 200, { isSummon: true, controller: 'ai' });
+    const blind = make([isolated, unit('unseen', 'enemy', 0, 100)], [[1, 4], [3, 4]]);
+    check('TT-ALERTS 召唤物原地攻击不受个人感知半径限制', blind.planEnemyAction()?.aim?.targetId === 'unseen');
   }
   {
     const quiet = make([unit('h', 'hero', 0, 200), unit('e', 'enemy', 0, 100, { ref: { moveDistance: 0.5 } })], [[2, 2], [18, 2]]);
     advanceTo(quiet, 'e');
-    const plan = quiet.planEnemyAction();
     const result = quiet.runEnemyTurn();
-    check('TT-ALERTS 无警报敌人没有一步额度时不冲刺也不移动', plan?.action === 'wait' && !plan.moveTo && !plan.skill
-      && result.currentId !== 'e' && !result.events.some(event => event.type === 'unit-moved' && event.unitId === 'e'), plan);
-  }
-  {
-    const buff = { name: '自我强化', type: '[增攻]', power: 10, range: { type: '自身' }, actionCost: { main: 1, aux: 0 } };
-    const b = make([unit('h', 'hero', 0, 200), unit('e', 'enemy', 0, 100, { skills: [buff] })], [[2, 2], [18, 2]]);
-    advanceTo(b, 'e');
-    const before = b.snapshot().resources.moveRemaining;
-    const buffUsable = b.skillStatus(buff).ok;
-    const plan = b.planEnemyAction();
-    const result = b.runEnemyTurn();
-    const travelled = result.events.filter(event => event.type === 'unit-moved' && event.unitId === 'e').reduce((sum, event) => sum + event.distance, 0);
-    check('TT-ALERTS 无敌时随机走完正常移动额度，不自施可用增攻', buffUsable && plan?.moveTo && !plan.skill
-      && travelled <= before + 1e-9 && before - travelled < 1 && !result.events.some(event => event.casterId === 'e')
-      && b.getEffectiveUnit('e').atk === 10 && state(b, 'e') === 'idle', [plan, before, travelled]);
+    check('TT-ALERTS 低于一步额度时按待机策略结束回合', result.events.some(event => event.type === 'unit-moved' && event.unitId === 'e') === false
+      && quiet.getEffectiveUnit('e').atk === 10, result.events);
   }
   {
     const b = make([unit('h', 'hero', 0, 200), unit('e', 'enemy', 10, 100)], [[2, 0], [8, 0]],
-      { rows: 1, random: () => 0, objects: [{ ...wall, bounds: { ...wall.bounds, col: 9, row: 0 } }] });
+      { rows: 1, random: () => 0 });
     advanceTo(b, 'e');
     const plan = b.planEnemyAction();
     const result = b.runEnemyTurn();
-    const discovery = result.events.find(event => event.type === 'unit-moved' && event.unitId === 'e' && event.stoppedOnDiscovery);
-    check('TT-ALERTS 巡走途中发现敌人即暂停并预警', plan?.moveTo?.col < 8 && !plan.skill && result.currentId !== 'e'
-      && discovery?.discoveredIds.includes('h') && state(b, 'e') === 'pending', [plan, discovery, state(b, 'e')]);
+    check('TT-ALERTS 探索移动可继续经过已知单位，不触发发现截停', plan?.moveTo?.col === 4
+      && result.events.some(event => event.type === 'unit-moved' && event.unitId === 'e' && !event.stoppedOnDiscovery), [plan, result.events]);
   }
   {
     const owner = unit('owner', 'hero', 0, 200, { footprint: { width: 2, height: 1 } });

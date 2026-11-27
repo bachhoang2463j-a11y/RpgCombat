@@ -45,7 +45,9 @@ const routes = casesFor(check => {
     check('实墙不能跳，普通通路只步行', !solid.planEnemyAction().jumpTo && make(units(), placements, scene(1)).planEnemyAction().moveTo?.col === 5);
     const spent = make(units(), placements, scene(1, [wall]));
     spent.battleState.combatState.clock.currentAction.resources.aux = 0;
-    check('辅助已用完不能自动跳', spent.planEnemyAction().action === 'wait');
+    const fromMain = spent.planEnemyAction();
+    spent.battleState.combatState.clock.currentAction.resources.main = 0;
+    check('无辅助点可用主点自动跳，二者均用完则不能跳', fromMain.jumpTo?.col === 4 && spent.planEnemyAction().action === 'wait');
   }
   for (const rows of [1, 5]) {
     const mob = unit('e', 'enemy', 200, { ref: { moveDistance: 3 } });
@@ -95,10 +97,12 @@ const items = casesFor(check => {
     const item = { ...heal, category: '道具', count: 0, maxUses: 0 };
     const b = battle(item);
     const first = b.useItem(item);
-    const aux = b.canUseItem(item).reason;
+    const fromMain = b.useItem(item);
+    const noPoints = b.canUseItem(item).reason;
     b.endAction();
-    const second = b.useItem(item);
-    check('不限次数道具可跨自然行动重复使用，缺辅与库存分开', first.ok && aux === '辅助行动已用完' && second.ok && item.count === 0);
+    const nextTurn = b.useItem(item);
+    check('不限次数道具可用主点补扣，行动点不足与库存分开', first.ok && first.costSummary.aux === 1
+      && fromMain.ok && fromMain.costSummary.main === 1 && noPoints === '辅助行动已用完' && nextTurn.ok && item.count === 0);
   }
   {
     const mp = { ...heal, cost: 21 };

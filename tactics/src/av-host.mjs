@@ -244,6 +244,18 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
     return file;
   }
 
+  const consumedMainPointEvents = new Set();
+  function playMainPointReceived(event, actionSerial) {
+    if (!event || !event.eventId || consumedMainPointEvents.has(event.eventId)) return false;
+    consumedMainPointEvents.add(event.eventId);
+    const unit = unitById(event.unitId);
+    if (!unit) return false;
+    if (unit.side !== 'hero') return 'enemy';
+    sfx('heroTurn', 1, { category: 'M' });
+    playTurnVoice(unit, actionSerial + ':' + event.eventId);
+    return 'hero';
+  }
+
   function sfx(key, vol = 1, opts = {}) {
     const rate = opts && Number.isFinite(opts.rate) ? opts.rate : 1;
     return av.playSound(key, vol, rate, Object.assign({ category: 'K' }, opts));
@@ -293,5 +305,5 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
   function setAtmoTheme(theme) { return av.atmoAudio ? av.atmoAudio.setTheme(theme) : 'baseline'; }
   function setAtmoSound(on) { return av.atmoAudio ? av.atmoAudio.setAmbientSound(on) : false; }
 
-  return { av, host, attachStage, entity, syncRoster, consumeVisualEvents, syncVisualState, unlockAudio, playTurnVoice, sfx, setToken, clear, trackImage, resourceReport, destroy, voiceUrl, setAtmoTheme, setAtmoSound };
+  return { av, host, attachStage, entity, syncRoster, consumeVisualEvents, syncVisualState, unlockAudio, playTurnVoice, playMainPointReceived, sfx, setToken, clear, trackImage, resourceReport, destroy, voiceUrl, setAtmoTheme, setAtmoSound };
 }

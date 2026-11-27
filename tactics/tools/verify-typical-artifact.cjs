@@ -24,7 +24,7 @@ check('辅助真实结果与持久标签回读入包', ['playSupportEffects', 's
 check('辅助取消通知与动作代际隔离入包', html.includes('supportHandles') && html.includes('actionScope') && html.includes('isCurrent()'));
 check('击杀自爆medium震动档位入包', html.includes('medium:[250,5]'));
 check('原版特效与角色独立堆叠层入包', html.includes('z-index:2;') && html.includes('z-index:3;'));
-check('发现敌人记录字段及枪声去重入包', html.includes('discoveredIds') && html.includes('discoveredBySide') && html.includes('playRandomStandardGunshot.last'));
+check('全局已知位置及枪声去重入包', html.includes('knownPositions:') && html.includes('playRandomStandardGunshot.last'));
 check('辅助1.5倍速、隐匿音色及滑行续播入包', ['duration/=1.5', 'totalMs=1100/1.5', 'p.life/=1.5', 'effect.kind==="taunt"?effect.value<0?["buff","hide"]', 'glideSfx.loop', 'cue?.()'].every(s => html.includes(s)));
 check('巡走跟随、整技锁定急袭与合并状态入包', ['planIdleMove', 'summonOwnerId', 'idleMovement', 'bdg.concealAtk', 't-st-taunt'].every(s => html.includes(s)) && !html.includes('t-st-passive-taunt'));
 check('即时隐匿阈值、急袭次数徽章及错峰并行收尾入包', ['checkStealthThresholds(target)', 'isConcealAtk:', 'conceal-atk', '200/1.5', 'Promise.all(pending)'].every(s => html.includes(s)));
@@ -55,17 +55,15 @@ if (backend) {
   const arenaBattle = backend.createBattle({ ...arena, random: backend.createSeededRandom(arena.seed) });
   const arenaOpening = arenaBattle.start();
   const arenaTurn = arenaBattle.runEnemyTurn();
-  check('单房间默认入口、技能雾限制瞄准但不隐藏棋子', html.includes('defaultYaml') && /createApp\([^\n]*:createEncounterDemo\(/.test(html)
-    && html.includes('sc-chapel-nave') && html.includes('function inEnemyFog(') && !html.includes('t-unit-fog-hidden'));
-  const kinds = k => arena.scene.objects.filter(o => o.kind === k).length;
-  check('产物真实单间开场：大档礼拜堂保留原阵容、2×2 与教堂陈设', arena.scene.size === 'large' && arena.scene.floor.length === 1
-    && arena.scene.floor[0].width === 32 && arena.scene.floor[0].height === 26 && arenaOpening.units.length === 10
-    && arena.units.filter(u => u.footprint.width === 2 && u.footprint.height === 2).length === 2
-    && kinds('pillar') === 6 && kinds('altar') === 1 && kinds('pulpit') === 1 && kinds('lectern') === 1 && kinds('dais') === 1 && kinds('chapelDoor') === 1
-    && kinds('pew') >= 12 && !arena.scene.objects.some(o => /^(high|low)-/.test(o.id))
-    && ['class="confessional"', 'class="pulpit"', 'class="chapel-door"', 'class="apse"'].every(s => html.includes(s)));
-  check('产物默认单间真实接战、不发旧警报且可重置', arenaTurn.events.some(e => e.type === 'attack-start' || e.type === 'unit-moved')
-    && !arenaTurn.events.some(e => e.type === 'enemy-alarm') && JSON.stringify(arenaBattle.reset().positions) === JSON.stringify(arenaOpening.positions));
+  check('单文件默认三层，显式 demo=nave 才选单间', html.includes('demo=nave(&|$)')
+    && /singleRoom\s*\?\s*createEncounterDemo\([^)]*\)\s*:\s*\{\s*defaultYaml:/.test(html));
+  const chapel = backend.scene;
+  const kinds = k => chapel.objects.filter(o => o.kind === k).length;
+  check('产物三层棋盘保持三厅两廊与固定陈设', chapel.sceneId === 'sc-chapel' && chapel.floor.length === 5
+    && chapel.floor.some(f => f.width === 20 && f.height === 13) && chapel.floor.some(f => f.width === 18 && f.height === 13)
+    && chapel.floor.some(f => f.width === 12 && f.height === 10) && kinds('pillar') === 4 && kinds('altar') === 1 && kinds('pew') >= 12);
+  check('可选单房间仍可接战并重置', arena.scene.sceneId === 'sc-chapel-nave' && arenaTurn.events.some(e => e.type === 'attack-start' || e.type === 'unit-moved')
+    && JSON.stringify(arenaBattle.reset().positions) === JSON.stringify(arenaOpening.positions));
   check('权威样本四英雄六敌两召唤词条入产物', block.heroes.length === 4 && block.enemies.length === 6 && block.summonTemplates.length === 2);
   check('中文原值与独立属性保真', data.units[0].ref.hp === 100 && data.units[0].ref.mp === 110 && data.units[0].ref.perception === 50);
   const fog = block.heroes[0].skills.find(s => s.name === '拉莱耶造雾术');
@@ -93,6 +91,8 @@ if (backend) {
 
   const battle = backend.createBattle({ ...data, scene: backend.scene, random: backend.createSeededRandom(data.seed) });
   const opening = battle.start();
+  check('正式战斗开局公开位置并发出主点到账事件', battle.ctx.knownPositions && !battle.ctx.enforcePerception
+    && battle.snapshot('h:弗兰克').units.length === 10 && opening.events.some(e => e.type === 'main-point-received' && e.unitId === opening.currentId && e.natural));
   check('产物创建真实对局并发放自然行动', opening.units.length === 10 && opening.currentId === 'e:伊塔库亚的眷族' && opening.resources.main === 1 && opening.resources.aux === 1);
   const caster = data.units.find(u => u.id === opening.currentId);
   const rage = caster.skills.find(s => s.name === '风雪狂暴');
@@ -107,6 +107,7 @@ if (backend) {
   const before = JSON.stringify(battle.snapshot());
   battle.previewAttack(rage);
   check('产物预览不扣HP/MP/主辅资源', JSON.stringify(battle.snapshot()) === before);
+  check('精英越障、全图看破及主辅支付关键函数入包', ['planPriorityJump', 'selectKanpo', 'playMainPointReceived', 'actionPayment', 'jumpsRemaining'].every(k => html.includes(k)));
   const stepData = backend.createScenarioData(block);
   const monsterId = 'e:伊塔库亚的眷族';
   Object.assign(stepData.placementsById[monsterId], { col: 11, row: 15 });
@@ -116,6 +117,8 @@ if (backend) {
   const stepTurn = stepBattle.runEnemyTurn();
   const jump = stepTurn.events.find(e => e.type === 'unit-jumped' && e.unitId === monsterId);
   check('产物AI真实走到北面台阶并完成大体型跳跃', jump?.from.row === 16 && jump?.to.row === 19 && stepData.placementsById[monsterId].row >= 19);
+  check('产物三层战斗已知位置，保留真实北段越障', jump?.unitId === monsterId
+    && stepBattle.ctx.knownPositions === true && backend.scene.sceneId === 'sc-chapel');
   const moveData = backend.createScenarioData(backend.parseYamlText(yaml));
   const moveBattle = backend.createBattle({ ...moveData, scene: backend.scene, random: backend.createSeededRandom(moveData.seed) });
   moveBattle.start();
@@ -140,11 +143,29 @@ if (backend) {
   const lackAux = itemBattle.canUseItem(gear).reason;
   itemBattle.endAction();
   check('产物不限次物品无需主行动、只耗辅助行动且跨行动可复用', firstUse.ok && firstUse.costSummary.aux === 1
-    && lackAux === '辅助行动已用完' && itemBattle.useItem(gear).ok && gear.count === 0);
+    && firstUse.costSummary.main === 0 && lackAux === '辅助行动已用完' && itemBattle.useItem(gear).ok && gear.count === 0);
+  const replacementBattle = backend.createBattle({ units: [unit('active', 'hero', 200), unit('reserve', 'hero', 50), unit('opponent', 'enemy', 10)],
+    placementsById: { active: { col: 2, row: 3 }, reserve: { col: 4, row: 3 }, opponent: { col: 8, row: 3 } },
+    scene: { sceneId: 'replacement-artifact', grid: { columns: 16, rows: 10, metersPerCell: 1 }, objects: [] } });
+  replacementBattle.start();
+  check('产物辅助效果替补接线及实际资源到账路径入包', html.includes('supportResourceDelta') && html.includes('applyPersistentFxTags')
+    && html.includes('supportHandles') && html.includes('actionScope') && html.includes('playSupportEffects'));
+  const supportCaster = unit('support', 'hero', 200);
+  supportCaster.skills = [{ name: '产物辅助', type: '[治疗]', power: 20, range: { type: '单体', castRange: 10 }, actionCost: { main: 0, aux: 1 } }];
+  const supportTarget = unit('wounded', 'hero', 50);
+  supportTarget.ref.hp = 400;
+  const supportBattle = backend.createBattle({ units: [supportCaster, supportTarget, unit('support-foe', 'enemy', 10)],
+    placementsById: { support: { col: 2, row: 3 }, wounded: { col: 4, row: 3 }, 'support-foe': { col: 8, row: 3 } },
+    scene: { sceneId: 'support-artifact', grid: { columns: 16, rows: 10, metersPerCell: 1 }, objects: [] } });
+  supportBattle.start();
+  const supportResult = supportBattle.attack(supportCaster.skills[0], { x: 4.5, y: 3.5, targetId: 'wounded' });
+  check('产物辅助技能实际治疗到账并正确扣辅助行动', supportResult.ok && supportTarget.ref.hp > 400
+    && supportResult.costSummary.aux === 1 && supportResult.costSummary.main === 0
+    && supportBattle.snapshot().resources.aux === 0);
   for (let i = 0; i < 12 && moveBattle.snapshot().currentId !== 'h:玛德琳'; i++) moveBattle.endAction();
   const move = moveBattle.move(11, 34);
   check('产物实际移动遇到队友已发现食尸鬼不重复截停', move.ok && !move.stoppedOnDiscovery && move.cell.col === 11 && move.cell.row === 34 &&
-    move.discoveredIds.length === 0 && moveBattle.battleState.combatState.discoveredBySide.hero.includes('e:食尸鬼A') && !moveBattle.snapshot().log.at(-1).includes('暂停移动'));
+    move.discoveredIds.length === 0 && moveBattle.snapshot('h:玛德琳').units.some(u => u.id === 'e:食尸鬼A') && !moveBattle.snapshot().log.at(-1).includes('暂停移动'));
   const el = block.heroes.find(h => h.name === '埃利奥特'), fireGroup = el.skills.find(s => s.name === '火舞术' && s.isGroup);
   check('产物显式技能组保留原名及全局子引用', fireGroup && fireGroup.children.length === 2 && el.skills.includes(fireGroup.children[0]) && fireGroup.children[0].name === '火舞术-精准流火' && block.heroes.every(h => {
     const parent = h.skills.find(s => s.name === '早有准备' && s.isGroup);
@@ -156,10 +177,9 @@ if (backend) {
   check('产物实际受击段保留原伤盾值暴击和性质', shotResult.ok && landed.length > 0 && landed.every(s => Number.isFinite(s.rawDmg) && Number.isFinite(s.shieldBefore) && Number.isFinite(s.shieldAfter) && typeof s.isCrit === 'boolean' && s.damageCategory === '枪击' && s.outcome === 'hit'));
 }
 async function reportResult() {
-  check('预警头像角标与召唤头像解析入包', ['t-unit-alert-pending', 'portraitName', 'syncDynamicUnits'].every(s => html.includes(s)));
-  check('火焰/中毒领域常驻层与施放演出、护盾罩/护盾段、警戒弹出与警报波纹、被动到账反馈入包',
-    ['fire-domain', 'poison-domain', 'regionTypes', 'data-flicker', 'data-bubble', 'region-contest', 't-unit-shield', 't-unit-shielded', 't-bar-shield', 't-unit-alert-flash',
-      'enemy-alarm', 'passive-gain', 't-card-passive', 't-card-pop', 'bowlBronze', 'bellPing', 'incendiary-bottle', 'throwVial', 'audio:2.5', 'ranshao.webm'].every(s => html.includes(s)));
+  check('火焰/中毒领域常驻层与施放演出、护盾罩/护盾段、区域争夺与被动到账反馈入包',
+    ['fire-domain', 'poison-domain', 'regionTypes', 'data-flicker', 'data-bubble', 'region-contest', 't-unit-shield', 't-unit-shielded', 't-bar-shield',
+      'passive-gain', 't-card-passive', 't-card-pop', 'bowlBronze', 'bellPing', 'incendiary-bottle', 'throwVial', 'audio:2.5', 'ranshao.webm'].every(s => html.includes(s)));
   if (backend) {
     const fixture = path.join(root, 'integration-test', 'fixtures', 'tactics', 'alerts-node-cases.mjs');
     const { runAlertsCases } = await import(pathToFileURL(fixture).href);

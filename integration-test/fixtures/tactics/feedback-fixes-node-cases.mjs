@@ -4,7 +4,6 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { createBattle } from '../../../tactics/src/battle.mjs';
-import { canSeeUnit } from '../../../tactics/src/perception.mjs';
 
 const scene = () => ({ sceneId: 'feedback-fixes', grid: { columns: 24, rows: 12, metersPerCell: 1 }, ground: { material: 'brick' }, objects: [] });
 function unit(id, side, opts = {}) {
@@ -47,7 +46,6 @@ function movement(opts = {}) {
     unit('e', 'enemy', { ref: { perception: 10 } }), unit('e2', 'enemy', { ref: { perception: 10 } })],
     { h: { col: 1, row: 4 }, a: { col: opts.allyCol ?? 18, row: 5 },
       e: { col: 6, row: 4 }, e2: { col: 12, row: 4 } });
-  b.ctx.enforcePerception = true;
   return b;
 }
 function moveChecked(b, col, row = 4) {
@@ -55,8 +53,6 @@ function moveChecked(b, col, row = 4) {
   if (!r.ok) throw new Error('移动夹具不可达：' + r.reason);
   return r;
 }
-const knows = (b, side, id) => Array.isArray(b.battleState.combatState.discoveredBySide?.[side])
-  && b.battleState.combatState.discoveredBySide[side].includes(id);
 
 export function runCases() {
   const cases = [];
@@ -149,53 +145,24 @@ export function runCases() {
     return { pass: preview.ok && support.ok && prepared.ok && prepared.preparing && rushes(b)[0] === old
       && b.getEffectiveUnit('h').atk === 27 };
   });
-  check('FB-D01 存活队友当前可见敌人不重复截停', 'discovery', () => {
-    const b = movement({ allyCol: 6 });
-    if (canSeeUnit(b.ctx, 'h', 'e') || !canSeeUnit(b.ctx, 'a', 'e')) throw new Error('队友视野夹具不成立');
-    const r = moveChecked(b, 5, 3);
-    return { pass: !r.stoppedOnDiscovery && r.discoveredIds.length === 0 && knows(b, 'hero', 'e') && r.cell.col === 5 };
+  check('FB-D01 敌方位置已知，移动越过原感知边界不截停', 'discovery', () => {
+    const b = movement();
+    const r = moveChecked(b, 11, 3);
+    return { pass: b.snapshot('h').units.some(u => u.id === 'e2') && r.cell.col === 11
+      && !r.stoppedOnDiscovery && r.discoveredIds.length === 0 };
   });
-  check('FB-D02 首次未知敌人逐格截停并登记本队', 'discovery', () => {
-    const b = movement(); const r = moveChecked(b, 5, 3);
-    return { pass: r.stoppedOnDiscovery && r.cell.path.length > 1 && r.discoveredIds.length === 1
-      && r.discoveredIds[0] === 'e' && knows(b, 'hero', 'e') && !knows(b, 'enemy', 'e') };
-  });
-  check('FB-D03 撤离再接近已发现敌人不重复截停', 'discovery', () => {
+  check('FB-D03 撤离再接近敌人不截停', 'discovery', () => {
     const b = movement(); moveChecked(b, 5, 3); moveChecked(b, 1);
     const r = moveChecked(b, 5, 3);
     return { pass: !r.stoppedOnDiscovery && r.discoveredIds.length === 0 && r.cell.col === 5 };
   });
-  check('FB-D04 已知敌人不掩盖下一个未知敌人', 'discovery', () => {
-    const b = movement(); b.battleState.combatState.discoveredBySide = { hero: ['e'] };
-    const r = moveChecked(b, 11, 3);
-    return { pass: r.stoppedOnDiscovery && r.discoveredIds.length === 1 && r.discoveredIds[0] === 'e2'
-      && knows(b, 'hero', 'e') && knows(b, 'hero', 'e2') };
-  });
-  check('FB-D05 阵营发现记录互不共享', 'discovery', () => {
-    const b = movement(); b.battleState.combatState.discoveredBySide = { enemy: ['e'] };
-    const r = moveChecked(b, 5, 3);
-    return { pass: r.stoppedOnDiscovery && r.discoveredIds.includes('e') && knows(b, 'hero', 'e') && knows(b, 'enemy', 'e') };
-  });
-  check('FB-D06 阵亡队友视野不预登记', 'discovery', () => {
-    const b = movement({ allyCol: 6, allyHp: 0 });
-    const r = moveChecked(b, 5, 3);
-    return { pass: r.stoppedOnDiscovery && r.discoveredIds.includes('e') && knows(b, 'hero', 'e') };
-  });
-  check('FB-D07 重建battle读取真实存档保留发现', 'discovery', () => {
-    const b = movement(); moveChecked(b, 5, 3); moveChecked(b, 1);
+  check('FB-D07 旧存档发现字段不影响已知位置和移动', 'discovery', () => {
+    const b = movement();
     const saved = structuredClone(b.battleState);
+    saved.combatState.discoveredBySide = { hero: ['e'], enemy: [] };
     const rebuilt = make(structuredClone(b.ctx.units), structuredClone(b.ctx.placementsById), saved);
-    rebuilt.ctx.enforcePerception = true;
-    const r = moveChecked(rebuilt, 5, 3);
-    return { pass: knows(rebuilt, 'hero', 'e') && !r.stoppedOnDiscovery && r.discoveredIds.length === 0 };
-  });
-  check('FB-D08 重置清空双方发现，之后重新发现', 'discovery', () => {
-    const b = movement(); moveChecked(b, 5, 3);
-    b.battleState.combatState.discoveredBySide = { hero: ['e2'], enemy: ['h'] };
-    b.reset();
-    const cleared = !knows(b, 'hero', 'e2') && !knows(b, 'enemy', 'h');
-    const r = moveChecked(b, 5, 3);
-    return { pass: cleared && r.stoppedOnDiscovery && r.discoveredIds.includes('e') && knows(b, 'hero', 'e') };
+    const r = moveChecked(rebuilt, 11, 3);
+    return { pass: rebuilt.snapshot('h').units.some(u => u.id === 'e2') && r.cell.col === 11 && !r.stoppedOnDiscovery };
   });
   return { cases };
 }

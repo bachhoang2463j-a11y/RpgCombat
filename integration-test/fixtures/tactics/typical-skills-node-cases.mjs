@@ -83,7 +83,7 @@ function createReactionCase(source, skill, observe = () => {}) {
     },
   }));
   const hit = (r.hits || [])[0] || {};
-  const reaction = hit.reaction || null;
+  const reaction = r.kanpo || hit.reaction || null;
   const mpDelta = mpBefore - responder.ref.mp;
   const usesAfter = usesOf(b, responder.id);
   const cost = skill.cost || 0;

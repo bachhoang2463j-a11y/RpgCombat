@@ -58,14 +58,14 @@ export const groups = { 'TG-BATTLE': { run: async () => {
     try { fn(); cases.push({ id: 'TG-BATTLE ' + name, pass: true, detail: '' }); }
     catch (e) { cases.push({ id: 'TG-BATTLE ' + name, pass: false, detail: e.stack }); }
   }
-  test('候选纯查询及半有效移动（飞行加成）', () => {
-    let f = make({ positions: { g: { col: 3, row: 5 } } });
+  test('候选纯查询及完整有效移动（飞行加成）', () => {
+    let f = make({ positions: { t: { col: 9, row: 5 }, g: { col: 2, row: 5 } } });
     const before = costs(f.b, f.g), p = structuredClone(f.placementsById);
     assert.equal(f.b.previewGuardCandidates('t', 's', incoming()).length, 0);
     assert.deepEqual(costs(f.b, f.g), before); assert.deepEqual(f.placementsById, p);
-    f = make({ guardian: { flying: true }, positions: { g: { col: 3, row: 5 } } });
+    f = make({ guardian: { flying: true }, positions: { t: { col: 9, row: 5 }, g: { col: 2, row: 5 } } });
     const cs = f.b.previewGuardCandidates('t', 's', incoming()); assert.equal(cs.length, 1);
-    assert.equal(cs[0].guard.maxDistance, 4.5);
+    assert.equal(cs[0].guard.maxDistance, 9);
   });
   test('选择后全部来源侧被占：提交失败零消费零位移', () => {
     const blockers = ['a', 'b', 'c'].map(id => unit(id, 'hero'));

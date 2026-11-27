@@ -275,6 +275,11 @@ export function createApp(rootEl, opts = {}) {
     // FX02 反应接线（contract v2/v3）：玩家控制的单位（controller 优先，缺省按 side）受击弹全屏反应弹窗；
     // AI 控制的（敌方/召唤物/AI 侧 hero）不弹窗，自动选首个可用候选（原版敌方口径）
     promptReaction: (req) => {
+      if (req?.type === 'kanpo') {
+        const candidates = (req.candidates || []).map(c => unitById(c.responderId)).filter(Boolean);
+        if (!candidates.some(isPlayerUnit)) return Promise.resolve(autoPickChoice(req));
+        return shell.promptReaction(enrichReactionReq(req));
+      }
       const responder = unitById(req && req.responderId);
       if (!responder) return Promise.resolve(autoPickChoice(req));
       const controller = responder.controller || (responder.side === 'hero' ? 'player' : 'ai');
@@ -287,7 +292,7 @@ export function createApp(rootEl, opts = {}) {
     if (!req) return req;
     const responder = unitById(req.responderId), caster = unitById(req.casterId);
     return Object.assign({}, req, {
-      responderName: responder ? responder.name : req.responderId,
+      responderName: responder ? responder.name : req.type === 'kanpo' ? '我方队伍' : req.responderId,
       responderEmoji: responder ? responder.emoji : null,
       responderAvatarUrl: responder ? responder.avatarUrl : null,
       casterName: caster ? caster.name : (req.casterId || '敌人'),
@@ -347,8 +352,8 @@ export function createApp(rootEl, opts = {}) {
     const key = hit.col + ',' + hit.row;
     if (fieldAction === 'jump' && jumpArm === key) { jumpArm = null; runFieldTarget('jump', hit); return true; }
     const r = battle.snapshot().resources, reach = jumpReach(currentUnit(), r);
-    if (!r || r.aux < 1 || r.jumped || reach < 1) {
-      ui('deny'); shell.showLog(r && r.aux < 1 ? '辅助行动不足，无法跳跃' : r && r.jumped ? '本次自然行动已经跳跃' : '无法起跳', 'warn');
+    if (!r || r.aux + r.main < 1 || r.jumpsRemaining < 1 || reach < 1) {
+      ui('deny'); shell.showLog(r && r.aux + r.main < 1 ? '行动点不足，无法跳跃' : r && r.jumpsRemaining < 1 ? '本次自然行动已经跳跃' : '无法起跳', 'warn');
       return true;
     }
     if (fieldAction !== 'jump') handleFieldAction('jump');
@@ -631,7 +636,7 @@ export function createApp(rootEl, opts = {}) {
   // 基础行动格数据：资格只读规则已有的资源与状态；最终判定仍以 battle.* 返回为准
   function basicActions(u, r, carrying) {
     const atkReason = skillReason(BASIC_ATTACK);
-    const reach = jumpReach(u, r);
+    const reach = jumpReach(u, r), canPayAux = r.aux + r.main >= 1;
     const downAlly = currentViewData.units.some(x => x.side === 'hero' && x.id !== u.id && x.ref.hp <= 0 && !Object.values(battle.snapshot().carrying).includes(x.id));
     const carried = carrying ? unitById(carrying) : null;
     const ready = battle.previewReady();
@@ -642,9 +647,9 @@ export function createApp(rootEl, opts = {}) {
         reason: typeof battle.defend !== 'function' ? '防御姿态：规则接口待对齐' : '主行动已用完',
         short: typeof battle.defend !== 'function' ? '⏳ 待规则接入' : '◆ 主行动已用完', desc: '恢复 MP／TP 并进入防御姿态，持续 100 虚拟时间' },
       { key: 'sprint', icon: '💨', name: '冲刺', cost: { main: 1 }, mode: 'instant', tone: 'sky', note: '+' + u.ref.moveDistance + 'm', ok: r.main >= 1, reason: '主行动已用完', short: '◆ 主行动已用完', desc: '消耗主行动，立即追加一份移动额度' },
-      { key: 'jump', icon: '🦘', name: '跳跃', cost: { aux: 1 }, mode: 'target', tone: 'violet', note: '≤' + reach + 'm', ok: r.aux >= 1 && !r.jumped && reach >= 1,
-        reason: r.aux < 1 ? '辅助行动不足' : r.jumped ? '本次自然行动已经跳跃' : '无法起跳', short: r.aux < 1 ? '◇ 辅助行动已用完' : r.jumped ? '🦘 本次已跳跃' : '无法起跳', desc: '沿八方向直线跳跃，越过低矮障碍；不扣移动额度，每次自然行动一次' },
-      { key: 'push', icon: '✋', name: '推动', cost: { aux: 1 }, mode: 'target', tone: 'amber', ok: r.aux >= 1, reason: '辅助行动不足', short: '◇ 辅助行动已用完', desc: '与相邻单位力量对抗，推开数米；撞墙造成伤害' },
+      { key: 'jump', icon: '🦘', name: '跳跃', cost: { aux: 1 }, mode: 'target', tone: 'violet', note: '≤' + reach + 'm', ok: canPayAux && r.jumpsRemaining > 0 && reach >= 1,
+        reason: !canPayAux ? '行动点不足' : r.jumpsRemaining < 1 ? '本次自然行动已经跳跃' : '无法起跳', short: !canPayAux ? '◇ 行动点已用完' : r.jumpsRemaining < 1 ? '🦘 本次已跳跃' : '无法起跳', desc: '沿八方向直线跳跃，越过低矮障碍；不扣移动额度，每次自然行动一次' },
+      { key: 'push', icon: '✋', name: '推动', cost: { aux: 1 }, mode: 'target', tone: 'amber', ok: canPayAux, reason: '行动点不足', short: '◇ 行动点已用完', desc: '与相邻单位力量对抗，推开数米；撞墙造成伤害' },
       carried
         ? { key: 'drop', icon: '⬇️', name: '放下', cost: null, mode: 'instant', tone: 'emerald', note: carried.name, ok: true, desc: '把背负的友方放到身边空格' }
         : { key: 'carry', icon: '⛑️', name: '背起', cost: { main: 1 }, mode: 'target', tone: 'emerald', ok: r.main >= 1 && downAlly,
@@ -679,7 +684,7 @@ export function createApp(rootEl, opts = {}) {
     }
   }
   const PASSIVE_CARD_COLOR = { taunt: '#f87171', stealth: '#a5b4fc', haste: '#22d3ee' };
-  const alertPending = new Set();
+  const naturalTurnAudio = new Set();
   function refreshBattle({ deferPassive = false } = {}) {
     const snap = battle.snapshot();
     syncDynamicUnits(snap);
@@ -690,15 +695,9 @@ export function createApp(rootEl, opts = {}) {
     }
     sandbox.update(currentViewData);
     const view = sandbox.getUnitView();
-    let alerted = false;
     for (const u of currentViewData.units) {
       view.setFlag(u.id, 't-unit-down', shownOf(u).hp <= 0);
       view.setFlag(u.id, 't-unit-current', u.id === snap.currentId && !snap.terminal);
-      const pending = u.effective?.alertState === 'pending' && shownOf(u).hp > 0 && !snap.terminal;
-      view.setFlag(u.id, 't-unit-alert-pending', pending);
-      // 新进入警戒：感叹号弹出 + 警觉音（同一刷新多名敌人只响一次）
-      if (pending && !alertPending.has(u.id)) { view.pulseAlert(u.id); alerted = true; }
-      if (pending) alertPending.add(u.id); else alertPending.delete(u.id);
       view.setFlag(u.id, 't-unit-channel', !!battle.battleState.combatState.charges?.[u.id]?.preparing);
       const ch = snap.units.find(x => x.id === u.id)?.charge;
       view.setFlag(u.id, 't-unit-charge-full', !!(ch && ch.current >= ch.max && shownOf(u).hp > 0));
@@ -706,7 +705,11 @@ export function createApp(rootEl, opts = {}) {
       view.setFlag(u.id, 't-unit-winged', shownOf(u).hp > 0 && (u.effective?.buffs || []).some(b => b.variant === '飞行' || b.type === '飞行' || b.type === 'flying'));
       if (unitStyles[u.id]) view.setFlag(u.id, unitStyles[u.id].cls, true);
     }
-    if (alerted) avHost.sfx('bellPing', 0.36, { category: 'K' });
+    for (const ev of snap.events) if (ev.type === 'main-point-received') {
+      const playback = avHost.playMainPointReceived(ev, snap.actionSerial);
+      if (playback && ev.natural) naturalTurnAudio.add(ev.unitId);
+      if (playback === 'enemy') ui('enemyTurn');
+    }
     avHost.consumeVisualEvents(snap.events.filter(ev => !ev.attackId));
     avHost.syncVisualState();
     director.syncRegions(snap.regions || []);
@@ -1245,19 +1248,22 @@ export function createApp(rootEl, opts = {}) {
     if (snap.terminal) { playTurnGains(); finishBattle(snap.terminal); return; }
     const u = currentUnit();
     if (!u) { playTurnGains(); return; }
+    const hasNaturalTurnAudio = naturalTurnAudio.delete(u.id);
     aim = null; pending = null; endArmedUntil = 0;
     setBusy(true);
     sandbox.beginAction();
     if (intro) { await sandbox.introSweep(1600); if (myFlow !== flow) return; }
     const c = sandbox.unitWorldCenter(u.id);
     shell.showBanner(u, u.side === 'hero' ? '我方行动' : '敌方行动');
-    if (u.side === 'hero') avHost.sfx('heroTurn', 1, { category: 'M' }); else ui('enemyTurn');
+    if (u.side === 'hero') {
+      if (!hasNaturalTurnAudio) avHost.sfx('heroTurn', 1, { category: 'M' });
+    } else if (!hasNaturalTurnAudio) ui('enemyTurn');
     if (c) await sandbox.guideTo([c], { ms: 420 });
     if (myFlow !== flow) return;
     // 时钟到账等镜头就位，地图短动效和底栏反馈同时起播。
     playTurnGains();
     if (isPlayerUnit(u)) {
-      avHost.playTurnVoice(u, snap.actionSerial);
+      if (!hasNaturalTurnAudio) avHost.playTurnVoice(u, snap.actionSerial);
       fullReach = findReachable(battle.ctx, u.id, Infinity);
       setBusy(false);
       renderCommand();

@@ -351,6 +351,16 @@ export function createActionDirector(deps) {
     const actionScope = scope();
     if (!actionScope || !actionScope.isLive) return false;
     const isCurrent = () => actionScope === scope() && actionScope.isLive;
+    if (result.kanpo) {
+      const ev = (result.events || []).find(e => e.type === 'kanpo-resolved') || result.kanpo;
+      if (ev.eventId && consumedKanpoEvents.has(ev.eventId)) return true;
+      if (ev.eventId) consumedKanpoEvents.add(ev.eventId);
+      const responderId = ev.responderId;
+      const reaction = { kanpo: true, responderId, fxTag: ev.fxTag || null };
+      const ok = await playReaction({ targetId: responderId || result.casterId, attackerId: result.casterId, reaction });
+      if (!ok || !isCurrent()) return false;
+      return true;
+    }
     avHost.syncRoster();
     const vd = getViewData();
     const skill = result.skill || battleOf().itemSkill(result.item);
@@ -990,6 +1000,7 @@ export function createActionDirector(deps) {
   // 选择（skill 对象或 null）喂回 generator.next(choice)；generator 返回 FX01 result（hits 含 segments/events）。
   // 弹窗等待期间不推进任何虚拟时间：battle 时钟只由规则命令推进，演出定时器在拿到最终 result 前不会启动。
   // scope 失活（重置/换场）或 cancelAttack() 时等待以 null 结算，旧 generator 已 return、旧弹窗已由宿主关闭。
+  const consumedKanpoEvents = new Set();
   let activeRun = null;
   async function driveAttack(gen) {
     const run = { gen, cancelled: false, cancelWait: null };
@@ -1001,7 +1012,7 @@ export function createActionDirector(deps) {
         const req = step.value;
         if (run.cancelled) return null;
         let choice = null;
-        if (req && req.type === 'reaction') {
+        if (req && (req.type === 'reaction' || req.type === 'kanpo')) {
           const s = scope();
           if (!s || !s.isLive) return null;
           choice = await Promise.race([promptReaction(req), cancelled]);

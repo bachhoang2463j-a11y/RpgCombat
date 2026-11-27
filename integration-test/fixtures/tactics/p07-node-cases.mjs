@@ -239,11 +239,26 @@ async function p07(m) {
   // 反击需显式 policy:auto；反击伤害＝反击槽 power 3＋自身攻击 10＝13（battle.mjs counterStrike 原版口径），恰好执行一次
   const counterResult = attackAt(counterBattle, shot, 'counterEnemy', { col: 6, row: 4 }, { policy: 'auto' });
   cases.push(ok('T07-08 同一目标同次攻击反应只执行一次并扣费一次', counterResult.ok && counterHero.ref.hp === 87 && counterEnemy.ref.mp === 8 && counterBattle.snapshot().log.filter(s => s.includes('趁势反击')).length === 1, JSON.stringify({ hp: counterHero.ref.hp, mp: counterEnemy.ref.mp, log: counterBattle.snapshot().log })));
-  const rejected = [
-    { ...shot, kanpoTarget: 'all' }, { ...shot, sheshenTarget: 'all' },
-  ];
-  // 看破经 canUseReaction（反应链入口）现应可用，旧"反应路径也拒绝"负例随 RULES02 失效
-  cases.push(ok('P07 看破舍身仍拒绝（中毒/降防减益槽已按 RULES02 迁移为真实支持）', rejected.every(s => !m.battle.skillSupport(s).ok), JSON.stringify(rejected.map(s => m.battle.skillSupport(s)))));
+  const kanpoSkill = { name: '看破', kanpoTarget: 'all', cost: 1, maxUses: 1, type: '[无]',
+    range: { type: '自身' }, actionCost: { main: 0, aux: 0 } };
+  const kanpoHero = unit('kh', 'hero', { mp: 10, skills: [kanpoSkill] });
+  const target = unit('target', 'hero', { spd: 40 });
+  const triEnemy = unit('ke', 'enemy', { hp: 100, spd: 300 });
+  const incoming = { ...shot, name: 'incoming', power: 12, power2: 12, power3: 12, damageType: '远程', type: '[单体]', type2: '[单体]', type3: '[单体]',
+    range: { type: '单体', castRange: 10 }, actionCost: { main: 1, aux: 0 } };
+  const incomingBattle = makeBattle(m, [target, kanpoHero], [triEnemy],
+    { target: { col: 2, row: 4 }, kh: { col: 3, row: 3 }, ke: { col: 6, row: 4 } }, rng([0, 0]));
+  incomingBattle.start();
+  const canKanpo = incomingBattle.canUseReaction(kanpoHero, kanpoSkill, triEnemy.id, '远程');
+  const canceledByKanpo = attackAt(incomingBattle, incoming, 'target', { col: 2, row: 4 }, { policy: 'auto' });
+  cases.push(ok('P07 看破可用于反应链：按来袭类型整招取消一次、不逐发重触发', canKanpo.ok
+    && canceledByKanpo.ok && canceledByKanpo.canceled && canceledByKanpo.kanpo?.kanpo
+    && canceledByKanpo.hits.length === 0 && target.ref.hp === 100
+    && canceledByKanpo.events.filter(event => event.type === 'kanpo-resolved').length === 1
+    && kanpoHero.ref.mp === 9 && incomingBattle.battleState.perBattleUses.kh?.看破 === 1,
+    JSON.stringify({ canKanpo: canKanpo.ok, reason: canceledByKanpo.reason, caster: incomingBattle.snapshot().currentId, canceled: canceledByKanpo.canceled, hits: canceledByKanpo.hits.length,
+      targetHp: target.ref.hp, kanpoEvents: canceledByKanpo.events.filter(event => event.type === 'kanpo-resolved').length,
+      heroMp: kanpoHero.ref.mp, uses: incomingBattle.battleState.perBattleUses.kh })));
   speedBattle.battleState.combatState.clock.currentAction.resources.main = 1;
   const speedRefresh = speedBattle.attack({ ...speedSkill, power: 30 }, { x: 2.5, y: 7.5, targetId: 'speed-ally' });
   const refreshedSpeed = speedBattle.getEffectiveUnit('speed-ally').spd;

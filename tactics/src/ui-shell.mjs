@@ -389,7 +389,7 @@ export function buildShell(root) {
         '<i class="t-res-sprint" style="width:' + (sprint / cap * 100).toFixed(1) + '%"></i><i class="t-res-cost"></i></span>' +
         '<b class="t-res-num">' + r.moveRemaining.toFixed(1) + '<small>/' + (+cap.toFixed(1)) + 'm</small></b></div>' +
       '<div class="t-res-pips"><button class="t-res-lab' + (state.costFilter === 'main' ? ' t-filter-on' : '') + '" data-cost-filter="main" title="主行动：剩余 ' + r.main + ' 点 · 攻击技能、冲刺、背起 · 点击只看消耗主行动的技能">主 ' + r.main + '</button>' + pips('main', state.pipMax.main, r.main, prev.main) +
-        '<button class="t-res-lab t-aux' + (state.costFilter === 'aux' ? ' t-filter-on' : '') + '" data-cost-filter="aux" title="辅助行动：跳跃、推动、[行动:辅] 技能 · 点击只看消耗辅助行动的技能">辅</button>' + pips('aux', state.pipMax.aux, r.aux, prev.aux) + charge + '</div>';
+        '<button class="t-res-lab t-aux' + (state.costFilter === 'aux' ? ' t-filter-on' : '') + '" data-cost-filter="aux" title="辅助行动：剩余 ' + r.aux + ' 点 · 跳跃、推动、[行动:辅] 技能 · 点击只看消耗辅助行动的技能">辅 ' + r.aux + '</button>' + pips('aux', state.pipMax.aux, r.aux, prev.aux) + charge + '</div>';
     if (state.moveCost != null) previewMoveCost(state.moveCost);
   }
   function previewMoveCost(cost) {

@@ -11,12 +11,12 @@ import { compileScene } from './scene.mjs';
 import { findReachable, findJumpPath, canPlaceAt, traceDisplacement, cellsAdjacent } from './movement.mjs';
 import { unitCenter, occupiedCells, cellKey } from './geometry.mjs';
 import { fogAt, fogAffects, createRegion, expireRegions, moveMultiplier } from './regions.mjs';
-import { canSeeUnit, sightRadius, visibleUnitIds as queryVisibleUnitIds } from './perception.mjs';
 import { previewBarrier, createBarrier, interception, damageBarrier, expireBarriers, clearBarriers, barrierContact } from './barriers.mjs';
 import { previewGuard } from './guard.mjs';
 import { queryAttack, resolveDefaultRange } from './range.mjs';
 import { resolveHit, calculateDamage, computeSegmentRawDamage, applyCollisionDamage } from './damage.mjs';
-import { chooseEnemyAction, visibleEnemies, fogRouteFilter } from './ai.mjs';
+import { chooseEnemyAction, fogRouteFilter } from './ai.mjs';
+import { enemyTier } from './unit-style.mjs';
 import { skillSlots, sortSlotsForResolve, normalizeEffectTag, effectDefinition } from './effect-definitions.mjs';
 import { applyEffectSlot } from './effect-handlers.mjs';
 import { CLASS_PASSIVES, getEffectiveStats } from './class-passives.mjs';
@@ -32,6 +32,13 @@ function skillKey(skill) { return (skill.parentItemName || skill.parentName ? (s
 function usedCount(state, unitId, key) { return state.perBattleUses?.[unitId]?.[key] || 0; }
 
 const ITEM_ACTION_COST = { main: 0, aux: 1 };
+
+function actionPayment(r, main, aux) {
+  if (r.main < main) return { ok: false, reason: '主行动已用完' };
+  const auxCost = Math.min(aux, r.aux);
+  const mainCost = main + aux - auxCost;
+  return r.main < mainCost ? { ok: false, reason: '辅助行动已用完' } : { ok: true, mainCost, auxCost };
+}
 
 // 物品 → 技能形态（规范 range/slots/isItem，供 attackPreview / aim 复用；不回写原物品）
 export function itemAsSkill(item, child = null) {
@@ -86,6 +93,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     items: units.map(u => ({ id: u.id, items: (u.items || []).map(it => ({ name: it.name, count: it.count, usesRemaining: it.usesRemaining })) })),
     flags: units.map(u => ({ id: u.id, ref: structuredClone(u.ref) })),
   };
+  const heroRefs = units.filter(u => u.side === 'hero' && !u.isSummon).map(u => u.ref);
+  const eliteIds = new Set(scene.sceneId === 'sc-chapel'
+    ? units.filter(u => u.side === 'enemy' && enemyTier(u.ref, heroRefs) === 'elite').map(u => u.id) : []);
+  const jumpLimit = u => eliteIds.has(u.id) ? 2 : 1;
   let resources = null;
   let visibleIds = visibleUnitIds ? visibleUnitIds.slice() : null;
   const ctx = {
@@ -98,10 +109,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     barriers: state.combatState.barriers || (state.combatState.barriers = []),
     now: () => state.combatState.clock?.now || 0,
     encounter: scene.encounter === true,
-    enforcePerception: scene.encounter === true || units.every(u => Number.isFinite(u.ref.perception)),
+    knownPositions: true,
+    enforcePerception: false,
     buffsOf,
     random,
-    canSeeUnit(observerId, targetId) { return canSeeUnit(this, observerId, targetId, true); },
   };
   let log = [];
   let domainEvents = [];
@@ -128,6 +139,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (command.type === 'exitUnit' && wasCurrent) resources = null;
     if (command.type === 'grantMainPoint' && result.events?.some(ev => ev.immediate) && currentId() === command.targetId) {
       state.combatState.clock.currentAction.resources.main += 1;
+      emit('main-point-received', { unitId: command.targetId, amount: 1, natural: false });
     }
     if (command.type === 'exitUnit' && state.combatState.charges?.[command.unitId]) {
       state.combatState.charges[command.unitId].preparing = null;
@@ -135,41 +147,6 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     return result;
   }
   function addLog(text) { log.push(text); }
-  function alarmOf(unitId) { return ctx.encounter ? undefined : state.combatState.enemyAlarms?.[unitId]; }
-  function noteEnemyContact(enemy, hero) {
-    if (ctx.encounter || enemy.side !== 'enemy' || enemy.ref.hp <= 0 || hero.side !== 'hero') return;
-    const alarms = state.combatState.enemyAlarms || (state.combatState.enemyAlarms = {});
-    const record = alarms[enemy.id] || (alarms[enemy.id] = { state: 'pending', contacts: {} });
-    if (!record.broadcasted) record.state = 'pending';
-    record.contacts[hero.id] = unitCenter(placementsById[hero.id], hero.footprint);
-  }
-  function scanEnemyContacts(moved = null) {
-    if (ctx.encounter || (moved && moved.ref.hp <= 0)) return;
-    const heroes = moved?.side === 'hero' ? [moved] : units.filter(u => u.side === 'hero' && u.ref.hp > 0);
-    const enemies = moved?.side === 'enemy' ? [moved] : units.filter(u => u.side === 'enemy' && u.ref.hp > 0);
-    for (const enemy of enemies) for (const hero of heroes) {
-      if (canSeeUnit(ctx, enemy.id, hero.id)) noteEnemyContact(enemy, hero);
-    }
-  }
-  function broadcastEnemyAlarm(enemy) {
-    const record = alarmOf(enemy.id);
-    if (record?.state !== 'pending') return;
-    record.state = 'engaged';
-    record.broadcasted = true;
-    const center = unitCenter(placementsById[enemy.id], enemy.footprint);
-    const radius = sightRadius(ctx, enemy) * 3;
-    const recipientIds = [];
-    for (const ally of units) {
-      if (ally === enemy || ally.side !== 'enemy' || ally.ref.hp <= 0) continue;
-      const p = unitCenter(placementsById[ally.id], ally.footprint);
-      if (Math.hypot(p.x - center.x, p.y - center.y) > radius + 1e-9) continue;
-      const alarms = state.combatState.enemyAlarms;
-      const recipient = alarms[ally.id] || (alarms[ally.id] = { state: 'engaged', contacts: {} });
-      recipient.contacts = { ...record.contacts, ...recipient.contacts };
-      recipientIds.push(ally.id);
-    }
-    emit('enemy-alarm', { unitId: enemy.id, center, radius, recipientIds });
-  }
   function emit(type, fields = {}) {
     const seq = domainEvents.length + 1;
     const event = { seq, eventId: runId + ':event:' + seq, runId, actionId: runId + ':action:' + actionSerial,
@@ -693,11 +670,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         resources = state.combatState.clock.currentAction.resources;
         resources.moveRemaining = moveDistanceOf(u) * resources.moveQuota;
         resources.moveMultiplier = 1;
-        resources.jumped = false;
+        resources.jumpsRemaining = jumpLimit(u);
         resources.chargeFullAtStart = chargeFull(u);
-        scanEnemyContacts();
-        if (u.side === 'enemy') broadcastEnemyAlarm(u);
-        prepareAtActionStart(u);
         actionSerial++;
         addLog('t=' + next.time.toFixed(2) + ' · ' + u.name + ' 行动');
         if (tryParalyzeSkip(u)) {
@@ -706,6 +680,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
           resources = null;
           continue; // 跳过本次行动，重跑一圈
         }
+        emit('main-point-received', { unitId: u.id, amount: resources.main, natural: true });
+        prepareAtActionStart(u);
         const ai = isAiControlled(u);
         if ((u.side === 'hero' && !ai) || (u.side === 'enemy' && ai)) {
           dispatchClock(state, { type: 'recordPacingAction', unitId: u.id, player: !ai });
@@ -725,41 +701,24 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       const u = actor();
       const r = state.combatState.clock.currentAction.resources;
       resources = r;
-      scanEnemyContacts();
       if (resources.moveRemaining === undefined) resources.moveRemaining = moveDistanceOf(u) * r.moveQuota;
       if (resources.moveMultiplier === undefined) resources.moveMultiplier = 1;
+      resources.jumpsRemaining ??= r.jumped ? 0 : jumpLimit(u);
       actionSerial++;
       return snapshot();
     }
     return advance();
   }
 
-  function syncDiscovered(side) {
-    const discovered = state.combatState.discoveredBySide || (state.combatState.discoveredBySide = {});
-    const known = new Set(discovered[side] || []);
-    for (const observer of units.filter(u => u.side === side && u.ref.hp > 0)) {
-      for (const id of queryVisibleUnitIds(ctx, observer.id)) {
-        if (byId.get(id).side !== side) known.add(id);
-      }
-    }
-    discovered[side] = [...known];
-    return known;
-  }
   function snapshot(viewerId = null) {
     units.forEach(syncRageResult);
-    syncDiscovered('hero');
-    if (ctx.enforcePerception) syncDiscovered('enemy');
     const clock = state.combatState.clock;
-    const visible = viewerId ? new Set(queryVisibleUnitIds(ctx, viewerId)) : null;
-    const viewer = viewerId ? byId.get(viewerId) : null;
-    const shownUnits = visible ? units.filter(u => u.side === viewer.side || visible.has(u.id)) : units;
-    const showCurrent = !visible || !currentId() || visible.has(currentId()) || byId.get(currentId())?.side === viewer.side;
     return {
-      runId, now: clock?.now || 0, currentId: showCurrent ? currentId() : null, actionSerial, resources: resources && showCurrent ? { moveRemaining: resources.moveRemaining, sprintRemaining: resources.sprintRemaining || 0, main: resources.main, aux: resources.aux, moveMultiplier: resources.moveMultiplier || 1, jumped: !!resources.jumped, jumpDistance: Math.ceil(actor().ref.moveDistance / 3) } : null,
+      runId, now: clock?.now || 0, currentId: currentId(), actionSerial, resources: resources ? { moveRemaining: resources.moveRemaining, sprintRemaining: resources.sprintRemaining || 0, main: resources.main, aux: resources.aux, moveMultiplier: resources.moveMultiplier || 1, jumpsRemaining: resources.jumpsRemaining, jumped: resources.jumpsRemaining === 0, jumpDistance: Math.ceil(actor().ref.moveDistance / 3) } : null,
       terminal: clock?.terminal ? { ...clock.terminal } : null,
-      preparation: showCurrent && clock?.currentAction ? structuredClone(state.combatState.charges?.[clock.currentAction.unitId]?.preparing || null) : null,
-      chargeInventory: showCurrent && clock?.currentAction ? (state.combatState.charges?.[clock.currentAction.unitId]?.inventory || 0) : 0,
-      units: shownUnits.map(u => {
+      preparation: clock?.currentAction ? structuredClone(state.combatState.charges?.[clock.currentAction.unitId]?.preparing || null) : null,
+      chargeInventory: clock?.currentAction ? (state.combatState.charges?.[clock.currentAction.unitId]?.inventory || 0) : 0,
+      units: units.map(u => {
         const st = statsOf(u);
         const cs = chargeSkillOf(u);
         return { id: u.id, name: u.name, side: u.side, controller: u.controller || (u.side === 'hero' ? 'player' : 'ai'),
@@ -769,7 +728,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
           buffs: buffsOf(u.id).map(b => ({ type: b.type, value: b.value, variant: b.variant || null, duration: Number.isFinite(b.duration) ? b.duration : null, isConsumable: !!b.isConsumable })) };
       }),
       carrying: structuredClone(state.combatState.carrying || {}),
-      positions: structuredClone(visible ? Object.fromEntries(shownUnits.map(u => [u.id, placementsById[u.id]])) : placementsById),
+      positions: structuredClone(placementsById),
       regions: structuredClone(ctx.regions), barriers: structuredClone(ctx.barriers),
       events: viewerId ? [] : structuredClone(domainEvents), log: viewerId ? [] : log.slice(),
     };
@@ -781,7 +740,6 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (!u) return null;
     const st = statsOf(u);
     return { id: u.id, name: u.name, side: u.side, controller: u.controller || (u.side === 'hero' ? 'player' : 'ai'),
-      alertState: u.side === 'enemy' ? (alarmOf(u.id)?.state || 'idle') : null,
       classType: u.classType || null, baseTauntBonus: u.ref.baseTauntBonus || 0, isSummon: !!u.isSummon, summonOwnerId: u.summonOwnerId || null,
       hp: u.ref.hp, maxHp: u.ref.maxHp, mp: u.ref.mp, maxMp: u.ref.maxMp, tp: u.ref.tp || 0, maxTp: u.ref.maxTp || 0,
       moveDistance: u.ref.moveDistance, effectiveMoveDistance: moveDistanceOf(u), jumpDistance: Math.ceil(u.ref.moveDistance / 3),
@@ -815,19 +773,13 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (!cell || cell.cost === 0) return { ok: false, reason: '落点不可达' };
     const p = placementsById[currentId()];
     const from = { col: p.col, row: p.row, facing: p.facing };
-    const seen = !ctx.encounter && ctx.enforcePerception ? syncDiscovered(actor().side) : null;
     const multiplier = resources.moveMultiplier || 1;
-    let stoppedOnDiscovery = false;
     let cost = 0;
     const path = [cell.path[0]];
     for (const next of cell.path.slice(1)) {
       const previous = path[path.length - 1];
       cost += Math.hypot(next.col - previous.col, next.row - previous.row) * ((state.combatState.carrying || {})[currentId()] ? 2 : 1) / moveMultiplier(ctx, currentId(), previous);
       p.col = next.col; p.row = next.row; path.push(next);
-      scanEnemyContacts(actor());
-      if (seen && units.some(u => u.side !== actor().side && u.ref.hp > 0 && !seen.has(u.id) && canSeeUnit(ctx, currentId(), u.id))) {
-        if (canPlaceAt(ctx, currentId(), next.col, next.row).ok) { stoppedOnDiscovery = true; break; }
-      }
     }
     col = p.col; row = p.row;
     cell = { ...cell, col, row, cost, path };
@@ -837,11 +789,9 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const before = resources.moveRemaining;
     resources.moveRemaining = Math.max(0, resources.moveRemaining - travel);
     if (resources.sprintRemaining) resources.sprintRemaining = Math.max(0, resources.sprintRemaining - travel);
-    const discoveredIds = stoppedOnDiscovery ? queryVisibleUnitIds(ctx, currentId()).filter(id => !seen.has(id) && byId.get(id).side !== actor().side) : [];
-    if (ctx.enforcePerception || actor().side === 'hero') syncDiscovered(actor().side);
-    emit('unit-moved', { unitId: currentId(), from, to: { col, row }, path: cell.path, distance: travel, stoppedOnDiscovery, discoveredIds });
-    addLog(actor().name + ' 移动 ' + travel.toFixed(2) + 'm' + (stoppedOnDiscovery ? ' · 发现 ' + discoveredIds.map(id => byId.get(id).name).join('、') + '，暂停移动（剩余 ' + resources.moveRemaining.toFixed(2) + 'm）' : ''));
-    return { ok: true, stoppedOnDiscovery, discoveredIds, cell: { ...cell, cost: travel, budgetCost: cell.cost }, from, unitId: currentId(), moveBefore: before, moveAfter: resources.moveRemaining };
+    emit('unit-moved', { unitId: currentId(), from, to: { col, row }, path: cell.path, distance: travel, stoppedOnDiscovery: false, discoveredIds: [] });
+    addLog(actor().name + ' 移动 ' + travel.toFixed(2) + 'm');
+    return { ok: true, stoppedOnDiscovery: false, discoveredIds: [], cell: { ...cell, cost: travel, budgetCost: cell.cost }, from, unitId: currentId(), moveBefore: before, moveAfter: resources.moveRemaining };
   }
   function sprint() {
     if (!resources || resources.main < 1) return { ok: false, reason: '主行动已用完' };
@@ -854,8 +804,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
   function previewJump(col, row) {
     const u = actor();
-    if (!u || !resources || resources.aux < 1) return { ok: false, reason: '辅助行动不足' };
-    if (resources.jumped) return { ok: false, reason: '本次自然行动已经跳跃' };
+    if (!u || !resources || resources.aux + resources.main < 1) return { ok: false, reason: '辅助行动不足' };
+    if (resources.jumpsRemaining === 0) return { ok: false, reason: '本次自然行动跳跃次数已用完' };
     const maxDistance = Math.ceil(u.ref.moveDistance / 3);
     return findJumpPath(ctx, u.id, col, row, maxDistance);
   }
@@ -867,9 +817,9 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const last = q.path[q.path.length - 2] || p;
     p.facing = ((Math.atan2(col - last.col, -(row - last.row)) * 180 / Math.PI) + 360) % 360;
     p.col = col; p.row = row;
-    resources.aux--;
-    resources.jumped = true;
-    scanEnemyContacts(actor());
+    const { mainCost, auxCost } = actionPayment(resources, 0, 1);
+    resources.main -= mainCost; resources.aux -= auxCost;
+    resources.jumpsRemaining--;
     emit('unit-jumped', { unitId: currentId(), from, to: { col, row }, distance: q.distance });
     addLog(actor().name + ' 跳跃 ' + q.distance.toFixed(2) + 'm');
     return { ...q, from, to: { col, row }, unitId: currentId(), moveRemaining: resources.moveRemaining };
@@ -877,12 +827,13 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   function adjacent(a, afp, b, bfp) { return cellsAdjacent(a, afp, b, bfp); }
   function push(targetId) {
     const u = actor(), target = byId.get(targetId);
-    if (!u || !resources || resources.aux < 1) return { ok: false, reason: '辅助行动不足' };
+    if (!u || !resources || resources.aux + resources.main < 1) return { ok: false, reason: '辅助行动不足' };
     if (!target || target.ref.hp <= 0 || target.id === u.id) return { ok: false, reason: '推动目标无效' };
     const up = placementsById[u.id], tp = placementsById[targetId];
     const ufp = ctx.footprintsById[u.id] || { width: 1, height: 1 }, tfp = ctx.footprintsById[targetId] || { width: 1, height: 1 };
     if (!adjacent(up, ufp, tp, tfp)) return { ok: false, reason: '推动目标必须相邻' };
-    resources.aux--;
+    const { mainCost, auxCost } = actionPayment(resources, 0, 1);
+    resources.main -= mainCost; resources.aux -= auxCost;
     const strength = Math.max(0, Number(u.ref.strength || 0));
     const weight = Number(target.ref.totalWeight || 0);
     const opposed = target.side !== u.side && target.ref.hp > 0;
@@ -906,7 +857,6 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       target.ref.hp = view.hp; target.ref.shield = view.shield;
     }
     if (target.ref.hp <= 0) handleDown(target, 'collision');
-    scanEnemyContacts(target);
     addLog(u.name + ' 推动 ' + target.name + ' ' + traced.distance.toFixed(2) + 'm' + (collision ? ' · 撞击 ' + collision.hpDmg + ' HP' : ''));
     return { ok: true, success: true, targetId, from, to: { col: tp.col, row: tp.row }, requestedDistance: requested,
       movedDistance: traced.distance, path: traced.path, blockedBy: traced.blockedBy, collision, hpAfter: target.ref.hp, down: target.ref.hp <= 0, rollPush, rollResist };
@@ -1086,12 +1036,13 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const prepSkill = skill.delay > 0;
     const mainCost = prepSkill ? (preparing || skill.isItem ? 0 : 1) : (cost.main || 0);
     const auxCost = prepSkill && (preparing || !skill.isItem) ? 0 : (cost.aux || 0);
-    if (r.main < mainCost || r.aux < auxCost) return { ok: false, reason: r.main < mainCost ? '主行动已用完' : '辅助行动已用完' };
+    const payment = actionPayment(r, mainCost, auxCost);
+    if (!payment.ok) return payment;
     const mpShort = u.ref.mp < (preparing ? 0 : (skill.cost || 0));
     const hpShort = u.ref.hp <= (preparing ? 0 : (skill.hpCost || 0));
     const tpShort = (u.ref.tp || 0) < (preparing ? 0 : (skill.tpCost || 0));
     if (mpShort || hpShort || tpShort) return { ok: false, reason: skill.isItem ? (mpShort ? 'MP不足' : hpShort ? 'HP不足' : 'TP不足') : '数值资源不足' };
-    return { ok: true, eff: effectiveSkill(skill), preparing: !!preparing, ready, mainCost, auxCost };
+    return { ...payment, eff, preparing: !!preparing, ready };
   }
   function skillCooldownAt(unitId, key) {
     return state.cooldowns?.[unitId]?.[key] || 0;
@@ -1167,7 +1118,6 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   function canUseReaction(responder, skill, sourceId, incomingType = null) {
     const source = byId.get(sourceId);
     if (!responder || !source || !skill || responder.ref.hp <= 0 || source.ref.hp <= 0) return { ok: false, reason: '反应技能不可用' };
-    if (skill.reactionSource && ctx.enforcePerception && !canSeeUnit(ctx, responder.id, source.id)) return { ok: false, reason: '无法看见攻击来源' };
     if (skill.kanpoTarget) {
       if (skill.kanpoTarget !== 'all' && skill.kanpoTarget !== (incomingType || '近战')) return { ok: false, reason: '看破类型不匹配' };
     } else if (!skill.isReaction) {
@@ -1178,6 +1128,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (usesLeft(responder.id, skill) <= 0 || skillCooldownAt(responder.id, key) > state.combatState.clock.now + 1e-9) return { ok: false, reason: '反应限次或冷却未就绪' };
     if (responder.ref.mp < (skill.cost || 0) || responder.ref.hp <= (skill.hpCost || 0) || (responder.ref.tp || 0) < (skill.tpCost || 0)) return { ok: false, reason: '反应资源不足' };
     if (!hasEnoughBindings(responder, skill)) return { ok: false, reason: '绑定物品存量不足' };
+    if (skill.kanpoTarget && responder.side === 'hero') return { ok: true, responder, source };
     const target = source;
     const check = queryAttack(ctx, responder.id, effectiveSkill(skill), { ...unitCenter(placementsById[target.id], target.footprint), targetId: target.id });
     return check.ok ? { ok: true, query: check, responder, source } : { ok: false, reason: check.reason, query: check };
@@ -1194,7 +1145,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const key = skillKey(skill);
     if (usesLeft(guardian.id, skill) <= 0 || skillCooldownAt(guardian.id, key) > ctx.now() || !hasEnoughBindings(guardian, skill)) return { ok: false, reason: '守护限次、冷却或材料不可用' };
     if (guardian.ref.mp < (skill.cost || 0) || guardian.ref.hp <= (skill.hpCost || 0) || (guardian.ref.tp || 0) < (skill.tpCost || 0)) return { ok: false, reason: '守护资源不足' };
-    return previewGuard(ctx, guardian.id, target.id, sourceId, moveDistanceOf(guardian) / 2);
+    return previewGuard(ctx, guardian.id, target.id, sourceId, moveDistanceOf(guardian));
   }
   function previewGuardCandidates(targetId, sourceId, incomingSkill) {
     const target = byId.get(targetId);
@@ -1218,7 +1169,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   function collectReactionCandidates(target, incomingSkill, incomingType, sourceId, isAttack = true, allowGuardian = true) {
     const out = [];
     for (const s of (target.skills || [])) {
-      if ((!s.isReaction && !s.kanpoTarget) || s.sheshenTarget || !reactionSupportFor(s, incomingType, isAttack)) continue;
+      if ((!s.isReaction && !s.kanpoTarget) || (s.kanpoTarget && target.side === 'hero') || s.sheshenTarget || !reactionSupportFor(s, incomingType, isAttack)) continue;
       if (canUseReaction(target, s, sourceId, incomingType).ok) out.push({ skill: s, responderId: target.id });
     }
     if (allowGuardian && isAttack && incomingSkill.range.type === '单体' && !target.isSummon) {
@@ -1232,6 +1183,30 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       }
     }
     return out;
+  }
+  function* selectKanpo(caster, skill, target, options) {
+    if (caster.side !== 'enemy' || options.suppressReactions || options.isReactionTrigger || target?.isSummon && skill.range.type === '单体') return null;
+    const incomingType = skill.damageType || '近战';
+    const candidates = units.filter(u => u.side === 'hero' && !isAiControlled(u) && !u.isSummon && !u.isSubdued && !u.ref.isSubdued)
+      .flatMap(u => (u.skills || []).filter(s => s.kanpoTarget && canUseReaction(u, s, caster.id, incomingType).ok)
+        .map(s => ({ skill: s, responderId: u.id, usesLeft: usesLeft(u.id, s), cost: s.cost || 0,
+          bindings: itemBindingsFor(u, s).map(b => ({ item: b.item.name, category: b.item.category, cost: b.cost,
+            remaining: b.item.category === '道具' ? (b.item.usesRemaining ?? b.item.maxUses ?? 0) : (b.item.count || 0) })) })));
+    if (!candidates.length) return null;
+    const request = { type: 'kanpo', runId, attackId: currentAttackId(), responderId: target?.id || null,
+      targetId: target?.id || null, casterId: caster.id, skill, incomingType, candidates };
+    emit('kanpo-request', { casterId: caster.id, targetId: request.targetId });
+    const choice = options.autoAnswer ? options.autoAnswer(request) : yield request;
+    if (request.runId !== runId) return null;
+    const selected = candidates.find(c => c.skill === choice?.skill && c.responderId === (choice.responderId || target?.id));
+    if (!selected) return null;
+    const responder = byId.get(selected.responderId);
+    if (!canUseReaction(responder, selected.skill, caster.id, incomingType).ok) return null;
+    const rr = executeReaction(responder, selected.skill, caster, skill);
+    const result = { responderId: responder.id, skillName: selected.skill.name, fxTag: selected.skill.fxTag || null,
+      canceled: true, kanpo: true, drained: rr.drained, reactionUsed: rr.reactionUsed };
+    emit('kanpo-resolved', { casterId: caster.id, ...result });
+    return result;
   }
   function* selectReaction(target, caster, skill, incomingType, options, segment = {}, isAttack = true, allowGuardian = true) {
     const candidates = collectReactionCandidates(target, skill, incomingType, caster.id, isAttack, allowGuardian);
@@ -1468,7 +1443,6 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         const selected = query.summonPlacements?.[created.length] || query.summonPlacement || query.summon?.anchor || { col: Math.floor(query.aim.x), row: Math.floor(query.aim.y) };
         placementsById[id] = { ...selected, facing: placementsById[caster.id].facing };
         dispatchBattleClock({ type: 'registerUnit', unit: { id, side: unit.side, name: unit.name, baseSpd: unit.ref.spd } });
-        scanEnemyContacts(unit);
         emit('unit-summoned', { unitId: id, casterId: caster.id, placement: { ...placementsById[id] } });
         addLog(caster.name + ' 召唤了 ' + unit.name);
         created.push(unit);
@@ -1500,7 +1474,6 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       collision.hpAfter = target.ref.hp;
       collision.shieldAfter = target.ref.shield;
     }
-    scanEnemyContacts(target);
     addLog(target.name + ' ' + rule.type + ' ' + traced.distance.toFixed(2) + 'm' + (collision ? ' · 碰撞-' + collision.hpDmg : ''));
     return emit('unit-displaced', { attackId: currentAttackId(), casterId: caster.id, unitId: target.id, mode: rule.type,
       from, to: { col: p.col, row: p.row }, requestedDistance: rule.distance, distance: traced.distance, path: traced.path,
@@ -1572,7 +1545,6 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       if (stopped()) break;
       if (canPlaceAt(ctx, caster.id, step.col, step.row).ok) {
         position.col = step.col; position.row = step.row;
-        scanEnemyContacts(caster);
       }
     }
     // 中途允许穿越占格，演出仍扫到最远处，再回到最后可站立的格。
@@ -1686,7 +1658,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       consumeParentItem(u, skill, costSummary);
       if (costSummary.bindings) addLog('施展材料：' + costSummary.bindings);
     }
-    // 大招释放：预检通过并付费后才清空充能（原版释放前清槽）；Cut-in 由前端读 chargeRelease
+    // 大招释放：预检通过并付费后清空充能；看破取消效果，不返还施法成本。
     if (chargeRelease) {
       charge.current = 0;
       emit('charge-released', { attackId: currentAttackId(), unitId: u.id, skillName: skill.name, max: skill.charge });
@@ -1694,6 +1666,16 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     }
     // 冷却（独立字段 [冷却:N]，延迟不再当冷却）
     if (skill.cooldownTurns > 0 && !preparing) dispatchClock(state, { type: 'applyCooldown', unitId: u.id, skillKey: key, duration: skill.cooldownTurns * ROUND_TIME });
+
+    const kanpoType = skill.damageType || '近战';
+    const kanpoTarget = byId.get(query.aim?.targetId || allTargets[0]);
+    const kanpo = yield* selectKanpo(u, eff, kanpoTarget, options);
+    if (actionRun !== runId) return failAttack('战斗已经重置');
+    if (kanpo) {
+      if (preparing) charge.preparing = null;
+      return { ok: true, canceled: true, kanpo, hits: [], shots: [], effects: [], ammoEvents: [], summons: [],
+        query, casterId: u.id, skill, aim: { ...aim }, incomingType: kanpoType, costSummary, charge: chargeInfo, logFrom, logTo: log.length };
+    }
 
     const isAoE = ['直线', '扇形', '圆形', '全域', '爆炸'].includes(eff.range.type);
     const isCharge = eff.displacements?.some(d => d.type === '冲锋');
@@ -1980,7 +1962,6 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         return { ...segBase, hit: false, outcome: 'prevented', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reason: check.reason, logEnd: log.length };
       }
     }
-    noteEnemyContact(target, caster);
     const guard = skill.displacements?.some(d => d.type === '冲锋') ? null : bdg.barrierTargets?.[target.id] || interception(ctx, caster.id, target.id);
     if (guard) {
       const barrierHit = resolveBarrierDamage(caster, guard, slot, segmentIndex, roll, skillMultiplier, incomingType, bdg, segBase.contactPoint);
@@ -2303,22 +2284,15 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const u = actor();
     if (!u || !isAiControlled(u) || state.combatState.clock.terminal || !resources) return null;
     if (resources.main < 1 && resources.aux < 1 && resources.moveRemaining <= 1e-9 && !chargeState(u.id).preparing?.ready) return { moveTo: null, skill: null, aim: null, action: 'wait' };
-    const alarm = alarmOf(u.id);
-    const seen = visibleEnemies(ctx, u);
     const preparing = chargeState(u.id).preparing;
-    if (seen.length && preparing && !preparing.ready && resources.main > 0) return { moveTo: null, skill: null, aim: null, action: 'prepare' };
-    const aiRes = { ...resources, preparing, seen, moveDistance: moveDistanceOf(u),
-      trackedTargetIds: u.side === 'hero' && u.isSummon ? syncDiscovered('hero') : null,
-      pursuitPoints: Object.entries(alarm?.contacts || {}).filter(([id]) => byId.get(id)?.ref.hp > 0).map(([, point]) => point),
-    };
+    if (preparing && !preparing.ready && resources.main > 0) return { moveTo: null, skill: null, aim: null, action: 'prepare' };
+    const aiRes = { ...resources, preparing, moveDistance: moveDistanceOf(u), jumpFirst: eliteIds.has(u.id) };
     const aiBudget = resources.moveRemaining * (resources.moveMultiplier || 1);
-    // 单房间位置已知：盲投范围技仍由查询判断；旧场景无目击时只移动。
-    const canAim = ctx.encounter || seen.length;
-    if (canAim && !preparing && chargeFull(u)) {
+    if (!preparing && chargeFull(u)) {
       const ult = chooseEnemyAction(ctx, u.id, aiBudget, [chargeSkillOf(u)], skill => skillStatus(skill), aiRes);
       if (ult.skill) return ult;
     }
-    const skills = !canAim ? [] : preparing ? (preparing.ready ? [preparing.skill] : []) : enemySkills();
+    const skills = preparing ? (preparing.ready ? [preparing.skill] : []) : enemySkills();
     return chooseEnemyAction(ctx, u.id, aiBudget, skills, skill => skillStatus(skill), { ...aiRes, idleMovement: true });
   }
   function* beginEnemyTurn(options = {}) {

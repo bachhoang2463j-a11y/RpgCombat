@@ -7,7 +7,7 @@
 // 浓雾：无八邻接可见敌人时优先离雾，出口路径跨预算且主行动>0 时请求冲刺；出雾后下一轮再攻击。
 // ==========================================
 
-import { findReachable, findJumpPath, cellsAdjacent } from './movement.mjs';
+import { findReachable, findJumpPath, canPlaceAt, cellsAdjacent } from './movement.mjs';
 import { queryAttack, resolveDefaultRange } from './range.mjs';
 import { cellKey, unitCenter, cellCenter, occupiedCells } from './geometry.mjs';
 import { skillSlots } from './effect-definitions.mjs';
@@ -386,29 +386,66 @@ function movePlan(moveTo, avoidFog = false) {
   return { ...IDLE, moveTo, action: null, ...(avoidFog ? { avoidFog: true } : {}) };
 }
 
-// 只跳到步行全图仍到不了、且比步行目标更接近任务的位置。
-function planJump(ctx, unit, res, budget, reach, walk, distanceTo, walkDistance, canStep) {
-  if (res.aux < 1 || res.jumped) return null;
+// 寻找要留给越障的跳跃；步行可达时，只考虑实际跨过障碍的捷径。
+function planJump(ctx, unit, res, budget, reach, walk, distanceTo, walkDistance, canStep, reserve = false) {
+  if (!canJump(res)) return null;
   const distance = Math.ceil(unit.ref.moveDistance / 3);
+  const origin = ctx.placementsById[unit.id];
   let best = null;
   for (const start of reach.cells) {
     const approach = start.cost > EPS ? stepAlong(ctx, reach, unit, start.path, budget) : null;
     if (start.cost > EPS && !approach) continue;
-    const origin = withPlacement(ctx, unit.id, start.col, start.row);
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      if (!dx && !dy) continue;
-      const step = Math.hypot(dx, dy);
-      for (let n = 1; n * step <= distance + EPS; n++) {
-        const col = start.col + dx * n, row = start.row + dy * n;
-        if (walk.byKey.has(cellKey(col, row)) || (canStep && !canStep(start.col, start.row, col, row))) continue;
-        const land = { col, row }, dist = distanceTo(land), cost = start.cost + n * step;
-        if (dist >= walkDistance - EPS || (best && (dist > best.dist + EPS || (Math.abs(dist - best.dist) <= EPS && cost >= best.cost - EPS)))) continue;
-        if (findJumpPath(origin, unit.id, col, row, distance).ok) best = { approach, land, dist, cost };
-      }
+    const view = withPlacement(ctx, unit.id, start.col, start.row);
+    for (const { col, row, length } of jumpLandings(start, distance)) {
+      if (canStep && !canStep(start.col, start.row, col, row)) continue;
+      const land = { col, row }, dist = distanceTo(land), cost = start.cost + length;
+      const walking = walk.byKey.get(cellKey(col, row));
+      if (walking) {
+        if (!reserve || walking.cost <= cost + EPS || dist >= distanceTo(start) - EPS || dist >= distanceTo(origin) - EPS) continue;
+      } else if (dist >= walkDistance - EPS) continue;
+      const score = reserve ? cost + dist : dist;
+      if (best && (score > best.score + EPS || (Math.abs(score - best.score) <= EPS && cost >= best.cost - EPS))) continue;
+      const query = findJumpPath(view, unit.id, col, row, distance);
+      if (!query.ok || (walking && !query.path.slice(1, -1).some(c => !canPlaceAt(view, unit.id, c.col, c.row).ok))) continue;
+      best = { approach, land, score, cost };
     }
   }
   if (!best) return null;
   return best.approach ? movePlan(best.approach, !!canStep) : { ...IDLE, jumpTo: best.land, action: null };
+}
+
+function canJump(res) {
+  return res.main + res.aux >= 1 && (res.jumpsRemaining ?? Number(!res.jumped)) > 0;
+}
+
+function* jumpLandings(start, distance) {
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    if (!dx && !dy) continue;
+    const step = Math.hypot(dx, dy);
+    for (let n = 1; n * step <= distance + EPS; n++) {
+      yield { col: start.col + dx * n, row: start.row + dy * n, length: n * step };
+    }
+  }
+}
+
+function planPriorityJump(ctx, unit, res, budget, points, avoid) {
+  if (!canJump(res)) return null;
+  const p = ctx.placementsById[unit.id];
+  const distanceTo = points.length ? distanceToPoints(ctx, unit, points) : () => 0;
+  if (points.length) {
+    const walk = moveReach(ctx, unit, Infinity);
+    const dry = avoid ? moveReach(ctx, unit, Infinity, avoid) : walk;
+    const baseline = distanceTo(nearestPointCell(walk.cells, distanceTo));
+    const obstacle = planJump(ctx, unit, res, budget, dry, walk, distanceTo, baseline, avoid, true)
+      || (avoid && planJump(ctx, unit, res, budget, walk, walk, distanceTo, baseline, null, true));
+    if (obstacle) return obstacle;
+  }
+  const distance = Math.ceil(unit.ref.moveDistance / 3);
+  const land = [...jumpLandings(p, distance)]
+    .sort((a, b) => Number(avoid && !avoid(p.col, p.row, a.col, a.row)) - Number(avoid && !avoid(p.col, p.row, b.col, b.row))
+      || distanceTo(a) - distanceTo(b) || b.length - a.length)
+    .find(c => findJumpPath(ctx, unit.id, c.col, c.row, distance).ok);
+  return land ? { ...IDLE, jumpTo: { col: land.col, row: land.row }, action: null } : null;
 }
 
 // 无战斗动作时：召唤物按占地贴近主人，其它敌人在合法落点中巡走。
@@ -506,6 +543,14 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
   const preferred = moveReach(ctx, unit, moveBudget, avoid);
   const inBudget = searchBest(ctx, unit, usable, moveBudget, enemies, allies, tracking, preferred);
   const markRoute = plan => plan.moveTo && avoid ? { ...plan, avoidFog: true } : plan;
+  if (res.jumpFirst && (!inBudget.best?.attackTarget || inBudget.best.cost > EPS)) {
+    const jump = planPriorityJump(ctx, unit, res, moveBudget, points, avoid);
+    if (jump) return jump;
+  }
+  const following = ctx.knownPositions && unit.isSummon && unit.side === 'hero' && res.idleMovement;
+  if (following && (!inBudget.best?.attackTarget || inBudget.best.cost > EPS)) {
+    return planIdleMove(ctx, unit, res, moveBudget, preferred, avoid ? fog : null) || { ...IDLE };
+  }
   if (inBudget.best) {
     const plan = markRoute(toResult(inBudget.best, res));
     return needsExit && plan.moveTo ? movePlan(plan.moveTo, !!avoid) : plan;

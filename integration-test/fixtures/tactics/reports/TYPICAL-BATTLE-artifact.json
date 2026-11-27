@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "f484d1951d548c39d1969aef1184078f4b88994486c86b23e64ebc2075180531",
-  "bytes": 1916178,
+  "sha256": "7b3542ed8c54fb8ed2376b09af14109a6d45b16088631377a78cb08c5bcf17d4",
+  "bytes": 1918221,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -71,7 +71,7 @@
       "detail": ""
     },
     {
-      "id": "发现敌人记录字段及枪声去重入包",
+      "id": "全局已知位置及枪声去重入包",
       "pass": true,
       "detail": ""
     },
@@ -146,17 +146,17 @@
       "detail": ""
     },
     {
-      "id": "单房间默认入口、技能雾限制瞄准但不隐藏棋子",
+      "id": "单文件默认三层，显式 demo=nave 才选单间",
       "pass": true,
       "detail": ""
     },
     {
-      "id": "产物真实单间开场：大档礼拜堂保留原阵容、2×2 与教堂陈设",
+      "id": "产物三层棋盘保持三厅两廊与固定陈设",
       "pass": true,
       "detail": ""
     },
     {
-      "id": "产物默认单间真实接战、不发旧警报且可重置",
+      "id": "可选单房间仍可接战并重置",
       "pass": true,
       "detail": ""
     },
@@ -191,6 +191,11 @@
       "detail": ""
     },
     {
+      "id": "正式战斗开局公开位置并发出主点到账事件",
+      "pass": true,
+      "detail": ""
+    },
+    {
       "id": "产物创建真实对局并发放自然行动",
       "pass": true,
       "detail": ""
@@ -211,7 +216,17 @@
       "detail": ""
     },
     {
+      "id": "精英越障、全图看破及主辅支付关键函数入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
       "id": "产物AI真实走到北面台阶并完成大体型跳跃",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "产物三层战斗已知位置，保留真实北段越障",
       "pass": true,
       "detail": ""
     },
@@ -226,6 +241,16 @@
     },
     {
       "id": "产物不限次物品无需主行动、只耗辅助行动且跨行动可复用",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "产物辅助效果替补接线及实际资源到账路径入包",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "产物辅助技能实际治疗到账并正确扣辅助行动",
       "pass": true,
       "detail": ""
     },
@@ -245,59 +270,24 @@
       "detail": ""
     },
     {
-      "id": "预警头像角标与召唤头像解析入包",
+      "id": "火焰/中毒领域常驻层与施放演出、护盾罩/护盾段、区域争夺与被动到账反馈入包",
       "pass": true,
       "detail": ""
     },
     {
-      "id": "火焰/中毒领域常驻层与施放演出、护盾罩/护盾段、警戒弹出与警报波纹、被动到账反馈入包",
+      "id": "TT-ALERTS 开战即知全部位置，不受感知值限制",
       "pass": true,
       "detail": ""
     },
     {
-      "id": "TT-ALERTS 移动只在途中经过敌人感知也会预警",
-      "pass": true,
-      "detail": "[\"idle\",{\"col\":5,\"row\":7,\"cost\":5,\"path\":[{\"col\":5,\"row\":2},{\"col\":5,\"row\":3},{\"col\":5,\"row\":4},{\"col\":5,\"row\":5},{\"col\":5,\"row\":6},{\"col\":5,\"row\":7}],\"budgetCost\":5},\"pending\"]"
-    },
-    {
-      "id": "TT-ALERTS 墙遮住感知时不预警",
+      "id": "TT-ALERTS 已知位置仍受墙阻挡攻击射线",
       "pass": true,
       "detail": ""
     },
     {
-      "id": "TT-ALERTS 预览不触发；超出敌人感知的攻击即使闪避也预警",
+      "id": "TT-ALERTS 雾内目标位置已知但预览锁定被拒",
       "pass": true,
-      "detail": "[\"idle\",[{\"targetId\":\"e\",\"side\":\"enemy\",\"hit\":false,\"hpDmg\":0,\"hpBefore\":100,\"hpAfter\":100,\"maxHp\":100,\"down\":false,\"logIndex\":1,\"logEnd\":2,\"segments\":[{\"runId\":\"battle:9:0\",\"attackId\":\"attack:1\",\"segmentId\":\"battle:9:0:attack:1:slot:0:segment:1\",\"slotIndex\":0,\"segmentIndex\":1,\"shotIndex\":1,\"index\":0,\"origin\":{\"x\":1.5,\"y\":2.5},\"originalTargetId\":\"e\",\"contactPoint\":{\"x\":15.5,\"y\":2.5},\"targetId\":\"e\",\"logIndex\":1,\"side\":\"enemy\",\"maxHp\":100,\"damageType\":\"近战\",\"damageCategory\":null,\"isCrit\":false,\"isPierce\":false,\"hit\":false,\"outcome\":\"dodge\",\"hpDmg\":0,\"hpBefore\":100,\"hpAfter\":100,\"down\":false,\"logEnd\":2,\"aim\":{\"x\":15.5,\"y\":2.5,\"targetId\":\"e\"},\"facing\":90,\"cells\":[{\"col\":15,\"row\":2}]}]}],\"pending\"]"
-    },
-    {
-      "id": "TT-ALERTS 重置清掉由攻击引发的预警",
-      "pass": true,
-      "detail": ""
-    },
-    {
-      "id": "TT-ALERTS 看见我方立即预警但不提前通知邻居",
-      "pass": true,
-      "detail": ""
-    },
-    {
-      "id": "TT-ALERTS 预警者自然行动时广播到欧氏半径边界，不插队",
-      "pass": true,
-      "detail": "[\"engaged\",\"engaged\",\"idle\"]"
-    },
-    {
-      "id": "TT-ALERTS 广播发出一条警报事件：报警者、规则半径与实际收报名单（前端波纹据此播放）",
-      "pass": true,
-      "detail": "[{\"seq\":1,\"eventId\":\"battle:10:0:event:1\",\"runId\":\"battle:10:0\",\"actionId\":\"battle:10:0:action:1\",\"at\":62.5,\"attackId\":null,\"type\":\"enemy-alarm\",\"unitId\":\"sender\",\"center\":{\"x\":7.5,\"y\":5.5},\"radius\":6,\"recipientIds\":[\"receiver\"]}]"
-    },
-    {
-      "id": "TT-ALERTS 收报敌人按自身回合追击，不用范围技盲打也不自动接力",
-      "pass": true,
-      "detail": "{\"moveTo\":{\"col\":8,\"row\":5},\"skill\":null,\"aim\":null,\"action\":null}"
-    },
-    {
-      "id": "TT-ALERTS 雾外远距单锁雾内在预览和实战均被拒",
-      "pass": true,
-      "detail": "[true,\"无法瞄准：浓雾中只能瞄准相邻目标\",\"无法瞄准：浓雾中只能瞄准相邻目标\"]"
+      "detail": "\"无法瞄准：浓雾中只能瞄准相邻目标\""
     },
     {
       "id": "TT-ALERTS 单锁仍受墙、友方挡弹及射程限制",
@@ -310,29 +300,24 @@
       "detail": "[null,\"行军兽\",\"🦏◈行军兽◈\"]"
     },
     {
-      "id": "TT-ALERTS 我方召唤物追全队失视的已知敌人而非未发现敌人",
+      "id": "TT-ALERTS 无原地攻击时召唤物跟随主人，仍公开双方位置",
       "pass": true,
-      "detail": "{\"moveTo\":{\"col\":4,\"row\":2},\"skill\":null,\"aim\":null,\"action\":null}"
+      "detail": "{\"moveTo\":{\"col\":1,\"row\":3},\"skill\":null,\"aim\":null,\"action\":null}"
     },
     {
-      "id": "TT-ALERTS 没有我方发现记录的敌人不作为追踪目标",
+      "id": "TT-ALERTS 召唤物原地攻击不受个人感知半径限制",
       "pass": true,
       "detail": ""
     },
     {
-      "id": "TT-ALERTS 无警报敌人没有一步额度时不冲刺也不移动",
+      "id": "TT-ALERTS 低于一步额度时按待机策略结束回合",
       "pass": true,
-      "detail": "{\"moveTo\":null,\"skill\":null,\"aim\":null,\"action\":\"wait\"}"
+      "detail": "[{\"seq\":1,\"eventId\":\"battle:16:0:event:1\",\"runId\":\"battle:16:0\",\"actionId\":\"battle:16:0:action:1\",\"at\":50,\"attackId\":null,\"type\":\"main-point-received\",\"unitId\":\"h\",\"amount\":1,\"natural\":true},{\"seq\":2,\"eventId\":\"battle:16:0:event:2\",\"runId\":\"battle:16:0\",\"actionId\":\"battle:16:0:action:2\",\"at\":100,\"attackId\":null,\"type\":\"main-point-received\",\"unitId\":\"h\",\"amount\":1,\"natural\":true},{\"seq\":3,\"eventId\":\"battle:16:0:event:3\",\"runId\":\"battle:16:0\",\"actionId\":\"battle:16:0:action:3\",\"at\":100,\"attackId\":null,\"type\":\"main-point-received\",\"unitId\":\"e\",\"amount\":1,\"natural\":true},{\"seq\":4,\"eventId\":\"battle:16:0:event:4\",\"runId\":\"battle:16:0\",\"actionId\":\"battle:16:0:action:4\",\"at\":150,\"attackId\":null,\"type\":\"main-point-received\",\"unitId\":\"h\",\"amount\":1,\"natural\":true}]"
     },
     {
-      "id": "TT-ALERTS 无敌时随机走完正常移动额度，不自施可用增攻",
+      "id": "TT-ALERTS 探索移动可继续经过已知单位，不触发发现截停",
       "pass": true,
-      "detail": "[{\"moveTo\":{\"col\":19,\"row\":3},\"skill\":null,\"aim\":null,\"action\":null},6,5.414213562373095]"
-    },
-    {
-      "id": "TT-ALERTS 巡走途中发现敌人即暂停并预警",
-      "pass": true,
-      "detail": "[{\"moveTo\":{\"col\":3,\"row\":0},\"skill\":null,\"aim\":null,\"action\":null},{\"seq\":1,\"eventId\":\"battle:18:0:event:1\",\"runId\":\"battle:18:0\",\"actionId\":\"battle:18:0:action:3\",\"at\":100,\"attackId\":null,\"type\":\"unit-moved\",\"unitId\":\"e\",\"from\":{\"col\":8,\"row\":0},\"to\":{\"col\":4,\"row\":0},\"path\":[{\"col\":8,\"row\":0},{\"col\":7,\"row\":0},{\"col\":6,\"row\":0},{\"col\":5,\"row\":0},{\"col\":4,\"row\":0}],\"distance\":4,\"stoppedOnDiscovery\":true,\"discoveredIds\":[\"h\"]},\"pending\"]"
+      "detail": "[{\"moveTo\":{\"col\":4,\"row\":0},\"skill\":{\"name\":\"普通攻击\",\"type\":\"[伤害]\",\"fxTag\":\"刀砍\",\"power\":0,\"hit\":100,\"cost\":0,\"range\":{\"type\":\"单体\",\"castRange\":2},\"actionCost\":{\"main\":1,\"aux\":0}},\"aim\":{\"x\":2.5,\"y\":0.5,\"targetId\":\"h\"},\"action\":null},[{\"seq\":1,\"eventId\":\"battle:17:0:event:1\",\"runId\":\"battle:17:0\",\"actionId\":\"battle:17:0:action:1\",\"at\":50,\"attackId\":null,\"type\":\"main-point-received\",\"unitId\":\"h\",\"amount\":1,\"natural\":true},{\"seq\":2,\"eventId\":\"battle:17:0:event:2\",\"runId\":\"battle:17:0\",\"actionId\":\"battle:17:0:action:2\",\"at\":100,\"attackId\":null,\"type\":\"main-point-received\",\"unitId\":\"h\",\"amount\":1,\"natural\":true},{\"seq\":3,\"eventId\":\"battle:17:0:event:3\",\"runId\":\"battle:17:0\",\"actionId\":\"battle:17:0:action:3\",\"at\":100,\"attackId\":null,\"type\":\"main-point-received\",\"unitId\":\"e\",\"amount\":1,\"natural\":true},{\"seq\":4,\"eventId\":\"battle:17:0:event:4\",\"runId\":\"battle:17:0\",\"actionId\":\"battle:17:0:action:3\",\"at\":100,\"attackId\":null,\"type\":\"unit-moved\",\"unitId\":\"e\",\"from\":{\"col\":8,\"row\":0},\"to\":{\"col\":4,\"row\":0},\"path\":[{\"col\":8,\"row\":0},{\"col\":7,\"row\":0},{\"col\":6,\"row\":0},{\"col\":5,\"row\":0},{\"col\":4,\"row\":0}],\"distance\":4,\"stoppedOnDiscovery\":false,\"discoveredIds\":[]},{\"seq\":5,\"eventId\":\"battle:17:0:event:5\",\"runId\":\"battle:17:0\",\"actionId\":\"battle:17:0:action:3\",\"at\":100,\"attackId\":\"attack:1\",\"type\":\"attack-start\",\"id\":\"attack:1\",\"casterId\":\"e\",\"skillKey\":\"普通攻击\"},{\"seq\":6,\"eventId\":\"battle:17:0:event:6\",\"runId\":\"battle:17:0\",\"actionId\":\"battle:17:0:action:3\",\"at\":100,\"attackId\":\"attack:1\",\"segmentId\":\"battle:17:0:attack:1:slot:0:segment:1\",\"slotIndex\":0,\"segmentIndex\":1,\"shotIndex\":1,\"type\":\"segment-resolved\",\"casterId\":\"e\",\"targetId\":\"h\",\"originalTargetId\":\"h\",\"contactPoint\":{\"x\":2.5,\"y\":0.5},\"maxHp\":100,\"hpDmg\":8,\"shieldDmg\":0,\"guardDmg\":0,\"shieldBefore\":0,\"shieldAfter\":0,\"rawBeforeResist\":8,\"rawDmg\":8,\"resistance\":{\"before\":8,\"after\":8,\"layers\":[]},\"fatalResult\":null,\"hpBefore\":100,\"hpAfter\":92,\"isCrit\":false,\"isPierce\":false,\"damageType\":\"近战\",\"down\":false,\"damageCategory\":null},{\"seq\":7,\"eventId\":\"battle:17:0:event:7\",\"runId\":\"battle:17:0\",\"actionId\":\"battle:17:0:action:3\",\"at\":100,\"attackId\":\"attack:1\",\"segmentId\":\"battle:17:0:attack:1:slot:0:segment:1\",\"slotIndex\":0,\"segmentIndex\":1,\"shotIndex\":1,\"type\":\"attack-end\",\"id\":\"attack:1\",\"casterId\":\"e\",\"skillKey\":\"普通攻击\"},{\"seq\":8,\"eventId\":\"battle:17:0:event:8\",\"runId\":\"battle:17:0\",\"actionId\":\"battle:17:0:action:3\",\"at\":100,\"attackId\":null,\"type\":\"unit-moved\",\"unitId\":\"e\",\"from\":{\"col\":4,\"row\":0,\"facing\":270},\"to\":{\"col\":3,\"row\":0},\"path\":[{\"col\":4,\"row\":0},{\"col\":3,\"row\":0}],\"distance\":1,\"stoppedOnDiscovery\":false,\"discoveredIds\":[]},{\"seq\":9,\"eventId\":\"battle:17:0:event:9\",\"runId\":\"battle:17:0\",\"actionId\":\"battle:17:0:action:4\",\"at\":150,\"attackId\":null,\"type\":\"main-point-received\",\"unitId\":\"h\",\"amount\":1,\"natural\":true}]]"
     },
     {
       "id": "TT-ALERTS 空闲召唤物跨轮走到多格主人八邻接并停下",
@@ -340,6 +325,6 @@
       "detail": "[{\"moveTo\":{\"col\":6,\"row\":3},\"skill\":null,\"aim\":null,\"action\":null},6,{\"moveTo\":{\"col\":5,\"row\":3},\"skill\":null,\"aim\":null,\"action\":null},{\"col\":5,\"row\":3,\"facing\":270},{\"moveTo\":null,\"skill\":null,\"aim\":null,\"action\":\"wait\"}]"
     }
   ],
-  "passed": 66,
+  "passed": 63,
   "failed": 0
 }

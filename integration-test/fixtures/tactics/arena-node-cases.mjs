@@ -138,9 +138,10 @@ async function runArena(deps = {}) {
   const shot = () => m.range.queryAttack(fight.ctx, 'h', gun, { targetId: 'e', x: 7.5, y: 4.5 });
   check('TARENA 墙后单位位置已知但射线被高墙挡住', fight.snapshot('h').units.some(u => u.id === 'e') && shot().blockedBy?.type === 'wall');
   const move = fight.move(7, 2);
-  check('TARENA 绕墙移动不中途触发发现截停', move.ok && move.cell.col === 7 && !move.stoppedOnDiscovery && shot().ok);
+  check('TARENA 战斗中单位位置始终已知，移动不再因探索发现截停', fight.snapshot('h').units.some(u => u.id === 'e')
+    && move.ok && move.cell.col === 7 && !move.stoppedOnDiscovery && shot().ok);
   fight.ctx.regions.push({ id: 'fog', type: 'fog', cells: [{ col: 7, row: 2 }], strength: 25, endAt: fight.ctx.now() + 100 });
-  check('TARENA 技能雾仍限制视野和锁定', !fight.snapshot('h').units.some(u => u.id === 'e') && !shot().ok);
+  check('TARENA 技能雾仍限制攻击瞄准', !shot().ok);
   fight.ctx.regions.length = 0;
   check('TARENA 雾解除后恢复位置与合法弹道', fight.snapshot('h').units.some(u => u.id === 'e') && shot().ok);
 
