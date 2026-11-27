@@ -943,3 +943,11 @@
 - 文件：`tactics/src/{ui-shell,main,status-ui}.mjs`、`tactics/tactics.css`、`tactics/tools/verify-fx-polish-artifact.cjs`（入包标记改 t-ally-tab/onAllyPin/inspectPin）、产物报告、`tactics/mvp-standalone.html`。
 - 验证：全量回归退出码 0；fx-polish、feedback 25/25、guard-barrier 16/16、phase4 11/11、典型对局 63/63 通过。无头 Chrome 实页：注入两名支援单位（🐺/💨），容器 overflowX=hidden、scrollWidth=clientWidth、无滚动条；实点签 → 检视卡出现且 right=60px、脚注为已固定、签 aria-pressed=true；再点 → 收起；页面无「行动中」节点。未在真实召唤流程中复测；未接入真实酒馆。
 - 目的 vs 现状：一致。
+
+## 2026-11-28 · 反应弹窗统一暗金扁平（dfaf521）
+- 核心目的：「即将遭受攻击 / 看破契机」弹窗与指令面板、检视卡同族；三类反应仍可一眼区分，危险等级不被弱化。
+- 样式：FX02 段整体替换——去毛玻璃与靛紫/天蓝/琥珀大面积渐变，改近黑铭牌 + 金细线 + 四角刻线（复用检视卡/指令面板 ::before）；头像改斜角方框。三类反应只走强调色 --rx（反应暗紫 #9d7cc9 / 舍身钢蓝 #6f9fb8 / 看破金），用于顶部光束、REACTION 标签、头像框与候选左色条；候选悬停统一暗金渐亮。致命红（脉动）、穿透金与安全绿语义保留。
+- 收起胶囊「继续反应 / 继续看破」改暗金斜切签 + 呼吸辉光，位置由底部 64px 上移到 206px，不再压住底栏角色卡（原位置即遮挡，顺手修）。
+- 文件：`tactics/tactics.css`、产物报告、`tactics/mvp-standalone.html`；`reaction-prompt.mjs` 结构与逻辑未改（纯 CSS 换肤）。
+- 验证：全量回归退出码 0；fx-polish、feedback 25/25、guard-barrier 16/16、phase4 11/11、典型对局 63/63 通过。无头 Chrome 实页直接调起 promptReaction 三态截图（反应+舍身+致命 / 仅舍身+穿透 / 仅看破），候选悬停高亮、收起胶囊底沿 794 < 角色栏顶 843；backdrop-filter 为 none。未在真实受击流程中触发；未接入真实酒馆。
+- 目的 vs 现状：一致。
