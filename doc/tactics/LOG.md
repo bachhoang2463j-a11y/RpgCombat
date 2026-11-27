@@ -951,3 +951,13 @@
 - 文件：`tactics/tactics.css`、产物报告、`tactics/mvp-standalone.html`；`reaction-prompt.mjs` 结构与逻辑未改（纯 CSS 换肤）。
 - 验证：全量回归退出码 0；fx-polish、feedback 25/25、guard-barrier 16/16、phase4 11/11、典型对局 63/63 通过。无头 Chrome 实页直接调起 promptReaction 三态截图（反应+舍身+致命 / 仅舍身+穿透 / 仅看破），候选悬停高亮、收起胶囊底沿 794 < 角色栏顶 843；backdrop-filter 为 none。未在真实受击流程中触发；未接入真实酒馆。
 - 目的 vs 现状：一致。
+
+
+## 2026-11-28 · 战棋动态配乐引擎（《33号远征队》7态战况驱动 + AiRadio 跨窗联动，bfc9938）
+- 核心目的：接入 `AiRadio` 音源核并让战棋按实时战况自动演绎《33号远征队》配乐（探索序幕/常规交锋/强敌压境/首领狂暴/绝境求生/凯旋/陨落）。
+- 架构：新增 `tactics/src/bgm-director.mjs`，内置 14 首实测精确网易云 ID 曲库（`EXPEDITION33_TRACK_DB`）、纯函数 `evaluateBattleMood`（7 态评估）、升档 0 延迟与降档 25s+连续 2 次独立评估防抖迟滞锁、三级直链容错解析与邻档预热、`postMessage` 跨窗遥控顶层 `AiRadio`（无电台时自动启用内置双 `<audio>` 1.8s Crossfade 兜底）、以及 L3/L4 大招与角色语音 Sidechain Ducking 闪避。
+- 界面：顶部左侧空闲区（`top: 10px; left: 74px`）挂载 `#tactics-bgm-widget` 暗金旋转黑胶唱片微件，折叠态显示战况徽章/曲名/引擎模式与切歌静音键；展开抽屉支持 7 档曲目点播、音量推子与“战况自动导演 / 手动锁频”切换，避开行动轴、召唤物签与右下行动面板。
+- 审查与修复：采纳只读审查报告全部 5 项高危与核心中危修复（`playSeq` 静音竞态锁、交叉淡入归零防瞬跳、`detectBridge` 异步握手、`loadYaml` 新局强制复位、延迟 `playAttackResult` 至演出揭示后切歌、及左上避让布局）。
+- 文件：`tactics/src/bgm-director.mjs`、`tactics/src/{main,action-director}.mjs`、`tactics/tactics.css`、`tactics/tools/{build-demo-html,run-tests}.cjs`、`integration-test/fixtures/tactics/bgm-director-node-cases.mjs`、`tactics/mvp-standalone.html`（跨仓联动升级 `D:\Project\AiRadio` @ `5ee7273`）。
+- 验证：修改前全量 `--all` 1518 项全绿；修复后复跑 `bgm-director` 5/5、`main-point-av` 2/2、`p07-av` 13/13 通过；重新打包 `mvp-standalone.html`（2,088,754 字节，62 模块/47 输入/121 符号门禁通过）；内置浏览器实机验证（`888x904` 零 JS 报错、展开抽屉 `x=74..362, y=51.56..481.56` 与行动面板完全零重叠、手自动切换与静音交互正常）。未在真实酒馆宿主内双窗联调。
+- 目的 vs 现状：一致。
