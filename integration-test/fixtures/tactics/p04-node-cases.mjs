@@ -66,6 +66,11 @@ async function p04(m) {
     collision.hpDmg === 2 && collisionTarget.ref.hp === 8 && collisionTarget.ref.shield === 0,
     JSON.stringify({ collision, hp: collisionTarget.ref.hp, shield: collisionTarget.ref.shield })));
 
+  const diagonal = { hp: 20, shield: 2, def: 0 };
+  const diagonalHit = m.damage.applyCollisionDamage((3 - Math.SQRT2) * 5, diagonal);
+  cases.push(ok('T04-06 斜撞小数在扣护盾与 HP 前向下取整', diagonalHit.mitigated === 7 && diagonalHit.hpDmg === 5
+    && diagonal.shield === 0 && diagonal.hp === 15, JSON.stringify({ diagonalHit, diagonal })));
+
   const failTarget = unit('f', 'enemy', { hp: 30, strength: 40, totalWeight: 60 });
   const bf = createBattle(m, [unit('p', 'hero', { hp: 30, spd: 200, strength: 40 }), failTarget, unit('e2', 'enemy', { hp: 30, spd: 50 })], { p: { col: 2, row: 2 }, f: { col: 3, row: 2 }, e2: { col: 10, row: 8 } }, room());
   bf.start();

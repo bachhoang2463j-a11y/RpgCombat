@@ -188,11 +188,11 @@ function run() {
       return { opening, longest, counts };
     };
     const before = measure(plainNext), after = measure(actualNext);
-    const heroMax = Math.max(...us.filter(u => u.side === 'hero').map(u => after.counts[u.id]));
-    const bosses = us.filter(u => u.ref.spd === 270 || u.ref.spd === 203);
-    check('TT-B 典型对局从开场5连动降为3、敌阵最长连动降低、高敏双怪各自仍多于任一玩家',
-      before.opening === 5 && after.opening === 3 && after.longest < before.longest
-      && bosses.length === 2 && bosses.every(u => after.counts[u.id] > heroMax), { before, after });
+    const roster = sample().units;
+    const highRanks = ['伊塔库亚的眷族', '犹格索托斯之子'].map(name => roster.findIndex(u => u.name.includes(name)));
+    check('TT-B 眷族和优格按新敏捷排轴，连续行动衰减仍生效', highRanks.every(i => i >= 0)
+      && us[highRanks[0]].ref.spd === 100 && us[highRanks[1]].ref.spd === 80
+      && after.opening === 1 && after.longest <= before.longest && after.counts.u6 < before.counts.u6, { before, after });
   }
   {
     const us = [unit('h', 'hero', { spd: 50 }), unit('s', 'hero', { spd: 200, controller: 'ai' }), unit('e', 'enemy', { spd: 400, controller: 'ai' })];

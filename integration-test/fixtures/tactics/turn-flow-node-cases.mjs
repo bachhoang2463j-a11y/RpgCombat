@@ -38,6 +38,7 @@ function run() {
     const caster = unit('caster', 'enemy', { spd: 200 });
     const scene = field([{ id: 'wall', kind: 'wall', bounds: { col: 8, row: 0, width: 1, height: 9 } }]);
     const b = make([victim, buddy, watcher, caster], { victim: p(4), buddy: p(4, 5), watcher: p(15), caster: p(2) }, scene);
+    b.state.combatState.exposure = { caster: { stacks: 1, remaining: 3 } };
     const requests = [];
     const result = drive(b.beginAttack(spell, aim(b, 'victim')), req => {
       requests.push(req.type);

@@ -253,6 +253,7 @@ async function p07(m) {
   const incomingBattle = makeBattle(m, [target, kanpoHero], [triEnemy],
     { target: { col: 2, row: 4 }, kh: { col: 3, row: 3 }, ke: { col: 6, row: 4 } }, rng([0, 0]));
   incomingBattle.start();
+  incomingBattle.state.combatState.exposure = { ke: { stacks: 1, remaining: 3 } };
   const canKanpo = incomingBattle.canUseReaction(kanpoHero, kanpoSkill, triEnemy.id, '远程');
   const canceledByKanpo = attackAt(incomingBattle, incoming, 'target', { col: 2, row: 4 }, { policy: 'auto' });
   cases.push(ok('P07 看破可用于反应链：按来袭类型整招取消一次、不逐发重触发', canKanpo.ok

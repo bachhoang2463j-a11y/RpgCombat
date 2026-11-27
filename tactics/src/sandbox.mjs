@@ -39,7 +39,7 @@ export function createSandbox(rootEl, deps = {}) {
   let onHoverCb = null;
   let preview = null;
   let persistentIntents = [];
-  let hoverKey = null;
+  let hoverKey = null, backstabHoverId = null;
   let userCamTouched = false;     // 本次动作内玩家是否拖拽/缩放过（中断自动跟随）
   let worldW = 1000, worldH = 1000;
   let onCancelCb = null, onContextCb = null;
@@ -105,7 +105,7 @@ export function createSandbox(rootEl, deps = {}) {
     const g = dom.overlay.getContext('2d');
     g.setTransform(dom.dpr, 0, 0, dom.dpr, 0, 0);
     g.clearRect(0, 0, worldW, worldH);
-    drawOverlay(g, preview, viewData, selectedId, persistentIntents);
+    drawOverlay(g, preview, viewData, selectedId, persistentIntents, backstabHoverId);
   }
 
   // ---------- 手势（每 mount 绑定一次） ----------
@@ -121,13 +121,14 @@ export function createSandbox(rootEl, deps = {}) {
     scope.listen(dom.viewport, 'pointermove', (e) => {
       const r = gesture.move(e);
       if (r && r.state === 'dragging') {
+        if (backstabHoverId) { backstabHoverId = null; redrawOverlay(); }
         stopFocusAnim(); userCamTouched = true;
         pose = r.pose;
         applyCamera();
         dom.viewport.style.cursor = 'grabbing';
         return;
       }
-      if (gesture.state === 'idle') handleHover(e.clientX, e.clientY);
+      if (gesture.state === 'idle') handleHover(e.clientX, e.clientY, e.pointerType === 'mouse');
     });
     scope.listen(dom.viewport, 'pointerup', (e) => {
       dom.viewport.style.cursor = 'grab';
@@ -168,7 +169,9 @@ export function createSandbox(rootEl, deps = {}) {
     const unitId = occupancy ? unitAt(occupancy, gridHit.col, gridHit.row) || null : null;
     return { ...gridHit, x: gridHit.col + .5, y: gridHit.row + .5, targetId: unitId, client: { x: sx, y: sy } };
   }
-  function setHover(hit) {
+  function setHover(hit, mouse = false) {
+    const nextBackstab = mouse && hit?.targetId || null;
+    if (backstabHoverId !== nextBackstab) { backstabHoverId = nextBackstab; redrawOverlay(); }
     const key = hit ? hit.col + ',' + hit.row + ',' + (hit.targetId || '') : null;
     if (key === hoverKey) return;
     hoverKey = key;
@@ -178,7 +181,7 @@ export function createSandbox(rootEl, deps = {}) {
     }
     if (onHoverCb) onHoverCb(hit);
   }
-  function handleHover(sx, sy) { if (compiled) setHover(hitAt(sx, sy)); }
+  function handleHover(sx, sy, mouse) { if (compiled) setHover(hitAt(sx, sy), mouse); }
 
   function handleSelect(sx, sy, clickCount) {
     const hit = hitAt(sx, sy);
@@ -281,7 +284,7 @@ export function createSandbox(rootEl, deps = {}) {
     scope = createViewScope();
     token = vd.combatToken;
     viewData = vd;
-    preview = null; persistentIntents = []; hoverKey = null; userCamTouched = false;
+    preview = null; persistentIntents = []; hoverKey = null; backstabHoverId = null; userCamTouched = false;
     compiled = compileScene(vd.scene);
     worldW = compiled.grid.columns * 50; worldH = compiled.grid.rows * 50;
     buildDom();

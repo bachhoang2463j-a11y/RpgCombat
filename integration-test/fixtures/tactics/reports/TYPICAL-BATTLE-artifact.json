@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "a7bbaee75d408f991ec3d88b9df15d444bfcaf42bb6e90ff40205186421c3a47",
-  "bytes": 2024909,
+  "sha256": "7b677d89518c4f3acc1109edae350055a3b6556ca31f538791ce02bfe7023031",
+  "bytes": 2029248,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -201,7 +201,7 @@
       "detail": ""
     },
     {
-      "id": "产物真实技能结算扣费与增攻",
+      "id": "产物首领施法优先消耗专用点并保留基础主行动",
       "pass": true,
       "detail": ""
     },
@@ -231,12 +231,11 @@
       "detail": ""
     },
     {
-      "id": "产物高敏怪开场仍多动但只在首位玩家前行动三次",
+      "id": "产物眷族敏捷100、优格80，开场分别拿到一次自然行动",
       "pass": true,
       "detail": [
         "e:伊塔库亚的眷族",
-        "e:犹格索托斯之子",
-        "e:伊塔库亚的眷族"
+        "e:犹格索托斯之子"
       ]
     },
     {

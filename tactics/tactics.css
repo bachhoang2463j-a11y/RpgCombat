@@ -154,10 +154,7 @@ button:disabled { opacity: .42; cursor: default; }
   margin-left: calc((var(--d) + 22px) / -2); margin-top: calc((var(--d) + 22px) / -2); transform-origin: 50% 50%; pointer-events: none; overflow: visible; transition: transform .12s linear; }
 .t-unit-direction path { fill: var(--gold-2); stroke: #4a3410; stroke-width: 1.2; }
 .t-side-enemy .t-unit-direction path { fill: #ff8a94; stroke: #3d0a10; }
-.t-unit-direction .t-unit-rear, .t-side-enemy .t-unit-direction .t-unit-rear { display: none; fill: rgba(239,68,68,.5); stroke: #fecaca; stroke-width: 1; }
-.t-unit-backstab .t-unit-direction .t-unit-rear { display: block; animation: t-rear-pulse .8s ease-in-out infinite alternate; }
 .t-unit-backstab .t-unit-predict-tag { color: #fca5a5; }
-@keyframes t-rear-pulse { from { opacity: .55; } to { opacity: 1; filter: drop-shadow(0 0 4px #ef4444); } }
 .t-unit-name { position: absolute; left: 50%; bottom: calc(var(--d) / 2 + 4px); transform: translateX(-50%); font-size: 11px; font-weight: 800; white-space: nowrap; letter-spacing: .5px;
   color: var(--gold-2); text-shadow: 0 1px 2px #000, 0 0 6px rgba(0,0,0,0.9); pointer-events: none; }
 .t-side-enemy .t-unit-name { color: #ff9aa3; }

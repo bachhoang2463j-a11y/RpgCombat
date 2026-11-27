@@ -587,9 +587,9 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
     const target = visible && ctx.units.find(u => u.id === targetId);
     const intent = chooseEnemyAction(ctx, unitId, moveBudget, target ? skills : [], canUseSkill, {
       ...res, focus: null, focusOnly: true, focusTargetId: target ? targetId : null,
-      seen: target ? [target] : [], pursuitPoints: [lastSeen], idleMovement: false,
+      seen: target ? [target] : [], pursuitPoints: [lastSeen], idleMovement: false, recoverSkills: target ? res.recoverSkills : [],
     });
-    if (intent.skill || intent.moveTo || intent.jumpTo || intent.action === 'sprint') return intent;
+    if (intent.skill || intent.moveTo || intent.jumpTo || intent.action === 'sprint' || intent.action === 'recoverMp') return intent;
     res = { ...res, hiddenFocusId: visible ? null : targetId };
   }
 
@@ -613,7 +613,15 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
 
   const tracking = !!(seenIds || res.pursuitPoints?.length);
   const preferred = moveReach(ctx, unit, moveBudget, avoid);
-  const inBudget = searchBest(ctx, unit, usable, moveBudget, enemies, allies, tracking, preferred, res);
+  let inBudget = searchBest(ctx, unit, usable, moveBudget, enemies, allies, tracking, preferred, res);
+  if (res.recoverSkills?.length && (!inBudget.best || inBudget.best.skill === res.basicAttack)) {
+    const available = usable.filter(skill => skill !== res.basicAttack);
+    const alternative = available.length && searchBest(ctx, unit, available, moveBudget, enemies, allies, tracking, preferred, res);
+    if (alternative?.best) inBudget = alternative;
+    else if (searchBest(ctx, unit, res.recoverSkills, moveBudget, enemies, allies, tracking, preferred, res).best) {
+      return { ...IDLE, action: 'recoverMp' };
+    }
+  }
   const markRoute = plan => plan.moveTo && avoid ? { ...plan, avoidFog: true } : plan;
   if (res.jumpFirst && (!inBudget.best?.attackTarget || inBudget.best.cost > EPS)) {
     const attackPlace = inBudget.best?.attackTarget && inBudget.best.cell;
@@ -677,7 +685,7 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
     if (exit) return exit;
   }
   if (hasAdjacentEnemy(ctx, unit, seen)) {
-    return res.main > 0 ? { ...IDLE, action: 'defend' } : { ...IDLE };
+    return unit.side !== 'enemy' && res.main > 0 ? { ...IDLE, action: 'defend' } : { ...IDLE };
   }
   if (res.idleMovement && (!points.length || unit.isSummon)) {
     const idle = planIdleMove(ctx, unit, res, moveBudget, preferred, avoid ? fog : null);

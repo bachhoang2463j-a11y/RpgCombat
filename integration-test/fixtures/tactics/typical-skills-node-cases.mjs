@@ -62,6 +62,7 @@ function createReactionCase(source, skill, observe = () => {}) {
     b.endAction();
   }
   actUntil(b, 'attacker');
+  if (skill.kanpoTarget) b.state.combatState.exposure = { attacker: { stacks: 1, remaining: 3 } };
   const target = b.ctx.units.find(u => u.id === targetId);
   const aim = { ...unitCenter(placements[targetId], target.footprint), targetId };
   const hpBefore = responder.ref.hp;

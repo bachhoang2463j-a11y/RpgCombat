@@ -59,7 +59,7 @@ export function applyAttackDamage(caster, target, skill, random = Math.random) {
 
 // 碰撞不掷命闪：先结算护甲折算，再由护盾吸收，余量扣 HP。
 export function applyCollisionDamage(rawDmg, target) {
-  const mitigated = calculateDamage(rawDmg, { ...target, shield: 0 }).hpDmg;
+  const mitigated = Math.floor(calculateDamage(rawDmg, { ...target, shield: 0 }).hpDmg);
   const shieldDmg = Math.min(Math.max(0, target.shield || 0), mitigated);
   target.shield = Math.max(0, (target.shield || 0) - shieldDmg);
   const hpDmg = Math.min(target.hp, mitigated - shieldDmg);

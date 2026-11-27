@@ -68,6 +68,8 @@ function linePassesLowCover(ctx, origin, target, { col, row }, { width, height }
   return false;
 }
 
+export const BACKSTAB_HALF_ANGLE = Math.PI / 8;
+
 export function spatialAttackModifiers(ctx, casterId, targetId, skill) {
   const caster = unitById(ctx, casterId), target = unitById(ctx, targetId);
   const type = skill?.range?.type;
@@ -80,7 +82,7 @@ export function spatialAttackModifiers(ctx, casterId, targetId, skill) {
     const facing = directionVector(at.facing);
     const x = origin.x - center.x, y = origin.y - center.y;
     const dot = facing.dx * x + facing.dy * y;
-    return { backstab: dot < 0 && Math.abs(facing.dx * y - facing.dy * x) <= -dot * Math.tan(Math.PI / 8) + EPS, lowCover: false };
+    return { backstab: dot < 0 && Math.abs(facing.dx * y - facing.dy * x) <= -dot * Math.tan(BACKSTAB_HALF_ANGLE) + EPS, lowCover: false };
   }
   const lowCover = caster.side === 'enemy' && target.side === 'hero'
     && (skill.damageType === '远程' || type === '直线' && skill.damageType === '法术')

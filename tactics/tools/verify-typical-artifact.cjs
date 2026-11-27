@@ -97,7 +97,8 @@ if (backend) {
   const caster = data.units.find(u => u.id === opening.currentId);
   const rage = caster.skills.find(s => s.name === '风雪狂暴');
   const action = battle.attack(rage);
-  check('产物真实技能结算扣费与增攻', action.ok && caster.ref.mp === 13 && battle.getEffectiveUnit(caster.id).atk === 150 && battle.snapshot().resources.main === 0);
+  check('产物首领施法优先消耗专用点并保留基础主行动', action.ok && caster.ref.mp === 13 && battle.getEffectiveUnit(caster.id).atk === 150
+    && opening.resources.skillMain === 2 && battle.snapshot().resources.main === 1 && battle.snapshot().resources.skillMain === 1);
   const ruleState = snap => {
     const { runId, resetEvents, events, ...state } = snap;
     return JSON.stringify({ ...state, events: events.map(({ runId, eventId, actionId, ...event }) => event) });
@@ -129,7 +130,8 @@ if (backend) {
     openingIds.push(id);
     moveBattle.endAction();
   }
-  check('产物高敏怪开场仍多动但只在首位玩家前行动三次', openingIds.length === 3 && openingIds[0] === monsterId && openingIds[2] === monsterId
+  check('产物眷族敏捷100、优格80，开场分别拿到一次自然行动', openingIds.join(',') === monsterId + ',e:犹格索托斯之子'
+    && moveData.units.find(u => u.id === monsterId).ref.spd === 100 && moveData.units.find(u => u.id === openingIds[1]).ref.spd === 80
     && moveBattle.snapshot().currentId === 'h:玛德琳', openingIds);
   const gear = { name: '无限补给', isItem: true, category: '道具', type: '[回蓝]', power: 5, count: 0,
     actionCost: { main: 1, aux: 0 }, range: { type: '自身' } };

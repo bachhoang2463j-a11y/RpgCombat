@@ -1489,7 +1489,10 @@ export function createApp(rootEl, opts = {}) {
         if (battle.snapshot().currentId !== actorId || battle.snapshot().terminal) break;
         if (plan.jumpTo || result.stopped || !plan.skill) continue;
       }
-      if (plan.action === 'defend') {
+      if (plan.action === 'recoverMp') {
+        if (!battle.recoverEnemyMp().ok) break;
+        syncShown(); refreshBattle();
+      } else if (plan.action === 'defend') {
         if (!battle.defend().ok) break;
         avHost.sfx('defUp', 0.55, { category: 'K' }); fxAtUnit(actorId, 't-heal-pulse', 700); refreshBattle();
       } else if (plan.action === 'prepare' && !plan.skill) {

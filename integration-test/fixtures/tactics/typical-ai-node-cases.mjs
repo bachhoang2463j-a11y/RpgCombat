@@ -216,14 +216,14 @@ async function run(deps) {
       !plan.skill && !!plan.moveTo && plan.moveTo.col === 8 && plan.moveTo.row === 3, j(plan)));
   }
 
-  // 09 贴身且无可用收益 → 防御
+  // 09 敌方贴身且无可用收益 → 等待
   {
     const scene = sceneOf(12, 10);
     const units = [mkUnit('h', 'hero', { hp: 100 }), mkUnit('e', 'enemy', { hp: 100 })];
     const ctx = makeCtx(m, scene, units, { h: { col: 3, row: 5 }, e: { col: 2, row: 5 } });
     const plan = ai.chooseEnemyAction(ctx, 'e', 0, []);
-    cases.push(ok('TT-AI-09 贴身无可用技能时选择防御',
-      !plan.moveTo && !plan.skill && plan.action === 'defend', j(plan)));
+    cases.push(ok('TT-AI-09 敌方贴身无可用技能时等待',
+      !plan.moveTo && !plan.skill && plan.action === 'wait', j(plan)));
   }
 
   return { cases };

@@ -300,7 +300,11 @@ export function advanceToNextAction(battleState, rulesContext = {}) {
     const arrivals = collectArrivals(battleState, next);
     const batchEvents = [];
     for (const u of arrivals) {
-      if (u.stun) { batchEvents.push(processStunSkip(battleState, u.id, next)); continue; }
+      if (u.stun) {
+        const ev = processStunSkip(battleState, u.id, next);
+        batchEvents.push(ev); hooks.onEvent(ev);
+        continue;
+      }
       const g = grantNaturalAction(battleState, u.id, next);
       clock.currentAction = { unitId: u.id, resources: g.resources };
       return {

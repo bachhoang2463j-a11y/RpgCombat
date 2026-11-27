@@ -14,7 +14,8 @@ const symbols = [
   'function playZheYingBu(', 'function playStrangeConch(', 'land ? land.x', 'arcane-ghost-shatter',
   'obstacle-destroyed', 'playObstacleBreak', 'onObstacleBreak', 'molt_crack', 'mx_golem_stomp',
   'marcher-charge', 'marcher-roar', '行军兽冲撞', '行军兽咆哮',
-  'playBackstabMark', 't-unit-rear', 't-unit-backstab', '🗡背袭',
+  'playBackstabMark', 'drawBackstabSector', 't-unit-backstab', '🗡背袭',
+  'enemy-mp-recovered', 'finishExposureTurn', 'skillMain', '暴露',
   'stationaryStatus', 't-prep-pips', 't-prep-still', '驻足起咏', '驻足继续',
   'reaction-sonic-jam', '声波干扰雷', '净蚀反冲', 'seerEyeHtml', 'slamSeal', 't-card-still', 't-ally-ring', 't-ally-mini', 't-ab-fill', 'creature_slime_01',
 ];

@@ -55,6 +55,10 @@ const STAGES = {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'turn-flow-node-cases.mjs'),
     groups: ['TURN-FLOW'], modules: [], requiredExports: [],
   },
+  'exposure-enemy': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'exposure-enemy-node-cases.mjs'),
+    groups: ['EXPOSURE-ENEMY'], modules: [], requiredExports: [],
+  },
   'main-point-av': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'main-point-av-node-cases.mjs'),
     groups: ['MPAV'], modules: [], requiredExports: [],

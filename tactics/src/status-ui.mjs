@@ -63,6 +63,11 @@ export function statusBadges(eff, extra = {}) {
     push({ key: 'taunt', icon: hidden ? '🌫️' : '💢', text: name + ' ' + value, short: (hidden ? '匿' : '嘲') + value,
       color: hidden ? '#94a3b8' : '#fca5a5', title: hidden ? '当前隐匿值 ' + value : '当前嘲讽 ' + value }, 5);
   }
+  if (eff.exposure) {
+    const { stacks, remaining } = eff.exposure;
+    push({ key: 'exposure', icon: '🎯', text: '暴露×' + stacks + ' · 闪避−' + stacks * 5 + ' · ' + remaining + '回', short: '暴露×' + stacks,
+      color: '#fca5a5', neg: true, expiring: remaining === 1, title: '【暴露】闪避−' + stacks * 5 + '，剩余 ' + remaining + ' 个自身回合' }, 2);
+  }
   const counter = group('counter');
   if (counter.length) { const v = counter.reduce((n, b) => n + b.value, 0);
     push({ key: 'counter', icon: '⚔️', text: v ? '反击+' + v : '反击架势', short: '反击', color: '#fcd34d', expiring: expiring(counter), title: '【反击架势】受到攻击时反击' + (v ? '，附加威力 +' + v : '') }, 5); }

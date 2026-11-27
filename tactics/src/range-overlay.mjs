@@ -5,7 +5,8 @@
 // 多格单位只画一个目标标记。所有坐标为世界美术像素（Q=50/米）。
 // ==========================================
 
-import { occupiedCells, unitCenter, cellKey } from './geometry.mjs';
+import { occupiedCells, unitCenter, cellKey, directionVector } from './geometry.mjs';
+import { BACKSTAB_HALF_ANGLE } from './range.mjs';
 
 const Q = 50;
 const C = {
@@ -275,7 +276,24 @@ function drawChargeIntent(g, intent) {
 }
 
 // 绘制入口：固定意向先画，独立于玩家悬停和当次施放预览。
-export function drawOverlay(g, pv, viewData, selectedId, intents = []) {
+function drawBackstabSector(g, viewData, unitId) {
+  const unit = viewData?.units.find(u => u.id === unitId);
+  const at = unit && viewData.placementsById[unitId];
+  if (unit?.side !== 'enemy' || at?.facing == null) return;
+  const center = unitCenter(at, viewData.footprintsById[unitId]);
+  const facing = directionVector(at.facing), dir = Math.atan2(-facing.dy, -facing.dx);
+  const scale = g.getTransform().a;
+  const width = g.canvas.width / scale, height = g.canvas.height / scale;
+  g.save();
+  g.beginPath(); g.rect(0, 0, width, height); g.clip();
+  shapePath(g, { type: '扇形', center, dir, angle: BACKSTAB_HALF_ANGLE * 360 / Math.PI, radius: Math.hypot(width, height) / Q });
+  g.fillStyle = 'rgba(244,114,182,.13)'; g.fill();
+  g.strokeStyle = 'rgba(251,146,180,.62)'; g.lineWidth = 1.8; g.stroke();
+  g.restore();
+}
+
+export function drawOverlay(g, pv, viewData, selectedId, intents = [], backstabHoverId = null) {
+  if (backstabHoverId) drawBackstabSector(g, viewData, backstabHoverId);
   for (const intent of intents) drawChargeIntent(g, intent);
   if (pv && viewData) {
     if (pv.kind === 'move') drawMove(g, pv, viewData);
