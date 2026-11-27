@@ -100,6 +100,7 @@ export function createUnitView(parent, deps) {
         '<div class="t-bar t-bar-hp"><i class="t-bar-ghost" id="' + escapeHtml(unit.id) + '-hp-ghost"></i><i class="t-bar-fill" id="' + escapeHtml(unit.id) + '-hp-bar"></i><i class="t-bar-predict"></i></div>' +
         (unit.bars && unit.bars.maxMp ? '<div class="t-bar t-bar-mp"><i class="t-bar-fill"></i></div>' : '') +
       '</div>' +
+      (unit.side === 'enemy' ? '<div class="t-unit-charge"></div>' : '') +
       '<div class="t-unit-status"></div><div class="t-unit-predict-tag"></div>';
 
     const img = billboard.querySelector('img');
@@ -133,7 +134,7 @@ export function createUnitView(parent, deps) {
       status: billboard.querySelector('.t-unit-status'), statusHtml: '',
       predictBar: billboard.querySelector('.t-bar-predict'), predictTag: billboard.querySelector('.t-unit-predict-tag'),
       shield: billboard.querySelector('.t-unit-shield'), shieldShown: (unit.bars && unit.bars.shield) || 0,
-      alert: billboard.querySelector('.t-unit-alert'),
+      alert: billboard.querySelector('.t-unit-alert'), charge: billboard.querySelector('.t-unit-charge'),
       auras: billboard.querySelector('.t-unit-auras'), auraKey: '',
       unit, placement, bars: unit.bars || null, motionLock: false, displayFacing: null,
     };
@@ -253,6 +254,17 @@ export function createUnitView(parent, deps) {
     applyFacing(rec);
   }
   function setFlag(id, cls, on) { const rec = nodes.get(id); if (rec) rec.root.classList.toggle(cls, !!on); }
+  function setCharge(id, charge) {
+    const rec = nodes.get(id);
+    if (!rec || !rec.charge) return;
+    const key = charge ? charge.current + '/' + charge.max + ':' + charge.skillName : '';
+    if (rec.chargeKey === key) return;
+    rec.chargeKey = key;
+    rec.root.classList.toggle('t-unit-has-charge', !!charge);
+    rec.charge.title = charge ? charge.skillName : '';
+    rec.charge.innerHTML = charge ? '<span class="t-charge-pip-row" aria-hidden="true">' + Array.from({ length: charge.max }, (_, i) =>
+      '<i class="charge-pip ' + (i < charge.current ? 'filled' : 'empty') + '"></i>').join('') + '</span><b>' + charge.current + '/' + charge.max + '</b>' : '';
+  }
   // 步态起落：只改 medal 层（sprite 层留给受击/前摇，root 层留给位置），互不覆盖
   function setHop(id, px, squash) {
     const rec = nodes.get(id);
@@ -295,5 +307,5 @@ export function createUnitView(parent, deps) {
   }
 
   return { setUnits, syncUnits, updateUnit, setFacing, onCameraChange, getEntitySpriteDom, nodes,
-    lockMotion, setDisplayPos, setDisplayFacing, setFlag, clearFlag, setHop, setStatus, setPredict, clearPredict, setShield, setAuras, pulseAlert };
+    lockMotion, setDisplayPos, setDisplayFacing, setFlag, clearFlag, setHop, setCharge, setStatus, setPredict, clearPredict, setShield, setAuras, pulseAlert };
 }

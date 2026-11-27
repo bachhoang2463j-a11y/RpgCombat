@@ -255,8 +255,28 @@ function drawJump(g, pv, viewData) {
   }
 }
 
-// 绘制入口：pv = { kind:'move'|'attack', ... }；actorId 为当前行动者（地面描边由 CSS 负责）
-export function drawOverlay(g, pv, viewData, selectedId) {
+function drawChargeIntent(g, intent) {
+  const { shape, cells, aim, origin } = intent;
+  if (!cells.length) return;
+  const curved = shape.type === '爆炸' || shape.type === '圆形' || shape.type === '扇形';
+  const hasShape = curved || shape.type === '直线' && shape.width > 0;
+  g.save();
+  g.fillStyle = 'rgba(248,113,113,0.17)';
+  if (hasShape) {
+    clipCells(g, cells); shapePath(g, shape); g.fill();
+    g.strokeStyle = 'rgba(248,113,113,0.9)'; g.lineWidth = 2; g.setLineDash([7, 5]); g.stroke();
+  } else for (const c of cells) g.fillRect(c.col * Q, c.row * Q, Q, Q);
+  g.restore();
+  strokeCellOutline(g, cells, 'rgba(248,113,113,0.58)', 1.5);
+  const from = shape.center || aim || origin;
+  g.save(); g.fillStyle = '#fecaca'; g.font = 'bold 15px sans-serif';
+  g.shadowColor = '#180607'; g.shadowBlur = 4;
+  g.fillText('施放时重选', from.x * Q + 8, from.y * Q - 10); g.restore();
+}
+
+// 绘制入口：固定意向先画，独立于玩家悬停和当次施放预览。
+export function drawOverlay(g, pv, viewData, selectedId, intents = []) {
+  for (const intent of intents) drawChargeIntent(g, intent);
   if (pv && viewData) {
     if (pv.kind === 'move') drawMove(g, pv, viewData);
     else if (pv.kind === 'attack') drawAttack(g, pv, viewData);

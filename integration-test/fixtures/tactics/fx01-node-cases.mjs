@@ -462,7 +462,7 @@ export const groups = {
     const healFx = heal.effects.find(e => e.kind === 'heal');
     cases.push(ok('TFX-03 迅捷愈合法：规则 effects 回复真值 → heal-mend(L2)，不走受击揭示',
       heal.ok && !heal.hits.length && healFx && healFx.value === 30 && heal.costSummary.aux === 1 && heal.costSummary.mp === 3 && pick(heal) === 'heal-mend', j({ ok: heal.ok, effects: heal.effects, cost: heal.costSummary, id: pick(heal) })));
-    b.endAction(); toEl();   // 愈合与造雾同为辅助行动：分两次自然行动
+    b.endAction(); toEl(true);   // 分两次自然行动验证辅助演出，不把施法者能否活过敌方回合当作前提
     const fogBefore = (b.snapshot().regions || []).length;
     const fogAim = ['e:食尸鬼A', 'e:食尸鬼B', 'e:深潜者A'].map(center).find(c => b.previewAttack(sk('拉莱耶造雾术'), c).ok);
     const fog = drive(b.beginAttack(sk('拉莱耶造雾术'), fogAim));

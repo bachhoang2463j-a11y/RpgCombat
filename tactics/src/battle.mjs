@@ -12,11 +12,11 @@ import { findReachable, findRiskAwareReachable, findJumpPath, canPlaceAt, traceD
 import { unitCenter, occupiedCells, cellKey } from './geometry.mjs';
 import { fogAt, fogAffects, createRegion, expireRegions, moveMultiplier } from './regions.mjs';
 import { previewBarrier, createBarrier, interception, damageBarrier, expireBarriers, clearBarriers, barrierAt, barrierContact, barrierCrossing } from './barriers.mjs';
-import { canSeePoint, sightRadius } from './perception.mjs';
+import { canSeePoint, canSeeUnit, sightRadius } from './perception.mjs';
 import { previewGuard } from './guard.mjs';
 import { queryAttack, resolveDefaultRange, spatialAttackModifiers } from './range.mjs';
 import { resolveHit, calculateDamage, computeSegmentRawDamage, applyCollisionDamage } from './damage.mjs';
-import { chooseEnemyAction, fogRouteFilter } from './ai.mjs';
+import { chooseEnemyAction, fogRouteFilter, selectChargeAim } from './ai.mjs';
 import { skillSlots, sortSlotsForResolve, normalizeEffectTag, effectDefinition } from './effect-definitions.mjs';
 import { applyEffectSlot } from './effect-handlers.mjs';
 import { CLASS_PASSIVES, getEffectiveStats } from './class-passives.mjs';
@@ -138,6 +138,45 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   const currentId = () => state.combatState.clock?.currentAction?.unitId || null;
   const actor = () => byId.get(currentId());
 
+  function activeCombatant(u) {
+    return u?.ref.hp > 0 && !u.ref.isSubdued && !u.isSubdued && !ctx.carriedUnitIds.has(u.id)
+      && state.combatState.clock?.units[u.id]?.status === 'active' && placementsById[u.id];
+  }
+  const hpRatio = u => u.ref.hp / u.ref.maxHp;
+  const centerOf = u => unitCenter(placementsById[u.id], u.footprint);
+  const distanceTo = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  function syncFocus(sighting = false) {
+    const orders = state.combatState.focusOrders;
+    if (!orders) return;
+    for (const [id, order] of Object.entries(orders)) {
+      const target = byId.get(order.targetId);
+      if (state.combatState.clock?.terminal || !activeCombatant(byId.get(id)) || !activeCombatant(byId.get(order.issuerId))
+        || !activeCombatant(target) || !(hpRatio(target) < 0.3)) delete orders[id];
+      else if (sighting && canSeeUnit(ctx, id, target.id)) order.lastSeen = centerOf(target);
+    }
+  }
+  function issueFocus(u) {
+    if (u.side !== 'enemy' || !(u.level === '精英' || u.level === '首领' || u.isWise || u.ref.isWise)) return;
+    const from = centerOf(u), radius = sightRadius(ctx, u);
+    const candidates = state.combatState.clock.order.map(id => byId.get(id))
+      .filter(t => t?.side === 'hero' && activeCombatant(t) && hpRatio(t) < 0.3)
+      .map(target => ({ target, to: centerOf(target) })).filter(({ target, to }) => distanceTo(from, to) <= radius + 1e-9 && canSeeUnit(ctx, u.id, target.id));
+    candidates.sort((a, b) => hpRatio(a.target) - hpRatio(b.target) || distanceTo(from, a.to) - distanceTo(from, b.to));
+    if (!candidates.length) return;
+    const { target, to } = candidates[0];
+    const orders = state.combatState.focusOrders ||= {};
+    const receiverIds = [];
+    for (const id of state.combatState.clock.order) {
+      const receiver = byId.get(id);
+      if (orders[id] || receiver?.side !== 'enemy' || !activeCombatant(receiver) || distanceTo(from, centerOf(receiver)) > 3 * radius + 1e-9) continue;
+      orders[id] = { issuerId: u.id, targetId: target.id, lastSeen: to };
+      receiverIds.push(id);
+    }
+    if (!receiverIds.length) return;
+    addLog(u.name + ' 传令集火 ' + target.name);
+    emit('focus-issued', { issuerId: u.id, targetId: target.id, from, to, receiverIds });
+  }
+
   function dispatchBattleClock(command, rulesContext = {}) {
     const wasCurrent = currentId() === command.unitId;
     const result = dispatchClock(state, command, rulesContext);
@@ -148,8 +187,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       emit('main-point-received', { unitId: command.targetId, amount: 1, natural: false });
       if (resources?.preparationContinued) investPreparation(actor());
     }
-    if (command.type === 'exitUnit' && state.combatState.charges?.[command.unitId]) {
-      state.combatState.charges[command.unitId].preparing = null;
+    if (command.type === 'exitUnit') {
+      const charge = state.combatState.charges?.[command.unitId];
+      if (charge) { charge.preparing = null; delete charge.intent; }
+      syncFocus();
     }
     return result;
   }
@@ -159,6 +200,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const event = { seq, eventId: runId + ':event:' + seq, runId, actionId: runId + ':action:' + actionSerial,
       at: ctx.now(), attackId: currentAttackId(), ...activeSegment, type, ...structuredClone(fields) };
     domainEvents.push(event);
+    const visionChanged = ['unit-moved', 'unit-jumped', 'unit-charged', 'unit-teleported', 'unit-displaced', 'guard-committed', 'barrier-created', 'barrier-removed', 'region-created', 'region-expired', 'obstacle-destroyed'].includes(type);
+    syncFocus(visionChanged);
     if (['unit-moved', 'unit-charged', 'unit-teleported', 'unit-displaced', 'guard-committed', 'barrier-created', 'barrier-removed', 'region-created', 'region-expired'].includes(type)) syncFieldBlocks();
     return event;
   }
@@ -689,6 +732,9 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const cs = chargeSkillOf(u);
     return !!cs && (chargeState(u.id).current || 0) >= cs.charge;
   }
+  function chargeAim(u, skill) {
+    return selectChargeAim(ctx, u, effectiveSkill(skill), units.filter(t => t.side !== u.side && activeCombatant(t)));
+  }
   function gainNaturalCharge(u) {
     const cs = chargeSkillOf(u);
     if (!cs || !isAiControlled(u) || u.ref.hp <= 0 || !resources || resources.chargeFullAtStart) return;
@@ -696,8 +742,16 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const next = Math.min((c.current || 0) + 1, cs.charge);
     if (next === (c.current || 0)) return;
     c.current = next;
-    emit('charge-gained', { unitId: u.id, skillName: cs.name, current: next, max: cs.charge, full: next >= cs.charge });
-    addLog('⏳ ' + u.name + ' 充能 ' + next + '/' + cs.charge + (next >= cs.charge ? '（已满，下次行动释放【' + cs.name + '】）' : ''));
+    const full = next >= cs.charge;
+    if (full && !(cs.delay > 0)) {
+      const query = chargeAim(u, cs);
+      if (query) {
+        const { shape, cells, origin, aim } = query;
+        c.intent = structuredClone({ shape, cells, origin, aim });
+      }
+    }
+    emit('charge-gained', { unitId: u.id, skillName: cs.name, current: next, max: cs.charge, full });
+    addLog('⏳ ' + u.name + ' 充能 ' + next + '/' + cs.charge + (full ? '（已满，待施放【' + cs.name + '】）' : ''));
   }
   function advance() {
     resources = null;
@@ -728,6 +782,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         if (state.combatState.opportunityUsed) delete state.combatState.opportunityUsed[u.id];
         emit('main-point-received', { unitId: u.id, amount: resources.main, natural: true });
         const ai = isAiControlled(u);
+        syncFocus(true);
+        if (ai) issueFocus(u);
         if (ai && chargeState(u.id).preparing) { resources.preparationContinued = true; investPreparation(u); }
         if ((u.side === 'hero' && !ai) || (u.side === 'enemy' && ai)) {
           dispatchClock(state, { type: 'recordPacingAction', unitId: u.id, player: !ai });
@@ -760,19 +816,23 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
 
   function snapshot(viewerId = null) {
     units.forEach(syncRageResult);
+    syncFocus();
     const clock = state.combatState.clock;
     return {
       runId, now: clock?.now || 0, currentId: currentId(), actionSerial, resources: resources ? { moveRemaining: resources.moveRemaining, sprintRemaining: resources.sprintRemaining || 0, main: resources.main, aux: resources.aux, moveMultiplier: resources.moveMultiplier || 1, jumpsRemaining: resources.jumpsRemaining, freeJumpAvailable: resources.freeJumpAvailable, jumped: resources.jumpsRemaining === 0, jumpDistance: Math.ceil(actor().ref.moveDistance / 3) } : null,
       terminal: clock?.terminal ? { ...clock.terminal } : null,
       preparation: clock?.currentAction ? structuredClone(state.combatState.charges?.[clock.currentAction.unitId]?.preparing || null) : null,
       chargeInventory: clock?.currentAction ? (state.combatState.charges?.[clock.currentAction.unitId]?.inventory || 0) : 0,
+      focusOrders: structuredClone(state.combatState.focusOrders || {}),
       units: units.map(u => {
         const st = statsOf(u);
         const cs = chargeSkillOf(u);
+        const charge = cs && isAiControlled(u) ? chargeState(u.id) : null;
         return { id: u.id, name: u.name, side: u.side, controller: u.controller || (u.side === 'hero' ? 'player' : 'ai'),
           hp: u.ref.hp, mp: u.ref.mp, tp: u.ref.tp || 0, status: u.ref.hp > 0 ? 'active' : u.side === 'hero' ? 'down' : 'dead',
           atk: st.atk, def: st.def, hit: st.hit, eva: st.eva, taunt: st.taunt, spd: st.spd, shield: u.ref.shield || 0,
-          charge: cs && isAiControlled(u) ? { current: chargeState(u.id).current || 0, max: cs.charge, skillName: cs.name } : null,
+          charge: charge ? { current: charge.current || 0, max: cs.charge, skillName: cs.name,
+            ...(charge.intent && !clock?.terminal && activeCombatant(u) ? { intent: structuredClone(charge.intent) } : {}) } : null,
           buffs: buffsOf(u.id).map(b => ({ type: b.type, value: b.value, variant: b.variant || null, duration: Number.isFinite(b.duration) ? b.duration : null, isConsumable: !!b.isConsumable })) };
       }),
       carrying: structuredClone(state.combatState.carrying || {}),
@@ -886,6 +946,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         if (!landing.ok && (landing.blockedBy.side !== u.side || next === cell.path.at(-1))) break;
       }
       p.col = next.col; p.row = next.row; p.facing = sideStepFacing(previous, next);
+      syncFocus(true);
       path.push(next);
       travel += cost; legCost += cost;
       r.moveRemaining = Math.max(0, r.moveRemaining - cost);
@@ -1918,7 +1979,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     // 大招释放：预检通过并付费后清空充能；看破取消效果，不返还施法成本。
     if (chargeRelease) {
       charge.current = 0;
-      emit('charge-released', { attackId: currentAttackId(), unitId: u.id, skillName: skill.name, max: skill.charge });
+      delete charge.intent;
+      emit('charge-released', { attackId: currentAttackId(), unitId: u.id, skillName: skill.name, max: skill.charge, aim: query.aim });
       addLog('⚠️ ' + u.name + ' 释放致命一击！【' + skill.name + '】');
     }
     // 冷却（独立字段 [冷却:N]，延迟不再当冷却）
@@ -2568,12 +2630,21 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (preparing && !preparing.ready && resources.main > 0) return { moveTo: null, skill: null, aim: null, action: 'prepare' };
     const aiRes = { ...resources, preparing, moveDistance: moveDistanceOf(u), jumpFirst: hasDoubleJump(u) };
     const aiBudget = resources.moveRemaining * (resources.moveMultiplier || 1);
-    if (!preparing && chargeFull(u)) {
-      const ult = chooseEnemyAction(ctx, u.id, aiBudget, [chargeSkillOf(u)], skill => skillStatus(skill), aiRes);
-      if (ult.skill) return ult;
+    const charged = chargeSkillOf(u);
+    if (!preparing && charged && chargeFull(u) && canUseSkill(charged).ok) {
+      const query = chargeAim(u, charged);
+      if (query) return { moveTo: null, skill: charged, aim: query.aim, action: charged.delay > 0 ? 'prepare' : null };
+      // 有可用射击位才为大招移动，抵达后由下一次决策用真实站位重选。
+      const plan = chooseEnemyAction(ctx, u.id, aiBudget, [charged], skill => skillStatus(skill), { ...aiRes, jumpFirst: false });
+      if (plan.moveTo && plan.skill) return { ...plan, skill: null, aim: null, action: null };
     }
-    const skills = preparing ? (preparing.ready ? [preparing.skill] : []) : enemySkills();
-    return chooseEnemyAction(ctx, u.id, aiBudget, skills, skill => skillStatus(skill), { ...aiRes, idleMovement: true });
+    const skills = preparing ? (preparing.ready ? [preparing.skill] : []) : enemySkills().filter(skill => skill !== charged);
+    syncFocus(true);
+    const order = state.combatState.focusOrders?.[u.id];
+    const focus = order && { ...order, visible: canSeeUnit(ctx, u.id, order.targetId) };
+    const plan = chooseEnemyAction(ctx, u.id, aiBudget, skills, skill => skillStatus(skill), { ...aiRes, focus, idleMovement: true });
+    if (focus && plan.moveTo && plan.skill) return { ...plan, skill: null, aim: null, action: null };
+    return plan;
   }
   function* beginEnemyTurn(options = {}) {
     const id = currentId();

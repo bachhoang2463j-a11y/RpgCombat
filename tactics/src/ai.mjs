@@ -218,6 +218,56 @@ export function barrierBenefit(unit, slot, skill, barrier) {
   return Math.min(barrier.integrity, Math.max(0, resisted - barrier.armor * (slot.definition.scatter ? 3 : 1)));
 }
 
+// 满充在一个固定站位求解：瞄准格与方向都走正常空间查询；不沿用普通 AI 的选人抽签。
+export function selectChargeAim(ctx, unit, skill, enemies) {
+  const range = skill.range || resolveDefaultRange(skill);
+  const origin = unitCenter(ctx.placementsById[unit.id], footprintOf(ctx, unit));
+  const targetIds = new Set(enemies.filter(e => !interception(ctx, unit.id, e.id)).map(e => e.id));
+  if (!targetIds.size) return null;
+  const targets = enemies.filter(e => targetIds.has(e.id));
+  const centers = targets.map(e => ({ ...unitCenter(ctx.placementsById[e.id], footprintOf(ctx, e)), targetId: e.id }));
+  const targetCells = targets.flatMap(e => occupiedCells(ctx.placementsById[e.id], footprintOf(ctx, e)));
+  const fixed = ['自身', '圆形', '全域'].includes(range.type);
+  const aimPoints = fixed ? [null] : centers.slice();
+  if (!fixed && range.type !== '单体') {
+    const { columns, rows } = ctx.compiled.grid;
+    const reach = range.castRange ?? Infinity;
+    for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
+      const x = col + 0.5, y = row + 0.5;
+      if (Math.hypot(x - origin.x, y - origin.y) <= reach + EPS) aimPoints.push({ x, y });
+    }
+  }
+  let best = null;
+  const seen = new Set();
+  const p = ctx.placementsById[unit.id];
+  const inFog = fogChecker(ctx, unit)?.(p.col, p.row);
+  for (const aim of aimPoints) {
+    if (aim && range.type === '直线' && !skill.displacements?.some(d => d.type === '冲锋')) {
+      const dx = aim.x - origin.x, dy = aim.y - origin.y, length = Math.hypot(dx, dy);
+      if (length <= EPS) continue;
+      const ux = dx / length, uy = dy / length;
+      const key = Math.atan2(dy, dx).toFixed(12);
+      // 雾中的方向必须先通过瞄准点限制，不能因更远的同方向格而丢掉近处合法点。
+      if (!inFog) {
+        if (seen.has(key)) continue;
+        seen.add(key);
+      }
+      if (!targetCells.some(({ col, row }) => {
+        const rx = col + 0.5 - origin.x, ry = row + 0.5 - origin.y;
+        const along = rx * ux + ry * uy;
+        return along >= -EPS && along <= range.length + EPS && Math.abs(rx * uy - ry * ux) <= range.width / 2 + EPS;
+      })) continue;
+    }
+    const query = queryAttack(ctx, unit.id, skill, aim);
+    if (!query.ok) continue;
+    const count = new Set(query.slotTargets.flatMap(slot => slot.attack ? slot.targetIds.filter(id => targetIds.has(id)) : [])).size;
+    if (!count || best && count < best.count) continue;
+    const score = evaluateQuery(ctx, unit, skill, query, null);
+    if (!best || count > best.count || score > best.score + EPS) best = { query, count, score };
+  }
+  return best?.query || null;
+}
+
 // ---------- 候选搜索 ----------
 
 function aimPool(eff, enemies, allies, unit) {
@@ -269,7 +319,7 @@ function moveReach(ctx, unit, budget, canStep = null) {
   return findRiskAwareReachable(ctx, unit.id, budget, ctx.carrying?.[unit.id] ? 2 : 1, canStep);
 }
 
-function searchBest(ctx, unit, skills, budget, enemies, allies, tracking, reach = moveReach(ctx, unit, budget)) {
+function searchBest(ctx, unit, skills, budget, enemies, allies, tracking, reach = moveReach(ctx, unit, budget), selection = {}) {
   const cells = reach.cells.slice().sort(cmpCell);
   const start = ctx.placementsById[unit.id];
   const startCenter = unitCenter(start, footprintOf(ctx, unit));
@@ -284,6 +334,8 @@ function searchBest(ctx, unit, skills, budget, enemies, allies, tracking, reach 
       if (r) eff = Object.assign({}, raw, { range: r });
     }
     if (!eff || !eff.range || eff.displacements?.some(d => d.type === '闪现')) continue;
+    const offensiveSlots = selection.focusTargetId ? new Set(skillSlots(eff).filter(s => s.attack || s.definition.debuff).map(s => s.index)) : null;
+    if (offensiveSlots && !offensiveSlots.size) continue;
 
     // 召唤：无空间查询可用，仅在原地给出低收益候选（合法性由 canUseSkill 前置门禁保证）
     if (!SPATIAL_RANGES.includes(eff.range.type)) {
@@ -322,9 +374,10 @@ function searchBest(ctx, unit, skills, budget, enemies, allies, tracking, reach 
         const ctx2 = withPlacement(ctx, unit.id, cell.col, cell.row);
         const aim = target.barrier ? { barrierId: target.id } : { x: tc.x, y: tc.y, targetId: target.id };
         const q = queryAttack(ctx2, unit.id, eff, aim);
-        if (!q.ok) continue;
-        // 警报/追踪只用于接近，不能把不可锁定的隐藏单位当成技能收益。
-        const disclosed = tracking ? new Set(q.disclosureTargetIds) : null;
+        if (!q.ok || (offensiveSlots && !q.slotTargets.some(slot => offensiveSlots.has(slot.index) && slot.targetIds.includes(selection.focusTargetId)))) continue;
+        // 警报与最后见处只用于接近，不能直接给不可追踪的目标计收益。
+        const disclosed = tracking || selection.hiddenFocusId ? new Set(tracking ? q.disclosureTargetIds : q.actualTargetIds) : null;
+        if (selection.hiddenFocusId) disclosed.delete(selection.hiddenFocusId);
         if (disclosed && !target.barrier && target.side !== unit.side && !disclosed.has(target.id)) continue;
         const score = evaluateQuery(ctx2, unit, eff, q, disclosed) / (1 + (cell.opportunityRisk || 0) * 0.1);
         if (score <= EPS) continue;
@@ -528,12 +581,22 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
   if (!unit || !isLive(unit)) return Object.assign({}, IDLE);
   const p = ctx.placementsById[unitId];
   if (!p) return Object.assign({}, IDLE);
-  const res = resources || { main: 1, aux: 1, preparing: null, moveDistance: (unit.ref && unit.ref.moveDistance) || 0 };
+  let res = resources || { main: 1, aux: 1, preparing: null, moveDistance: (unit.ref && unit.ref.moveDistance) || 0 };
+  if (res.focus) {
+    const { targetId, lastSeen, visible } = res.focus;
+    const target = visible && ctx.units.find(u => u.id === targetId);
+    const intent = chooseEnemyAction(ctx, unitId, moveBudget, target ? skills : [], canUseSkill, {
+      ...res, focus: null, focusOnly: true, focusTargetId: target ? targetId : null,
+      seen: target ? [target] : [], pursuitPoints: [lastSeen], idleMovement: false,
+    });
+    if (intent.skill || intent.moveTo || intent.jumpTo || intent.action === 'sprint') return intent;
+    res = { ...res, hiddenFocusId: visible ? null : targetId };
+  }
 
-  const seen = res.seen || visibleEnemies(ctx, unit);
+  const seen = (res.seen || visibleEnemies(ctx, unit)).filter(e => e.id !== res.hiddenFocusId);
   const seenIds = !ctx.encounter && res.trackedTargetIds && new Set(seen.map(u => u.id));
-  const enemies = ctx.encounter || seenIds ? ctx.units.filter(u => isLive(u) && u.side !== unit.side && !u.isSubdued && !u.ref.isSubdued
-    && (ctx.encounter || seenIds.has(u.id) || res.trackedTargetIds.has(u.id))) : seen;
+  const enemies = !res.focusOnly && (ctx.encounter || seenIds) ? ctx.units.filter(u => isLive(u) && u.side !== unit.side && !u.isSubdued && !u.ref.isSubdued
+    && u.id !== res.hiddenFocusId && (ctx.encounter || seenIds.has(u.id) || res.trackedTargetIds.has(u.id))) : seen;
   const allies = ctx.units.filter(u => isLive(u) && u.side === unit.side);
   const usable = (skills || []).filter(s => s && !s.isReaction && s.trigger !== 'death'
     && (!canUseSkill || canUseSkill(s).ok));
@@ -550,7 +613,7 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
 
   const tracking = !!(seenIds || res.pursuitPoints?.length);
   const preferred = moveReach(ctx, unit, moveBudget, avoid);
-  const inBudget = searchBest(ctx, unit, usable, moveBudget, enemies, allies, tracking, preferred);
+  const inBudget = searchBest(ctx, unit, usable, moveBudget, enemies, allies, tracking, preferred, res);
   const markRoute = plan => plan.moveTo && avoid ? { ...plan, avoidFog: true } : plan;
   if (res.jumpFirst && (!inBudget.best?.attackTarget || inBudget.best.cost > EPS)) {
     const attackPlace = inBudget.best?.attackTarget && inBudget.best.cell;
@@ -582,7 +645,7 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
   let fullReach;
   if (enemies.length && usable.length && (moveBudget > EPS || sprintBudget > EPS)) {
     fullReach = moveReach(ctx, unit, Infinity, avoid);
-    const fullBest = searchBest(ctx, unit, usable, Infinity, enemies, allies, tracking, fullReach);
+    const fullBest = searchBest(ctx, unit, usable, Infinity, enemies, allies, tracking, fullReach, res);
     if (fullBest.best) {
       const plan = followPath(fullReach, fullBest.best.cell.path, !!avoid);
       if (plan) return plan;
@@ -600,7 +663,7 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
     // 同样能接近目标时用避雾路径；否则准许朝目标穿雾，而不是离雾后向原出口折返。
     const useDry = avoid && distance(nearDry) <= distance(near) + EPS;
     if (avoid && !useDry) {
-      const closer = searchBest(ctx, unit, usable, moveBudget, enemies, allies, tracking);
+      const closer = searchBest(ctx, unit, usable, moveBudget, enemies, allies, tracking, moveReach(ctx, unit, moveBudget), res);
       if (closer.best) return toResult(closer.best, res);
       const leap = planJump(ctx, unit, res, moveBudget, walk, walk, distance, distance(near));
       if (leap) return leap;

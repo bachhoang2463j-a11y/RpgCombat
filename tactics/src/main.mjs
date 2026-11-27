@@ -691,6 +691,20 @@ export function createApp(rootEl, opts = {}) {
   }
   const PASSIVE_CARD_COLOR = { taunt: '#f87171', stealth: '#a5b4fc', haste: '#22d3ee' };
   const naturalTurnAudio = new Set();
+  let focusFxRun = null, lastFocusFxSeq = 0;
+  function syncTacticalWarnings(snap) {
+    if (focusFxRun !== snap.runId) { focusFxRun = snap.runId; lastFocusFxSeq = 0; }
+    sandbox.setPersistentIntents(snap.units.flatMap(u => u.charge?.intent ? [u.charge.intent] : []));
+    for (const ev of snap.events) {
+      if (ev.type !== 'focus-issued' || ev.seq <= lastFocusFxSeq) continue;
+      lastFocusFxSeq = ev.seq;
+      if (snap.terminal || !ev.receiverIds.some(id => snap.focusOrders[id]?.issuerId === ev.issuerId && snap.focusOrders[id]?.targetId === ev.targetId)) continue;
+      const dx = ev.to.x - ev.from.x, dy = ev.to.y - ev.from.y;
+      fxNode('t-focus-order-line', ev.from.x, ev.from.y, 900, {
+        width: (Math.hypot(dx, dy) * 50) + 'px', transform: 'rotate(' + Math.atan2(dy, dx) + 'rad)',
+      });
+    }
+  }
   function refreshBattle({ deferPassive = false } = {}) {
     const snap = battle.snapshot();
     syncDynamicUnits(snap);
@@ -712,11 +726,15 @@ export function createApp(rootEl, opts = {}) {
     }
     sandbox.update(currentViewData);
     const view = sandbox.getUnitView();
+    const targets = new Set(Object.values(snap.focusOrders).map(order => order.targetId));
     for (const u of currentViewData.units) {
+      view.setFlag(u.id, 't-unit-focus-target', targets.has(u.id));
+      view.setFlag(u.id, 't-unit-alert-pending', !!snap.focusOrders[u.id]);
       view.setFlag(u.id, 't-unit-down', shownOf(u).hp <= 0);
       view.setFlag(u.id, 't-unit-current', u.id === snap.currentId && !snap.terminal);
       view.setFlag(u.id, 't-unit-channel', !!battle.battleState.combatState.charges?.[u.id]?.preparing);
       const ch = snap.units.find(x => x.id === u.id)?.charge;
+      view.setCharge(u.id, shownOf(u).hp > 0 ? ch : null);
       view.setFlag(u.id, 't-unit-charge-full', !!(ch && ch.current >= ch.max && shownOf(u).hp > 0));
       // 灵风术等赋予的飞行状态：头像两侧常驻白色羽翼，飞行到期即收起（天生飞行不显示）
       view.setFlag(u.id, 't-unit-winged', shownOf(u).hp > 0 && (u.effective?.buffs || []).some(b => b.variant === '飞行' || b.type === '飞行' || b.type === 'flying'));
@@ -727,6 +745,7 @@ export function createApp(rootEl, opts = {}) {
       if (playback && ev.natural) naturalTurnAudio.add(ev.unitId);
       if (playback === 'enemy') ui('enemyTurn');
     }
+    syncTacticalWarnings(snap);
     avHost.consumeVisualEvents(snap.events.filter(ev => !ev.attackId));
     avHost.syncVisualState();
     director.syncRegions(snap.regions || []);

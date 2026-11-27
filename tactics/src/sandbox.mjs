@@ -38,6 +38,7 @@ export function createSandbox(rootEl, deps = {}) {
   let onMapClickCb = null;
   let onHoverCb = null;
   let preview = null;
+  let persistentIntents = [];
   let hoverKey = null;
   let userCamTouched = false;     // 本次动作内玩家是否拖拽/缩放过（中断自动跟随）
   let worldW = 1000, worldH = 1000;
@@ -104,7 +105,7 @@ export function createSandbox(rootEl, deps = {}) {
     const g = dom.overlay.getContext('2d');
     g.setTransform(dom.dpr, 0, 0, dom.dpr, 0, 0);
     g.clearRect(0, 0, worldW, worldH);
-    drawOverlay(g, preview, viewData, selectedId);
+    drawOverlay(g, preview, viewData, selectedId, persistentIntents);
   }
 
   // ---------- 手势（每 mount 绑定一次） ----------
@@ -280,7 +281,7 @@ export function createSandbox(rootEl, deps = {}) {
     scope = createViewScope();
     token = vd.combatToken;
     viewData = vd;
-    preview = null; hoverKey = null; userCamTouched = false;
+    preview = null; persistentIntents = []; hoverKey = null; userCamTouched = false;
     compiled = compileScene(vd.scene);
     worldW = compiled.grid.columns * 50; worldH = compiled.grid.rows * 50;
     buildDom();
@@ -426,6 +427,12 @@ export function createSandbox(rootEl, deps = {}) {
     onHover: (cb) => { onHoverCb = cb; },
     onCamera: (fn) => { cameraListeners.add(fn); return () => cameraListeners.delete(fn); },
     setPreview: (data) => { preview = data; redrawOverlay(); },
+    setPersistentIntents: (data) => {
+      persistentIntents = data;
+      if (data.length) dom.overlay.setAttribute('aria-label', '敌方充能意向：施放时重选');
+      else dom.overlay.removeAttribute('aria-label');
+      redrawOverlay();
+    },
     getPreview: () => preview,
     setHint,
     refreshHover: () => { hoverKey = null; },
