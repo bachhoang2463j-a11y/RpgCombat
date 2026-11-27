@@ -61,6 +61,8 @@ export function createActionDirector(deps) {
   const onEffectReveal = deps.onEffectReveal || null;
   const promptReaction = deps.promptReaction || (() => Promise.resolve(null));
   const promptRetarget = deps.promptRetarget || null;
+  const promptTeleport = deps.promptTeleport || null;
+  const onMovementRequest = deps.onMovementRequest || null;
   const onSelfDestruct = deps.onSelfDestruct || null;
   const battleOf = deps.battle || (() => null);
   const av = avHost.av;
@@ -364,6 +366,12 @@ export function createActionDirector(deps) {
     avHost.syncRoster();
     const vd = getViewData();
     const skill = result.skill || battleOf().itemSkill(result.item);
+    if (result.teleport) {
+      const fp = vd.footprintsById[result.casterId];
+      await sandbox.guideTo([unitCenter(result.teleport.from, fp), unitCenter(result.teleport.to, fp)]);
+      if (!isCurrent()) return false;
+      return playReaction({ targetId: result.casterId, reaction: { fxTag: skill.fxTag, shift: result.teleport } });
+    }
     const casterUnit = vd.units.find(u => u.id === result.casterId);
     const identity = resolveAttackIdentity(skill);
     const casterEnt = avHost.entity(result.casterId);
@@ -1024,6 +1032,16 @@ export function createActionDirector(deps) {
           if (run.cancelled) return null;
           const s2 = scope();
           if (!s2 || !s2.isLive) return null;
+        } else if (req && req.type === 'teleport' && typeof promptTeleport === 'function') {
+          const s = scope();
+          if (!s || !s.isLive) return null;
+          choice = await Promise.race([promptTeleport(req), cancelled]);
+          if (run.cancelled) return null;
+          const s2 = scope();
+          if (!s2 || !s2.isLive) return null;
+        } else if (req && (req.type === 'move-leg' || req.type === 'opportunity-result') && typeof onMovementRequest === 'function') {
+          await onMovementRequest(req);
+          if (run.cancelled) return null;
         } else if (req && req.type === 'retarget-request' && typeof promptRetarget === 'function') {
           const s = scope();
           if (!s || !s.isLive) return null;

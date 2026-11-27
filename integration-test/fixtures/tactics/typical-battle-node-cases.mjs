@@ -120,13 +120,13 @@ function run() {
     check('TT-B 巫师护盾逐段加总不单段清空',r.ok && e.ref.shield===390 && e.ref.mp===98,{shield:e.ref.shield,mp:e.ref.mp});
   }
   {
-    const step=parseSkill('【侧闪】[单避;power:900][MP:4][反应:远程][位移:侧闪;距离:3][范围:自身]');
+    const step=parseSkill('【折影步】[单避;power:900][MP:4][反应:近战][位移:闪现;距离:2][范围:自身]');
     const h=unit('h','hero',{spd:200});const e=unit('e','enemy',{skills:[step]});
     const b=make([h,e],{h:{col:2,row:4},e:{col:5,row:4}},{random:()=>0.9});
-    const tri=parseSkill('【三段】[枪击;power:50][枪击;power:50][枪击;power:50][远程][范围:单体;射程:3]');
+    const tri=parseSkill('【三段】[伤害;power:50][伤害;power:50][伤害;power:50][近战][范围:单体;射程:3]');
     let requests=0;
-    const r=drive(b.beginAttack(tri,aim(b,'e')),req=>{requests++;return {skill:req.candidates[0].skill};});
-    check('TT-B 单避本段化解后侧闪3米',r.hits[0].segments[0].hpDmg===0 && r.hits[0].segments[0].reaction.shift.distance===3);
+    const r=drive(b.beginAttack(tri,aim(b,'e')),req=>{if(req.type==='teleport')return {col:5,row:6};requests++;return {skill:req.candidates[0].skill};});
+    check('TT-B 单避本段化解后选格闪现2米',r.hits[0].segments[0].hpDmg===0 && r.hits[0].segments[0].reaction.shift?.distance===2);
     check('TT-B 后两段重查射程并不再弹反应', requests===1 && e.ref.mp===106 && r.hits[0].segments.slice(1).every(s=>s.reason==='目标超出射程'),r.hits[0].segments);
   }
   {

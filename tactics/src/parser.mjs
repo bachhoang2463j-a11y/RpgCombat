@@ -58,9 +58,9 @@ export const SKILL_TYPES = [
 
 const RANGE_TAG_RE = /\[\s*范围\s*[:：]\s*([^\[\]]+)\]/i;
 const ACTION_TAG_RE = /\[\s*行动\s*[:：]\s*(主|辅)\s*\]/i;
-// [位移:侧闪|击退|拉近|冲锋|后撤;距离:N(;方向:…)]：战棋位移真值（可多个，不占效果槽）
+// [位移:侧闪|击退|拉近|冲锋|后撤|闪现;距离:N(;方向:…)]：战棋位移真值（可多个，不占效果槽）
 const SHIFT_TAG_RE = /\[\s*位移\s*[:：]\s*([^\[\]]+)\]/g;
-const SHIFT_TYPES = ['侧闪', '击退', '拉近', '冲锋', '后撤'];
+const SHIFT_TYPES = ['侧闪', '击退', '拉近', '冲锋', '后撤', '闪现'];
 
 // [范围:直线;长:10;宽:1] → { type:'直线', length:10, width:1, _explicit:['type','length','width'] }
 function parseRangeTag(body) {
@@ -375,7 +375,7 @@ export function parseSkill(skillStr) {
     if (typeMatches[i][3] !== undefined) slotTurnsArr[i] = parseInt(typeMatches[i][3]);
   }
   if (!typeMatches.length) {
-    const noDamageIntent = !!(summonTarget || barrierMatch || kanpoTarget || sheshenTarget || /\[自爆[:：]/.test(skillStr));
+    const noDamageIntent = !!(summonTarget || barrierMatch || kanpoTarget || sheshenTarget || ext.displacements.some(d => d.type === '闪现') || /\[自爆[:：]/.test(skillStr));
     if (!noDamageIntent) { types[0] = '[伤害]'; powers[0] = 20; }
   }
 

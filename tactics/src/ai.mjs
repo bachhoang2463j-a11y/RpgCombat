@@ -7,7 +7,7 @@
 // 浓雾：无八邻接可见敌人时优先离雾，出口路径跨预算且主行动>0 时请求冲刺；出雾后下一轮再攻击。
 // ==========================================
 
-import { findReachable, findJumpPath, canPlaceAt, cellsAdjacent } from './movement.mjs';
+import { findRiskAwareReachable, findJumpPath, canPlaceAt, cellsAdjacent } from './movement.mjs';
 import { queryAttack, resolveDefaultRange } from './range.mjs';
 import { cellKey, unitCenter, cellCenter, occupiedCells } from './geometry.mjs';
 import { skillSlots } from './effect-definitions.mjs';
@@ -235,7 +235,8 @@ function aimPool(eff, enemies, allies, unit) {
 }
 
 function cmpCell(a, b) {
-  if (Math.abs(a.cost - b.cost) > EPS) return a.cost - b.cost;
+  const delta = a.cost - b.cost + ((a.opportunityRisk || 0) - (b.opportunityRisk || 0)) * Math.SQRT2;
+  if (Math.abs(delta) > EPS) return delta;
   if (a.row !== b.row) return a.row - b.row;
   return a.col - b.col;
 }
@@ -265,7 +266,7 @@ export function chooseTauntTarget(ctx, unit, targets, random = ctx.random || Mat
 }
 
 function moveReach(ctx, unit, budget, canStep = null) {
-  return findReachable(ctx, unit.id, budget, ctx.carrying?.[unit.id] ? 2 : 1, canStep);
+  return findRiskAwareReachable(ctx, unit.id, budget, ctx.carrying?.[unit.id] ? 2 : 1, canStep);
 }
 
 function searchBest(ctx, unit, skills, budget, enemies, allies, tracking, reach = moveReach(ctx, unit, budget)) {
@@ -282,7 +283,7 @@ function searchBest(ctx, unit, skills, budget, enemies, allies, tracking, reach 
       const r = resolveDefaultRange(raw);
       if (r) eff = Object.assign({}, raw, { range: r });
     }
-    if (!eff || !eff.range) continue;
+    if (!eff || !eff.range || eff.displacements?.some(d => d.type === '闪现')) continue;
 
     // 召唤：无空间查询可用，仅在原地给出低收益候选（合法性由 canUseSkill 前置门禁保证）
     if (!SPATIAL_RANGES.includes(eff.range.type)) {
@@ -325,7 +326,7 @@ function searchBest(ctx, unit, skills, budget, enemies, allies, tracking, reach 
         // 警报/追踪只用于接近，不能把不可锁定的隐藏单位当成技能收益。
         const disclosed = tracking ? new Set(q.disclosureTargetIds) : null;
         if (disclosed && !target.barrier && target.side !== unit.side && !disclosed.has(target.id)) continue;
-        const score = evaluateQuery(ctx2, unit, eff, q, disclosed);
+        const score = evaluateQuery(ctx2, unit, eff, q, disclosed) / (1 + (cell.opportunityRisk || 0) * 0.1);
         if (score <= EPS) continue;
         found = { score, cost: cell.cost, cell, skill: raw, aim, targetId: target.id, si,
           attackTarget: (q.damageTargetIds || []).includes(target.id) };
@@ -371,11 +372,10 @@ function distanceToPoints(ctx, unit, points) {
 function nearestPointCell(cells, distanceTo) {
   let best = null;
   for (const cell of cells) {
-    const cand = { dist: distanceTo(cell), cost: cell.cost, key: cellKey(cell.col, cell.row), cell };
+    const cand = { dist: distanceTo(cell), cell };
     if (!best
       || cand.dist < best.dist - EPS
-      || (Math.abs(cand.dist - best.dist) <= EPS && (cand.cost < best.cost - EPS
-        || (Math.abs(cand.cost - best.cost) <= EPS && cand.key < best.key)))) {
+      || (Math.abs(cand.dist - best.dist) <= EPS && cmpCell(cand.cell, best.cell) < 0)) {
       best = cand;
     }
   }

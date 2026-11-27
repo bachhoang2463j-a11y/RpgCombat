@@ -461,9 +461,10 @@ export function buildShell(root) {
   // 战棋专有信息：技能卡第二行末尾追加空间范围胶囊——沿用原版修饰胶囊样式（同 🎯命中值胶囊：灰底细边 + 等宽数值）
   // 与原版标签悬浮提示引擎（data-tagtip-*）；原版打开子菜单会重建列表，按列表变化补挂
   const ATTR = t => rpgUi.escapeHistoryHtml(t);
-  function rangePill(r) {
+  function rangePill(r, blink) {
     let label, num, title, body;
-    if (r.type === '自身') { label = '自身'; num = '自身'; title = '【范围·自身】'; body = '只作用于施法者自身；不选择目标，不受射程与视线限制（效果槽可另配「自身覆盖」指向其它对象）。'; }
+    if (blink) { label = '闪现'; num = blink.distance + 'm'; title = '【位移·闪现】'; body = '选择 ' + blink.distance + ' 米内本人可见的空地；不扣步行额度，不能跨越敌方结界。'; }
+    else if (r.type === '自身') { label = '自身'; num = '自身'; title = '【范围·自身】'; body = '只作用于施法者自身；不选择目标，不受射程与视线限制（效果槽可另配「自身覆盖」指向其它对象）。'; }
     else if (r.type === '单体') { label = '射程'; num = (r.castRange || 0) + 'm'; title = '【范围·单体】'; body = '选择 ' + (r.castRange || 0) + ' 米内、视线无遮挡的一名敌人；墙体与高障碍会阻挡视线，低矮掩体不阻挡。'; }
     else if (r.type === '直线') { label = '直线'; num = r.length + '×' + (r.width || 1) + 'm'; title = '【范围·直线】'; body = '自施法者向瞄准方向延伸 ' + r.length + ' 米、宽 ' + (r.width || 1) + ' 米，命中路径上所有敌人；遇墙截断。'; }
     else if (r.type === '扇形') { label = '扇形'; num = r.castRange + 'm·' + r.angle + '°'; title = '【范围·扇形】'; body = '以施法者为圆心、半径 ' + r.castRange + ' 米、张角 ' + r.angle + '° 的扇形，命中其中所有敌人；遇墙截断。'; }
@@ -473,7 +474,7 @@ export function buildShell(root) {
     else if (r.type === '召唤') { label = '召唤'; num = (r.castRange ?? 8) + 'm'; title = '【范围·召唤】'; body = '在 ' + (r.castRange ?? 8) + ' 米内选择空闲合法空地召唤单位入场（需容纳召唤物体型）。'; }
     else return '';
     return '<span class="t-range-pill text-[8px] px-1 py-0.2 rounded border bg-slate-900 text-slate-400 border-slate-700 shrink-0 flex items-center leading-none"' +
-      ' data-tagtip-title="' + ATTR(title) + '" data-tagtip-body="' + ATTR(body) + '" data-tagtip-raw="' + ATTR('[范围:' + r.type + ']') + '">' +
+      ' data-tagtip-title="' + ATTR(title) + '" data-tagtip-body="' + ATTR(body) + '" data-tagtip-raw="' + ATTR(blink ? '[位移:闪现]' : '[范围:' + r.type + ']') + '">' +
       label + '<span class="opacity-90 font-mono-num ml-0.5">' + num + '</span></span>';
   }
   function decorateSkillCards(u) {
@@ -509,7 +510,7 @@ export function buildShell(root) {
         if (reason) btn.insertAdjacentHTML('beforeend', '<div class="t-skill-reason">' + ESC(shortReason(reason)) + (shortReason(reason).includes(reason) ? '' : '<small>' + ESC(reason) + '</small>') + '</div>');
       }
       if (!s.range || row.querySelector('.t-range-pill')) return;
-      const pill = rangePill(s.range);
+      const pill = rangePill(s.range, !s.isReaction && s.displacements?.find(d => d.type === '闪现'));
       if (!pill) return;
       const empty = row.querySelector('span.text-slate-500:only-child');
       if (empty) empty.remove();

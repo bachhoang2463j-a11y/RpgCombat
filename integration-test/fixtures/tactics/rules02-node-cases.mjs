@@ -180,7 +180,7 @@ export const groups = {
   'TR2-C': { run({ modules: m }) {
     const cases = [];
     const zhey = () => m.parser.parseSkill('【折影步】[单避;power:900][MP:4][反应:近战][限1次][位移:侧闪;距离:2][范围:自身]');
-    // C1 反应 generator：yield 请求 → 采纳 → 二次闪避（纯回避值900）成功 → 该发落空 + 侧闪错位；恰好扣一次费
+    // C1 反应 generator：yield 请求 → 采纳 → 二次闪避（纯回避值900）成功 → 该发落空 + 选格闪现；恰好扣一次费
     {
       const attacker = unit('h', 'hero', { spd: 200, atk: 10 });
       const defender = unit('re', 'enemy', { hp: 50, mp: 20, skills: [zhey()] });
@@ -196,11 +196,12 @@ export const groups = {
           && req.candidates[0].skill.name === '折影步' && typeof req.candidates[0].usesLeft === 'number'
           && req.slotIndex === 0 && req.shotIndex === 1;
         const row0 = b.ctx.placementsById.re.row;
-        const res = gen.next({ responderId: 're', skill: req.candidates[0].skill });
+        const teleport = gen.next({ responderId: 're', skill: req.candidates[0].skill });
+        const res = !teleport.done ? gen.next({ col: 5, row: row0 - 2 }) : teleport;
         const seg0 = res.value.hits[0].segments[0];
         cases.push(ok('TR2-C reaction 请求 shape 完整（含 shotIndex/slotIndex/usesLeft）', shapeOk, j(req)));
-        cases.push(ok('TR2-C 折影步：确认后该发落空、侧闪2m错位、反应方恰好扣一次费、攻击零伤害',
-          res.value.ok && seg0.hit === false && seg0.reaction && seg0.reaction.dodged === true && seg0.reaction.shift
+        cases.push(ok('TR2-C 折影步：确认后该发落空、选格闪现2m、反应方恰好扣一次费、攻击零伤害',
+          teleport.value.type === 'teleport' && res.value.ok && seg0.hit === false && seg0.reaction && seg0.reaction.dodged === true && seg0.reaction.shift
           && b.ctx.placementsById.re.row === row0 - 2 && defender.ref.mp === 16 && res.value.hits[0].hpDmg === 0,
           j({ seg: seg0, mp: defender.ref.mp, at: b.ctx.placementsById.re })));
       }

@@ -129,14 +129,15 @@ function run() {
       const { b, caster, target } = createCase(source, skill);
       const slots = skillSlots(skill);
       const ally = slots.some(s => !s.debuff && !s.attack && s.definition.side === 'ally');
-      const aim = skill.range.type === '召唤' ? { x: 8.5, y: 4.5 } : { ...unitCenter(b.ctx.placementsById[ally ? 'caster' : 'target'], ally ? caster.footprint : target.footprint), targetId: ally ? 'caster' : 'target' };
+      const blink = skill.displacements?.some(d => d.type === '闪现');
+      const aim = blink ? { x: 4.5, y: 6.5 } : skill.range.type === '召唤' ? { x: 8.5, y: 4.5 } : { ...unitCenter(b.ctx.placementsById[ally ? 'caster' : 'target'], ally ? caster.footprint : target.footprint), targetId: ally ? 'caster' : 'target' };
       let r = drive(b.beginAttack(skill, aim));
       for (let i = 0; r.preparing && i < 10; i++) {
         b.endAction(); actUntil(b, 'caster');
         const prep = b.snapshot().preparation;
         if (prep?.ready) r = drive(b.beginAttack(skill, aim));
       }
-      const meaningful = r.ok && !r.preparing && (r.hits?.length || r.effects?.length || r.summons?.length || skill.barrierSub || skill.regionEffect);
+      const meaningful = r.ok && !r.preparing && (r.hits?.length || r.effects?.length || r.summons?.length || skill.barrierSub || skill.regionEffect || r.teleport);
       cases.push(result('TT-SKILL[专项夹具] 主动执行 ' + name, meaningful,
         meaningful ? '专用30x20测试场，非正式主棋盘；原技能成本/属性/次数未改' : JSON.stringify({ ok: r.ok, reason: r.reason, prep: b.snapshot().preparation })));
     }
@@ -260,7 +261,7 @@ function run() {
     cases.push(result('TT-SKILL[D1-3] 已付行动费用仍可预览转火', !bAuto.previewAttack(suigu, east).ok && eastQuery.ok && sync(eastQuery)));
 
     const counter = { name: '致死反击', type: '[反击]', power: 20, isReaction: true, reactionTarget: '近战', range: { type: '单体', castRange: 1 } };
-    const evade = { ...counter, name: '测试侧闪', type: '[回避]', power: 1000, evadeShift: { mode: 'side', distance: 2 } };
+    const evade = { ...counter, name: '折影步', type: '[回避]', power: 1000 };
     const makeInterrupted = (reaction, hp) => {
       const caster = structuredClone(hero);
       caster.ref.hp = hp;
@@ -285,8 +286,8 @@ function run() {
     JSON.stringify({ done: groupedStep.done, hits: groupedResult?.hits.map(h => [h.targetId, h.hpDmg]) })));
     const shift = makeInterrupted(evade, 500);
     const narrow = { ...suigu, guaranteedHit: true, range: { type: '单体', castRange: 1 } };
-    const shifted = drive(shift.b.beginAttack(narrow, north, { autoAnswer: req => req.candidates[0], interactiveRetarget: false }));
-    cases.push(result('TT-SKILL 侧闪离射程后重查并补选', shifted.hits[0]?.reaction?.shift && shifted.hits[1]?.targetId === 'e2' && shifted.shots[1]?.aim.targetId === 'e2', JSON.stringify(shifted.shots)));
+    const shifted = drive(shift.b.beginAttack(narrow, north, { autoAnswer: req => req.type === 'teleport' ? { col: 5, row: 2 } : req.candidates[0], interactiveRetarget: false }));
+    cases.push(result('TT-SKILL 折影步离开射程后重查并补选', shifted.hits[0]?.reaction?.shift && shifted.hits[1]?.targetId === 'e2' && shifted.shots[1]?.aim.targetId === 'e2', JSON.stringify(shifted.shots)));
     const mixed = { ...narrow, type2: '[降防]' };
     const precise = makeInterrupted(counter, 500).b;
     const generic = precise.previewRetarget(mixed, east, 'caster');

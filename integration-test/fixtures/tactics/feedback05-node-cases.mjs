@@ -17,7 +17,8 @@ async function run() {
   const fogOf = u => u.skills.find(s => s.name === '拉莱耶造雾术');
   const elFog = fogOf(data.units.find(u => u.id === 'h:埃利奥特'));
   check('TFB 埃利奥特造雾半径5射程12', elFog.range.radius === 5 && elFog.range.castRange === 12);
-  check('TFB 深潜者造雾数值不变', data.units.filter(u => u.name.startsWith('深潜者')).every(u => fogOf(u).range.radius === 5 && fogOf(u).range.castRange === 15));
+  const deepFogs = data.units.filter(u => u.name.startsWith('深潜者')).map(fogOf);
+  check('TFB 两名深潜者造雾半径向上取整为3，射程仍为15', deepFogs.length === 2 && deepFogs.every(fog => fog.range.radius === 3 && fog.range.castRange === 15));
   for (const type of ['伤害', '钝击', '切割', '枪击', '霰弹', '火焰', '圣光', '雷电', '水流', '冰霜', '诅咒', '穿透', '散射']) {
     check('TFB 分类伤害 ' + type, attack({ type: '[' + type + ']', actionCost: { main: 0, aux: 1 } }));
   }

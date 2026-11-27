@@ -326,17 +326,17 @@ export const groups = {
     const sup = s => m.battle.skillSupport(s);
     const usable = ell.skills.filter(s => sup(s).ok).map(s => s.name).sort();
     const rejected = ell.skills.filter(s => !s.isGroup && !sup(s).ok).map(s => ({ name: s.name, reason: sup(s).reason }));
-    cases.push(ok('TFX-02 埃利奥特原值属性与技能/物品全量载入（19 技能条目含 2 组头 + 7 物品）',
-      ell.maxHp === 100 && ell.maxMp === 110 && ell.atk === 20 && ell.def === 40 && ell.spd === 50 && ell.skills.length === 19 && ell.items.length === 7,
+    cases.push(ok('TFX-02 埃利奥特原值属性与技能/物品全量载入（20 技能条目含 2 组头 + 7 物品）',
+      ell.maxHp === 100 && ell.maxMp === 110 && ell.atk === 20 && ell.def === 40 && ell.spd === 50 && ell.skills.length === 20 && ell.items.length === 7,
       j({ hp: ell.maxHp, mp: ell.maxMp, atk: ell.atk, def: ell.def, spd: ell.spd, skills: ell.skills.length, items: ell.items.length })));
     const rejBy = name => (rejected.find(r => r.name === name) || {}).reason || '';
-    cases.push(ok('TFX-02 主动可用恰为 13 项（含 2 结界）；4 反应按真实原因拒绝（无"范围未迁移"遮挡）',
-      j(usable) === j(['伊西斯之拥', '压缩爆燃', '召雷术', '圣域帷幕', '归尘礼赞', '拉莱耶造雾术', '提前瞄准', '灵风术', '精准流火', '纳克提特障壁术', '萨维奇三连发', '迅捷愈合法', '预备咏唱'].sort()) &&
+    cases.push(ok('TFX-02 主动可用恰为 14 项（含 2 结界）；4 反应按真实原因拒绝（无"范围未迁移"遮挡）',
+      j(usable) === j(['伊西斯之拥', '压缩爆燃', '召雷术', '圣域帷幕', '归尘礼赞', '折影步', '拉莱耶造雾术', '提前瞄准', '灵风术', '精准流火', '纳克提特障壁术', '萨维奇三连发', '迅捷愈合法', '预备咏唱'].sort()) &&
       rejected.length === 4 && rejected.every(r => r.reason && r.reason !== '范围未迁移') &&
       rejBy('折影步') === '反应技能只能被动触发' && rejBy('双莲祛煞') === '反应技能只能被动触发' && rejBy('巫师护盾') === '反应技能只能被动触发' &&
       rejBy('净蚀反冲') === '反应技能只能被动触发', j({ usable, rejected })));
     const zy = skillNamed(ell, '折影步');
-    cases.push(ok('TFX-02 折影步：近战回避反应 + 显式侧闪 2m 位移标签', zy.isReaction && zy.reactionTarget === '近战' && zy.evadeShift && zy.evadeShift.mode === 'side' && zy.evadeShift.distance === 2 && zy.fxTag === '折影步', j(zy.evadeShift)));
+    cases.push(ok('TFX-02 折影步：近战回避反应 + 显式闪现 2m 位移标签', zy.isReaction && zy.reactionTarget === '近战' && zy.displacements[0]?.type === '闪现' && zy.displacements[0].distance === 2 && zy.fxTag === '折影步', j(zy.displacements)));
 
     // 多段攻击槽逐段结算：三段 55，护甲 0；第二段被闪避
     const savage = skillNamed(ell, '萨维奇三连发');
@@ -366,7 +366,7 @@ export const groups = {
       r3.ok && r3.query.contact.unitId === 'front' && j(ids3) === j(['front', 'side']) && front.ref.hp === 130 && side.ref.hp === 130 && far.ref.hp === 200 && j(burns) === j(['front', 'side']),
       j({ contact: r3.query.contact, ids3, hp: [front.ref.hp, side.ref.hp, far.ref.hp], burns })));
 
-    // 折影步：近战来袭 → 回避成功 → 沿攻击线垂直方向真实错位 2m（先左后右），扣反应 MP，不扣 HP
+    // 折影步：近战来袭 → 回避成功 → 玩家选择合法的 2m 落点，扣反应 MP，不扣 HP
     const melee = m.parser.parseSkill('【横扫】[近战] [单体(刀砍);power:18] [范围:单体;射程:2]');
     const ranged = m.parser.parseSkill('【箭矢】[远程] [单体;power:10] [范围:单体;射程:10]');
     const shiftCase = (blocker) => {
@@ -374,23 +374,23 @@ export const groups = {
       const foe = unit('foe', 'enemy', { spd: 200 });
       const units = [hero, foe];
       const placements = { ell: { col: 4, row: 4 }, foe: { col: 5, row: 4 } };
-      if (blocker) { units.push(unit('blk', 'hero', { spd: 5 })); placements.blk = { col: 4, row: 5 }; }
+      if (blocker) { units.push(unit('blk', 'hero', { spd: 5 })); placements.blk = { col: 4, row: 6 }; }
       // 同步 attack() 缺省 policy:none 不代玩家响应反应（battle.mjs 离线包装）；改走 beginAttack 生成器，收到 reaction 请求后显式确认折影步。
       // 序列：系数0→0.8 → 命闪(1,100)命中 → 反应二次闪避 dodge 0.99×900 vs attack 1 → 回避成功
       const b = battle(m, units, placements, rng([0, 0, 0.99, 0.99, 0]));
       const gen = b.beginAttack(melee, { x: 4.5, y: 4.5, targetId: 'ell' });
       let step = gen.next(), req = null;
-      while (!step.done) { if (step.value && step.value.type === 'reaction') { req = step.value; step = gen.next({ responderId: req.responderId, skill: req.candidates[0].skill }); } else step = gen.next(null); }
+      while (!step.done) { if (step.value && step.value.type === 'reaction') { req = step.value; step = gen.next({ responderId: req.responderId, skill: req.candidates[0].skill }); } else step = gen.next({ col: 4, row: 6 }); }
       const r = step.value;
       return { r, hero, b, at: { col: b.ctx.placementsById.ell.col, row: b.ctx.placementsById.ell.row } };
     };
     const free = shiftCase(false), blocked = shiftCase(true);
     const rx = free.r.hits[0] && free.r.hits[0].reaction;
-    cases.push(ok('TFX-02 折影步：回避成功即侧闪 2m，规则站位立即更新，结果带 reaction.shift 路径',
-      free.r.ok && rx && rx.dodged && rx.fxTag === '折影步' && rx.shift.distance === 2 && j(free.at) === j({ col: 4, row: 6 }) &&
-      rx.shift.path.length === 3 && free.hero.ref.hp === 100 && free.hero.ref.mp === 106,
+    cases.push(ok('TFX-02 折影步：回避成功后自选 2m 闪现，规则站位立即更新，结果带 reaction.shift 路径',
+      free.r.ok && rx && rx.dodged && rx.fxTag === '折影步' && rx.shift?.distance === 2 && j(free.at) === j({ col: 4, row: 6 }) &&
+      rx.shift.path.length === 2 && free.hero.ref.hp === 100 && free.hero.ref.mp === 106,
       j({ reaction: rx, at: free.at, hp: free.hero.ref.hp, mp: free.hero.ref.mp })));
-    cases.push(ok('TFX-02 折影步：一侧被挡改向另一侧', blocked.r.ok && j(blocked.at) === j({ col: 4, row: 2 }), j({ at: blocked.at, reaction: blocked.r.hits[0] && blocked.r.hits[0].reaction })));
+    cases.push(ok('TFX-02 折影步：所选格被占时保留闪避但不位移', blocked.r.ok && blocked.r.hits[0]?.reaction?.dodged && j(blocked.at) === j({ col: 4, row: 4 }), j({ at: blocked.at, reaction: blocked.r.hits[0] && blocked.r.hits[0].reaction })));
     const rangedHero = unit('ell', 'hero', { spd: 10, skills: [zy] }), archer = unit('arc', 'enemy', { spd: 200 });
     const b5 = battle(m, [rangedHero, archer], { ell: { col: 4, row: 4 }, arc: { col: 9, row: 4 } }, () => 0.5);
     const r5 = b5.attack(ranged, { x: 4.5, y: 4.5, targetId: 'ell' });

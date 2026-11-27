@@ -109,8 +109,9 @@ async function runTTData(deps = {}) {
   ok('TT 舍身近战', guard && guard.isReaction === true && guard.sheshenTarget === '近战', JSON.stringify({ s: guard && guard.sheshenTarget }));
 
   // 六、位移
-  ok('TT 侧闪3', zhe && Array.isArray(zhe.displacements) && zhe.displacements.length === 1 && zhe.displacements[0].type === '侧闪' && zhe.displacements[0].distance === 3, JSON.stringify(zhe && zhe.displacements));
-  ok('TT evadeShift兼容派生', zhe && zhe.evadeShift && zhe.evadeShift.mode === 'side' && zhe.evadeShift.distance === 3, JSON.stringify(zhe && zhe.evadeShift));
+  ok('TT 反应折影步闪现2米', zhe && zhe.isReaction && zhe.displacements[0]?.type === '闪现' && zhe.displacements[0].distance === 2, JSON.stringify(zhe && zhe.displacements));
+  const activeZhe = el.skills.find(s => s.name === '折影步' && !s.isReaction);
+  ok('TT 同名主动折影步闪现5米、1辅4MP', activeZhe && activeZhe.displacements[0]?.type === '闪现' && activeZhe.displacements[0].distance === 5 && activeZhe.actionCost.aux === 1 && activeZhe.cost === 4, JSON.stringify(activeZhe));
   const push = skill(hero('弗兰克'), '重击推撞');
   ok('TT 击退3', push && push.displacements && push.displacements.some(d => d.type === '击退' && d.distance === 3), JSON.stringify(push && push.displacements));
   ok('TT 重击推撞冲锋4+击退3方向+直线4', push && push.displacements.some(d => d.type === '冲锋' && d.distance === 4) && push.displacements.some(d => d.type === '击退' && d.direction === '冲锋方向') && push.range.type === '直线' && push.range.length === 4, JSON.stringify(push && { d: push.displacements, r: push.range }));
@@ -159,7 +160,7 @@ async function runTTData(deps = {}) {
   ok('TT 配置读回父子同引用及全局索引', restoredGroup && restoredSkills.includes(restoredGroup.children[0]) && restoredGroup.children[0].name === '火舞术-精准流火');
   ok('TT 配置往返范围/动作/穿透', dFire && dFire.range && dFire.range.type === '单体' && dFire.range.castRange === 15 && dFire.actionCost && dFire.actionCost.main === 1 && dFire.isPierce === true, JSON.stringify(dFire && { r: dFire.range, a: dFire.actionCost, p: dFire.isPierce }));
   const dZhe = dEl && dEl.skills.find(s => s.name === '折影步');
-  ok('TT 配置往返位移', dZhe && Array.isArray(dZhe.displacements) && dZhe.displacements[0] && dZhe.displacements[0].type === '侧闪' && dZhe.displacements[0].distance === 3, JSON.stringify(dZhe && dZhe.displacements));
+  ok('TT 配置往返位移', dZhe && Array.isArray(dZhe.displacements) && dZhe.displacements[0] && dZhe.displacements[0].type === '闪现' && dZhe.displacements[0].distance === 2, JSON.stringify(dZhe && dZhe.displacements));
   const dFog = dEl && dEl.skills.find(s => s.name === '拉莱耶造雾术');
   ok('TT 配置往返区域', dFog && dFog.regionEffect && dFog.regionEffect.type === 'fog', JSON.stringify(dFog && dFog.regionEffect));
 

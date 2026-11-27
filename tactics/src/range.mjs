@@ -7,7 +7,7 @@
 // ==========================================
 
 import { cellAt } from './scene.mjs';
-import { occupiedCells, cellKey, unitCenter } from './geometry.mjs';
+import { occupiedCells, cellKey, unitCenter, directionVector } from './geometry.mjs';
 import { skillSlots } from './effect-definitions.mjs';
 import { barrierContact } from './barriers.mjs';
 import { canSeeUnit, canSeePoint, sightRadius } from './perception.mjs';
@@ -44,6 +44,49 @@ function skillHasHeal(skill) {
 }
 function footprintOf(ctx, u) { return ctx.footprintsById[u.id] || u.footprint || { width: 1, height: 1 }; }
 function inBounds(ctx, c, r) { return c >= 0 && r >= 0 && c < ctx.compiled.grid.columns && r < ctx.compiled.grid.rows; }
+
+function crossesCell(from, to, col, row) {
+  let enter = 0, exit = 1;
+  for (const [start, end, edge] of [[from.x, to.x, col], [from.y, to.y, row]]) {
+    if (start === end) {
+      if (start < edge || start >= edge + 1) return false;
+      continue;
+    }
+    const a = (edge - start) / (end - start), b = (edge + 1 - start) / (end - start);
+    enter = Math.max(enter, Math.min(a, b));
+    exit = Math.min(exit, Math.max(a, b));
+    if (exit - enter <= EPS) return false;
+  }
+  return true;
+}
+
+function linePassesLowCover(ctx, origin, target, { col, row }, { width, height }) {
+  for (let r = row - 1; r <= row + height; r++) for (let c = col - 1; c <= col + width; c++) {
+    if (c >= col && c < col + width && r >= row && r < row + height) continue;
+    if (cellAt(ctx.compiled, c, r)?.lowObstacle && crossesCell(origin, target, c, r)) return true;
+  }
+  return false;
+}
+
+export function spatialAttackModifiers(ctx, casterId, targetId, skill) {
+  const caster = unitById(ctx, casterId), target = unitById(ctx, targetId);
+  const type = skill?.range?.type;
+  if (!caster || !target || caster.side === target.side || (type !== '单体' && type !== '直线')
+    || skill.displacements?.some(d => d.type === '冲锋') || !skillSlots(skill).some(slot => slot.attack)) return { backstab: false, lowCover: false };
+  const origin = unitCenter(ctx.placementsById[casterId], footprintOf(ctx, caster));
+  const at = ctx.placementsById[targetId], footprint = footprintOf(ctx, target);
+  const center = unitCenter(at, footprint);
+  if (caster.side === 'hero' && target.side === 'enemy' && at.facing != null) {
+    const facing = directionVector(at.facing);
+    const x = origin.x - center.x, y = origin.y - center.y;
+    const dot = facing.dx * x + facing.dy * y;
+    return { backstab: dot < 0 && Math.abs(facing.dx * y - facing.dy * x) <= -dot * Math.tan(Math.PI / 8) + EPS, lowCover: false };
+  }
+  const lowCover = caster.side === 'enemy' && target.side === 'hero'
+    && (skill.damageType === '远程' || type === '直线' && skill.damageType === '法术')
+    && linePassesLowCover(ctx, origin, center, at, footprint);
+  return { backstab: false, lowCover };
+}
 
 function buildLiveOcc(ctx) {
   const occ = new Map();
@@ -131,7 +174,7 @@ function collectArea(ctx, type, origin, aim, range, casterSide, rayOrigin = orig
   return cells;
 }
 
-function collectLine(ctx, casterId, origin, aim, range) {
+function collectLine(ctx, origin, aim, range) {
   const dx = aim.x - origin.x, dy = aim.y - origin.y, len = Math.hypot(dx, dy);
   if (len <= EPS) return { ok: false, reason: '瞄准方向无效', cells: [], shape: null, collisionPoint: null, contact: null };
   const dir = { x: dx / len, y: dy / len };
@@ -143,17 +186,17 @@ function collectLine(ctx, casterId, origin, aim, range) {
     const rx = col + 0.5 - origin.x, ry = row + 0.5 - origin.y;
     const t = rx * dir.x + ry * dir.y, lateral = Math.abs(rx * -dir.y + ry * dir.x);
     if (t < -EPS || t > range.length + EPS || lateral > maxLateral) continue;
-    const wall = rayFirst(ctx, origin.x, origin.y, col + 0.5, row + 0.5, { skipUnitIds: [casterId], passSide: unitById(ctx, casterId)?.side });
-    if (wall && wall.type !== 'unit') continue;
+    const wall = rayFirst(ctx, origin.x, origin.y, col + 0.5, row + 0.5);
+    if (wall) continue;
     const k = cellKey(col, row); if (!seen.has(k)) { seen.add(k); cells.push({ col, row }); }
   }
-  const collision = rayFirst(ctx, origin.x, origin.y, to.x, to.y, { skipUnitIds: [casterId], blockUnits: true, passSide: unitById(ctx, casterId)?.side });
+  const collision = rayFirst(ctx, origin.x, origin.y, to.x, to.y);
   return { ok: true, cells, shape: { type: '直线', from: origin, dir: Math.atan2(dir.y, dir.x), length: range.length, width: range.width }, collisionPoint: collision && collision.point, contact: collision };
 }
 
 // 单体重查：调用方传入新 unitCenter 作为 aim；skipSpatialRecheck 供冲锋接触复用，
 // 只验目标身份/可选性，不再按技能射程与线遮挡重查（避免 6m 冲锋接触被射程/墙体误判）。
-function collectSingle(ctx, caster, origin, aim, range, guaranteedHit, includeDowned, skipSpatialRecheck, hostile) {
+function collectSingle(ctx, caster, origin, aim, range, guaranteedHit, includeDowned, skipSpatialRecheck, hostile, passFriendly) {
   if (!aim.targetId) return { ok: false, reason: '单体技能需锁定目标', cells: [], targetIds: [], blockedBy: null };
   const target = unitById(ctx, aim.targetId);
   if (!target) return { ok: false, reason: '目标不存在', cells: [], targetIds: [], blockedBy: null };
@@ -166,7 +209,7 @@ function collectSingle(ctx, caster, origin, aim, range, guaranteedHit, includeDo
   const dist = centerDistance(origin, tc);
   if (range.castRange !== undefined && dist > range.castRange + EPS) return { ok: false, reason: '目标超出射程', cells: [], targetIds: [], blockedBy: { type: 'range', point: tc } };
   const wall = rayFirst(ctx, origin.x, origin.y, tc.x, tc.y, {
-    skipUnitIds: [caster.id, target.id], blockUnits: target.side !== caster.side,
+    skipUnitIds: [caster.id, target.id], blockUnits: target.side !== caster.side, passSide: passFriendly ? caster.side : null,
   });
   if (wall && wall.type === 'wall') return { ok: false, reason: '视线被墙阻挡', cells: [], targetIds: [], blockedBy: wall };
   if (wall && wall.type === 'boundary') return { ok: false, reason: '目标路径越出地图', cells: [], targetIds: [], blockedBy: wall };
@@ -324,7 +367,10 @@ export function queryAttack(ctx, casterId, skill, aim, options = {}) {
     if (fogBlocksPoint(point)) return fogFailure();
     const limit = range.type === '圆形' ? range.radius : range.castRange ?? range.length;
     if (limit != null && centerDistance(origin, point) > limit + EPS) return fail('结界超出射程');
-    const blocked = rayFirst(ctx, origin.x, origin.y, point.x, point.y, { skipUnitIds: [casterId], blockUnits: true });
+    const passFriendly = range.type === '单体' && skill.damageType === '远程';
+    const blocked = rayFirst(ctx, origin.x, origin.y, point.x, point.y, {
+      skipUnitIds: [casterId], blockUnits: range.type !== '直线', passSide: passFriendly ? caster.side : null,
+    });
     if (blocked && (blocked.type !== 'unit' || !skill.guaranteedHit)) return fail('结界攻击路径被阻挡', blocked);
     if (ctx.enforcePerception && !canSeePoint(ctx, casterId, point)) return fail('结界不在本人视野内');
     const slotTargets = resolveSlotTargets(ctx, casterId, skill, [], null).map(slot => ({ ...slot, barrierIds: slot.attack ? [barrier.id] : [] }));
@@ -375,11 +421,11 @@ export function queryAttack(ctx, casterId, skill, aim, options = {}) {
 
   let cells = [], targetIds = [], shape = null, collisionPoint = null, contact = null, blockedBy = null, blastCenter = null;
   if (range.type === '单体') {
-    const single = collectSingle(ctx, caster, origin, normAim, range, !!skill.guaranteedHit, includeDowned, skipSpatialRecheck, hostile);
+    const single = collectSingle(ctx, caster, origin, normAim, range, !!skill.guaranteedHit, includeDowned, skipSpatialRecheck, hostile, hostile && skill.damageType === '远程');
     if (!single.ok) return Object.assign(fail(single.reason, single.blockedBy), { range });
     cells = single.cells; targetIds = single.targetIds; shape = single.shape; collisionPoint = single.collisionPoint;
   } else if (range.type === '直线') {
-    const line = collectLine(ctx, casterId, origin, normAim, range);
+    const line = collectLine(ctx, origin, normAim, range);
     if (!line.ok) return Object.assign(fail(line.reason), { range });
     cells = line.cells; shape = line.shape; collisionPoint = line.collisionPoint; contact = line.contact; blockedBy = line.contact;
     targetIds = cellsToTargets(ctx, cells).filter(t => t.unitId !== casterId && t.side !== caster.side).map(t => t.unitId);

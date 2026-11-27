@@ -251,6 +251,37 @@ export function findReachable(ctx, unitId, budget = Infinity, costMultiplier = 1
   return { cells, byKey };
 }
 
+// AI 同时保留可达的冒险路线；同一落点若能安全到达，优先采用安全走法。
+export function findRiskAwareReachable(ctx, unitId, budget, costMultiplier, canStep) {
+  const reach = findReachable(ctx, unitId, budget, costMultiplier, canStep);
+  if (!ctx.opportunityAttackers) return reach;
+  const edges = new Map();
+  function threat(from, to) {
+    const key = cellKey(from.col, from.row) + ':' + cellKey(to.col, to.row);
+    if (!edges.has(key)) edges.set(key, ctx.opportunityAttackers(unitId, from, to));
+    return edges.get(key);
+  }
+  let hasRisk = false;
+  for (const cell of reach.cells) {
+    const ids = new Set();
+    for (let i = 1; i < cell.path.length; i++) {
+      for (const id of threat(cell.path[i - 1], cell.path[i])) ids.add(id);
+    }
+    if (ids.size) { cell.opportunityRisk = ids.size; hasRisk = true; }
+  }
+  if (!hasRisk) return reach;
+  const safe = findReachable(ctx, unitId, budget, costMultiplier, (col, row, nc, nr) =>
+    (!canStep || canStep(col, row, nc, nr)) && !threat({ col, row }, { col: nc, row: nr }).length);
+  for (let i = 0; i < reach.cells.length; i++) {
+    const c = reach.cells[i], key = cellKey(c.col, c.row);
+    if (c.opportunityRisk && safe.byKey.has(key)) {
+      reach.cells[i] = safe.byKey.get(key);
+      reach.byKey.set(key, reach.cells[i]);
+    }
+  }
+  return reach;
+}
+
 // 冲锋的扫掠只受实墙（含关门、实心外壁）截停；占格接触不阻断路径。
 export function chargePath(ctx, unitId, aim, distance) {
   const unit = findUnit(ctx, unitId);

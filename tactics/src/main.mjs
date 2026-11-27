@@ -271,6 +271,8 @@ export function createApp(rootEl, opts = {}) {
       const caster = unitById(req.casterId);
       return isPlayerUnit(caster) ? beginRetargetPrompt(req) : Promise.resolve(null);
     },
+    promptTeleport: (req) => beginTeleportPrompt(req),
+    onMovementRequest: (req) => presentMovementRequest(req),
     getUnitStyle: (id) => effectiveUnitStyle(id),
     // FX02 反应接线（contract v2/v3）：玩家控制的单位（controller 优先，缺省按 side）受击弹全屏反应弹窗；
     // AI 控制的（敌方/召唤物/AI 侧 hero）不弹窗，自动选首个可用候选（原版敌方口径）
@@ -744,7 +746,7 @@ export function createApp(rootEl, opts = {}) {
     const id = battle.snapshot().currentId;
     const r = battle.snapshot().resources;
     const cell = battle.previewMove(hit.col, hit.row);
-    if (cell && cell.cost > 0) return { ok: true, cell, html: '移动 <b>' + cell.cost.toFixed(1) + 'm</b> · 余 ' + (r.moveRemaining - cell.cost).toFixed(1) + 'm' };
+    if (cell && cell.cost > 0) return { ok: true, cell, html: '移动 <b>' + cell.cost.toFixed(1) + 'm</b> · 余 ' + (r.moveRemaining - cell.cost).toFixed(1) + 'm' + (cell.opportunityIds?.length ? '<br><b class="t-kill">⚠ 将触发 ' + cell.opportunityIds.length + ' 次借机攻击</b>' : '') };
     const p = currentViewData.placementsById[id];
     if (p.col === hit.col && p.row === hit.row) return { ok: false, quiet: true };
     const full = fullReach && fullReach.byKey.get(hit.col + ',' + hit.row);
@@ -796,7 +798,8 @@ export function createApp(rootEl, opts = {}) {
       const summary = t0 && t0.dmg > 0
         ? '命中 <b>' + Math.round(t0.p * 100) + '%</b> · 预计 <b>-' + t0.dmg + '</b>' + (t0.kill ? ' · <b class="t-kill">☠ 可击杀</b>' : '') + (fx ? ' · ' + fx : '')
         : fx;
-      html = '<b>' + skill.name + '</b> · ' + (q.disclosureTargetIds.length > 1 ? q.disclosureTargetIds.length + ' 名目标 · ' : '') + summary + (segs > 1 ? ' · ' + segs + ' 段' : '') + ammo + (locked ? ' · <b>再点发动</b>' : '');
+      const mechanics = (t0?.backstab ? ' · <b>背袭</b>' : '') + (t0?.lowCover ? ' · <b>低墙掩护</b>' : '');
+      html = '<b>' + skill.name + '</b> · ' + (q.disclosureTargetIds.length > 1 ? q.disclosureTargetIds.length + ' 名目标 · ' : '') + summary + mechanics + (segs > 1 ? ' · ' + segs + ' 段' : '') + ammo + (locked ? ' · <b>再点发动</b>' : '');
     } else html = q.ok ? '<b>' + skill.name + '</b> · 范围内无敌人' + (locked ? ' · <b>再点发动</b>' : '') : q.reason;
     sandbox.setHint({ x: a.x, y: a.y }, html, q.ok ? (locked ? 'lock' : null) : 'bad');
     return { ok: q.ok, aim: a, query: q, reason: q.reason };
@@ -810,15 +813,32 @@ export function createApp(rootEl, opts = {}) {
       const dmg = mine.reduce((n, r) => n + r.estimatedHpDmg, 0), hp = shownOf(u).hp, max = u.ref.maxHp || 1;
       const p = skill.guaranteedHit ? 1 : hitChance(mine[0].attackCap, mine[0].dodgeCap), kill = dmg >= hp && hp > 0;
       if (view) view.setPredict(id, { from: hp / max, to: Math.max(0, hp - dmg) / max, kill, tag: (kill ? '☠ ' : '') + Math.round(p * 100) + '%' + (mine.length > 1 ? ' ×' + mine.length : '') });
-      return { id, dmg, p, kill };
+      return { id, dmg, p, kill, backstab: mine.some(r => r.backstab), lowCover: mine.some(r => r.lowCover) };
     }).filter(Boolean);
   }
   function hitKey(skill, hit) { return (skill.range.type === '单体' || skill.range.type === '自身') ? (hit.targetId ? 'u:' + hit.targetId : null) : hit.col + ',' + hit.row; }
   const isEnemyHit = hit => hit && hit.targetId && unitById(hit.targetId) && unitById(hit.targetId).side !== 'hero';
 
   let retargetPrompt = null;
+  let teleportPrompt = null;
   function cancelRetargetPrompt() {
     if (retargetPrompt) retargetPrompt.finish(null);
+    if (teleportPrompt) teleportPrompt.finish(null);
+  }
+  function beginTeleportPrompt(req) {
+    if (teleportPrompt) teleportPrompt.finish(null);
+    return new Promise(resolve => {
+      const cells = req.cells || [];
+      const finish = choice => {
+        if (!teleportPrompt) return;
+        teleportPrompt = null;
+        sandbox.setPreview(null); sandbox.setHint(null);
+        resolve(choice);
+      };
+      teleportPrompt = { req, cells, finish };
+      sandbox.setPreview({ kind: 'move', unitId: req.unitId, cells });
+      sandbox.refreshHover();
+    });
   }
   function beginRetargetPrompt(req) {
     if (retargetPrompt) retargetPrompt.finish(null);
@@ -857,6 +877,14 @@ export function createApp(rootEl, opts = {}) {
       }
       return;
     }
+    if (teleportPrompt) {
+      if (!hit) { sandbox.setHint(null); return; }
+      const pos = teleportPrompt.req.unitId && currentViewData.placementsById[teleportPrompt.req.unitId];
+      const staying = pos && pos.col === hit.col && pos.row === hit.row;
+      const cell = teleportPrompt.cells.find(c => c.col === hit.col && c.row === hit.row);
+      sandbox.setHint({ x: hit.col + 0.5, y: hit.row + 0.5 }, staying ? '点此留在原地 · 按取消也可留原地' : cell ? '折影步 · 点击确认' : '不可闪现至此格 · 按取消留在原地', staying || cell ? null : 'bad');
+      return;
+    }
     if (!battle || busy || !isHeroTurn()) { sandbox.setHint(null); shell.previewMoveCost(null); return; }
     if (pending) return;
     if (!hit) { sandbox.setHint(null); shell.previewMoveCost(null); if (fieldAction === 'jump') sandbox.setPreview({ kind: 'jump', unitId: battle.snapshot().currentId, cells: jumpCells() }); else idleOverlay(); return; }
@@ -875,6 +903,16 @@ export function createApp(rootEl, opts = {}) {
       const res = battle.snapshot().resources;
       const valid = !!target && (fieldAction === 'push' ? target.ref.hp > 0 && target.id !== battle.snapshot().currentId : target.ref.hp <= 0 && target.side === 'hero');
       sandbox.setHint({ x: hit.x, y: hit.y }, valid ? (fieldAction === 'push' ? '推动 ' : '背起 ') + escapeText(target.name) + ' · 点选确认' : (fieldAction === 'push' ? '选择相邻单位' : '选择倒地友方'), valid ? null : 'bad');
+      return;
+    }
+    if (aim && !aim.item && !aim.skill.isReaction && aim.skill.displacements?.some(d => d.type === '闪现')) {
+      const q = battle.previewAttack(aim.skill, { x: hit.col + 0.5, y: hit.row + 0.5 });
+      const cells = battle.teleportCells();
+      const legal = cells.some(c => c.col === hit.col && c.row === hit.row) && q.ok && q.teleport;
+      sandbox.setPreview({ kind: 'move', unitId: battle.snapshot().currentId, cells,
+        hover: legal ? { col: hit.col, row: hit.row, cost: q.teleport.distance, path: q.teleport.path } : null,
+        invalid: legal ? null : { col: hit.col, row: hit.row } });
+      sandbox.setHint({ x: hit.col + 0.5, y: hit.row + 0.5 }, legal ? '折影步 · ' + q.teleport.distance.toFixed(1) + 'm · 点击确认' : q.reason || '不可闪现至此格', legal ? null : 'bad');
       return;
     }
     if (aim) { attackPreview(aim, hit, false); return; }
@@ -900,6 +938,14 @@ export function createApp(rootEl, opts = {}) {
   });
 
   sandbox.onMapClick((hit, clickCount) => {
+    if (teleportPrompt) {
+      const cell = hit && teleportPrompt.cells.find(c => c.col === hit.col && c.row === hit.row);
+      const pos = teleportPrompt.req.unitId && currentViewData.placementsById[teleportPrompt.req.unitId];
+      if (pos && hit && pos.col === hit.col && pos.row === hit.row) { teleportPrompt.finish(null); return true; }
+      if (!cell) { ui('deny'); return true; }
+      teleportPrompt.finish({ col: cell.col, row: cell.row });
+      return true;
+    }
     if (retargetPrompt) {
       const r = retargetPrompt.req;
       const a = aimFor(r.skill, hit);
@@ -913,6 +959,17 @@ export function createApp(rootEl, opts = {}) {
     if (!battle || !isHeroTurn()) return false;
     if (busy) { ui('deny'); return true; }
     if (fieldAction) return handleFieldTarget(hit);
+    if (aim && !aim.item && !aim.skill.isReaction && aim.skill.displacements?.some(d => d.type === '闪现')) {
+      const cells = battle.teleportCells();
+      if (!cells.some(c => c.col === hit.col && c.row === hit.row)) { ui('deny'); return true; }
+      const q = battle.previewAttack(aim.skill, { x: hit.col + 0.5, y: hit.row + 0.5 });
+      if (!q.ok || !q.teleport) { ui('deny'); shell.showLog(q.reason || '该格不可闪现', 'warn'); return true; }
+      const key = hit.col + ',' + hit.row;
+      if (pending?.key === key) { firePending(); return true; }
+      pending = { key, aim: { x: hit.col + 0.5, y: hit.row + 0.5 } };
+      ui('lock'); renderCommand();
+      return true;
+    }
     if (aim) {
       const key = hitKey(aim.skill, hit);
       const sameTarget = pending?.aim.targetId && pending.aim.targetId === hit.targetId;
@@ -960,6 +1017,7 @@ export function createApp(rootEl, opts = {}) {
   });
 
   function cancelStep() {
+    if (teleportPrompt) { teleportPrompt.finish(null); ui('cancel'); return; }
     if (!battle || !isHeroTurn()) return;
     sandbox.getUnitView()?.clearPredict(); jumpArm = null;
     if (sprintArm) { sprintArm = null; ui('cancel'); sandbox.refreshHover(); return; }
@@ -1149,6 +1207,10 @@ export function createApp(rootEl, opts = {}) {
     pending = null;
     aim = { key, skill };
     sandbox.setHint(null); sandbox.refreshHover();
+    if (!skill.isReaction && skill.displacements?.some(d => d.type === '闪现')) {
+      sandbox.setPreview({ kind: 'move', unitId: battle.snapshot().currentId, cells: battle.teleportCells() });
+      renderCommand(); return;
+    }
     sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: aim.skill, query: null });
     if (isSelfCast(skill)) { fireSelf(); return; }
     renderCommand();
@@ -1172,19 +1234,45 @@ export function createApp(rootEl, opts = {}) {
     battle.endAction(); syncShown(); refreshBattle({ deferPassive: true }); beginTurn();
   }
 
-  async function doMove(col, row) {
+  async function presentMovementRequest(req) {
+    if (req.type === 'move-leg') {
+      const movement = req.movement;
+      const view = sandbox.getUnitView();
+      view.lockMotion(movement.unitId, true);
+      const first = movement.cell.path[0], fp = currentViewData.footprintsById[movement.unitId];
+      const from = unitCenter(first, fp);
+      view.setDisplayPos(movement.unitId, from.x, from.y);
+      refreshBattle();
+      await director.playMove(movement);
+      view.lockMotion(movement.unitId, false);
+      view.updateUnit(movement.unitId, { placement: currentViewData.placementsById[movement.unitId] });
+      return;
+    }
+    if (req.type === 'opportunity-result') await playAttackResult(req.result);
+  }
+
+  async function doMove(col, row, avoidFog = false) {
     const myFlow = flow;
     setBusy(true);
     sandbox.setPreview(null); sandbox.setHint(null);
     sandbox.beginAction();
     const mover = battle.snapshot().currentId;
-    sandbox.getUnitView().lockMotion(mover, true);   // 显示位置留在起点，直到路径演出接管（否则刷新会先闪到终点）
-    const res = battle.move(col, row);
-    if (!res.ok) { sandbox.getUnitView().lockMotion(mover, false); setBusy(false); ui('deny'); shell.showLog(res.reason, 'warn'); return; }
-    refreshBattle();
-    await director.playMove(res);
+    sandbox.getUnitView().lockMotion(mover, true);
+    const gen = battle.beginMove(col, row, avoidFog, { presentOpportunity: true });
+    const res = await director.driveAttack(gen);
     if (myFlow !== flow) return;
-    if (res.stoppedOnDiscovery) shell.showLog(battle.snapshot().log.at(-1), 'warn');
+    if (!res || !res.ok) { sandbox.getUnitView().lockMotion(mover, false); setBusy(false); if (res?.reason) shell.showLog(res.reason, 'warn'); return; }
+    if (res.displayMove) await director.playMove(res.displayMove);
+    sandbox.getUnitView().lockMotion(mover, false);
+    sandbox.getUnitView().updateUnit(mover, { placement: currentViewData.placementsById[mover] });
+    if (myFlow !== flow) return;
+    if (!battle.snapshot().currentId || battle.snapshot().terminal) {
+      if (!battle.snapshot().terminal) battle.endAction();
+      syncShown(); setBusy(false); refreshBattle({ deferPassive: true }); beginTurn(); return;
+    }
+    if (battle.snapshot().currentId !== mover) {
+      syncShown(); setBusy(false); refreshBattle({ deferPassive: true }); beginTurn(); return;
+    }
     afterHeroAction();
   }
   function fireSelf() {
@@ -1288,12 +1376,16 @@ export function createApp(rootEl, opts = {}) {
       if (!plan || plan.action === 'wait') break;
       if (plan.jumpTo || plan.moveTo) {
         sandbox.getUnitView().lockMotion(actorId, true);
-        const result = plan.jumpTo ? battle.jump(plan.jumpTo.col, plan.jumpTo.row) : battle.move(plan.moveTo.col, plan.moveTo.row, plan.avoidFog);
-        if (!result.ok) { sandbox.getUnitView().lockMotion(actorId, false); break; }
+        const result = plan.jumpTo ? battle.jump(plan.jumpTo.col, plan.jumpTo.row)
+          : await director.driveAttack(battle.beginMove(plan.moveTo.col, plan.moveTo.row, plan.avoidFog, { presentOpportunity: true }));
+        if (!result?.ok) { sandbox.getUnitView().lockMotion(actorId, false); break; }
         refreshBattle();
         if (plan.jumpTo) await director.playJump(result);
-        else await director.playMove(result);
+        else if (result.displayMove) await director.playMove(result.displayMove);
+        sandbox.getUnitView().lockMotion(actorId, false);
+        sandbox.getUnitView().updateUnit(actorId, { placement: currentViewData.placementsById[actorId] });
         if (!alive()) return;
+        if (battle.snapshot().currentId !== actorId || battle.snapshot().terminal) break;
         if (plan.jumpTo || result.stoppedOnDiscovery || !plan.skill) continue;
       }
       if (plan.action === 'sprint') {
@@ -1371,6 +1463,7 @@ export function createApp(rootEl, opts = {}) {
     for (const ev of (res.events || [])) {
       if (ev.type === 'unit-charged' || ev.type === 'unit-displaced') holdMotion(ev.unitId, ev.from);
     }
+    if (res.teleport) holdMotion(res.casterId, res.teleport.from);
     refreshBattle();
     try {
       await director.playAttack(res);
