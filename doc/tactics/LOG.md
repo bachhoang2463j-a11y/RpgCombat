@@ -934,3 +934,12 @@
 - 文件：`tactics/src/{hero-flame-fx,ui-shell}.mjs`（删 `hero-emblem-fx.mjs`）、`tactics/tactics.css`、`tactics/tools/build-demo-html.cjs`、产物报告、`tactics/mvp-standalone.html`。
 - 验证：全量回归退出码 0；单文件 61 模块，fx-polish、feedback 25/25、guard-barrier 16/16、phase4 11/11、典型对局 63/63 通过。无头 Chrome 逐态截图（待机/行动/TP62/TP 满爆发/残血红金/残血满 TP/悬停抠图）与 2x 高清近景，四卡全开时帧率约 110~120fps；调参三轮（过曝白团 → 过稀 → 加焰体），静态截图无法完全代表动态观感；未接入真实酒馆。
 - 目的 vs 现状：一致；火焰强弱/高度为首版，待用户实机观感后再调 TIER 表。
+
+## 2026-11-28 · 召唤物收纳签与图鉴展开、去「行动中」（d6ff04f）
+- 核心目的：右侧召唤物/临时友军图标去掉灰色滚动条，改为贴屏幕右缘的单目标收纳签；点击展开与敌方同款图鉴卡；去掉遮挡头像的「行动中」文字。
+- 收纳签：每个支援单位一签（左圆角、右侧贴边、暗金细边），内部只放 emoji（无 emoji 时为小头像），不显示血条与角标；低血红边呼吸、倒下灰显、当前行动金光、悬停外伸。容器改为仅纵向溢出并隐藏滚动条（原 overflow:auto + 展开详情卡导致横向灰条）。
+- 图鉴：删除原友军详情卡（HP/MP 条、状态行），点签即把右上检视卡（inspectorHtml，与敌方同卡）固定到该单位，再点收起；固定期间悬停其他单位临时切换，移开回到固定单位；卡脚注提示「已固定」。有支援单位时检视卡右移让出签列（right 12→60px）。支援单位消失时自动解除固定。
+- 角色栏：移除「行动中」标签及样式，当前行动只靠上浮放大、金辉与头像火焰表达。
+- 文件：`tactics/src/{ui-shell,main,status-ui}.mjs`、`tactics/tactics.css`、`tactics/tools/verify-fx-polish-artifact.cjs`（入包标记改 t-ally-tab/onAllyPin/inspectPin）、产物报告、`tactics/mvp-standalone.html`。
+- 验证：全量回归退出码 0；fx-polish、feedback 25/25、guard-barrier 16/16、phase4 11/11、典型对局 63/63 通过。无头 Chrome 实页：注入两名支援单位（🐺/💨），容器 overflowX=hidden、scrollWidth=clientWidth、无滚动条；实点签 → 检视卡出现且 right=60px、脚注为已固定、签 aria-pressed=true；再点 → 收起；页面无「行动中」节点。未在真实召唤流程中复测；未接入真实酒馆。
+- 目的 vs 现状：一致。
