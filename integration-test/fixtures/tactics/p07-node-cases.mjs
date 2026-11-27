@@ -92,11 +92,13 @@ async function p07(m) {
   const startedState = { mp: chargeHero2.ref.mp, uses: b3b.battleState.perBattleUses.ch2?.charge1 || 0 };
   b3b.endAction();
   const afterNextNatural = b3b.snapshot();
+  const untouched = afterNextNatural.preparation?.remaining === 1 && afterNextNatural.resources.main === 1;
+  b3b.advancePreparation();
   const prep = afterNextNatural.currentId === 'ch2' ? b3b.battleState.combatState.charges.ch2.preparing : null;
   const beforeRelease = { mp: chargeHero2.ref.mp, uses: b3b.battleState.perBattleUses.ch2?.charge1 || 0, resources: afterNextNatural.resources };
   const release = prep?.ready ? attackAt(b3b, charged, 'ce2', { col: 7, row: 4 }) : { ok: false, reason: '准备未完成' };
-  cases.push(ok('T07-02/03/04 蓄力开始付费一次，后续自然行动投入准备点，释放不重复扣费',
-    repeatStart.ok && startedState.mp === 7 && startedState.uses === 1 && afterNextNatural.currentId === 'ch2' && prep?.ready && beforeRelease.mp === 7 && beforeRelease.uses === 1 && release.ok && !release.preparing && chargeHero2.ref.mp === 7,
+  cases.push(ok('T07-02/03/04 蓄力开始付费一次，后续自然行动确认才投入准备点，释放不重复扣费',
+    repeatStart.ok && untouched && startedState.mp === 7 && startedState.uses === 1 && afterNextNatural.currentId === 'ch2' && prep?.ready && beforeRelease.mp === 7 && beforeRelease.uses === 1 && release.ok && !release.preparing && chargeHero2.ref.mp === 7,
     JSON.stringify({ start: repeatStart.ok, startedState, next: afterNextNatural.currentId, prep, beforeRelease, release: release.ok, mp: chargeHero2.ref.mp })));
 
   const readyStartSkill = { ...shot, name: 'readyCharge', cost: 1, delay: 1 };
@@ -104,6 +106,7 @@ async function p07(m) {
   readyBattle.start();
   const readyStart = attackAt(readyBattle, readyStartSkill, 're', { col: 7, row: 4 });
   readyBattle.endAction();
+  readyBattle.advancePreparation();
   const readyAction = readyBattle.snapshot();
   const endedReady = readyAction.currentId === 'rh' && readyAction.preparation?.ready;
   readyBattle.endAction();
@@ -117,6 +120,7 @@ async function p07(m) {
   const downCharge = { ...shot, name: 'downCharge', cost: 0, delay: 1 };
   downBattle.attack(downCharge, { x: 5.5, y: 4.5, targetId: 'de' });
   downBattle.endAction();
+  downBattle.advancePreparation();
   downBattle.attack(downCharge, { x: 5.5, y: 4.5, targetId: 'de' }, { policy: 'auto' });
   cases.push(ok('T07-05 施术者倒地清除蓄力准备态', downBattle.battleState.combatState.clock.units.ah.status === 'down' && downBattle.battleState.combatState.charges.ah.preparing === null,
     JSON.stringify({ status: downBattle.battleState.combatState.clock.units.ah.status, charge: downBattle.battleState.combatState.charges.ah })));

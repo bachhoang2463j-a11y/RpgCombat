@@ -91,6 +91,7 @@ export function createScenarioData(block, options = {}) {
       items: structuredClone(src.items || []),
       attrTags: Array.isArray(src.attrTags) ? src.attrTags.slice() : [],
       classType: src.classType == null ? null : src.classType,
+      ...(src.level == null ? {} : { level: src.level }),
       controller: side === 'hero' ? 'player' : 'ai',
     });
     if (p) placementsById[id] = { col: p.col, row: p.row, facing: p.facing == null ? 0 : p.facing };

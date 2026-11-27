@@ -353,6 +353,8 @@ export function buildShell(root) {
       state.menuKey = menuKey;
       rpgUi.updateSkillMenus(hero);
       decorateSkillCards(u);
+    } else {
+      decorateSkillCards(u);
     }
     renderBasic(cmd);
     renderCharge(cmd);
@@ -435,7 +437,7 @@ export function buildShell(root) {
   // ---------- 蓄力：复用原版 #charge-menu 槽（准备中替换四个主项）；可暂离去做移动/其他动作，资源条蓄力徽章随时回来 ----------
   function renderCharge(cmd) {
     const prep = cmd && cmd.playable ? cmd.preparation : null;
-    const key = prep ? [cmd.unit.id, cmd.serial, prep.skill && prep.skill.name, prep.remaining, prep.ready, cmd.resources.main].join('|') : '';
+    const key = prep ? [cmd.unit.id, cmd.serial, prep.skill && prep.skill.name, prep.remaining, prep.ready, cmd.resources.main, cmd.canContinue, cmd.canStationary].join('|') : '';
     if (!prep) state.chargeAside = false;
     const show = !!prep && !state.chargeAside;
     els.menuMain.style.display = show ? 'none' : '';
@@ -443,7 +445,7 @@ export function buildShell(root) {
     if (!show || key === state.chargeKey) { if (!show) state.chargeKey = ''; return; }
     state.chargeKey = key;
     const name = ESC(prep.skill && prep.skill.name);
-    const main = cmd.resources.main;
+    const canContinue = cmd.canContinue;
     const btnA = 'w-full py-1.5 px-2.5 bg-gradient-to-r border rounded-lg text-xs font-bold text-white flex items-center justify-center gap-1.5 transition-all';
     const btnB = 'w-full py-1.5 px-2.5 bg-slate-800/90 hover:bg-slate-700/90 border border-slate-600/80 rounded-lg text-xs font-bold text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-all';
     els.chargeMenu.innerHTML = prep.ready
@@ -451,10 +453,10 @@ export function buildShell(root) {
         '<button data-tactics-action="release" class="' + btnA + ' from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 border-cyan-400 shadow-lg"><span>1.</span> 释放蓄力 (进入目标选择)</button>' +
         '<button data-tactics-action="cancel-charge" class="' + btnB + '"><span>2.</span> 终止蓄力 (已付资源不退)</button>' +
         '<button data-tactics-charge-aside class="t-charge-aside">↩ 先做其他行动（移动/跳跃…）</button>'
-      : '<div class="text-center text-[10px] font-bold text-cyan-300 bg-cyan-950/80 border border-cyan-500/50 py-1 px-2 rounded-lg shadow-inner flex items-center justify-center gap-1.5 mb-1"><span class="animate-spin">⏳</span> 【' + name + '】蓄力中 (还需 ' + prep.remaining + ' 主行动)</div>' +
-        '<button data-tactics-action="prepare" class="' + btnA + ' from-cyan-700 to-blue-700 hover:from-cyan-600 hover:to-blue-600 border-cyan-500 shadow-md' + (main < 1 ? ' t-bact-off' : '') + '"' +
-          (main < 1 ? ' aria-disabled="true" title="本次行动的主行动已用完；下次自然行动会自动投入"' : '') + ' data-cost-main="' + Math.min(main, prep.remaining) + '">' +
-          '<span>1.</span> ' + (main < 1 ? '继续准备 (下次行动自动投入)' : '继续准备 (投入主行动 ×' + Math.min(main, prep.remaining) + ')') + '</button>' +
+      : '<div class="text-center text-[10px] font-bold text-cyan-300 bg-cyan-950/80 border border-cyan-500/50 py-1 px-2 rounded-lg mb-1">⏳ 【' + name + '】蓄力中（还需 ' + prep.remaining + ' 点准备）</div>' +
+        '<button data-tactics-action="prepare" class="' + btnA + ' from-cyan-700 to-blue-700 border-cyan-500"' +
+          (canContinue ? '' : ' disabled title="主行动或加速不足"') + '>继续准备</button>' +
+        (cmd.canStationary ? '<button data-tactics-action="stationary-prepare" class="' + btnB + '">驻足继续 · 消耗全部移动 · 准备−1</button>' : '') +
         '<button data-tactics-action="cancel-charge" class="' + btnB + '"><span>2.</span> 终止蓄力 (已付资源不退)</button>' +
         '<button data-tactics-charge-aside class="t-charge-aside">↩ 先做其他行动（移动/跳跃…）</button>';
   }
@@ -500,6 +502,12 @@ export function buildShell(root) {
       // 主/辅过滤：不匹配的卡（组父按子项）隐藏；组内子卡单独判定
       const hide = !!state.costFilter && !matches(s);
       (s.isGroup ? btn.parentElement : btn).style.display = hide ? 'none' : '';
+      const start = btn.nextElementSibling?.classList.contains('t-stationary-start') ? btn.nextElementSibling : null;
+      const canStart = !hide && s.delay > 0 && !s.isGroup && state.cmd?.canStationary && !state.cmd.preparation && state.cmd.canUse(s);
+      if (canStart && !start) {
+        btn.insertAdjacentHTML('afterend', '<button class="t-stationary-start w-full px-2 py-1 rounded border border-cyan-700 text-cyan-300 text-xs" data-tactics-action="stationary-start:' +
+          btn.dataset.skillIdx + '" title="消耗全部移动，蓄力−1">驻足开始 · ' + ESC(s.name) + '</button>');
+      } else if (!canStart && start) start.remove();
       if (state.cmd && state.cmd.skillReason) {
         const reason = state.cmd.skillReason(s);
         btn.title = reason || '';
@@ -578,7 +586,13 @@ export function buildShell(root) {
       uiSound('deny'); showLog((s ? '【' + s.name + '】' : '') + (s && callCmd('skillReason', s) || '当前不可用'), 'warn', 5200); return;
     }
     const action = e.target.closest('[data-tactics-action]');
-    if (action) { e.stopPropagation(); callCmd('onAction', action.dataset.tacticsAction); return; }
+    if (action) {
+      e.stopPropagation();
+      const key = action.dataset.tacticsAction;
+      if (key.startsWith('stationary-start:')) callCmd('onStationary', Number(key.split(':')[1]));
+      else callCmd('onAction', key);
+      return;
+    }
     const b = e.target.closest('button[data-rpg-ui-act]');
     if (!b) return;
     const act = b.getAttribute('data-rpg-ui-act');

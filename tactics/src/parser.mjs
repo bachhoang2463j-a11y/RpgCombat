@@ -1029,6 +1029,7 @@ export function parseEnemyEntry(entry, index) {
   for (let i = 0; i < count; i++) {
     const u = {
       name: name + (count > 1 ? `·${i + 1}` : ''),
+      ...(entry['等级'] != null ? { level: String(entry['等级']).trim() } : {}),
       maxHp: attrs.maxHp, hp: attrs.hp, maxMp: attrs.maxMp, mp: attrs.mp, maxTp: attrs.maxTp, tp: attrs.tp,
       atk: attrs.atk, def: attrs.def, spd: attrs.spd, actCount: attrs.actCount,
       classType: attrs.classType, isWise: attrs.isWise, attrTags: attrs.attrTags.slice(),

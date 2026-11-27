@@ -60,6 +60,7 @@ export function getEffectiveStats(unit, buffs = [], concealAtk = 0) {
 // ---------- 1. 防守者 ----------
 CLASS_PASSIVES['防守者'] = {
   name: '防守者',
+  unlimitedOpportunity: true,
   onBattleInit(unit) {
     const ref = unit.ref;
     ref.baseTauntBonus = 100;
@@ -82,13 +83,14 @@ CLASS_PASSIVES['防守者'] = {
     return 10 + Math.max(0, (stats.taunt || 0) - 200) * 0.2;
   },
   onPowerCounter() {
-    return { resetTaunt: true }; // 触发后清除临时嘲讽 buff、回归天生重装
+    return { resetTaunt: true, knockback: 2 }; // 触发后清除临时嘲讽 buff、回归天生重装
   },
 };
 
 // ---------- 2. 狂战士 ----------
 CLASS_PASSIVES['狂战士'] = {
   name: '狂战士',
+  landingPush: true,
   modifyStats(unit, stats) {
     const ref = unit.ref;
     if (ref.maxHp > 0 && ref.hp >= 0) {
@@ -116,6 +118,7 @@ CLASS_PASSIVES['狂战士'] = {
 // ---------- 3. 风行者 ----------
 CLASS_PASSIVES['风行者'] = {
   name: '风行者',
+  freeJump: true,
   modifyStats(unit, stats) {
     stats.eva += unit.ref.tp || 0;
   },
@@ -143,6 +146,8 @@ CLASS_PASSIVES['风行者'] = {
 // ---------- 4. 隐匿者（负嘲讽/远程隐袭加成/暗袭眩晕/击杀与未受击窗口累积/阈值再动与急袭） ----------
 CLASS_PASSIVES['隐匿者'] = {
   name: '隐匿者',
+  evadeOpportunity: true,
+  refillMovement: true,
   onBattleInit(unit) {
     unit.ref.baseTauntBonus = -50;
     unit.ref.stealthCycleProcessed = false; // 再动锁定标记：触发后置true，隐匿值跌回80以下解锁（原版 L21772）
@@ -214,6 +219,8 @@ CLASS_PASSIVES['隐匿者'] = {
 // ---------- 5. 施法者 ----------
 CLASS_PASSIVES['施法者'] = {
   name: '施法者',
+  stationaryPreparation: true,
+  prismRelay(level) { return level === '首领' ? 20 : level === '精英' ? 10 : 5; },
   onBattleInit(unit) {
     const shield = Math.floor((unit.ref.maxMp || 0) * 0.5);
     unit.ref.shield = (unit.ref.shield || 0) + shield;
@@ -229,6 +236,7 @@ CLASS_PASSIVES['施法者'] = {
 // ---------- 6. 圣职者 / 支援者（溢出治疗转盾） ----------
 const clericPassive = {
   name: '圣职者',
+  stabilizeRadius: 3,
   onOverheal(ctx) {
     const overflow = Math.max(0, Math.floor((ctx.oldHp + ctx.healAmount) - ctx.target.ref.maxHp));
     return overflow > 0 ? { shield: overflow } : null;
@@ -240,6 +248,7 @@ CLASS_PASSIVES['支援者'] = Object.assign({}, clericPassive, { name: '支援�
 // ---------- 7. 灾厄使 / 施毒者 ----------
 const corruptorPassive = {
   name: '灾厄使',
+  pushTicksDots: true,
   modifyDamageMultiplier(caster, target, targetBuffs) {
     const count = (targetBuffs || []).filter(b => b && (b.type === 'poison' || b.type === 'burn'
       || (b.type === 'def' && b.value < 0) || (b.type === 'hit' && b.value < 0)

@@ -133,7 +133,9 @@ function run() {
       const aim = blink ? { x: 4.5, y: 6.5 } : skill.range.type === '召唤' ? { x: 8.5, y: 4.5 } : { ...unitCenter(b.ctx.placementsById[ally ? 'caster' : 'target'], ally ? caster.footprint : target.footprint), targetId: ally ? 'caster' : 'target' };
       let r = drive(b.beginAttack(skill, aim));
       for (let i = 0; r.preparing && i < 10; i++) {
-        b.endAction(); actUntil(b, 'caster');
+        if (!b.snapshot().preparation?.ready) {
+          b.endAction(); actUntil(b, 'caster'); b.advancePreparation();
+        }
         const prep = b.snapshot().preparation;
         if (prep?.ready) r = drive(b.beginAttack(skill, aim));
       }
@@ -186,7 +188,7 @@ function run() {
     const aim3 = { ...unitCenter(b3Crit.ctx.placementsById.target, t3.footprint), targetId: 'target' };
     let r3 = drive(b3Crit.beginAttack(krupp, aim3));
     for (let i = 0; r3.preparing && i < 6; i++) {
-      b3Crit.endAction(); actUntil(b3Crit, 'caster');
+      if (!b3Crit.snapshot().preparation?.ready) { b3Crit.endAction(); actUntil(b3Crit, 'caster'); b3Crit.advancePreparation(); }
       if (b3Crit.snapshot().preparation?.ready) r3 = drive(b3Crit.beginAttack(krupp, aim3));
     }
     const selfBlind = (r3.effects || []).find(e => e.kind === 'buff' && e.field === 'hit');

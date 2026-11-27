@@ -270,6 +270,7 @@ function run() {
     const b=make([h,e],{h:{col:2,row:4},e:{col:4,row:4}});
     const r=b.attack(shot,aim(b,'e'));
     b.endAction();nextActor(b,'h');
+    b.advancePreparation();
     const fired=b.attack(shot,aim(b,'e'));
     check('TT-B 蓄力枪准备扣弹药一次释放不重复',r.preparing&&fired.ok&&!fired.preparing&&ammo.count===1,fired);
   }

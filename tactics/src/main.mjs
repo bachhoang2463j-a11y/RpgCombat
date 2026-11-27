@@ -209,7 +209,7 @@ export function buildViewData(block, resolvedHeroes, scene, positions, combatTok
         bars: { hp: src.hp == null ? src.maxHp : src.hp, maxHp: src.maxHp || 0, mp: src.mp == null ? src.maxMp : src.mp, maxMp: src.maxMp || 0 },
         skills: linkSkillGroupRows(Array.isArray(src.skills) ? src.skills : []),
         items: Array.isArray(src.items) ? src.items : [],
-        ref: src,
+        ref: src, classType: src.classType, ...(src.level == null ? {} : { level: src.level }),
       });
     };
   (resolvedHeroes || []).forEach(h => addUnit(h, 'hero'));
@@ -311,6 +311,7 @@ export function createApp(rootEl, opts = {}) {
   let aim = null;            // 瞄准模式 { key, skill }；null = 自由模式（点地面移动、点敌人攻击）
   let fieldAction = null;    // P04：跳跃/推动/背负/放下目标选择
   let pending = null;        // 已锁定的攻击 { key, aim }
+  let offeredPreparation = null;
   let fullReach = null;      // 本次行动无额度可达表（区分"超出额度"与"不可达"）
   let currentState = null;
   let lastResult = null;
@@ -354,8 +355,8 @@ export function createApp(rootEl, opts = {}) {
     const key = hit.col + ',' + hit.row;
     if (fieldAction === 'jump' && jumpArm === key) { jumpArm = null; runFieldTarget('jump', hit); return true; }
     const r = battle.snapshot().resources, reach = jumpReach(currentUnit(), r);
-    if (!r || r.aux + r.main < 1 || r.jumpsRemaining < 1 || reach < 1) {
-      ui('deny'); shell.showLog(r && r.aux + r.main < 1 ? '行动点不足，无法跳跃' : r && r.jumpsRemaining < 1 ? '本次自然行动已经跳跃' : '无法起跳', 'warn');
+    if (!r || !r.freeJumpAvailable && r.aux + r.main < 1 || r.jumpsRemaining < 1 || reach < 1) {
+      ui('deny'); shell.showLog(r && !r.freeJumpAvailable && r.aux + r.main < 1 ? '行动点不足，无法跳跃' : r && r.jumpsRemaining < 1 ? '本次自然行动已经跳跃' : '无法起跳', 'warn');
       return true;
     }
     if (fieldAction !== 'jump') handleFieldAction('jump');
@@ -585,7 +586,7 @@ export function createApp(rootEl, opts = {}) {
       }
     }
     const usable = skills.map((s, i) => ({ key: 'sk:' + i, skill: s }))
-      .filter(a => !a.skill._inGroup && !a.skill.isGroup && !(a.skill.charge > 0) && !isSelfCast(a.skill) && skillUsable(a.skill) && skillSlots(a.skill).some(x => x.attack));
+      .filter(a => !a.skill._inGroup && !a.skill.isGroup && !(a.skill.charge > 0 || a.skill.delay > 0) && !isSelfCast(a.skill) && skillUsable(a.skill) && skillSlots(a.skill).some(x => x.attack));
     if (skillUsable(BASIC_ATTACK)) usable.push({ key: 'attack', skill: BASIC_ATTACK });
     if (!usable.length) return { ok: false, remembered: false, reason: skillReason(BASIC_ATTACK) || '主行动已用完' };
     if (hit) {
@@ -623,6 +624,9 @@ export function createApp(rootEl, opts = {}) {
         ? '【' + esc(aim.skill.name) + '】已锁定<br>再次点击目标或 Enter 发动'
         : '【' + esc(aim.skill.name) + '】请在地图上选择目标',
       canUse: skillUsable,
+      canStationary: hero && !busy && battle.canStationaryPrepare(),
+      canContinue: hero && !busy && !!snap.preparation && battle.canAdvancePreparation().ok,
+      onStationary: (idx) => handleCommand('sk:' + idx, true),
       skillReason,
       itemStatus: (it, child) => battle.canUseItem(it, child),
       onItem: (idx, childIdx) => handleItemEntry(idx, childIdx),
@@ -638,7 +642,7 @@ export function createApp(rootEl, opts = {}) {
   // 基础行动格数据：资格只读规则已有的资源与状态；最终判定仍以 battle.* 返回为准
   function basicActions(u, r, carrying) {
     const atkReason = skillReason(BASIC_ATTACK);
-    const reach = jumpReach(u, r), canPayAux = r.aux + r.main >= 1;
+    const reach = jumpReach(u, r), canPayAux = r.aux + r.main >= 1, canJump = r.freeJumpAvailable || canPayAux;
     const downAlly = currentViewData.units.some(x => x.side === 'hero' && x.id !== u.id && x.ref.hp <= 0 && !Object.values(battle.snapshot().carrying).includes(x.id));
     const carried = carrying ? unitById(carrying) : null;
     const ready = battle.previewReady();
@@ -649,8 +653,8 @@ export function createApp(rootEl, opts = {}) {
         reason: typeof battle.defend !== 'function' ? '防御姿态：规则接口待对齐' : '主行动已用完',
         short: typeof battle.defend !== 'function' ? '⏳ 待规则接入' : '◆ 主行动已用完', desc: '恢复 MP／TP 并进入防御姿态，持续 100 虚拟时间' },
       { key: 'sprint', icon: '💨', name: '冲刺', cost: { main: 1 }, mode: 'instant', tone: 'sky', note: '+' + u.ref.moveDistance + 'm', ok: r.main >= 1, reason: '主行动已用完', short: '◆ 主行动已用完', desc: '消耗主行动，立即追加一份移动额度' },
-      { key: 'jump', icon: '🦘', name: '跳跃', cost: { aux: 1 }, mode: 'target', tone: 'violet', note: '≤' + reach + 'm', ok: canPayAux && r.jumpsRemaining > 0 && reach >= 1,
-        reason: !canPayAux ? '行动点不足' : r.jumpsRemaining < 1 ? '本次自然行动已经跳跃' : '无法起跳', short: !canPayAux ? '◇ 行动点已用完' : r.jumpsRemaining < 1 ? '🦘 本次已跳跃' : '无法起跳', desc: '沿八方向直线跳跃，越过低矮障碍；不扣移动额度，每次自然行动一次' },
+      { key: 'jump', icon: '🦘', name: '跳跃', cost: r.freeJumpAvailable ? null : { aux: 1 }, mode: 'target', tone: 'violet', note: (r.freeJumpAvailable ? '免费 · ' : '') + '≤' + reach + 'm', ok: canJump && r.jumpsRemaining > 0 && reach >= 1,
+        reason: !canJump ? '行动点不足' : r.jumpsRemaining < 1 ? '本次自然行动已经跳跃' : '无法起跳', short: !canJump ? '◇ 行动点已用完' : r.jumpsRemaining < 1 ? '🦘 本次已跳跃' : '无法起跳', desc: '沿八方向直线跳跃，越过低矮障碍；不扣移动额度；风行者首跳免费，可再付费跳一次' },
       { key: 'push', icon: '✋', name: '推动', cost: { aux: 1 }, mode: 'target', tone: 'amber', ok: canPayAux, reason: '行动点不足', short: '◇ 行动点已用完', desc: '与相邻单位力量对抗，推开数米；撞墙造成伤害' },
       carried
         ? { key: 'drop', icon: '⬇️', name: '放下', cost: null, mode: 'instant', tone: 'emerald', note: carried.name, ok: true, desc: '把背负的友方放到身边空格' }
@@ -694,6 +698,13 @@ export function createApp(rootEl, opts = {}) {
       const s = shownOf(u);
       u.effective = battle.getEffectiveUnit(u.id);
       u.bars = { ...u.bars, hp: s.hp, mp: s.mp, tp: s.tp, shield: s.shield };
+    }
+    if (currentViewData.scene !== battle.ctx.scene) {
+      const previousObjects = currentViewData.scene.objects || {};
+      const nextScene = battle.ctx.scene;
+      const destroyed = Object.keys(previousObjects).filter(id => previousObjects[id] && !nextScene.objects?.[id]);
+      currentViewData = { ...currentViewData, scene: nextScene };
+      for (const id of destroyed) currentState.scenes[currentViewData.sceneId].objects[id] = null;
     }
     sandbox.update(currentViewData);
     const view = sandbox.getUnitView();
@@ -1028,28 +1039,16 @@ export function createApp(rootEl, opts = {}) {
 
   function handleFieldAction(kind) {
     if (!battle || !isHeroTurn() || busy) return;
-    if (kind === 'release') {
-      const prep = battle.snapshot().preparation;
-      if (prep?.skill.isItem) {
-        const items = currentUnit()?.items || [];
-        const idx = items.findIndex(it => it.name === (prep.skill.parentItemName || prep.skill.name));
-        const childIdx = prep.skill.parentItemName ? items[idx]?.children?.findIndex(child => child.name === prep.skill.name) : null;
-        if (idx < 0 || (prep.skill.parentItemName && !(childIdx >= 0))) { ui('deny'); shell.showLog('找不到待释放的蓄力物品', 'warn'); return; }
-        handleItemEntry(idx, childIdx); return;
-      }
-      const idx = prep ? (currentUnit()?.skills || []).findIndex(s => s.name === prep.skill.name) : -1;
-      if (idx < 0) { ui('deny'); shell.showLog('找不到待释放的蓄力技能', 'warn'); return; }
-      handleCommand('sk:' + idx); return;
-    }
-    if (kind === 'prepare' || kind === 'cancel-charge') {
-      const result = kind === 'prepare' ? battle.advancePreparation() : battle.cancelPreparation();
+    if (kind === 'release') { offerPreparedRelease(true); return; }
+    if (kind === 'prepare' || kind === 'stationary-prepare' || kind === 'cancel-charge') {
+      const canceled = kind === 'cancel-charge';
+      const result = canceled ? battle.cancelPreparation() : battle.advancePreparation({ stationary: kind === 'stationary-prepare' });
       if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return; }
-      ui(kind === 'prepare' ? 'charge' : 'cancel');
-      if (kind === 'prepare') avHost.sfx(result.ready ? 'herochargedone' : 'herocharge', 0.65, { category: 'K' });
-      const log = battle.snapshot().log;
-      shell.showLog(log[log.length - 1], 'act');
-      if (kind === 'prepare') fxAtUnit(battle.snapshot().currentId, 't-charge-pulse', 900);
-      refreshBattle(); idleOverlay(); return;
+      ui(canceled ? 'cancel' : 'charge');
+      if (!canceled) avHost.sfx(result.ready ? 'herochargedone' : 'herocharge', 0.65, { category: 'K' });
+      shell.showLog(battle.snapshot().log.at(-1), 'act');
+      if (!canceled) fxAtUnit(battle.snapshot().currentId, 't-charge-pulse', 900);
+      afterHeroAction(); return;
     }
     if (kind === 'sprint') {
       const result = battle.sprint();
@@ -1087,6 +1086,11 @@ export function createApp(rootEl, opts = {}) {
     const valid = battle.canUseItem(it, child);
     if (!valid.ok) { ui('deny'); shell.showLog(valid.reason, 'warn'); return; }
     const skill = battle.itemSkill(it, child);
+    if (skill.delay > 0) {
+      if (battle.snapshot().preparation?.ready) offerPreparedRelease(true);
+      else declarePreparation(skill);
+      return;
+    }
     pending = null; fieldAction = null;
     aim = { key: 'item:' + idx + (child ? ':' + childIdx : ''), skill, item: it, child };
     sandbox.setHint(null); sandbox.refreshHover();
@@ -1113,6 +1117,14 @@ export function createApp(rootEl, opts = {}) {
     runFieldTarget(fieldAction, hit);
     return true;
   }
+  function stageJumpTargets(result) {
+    const view = sandbox.getUnitView();
+    for (const move of result.displacements || []) {
+      const from = unitCenter(move.from, currentViewData.footprintsById[move.unitId]);
+      view.lockMotion(move.unitId, true);
+      view.setDisplayPos(move.unitId, from.x, from.y);
+    }
+  }
   // 场地动作：规则命令一次结算 → 演出层按结果播放（跳跃抛物线 / 推动冲撞滑移 / 背起抬升）→ 交还控制
   async function runFieldTarget(kind, hit) {
     const myFlow = flow;
@@ -1129,6 +1141,7 @@ export function createApp(rootEl, opts = {}) {
     setBusy(true);
     sandbox.beginAction();
     ui('confirm');
+    if (kind === 'jump') stageJumpTargets(result);
     refreshBattle();
     if (kind === 'jump') await director.playJump(result);
     else if (kind === 'push') {
@@ -1196,7 +1209,7 @@ export function createApp(rootEl, opts = {}) {
     }
   }
 
-  function handleCommand(key) {
+  function handleCommand(key, stationary = false) {
     if (!battle || !isHeroTurn()) return;
     if (busy) { ui('deny'); return; }
     if (key === 'end') { requestEnd(); return; }
@@ -1204,6 +1217,11 @@ export function createApp(rootEl, opts = {}) {
     const skill = skillOfKey(key);
     if (!skill || skill.isGroup) return;
     if (!skillUsable(skill)) { ui('deny'); shell.showLog(skillReason(skill), 'warn'); return; }
+    if (skill.delay > 0) {
+      if (battle.snapshot().preparation?.ready) offerPreparedRelease(true);
+      else declarePreparation(skill, stationary);
+      return;
+    }
     pending = null;
     aim = { key, skill };
     sandbox.setHint(null); sandbox.refreshHover();
@@ -1275,6 +1293,35 @@ export function createApp(rootEl, opts = {}) {
     }
     afterHeroAction();
   }
+  async function declarePreparation(skill, stationary = false) {
+    const myFlow = flow;
+    const result = battle.startPreparation(skill, { stationary });
+    if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return; }
+    aim = null; pending = null; fieldAction = null;
+    shell.closeMenus(); sandbox.setPreview(null); sandbox.setHint(null);
+    setBusy(true); sandbox.beginAction();
+    syncShown(); refreshBattle();
+    shell.showLog(battle.snapshot().log.at(-1), 'act');
+    if (!result.charge.ready) await director.playPrepare(result);
+    if (myFlow === flow) afterHeroAction();
+  }
+  function offerPreparedRelease(manual = false) {
+    if (!isHeroTurn() || busy) return false;
+    const snap = battle.snapshot(), prep = snap.preparation;
+    if (!prep?.ready) { offeredPreparation = null; return false; }
+    const token = snap.runId + ':' + (prep.id || prep.skillKey);
+    if (!manual && offeredPreparation === token) return false;
+    offeredPreparation = token;
+    fieldAction = null; pending = null;
+    aim = { key: 'release', skill: prep.skill };
+    shell.closeMenus(); sandbox.setHint(null);
+    if (isSelfCast(prep.skill) || ['圆形', '全域'].includes(prep.skill.range.type)) fireSelf();
+    else {
+      sandbox.setPreview({ kind: 'attack', casterId: snap.currentId, skill: prep.skill, query: null });
+      sandbox.refreshHover(); renderCommand();
+    }
+    return true;
+  }
   function fireSelf() {
     const me = battle.snapshot().currentId;
     pending = { aim: { ...sandbox.unitWorldCenter(me), targetId: me } };
@@ -1310,7 +1357,7 @@ export function createApp(rootEl, opts = {}) {
       sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: act.skill, query: null });
       return;
     }
-    if (!act.item && act.skill && !(act.skill.charge > 0) && (act.key === 'attack' || skillSlots(act.skill).some(x => x.attack))) {
+    if (!act.item && act.skill && !(act.skill.charge > 0 || act.skill.delay > 0) && (act.key === 'attack' || skillSlots(act.skill).some(x => x.attack))) {
       lastAttackByUnit.set(casterId, { key: act.key, name: act.skill.name });
     }
     await playAttackResult(res);
@@ -1321,8 +1368,14 @@ export function createApp(rootEl, opts = {}) {
     sprintArm = null; jumpArm = null;
     syncShown();
     setBusy(false);
+    const snap = battle.snapshot();
+    if (!snap.currentId || snap.terminal) {
+      if (!snap.terminal) battle.endAction();
+      refreshBattle({ deferPassive: true }); beginTurn(); return;
+    }
     refreshBattle();
-    fullReach = findReachable(battle.ctx, battle.snapshot().currentId, Infinity);
+    fullReach = findReachable(battle.ctx, snap.currentId, Infinity);
+    if (offerPreparedRelease()) return;
     sandbox.refreshHover();
     idleOverlay();
     if (!currentViewData.units.some(u => u.side !== 'hero' && u.ref.hp > 0)) shell.showLog('敌方已全灭 · 结束回合以结算', 'win');
@@ -1355,7 +1408,7 @@ export function createApp(rootEl, opts = {}) {
       fullReach = findReachable(battle.ctx, u.id, Infinity);
       setBusy(false);
       renderCommand();
-      idleOverlay();
+      if (!offerPreparedRelease()) idleOverlay();
       return;
     }
     renderCommand();
@@ -1379,6 +1432,7 @@ export function createApp(rootEl, opts = {}) {
         const result = plan.jumpTo ? battle.jump(plan.jumpTo.col, plan.jumpTo.row)
           : await director.driveAttack(battle.beginMove(plan.moveTo.col, plan.moveTo.row, plan.avoidFog, { presentOpportunity: true }));
         if (!result?.ok) { sandbox.getUnitView().lockMotion(actorId, false); break; }
+        if (plan.jumpTo) stageJumpTargets(result);
         refreshBattle();
         if (plan.jumpTo) await director.playJump(result);
         else if (result.displayMove) await director.playMove(result.displayMove);
@@ -1400,6 +1454,13 @@ export function createApp(rootEl, opts = {}) {
         if (!pr.ok) break;
         avHost.sfx(pr.ready ? 'herochargedone' : 'herocharge', 0.58, { category: 'K' }); fxAtUnit(actorId, 't-charge-pulse', 900); refreshBattle();
       } else if (plan.skill) {
+        if (plan.skill.delay > 0 && !battle.snapshot().preparation) {
+          const prep = battle.startPreparation(plan.skill);
+          if (!prep.ok) break;
+          syncShown(); refreshBattle(); await director.playPrepare(prep);
+          if (!alive()) return;
+          continue;
+        }
         const q = battle.previewAttack(plan.skill, plan.aim);
         if (!q.ok) break;
         const before = progress();

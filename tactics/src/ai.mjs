@@ -415,7 +415,7 @@ function planJump(ctx, unit, res, budget, reach, walk, distanceTo, walkDistance,
 }
 
 function canJump(res) {
-  return res.main + res.aux >= 1 && (res.jumpsRemaining ?? Number(!res.jumped)) > 0;
+  return (res.freeJumpAvailable || res.main + res.aux >= 1) && (res.jumpsRemaining ?? Number(!res.jumped)) > 0;
 }
 
 function* jumpLandings(start, distance) {

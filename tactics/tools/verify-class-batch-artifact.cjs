@@ -1,0 +1,48 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const html = readFileSync(path.join(__dirname, '..', 'mvp-standalone.html'), 'utf8');
+const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+assert.equal(scripts.length, 1);
+assert.equal((html.match(/<\/script>/gi) || []).length, 1);
+assert.doesNotMatch(html, /<script[^>]+src=|<link[^>]+stylesheet/i);
+assert.doesNotMatch(scripts[0][1], /\bimport\s*(?:\(|[{*'"\w])/);
+for (const symbol of ['startPreparation', 'offerPreparedRelease', 'stationary-start:', 'stabilizerOf', 'creditEnemyDefeat', 'freeJumpAvailable']) {
+  assert.ok(scripts[0][1].includes(symbol), symbol + ' 未入包');
+}
+const host = { console, structuredClone, URL, setTimeout, clearTimeout };
+host.window = host;
+vm.createContext(host);
+assert.throws(() => new vm.Script(scripts[0][1]).runInContext(host), /document is not defined/);
+const { parseYamlText, createBattle, createScenarioData } = host.__TACTICS_BACKEND__;
+const yaml = readFileSync(path.join(__dirname, '..', '..', 'doc', 'tactics', '典型对局-战棋版.yaml'), 'utf8');
+const data = createScenarioData(parseYamlText(yaml));
+const mage = data.units.find(u => u.name === '埃利奥特');
+const frank = data.units.find(u => u.name === '弗兰克');
+assert.equal(frank.skills.find(s => s.name === '掩体包扎').range.type, '自身');
+assert.deepEqual([...data.units.filter(u => u.side === 'enemy').map(u => u.level)], ['杂兵', '杂兵', '首领', '精英', '杂兵', '杂兵']);
+const target = data.units.find(u => u.level === '首领');
+mage.ref.tp = 10; mage.ref.spd = 200;
+target.ref.hp = 1; target.ref.spd = 20; target.ref.evasion = 0; target.skills = [];
+const spell = mage.skills.find(s => s.name === '召雷术');
+const placementsById = { [mage.id]: { col: 2, row: 3, facing: 90 }, [target.id]: { col: 6, row: 3, facing: 270 } };
+const scene = { sceneId: 'class-batch-artifact', grid: { columns: 13, rows: 9, metersPerCell: 1 }, objects: [] };
+const battle = createBattle({ scene, units: [mage, target], placementsById, random: () => 0 });
+const opening = battle.start();
+const mp = mage.ref.mp;
+const prep = battle.startPreparation(spell, { stationary: true });
+assert.ok(prep.charge.ready && prep.preparing && !battle.snapshot().preparation.aim);
+assert.equal(prep.costSummary.movement, opening.resources.moveRemaining);
+assert.deepEqual([prep.costSummary.main, prep.costSummary.mp, prep.costSummary.tp], [1, 10, 10]);
+assert.equal(mage.ref.mp, mp - 10);
+assert.equal(target.ref.hp, 1);
+assert.equal(battle.snapshot().chargeInventory, 0);
+const result = battle.attack(spell, { x: 6.5, y: 3.5 });
+assert.ok(result.ok && !result.preparing);
+assert.equal(mage.ref.mp, mp - 10);
+assert.equal(result.events.find(ev => ev.passive === '棱镜中继')?.value, 20);
+assert.equal(battle.snapshot().preparation, null);
+console.log('[class-batch artifact] 单脚本、零外部 import、职业模块入包、无目标声明、驻足回响即就绪、释放扣费与首领奖励通过');

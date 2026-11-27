@@ -243,7 +243,8 @@ export const groups = {
       const b = battle(m, [h, e], { h: { col: 1, row: 4 }, e: { col: 5, row: 4 } }, rng([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]));
       const r1 = b.attack(delaySkill, aim(5, 4, 'e'));
       const prepOk = r1.preparing === true && b.snapshot().preparation && b.snapshot().preparation.source === 'delay' && b.snapshot().preparation.remaining === 1 && e.ref.hp === 100;
-      b.endAction(); // 下一自然行动自动投入主行动 → 就绪（SPEC S06：后续取得的主行动自动投入）
+      b.endAction();
+      b.advancePreparation(); // 玩家明确继续后投入 → 就绪
       const prep = b.snapshot().preparation;
       const readyOk = prep && prep.remaining === 0;
       const r2 = b.attack(delaySkill, aim(5, 4, 'e')); // 就绪释放当下目标，不再扣主行动/MP

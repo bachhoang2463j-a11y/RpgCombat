@@ -118,7 +118,11 @@ const items = casesFor(check => {
     const b = battle(item);
     const used = b.useItem(item);
     const opening = b.snapshot();
-    for (let i = 0; i < 6 && !b.snapshot().preparation?.ready; i++) b.endAction();
+    for (let i = 0; i < 6 && !b.snapshot().preparation?.ready; i++) {
+      const prior = b.snapshot().currentId;
+      const next = b.endAction();
+      if (next.preparation && next.currentId === opening.currentId && (next.currentId !== prior || next.actionSerial !== opening.actionSerial)) b.advancePreparation();
+    }
     const before = b.snapshot();
     const release = b.useItem(item);
     check('延迟物品先付一辅，再投入现有主行动，释放不再扣点或扣库存', used.preparing && used.costSummary.main === 0

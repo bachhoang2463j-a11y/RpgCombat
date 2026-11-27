@@ -480,8 +480,8 @@ export const groups = {
     const gsEntry = reg.resolve(prepareInput(gs));
     cases.push(ok('TFX-03 归尘礼赞起手：延迟准备结果（未结算槽位、已扣 HP/MP/TP）→ holy-vow(L2)',
       gs.ok && gs.preparing && !gs.hits.length && gs.costSummary.hp === 10 && gs.costSummary.tp === 10 && gsEntry && gsEntry.id === 'holy-vow', j({ ok: gs.ok, reason: gs.reason, cost: gs.costSummary, id: gsEntry && gsEntry.id })));
-    b.endAction(); toEl(true);
-    const gr = drive(b.beginAttack(sk('归尘礼赞'), prep() ? prep().aim : { ...center(target), targetId: target }));
+    if (!prep()?.ready) { b.endAction(); toEl(true); b.advancePreparation(); }
+    const gr = drive(b.beginAttack(sk('归尘礼赞'), { ...center(target), targetId: target }));
     cases.push(ok('TFX-03 归尘礼赞释放：必中穿透 + 降防效果真值 → holy-judgment(L4)',
       gr.ok && !gr.preparing && gr.hits.length === 1 && gr.hits[0].hit && gr.effects.some(e => e.tag === '降防') && pick(gr) === 'holy-judgment', j({ ok: gr.ok, reason: gr.reason, hits: gr.hits.map(h => [h.targetId, h.hit]), id: pick(gr) })));
     fresh(); toEl(true);
@@ -489,9 +489,9 @@ export const groups = {
     const ts = drive(b.beginAttack(sk('召雷术'), center('e:食尸鬼A')));
     const tsEntry = ts.ok && reg.resolve(prepareInput(ts));
     let waited = 0;
-    while (prep() && !prep().ready && waited++ < 3) { b.endAction(); toEl(true); }
-    const tr = prep() ? drive(b.beginAttack(sk('召雷术'), prep().aim)) : { ok: false, reason: '准备丢失', hp: el.ref.hp, cur: b.snapshot().currentId, log: b.snapshot().log.slice(-8) };
-    cases.push(ok('TFX-03 召雷术：延迟2起手 → storm-gather(L2)；后续自然行动自动投入（含加速库存）就绪后释放 → thunder-storm(L3)，麻痹效果真值',
+    while (prep() && !prep().ready && waited++ < 3) { b.endAction(); toEl(true); b.advancePreparation(); }
+    const tr = prep() ? drive(b.beginAttack(sk('召雷术'), center('e:食尸鬼A'))) : { ok: false, reason: '准备丢失', hp: el.ref.hp, cur: b.snapshot().currentId, log: b.snapshot().log.slice(-8) };
+    cases.push(ok('TFX-03 召雷术：延迟2起手 → storm-gather(L2)；后续自然行动确认投入（含加速库存）就绪后释放 → thunder-storm(L3)，麻痹效果真值',
       ts.ok && ts.preparing && tsEntry && tsEntry.id === 'storm-gather' && waited >= 1 && waited <= 2 && tr.ok && tr.hits.length > 0 && tr.effects.some(e => e.tag === '麻痹') && pick(tr) === 'thunder-storm',
       j({ start: ts.ok && ts.reason, waited, release: tr.ok, reason: tr.reason, hits: (tr.hits || []).length, id: tr.ok && pick(tr), hp: tr.hp, cur: tr.cur, log: tr.log })));
     const graded = reg.list().filter(e => ['heal-mend', 'abyss-fog', 'holy-vow', 'storm-gather', 'holy-judgment', 'thunder-storm'].includes(e.id));

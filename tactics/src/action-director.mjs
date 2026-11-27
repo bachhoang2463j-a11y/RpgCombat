@@ -190,6 +190,15 @@ export function createActionDirector(deps) {
     view.lockMotion(id, false);
     view.setDisplayFacing(id, null);
     view.updateUnit(id, { placement: vd.placementsById[id] });
+    const actionScope = scope();
+    for (const move of res.displacements || []) {
+      if (!actionScope?.isLive || actionScope !== scope()) return false;
+      if (ok) ok = await playDisplacement(move, vd.footprintsById[move.unitId]);
+      if (!actionScope.isLive || actionScope !== scope()) return false;
+      view.lockMotion(move.unitId, false);
+      view.updateUnit(move.unitId, { placement: vd.placementsById[move.unitId] });
+      if (ok && move.collision) onReveal?.({ ...move.collision, targetId: move.unitId, hit: true, down: move.collision.hpAfter <= 0 });
+    }
     return ok;
   }
 

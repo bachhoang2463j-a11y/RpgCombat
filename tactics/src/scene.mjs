@@ -168,6 +168,8 @@ export function compileScene(scene) {
   return { grid: { columns, rows, metersPerCell }, cells, artJson, objectsIndex, style: scene.style || null, floor: hasFloor ? scene.floor.map(f => ({ ...f })) : null };
 }
 
+export function isLowObstacleKind(kind) { return !!KIND_RULES[kind]?.lowObstacle; }
+
 // 格查询：越界返回 null（不 clamp）
 export function cellAt(compiled, col, row) {
   const { columns, rows } = compiled.grid;

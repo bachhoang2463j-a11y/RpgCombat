@@ -441,7 +441,7 @@ function stormAndReactionCases() {
       type: '[单避]', power: 10000, range: { type: '自身' }, damageType: type };
     const defender = unit('pc-' + type, 'enemy', '防守者', { spd: 50, atk: 20, skills: [counter] });
     const attacker = unit('at-' + type, 'hero', null, { spd: 300, atk: 10 });
-    const battle = make([attacker, defender], { [attacker.id]: { col: 2, row: 3 }, [defender.id]: { col: 4, row: 3 } }, () => 0.99);
+    const battle = make([attacker, defender], { [attacker.id]: { col: 6, row: 3 }, [defender.id]: { col: 8, row: 3 } }, () => 0.99);
     const skill = atkSkill({ damageType: type, actionCost: { main: 0, aux: 0 } });
     // 每次明确把概率升至100%以上；强力反击会真实重置嘲讽，不依赖随机消费顺序。
     defender.ref.baseTauntBonus = 600;
