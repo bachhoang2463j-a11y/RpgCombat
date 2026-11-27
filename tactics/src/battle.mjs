@@ -695,6 +695,14 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     return !!(u && r && !state.combatState.clock.terminal && passiveOf(u)?.stationaryPreparation && !r.stationaryUsed
       && r.baseMove > 0 && r.moveRemaining >= r.baseMove - 1e-9);
   }
+  // 驻足界面口径（只读）：是否具备驻足、当前能否、不能的原因、驻足将消耗的移动
+  function stationaryStatus() {
+    const u = actor(), r = resources;
+    if (!u || !r || !passiveOf(u)?.stationaryPreparation) return { available: false, ok: false, reason: '', movement: 0 };
+    const ok = canStationaryPrepare();
+    const reason = ok ? '' : r.stationaryUsed ? '本次行动已驻足' : '已移动 ' + Math.max(0, r.baseMove - r.moveRemaining).toFixed(1) + 'm · 驻足需满额移动';
+    return { available: true, ok, reason, movement: r.moveRemaining };
+  }
   function investStationary(u, prep) {
     const spent = resources.moveRemaining;
     resources.moveRemaining = resources.sprintRemaining = 0;
@@ -1002,6 +1010,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     emit('unit-jumped', { unitId: u.id, from, to: { col, row }, distance: q.distance, free });
     addLog(u.name + (free ? ' 免费跳跃 ' : ' 跳跃 ') + q.distance.toFixed(2) + 'm');
     const berserker = passiveOf(u)?.landingPush;
+    let breaks = [];
     if (elite) {
       const rim = [];
       for (let y = row - 1; y <= row + u.footprint.height; y++) {
@@ -1009,7 +1018,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
           if (x < col || y < row || x >= col + u.footprint.width || y >= row + u.footprint.height) rim.push(cellAt(ctx.compiled, x, y));
         }
       }
-      breakLowObstacles(rim);
+      breaks = breakLowObstacles(rim, false, 'landing');
     }
     const displacements = [];
     if (berserker || elite) {
@@ -1025,7 +1034,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         }
       }
     }
-    return { ...q, from, to: { col, row }, unitId: u.id, moveRemaining: r.moveRemaining, free, displacements };
+    return { ...q, from, to: { col, row }, unitId: u.id, moveRemaining: r.moveRemaining, free, displacements, breaks };
   }
   function adjacent(a, afp, b, bfp) { return cellsAdjacent(a, afp, b, bfp); }
   function pushContest(u, target, contestAll = false) {
@@ -1706,8 +1715,9 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         .every(p => barrierAt(ctx, p) === barrier);
     });
   }
-  function breakLowObstacles(cells, sectional = false) {
-    const hits = new Map();
+  // 返回实际消失的格（整件拆除取整件占格，分段拆除取被击格；含材质种类），供演出在破坏拍点播放碎裂；cause：attack 攻击段 / landing 强敌落地 / collision 推撞
+  function breakLowObstacles(cells, sectional = false, cause = 'attack') {
+    const hits = new Map(), broken = [];
     for (const cell of cells) {
       if (!cell?.lowObstacle || cell.blocksProjectile) continue;
       for (const id of cell.objectIds) {
@@ -1716,17 +1726,21 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         hits.get(id).add(cellKey(cell.col, cell.row));
       }
     }
-    if (!hits.size) return;
+    if (!hits.size) return broken;
     const objects = ctx.scene.objects.flatMap(obj => {
       const struck = hits.get(obj.id);
       if (!struck) return [obj];
-      if (!sectional || (obj.kind !== 'lowCounter' && obj.kind !== 'pew')) return [];
-      const rest = (obj.cells || occupiedCells(obj.bounds, obj.bounds)).filter(c => !struck.has(cellKey(c.col, c.row)));
+      const all = obj.cells || occupiedCells(obj.bounds, obj.bounds);
+      const partial = sectional && (obj.kind === 'lowCounter' || obj.kind === 'pew');
+      for (const c of all) if (!partial || struck.has(cellKey(c.col, c.row))) broken.push({ col: c.col, row: c.row, kind: obj.kind });
+      if (!partial) return [];
+      const rest = all.filter(c => !struck.has(cellKey(c.col, c.row)));
       return rest.length ? [{ ...obj, cells: rest }] : [];
     });
     ctx.scene = { ...ctx.scene, objects };
     ctx.compiled = compileScene(ctx.scene);
-    emit('obstacle-destroyed', { objectIds: [...hits.keys()] });
+    emit('obstacle-destroyed', { objectIds: [...hits.keys()], cells: broken, cause });
+    return broken;
   }
   function displacement(caster, target, rule, query, direction = null, chargeStep) {
     const protector = stabilizerOf(caster, target, rule.type);
@@ -1751,10 +1765,11 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const blocked = traced.blockedBy;
     if (blocked && blocked.type !== 'barrier' && distance - traced.distance > 1e-9) {
       const low = blocked.cell?.lowObstacle && !blocked.cell.blocksProjectile;
-      if (low) breakLowObstacles([blocked.cell]);
+      const broken = low ? breakLowObstacles([blocked.cell], false, 'collision') : [];
       const view = { ...target.ref, def: statsOf(target).def };
       collision = { ...applyCollisionDamage((distance - traced.distance) * (low ? 5 : 10), view),
         hpBefore: target.ref.hp, maxHp: target.ref.maxHp, shieldBefore: target.ref.shield || 0 };
+      if (broken.length) collision.broken = broken;
       target.ref.hp = view.hp; target.ref.shield = view.shield;
       if (target.ref.hp <= 0) handleDown(target, 'collision', caster.id);
       collision.hpAfter = target.ref.hp;
@@ -2729,7 +2744,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
 
   return { ctx, battleState: state, get state() { return state; }, start, snapshot, reachable, previewMove, beginMove, move, sprint, previewJump, jump, push, previewCarry, carry, drop, previewDisplacement,
     setVisibleUnitIds(ids) { visibleIds = ids ? ids.slice() : null; },
-    canUseSkill, skillStatus, canUseReaction, canUseItem, itemSkill: itemAsSkill, startPreparation, canStationaryPrepare, canAdvancePreparation, advancePreparation, cancelPreparation,
+    canUseSkill, skillStatus, canUseReaction, canUseItem, itemSkill: itemAsSkill, startPreparation, canStationaryPrepare, stationaryStatus, canAdvancePreparation, advancePreparation, cancelPreparation,
     previewAttack, previewRetarget, teleportCells, beginAttack, attack, beginUseItem, useItem, predictAttack, defend, previewReady, ready,
     getEffectiveUnit, statsOf, buffsOf,
     previewGuardCandidates, queryBarrierTargets(skill) {

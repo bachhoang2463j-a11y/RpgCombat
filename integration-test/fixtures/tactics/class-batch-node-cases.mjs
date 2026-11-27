@@ -107,6 +107,7 @@ export const groups = {
       const b = setup([h, e], { h: p(3), e: p(4) }, { objects });
       const res = b.push('e');
       assert.deepEqual([res.success, res.movedDistance, res.collision.hpDmg, e.ref.hp], [true, 0, 10, 90]);
+      assert.deepEqual(res.collision.broken, [{ col: 5, row: 4, kind: 'lowCounter' }]);
       assert.equal(cellAt(b.ctx.compiled, 5, 4).blocksMovement, false);
       assert.deepEqual(b.ctx.scene.objects, []);
     });
@@ -175,11 +176,14 @@ export const groups = {
       const b = setup([unit('h', 'hero', { classType: '施法者', spd: 200, tp: 10 }), unit('e', 'enemy')], { h: p(3), e: p(12) });
       b.move(2, 4);
       const skill = delay();
+      const st = b.stationaryStatus();
+      assert.ok(st.available && !st.ok && /驻足需满额移动/.test(st.reason));
       assert.equal(b.startPreparation(skill, { stationary: true }).ok, false);
       assert.equal(b.snapshot().units[0].mp, 40);
       assert.equal(b.snapshot().resources.main, 1);
       b.attack(gather); b.sprint();
       assert.ok(b.canStationaryPrepare());
+      assert.ok(b.stationaryStatus().ok);
       const declared = b.attack(skill, at(99, 99), { stationary: true });
       assert.ok(declared.preparing && !declared.charge.ready);
       assert.equal(declared.costSummary.movement, 11);

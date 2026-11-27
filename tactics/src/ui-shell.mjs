@@ -435,9 +435,28 @@ export function buildShell(root) {
     els.basicList.innerHTML = list.concat(fixed).map(tile).join('');
   }
   // ---------- 蓄力：复用原版 #charge-menu 槽（准备中替换四个主项）；可暂离去做移动/其他动作，资源条蓄力徽章随时回来 ----------
+  // 投入预演（与规则 investPreparation 同序：先加速库存、再余下主行动；驻足先抵 1 点）：返回本次各来源投入量与投入后剩余
+  function prepPlan(remaining, { stationary = false, inventory = 0, main = 0 } = {}) {
+    const st = stationary && remaining > 0 ? 1 : 0, rest = remaining - st;
+    const inv = Math.min(rest, inventory), m = Math.min(rest - inv, Math.max(0, main));
+    return { st, inv, main: m, after: rest - inv - m };
+  }
+  function planText(plan, from) {
+    const parts = [];
+    if (plan.inv) parts.push('加速×' + plan.inv);
+    if (plan.main) parts.push('◆主×' + plan.main);
+    return (parts.length ? '<small>' + (plan.st ? '另耗 ' : '消耗 ') + parts.join(' + ') + '</small>' : '') +
+      '<b class="t-prep-delta">准备 ' + from + '→' + plan.after + (plan.after === 0 ? ' · 就绪' : '') + '</b>';
+  }
+  function prepPips(invested, remaining, plan) {
+    const total = invested + remaining, gain = plan ? remaining - plan.after : 0;
+    return '<span class="t-prep-pips" aria-hidden="true">' + Array.from({ length: total }, (_, i) =>
+      '<i class="' + (i < invested ? 'on' : i < invested + gain ? 'next' : '') + '"></i>').join('') + '</span>';
+  }
   function renderCharge(cmd) {
     const prep = cmd && cmd.playable ? cmd.preparation : null;
-    const key = prep ? [cmd.unit.id, cmd.serial, prep.skill && prep.skill.name, prep.remaining, prep.ready, cmd.resources.main, cmd.canContinue, cmd.canStationary].join('|') : '';
+    const sta = (cmd && cmd.stationary) || { available: false };
+    const key = prep ? [cmd.unit.id, cmd.serial, prep.skill && prep.skill.name, prep.remaining, prep.ready, cmd.resources.main, cmd.chargeInventory, cmd.canContinue, sta.ok, sta.reason, sta.movement].join('|') : '';
     if (!prep) state.chargeAside = false;
     const show = !!prep && !state.chargeAside;
     els.menuMain.style.display = show ? 'none' : '';
@@ -448,15 +467,23 @@ export function buildShell(root) {
     const canContinue = cmd.canContinue;
     const btnA = 'w-full py-1.5 px-2.5 bg-gradient-to-r border rounded-lg text-xs font-bold text-white flex items-center justify-center gap-1.5 transition-all';
     const btnB = 'w-full py-1.5 px-2.5 bg-slate-800/90 hover:bg-slate-700/90 border border-slate-600/80 rounded-lg text-xs font-bold text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-all';
+    const res = { inventory: cmd.chargeInventory || 0, main: cmd.resources.main || 0 };
+    const go = prepPlan(prep.remaining, res), still = sta.ok ? prepPlan(prep.remaining, { ...res, stationary: true }) : null;
+    const head = '<div class="t-prep-head"><span>⏳ 【' + name + '】蓄力中</span>' + prepPips(prep.invested || 0, prep.remaining, null) +
+      '<small>已备 ' + (prep.invested || 0) + ' · 还需 <b>' + prep.remaining + '</b></small></div>';
+    const goBtn = '<button data-tactics-action="prepare" class="t-prep-btn t-prep-go"' + (canContinue ? '' : ' aria-disabled="true" title="主行动或加速不足"') + '>' +
+      '<span class="t-prep-ico">⏩</span><span class="t-prep-body"><b>继续准备</b>' + (canContinue ? planText(go, prep.remaining) : '<small>主行动或加速不足</small>') + '</span>' +
+      (canContinue ? prepPips(prep.invested || 0, prep.remaining, go) : '') + '</button>';
+    const stillBtn = !sta.available ? '' : '<button data-tactics-action="stationary-prepare" class="t-prep-btn t-prep-still"' + (sta.ok ? '' : ' aria-disabled="true" title="' + ESC(sta.reason) + '"') + '>' +
+      '<span class="t-prep-ico">⛩</span><span class="t-prep-body"><b>驻足继续</b>' +
+      (sta.ok ? '<small>移动 ' + sta.movement.toFixed(1) + 'm→0 · 抵 1 点</small>' + planText(still, prep.remaining) : '<small>' + ESC(sta.reason) + '</small>') + '</span>' +
+      (sta.ok ? prepPips(prep.invested || 0, prep.remaining, still) : '') + '</button>';
     els.chargeMenu.innerHTML = prep.ready
       ? '<div class="text-center text-[10px] font-bold text-cyan-300 bg-cyan-950/80 border border-cyan-500/50 py-1 px-2 rounded-lg shadow-inner flex items-center justify-center gap-1.5 animate-pulse mb-1"><span>⚡</span> 【' + name + '】蓄力已完成！</div>' +
         '<button data-tactics-action="release" class="' + btnA + ' from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 border-cyan-400 shadow-lg"><span>1.</span> 释放蓄力 (进入目标选择)</button>' +
         '<button data-tactics-action="cancel-charge" class="' + btnB + '"><span>2.</span> 终止蓄力 (已付资源不退)</button>' +
         '<button data-tactics-charge-aside class="t-charge-aside">↩ 先做其他行动（移动/跳跃…）</button>'
-      : '<div class="text-center text-[10px] font-bold text-cyan-300 bg-cyan-950/80 border border-cyan-500/50 py-1 px-2 rounded-lg mb-1">⏳ 【' + name + '】蓄力中（还需 ' + prep.remaining + ' 点准备）</div>' +
-        '<button data-tactics-action="prepare" class="' + btnA + ' from-cyan-700 to-blue-700 border-cyan-500"' +
-          (canContinue ? '' : ' disabled title="主行动或加速不足"') + '>继续准备</button>' +
-        (cmd.canStationary ? '<button data-tactics-action="stationary-prepare" class="' + btnB + '">驻足继续 · 消耗全部移动 · 准备−1</button>' : '') +
+      : head + goBtn + stillBtn +
         '<button data-tactics-action="cancel-charge" class="' + btnB + '"><span>2.</span> 终止蓄力 (已付资源不退)</button>' +
         '<button data-tactics-charge-aside class="t-charge-aside">↩ 先做其他行动（移动/跳跃…）</button>';
   }
@@ -503,11 +530,19 @@ export function buildShell(root) {
       const hide = !!state.costFilter && !matches(s);
       (s.isGroup ? btn.parentElement : btn).style.display = hide ? 'none' : '';
       const start = btn.nextElementSibling?.classList.contains('t-stationary-start') ? btn.nextElementSibling : null;
-      const canStart = !hide && s.delay > 0 && !s.isGroup && state.cmd?.canStationary && !state.cmd.preparation && state.cmd.canUse(s);
-      if (canStart && !start) {
-        btn.insertAdjacentHTML('afterend', '<button class="t-stationary-start w-full px-2 py-1 rounded border border-cyan-700 text-cyan-300 text-xs" data-tactics-action="stationary-start:' +
-          btn.dataset.skillIdx + '" title="消耗全部移动，蓄力−1">驻足开始 · ' + ESC(s.name) + '</button>');
-      } else if (!canStart && start) start.remove();
+      // 驻足起咏（施法者）：可用时写明移动→0、准备 N→M 与另耗；具备驻足但条件不满足时灰显原因（点按给出完整原因）
+      const sta = state.cmd?.stationary || { available: false };
+      const showStart = !hide && s.delay > 0 && !s.isGroup && sta.available && !state.cmd.preparation && state.cmd.canUse(s);
+      const r0 = state.cmd?.resources || {}, startKey = showStart ? [sta.ok, sta.reason, sta.movement, s.delay, state.cmd.chargeInventory, r0.main].join('|') : '';
+      const fresh = !!start && start.dataset.key === startKey;
+      if (start && !fresh) start.remove();
+      if (startKey && !fresh) {
+        const plan = prepPlan(s.delay, { stationary: true, inventory: state.cmd.chargeInventory || 0, main: (r0.main || 0) - (cost.main || 0) });
+        btn.insertAdjacentHTML('afterend', '<button class="t-stationary-start' + (sta.ok ? '' : ' t-off') + '" data-key="' + ESC(startKey) + '" data-tactics-action="stationary-start:' + btn.dataset.skillIdx + '"' +
+          (sta.ok ? ' title="驻足起咏：消耗全部移动抵 1 点准备"' : ' aria-disabled="true" title="' + ESC(sta.reason) + '"') + '>' +
+          '<span class="t-prep-ico">⛩</span><span class="t-prep-body"><b>驻足起咏 · ' + ESC(s.name) + '</b>' +
+          (sta.ok ? '<small>移动 ' + sta.movement.toFixed(1) + 'm→0 · 抵 1 点</small>' + planText(plan, s.delay) : '<small>' + ESC(sta.reason) + '</small>') + '</span></button>');
+      }
       if (state.cmd && state.cmd.skillReason) {
         const reason = state.cmd.skillReason(s);
         btn.title = reason || '';

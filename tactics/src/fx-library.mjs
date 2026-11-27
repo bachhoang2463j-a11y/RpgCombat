@@ -814,24 +814,22 @@ export async function glide(rctx, { ghosts, ms }) {
   return ok;
 }
 
+// 折影步（原版 playZheYingBu）：高通疾风 + 低频踏音 + 冷光闪 + 靛蓝暗晕与涟漪 → 160ms 闪避成立：三重残影原位碎裂 + 冰晶碎屑 + 落点涟漪。
+// 原版卡片横移 -90px 改为战棋真实滑步（反应 2 米 / 主动 5 米），涟漪落在真实落点脚下
 const zheYing = {
-  id: 'evade-shift-ghost', kind: 'reaction', grade: 'L1', fxTags: ['折影步'],
-  timeline: { totalMs: 600 },
-  cues: [{ key: 'hide', vol: 0.32 }, { key: 'link_dash', vol: 0.26 }],
-  prepareKeys() { return this.cues.map(c => c.key); },
+  id: 'evade-shift-ghost', kind: 'reaction', grade: 'identity', fxTags: ['折影步'],
+  prepareKeys: () => [],
   async play(rctx) {
-    const { fx, shift } = rctx;
+    const { shift } = rctx;
     if (!shift) return true;
-    const from = worldPx(unitCenter(shift.from, rctx.footprint)), to = worldPx(unitCenter(shift.to, rctx.footprint));
-    fx.sfx('hide', 0.32);
-    fx.top(orbHtml(from.x, from.y, 90, 'rgba(129,140,248,0.7)', '#e0e7ff'), 260).firstChild.animate([{ transform: 'scale(0.5)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 240, fill: 'forwards' });
-    if (!(await rctx.wait(70))) return false;
-    fx.sfx('link_dash', 0.26);
-    const ok = await glide(rctx, { ghosts: true, ms: 300 });
-    fx.top(ringHtml(to.x, to.y, 80, 'rgba(199,210,254,0.85)', 'rgba(99,102,241,0.6)'), 320).firstChild.animate([{ transform: 'scale(0.3)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 300, fill: 'forwards' });
-    particles(fx, Array.from({ length: 9 }, () => { const a = rnd(0, TAU), d = rnd(18, 34); return { x: to.x, y: to.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d + 10, size: rnd(5, 9), color: '#a5b4fc', core: '#eef2ff', dur: rnd(220, 320) }; }), 400);
-    await rctx.wait(230);
-    return ok;
+    const fp = rctx.footprint || { width: 1, height: 1 }, to = unitCenter(shift.to, fp);
+    const ent = rctx.ent(rctx.responderId);
+    const handle = ent && rctx.av.CombatAudioMixer.withContext('B', () => rctx.av.playZheYingBu(ent, [], true));
+    if (!(await rctx.wait(160))) return false;
+    if (handle) rctx.av.CombatAudioMixer.withContext('B', () => handle.dodge(true, stagePt({ x: to.x, y: to.y + fp.height * 0.5 - 0.16 })));
+    const ok = await glide(rctx, { ghosts: false, ms: 300 });
+    if (!ok || !(await rctx.wait(320))) return false;
+    return true;
   },
 };
 // 回避错位：只滑步，不加残影
@@ -1425,6 +1423,68 @@ export function playJumpDust(fx, at, { phase, heavy = false, scale = 1 }) {
   const pl = fx.ground(pebbles.map(q => '<i style="position:absolute;left:' + q.x + 'px;top:' + q.y + 'px;width:' + q.s + 'px;height:' + q.s + 'px;margin:' + (-q.s / 2) + 'px;border-radius:30%;background:#8b7f6a;pointer-events:none;"></i>').join(''), 700);
   [...pl.children].forEach((el, i) => { const q = pebbles[i];
     el.animate([{ transform: 'translate(0,0)', opacity: 1 }, { transform: 'translate(' + (q.dx * 0.5).toFixed(1) + 'px,' + (-q.up).toFixed(1) + 'px)', offset: 0.45 }, { transform: 'translate(' + q.dx.toFixed(1) + 'px,2px)', opacity: 0 }], { duration: rnd(460, 620), easing: 'ease-out', fill: 'both' }); });
+}
+
+// ---------- 地形破坏（规则 obstacle-destroyed：攻击拆墙 / 强敌落地震碎 / 推撞撞碎）：按材质（木 / 石 / 金属）逐格碎裂 ----------
+// 每格：受力白闪 → 碎块带旋转抛起落地（木质另有长条木屑）→ 尘团外推 → 地面残渣淡出；音效按材质每次各一组（不逐格叠加），多格时中震
+const BREAK_MATERIAL = {
+  wood: { chips: ['#7c4a21', '#a0642c', '#5b3418', '#c08a52'], dust: 'rgba(206,182,150,0.92)', splinter: true, sfx: [['molt_crack', 0.72, 0.82], ['mx_golem_stomp', 0.26, 1.3]] },
+  stone: { chips: ['#a8a29e', '#78716c', '#d6d3d1', '#57534e'], dust: 'rgba(222,218,214,0.94)', splinter: false, sfx: [['mx_golem_stomp', 0.6, 1.05], ['molt_crack', 0.4, 0.7]] },
+  metal: { chips: ['#d4d4d8', '#a1a1aa', '#fbbf24', '#78716c'], dust: 'rgba(214,208,192,0.82)', splinter: false, sfx: [['mx_armor_strike', 0.55, 1], ['parry_3', 0.3, 1.2]] },
+};
+const BREAK_KIND = { altar: 'stone', tomb: 'stone', font: 'stone', candelabra: 'metal' };
+export const OBSTACLE_BREAK_AUDIO = [...new Set(Object.values(BREAK_MATERIAL).flatMap(m => m.sfx.map(s => s[0])))];
+export function playObstacleBreak(fx, cells, playSound) {
+  const mats = new Set();
+  cells.forEach((cell, i) => {
+    const mat = BREAK_MATERIAL[BREAK_KIND[cell.kind] || 'wood'];
+    mats.add(mat);
+    const x = (cell.col + 0.5) * PX, y = (cell.row + 0.5) * PX, delay = Math.min(240, i * 28);
+    fx.top(orbHtml(x, y, 0.95 * PX, 'rgba(255,237,213,0.75)', '#ffffff'), delay + 280).firstChild
+      .animate([{ transform: 'scale(.4)', opacity: 0 }, { transform: 'scale(1)', opacity: 1, offset: 0.25 }, { transform: 'scale(1.45)', opacity: 0 }], { duration: 260, delay, fill: 'both' });
+    const chips = Array.from({ length: 7 }, () => ({ w: rnd(5, 11), h: rnd(4, 8) }));
+    if (mat.splinter) for (let k = 0; k < 4; k++) chips.push({ w: rnd(12, 18), h: 2.5 });
+    chips.forEach(q => { const a = rnd(0, TAU), d = rnd(0.35, 1) * PX; Object.assign(q, { dx: Math.cos(a) * d, dy: Math.sin(a) * d * 0.55, up: rnd(14, 38), r: rnd(-620, 620), c: pick(mat.chips) }); });
+    const cl = fx.top(chips.map(q => '<i style="position:absolute;left:' + x + 'px;top:' + y + 'px;width:' + q.w.toFixed(1) + 'px;height:' + q.h.toFixed(1) + 'px;margin:' + (-q.h / 2).toFixed(1) + 'px 0 0 ' + (-q.w / 2).toFixed(1) + 'px;' +
+      'border-radius:1.5px;background:linear-gradient(160deg,' + q.c + ',rgba(0,0,0,.35));box-shadow:0 1px 1px rgba(0,0,0,.45);pointer-events:none;"></i>').join(''), delay + 900);
+    [...cl.children].forEach((el, k) => { const q = chips[k], end = 'translate(' + q.dx.toFixed(1) + 'px,' + (q.dy + 4).toFixed(1) + 'px) rotate(' + q.r.toFixed(0) + 'deg)';
+      el.animate([{ transform: 'translate(0,0) rotate(0deg)', opacity: 1 },
+        { transform: 'translate(' + (q.dx * 0.55).toFixed(1) + 'px,' + (q.dy * 0.55 - q.up).toFixed(1) + 'px) rotate(' + (q.r * 0.5).toFixed(0) + 'deg)', opacity: 1, offset: 0.42 },
+        { transform: end, opacity: 1, offset: 0.8 }, { transform: end, opacity: 0 }], { duration: rnd(620, 820), delay, easing: 'cubic-bezier(.25,.6,.45,1)', fill: 'both' }); });
+    const puffs = Array.from({ length: 5 }, () => { const a = rnd(0, TAU), d = rnd(0.25, 0.65) * PX; return { dx: Math.cos(a) * d, dy: Math.sin(a) * d * 0.45 - rnd(4, 12), s: rnd(26, 44) }; });
+    const pl = fx.top(puffs.map(q => dustPuff(x, y, q.s, mat.dust)).join(''), delay + 960);
+    [...pl.children].forEach((el, k) => { const q = puffs[k];
+      el.animate([{ transform: 'translate(0,0) scale(.4)', opacity: 0.95 }, { transform: 'translate(' + q.dx.toFixed(1) + 'px,' + q.dy.toFixed(1) + 'px) scale(1.5)', opacity: 0 }], { duration: rnd(640, 880), delay: delay + 40, easing: 'cubic-bezier(.15,.7,.3,1)', fill: 'both' }); });
+    const bits = Array.from({ length: 6 }, () => ({ x: x + rnd(-0.42, 0.42) * PX, y: y + rnd(-0.32, 0.32) * PX, s: rnd(2.5, 5), c: pick(mat.chips) }));
+    const dl = fx.ground(bits.map(q => '<i style="position:absolute;left:' + q.x.toFixed(1) + 'px;top:' + q.y.toFixed(1) + 'px;width:' + q.s.toFixed(1) + 'px;height:' + q.s.toFixed(1) + 'px;border-radius:30%;background:' + q.c + ';pointer-events:none;"></i>').join(''), delay + 1800);
+    [...dl.children].forEach(el => el.animate([{ opacity: 0 }, { opacity: 0.85, offset: 0.2 }, { opacity: 0.85, offset: 0.7 }, { opacity: 0 }], { duration: 1500, delay: delay + 280, fill: 'both' }));
+  });
+  for (const m of mats) m.sfx.forEach(([key, vol, rate], k) => playSound(key, vol, rate, k * 40));
+  fx.shake(cells.length > 3 ? 'medium' : 'light');
+}
+
+// ---------- 背袭（规则 seg.backstab：自目标正后 45° 内出手，伤害 ×1.2、闪避 −20）：地面亮出目标背后 45° 扇区 → 背刺光刃自后方贯入 → 背后血色新月斩痕 + 「背袭」飘字 ----------
+// 落空时只亮扇区与飘字（背袭判定成立但被闪开）；facing 为目标受击当刻朝向（0°向上，顺时针）
+export const BACKSTAB_AUDIO = ['slash_whoosh_hit_fs434873'];
+export function playBackstabMark(fx, p, facing, { size = 1, hit = true } = {}) {
+  const R = 0.8 * PX * size, uid = fx.uid(), S = R * 4.4;
+  const wedge = 'M0,0 L' + (-R * 2 * 0.414).toFixed(1) + ',' + (R * 2).toFixed(1) + ' A' + (R * 2.16).toFixed(1) + ',' + (R * 2.16).toFixed(1) + ' 0 0,0 ' + (R * 2 * 0.414).toFixed(1) + ',' + (R * 2).toFixed(1) + ' Z';
+  const g = fx.ground('<svg width="' + S + '" height="' + S + '" viewBox="' + (-S / 2) + ' ' + (-S / 2) + ' ' + S + ' ' + S + '" style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;transform:translate(-50%,-50%) rotate(' + (facing || 0) + 'deg);overflow:visible;pointer-events:none;">' +
+    '<defs><radialGradient id="bsw' + uid + '" cx="0" cy="0" r="' + (R * 2.16).toFixed(1) + '" gradientUnits="userSpaceOnUse"><stop offset="0.3" stop-color="#ef4444" stop-opacity="0.55"/><stop offset="1" stop-color="#7f1d1d" stop-opacity="0"/></radialGradient></defs>' +
+    '<path d="' + wedge + '" fill="url(#bsw' + uid + ')" stroke="rgba(252,165,165,0.7)" stroke-width="1.4"/></svg>', 760);
+  g.firstChild.animate([{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 1, offset: 0.6 }, { opacity: 0 }], { duration: 740, fill: 'both' });
+  floatText(fx, p.x, p.y - 30 * size - 22, '🗡 背袭', '#fecaca', '#991b1b', { ms: 900, size: 14, delay: 60 });
+  if (!hit) return;
+  fx.sfx('slash_whoosh_hit_fs434873', 0.36);
+  const blade = '<path d="M0,' + (R * 2.1).toFixed(1) + ' L0,' + (R * 0.15).toFixed(1) + '" stroke="url(#bsb' + uid + ')" stroke-width="5" stroke-linecap="round" pathLength="100" stroke-dasharray="100 100" stroke-dashoffset="100"/>';
+  const moon = '<path d="M' + (-R * 0.95).toFixed(1) + ',' + (R * 0.2).toFixed(1) + ' Q0,' + (R * 1.45).toFixed(1) + ' ' + (R * 0.95).toFixed(1) + ',' + (R * 0.2).toFixed(1) + ' Q0,' + (R * 0.95).toFixed(1) + ' ' + (-R * 0.95).toFixed(1) + ',' + (R * 0.2).toFixed(1) + ' Z" fill="url(#bsm' + uid + ')"/>';
+  const t = fx.top('<svg width="' + S + '" height="' + S + '" viewBox="' + (-S / 2) + ' ' + (-S / 2) + ' ' + S + ' ' + S + '" style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;transform:translate(-50%,-50%) rotate(' + (facing || 0) + 'deg);overflow:visible;pointer-events:none;filter:drop-shadow(0 0 6px #ef4444);">' +
+    '<defs><linearGradient id="bsb' + uid + '" x1="0" y1="' + (R * 2.1).toFixed(1) + '" x2="0" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#7f1d1d" stop-opacity="0"/><stop offset="0.7" stop-color="#f87171"/><stop offset="1" stop-color="#fff1f2"/></linearGradient>' +
+    '<linearGradient id="bsm' + uid + '" x1="-1" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7f1d1d" stop-opacity="0"/><stop offset="0.5" stop-color="#fecaca"/><stop offset="1" stop-color="#7f1d1d" stop-opacity="0"/></linearGradient></defs>' +
+    '<g data-k="blade">' + blade + '</g><g data-k="moon" style="transform-origin:0 ' + (R * 0.6).toFixed(1) + 'px">' + moon + '</g></svg>', 700);
+  t.querySelector('[data-k=blade] path').animate([{ strokeDashoffset: 100, opacity: 1 }, { strokeDashoffset: 0, opacity: 1, offset: 0.6 }, { strokeDashoffset: -100, opacity: 0 }], { duration: 260, easing: 'cubic-bezier(.5,0,.6,1)', fill: 'both' });
+  t.querySelector('[data-k=moon]').animate([{ transform: 'scale(.3,.6)', opacity: 0 }, { transform: 'scale(1.1,1)', opacity: 1, offset: 0.35 }, { transform: 'scale(1.3,1.1)', opacity: 0 }], { duration: 460, delay: 120, easing: 'ease-out', fill: 'both' });
+  particles(fx, Array.from({ length: 10 }, () => { const a = (facing || 0) * Math.PI / 180 + Math.PI / 2 + rnd(-0.9, 0.9), d = rnd(18, 40) * size; return { x: p.x, y: p.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(4, 8), color: '#ef4444', core: '#fecaca', dur: rnd(300, 460), delay: 140 }; }), 700);
 }
 export function playEnemyAlarm(fx, ev, centerOf) {
   const b = worldPx(ev.center), R = ev.radius * PX;
@@ -2118,6 +2178,152 @@ const nakTithBarrier = {
 };
 
 // ---------- 回合制原版秘术 / 奇物演出接入（vendor 原样提取函数；战棋只传真实目标，按原版拍点揭示规则结果） ----------
+
+// ---------- 幻梦行军兽（召唤物，按精英强力技能口径的专属 L3） ----------
+// 地裂放射纹：自中心向外的锯齿裂缝（地面层），描边由内向外推开
+function groundCrackHtml(x, y, R, n, color, glow) {
+  let d = '';
+  for (let i = 0; i < n; i++) {
+    let a = i / n * TAU + rnd(-0.25, 0.25), r = R * 0.12;
+    d += 'M' + (Math.cos(a) * r).toFixed(1) + ',' + (Math.sin(a) * r * 0.6).toFixed(1);
+    const len = R * rnd(0.65, 1.05);
+    while (r < len) { r += R * rnd(0.12, 0.2); a += rnd(-0.22, 0.22); d += ' L' + (Math.cos(a) * r).toFixed(1) + ',' + (Math.sin(a) * r * 0.6).toFixed(1); }
+  }
+  const S = R * 2.4;
+  return '<svg width="' + S + '" height="' + S + '" viewBox="' + (-S / 2) + ' ' + (-S / 2) + ' ' + S + ' ' + S + '" style="position:absolute;left:' + x + 'px;top:' + y + 'px;transform:translate(-50%,-50%);overflow:visible;pointer-events:none;filter:drop-shadow(0 0 5px ' + glow + ');">' +
+    '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/></svg>';
+}
+function crackIn(layer, ms) { layer.querySelector('path').animate([{ strokeDashoffset: 1, opacity: 1 }, { strokeDashoffset: 0, opacity: 1, offset: 0.35 }, { strokeDashoffset: 0, opacity: 0 }], { duration: ms, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' }); }
+const MARCHER = { violet: '#8b5cf6', lilac: '#ddd6fe', amber: '#f59e0b', dust: 'rgba(196,176,150,0.92)' };
+
+// 冲撞 L3（[特效:行军兽冲撞]；直线 6×2 自身冲锋，路径敌人逐个结算、命中后沿冲锋方向击退 3）：
+// 两记重踏（地裂放射 + 扬尘 + 低吼）→ 犀角前倾凝聚紫金冲角光 + 冲锋射界带亮起 → 收 →
+// 巨兽沿真实路径冲出：身后尘浪拖尾与速度线、角前锥形冲击波；每次接触（规则逐步结算）重冲击 + 碎石 + 冲角新月并揭示 → 终点刹停尘爆 → 尘埃落定
+const marcherCharge = {
+  id: 'marcher-charge', grade: 'L3', fxTags: ['行军兽冲撞'],
+  timeline: { chargeMs: 820, totalMs: 2200, fullscreen: true, darken: false },   // 820 蓄势 + ≤420 冲出 + 960 余韵
+  cues: [{ key: 'mx_golem_stomp', vol: 0.7 }, { key: 'mx_dino_roar', vol: 0.58 }, { key: 'mx_deep_impact', vol: 0.74 }],
+  prepareKeys() { return this.cues.map(c => c.key); },
+  async play(ctx) {
+    const { fx, charge } = ctx;
+    const fp = charge?.footprint || { width: 2, height: 2 }, K = Math.max(fp.width, fp.height);
+    const from = charge ? unitCenter(charge.from, fp) : ctx.centerOf(ctx.casterId);
+    const end = charge ? unitCenter(charge.path.at(-1), fp) : (ctx.result.aim || from);
+    const a = worldPx(from), b = worldPx(end), dist = Math.hypot(end.x - from.x, end.y - from.y);
+    const dir = dist > 0.01 ? Math.atan2(b.y - a.y, b.x - a.x) : 0, ux = Math.cos(dir), uy = Math.sin(dir);
+    const feet = { x: a.x, y: a.y + K * PX * 0.3 }, horn = { x: a.x + ux * K * PX * 0.55, y: a.y + uy * K * PX * 0.55 - 6 };
+    const stomp = (k, vol, rate) => {
+      ctx.av.playSound('mx_golem_stomp', vol, rate, { track: 'skill', category: ctx.audioContext.category });
+      const cr = fx.ground(groundCrackHtml(feet.x, feet.y, K * PX * (0.9 + k * 0.35), 9, MARCHER.lilac, MARCHER.violet), 900);
+      crackIn(cr, 880);
+      playJumpDust(fx, { x: from.x, y: from.y + K * 0.3 }, { phase: 'land', heavy: true, scale: K * (0.7 + k * 0.25) });
+      jolt(ctx, ctx.casterId, { amp: 3 + k * 2, ms: 60, glow: MARCHER.violet });
+      fx.shake(k ? 'medium' : 'light');
+    };
+    // ① 蓄势：重踏 ×2 → 冲角凝聚 + 射界带
+    tint(fx, 'radial-gradient(circle,rgba(91,33,182,.06),rgba(20,8,32,.88))', { inMs: 380, holdMs: 1100, outMs: 520, peak: 0.36 });
+    stomp(0, 0.62, 1.05);
+    const laneL = dist * PX + K * PX * 0.6, laneW = 2 * PX;
+    const lane = fx.ground('<div style="position:absolute;left:' + a.x + 'px;top:' + a.y + 'px;width:0;height:0;transform:rotate(' + deg(dir).toFixed(2) + 'deg);">' +
+      '<i style="position:absolute;left:0;top:' + (-laneW / 2) + 'px;width:' + laneL + 'px;height:' + laneW + 'px;border-radius:' + (laneW / 2) + 'px;' +
+      'background:linear-gradient(90deg,rgba(139,92,246,.38),rgba(245,158,11,.22) 75%,transparent);"></i></div>', 1300).firstChild.firstChild;
+    lane.style.transformOrigin = '0 50%';
+    lane.animate([{ opacity: 0, transform: 'scaleX(.2)' }, { opacity: 1, transform: 'scaleX(1)', offset: 0.5 }, { opacity: 0.7, transform: 'scaleX(1)' }], { duration: 820, fill: 'forwards' });
+    ctx.after(340, () => stomp(1, 0.72, 0.92));
+    ctx.after(460, () => {
+      fx.sfx('mx_dino_roar', 0.58);
+      fx.top(orbHtml(horn.x, horn.y, K * PX * 0.9, 'rgba(139,92,246,0.85)', '#fef3c7'), 420).firstChild
+        .animate([{ transform: 'scale(.2)', opacity: 0 }, { transform: 'scale(1.1)', opacity: 1, offset: 0.8 }, { transform: 'scale(.7)', opacity: 0.9 }], { duration: 400, fill: 'forwards' });
+      particles(fx, Array.from({ length: 18 }, () => { const t = rnd(0, TAU), d = rnd(0.9, 1.5) * K * PX; return { x: horn.x + Math.cos(t) * d, y: horn.y + Math.sin(t) * d * 0.6, dx: -Math.cos(t) * d, dy: -Math.sin(t) * d * 0.6, size: rnd(5, 9), color: pick([MARCHER.violet, MARCHER.amber]), core: '#ffffff', s0: 1, s1: 0.2, dur: rnd(260, 340), ease: 'cubic-bezier(.6,0,.9,.5)' }; }), 420);
+    });
+    if (!(await ctx.wait(820))) return false;
+    // ② 冲出：尘浪拖尾 + 速度线 + 角前冲击锥；接触即重冲击并揭示
+    fx.shake('heavy');
+    ctx.atmos?.burst();
+    const dashMs = Math.min(420, Math.max(160, Math.round(dist * 75)));
+    for (let t = 0; t <= dashMs; t += 45) ctx.after(t, () => {
+      const k = t / dashMs, px = a.x + (b.x - a.x) * k, py = a.y + (b.y - a.y) * k;
+      particles(fx, Array.from({ length: 3 }, () => { const s = rnd(-1, 1) * K * PX * 0.5; return { x: px - ux * K * PX * 0.4 - uy * s, y: py - uy * K * PX * 0.4 + ux * s + K * PX * 0.25, dx: -ux * rnd(20, 50) + rnd(-10, 10), dy: -uy * rnd(20, 50) - rnd(6, 16), size: rnd(26, 44) * K * 0.6, color: MARCHER.dust, core: 'rgba(240,230,210,.95)', s0: 0.5, s1: 1.5, o0: 0.85, dur: rnd(520, 760) }; }), 800, 'ground');
+      const streak = fx.top('<i style="position:absolute;left:' + (px - ux * K * PX * 0.2).toFixed(1) + 'px;top:' + (py + rnd(-0.6, 0.6) * K * PX).toFixed(1) + 'px;width:' + (K * PX * 1.4).toFixed(0) + 'px;height:2.5px;transform-origin:0 50%;transform:rotate(' + deg(dir + Math.PI).toFixed(1) + 'deg);' +
+        'background:linear-gradient(90deg,rgba(255,255,255,.9),rgba(221,214,254,.5),transparent);mix-blend-mode:screen;"></i>', 260);
+      streak.firstChild.animate([{ opacity: 0.9, scale: '1 1' }, { opacity: 0, scale: '0.3 1' }], { duration: 240, fill: 'forwards' });
+      const cone = fx.top('<i style="position:absolute;left:' + (px + ux * K * PX * 0.6).toFixed(1) + 'px;top:' + (py + uy * K * PX * 0.6).toFixed(1) + 'px;width:' + (K * PX * 0.9).toFixed(0) + 'px;height:' + (K * PX * 1.5).toFixed(0) + 'px;margin:' + (-K * PX * 0.75).toFixed(0) + 'px 0 0 ' + (-K * PX * 0.2).toFixed(0) + 'px;' +
+        'transform:rotate(' + deg(dir).toFixed(1) + 'deg);transform-origin:' + (K * PX * 0.2).toFixed(0) + 'px 50%;clip-path:ellipse(42% 50% at 20% 50%);background:radial-gradient(ellipse at 15% 50%,rgba(254,243,199,.85),rgba(139,92,246,.45) 55%,transparent 75%);mix-blend-mode:screen;"></i>', 200);
+      cone.firstChild.animate([{ opacity: 0.9 }, { opacity: 0 }], { duration: 180, fill: 'forwards' });
+    });
+    const impact = step => {
+      const c = charge ? unitCenter(charge.path[Math.min(step, charge.path.length - 1)], fp) : end, p = worldPx(c), q = { x: p.x + ux * K * PX * 0.6, y: p.y + uy * K * PX * 0.6 };
+      fx.sfx('mx_deep_impact', 0.74); fx.shake('heavy');
+      fx.top(orbHtml(q.x, q.y, K * PX * 1.3, 'rgba(245,158,11,0.75)', '#ffffff'), 260).firstChild
+        .animate([{ transform: 'scale(.3)', opacity: 1 }, { transform: 'scale(1.25)', opacity: 0 }], { duration: 240, fill: 'forwards' });
+      const moon = fx.top('<i style="position:absolute;left:' + q.x + 'px;top:' + q.y + 'px;width:' + (K * PX * 1.6).toFixed(0) + 'px;height:' + (K * PX * 0.7).toFixed(0) + 'px;margin:' + (-K * PX * 0.35).toFixed(0) + 'px 0 0 ' + (-K * PX * 0.8).toFixed(0) + 'px;border-radius:50%;' +
+        'transform:rotate(' + (deg(dir) + 90).toFixed(1) + 'deg);box-shadow:0 -6px 0 0 rgba(254,243,199,.95),0 -10px 14px 2px rgba(139,92,246,.7);"></i>', 360);
+      moon.firstChild.animate([{ scale: '0.4', opacity: 1 }, { scale: '1.2', opacity: 0 }], { duration: 340, easing: 'ease-out', fill: 'forwards' });
+      const rocks = fx.top(Array.from({ length: 10 }, () => { const s = rnd(6, 12); return '<i style="position:absolute;left:' + q.x + 'px;top:' + q.y + 'px;width:' + s.toFixed(0) + 'px;height:' + (s * 0.8).toFixed(0) + 'px;margin:' + (-s * 0.4).toFixed(0) + 'px 0 0 ' + (-s / 2).toFixed(0) + 'px;clip-path:polygon(10% 30%,60% 0,100% 45%,70% 100%,15% 85%);background:linear-gradient(135deg,#d6d3d1,#57534e);"></i>'; }).join(''), 700);
+      [...rocks.children].forEach(el => { const t = dir + rnd(-1.2, 1.2), d = rnd(0.6, 1.4) * K * PX, up = rnd(16, 36); el.animate([{ transform: 'translate(0,0) rotate(0deg)', opacity: 1 }, { transform: 'translate(' + (Math.cos(t) * d * 0.55).toFixed(0) + 'px,' + (Math.sin(t) * d * 0.55 - up).toFixed(0) + 'px) rotate(' + rnd(-240, 240).toFixed(0) + 'deg)', opacity: 1, offset: 0.45 }, { transform: 'translate(' + (Math.cos(t) * d).toFixed(0) + 'px,' + (Math.sin(t) * d + 4).toFixed(0) + 'px) rotate(' + rnd(-480, 480).toFixed(0) + 'deg)', opacity: 0 }], { duration: rnd(520, 680), easing: 'cubic-bezier(.25,.6,.45,1)', fill: 'both' }); });
+    };
+    if (!charge) { ctx.after(160, () => { impact(0); ctx.hits.forEach(h => ctx.reveal(h.targetId)); }); return ctx.wait(1100); }
+    const ok = await ctx.playCharge(impact);
+    if (!ok) return false;
+    // ③ 刹停尘爆 → 尘埃落定
+    lane.animate([{ opacity: 0.7 }, { opacity: 0 }], { duration: 360, fill: 'forwards' });
+    playJumpDust(fx, { x: end.x, y: end.y + K * 0.3 }, { phase: 'land', heavy: true, scale: K });
+    const cr = fx.ground(groundCrackHtml(b.x, b.y + K * PX * 0.3, K * PX * 1.1, 7, MARCHER.lilac, MARCHER.violet), 900);
+    crackIn(cr, 880);
+    fx.sfx('mx_golem_stomp', 0.5);
+    return ctx.wait(900);
+  },
+};
+
+// 咆哮 L3（[特效:行军兽咆哮]；自身圆形 6m：致盲敌人、驱散友军、自身嘲讽）：
+// 仰首吸气——周身紫金气流回卷入口、地面威压阵逆旋、巨兽后仰 → 收 →
+// 咆哮：四重声浪环按真实半径外扩 + 地裂放射 + 尘环推开；受影响者按到声源的距离随声浪抵达逐个震颤并揭示效果 → 声浪余震
+const marcherRoar = {
+  id: 'marcher-roar', grade: 'L3', fxTags: ['行军兽咆哮'],
+  timeline: { chargeMs: 820, totalMs: 2220, fullscreen: true, darken: false },   // 820 吸气 + 420 声浪抵达 + 980 余震
+  cues: [{ key: 'mx_giant_roar', vol: 0.7 }, { key: 'mx_dino_roar', vol: 0.75 }, { key: 'taunt', vol: 0.42 }],
+  prepareKeys() { return this.cues.map(c => c.key); },
+  async play(ctx) {
+    const { fx, result } = ctx, center = ctx.centerOf(ctx.casterId), c = worldPx(center), R = (result.query?.shape?.radius || 6) * PX;
+    const fp = ctx.sandbox.getUnitView().nodes.get(ctx.casterId)?.unit?.footprint || { width: 2, height: 2 }, K = Math.max(fp.width, fp.height);
+    // ① 吸气
+    fx.sfx('mx_giant_roar', 0.7);
+    tint(fx, 'radial-gradient(circle,rgba(91,33,182,.05),rgba(18,8,30,.9))', { inMs: 360, holdMs: 1000, outMs: 600, peak: 0.4 });
+    const rune = fx.ground(runeHtml(fx.uid(), c.x, c.y + K * PX * 0.2, R * 0.55, MARCHER.violet, MARCHER.lilac, 'ᚢᚱᚢᛉ'), 1100);
+    grow(rune.firstChild, { ms: 1100, s0: 0.3, s1: 1, hold: 0.6, o: 0.85 });
+    spin(rune.querySelector('[data-fx=spin]'), -150, 1100);
+    particles(fx, Array.from({ length: 28 }, () => { const t = rnd(0, TAU), d = rnd(1.1, 1.7) * K * PX; return { x: c.x + Math.cos(t) * d, y: c.y + Math.sin(t) * d * 0.62, dx: -Math.cos(t) * d * 0.9, dy: -Math.sin(t) * d * 0.56 - 8, size: rnd(5, 10), color: pick([MARCHER.violet, MARCHER.amber, MARCHER.lilac]), core: '#ffffff', s0: 1, s1: 0.2, dur: rnd(460, 620), delay: rnd(0, 160), ease: 'cubic-bezier(.6,0,.9,.5)' }; }), 820);
+    ctx.sandbox.getUnitView().nodes.get(ctx.casterId)?.sprite.animate([{ transform: 'translateY(0) scale(1)' }, { transform: 'translateY(-7px) scale(1.07)', offset: 0.85 }, { transform: 'translateY(2px) scale(0.97)' }],
+      { duration: 820, easing: 'cubic-bezier(.4,0,.6,1)' });
+    if (!(await ctx.wait(820))) return false;
+    // ② 咆哮爆发
+    fx.sfx('mx_dino_roar', 0.75); fx.sfx('taunt', 0.42); fx.shake('quake');
+    ctx.atmos?.burst();
+    [0, 110, 230, 360].forEach((dl, i) => ctx.after(dl, () => fx.top(ringHtml(c.x, c.y, R * 2 * (1 - i * 0.08), i % 2 ? 'rgba(245,158,11,0.75)' : 'rgba(221,214,254,0.85)', 'rgba(139,92,246,0.4)'), 600).firstChild
+      .animate([{ transform: 'scale(.12)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 560, easing: 'cubic-bezier(.15,.75,.3,1)', fill: 'forwards' })));
+    fx.top(orbHtml(c.x, c.y - 8, K * PX * 1.8, 'rgba(221,214,254,0.8)', '#ffffff'), 300).firstChild
+      .animate([{ transform: 'scale(.3)', opacity: 1 }, { transform: 'scale(1.2)', opacity: 0 }], { duration: 280, fill: 'forwards' });
+    crackIn(fx.ground(groundCrackHtml(c.x, c.y + K * PX * 0.25, R * 0.75, 12, MARCHER.lilac, MARCHER.violet), 1100), 1080);
+    playJumpDust(fx, { x: center.x, y: center.y + K * 0.3 }, { phase: 'land', heavy: true, scale: K * 1.6 });
+    const seen = new Set();
+    for (const e of result.effects || []) {
+      const p = ctx.centerOf(e.targetId);
+      const d = p ? Math.hypot(p.x - center.x, p.y - center.y) : 0, at = e.targetId === ctx.casterId ? 40 : 60 + Math.min(1, d * PX / R) * 380;
+      ctx.after(at, () => {
+        ctx.revealEffect(e, true);
+        if (seen.has(e.targetId) || e.targetId === ctx.casterId) return;
+        seen.add(e.targetId);
+        jolt(ctx, e.targetId, { amp: 5, ms: 55, times: 2, glow: MARCHER.violet });
+      });
+    }
+    if (!(await ctx.wait(700))) return false;
+    // ③ 余震
+    for (const dl of [0, 260]) ctx.after(dl, () => fx.ground(ringHtml(c.x, c.y, R * 1.4, 'rgba(221,214,254,0.35)', 'rgba(139,92,246,0.18)'), 760).firstChild
+      .animate([{ transform: 'scale(.4)', opacity: 0.8 }, { transform: 'scale(1)', opacity: 0 }], { duration: 740, fill: 'forwards' }));
+    return ctx.wait(800);
+  },
+};
+
 // 原版函数自带暗场、全屏层、震屏与合成音色，故按 identity 级接入（不叠通用屏幕氛围/运镜），与灵风术同口径。
 const stagePt = p => ({ x: p.x * PX / FX_SCALE, y: p.y * PX / FX_SCALE });   // 世界米 → 视听底座舞台坐标
 const effectIds = (ctx, accept = () => true) => [...new Set((ctx.result.effects || []).filter(accept).map(e => e.targetId))];
@@ -2604,21 +2810,17 @@ const bastetOpal = {
   },
 };
 
+// 奇异海螺（原版 playStrangeConch「敌阵全域致盲」）：暗场 + 海螺回旋涡流蓄势（钵音 / 深海气泡 / 冥河呼啸）→ 500ms 深渊声环与三重波纹爆开 →
+// 受影响单位自 80ms 起每人 35ms 错峰闪紫、眼部罩上暗雾；规则结果按原版拍点揭示（原版 80ms 顿帧在战棋恒为 0）
 const strangeConch = {
-  id: 'strange-conch', grade: 'L3', fxTags: ['奇异海螺'],
-  timeline: { chargeMs: 820, totalMs: 2150, fullscreen: true, darken: false },
-  cues: [{ key: 'enemyDebuff', vol: 0.62 }],
-  prepareKeys() { return ['enemyDebuff']; },
+  id: 'strange-conch', grade: 'identity', fxTags: ['奇异海螺'],
+  prepareKeys: () => ['conchCharge', 'conchMist', 'mx_stygian_whoosh'],
   async play(ctx) {
-    const { fx, hits } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
-    fx.ground(ringHtml(c.x, c.y, 4 * PX, 'rgba(34,211,238,0.55)', 'rgba(15,23,42,0.3)'), 840)
-      .firstChild.animate([{ transform: 'scale(0.3)', opacity: 0.3 }, { transform: 'scale(1)', opacity: 0.9 }], { duration: 800, fill: 'forwards' });
-    if (!(await ctx.wait(820))) return false;
-    fx.sfx('enemyDebuff', 0.62); fx.shake('medium');
-    ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
-    webm(ctx, 'vfx_conch_vortex.webm', c.x, c.y, 6 * PX, { ms: 1300 });
-    hits.forEach((h, i) => ctx.after(50 + i * 40, () => ctx.reveal(h.targetId)));
-    return ctx.wait(1260);
+    // 【致盲】为效果槽：受影响者来自 result.effects（另并入攻击段命中者）
+    const ids = [...new Set([...ctx.hits.map(h => h.targetId), ...(ctx.result.effects || []).map(e => e.targetId)])];
+    const handle = arcaneRun(ctx, () => ctx.av.playStrangeConch(ctx.casterEnt, ids.map(ctx.ent).filter(Boolean)));
+    ids.forEach((id, i) => ctx.after(580 + i * 35, () => { ctx.reveal(id); revealEffectsOf(ctx, id); }));
+    return ctx.awaitHandle(handle, 1600);
   },
 };
 
@@ -2840,7 +3042,7 @@ const sanctumVeil = {
   },
 };
 
-export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, slugShot, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, incendiaryBottle, vitalFlow, sanctumVeil, healMend, fogBurst, rlyehSediment, fireDomain, poisonDomain, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, polarBlizzard, temporalQuake, dimensionRift, waterBolt, curseBeam, ...basicAttacks, enemyGroupAttack, neutralImpact, zheYing, mirrorCounter, wizardShield, reactionKanpo, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, frostGather, riftGather, kruppAim, sekhmetVow];
+export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, slugShot, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, incendiaryBottle, vitalFlow, sanctumVeil, healMend, fogBurst, rlyehSediment, fireDomain, poisonDomain, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, polarBlizzard, temporalQuake, dimensionRift, marcherCharge, marcherRoar, waterBolt, curseBeam, ...basicAttacks, enemyGroupAttack, neutralImpact, zheYing, mirrorCounter, wizardShield, reactionKanpo, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, frostGather, riftGather, kruppAim, sekhmetVow];
 export function getFxTagOptions() {
   return [...new Set(DEFAULT_FX_ENTRIES.flatMap(entry => entry.fxTags || []))].map(name => ({ name, label: name }));
 }

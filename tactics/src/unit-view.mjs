@@ -93,7 +93,8 @@ export function createUnitView(parent, deps) {
             '<svg class="t-alert-ring" viewBox="-50 -50 100 100" aria-hidden="true"><circle class="t-alert-arc" r="46" pathLength="100"/><circle class="t-alert-tick" r="40" pathLength="100"/></svg>' +
             '<svg class="t-alert-eye" viewBox="-16 -9 32 18" aria-hidden="true"><path d="M-15,0 Q0,-11 15,0 Q0,11 -15,0 Z"/><ellipse rx="2.4" ry="6.2"/></svg>' +
           '</b>' : '') +
-          '<svg class="t-unit-direction" viewBox="-30 -30 60 60" aria-hidden="true"><path d="M0,-29 L6.5,-19.5 L0,-22 L-6.5,-19.5 Z"/></svg>' +
+          '<svg class="t-unit-direction" viewBox="-30 -30 60 60" aria-hidden="true"><path d="M0,-29 L6.5,-19.5 L0,-22 L-6.5,-19.5 Z"/>' +
+            '<path class="t-unit-rear" d="M-8,19.4 L-13.8,33.3 A36,36 0 0,0 13.8,33.3 L8,19.4 A21,21 0 0,1 -8,19.4 Z"/></svg>' +
         '</div>' +
       '</div>' +
       '<div class="t-unit-bars">' +
@@ -284,12 +285,13 @@ export function createUnitView(parent, deps) {
   function setPredict(id, p) {
     const rec = nodes.get(id);
     if (!rec) return;
-    if (!p) { rec.predictBar.style.width = '0'; rec.predictTag.textContent = ''; rec.root.classList.remove('t-unit-predicting', 't-unit-lethal'); return; }
+    if (!p) { rec.predictBar.style.width = '0'; rec.predictTag.textContent = ''; rec.root.classList.remove('t-unit-predicting', 't-unit-lethal', 't-unit-backstab'); return; }
     rec.predictBar.style.left = (p.to * 100).toFixed(1) + '%';
     rec.predictBar.style.width = (Math.max(0, p.from - p.to) * 100).toFixed(1) + '%';
     rec.predictTag.textContent = p.tag || '';
     rec.root.classList.add('t-unit-predicting');
     rec.root.classList.toggle('t-unit-lethal', !!p.kill);
+    rec.root.classList.toggle('t-unit-backstab', !!p.backstab);   // 背袭预览：朝向环背后 45° 扇区亮起
   }
   function clearPredict() { for (const id of nodes.keys()) setPredict(id, null); }
   function setFacing(id, deg) { setDisplayFacing(id, deg); }

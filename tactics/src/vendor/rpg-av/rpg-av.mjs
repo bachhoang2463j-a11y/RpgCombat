@@ -1,10 +1,10 @@
 // ==========================================
 // 由 tactics/tools/extract-rpg-av.cjs 自动生成，请勿手改。
 // 源: index.html  sha256=5c1ab2a1a243bb7d7e79b4aca76026ad1058af2a74bf9dfbf8763ae8b13554e7
-// arcaneVfxModule 行区间(源 5729–14230): 5730–5791, 5800–5924, 5932–6302, 6431–6485, 6565–7584, 7596–11500, 11917–12083, 12201–12562, 12565–14208
-// 入选语句 313 段 / 7711 行；入口: playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar, CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx, syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked, playSummonEnter, playSummonExit, playSummonGuard, clearSummonState, playLingFeng, playIsis, playFeiShaHuaJia, playXieYanKey, playHarmonyShelter, playSilenceDomain, playShatterResonance, playMeleeGroup, playRangedGroup, playSpellGroup, playRescueGrit, playRescueAvoidFatal, clearRescueState, playVariantResistFx, playCounterAttackL1, playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, clearSelfDestructState, syncSelfDestructWarning, setIdentitySfx, setVariantSfx, setStatusSfx, setSelfDestructSfx
+// arcaneVfxModule 行区间(源 5729–14230): 5730–5924, 5932–6356, 6431–6485, 6565–7584, 7596–11500, 11829–12083, 12201–12562, 12565–14208
+// 入选语句 316 段 / 7861 行；入口: playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar, CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx, syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked, playSummonEnter, playSummonExit, playSummonGuard, clearSummonState, playLingFeng, playIsis, playFeiShaHuaJia, playXieYanKey, playHarmonyShelter, playSilenceDomain, playShatterResonance, playZheYingBu, playStrangeConch, playMeleeGroup, playRangedGroup, playSpellGroup, playRescueGrit, playRescueAvoidFatal, clearRescueState, playVariantResistFx, playCounterAttackL1, playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, clearSelfDestructState, syncSelfDestructWarning, setIdentitySfx, setVariantSfx, setStatusSfx, setSelfDestructSfx
 // 显式存根: 
-// 宿主适配补丁: 枪击采样相邻去重×1; 远程击杀隐藏我方名称×1; 特写挂屏幕宿主×2; 特写收尾登记×2; 特写震屏走舞台震动层×1; 特写计时可随重开清理×6; 环境音脱离#battle-scene DOM×1; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 重击数字不等定帧×1; 蝎眼钥匙落点参数×1; 蝎眼钥匙裂隙钉召唤落点×1; 蝎眼钥匙裂隙舞台定位×1; 谐律之庇音叉悬于受益者上方×1; 屏幕矩形 → 特效舞台坐标×13; innerWidth → 舞台宽×22; innerHeight → 舞台高×15; body 挂载 → 特效舞台×5; JS position:fixed → absolute×1; arcane canvas resize 走舞台×1; 舞台震动独立层×3; window.* 声音函数改为工厂内本地×14; 环境氛围音随清场停止×1; 去抗性全局挂载×1; 毅力血幕挂圆形棋子内框×1; 致命回避残影保留圆形尺度×1; 反击残影保留圆形尺度×1; 灵风术法阵按头像尺度×1; 灵风术法阵透视原点钉在阵心×1; 灵风术收尾羽翼按头像尺度×1; 强力反击原版震屏函数×1; 强力反击震屏宿主×1; 强力反击震屏清理登记×1; 强力反击震屏代际×1; 强力反击震屏帧登记×2; 强力反击爆发粒子注入×1; 强力反击蓄力粒子注入×1; 强力反击回调契约×1; 强力反击代际句柄×1; 强力反击取消结果×1; 强力反击闪避缓冲可取消×1; 强力反击蓄力可取消×1; 强力反击预载取消×1; 强力反击起播等待可取消×1; 强力反击登记蓄力光×1; 强力反击音效取消登记×1; 强力反击阶段取消结果×1; 强力反击舞台坐标×1; 强力反击实体DOM蓄力光×1; 强力反击实体DOM×1; 强力反击蓄力粒子×1; 强力反击聚气使用本地函数×1; 强力反击蓄力坐标×1; 强力反击方向坐标×1; 强力反击锁定读取本地模块×1; 强力反击白闪舞台挂载×1; 强力反击白闪计时×1; 强力反击准星舞台坐标×1; 强力反击准星舞台挂载×1; 强力反击准星计时×1; 强力反击爆发与命中回调×1; 强力反击攻击方向实体×1; 强力反击目标震动清理×1; 强力反击原版震屏调用×1; 强力反击余波等待可取消×1; 强力反击保留余波并返回成功×1; CSS position:fixed → absolute×13; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1; CSS 残留视口单位(按舞台尺度保留)×42
+// 宿主适配补丁: 枪击采样相邻去重×1; 远程击杀隐藏我方名称×1; 特写挂屏幕宿主×2; 特写收尾登记×2; 特写震屏走舞台震动层×1; 特写计时可随重开清理×6; 环境音脱离#battle-scene DOM×1; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 重击数字不等定帧×1; 蝎眼钥匙落点参数×1; 蝎眼钥匙裂隙钉召唤落点×1; 蝎眼钥匙裂隙舞台定位×1; 折影步去卡片横移×1; 折影步落点参数×1; 折影步落点涟漪×1; 折影步残影保留圆形尺度×1; 奇异海螺去顿帧×1; 谐律之庇音叉悬于受益者上方×1; 屏幕矩形 → 特效舞台坐标×14; innerWidth → 舞台宽×22; innerHeight → 舞台高×15; body 挂载 → 特效舞台×6; JS position:fixed → absolute×2; arcane canvas resize 走舞台×1; 舞台震动独立层×3; window.* 声音函数改为工厂内本地×14; 环境氛围音随清场停止×1; 去抗性全局挂载×1; 毅力血幕挂圆形棋子内框×1; 致命回避残影保留圆形尺度×1; 反击残影保留圆形尺度×1; 灵风术法阵按头像尺度×1; 灵风术法阵透视原点钉在阵心×1; 灵风术收尾羽翼按头像尺度×1; 强力反击原版震屏函数×1; 强力反击震屏宿主×1; 强力反击震屏清理登记×1; 强力反击震屏代际×1; 强力反击震屏帧登记×2; 强力反击爆发粒子注入×1; 强力反击蓄力粒子注入×1; 强力反击回调契约×1; 强力反击代际句柄×1; 强力反击取消结果×1; 强力反击闪避缓冲可取消×1; 强力反击蓄力可取消×1; 强力反击预载取消×1; 强力反击起播等待可取消×1; 强力反击登记蓄力光×1; 强力反击音效取消登记×1; 强力反击阶段取消结果×1; 强力反击舞台坐标×1; 强力反击实体DOM蓄力光×1; 强力反击实体DOM×1; 强力反击蓄力粒子×1; 强力反击聚气使用本地函数×1; 强力反击蓄力坐标×1; 强力反击方向坐标×1; 强力反击锁定读取本地模块×1; 强力反击白闪舞台挂载×1; 强力反击白闪计时×1; 强力反击准星舞台坐标×1; 强力反击准星舞台挂载×1; 强力反击准星计时×1; 强力反击爆发与命中回调×1; 强力反击攻击方向实体×1; 强力反击目标震动清理×1; 强力反击原版震屏调用×1; 强力反击余波等待可取消×1; 强力反击保留余波并返回成功×1; CSS position:fixed → absolute×13; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1; CSS 残留视口单位(按舞台尺度保留)×42
 // ==========================================
 /* eslint-disable */
 // ---- 纯数据导出（原样，供宿主在工厂创建前解析人物头像/语音与预载清单） ----
@@ -1733,6 +1733,14 @@ const CombatEvents = {
         if (ms) setTimeout(() => { S.layers.delete(d); d.remove(); }, ms); // 纯清理回调，恒执行
         return d;
     }
+    function mkAnchor(x, y) {
+        const d = document.createElement('div');
+        d.style.cssText = 'position:absolute; left:' + (x - 1) + 'px; top:' + (y - 1) + 'px; width:2px; height:2px; pointer-events:none; z-index:56; opacity:0;';
+        d.setAttribute('data-arcane-fx', 'anchor');
+        __STAGE.el.appendChild(d);
+        S.anchors.add(d);
+        return d;
+    }
     function dropAnchor(d) { if (d && d.isConnected) { S.anchors.delete(d); d.remove(); } }
     function flash(el, cls) {
         if (!el || isEntityVariantLocked(el)) return;
@@ -2227,6 +2235,55 @@ const CombatEvents = {
             idSample(null, 'light_impact', 0.92);
             burst(24, () => { const an = Math.random() * 6.283, s = rnd(1.5, 5); return { x: b.x, y: b.y, vx: Math.cos(an) * s, vy: Math.sin(an) * s, drag: 0.93, decay: 0.04, size: rnd(1, 2.4), color: pick(['#e9d5ff', '#c084fc', '#7c3aed']) }; });
         }, k => k);
+    }
+
+    // ===== ③ 折影步：准备冷闪+原位锚点 → dodge(true) 才错身/残影碎裂（WAAPI，不碰 inline transform） =====
+    function playZheYingBu(caster, targets, isReaction) {
+        const el = domOf(caster); if (!el) return null;
+        const token = combatToken;
+        ensureCanvas(); ensureDriver();
+        const r = el[__GBCR](), c = ctr(el);
+        let done = false, cancelled = false, anim = null, held = false;
+        const retreatTimers = new Set();
+        const retire = delay => { const id = after(delay, () => { retreatTimers.delete(id); if (!held) { dropAnchor(anchor); S.handles.delete(handle); releaseIdleCanvas(); } }); retreatTimers.add(id); };
+        const anchor = mkAnchor(c.x, c.y); // 原位无视觉落点锚（主代理把弹道 toDom 指向它）
+        retire(8000);
+        const handle = { doneAt: 0, impactDom: anchor, dodge: null, hit: null, cancel: null };
+        S.handles.add(handle);
+        whoosh(0, { type: 'highpass', f0: 6000, f1: 700, q: 0.7, dur: 0.18, vol: 0.45, peak: 0.17, cut: true });
+        kick(0.16, { hi: 70, lo: 40, pd: 0.06, dur: 0.3, vol: 0.4, drive: 2 }); tone(0.16, { f0: 220, f1: 110, dur: 0.45, vol: 0.1, wet: 0.6 });
+        flash(el, 'arcane-flash-cold');
+        fsLayer(`<div style="position:absolute; inset:0; background:radial-gradient(circle at ${c.x}px ${c.y}px, rgba(99,102,241,0.0) 0%, rgba(30,27,75,0.35) 60%); animation: arcane-tint 0.9s ease both;"></div>
+          <div class="arcane-fs-anchor" style="left:${c.x}px; top:${c.y}px; width:180px; height:180px; border-radius:50%; border:2px solid #a5b4fc; box-shadow:0 0 20px #6366f1; animation: arcane-ripple 0.4s ease-out both;"></div>`, 950);
+        handle.dodge = (success, land = null) => {
+            if (done || cancelled || token !== combatToken) return;
+            if (!success) { done = true; retire(1200); return; }
+            done = true;
+            handle.doneAt = Date.now() + 1900;
+            const ghosts = [0, 1, 2].map(i => `<div style="position:absolute; left:${r.left + i * 10}px; top:${r.top}px; width:${r.width}px; height:${r.height}px; --d:${r.width}px; border-radius:50%; opacity:${0.75 - i * 0.18}; filter: grayscale(1) brightness(1.4) sepia(1) hue-rotate(200deg) saturate(4) drop-shadow(0 0 10px #6366f1); animation: arcane-ghost-shatter 0.32s ${0.18 + i * 0.12}s ease-in both;">${el.innerHTML.replace(/ id="[^"]*"/g, '')}</div>`).join('');
+            fsLayer(ghosts, 900);
+            /* 战棋：真实位移由宿主滑步演出 */
+            whoosh(0, { type: 'highpass', f0: 5000, f1: 2500, q: 0.8, dur: 0.14, vol: 0.45, peak: 0.03, pan: 0.2, pan1: -0.4 });
+            [0, 1, 2].forEach(i => after(180 + i * 120, () => {
+                if (cancelled || token !== combatToken) return;
+                const gx = r.left + r.width / 2 + i * 10, gy = r.top + r.height / 2;
+                burst(14, () => ({ x: gx + rnd(-30, 30), y: gy + rnd(-60, 60), vx: rnd(-2.5, 2.5), vy: rnd(-2, 1.5), grav: 0.06, drag: 0.96, rot: rnd(0, 6), vr: rnd(-0.2, 0.2), decay: rnd(0.025, 0.04), size: rnd(4, 8), shape: 'shard', color: '#a5b4fc', fill: 'rgba(99,102,241,0.35)' }));
+                whoosh(0, { type: 'highpass', f0: 4500, f1: 2000, q: 0.8, dur: 0.1, vol: 0.3, peak: 0.02, pan: 0.1 * i });
+                for (let k = 0; k < 4; k++) crystal(k * 0.025, rnd(3000, 6000), 0.05, rnd(-0.3, 0.3));
+            }));
+            after(280, () => {
+                if (cancelled || token !== combatToken) return;
+                fsLayer(`<div class="arcane-fs-anchor" style="left:${land ? land.x : r.left + r.width / 2 - 90}px; top:${land ? land.y : r.bottom - 8}px; width:160px; height:40px; border-radius:50%; border:2px solid #c7d2fe; box-shadow:0 0 16px #818cf8; animation: arcane-ripple 0.6s ease-out both;"></div>`, 700);
+                tone(0, { f0: 880, dur: 0.5, vol: 0.06, wet: 0.7 }); // 不写 MISS 文本
+            });
+            retire(2000);
+        };
+        if (isReaction) { handle.doneAt = Date.now() + 1000; }
+        else { handle.doneAt = Date.now() + 2100; after(160, () => handle.dodge(true)); } // 非反应自主演出
+        handle.holdForImpact = () => { held = true; retreatTimers.forEach(id => { clearTimeout(id); S.timers.delete(id); }); retreatTimers.clear(); };
+        handle.releaseImpact = () => { held = false; retire(Math.max(0, handle.doneAt - Date.now())); };
+        handle.cancel = () => { cancelled = true; done = true; retreatTimers.forEach(id => { clearTimeout(id); S.timers.delete(id); }); retreatTimers.clear(); if (anim) { anim.cancel(); anim = null; } dropAnchor(anchor); S.handles.delete(handle); };
+        return handle;
     }
 
     // ===== ⑤ 灵风术（L3，蓄势 1000ms）：风玫瑰阵 + 羽毛绕场 → 全屏疾风 → 翼纹加身 =====
@@ -7229,6 +7286,94 @@ const CombatEvents = {
         return handle;
     }
 
+    // ===== ② 【奇异海螺】L2+ 敌阵全域致盲 (1600ms / 500ms 爆发声波) =====
+    function playStrangeConch(caster, targets) {
+        const token = combatToken, uid = ++S.uid;
+        const rawDoms = (targets || []).map(domOf).filter(Boolean);
+        const box = unionRect(rawDoms); if (!box) return null;
+        const owner = fixedItemSkillRun(1600);
+        const after = owner.at, fsLayer = (markup, ms) => skillLayer(owner, markup, ms);
+        const addP = p => owner.addP(Object.assign({ itemFx:true, inner:p.mistCore }, p)), burst = (n, fn) => { for (let i = 0; i < n; i++) addP(fn(i)); };
+        const playSfxSample = (key, delay, opts) => playItemSample(owner, key, delay, opts);
+        const playWebMFX = (file, x, y, opts) => playArcaneWebM(file, x, y, opts, owner);
+        const darken = opacity => itemDarken(owner, opacity), flash = (dom, cls) => flashOwned(owner, dom, cls);
+        const orbitCharge = (c, n, dur, mk, rx, ry, shrink) => orbitItemCharge(owner, c, n, dur, mk, rx, ry, shrink);
+        const flyBezier = (a, ctrl, b, dur, draw, done, ease) => flyItemBezier(owner, a, ctrl, b, dur, draw, done, ease);
+        const conchPt = { x: box.x, y: Math.max(92, box.t + box.h * 0.24) };
+
+        darken(0.56);
+        tintOverlay(owner, `radial-gradient(ellipse at ${Math.round(box.x)}px ${Math.round(box.y)}px, rgba(10,18,42,0.72) 0%, rgba(15,23,42,0.84) 64%, rgba(2,6,23,0.92) 100%)`, 1600, 0.86);
+        playSfxSample('conchCharge', 0.02, { volume: 0.62, fadeOut: 0.25 });
+        playSfxSample('conchMist', 0.85, { volume: 0.62, durCap: 0.85, fadeOut: 0.32 });
+        playSfxSample('mx_stygian_whoosh', 0.88, { volume: 0.50, offset: 0.1, durCap: 0.80, fadeOut: 0.32 });
+
+        const conchHtml = `<div class="arcane-fs-anchor" style="left:${conchPt.x}px; top:${conchPt.y}px; width:156px; height:156px;">
+          <svg viewBox="0 0 160 160" class="w-full h-full overflow-visible">
+            <defs>
+              <radialGradient id="cn-halo-${uid}" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#38bdf8" stop-opacity="0.58"/><stop offset="48%" stop-color="#7c3aed" stop-opacity="0.26"/><stop offset="100%" stop-color="#0f172a" stop-opacity="0"/></radialGradient>
+              <linearGradient id="cn-shell-${uid}" x1="15%" y1="10%" x2="88%" y2="90%"><stop offset="0%" stop-color="#fde68a"/><stop offset="32%" stop-color="#b45309"/><stop offset="68%" stop-color="#6d28d9"/><stop offset="100%" stop-color="#0f172a"/></linearGradient>
+              <radialGradient id="cn-pearl-${uid}" cx="42%" cy="42%" r="55%"><stop offset="0%" stop-color="#e0f2fe"/><stop offset="45%" stop-color="#67e8f9"/><stop offset="85%" stop-color="#6d28d9"/><stop offset="100%" stop-color="#1e1b4b"/></radialGradient>
+              <filter id="cn-glow-${uid}" x="-35%" y="-35%" width="170%" height="170%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <circle cx="80" cy="80" r="74" fill="url(#cn-halo-${uid})"/>
+            <path d="M80,22 C112,24 134,48 128,80 C122,114 94,132 62,126 C36,120 24,96 32,70 C40,46 66,34 90,46 C108,56 112,78 98,94 C86,108 66,104 60,88" fill="url(#cn-shell-${uid})" stroke="#67e8f9" stroke-width="2" opacity="0.94" filter="url(#cn-glow-${uid})"/>
+            <ellipse cx="62" cy="86" rx="22" ry="16" fill="url(#cn-pearl-${uid})" opacity="0.9"/>
+            <path d="M46,66 Q76,42 110,64 M42,84 Q78,64 116,86" fill="none" stroke="#bae6fd" stroke-width="1.3" opacity="0.65"/>
+          </svg></div>`;
+        const cLayer = fsLayer(conchHtml, 1080);
+        if (cLayer.firstElementChild && cLayer.firstElementChild.animate) owner.anim(cLayer.firstElementChild, [
+            { transform: 'translate(-50%,-50%) scale(0.32) rotate(-14deg)', opacity: 0 },
+            { transform: 'translate(-50%,-50%) scale(1.06) rotate(4deg)', opacity: 0.98, offset: 0.38 },
+            { transform: 'translate(-50%,-50%) scale(0.9) rotate(0deg)', opacity: 0.96, offset: 0.48 },
+            { transform: 'translate(-50%,-50%) scale(1.18) rotate(3deg)', opacity: 0.92, offset: 0.56 },
+            { transform: 'translate(-50%,-50%) scale(0.85)', opacity: 0 }
+        ], { duration: 1020, fill: 'both' });
+        playWebMFX('vfx_conch_vortex.webm', conchPt.x, conchPt.y, { width: 196, height: 184, opacity: 0.88, blend: 'screen', durMs: 650 });
+        orbitCharge(conchPt, 28, 420, o => ({ size: rnd(4, 9), shape: 'gradOrb', core: '#e0f2fe', mid: o.k < 0.5 ? '#22d3ee' : '#a855f7', outer: 'rgba(109,40,217,0.16)' }), 78, 60, 0.85);
+
+        
+        after(500, () => {
+            if (token !== combatToken) return;
+            shake('heavy');
+            const ringW = Math.max(460, Math.round(box.w * 1.18));
+            playWebMFX('vfx_conch_abyss.webm', box.x, box.y, { width: ringW, height: Math.round(ringW * 0.42), opacity: 0.84, blend: 'screen', durMs: 720 });
+            [0, 95, 190].forEach((delayMs, idx) => {
+                after(delayMs, () => {
+                    if (token !== combatToken) return;
+                    addP({ x: box.x, y: box.y, shape: 'gradRing', sy: 0.44, r0: 28, r1: Math.round(ringW * (0.48 + idx * 0.08)), decay: 0.028, color: idx % 2 ? 'rgba(168,85,247,0.34)' : 'rgba(34,211,238,0.34)', edge: idx % 2 ? 'rgba(233,213,255,0.72)' : 'rgba(165,243,252,0.72)' });
+                    if (idx === 0) playWebMFX('vfx_conch_ripple.webm', box.x, box.y + 12, { width: Math.round(ringW * 0.82), height: Math.round(ringW * 0.42), opacity: 0.9, blend: 'screen', durMs: 560 });
+                });
+            });
+            burst(34, () => { const a = rnd(0, 6.283), sp = rnd(2.2, 8.2); return { x: conchPt.x, y: conchPt.y, vx: Math.cos(a)*sp*1.25, vy: Math.sin(a)*sp*0.65, drag: 0.94, decay: rnd(0.022, 0.042), size: rnd(5, 11), shape: 'gradOrb', core: '#f0f9ff', mid: pick(['#22d3ee', '#a855f7', '#67e8f9']), outer: 'rgba(67,56,202,0.14)' }; });
+
+            rawDoms.forEach((tDom, ti) => {
+                after(80 + ti * 35, () => {
+                    if (token !== combatToken) return;
+                    const r = entityVisualRect(tDom); if (!r) return;
+                    const eyeY = r.top + r.h * 0.36;
+                    flash(tDom, 'arcane-flash-silence');
+                    const fogW = Math.max(76, Math.round(r.w * 0.95));
+                    fsLayer(`<div class="arcane-fs-anchor" style="left:${r.x}px; top:${eyeY}px; width:${fogW}px; height:${Math.round(fogW*0.65)}px;">
+                      <svg viewBox="0 0 100 66" class="w-full h-full overflow-visible">
+                        <defs>
+                          <radialGradient id="cn-eye-${uid}-${ti}" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(124,58,237,0.52)"/><stop offset="55%" stop-color="rgba(30,27,75,0.34)"/><stop offset="100%" stop-color="rgba(10,18,42,0)"/></radialGradient>
+                          <filter id="cn-eg-${uid}-${ti}" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2"/></filter>
+                        </defs>
+                        <ellipse cx="50" cy="33" rx="46" ry="26" fill="url(#cn-eye-${uid}-${ti})"/>
+                        <g filter="url(#cn-eg-${uid}-${ti})">
+                          <ellipse cx="50" cy="33" rx="34" ry="14" fill="none" stroke="#a855f7" stroke-width="1.8" opacity="0.65"/>
+                          <ellipse cx="50" cy="33" rx="22" ry="9" fill="none" stroke="#67e8f9" stroke-width="1.3" opacity="0.55"/>
+                        </g>
+                      </svg></div>`, 620);
+                    for (let m = 0; m < 4; m++) addP({ x: r.x + rnd(-16, 16), y: eyeY + rnd(-8, 8), vx: rnd(-0.4, 0.4), vy: rnd(-0.55, 0.15), drag: 0.98, decay: 0.018, size: rnd(18, 28), shape: 'gradMist', blend: 'source-over', mistCore: 'rgba(88,28,135,0.48)', outer: 'rgba(15,23,42,0.14)' });
+                    burst(5, () => ({ x: r.x + rnd(-18, 18), y: eyeY + rnd(-6, 10), vx: rnd(-0.4, 0.4), vy: rnd(-1.4, -0.5), drag: 0.97, decay: 0.026, size: rnd(3, 6), shape: 'gradOrb', core: '#e0f2fe', mid: '#38bdf8', outer: 'rgba(109,40,217,0.12)' }));
+                });
+            });
+        });
+        after(1320, () => darken(0));
+        return owner.handle;
+    }
+
     // ===== ③ 【砷弹射击】L1+ 枪口蓄力 → 黑弹破甲 → 命中爆炸与毒液溅射 (1180ms / 音效沿用枪击穿透) =====
     function playArsenicShot(caster, targets) {
         const token = combatToken, uid = ++S.uid;
@@ -9412,6 +9557,7 @@ function playRescueAvoidFatal(entity, meta, onBeat) {
       playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, clearSelfDestructState, syncSelfDestructWarning,
       setIdentitySfx, setVariantSfx, setStatusSfx, setSelfDestructSfx, clearSummonState, playLingFeng,
       playIsis, playFeiShaHuaJia, playXieYanKey, playHarmonyShelter, playSilenceDomain, playShatterResonance,
+      playZheYingBu, playStrangeConch,
       playMeleeGroup, playRangedGroup, playSpellGroup };
   })();
 CombatEvents.on(EVENTS.DAMAGE_RESOLVED, arcane.CombatAudioDirector.consume);

@@ -22,6 +22,7 @@ const ENTRIES = [
   'playSummonEnter', 'playSummonExit', 'playSummonGuard', 'clearSummonState',
   'playLingFeng',
   'playIsis', 'playFeiShaHuaJia', 'playXieYanKey', 'playHarmonyShelter', 'playSilenceDomain', 'playShatterResonance',
+  'playZheYingBu', 'playStrangeConch',
   'playMeleeGroup', 'playRangedGroup', 'playSpellGroup',
   'playRescueGrit', 'playRescueAvoidFatal', 'clearRescueState',
   'playVariantResistFx', 'playCounterAttackL1',
@@ -494,14 +495,21 @@ ${supportBranches.join('\n').replace('else if', 'if')}
   mod = patch(mod, 'const vw = window.innerWidth, vh = window.innerHeight;\n        const cX = vw * 0.5, cY = vh * 0.46;',
     'const vw = 1280, vh = 720;\n        const cX = at ? at.x : __STAGE.w * 0.5, cY = at ? at.y : __STAGE.h * 0.46;', 1, '蝎眼钥匙裂隙钉召唤落点');
   mod = patch(mod, '<div class="arcane-marcher-rift-stage is-vertical">', '<div class="arcane-marcher-rift-stage is-vertical" style="left:${cX}px; top:${cY}px;">', 1, '蝎眼钥匙裂隙舞台定位');
+  // 折影步：战棋有真实落点，去掉原版卡片横移 -90px 再回位（由战棋滑步演出真实位移）；涟漪落在 dodge(true, land) 给的落点，残影保留圆形棋子尺度
+  mod = patch(mod, /anim = el\.animate\(\[\s*\{ transform: 'translateX\(0px\) skewX\(0deg\)'[\s\S]*?\], \{ duration: 1750 \}\);/, '/* 战棋：真实位移由宿主滑步演出 */', 1, '折影步去卡片横移');
+  mod = patch(mod, 'handle.dodge = (success) => {', 'handle.dodge = (success, land = null) => {', 1, '折影步落点参数');
+  mod = patch(mod, 'left:${r.left + r.width / 2 - 90}px; top:${r.bottom - 8}px;', 'left:${land ? land.x : r.left + r.width / 2 - 90}px; top:${land ? land.y : r.bottom - 8}px;', 1, '折影步落点涟漪');
+  mod = patch(mod, 'opacity:${0.75 - i * 0.18}; filter: grayscale(1)', '--d:${r.width}px; border-radius:50%; opacity:${0.75 - i * 0.18}; filter: grayscale(1)', 1, '折影步残影保留圆形尺度');
+  // 奇异海螺：战棋顿帧恒为 0
+  mod = patch(mod, 'after(420, () => { if (token === combatToken) fxEngine.hitStop = 80; });', '', 1, '奇异海螺去顿帧');
   // 谐律之庇：原版音叉悬在屏幕上方正中；战棋改悬在受益者包围盒上方（原版约 0.38 屏高 ≈ 260px）
   mod = patch(mod, 'const forkPos = { x: window.innerWidth * 0.5, y: Math.max(150, window.innerHeight * 0.34) };',
     'const forkPos = { x: box.x, y: box.y - 260 };', 1, '谐律之庇音叉悬于受益者上方');
-  mod = patch(mod, /\.getBoundingClientRect\(\)/g, '[__GBCR]()', 13, '屏幕矩形 → 特效舞台坐标');
+  mod = patch(mod, /\.getBoundingClientRect\(\)/g, '[__GBCR]()', 14, '屏幕矩形 → 特效舞台坐标');
   mod = patch(mod, /\b(?:window\.)?innerWidth\b/g, '__STAGE.w', 22, 'innerWidth → 舞台宽');
   mod = patch(mod, /\b(?:window\.)?innerHeight\b/g, '__STAGE.h', 15, 'innerHeight → 舞台高');
-  mod = patch(mod, 'document.body.appendChild(', '__STAGE.el.appendChild(', 5, 'body 挂载 → 特效舞台');
-  mod = patch(mod, /position\s*:\s*fixed/g, 'position:absolute', 1, 'JS position:fixed → absolute');
+  mod = patch(mod, 'document.body.appendChild(', '__STAGE.el.appendChild(', 6, 'body 挂载 → 特效舞台');
+  mod = patch(mod, /position\s*:\s*fixed/g, 'position:absolute', 2, 'JS position:fixed → absolute');
   mod = patch(mod, "window.addEventListener('resize', resizeCanvas);", '__STAGE.onResize(resizeCanvas);', 1, 'arcane canvas resize 走舞台');
   mod = patch(mod, "document.getElementById('battle-scene')", '__STAGE.shakeEl()', 3, '舞台震动独立层');
   mod = patch(mod, /window\.(playSound|playRandomStandardGunshot|playShotgunSound|AudioContext|webkitAudioContext)\b/g,
@@ -729,6 +737,7 @@ ${mod}
       playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, clearSelfDestructState, syncSelfDestructWarning,
       setIdentitySfx, setVariantSfx, setStatusSfx, setSelfDestructSfx, clearSummonState, playLingFeng,
       playIsis, playFeiShaHuaJia, playXieYanKey, playHarmonyShelter, playSilenceDomain, playShatterResonance,
+      playZheYingBu, playStrangeConch,
       playMeleeGroup, playRangedGroup, playSpellGroup };
   })();
 ${busOn.map(l => l.replace('CombatAudioDirector.consume', 'arcane.CombatAudioDirector.consume')).join('\n')}

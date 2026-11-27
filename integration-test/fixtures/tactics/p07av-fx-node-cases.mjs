@@ -240,17 +240,21 @@ function killAndSummonCases() {
     && !/playExecutionAnimation[\s\S]{0,9000}?\bsetTimeout\(/.test(av.slice(av.indexOf('async function playExecutionAnimation'), av.indexOf('async function playEnemyUltimateCutin')))
     && /clearArcaneFx\(\) \{ clearPowerCounterEffects\(\); supportHandles\.forEach\(handle => handle\.cancel\(\)\); clearMoments\(\);/.test(av) && /setToken\(t\) \{ if \(t !== combatToken\) \{[^}]*clearMoments\(\);/.test(av)));
   // 真实页面启动崩溃回归：clearSummonState（清场/重开必经）引用的回合制顶层集合必须在工厂内声明
+  const conchAt = av.indexOf('function playStrangeConch(caster, targets)');
+  out.push(ok('TP7AV-X 折影步/奇异海螺原版入包：去卡片横移、涟漪落真实落点、海螺无顿帧', /function playZheYingBu\(caster, targets, isReaction\)/.test(av)
+    && /handle\.dodge = \(success, land = null\) =>/.test(av) && /left:\$\{land \? land\.x : /.test(av) && !/translateX\(-90px\) skewX/.test(av)
+    && conchAt > 0 && !/fxEngine\.hitStop = 80/.test(av.slice(conchAt, conchAt + 6000))));
   const hostSrc = readFileSync(new URL('../../../tactics/src/av-host.mjs', import.meta.url), 'utf8');
   out.push(ok('TP7AV-X 击杀特写/Cut-in 屏幕宿主挂 iframe body 最顶层（压住全部 UI、不挡输入）',
     /document\.body\.appendChild\(screenEl\)/.test(hostSrc) && /position:fixed; inset:0; z-index:2147483000; pointer-events:none/.test(hostSrc) && /screenEl\.setAttribute\('data-rpg-av-scope', ''\)/.test(hostSrc)));
   const libSrc = readFileSync(new URL('../../../tactics/src/fx-library.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
   const fsIds = [...libSrc.matchAll(/id: '([\w-]+)', grade: 'L[34]'[^\n]*\n\s*timeline: \{[^}]*fullscreen: true/g)].map(m => m[1]);
-  // 火焰/中毒领域两条目共用 playDomainBurst 的同一处爆发拍点：16 条目对应 15 处调用（伊西丝/音叉三件/高阶召唤/蝎眼钥匙为原版 identity 直调；时空扭曲震荡/维度撕裂升为 L3）
-  out.push(ok('TP7AV-L 每个全屏 L3/L4 条目都有独立屏幕主演出，并在真实冲击拍点 ctx.atmos.burst()', fsIds.length === 16 && fsIds.every(id => SHOWPIECES[id])
-    && (libSrc.match(/ctx\.atmos\?\.burst\(\);/g) || []).length === 15 && !/fx\.screen\('<i style="position:absolute;inset:0;background:radial-gradient/.test(libSrc), fsIds));
+  // 火焰/中毒领域两条目共用 playDomainBurst 的同一处爆发拍点：17 条目对应 16 处调用（伊西丝/音叉三件/高阶召唤/蝎眼钥匙/奇异海螺为原版 identity 直调；时空扭曲震荡/维度撕裂升为 L3；幻梦行军兽冲撞/咆哮为精英口径 L3）
+  out.push(ok('TP7AV-L 每个全屏 L3/L4 条目都有独立屏幕主演出，并在真实冲击拍点 ctx.atmos.burst()', fsIds.length === 17 && fsIds.every(id => SHOWPIECES[id])
+    && (libSrc.match(/ctx\.atmos\?\.burst\(\);/g) || []).length === 16 && !/fx\.screen\('<i style="position:absolute;inset:0;background:radial-gradient/.test(libSrc), fsIds));
   let seed = 3; const rr = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
   const built = fsIds.map(id => SHOWPIECES[id].build(9, rr));
-  out.push(ok('TP7AV-L 主演出构图互不相同、渐变辉光滤镜带 uid、无 NaN/undefined', new Set(built).size === 16 && built.every(h => /<filter id="g9"/.test(h) && !/NaN|undefined/.test(h))));
+  out.push(ok('TP7AV-L 主演出构图互不相同、渐变辉光滤镜带 uid、无 NaN/undefined', new Set(built).size === 17 && built.every(h => /<filter id="g9"/.test(h) && !/NaN|undefined/.test(h))));
   const holyBuilt = SHOWPIECES['holy-judgment'].build(9, rr, { x: 800, y: 450 });
   out.push(ok('TP7AV-L 圣光01 屏幕层无中心光柱/十字/中央光束（真实光柱只在目标处）', !/data-k="pillar"|data-k="cross"/.test(holyBuilt) && (holyBuilt.match(/data-k="ray"/g) || []).length === 8));
   const k1 = SHOWPIECES['krupp-snipe'].build(9, rr, { x: 300, y: 200 });

@@ -11,7 +11,8 @@ import { playPathMotion, pathSegments, pointAtDistance } from './motion.mjs';
 import { unitCenter } from './geometry.mjs';
 import { createFxRegistry, actionInput, reactionInput, prepareInput } from './fx-registry.mjs';
 import { registerDefaultFx, EXTRA_AUDIO, fogFieldHtml, animateFogField, elementFieldHtml, animateElementField,
-  playRegionPulse, REGION_PULSE_AUDIO, playPassiveGain, PASSIVE_AUDIO, playEnemyAlarm, ALARM_AUDIO, playJumpDust, glide, READY_AUDIO, playReadyFx } from './fx-library.mjs';
+  playRegionPulse, REGION_PULSE_AUDIO, playPassiveGain, PASSIVE_AUDIO, playEnemyAlarm, ALARM_AUDIO, playJumpDust, glide, READY_AUDIO, playReadyFx,
+  playObstacleBreak, playBackstabMark } from './fx-library.mjs';
 import { createVfxHost } from './vfx-host.mjs';
 import { skillSlots } from './effect-definitions.mjs';
 import { startAtmos, atmosStyleOf } from './screen-atmos.mjs';
@@ -153,6 +154,13 @@ export function createActionDirector(deps) {
   }
   const feedback = (id, kind, p) => { if (onMoveFeedback) onMoveFeedback(id, kind, p); };
   const facingOf = (a, b) => ((Math.atan2(b.x - a.x, -(b.y - a.y)) * 180 / Math.PI) + 360) % 360;
+  // 地形破坏：碎裂拍点请宿主换上新底图（宿主在演出前保留旧底图），再按材质播碎裂
+  function playBreaks(cells) {
+    const s = scope();
+    if (!cells || !cells.length || !s || !s.isLive) return;
+    deps.onObstacleBreak?.();
+    playObstacleBreak(makeFx('C'), cells, (key, vol, rate, ms) => s.after(ms, () => av.playSound(key, vol, rate, { track: 'skill', category: 'C' })));
+  }
 
   // ---------- 跳跃：下蹲蓄势 → 起跳拉伸 → 抛物线飞行（弧高随距离，地影缩小，镜头跟随）→ 落地压扁 + 尘环 ----------
   async function playJump(res) {
@@ -183,6 +191,7 @@ export function createActionDirector(deps) {
     if (ok) {
       feedback(id, 'jump-land', b);
       playJumpDust(makeFx('C'), { x: b.x, y: b.y + 0.28 * dustK }, { phase: 'land', heavy: heavyDust, scale: dustK });
+      playBreaks(res.breaks);
       ok = await tween(230, t => view.setHop(id, 0, t < 0.3 ? 1 - 0.28 * (t / 0.3) : 0.72 + 0.28 * ((t - 0.3) / 0.7)));
     }
     view.setHop(id, 0, 1);
@@ -197,6 +206,7 @@ export function createActionDirector(deps) {
       if (!actionScope.isLive || actionScope !== scope()) return false;
       view.lockMotion(move.unitId, false);
       view.updateUnit(move.unitId, { placement: vd.placementsById[move.unitId] });
+      if (ok) playBreaks(move.collision?.broken);
       if (ok && move.collision) onReveal?.({ ...move.collision, targetId: move.unitId, hit: true, down: move.collision.hpAfter <= 0 });
     }
     return ok;
@@ -227,7 +237,7 @@ export function createActionDirector(deps) {
         at(0.34 * (1 - Math.min(1, t * 2.2)));
         sandbox.followWorld(p.x, p.y);
       });
-      if (res.collision) feedback(tid, 'impact', unitCenter(res.to, tfp));
+      if (res.collision) { feedback(tid, 'impact', unitCenter(res.to, tfp)); playBreaks(res.collision.broken); }
     } else if (ok) {
       view.setFlag(tid, 't-unit-resist', true);
       ok = await tween(300, t => at(0.34 * (1 - t)));
@@ -436,6 +446,11 @@ export function createActionDirector(deps) {
     if (cine) { const burst = atmos.burst; atmos.burst = () => { burst(); cine.burst(); }; }
 
     const revealed = new Map();      // targetId → 已揭示段序号集合
+    // 攻击段拆墙：首个真实揭示拍点碎裂（无人受击时在条目结束后补播）；背袭标记每个目标一次
+    const attackBreaks = (result.events || []).filter(ev => ev.type === 'obstacle-destroyed' && ev.cause === 'attack');
+    let breaksShown = !attackBreaks.length;
+    const showAttackBreaks = () => { if (breaksShown) return; breaksShown = true; attackBreaks.forEach(ev => playBreaks(ev.cells)); };
+    const backstabShown = new Set();
     const reactionRuns = [];
     const shiftRuns = new Map();
     function queueReaction(targetId, reaction) {
@@ -539,6 +554,7 @@ export function createActionDirector(deps) {
       if (done.has(i)) return;
       done.add(i); revealed.set(targetId, done);
       if (atmos) atmos.lower();
+      showAttackBreaks();
       if (cine && !seg.heal) cine.firstHit(targetId);
       if (guard) revealRule(guard, 'guard');
       const segmentReactions = [];
@@ -569,6 +585,11 @@ export function createActionDirector(deps) {
         wave: hitWaves[waveIndex] || (hitWaves[waveIndex] = { shook: false, hitStopped: false, classified: [] }),
         suppressDodgeFx: !!reaction?.shift || !!guardianReaction?.shift,
       });
+      if (seg.backstab && !healed && !backstabShown.has(targetId)) {
+        backstabShown.add(targetId);
+        const c = centerOf(targetId), fp = vd.footprintsById[targetId] || { width: 1, height: 1 };
+        if (c) playBackstabMark(makeFx('E'), worldPx(c), vd.placementsById[targetId]?.facing || 0, { size: Math.max(fp.width, fp.height) > 1 ? 1.5 : 1, hit: !!seg.hit });
+      }
       if (!healed && !seg.barrierHitId && fatalReason === 'grit') {
         const ent = avHost.entity(targetId);
         const rescue = ent && av.playRescueGrit ? av.playRescueGrit(ent) : null;
@@ -634,6 +655,7 @@ export function createActionDirector(deps) {
               const fp = vd.footprintsById[ev.unitId], start = unitCenter(ev.from, fp);
               sandbox.getUnitView().setDisplayPos(ev.unitId, start.x, start.y);
               return playDisplacement(ev, fp).then(ok => {
+                if (ok && isCurrent()) playBreaks(ev.collision?.broken);
                 if (ok && isCurrent() && ev.collision) revealChargeCollision(ev);
                 return ok;
               });
@@ -674,6 +696,7 @@ export function createActionDirector(deps) {
     if (atmos) atmos.end();
     if (cine && isCurrent() && ok !== false) await cine.end();
     if (!isCurrent() || ok === false) return false;
+    showAttackBreaks();
     if (!(await playCharge()) || !isCurrent()) return false;
     await Promise.all(reactionRuns);
     hits.forEach(h => reveal(h.targetId, { late: true }));
@@ -702,6 +725,7 @@ export function createActionDirector(deps) {
       for (const ev of moves) {
         if (!(await playDisplacement(ev, vd.footprintsById[ev.unitId]))) break;
         if (ev.collided) makeFx('B').shake('light');
+        playBreaks(ev.collision?.broken);
       }
     }));
     // 召唤入场：消费规则真实生成的 summons（单位 ID 与落点），原版 playSummonEnter 在实际落点逐个显形
@@ -1115,6 +1139,7 @@ export function createActionDirector(deps) {
     const rctx = {
       hitTargetId: h.targetId, reaction, shift: reaction.shift, footprint: getViewData().footprintsById[h.targetId],
       view: sandbox.getUnitView(), sandbox, av, fx: makeFx('B'), wait, tween, centerOf,
+      ent: id => avHost.entity(id),
       responderId: reaction.responderId || h.targetId, attackerId: h.attackerId || null,
       cameraScale: () => sandbox.getPose().scale,
       placement: () => getViewData().placementsById[h.targetId],

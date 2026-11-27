@@ -65,6 +65,7 @@ export function phase3Groups({ createBattle, parseSkill }) {
         { boss: p(1), h: p(4, 3), a: p(3, 6), heavy: p(7, 5) }, { objects });
         const first = b.jump(3, 4);
         assert.ok(first.ok);
+        assert.ok(first.breaks.length > 0 && first.breaks.every(c => c.kind && Number.isInteger(c.col) && Number.isInteger(c.row)));
         assert.ok(first.displacements.find(d => d.unitId === 'h').collision);
         assert.ok(first.displacements.some(d => d.unitId === 'a' && d.distance > 0));
         assert.ok(!b.ctx.compiled.objectsIndex.has('first'));
@@ -75,6 +76,7 @@ export function phase3Groups({ createBattle, parseSkill }) {
         assert.equal(b.ctx.scene.objects.length, 1);
         const events = b.snapshot().events;
         assert.ok(events.findIndex(e => e.type === 'obstacle-destroyed') < events.findIndex(e => e.type === 'unit-displaced'));
+        assert.equal(events.find(e => e.type === 'obstacle-destroyed').cause, 'landing');
       });
       test('原始伤害固定倍率：100不拆、101拆，与掷骰无关；空地可拆', () => {
         for (const [make, power, destroyed, random] of [[p => line([p]), 100, false, () => 0.99],
@@ -103,6 +105,8 @@ export function phase3Groups({ createBattle, parseSkill }) {
         const cells = b.ctx.compiled.objectsIndex.get('row').cells;
         assert.equal(cells.length, 1);
         assert.equal(cells[0].col, 7);
+        const ev = b.snapshot().events.find(e => e.type === 'obstacle-destroyed');
+        assert.deepEqual([ev.cause, ev.cells.map(c => c.col)], ['attack', [5]]);
       });
       test('同段击破结界不溢入拆墙，下一段才可拆结界内低墙', () => {
         const b = setup([unit('h', 'hero', { spd: 110 }), unit('e', 'enemy')], { h: p(2), e: p(7) },

@@ -199,6 +199,43 @@ export const SHOWPIECES = {
     linger(T) { T.fade('sm', 1, 0, 700); T.fade('sc', 1, 0, 500); T.fade('stz', .3, 0, 500); },
   },
 
+  // 幻梦行军兽·冲撞：下屏缘地裂向上蔓延、上下屏缘尘浪翻涌 → 一道紫金巨角冲击弧自左向右横扫全屏 + 闪屏 → 尘浪外吹、裂纹淡出
+  'marcher-charge': {
+    build(u, r) {
+      const fissures = Array.from({ length: 12 }, (_, i) => { const x0 = (i + .5) / 12 * W + (r() - .5) * 60, y0 = i % 3 ? H + 10 : -10, x1 = x0 + (r() - .5) * 220, y1 = i % 3 ? H - 140 - r() * 120 : 120 + r() * 90; return draw(jag(r, x0, y0, x1, y1, 8, 70), i % 2 ? '#ddd6fe' : '#f59e0b', 3.5, 'fs', 'filter="url(#g' + u + ')"'); }).join('');
+      const dust = [60, H - 40].map((y, i) => Array.from({ length: 9 }, (_, k) => '<ellipse data-k="db" data-s="' + (i ? 1 : -1) + '" cx="' + f1((k + .5) / 9 * W + (r() - .5) * 80) + '" cy="' + f1(y + (r() - .5) * 40) + '" rx="' + f1(120 + r() * 90) + '" ry="' + f1(48 + r() * 30) + '" fill="url(#dd' + u + ')" filter="url(#s' + u + ')" opacity="0"/>').join('')).join('');
+      const horn = '<g data-k="hw" opacity="0"><path d="M-260,' + (CY + 260) + ' Q' + CX + ',' + (CY - 380) + ' ' + (W + 260) + ',' + (CY + 60) + ' Q' + CX + ',' + (CY - 200) + ' -260,' + (CY + 260) + ' Z" fill="url(#hn' + u + ')" filter="url(#g' + u + ')"/>' +
+        '<path d="M-260,' + (CY + 260) + ' Q' + CX + ',' + (CY - 380) + ' ' + (W + 260) + ',' + (CY + 60) + '" fill="none" stroke="#fef3c7" stroke-width="5" opacity=".9"/></g>';
+      return defs(u, rad('mv' + u, st(.5, '#1e0b3a', 0) + st(.85, '#4c1d95', .3) + st(1, '#0f0618', .7)) + rad('dd' + u, st(0, '#e7dcc8', .85) + st(1, '#a8957a', 0)) +
+        lin('hn' + u, st(0, '#8b5cf6', 0) + st(.45, '#a78bfa', .55) + st(.8, '#f59e0b', .7) + st(1, '#fef3c7', .9), 0, 0, 1, 0) + rad('mf' + u, st(0, '#fef3c7', .45) + st(.5, '#8b5cf6', .2) + st(1, '#0f0618', 0))) +
+        '<rect data-k="vig" width="' + W + '" height="' + H + '" fill="url(#mv' + u + ')" opacity="0"/>' + dust + fissures + horn + '<rect data-k="fl" width="' + W + '" height="' + H + '" fill="url(#mf' + u + ')" opacity="0"/>';
+    },
+    gather(T, ms) { T.fade('vig', 0, 1, ms); T.drawIn('fs', ms * .9, 30); T.all('db', (el, i) => T.a(el, [{ transform: 'translateY(' + (+el.dataset.s * 40) + 'px)', opacity: 0 }, { transform: 'translateY(0)', opacity: .75 }], ms, { delay: (i % 9) * 30 })); },
+    burst(T) {
+      T.all('hw', el => T.a(el, [{ transform: 'translateX(-' + W + 'px)', opacity: 0 }, { transform: 'translateX(-200px)', opacity: 1, offset: .35 }, { transform: 'translateX(' + W + 'px)', opacity: 0 }], 440, { easing: 'cubic-bezier(.5,0,.6,1)' }));
+      T.all('fl', el => T.a(el, [{ opacity: 0 }, { opacity: 1, offset: .2 }, { opacity: 0 }], 380));
+      T.all('db', (el, i) => T.a(el, [{ transform: 'translate(0,0) scale(1)', opacity: .75 }, { transform: 'translate(' + (160 + (i % 4) * 50) + 'px,' + (+el.dataset.s * 30) + 'px) scale(1.4)', opacity: .5 }], 520));
+    },
+    linger(T) { T.fade('fs', 1, 0, 800); T.fade('vig', 1, 0, 800); T.fade('db', .5, 0, 900); },
+  },
+
+  // 幻梦行军兽·咆哮：四缘声浪弧向内压迫、屏缘地裂描出 → 中心三重声爆环外扩 + 声浪弧被震出屏外 → 裂纹与暗角淡出
+  'marcher-roar': {
+    build(u, r) {
+      const arcs = [[CX, -60], [CX, H + 60], [-60, CY], [W + 60, CY]].map(([x, y], i) => [0, 1, 2].map(k => '<circle data-k="sa" data-i="' + i + '" cx="' + x + '" cy="' + y + '" r="' + (170 + k * 70) + '" fill="none" stroke="' + (k % 2 ? '#f59e0b' : '#ddd6fe') + '" stroke-width="' + (9 - k * 2) + '" filter="url(#g' + u + ')" opacity="0" style="' + org(x, y) + '"/>').join('')).join('');
+      const cracks = Array.from({ length: 16 }, (_, i) => { const p = edgePt(i / 16 + r() * 0.02), q = toward(p, .14 + r() * .1); return draw(jag(r, p.x, p.y, q.x, q.y, 7, 46), i % 2 ? '#a78bfa' : '#fcd34d', 3, 'ck', 'filter="url(#g' + u + ')"'); }).join('');
+      const rings = ['#ddd6fe', '#f59e0b', '#ffffff'].map((c, i) => '<circle data-k="cr" cx="' + CX + '" cy="' + CY + '" r="' + (100 + i * 14) + '" fill="none" stroke="' + c + '" stroke-width="' + (i === 2 ? 8 : 14) + '" filter="url(#g' + u + ')" opacity="0" style="' + org(CX, CY) + '"/>').join('');
+      return defs(u, rad('rv' + u, st(.5, '#1e0b3a', 0) + st(.82, '#4c1d95', .32) + st(1, '#0f0618', .72))) +
+        '<rect data-k="vig" width="' + W + '" height="' + H + '" fill="url(#rv' + u + ')" opacity="0"/>' + arcs + cracks + rings;
+    },
+    gather(T, ms) { T.fade('vig', 0, 1, ms); T.drawIn('ck', ms * .8, 30); T.all('sa', (el, i) => T.a(el, [{ transform: 'scale(1.35)', opacity: 0 }, { transform: 'scale(1)', opacity: .85 }], ms, { delay: (i % 3) * 60, easing: 'cubic-bezier(.4,0,.6,1)' })); },
+    burst(T) {
+      T.all('cr', (el, i) => T.a(el, [{ transform: 'scale(.2)', opacity: 1 }, { transform: 'scale(8)', opacity: 0 }], 520, { delay: i * 60, easing: 'cubic-bezier(.1,.8,.3,1)' }));
+      T.all('sa', el => T.a(el, [{ transform: 'scale(1)', opacity: .85 }, { transform: 'scale(1.9)', opacity: 0 }], 480, { easing: 'cubic-bezier(.2,.7,.3,1)' }));
+    },
+    linger(T) { T.fade('ck', 1, 0, 800); T.fade('vig', 1, 0, 900); },
+  },
+
   // 纳克提特障壁术：蜂巢晶格自四缘扫入、八芒几何阵描边 → 锁定闪耀 → 晶格由内向外淡出
   'nak-tith-barrier': {
     build(u) {

@@ -154,6 +154,10 @@ button:disabled { opacity: .42; cursor: default; }
   margin-left: calc((var(--d) + 22px) / -2); margin-top: calc((var(--d) + 22px) / -2); transform-origin: 50% 50%; pointer-events: none; overflow: visible; transition: transform .12s linear; }
 .t-unit-direction path { fill: var(--gold-2); stroke: #4a3410; stroke-width: 1.2; }
 .t-side-enemy .t-unit-direction path { fill: #ff8a94; stroke: #3d0a10; }
+.t-unit-direction .t-unit-rear, .t-side-enemy .t-unit-direction .t-unit-rear { display: none; fill: rgba(239,68,68,.5); stroke: #fecaca; stroke-width: 1; }
+.t-unit-backstab .t-unit-direction .t-unit-rear { display: block; animation: t-rear-pulse .8s ease-in-out infinite alternate; }
+.t-unit-backstab .t-unit-predict-tag { color: #fca5a5; }
+@keyframes t-rear-pulse { from { opacity: .55; } to { opacity: 1; filter: drop-shadow(0 0 4px #ef4444); } }
 .t-unit-name { position: absolute; left: 50%; bottom: calc(var(--d) / 2 + 4px); transform: translateX(-50%); font-size: 11px; font-weight: 800; white-space: nowrap; letter-spacing: .5px;
   color: var(--gold-2); text-shadow: 0 1px 2px #000, 0 0 6px rgba(0,0,0,0.9); pointer-events: none; }
 .t-side-enemy .t-unit-name { color: #ff9aa3; }
@@ -459,6 +463,24 @@ button:disabled { opacity: .42; cursor: default; }
 .t-bact-off .t-bact-body i { color: #fca5a5; }
 .t-charge-aside { align-self: center; margin-top: 1px; font-size: 9.5px; color: #94a3b8; text-decoration: underline dotted; }
 .t-charge-aside:hover { color: #67e8f9; }
+/* 蓄力面板：进度格（已备 / 本次将投入 / 未备）+ 每个按钮写明实际消耗与「准备 N→M」；驻足按钮琥珀色，不可用时灰显原因 */
+.t-prep-head { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 8px; margin-bottom: 2px; border-radius: 8px; border: 1px solid rgba(6,182,212,.5); background: rgba(8,51,68,.8); color: #a5f3fc; font-size: 10.5px; font-weight: 800; }
+.t-prep-head small { font-size: 9.5px; color: #94a3b8; font-weight: 600; } .t-prep-head small b { color: #fde68a; }
+.t-prep-pips { display: inline-flex; gap: 3px; }
+.t-prep-pips i { width: 9px; height: 9px; transform: rotate(45deg); border: 1px solid rgba(103,232,249,.55); background: rgba(15,23,42,.8); }
+.t-prep-pips i.on { background: linear-gradient(135deg,#67e8f9,#0891b2); border-color: #cffafe; box-shadow: 0 0 5px rgba(34,211,238,.8); }
+.t-prep-pips i.next { background: rgba(253,230,138,.35); border-color: #fde68a; animation: t-pip-next .7s ease-in-out infinite alternate; }
+@keyframes t-pip-next { to { background: rgba(253,230,138,.85); box-shadow: 0 0 6px rgba(251,191,36,.8); } }
+.t-prep-btn, .t-stationary-start { width: 100%; display: flex; align-items: center; gap: 7px; padding: 5px 9px; border-radius: 9px; border: 1px solid; text-align: left; transition: filter .12s, transform .12s; }
+.t-prep-btn:hover:not([aria-disabled="true"]), .t-stationary-start:hover:not([aria-disabled="true"]) { filter: brightness(1.18); transform: translateY(-1px); }
+.t-prep-ico { font-size: 15px; line-height: 1; }
+.t-prep-body { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.t-prep-body b { font-size: 12px; color: #fff; } .t-prep-body small { font-size: 9.5px; color: #cbd5e1; font-weight: 600; }
+.t-prep-body .t-prep-delta { font-size: 10px; color: #fde68a; }
+.t-prep-go { background: linear-gradient(90deg,rgba(14,116,144,.95),rgba(29,78,216,.9)); border-color: #22d3ee; }
+.t-prep-still, .t-stationary-start { background: linear-gradient(90deg,rgba(120,53,15,.92),rgba(68,64,60,.9)); border-color: #f59e0b; }
+.t-stationary-start { margin-top: 3px; }
+.t-prep-btn[aria-disabled="true"], .t-stationary-start.t-off { opacity: .55; filter: grayscale(.6); cursor: not-allowed; }
 
 /* ---- 技能卡：不可用原因常驻卡底一行 ---- */
 .t-skill-reason { display: flex; align-items: baseline; gap: 6px; min-width: 0; padding: 1px 5px; border-radius: 4px; font-size: 9px; line-height: 1.3; color: #fecaca;

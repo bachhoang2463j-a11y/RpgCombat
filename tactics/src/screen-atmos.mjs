@@ -25,7 +25,7 @@ export const ATMOS_STYLES = {
 export const ENTRY_ATMOS = {
   'fire-blast': 'fire', 'sekhmet-wrath': 'fire', 'fire-domain': 'fire', 'poison-domain': 'poison', 'frost-blast': 'frost', 'thunder-storm': 'thunder', 'storm-gather': 'thunder',
   'holy-judgment': 'holy', 'sanctum-veil': 'holy', 'isis-embrace': 'holy', 'holy-vow': 'holy',
-  'xenon-blight-fog': 'poison', 'abyss-fog': 'void', 'void-quake': 'void', 'line-rift': 'void', 'shatter-echo': 'void',
+  'xenon-blight-fog': 'poison', 'abyss-fog': 'void', 'void-quake': 'void', 'line-rift': 'void', 'shatter-echo': 'void', 'marcher-charge': 'void', 'marcher-roar': 'void',
   'krupp-snipe': 'gun', 'strafe-burst': 'gun', 'krupp-aim': 'gun',
   'harmony-ward': 'arcane', 'silence-field': 'arcane', 'high-summon': 'arcane', 'scorpion-key': 'arcane', 'nak-tith-barrier': 'arcane',
   'strange-conch': 'water', 'water-bolt': 'water', 'vital-flow': 'life',

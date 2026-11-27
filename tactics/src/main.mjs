@@ -266,6 +266,7 @@ export function createApp(rootEl, opts = {}) {
     onMoveFeedback: (id, kind, p) => moveFeedback(id, kind, p),
     onRuleReveal: (value, { kind }) => { if (kind === 'reaction-damage') revealCounter(value); },
     onSelfDestruct: () => { syncShown(); refreshBattle(); },
+    onObstacleBreak: () => releaseScene(),
     onPassiveGain: (ev) => { if (unitById(ev.unitId)?.side === 'hero') shell.flashHeroPassive(ev.unitId, passiveGainLabel(ev), PASSIVE_CARD_COLOR[ev.kind]); },
     promptRetarget: (req) => {
       const caster = unitById(req.casterId);
@@ -625,6 +626,7 @@ export function createApp(rootEl, opts = {}) {
         : '【' + esc(aim.skill.name) + '】请在地图上选择目标',
       canUse: skillUsable,
       canStationary: hero && !busy && battle.canStationaryPrepare(),
+      stationary: hero && !busy ? battle.stationaryStatus() : null,
       canContinue: hero && !busy && !!snap.preparation && battle.canAdvancePreparation().ok,
       onStationary: (idx) => handleCommand('sk:' + idx, true),
       skillReason,
@@ -705,14 +707,16 @@ export function createApp(rootEl, opts = {}) {
       });
     }
   }
-  function refreshBattle({ deferPassive = false } = {}) {
-    const snap = battle.snapshot();
-    syncDynamicUnits(snap);
-    for (const u of currentViewData.units) {
-      const s = shownOf(u);
-      u.effective = battle.getEffectiveUnit(u.id);
-      u.bars = { ...u.bars, hp: s.hp, mp: s.mp, tp: s.tp, shield: s.shield };
-    }
+  // 地形破坏：本次动作改动了底图时先保留旧底图，导演在碎裂拍点（或动作收尾）才换上新底图
+  let sceneHeld = false;
+  function holdScene() { sceneHeld = currentViewData.scene !== battle.ctx.scene; }
+  function releaseScene() {
+    if (!sceneHeld) return;
+    sceneHeld = false;
+    syncScene();
+    sandbox.update(currentViewData);
+  }
+  function syncScene() {
     if (currentViewData.scene !== battle.ctx.scene) {
       const nextScene = battle.ctx.scene;
       const remaining = new Map(nextScene.objects.map(obj => [obj.id, obj]));
@@ -724,6 +728,16 @@ export function createApp(rootEl, opts = {}) {
       }
       currentViewData = { ...currentViewData, scene: nextScene };
     }
+  }
+  function refreshBattle({ deferPassive = false } = {}) {
+    const snap = battle.snapshot();
+    syncDynamicUnits(snap);
+    for (const u of currentViewData.units) {
+      const s = shownOf(u);
+      u.effective = battle.getEffectiveUnit(u.id);
+      u.bars = { ...u.bars, hp: s.hp, mp: s.mp, tp: s.tp, shield: s.shield };
+    }
+    if (!sceneHeld) syncScene();
     sandbox.update(currentViewData);
     const view = sandbox.getUnitView();
     const targets = new Set(Object.values(snap.focusOrders).map(order => order.targetId));
@@ -846,8 +860,9 @@ export function createApp(rootEl, opts = {}) {
       if (!u || !mine.length) return null;
       const dmg = mine.reduce((n, r) => n + r.estimatedHpDmg, 0), hp = shownOf(u).hp, max = u.ref.maxHp || 1;
       const p = skill.guaranteedHit ? 1 : hitChance(mine[0].attackCap, mine[0].dodgeCap), kill = dmg >= hp && hp > 0;
-      if (view) view.setPredict(id, { from: hp / max, to: Math.max(0, hp - dmg) / max, kill, tag: (kill ? '☠ ' : '') + Math.round(p * 100) + '%' + (mine.length > 1 ? ' ×' + mine.length : '') });
-      return { id, dmg, p, kill, backstab: mine.some(r => r.backstab), lowCover: mine.some(r => r.lowCover) };
+      const backstab = mine.some(r => r.backstab);
+      if (view) view.setPredict(id, { from: hp / max, to: Math.max(0, hp - dmg) / max, kill, backstab, tag: (kill ? '☠ ' : '') + (backstab ? '🗡背袭 ' : '') + Math.round(p * 100) + '%' + (mine.length > 1 ? ' ×' + mine.length : '') });
+      return { id, dmg, p, kill, backstab, lowCover: mine.some(r => r.lowCover) };
     }).filter(Boolean);
   }
   function hitKey(skill, hit) { return (skill.range.type === '单体' || skill.range.type === '自身') ? (hit.targetId ? 'u:' + hit.targetId : null) : hit.col + ',' + hit.row; }
@@ -1165,6 +1180,7 @@ export function createApp(rootEl, opts = {}) {
     sandbox.beginAction();
     ui('confirm');
     if (kind === 'jump') stageJumpTargets(result);
+    holdScene();
     refreshBattle();
     if (kind === 'jump') await director.playJump(result);
     else if (kind === 'push') {
@@ -1180,6 +1196,7 @@ export function createApp(rootEl, opts = {}) {
       shell.showLog(unitName(me) + ' 背起 ' + unitName(result.targetId), 'act');
     }
     if (myFlow !== flow) return;
+    releaseScene();
     afterHeroAction();
   }
   // 整备：规则先祛除负面，演出在该单位处播放（期间锁定输入），结束后交还
@@ -1461,9 +1478,11 @@ export function createApp(rootEl, opts = {}) {
           : await director.driveAttack(battle.beginMove(plan.moveTo.col, plan.moveTo.row, plan.avoidFog, { presentOpportunity: true }));
         if (!result?.ok) { sandbox.getUnitView().lockMotion(actorId, false); break; }
         if (plan.jumpTo) stageJumpTargets(result);
+        holdScene();
         refreshBattle();
         if (plan.jumpTo) await director.playJump(result);
         else if (result.displayMove) await director.playMove(result.displayMove);
+        releaseScene();
         sandbox.getUnitView().lockMotion(actorId, false);
         sandbox.getUnitView().updateUnit(actorId, { placement: currentViewData.placementsById[actorId] });
         if (!alive()) return;
@@ -1549,10 +1568,12 @@ export function createApp(rootEl, opts = {}) {
       if (ev.type === 'unit-charged' || ev.type === 'unit-displaced') holdMotion(ev.unitId, ev.from);
     }
     if (res.teleport) holdMotion(res.casterId, res.teleport.from);
+    holdScene();
     refreshBattle();
     try {
       await director.playAttack(res);
     } finally {
+      releaseScene();
       if (myFlow === flow) for (const id of motionIds) {
         view.lockMotion(id, false);
         view.updateUnit(id, { placement: currentViewData.placementsById[id] });
