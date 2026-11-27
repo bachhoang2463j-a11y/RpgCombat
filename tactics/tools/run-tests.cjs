@@ -159,6 +159,10 @@ const STAGES = {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'status-variant-node-cases.mjs'),
     groups: ['TSV-01', 'TSV-02'], modules: [], requiredExports: [],
   },
+  'bgm-director': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'bgm-director-node-cases.mjs'),
+    groups: ['BGM'], modules: [], requiredExports: [],
+  },
   'hit-feedback': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'hit-feedback-node-cases.mjs'),
     groups: ['THIT-01', 'THIT-02', 'THIT-03', 'THIT-04'], modules: [], requiredExports: [],

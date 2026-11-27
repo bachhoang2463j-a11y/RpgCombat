@@ -34,6 +34,7 @@ import { resolveLore } from './lore.mjs';
 import { getEffectiveStats } from './class-passives.mjs';
 import { hitChance } from './damage.mjs';
 import { skillSlots } from './effect-definitions.mjs';
+import { createBgmDirector, mountBgmWidget, evaluateBattleMood, EXPEDITION33_TRACK_DB } from './bgm-director.mjs';
 // 同名 YAML 技能仍保留规则字段，本场编辑仅覆写显式演出标签。
 export function applyEditorFxTags(rows, editedRows) {
   const byName = new Map((editedRows || []).map(row => [row.name, row]));
@@ -255,6 +256,35 @@ export function createApp(rootEl, opts = {}) {
   const avHost = createAvHost({ getUnitView: () => sandbox.getUnitView(), getUnits: () => (currentViewData ? currentViewData.units : []),
     getEffectiveUnit: id => battle?.getEffectiveUnit(id), onStatusTick: (ev, index) => playDotTick(ev, index) });
   const ui = createUiSfx(avHost.av.CombatAudioMixer);
+  let combatStarted = false;
+  let enragedBossIds = new Set();
+  let bgmEventSeq = 0;
+  const bgm = createBgmDirector();
+  const bgmTracker = () => ({
+    combatStarted,
+    enragedBossIds: [...enragedBossIds],
+    hasRescuingHero: currentViewData ? currentViewData.units.some(u => u.side === 'hero' && !u.isSummon && u.ref.hp <= 0) : false,
+  });
+  const bgmWidget = mountBgmWidget(rootEl, bgm, () => ({ snapshot: battle?.snapshot(), tracker: bgmTracker() }));
+  const unlockBgm = (ev) => {
+    if (ev?.target?.closest?.('#tactics-bgm-widget [data-act="mute"]')) return;
+    bgm.unlock();
+  };
+  rootEl.ownerDocument?.addEventListener('pointerdown', unlockBgm, { capture: true });
+  rootEl.ownerDocument?.addEventListener('keydown', unlockBgm, { capture: true });
+  function syncBgmFromBattle(snap, extraEvents = [], { force = false } = {}) {
+    if (!snap) return;
+    for (const ev of [...(snap.events || []), ...extraEvents]) {
+      if (ev && Number.isFinite(ev.seq) && ev.seq <= bgmEventSeq) continue;
+      if (ev && Number.isFinite(ev.seq)) bgmEventSeq = ev.seq;
+      if (ev?.type === 'variant-trigger' && (ev.trigger === 'rage' || ev.trigger === 'molt')) {
+        const u = unitById(ev.unitId);
+        if (u?.level === '首领') enragedBossIds.add(ev.unitId);
+      }
+      if (ev?.type === 'damage' || ev?.type === 'unit-down' || ev?.type === 'self-destruct') combatStarted = true;
+    }
+    bgm.syncBattle(snap, bgmTracker(), { force });
+  }
   const sandbox = createSandbox(shell.els.mapSlot, {
     getSafeRect: () => shell.getSafeRect(),
     onStage: (els) => avHost.attachStage(els),
@@ -275,6 +305,7 @@ export function createApp(rootEl, opts = {}) {
     },
     promptTeleport: (req) => beginTeleportPrompt(req),
     onMovementRequest: (req) => presentMovementRequest(req),
+    onBgmDuck: (ratio, ms) => bgm.duck(ratio, ms),
     getUnitStyle: (id) => effectiveUnitStyle(id),
     // FX02 反应接线（contract v2/v3）：玩家控制的单位（controller 优先，缺省按 side）受击弹全屏反应弹窗；
     // AI 控制的（敌方/召唤物/AI 侧 hero）不弹窗，自动选首个可用候选（原版敌方口径）
@@ -469,9 +500,11 @@ export function createApp(rootEl, opts = {}) {
     if (opts.playable) {
       aim = null; pending = null; fieldAction = null; busy = false; endArmedUntil = 0; shown.clear(); hiddenLog.clear();
       shell.setBusy(false);
-      if (!unchanged || forceReset || !battle) {
+      const isFreshBattle = !unchanged || forceReset || !battle;
+      if (isFreshBattle) {
         lastAttackByUnit.clear();
         shell.clearBattle();
+        combatStarted = false; enragedBossIds = new Set(); bgmEventSeq = 0;
         currentState = result.state;
         lastResult = null;
         battle = createBattle({ units: currentViewData.units, placementsById: currentViewData.placementsById, scene, battleState: result.battleState,
@@ -480,7 +513,8 @@ export function createApp(rootEl, opts = {}) {
         unitStyles = resolveUnitStyles(currentViewData.units);
       }
       syncShown();
-      refreshBattle({ deferPassive: true });
+      refreshBattle({ deferPassive: true, deferBgm: isFreshBattle });
+      if (isFreshBattle) syncBgmFromBattle(battle.snapshot(), [], { force: true });
       beginTurn({ intro: !booted || forceReset });
       booted = true;
       return { block, roster, result, branch, viewData: currentViewData };
@@ -741,7 +775,7 @@ export function createApp(rootEl, opts = {}) {
       currentViewData = { ...currentViewData, scene: nextScene };
     }
   }
-  function refreshBattle({ deferPassive = false } = {}) {
+  function refreshBattle({ deferPassive = false, deferBgm = false } = {}) {
     const snap = battle.snapshot();
     syncDynamicUnits(snap);
     for (const u of currentViewData.units) {
@@ -769,9 +803,11 @@ export function createApp(rootEl, opts = {}) {
     for (const ev of snap.events) if (ev.type === 'main-point-received') {
       const playback = avHost.playMainPointReceived(ev, snap.actionSerial);
       if (playback && ev.natural) naturalTurnAudio.add(ev.unitId);
+      if (playback === 'hero') bgm.duck(0.42, 1800);
       if (playback === 'enemy') ui('enemyTurn');
     }
     syncTacticalWarnings(snap);
+    if (!deferBgm) syncBgmFromBattle(snap);
     avHost.consumeVisualEvents(snap.events.filter(ev => !ev.attackId));
     avHost.syncVisualState();
     director.syncRegions(snap.regions || []);
@@ -1197,7 +1233,7 @@ export function createApp(rootEl, opts = {}) {
     ui('confirm');
     if (kind === 'jump') stageJumpTargets(result);
     holdScene();
-    refreshBattle();
+    refreshBattle({ deferBgm: true });
     if (kind === 'jump') await director.playJump(result);
     else if (kind === 'push') {
       await director.playShove(me, result);
@@ -1460,7 +1496,7 @@ export function createApp(rootEl, opts = {}) {
     // 时钟到账等镜头就位，地图短动效和底栏反馈同时起播。
     playTurnGains();
     if (isPlayerUnit(u)) {
-      if (!hasNaturalTurnAudio) avHost.playTurnVoice(u, snap.actionSerial);
+      if (!hasNaturalTurnAudio && avHost.playTurnVoice(u, snap.actionSerial)) bgm.duck(0.42, 1800);
       fullReach = findReachable(battle.ctx, u.id, Infinity);
       setBusy(false);
       renderCommand();
@@ -1588,7 +1624,7 @@ export function createApp(rootEl, opts = {}) {
     }
     if (res.teleport) holdMotion(res.casterId, res.teleport.from);
     holdScene();
-    refreshBattle();
+    refreshBattle({ deferBgm: true });
     try {
       await director.playAttack(res);
     } finally {
@@ -1601,6 +1637,7 @@ export function createApp(rootEl, opts = {}) {
     if (myFlow !== flow) return;
     await director.playExecution(res);   // 技能演出、反应与自爆全部完成后统一收尾一次；胜利弹窗在其后
     if (myFlow !== flow) return;
+    syncBgmFromBattle(battle.snapshot(), res.events || []);
     for (let i = res.logFrom; i < res.logTo; i++) hiddenLog.delete(i);
     if (!res.hits.length) shell.showLog(battle.snapshot().log[res.logTo - 1] || '', 'miss');
   }
@@ -1834,6 +1871,7 @@ export function createApp(rootEl, opts = {}) {
     sandbox.setPreview(null);
     if (lastResult === terminal.type) return;
     lastResult = terminal.type;
+    syncBgmFromBattle(battle.snapshot());
     const view = sandbox.getUnitView();
     for (const u of currentViewData.units) view.setFlag(u.id, 't-unit-current', false);
     renderCommand();
@@ -2037,6 +2075,10 @@ export function createApp(rootEl, opts = {}) {
     flow++;
     activeGlides.forEach((_h, uid) => stopActiveGlide(uid));
     shell.els.editorModal?.removeEventListener('change', onAudioPrefChange);
+    rootEl.ownerDocument?.removeEventListener('pointerdown', unlockBgm, { capture: true });
+    rootEl.ownerDocument?.removeEventListener('keydown', unlockBgm, { capture: true });
+    bgmWidget?.destroy();
+    bgm.destroy();
     cancelRetargetPrompt();
     director.cancelAttack();
     shell.cancelReactionPrompt();
@@ -2049,7 +2091,8 @@ export function createApp(rootEl, opts = {}) {
 
   return {
     loadYaml, boot, destroy, playProjectile, restart,
-    sandbox, shell, avHost, director,
+    sandbox, shell, avHost, director, bgm,
+    evaluateBattleMood, EXPEDITION33_TRACK_DB,
     getToken: () => combatToken,
     getViewData: () => currentViewData,
     getBattle: () => battle,

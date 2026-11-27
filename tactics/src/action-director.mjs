@@ -437,6 +437,7 @@ export function createActionDirector(deps) {
       after: (ms, fn) => scope().after(ms, fn), entryId: entry.id,
       focus: (() => { const p = hits[0] ? centerOf(hits[0].targetId) : result.aim; const vp = sandbox.getDom().viewport.getBoundingClientRect(), s = p && sandbox.worldToScreenClient(p.x, p.y); return s ? { x: s.x - vp.left, y: s.y - vp.top } : null; })(),
     }) : null;
+    if (atmos && deps.onBgmDuck) deps.onBgmDuck(0.28, (entry.timeline?.totalMs || 2000) + 600);
     // 高阶运镜：与氛围层同生命周期；条目 cine:false 自行编排。爆发拍时停、首次命中顿帧、收尾回位
     const cine = atmos && entry.cine !== false ? startCine({
       sandbox, fx: makeFx(audioContext.category), hold, after: (ms, fn) => scope().after(ms, fn), style: entry.cine, freeze: entry.cineHold, grade, result, hits, centerOf,
@@ -802,7 +803,10 @@ export function createActionDirector(deps) {
   function playChargeCutin(unitId, skill) {
     const ent = portraitOf(unitId);
     if (!ent || !skill) return Promise.resolve(true);
-    return serialMoment(() => untilScope(av.playEnemyUltimateCutin(ent, skill.name)));
+    return serialMoment(() => {
+      if (deps.onBgmDuck) deps.onBgmDuck(0.32, 2200);
+      return untilScope(av.playEnemyUltimateCutin(ent, skill.name));
+    });
   }
   // 整技能聚合真实死亡（原版 _pendingKills + caster 为英雄）：本技能命中前存活、此刻真实 HP≤0 的敌方单位；
   // 保命/复活拦截者 HP>0 自然不计；多段/群攻只收尾一次。类型按原版 skill.damageType || '近战'。

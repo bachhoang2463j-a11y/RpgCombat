@@ -911,9 +911,9 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
 @keyframes t-down-tag { 0% { opacity: 0; transform: translateY(8px) scale(.9); } 12% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px); } }
 
 /* ==== 远征33 · 角落旋转黑胶动态配乐微件 ==== */
-#tactics-bgm-widget { position: absolute; top: 48px; right: 10px; z-index: 112; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; --bgm-accent: #38bdf8; }
+#tactics-bgm-widget { position: absolute; top: 10px; left: 74px; z-index: 112; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; --bgm-accent: #38bdf8; }
 .bgm-pill { display: flex; align-items: center; gap: 7px; padding: 4px 8px 4px 5px; max-width: 268px;
-  background: rgba(11,10,8,.90); border: 1px solid var(--g-line); border-right: 2px solid var(--bgm-accent);
+  background: rgba(11,10,8,.90); border: 1px solid var(--g-line); border-left: 2px solid var(--bgm-accent);
   box-shadow: 0 8px 22px rgba(0,0,0,.65); backdrop-filter: blur(8px); transition: border-color .35s, box-shadow .35s; }
 #tactics-bgm-widget.is-ducked .bgm-pill { opacity: .82; transform: scale(.985); }
 .bgm-disc-btn { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; flex-shrink: 0; }
@@ -931,10 +931,13 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
 .bgm-title { display: block; font-size: 10.5px; color: var(--g-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bgm-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
 .bgm-btn { width: 22px; height: 22px; font-size: 11px; border-radius: 2px; color: var(--g-gold-2); background: rgba(255,255,255,.04); border: 1px solid rgba(201,164,92,.2); transition: background .15s; }
-.bgm-btn:hover { background: rgba(201,164,92,.2); }
-.bgm-drawer { width: 288px; max-height: 62vh; overflow-y: auto; padding: 9px 10px;
+.bgm-btn:hover, .bgm-btn:focus-visible { background: rgba(201,164,92,.22); outline: 1px solid var(--g-gold); }
+.bgm-drawer { width: 288px; max-height: min(430px, 60vh); overflow-y: auto; padding: 9px 10px; scrollbar-width: thin; scrollbar-color: rgba(201,164,92,.45) rgba(0,0,0,.3);
   background: linear-gradient(180deg, rgba(20,18,14,.97), rgba(10,9,7,.98)); border: 1px solid var(--g-line-2);
   box-shadow: 0 16px 36px rgba(0,0,0,.85); }
+.bgm-drawer::-webkit-scrollbar { width: 4px; }
+.bgm-drawer::-webkit-scrollbar-track { background: rgba(0,0,0,.35); }
+.bgm-drawer::-webkit-scrollbar-thumb { background: rgba(201,164,92,.4); border-radius: 2px; }
 .bgm-drawer[hidden] { display: none; }
 .bgm-drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid var(--g-line); }
 .bgm-drawer-brand { font-size: 11px; font-weight: 800; color: var(--g-gold-2); letter-spacing: .06em; }

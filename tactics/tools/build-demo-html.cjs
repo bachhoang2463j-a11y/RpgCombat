@@ -26,6 +26,7 @@ const REQUIRED_INPUTS = [
   'src/reaction-prompt.mjs', 'src/ui-shell.mjs', 'src/hero-flame-fx.mjs',
   'src/screen-atmos.mjs', 'src/screen-showpiece.mjs', 'src/guard-barrier-fx.mjs', 'src/status-ui.mjs', 'src/lore.mjs',
   'src/scenario-data.mjs', 'src/regions.mjs', 'src/perception.mjs', 'src/barriers.mjs', 'src/unit-view.mjs',
+  'src/bgm-director.mjs',
   '典型对局-战棋版.yaml',
 ];
 // 复用模块关键函数必须进入产物（防止 tree-shaking 或误删导致"复用"名不副实）
@@ -43,7 +44,8 @@ const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFee
   'barrierCrossing', 'barrierContact', 'holdGuards', 'revealGuard', 'immunityReason',
   'playGuardDash', 'playGuardBlock', 'mountBarrierDome', 'playBarrierHit', 'playBarrierBlocked', 'playBarrierShatter', 'playRuleFx',
   'chooseTauntTarget', 'planIdleMove', 'statusBadges', 'compactStatusHtml', 'effectFloat', 'inspectorHtml', 'hitChance', 'predictTargets', 'toggleCostFilter', 'setPredict', 'resolveLore', 'SAMPLE_LORE',
-  'playRescueGrit', 'playRescueAvoidFatal', 'playVariantResistFx', 'playCounterAttackL1', 'playPowerCounterEffect', 'spawnPowerBurst', 'spawnChargeUpParticles', 'queueCounters', 'revealCounter', 'playSelfDestructWindup', 'playSelfDestructBurst', 'setIdentitySfx', 'setVariantSfx', 'setStatusSfx', 'setSelfDestructSfx'];
+  'playRescueGrit', 'playRescueAvoidFatal', 'playVariantResistFx', 'playCounterAttackL1', 'playPowerCounterEffect', 'spawnPowerBurst', 'spawnChargeUpParticles', 'queueCounters', 'revealCounter', 'playSelfDestructWindup', 'playSelfDestructBurst', 'setIdentitySfx', 'setVariantSfx', 'setStatusSfx', 'setSelfDestructSfx',
+  'createBgmDirector', 'evaluateBattleMood', 'EXPEDITION33_TRACK_DB'];
 
 const entry = [
   "import { createApp } from './src/main.mjs';",
