@@ -23,7 +23,7 @@ const REQUIRED_INPUTS = [
   'src/vendor/rpg-ui/rpg-ui.mjs', 'src/unit-style.mjs', 'src/editor-panel.mjs',
   'src/fx-registry.mjs', 'src/fx-library.mjs', 'src/vfx-host.mjs',
   'src/effect-definitions.mjs', 'src/effect-handlers.mjs', 'src/class-passives.mjs', 'src/variant-rules.mjs',
-  'src/reaction-prompt.mjs', 'src/ui-shell.mjs',
+  'src/reaction-prompt.mjs', 'src/ui-shell.mjs', 'src/hero-emblem-fx.mjs',
   'src/screen-atmos.mjs', 'src/screen-showpiece.mjs', 'src/guard-barrier-fx.mjs', 'src/status-ui.mjs', 'src/lore.mjs',
   'src/scenario-data.mjs', 'src/regions.mjs', 'src/perception.mjs', 'src/barriers.mjs', 'src/unit-view.mjs',
   '典型对局-战棋版.yaml',
