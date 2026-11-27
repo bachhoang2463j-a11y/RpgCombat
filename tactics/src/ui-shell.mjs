@@ -11,7 +11,7 @@ import { createReactionPrompt } from './reaction-prompt.mjs';
 import { normalizeEffectTag } from './effect-definitions.mjs';
 import { skillActionKind, actionPayment } from './actions.mjs';
 import { CLASS_STYLE } from './unit-style.mjs';
-import { attachEmblemFx } from './hero-emblem-fx.mjs';
+import { createHeroFlameFx } from './hero-flame-fx.mjs';
 
 const ESC = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 // 禁用原因短标签（卡面一行可读；完整原因仍写入 title/aria 与点击后的战报）
@@ -80,6 +80,8 @@ export function buildShell(root) {
     settings: null, onUiSound: null, busy: false, currentId: null, cmd: null, menuKey: '',
     pipKey: '', pipMax: { main: 0, aux: 0 }, pipPrev: null, moveCap: 0, basicKey: '', chargeKey: '', chargeAside: false, moveCost: null };
   const uiSound = (kind) => { if (state.onUiSound) state.onUiSound(kind); };
+  // 头像火焰层：全宽透明画布，避让指令面板与资源条
+  const flames = createHeroFlameFx(root, () => els.heroes, () => [els.menuBox, els.strip].map(el => el.getBoundingClientRect()).filter(r => r.width));
   const pct = (v, max) => (max ? Math.max(0, Math.min(100, v / max * 100)) : 100).toFixed(1);
 
   // ---------- 原版界面宿主（伪 state + 规则/瞄准回调转交 main） ----------
@@ -148,7 +150,6 @@ export function buildShell(root) {
     const res = (cls, label) => '<span class="t-hero-res ' + cls + '"><span class="t-hero-res-h"><em>' + label + '</em><b></b></span><i class="t-bar"><i class="t-bar-fill"></i></i></span>';
     const key = (CLASS_STYLE[(u.classType || '').trim()] || { key: 'default' }).key;
     return '<button class="t-hero-card t-hc-' + key + '" data-unit-id="' + ESC(u.id) + '">' +
-      '<span class="t-hero-emblem" aria-hidden="true"><canvas data-emblem="' + key + '"></canvas></span><span class="t-hero-burst" aria-hidden="true"></span>' +
       faceHtml(u, 't-hero-avatar') +
       '<span class="t-hero-info"><span class="t-hero-row"><b title="' + ESC(u.name) + '">' + ESC(u.name) + '</b>' + (u.classType ? '<em class="t-hero-cls">' + ESC(u.classType) + '</em>' : '') + '</span>' +
         '<i class="t-bar t-bar-hp"><i class="t-bar-ghost"></i><i class="t-bar-fill"></i><i class="t-bar-shield"></i><span class="t-hero-hpnum"></span></i>' +
@@ -238,8 +239,6 @@ export function buildShell(root) {
       els.heroes.dataset.key = keyNow;
       els.heroes.querySelectorAll('.t-hero-card').forEach(card => {
         card.addEventListener('click', () => { uiSound('select'); if (state.onUnitClick) state.onUnitClick(card.getAttribute('data-unit-id')); });
-        const emb = card.querySelector('.t-hero-emblem canvas');
-        attachEmblemFx(emb, emb.dataset.emblem, card);
         const img = card.querySelector('img');
         if (img) img.addEventListener('error', () => card.querySelector('.t-hero-avatar').classList.add('t-avatar-missing'), { once: true });
       });
@@ -270,9 +269,9 @@ export function buildShell(root) {
     setRes('t-res-mp', bars.mp ?? ref.mp ?? 0, bars.maxMp || 0);
     const tp = bars.tp ?? ref.tp ?? 0, maxTp = ref.maxTp || 100;
     setRes('t-res-tp', tp, maxTp);
-    // TP 能量态：≥50 流光火星，满值常驻能量环；从未满跨入满值时爆发一次（白闪 + 扩散环 + 音）
+    // TP 能量态（驱动头像火焰档位）：50<TP<100 中等偏亮，满值大型火焰；从未满跨入满值时爆发一次（火星喷射 + 扩散方环 + 音）
     const full = tp >= maxTp;
-    card.classList.toggle('t-tp-half', tp >= 50 && !full);
+    card.classList.toggle('t-tp-half', tp > 50 && !full);
     card.classList.toggle('t-tp-full', full);
     if (full && card._tpFull === false && bars.hp > 0) {
       card.classList.remove('t-tp-burst'); void card.offsetWidth; card.classList.add('t-tp-burst');
@@ -282,7 +281,7 @@ export function buildShell(root) {
     card._tpFull = full;
     card.querySelector('.t-hero-hpnum').innerHTML = '<b>' + Math.max(0, Math.round(bars.hp)) + '</b><small>/' + bars.maxHp + '</small>' + (shield > 0 ? '<em class="t-hero-shnum">+' + Math.round(shield) + '</em>' : '');
     card.classList.toggle('t-shielded', shield > 0);
-    card.classList.toggle('t-low', bars.hp > 0 && bars.hp / bars.maxHp <= 0.3);
+    card.classList.toggle('t-low', bars.hp > 0 && bars.hp / bars.maxHp < 0.3);
     clearTimeout(ghost._t);
     if (instant) { ghost.style.transition = 'none'; ghost.style.width = w; }
     else { ghost._t = setTimeout(() => { ghost.style.transition = 'width 500ms cubic-bezier(0.3,0,0.2,1)'; ghost.style.width = w; }, 450); }
@@ -844,7 +843,7 @@ export function buildShell(root) {
   function markRoundStart() { rpgUi.markRoundStart(); }
 
   return {
-    destroy: () => { clearTimeout(showLog._t); clearTimeout(showBanner._t); rpgUi.hideTagTip(); document.removeEventListener('mousedown', onComboDown); reactionPrompt.cancel(); state.onReset = null; state.onUnitClick = null; root.replaceChildren(); },
+    destroy: () => { flames.destroy(); clearTimeout(showLog._t); clearTimeout(showBanner._t); rpgUi.hideTagTip(); document.removeEventListener('mousedown', onComboDown); reactionPrompt.cancel(); state.onReset = null; state.onUnitClick = null; root.replaceChildren(); },
     els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setHeroStatus, setAllyStatus, setHeroStats, flashHeroPassive, showInspector, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
     previewMoveCost, previewPips, openModal, closeModal,
     promptReaction: (req) => reactionPrompt.prompt(req), cancelReactionPrompt: () => reactionPrompt.cancel(),
