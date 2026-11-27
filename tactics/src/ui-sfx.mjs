@@ -197,6 +197,14 @@ export function createUiSfx(mixer) {
       tone(c, t, { type: 'triangle', f0: 523, f1: 196, dur: 0.6, vol: 0.06 });
       tone(c, t, { type: 'sine', f0: 98, f1: 55, dur: 0.6, vol: 0.09 });
     },
+    tpFull(c, t) {              // TP 满值爆发：能量上扫 + 低频冲击 + 金属余辉和弦
+      tone(c, t, { type: 'sawtooth', f0: 220, f1: 880, dur: 0.32, vol: 0.035, attack: 0.08, lp: 2600 });
+      tick(c, t + 0.3, { freq: 120, q: 0.7, dur: 0.22, vol: 0.26, type: 'lowpass' });
+      tone(c, t + 0.3, { type: 'sine', f0: 70, f1: 42, dur: 0.3, vol: 0.12 });
+      tone(c, t + 0.32, { type: 'triangle', f0: 1047, dur: 0.7, vol: 0.03 });
+      tone(c, t + 0.36, { type: 'triangle', f0: 1568, dur: 0.8, vol: 0.022 });
+      tick(c, t + 0.3, { freq: 5200, q: 3, dur: 0.4, vol: 0.03 });
+    },
     jumpCrouch(c, t) { tick(c, t, { freq: 320, q: 0.9, dur: 0.08, vol: 0.10, type: 'lowpass' }); },
     jumpTakeoff(c, t) {         // 起跳：蹬地 + 风声上扫
       tick(c, t, { freq: 160, q: 0.8, dur: 0.09, vol: 0.24, type: 'lowpass' });

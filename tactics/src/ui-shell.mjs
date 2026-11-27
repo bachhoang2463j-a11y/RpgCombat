@@ -10,6 +10,25 @@ import { createRpgUi, RPG_UI_RAIL_HTML, RPG_UI_MENU_HTML, RPG_UI_TIP_HTML, RPG_U
 import { createReactionPrompt } from './reaction-prompt.mjs';
 import { normalizeEffectTag } from './effect-definitions.mjs';
 import { skillActionKind, actionPayment } from './actions.mjs';
+import { CLASS_STYLE } from './unit-style.mjs';
+
+// 角色栏职业徽记剪影（黑底 + 暗金描边，viewBox 0..100）：fill = 剪影主体，line = 内部刻线
+const EMBLEMS = {
+  guard:   { fill: 'M50 6 L88 18 C88 52 74 78 50 94 C26 78 12 52 12 18 Z', line: 'M50 22 V80 M28 38 H72' },
+  berserk: { fill: 'M47 8 H53 V94 H47 Z M47 20 C30 14 12 26 8 48 C20 42 34 44 47 54 Z M53 20 C70 14 88 26 92 48 C80 42 66 44 53 54 Z', line: 'M14 44 C24 36 36 36 46 42 M86 44 C76 36 64 36 54 42' },
+  swift:   { fill: 'M80 6 C52 16 30 42 24 78 L16 96 L28 82 C50 76 72 56 86 24 C78 34 68 42 60 44 C72 34 80 22 80 6 Z', line: 'M26 80 C42 60 58 38 76 14' },
+  blight:  { fill: 'M38 6 H62 V13 H57 V32 C74 40 86 54 86 68 C86 84 70 95 50 95 C30 95 14 84 14 68 C14 54 26 40 43 32 V13 H38 Z', line: 'M20 66 C34 59 44 72 56 64 C66 58 74 63 80 66 M42 82 a3 3 0 1 0 0.1 0 M60 78 a2 2 0 1 0 0.1 0' },
+  stealth: { fill: 'M50 4 L59 22 L56 62 H44 L41 22 Z M28 62 H72 V69 H28 Z M45 69 H55 V86 H45 Z M50 86 a6 6 0 1 1 -0.1 0 Z', line: 'M50 12 V58' },
+  caster:  { fill: 'M47 34 H53 V95 H47 Z M50 2 L57 18 L74 25 L57 32 L50 48 L43 32 L26 25 L43 18 Z', line: 'M50 9 a16 16 0 1 0 0.1 0 M38 70 H62' },
+  holy:    { fill: 'M44 16 H56 V36 H76 V48 H56 V92 H44 V48 H24 V36 H44 Z', line: 'M50 8 a34 34 0 1 0 0.1 0' },
+  conquer: { fill: 'M22 10 L25 0 L28 10 V96 H22 Z M28 14 H86 L72 32 L86 50 H28 Z', line: 'M38 24 L48 32 L38 40' },
+  default: { fill: 'M50 6 L90 50 L50 94 L10 50 Z', line: 'M50 26 L74 50 L50 74 L26 50 Z' },
+};
+function emblemSvg(key) {
+  const e = EMBLEMS[key] || EMBLEMS.default;
+  return '<svg viewBox="-6 -6 112 112"><path class="t-emb-fill" d="' + e.fill + '"/><path class="t-emb-line" d="' + e.line + '"/>' +
+    '<path class="t-emb-sheen" pathLength="100" d="' + e.fill + '"/></svg>';
+}
 
 const ESC = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 // 禁用原因短标签（卡面一行可读；完整原因仍写入 title/aria 与点击后的战报）
@@ -144,7 +163,11 @@ export function buildShell(root) {
   const STAT_KEYS = [['atk', '攻', '攻击'], ['def', '防', '防御'], ['hit', '命', '命中'], ['eva', '避', '回避'], ['spd', '速', '速度']];
   function cardHtml(u) {
     const res = (cls, label) => '<span class="t-hero-res ' + cls + '"><span class="t-hero-res-h"><em>' + label + '</em><b></b></span><i class="t-bar"><i class="t-bar-fill"></i></i></span>';
-    return '<button class="t-hero-card" data-unit-id="' + ESC(u.id) + '">' + faceHtml(u, 't-hero-avatar') +
+    const key = (CLASS_STYLE[(u.classType || '').trim()] || { key: 'default' }).key;
+    return '<button class="t-hero-card t-hc-' + key + '" data-unit-id="' + ESC(u.id) + '">' +
+      '<span class="t-hero-emblem" aria-hidden="true">' + emblemSvg(key) + '</span><span class="t-hero-aura" aria-hidden="true"></span>' +
+      '<span class="t-hero-burst" aria-hidden="true"></span><span class="t-hero-sparks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>' +
+      faceHtml(u, 't-hero-avatar') +
       '<span class="t-hero-info"><span class="t-hero-row"><b title="' + ESC(u.name) + '">' + ESC(u.name) + '</b>' + (u.classType ? '<em class="t-hero-cls">' + ESC(u.classType) + '</em>' : '') + '</span>' +
         '<i class="t-bar t-bar-hp"><i class="t-bar-ghost"></i><i class="t-bar-fill"></i><i class="t-bar-shield"></i><span class="t-hero-hpnum"></span></i>' +
         '<span class="t-hero-res2">' + res('t-res-mp', 'MP') + res('t-res-tp', 'TP') + '</span>' +
@@ -261,7 +284,18 @@ export function buildShell(root) {
       flashNum(box.querySelector('b'), Math.max(0, Math.round(v)), '<small>/' + max + '</small>');
     };
     setRes('t-res-mp', bars.mp ?? ref.mp ?? 0, bars.maxMp || 0);
-    setRes('t-res-tp', bars.tp ?? ref.tp ?? 0, ref.maxTp || 100);
+    const tp = bars.tp ?? ref.tp ?? 0, maxTp = ref.maxTp || 100;
+    setRes('t-res-tp', tp, maxTp);
+    // TP 能量态：≥50 流光火星，满值常驻能量环；从未满跨入满值时爆发一次（白闪 + 扩散环 + 音）
+    const full = tp >= maxTp;
+    card.classList.toggle('t-tp-half', tp >= 50 && !full);
+    card.classList.toggle('t-tp-full', full);
+    if (full && card._tpFull === false && bars.hp > 0) {
+      card.classList.remove('t-tp-burst'); void card.offsetWidth; card.classList.add('t-tp-burst');
+      clearTimeout(card._burstT); card._burstT = setTimeout(() => card.classList.remove('t-tp-burst'), 1300);
+      uiSound('tpFull');
+    }
+    card._tpFull = full;
     card.querySelector('.t-hero-hpnum').innerHTML = '<b>' + Math.max(0, Math.round(bars.hp)) + '</b><small>/' + bars.maxHp + '</small>' + (shield > 0 ? '<em class="t-hero-shnum">+' + Math.round(shield) + '</em>' : '');
     card.classList.toggle('t-shielded', shield > 0);
     card.classList.toggle('t-low', bars.hp > 0 && bars.hp / bars.maxHp <= 0.3);
