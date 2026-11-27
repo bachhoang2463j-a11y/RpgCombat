@@ -675,12 +675,14 @@ const basicAttacks = [
   basicAttack('刀砍'), basicAttack('拳击'), basicAttack('爪击'), basicAttack('撕咬'), basicAttack('箭矢'),
 ];
 
-// 砷弹射击（索恩定稿）：黑弹飞向最远命中目标（全闪避则到射界末端），途经目标在弹头经过时揭示
+// 砷弹射击（索恩定稿 + 战棋贯穿层）：原版枪口毒能涡流蓄力 → 黑弹 → 终点爆轰与毒液溅射，飞向最远命中目标（全闪避则到射界末端）；
+// 战棋层补齐 20 米直线贯穿：弹头经过时沿射线拉出酸绿曳光（黑芯 + 绿辉）并留下腐蚀残痕滴落毒液、毒雾团滞留；
+// 每名被贯穿者在弹头经过拍点：入射穿孔环 + 沿弹道方向喷出毒液锥 + 毒泡上浮（停滞者叠灰青时轮缓转），闪开者只擦出风痕；终点地面腐蚀斑
 const arsenicShot = {
   id: 'arsenic-shot', grade: 'identity', fxTags: ['砷弹射击'],
-  prepareKeys: () => ['gunshot_pierce'],
+  prepareKeys: () => ['gunshot_pierce', 'creature_slime_01', 'aoe_poison_spell_fs219566'],
   async play(ctx) {
-    const { av, hits, audioContext, casterEnt } = ctx;
+    const { av, hits, audioContext, casterEnt, fx, result } = ctx;
     const origin = ctx.centerOf(ctx.casterId);
     const dist = h => { const c = ctx.centerOf(h.targetId); return Math.hypot(c.x - origin.x, c.y - origin.y); };
     const landed = hits.filter(h => h.hit).sort((a, b) => dist(b) - dist(a));
@@ -688,10 +690,58 @@ const arsenicShot = {
     const endDist = landed.length ? dist(landed[0]) : (ctx.skill.range.length || 10);
     const handle = av.CombatAudioMixer.withContext(audioContext, () => av.playArsenicShot(casterEnt, [endTarget]));
     const CHARGE = 340, FLIGHT = 160;
+    const shape = result.query?.shape || {}, aimP = result.aim || origin;
+    const dir = shape.dir != null ? shape.dir : Math.atan2(aimP.y - origin.y, aimP.x - origin.x), ux = Math.cos(dir), uy = Math.sin(dir);
+    const tail = Math.min(endDist + 1.6, shape.length || ctx.skill.range.length || 20);
+    const a = worldPx(origin), z = worldPx({ x: origin.x + ux * tail, y: origin.y + uy * tail }), L = tail * PX, rotD = deg(dir).toFixed(2);
+    const ACID = ['#a3e635', '#84cc16', '#d9f99d'];
+    const band = (inner, ms) => fx.top('<div style="position:absolute;left:' + a.x + 'px;top:' + a.y + 'px;width:0;height:0;transform:rotate(' + rotD + 'deg);">' + inner + '</div>', ms).firstChild;
+    ctx.after(CHARGE, () => {
+      // 曳光：黑芯 + 酸绿辉自枪口推进到弹尾（与弹头同 160ms），随后残痕腐蚀淡出
+      const tr = band('<i style="position:absolute;left:0;top:-5px;width:' + L + 'px;height:10px;border-radius:5px;transform-origin:0 50%;' +
+        'background:linear-gradient(90deg,rgba(132,204,22,0),rgba(163,230,53,.85) 12%,rgba(217,249,157,.95) 50%,rgba(132,204,22,.7) 88%,rgba(132,204,22,0));box-shadow:0 0 14px 3px rgba(132,204,22,.55);mix-blend-mode:screen;"></i>' +
+        '<i style="position:absolute;left:0;top:-1.5px;width:' + L + 'px;height:3px;border-radius:2px;transform-origin:0 50%;background:linear-gradient(90deg,transparent,#090d16 15%,#1a2e05 85%,transparent);"></i>', 1250);
+      [...tr.children].forEach((el, i) => el.animate([{ transform: 'scaleX(0)', opacity: 1 }, { transform: 'scaleX(1)', opacity: 1, offset: 0.15 }, { transform: 'scaleX(1) scaleY(' + (i ? 0.6 : 0.45) + ')', opacity: i ? 0.8 : 0.55, offset: 0.4 }, { transform: 'scaleX(1) scaleY(.2)', opacity: 0 }],
+        { duration: 1200, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' }));
+      // 残痕滴落毒液 + 毒雾团沿弹道滞留
+      for (let t = 0; t < 900; t += 110) ctx.after(160 + t, () => {
+        const s = rnd(0.08, 0.95) * L, x = a.x + ux * s, y = a.y + uy * s;
+        particles(fx, [{ x, y, dx: rnd(-3, 3), dy: rnd(14, 26), size: rnd(4, 6), color: pick(ACID), core: '#ecfccb', s0: 1, s1: 0.5, dur: rnd(420, 560), ease: 'cubic-bezier(.5,0,.9,.6)' }], 620);
+      });
+      const puffs = Array.from({ length: Math.max(4, Math.round(tail / 1.6)) }, (_, i) => { const s = (i + 0.5) / Math.max(4, Math.round(tail / 1.6)) * L; return { x: a.x + ux * s + rnd(-6, 6), y: a.y + uy * s + rnd(-6, 6), sz: rnd(24, 40) }; });
+      const gas = fx.ground(puffs.map(q => '<i style="position:absolute;left:' + q.x.toFixed(0) + 'px;top:' + q.y.toFixed(0) + 'px;width:' + q.sz.toFixed(0) + 'px;height:' + (q.sz * 0.7).toFixed(0) + 'px;margin:' + (-q.sz * 0.35).toFixed(0) + 'px 0 0 ' + (-q.sz / 2).toFixed(0) + 'px;border-radius:50%;' +
+        'background:radial-gradient(ellipse,rgba(132,204,22,.45),rgba(54,83,20,.25) 55%,transparent 72%);pointer-events:none;"></i>').join(''), 1500);
+      [...gas.children].forEach((el, i) => el.animate([{ transform: 'scale(.4)', opacity: 0 }, { transform: 'scale(1)', opacity: 1, offset: 0.25 }, { transform: 'scale(1.5) translateY(-6px)', opacity: 0 }], { duration: 1400, delay: i * 18, fill: 'both' }));
+    });
+    const stasis = new Set((result.effects || []).filter(e => /停滞/.test(e.tag || '')).map(e => e.targetId));
+    const puncture = h => {
+      const c = worldPx(ctx.centerOf(h.targetId));
+      if (!h.hit) {   // 闪开：弹头擦过的风痕
+        fx.top(ringHtml(c.x, c.y, 0.9 * PX, 'rgba(217,249,157,0.5)', 'rgba(132,204,22,0.2)'), 300).firstChild.animate([{ transform: 'scale(.5)', opacity: 0.8 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 280, fill: 'forwards' });
+        return;
+      }
+      ctx.av.playSound('creature_slime_01', 0.32, rnd(0.9, 1.1), { track: 'skill', category: audioContext.category });
+      fx.top(ringHtml(c.x, c.y, 1.1 * PX, 'rgba(163,230,53,0.95)', 'rgba(9,13,22,0.65)'), 360).firstChild.animate([{ transform: 'scale(.2)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 340, fill: 'forwards' });
+      particles(fx, Array.from({ length: 16 }, () => { const t = dir + rnd(-0.55, 0.55), d = rnd(0.5, 1.3) * PX; return { x: c.x + ux * 10, y: c.y + uy * 10, dx: Math.cos(t) * d, dy: Math.sin(t) * d + rnd(4, 12), size: rnd(4, 9), color: pick(ACID), core: '#f7fee7', s0: 1, s1: 0.35, dur: rnd(380, 560) }; }), 640);
+      particles(fx, Array.from({ length: 7 }, () => ({ x: c.x + rnd(-14, 14), y: c.y + rnd(-6, 10), dx: rnd(-6, 6), dy: -rnd(26, 46), size: rnd(5, 9), color: '#65a30d', core: '#d9f99d', s0: 0.6, s1: 1.1, o0: 0.9, dur: rnd(620, 860), delay: rnd(60, 220) })), 1100);
+      if (stasis.has(h.targetId)) {
+        const dial = fx.top(runeRingHtml(c.x, c.y, 0.75 * PX, 'ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪⅫ', '#a5f3fc', 'rgba(103,232,249,.8)', { size: 0.22, width: 1.6 }), 1000);
+        dial.firstChild.animate([{ transform: 'translate(-50%,-50%) scale(1.3)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 0.9, offset: 0.25 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 0.8, offset: 0.75 }, { transform: 'translate(-50%,-50%) scale(.85)', opacity: 0 }], { duration: 980, fill: 'forwards' });
+        spin(dial.querySelector('[data-k=spin]'), -40, 980, 'cubic-bezier(.2,.8,.4,1)');
+      }
+    };
     for (const h of hits) {
       const k = Math.min(1, dist(h) / Math.max(0.5, endDist));
-      ctx.after(CHARGE + FLIGHT * Math.pow(k, 1 / 0.88), () => ctx.reveal(h.targetId));
+      ctx.after(CHARGE + FLIGHT * Math.pow(k, 1 / 0.88), () => { ctx.reveal(h.targetId); puncture(h); });
     }
+    // 终点：地面腐蚀斑（毒液嘶响）
+    ctx.after(CHARGE + FLIGHT + 40, () => {
+      const p = landed.length ? worldPx(ctx.centerOf(landed[0].targetId)) : z;
+      ctx.av.playSound('aoe_poison_spell_fs219566', 0.3, 1.15, { track: 'skill', category: audioContext.category });
+      const st = fx.ground('<i style="position:absolute;left:' + p.x + 'px;top:' + (p.y + 0.3 * PX) + 'px;width:' + 1.9 * PX + 'px;height:' + 1.1 * PX + 'px;margin:' + (-0.55 * PX) + 'px 0 0 ' + (-0.95 * PX) + 'px;border-radius:46% 54% 50% 50%;' +
+        'background:radial-gradient(ellipse,rgba(26,46,5,.75),rgba(77,124,15,.5) 45%,rgba(132,204,22,.18) 65%,transparent 75%);pointer-events:none;"></i>', 1700);
+      st.firstChild.animate([{ transform: 'scale(.2)', opacity: 0 }, { transform: 'scale(1)', opacity: 1, offset: 0.2 }, { transform: 'scale(1.05)', opacity: 0.85, offset: 0.7 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 1650, fill: 'forwards' });
+    });
     return ctx.awaitHandle(handle, 1300);
   },
 };
@@ -2047,57 +2097,206 @@ const curseBeam = {
   },
 };
 
-const reactionKanpo = {
-  // 原版 playKanpoEffect（index.html）移植到世界层：压暗 + 来袭者锁定 → 看破者金色之眼 + 金流射向来袭者 →
-  // 金环汇聚 + 金屑迸射 → 斜斩 + 「无效化」印章 + 暖白闪 + 震屏；尺寸按头像（PX）而非屏幕像素
-  id: 'reaction-kanpo', kind: 'reaction', grade: 'identity', fxTags: ['看破'], reuseAudio: true,
-  timeline: { totalMs: 1410 },
-  cues: [{ key: 'kanpo', vol: 1 }],
-  prepareKeys() { return ['kanpo']; },
+// ---------- 看破演出（成功看破按技能显式特效标签分流；未配专属标签的看破走【净蚀反冲】金色法眼） ----------
+// 文字沿二次贝塞尔飞行（咒文流 / 字符雨共用）
+function flyGlyph(fx, a, c, b, ch, { size = 14, color = '#fde68a', glow = '#f59e0b', ms = 360, delay = 0, rot = 0 } = {}) {
+  const l = fx.top('<b style="position:absolute;left:0;top:0;font:900 ' + size + 'px/1 serif;color:' + color + ';text-shadow:0 0 6px ' + glow + ',0 0 2px #000;pointer-events:none;">' + ch + '</b>', ms + delay + 60);
+  const frames = [];
+  for (let k = 0; k <= 10; k++) { const p = bez(a, c, b, k / 10); frames.push({ transform: 'translate(' + p.x.toFixed(1) + 'px,' + p.y.toFixed(1) + 'px) translate(-50%,-50%) rotate(' + (rot * k / 10).toFixed(0) + 'deg)', opacity: k === 0 ? 0 : k === 10 ? 0 : 1 }); }
+  l.firstChild.animate(frames, { duration: ms, delay, easing: 'cubic-bezier(.45,0,.25,1)', fill: 'both' });
+}
+// 环形咒文：一圈符文字沿圆排布（SVG text + 旋转）
+function runeRingHtml(x, y, r, glyphs, color, glow, { size = 0.16, width = 2 } = {}) {
+  const S = r * 2.4, n = glyphs.length;
+  const txt = glyphs.split('').map((ch, i) => { const t = i / n * 360; return '<text x="0" y="' + (-r * 0.86).toFixed(1) + '" transform="rotate(' + t.toFixed(1) + ')" font-size="' + (r * size).toFixed(1) + '" fill="' + color + '" text-anchor="middle" dominant-baseline="central" font-family="serif" font-weight="700">' + ch + '</text>'; }).join('');
+  return '<svg width="' + S + '" height="' + S + '" viewBox="' + (-S / 2) + ' ' + (-S / 2) + ' ' + S + ' ' + S + '" style="position:absolute;left:' + x + 'px;top:' + y + 'px;transform:translate(-50%,-50%);overflow:visible;pointer-events:none;filter:drop-shadow(0 0 5px ' + glow + ');">' +
+    '<g data-k="spin"><circle r="' + r + '" fill="none" stroke="' + color + '" stroke-width="' + width + '" opacity=".9"/><circle r="' + (r * 0.72) + '" fill="none" stroke="' + color + '" stroke-width="' + (width * 0.6) + '" stroke-dasharray="3 7" opacity=".75"/>' + txt + '</g></svg>';
+}
+// 看破法眼：眼睑开合（scaleY）+ 虹膜收束 + 背后放射金芒；kind=gold 咒文法眼 / tech 战术镜头
+function seerEyeHtml(uid, x, y, size, { gold = true } = {}) {
+  const c1 = gold ? '#fbbf24' : '#22d3ee', c2 = gold ? '#fff7ed' : '#ecfeff', c3 = gold ? '#78350f' : '#0c4a6e', glow = gold ? 'rgba(245,158,11,.95)' : 'rgba(34,211,238,.95)';
+  const rays = Array.from({ length: 12 }, (_, i) => '<path d="M0,-34 L4,-62 L0,-74 L-4,-62 Z" fill="' + c1 + '" opacity="' + (i % 2 ? 0.45 : 0.8) + '" transform="rotate(' + i * 30 + ')"/>').join('');
+  const iris = gold
+    ? '<circle data-k="iris" r="20" fill="url(#se' + uid + ')" stroke="' + c2 + '" stroke-width="2.5"/><ellipse data-k="pupil" rx="4.5" ry="14" fill="#1c0a00"/><circle cx="-7" cy="-7" r="3.5" fill="#fff" opacity=".9"/>'
+    : '<polygon data-k="iris" points="0,-20 17,-10 17,10 0,20 -17,10 -17,-10" fill="url(#se' + uid + ')" stroke="' + c2 + '" stroke-width="2"/><circle data-k="pupil" r="6" fill="#020617" stroke="' + c1 + '" stroke-width="1.5"/><path d="M-20,0 L20,0" stroke="' + c2 + '" stroke-width="1" opacity=".7"/>';
+  return '<svg viewBox="-80 -80 160 160" width="' + size + '" height="' + size + '" style="position:absolute;left:' + x + 'px;top:' + y + 'px;transform:translate(-50%,-50%);overflow:visible;pointer-events:none;filter:drop-shadow(0 0 10px ' + glow + ');">' +
+    '<defs><radialGradient id="se' + uid + '"><stop offset="0" stop-color="' + c2 + '"/><stop offset=".55" stop-color="' + c1 + '"/><stop offset="1" stop-color="' + c3 + '"/></radialGradient></defs>' +
+    '<g data-k="rays">' + rays + '</g>' +
+    '<g data-k="lid"><path d="M-58,0 Q-28,-36 0,-36 Q28,-36 58,0 Q28,36 0,36 Q-28,36 -58,0 Z" fill="' + c3 + '" stroke="' + c1 + '" stroke-width="4"/>' + iris +
+    '<path d="M-46,-6 Q0,-46 46,-6" fill="none" stroke="' + c2 + '" stroke-width="2" opacity=".6"/></g></svg>';
+}
+function openEye(layer, ms, { hold = 0.55 } = {}) {
+  const svg = layer.firstChild;
+  svg.animate([{ opacity: 0, transform: 'translate(-50%,-50%) scale(.6)' }, { opacity: 1, transform: 'translate(-50%,-50%) scale(1.08)', offset: 0.18 }, { opacity: 1, transform: 'translate(-50%,-50%) scale(1)', offset: hold }, { opacity: 0, transform: 'translate(-50%,-50%) scale(1.3)' }], { duration: ms, fill: 'forwards' });
+  const lid = svg.querySelector('[data-k=lid]'); lid.style.transformOrigin = '0 0'; lid.style.transformBox = 'view-box';
+  lid.animate([{ transform: 'scaleY(.04)' }, { transform: 'scaleY(.04)', offset: 0.1 }, { transform: 'scaleY(1.12)', offset: 0.24 }, { transform: 'scaleY(1)', offset: 0.32 }, { transform: 'scaleY(1)', offset: 0.82 }, { transform: 'scaleY(.2)' }], { duration: ms, easing: 'ease-out', fill: 'forwards' });
+  const pupil = svg.querySelector('[data-k=pupil]'); pupil.style.transformBox = 'fill-box'; pupil.style.transformOrigin = '50% 50%';
+  pupil.animate([{ transform: 'scale(1.6)' }, { transform: 'scale(1.6)', offset: 0.24 }, { transform: 'scale(.55,1)', offset: 0.4 }, { transform: 'scale(.55,1)' }], { duration: ms, fill: 'forwards' });
+  const rays = svg.querySelector('[data-k=rays]'); rays.style.transformBox = 'view-box'; rays.style.transformOrigin = '0 0';
+  rays.animate([{ transform: 'rotate(0deg) scale(.3)', opacity: 0 }, { transform: 'rotate(40deg) scale(1.1)', opacity: 1, offset: 0.3 }, { transform: 'rotate(110deg) scale(1)', opacity: 0.6 }], { duration: ms, fill: 'forwards' });
+}
+// 印章落印：自大到小砸下 + 回弹 + 外环冲击
+function slamSeal(fx, p, size, inner, { ring = 'rgba(251,191,36,0.9)', ms = 900 } = {}) {
+  const l = fx.top('<div style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:' + size + 'px;height:' + size + 'px;transform:translate(-50%,-50%);pointer-events:none;">' + inner + '</div>', ms);
+  l.firstChild.animate([{ transform: 'translate(-50%,-50%) scale(2.4) rotate(-18deg)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(.9) rotate(-4deg)', opacity: 1, offset: 0.16 },
+    { transform: 'translate(-50%,-50%) scale(1.04) rotate(-6deg)', opacity: 1, offset: 0.26 }, { transform: 'translate(-50%,-50%) scale(1) rotate(-6deg)', opacity: 1, offset: 0.78 }, { transform: 'translate(-50%,-50%) scale(1.15) rotate(-6deg)', opacity: 0 }], { duration: ms, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'forwards' });
+  fx.top(ringHtml(p.x, p.y, size * 1.9, ring, 'rgba(120,53,15,0.4)'), 520).firstChild
+    .animate([{ transform: 'scale(.3)', opacity: 0 }, { transform: 'scale(.3)', opacity: 1, offset: 0.25 }, { transform: 'scale(1.15)', opacity: 0 }], { duration: 520, fill: 'forwards' });
+}
+
+// 【净蚀反冲】（埃利奥特·法术看破，吸蓝 5）：金色咒文 + 看破法眼
+// ① 识破 0–400：暗场锚在来袭者，来袭者头顶凝起紫色咒力；看破者脚下金色符阵展开、头顶法眼睁开（眼睑开合 + 虹膜收束 + 金芒），镜铃
+// ② 锁咒 400–760：金色咒文沿弧线从法眼涌向来袭者、来袭者周身咒文环逆旋收紧，水晶清鸣
+// ③ 净蚀 760：紫色咒力崩碎成暗晶飞散 + 「蝕」字金印砸落 + 金色十字斩 + 暖白闪 + 中震，原版看破音 + 碎晶 + 完美格挡
+// ④ 反冲 760–1300：真实吸蓝时蓝色法力流回看破者并飘「吸蓝 +N」（法力流音），无吸蓝时金屑回流
+const PURE_ERASE = {
+  id: 'reaction-kanpo', kind: 'reaction', grade: 'identity', fxTags: ['净蚀反冲', '看破'],
+  timeline: { totalMs: 1700 },
+  cues: [{ key: 'mirrorRing', vol: 0.5 }, { key: 'bellPing', vol: 0.42 }, { key: 'crystalChime', vol: 0.4 }, { key: 'kanpo', vol: 0.75 }, { key: 'crystalSnap', vol: 0.55 }, { key: 'parry_perfect', vol: 0.45 }, { key: 'mirrorStream', vol: 0.45 }],
+  prepareKeys() { return this.cues.map(c => c.key); },
+  async play(ctx) {
+    const { fx } = ctx;
+    const hp = ctx.centerOf(ctx.responderId), ep = ctx.attackerId && ctx.centerOf(ctx.attackerId);
+    if (!hp) return true;
+    const h = worldPx(hp), e = ep ? worldPx(ep) : { x: h.x, y: h.y - 2 * PX }, eyeP = { x: h.x, y: h.y - 1.75 * PX }, drained = ctx.reaction?.drained || 0;
+    const GOLD = ['#fbbf24', '#f59e0b', '#fde68a'], RUNES = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
+    // ① 识破
+    worldDarken(fx, e, { holeR: 1.7 * PX, inMs: 260, holdMs: 1100, outMs: 320, peak: 0.55 });
+    fx.sfx('mirrorRing', 0.5);
+    const rune = fx.ground(runeHtml(fx.uid(), h.x, h.y + 0.15 * PX, 1.25 * PX, '#f59e0b', '#fde68a', 'ᛟᚨᛁᚱᛖᛗ'), 1500);
+    grow(rune.firstChild, { ms: 1500, s0: 0.3, s1: 1, hold: 0.7, o: 0.95 });
+    spin(rune.querySelector('[data-fx=spin]'), 220, 1500);
+    const eye = fx.top(seerEyeHtml(fx.uid(), eyeP.x, eyeP.y, 2.9 * PX, { gold: true }), 1500);
+    openEye(eye, 1500, { hold: 0.6 });
+    ctx.after(160, () => fx.sfx('bellPing', 0.42));
+    const curse = fx.top(orbHtml(e.x, e.y - 0.9 * PX, 1.3 * PX, 'rgba(147,51,234,0.8)', '#f5d0fe'), 820);
+    curse.firstChild.style.mixBlendMode = 'normal';
+    curse.firstChild.animate([{ transform: 'scale(.2)', opacity: 0 }, { transform: 'scale(1)', opacity: 0.95, offset: 0.4 }, { transform: 'scale(1.1)', opacity: 1, offset: 0.9 }, { transform: 'scale(.3)', opacity: 0 }], { duration: 800, fill: 'forwards' });
+    particles(fx, Array.from({ length: 14 }, () => { const a = rnd(0, TAU), d = rnd(0.6, 1.1) * PX; return { x: e.x + Math.cos(a) * d, y: e.y - 0.9 * PX + Math.sin(a) * d, dx: -Math.cos(a) * d, dy: -Math.sin(a) * d, size: rnd(5, 9), color: '#a855f7', core: '#f5d0fe', s0: 1, s1: 0.3, dur: rnd(380, 560) }; }), 620);
+    floatText(fx, h.x, h.y - 3.25 * PX, '👁 看破', '#fde68a', '#b45309', { ms: 900, size: 14, delay: 200 });
+    if (!(await ctx.wait(400))) return false;
+    // ② 锁咒：金色咒文流 + 来袭者咒文环逆旋收紧
+    fx.sfx('crystalChime', 0.4);
+    const mid = { x: (eyeP.x + e.x) / 2 + (e.y - eyeP.y) * 0.18, y: (eyeP.y + e.y) / 2 - 1.1 * PX };
+    trail(fx, eyeP, mid, e, { color: '#fbbf24', width: 7, ms: 380 });
+    for (let i = 0; i < 16; i++) flyGlyph(fx, { x: eyeP.x + rnd(-10, 10), y: eyeP.y + rnd(-8, 8) }, { x: mid.x + rnd(-0.5, 0.5) * PX, y: mid.y + rnd(-0.4, 0.4) * PX }, { x: e.x + rnd(-14, 14), y: e.y + rnd(-14, 14) }, pick(RUNES.split('')),
+      { size: rnd(11, 17), ms: rnd(300, 380), delay: i * 14, rot: rnd(-120, 120) });
+    const lockR = 1.35 * PX, lock = fx.top(runeRingHtml(e.x, e.y, lockR, 'ᛉᛟᚦᚨᛇᛊᛏᛒᚾᛁᛞᛜ', '#fbbf24', 'rgba(245,158,11,.9)'), 900);
+    lock.firstChild.animate([{ transform: 'translate(-50%,-50%) scale(1.6)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 1, offset: 0.4 }, { transform: 'translate(-50%,-50%) scale(.72)', opacity: 1, offset: 0.8 }, { transform: 'translate(-50%,-50%) scale(1.4)', opacity: 0 }], { duration: 900, easing: 'cubic-bezier(.4,0,.3,1)', fill: 'forwards' });
+    spin(lock.querySelector('[data-k=spin]'), -260, 900, 'cubic-bezier(.3,0,.5,1)');
+    if (!(await ctx.wait(360))) return false;
+    // ③ 净蚀：咒力崩碎 + 「蝕」字金印 + 十字斩 + 暖白闪
+    fx.sfx('kanpo', 0.75); ctx.after(30, () => fx.sfx('crystalSnap', 0.55)); ctx.after(60, () => fx.sfx('parry_perfect', 0.45));
+    fx.shake('medium');
+    fx.top('<i style="position:absolute;left:' + e.x + 'px;top:' + e.y + 'px;width:' + 8 * PX + 'px;height:' + 8 * PX + 'px;margin:' + (-4 * PX) + 'px 0 0 ' + (-4 * PX) + 'px;border-radius:50%;background:radial-gradient(circle,rgba(255,247,237,0.95),rgba(251,191,36,0.4) 42%,transparent 72%);mix-blend-mode:screen;"></i>', 460)
+      .firstChild.animate([{ opacity: 0, transform: 'scale(.5)' }, { opacity: 1, transform: 'scale(1)', offset: 0.22 }, { opacity: 0, transform: 'scale(1.2)' }], { duration: 440, fill: 'forwards' });
+    const shards = fx.top(Array.from({ length: 16 }, () => { const s = rnd(10, 20); return '<i style="position:absolute;left:' + e.x + 'px;top:' + (e.y - 0.9 * PX) + 'px;width:' + s.toFixed(0) + 'px;height:' + (s * 0.75).toFixed(0) + 'px;margin:' + (-s * 0.37).toFixed(0) + 'px 0 0 ' + (-s / 2).toFixed(0) + 'px;' +
+      'clip-path:polygon(0 30%,60% 0,100% 55%,40% 100%);background:linear-gradient(135deg,#f5d0fe,#7e22ce 55%,#1e0b3a);filter:drop-shadow(0 0 4px #a855f7);"></i>'; }).join(''), 820);
+    [...shards.children].forEach(el => { const a = rnd(0, TAU), d = rnd(0.9, 1.9) * PX; el.animate([{ transform: 'translate(0,0) rotate(0deg) scale(.5)', opacity: 1 }, { transform: 'translate(' + (Math.cos(a) * d).toFixed(0) + 'px,' + (Math.sin(a) * d + 14).toFixed(0) + 'px) rotate(' + rnd(-360, 360).toFixed(0) + 'deg) scale(1)', opacity: 0 }], { duration: rnd(560, 780), easing: 'cubic-bezier(.1,.8,.3,1)', fill: 'forwards' }); });
+    const cross = fx.top('<svg viewBox="0 0 100 100" width="' + 3.8 * PX + '" height="' + 3.8 * PX + '" style="position:absolute;left:' + e.x + 'px;top:' + e.y + 'px;transform:translate(-50%,-50%);overflow:visible;filter:drop-shadow(0 0 8px rgba(245,158,11,.95));">' +
+      '<path d="M8,92 L92,8" stroke="#f59e0b" stroke-width="9" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/><path d="M8,8 L92,92" stroke="#f59e0b" stroke-width="9" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>' +
+      '<path d="M18,92 L94,16" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/></svg>', 620);
+    [...cross.firstChild.children].forEach((pth, i) => pth.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0, offset: 0.4 }, { strokeDashoffset: 0, opacity: 1, offset: 0.7 }, { strokeDashoffset: 0, opacity: 0 }], { duration: 560, delay: i * 50, easing: 'cubic-bezier(.6,0,.4,1)', fill: 'both' }));
+    slamSeal(fx, { x: e.x, y: e.y - 0.15 * PX }, 2.1 * PX,
+      '<svg viewBox="-50 -50 100 100" width="100%" height="100%" style="overflow:visible;filter:drop-shadow(0 0 10px rgba(245,158,11,.9));">' +
+      '<circle r="44" fill="rgba(120,53,15,.55)" stroke="#fbbf24" stroke-width="5"/><circle r="36" fill="none" stroke="#fde68a" stroke-width="1.5" stroke-dasharray="4 4"/>' +
+      '<text x="0" y="2" font-size="46" font-weight="900" fill="#fff7ed" stroke="#b45309" stroke-width="1.4" text-anchor="middle" dominant-baseline="central" font-family="serif">蝕</text></svg>', { ms: 980 });
+    particles(fx, Array.from({ length: 34 }, () => { const a = rnd(0, TAU), d = rnd(0.7, 2.1) * PX; return { x: e.x + rnd(-10, 10), y: e.y + rnd(-10, 10), dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(6, 11), color: pick(GOLD), core: '#fff7ed', s0: 1, s1: 0.3, dur: rnd(420, 800) }; }), 900);
+    floatText(fx, e.x, e.y - 2.75 * PX, '净蚀反冲！', '#fde68a', '#b45309', { ms: 1000, size: 18, delay: 60 });
+    floatText(fx, e.x, e.y - 1.65 * PX, '【' + (ctx.reaction?.incoming || '来袭技能') + '】无效化', '#fcd34d', '#78350f', { ms: 950, size: 12, delay: 200 });
+    // ④ 反冲：真实吸蓝 → 蓝色法力回流
+    ctx.after(280, () => {
+      const blue = drained > 0, col = blue ? ['#60a5fa', '#38bdf8', '#bfdbfe'] : GOLD;
+      if (blue) fx.sfx('mirrorStream', 0.45);
+      for (let i = 0; i < 18; i++) flyOrb(fx, { x: e.x + rnd(-12, 12), y: e.y + rnd(-12, 12) }, { x: (e.x + h.x) / 2 + rnd(-0.6, 0.6) * PX, y: Math.min(e.y, h.y) - rnd(0.6, 1.4) * PX }, { x: h.x + rnd(-8, 8), y: h.y + rnd(-8, 8) },
+        { size: rnd(0.14, 0.26) * PX, color: pick(col), core: '#ffffff', ms: rnd(380, 480), delay: i * 16, fade: true });
+      ctx.after(460, () => {
+        fx.top(ringHtml(h.x, h.y, 2.4 * PX, blue ? 'rgba(96,165,250,0.9)' : 'rgba(251,191,36,0.85)', 'rgba(30,58,138,0.4)'), 520).firstChild
+          .animate([{ transform: 'scale(.3)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 500, fill: 'forwards' });
+        if (blue) floatText(fx, h.x, h.y - 0.9 * PX, '吸蓝 +' + drained, '#bfdbfe', '#1e3a8a', { ms: 900, size: 14 });
+      });
+    });
+    return ctx.wait(1000);
+  },
+};
+const reactionKanpo = PURE_ERASE;
+
+// 【声波干扰雷】（索恩·远程看破）：战术镜头式「看破」——
+// ① 识破 0–380：索恩头顶战术镜头张开（六角虹膜 + 扫描线），抛出声波雷沿弧线落到来袭者身前，来袭者四角锁定框收紧
+// ② 部署 380–640：雷落地扬尘、指示灯三连闪（铃）
+// ③ 声爆 640：音叉击响 + 环形冲击：五重青色声环（色差错位）自雷外扩 + 正弦声波带沿雷→来袭者传导，中震
+// ④ 干扰 700–1250：来袭者 RGB 错位抖动 + 横向雪花噪带 + 被截停的子弹弹壳坠地，「Ø 干扰」六角章，音叉闷止；雷自毁小爆
+const SONIC_JAM = {
+  id: 'reaction-sonic-jam', kind: 'reaction', grade: 'identity', fxTags: ['声波干扰雷'],
+  timeline: { totalMs: 1650 },
+  cues: [{ key: 'bomb_throw', vol: 0.45 }, { key: 'bellPing', vol: 0.4 }, { key: 'fork432', vol: 0.6 }, { key: 'sd_ring_blast', vol: 0.5 }, { key: 'forkMute', vol: 0.5 }, { key: 'kanpo', vol: 0.55 }],
+  prepareKeys() { return this.cues.map(c => c.key); },
   async play(ctx) {
     const { fx } = ctx;
     const hp = ctx.centerOf(ctx.responderId), ep = ctx.attackerId && ctx.centerOf(ctx.attackerId);
     if (!hp) return true;
     const h = worldPx(hp), e = ep ? worldPx(ep) : { x: h.x, y: h.y - 2 * PX };
-    const pop = (html, ms, frames, o = {}) => fx.top(html, ms).firstChild.animate(frames, Object.assign({ duration: ms, fill: 'forwards' }, o));
-    const svgAt = (x, y, size, vb, body, glow) => '<svg viewBox="' + vb + '" width="' + size + '" height="' + size + '" style="position:absolute;left:' + x + 'px;top:' + y + 'px;transform:translate(-50%,-50%);overflow:visible;filter:drop-shadow(0 0 ' + glow + 'px rgba(245,158,11,0.9));">' + body + '</svg>';
-    const T = (s, o = 1, extra = '') => ({ transform: 'translate(-50%,-50%) ' + extra + ' scale(' + s + ')', opacity: o });
-    // ① 压暗（锚在来袭者）+ 来袭者锁定环
-    worldDarken(fx, e, { holeR: 1.6 * PX, inMs: 250, holdMs: 900, outMs: 260, peak: 0.5 });
-    const lock = svgAt(e.x, e.y, 3 * PX, '0 0 100 100', '<circle cx="50" cy="50" r="42" stroke="#fbbf24" stroke-width="3" fill="none" stroke-dasharray="10 8"/>' +
-      '<path d="M30,50 L45,50 L45,35 L55,35 L55,50 L70,50 M50,50 L50,62" stroke="#fde68a" stroke-width="7" stroke-linecap="round" fill="none"/><circle cx="50" cy="62" r="8" fill="none" stroke="#fff7ed" stroke-width="2"/>', 18);
-    pop(lock, 900, [T(0.8, 0), T(1.1, 1, 'rotate(20deg)'), T(1.05, 1, 'rotate(60deg)'), T(1.2, 0, 'rotate(80deg)')]);
-    // ② 看破者头顶金色之眼 + 文字
-    const eye = svgAt(h.x, h.y - 1.7 * PX, 2.5 * PX, '0 0 120 120', '<defs><radialGradient id="kpg' + fx.uid() + '"><stop offset="0" stop-color="#fff7ed"/><stop offset=".45" stop-color="#fbbf24" stop-opacity=".85"/><stop offset="1" stop-color="#f59e0b" stop-opacity="0"/></radialGradient></defs>' +
-      '<circle cx="60" cy="60" r="52" fill="#fbbf2433"/><path d="M14,60 Q34,28 60,28 Q86,28 106,60 Q86,92 60,92 Q34,92 14,60 Z" fill="#78350f" stroke="#fbbf24" stroke-width="4"/>' +
-      '<circle cx="60" cy="60" r="24" fill="#fde68a" stroke="#fff7ed" stroke-width="3"/><circle cx="60" cy="60" r="8" fill="#fff7ed"/><path d="M38,60 Q48,52 60,52 Q72,52 82,60" stroke="#f59e0b" stroke-width="3" fill="none" opacity=".9"/>', 22);
-    pop(eye, 1000, [T(0.4, 0), T(1.15, 1), T(0.95, 1), T(1.15, 0.9), T(1.3, 0)], { easing: 'ease-out' });
-    floatText(fx, h.x, h.y - 3.1 * PX, '看破识破！', '#fde68a', '#f59e0b', { ms: 1000, size: 15 });
-    // 金流：金屑从看破者出发，在来袭者身上汇合。
-    const origin = { x: h.x, y: h.y - 1.2 * PX };
-    for (let i = 0; i < 28; i++) {
-      const a = { x: origin.x + rnd(-0.24, 0.24) * PX, y: origin.y + rnd(-0.24, 0.24) * PX };
-      const b = { x: e.x + rnd(-0.2, 0.2) * PX, y: e.y + rnd(-0.2, 0.2) * PX };
-      const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - rnd(0.3, 1) * PX };
-      flyOrb(fx, a, c, b, { size: rnd(0.12, 0.22) * PX, color: pick(['#fbbf24', '#f59e0b', '#fde68a']), core: '#fff7ed', ms: rnd(270, 340), delay: i * 3, fade: true });
-    }
-    if (!(await ctx.wait(430))) return false;
-    // ③ 金环汇聚 + 金屑迸射
-    pop(svgAt(e.x, e.y, 2.6 * PX, '0 0 100 100', '<circle cx="50" cy="50" r="30" stroke="#fbbf24" stroke-width="4" fill="none"/><circle cx="50" cy="50" r="42" stroke="#fde68a" stroke-width="2" fill="none" stroke-dasharray="6 6"/>', 22),
-      700, [T(1.35, 0), { ...T(0.72, 1), offset: 0.36 }, T(1.65, 0)], { easing: 'ease-out' });
-    particles(fx, Array.from({ length: 38 }, () => { const a = rnd(0, TAU), d = rnd(0.6, 2) * PX; return { x: e.x + rnd(-12, 12), y: e.y + rnd(-12, 12), dx: Math.cos(a) * d, dy: Math.sin(a) * d, size: rnd(6, 11), color: pick(['#fbbf24', '#f59e0b', '#fde68a']), core: '#fff7ed', s0: 1, s1: 0.3, dur: rnd(420, 800) }; }), 900);
+    const len = Math.hypot(e.x - h.x, e.y - h.y) || 1, ux = (e.x - h.x) / len, uy = (e.y - h.y) / len;
+    const off = Math.min(len * 0.45, 1.4 * PX), m = { x: e.x - ux * off, y: e.y - uy * off + 0.25 * PX };
+    const CY = ['#22d3ee', '#67e8f9', '#a5f3fc'];
+    // ① 识破：战术镜头 + 抛雷 + 锁定框
+    worldDarken(fx, e, { holeR: 1.6 * PX, inMs: 240, holdMs: 1100, outMs: 300, peak: 0.5 });
+    const eye = fx.top(seerEyeHtml(fx.uid(), h.x, h.y - 1.7 * PX, 2.5 * PX, { gold: false }), 1300);
+    openEye(eye, 1300, { hold: 0.55 });
+    floatText(fx, h.x, h.y - 3.05 * PX, '👁 看破 · 远程', '#a5f3fc', '#0e7490', { ms: 900, size: 13, delay: 150 });
+    fx.sfx('bomb_throw', 0.45);
+    const mine = '<svg viewBox="-20 -20 40 40" width="' + 0.62 * PX + '" height="' + 0.62 * PX + '" style="position:absolute;left:0;top:0;margin:' + (-0.31 * PX) + 'px 0 0 ' + (-0.31 * PX) + 'px;overflow:visible;filter:drop-shadow(0 2px 3px #000c);">' +
+      '<circle r="16" fill="#1f2937" stroke="#94a3b8" stroke-width="2.5"/><circle r="10" fill="none" stroke="#475569" stroke-width="2" stroke-dasharray="3 3"/>' +
+      '<circle data-k="led" r="4" fill="#f59e0b"/><path d="M0,-16 L0,-24" stroke="#cbd5e1" stroke-width="2"/></svg>';
+    const ml = fx.top(mine, 1400), ctrl = { x: (h.x + m.x) / 2, y: Math.min(h.y, m.y) - 1.6 * PX };
+    const frames = []; for (let k = 0; k <= 12; k++) { const p = bez(h, ctrl, m, k / 12); frames.push({ transform: 'translate(' + p.x.toFixed(1) + 'px,' + p.y.toFixed(1) + 'px) rotate(' + (k * 60) + 'deg)' }); }
+    ml.firstChild.animate(frames, { duration: 380, easing: 'cubic-bezier(.3,0,.6,1)', fill: 'forwards' });
+    const brk = fx.top('<svg viewBox="-50 -50 100 100" width="' + 2.6 * PX + '" height="' + 2.6 * PX + '" style="position:absolute;left:' + e.x + 'px;top:' + e.y + 'px;transform:translate(-50%,-50%);overflow:visible;filter:drop-shadow(0 0 5px rgba(34,211,238,.9));">' +
+      [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => '<path d="M' + sx * 44 + ',' + sy * 26 + ' L' + sx * 44 + ',' + sy * 44 + ' L' + sx * 26 + ',' + sy * 44 + '" fill="none" stroke="#67e8f9" stroke-width="4" stroke-linecap="square"/>').join('') +
+      '<path data-k="scan" d="M-40,0 L40,0" stroke="#a5f3fc" stroke-width="1.5" opacity=".8"/></svg>', 1250);
+    brk.firstChild.animate([{ transform: 'translate(-50%,-50%) scale(1.8)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 1, offset: 0.3 }, { transform: 'translate(-50%,-50%) scale(.92)', opacity: 1, offset: 0.85 }, { transform: 'translate(-50%,-50%) scale(1.2)', opacity: 0 }], { duration: 1250, easing: 'cubic-bezier(.3,.8,.3,1)', fill: 'forwards' });
+    brk.querySelector('[data-k=scan]').animate([{ transform: 'translateY(-40px)' }, { transform: 'translateY(40px)' }], { duration: 420, iterations: 3, direction: 'alternate' });
+    if (!(await ctx.wait(380))) return false;
+    // ② 部署：落地扬尘 + 指示灯三连闪
+    playJumpDust(fx, { x: m.x / PX, y: m.y / PX + 0.1 }, { phase: 'land', heavy: false, scale: 0.5 });
+    const led = ml.querySelector('[data-k=led]');
+    led.animate([{ fill: '#f59e0b' }, { fill: '#fef3c7', offset: 0.5 }, { fill: '#ef4444' }], { duration: 85, iterations: 3 });
+    fx.sfx('bellPing', 0.4);
     if (!(await ctx.wait(260))) return false;
-    // ④ 斜斩 + 无效化印章 + 暖白闪 + 震屏（原版 playKanpoSound）
-    fx.sfx('kanpo', 1); fx.shake('medium');
-    pop('<i style="position:absolute;left:' + e.x + 'px;top:' + e.y + 'px;width:' + 8 * PX + 'px;height:' + 8 * PX + 'px;margin:' + (-4 * PX) + 'px 0 0 ' + (-4 * PX) + 'px;border-radius:50%;background:radial-gradient(circle,rgba(255,237,213,0.9),rgba(251,191,36,0.35) 45%,transparent 75%);mix-blend-mode:screen;"></i>',
-      450, [{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 0 }]);
-    pop(svgAt(e.x, e.y, 3.6 * PX, '0 0 100 100', '<path d="M10,90 L90,10" stroke="#f59e0b" stroke-width="8" stroke-linecap="round" fill="none"/><path d="M22,90 L95,17" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" fill="none" opacity=".9"/>', 18),
-      550, [T(0.2, 1), Object.assign(T(1.15, 1), { offset: 0.35 }), T(1.4, 0)], { easing: 'ease-out' });
-    pop(svgAt(e.x, e.y - 0.9 * PX, 3 * PX, '0 0 100 100', '<path d="M50,12 L58,42 L88,50 L58,58 L50,88 L42,58 L12,50 L42,42 Z" fill="#fbbf24" opacity=".9"/><path d="M42,50 L70,50 L55,65 L50,48 L62,38 Z" fill="#fff7ed" opacity=".95"/>' +
-      '<path d="M24,24 L38,38 M62,62 L76,76 M24,76 L38,62 M62,38 L76,24" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" opacity=".8"/>', 24), 800, [T(0.4, 0), T(1.15, 1), T(1.05, 1), T(1.35, 0)], { easing: 'ease-out' });
-    floatText(fx, e.x, e.y - 2.6 * PX, '无效化', '#fde68a', '#f59e0b', { ms: 800, size: 17 });
-    floatText(fx, e.x, e.y - 1.4 * PX, '技能无效化！', '#fcd34d', '#92400e', { ms: 900, size: 13, delay: 120 });
-    return ctx.wait(720);
+    // ③ 声爆：音叉击响 + 五重声环（色差）+ 正弦声波带
+    fx.sfx('fork432', 0.6); fx.sfx('sd_ring_blast', 0.5); fx.shake('medium');
+    for (let k = 0; k < 5; k++) ctx.after(k * 70, () => {
+      const R = (2.2 + k * 0.5) * PX;
+      fx.top(ringHtml(m.x - 3, m.y, R, 'rgba(244,114,182,0.55)', 'rgba(190,24,93,0.2)') + ringHtml(m.x + 3, m.y, R, 'rgba(34,211,238,0.85)', 'rgba(14,116,144,0.35)'), 560)
+        .childNodes.forEach(el => el.animate([{ transform: 'scale(.12)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 540, easing: 'cubic-bezier(.1,.8,.3,1)', fill: 'forwards' }));
+    });
+    const wl = Math.hypot(e.x - m.x, e.y - m.y) + 0.6 * PX, rot = Math.atan2(e.y - m.y, e.x - m.x) * 180 / Math.PI;
+    let wave = 'M0,0'; for (let x = 6; x <= wl; x += 6) wave += ' L' + x + ',' + (Math.sin(x / 9) * 9 * Math.min(1, x / 40)).toFixed(1);
+    const band = fx.top('<svg width="1" height="1" style="position:absolute;left:' + m.x + 'px;top:' + m.y + 'px;overflow:visible;transform:rotate(' + rot.toFixed(1) + 'deg);filter:drop-shadow(0 0 5px #22d3ee);">' +
+      [['#22d3ee', 4, 0], ['#f472b6', 2, 3], ['#ecfeff', 1.5, -2]].map(([c, w, dy]) => '<path d="' + wave + '" transform="translate(0,' + dy + ')" fill="none" stroke="' + c + '" stroke-width="' + w + '" stroke-linecap="round" pathLength="1" stroke-dasharray=".35 1" stroke-dashoffset=".35"/>').join('') + '</svg>', 760);
+    [...band.firstChild.children].forEach((pth, i) => pth.animate([{ strokeDashoffset: 0.35 }, { strokeDashoffset: -1 }], { duration: 520, delay: i * 30, easing: 'cubic-bezier(.3,0,.5,1)', fill: 'both' }));
+    ml.firstChild.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, delay: 120, fill: 'forwards' });
+    particles(fx, Array.from({ length: 14 }, () => { const a = rnd(0, TAU), d = rnd(0.3, 0.8) * PX; return { x: m.x, y: m.y, dx: Math.cos(a) * d, dy: Math.sin(a) * d - 8, size: rnd(5, 9), color: pick(CY), core: '#ffffff', s0: 1, s1: 0.3, dur: rnd(300, 460) }; }), 520);
+    if (!(await ctx.wait(240))) return false;
+    // ④ 干扰：来袭者 RGB 错位抖动 + 雪花噪带 + 截停子弹坠地 + 「Ø 干扰」章
+    ctx.after(60, () => fx.sfx('forkMute', 0.5)); ctx.after(120, () => fx.sfx('kanpo', 0.55));
+    const sp = ctx.sandbox.getUnitView().nodes.get(ctx.attackerId)?.sprite;
+    if (sp) sp.animate(Array.from({ length: 9 }, (_, k) => ({ translate: (k === 8 ? 0 : rnd(-5, 5)).toFixed(1) + 'px ' + (k === 8 ? 0 : rnd(-2, 2)).toFixed(1) + 'px',
+      filter: k === 8 ? 'none' : 'drop-shadow(' + (k % 2 ? 4 : -4) + 'px 0 0 rgba(244,114,182,.9)) drop-shadow(' + (k % 2 ? -4 : 4) + 'px 0 0 rgba(34,211,238,.9)) saturate(' + (k % 3 ? 1.8 : 0.3) + ')' })), { duration: 560, easing: 'steps(9)' });
+    const noise = fx.top(Array.from({ length: 9 }, () => '<i style="position:absolute;left:' + (e.x - 0.75 * PX + rnd(-6, 6)).toFixed(0) + 'px;top:' + (e.y + rnd(-0.7, 0.7) * PX).toFixed(0) + 'px;width:' + (1.5 * PX * rnd(0.6, 1.1)).toFixed(0) + 'px;height:' + rnd(1.5, 4).toFixed(1) + 'px;' +
+      'background:repeating-linear-gradient(90deg,rgba(236,254,255,.95) 0 3px,rgba(34,211,238,.5) 3px 5px,transparent 5px 8px);mix-blend-mode:screen;"></i>').join(''), 620);
+    [...noise.children].forEach(el => el.animate([{ opacity: 0 }, { opacity: 1 }, { opacity: 0.2 }, { opacity: 0.9 }, { opacity: 0 }], { duration: rnd(320, 560), delay: rnd(0, 140), easing: 'steps(5)', fill: 'both' }));
+    const shells = fx.top(Array.from({ length: 4 }, () => '<i style="position:absolute;left:' + (e.x - ux * 0.7 * PX).toFixed(0) + 'px;top:' + (e.y - uy * 0.7 * PX - 0.3 * PX).toFixed(0) + 'px;width:5px;height:12px;margin:-6px 0 0 -2.5px;border-radius:2px 2px 1px 1px;background:linear-gradient(90deg,#92400e,#fbbf24 45%,#b45309);box-shadow:0 0 4px #fbbf24;"></i>').join(''), 900);
+    [...shells.children].forEach((el, i) => { const dx = rnd(-0.5, 0.5) * PX; el.animate([{ transform: 'translate(0,0) rotate(0deg)', opacity: 1 }, { transform: 'translate(' + (dx * 0.5).toFixed(0) + 'px,-10px) rotate(' + rnd(90, 200).toFixed(0) + 'deg)', offset: 0.3 },
+      { transform: 'translate(' + dx.toFixed(0) + 'px,' + (0.55 * PX).toFixed(0) + 'px) rotate(' + rnd(300, 540).toFixed(0) + 'deg)', opacity: 1, offset: 0.75 }, { transform: 'translate(' + dx.toFixed(0) + 'px,' + (0.55 * PX).toFixed(0) + 'px) rotate(540deg)', opacity: 0 }], { duration: 820, delay: i * 40, easing: 'cubic-bezier(.3,0,.7,1)', fill: 'both' }); });
+    slamSeal(fx, { x: e.x, y: e.y - 0.1 * PX }, 2 * PX,
+      '<svg viewBox="-50 -50 100 100" width="100%" height="100%" style="overflow:visible;filter:drop-shadow(0 0 9px rgba(34,211,238,.9));">' +
+      '<polygon points="0,-46 40,-23 40,23 0,46 -40,23 -40,-23" fill="rgba(8,47,73,.7)" stroke="#22d3ee" stroke-width="4.5"/><polygon points="0,-36 31,-18 31,18 0,36 -31,18 -31,-18" fill="none" stroke="#a5f3fc" stroke-width="1.5" stroke-dasharray="4 3"/>' +
+      '<text x="0" y="-6" font-size="26" font-weight="900" fill="#ecfeff" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif">Ø</text>' +
+      '<text x="0" y="18" font-size="15" font-weight="900" fill="#a5f3fc" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif">干扰</text></svg>', { ring: 'rgba(34,211,238,0.9)', ms: 960 });
+    floatText(fx, e.x, e.y - 2.7 * PX, '声波干扰！', '#a5f3fc', '#0e7490', { ms: 1000, size: 17, delay: 60 });
+    floatText(fx, e.x, e.y - 1.6 * PX, '【' + (ctx.reaction?.incoming || '远程攻击') + '】无效化', '#cffafe', '#164e63', { ms: 950, size: 12, delay: 200 });
+    return ctx.wait(1000);
   },
 };
 
@@ -3042,7 +3241,7 @@ const sanctumVeil = {
   },
 };
 
-export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, slugShot, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, incendiaryBottle, vitalFlow, sanctumVeil, healMend, fogBurst, rlyehSediment, fireDomain, poisonDomain, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, polarBlizzard, temporalQuake, dimensionRift, marcherCharge, marcherRoar, waterBolt, curseBeam, ...basicAttacks, enemyGroupAttack, neutralImpact, zheYing, mirrorCounter, wizardShield, reactionKanpo, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, frostGather, riftGather, kruppAim, sekhmetVow];
+export const DEFAULT_FX_ENTRIES = [arsenicShot, holyJudgment, thunderStorm, fireBlast, lingFengShu, nakTithBarrier, isisEmbrace, sandArmor, meleeHeavy, rangedHeavy, slugShot, gunshotPierce, strafeBurst, kruppSnipe, harmonyWard, silenceField, shatterEcho, sekhmetWrath, bastetOpal, strangeConch, highSummon, scorpionKey, xenonBlightFog, incendiaryBottle, vitalFlow, sanctumVeil, healMend, fogBurst, rlyehSediment, fireDomain, poisonDomain, selfBoost, aoeHeal, allyBuff, pureDebuff, chargeDash, roarWave, polarBlizzard, temporalQuake, dimensionRift, marcherCharge, marcherRoar, waterBolt, curseBeam, ...basicAttacks, enemyGroupAttack, neutralImpact, zheYing, mirrorCounter, wizardShield, reactionKanpo, SONIC_JAM, reactionSheshen, reactionGuard, evadeGlide, holyVow, stormGather, frostGather, riftGather, kruppAim, sekhmetVow];
 export function getFxTagOptions() {
   return [...new Set(DEFAULT_FX_ENTRIES.flatMap(entry => entry.fxTags || []))].map(name => ({ name, label: name }));
 }

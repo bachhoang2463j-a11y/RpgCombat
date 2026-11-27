@@ -377,7 +377,7 @@ export function createActionDirector(deps) {
       if (ev.eventId && consumedKanpoEvents.has(ev.eventId)) return true;
       if (ev.eventId) consumedKanpoEvents.add(ev.eventId);
       const responderId = ev.responderId;
-      const reaction = { kanpo: true, responderId, fxTag: ev.fxTag || null };
+      const reaction = { kanpo: true, responderId, fxTag: ev.fxTag || null, drained: ev.drained || 0, incoming: result.skill?.name || result.item?.name || null };
       const ok = await playReaction({ targetId: responderId || result.casterId, attackerId: result.casterId, reaction });
       if (!ok || !isCurrent()) return false;
       return true;
@@ -1139,6 +1139,7 @@ export function createActionDirector(deps) {
     const rctx = {
       hitTargetId: h.targetId, reaction, shift: reaction.shift, footprint: getViewData().footprintsById[h.targetId],
       view: sandbox.getUnitView(), sandbox, av, fx: makeFx('B'), wait, tween, centerOf,
+      after: (ms, fn) => scope().after(ms, fn),
       ent: id => avHost.entity(id),
       responderId: reaction.responderId || h.targetId, attackerId: h.attackerId || null,
       cameraScale: () => sandbox.getPose().scale,

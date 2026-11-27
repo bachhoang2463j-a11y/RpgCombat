@@ -13,6 +13,11 @@ export function runCases() {
   cases.push(ok('FB-AV08 registry看破优先 reaction-kanpo，非看破逆咒标签仍选 mirror-counter',
     registry.resolve(reactionInput({ kanpo: true, fxTag: '逆咒归源镜' }))?.id === 'reaction-kanpo'
     && registry.resolve(reactionInput({ kanpo: false, fxTag: '逆咒归源镜' }))?.id === 'mirror-counter'));
+  cases.push(ok('FB-AV08b 专属看破分流：净蚀反冲→金色法眼，声波干扰雷→声波干扰，无专属标签仍走净蚀反冲',
+    registry.resolve(reactionInput({ kanpo: true, fxTag: '净蚀反冲' }))?.id === 'reaction-kanpo'
+    && registry.resolve(reactionInput({ kanpo: true, fxTag: '声波干扰雷' }))?.id === 'reaction-sonic-jam'
+    && registry.resolve(reactionInput({ kanpo: true, fxTag: null }))?.id === 'reaction-kanpo'
+    && registry.resolve(reactionInput({ kanpo: true, fxTag: '看破' }))?.fxTags.includes('净蚀反冲')));
 
   const passiveLayers = [], passiveSounds = [], spriteAnimations = [];
   const makeElement = () => ({ animate(frames, opts) { this.frames = frames; this.opts = opts; }, style: {} });

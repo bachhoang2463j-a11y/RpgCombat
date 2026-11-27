@@ -16,12 +16,14 @@ const symbols = [
   'marcher-charge', 'marcher-roar', '行军兽冲撞', '行军兽咆哮',
   'playBackstabMark', 't-unit-rear', 't-unit-backstab', '🗡背袭',
   'stationaryStatus', 't-prep-pips', 't-prep-still', '驻足起咏', '驻足继续',
+  'reaction-sonic-jam', '声波干扰雷', '净蚀反冲', 'seerEyeHtml', 'slamSeal', 't-card-still', 't-ally-ring', 't-ally-mini', 't-ab-fill', 'creature_slime_01',
 ];
 // 产物经压缩：去空白、非 ASCII 字符转 \uXXXX
 const esc = s => [...s].map(c => c.codePointAt(0) > 0xffff ? '\\u{' + c.codePointAt(0).toString(16).toUpperCase() + '}' : c.charCodeAt(0) > 127 ? '\\u' + c.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0') : c).join('');
 const has = s => [s, s.replace(/ /g, ''), esc(s)].some(x => html.includes(x));
 for (const s of symbols) assert.ok(has(s), s + ' 未入包');
 assert.doesNotMatch(html, /translateX\(-90px\)\s*skewX/);
+assert.ok(!html.includes('t-stationary-start'), '旧的独立驻足卡仍在包内');
 const conch = scripts[0][1].indexOf('function playStrangeConch(');
 assert.doesNotMatch(scripts[0][1].slice(conch, conch + 6000), /hitStop = 80/);
 console.log('[fx-polish artifact] 单脚本、零外部 import，' + symbols.length + ' 项新代码入包，折影步无卡片横移、海螺无顿帧');

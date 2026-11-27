@@ -166,7 +166,8 @@ export function buildShell(root) {
     if (inspector.innerHTML !== html) inspector.innerHTML = html;
     inspector.hidden = false;
   }
-  // 友方支援单位不占底栏；右侧详情只显示实际使用的资源与简要状态。
+  // 友方支援单位不占底栏：右侧竖排圆标（召唤物紫环 / 临时友军翠环，外圈血量弧 + 类型角标 + 迷你血条，当前行动金光）；
+  // 点开为详情卡（名字 + 类型签 + 等级/主人、图形化 HP/护盾/MP 条、状态徽章），只显示实际使用的资源。
   const allyOf = id => els.allies.querySelector('[data-unit-id="' + CSS.escape(id) + '"]');
   function renderAllies(allies) {
     const key = allies.map(u => u.id).join('|');
@@ -174,14 +175,23 @@ export function buildShell(root) {
       const open = new Set(Array.from(els.allies.querySelectorAll('[aria-expanded="true"]'), b => b.parentElement.dataset.unitId));
       els.allies.innerHTML = allies.map(u => {
         const id = ESC(u.id), name = ESC(u.name), expanded = open.has(u.id);
-        return '<div class="t-ally-row" data-unit-id="' + id + '">' +
-          '<button type="button" class="t-ally-toggle" aria-label="' + name + '" title="' + name + '" aria-expanded="' + expanded + '" aria-controls="t-ally-' + id + '">' + faceHtml(u, 't-ally-face') + '</button>' +
-          '<div class="t-ally-detail" id="t-ally-' + id + '"' + (expanded ? '' : ' hidden') + '><b>' + name + '</b><small>' + (u.isSummon ? '召唤物' : '盟友') + '</small><span class="t-ally-bars"></span><span class="t-ally-status"></span></div></div>';
+        const owner = u.isSummon && u.summonOwnerId ? (state.units || []).find(x => x.id === u.summonOwnerId) : null;
+        const level = u.ref && u.ref.level;
+        const sub = [level, owner ? '主人 · ' + owner.name : ''].filter(Boolean).map(ESC).join(' · ');
+        return '<div class="t-ally-row ' + (u.isSummon ? 't-ally-summon' : 't-ally-temp') + '" data-unit-id="' + id + '">' +
+          '<button type="button" class="t-ally-toggle" aria-label="' + name + '" title="' + name + (u.isSummon ? ' · 召唤物' : ' · 临时友军') + '" aria-expanded="' + expanded + '" aria-controls="t-ally-' + id + '">' +
+            '<span class="t-ally-ring">' + faceHtml(u, 't-ally-face') + '</span><i class="t-ally-badge" aria-hidden="true">' + (u.isSummon ? '🐾' : '✦') + '</i>' +
+            '<i class="t-ally-mini" aria-hidden="true"><i></i></i></button>' +
+          '<div class="t-ally-detail" id="t-ally-' + id + '"' + (expanded ? '' : ' hidden') + '>' +
+            '<div class="t-ally-head"><b>' + name + '</b><span class="t-ally-tag">' + (u.isSummon ? '召唤物' : '临时友军') + '</span></div>' +
+            (sub ? '<small class="t-ally-sub">' + sub + '</small>' : '') +
+            '<span class="t-ally-bars"></span><span class="t-ally-status"></span></div></div>';
       }).join('');
       els.allies.dataset.key = key;
     }
     els.allies.hidden = !allies.length;
     for (const u of allies) setAllyBars(u.id, u.bars);
+    markCards();
   }
   els.allies.addEventListener('click', e => {
     const btn = e.target.closest('.t-ally-toggle');
@@ -196,8 +206,13 @@ export function buildShell(root) {
     if (!row) return;
     const { hp, maxHp, mp, maxMp, shield } = bars;
     row.classList.toggle('t-down', hp <= 0);
-    const html = 'HP ' + Math.max(0, Math.round(hp)) + '/' + maxHp + (shield > 0 ? ' · 🔰+' + Math.round(shield) : '') +
-      (maxMp > 0 ? '<br>MP ' + Math.max(0, Math.round(mp)) + '/' + maxMp : '');
+    const sh = Math.max(0, shield || 0), scale = Math.max(maxHp || 1, Math.max(0, hp) + sh), hpPct = pct(hp, scale), ratio = pct(hp, maxHp || 1);
+    row.style.setProperty('--hp', ratio + '%');
+    row.classList.toggle('t-low', hp > 0 && ratio < 30);
+    const bar = (cls, label, fill, value, extra = '') => '<span class="t-ab ' + cls + '"><span class="t-ab-track"><i class="t-ab-fill" style="width:' + fill + '%"></i>' + extra + '</span><em>' + label + '</em><b>' + value + '</b></span>';
+    const html = bar('t-ab-hp', 'HP', hpPct, Math.max(0, Math.round(hp)) + '/' + maxHp + (sh > 0 ? ' <i class="t-ab-shv">🔰' + Math.round(sh) + '</i>' : ''),
+      sh > 0 ? '<i class="t-ab-sh" style="left:' + hpPct + '%;width:' + pct(sh, scale) + '%"></i>' : '') +
+      (maxMp > 0 ? bar('t-ab-mp', 'MP', pct(mp, maxMp), Math.max(0, Math.round(mp)) + '/' + maxMp) : '');
     const el = row.querySelector('.t-ally-bars');
     if (el.innerHTML !== html) el.innerHTML = html;
   }
@@ -284,6 +299,7 @@ export function buildShell(root) {
       c.classList.toggle('t-selected', id === state.selectedId);
       c.classList.toggle('t-current', id === state.currentId);
     });
+    els.allies.querySelectorAll('.t-ally-row').forEach(r => r.classList.toggle('t-current', r.dataset.unitId === state.currentId));
   }
   // 职业被动资源到账：卡片描边闪职业色 + 卡片上方弹出图标数值
   function flashHeroPassive(id, text, color) {
@@ -529,19 +545,20 @@ export function buildShell(root) {
       // 主/辅过滤：不匹配的卡（组父按子项）隐藏；组内子卡单独判定
       const hide = !!state.costFilter && !matches(s);
       (s.isGroup ? btn.parentElement : btn).style.display = hide ? 'none' : '';
-      const start = btn.nextElementSibling?.classList.contains('t-stationary-start') ? btn.nextElementSibling : null;
-      // 驻足起咏（施法者）：可用时写明移动→0、准备 N→M 与另耗；具备驻足但条件不满足时灰显原因（点按给出完整原因）
+      // 驻足起咏（施法者）：同卡消耗行末尾一枚小签「⛩驻足 N→M」，点签＝驻足起咏、点卡身＝普通声明；详情与不可用原因放悬停提示
+      const costLine = btn.children[2] && btn.children[2].firstElementChild;
+      const start = costLine && costLine.querySelector('.t-card-still');
       const sta = state.cmd?.stationary || { available: false };
-      const showStart = !hide && s.delay > 0 && !s.isGroup && sta.available && !state.cmd.preparation && state.cmd.canUse(s);
+      const showStart = !!costLine && !hide && s.delay > 0 && !s.isGroup && sta.available && !state.cmd.preparation && state.cmd.canUse(s);
       const r0 = state.cmd?.resources || {}, startKey = showStart ? [sta.ok, sta.reason, sta.movement, s.delay, state.cmd.chargeInventory, r0.main].join('|') : '';
       const fresh = !!start && start.dataset.key === startKey;
       if (start && !fresh) start.remove();
       if (startKey && !fresh) {
         const plan = prepPlan(s.delay, { stationary: true, inventory: state.cmd.chargeInventory || 0, main: (r0.main || 0) - (cost.main || 0) });
-        btn.insertAdjacentHTML('afterend', '<button class="t-stationary-start' + (sta.ok ? '' : ' t-off') + '" data-key="' + ESC(startKey) + '" data-tactics-action="stationary-start:' + btn.dataset.skillIdx + '"' +
-          (sta.ok ? ' title="驻足起咏：消耗全部移动抵 1 点准备"' : ' aria-disabled="true" title="' + ESC(sta.reason) + '"') + '>' +
-          '<span class="t-prep-ico">⛩</span><span class="t-prep-body"><b>驻足起咏 · ' + ESC(s.name) + '</b>' +
-          (sta.ok ? '<small>移动 ' + sta.movement.toFixed(1) + 'm→0 · 抵 1 点</small>' + planText(plan, s.delay) : '<small>' + ESC(sta.reason) + '</small>') + '</span></button>');
+        const extra = [plan.inv ? '加速×' + plan.inv : '', plan.main ? '主×' + plan.main : ''].filter(Boolean).join('+');
+        const tip = sta.ok ? '驻足起咏：移动 ' + sta.movement.toFixed(1) + 'm→0 抵 1 点' + (extra ? '，另耗 ' + extra : '') + '，准备 ' + s.delay + '→' + plan.after + (plan.after ? '' : '（就绪）') : sta.reason;
+        costLine.insertAdjacentHTML('beforeend', '<span class="t-card-still' + (sta.ok ? '' : ' t-off') + '" role="button" data-key="' + ESC(startKey) + '" data-tactics-action="stationary-start:' + btn.dataset.skillIdx + '"' +
+          (sta.ok ? '' : ' aria-disabled="true"') + ' title="' + ESC(tip) + '">⛩驻足 ' + (sta.ok ? s.delay + '→' + plan.after : '✕') + '</span>');
       }
       if (state.cmd && state.cmd.skillReason) {
         const reason = state.cmd.skillReason(s);

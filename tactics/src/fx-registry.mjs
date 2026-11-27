@@ -31,9 +31,11 @@ export function prepareInput(result) {
   return { kind: 'prepare', fxTag: skill.fxTag || null };
 }
 
-// 成功看破优先走通用看破演出，其他反应仍按技能显式标签。
+// 成功看破：技能配了专属看破特效（净蚀反冲 / 声波干扰雷）则用之，其余一律走通用看破（=【净蚀反冲】金色法眼）；
+// 其他反应仍按技能显式标签。
+export const KANPO_FX_TAGS = ['净蚀反冲', '声波干扰雷'];
 export function reactionInput(reaction) {
-  return { kind: 'reaction', fxTag: reaction.kanpo ? '看破' : reaction.fxTag || null };
+  return { kind: 'reaction', fxTag: reaction.kanpo ? (KANPO_FX_TAGS.includes(reaction.fxTag) ? reaction.fxTag : '看破') : reaction.fxTag || null };
 }
 
 export function createFxRegistry() {
