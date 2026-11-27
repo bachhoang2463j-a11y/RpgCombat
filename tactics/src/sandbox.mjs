@@ -18,6 +18,7 @@ import { drawOverlay } from './range-overlay.mjs';
 const FOCUS_MS = 320;        // 镜头引导缓动时长（表现参数，非玩法预算）
 const WHEEL_FACTOR = 1.15;
 const MIN_SCALE = 0.2, MAX_SCALE = 3.2;
+const INTENT_DELAY_MS = 450, INTENT_FADE_MS = 550;   // 敌方危险区：本体蓄力前摇 0.45s 后淡入 0.55s
 
 export function createSandbox(rootEl, deps = {}) {
   const getSafeRect = deps.getSafeRect || (() => ({ left: 0, top: 0, width: rootEl.clientWidth, height: rootEl.clientHeight }));
@@ -39,6 +40,8 @@ export function createSandbox(rootEl, deps = {}) {
   let onHoverCb = null;
   let preview = null;
   let persistentIntents = [];
+  const intentBorn = new Map();   // unitId → 危险区开始淡入的时刻（先让本体蓄力前摇播一拍）
+  let intentFadeRaf = 0;
   let hoverKey = null, backstabHoverId = null;
   let userCamTouched = false;     // 本次动作内玩家是否拖拽/缩放过（中断自动跟随）
   let worldW = 1000, worldH = 1000;
@@ -105,7 +108,15 @@ export function createSandbox(rootEl, deps = {}) {
     const g = dom.overlay.getContext('2d');
     g.setTransform(dom.dpr, 0, 0, dom.dpr, 0, 0);
     g.clearRect(0, 0, worldW, worldH);
-    drawOverlay(g, preview, viewData, selectedId, persistentIntents, backstabHoverId);
+    const now = performance.now();
+    let fading = false;
+    const intents = persistentIntents.map(it => {
+      const alpha = Math.max(0, Math.min(1, (now - intentBorn.get(it.unitId)) / INTENT_FADE_MS));
+      if (alpha < 1) fading = true;
+      return { ...it, alpha };
+    });
+    drawOverlay(g, preview, viewData, selectedId, intents, backstabHoverId);
+    if (fading && !intentFadeRaf) intentFadeRaf = requestAnimationFrame(() => { intentFadeRaf = 0; redrawOverlay(); });
   }
 
   // ---------- 手势（每 mount 绑定一次） ----------
@@ -432,7 +443,10 @@ export function createSandbox(rootEl, deps = {}) {
     setPreview: (data) => { preview = data; redrawOverlay(); },
     setPersistentIntents: (data) => {
       persistentIntents = data;
-      if (data.length) dom.overlay.setAttribute('aria-label', '敌方充能意向：施放时重选');
+      const live = new Set(data.map(it => it.unitId));
+      for (const id of intentBorn.keys()) if (!live.has(id)) intentBorn.delete(id);
+      for (const id of live) if (!intentBorn.has(id)) intentBorn.set(id, performance.now() + INTENT_DELAY_MS);
+      if (data.length) dom.overlay.setAttribute('aria-label', '敌方充能意向：施放时按当时站位重选');
       else dom.overlay.removeAttribute('aria-label');
       redrawOverlay();
     },

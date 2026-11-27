@@ -899,8 +899,8 @@ export function createActionDirector(deps) {
     const c = centerOf(ev.unitId);
     if (!c || !scope()?.isLive) return;
     const p = worldPx(c), poison = ev.kind === 'poison';
-    floatText(makeFx('B'), p.x, p.y - 30 - index * 18, (poison ? '中毒' : '燃烧') + ' -' + ev.damage,
-      poison ? '#bef264' : '#fdba74', poison ? '#365314' : '#7c2d12', { size: 14 });
+    floatText(makeFx('B'), p.x, p.y - 34 - index * 24, (poison ? '☠️ 中毒 -' : '🔥 燃烧 -') + ev.damage,
+      poison ? '#d9f99d' : '#fed7aa', poison ? '#4d7c0f' : '#c2410c', { size: 19, ms: 1100 });
   }
 
   const FIELD_EVENTS = ['region-contest', 'enemy-alarm', 'passive-gain'];

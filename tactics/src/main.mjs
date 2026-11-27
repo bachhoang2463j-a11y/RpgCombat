@@ -28,7 +28,7 @@ import { createEditorPanel } from './editor-panel.mjs';
 import { autoPickChoice } from './reaction-prompt.mjs';
 import { unitCenter } from './geometry.mjs';
 import { createEncounterScenario, createScenarioData, createSeededRandom } from './scenario-data.mjs';
-import { statusBadges, compactStatusHtml, fullStatusHtml, inspectorHtml, auraList } from './status-ui.mjs';
+import { statusBadges, compactStatusHtml, iconStatusHtml, inspectorHtml, auraList } from './status-ui.mjs';
 import { passiveGainLabel } from './fx-library.mjs';
 import { resolveLore } from './lore.mjs';
 import { getEffectiveStats } from './class-passives.mjs';
@@ -253,7 +253,7 @@ export function createApp(rootEl, opts = {}) {
   let currentYamlText = null;
   let currentViewData = null;
   const avHost = createAvHost({ getUnitView: () => sandbox.getUnitView(), getUnits: () => (currentViewData ? currentViewData.units : []),
-    getEffectiveUnit: id => battle?.getEffectiveUnit(id), onStatusTick: (ev, index) => director.playStatusTick(ev, index) });
+    getEffectiveUnit: id => battle?.getEffectiveUnit(id), onStatusTick: (ev, index) => playDotTick(ev, index) });
   const ui = createUiSfx(avHost.av.CombatAudioMixer);
   const sandbox = createSandbox(shell.els.mapSlot, {
     getSafeRect: () => shell.getSafeRect(),
@@ -516,7 +516,7 @@ export function createApp(rootEl, opts = {}) {
       view.setAuras(u.id, auraList(list));
       if (u.side === 'hero') {
         if (currentViewData.heroCardIds.has(u.id)) {
-          shell.setHeroStatus(u.id, fullStatusHtml(list.filter(b => b.key !== 'shield')));  // 护盾已写进卡片血条
+          shell.setHeroStatus(u.id, iconStatusHtml(list.filter(b => b.key !== 'shield')));  // 护盾已写进卡片血条
           shell.setHeroStats(u.id, shownEff.get(u.id) || battle.getEffectiveUnit(u.id), getEffectiveStats(u, []));
         } else shell.setAllyStatus(u.id, compactStatusHtml(list.filter(b => b.key !== 'shield')));
       }
@@ -699,9 +699,14 @@ export function createApp(rootEl, opts = {}) {
   const PASSIVE_CARD_COLOR = { taunt: '#f87171', stealth: '#a5b4fc', haste: '#22d3ee' };
   const naturalTurnAudio = new Set();
   let focusFxRun = null, lastFocusFxSeq = 0;
+  let intentSeen = new Set();
   function syncTacticalWarnings(snap) {
-    if (focusFxRun !== snap.runId) { focusFxRun = snap.runId; lastFocusFxSeq = 0; }
-    sandbox.setPersistentIntents(snap.units.flatMap(u => u.charge?.intent ? [u.charge.intent] : []));
+    if (focusFxRun !== snap.runId) { focusFxRun = snap.runId; lastFocusFxSeq = 0; intentSeen = new Set(); }
+    // 敌方充能已满：先在本体播蓄力前摇（红光震颤 + 聚气 + 低鸣），危险区随后由叠加层淡入，不凭空出现
+    const intents = snap.units.flatMap(u => u.charge?.intent ? [{ ...u.charge.intent, unitId: u.id }] : []);
+    for (const it of intents) if (!intentSeen.has(it.unitId)) playChargeWindup(it.unitId);
+    intentSeen = new Set(intents.map(it => it.unitId));
+    sandbox.setPersistentIntents(intents);
     for (const ev of snap.events) {
       if (ev.type !== 'focus-issued' || ev.seq <= lastFocusFxSeq) continue;
       lastFocusFxSeq = ev.seq;
@@ -891,7 +896,8 @@ export function createApp(rootEl, opts = {}) {
         resolve(choice);
       };
       teleportPrompt = { req, cells, finish };
-      sandbox.setPreview({ kind: 'move', unitId: req.unitId, cells });
+      // 折影步反应：闪现可达范围（半径圈 + 可落格）常驻到落点确认
+      sandbox.setPreview({ kind: 'blink', unitId: req.unitId, cells, radius: req.distance || 2 });
       sandbox.refreshHover();
     });
   }
@@ -937,6 +943,8 @@ export function createApp(rootEl, opts = {}) {
       const pos = teleportPrompt.req.unitId && currentViewData.placementsById[teleportPrompt.req.unitId];
       const staying = pos && pos.col === hit.col && pos.row === hit.row;
       const cell = teleportPrompt.cells.find(c => c.col === hit.col && c.row === hit.row);
+      sandbox.setPreview({ kind: 'blink', unitId: teleportPrompt.req.unitId, cells: teleportPrompt.cells, radius: teleportPrompt.req.distance || 2,
+        hover: cell || null, invalid: cell || staying ? null : { col: hit.col, row: hit.row } });
       sandbox.setHint({ x: hit.col + 0.5, y: hit.row + 0.5 }, staying ? '点此留在原地 · 按取消也可留原地' : cell ? '折影步 · 点击确认' : '不可闪现至此格 · 按取消留在原地', staying || cell ? null : 'bad');
       return;
     }
@@ -964,8 +972,8 @@ export function createApp(rootEl, opts = {}) {
       const q = battle.previewAttack(aim.skill, { x: hit.col + 0.5, y: hit.row + 0.5 });
       const cells = battle.teleportCells();
       const legal = cells.some(c => c.col === hit.col && c.row === hit.row) && q.ok && q.teleport;
-      sandbox.setPreview({ kind: 'move', unitId: battle.snapshot().currentId, cells,
-        hover: legal ? { col: hit.col, row: hit.row, cost: q.teleport.distance, path: q.teleport.path } : null,
+      sandbox.setPreview({ kind: 'blink', unitId: battle.snapshot().currentId, cells, radius: blinkRadius(aim.skill),
+        hover: legal ? { col: hit.col, row: hit.row } : null,
         invalid: legal ? null : { col: hit.col, row: hit.row } });
       sandbox.setHint({ x: hit.col + 0.5, y: hit.row + 0.5 }, legal ? '折影步 · ' + q.teleport.distance.toFixed(1) + 'm · 点击确认' : q.reason || '不可闪现至此格', legal ? null : 'bad');
       return;
@@ -1272,7 +1280,7 @@ export function createApp(rootEl, opts = {}) {
     aim = { key, skill };
     sandbox.setHint(null); sandbox.refreshHover();
     if (!skill.isReaction && skill.displacements?.some(d => d.type === '闪现')) {
-      sandbox.setPreview({ kind: 'move', unitId: battle.snapshot().currentId, cells: battle.teleportCells() });
+      sandbox.setPreview({ kind: 'blink', unitId: battle.snapshot().currentId, cells: battle.teleportCells(), radius: blinkRadius(skill) });
       renderCommand(); return;
     }
     sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: aim.skill, query: null });
@@ -1629,7 +1637,7 @@ export function createApp(rootEl, opts = {}) {
   }
 
   // ---------- 接触拍点揭示 ----------
-  function revealHit(hit) {
+  function revealHit(hit, meta) {
     const u = unitById(hit.targetId);
     if (!u) return;
     const prev = shownOf(u);
@@ -1643,6 +1651,15 @@ export function createApp(rootEl, opts = {}) {
     for (let i = hit.logIndex; i < hit.logEnd; i++) hiddenLog.delete(i);
     shell.setHistory(visibleLog());
     shell.showLog(battle.snapshot().log[hit.logIndex], hit.hit ? 'hit' : hit.heal ? 'heal' : 'dodge');
+    // 结算覆盖确认：每个被判定的目标闪一次结果环（命中红 / 击倒白红 / 闪避白虚线）；我方闪避在角色栏再弹一次
+    if (!hit.heal) {
+      sandbox.getUnitView()?.pulseOutcome(u.id, hit.hit ? (hit.down ? 'kill' : 'hit') : 'dodge');
+      if (!hit.hit && u.side === 'hero') shell.flashHeroPassive(u.id, '💨 闪避', '#e2e8f0');
+    }
+    if (hit.down) {
+      const res = meta && meta.result, killer = res && unitById(res.casterId);
+      downTag(u.id, killer && killer.id !== u.id ? '☠ ' + killer.name + (res.skill?.name ? '【' + res.skill.name + '】' : '') + ' 击倒' : '☠ 倒下');
+    }
     if (hit.down) playDown(u);
   }
   function playDown(u) {
@@ -1691,6 +1708,34 @@ export function createApp(rootEl, opts = {}) {
     sandbox.getScope().after(ms, () => sandbox.getScope().removeNode(el));
     return el;
   }
+  // 倒地原因牌：倒下单位头顶停留 1.8s（谁用什么打倒 / 持续伤害致死）
+  function downTag(id, text) {
+    const c = sandbox.unitWorldCenter(id);
+    const el = c && fxNode('t-down-tag', c.x, c.y, 1800);
+    if (el) el.textContent = text;
+  }
+  // 持续伤害跳伤：放大飘字 + 结果环 + 状态图标闪 + 角色栏弹字 + 合成音；致死时挂原因牌
+  function playDotTick(ev, index) {
+    director.playStatusTick(ev, index);
+    const poison = ev.kind === 'poison', u = unitById(ev.unitId);
+    ui(poison ? 'poisonTick' : 'burnTick');
+    const view = sandbox.getUnitView();
+    view?.pulseOutcome(ev.unitId, poison ? 'poison' : 'burn');
+    view?.nodes.get(ev.unitId)?.status.querySelector('[data-k="' + ev.kind + '"]')?.animate(
+      [{ transform: 'scale(1.6)', filter: 'brightness(2.2)' }, { transform: 'scale(1)', filter: 'brightness(1)' }], { duration: 520, easing: 'ease-out' });
+    if (u && u.side === 'hero') shell.flashHeroPassive(u.id, (poison ? '☠️ ' : '🔥 ') + '-' + ev.damage, poison ? '#bef264' : '#fb923c');
+    if (ev.hpAfter <= 0) { ui('lethal'); downTag(ev.unitId, '☠ ' + (poison ? '中毒' : '燃烧') + '致死'); }
+  }
+  // 敌方充能已满的前摇：本体红光震颤先起（t-unit-charge-full 常驻）+ 一次红色聚气 + 低鸣
+  function playChargeWindup(id) {
+    const view = sandbox.getUnitView(), c = sandbox.unitWorldCenter(id);
+    if (!view || !c) return;
+    view.setFlag(id, 't-unit-charge-windup', true);
+    sandbox.getScope().after(900, () => view.setFlag(id, 't-unit-charge-windup', false));
+    fxNode('t-danger-gather', c.x, c.y, 1000);
+    ui('enemyCharge');
+  }
+  function blinkRadius(skill) { return skill.displacements.find(d => d.type === '闪现').distance; }
   function moveFeedback(id, kind, p) {
     const st = effectiveUnitStyle(id) || {};
     const u = unitById(id);

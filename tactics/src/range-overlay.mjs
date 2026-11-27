@@ -11,7 +11,8 @@ import { BACKSTAB_HALF_ANGLE } from './range.mjs';
 const Q = 50;
 const C = {
   move: { fill: 'rgba(125,211,252,0.10)', edge: 'rgba(147,197,253,0.55)', path: '#e0f2fe', glow: 'rgba(56,189,248,0.45)' },
-  atk: { fill: 'rgba(251,146,60,0.16)', edge: 'rgba(253,186,116,0.85)', guide: 'rgba(254,215,170,0.55)' },
+  atk: { fill: 'rgba(251,146,60,0.16)', edge: 'rgba(253,186,116,0.85)', guide: 'rgba(254,215,170,0.55)', cell: 'rgba(251,146,60,0.08)' },
+  blink: { fill: 'rgba(129,140,248,0.16)', edge: 'rgba(165,180,252,0.85)', dot: 'rgba(224,231,255,0.8)', path: '#e0e7ff', glow: 'rgba(99,102,241,0.5)' },
   lock: '#fde68a', bad: '#f87171', ally: 'rgba(125,211,252,0.9)',
 };
 
@@ -32,6 +33,17 @@ function clipCells(g, cells) {
   g.beginPath();
   for (const c of cells) g.rect(c.col * Q, c.row * Q, Q, Q);
   g.clip();
+}
+// 直线范围按真实几何画平滑旋转带（斜向不再沿格阶梯描边）：长度截到最远作用格（遇墙截断），作用格只叠一层极淡底色
+function truncatedLine(shape, cells) {
+  const ux = Math.cos(shape.dir), uy = Math.sin(shape.dir), from = shape.from || shape.center;
+  let far = 0;
+  for (const c of cells) far = Math.max(far, (c.col + 0.5 - from.x) * ux + (c.row + 0.5 - from.y) * uy);
+  return { ...shape, length: Math.min(shape.length, far + 0.5) };
+}
+function fillCells(g, cells, color) {
+  g.fillStyle = color;
+  for (const c of cells) g.fillRect(c.col * Q + 1, c.row * Q + 1, Q - 2, Q - 2);
 }
 
 function shapePath(g, shape) {
@@ -159,9 +171,16 @@ function drawAttack(g, pv, viewData) {
     return;
   }
   const shape = q.shape;
+  const line = q.ok && shape && shape.type === '直线' && !q.chargePath && q.cells.length ? truncatedLine(shape, q.cells) : null;
   if (q.ok && shape && shape.type !== '单体') {
     // 面：只在真实作用格内填充与描边（墙后格不在 cells，自然被裁掉）
-    if (q.cells.length) {
+    if (line) {
+      fillCells(g, q.cells, C.atk.cell);
+      g.save();
+      shapePath(g, line); g.fillStyle = C.atk.fill; g.fill();
+      g.strokeStyle = C.atk.edge; g.lineWidth = 1.8; g.lineJoin = 'round'; g.stroke();
+      g.restore();
+    } else if (q.cells.length) {
       g.save(); clipCells(g, q.cells);
       if (shape.type === '全域' || q.chargePath) { g.fillStyle = C.atk.fill; g.fillRect(0, 0, 1e5, 1e5); }
       else {
@@ -175,7 +194,7 @@ function drawAttack(g, pv, viewData) {
     if (shape.type === '直线' || shape.type === '扇形') {
       g.save();
       const ux = Math.cos(shape.dir), uy = Math.sin(shape.dir);
-      const L = (shape.type === '直线' ? shape.length : shape.radius) * Q;
+      const L = (line ? line.length : shape.type === '直线' ? shape.length : shape.radius) * Q;
       g.strokeStyle = C.atk.guide; g.lineWidth = 1.4; g.setLineDash([6, 6]);
       g.beginPath(); g.moveTo(o.x * Q, o.y * Q); g.lineTo(o.x * Q + ux * L, o.y * Q + uy * L); g.stroke();
       g.setLineDash([]);
@@ -256,23 +275,63 @@ function drawJump(g, pv, viewData) {
   }
 }
 
+// 闪现（折影步主动/反应）：半径圈 + 可落格菱点；悬停落点画虚线位移与落点环
+function drawBlink(g, pv, viewData) {
+  const p = viewData.placementsById[pv.unitId];
+  if (!p) return;
+  const fp = viewData.footprintsById[pv.unitId] || { width: 1, height: 1 };
+  const o = unitCenter(p, fp), ox = o.x * Q, oy = o.y * Q, R = pv.radius * Q;
+  g.save();
+  const grad = g.createRadialGradient(ox, oy, R * 0.25, ox, oy, R);
+  grad.addColorStop(0, 'rgba(129,140,248,0.02)'); grad.addColorStop(1, C.blink.fill);
+  g.fillStyle = grad;
+  g.beginPath(); g.arc(ox, oy, R, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = C.blink.edge; g.lineWidth = 1.8; g.setLineDash([8, 6]); g.stroke(); g.setLineDash([]);
+  for (const c of pv.cells || []) {
+    const m = unitCenter(c, fp);
+    g.fillStyle = 'rgba(165,180,252,0.10)'; g.fillRect(c.col * Q + 4, c.row * Q + 4, Q - 8, Q - 8);
+    g.fillStyle = C.blink.dot;
+    g.beginPath(); g.moveTo(m.x * Q, m.y * Q - 3.4); g.lineTo(m.x * Q + 3.4, m.y * Q); g.lineTo(m.x * Q, m.y * Q + 3.4); g.lineTo(m.x * Q - 3.4, m.y * Q); g.closePath(); g.fill();
+  }
+  const h = pv.hover;
+  if (h) {
+    const b = unitCenter(h, fp), bx = b.x * Q, by = b.y * Q;
+    g.lineCap = 'round';
+    g.strokeStyle = C.blink.glow; g.lineWidth = 8;
+    g.beginPath(); g.moveTo(ox, oy); g.lineTo(bx, by); g.stroke();
+    g.strokeStyle = C.blink.path; g.lineWidth = 2.2; g.setLineDash([6, 6]);
+    g.beginPath(); g.moveTo(ox, oy); g.lineTo(bx, by); g.stroke(); g.setLineDash([]);
+    g.strokeStyle = C.blink.path; g.lineWidth = 2.4; g.shadowColor = C.blink.glow; g.shadowBlur = 10;
+    for (const c of occupiedCells(h, fp)) g.strokeRect(c.col * Q + 3, c.row * Q + 3, Q - 6, Q - 6);
+    g.beginPath(); g.arc(bx, by, 9, 0, Math.PI * 2); g.stroke();
+  }
+  g.restore();
+  if (pv.invalid) drawBlock(g, { x: pv.invalid.col + 0.5, y: pv.invalid.row + 0.5 });
+}
+
 function drawChargeIntent(g, intent) {
-  const { shape, cells, aim, origin } = intent;
-  if (!cells.length) return;
+  const { shape, cells } = intent;
+  if (!cells.length || !(intent.alpha > 0)) return;
   const curved = shape.type === '爆炸' || shape.type === '圆形' || shape.type === '扇形';
   const hasShape = curved || shape.type === '直线' && shape.width > 0;
   g.save();
+  g.globalAlpha = intent.alpha;
   g.fillStyle = 'rgba(248,113,113,0.17)';
+  if (shape.type === '直线' && shape.width > 0) {
+    fillCells(g, cells, 'rgba(248,113,113,0.07)');
+    shapePath(g, truncatedLine(shape, cells)); g.fillStyle = 'rgba(248,113,113,0.17)'; g.fill();
+    g.strokeStyle = 'rgba(248,113,113,0.9)'; g.lineWidth = 2; g.lineJoin = 'round'; g.setLineDash([7, 5]); g.stroke();
+    g.restore();
+    return;
+  }
   if (hasShape) {
     clipCells(g, cells); shapePath(g, shape); g.fill();
     g.strokeStyle = 'rgba(248,113,113,0.9)'; g.lineWidth = 2; g.setLineDash([7, 5]); g.stroke();
   } else for (const c of cells) g.fillRect(c.col * Q, c.row * Q, Q, Q);
   g.restore();
+  g.save(); g.globalAlpha = intent.alpha;
   strokeCellOutline(g, cells, 'rgba(248,113,113,0.58)', 1.5);
-  const from = shape.center || aim || origin;
-  g.save(); g.fillStyle = '#fecaca'; g.font = 'bold 15px sans-serif';
-  g.shadowColor = '#180607'; g.shadowBlur = 4;
-  g.fillText('施放时重选', from.x * Q + 8, from.y * Q - 10); g.restore();
+  g.restore();
 }
 
 // 绘制入口：固定意向先画，独立于玩家悬停和当次施放预览。
@@ -299,6 +358,7 @@ export function drawOverlay(g, pv, viewData, selectedId, intents = [], backstabH
     if (pv.kind === 'move') drawMove(g, pv, viewData);
     else if (pv.kind === 'attack') drawAttack(g, pv, viewData);
     else if (pv.kind === 'jump') drawJump(g, pv, viewData);
+    else if (pv.kind === 'blink') drawBlink(g, pv, viewData);
   }
   if (selectedId && viewData && viewData.placementsById[selectedId]) {
     const p = viewData.placementsById[selectedId], fp = viewData.footprintsById[selectedId];

@@ -140,7 +140,7 @@ export function buildShell(root) {
   }
 
   // ---------- 我方卡片 ----------
-  // 布局：头像 + 名字/职业 + HP 条（数值与护盾写在条内）+ MP/TP 双条（各带数值）；底行五项有效属性（相对基础值着色，悬停看构成）
+  // 布局（33号远征队式）：半身肖像出框 + 斜切铭牌（名字/职业 · HP 条内数值与护盾 · 分段 MP · TP 细线）；五项有效属性收进悬停浮层（相对基础值着色）
   const STAT_KEYS = [['atk', '攻', '攻击'], ['def', '防', '防御'], ['hit', '命', '命中'], ['eva', '避', '回避'], ['spd', '速', '速度']];
   function cardHtml(u) {
     const res = (cls, label) => '<span class="t-hero-res ' + cls + '"><span class="t-hero-res-h"><em>' + label + '</em><b></b></span><i class="t-bar"><i class="t-bar-fill"></i></i></span>';
@@ -295,11 +295,14 @@ export function buildShell(root) {
     }
   }
   function markCards() {
+    let current = false;
     els.heroes.querySelectorAll('.t-hero-card').forEach(c => {
       const id = c.getAttribute('data-unit-id');
       c.classList.toggle('t-selected', id === state.selectedId);
       c.classList.toggle('t-current', id === state.currentId);
+      current = current || id === state.currentId;
     });
+    els.heroes.classList.toggle('t-has-current', current);   // 有我方行动者时其余卡压暗
     els.allies.querySelectorAll('.t-ally-row').forEach(r => r.classList.toggle('t-current', r.dataset.unitId === state.currentId));
   }
   // 职业被动资源到账：卡片描边闪职业色 + 卡片上方弹出图标数值
@@ -402,14 +405,18 @@ export function buildShell(root) {
     const prep = cmd.preparation;
     const charge = prep ? '<button class="t-res-charge' + (prep.ready ? ' t-ready' : '') + '" data-tactics-charge title="蓄力面板"><span class="t-charge-name">' +
       (prep.ready ? '⚡ ' : '⏳ ') + ESC(prep.skill && prep.skill.name) + '</span><b class="t-charge-progress">' + (prep.ready ? '就绪' : prep.invested + '/' + (prep.invested + prep.remaining)) + '</b></button>' : '';
+    // 点数只靠点的个数表达；万能点为临时获得，0 点时整组隐藏
+    const uni = r.universal || 0;
+    const uniGroup = uni > 0 ? '<span class="t-res-action-group t-uni-group"><span class="t-res-lab t-universal" title="万能行动点：剩余 ' + uni + ' 点 · 可支付主行动或辅助行动">万能</span>' +
+      Array.from({ length: uni }, () => '<i class="t-pip t-pip-universal t-on"></i>').join('') + '</span>' : '';
     els.strip.innerHTML =
       '<div class="t-res-move" title="剩余移动额度' + (sprint > 0 ? '（含冲刺 ' + sprint.toFixed(1) + 'm）' : '') + '">' +
         '<span class="t-res-ico">🦶</span><span class="t-res-track"><i class="t-res-base" style="width:' + (base / cap * 100).toFixed(1) + '%"></i>' +
         '<i class="t-res-sprint" style="width:' + (sprint / cap * 100).toFixed(1) + '%"></i><i class="t-res-cost"></i></span>' +
         '<b class="t-res-num">' + r.moveRemaining.toFixed(1) + '<small>/' + (+cap.toFixed(1)) + 'm</small></b></div>' +
       '<div class="t-res-pips"><span class="t-res-action-group"><button class="t-res-lab' + (state.costFilter === 'main' ? ' t-filter-on' : '') + '" data-cost-filter="main" title="主行动：剩余 ' + r.main + ' 点 · 攻击技能、冲刺、背起 · 点击只看消耗主行动的技能">主</button>' + pips('main', state.pipMax.main, r.main, prev.main) + '</span>' +
-        '<span class="t-res-action-group"><button class="t-res-lab t-aux' + (state.costFilter === 'aux' ? ' t-filter-on' : '') + '" data-cost-filter="aux" title="辅助行动：剩余 ' + r.aux + ' 点 · 跳跃、推动、辅助技能 · 点击只看消耗辅助行动的技能">辅 ' + r.aux + '</button>' + pips('aux', state.pipMax.aux, r.aux, prev.aux) +
-        '<span class="t-universal-pair"><span class="t-universal" title="万能行动点：可支付主行动或辅助行动">万能 ' + (r.universal || 0) + '</span><i class="t-universal-mark" aria-hidden="true"></i></span></span>' + charge + '</div>';
+        '<span class="t-res-action-group"><button class="t-res-lab t-aux' + (state.costFilter === 'aux' ? ' t-filter-on' : '') + '" data-cost-filter="aux" title="辅助行动：剩余 ' + r.aux + ' 点 · 跳跃、推动、辅助技能 · 点击只看消耗辅助行动的技能">辅</button>' + pips('aux', state.pipMax.aux, r.aux, prev.aux) + '</span>' +
+        uniGroup + charge + '</div>';
     if (state.moveCost != null) previewMoveCost(state.moveCost);
   }
   function previewMoveCost(cost) {
@@ -427,7 +434,7 @@ export function buildShell(root) {
     const mark = (kind, n) => { const on = [...els.strip.querySelectorAll('.t-pip-' + kind + '.t-on')]; on.slice(Math.max(0, on.length - n)).forEach(p => p.classList.add('t-pip-will')); };
     if (main > 0) mark('main', main);
     if (aux > 0) mark('aux', aux);
-    els.strip.querySelector('.t-universal')?.classList.toggle('t-universal-will', universal > 0);
+    if (universal > 0) mark('universal', universal);
   }
   // ---------- 基础行动：原版二级菜单内改两列格子（普攻 + 战棋动作 + 未迁移的防御/撤离）；每格写明花费与「立即/选目标」 ----------
   function renderBasic(cmd) {
@@ -467,6 +474,17 @@ export function buildShell(root) {
     return (parts.length ? '<small>' + (plan.stationary ? '另耗 ' : '消耗 ') + parts.join(' + ') + '</small>' : '') +
       '<b class="t-prep-delta">准备 ' + from + '→' + plan.after + (plan.after === 0 ? ' · 就绪' : '') + '</b>';
   }
+  // 蓄力卡紧凑一行：消耗 + 结果（完整「消耗 / 准备 N→M」进悬停提示）
+  function planShort(plan) {
+    const parts = [];
+    if (plan.inventory) parts.push('加速' + plan.inventory);
+    if (plan.skillMain) parts.push('技主' + plan.skillMain);
+    if (plan.main) parts.push('◆' + plan.main);
+    if (plan.aux) parts.push('◇' + plan.aux);
+    if (plan.universal) parts.push('✦' + plan.universal);
+    return (parts.length ? parts.join(' ') + ' → ' : '') + (plan.after === 0 ? '就绪' : '剩 ' + plan.after);
+  }
+  const plainText = html => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
   function prepPips(invested, remaining, plan) {
     const total = invested + remaining, gain = plan ? remaining - plan.after : 0;
     return '<span class="t-prep-pips" aria-hidden="true">' + Array.from({ length: total }, (_, i) =>
@@ -486,26 +504,22 @@ export function buildShell(root) {
     const name = ESC(prep.skill && prep.skill.name);
     const canContinue = !!cmd.preparePayment;
     const canStationary = !!sta.payment;
-    const btnA = 'w-full py-1.5 px-2.5 bg-gradient-to-r border rounded-lg text-xs font-bold text-white flex items-center justify-center gap-1.5 transition-all';
-    const btnB = 'w-full py-1.5 px-2.5 bg-slate-800/90 hover:bg-slate-700/90 border border-slate-600/80 rounded-lg text-xs font-bold text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-all';
     const go = cmd.preparePayment, still = sta.payment;
-    const head = '<div class="t-prep-head"><span>⏳ 【' + name + '】蓄力中</span>' + prepPips(prep.invested || 0, prep.remaining, null) +
-      '<small>已备 ' + (prep.invested || 0) + ' · 还需 <b>' + prep.remaining + '</b></small></div>';
-    const goBtn = '<button data-tactics-action="prepare" class="t-prep-btn t-prep-go"' + (canContinue ? '' : ' aria-disabled="true" title="' + ESC(cmd.continueReason || '主行动、辅助行动或万能行动点不足') + '"') + '>' +
-      '<span class="t-prep-ico">⏩</span><span class="t-prep-body"><b>继续准备</b>' + (canContinue ? planText(go, prep.remaining) : '<small>' + ESC(cmd.continueReason || '主行动、辅助行动或万能行动点不足') + '</small>') + '</span>' +
-      (canContinue ? prepPips(prep.invested || 0, prep.remaining, go) : '') + '</button>';
-    const stillBtn = !sta.available ? '' : '<button data-tactics-action="stationary-prepare" class="t-prep-btn t-prep-still"' + (canStationary ? '' : ' aria-disabled="true" title="' + ESC(sta.reason) + '"') + '>' +
-      '<span class="t-prep-ico">⛩</span><span class="t-prep-body"><b>驻足继续</b>' +
-      (canStationary ? '<small>移动 ' + sta.movement.toFixed(1) + 'm→0 · 抵 1 点</small>' + planText(still, prep.remaining) : '<small>' + ESC(sta.reason) + '</small>') + '</span>' +
-      (canStationary ? prepPips(prep.invested || 0, prep.remaining, still) : '') + '</button>';
+    const invested = prep.invested || 0, total = invested + prep.remaining;
+    // 三行：标题（名字 + 进度格 + 计数）/ 两个并排动作（不可用原因进悬停）/ 两个文字链接
+    const head = '<div class="t-prep-head"><span class="t-prep-title">' + (prep.ready ? '⚡ ' : '⏳ ') + name + '</span>' + prepPips(invested, prep.remaining, null) +
+      '<b class="t-prep-count">' + (prep.ready ? '就绪' : invested + '/' + total) + '</b></div>';
+    const goReason = cmd.continueReason || '主行动、辅助行动或万能行动点不足';
+    const goBtn = '<button data-tactics-action="prepare" class="t-prep-btn t-prep-go"' + (canContinue ? ' title="' + ESC(plainText(planText(go, prep.remaining))) + '"' : ' aria-disabled="true" title="' + ESC(goReason) + '"') + '>' +
+      '<b>继续准备</b><small>' + (canContinue ? ESC(planShort(go)) : '资源不足') + '</small></button>';
+    const stillBtn = !sta.available ? '' : '<button data-tactics-action="stationary-prepare" class="t-prep-btn t-prep-still"' +
+      (canStationary ? ' title="' + ESC('驻足：移动 ' + sta.movement.toFixed(1) + 'm→0 抵 1 点 · ' + plainText(planText(still, prep.remaining))) + '"' : ' aria-disabled="true" title="' + ESC(sta.reason) + '"') + '>' +
+      '<b>驻足继续</b><small>' + (canStationary ? ESC(planShort(still)) : /驻足需满额移动/.test(sta.reason) ? '需满额移动' : ESC(sta.reason)) + '</small></button>';
+    const links = '<div class="t-prep-links"><button data-tactics-action="cancel-charge" class="t-prep-link t-prep-cancel" title="已付资源不退">终止蓄力</button>' +
+      '<button data-tactics-charge-aside class="t-prep-link t-charge-aside" title="暂离蓄力面板去移动/跳跃，资源条的蓄力徽章可随时回来">先做其他行动 ↩</button></div>';
     els.chargeMenu.innerHTML = prep.ready
-      ? '<div class="text-center text-[10px] font-bold text-cyan-300 bg-cyan-950/80 border border-cyan-500/50 py-1 px-2 rounded-lg shadow-inner flex items-center justify-center gap-1.5 animate-pulse mb-1"><span>⚡</span> 【' + name + '】蓄力已完成！</div>' +
-        '<button data-tactics-action="release" class="' + btnA + ' from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 border-cyan-400 shadow-lg"><span>1.</span> 释放蓄力 (进入目标选择)</button>' +
-        '<button data-tactics-action="cancel-charge" class="' + btnB + '"><span>2.</span> 终止蓄力 (已付资源不退)</button>' +
-        '<button data-tactics-charge-aside class="t-charge-aside">↩ 先做其他行动（移动/跳跃…）</button>'
-      : head + goBtn + stillBtn +
-        '<button data-tactics-action="cancel-charge" class="' + btnB + '"><span>2.</span> 终止蓄力 (已付资源不退)</button>' +
-        '<button data-tactics-charge-aside class="t-charge-aside">↩ 先做其他行动（移动/跳跃…）</button>';
+      ? head + '<button data-tactics-action="release" class="t-prep-release"><b>释放【' + name + '】</b><small>进入目标选择</small></button>' + links
+      : head + '<div class="t-prep-row">' + goBtn + stillBtn + '</div>' + links;
   }
   // 战棋专有信息：技能卡第二行末尾追加空间范围胶囊——沿用原版修饰胶囊样式（同 🎯命中值胶囊：灰底细边 + 等宽数值）
   // 与原版标签悬浮提示引擎（data-tagtip-*）；原版打开子菜单会重建列表，按列表变化补挂

@@ -29,17 +29,17 @@ export function statusBadges(eff, extra = {}) {
   const expiring = list => list.some(b => b.remaining != null && b.remaining <= 1);
 
   if (eff.stunned) push({ key: 'stun', icon: '💫', text: '眩晕', short: '眩晕', color: '#facc15', neg: true, title: '【眩晕】跳过下一次自然行动' }, 0);
-  if (group('defend').length) push({ key: 'defend', icon: '🛡️', text: '防卫', short: '防卫', color: '#6ee7b7', title: '【防卫姿态】受到伤害降低，命中+30', expiring: expiring(group('defend')) }, 1);
+  if (group('defend').length) push({ key: 'defend', icon: '🛡️', text: '防卫', short: '防卫', color: '#6ee7b7', title: '【防卫姿态】受到伤害降低，命中+30', expiring: expiring(group('defend')), turns: maxRem(group('defend')) }, 1);
   for (const [type, icon, name, color] of [['poison', '☠️', '毒', '#c084fc'], ['burn', '🔥', '燃', '#fb923c']]) {
     const g = group(type);
     if (!g.length) continue;
     const v = type === 'burn' ? Math.max(...g.map(b => b.value)) : g.reduce((n, b) => n + b.value, 0), rem = maxRem(g);
-    push({ key: type, icon, text: name + v + (rem != null ? '·' + rem + '回' : ''), short: name + v, color, neg: true, expiring: expiring(g),
+    push({ key: type, icon, text: name + v + (rem != null ? '·' + rem + '回' : ''), short: name + v, color, neg: true, expiring: expiring(g), turns: rem,
       title: type === 'poison' ? '【中毒】每回合损失 ' + v + ' HP，可叠层（' + g.length + ' 层）' : '【燃烧】每回合损失 ' + v + ' HP，治疗减半' }, 2);
   }
   const para = group('paralyze');
   if (para.length) push({ key: 'paralyze', icon: '⚡', text: '麻' + para.length + '层·' + Math.min(20, para.length * 5) + '%' + (maxRem(para) != null ? '·' + maxRem(para) + '回' : ''), short: '麻' + para.length,
-    color: '#fde047', neg: true, expiring: expiring(para), title: '【麻痹】回避 ' + para.reduce((n, b) => n + b.value, 0) + '，行动僵直概率 ' + Math.min(20, para.length * 5) + '%' }, 2);
+    color: '#fde047', neg: true, expiring: expiring(para), turns: maxRem(para), title: '【麻痹】回避 ' + para.reduce((n, b) => n + b.value, 0) + '，行动僵直概率 ' + Math.min(20, para.length * 5) + '%' }, 2);
   const rush = group('atk').filter(b => b.isConcealAtk);
   if (rush.length) {
     const value = rush.reduce((n, b) => n + b.value, 0);
@@ -53,7 +53,7 @@ export function statusBadges(eff, extra = {}) {
     if (!v) continue;
     const rem = maxRem(g), consumable = g.every(b => b.isConsumable), t = turnsText(rem, consumable);
     push({ key: field, icon: v < 0 && field === 'spd' ? '🐌' : s.icon, text: s.name + sign(v) + (t ? '·' + t : ''), short: s.name + sign(v), color: v < 0 ? NEG : s.color, neg: v < 0,
-      expiring: expiring(g), title: '【' + s.title + (v < 0 ? '下降' : '提升') + '】' + sign(v) + (t ? '，剩余 ' + t : '') }, v < 0 ? 3 : 4);
+      expiring: expiring(g), turns: rem, title: '【' + s.title + (v < 0 ? '下降' : '提升') + '】' + sign(v) + (t ? '，剩余 ' + t : '') }, v < 0 ? 3 : 4);
   }
   const tauntDelta = eff.taunt - BASE_TAUNT;
   if (tauntDelta) {
@@ -66,14 +66,14 @@ export function statusBadges(eff, extra = {}) {
   if (eff.exposure) {
     const { stacks, remaining } = eff.exposure;
     push({ key: 'exposure', icon: '🎯', text: '暴露×' + stacks + ' · 闪避−' + stacks * 5 + ' · ' + remaining + '回', short: '暴露×' + stacks,
-      color: '#fca5a5', neg: true, expiring: remaining === 1, title: '【暴露】闪避−' + stacks * 5 + '，剩余 ' + remaining + ' 个自身回合' }, 2);
+      color: '#fca5a5', neg: true, expiring: remaining === 1, turns: remaining, title: '【暴露】闪避−' + stacks * 5 + '，剩余 ' + remaining + ' 个自身回合' }, 2);
   }
   const counter = group('counter');
   if (counter.length) { const v = counter.reduce((n, b) => n + b.value, 0);
-    push({ key: 'counter', icon: '⚔️', text: v ? '反击+' + v : '反击架势', short: '反击', color: '#fcd34d', expiring: expiring(counter), title: '【反击架势】受到攻击时反击' + (v ? '，附加威力 +' + v : '') }, 5); }
+    push({ key: 'counter', icon: '⚔️', text: v ? '反击+' + v : '反击架势', short: '反击', color: '#fcd34d', expiring: expiring(counter), turns: maxRem(counter), title: '【反击架势】受到攻击时反击' + (v ? '，附加威力 +' + v : '') }, 5); }
   const guard = group('damageGuard');
   if (guard.length) push({ key: 'damageGuard', icon: '🛡️', text: '免伤+' + guard.reduce((n, b) => n + b.value, 0), short: '免伤', color: '#7dd3fc', title: '【免伤】本次整技累计可抵消的伤害额度' }, 5);
-  for (const b of group('variant')) push({ key: 'variant:' + b.variant, icon: '🧬', text: b.variant + (b.remaining != null ? '·' + b.remaining + '回' : ''), short: b.variant, color: '#67e8f9',
+  for (const b of group('variant')) push({ key: 'variant:' + b.variant, icon: '🧬', text: b.variant + (b.remaining != null ? '·' + b.remaining + '回' : ''), short: b.variant, color: '#67e8f9', turns: b.remaining,
     expiring: b.remaining != null && b.remaining <= 1, title: '【' + b.variant + '】获得特性' + (b.remaining != null ? '，剩余 ' + b.remaining + ' 回合' : '') }, 6);
   if (eff.chargeInventory > 0) push({ key: 'haste', icon: '⚡', text: '加速 ' + eff.chargeInventory,
     short: '加速 ' + eff.chargeInventory, color: '#67e8f9', title: '【加速】剩余 ' + eff.chargeInventory + ' 点，用于开始或继续蓄力' }, 1);
@@ -83,7 +83,7 @@ export function statusBadges(eff, extra = {}) {
   return out.sort((a, b) => a.rank - b.rank);
 }
 
-const badgeHtml = (b, full) => '<span class="t-st' + (b.key === 'taunt' ? ' t-st-taunt' : '') + (b.neg ? ' t-st-neg' : '') + (b.expiring ? ' t-st-exp' : '') + '" style="--c:' + b.color + '" title="' + ESC(b.title || b.text) + '">' +
+const badgeHtml = (b, full) => '<span class="t-st' + (b.key === 'taunt' ? ' t-st-taunt' : '') + (b.neg ? ' t-st-neg' : '') + (b.expiring ? ' t-st-exp' : '') + '" data-k="' + ESC(b.key) + '" style="--c:' + b.color + '" title="' + ESC(b.title || b.text) + '">' +
   '<i>' + b.icon + '</i>' + ESC(full ? b.text : b.short) + '</span>';
 // 地图单位：最多 max 个紧凑徽章，其余折叠为 +N
 export function compactStatusHtml(list, max = 4) {
@@ -91,6 +91,11 @@ export function compactStatusHtml(list, max = 4) {
   return list.slice(0, max).map(b => badgeHtml(b, false)).join('') + (list.length > max ? '<span class="t-st t-st-more" title="' + ESC(list.slice(max).map(b => b.text).join(' / ')) + '">+' + (list.length - max) + '</span>' : '');
 }
 export function fullStatusHtml(list) { return list.map(b => badgeHtml(b, true)).join(''); }
+// 角色栏：图标格（角标 = 剩余回合；数值与说明进悬停提示）
+export function iconStatusHtml(list) {
+  return list.map(b => '<span class="t-sti' + (b.neg ? ' t-sti-neg' : '') + (b.expiring ? ' t-st-exp' : '') + '" data-k="' + ESC(b.key) + '" style="--c:' + b.color + '" title="' + ESC(b.text + (b.title ? ' — ' + b.title : '')) + '">' +
+    '<i>' + b.icon + '</i>' + (b.turns != null ? '<b>' + b.turns + '</b>' : '') + '</span>').join('');
+}
 // 徽章 → 头像持续弧光种类（同种只一层，按徽章重要度由内向外，最多 max 层）；持续伤害/麻痹/护盾已有独立状态层，不重复
 export function auraList(list, max = 4) {
   const out = [], seen = new Set();

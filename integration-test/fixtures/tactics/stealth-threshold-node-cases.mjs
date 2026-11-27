@@ -85,7 +85,9 @@ function assertStrip(html, count, extra) {
   const pips = [...html.matchAll(/<i\b[^>]*class="([^"]*\bt-pip-main\b[^"]*)"[^>]*>/g)];
   assert.equal(pips.length, 1, '主点格容量必须保持');
   assert.equal(pips.filter(p => /(?:^|\s)t-on(?:\s|$)/.test(p[1])).length, count, '亮起格数必须等于真实主点');
-  assert.ok(html.includes('>万能 ' + extra + '</span>'), '万能文本必须等于实际余额');
+  const uni = [...html.matchAll(/<i\b[^>]*class="[^"]*\bt-pip-universal\b[^"]*\bt-on\b[^"]*"[^>]*>/g)];
+  assert.equal(uni.length, extra, '万能点格数必须等于实际余额（0 时整组隐藏）');
+  assert.equal(html.includes('t-uni-group'), extra > 0, '万能点为 0 时整组隐藏');
 }
 
 export function runCases() {

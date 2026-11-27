@@ -76,9 +76,9 @@ function previewCases() {
     base: { atk: 50, def: 10, hit: 0, eva: 0, spd: 100 }, badges: [], charge: { current: 4, max: 4 }, lore: resolveLore({ name: '🦈深潜者A' }) });
   out.push(ok('UIR-P 检视卡：加减成标注、原版变种特质图标与说明、满充能提示', /ATK:<b>70<\/b><em class="t-up">\+20<\/em>/.test(html) && /SPD:<b>90<\/b><em class="t-down">-10<\/em>/.test(html)
     && /data-tagtip-body="受到的远程伤害 -50%"><i>💧<\/i>流体<\/span>/.test(html) && /大招就绪/.test(html)));
-  out.push(ok('UIR-P 检视卡保留毛玻璃，无四角与钉住行为', /t-insp-glass/.test(html) && !/t-insp-corner|点选钉住/.test(html)
+  out.push(ok('UIR-P 检视卡为暗金扁平铭牌（金细线 + 伪元素四角刻线），无四角节点与钉住行为', /t-insp-glass/.test(html) && !/t-insp-corner|点选钉住/.test(html)
     && !/inspectPinned/.test(m) && !/\.t-insp-corner/.test(src('tactics.css'))
-    && /\.t-insp-glass \{[^}]*rgba\(30,41,59,0\.20\)[^}]*backdrop-filter: blur\(14px\)[^}]*border: 1px solid rgba\(6,182,212,0\.4\)/.test(src('tactics.css'))));
+    && /\.t-insp-glass \{[^}]*rgba\(24,21,16,\.96\)[^}]*border: 1px solid var\(--g-line\)/.test(src('tactics.css')) && /\.t-insp-glass::before/.test(src('tactics.css'))));
   out.push(ok('UIR-P 世界书档案块：示例标 SAMPLE，接入后 unit.wbSource（原版契约）优先并标 LORE ENTRY', /📚 世界书图鉴档案<\/span><em>SAMPLE<\/em>/.test(html) && html.includes(SAMPLE_LORE['深潜者'])
     && resolveLore({ name: '食尸鬼B', wbSource: { wbName: '澳洲篇', entryName: '食尸鬼', desc: '真值' } }).desc === '真值' && !resolveLore({ name: '食尸鬼B', wbSource: { wbName: '澳洲篇', entryName: '食尸鬼', desc: '真值' } }).sample));
   {

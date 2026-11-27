@@ -1513,7 +1513,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (rr.dodged && selected.skill.name === '折影步') {
       const cells = teleportCells(responder.id, 2);
       if (cells.length) {
-        const request = { type: 'teleport', runId, attackId: currentAttackId(), unitId: responder.id, cells, candidates: [] };
+        const request = { type: 'teleport', runId, attackId: currentAttackId(), unitId: responder.id, cells, distance: 2, candidates: [] };
         const choice = options.autoAnswer ? options.autoAnswer(request) : isAiControlled(responder) ? cells[0] : yield request;
         if (request.runId !== runId) return null;
         if (choice && cells.some(c => c.col === choice.col && c.row === choice.row)) {

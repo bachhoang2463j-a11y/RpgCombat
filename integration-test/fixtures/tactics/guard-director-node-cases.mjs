@@ -108,7 +108,7 @@ async function run() {
         ];
         host.consumeVisualEvents(events);
         host.consumeVisualEvents(events);
-        assert.deepEqual(labels, ['燃烧 -7', '中毒 -13', '中毒 -4']);
+        assert.deepEqual(labels, ['🔥 燃烧 -7', '☠️ 中毒 -13', '☠️ 中毒 -4']);
       } finally {
         for (const [key, value] of Object.entries(original)) {
           if (value === undefined) delete globalThis[key]; else globalThis[key] = value;

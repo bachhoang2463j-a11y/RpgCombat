@@ -176,6 +176,27 @@ export function createUiSfx(mixer) {
       tone(c, t, { type: 'sine', f0: 196, f1: 392, dur: 0.45, vol: 0.06, attack: 0.05 });
       tone(c, t + 0.08, { type: 'triangle', f0: 784, f1: 1175, dur: 0.35, vol: 0.025, attack: 0.04 });
     },
+    // ---- 战况可读性 ----
+    enemyCharge(c, t) {         // 敌方充能已满：低频压迫上扬 + 颤音锯齿 + 末尾金属警示
+      tone(c, t, { type: 'sawtooth', f0: 70, f1: 140, dur: 0.75, vol: 0.07, attack: 0.12, lp: 600 });
+      tone(c, t, { type: 'sine', f0: 140, f1: 280, dur: 0.7, vol: 0.05, attack: 0.1 });
+      tick(c, t + 0.05, { freq: 500, q: 0.7, dur: 0.6, vol: 0.05 });
+      tone(c, t + 0.62, { type: 'square', f0: 880, dur: 0.09, vol: 0.022, lp: 2400 });
+      tone(c, t + 0.74, { type: 'square', f0: 880, dur: 0.12, vol: 0.022, lp: 2400 });
+    },
+    burnTick(c, t) {            // 燃烧跳伤：灼烧嘶声 + 闷痛
+      tick(c, t, { freq: 4200, q: 0.6, dur: 0.22, vol: 0.07, type: 'highpass' });
+      tick(c, t + 0.02, { freq: 180, q: 0.8, dur: 0.12, vol: 0.18, type: 'lowpass' });
+    },
+    poisonTick(c, t) {          // 中毒跳伤：气泡破裂 + 闷痛
+      tone(c, t, { type: 'sine', f0: 420, f1: 900, dur: 0.06, vol: 0.04 });
+      tone(c, t + 0.07, { type: 'sine', f0: 360, f1: 780, dur: 0.06, vol: 0.035 });
+      tick(c, t + 0.02, { freq: 160, q: 0.8, dur: 0.12, vol: 0.18, type: 'lowpass' });
+    },
+    lethal(c, t) {              // 持续伤害致死：下坠钟音
+      tone(c, t, { type: 'triangle', f0: 523, f1: 196, dur: 0.6, vol: 0.06 });
+      tone(c, t, { type: 'sine', f0: 98, f1: 55, dur: 0.6, vol: 0.09 });
+    },
     jumpCrouch(c, t) { tick(c, t, { freq: 320, q: 0.9, dur: 0.08, vol: 0.10, type: 'lowpass' }); },
     jumpTakeoff(c, t) {         // 起跳：蹬地 + 风声上扫
       tick(c, t, { freq: 160, q: 0.8, dur: 0.09, vol: 0.24, type: 'lowpass' });

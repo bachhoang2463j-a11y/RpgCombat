@@ -275,6 +275,19 @@ export function createUnitView(parent, deps) {
     rec.shadow.style.transform = 'scale(' + (1 - px / 40).toFixed(3) + ')';
   }
   function clearFlag(cls) { for (const rec of nodes.values()) rec.root.classList.remove(cls); }
+  // 结算结果环（命中 / 击倒 / 闪避 / 燃烧 / 中毒）：头像外一圈自外收紧后淡出，确认这一击是否落到该单位
+  function pulseOutcome(id, kind) {
+    const rec = nodes.get(id);
+    if (!rec) return;
+    const el = document.createElement('i');
+    el.className = 't-outcome t-outcome-' + kind;
+    rec.billboard.appendChild(el);
+    const a = el.animate(kind === 'dodge'
+      ? [{ opacity: 0, transform: 'scale(.8) rotate(0deg)' }, { opacity: 1, transform: 'scale(1.05) rotate(25deg)', offset: 0.3 }, { opacity: 0, transform: 'scale(1.3) rotate(60deg)' }]
+      : [{ opacity: 0, transform: 'scale(1.5)' }, { opacity: 1, transform: 'scale(.96)', offset: 0.35 }, { opacity: 0, transform: 'scale(1.08)' }],
+      { duration: kind === 'kill' ? 900 : 650, easing: 'cubic-bezier(.2,.8,.3,1)' });
+    a.onfinish = () => el.remove();
+  }
   // 状态徽章行（血条下方，宿主给 HTML；同内容不重写）
   function setStatus(id, html) {
     const rec = nodes.get(id);
@@ -309,5 +322,5 @@ export function createUnitView(parent, deps) {
   }
 
   return { setUnits, syncUnits, updateUnit, setFacing, onCameraChange, getEntitySpriteDom, nodes,
-    lockMotion, setDisplayPos, setDisplayFacing, setFlag, clearFlag, setHop, setCharge, setStatus, setPredict, clearPredict, setShield, setAuras, pulseAlert };
+    lockMotion, setDisplayPos, setDisplayFacing, setFlag, clearFlag, setHop, setCharge, setStatus, setPredict, clearPredict, setShield, setAuras, pulseAlert, pulseOutcome };
 }

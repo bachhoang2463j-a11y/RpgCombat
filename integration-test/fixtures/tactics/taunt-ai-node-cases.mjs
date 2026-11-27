@@ -126,7 +126,7 @@ function run() {
     && /嘲讽 \+100/.test(html) && /隐匿 50/.test(html) && !/永久|临时|回合|t-st-exp/.test(html), html));
   const main = readFileSync(new URL('../../../tactics/src/main.mjs', import.meta.url), 'utf8');
   cases.push(ok('TA-UI2 地图与英雄卡复用同一份状态列表', /view\.setStatus\(u\.id, compactStatusHtml\(list\)\)/.test(main)
-    && /shell\.setHeroStatus\(u\.id, fullStatusHtml\(list\.filter\(b => b\.key !== 'shield'\)\)\)/.test(main)));
+    && /shell\.setHeroStatus\(u\.id, iconStatusHtml\(list\.filter\(b => b\.key !== 'shield'\)\)\)/.test(main)));
   return { cases };
 }
 export const groups = { 'TAUNT-AI': { run } };
