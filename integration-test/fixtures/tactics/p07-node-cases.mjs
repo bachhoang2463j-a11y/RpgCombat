@@ -149,12 +149,13 @@ async function p07(m) {
   }, rng([0, 0]));
   extraBattle.start();
   const extraSkill = { ...shot, name: 'extraPoint', cost: 0, type: '[再动]', type2: '[无]', type3: '[无]', power: 1, power2: 0, range: { type: '单体', castRange: 10 }, actionCost: { main: 1, aux: 0 } };
+  const extraSkillAgain = { ...extraSkill, name: 'extraPointAgain' };
   const extraCurrent = attackAt(extraBattle, extraSkill, 'extra', { col: 2, row: 4 });
-  const afterImmediate = extraBattle.snapshot().resources.main;
-  const repeatedCurrent = attackAt(extraBattle, extraSkill, 'extra', { col: 2, row: 4 });
-  const afterRepeated = extraBattle.snapshot().resources.main;
-  cases.push(ok('T07-06 当前再动点可继续消费且同源不重发',
-    extraCurrent.ok && afterImmediate === 1 && repeatedCurrent.ok && afterRepeated === 0,
+  const afterImmediate = extraBattle.snapshot().resources.universal;
+  const repeatedCurrent = attackAt(extraBattle, extraSkillAgain, 'extra', { col: 2, row: 4 });
+  const afterRepeated = extraBattle.snapshot().resources.universal;
+  cases.push(ok('T07-06 当前再动万能点可继续消费且不同来源各发一次',
+    extraCurrent.ok && afterImmediate === 1 && repeatedCurrent.ok && afterRepeated === 1,
     JSON.stringify({ current: extraCurrent.ok, afterImmediate, repeated: repeatedCurrent.ok, afterRepeated })));
   const allyBattle = makeBattle(m, [unit('giver', 'hero', { spd: 200 }), unit('receiver', 'hero', { spd: 100 })], [unit('foe', 'enemy', { spd: 20 })], {
     giver: { col: 2, row: 4 }, receiver: { col: 3, row: 6 }, foe: { col: 6, row: 4 },
@@ -166,9 +167,9 @@ async function p07(m) {
   const giverAfter = allyBattle.snapshot().resources;
   for (let i = 0; i < 4 && allyBattle.snapshot().currentId !== 'receiver'; i++) allyBattle.endAction();
   const delivered = allyBattle.snapshot();
-  cases.push(ok('T07-06 队友再动真实提交、待领取并在自然行动交付，不刷新移动辅助',
+  cases.push(ok('T07-06 队友再动真实提交、待领取并在自然行动交付万能点，不刷新移动辅助',
     // sourceKey 现带 ':mp0' 后缀标记，按前缀匹配同源
-    extraAlly.ok && pendingAfter.some(p => p.targetId === 'receiver' && p.sourceKey.indexOf('giver:grantAlly') === 0) && giverAfter.main === 0 && giverAfter.aux === 1 && giverAfter.moveRemaining === 4 && delivered.currentId === 'receiver' && delivered.resources.main === 2 && delivered.resources.aux === 1 && delivered.resources.moveRemaining === 4,
+    extraAlly.ok && pendingAfter.some(p => p.targetId === 'receiver' && p.sourceKey.indexOf('giver:grantAlly') === 0) && giverAfter.main === 1 && giverAfter.aux === 0 && giverAfter.moveRemaining === 4 && delivered.currentId === 'receiver' && delivered.resources.main === 1 && delivered.resources.aux === 1 && delivered.resources.universal === 1 && delivered.resources.moveRemaining === 4,
     JSON.stringify({ extraAlly: extraAlly.ok, pendingAfter, giverAfter, delivered: { currentId: delivered.currentId, resources: delivered.resources } })));
 
   const speedHero = unit('speed-caster', 'hero', { spd: 1000 });
@@ -264,7 +265,7 @@ async function p07(m) {
     JSON.stringify({ canKanpo: canKanpo.ok, reason: canceledByKanpo.reason, caster: incomingBattle.snapshot().currentId, canceled: canceledByKanpo.canceled, hits: canceledByKanpo.hits.length,
       targetHp: target.ref.hp, kanpoEvents: canceledByKanpo.events.filter(event => event.type === 'kanpo-resolved').length,
       heroMp: kanpoHero.ref.mp, uses: incomingBattle.battleState.perBattleUses.kh })));
-  speedBattle.battleState.combatState.clock.currentAction.resources.main = 1;
+  speedBattle.battleState.combatState.clock.currentAction.resources.aux = 1;
   const speedRefresh = speedBattle.attack({ ...speedSkill, power: 30 }, { x: 2.5, y: 7.5, targetId: 'speed-ally' });
   const refreshedSpeed = speedBattle.getEffectiveUnit('speed-ally').spd;
   for (let i = 0; i < 32 && speedBattle.snapshot().now < 210; i++) speedBattle.endAction();

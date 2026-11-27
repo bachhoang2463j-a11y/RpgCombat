@@ -533,7 +533,7 @@ async function t0305(deps) {
     'grant=' + JSON.stringify({ status: rStun.status, time: rStun.time, unitId: rStun.unitId, res: rStun.resources }) +
     ' grantsAt10=' + grantsAt10.length));
   cases.push(ok('T03-05 待领取点跨眩晕保留并在下次自然行动交付（main=2）',
-    rStun.resources.main === 2 && eqJson(rStun.resources.deliveredMainSources, ['再动A']) &&
+    rStun.resources.universal === 1 && eqJson(rStun.resources.deliveredMainSources, ['再动A']) &&
     entriesOf(bsS, 'main-point-granted').length === 1,
     'res=' + JSON.stringify(rStun.resources)));
 
@@ -611,12 +611,12 @@ async function t0305(deps) {
   const grantLogs = entriesOf(bsR, 'main-point-granted');
   cases.push(ok('T03-05 行动中grantMainPoint立即加点且getActionState实时含余额',
     !!im1 && im1.ok === true && !!stateFirst && stateFirst.unitId === 'a-actor' &&
-    stateFirst.resources.main === 2 &&
+    stateFirst.resources.universal === 1 &&
     grantLogs.some(e => e.immediate === true && e.targetId === 'a-actor' && e.sourceKey === '迅捷'),
     'state=' + JSON.stringify(stateFirst) + ' logs=' + JSON.stringify(grantLogs)));
   cases.push(ok('T03-05 同sourceKey本次行动二次拒绝而不同来源可叠加',
     !!im2 && im2.ok === false && im2.events.length === 0 &&
-    !!im3 && im3.ok === true && !!stateAfterThird && stateAfterThird.resources.main === 3,
+    !!im3 && im3.ok === true && !!stateAfterThird && stateAfterThird.resources.universal === 2,
     'dup=' + JSON.stringify(im2) + ' third=' + JSON.stringify(im3) +
     ' state=' + JSON.stringify(stateAfterThird)));
   cases.push(ok('T03-05 endAction清未用点并解冻（getActionState回null）',
@@ -624,7 +624,7 @@ async function t0305(deps) {
     JSON.stringify(endState)));
   cases.push(ok('T03-05 非当前行动者转待领取并在其自然行动交付（main=2）',
     !!pend && pend.ok === true && eqJson(pendSnapshot, [{ targetId: 'b-buddy', sourceKey: '援射' }]) &&
-    !!buddyGrant && near(buddyGrant.t, 20) && buddyGrant.res.main === 2 &&
+    !!buddyGrant && near(buddyGrant.t, 20) && buddyGrant.res.main === 1 && buddyGrant.res.universal === 1 &&
     eqJson(buddyGrant.res.deliveredMainSources, ['援射']),
     'pend=' + JSON.stringify(pend) + ' snapshot=' + JSON.stringify(pendSnapshot) +
     ' grant=' + JSON.stringify(buddyGrant)));
@@ -685,9 +685,9 @@ async function t0305(deps) {
   cases.push(ok('T03-05 交付点入冻结期实时余额（getActionState main=2）',
     pendPoint.ok === true && stateBefore === null &&
     rM.status === 'action' && rM.unitId === 'receiver' && near(rM.time, 10) &&
-    rM.resources.main === 2 && eqJson(rM.resources.deliveredMainSources, ['策应']) &&
+    rM.resources.universal === 1 && eqJson(rM.resources.deliveredMainSources, ['策应']) &&
     !!stateFrozen && stateFrozen.unitId === 'receiver' &&
-    stateFrozen.resources.main === 2 && stateFrozen.resources.moveQuota === 1 && stateFrozen.resources.aux === 1 &&
+    stateFrozen.resources.main === 1 && stateFrozen.resources.universal === 1 && stateFrozen.resources.moveQuota === 1 && stateFrozen.resources.aux === 1 &&
     extraFrozen === 1 &&
     stateAfter === null && extraAfter === 0,
     'frozen=' + JSON.stringify(stateFrozen) + ' extraFrozen=' + extraFrozen +

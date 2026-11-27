@@ -427,6 +427,19 @@ button:disabled { opacity: .42; cursor: default; }
 
 /* 指令面板：原版技能栏（vendor/rpg-ui，原样尺寸 260×172）；演出中轻微压暗 */
 #menu-outer { pointer-events: auto; }
+#menu-container { height: min(172px, 38vh); min-height: 0; overflow: clip; }
+/* 蓄力菜单独立占位：收起飞出子菜单，不让它们的平移增加可滚动宽度。 */
+#menu-container.t-charge-open { height: auto; max-height: 55vh; }
+#menu-container.t-charge-open > .translate-x-full, #menu-container.t-charge-open > #target-menu.translate-y-full { display: none; }
+#charge-menu { min-width: 0; min-height: 0; max-width: 100%; max-height: 100%; overflow-x: hidden; overflow-y: auto; align-items: stretch; justify-content: flex-start; }
+#charge-menu > * { min-width: 0; max-width: 100%; }
+.t-prep-head, .t-prep-btn { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.t-prep-head > span { min-width: 0; max-width: 100%; overflow-wrap: anywhere; text-align: center; }
+.t-prep-btn { flex-wrap: wrap; }
+.t-prep-btn > .t-prep-pips { flex: 0 0 auto; margin-left: auto; }
+.t-prep-body { overflow-wrap: anywhere; }
+.t-prep-body small { white-space: normal; }
+@media (max-height: 480px) { #menu-container { height: min(150px, 35vh); min-height: 0; } #charge-menu { padding-top: 4px; padding-bottom: 4px; } }
 #menu-container.t-busy #main-menu { filter: saturate(.6) brightness(.8); }
 /* 标题栏：原版"XX 的回合"居中文字 + 右侧高频【结束回合】 */
 #active-hero-name { position: relative; display: flex; align-items: center; justify-content: center; min-height: 26px; padding-right: 86px; padding-left: 6px; }
@@ -456,10 +469,16 @@ button:disabled { opacity: .42; cursor: default; }
 @keyframes t-cost-blink { from { opacity: .55; } to { opacity: 1; } }
 .t-res-num { min-width: 62px; text-align: right; font-weight: 800; color: #e0f2fe; font-variant-numeric: tabular-nums; }
 .t-res-num small { color: #64748b; font-weight: 600; }
-.t-res-pips { display: flex; align-items: center; gap: 3px; min-height: 14px; }
-.t-res-lab { font-weight: 900; color: #fda4af; margin-right: 1px; cursor: help; }
+.t-res-pips { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; min-height: 14px; min-width: 0; }
+.t-res-action-group { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; min-width: 0; max-width: 100%; }
+.t-res-lab { font-weight: 900; color: #fda4af; margin-right: 1px; cursor: help; flex: 0 0 auto; }
 .t-res-lab.t-aux { color: #7dd3fc; margin-left: 9px; }
-.t-pip { width: 11px; height: 11px; border-radius: 2px; transform: rotate(45deg) scale(.8); border: 1px solid rgba(100,116,139,.75); background: rgba(15,23,42,.95); transition: background .25s, box-shadow .25s; }
+.t-universal-pair { display: inline-flex; align-items: center; gap: 2px; flex: 0 0 auto; white-space: nowrap; }
+.t-universal { margin-left: 4px; color: #e9d5ff; font-weight: 800; white-space: nowrap; flex: 0 0 auto; }
+.t-universal-mark { width: 7px; height: 7px; margin-left: -1px; transform: rotate(45deg); border: 1px solid #e9d5ff; background: linear-gradient(135deg,#c084fc,#6d28d9); box-shadow: 0 0 5px rgba(192,132,252,.7); flex: 0 0 auto; }
+.t-universal.t-universal-will { color: #fff; text-shadow: 0 0 7px #c084fc; }
+.t-universal.t-universal-will + .t-universal-mark { animation: t-pip-will .5s ease-in-out infinite alternate; }
+.t-pip { width: 11px; height: 11px; border-radius: 2px; transform: rotate(45deg) scale(.8); border: 1px solid rgba(100,116,139,.75); background: rgba(15,23,42,.95); transition: background .25s, box-shadow .25s; flex: 0 0 auto; }
 .t-pip-aux { border-radius: 50%; transform: scale(.85); }
 .t-pip-main.t-on { background: linear-gradient(135deg, #fb7185, #be123c); border-color: #fecdd3; box-shadow: 0 0 8px rgba(244,63,94,.7); }
 .t-pip-aux.t-on { background: linear-gradient(135deg, #7dd3fc, #0369a1); border-color: #bae6fd; box-shadow: 0 0 8px rgba(56,189,248,.7); }
@@ -467,9 +486,10 @@ button:disabled { opacity: .42; cursor: default; }
 @keyframes t-pip-will { to { filter: brightness(1.8); box-shadow: 0 0 12px #fff; } }
 .t-pip.t-pip-break { animation: t-pip-break .6s ease-out; }
 @keyframes t-pip-break { 0% { background: #fff; box-shadow: 0 0 18px #fff; filter: brightness(2); } 50% { opacity: .3; } 100% { opacity: 1; } }
-.t-res-charge { margin-left: auto; max-width: 128px; padding: 1px 7px; border-radius: 999px; border: 1px solid rgba(34,211,238,.6); background: rgba(8,51,68,.85);
-  color: #a5f3fc; font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.t-res-charge b { color: #e0f2fe; }
+.t-res-charge { margin-left: auto; display: flex; align-items: center; gap: 4px; width: 128px; max-width: 128px; min-width: 52px; flex: 1 1 72px; padding: 1px 7px; border-radius: 999px; border: 1px solid rgba(34,211,238,.6); background: rgba(8,51,68,.85);
+  color: #a5f3fc; font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+.t-charge-name { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t-res-charge .t-charge-progress { color: #e0f2fe; flex: 0 0 auto; }
 .t-res-charge.t-ready { color: #0b1220; background: linear-gradient(90deg, #67e8f9, #a5b4fc); border-color: #e0f2fe; animation: t-armed .6s ease-in-out infinite alternate; }
 .t-res-charge.t-ready b { color: #0b1220; }
 
@@ -496,7 +516,7 @@ button:disabled { opacity: .42; cursor: default; }
 /* 蓄力面板：进度格（已备 / 本次将投入 / 未备）+ 每个按钮写明实际消耗与「准备 N→M」；驻足按钮琥珀色，不可用时灰显原因 */
 .t-prep-head { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 8px; margin-bottom: 2px; border-radius: 8px; border: 1px solid rgba(6,182,212,.5); background: rgba(8,51,68,.8); color: #a5f3fc; font-size: 10.5px; font-weight: 800; }
 .t-prep-head small { font-size: 9.5px; color: #94a3b8; font-weight: 600; } .t-prep-head small b { color: #fde68a; }
-.t-prep-pips { display: inline-flex; gap: 3px; }
+.t-prep-pips { display: inline-flex; flex-wrap: wrap; max-width: 100%; gap: 3px; }
 .t-prep-pips i { width: 9px; height: 9px; transform: rotate(45deg); border: 1px solid rgba(103,232,249,.55); background: rgba(15,23,42,.8); }
 .t-prep-pips i.on { background: linear-gradient(135deg,#67e8f9,#0891b2); border-color: #cffafe; box-shadow: 0 0 5px rgba(34,211,238,.8); }
 .t-prep-pips i.next { background: rgba(253,230,138,.35); border-color: #fde68a; animation: t-pip-next .7s ease-in-out infinite alternate; }

@@ -15,7 +15,7 @@ const { build: buildRpgUi } = require('./extract-rpg-ui.cjs');
 
 // 产物专项断言：本轮新增与核心模块必须真实入包（存在性，不是仅字符串出现）
 const REQUIRED_INPUTS = [
-  'src/main.mjs', 'src/battle.mjs', 'src/guard.mjs', 'src/movement.mjs', 'src/range.mjs',
+  'src/main.mjs', 'src/battle.mjs', 'src/actions.mjs', 'src/guard.mjs', 'src/movement.mjs', 'src/range.mjs',
   'src/damage.mjs', 'src/ai.mjs', 'src/generation.mjs', 'src/demo-fixture.mjs', 'src/clock.mjs',
   'src/scheduler.mjs', 'src/parser.mjs', 'src/vendor/js-yaml-4.1.0.mjs',
   'src/av-host.mjs', 'src/action-director.mjs', 'src/motion.mjs', 'src/range-overlay.mjs',

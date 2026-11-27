@@ -8,7 +8,7 @@
 import { createClock, dispatchClock, advanceToNextAction } from './clock.mjs';
 import { emptyBattleState } from './lifecycle.mjs';
 import { cellAt, compileScene, isLowObstacleKind } from './scene.mjs';
-import { findReachable, findRiskAwareReachable, findJumpPath, canPlaceAt, traceDisplacement, cellsAdjacent } from './movement.mjs';
+import { findReachable, findRiskAwareReachable, findJumpPath, canPlaceAt, traceDisplacement, cellsAdjacent, hasFlying } from './movement.mjs';
 import { unitCenter, occupiedCells, cellKey } from './geometry.mjs';
 import { fogAt, fogAffects, createRegion, expireRegions, moveMultiplier } from './regions.mjs';
 import { previewBarrier, createBarrier, interception, damageBarrier, expireBarriers, clearBarriers, barrierAt, barrierContact, barrierCrossing } from './barriers.mjs';
@@ -22,6 +22,7 @@ import { applyEffectSlot } from './effect-handlers.mjs';
 import { CLASS_PASSIVES, getEffectiveStats } from './class-passives.mjs';
 import { rageAtkMultiplier, applyTypeResist, hasVariantTag, immunityReason, isImmuneToStun, lifestealRatio, hasThorns, thornsRawReflect } from './variant-rules.mjs';
 import { statusKeyOf, ROUND_TIME } from './scheduler.mjs';
+import { skillActionKind, actionBalance, actionPayment, spendAction } from './actions.mjs';
 
 export const BASIC_ATTACK = {
   name: '普通攻击', type: '[伤害]', fxTag: '刀砍', power: 0, hit: 100, cost: 0,
@@ -36,22 +37,14 @@ const sideStepFacing = (a, b) => ((Math.atan2(b.col - a.col, -(b.row - a.row)) *
 function skillKey(skill) { return (skill.parentItemName || skill.parentName ? (skill.parentItemName || skill.parentName) + '\u0000' : '') + skill.name + (teleportRule(skill) ? '\u0000闪现' : ''); }
 function usedCount(state, unitId, key) { return state.perBattleUses?.[unitId]?.[key] || 0; }
 
-const ITEM_ACTION_COST = { main: 0, aux: 1 };
-
-function actionPayment(r, main, aux, skillMainCost = 0) {
-  main -= skillMainCost;
-  if (r.main < main) return { ok: false, reason: '主行动已用完' };
-  const auxCost = Math.min(aux, r.aux);
-  const mainCost = main + aux - auxCost;
-  return r.main < mainCost ? { ok: false, reason: '辅助行动已用完' } : { ok: true, mainCost, auxCost, skillMainCost };
-}
+const usesSkillMain = skill => !skill.isItem && skill !== BASIC_ATTACK;
 
 // 物品 → 技能形态（规范 range/slots/isItem，供 attackPreview / aim 复用；不回写原物品）
 export function itemAsSkill(item, child = null) {
   if (!item || !item.isItem) return null;
   const selected = child ? { ...child, isItem: true, category: item.category, parentItemName: item.name } : item;
   const range = selected.range || resolveDefaultRange(selected);
-  const view = { ...selected, range, actionCost: ITEM_ACTION_COST };
+  const view = { ...selected, range };
   Object.defineProperty(view, '_itemSource', { value: item });
   return view;
 }
@@ -183,7 +176,6 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const result = dispatchClock(state, command, rulesContext);
     if (command.type === 'exitUnit' && wasCurrent) resources = null;
     if (command.type === 'grantMainPoint' && result.events?.some(ev => ev.immediate) && currentId() === command.targetId) {
-      state.combatState.clock.currentAction.resources.main += 1;
       refillBaseMovement(actor());
       emit('main-point-received', { unitId: command.targetId, amount: 1, natural: false });
       if (resources?.preparationContinued) investPreparation(actor());
@@ -280,7 +272,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (!u.ref.linked && hasVariantTag(u, '连动', buffs) && u.ref.maxHp > 0 && u.ref.hp / u.ref.maxHp <= 0.3) {
       u.ref.linked = true; // 一次性标记防【再生】回血震荡反复触发（原版 L31079）
       dispatchBattleClock({ type: 'grantMainPoint', targetId: u.id, sourceKey: '连动:' + u.id });
-      addLog('⚡ [' + u.name + '] 濒死求生本能激发（绝境抢攻），获得额外主行动点！');
+      addLog('⚡ [' + u.name + '] 濒死求生本能激发（绝境抢攻），获得万能行动点！');
     }
   }
   // 【自爆】敌方死亡自爆（原版 doEnemySelfDestruct L20911 战棋收口）：[自爆:群伤/群火/群毒/群穿;power:N]（缺省 50）
@@ -384,8 +376,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     return stats;
   }
   function moveDistanceOf(unit) {
-    const flying = buffsOf(unit.id).some(b => b.type === 'variant' && b.variant === '飞行') || unit.ref.flying;
-    return unit.ref.moveDistance * (flying ? 1.5 : 1);
+    return unit.ref.moveDistance * (hasFlying(ctx, unit) ? 1.5 : 1);
   }
   function refillBaseMovement(unit) {
     if (currentId() !== unit.id || !resources || !passiveOf(unit)?.refillMovement) return;
@@ -427,10 +418,16 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   // 同源刷新（S06）：同名来源更新强度/期限，不叠层；无限期（免伤/反击架势永久）不进时钟。
   function registerBuff(target, buff, source) {
     const list = buffsOf(target.id);
+    const flight = buff.variant === '飞行' || buff.type === '飞行' || buff.type === 'flying';
+    const takesOff = flight && resources && currentId() === target.id && !hasFlying(ctx, target);
     const key = statusKeyOf(target.id, source);
     const prev = list.find(b => b._key === key);
     const rec = Object.assign({}, buff, { _key: key, _source: source });
     if (prev) Object.assign(prev, rec); else list.push(rec);
+    if (takesOff) {
+      resources.baseMove = moveDistanceOf(target) * resources.moveQuota;
+      resources.moveRemaining = resources.baseMove + (resources.sprintRemaining || 0);
+    }
     if (Number.isFinite(buff.duration)) {
       dispatchClock(state, { type: 'applyStatus', unitId: target.id, source,
         kind: buff.type, strength: buff.value, duration: buff.duration * ROUND_TIME }, { speedOf });
@@ -732,15 +729,31 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     emit('preparation-invested', { unitId: u.id, preparationId: prep.id, source: 'stationary', movement: spent, remaining: prep.remaining });
     return spent;
   }
-  function investPreparation(u) {
+  function planPreparation(charge, stationary = false, available = resources) {
+    const { skill, remaining } = charge.preparing;
+    const kind = skillActionKind(skill), skillOnly = usesSkillMain(skill);
+    const st = stationary ? 1 : 0, inventory = Math.min(remaining - st, charge.inventory);
+    const amount = Math.min(remaining - st - inventory, actionBalance(available, kind, skillOnly));
+    const pay = actionPayment(available, kind, amount, skillOnly);
+    return { stationary: st, inventory, main: pay.mainCost, aux: pay.auxCost,
+      universal: pay.universalCost, skillMain: pay.skillMainCost, after: remaining - st - inventory - amount };
+  }
+  function previewStationaryStart(skill) {
+    const valid = canUseSkill(skill);
+    if (!valid.ok || !canStationaryPrepare()) return null;
+    const available = { ...resources };
+    spendAction(available, valid);
+    return planPreparation({ inventory: chargeState(actor().id).inventory, preparing: { skill, remaining: skill.delay } }, true, available);
+  }
+  function investPreparation(u, plan = null) {
     const charge = chargeState(u.id), prep = charge.preparing;
-    if (!prep || prep.ready) return { inventory: 0, main: 0 };
-    const inventory = investDelay(prep, charge.inventory);
-    charge.inventory -= inventory;
-    const main = investDelay(prep, resources.main);
-    resources.main -= main;
-    if (inventory || main) addLog(u.name + ' 准备 ' + prep.skill.name + ' · 剩余 ' + prep.remaining);
-    return { inventory, main };
+    if (!prep || prep.ready) return null;
+    const pay = plan || planPreparation(charge);
+    if (pay.stationary) investStationary(u, prep);
+    charge.inventory -= pay.inventory;
+    spendAction(resources, { mainCost: pay.main, auxCost: pay.aux, universalCost: pay.universal, skillMainCost: pay.skillMain });
+    if (investDelay(prep, prep.remaining - pay.after)) addLog(u.name + ' 准备 ' + prep.skill.name + ' · 剩余 ' + prep.remaining);
+    return pay;
   }
   // 麻痹行动僵直：每次自然行动掷骰 5%×层数（≤20%），命中消耗一层并跳过本次行动（原版麻痹语义）
   function tryParalyzeSkip(u) {
@@ -849,7 +862,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     syncFocus();
     const clock = state.combatState.clock;
     return {
-      runId, now: clock?.now || 0, currentId: currentId(), actionSerial, resources: resources ? { moveRemaining: resources.moveRemaining, sprintRemaining: resources.sprintRemaining || 0, main: resources.main, skillMain: resources.skillMain || 0, aux: resources.aux, moveMultiplier: resources.moveMultiplier || 1, jumpsRemaining: resources.jumpsRemaining, freeJumpAvailable: resources.freeJumpAvailable, jumped: resources.jumpsRemaining === 0, jumpDistance: Math.ceil(actor().ref.moveDistance / 3) } : null,
+      runId, now: clock?.now || 0, currentId: currentId(), actionSerial, resources: resources ? { moveRemaining: resources.moveRemaining, baseMove: resources.baseMove, sprintRemaining: resources.sprintRemaining || 0, main: resources.main, skillMain: resources.skillMain || 0, aux: resources.aux, universal: resources.universal || 0, moveMultiplier: resources.moveMultiplier || 1, jumpsRemaining: resources.jumpsRemaining, freeJumpAvailable: resources.freeJumpAvailable, jumped: resources.jumpsRemaining === 0, jumpDistance: Math.ceil(actor().ref.moveDistance / 3) } : null,
       terminal: clock?.terminal ? { ...clock.terminal } : null,
       preparation: clock?.currentAction ? structuredClone(state.combatState.charges?.[clock.currentAction.unitId]?.preparing || null) : null,
       chargeInventory: clock?.currentAction ? (state.combatState.charges?.[clock.currentAction.unitId]?.inventory || 0) : 0,
@@ -895,7 +908,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
 
   function opportunityAttackers(moverId, from, to) {
     const mover = byId.get(moverId);
-    if (passiveOf(mover)?.evadeOpportunity) return [];
+    if (hasFlying(ctx, mover) || passiveOf(mover)?.evadeOpportunity) return [];
     const fp = ctx.footprintsById[moverId];
     let view;
     return state.combatState.clock.order.filter(id => {
@@ -1000,8 +1013,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     return step.value;
   }
   function sprint() {
-    if (!resources || resources.main < 1) return { ok: false, reason: '主行动已用完' };
-    resources.main--;
+    if (!resources) return { ok: false, reason: '当前不能冲刺' };
+    const payment = actionPayment(resources, 'main');
+    if (!payment.ok) return payment;
+    spendAction(resources, payment);
     resources.moveRemaining += moveDistanceOf(actor());
     resources.moveMultiplier = 1;
     resources.sprintRemaining = (resources.sprintRemaining || 0) + moveDistanceOf(actor());
@@ -1012,7 +1027,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const u = actor();
     if (!u || !resources) return { ok: false, reason: '辅助行动不足' };
     if (resources.jumpsRemaining === 0) return { ok: false, reason: '本次自然行动跳跃次数已用完' };
-    if (!resources.freeJumpAvailable && resources.aux + (hasDoubleJump(u) ? 0 : resources.main) < 1) return { ok: false, reason: '辅助行动不足' };
+    if (!resources.freeJumpAvailable && actionBalance(resources, 'aux') < 1) return { ok: false, reason: '辅助行动不足' };
     return findJumpPath(ctx, u.id, col, row, Math.ceil(u.ref.moveDistance / 3));
   }
   function jump(col, row) {
@@ -1025,10 +1040,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     p.col = col; p.row = row;
     const free = r.freeJumpAvailable;
     const elite = hasDoubleJump(u);
-    if (!free) {
-      const { mainCost, auxCost } = actionPayment(r, 0, 1);
-      r.main -= mainCost; r.aux -= auxCost;
-    }
+    if (!free) spendAction(r, actionPayment(r, 'aux'));
     r.jumpsRemaining--;
     r.freeJumpAvailable = elite && r.jumpsRemaining === 1;
     emit('unit-jumped', { unitId: u.id, from, to: { col, row }, distance: q.distance, free });
@@ -1072,12 +1084,13 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
   function push(targetId) {
     const u = actor(), target = byId.get(targetId);
-    if (!u || !resources || resources.aux + resources.main < 1) return { ok: false, reason: '辅助行动不足' };
+    if (!u || !resources) return { ok: false, reason: '当前不能推动' };
+    const payment = actionPayment(resources, 'aux');
+    if (!payment.ok) return payment;
     if (!target || target.ref.hp <= 0 || target.id === u.id) return { ok: false, reason: '推动目标无效' };
     const up = placementsById[u.id], tp = placementsById[targetId];
     if (!adjacent(up, u.footprint, tp, target.footprint)) return { ok: false, reason: '推动目标必须相邻' };
-    const { mainCost, auxCost } = actionPayment(resources, 0, 1);
-    resources.main -= mainCost; resources.aux -= auxCost;
+    spendAction(resources, payment);
     const { distance, rollPush, rollResist } = pushContest(u, target);
     if (!distance) {
       addLog(u.name + ' 推动 ' + target.name + ' 失败');
@@ -1102,8 +1115,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   function carry(targetId) {
     const q = previewCarry(targetId);
     if (!q.ok) return q;
-    if (!resources || resources.main < 1) return { ok: false, reason: '主行动不足' };
-    resources.main--;
+    if (!resources) return { ok: false, reason: '当前不能背负' };
+    const payment = actionPayment(resources, 'main');
+    if (!payment.ok) return payment;
+    spendAction(resources, payment);
     const carrying = state.combatState.carrying || (state.combatState.carrying = {});
     carrying[q.carrierId] = targetId;
     ctx.carriedUnitIds.add(targetId);
@@ -1230,7 +1245,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       if (missing.length) return { ok: false, reason: '召唤词条缺失：' + missing.join('、') + '（名册/图鉴查无此词条）' };
     }
     const eff = effectiveSkill(skill);
-    const key = skillKey(skill), cost = skill.isItem ? ITEM_ACTION_COST : skill.actionCost || { main: 1, aux: 0 };
+    const key = skillKey(skill);
     const charge = chargeState(u.id), preparing = charge.preparing && charge.preparing.skillKey === key;
     if (skill.isItem && skill.children?.length) return { ok: false, reason: '请选择道具子用法' };
     // 大招充能门槛（原版 validSkills 排除未满 charge 技能，满时只放首个 charge 技能）；玩家操控单位不走自然充能
@@ -1259,10 +1274,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const ready = preparing && charge.preparing.remaining <= 0;
     if (preparing && !ready) return { ok: false, reason: '准备尚未就绪，请继续准备' };
     if (skill.delay > 0 && charge.preparing && !preparing) return { ok: false, reason: '请先释放或取消当前准备' };
-    const prepSkill = skill.delay > 0;
-    const mainCost = prepSkill ? (preparing || skill.isItem ? 0 : 1) : (cost.main || 0);
-    const auxCost = prepSkill && (preparing || !skill.isItem) ? 0 : (cost.aux || 0);
-    const payment = actionPayment(r, mainCost, auxCost, skill.isItem ? 0 : Math.min(mainCost, r.skillMain || 0));
+    const payment = actionPayment(r, skillActionKind(eff), ready ? 0 : 1, usesSkillMain(skill));
     if (!payment.ok) return payment;
     const mpShort = (mp ?? u.ref.mp) < (preparing ? 0 : (skill.cost || 0));
     const hpShort = u.ref.hp <= (preparing ? 0 : (skill.hpCost || 0));
@@ -1933,10 +1945,9 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (charge.preparing) return failAttack('当前已有蓄力');
     if (stationary && !canStationaryPrepare()) return failAttack('需要满额移动，且本次行动未驻足');
     const r = resources, key = skillKey(skill), logFrom = log.length, eventFrom = domainEvents.length;
-    const costSummary = { main: valid.mainCost + valid.skillMainCost, aux: valid.auxCost, mp: skill.cost || 0, hp: skill.hpCost || 0,
-      tp: skill.tpCost || 0, uses: 0, bindings: null, ammoShots: 0 };
-    r.main -= valid.mainCost; r.aux -= valid.auxCost;
-    if (valid.skillMainCost) r.skillMain -= valid.skillMainCost;
+    const costSummary = { main: valid.mainCost + valid.skillMainCost, aux: valid.auxCost, universal: valid.universalCost,
+      mp: skill.cost || 0, hp: skill.hpCost || 0, tp: skill.tpCost || 0, uses: 0, bindings: null, ammoShots: 0 };
+    spendAction(r, valid);
     u.ref.mp -= costSummary.mp; u.ref.hp -= costSummary.hp;
     u.ref.tp = (u.ref.tp || 0) - costSummary.tp;
     if (skill.maxUses > 0) {
@@ -1952,8 +1963,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     r.preparationContinued = true;
     if (stationary) costSummary.movement = investStationary(u, prep);
     notifyManaSpent(u, costSummary.mp, prep);
-    const { main } = investPreparation(u);
-    if (main || skill.isItem) costSummary.preparationMain = main;
+    costSummary.preparation = investPreparation(u);
     addLog(u.name + ' 声明蓄力 ' + skill.name + ' · 剩余 ' + prep.remaining);
     return { ok: true, preparing: true, charge: { preparing: true, ready: prep.ready, kind: 'delay' }, hits: [], effects: [],
       events: domainEvents.slice(eventFrom), ammoEvents: [], casterId: u.id, skill, costSummary, logFrom, logTo: log.length };
@@ -1996,7 +2006,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const prepKind = skill.delay > 0 ? 'delay' : null;
     const chargeInfo = { preparing: !!preparing, ready: prepReady, kind: prepKind };
     const chargeRelease = skill.charge > 0 && isAiControlled(u);
-    const costSummary = { main: 0, aux: 0, mp: 0, hp: 0, tp: 0, uses: 0, bindings: null, ammoShots: 0 };
+    const costSummary = { main: 0, aux: 0, universal: 0, mp: 0, hp: 0, tp: 0, uses: 0, bindings: null, ammoShots: 0 };
 
     // 目标与槽位校验（召唤技能允许无目标槽位；纯空目标才拒绝）
     const damageSlots = slots.filter(s => s.attack);
@@ -2010,9 +2020,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
 
     // 费用一次（就绪释放不再支付；普通技能整次一次）
     if (!preparing) {
-      resources.main -= valid.mainCost; resources.aux -= valid.auxCost;
-      if (valid.skillMainCost) resources.skillMain -= valid.skillMainCost;
-      costSummary.main = valid.mainCost + valid.skillMainCost; costSummary.aux = valid.auxCost;
+      spendAction(resources, valid);
+      costSummary.main = valid.mainCost + valid.skillMainCost; costSummary.aux = valid.auxCost; costSummary.universal = valid.universalCost;
       u.ref.mp -= skill.cost || 0; costSummary.mp = skill.cost || 0;
       u.ref.hp -= skill.hpCost || 0; costSummary.hp = skill.hpCost || 0;
       u.ref.tp = (u.ref.tp || 0) - (skill.tpCost || 0); costSummary.tp = skill.tpCost || 0;
@@ -2547,11 +2556,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const slots = skillSlots(eff);
     const ammoBinds = itemBindingsFor(u, skill).filter(b => b.item.category === '弹药');
     const damageSlotCount = slots.filter(s => s.attack).length;
-    const cost = skill.actionCost || { main: 1, aux: 0 };
     return {
       ok: true,
       slotTargets: query.slotTargets,
-      costs: { main: valid.mainCost ?? cost.main, aux: valid.auxCost ?? cost.aux, mp: skill.cost || 0, hp: skill.hpCost || 0, tp: skill.tpCost || 0,
+      costs: { main: valid.mainCost + valid.skillMainCost, aux: valid.auxCost, universal: valid.universalCost, mp: skill.cost || 0, hp: skill.hpCost || 0, tp: skill.tpCost || 0,
         usesLeft: usesLeft(u.id, skill), bindings: itemBindingsFor(u, skill).map(b => ({ item: b.item.name, cost: b.cost, enough: bindingStockOk(b) })),
         cooldownTurns: skill.cooldownTurns || 0, delay: skill.delay || 0, charge: skill.charge || 0 },
       ammoPlan: ammoBinds.map(b => ({ item: b.item.name, perShot: ammoQuotaForShot(b.cost, Math.max(1, damageSlotCount), 1), totalCost: b.cost, remaining: b.item.count || 0 })),
@@ -2600,8 +2608,9 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   function defend() {
     const u = actor(), r = currentResources();
     if (!u || u.side === 'enemy' || !r || state.combatState.clock?.terminal) return { ok: false, reason: '当前不能防御' };
-    if (r.main < 1) return { ok: false, reason: '主行动已用完' };
-    r.main -= 1;
+    const payment = actionPayment(r, 'main');
+    if (!payment.ok) return payment;
+    spendAction(r, payment);
     u.ref.mp = Math.min(u.ref.maxMp, u.ref.mp + Math.floor(u.ref.maxMp * 0.2));
     u.ref.tp = Math.min(u.ref.maxTp || 100, (u.ref.tp || 0) + Math.floor((u.ref.maxTp || 100) * 0.25));
     const source = statusSource(u.id, { casterId: u.id, skillId: 'defend' }, 'defend');
@@ -2614,10 +2623,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   const recoverableMp = u => Math.min(u.ref.maxMp - u.ref.mp, Math.floor(u.ref.maxMp * 0.5));
   function recoverEnemyMp() {
     const u = actor(), r = currentResources();
-    if (u?.side !== 'enemy' || !r || r.enemyRecoveredMp || r.main < 1 || state.combatState.clock.terminal) return { ok: false };
+    if (u?.side !== 'enemy' || !r || r.enemyRecoveredMp || actionBalance(r, 'main') < 1 || state.combatState.clock.terminal) return { ok: false };
     const amount = recoverableMp(u);
     if (!(amount > 0)) return { ok: false };
-    r.main--; r.enemyRecoveredMp = true;
+    spendAction(r, actionPayment(r, 'main')); r.enemyRecoveredMp = true;
     u.ref.mp += amount;
     addLog(u.name + ' 恢复 ' + amount + ' MP');
     emit('enemy-mp-recovered', { unitId: u.id, amount, mpAfter: u.ref.mp });
@@ -2627,7 +2636,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   function previewReady() {
     const u = actor(), r = currentResources();
     if (!u || !r || state.combatState.clock?.terminal) return { ok: false, reason: '当前不能整备' };
-    if (r.main < 1) return { ok: false, reason: '主行动已用完' };
+    if (actionBalance(r, 'main') < 1) return { ok: false, reason: '主行动已用完' };
     if (!negativeBuffsOf(u.id).length) return { ok: false, reason: '没有可驱散的负面状态' };
     return { ok: true };
   }
@@ -2636,7 +2645,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (!check.ok) return check;
     const u = actor(), candidates = negativeBuffsOf(u.id);
     const removed = candidates[Math.floor(random() * candidates.length)];
-    currentResources().main--;
+    spendAction(resources, actionPayment(resources, 'main'));
     removeBuffRecord(u.id, removed);
     addLog(u.name + ' 整备，祛除一项负面状态');
     return { ok: true, removed };
@@ -2646,17 +2655,21 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const u = actor(), charge = u && chargeState(u.id);
     if (!resources || !charge?.preparing || charge.preparing.ready) return { ok: false, reason: '当前没有待准备技能' };
     if (stationary && !canStationaryPrepare()) return { ok: false, reason: '需要满额移动，且本次行动未驻足' };
-    if (!stationary && resources.main < 1 && charge.inventory < 1) return { ok: false, reason: '主行动或加速不足' };
-    return { ok: true };
+    const payment = planPreparation(charge, stationary);
+    if (payment.after === charge.preparing.remaining) {
+      const kind = skillActionKind(charge.preparing.skill);
+      return { ok: false, reason: (kind === 'aux' ? '辅助' : '主') + '行动、加速或万能不足' };
+    }
+    return { ok: true, payment };
   }
   function advancePreparation({ stationary = false } = {}) {
     const valid = canAdvancePreparation({ stationary });
     if (!valid.ok) return valid;
     const u = actor(), prep = chargeState(u.id).preparing;
     resources.preparationContinued = true;
-    if (stationary) investStationary(u, prep);
-    const { main } = investPreparation(u);
-    return { ok: true, invested: main, remaining: prep.remaining, ready: prep.ready };
+    const before = prep.remaining;
+    investPreparation(u, valid.payment);
+    return { ok: true, invested: before - prep.remaining, payment: valid.payment, remaining: prep.remaining, ready: prep.ready };
   }
 
   function cancelPreparation(unitId = currentId()) {
@@ -2691,11 +2704,19 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const u = actor();
     if (!u || !isAiControlled(u) || state.combatState.clock.terminal || !resources || state.combatState.clock.units[u.id].stun) return null;
     const preparing = chargeState(u.id).preparing;
-    if (resources.main < 1 && !resources.skillMain && resources.aux < 1 && !resources.freeJumpAvailable && resources.moveRemaining <= 1e-9 && !preparing?.ready) return { moveTo: null, skill: null, aim: null, action: 'wait' };
-    if (preparing && !preparing.ready && resources.main > 0) return { moveTo: null, skill: null, aim: null, action: 'prepare' };
+    if (preparing && !preparing.ready && canAdvancePreparation().ok) return { moveTo: null, skill: null, aim: null, action: 'prepare' };
+    if (actionBalance(resources, 'main', true) < 1 && resources.aux < 1 && !resources.freeJumpAvailable && resources.moveRemaining <= 1e-9 && !preparing?.ready) return { moveTo: null, skill: null, aim: null, action: 'wait' };
     const aiRes = { ...resources, preparing, moveDistance: moveDistanceOf(u), jumpFirst: hasDoubleJump(u) };
     const aiBudget = resources.moveRemaining * (resources.moveMultiplier || 1);
     const charged = chargeSkillOf(u);
+    const skills = preparing?.ready ? [preparing.skill] : enemySkills().filter(skill => skill !== charged);
+    if (u.side === 'enemy' && !preparing?.ready && resources.aux > 0) {
+      const supports = skills.filter(skill => skillActionKind(skill) === 'aux');
+      if (supports.length) {
+        const plan = chooseEnemyAction(ctx, u.id, aiBudget, supports, null, { ...aiRes, supportOnly: true });
+        if (plan.skill) return plan;
+      }
+    }
     if (!preparing && charged && chargeFull(u) && canUseSkill(charged).ok) {
       const query = chargeAim(u, charged);
       if (query) return { moveTo: null, skill: charged, aim: query.aim, action: charged.delay > 0 ? 'prepare' : null };
@@ -2703,11 +2724,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       const plan = chooseEnemyAction(ctx, u.id, aiBudget, [charged], skill => skillStatus(skill), { ...aiRes, jumpFirst: false });
       if (plan.moveTo && plan.skill) return { ...plan, skill: null, aim: null, action: null };
     }
-    const skills = preparing ? (preparing.ready ? [preparing.skill] : []) : enemySkills().filter(skill => skill !== charged);
     syncFocus(true);
     const order = state.combatState.focusOrders?.[u.id];
     const focus = order && { ...order, visible: canSeeUnit(ctx, u.id, order.targetId) };
-    const recovery = u.side === 'enemy' && !preparing && resources.main > 0 && !resources.enemyRecoveredMp ? recoverableMp(u) : 0;
+    const recovery = u.side === 'enemy' && !preparing && actionBalance(resources, 'main') > 0 && !resources.enemyRecoveredMp ? recoverableMp(u) : 0;
     const recoverSkills = recovery > 0 ? enemySkills(u.ref.mp + recovery).filter(s => (s.cost || 0) > u.ref.mp) : [];
     const plan = chooseEnemyAction(ctx, u.id, aiBudget, skills, skill => skillStatus(skill), { ...aiRes, focus, idleMovement: true, basicAttack: BASIC_ATTACK, recoverSkills });
     if (focus && plan.moveTo && plan.skill) return { ...plan, skill: null, aim: null, action: null };
@@ -2797,7 +2817,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
 
   return { ctx, battleState: state, get state() { return state; }, start, snapshot, reachable, previewMove, beginMove, move, sprint, previewJump, jump, push, previewCarry, carry, drop, previewDisplacement,
     setVisibleUnitIds(ids) { visibleIds = ids ? ids.slice() : null; },
-    canUseSkill, skillStatus, canUseReaction, canUseItem, itemSkill: itemAsSkill, startPreparation, canStationaryPrepare, stationaryStatus, canAdvancePreparation, advancePreparation, cancelPreparation,
+    canUseSkill, skillStatus, canUseReaction, canUseItem, itemSkill: itemAsSkill, startPreparation, canStationaryPrepare, stationaryStatus, previewStationaryStart, canAdvancePreparation, advancePreparation, cancelPreparation,
     previewAttack, previewRetarget, teleportCells, beginAttack, attack, beginUseItem, useItem, predictAttack, defend, recoverEnemyMp, previewReady, ready,
     getEffectiveUnit, statsOf, buffsOf,
     previewGuardCandidates, queryBarrierTargets(skill) {

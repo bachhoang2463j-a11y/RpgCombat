@@ -245,7 +245,8 @@ function corruptorCases() {
     const h = unit('k', 'hero', '施毒者', { spd: 300, atk: 20 });
     const e = unit('e', 'enemy', null, { spd: 50, hp: 500 });
     const b = make([h, e], { k: { col: 2, row: 9 }, e: { col: 4, row: 9 } }, () => 0.01);
-    const sk = atkSkill({ actionCost: { main: 0, aux: 0 } });
+    b.battleState.combatState.clock.currentAction.resources.universal = 1;
+    const sk = atkSkill();
     const r1 = b.attack(sk, aimOf(b, 'e'));
     const poisonAfter1 = b.buffsOf('e').filter(x => x.type === 'poison').length;
     const r2 = b.attack(sk, aimOf(b, 'e'));
@@ -336,7 +337,8 @@ function counterCases() {
     const b = make([unit('ch', 'hero', null, { spd: 300, atk: 10 }),
       unit('gh', 'enemy', '防守者', { spd: 50, atk: 20, evasion: 10000 })],
       { ch: { col: 2, row: 3 }, gh: { col: 4, row: 3 } }, () => 0.5);
-    const skill = atkSkill({ actionCost: { main: 0, aux: 0 } });
+    b.battleState.combatState.clock.currentAction.resources.universal = 1;
+    const skill = atkSkill();
     const first = b.attack(skill, aimOf(b, 'gh'));
     const second = b.attack(skill, aimOf(b, 'gh'));
     const events = [...evs(first, 'reaction-damage'), ...evs(second, 'reaction-damage')];
@@ -442,7 +444,8 @@ function stormAndReactionCases() {
     const defender = unit('pc-' + type, 'enemy', '防守者', { spd: 50, atk: 20, skills: [counter] });
     const attacker = unit('at-' + type, 'hero', null, { spd: 300, atk: 10 });
     const battle = make([attacker, defender], { [attacker.id]: { col: 6, row: 3 }, [defender.id]: { col: 8, row: 3 } }, () => 0.99);
-    const skill = atkSkill({ damageType: type, actionCost: { main: 0, aux: 0 } });
+    battle.battleState.combatState.clock.currentAction.resources.universal = 1;
+    const skill = atkSkill({ damageType: type });
     // 每次明确把概率升至100%以上；强力反击会真实重置嘲讽，不依赖随机消费顺序。
     defender.ref.baseTauntBonus = 600;
     const first = battle.attack(skill, aimOf(battle, defender.id), { policy: 'auto' });

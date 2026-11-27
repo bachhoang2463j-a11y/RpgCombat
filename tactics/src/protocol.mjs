@@ -72,7 +72,7 @@ export const RANGE_PARAMS_BY_TYPE = {
 };
 
 // ---------- 行动成本 ----------
-// 普通主动技能缺省主行动；[行动:主]/[行动:辅] 显式覆盖。不新增通用零行动主动技。
+// 旧名册及编辑器数据兼容字段；战斗内主辅消耗由效果槽自动判定。
 export const ACTION_COST_MAIN = { main: 1, aux: 0 };
 export const ACTION_COST_AUX = { main: 0, aux: 1 };
 export const ACTION_COST_DEFAULT = ACTION_COST_MAIN;

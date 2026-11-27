@@ -204,7 +204,7 @@ export function collectArrivals(battleState, t) {
   return list;
 }
 
-// 自然行动发放：本圈完成清零计距；待领取额外主行动点随本次自然行动交付（不同来源可叠加）
+// 自然行动发放：本圈完成清零计距；待领取万能点随本次自然行动交付（不同来源可叠加）
 export function grantNaturalAction(battleState, unitId, now) {
   const clock = clockOf(battleState);
   const u = clock.units[unitId];
@@ -218,9 +218,9 @@ export function grantNaturalAction(battleState, unitId, now) {
     return true;
   });
   u.mainPointSources = [];
-  u.extraMain += delivered.length; // 待领取交付并入实时余额，冻结期 getActionState 可读
-  const resources = { moveQuota: 1, main: 1 + delivered.length, aux: 1, deliveredMainSources: delivered };
-  const ev = pushLog(clock, now, 'action-granted', { unitId, main: resources.main, aux: resources.aux, lap: p.lap });
+  u.extraMain += delivered.length;
+  const resources = { moveQuota: 1, main: 1, aux: 1, universal: delivered.length, deliveredMainSources: delivered };
+  const ev = pushLog(clock, now, 'action-granted', { unitId, main: resources.main, aux: resources.aux, universal: resources.universal, lap: p.lap });
   return { resources, events: [ev] };
 }
 
@@ -236,7 +236,8 @@ export function processStunSkip(battleState, unitId, now) {
   return pushLog(clock, now, 'stun-skip', { unitId });
 }
 
-// 再动 → 主行动点（SPEC S03 L46-47）：当前行动目标立即加点；其他目标待领取（每来源每目标最多1）
+// 再动 → 万能行动点：当前行动的目标立即加点；其他目标待领取（每来源每目标最多 1）。
+// 保留存档里的 extraMain 与来源字段名。
 export function grantMainPoint(battleState, targetId, sourceKey, now) {
   const clock = clockOf(battleState);
   const target = clock.units[targetId];
@@ -246,6 +247,7 @@ export function grantMainPoint(battleState, targetId, sourceKey, now) {
     if (target.mainPointSources.includes(sourceKey)) return null; // 同一再动技能本次自然行动只提供一次
     target.mainPointSources.push(sourceKey);
     target.extraMain += 1;
+    cur.resources.universal = (cur.resources.universal || 0) + 1;
     return pushLog(clock, now, 'main-point-granted', { targetId, sourceKey, immediate: true });
   }
   if (clock.pendingMainPoints.some(pt => pt.targetId === targetId && pt.sourceKey === sourceKey)) return null;

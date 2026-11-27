@@ -326,11 +326,8 @@ export function getUnitNextActionAt(battleState, unitId) {
 export function getActionState(battleState) {
   const clock = battleState.combatState && battleState.combatState.clock;
   if (!clock || !clock.currentAction) return null;
-  const u = clock.units[clock.currentAction.unitId];
-  return {
-    unitId: clock.currentAction.unitId,
-    resources: { moveQuota: 1, main: 1 + (u ? u.extraMain : 0), aux: 1 },
-  };
+  const { unitId, resources: { moveQuota, main, aux, universal = 0 } } = clock.currentAction;
+  return { unitId, resources: { moveQuota, main, aux, universal } };
 }
 
 export function isOpportunityReadyAt(battleState, key) {

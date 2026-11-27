@@ -54,13 +54,15 @@ function run() {
   {
     const h = unit('h', 'hero', { spd: 200 }), e = unit('e', 'enemy');
     const b = make([h, e], { h: p(2), e: p(5) });
-    const aux = parseSkill('【辅技】[伤害;power:10][行动:辅][范围:单体;射程:8]');
-    const first = b.attack(aux, aim(b, 'e'));
-    const second = b.attack(aux, aim(b, 'e'));
-    const third = b.attack(aux, aim(b, 'e'));
-    check('辅助优先扣辅，耗尽后扣一主', first.ok && first.costSummary.aux === 1 && first.costSummary.main === 0
-      && second.ok && second.costSummary.aux === 0 && second.costSummary.main === 1 && !third.ok,
-    [first.costSummary, second.costSummary, third.reason]);
+    const aux = parseSkill('【辅技】[增防;power:10][行动:主][范围:自身]');
+    const first = b.attack(aux, aim(b, 'h'));
+    const blocked = b.attack(aux, aim(b, 'h'));
+    const r = b.battleState.combatState.clock.currentAction.resources;
+    r.universal = 1;
+    const second = b.attack(aux, aim(b, 'h'));
+    check('辅助优先扣辅，不借主点，缺额由万能支付', first.ok && first.costSummary.aux === 1 && !blocked.ok
+      && second.ok && second.costSummary.universal === 1 && r.main === 1 && r.aux === 0 && r.universal === 0,
+    [first.costSummary, blocked.reason, second.costSummary]);
   }
 
   for (const obstructed of [false, true]) {

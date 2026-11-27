@@ -34,6 +34,8 @@ const fog = (col, row, id = 'fog', casterId = 'fog-owner') => ({
 });
 const single = { name: '远程单锁', type: '[伤害]', power: 10, cost: 1, actionCost: { main: 1, aux: 0 }, range: { type: '单体', castRange: 12 } };
 const blast = { name: '范围攻击', type: '[伤害]', power: 10, cost: 1, actionCost: { main: 1, aux: 0 },  range: { type: '爆炸', castRange: 12, radius: 2.5 } };
+const guaranteedSingle = { ...single, name: '必中远程单锁', guaranteedHit: true };
+const guaranteedBlast = { ...blast, name: '必中范围攻击', guaranteedHit: true };
 
 function run() {
   const cases = [];
@@ -127,6 +129,48 @@ function run() {
     const melee = c2.previewAttack({ ...charge, damageType: '近战' }, { x: 4.5, y: 4.5 });
     cases.push(ok('FOG-AIM-14 带射击的冲锋不能远瞄，近战冲锋仍可移动接触', !rifle.ok && /无法瞄准/.test(rifle.reason) && melee.ok,
       [rifle.reason, melee.reason]));
+  }
+  // 必中可越过技能雾的一格瞄准限制，但本人视野缺失时只接受队友当前可见目标；绝不泄漏未知单位。
+  {
+    const c = unit('hero', 'hero', { spd: 200, skills: [guaranteedSingle] });
+    const ally = unit('ally', 'hero'), seen = unit('seen', 'enemy'), hidden = unit('hidden', 'enemy');
+    const b = make([c, ally, seen, hidden], {
+      hero: { col: 2, row: 4 }, ally: { col: 8, row: 4 }, seen: { col: 10, row: 4 }, hidden: { col: 12, row: 4 },
+    }, [fog(2, 4, 'owner-fog', 'enemy'), fog(12, 4, 'hidden-fog', 'hidden')]);
+    b.ctx.enforcePerception = true;
+    const seenQuery = queryAttack(b.ctx, c.id, guaranteedSingle, aim(b, seen.id));
+    const hiddenQuery = queryAttack(b.ctx, c.id, guaranteedSingle, aim(b, hidden.id));
+    const unknownCell = queryAttack(b.ctx, c.id, guaranteedSingle, { x: 12.5, y: 4.5 });
+    const unknownId = queryAttack({ ...b.ctx, enforcePerception: false }, c.id, guaranteedSingle, aim(b, hidden.id));
+    const ordinary = queryAttack(b.ctx, c.id, single, aim(b, seen.id));
+    cases.push(ok('FOG-AIM-15 必中单体可锁队友当前可见但本人雾遮挡目标', seenQuery.ok && seenQuery.damageTargetIds.includes(seen.id)
+      && !hiddenQuery.ok && !unknownCell.ok && !unknownId.ok && !ordinary.ok, {
+      seen: { ok: seenQuery.ok, ids: seenQuery.disclosureTargetIds }, hidden: hiddenQuery.reason,
+      unknownCell: unknownCell.reason, unknownId: unknownId.reason, ordinary: ordinary.reason,
+    }));
+  }
+  // 必中范围瞄准免技能雾一格限制；射程不因此增加，普通技能雾规则不变。
+  {
+    const c = unit('hero', 'hero', { spd: 200 }), ally = unit('ally', 'hero'), e = unit('enemy', 'enemy');
+    const b = make([c, ally, e], { hero: { col: 2, row: 4 }, ally: { col: 8, row: 4 }, enemy: { col: 9, row: 4 } },
+      [fog(2, 4, 'owner-fog', 'enemy'), fog(14, 4, 'unknown-point-fog', 'hidden')]);
+    const point = { x: 9.5, y: 4.5 };
+    const ordinary = queryAttack(b.ctx, c.id, blast, point);
+    const guaranteed = queryAttack(b.ctx, c.id, guaranteedBlast, point);
+    const outOfRange = queryAttack(b.ctx, c.id, { ...guaranteedBlast, range: { ...guaranteedBlast.range, castRange: 3 } }, point);
+    const unknownPoint = queryAttack(b.ctx, c.id, guaranteedBlast, { x: 14.5, y: 4.5 });
+    cases.push(ok('FOG-AIM-16 必中范围点仅可越技能雾瞄准已知点且不增加射程', !ordinary.ok && guaranteed.ok
+      && !outOfRange.ok && !unknownPoint.ok, { ordinary: ordinary.reason, guaranteed: guaranteed.ok, outOfRange: outOfRange.reason, unknownPoint: unknownPoint.reason }));
+  }
+  // 只有本人雾视野被阻时可借队友可见目标；无雾时不得扩展个人视距。
+  {
+    const c = unit('hero', 'hero', { spd: 200, perception: 10 });
+    const ally = unit('ally', 'hero', { perception: 100 }), e = unit('enemy', 'enemy');
+    const b = make([c, ally, e], { hero: { col: 2, row: 4 }, ally: { col: 8, row: 4 }, enemy: { col: 10, row: 4 } });
+    b.ctx.encounter = false;
+    b.ctx.enforcePerception = true;
+    const q = queryAttack(b.ctx, c.id, guaranteedSingle, aim(b, e.id));
+    cases.push(ok('FOG-AIM-18 无雾时必中不借队友扩展个人视距', !q.ok && /视野/.test(q.reason || ''), { ok: q.ok, reason: q.reason }));
   }
   return { cases };
 }

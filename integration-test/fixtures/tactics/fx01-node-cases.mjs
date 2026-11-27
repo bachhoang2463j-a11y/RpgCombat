@@ -404,7 +404,7 @@ export const groups = {
     const before6 = b6.snapshot().resources.main;
     const r6 = b6.attack(chant, { x: 2.5, y: 4.5, targetId: 'ell' });
     const after6 = b6.snapshot();
-    cases.push(ok('TFX-02 预备咏唱：只作用自身，再动返还主行动，加速 +3 入库存', r6.ok && before6 === 1 && after6.resources.main === 1 && after6.chargeInventory === 3 && r6.hits.length === 0,
+    cases.push(ok('TFX-02 预备咏唱：只作用自身，再动发万能点，加速 +3 入库存', r6.ok && before6 === 1 && after6.resources.main === 1 && after6.resources.aux === 0 && after6.resources.universal === 1 && after6.chargeInventory === 3 && r6.hits.length === 0,
       j({ before6, after: after6.resources, inv: after6.chargeInventory, hits: r6.hits })));
     return { cases };
   } },

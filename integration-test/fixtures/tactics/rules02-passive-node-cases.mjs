@@ -161,11 +161,11 @@ function prepAndSummonCases() {
   const b = createBattle({ units, placementsById: { hp1: { col: 3, row: 3 }, ed1: { col: 4, row: 3 } }, scene: mkScene(), random: mulberry(7) });
   b.start();
   const st = b.battleState;
-  st.combatState.clock.currentAction.resources.main += 2; // 预备技能开始固定耗1主行动（canUseSkill 口径），补足投点所需
+  st.combatState.clock.currentAction.resources.universal = 1; // 辅点启动，万能补足首点进度；不预支技能自带加速
   const aimSelf = { x: 3.5, y: 3.5, targetId: 'hp1' }; // 单体技能需锁定目标（aim.targetId）
   const r1 = b.attack(chant, aimSelf);            // 开始准备（早 return，不入库存）
   const invBegin = st.combatState.charges['hp1']?.inventory || 0;
-  const r2 = b.attack(chant, aimSelf);            // 释放（prepareAtActionStart 自动投主行动）→ haste 3 入库存
+  const r2 = b.attack(chant, aimSelf);            // 已就绪释放 → haste 3 入库存
   const invAfter = st.combatState.charges['hp1']?.inventory || 0;
   out.push(ok('R02-B9 准备带[加速:3]技能：开始不入账，释放后入库存3',
     r1.preparing === true && invBegin === 0 && r2.ok === true && invAfter === 3

@@ -35,7 +35,7 @@ check('原版状态变种真实入口与常量入包', ['syncStatusLayers', 'cle
 check('实际结果事件和视觉消费入包', ['variant-trigger', 'status-tick', 'status-proc', 'status-removed', 'consumeVisualEvents', 'syncVisualState'].every(s => html.includes(s)));
 check('冲锋扫掠、逐段闪避和周期扣血飘字入包', ['chargePath', 'queueReaction', 'awaitShotFeedback', 'suppressDodgeFx', 'onStatusTick', 'playStatusTick'].every(s => html.includes(s)));
 check('路径接触揭示、双击转火、自身直放和加速/燃烧展示入包', ['chargeStep', 'playCharge', 'reuseTarget', 'fireSelf', 'chargeInventory', '.t-unit-sprite .arcane-status-persist-burn'].every(s => html.includes(s)));
-check('自动跳跃、避雾、物品辅助耗费和整备入包', ['planJump', 'fogRouteFilter', 'ITEM_ACTION_COST', 'previewReady', 'battle.ready()', 'tauntDelta'].every(s => html.includes(s)));
+check('自动跳跃、必中避雾、自动攻辅扣费和整备入包', ['planJump', 'fogRouteFilter', 'skillActionKind', 'universalCost', 'planPreparation', 'previewReady', 'battle.ready()', 'tauntDelta'].every(s => html.includes(s)));
 check('物品父子状态与敌方递减入包', /itemStatus\(entry,\s*child\)/.test(html) && /createItemCard\(hero,\s*entry,\s*idx,\s*cIdx\)/.test(html)
   && ['repeatActions', 'recordPacingAction'].every(s => html.includes(s)));
 const context = { console, structuredClone, URL, setTimeout, clearTimeout };
@@ -97,8 +97,8 @@ if (backend) {
   const caster = data.units.find(u => u.id === opening.currentId);
   const rage = caster.skills.find(s => s.name === '风雪狂暴');
   const action = battle.attack(rage);
-  check('产物首领施法优先消耗专用点并保留基础主行动', action.ok && caster.ref.mp === 13 && battle.getEffectiveUnit(caster.id).atk === 150
-    && opening.resources.skillMain === 2 && battle.snapshot().resources.main === 1 && battle.snapshot().resources.skillMain === 1);
+  check('产物辅助技能只扣辅点，保留首领攻击专用点', action.ok && caster.ref.mp === 13 && battle.getEffectiveUnit(caster.id).atk === 150
+    && opening.resources.skillMain === 2 && battle.snapshot().resources.main === 1 && battle.snapshot().resources.aux === 0 && battle.snapshot().resources.skillMain === 2);
   const ruleState = snap => {
     const { runId, resetEvents, events, ...state } = snap;
     return JSON.stringify({ ...state, events: events.map(({ runId, eventId, actionId, ...event }) => event) });
@@ -111,6 +111,8 @@ if (backend) {
   check('精英越障、全图看破及主辅支付关键函数入包', ['planPriorityJump', 'selectKanpo', 'playMainPointReceived', 'actionPayment', 'jumpsRemaining'].every(k => html.includes(k)));
   const stepData = backend.createScenarioData(block);
   const monsterId = 'e:伊塔库亚的眷族';
+  const jumper = stepData.units.find(u => u.id === monsterId);
+  jumper.skills = jumper.skills.filter(skill => skill.name !== '风雪狂暴');
   Object.assign(stepData.placementsById[monsterId], { col: 11, row: 15 });
   Object.assign(stepData.placementsById['h:埃利奥特'], { col: 11, row: 22 });
   const stepBattle = backend.createBattle({ ...stepData, scene: backend.scene, random: backend.createSeededRandom(stepData.seed) });
@@ -145,7 +147,7 @@ if (backend) {
   const lackAux = itemBattle.canUseItem(gear).reason;
   itemBattle.endAction();
   check('产物不限次物品无需主行动、只耗辅助行动且跨行动可复用', firstUse.ok && firstUse.costSummary.aux === 1
-    && firstUse.costSummary.main === 0 && lackAux === '辅助行动已用完' && itemBattle.useItem(gear).ok && gear.count === 0);
+    && firstUse.costSummary.main === 0 && lackAux === '辅助行动不足' && itemBattle.useItem(gear).ok && gear.count === 0);
   const replacementBattle = backend.createBattle({ units: [unit('active', 'hero', 200), unit('reserve', 'hero', 50), unit('opponent', 'enemy', 10)],
     placementsById: { active: { col: 2, row: 3 }, reserve: { col: 4, row: 3 }, opponent: { col: 8, row: 3 } },
     scene: { sceneId: 'replacement-artifact', grid: { columns: 16, rows: 10, metersPerCell: 1 }, objects: [] } });

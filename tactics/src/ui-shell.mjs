@@ -9,6 +9,7 @@
 import { createRpgUi, RPG_UI_RAIL_HTML, RPG_UI_MENU_HTML, RPG_UI_TIP_HTML, RPG_UI_EDITOR_HTML } from './vendor/rpg-ui/rpg-ui.mjs';
 import { createReactionPrompt } from './reaction-prompt.mjs';
 import { normalizeEffectTag } from './effect-definitions.mjs';
+import { skillActionKind, actionPayment } from './actions.mjs';
 
 const ESC = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 // 禁用原因短标签（卡面一行可读；完整原因仍写入 title/aria 与点击后的战报）
@@ -362,7 +363,7 @@ export function buildShell(root) {
     if (!cmd.playable) { state.menuKey = ''; rpgUi.closeAllSubMenus(); showTarget(null); renderCharge(null); return; }
     // 技能卡按资源变化重建（原版 updateSkillMenus：每次渲染折叠变体组）；同一资源态不重建，保留展开与滚动
     const prep = cmd.preparation;
-    const menuKey = u.id + '|' + u.ref.mp + '|' + (r ? r.main + ':' + r.aux : '') + '|' + (cmd.serial || 0) + '|' + (prep ? prep.remaining + ':' + prep.invested : '') + '|' + u.skills.map(s => s.usesRemaining + ':' + s.maxUses).join(',');
+    const menuKey = u.id + '|' + u.ref.mp + '|' + (r ? r.main + ':' + r.aux + ':' + (r.universal || 0) : '') + '|' + (cmd.serial || 0) + '|' + (prep ? prep.remaining + ':' + prep.invested : '') + '|' + u.skills.map(s => s.usesRemaining + ':' + s.maxUses).join(',');
     const hero = Object.assign(refOf(u), { skills: u.skills, items: u.items || [], mp: u.ref.mp, hp: u.ref.hp, tp: u.ref.tp || 0, burstActivated: false });
     if (menuKey !== state.menuKey) {
       if (state.menuKey.split('|')[0] !== u.id) { rpgUi.closeAllSubMenus(); state.chargeAside = false; state.costFilter = null; }
@@ -399,15 +400,16 @@ export function buildShell(root) {
     state.pipPrev = { main: r.main, aux: r.aux };
     const cap = state.moveCap || 1, sprint = Math.min(r.sprintRemaining || 0, r.moveRemaining), base = r.moveRemaining - sprint;
     const prep = cmd.preparation;
-    const charge = prep ? '<button class="t-res-charge' + (prep.ready ? ' t-ready' : '') + '" data-tactics-charge title="蓄力面板">' +
-      (prep.ready ? '⚡ ' : '⏳ ') + ESC(prep.skill && prep.skill.name) + ' <b>' + (prep.ready ? '就绪' : prep.invested + '/' + (prep.invested + prep.remaining)) + '</b></button>' : '';
+    const charge = prep ? '<button class="t-res-charge' + (prep.ready ? ' t-ready' : '') + '" data-tactics-charge title="蓄力面板"><span class="t-charge-name">' +
+      (prep.ready ? '⚡ ' : '⏳ ') + ESC(prep.skill && prep.skill.name) + '</span><b class="t-charge-progress">' + (prep.ready ? '就绪' : prep.invested + '/' + (prep.invested + prep.remaining)) + '</b></button>' : '';
     els.strip.innerHTML =
       '<div class="t-res-move" title="剩余移动额度' + (sprint > 0 ? '（含冲刺 ' + sprint.toFixed(1) + 'm）' : '') + '">' +
         '<span class="t-res-ico">🦶</span><span class="t-res-track"><i class="t-res-base" style="width:' + (base / cap * 100).toFixed(1) + '%"></i>' +
         '<i class="t-res-sprint" style="width:' + (sprint / cap * 100).toFixed(1) + '%"></i><i class="t-res-cost"></i></span>' +
         '<b class="t-res-num">' + r.moveRemaining.toFixed(1) + '<small>/' + (+cap.toFixed(1)) + 'm</small></b></div>' +
-      '<div class="t-res-pips"><button class="t-res-lab' + (state.costFilter === 'main' ? ' t-filter-on' : '') + '" data-cost-filter="main" title="主行动：剩余 ' + r.main + ' 点 · 攻击技能、冲刺、背起 · 点击只看消耗主行动的技能">主 ' + r.main + '</button>' + pips('main', state.pipMax.main, r.main, prev.main) +
-        '<button class="t-res-lab t-aux' + (state.costFilter === 'aux' ? ' t-filter-on' : '') + '" data-cost-filter="aux" title="辅助行动：剩余 ' + r.aux + ' 点 · 跳跃、推动、[行动:辅] 技能 · 点击只看消耗辅助行动的技能">辅 ' + r.aux + '</button>' + pips('aux', state.pipMax.aux, r.aux, prev.aux) + charge + '</div>';
+      '<div class="t-res-pips"><span class="t-res-action-group"><button class="t-res-lab' + (state.costFilter === 'main' ? ' t-filter-on' : '') + '" data-cost-filter="main" title="主行动：剩余 ' + r.main + ' 点 · 攻击技能、冲刺、背起 · 点击只看消耗主行动的技能">主</button>' + pips('main', state.pipMax.main, r.main, prev.main) + '</span>' +
+        '<span class="t-res-action-group"><button class="t-res-lab t-aux' + (state.costFilter === 'aux' ? ' t-filter-on' : '') + '" data-cost-filter="aux" title="辅助行动：剩余 ' + r.aux + ' 点 · 跳跃、推动、辅助技能 · 点击只看消耗辅助行动的技能">辅 ' + r.aux + '</button>' + pips('aux', state.pipMax.aux, r.aux, prev.aux) +
+        '<span class="t-universal-pair"><span class="t-universal" title="万能行动点：可支付主行动或辅助行动">万能 ' + (r.universal || 0) + '</span><i class="t-universal-mark" aria-hidden="true"></i></span></span>' + charge + '</div>';
     if (state.moveCost != null) previewMoveCost(state.moveCost);
   }
   function previewMoveCost(cost) {
@@ -420,27 +422,30 @@ export function buildShell(root) {
     el.style.width = (c / cap * 100).toFixed(1) + '%';
     els.strip.classList.add('t-previewing');
   }
-  function previewPips(main, aux) {
+  function previewPips(main, aux, universal = 0) {
     els.strip.querySelectorAll('.t-pip-will').forEach(p => p.classList.remove('t-pip-will'));
     const mark = (kind, n) => { const on = [...els.strip.querySelectorAll('.t-pip-' + kind + '.t-on')]; on.slice(Math.max(0, on.length - n)).forEach(p => p.classList.add('t-pip-will')); };
     if (main > 0) mark('main', main);
     if (aux > 0) mark('aux', aux);
+    els.strip.querySelector('.t-universal')?.classList.toggle('t-universal-will', universal > 0);
   }
   // ---------- 基础行动：原版二级菜单内改两列格子（普攻 + 战棋动作 + 未迁移的防御/撤离）；每格写明花费与「立即/选目标」 ----------
   function renderBasic(cmd) {
     const list = cmd.basic || [];
-    const key = JSON.stringify(list);
+    const key = JSON.stringify([list, cmd.resources && [cmd.resources.main, cmd.resources.aux, cmd.resources.universal]]);
     if (key === state.basicKey) return;
     state.basicKey = key;
     const costText = c => !c ? '免费' : [c.main ? '主' + c.main : '', c.aux ? '辅' + c.aux : ''].filter(Boolean).join('+');
     const tile = a => {
       const off = !a.ok;
+      const actionKind = a.cost && a.cost.main ? 'main' : a.cost && a.cost.aux ? 'aux' : null;
+      const pay = actionKind ? actionPayment(cmd.resources || {}, actionKind, (a.cost.main || 0) + (a.cost.aux || 0)) : null;
       const attr = a.key === 'attack' ? 'data-rpg-ui-act="handleBasicAttack"' : a.key === 'unmigrated' ? 'data-tactics-unmigrated="' + ESC(a.name) + '"' : 'data-tactics-action="' + ESC(a.key) + '"';
       const sub = off ? ESC(a.short || a.reason || '不可用')
         : (a.mode === 'instant' ? '⚡立即 ' : '🎯选目标 ') + costText(a.cost) + (a.note ? '·' + ESC(a.note) : '');
       return '<button class="t-bact t-bact-' + ESC(a.tone || 'cyan') + (off ? ' t-bact-off' : '') + '" ' + attr +
         (off ? ' aria-disabled="true"' : '') + ' title="' + ESC(off ? a.reason || '' : a.desc || a.name) + '"' +
-        ' data-cost-main="' + ((a.cost && a.cost.main) || 0) + '" data-cost-aux="' + ((a.cost && a.cost.aux) || 0) + '">' +
+        ' data-cost-main="' + ((pay && pay.mainCost) || 0) + '" data-cost-aux="' + ((pay && pay.auxCost) || 0) + '" data-cost-universal="' + ((pay && pay.universalCost) || 0) + '">' +
         '<span class="t-bact-ico">' + a.icon + '</span><span class="t-bact-body"><b>' + ESC(a.name) + '</b><i>' + sub + '</i></span></button>';
     };
     const fixed = [
@@ -451,17 +456,15 @@ export function buildShell(root) {
     els.basicList.innerHTML = list.concat(fixed).map(tile).join('');
   }
   // ---------- 蓄力：复用原版 #charge-menu 槽（准备中替换四个主项）；可暂离去做移动/其他动作，资源条蓄力徽章随时回来 ----------
-  // 投入预演（与规则 investPreparation 同序：先加速库存、再余下主行动；驻足先抵 1 点）：返回本次各来源投入量与投入后剩余
-  function prepPlan(remaining, { stationary = false, inventory = 0, main = 0 } = {}) {
-    const st = stationary && remaining > 0 ? 1 : 0, rest = remaining - st;
-    const inv = Math.min(rest, inventory), m = Math.min(rest - inv, Math.max(0, main));
-    return { st, inv, main: m, after: rest - inv - m };
-  }
   function planText(plan, from) {
+    if (!plan) return '';
     const parts = [];
-    if (plan.inv) parts.push('加速×' + plan.inv);
+    if (plan.inventory) parts.push('加速×' + plan.inventory);
+    if (plan.skillMain) parts.push('技能主×' + plan.skillMain);
     if (plan.main) parts.push('◆主×' + plan.main);
-    return (parts.length ? '<small>' + (plan.st ? '另耗 ' : '消耗 ') + parts.join(' + ') + '</small>' : '') +
+    if (plan.aux) parts.push('◇辅×' + plan.aux);
+    if (plan.universal) parts.push('万能×' + plan.universal);
+    return (parts.length ? '<small>' + (plan.stationary ? '另耗 ' : '消耗 ') + parts.join(' + ') + '</small>' : '') +
       '<b class="t-prep-delta">准备 ' + from + '→' + plan.after + (plan.after === 0 ? ' · 就绪' : '') + '</b>';
   }
   function prepPips(invested, remaining, plan) {
@@ -472,28 +475,29 @@ export function buildShell(root) {
   function renderCharge(cmd) {
     const prep = cmd && cmd.playable ? cmd.preparation : null;
     const sta = (cmd && cmd.stationary) || { available: false };
-    const key = prep ? [cmd.unit.id, cmd.serial, prep.skill && prep.skill.name, prep.remaining, prep.ready, cmd.resources.main, cmd.chargeInventory, cmd.canContinue, sta.ok, sta.reason, sta.movement].join('|') : '';
+    const key = prep ? [cmd.unit.id, cmd.serial, prep.skill && prep.skill.name, prep.remaining, prep.ready, cmd.resources.main, cmd.resources.aux, cmd.resources.universal, cmd.chargeInventory, cmd.preparePayment && JSON.stringify(cmd.preparePayment), cmd.continueReason, sta.ok, sta.reason, sta.movement, sta.payment && JSON.stringify(sta.payment)].join('|') : '';
     if (!prep) state.chargeAside = false;
     const show = !!prep && !state.chargeAside;
+    els.menuBox.classList.toggle('t-charge-open', show);
     els.menuMain.style.display = show ? 'none' : '';
     els.chargeMenu.style.display = show ? 'flex' : 'none';
     if (!show || key === state.chargeKey) { if (!show) state.chargeKey = ''; return; }
     state.chargeKey = key;
     const name = ESC(prep.skill && prep.skill.name);
-    const canContinue = cmd.canContinue;
+    const canContinue = !!cmd.preparePayment;
+    const canStationary = !!sta.payment;
     const btnA = 'w-full py-1.5 px-2.5 bg-gradient-to-r border rounded-lg text-xs font-bold text-white flex items-center justify-center gap-1.5 transition-all';
     const btnB = 'w-full py-1.5 px-2.5 bg-slate-800/90 hover:bg-slate-700/90 border border-slate-600/80 rounded-lg text-xs font-bold text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-all';
-    const res = { inventory: cmd.chargeInventory || 0, main: cmd.resources.main || 0 };
-    const go = prepPlan(prep.remaining, res), still = sta.ok ? prepPlan(prep.remaining, { ...res, stationary: true }) : null;
+    const go = cmd.preparePayment, still = sta.payment;
     const head = '<div class="t-prep-head"><span>⏳ 【' + name + '】蓄力中</span>' + prepPips(prep.invested || 0, prep.remaining, null) +
       '<small>已备 ' + (prep.invested || 0) + ' · 还需 <b>' + prep.remaining + '</b></small></div>';
-    const goBtn = '<button data-tactics-action="prepare" class="t-prep-btn t-prep-go"' + (canContinue ? '' : ' aria-disabled="true" title="主行动或加速不足"') + '>' +
-      '<span class="t-prep-ico">⏩</span><span class="t-prep-body"><b>继续准备</b>' + (canContinue ? planText(go, prep.remaining) : '<small>主行动或加速不足</small>') + '</span>' +
+    const goBtn = '<button data-tactics-action="prepare" class="t-prep-btn t-prep-go"' + (canContinue ? '' : ' aria-disabled="true" title="' + ESC(cmd.continueReason || '主行动、辅助行动或万能行动点不足') + '"') + '>' +
+      '<span class="t-prep-ico">⏩</span><span class="t-prep-body"><b>继续准备</b>' + (canContinue ? planText(go, prep.remaining) : '<small>' + ESC(cmd.continueReason || '主行动、辅助行动或万能行动点不足') + '</small>') + '</span>' +
       (canContinue ? prepPips(prep.invested || 0, prep.remaining, go) : '') + '</button>';
-    const stillBtn = !sta.available ? '' : '<button data-tactics-action="stationary-prepare" class="t-prep-btn t-prep-still"' + (sta.ok ? '' : ' aria-disabled="true" title="' + ESC(sta.reason) + '"') + '>' +
+    const stillBtn = !sta.available ? '' : '<button data-tactics-action="stationary-prepare" class="t-prep-btn t-prep-still"' + (canStationary ? '' : ' aria-disabled="true" title="' + ESC(sta.reason) + '"') + '>' +
       '<span class="t-prep-ico">⛩</span><span class="t-prep-body"><b>驻足继续</b>' +
-      (sta.ok ? '<small>移动 ' + sta.movement.toFixed(1) + 'm→0 · 抵 1 点</small>' + planText(still, prep.remaining) : '<small>' + ESC(sta.reason) + '</small>') + '</span>' +
-      (sta.ok ? prepPips(prep.invested || 0, prep.remaining, still) : '') + '</button>';
+      (canStationary ? '<small>移动 ' + sta.movement.toFixed(1) + 'm→0 · 抵 1 点</small>' + planText(still, prep.remaining) : '<small>' + ESC(sta.reason) + '</small>') + '</span>' +
+      (canStationary ? prepPips(prep.invested || 0, prep.remaining, still) : '') + '</button>';
     els.chargeMenu.innerHTML = prep.ready
       ? '<div class="text-center text-[10px] font-bold text-cyan-300 bg-cyan-950/80 border border-cyan-500/50 py-1 px-2 rounded-lg shadow-inner flex items-center justify-center gap-1.5 animate-pulse mb-1"><span>⚡</span> 【' + name + '】蓄力已完成！</div>' +
         '<button data-tactics-action="release" class="' + btnA + ' from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 border-cyan-400 shadow-lg"><span>1.</span> 释放蓄力 (进入目标选择)</button>' +
@@ -524,24 +528,22 @@ export function buildShell(root) {
   }
   function decorateSkillCards(u) {
     if (!u) return;
-    const costOf = s => s.actionCost || { main: 1, aux: 0 };
+    const resources = state.cmd?.resources || {};
+    const costOf = s => {
+      const kind = skillActionKind(s), pay = actionPayment(resources, kind, 1, true);
+      return { main: pay.mainCost || 0, aux: pay.auxCost || 0, universal: pay.universalCost || 0, skillMain: pay.skillMainCost || 0, kind };
+    };
     const kidsOf = s => s.isGroup ? u.skills.filter(c => c._inGroup && c.parentName === s.name) : [];
-    const matches = s => { const k = kidsOf(s); if (k.length) return k.some(matches); const c = costOf(s); return state.costFilter === 'main' ? c.main > 0 : state.costFilter === 'aux' ? c.aux > 0 : true; };
+    const matches = s => { const k = kidsOf(s); if (k.length) return k.some(matches); return !state.costFilter || skillActionKind(s) === state.costFilter; };
     root.querySelectorAll('#attack-skill-list [data-skill-idx], #support-skill-list [data-skill-idx]').forEach(btn => {
       const s = u.skills[Number(btn.dataset.skillIdx)];
       const row = btn.children[1];
       if (!s || !row) return;
       const cost = costOf(s);
-      btn.dataset.costMain = cost.main || 0; btn.dataset.costAux = cost.aux || 0;
-      // 主/辅行动消耗角标（变体组父项取子项并集）：放在原版消耗行最前
+      btn.dataset.costMain = cost.main || 0; btn.dataset.costAux = cost.aux || 0; btn.dataset.costUniversal = cost.universal || 0;
+      // 主/辅过滤由技能行动类型决定；普通技能卡不再重复显示行动成本。
       const costRow = btn.children[2] && btn.children[2].firstElementChild;
-      if (costRow && !costRow.querySelector('.t-act-cost')) {
-        const kids = kidsOf(s), list = kids.length ? kids.map(costOf) : [cost];
-        const main = list.some(c => c.main > 0), aux = list.some(c => c.aux > 0);
-        costRow.insertAdjacentHTML('afterbegin', (main ? '<span class="t-act-cost t-main" title="消耗主行动">◆主' + (!kids.length && cost.main > 1 ? '×' + cost.main : '') + '</span>' : '') +
-          (aux ? '<span class="t-act-cost t-aux" title="消耗辅助行动">◇辅' + (!kids.length && cost.aux > 1 ? '×' + cost.aux : '') + '</span>' : '') +
-          (!main && !aux ? '<span class="t-act-cost" title="不消耗主/辅行动">免行动</span>' : ''));
-      }
+      costRow?.querySelectorAll('.t-act-cost').forEach(el => el.remove());
       // 主/辅过滤：不匹配的卡（组父按子项）隐藏；组内子卡单独判定
       const hide = !!state.costFilter && !matches(s);
       (s.isGroup ? btn.parentElement : btn).style.display = hide ? 'none' : '';
@@ -550,15 +552,14 @@ export function buildShell(root) {
       const start = costLine && costLine.querySelector('.t-card-still');
       const sta = state.cmd?.stationary || { available: false };
       const showStart = !!costLine && !hide && s.delay > 0 && !s.isGroup && sta.available && !state.cmd.preparation && state.cmd.canUse(s);
-      const r0 = state.cmd?.resources || {}, startKey = showStart ? [sta.ok, sta.reason, sta.movement, s.delay, state.cmd.chargeInventory, r0.main].join('|') : '';
+      const plan = showStart && sta.ok ? state.cmd.startPayment(s) : null;
+      const startKey = showStart ? [sta.reason, sta.movement, s.delay, JSON.stringify(plan)].join('|') : '';
       const fresh = !!start && start.dataset.key === startKey;
       if (start && !fresh) start.remove();
       if (startKey && !fresh) {
-        const plan = prepPlan(s.delay, { stationary: true, inventory: state.cmd.chargeInventory || 0, main: (r0.main || 0) - (cost.main || 0) });
-        const extra = [plan.inv ? '加速×' + plan.inv : '', plan.main ? '主×' + plan.main : ''].filter(Boolean).join('+');
-        const tip = sta.ok ? '驻足起咏：移动 ' + sta.movement.toFixed(1) + 'm→0 抵 1 点' + (extra ? '，另耗 ' + extra : '') + '，准备 ' + s.delay + '→' + plan.after + (plan.after ? '' : '（就绪）') : sta.reason;
-        costLine.insertAdjacentHTML('beforeend', '<span class="t-card-still' + (sta.ok ? '' : ' t-off') + '" role="button" data-key="' + ESC(startKey) + '" data-tactics-action="stationary-start:' + btn.dataset.skillIdx + '"' +
-          (sta.ok ? '' : ' aria-disabled="true"') + ' title="' + ESC(tip) + '">⛩驻足 ' + (sta.ok ? s.delay + '→' + plan.after : '✕') + '</span>');
+        const tip = plan ? '驻足起咏：移动 ' + sta.movement.toFixed(1) + 'm→0 抵 1 点 · ' + planText(plan, s.delay).replace(/<[^>]+>/g, ' ').trim() : sta.reason;
+        costLine.insertAdjacentHTML('beforeend', '<span class="t-card-still' + (plan ? '' : ' t-off') + '" role="button" data-key="' + ESC(startKey) + '" data-tactics-action="stationary-start:' + btn.dataset.skillIdx + '"' +
+          (plan ? '' : ' aria-disabled="true"') + ' title="' + ESC(tip) + '">⛩驻足 ' + (plan ? s.delay + '→' + plan.after : '✕') + '</span>');
       }
       if (state.cmd && state.cmd.skillReason) {
         const reason = state.cmd.skillReason(s);
@@ -585,6 +586,38 @@ export function buildShell(root) {
       if (want) list.insertAdjacentHTML('beforeend', '<div class="t-filter-empty">' + want + '</div>');
     });
   }
+  function decorateItemCards(u) {
+    if (!u || !state.cmd?.itemStatus) return;
+    const list = $('item-list');
+    [...list.children].forEach((wrap, idx) => {
+      const entry = u.items[idx];
+      if (!entry) return;
+      const parent = wrap.matches('button') ? wrap : wrap.firstElementChild;
+      const decorate = (btn, item, child) => {
+        if (!btn) return;
+        const kinds = child ? [skillActionKind(child)] : item.children?.length ? [...new Set(item.children.map(skillActionKind))] : [skillActionKind(item)];
+        const pay = actionPayment(state.cmd.resources || {}, kinds[0], 1);
+        if (child || !item.children?.length) {
+          btn.dataset.costMain = pay.mainCost || 0;
+          btn.dataset.costAux = pay.auxCost || 0;
+          btn.dataset.costUniversal = pay.universalCost || 0;
+        } else {
+          delete btn.dataset.costMain; delete btn.dataset.costAux; delete btn.dataset.costUniversal;
+        }
+        const row = btn.children[2]?.firstElementChild;
+        if (!row) return;
+        row.querySelectorAll('.t-act-cost').forEach(el => el.remove());
+        row.insertAdjacentHTML('afterbegin', kinds.map(kind => kind === 'main'
+          ? '<span class="t-act-cost t-main">主×1</span>' : '<span class="t-act-cost t-aux">辅×1</span>').join(''));
+      };
+      decorate(parent, entry, null);
+      const childWrap = wrap.matches('button') ? null : wrap.children[1];
+      if (childWrap) [...childWrap.children].forEach((btn, childIdx) => decorate(btn, entry, entry.children?.[childIdx]));
+    });
+  }
+  const itemListObserver = new MutationObserver(() => { const u = cmdHero(); if (u) decorateItemCards(u); });
+  itemListObserver.observe($('item-list'), { childList: true });
+
   const cardVisible = b => b.style.display !== 'none' && !(b.parentElement && b.parentElement.style.display === 'none');
   const listHas = id => [...root.querySelectorAll('#' + id + ' [data-skill-idx]')].some(cardVisible);
   // 点击资源条「主」「辅」：切换过滤并打开有匹配技能的技能栏
@@ -615,8 +648,8 @@ export function buildShell(root) {
     const b = e.target.closest('button');
     if (b && b !== state.hoverBtn && !b.disabled) { state.hoverBtn = b; uiSound('hover'); }
     const c = e.target.closest('[data-cost-main]');
-    if (c && c.getAttribute('aria-disabled') !== 'true' && !c.classList.contains('disabled-card')) previewPips(+c.dataset.costMain, +c.dataset.costAux);
-    else previewPips(0, 0);
+    if (c && c.getAttribute('aria-disabled') !== 'true' && !c.classList.contains('disabled-card')) previewPips(+c.dataset.costMain, +c.dataset.costAux, +c.dataset.costUniversal);
+    else previewPips(0, 0, 0);
   });
   els.menuBox.addEventListener('pointerleave', () => previewPips(0, 0));
   els.strip.addEventListener('click', e => {

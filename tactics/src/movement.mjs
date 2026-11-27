@@ -23,7 +23,7 @@ function findUnit(ctx, unitId) {
 }
 
 // 飞行：ref.flying 或 buffsOf 中出现 variant 飞行
-function hasFlying(ctx, unit) {
+export function hasFlying(ctx, unit) {
   if (unit.ref && unit.ref.flying) return true;
   const buffs = typeof ctx.buffsOf === 'function' ? (ctx.buffsOf(unit.id) || []) : [];
   return buffs.some(b => b && (b.type === '飞行' || b.type === 'flying' || b.variant === '飞行'));

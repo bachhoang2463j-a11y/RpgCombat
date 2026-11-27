@@ -71,6 +71,7 @@ export function runCases() {
   });
   check('FB-C02 落空也消费本次急袭，紧接着的攻击不加攻', 'conceal', () => {
     const b = duel({ enemy: { ref: { evasion: 10000 } } }); seedRush(b);
+    b.battleState.combatState.clock.currentAction.resources.universal = 1;
     const r = attackChecked(b, skill({ guaranteedHit: false, hit: 0 }));
     return { pass: segments(r).every(s => !s.hit) && !rushes(b).length
       && segments(attackChecked(b, skill(), 'e2'))[0].rawDmg === 20 };
@@ -110,6 +111,7 @@ export function runCases() {
     attackChecked(b, skill({ power: 999 }));
     const first = segments(attackChecked(b, skill(), 'e2'))[0];
     const consumed = rushes(b).length === 0;
+    b.battleState.combatState.clock.currentAction.resources.universal += 1;
     const second = segments(attackChecked(b, skill(), 'e2'))[0];
     return { pass: consumed && first.rawDmg === second.rawDmg + 50 && !rushes(b).length };
   });

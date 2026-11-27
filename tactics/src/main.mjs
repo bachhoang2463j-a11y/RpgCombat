@@ -16,6 +16,7 @@ import { buildShell } from './ui-shell.mjs';
 import { resolveAvatarUrl, splitEmojiName } from './unit-view.mjs';
 import { TEST_ROOM } from './scene.mjs';
 import { createBattle, BASIC_ATTACK } from './battle.mjs';
+import { actionBalance } from './actions.mjs';
 import { getVisibleTurnQueue } from './clock.mjs';
 import { findReachable } from './movement.mjs';
 import { createAvHost, heroAvatarUrl } from './av-host.mjs';
@@ -356,8 +357,8 @@ export function createApp(rootEl, opts = {}) {
     const key = hit.col + ',' + hit.row;
     if (fieldAction === 'jump' && jumpArm === key) { jumpArm = null; runFieldTarget('jump', hit); return true; }
     const r = battle.snapshot().resources, reach = jumpReach(currentUnit(), r);
-    if (!r || !r.freeJumpAvailable && r.aux + r.main < 1 || r.jumpsRemaining < 1 || reach < 1) {
-      ui('deny'); shell.showLog(r && !r.freeJumpAvailable && r.aux + r.main < 1 ? '行动点不足，无法跳跃' : r && r.jumpsRemaining < 1 ? '本次自然行动已经跳跃' : '无法起跳', 'warn');
+    if (!r || !r.freeJumpAvailable && actionBalance(r, 'aux') < 1 || r.jumpsRemaining < 1 || reach < 1) {
+      ui('deny'); shell.showLog(r && !r.freeJumpAvailable && actionBalance(r, 'aux') < 1 ? '行动点不足，无法跳跃' : r && r.jumpsRemaining < 1 ? '本次自然行动已经跳跃' : '无法起跳', 'warn');
       return true;
     }
     if (fieldAction !== 'jump') handleFieldAction('jump');
@@ -612,6 +613,9 @@ export function createApp(rootEl, opts = {}) {
     const hero = isPlayerUnit(u) && !snap.terminal;
     const carrying = snap.carrying[u.id] || null;
     const basic = hero && r ? basicActions(u, r, carrying) : [];
+    const prep = hero && !busy && snap.preparation ? battle.canAdvancePreparation() : null;
+    const stationary = hero && !busy ? battle.stationaryStatus() : null;
+    if (stationary?.ok && snap.preparation) stationary.payment = battle.canAdvancePreparation({ stationary: true }).payment;
     const fieldHint = {
       jump: '【跳跃】在地图上选择落点<br><small>八方向直线 · 最远 ' + jumpReach(u, r) + 'm · 越过低矮障碍与单位 · 不扣移动额度</small>',
       push: '【推动】选择相邻单位<br><small>力量对抗 · 撞墙按剩余距离受伤</small>',
@@ -619,15 +623,15 @@ export function createApp(rootEl, opts = {}) {
     };
     shell.renderCommand({
       unit: u, terminal: !!snap.terminal, playable: hero, serial: snap.actionSerial,
-      resources: r ? { moveRemaining: r.moveRemaining, moveMax: u.ref.moveDistance, sprintRemaining: r.sprintRemaining || 0, main: r.main, aux: r.aux, mp: u.ref.mp } : null,
+      resources: r ? { ...r, moveMax: r.baseMove, mp: u.ref.mp } : null,
       carrying, preparation: snap.preparation, chargeInventory: snap.chargeInventory, endArmed: performance.now() < endArmedUntil, basic,
       aimHint: !hero ? null : fieldAction ? fieldHint[fieldAction] : !aim ? null : pending
         ? '【' + esc(aim.skill.name) + '】已锁定<br>再次点击目标或 Enter 发动'
         : '【' + esc(aim.skill.name) + '】请在地图上选择目标',
       canUse: skillUsable,
       canStationary: hero && !busy && battle.canStationaryPrepare(),
-      stationary: hero && !busy ? battle.stationaryStatus() : null,
-      canContinue: hero && !busy && !!snap.preparation && battle.canAdvancePreparation().ok,
+      stationary, startPayment: battle.previewStationaryStart,
+      preparePayment: prep?.payment || null, continueReason: prep?.reason,
       onStationary: (idx) => handleCommand('sk:' + idx, true),
       skillReason,
       itemStatus: (it, child) => battle.canUseItem(it, child),
@@ -644,24 +648,25 @@ export function createApp(rootEl, opts = {}) {
   // 基础行动格数据：资格只读规则已有的资源与状态；最终判定仍以 battle.* 返回为准
   function basicActions(u, r, carrying) {
     const atkReason = skillReason(BASIC_ATTACK);
-    const reach = jumpReach(u, r), canPayAux = r.aux + r.main >= 1, canJump = r.freeJumpAvailable || canPayAux;
+    const reach = jumpReach(u, r), canPayAux = actionBalance(r, 'aux') >= 1, canJump = r.freeJumpAvailable || canPayAux;
+    const canPayMain = actionBalance(r, 'main') >= 1;
     const downAlly = currentViewData.units.some(x => x.side === 'hero' && x.id !== u.id && x.ref.hp <= 0 && !Object.values(battle.snapshot().carrying).includes(x.id));
     const carried = carrying ? unitById(carrying) : null;
     const ready = battle.previewReady();
     return [
       { key: 'attack', icon: '⚔️', name: '普通攻击', cost: { main: 1 }, mode: 'target', tone: 'rose', ok: !atkReason, reason: atkReason, short: atkReason && shortLabel(atkReason) },
       { key: 'defend', icon: '🛡️', name: '防御姿态', cost: { main: 1 }, mode: 'instant', tone: 'emerald',
-        ok: typeof battle.defend === 'function' && r.main >= 1,
+        ok: typeof battle.defend === 'function' && canPayMain,
         reason: typeof battle.defend !== 'function' ? '防御姿态：规则接口待对齐' : '主行动已用完',
         short: typeof battle.defend !== 'function' ? '⏳ 待规则接入' : '◆ 主行动已用完', desc: '恢复 MP／TP 并进入防御姿态，持续 100 虚拟时间' },
-      { key: 'sprint', icon: '💨', name: '冲刺', cost: { main: 1 }, mode: 'instant', tone: 'sky', note: '+' + u.ref.moveDistance + 'm', ok: r.main >= 1, reason: '主行动已用完', short: '◆ 主行动已用完', desc: '消耗主行动，立即追加一份移动额度' },
+      { key: 'sprint', icon: '💨', name: '冲刺', cost: { main: 1 }, mode: 'instant', tone: 'sky', note: '+' + battle.getEffectiveUnit(u.id).effectiveMoveDistance + 'm', ok: canPayMain, reason: '主行动已用完', short: '◆ 主行动已用完', desc: '消耗主行动，立即追加一份移动额度' },
       { key: 'jump', icon: '🦘', name: '跳跃', cost: r.freeJumpAvailable ? null : { aux: 1 }, mode: 'target', tone: 'violet', note: (r.freeJumpAvailable ? '免费 · ' : '') + '≤' + reach + 'm', ok: canJump && r.jumpsRemaining > 0 && reach >= 1,
         reason: !canJump ? '行动点不足' : r.jumpsRemaining < 1 ? '本次自然行动已经跳跃' : '无法起跳', short: !canJump ? '◇ 行动点已用完' : r.jumpsRemaining < 1 ? '🦘 本次已跳跃' : '无法起跳', desc: '沿八方向直线跳跃，越过低矮障碍；不扣移动额度；风行者首跳免费，可再付费跳一次' },
       { key: 'push', icon: '✋', name: '推动', cost: { aux: 1 }, mode: 'target', tone: 'amber', ok: canPayAux, reason: '行动点不足', short: '◇ 行动点已用完', desc: '与相邻单位力量对抗，推开数米；撞墙造成伤害' },
       carried
         ? { key: 'drop', icon: '⬇️', name: '放下', cost: null, mode: 'instant', tone: 'emerald', note: carried.name, ok: true, desc: '把背负的友方放到身边空格' }
-        : { key: 'carry', icon: '⛑️', name: '背起', cost: { main: 1 }, mode: 'target', tone: 'emerald', ok: r.main >= 1 && downAlly,
-          reason: r.main < 1 ? '主行动不足' : '没有可背起的倒地友方', short: r.main < 1 ? '◆ 主行动已用完' : '无倒地友方', desc: '背起相邻倒地友方，背负中移动消耗加倍' },
+        : { key: 'carry', icon: '⛑️', name: '背起', cost: { main: 1 }, mode: 'target', tone: 'emerald', ok: canPayMain && downAlly,
+          reason: !canPayMain ? '主行动不足' : '没有可背起的倒地友方', short: !canPayMain ? '◆ 主行动已用完' : '无倒地友方', desc: '背起相邻倒地友方，背负中移动消耗加倍' },
       { key: 'ready', icon: '🧹', name: '整备', cost: { main: 1 }, mode: 'instant', tone: 'emerald',
         ok: ready.ok, reason: ready.reason, short: shortLabel(ready.reason), desc: '随机祛除自身一项可驱散的负面状态' },
     ];
@@ -801,12 +806,13 @@ export function createApp(rootEl, opts = {}) {
     if (full) {
       // 冲刺后可达：再点同格 = 消耗主行动冲刺并移动（冲刺额度/背负倍率取规则视图）
       const add = battle.getEffectiveUnit(id).effectiveMoveDistance, need = full.cost * (battle.snapshot().carrying[id] ? 2 : 1);
-      if (r.main >= 1 && need <= r.moveRemaining + add + 1e-9) {
+      const canSprint = actionBalance(r, 'main') >= 1;
+      if (canSprint && need <= r.moveRemaining + add + 1e-9) {
         const key = hit.col + ',' + hit.row, armed = sprintArm === key;
         return { ok: false, sprint: true, key, armed, cell: { col: hit.col, row: hit.row, cost: need },
-          html: '💨 冲刺后可达（需 ' + need.toFixed(1) + 'm · 余 ' + r.moveRemaining.toFixed(1) + 'm +冲刺 ' + add + 'm）<br>' + (armed ? '<b>再点一次</b>：消耗 ◆主行动 冲刺并移动' : '点击：准备冲刺移动') };
+          html: '💨 冲刺后可达（需 ' + need.toFixed(1) + 'm · 余 ' + r.moveRemaining.toFixed(1) + 'm +冲刺 ' + add + 'm）<br>' + (armed ? '<b>再点一次</b>：消耗 ' + (r.main > 0 ? '◆主行动' : '✦万能行动') + ' 冲刺并移动' : '点击：准备冲刺移动') };
       }
-      if (r.moveRemaining <= 0.999) return { ok: false, reason: '移动额度已用完' + (r.main < 1 ? '（主行动也已用完，无法冲刺）' : '（冲刺后仍不可达）') };
+      if (r.moveRemaining <= 0.999) return { ok: false, reason: '移动额度已用完' + (!canSprint ? '（没有可用行动点冲刺）' : '（冲刺后仍不可达）') };
       return { ok: false, reason: '超出移动额度（需 ' + need.toFixed(1) + 'm，余 ' + r.moveRemaining.toFixed(1) + 'm）' };
     }
     if (r.moveRemaining <= 0.999) return { ok: false, reason: '移动额度已用完' };
@@ -977,7 +983,7 @@ export function createApp(rootEl, opts = {}) {
     if (ev.sprint) {
       sandbox.setPreview({ kind: 'move', unitId: battle.snapshot().currentId, cells: r.moveRemaining > 0.999 ? battle.reachable().cells : [], hover: ev.cell });
       sandbox.setHint({ x: hit.col + 0.5, y: hit.row + 0.5 }, ev.html, ev.armed ? 'lock' : null);
-      shell.previewMoveCost(null); shell.previewPips(1, 0);
+      shell.previewMoveCost(null); shell.previewPips(r.main > 0 ? 1 : 0, 0, r.main > 0 ? 0 : 1);
       return;
     }
     shell.previewPips(0, 0);
@@ -1275,10 +1281,10 @@ export function createApp(rootEl, opts = {}) {
   }
   function requestEnd() {
     const r = battle.snapshot().resources;
-    const left = r && (r.main > 0 || r.aux > 0 || r.moveRemaining > 0.999);
+    const left = r && (r.main > 0 || r.aux > 0 || r.universal > 0 || r.moveRemaining > 0.999);
     if (left && performance.now() > endArmedUntil) {
       endArmedUntil = performance.now() + 2200;
-      const unused = [r.main > 0 && '主行动', r.aux > 0 && '辅助行动', r.moveRemaining > 0.999 && '移动额度'].filter(Boolean);
+      const unused = [r.main > 0 && '主行动', r.aux > 0 && '辅助行动', r.universal > 0 && '万能行动', r.moveRemaining > 0.999 && '移动额度'].filter(Boolean);
       ui('select'); shell.showLog('还有' + unused.join('、') + '未用 · 再按一次结束回合', 'warn');
       renderCommand();
       setTimeout(() => { if (performance.now() >= endArmedUntil && battle && isHeroTurn()) renderCommand(); }, 2300);

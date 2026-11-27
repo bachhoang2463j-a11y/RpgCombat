@@ -26,15 +26,17 @@ function make() {
   return b;
 }
 const main = b => b.snapshot().resources.main;
+const universal = b => b.snapshot().resources.universal;
 const depth = (b, id = 'h') => Math.max(0, 100 - b.getEffectiveUnit(id).taunt);
 const rushes = (b, id = 'h') => b.buffsOf(id).filter(x => x.isConcealAtk);
 const target = (b, id) => ({ x: b.ctx.placementsById[id].col + 0.5, y: b.ctx.placementsById[id].row + 0.5, targetId: id });
 let sequence = 0;
 function castTaunt(b, value, id = 'h') {
+  // 注入辅助额度，只隔离本用例的隐匿阈值，不花被测的万能奖励。
+  b.battleState.combatState.clock.currentAction.resources.aux = 1;
   const sk = { name: '阈值临时嘲讽-' + (++sequence), type: '[嘲讽]', power: value, isOthers: true,
     turns: 20, slotTurns: 20, hit: 100, guaranteedHit: true, cost: 0,
-    range: id === b.snapshot().currentId ? { type: '自身' } : { type: '单体', castRange: 10 },
-    actionCost: { main: 0, aux: 0 } };
+    range: id === b.snapshot().currentId ? { type: '自身' } : { type: '单体', castRange: 10 } };
   const result = b.attack(sk, target(b, id), { policy: 'none' });
   assert.equal(result.ok, true, '真实临时嘲讽技能必须成功：' + (result.reason || ''));
   // 必须真实进入 effect-handlers 的 taunt 分支，避免未知标签产生空结算假绿。
@@ -44,10 +46,10 @@ function castTaunt(b, value, id = 'h') {
   }
   return result;
 }
-function attack(b, mainCost = 0) {
+function attack(b) {
   const result = b.attack({ name: '急袭消费试攻', type: '[伤害]', power: 0, hit: 100,
     guaranteedHit: true, damageType: '近战', cost: 0,
-    range: { type: '单体', castRange: 10 }, actionCost: { main: mainCost, aux: 0 } }, target(b, 'e'), { policy: 'none' });
+    range: { type: '单体', castRange: 10 } }, target(b, 'e'), { policy: 'none' });
   assert.equal(result.ok, true, result.reason || '攻击必须成功');
   const hits = (result.hits || []).flatMap(h => h.segments || [h]).filter(h => h.hit);
   assert.ok(hits.length, '必须存在真实命中，不能用空攻击验证消费');
@@ -76,13 +78,14 @@ function stripHost() {
     },
   };
 }
-function assertStrip(html, count, slots) {
+function assertStrip(html, count, extra) {
   const button = html.match(/<button\b[^>]*data-cost-filter="main"[^>]*>([\s\S]*?)<\/button>/);
   assert.ok(button, '必须保留原有主按钮');
-  assert.equal(button[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(), '主 ' + count);
+  assert.equal(button[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(), '主');
   const pips = [...html.matchAll(/<i\b[^>]*class="([^"]*\bt-pip-main\b[^"]*)"[^>]*>/g)];
-  assert.equal(pips.length, slots, '主点格容量必须保持');
+  assert.equal(pips.length, 1, '主点格容量必须保持');
   assert.equal(pips.filter(p => /(?:^|\s)t-on(?:\s|$)/.test(p[1])).length, count, '亮起格数必须等于真实主点');
+  assert.ok(html.includes('>万能 ' + extra + '</span>'), '万能文本必须等于实际余额');
 }
 
 export function runCases() {
@@ -96,7 +99,8 @@ export function runCases() {
       const b = make();
       castTaunt(b, -(value - 50));
       const u = b.ctx.units.find(x => x.id === 'h');
-      assert.equal(main(b), value >= 80 ? 2 : 1, '80 阈值必须增加当前真实主点');
+      assert.equal(main(b), 1);
+      assert.equal(universal(b), value >= 80 ? 1 : 0, '80 阈值必须增加当前万能点');
       assert.equal(depth(b), value === 100 ? 50 : value);
       assert.equal(u.ref.baseTauntBonus, -50, '临时隐匿不可固化为永久深度');
       assert.equal(u.ref.stealthCycleProcessed, value >= 80 && value < 100);
@@ -107,14 +111,14 @@ export function runCases() {
       }
     });
   }
-  check('80 主点 1→2，同循环重复检查不重复发放', () => {
+  check('80 万能点 0→1，同循环重复检查不重复发放', () => {
     const b = make();
     castTaunt(b, -30);
-    assert.equal(main(b), 2);
-    for (let i = 0; i < 3; i++) { castTaunt(b, 0); assert.equal(main(b), 2); }
+    assert.equal(universal(b), 1);
+    for (let i = 0; i < 3; i++) { castTaunt(b, 0); assert.equal(universal(b), 1); }
     castTaunt(b, -19);
     assert.equal(depth(b), 99);
-    assert.equal(main(b), 2, '同循环涨至99仍不重复');
+    assert.equal(universal(b), 1, '同循环涨至99仍不重复');
   });
   check('跌回79解锁，重越80进入新循环', () => {
     const b = make();
@@ -124,9 +128,9 @@ export function runCases() {
     assert.equal(b.ctx.units.find(x => x.id === 'h').ref.stealthCycleProcessed, false);
     castTaunt(b, -1);
     assert.equal(depth(b), 80);
-    assert.equal(main(b), 3, '新循环应再授予一主点');
+    assert.equal(universal(b), 2, '新循环应再授予一万能点');
     castTaunt(b, 0);
-    assert.equal(main(b), 3);
+    assert.equal(universal(b), 2);
   });
   check('100 清全部负taunt、回50、保留无关buff并开启新循环', () => {
     const b = make();
@@ -138,10 +142,10 @@ export function runCases() {
     assert.ok(!b.buffsOf('h').some(x => x.type === 'taunt' && x.value < 0));
     assert.ok(b.buffsOf('h').includes(ordinary));
     assert.equal(rushes(b).length, 1);
-    assert.equal(main(b), 2, '80与100一次跨越只领一次主点');
+    assert.equal(universal(b), 1, '80与100一次跨越只领一次万能点');
     castTaunt(b, -30);
     assert.equal(depth(b), 80);
-    assert.equal(main(b), 3, '回50后可进入下一循环');
+    assert.equal(universal(b), 2, '回50后可进入下一循环');
     assert.equal(rushes(b).length, 1);
   });
   check('100真实授予快照isConcealAtk，下一次攻击+50并消费', () => {
@@ -169,22 +173,22 @@ export function runCases() {
     attack(b);
     assert.equal(rushes(b).length, 0);
   });
-  check('非当前隐匿者待领取主点，不发给施术者且只领取一次', () => {
+  check('非当前隐匿者待领取万能点，不发给施术者且只领取一次', () => {
     const b = make();
     castTaunt(b, -30, 'a');
     assert.equal(depth(b, 'a'), 80);
     assert.equal(b.snapshot().currentId, 'h');
-    assert.equal(main(b), 1, '非当前单位奖励不能误入当前主点');
+    assert.equal(universal(b), 0, '非当前单位奖励不得误发给施术者');
     castTaunt(b, 0, 'a');
     for (let i = 0; i < 12 && b.snapshot().currentId !== 'a'; i++) b.endAction();
     assert.equal(b.snapshot().currentId, 'a', '有限轮转内必须轮到待领取者');
-    assert.equal(main(b), 2, '自然主点加一份待领奖励');
+    assert.equal(universal(b), 1, '自然行动交付一份万能奖励');
     castTaunt(b, 0, 'a');
-    assert.equal(main(b), 2, '领取后同循环不可重复授予');
+    assert.equal(universal(b), 1, '领取后同循环不可重复授予');
     b.endAction();
     for (let i = 0; i < 12 && b.snapshot().currentId !== 'a'; i++) b.endAction();
     assert.equal(b.snapshot().currentId, 'a');
-    assert.equal(main(b), 1, '待领主点不得下次自然行动重复领取');
+    assert.equal(universal(b), 0, '万能点不得下次自然行动重复领取');
   });
   check('statusBadges 只显示合并后的当前值和名称', () => {
     const b = make();
@@ -209,27 +213,26 @@ export function runCases() {
     assert.ok(!after.some(x => /急袭/.test(x.text)));
     assert.ok(after.some(x => /^攻\+7(?:·|$)/.test(x.text)));
   });
-  check('奖励主点允许真实攻击两次，2→1→0后第三次被禁止', () => {
+  check('专用主点再用万能点，第三次攻击被禁止', () => {
     const b = make();
     castTaunt(b, -30);
-    assert.equal(main(b), 2);
-    attack(b, 1);
-    assert.equal(main(b), 1);
-    attack(b, 1);
+    assert.equal(universal(b), 1);
+    attack(b);
     assert.equal(main(b), 0);
-    assert.throws(() => attack(b, 1), /主行动|行动点/);
+    assert.equal(universal(b), 1);
+    attack(b);
+    assert.equal(universal(b), 0);
+    assert.throws(() => attack(b), /主行动|行动点/);
   });
-  check('真实renderStrip：阈值后主2，消费后主1/主0且pips同步', () => {
+  check('真实renderStrip：主点只显示菱形，万能点奖励和消费同步', () => {
     const b = make(), host = stripHost();
-    assertStrip(host.render(b), 1, 1);
+    assertStrip(host.render(b), 1, 0);
     castTaunt(b, -30);
-    assertStrip(host.render(b), 2, 2);
+    assertStrip(host.render(b), 1, 1);
     assert.equal(b.sprint().ok, true);
-    assert.equal(main(b), 1);
-    assertStrip(host.render(b), 1, 2);
+    assertStrip(host.render(b), 0, 1);
     assert.equal(b.sprint().ok, true);
-    assert.equal(main(b), 0);
-    assertStrip(host.render(b), 0, 2);
+    assertStrip(host.render(b), 0, 0);
   });
   return { cases };
 }

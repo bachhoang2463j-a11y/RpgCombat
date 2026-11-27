@@ -24,7 +24,7 @@ function group(fn) {
     return { cases };
   } };
 }
-const shot = parseSkill('【试射】[伤害;power:40][必中][远程][行动:辅][范围:单体;射程:12]');
+const shot = parseSkill('【试射】[伤害;power:40][必中][远程][范围:单体;射程:12]');
 const gather = parseSkill('【回点】[再动;power:1][行动:辅][范围:自身]');
 const delay = (n = 2) => parseSkill('【雷鸣】[雷电;power:30][MP:10][TP:10][必中][法术][延迟:' + n + '][范围:单体;射程:8]');
 
@@ -63,20 +63,23 @@ export const groups = {
       assert.equal(b.snapshot().resources.aux, 0);
       assert.equal(b.jump(8, 4).ok, false);
       const b2 = setup([unit('h', 'hero', { classType: '风行者', spd: 200 }), unit('e', 'enemy')], { h: p(2), e: p(12) });
-      b2.defend(); b2.attack(shot, at(12, 4, 'e'));
+      b2.defend(); assert.ok(b2.attack(parseSkill('【提速】[增速;power:5][范围:自身]')).ok);
       assert.deepEqual([b2.snapshot().resources.aux, b2.snapshot().resources.main], [0, 0]);
       assert.ok(b2.jump(4, 4).free);
     });
-    test('隐匿免借机，击杀补基础且保留冲刺，主点到账后再次补足', () => {
+    test('隐匿免借机，击杀补基础且保留冲刺，万能点到账后再次补足', () => {
       const h = unit('h', 'hero', { classType: '隐匿者', spd: 200 });
       const b = setup([h, unit('e', 'enemy', { hp: 1 }), unit('z', 'enemy')], { h: p(5), e: p(6), z: p(12, 7) });
       assert.deepEqual(b.move(3, 4).opportunities, []);
       assert.ok(b.sprint().ok);
       assert.equal(b.snapshot().resources.moveRemaining, 10);
+      b.battleState.combatState.clock.currentAction.resources.universal = 1;
       assert.ok(b.attack(shot, at(6, 4, 'e')).ok);
       assert.deepEqual([b.snapshot().resources.moveRemaining, b.snapshot().resources.sprintRemaining], [12, 6]);
       b.move(2, 4);
-      assert.ok(b.attack({ ...gather, actionCost: { main: 1, aux: 0 } }).ok);
+      const before = b.snapshot().resources.universal;
+      assert.ok(b.attack(gather).ok);
+      assert.equal(b.snapshot().resources.universal, before + 1);
       assert.equal(b.snapshot().resources.moveRemaining, 11);
     });
     test('狂战士只推落点八邻域敌人，重量不合格和友军不推', () => {
@@ -115,9 +118,10 @@ export const groups = {
       const h = unit('h', 'hero', { classType: '灾厄使', spd: 200 }), e = unit('e', 'enemy', { strength: 10 });
       const b = setup([h, e], { h: p(3), e: p(4) });
       const dots = parseSkill('【淬火】[中毒;power:7][燃烧;power:11][Turns:3][必中][范围:单体;射程:4]');
-      assert.ok(b.attack(dots, at(4, 4, 'e')).ok);
       const clock = b.battleState.combatState.clock;
+      assert.ok(b.attack(dots, at(4, 4, 'e')).ok);
       const before = structuredClone(clock.statuses);
+      clock.currentAction.resources.universal = 1;
       assert.ok(b.push('e').success);
       assert.equal(e.ref.hp, 82);
       assert.deepEqual(clock.statuses, before);
@@ -138,7 +142,8 @@ export const groups = {
       const first = b.attack(shot, at(4, 4, 'e'));
       assert.ok(first.events.some(x => x.trigger === 'revive'));
       assert.ok(!first.events.some(x => x.passive === '棱镜中继'));
-      const second = b.attack({ ...shot, actionCost: { main: 1, aux: 0 } }, at(4, 4, 'e'));
+      b.state.combatState.clock.currentAction.resources.universal = 1;
+      const second = b.attack(shot, at(4, 4, 'e'));
       assert.equal(second.events.filter(x => x.passive === '棱镜中继').reduce((n, x) => n + x.value, 0), 10);
     });
     test('倒地施法者的在场毒伤仍保留击杀归属', () => {

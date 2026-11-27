@@ -26,6 +26,8 @@ const routes = casesFor(check => {
     const { units } = sample();
     const monster = units.find(u => u.name === '伊塔库亚的眷族');
     const hero = unit('h', 'hero', 10);
+    // 单测地形与连续跳跃，不让风雪狂暴提前占用唯一的辅助点。
+    monster.skills = monster.skills.filter(skill => skill.name !== '风雪狂暴');
     const b = make([monster, hero], { [monster.id]: at(11, 15), h: at(11, 22) }, CHAPEL_SCENE);
     const done = b.runEnemyTurn();
     const jumps = done.events.filter(e => e.type === 'unit-jumped' && e.unitId === monster.id);
@@ -45,10 +47,11 @@ const routes = casesFor(check => {
     const solid = make(units(), placements, scene(1, [{ ...wall, kind: 'wall' }]));
     check('实墙不能跳，普通通路只步行', !solid.planEnemyAction().jumpTo && make(units(), placements, scene(1)).planEnemyAction().moveTo?.col === 5);
     const spent = make(units(), placements, scene(1, [wall]));
-    spent.battleState.combatState.clock.currentAction.resources.aux = 0;
-    const fromMain = spent.planEnemyAction();
-    spent.battleState.combatState.clock.currentAction.resources.main = 0;
-    check('无辅助点可用主点自动跳，二者均用完则不能跳', fromMain.jumpTo?.col === 4 && spent.planEnemyAction().action === 'wait');
+    const r = spent.battleState.combatState.clock.currentAction.resources;
+    r.aux = 0;
+    const noJump = spent.planEnemyAction();
+    r.universal = 1;
+    check('无辅助点不能借主点跳，但万能可代付', noJump.action === 'wait' && spent.planEnemyAction().jumpTo?.col === 4);
   }
   for (const rows of [1, 5]) {
     const mob = unit('e', 'enemy', 200, { ref: { moveDistance: 3 } });
@@ -98,12 +101,13 @@ const items = casesFor(check => {
     const item = { ...heal, category: '道具', count: 0, maxUses: 0 };
     const b = battle(item);
     const first = b.useItem(item);
-    const fromMain = b.useItem(item);
-    const noPoints = b.canUseItem(item).reason;
+    const blocked = b.useItem(item);
+    b.battleState.combatState.clock.currentAction.resources.universal = 1;
+    const fromUniversal = b.useItem(item);
     b.endAction();
     const nextTurn = b.useItem(item);
-    check('不限次数道具可用主点补扣，行动点不足与库存分开', first.ok && first.costSummary.aux === 1
-      && fromMain.ok && fromMain.costSummary.main === 1 && noPoints === '辅助行动已用完' && nextTurn.ok && item.count === 0);
+    check('不限次数道具仅扣辅或万能，行动点不足与库存分开', first.ok && first.costSummary.aux === 1
+      && !blocked.ok && blocked.reason === '辅助行动不足' && fromUniversal.ok && fromUniversal.costSummary.universal === 1 && nextTurn.ok && item.count === 0);
   }
   {
     const mp = { ...heal, cost: 21 };
@@ -126,9 +130,9 @@ const items = casesFor(check => {
     }
     const before = b.snapshot();
     const release = b.useItem(item);
-    check('延迟物品先付一辅，再投入现有主行动，释放不再扣点或扣库存', used.preparing && used.costSummary.main === 0
-      && used.costSummary.aux === 1 && used.costSummary.preparationMain === 1 && opening.preparation.remaining === 2
-      && opening.resources.main === 0 && before.preparation?.ready && release.ok && release.costSummary.aux === 0 && item.count === 1, { used: used.costSummary, opening: opening.preparation, ready: before.preparation, release: release.reason });
+    check('延迟辅助道具先付一辅，不扣主；释放不再扣点或扣库存', used.preparing && used.costSummary.main === 0
+      && used.costSummary.aux === 1 && opening.preparation.remaining === 3
+      && opening.resources.main === 1 && before.preparation?.ready && release.ok && release.costSummary.aux === 0 && item.count === 1, { used: used.costSummary, opening: opening.preparation, ready: before.preparation, release: release.reason });
   }
   {
     const b = battle({ ...heal });

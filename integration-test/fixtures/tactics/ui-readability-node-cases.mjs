@@ -95,8 +95,9 @@ function wiringCases() {
   out.push(ok('UIR-W 冲刺移动：超额/额度用完且冲刺后可达 → 首次点击锁定，同格再点 sprint()+move()', /if \(!ev\.armed\) \{ sprintArm = ev\.key;/.test(m) && /const sp = battle\.sprint\(\);/.test(m) && /need <= r\.moveRemaining \+ add/.test(m)));
   out.push(ok('UIR-W 右键：瞄准/目标选择中仍为取消；否则进入跳跃并锁定，同格再右键起跳', /if \(aim \|\| pending \|\| sprintArm \|\| \(fieldAction && fieldAction !== 'jump'\)\) return false;/.test(m)
     && /if \(fieldAction === 'jump' && jumpArm === key\) \{ jumpArm = null; runFieldTarget\('jump', hit\);/.test(m) && /onContextCb\(hitAt\(e\.clientX, e\.clientY\)\)\) return;\s*\n\s*if \(onCancelCb\) onCancelCb\(\);/.test(sb)));
-  out.push(ok('UIR-W 主/辅：资源条标签可点过滤并打开匹配技能栏；技能卡 ◆主/◇辅 角标；空列表提示只在变化时增删（防监听自触发）',
-    /data-cost-filter="main"/.test(sh) && /data-cost-filter="aux"/.test(sh) && /title="消耗主行动">◆主/.test(sh) && /title="消耗辅助行动">◇辅/.test(sh) && /if \(tip && tip\.textContent === want\) return;/.test(sh)));
+  out.push(ok('UIR-W 主/辅筛选按效果；技能卡不重复标费，物品显示主辅费；空列表提示仅在变化时更新',
+    /data-cost-filter="main"/.test(sh) && /data-cost-filter="aux"/.test(sh) && /skillActionKind\(s\) === state\.costFilter/.test(sh)
+    && sh.includes('decorateItemCards') && sh.includes('t-universal') && /if \(tip && tip\.textContent === want\) return;/.test(sh)));
   out.push(ok('UIR-W 技能卡 TP 校验读真实 TP（原 tp:0 导致 TP 技能误判不足）', /tp: u\.ref\.tp \|\| 0, burstActivated/.test(sh)));
   out.push(ok('UIR-W 徽章显示态：结算揭示前保持旧状态，效果揭示拍点只更新该单位', /shownEff\.set\(u\.id, battle\.getEffectiveUnit\(u\.id\)\);\s*\n\s*renderStatus\(u\.id\);/.test(m) && /setStatus, setPredict, clearPredict/.test(uv)));
   return out;

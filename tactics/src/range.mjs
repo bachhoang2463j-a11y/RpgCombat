@@ -216,10 +216,13 @@ function collectSingle(ctx, caster, origin, aim, range, guaranteedHit, includeDo
   if (wall && wall.type === 'wall') return { ok: false, reason: '视线被墙阻挡', cells: [], targetIds: [], blockedBy: wall };
   if (wall && wall.type === 'boundary') return { ok: false, reason: '目标路径越出地图', cells: [], targetIds: [], blockedBy: wall };
   const adjacent = cellsAdjacent(ctx.placementsById[caster.id], footprintOf(ctx, caster), tp, fp);
-  if (hostile && !adjacent && (inEnemyFog(ctx, caster) || (target.side !== caster.side && inEnemyFog(ctx, caster, target.id)))) {
+  const fogRestricted = hostile && !adjacent && (inEnemyFog(ctx, caster) || (target.side !== caster.side && inEnemyFog(ctx, caster, target.id)));
+  if (fogRestricted && !guaranteedHit) {
     return { ok: false, reason: '无法瞄准：浓雾中只能瞄准相邻目标', cells: [], targetIds: [], blockedBy: { type: 'vision' } };
   }
-  if (ctx.enforcePerception && !canSeeUnit(ctx, caster.id, target.id, false, hostile)) {
+  const knownInFog = !fogRestricted || canSeeUnit(ctx, caster.id, target.id)
+    || ctx.units.some(ally => ally.id !== caster.id && ally.side === caster.side && canSeeUnit(ctx, ally.id, target.id));
+  if (!knownInFog || (ctx.enforcePerception && !canSeeUnit(ctx, caster.id, target.id, false, hostile))) {
     return { ok: false, reason: '目标不在本人视野内', cells: [], targetIds: [], blockedBy: { type: 'vision' } };
   }
   if (wall && wall.type === 'unit' && !guaranteedHit) return { ok: false, reason: wall.side === caster.side ? '友方挡弹' : '被其他敌人阻挡', cells: [], targetIds: [], blockedBy: wall };
@@ -337,18 +340,23 @@ export function queryAttack(ctx, casterId, skill, aim, options = {}) {
   if (!range) return fail('技能缺少显式范围');
   if (!RANGE_TYPES.includes(range.type)) return fail('范围类型不支持: ' + range.type);
   const hostile = skillSlots(skill).some(s => s.attack || s.definition.side === 'enemy');
-  const fogBlocksPoint = point => {
+  const fogBlocksPoint = (point, bypassFog = false) => {
     if (!hostile || !inEnemyFog(ctx, caster)) return false;
     const col = Math.floor(point.x), row = Math.floor(point.y);
     const { width, height } = footprintOf(ctx, caster);
-    return col < cp.col - 1 || col > cp.col + width || row < cp.row - 1 || row > cp.row + height;
+    const adjacent = !(col < cp.col - 1 || col > cp.col + width || row < cp.row - 1 || row > cp.row + height);
+    if (adjacent) return false;
+    if (bypassFog && ctx.units.some(ally => ally.id !== casterId && ally.side === caster.side
+      && (point.targetId && canSeeUnit(ctx, ally.id, point.targetId, false, false)
+        || canSeePoint(ctx, ally.id, point)))) return false;
+    return true;
   };
   const fogFailure = () => fail('无法瞄准：浓雾中只能瞄准一格内', { type: 'vision' });
   const charge = skill.displacements?.find(d => d.type === '冲锋');
   if (charge) {
     if (!normAim) return fail('缺少瞄准点');
     // 近战冲锋沿方向移动、靠接触命中；带射击的冲锋仍要先通过远程瞄准。
-    if ((skill.damageType === '远程' || skill.damageType === '法术') && fogBlocksPoint(normAim)) return fogFailure();
+    if ((skill.damageType === '远程' || skill.damageType === '法术') && fogBlocksPoint(normAim, !!skill.guaranteedHit)) return fogFailure();
     const sweep = chargePath(ctx, casterId, normAim, charge.distance);
     if (!sweep.ok) return fail(sweep.reason);
     const touched = new Set(sweep.blockingEntries.filter(e => e.type === 'unit' && e.side !== caster.side).map(e => e.unitId));
@@ -366,7 +374,7 @@ export function queryAttack(ctx, casterId, skill, aim, options = {}) {
     if (range.type === '自身' || range.type === '召唤') return fail('范围不能直接攻击结界');
     const point = barrierContact(ctx, barrier, origin, aim);
     if (!point) return fail('瞄准射线未接触结界');
-    if (fogBlocksPoint(point)) return fogFailure();
+    if (fogBlocksPoint(point, !!skill.guaranteedHit)) return fogFailure();
     const limit = range.type === '圆形' ? range.radius : range.castRange ?? range.length;
     if (limit != null && centerDistance(origin, point) > limit + EPS) return fail('结界超出射程');
     const passFriendly = range.type === '单体' && skill.damageType === '远程';
@@ -419,7 +427,7 @@ export function queryAttack(ctx, casterId, skill, aim, options = {}) {
     return finishQuery(ctx, caster, skill, origin, normAim, cells, targetIds, actualTargets, { type: '全域' }, null, null, range, null, null);
   }
   if (!normAim) return fail('缺少瞄准点');
-  if (range.type !== '单体' && fogBlocksPoint(normAim)) return fogFailure();
+  if (range.type !== '单体' && fogBlocksPoint(normAim, !!skill.guaranteedHit)) return fogFailure();
 
   let cells = [], targetIds = [], shape = null, collisionPoint = null, contact = null, blockedBy = null, blastCenter = null;
   if (range.type === '单体') {

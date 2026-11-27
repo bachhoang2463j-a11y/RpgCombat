@@ -14,6 +14,7 @@ import { skillSlots } from './effect-definitions.mjs';
 import { interception } from './barriers.mjs';
 import { fogAffects } from './regions.mjs';
 import { getEffectiveStats } from './class-passives.mjs';
+import { actionBalance } from './actions.mjs';
 
 const EPS = 1e-9;
 const IDLE = { moveTo: null, skill: null, aim: null, action: 'wait' };
@@ -185,7 +186,11 @@ function evaluateQuery(ctx, unit, skill, query, disclosed) {
         score += (t.side === unit.side ? 1 : -1) * Math.min(miss, slot.power || 0);
       }
     } else if (def.kind === 'healMp' || def.kind === 'healTp') {
-      if (targets.length) score += Math.min(slot.power || 0, 10);
+      const key = def.kind === 'healMp' ? 'mp' : 'tp', maxKey = def.kind === 'healMp' ? 'maxMp' : 'maxTp';
+      for (const tid of targets) {
+        const ref = ctx.units.find(u => u.id === tid)?.ref;
+        if (ref) score += Math.min(slot.power || 0, Math.max(0, (ref[maxKey] ?? 100) - (ref[key] || 0)), 10);
+      }
     } else if (def.kind === 'buff' || def.kind === 'shield' || def.kind === 'stun'
       || def.kind === 'dot' || def.kind === 'paralyze' || def.kind === 'taunt'
       || def.kind === 'damageGuard' || def.kind === 'counter' || def.kind === 'variant') {
@@ -474,7 +479,7 @@ function planJump(ctx, unit, res, budget, reach, walk, distanceTo, walkDistance,
 }
 
 function canJump(res) {
-  return (res.freeJumpAvailable || res.aux + (res.jumpFirst ? 0 : res.main) >= 1) && (res.jumpsRemaining ?? Number(!res.jumped)) > 0;
+  return (res.freeJumpAvailable || actionBalance(res, 'aux') >= 1) && (res.jumpsRemaining ?? Number(!res.jumped)) > 0;
 }
 
 function* jumpLandings(start, distance) {
@@ -557,7 +562,7 @@ function planFogExit(ctx, unit, moveBudget, res, inFog) {
     return { moveTo: { col: exit.col, row: exit.row }, skill: null, aim: null, action: null };
   }
   // 出口路径跨当前移动预算：主行动可用则请求冲刺，由主代理加额度后重算
-  if (res && res.main > 0) return { moveTo: null, skill: null, aim: null, action: 'sprint' };
+  if (res && actionBalance(res, 'main') > 0) return { moveTo: null, skill: null, aim: null, action: 'sprint' };
   // 无法冲刺：本轮向出口尽量前进
   const moveTo = stepAlong(ctx, full, unit, exit.path, moveBudget);
   if (moveTo) return { moveTo, skill: null, aim: null, action: null };
@@ -606,7 +611,7 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
   const fog = fogChecker(ctx, unit);
   const avoid = unit.side === 'enemy' ? fogRouteFilter(ctx, unit, fog) : null;
   const needsExit = fog && fog(p.col, p.row) && !hasAdjacentEnemy(ctx, unit, seen);
-  if (needsExit && (!avoid || !points.length)) {
+  if (!res.supportOnly && needsExit && (!avoid || !points.length)) {
     const exit = planFogExit(ctx, unit, moveBudget, res, fog);
     if (exit) return exit;
   }
@@ -614,6 +619,11 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
   const tracking = !!(seenIds || res.pursuitPoints?.length);
   const preferred = moveReach(ctx, unit, moveBudget, avoid);
   let inBudget = searchBest(ctx, unit, usable, moveBudget, enemies, allies, tracking, preferred, res);
+  if (res.supportOnly) {
+    if (!inBudget.best) return { ...IDLE };
+    const plan = toResult(inBudget.best, res);
+    return plan.moveTo && avoid ? { ...plan, avoidFog: true } : plan;
+  }
   if (res.recoverSkills?.length && (!inBudget.best || inBudget.best.skill === res.basicAttack)) {
     const available = usable.filter(skill => skill !== res.basicAttack);
     const alternative = available.length && searchBest(ctx, unit, available, moveBudget, enemies, allies, tracking, preferred, res);
@@ -638,7 +648,7 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
     return needsExit && plan.moveTo ? movePlan(plan.moveTo, !!avoid) : plan;
   }
 
-  const sprintBudget = resources && unit.side === 'enemy' && res.main > 0 && !res.preparing
+  const sprintBudget = resources && unit.side === 'enemy' && actionBalance(res, 'main') > 0 && !res.preparing
     ? moveBudget / (res.moveMultiplier || 1) + res.moveDistance : moveBudget;
   const followPath = (reach, path, avoidFog) => {
     const moveTo = stepAlong(ctx, reach, unit, path, moveBudget);
@@ -685,7 +695,7 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
     if (exit) return exit;
   }
   if (hasAdjacentEnemy(ctx, unit, seen)) {
-    return unit.side !== 'enemy' && res.main > 0 ? { ...IDLE, action: 'defend' } : { ...IDLE };
+    return unit.side !== 'enemy' && actionBalance(res, 'main') > 0 ? { ...IDLE, action: 'defend' } : { ...IDLE };
   }
   if (res.idleMovement && (!points.length || unit.isSummon)) {
     const idle = planIdleMove(ctx, unit, res, moveBudget, preferred, avoid ? fog : null);

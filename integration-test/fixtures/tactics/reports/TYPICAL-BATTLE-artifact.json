@@ -1,7 +1,7 @@
 {
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "7b677d89518c4f3acc1109edae350055a3b6556ca31f538791ce02bfe7023031",
-  "bytes": 2029248,
+  "sha256": "1bc573501e45fb3b34cfaecf6899f4b4b112d4751e34f52db6669406b0db98b1",
+  "bytes": 2036496,
   "kind": "artifact-backend-only",
   "pageGate": "pending-frontend",
   "cases": [
@@ -126,7 +126,7 @@
       "detail": ""
     },
     {
-      "id": "自动跳跃、避雾、物品辅助耗费和整备入包",
+      "id": "自动跳跃、必中避雾、自动攻辅扣费和整备入包",
       "pass": true,
       "detail": ""
     },
@@ -201,7 +201,7 @@
       "detail": ""
     },
     {
-      "id": "产物首领施法优先消耗专用点并保留基础主行动",
+      "id": "产物辅助技能只扣辅点，保留首领攻击专用点",
       "pass": true,
       "detail": ""
     },

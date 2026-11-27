@@ -38,8 +38,8 @@ export function phase3Groups({ createBattle, parseSkill }) {
           const first = b.jump(3, 4);
           assert.ok(first.ok && !first.free);
           assert.equal(b.snapshot().resources.aux, 0);
-          const skill = parseSkill('【跳间蓄势】[增攻;power:5][范围:自身]');
-          assert.ok(b.attack(skill, aim(3)).ok);
+          const skill = parseSkill('【跳间斩击】[伤害;power:5][必中][范围:单体;射程:14]');
+          assert.ok(b.attack(skill, { ...aim(13), targetId: 'h' }).ok);
           const second = b.jump(5, 4);
           assert.ok(second.ok && second.free);
           assert.equal(b.snapshot().resources.moveRemaining, 6);

@@ -101,7 +101,7 @@ export const groups = { 'PHASE2-ACTIONS': { run() {
     assert.equal(h.ref.mp, 16);
   });
 
-  test('主动折影步仅走合法可见空地，不扣步数，可用主点代付', () => {
+  test('主动折影步仅走合法可见空地，不扣步数，缺辅点时可用万能代付', () => {
     const h = unit('h', 'hero', { spd: 200, skills: [blink] });
     const b = make({ h: at(1, 3), e: at(1, 4) }, [h, unit('e', 'enemy')], [wall(3, 3)]);
     for (const invalid of [point(1, 4), point(4, 3), point(7, 3)]) assert.equal(b.attack(blink, invalid).ok, false);
@@ -112,8 +112,10 @@ export const groups = { 'PHASE2-ACTIONS': { run() {
     const first = b.attack(blink, point(1, 1));
     assert.deepEqual(first.teleport.to, { col: 1, row: 1 });
     assert.deepEqual([first.costSummary.aux, first.costSummary.main, first.costSummary.mp], [1, 0, 4]);
+    assert.equal(b.attack(blink, point(1, 2)).ok, false);
+    b.battleState.combatState.clock.currentAction.resources.universal = 1;
     const second = b.attack(blink, point(1, 2));
-    assert.deepEqual([second.costSummary.aux, second.costSummary.main, second.costSummary.mp], [0, 1, 4]);
+    assert.deepEqual([second.costSummary.aux, second.costSummary.main, second.costSummary.universal, second.costSummary.mp], [0, 0, 1, 4]);
     assert.equal(h.ref.mp, 12);
     assert.equal(b.snapshot().resources.moveRemaining, before);
     assert.equal(b.snapshot().events.filter(ev => ev.type === 'opportunity-attack').length, 0);
