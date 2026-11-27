@@ -1155,6 +1155,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   function commitGuard(guardian, target, caster, skill, reason, incomingSkill, extra = {}) {
     const checked = guardAvailability(guardian, target, caster.id, skill);
     if (!checked.ok) return null;
+    if (checked.targetShift) Object.assign(placementsById[target.id], checked.targetShift.to);
     Object.assign(placementsById[guardian.id], checked.to);
     const rr = reason === 'summon-lethal-guard'
       ? { reactionUsed: emit('reaction-used', { responderId: guardian.id, skillName: skill.name,

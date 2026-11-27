@@ -43,23 +43,25 @@ test('来源侧对齐优先、真实路径、几何字段、查询不修改状�
   assert.deepEqual(q.contactPoint, { x: 5.5, y: 4.5 });
   assert.deepEqual(ctx, before);
 });
-test('无来源侧可达点失败，不退化反侧', () => {
+test('无来源侧落点时原地替挡，不落到其他格', () => {
   const ctx = makeCtx(); for (const row of [3, 4, 5]) block(ctx, 5, row);
-  assert.deepEqual(query(ctx), { ok: false, reason: '攻击来源侧没有可达舍身落点' });
+  const q = query(ctx); assert.equal(q.ok, true); assert.equal(q.pathDistance, 0);
+  assert.deepEqual(q.path, [{ col: 3, row: 4 }]);
 });
 test('实体墙隔断路径，即使几何够近也不穿墙', () => {
-  const ctx = makeCtx(); for (let row = 0; row < 10; row++) block(ctx, 5, row);
-  assert.equal(query(ctx).ok, false);
+  const ctx = makeCtx({ g: [2, 4], t: [4, 4], s: [9, 4] });
+  for (let row = 0; row < 10; row++) block(ctx, 3, row);
+  assert.equal(query(ctx).reason, '高障碍隔断舍身');
 });
 test('两实障夹角不可斜穿', () => {
   const ctx = makeCtx({ g: [3, 3], t: [4, 4], s: [9, 4] });
   for (const [c, r] of [[2, 2], [3, 2], [4, 2], [2, 3], [4, 3], [2, 4], [3, 4]]) block(ctx, c, r);
   assert.equal(query(ctx).ok, false);
 });
-test('敌方结界阻断来源侧落点、友方结界允许', () => {
+test('敌方结界阻断落点但仍可原地替挡，友方结界允许通过', () => {
   const ctx = makeCtx();
   ctx.barriers.push({ id: 'b', side: 'enemy', cells: [{ col: 5, row: 3 }, { col: 5, row: 4 }, { col: 5, row: 5 }] });
-  assert.equal(query(ctx).ok, false);
+  assert.equal(query(ctx).pathDistance, 0);
   ctx.barriers[0].side = 'hero'; checkPath(ctx, query(ctx));
 });
 test('友方格可经过但不得落点重叠', () => {
@@ -89,14 +91,13 @@ test('大型守护者完整footprint合法且不覆盖目标', () => {
   block(ctx, 8, 4);
   const next = query(ctx); if (next.ok) { checkPath(ctx, next); assert.notEqual(next.to.row, 4); }
 });
-test('真实绕行成本超过预算不能冲刺', () => {
-  const ctx = makeCtx(); for (const row of [3, 4, 5]) block(ctx, 4, row);
-  assert.equal(query(ctx, 3).ok, false);
-  checkPath(ctx, query(ctx, 6));
+test('只能绕到前方但路程超预算，原地格挡', () => {
+  const ctx = makeCtx(); for (const row of [3, 4, 5]) block(ctx, 5, row);
+  const q = query(ctx, 3); assert.equal(q.ok, true); assert.equal(q.pathDistance, 0);
 });
 test('背负费用倍率2，distance预算成本与pathDistance几何分离', () => {
   const ctx = makeCtx(); ctx.carrying.g = 'passenger';
-  assert.equal(query(ctx, 3).ok, false);
+  assert.equal(query(ctx, 3).pathDistance, 0);
   const q = query(ctx, 4); checkPath(ctx, q);
   assert.equal(q.distance, 4); assert.equal(q.pathDistance, 2);
 });

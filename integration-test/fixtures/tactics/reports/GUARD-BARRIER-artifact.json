@@ -1,8 +1,8 @@
 {
   "kind": "guard-barrier-artifact-backend",
   "artifact": "tactics/mvp-standalone.html",
-  "bytes": 1892337,
-  "sha256": "47a8807e1bdebd5a1770a0696fe53a8f7a014675adbb6147bc476917eb898a88",
+  "bytes": 1920901,
+  "sha256": "c50885439f0adb7a816af730d0025b60a15935e54ddcc9bfa7b9a22e69fc305a",
   "cases": [
     {
       "id": "单脚本与闭合",
@@ -31,6 +31,11 @@
     },
     {
       "id": "真实后端createBattle导出",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "产物近战贴脸：弹出弗兰克舍身，队友退一格，弗兰克占原位承伤",
       "pass": true,
       "detail": ""
     },
@@ -80,18 +85,18 @@
       "detail": ""
     }
   ],
-  "passed": 15,
+  "passed": 16,
   "failed": 0,
   "examples": {
     "summonGuard": {
       "event": {
         "seq": 4,
-        "eventId": "battle:1:0:event:4",
-        "runId": "battle:1:0",
-        "actionId": "battle:1:0:action:1",
+        "eventId": "battle:2:0:event:4",
+        "runId": "battle:2:0",
+        "actionId": "battle:2:0:action:1",
         "at": 33.333333333333336,
         "attackId": "attack:1",
-        "segmentId": "battle:1:0:attack:1:slot:0:segment:1",
+        "segmentId": "battle:2:0:attack:1:slot:0:segment:1",
         "slotIndex": 0,
         "segmentIndex": 1,
         "shotIndex": 1,
@@ -124,7 +129,7 @@
           }
         ],
         "distance": 2,
-        "maxDistance": 3,
+        "maxDistance": 6,
         "origin": {
           "x": 10.5,
           "y": 4.5
@@ -147,12 +152,12 @@
         "committed": true,
         "reactionUsed": {
           "seq": 3,
-          "eventId": "battle:1:0:event:3",
-          "runId": "battle:1:0",
-          "actionId": "battle:1:0:action:1",
+          "eventId": "battle:2:0:event:3",
+          "runId": "battle:2:0",
+          "actionId": "battle:2:0:action:1",
           "at": 33.333333333333336,
           "attackId": "attack:1",
-          "segmentId": "battle:1:0:attack:1:slot:0:segment:1",
+          "segmentId": "battle:2:0:attack:1:slot:0:segment:1",
           "slotIndex": 0,
           "segmentIndex": 1,
           "shotIndex": 1,
@@ -178,9 +183,9 @@
         }
       },
       "segment": {
-        "runId": "battle:1:0",
+        "runId": "battle:2:0",
         "attackId": "attack:1",
-        "segmentId": "battle:1:0:attack:1:slot:0:segment:1",
+        "segmentId": "battle:2:0:attack:1:slot:0:segment:1",
         "slotIndex": 0,
         "segmentIndex": 1,
         "shotIndex": 1,
@@ -258,7 +263,7 @@
               }
             ],
             "distance": 2,
-            "maxDistance": 3,
+            "maxDistance": 6,
             "origin": {
               "x": 10.5,
               "y": 4.5
@@ -281,12 +286,12 @@
             "committed": true,
             "reactionUsed": {
               "seq": 3,
-              "eventId": "battle:1:0:event:3",
-              "runId": "battle:1:0",
-              "actionId": "battle:1:0:action:1",
+              "eventId": "battle:2:0:event:3",
+              "runId": "battle:2:0",
+              "actionId": "battle:2:0:action:1",
               "at": 33.333333333333336,
               "attackId": "attack:1",
-              "segmentId": "battle:1:0:attack:1:slot:0:segment:1",
+              "segmentId": "battle:2:0:attack:1:slot:0:segment:1",
               "slotIndex": 0,
               "segmentIndex": 1,
               "shotIndex": 1,
@@ -302,9 +307,9 @@
               "usesLeft": null,
               "cooldownAt": 0
             },
-            "runId": "battle:1:0",
+            "runId": "battle:2:0",
             "attackId": "attack:1",
-            "segmentId": "battle:1:0:attack:1:slot:0:segment:1",
+            "segmentId": "battle:2:0:attack:1:slot:0:segment:1",
             "slotIndex": 0,
             "segmentIndex": 1,
             "shotIndex": 1,
@@ -319,12 +324,12 @@
           },
           "reactionUsed": {
             "seq": 3,
-            "eventId": "battle:1:0:event:3",
-            "runId": "battle:1:0",
-            "actionId": "battle:1:0:action:1",
+            "eventId": "battle:2:0:event:3",
+            "runId": "battle:2:0",
+            "actionId": "battle:2:0:action:1",
             "at": 33.333333333333336,
             "attackId": "attack:1",
-            "segmentId": "battle:1:0:attack:1:slot:0:segment:1",
+            "segmentId": "battle:2:0:attack:1:slot:0:segment:1",
             "slotIndex": 0,
             "segmentIndex": 1,
             "shotIndex": 1,
@@ -358,17 +363,17 @@
       }
     },
     "created": {
-      "seq": 2,
-      "eventId": "battle:3:0:event:2",
-      "runId": "battle:3:0",
-      "actionId": "battle:3:0:action:1",
+      "seq": 3,
+      "eventId": "battle:4:0:event:3",
+      "runId": "battle:4:0",
+      "actionId": "battle:4:0:action:1",
       "at": 33.333333333333336,
       "attackId": "attack:1",
       "type": "barrier-created",
-      "barrierId": "battle:3:0:barrier:h:1",
+      "barrierId": "battle:4:0:barrier:h:1",
       "reason": "created",
       "barrier": {
-        "id": "battle:3:0:barrier:h:1",
+        "id": "battle:4:0:barrier:h:1",
         "casterId": "h",
         "side": "hero",
         "center": {
@@ -456,18 +461,18 @@
       }
     },
     "groupHit": {
-      "seq": 6,
-      "eventId": "battle:4:0:event:6",
-      "runId": "battle:4:0",
-      "actionId": "battle:4:0:action:4",
+      "seq": 9,
+      "eventId": "battle:5:0:event:9",
+      "runId": "battle:5:0",
+      "actionId": "battle:5:0:action:4",
       "at": 100,
       "attackId": "attack:2",
-      "segmentId": "battle:4:0:attack:2:slot:0:segment:1",
+      "segmentId": "battle:5:0:attack:2:slot:0:segment:1",
       "slotIndex": 0,
       "segmentIndex": 1,
       "shotIndex": 1,
       "type": "barrier-damaged",
-      "barrierId": "battle:4:0:barrier:h:1",
+      "barrierId": "battle:5:0:barrier:h:1",
       "reason": "damage",
       "casterId": "e",
       "origin": {
@@ -493,7 +498,7 @@
       "noOverflow": true,
       "broken": false,
       "barrier": {
-        "id": "battle:4:0:barrier:h:1",
+        "id": "battle:5:0:barrier:h:1",
         "casterId": "h",
         "side": "hero",
         "center": {
@@ -580,7 +585,7 @@
         }
       },
       "barrierBefore": {
-        "id": "battle:4:0:barrier:h:1",
+        "id": "battle:5:0:barrier:h:1",
         "casterId": "h",
         "side": "hero",
         "center": {
@@ -667,7 +672,7 @@
         }
       },
       "barrierAfter": {
-        "id": "battle:4:0:barrier:h:1",
+        "id": "battle:5:0:barrier:h:1",
         "casterId": "h",
         "side": "hero",
         "center": {
@@ -755,7 +760,7 @@
       }
     },
     "directTarget": {
-      "barrierId": "battle:5:0:barrier:h:1",
+      "barrierId": "battle:6:0:barrier:h:1",
       "point": {
         "x": 6.5,
         "y": 4.5
@@ -768,7 +773,7 @@
           "y": 4.5
         },
         "aim": {
-          "barrierId": "battle:5:0:barrier:h:1",
+          "barrierId": "battle:6:0:barrier:h:1",
           "x": 6.5,
           "y": 4.5
         },
@@ -787,16 +792,16 @@
             "attack": true,
             "targetIds": [],
             "barrierIds": [
-              "battle:5:0:barrier:h:1"
+              "battle:6:0:barrier:h:1"
             ]
           }
         ],
         "barrierTargetIds": [
-          "battle:5:0:barrier:h:1"
+          "battle:6:0:barrier:h:1"
         ],
         "barrierTargets": [
           {
-            "barrierId": "battle:5:0:barrier:h:1",
+            "barrierId": "battle:6:0:barrier:h:1",
             "point": {
               "x": 6.5,
               "y": 4.5
@@ -810,7 +815,7 @@
         },
         "contact": {
           "type": "barrier",
-          "barrierId": "battle:5:0:barrier:h:1",
+          "barrierId": "battle:6:0:barrier:h:1",
           "point": {
             "x": 6.5,
             "y": 4.5
@@ -832,9 +837,9 @@
       }
     },
     "resistance": {
-      "runId": "battle:6:0",
+      "runId": "battle:7:0",
       "attackId": "attack:1",
-      "segmentId": "battle:6:0:attack:1:slot:0:segment:1",
+      "segmentId": "battle:7:0:attack:1:slot:0:segment:1",
       "slotIndex": 0,
       "segmentIndex": 1,
       "shotIndex": 1,

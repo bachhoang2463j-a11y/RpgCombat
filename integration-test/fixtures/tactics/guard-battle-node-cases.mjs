@@ -67,7 +67,7 @@ export const groups = { 'TG-BATTLE': { run: async () => {
     const cs = f.b.previewGuardCandidates('t', 's', incoming()); assert.equal(cs.length, 1);
     assert.equal(cs[0].guard.maxDistance, 9);
   });
-  test('选择后全部来源侧被占：提交失败零消费零位移', () => {
+  test('选择后全部来源侧被占：改为原地替挡', () => {
     const blockers = ['a', 'b', 'c'].map(id => unit(id, 'hero'));
     const f = make({ extra: blockers, positions: { a: { col: 15, row: 1 }, b: { col: 15, row: 2 }, c: { col: 15, row: 3 } } });
     const before = costs(f.b, f.g), original = { ...f.placementsById.g };
@@ -75,8 +75,10 @@ export const groups = { 'TG-BATTLE': { run: async () => {
       const choice = chosen(req); if (choice) for (const [i, id] of ['a', 'b', 'c'].entries()) Object.assign(f.placementsById[id], { col: 7, row: 4 + i });
       return choice;
     });
-    assert.deepEqual(costs(f.b, f.g), before); assert.deepEqual(f.placementsById.g, original);
-    assert.ok(!segments(r)[0].reaction?.guard); assert.ok(f.t.ref.hp < 500);
+    assert.equal(f.g.ref.mp, before.mp - 3); assert.ok(f.g.ref.hp < before.hp);
+    assert.equal(f.t.ref.hp, 500);
+    const guard = guardMeta(segments(r)[0], 'selected-guard', 'g');
+    assert.equal(guard.pathDistance, 0); assert.equal(guard.from.col, original.col); assert.equal(guard.to.col, original.col);
   });
   test('选择后资源不足：提交失败不新增任何消费', () => {
     const f = make(); let afterExternal;

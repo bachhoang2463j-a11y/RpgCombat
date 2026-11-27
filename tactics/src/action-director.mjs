@@ -481,7 +481,13 @@ export function createActionDirector(deps) {
     async function revealGuard(guard) {
       const key = guard.segmentId + ':' + guard.guardianId;
       if (!guardRuns.has(key)) guardRuns.set(key, (async () => {
-        const present = deps.presentGuard || (g => playGuardDash({ fx: makeFx('B'), view: sandbox.getUnitView(), tween, wait, footprint: vd.footprintsById[g.guardianId] }, g));
+        const view = sandbox.getUnitView();
+        const shift = guard.targetShift;
+        if (shift) {
+          if (!(await playDisplacement(shift, vd.footprintsById[shift.unitId])) || !isCurrent()) return false;
+          view.lockMotion(shift.unitId, false);
+        }
+        const present = deps.presentGuard || (g => g.pathDistance === 0 || playGuardDash({ fx: makeFx('B'), view, tween, wait, footprint: vd.footprintsById[g.guardianId] }, g));
         {
           const s = scope();
           const ok = await new Promise(resolve => {
@@ -494,7 +500,6 @@ export function createActionDirector(deps) {
           if (ok === false) return false;
         }
         if (!isCurrent()) return false;
-        const view = sandbox.getUnitView();
         view.setDisplayPos(guard.guardianId, guard.contactPoint.x, guard.contactPoint.y);
         view.lockMotion(guard.guardianId, false);
         return true;
@@ -1125,11 +1130,18 @@ export function createActionDirector(deps) {
 
   function holdGuards(result) {
     const view = sandbox.getUnitView(), held = new Set();
+    const vd = getViewData();
+    const hold = (id, pos) => {
+      if (held.has(id)) return;
+      held.add(id);
+      view.lockMotion(id, true);
+      view.setDisplayPos(id, pos.x, pos.y);
+    };
     for (const ev of result.events || []) {
-      if (ev.type !== 'guard-committed' || held.has(ev.guardianId)) continue;
-      held.add(ev.guardianId);
-      view.lockMotion(ev.guardianId, true);
-      view.setDisplayPos(ev.guardianId, ev.startPosition.x, ev.startPosition.y);
+      if (ev.type !== 'guard-committed') continue;
+      hold(ev.guardianId, ev.startPosition);
+      const shift = ev.targetShift;
+      if (shift) hold(shift.unitId, unitCenter(shift.from, vd.footprintsById[shift.unitId]));
     }
   }
 

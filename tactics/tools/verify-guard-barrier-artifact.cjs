@@ -43,6 +43,21 @@ function test(id, run) { try { check(id, run()); } catch (error) { check(id, fal
 const attack = { name: '来袭', type: '[伤害]', power: 50, guaranteedHit: true, damageType: '法术', range: { type: '单体', castRange: 15 }, actionCost: { main: 1, aux: 0 } };
 const barrier = { name: '肃正', type: '[肃正:法术]', power: 60, slotTurns: 2, range: { type: '圆形', radius: 2 }, actionCost: { main: 1, aux: 0 } };
 if (backend) {
+  test('产物近战贴脸：弹出弗兰克舍身，队友退一格，弗兰克占原位承伤', () => {
+    const { battle, units, placementsById } = fixture();
+    const skill = { name: '紧急格挡', type: '[无]', sheshenTarget: '近战', cost: 1, range: { type: '自身' } };
+    units[1].skills.push(skill);
+    Object.assign(placementsById.a, { col: 2, row: 4 });
+    Object.assign(placementsById.e, { col: 5, row: 4 });
+    turn(battle, 'e');
+    const gen = battle.beginAttack({ ...attack, damageType: '近战' }, { targetId: 'h', x: 4.5, y: 4.5 });
+    const prompt = gen.next().value;
+    const candidate = prompt.candidates?.find(c => c.guardian && c.responderId === 'a');
+    const result = gen.next(candidate && { responderId: 'a', skill: candidate.skill }).value;
+    const event = result.events?.find(e => e.type === 'guard-committed');
+    return candidate && event?.targetShift?.to.col === 3 && placementsById.h.col === 3 && placementsById.a.col === 4
+      && units[0].ref.hp === 100 && units[1].ref.hp === 50 && units[1].ref.mp === 99;
+  });
   test('产物自动致死守护真实留位、同段关联与主人零伤', () => {
     const { battle, units, placementsById } = fixture(true);
     const result = battle.attack(attack, { targetId: 'h', x: 4.5, y: 4.5 });

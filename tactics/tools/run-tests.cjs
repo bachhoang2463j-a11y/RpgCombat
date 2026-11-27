@@ -91,6 +91,10 @@ const STAGES = {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'guard-director-node-cases.mjs'),
     groups: ['TG-DIRECTOR'], modules: [], requiredExports: [],
   },
+  'guard-close': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'guard-close-node-cases.mjs'),
+    groups: ['TG-CLOSE'], modules: [], requiredExports: [],
+  },
   'guard-path': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'guard-path-node-cases.mjs'),
     groups: ['TG-PATH'], modules: [], requiredExports: [],
