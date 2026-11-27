@@ -64,7 +64,8 @@ function run() {
 
   for (const obstructed of [false, true]) {
     const hero = unit('hero', 'hero', { spd: 10 });
-    const elite = unit('elite', 'enemy', { hp: 180, spd: 200 });
+    const elite = { ...unit('elite', 'enemy', { hp: 180, spd: 200 }), level: '精英', footprint: { width: 2, height: 2 } };
+    elite.ref.moveDistance = 9;
     const scene = field(obstructed ? [{ id: 'bench', kind: 'pew', bounds: { col: 6, row: 0, width: 1, height: 9 } }] : []);
     const b = make([hero, elite], { hero: p(14), elite: p(2) }, scene);
     const first = b.planEnemyAction();
@@ -76,9 +77,9 @@ function run() {
     if (jump2) b.jump(jump2.col, jump2.row);
     const final = b.snapshot().resources;
     check(obstructed ? '先走到起跳点，保留跳跃跨越障碍' : '空旷路线两跳早于步行',
-      (obstructed ? first.moveTo?.col === 5 && !first.jumpTo && jump1?.col === 7 : !!first.jumpTo)
-      && after.jumpsRemaining === 1 && after.aux === 0 && after.main === 1 && final.jumpsRemaining === 0 && final.main === 0,
-    { first, jump1, jump2, after, final });
+      (obstructed ? first.moveTo?.col === 4 && !first.jumpTo && jump1?.col === 7 : !!first.jumpTo)
+      && after.jumpsRemaining === 1 && after.aux === 0 && after.main === 1 && final.jumpsRemaining === 0 && final.main === 1,
+    JSON.stringify({ first, jump1, jump2, after, final }));
   }
 
   {
@@ -93,13 +94,12 @@ function run() {
 
   {
     const hero = unit('hero', 'hero', { spd: 10 });
-    const elite = unit('elite', 'enemy', { hp: 180, spd: 200 });
+    const elite = { ...unit('elite', 'enemy', { hp: 180, spd: 200 }), level: '精英', footprint: { width: 2, height: 2 } };
     const b = make([hero, elite], { hero: p(14), elite: p(10) }, field([
-      { id: 'wall', kind: 'wall', bounds: { col: 11, row: 0, width: 1, height: 9 } },
+      { id: 'wall', kind: 'wall', bounds: { col: 12, row: 0, width: 1, height: 9 } },
     ]));
-    const jump = b.planEnemyAction().jumpTo;
-    check('合法跳跃不必缩短到目标的距离', !!jump && Math.hypot(jump.col - 14, jump.row - 4) > 4
-      && b.previewJump(jump.col, jump.row).ok, jump);
+    const plan = b.planEnemyAction();
+    check('高墙截断且无有效推进时不向无关空格起跳', !plan.jumpTo && plan.action !== 'sprint', JSON.stringify(plan));
   }
 
   {

@@ -700,11 +700,15 @@ export function createApp(rootEl, opts = {}) {
       u.bars = { ...u.bars, hp: s.hp, mp: s.mp, tp: s.tp, shield: s.shield };
     }
     if (currentViewData.scene !== battle.ctx.scene) {
-      const previousObjects = currentViewData.scene.objects || {};
       const nextScene = battle.ctx.scene;
-      const destroyed = Object.keys(previousObjects).filter(id => previousObjects[id] && !nextScene.objects?.[id]);
+      const remaining = new Map(nextScene.objects.map(obj => [obj.id, obj]));
+      const savedObjects = currentState.scenes[currentViewData.sceneId].objects;
+      for (const obj of currentViewData.scene.objects) {
+        const next = remaining.get(obj.id);
+        if (!next) savedObjects[obj.id] = null;
+        else if (next.cells !== obj.cells) savedObjects[obj.id] = { ...savedObjects[obj.id], cells: next.cells };
+      }
       currentViewData = { ...currentViewData, scene: nextScene };
-      for (const id of destroyed) currentState.scenes[currentViewData.sceneId].objects[id] = null;
     }
     sandbox.update(currentViewData);
     const view = sandbox.getUnitView();
@@ -1427,6 +1431,11 @@ export function createApp(rootEl, opts = {}) {
     for (;;) {
       const plan = battle.planEnemyAction();
       if (!plan || plan.action === 'wait') break;
+      if (plan.action === 'sprint') {
+        const sp = battle.sprint();
+        if (!sp.ok) break;
+        ui('sprint'); fxAtUnit(actorId, 't-sprint-burst', 760); refreshBattle();
+      }
       if (plan.jumpTo || plan.moveTo) {
         sandbox.getUnitView().lockMotion(actorId, true);
         const result = plan.jumpTo ? battle.jump(plan.jumpTo.col, plan.jumpTo.row)
@@ -1440,13 +1449,9 @@ export function createApp(rootEl, opts = {}) {
         sandbox.getUnitView().updateUnit(actorId, { placement: currentViewData.placementsById[actorId] });
         if (!alive()) return;
         if (battle.snapshot().currentId !== actorId || battle.snapshot().terminal) break;
-        if (plan.jumpTo || result.stoppedOnDiscovery || !plan.skill) continue;
+        if (plan.jumpTo || result.stopped || !plan.skill) continue;
       }
-      if (plan.action === 'sprint') {
-        const sp = battle.sprint();
-        if (!sp.ok) break;
-        ui('sprint'); fxAtUnit(actorId, 't-sprint-burst', 760); refreshBattle();
-      } else if (plan.action === 'defend') {
+      if (plan.action === 'defend') {
         if (!battle.defend().ok) break;
         avHost.sfx('defUp', 0.55, { category: 'K' }); fxAtUnit(actorId, 't-heal-pulse', 700); refreshBattle();
       } else if (plan.action === 'prepare' && !plan.skill) {

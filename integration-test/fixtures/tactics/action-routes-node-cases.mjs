@@ -30,8 +30,9 @@ const routes = casesFor(check => {
     const done = b.runEnemyTurn();
     const jumps = done.events.filter(e => e.type === 'unit-jumped' && e.unitId === monster.id);
     const launch = done.events.find(e => e.type === 'unit-moved' && e.unitId === monster.id && e.to.row === 16);
-    check('北房2×2怪物先到起跳点、越过路口台阶后向目标推进', launch && jumps.length === 1 && launch.seq < jumps[0].seq
-      && jumps[0].from.row === 16 && jumps[0].to.row === 19 && b.ctx.placementsById[monster.id].row > 19, { launch, jumps, enemy: b.ctx.placementsById[monster.id] });
+    check('北房2×2怪物先到起跳点、越过台阶，再用免费次跳推进', launch && jumps.length === 2 && launch.seq < jumps[0].seq
+      && jumps[0].from.row === 16 && jumps[0].to.row === 19 && !jumps[0].free && jumps[1].free
+      && b.ctx.placementsById[monster.id].row > 19, { launch, jumps, enemy: b.ctx.placementsById[monster.id] });
   }
   {
     const wall = { id: 'step', kind: 'lowCounter', bounds: { col: 3, row: 0, width: 1, height: 1 } };

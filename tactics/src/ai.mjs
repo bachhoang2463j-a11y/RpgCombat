@@ -386,6 +386,12 @@ function movePlan(moveTo, avoidFog = false) {
   return { ...IDLE, moveTo, action: null, ...(avoidFog ? { avoidFog: true } : {}) };
 }
 
+function landingAllyCost(ctx, unit, land) {
+  return ctx.units.filter(ally => ally !== unit && ally.side === unit.side && isLive(ally) && ctx.placementsById[ally.id]
+    && !ctx.carriedUnitIds?.has(ally.id) && ally.ref.totalWeight < unit.ref.strength * 1.5
+    && cellsAdjacent(land, footprintOf(ctx, unit), ctx.placementsById[ally.id], footprintOf(ctx, ally))).length;
+}
+
 // 寻找要留给越障的跳跃；步行可达时，只考虑实际跨过障碍的捷径。
 function planJump(ctx, unit, res, budget, reach, walk, distanceTo, walkDistance, canStep, reserve = false) {
   if (!canJump(res)) return null;
@@ -403,7 +409,7 @@ function planJump(ctx, unit, res, budget, reach, walk, distanceTo, walkDistance,
       if (walking) {
         if (!reserve || walking.cost <= cost + EPS || dist >= distanceTo(start) - EPS || dist >= distanceTo(origin) - EPS) continue;
       } else if (dist >= walkDistance - EPS) continue;
-      const score = reserve ? cost + dist : dist;
+      const score = (reserve ? cost + dist : dist) + (res.jumpFirst ? landingAllyCost(ctx, unit, land) : 0);
       if (best && (score > best.score + EPS || (Math.abs(score - best.score) <= EPS && cost >= best.cost - EPS))) continue;
       const query = findJumpPath(view, unit.id, col, row, distance);
       if (!query.ok || (walking && !query.path.slice(1, -1).some(c => !canPlaceAt(view, unit.id, c.col, c.row).ok))) continue;
@@ -415,7 +421,7 @@ function planJump(ctx, unit, res, budget, reach, walk, distanceTo, walkDistance,
 }
 
 function canJump(res) {
-  return (res.freeJumpAvailable || res.main + res.aux >= 1) && (res.jumpsRemaining ?? Number(!res.jumped)) > 0;
+  return (res.freeJumpAvailable || res.aux + (res.jumpFirst ? 0 : res.main) >= 1) && (res.jumpsRemaining ?? Number(!res.jumped)) > 0;
 }
 
 function* jumpLandings(start, distance) {
@@ -440,10 +446,13 @@ function planPriorityJump(ctx, unit, res, budget, points, avoid) {
       || (avoid && planJump(ctx, unit, res, budget, walk, walk, distanceTo, baseline, null, true));
     if (obstacle) return obstacle;
   }
+  if (!points.length) return null;
   const distance = Math.ceil(unit.ref.moveDistance / 3);
   const land = [...jumpLandings(p, distance)]
+    .filter(c => distanceTo(c) < distanceTo(p) - EPS)
+    .map(c => ({ ...c, score: distanceTo(c) + landingAllyCost(ctx, unit, c) }))
     .sort((a, b) => Number(avoid && !avoid(p.col, p.row, a.col, a.row)) - Number(avoid && !avoid(p.col, p.row, b.col, b.row))
-      || distanceTo(a) - distanceTo(b) || b.length - a.length)
+      || a.score - b.score || b.length - a.length)
     .find(c => findJumpPath(ctx, unit.id, c.col, c.row, distance).ok);
   return land ? { ...IDLE, jumpTo: { col: land.col, row: land.row }, action: null } : null;
 }
@@ -544,7 +553,9 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
   const inBudget = searchBest(ctx, unit, usable, moveBudget, enemies, allies, tracking, preferred);
   const markRoute = plan => plan.moveTo && avoid ? { ...plan, avoidFog: true } : plan;
   if (res.jumpFirst && (!inBudget.best?.attackTarget || inBudget.best.cost > EPS)) {
-    const jump = planPriorityJump(ctx, unit, res, moveBudget, points, avoid);
+    const attackPlace = inBudget.best?.attackTarget && inBudget.best.cell;
+    const jump = planPriorityJump(ctx, unit, res, moveBudget,
+      attackPlace ? [unitCenter(attackPlace, footprintOf(ctx, unit))] : points, avoid);
     if (jump) return jump;
   }
   const following = ctx.knownPositions && unit.isSummon && unit.side === 'hero' && res.idleMovement;
@@ -556,13 +567,25 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
     return needsExit && plan.moveTo ? movePlan(plan.moveTo, !!avoid) : plan;
   }
 
+  const sprintBudget = resources && unit.side === 'enemy' && res.main > 0 && !res.preparing
+    ? moveBudget / (res.moveMultiplier || 1) + res.moveDistance : moveBudget;
+  const followPath = (reach, path, avoidFog) => {
+    const moveTo = stepAlong(ctx, reach, unit, path, moveBudget);
+    if (sprintBudget > moveBudget + EPS) {
+      const farther = stepAlong(ctx, reach, unit, path, sprintBudget);
+      if (farther && (!moveTo || farther.col !== moveTo.col || farther.row !== moveTo.row)) {
+        return { ...movePlan(farther, avoidFog), action: 'sprint' };
+      }
+    }
+    return moveTo && movePlan(moveTo, avoidFog);
+  };
   let fullReach;
-  if (enemies.length && usable.length && moveBudget > EPS) {
+  if (enemies.length && usable.length && (moveBudget > EPS || sprintBudget > EPS)) {
     fullReach = moveReach(ctx, unit, Infinity, avoid);
     const fullBest = searchBest(ctx, unit, usable, Infinity, enemies, allies, tracking, fullReach);
     if (fullBest.best) {
-      const moveTo = stepAlong(ctx, fullReach, unit, fullBest.best.cell.path, moveBudget);
-      if (moveTo) return movePlan(moveTo, !!avoid);
+      const plan = followPath(fullReach, fullBest.best.cell.path, !!avoid);
+      if (plan) return plan;
     }
   }
 
@@ -582,8 +605,8 @@ export function chooseEnemyAction(ctx, unitId, moveBudget, skills, canUseSkill =
       const leap = planJump(ctx, unit, res, moveBudget, walk, walk, distance, distance(near));
       if (leap) return leap;
     }
-    const moveTo = stepAlong(ctx, useDry ? reach : walk, unit, (useDry ? nearDry : near).path, moveBudget);
-    if (moveTo) return movePlan(moveTo, useDry);
+    const plan = followPath(useDry ? reach : walk, (useDry ? nearDry : near).path, useDry);
+    if (plan) return plan;
   }
 
   if (needsExit && avoid && points.length) {

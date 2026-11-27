@@ -64,7 +64,7 @@ function pew(b, variant, side) {
     `<rect x="${x + w - 7}" y="${y}" width="7" height="${h}" rx="2" fill="#3d2417"/>`) + '</g>';
 }
 function pewGroup(o) {
-  if (!o.cells || o.bounds.width === 1 || o.bounds.height === 1) return pew(o.bounds, o.variant, o.side);
+  if (!o.cells || o.cells.length === o.bounds.width * o.bounds.height) return pew(o.bounds, o.variant, o.side);
   return o.cells.map(c => pew({ ...c, width: 1, height: 1 })).join('');
 }
 

@@ -7,17 +7,16 @@
 
 import { createClock, dispatchClock, advanceToNextAction } from './clock.mjs';
 import { emptyBattleState } from './lifecycle.mjs';
-import { compileScene, isLowObstacleKind } from './scene.mjs';
+import { cellAt, compileScene, isLowObstacleKind } from './scene.mjs';
 import { findReachable, findRiskAwareReachable, findJumpPath, canPlaceAt, traceDisplacement, cellsAdjacent } from './movement.mjs';
 import { unitCenter, occupiedCells, cellKey } from './geometry.mjs';
 import { fogAt, fogAffects, createRegion, expireRegions, moveMultiplier } from './regions.mjs';
-import { previewBarrier, createBarrier, interception, damageBarrier, expireBarriers, clearBarriers, barrierContact, barrierCrossing } from './barriers.mjs';
+import { previewBarrier, createBarrier, interception, damageBarrier, expireBarriers, clearBarriers, barrierAt, barrierContact, barrierCrossing } from './barriers.mjs';
 import { canSeePoint, sightRadius } from './perception.mjs';
 import { previewGuard } from './guard.mjs';
 import { queryAttack, resolveDefaultRange, spatialAttackModifiers } from './range.mjs';
 import { resolveHit, calculateDamage, computeSegmentRawDamage, applyCollisionDamage } from './damage.mjs';
 import { chooseEnemyAction, fogRouteFilter } from './ai.mjs';
-import { enemyTier } from './unit-style.mjs';
 import { skillSlots, sortSlotsForResolve, normalizeEffectTag, effectDefinition } from './effect-definitions.mjs';
 import { applyEffectSlot } from './effect-handlers.mjs';
 import { CLASS_PASSIVES, getEffectiveStats } from './class-passives.mjs';
@@ -99,11 +98,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     items: units.map(u => ({ id: u.id, items: (u.items || []).map(it => ({ name: it.name, count: it.count, usesRemaining: it.usesRemaining })) })),
     flags: units.map(u => ({ id: u.id, ref: structuredClone(u.ref) })),
   };
-  const heroRefs = units.filter(u => u.side === 'hero' && !u.isSummon).map(u => u.ref);
-  const eliteIds = new Set(scene.sceneId === 'sc-chapel'
-    ? units.filter(u => u.side === 'enemy' && enemyTier(u.ref, heroRefs) === 'elite').map(u => u.id) : []);
+  const hasDoubleJump = u => u.side === 'enemy' && (u.level === '精英' || u.level === '首领') && u.footprint.width === 2 && u.footprint.height === 2;
   const passiveOf = u => CLASS_PASSIVES[u.classType];
-  const jumpLimit = u => (eliteIds.has(u.id) ? 2 : 1) + (passiveOf(u)?.freeJump ? 1 : 0);
+  const firstJumpFree = u => !hasDoubleJump(u) && !!passiveOf(u)?.freeJump;
+  const jumpLimit = u => hasDoubleJump(u) || firstJumpFree(u) ? 2 : 1;
   let resources = null;
   let visibleIds = visibleUnitIds ? visibleUnitIds.slice() : null;
   const ctx = {
@@ -715,7 +713,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         resources = state.combatState.clock.currentAction.resources;
         resources.baseMove = moveDistanceOf(u) * resources.moveQuota;
         resources.moveRemaining = resources.baseMove;
-        resources.freeJumpAvailable = !!passiveOf(u)?.freeJump;
+        resources.freeJumpAvailable = firstJumpFree(u);
         resources.moveMultiplier = 1;
         resources.jumpsRemaining = jumpLimit(u);
         resources.chargeFullAtStart = chargeFull(u);
@@ -751,9 +749,9 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       resources = r;
       resources.baseMove ??= moveDistanceOf(u) * r.moveQuota;
       resources.moveRemaining ??= resources.baseMove;
-      resources.freeJumpAvailable ??= !!passiveOf(u)?.freeJump && !r.jumped && (r.jumpsRemaining ?? 1) > 0;
       if (resources.moveMultiplier === undefined) resources.moveMultiplier = 1;
       resources.jumpsRemaining ??= r.jumped ? 0 : jumpLimit(u);
+      resources.freeJumpAvailable ??= firstJumpFree(u) && !r.jumped && r.jumpsRemaining > 0;
       actionSerial++;
       return snapshot();
     }
@@ -919,8 +917,9 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
   function previewJump(col, row) {
     const u = actor();
-    if (!u || !resources || !resources.freeJumpAvailable && resources.aux + resources.main < 1) return { ok: false, reason: '辅助行动不足' };
+    if (!u || !resources) return { ok: false, reason: '辅助行动不足' };
     if (resources.jumpsRemaining === 0) return { ok: false, reason: '本次自然行动跳跃次数已用完' };
+    if (!resources.freeJumpAvailable && resources.aux + (hasDoubleJump(u) ? 0 : resources.main) < 1) return { ok: false, reason: '辅助行动不足' };
     return findJumpPath(ctx, u.id, col, row, Math.ceil(u.ref.moveDistance / 3));
   }
   function jump(col, row) {
@@ -932,24 +931,33 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     p.facing = sideStepFacing(last, { col, row });
     p.col = col; p.row = row;
     const free = r.freeJumpAvailable;
-    if (free) r.freeJumpAvailable = false;
-    else {
+    const elite = hasDoubleJump(u);
+    if (!free) {
       const { mainCost, auxCost } = actionPayment(r, 0, 1);
       r.main -= mainCost; r.aux -= auxCost;
     }
     r.jumpsRemaining--;
+    r.freeJumpAvailable = elite && r.jumpsRemaining === 1;
     emit('unit-jumped', { unitId: u.id, from, to: { col, row }, distance: q.distance, free });
     addLog(u.name + (free ? ' 免费跳跃 ' : ' 跳跃 ') + q.distance.toFixed(2) + 'm');
     const berserker = passiveOf(u)?.landingPush;
-    const elite = u.side === 'enemy' && (u.level === '精英' || u.level === '首领') && u.footprint.width === 2 && u.footprint.height === 2;
+    if (elite) {
+      const rim = [];
+      for (let y = row - 1; y <= row + u.footprint.height; y++) {
+        for (let x = col - 1; x <= col + u.footprint.width; x++) {
+          if (x < col || y < row || x >= col + u.footprint.width || y >= row + u.footprint.height) rim.push(cellAt(ctx.compiled, x, y));
+        }
+      }
+      breakLowObstacles(rim);
+    }
     const displacements = [];
     if (berserker || elite) {
       for (const id of state.combatState.clock.order) {
         if (u.ref.hp <= 0) break;
         const target = byId.get(id);
-        if (!target || target === u || target.ref.hp <= 0 || ctx.carriedUnitIds.has(id) || (berserker && target.side === u.side)) continue;
+        if (!target || target === u || target.ref.hp <= 0 || state.combatState.clock.units[id]?.status === 'out' || ctx.carriedUnitIds.has(id) || (!elite && target.side === u.side)) continue;
         if (!adjacent(p, u.footprint, placementsById[id], target.footprint)) continue;
-        const contest = pushContest(u, target, elite && !berserker);
+        const contest = pushContest(u, target, elite);
         if (contest.distance > 0) {
           const result = displacement(u, target, { type: '跳砸', distance: contest.distance });
           if (result.type === 'unit-displaced') displacements.push(result);
@@ -1235,7 +1243,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     }
     if (!eff.summonTarget && !skillSlots(eff).some(s => s.definition.kind === 'barrier') && !eff.regionEffect
       && !query.barrierTargetIds?.length && !query.slotTargets.some(s => s.targetIds.length > 0)) {
-      return { ...query, ok: false, reason: '范围内没有合法目标' };
+      const concealAtk = buffsOf(caster.id).filter(b => b.isConcealAtk).reduce((sum, b) => sum + b.value, 0);
+      if (!skillSlots(eff).some(slot => terrainAttackCells(caster, eff, slot, query, concealAtk).length)) {
+        return { ...query, ok: false, reason: '范围内没有合法目标' };
+      }
     }
     return query;
   }
@@ -1618,12 +1629,43 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       return Math.hypot(p.x - center.x, p.y - center.y) <= radius + 1e-9;
     });
   }
-  function breakLowObstacles(cell) {
-    const ids = cell.objectIds.filter(id => isLowObstacleKind(ctx.compiled.objectsIndex.get(id).kind));
-    if (!ids.length) return;
-    ctx.scene = { ...ctx.scene, objects: ctx.scene.objects.filter(obj => !ids.includes(obj.id)) };
+  function terrainAttackCells(caster, skill, slot, query, concealAtk = 0) {
+    if (!slot.attack || query.chargePath || !(skill.range.type === '爆炸'
+      || skill.range.type === '直线' && (skill.isPierce || slot.definition.pierce))) return [];
+    const stats = statsOf(caster, concealAtk);
+    const raw = computeSegmentRawDamage(stats, caster.ref.atk, slot.power, 1, 1, {
+      modifyDamageDealt: () => passiveOf(caster)?.modifyDamageDealt?.(caster, skill, stats) || 0,
+    });
+    if (raw <= 100) return [];
+    // 先锁定本段可破坏的格；击破结界也不能让同一段溢入内部。
+    return query.cells.map(({ col, row }) => cellAt(ctx.compiled, col, row)).filter(cell => {
+      if (!cell?.lowObstacle || cell.blocksProjectile) return false;
+      const barrier = barrierAt(ctx, cell);
+      return !barrier || barrier.side === caster.side || occupiedCells(placementsById[caster.id], caster.footprint)
+        .every(p => barrierAt(ctx, p) === barrier);
+    });
+  }
+  function breakLowObstacles(cells, sectional = false) {
+    const hits = new Map();
+    for (const cell of cells) {
+      if (!cell?.lowObstacle || cell.blocksProjectile) continue;
+      for (const id of cell.objectIds) {
+        if (!isLowObstacleKind(ctx.compiled.objectsIndex.get(id)?.kind)) continue;
+        if (!hits.has(id)) hits.set(id, new Set());
+        hits.get(id).add(cellKey(cell.col, cell.row));
+      }
+    }
+    if (!hits.size) return;
+    const objects = ctx.scene.objects.flatMap(obj => {
+      const struck = hits.get(obj.id);
+      if (!struck) return [obj];
+      if (!sectional || (obj.kind !== 'lowCounter' && obj.kind !== 'pew')) return [];
+      const rest = (obj.cells || occupiedCells(obj.bounds, obj.bounds)).filter(c => !struck.has(cellKey(c.col, c.row)));
+      return rest.length ? [{ ...obj, cells: rest }] : [];
+    });
+    ctx.scene = { ...ctx.scene, objects };
     ctx.compiled = compileScene(ctx.scene);
-    emit('obstacle-destroyed', { objectIds: ids });
+    emit('obstacle-destroyed', { objectIds: [...hits.keys()] });
   }
   function displacement(caster, target, rule, query, direction = null, chargeStep) {
     const protector = stabilizerOf(caster, target, rule.type);
@@ -1648,7 +1690,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const blocked = traced.blockedBy;
     if (blocked && blocked.type !== 'barrier' && distance - traced.distance > 1e-9) {
       const low = blocked.cell?.lowObstacle && !blocked.cell.blocksProjectile;
-      if (low) breakLowObstacles(blocked.cell);
+      if (low) breakLowObstacles([blocked.cell]);
       const view = { ...target.ref, def: statsOf(target).def };
       collision = { ...applyCollisionDamage((distance - traced.distance) * (low ? 5 : 10), view),
         hpBefore: target.ref.hp, maxHp: target.ref.maxHp, shieldBefore: target.ref.shield || 0 };
@@ -1855,10 +1897,6 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       }
     }
     const allTargets = [...new Set(slots.flatMap(s => s.targetIds || []))];
-    if (!allTargets.length && !query.barrierTargetIds?.length && !skill.summonTarget && !skill.regionEffect && !query.teleport
-      && !slots.some(s => s.definition.kind === 'barrier' || s.target === 'self' || s.definition.side === 'self')) {
-      return failAttack('范围内没有合法目标', { query });
-    }
 
     // 费用一次（就绪释放不再支付；普通技能整次一次）
     if (!preparing) {
@@ -2020,6 +2058,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         shots.push({ shotIndex: shotIdx, aim: { ...activeAim }, facing: segFacing, cells: activeQuery.cells });
         if (ammoBinds.length && !preparing) consumeAmmoForShot(ammoBinds, shotIdx, damageSlots.length, ammoEvents);
       }
+      const terrainCells = terrainAttackCells(u, eff, slot, activeQuery, bdg.concealAtk);
       if (def.kind === 'attack') {
         for (const barrierId of activeQuery.slotTargets.find(s => s.index === slot.index)?.barrierIds || []) {
           const barrier = ctx.barriers.find(b => b.id === barrierId);
@@ -2080,6 +2119,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
           effects.push(...applied.applied);
         }
       }
+      if (!canceled.value && terrainCells.length) breakLowObstacles(terrainCells, true);
     }
 
     if (preparing) charge.preparing = null;
@@ -2523,10 +2563,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   function planEnemyAction() {
     const u = actor();
     if (!u || !isAiControlled(u) || state.combatState.clock.terminal || !resources) return null;
-    if (resources.main < 1 && resources.aux < 1 && !resources.freeJumpAvailable && resources.moveRemaining <= 1e-9 && !chargeState(u.id).preparing?.ready) return { moveTo: null, skill: null, aim: null, action: 'wait' };
     const preparing = chargeState(u.id).preparing;
+    if (resources.main < 1 && resources.aux < 1 && !resources.freeJumpAvailable && resources.moveRemaining <= 1e-9 && !preparing?.ready) return { moveTo: null, skill: null, aim: null, action: 'wait' };
     if (preparing && !preparing.ready && resources.main > 0) return { moveTo: null, skill: null, aim: null, action: 'prepare' };
-    const aiRes = { ...resources, preparing, moveDistance: moveDistanceOf(u), jumpFirst: eliteIds.has(u.id) };
+    const aiRes = { ...resources, preparing, moveDistance: moveDistanceOf(u), jumpFirst: hasDoubleJump(u) };
     const aiBudget = resources.moveRemaining * (resources.moveMultiplier || 1);
     if (!preparing && chargeFull(u)) {
       const ult = chooseEnemyAction(ctx, u.id, aiBudget, [chargeSkillOf(u)], skill => skillStatus(skill), aiRes);
@@ -2546,13 +2586,13 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         if (!jump(choice.jumpTo.col, choice.jumpTo.row).ok) break;
         continue;
       }
+      if (choice.action === 'sprint' && !sprint().ok) break;
       if (choice.moveTo) {
         const moved = yield* beginMove(choice.moveTo.col, choice.moveTo.row, choice.avoidFog, options);
         if (!moved.ok || currentId() !== id || state.combatState.clock.units[id]?.stun) break;
         if (moved.stopped) continue;
       }
-      if (choice.action === 'sprint') sprint();
-      else if (choice.action === 'defend') defend();
+      if (choice.action === 'defend') defend();
       else if (choice.action === 'prepare' && !choice.skill) advancePreparation();
       else if (choice.skill) {
         const result = yield* beginAttack(choice.skill, choice.aim, options);

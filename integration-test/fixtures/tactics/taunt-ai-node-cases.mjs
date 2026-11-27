@@ -104,7 +104,7 @@ function run() {
   pursuit.ctx.units.find(u => u.id === 'e').skills = [parseSkill('【追击】[伤害:30][范围:单体;射程:1]')];
   pursuit.start();
   const chase = pursuit.planEnemyAction();
-  cases.push(ok('TA-22 当前射程外的追击方案同样按嘲讽选定方向', chase.moveTo?.col < 9 && !chase.skill, JSON.stringify(chase)));
+  cases.push(ok('TA-22 当前射程外的冲刺追击仍按嘲讽选定方向', chase.action === 'sprint' && chase.moveTo?.col < 9 && !chase.skill, JSON.stringify(chase)));
   const aging = createBattle({ units: [unit('d', 'hero', '防守者', { spd: 300 }), unit('e', 'enemy')],
     placementsById: { d: { col: 6, row: 4 }, e: { col: 4, row: 4 } }, scene, random: () => 0.5 });
   aging.ctx.units.find(u => u.id === 'e').ref.spd = 100;

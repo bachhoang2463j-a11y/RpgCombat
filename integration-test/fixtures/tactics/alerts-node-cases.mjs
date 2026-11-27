@@ -71,9 +71,11 @@ export function runAlertsCases(api) {
   {
     const quiet = make([unit('h', 'hero', 0, 200), unit('e', 'enemy', 0, 100, { ref: { moveDistance: 0.5 } })], [[2, 2], [18, 2]]);
     advanceTo(quiet, 'e');
+    const plan = quiet.planEnemyAction();
     const result = quiet.runEnemyTurn();
-    check('TT-ALERTS 低于一步额度时按待机策略结束回合', result.events.some(event => event.type === 'unit-moved' && event.unitId === 'e') === false
-      && quiet.getEffectiveUnit('e').atk === 10, result.events);
+    check('TT-ALERTS 基础额度不足一步但冲刺可推进一格', plan?.action === 'sprint'
+      && result.events.some(event => event.type === 'unit-moved' && event.unitId === 'e' && event.distance === 1)
+      && quiet.getEffectiveUnit('e').atk === 10, [plan, result.events]);
   }
   {
     const b = make([unit('h', 'hero', 0, 200), unit('e', 'enemy', 10, 100)], [[2, 0], [8, 0]],
