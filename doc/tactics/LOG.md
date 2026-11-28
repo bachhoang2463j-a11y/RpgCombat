@@ -1041,3 +1041,12 @@
 - 验证：AVP-STAGE-D 6/6、av-polish 40/40、status-variant 19/19；稳定后唯一一次全量回归 57 阶段 1577 项通过；现有单文件脚本闭合数量、零外部业务 JS/CSS 与阶段 D 关键标识共 7 项静态检查通过。首次使用逗号组合 --stage 参数被运行器拒绝，改为分别运行两个阶段后通过。
 - 真页验收边界：经用户选择进入排障模式，成功访问现有 127.0.0.1:8123/tactics/mvp-standalone.html，操作攻击技能选择与 Escape 取消；当前地图选取未能锁定食尸鬼目标，未触发复活演出，典型对局没有蜕皮单位。复活/蜕皮/眩晕跳过/演出中取消仍未验证；未构造替代场景或注入伪造事件。控制台有资源加载 404/连接拒绝记录，不报告零报错。
 - 目的 vs 现状：再生测试缺口已补齐；真实演出验收仍需用户将页面推进到可触发场景，本轮不宣称阶段 D 演出验收全部完成。
+
+## 2026-11-28 · 八方旅人双主题动态配乐引擎、自然切歌与暗金频谱面板（fc765f0）
+- 根因与需求：原 BGM 在纯移动/空蓄力也会触发无伤结算，导致刚升中烈度 5s 左右因连续两次无伤走位退回低烈度；且 4s 等功率硬叠/双 vocal 2.2s 静音坑/0:00 慢前奏起播切感生硬。按用户拍板改为《八方旅人》默认双主题配乐、烈度单向只升不降、任意烈度可插入反击曲，并统一右上角按钮与音乐弹窗为暗金频谱风格。
+- 音源与双主题：从本地《八方旅人 1/2》无损 FLAC 只读转码 11 首高张力战斗/首领/终局曲（256kbps MP3）至 `D:\Project\my_assets\BGM_OCTOPATH\`（低：暗黑悬疑对峙 `For Revenge` / `For Truth` / `夜の目覚め`；中：去重精选 T0 首领战 `ボスバトル2` / `決戦2` / `激戦`；高：神魔终战 `理を司る者` / `魔神の血を継ぐ者` / `明日を望まぬ者`；反击：`それぞれの未来のために` / `旅路の果てに立ちはだかる者`）。`bgm-library.mjs` 默认 `octopath`，完整保留原版 `e33`（`BGM_33/`），全 22 首补充 50ms 瞬态实测 `cueIn` 强拍锚点。
+- 自然切歌与烈度导演：`bgm-director.mjs` `createBattleMood` 改为 `low → medium → high` 单向棘轮；升 `medium` 需满足敌方首杀、任一主力 HP≤75%、全队受压或累计实质交火≥3 次；反击曲（单局限 1 次）解绑高危限制，在任意中/高烈度或曾受创下击杀即可插入并播完归位。混音废弃 4s 硬叠与 2.2s 静音坑，串联 `BiquadFilterNode (lowpass)` 实现 0.95s 低通暗化快收（20kHz→420Hz）+ 0.50s 处新曲从 `cueIn` 强拍直入 + 反向镲片扫频与低频鼓点过渡掩蔽 + `AnalyserNode` 频谱采样 + `setTheme()` 持久化；`main.mjs` 剔除纯走路/蓄力空结算、仅在致死/半血/重创接触落点即时触发高潮/反击、`beginTurn` 横幅处 `flushTurnCue()` 切常规升温。
+- 顶栏与频谱音乐面板：`ui-shell.mjs` 将 `#tactics-topbar` 8 个入口转为 14×14 线性矢量 SVG 并暴露 `setMusicPlaying`；`tactics.css` 将顶栏、`#panel-box` 弹窗（四角刻线）与 `.t-music-panel` 统一为 E33 暗金扁平风格，参照 `AiRadio` 实现旋转黑胶微盘、双主题分段按钮、静音记忆与 24 柱等离子律动频谱音量条（`requestAnimationFrame` 实时驱动，面板关闭即停）。
+- 文件：`tactics/src/{bgm-library,bgm-director,main,ui-shell}.mjs`、`tactics/tactics.css`、`integration-test/fixtures/tactics/bgm-director-node-cases.mjs`、`tactics/mvp-standalone.html`（另外部资源目录新增 `D:\Project\my_assets\BGM_OCTOPATH\bgm_*.mp3` 共 11 首）。
+- 验证：源码定向 `bgm-director 10/10`、`p02 70/70`、`ui-readability 23/23`；全量回归停在 `TP7AV-K` 旧字面量匹配后修正，复跑 `TP7AV-K 23/23` 与剩余 26 个阶段全部通过；只读 `flash` 子代理审查发现 2 中危（`closePanel` 隐藏 `rAF` 空转、`#tactics-topbar` `z-index:115` 高于弹窗遮罩）及 3 低危（切歌清旧错、暂停止 stinger、暂停切主题清旧曲），全部修复后复跑 `bgm-director 10/10`、`p02 70/70`、`ui-readability 23/23`；重打 `mvp-standalone.html`（2,156,268 字节，67 模块/48 断言/127 符号），`verify-demo.cjs` 全部阶段与 `verify-typical-artifact.cjs 63/63` 通过；内置浏览器实测 `127.0.0.1:8123` + `8766` 资源服 0 JS 报错、SVG 暗金顶栏、默认八方主题、24 柱频谱音量/静音联动、双主题切换与玛德琳走格保持 `低烈度 · 自动`（标签页已留页，未实机打完高烈度/反击全战斗听感，未连真实酒馆）。
+- 目的 vs 现状：一致；本轮未改动 `README.md` 待用户验收后确认。
