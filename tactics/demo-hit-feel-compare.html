@@ -43133,8 +43133,7 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
   }
   window.__HIT_DEMO_FX__ = {
     playChargeSound(fx, key) {
-      const cap = key === "tackle_start" ? { maxDurSec: 0.46, fadeOutSec: 0.12 } : { offsetSec: key === "herocharge" ? 0.315 : 0 };
-      fx.sfx(key, 1.4, cap);
+      fx.sfx(key, 1.4);
     },
     playKillCharge(fx, from, ms) {
       const c = worldPx2(from);

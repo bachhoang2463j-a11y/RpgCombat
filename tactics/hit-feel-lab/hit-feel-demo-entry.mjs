@@ -167,8 +167,7 @@ function playScreenBlood(fx, ms = 1150) {
 // ---------- 八方旅人2 打击感与击杀破碎/蓄势核心效果器 ----------
 window.__HIT_DEMO_FX__ = {
   playChargeSound(fx, key) {
-    const cap = key === 'tackle_start' ? { maxDurSec: 0.46, fadeOutSec: 0.12 } : { offsetSec: key === 'herocharge' ? 0.315 : 0 };
-    fx.sfx(key, 1.4, cap);
+    fx.sfx(key, 1.4);
   },
   playKillCharge(fx, from, ms) {
     const c = worldPx(from);
