@@ -1085,3 +1085,14 @@
 - 已有重击和穿透的前摇与推近／横切共用时长，在出手拍拉远；致死顿帧包含接触同拍挂载的后坐和受击动画，音效与飘字仍按命中拍，非致死和战斗时钟不变。
 - 文件：`tactics/src/{action-director,cinematic,fx-library}.mjs`、`integration-test/fixtures/tactics/hit-feedback-node-cases.mjs`、`tactics/mvp-standalone.html`。
 - 验证：定向 65+51 项、全量 1602 项通过；单文件 67 模块，48 项专项及单脚本／零外部导入通过，SHA256 `19b349c4…`；IAB 在独立新包页面试射精英靶，确认扣 7 HP、归零并回到行动界面。原预览未刷新；未验真 Chrome、酒馆或安卓，README 未改。
+
+## 2026-11-28 · 击杀靶场急推、蓄力与固定重击音（475c60d / 12ecc36）
+- 目的：保留 `3cac3b1` 的构图和致死停拍，不让速度线落在推镜之后。B/C 在速度线首帧同步急推（90/72ms），保留到位后 380/450ms，加入棋子局部光粒收束和项目原蓄力声；破碎仍为屏幕血块，结算衔接不重复累加冻结时间。
+- 音效：远程致死固定 `hitDown`，近战固定 `parry_heavy` 加 80ms 后的 `hitDown`，法术固定 `light01` 加 `light_impact`；专属技能不重放同一命中音，出手照旧。后续按实听反馈将 `herocharge/light_charge` 的单次增益升到 1.5/1.25，不调总线音量。
+- 文件：`tactics/hit-feel-lab/{build-hit-feel-demo.cjs,hit-feel-demo-entry.mjs}`、`tactics/demo-hit-feel-compare.html`，正式战棋代码与产物未改。
+- 验证：源码语法、重新构建、产物单脚本/零外部导入通过；内置浏览器 B 档实页验证急推当拍速度线已显示、蓄力结束释放，并核对远程、近战、圣光采样与破碎→既有结算特写顺序。音量新包实页确认 `herocharge.mp3` 走技能轨、增益 1.5 且实际起播。原正式预览未刷新。待推送的父提交含参考视频，当前仅本地备份。
+
+## 2026-11-28 · 替换 3 条违和跳跃音效采样（efa37d8）
+- 目的：经逐条声学分析与实听排查，替换掉下蹲蓄势的尖锐“咔哒”音及重装落地的碎玻璃/空心木箱违和音效。
+- 变更：采用 Mixkit 免版税物理音效库重新裁剪规范化（44.1kHz / 192kbps / 去前导静音 / loudnorm）并同步至 `资源/tactics-jump-sfx-candidates/` 与 `D:\Project\my_assets\`：`jump_crouch_3.mp3` 换为 `#534`（轻柔垫步）、`jump_land_heavy_1.mp3` 换为 `#3057`（末日重踏冲击）、`jump_land_heavy_3.mp3` 换为 `#756`（碎石地面重砸），并更新 `JUMP-SFX-MANIFEST.md` 来源说明。
+- 边界：仅替换音频资源与清单，战棋源码与单文件产物未改、无需重打包。
