@@ -39,7 +39,6 @@ import { hitChance } from './damage.mjs';
 import { skillSlots } from './effect-definitions.mjs';
 import { createBgmDirector } from './bgm-director.mjs';
 import { SPEED_STEPS, setTimeScale, getTimeScale } from './time-scale.mjs';
-import { BGM_TRACKS } from './bgm-library.mjs';
 // C1 特效推断：LLM 漏写/写错 [特效:名] 时按白名单补全（只改 fxTag，标记 fxTagInferred）；显式合法与「无」不动。
 export function inferUnitFx(units, legal = new Set(getFxTagOptions().map(o => o.name))) {
   let n = 0;
@@ -287,45 +286,145 @@ export function createApp(rootEl, opts = {}) {
         hp: u.hp, maxHp, shield: u.shield, status: u.status };
     }) };
   }
-  function settleBgm(before, snap = battle.snapshot()) {
-    bgm.syncBattle(bgmFrame(snap), ++settlementSeq, before);
+  function liveBgmFrame(snap = battle.snapshot()) {
+    const byId = new Map(snap.units.map(u => [u.id, u]));
+    return { terminal: snap.terminal, units: (currentViewData?.units || []).map(u => {
+      const s = shownOf(u), raw = byId.get(u.id);
+      const { maxHp, isSummon } = battle.getEffectiveUnit(u.id);
+      return { id: u.id, side: u.side, primary: currentViewData.heroCardIds.has(u.id), isSummon,
+        hp: Math.max(0, s.hp ?? raw?.hp ?? 0), maxHp, shield: s.shield ?? raw?.shield ?? 0,
+        status: (s.hp ?? 1) <= 0 ? (u.side === 'hero' ? 'down' : 'dead') : (raw?.status || 'active') };
+    }) };
+  }
+  function hasCombatChange(before, snap = battle.snapshot()) {
+    if (!before?.units) return false;
+    const prior = new Map(before.units.map(u => [u.id, u]));
+    return snap.units.some(u => {
+      const p = prior.get(u.id);
+      return p && !u.isSummon && (p.hp !== u.hp || p.shield !== u.shield || p.status !== u.status);
+    });
+  }
+  let liveBgmBefore = null;
+  function settleBgm(before, snap = battle.snapshot(), opts) {
+    bgm.syncBattle(bgmFrame(snap), ++settlementSeq, before, opts);
+  }
+  function settleLiveBgm() {
+    if (!liveBgmBefore) return;
+    const after = liveBgmFrame();
+    const prior = new Map(liveBgmBefore.units.map(u => [u.id, u]));
+    if (!after.units.some(u => { const p = prior.get(u.id); return p && !u.isSummon && (p.hp !== u.hp || p.shield !== u.shield || p.status !== u.status); })) return;
+    bgm.syncBattle(after, ++settlementSeq, liveBgmBefore, { deferMedium: true });
+    liveBgmBefore = after;
   }
   function endActionWithBgm() {
     const before = bgmFrame();
     battle.endAction();
     const after = battle.snapshot();
-    const prior = new Map(before.units.map(u => [u.id, u]));
-    if (after.units.some(u => prior.has(u.id) && (prior.get(u.id).hp !== u.hp || prior.get(u.id).shield !== u.shield))) settleBgm(before, after);
+    if (hasCombatChange(before, after)) settleBgm(before, after, { deferMedium: true });
   }
 
-  let musicPanel;
-  const unsubscribeBgm = bgm.subscribe(state => {
-    if (musicPanel?.isConnected) updateMusicPanel(state);
-  });
-  function updateMusicPanel(state) {
-    const level = { low: '低烈度', medium: '中烈度', high: '高烈度' }[state.level];
-    musicPanel.querySelector('[data-music-status]').textContent = (state.comeback ? '反击 · ' : '') + level + ' · ' + (state.mode === 'auto' ? '自动' : '手动');
-    musicPanel.querySelector('[data-music-title]').textContent = state.error || state.track?.title || '暂无曲目';
-    musicPanel.querySelector('[data-music-toggle]').textContent = state.playing || state.loading ? '暂停' : '播放';
-    musicPanel.querySelector('[data-music-auto]').disabled = state.mode === 'auto';
-    musicPanel.querySelector('output').textContent = Math.round(state.volume * 100) + '%';
+  let musicPanel, musicRaf = 0, lastNonZeroVol = 0.30;
+  const EQ_DURATIONS = [0.54, 0.71, 0.62, 0.83, 0.59, 0.76];
+  const SPEAKER_SVG = [
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="rgba(224,82,94,.22)"></polygon><line x1="22" y1="9" x2="16" y2="15"></line><line x1="16" y1="9" x2="22" y2="15"></line></svg>',
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="rgba(201,164,92,.2)"></polygon><path d="M15.5 8.5a5 5 0 0 1 0 7"></path></svg>',
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="rgba(201,164,92,.2)"></polygon><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M19 5a10 10 0 0 1 0 14"></path></svg>',
+  ];
+  function stopMusicSpectrum() {
+    if (musicRaf) { cancelAnimationFrame(musicRaf); musicRaf = 0; }
   }
-  shell.onMusic = () => {
-    shell.openPanel('🎵 音乐', '<div class="t-music-panel"><strong data-music-title></strong><span data-music-status></span>' +
-      '<label>选曲 <select><option value="">选择曲目</option></select></label>' +
-      '<label>音乐音量 <input type="range" min="0" max="100"><output></output></label>' +
-      '<div><button type="button" data-music-toggle></button><button type="button" data-music-next>下一首</button>' +
-      '<button type="button" data-music-auto>恢复自动</button></div></div>');
-    musicPanel = shell.els.panelBody.querySelector('.t-music-panel');
-    const select = musicPanel.querySelector('select');
-    for (const track of BGM_TRACKS) {
+  function isMusicPanelActive() {
+    return Boolean(musicPanel?.isConnected && shell.els.overlay?.style.display !== 'none');
+  }
+  function tickMusicSpectrum() {
+    musicRaf = 0;
+    const st = bgm.state();
+    const wrap = isMusicPanelActive() && musicPanel.querySelector('.t-eq-bars');
+    if (!wrap || !st.playing || st.volume <= 0) { wrap && wrap.classList.remove('real-spectrum'); return; }
+    const bars = wrap.children;
+    const spec = bgm.sampleSpectrum(bars.length);
+    if (spec) {
+      wrap.classList.add('real-spectrum');
+      const activeCount = Math.round(st.volume * bars.length);
+      for (let i = 0; i < bars.length; i++) {
+        bars[i].style.height = i < activeCount ? Math.max(16, Math.round(spec[i] * 100)) + '%' : '3px';
+      }
+    } else {
+      wrap.classList.remove('real-spectrum');
+      for (let i = 0; i < bars.length; i++) bars[i].style.height = '';
+    }
+    musicRaf = requestAnimationFrame(tickMusicSpectrum);
+  }
+  const unsubscribeBgm = bgm.subscribe(state => {
+    shell.setMusicPlaying?.(state.playing);
+    if (isMusicPanelActive()) updateMusicPanel(state);
+    else stopMusicSpectrum();
+  });
+  function fillMusicTracks(select, state) {
+    if (!select || select.dataset.theme === state.theme) return;
+    select.dataset.theme = state.theme;
+    select.length = 1;
+    const curTheme = (state.themes || []).find(t => t.id === state.theme);
+    for (const track of (curTheme?.tracks || [])) {
       const option = rootEl.ownerDocument.createElement('option');
       option.value = track.id; option.textContent = track.title;
       select.append(option);
     }
+  }
+  function updateMusicPanel(state) {
+    const levelText = { low: '低烈度', medium: '中烈度', high: '高烈度' }[state.level] || '低烈度';
+    const activeThemeObj = (state.themes || []).find(t => t.id === state.theme);
+    musicPanel.querySelector('[data-music-title]').textContent = state.error || state.track?.title || '暂无曲目';
+    musicPanel.querySelector('[data-music-sub]').textContent = (activeThemeObj?.label || '八方旅人') + ' · 战况动态导演';
+    const badge = musicPanel.querySelector('[data-music-status]');
+    badge.textContent = (state.comeback ? '反击高潮 · ' : '') + levelText + ' · ' + (state.mode === 'auto' ? '自动' : '手动');
+    badge.dataset.level = state.comeback ? 'comeback' : state.level;
+    musicPanel.querySelector('.t-mp-disc')?.classList.toggle('is-spinning', Boolean(state.playing));
+    for (const btn of musicPanel.querySelectorAll('[data-music-theme]')) {
+      btn.classList.toggle('is-active', btn.dataset.musicTheme === state.theme);
+    }
+    fillMusicTracks(musicPanel.querySelector('select'), state);
+    musicPanel.querySelector('[data-music-toggle]').textContent = state.playing || state.loading ? '暂停' : '播放';
+    musicPanel.querySelector('[data-music-auto]').disabled = state.mode === 'auto';
+    if (state.volume > 0) lastNonZeroVol = state.volume;
+    const pctText = Math.round(state.volume * 100);
+    musicPanel.querySelector('output').textContent = pctText + '%';
+    const slider = musicPanel.querySelector('input[type="range"]');
+    if (slider) slider.value = pctText;
+    const muteBtn = musicPanel.querySelector('[data-music-mute]');
+    if (muteBtn) {
+      muteBtn.innerHTML = SPEAKER_SVG[state.volume === 0 ? 0 : state.volume < 0.5 ? 1 : 2];
+      muteBtn.classList.toggle('is-muted', state.volume === 0);
+    }
+    const eqWrap = musicPanel.querySelector('.t-eq-bars');
+    if (eqWrap) {
+      eqWrap.style.setProperty('--eq-vol', state.volume);
+      eqWrap.classList.toggle('playing', Boolean(state.playing && state.volume > 0));
+      const activeCount = Math.round(state.volume * eqWrap.children.length);
+      for (let i = 0; i < eqWrap.children.length; i++) eqWrap.children[i].classList.toggle('active', i < activeCount);
+      if (state.playing && state.volume > 0) { if (!musicRaf) musicRaf = requestAnimationFrame(tickMusicSpectrum); }
+      else { stopMusicSpectrum(); eqWrap.classList.remove('real-spectrum'); for (const b of eqWrap.children) b.style.height = ''; }
+    }
+  }
+  shell.onMusic = () => {
+    const eqBarsHtml = Array.from({ length: 24 }, (_, i) => {
+      const dur = EQ_DURATIONS[i % EQ_DURATIONS.length];
+      return '<i class="t-eq-bar" style="animation-duration:' + dur + 's;animation-delay:-' + ((i * 0.09) % dur).toFixed(2) + 's"></i>';
+    }).join('');
+    shell.openPanel('战斗配乐 · 音乐电台',
+      '<div class="t-music-panel">' +
+        '<div class="t-mp-hero"><div class="t-mp-disc" aria-hidden="true"></div><div class="t-mp-meta"><strong data-music-title></strong><span data-music-sub></span></div><span class="t-mp-badge" data-music-status></span></div>' +
+        '<div class="t-mp-row"><span class="t-mp-label">曲库主题</span><div class="t-mp-seg-group"><button type="button" class="t-mp-seg" data-music-theme="octopath">八方旅人</button><button type="button" class="t-mp-seg" data-music-theme="e33">33号混搭</button></div></div>' +
+        '<label class="t-mp-row"><span class="t-mp-label">手动选曲</span><select><option value="">选择曲目</option></select></label>' +
+        '<div class="t-mp-row t-mp-vol"><span class="t-mp-label">频谱音量</span><button type="button" class="t-mp-mute" data-music-mute title="静音/恢复"></button><div class="t-eq-wrap"><div class="t-eq-bars">' + eqBarsHtml + '</div><input type="range" class="t-eq-slider" min="0" max="100" aria-label="音乐音量"></div><output class="t-eq-pct"></output></div>' +
+        '<div class="t-mp-actions"><button type="button" data-music-toggle></button><button type="button" data-music-next>下一首</button><button type="button" data-music-auto>恢复自动</button></div>' +
+      '</div>');
+    musicPanel = shell.els.panelBody.querySelector('.t-music-panel');
+    for (const btn of musicPanel.querySelectorAll('[data-music-theme]')) btn.onclick = () => bgm.setTheme(btn.dataset.musicTheme);
+    const select = musicPanel.querySelector('select');
     select.onchange = () => { if (select.value) bgm.selectTrack(select.value); select.value = ''; };
-    const slider = musicPanel.querySelector('input');
-    slider.value = Math.round(bgm.state().volume * 100);
+    musicPanel.querySelector('[data-music-mute]').onclick = () => { const cur = bgm.state().volume; bgm.setVolume(cur > 0 ? 0 : (lastNonZeroVol || 0.30)); };
+    const slider = musicPanel.querySelector('input[type="range"]');
     slider.oninput = () => bgm.setVolume(Number(slider.value) / 100);
     musicPanel.querySelector('[data-music-toggle]').onclick = () => bgm.togglePause();
     musicPanel.querySelector('[data-music-next]').onclick = () => bgm.nextTrack();
@@ -534,6 +633,7 @@ export function createApp(rootEl, opts = {}) {
     const unchanged = !forceReset && currentViewData && result.branch === 'resume' && currentViewData.sceneId === nextView.sceneId && currentViewData.battleId === nextView.battleId && JSON.stringify([currentViewData.scene, currentViewData.units, currentViewData.placementsById]) === JSON.stringify([nextView.scene, nextView.units, nextView.placementsById]);
     if (!unchanged) {
       flow++;
+      liveBgmBefore = null;
       bgm.stopBattle();
       cancelRetargetPrompt();
       director.cancelAttack();          // 旧攻击 generator 作废（generator.return）
@@ -1413,7 +1513,7 @@ export function createApp(rootEl, opts = {}) {
     }
     if (myFlow !== flow) return;
     releaseScene();
-    settleBgm(beforeBgm);
+    if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot(), { deferMedium: true });
     afterHeroAction();
   }
   // 整备：规则先祛除负面，演出在该单位处播放（期间锁定输入），结束后交还
@@ -1543,7 +1643,7 @@ export function createApp(rootEl, opts = {}) {
     sandbox.getUnitView().lockMotion(mover, false);
     sandbox.getUnitView().updateUnit(mover, { placement: currentViewData.placementsById[mover] });
     if (myFlow !== flow) return;
-    settleBgm(beforeBgm);
+    if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot(), { deferMedium: true });
     if (!battle.snapshot().currentId || battle.snapshot().terminal) {
       if (!battle.snapshot().terminal) endActionWithBgm();
       syncShown(); setBusy(false); refreshBattle({ deferPassive: true }); beginTurn(); return;
@@ -1572,7 +1672,10 @@ export function createApp(rootEl, opts = {}) {
     syncShown(); refreshBattle();
     shell.showLog(battle.snapshot().log.at(-1), 'act');
     if (!result.charge.ready) await director.playPrepare(result);
-    if (myFlow === flow) { settleBgm(beforeBgm); afterHeroAction(); }
+    if (myFlow === flow) {
+      if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot(), { deferMedium: true });
+      afterHeroAction();
+    }
   }
   function offerPreparedRelease(manual = false) {
     if (!isHeroTurn() || busy) return false;
@@ -1621,7 +1724,7 @@ export function createApp(rootEl, opts = {}) {
       refreshBattle();
       await director.playPrepare(res);
       if (myFlow !== flow) return;
-      settleBgm(beforeBgm);
+      if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot(), { deferMedium: true });
       setBusy(false);
       refreshBattle();
       shell.showLog(res.logTo > res.logFrom ? battle.snapshot().log[res.logTo - 1] : act.skill.name + ' 正在准备', 'act');
@@ -1691,6 +1794,7 @@ export function createApp(rootEl, opts = {}) {
     sandbox.beginAction();
     const c = sandbox.unitWorldCenter(u.id);
     shell.showBanner(u, u.side === 'hero' ? '我方行动' : '敌方行动');
+    bgm.flushTurnCue();
     if (u.side === 'hero') {
       if (!hasNaturalTurnAudio) avHost.sfx('heroTurn', 1, { category: 'M' });
     } else if (!hasNaturalTurnAudio) ui('enemyTurn');
@@ -1743,7 +1847,7 @@ export function createApp(rootEl, opts = {}) {
         sandbox.getUnitView().lockMotion(actorId, false);
         sandbox.getUnitView().updateUnit(actorId, { placement: currentViewData.placementsById[actorId] });
         if (!alive()) return;
-        settleBgm(beforeBgm);
+        if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot(), { deferMedium: true });
         if (battle.snapshot().currentId !== actorId || battle.snapshot().terminal) break;
         if (plan.jumpTo || result.stopped || !plan.skill) continue;
       }
@@ -1764,7 +1868,7 @@ export function createApp(rootEl, opts = {}) {
           if (!prep.ok) break;
           syncShown(); refreshBattle(); await director.playPrepare(prep);
           if (!alive()) return;
-          settleBgm(beforeBgm);
+          if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot(), { deferMedium: true });
           continue;
         }
         const q = battle.previewAttack(plan.skill, plan.aim);
@@ -1787,7 +1891,10 @@ export function createApp(rootEl, opts = {}) {
         const res = await director.runAttackLive(plan.skill, plan.aim);
         if (!alive()) return;
         if (!res?.ok) break;
-        if (res.preparing) { refreshBattle(); await director.playPrepare(res); if (alive()) settleBgm(beforeBgm); }
+        if (res.preparing) {
+          refreshBattle(); await director.playPrepare(res);
+          if (alive() && hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot(), { deferMedium: true });
+        }
         else await playAttackResult(res, beforeBgm);
         if (!alive()) return;
         const snap = battle.snapshot();
@@ -1836,6 +1943,7 @@ export function createApp(rootEl, opts = {}) {
     if (res.teleport) holdMotion(res.casterId, res.teleport.from);
     holdScene();
     refreshBattle();
+    liveBgmBefore = beforeBgm || liveBgmFrame();
     try {
       await director.playAttack(res);
     } finally {
@@ -1843,12 +1951,14 @@ export function createApp(rootEl, opts = {}) {
       if (myFlow === flow) for (const id of motionIds) {
         view.lockMotion(id, false);
         view.updateUnit(id, { placement: currentViewData.placementsById[id] });
-      }
+      } else liveBgmBefore = null;
     }
     if (myFlow !== flow) return;
     await director.playExecution(res);   // 技能演出、反应与自爆全部完成后统一收尾一次；胜利弹窗在其后
-    if (myFlow !== flow) return;
-    if (beforeBgm) settleBgm(beforeBgm);
+    if (myFlow !== flow) { liveBgmBefore = null; return; }
+    const tailBefore = liveBgmBefore;
+    liveBgmBefore = null;
+    if (tailBefore && hasCombatChange(tailBefore)) settleBgm(tailBefore, battle.snapshot(), { deferMedium: true });
     for (let i = res.logFrom; i < res.logTo; i++) hiddenLog.delete(i);
     if (!res.hits.length) shell.showLog(battle.snapshot().log[res.logTo - 1] || '', 'miss');
   }
@@ -1875,7 +1985,8 @@ export function createApp(rootEl, opts = {}) {
   // 反击只揭示当前命中快照，不提前同步后续段的最终资源值。
   function revealCounter(value) {
     const u = unitById(value.targetId);
-    const next = { ...shownOf(u), hp: value.hpAfter, shield: value.shieldAfter };
+    const prev = shownOf(u);
+    const next = { ...prev, hp: value.hpAfter, shield: value.shieldAfter };
     shown.set(u.id, next);
     u.bars = { ...u.bars, ...next };
     sandbox.getUnitView().updateUnit(u.id, { bars: u.bars, syncGhost: true });
@@ -1884,6 +1995,8 @@ export function createApp(rootEl, opts = {}) {
     shownEff.set(source.id, battle.getEffectiveUnit(source.id));
     renderStatus(source.id);
     if (value.hpAfter <= 0) playDown(u);
+    const maxHp = u.bars.maxHp || u.ref?.maxHp || 1;
+    if (value.hpAfter <= 0 || (u.side === 'hero' && (value.hpAfter <= maxHp * 0.55 || (prev.hp - value.hpAfter) >= maxHp * 0.30))) settleLiveBgm();
   }
 
   // ---------- 接触拍点揭示 ----------
@@ -1912,6 +2025,8 @@ export function createApp(rootEl, opts = {}) {
       downTag(u.id, killer && killer.id !== u.id ? '☠ ' + killer.name + (res.skill?.name ? '【' + res.skill.name + '】' : '') + ' 击倒' : '☠ 倒下');
     }
     if (hit.down) playDown(u);
+    const maxHp = u.bars.maxHp || u.ref?.maxHp || 1;
+    if (hit.down || (u.side === 'hero' && hit.hit && (hit.hpAfter <= maxHp * 0.55 || (prev.hp - hit.hpAfter) >= maxHp * 0.30))) settleLiveBgm();
   }
   function playDown(u) {
     const view = sandbox.getUnitView(), scope = sandbox.getScope();
@@ -2379,6 +2494,8 @@ export function createApp(rootEl, opts = {}) {
     rootEl.ownerDocument?.removeEventListener('pointerdown', unlockBgm, { capture: true });
     rootEl.ownerDocument?.removeEventListener('keydown', unlockBgm, { capture: true });
     unsubscribeBgm();
+    stopMusicSpectrum();
+    liveBgmBefore = null;
     bgm.destroy();
     cancelRetargetPrompt();
     director.cancelAttack();

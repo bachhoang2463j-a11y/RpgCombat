@@ -37,15 +37,15 @@ export function buildShell(root) {
     '<div id="turn-banner" aria-hidden="true"><div class="tb-inner"><div class="tb-face"></div><div class="tb-text"><b class="tb-name"></b><i class="tb-sub"></i></div></div></div>',
     RPG_UI_RAIL_HTML,
     '<div id="tactics-topbar">' +
-      '<div id="field-badge" class="t-topbtn" style="display:none">🏟️ <span id="field-badge-name">场地</span></div>' +
-      '<button id="btn-worldbook" class="t-topbtn" title="世界书">📚<span class="t-toplabel">世界书</span></button>' +
-      '<button id="btn-history" class="t-topbtn" title="记录">📜<span class="t-toplabel">记录</span></button>' +
-      '<button id="btn-fullscreen" class="t-topbtn" title="全屏">🔲<span class="t-toplabel">全屏</span></button>' +
-      '<button id="btn-dialogue" class="t-topbtn" title="对话">💬<span class="t-toplabel">对话</span></button>' +
-      '<button id="btn-editor" class="t-topbtn" title="设置">⚙️<span class="t-toplabel">设置</span></button>' +
-      '<button id="btn-speed" class="t-topbtn" type="button" title="演出倍速（点击切换）">⏩<span class="t-toplabel" id="btn-speed-label">1.0×</span></button>' +
-      '<button id="btn-music" class="t-topbtn" type="button" title="音乐" aria-label="音乐">🎵<span class="t-toplabel">音乐</span></button>' +
-      '<button id="btn-reset" class="t-topbtn" title="重置">🔄<span class="t-toplabel">重置</span></button>' +
+      '<div id="field-badge" class="t-topbtn" style="display:none"><svg class="t-topico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 4v5c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9V7l7-4z"/></svg><span id="field-badge-name">场地</span></div>' +
+      '<button id="btn-worldbook" class="t-topbtn" title="世界书"><svg class="t-topico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span class="t-toplabel">世界书</span></button>' +
+      '<button id="btn-history" class="t-topbtn" title="记录"><svg class="t-topico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h4"/></svg><span class="t-toplabel">记录</span></button>' +
+      '<button id="btn-fullscreen" class="t-topbtn" title="全屏"><svg class="t-topico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg><span class="t-toplabel">全屏</span></button>' +
+      '<button id="btn-dialogue" class="t-topbtn" title="对话"><svg class="t-topico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="t-toplabel">对话</span></button>' +
+      '<button id="btn-editor" class="t-topbtn" title="设置"><svg class="t-topico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.79 1.01 1.44 1.06H21a2 2 0 1 1 0 4h-.09c-.65.05-1.18.46-1.51 1z"/></svg><span class="t-toplabel">设置</span></button>' +
+      '<button id="btn-speed" class="t-topbtn" type="button" title="演出倍速（点击切换）"><svg class="t-topico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 19 22 12 13 5 13 19"/><polygon points="2 19 11 12 2 5 2 19"/></svg><span class="t-toplabel" id="btn-speed-label">1.0×</span></button>' +
+      '<button id="btn-music" class="t-topbtn" type="button" title="音乐" aria-label="音乐"><svg class="t-topico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span class="t-toplabel">音乐</span></button>' +
+      '<button id="btn-reset" class="t-topbtn" title="重置"><svg class="t-topico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><span class="t-toplabel">重置</span></button>' +
     '</div>',
     '<div id="tactics-allies" role="group" aria-label="召唤物与临时盟友" hidden></div>',
     '<div id="tactics-float-ui">' +
@@ -737,7 +737,7 @@ export function buildShell(root) {
     els.overlay.style.display = 'flex';
     els.overlay.classList.remove('t-panel-in'); void els.overlay.offsetWidth; els.overlay.classList.add('t-panel-in');
   }
-  function closePanel() { els.overlay.style.display = 'none'; }
+  function closePanel() { els.overlay.style.display = 'none'; els.panelBody.replaceChildren(); }
   function setHistory(lines) { state.history = lines.slice(); }
   function showHistory() {
     openPanel('📜 记录', state.history.length ? state.history.map(h => '<div class="t-history-row">' + ESC(h) + '</div>').join('') : '<div class="t-submenu-empty">当前无记录。</div>');
@@ -831,11 +831,12 @@ export function buildShell(root) {
   function bindMenus() { renderCommand(null); }
   function markRoundStart() { rpgUi.markRoundStart(); }
   function setSpeedLabel(v) { $('btn-speed-label').textContent = v.toFixed(1) + '×'; $('btn-speed').classList.toggle('t-topbtn-on', v !== 1); }
+  function setMusicPlaying(playing) { $('btn-music').classList.toggle('t-topbtn-on', Boolean(playing)); }
 
   return {
     destroy: () => { flames.destroy(); clearTimeout(showLog._t); clearTimeout(showBanner._t); rpgUi.hideTagTip(); document.removeEventListener('mousedown', onComboDown); reactionPrompt.cancel(); state.onReset = null; state.onUnitClick = null; state.onAllyPin = null; root.replaceChildren(); },
     els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setHeroStatus, setHeroStats, flashHeroPassive, showInspector, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
-    previewMoveCost, previewPips, openModal, closeModal, setSpeedLabel,
+    previewMoveCost, previewPips, openModal, closeModal, setSpeedLabel, setMusicPlaying,
     promptReaction: (req) => reactionPrompt.prompt(req), cancelReactionPrompt: () => reactionPrompt.cancel(),
     getSafeRect, showLog, openPanel, closePanel, openResult, clearBattle, closeSubmenu: () => {},
     set onUnitClick(fn) { state.onUnitClick = fn; },
