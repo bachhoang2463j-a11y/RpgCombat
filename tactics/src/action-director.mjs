@@ -22,6 +22,8 @@ import { GUARD_AUDIO_KEYS, BARRIER_AUDIO_KEYS, playGuardDash, playGuardBlock, mo
 import { effectFloat } from './status-ui.mjs';
 import { floatText, worldPx } from './vfx-primitives.mjs';
 import { fxDateNow, getTimeScale } from './time-scale.mjs';
+import { createBattleMarks, lightTier, seedOf } from './battle-marks.mjs';
+import { skillElement, ELEMENT_COLORS } from './fx-infer.mjs';
 
 export const WINDUP_BEAT_MS = 330;   // 回合制敌方前摇拍点（OMEN_BEAT）：起手后此刻出手
 
@@ -406,6 +408,21 @@ export function createActionDirector(deps) {
     });
   }
   let cineSeen = { scope: null, keys: new Set() };
+  // ---------- 战斗留痕（C3）与法术照亮（C4） ----------
+  const marks = createBattleMarks();
+  const GLOW_ELEMENTS = new Set(['fire', 'frost', 'thunder', 'poison', 'holy', 'water', 'void', 'curse', 'arcane', 'blast']);
+  const clockNow = () => battleOf()?.battleState?.combatState?.clock?.now || 0;
+  function addMark(x, y, element, size, seedKey) {
+    const s = scope();
+    if (!s || !s.isLive) return;
+    marks.mark(s, sandbox.getDom(), { x, y, element, size, seed: seedOf(seedKey), now: clockNow() });
+  }
+  function flash(p, element, tier, peak) {
+    const s = scope();
+    if (!s || !s.isLive || !p) return;
+    marks.light(s, sandbox.getDom(), { x: p.x, y: p.y, color: ELEMENT_COLORS[element] || ELEMENT_COLORS.arcane, radius: tier.radius, ms: tier.ms, peak });
+  }
+  function ageMarks(now) { marks.age(now); }
 
   // ---------- 攻击：注册表分发演出 + 接触拍点逐段揭示 ----------
   async function playAttack(result) {
@@ -474,6 +491,12 @@ export function createActionDirector(deps) {
 
     // L3/L4 屏幕氛围层（视口宿主）：与条目同风格的边缘围压；首个真实揭示即降低遮挡，条目结束即外撤
     const grade = entry.grade;
+    const element = skillElement(skill), tier = lightTier(grade);
+    const glowing = GLOW_ELEMENTS.has(element);
+    if (glowing) flash(centerOf(result.casterId), element, { radius: Math.max(1.5, tier.radius * 0.4), ms: Math.max(300, entry.timeline?.chargeMs || 400) }, 0.45);
+    const lit = new Set();
+    const blastCenter = result.query && result.query.blastCenter;
+    let blastMarked = false;
     const shape = result.query && result.query.shape;
     const atmos = (grade === 'L3' || grade === 'L4') ? startAtmos(makeFx(audioContext.category), {
       style: atmosStyleOf(entry, skill), grade, chargeMs: entry.timeline?.chargeMs || 600, totalMs: entry.timeline?.totalMs || 2000,
@@ -637,6 +660,13 @@ export function createActionDirector(deps) {
         suppressDodgeFx: !!reaction?.shift || !!guardianReaction?.shift,
       });
       if (!healed && !seg.barrierHitId) microStop(result.casterId, targetId, hitStopMs(r));
+      if (!healed && !seg.barrierHitId) {
+        const c = centerOf(targetId);
+        if (element === 'gun') flash(centerOf(result.casterId), 'gun', { radius: 1, ms: 160 }, 0.7);
+        if (c && (glowing || element === 'gun') && !lit.has(targetId)) { lit.add(targetId); flash(c, element, element === 'gun' ? { radius: 1.2, ms: 220 } : tier, 0.85); }
+        if (c && seg.hit && seg.hpDmg > 0) addMark(c.x + (seedOf(targetId + i) % 7 - 3) * 0.05, c.y + 0.25, element || 'physical', element === 'gun' ? 0.7 : 1.1, (seg.segmentId || result.casterId + ':' + targetId) + ':' + i);
+        if (blastCenter && !blastMarked) { blastMarked = true; addMark(blastCenter.x, blastCenter.y, element === 'fire' || !element ? 'blast' : element, 2.4, 'blast:' + (seg.segmentId || targetId)); }
+      }
       if (seg.backstab && !healed && !backstabShown.has(targetId)) {
         backstabShown.add(targetId);
         const c = centerOf(targetId), fp = vd.footprintsById[targetId] || { width: 1, height: 1 };
@@ -1262,5 +1292,5 @@ export function createActionDirector(deps) {
     }
   }
   return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, playPrepare, playReady, syncRegions, playFieldFeedback, playStatusTick, syncBarriers, syncPreparations, holdRegions, holdGuards, wait, resolveAttackIdentity, resolveWindupKind,
-    runAttackLive, driveAttack, cancelAttack, playChargeCutin, playExecution, executionKills };
+    runAttackLive, driveAttack, cancelAttack, playChargeCutin, playExecution, executionKills, ageMarks };
 }

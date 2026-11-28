@@ -30,8 +30,10 @@ import { unitCenter, occupiedCells, cellKey } from './geometry.mjs';
 import { threatOf, threatHeat } from './threat.mjs';
 import { canSeeUnit } from './perception.mjs';
 import { createEncounterScenario, createScenarioData, createSeededRandom } from './scenario-data.mjs';
-import { statusBadges, compactStatusHtml, iconStatusHtml, inspectorHtml, auraList } from './status-ui.mjs';
-import { passiveGainLabel } from './fx-library.mjs';
+import { statusBadges, compactStatusHtml, iconStatusHtml, inspectorHtml, auraList, VARIANT_TAGS } from './status-ui.mjs';
+import { passiveGainLabel, getFxTagOptions } from './fx-library.mjs';
+import { applyFxInference, unitElement, ELEMENT_COLORS } from './fx-infer.mjs';
+import { activeVariantNames } from './variant-rules.mjs';
 import { resolveLore } from './lore.mjs';
 import { getEffectiveStats } from './class-passives.mjs';
 import { hitChance } from './damage.mjs';
@@ -39,6 +41,16 @@ import { skillSlots } from './effect-definitions.mjs';
 import { createBgmDirector } from './bgm-director.mjs';
 import { SPEED_STEPS, setTimeScale, getTimeScale } from './time-scale.mjs';
 import { BGM_TRACKS } from './bgm-library.mjs';
+// C1 特效推断：LLM 漏写/写错 [特效:名] 时按白名单补全（只改 fxTag，标记 fxTagInferred）；显式合法与「无」不动。
+export function inferUnitFx(units, legal = new Set(getFxTagOptions().map(o => o.name))) {
+  let n = 0;
+  for (const u of units || []) {
+    const opts = { legal, boss: u.level === '首领' };
+    n += applyFxInference(u.skills, opts) + applyFxInference(u.items, opts);
+  }
+  return n;
+}
+
 // 同名 YAML 技能仍保留规则字段，本场编辑仅覆写显式演出标签。
 export function applyEditorFxTags(rows, editedRows) {
   const byName = new Map((editedRows || []).map(row => [row.name, row]));
@@ -46,6 +58,7 @@ export function applyEditorFxTags(rows, editedRows) {
     const edited = byName.get(row.name);
     if (!edited) continue;
     row.fxTag = edited.fxTag || null;
+    delete row.fxTagInferred;
     if (row.children) applyEditorFxTags(row.children, edited.children);
   }
 }
@@ -482,6 +495,7 @@ export function createApp(rootEl, opts = {}) {
       roster = loadTacticsRoster(block, []);
       nextView = buildViewData(block, roster.heroes, scene, result.sceneState.positions, nextToken);
     }
+    inferUnitFx(nextView.units);
     const overrideKey = block.sceneId + '\u0000' + block.battleId;
     const localOverrides = editorOverrides.get(overrideKey);
     if (localOverrides) {
@@ -836,6 +850,7 @@ export function createApp(rootEl, opts = {}) {
     if (!sceneHeld) syncScene();
     sandbox.update(currentViewData);
     threatCache.clear();
+    director.ageMarks(snap.now);
     const view = sandbox.getUnitView();
     const targets = new Set(Object.values(snap.focusOrders).map(order => order.targetId));
     for (const u of currentViewData.units) {
@@ -843,6 +858,7 @@ export function createApp(rootEl, opts = {}) {
       view.setFlag(u.id, 't-unit-alert-pending', !!snap.focusOrders[u.id]);
       view.setFlag(u.id, 't-unit-down', shownOf(u).hp <= 0);
       view.setFlag(u.id, 't-unit-lowhp', u.side === 'hero' && lowHp(u));
+      if (u.side !== 'hero') view.setBadge(u.id, enemyBadge(u));
       view.setFlag(u.id, 't-unit-current', u.id === snap.currentId && !snap.terminal);
       view.setFlag(u.id, 't-unit-channel', !!battle.battleState.combatState.charges?.[u.id]?.preparing);
       const ch = snap.units.find(x => x.id === u.id)?.charge;
@@ -936,6 +952,23 @@ export function createApp(rootEl, opts = {}) {
     dom.viewport.appendChild(d); s.addNode(d);
     s.animate(d.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0.7, offset: 0.45 }, { opacity: 0.95, offset: 0.6 }, { opacity: 0 }], { duration: 1200, easing: 'ease-out' }));
     s.after(1200, () => s.removeNode(d));
+  }
+  // ---------- 敌方徽章（C2）：分级外框 / 主元素底色 / 关键特性角标（复活用尽、蜕皮已触发灰显） ----------
+  const TRAIT_ORDER = ['复活', '蜕皮', '自爆', '钢体', '流体', '虚形', '破法'];
+  function enemyBadge(u) {
+    const tier = u.level === '首领' ? 'boss' : u.level === '精英' ? 'elite' : u.level === '杂兵' ? 'fodder'
+      : ({ legend: 'boss', elite: 'elite' }[unitStyles[u.id]?.tier] || 'fodder');
+    const el = unitElement(u);
+    const names = activeVariantNames(u, battle.getEffectiveUnit(u.id)?.buffs || []);
+    const blast = [...(u.attrTags || []), ...(u.skills || []).filter(s => s.isDeathTrigger).map(s => s.deathTag)]
+      .map(t => /^\[自爆[:：]([^\];]+)/.exec(String(t || ''))).find(Boolean);
+    if (blast) names.add('自爆');
+    const traits = TRAIT_ORDER.filter(n => names.has(n)).slice(0, 3).map(n => {
+      const [icon, tip, color] = n === '自爆' ? ['💥', '死亡自爆（' + blast[1] + '）：对周围我方造成伤害或状态', '#fca5a5'] : VARIANT_TAGS[n];
+      const spent = (n === '复活' && !((u.ref.reviveCount || 0) > 0)) || (n === '蜕皮' && !!u.ref.molted);
+      return { name: n === '自爆' ? '自爆·' + blast[1] : n, icon, tip, color, spent };
+    });
+    return { tier, color: el ? ELEMENT_COLORS[el] : null, traits };
   }
   function moveEval(hit) {
     const id = battle.snapshot().currentId;

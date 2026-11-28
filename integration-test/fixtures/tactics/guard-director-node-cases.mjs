@@ -10,7 +10,7 @@ function setup(cancel = false, action, onHit) {
   const positions = { e: { col: 9, row: 4 }, g: { col: 5, row: 4 }, h: { col: 7, row: 4 } };
   const units = Object.keys(positions).map(id => ({ id, ref: { hp: 100, atk: 10 } }));
   const view = { nodes: new Map(), lockMotion(id, locked) { calls.push(['lock', id, locked]); }, setDisplayPos(id, x, y) { calls.push(['pos', id, x, y]); }, setDisplayFacing() {}, updateUnit() {} };
-  const sandbox = { getScope: () => scope, getUnitView: () => view, getDom: () => ({ world: node(), unitLayer: node() }),
+  const sandbox = { getScope: () => scope, getUnitView: () => view, getDom: () => ({ world: node(), art: node(), unitLayer: node() }),
     unitWorldCenter: id => ({ x: positions[id].col + 0.5, y: positions[id].row + 0.5 }), guideTo: async () => {}, getPose: () => ({ scale: 1 }) };
   const av = { CombatAudioMixer: { classify: () => 'B' }, CombatAudioDirector: {
     beginAction: () => 1, publish() {}, closeWave() {}, completeTarget() {},

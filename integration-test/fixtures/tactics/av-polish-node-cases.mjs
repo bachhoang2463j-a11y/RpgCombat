@@ -9,6 +9,10 @@ import { createActionDirector } from '../../../tactics/src/action-director.mjs';
 import { createBattle } from '../../../tactics/src/battle.mjs';
 import { threatOf, threatHeat, threatReach } from '../../../tactics/src/threat.mjs';
 import { cellKey } from '../../../tactics/src/geometry.mjs';
+import { inferFxTag, applyFxInference, skillElement, unitElement, INFERABLE_FX } from '../../../tactics/src/fx-infer.mjs';
+import { getFxTagOptions } from '../../../tactics/src/fx-library.mjs';
+import { lightTier, seedOf } from '../../../tactics/src/battle-marks.mjs';
+import { parseYamlText } from '../../../tactics/src/parser.mjs';
 
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../tactics/src');
 const read = f => readFileSync(path.join(SRC, f), 'utf8');
@@ -84,7 +88,7 @@ function directorHarness() {
   const director = createActionDirector({
     sandbox: { getScope: () => scope, getUnitView: () => ({ setDisplayFacing() {}, updateUnit() {}, nodes }),
       unitWorldCenter: id => ({ x: id === 'c' ? 1 : 4, y: 2 }), worldToScreenClient: x => ({ x: x * 100, y: 0 }), async guideTo() {},
-      getDom: () => ({ world: { insertBefore() {}, appendChild() {} }, unitLayer: {}, viewport: { getBoundingClientRect: () => ({ left: 0, width: 500 }) } }) },
+      getDom: () => ({ world: { insertBefore() {}, appendChild() {} }, art: {}, unitLayer: {}, viewport: { getBoundingClientRect: () => ({ left: 0, width: 500 }) } }) },
     getViewData: () => ({ units, placementsById: { c: {}, a: {} }, footprintsById: {} }),
     avHost: { syncRoster() {}, entity: id => ({ id }), particleStop: ms => stops.push(ms), setPanHint: p => pans.push(p),
       av: { CombatAudioMixer: { classify: () => 'B' },
@@ -258,5 +262,99 @@ async function lowHpWarn() {
   return { cases };
 }
 
+async function infer() {
+  const cases = [], check = checker(cases);
+  const legal = new Set(getFxTagOptions().map(o => o.name));
+  const sk = (name, type, extra = {}) => ({ name, type, power: 60, damageType: '近战', range: { type: '单体', castRange: 2 }, ...extra });
+  await check('AVP-C01 推断白名单内的名字全部是演出库合法名；专属演出不在可推断集合', () => {
+    for (const n of INFERABLE_FX) assert.ok(legal.has(n), n);
+    for (const n of ['克虏伯重狙', '极地暴风雪', '维度撕裂', '时空扭曲震荡', '圣光01', '净蚀反冲', '火焰领域']) assert.ok(!INFERABLE_FX.includes(n), n);
+  });
+  await check('AVP-C02 顺序：显式「无」与合法名不动；非法名别名/就近纠正；未写按关键词', () => {
+    assert.equal(inferFxTag(sk('砍', '[伤害]', { fxTag: '无' }), { legal }), null);
+    assert.equal(inferFxTag(sk('砍', '[伤害]', { fxTag: '克虏伯重狙' }), { legal }), null);
+    assert.equal(inferFxTag(sk('x', '[伤害]', { fxTag: '火球' }), { legal }).fxTag, '火焰');
+    assert.equal(inferFxTag(sk('x', '[伤害]', { fxTag: '冰霜弹' }), { legal }).fxTag, '冰霜');
+    assert.equal(inferFxTag(sk('x', '[伤害]', { fxTag: '爪击·重' }), { legal }).fxTag, '爪击');
+    const r = inferFxTag(sk('撕裂利爪', '[伤害]'), { legal });
+    assert.deepEqual([r.fxTag, r.reason], ['爪击', 'keyword']);
+  });
+  await check('AVP-C03 元素优先于枪械：火焰弹→火焰、冰霜子弹→冰霜、鹿弹齐射→霰弹', () => {
+    assert.equal(inferFxTag(sk('火焰弹', '[伤害]', { damageType: '远程' }), { legal }).fxTag, '火焰');
+    assert.equal(inferFxTag(sk('冰霜子弹', '[伤害]', { damageType: '远程' }), { legal }).fxTag, '冰霜');
+    assert.equal(inferFxTag(sk('鹿弹齐射', '[伤害]', { damageType: '远程' }), { legal }).fxTag, '霰弹');
+    assert.equal(inferFxTag(sk('毒雾吐息', '[伤害]', { range: { type: '扇形', length: 4, angle: 60 } }), { legal }).fxTag, '毒雾');
+  });
+  await check('AVP-C04 升档：Charge / 首领 / 单段 power≥140 任一满足才升档', () => {
+    const fire = sk('烈焰冲击', '[伤害]', { damageType: '法术' });
+    assert.equal(inferFxTag(fire, { legal }).fxTag, '火焰');
+    assert.equal(inferFxTag({ ...fire, charge: 2 }, { legal }).fxTag, '火焰01');
+    assert.equal(inferFxTag(fire, { legal, boss: true }).fxTag, '火焰01');
+    assert.equal(inferFxTag({ ...fire, power: 140 }, { legal }).fxTag, '火焰01');
+    assert.equal(inferFxTag({ ...fire, power: 139 }, { legal }).fxTag, '火焰');
+  });
+  await check('AVP-C05 兜底：范围 × 伤害类型；辅助技能按回复/增益/减益/再动', () => {
+    assert.equal(inferFxTag(sk('重拳', '[伤害]', { name: '无名一击', power: 120 }), { legal }).fxTag, '近战重击');
+    assert.equal(inferFxTag(sk('无名一击', '[伤害]', { damageType: '远程', range: { type: '单体', castRange: 10 } }), { legal }).fxTag, '枪击');
+    assert.equal(inferFxTag(sk('无名一击', '[伤害]', { damageType: '法术', range: { type: '圆形', radius: 3 } }), { legal }).fxTag, 'group:spell');
+    assert.equal(inferFxTag(sk('祷言', '[回复]', { range: { type: '单体', castRange: 4 } }), { legal }).fxTag, '单体回复');
+    assert.equal(inferFxTag(sk('战歌', '[增攻]', { range: { type: '圆形', radius: 4 } }), { legal }).fxTag, '群体增益');
+    assert.equal(inferFxTag(sk('疾行', '[再动]', { range: { type: '自身' } }), { legal }).fxTag, '再动加速');
+  });
+  await check('AVP-C06 典型对局：显式标签全部保留；去掉全部标签后 6 名敌人至少 4 种首技能演出', () => {
+    const block = parseYamlText(readFileSync(path.join(SRC, '..', '..', 'doc', 'tactics', '典型对局-战棋版.yaml'), 'utf8'));
+    const units = [...block.heroes, ...block.enemies];
+    const before = JSON.stringify(units.map(u => (u.skills || []).map(s => s.fxTag)));
+    const n = units.reduce((k, u) => k + applyFxInference(u.skills, { legal, boss: u.level === '首领' }) + applyFxInference(u.items, { legal, boss: u.level === '首领' }), 0);
+    assert.equal(n, 0, '显式合法标签不应被改');
+    assert.equal(JSON.stringify(units.map(u => (u.skills || []).map(s => s.fxTag))), before);
+    const first = new Set(block.enemies.map(u => { const s = (u.skills || []).find(x => !x.isGroup); const r = s && inferFxTag({ ...s, fxTag: null }, { legal }); return r ? r.fxTag : null; }));
+    assert.ok(first.size >= 4, [...first].join(','));
+  });
+  await check('AVP-C07 元素判定：特效标签优先，再看伤害类别槽，最后按伤害类型', () => {
+    assert.equal(skillElement({ fxTag: '火焰01', type: '[伤害]' }), 'fire');
+    assert.equal(skillElement({ fxTag: '枪击', type: '[伤害]' }), 'gun');
+    assert.equal(skillElement({ type: '[冰霜]' }), 'frost');
+    assert.equal(skillElement({ type: '[伤害]', damageType: '法术' }), 'arcane');
+    assert.equal(skillElement({ type: '[回复]' }), null);
+    assert.equal(unitElement({ skills: [{ type: '[伤害]', power: 20, fxTag: '爪击' }, { type: '[伤害]', power: 90, fxTag: '雷击' }] }), 'thunder');
+  });
+  await check('AVP-C08 编辑器显示「（推断）」，显式选「无」存为「无」不再被补回；编辑覆写清推断标记', () => {
+    const ep = read('editor-panel.mjs'), main = read('main.mjs');
+    assert.ok(ep.includes("label + '（推断）'"));
+    assert.ok(ep.includes("s.fxTag = val(id('fxTag')) || '无';"));
+    assert.ok(main.includes('delete row.fxTagInferred;'));
+    assert.ok(main.includes('inferUnitFx(nextView.units);'));
+  });
+  return { cases };
+}
+
+async function looks() {
+  const cases = [], check = checker(cases);
+  const main = read('main.mjs'), uv = read('unit-view.mjs'), css = readFileSync(path.join(SRC, '..', 'tactics.css'), 'utf8'), marks = read('battle-marks.mjs'), ad = read('action-director.mjs');
+  await check('AVP-E01 敌人徽章：显式首领/精英优先于强度分级；特性至多 3 个，复活用尽与蜕皮已触发灰显', () => {
+    assert.ok(main.includes("const tier = u.level === '首领' ? 'boss' : u.level === '精英' ? 'elite' : u.level === '杂兵' ? 'fodder'"));
+    assert.ok(main.includes('.slice(0, 3)'));
+    assert.ok(main.includes("(n === '复活' && !((u.ref.reviveCount || 0) > 0)) || (n === '蜕皮' && !!u.ref.molted)"));
+    assert.ok(uv.includes("'<i class=\"t-unit-tierframe\" aria-hidden=\"true\"></i><b class=\"t-unit-traits\"></b>'"));
+    for (const k of ['.t-badge-elite .t-unit-tierframe', '.t-badge-boss .t-unit-tierframe', '.t-trait-spent']) assert.ok(css.includes(k), k);
+  });
+  await check('AVP-E02 留痕：上限 40、3 回合淡出、种子决定形态（同键同种子）', () => {
+    assert.ok(marks.includes('MAX_MARKS = 40') && marks.includes('LIFE = ROUND_TIME * 3'));
+    assert.equal(seedOf('seg-1:0'), seedOf('seg-1:0'));
+    assert.notEqual(seedOf('seg-1:0'), seedOf('seg-1:1'));
+    assert.ok(ad.includes('if (c && seg.hit && seg.hpDmg > 0) addMark('));
+    assert.ok(main.includes('director.ageMarks(snap.now);'));
+  });
+  await check('AVP-E03 光照分级：L3/L4 8m 600ms，L2 4m 450ms，其余 2m 300ms；枪口闪光', () => {
+    assert.deepEqual(lightTier('L4'), { radius: 8, ms: 600 });
+    assert.deepEqual(lightTier('L3'), { radius: 8, ms: 600 });
+    assert.deepEqual(lightTier('L2'), { radius: 4, ms: 450 });
+    assert.deepEqual(lightTier('identity'), { radius: 2, ms: 300 });
+    assert.ok(ad.includes("if (element === 'gun') flash(centerOf(result.casterId), 'gun', { radius: 1, ms: 160 }, 0.7);"));
+  });
+  return { cases };
+}
+
 export const groups = { 'AVP-SPEED': { run: speed }, 'AVP-VENDOR': { run: vendor }, 'AVP-DIRECTOR': { run: director },
-  'AVP-THREAT': { run: threat }, 'AVP-LOWHP': { run: lowHpWarn } };
+  'AVP-THREAT': { run: threat }, 'AVP-LOWHP': { run: lowHpWarn }, 'AVP-INFER': { run: infer }, 'AVP-LOOKS': { run: looks } };

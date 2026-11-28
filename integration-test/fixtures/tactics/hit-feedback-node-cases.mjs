@@ -126,7 +126,7 @@ export const groups = {
     try {
       const director = createActionDirector({
         sandbox: { getScope: () => scope, getUnitView: () => view, unitWorldCenter: id => ({ x: units.findIndex(u => u.id === id) + 1, y: 2 }),
-          async guideTo() {}, getDom: () => ({ world: { insertBefore() {}, appendChild() {} }, unitLayer: {} }) },
+          async guideTo() {}, getDom: () => ({ world: { insertBefore() {}, appendChild() {} }, art: {}, unitLayer: {} }) },
         getViewData: () => ({ units, placementsById: { c: {}, a: {}, b: {} }, footprintsById: {} }),
         avHost: { syncRoster() {}, entity: id => ({ id }), av: { CombatAudioMixer: { classify: () => 'B' },
           CombatAudioDirector: { beginAction: () => 77, beginWave: targets => { const w = { id: 'w' + (waves.length + 1), targets }; waves.push(w); return w; },

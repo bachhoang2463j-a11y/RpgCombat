@@ -17,7 +17,7 @@ check('零外部import', !/\bimport\s*(?:\(|[{*'"\w])/.test(scripts[0][1]));
 check('伤害槽与父子菜单分类及阵营收益修复入包', html.includes('some(isAttackSkill)') && html.includes('skillSlots(skill).some') && /\bbeneficial\s*=\s*def\.debuff/.test(html));
 check('唯一显式特效协议与中性反馈入包', /id:\s*["']neutral-impact["']/.test(html) && /pool\.find\(e\s*=>\s*e\.fxTags\?\.includes\(input\.fxTag\)\)/.test(html) && !html.includes('SUBTYPE_RE'));
 check('原版逐发记录与转火专用预览入包', html.includes('result.shots') && /previewRetarget\(r\.skill,\s*a,\s*r\.casterId,\s*r\.slotIndex\)/.test(html) && html.includes('segment.shotIndex'));
-check('编辑器特效清单来自注册表', html.includes('function getFxTagOptions()') && html.includes('[...getFxTagOptions()]') && html.includes('fxOptions(s.fxTag)'));
+check('编辑器特效清单来自注册表', html.includes('function getFxTagOptions()') && html.includes('[...getFxTagOptions()]') && html.includes('fxOptions(s.fxTag,s.fxTagInferred)'));
 check('空霰弹与群体规则区域适配入包', html.includes('suppressImpact') && html.includes('areaBounds'));
 check('原版辅助SVG及四类动画入包', ['playGenericSupportFx', 'spawnHealParticles', 'anim-heal', 'anim-buff', 'anim-shield', 'anim-mp', '35,15 L65,15', '50,5 85,25'].every(s => html.includes(s)));
 check('辅助真实结果与持久标签回读入包', ['playSupportEffects', 'supportResourceDelta', 'applyPersistentFxTags', 'SUPPORT_BUFF', 'SUPPORT_EFFECT'].every(s => html.includes(s)));

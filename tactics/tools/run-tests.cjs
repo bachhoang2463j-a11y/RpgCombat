@@ -173,7 +173,7 @@ const STAGES = {
   },
   'av-polish': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'av-polish-node-cases.mjs'),
-    groups: ['AVP-SPEED', 'AVP-VENDOR', 'AVP-DIRECTOR', 'AVP-THREAT', 'AVP-LOWHP'], modules: [], requiredExports: [],
+    groups: ['AVP-SPEED', 'AVP-VENDOR', 'AVP-DIRECTOR', 'AVP-THREAT', 'AVP-LOWHP', 'AVP-INFER', 'AVP-LOOKS'], modules: [], requiredExports: [],
   },
   feedback05: {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'feedback05-node-cases.mjs'),

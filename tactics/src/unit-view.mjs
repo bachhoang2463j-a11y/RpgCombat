@@ -89,6 +89,7 @@ export function createUnitView(parent, deps) {
         '<div class="t-unit-medal">' + WINGS_HTML + face +
           '<b class="t-unit-auras" aria-hidden="true"></b>' +
           '<i class="t-unit-shield" aria-hidden="true"></i>' +
+          (unit.side === 'enemy' ? '<i class="t-unit-tierframe" aria-hidden="true"></i><b class="t-unit-traits"></b>' : '') +
           (unit.side === 'enemy' ? '<b class="t-unit-alert" title="预警" aria-label="预警">' +
             '<svg class="t-alert-ring" viewBox="-50 -50 100 100" aria-hidden="true"><circle class="t-alert-arc" r="46" pathLength="100"/><circle class="t-alert-tick" r="40" pathLength="100"/></svg>' +
             '<svg class="t-alert-eye" viewBox="-16 -9 32 18" aria-hidden="true"><path d="M-15,0 Q0,-11 15,0 Q0,11 -15,0 Z"/><ellipse rx="2.4" ry="6.2"/></svg>' +
@@ -136,6 +137,7 @@ export function createUnitView(parent, deps) {
       predictBar: billboard.querySelector('.t-bar-predict'), predictTag: billboard.querySelector('.t-unit-predict-tag'),
       shield: billboard.querySelector('.t-unit-shield'), shieldShown: (unit.bars && unit.bars.shield) || 0,
       alert: billboard.querySelector('.t-unit-alert'), charge: billboard.querySelector('.t-unit-charge'),
+      traits: billboard.querySelector('.t-unit-traits'), badgeKey: '',
       auras: billboard.querySelector('.t-unit-auras'), auraKey: '',
       unit, placement, bars: unit.bars || null, motionLock: false, displayFacing: null,
     };
@@ -255,6 +257,18 @@ export function createUnitView(parent, deps) {
     applyFacing(rec);
   }
   function setFlag(id, cls, on) { const rec = nodes.get(id); if (rec) rec.root.classList.toggle(cls, !!on); }
+  // 敌方徽章：分级外框（fodder/elite/boss）+ 主元素底色 + 至多 3 个特性角标（spent=已用掉，灰显）
+  function setBadge(id, badge) {
+    const rec = nodes.get(id);
+    if (!rec || !rec.traits) return;
+    const key = JSON.stringify(badge);
+    if (rec.badgeKey === key) return;
+    rec.badgeKey = key;
+    for (const t of ['fodder', 'elite', 'boss']) rec.root.classList.toggle('t-badge-' + t, badge.tier === t);
+    if (badge.color) rec.medal.style.setProperty('--elem', badge.color); else rec.medal.style.removeProperty('--elem');
+    rec.traits.innerHTML = (badge.traits || []).map((t, i) =>
+      '<i class="t-trait' + (t.spent ? ' t-trait-spent' : '') + '" style="--i:' + i + ';--c:' + t.color + '" data-tagtip-title="【' + escapeHtml(t.name) + '】" data-tagtip-body="' + escapeHtml(t.tip) + '">' + escapeHtml(t.icon) + '</i>').join('');
+  }
   function setCharge(id, charge) {
     const rec = nodes.get(id);
     if (!rec || !rec.charge) return;
@@ -322,5 +336,5 @@ export function createUnitView(parent, deps) {
   }
 
   return { setUnits, syncUnits, updateUnit, setFacing, onCameraChange, getEntitySpriteDom, nodes,
-    lockMotion, setDisplayPos, setDisplayFacing, setFlag, clearFlag, setHop, setCharge, setStatus, setPredict, clearPredict, setShield, setAuras, pulseAlert, pulseOutcome };
+    lockMotion, setDisplayPos, setDisplayFacing, setFlag, clearFlag, setHop, setCharge, setBadge, setStatus, setPredict, clearPredict, setShield, setAuras, pulseAlert, pulseOutcome };
 }

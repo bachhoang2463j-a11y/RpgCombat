@@ -79,18 +79,19 @@ export function createEditorPanel({ rpgUi, shell, globalHtml, validate, onSave, 
       '<label title="敌方大招充能：每个自然行动末 +1，满后下次行动优先释放；与[延迟]准备无关"><span>充能</span><input type="number" min="0" id="edit-' + ns + '-charge" value="' + (s.charge || 0) + '" class="edit-input-game w-12 font-mono-num text-right text-cyan-100 text-[10px] py-0.5 px-1"><em>回合</em></label></div>' +
       slotSelfHtml(ns, s);
   }
-  function fxOptions(value) {
+  function fxOptions(value, inferred = false) {
+    if (value === '无') value = '';
     const options = [...getFxTagOptions()];
     if (value && !options.some(({ name }) => name === value)) {
       options.push({ name: value, label: value + '（未知特效）' });
     }
     return [{ name: '', label: '特效:无' }, ...options].map(({ name, label }) =>
-      '<option value="' + E(name) + '"' + ((value || '') === name ? ' selected' : '') + '>' + E(label) + '</option>').join('');
+      '<option value="' + E(name) + '"' + ((value || '') === name ? ' selected' : '') + '>' + E(inferred && name && name === value ? label + '（推断）' : label) + '</option>').join('');
   }
   function skillBody(ns, s) {
     const fields = rpgUi.buildSkillFormFieldsHtml(ns, s, '');
     const fxSelect = /(<select id="edit-[^"]+-fxTag"[^>]*>)[\s\S]*?(<\/select>)/;
-    return moduleG(ns, s) + fields.replace(fxSelect, (_, open, close) => open + fxOptions(s.fxTag) + close);
+    return moduleG(ns, s) + fields.replace(fxSelect, (_, open, close) => open + fxOptions(s.fxTag, s.fxTagInferred) + close);
   }
 
   // 槽标签预览统一走官方规范名（输入别名可接受，显示只规范）：'[单体(枪击)]' → '[伤害(枪击)]'
@@ -179,7 +180,7 @@ export function createEditorPanel({ rpgUi, shell, globalHtml, validate, onSave, 
       h += '<div class="sm:col-span-2 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">属性</span><select id="edit-' + ns + '-dmgType" class="edit-input-game w-full text-orange-300 font-bold py-1 text-xs">' +
         [['', '无(近战)'], ['近战', '🗡️ 近战'], ['远程', '🎯 远程'], ['法术', '⚡ 法术']].map(([v, l]) => '<option value="' + v + '"' + ((it.damageType || '') === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></div>';
       h += '<div class="sm:col-span-3 flex items-center gap-1"><span class="text-slate-400 text-[10px] whitespace-nowrap">特效</span><select id="edit-' + ns + '-fxTag" class="edit-input-game w-full text-yellow-300 font-bold py-1 text-xs">' +
-        fxOptions(it.fxTag) + '</select></div>';
+        fxOptions(it.fxTag, it.fxTagInferred) + '</select></div>';
       h += '<div class="sm:col-span-12 flex items-center gap-1.5 flex-wrap">' + pill(ns + '-others', it.isOthers, 'border-emerald-500 text-emerald-300 bg-emerald-950/70', '👥', '他人') +
         pill(ns + '-guaranteed', it.guaranteedHit, 'border-rose-500 text-rose-300 bg-rose-950/70', '🎯', '必中') + pill(ns + '-legendary', it.isLegendary, 'border-amber-500 text-amber-300 bg-amber-950/70', '✦', '传奇') +
         pill(ns + '-highTier', !it.isLegendary && it.isHighTier, 'border-violet-500 text-violet-300 bg-violet-950/70', '⬥', '高阶') +
@@ -309,7 +310,7 @@ export function createEditorPanel({ rpgUi, shell, globalHtml, validate, onSave, 
     s.isOthers = chk(id('others')); s.guaranteedHit = chk(id('guaranteed')); s.switchTarget = chk(id('switch'));
     s.critRate = Math.max(0, Math.min(100, num(id('crit'))));
     const leg = chk(id('legendary')); s.isLegendary = leg; s.isHighTier = leg ? false : chk(id('highTier'));
-    s.damageType = val(id('dmgType')); s.fxTag = val(id('fxTag')) || null;
+    s.damageType = val(id('dmgType')); s.fxTag = val(id('fxTag')) || '无';   // 显式选「无」保存为「无」：推断不会再补回
     s.cost = num(id('cost')); s.hpCost = num(id('hpCost')); s.tpCost = num(id('tpCost')); s.hit = num(id('hit'), 100);
     s.turns = val(id('turns')) !== '' ? Number(val(id('turns'))) : null;
     s.delay = num(id('delay')); s.haste = num(id('haste')); s.maxUses = num(id('limit'));
@@ -340,7 +341,7 @@ export function createEditorPanel({ rpgUi, shell, globalHtml, validate, onSave, 
     const id = k => 'edit-' + ns + '-' + k;
     it.name = val(id('name')); it.category = val(id('category'));
     if (it.category === '道具') it.maxUses = num(id('stock')); else it.count = num(id('stock'));
-    it.damageType = val(id('dmgType')) || null; it.fxTag = val(id('fxTag')) || null;
+    it.damageType = val(id('dmgType')) || null; it.fxTag = val(id('fxTag')) || '无';
     it.isOthers = chk(id('others')); it.guaranteedHit = chk(id('guaranteed'));
     const leg = chk(id('legendary')); it.isLegendary = leg; it.isHighTier = leg ? false : chk(id('highTier'));
     it.hit = num(id('hit'), 100); it.critRate = Math.max(0, Math.min(100, num(id('crit'))));
