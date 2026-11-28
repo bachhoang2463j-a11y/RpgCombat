@@ -1146,3 +1146,10 @@
 - 验证：唯一源码全量 1643 项通过，成品配乐 17/17 和双倍增益/无回合等待专项通过，70 模块成品 SHA256 `a55dec5d…`。IAB 普通定位点击超时，实际音乐按钮事件打开低档自动面板，成品正式 endTurn 入口从玛德琳推进至斥候。未实听、未进酒馆；不修改 README。
 - 目的 vs 现状：三项要求已落实并打包，试听反馈由用户确认。
 
+## 2026-11-28 · 特效音效规则软化与遗留回归报告收尾（cf97f91）
+- 原因：工作区遗留三处未提交的文档/报告改动（音效规则软化与两份回归报告刷新），统一收尾入库；对应业务轮次此前均已各自记录并推送。
+- 行为：`.agents/skills/svg-skill-vfx/SKILL.md` 音效条目由「除非用户明确要求否则禁用 Web Audio 合成音」软化为「优先复用/检索抓取真实专业素材，实在找不到现成资源时再使用 WebAudio 合成」，多模态试听与混音管控要求不变；`MVP-2026-11-21-node.json` 刷新为 fc765f0 轮 `--all` 记录（1578 通过 0 失败，含 42494ca 新增 tactical-followup 13 项）；`TYPICAL-BATTLE-artifact.json` 刷新为 0d0553d 轮产物记录（segment-resolved 新增 `guardBroken` 分档招架字段，产物 52beb150… / 2,461,215 B）。
+- 文件：`.agents/skills/svg-skill-vfx/SKILL.md`、`integration-test/fixtures/tactics/reports/MVP-2026-11-21-node.json`、`integration-test/fixtures/tactics/reports/TYPICAL-BATTLE-artifact.json`。
+- 验证：纯文档/报告收尾轮次，不重跑测试、不重打包；报告数字为对应轮次当时的实测记录。
+- 目的 vs 现状：已跟踪文件的遗留改动全部入库，工作区仅剩刻意保留的本地笔记与素材类未跟踪文件；README 仍待用户实际验收后统一更新。
+
