@@ -175,7 +175,31 @@ export async function runBgmCases({ tracks = BGM_TRACKS, pools = BGM_POOLS, come
     director.destroy();
   });
 
-  await check('BGM-05 默认八方旅人主题从零流式起播，最近两首不重复，手动锁跨局', async () => {
+  await check('BGM-05 战斗外手动选曲与下一首正常播放，且不启动自动配乐', async () => {
+    const h = audioHarness(Director);
+    const d = h.director;
+    await d.unlock();
+    d.selectTrack('ot1-for-revenge');
+    await flush();
+    assert.equal(d.state().mode, 'manual');
+    assert.equal(d.state().track.id, 'ot1-for-revenge');
+    assert.equal(d.state().playing, true);
+    assert.equal(h.calls.filter(([kind]) => kind === 'play').length, 1);
+    d.nextTrack();
+    await flush();
+    await h.advance(1.1);
+    assert.equal(d.state().mode, 'manual');
+    assert.ok(d.state().track);
+    assert.equal(d.state().playing, true);
+    d.togglePause();
+    assert.equal(d.state().playing, false);
+    d.togglePause();
+    await flush();
+    assert.equal(d.state().playing, true);
+    d.destroy();
+  });
+
+  await check('BGM-06 默认八方旅人主题从零流式起播，最近两首不重复，手动锁跨局', async () => {
     const { director, calls, active, saved } = audioHarness(Director);
     assert.equal(DEFAULT_BGM_THEME, 'octopath');
     assert.equal(director.state().theme, 'octopath');

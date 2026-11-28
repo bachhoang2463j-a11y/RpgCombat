@@ -327,7 +327,7 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
   }
 
   function pump() {
-    if (!unlocked || paused || terminal || !battle || !queued || job) return;
+    if (!unlocked || paused || terminal || (mode !== 'manual' && !battle) || !queued || job) return;
     const intent = queued;
     queued = null;
     const standby = decks.find(deck => deck !== current);
@@ -343,7 +343,7 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
   }
 
   function enqueue(intent) {
-    if (!battle || terminal) return;
+    if (terminal || (!battle && mode !== 'manual')) return;
     queued = intent;
     if (job && !job.fading) cancelJob();
     pump();
