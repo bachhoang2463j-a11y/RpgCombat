@@ -2599,11 +2599,12 @@ const meleeHeavy = {
       landed.forEach(t => heavyFlinch(ctx, t.id, RAM_FLINCH, ang));
     };
     // ① 蓄力：重心后压 + 脚下尘环
+    const windup = ctx.finisherWindupMs || 220;
     const me = ctx.sandbox.getUnitView().nodes.get(ctx.casterId)?.sprite;
-    me?.animate([{ translate: '0 0', scale: '1' }, { translate: (-ux * 6).toFixed(1) + 'px ' + (-uy * 6).toFixed(1) + 'px', scale: '0.9 1.06', offset: 0.8 }, { translate: '0 0', scale: '1' }], { duration: 240, easing: 'ease-in' });
-    fx.ground(ringHtml(c.x, c.y, 1.6 * PX, 'rgba(251,191,36,0.55)', 'rgba(120,53,15,0.25)'), 300).firstChild
-      .animate([{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(.6)', opacity: 0.9 }], { duration: 240, fill: 'forwards' });
-    if (!(await ctx.wait(220))) return false;
+    me?.animate([{ translate: '0 0', scale: '1' }, { translate: (-ux * 6).toFixed(1) + 'px ' + (-uy * 6).toFixed(1) + 'px', scale: '0.9 1.06', offset: 0.8 }, { translate: '0 0', scale: '1' }], { duration: windup + 20, easing: 'ease-in' });
+    fx.ground(ringHtml(c.x, c.y, 1.6 * PX, 'rgba(251,191,36,0.55)', 'rgba(120,53,15,0.25)'), windup + 80).firstChild
+      .animate([{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(.6)', opacity: 0.9 }], { duration: windup + 20, fill: 'forwards' });
+    if (!(await ctx.wait(windup))) return false;
     ctx.releaseFinisher?.();
     fx.sfx('swish_3', 0.5);
     if (!charge) {
@@ -2711,7 +2712,7 @@ const rangedHeavy = {
   prepareKeys() { return ['herocharge', 'shot', 'hitDown']; },
   async play(ctx) {
     const { fx, hits, result } = ctx;
-    const CHARGE = 260, FLY = 110;
+    const CHARGE = ctx.finisherWindupMs || 260, FLY = 110;
     const cm = ctx.centerOf(ctx.casterId), tm = hits[0] ? ctx.centerOf(hits[0].targetId) : result.aim;
     const c = worldPx(cm), t = worldPx(tm), ang = Math.atan2(t.y - c.y, t.x - c.x), ux = Math.cos(ang), uy = Math.sin(ang);
     const m = { x: c.x + ux * 24, y: c.y + uy * 24 }, landed = hits.filter(h => h.hit);
@@ -2754,10 +2755,11 @@ const gunshotPierce = {
     const dx = t.x - c.x, dy = t.y - c.y, len = Math.max(1, Math.hypot(dx, dy)), ux = dx / len, uy = dy / len, ang = Math.atan2(dy, dx);
     const landed = hits.filter(h => h.hit);
     const m = { x: c.x + ux * 22, y: c.y + uy * 22 }, over = { x: t.x + ux * 150, y: t.y + uy * 150 };
-    fx.top(orbHtml(m.x, m.y, 34, 'rgba(56,189,248,0.85)', '#f0f9ff'), 320).firstChild
-      .animate([{ transform: 'scale(1.6)', opacity: 0 }, { transform: 'scale(.55)', opacity: 1, offset: 0.85 }, { transform: 'scale(.3)', opacity: 1 }], { duration: 300, easing: 'cubic-bezier(.5,0,.8,.6)', fill: 'forwards' });
-    particles(fx, Array.from({ length: 10 }, () => { const a = rnd(0, TAU), d = rnd(26, 46); return { x: m.x + Math.cos(a) * d, y: m.y + Math.sin(a) * d, dx: -Math.cos(a) * d, dy: -Math.sin(a) * d, size: rnd(4, 7), color: '#7dd3fc', core: '#ffffff', s0: 1, s1: 0.3, dur: rnd(220, 290) }; }), 320);
-    if (!(await ctx.wait(300))) return false;
+    const windup = ctx.finisherWindupMs || 300;
+    fx.top(orbHtml(m.x, m.y, 34, 'rgba(56,189,248,0.85)', '#f0f9ff'), windup + 20).firstChild
+      .animate([{ transform: 'scale(1.6)', opacity: 0 }, { transform: 'scale(.55)', opacity: 1, offset: 0.85 }, { transform: 'scale(.3)', opacity: 1 }], { duration: windup, easing: 'cubic-bezier(.5,0,.8,.6)', fill: 'forwards' });
+    particles(fx, Array.from({ length: 10 }, () => { const a = rnd(0, TAU), d = rnd(26, 46); return { x: m.x + Math.cos(a) * d, y: m.y + Math.sin(a) * d, dx: -Math.cos(a) * d, dy: -Math.sin(a) * d, size: rnd(4, 7), color: '#38bdf8', core: '#ffffff', s0: 1, s1: 0.3, dur: rnd(220, windup - 10) }; }), windup + 20);
+    if (!(await ctx.wait(windup))) return false;
     ctx.releaseFinisher?.();
     fx.sfx('gunshot_pierce', 0.75); fx.shake('heavy');
     gunFlash(fx, m, ang, { size: 48, ms: 210 });

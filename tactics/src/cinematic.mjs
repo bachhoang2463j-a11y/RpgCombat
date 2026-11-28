@@ -93,13 +93,15 @@ export function planKillBeat(result, caster, units) {
   return { lethal, focus };
 }
 
+export const KILL_TIMING = { push: 345, pull: 435, cutin: 570, stop: 210, tail: 500 };
+
 export function startKillCamera(sandbox, from, to) {
   const home = sandbox.getPose();
-  sandbox.cameraTo(sandbox.poseAt(from.x, from.y, home.scale * 1.24), 115);
+  sandbox.cameraTo(sandbox.poseAt(from.x, from.y, home.scale * 1.24), KILL_TIMING.push);
   return () => {
     const frame = sandbox.poseFrame([from, to], { pad: 2 });
     const pose = frame.scale <= home.scale ? frame : sandbox.poseAt((from.x + to.x) / 2, (from.y + to.y) / 2, home.scale);
-    return sandbox.cameraTo(pose, 145);
+    return sandbox.cameraTo(pose, KILL_TIMING.pull);
   };
 }
 

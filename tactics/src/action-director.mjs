@@ -16,7 +16,7 @@ import { registerDefaultFx, EXTRA_AUDIO, fogFieldHtml, animateFogField, elementF
 import { createVfxHost } from './vfx-host.mjs';
 import { skillSlots } from './effect-definitions.mjs';
 import { startAtmos, atmosStyleOf } from './screen-atmos.mjs';
-import { startCine, planKillBeat, startKillCamera, killPortraitSweep } from './cinematic.mjs';
+import { startCine, planKillBeat, startKillCamera, killPortraitSweep, KILL_TIMING } from './cinematic.mjs';
 import { GUARD_AUDIO_KEYS, BARRIER_AUDIO_KEYS, playGuardDash, playGuardBlock, mountBarrierDome, updateBarrierBadge,
   playBarrierRaise, playBarrierHit, playBarrierBlocked, playBarrierShatter, fadeBarrierDome } from './guard-barrier-fx.mjs';
 import { effectFloat, variantFloat, expireFloat } from './status-ui.mjs';
@@ -26,7 +26,6 @@ import { createBattleMarks, lightTier, seedOf } from './battle-marks.mjs';
 import { skillElement, ELEMENT_COLORS } from './fx-infer.mjs';
 
 export const WINDUP_BEAT_MS = 330;   // 回合制敌方前摇拍点（OMEN_BEAT）：起手后此刻出手
-const KILL_STOP_MS = 70;
 const KILL_IMPACT = { '近战': 'parry_heavy', '远程': 'hitDown', '法术': 'mx_deep_impact' };
 
 // 演出身份只来自显式特效标签；伤害类型与旧括号不参与选择。
@@ -535,15 +534,15 @@ export function createActionDirector(deps) {
     const killFrom = kill.focus && centerOf(result.casterId), killTo = kill.focus && centerOf(kill.focus.targetId);
     let pullKill = !atmos && killFrom && killTo && !sandbox.cameraTouched?.() ? startKillCamera(sandbox, killFrom, killTo) : null;
     const portrait = kill.focus?.cutin ? portraitOf(result.casterId)?.img : null;
-    const portraitMs = portrait ? 190 : 0;
-    if (portrait) killPortraitSweep(makeFx(audioContext.category), portrait, portraitMs, getTimeScale());
+    if (portrait) killPortraitSweep(makeFx(audioContext.category), portrait, KILL_TIMING.cutin, getTimeScale());
+    const finisherWindupMs = atmos ? 0 : portrait ? KILL_TIMING.cutin : pullKill ? KILL_TIMING.push : 0;
     function releaseFinisher() {
       if (!pullKill || !isCurrent()) return;
       pullKill();
       pullKill = null;
     }
-    if (!atmos && !entry.finisherCue && (pullKill || portrait)) {
-      if (!(await wait(portraitMs || 115)) || !isCurrent()) return false;
+    if (!entry.finisherCue && finisherWindupMs) {
+      if (!(await wait(finisherWindupMs)) || !isCurrent()) return false;
       releaseFinisher();
     }
 
@@ -707,10 +706,11 @@ export function createActionDirector(deps) {
       if (finisher) {
         if (!killWaves.has(waveIndex)) {
           killWaves.add(waveIndex);
-          microStop(result.casterId, targetId, KILL_STOP_MS);
+          // 同拍新挂的后仰／后坐也纳入定格；不拦飘字和重击声。
+          queueMicrotask(() => { if (isCurrent()) microStop(result.casterId, targetId, KILL_TIMING.stop); });
         }
-        // 倒下动作在接触稍后起播；短技能也给它留一拍，再交给旧击杀特写。
-        killTail = wait(360);
+        // 短技能也等倒下动作露出来，再交给旧击杀特写。
+        killTail = wait(KILL_TIMING.tail);
       } else if (!healed && !seg.barrierHitId) microStop(result.casterId, targetId, hitStopMs(r));
       if (!healed && !seg.barrierHitId) {
         const c = centerOf(targetId);
@@ -817,7 +817,7 @@ export function createActionDirector(deps) {
       charge: charge && { ...charge, footprint: vd.footprintsById[charge.unitId] }, playCharge,
       audioContext, outcomeMap: new Map(hits.map(h => [h.targetId, h.hit ? 'hit' : 'dodge'])),
       fx: makeFx(audioContext.category, audioContext),
-      wait, tween, awaitHandle, hold, releaseFinisher, after: (ms, fn) => scope().after(ms, fn),
+      wait, tween, awaitHandle, hold, releaseFinisher, finisherWindupMs, after: (ms, fn) => scope().after(ms, fn),
       reveal, revealSegment, revealEffect, revealGuard, revealRule, revealRegion,
       awaitCounters: () => counterRun,
       awaitShotFeedback: async () => {

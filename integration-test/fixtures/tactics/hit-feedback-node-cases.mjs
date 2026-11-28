@@ -6,7 +6,7 @@ import { buildHitFeedback, resolveWindupKind, createActionDirector } from '../..
 import { avatarScaleForZoom } from '../../../tactics/src/unit-view.mjs';
 import { linkSkillGroupRows } from '../../../tactics/src/main.mjs';
 import { skillSlots } from '../../../tactics/src/effect-definitions.mjs';
-import { planKillBeat } from '../../../tactics/src/cinematic.mjs';
+import { planKillBeat, startKillCamera, killPortraitSweep, KILL_TIMING } from '../../../tactics/src/cinematic.mjs';
 
 const source = readFileSync(new URL('../../../tactics/src/vendor/rpg-av/rpg-av.mjs', import.meta.url), 'utf8');
 const start = source.indexOf('    const HIT_HOLD_MS =');
@@ -176,6 +176,18 @@ export const groups = {
       const p = planKillBeat({ ...result, hits: [{ targetId: 'e', segments: [{ ...lethal, ...change }] }] }, caster, [enemy]);
       cases.push(ok('THIT ' + label + '不冒充真实击杀', !p.lethal.size && p.focus === null));
     }
+    const moves = [];
+    const from = { x: 2, y: 3 }, to = { x: 7, y: 3 };
+    const pull = startKillCamera({ getPose: () => ({ scale: 1 }), poseAt: (x, y, scale) => ({ x, y, scale }),
+      poseFrame: () => ({ x: 4.5, y: 3, scale: 0.8 }), cameraTo: (pose, ms) => moves.push({ pose, ms }) }, from, to);
+    cases.push(ok('THIT 前推独立占 345ms，直到出手才启动 435ms 拉远', moves.length === 1 && moves[0].pose.x === from.x && moves[0].ms === 345));
+    pull();
+    cases.push(ok('THIT 拉远直接构图至双方，不跳回全图', moves.length === 2 && moves[1].pose.x === 4.5 && moves[1].ms === 435, json(moves)));
+    let bandMs, visibleMs;
+    const band = { firstChild: {}, animate: (_, options) => { bandMs = options.duration; } };
+    killPortraitSweep({ screen: (_, ms) => { visibleMs = ms; return { firstChild: band, dataset: {}, style: {} }; } }, 'portrait.png', KILL_TIMING.cutin, 1);
+    cases.push(ok('THIT 头像横切显示 570ms、致死局部停 210ms，特写在顿帧后接管',
+      bandMs === 570 && visibleMs === 570 && KILL_TIMING.stop === 210 && KILL_TIMING.tail > KILL_TIMING.stop));
     return { cases };
   } },
   'THIT-02': { run() {
