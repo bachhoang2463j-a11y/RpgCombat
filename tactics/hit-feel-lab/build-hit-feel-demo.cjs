@@ -226,7 +226,7 @@ export function startKillCamera(sandbox, from, to, fx) {
     const demoCharge = () => {
       if (!isCurrent()) return;
       const fx = makeFx(audioContext.category, audioContext);
-      fx.sfx(chargeKey, chargeKey === 'herocharge' ? 0.68 : 0.55);
+      window.__HIT_DEMO_FX__.playChargeSound(fx, chargeKey);
       window.__HIT_DEMO_FX__.playKillCharge(fx, killFrom, KILL_TIMING.cast);
     };`,
         'director:chargeBeat'
@@ -344,6 +344,9 @@ export function startKillCamera(sandbox, from, to, fx) {
         ["fx.sfx('hitDown', heavy ? 0.6 : 0.52); subBass(ctx, { type: 'sine', f0: 120, f1: 34, gain: heavy ? 0.6 : 0.45, ms: 260 });", 'slugImpact'],
       ]) s = mustReplace(s, cue, 'if (!ctx.demoLethal) { ' + cue + ' }', 'fxlib:' + label);
       s = mustReplace(s, "fx.sfx('herocharge', 0.4);", "if (!ctx.demoChargeScheduled) fx.sfx('herocharge', 0.4);", 'fxlib:rangedCharge');
+      s = mustReplace(s,
+        "fx.sfx('light_charge', 0.55);\n    worldDarken(fx, t, { holeR: 72,",
+        "window.__HIT_DEMO_FX__.playChargeSound(fx, 'light_charge');\n    worldDarken(fx, t, { holeR: 72,", 'fxlib:holyCharge');
       return { contents: s, loader: 'js' };
     });
 

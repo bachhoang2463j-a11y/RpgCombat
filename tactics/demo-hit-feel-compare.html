@@ -31898,7 +31898,7 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       const h = hits[0] || null;
       const t = worldPx(h ? ctx.centerOf(h.targetId) : result.aim), c = worldPx(ctx.centerOf(ctx.casterId));
       const sky = { x: t.x, y: t.y - 3.4 * PX2 };
-      fx.sfx("light_charge", 0.55);
+      window.__HIT_DEMO_FX__.playChargeSound(fx, "light_charge");
       worldDarken(fx, t, { holeR: 72, inMs: 500, holdMs: 2100, outMs: 700, peak: 0.86 });
       tint(fx, "radial-gradient(circle,rgba(0,0,0,0) 45%,rgba(120,72,8,.55))", { inMs: 800, holdMs: 1700, outMs: 800, peak: 0.55 });
       const beaconCtrl = { x: (c.x + sky.x) / 2, y: Math.min(c.y, sky.y) - 2.2 * PX2 };
@@ -36427,7 +36427,7 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       const demoCharge = () => {
         if (!isCurrent()) return;
         const fx = makeFx(audioContext.category, audioContext);
-        fx.sfx(chargeKey, chargeKey === "herocharge" ? 0.68 : 0.55);
+        window.__HIT_DEMO_FX__.playChargeSound(fx, chargeKey);
         window.__HIT_DEMO_FX__.playKillCharge(fx, killFrom, KILL_TIMING.cast);
       };
       function releaseFinisher() {
@@ -43112,6 +43112,9 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
     });
   }
   window.__HIT_DEMO_FX__ = {
+    playChargeSound(fx, key) {
+      fx.sfx(key, key === "herocharge" ? 1.5 : 1.25);
+    },
     playKillCharge(fx, from, ms) {
       const c = worldPx2(from);
       const sparks = Array.from({ length: 12 }, (_, i) => {
@@ -43318,7 +43321,7 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       const c = worldPx2(ctx.centerOf(ctx.casterId));
       const t = worldPx2(hits[0] ? ctx.centerOf(hits[0].targetId) : result.aim);
       const ang = Math.atan2(t.y - c.y, t.x - c.x) * 180 / Math.PI;
-      fx.sfx("light_charge", 0.55);
+      window.__HIT_DEMO_FX__.playChargeSound(fx, "light_charge");
       const pillar2 = fx.top(
         `<div style="position:absolute;left:${c.x}px;top:${c.y}px;width:72px;height:180px;transform:translate(-50%,-82%);background:radial-gradient(ellipse at 50% 80%,rgba(56,189,248,.92) 0%,rgba(14,165,233,.45) 45%,transparent 75%);mix-blend-mode:screen;filter:blur(2px);"></div>`,
         1150

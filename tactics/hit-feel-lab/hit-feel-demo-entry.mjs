@@ -156,6 +156,9 @@ function playScreenBlood(fx, ms = 1150) {
 
 // ---------- 八方旅人2 打击感与击杀破碎/蓄势核心效果器 ----------
 window.__HIT_DEMO_FX__ = {
+  playChargeSound(fx, key) {
+    fx.sfx(key, key === 'herocharge' ? 1.5 : 1.25);
+  },
   playKillCharge(fx, from, ms) {
     const c = worldPx(from);
     const sparks = Array.from({ length: 12 }, (_, i) => {
@@ -383,7 +386,7 @@ const SWORD_ULT_ENTRY = {
     const t = worldPx(hits[0] ? ctx.centerOf(hits[0].targetId) : result.aim);
     const ang = Math.atan2(t.y - c.y, t.x - c.x) * 180 / Math.PI;
     // ① 起势蓝焰柱 + 末段细金环极点内收
-    fx.sfx('light_charge', 0.55);
+    window.__HIT_DEMO_FX__.playChargeSound(fx, 'light_charge');
     const pillar = fx.top(
       `<div style="position:absolute;left:${c.x}px;top:${c.y}px;width:72px;height:180px;transform:translate(-50%,-82%);background:radial-gradient(ellipse at 50% 80%,rgba(56,189,248,.92) 0%,rgba(14,165,233,.45) 45%,transparent 75%);mix-blend-mode:screen;filter:blur(2px);"></div>`,
       1150
