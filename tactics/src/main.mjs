@@ -283,7 +283,7 @@ export function createApp(rootEl, opts = {}) {
   function bgmFrame(snap = battle.snapshot()) {
     return { terminal: snap.terminal, units: snap.units.map(u => {
       const { maxHp, isSummon } = battle.getEffectiveUnit(u.id);
-      return { id: u.id, side: u.side, primary: currentViewData.heroCardIds.has(u.id), isSummon,
+      return { id: u.id, side: u.side, level: unitById(u.id)?.level, primary: currentViewData.heroCardIds.has(u.id), isSummon,
         hp: u.hp, maxHp, shield: u.shield, status: u.status };
     }) };
   }
@@ -292,9 +292,10 @@ export function createApp(rootEl, opts = {}) {
     return { terminal: snap.terminal, units: (currentViewData?.units || []).map(u => {
       const s = shownOf(u), raw = byId.get(u.id);
       const { maxHp, isSummon } = battle.getEffectiveUnit(u.id);
-      return { id: u.id, side: u.side, primary: currentViewData.heroCardIds.has(u.id), isSummon,
-        hp: Math.max(0, s.hp ?? raw?.hp ?? 0), maxHp, shield: s.shield ?? raw?.shield ?? 0,
-        status: (s.hp ?? 1) <= 0 ? (u.side === 'hero' ? 'down' : 'dead') : (raw?.status || 'active') };
+      const hp = Math.max(0, s.hp ?? raw?.hp ?? 0);
+      return { id: u.id, side: u.side, level: u.level, primary: currentViewData.heroCardIds.has(u.id), isSummon,
+        hp, maxHp, shield: s.shield ?? raw?.shield ?? 0,
+        status: hp > 0 || raw?.status === 'active' ? 'active' : (u.side === 'hero' ? 'down' : 'dead') };
     }) };
   }
   function hasCombatChange(before, snap = battle.snapshot()) {
@@ -305,17 +306,17 @@ export function createApp(rootEl, opts = {}) {
       return p && !u.isSummon && (p.hp !== u.hp || p.shield !== u.shield || p.status !== u.status);
     });
   }
-  let liveBgmBefore = null;
+  let liveBgmBefore = null, liveBgmAction = null, liveBgmStart = null;
   const chargeThreatByCast = new WeakMap();
   function settleBgm(before, snap = battle.snapshot(), opts) {
-    bgm.syncBattle(bgmFrame(snap), ++settlementSeq, before, opts);
+    bgm.syncBattle(bgmFrame(snap), ++settlementSeq, before, { contactId: liveBgmAction, impactBefore: liveBgmStart || before, ...opts });
   }
   function settleLiveBgm(chargeThreat = false) {
     if (!liveBgmBefore) return;
     const after = liveBgmFrame();
     const prior = new Map(liveBgmBefore.units.map(u => [u.id, u]));
     if (!chargeThreat && !after.units.some(u => { const p = prior.get(u.id); return p && !u.isSummon && (p.hp !== u.hp || p.shield !== u.shield || p.status !== u.status); })) return;
-    bgm.syncBattle(after, ++settlementSeq, liveBgmBefore, { deferMedium: true, chargeThreat });
+    bgm.syncBattle(after, ++settlementSeq, liveBgmBefore, { contactId: liveBgmAction, impactBefore: liveBgmStart, chargeThreat });
     liveBgmBefore = after;
   }
   function endActionWithBgm() {
@@ -324,7 +325,7 @@ export function createApp(rootEl, opts = {}) {
     const before = bgmFrame();
     battle.endAction();
     const after = battle.snapshot();
-    if (hasCombatChange(before, after)) settleBgm(before, after, { deferMedium: true });
+    if (hasCombatChange(before, after)) settleBgm(before, after);
   }
 
   let musicPanel, musicRaf = 0, lastNonZeroVol = 0.30;
@@ -705,7 +706,7 @@ export function createApp(rootEl, opts = {}) {
     const unchanged = !forceReset && currentViewData && result.branch === 'resume' && currentViewData.sceneId === nextView.sceneId && currentViewData.battleId === nextView.battleId && JSON.stringify([currentViewData.scene, currentViewData.units, currentViewData.placementsById]) === JSON.stringify([nextView.scene, nextView.units, nextView.placementsById]);
     if (!unchanged) {
       flow++;
-      liveBgmBefore = null;
+      liveBgmBefore = liveBgmAction = liveBgmStart = null;
       bgm.stopBattle();
       ui.clearBoost(); boostOwner = null; aimHit = null;
       cancelRetargetPrompt();
@@ -1596,7 +1597,7 @@ export function createApp(rootEl, opts = {}) {
     }
     if (myFlow !== flow) return;
     releaseScene();
-    if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot(), { deferMedium: true });
+    if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot());
     afterHeroAction();
   }
   // 整备：规则先祛除负面，演出在该单位处播放（期间锁定输入），结束后交还
@@ -1728,7 +1729,7 @@ export function createApp(rootEl, opts = {}) {
     sandbox.getUnitView().lockMotion(mover, false);
     sandbox.getUnitView().updateUnit(mover, { placement: currentViewData.placementsById[mover] });
     if (myFlow !== flow) return;
-    if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot(), { deferMedium: true });
+    if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot());
     if (!battle.snapshot().currentId || battle.snapshot().terminal) {
       if (!battle.snapshot().terminal) endActionWithBgm();
       syncShown(); setBusy(false); refreshBattle({ deferPassive: true }); beginTurn(); return;
@@ -1759,7 +1760,7 @@ export function createApp(rootEl, opts = {}) {
     shell.showLog(battle.snapshot().log.at(-1), 'act');
     if (!result.charge.ready) await director.playPrepare(result);
     if (myFlow === flow) {
-      if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot(), { deferMedium: true });
+      if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot());
       afterHeroAction();
     }
   }
@@ -1811,7 +1812,7 @@ export function createApp(rootEl, opts = {}) {
       refreshBattle();
       await director.playPrepare(res);
       if (myFlow !== flow) return;
-      if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot(), { deferMedium: true });
+      if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot());
       setBusy(false);
       refreshBattle();
       shell.showLog(res.logTo > res.logFrom ? battle.snapshot().log[res.logTo - 1] : act.skill.name + ' 正在准备', 'act');
@@ -1881,7 +1882,6 @@ export function createApp(rootEl, opts = {}) {
     sandbox.beginAction();
     const c = sandbox.unitWorldCenter(u.id);
     shell.showBanner(u, u.side === 'hero' ? '我方行动' : '敌方行动');
-    bgm.flushTurnCue();
     if (u.side === 'hero') {
       if (!hasNaturalTurnAudio) avHost.sfx('heroTurn', 1, { category: 'M' });
     } else if (!hasNaturalTurnAudio) ui('enemyTurn');
@@ -1934,7 +1934,7 @@ export function createApp(rootEl, opts = {}) {
         sandbox.getUnitView().lockMotion(actorId, false);
         sandbox.getUnitView().updateUnit(actorId, { placement: currentViewData.placementsById[actorId] });
         if (!alive()) return;
-        if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot(), { deferMedium: true });
+        if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot());
         if (battle.snapshot().currentId !== actorId || battle.snapshot().terminal) break;
         if (plan.jumpTo || result.stopped || !plan.skill) continue;
       }
@@ -1955,7 +1955,7 @@ export function createApp(rootEl, opts = {}) {
           if (!prep.ok) break;
           syncShown(); refreshBattle(); await director.playPrepare(prep);
           if (!alive()) return;
-          if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot(), { deferMedium: true });
+          if (hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot());
           continue;
         }
         const q = battle.previewAttack(plan.skill, plan.aim);
@@ -1980,7 +1980,7 @@ export function createApp(rootEl, opts = {}) {
         if (!res?.ok) break;
         if (res.preparing) {
           refreshBattle(); await director.playPrepare(res);
-          if (alive() && hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot(), { deferMedium: true });
+          if (alive() && hasCombatChange(beforeBgm)) settleBgm(beforeBgm, battle.snapshot());
         }
         else await playAttackResult(res, beforeBgm);
         if (!alive()) return;
@@ -2033,6 +2033,8 @@ export function createApp(rootEl, opts = {}) {
     holdScene();
     refreshBattle();
     liveBgmBefore = beforeBgm || liveBgmFrame();
+    liveBgmStart = liveBgmBefore;
+    liveBgmAction = res;
     try {
       await director.playAttack(res);
     } finally {
@@ -2040,14 +2042,14 @@ export function createApp(rootEl, opts = {}) {
       if (myFlow === flow) for (const id of motionIds) {
         view.lockMotion(id, false);
         view.updateUnit(id, { placement: currentViewData.placementsById[id] });
-      } else liveBgmBefore = null;
+      } else liveBgmBefore = liveBgmAction = liveBgmStart = null;
     }
     if (myFlow !== flow) return;
     await director.playExecution(res);   // 技能演出、反应与自爆全部完成后统一收尾一次；胜利弹窗在其后
-    if (myFlow !== flow) { liveBgmBefore = null; return; }
+    if (myFlow !== flow) { liveBgmBefore = liveBgmAction = liveBgmStart = null; return; }
     const tailBefore = liveBgmBefore;
-    liveBgmBefore = null;
-    if (tailBefore && hasCombatChange(tailBefore)) settleBgm(tailBefore, battle.snapshot(), { deferMedium: true });
+    if (tailBefore && hasCombatChange(tailBefore)) settleBgm(tailBefore, battle.snapshot());
+    liveBgmBefore = liveBgmAction = liveBgmStart = null;
     for (let i = res.logFrom; i < res.logTo; i++) hiddenLog.delete(i);
     if (!res.hits.length) shell.showLog(battle.snapshot().log[res.logTo - 1] || '', 'miss');
   }
@@ -2084,8 +2086,7 @@ export function createApp(rootEl, opts = {}) {
     shownEff.set(source.id, battle.getEffectiveUnit(source.id));
     renderStatus(source.id);
     if (value.hpAfter <= 0) playDown(u);
-    const maxHp = u.bars.maxHp || u.ref?.maxHp || 1;
-    if (value.hpAfter <= 0 || (u.side === 'hero' && (value.hpAfter <= maxHp * 0.55 || (prev.hp - value.hpAfter) >= maxHp * 0.30))) settleLiveBgm();
+    settleLiveBgm();
   }
 
   // ---------- 接触拍点揭示 ----------
@@ -2115,8 +2116,7 @@ export function createApp(rootEl, opts = {}) {
     }
     if (hit.down && !meta?.finisher) playDown(u);
     const chargeThreat = chargeThreatByCast.get(meta?.result)?.(hit, u);
-    const maxHp = u.bars.maxHp || u.ref?.maxHp || 1;
-    if (chargeThreat || hit.down || (u.side === 'hero' && hit.hit && (hit.hpAfter <= maxHp * 0.55 || (prev.hp - hit.hpAfter) >= maxHp * 0.30))) settleLiveBgm(chargeThreat);
+    settleLiveBgm(chargeThreat);
   }
   function playDown(u) {
     const view = sandbox.getUnitView(), scope = sandbox.getScope();
@@ -2587,7 +2587,7 @@ export function createApp(rootEl, opts = {}) {
     rootEl.ownerDocument?.removeEventListener('keydown', unlockBgm, { capture: true });
     unsubscribeBgm();
     stopMusicSpectrum();
-    liveBgmBefore = null;
+    liveBgmBefore = liveBgmAction = liveBgmStart = null;
     bgm.destroy();
     cancelRetargetPrompt();
     director.cancelAttack();

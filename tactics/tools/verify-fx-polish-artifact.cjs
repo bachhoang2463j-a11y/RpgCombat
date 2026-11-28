@@ -18,7 +18,7 @@ const symbols = [
   'enemy-mp-recovered', 'finishExposureTurn', 'skillMain', '暴露',
   'stationaryStatus', 't-prep-pips', 't-prep-still', '驻足起咏', '驻足继续',
   'reaction-sonic-jam', '声波干扰雷', '净蚀反冲', 'seerEyeHtml', 'slamSeal', 't-card-still', 't-ally-tab', 'onAllyPin', 'inspectPin', 'creature_slime_01',
-  'guardBroken', 'GuardBroken', 'parry_Weapon_GuardBreak.wav', 'combatOf', 'queueNaturalNext', 'waitForTurnCue', 'seeked',
+  'guardBroken', 'GuardBroken', 'parry_Weapon_GuardBreak.wav', 'combatOf', 'queueNaturalNext', 'eliteDefeated', 'seeked',
   'createChargeThreatTracker', 'chargeThreatByCast', 'shieldTier',
   'function planKillBeat(', 'function startKillCamera(', 'function planHitStopWaves(', 'releaseFinisher', 'playKillCharge', 'playUnitShatter',
   'kill-blood', 'hit-time-stop', 'self-destruct-pending', 'resolveSelfDestruct', 'playRangedKillBass',

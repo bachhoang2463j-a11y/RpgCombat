@@ -36,17 +36,17 @@ export function createChargeThreatTracker(caster, skill) {
 }
 
 export function createBattleMood() {
-  let level, pressure, contacts, blooded, comebackUsed;
+  let level, pressure, contacts, comebackUsed, contactIds;
 
   function reset(frame) {
     pressure = sustainedPressure(partyState(frame), 0);
     level = LEVELS[pressure];
     contacts = 0;
-    blooded = pressure > 0;
+    contactIds = new Set();
     comebackUsed = false;
   }
 
-  function settle(before, after, { chargeThreat = false } = {}) {
+  function settle(before, after, { chargeThreat = false, contactId = null, impactBefore = before } = {}) {
     if (after.terminal) return { level, upgraded: false, urgent: false, comeback: false, crisis: false };
     const previous = pressure;
     const party = partyState(after);
@@ -58,20 +58,21 @@ export function createBattleMood() {
     });
     const defeated = after.units.some(u => u.side === 'enemy' && !u.isSummon &&
       u.status !== 'active' && prior.get(u.id)?.status === 'active');
-    const heavyHit = partyState(before).average - party.average >= 0.30 - 1e-9 || party.heroes.some(u => {
-      const old = prior.get(u.id);
+    const impactPrior = new Map(impactBefore.units.map(unit => [unit.id, unit]));
+    const heavyHit = partyState(impactBefore).average - party.average >= 0.30 - 1e-9 || party.heroes.some(u => {
+      const old = impactPrior.get(u.id);
       return old && hpRatio(u) <= 0.15 && hpRatio(old) - hpRatio(u) >= 0.35 - 1e-9;
     });
     const hurtHero = party.down > 0 || party.heroes.some(u => hpRatio(u) <= 0.75 + 1e-9);
 
-    if (damage) contacts++;
-    if (pressure >= 1 || hurtHero || heavyHit) blooded = true;
-
-    const canComeback = !comebackUsed && !heavyHit && defeated && (level !== 'low' || blooded);
-    if (canComeback) {
-      comebackUsed = true;
-      blooded = true;
+    if (damage && (contactId == null || !contactIds.has(contactId))) {
+      contacts++;
+      if (contactId != null) contactIds.add(contactId);
     }
+    const eliteDefeated = after.units.some(u => u.side === 'enemy' && !u.isSummon && u.status === 'dead'
+      && prior.get(u.id)?.status === 'active' && (u.level === '精英' || u.level === '首领'));
+    const canComeback = !comebackUsed && !heavyHit && eliteDefeated;
+    if (canComeback) comebackUsed = true;
 
     const crisis = chargeThreat || heavyHit || pressure === 2;
     const raw = crisis ? 'high'
@@ -200,18 +201,6 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
     });
   }
 
-  function waitForTurnCue(op) {
-    if (!op.deferred) return true;
-    return new Promise(resolve => {
-      const release = value => {
-        op.cancelWait = op.releaseCue = null;
-        resolve(value);
-      };
-      op.cancelWait = () => release(false);
-      op.releaseCue = () => release(true);
-    });
-  }
-
   function audioTime(op, time) {
     return new Promise(resolve => {
       // 单样点静音源只用来收到音频时钟回调，旋律仍由流式媒体元素播放。
@@ -309,7 +298,6 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
         if (audio.currentTime !== offset) audio.currentTime = offset;
       }
       if (!await mediaReady(op, a => a.readyState >= 3 && !a.seeking, 'canplay', 'seeked') || job !== op) return;
-      if (!await waitForTurnCue(op) || job !== op) return;
       resetFilter(incoming);
       gain(incoming, 0);
       // play() 确认入轨已起播；在此之前不碰旧轨的增益或滤波。
@@ -367,7 +355,7 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
     if (!track || (current?.track === track && !current.audio.ended && !current.audio.paused)) return;
     load(standby, track);
     job = { incoming: standby, outgoing: current, track, dramatic: Boolean(intent.dramatic),
-      useCue: Boolean(intent.dramatic || intent.useCue), deferred: Boolean(intent.deferred), fading: false, cancelWait: null };
+      useCue: Boolean(intent.dramatic || intent.useCue), fading: false, cancelWait: null };
     void switchTrack(job);
   }
 
@@ -461,7 +449,7 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
     notify();
   }
 
-  function syncBattle(frame, settlementId = null, beforeFrame, { deferMedium = false, chargeThreat = false } = {}) {
+  function syncBattle(frame, settlementId = null, beforeFrame, { chargeThreat = false, contactId = null, impactBefore = beforeFrame || settledFrame } = {}) {
     if (!battle || terminal) return;
     battle = frame;
     if (frame.terminal) {
@@ -474,25 +462,16 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
     }
     if (settlementId == null || (lastSettlement != null && settlementId <= lastSettlement)) return;
     lastSettlement = settlementId;
-    const result = mood.settle(beforeFrame || settledFrame, frame, { chargeThreat });
+    const result = mood.settle(beforeFrame || settledFrame, frame, { chargeThreat, contactId, impactBefore });
     settledFrame = frame;
     if (mode === 'auto' && !paused) {
       const special = isComeback(current?.track) || isComeback(job?.track) || queued?.comeback;
       if (!special) {
         if (result.urgent) enqueue(result.comeback ? { comeback: true, dramatic: true } : { level: result.level, dramatic: true });
-        else if (result.upgraded) enqueue({ level: result.level, dramatic: true, deferred: deferMedium });
+        else if (result.upgraded) enqueue({ level: result.level, dramatic: true });
       }
     }
     notify();
-  }
-
-  function flushTurnCue() {
-    if (mode !== 'auto' || paused || !battle || terminal) return;
-    if (queued?.deferred) queued.deferred = false;
-    if (job?.deferred) {
-      job.deferred = false;
-      job.releaseCue?.();
-    }
   }
 
   function selectTrack(id) {
@@ -609,7 +588,7 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
   }
 
   return {
-    startBattle, syncBattle, flushTurnCue, stopBattle, unlock, state, subscribe,
+    startBattle, syncBattle, stopBattle, unlock, state, subscribe,
     selectTrack, nextTrack, togglePause, setVolume, setTheme, resumeAuto, sampleSpectrum, destroy,
   };
 }

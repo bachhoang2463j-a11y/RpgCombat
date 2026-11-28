@@ -366,13 +366,13 @@ export const groups = {
       assert.equal(result.effects.find(e => e.kind === 'buff' && e.field === 'def').value, -22);
     });
     try {
-      const sources = [], played = [];
+      const sources = [], played = [], volumes = [], loopVolumes = [];
       const context = { state: 'running', currentTime: 0,
         createBufferSource() { const source = { loop: false, stopped: 0, disconnected: 0, connect() {}, start() {}, stop() { this.stopped++; }, disconnect() { this.disconnected++; } }; sources.push(source); return source; },
-        createGain: () => ({ gain: { setValueAtTime() {}, linearRampToValueAtTime() {} }, connect() {}, disconnect() {} }),
+        createGain: () => ({ gain: { setValueAtTime() {}, linearRampToValueAtTime(v) { loopVolumes.push(v); } }, connect() {}, disconnect() {} }),
       };
       const mixer = { context: () => context, output: () => ({}), prepare: async () => ({ duration: 14 }),
-        play: url => { played.push(url); return () => {}; } };
+        play: (url, opts) => { played.push(url); volumes.push(opts.vol); return () => {}; } };
       const urls = Object.fromEntries(['lv1', 'lv2', 'lv3', 'lv1s', 'lv2s', 'lv3s', 'cancel', 'cast'].map(k => ['boost_' + k, k]));
       const ui = createUiSfx(mixer, urls);
       ui.setBoost('h', 1); ui.setBoost('h', 2); ui.setBoost('h', 0);
@@ -384,6 +384,8 @@ export const groups = {
       ui.castBoost('h', 3);
       assert.equal(sources[0].stopped, 1); assert.equal(sources[0].disconnected, 1);
       assert.equal(played.at(-1), 'cast');
+      assert.ok(volumes.every(v => v === 0.84), 'Boost 一次性音效翻倍');
+      assert.deepEqual(loopVolumes, [0.44], 'Boost 循环音效翻倍');
       ui.setBoost('h', 1); ui.clearBoost(); await Promise.resolve();
       assert.equal(sources.length, 1, '清场后不得异步回放待机音');
       check('BOOST-23 原版音效升档、无缝循环、取消/释放/清场与异步竞态', true);

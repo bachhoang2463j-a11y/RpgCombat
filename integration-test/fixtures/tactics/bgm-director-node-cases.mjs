@@ -5,7 +5,7 @@ import { createBattleMood, createBgmDirector, createChargeThreatTracker } from '
 const unit = (id, side, hp, extra = {}) => ({ id, side, primary: side === 'hero', hp, maxHp: 100,
   shield: 0, isSummon: false, status: hp > 0 ? 'active' : side === 'hero' ? 'down' : 'dead', ...extra });
 const hero = (hp, i) => unit('hero' + i, 'hero', hp);
-const enemy = (hp, extra) => unit('enemy', 'enemy', hp, extra);
+const enemy = (hp, extra) => unit('enemy', 'enemy', hp, { level: '精英', ...extra });
 const frame = (hp, units = [enemy(100)]) => ({ terminal: null, units: [...hp.map(hero), ...units] });
 const calm = frame([100, 100, 100, 100]);
 const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
@@ -170,9 +170,17 @@ export async function runBgmCases({ tracks = BGM_TRACKS, pools = BGM_POOLS, come
     assert.equal(hk.comeback, true);
     assert.equal(hk.level, 'high');
 
-    // 低烈度无伤首杀不播反击（直接升入 medium），随后再杀才算激战斩杀
+    // 只有精英/首领死亡取得反击资格，低档无伤也能触发。
     mood.reset(calm);
-    assert.equal(mood.settle(calm, frame([100, 100, 100, 100], [enemy(0)])).comeback, false);
+    assert.equal(mood.settle(calm, frame([100, 100, 100, 100], [enemy(0)])).comeback, true);
+    for (const level of ['杂兵', undefined]) {
+      const before = frame([50, 50, 50, 50], [enemy(100, { level })]);
+      mood.reset(before);
+      assert.equal(mood.settle(before, frame([50, 50, 50, 50], [enemy(0, { level })])).comeback, false);
+    }
+    const boss = frame([100, 100, 100, 100], [enemy(100, { level: '首领' })]);
+    mood.reset(boss);
+    assert.equal(mood.settle(boss, frame([100, 100, 100, 100], [enemy(0, { level: '首领' })])).comeback, true);
 
     // 单拍灭团重创、终局、召唤物击杀不触发反击
     mood.reset(pressure);
@@ -337,7 +345,7 @@ export async function runBgmCases({ tracks = BGM_TRACKS, pools = BGM_POOLS, come
     }
   });
 
-  await check('BGM-10 反击二选一播完回最高烈度，deferMedium 等回合横幅 flushTurnCue 切入', async () => {
+  await check('BGM-10 精英击杀反击二选一，普通升温条件满足即交接', async () => {
     const enemy2 = hp => unit('enemy2', 'enemy', hp);
     for (const random of [0, 0.99]) {
       const h = audioHarness(Director, { random: () => random });
@@ -361,18 +369,12 @@ export async function runBgmCases({ tracks = BGM_TRACKS, pools = BGM_POOLS, come
       d.destroy();
     }
 
-    // deferMedium 挂起直到 flushTurnCue 才从 low 切入 medium
     const h3 = audioHarness(Director, { random: () => 0 });
     h3.director.startBattle(calm);
     await h3.director.unlock(); await flush();
-    const lowId = h3.director.state().track.id;
-    h3.director.syncBattle(frame([100, 100, 100, 70]), 1, calm, { deferMedium: true });
+    h3.director.syncBattle(frame([100, 100, 100, 70]), 1, calm);
     await flush();
     assert.equal(h3.director.state().level, 'medium');
-    assert.equal(h3.director.state().track.id, lowId);
-    h3.director.flushTurnCue();
-    await flush();
-    await h3.advance(0.6);
     assert.ok(pools.medium.includes(h3.director.state().track.id));
     h3.director.destroy();
   });
@@ -406,7 +408,7 @@ export async function runBgmCases({ tracks = BGM_TRACKS, pools = BGM_POOLS, come
     }
   });
 
-  await check('BGM-12 自然续播备用轨单次交接，普通升温预热待横幅，紧急请求可取代', async () => {
+  await check('BGM-12 自然续播一次交接，升温即时起播，反击无需横幅', async () => {
     const h = audioHarness(Director, { random: () => 0 });
     const d = h.director;
     d.startBattle(calm); await d.unlock(); await flush();
@@ -423,12 +425,9 @@ export async function runBgmCases({ tracks = BGM_TRACKS, pools = BGM_POOLS, come
     d2.startBattle(calm); await d2.unlock(); await flush();
     const base = frame([100, 100, 100, 100], [enemy(90)]);
     const medium = frame([100, 100, 100, 70]);
-    d2.syncBattle(base, 1, calm, { deferMedium: true });
-    d2.syncBattle(medium, 2, base, { deferMedium: true }); await flush();
-    assert.ok(!pools.medium.includes(d2.state().track.id));
-    assert.equal(decodeURIComponent(h2.decks.find(deck => deck !== h2.active()).src).split('/').slice(-2).join('/'), tracks.find(t => t.id === pools.medium[0]).path);
+    d2.syncBattle(base, 1, calm);
     const before = h2.calls.filter(([kind]) => kind === 'play').length;
-    d2.flushTurnCue(); await flush(); await h2.advance(0.5);
+    d2.syncBattle(medium, 2, base); await flush();
     assert.ok(pools.medium.includes(d2.state().track.id));
     assert.equal(h2.calls.filter(([kind]) => kind === 'play').length, before + 1);
     d2.destroy();
@@ -436,12 +435,12 @@ export async function runBgmCases({ tracks = BGM_TRACKS, pools = BGM_POOLS, come
     const h3 = audioHarness(Director, { random: () => 0 });
     const d3 = h3.director;
     d3.startBattle(calm); await d3.unlock(); await flush();
-    d3.syncBattle(medium, 1, calm, { deferMedium: true }); await flush();
+    d3.syncBattle(medium, 1, calm); await flush(); await h3.advance(0.4);
     const turning = frame([100, 100, 100, 65], [enemy(0), unit('survivor', 'enemy', 100)]);
-    d3.syncBattle(turning, 2, medium, { deferMedium: true }); await flush();
+    d3.syncBattle(turning, 2, medium); await flush();
     assert.ok(comeback.includes(d3.state().track.id));
-    assert.equal(h3.calls.filter(([kind]) => kind === 'play').length, 2);
-    d3.flushTurnCue(); await h3.advance(0.4);
+    assert.equal(h3.calls.filter(([kind]) => kind === 'play').length, 3);
+    await h3.advance(0.8);
     assert.ok(comeback.includes(d3.state().track.id));
     d3.destroy();
   });
@@ -506,7 +505,7 @@ export async function runBgmCases({ tracks = BGM_TRACKS, pools = BGM_POOLS, come
       assert.equal(ChargeThreat(caster, cast)(contact, c), false); // 另一次施放不承接前两人
       assert.equal(director.state().level, 'low');
       assert.equal(tracker(contact, c), true);
-      director.syncBattle(calm, 1, calm, { deferMedium: true, chargeThreat: true });
+      director.syncBattle(calm, 1, calm, { chargeThreat: true });
       await flush();
       assert.equal(director.state().level, 'high');
       assert.ok(pools.high.includes(director.state().track.id)); // 无需行动横幅
@@ -514,6 +513,28 @@ export async function runBgmCases({ tracks = BGM_TRACKS, pools = BGM_POOLS, come
       director.syncBattle(calm, 2, calm);
       assert.equal(director.state().level, 'high');
       director.destroy();
+    }
+  });
+
+  await check('BGM-16 同次施放交火只计一次，多人受创沿用施放前快照', () => {
+    const mood = Mood();
+    mood.reset(calm);
+    let before = calm;
+    for (const hp of [99, 98, 97]) {
+      const after = frame([100, 100, 100, 100], [enemy(hp)]);
+      assert.equal(mood.settle(before, after, { contactId: 'cast1' }).level, 'low');
+      before = after;
+    }
+    const second = frame([100, 100, 100, 100], [enemy(96)]);
+    assert.equal(mood.settle(before, second, { contactId: 'cast2' }).level, 'low');
+    assert.equal(mood.settle(second, frame([100, 100, 100, 100], [enemy(95)]), { contactId: 'cast3' }).level, 'medium');
+    mood.reset(calm);
+    before = calm;
+    for (const hp of [[70, 100, 100, 100], [70, 70, 100, 100], [70, 70, 70, 100], [70, 70, 70, 70]]) {
+      const after = frame(hp);
+      const result = mood.settle(before, after, { contactId: 'aoe', impactBefore: calm });
+      assert.equal(result.level, hp.every(h => h === 70) ? 'high' : 'medium');
+      before = after;
     }
   });
 

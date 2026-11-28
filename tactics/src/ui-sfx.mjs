@@ -56,7 +56,7 @@ export function createUiSfx(mixer, audioUrls = {}) {
     if (now - (last.get(kind) || 0) < ms) return false;
     last.set(kind, now); return true;
   }
-  function boostPlay(key, vol = 0.42) {
+  function boostPlay(key, vol = 0.84) {
     const url = audioUrls[key];
     if (!url) return null;
     return mixer.play(url, { track: 'aux', category: 'K', vol });
@@ -81,7 +81,7 @@ export function createUiSfx(mixer, audioUrls = {}) {
       const source = c.createBufferSource(), gain = c.createGain();
       source.buffer = buffer; source.loop = true;
       gain.gain.setValueAtTime(0, c.currentTime);
-      gain.gain.linearRampToValueAtTime(0.22, c.currentTime + 0.12);
+      gain.gain.linearRampToValueAtTime(0.44, c.currentTime + 0.12);
       source.connect(gain); gain.connect(mixer.output('aux', 'K'));
       source.start();
       rec.cue = () => { source.stop(); source.disconnect(); gain.disconnect(); };
