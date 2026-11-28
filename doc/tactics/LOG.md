@@ -1079,3 +1079,9 @@
 - 文件：`tactics/src/{action-director,cinematic,fx-library}.mjs`、`tactics/src/vendor/rpg-av/rpg-av.mjs`、`tactics/tools/{extract-rpg-av,run-tests,verify-fx-polish-artifact}.cjs`、`integration-test/fixtures/tactics/hit-feedback-node-cases.mjs`、`tactics/mvp-standalone.html`。
 - 验证：源码全量 1599 项通过；复核后的受击定向 62 项通过。单文件 67 模块、48 项专项符号、单脚本和零外部 import 验证通过，SHA256 `ad2997e7…`。IAB 对最终包用既有载入接口置入两靶场景，实页选技能、锁定、发射，确认精英横切 → `-7` → 旧特写，精英 7→0、杂兵仍为 7；复位供试播。
 - 目的 vs 现状：致死拍已在结算之前独立呈现。真 Chrome 帧感和听感、酒馆宿主与安卓未验；README 未改。
+
+## 2026-11-28 · 击杀演出放慢三倍（d4497b2）
+- 原因：实看反馈指出初版太快、70ms 顿帧难以感知。仅延长击杀演出：推近 345ms、拉远 435ms、精英／首领头像横切 570ms、局部顿帧 210ms，短技能至少留 500ms 才交给旧特写。
+- 已有重击和穿透的前摇与推近／横切共用时长，在出手拍拉远；致死顿帧包含接触同拍挂载的后坐和受击动画，音效与飘字仍按命中拍，非致死和战斗时钟不变。
+- 文件：`tactics/src/{action-director,cinematic,fx-library}.mjs`、`integration-test/fixtures/tactics/hit-feedback-node-cases.mjs`、`tactics/mvp-standalone.html`。
+- 验证：定向 65+51 项、全量 1602 项通过；单文件 67 模块，48 项专项及单脚本／零外部导入通过，SHA256 `19b349c4…`；IAB 在独立新包页面试射精英靶，确认扣 7 HP、归零并回到行动界面。原预览未刷新；未验真 Chrome、酒馆或安卓，README 未改。
