@@ -71,6 +71,15 @@ export const RANGE_YAML = [
   '    物品: []',
 ].join('\n');
 
+const CHARGE_CHOICES = [
+  { key: 'bomb_throw', label: '炸药充能' },
+  { key: 'explosion_aoe_charge', label: '爆炸蓄压' },
+  { key: 'thunder_charge', label: '雷电蓄能' },
+  { key: 'light_charge', label: '圣光咏唱' },
+  { key: 'herocharge', label: '原蓄力' },
+];
+let chargeIdx = 0;
+
 const cfg = window.__HIT_DEMO_CFG__ = {
   mode: 'B',        // 'A' 现行版 | 'B' 八方均衡版 | 'C' 八方重击版
   execFlow: true,   // 攻击击杀特写结束后自然衔接原版击杀结算特写
@@ -157,8 +166,7 @@ function playScreenBlood(fx, ms = 1150) {
 // ---------- 八方旅人2 打击感与击杀破碎/蓄势核心效果器 ----------
 window.__HIT_DEMO_FX__ = {
   playChargeSound(fx, key) {
-    const physical = key === 'herocharge';
-    fx.sfx(key, physical ? 1.5 : 1.25, physical ? { offsetSec: 0.315 } : undefined);
+    fx.sfx(key, 1.4, { offsetSec: key === 'herocharge' ? 0.315 : 0 });
   },
   playKillCharge(fx, from, ms) {
     const c = worldPx(from);
@@ -449,7 +457,7 @@ bar.innerHTML = [
   '<button data-mode="B" class="active">B 八方均衡版</button>',
   '<button data-mode="C">C 八方重击版</button>',
   '<span class="sep"></span>',
-  '<button id="hd-exec">击杀结算特写: 开</button>',
+  '<button id="hd-charge">蓄力音: 炸药充能</button>',
   '<span class="sep"></span>',
   '<button data-preset="normal">普攻命中</button>',
   '<button data-preset="fodder">击杀杂兵</button>',
@@ -494,6 +502,7 @@ async function runPreset(kind) {
   const aim = { x: pos.col + fp.width / 2, y: pos.row + fp.height / 2, targetId: map.target.id };
   const res = await app.director.runAttackLive(sk, aim);
   if (res && res.ok) {
+    if (kind === 'fodder' || kind === 'elite') res.demoRangedHeavy = true;
     await app.director.playAttack(res);
     await app.director.playExecution(res);
   } else {
@@ -506,6 +515,12 @@ bar.addEventListener('click', e => {
   if (!btn) return;
   if (btn.dataset.mode) { cfg.mode = btn.dataset.mode; syncBar(); }
   else if (btn.id === 'hd-exec') { cfg.execFlow = !cfg.execFlow; syncBar(); }
+  else if (btn.id === 'hd-charge') {
+    chargeIdx = (chargeIdx + 1) % CHARGE_CHOICES.length;
+    window.__HIT_DEMO_CHARGE_KEY__ = CHARGE_CHOICES[chargeIdx].key;
+    btn.textContent = '蓄力音: ' + CHARGE_CHOICES[chargeIdx].label;
+    app.avHost.av.playSound(CHARGE_CHOICES[chargeIdx].key, 1.4);
+  }
   else if (btn.id === 'hd-reset') { resetRange(); }
   else if (btn.dataset.preset) { void runPreset(btn.dataset.preset); }
 });
