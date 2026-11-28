@@ -3183,62 +3183,32 @@ const incendiaryBottle = {
 };
 
 const vitalFlow = {
-  id: 'vital-flow', grade: 'L2', fxTags: ['生体流转'],
-  timeline: { totalMs: 1180, fullscreen: false, darken: false },
-  cues: [{ key: 'herocharge', vol: 0.56 }],
-  prepareKeys() { return ['herocharge']; },
-  // 心搏两拍（lub-dub ×2）：脚下血脉法阵 → 胸前心核随拍收缩、八道血管自心核描向周身 → 血珠沿 ∞ 环流 →
-  // 心电迹线横扫 → 第二拍揭示再动。全部锚定施术者世界坐标、半径 ≤2.6m，不遮邻格。
+  id: 'vital-flow', grade: 'identity', fxTags: ['生体流转'], reuseAudio: true,
+  timeline: { fullscreen: false, darken: false },
+  cues: [{ key: 'heart.mp4 原声', vol: 2.5 }],
+  prepareKeys() { return []; },
+  // 完整播放 heart.mp4（开启原声），辅以单圈血色扩散环与轻量血色/暖金光粒脉冲
   async play(ctx) {
-    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId)), u = fx.uid();
-    const hx = c.x, hy = c.y - 30, R = 2.6 * PX;
-    fx.sfx('herocharge', 0.56);
-    webm(ctx, 'heart.mp4', hx, hy, 4.4 * PX, { ms: 1150, opacity: 0.9 });
-    const rune = fx.ground(runeHtml(u, c.x, c.y, 1.8 * PX, '#ef4444', '#fecaca', 'ᛒᛚᛟᛞ'), 1180).firstChild;
-    rune.animate([{ transform: 'translate(-50%,-50%) scale(0.3)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 1, offset: 0.3 }, { transform: 'translate(-50%,-50%) scale(1.06)', opacity: 0.9, offset: 0.7 }, { transform: 'translate(-50%,-50%) scale(1.2)', opacity: 0 }], { duration: 1160, fill: 'forwards' });
-    spin(rune.querySelector('[data-fx=spin]'), 90, 1160);
-    // 心核 + 血管（共用 viewBox 以心核为原点）
-    const veins = Array.from({ length: 8 }, (_, i) => {
-      const a = i / 8 * TAU + 0.2, L = R * (0.75 + (i % 3) * 0.1), m = L * 0.5;
-      return '<path d="M0,0 Q' + (Math.cos(a + 0.5) * m).toFixed(1) + ',' + (Math.sin(a + 0.5) * m).toFixed(1) + ' ' + (Math.cos(a) * L).toFixed(1) + ',' + (Math.sin(a) * L).toFixed(1) + '" fill="none" stroke="url(#vv' + u + ')" stroke-width="' + (3.4 - (i % 2)) + '" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" data-fx="vein"/>';
-    }).join('');
-    const heart = 'M0,14 C-26,-6 -24,-30 -10,-32 C-2,-33 0,-26 0,-22 C0,-26 2,-33 10,-32 C24,-30 26,-6 0,14Z';
-    const S = R * 2.4;
-    const svg = '<svg width="' + S + '" height="' + S + '" viewBox="' + (-S / 2) + ' ' + (-S / 2) + ' ' + S + ' ' + S + '" style="position:absolute;left:' + hx + 'px;top:' + hy + 'px;transform:translate(-50%,-50%);overflow:visible;pointer-events:none;">' +
-      '<defs><radialGradient id="hc' + u + '"><stop offset="0" stop-color="#fff1f2"/><stop offset="0.45" stop-color="#fb7185"/><stop offset="1" stop-color="#9f1239"/></radialGradient>' +
-      '<linearGradient id="vv' + u + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fecdd3"/><stop offset="1" stop-color="#be123c" stop-opacity="0.2"/></linearGradient>' +
-      '<filter id="hg' + u + '" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>' +
-      '<g filter="url(#hg' + u + ')">' + veins + '<g data-fx="heart"><path d="' + heart + '" fill="url(#hc' + u + ')" transform="scale(1.3)"/></g></g></svg>';
-    const layer = fx.top(svg, 1180);
-    const hEl = layer.querySelector('[data-fx=heart]');
-    const beat = [{ transform: 'scale(0.6)', opacity: 0 }, { transform: 'scale(1.25)', opacity: 1, offset: 0.12 }, { transform: 'scale(0.95)', offset: 0.22 }, { transform: 'scale(1.15)', offset: 0.32 }, { transform: 'scale(1)', offset: 0.45 },
-      { transform: 'scale(1.28)', offset: 0.56 }, { transform: 'scale(0.95)', offset: 0.64 }, { transform: 'scale(1.18)', offset: 0.72 }, { transform: 'scale(1)', opacity: 1, offset: 0.85 }, { transform: 'scale(0.7)', opacity: 0 }];
-    hEl.animate(beat, { duration: 1150, fill: 'forwards', easing: 'ease-out' });
-    layer.querySelectorAll('[data-fx=vein]').forEach((v, i) => {
-      v.animate([{ strokeDashoffset: 1, opacity: 1 }, { strokeDashoffset: 0, opacity: 1, offset: 0.35 }, { strokeDashoffset: 0, opacity: 0.25, offset: 0.55 }, { strokeDashoffset: -1, opacity: 0 }], { duration: 600, delay: (i % 2) * 40, fill: 'forwards' });
-      v.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 520, delay: 560 + (i % 2) * 40, fill: 'forwards' });
-    });
-    // 每拍一圈血色冲击环
-    [0, 100, 560, 660].forEach((t, k) => ctx.after(t, () => fx.top(ringHtml(hx, hy, R * (k % 2 ? 1.4 : 2), 'rgba(254,205,211,0.85)', 'rgba(225,29,72,0.45)'), 560)
-      .firstChild.animate([{ transform: 'scale(0.2)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 520, easing: 'cubic-bezier(0.1,0.8,0.3,1)', fill: 'forwards' })));
-    // 血珠沿 ∞ 字环流（伯努利双纽线，同一组采样点保证首尾相接）
-    const lem = t => { const s = Math.sin(t), k = 1 + s * s; return { x: hx + R * 0.9 * Math.cos(t) / k, y: c.y + R * 0.45 * Math.sin(t) * Math.cos(t) / k }; };
-    for (let n = 0; n < 10; n++) {
-      const l = fx.top(orbHtml(0, 0, 10 - (n % 3) * 2, '#e11d48', '#ffe4e6'), 1180);
-      const frames = Array.from({ length: 17 }, (_, k) => { const p = lem((k / 16) * TAU + n * 0.63); return { transform: 'translate(' + p.x.toFixed(1) + 'px,' + p.y.toFixed(1) + 'px)', opacity: k === 0 || k === 16 ? 0 : 1 }; });
-      l.firstChild.animate(frames, { duration: 900, delay: 100 + n * 24, easing: 'linear', fill: 'both' });
-    }
-    // 心电迹线：头顶横扫（描边推进）
-    let ecg = 'M' + (-R) + ',0';
-    [[-0.55, 0], [-0.42, -8], [-0.34, 0], [-0.22, 0], [-0.16, 14], [-0.1, -46], [-0.03, 22], [0.04, 0], [0.22, 0], [0.32, -12], [0.42, 0], [R / R, 0]].forEach(([x, y]) => { ecg += ' L' + (x * R).toFixed(1) + ',' + y; });
-    const ecgL = fx.top('<svg width="' + (R * 2) + '" height="80" viewBox="' + (-R) + ' -50 ' + (R * 2) + ' 80" style="position:absolute;left:' + hx + 'px;top:' + (hy - R * 0.95) + 'px;transform:translate(-50%,-50%);overflow:visible;"><path d="' + ecg + '" fill="none" stroke="#fda4af" stroke-width="3" stroke-linejoin="round" pathLength="1" stroke-dasharray="0.35 1" stroke-dashoffset="0.35" filter="url(#hg' + u + ')"/></svg>', 1150);
-    ecgL.querySelector('path').animate([{ strokeDashoffset: 0.35, opacity: 1 }, { strokeDashoffset: -1, opacity: 1, offset: 0.9 }, { strokeDashoffset: -1, opacity: 0 }], { duration: 980, delay: 80, fill: 'forwards' });
-    // 第二拍揭示再动（规则结果）
+    const { fx, result } = ctx, c = worldPx(ctx.centerOf(ctx.casterId));
+    const hx = c.x, hy = c.y - 30, R = 2.2 * PX;
+    const cv = webm(ctx, 'heart.mp4', hx, hy, 4.4 * PX, { ms: 6000, opacity: 0.95, audio: 2.5 });
+    fx.top(ringHtml(hx, hy, R * 1.45, 'rgba(254,205,211,0.72)', 'rgba(225,29,72,0.32)'), 760)
+      .firstChild.animate([{ transform: 'scale(0.28)', opacity: 0.9 }, { transform: 'scale(1)', opacity: 0 }], { duration: 720, easing: 'cubic-bezier(0.16,0.84,0.3,1)', fill: 'forwards' });
+    const palette = ['#fb7185', '#f43f5e', '#fda4af', '#fbbf24'];
+    particles(fx, Array.from({ length: 16 }, (_, i) => {
+      const a = (i / 16) * TAU + rnd(-0.25, 0.25), dist = rnd(0.25, 0.85) * R;
+      return {
+        x: hx + Math.cos(a) * rnd(8, 26), y: c.y + Math.sin(a) * rnd(6, 18) - 8,
+        dx: Math.cos(a) * dist * 0.45 + rnd(-8, 8), dy: -rnd(28, 64) + Math.sin(a) * 14,
+        size: rnd(5, 10), color: palette[i % palette.length], core: '#fff1f2',
+        s0: 0.55, s1: 0.2, o0: 0.88, dur: rnd(680, 1050), delay: rnd(40, 320),
+      };
+    }), 1450);
     ctx.after(580, () => {
       (result.effects || []).forEach(e => ctx.revealEffect(e, true));
-      floatText(fx, hx, hy - R * 0.55, '💓 生体流转 · 再动 +1', '#fecaca', '#7f1d1d', { ms: 580, size: 14 });
+      floatText(fx, hx, hy - R * 0.6, '💓 生体流转 · 再动 +1', '#fecaca', '#7f1d1d', { ms: 680, size: 14 });
     });
-    return ctx.wait(1160);
+    return ctx.awaitHandle(cv.handle, 5000);
   },
 };
 
