@@ -6,6 +6,8 @@
 // 幂等：dispose 可重复调用，清理计数不为负，回调不二次执行。
 // ==========================================
 
+import { fxNow, getTimeScale } from './time-scale.mjs';
+
 export function createViewScope(clock = {}) {
   const t = {
     setTimeout: clock.setTimeout || ((fn, ms) => setTimeout(fn, ms)),
@@ -14,7 +16,8 @@ export function createViewScope(clock = {}) {
     clearInterval: clock.clearInterval || ((id) => clearInterval(id)),
     raf: clock.raf || ((fn) => requestAnimationFrame(fn)),
     caf: clock.caf || ((id) => cancelAnimationFrame(id)),
-    now: clock.time || (() => performance.now()),
+    now: clock.time || fxNow,
+    scale: clock.scale || getTimeScale,
   };
 
   let active = true;
@@ -22,7 +25,7 @@ export function createViewScope(clock = {}) {
   let timerSeq = 0, holdDepth = 0, holdStart = 0, heldTotal = 0;
   function arm(key, rec, ms) {
     rec.due = t.now() + ms;
-    rec.cur = t.setTimeout(() => { timers.delete(key); if (active) rec.fn(); }, ms);
+    rec.cur = t.setTimeout(() => { timers.delete(key); if (active) rec.fn(); }, ms / t.scale());
   }
   const intervals = new Set();
   const rafIds = new Set();
@@ -67,7 +70,7 @@ export function createViewScope(clock = {}) {
     heldMs() { return heldTotal + (holdDepth ? t.now() - holdStart : 0); },
     every(ms, fn) {
       if (!active) return null;
-      const id = t.setInterval(() => { if (!active) { t.clearInterval(id); intervals.delete(id); return; } fn(); }, ms);
+      const id = t.setInterval(() => { if (!active) { t.clearInterval(id); intervals.delete(id); return; } fn(); }, ms / t.scale());
       intervals.add(id);
       return id;
     },

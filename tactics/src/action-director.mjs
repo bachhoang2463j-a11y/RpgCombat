@@ -21,6 +21,7 @@ import { GUARD_AUDIO_KEYS, BARRIER_AUDIO_KEYS, playGuardDash, playGuardBlock, mo
   playBarrierRaise, playBarrierHit, playBarrierBlocked, playBarrierShatter, fadeBarrierDome } from './guard-barrier-fx.mjs';
 import { effectFloat } from './status-ui.mjs';
 import { floatText, worldPx } from './vfx-primitives.mjs';
+import { fxDateNow, getTimeScale } from './time-scale.mjs';
 
 export const WINDUP_BEAT_MS = 330;   // 回合制敌方前摇拍点（OMEN_BEAT）：起手后此刻出手
 
@@ -87,7 +88,7 @@ export function createActionDirector(deps) {
       const finish = ok => { if (done) return; done = true; resolve(ok); };
       const cancel = s.settleOnDispose(finish);
       if (handle.onFinish && handle.onFinish.add) handle.onFinish.add(ok => { if (cancel) cancel(); finish(ok !== false); });
-      const ms = Math.max(0, (handle.doneAt || Date.now()) - Date.now()) + 400;
+      const ms = Math.max(0, (handle.doneAt || fxDateNow()) - fxDateNow()) + 400;
       s.after(Math.max(ms, fallbackMs || 0), () => { if (cancel) cancel(); finish(true); });
     });
   }
@@ -122,11 +123,13 @@ export function createActionDirector(deps) {
     if (!s || !s.isLive) return Promise.resolve(false);
     return new Promise(resolve => {
       let done = false;
-      const t0 = performance.now(), h0 = s.heldMs();
+      const h0 = s.heldMs();
+      let last = performance.now(), elapsed = 0;   // 逐帧按演出倍速累加（帧时刻取循环给出的时间戳）
       const finish = ok => { if (done) return; done = true; resolve(ok); };
       const stop = s.settleOnDispose(() => finish(false));
       s.loop(now => {
-        const t = Math.max(0, Math.min(1, (now - t0 - (s.heldMs() - h0)) / ms));
+        elapsed += (now - last) * getTimeScale(); last = now;
+        const t = Math.max(0, Math.min(1, (elapsed - (s.heldMs() - h0)) / ms));
         fn(t);
         if (t >= 1) { if (stop) stop(); finish(true); return false; }
       });
@@ -302,6 +305,7 @@ export function createActionDirector(deps) {
     avHost.syncRoster();
     const kind = resolveWindupKind(skill);
     if (!kind) return { kind, ok: true, handle: null };
+    avHost.setPanHint?.(panOf(unitId));
     const handle = av.playEnemyWindup(avHost.entity(unitId), kind);
     if (!handle) return { kind, ok: false };
     const ok = await wait(WINDUP_BEAT_MS);
@@ -366,8 +370,48 @@ export function createActionDirector(deps) {
     });
   }
 
+  // ---------- 声像与局部顿帧 ----------
+  // 声像：发声单位在视口中的横向位置 → [-0.6, 0.6]（只作用于战斗音效轨，界面/语音不偏）
+  function panOf(id) {
+    const c = centerOf(id);
+    if (!c) return null;
+    const vp = sandbox.getDom().viewport.getBoundingClientRect(), s = sandbox.worldToScreenClient(c.x, c.y);
+    if (!s || !vp.width) return null;
+    return Math.max(-0.6, Math.min(0.6, ((s.x - vp.left) / vp.width * 2 - 1) * 0.6));
+  }
+  // 顿帧分档：本段实际掉血 / 最大生命 <10% 不顿、10–25% 40ms、25–50% 及以上 70ms；暴击或击杀 110ms
+  function hitStopMs(r) {
+    if (r.outcome !== 'hit' || !(r.hpDmg > 0)) return 0;
+    if (r.isCrit || (r.hpBefore > 0 && r.hpAfter <= 0)) return 110;
+    const k = r.hpDmg / Math.max(1, r.maxHp || 1);
+    return k >= 0.25 ? 70 : k >= 0.10 ? 40 : 0;
+  }
+  // 只冻结出手者与受击者（及粒子层），画面其余部分与声音照常；解冻后受击者沿来袭方向位移 0.08 格回弹
+  function microStop(casterId, targetId, ms) {
+    const s = scope();
+    if (!s || !s.isLive || !(ms > 0)) return;
+    const view = sandbox.getUnitView();
+    const frozen = [...new Set([casterId, targetId])].map(id => view.nodes.get(id)?.root).filter(Boolean)
+      .flatMap(el => el.getAnimations({ subtree: true }).filter(a => a.playState === 'running'));
+    frozen.forEach(a => a.pause());
+    avHost.particleStop?.(ms);
+    s.after(ms, () => {
+      frozen.forEach(a => { if (a.playState === 'paused') a.play(); });
+      const a = centerOf(casterId), b = centerOf(targetId), rec = view.nodes.get(targetId);
+      if (!a || !b || !rec || casterId === targetId) return;
+      const d = Math.hypot(b.x - a.x, b.y - a.y) || 1, px = 0.08 * 50;
+      s.animate(rec.sprite.animate([{ transform: 'translate(0,0)' },
+        { transform: 'translate(' + ((b.x - a.x) / d * px).toFixed(1) + 'px,' + ((b.y - a.y) / d * px).toFixed(1) + 'px)', offset: 0.35 },
+        { transform: 'translate(0,0)' }], { duration: 160, easing: 'ease-out', composite: 'add' }));
+    });
+  }
+  let cineSeen = { scope: null, keys: new Set() };
+
   // ---------- 攻击：注册表分发演出 + 接触拍点逐段揭示 ----------
   async function playAttack(result) {
+    try { return await playAttackBody(result); } finally { avHost.setPanHint?.(null); }
+  }
+  async function playAttackBody(result) {
     if (!result || !result.ok) return false;
     const actionScope = scope();
     if (!actionScope || !actionScope.isLive) return false;
@@ -424,6 +468,7 @@ export function createActionDirector(deps) {
     if (result.query && result.query.blastCenter) pts.push(result.query.blastCenter);
     if (!hits.length && result.aim) pts.push({ x: result.aim.x, y: result.aim.y });
     await sandbox.guideTo(pts);
+    avHost.setPanHint?.(panOf(result.casterId));
     const ruleKeys = [...(guardEvents.length && !deps.presentGuard ? GUARD_AUDIO_KEYS : []), ...((result.events || []).some(ev => ev.type.startsWith('barrier-')) ? BARRIER_AUDIO_KEYS : [])];
     if (!isCurrent() || !(await prepareAudio([...(entry.prepareKeys ? entry.prepareKeys({ identity }) : []), ...ruleKeys])) || !isCurrent()) return false;
 
@@ -438,7 +483,12 @@ export function createActionDirector(deps) {
       focus: (() => { const p = hits[0] ? centerOf(hits[0].targetId) : result.aim; const vp = sandbox.getDom().viewport.getBoundingClientRect(), s = p && sandbox.worldToScreenClient(p.x, p.y); return s ? { x: s.x - vp.left, y: s.y - vp.top } : null; })(),
     }) : null;
     // 高阶运镜：与氛围层同生命周期；条目 cine:false 自行编排。爆发拍时停、首次命中顿帧、收尾回位
-    const cine = atmos && entry.cine !== false ? startCine({
+    // 精简运镜：同一出手者的同一技能本场再次施放时，只保留氛围层与爆发，不再遮幅/推近/拉远
+    if (cineSeen.scope !== actionScope) cineSeen = { scope: actionScope, keys: new Set() };
+    const cineKey = result.casterId + '|' + (skill.name || entry.id);
+    const liteCine = !!deps.liteRepeatCine?.() && cineSeen.keys.has(cineKey);
+    cineSeen.keys.add(cineKey);
+    const cine = atmos && entry.cine !== false && !liteCine ? startCine({
       sandbox, fx: makeFx(audioContext.category), hold, after: (ms, fn) => scope().after(ms, fn), style: entry.cine, freeze: entry.cineHold, grade, result, hits, centerOf,
       shape: shape && shape.radius > 0 ? { center: shape.center || result.aim, radius: shape.radius } : null,
       regions: (result.events || []).filter(ev => ev.type === 'region-created'), chargeMs: entry.timeline?.chargeMs || 600, totalMs: entry.timeline?.totalMs || 2000,
@@ -567,6 +617,7 @@ export function createActionDirector(deps) {
       const healed = seg.heal != null ? !!seg.heal : (!seg.hit && seg.hpAfter > seg.hpBefore);
       const waveIndex = seg.shotIndex ?? i, wave = waves.get(waveIndex);
       const r = { ...buildHitFeedback({ ...result, skill }, h, seg, incoming), actionId, waveId: wave ? wave.id : null };
+      avHost.setPanHint?.(panOf(targetId));
       if (seg.resistance?.layers?.length) revealRule({ ...seg.resistance, segmentId: seg.segmentId, targetId }, 'resistance');
       if (seg.barrierHitId) {
         const event = (result.events || []).find(ev => ev.eventId === seg.barrierHitId);
@@ -585,6 +636,7 @@ export function createActionDirector(deps) {
         wave: hitWaves[waveIndex] || (hitWaves[waveIndex] = { shook: false, hitStopped: false, classified: [] }),
         suppressDodgeFx: !!reaction?.shift || !!guardianReaction?.shift,
       });
+      if (!healed && !seg.barrierHitId) microStop(result.casterId, targetId, hitStopMs(r));
       if (seg.backstab && !healed && !backstabShown.has(targetId)) {
         backstabShown.add(targetId);
         const c = centerOf(targetId), fp = vd.footprintsById[targetId] || { width: 1, height: 1 };

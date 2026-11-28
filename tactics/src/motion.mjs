@@ -7,6 +7,7 @@
 // ==========================================
 
 import { unitCenter } from './geometry.mjs';
+import { getTimeScale } from './time-scale.mjs';
 
 export const MOVE_SPEED = 4.6;      // 米/秒（表现参数）
 const EASE_MS = 140;                // 首末段缓起缓停额外时长
@@ -80,7 +81,7 @@ export function playPathMotion(unitView, scope, opts) {
   return new Promise(resolve => {
     let done = false, lastSeg = -1, lastStepIdx = -1, lastStepDist = -Infinity;
     const stride = gait.stride > 0 ? gait.stride : 0;
-    const t0 = performance.now();
+    let last = performance.now(), elapsed = 0;   // 逐帧按演出倍速累加
     const finish = ok => {
       if (done) return; done = true;
       unitView.setFlag(unitId, 't-unit-moving', false);
@@ -90,7 +91,8 @@ export function playPathMotion(unitView, scope, opts) {
     };
     const stopCancel = scope.settleOnDispose(() => finish(false));
     scope.loop(now => {
-      const t = Math.min(1, (now - t0) / totalMs);
+      elapsed += (now - last) * getTimeScale(); last = now;
+      const t = Math.min(1, elapsed / totalMs);
       const d = dist(t);
       const p = pointAtDistance(segs, d);
       unitView.setDisplayPos(unitId, p.x, p.y);

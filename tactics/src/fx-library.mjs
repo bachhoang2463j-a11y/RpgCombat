@@ -10,6 +10,7 @@ import { pathSegments, pointAtDistance } from './motion.mjs';
 import { FX_SCALE } from './av-host.mjs';
 import { unitCenter } from './geometry.mjs';
 import { letterbox, timeStop, hitFlash, ATTACK_STOP_MS, ATTACK_HIT_MS, zoomAt, holdOr } from './cinematic.mjs';
+import { fxDateNow, getTimeScale } from './time-scale.mjs';
 
 const TAU = Math.PI * 2;
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -79,7 +80,7 @@ function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1, cover 
   const g = cv.getContext('2d', { willReadFrequently: true });
   let screenMode = false, raf = 0;
   // 播完句柄（导演 awaitHandle）：元数据到达后按真实时长更新 doneAt，释放时通知
-  const t0 = Date.now();
+  const t0 = fxDateNow();
   cv.handle = { onFinish: new Set(), doneAt: t0 + ms };
   v.onloadedmetadata = () => {
     if (v.duration) cv.handle.doneAt = t0 + v.duration * 1000 / rate;
@@ -128,7 +129,7 @@ function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1, cover 
   v.onended = release;
   v.onerror = release;
   v.src = ctx.av.ASSET_BASE + '/' + file;
-  v.playbackRate = rate;
+  v.playbackRate = rate * getTimeScale();
   layer.appendChild(v);
   layer.appendChild(cv);
   if (audio) ctx.av.CombatAudioMixer.media(v, audio, 'skill', { category: ctx.audioContext?.category });

@@ -67,12 +67,12 @@ export function runCases() {
   const engine = { particles, addParticle: p => particles.push(p) };
   let stoppedAudio = 0, impacted = 0;
   const source = av.slice(av.indexOf('const supportHandles = new Set();'), av.indexOf('// ---- 事件总线'));
-  const support = new Function('document', 'getEntitySpriteDom', '__GBCR', '__STAGE', 'spawnHealParticles', 'fxEngine', 'playSound', 'Date', 'setTimeout', 'clearTimeout',
+  const support = new Function('document', 'getEntitySpriteDom', '__GBCR', '__STAGE', 'spawnHealParticles', 'fxEngine', 'playSound', '__fxDateNow', '__fxTimeout', 'clearTimeout',
     source + '\nreturn playGenericSupportFx;')(
     { createElement() { const node = { style: {}, firstElementChild: { style: {} }, remove() { this.removed = true; } }; wrappers.push(node); return node; } },
     () => ({ rect() { return { left: 0, top: 0, width: 100, height: 100 }; } }), 'rect', { el: { appendChild() {} } },
     add => add({ life: 900, vx: 2, vy: -2 }), engine,
-    () => ({ stop() { stoppedAudio++; } }), { now: () => 100 },
+    () => ({ stop() { stoppedAudio++; } }), () => 100,
     (fn, ms) => { const rec = { fn, ms, cleared: false }; timers.push(rec); return rec; }, rec => { rec.cleared = true; });
   const handle = support('h', 'buff', { soundKey: 'atkUp', onImpact() { impacted++; } });
   cases.push(ok('FB-AV02 辅助SVG/粒子/句柄同步1.5倍速且拍点一次', wrappers[0].style.animationDuration === '400ms'

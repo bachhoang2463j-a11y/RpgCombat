@@ -310,6 +310,9 @@ button:disabled { opacity: .42; cursor: default; }
 .t-topbtn { display: flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border-radius: 6px; background: var(--panel); border: 1px solid var(--line); font-size: 11px; color: var(--mute); transition: color .15s, border-color .15s; }
 .t-topbtn:hover { color: var(--text); border-color: var(--line-2); }
 @media (max-width: 1400px) { .t-toplabel { display: none; } }
+/* 演出倍速：非 1× 时金色高亮；窄屏也保留倍率读数 */
+.t-topbtn-on { color: var(--gold); border-color: var(--gold-2); }
+@media (max-width: 1400px) { #btn-speed .t-toplabel { display: inline; } }
 
 /* ---- 右侧支援单位：贴屏幕右缘的竖排收纳签（单个目标一签，只放 emoji，不显示血条）；点签展开右上图鉴检视卡 ---- */
 #tactics-allies { position: absolute; top: 52px; right: 0; bottom: 218px; z-index: 46; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;

@@ -12,6 +12,7 @@
 
 import { hasVariantTag } from './variant-rules.mjs';
 import { createRpgAv, RPG_AVATAR_MAP, RPG_HERO_VOICE_LINES } from './vendor/rpg-av/rpg-av.mjs';
+import { fxNow, fxDateNow, fxTimeout, fxInterval, getTimeScale } from './time-scale.mjs';
 
 export const FX_SCALE = 0.72;            // 卡片尺寸特效 → 地图尺度（舞台整体 scale，坐标同步换算）
 let STAGE_W = 1000 / FX_SCALE;            // 舞台尺寸 = 世界尺寸 / FX_SCALE（随场景网格变化）
@@ -123,14 +124,17 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
     isActive(e) { const u = unitById(idOf(e)); return !!(u && u.ref.hp > 0); },
     hasVariantTag(e, name) { const u = unitById(idOf(e)); return hasVariantTag(u, name, getEffectiveUnit(idOf(e))?.buffs || []); },
     report(kind, detail) { reports.missing.push({ kind, detail }); },
+    clock: { now: fxNow, dateNow: fxDateNow, timeout: fxTimeout, interval: fxInterval, scale: getTimeScale },
   };
 
   const av = createRpgAv(host);
   for (const [k, file] of Object.entries({ ...MOVE_AUDIO_FILES, ...JUMP_AUDIO_FILES })) {
     if (!av.audioUrls[k]) av.audioUrls[k] = av.ASSET_BASE + '/' + file;
   }
-  // 战棋不用顿帧：回合制底座粒子层的定帧（受击 60ms / 强力反击 80ms）恒为 0（底座为抽取生成物，不改其源）
-  if (av.fxEngine) Object.defineProperty(av.fxEngine, 'hitStop', { get: () => 0, set() {}, configurable: true });
+  // 粒子层定帧只由战棋局部顿帧（particleStop）抬高；底座自带的受击 60ms / 强力反击 80ms 抬高被忽略，引擎逐帧递减照常生效
+  let particleHold = 0;
+  if (av.fxEngine) Object.defineProperty(av.fxEngine, 'hitStop', { get: () => particleHold, set(v) { if (v < particleHold) particleHold = Math.max(0, v); }, configurable: true });
+  function particleStop(ms) { particleHold = Math.max(particleHold, ms); }
 
   // ---------- 舞台挂载（sandbox 每次 buildDom 后调用） ----------
   function attachStage({ stage, shake, worldW = 1000, worldH = 1000 }) {
@@ -304,6 +308,9 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
 
   function setAtmoTheme(theme) { return av.atmoAudio ? av.atmoAudio.setTheme(theme) : 'baseline'; }
   function setAtmoSound(on) { return av.atmoAudio ? av.atmoAudio.setAmbientSound(on) : false; }
+  function setBusVolume(name, v) { av.CombatAudioMixer.setBusVolume(name, v); }
+  function setPanHint(p) { av.CombatAudioMixer.setPanHint(p); }
 
-  return { av, host, attachStage, entity, syncRoster, consumeVisualEvents, syncVisualState, unlockAudio, playTurnVoice, playMainPointReceived, sfx, setToken, clear, trackImage, resourceReport, destroy, voiceUrl, setAtmoTheme, setAtmoSound };
+  return { av, host, attachStage, entity, syncRoster, consumeVisualEvents, syncVisualState, unlockAudio, playTurnVoice, playMainPointReceived, sfx, setToken, clear, trackImage, resourceReport, destroy, voiceUrl, setAtmoTheme, setAtmoSound,
+    setBusVolume, setPanHint, particleStop };
 }

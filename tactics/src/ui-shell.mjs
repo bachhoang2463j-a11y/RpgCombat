@@ -43,6 +43,7 @@ export function buildShell(root) {
       '<button id="btn-fullscreen" class="t-topbtn" title="全屏">🔲<span class="t-toplabel">全屏</span></button>' +
       '<button id="btn-dialogue" class="t-topbtn" title="对话">💬<span class="t-toplabel">对话</span></button>' +
       '<button id="btn-editor" class="t-topbtn" title="设置">⚙️<span class="t-toplabel">设置</span></button>' +
+      '<button id="btn-speed" class="t-topbtn" type="button" title="演出倍速（点击切换）">⏩<span class="t-toplabel" id="btn-speed-label">1.0×</span></button>' +
       '<button id="btn-music" class="t-topbtn" type="button" title="音乐" aria-label="音乐">🎵<span class="t-toplabel">音乐</span></button>' +
       '<button id="btn-reset" class="t-topbtn" title="重置">🔄<span class="t-toplabel">重置</span></button>' +
     '</div>',
@@ -799,6 +800,7 @@ export function buildShell(root) {
   $('btn-worldbook').addEventListener('click', showWorldbook);
   $('btn-fullscreen').addEventListener('click', toggleFullScreen);
   $('btn-music').addEventListener('click', () => { uiSound('select'); state.onMusic?.(); });
+  $('btn-speed').addEventListener('click', () => { uiSound('select'); state.onSpeed?.(); });
   $('btn-reset').addEventListener('click', () => { uiSound('select'); if (state.onReset) state.onReset(); });
   $('panel-close').addEventListener('click', closePanel);
   els.overlay.addEventListener('click', (e) => { if (e.target === els.overlay) closePanel(); });
@@ -828,17 +830,19 @@ export function buildShell(root) {
   // 非可玩模式（P02 展示）兼容：静态菜单
   function bindMenus() { renderCommand(null); }
   function markRoundStart() { rpgUi.markRoundStart(); }
+  function setSpeedLabel(v) { $('btn-speed-label').textContent = v.toFixed(1) + '×'; $('btn-speed').classList.toggle('t-topbtn-on', v !== 1); }
 
   return {
     destroy: () => { flames.destroy(); clearTimeout(showLog._t); clearTimeout(showBanner._t); rpgUi.hideTagTip(); document.removeEventListener('mousedown', onComboDown); reactionPrompt.cancel(); state.onReset = null; state.onUnitClick = null; state.onAllyPin = null; root.replaceChildren(); },
     els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setHeroStatus, setHeroStats, flashHeroPassive, showInspector, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
-    previewMoveCost, previewPips, openModal, closeModal,
+    previewMoveCost, previewPips, openModal, closeModal, setSpeedLabel,
     promptReaction: (req) => reactionPrompt.prompt(req), cancelReactionPrompt: () => reactionPrompt.cancel(),
     getSafeRect, showLog, openPanel, closePanel, openResult, clearBattle, closeSubmenu: () => {},
     set onUnitClick(fn) { state.onUnitClick = fn; },
     set onAllyPin(fn) { state.onAllyPin = fn; },
     set onReset(fn) { state.onReset = fn; },
     set onMusic(fn) { state.onMusic = fn; },
+    set onSpeed(fn) { state.onSpeed = fn; },
     set onUiSound(fn) { state.onUiSound = fn; },
     set settings(provider) { state.settings = provider; },
     get state() { return state; },

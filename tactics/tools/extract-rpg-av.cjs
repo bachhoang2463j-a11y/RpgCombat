@@ -266,6 +266,16 @@ function build() {
   const mixA = lineIndex(L, l => l.startsWith('const _fxAudioCache = new Map();'), 0, '混音器缓存起点');
   const mixB = lineIndex(L, l => l.startsWith('window.CombatAudioMixer = CombatAudioMixer;'), mixA, '混音器终点');
   let mixer = L.slice(mixA, mixB).join('\n');
+  // 分轨音量：主总线 + 语音/环境独立轨（N 类语音改走 voice 轨）；战斗音效未显式声像时取导演给的声像提示
+  mixer = patch(mixer, '    let ctx = null, tracks = {}, categoryTracks = new Map(), generation = 0, nextCueId = 0, audioScope = null;',
+    '    let ctx = null, tracks = {}, categoryTracks = new Map(), generation = 0, nextCueId = 0, audioScope = null;\n    const __busVol = { master: 1, skill: 1, result: 1, aux: 1, voice: 1, atmo: 1 }; let __panHint = null;', 1, '混音器分轨音量与声像提示状态');
+  mixer = patch(mixer, "for (const name of ['skill', 'result', 'aux']) { const bus = ctx.createGain(); bus.connect(ctx.destination); tracks[name] = bus; }",
+    "const __master = ctx.createGain(); __master.gain.value = __busVol.master; __master.connect(ctx.destination); tracks.master = __master;\n            for (const name of ['skill', 'result', 'aux', 'voice', 'atmo']) { const bus = ctx.createGain(); bus.gain.value = __busVol[name]; bus.connect(__master); tracks[name] = bus; }", 1, '混音器主总线与五轨');
+  mixer = patch(mixer, "const trackOf = category => ['F','G','H','I']", "const trackOf = category => category === 'N' ? 'voice' : ['F','G','H','I']", 1, '语音独立轨');
+  mixer = patch(mixer, 'if (opts.pan != null && audioCtx.createStereoPanner) { pan = audioCtx.createStereoPanner(); pan.pan.value = opts.pan;',
+    "const __p = opts.pan != null ? opts.pan : (cue.track === 'skill' || cue.track === 'result') ? __panHint : null;\n            if (__p != null && audioCtx.createStereoPanner) { pan = audioCtx.createStereoPanner(); pan.pan.value = __p;", 1, '战斗音效声像提示');
+  mixer = patch(mixer, '    return { context, skillContext, output,',
+    '    function setBusVolume(name, v) { __busVol[name] = v; if (ctx && tracks[name]) tracks[name].gain.setTargetAtTime(v, ctx.currentTime, 0.015); }\n    function setPanHint(p) { __panHint = p; }\n    return { setBusVolume, setPanHint, context, skillContext, output,', 1, '混音器分轨音量与声像接口');
   const applyVol = topBlock(L, l => l.startsWith('function applyAudioVolume('), 'applyAudioVolume');
   const playCustom = topBlock(L, l => l.startsWith('function playCustomAudio('), 'playCustomAudio');
   const audioUrls = topBlock(L, l => l.startsWith('const audioUrls = {'), 'audioUrls', /^\};\s*$/);
@@ -307,7 +317,8 @@ function build() {
   const atmoPink = topBlock(L, l => l.startsWith('    function getPinkNoise(ctx)'), 'getPinkNoise', /^    \}\s*$/);
   const atmoStop = topBlock(L, l => l.startsWith('    function stopAmbientAudio('), 'stopAmbientAudio', /^    \}\s*$/);
   let atmoSync = topBlock(L, l => l.startsWith('    function syncAmbientAudio('), 'syncAmbientAudio', /^    \}\s*$/);
-  const atmoSyncText = patch(atmoSync.text, "if (!state.ambientSound || state.theme === 'baseline' || !state.rootEl?.isConnected)", "if (!state.ambientSound || state.theme === 'baseline')", 1, '环境音脱离#battle-scene DOM');
+  let atmoSyncText = patch(atmoSync.text, "if (!state.ambientSound || state.theme === 'baseline' || !state.rootEl?.isConnected)", "if (!state.ambientSound || state.theme === 'baseline')", 1, '环境音脱离#battle-scene DOM');
+  atmoSyncText = patch(atmoSyncText, "bus.connect(CombatAudioMixer.output('aux', 'L'));", "bus.connect(CombatAudioMixer.output('atmo', 'L'));", 1, '环境音独立轨');
   const atmoAudioCode = `  const atmoState = { theme: 'baseline', ambientSound: false, pinkNoiseBuf: null, audioSession: null };
   const atmoAudio = (function () {
     const state = atmoState;
@@ -527,6 +538,7 @@ ${supportBranches.join('\n').replace('else if', 'if')}
     'const rose = fsLayer(`<div style="position:absolute; inset:0; perspective:${SZ * 3}px; perspective-origin:${c.x}px ${c.bottom - 6}px;">', 1, '灵风术法阵透视原点钉在阵心');
   mod = patch(mod, 'top:${c.y - 6}px; width:330px; height:200px; animation: arcane-wing-glyph',
     'top:${c.y - 6}px; width:${c.h * 3.3}px; height:${c.h * 2}px; animation: arcane-wing-glyph', 1, '灵风术收尾羽翼按头像尺度');
+  mod = patch(mod, 'v.playbackRate = rate;', 'v.playbackRate = rate * __fxScale();', 1, '技能视频随演出倍速');
 
   const stubText = STUBS.map(n => 'function ' + n + '() { /* 未迁移段：本 Demo 不产生该状态 */ }').join('\n');
   // 2d) 强力反击专属音效 URL 与精确演出源段（不连带近/远程重击函数）
@@ -653,18 +665,8 @@ ${powerEffect}
   const refText = mod + '\n' + gun.text + '\n' + shotgun.text + '\n' + mixer;
   const usedKeys = urlKeys.filter(k => refText.includes("'" + k + "'") || refText.includes('"' + k + '"') || refText.includes('audioUrls.' + k));
 
-  const header = [
-    '// ==========================================',
-    '// 由 tactics/tools/extract-rpg-av.cjs 自动生成，请勿手改。',
-    '// 源: index.html  sha256=' + sha(html),
-    '// arcaneVfxModule 行区间(源 ' + arc.span.join('–') + '): ' + arc.ranges.map(r => r.join('–')).join(', '),
-    '// 入选语句 ' + arc.count + ' 段 / ' + arc.lines + ' 行；入口: ' + ENTRIES.join(', '),
-    '// 显式存根: ' + STUBS.join(', '),
-    '// 宿主适配补丁: ' + PATCH_LOG.map(p => p.what + '×' + p.hits).join('; '),
-    '// ==========================================',
-  ].join('\n');
-
-  const js = header + `
+  const MIXER_SLOT = '/*__RPG_AV_MIXER__*/';
+  let body = `
 /* eslint-disable */
 // ---- 纯数据导出（原样，供宿主在工厂创建前解析人物头像/语音与预载清单） ----
 export const RPG_AVATAR_MAP = {
@@ -677,6 +679,7 @@ export function createRpgAv(host) {
   // ---- 宿主注入（战棋舞台、单位视图、代际令牌） ----
   const __STAGE = host.stage;              // { el, w, h, onResize(fn), shakeEl() }
   const __GBCR = host.rectSymbol;          // Element.prototype[__GBCR]() → 舞台坐标矩形
+  const __fxNow = host.clock.now, __fxDateNow = host.clock.dateNow, __fxTimeout = host.clock.timeout, __fxInterval = host.clock.interval, __fxScale = host.clock.scale;
   ${originLine}
   const ASSET_BASE = ASSET_ORIGIN;
   const HERO_VOICE_BASE = ASSET_BASE;
@@ -707,7 +710,7 @@ ${moments}
   };
 
   // ---- CombatAudioMixer 及采样工具（原样） ----
-${mixer}
+${MIXER_SLOT}
 
 ${soundText}
 
@@ -754,6 +757,25 @@ ${busOn.map(l => l.replace('CombatAudioDirector.consume', 'arcane.CombatAudioDir
   });
 }
 `;
+  // 演出倍速：除混音器（音频上下文时间换算必须用真实时钟）外，底座计时与时刻读数统一走宿主虚拟时钟
+  body = patch(body, /(?<![.\w$])setTimeout\(/g, '__fxTimeout(', 12, '底座计时随演出倍速');
+  body = patch(body, /(?<![.\w$])setInterval\(/g, '__fxInterval(', 1, '底座间隔随演出倍速');
+  body = patch(body, /(?<![.\w$])performance\.now\(\)/g, '__fxNow()', 19, '底座时刻随演出倍速');
+  body = patch(body, /(?<![.\w$])Date\.now\(\)/g, '__fxDateNow()', 23, '底座句柄时刻随演出倍速');
+  if (body.split(MIXER_SLOT).length !== 2) fail('混音器插槽数变化');
+  body = body.replace(MIXER_SLOT, () => mixer);
+
+  const header = [
+    '// ==========================================',
+    '// 由 tactics/tools/extract-rpg-av.cjs 自动生成，请勿手改。',
+    '// 源: index.html  sha256=' + sha(html),
+    '// arcaneVfxModule 行区间(源 ' + arc.span.join('–') + '): ' + arc.ranges.map(r => r.join('–')).join(', '),
+    '// 入选语句 ' + arc.count + ' 段 / ' + arc.lines + ' 行；入口: ' + ENTRIES.join(', '),
+    '// 显式存根: ' + STUBS.join(', '),
+    '// 宿主适配补丁: ' + PATCH_LOG.map(p => p.what + '×' + p.hits).join('; '),
+    '// ==========================================',
+  ].join('\n');
+  const js = header + body;
   return { js, css: '/* 由 extract-rpg-av.cjs 自动生成，请勿手改。源 sha256=' + sha(html) + ' */\n' + css.css + hitCss, report: {
     source: SRC, sourceSha: sha(html), arcaneRanges: arc.ranges, arcaneSegments: arc.count, arcaneLines: arc.lines,
     cssRules: css.rules, cssKeyframes: css.keyframes, patches: PATCH_LOG.slice(), jsBytes: Buffer.byteLength(js),

@@ -33,12 +33,14 @@ function originalHitHarness(scale = 1, locked = false) {
   let timerId = 0, stopCount = 0, hitStop = 0;
   const engine = { get hitStop() { return hitStop; }, set hitStop(v) { hitStop = v; stopCount++; } };
   const after = (ms, fn) => { const id = ++timerId; timers.set(id, { ms, fn }); S.timers.add(id); return id; };
-  const names = ['document', 'host', 'domOf', 'entityVisualRect', 'ctr', 'S', '__STAGE', '__GBCR', 'heroesData', 'enemiesData', 'isEntityVariantLocked', 'burst', 'rnd', 'pick', 'getComputedStyle', 'after', 'clearTimeout', 'shake', 'fxEngine', 'releaseIdleCanvas'];
+  const names = ['document', 'host', 'domOf', 'entityVisualRect', 'ctr', 'S', '__STAGE', '__GBCR', 'heroesData', 'enemiesData', 'isEntityVariantLocked', 'burst', 'rnd', 'pick', 'getComputedStyle', 'after', 'clearTimeout', 'shake', 'fxEngine', 'releaseIdleCanvas',
+    '__fxNow', '__fxDateNow', '__fxTimeout'];
   const api = new Function(...names, hitSource + '\nreturn { classifyHit, playHitFeedback, hitVisual, emitBloodMist };')(
     { createElement: () => node(), createElementNS: (_, tag) => node(tag), getElementById: () => null, querySelectorAll: () => [] },
     { hitNumberScale: () => scale }, () => dom, () => rect, () => rect, S, { el: layers }, rectKey, [], [], () => locked,
     (count, factory) => { for (let i = 0; i < count; i++) particles.push(factory()); }, (a, b) => (a + b) / 2, list => list[0],
-    () => ({ fontSize: '42px' }), after, id => timers.delete(id), kind => shakes.push(kind), engine, () => {});
+    () => ({ fontSize: '42px' }), after, id => timers.delete(id), kind => shakes.push(kind), engine, () => {},
+    () => performance.now(), () => Date.now(), setTimeout);
   return { ...api, layers, dom, particles, timers, shakes, engine, stopCount: () => stopCount,
     beat(ms) { for (const [id, t] of [...timers]) if (t.ms === ms) { timers.delete(id); t.fn(); } } };
 }
@@ -119,7 +121,7 @@ export const groups = {
     const cases = [], waves = [], feedback = [], completed = [], closed = [], previousDocument = globalThis.document;
     const scope = { isLive: true, addNode() {}, removeNode() {}, after: (_, fn) => fn(), settleOnDispose: () => () => {} };
     const units = [{ id: 'c', side: 'hero', ref: { atk: 10 } }, { id: 'a', side: 'enemy' }, { id: 'b', side: 'enemy' }];
-    const view = { setDisplayFacing() {}, updateUnit() {} };
+    const view = { setDisplayFacing() {}, updateUnit() {}, nodes: new Map() };
     globalThis.document = { createElement: () => node() };
     try {
       const director = createActionDirector({

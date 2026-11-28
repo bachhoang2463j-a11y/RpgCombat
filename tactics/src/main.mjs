@@ -35,6 +35,7 @@ import { getEffectiveStats } from './class-passives.mjs';
 import { hitChance } from './damage.mjs';
 import { skillSlots } from './effect-definitions.mjs';
 import { createBgmDirector } from './bgm-director.mjs';
+import { SPEED_STEPS, setTimeScale, getTimeScale } from './time-scale.mjs';
 import { BGM_TRACKS } from './bgm-library.mjs';
 // 同名 YAML 技能仍保留规则字段，本场编辑仅覆写显式演出标签。
 export function applyEditorFxTags(rows, editedRows) {
@@ -258,7 +259,8 @@ export function createApp(rootEl, opts = {}) {
     getEffectiveUnit: id => battle?.getEffectiveUnit(id), onStatusTick: (ev, index) => playDotTick(ev, index) });
   const ui = createUiSfx(avHost.av.CombatAudioMixer);
   let settlementSeq = 0;
-  const bgm = createBgmDirector({ assetBase: avHost.resourceReport().assetBase, context: () => avHost.av.CombatAudioMixer.context() });
+  const bgm = createBgmDirector({ assetBase: avHost.resourceReport().assetBase, context: () => avHost.av.CombatAudioMixer.context(),
+    output: () => avHost.av.CombatAudioMixer.output('master') });
   const unlockBgm = () => { void bgm.unlock(); };
   rootEl.ownerDocument?.addEventListener('pointerdown', unlockBgm, { capture: true });
   rootEl.ownerDocument?.addEventListener('keydown', unlockBgm, { capture: true });
@@ -315,6 +317,15 @@ export function createApp(rootEl, opts = {}) {
     musicPanel.querySelector('[data-music-auto]').onclick = () => bgm.resumeAuto();
     updateMusicPanel(bgm.state());
   };
+  // 演出倍速：顶栏按钮在 1.0/1.2/1.5/2.0 间循环，全局作用于我方与敌方演出（规则时钟不受影响）
+  const SPEED_KEY = 'tactics.speed.v1';
+  function applySpeed(v) { setTimeScale(v); shell.setSpeedLabel(v); }
+  try { const saved = Number(localStorage.getItem(SPEED_KEY)); if (SPEED_STEPS.includes(saved)) applySpeed(saved); } catch (_) {}
+  shell.onSpeed = () => {
+    const next = SPEED_STEPS[(SPEED_STEPS.indexOf(getTimeScale()) + 1) % SPEED_STEPS.length];
+    applySpeed(next);
+    try { localStorage.setItem(SPEED_KEY, String(next)); } catch (_) {}
+  };
   const sandbox = createSandbox(shell.els.mapSlot, {
     getSafeRect: () => shell.getSafeRect(),
     onStage: (els) => avHost.attachStage(els),
@@ -336,6 +347,7 @@ export function createApp(rootEl, opts = {}) {
     promptTeleport: (req) => beginTeleportPrompt(req),
     onMovementRequest: (req) => presentMovementRequest(req),
     getUnitStyle: (id) => effectiveUnitStyle(id),
+    liteRepeatCine: () => audioPrefs.liteCine !== false,
     // FX02 反应接线（contract v2/v3）：玩家控制的单位（controller 优先，缺省按 side）受击弹全屏反应弹窗；
     // AI 控制的（敌方/召唤物/AI 侧 hero）不弹窗，自动选首个可用候选（原版敌方口径）
     promptReaction: (req) => {
@@ -2092,9 +2104,16 @@ export function createApp(rootEl, opts = {}) {
 
   const AUDIO_PREF_KEY = 'tactics.audioPrefs.v1';
   const audioPrefs = (() => {
-    const def = { move: true, identity: true, variant: true, status: true, selfDestruct: true, atmoSound: false, atmoTheme: 'rain' };
+    const def = { move: true, identity: true, variant: true, status: true, selfDestruct: true, atmoSound: false, atmoTheme: 'rain',
+      volMaster: 1, volSfx: 1, volUi: 1, volVoice: 1, volAtmo: 1, muted: false, liteCine: true };
     try { return Object.assign(def, JSON.parse(localStorage.getItem(AUDIO_PREF_KEY) || '{}')); } catch (_) { return def; }
   })();
+  // 分轨：主音量（含配乐）/ 战斗音效（技能+结果轨）/ 界面·提示·脚步（aux）/ 角色语音 / 环境音
+  function applyVolumes() {
+    avHost.setBusVolume('master', audioPrefs.muted ? 0 : audioPrefs.volMaster);
+    avHost.setBusVolume('skill', audioPrefs.volSfx); avHost.setBusVolume('result', audioPrefs.volSfx);
+    avHost.setBusVolume('aux', audioPrefs.volUi); avHost.setBusVolume('voice', audioPrefs.volVoice); avHost.setBusVolume('atmo', audioPrefs.volAtmo);
+  }
   function applyAudioPrefs() {
     moveSfxOn = !!audioPrefs.move;
     if (!moveSfxOn) activeGlides.forEach((_h, uid) => stopActiveGlide(uid));
@@ -2104,23 +2123,45 @@ export function createApp(rootEl, opts = {}) {
     avHost.av.setSelfDestructSfx?.(!!audioPrefs.selfDestruct);
     avHost.setAtmoTheme(audioPrefs.atmoTheme);
     avHost.setAtmoSound(!!audioPrefs.atmoSound);
+    applyVolumes();
   }
   applyAudioPrefs();
+  function saveAudioPrefs() { try { localStorage.setItem(AUDIO_PREF_KEY, JSON.stringify(audioPrefs)); } catch (_) {} }
   const onAudioPrefChange = (e) => {
     const t = e.target;
     const key = t && t.dataset && t.dataset.audioPref;
     if (!key) return;
+    if (t.type === 'range') {
+      audioPrefs[key] = Number(t.value) / 100;
+      const out = t.parentElement && t.parentElement.querySelector('output');
+      if (out) out.textContent = t.value + '%';
+      applyVolumes();
+      if (e.type === 'change') saveAudioPrefs();
+      return;
+    }
+    if (e.type !== 'change') return;
     audioPrefs[key] = t.type === 'checkbox' ? !!t.checked : String(t.value || 'baseline');
-    try { localStorage.setItem(AUDIO_PREF_KEY, JSON.stringify(audioPrefs)); } catch (_) {}
+    saveAudioPrefs();
     applyAudioPrefs();
   };
   shell.els.editorModal?.addEventListener('change', onAudioPrefChange);
+  shell.els.editorModal?.addEventListener('input', onAudioPrefChange);
+  function toggleMute() {
+    audioPrefs.muted = !audioPrefs.muted;
+    saveAudioPrefs(); applyVolumes();
+    const box = shell.els.editorModal?.querySelector('[data-audio-pref="muted"]');
+    if (box) box.checked = audioPrefs.muted;
+    shell.showLog(audioPrefs.muted ? '🔇 已静音（按 M 恢复）' : '🔊 声音已恢复', 'act', 1600);
+  }
 
   function soundSettingsHtml() {
     const rep = avHost.resourceReport();
     const count = (list, st) => list.filter(r => r.status === st).length;
     const bad = rep.audio.filter(r => r.status === 'error').concat(rep.images.filter(r => r.status === 'error'));
     const chk = (k, label) => '<label class="flex items-center justify-between gap-2 text-[11px] text-slate-200 cursor-pointer py-0.5"><span>' + label + '</span><input type="checkbox" data-audio-pref="' + k + '"' + (audioPrefs[k] ? ' checked' : '') + '></label>';
+    const vol = (k, label) => '<label class="flex items-center justify-between gap-2 text-[11px] text-slate-200 py-0.5"><span class="whitespace-nowrap">' + label + '</span>' +
+      '<input type="range" min="0" max="100" step="5" class="flex-1" data-audio-pref="' + k + '" value="' + Math.round(audioPrefs[k] * 100) + '">' +
+      '<output class="w-9 text-right text-slate-400">' + Math.round(audioPrefs[k] * 100) + '%</output></label>';
     const themes = [['baseline', '默认静音'], ['rain', '夜雨'], ['mist', '冷雾'], ['ruins', '废墟尘埃'], ['eldritch', '异界低光']];
     return '<h4 class="t-panel-h">声音与资源</h4>' +
       '<div class="t-res-report"><div>资源基址：<code>' + escapeText(rep.assetBase) + '</code></div>' +
@@ -2130,6 +2171,10 @@ export function createApp(rootEl, opts = {}) {
       (bad.length ? '<div class="t-res-bad">加载失败：<br>' + bad.map(r => escapeText(r.url)).join('<br>') + '</div>' : '') +
       (rep.missing.length ? '<div class="t-res-bad">缺失：' + rep.missing.map(m => escapeText(m.kind + ':' + m.detail)).join('，') + '</div>' : '') +
       '<div class="mt-2 pt-2 border-t border-slate-700/60">' +
+      vol('volMaster', '主音量（含配乐）') + vol('volSfx', '战斗音效') + vol('volUi', '界面·提示·脚步') + vol('volVoice', '角色语音') + vol('volAtmo', '环境音') +
+      chk('muted', '静音（快捷键 M）') +
+      chk('liteCine', '重复技能精简运镜') +
+      '</div><div class="mt-2 pt-2 border-t border-slate-700/60">' +
       chk('move', '步态移动音效（6 档真实采样）') +
       chk('identity', '攻击身份音效') +
       chk('variant', '怪物变体与抗性音效') +
@@ -2148,6 +2193,7 @@ export function createApp(rootEl, opts = {}) {
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
     if (e.key === 'Escape') { if (retargetPrompt) { retargetPrompt.finish(null); return; } cancelStep(); return; }
     if (e.key === 'Enter' && retargetPrompt) { e.preventDefault(); retargetPrompt.finish(null); return; }
+    if ((e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.metaKey && !e.altKey) { toggleMute(); return; }
     if (!battle || !isHeroTurn()) return;
     if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); if (busy) { ui('deny'); return; } requestEnd(); return; }
     if (e.key === 'Enter' && pending) { e.preventDefault(); if (!busy) firePending(); return; }

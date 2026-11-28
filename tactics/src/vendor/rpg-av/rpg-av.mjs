@@ -4,7 +4,7 @@
 // arcaneVfxModule 行区间(源 5729–14230): 5730–5924, 5932–6356, 6431–6485, 6565–7584, 7596–11500, 11829–12083, 12201–12562, 12565–14208
 // 入选语句 316 段 / 7861 行；入口: playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar, CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx, syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked, playSummonEnter, playSummonExit, playSummonGuard, clearSummonState, playLingFeng, playIsis, playFeiShaHuaJia, playXieYanKey, playHarmonyShelter, playSilenceDomain, playShatterResonance, playZheYingBu, playStrangeConch, playMeleeGroup, playRangedGroup, playSpellGroup, playRescueGrit, playRescueAvoidFatal, clearRescueState, playVariantResistFx, playCounterAttackL1, playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, clearSelfDestructState, syncSelfDestructWarning, setIdentitySfx, setVariantSfx, setStatusSfx, setSelfDestructSfx
 // 显式存根: 
-// 宿主适配补丁: 枪击采样相邻去重×1; 远程击杀隐藏我方名称×1; 特写挂屏幕宿主×2; 特写收尾登记×2; 特写震屏走舞台震动层×1; 特写计时可随重开清理×6; 环境音脱离#battle-scene DOM×1; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 重击数字不等定帧×1; 蝎眼钥匙落点参数×1; 蝎眼钥匙裂隙钉召唤落点×1; 蝎眼钥匙裂隙舞台定位×1; 折影步去卡片横移×1; 折影步落点参数×1; 折影步落点涟漪×1; 折影步残影保留圆形尺度×1; 奇异海螺去顿帧×1; 谐律之庇音叉悬于受益者上方×1; 屏幕矩形 → 特效舞台坐标×14; innerWidth → 舞台宽×22; innerHeight → 舞台高×15; body 挂载 → 特效舞台×6; JS position:fixed → absolute×2; arcane canvas resize 走舞台×1; 舞台震动独立层×3; window.* 声音函数改为工厂内本地×14; 环境氛围音随清场停止×1; 去抗性全局挂载×1; 毅力血幕挂圆形棋子内框×1; 致命回避残影保留圆形尺度×1; 反击残影保留圆形尺度×1; 灵风术法阵按头像尺度×1; 灵风术法阵透视原点钉在阵心×1; 灵风术收尾羽翼按头像尺度×1; 强力反击原版震屏函数×1; 强力反击震屏宿主×1; 强力反击震屏清理登记×1; 强力反击震屏代际×1; 强力反击震屏帧登记×2; 强力反击爆发粒子注入×1; 强力反击蓄力粒子注入×1; 强力反击回调契约×1; 强力反击代际句柄×1; 强力反击取消结果×1; 强力反击闪避缓冲可取消×1; 强力反击蓄力可取消×1; 强力反击预载取消×1; 强力反击起播等待可取消×1; 强力反击登记蓄力光×1; 强力反击音效取消登记×1; 强力反击阶段取消结果×1; 强力反击舞台坐标×1; 强力反击实体DOM蓄力光×1; 强力反击实体DOM×1; 强力反击蓄力粒子×1; 强力反击聚气使用本地函数×1; 强力反击蓄力坐标×1; 强力反击方向坐标×1; 强力反击锁定读取本地模块×1; 强力反击白闪舞台挂载×1; 强力反击白闪计时×1; 强力反击准星舞台坐标×1; 强力反击准星舞台挂载×1; 强力反击准星计时×1; 强力反击爆发与命中回调×1; 强力反击攻击方向实体×1; 强力反击目标震动清理×1; 强力反击原版震屏调用×1; 强力反击余波等待可取消×1; 强力反击保留余波并返回成功×1; CSS position:fixed → absolute×13; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1; CSS 残留视口单位(按舞台尺度保留)×42
+// 宿主适配补丁: 混音器分轨音量与声像提示状态×1; 混音器主总线与五轨×1; 语音独立轨×1; 战斗音效声像提示×1; 混音器分轨音量与声像接口×1; 枪击采样相邻去重×1; 远程击杀隐藏我方名称×1; 特写挂屏幕宿主×2; 特写收尾登记×2; 特写震屏走舞台震动层×1; 特写计时可随重开清理×6; 环境音脱离#battle-scene DOM×1; 环境音独立轨×1; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 重击数字不等定帧×1; 蝎眼钥匙落点参数×1; 蝎眼钥匙裂隙钉召唤落点×1; 蝎眼钥匙裂隙舞台定位×1; 折影步去卡片横移×1; 折影步落点参数×1; 折影步落点涟漪×1; 折影步残影保留圆形尺度×1; 奇异海螺去顿帧×1; 谐律之庇音叉悬于受益者上方×1; 屏幕矩形 → 特效舞台坐标×14; innerWidth → 舞台宽×22; innerHeight → 舞台高×15; body 挂载 → 特效舞台×6; JS position:fixed → absolute×2; arcane canvas resize 走舞台×1; 舞台震动独立层×3; window.* 声音函数改为工厂内本地×14; 环境氛围音随清场停止×1; 去抗性全局挂载×1; 毅力血幕挂圆形棋子内框×1; 致命回避残影保留圆形尺度×1; 反击残影保留圆形尺度×1; 灵风术法阵按头像尺度×1; 灵风术法阵透视原点钉在阵心×1; 灵风术收尾羽翼按头像尺度×1; 技能视频随演出倍速×1; 强力反击原版震屏函数×1; 强力反击震屏宿主×1; 强力反击震屏清理登记×1; 强力反击震屏代际×1; 强力反击震屏帧登记×2; 强力反击爆发粒子注入×1; 强力反击蓄力粒子注入×1; 强力反击回调契约×1; 强力反击代际句柄×1; 强力反击取消结果×1; 强力反击闪避缓冲可取消×1; 强力反击蓄力可取消×1; 强力反击预载取消×1; 强力反击起播等待可取消×1; 强力反击登记蓄力光×1; 强力反击音效取消登记×1; 强力反击阶段取消结果×1; 强力反击舞台坐标×1; 强力反击实体DOM蓄力光×1; 强力反击实体DOM×1; 强力反击蓄力粒子×1; 强力反击聚气使用本地函数×1; 强力反击蓄力坐标×1; 强力反击方向坐标×1; 强力反击锁定读取本地模块×1; 强力反击白闪舞台挂载×1; 强力反击白闪计时×1; 强力反击准星舞台坐标×1; 强力反击准星舞台挂载×1; 强力反击准星计时×1; 强力反击爆发与命中回调×1; 强力反击攻击方向实体×1; 强力反击目标震动清理×1; 强力反击原版震屏调用×1; 强力反击余波等待可取消×1; 强力反击保留余波并返回成功×1; CSS position:fixed → absolute×13; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1; CSS 残留视口单位(按舞台尺度保留)×42; 底座计时随演出倍速×12; 底座间隔随演出倍速×1; 底座时刻随演出倍速×19; 底座句柄时刻随演出倍速×23
 // ==========================================
 /* eslint-disable */
 // ---- 纯数据导出（原样，供宿主在工厂创建前解析人物头像/语音与预载清单） ----
@@ -42,6 +42,7 @@ export function createRpgAv(host) {
   // ---- 宿主注入（战棋舞台、单位视图、代际令牌） ----
   const __STAGE = host.stage;              // { el, w, h, onResize(fn), shakeEl() }
   const __GBCR = host.rectSymbol;          // Element.prototype[__GBCR]() → 舞台坐标矩形
+  const __fxNow = host.clock.now, __fxDateNow = host.clock.dateNow, __fxTimeout = host.clock.timeout, __fxInterval = host.clock.interval, __fxScale = host.clock.scale;
   const ASSET_ORIGIN = window.__RPG_ASSET_BASE__ || 'http://192.168.110.83:8766';
   const ASSET_BASE = ASSET_ORIGIN;
   const HERO_VOICE_BASE = ASSET_BASE;
@@ -71,7 +72,7 @@ function countLimitedSummons(side) {
   // ---- 击杀特写 / 大招 Cut-in（原版顶层函数；屏幕宿主由战棋提供，重开/清场统一取消计时与遮罩） ----
   const __MOMENTS = new Set(), __momentTimers = new Set();
   const __SCREEN = () => (host.screen ? host.screen() : __STAGE.el);
-  function __momentTimeout(fn, ms) { const id = setTimeout(() => { __momentTimers.delete(id); fn(); }, ms); __momentTimers.add(id); return id; }
+  function __momentTimeout(fn, ms) { const id = __fxTimeout(() => { __momentTimers.delete(id); fn(); }, ms); __momentTimers.add(id); return id; }
   function clearMoments() { __momentTimers.forEach(clearTimeout); __momentTimers.clear(); __MOMENTS.forEach(o => o.remove()); __MOMENTS.clear(); }
 async function playExecutionAnimation(hero, killedEnemies, damageType) {
     return new Promise(resolve => {
@@ -414,6 +415,7 @@ const itemFxAssetUrl = file => ASSET_BASE + '/' + file.split('/').map(encodeURIC
 
 const CombatAudioMixer = (function () {
     let ctx = null, tracks = {}, categoryTracks = new Map(), generation = 0, nextCueId = 0, audioScope = null;
+    const __busVol = { master: 1, skill: 1, result: 1, aux: 1, voice: 1, atmo: 1 }; let __panHint = null;
     const buffers = new Map(), decodes = new Map(), voices = new Set(), protections = new Set(), timers = new Map();
     const categories = {
         A:{ priority:8, gain:1.3 }, C:{ priority:8, gain:1.3 }, M:{ priority:7, gain:1 }, B:{ priority:6, gain:1.3 },
@@ -422,7 +424,7 @@ const CombatAudioMixer = (function () {
         J:{ priority:0, gain:1 }, L:{ priority:0, gain:1 }
     };
     const profiles = { short:{ holdMs:180 }, special:{ holdMs:450 } };
-    const trackOf = category => ['F','G','H','I'].includes(category) ? 'result' : ['A','B','C','D','E'].includes(category) ? 'skill' : 'aux';
+    const trackOf = category => category === 'N' ? 'voice' : ['F','G','H','I'].includes(category) ? 'result' : ['A','B','C','D','E'].includes(category) ? 'skill' : 'aux';
     const categoryOf = opts => opts.category || opts.audioContext?.category || opts.owner?.audioContext?.category || audioScope?.category
         || (opts.track === 'skill' ? 'D' : opts.track === 'result' ? 'F' : 'K');
     function capture(fallback = 'K') { return audioScope || Object.freeze({ category:fallback }); }
@@ -442,7 +444,8 @@ const CombatAudioMixer = (function () {
             const Ctx = window.AudioContext || window.webkitAudioContext;
             if (!Ctx) return null;
             ctx = new Ctx();
-            for (const name of ['skill', 'result', 'aux']) { const bus = ctx.createGain(); bus.connect(ctx.destination); tracks[name] = bus; }
+            const __master = ctx.createGain(); __master.gain.value = __busVol.master; __master.connect(ctx.destination); tracks.master = __master;
+            for (const name of ['skill', 'result', 'aux', 'voice', 'atmo']) { const bus = ctx.createGain(); bus.gain.value = __busVol[name]; bus.connect(__master); tracks[name] = bus; }
         }
         return ctx;
     }
@@ -574,7 +577,8 @@ const CombatAudioMixer = (function () {
         }
         function route(audioCtx) {
             gain = audioCtx.createGain();
-            if (opts.pan != null && audioCtx.createStereoPanner) { pan = audioCtx.createStereoPanner(); pan.pan.value = opts.pan; gain.connect(pan); pan.connect(output(cue.track, cue.category)); }
+            const __p = opts.pan != null ? opts.pan : (cue.track === 'skill' || cue.track === 'result') ? __panHint : null;
+            if (__p != null && audioCtx.createStereoPanner) { pan = audioCtx.createStereoPanner(); pan.pan.value = __p; gain.connect(pan); pan.connect(output(cue.track, cue.category)); }
             else gain.connect(output(cue.track, cue.category));
         }
         function started(when, duration) {
@@ -673,7 +677,9 @@ const CombatAudioMixer = (function () {
         if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
         return audioCtx;
     }
-    return { context, skillContext, output, load, prepare, prepareSkill, play, protect, atTime, bindOwner, media, clear, buffers, decodes, categories, classify, capture, withContext, trackOf };
+    function setBusVolume(name, v) { __busVol[name] = v; if (ctx && tracks[name]) tracks[name].gain.setTargetAtTime(v, ctx.currentTime, 0.015); }
+    function setPanHint(p) { __panHint = p; }
+    return { setBusVolume, setPanHint, context, skillContext, output, load, prepare, prepareSkill, play, protect, atTime, bindOwner, media, clear, buffers, decodes, categories, classify, capture, withContext, trackOf };
 })();
 
 function applyAudioVolume(audio, volume, opts = {}) { return CombatAudioMixer.media(audio, volume, 'skill', opts); }
@@ -866,7 +872,7 @@ function playShotgunSound(owner = null) {
     return run;
   }
   function powerSchedule(run, fn, ms) {
-    const id = setTimeout(() => { run.timers.delete(id); if (run.active) fn(); }, ms);
+    const id = __fxTimeout(() => { run.timers.delete(id); if (run.active) fn(); }, ms);
     run.timers.add(id);
     return id;
   }
@@ -912,11 +918,11 @@ function playPowerCounterShake(run, intensity = 6, duration = 300) {
     const scene = __STAGE.shakeEl();
     if (!scene) return;
     run.shakeScene = scene;
-    const startTime = Date.now();
+    const startTime = __fxDateNow();
 
     const shakeLoop = () => {
         if (!run.active) { scene.style.transform = ''; return; }
-        const elapsed = Date.now() - startTime;
+        const elapsed = __fxDateNow() - startTime;
         if (elapsed < duration) {
             const decay = 1 - (elapsed / duration);
             const dx = (Math.random() - 0.5) * intensity * decay;
@@ -1347,7 +1353,7 @@ class CanvasFxEngine {
     update() {
         // Delta-time：按真实帧间隔推进动画，速度与 FPS 解耦（高刷屏不加速、掉帧不减速）
         // dt 上限 33ms：标签页休眠/卡顿后恢复时防止粒子瞬移跳变
-        const now = performance.now();
+        const now = __fxNow();
         const dt = this.lastFrameTime ? Math.min(now - this.lastFrameTime, 33) : 16.7;
         this.lastDt = dt;
         this.lastFrameTime = now;
@@ -1435,7 +1441,7 @@ class CanvasFxEngine {
             sess.bus.gain.setValueAtTime(Math.max(0.0001, sess.bus.gain.value), t);
             sess.bus.gain.linearRampToValueAtTime(0.0001, t + 0.16);
         } catch {}
-        setTimeout(release, 190);
+        __fxTimeout(release, 190);
     }
     function syncAmbientAudio() {
         if (!state.ambientSound || state.theme === 'baseline') { stopAmbientAudio(); return; }
@@ -1447,7 +1453,7 @@ class CanvasFxEngine {
         const volMap = { rain: 0.036, mist: 0.034, ruins: 0.034, eldritch: 0.038 };
         bus.gain.setValueAtTime(0.0001, t);
         bus.gain.linearRampToValueAtTime(volMap[state.theme] || 0.034, t + 0.35);
-        bus.connect(CombatAudioMixer.output('aux', 'L'));
+        bus.connect(CombatAudioMixer.output('atmo', 'L'));
         const stoppers = [], nodes = [bus];
         const mkNoise = () => { const s = ctx.createBufferSource(); s.buffer = getPinkNoise(ctx); s.loop = true; s.start(t); stoppers.push(s); nodes.push(s); return s; };
         const mkLfo = (hz, amp, target) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = hz; g.gain.value = amp; o.connect(g); g.connect(target); o.start(t); stoppers.push(o); nodes.push(o, g); };
@@ -1594,7 +1600,7 @@ function spawnHealParticles(addParticle, x, y, colorTheme = 'green') {
       onFinish.clear();
     };
     const totalMs = 1100 / 1.5;
-    const handle = { doneAt: Date.now() + totalMs, onFinish, cancel() {
+    const handle = { doneAt: __fxDateNow() + totalMs, onFinish, cancel() {
       clearTimeout(svgTimer);
       clearTimeout(endTimer);
       svgWrapper.remove();
@@ -1602,8 +1608,8 @@ function spawnHealParticles(addParticle, x, y, colorTheme = 'green') {
       cue?.stop?.();
       finish(false);
     } };
-    const svgTimer = setTimeout(() => svgWrapper.remove(), duration);
-    const endTimer = setTimeout(() => finish(true), totalMs);
+    const svgTimer = __fxTimeout(() => svgWrapper.remove(), duration);
+    const endTimer = __fxTimeout(() => finish(true), totalMs);
     supportHandles.add(handle);
     onImpact?.();
     return handle;
@@ -1710,13 +1716,13 @@ const CombatEvents = {
     // ===== combatToken 守卫定时 =====
     function after(ms, fn) {
         const token = combatToken, sound = CombatAudioMixer.capture('D');
-        const id = setTimeout(() => { S.timers.delete(id); if (token !== combatToken) return; CombatAudioMixer.withContext(sound, fn); }, ms);
+        const id = __fxTimeout(() => { S.timers.delete(id); if (token !== combatToken) return; CombatAudioMixer.withContext(sound, fn); }, ms);
         S.timers.add(id);
         return id;
     }
     function every(ms, fn) {
         const token = combatToken, sound = CombatAudioMixer.capture('D');
-        const id = setInterval(() => { if (token !== combatToken) { clearInterval(id); S.intervals.delete(id); return; } CombatAudioMixer.withContext(sound, fn); }, ms);
+        const id = __fxInterval(() => { if (token !== combatToken) { clearInterval(id); S.intervals.delete(id); return; } CombatAudioMixer.withContext(sound, fn); }, ms);
         S.intervals.add(id);
         return id;
     }
@@ -1730,7 +1736,7 @@ const CombatEvents = {
         d.innerHTML = html;
         __STAGE.el.appendChild(d);
         S.layers.add(d);
-        if (ms) setTimeout(() => { S.layers.delete(d); d.remove(); }, ms); // 纯清理回调，恒执行
+        if (ms) __fxTimeout(() => { S.layers.delete(d); d.remove(); }, ms); // 纯清理回调，恒执行
         return d;
     }
     function mkAnchor(x, y) {
@@ -2093,9 +2099,9 @@ const CombatEvents = {
     }
     function scheduleParticleCleanup() {
         if (S.particleTimer !== null) return;
-        S.particleTimer = after(Math.max(0, S.particleUntil - performance.now()), () => {
+        S.particleTimer = after(Math.max(0, S.particleUntil - __fxNow()), () => {
             S.particleTimer = null;
-            const now = performance.now();
+            const now = __fxNow();
             S.particles = S.particles.filter(p => p.expiresAt > now);
             if (S.particles.length) { scheduleParticleCleanup(); return; }
             if (!S.flights.length && S.driver) {
@@ -2109,7 +2115,7 @@ const CombatEvents = {
     }
     function addP(o) {
         const p = Object.assign({ vx: 0, vy: 0, life: 1, decay: 0.02, size: 3, color: '#fde68a', grav: 0, drag: 0.98, rot: 0, vr: 0, shape: 'dot', blend: 'lighter' }, o);
-        p.expiresAt = performance.now() + p.life / p.decay * 16.7;
+        p.expiresAt = __fxNow() + p.life / p.decay * 16.7;
         S.particleUntil = Math.max(S.particleUntil, p.expiresAt);
         S.particles.push(p);
         ensureCanvas(); ensureDriver(); scheduleParticleCleanup();
@@ -2118,18 +2124,18 @@ const CombatEvents = {
     // 绕场收束（demo orbitCharge 原样）
     function orbitCharge(c, n, dur, mk, rx, ry, shrink = 0.8) {
         const orb = []; for (let i = 0; i < n; i++) orb.push({ a: Math.random() * 6.283, r: rnd(0.45, 1), s: rnd(0.025, 0.05), k: Math.random() });
-        const t0 = performance.now();
-        const id = every(33, () => { const k = Math.min(1, (performance.now() - t0) / dur); orb.forEach(o => { o.a += o.s * (1 + k * 3); const r = o.r * (1 - k * shrink); addP(Object.assign({ x: c.x + Math.cos(o.a) * rx * r, y: c.y + Math.sin(o.a) * ry * r, decay: 0.25 }, mk(o))); }); });
+        const t0 = __fxNow();
+        const id = every(33, () => { const k = Math.min(1, (__fxNow() - t0) / dur); orb.forEach(o => { o.a += o.s * (1 + k * 3); const r = o.r * (1 - k * shrink); addP(Object.assign({ x: c.x + Math.cos(o.a) * rx * r, y: c.y + Math.sin(o.a) * ry * r, decay: 0.25 }, mk(o))); }); });
         after(dur, () => stopEvery(id));
     }
     // 贝塞尔弹道（demo fly 原样；由驱动粒子步进，不另启 rAF）
     function flyBezier(a, ctrl, b, dur, draw, done, ease) {
         ease = ease || (k => k * k);
-        const startedAt = performance.now(), sound = CombatAudioMixer.capture('D');
+        const startedAt = __fxNow(), sound = CombatAudioMixer.capture('D');
         const f = {
             age: 0, dur, timer: null,
             step(pr) { const t = ease(pr), u = 1 - t; CombatAudioMixer.withContext(sound, () => draw(u * u * a.x + 2 * u * t * ctrl.x + t * t * b.x, u * u * a.y + 2 * u * t * ctrl.y + t * t * b.y, pr)); },
-            progress() { return Math.min(1, (performance.now() - startedAt) / dur); }
+            progress() { return Math.min(1, (__fxNow() - startedAt) / dur); }
         };
         S.flights.push(f);
         ensureCanvas(); ensureDriver();
@@ -2172,7 +2178,7 @@ const CombatEvents = {
             if (p.trailMax) { (p.hist || (p.hist = [])).push({ x:p.x, y:p.y }); if (p.hist.length > p.trailMax) p.hist.shift(); }
             else if (p.trail) { (p.hist || (p.hist = [])).unshift([p.x, p.y]); if (p.hist.length > p.trail) p.hist.pop(); }
             p.rot += p.vr * k;
-            p.life = Math.min(p.life - p.decay * k, Math.max(0, (p.expiresAt - performance.now()) * p.decay / 16.7));
+            p.life = Math.min(p.life - p.decay * k, Math.max(0, (p.expiresAt - __fxNow()) * p.decay / 16.7));
             if (p.life <= 0) S.particles.splice(i, 1);
         }
     }
@@ -2181,7 +2187,7 @@ const CombatEvents = {
         g.clearRect(0, 0, S.canvas.width, S.canvas.height);
         for (const owner of new Set(S.particles.filter(p => p.owner && p.owner.dom).map(p => p.owner))) {
             const r = ctr(owner.dom);
-            owner.frame = Object.assign(r, { left: r.left, clipBottom: Math.min(r.bottom, owner.barTop - 2), now: performance.now() });
+            owner.frame = Object.assign(r, { left: r.left, clipBottom: Math.min(r.bottom, owner.barTop - 2), now: __fxNow() });
         }
         for (let i = 0; i < S.particles.length; i++) {
             const p = S.particles[i];
@@ -2207,7 +2213,7 @@ const CombatEvents = {
                 if (token !== combatToken) return;
                 addP({ x, y, shape: 'flame', size: 16, decay: 0.2, color: '#fb923c' });
                 burst(5, () => ({ x: x + rnd(-6, 6), y: y + rnd(-6, 6), vx: rnd(-1, 1), vy: rnd(-1.6, -0.3), drag: 0.94, decay: rnd(0.04, 0.07), size: rnd(6, 11), shape: 'flame', color: pick(['#f97316', '#ef4444', '#fbbf24']) }));
-                for (let j = 0; j < 2; j++) { const an = performance.now() / 45 + j * 3.14; addP({ x: x + Math.cos(an) * 11, y: y + Math.sin(an) * 11, decay: 0.3, size: 2, color: '#fff7d6' }); }
+                for (let j = 0; j < 2; j++) { const an = __fxNow() / 45 + j * 3.14; addP({ x: x + Math.cos(an) * 11, y: y + Math.sin(an) * 11, decay: 0.3, size: 2, color: '#fff7d6' }); }
             }, () => {
                 if (onImpact) onImpact();
                 if (token !== combatToken || _pipelineFrozen || dodged) return; // 闪避保留原弹道，命中采样不双播
@@ -2259,7 +2265,7 @@ const CombatEvents = {
             if (done || cancelled || token !== combatToken) return;
             if (!success) { done = true; retire(1200); return; }
             done = true;
-            handle.doneAt = Date.now() + 1900;
+            handle.doneAt = __fxDateNow() + 1900;
             const ghosts = [0, 1, 2].map(i => `<div style="position:absolute; left:${r.left + i * 10}px; top:${r.top}px; width:${r.width}px; height:${r.height}px; --d:${r.width}px; border-radius:50%; opacity:${0.75 - i * 0.18}; filter: grayscale(1) brightness(1.4) sepia(1) hue-rotate(200deg) saturate(4) drop-shadow(0 0 10px #6366f1); animation: arcane-ghost-shatter 0.32s ${0.18 + i * 0.12}s ease-in both;">${el.innerHTML.replace(/ id="[^"]*"/g, '')}</div>`).join('');
             fsLayer(ghosts, 900);
             /* 战棋：真实位移由宿主滑步演出 */
@@ -2278,10 +2284,10 @@ const CombatEvents = {
             });
             retire(2000);
         };
-        if (isReaction) { handle.doneAt = Date.now() + 1000; }
-        else { handle.doneAt = Date.now() + 2100; after(160, () => handle.dodge(true)); } // 非反应自主演出
+        if (isReaction) { handle.doneAt = __fxDateNow() + 1000; }
+        else { handle.doneAt = __fxDateNow() + 2100; after(160, () => handle.dodge(true)); } // 非反应自主演出
         handle.holdForImpact = () => { held = true; retreatTimers.forEach(id => { clearTimeout(id); S.timers.delete(id); }); retreatTimers.clear(); };
-        handle.releaseImpact = () => { held = false; retire(Math.max(0, handle.doneAt - Date.now())); };
+        handle.releaseImpact = () => { held = false; retire(Math.max(0, handle.doneAt - __fxDateNow())); };
         handle.cancel = () => { cancelled = true; done = true; retreatTimers.forEach(id => { clearTimeout(id); S.timers.delete(id); }); retreatTimers.clear(); if (anim) { anim.cancel(); anim = null; } dropAnchor(anchor); S.handles.delete(handle); };
         return handle;
     }
@@ -2352,7 +2358,7 @@ const CombatEvents = {
         const pc = unionRect(tDoms.length ? tDoms : [el]) || ctr(el);
         const Wd = Math.min(__STAGE.w * 0.95, 1300), Hd = Wd * 0.42, ax = pc.x, ay = pc.t - Hd * 0.12;
         let cancelled = false;
-        const handle = { doneAt: Date.now() + CHARGE + 2000, impactDom: null, dodge: null, hit: null, dispel: null, cancel: null };
+        const handle = { doneAt: __fxDateNow() + CHARGE + 2000, impactDom: null, dodge: null, hit: null, dispel: null, cancel: null };
         S.handles.add(handle);
         darken(0.72);
         const end = CHARGE / 1000 - 0.12;
@@ -2426,7 +2432,7 @@ const CombatEvents = {
     // combatToken 守卫、且能被 handle.cancel() 单独摘除的定时器（after() 只随全局重置清理）
     function localAfter(ms, fn, bag) {
         const token = combatToken;
-        const id = setTimeout(() => { S.timers.delete(id); bag.delete(id); if (token !== combatToken) return; fn(); }, ms);
+        const id = __fxTimeout(() => { S.timers.delete(id); bag.delete(id); if (token !== combatToken) return; fn(); }, ms);
         S.timers.add(id); bag.add(id);
         return id;
     }
@@ -2499,7 +2505,7 @@ const CombatEvents = {
     }
 
     function omenParticle(owner, dur, from, via, to, size, texture = 'spark', tail = 0.2) {
-        addP({ shape: 'omen', owner, born: performance.now(), dur, decay: 16.7 / dur,
+        addP({ shape: 'omen', owner, born: __fxNow(), dur, decay: 16.7 / dur,
                from, via, to, size, texture, tail, colors: OMEN_COLORS[owner.kind], x: 0, y: 0,
                blend: texture === 'mist' ? 'source-over' : 'screen' });
     }
@@ -2592,7 +2598,7 @@ const CombatEvents = {
         if (kind !== 'red-single') {
             const r = ctr(dom);
             owner = { kind, dom, barTop: document.getElementById(caster.id + '-hp-bar')[__GBCR]().top,
-                      frame: Object.assign(r, { clipBottom: r.bottom, now: performance.now() }) };
+                      frame: Object.assign(r, { clipBottom: r.bottom, now: __fxNow() }) };
         }
 
         dom.classList.remove('breathe');
@@ -2621,7 +2627,7 @@ const CombatEvents = {
             bag.forEach(id => { clearTimeout(id); S.timers.delete(id); }); bag.clear();
             restore(); dropParticles(); S.handles.delete(handle); releaseIdleCanvas();
         };
-        const handle = { doneAt: Date.now() + OMEN_MS, impactDom: dom, cancel: finish };
+        const handle = { doneAt: __fxDateNow() + OMEN_MS, impactDom: dom, cancel: finish };
         S.handles.add(handle);
         localAfter(OMEN_MS, finish, bag);
         return handle;
@@ -2683,7 +2689,7 @@ const CombatEvents = {
             }
             S.handles.delete(handle); releaseIdleCanvas();
         };
-        const handle = { doneAt: Date.now() + ms, cancel() { owner.cancelled = true; owner.audioStoppers.forEach(stop => stop()); owner.audioStoppers.clear(); finish(); } };
+        const handle = { doneAt: __fxDateNow() + ms, cancel() { owner.cancelled = true; owner.audioStoppers.forEach(stop => stop()); owner.audioStoppers.clear(); finish(); } };
         S.handles.add(handle); owner.at(ms, finish); owner.handle = handle;
         return owner;
     }
@@ -3254,25 +3260,25 @@ const CombatEvents = {
         const owner = { cancelled: false, finished: false, token, audioContext:CombatAudioMixer.capture('D'), timers: new Set(), intervals: new Set(), animations: new Set(),
             layers: new Set(), anchors: new Set(), flights: new Set(), audioStoppers: new Set(), onCleanups: new Set() };
         let finishTimer;
-        const handle = { doneAt: Date.now() + totalMs, cancel() { owner.cancelled = true; cleanup(true); }, onFinish: new Set() };
+        const handle = { doneAt: __fxDateNow() + totalMs, cancel() { owner.cancelled = true; cleanup(true); }, onFinish: new Set() };
         function finishLater() {
             clearTimeout(finishTimer); S.timers.delete(finishTimer);
             if (owner.held || owner.finished || owner.cancelled) { finishTimer = null; return; }
-            finishTimer = setTimeout(() => {
+            finishTimer = __fxTimeout(() => {
                 S.timers.delete(finishTimer); finishTimer = null;
                 if (token !== combatToken || _pipelineFrozen) { handle.cancel(); return; }
                 if (owner.fixedLife || (!owner.timers.size && !owner.flights.size)) cleanup(false);
-            }, Math.max(0, handle.doneAt - Date.now()));
+            }, Math.max(0, handle.doneAt - __fxDateNow()));
             S.timers.add(finishTimer);
         }
         owner.retain = ms => {
-            handle.doneAt = Math.max(handle.doneAt, Date.now() + ms);
+            handle.doneAt = Math.max(handle.doneAt, __fxDateNow() + ms);
             if (!owner.finished) finishLater();
         };
         owner.hold = () => { owner.held = true; finishLater(); };
         owner.resume = ms => {
             if (owner.finished || owner.cancelled) return;
-            owner.held = false; handle.doneAt = Date.now() + ms; finishLater();
+            owner.held = false; handle.doneAt = __fxDateNow() + ms; finishLater();
         };
         owner.at = (delay, fn) => {
             const id = after(delay, () => {
@@ -4247,7 +4253,7 @@ const CombatEvents = {
     // 延时用 after / every；SVG 用 fsLayer(html, 生命周期毫秒)；粒子用 addP / burst / fly；不要另起永久 rAF。
     // 无固定寿命的图层由 handle.cancel() 和自然收尾显式移除；darken(o) 收尾必须调用 darken(0)。
     // 保持纯演出：不改 HP/状态，不负责浮字或战斗结算；测试反馈放在下方演示控制区。
-    // 持续演出返回 handle：doneAt: Date.now() + 总演出毫秒（含尾韵），不能用 performance.now()。
+    // 持续演出返回 handle：doneAt: __fxDateNow() + 总演出毫秒（含尾韵），不能用 __fxNow()。
     // cancel() 只清理自身图层、计时和 WAAPI 动画，不在技能内部调用全局 clearArcaneFx()。
     // 按需提供 dodge(success) / hit(type) / dispel(dom) / impactDom，与正式版反应接口一致。
     // impactDom 可指向实体或 mkAnchor() 自建落点；dropAnchor() 只用于后者，不能删除真实角色 DOM。
@@ -5231,18 +5237,18 @@ const CombatEvents = {
         ghost.style.transition = 'none';
         ghost.style.width = Math.max(pct(hpAfter), width) + '%';
         const next = { el: ghost, timer: null, hpAfter, collapsing: false };
-        next.timer = setTimeout(() => {
+        next.timer = __fxTimeout(() => {
             if (!ghost.isConnected) { H.ghosts.delete(id); return; }
             next.collapsing = true;
             ghost.style.transition = 'width ' + HIT_COLLAPSE_MS + 'ms cubic-bezier(0.3,0,0.2,1)';
             ghost.style.width = pct(next.hpAfter) + '%';
-            next.timer = setTimeout(() => { if (H.ghosts.get(id) === next) H.ghosts.delete(id); }, HIT_COLLAPSE_MS);
+            next.timer = __fxTimeout(() => { if (H.ghosts.get(id) === next) H.ghosts.delete(id); }, HIT_COLLAPSE_MS);
         }, HIT_HOLD_MS);
         H.ghosts.set(id, next);
     }
 
     function stackSlot(id) {
-        const now = Date.now(), s = H.stacks.get(id);
+        const now = __fxDateNow(), s = H.stacks.get(id);
         const k = s && now - s.at < 750 ? s.k + 1 : 0;
         H.stacks.set(id, { k, at: now });
         return { dx: [0, 12, 24, 36, 48][k % 5], dy: [0, -44, 44, -88, 88][k % 5] };
@@ -5635,7 +5641,7 @@ const CombatEvents = {
         }
         list.forEach((r, i) => hitVisual(layer, Object.assign({}, r, { suppressRecoil: opts.suppressRecoil || r.suppressRecoil, suppressDodgeFx: opts.suppressDodgeFx || r.suppressDodgeFx }), hs[i], anims, timers));
         const handle = {
-            doneAt: Date.now() + HIT_LIFE_MS,
+            doneAt: __fxDateNow() + HIT_LIFE_MS,
             cancel() {
                 timers.forEach(id => { clearTimeout(id); S.timers.delete(id); });
                 anims.forEach(a => a.cancel());
@@ -5673,7 +5679,7 @@ const CombatEvents = {
         };
         if (!handle.duration || _pipelineFrozen) { finishImpact(); return handle; }
         // 355ms 演出收尾即回落结算；后台 rAF 暂停或视觉取消不丢失已触发的反击。
-        fallbackTimer = setTimeout(finishImpact, handle.duration);
+        fallbackTimer = __fxTimeout(finishImpact, handle.duration);
         S.rawTimers.set(fallbackTimer, finishImpact);
         S.handles.add(handle);
         const dx = toRect.x - fromRect.x, dy = toRect.y - fromRect.y;
@@ -6905,9 +6911,9 @@ const CombatEvents = {
     }
     function orbitItemCharge(owner, c, n, dur, mk, rx, ry, shrink = 0.8) {
         const orb = []; for (let i = 0; i < n; i++) orb.push({ a:Math.random() * 6.283, r:rnd(0.45, 1), s:rnd(0.025, 0.05), k:Math.random() });
-        const t0 = performance.now();
+        const t0 = __fxNow();
         const id = owner.every(33, () => {
-            const k = Math.min(1, (performance.now() - t0) / dur);
+            const k = Math.min(1, (__fxNow() - t0) / dur);
             orb.forEach(o => {
                 o.a += o.s * (1 + k * 3); const r = o.r * (1 - k * shrink);
                 owner.addP(Object.assign({ itemFx:true, x:c.x + Math.cos(o.a) * rx * r, y:c.y + Math.sin(o.a) * ry * r, decay:0.25 }, mk(o)));
@@ -6982,7 +6988,7 @@ const CombatEvents = {
                 cv.remove();
             });
             const scale = opts.scale ?? 1.0, rate = opts.playbackRate ?? 1.0;
-            v.playbackRate = rate;
+            v.playbackRate = rate * __fxScale();
             v.addEventListener('loadedmetadata', () => {
                 if (stopped || token !== combatToken || owner.cancelled || owner.finished) { cleanup(); return; }
                 const natW = v.videoWidth || 480, natH = v.videoHeight || 360;
@@ -7604,9 +7610,9 @@ function resistLayer(owner, html, z, kind) {
 
 // 逐帧 tween 用模块现有 every（token 守卫），结束即 stopEvery，不占永久引擎。
 function resistTween(owner, dur, step) {
-    const t0 = performance.now();
+    const t0 = __fxNow();
     const id = owner.every(16, () => {
-        const p = Math.min(1, (performance.now() - t0) / Math.max(1, dur));
+        const p = Math.min(1, (__fxNow() - t0) / Math.max(1, dur));
         step(p);
         if (p >= 1) { stopEvery(id); owner.intervals.delete(id); }
     });
@@ -7926,7 +7932,7 @@ function playVariantResistFx(opts = {}) {
     }
     function statusSfxGate(key, minGapMs = 65) {
         if (!statusSfxOn) return 0;
-        const now = performance.now(), prev = ST.sfxAt.get(key) || 0, gap = now - prev;
+        const now = __fxNow(), prev = ST.sfxAt.get(key) || 0, gap = now - prev;
         if (gap < 28) return 0;
         ST.sfxAt.set(key, now);
         return gap < minGapMs ? 0.45 : 1;
@@ -8481,7 +8487,7 @@ function playVariantResistFx(opts = {}) {
         const handle = owner.handle;
         owner.hold();
         let released = false, interrupted = false, readyResolve;
-        const startAt = Date.now();
+        const startAt = __fxDateNow();
         handle.ready = new Promise(resolve => { readyResolve = resolve; });
         handle.onFinish.add(() => readyResolve(false));
         handle.stageCtx = ctx;
@@ -8508,7 +8514,7 @@ function playVariantResistFx(opts = {}) {
         handle.release = () => {
             if (released || interrupted || owner.finished || owner.cancelled) return;
             released = true;
-            const gatherTail = Math.max(0,wms.unstable+wms.gather - (Date.now() - startAt));
+            const gatherTail = Math.max(0,wms.unstable+wms.gather - (__fxDateNow() - startAt));
             owner.at(gatherTail,() => {
                 owner.intervals.forEach(stopEvery); owner.intervals.clear();
                 onBeat && onBeat('critical_start',{ entity,form,conf });
@@ -9280,14 +9286,14 @@ function playRescueAvoidFatal(entity, meta, onBeat) {
     function playSummonEnter(caster, targets, meta = {}, onBeat) {
         if (isSummonDedicatedFx(meta.fxTag)) {
             if (onBeat) onBeat({ phase: 'skippedByFxTag', fxTag: meta.fxTag });
-            return { doneAt: Date.now(), done: Promise.resolve(true), skipped: true, fxTag: meta.fxTag, cancel() {} };
+            return { doneAt: __fxDateNow(), done: Promise.resolve(true), skipped: true, fxTag: meta.fxTag, cancel() {} };
         }
         const list = (Array.isArray(targets) ? targets : [targets]).filter(Boolean);
         const rects = list.map(entity => ({ entity, rect: entityVisualRect(entity) })).filter(x => x.rect && x.rect.dom.isConnected);
         if (!rects.length) return null;
         const isEnemy = meta.side === 'enemy' || list[0].side === 'enemy';
         const colCore = '#e0f2fe', colArc = isEnemy ? '#e879f9' : '#22d3ee', colViolet = '#a78bfa', uid = ++S.uid;
-        const createdAt = Date.now();
+        const createdAt = __fxDateNow();
         const owner = summonRun(1800 + 350 + rects.length * 110, list.flatMap(t => ['summon:' + t.id, 'enter:' + t.id]));
         owner.hold();
         const beat = (phase, extra = {}) => { if (onBeat) onBeat(Object.assign({ phase, side: isEnemy ? 'enemy' : 'hero' }, extra)); };
@@ -9450,7 +9456,7 @@ function playRescueAvoidFatal(entity, meta, onBeat) {
         const shieldSize = Math.round(Math.max(94, Math.min(118, gRect.w * 1.4)));
         function impact(finalOutcome = 'hit', opts = {}) {
             if (settled || !owner.valid()) return;
-            settled = true; impactAt = Date.now();
+            settled = true; impactAt = __fxDateNow();
             if (finalOutcome === 'secondDodge') {
                 outcome = 'secondDodge';
                 if (!opts.suppressDodgeFx) {
@@ -9498,7 +9504,7 @@ function playRescueAvoidFatal(entity, meta, onBeat) {
                 });
                 return done;
             }
-            const delay = Math.max(0, impactAt + (finalOutcome === 'secondDodge' ? 330 : 360) - Date.now());
+            const delay = Math.max(0, impactAt + (finalOutcome === 'secondDodge' ? 330 : 360) - __fxDateNow());
             owner.at(delay, doReturn); owner.resume(delay + 450);
             return done;
         }

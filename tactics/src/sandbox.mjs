@@ -14,6 +14,7 @@ import { buildOccupancyIndex, unitAt, unitCenter } from './geometry.mjs';
 import { createUnitView } from './unit-view.mjs';
 import { createViewScope } from './view-scope.mjs';
 import { drawOverlay } from './range-overlay.mjs';
+import { getTimeScale } from './time-scale.mjs';
 
 const FOCUS_MS = 320;        // 镜头引导缓动时长（表现参数，非玩法预算）
 const WHEEL_FACTOR = 1.15;
@@ -207,11 +208,12 @@ export function createSandbox(rootEl, deps = {}) {
   function animateTo(target, ms) {
     stopFocusAnim();
     const from = { ...pose };
-    const t0 = performance.now();
+    let last = performance.now(), elapsed = 0;   // 逐帧按演出倍速累加
     return new Promise(resolve => {
       const cancelSettle = scope.settleOnDispose(resolve);
       const stop = scope.loop((now) => {
-        const k = Math.min(1, (now - t0) / ms);
+        elapsed += (now - last) * getTimeScale(); last = now;
+        const k = Math.min(1, elapsed / ms);
         const e = 1 - Math.pow(1 - k, 3);
         pose = { tx: from.tx + (target.tx - from.tx) * e, ty: from.ty + (target.ty - from.ty) * e, scale: from.scale + (target.scale - from.scale) * e };
         applyCamera();

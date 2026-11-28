@@ -74,7 +74,7 @@ function localStorageForBgm() {
   try { return globalThis.localStorage; } catch (_) { return null; }
 }
 
-export function createBgmDirector({ assetBase, context, createAudio = () => new Audio(), random = Math.random,
+export function createBgmDirector({ assetBase, context, output = null, createAudio = () => new Audio(), random = Math.random,
   storage = localStorageForBgm() } = {}) {
   const mood = createBattleMood();
   const listeners = new Set();
@@ -283,7 +283,7 @@ export function createBgmDirector({ assetBase, context, createAudio = () => new 
     unlocked = true;
     master = ctx.createGain();
     master.gain.value = volume;
-    master.connect(ctx.destination);
+    master.connect(output ? output() : ctx.destination);   // 宿主主总线：主音量与静音同样作用于配乐
     decks = [0, 1].map(() => {
       const audio = createAudio();
       audio.preload = 'auto';
