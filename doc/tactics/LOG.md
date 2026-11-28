@@ -1064,3 +1064,11 @@
 - 文件：`tactics/src/bgm-director.mjs`、`integration-test/fixtures/tactics/bgm-director-node-cases.mjs`、`tactics/mvp-standalone.html`。
 - 验证：`bgm-director` 11/11；唯一一次全量 1578 项通过；重打单文件 2,156,302 字节，`verify-demo.cjs` 与 `verify-typical-artifact.cjs` 产物断言通过。当前 IAB 与用户已打开页面列表均为空，本轮未做真实页面交互验收。
 - 目的 vs 现状：战斗外音乐面板手动控制已由回归用例与产物验证覆盖；真实页面交互验收仍未完成。
+
+## 2026-11-28 · 战斗攻防音效分层与 BGM 交接（caa5e40）
+- 核心目的：仅复用已有采样增强敌我打击反馈，并消除八方旅人战况升温/反击时因提前淡出产生的静音空档；不改战斗数值、曲库或界面。
+- 音效：无专属演出按近战/远程/法术选已有出招采样；保留专属群攻演出。全挡按来袭伤害占最大 HP 分三档，个人护盾或本次免伤池被打空固定最高档破防；同段扣 HP 再独立播受击音，双层同破不重复。敌方同一发只合并同类同档，闪避/受伤/格挡按接触拍点发声。仅攻击和结算角色分轨彼此不削音，界面等其他优先级不改。
+- BGM：先准备目标切入点并确认新轨起播，再做双轨交接；手动/自然 300ms，战况 400ms，取消固定 500ms 空等。普通升温预备后由行动横幅放行，危机/反击可替换未交接请求，自然续播在曲尾前约 1.2s 触发并保留 ended 路径。
+- 文件：`tactics/src/{action-director,battle,bgm-director,fx-library}.mjs`、`tactics/src/vendor/rpg-av/rpg-av.mjs`、`tactics/tools/{extract-rpg-av,run-tests,verify-fx-polish-artifact}.cjs`、`integration-test/fixtures/tactics/{audio-gait-passive,bgm-director,hit-feedback}-node-cases.mjs`、`tactics/mvp-standalone.html`。
+- 验证：源码全量首次停在旧兜底音字面量断言，更新后从该阶段续跑，合计 57 阶段 1588 项通过；BGM 15、受击 51。独立审查所提的待起播取消窗口补行为断言确认。单文件 67 模块、SHA256 `127f0828…`，入包/单脚本/零外部导入断言通过，直接对产物的配乐模块跑 15/15。内置浏览器默认对局未越过开局敌方回合，先手切片的基础行动定位超时，独立的点击走格通过（6.0m→5.0m）。
+- 目的 vs 现状：交付逻辑已覆盖；未进酒馆或安卓模拟器，自动升温/反击的实机听感与曲首尾留白留待用户另验，README 未改。
