@@ -2580,7 +2580,7 @@ const sandArmor = {
 // 近战重击（移植回合制 spawnMeleeHeavyParticles，弗兰克【重击推撞】）：蓄力下压 → 沿直线冲撞（冲锋路径真值，逐接触步结算）→
 // 每次命中：破防音 parry_heavy + 80ms 后 hitDown，原版重震屏、金色平闪、盾击推撞爆发（新月波沿冲撞方向）、目标推撞踉跄 + 眩晕星环；落空只擦出火星
 const meleeHeavy = {
-  id: 'melee-heavy', grade: 'L2', fxTags: ['近战重击'],
+  id: 'melee-heavy', grade: 'L2', fxTags: ['近战重击'], finisherCue: true, finisherOwnImpact: true,
   timeline: { totalMs: 1100, fullscreen: false, darken: false },
   cues: [{ key: 'parry_heavy', vol: 0.72 }, { key: 'hitDown', vol: 0.6 }],
   prepareKeys() { return ['parry_heavy', 'hitDown', 'swish_3']; },
@@ -2604,6 +2604,7 @@ const meleeHeavy = {
     fx.ground(ringHtml(c.x, c.y, 1.6 * PX, 'rgba(251,191,36,0.55)', 'rgba(120,53,15,0.25)'), 300).firstChild
       .animate([{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(.6)', opacity: 0.9 }], { duration: 240, fill: 'forwards' });
     if (!(await ctx.wait(220))) return false;
+    ctx.releaseFinisher?.();
     fx.sfx('swish_3', 0.5);
     if (!charge) {
       const t = hits[0] ? worldPx(ctx.centerOf(hits[0].targetId)) : e;
@@ -2652,7 +2653,7 @@ function armorCrack(fx, p, ang) {
     .animate([{ strokeDashoffset: 1, opacity: 1 }, { strokeDashoffset: 0, opacity: 1, offset: 0.25 }, { strokeDashoffset: 0, opacity: 0.9, offset: 0.7 }, { strokeDashoffset: 0, opacity: 0 }], { duration: 800, easing: 'ease-out', fill: 'forwards' });
 }
 const slugShot = {
-  id: 'slug-shot', grade: 'L2', fxTags: ['独头弹'], reuseAudio: true,
+  id: 'slug-shot', grade: 'L2', fxTags: ['独头弹'], reuseAudio: true, finisherOwnImpact: true,
   timeline: { totalMs: 1150, fullscreen: false, darken: false },
   cues: [{ key: 'xiandan', vol: 0.75 }, { key: 'hitDown', vol: 0.6 }, { key: 'mx_gear_lock', vol: 0.5 }],
   prepareKeys() { return ['xiandan', 'hitDown', 'mx_gear_lock']; },
@@ -2704,7 +2705,7 @@ const slugShot = {
 // 远程重击（弗兰克【皇家猎象枪】，移植回合制 spawnRangedHeavyParticles）：枪口红光快速聚能 → shot01 击发 + 重枪口焰 + 后坐，
 // 粗红色弹道直射目标 → 命中拍 hitDown + 低频冲击 + 白闪 + 原版双管重爆、原版重震屏、屏幕血花（无论命中/闪避都溅，闪避在目标身后炸开）+ 目标后仰
 const rangedHeavy = {
-  id: 'ranged-heavy', grade: 'L2', fxTags: ['远程重击'], reuseAudio: true,
+  id: 'ranged-heavy', grade: 'L2', fxTags: ['远程重击'], reuseAudio: true, finisherCue: true, finisherOwnImpact: true,
   timeline: { totalMs: 980, fullscreen: false, darken: false },
   cues: [{ key: 'herocharge', vol: 0.4 }, { key: 'shot', vol: 0.8 }, { key: 'hitDown', vol: 0.75 }],
   prepareKeys() { return ['herocharge', 'shot', 'hitDown']; },
@@ -2722,6 +2723,7 @@ const rangedHeavy = {
     particles(fx, Array.from({ length: 10 }, () => { const a = rnd(0, TAU), r = rnd(34, 56); return { x: m.x + Math.cos(a) * r, y: m.y + Math.sin(a) * r, dx: -Math.cos(a) * r, dy: -Math.sin(a) * r, size: rnd(4, 7), color: '#f87171', core: '#fee2e2', s0: 1, s1: 0.4, dur: rnd(180, CHARGE), ease: 'ease-in' }; }), CHARGE);
     if (!(await ctx.wait(CHARGE))) return false;
     // ② 击发：重枪口焰 + 后坐 + 粗红色弹道
+    ctx.releaseFinisher?.();
     fx.sfx('shot', 0.8); fx.shake('heavy');
     gunFlash(fx, m, ang, { size: 52, ms: 200 });
     jolt(ctx, ctx.casterId, { amp: 5, ms: 55, glow: '#ef4444' });
@@ -2743,7 +2745,7 @@ const rangedHeavy = {
 // 枪击穿透（移植回合制 gunshot_pierce）：枪口青光聚能 → 击发：重枪口焰 + 抛壳后坐 + 超音速青色贯穿光束
 // → 命中：菱形弱点准星与伤害同帧锁定 + 双圈激波星芒 + 背部破片锥 + 出口血雾喷溅 + 受击硬直 + 重震（L2 预算内，不用暗场/全屏）
 const gunshotPierce = {
-  id: 'gunshot-pierce', grade: 'L2', fxTags: ['枪击穿透'], reuseAudio: true,
+  id: 'gunshot-pierce', grade: 'L2', fxTags: ['枪击穿透'], reuseAudio: true, finisherCue: true,
   timeline: { totalMs: 1160, fullscreen: false, darken: false },
   cues: [{ key: 'gunshot_pierce', vol: 0.75 }],
   prepareKeys() { return ['gunshot_pierce']; },
@@ -2756,6 +2758,7 @@ const gunshotPierce = {
       .animate([{ transform: 'scale(1.6)', opacity: 0 }, { transform: 'scale(.55)', opacity: 1, offset: 0.85 }, { transform: 'scale(.3)', opacity: 1 }], { duration: 300, easing: 'cubic-bezier(.5,0,.8,.6)', fill: 'forwards' });
     particles(fx, Array.from({ length: 10 }, () => { const a = rnd(0, TAU), d = rnd(26, 46); return { x: m.x + Math.cos(a) * d, y: m.y + Math.sin(a) * d, dx: -Math.cos(a) * d, dy: -Math.sin(a) * d, size: rnd(4, 7), color: '#7dd3fc', core: '#ffffff', s0: 1, s1: 0.3, dur: rnd(220, 290) }; }), 320);
     if (!(await ctx.wait(300))) return false;
+    ctx.releaseFinisher?.();
     fx.sfx('gunshot_pierce', 0.75); fx.shake('heavy');
     gunFlash(fx, m, ang, { size: 48, ms: 210 });
     casing(fx, c, ang);

@@ -6,6 +6,7 @@ import { buildHitFeedback, resolveWindupKind, createActionDirector } from '../..
 import { avatarScaleForZoom } from '../../../tactics/src/unit-view.mjs';
 import { linkSkillGroupRows } from '../../../tactics/src/main.mjs';
 import { skillSlots } from '../../../tactics/src/effect-definitions.mjs';
+import { planKillBeat } from '../../../tactics/src/cinematic.mjs';
 
 const source = readFileSync(new URL('../../../tactics/src/vendor/rpg-av/rpg-av.mjs', import.meta.url), 'utf8');
 const start = source.indexOf('    const HIT_HOLD_MS =');
@@ -106,6 +107,12 @@ export const groups = {
       for (const target of ['h', 't', 'u', 'v', 'dup']) director.completeTarget(wave, target);
       director.closeWave(wave);
       cases.push(ok('THIT 同波同一受击音档不重复，收口不补播', clips().length === 8, json(clips())));
+      const finishWave = director.beginWave(['a', 'b']);
+      director.publish(result(7, { wave: finishWave, targetId: 'a', finisher: true, finisherSound: 'hitDown' }));
+      director.publish(result(7, { wave: finishWave, targetId: 'b', finisher: true, finisherSound: 'hitDown' }));
+      director.publish(result(7, { finisher: true, finisherSound: null }));
+      director.completeTarget(finishWave, 'a'); director.completeTarget(finishWave, 'b'); director.closeWave(finishWave);
+      cases.push(ok('THIT 致死替换普通受击音、同波一次、专属重击不叠受击音', json(clips().slice(8)) === '["hitDown.mp3"]', json(clips())));
       const low = (track, cat, combat) => Math.min(...mixer.output(track, cat, combat).gain.values);
       cases.push(ok('THIT 出招和闪避／受伤／防御不相互压音，UI 优先级仍生效',
         low('skill', 'L', true) === 1 && ['F', 'G', 'H'].every(c => low('result', c, true) === 1) && low('aux', 'K', false) === 0.4));
@@ -147,6 +154,30 @@ export const groups = {
       through.shieldAfter === 100 && through.hpDmg === 32, json(through)));
     return { cases };
   } },
+  'THIT-06': { run() {
+    const cases = [];
+    const caster = { id: 'c', side: 'hero', isSummon: false };
+    const enemy = { id: 'e', side: 'enemy', level: '精英' };
+    const lethal = { shotIndex: 0, hit: true, down: true, outcome: 'hit', hpBefore: 10, hpAfter: 0, hpDmg: 10 };
+    const result = { casterId: 'c', skill: { range: { type: '单体' } }, hits: [{ targetId: 'e', segments: [lethal] }] };
+    const planned = planKillBeat(result, caster, [enemy]);
+    cases.push(ok('THIT 单体单发致死段形成 focus 且精英显式 level 触发 cutin', planned.lethal instanceof Set && planned.lethal.has(lethal) &&
+      planned.focus?.targetId === 'e' && planned.focus.cutin === true, json({ lethal: [...planned.lethal || []], focus: planned.focus })));
+    const normal = planKillBeat(result, caster, [{ ...enemy, level: '杂兵' }]);
+    const boss = planKillBeat(result, caster, [{ ...enemy, level: '首领' }]);
+    cases.push(ok('THIT 普通敌人不横切、首领横切', normal.focus?.cutin === false && boss.focus?.cutin === true));
+    const summon = planKillBeat(result, { ...caster, isSummon: true }, [enemy]);
+    cases.push(ok('THIT 召唤者不安排击杀节拍', summon.lethal.size === 0 && summon.focus === null));
+    const nonlethal = { ...lethal, hpBefore: 20, hpAfter: 10, down: false };
+    const multi = planKillBeat({ ...result, hits: [{ targetId: 'e', segments: [nonlethal, lethal] }] }, caster, [enemy]);
+    const area = planKillBeat({ ...result, skill: { range: { type: '圆形' } } }, caster, [enemy]);
+    cases.push(ok('THIT 群攻和多段不切镜，只保留致死段', multi.focus === null && area.focus === null && multi.lethal.has(lethal) && !multi.lethal.has(nonlethal) && area.lethal.has(lethal)));
+    for (const [label, change] of [['复活', { hpAfter: 10, down: false }], ['保命', { fatalResult: { reason: 'grit' } }], ['制服', { hpAfter: 1 }], ['结界', { barrierHitId: 'barrier' }]]) {
+      const p = planKillBeat({ ...result, hits: [{ targetId: 'e', segments: [{ ...lethal, ...change }] }] }, caster, [enemy]);
+      cases.push(ok('THIT ' + label + '不冒充真实击杀', !p.lethal.size && p.focus === null));
+    }
+    return { cases };
+  } },
   'THIT-02': { run() {
     const cases = [];
     for (const [damage, mist, drops] of [[9, 2, 4], [20, 6, 10], [60, 11, 18]]) {
@@ -175,6 +206,16 @@ export const groups = {
     const pierced = originalHitHarness();
     pierced.playHitFeedback(result(9, { isPierce: true, damageCategory: '火焰' }));
     cases.push(ok('THIT 穿透类型只读真实字段且保持性质颜色', pierced.layers.children[0].getAttribute('data-hit-type') === '火焰·穿透' && pierced.layers.children[0].style['--hit-color'] === '#fb923c'));
+    const finisher = originalHitHarness();
+    finisher.playHitFeedback(result(20, { finisher: true }));
+    const finisherNum = finisher.layers.children[0].children.find(n => n.textContent === '-20');
+    cases.push(ok('THIT 致死 HP 数字只挂 finisher class 与局部 1.3 缩放，原值不变', finisherNum?.className?.includes('finisher') &&
+      finisherNum.style['--hit-scale'] === '1.3' && finisher.layers.children[0].style['--hit-scale'] === '1'));
+    const mixedFinisher = originalHitHarness();
+    mixedFinisher.playHitFeedback(result(20, { shieldDmg: 5, shieldBefore: 5, shieldAfter: 0, finisher: true }));
+    const mixedFinisherNums = mixedFinisher.layers.children[0].children;
+    cases.push(ok('THIT 致死不放大盾数字', mixedFinisherNums.find(n => n.textContent === '-20')?.className?.includes('finisher') &&
+      mixedFinisherNums.find(n => n.textContent === '盾-5')?.style['--hit-scale'] === undefined));
     const h = originalHitHarness(), wave = { shook: false, hitStopped: false, classified: [] };
     h.playHitFeedback(result(60), { wave }); h.playHitFeedback(result(70, { targetId: 'u' }), { wave });
     cases.push(ok('THIT 群体同波只震动/卡肉一次', h.shakes.length === 1 && h.stopCount() === 1 && wave.classified.length === 2));

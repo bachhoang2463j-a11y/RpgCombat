@@ -4,7 +4,7 @@
 // arcaneVfxModule 行区间(源 5729–14230): 5730–5924, 5932–6356, 6431–6485, 6565–7584, 7596–11500, 11829–12083, 12201–12562, 12565–14208
 // 入选语句 316 段 / 7861 行；入口: playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar, CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx, syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked, playSummonEnter, playSummonExit, playSummonGuard, clearSummonState, playLingFeng, playIsis, playFeiShaHuaJia, playXieYanKey, playHarmonyShelter, playSilenceDomain, playShatterResonance, playZheYingBu, playStrangeConch, playMeleeGroup, playRangedGroup, playSpellGroup, playRescueGrit, playRescueAvoidFatal, clearRescueState, playVariantResistFx, playCounterAttackL1, playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, clearSelfDestructState, syncSelfDestructWarning, setIdentitySfx, setVariantSfx, setStatusSfx, setSelfDestructSfx
 // 显式存根: 
-// 宿主适配补丁: 混音器分轨音量与声像提示状态×1; 混音器主总线与五轨×1; 语音独立轨×1; 战斗音效声像提示×1; 混音器分轨音量与声像接口×1; 攻防混音上下文×1; 攻防混音上下文×1; 攻防角色分轨×1; 攻防角色分轨×1; 攻防角色分轨×1; 攻防角色之间不削音×1; 记录削音来源角色×1; 记录削音来源角色×1; 采样保留攻防角色×1; 采样走攻防角色分轨×2; 采样保留攻防削音角色×1; 媒体保留攻防角色×1; 媒体走攻防角色分轨×1; 媒体保留攻防削音角色×1; 枪击采样相邻去重×1; 远程击杀隐藏我方名称×1; 特写挂屏幕宿主×2; 特写收尾登记×2; 特写震屏走舞台震动层×1; 特写计时可随重开清理×6; 环境音脱离#battle-scene DOM×1; 环境音独立轨×1; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 重击数字不等定帧×1; 蝎眼钥匙落点参数×1; 蝎眼钥匙裂隙钉召唤落点×1; 蝎眼钥匙裂隙舞台定位×1; 折影步去卡片横移×1; 折影步落点参数×1; 折影步落点涟漪×1; 折影步残影保留圆形尺度×1; 奇异海螺去顿帧×1; 谐律之庇音叉悬于受益者上方×1; 屏幕矩形 → 特效舞台坐标×14; innerWidth → 舞台宽×22; innerHeight → 舞台高×15; body 挂载 → 特效舞台×6; JS position:fixed → absolute×2; arcane canvas resize 走舞台×1; 舞台震动独立层×3; window.* 声音函数改为工厂内本地×14; 受击分类透传免伤破防×1; 去掉波次全类择强×1; 接触拍点按音档播结果×1; 波次只记已播音档×1; 波次收口不再补播×1; 波次重定向只保留待结算目标×1; 波次不缓存结算结果×1; 区分盾与免伤破防×1; 结果音保留各接触对象声像×1; 受击采样保留播放选项×1; 受击采样保留播放选项×1; 攻防结果分层播放×1; 敌方攻击前摇纳入攻防混音×1; 合成攻击声音保留分轨角色×1; 合成攻击声音保留分轨角色×1; 合成节点按角色缓存×1; 合成节点按角色缓存×1; 重音跟随结算分轨×1; 环境氛围音随清场停止×1; 去抗性全局挂载×1; 毅力血幕挂圆形棋子内框×1; 致命回避残影保留圆形尺度×1; 反击残影保留圆形尺度×1; 灵风术法阵按头像尺度×1; 灵风术法阵透视原点钉在阵心×1; 灵风术收尾羽翼按头像尺度×1; 技能视频随演出倍速×1; 强力反击原版震屏函数×1; 强力反击震屏宿主×1; 强力反击震屏清理登记×1; 强力反击震屏代际×1; 强力反击震屏帧登记×2; 强力反击爆发粒子注入×1; 强力反击蓄力粒子注入×1; 强力反击回调契约×1; 强力反击代际句柄×1; 强力反击取消结果×1; 强力反击闪避缓冲可取消×1; 强力反击蓄力可取消×1; 强力反击预载取消×1; 强力反击起播等待可取消×1; 强力反击登记蓄力光×1; 强力反击音效取消登记×1; 强力反击阶段取消结果×1; 强力反击舞台坐标×1; 强力反击实体DOM蓄力光×1; 强力反击实体DOM×1; 强力反击蓄力粒子×1; 强力反击聚气使用本地函数×1; 强力反击蓄力坐标×1; 强力反击方向坐标×1; 强力反击锁定读取本地模块×1; 强力反击白闪舞台挂载×1; 强力反击白闪计时×1; 强力反击准星舞台坐标×1; 强力反击准星舞台挂载×1; 强力反击准星计时×1; 强力反击爆发与命中回调×1; 强力反击攻击方向实体×1; 强力反击目标震动清理×1; 强力反击原版震屏调用×1; 强力反击余波等待可取消×1; 强力反击保留余波并返回成功×1; CSS position:fixed → absolute×13; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1; CSS 残留视口单位(按舞台尺度保留)×42; 底座计时随演出倍速×12; 底座间隔随演出倍速×1; 底座时刻随演出倍速×19; 底座句柄时刻随演出倍速×23
+// 宿主适配补丁: 混音器分轨音量与声像提示状态×1; 混音器主总线与五轨×1; 语音独立轨×1; 战斗音效声像提示×1; 混音器分轨音量与声像接口×1; 攻防混音上下文×1; 攻防混音上下文×1; 攻防角色分轨×1; 攻防角色分轨×1; 攻防角色分轨×1; 攻防角色之间不削音×1; 记录削音来源角色×1; 记录削音来源角色×1; 采样保留攻防角色×1; 采样走攻防角色分轨×2; 采样保留攻防削音角色×1; 媒体保留攻防角色×1; 媒体走攻防角色分轨×1; 媒体保留攻防削音角色×1; 枪击采样相邻去重×1; 远程击杀隐藏我方名称×1; 特写挂屏幕宿主×2; 特写收尾登记×2; 特写震屏走舞台震动层×1; 特写计时可随重开清理×6; 环境音脱离#battle-scene DOM×1; 环境音独立轨×1; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 击杀只放大实际 HP 数字×1; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 重击数字不等定帧×1; 蝎眼钥匙落点参数×1; 蝎眼钥匙裂隙钉召唤落点×1; 蝎眼钥匙裂隙舞台定位×1; 折影步去卡片横移×1; 折影步落点参数×1; 折影步落点涟漪×1; 折影步残影保留圆形尺度×1; 奇异海螺去顿帧×1; 谐律之庇音叉悬于受益者上方×1; 屏幕矩形 → 特效舞台坐标×14; innerWidth → 舞台宽×22; innerHeight → 舞台高×15; body 挂载 → 特效舞台×6; JS position:fixed → absolute×2; arcane canvas resize 走舞台×1; 舞台震动独立层×3; window.* 声音函数改为工厂内本地×14; 受击分类透传免伤破防×1; 去掉波次全类择强×1; 接触拍点按音档播结果×1; 波次只记已播音档×1; 波次收口不再补播×1; 波次重定向只保留待结算目标×1; 波次不缓存结算结果×1; 区分盾与免伤破防×1; 结果音保留接触对象声像与致死重击×1; 受击采样保留播放选项×1; 受击采样保留播放选项×1; 攻防结果分层播放×1; 敌方攻击前摇纳入攻防混音×1; 合成攻击声音保留分轨角色×1; 合成攻击声音保留分轨角色×1; 合成节点按角色缓存×1; 合成节点按角色缓存×1; 重音跟随结算分轨×1; 环境氛围音随清场停止×1; 去抗性全局挂载×1; 毅力血幕挂圆形棋子内框×1; 致命回避残影保留圆形尺度×1; 反击残影保留圆形尺度×1; 灵风术法阵按头像尺度×1; 灵风术法阵透视原点钉在阵心×1; 灵风术收尾羽翼按头像尺度×1; 技能视频随演出倍速×1; 强力反击原版震屏函数×1; 强力反击震屏宿主×1; 强力反击震屏清理登记×1; 强力反击震屏代际×1; 强力反击震屏帧登记×2; 强力反击爆发粒子注入×1; 强力反击蓄力粒子注入×1; 强力反击回调契约×1; 强力反击代际句柄×1; 强力反击取消结果×1; 强力反击闪避缓冲可取消×1; 强力反击蓄力可取消×1; 强力反击预载取消×1; 强力反击起播等待可取消×1; 强力反击登记蓄力光×1; 强力反击音效取消登记×1; 强力反击阶段取消结果×1; 强力反击舞台坐标×1; 强力反击实体DOM蓄力光×1; 强力反击实体DOM×1; 强力反击蓄力粒子×1; 强力反击聚气使用本地函数×1; 强力反击蓄力坐标×1; 强力反击方向坐标×1; 强力反击锁定读取本地模块×1; 强力反击白闪舞台挂载×1; 强力反击白闪计时×1; 强力反击准星舞台坐标×1; 强力反击准星舞台挂载×1; 强力反击准星计时×1; 强力反击爆发与命中回调×1; 强力反击攻击方向实体×1; 强力反击目标震动清理×1; 强力反击原版震屏调用×1; 强力反击余波等待可取消×1; 强力反击保留余波并返回成功×1; CSS position:fixed → absolute×13; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1; CSS 残留视口单位(按舞台尺度保留)×42; 底座计时随演出倍速×12; 底座间隔随演出倍速×1; 底座时刻随演出倍速×19; 底座句柄时刻随演出倍速×23
 // ==========================================
 /* eslint-disable */
 // ---- 纯数据导出（原样，供宿主在工厂创建前解析人物头像/语音与预载清单） ----
@@ -5470,11 +5470,12 @@ const CombatEvents = {
         const pop = () => {
             if (!r.suppressRecoil) hitRecoil(dom, isHero, 'hp', h.tier, anims);
             const cls = 'arcane-hit-num l' + h.tier + (h.burst ? ' burst' : h.crit ? ' crit' : '');
-            const el = hitNumEl(layer, cls, '-' + h.hpDmg, p.x, p.y);
+            const el = hitNumEl(layer, cls + (r.finisher ? ' finisher' : ''), '-' + h.hpDmg, p.x, p.y);
+            if (r.finisher) el.style.setProperty('--hit-scale', scale * 1.3);
             let kf = NUM_KF[h.tier];
             if (h.crit && !h.burst) kf = kf.map((f, idx) => idx === 1 ? Object.assign({}, f, { transform: f.transform + ' scale(1.14)' }) : f);
             anims.push(animateHitNumber(el, kf, { duration: h.burst ? 1200 : NUM_MS[h.tier], easing: 'cubic-bezier(0.2,0.8,0.3,1)', fill: 'forwards' }, scale));
-            const fs = [0, 24, 27, 32][h.tier] * scale;
+            const fs = [0, 24, 27, 32][h.tier] * scale * (r.finisher ? 1.3 : 1);
             if (h.crit || h.burst) {
                 const t = hitTagEl(layer, 'arcane-hit-tag ' + (h.burst ? 'burst' : 'crit'), h.burst ? '爆发' : '暴击', p.x, p.y - fs * 0.25 - 12 * scale);
                 anims.push(animateHitNumber(t, NUM_KF.tag, { duration: h.burst ? 1200 : NUM_MS.tag, easing: 'ease-out', fill: 'forwards' }, scale));
@@ -5560,7 +5561,7 @@ const CombatEvents = {
                 : classified.kind === 'block' ? 'Block' : classified.kind === 'shield' ? 'ShieldHit'
                 : source === 'counter' ? 'CounterHit' : source === 'dot' ? 'PeriodicDamage' : source === 'reflect' ? 'ReflectDamage' : 'Hit';
             const event = Object.freeze(Object.assign({}, classified, {
-                targetId:result.targetId, sourceId:result.sourceId || null, source, resultType, isHero:!!result.isHero, pan:result.pan,
+                targetId:result.targetId, sourceId:result.sourceId || null, source, resultType, isHero:!!result.isHero, pan:result.pan, finisher:!!result.finisher, finisherSound:result.finisherSound,
                 maxHp:result.maxHp, hpBefore:result.hpBefore, hpAfter:result.hpAfter,
                 shieldBefore:result.shieldBefore || 0, shieldAfter:result.shieldAfter || 0,
                 damageType:result.damageType || '近战',
@@ -5607,7 +5608,12 @@ const CombatEvents = {
             : h.kind === 'block' ? 'parry_' + h.blockTier : h.kind === 'shield' ? 'parryShield' : null;
         if (defense && take(defense)) playSound(defense, defense === 'parry_3' ? 0.95 : defense === 'parryShield' ? 0.55 : 0.85, 1,
             { ...opts, category:'G' });
-        if (h.kind !== 'hp' || !take('hit_' + h.tier)) return;
+        if (h.kind !== 'hp') return;
+        if (h.finisher) {
+            if (h.finisherSound && h.finisherSound !== defense && take('finisher')) playSound(h.finisherSound, 0.86, 1, { ...opts, category:'F' });
+            return;
+        }
+        if (!take('hit_' + h.tier)) return;
         playHitTierAudio(h.tier, opts);
         if (h.burst || h.crit) {
             resultOutput = true;

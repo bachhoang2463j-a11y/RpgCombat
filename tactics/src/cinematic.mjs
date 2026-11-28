@@ -72,6 +72,57 @@ export function cineKind(result, hits, regions) {
   return dmg.length === 1 && (result.skill?.range?.type || '单体') === '单体' ? 'single' : 'area';
 }
 
+// 只消费真实伤害段；范围和多发守住原构图，单体单发才安排出手前镜头。
+export function planKillBeat(result, caster, units) {
+  const lethal = new Set();
+  const hits = result.hits || [];
+  let focus = null;
+  if (caster?.side !== 'hero' || caster.isSummon) return { lethal, focus };
+  for (const h of hits) {
+    const target = units.find(u => u.id === h.targetId && u.side === 'enemy');
+    if (!target) continue;
+    const segments = h.segments || [h];
+    for (const s of segments) {
+      if (s.hit && s.down && s.hpBefore > 0 && s.hpAfter === 0 && s.hpDmg > 0 && !s.heal && !s.fatalResult && !s.barrierHitId) lethal.add(s);
+    }
+    if (hits.length === 1 && segments.filter(s => !s.heal).length === 1 && lethal.size && (result.shots?.length || 0) <= 1
+      && (result.skill?.range?.type || '单体') === '单体') {
+      focus = { targetId: h.targetId, cutin: target.level === '精英' || target.level === '首领' };
+    }
+  }
+  return { lethal, focus };
+}
+
+export function startKillCamera(sandbox, from, to) {
+  const home = sandbox.getPose();
+  sandbox.cameraTo(sandbox.poseAt(from.x, from.y, home.scale * 1.24), 115);
+  return () => {
+    const frame = sandbox.poseFrame([from, to], { pad: 2 });
+    const pose = frame.scale <= home.scale ? frame : sandbox.poseAt((from.x + to.x) / 2, (from.y + to.y) / 2, home.scale);
+    return sandbox.cameraTo(pose, 145);
+  };
+}
+
+// 窄带只压暗地图上部；头像四边渐隐，不盖住命中区或接管 HUD。
+export function killPortraitSweep(fx, portrait, ms, scale) {
+  const root = fx.screen('<div style="position:absolute;left:0;right:0;top:14%;height:clamp(72px,23%,155px);overflow:hidden;' +
+    'background:linear-gradient(90deg,transparent,rgba(27,16,18,.93) 30%,rgba(48,24,20,.82) 58%,transparent),' +
+    'linear-gradient(0deg,transparent,rgba(252,164,88,.16),transparent);' +
+    'mask-image:linear-gradient(0deg,transparent,#000 19%,#000 81%,transparent);"><img alt="" ' +
+    'style="position:absolute;left:50%;top:50%;width:min(60%,360px);height:210%;object-fit:cover;object-position:center 35%;' +
+    'transform:translate(-50%,-48%);mask-image:radial-gradient(ellipse,black 23%,transparent 72%);' +
+    'filter:brightness(1.23) saturate(.81);"></div>', ms);
+  root.dataset.tacticsFx = 'kill-cutin';
+  root.style.zIndex = '6';
+  const band = root.firstChild;
+  band.firstChild.src = portrait;
+  band.animate([{ transform: 'translateX(-60%) skewX(-12deg)', opacity: 0 },
+    { transform: 'translateX(-5%) skewX(-8deg)', opacity: 1, offset: 0.28 },
+    { transform: 'translateX(4%) skewX(-8deg)', opacity: 1, offset: 0.68 },
+    { transform: 'translateX(56%) skewX(-12deg)', opacity: 0 }], { duration: ms / scale, easing: 'cubic-bezier(.19,.62,.42,1)', fill: 'both' });
+  return root;
+}
+
 // env: { sandbox, fx, hold, after, style, freeze, grade, totalMs, chargeMs, result, hits, regions, shape, centerOf }
 export function startCine(env) {
   const { sandbox: sb, fx, hold, grade, result, hits, centerOf } = env;

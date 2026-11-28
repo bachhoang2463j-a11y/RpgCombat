@@ -454,7 +454,8 @@ ${supportBranches.join('\n').replace('else if', 'if')}
   const originalVisual = mod.slice(visualStart, visualEnd);
   let visual = patch(originalVisual, 'const dom = domOf(r.targetId); if (!dom) return;', 'const dom = domOf(r.targetId); if (!dom) return;\n        const scale = prepareHitNumbers(layer, r, dom);', 1, '受击数字宿主缩放');
   visual = patch(visual, /anims\.push\((el|b|t|s)\.animate\(([^\n]+)\)\);/g, (_, el, args) => 'anims.push(animateHitNumber(' + el + ', ' + args + ', scale));', 8, '受击数字保持原版时序与远景可读');
-  visual = patch(visual, 'const fs = [0, 24, 27, 32][h.tier];', 'const fs = [0, 24, 27, 32][h.tier] * scale;', 1, '受击数字分层间距');
+  visual = patch(visual, "const el = hitNumEl(layer, cls, '-' + h.hpDmg, p.x, p.y);", "const el = hitNumEl(layer, cls + (r.finisher ? ' finisher' : ''), '-' + h.hpDmg, p.x, p.y);\n            if (r.finisher) el.style.setProperty('--hit-scale', scale * 1.3);", 1, '击杀只放大实际 HP 数字');
+  visual = patch(visual, 'const fs = [0, 24, 27, 32][h.tier];', 'const fs = [0, 24, 27, 32][h.tier] * scale * (r.finisher ? 1.3 : 1);', 1, '受击数字分层间距');
   visual = patch(visual, 'p.y - 22)', 'p.y - 22 * scale)', 1, '破盾词牌间距');
   visual = patch(visual, 'p.y - fs * 0.25 - 12)', 'p.y - fs * 0.25 - 12 * scale)', 1, '暴击词牌间距');
   visual = patch(visual, 'p.y + fs * 0.92 + 5;', 'p.y + fs * 1.15 + 14 * scale;', 1, '护盾副数字间距');
@@ -555,7 +556,7 @@ ${supportBranches.join('\n').replace('else if', 'if')}
   mod = patch(mod, '        for (const id of wave.results.keys()) if (!targets.has(id)) wave.results.delete(id);\n', '', 1, '波次不缓存结算结果');
   mod = patch(mod, "classified.shieldBroken ? 'ShieldBroken'", "classified.shieldBroken ? 'ShieldBroken' : classified.guardBroken ? 'GuardBroken'", 1, '区分盾与免伤破防');
   mod = patch(mod, 'targetId:result.targetId, sourceId:result.sourceId || null, source, resultType, isHero:!!result.isHero,',
-    'targetId:result.targetId, sourceId:result.sourceId || null, source, resultType, isHero:!!result.isHero, pan:result.pan,', 1, '结果音保留各接触对象声像');
+    'targetId:result.targetId, sourceId:result.sourceId || null, source, resultType, isHero:!!result.isHero, pan:result.pan, finisher:!!result.finisher, finisherSound:result.finisherSound,', 1, '结果音保留接触对象声像与致死重击');
   mod = patch(mod, 'function playHitTierAudio(tier)', 'function playHitTierAudio(tier, opts)', 1, '受击采样保留播放选项');
   mod = patch(mod, "t === 3 ? 0.94 : t === 2 ? 0.88 : 0.82, 1, { track:'result', category:'F' }", "t === 3 ? 0.94 : t === 2 ? 0.88 : 0.82, 1, { ...opts, category:'F' }", 1, '受击采样保留播放选项');
   mod = patch(mod, /^    function hitAudio\(list\) \{[\s\S]*?^    \}/gm, `    function hitAudio(h, played) {
@@ -575,7 +576,12 @@ ${supportBranches.join('\n').replace('else if', 'if')}
             : h.kind === 'block' ? 'parry_' + h.blockTier : h.kind === 'shield' ? 'parryShield' : null;
         if (defense && take(defense)) playSound(defense, defense === 'parry_3' ? 0.95 : defense === 'parryShield' ? 0.55 : 0.85, 1,
             { ...opts, category:'G' });
-        if (h.kind !== 'hp' || !take('hit_' + h.tier)) return;
+        if (h.kind !== 'hp') return;
+        if (h.finisher) {
+            if (h.finisherSound && h.finisherSound !== defense && take('finisher')) playSound(h.finisherSound, 0.86, 1, { ...opts, category:'F' });
+            return;
+        }
+        if (!take('hit_' + h.tier)) return;
         playHitTierAudio(h.tier, opts);
         if (h.burst || h.crit) {
             resultOutput = true;
