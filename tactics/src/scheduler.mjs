@@ -229,7 +229,10 @@ export function grantNaturalAction(battleState, unitId, now) {
 export function processStunSkip(battleState, unitId, now) {
   const clock = clockOf(battleState);
   const u = clock.units[unitId];
-  if (u.stun && !u.stun.permanent) u.stun = null;
+  if (u.stun && !u.stun.permanent) {
+    if (u.stun.remaining > 1) u.stun.remaining--;
+    else u.stun = null;
+  }
   const p = ensureProgress(battleState, unitId);
   p.distance = 0;
   u.lastSync = now;

@@ -410,6 +410,7 @@ export function createActionDirector(deps) {
     const actionScope = scope();
     if (!actionScope || !actionScope.isLive) return false;
     const isCurrent = () => actionScope === scope() && actionScope.isLive;
+    if (deps.onCast) deps.onCast(result);
     if (result.kanpo) {
       const ev = (result.events || []).find(e => e.type === 'kanpo-resolved') || result.kanpo;
       if (ev.eventId && consumedKanpoEvents.has(ev.eventId)) return true;

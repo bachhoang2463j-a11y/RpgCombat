@@ -207,6 +207,10 @@ function drawAttack(g, pv, viewData) {
     }
   }
   if (shape && shape.type === '单体' && q.ok) {
+    if (q.splashCells?.length) {
+      fillCells(g, q.splashCells, C.atk.cell);
+      strokeCellOutline(g, q.splashCells, C.atk.edge, 1.4);
+    }
     const t = shape.to;
     g.save();
     g.strokeStyle = pv.locked ? C.lock : C.atk.edge; g.lineWidth = pv.locked ? 2.4 : 1.8;

@@ -151,8 +151,8 @@ export function buildShell(root) {
   function cardHtml(u) {
     const res = (cls, label) => '<span class="t-hero-res ' + cls + '"><span class="t-hero-res-h"><em>' + label + '</em><b></b></span><i class="t-bar"><i class="t-bar-fill"></i></i></span>';
     const key = (CLASS_STYLE[(u.classType || '').trim()] || { key: 'default' }).key;
-    return '<button class="t-hero-card t-hc-' + key + '" data-unit-id="' + ESC(u.id) + '">' +
-      faceHtml(u, 't-hero-avatar') +
+    return '<button class="t-hero-card t-hc-' + key + '" data-unit-id="' + ESC(u.id) + '" data-boost-tier="0">' +
+      faceHtml(u, 't-hero-avatar').replace('</span>', '<span class="t-boost-badge" aria-hidden="true"></span></span>') +
       '<span class="t-hero-info"><span class="t-hero-row"><b title="' + ESC(u.name) + '">' + ESC(u.name) + '</b>' + (u.classType ? '<em class="t-hero-cls">' + ESC(u.classType) + '</em>' : '') + '</span>' +
         '<i class="t-bar t-bar-hp"><i class="t-bar-ghost"></i><i class="t-bar-fill"></i><i class="t-bar-shield"></i><span class="t-hero-hpnum"></span></i>' +
         '<span class="t-hero-res2">' + res('t-res-mp', 'MP') + res('t-res-tp', 'TP') + '</span>' +
@@ -221,7 +221,16 @@ export function buildShell(root) {
       els.heroes.innerHTML = heroes.map(cardHtml).join('');
       els.heroes.dataset.key = keyNow;
       els.heroes.querySelectorAll('.t-hero-card').forEach(card => {
-        card.addEventListener('click', () => { uiSound('select'); if (state.onUnitClick) state.onUnitClick(card.getAttribute('data-unit-id')); });
+        card.addEventListener('click', (e) => {
+          const id = card.getAttribute('data-unit-id');
+          if (id === state.currentId && state.onBoostClick && state.onBoostClick(id)) { e.preventDefault(); return; }
+          uiSound('select'); if (state.onUnitClick) state.onUnitClick(id);
+        });
+        card.addEventListener('contextmenu', (e) => {
+          const id = card.getAttribute('data-unit-id');
+          if (id !== state.currentId || !state.onBoostReset || !state.onBoostReset(id)) return;
+          e.preventDefault(); e.stopPropagation();
+        });
         const img = card.querySelector('img');
         if (img) img.addEventListener('error', () => card.querySelector('.t-hero-avatar').classList.add('t-avatar-missing'), { once: true });
       });
@@ -234,6 +243,7 @@ export function buildShell(root) {
     const card = cardOf(id);
     if (!card) { setAllyBars(id, bars); return; }
     const fill = card.querySelector('.t-bar-hp .t-bar-fill'), ghost = card.querySelector('.t-bar-hp .t-bar-ghost');
+    const boostPreview = card === cardOf(state.currentId) ? Number(card.dataset.boostPreview) || 0 : 0;
     // 护盾叠在 HP 末端；HP+盾超过上限时整条按 (HP+盾) 等比压缩
     const shield = Math.max(0, bars.shield || 0), scale = Math.max(bars.maxHp, Math.max(0, bars.hp) + shield);
     const w = pct(bars.hp, scale) + '%';
@@ -252,6 +262,14 @@ export function buildShell(root) {
     setRes('t-res-mp', bars.mp ?? ref.mp ?? 0, bars.maxMp || 0);
     const tp = bars.tp ?? ref.tp ?? 0, maxTp = ref.maxTp || 100;
     setRes('t-res-tp', tp, maxTp);
+    const tpBox = card.querySelector('.t-res-tp'), tpFill = tpBox.querySelector('.t-bar-fill');
+    let tpPreview = tpBox.querySelector('.t-boost-cost-preview');
+    if (boostPreview > 0) {
+      const left = pct(Math.max(0, tp - boostPreview), maxTp), width = pct(Math.min(tp, boostPreview), maxTp);
+      tpFill.style.width = left;
+      if (!tpPreview) { tpPreview = document.createElement('i'); tpPreview.className = 't-bar-fill t-boost-cost-preview'; tpBox.querySelector('.t-bar').appendChild(tpPreview); }
+      tpPreview.style.left = left; tpPreview.style.width = width;
+    } else tpPreview?.remove();
     // TP 能量态（驱动头像火焰档位）：50<TP<100 中等偏亮，满值大型火焰；从未满跨入满值时爆发一次（火星喷射 + 扩散方环 + 音）
     const full = tp >= maxTp;
     card.classList.toggle('t-tp-half', tp > 50 && !full);
@@ -305,6 +323,41 @@ export function buildShell(root) {
     els.heroes.classList.toggle('t-has-current', current);   // 有我方行动者时其余卡压暗
     els.allies.querySelectorAll('.t-ally-row').forEach(r => r.classList.toggle('t-current', r.dataset.unitId === state.currentId));
   }
+  function setBoost(id, tier, canChange, tpCost = 0) {
+    const card = cardOf(id);
+    if (!card) return;
+    const next = Math.max(0, Number(tier) || 0), prev = Number(card.dataset.boostTier) || 0;
+    card.dataset.boostTier = String(next);
+    card.dataset.boostCanChange = canChange ? 'true' : 'false';
+    card.dataset.boostPulse = card.dataset.boostPulse || '0';
+    card.dataset.boostCast = card.dataset.boostCast || '0';
+    card.dataset.boostCastTier = card.dataset.boostCastTier || '0';
+    const badge = card.querySelector('.t-boost-badge');
+    if (badge) badge.textContent = next === 3 ? 'MAX' : next ? 'LV' + next : '';
+    card.classList.toggle('t-boost-active', next > 0);
+    card.classList.toggle('t-boost-locked', !canChange && next > 0);
+    card.dataset.boostPreview = String(Math.max(0, Number(tpCost) || 0));
+    if (next > prev) card.dataset.boostPulse = String((Number(card.dataset.boostPulse) || 0) + 1);
+    const tpBox = card.querySelector('.t-res-tp'), fill = tpBox?.querySelector('.t-bar-fill');
+    const unit = state.units.find(u => u.id === id), ref = unit?.ref || {};
+    const tp = Number(unit?.bars?.tp ?? ref.tp ?? 0), maxTp = ref.maxTp || 100, cost = Math.max(0, Number(tpCost) || 0);
+    if (fill) {
+      const left = pct(Math.max(0, tp - cost), maxTp) + '%', width = pct(Math.min(tp, cost), maxTp) + '%';
+      fill.style.width = left;
+      let preview = tpBox.querySelector('.t-boost-cost-preview');
+      if (cost > 0) {
+        if (!preview) { preview = document.createElement('i'); preview.className = 't-bar-fill t-boost-cost-preview'; tpBox.querySelector('.t-bar').appendChild(preview); }
+        preview.style.left = left; preview.style.width = width;
+      } else preview?.remove();
+    }
+    card.title = next ? 'BOOST ' + next + (canChange ? ' · 左键升档，右键归零' : ' · 已锁定') : (canChange ? '左键循环Boost档位，右键归零' : '当前不可调整Boost');
+  }
+  function boostCast(id, tier) {
+    const card = cardOf(id);
+    if (!card) return;
+    card.dataset.boostCastTier = String(tier || 0);
+    card.dataset.boostCast = String((Number(card.dataset.boostCast) || 0) + 1);
+  }
   // 职业被动资源到账：卡片描边闪职业色 + 卡片上方弹出图标数值
   function flashHeroPassive(id, text, color) {
     const card = cardOf(id);
@@ -353,6 +406,7 @@ export function buildShell(root) {
   function renderCommand(cmd) {
     state.cmd = cmd;
     const u = cmd && cmd.unit;
+    if (u && cmd.boost) setBoost(u.id, cmd.boost.tier, cmd.boost.canChange, cmd.boost.tpCost);
     const enemyTurn = !!(u && u.side !== 'hero' && !cmd.terminal);
     els.enemyOverlay.classList.toggle('opacity-0', !enemyTurn);
     els.enemyOverlay.classList.toggle('pointer-events-none', !enemyTurn);
@@ -366,7 +420,7 @@ export function buildShell(root) {
     if (!cmd.playable) { state.menuKey = ''; rpgUi.closeAllSubMenus(); showTarget(null); renderCharge(null); return; }
     // 技能卡按资源变化重建（原版 updateSkillMenus：每次渲染折叠变体组）；同一资源态不重建，保留展开与滚动
     const prep = cmd.preparation;
-    const menuKey = u.id + '|' + u.ref.mp + '|' + (r ? r.main + ':' + r.aux + ':' + (r.universal || 0) : '') + '|' + (cmd.serial || 0) + '|' + (prep ? prep.remaining + ':' + prep.invested : '') + '|' + u.skills.map(s => s.usesRemaining + ':' + s.maxUses).join(',');
+    const menuKey = u.id + '|' + u.ref.mp + '|' + (r ? r.main + ':' + r.aux + ':' + (r.universal || 0) : '') + '|' + (cmd.serial || 0) + '|' + (u.ref.tp || 0) + ':' + (cmd.boost?.tier || 0) + '|' + (prep ? prep.remaining + ':' + prep.invested : '') + '|' + u.skills.map(s => s.usesRemaining + ':' + s.maxUses).join(',');
     const hero = Object.assign(refOf(u), { skills: u.skills, items: u.items || [], mp: u.ref.mp, hp: u.ref.hp, tp: u.ref.tp || 0, burstActivated: false });
     if (menuKey !== state.menuKey) {
       if (state.menuKey.split('|')[0] !== u.id) { rpgUi.closeAllSubMenus(); state.chargeAside = false; state.costFilter = null; }
@@ -686,6 +740,7 @@ export function buildShell(root) {
     const card = e.target.closest('[data-skill-idx]');
     if (card && card.classList.contains('disabled-card') || card && card.classList.contains('exhausted-card')) {
       const s = cmdHero() && cmdHero().skills[Number(card.dataset.skillIdx)];
+      if (s && state.cmd?.onSkill) { state.cmd.onSkill(Number(card.dataset.skillIdx)); return; }
       uiSound('deny'); showLog((s ? '【' + s.name + '】' : '') + (s && callCmd('skillReason', s) || '当前不可用'), 'warn', 5200); return;
     }
     const action = e.target.closest('[data-tactics-action]');
@@ -836,11 +891,13 @@ export function buildShell(root) {
   return {
     destroy: () => { flames.destroy(); clearTimeout(showLog._t); clearTimeout(showBanner._t); rpgUi.hideTagTip(); document.removeEventListener('mousedown', onComboDown); reactionPrompt.cancel(); state.onReset = null; state.onUnitClick = null; state.onAllyPin = null; root.replaceChildren(); },
     els, renderHeroes, renderTurnOrder, renderQueue, bindMenus, setSelected, setHeroBars, setHeroStatus, setHeroStats, flashHeroPassive, showInspector, setBusy, setCurrent, renderCommand, showBanner, setHistory, closeMenus, markRoundStart, rpgUi,
-    previewMoveCost, previewPips, openModal, closeModal, setSpeedLabel, setMusicPlaying,
+    previewMoveCost, previewPips, openModal, closeModal, setSpeedLabel, setMusicPlaying, setBoost, boostCast,
     promptReaction: (req) => reactionPrompt.prompt(req), cancelReactionPrompt: () => reactionPrompt.cancel(),
     getSafeRect, showLog, openPanel, closePanel, openResult, clearBattle, closeSubmenu: () => {},
     set onUnitClick(fn) { state.onUnitClick = fn; },
     set onAllyPin(fn) { state.onAllyPin = fn; },
+    set onBoostClick(fn) { state.onBoostClick = fn; },
+    set onBoostReset(fn) { state.onBoostReset = fn; },
     set onReset(fn) { state.onReset = fn; },
     set onMusic(fn) { state.onMusic = fn; },
     set onSpeed(fn) { state.onSpeed = fn; },

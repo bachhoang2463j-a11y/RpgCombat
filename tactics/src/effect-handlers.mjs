@@ -126,7 +126,7 @@ function applyToTarget(rt, { caster, target, slot, def, power, turns, skill, ski
     case 'stun': {
       const immunity = immunityReason(target, 'stun', rt.buffsOf(target.id));
       const immune = !!immunity;
-      if (!immune) rt.dispatchBattleClock({ type: 'applyStun', unitId: target.id });
+      if (!immune) rt.dispatchBattleClock({ type: 'applyStun', unitId: target.id, skips: 1 + (skill.boostModifiers?.durationBonus || 0) });
       rt.addLog(target.name + (immune ? ' 免疫眩晕（钢体）' : ' 被击晕，将跳过下一次自然行动'));
       return { kind: 'stun', targetId: target.id, tag: slot.tag, immune, immunity, reason: immunity?.reason ?? null };
     }

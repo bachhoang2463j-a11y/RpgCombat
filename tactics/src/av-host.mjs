@@ -39,6 +39,11 @@ const JUMP_AUDIO_FILES = {
   jump_land_heavy_1: 'jump_land_heavy_1.mp3', jump_land_heavy_2: 'jump_land_heavy_2.mp3', jump_land_heavy_3: 'jump_land_heavy_3.mp3',
 };
 
+const BOOST_AUDIO_FILES_ALL = Object.fromEntries(
+  [...['lv1', 'lv2', 'lv3', 'lv1s', 'lv2s', 'lv3s'].map(name => 'boost_' + name), 'boost_cancel', 'boost_cast']
+    .map(key => [key, key + '.ogg'])
+);
+
 export const MOVE_AUDIO_KEYS = Object.keys(MOVE_AUDIO_FILES);
 export const JUMP_AUDIO_KEYS = Object.keys(JUMP_AUDIO_FILES);
 
@@ -134,6 +139,11 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
   for (const [k, file] of Object.entries({ ...MOVE_AUDIO_FILES, ...JUMP_AUDIO_FILES })) {
     if (!av.audioUrls[k]) av.audioUrls[k] = av.ASSET_BASE + '/' + file;
   }
+  for (const [k, file] of Object.entries(BOOST_AUDIO_FILES_ALL)) {
+    av.audioUrls[k] = typeof __TACTICS_BOOST_AUDIO_URLS__ === 'object' && __TACTICS_BOOST_AUDIO_URLS__
+      ? __TACTICS_BOOST_AUDIO_URLS__[k] : av.ASSET_BASE + '/' + file;
+  }
+
   // 粒子层定帧只由战棋局部顿帧（particleStop）抬高；底座自带的受击 60ms / 强力反击 80ms 抬高被忽略，引擎逐帧递减照常生效
   let particleHold = 0;
   if (av.fxEngine) Object.defineProperty(av.fxEngine, 'hitStop', { get: () => particleHold, set(v) { if (v < particleHold) particleHold = Math.max(0, v); }, configurable: true });
@@ -247,8 +257,8 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
   let preloaded = false;
   function preload() {
     if (preloaded) return; preloaded = true;
-    const decodeSet = new Set([...MOVE_AUDIO_KEYS, ...JUMP_AUDIO_KEYS]);
-    for (const key of [...DEMO_AUDIO_KEYS, ...MOVE_AUDIO_KEYS, ...JUMP_AUDIO_KEYS]) {
+    const decodeSet = new Set([...MOVE_AUDIO_KEYS, ...JUMP_AUDIO_KEYS, ...Object.keys(BOOST_AUDIO_FILES_ALL)]);
+    for (const key of [...DEMO_AUDIO_KEYS, ...MOVE_AUDIO_KEYS, ...JUMP_AUDIO_KEYS, ...Object.keys(BOOST_AUDIO_FILES_ALL)]) {
       const url = av.audioUrls[key];
       if (!url) { reports.missing.push({ kind: 'audio-key', detail: key }); continue; }
       trackLoad(key, url, 'sfx');

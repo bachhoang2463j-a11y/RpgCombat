@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-28",
+  "artifact": "tactics/mvp-standalone.html",
+  "sha256": "d71e5c623044679fc435bb79c05d237b1b852270601872f6bea54f6c668070a7",
+  "sourceFullRegression": { "passed": 1639, "failed": 0, "pending": 0, "runs": 1, "note": "全量在火焰 sc 作用域修复和新增两条运行时/音频回归之前执行；最终只复跑相关组，不重复全量。" },
+  "finalBoostRegression": { "passed": 23, "failed": 0, "pending": 0 },
+  "artifactChecks": { "passed": true, "bundledModules": 70, "requiredInputs": 51, "requiredSymbols": 133, "scriptClosingTags": 1, "externalBusinessImports": 0, "embeddedBoostAudio": 8, "phase4CasesPassed": 11 },
+  "browser": {
+    "backend": "chrome-devtools",
+    "url": "http://127.0.0.1:8123/tactics/mvp-standalone.html",
+    "setup": "用户授权排障模式，并手动关闭占用 chrome-profile 的测试窗口；沿用项目本地页面与权威典型对局数据，未伪造 roster/state。",
+    "initialIssue": "首包真实页面发现 hero-flame-fx 遮罩循环引用作用域外 sc；修复为遮罩记录自身 sc，上下羽化限制在文字区内部。",
+    "checks": [
+      "原版八个 Boost OGG 均解码 status=ok",
+      "通过实际防御姿态获得 TP，头像点击不扣费",
+      "25TP 升到 LV1，白条 left=5% width=20%；再升档不足回到0，右键取消也归0",
+      "实际 LV1 无迹可寻释放：TP25→10（扣20+施法回补5）、MP14→12，castTier=1，castCount=1，canChange=false",
+      "自然行动轮换与防御回补后60TP，连续1/2/3档：LV1/LV2/MAX，白条20%/40%/60%，TP保持60",
+      "MAX 白金火焰全铭牌蔓延，姓名与资源数字保持可读，释放圆波运行时回归使用真实火焰模块",
+      "锁定寂静指令后换档不丢目标：Aim120/140/170，AOE半径4/4/5，仍显示已锁定",
+      "MAX 寂静指令实际释放：TP60→5，MP14→12，castTier=3，castCount=2，canChange=false",
+      "最终归一化威力版重新载入后复验LV1实际释放，TP10/100、MP12/14、档位0、本回合锁档、8采样解码ok"
+    ],
+    "finalJavaScriptErrors": 0,
+    "unrelatedNetworkErrors": "既有 /favicon.ico 两次404，未修改与Boost无关的页面图标。",
+    "iab": "已打开产物；初轮未交还控制，未将其报告为交互通过；最终战斗与视觉门禁在用户授权的真Chrome完成。"
+  },
+  "passed": true
+}

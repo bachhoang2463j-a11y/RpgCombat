@@ -268,6 +268,8 @@ export function resolveSlotTargets(ctx, casterId, skill, areaTargetIds, aimTarge
     let targetIds = [];
     if (override === 'self' || slot.target === 'self' || slot.definition.side === 'self') {
       targetIds = isLive(caster) ? [casterId] : [];
+    } else if (scope === 'single' && slot.attack && skill.boostModifiers?.splashMultiplier) {
+      targetIds = all.filter(u => affectsAll || (side === 'enemy' ? u.side !== caster.side : u.side === caster.side)).map(u => u.id);
     } else if (affectsAll) {
       if (scope === 'single') targetIds = aimUnit ? [aimUnit.id] : [];
       else if (scope === 'self') targetIds = isLive(caster) ? [casterId] : [];
@@ -434,6 +436,18 @@ export function queryAttack(ctx, casterId, skill, aim, options = {}) {
     const single = collectSingle(ctx, caster, origin, normAim, range, !!skill.guaranteedHit, includeDowned, skipSpatialRecheck, hostile, hostile && skill.damageType === '远程');
     if (!single.ok) return Object.assign(fail(single.reason, single.blockedBy), { range });
     cells = single.cells; targetIds = single.targetIds; shape = single.shape; collisionPoint = single.collisionPoint;
+    if (skill.boostModifiers?.splashMultiplier) {
+      const primaryCells = single.cells, keys = new Set(primaryCells.map(c => cellKey(c.col, c.row)));
+      const splash = [];
+      for (const from of primaryCells) for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const col = from.col + dc, row = from.row + dr, key = cellKey(col, row);
+        if (!inBounds(ctx, col, row) || keys.has(key) || rayFirst(ctx, from.col + 0.5, from.row + 0.5, col + 0.5, row + 0.5)) continue;
+        keys.add(key); splash.push({ col, row });
+      }
+      cells = [...primaryCells, ...splash];
+      shape = { ...shape, splashCells: splash };
+      targetIds = cellsToTargets(ctx, cells).filter(t => t.side !== caster.side).map(t => t.unitId);
+    }
   } else if (range.type === '直线') {
     const line = collectLine(ctx, origin, normAim, range);
     if (!line.ok) return Object.assign(fail(line.reason), { range });
@@ -487,5 +501,6 @@ function finishQuery(ctx, caster, skill, origin, aim, cells, targetIds, actualTa
     ok: true, reason: null, origin, aim, range: range.castRange ?? range.length ?? null,
     cells, targetIds, damageTargetIds: damageSlotTargets, actualTargetIds: actualTargets.map(t => t.unitId), targets: actualTargets, slotTargets,
     disclosureTargetIds, collisionPoint, contact: contact || (shape && shape.contact) || null, blockedBy, shape, blastCenter,
+    ...(shape?.splashCells ? { splashCells: shape.splashCells, splashTargetIds: [...new Set(slotTargets.filter(s => s.attack).flatMap(s => s.targetIds))].filter(id => id !== aimTargetId) } : {}),
   };
 }

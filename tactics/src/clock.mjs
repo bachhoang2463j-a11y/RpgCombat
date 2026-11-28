@@ -171,7 +171,7 @@ export function dispatchClock(battleState, command, rulesContext = {}) {
     case 'applyStun': {
       const u = clock.units[command.unitId];
       if (!u) return { ok: false, events: [] };
-      u.stun = { permanent: !!command.permanent };
+      u.stun = { permanent: !!command.permanent, ...(command.skips > 1 ? { remaining: command.skips } : {}) };
       return { ok: true, events: [pushLog(clock, t, 'stun-applied', { unitId: command.unitId, permanent: !!command.permanent })] };
     }
     case 'scheduleRescue': {

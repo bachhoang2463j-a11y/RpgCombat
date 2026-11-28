@@ -15,7 +15,7 @@ const { build: buildRpgUi } = require('./extract-rpg-ui.cjs');
 
 // 产物专项断言：本轮新增与核心模块必须真实入包（存在性，不是仅字符串出现）
 const REQUIRED_INPUTS = [
-  'src/main.mjs', 'src/battle.mjs', 'src/actions.mjs', 'src/guard.mjs', 'src/movement.mjs', 'src/range.mjs',
+  'src/main.mjs', 'src/battle.mjs', 'src/boost.mjs', 'src/actions.mjs', 'src/guard.mjs', 'src/movement.mjs', 'src/range.mjs',
   'src/damage.mjs', 'src/ai.mjs', 'src/generation.mjs', 'src/demo-fixture.mjs', 'src/clock.mjs',
   'src/scheduler.mjs', 'src/parser.mjs', 'src/vendor/js-yaml-4.1.0.mjs',
   'src/av-host.mjs', 'src/action-director.mjs', 'src/motion.mjs', 'src/range-overlay.mjs',
@@ -46,18 +46,20 @@ const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFee
   'chooseTauntTarget', 'planIdleMove', 'statusBadges', 'compactStatusHtml', 'effectFloat', 'inspectorHtml', 'hitChance', 'predictTargets', 'toggleCostFilter', 'setPredict', 'resolveLore', 'SAMPLE_LORE',
   'playRescueGrit', 'playRescueAvoidFatal', 'playVariantResistFx', 'playCounterAttackL1', 'playPowerCounterEffect', 'spawnPowerBurst', 'spawnChargeUpParticles', 'queueCounters', 'revealCounter', 'playSelfDestructWindup', 'playSelfDestructBurst', 'setIdentitySfx', 'setVariantSfx', 'setStatusSfx', 'setSelfDestructSfx',
   'createBgmDirector', 'createBattleMood', 'BGM_TRACKS', 'BGM_POOLS', 'COMEBACK_POOL',
-  'sprintReachable', 'previewApproach', 'dismissField', 'dismissOwnField'];
+  'sprintReachable', 'previewApproach', 'dismissField', 'dismissOwnField',
+  'resolveBoostModifiers', 'applyBoostSkill', 'boostAffordable', 'cycleBoost', 'consumeBoost', 'awardBoostKill'];
 
 const entry = [
   "import { createApp } from './src/main.mjs';",
   "import { DEMO_YAML, DEMO_PLACEMENTS } from './src/demo-fixture.mjs';",
   "import { generateTacticalScene } from './src/generation.mjs';",
-  "import { createBattle } from './src/battle.mjs';",
+  "import { createBattle, BASIC_ATTACK } from './src/battle.mjs';",
+  "import { resolveBoostModifiers, applyBoostSkill } from './src/boost.mjs';",
   "import { parseYamlText } from './src/parser.mjs';",
   "import { createEncounterDemo, createEncounterScenario, createScenarioData, createSeededRandom } from './src/scenario-data.mjs';",
   "import { CHAPEL_SCENE } from './src/chapel-scene.mjs';",
   "import TYPICAL_YAML from '../doc/tactics/典型对局-战棋版.yaml';",
-  'window.__TACTICS_BACKEND__ = { parseYamlText, createEncounterScenario, createScenarioData, createSeededRandom, createBattle, scene: CHAPEL_SCENE };',
+  'window.__TACTICS_BACKEND__ = { parseYamlText, createEncounterScenario, createScenarioData, createSeededRandom, createBattle, BASIC_ATTACK, resolveBoostModifiers, applyBoostSkill, scene: CHAPEL_SCENE };',
   // 默认载入典型对局权威样本（打包时内联原文）；?demo=slice 回到旧视听切片，?demo=nave 使用单房间演示数据
   'const slice = /[?&]demo=slice(&|$)/.test(document.location.search);',
   'const singleRoom = /[?&]demo=nave(&|$)/.test(document.location.search);',
@@ -84,11 +86,15 @@ const entry = [
     if (readFileSync(path.join(uiDir, name), 'utf8').replace(/\r\n/g, '\n') !== text) throw new Error('原版界面生成物过期: ' + name + '（先运行 node tactics/tools/extract-rpg-ui.cjs）');
   }
   const killChargeUrl = 'data:audio/wav;base64,' + readFileSync(path.join(tacticsDir, 'assets', 'tackle_start.wav')).toString('base64');
+  const boostAudioUrls = Object.fromEntries(['lv1', 'lv2', 'lv3', 'lv1s', 'lv2s', 'lv3s', 'cancel', 'cast'].map(name => {
+    const key = 'boost_' + name;
+    return [key, 'data:audio/ogg;base64,' + readFileSync(path.join(tacticsDir, 'assets', 'boost', key + '.ogg')).toString('base64')];
+  }));
   const result = await esbuild.build({
     absWorkingDir: tacticsDir,
     stdin: { contents: entry, resolveDir: tacticsDir, sourcefile: 'demo-entry.mjs' },
     loader: { '.yaml': 'text' },
-    define: { __TACTICS_KILL_CHARGE_URL__: JSON.stringify(killChargeUrl) },
+    define: { __TACTICS_KILL_CHARGE_URL__: JSON.stringify(killChargeUrl), __TACTICS_BOOST_AUDIO_URLS__: JSON.stringify(boostAudioUrls) },
     bundle: true, format: 'iife', platform: 'browser', target: 'es2020',
     minifyWhitespace: true, minifySyntax: true, minifyIdentifiers: false, legalComments: 'none', metafile: true, write: false,
   });
@@ -121,6 +127,10 @@ const entry = [
   ].join('\n');
   const closes = html.split('</script').length - 1; // 仅允许模板自身的 1 个闭合标签
   if (closes !== 1) throw new Error('脚本闭合标签数量异常: ' + closes);
+  for (const [key, url] of Object.entries(boostAudioUrls)) {
+    if (!bundle.includes(url)) throw new Error('Boost 原版音效未入包: ' + key);
+  }
+  if (!html.includes('t-boost-badge') || !html.includes('splashTargetIds')) throw new Error('Boost 交互或溅射未入包');
   const out = path.join(tacticsDir, 'mvp-standalone.html');
   writeFileSync(out, html);
   console.log(JSON.stringify({

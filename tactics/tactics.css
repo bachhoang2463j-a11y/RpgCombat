@@ -380,6 +380,15 @@ button:disabled { opacity: .42; cursor: default; }
 .t-hero-card.t-current::after { border-top-color: var(--g-gold-2); border-bottom-color: var(--g-line-2); box-shadow: inset 0 0 18px rgba(201,164,92,.14); }
 .t-hero-card.t-current::before { background: var(--g-gold-2); }
 .t-hero-card.t-selected::after { border-bottom-color: var(--g-gold-2); }
+.t-boost-badge { position: absolute; left: 2px; bottom: 2px; z-index: 4; padding: 1px 5px; border: 1px solid rgba(243,215,153,.72); border-radius: 3px; background: rgba(15,11,6,.92); color: #f6e3b8; font: 900 9px/1.15 ui-monospace, Consolas, monospace; opacity: 0; transform: scale(.82); transition: opacity .16s, transform .16s; pointer-events: none; }
+.t-hero-card[data-boost-tier]:not([data-boost-tier="0"]) .t-boost-badge { opacity: 1; transform: scale(1); }
+.t-hero-card[data-boost-tier="3"] .t-boost-badge { color: #2b1600; background: #fff4cc; border-color: #fff; box-shadow: 0 0 8px #ffd773; }
+.t-hero-card.t-boost-locked .t-boost-badge { filter: saturate(.65); }
+.t-hero-card .t-res-tp .t-boost-cost-preview { position: absolute; top: 0; bottom: 0; background: rgba(255,255,255,.78); box-shadow: 0 0 6px #fff; pointer-events: none; }
+.t-hero-card[data-boost-pulse]:not([data-boost-pulse="0"])::after { animation: t-boost-pulse .55s ease-out; }
+@keyframes t-boost-pulse { 20% { border-top-color: #fff4cc; box-shadow: inset 0 0 24px rgba(255,215,115,.55), 0 0 16px rgba(255,215,115,.35); } }
+.t-hero-card[data-boost-cast]:not([data-boost-cast="0"]) .t-hero-avatar img { animation: t-boost-cast .72s ease-out; }
+@keyframes t-boost-cast { 12% { filter: brightness(2.5) saturate(.35); } 45% { filter: brightness(1.7) saturate(1.5); } 100% { filter: none; } }
 #heroes-container.t-has-current .t-hero-card:not(.t-current):not(:hover) { filter: brightness(.7) saturate(.75); }
 /* 1:1 头像：金色细框（外层底色 + 内缩 1.5px）+ 左上/右下斜角；呼吸 + 斜向扫光；低血量底部渗红 */
 .t-hero-avatar { position: relative; z-index: 1; display: block; width: 64px; height: 64px; margin-top: -28px; padding: 1.5px; overflow: hidden; background: var(--g-line-2);

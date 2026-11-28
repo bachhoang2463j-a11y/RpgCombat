@@ -24,12 +24,12 @@ export function hitChance(attackCap, dodgeCap) {
 // hooks = { modifyDamageDealt(caster, skill)?, modifyDamageMultiplier(...)? } 返回值直接累加。
 export function computeSegmentRawDamage(casterStats, baseAtk, tagPower, multiplier, roll, hooks = {}, hookArgs = {}) {
   const buffAtkBonus = casterStats.atk - (baseAtk || 0);
-  const baseDmg = tagPower === 0 ? (casterStats.atk * multiplier) : ((tagPower * multiplier) + (buffAtkBonus * multiplier));
+  const baseDmg = tagPower === 0 ? (casterStats.atk * multiplier * (hookArgs.skill?.boostModifiers?.powerMultiplier || 1)) : ((tagPower * multiplier) + (buffAtkBonus * multiplier));
   let rawDamage = Math.max(1, Math.floor(baseDmg * roll));
   let dmgMultiplier = 1;
   if (hooks.modifyDamageMultiplier) dmgMultiplier += hooks.modifyDamageMultiplier(hookArgs) || 0;
   if (hooks.modifyDamageDealt) rawDamage += hooks.modifyDamageDealt(hookArgs) || 0;
-  return Math.floor(rawDamage * dmgMultiplier);
+  return Math.floor(rawDamage * dmgMultiplier * (hookArgs.splashMultiplier ?? 1));
 }
 
 // 护甲／防御姿态→整技免伤池→护盾→HP；纯计算，不扣真实护盾或免伤额度。

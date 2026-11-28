@@ -1,12 +1,13 @@
 // ==========================================
-// 界面与步伐合成音（WebAudio 现场合成，不加载采样）：
+// 界面与步伐合成音（WebAudio）及 Boost 原版采样：
 //   hover（极轻，节流）/ select / lock / confirm / cancel / deny / turn（我方轮次提示）/ enemyTurn / step（脚步）/ endTurn
 // 输出接回合制 CombatAudioMixer 的 aux 轨（K 类），与战斗音同一上下文与清场：混音器 clear 后自动重建。
 // 风格：短、干净、偏木质/金属轻敲，配合深色哥特界面；不做旋律铺底。
 // ==========================================
 
-export function createUiSfx(mixer) {
+export function createUiSfx(mixer, audioUrls = {}) {
   let noiseBuf = null, noiseCtx = null;
+  const boostLoops = new Map();
   const last = new Map();
 
   function ctx() {
@@ -54,6 +55,37 @@ export function createUiSfx(mixer) {
     const now = performance.now();
     if (now - (last.get(kind) || 0) < ms) return false;
     last.set(kind, now); return true;
+  }
+  function boostPlay(key, vol = 0.42) {
+    const url = audioUrls[key];
+    if (!url) return null;
+    return mixer.play(url, { track: 'aux', category: 'K', vol });
+  }
+  function stopBoostLoop(unitId) {
+    const rec = boostLoops.get(unitId);
+    if (!rec) return;
+    rec.stopped = true; rec.race++;
+    rec.cue?.(); boostLoops.delete(unitId);
+  }
+  function stopAllBoostLoops() { for (const id of [...boostLoops.keys()]) stopBoostLoop(id); }
+  function startBoostLoop(unitId, tier) {
+    stopBoostLoop(unitId);
+    if (!tier) return;
+    const rec = { tier, race: 0, stopped: false, cue: null };
+    boostLoops.set(unitId, rec);
+    const key = 'boost_lv' + tier + 's', race = rec.race;
+    mixer.prepare(audioUrls[key]).then(buffer => {
+      if (!buffer || rec.stopped || rec.race !== race || boostLoops.get(unitId) !== rec) return;
+      const c = ctx();
+      if (!c) return;
+      const source = c.createBufferSource(), gain = c.createGain();
+      source.buffer = buffer; source.loop = true;
+      gain.gain.setValueAtTime(0, c.currentTime);
+      gain.gain.linearRampToValueAtTime(0.22, c.currentTime + 0.12);
+      source.connect(gain); gain.connect(mixer.output('aux', 'K'));
+      source.start();
+      rec.cue = () => { source.stop(); source.disconnect(); gain.disconnect(); };
+    });
   }
 
   const SFX = {
@@ -247,11 +279,25 @@ export function createUiSfx(mixer) {
   };
   const RATE = { hover: 60, select: 50, step: 40, heavyStep: 60, sparkle: 60 };
 
-  return function play(kind, opts) {
+  function play(kind, opts) {
     const fn = SFX[kind];
     if (!fn || !gate(kind, RATE[kind] || 30)) return;
     const c = ctx();
     if (!c) return;
     fn(c, c.currentTime + 0.005, opts);
+  }
+  play.setBoost = (unitId, tier, { cancel = true } = {}) => {
+    const prev = boostLoops.has(unitId);
+    stopBoostLoop(unitId);
+    if (tier > 0) {
+      boostPlay('boost_lv' + tier);
+      startBoostLoop(unitId, tier);
+    } else if (prev && cancel) boostPlay('boost_cancel');
   };
+  play.castBoost = (unitId, tier) => {
+    stopBoostLoop(unitId);
+    if (tier > 0) boostPlay('boost_cast');
+  };
+  play.clearBoost = () => stopAllBoostLoops();
+  return play;
 }

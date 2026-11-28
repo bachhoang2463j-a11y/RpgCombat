@@ -17,6 +17,7 @@ import { resolveAvatarUrl, splitEmojiName } from './unit-view.mjs';
 import { TEST_ROOM } from './scene.mjs';
 import { createBattle, BASIC_ATTACK } from './battle.mjs';
 import { actionBalance } from './actions.mjs';
+import { boostAffordable, BOOST_TP_COST } from './boost.mjs';
 import { getVisibleTurnQueue } from './clock.mjs';
 import { findReachable } from './movement.mjs';
 import { createAvHost, heroAvatarUrl } from './av-host.mjs';
@@ -271,7 +272,7 @@ export function createApp(rootEl, opts = {}) {
   const avHost = createAvHost({ getUnitView: () => sandbox.getUnitView(), getUnits: () => (currentViewData ? currentViewData.units : []),
     getEffectiveUnit: id => battle?.getEffectiveUnit(id), onStatusTick: (ev, index) => playDotTick(ev, index),
     onStatusExpired: (ev, index) => playExpiredStatus(ev, index), onVariantTrigger: (ev, beat) => playVariantFeedback(ev, beat) });
-  const ui = createUiSfx(avHost.av.CombatAudioMixer);
+  const ui = createUiSfx(avHost.av.CombatAudioMixer, avHost.av.audioUrls);
   let settlementSeq = 0;
   const bgm = createBgmDirector({ assetBase: avHost.resourceReport().assetBase, context: () => avHost.av.CombatAudioMixer.context(),
     output: () => avHost.av.CombatAudioMixer.output('master') });
@@ -318,6 +319,8 @@ export function createApp(rootEl, opts = {}) {
     liveBgmBefore = after;
   }
   function endActionWithBgm() {
+    const id = battle.snapshot().currentId;
+    if (id) ui.setBoost(id, 0);
     const before = bgmFrame();
     battle.endAction();
     const after = battle.snapshot();
@@ -450,6 +453,12 @@ export function createApp(rootEl, opts = {}) {
     sandbox, avHost, getViewData: () => currentViewData,
     onReveal: (hit, meta) => revealHit(hit, meta),
     onEffectReveal: (e) => revealEffect(e),
+    onCast: result => {
+      const tier = result.skill?.boostTier || 0;
+      if (!tier) return;
+      ui.castBoost(result.casterId, tier);
+      shell.boostCast(result.casterId, tier);
+    },
     onMoveFeedback: (id, kind, p) => moveFeedback(id, kind, p),
     onRuleReveal: (value, { kind }) => { if (kind === 'reaction-damage') revealCounter(value); },
     onSelfDestruct: (event, deferred) => {
@@ -510,6 +519,8 @@ export function createApp(rootEl, opts = {}) {
   let combatToken = {};
   let battle = null;
   let aim = null;            // 瞄准模式 { key, skill }；null = 自由模式（点地面移动、点敌人攻击）
+  let aimHit = null;
+  let boostOwner = null;
   let fieldAction = null;    // P04：跳跃/推动/背负/放下目标选择
   let pending = null;        // 已锁定的攻击 { key, aim }
   let offeredPreparation = null;
@@ -534,6 +545,54 @@ export function createApp(rootEl, opts = {}) {
   const carriedShown = new Set(); // 正在被背负、显示位置跟随背负者的单位
 
   shell.onUiSound = (kind) => ui(kind);
+  shell.onBoostClick = id => changeBoost(id);
+  shell.onBoostReset = id => changeBoost(id, true);
+  function syncBoost() {
+    const snap = battle.snapshot(), u = currentUnit();
+    const id = u?.side === 'hero' && u.ref.hp > 0 && !snap.terminal ? u.id : null;
+    if (boostOwner !== id) {
+      if (boostOwner) { shell.setBoost(boostOwner, 0, false, 0); ui.setBoost(boostOwner, 0); }
+      boostOwner = id;
+    }
+    const boost = battle.boostState(), base = aim?.skill.boostBase || aim?.skill;
+    const preview = boost.tier ? BOOST_TP_COST[boost.tier] + (base?.tpCost || 0) : 0;
+    if (id) shell.setBoost(id, boost.tier, boost.canChange && !busy, preview);
+    return { ...boost, canChange: boost.canChange && !busy, tpCost: preview };
+  }
+  function changeBoost(id, reset = false) {
+    if (!battle || busy || id !== battle.snapshot().currentId) return false;
+    const before = battle.boostState();
+    if (!before.canChange && !(reset && before.tier)) return false;
+    const skill = aim?.skill.boostBase || aim?.skill;
+    const result = reset ? battle.setBoostTier(0) : battle.cycleBoost(skill);
+    if (!result.ok) return false;
+    if (result.changed) ui.setBoost(id, result.tier);
+    else if (!reset) ui('deny');
+    sandbox.getUnitView()?.clearPredict();
+    if (aim && !aim.item && aim.key !== 'release') {
+      aim.skill = battle.effectiveSkill(aim.skill);
+      const hit = pending?.aim || aimHit;
+      if (aim.skill.displacements?.some(d => d.type === '闪现')) {
+        const radius = blinkRadius(aim.skill), cells = battle.teleportCells(id, radius);
+        const hover = hit && cells.find(c => c.col === Math.floor(hit.x) && c.row === Math.floor(hit.y));
+        if (pending && !hover) pending = null;
+        sandbox.setPreview({ kind: 'blink', unitId: id, cells, radius, hover });
+      } else if (hit) {
+        const preview = attackPreview(aim, { ...hit, col: Math.floor(hit.x), row: Math.floor(hit.y) }, !!pending);
+        if (!preview.ok) pending = null;
+      } else idleOverlay();
+    }
+    renderCommand();
+    return true;
+  }
+  function selectBoostFor(skill) {
+    const boost = battle.boostState();
+    if (boost.tier && !boostAffordable(skill, boost.tier, currentUnit().ref.tp || 0)) {
+      battle.setBoostTier(0);
+      ui.setBoost(currentUnit().id, 0);
+      syncBoost();
+    }
+  }
   shell.onUnitClick = (unitId) => {
     if (!currentViewData) return;
     const c = sandbox.unitWorldCenter(unitId);
@@ -648,6 +707,7 @@ export function createApp(rootEl, opts = {}) {
       flow++;
       liveBgmBefore = null;
       bgm.stopBattle();
+      ui.clearBoost(); boostOwner = null; aimHit = null;
       cancelRetargetPrompt();
       director.cancelAttack();          // 旧攻击 generator 作废（generator.return）
       battle?.destroy();
@@ -750,6 +810,13 @@ export function createApp(rootEl, opts = {}) {
     if (skill.isGroup) return (skill.children || []).some(skillUsable);
     return !!(battle && battle.skillStatus(skill).ok);
   }
+  function menuSkillUsable(skill) {
+    if (skill.isGroup) return (skill.children || []).some(menuSkillUsable);
+    return battle.skillStatus(skill).ok || battle.boostState().tier > 0 && battle.skillStatus(skill, undefined, 0).ok;
+  }
+  function menuSkillReason(skill) {
+    return menuSkillUsable(skill) ? '' : skillReason(skill);
+  }
   function skillReason(skill) {
     if (!battle) return '当前不能使用技能';
     // 变体组父项无自身行动语义：有可用子项即不标原因，否则报首个子项的真实原因
@@ -815,7 +882,7 @@ export function createApp(rootEl, opts = {}) {
   function renderCommand() {
     const snap = battle.snapshot();
     const u = currentUnit();
-    if (!u) { shell.renderCommand(null); return; }
+    if (!u) { syncBoost(); shell.renderCommand(null); return; }
     const r = snap.resources;
     const hero = isPlayerUnit(u) && !snap.terminal;
     const carrying = snap.carrying[u.id] || null;
@@ -829,19 +896,20 @@ export function createApp(rootEl, opts = {}) {
       carry: '【背起】选择相邻的倒地友方<br><small>背负中移动消耗加倍</small>',
     };
     shell.renderCommand({
-      unit: u, terminal: !!snap.terminal, playable: hero, serial: snap.actionSerial,
+      unit: { ...u, skills: u.skills.map(skill => battle.effectiveSkill(skill)) }, terminal: !!snap.terminal, playable: hero, serial: snap.actionSerial,
+      boost: syncBoost(),
       resources: r ? { ...r, moveMax: r.baseMove, mp: u.ref.mp } : null,
       carrying, preparation: snap.preparation, chargeInventory: snap.chargeInventory, endArmed: performance.now() < endArmedUntil, basic,
       aimHint: !hero ? null : fieldAction ? fieldHint[fieldAction] : !aim ? null : pending
         ? '【' + esc(aim.skill.name) + '】已锁定<br>再次点击目标或 Enter 发动'
         : '【' + esc(aim.skill.name) + '】请在地图上选择目标',
-      canUse: s => battle.hasActiveField(s) || skillUsable(s),
+      canUse: s => battle.hasActiveField(s) || menuSkillUsable(s),
       canDismissSkill: battle.hasActiveField,
       canStationary: hero && !busy && battle.canStationaryPrepare(),
       stationary, startPayment: battle.previewStationaryStart,
       preparePayment: prep?.payment || null, continueReason: prep?.reason,
       onStationary: (idx) => handleCommand('sk:' + idx, true),
-      skillReason,
+      skillReason: menuSkillReason,
       itemStatus: (it, child) => {
         const skill = battle.itemSkill(it, child);
         if (battle.hasActiveField(skill)) return { ok: true, mainCost: 0, auxCost: 0, reason: '已生效 · 点击撤销' };
@@ -1115,7 +1183,8 @@ export function createApp(rootEl, opts = {}) {
   function attackPreview(action, hit, locked, allowApproach = false) {
     shell.previewMoveCost(null); shell.previewPips(0, 0);
     const { currentId: id, resources } = battle.snapshot();
-    const skill = action.skill;
+    const skill = action.item || action.key === 'release' ? action.skill : battle.effectiveSkill(action.skill);
+    if (action === aim) aimHit = { ...hit };
     const a = aimFor(skill, hit);
     if (!a) {
       sandbox.setPreview({ kind: 'attack', casterId: id, skill, query: null });
@@ -1267,8 +1336,9 @@ export function createApp(rootEl, opts = {}) {
       return;
     }
     if (aim && !aim.item && !aim.skill.isReaction && aim.skill.displacements?.some(d => d.type === '闪现')) {
+      aimHit = { ...hit };
       const q = battle.previewAttack(aim.skill, { x: hit.col + 0.5, y: hit.row + 0.5 });
-      const cells = battle.teleportCells();
+      const cells = battle.teleportCells(battle.snapshot().currentId, blinkRadius(aim.skill));
       const legal = cells.some(c => c.col === hit.col && c.row === hit.row) && q.ok && q.teleport;
       sandbox.setPreview({ kind: 'blink', unitId: battle.snapshot().currentId, cells, radius: blinkRadius(aim.skill),
         hover: legal ? { col: hit.col, row: hit.row } : null,
@@ -1321,7 +1391,7 @@ export function createApp(rootEl, opts = {}) {
     if (busy) { ui('deny'); return true; }
     if (fieldAction) return handleFieldTarget(hit);
     if (aim && !aim.item && !aim.skill.isReaction && aim.skill.displacements?.some(d => d.type === '闪现')) {
-      const cells = battle.teleportCells();
+      const cells = battle.teleportCells(battle.snapshot().currentId, blinkRadius(aim.skill));
       if (!cells.some(c => c.col === hit.col && c.row === hit.row)) { ui('deny'); return true; }
       const q = battle.previewAttack(aim.skill, { x: hit.col + 0.5, y: hit.row + 0.5 });
       if (!q.ok || !q.teleport) { ui('deny'); shell.showLog(q.reason || '该格不可闪现', 'warn'); return true; }
@@ -1584,20 +1654,22 @@ export function createApp(rootEl, opts = {}) {
     if (busy) { ui('deny'); return; }
     if (key === 'end') { requestEnd(); return; }
     fieldAction = null;
-    const skill = skillOfKey(key);
-    if (!skill || skill.isGroup) return;
-    if (dismissOwnField(skill)) return;
+    const base = skillOfKey(key);
+    if (!base || base.isGroup) return;
+    if (dismissOwnField(base)) return;
+    selectBoostFor(base);
+    const skill = battle.effectiveSkill(base);
     if (!skillUsable(skill)) { ui('deny'); shell.showLog(skillReason(skill), 'warn'); return; }
-    if (skill.delay > 0) {
+    if (base.delay > 0) {
       if (battle.snapshot().preparation?.ready) offerPreparedRelease(true);
-      else declarePreparation(skill, stationary);
+      else declarePreparation(base, stationary);
       return;
     }
-    pending = null;
+    pending = null; aimHit = null;
     aim = { key, skill };
     sandbox.setHint(null); sandbox.refreshHover();
     if (!skill.isReaction && skill.displacements?.some(d => d.type === '闪现')) {
-      sandbox.setPreview({ kind: 'blink', unitId: battle.snapshot().currentId, cells: battle.teleportCells(), radius: blinkRadius(skill) });
+      sandbox.setPreview({ kind: 'blink', unitId: battle.snapshot().currentId, cells: battle.teleportCells(battle.snapshot().currentId, blinkRadius(skill)), radius: blinkRadius(skill) });
       renderCommand(); return;
     }
     sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: aim.skill, query: null });
@@ -1679,6 +1751,7 @@ export function createApp(rootEl, opts = {}) {
     const beforeBgm = bgmFrame();
     const result = battle.startPreparation(skill, { stationary });
     if (!result.ok) { ui('deny'); shell.showLog(result.reason, 'warn'); return; }
+    ui.setBoost(result.casterId, 0, { cancel: false });
     aim = null; pending = null; fieldAction = null;
     shell.closeMenus(); sandbox.setPreview(null); sandbox.setHint(null);
     setBusy(true); sandbox.beginAction();
@@ -1716,6 +1789,7 @@ export function createApp(rootEl, opts = {}) {
     const myFlow = flow;
     const casterId = battle.snapshot().currentId;
     const p = pending, act = aim;
+    if (!act.item) ui.setBoost(casterId, 0, { cancel: false });
     sandbox.getUnitView()?.clearPredict();
     pending = null; aim = null;
     shell.closeMenus();
@@ -2260,6 +2334,7 @@ export function createApp(rootEl, opts = {}) {
 
   // ---------- 胜负收束 ----------
   function finishBattle(terminal) {
+    ui.clearBoost();
     setBusy(false);
     sandbox.setPreview(null);
     if (lastResult === terminal.type) return;
@@ -2504,6 +2579,7 @@ export function createApp(rootEl, opts = {}) {
   function boot() { loadYaml(opts.defaultYaml || DEFAULT_YAML_A); }
 
   function destroy() {
+    ui.clearBoost();
     flow++;
     activeGlides.forEach((_h, uid) => stopActiveGlide(uid));
     shell.els.editorModal?.removeEventListener('change', onAudioPrefChange);

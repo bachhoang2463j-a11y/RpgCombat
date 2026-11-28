@@ -23,6 +23,7 @@ import { CLASS_PASSIVES, getEffectiveStats } from './class-passives.mjs';
 import { rageAtkMultiplier, applyTypeResist, hasVariantTag, immunityReason, isImmuneToStun, lifestealRatio, hasThorns, thornsRawReflect } from './variant-rules.mjs';
 import { statusKeyOf, ROUND_TIME } from './scheduler.mjs';
 import { skillActionKind, actionBalance, actionPayment, spendAction } from './actions.mjs';
+import { applyBoostSkill, boostAffordable, nextBoostTier } from './boost.mjs';
 
 export const BASIC_ATTACK = {
   name: '普通攻击', type: '[伤害]', fxTag: '刀砍', power: 0, hit: 100, cost: 0,
@@ -37,7 +38,7 @@ const sideStepFacing = (a, b) => ((Math.atan2(b.col - a.col, -(b.row - a.row)) *
 function skillKey(skill) { return (skill.parentItemName || skill.parentName ? (skill.parentItemName || skill.parentName) + '\u0000' : '') + skill.name + (teleportRule(skill) ? '\u0000闪现' : ''); }
 function usedCount(state, unitId, key) { return state.perBattleUses?.[unitId]?.[key] || 0; }
 
-const usesSkillMain = skill => !skill.isItem && skill !== BASIC_ATTACK;
+const usesSkillMain = skill => !skill.isItem && (skill.boostBase || skill) !== BASIC_ATTACK;
 
 // 物品 → 技能形态（规范 range/slots/isItem，供 attackPreview / aim 复用；不回写原物品）
 export function itemAsSkill(item, child = null) {
@@ -215,7 +216,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
   function currentAttackId() { return attackStack[attackStack.length - 1]?.id || null; }
   function openAttack(caster, skill) {
-    const attack = { id: 'attack:' + (++attackSerial), casterId: caster.id, skillKey: skillKey(skill) };
+    const attack = { id: 'attack:' + (++attackSerial), casterId: caster.id, skillKey: skillKey(skill),
+      boostTier: skill.boostTier || 0, boostRefunded: false, boostDispelled: [] };
     attackStack.push(attack);
     emit('attack-start', { ...attack, attackId: attack.id });
     return attack;
@@ -500,6 +502,21 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   function applyBattleEffect(args) {
     const result = applyEffectSlot(rt, args);
     for (const effect of result.applied) emit('effect-resolved', effect);
+    const attack = attackStack.at(-1);
+    if (attack && args.skill.boostModifiers?.dispelCount && args.slot.debuff && !args.slot.definition.selfCost) {
+      for (const effect of result.applied.slice()) {
+        if (effect.immune || effect.kind === 'blocked' || attack.boostDispelled.includes(effect.targetId)) continue;
+        attack.boostDispelled.push(effect.targetId);
+        const target = byId.get(effect.targetId), negatives = new Set(negativeBuffsOf(target.id));
+        const buff = buffsOf(target.id).find(b => !negatives.has(b) && b.type !== 'taunt' && !b.isConcealAtk);
+        if (!buff) continue;
+        removeBuffRecord(target.id, buff, 'boost-dispelled');
+        const dispel = { kind: 'dispel', targetId: target.id, casterId: args.caster.id, tag: 'Boost驱散', removed: [buff.type], boost: true };
+        result.applied.push(dispel);
+        emit('effect-resolved', dispel);
+        addLog(target.name + ' · Boost MAX 驱散 1 个增益');
+      }
+    }
     return result;
   }
   // 领域标签：失败即挂独立 3 回合 debuff，同源刷新；离场/区域消失保留。
@@ -742,6 +759,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       position: { ...placementsById[target.id] }, hpAfter: target.ref.hp });
     addLog(target.name + (target.side === 'hero' ? ' 倒地' : ' 死亡'));
     creditEnemyDefeat(target, sourceId);
+    awardBoostKill(target, sourceId);
     const selfDestruct = target.side === 'enemy' && selfDestructProfile(target);
     if (selfDestruct) {
       if (deferKillSelfDestruct) {
@@ -751,6 +769,16 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       } else doEnemySelfDestruct(target, selfDestruct);
     }
     return true;
+  }
+  function awardBoostKill(target, sourceId) {
+    const attack = attackStack.at(-1), caster = byId.get(sourceId);
+    if (!attack || attack.casterId !== sourceId || attack.boostTier !== 3 || attack.boostRefunded
+      || !caster || caster.side !== 'hero' || target.side === caster.side || caster.ref.hp <= 0 || currentId() !== sourceId) return;
+    const result = dispatchClock(state, { type: 'grantMainPoint', targetId: sourceId, sourceKey: runId + ':' + attack.id + ':boost' });
+    if (!result.events?.length) return;
+    attack.boostRefunded = true;
+    addLog(caster.name + ' · Boost MAX 收割 · 返还 1 个万能行动点');
+    emit('passive-gain', { unitId: sourceId, passive: 'Boost MAX', kind: 'boost', value: 1, universal: 1 });
   }
   function canReviveLocal(unit) {
     return (unit.ref.reviveCount || 0) > 0 && hasVariantTag(unit, '复活', buffsOf(unit.id));
@@ -811,7 +839,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (!valid.ok || !canStationaryPrepare()) return null;
     const available = { ...resources };
     spendAction(available, valid);
-    return planPreparation({ inventory: chargeState(actor().id).inventory, preparing: { skill, remaining: skill.delay } }, true, available);
+    return planPreparation({ inventory: chargeState(actor().id).inventory, preparing: { skill: valid.eff, remaining: valid.eff.delay } }, valid.eff.delay > 0, available);
   }
   function investPreparation(u, plan = null) {
     const charge = chargeState(u.id), prep = charge.preparing;
@@ -842,7 +870,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     return !!cs && (chargeState(u.id).current || 0) >= cs.charge;
   }
   function chargeAim(u, skill) {
-    return selectChargeAim(ctx, u, effectiveSkill(skill), units.filter(t => t.side !== u.side && activeCombatant(t)));
+    return selectChargeAim(ctx, u, effectiveSkill(skill, u.id), units.filter(t => t.side !== u.side && activeCombatant(t)));
   }
   function gainNaturalCharge(u) {
     const cs = chargeSkillOf(u);
@@ -931,6 +959,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const clock = state.combatState.clock;
     return {
       runId, now: clock?.now || 0, currentId: currentId(), actionSerial, resources: resources ? { moveRemaining: resources.moveRemaining, baseMove: resources.baseMove, sprintRemaining: resources.sprintRemaining || 0, main: resources.main, skillMain: resources.skillMain || 0, aux: resources.aux, universal: resources.universal || 0, moveMultiplier: resources.moveMultiplier || 1, jumpsRemaining: resources.jumpsRemaining, freeJumpAvailable: resources.freeJumpAvailable, jumped: resources.jumpsRemaining === 0, jumpDistance: Math.ceil(actor().ref.moveDistance / 3) } : null,
+      boostTier: boostState().tier, boostCanChange: boostState().canChange,
       terminal: clock?.terminal ? { ...clock.terminal } : null,
       preparation: clock?.currentAction ? structuredClone(state.combatState.charges?.[clock.currentAction.unitId]?.preparing || null) : null,
       chargeInventory: clock?.currentAction ? (state.combatState.charges?.[clock.currentAction.unitId]?.inventory || 0) : 0,
@@ -1235,6 +1264,33 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const charges = state.combatState.charges || (state.combatState.charges = {});
     return charges[unitId] || (charges[unitId] = { inventory: 0, preparing: null, current: 0 });
   }
+  function boostState() {
+    const u = actor(), r = currentResources();
+    return { tier: u?.ref.hp > 0 && !state.combatState.clock?.terminal ? r?.boostTier || 0 : 0, canChange: !!(u && u.side === 'hero' && !isAiControlled(u) && u.ref.hp > 0 && r
+      && !r.boostUsed && !state.combatState.charges?.[u.id]?.preparing && !state.combatState.clock?.terminal) };
+  }
+  function setBoostTier(tier, skill = null) {
+    const before = boostState();
+    if (tier && !before.canChange) return { ok: false, ...before, changed: false };
+    const r = currentResources();
+    if (!r) return { ok: false, tier: 0, changed: false };
+    const next = boostAffordable(skill, tier, actor().ref.tp || 0) ? tier : 0;
+    r.boostTier = next;
+    return { ok: true, tier: next, changed: next !== before.tier };
+  }
+  function cycleBoost(skill = null) {
+    const before = boostState();
+    if (!before.canChange) return { ok: false, ...before, changed: false };
+    return setBoostTier(nextBoostTier(skill, before.tier, actor().ref.tp || 0), skill);
+  }
+  function consumeBoost(skill, preparing = false) {
+    if (skill.isItem || skill.isReaction) return;
+    resources.boostUsed = true;
+    resources.boostTier = 0;
+    if (skill.boostTier) emit(preparing ? 'boost-prepared' : 'boost-cast', {
+      unitId: actor().id, tier: skill.boostTier, skillName: skill.name,
+    });
+  }
   function usesLeft(unitId, skill) {
     if (!(skill.maxUses > 0)) return Infinity;
     return Math.max(0, skill.maxUses - usedCount(state, unitId, skillKey(skill)));
@@ -1282,15 +1338,19 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
 
   // 有效技能视图：缺显式范围按 S14 预设补齐（不回写原对象）
-  function effectiveSkill(skill) {
-    let eff = skill.range ? skill : Object.assign({}, skill, { range: resolveDefaultRange(skill) });
+  function effectiveSkill(skill, unitId = currentId(), boostTier = null) {
+    const prep = state.combatState.charges?.[unitId]?.preparing;
+    if (prep?.skillKey === skillKey(skill)) return prep.skill;
+    const base = skill.boostBase || skill;
+    const tier = boostTier ?? (unitId === currentId() && boostState().canChange ? boostState().tier : 0);
+    let eff = base.range ? base : Object.assign({}, base, { range: resolveDefaultRange(base) });
     if (skill.summonTarget && summonProvider) {
       const spec = parseSummonSpecs(skill.summonTarget)[0];
       const data = spec && summonProvider(spec.name, spec.tags);
       if (data) eff = Object.assign({}, eff, { summonFootprint: data.footprint });
     }
     if (skill.summonTarget && (skill.range?.type !== '召唤')) eff = Object.assign({}, eff, { range: { type: '召唤', castRange: skill.range?.castRange ?? 8 } });
-    return eff;
+    return applyBoostSkill(eff, tier);
   }
 
   function parentItemFor(unit, skill) {
@@ -1316,17 +1376,17 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     costSummary.item = { name: item.name, remaining: item.category === '道具' ? item.usesRemaining : item.count };
     emit('item-consumed', { unitId: unit.id, ...costSummary.item });
   }
-  function canUseSkill(skill, mp) {
+  function canUseSkill(skill, mp, boostTier = null) {
     const u = actor(), r = currentResources();
     if (!u || !r || state.combatState.clock?.terminal) return { ok: false, reason: '当前不能使用技能' };
-    const support = skillSupport(effectiveSkill(skill));
+    const support = skillSupport(effectiveSkill(skill, currentId(), boostTier));
     if (!support.ok) return support;
     if (skill.summonTarget && !summonProvider) return { ok: false, reason: '召唤词条缺失：未接入 summonProvider，无法召唤「' + String(skill.summonTarget) + '」' };
     if (skill.summonTarget && summonProvider) {
       const missing = parseSummonSpecs(skill.summonTarget).filter(spec => !summonProvider(spec.name, spec.tags)).map(spec => spec.name);
       if (missing.length) return { ok: false, reason: '召唤词条缺失：' + missing.join('、') + '（名册/图鉴查无此词条）' };
     }
-    const eff = effectiveSkill(skill);
+    const eff = effectiveSkill(skill, currentId(), boostTier);
     const key = skillKey(skill);
     const charge = chargeState(u.id), preparing = charge.preparing && charge.preparing.skillKey === key;
     if (skill.isItem && skill.children?.length) return { ok: false, reason: '请选择道具子用法' };
@@ -1360,7 +1420,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     if (!payment.ok) return payment;
     const mpShort = (mp ?? u.ref.mp) < (preparing ? 0 : (skill.cost || 0));
     const hpShort = u.ref.hp <= (preparing ? 0 : (skill.hpCost || 0));
-    const tpShort = (u.ref.tp || 0) < (preparing ? 0 : (skill.tpCost || 0));
+    const tpShort = (u.ref.tp || 0) < (preparing ? 0 : (eff.tpCost || 0));
     if (mpShort || hpShort || tpShort) return { ok: false, reason: skill.isItem ? (mpShort ? 'MP不足' : hpShort ? 'HP不足' : 'TP不足') : '数值资源不足' };
     return { ...payment, eff, preparing: !!preparing, ready };
   }
@@ -1385,11 +1445,11 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       if (!preparing && skill.cooldownTurns > 0 && skillCooldownAt(u.id, key) > state.combatState.clock.now + 1e-9) return false;
       if (!preparing && (u.ref.mp < (skill.cost || 0) || u.ref.hp <= (skill.hpCost || 0) || (u.ref.tp || 0) < (skill.tpCost || 0))) return false;
       return skillSlots(skill).some(s => s.attack || s.definition.side === 'enemy');
-    }).map(effectiveSkill);
+    }).map(skill => effectiveSkill(skill, unitId));
   }
 
-  function skillStatus(skill, mp) {
-    const status = canUseSkill(skill, mp);
+  function skillStatus(skill, mp, boostTier = null) {
+    const status = canUseSkill(skill, mp, boostTier);
     if (!status.ok) return status;
     if (skill.isReaction) return { ok: false, reason: '反应技能只能被动触发' };
     return status;
@@ -2071,10 +2131,11 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     return Object.assign({ ok: false, reason, hits: [], effects: [], events: [], ammoEvents: [], logFrom: log.length, logTo: log.length }, extra);
   }
 
-  function startPreparation(skill, { stationary = false } = {}) {
-    if (!(skill?.delay > 0)) return failAttack('该技能无需蓄力');
-    const valid = canUseSkill(skill);
+  function startPreparation(skillInput, { stationary = false } = {}) {
+    if (!((skillInput?.boostBase || skillInput)?.delay > 0)) return failAttack('该技能无需蓄力');
+    const valid = canUseSkill(skillInput);
     if (!valid.ok) return failAttack(valid.reason);
+    const skill = valid.eff;
     const u = actor(), charge = chargeState(u.id);
     if (charge.preparing) return failAttack('当前已有蓄力');
     if (stationary && !canStationaryPrepare()) return failAttack('需要满额移动，且本次行动未驻足');
@@ -2093,26 +2154,29 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     consumeParentItem(u, skill, costSummary);
     if (skill.cooldownTurns > 0) dispatchClock(state, { type: 'applyCooldown', unitId: u.id, skillKey: key, duration: skill.cooldownTurns * ROUND_TIME });
     const prep = charge.preparing = { id: 'prepare:' + passiveSeq(), skillKey: key, skill: structuredClone(skill),
-      remaining: skill.delay, invested: 0, source: 'delay', ready: false };
+      remaining: skill.delay, invested: 0, source: 'delay', ready: skill.delay === 0, boostTier: skill.boostTier || 0 };
+    consumeBoost(skill, true);
     r.preparationContinued = true;
-    if (stationary) costSummary.movement = investStationary(u, prep);
+    if (stationary && !prep.ready) costSummary.movement = investStationary(u, prep);
     notifyManaSpent(u, costSummary.mp, prep);
     costSummary.preparation = investPreparation(u);
     addLog(u.name + ' 声明蓄力 ' + skill.name + ' · 剩余 ' + prep.remaining);
-    return { ok: true, preparing: true, charge: { preparing: true, ready: prep.ready, kind: 'delay' }, hits: [], effects: [],
+    return { ok: true, preparing: true, boostTier: skill.boostTier || 0, charge: { preparing: true, ready: prep.ready, kind: 'delay' }, hits: [], effects: [],
       events: domainEvents.slice(eventFrom), ammoEvents: [], casterId: u.id, skill, costSummary, logFrom, logTo: log.length };
   }
 
   function* beginAttack(skill, aim, options = {}) {
     const u = actor();
     if (!u) return failAttack('当前不能使用技能');
-    if (skill?.delay > 0 && !chargeState(u.id).preparing) return startPreparation(skill, options);
+    if ((skill?.boostBase || skill)?.delay > 0 && !chargeState(u.id).preparing) return startPreparation(skill, options);
+    const valid = canUseSkill(skill);
+    if (!valid.ok) return failAttack(valid.reason);
     const query = previewAttack(skill, aim);
     if (!query.ok) return failAttack(query.reason, { query });
     const attackRun = runId;
-    const attack = openAttack(u, skill);
+    const attack = openAttack(u, valid.eff);
     try {
-      const result = yield* resolveAction(skill, query.aim, options);
+      const result = yield* resolveAction(valid.eff, query.aim, options, valid, query);
       return { ...result, runId: attackRun, attackId: attack.id, events: domainEvents.filter(ev => ev.attackId === attack.id && ev.runId === attackRun) };
     } finally {
       if (attackRun === runId) {
@@ -2121,15 +2185,15 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       }
     }
   }
-  function* resolveAction(skillInput, aim, options = {}) {
+  function* resolveAction(skillInput, aim, options = {}, validity = null, spatial = null) {
     const actionRun = runId;
-    const skill = skillInput;
     const u = actor();
     const logFrom = log.length;
-    const valid = canUseSkill(skill);
+    const valid = validity || canUseSkill(skillInput);
     if (!valid.ok) return failAttack(valid.reason);
-    const eff = valid.eff || effectiveSkill(skill);
-    const query = previewAttack(skill, aim);
+    const eff = valid.eff || effectiveSkill(skillInput);
+    const skill = eff;
+    const query = spatial || previewAttack(skillInput, aim);
     if (!query.ok) return failAttack(query.reason, { query });
     // 规范槽视图（skillSlots）合并空间结果（query.slotTargets 提供各槽 targetIds）
     const slots = skillSlots(eff).map(s => Object.assign({}, s, { targetIds: query.slotTargets.find(slot => slot.index === s.index)?.targetIds || [] }));
@@ -2137,7 +2201,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const charge = chargeState(u.id);
     const preparing = charge.preparing && charge.preparing.skillKey === key;
     const prepReady = preparing && charge.preparing.remaining <= 0;
-    const prepKind = skill.delay > 0 ? 'delay' : null;
+    const prepKind = (skill.boostBase || skill).delay > 0 ? 'delay' : null;
     const chargeInfo = { preparing: !!preparing, ready: prepReady, kind: prepKind };
     const chargeRelease = skill.charge > 0 && isAiControlled(u);
     const costSummary = { main: 0, aux: 0, universal: 0, mp: 0, hp: 0, tp: 0, uses: 0, bindings: null, ammoShots: 0 };
@@ -2169,6 +2233,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       consumeParentItem(u, skill, costSummary);
       if (costSummary.bindings) addLog('施展材料：' + costSummary.bindings);
     }
+    consumeBoost(skill);
     // 大招释放：预检通过并付费后清空充能；看破取消效果，不返还施法成本。
     if (chargeRelease) {
       charge.current = 0;
@@ -2230,7 +2295,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     }
 
     // 命中结论账本（原版 _bdg）：减益共享"至少一次命中"
-    const bdg = { targetHit: {}, targetResolved: {}, debuffRolled: {}, concealAtk };
+    const bdg = { targetHit: {}, targetResolved: {}, debuffRolled: {}, concealAtk, skill: eff };
     const eventStart = domainEvents.length;
     const hits = [];
     const hitMap = new Map();
@@ -2324,8 +2389,11 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         if (canceled.value || (!isAoE && u.ref.hp <= 0)) break;
         if (def.kind === 'attack') {
           if (target.ref.hp <= 0) continue;
-          const seg = yield* resolveAttackSegment({ caster: u, target, slot, skill: eff, baseSkill: skill, slotIndex: slot.index,
-            segmentIndex: shotIdx, shotIndex: shotIdx, totalShots: damageSlots.length, bdg, canceled, incomingType, isAoE, options, skillMultiplier: skillCrit.multiplier });
+          const splash = activeQuery.splashTargetIds?.includes(target.id);
+          const targetSlot = splash ? { ...slot, boostSplash: eff.boostModifiers.splashMultiplier } : slot;
+          const seg = yield* resolveAttackSegment({ caster: u, target, slot: targetSlot, skill: eff, baseSkill: skill, slotIndex: slot.index,
+            segmentIndex: shotIdx, shotIndex: shotIdx, totalShots: damageSlots.length, bdg, canceled, incomingType,
+            isAoE: isAoE || splash, options: splash ? { ...options, skipSpatialRecheck: true } : options, skillMultiplier: skillCrit.multiplier });
           if (actionRun !== runId) return failAttack('战斗已取消');
           if (!seg) continue;
           seg.aim = { ...activeAim };
@@ -2388,8 +2456,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const p = placementsById[u.id];
     if (damageSlots.length) p.facing = aimFacing(activeQuery, p.facing);
     // 施法 TP：普通攻击 +20，其余技能 +5（原版口径）
-    if (u.ref.hp > 0) u.ref.tp = Math.min(u.ref.maxTp || 100, (u.ref.tp || 0) + (skill === BASIC_ATTACK ? 20 : 5));
-    return { ok: true, hits, shots, effects, barrierHits: Object.values(bdg.barrierHits || {}), events: domainEvents.slice(eventStart), ammoEvents, summons: summons.map(s => s.id), query, casterId: u.id, skill, aim: { ...aim },
+    if (u.ref.hp > 0) u.ref.tp = Math.min(u.ref.maxTp || 100, (u.ref.tp || 0) + ((skill.boostBase || skill) === BASIC_ATTACK ? 20 : 5));
+    return { ok: true, boostTier: skill.boostTier || 0, hits, shots, effects, barrierHits: Object.values(bdg.barrierHits || {}), events: domainEvents.slice(eventStart), ammoEvents, summons: summons.map(s => s.id), query, casterId: u.id, skill, aim: { ...aim },
       facing: p.facing, incomingType, canceled: canceled.value, crit: skillCrit.crit, costSummary, charge: chargeInfo, chargeRelease, logFrom, logTo: log.length };
   }
 
@@ -2398,7 +2466,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const segmentId = runId + ':' + currentAttackId() + ':slot:' + slot.index + ':segment:' + segmentIndex;
     const key = barrier.id + ':' + segmentId;
     if (cache[key]) return cache[key];
-    const raw = rawOverride ?? computeSegmentRawDamage(statsOf(caster, ledger.concealAtk), caster.ref.atk, slot.power, multiplier, roll);
+    const raw = rawOverride ?? computeSegmentRawDamage(statsOf(caster, ledger.concealAtk), caster.ref.atk, slot.power, multiplier, roll, {}, { skill: ledger.skill, splashMultiplier: slot.boostSplash });
     const origin = unitCenter(placementsById[caster.id], caster.footprint);
     const protectedTargetIds = Object.entries(ledger.barrierTargets || {}).filter(([, b]) => b.id === barrier.id).map(([id]) => id);
     const result = damageBarrier(ctx, barrier.id, raw, { armorMult: slot.definition.scatter ? 3 : 1, incomingType });
@@ -2421,7 +2489,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     return adjustedRaw(computeSegmentRawDamage(cStats, caster.ref.atk, slot.power, multiplier, roll, {
       modifyDamageMultiplier: args => passive?.modifyDamageMultiplier?.(args.caster, args.target, buffsOf(args.target.id), cStats, statsOf(args.target)) || 0,
       modifyDamageDealt: args => passive?.modifyDamageDealt?.(args.caster, args.skill, cStats) || 0,
-    }, { caster, target, skill }), tactics);
+    }, { caster, target, skill, splashMultiplier: slot.boostSplash }), tactics);
   }
 
   function segmentDamage(caster, target, slot, skill, incomingType, isAoE, pierce, roll, multiplier, concealAtk, tactics) {
@@ -2462,7 +2530,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const guard = buffsOf(target.id).filter(b => b.type === 'damageGuard' && (b.attackId === currentAttackId() || b.attackId == null)).reduce((n, b) => n + b.value, 0);
     const armorMult = slot.definition.scatter ? 3 : 1, defending = isDefending(target), shield = target.ref.shield || 0;
     const at = roll => {
-      const raw = adjustedRaw(computeSegmentRawDamage(cStats, caster.ref.atk, slot.power, 1, roll, hooks, { caster, target, skill }), tactics);
+      const raw = adjustedRaw(computeSegmentRawDamage(cStats, caster.ref.atk, slot.power, 1, roll, hooks, { caster, target, skill, splashMultiplier: slot.boostSplash }), tactics);
       const resisted = applyTypeResist(raw, incomingType, isAoE, target, buffsOf(target.id));
       return { raw, resisted, ...calculateDamage(resisted, { def: tStats.def, shield, hp: target.ref.hp }, { isPierce: pierce, armorMult, guardRemaining: guard, defending }) };
     };
@@ -2716,9 +2784,9 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     return {
       ok: true,
       slotTargets: query.slotTargets,
-      costs: { main: valid.mainCost + valid.skillMainCost, aux: valid.auxCost, universal: valid.universalCost, mp: skill.cost || 0, hp: skill.hpCost || 0, tp: skill.tpCost || 0,
+      costs: { main: valid.mainCost + valid.skillMainCost, aux: valid.auxCost, universal: valid.universalCost, mp: valid.preparing ? 0 : skill.cost || 0, hp: valid.preparing ? 0 : skill.hpCost || 0, tp: valid.preparing ? 0 : eff.tpCost || 0,
         usesLeft: usesLeft(u.id, skill), bindings: itemBindingsFor(u, skill).map(b => ({ item: b.item.name, cost: b.cost, enough: bindingStockOk(b) })),
-        cooldownTurns: skill.cooldownTurns || 0, delay: skill.delay || 0, charge: skill.charge || 0 },
+        cooldownTurns: skill.cooldownTurns || 0, delay: eff.delay || 0, charge: skill.charge || 0 },
       ammoPlan: ammoBinds.map(b => ({ item: b.item.name, perShot: ammoQuotaForShot(b.cost, Math.max(1, damageSlotCount), 1), totalCost: b.cost, remaining: b.item.count || 0 })),
       effects: slots.map(s => ({ index: s.index, tag: s.tag, power: s.power, turns: s.turns, target: s.target, attack: s.attack, targetIds: query.slotTargets.find(slot => slot.index === s.index)?.targetIds || [] })),
       // 零掷骰伤害预估（roll=1 中值口径；实际结算带 0.8–1.2 随机）：每目标每攻击槽一条。
@@ -2743,8 +2811,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
             const raw = adjustedRaw(computeSegmentRawDamage(cStats, u.ref.atk, s.power, 1, 1, {
               modifyDamageMultiplier: args => (passive && passive.modifyDamageMultiplier ? passive.modifyDamageMultiplier(args.caster, args.target, buffsOf(args.target.id), statsOf(args.caster), statsOf(args.target)) : 0),
               modifyDamageDealt: args => (passive && passive.modifyDamageDealt ? passive.modifyDamageDealt(args.caster, args.skill, statsOf(args.caster)) : 0),
-            }, { caster: u, target, skill: eff }), tactics);
-            const afterResist = applyTypeResist(raw, eff.damageType || '近战', isAoE0, target, buffsOf(target.id));
+            }, { caster: u, target, skill: eff, splashMultiplier: query.splashTargetIds?.includes(targetId) ? eff.boostModifiers.splashMultiplier : 1 }), tactics);
+            const afterResist = applyTypeResist(raw, eff.damageType || '近战', isAoE0 || query.splashTargetIds?.includes(targetId), target, buffsOf(target.id));
             const isPierce = !!eff.isPierce || !!s.definition.pierce || !!(passive && passive.checkPierce && passive.checkPierce(u));
             const { hpDmg, shieldDmg, guardDmg } = calculateDamage(afterResist, view,
               { isPierce, armorMult: s.definition.scatter ? 3 : 1, guardRemaining: view.guard, defending: isDefending(target) });
@@ -2839,6 +2907,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
 
   function endAction() {
+    if (resources) resources.boostTier = 0;
     const id = currentId();
     if (state.combatState.clock?.terminal) return snapshot();
     if (!id) return state.combatState.clock ? advance() : snapshot();
@@ -2974,7 +3043,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
 
   return { ctx, battleState: state, get state() { return state; }, start, snapshot, reachable, sprintReachable, previewMove, beginMove, move, sprint, previewJump, jump, push, previewCarry, carry, drop, previewDisplacement,
-    hasActiveField, dismissField,
+    hasActiveField, dismissField, effectiveSkill, boostState, setBoostTier, cycleBoost,
     setVisibleUnitIds(ids) { visibleIds = ids ? ids.slice() : null; },
     canUseSkill, skillStatus, canUseReaction, canUseItem, itemSkill: itemAsSkill, startPreparation, canStationaryPrepare, stationaryStatus, previewStationaryStart, canAdvancePreparation, advancePreparation, cancelPreparation,
     previewAttack, previewApproach, previewRetarget, teleportCells, beginAttack, attack, beginUseItem, useItem, resolveSelfDestruct, predictAttack, defend, recoverEnemyMp, previewReady, ready,
