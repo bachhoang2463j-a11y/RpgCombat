@@ -6,6 +6,10 @@ const { createRequire } = require('node:module');
 const tacticsDir = path.resolve(__dirname, '..');
 const workspaceDir = path.resolve(tacticsDir, '..');
 const esbuild = createRequire(path.join(tacticsDir, 'p00-probe', 'node_modules', 'esbuild'))('esbuild');
+const chargeSamples = {
+  herocharge: '资源/misc-sfx/herocharge.mp3',
+  light_charge: '资源/attack-identity-sfx/light_charge.mp3',
+};
 
 function mustReplace(src, target, replacement, label) {
   if (!src.includes(target)) throw new Error('Patch target missing: ' + label);
@@ -216,6 +220,8 @@ export function startKillCamera(sandbox, from, to, fx) {
     if (rushMode && kill.focus) ruleKeys.push(chargeKey);`, 'prepareImpact'],
         ['await sandbox.guideTo(pts);', 'if (window.__HIT_DEMO_CFG__?.mode === "A" || !kill.focus) await sandbox.guideTo(pts);', 'skipSoftGuide'],
         ['startKillCamera(sandbox, killFrom, killTo)', 'startKillCamera(sandbox, killFrom, killTo, makeFx(audioContext.category))', 'rushHost'],
+        ["sfx: (key, vol) => av.playSound(key, vol, 1, { track: 'skill', category, audioContext, pan: audioContext?.pan }),",
+          "sfx: (key, vol, opts) => av.playSound(key, vol, 1, { track: 'skill', category, audioContext, pan: audioContext?.pan, ...opts }),", 'chargeStartOffset'],
         ['      wait, tween, awaitHandle, hold, releaseFinisher, finisherWindupMs, after:',
           '      wait, tween, awaitHandle, hold, releaseFinisher, finisherWindupMs, demoLethal: kill.lethal.size > 0, demoChargeScheduled: demoClose, after:', 'demoCues'],
       ]) s = mustReplace(s, target, replacement, 'director:' + label);
@@ -351,7 +357,12 @@ export function startKillCamera(sandbox, from, to, fx) {
     });
 
     build.onLoad({ filter: /tactics[\\/]src[\\/]vendor[\\/]rpg-av[\\/]rpg-av\.mjs$/ }, args => {
-      const s = mustReplace(readLf(args.path),
+      let s = readLf(args.path);
+      for (const [key, file] of Object.entries(chargeSamples)) {
+        const inline = 'data:audio/mpeg;base64,' + readFileSync(path.join(workspaceDir, file)).toString('base64');
+        s = mustReplace(s, "'" + key + "': `\${ASSET_BASE}/" + key + ".mp3`,", JSON.stringify(key) + ': ' + JSON.stringify(inline) + ',', 'av:localCharge:' + key);
+      }
+      s = mustReplace(s,
         "if (h.finisherSound && h.finisherSound !== defense && take('finisher')) playSound(h.finisherSound, 0.86, 1, { ...opts, category:'F' });",
         `if (h.finisherSound && take('finisher')) {
                 const key = h.finisherSound, impactOpts = { ...opts, category:'F' };
