@@ -169,9 +169,17 @@ export function createUnitView(parent, deps) {
     const prev = rec.shieldShown || 0;
     rec.shieldShown = value;
     rec.root.classList.toggle('t-unit-shielded', value > 0);
-    if (value > 0 && prev <= 0) rec.shield.animate([{ transform: 'scale(1.45)', opacity: 0 }, { transform: 'scale(0.94)', opacity: 1, offset: 0.6 }, { transform: 'scale(1)', opacity: 1 }], { duration: 460, easing: 'ease-out' });
-    else if (value <= 0 && prev > 0) rec.shield.animate([{ transform: 'scale(1)', opacity: 1, filter: 'brightness(2.2)' }, { transform: 'scale(1.12)', opacity: 0.8, offset: 0.25 }, { transform: 'scale(1.5)', opacity: 0, filter: 'brightness(1)' }], { duration: 520, easing: 'ease-out' });
-    else if (value < prev) rec.shield.animate([{ filter: 'brightness(2)', transform: 'scale(1.06)' }, { filter: 'brightness(1)', transform: 'scale(1)' }], { duration: 320, easing: 'ease-out' });
+    if (value > 0) {
+      rec.root.classList.remove('t-unit-shield-breaking');
+      if (prev <= 0) rec.shield.animate([{ transform: 'scale(1.45)', opacity: 0 }, { transform: 'scale(0.94)', opacity: 1, offset: 0.6 }, { transform: 'scale(1)', opacity: 1 }], { duration: 460, easing: 'ease-out' });
+      else if (value < prev) rec.shield.animate([{ filter: 'brightness(2)', transform: 'scale(1.06)' }, { filter: 'brightness(1)', transform: 'scale(1)' }], { duration: 320, easing: 'ease-out' });
+    } else if (prev > 0) {
+      rec.root.classList.add('t-unit-shield-breaking');
+      const anim = rec.shield.animate([{ transform: 'scale(1)', opacity: 1, filter: 'brightness(2.4)' }, { transform: 'scale(1.16)', opacity: 0.88, offset: 0.25 }, { transform: 'scale(1.55)', opacity: 0, filter: 'brightness(1)' }], { duration: 520, easing: 'ease-out' });
+      const clearBreak = () => rec.root.classList.remove('t-unit-shield-breaking');
+      anim.onfinish = clearBreak;
+      anim.oncancel = clearBreak;
+    }
   }
   function setShield(id, value) { const rec = nodes.get(id); if (rec) syncShield(rec, Math.max(0, value || 0)); }
   // 增益/减益持续弧光：list=[{kind, exp}]（由内向外错层）；新出现的弧环自外向内收拢显形，种类不变不重建

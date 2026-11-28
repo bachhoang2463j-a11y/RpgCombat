@@ -58,6 +58,8 @@ export const DEMO_AUDIO_KEYS = [
   'atkUp', 'defUp', 'hitUp', 'hitDown', 'hpHeal', 'mpHeal', 'shieldUp', 'taunt', // 通用辅助与兜底
   'atk1', 'atk2', 'light_impact', 'kanpo', 'parry_perfect', 'avoid_dash_perfect', 'sheshen_armor_step',
   'creature_slime_01', 'thunder_charge', 'fog',                               // 异常状态发作
+  'revive_gather', 'revive_bloom', 'molt_crack', 'molt_snap', 'molt_empower', // 变体转折与被动反馈
+  'rage_exit', 'leech_flow', 'regen_hum', 'thorn_parry',
   'resist_fluid', 'resist_phantom', 'resist_antimagic', 'resist_vital', 'resist_fireproof', 'resist_poisonproof', 'resist_ironbody', // 变体抗性
 ];
 
@@ -68,7 +70,7 @@ export function heroHasVoice(name) {
   return Object.prototype.hasOwnProperty.call(RPG_HERO_VOICE_LINES, name);
 }
 
-export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => null, onStatusTick }) {
+export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => null, onStatusTick, onStatusExpired, onVariantTrigger }) {
   const rectSymbol = Symbol('tacticsStageRect');
   let stageEl = document.createElement('div');   // 初始占位；sandbox 挂载后 attachStage 换成真实舞台
   let shakeEl = null;
@@ -153,31 +155,57 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
     const effective = getEffectiveUnit(id);
     return { id: u.id, name: u.name, isAlive: u.ref.hp > 0, isHero: u.side === 'hero', side: u.side, hp: u.ref.hp, maxHp: u.ref.maxHp,
       molted: !!u.ref.molted, hasRageNarrated: !!u.ref.hasRageNarrated,
-      buffs: (effective?.buffs || []).map(b => ({ ...b, permanent: b.duration === null })) };
+      buffs: (effective?.buffs || []).map(b => ({ ...b, permanent: b.duration == null || !Number.isFinite(b.duration) })) };
   }
   function syncRoster() {
     const units = getUnits() || [];
     av.setRoster(units.filter(u => u.side === 'hero').map(u => entity(u.id)), units.filter(u => u.side !== 'hero').map(u => entity(u.id)));
   }
 
+  const EXPIRE_COLORS = {
+    poison: '#a855f7', burn: '#f97316', paralyze: '#facc15', stun: '#fde047',
+    defend: '#6ee7b7', counter: '#fcd34d', damageGuard: '#7dd3fc',
+    exposure: '#fca5a5', variant: '#67e8f9', taunt: '#fca5a5',
+    atk: '#fb923c', def: '#60a5fa', hit: '#fde047', eva: '#5eead4', spd: '#67e8f9',
+  };
   const consumedEvents = new Set();
   function consumeVisualEvents(events) {
-    const ticksByUnit = new Map();
+    const ticksByUnit = new Map(), expiredByUnit = new Map(), handles = [];
     for (const ev of events) {
       if (consumedEvents.has(ev.seq)) continue;
       consumedEvents.add(ev.seq);
       const ent = entity(ev.unitId);
       if (!ent) continue;
-      if (ev.type === 'variant-trigger') av.playVariantTriggerFx({ trigger: ev.trigger, entity: ent, meta: ev });
-      else if (ev.type === 'status-tick') {
+      if (ev.type === 'variant-trigger') {
+        let beatFired = false;
+        const h = av.playVariantTriggerFx({
+          trigger: ev.trigger, entity: ent,
+          sourceEntity: ev.sourceId ? entity(ev.sourceId) : undefined,
+          targetEntity: ev.targetId ? entity(ev.targetId) : undefined,
+          meta: ev,
+          onBeat: beat => { beatFired = true; onVariantTrigger?.(ev, beat); },
+        });
+        if (h) handles.push({ trigger: ev.trigger, handle: h });
+        else if (!beatFired) onVariantTrigger?.(ev, { phase: ev.trigger, instant: true });
+      } else if (ev.type === 'status-tick') {
         av.playStatusTickFx({ event: ev.kind === 'poison' ? 'poisonTick' : 'burnTick', entity: ent, meta: ev });
         const index = ticksByUnit.get(ev.unitId) || 0;
         ticksByUnit.set(ev.unitId, index + 1);
         onStatusTick?.(ev, index);
       } else if (ev.type === 'status-proc') av.playStatusTickFx({ event: 'paraProc', entity: ent, meta: ev });
-      else if (ev.type === 'status-removed' && ['burn', 'poison', 'paralyze'].includes(ev.kind))
-        av.playStatusTickFx({ event: 'expire', entity: ent, meta: { expiredType: ev.kind } });
+      else if (ev.type === 'status-removed' && (ev.reason === 'expired' || (!ev.reason && ['burn', 'poison', 'paralyze'].includes(ev.kind)))) {
+        const isNeg = Number(ev.value) < 0;
+        const color = ev.kind === 'taunt' && isNeg ? '#94a3b8'
+          : (isNeg && ['atk', 'def', 'hit', 'eva', 'spd'].includes(ev.kind)) ? '#c084fc'
+          : (EXPIRE_COLORS[ev.kind] || '#cbd5e1');
+        const typeKey = isNeg && ['atk', 'def', 'hit', 'eva', 'spd'].includes(ev.kind) ? ev.kind + '-' : ev.kind;
+        av.playStatusTickFx({ event: 'expire', entity: ent, meta: { expiredType: typeKey, expiredColors: { [typeKey]: color } } });
+        const expIdx = expiredByUnit.get(ev.unitId) || 0;
+        expiredByUnit.set(ev.unitId, expIdx + 1);
+        onStatusExpired?.(ev, expIdx);
+      }
     }
+    return handles;
   }
   function syncVisualState() {
     for (const u of getUnits()) {

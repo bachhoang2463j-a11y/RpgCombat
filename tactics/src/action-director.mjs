@@ -19,7 +19,7 @@ import { startAtmos, atmosStyleOf } from './screen-atmos.mjs';
 import { startCine } from './cinematic.mjs';
 import { GUARD_AUDIO_KEYS, BARRIER_AUDIO_KEYS, playGuardDash, playGuardBlock, mountBarrierDome, updateBarrierBadge,
   playBarrierRaise, playBarrierHit, playBarrierBlocked, playBarrierShatter, fadeBarrierDome } from './guard-barrier-fx.mjs';
-import { effectFloat } from './status-ui.mjs';
+import { effectFloat, variantFloat, expireFloat } from './status-ui.mjs';
 import { floatText, worldPx } from './vfx-primitives.mjs';
 import { fxDateNow, getTimeScale } from './time-scale.mjs';
 import { createBattleMarks, lightTier, seedOf } from './battle-marks.mjs';
@@ -639,17 +639,30 @@ export function createActionDirector(deps) {
       // 回复槽段：规则真实标记（seg.heal）优先，回退生命提升推断（events 真实回复结果形态待规则 result 落地后接）
       const healed = seg.heal != null ? !!seg.heal : (!seg.hit && seg.hpAfter > seg.hpBefore);
       const waveIndex = seg.shotIndex ?? i, wave = waves.get(waveIndex);
-      const r = { ...buildHitFeedback({ ...result, skill }, h, seg, incoming), actionId, waveId: wave ? wave.id : null };
+      const segEvents = (result.events || []).filter(ev => ev.type === 'variant-trigger' && ev.segmentId && ev.segmentId === seg.segmentId
+        && (ev.unitId === targetId || ev.sourceId === targetId || ev.targetId === targetId));
+      const reviveEv = segEvents.find(ev => ev.trigger === 'revive' && ev.unitId === targetId && ev.hpBeforeDeath === 0);
+      const moltEv = segEvents.find(ev => ev.trigger === 'molt' && ev.unitId === targetId && Number.isFinite(ev.hpBefore));
+      const hitSnap = reviveEv ? { ...seg, hpAfter: 0, shieldAfter: 0 } : moltEv ? { ...seg, hpAfter: moltEv.hpBefore } : seg;
+      const r = { ...buildHitFeedback({ ...result, skill }, h, hitSnap, incoming), actionId, waveId: wave ? wave.id : null };
       avHost.setPanHint?.(panOf(targetId));
       if (seg.resistance?.layers?.length) revealRule({ ...seg.resistance, segmentId: seg.segmentId, targetId }, 'resistance');
       if (seg.barrierHitId) {
         const event = (result.events || []).find(ev => ev.eventId === seg.barrierHitId);
         if (event) revealRule(event, 'barrier-damage');
       }
-      avHost.consumeVisualEvents?.((result.events || []).filter(ev => ev.unitId === targetId && ev.type === 'variant-trigger' && ev.segmentId && ev.segmentId === seg.segmentId));
+      const variantHandles = avHost.consumeVisualEvents?.(segEvents) || [];
+      for (const vh of variantHandles) {
+        if (vh?.handle && (vh.trigger === 'revive' || vh.trigger === 'molt')) reactionRuns.push(awaitHandle(vh.handle, vh.trigger === 'revive' ? 1500 : 1000));
+      }
       const fatalReason = seg.fatalResult && seg.fatalResult.reason;
       if (healed) playHealPulse(targetId);
       else if (fatalReason === 'avoid-fatal' && !seg.barrierHitId) {
+        if (seg.shieldDmg > 0) {
+          const sr = { ...r, hpDmg: 0, hpAfter: seg.hpBefore };
+          av.playHitFeedback(sr, { suppressShake: true, suppressRecoil: true });
+          av.CombatAudioDirector.publish(sr);
+        }
         const ent = avHost.entity(targetId);
         const rescue = ent && av.playRescueAvoidFatal ? av.playRescueAvoidFatal(ent) : null;
         if (rescue?.handle) reactionRuns.push(awaitHandle(rescue.handle, 950));
@@ -681,7 +694,7 @@ export function createActionDirector(deps) {
       }
       if (!healed && !seg.barrierHitId) av.CombatAudioDirector.publish(r);
       if (wave) av.CombatAudioDirector.completeTarget(wave, targetId);
-      if (onReveal) onReveal({ ...h, ...seg, targetId, heal: healed, segmentIndex: i, segmentCount: segs.length }, Object.assign({ result, identity, entryId: entry.id }, meta));
+      if (onReveal) onReveal({ ...h, ...hitSnap, targetId, heal: healed, segmentIndex: i, segmentCount: segs.length }, Object.assign({ result, identity, entryId: entry.id }, meta));
       if (seg.segmentId) queueCounters(seg.segmentId, Promise.all(segmentReactions).then(values => values.every(value => value !== false)));
     }
     function reveal(targetId, meta) {
@@ -755,6 +768,8 @@ export function createActionDirector(deps) {
       const u = vd.units.find(u => u.id === unitId);
       const r = { ...collision, targetId: unitId, sourceId: result.casterId, outcome: 'hit', isHero: u?.side === 'hero' };
       av.playHitFeedback(r);
+      av.CombatAudioDirector.publish(r);
+      sandbox.getUnitView()?.setShield?.(unitId, collision.shieldAfter ?? 0);
       onReveal?.({ ...r, hit: true, logIndex: ev.logIndex, logEnd: ev.logEnd, down: collision.hpAfter <= 0 }, { result, identity, entryId: entry.id });
     }
 
@@ -808,6 +823,7 @@ export function createActionDirector(deps) {
         if (!(await playDisplacement(ev, vd.footprintsById[ev.unitId]))) break;
         if (ev.collided) makeFx('B').shake('light');
         playBreaks(ev.collision?.broken);
+        if (ev.collision) revealChargeCollision(ev);
       }
     }));
     // 召唤入场：消费规则真实生成的 summons（单位 ID 与落点），原版 playSummonEnter 在实际落点逐个显形
@@ -843,16 +859,33 @@ export function createActionDirector(deps) {
       fx.top(ring, 560).firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 540, fill: 'forwards' });
       const targetList = (sd.targets || []).map(t => avHost.entity(t.targetId)).filter(Boolean);
       const outcomes = Object.fromEntries((sd.targets || []).map(t => [t.targetId, t.hit ? 'hit' : 'dodge']));
+      const sdHitRevealed = new Set();
+      const emitSdHit = tid => {
+        const tInfo = (sd.targets || []).find(x => x.targetId === tid);
+        if (!tInfo || !tid || sdHitRevealed.has(tid) || !tInfo.hit || !(tInfo.hpDmg > 0 || tInfo.shieldDmg > 0)) return;
+        sdHitRevealed.add(tid);
+        const r = { targetId: tid, sourceId: sd.unitId, outcome: 'hit', maxHp: tInfo.maxHp, hpBefore: tInfo.hpBefore, hpAfter: tInfo.hpAfter,
+          hpDmg: tInfo.hpDmg, shieldBefore: tInfo.shieldBefore || 0, shieldAfter: tInfo.shieldAfter || 0, shieldDmg: tInfo.shieldDmg || 0,
+          damageType: '法术', isHero: avHost.entity(tid)?.side === 'hero' };
+        av.playHitFeedback(r, { suppressShake: true });
+        av.CombatAudioDirector.publish(r);
+        sandbox.getUnitView()?.setShield?.(tid, tInfo.shieldAfter || 0);
+      };
       const bHandle = sdEnt && av.playSelfDestructBurst
         ? av.playSelfDestructBurst(sdEnt, targetList, { form: sdForm, outcomes }, (beat, meta) => {
           if (beat === 'target_hit' || beat === 'target_attach') {
-            const tInfo = (sd.targets || []).find(x => x.targetId === meta?.target?.id);
+            const tid = meta?.target?.id;
+            emitSdHit(tid);
+            const tInfo = (sd.targets || []).find(x => x.targetId === tid);
             if (tInfo?.fatalResult?.reason === 'grit' && av.playRescueGrit) av.playRescueGrit(meta.target);
             else if (tInfo?.fatalResult?.reason === 'avoid-fatal' && av.playRescueAvoidFatal) av.playRescueAvoidFatal(meta.target);
           }
         }, wHandle?.stageCtx || null)
         : null;
-      if (!bHandle) { fx.sfx('explosion_aoe_blast', 0.65); fx.shake('medium'); }
+      if (!bHandle) {
+        fx.sfx('explosion_aoe_blast', 0.65); fx.shake('medium');
+        (sd.targets || []).forEach(t => emitSdHit(t.targetId));
+      }
       if (onSelfDestruct) onSelfDestruct(sd);
       if (bHandle && !(await awaitHandle(bHandle, 950))) return false;
       else if (!bHandle && !(await wait(620))) return false;
@@ -985,6 +1018,27 @@ export function createActionDirector(deps) {
     const p = worldPx(c), poison = ev.kind === 'poison';
     floatText(makeFx('B'), p.x, p.y - 34 - index * 24, (poison ? '☠️ 中毒 -' : '🔥 燃烧 -') + ev.damage,
       poison ? '#d9f99d' : '#fed7aa', poison ? '#4d7c0f' : '#c2410c', { size: 19, ms: 1100 });
+  }
+  function playVariantFloat(ev) {
+    const lab = variantFloat(ev);
+    const id = ev?.trigger === 'thorn' ? ev.targetId : ev?.unitId;
+    const c = lab && id && centerOf(id);
+    if (!c || !scope()?.isLive) return;
+    const p = worldPx(c);
+    floatText(makeFx('J'), p.x, p.y - 42, lab.text, lab.color, lab.glow, { size: 14, ms: 1000 });
+  }
+  function playStatusExpired(ev, index = 0) {
+    const lab = expireFloat(ev);
+    const c = lab && ev?.unitId && centerOf(ev.unitId);
+    if (!c || !scope()?.isLive) return;
+    const p = worldPx(c);
+    floatText(makeFx('B'), p.x, p.y - 24 - index * 18, lab.text, lab.color, lab.glow, { size: 12, ms: 900, delay: Math.min(index, 3) * 70 });
+  }
+  function playStunSkip(unitId) {
+    const c = unitId && centerOf(unitId);
+    if (!c || !scope()?.isLive) return;
+    const p = worldPx(c);
+    floatText(makeFx('B'), p.x, p.y - 36, '💫 眩晕 · 跳过行动', '#fef08a', '#854d0e', { size: 15, ms: 900 });
   }
 
   const FIELD_EVENTS = ['region-contest', 'enemy-alarm', 'passive-gain'];
@@ -1291,6 +1345,6 @@ export function createActionDirector(deps) {
       if (ev.type === 'barrier-damaged') lockedBarriers.set(ev.barrierId, (lockedBarriers.get(ev.barrierId) || 0) + 1);
     }
   }
-  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, playPrepare, playReady, syncRegions, playFieldFeedback, playStatusTick, syncBarriers, syncPreparations, holdRegions, holdGuards, wait, resolveAttackIdentity, resolveWindupKind,
+  return { playMove, playJump, playShove, playTransfer, playWindup, playAttack, playPrepare, playReady, syncRegions, playFieldFeedback, playStatusTick, playVariantFloat, playStatusExpired, playStunSkip, syncBarriers, syncPreparations, holdRegions, holdGuards, wait, resolveAttackIdentity, resolveWindupKind,
     runAttackLive, driveAttack, cancelAttack, playChargeCutin, playExecution, executionKills, ageMarks };
 }

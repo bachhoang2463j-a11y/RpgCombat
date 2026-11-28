@@ -12,7 +12,9 @@ import { cellKey } from '../../../tactics/src/geometry.mjs';
 import { inferFxTag, applyFxInference, skillElement, unitElement, INFERABLE_FX } from '../../../tactics/src/fx-infer.mjs';
 import { getFxTagOptions } from '../../../tactics/src/fx-library.mjs';
 import { lightTier, seedOf } from '../../../tactics/src/battle-marks.mjs';
-import { parseYamlText } from '../../../tactics/src/parser.mjs';
+import { parseYamlText, parseSkill } from '../../../tactics/src/parser.mjs';
+import { inspectorHtml, variantFloat, expireFloat } from '../../../tactics/src/status-ui.mjs';
+import { DEMO_AUDIO_KEYS, createAvHost } from '../../../tactics/src/av-host.mjs';
 
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../tactics/src');
 const read = f => readFileSync(path.join(SRC, f), 'utf8');
@@ -241,6 +243,13 @@ async function threat() {
     assert.ok(main.includes('threatCache.clear();'));
     assert.ok(main.includes('if (!battle || !currentViewData || busy || !isHeroTurn()) { sandbox.setThreat(null); return; }'));
   });
+  await check('AVP-T08 威胁区偏淡 50% 且显式选招/锁定隐藏悬停威胁区', () => {
+    const ro = read('range-overlay.mjs'), main = read('main.mjs');
+    assert.ok(ro.includes("move: 'rgba(239,68,68,0.07)'") && ro.includes("atk: 'rgba(220,38,38,0.035)'") && ro.includes("atkEdge: 'rgba(252,165,165,0.425)'"));
+    assert.ok(ro.includes('Math.min(0.21, 0.03 + 0.04 * c.n)'));
+    assert.ok(main.includes('const suppressHover = !!(aim || pending || fieldAction || retargetPrompt || teleportPrompt);'));
+    assert.ok(main.includes('!suppressHover && threatHoverId'));
+  });
   return { cases };
 }
 
@@ -352,8 +361,126 @@ async function looks() {
     assert.deepEqual(lightTier('identity'), { radius: 2, ms: 300 });
     assert.ok(ad.includes("if (element === 'gun') flash(centerOf(result.casterId), 'gun', { radius: 1, ms: 160 }, 0.7);"));
   });
+  await check('AVP-E04 检视面板补全死亡触发自爆（食尸鬼 💥 自爆·群火）并去重', () => {
+    const block = parseYamlText(readFileSync(path.join(SRC, '..', '..', 'doc', 'tactics', '典型对局-战棋版.yaml'), 'utf8'));
+    const ghoul = block.enemies.find(e => e.name.includes('食尸鬼'));
+    const html = inspectorHtml({ unit: ghoul, eff: { hp: ghoul.hp, maxHp: ghoul.maxHp, mp: 0, maxMp: 0, tp: 0, maxTp: 100, shield: 0, atk: ghoul.atk, def: ghoul.def, spd: ghoul.spd, hit: ghoul.hit, eva: 0, effectiveMoveDistance: 3, moveDistance: 3, buffs: [] }, base: { atk: ghoul.atk, def: ghoul.def, spd: ghoul.spd, hit: ghoul.hit, eva: 0 }, badges: [] });
+    assert.ok(html.includes('💥') && html.includes('自爆·群火'), html);
+    assert.ok(html.includes('复活') && html.includes('流体'));
+    const dup = inspectorHtml({ unit: { ...ghoul, attrTags: [...(ghoul.attrTags || []), '[自爆:群火]'] }, eff: { hp: ghoul.hp, maxHp: ghoul.maxHp, mp: 0, maxMp: 0, tp: 0, maxTp: 100, shield: 0, atk: ghoul.atk, def: ghoul.def, spd: ghoul.spd, hit: ghoul.hit, eva: 0, effectiveMoveDistance: 3, moveDistance: 3, buffs: [] }, base: { atk: ghoul.atk, def: ghoul.def, spd: ghoul.spd, hit: ghoul.hit, eva: 0 }, badges: [] });
+    assert.equal(dup.match(/自爆·群火/g)?.length, 2, 'title 与正文中各自爆·群火只应出现一次（不重复标签）');
+  });
+  return { cases };
+}
+
+async function stageD() {
+  const cases = [], check = checker(cases);
+  const mk = (id, side, opts = {}) => ({ id, name: id, side, footprint: { width: 1, height: 1 }, skills: opts.skills || [], items: [], attrTags: opts.attrTags || [],
+    ref: { hp: opts.hp ?? 100, maxHp: opts.maxHp ?? 100, mp: 100, maxMp: 100, shield: opts.shield ?? 0, atk: opts.atk ?? 20, def: 0, spd: opts.spd ?? (side === 'hero' ? 100 : 10), evasion: 0, moveDistance: 6, reviveCount: 1 } });
+
+  await check('AVP-SD01 变体音频键全部纳入 DEMO_AUDIO_KEYS 预载', () => {
+    for (const k of ['revive_gather', 'revive_bloom', 'molt_crack', 'molt_snap', 'molt_empower', 'rage_exit', 'leech_flow', 'regen_hum', 'thorn_parry'])
+      assert.ok(DEMO_AUDIO_KEYS.includes(k), k);
+  });
+  await check('AVP-SD02 连动/蜕皮清除列表/再生/吸血/荆棘真实事件发射', () => {
+    const b1 = createBattle({ units: [mk('h', 'hero'), mk('e', 'enemy', { attrTags: ['[连动]', '[蜕皮]'] })],
+      placementsById: { h: { col: 1, row: 1 }, e: { col: 3, row: 1 } }, scene: { sceneId: 'sd1', grid: { columns: 8, rows: 6, metersPerCell: 1 }, objects: [] }, random: () => 0.5 });
+    b1.start();
+    b1.attack(parseSkill('【烧】造成[燃烧;power:5;turns:2]伤害[必中][远程][范围:单体;射程:10]'), { x: 3.5, y: 1.5, targetId: 'e' });
+    const res1 = b1.attack(parseSkill('【重击】造成[伤害;power:75]伤害[必中][远程][范围:单体;射程:10]'), { x: 3.5, y: 1.5, targetId: 'e' });
+    const molt = res1.events.find(e => e.type === 'variant-trigger' && e.trigger === 'molt');
+    assert.ok(molt && molt.clearedDebuffs?.includes('burn') && molt.hpBefore < molt.hpAfter, JSON.stringify(molt));
+    // 蜕皮回血到 50 HP；再一击压到 ≤30% 触发连动
+    b1.endAction();
+    const res1b = b1.attack(parseSkill('【补刀】造成[伤害;power:30]伤害[必中][远程][范围:单体;射程:10]'), { x: 3.5, y: 1.5, targetId: 'e' });
+    const link = res1b.events.find(e => e.type === 'variant-trigger' && e.trigger === 'link');
+    assert.ok(link && link.unitId === 'e', JSON.stringify(link));
+
+    const b2 = createBattle({ units: [mk('h', 'hero', { attrTags: ['[吸血]'], hp: 60, spd: 20 }), mk('e', 'enemy', { attrTags: ['[荆棘]', '[再生]'], hp: 80, spd: 10 })],
+      placementsById: { h: { col: 1, row: 1 }, e: { col: 2, row: 1 } }, scene: { sceneId: 'sd2', grid: { columns: 8, rows: 6, metersPerCell: 1 }, objects: [] }, random: () => 0.5 });
+    b2.start();
+    const res2 = b2.attack(parseSkill('【斩】造成[伤害;power:30]伤害[必中][近战][范围:单体;射程:2]'), { x: 2.5, y: 1.5, targetId: 'e' });
+    const leech = res2.events.find(e => e.type === 'variant-trigger' && e.trigger === 'leech');
+    const thorn = res2.events.find(e => e.type === 'variant-trigger' && e.trigger === 'thorn');
+    assert.ok(leech && leech.unitId === 'h' && leech.sourceId === 'e' && leech.healed > 0 && leech.segmentId, JSON.stringify(leech));
+    assert.ok(thorn && thorn.sourceId === 'e' && thorn.targetId === 'h' && thorn.isMelee && thorn.reflected && thorn.hpDmg > 0, JSON.stringify(thorn));
+
+    let regenEv = null;
+    for (let i = 0; i < 6 && !regenEv; i++) {
+      const snap = b2.endAction();
+      regenEv = snap.events.find(e => e.type === 'variant-trigger' && e.trigger === 'regen' && e.unitId === 'e');
+    }
+    assert.ok(regenEv && regenEv.healed > 0 && regenEv.hpAfter > regenEv.hpBefore, JSON.stringify(regenEv));
+  });
+  await check('AVP-SD03 眩晕跳过发 stun-skipped，增减益区分自然到期与驱散', () => {
+    const b = createBattle({ units: [mk('h', 'hero', { spd: 2 }), mk('e', 'enemy', { spd: 1 })],
+      placementsById: { h: { col: 1, row: 1 }, e: { col: 3, row: 1 } }, scene: { sceneId: 'sd3', grid: { columns: 8, rows: 6, metersPerCell: 1 }, objects: [] }, random: () => 0.5 });
+    b.start();
+    const debuffRes = b.attack(parseSkill('【弱】[弱攻;power:10;turns:1][必中][远程][范围:单体;射程:10]'), { x: 3.5, y: 1.5, targetId: 'e' });
+    assert.ok(debuffRes.ok && debuffRes.effects.length > 0, debuffRes.reason);
+    b.endAction();
+    const stunRes = b.attack(parseSkill('【震】[眩晕][必中][远程][范围:单体;射程:10]'), { x: 3.5, y: 1.5, targetId: 'e' });
+    assert.ok(stunRes.ok, stunRes.reason);
+    let evs = [];
+    for (let i = 0; i < 10; i++) {
+      evs = b.endAction().events;
+      if (evs.some(e => e.type === 'stun-skipped') && evs.some(e => e.type === 'status-removed' && e.kind === 'atk' && e.reason === 'expired')) break;
+    }
+    assert.ok(evs.some(e => e.type === 'stun-skipped' && e.unitId === 'e'), '眩晕跳过应发射 stun-skipped');
+    assert.ok(evs.some(e => e.type === 'status-removed' && e.unitId === 'e' && e.kind === 'atk' && e.reason === 'expired'), '自然到期应标明 reason=expired');
+
+    const bClean = createBattle({ units: [mk('h', 'hero', { spd: 200 }), mk('e', 'enemy', { spd: 10, attrTags: ['[蜕皮]'] })],
+      placementsById: { h: { col: 1, row: 1 }, e: { col: 3, row: 1 } }, scene: { sceneId: 'sd3b', grid: { columns: 8, rows: 6, metersPerCell: 1 }, objects: [] }, random: () => 0.5 });
+    bClean.start();
+    bClean.attack(parseSkill('【弱】[弱攻;power:10;turns:3][必中][远程][范围:单体;射程:10]'), { x: 3.5, y: 1.5, targetId: 'e' });
+    const moltRes = bClean.attack(parseSkill('【砸】[伤害;power:60][必中][远程][范围:单体;射程:10]'), { x: 3.5, y: 1.5, targetId: 'e' });
+    assert.ok(moltRes.events.some(e => e.type === 'status-removed' && e.kind === 'atk' && e.reason === 'dispelled'), '蜕皮驱散不应标为 expired');
+  });
+  await check('AVP-SD04 死亡自爆记录护盾破碎前后快照；飘字与到期映射覆盖完整', () => {
+    const b = createBattle({ units: [mk('h', 'hero', { shield: 15, hp: 100 }), mk('e', 'enemy', { hp: 20, attrTags: ['[自爆:群伤;power:80]'] })],
+      placementsById: { h: { col: 1, row: 1 }, e: { col: 2, row: 1 } }, scene: { sceneId: 'sd4', grid: { columns: 8, rows: 6, metersPerCell: 1 }, objects: [] }, random: () => 0.5 });
+    b.start();
+    const res = b.attack(parseSkill('【斩】[伤害;power:50][必中][近战][范围:单体;射程:2]'), { x: 2.5, y: 1.5, targetId: 'e' });
+    const sd = res.events.find(e => e.type === 'self-destruct');
+    assert.ok(sd && sd.targets[0].shieldBefore === 15 && sd.targets[0].shieldAfter === 0 && sd.targets[0].shieldDmg === 15, JSON.stringify(sd));
+    assert.ok(variantFloat({ trigger: 'link' })?.text.includes('连动'));
+    assert.ok(variantFloat({ trigger: 'thorn', hpDmg: 12 })?.text.includes('12'));
+    assert.ok(expireFloat({ kind: 'atk', value: 20 })?.text.includes('攻+20 到期'));
+    assert.ok(expireFloat({ kind: 'exposure' })?.text.includes('暴露消退'));
+    assert.ok(read('ui-sfx.mjs').includes('stunSkip(c, t)'));
+    assert.ok(read('unit-view.mjs').includes('t-unit-shield-breaking'));
+  });
+  await check('AVP-SD05 avHost 仅在 reason=expired 播到期，并消费复活/自爆/到期回调', () => {
+    const prevDoc = globalThis.document, prevEl = globalThis.Element, prevWin = globalThis.window;
+    const mkEl = () => ({ style: { setProperty() {} }, classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+      setAttribute() {}, getAttribute: () => null, appendChild() {}, insertBefore() {}, remove() {}, querySelector: () => null, querySelectorAll: () => [],
+      getContext: () => ({ clearRect() {}, save() {}, restore() {}, translate() {}, scale() {}, beginPath() {}, arc() {}, fill() {}, stroke() {}, moveTo() {}, lineTo() {}, createRadialGradient: () => ({ addColorStop() {} }), createLinearGradient: () => ({ addColorStop() {} }) }),
+      animate: () => ({ onfinish: null, cancel() {} }) });
+    globalThis.Element = function ElementStub() {};
+    globalThis.document = { addEventListener() {}, removeEventListener() {}, createElement: mkEl, createElementNS: mkEl, getElementById: () => null, querySelectorAll: () => [], body: mkEl() };
+    globalThis.window = globalThis;
+    try {
+      const expiredCalls = [], variantCalls = [];
+      const u = mk('e', 'enemy');
+      const host = createAvHost({ getUnitView: () => ({ nodes: new Map() }), getUnits: () => [u], getEffectiveUnit: () => ({ buffs: [] }),
+        onStatusExpired: (ev, i) => expiredCalls.push([ev.kind, i]), onVariantTrigger: ev => variantCalls.push(ev.trigger) });
+      host.consumeVisualEvents([
+        { seq: 1, type: 'status-removed', unitId: 'e', kind: 'atk', reason: 'dispelled', value: -10 },
+        { seq: 2, type: 'status-removed', unitId: 'e', kind: 'atk', reason: 'expired', value: 20 },
+        { seq: 3, type: 'status-removed', unitId: 'e', kind: 'exposure', reason: 'expired' },
+        { seq: 4, type: 'variant-trigger', unitId: 'e', trigger: 'regen', healed: 10, hpAfter: 100 },
+      ]);
+      assert.deepEqual(expiredCalls, [['atk', 0], ['exposure', 1]]);
+      assert.deepEqual(variantCalls, ['regen']);
+      host.destroy();
+    } finally {
+      if (prevDoc === undefined) delete globalThis.document; else globalThis.document = prevDoc;
+      if (prevEl === undefined) delete globalThis.Element; else globalThis.Element = prevEl;
+      if (prevWin === undefined) delete globalThis.window; else globalThis.window = prevWin;
+    }
+  });
   return { cases };
 }
 
 export const groups = { 'AVP-SPEED': { run: speed }, 'AVP-VENDOR': { run: vendor }, 'AVP-DIRECTOR': { run: director },
-  'AVP-THREAT': { run: threat }, 'AVP-LOWHP': { run: lowHpWarn }, 'AVP-INFER': { run: infer }, 'AVP-LOOKS': { run: looks } };
+  'AVP-THREAT': { run: threat }, 'AVP-LOWHP': { run: lowHpWarn }, 'AVP-INFER': { run: infer }, 'AVP-LOOKS': { run: looks }, 'AVP-STAGE-D': { run: stageD } };

@@ -212,6 +212,11 @@ export function createUiSfx(mixer) {
         tone(c, t + dt, { type: 'sine', f0: 62, f1: 40, dur: 0.17, vol: v * 0.42 });
       }
     },
+    stunSkip(c, t) {            // 眩晕跳过：晕眩滑落双音 + 轻钝击
+      tone(c, t, { type: 'triangle', f0: 680, f1: 310, dur: 0.24, vol: 0.05 });
+      tone(c, t + 0.12, { type: 'sine', f0: 520, f1: 220, dur: 0.26, vol: 0.045 });
+      tick(c, t + 0.02, { freq: 240, q: 1.0, dur: 0.10, vol: 0.14, type: 'lowpass' });
+    },
     jumpTakeoff(c, t) {         // 起跳：蹬地 + 风声上扫
       tick(c, t, { freq: 160, q: 0.8, dur: 0.09, vol: 0.24, type: 'lowpass' });
       tick(c, t + 0.02, { freq: 1400, q: 0.5, dur: 0.30, vol: 0.06 });

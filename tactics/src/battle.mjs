@@ -248,10 +248,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       random, buffsOf, nextSeq: () => passiveSeq(),
       grantMainPoint: (targetId, sourceKey) => dispatchBattleClock({ type: 'grantMainPoint', targetId, sourceKey }),
       addBuff: (u, buff, effectKey) => {
-        if (buff.isConcealAtk) buffsOf(u.id).filter(b => b.isConcealAtk).forEach(b => removeBuffRecord(u.id, b));
+        if (buff.isConcealAtk) buffsOf(u.id).filter(b => b.isConcealAtk).forEach(b => removeBuffRecord(u.id, b, 'replaced'));
         return registerBuff(u, buff, statusSource(u.id, { casterId: u.id, skillId: 'class:' + (u.classType || '') }, effectKey));
       },
-      clearTempNegativeTaunt: u => buffsOf(u.id).filter(b => b.type === 'taunt' && b.value < 0).forEach(b => removeBuffRecord(u.id, b)),
+      clearTempNegativeTaunt: u => buffsOf(u.id).filter(b => b.type === 'taunt' && b.value < 0).forEach(b => removeBuffRecord(u.id, b, 'consumed')),
       log: addLog,
     };
   }
@@ -266,12 +266,14 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       const cleared = dispelNegatives(u, Infinity);
       const before = u.ref.hp;
       u.ref.hp = Math.min(u.ref.maxHp, u.ref.hp + Math.max(1, Math.floor(u.ref.maxHp * 0.3)));
-      emit('variant-trigger', { attackId: currentAttackId(), unitId: u.id, trigger: 'molt', healed: u.ref.hp - before });
+      emit('variant-trigger', { attackId: currentAttackId(), unitId: u.id, trigger: 'molt',
+        healed: u.ref.hp - before, hpBefore: before, hpAfter: u.ref.hp, clearedDebuffs: cleared.map(b => b.type) });
       addLog('💥 [' + u.name + '] 触发【绝境爆发】（蜕皮觉醒）！' + (cleared.length ? '强行排除 ' + cleared.length + ' 个负面状态，' : '') + '回复 ' + (u.ref.hp - before) + ' HP，永久攻击+50%');
     }
     if (!u.ref.linked && hasVariantTag(u, '连动', buffs) && u.ref.maxHp > 0 && u.ref.hp / u.ref.maxHp <= 0.3) {
       u.ref.linked = true; // 一次性标记防【再生】回血震荡反复触发（原版 L31079）
       dispatchBattleClock({ type: 'grantMainPoint', targetId: u.id, sourceKey: '连动:' + u.id });
+      emit('variant-trigger', { attackId: currentAttackId(), unitId: u.id, trigger: 'link' });
       addLog('⚡ [' + u.name + '] 濒死求生本能激发（绝境抢攻），获得万能行动点！');
     }
   }
@@ -328,14 +330,21 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
             addLog(hero.name + ' 触发职业被动【' + (fatalCtx.hpDmg === 0 ? '回避致命' : '毅力留存') + '】躲过了自爆致命伤！');
           }
         }
-        if (shieldDmg > 0) hero.ref.shield = Math.max(0, (hero.ref.shield || 0) - shieldDmg);
+        const hpBefore = hero.ref.hp, shieldBefore = hero.ref.shield || 0;
+        if (shieldDmg > 0) hero.ref.shield = Math.max(0, shieldBefore - shieldDmg);
+        const shieldAfter = hero.ref.shield || 0;
         const dealt = Math.min(hero.ref.hp, hpDmg);
         hero.ref.hp = Math.max(0, hero.ref.hp - hpDmg);
         addLog('☠️ 自爆命中 ' + hero.name + ' -' + dealt + ' HP' + (shieldDmg ? '（破盾' + shieldDmg + '）' : ''));
-        affectedTargets.push({ targetId: hero.id, hit: true, hpDmg: dealt, shieldDmg, rawDmg: raw, resistance, fatalResult: sdFatalResult,
+        affectedTargets.push({ targetId: hero.id, hit: true, maxHp: hero.ref.maxHp, hpBefore, hpDmg: dealt, shieldDmg,
+          shieldBefore, shieldAfter, rawDmg: raw, resistance, fatalResult: sdFatalResult,
           segmentId: runId + ':' + currentAttackId() + ':slot:self-destruct:segment:' + deathSegment,
           hpAfter: hero.ref.hp, down: hero.ref.hp <= 0 });
-        if (hero.ref.hp <= 0) handleDown(hero, 'selfdestruct');
+        if (hero.ref.hp <= 0) {
+          const prevSeg = activeSegment;
+          activeSegment = null;
+          try { handleDown(hero, 'selfdestruct'); } finally { activeSegment = prevSeg; }
+        }
       }
     }
     emit('self-destruct', {
@@ -367,7 +376,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const mark = exposureOf(id);
     if (!mark) return;
     if (mark.skipEnd) mark.skipEnd = false;
-    else if (--mark.remaining === 0) delete state.combatState.exposure[id];
+    else if (--mark.remaining === 0) {
+      delete state.combatState.exposure[id];
+      emit('status-removed', { unitId: id, kind: 'exposure', reason: 'expired' });
+    }
   }
   function statsOf(unit, concealAtk) {
     const stats = getEffectiveStats(unit, buffsOf(unit.id), concealAtk);
@@ -406,12 +418,13 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     s[unitId] = (s[unitId] || 0) + 1;
     return s[unitId];
   }
-  function removeBuffRecord(unitId, rec) {
+  function removeBuffRecord(unitId, rec, reason = 'removed') {
     const list = buffsOf(unitId);
     const i = list.indexOf(rec);
     if (i >= 0) {
       list.splice(i, 1);
-      emit('status-removed', { attackId: currentAttackId(), unitId, kind: rec.type });
+      emit('status-removed', { attackId: currentAttackId(), unitId, kind: rec.type, reason,
+        value: rec.value, variant: rec.variant, isConcealAtk: !!rec.isConcealAtk });
     }
     if (rec._source) dispatchClock(state, { type: 'removeStatus', unitId, source: rec._source }, { speedOf });
   }
@@ -453,7 +466,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
   function dispelNegatives(target, count) {
     const removed = negativeBuffsOf(target.id).slice(0, Math.max(0, Math.ceil(count)));
-    removed.forEach(b => removeBuffRecord(target.id, b));
+    removed.forEach(b => removeBuffRecord(target.id, b, 'dispelled'));
     return removed;
   }
   const rt = {
@@ -603,7 +616,12 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     else runEnemyThresholdVariants(target);
   }
   function settleClockEvent(ev) {
-    if (ev.type === 'stun-skip') finishExposureTurn(ev.unitId);
+    if (ev.type === 'stun-skip') {
+      finishExposureTurn(ev.unitId);
+      const stunned = byId.get(ev.unitId);
+      if (stunned) addLog('💫 ' + stunned.name + ' 处于【眩晕】，跳过本次行动');
+      emit('stun-skipped', { unitId: ev.unitId });
+    }
     if (ev.type === 'status-expired') expireBarriers(ctx, ev.t ?? ctx.now()).forEach(barrier => removeBarrierResult(barrier, 'expired'));
     if (ev.type === 'dot-tick' && !ev.suppressed) {
       settleDotDamage(ev);
@@ -615,7 +633,13 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     } else if (ev.type === 'periodic-tick' && ev.kind === 'periodic' && !ev.suppressed) {
       const target = byId.get(ev.unitId);
       if (target && target.ref.hp > 0) {
+        const before = target.ref.hp;
         target.ref.hp = Math.min(target.ref.maxHp, target.ref.hp + (ev.strength || 0));
+        const healed = target.ref.hp - before;
+        if (healed > 0) {
+          addLog('🌿 ' + target.name + ' 【再生】回复 ' + healed + ' HP');
+          emit('variant-trigger', { unitId: target.id, trigger: 'regen', healed, hpBefore: before, hpAfter: target.ref.hp });
+        }
       }
     } else if (ev.type === 'stealth-window' && !ev.suppressed) {
       // 隐匿窗口：每 100 时间未受击 +10（P03 映射；受击经 markHit 记录，wasHit=true 本窗口不累积）
@@ -636,7 +660,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       const i = list.findIndex(b => b._key === key);
       if (i >= 0) {
         const [removed] = list.splice(i, 1);
-        emit('status-removed', { unitId: ev.unitId, kind: removed.type });
+        emit('status-removed', { unitId: ev.unitId, kind: removed.type, reason: 'expired',
+          value: removed.value, variant: removed.variant, isConcealAtk: !!removed.isConcealAtk });
       }
     }
   }
@@ -684,7 +709,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       target.ref.shield = 0;
       buffsOf(target.id).splice(0).forEach(b => { if (b._source) dispatchClock(state, { type: 'removeStatus', unitId: target.id, source: b._source }); });
       dispatchBattleClock({ type: 'reenterUnit', unitId: target.id });
-      emit('variant-trigger', { attackId: currentAttackId(), unitId: target.id, trigger: 'revive', cause, hpAfter: target.ref.hp });
+      emit('variant-trigger', { attackId: currentAttackId(), unitId: target.id, trigger: 'revive', cause, hpBeforeDeath: 0, hpAfter: target.ref.hp });
       addLog(target.name + ' 触发【复活】！以 30% 生命重新站起（剩余 ' + target.ref.reviveCount + ' 次）');
       return false;
     }
@@ -785,7 +810,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const chance = Math.min(20, layers.length * 5);
     if (random() * 100 >= chance) return false;
     emit('status-proc', { unitId: u.id, kind: 'paralyze', layers: layers.length, triggered: true });
-    removeBuffRecord(u.id, layers[0]);
+    removeBuffRecord(u.id, layers[0], 'consumed');
     addLog(u.name + ' 麻痹僵直，跳过本次行动（消耗 1 层）');
     return true;
   }
@@ -1696,7 +1721,11 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       addLog('🛡️ ' + defender.name + ' 的防守反击吸引了更多仇恨（嘲讽值永久+20）');
     }
     expose(defender, attacker);
-    if (attacker.ref.hp <= 0) handleDown(attacker, 'counter', defender.id);
+    if (attacker.ref.hp <= 0) {
+      const prevSeg = activeSegment;
+      activeSegment = null;
+      try { handleDown(attacker, 'counter', defender.id); } finally { activeSegment = prevSeg; }
+    }
     const result = { targetId: attacker.id, casterId: defender.id, maxHp, hpBefore, hpAfter, shieldBefore, shieldAfter,
       incomingDmg: raw, hpDmg, shieldDmg, rawDmg: raw, resistance, reason: 'counter' };
     emit('reaction-damage', result);
@@ -1730,11 +1759,15 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const granted = passive.onPowerCounter ? passive.onPowerCounter(defender) : null;
     if (granted && granted.resetTaunt) {
       const list = buffsOf(defender.id);
-      list.filter(b => b.type === 'taunt').forEach(b => removeBuffRecord(defender.id, b));
+      list.filter(b => b.type === 'taunt').forEach(b => removeBuffRecord(defender.id, b, 'consumed'));
       defender.ref.baseTauntBonus = 100;
     }
     expose(defender, attacker);
-    if (attacker.ref.hp <= 0) handleDown(attacker, 'counter', defender.id);
+    if (attacker.ref.hp <= 0) {
+      const prevSeg = activeSegment;
+      activeSegment = null;
+      try { handleDown(attacker, 'counter', defender.id); } finally { activeSegment = prevSeg; }
+    }
     emit('reaction-damage', { targetId: attacker.id, casterId: defender.id, maxHp, hpBefore, hpAfter, shieldBefore, shieldAfter,
       incomingDmg: raw, hpDmg, shieldDmg, rawDmg: raw, resistance, reason: 'power-counter' });
     if (granted?.knockback && hpAfter > 0 && hpAfter < hpBefore) {
@@ -2554,17 +2587,29 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const ls = lifestealRatio(caster, buffsOf(caster.id));
     if (ls > 0 && dealt > 0 && caster.ref.hp > 0) {
       const heal = Math.max(1, Math.floor(dealt * ls));
+      const cBefore = caster.ref.hp;
       caster.ref.hp = Math.min(caster.ref.maxHp, caster.ref.hp + heal);
+      const healed = caster.ref.hp - cBefore;
       addLog(caster.name + ' 【吸血】回复 ' + heal + ' HP');
+      if (healed > 0) emit('variant-trigger', { attackId: currentAttackId(), unitId: caster.id, sourceId: target.id, targetId: caster.id,
+        trigger: 'leech', healed, hpBefore: cBefore, hpAfter: caster.ref.hp });
     }
     // 荆棘（被近战命中反弹 50% 实际伤害，下限垫高）
     if (hasThorns(target, buffsOf(target.id)) && incomingType === '近战' && caster.ref.hp > 0 && (dealt + shieldDmg) > 0) {
       const reflectRaw = thornsRawReflect(dealt + shieldDmg, aStats0(caster).def);
       const aStats = statsOf(caster);
       const r = calculateDamage(reflectRaw, { def: aStats.def, shield: caster.ref.shield || 0 }, { defending: isDefending(caster) });
+      const cHpBefore = caster.ref.hp, cShieldBefore = caster.ref.shield || 0;
       caster.ref.hp = Math.max(0, caster.ref.hp - r.hpDmg);
       addLog('🌵 ' + target.name + ' 的【荆棘】反弹 ' + r.hpDmg + ' HP → ' + caster.name);
-      if (caster.ref.hp <= 0) handleDown(caster, 'thorns', target.id);
+      emit('variant-trigger', { attackId: currentAttackId(), unitId: target.id, sourceId: target.id, targetId: caster.id,
+        trigger: 'thorn', isMelee: true, reflected: r.hpDmg > 0, hpDmg: r.hpDmg, shieldDmg: 0,
+        hpBefore: cHpBefore, hpAfter: caster.ref.hp, shieldBefore: cShieldBefore, shieldAfter: caster.ref.shield || 0, maxHp: caster.ref.maxHp });
+      if (caster.ref.hp <= 0) {
+        const prevSeg = activeSegment;
+        activeSegment = null;
+        try { handleDown(caster, 'thorns', target.id); } finally { activeSegment = prevSeg; }
+      }
     }
     let down = false;
     if (target.ref.hp <= 0) down = handleDown(target, 'attack', caster.id);
@@ -2724,7 +2769,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     const u = actor(), candidates = negativeBuffsOf(u.id);
     const removed = candidates[Math.floor(random() * candidates.length)];
     spendAction(resources, actionPayment(resources, 'main'));
-    removeBuffRecord(u.id, removed);
+    removeBuffRecord(u.id, removed, 'dispelled');
     addLog(u.name + ' 整备，祛除一项负面状态');
     return { ok: true, removed };
   }

@@ -141,6 +141,44 @@ export function effectFloat(e) {
   }
 }
 
+export function variantFloat(ev) {
+  if (!ev) return null;
+  switch (ev.trigger) {
+    case 'revive': return { text: '✨ 复活 +' + (ev.hpAfter || 0) + ' HP', color: '#bae6fd', glow: '#0284c7' };
+    case 'molt': return { text: '🐍 蜕皮 · 攻+50%' + (ev.healed > 0 ? ' +' + ev.healed + 'HP' : ''), color: '#fef08a', glow: '#b45309' };
+    case 'rage': return { text: '🩸 狂暴 · 攻+50%', color: '#fca5a5', glow: '#991b1b' };
+    case 'rageExit': return { text: '狂暴平息', color: '#cbd5e1', glow: '#334155' };
+    case 'link': return { text: '⚡ 连动 · 万能行动+1', color: '#f5d0fe', glow: '#9333ea' };
+    case 'regen': return { text: '🌿 再生 +' + (ev.healed || 0) + ' HP', color: '#a7f3d0', glow: '#059669' };
+    case 'leech': return { text: '🧛 吸血 +' + (ev.healed || 0) + ' HP', color: '#fda4af', glow: '#be123c' };
+    case 'thorn': return { text: '🌵 荆棘 -' + (ev.hpDmg || 0), color: '#99f6e4', glow: '#0e7490' };
+    default: return null;
+  }
+}
+
+export function expireFloat(ev) {
+  if (!ev || !ev.kind) return null;
+  switch (ev.kind) {
+    case 'burn': return { text: '🔥 燃烧消退', color: '#fdba74', glow: '#9a3412' };
+    case 'poison': return { text: '☠️ 中毒消退', color: '#d8b4fe', glow: '#6b21a8' };
+    case 'paralyze': return { text: '⚡ 麻痹消退', color: '#fde047', glow: '#854d0e' };
+    case 'stun': return { text: '💫 眩晕解除', color: '#fde047', glow: '#854d0e' };
+    case 'defend': return { text: '🛡️ 防卫结束', color: '#6ee7b7', glow: '#065f46' };
+    case 'counter': return { text: '⚔️ 反击架势结束', color: '#fcd34d', glow: '#92400e' };
+    case 'damageGuard': return { text: '🛡️ 免伤消散', color: '#7dd3fc', glow: '#0369a1' };
+    case 'exposure': return { text: '🎯 暴露消退', color: '#fca5a5', glow: '#7f1d1d' };
+    case 'taunt': return Number(ev.value) < 0 ? { text: '🌫️ 隐匿消退', color: '#cbd5e1', glow: '#334155' } : { text: '💢 嘲讽消退', color: '#fca5a5', glow: '#7f1d1d' };
+    case 'variant': return { text: '🧬 ' + (ev.variant || '变种') + ' 到期', color: '#a5f3fc', glow: '#0e7490' };
+    default: {
+      if (ev.isConcealAtk) return { text: '🎯 急袭失效', color: '#fde68a', glow: '#92400e' };
+      const s = STAT[ev.kind];
+      if (!s) return null;
+      const v = Number(ev.value) || 0;
+      return { text: s.icon + ' ' + s.name + (v ? sign(v) : '') + ' 到期', color: v < 0 ? '#e9d5ff' : s.color, glow: v < 0 ? '#6b21a8' : '#1e293b' };
+    }
+  }
+}
+
 // 原版 showEnemyInfo VARIANT_TAG_CONFIG（index.html L26424）：名称 / 说明 / 图标 / 主色
 const VARIANT_TAGS = {
   复活: ['✨', '死后以 30% 生命值复活一次', '#6ee7b7'], 智慧: ['🧠', '三档智慧旁白（回合开始/低血/死亡）', '#fda4af'],
@@ -152,8 +190,8 @@ const VARIANT_TAGS = {
   钢体: ['⛓️', '免疫眩晕控制状态', '#cbd5e1'], 飞行: ['🕊️', '起飞补满移动，基础移动 +50%；可跨低障碍，不触发借机攻击', '#a7f3d0'],
 };
 function tagChip(raw) {
-  const name = String(raw).replace(/^\[|\]$/g, ''), ex = /^自爆[:：](.+)$/.exec(name);
-  const [icon, tip, color] = ex ? ['💥', '死亡自爆（' + ex[1] + '）：对周围我方造成伤害或状态', '#fca5a5'] : (VARIANT_TAGS[name] || ['🔹', name, '#cbd5e1']);
+  const name = String(raw).replace(/^\[|\]$/g, ''), ex = /^自爆[:：]([^;]+?)(?:;power:(\d+))?$/.exec(name);
+  const [icon, tip, color] = ex ? ['💥', '死亡自爆（' + ex[1] + (ex[2] ? '，威力 ' + ex[2] : '') + '）：死亡时对周围敌对目标造成伤害或状态', '#fca5a5'] : (VARIANT_TAGS[name] || ['🔹', name, '#cbd5e1']);
   return '<span class="t-insp-tag" style="--c:' + color + '" data-tagtip-title="【' + ESC(ex ? '自爆·' + ex[1] : name) + '】" data-tagtip-body="' + ESC(tip) + '"><i>' + icon + '</i>' + ESC(ex ? '自爆·' + ex[1] : name) + '</span>';
 }
 
@@ -169,7 +207,15 @@ export function inspectorHtml({ unit, eff, base, badges, charge, preparing, show
   };
   const ally = unit.side === 'hero';
   const sideBadge = unit.isSummon ? '<span class="t-insp-badge t-summon">召唤物</span>' : '<span class="t-insp-badge ' + (ally ? 't-ally' : 't-foe') + '">' + (ally ? '我方' : '敌方') + '</span>';
-  const tags = (unit.attrTags || []).filter(Boolean);
+  const deathTags = (unit.skills || []).filter(s => s && s.isDeathTrigger && s.deathTag).map(s => String(s.deathTag));
+  const seenTags = new Set();
+  const tags = [...(unit.attrTags || []), ...deathTags].filter(Boolean).filter(t => {
+    const raw = String(t).replace(/^\[|\]$/g, ''), m = /^自爆[:：]([^;]+)/.exec(raw);
+    const k = m ? '自爆:' + m[1] : raw;
+    if (seenTags.has(k)) return false;
+    seenTags.add(k);
+    return true;
+  });
   const moveD = +(eff.effectiveMoveDistance - eff.moveDistance).toFixed(1);
   return '<div class="t-insp-glass">' +
     '<div class="t-insp-head"><span class="t-insp-emoji">' + ESC(unit.emoji || (ally ? '🛡️' : '☠️')) + '</span><div class="t-insp-title"><b>' + ESC(unit.name) + '</b>' +

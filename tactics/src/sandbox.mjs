@@ -298,7 +298,7 @@ export function createSandbox(rootEl, deps = {}) {
     scope = createViewScope();
     token = vd.combatToken;
     viewData = vd;
-    preview = null; persistentIntents = []; hoverKey = null; backstabHoverId = null; userCamTouched = false;
+    preview = null; threat = null; persistentIntents = []; hoverKey = null; backstabHoverId = null; userCamTouched = false;
     compiled = compileScene(vd.scene);
     worldW = compiled.grid.columns * 50; worldH = compiled.grid.rows * 50;
     buildDom();

@@ -270,7 +270,8 @@ export function createApp(rootEl, opts = {}) {
   let currentYamlText = null;
   let currentViewData = null;
   const avHost = createAvHost({ getUnitView: () => sandbox.getUnitView(), getUnits: () => (currentViewData ? currentViewData.units : []),
-    getEffectiveUnit: id => battle?.getEffectiveUnit(id), onStatusTick: (ev, index) => playDotTick(ev, index) });
+    getEffectiveUnit: id => battle?.getEffectiveUnit(id), onStatusTick: (ev, index) => playDotTick(ev, index),
+    onStatusExpired: (ev, index) => playExpiredStatus(ev, index), onVariantTrigger: (ev, beat) => playVariantFeedback(ev, beat) });
   const ui = createUiSfx(avHost.av.CombatAudioMixer);
   let settlementSeq = 0;
   const bgm = createBgmDirector({ assetBase: avHost.resourceReport().assetBase, context: () => avHost.av.CombatAudioMixer.context(),
@@ -741,6 +742,7 @@ export function createApp(rootEl, opts = {}) {
       onAction: handleFieldAction,
       onCancel: () => { if (pending) cancelStep(); cancelStep(); },
     });
+    updateThreat();
   }
   // 跳距由规则给出（契约：ceil(基础移动÷3)，不扣移动额度、每次自然行动一次）
   function jumpReach(u, r) { return r ? r.jumpDistance : 0; }
@@ -929,7 +931,8 @@ export function createApp(rootEl, opts = {}) {
     if (!battle || !currentViewData || busy || !isHeroTurn()) { sandbox.setThreat(null); return; }
     const visible = threatEnemies();
     if (threatAll) { sandbox.setThreat({ heat: threatHeat(visible.map(u => threatFor(u.id))) }); return; }
-    const u = threatHoverId && visible.find(v => v.id === threatHoverId);
+    const suppressHover = !!(aim || pending || fieldAction || retargetPrompt || teleportPrompt);
+    const u = !suppressHover && threatHoverId && visible.find(v => v.id === threatHoverId);
     sandbox.setThreat(u ? threatFor(u.id) : null);
   }
   function threatCount(cell) {
@@ -1069,9 +1072,11 @@ export function createApp(rootEl, opts = {}) {
         if (!teleportPrompt) return;
         teleportPrompt = null;
         sandbox.setPreview(null); sandbox.setHint(null);
+        updateThreat();
         resolve(choice);
       };
       teleportPrompt = { req, cells, finish };
+      updateThreat();
       // 折影步反应：闪现可达范围（半径圈 + 可落格）常驻到落点确认
       sandbox.setPreview({ kind: 'blink', unitId: req.unitId, cells, radius: req.distance || 2 });
       sandbox.refreshHover();
@@ -1089,11 +1094,13 @@ export function createApp(rootEl, opts = {}) {
         retargetPrompt = null;
         bar.remove();
         sandbox.setPreview(null); sandbox.setHint(null);
+        updateThreat();
         resolve(choice);
       };
       bar.querySelector('button').addEventListener('click', () => finish(null));
       rootEl.ownerDocument.body.appendChild(bar);
       retargetPrompt = { req, finish };
+      updateThreat();
       sandbox.setPreview({ kind: 'attack', casterId: req.casterId, skill: req.skill, query: null });
     });
   }
@@ -1646,18 +1653,42 @@ export function createApp(rootEl, opts = {}) {
   }
 
   // ---------- 轮次：取得行动 → 横幅/音 → 镜头 → 玩家操作或敌方演出 ----------
+  const stunSeen = new Set();
+  async function presentStunSkips(myFlow, snap) {
+    const skips = (snap?.events || []).filter(ev => ev.type === 'stun-skipped' && !stunSeen.has(ev.eventId));
+    for (const ev of skips) {
+      stunSeen.add(ev.eventId);
+      const u = unitById(ev.unitId), c = u && sandbox.unitWorldCenter(u.id);
+      if (!u || !c) continue;
+      await sandbox.guideTo([c], { ms: 220 });
+      if (myFlow !== flow) return false;
+      ui('stunSkip');
+      shell.showLog('💫 ' + u.name + ' 处于【眩晕】，跳过本次行动', 'warn', 1400);
+      const view = sandbox.getUnitView();
+      view?.setFlag(u.id, 't-unit-stun-skip', true);
+      director.playStunSkip(u.id);
+      if (u.side === 'hero') shell.flashHeroPassive(u.id, '💫 眩晕跳过', '#facc15');
+      const ok = await director.wait(500);
+      view?.setFlag(u.id, 't-unit-stun-skip', false);
+      if (!ok || myFlow !== flow) return false;
+    }
+    return true;
+  }
   async function beginTurn({ intro = false } = {}) {
     const myFlow = flow;
     const snap = battle.snapshot();
     const playTurnGains = () => director.playFieldFeedback(snap.events.filter(ev => !ev.attackId && ev.type === 'passive-gain'));
+    const hasStunSkip = (snap.events || []).some(ev => ev.type === 'stun-skipped' && !stunSeen.has(ev.eventId));
+    if (intro || hasStunSkip) { setBusy(true); sandbox.beginAction(); }
+    if (intro) { await sandbox.introSweep(1600); if (myFlow !== flow) return; }
+    if (hasStunSkip && !(await presentStunSkips(myFlow, snap))) { if (myFlow === flow) setBusy(false); return; }
     if (snap.terminal) { playTurnGains(); finishBattle(snap.terminal); return; }
     const u = currentUnit();
-    if (!u) { playTurnGains(); return; }
+    if (!u) { playTurnGains(); if (intro || hasStunSkip) setBusy(false); return; }
     const hasNaturalTurnAudio = naturalTurnAudio.delete(u.id);
     aim = null; pending = null; endArmedUntil = 0;
     setBusy(true);
     sandbox.beginAction();
-    if (intro) { await sandbox.introSweep(1600); if (myFlow !== flow) return; }
     const c = sandbox.unitWorldCenter(u.id);
     shell.showBanner(u, u.side === 'hero' ? '我方行动' : '敌方行动');
     if (u.side === 'hero') {
@@ -1933,6 +1964,56 @@ export function createApp(rootEl, opts = {}) {
     const c = sandbox.unitWorldCenter(id);
     const el = c && fxNode('t-down-tag', c.x, c.y, 1800);
     if (el) el.textContent = text;
+  }
+  function playExpiredStatus(ev, index) {
+    director.playStatusExpired(ev, index);
+    const u = unitById(ev.unitId);
+    if (u && battle) { shownEff.set(u.id, battle.getEffectiveUnit(u.id)); renderStatus(u.id); }
+  }
+  function pushDisplayedBars(u, patch, opts = {}) {
+    const next = { ...shownOf(u), ...patch };
+    shown.set(u.id, next);
+    u.bars = { ...u.bars, ...next };
+    const view = sandbox.getUnitView();
+    view?.updateUnit(u.id, { bars: u.bars, syncGhost: true });
+    view?.setFlag(u.id, 't-unit-lowhp', u.side === 'hero' && lowHp(u));
+    if (u.side === 'hero') shell.setHeroBars(u.id, u.bars, opts);
+  }
+  function playVariantFeedback(ev) {
+    director.playVariantFloat(ev);
+    const view = sandbox.getUnitView();
+    if (ev.trigger === 'revive' || ev.trigger === 'molt' || ev.trigger === 'regen') {
+      const u = unitById(ev.unitId);
+      if (!u) return;
+      if (ev.trigger === 'revive') { view?.setFlag(u.id, 't-unit-falling', false); view?.setFlag(u.id, 't-unit-down', false); }
+      pushDisplayedBars(u, { hp: ev.hpAfter, ...(ev.trigger === 'revive' ? { shield: 0 } : {}) }, { heal: true });
+      if (battle) { shownEff.set(u.id, battle.getEffectiveUnit(u.id)); renderStatus(u.id); }
+      if (ev.trigger === 'regen' && u.side === 'hero') shell.flashHeroPassive(u.id, '🌿 +' + (ev.healed || 0), '#6ee7b7');
+      return;
+    }
+    if (ev.trigger === 'leech') {
+      const u = unitById(ev.unitId);
+      if (!u) return;
+      const prev = shownOf(u), nextHp = Math.min(u.ref.maxHp || prev.hp, prev.hp + (ev.healed || 0));
+      pushDisplayedBars(u, { hp: nextHp }, { heal: true });
+      if (u.side === 'hero') shell.flashHeroPassive(u.id, '🧛 +' + (ev.healed || 0), '#fda4af');
+      return;
+    }
+    if (ev.trigger === 'thorn') {
+      const attacker = unitById(ev.targetId);
+      if (!attacker) return;
+      pushDisplayedBars(attacker, { hp: ev.hpAfter, shield: ev.shieldAfter ?? shownOf(attacker).shield }, { hit: true });
+      avHost.av.playHitFeedback({ targetId: attacker.id, sourceId: ev.sourceId, source: 'reflect', damageType: '近战', outcome: 'hit',
+        maxHp: ev.maxHp, hpBefore: ev.hpBefore, hpAfter: ev.hpAfter, hpDmg: ev.hpDmg,
+        shieldBefore: ev.shieldBefore || 0, shieldAfter: ev.shieldAfter || 0, shieldDmg: ev.shieldDmg || 0,
+        isHero: attacker.side === 'hero' }, { suppressShake: true, suppressRecoil: true });
+      if (ev.hpAfter <= 0 && attacker.ref.hp <= 0) { playDown(attacker); downTag(attacker.id, '🌵 荆棘反伤致死'); }
+      return;
+    }
+    const u = unitById(ev.unitId);
+    if (!u) return;
+    if (ev.trigger === 'link' && u.side === 'hero') shell.flashHeroPassive(u.id, '⚡ 连动 +1', '#f0abfc');
+    if (battle) { shownEff.set(u.id, battle.getEffectiveUnit(u.id)); renderStatus(u.id); }
   }
   // 持续伤害跳伤：放大飘字 + 结果环 + 状态图标闪 + 角色栏弹字 + 合成音；致死时挂原因牌
   function playDotTick(ev, index) {

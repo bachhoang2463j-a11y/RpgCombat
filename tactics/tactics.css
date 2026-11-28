@@ -105,7 +105,10 @@ button:disabled { opacity: .42; cursor: default; }
   background: conic-gradient(from 0deg, transparent 0 68%, rgba(255,255,255,.7) 80%, transparent 92%);
   -webkit-mask: radial-gradient(circle, transparent 63%, #000 67%, #000 72%, transparent 75%); mask: radial-gradient(circle, transparent 63%, #000 67%, #000 72%, transparent 75%); }
 .t-unit-shielded .t-unit-shield { opacity: 1; animation: t-shield-breathe 2.4s ease-in-out infinite; }
-.t-unit-down .t-unit-shield { display: none; }
+.t-unit-shield-breaking .t-unit-shield { display: block; opacity: 1; transition: none; box-shadow: 0 0 22px rgba(224,242,254,.95), inset 0 0 20px rgba(186,230,253,.85); }
+.t-unit-down:not(.t-unit-shield-breaking) .t-unit-shield { display: none; }
+.t-unit-stun-skip .t-unit-medal { animation: t-stun-wobble .48s ease-in-out; filter: saturate(.75) brightness(1.08); }
+@keyframes t-stun-wobble { 0%,100% { transform: translate(-50%,-50%); } 20% { transform: translate(calc(-50% - 5px),-50%) rotate(-7deg); } 45% { transform: translate(calc(-50% + 5px),-50%) rotate(7deg); } 70% { transform: translate(calc(-50% - 3px),-50%) rotate(-4deg); } }
 @keyframes t-shield-sheen { to { transform: rotate(360deg); } }
 @keyframes t-shield-breathe { 50% { box-shadow: 0 0 16px rgba(125,211,252,.75), inset 0 0 16px rgba(186,230,253,.6); } }
 /* 增益/减益持续弧光：头像外缘细弧环，按种类配色/弧形/转速区分；多种同时存在时由内向外错层（--i）；即将到期加快明灭 */

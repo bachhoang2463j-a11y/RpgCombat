@@ -353,12 +353,12 @@ function drawBackstabSector(g, viewData, unitId) {
   g.restore();
 }
 
-// 敌方威胁区：单个 = 可走暗红薄面 + 跳跃落点小点 + 冲刺可达虚线 + 可打红描边；合集 = 被覆盖人数越多越深
-const TH = { move: 'rgba(239,68,68,0.14)', moveEdge: 'rgba(248,113,113,0.5)', sprint: 'rgba(248,113,113,0.42)',
-  atk: 'rgba(220,38,38,0.07)', atkEdge: 'rgba(252,165,165,0.85)', dot: 'rgba(254,202,202,0.7)' };
+// 敌方威胁区：单个 = 可走暗红薄面 + 跳跃落点小点 + 冲刺可达虚线 + 可打红描边；合集 = 被覆盖人数越多越深（整体偏淡 50% 减轻遮挡）
+const TH = { move: 'rgba(239,68,68,0.07)', moveEdge: 'rgba(248,113,113,0.25)', sprint: 'rgba(248,113,113,0.21)',
+  atk: 'rgba(220,38,38,0.035)', atkEdge: 'rgba(252,165,165,0.425)', dot: 'rgba(254,202,202,0.35)' };
 function drawThreat(g, th) {
   if (th.heat) {
-    for (const c of th.heat.values()) { g.fillStyle = 'rgba(220,38,38,' + Math.min(0.42, 0.06 + 0.08 * c.n).toFixed(3) + ')'; g.fillRect(c.col * Q + 1, c.row * Q + 1, Q - 2, Q - 2); }
+    for (const c of th.heat.values()) { g.fillStyle = 'rgba(220,38,38,' + Math.min(0.21, 0.03 + 0.04 * c.n).toFixed(3) + ')'; g.fillRect(c.col * Q + 1, c.row * Q + 1, Q - 2, Q - 2); }
     strokeCellOutline(g, [...th.heat.values()], TH.atkEdge, 1.6);
     return;
   }
