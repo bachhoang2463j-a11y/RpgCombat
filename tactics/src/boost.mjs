@@ -2,16 +2,19 @@ import { skillSlots } from './effect-definitions.mjs';
 
 export const BOOST_TP_COST = [0, 20, 40, 60];
 
-// 专项技能以各档专属收益替代通用保底；空间与位移收益独立叠加。
+// 通用保底与专属机制并行；混合技能的伤害/治疗/护盾与减益槽分别修正。
 export function resolveBoostModifiers(skill, tier) {
   const base = skill.boostBase || skill;
-  const debuff = skillSlots(base).some(slot => slot.debuff && !slot.definition.selfCost);
+  const slots = skillSlots(base);
+  const debuff = slots.some(slot => slot.debuff && !slot.definition.selfCost);
   const delayed = base.delay > 0;
-  const specialized = delayed || debuff;
+  const general = slots.some(slot => slot.attack || ['heal', 'shield', 'barrier'].includes(slot.definition.kind));
+  const specialized = (delayed || debuff) && !general;
   return {
     tier, tpCost: BOOST_TP_COST[tier],
     powerMultiplier: tier === 0 ? 1 : specialized ? 1.1 : [1, 1.1, 1.25, 1.5][tier],
     aimBonus: tier === 0 ? 0 : specialized ? 20 : [0, 20, 40, 70][tier],
+    debuffPowerMultiplier: tier === 0 ? 1 : 1.1,
     delayReduction: delayed ? [0, 0, 1, 3][tier] : 0,
     durationBonus: debuff && tier >= 2 ? 1 : 0,
     dispelCount: debuff && tier === 3 ? 1 : 0,
@@ -56,7 +59,8 @@ export function applyBoostSkill(skill, tier) {
     const def = slot.definition, suffix = slot.index === 0 ? '' : slot.index + 1;
     // TP、MP、再动等资源返还和固定自损不随 Boost 放大。
     if (!def.selfCost && (slot.attack || def.kind === 'heal' || def.kind === 'shield' || def.kind === 'barrier' || slot.debuff)) {
-      result['power' + suffix] = slot.power === 0 ? 0 : Math.round(slot.power * mods.powerMultiplier * 100) / 100;
+      const multiplier = slot.debuff ? mods.debuffPowerMultiplier : mods.powerMultiplier;
+      result['power' + suffix] = slot.power === 0 ? 0 : Math.round(slot.power * multiplier * 100) / 100;
     }
     if (slot.debuff && !def.selfCost && mods.durationBonus) result['slotTurns' + suffix] = slot.turns + mods.durationBonus;
   }

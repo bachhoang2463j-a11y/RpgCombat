@@ -1,9 +1,10 @@
 {
   "date": "2026-11-28",
   "artifact": "tactics/mvp-standalone.html",
-  "sha256": "d71e5c623044679fc435bb79c05d237b1b852270601872f6bea54f6c668070a7",
-  "sourceFullRegression": { "passed": 1639, "failed": 0, "pending": 0, "runs": 1, "note": "全量在火焰 sc 作用域修复和新增两条运行时/音频回归之前执行；最终只复跑相关组，不重复全量。" },
-  "finalBoostRegression": { "passed": 23, "failed": 0, "pending": 0 },
+  "sha256": "71f7ce0b2a3afa3c6cf5c26a9762848f97b801484edf7d79fc915eeb13542587",
+  "confirmedRule": "用户确认通用保底与专属并行：延迟与混合技能伤害/治疗/护盾在MAX累计50%、Aim70，纯减益按控制行；混合技能减益槽10%并延时/驱散。",
+  "sourceFullRegression": { "passed": 1639, "failed": 0, "pending": 0, "runs": 1, "note": "唯一全量在火焰sc修复、新增运行时/音频回归及用户确认保底与专属并行口径之前执行；最终只复跑相关组及产物，不重复全量。" },
+  "finalBoostRegression": { "passed": 24, "failed": 0, "pending": 0 },
   "artifactChecks": { "passed": true, "bundledModules": 70, "requiredInputs": 51, "requiredSymbols": 133, "scriptClosingTags": 1, "externalBusinessImports": 0, "embeddedBoostAudio": 8, "phase4CasesPassed": 11 },
   "browser": {
     "backend": "chrome-devtools",
@@ -19,7 +20,7 @@
       "MAX 白金火焰全铭牌蔓延，姓名与资源数字保持可读，释放圆波运行时回归使用真实火焰模块",
       "锁定寂静指令后换档不丢目标：Aim120/140/170，AOE半径4/4/5，仍显示已锁定",
       "MAX 寂静指令实际释放：TP60→5，MP14→12，castTier=3，castCount=2，canChange=false",
-      "最终归一化威力版重新载入后复验LV1实际释放，TP10/100、MP12/14、档位0、本回合锁档、8采样解码ok"
+      "最终保底与专属并行版重新载入（真实包含debuffPowerMultiplier）后复验LV1实际释放，TP10/100、MP12/14、档位0、本回合锁档、8采样解码ok；产物规则补验延迟伤害50%/Aim70与混合伤害50%+减益10%"
     ],
     "finalJavaScriptErrors": 0,
     "unrelatedNetworkErrors": "既有 /favicon.ico 两次404，未修改与Boost无关的页面图标。",

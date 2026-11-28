@@ -50,13 +50,13 @@ export const groups = {
       assert.equal(nextBoostTier(attack, 1, 100), 2);
     });
 
-    test('BOOST-02 通用威力与Aim按0~3档累计，专项延迟/减益只取stage1', () => {
+    test('BOOST-02 通用威力与Aim按0~3档累计，延迟伤害保底并行、纯减益按控制行', () => {
       assert.deepEqual([0, 1, 2, 3].map(t => resolveBoostModifiers(attack, t).powerMultiplier), [1, 1.1, 1.25, 1.5]);
       assert.deepEqual([0, 1, 2, 3].map(t => resolveBoostModifiers(attack, t).aimBonus), [0, 20, 40, 70]);
-      for (const skill of [delayed, debuff]) {
-        assert.deepEqual([1, 2, 3].map(t => resolveBoostModifiers(skill, t).powerMultiplier), [1.1, 1.1, 1.1]);
-        assert.deepEqual([1, 2, 3].map(t => resolveBoostModifiers(skill, t).aimBonus), [20, 20, 20]);
-      }
+      assert.deepEqual([1, 2, 3].map(t => resolveBoostModifiers(delayed, t).powerMultiplier), [1.1, 1.25, 1.5]);
+      assert.deepEqual([1, 2, 3].map(t => resolveBoostModifiers(delayed, t).aimBonus), [20, 40, 70]);
+      assert.deepEqual([1, 2, 3].map(t => resolveBoostModifiers(debuff, t).powerMultiplier), [1.1, 1.1, 1.1]);
+      assert.deepEqual([1, 2, 3].map(t => resolveBoostModifiers(debuff, t).aimBonus), [20, 20, 20]);
     });
 
     test('BOOST-03 延迟减回合分档、减益延时与驱散、范围和位移加成符合契约', () => {
@@ -349,6 +349,21 @@ export const groups = {
         fx?.destroy();
         for (const [key, value] of Object.entries(saved)) { if (value === undefined) delete globalThis[key]; else globalThis[key] = value; }
       }
+    });
+    test('BOOST-24 混合技能按槽并行叠加：伤害保底50%，减益10%并延时驱散', () => {
+      const mixed = { ...cross, name: '混合强化', power: 50, type2: '[降防]', power2: 20, slotTurns2: 3 };
+      const b = make([unit('h', 'hero', { skills: [mixed] }), unit('e', 'enemy', { hp: 500 })], { h: at(2), e: at(5) });
+      b.setBoostTier(3, mixed);
+      const eff = b.effectiveSkill(mixed);
+      assert.equal(eff.power, 75);
+      assert.equal(eff.power2, 22);
+      assert.equal(eff.hit, 170);
+      assert.equal(eff.slotTurns2, 4);
+      const predicted = b.predictAttack(mixed, aim(b, 'e'));
+      const result = b.attack(mixed, aim(b, 'e'));
+      assert.equal(result.hits[0].hpDmg, 75);
+      assert.equal(predicted.damagePreview[0].estimatedHpDmg, result.hits[0].hpDmg);
+      assert.equal(result.effects.find(e => e.kind === 'buff' && e.field === 'def').value, -22);
     });
     try {
       const sources = [], played = [];
