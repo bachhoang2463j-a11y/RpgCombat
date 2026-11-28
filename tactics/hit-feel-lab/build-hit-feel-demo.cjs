@@ -108,8 +108,8 @@ export const zoomAt = (homeScale, s) => {
         'export const KILL_TIMING = { push: 345, pull: 435, cutin: 570, stop: 210, tail: 500 };',
         `const KILL_PRESETS = {
   A: { push: 345, pull: 435, cutin: 570, stop: 210, tail: 500 },
-  B: { push: 320, pull: 340, cutin: 0, stop: 460, tail: 820 },
-  C: { push: 360, pull: 380, cutin: 0, stop: 560, tail: 980 },
+  B: { push: 320, pull: 340, cutin: 0, stop: 460, tail: 820, rush: 90, cast: 380 },
+  C: { push: 360, pull: 380, cutin: 0, stop: 560, tail: 980, rush: 72, cast: 450 },
 };
 export const KILL_TIMING = new Proxy({}, {
   get(_, prop) {
@@ -120,10 +120,17 @@ export const KILL_TIMING = new Proxy({}, {
         'cinematic:KILL_TIMING'
       );
       s = mustReplace(s,
-        'sandbox.cameraTo(sandbox.poseAt(from.x, from.y, home.scale * 1.24), KILL_TIMING.push);',
-        `const m = (typeof window !== 'undefined' && window.__HIT_DEMO_CFG__?.mode) || 'B';
+        'export function startKillCamera(sandbox, from, to) {\n  const home = sandbox.getPose();\n  sandbox.cameraTo(sandbox.poseAt(from.x, from.y, home.scale * 1.24), KILL_TIMING.push);',
+        `function rushFocus(sb, fx, at, ms) {
+  if (!sb.cameraTouched()) timeStop(sb, fx, ms, at, { tint: 'rgba(255,242,218,.88)', lines: 32, filter: 'none', rush: true });
+}
+export function startKillCamera(sandbox, from, to, fx) {
+  const home = sandbox.getPose();
+  const m = (typeof window !== 'undefined' && window.__HIT_DEMO_CFG__?.mode) || 'B';
   const k = m === 'A' ? 1.24 : m === 'C' ? 2.2 : 1.9;
-  sandbox.cameraTo(sandbox.poseAt(from.x, from.y, home.scale * k), KILL_TIMING.push);`,
+  const ms = KILL_TIMING.rush || KILL_TIMING.push;
+  if (m !== 'A') rushFocus(sandbox, fx, from, ms);
+  sandbox.cameraTo(sandbox.poseAt(from.x, from.y, home.scale * k), ms);`,
         'cinematic:startKillCamera'
       );
       s = mustReplace(s,
@@ -133,18 +140,43 @@ export const KILL_TIMING = new Proxy({}, {
       );
       s = mustReplace(s,
         'sb.cameraTo(P(cm.x + dx / L * b, cm.y + dy / L * b, home.scale * (strike ? 1.45 : K.push) * (epic ? 1.12 : 1)), Math.min(casterMs, 620));',
-        "const dm = (typeof window !== 'undefined' && window.__HIT_DEMO_CFG__?.mode) || 'B';\n  const pushMs = dm === 'A' ? Math.min(casterMs, 620) : dm === 'C' ? 340 : 300;\n  sb.cameraTo(P(cm.x + dx / L * b, cm.y + dy / L * b, home.scale * (strike ? (dm === 'C' ? 2.1 : 1.85) : K.push) * (epic ? 1.15 : 1)), pushMs);",
+        "const dm = (typeof window !== 'undefined' && window.__HIT_DEMO_CFG__?.mode) || 'B';\n  const pushMs = KILL_TIMING.rush || Math.min(casterMs, 620);\n  if (dm !== 'A') rushFocus(sb, fx, cm, pushMs);\n  sb.cameraTo(P(cm.x + dx / L * b, cm.y + dy / L * b, home.scale * (strike ? (dm === 'C' ? 2.1 : 1.85) : K.push) * (epic ? 1.15 : 1)), pushMs);",
         'cinematic:instantPush'
       );
       s = mustReplace(s,
         'if (style === \'lock\') env.after(casterMs, () => { if (!bursted) whip(I, epic ? 1.8 : 1.65, 240, env.chargeMs - casterMs); });',
-        "if (style === 'lock') env.after(casterMs, () => { if (!bursted) whip(I, epic ? (dm === 'C' ? 2.35 : 2.1) : 1.7, dm === 'A' ? 240 : (dm === 'C' ? 360 : 320), env.chargeMs - casterMs); });",
+        "if (style === 'lock') env.after(casterMs, () => { if (!bursted) { if (dm !== 'A') rushFocus(sb, fx, I, KILL_TIMING.rush); whip(I, epic ? (dm === 'C' ? 2.35 : 2.1) : 1.7, KILL_TIMING.rush || 240, env.chargeMs - casterMs); } });",
         'cinematic:instantWhip'
       );
       s = mustReplace(s,
         "if (stopMs > 0) timeStop(sb, fx, stopMs, I, { tint: 'rgba(255,255,255,.95)', lines: 36 });",
-        "if (stopMs > 0) timeStop(sb, fx, stopMs, I, { tint: 'rgba(255,255,255,.95)', lines: 36, filter: 'contrast(1.6) saturate(1.4) brightness(1.1)' });",
+        "if (stopMs > 0) timeStop(sb, fx, stopMs, I, { tint: 'rgba(255,255,255,.9)', lines: 36, filter: 'brightness(0.86) saturate(0.88)' });",
         'cinematic:strikeStopFilter'
+      );
+      s = mustReplace(s,
+        "'<i style=\"position:absolute;inset:0;background:radial-gradient(circle at ' + p.x.toFixed(0) + 'px ' + p.y.toFixed(0) + 'px,rgba(255,255,255,.9) 0%,rgba(255,251,235,.35) 9%,rgba(255,255,255,0) 24%);mix-blend-mode:screen;\"></i>'",
+        "'<i style=\"position:absolute;inset:0;opacity:0;\"></i>'",
+        'cinematic:removeTimeStopFlash'
+      );
+      s = mustReplace(s,
+        'lines = 30, filter =',
+        'lines = 30, rush = false, filter =',
+        'cinematic:rushOption'
+      );
+      s = mustReplace(s,
+        'total = ms + 200;',
+        'total = ms + (rush ? 70 : 200);',
+        'cinematic:rushLife'
+      );
+      s = mustReplace(s,
+        '  const [gray, svg, flash] = root.children, k = ms / total;',
+        `  const [gray, svg, flash] = root.children, k = ms / total;
+  if (rush) {
+    root.dataset.hitDemoCue = 'camera-rush';
+    svg.animate([{ opacity: .96, transform: 'scale(1.14)' }, { opacity: .72, transform: 'scale(1)', offset: k }, { opacity: 0, transform: 'scale(.97)' }], { duration: total, fill: 'both' });
+    return;
+  }`,
+        'cinematic:rushFirstFrame'
       );
       return { contents: s, loader: 'js' };
     });
@@ -152,6 +184,16 @@ export const KILL_TIMING = new Proxy({}, {
     // 3. action-director.mjs: 去掉横切头像 + 出招前时停 + 命中全球时停(timeStop+hold) + 解冻瞬间气化崩散
     build.onLoad({ filter: /tactics[\\/]src[\\/]action-director\.mjs$/ }, args => {
       let s = readLf(args.path);
+      s = mustReplace(s,
+        "const KILL_IMPACT = { '近战': 'parry_heavy', '远程': 'hitDown', '法术': 'mx_deep_impact' };",
+        "const KILL_IMPACT = { '近战': 'parry_heavy', '远程': 'hitDown', '法术': 'light01' };",
+        'director:KILL_IMPACT'
+      );
+      s = mustReplace(s,
+        "return key === 'parry_heavy' && (seg.guardBroken || (seg.shieldDmg > 0 && seg.shieldAfter === 0)) ? 'hitDown' : key;",
+        "return key;",
+        'director:killSoundConst'
+      );
       s = mustReplace(s,
         "import { startCine, planKillBeat, startKillCamera, killPortraitSweep, KILL_TIMING } from './cinematic.mjs';",
         "import { startCine, planKillBeat, startKillCamera, killPortraitSweep, timeStop, hitFlash, KILL_TIMING } from './cinematic.mjs';",
@@ -162,16 +204,40 @@ export const KILL_TIMING = new Proxy({}, {
         '    const portrait = null;',
         'director:noCutin'
       );
+      for (const [target, replacement, label] of [
+        ['      if (entry.finisherOwnImpact) return null;\n', '', 'fixedImpact'],
+        ['    if (!entry.finisherOwnImpact) ruleKeys.push(...new Set([...kill.lethal].map(killSound).filter(Boolean)));',
+          `    if (kill.lethal.size) ruleKeys.push(...new Set([...kill.lethal].flatMap(seg => {
+      const key = killSound(seg);
+      return key === 'parry_heavy' ? [key, 'hitDown'] : key === 'light01' ? [key, 'light_impact'] : [key];
+    })));
+    const rushMode = window.__HIT_DEMO_CFG__?.mode !== 'A';
+    const chargeKey = skill.damageType === '法术' ? 'light_charge' : 'herocharge';
+    if (rushMode && kill.focus) ruleKeys.push(chargeKey);`, 'prepareImpact'],
+        ['await sandbox.guideTo(pts);', 'if (window.__HIT_DEMO_CFG__?.mode === "A" || !kill.focus) await sandbox.guideTo(pts);', 'skipSoftGuide'],
+        ['startKillCamera(sandbox, killFrom, killTo)', 'startKillCamera(sandbox, killFrom, killTo, makeFx(audioContext.category))', 'rushHost'],
+        ['      wait, tween, awaitHandle, hold, releaseFinisher, finisherWindupMs, after:',
+          '      wait, tween, awaitHandle, hold, releaseFinisher, finisherWindupMs, demoLethal: kill.lethal.size > 0, demoChargeScheduled: demoClose, after:', 'demoCues'],
+      ]) s = mustReplace(s, target, replacement, 'director:' + label);
+      s = mustReplace(s,
+        '    const finisherWindupMs = atmos ? 0 : portrait ? KILL_TIMING.cutin : pullKill ? KILL_TIMING.push : 0;',
+        `    const demoClose = rushMode && !!pullKill;
+    const finisherWindupMs = demoClose ? KILL_TIMING.rush + KILL_TIMING.cast : atmos ? 0 : portrait ? KILL_TIMING.cutin : pullKill ? KILL_TIMING.push : 0;
+    const demoCharge = () => {
+      if (!isCurrent()) return;
+      const fx = makeFx(audioContext.category, audioContext);
+      fx.sfx(chargeKey, chargeKey === 'herocharge' ? 0.68 : 0.55);
+      window.__HIT_DEMO_FX__.playKillCharge(fx, killFrom, KILL_TIMING.cast);
+    };`,
+        'director:chargeBeat'
+      );
       s = mustReplace(s,
         '    if (!entry.finisherCue && finisherWindupMs) {\n      if (!(await wait(finisherWindupMs)) || !isCurrent()) return false;\n      releaseFinisher();\n    }',
-        `    if (!entry.finisherCue && finisherWindupMs) {
-      if (!(await wait(finisherWindupMs)) || !isCurrent()) return false;
-      const dm = (typeof window !== 'undefined' && window.__HIT_DEMO_CFG__?.mode) || 'B';
-      if (dm !== 'A' && killFrom) {
-        const castStop = dm === 'C' ? 450 : 380;
-        await hold(castStop, () => timeStop(sandbox, makeFx(audioContext.category), castStop, killFrom, { tint: 'rgba(254,243,199,.95)', lines: 32, filter: 'contrast(1.3) saturate(1.2) brightness(1.08)' }));
-        if (!isCurrent()) return false;
-      }
+        `    if (entry.finisherCue && demoClose) {
+      scope().after(KILL_TIMING.rush, demoCharge);
+    } else if (!entry.finisherCue && finisherWindupMs) {
+      if (!(await wait(demoClose ? KILL_TIMING.rush : finisherWindupMs)) || !isCurrent()) return false;
+      if (demoClose && (!(await hold(KILL_TIMING.cast, demoCharge)) || !isCurrent())) return false;
       releaseFinisher();
     }`,
         'director:castStop'
@@ -198,28 +264,26 @@ export const KILL_TIMING = new Proxy({}, {
           const dl = ca && tb ? Math.hypot(tb.x - ca.x, tb.y - ca.y) || 1 : 1;
           const dirX = ca && tb ? (tb.x - ca.x) / dl : 1, dirY = ca && tb ? (tb.y - ca.y) / dl : 0;
           const stopMs = KILL_TIMING.stop;
-          const stopFilter = demoMode === 'C' ? 'contrast(1.7) saturate(1.45) brightness(1.1)' : 'contrast(1.45) saturate(1.3) brightness(1.06)';
+          const stopFilter = demoMode === 'C' ? 'brightness(0.82) saturate(0.85)' : 'brightness(0.88) saturate(0.9)';
           if (!killWaves.has(waveIndex)) {
             killWaves.add(waveIndex);
             hold(stopMs, () => {
               if (!isCurrent() || !tb) return;
               timeStop(sandbox, makeFx(audioContext.category), stopMs, tb, { tint: 'rgba(255,255,255,.96)', lines: 36, filter: stopFilter });
-              hitFlash(makeFx(audioContext.category), tb, { ms: stopMs + 140 });
             }).then(ok => {
               if (!ok || !isCurrent()) return;
               window.__HIT_DEMO_FX__?.playUnitShatter({ sandbox, fx: makeFx(audioContext.category) }, {
                 targetId, dirX, dirY,
-                onSound: () => scope().after(60, () => av.playSound('sd_shatter_blast', demoMode === 'C' ? 0.62 : 0.46, 0.92, { track: 'result', category: 'F', pan })),
               });
             });
           }
-          killTail = wait(stopMs + KILL_TIMING.tail);
+          killTail = wait(KILL_TIMING.tail);
         }
       } else if (!healed && !seg.barrierHitId) {
         if (demoMode !== 'A' && r.outcome === 'hit') {
           const tb = centerOf(targetId);
           const hitStop = demoMode === 'C' ? 170 : 120;
-          hold(hitStop, () => { if (tb) timeStop(sandbox, makeFx(audioContext.category), hitStop, tb, { tint: 'rgba(254,243,199,.92)', lines: 26, filter: 'contrast(1.2) saturate(1.1)' }); });
+          hold(hitStop, () => { if (tb) timeStop(sandbox, makeFx(audioContext.category), hitStop, tb, { tint: 'rgba(254,243,199,.88)', lines: 26, filter: 'brightness(0.88) saturate(0.9)' }); });
         } else microStop(result.casterId, targetId, hitStopMs(r));
       }`,
         'director:revealSegment'
@@ -230,11 +294,7 @@ export const KILL_TIMING = new Proxy({}, {
     const kills = result && result.ok ? executionKills(result) : [];
     if (!kills.length) return Promise.resolve(true);
     const demoCfg = typeof window !== 'undefined' ? window.__HIT_DEMO_CFG__ : null;
-    if (demoCfg && demoCfg.mode !== 'A') {
-      const b = battleOf();
-      const hasElite = kills.some(id => { const u = b?.getEffectiveUnit(id); return u && (u.level === '精英' || u.level === '首领'); });
-      if (!hasElite || !demoCfg.eliteExec) return Promise.resolve(true);
-    }`,
+    if (demoCfg && demoCfg.mode !== 'A' && !demoCfg.execFlow) return Promise.resolve(true);`,
         'director:playExecution'
       );
       return { contents: s, loader: 'js' };
@@ -276,6 +336,26 @@ export const KILL_TIMING = new Proxy({}, {
         "core.firstChild.animate([{ transform: 'scale(0.1)', opacity: 0 }, { transform: 'scale(1.5)', opacity: 1, offset: 0.86 }, { transform: 'scale(0.25)', opacity: 1 }], { duration: 1300, fill: 'forwards' });\n    window.__HIT_DEMO_FX__?.playUltConverge?.(fx, sky, { chargeMs: 1280, color: '#fde047' });",
         'fxlib:holy-converge'
       );
+      // 致死由统一结果轨播放原采样组合，技能自身只保留出手声与非致死反馈。
+      for (const [cue, label] of [
+        ["fx.sfx('light01', 0.72); fx.sfx('light_impact', 0.60);", 'holyImpact'],
+        ["fx.sfx('parry_heavy', 0.72); subBass(ctx, MELEE_SUB_BASS); ctx.after(80, () => fx.sfx('hitDown', 0.6));", 'meleeImpact'],
+        ["fx.sfx('hitDown', 0.75); subBass(ctx, RANGED_SUB_BASS);", 'rangedImpact'],
+        ["fx.sfx('hitDown', heavy ? 0.6 : 0.52); subBass(ctx, { type: 'sine', f0: 120, f1: 34, gain: heavy ? 0.6 : 0.45, ms: 260 });", 'slugImpact'],
+      ]) s = mustReplace(s, cue, 'if (!ctx.demoLethal) { ' + cue + ' }', 'fxlib:' + label);
+      s = mustReplace(s, "fx.sfx('herocharge', 0.4);", "if (!ctx.demoChargeScheduled) fx.sfx('herocharge', 0.4);", 'fxlib:rangedCharge');
+      return { contents: s, loader: 'js' };
+    });
+
+    build.onLoad({ filter: /tactics[\\/]src[\\/]vendor[\\/]rpg-av[\\/]rpg-av\.mjs$/ }, args => {
+      const s = mustReplace(readLf(args.path),
+        "if (h.finisherSound && h.finisherSound !== defense && take('finisher')) playSound(h.finisherSound, 0.86, 1, { ...opts, category:'F' });",
+        `if (h.finisherSound && take('finisher')) {
+                const key = h.finisherSound, impactOpts = { ...opts, category:'F' };
+                playSound(key, key === 'hitDown' ? 0.75 : 0.72, 1, impactOpts);
+                if (key === 'parry_heavy') after(80, () => playSound('hitDown', 0.6, 1, impactOpts));
+                else if (key === 'light01') playSound('light_impact', 0.60, 1, impactOpts);
+            }`, 'av:fixedKillMix');
       return { contents: s, loader: 'js' };
     });
   },

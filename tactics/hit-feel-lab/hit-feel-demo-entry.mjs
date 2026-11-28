@@ -73,7 +73,7 @@ export const RANGE_YAML = [
 
 const cfg = window.__HIT_DEMO_CFG__ = {
   mode: 'B',        // 'A' 现行版 | 'B' 八方均衡版 | 'C' 八方重击版
-  eliteExec: false, // 精英/首领击杀后是否接续旧版全屏处决
+  execFlow: true,   // 攻击击杀特写结束后自然衔接原版击杀结算特写
 };
 
 // 8 块 & 12 块不规则多边形裂片模板（百分比坐标，围绕圆心放射割裂）
@@ -112,8 +112,69 @@ function cloneVisualOnly(medalEl) {
   return clone;
 }
 
+// 远程重击同款屏幕血块（原版 fx-library.mjs screenBlood + RANGED_SPLAT_POS / DRIPS）
+const SPLAT_PATHS = [
+  'M20,10 C35,2 50,15 45,30 C55,40 60,60 45,70 C30,80 15,65 10,50 C5,35 10,18 20,10 Z',
+  'M30,5 C45,5 55,20 50,35 C65,30 75,45 70,60 C55,75 40,70 30,80 C15,75 10,55 15,40 C5,25 20,10 30,5 Z',
+  'M15,20 C30,10 50,10 40,30 C55,35 60,55 45,65 C35,75 20,80 15,60 C5,45 5,30 15,20 Z',
+  'M25,12 C40,4 55,18 48,32 C60,42 62,65 48,72 C32,82 18,68 12,52 C8,38 12,20 25,12 Z',
+];
+const RANGED_SPLAT_POS = [
+  { top: '16%', left: '18%', size: 150, rot: -25, delay: 40 }, { top: '65%', left: '22%', size: 150, rot: 45, delay: 80 },
+  { top: '20%', right: '16%', size: 150, rot: 15, delay: 60 }, { top: '60%', right: '18%', size: 150, rot: -55, delay: 95 },
+  { top: '38%', left: '46%', size: 150, rot: 8, delay: 15 },
+];
+const RANGED_SPLAT_DRIPS = [['right:25%', 6, 140, 90, 1050], ['left:22%', 8, 180, 60, 1100]];
+
+function playScreenBlood(fx, ms = 1150) {
+  const pos = s => (s.top ? 'top:' + s.top + ';' : '') + (s.bottom ? 'bottom:' + s.bottom + ';' : '') + (s.left ? 'left:' + s.left + ';' : '') + (s.right ? 'right:' + s.right + ';' : '');
+  const splats = RANGED_SPLAT_POS.map((s, i) => {
+    const d = SPLAT_PATHS[i % SPLAT_PATHS.length];
+    return '<div data-splat style="position:absolute;' + pos(s) + 'width:' + s.size + 'px;height:' + s.size + 'px;opacity:0;filter:drop-shadow(0 0 8px #7f1d1d);">' +
+      '<svg viewBox="0 0 100 100" width="100%" height="100%"><path d="' + d + '" fill="#7f1d1d"/><path d="' + d + '" fill="#991b1b" transform="translate(8,8) scale(.85)" opacity=".9"/>' +
+      '<circle cx="85" cy="18" r="4.5" fill="#991b1b"/><circle cx="15" cy="85" r="3.5" fill="#7f1d1d"/><circle cx="92" cy="72" r="5" fill="#881337"/><circle cx="6" cy="16" r="3" fill="#991b1b"/><circle cx="70" cy="92" r="2.5" fill="#dc2626"/>' +
+      '<circle cx="35" cy="28" r="1.8" fill="#fff" opacity=".6"/><circle cx="58" cy="45" r="1.5" fill="#fff" opacity=".5"/></svg></div>';
+  }).join('');
+  const drips = RANGED_SPLAT_DRIPS.map(([x, w, h]) => '<i data-drip style="position:absolute;top:0;' + x + ';width:' + w + 'px;height:' + h + 'px;border-radius:' + w + 'px;transform-origin:50% 0;opacity:0;' +
+    'background:linear-gradient(#b91c1c,#7f1d1d 55%,transparent);filter:drop-shadow(0 0 6px #450a0a);"></i>').join('');
+  const root = fx.screen('<i data-vig style="position:absolute;inset:0;opacity:0;background:radial-gradient(circle,transparent 32%,rgba(136,8,8,.45) 70%,rgba(65,8,8,.95) 100%);"></i>' + splats + drips, ms);
+  root.style.overflow = 'hidden';
+  root.querySelector('[data-vig]').animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'scale(1)', offset: 0.14 }, { opacity: 0.88, transform: 'scale(1.02)', offset: 0.78 }, { opacity: 0, transform: 'scale(1.05)' }],
+    { duration: ms, easing: 'cubic-bezier(0.1,0.8,0.2,1)', fill: 'forwards' });
+  root.querySelectorAll('[data-splat]').forEach((el, i) => {
+    const s = RANGED_SPLAT_POS[i], rr = ' rotate(' + s.rot + 'deg)';
+    el.animate([{ transform: 'scale(.12)' + rr, opacity: 0 }, { transform: 'scale(1.12)' + rr, opacity: 1, offset: 0.22 }, { transform: 'scale(1)' + rr, opacity: 0.96, offset: 0.38 },
+      { transform: 'translateY(4px) scale(1.01)' + rr, opacity: 0.85, offset: 0.72 }, { transform: 'translateY(12px) scale(1.04)' + rr, opacity: 0 }],
+      { duration: Math.max(400, ms - s.delay), delay: s.delay, easing: 'cubic-bezier(0.12,0.85,0.25,1)', fill: 'both' });
+  });
+  root.querySelectorAll('[data-drip]').forEach((el, i) => {
+    const [, , , delay, dms] = RANGED_SPLAT_DRIPS[i];
+    el.animate([{ transform: 'scaleY(0)', opacity: 0 }, { transform: 'scaleY(1)', opacity: 0.9, offset: 0.35 }, { transform: 'scaleY(1.25)', opacity: 0 }],
+      { duration: Math.min(dms, ms - delay), delay, easing: 'ease-out', fill: 'both' });
+  });
+}
+
 // ---------- 八方旅人2 打击感与击杀破碎/蓄势核心效果器 ----------
 window.__HIT_DEMO_FX__ = {
+  playKillCharge(fx, from, ms) {
+    const c = worldPx(from);
+    const sparks = Array.from({ length: 12 }, (_, i) => {
+      const a = i * 2.39996, d = 60 + i % 3 * 16;
+      return { x: Math.cos(a) * d, y: Math.sin(a) * d * .64 };
+    });
+    const root = fx.top(`<div data-hit-demo-cue="kill-charge" style="position:absolute;left:${c.x}px;top:${c.y}px;">` +
+      `<i style="position:absolute;left:-48px;top:-48px;width:96px;height:96px;background:radial-gradient(circle,#fff1c879 0%,#eaa64a4d 24%,#dd863823 49%,transparent 71%);mix-blend-mode:screen;"></i>` +
+      sparks.map(() => '<i style="position:absolute;left:-8px;top:-8px;width:16px;height:16px;background:radial-gradient(ellipse,#fff5d9 0%,#efbb63a8 32%,transparent 73%);mix-blend-mode:screen;"></i>').join('') + '</div>', ms);
+    const [core, ...particles] = root.firstChild.children;
+    core.animate([{ transform: 'scale(.45)', opacity: 0 }, { transform: 'scale(1.12)', opacity: .65, offset: .44 },
+      { transform: 'scale(.52)', opacity: 1, offset: .83 }, { transform: 'scale(.22)', opacity: 0 }], { duration: ms, fill: 'both' });
+    particles.forEach((el, i) => {
+      const { x, y } = sparks[i], delay = i % 4 * 16;
+      el.animate([{ transform: `translate(${x}px,${y}px) scale(.5)`, opacity: 0 },
+        { transform: `translate(${x * .8}px,${y * .8}px) scale(.88)`, opacity: .95, offset: .28 },
+        { transform: 'translate(0,0) scale(.18)', opacity: 0 }], { duration: ms - delay, delay, easing: 'cubic-bezier(.48,.05,.83,.38)', fill: 'both' });
+    });
+  },
   // 普通命中基座（B/C 模式）：高频颤动 + 瞬时白闪剪影 + 锐利细冲击圆环 + 方向火星
   onImpactHit(directorCtx, { casterId, targetId, dirX, dirY, isLethal }) {
     if (cfg.mode === 'A') return;
@@ -126,12 +187,12 @@ window.__HIT_DEMO_FX__ = {
     const p = worldPx(c);
     const ux = dirX || 1, uy = dirY || 0;
 
-    // 1. 瞬时高白剪影过曝 + 高频受击颤动（不靠缓慢平推 4px）
+    // 1. 瞬时受击微缩 + 高频受击颤动（去掉高曝光滤镜）
     const flashDur = heavy ? 110 : 85;
     rec.medal.animate([
-      { filter: 'brightness(3.8) contrast(1.8) saturate(0)', transform: 'translate(-50%,-50%) scale(1.12)' },
-      { filter: 'brightness(2.2) contrast(1.3)', transform: 'translate(-50%,-50%) scale(1.04)', offset: 0.45 },
-      { filter: 'none', transform: 'translate(-50%,-50%) scale(1)' },
+      { transform: 'translate(-50%,-50%) scale(1.1)' },
+      { transform: 'translate(-50%,-50%) scale(1.03)', offset: 0.45 },
+      { transform: 'translate(-50%,-50%) scale(1)' },
     ], { duration: flashDur + 90, easing: 'ease-out' });
 
     const vibDur = heavy ? 190 : 150;
@@ -177,7 +238,7 @@ window.__HIT_DEMO_FX__ = {
     const d = parseFloat(rec.sprite.style.getPropertyValue('--d')) || 42;
     const faceNode = cloneVisualOnly(rec.medal);
 
-    // 1. 先瞬间将原单位隐藏，由两半被刀风/冲击斜向劈开错位的残影接管并瞬间气化
+    // 1. 先瞬间将原单位隐藏，由两半被刀风/冲击斜向劈开错位的残影接管并消散（去掉高曝光，保留真实色泽与血染）
     rec.root.classList.add('t-unit-shattered');
     if (faceNode) {
       const splitMs = heavy ? 320 : 240;
@@ -191,20 +252,23 @@ window.__HIT_DEMO_FX__ = {
         { poly: '0 54%, 100% 48%, 100% 100%, 0 100%', sx: ux * 10 - nx * 5, sy: uy * 10 - ny * 5, rot: -10 },
       ].forEach(h => {
         const w = document.createElement('div');
-        w.style.cssText = `position:absolute;inset:0;clip-path:polygon(${h.poly});filter:brightness(3.2) contrast(1.6) saturate(0.15);`;
+        w.style.cssText = `position:absolute;inset:0;clip-path:polygon(${h.poly});filter:drop-shadow(0 0 4px rgba(127,29,29,0.85));`;
         w.appendChild(faceNode.cloneNode(true));
         splitHost.appendChild(w);
         w.animate([
-          { transform: 'translate(0,0) scale(1.12)', opacity: 1, filter: 'brightness(3.6) saturate(0)' },
-          { transform: `translate(${h.sx.toFixed(1)}px,${h.sy.toFixed(1)}px) rotate(${h.rot}deg) scale(0.85)`, opacity: 0, filter: 'brightness(0.4) blur(2px)' },
+          { transform: 'translate(0,0) scale(1.06)', opacity: 1, filter: 'contrast(1.15) drop-shadow(0 0 4px rgba(153,27,27,0.9))' },
+          { transform: `translate(${h.sx.toFixed(1)}px,${h.sy.toFixed(1)}px) rotate(${h.rot}deg) scale(0.85)`, opacity: 0, filter: 'brightness(0.45) blur(1.5px)' },
         ], { duration: splitMs, easing: 'cubic-bezier(0.15, 0.9, 0.3, 1)', fill: 'forwards' });
       });
     }
 
-    // 2. 贯穿受击点的白热伤口闪光 + 慢扩深红冲击环（力量感从"魔法金色"换成"血肉冲击"）
+    // 2. 屏幕血块（与远程重击完全一致的 5 团屏幕溅血 + 2 道血泪 + 暗红边缘暗角）
+    playScreenBlood(fx, heavy ? 1150 : 980);
+
+    // 3. 贯穿受击点的深红裂痕（无高曝光白闪）
     const slashAng = ang * 180 / Math.PI + 24;
     const tear = fx.top(
-      `<div style="position:absolute;left:${p.x}px;top:${p.y}px;width:${d * 3.4}px;height:4px;transform:translate(-50%,-50%) rotate(${slashAng.toFixed(1)}deg);background:linear-gradient(90deg,transparent,#dc2626 20%,#ffffff 50%,#dc2626 80%,transparent);mix-blend-mode:screen;filter:drop-shadow(0 0 8px #7f1d1d);"></div>`,
+      `<div style="position:absolute;left:${p.x}px;top:${p.y}px;width:${d * 3.4}px;height:4px;transform:translate(-50%,-50%) rotate(${slashAng.toFixed(1)}deg);background:linear-gradient(90deg,transparent,#7f1d1d 20%,#dc2626 50%,#7f1d1d 80%,transparent);filter:drop-shadow(0 0 6px #450a0a);"></div>`,
       260
     ).firstChild;
     tear.animate([
@@ -331,10 +395,9 @@ const SWORD_ULT_ENTRY = {
     ], { duration: 1050, easing: 'ease-out', fill: 'forwards' });
     if (cfg.mode !== 'A') window.__HIT_DEMO_FX__.playUltConverge(fx, c, { chargeMs: 1180, color: '#fde047' });
     if (!(await ctx.wait(1200))) return false;
-    // ② 极速瞬发贯屏金紫斩痕
+    // ② 极速瞬发贯屏金紫斩痕（近战大招命中音由导演层恒定走 parry_heavy 近战重击音效）
     ctx.atmos?.burst();
     fx.sfx('slash_whoosh_hit_fs434873', 0.85);
-    fx.sfx('mx_deep_impact', 0.65);
     fx.shake('quake');
     const beam = fx.top(
       `<div style="position:absolute;left:${t.x}px;top:${t.y}px;width:540px;height:28px;transform:translate(-50%,-50%) rotate(${ang.toFixed(1)}deg);background:linear-gradient(90deg,transparent 0%,#c084fc 20%,#ffffff 50%,#fde047 80%,transparent 100%);mix-blend-mode:screen;filter:drop-shadow(0 0 18px #f59e0b);"></div>`,
@@ -382,7 +445,7 @@ bar.innerHTML = [
   '<button data-mode="B" class="active">B 八方均衡版</button>',
   '<button data-mode="C">C 八方重击版</button>',
   '<span class="sep"></span>',
-  '<button id="hd-exec">精英全屏处决: 关</button>',
+  '<button id="hd-exec">击杀结算特写: 开</button>',
   '<span class="sep"></span>',
   '<button data-preset="normal">普攻命中</button>',
   '<button data-preset="fodder">击杀杂兵</button>',
@@ -396,8 +459,8 @@ document.body.appendChild(bar);
 function syncBar() {
   bar.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === cfg.mode));
   const ex = document.getElementById('hd-exec');
-  ex.textContent = '精英全屏处决: ' + (cfg.eliteExec ? '开' : '关');
-  ex.classList.toggle('active', cfg.eliteExec);
+  ex.textContent = '击杀结算特写: ' + (cfg.execFlow ? '开' : '关');
+  ex.classList.toggle('active', cfg.execFlow);
 }
 
 // 靶场便捷自动续行：弗兰克行动完不切走，且支持一键复位与快捷施放
@@ -438,7 +501,7 @@ bar.addEventListener('click', e => {
   const btn = e.target.closest('button');
   if (!btn) return;
   if (btn.dataset.mode) { cfg.mode = btn.dataset.mode; syncBar(); }
-  else if (btn.id === 'hd-exec') { cfg.eliteExec = !cfg.eliteExec; syncBar(); }
+  else if (btn.id === 'hd-exec') { cfg.execFlow = !cfg.execFlow; syncBar(); }
   else if (btn.id === 'hd-reset') { resetRange(); }
   else if (btn.dataset.preset) { void runPreset(btn.dataset.preset); }
 });

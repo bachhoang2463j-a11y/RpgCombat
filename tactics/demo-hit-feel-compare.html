@@ -24726,7 +24726,12 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
         );
         if (h.kind !== "hp") return;
         if (h.finisher) {
-          if (h.finisherSound && h.finisherSound !== defense && take("finisher")) playSound(h.finisherSound, 0.86, 1, { ...opts, category: "F" });
+          if (h.finisherSound && take("finisher")) {
+            const key = h.finisherSound, impactOpts = { ...opts, category: "F" };
+            playSound(key, key === "hitDown" ? 0.75 : 0.72, 1, impactOpts);
+            if (key === "parry_heavy") after(80, () => playSound("hitDown", 0.6, 1, impactOpts));
+            else if (key === "light01") playSound("light_impact", 0.6, 1, impactOpts);
+          }
           return;
         }
         if (!take("hit_" + h.tier)) return;
@@ -29900,14 +29905,19 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       el.animate([{ transform: off }, { transform: "translateY(0)", offset: inMs / ms }, { transform: "translateY(0)", offset: 1 - outMs / ms }, { transform: off }], { duration: ms, easing: "cubic-bezier(.3,.7,.2,1)", fill: "forwards" });
     });
   }
-  function timeStop(sandbox, fx, ms, m, { tint: tint2 = "rgba(254,243,199,.95)", lines = 30, filter = "grayscale(1) contrast(1.45) brightness(1.06)" } = {}) {
-    const p = viewPt(sandbox, m), R2 = Math.hypot(p.w, p.h), total = ms + 200;
+  function timeStop(sandbox, fx, ms, m, { tint: tint2 = "rgba(254,243,199,.95)", lines = 30, rush = false, filter = "grayscale(1) contrast(1.45) brightness(1.06)" } = {}) {
+    const p = viewPt(sandbox, m), R2 = Math.hypot(p.w, p.h), total = ms + (rush ? 70 : 200);
     const ls = Array.from({ length: lines }, (_, i) => {
       const a = i / lines * TAU2 + rnd(-0.08, 0.08), r0 = R2 * rnd(0.14, 0.28);
       return '<line x1="' + (p.x + Math.cos(a) * r0).toFixed(1) + '" y1="' + (p.y + Math.sin(a) * r0).toFixed(1) + '" x2="' + (p.x + Math.cos(a) * R2).toFixed(1) + '" y2="' + (p.y + Math.sin(a) * R2).toFixed(1) + '" stroke="' + tint2 + '" stroke-width="' + rnd(1.2, 4.5).toFixed(1) + '" stroke-linecap="round"/>';
     }).join("");
-    const root = fx.screen('<i style="position:absolute;inset:0;backdrop-filter:' + filter + ";-webkit-backdrop-filter:" + filter + ';"></i><svg width="100%" height="100%" style="position:absolute;inset:0;overflow:visible;transform-origin:' + p.x.toFixed(0) + "px " + p.y.toFixed(0) + 'px;mix-blend-mode:screen;">' + ls + '</svg><i style="position:absolute;inset:0;background:radial-gradient(circle at ' + p.x.toFixed(0) + "px " + p.y.toFixed(0) + 'px,rgba(255,255,255,.9) 0%,rgba(255,251,235,.35) 9%,rgba(255,255,255,0) 24%);mix-blend-mode:screen;"></i>', total);
+    const root = fx.screen('<i style="position:absolute;inset:0;backdrop-filter:' + filter + ";-webkit-backdrop-filter:" + filter + ';"></i><svg width="100%" height="100%" style="position:absolute;inset:0;overflow:visible;transform-origin:' + p.x.toFixed(0) + "px " + p.y.toFixed(0) + 'px;mix-blend-mode:screen;">' + ls + '</svg><i style="position:absolute;inset:0;opacity:0;"></i>', total);
     const [gray, svg, flash] = root.children, k2 = ms / total;
+    if (rush) {
+      root.dataset.hitDemoCue = "camera-rush";
+      svg.animate([{ opacity: 0.96, transform: "scale(1.14)" }, { opacity: 0.72, transform: "scale(1)", offset: k2 }, { opacity: 0, transform: "scale(.97)" }], { duration: total, fill: "both" });
+      return;
+    }
     gray.animate([{ opacity: 1 }, { opacity: 1, offset: k2 }, { opacity: 0 }], { duration: total, fill: "forwards" });
     svg.animate([{ opacity: 0, transform: "scale(1.18)" }, { opacity: 1, transform: "scale(1)", offset: 0.22 }, { opacity: 0.85, offset: k2 }, { opacity: 0, transform: "scale(.94)" }], { duration: total, easing: "cubic-bezier(.2,.8,.3,1)", fill: "forwards" });
     flash.animate([{ opacity: 1 }, { opacity: 0.4, offset: k2 }, { opacity: 0 }], { duration: total, fill: "forwards" });
@@ -29967,8 +29977,8 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
   }
   var KILL_PRESETS = {
     A: { push: 345, pull: 435, cutin: 570, stop: 210, tail: 500 },
-    B: { push: 320, pull: 340, cutin: 0, stop: 460, tail: 820 },
-    C: { push: 360, pull: 380, cutin: 0, stop: 560, tail: 980 }
+    B: { push: 320, pull: 340, cutin: 0, stop: 460, tail: 820, rush: 90, cast: 380 },
+    C: { push: 360, pull: 380, cutin: 0, stop: 560, tail: 980, rush: 72, cast: 450 }
   };
   var KILL_TIMING = new Proxy({}, {
     get(_, prop) {
@@ -29976,11 +29986,16 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       return (KILL_PRESETS[m] || KILL_PRESETS.B)[prop];
     }
   });
-  function startKillCamera(sandbox, from, to) {
+  function rushFocus(sb, fx, at, ms) {
+    if (!sb.cameraTouched()) timeStop(sb, fx, ms, at, { tint: "rgba(255,242,218,.88)", lines: 32, filter: "none", rush: true });
+  }
+  function startKillCamera(sandbox, from, to, fx) {
     const home = sandbox.getPose();
     const m = typeof window !== "undefined" && window.__HIT_DEMO_CFG__?.mode || "B";
     const k2 = m === "A" ? 1.24 : m === "C" ? 2.2 : 1.9;
-    sandbox.cameraTo(sandbox.poseAt(from.x, from.y, home.scale * k2), KILL_TIMING.push);
+    const ms = KILL_TIMING.rush || KILL_TIMING.push;
+    if (m !== "A") rushFocus(sandbox, fx, from, ms);
+    sandbox.cameraTo(sandbox.poseAt(from.x, from.y, home.scale * k2), ms);
     return () => {
       const frame = sandbox.poseFrame([from, to], { pad: 2 });
       const pose = frame.scale <= home.scale ? frame : sandbox.poseAt((from.x + to.x) / 2, (from.y + to.y) / 2, home.scale);
@@ -30020,7 +30035,8 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
     const dx = focus.x - cm.x, dy = focus.y - cm.y, L = Math.hypot(dx, dy) || 1, b = Math.min(1.2, L * 0.3);
     const casterMs = style === "lock" ? Math.max(300, env.chargeMs - 480) : Math.min(700, env.chargeMs * 0.8);
     const dm = typeof window !== "undefined" && window.__HIT_DEMO_CFG__?.mode || "B";
-    const pushMs = dm === "A" ? Math.min(casterMs, 620) : dm === "C" ? 340 : 300;
+    const pushMs = KILL_TIMING.rush || Math.min(casterMs, 620);
+    if (dm !== "A") rushFocus(sb, fx, cm, pushMs);
     sb.cameraTo(P(cm.x + dx / L * b, cm.y + dy / L * b, home.scale * (strike ? dm === "C" ? 2.1 : 1.85 : K.push) * (epic ? 1.15 : 1)), pushMs);
     function whip(at, k2, whipMs, untilMs) {
       sb.cameraTo(P(at.x, at.y, home.scale * k2), whipMs).then((ok) => {
@@ -30028,7 +30044,10 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       });
     }
     if (style === "lock") env.after(casterMs, () => {
-      if (!bursted) whip(I, epic ? dm === "C" ? 2.35 : 2.1 : 1.7, dm === "A" ? 240 : dm === "C" ? 360 : 320, env.chargeMs - casterMs);
+      if (!bursted) {
+        if (dm !== "A") rushFocus(sb, fx, I, KILL_TIMING.rush);
+        whip(I, epic ? dm === "C" ? 2.35 : 2.1 : 1.7, KILL_TIMING.rush || 240, env.chargeMs - casterMs);
+      }
     });
     function pullBack(quake) {
       if (quake) fx.shake("quake");
@@ -30045,7 +30064,7 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
         return;
       }
       holdOr(hold, stopMs, () => {
-        if (stopMs > 0) timeStop(sb, fx, stopMs, I, { tint: "rgba(255,255,255,.95)", lines: 36, filter: "contrast(1.6) saturate(1.4) brightness(1.1)" });
+        if (stopMs > 0) timeStop(sb, fx, stopMs, I, { tint: "rgba(255,255,255,.9)", lines: 36, filter: "brightness(0.86) saturate(0.88)" });
         hitFlash(fx, I, { ms: stopMs + 220 });
       }).then((ok) => {
         if (ok) pullBack(true);
@@ -31900,8 +31919,10 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       }), 700));
       for (const at of [380, 760, 1080]) ctx.after(at, () => fx.shake("light"));
       if (!await ctx.wait(1300)) return false;
-      fx.sfx("light01", 0.72);
-      fx.sfx("light_impact", 0.6);
+      if (!ctx.demoLethal) {
+        fx.sfx("light01", 0.72);
+        fx.sfx("light_impact", 0.6);
+      }
       fx.shake("quake");
       ctx.atmos?.burst();
       const H2 = 16 * PX2;
@@ -33007,9 +33028,11 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
           spray(fx, p, 6, { kind: "spark", ang: ang + Math.PI, spread: 2.4, dist: [16, 46], size: [2, 3], ms: [220, 320] });
           return;
         }
-        fx.sfx("parry_heavy", 0.72);
-        subBass(ctx, MELEE_SUB_BASS);
-        ctx.after(80, () => fx.sfx("hitDown", 0.6));
+        if (!ctx.demoLethal) {
+          fx.sfx("parry_heavy", 0.72);
+          subBass(ctx, MELEE_SUB_BASS);
+          ctx.after(80, () => fx.sfx("hitDown", 0.6));
+        }
         heavyShake(ctx, MELEE_HEAVY_SHAKE, 440);
         screenFlash(fx, "rgba(251,191,36,0.9)", 0.22, 300);
         meleeHeavyBurst(fx, p, ang);
@@ -33098,8 +33121,10 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
         if (!await ctx.wait(FLY)) return false;
         shot.impacts.forEach((p) => ctx.revealSegment(p.targetId, p.index));
         if (hit) {
-          fx.sfx("hitDown", heavy ? 0.6 : 0.52);
-          subBass(ctx, { type: "sine", f0: 120, f1: 34, gain: heavy ? 0.6 : 0.45, ms: 260 });
+          if (!ctx.demoLethal) {
+            fx.sfx("hitDown", heavy ? 0.6 : 0.52);
+            subBass(ctx, { type: "sine", f0: 120, f1: 34, gain: heavy ? 0.6 : 0.45, ms: 260 });
+          }
           slugImpact(fx, t, ang, heavy);
           armorCrack(fx, t, ang);
           spray(fx, t, heavy ? 14 : 10, { kind: "gore", ang, spread: 1.2, dist: [24, 92], size: [3, 7] });
@@ -33134,7 +33159,7 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       const c = worldPx(cm), t = worldPx(tm), ang = Math.atan2(t.y - c.y, t.x - c.x), ux = Math.cos(ang), uy = Math.sin(ang);
       const m = { x: c.x + ux * 24, y: c.y + uy * 24 }, landed = hits.filter((h) => h.hit);
       const ip = landed.length ? t : { x: t.x + ux * 45, y: t.y + uy * 45 };
-      fx.sfx("herocharge", 0.4);
+      if (!ctx.demoChargeScheduled) fx.sfx("herocharge", 0.4);
       fx.top(orbHtml(m.x, m.y, 0.9 * PX2, "rgba(220,38,38,0.6)", "rgba(254,226,226,0.95)"), CHARGE + 40).firstChild.animate([{ transform: "scale(.3)", opacity: 0.4 }, { transform: "scale(1.15)", opacity: 1, offset: 0.75 }, { transform: "scale(.7)", opacity: 0.9 }], { duration: CHARGE, fill: "forwards" });
       particles(fx, Array.from({ length: 10 }, () => {
         const a = rnd2(0, TAU3), r = rnd2(34, 56);
@@ -33149,8 +33174,10 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       tracer(fx, m, ip, { width: 9, ms: FLY, len: 150, tint: TRACER_RED });
       if (!await ctx.wait(FLY)) return false;
       hits.forEach((h) => ctx.reveal(h.targetId));
-      fx.sfx("hitDown", 0.75);
-      subBass(ctx, RANGED_SUB_BASS);
+      if (!ctx.demoLethal) {
+        fx.sfx("hitDown", 0.75);
+        subBass(ctx, RANGED_SUB_BASS);
+      }
       screenFlash(fx, "#fff", 0.45, 300);
       rangedHeavyBurst(fx, ip);
       heavyShake(ctx, RANGED_HEAVY_SHAKE, 480);
@@ -35827,7 +35854,7 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
 
   // src/action-director.mjs
   var WINDUP_BEAT_MS = 330;
-  var KILL_IMPACT = { "\u8FD1\u6218": "parry_heavy", "\u8FDC\u7A0B": "hitDown", "\u6CD5\u672F": "mx_deep_impact" };
+  var KILL_IMPACT = { "\u8FD1\u6218": "parry_heavy", "\u8FDC\u7A0B": "hitDown", "\u6CD5\u672F": "light01" };
   function resolveAttackIdentity(skill) {
     return { mode: "tag", subtype: skill?.fxTag || null };
   }
@@ -36312,9 +36339,8 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       const entry = registry.resolve(input);
       const kill = planKillBeat({ ...result, skill }, casterUnit, vd.units);
       const killSound = (seg) => {
-        if (entry.finisherOwnImpact) return null;
         const key = KILL_IMPACT[seg.damageType || result.incomingType || skill.damageType || "\u8FD1\u6218"];
-        return key === "parry_heavy" && (seg.guardBroken || seg.shieldDmg > 0 && seg.shieldAfter === 0) ? "hitDown" : key;
+        return key;
       };
       const killWaves = /* @__PURE__ */ new Set();
       let killTail = null;
@@ -36330,10 +36356,16 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       if (charge) pts.push(unitCenter(charge.from, vd.footprintsById[charge.unitId]));
       if (result.query && result.query.blastCenter) pts.push(result.query.blastCenter);
       if (!hits.length && result.aim) pts.push({ x: result.aim.x, y: result.aim.y });
-      await sandbox.guideTo(pts);
+      if (window.__HIT_DEMO_CFG__?.mode === "A" || !kill.focus) await sandbox.guideTo(pts);
       avHost.setPanHint?.(panOf(result.casterId));
       const ruleKeys = [...guardEvents.length && !deps.presentGuard ? GUARD_AUDIO_KEYS : [], ...(result.events || []).some((ev) => ev.type.startsWith("barrier-")) ? BARRIER_AUDIO_KEYS : []];
-      if (!entry.finisherOwnImpact) ruleKeys.push(...new Set([...kill.lethal].map(killSound).filter(Boolean)));
+      if (kill.lethal.size) ruleKeys.push(...new Set([...kill.lethal].flatMap((seg) => {
+        const key = killSound(seg);
+        return key === "parry_heavy" ? [key, "hitDown"] : key === "light01" ? [key, "light_impact"] : [key];
+      })));
+      const rushMode = window.__HIT_DEMO_CFG__?.mode !== "A";
+      const chargeKey = skill.damageType === "\u6CD5\u672F" ? "light_charge" : "herocharge";
+      if (rushMode && kill.focus) ruleKeys.push(chargeKey);
       if (!isCurrent() || !await prepareAudio([...entry.prepareKeys ? entry.prepareKeys({ identity }) : [], ...ruleKeys]) || !isCurrent()) return false;
       const grade = entry.grade;
       const element = skillElement(skill), tier = lightTier(grade);
@@ -36387,23 +36419,27 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
         };
       }
       const killFrom = kill.focus && centerOf2(result.casterId), killTo = kill.focus && centerOf2(kill.focus.targetId);
-      let pullKill = !atmos && killFrom && killTo && !sandbox.cameraTouched?.() ? startKillCamera(sandbox, killFrom, killTo) : null;
+      let pullKill = !atmos && killFrom && killTo && !sandbox.cameraTouched?.() ? startKillCamera(sandbox, killFrom, killTo, makeFx(audioContext.category)) : null;
       const portrait = null;
       if (portrait) killPortraitSweep(makeFx(audioContext.category), portrait, KILL_TIMING.cutin, getTimeScale());
-      const finisherWindupMs = atmos ? 0 : portrait ? KILL_TIMING.cutin : pullKill ? KILL_TIMING.push : 0;
+      const demoClose = rushMode && !!pullKill;
+      const finisherWindupMs = demoClose ? KILL_TIMING.rush + KILL_TIMING.cast : atmos ? 0 : portrait ? KILL_TIMING.cutin : pullKill ? KILL_TIMING.push : 0;
+      const demoCharge = () => {
+        if (!isCurrent()) return;
+        const fx = makeFx(audioContext.category, audioContext);
+        fx.sfx(chargeKey, chargeKey === "herocharge" ? 0.68 : 0.55);
+        window.__HIT_DEMO_FX__.playKillCharge(fx, killFrom, KILL_TIMING.cast);
+      };
       function releaseFinisher() {
         if (!pullKill || !isCurrent()) return;
         pullKill();
         pullKill = null;
       }
-      if (!entry.finisherCue && finisherWindupMs) {
-        if (!await wait(finisherWindupMs) || !isCurrent()) return false;
-        const dm = typeof window !== "undefined" && window.__HIT_DEMO_CFG__?.mode || "B";
-        if (dm !== "A" && killFrom) {
-          const castStop = dm === "C" ? 450 : 380;
-          await hold(castStop, () => timeStop(sandbox, makeFx(audioContext.category), castStop, killFrom, { tint: "rgba(254,243,199,.95)", lines: 32, filter: "contrast(1.3) saturate(1.2) brightness(1.08)" }));
-          if (!isCurrent()) return false;
-        }
+      if (entry.finisherCue && demoClose) {
+        scope().after(KILL_TIMING.rush, demoCharge);
+      } else if (!entry.finisherCue && finisherWindupMs) {
+        if (!await wait(demoClose ? KILL_TIMING.rush : finisherWindupMs) || !isCurrent()) return false;
+        if (demoClose && (!await hold(KILL_TIMING.cast, demoCharge) || !isCurrent())) return false;
         releaseFinisher();
       }
       const revealed = /* @__PURE__ */ new Map();
@@ -36609,31 +36645,29 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
             const dl = ca && tb ? Math.hypot(tb.x - ca.x, tb.y - ca.y) || 1 : 1;
             const dirX = ca && tb ? (tb.x - ca.x) / dl : 1, dirY = ca && tb ? (tb.y - ca.y) / dl : 0;
             const stopMs = KILL_TIMING.stop;
-            const stopFilter = demoMode === "C" ? "contrast(1.7) saturate(1.45) brightness(1.1)" : "contrast(1.45) saturate(1.3) brightness(1.06)";
+            const stopFilter = demoMode === "C" ? "brightness(0.82) saturate(0.85)" : "brightness(0.88) saturate(0.9)";
             if (!killWaves.has(waveIndex)) {
               killWaves.add(waveIndex);
               hold(stopMs, () => {
                 if (!isCurrent() || !tb) return;
                 timeStop(sandbox, makeFx(audioContext.category), stopMs, tb, { tint: "rgba(255,255,255,.96)", lines: 36, filter: stopFilter });
-                hitFlash(makeFx(audioContext.category), tb, { ms: stopMs + 140 });
               }).then((ok2) => {
                 if (!ok2 || !isCurrent()) return;
                 window.__HIT_DEMO_FX__?.playUnitShatter({ sandbox, fx: makeFx(audioContext.category) }, {
                   targetId,
                   dirX,
-                  dirY,
-                  onSound: () => scope().after(60, () => av.playSound("sd_shatter_blast", demoMode === "C" ? 0.62 : 0.46, 0.92, { track: "result", category: "F", pan }))
+                  dirY
                 });
               });
             }
-            killTail = wait(stopMs + KILL_TIMING.tail);
+            killTail = wait(KILL_TIMING.tail);
           }
         } else if (!healed && !seg.barrierHitId) {
           if (demoMode !== "A" && r.outcome === "hit") {
             const tb = centerOf2(targetId);
             const hitStop = demoMode === "C" ? 170 : 120;
             hold(hitStop, () => {
-              if (tb) timeStop(sandbox, makeFx(audioContext.category), hitStop, tb, { tint: "rgba(254,243,199,.92)", lines: 26, filter: "contrast(1.2) saturate(1.1)" });
+              if (tb) timeStop(sandbox, makeFx(audioContext.category), hitStop, tb, { tint: "rgba(254,243,199,.88)", lines: 26, filter: "brightness(0.88) saturate(0.9)" });
             });
           } else microStop(result.casterId, targetId, hitStopMs(r));
         }
@@ -36765,6 +36799,8 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
         hold,
         releaseFinisher,
         finisherWindupMs,
+        demoLethal: kill.lethal.size > 0,
+        demoChargeScheduled: demoClose,
         after: (ms, fn) => scope().after(ms, fn),
         reveal,
         revealSegment,
@@ -36946,14 +36982,7 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       const kills = result && result.ok ? executionKills(result) : [];
       if (!kills.length) return Promise.resolve(true);
       const demoCfg = typeof window !== "undefined" ? window.__HIT_DEMO_CFG__ : null;
-      if (demoCfg && demoCfg.mode !== "A") {
-        const b = battleOf();
-        const hasElite = kills.some((id) => {
-          const u = b?.getEffectiveUnit(id);
-          return u && (u.level === "\u7CBE\u82F1" || u.level === "\u9996\u9886");
-        });
-        if (!hasElite || !demoCfg.eliteExec) return Promise.resolve(true);
-      }
+      if (demoCfg && demoCfg.mode !== "A" && !demoCfg.execFlow) return Promise.resolve(true);
       const hero = portraitOf(result.casterId), skill = result.skill || {};
       return serialMoment(() => untilScope(av.playExecutionAnimation(hero, kills.map(portraitOf).filter(Boolean), skill.damageType || "\u8FD1\u6218")));
     }
@@ -43023,8 +43052,8 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
   var cfg = window.__HIT_DEMO_CFG__ = {
     mode: "B",
     // 'A' 现行版 | 'B' 八方均衡版 | 'C' 八方重击版
-    eliteExec: false
-    // 精英/首领击杀后是否接续旧版全屏处决
+    execFlow: true
+    // 攻击击杀特写结束后自然衔接原版击杀结算特写
   };
   function cloneVisualOnly(medalEl) {
     const face = medalEl.querySelector(".t-unit-avatar") || medalEl.querySelector(".t-unit-emoji");
@@ -43034,7 +43063,78 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
     clone.style.cssText = "position:absolute;inset:0;width:100%;height:100%;border-radius:50%;overflow:hidden;pointer-events:none;border:none;box-shadow:none;";
     return clone;
   }
+  var SPLAT_PATHS2 = [
+    "M20,10 C35,2 50,15 45,30 C55,40 60,60 45,70 C30,80 15,65 10,50 C5,35 10,18 20,10 Z",
+    "M30,5 C45,5 55,20 50,35 C65,30 75,45 70,60 C55,75 40,70 30,80 C15,75 10,55 15,40 C5,25 20,10 30,5 Z",
+    "M15,20 C30,10 50,10 40,30 C55,35 60,55 45,65 C35,75 20,80 15,60 C5,45 5,30 15,20 Z",
+    "M25,12 C40,4 55,18 48,32 C60,42 62,65 48,72 C32,82 18,68 12,52 C8,38 12,20 25,12 Z"
+  ];
+  var RANGED_SPLAT_POS2 = [
+    { top: "16%", left: "18%", size: 150, rot: -25, delay: 40 },
+    { top: "65%", left: "22%", size: 150, rot: 45, delay: 80 },
+    { top: "20%", right: "16%", size: 150, rot: 15, delay: 60 },
+    { top: "60%", right: "18%", size: 150, rot: -55, delay: 95 },
+    { top: "38%", left: "46%", size: 150, rot: 8, delay: 15 }
+  ];
+  var RANGED_SPLAT_DRIPS2 = [["right:25%", 6, 140, 90, 1050], ["left:22%", 8, 180, 60, 1100]];
+  function playScreenBlood(fx, ms = 1150) {
+    const pos = (s) => (s.top ? "top:" + s.top + ";" : "") + (s.bottom ? "bottom:" + s.bottom + ";" : "") + (s.left ? "left:" + s.left + ";" : "") + (s.right ? "right:" + s.right + ";" : "");
+    const splats = RANGED_SPLAT_POS2.map((s, i) => {
+      const d = SPLAT_PATHS2[i % SPLAT_PATHS2.length];
+      return '<div data-splat style="position:absolute;' + pos(s) + "width:" + s.size + "px;height:" + s.size + 'px;opacity:0;filter:drop-shadow(0 0 8px #7f1d1d);"><svg viewBox="0 0 100 100" width="100%" height="100%"><path d="' + d + '" fill="#7f1d1d"/><path d="' + d + '" fill="#991b1b" transform="translate(8,8) scale(.85)" opacity=".9"/><circle cx="85" cy="18" r="4.5" fill="#991b1b"/><circle cx="15" cy="85" r="3.5" fill="#7f1d1d"/><circle cx="92" cy="72" r="5" fill="#881337"/><circle cx="6" cy="16" r="3" fill="#991b1b"/><circle cx="70" cy="92" r="2.5" fill="#dc2626"/><circle cx="35" cy="28" r="1.8" fill="#fff" opacity=".6"/><circle cx="58" cy="45" r="1.5" fill="#fff" opacity=".5"/></svg></div>';
+    }).join("");
+    const drips = RANGED_SPLAT_DRIPS2.map(([x, w, h]) => '<i data-drip style="position:absolute;top:0;' + x + ";width:" + w + "px;height:" + h + "px;border-radius:" + w + 'px;transform-origin:50% 0;opacity:0;background:linear-gradient(#b91c1c,#7f1d1d 55%,transparent);filter:drop-shadow(0 0 6px #450a0a);"></i>').join("");
+    const root = fx.screen('<i data-vig style="position:absolute;inset:0;opacity:0;background:radial-gradient(circle,transparent 32%,rgba(136,8,8,.45) 70%,rgba(65,8,8,.95) 100%);"></i>' + splats + drips, ms);
+    root.style.overflow = "hidden";
+    root.querySelector("[data-vig]").animate(
+      [{ opacity: 0, transform: "scale(.94)" }, { opacity: 1, transform: "scale(1)", offset: 0.14 }, { opacity: 0.88, transform: "scale(1.02)", offset: 0.78 }, { opacity: 0, transform: "scale(1.05)" }],
+      { duration: ms, easing: "cubic-bezier(0.1,0.8,0.2,1)", fill: "forwards" }
+    );
+    root.querySelectorAll("[data-splat]").forEach((el, i) => {
+      const s = RANGED_SPLAT_POS2[i], rr = " rotate(" + s.rot + "deg)";
+      el.animate(
+        [
+          { transform: "scale(.12)" + rr, opacity: 0 },
+          { transform: "scale(1.12)" + rr, opacity: 1, offset: 0.22 },
+          { transform: "scale(1)" + rr, opacity: 0.96, offset: 0.38 },
+          { transform: "translateY(4px) scale(1.01)" + rr, opacity: 0.85, offset: 0.72 },
+          { transform: "translateY(12px) scale(1.04)" + rr, opacity: 0 }
+        ],
+        { duration: Math.max(400, ms - s.delay), delay: s.delay, easing: "cubic-bezier(0.12,0.85,0.25,1)", fill: "both" }
+      );
+    });
+    root.querySelectorAll("[data-drip]").forEach((el, i) => {
+      const [, , , delay, dms] = RANGED_SPLAT_DRIPS2[i];
+      el.animate(
+        [{ transform: "scaleY(0)", opacity: 0 }, { transform: "scaleY(1)", opacity: 0.9, offset: 0.35 }, { transform: "scaleY(1.25)", opacity: 0 }],
+        { duration: Math.min(dms, ms - delay), delay, easing: "ease-out", fill: "both" }
+      );
+    });
+  }
   window.__HIT_DEMO_FX__ = {
+    playKillCharge(fx, from, ms) {
+      const c = worldPx2(from);
+      const sparks = Array.from({ length: 12 }, (_, i) => {
+        const a = i * 2.39996, d = 60 + i % 3 * 16;
+        return { x: Math.cos(a) * d, y: Math.sin(a) * d * 0.64 };
+      });
+      const root = fx.top(`<div data-hit-demo-cue="kill-charge" style="position:absolute;left:${c.x}px;top:${c.y}px;"><i style="position:absolute;left:-48px;top:-48px;width:96px;height:96px;background:radial-gradient(circle,#fff1c879 0%,#eaa64a4d 24%,#dd863823 49%,transparent 71%);mix-blend-mode:screen;"></i>` + sparks.map(() => '<i style="position:absolute;left:-8px;top:-8px;width:16px;height:16px;background:radial-gradient(ellipse,#fff5d9 0%,#efbb63a8 32%,transparent 73%);mix-blend-mode:screen;"></i>').join("") + "</div>", ms);
+      const [core, ...particles2] = root.firstChild.children;
+      core.animate([
+        { transform: "scale(.45)", opacity: 0 },
+        { transform: "scale(1.12)", opacity: 0.65, offset: 0.44 },
+        { transform: "scale(.52)", opacity: 1, offset: 0.83 },
+        { transform: "scale(.22)", opacity: 0 }
+      ], { duration: ms, fill: "both" });
+      particles2.forEach((el, i) => {
+        const { x, y } = sparks[i], delay = i % 4 * 16;
+        el.animate([
+          { transform: `translate(${x}px,${y}px) scale(.5)`, opacity: 0 },
+          { transform: `translate(${x * 0.8}px,${y * 0.8}px) scale(.88)`, opacity: 0.95, offset: 0.28 },
+          { transform: "translate(0,0) scale(.18)", opacity: 0 }
+        ], { duration: ms - delay, delay, easing: "cubic-bezier(.48,.05,.83,.38)", fill: "both" });
+      });
+    },
     // 普通命中基座（B/C 模式）：高频颤动 + 瞬时白闪剪影 + 锐利细冲击圆环 + 方向火星
     onImpactHit(directorCtx, { casterId, targetId, dirX, dirY, isLethal }) {
       if (cfg.mode === "A") return;
@@ -43048,9 +43148,9 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       const ux = dirX || 1, uy = dirY || 0;
       const flashDur = heavy ? 110 : 85;
       rec.medal.animate([
-        { filter: "brightness(3.8) contrast(1.8) saturate(0)", transform: "translate(-50%,-50%) scale(1.12)" },
-        { filter: "brightness(2.2) contrast(1.3)", transform: "translate(-50%,-50%) scale(1.04)", offset: 0.45 },
-        { filter: "none", transform: "translate(-50%,-50%) scale(1)" }
+        { transform: "translate(-50%,-50%) scale(1.1)" },
+        { transform: "translate(-50%,-50%) scale(1.03)", offset: 0.45 },
+        { transform: "translate(-50%,-50%) scale(1)" }
       ], { duration: flashDur + 90, easing: "ease-out" });
       const vibDur = heavy ? 190 : 150;
       const amp = heavy ? 7.5 : 5.2;
@@ -43103,18 +43203,19 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
           { poly: "0 54%, 100% 48%, 100% 100%, 0 100%", sx: ux * 10 - nx * 5, sy: uy * 10 - ny * 5, rot: -10 }
         ].forEach((h) => {
           const w = document.createElement("div");
-          w.style.cssText = `position:absolute;inset:0;clip-path:polygon(${h.poly});filter:brightness(3.2) contrast(1.6) saturate(0.15);`;
+          w.style.cssText = `position:absolute;inset:0;clip-path:polygon(${h.poly});filter:drop-shadow(0 0 4px rgba(127,29,29,0.85));`;
           w.appendChild(faceNode.cloneNode(true));
           splitHost.appendChild(w);
           w.animate([
-            { transform: "translate(0,0) scale(1.12)", opacity: 1, filter: "brightness(3.6) saturate(0)" },
-            { transform: `translate(${h.sx.toFixed(1)}px,${h.sy.toFixed(1)}px) rotate(${h.rot}deg) scale(0.85)`, opacity: 0, filter: "brightness(0.4) blur(2px)" }
+            { transform: "translate(0,0) scale(1.06)", opacity: 1, filter: "contrast(1.15) drop-shadow(0 0 4px rgba(153,27,27,0.9))" },
+            { transform: `translate(${h.sx.toFixed(1)}px,${h.sy.toFixed(1)}px) rotate(${h.rot}deg) scale(0.85)`, opacity: 0, filter: "brightness(0.45) blur(1.5px)" }
           ], { duration: splitMs, easing: "cubic-bezier(0.15, 0.9, 0.3, 1)", fill: "forwards" });
         });
       }
+      playScreenBlood(fx, heavy ? 1150 : 980);
       const slashAng = ang * 180 / Math.PI + 24;
       const tear = fx.top(
-        `<div style="position:absolute;left:${p.x}px;top:${p.y}px;width:${d * 3.4}px;height:4px;transform:translate(-50%,-50%) rotate(${slashAng.toFixed(1)}deg);background:linear-gradient(90deg,transparent,#dc2626 20%,#ffffff 50%,#dc2626 80%,transparent);mix-blend-mode:screen;filter:drop-shadow(0 0 8px #7f1d1d);"></div>`,
+        `<div style="position:absolute;left:${p.x}px;top:${p.y}px;width:${d * 3.4}px;height:4px;transform:translate(-50%,-50%) rotate(${slashAng.toFixed(1)}deg);background:linear-gradient(90deg,transparent,#7f1d1d 20%,#dc2626 50%,#7f1d1d 80%,transparent);filter:drop-shadow(0 0 6px #450a0a);"></div>`,
         260
       ).firstChild;
       tear.animate([
@@ -43231,7 +43332,6 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       if (!await ctx.wait(1200)) return false;
       ctx.atmos?.burst();
       fx.sfx("slash_whoosh_hit_fs434873", 0.85);
-      fx.sfx("mx_deep_impact", 0.65);
       fx.shake("quake");
       const beam = fx.top(
         `<div style="position:absolute;left:${t.x}px;top:${t.y}px;width:540px;height:28px;transform:translate(-50%,-50%) rotate(${ang.toFixed(1)}deg);background:linear-gradient(90deg,transparent 0%,#c084fc 20%,#ffffff 50%,#fde047 80%,transparent 100%);mix-blend-mode:screen;filter:drop-shadow(0 0 18px #f59e0b);"></div>`,
@@ -43273,7 +43373,7 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
     '<button data-mode="B" class="active">B \u516B\u65B9\u5747\u8861\u7248</button>',
     '<button data-mode="C">C \u516B\u65B9\u91CD\u51FB\u7248</button>',
     '<span class="sep"></span>',
-    '<button id="hd-exec">\u7CBE\u82F1\u5168\u5C4F\u5904\u51B3: \u5173</button>',
+    '<button id="hd-exec">\u51FB\u6740\u7ED3\u7B97\u7279\u5199: \u5F00</button>',
     '<span class="sep"></span>',
     '<button data-preset="normal">\u666E\u653B\u547D\u4E2D</button>',
     '<button data-preset="fodder">\u51FB\u6740\u6742\u5175</button>',
@@ -43286,8 +43386,8 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
   function syncBar() {
     bar.querySelectorAll("[data-mode]").forEach((b) => b.classList.toggle("active", b.dataset.mode === cfg.mode));
     const ex = document.getElementById("hd-exec");
-    ex.textContent = "\u7CBE\u82F1\u5168\u5C4F\u5904\u51B3: " + (cfg.eliteExec ? "\u5F00" : "\u5173");
-    ex.classList.toggle("active", cfg.eliteExec);
+    ex.textContent = "\u51FB\u6740\u7ED3\u7B97\u7279\u5199: " + (cfg.execFlow ? "\u5F00" : "\u5173");
+    ex.classList.toggle("active", cfg.execFlow);
   }
   function resetRange() {
     app.restart();
@@ -43327,7 +43427,7 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       cfg.mode = btn.dataset.mode;
       syncBar();
     } else if (btn.id === "hd-exec") {
-      cfg.eliteExec = !cfg.eliteExec;
+      cfg.execFlow = !cfg.execFlow;
       syncBar();
     } else if (btn.id === "hd-reset") {
       resetRange();
