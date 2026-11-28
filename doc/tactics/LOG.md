@@ -1109,3 +1109,13 @@
 - 文件：`tactics/src/{main,battle,bgm-director}.mjs`、`tactics/src/vendor/rpg-av/rpg-av.mjs`、抽取器和产物断言、`integration-test/fixtures/tactics/{bgm-director,hit-feedback,rules02}-node-cases.mjs`、`tactics/mvp-standalone.html`。
 - 验证：唯一一次源码全量 1618 项通过；真规则和导演探针三名角色各吸盾 40，命中回调第三人触发。新单文件 68 模块，SHA256 `2599d2fa…`，单脚本/零外部导入/入包校验通过，成品配乐 16/16。IAB 加载成品，但走位和结束回合未确认结算；雷电未在线，未进酒馆实听。
 - 目的 vs 现状：规则、音效调度及成品断言已验证，真实交互和听感不标为通过。
+
+## 2026-11-28 · TP Boost 交互、叠加规则与原版音画完整移植（e1abbba）
+- 核心目的：把 `tactics/demo-tp-boost.html` 的当前头像 TP 投入、火焰蔓延与八方旅人 II 原版 Boost 音效移进主战棋，预览与实际结算同源；独立 demo 不改。
+- 行为：新增 `boost.mjs` 纯函数与本次技能快照；当前角色栏左键 0→1→2→3→0、右键归零、换人/回合归零，LV1/LV2/MAX 头像角标与白色总 TP 费用预览，瞄准/锁定期间换档实时重算范围与伤害。
+- 规则：按逐级累计，通用威力 10%/25%/50%、Aim 20/40/70；延迟/减益的专属各档收益替代通用保底，延迟总缩减 0/1/3、减益延时 1 回合和 MAX 驱散 1 个增益；空间、位移独立累计，单体 MAX 十字 50% 溅射。开始支付基础 TP+20×档位，读条冻结 Boost、就绪释放零重复费用；首次技能开始后锁档，MAX 多段/多杀每技能只返还 1 个万能行动点。
+- 音画：八边形升档波纹、45°~55°焰流、spreadNow 铭牌 1/3、2/3、全栏闭合与 MAX 白金焰，释放圆形冲击波/全卡火星雨；文字保护上下留边。8 个原版 WAV 转 OGG 放入 `D:/Project/my_assets`，同时备份 `tactics/assets/boost/` 并内嵌单文件；音效接既有混音器，分档瞬时音+柔和无缝气场循环，取消/施放/清场停止循环，异步解码不重入。
+- 文件：`tactics/src/{boost,battle,clock,scheduler,damage,effect-handlers,range,range-overlay,main,ui-shell,hero-flame-fx,ui-sfx,av-host,action-director}.mjs`、`tactics/tactics.css`、Boost 音效备份、构建/测试入口与 `verify-boost-artifact.cjs`、`integration-test/fixtures/tactics/boost-node-cases.mjs`、`reports/BOOST-live-artifact.json`、`tactics/mvp-standalone.html`。README/SPEC 不改；本轮外的未提交文件保留。
+- 验证：唯一一次源码全量 1639 项通过；真页面随后抓到火焰遮罩 sc 越作用域，已修为遮罩自身比例并补真实帧执行回归，最终定向 23/23（含循环音异步取消/清场）。新包 70 模块、51 输入/133 符号与 8 原音入包、单脚本/零外部业务 import 通过，产物真规则 Boost 验证及阶段 4 的 11/11 通过；修复后未重复全量。最终产物 SHA256 `d71e5c623044679fc435bb79c05d237b1b852270601872f6bea54f6c668070a7`。
+- 真页：用户授权排障模式并手动关闭占用测试 Chrome 的窗口；在原典型对局中自然防御积累 TP 验证 1→2→3→0、右键取消、费用条、MAX 白金焰、锁定时 AOE 半径 4→5；MAX 寂静指令 TP60→5、LV1 无迹可寻 TP25→10，施放后归零锁档且恢复操作，8 原音解码全部 ok。最终归一化威力版重新加载并复验 LV1 释放；无 JavaScript 错误，仅既有 favicon.ico 404。IAB 初轮未交还控制，不报告其交互通过；未操作酒馆/真机，主观听感留用户确认。
+- 目的 vs 现状：Boost 入口、同源规则、原版采样和当前源码单文件均已落地，定向/产物/真 Chrome 门禁通过；视觉风格和主观听感仍由用户最终验收，不擅自更新 README。
