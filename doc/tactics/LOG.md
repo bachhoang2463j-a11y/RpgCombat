@@ -1139,3 +1139,10 @@
 - 文件：`tactics/src/fx-library.mjs`、`tactics/mvp-standalone.html`。
 - 验证：`node tactics/tools/run-tests.cjs --stage=fx01` 3 组 51 项全绿；`node tactics/tools/build-demo-html.cjs` 重打包 70 模块/51 断言/133 符号，SHA256 `c8316b327b33d72f0d67f2ed86575be6dfabf00c8e739f052b7dd5bff3c9b027`；内置浏览器实页触发索恩「生体流转」验证扣血 30、获得万能行动点、播放 `heart.mp4` 与轻量粒子及浮字，控制台无报错，标签页保留供用户预览。
 
+## 2026-11-28 · 精英击杀反击、即时配乐与 Boost 双倍音量（8d3b04d）
+- 核心目的：只实现用户原始切歌要求，不做节拍标定；反击仅精英／首领实际死亡触发，条件满足的显示拍点立即平滑交接，Boost 两路音量直接翻倍。
+- 行为：移除普通升温的回合横幅等待；显示帧补等级且不提前读取尚未揭示的死亡，按同次施放去重交火计数并保留全队重创的施放前基线。中档阈值、只升不降、充能威胁与终局优先不变。一次性 Boost 0.42→0.84、循环 0.22→0.44，其他音轨不动。
+- 文件：`tactics/src/{bgm-director,main,ui-sfx}.mjs`、配乐/Boost 定向夹具、`tactics/tools/verify-fx-polish-artifact.cjs`、重打 `tactics/mvp-standalone.html`。
+- 验证：唯一源码全量 1643 项通过，成品配乐 17/17 和双倍增益/无回合等待专项通过，70 模块成品 SHA256 `a55dec5d…`。IAB 普通定位点击超时，实际音乐按钮事件打开低档自动面板，成品正式 endTurn 入口从玛德琳推进至斥候。未实听、未进酒馆；不修改 README。
+- 目的 vs 现状：三项要求已落实并打包，试听反馈由用户确认。
+
