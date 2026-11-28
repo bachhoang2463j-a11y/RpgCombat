@@ -1016,3 +1016,12 @@
 - 验证：v-polish 32 项通过；重建单文件，8 项产物断言通过；真页 6 名敌人无角标，分级正确，悬停食尸鬼检视面板仍列出「复活 / 流体」。未跑全量（只改表现层，未动规则）。
 - 已知：检视面板「变种特质」不列死亡触发技能带来的自爆（既有行为，本轮未改）。
 - 目的 vs 现状：一致；替代展示方案待用户选定。
+
+## 2026-11-28 · 威胁区调整、自爆检视补全与视听强化阶段 D（b97ce18）
+- 核心目的：解决威胁区偏浓与显式选招/锁定时悬停叠加；补全食尸鬼等死亡触发自爆在检视面板的展示；完成视听强化阶段 D（复活/蜕皮/狂暴/连动转折、再生/吸血/荆棘反馈、眩晕跳过、增减益自然到期、护盾破碎）；不改动核心战斗数值结算。
+- 备份 Demo 核查：`demo-variant-resist.html`（7 项抗性/免疫）战棋已完整接入；`demo-variant-triggers.html`（7 项变体触发）原仅半截落地（`av-host` 缺 9 个采样键，`battle` 缺 `link/regen/leech/thorn` 事件且缺中文飘字与复活血条分段节奏）。
+- 威胁区与检视面板：`range-overlay.mjs` `TH` 与 `threatHeat` 整体透明度减半（偏淡 50%）；`main.mjs` `updateThreat` 在 `aim/pending/fieldAction/retargetPrompt/teleportPrompt` 激活时隐藏单个悬停威胁区（`T` 键全体合集与自由模式保留）；`status-ui.mjs` `inspectorHtml` 同步扫描 `skills` 中的 `isDeathTrigger && deathTag` 并规范去重，食尸鬼检视面板显示 `💥 自爆·群火`。
+- 阶段 D：`av-host.mjs` `DEMO_AUDIO_KEYS` 补全 9 个变体音频键并透传 `sourceEntity`/`targetEntity`/`onBeat`；`battle.mjs` 补齐 `link`、`regen`、`leech`、`thorn`、`stun-skipped` 事件及 `status-removed` `reason`（`expired`/`dispelled`/`consumed`/`replaced`）、自爆护盾快照与反击/自爆/荆棘致死 `activeSegment` 隔离；`action-director.mjs` 与 `main.mjs` 落地复活归零→750ms绽放、蜕皮掉血→320ms甩 debuff 回血、变体与全类型自然到期飘字、眩晕跳过聚焦 500ms 微颤+音效、自爆/碰撞/致命回避破盾反馈及 `unit-view.mjs` `.t-unit-shield-breaking` 保护。
+- 文件：`tactics/src/{battle,av-host,action-director,main,range-overlay,sandbox,status-ui,ui-sfx,unit-view}.mjs`、`tactics/tactics.css`、`tactics/tools/run-tests.cjs`、`integration-test/fixtures/tactics/av-polish-node-cases.mjs`、`tactics/mvp-standalone.html`。
+- 验证：源码唯一全量回归 **57 阶段 1576 项**通过；只读子代理审查后修复 3 项 P1/2 项 P2，复跑 `av-polish`（39/39）、`counter-av`（12/12）、`status-variant`（19/19）通过；重建单文件（67 模块，2,132,936 字节，sha256 `80686170...`），`verify-typical-artifact.cjs`（63/63）与 `verify-fx-polish-artifact.cjs`（36 项）通过；内置浏览器实机打开 `127.0.0.1:8123/tactics/mvp-standalone.html` 验证食尸鬼 `💥 自爆·群火`、选招隐藏单个威胁区、`T` 键淡化热力图、玛德琳移动扣费及全程 0 JS 报错（仅外部音效服 `192.168.110.83:8766` 未连）。
+- 目的 vs 现状：阶段 D 与本轮交互/视觉目标全部达成。
