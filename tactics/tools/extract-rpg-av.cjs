@@ -541,7 +541,10 @@ ${supportBranches.join('\n').replace('else if', 'if')}
   mod = patch(mod, /window\.(playSound|playRandomStandardGunshot|playShotgunSound|AudioContext|webkitAudioContext)\b/g,
     (m, n) => (n.endsWith('AudioContext') ? m : n), 14, 'window.* 声音函数改为工厂内本地');
   // 同一接触可同时破防和掉血；敌方同波只合并同一音档，不推迟或覆盖其他结果。
-  mod = patch(mod, 'hpDmg, shieldDmg, shieldBroken, crit:', 'hpDmg, shieldDmg, shieldBroken, guardBroken:!!r.guardBroken, crit:', 1, '受击分类透传免伤破防');
+  mod = patch(mod, '        const shieldBroken = shieldDmg > 0', `        const shieldRatio = r.maxHp > 0 ? shieldDmg / r.maxHp : 0;
+        const shieldTier = shieldRatio < 0.10 ? 1 : shieldRatio < 0.50 ? 2 : 3;
+        const shieldBroken = shieldDmg > 0`, 1, '按实际吸盾量计算招架档位');
+  mod = patch(mod, 'hpDmg, shieldDmg, shieldBroken, crit:', 'hpDmg, shieldDmg, shieldTier, shieldBroken, guardBroken:!!r.guardBroken, crit:', 1, '受击分类透传护盾档位与免伤破防');
   mod = patch(mod, /^    function impactAudioScore\(hit\) \{[\s\S]*?^    \}\n\n/gm, '', 1, '去掉波次全类择强');
   mod = patch(mod, /^    function publishImpactAudio\(result\) \{[\s\S]*?^    \}/gm, `    function publishImpactAudio(result) {
         if (_pipelineFrozen || impactAudioEvents.has(result.eventId)) return;
@@ -573,7 +576,8 @@ ${supportBranches.join('\n').replace('else if', 'if')}
             return;
         }
         const defense = h.shieldBroken || h.guardBroken ? 'parry_3'
-            : h.kind === 'block' ? 'parry_' + h.blockTier : h.kind === 'shield' ? 'parryShield' : null;
+            : h.kind === 'block' ? 'parry_' + h.blockTier
+            : h.kind === 'shield' ? (h.isHero ? 'parry_' + h.shieldTier : 'parryShield') : null;
         if (defense && take(defense)) playSound(defense, defense === 'parry_3' ? 0.95 : defense === 'parryShield' ? 0.55 : 0.85, 1,
             { ...opts, category:'G' });
         if (h.kind !== 'hp') return;

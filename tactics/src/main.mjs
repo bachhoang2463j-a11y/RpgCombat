@@ -37,7 +37,7 @@ import { resolveLore } from './lore.mjs';
 import { getEffectiveStats } from './class-passives.mjs';
 import { hitChance } from './damage.mjs';
 import { skillSlots } from './effect-definitions.mjs';
-import { createBgmDirector } from './bgm-director.mjs';
+import { createBgmDirector, createChargeThreatTracker } from './bgm-director.mjs';
 import { SPEED_STEPS, setTimeScale, getTimeScale } from './time-scale.mjs';
 // C1 特效推断：LLM 漏写/写错 [特效:名] 时按白名单补全（只改 fxTag，标记 fxTagInferred）；显式合法与「无」不动。
 export function inferUnitFx(units, legal = new Set(getFxTagOptions().map(o => o.name))) {
@@ -305,15 +305,16 @@ export function createApp(rootEl, opts = {}) {
     });
   }
   let liveBgmBefore = null;
+  const chargeThreatByCast = new WeakMap();
   function settleBgm(before, snap = battle.snapshot(), opts) {
     bgm.syncBattle(bgmFrame(snap), ++settlementSeq, before, opts);
   }
-  function settleLiveBgm() {
+  function settleLiveBgm(chargeThreat = false) {
     if (!liveBgmBefore) return;
     const after = liveBgmFrame();
     const prior = new Map(liveBgmBefore.units.map(u => [u.id, u]));
-    if (!after.units.some(u => { const p = prior.get(u.id); return p && !u.isSummon && (p.hp !== u.hp || p.shield !== u.shield || p.status !== u.status); })) return;
-    bgm.syncBattle(after, ++settlementSeq, liveBgmBefore, { deferMedium: true });
+    if (!chargeThreat && !after.units.some(u => { const p = prior.get(u.id); return p && !u.isSummon && (p.hp !== u.hp || p.shield !== u.shield || p.status !== u.status); })) return;
+    bgm.syncBattle(after, ++settlementSeq, liveBgmBefore, { deferMedium: true, chargeThreat });
     liveBgmBefore = after;
   }
   function endActionWithBgm() {
@@ -1927,6 +1928,8 @@ export function createApp(rootEl, opts = {}) {
     director.holdGuards(res);
     shell.showLog(unitName(res.casterId) + ' · ' + (res.skill || res.item).name, 'act');
     const caster = unitById(res.casterId);
+    const trackChargeThreat = createChargeThreatTracker(caster, res.skill);
+    if (trackChargeThreat) chargeThreatByCast.set(res, trackChargeThreat);
     if (caster) {
       const s = shownOf(caster), gains = { mp: 0, tp: 0 };
       for (const e of res.effects || []) if (e.targetId === caster.id) {
@@ -2037,8 +2040,9 @@ export function createApp(rootEl, opts = {}) {
       downTag(u.id, killer && killer.id !== u.id ? '☠ ' + killer.name + (res.skill?.name ? '【' + res.skill.name + '】' : '') + ' 击倒' : '☠ 倒下');
     }
     if (hit.down && !meta?.finisher) playDown(u);
+    const chargeThreat = chargeThreatByCast.get(meta?.result)?.(hit, u);
     const maxHp = u.bars.maxHp || u.ref?.maxHp || 1;
-    if (hit.down || (u.side === 'hero' && hit.hit && (hit.hpAfter <= maxHp * 0.55 || (prev.hp - hit.hpAfter) >= maxHp * 0.30))) settleLiveBgm();
+    if (chargeThreat || hit.down || (u.side === 'hero' && hit.hit && (hit.hpAfter <= maxHp * 0.55 || (prev.hp - hit.hpAfter) >= maxHp * 0.30))) settleLiveBgm(chargeThreat);
   }
   function playDown(u) {
     const view = sandbox.getUnitView(), scope = sandbox.getScope();

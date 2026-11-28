@@ -1703,7 +1703,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         const rec = buffsOf(responder.id).find(b => b.type === 'eva' && b.isConsumable && b._source?.skillId === key);
         if (rec) removeBuffRecord(responder.id, rec);
       }
-      if (dodged) addLog(responder.name + ' 反应闪避成功');
+      if (dodged) {
+        responder.ref.tp = Math.min(responder.ref.maxTp || 100, (responder.ref.tp || 0) + 5);
+        addLog(responder.name + ' 反应闪避成功');
+      }
       return { ok: true, canceled: false, dodged, crit: rCrit.crit, reactionUsed };
     }
     // 反击槽反应：立即反击（威力=槽 power 加成）
@@ -2412,13 +2415,18 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
   const adjustedRaw = (raw, tactics) => tactics.damageMultiplier === 1 ? raw : Math.floor(raw * tactics.damageMultiplier);
 
-  function segmentDamage(caster, target, slot, skill, incomingType, isAoE, pierce, roll, multiplier, concealAtk, tactics) {
+  function segmentRawDamage(caster, target, slot, skill, roll, multiplier, concealAtk, tactics) {
     const passive = CLASS_PASSIVES[caster.classType];
     const cStats = statsOf(caster, concealAtk);
-    const raw0 = adjustedRaw(computeSegmentRawDamage(cStats, caster.ref.atk, slot.power, multiplier, roll, {
+    return adjustedRaw(computeSegmentRawDamage(cStats, caster.ref.atk, slot.power, multiplier, roll, {
       modifyDamageMultiplier: args => passive?.modifyDamageMultiplier?.(args.caster, args.target, buffsOf(args.target.id), cStats, statsOf(args.target)) || 0,
       modifyDamageDealt: args => passive?.modifyDamageDealt?.(args.caster, args.skill, cStats) || 0,
     }, { caster, target, skill }), tactics);
+  }
+
+  function segmentDamage(caster, target, slot, skill, incomingType, isAoE, pierce, roll, multiplier, concealAtk, tactics) {
+    const passive = CLASS_PASSIVES[caster.classType];
+    const raw0 = segmentRawDamage(caster, target, slot, skill, roll, multiplier, concealAtk, tactics);
     const resistance = {};
     const raw = applyTypeResist(raw0, incomingType, isAoE, target, buffsOf(target.id), resistance);
     const guards = buffsOf(target.id).filter(b => b.type === 'damageGuard' && (b.attackId === currentAttackId() || b.attackId == null));
@@ -2479,6 +2487,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       contactPoint: unitCenter(placementsById[target.id], target.footprint), targetId: target.id, logIndex: logStart,
       side: target.side, maxHp: target.ref.maxHp, damageType: incomingType, damageCategory: slot.definition.damageCategory || null,
       isCrit: skillMultiplier > 1, isPierce: pierce };
+    const dodgeRaw = (dodgeTarget, dodgeTactics = tactics) => segmentRawDamage(caster, dodgeTarget, slot, skill, roll, skillMultiplier, bdg.concealAtk, dodgeTactics);
     if (!options.skipSpatialRecheck && skill.range.type === '单体') {
       const aim = { ...unitCenter(placementsById[target.id], target.footprint), targetId: target.id };
       const check = queryAttack(ctx, caster.id, skill, aim);
@@ -2508,9 +2517,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       addLog(caster.name + ' · ' + skill.name + ' → ' + target.name + ' 闪避');
       // 命中结论账本：已判定即 resolved（miss 不覆写此前 targetHit=true，多段至少一次命中共享）
       if (!bdg.targetResolved[target.id]) { bdg.targetResolved[target.id] = true; bdg.targetHit[target.id] = false; }
+      const rawDmg = dodgeRaw(target);
       if (target.side === 'hero') target.ref.tp = Math.min(target.ref.maxTp || 100, (target.ref.tp || 0) + 5);
       resolveDodgeCounter(target, caster, incomingType);
-      return Object.assign(segBase, { hit: false, outcome: 'dodge', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: target.ref.hp <= 0, logEnd: log.length });
+      return Object.assign(segBase, { hit: false, outcome: 'dodge', rawDmg, hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: target.ref.hp <= 0, logEnd: log.length });
     }
     // 确认将命中 → 反应拦截（只对该发；选择由调用方 next() 给出或 policy 自动）
     const lethalDamage = !isAoE && units.some(u => u.isSummon && u.summonOwnerId === target.id && u.ref.hp > 0)
@@ -2525,9 +2535,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       return Object.assign(segBase, { hit: false, outcome: 'prevented', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reaction, logEnd: log.length });
     }
     if (reaction?.dodged) {
+      const rawDmg = dodgeRaw(target);
       resolveDodgeCounter(target, caster, incomingType);
       if (!bdg.targetResolved[target.id]) { bdg.targetResolved[target.id] = true; bdg.targetHit[target.id] = false; }
-      return Object.assign(segBase, { hit: false, outcome: 'dodge', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reaction, logEnd: log.length });
+      return Object.assign(segBase, { hit: false, outcome: 'dodge', rawDmg, hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reaction, logEnd: log.length });
     }
     if (reaction?.guardianId) {
       bdg.targetResolved[target.id] = true; bdg.targetHit[target.id] = false;
@@ -2540,8 +2551,9 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       if (segmentRun !== runId) return null;
       if (guardReaction?.canceled || (!isAoE && caster.ref.hp <= 0)) canceled.value = true;
       if (canceled.value || guardReaction?.dodged) {
+        const dodge = !canceled.value ? { rawDmg: dodgeRaw(target, tacticalModifiers(caster, target, skill)) } : {};
         if (guardReaction?.dodged) resolveDodgeCounter(target, caster, incomingType);
-        return Object.assign(segBase, { hit: false, outcome: canceled.value ? 'prevented' : 'dodge', hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reaction, guardianReaction: guardReaction, logEnd: log.length });
+        return Object.assign(segBase, { hit: false, outcome: canceled.value ? 'prevented' : 'dodge', ...dodge, hpDmg: 0, hpBefore: target.ref.hp, hpAfter: target.ref.hp, down: false, reaction, guardianReaction: guardReaction, logEnd: log.length });
       }
       reaction.guardianReaction = guardReaction;
       tactics = tacticalModifiers(caster, target, skill);

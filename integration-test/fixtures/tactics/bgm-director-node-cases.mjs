@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { BGM_TRACKS, BGM_POOLS, COMEBACK_POOL, BGM_THEMES, DEFAULT_BGM_THEME } from '../../../tactics/src/bgm-library.mjs';
-import { createBattleMood, createBgmDirector } from '../../../tactics/src/bgm-director.mjs';
+import { createBattleMood, createBgmDirector, createChargeThreatTracker } from '../../../tactics/src/bgm-director.mjs';
 
 const unit = (id, side, hp, extra = {}) => ({ id, side, primary: side === 'hero', hp, maxHp: 100,
   shield: 0, isSummon: false, status: hp > 0 ? 'active' : side === 'hero' ? 'down' : 'dead', ...extra });
@@ -108,7 +108,7 @@ function audioHarness(Director, { ready = true, random = () => 0, initialTheme =
 }
 
 export async function runBgmCases({ tracks = BGM_TRACKS, pools = BGM_POOLS, comeback = COMEBACK_POOL,
-  themes = BGM_THEMES, Director = createBgmDirector, Mood = createBattleMood } = {}) {
+  themes = BGM_THEMES, Director = createBgmDirector, Mood = createBattleMood, ChargeThreat = createChargeThreatTracker } = {}) {
   const cases = [];
   const check = async (id, fn) => {
     try { await fn(); cases.push({ id, pass: true }); }
@@ -486,6 +486,35 @@ export async function runBgmCases({ tracks = BGM_TRACKS, pools = BGM_POOLS, come
     standby.releasePlay(); await flush();
     assert.equal(d.state().track.id, pools.high[0]);
     d.destroy();
+  });
+
+  await check('BGM-15 精英/首领同一次 Charge 真命中三人时，未掉血也立即升高档', async () => {
+    const cast = { charge: 2 };
+    const contact = { segmentId: 'hit-1', outcome: 'hit', hpDmg: 0, shieldDmg: 0, guardDmg: 30 };
+    const [a, b, c, d] = calm.units;
+    assert.equal(ChargeThreat({ side: 'enemy', level: '杂兵' }, cast), null);
+    assert.equal(ChargeThreat({ side: 'hero', level: '首领' }, cast), null);
+    assert.equal(ChargeThreat({ side: 'enemy', level: '精英' }, { delay: 2 }), null);
+    for (const level of ['精英', '首领']) {
+      const caster = { side: 'enemy', level }, tracker = ChargeThreat(caster, cast);
+      const h = audioHarness(Director), director = h.director;
+      director.startBattle(calm); await director.unlock(); await flush();
+      for (const [hit, target] of [[contact, a], [contact, a], [{ ...contact, shieldDmg: 50 }, b],
+        [{ ...contact, outcome: 'dodge' }, c], [{ ...contact, outcome: 'prevented' }, c], [contact, { ...d, isSummon: true }]]) {
+        assert.equal(tracker(hit, target), false);
+      }
+      assert.equal(ChargeThreat(caster, cast)(contact, c), false); // 另一次施放不承接前两人
+      assert.equal(director.state().level, 'low');
+      assert.equal(tracker(contact, c), true);
+      director.syncBattle(calm, 1, calm, { deferMedium: true, chargeThreat: true });
+      await flush();
+      assert.equal(director.state().level, 'high');
+      assert.ok(pools.high.includes(director.state().track.id)); // 无需行动横幅
+      assert.equal(tracker(contact, d), false);
+      director.syncBattle(calm, 2, calm);
+      assert.equal(director.state().level, 'high');
+      director.destroy();
+    }
   });
 
   return { cases };

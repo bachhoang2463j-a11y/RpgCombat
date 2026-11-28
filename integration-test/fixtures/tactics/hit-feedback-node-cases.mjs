@@ -116,6 +116,14 @@ export const groups = {
       const low = (track, cat, combat) => Math.min(...mixer.output(track, cat, combat).gain.values);
       cases.push(ok('THIT 出招和闪避／受伤／防御不相互压音，UI 优先级仍生效',
         low('skill', 'L', true) === 1 && ['F', 'G', 'H'].every(c => low('result', c, true) === 1) && low('aux', 'K', false) === 0.4));
+      const shieldWave = director.beginWave(['h', 'u']), from = played.length;
+      for (const shieldDmg of [9, 10, 49, 50]) director.publish(result(0, {
+        wave: shieldWave, targetId: 'h', isHero: true, shieldDmg, shieldBefore: 70, shieldAfter: 70 - shieldDmg, incomingDmg: 80,
+      }));
+      director.publish(result(0, { wave: shieldWave, targetId: 'u', isHero: true, outcome: 'dodge', incomingDmg: 50, suppressDodgeFx: true }));
+      const shieldAndDodge = clips().slice(from);
+      cases.push(ok('THIT 我方未破盾按实际吸收量分三档，50% 最高档并保留同波反应闪避声',
+        json(shieldAndDodge) === json(['parry_Weapon_1.wav', 'parry_Weapon_3.wav', 'parry_Weapon_3.wav', 'parry_Weapon_GuardBreak.wav', 'dodge_3.mp3']), json(shieldAndDodge)));
     } finally {
       av?.CombatAudioMixer.clear();
       Object.assign(globalThis, previous);

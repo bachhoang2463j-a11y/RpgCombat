@@ -206,6 +206,19 @@ export const groups = {
           j({ seg: seg0, mp: defender.ref.mp, at: b.ctx.placementsById.re })));
       }
     }
+    // 反应闪避的 TP 和本段原伤都走真实伤害结算；护甲不应让强攻击的闪避分档变轻。
+    for (const [evasion, tp, wantTp] of [[900, 20, 22], [900, 99, 100], [1, 20, 27]]) {
+      const attacker = unit('e', 'enemy', { spd: 200 });
+      const reaction = m.parser.parseSkill('【试闪】[单避;power:' + evasion + '][TP:3][反应:近战][范围:自身]');
+      const target = unit('h', 'hero', { tp, def: 40, skills: [reaction] });
+      const b = battle(m, [attacker, target], { e: { col: 3, row: 4 }, h: { col: 5, row: 4 } }, rng());
+      const attack = m.parser.parseSkill('【重击】[伤害;power:30][必中][暴击:100%][近战][范围:单体;射程:12]');
+      const r = b.attack(attack, aim(5, 4, 'h'), { policy: 'auto' });
+      const seg = r.hits?.[0]?.segments[0], dodged = evasion > 1;
+      cases.push(ok('TR2-C 反应闪避奖励、封顶与真实原伤 ' + evasion + '/' + tp,
+        r.ok && seg?.outcome === (dodged ? 'dodge' : 'hit') && seg?.rawDmg === 60 && !!seg?.reaction?.dodged === dodged
+          && target.ref.tp === wantTp && target.ref.hp === (dodged ? 100 : 80), j({ tp: target.ref.tp, seg })));
+    }
     // C2 看破：确认后整段技能无效化（canceled）
     {
       const kanpo = m.parser.parseSkill('【净蚀反冲】[看破:法术][MP:10][限3次][范围:单体;射程:12]');

@@ -25,6 +25,16 @@ function sustainedPressure(party, previous) {
   return 0;
 }
 
+export function createChargeThreatTracker(caster, skill) {
+  if (caster?.side !== 'enemy' || (caster.level !== '精英' && caster.level !== '首领') || !(skill?.charge > 0)) return null;
+  const targets = new Set();
+  return (hit, target) => {
+    if (targets.size >= 3 || !hit.segmentId || hit.outcome !== 'hit' || hit.heal || target.side !== 'hero' || target.isSummon) return false;
+    targets.add(target.id);
+    return targets.size === 3;
+  };
+}
+
 export function createBattleMood() {
   let level, pressure, contacts, blooded, comebackUsed;
 
@@ -36,7 +46,7 @@ export function createBattleMood() {
     comebackUsed = false;
   }
 
-  function settle(before, after) {
+  function settle(before, after, { chargeThreat = false } = {}) {
     if (after.terminal) return { level, upgraded: false, urgent: false, comeback: false, crisis: false };
     const previous = pressure;
     const party = partyState(after);
@@ -63,13 +73,14 @@ export function createBattleMood() {
       blooded = true;
     }
 
-    const raw = (heavyHit || pressure === 2) ? 'high'
+    const crisis = chargeThreat || heavyHit || pressure === 2;
+    const raw = crisis ? 'high'
       : (pressure === 1 || hurtHero || defeated || contacts >= 3 || canComeback) ? 'medium' : 'low';
     const prevLevel = level;
     if (RANK[raw] > RANK[level]) level = raw;
     const upgraded = level !== prevLevel;
     const urgent = canComeback || (upgraded && level === 'high');
-    return { level, upgraded, urgent, comeback: canComeback, crisis: heavyHit || pressure === 2 };
+    return { level, upgraded, urgent, comeback: canComeback, crisis };
   }
 
   return { reset, settle, level: () => level };
@@ -450,7 +461,7 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
     notify();
   }
 
-  function syncBattle(frame, settlementId = null, beforeFrame, { deferMedium = false } = {}) {
+  function syncBattle(frame, settlementId = null, beforeFrame, { deferMedium = false, chargeThreat = false } = {}) {
     if (!battle || terminal) return;
     battle = frame;
     if (frame.terminal) {
@@ -463,7 +474,7 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
     }
     if (settlementId == null || (lastSettlement != null && settlementId <= lastSettlement)) return;
     lastSettlement = settlementId;
-    const result = mood.settle(beforeFrame || settledFrame, frame);
+    const result = mood.settle(beforeFrame || settledFrame, frame, { chargeThreat });
     settledFrame = frame;
     if (mode === 'auto' && !paused) {
       const special = isComeback(current?.track) || isComeback(job?.track) || queued?.comeback;
