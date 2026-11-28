@@ -198,11 +198,6 @@ export function startKillCamera(sandbox, from, to, fx) {
         'director:KILL_IMPACT'
       );
       s = mustReplace(s,
-        "return key === 'parry_heavy' && (seg.guardBroken || (seg.shieldDmg > 0 && seg.shieldAfter === 0)) ? 'hitDown' : key;",
-        "return key;",
-        'director:killSoundConst'
-      );
-      s = mustReplace(s,
         "import { startCine, planKillBeat, startKillCamera, killPortraitSweep, KILL_TIMING } from './cinematic.mjs';",
         "import { startCine, planKillBeat, startKillCamera, killPortraitSweep, timeStop, hitFlash, KILL_TIMING } from './cinematic.mjs';",
         'director:imports'
@@ -213,22 +208,14 @@ export function startKillCamera(sandbox, from, to, fx) {
         'director:noCutin'
       );
       for (const [target, replacement, label] of [
-        ['      if (entry.finisherOwnImpact) return null;\n', "      if (result.demoRangedHeavy) return 'hitDown';\n", 'fixedImpact'],
-        ['playObstacleBreak, playBackstabMark }', 'playObstacleBreak, playBackstabMark, playDemoRangedHeavyBass }', 'rangedHeavyBassImport'],
-        ['const audioContext = { category: av.CombatAudioMixer.classify(skill), combat:',
-          'const audioContext = { category: av.CombatAudioMixer.classify(skill), demoRangedHeavy: result.demoRangedHeavy, combat:', 'rangedHeavyContext'],
-        ['      if (!healed && !seg.barrierHitId && (fatalReason',
-          "      if (finisher && result.demoRangedHeavy) playDemoRangedHeavyBass({ av, audioContext });\n      if (!healed && !seg.barrierHitId && (fatalReason", 'rangedHeavyBassBeat'],
-        ["av.playExecutionAnimation(hero, kills.map(portraitOf).filter(Boolean), skill.damageType || '近战')",
-          "av.playExecutionAnimation(hero, kills.map(portraitOf).filter(Boolean), skill.damageType || '近战', result.demoRangedHeavy ? '远程' : undefined)", 'rangedHeavyExecutionSound'],
+        ['      if (entry.finisherOwnImpact) return null;\n', '', 'fixedImpact'],
         ['    if (!entry.finisherOwnImpact) ruleKeys.push(...new Set([...kill.lethal].map(killSound).filter(Boolean)));',
           `    if (kill.lethal.size) ruleKeys.push(...new Set([...kill.lethal].flatMap(seg => {
       const key = killSound(seg);
       return key === 'parry_heavy' ? [key, 'hitDown'] : key === 'light01' ? [key, 'light_impact'] : [key];
     })));
-    if (result.demoRangedHeavy) ruleKeys.push('shot');
     const rushMode = window.__HIT_DEMO_CFG__?.mode !== 'A';
-    const chargeKey = window.__HIT_DEMO_CHARGE_KEY__ || (skill.damageType === '法术' ? 'light_charge' : 'tackle_start');
+    const chargeKey = 'tackle_start';
     if (rushMode && kill.focus) ruleKeys.push(chargeKey);`, 'prepareImpact'],
         ['await sandbox.guideTo(pts);', 'if (window.__HIT_DEMO_CFG__?.mode === "A" || !kill.focus) await sandbox.guideTo(pts);', 'skipSoftGuide'],
         ['startKillCamera(sandbox, killFrom, killTo)', 'startKillCamera(sandbox, killFrom, killTo, makeFx(audioContext.category))', 'rushHost'],
@@ -361,12 +348,7 @@ export function startKillCamera(sandbox, from, to, fx) {
         ["fx.sfx('hitDown', 0.75); subBass(ctx, RANGED_SUB_BASS);", 'rangedImpact'],
         ["fx.sfx('hitDown', heavy ? 0.6 : 0.52); subBass(ctx, { type: 'sine', f0: 120, f1: 34, gain: heavy ? 0.6 : 0.45, ms: 260 });", 'slugImpact'],
       ]) s = mustReplace(s, cue, 'if (!ctx.demoLethal) { ' + cue + ' }', 'fxlib:' + label);
-      s = mustReplace(s, "fx.sfx('swish_3', 0.5);", "if (ctx.result.demoRangedHeavy) fx.sfx('shot', 0.8); else fx.sfx('swish_3', 0.5);", 'fxlib:rangedHeavyLaunch');
-      s = mustReplace(s, 'const RANGED_SUB_BASS = {', 'export const playDemoRangedHeavyBass = ctx => subBass(ctx, RANGED_SUB_BASS);\nconst RANGED_SUB_BASS = {', 'fxlib:rangedHeavyBass');
       s = mustReplace(s, "fx.sfx('herocharge', 0.4);", "if (!ctx.demoChargeScheduled) fx.sfx('herocharge', 0.4);", 'fxlib:rangedCharge');
-      s = mustReplace(s,
-        "fx.sfx('light_charge', 0.55);\n    worldDarken(fx, t, { holeR: 72,",
-        "window.__HIT_DEMO_FX__.playChargeSound(fx, 'light_charge');\n    worldDarken(fx, t, { holeR: 72,", 'fxlib:holyCharge');
       return { contents: s, loader: 'js' };
     });
 
@@ -386,20 +368,6 @@ export function startKillCamera(sandbox, from, to, fx) {
                 if (key === 'parry_heavy') after(80, () => playSound('hitDown', 0.6, 1, impactOpts));
                 else if (key === 'light01') playSound('light_impact', 0.60, 1, impactOpts);
             }`, 'av:fixedKillMix');
-      s = mustReplace(s,
-        "    const candidates = ['gunshot1', 'gunshot2', 'gunshot3'];",
-        `    if (owner?.audioContext?.demoRangedHeavy) {
-        owner.attackCue = playSound('shot', 0.8, 1, { track:'skill', sync:true, owner, audioContext:owner.audioContext });
-        return 'shot';
-    }
-    const candidates = ['gunshot1', 'gunshot2', 'gunshot3'];`, 'av:rangedHeavyLaunch');
-      s = mustReplace(s,
-        'async function playExecutionAnimation(hero, killedEnemies, damageType) {',
-        'async function playExecutionAnimation(hero, killedEnemies, damageType, audioType) {', 'av:executionSoundType');
-      const soundStart = s.indexOf('        // 风格开场音效（击杀相关 2 倍音量）');
-      const soundEnd = s.indexOf('            const scene = __STAGE.shakeEl();', soundStart);
-      const executionSounds = s.slice(soundStart, soundEnd);
-      s = mustReplace(s, executionSounds, '        audioType ||= type;\n' + executionSounds.replace(/\btype ===/g, 'audioType ==='), 'av:rangedExecutionSound');
       return { contents: s, loader: 'js' };
     });
   },
