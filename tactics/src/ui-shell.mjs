@@ -43,6 +43,7 @@ export function buildShell(root) {
       '<button id="btn-fullscreen" class="t-topbtn" title="全屏">🔲<span class="t-toplabel">全屏</span></button>' +
       '<button id="btn-dialogue" class="t-topbtn" title="对话">💬<span class="t-toplabel">对话</span></button>' +
       '<button id="btn-editor" class="t-topbtn" title="设置">⚙️<span class="t-toplabel">设置</span></button>' +
+      '<button id="btn-music" class="t-topbtn" type="button" title="音乐" aria-label="音乐">🎵<span class="t-toplabel">音乐</span></button>' +
       '<button id="btn-reset" class="t-topbtn" title="重置">🔄<span class="t-toplabel">重置</span></button>' +
     '</div>',
     '<div id="tactics-allies" role="group" aria-label="召唤物与临时盟友" hidden></div>',
@@ -793,6 +794,7 @@ export function buildShell(root) {
   $('btn-dialogue').addEventListener('click', showDialogue);
   $('btn-worldbook').addEventListener('click', showWorldbook);
   $('btn-fullscreen').addEventListener('click', toggleFullScreen);
+  $('btn-music').addEventListener('click', () => { uiSound('select'); state.onMusic?.(); });
   $('btn-reset').addEventListener('click', () => { uiSound('select'); if (state.onReset) state.onReset(); });
   $('panel-close').addEventListener('click', closePanel);
   els.overlay.addEventListener('click', (e) => { if (e.target === els.overlay) closePanel(); });
@@ -832,6 +834,7 @@ export function buildShell(root) {
     set onUnitClick(fn) { state.onUnitClick = fn; },
     set onAllyPin(fn) { state.onAllyPin = fn; },
     set onReset(fn) { state.onReset = fn; },
+    set onMusic(fn) { state.onMusic = fn; },
     set onUiSound(fn) { state.onUiSound = fn; },
     set settings(provider) { state.settings = provider; },
     get state() { return state; },

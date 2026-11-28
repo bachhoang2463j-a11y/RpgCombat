@@ -1,182 +1,254 @@
 import assert from 'node:assert/strict';
-import {
-  BGM_MOOD_TIERS,
-  EXPEDITION33_TRACK_DB,
-  evaluateBattleMood,
-  createTrackUrlResolver,
-  createBgmDirector,
-} from '../../../tactics/src/bgm-director.mjs';
+import { BGM_TRACKS, BGM_POOLS, COMEBACK_POOL } from '../../../tactics/src/bgm-library.mjs';
+import { createBattleMood, createBgmDirector } from '../../../tactics/src/bgm-director.mjs';
 
-const mkUnit = (id, side, hp, maxHp, level = '普通') => ({ id, side, hp, maxHp, level });
+const unit = (id, side, hp, extra = {}) => ({ id, side, primary: side === 'hero', hp, maxHp: 100,
+  shield: 0, isSummon: false, status: hp > 0 ? 'active' : side === 'hero' ? 'down' : 'dead', ...extra });
+const hero = (hp, i) => unit('hero' + i, 'hero', hp);
+const enemy = (hp, extra) => unit('enemy', 'enemy', hp, extra);
+const frame = (hp, units = [enemy(100)]) => ({ terminal: null, units: [...hp.map(hero), ...units] });
+const calm = frame([100, 100, 100, 100]);
+const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
 
-async function run() {
+function audioHarness(Director, { ready = true, random = () => 0 } = {}) {
+  const calls = [], decks = [], timers = new Set(), saved = new Map();
+  const gain = () => ({ connect() {}, disconnect() {}, gain: {
+    value: 1,
+    cancelScheduledValues() {},
+    setValueAtTime() {},
+    linearRampToValueAtTime(v, t) { calls.push(['linear', v, t]); },
+    setValueCurveAtTime(values, t, duration) { calls.push(['curve', values.slice(), t, duration]); },
+  } });
+  const ctx = {
+    state: 'running', currentTime: 0, sampleRate: 48000, destination: {}, createGain: gain,
+    createMediaElementSource() { return { connect() {}, disconnect() {} }; },
+    createBuffer(channels, length) { assert.equal(channels, 1); assert.equal(length, 1); return {}; },
+    createBufferSource() { return {
+      connect() {}, disconnect() {}, start(t) { this.time = t; timers.add(this); }, stop() { timers.delete(this); },
+    }; },
+  };
+  class FakeAudio extends EventTarget {
+    src = ''; currentTime = 0; paused = true; ended = false; readyState = 0;
+    load() { this.readyState = this.src && ready ? 3 : 0; this.ended = false; this.currentTime = 0; }
+    play() { assert.ok(this.readyState >= 3); calls.push(['play', this.src, this.currentTime]); this.paused = this.ended = false; return Promise.resolve(); }
+    pause() { this.paused = true; }
+    removeAttribute() { this.src = ''; }
+    end() { this.ended = this.paused = true; this.dispatchEvent(new Event('ended')); }
+  }
+  const director = Director({ assetBase: 'https://assets.invalid/', context: () => ctx, random,
+    createAudio: () => { const deck = new FakeAudio(); decks.push(deck); return deck; },
+    storage: { getItem: key => saved.get(key), setItem: (key, value) => saved.set(key, value) } });
+  async function advance(time) {
+    for (const timer of timers) if (timer.time <= time) {
+      ctx.currentTime = timer.time;
+      timers.delete(timer);
+      timer.onended();
+      await flush();
+    }
+    ctx.currentTime = time;
+  }
+  return { director, calls, decks, saved, advance, active: () => decks.find(deck => !deck.paused) };
+}
+
+export async function runBgmCases({ tracks = BGM_TRACKS, pools = BGM_POOLS, comeback = COMEBACK_POOL,
+  Director = createBgmDirector, Mood = createBattleMood } = {}) {
   const cases = [];
   const check = async (id, fn) => {
     try { await fn(); cases.push({ id, pass: true }); }
     catch (error) { cases.push({ id, pass: false, detail: error.stack }); }
   };
 
-  await check('BGM-01 7态战况情绪状态机与33号远征队曲库映射', async () => {
-    assert.equal(BGM_MOOD_TIERS.length, 7);
-    assert.equal(Object.keys(EXPEDITION33_TRACK_DB).length, 14);
-
-    // 1. 战前序幕
-    const calmSnap = { units: [mkUnit('h1', 'hero', 30, 30), mkUnit('h2', 'hero', 25, 25), mkUnit('e1', 'enemy', 20, 20)] };
-    assert.equal(evaluateBattleMood(calmSnap, {}).moodId, 'TACTICAL_CALM');
-
-    // 2. 常规交锋（发生伤害或已进入战斗）
-    const skirmishSnap = { units: [mkUnit('h1', 'hero', 28, 30), mkUnit('h2', 'hero', 25, 25), mkUnit('e1', 'enemy', 12, 20)] };
-    assert.equal(evaluateBattleMood(skirmishSnap, { combatStarted: true }).moodId, 'SKIRMISH');
-
-    // 3. 强敌压境（首领在场或精英 >= 2）
-    const bossSnap = { units: [mkUnit('h1', 'hero', 30, 30), mkUnit('h2', 'hero', 25, 25), mkUnit('e1', 'enemy', 80, 80, '首领')] };
-    assert.equal(evaluateBattleMood(bossSnap, { combatStarted: true }).moodId, 'BOSS_PHASE1');
-    const twoEliteSnap = { units: [mkUnit('h1', 'hero', 30, 30), mkUnit('e1', 'enemy', 30, 30, '精英'), mkUnit('e2', 'enemy', 30, 30, '精英')] };
-    assert.equal(evaluateBattleMood(twoEliteSnap, {}).moodId, 'BOSS_PHASE1');
-
-    // 4. 首领狂暴 / 二阶段（<=50% HP 或 variant-trigger rage/molt）
-    const bossHalfSnap = { units: [mkUnit('h1', 'hero', 30, 30), mkUnit('e1', 'enemy', 40, 80, '首领')] };
-    assert.equal(evaluateBattleMood(bossHalfSnap, { combatStarted: true }).moodId, 'CLIMAX_BOSS');
-    assert.equal(evaluateBattleMood(bossSnap, { bossEnraged: true }).moodId, 'CLIMAX_BOSS');
-
-    // 5. 绝境求生（我方 <30% HP 或 存活率 <= 50%）
-    const crisisLowSnap = { units: [mkUnit('h1', 'hero', 8, 30), mkUnit('h2', 'hero', 25, 25), mkUnit('e1', 'enemy', 40, 80, '首领')] };
-    assert.equal(evaluateBattleMood(crisisLowSnap, { bossEnraged: true }).moodId, 'CRISIS');
-    const crisisDeadSnap = { units: [mkUnit('h1', 'hero', 0, 30), mkUnit('h2', 'hero', 25, 25), mkUnit('e1', 'enemy', 20, 20)] };
-    assert.equal(evaluateBattleMood(crisisDeadSnap, {}).moodId, 'CRISIS');
-
-    // 6 & 7. 胜利 / 战败最高优先级覆盖
-    assert.equal(evaluateBattleMood({ ...crisisLowSnap, terminal: { type: 'victory' } }, {}).moodId, 'VICTORY');
-    assert.equal(evaluateBattleMood({ ...calmSnap, terminal: { type: 'defeat' } }, {}).moodId, 'DEFEAT');
+  await check('BGM-01 真实交战和两条血线回升门槛', () => {
+    const mood = Mood();
+    const hit = frame([100, 100, 100, 100], [enemy(85)]);
+    const second = frame([100, 100, 100, 100], [enemy(80)]);
+    const critical = frame([25, 25, 25, 25]);
+    const recover = frame([35, 35, 35, 35]);
+    const safer = frame([36, 36, 36, 36]);
+    const pressureExit = frame([65, 65, 65, 65]);
+    const stable = frame([66, 66, 66, 66]);
+    mood.reset(calm);
+    assert.equal(mood.settle(calm, hit).level, 'low');
+    assert.equal(mood.settle(hit, second).level, 'medium');
+    assert.equal(mood.settle(second, critical).level, 'high');
+    assert.equal(mood.settle(critical, recover).level, 'high');
+    assert.equal(mood.settle(recover, safer).level, 'high');
+    assert.equal(mood.settle(safer, safer).level, 'medium');
+    assert.equal(mood.settle(safer, pressureExit).level, 'medium');
+    assert.equal(mood.settle(pressureExit, stable).level, 'medium');
+    assert.equal(mood.settle(stable, stable).level, 'low');
   });
 
-  await check('BGM-02 升档0延迟响应与降档25s防抖迟滞锁', async () => {
-    let clock = 1000;
-    const director = createBgmDirector({ now: () => clock, holdMs: 25000, crossfadeMs: 0 });
-    director.unlock();
+  await check('BGM-02 单人和团队重创立即升高，召唤和护盾不冒充重创', () => {
+    const mood = Mood();
+    for (const hp of [[100, 100, 100, 10], [70, 70, 70, 70], [100, 100, 0, 0]]) {
+      mood.reset(calm);
+      const r = mood.settle(calm, frame(hp));
+      assert.equal(r.level, 'high');
+      assert.equal(r.comeback, false);
+    }
+    const summons = [unit('summon', 'hero', 1, { isSummon: true })];
+    mood.reset(calm);
+    const after = frame([100, 100, 100, 100], [enemy(100, { shield: 0 }), ...summons]);
+    const before = frame([100, 100, 100, 100], [enemy(100, { shield: 80 }), ...summons]);
+    assert.equal(mood.settle(before, after).level, 'low');
+    assert.equal(mood.settle(before, after).level, 'medium');
+  });
 
-    const calm = { units: [mkUnit('h1', 'hero', 30, 30), mkUnit('h2', 'hero', 25, 25), mkUnit('e1', 'enemy', 20, 20)] };
-    const crisis = { units: [mkUnit('h1', 'hero', 6, 30), mkUnit('h2', 'hero', 25, 25), mkUnit('e1', 'enemy', 15, 20)] };
-    const skirmish = { units: [mkUnit('h1', 'hero', 22, 30), mkUnit('h2', 'hero', 25, 25), mkUnit('e1', 'enemy', 15, 20)] };
+  await check('BGM-03 击杀证据仅消费一次，危机和终局优先', () => {
+    const mood = Mood(), pressure = frame([50, 50, 50, 50]);
+    const wonGround = frame([70, 70, 70, 70], [enemy(0)]);
+    mood.reset(pressure);
+    assert.equal(mood.settle(pressure, wonGround).comeback, true);
+    assert.equal(mood.settle(wonGround, wonGround).comeback, false);
+    mood.reset(calm);
+    assert.equal(mood.settle(calm, wonGround).comeback, false);
+    mood.reset(pressure);
+    const lostGround = frame([25, 25, 25, 25], [enemy(0)]);
+    assert.equal(mood.settle(pressure, lostGround).comeback, false);
+    mood.reset(pressure);
+    assert.equal(mood.settle(pressure, { ...wonGround, terminal: { type: 'victory' } }).comeback, false);
+    const summoned = frame([50, 50, 50, 50], [enemy(10, { isSummon: true })]);
+    mood.reset(summoned);
+    assert.equal(mood.settle(summoned, frame([70, 70, 70, 70], [enemy(0, { isSummon: true })])).comeback, false);
+    mood.reset(pressure);
+    assert.equal(mood.settle(pressure, calm).comeback, false);
+    assert.equal(mood.settle(calm, frame([100, 100, 100, 100], [enemy(0)])).comeback, true);
+  });
 
-    director.syncBattle(calm, {});
-    assert.equal(director.getState().moodId, 'TACTICAL_CALM');
-
-    // 升档即时跃迁至绝境
-    const r1 = director.syncBattle(crisis, { combatStarted: true });
-    assert.equal(r1.switched, true);
-    assert.equal(director.getState().moodId, 'CRISIS');
-
-    // 奶妈抬血至 SKIRMISH：未满 25s 必须锁住
-    clock += 10000;
-    assert.equal(director.syncBattle(skirmish, { combatStarted: true }).switched, false);
-    assert.equal(director.getState().moodId, 'CRISIS');
-
-    // 满 25s 后因之前已累计 1 次低档评估，本次(第2次)直接平稳降档
-    clock += 16000;
-    const r2 = director.syncBattle(skirmish, { combatStarted: true });
-    assert.equal(r2.switched, true);
-    assert.equal(director.getState().moodId, 'SKIRMISH');
-
-    // 重新切入 BOSS_PHASE1 验证同动作内防穿透：同一 actionSerial 在 1.5s 内连续评估不刷满 streak
-    const boss = { actionSerial: 10, units: [mkUnit('h1', 'hero', 30, 30), mkUnit('e1', 'enemy', 60, 60, '首领')] };
-    assert.equal(director.syncBattle(boss, { combatStarted: true }).switched, true);
-    clock += 26000;
-    assert.equal(director.syncBattle({ ...skirmish, actionSerial: 11 }, { combatStarted: true }).switched, false);
-    assert.equal(director.syncBattle({ ...skirmish, actionSerial: 11 }, { combatStarted: true }).switched, false);
-    assert.equal(director.syncBattle({ ...skirmish, actionSerial: 12 }, { combatStarted: true }).switched, true);
-    assert.equal(director.getState().moodId, 'SKIRMISH');
-
-    // 终局胜利无视防抖锁立即接管
-    const r3 = director.syncBattle({ ...skirmish, terminal: { type: 'victory' } }, { combatStarted: true });
-    assert.equal(r3.switched, true);
-    assert.equal(director.getState().moodId, 'VICTORY');
+  await check('BGM-04 刷新与重复回调不推进两次确认', () => {
+    const { director } = audioHarness(Director);
+    const first = frame([100, 100, 100, 100], [enemy(80)]);
+    const next = frame([100, 100, 100, 100], [enemy(70)]);
+    director.startBattle(calm);
+    director.syncBattle(first, 1, calm);
+    director.syncBattle(first, 1, calm);
+    director.syncBattle(next);
+    assert.equal(director.state().level, 'low');
+    director.syncBattle(next, 2, first);
+    assert.equal(director.state().level, 'medium');
     director.destroy();
   });
 
-  await check('BGM-03 手动锁频不受自动切歌干扰且切回自动立即对齐', async () => {
-    const director = createBgmDirector({ crossfadeMs: 0 });
-    director.selectTrack('BOSS_PHASE1', 1);
-    assert.equal(director.getState().mode, 'manual');
-    assert.equal(director.getState().track.title, 'Flying Waters - Goblu');
-
-    const crisis = { units: [mkUnit('h1', 'hero', 5, 30), mkUnit('e1', 'enemy', 20, 20)] };
-    const r = director.syncBattle(crisis, { combatStarted: true });
-    assert.equal(r.switched, false);
-    assert.equal(director.getState().moodId, 'BOSS_PHASE1');
-    assert.equal(director.getState().recommendedMoodId, 'CRISIS');
-
-    director.setMode('auto', crisis, { combatStarted: true });
-    assert.equal(director.getState().mode, 'auto');
-    assert.equal(director.getState().moodId, 'CRISIS');
+  await check('BGM-05 从零流式起播，最近两首不重复，手动锁跨局', async () => {
+    const { director, calls, active, saved } = audioHarness(Director);
+    director.startBattle(calm);
+    await director.unlock(); await flush();
+    const heard = [director.state().track.id];
+    for (let i = 0; i < 3; i++) {
+      active().end(); await flush(); heard.push(director.state().track.id);
+    }
+    assert.deepEqual(heard, [...pools.low, pools.low[0]]);
+    assert.ok(calls.filter(([type]) => type === 'play').every(([, src, time]) => src.includes('/BGM_33/') && time === 0));
+    director.togglePause();
+    director.setVolume(0.42);
+    assert.equal(director.state().playing, false);
+    assert.deepEqual([...saved.values()], ['0.42']);
+    director.startBattle(calm);
+    await director.unlock(); await flush();
+    assert.equal(director.state().mode, 'manual');
+    assert.equal(director.state().playing, false);
+    director.resumeAuto(); await flush();
+    assert.equal(director.state().playing, true);
     director.destroy();
   });
 
-  await check('BGM-04 三级直链容错解析与跨窗AiRadio协议联动及Ducking闪避', async () => {
-    // 1. 直链三级容错：前两个源报错，第三个 open.motues 成功并写入缓存
-    let calls = 0;
-    const resolver = createTrackUrlResolver({
-      fetchImpl: async (url) => {
-        calls++;
-        if (url.includes('open.motues.top')) {
-          return { ok: true, json: async () => ({ url: 'https://cdn.example.com/lumiere.mp3', size: 6400000, br: 320 }) };
-        }
-        throw new Error('upstream down');
-      },
-    });
-    const url1 = await resolver.resolveTrackUrl({ id: '2692441576', title: 'Lumière' });
-    assert.equal(url1, 'https://cdn.example.com/lumiere.mp3');
-    assert.equal(calls, 3);
-    const url2 = await resolver.resolveTrackUrl({ id: '2692441576', title: 'Lumière' });
-    assert.equal(url2, url1);
-    assert.equal(calls, 3); // 命中缓存不再发请求
-
-    // 2. 跨窗 postMessage 握手联动与 Ducking
-    const posted = [];
-    const listeners = new Set();
-    const fakeWin = {
-      parent: {
-        postMessage(msg) { posted.push(msg); },
-      },
-      addEventListener(type, fn) { if (type === 'message') listeners.add(fn); },
-      removeEventListener(type, fn) { if (type === 'message') listeners.delete(fn); },
-    };
-    const director = createBgmDirector({ window: fakeWin, crossfadeMs: 0, volume: 0.5 });
-    assert.equal(posted[0].type, 'TACTICS_BGM_PING');
-    for (const fn of listeners) fn({ data: { type: 'TACTICS_BGM_PONG' } });
-    assert.equal(director.getState().bridgeConnected, true);
-
-    director.duck(0.3, 400);
-    assert.equal(director.getState().duckFactor, 0.3);
-    assert.ok(Math.abs(director.getState().effectiveVolume - 0.15) < 1e-6);
-    assert.ok(posted.some(m => m.type === 'TACTICS_BGM_CMD' && m.action === 'duck' && m.ratio === 0.3));
+  await check('BGM-06 等功率 4 秒与双 vocal 先淡出再淡入', async () => {
+    const { director, calls, advance } = audioHarness(Director);
+    director.startBattle(calm);
+    await director.unlock(); await flush();
+    director.selectTrack(pools.medium[0]); await flush();
+    const curves = calls.filter(([kind]) => kind === 'curve');
+    assert.equal(curves.length, 2);
+    assert.deepEqual(curves.map(([, points, time, duration]) => [points[0], points.at(-1), time, duration]), [[1, 0, 0, 4], [0, 1, 0, 4]]);
+    assert.ok(Math.abs(curves[0][1][64] ** 2 + curves[1][1][64] ** 2 - 1) < 1e-6);
+    await advance(4);
+    director.selectTrack(pools.medium[1]); await flush();
+    assert.equal(director.state().track.id, pools.medium[0]);
+    assert.deepEqual(calls.filter(([kind]) => kind === 'linear'), [['linear', 0, 6.2]]);
+    await advance(6.2);
+    assert.equal(director.state().track.id, pools.medium[1]);
+    assert.deepEqual(calls.filter(([kind]) => kind === 'linear'), [['linear', 0, 6.2], ['linear', 1, 8]]);
     director.destroy();
   });
 
-  await check('BGM-05 异步解链期间静音竞态锁与深度Ducking保护', async () => {
-    const slowResolver = {
-      resolveTrackUrl: () => new Promise(res => setTimeout(() => res('https://cdn.example.com/slow.mp3'), 40)),
-      prewarmTier: () => {},
-    };
-    const director = createBgmDirector({ resolver: slowResolver, crossfadeMs: 0 });
-    director.unlock();
-    const p = director.playTrack({ id: '2692441576', title: 'Lumière', artist: 'Lorien Testard' });
-    director.toggleMute(); // 在解链途中立即静音
-    const ok = await p;
-    assert.equal(ok, false);
-    assert.equal(director.getState().muted, true);
-    assert.equal(director.getState().playing, false);
+  await check('BGM-07 暂停、切局和终局取消待就绪切换', async () => {
+    for (const interrupt of [d => d.togglePause(), d => d.stopBattle(), d => d.syncBattle({ ...calm, terminal: { type: 'victory' } })]) {
+      const { director, calls, decks } = audioHarness(Director, { ready: false });
+      director.startBattle(calm);
+      await director.unlock(); await flush();
+      assert.ok(decks.some(deck => deck.src));
+      interrupt(director);
+      for (const deck of decks) { deck.readyState = 3; deck.dispatchEvent(new Event('canplay')); }
+      await flush();
+      assert.equal(director.state().playing, false);
+      assert.equal(calls.some(([kind]) => kind === 'play'), false);
+      director.destroy();
+    }
+  });
 
-    // 验证深度 Ducking 不会被后续较浅/较短的 Duck 抬高或提前解除
-    director.duck(0.28, 2000);
-    director.duck(0.45, 300);
-    assert.equal(director.getState().duckFactor, 0.28);
+  await check('BGM-08 换档从新池抽歌，结算不续播', async () => {
+    const { director, calls, decks, advance } = audioHarness(Director, { random: () => 0.99 });
+    director.startBattle(calm);
+    await director.unlock(); await flush();
+    assert.equal(director.state().track.id, pools.low[2]);
+    const first = frame([100, 100, 100, 100], [enemy(80)]);
+    director.syncBattle(first, 1);
+    director.syncBattle(frame([100, 100, 100, 100], [enemy(50)]), 2);
+    await flush();
+    assert.equal(director.state().track.id, pools.medium[2]);
+    director.syncBattle({ ...calm, terminal: { type: 'victory' } });
+    await advance(4);
+    assert.equal(director.state().playing, true);
+    decks.find(deck => !deck.paused).end(); await flush();
+    assert.equal(calls.filter(([kind]) => kind === 'play').length, 2);
     director.destroy();
+  });
+
+  await check('BGM-09 改名曲库按前缀精确分池', () => {
+    assert.equal(tracks.length, 11);
+    assert.equal(new Set(tracks.map(track => track.path)).size, 11);
+    for (const track of tracks) {
+      assert.match(track.path, /^BGM_33\/[^/]+\.mp3$/);
+      assert.ok(['vocal', 'chant', 'instrumental'].includes(track.vocal));
+    }
+    for (const [ids, prefix, count] of [[pools.low, '低烈度', 3], [pools.medium, '中烈度', 3], [pools.high, '高烈度', 3], [comeback, '反击', 2]]) {
+      assert.equal(new Set(ids).size, count);
+      for (const id of ids) assert.ok(tracks.find(t => t.id === id)?.path.startsWith('BGM_33/' + prefix + ' - '));
+    }
+    assert.equal(new Set([...Object.values(pools).flat(), ...comeback]).size, 11);
+  });
+
+  await check('BGM-10 反击随机二选一，再触发不切也不排队，播完按最新烈度续播', async () => {
+    const enemy2 = hp => unit('enemy2', 'enemy', hp);
+    for (const random of [0, 0.99]) {
+      const h = audioHarness(Director, { random: () => random });
+      const d = h.director;
+      const pressure = frame([50, 50, 50, 50], [enemy(100), enemy2(100)]);
+      const relief = frame([75, 75, 75, 75], [enemy(0), enemy2(100)]);
+      const again = frame([50, 50, 50, 50], [enemy(0), enemy2(100)]);
+      const secondRelief = frame([75, 75, 75, 75], [enemy(0), enemy2(0)]);
+      d.startBattle(pressure);
+      await d.unlock(); await flush();
+      d.syncBattle(relief, 1); await flush(); await h.advance(4);
+      const special = comeback[random === 0 ? 0 : 1];
+      assert.equal(d.state().track.id, special);
+      assert.equal(d.state().comeback, true);
+      d.syncBattle(again, 2);
+      d.syncBattle(secondRelief, 3); await flush();
+      d.syncBattle(frame([20, 20, 20, 20], [enemy(0), enemy2(0)]), 4); await flush();
+      assert.equal(d.state().track.id, special);
+      assert.equal(d.state().level, 'high');
+      assert.equal(h.calls.filter(([type]) => type === 'play').length, 2);
+      h.active().end(); await flush();
+      assert.ok(pools.high.includes(d.state().track.id));
+      assert.equal(d.state().comeback, false);
+      assert.equal(h.calls.filter(([type]) => type === 'play').length, 3);
+      d.destroy();
+    }
   });
 
   return { cases };
 }
 
-export const groups = {
-  BGM: { run },
-};
+export const groups = { BGM: { run: () => runBgmCases() } };
