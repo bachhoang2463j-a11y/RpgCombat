@@ -344,7 +344,8 @@ async function looks() {
   await check('AVP-E01 敌人徽章：显式等级优先于强度分级；奖章上不叠特性角标', () => {
     assert.ok(main.includes("const tier = u.level === '首领' ? 'boss' : u.level === '精英' ? 'elite' : u.level === '杂兵' ? 'fodder'"));
     assert.ok(uv.includes("'<i class=\"t-unit-tierframe\" aria-hidden=\"true\"></i>'") && !uv.includes('t-unit-traits'));
-    for (const k of ['.t-badge-elite .t-unit-tierframe', '.t-badge-boss .t-unit-tierframe']) assert.ok(css.includes(k), k);
+    assert.ok(!css.includes('.t-badge-elite .t-unit-tierframe'), '精英奖章不显示银灰刻度圈');
+    assert.ok(css.includes('.t-badge-boss .t-unit-tierframe'), '保留首领金冠');
     assert.ok(!css.includes('.t-trait'));
   });
   await check('AVP-E02 留痕：上限 40、3 回合淡出、种子决定形态（同键同种子）', () => {

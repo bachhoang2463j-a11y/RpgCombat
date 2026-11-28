@@ -1179,7 +1179,6 @@ button:disabled { opacity: .42; cursor: default; }
 .t-side-enemy .t-unit-medal { --elem: #ef4444; }
 .t-side-enemy .t-unit-emoji { background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--elem) 38%, #1a0d10) 0%, #120a0d 78%); }
 .t-unit-tierframe { position: absolute; inset: -5px; border-radius: 50%; pointer-events: none; z-index: 1; }
-.t-badge-elite .t-unit-tierframe { border: 2px solid #cbd5e1; box-shadow: 0 0 0 2px rgba(7,9,13,.85), inset 0 0 0 2px rgba(148,163,184,.45); background: repeating-conic-gradient(from 0deg, transparent 0 26deg, rgba(226,232,240,.75) 26deg 30deg) border-box; -webkit-mask: radial-gradient(circle, transparent calc(50% - 3px), #000 calc(50% - 2px)); mask: radial-gradient(circle, transparent calc(50% - 3px), #000 calc(50% - 2px)); }
 .t-badge-boss .t-unit-tierframe { inset: -8px; border: 2.5px solid #f5c451; box-shadow: 0 0 0 2px rgba(7,9,13,.85), 0 0 16px rgba(245,196,81,.55); animation: t-boss-crown 2.6s ease-in-out infinite; }
 .t-badge-boss .t-unit-tierframe::before { content: ''; position: absolute; left: 50%; top: -9px; width: 22px; height: 10px; transform: translateX(-50%); background: #f5c451; clip-path: polygon(0 100%, 0 30%, 25% 70%, 50% 0, 75% 70%, 100% 30%, 100% 100%); filter: drop-shadow(0 0 3px rgba(245,196,81,.8)); }
 @keyframes t-boss-crown { 0%, 100% { box-shadow: 0 0 0 2px rgba(7,9,13,.85), 0 0 10px rgba(245,196,81,.35); } 50% { box-shadow: 0 0 0 2px rgba(7,9,13,.85), 0 0 20px rgba(245,196,81,.7); } }
