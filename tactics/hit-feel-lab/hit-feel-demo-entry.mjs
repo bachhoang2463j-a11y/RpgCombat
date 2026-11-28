@@ -72,6 +72,7 @@ export const RANGE_YAML = [
 ].join('\n');
 
 const CHARGE_CHOICES = [
+  { key: 'tackle_start', label: '冲撞起手' },
   { key: 'bomb_throw', label: '炸药充能' },
   { key: 'explosion_aoe_charge', label: '爆炸蓄压' },
   { key: 'thunder_charge', label: '雷电蓄能' },
@@ -166,7 +167,8 @@ function playScreenBlood(fx, ms = 1150) {
 // ---------- 八方旅人2 打击感与击杀破碎/蓄势核心效果器 ----------
 window.__HIT_DEMO_FX__ = {
   playChargeSound(fx, key) {
-    fx.sfx(key, 1.4, { offsetSec: key === 'herocharge' ? 0.315 : 0 });
+    const cap = key === 'tackle_start' ? { maxDurSec: 0.46, fadeOutSec: 0.12 } : { offsetSec: key === 'herocharge' ? 0.315 : 0 };
+    fx.sfx(key, 1.4, cap);
   },
   playKillCharge(fx, from, ms) {
     const c = worldPx(from);

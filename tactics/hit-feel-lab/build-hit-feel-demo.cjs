@@ -7,6 +7,7 @@ const tacticsDir = path.resolve(__dirname, '..');
 const workspaceDir = path.resolve(tacticsDir, '..');
 const esbuild = createRequire(path.join(tacticsDir, 'p00-probe', 'node_modules', 'esbuild'))('esbuild');
 const chargeSamples = {
+  tackle_start: '../my_assets/tackle_start.wav',
   herocharge: '资源/misc-sfx/herocharge.mp3',
   light_charge: '资源/attack-identity-sfx/light_charge.mp3',
   bomb_throw: '资源/attack-identity-sfx/bomb_throw.mp3',
@@ -227,7 +228,7 @@ export function startKillCamera(sandbox, from, to, fx) {
     })));
     if (result.demoRangedHeavy) ruleKeys.push('shot');
     const rushMode = window.__HIT_DEMO_CFG__?.mode !== 'A';
-    const chargeKey = window.__HIT_DEMO_CHARGE_KEY__ || (skill.damageType === '法术' ? 'light_charge' : 'herocharge');
+    const chargeKey = window.__HIT_DEMO_CHARGE_KEY__ || (skill.damageType === '法术' ? 'light_charge' : 'tackle_start');
     if (rushMode && kill.focus) ruleKeys.push(chargeKey);`, 'prepareImpact'],
         ['await sandbox.guideTo(pts);', 'if (window.__HIT_DEMO_CFG__?.mode === "A" || !kill.focus) await sandbox.guideTo(pts);', 'skipSoftGuide'],
         ['startKillCamera(sandbox, killFrom, killTo)', 'startKillCamera(sandbox, killFrom, killTo, makeFx(audioContext.category))', 'rushHost'],
@@ -372,8 +373,10 @@ export function startKillCamera(sandbox, from, to, fx) {
     build.onLoad({ filter: /tactics[\\/]src[\\/]vendor[\\/]rpg-av[\\/]rpg-av\.mjs$/ }, args => {
       let s = readLf(args.path);
       for (const [key, file] of Object.entries(chargeSamples)) {
-        const inline = 'data:audio/mpeg;base64,' + readFileSync(path.join(workspaceDir, file)).toString('base64');
-        s = mustReplace(s, "'" + key + "': `\${ASSET_BASE}/" + key + ".mp3`,", JSON.stringify(key) + ': ' + JSON.stringify(inline) + ',', 'av:localCharge:' + key);
+        const inline = 'data:audio/' + (file.endsWith('.wav') ? 'wav' : 'mpeg') + ';base64,' + readFileSync(path.join(workspaceDir, file)).toString('base64');
+        const urlLine = "'" + key + "': `${ASSET_BASE}/" + key + ".mp3`,";
+        if (s.includes(urlLine)) s = mustReplace(s, urlLine, JSON.stringify(key) + ': ' + JSON.stringify(inline) + ',', 'av:localCharge:' + key);
+        else s = s.replace("'" + 'herocharge' + "': ", JSON.stringify(key) + ': ' + JSON.stringify(inline) + ',\n    ' + JSON.stringify('herocharge') + ': ');
       }
       s = mustReplace(s,
         "if (h.finisherSound && h.finisherSound !== defense && take('finisher')) playSound(h.finisherSound, 0.86, 1, { ...opts, category:'F' });",
