@@ -961,3 +961,10 @@
 - 文件：`tactics/src/bgm-director.mjs`、`tactics/src/{main,action-director}.mjs`、`tactics/tactics.css`、`tactics/tools/{build-demo-html,run-tests}.cjs`、`integration-test/fixtures/tactics/bgm-director-node-cases.mjs`、`tactics/mvp-standalone.html`（跨仓联动升级 `D:\Project\AiRadio` @ `5ee7273`）。
 - 验证：修改前全量 `--all` 1518 项全绿；修复后复跑 `bgm-director` 5/5、`main-point-av` 2/2、`p07-av` 13/13 通过；重新打包 `mvp-standalone.html`（2,088,754 字节，62 模块/47 输入/121 符号门禁通过）；内置浏览器实机验证（`888x904` 零 JS 报错、展开抽屉 `x=74..362, y=51.56..481.56` 与行动面板完全零重叠、手自动切换与静音交互正常）。未在真实酒馆宿主内双窗联调。
 - 目的 vs 现状：一致。
+
+## 2026-11-28 · 三档战斗配乐与一次性反击曲（5c62690）
+- 要求与取舍：依据 `BGM_33/` 更新后的文件名前缀使用 11 首原曲，低、中、高各三首，最近两首不重复；不按敌种分档，不裁曲，不接 AiRadio，不改战斗规则。反击触发时从两首中随机选一首；播中再触发不换曲、不排队，播完回届时的烈度池。
+- 实现：以行动前后的权威 HP、护盾、减员与危机回升推进导演，重创可立即升高；保留手动锁、独立音量、双音轨淡化，在顶栏复用面板。结算停选曲只让响起的音乐自然收尾。
+- 文件：`tactics/src/{bgm-library,bgm-director,main,ui-shell,action-director}.mjs`、`tactics/tactics.css`、`tactics/tools/build-demo-html.cjs`、`tactics/mvp-standalone.html`、`integration-test/fixtures/tactics/bgm-director-node-cases.mjs`。
+- 验证：改名后 11 首原曲经 ffprobe 及 HTTP/CORS 检查；唯一一次 Node 全量 1524 通过。IAB 发现旧终局接口残留，修正后相关回归 25/25、最终单文件结构门槛、内联 BGM 10/10，IAB 起播、暂停/音量/恢复自动、390 像素宽面板、重开保留手动、实际走格与短局击杀胜利通过。未进行外部浏览器、酒馆宿主或真人听感验证。
+- 目的 vs 现状：一致。
