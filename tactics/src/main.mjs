@@ -694,13 +694,19 @@ export function createApp(rootEl, opts = {}) {
       aimHint: !hero ? null : fieldAction ? fieldHint[fieldAction] : !aim ? null : pending
         ? '【' + esc(aim.skill.name) + '】已锁定<br>再次点击目标或 Enter 发动'
         : '【' + esc(aim.skill.name) + '】请在地图上选择目标',
-      canUse: skillUsable,
+      canUse: s => battle.hasActiveField(s) || skillUsable(s),
+      canDismissSkill: battle.hasActiveField,
       canStationary: hero && !busy && battle.canStationaryPrepare(),
       stationary, startPayment: battle.previewStationaryStart,
       preparePayment: prep?.payment || null, continueReason: prep?.reason,
       onStationary: (idx) => handleCommand('sk:' + idx, true),
       skillReason,
-      itemStatus: (it, child) => battle.canUseItem(it, child),
+      itemStatus: (it, child) => {
+        const skill = battle.itemSkill(it, child);
+        if (battle.hasActiveField(skill)) return { ok: true, mainCost: 0, auxCost: 0, reason: '已生效 · 点击撤销' };
+        if (!child && it.children?.some(c => battle.hasActiveField(battle.itemSkill(it, c)))) return { ok: true };
+        return battle.canUseItem(it, child);
+      },
       onItem: (idx, childIdx) => handleItemEntry(idx, childIdx),
       onSkill: (idx) => handleCommand('sk:' + idx),
       onAttack: () => handleCommand('attack'),
@@ -861,11 +867,16 @@ export function createApp(rootEl, opts = {}) {
   }
 
   // ---------- 预览：自由模式显示可达范围；悬停路径/攻击 ----------
+  function movementOverlay(hover = null, invalid = null, sprintReach = undefined) {
+    const unitId = currentUnit().id, walk = battle.reachable().cells;
+    if (walk.length > 1) return { kind: 'move', unitId, cells: walk, hover, invalid };
+    const cells = (sprintReach === undefined ? battle.sprintReachable() : sprintReach)?.cells;
+    return cells?.length > 1 ? { kind: 'move', unitId, cells, hover, invalid, sprint: true } : null;
+  }
   function idleOverlay() {
     if (!isHeroTurn() || busy) { sandbox.setPreview(null); return; }
     if (aim) { sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: aim.skill, query: null }); return; }
-    const r = battle.snapshot().resources;
-    sandbox.setPreview(r && r.moveRemaining > 0.999 ? { kind: 'move', unitId: battle.snapshot().currentId, cells: battle.reachable().cells } : null);
+    sandbox.setPreview(movementOverlay());
   }
   function moveEval(hit) {
     const id = battle.snapshot().currentId;
@@ -876,16 +887,17 @@ export function createApp(rootEl, opts = {}) {
     if (p.col === hit.col && p.row === hit.row) return { ok: false, quiet: true };
     const full = fullReach && fullReach.byKey.get(hit.col + ',' + hit.row);
     if (full) {
-      // 冲刺后可达：再点同格 = 消耗主行动冲刺并移动（冲刺额度/背负倍率取规则视图）
-      const add = battle.getEffectiveUnit(id).effectiveMoveDistance, need = full.cost * (battle.snapshot().carrying[id] ? 2 : 1);
-      const canSprint = actionBalance(r, 'main') >= 1;
-      if (canSprint && need <= r.moveRemaining + add + 1e-9) {
-        const key = hit.col + ',' + hit.row, armed = sprintArm === key;
-        return { ok: false, sprint: true, key, armed, cell: { col: hit.col, row: hit.row, cost: need },
-          html: '💨 冲刺后可达（需 ' + need.toFixed(1) + 'm · 余 ' + r.moveRemaining.toFixed(1) + 'm +冲刺 ' + add + 'm）<br>' + (armed ? '<b>再点一次</b>：消耗 ' + (r.main > 0 ? '◆主行动' : '✦万能行动') + ' 冲刺并移动' : '点击：准备冲刺移动') };
+      // 冲刺后可达：再点同格 = 消耗主行动冲刺并移动。
+      const sprintReach = battle.sprintReachable();
+      const key = hit.col + ',' + hit.row, cell = sprintReach?.byKey.get(key);
+      if (cell) {
+        const armed = sprintArm === key;
+        return { ok: false, sprint: true, key, armed, cell, sprintReach,
+          html: '💨 冲刺后可达（需 ' + cell.cost.toFixed(1) + 'm · 余 ' + r.moveRemaining.toFixed(1) + 'm +冲刺 ' + sprintReach.added + 'm）<br>' + (armed ? '<b>再点一次</b>：消耗 ' + (sprintReach.payment.mainCost ? '◆主行动' : '✦万能行动') + ' 冲刺并移动' : '点击：准备冲刺移动') };
       }
-      if (r.moveRemaining <= 0.999) return { ok: false, reason: '移动额度已用完' + (!canSprint ? '（没有可用行动点冲刺）' : '（冲刺后仍不可达）') };
-      return { ok: false, reason: '超出移动额度（需 ' + need.toFixed(1) + 'm，余 ' + r.moveRemaining.toFixed(1) + 'm）' };
+      const need = full.cost * (battle.ctx.carrying[id] ? 2 : 1) / r.moveMultiplier;
+      if (r.moveRemaining < 1) return { ok: false, sprintReach, reason: '移动额度已用完' + (!sprintReach ? '（没有可用行动点冲刺）' : '（冲刺后仍不可达）') };
+      return { ok: false, sprintReach, reason: '超出移动额度（需 ' + need.toFixed(1) + 'm，余 ' + r.moveRemaining.toFixed(1) + 'm）' };
     }
     if (r.moveRemaining <= 0.999) return { ok: false, reason: '移动额度已用完' };
     if (hit.targetId) return { ok: false, quiet: true };
@@ -899,8 +911,9 @@ export function createApp(rootEl, opts = {}) {
     }
     return { x: hit.x, y: hit.y, targetId: hit.targetId };
   }
-  function attackPreview(action, hit, locked) {
-    const id = battle.snapshot().currentId;
+  function attackPreview(action, hit, locked, allowApproach = false) {
+    shell.previewMoveCost(null); shell.previewPips(0, 0);
+    const { currentId: id, resources } = battle.snapshot();
     const skill = action.skill;
     const a = aimFor(skill, hit);
     if (!a) {
@@ -909,6 +922,17 @@ export function createApp(rootEl, opts = {}) {
       return { ok: false, reason: '指向敌人' };
     }
     const q = battle.previewAttack(skill, a);
+    const approach = allowApproach && !action.item && a.targetId
+      && !q.slotTargets?.some(slot => q.ok && slot.attack && slot.targetIds.includes(a.targetId))
+      ? battle.previewApproach(skill, a) : null;
+    if (approach) {
+      const { cost, opportunityIds } = approach.cell;
+      sandbox.setPreview({ kind: 'attack', casterId: id, skill, query: approach.query, approach });
+      sandbox.setHint({ x: a.x, y: a.y }, '<b>' + esc(skill.name) + '</b> · 移动 <b>' + cost.toFixed(1) + 'm</b> · 余 '
+        + Math.max(0, resources.moveRemaining - cost).toFixed(1) + 'm<br><b>点击走过去攻击</b>'
+        + (opportunityIds.length ? ' · <b class="t-kill">⚠ 可能触发借机攻击</b>' : ''));
+      return { ok: false, aim: a, approach };
+    }
     sandbox.setPreview({ kind: 'attack', casterId: id, skill, query: q, locked });
     let html;
     const segs = q.ok ? (q.slotTargets || []).filter(s => s.attack).length : 0;
@@ -1045,7 +1069,7 @@ export function createApp(rootEl, opts = {}) {
       sandbox.setHint({ x: hit.col + 0.5, y: hit.row + 0.5 }, legal ? '折影步 · ' + q.teleport.distance.toFixed(1) + 'm · 点击确认' : q.reason || '不可闪现至此格', legal ? null : 'bad');
       return;
     }
-    if (aim) { attackPreview(aim, hit, false); return; }
+    if (aim) { attackPreview(aim, hit, false, true); return; }
     if (isEnemyHit(hit)) {
       const act = resolveEnemyQuickAction(hit);
       if (act && act.ok) { attackPreview(act, hit, false); return; }
@@ -1054,15 +1078,15 @@ export function createApp(rootEl, opts = {}) {
       sandbox.setHint({ x: hit.x, y: hit.y }, msg, 'bad'); return;
     }
     const ev = moveEval(hit);
-    const r = battle.snapshot().resources;
     if (ev.sprint) {
-      sandbox.setPreview({ kind: 'move', unitId: battle.snapshot().currentId, cells: r.moveRemaining > 0.999 ? battle.reachable().cells : [], hover: ev.cell });
+      sandbox.setPreview(movementOverlay(ev.cell, null, ev.sprintReach));
       sandbox.setHint({ x: hit.col + 0.5, y: hit.row + 0.5 }, ev.html, ev.armed ? 'lock' : null);
-      shell.previewMoveCost(null); shell.previewPips(r.main > 0 ? 1 : 0, 0, r.main > 0 ? 0 : 1);
+      const { mainCost, universalCost } = ev.sprintReach.payment;
+      shell.previewMoveCost(null); shell.previewPips(mainCost, 0, universalCost);
       return;
     }
     shell.previewPips(0, 0);
-    sandbox.setPreview(r.moveRemaining > 0.999 ? { kind: 'move', unitId: battle.snapshot().currentId, cells: battle.reachable().cells, hover: ev.ok ? ev.cell : null, invalid: ev.ok || ev.quiet ? null : { col: hit.col, row: hit.row } } : null);
+    sandbox.setPreview(movementOverlay(ev.ok ? ev.cell : null, ev.ok || ev.quiet ? null : { col: hit.col, row: hit.row }, ev.sprintReach));
     sandbox.setHint(ev.ok || !ev.quiet ? { x: hit.col + 0.5, y: hit.row + 0.5 } : null, ev.ok ? ev.html : ev.reason, ev.ok ? null : 'bad');
     shell.previewMoveCost(ev.ok ? ev.cell.cost : null);
   });
@@ -1107,7 +1131,13 @@ export function createApp(rootEl, opts = {}) {
       if (pending && key && (pending.key === key || reuseTarget)) {
         firePending({ reuseTarget }); return true;
       }
-      const ev = attackPreview(aim, hit, true);
+      const ev = attackPreview(aim, hit, true, true);
+      if (ev.approach) {
+        const action = aim, { col, row } = ev.approach.cell;
+        aim = null; pending = null;
+        doMove(col, row, false, { action, aim: ev.aim });
+        return true;
+      }
       if (!ev.ok || !key) { pending = null; ui('deny'); renderCommand(); return true; }
       pending = { key, aim: ev.aim };
       ui('lock'); renderCommand();
@@ -1196,15 +1226,25 @@ export function createApp(rootEl, opts = {}) {
     renderCommand();
   }
   function rpgCloseMenus() { shell.rpgUi.closeAllSubMenus(); }
+  function dismissOwnField(skill) {
+    if (!battle.dismissField(skill)) return false;
+    aim = null; pending = null; fieldAction = null;
+    shell.closeMenus(); sandbox.setHint(null);
+    ui('cancel'); shell.showLog('已撤销【' + skill.name + '】', 'act');
+    afterHeroAction();
+    return true;
+  }
   // 物品入口：菜单卡转发到此；contract v3：battle.beginUseItem(item, aim, options) generator（支持父子道具子技能）
   function handleItemEntry(idx, childIdx = null) {
+    if (!battle || !isHeroTurn() || busy) return;
     const u = currentUnit();
     const it = u && (u.items || [])[idx];
     if (!it) return;
     const child = childIdx != null && Array.isArray(it.children) ? it.children[childIdx] : null;
+    const skill = battle.itemSkill(it, child);
+    if (dismissOwnField(skill)) return;
     const valid = battle.canUseItem(it, child);
     if (!valid.ok) { ui('deny'); shell.showLog(valid.reason, 'warn'); return; }
-    const skill = battle.itemSkill(it, child);
     if (skill.delay > 0) {
       if (battle.snapshot().preparation?.ready) offerPreparedRelease(true);
       else declarePreparation(skill);
@@ -1339,6 +1379,7 @@ export function createApp(rootEl, opts = {}) {
     fieldAction = null;
     const skill = skillOfKey(key);
     if (!skill || skill.isGroup) return;
+    if (dismissOwnField(skill)) return;
     if (!skillUsable(skill)) { ui('deny'); shell.showLog(skillReason(skill), 'warn'); return; }
     if (skill.delay > 0) {
       if (battle.snapshot().preparation?.ready) offerPreparedRelease(true);
@@ -1392,7 +1433,7 @@ export function createApp(rootEl, opts = {}) {
     if (req.type === 'opportunity-result') await playAttackResult(req.result);
   }
 
-  async function doMove(col, row, avoidFog = false) {
+  async function doMove(col, row, avoidFog = false, followUp = null) {
     const myFlow = flow;
     setBusy(true);
     sandbox.setPreview(null); sandbox.setHint(null);
@@ -1415,6 +1456,14 @@ export function createApp(rootEl, opts = {}) {
     }
     if (battle.snapshot().currentId !== mover) {
       syncShown(); setBusy(false); refreshBattle({ deferPassive: true }); beginTurn(); return;
+    }
+    if (followUp && !res.stopped) {
+      const q = battle.previewAttack(followUp.action.skill, followUp.aim);
+      if (q.ok && q.slotTargets.some(slot => slot.attack && slot.targetIds.includes(followUp.aim.targetId))) {
+        aim = followUp.action; pending = { aim: followUp.aim };
+        return firePending();
+      }
+      shell.showLog(q.reason || '目标已无法攻击', 'warn');
     }
     afterHeroAction();
   }

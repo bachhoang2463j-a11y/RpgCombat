@@ -45,7 +45,8 @@ const REQUIRED_SYMBOLS = ['playEnemyWindup', 'playAttackIdentityFx', 'playHitFee
   'playGuardDash', 'playGuardBlock', 'mountBarrierDome', 'playBarrierHit', 'playBarrierBlocked', 'playBarrierShatter', 'playRuleFx',
   'chooseTauntTarget', 'planIdleMove', 'statusBadges', 'compactStatusHtml', 'effectFloat', 'inspectorHtml', 'hitChance', 'predictTargets', 'toggleCostFilter', 'setPredict', 'resolveLore', 'SAMPLE_LORE',
   'playRescueGrit', 'playRescueAvoidFatal', 'playVariantResistFx', 'playCounterAttackL1', 'playPowerCounterEffect', 'spawnPowerBurst', 'spawnChargeUpParticles', 'queueCounters', 'revealCounter', 'playSelfDestructWindup', 'playSelfDestructBurst', 'setIdentitySfx', 'setVariantSfx', 'setStatusSfx', 'setSelfDestructSfx',
-  'createBgmDirector', 'createBattleMood', 'BGM_TRACKS', 'BGM_POOLS', 'COMEBACK_POOL'];
+  'createBgmDirector', 'createBattleMood', 'BGM_TRACKS', 'BGM_POOLS', 'COMEBACK_POOL',
+  'sprintReachable', 'previewApproach', 'dismissField', 'dismissOwnField'];
 
 const entry = [
   "import { createApp } from './src/main.mjs';",

@@ -11,6 +11,7 @@ import { BACKSTAB_HALF_ANGLE } from './range.mjs';
 const Q = 50;
 const C = {
   move: { fill: 'rgba(125,211,252,0.10)', edge: 'rgba(147,197,253,0.55)', path: '#e0f2fe', glow: 'rgba(56,189,248,0.45)' },
+  sprint: { fill: 'rgba(250,204,21,0.21)', edge: 'rgba(253,224,71,0.84)', path: '#fef08a', glow: 'rgba(234,179,8,0.5)' },
   atk: { fill: 'rgba(251,146,60,0.16)', edge: 'rgba(253,186,116,0.85)', guide: 'rgba(254,215,170,0.55)', cell: 'rgba(251,146,60,0.08)' },
   blink: { fill: 'rgba(129,140,248,0.16)', edge: 'rgba(165,180,252,0.85)', dot: 'rgba(224,231,255,0.8)', path: '#e0e7ff', glow: 'rgba(99,102,241,0.5)' },
   lock: '#fde68a', bad: '#f87171', ally: 'rgba(125,211,252,0.9)',
@@ -101,11 +102,11 @@ function drawBlock(g, pt, label) {
 }
 
 function drawMove(g, pv, viewData) {
+  const color = pv.sprint ? C.sprint : C.move;
   const cells = (pv.cells || []).filter(c => c.cost > 0 || pv.showOrigin);
   if (cells.length) {
-    g.fillStyle = C.move.fill;
-    for (const c of cells) g.fillRect(c.col * Q + 1, c.row * Q + 1, Q - 2, Q - 2);
-    strokeCellOutline(g, pv.cells, C.move.edge, 1.6);
+    fillCells(g, cells, color.fill);
+    strokeCellOutline(g, pv.cells, color.edge, 1.6);
   }
   const h = pv.hover;
   if (h && h.path && h.path.length > 1) {
@@ -113,21 +114,21 @@ function drawMove(g, pv, viewData) {
     const pts = h.path.map(c => unitCenter(c, fp));
     g.save();
     g.lineJoin = 'round'; g.lineCap = 'round';
-    g.strokeStyle = C.move.glow; g.lineWidth = 9; g.globalAlpha = 0.5;
+    g.strokeStyle = color.glow; g.lineWidth = 9; g.globalAlpha = 0.5;
     g.beginPath(); pts.forEach((p, i) => (i ? g.lineTo(p.x * Q, p.y * Q) : g.moveTo(p.x * Q, p.y * Q))); g.stroke();
-    g.globalAlpha = 1; g.strokeStyle = C.move.path; g.lineWidth = 2.6;
+    g.globalAlpha = 1; g.strokeStyle = color.path; g.lineWidth = 2.6;
     if (!pv.locked) g.setLineDash([8, 6]);
     g.beginPath(); pts.forEach((p, i) => (i ? g.lineTo(p.x * Q, p.y * Q) : g.moveTo(p.x * Q, p.y * Q))); g.stroke();
     g.setLineDash([]);
     // 转角节点
-    g.fillStyle = C.move.path;
+    g.fillStyle = color.path;
     for (let i = 1; i < pts.length - 1; i++) {
       const a = pts[i - 1], b = pts[i], c = pts[i + 1];
       if (Math.abs((b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x)) > 1e-6) { g.beginPath(); g.arc(b.x * Q, b.y * Q, 3, 0, Math.PI * 2); g.fill(); }
     }
     // 落点：占地方框 + 中心环
     const end = h.path[h.path.length - 1];
-    g.strokeStyle = pv.locked ? C.lock : C.move.path; g.lineWidth = pv.locked ? 2.6 : 2;
+    g.strokeStyle = pv.locked ? C.lock : color.path; g.lineWidth = pv.locked ? 2.6 : 2;
     for (const c of occupiedCells(end, fp)) g.strokeRect(c.col * Q + 3, c.row * Q + 3, Q - 6, Q - 6);
     const ep = pts[pts.length - 1];
     g.beginPath(); g.arc(ep.x * Q, ep.y * Q, 7, 0, Math.PI * 2); g.stroke();
@@ -147,7 +148,8 @@ function drawAttack(g, pv, viewData) {
   const caster = viewData.placementsById[pv.casterId];
   const cfp = viewData.footprintsById[pv.casterId] || { width: 1, height: 1 };
   if (!caster) return;
-  const o = unitCenter(caster, cfp);
+  if (pv.approach) drawMove(g, { unitId: pv.casterId, hover: pv.approach.cell }, viewData);
+  const o = pv.approach ? q.origin : unitCenter(caster, cfp);
   const skillRange = pv.skill && pv.skill.range;
   // 射程参考圈（单体/扇形）：细虚线，只表达距离，不是作用区
   if (skillRange && skillRange.castRange) {

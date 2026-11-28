@@ -92,7 +92,7 @@ function previewCases() {
 
 function wiringCases() {
   const out = [], m = src('src/main.mjs'), sh = src('src/ui-shell.mjs'), sb = src('src/sandbox.mjs'), uv = src('src/unit-view.mjs');
-  out.push(ok('UIR-W 冲刺移动：超额/额度用完且冲刺后可达 → 首次点击锁定，同格再点 sprint()+move()', /if \(!ev\.armed\) \{ sprintArm = ev\.key;/.test(m) && /const sp = battle\.sprint\(\);/.test(m) && /need <= r\.moveRemaining \+ add/.test(m)));
+  out.push(ok('UIR-W 冲刺移动：复用规则可达格 → 首次点击锁定，同格再点 sprint()+move()', /if \(!ev\.armed\) \{ sprintArm = ev\.key;/.test(m) && /const sp = battle\.sprint\(\);/.test(m) && /const sprintReach = battle\.sprintReachable\(\);/.test(m) && /sprintReach\?\.byKey\.get\(key\)/.test(m)));
   out.push(ok('UIR-W 右键：瞄准/目标选择中仍为取消；否则进入跳跃并锁定，同格再右键起跳', /if \(aim \|\| pending \|\| sprintArm \|\| \(fieldAction && fieldAction !== 'jump'\)\) return false;/.test(m)
     && /if \(fieldAction === 'jump' && jumpArm === key\) \{ jumpArm = null; runFieldTarget\('jump', hit\);/.test(m) && /onContextCb\(hitAt\(e\.clientX, e\.clientY\)\)\) return;\s*\n\s*if \(onCancelCb\) onCancelCb\(\);/.test(sb)));
   out.push(ok('UIR-W 主/辅筛选按效果；技能卡不重复标费，物品显示主辅费；空列表提示仅在变化时更新',

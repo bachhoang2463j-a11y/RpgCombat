@@ -142,11 +142,13 @@ export function createRegion(ctx, { caster, skill, query, now, type } = {}) {
   if (regionType === 'fog' && blind && blind.turns != null) turns = blind.turns;
   if (turns == null) turns = tags.reduce((m, tg) => (tg.turns != null && tg.turns > m ? tg.turns : m), 3);
   const endAt = t + turns * ROUND_TIME;
-  const sourceKey = regionType + ':' + casterUnit.id + ':' + String((skill && (skill.name || skill.id)) || '');
+  const skillName = String((skill && (skill.name || skill.id)) || '');
+  const sourceKey = regionType + ':' + casterUnit.id + ':' + skillName;
   const region = {
     id: sourceKey,
     type: regionType,
     casterId: casterUnit.id,
+    skillName,
     source: { casterId: casterUnit.id, side: casterUnit.side,
       placement: { ...ctx.placementsById[casterUnit.id] }, footprint: { ...fpOf(ctx, casterUnit) } },
     sourceKey,

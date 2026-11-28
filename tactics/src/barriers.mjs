@@ -75,6 +75,7 @@ export function previewBarrier(ctx, casterId, skill, query) {
   const barrier = {
     id: (ctx.runId ? ctx.runId + ':' : '') + 'barrier:' + casterId + ':' + ((ctx._barrierSerial || 0) + 1),
     casterId,
+    skillName: skill.name,
     side: caster.side,
     center: { x: center.x, y: center.y },
     radius,
@@ -116,8 +117,16 @@ export function expireBarriers(ctx, now) {
   return removed;
 }
 
-export function clearBarriers(ctx) {
-  return (ctx.barriers || []).splice(0).map(b => structuredClone(b));
+export function clearBarriers(ctx, casterId = null, skillName = null) {
+  const removed = [];
+  const barriers = ctx.barriers || [];
+  for (let i = barriers.length - 1; i >= 0; i--) {
+    const b = barriers[i];
+    if ((casterId == null || b.casterId === casterId) && (skillName == null || b.skillName === skillName)) {
+      removed.unshift(structuredClone(barriers.splice(i, 1)[0]));
+    }
+  }
+  return removed;
 }
 
 // 查询某单位/站位所在的结界：

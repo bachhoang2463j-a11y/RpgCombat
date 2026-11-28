@@ -564,7 +564,9 @@ export function buildShell(root) {
       const costLine = btn.children[2] && btn.children[2].firstElementChild;
       const start = costLine && costLine.querySelector('.t-card-still');
       const sta = state.cmd?.stationary || { available: false };
-      const showStart = !!costLine && !hide && s.delay > 0 && !s.isGroup && sta.available && !state.cmd.preparation && state.cmd.canUse(s);
+      const dismiss = callCmd('canDismissSkill', s);
+      if (dismiss) btn.classList.remove('exhausted-card');
+      const showStart = !dismiss && !!costLine && !hide && s.delay > 0 && !s.isGroup && sta.available && !state.cmd.preparation && state.cmd.canUse(s);
       const plan = showStart && sta.ok ? state.cmd.startPayment(s) : null;
       const startKey = showStart ? [sta.reason, sta.movement, s.delay, JSON.stringify(plan)].join('|') : '';
       const fresh = !!start && start.dataset.key === startKey;
@@ -575,13 +577,15 @@ export function buildShell(root) {
           (plan ? '' : ' aria-disabled="true"') + ' title="' + ESC(tip) + '">⛩驻足 ' + (plan ? s.delay + '→' + plan.after : '✕') + '</span>');
       }
       if (state.cmd && state.cmd.skillReason) {
-        const reason = state.cmd.skillReason(s);
-        btn.title = reason || '';
-        if (reason) btn.setAttribute('aria-description', reason);
+        const reason = dismiss ? '' : state.cmd.skillReason(s);
+        const notice = dismiss ? '已生效 · 点击撤销' : reason;
+        btn.title = notice;
+        if (notice) btn.setAttribute('aria-description', notice);
         else btn.removeAttribute('aria-description');
         // 原因常驻卡底一行（不悬停也可读；不覆盖名字/数值/范围行）
         btn.querySelector('.t-skill-reason')?.remove();
-        if (reason) btn.insertAdjacentHTML('beforeend', '<div class="t-skill-reason">' + ESC(shortReason(reason)) + (shortReason(reason).includes(reason) ? '' : '<small>' + ESC(reason) + '</small>') + '</div>');
+        if (dismiss) btn.insertAdjacentHTML('beforeend', '<div class="t-skill-reason">已生效 · 点击撤销</div>');
+        else if (reason) btn.insertAdjacentHTML('beforeend', '<div class="t-skill-reason">' + ESC(shortReason(reason)) + (shortReason(reason).includes(reason) ? '' : '<small>' + ESC(reason) + '</small>') + '</div>');
       }
       if (!s.range || row.querySelector('.t-range-pill')) return;
       const pill = rangePill(s.range, !s.isReaction && s.displacements?.find(d => d.type === '闪现'));

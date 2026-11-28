@@ -547,12 +547,31 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     dispatchClock(state, { type: 'removeStatus', unitId: barrier.casterId, source: barrierClockSource(barrier) });
     emit('barrier-removed', { barrierId: barrier.id, reason, barrier: structuredClone(barrier) });
   }
-  function clearRegions() {
-    for (const region of ctx.regions.splice(0)) {
+  function clearRegions(casterId = null, skillName = null) {
+    const removed = [];
+    for (let i = ctx.regions.length - 1; i >= 0; i--) {
+      const r = ctx.regions[i];
+      if ((casterId == null || r.casterId === casterId) && (skillName == null || r.skillName === skillName)) removed.unshift(ctx.regions.splice(i, 1)[0]);
+    }
+    for (const region of removed) {
       dispatchClock(state, { type: 'removeStatus', unitId: region.casterId,
         source: { casterId: region.casterId, skillId: 'area:' + region.type, effectId: 'region:' + region.type } });
       emit('region-expired', { regionId: region.id });
     }
+  }
+  function hasActiveField(skill) {
+    const u = actor();
+    if (u?.side !== 'hero' || !skill?.name || state.combatState.clock?.terminal) return false;
+    const matches = field => field.casterId === u.id && field.skillName === skill.name;
+    return ctx.regions.some(matches) || ctx.barriers.some(matches);
+  }
+  function dismissField(skill) {
+    if (!hasActiveField(skill)) return false;
+    const u = actor();
+    clearRegions(u.id, skill.name);
+    clearBarriers(ctx, u.id, skill.name).forEach(barrier => removeBarrierResult(barrier, 'dismissed'));
+    addLog(u.name + ' 撤销【' + skill.name + '】');
+    return true;
   }
   function finishBattle(reason = 'battle-ended') {
     clearRegions();
@@ -677,6 +696,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       }
     }
     dispatchBattleClock({ type: 'exitUnit', unitId: target.id, cause: 'down' });
+    if (target.side === 'enemy') {
+      clearRegions(target.id);
+      clearBarriers(ctx, target.id).forEach(barrier => removeBarrierResult(barrier, 'caster-down'));
+    }
     emit('unit-down', { unitId: target.id, cause, sourceId, isSummon: !!target.isSummon, summonOwnerId: target.summonOwnerId || null,
       position: { ...placementsById[target.id] }, hpAfter: target.ref.hp });
     addLog(target.name + (target.side === 'hero' ? ' 倒地' : ' 死亡'));
@@ -923,20 +946,34 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
   ctx.opportunityAttackers = opportunityAttackers;
 
+  function reachWithin(u, budget, avoidFog) {
+    const search = isAiControlled(u) ? findRiskAwareReachable : findReachable;
+    return search(ctx, u.id, budget, ctx.carrying[u.id] ? 2 : 1, avoidFog ? fogRouteFilter(ctx, u) : null);
+  }
   function reachable(avoidFog = false) {
     const resourcesNow = state.combatState.clock?.currentAction?.resources;
     if (resourcesNow && resourcesNow.moveMultiplier === undefined) resourcesNow.moveMultiplier = 1;
-    const u = actor(), carrying = (state.combatState.carrying || {})[currentId()];
-    const search = isAiControlled(u) ? findRiskAwareReachable : findReachable;
-    return u && resources ? search(ctx, u.id, resources.moveRemaining * (resources.moveMultiplier || 1), carrying ? 2 : 1,
-      avoidFog ? fogRouteFilter(ctx, u) : null) : { cells: [], byKey: new Map() };
+    const u = actor();
+    return u && resources ? reachWithin(u, resources.moveRemaining * (resources.moveMultiplier || 1), avoidFog)
+      : { cells: [], byKey: new Map() };
   }
-  function previewMove(col, row, avoidFog = false) {
-    const cell = reachable(avoidFog).byKey.get(cellKey(col, row));
-    if (!cell) return null;
+  function sprintReachable() {
+    const u = actor(), r = resources;
+    if (!u || !r) return null;
+    const payment = actionPayment(r, 'main');
+    if (!payment.ok) return null;
+    const added = moveDistanceOf(u);
+    // 冲刺会把本次移动倍率重设为 1，预览按冲刺后的余额寻路。
+    return { ...reachWithin(u, r.moveRemaining + added, false), added, payment };
+  }
+  function movePreviewFor(cell) {
     const multiplier = resources.moveMultiplier || 1;
     const opportunityIds = [...new Set(cell.path.slice(1).flatMap((to, i) => opportunityAttackers(currentId(), cell.path[i], to)))];
     return { ...cell, cost: cell.cost / multiplier, budgetCost: cell.cost, opportunityIds };
+  }
+  function previewMove(col, row, avoidFog = false) {
+    const cell = reachable(avoidFog).byKey.get(cellKey(col, row));
+    return cell ? movePreviewFor(cell) : null;
   }
   function* beginMove(col, row, avoidFog = false, options = {}) {
     const u = actor(), r = resources, moveRun = runId;
@@ -1355,6 +1392,27 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       }
     }
     return query;
+  }
+  function previewApproach(skill, aim) {
+    const u = actor(), target = byId.get(aim?.targetId);
+    if (!u || !activeCombatant(target) || target.side === u.side || skill.damageType !== '近战'
+      || skill.isReaction || skill.isItem || skill.delay > 0
+      || skill.displacements?.some(d => d.type === '冲锋' || d.type === '闪现')) return null;
+    const valid = skillStatus(skill);
+    if (!valid.ok) return null;
+    const view = Object.create(ctx);
+    view.placementsById = { ...placementsById };
+    let best = null;
+    for (const cell of reachable().cells) {
+      if (best && cell.cost >= best.cell.cost) continue;
+      view.placementsById[u.id] = cell.cost > 0
+        ? { col: cell.col, row: cell.row, facing: sideStepFacing(cell.path.at(-2), cell) } : placementsById[u.id];
+      const query = queryAttack(view, u.id, valid.eff, aim);
+      if (!query.ok || !query.slotTargets.some(slot => slot.attack && slot.targetIds.includes(target.id))) continue;
+      if (cell.cost === 0) return null; // 原地可打，不改既有确认流程
+      best = { cell, query };
+    }
+    return best && { ...best, cell: movePreviewFor(best.cell) };
   }
   function aimFacing(query, fallback) {
     if (query.chargePath) {
@@ -2815,10 +2873,11 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     return { ...start(), resetEvents };
   }
 
-  return { ctx, battleState: state, get state() { return state; }, start, snapshot, reachable, previewMove, beginMove, move, sprint, previewJump, jump, push, previewCarry, carry, drop, previewDisplacement,
+  return { ctx, battleState: state, get state() { return state; }, start, snapshot, reachable, sprintReachable, previewMove, beginMove, move, sprint, previewJump, jump, push, previewCarry, carry, drop, previewDisplacement,
+    hasActiveField, dismissField,
     setVisibleUnitIds(ids) { visibleIds = ids ? ids.slice() : null; },
     canUseSkill, skillStatus, canUseReaction, canUseItem, itemSkill: itemAsSkill, startPreparation, canStationaryPrepare, stationaryStatus, previewStationaryStart, canAdvancePreparation, advancePreparation, cancelPreparation,
-    previewAttack, previewRetarget, teleportCells, beginAttack, attack, beginUseItem, useItem, predictAttack, defend, recoverEnemyMp, previewReady, ready,
+    previewAttack, previewApproach, previewRetarget, teleportCells, beginAttack, attack, beginUseItem, useItem, predictAttack, defend, recoverEnemyMp, previewReady, ready,
     getEffectiveUnit, statsOf, buffsOf,
     previewGuardCandidates, queryBarrierTargets(skill) {
       return ctx.barriers.map(barrier => queryAttack(ctx, currentId(), effectiveSkill(skill), { barrierId: barrier.id }))
