@@ -271,6 +271,10 @@ function build() {
     '    let ctx = null, tracks = {}, categoryTracks = new Map(), generation = 0, nextCueId = 0, audioScope = null;\n    const __busVol = { master: 1, skill: 1, result: 1, aux: 1, voice: 1, atmo: 1 }; let __panHint = null;', 1, '混音器分轨音量与声像提示状态');
   mixer = patch(mixer, "for (const name of ['skill', 'result', 'aux']) { const bus = ctx.createGain(); bus.connect(ctx.destination); tracks[name] = bus; }",
     "const __master = ctx.createGain(); __master.gain.value = __busVol.master; __master.connect(ctx.destination); tracks.master = __master;\n            for (const name of ['skill', 'result', 'aux', 'voice', 'atmo']) { const bus = ctx.createGain(); bus.gain.value = __busVol[name]; bus.connect(__master); tracks[name] = bus; }", 1, '混音器主总线与五轨');
+  mixer = patch(mixer,
+    'A:{ priority:8, gain:1.3 }, C:{ priority:8, gain:1.3 }, M:{ priority:7, gain:1 }, B:{ priority:6, gain:1.3 }',
+    'A:{ priority:8, gain:1.69 }, C:{ priority:8, gain:1.69 }, M:{ priority:7, gain:1.3 }, B:{ priority:6, gain:1.69 }', 1, '重点特效与提示额外增益');
+  mixer = patch(mixer, 'N:{ priority:3, gain:1 }', 'N:{ priority:3, gain:1.3 }', 1, '角色语音额外增益');
   mixer = patch(mixer, "const trackOf = category => ['F','G','H','I']", "const trackOf = category => category === 'N' ? 'voice' : ['F','G','H','I']", 1, '语音独立轨');
   mixer = patch(mixer, 'if (opts.pan != null && audioCtx.createStereoPanner) { pan = audioCtx.createStereoPanner(); pan.pan.value = opts.pan;',
     "const __p = opts.pan != null ? opts.pan : (cue.track === 'skill' || cue.track === 'result') ? __panHint : null;\n            if (__p != null && audioCtx.createStereoPanner) { pan = audioCtx.createStereoPanner(); pan.pan.value = __p;", 1, '战斗音效声像提示');

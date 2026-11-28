@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-28",
+  "artifact": "tactics/mvp-standalone.html",
+  "sha256": "5ca04c2abd9d8c02ac5a5ec4ccf26945976441c559ae7d2c29c4b33a1f95720b",
+  "sourceAll": { "passed": 1653, "failed": 0, "runs": 1 },
+  "related": { "boost": 26, "veilVideo": 6, "hitFeedback": 67, "fx01": 51 },
+  "artifactChecks": { "boostRules": true, "categoryGains": true, "fullLengthVeil": true, "nonBlockingVeil": true, "singleScript": true, "noExternalBusinessImport": true },
+  "browser": "ZCode IAB",
+  "url": "http://127.0.0.1:8123/tactics/mvp-standalone.html",
+  "scenario": "礼拜堂内埃利奥特与测试木桩；预备咏唱、圣域帷幕；测试夹具TP100，帷幕自身范围补半径3",
+  "plainSkillThenAvatar": { "tier": 1, "canChange": true, "busy": false, "tp": 100 },
+  "veilAtControlReturned": {
+    "busy": false,
+    "canBoost": true,
+    "tier": 0,
+    "tp": 100,
+    "mp": 80,
+    "video": { "time": 2.925831, "duration": 3.066, "paused": false, "canvasConnected": true, "ended": false, "error": null }
+  },
+  "veilFinished": { "time": 3.066, "duration": 3.066, "ended": true, "canvasConnected": false, "error": null },
+  "veilThenAvatar": { "tier": 1, "canChange": true, "busy": false },
+  "categoryGainsObserved": { "A": 1.690000057220459, "B": 1.690000057220459, "M": 1.2999999523162842, "N": 1.2999999523162842, "F": 1 },
+  "notes": [
+    "真实资源服务的weimu.webm为3.066秒；10秒媒体跨后续行动与清场由可控节点专项覆盖，不把模拟测试称为真实10秒媒体验证。",
+    "帷幕按钮定位点击遇到IAB outside-viewport，刷新快照后使用同一真实按钮的DOM click处理器；没有修改程序以迎合IAB。",
+    "帷幕LV1肃正耐久1100；TP净值受施法返还及施法者法力回响影响，独立费用断言由源码和单文件真实后端执行覆盖。",
+    "初次切片使用了不存在的场景ID，改用既有sc-chapel；首次帷幕试放缺少结界半径，补齐夹具后成功。未修改相关项目规则。",
+    "补充产物静态断言最初假设了未压缩的局部变量名和return形式；按esbuild压缩形式修正后专项通过，没有复跑全量。",
+    "主观响度尚未由用户试听验收；未操作酒馆、外部Chrome或安卓模拟器。"
+  ]
+}

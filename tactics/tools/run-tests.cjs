@@ -35,6 +35,10 @@ const STAGES = {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'boost-node-cases.mjs'),
     groups: ['BOOST'], modules: [], requiredExports: [],
   },
+  'veil-video': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'veil-video-node-cases.mjs'),
+    groups: ['VEIL-VIDEO'], modules: [], requiredExports: [],
+  },
   'tactical-followup': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'tactical-followup-node-cases.mjs'),
     groups: ['TACTICAL-FOLLOWUP'], modules: ['battle', 'parser'], requiredExports: [],

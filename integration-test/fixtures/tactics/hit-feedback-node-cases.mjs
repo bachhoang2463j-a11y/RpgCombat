@@ -124,6 +124,21 @@ export const groups = {
       const shieldAndDodge = clips().slice(from);
       cases.push(ok('THIT 我方未破盾按实际吸收量分三档，50% 最高档并保留同波反应闪避声',
         json(shieldAndDodge) === json(['parry_Weapon_1.wav', 'parry_Weapon_3.wav', 'parry_Weapon_3.wav', 'parry_Weapon_GuardBreak.wav', 'dodge_3.mp3']), json(shieldAndDodge)));
+      mixer.clear();
+      const boosted = { A: 1.69, B: 1.69, C: 1.69, M: 1.3, N: 1.3 };
+      const unchanged = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+      const track = c => c === 'N' ? 'voice' : 'skill';
+      cases.push(ok('THIT A/B/C与关键提示、语音额外30%，其他用途基础增益不变',
+        Object.entries(boosted).every(([c, v]) => mixer.output(track(c), c).gain.value === v)
+        && unchanged.every(c => mixer.output(c === 'F' || c === 'G' ? 'result' : 'aux', c).gain.value === 1)));
+      const skillBus = mixer.output('skill', 'A'), voiceBus = mixer.output('voice', 'N');
+      av.playSound('fire01', 0.72, 1, { category: 'A' });
+      av.playCustomAudio('https://audio.invalid/voice.mp3', 2, 1, { category: 'N' });
+      const [skillMedia, voiceMedia] = played.slice(-2);
+      cases.push(ok('THIT 采样原增益不重复放大，语音2倍与分类1.3仅各施加一次',
+        skillMedia.output.next.gain.values[0] === 0.72 && skillMedia.output.next.next === skillBus
+        && voiceMedia.output.next.gain.values[0] === 2 && voiceMedia.output.next.next === voiceBus
+        && mixer.output('skill', 'A') === skillBus && mixer.output('voice', 'N') === voiceBus));
     } finally {
       av?.CombatAudioMixer.clear();
       Object.assign(globalThis, previous);

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createBattle, BASIC_ATTACK } from '../../../tactics/src/battle.mjs';
-import { parseSkill } from '../../../tactics/src/parser.mjs';
+import { parseSkill, parseItem } from '../../../tactics/src/parser.mjs';
 import { resolveBoostModifiers, boostAffordable, nextBoostTier, applyBoostSkill } from '../../../tactics/src/boost.mjs';
 import { createHeroFlameFx } from '../../../tactics/src/hero-flame-fx.mjs';
 import { createUiSfx } from '../../../tactics/src/ui-sfx.mjs';
@@ -150,13 +150,51 @@ export const groups = {
       assert.equal(b.snapshot().resources.universal - before, 1);
     });
 
-    test('BOOST-10 技能开始后同回合不能改档或循环档位', () => {
-      const b = make([unit('h', 'hero', { skills: [attack] }), unit('e', 'enemy')], { h: at(2), e: at(5) });
+    test('BOOST-10 普通技能与Boost施放后均可重新投入，连续两招独立快照与扣费', () => {
+      const b = make([unit('h', 'hero', { skills: [extra, attack] }), unit('e', 'enemy')], { h: at(2), e: at(5) });
+      assert.ok(b.attack(extra).ok);
+      assert.equal(b.boostState().canChange, true);
       assert.ok(b.setBoostTier(1, attack).ok);
-      assert.ok(b.attack(attack, aim(b, 'e')).ok);
+      const first = b.attack(attack, aim(b, 'e'));
+      assert.ok(first.ok);
+      assert.equal(first.skill.boostTier, 1);
+      assert.equal(first.costSummary.tp, 25);
+      assert.equal(b.ctx.units[0].ref.tp, 80);
+      assert.deepEqual(b.boostState(), { tier: 0, canChange: true });
+      assert.ok(b.cycleBoost(attack).ok);
+      assert.equal(b.setBoostTier(2, attack).tier, 2);
+      const second = b.attack(attack, aim(b, 'e'));
+      assert.ok(second.ok);
+      assert.equal(second.skill.boostTier, 2);
+      assert.equal(second.costSummary.tp, 45);
+      assert.equal(b.ctx.units[0].ref.tp, 40);
+      assert.equal(first.skill.boostTier, 1);
+      assert.deepEqual(b.boostState(), { tier: 0, canChange: true });
+    });
+
+    test('BOOST-10b 移动后仍可投入，准备中冻结且释放后重新开放', () => {
+      const b = make([unit('h', 'hero', { skills: [delayed] }), unit('e', 'enemy')], { h: at(2), e: at(5) });
+      assert.ok(b.move(3, 4).ok);
+      assert.equal(b.boostState().canChange, true);
+      assert.equal(b.setBoostTier(3, delayed).tier, 3);
+      assert.ok(b.startPreparation(delayed).ok);
       assert.equal(b.boostState().canChange, false);
-      assert.equal(b.setBoostTier(2, attack).ok, false);
-      assert.equal(b.cycleBoost(attack).ok, false);
+      assert.equal(b.cycleBoost(delayed).ok, false);
+      const released = b.attack(delayed, aim(b, 'e'));
+      assert.ok(released.ok);
+      assert.equal(released.costSummary.tp, 0);
+      assert.deepEqual(b.boostState(), { tier: 0, canChange: true });
+      assert.equal(b.setBoostTier(1, delayed).tier, 1);
+      assert.equal(b.setBoostTier(3, delayed).tier, 0);
+    });
+
+    test('BOOST-10c 物品使用后保持头像可投入且不吞掉预选档位', () => {
+      const item = parseItem('【测试药剂】[回复:5][道具][次数:2][范围:自身]');
+      const b = make([unit('h', 'hero', { skills: [attack] }), unit('e', 'enemy')], { h: at(2), e: at(5) });
+      assert.equal(b.setBoostTier(1, attack).tier, 1);
+      assert.ok(b.useItem(item).ok);
+      assert.deepEqual(b.boostState(), { tier: 1, canChange: true });
+      assert.equal(b.setBoostTier(2, attack).tier, 2);
     });
 
     test('BOOST-11 换人或自然行动重置档位与可变更状态', () => {
@@ -241,15 +279,17 @@ export const groups = {
       assert.deepEqual(result.hits.map(hit => hit.targetId).sort(), preview.targetIds.slice().sort());
     });
 
-    test('BOOST-16 MAX再动返还后档位已锁，不能循环发动', () => {
+    test('BOOST-16 MAX再动返还后可重新投入，但不足支付MAX仍回归0档', () => {
       const b = make([unit('h', 'hero', { skills: [extra], tp: 100 }), unit('e', 'enemy')], { h: at(2), e: at(5) });
       assert.ok(b.setBoostTier(3, extra).ok);
       const grant = b.attack(extra);
       assert.ok(grant.ok);
       assert.equal(b.snapshot().resources.universal, 1);
-      assert.equal(b.boostState().canChange, false);
-      assert.equal(b.cycleBoost(extra).ok, false);
-      assert.equal(b.setBoostTier(3, extra).ok, false);
+      assert.equal(b.boostState().canChange, true);
+      const tp = b.ctx.units[0].ref.tp;
+      assert.equal(b.cycleBoost(extra).tier, 1);
+      assert.equal(b.setBoostTier(3, extra).tier, 0);
+      assert.equal(b.ctx.units[0].ref.tp, tp);
     });
 
     test('BOOST-17 蓄力期间冻结Boost档位并跨回合保持技能快照', () => {
@@ -274,7 +314,8 @@ export const groups = {
         unit('e', 'enemy', { spd: 100 })], { h: at(2), peer: at(3), e: at(7) });
       assert.ok(b.setBoostTier(2, attack).ok);
       assert.ok(b.attack(attack, aim(b, 'e')).ok);
-      assert.equal(b.boostState().canChange, false);
+      assert.equal(b.boostState().canChange, true);
+      assert.equal(b.setBoostTier(1, attack).tier, 1);
       b.endAction();
       assert.equal(b.snapshot().boostTier, 0);
       assert.equal(b.boostState().canChange, true);

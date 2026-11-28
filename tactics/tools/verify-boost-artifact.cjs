@@ -18,6 +18,15 @@ for (const name of ['lv1', 'lv2', 'lv3', 'lv1s', 'lv2s', 'lv3s', 'cancel', 'cast
   assert.equal(data.subarray(0, 4).toString(), 'OggS');
   assert.ok(html.includes('data:audio/ogg;base64,' + data.toString('base64')), '原版 Boost ' + name + ' 音效未入包');
 }
+for (const [category, priority, gain] of [['A', 8, 1.69], ['B', 6, 1.69], ['C', 8, 1.69], ['M', 7, 1.3], ['N', 3, 1.3],
+  ['D', 5, 1], ['E', 4, 1], ['F', 2, 1], ['G', 2, 1], ['H', 1, 1], ['I', 1, 1], ['J', 0, 1], ['K', 0, 1], ['L', 0, 1]]) {
+  assert.ok(scripts[0][1].includes(category + ':{priority:' + priority + ',gain:' + gain + '}'), category + ' 分类增益未入包');
+}
+assert.ok(!scripts[0][1].includes('boostUsed'), '整轮Boost锁定不应入包');
+assert.ok(/fullLength\?void 0:ms/.test(scripts[0][1]), '完整视频层不得按固定时限收回');
+const veil = scripts[0][1].slice(scripts[0][1].indexOf('id:"sanctum-veil"'), scripts[0][1].indexOf('DEFAULT_FX_ENTRIES='));
+assert.ok(/webm\(ctx,"weimu\.webm"[^)]*fullLength:!0/.test(veil), '圣域帷幕完整视频开关未入包');
+assert.ok(veil.includes('ctx.wait(1900)') && !veil.includes('awaitHandle'), '圣域帷幕不得等待视频播完');
 const host = { console, structuredClone, URL, setTimeout, clearTimeout };
 host.window = host;
 vm.createContext(host);
@@ -47,6 +56,7 @@ const preview = b.predictAttack(skill, aim);
 assert.equal(preview.costs.tp, 70);
 assert.equal(preview.ok, true);
 assert.equal(preview.damagePreview.length, 2);
+b.battleState.combatState.clock.currentAction.resources.universal = 1;
 const result = b.attack(skill, aim);
 assert.equal(result.costSummary.tp, 70);
 assert.equal(b.ctx.units[0].ref.tp, 35);
@@ -54,7 +64,16 @@ assert.equal(result.skill.boostTier, 3);
 assert.equal(result.hits.find(h => h.targetId === 'e').hpDmg, 30);
 assert.equal(result.hits.find(h => h.targetId === 'n').hpDmg, 15);
 for (const row of preview.damagePreview) assert.equal(row.estimatedHpDmg, result.hits.find(h => h.targetId === row.targetId).hpDmg);
-assert.equal(b.setBoostTier(1).ok, false, '技能执行后不得再次投入Boost');
+assert.equal(b.boostState().canChange, true, '技能执行后应重新开放Boost');
+const followUp = { ...skill, name: '产物Boost第二击', range: { type: '单体', castRange: 10 } };
+assert.equal(b.setBoostTier(1, followUp).tier, 1);
+const second = b.attack(followUp, aim);
+assert.equal(second.ok, true);
+assert.equal(second.costSummary.tp, 30, '第二次Boost独立付费');
+assert.equal(second.skill.boostTier, 1);
+assert.equal(result.skill.boostTier, 3, '后续投入不改上一招快照');
+assert.equal(b.ctx.units[0].ref.tp, 10);
+assert.equal(b.boostState().tier, 0);
 const kill = make(10);
 kill.setBoostTier(3, skill);
 assert.equal(kill.attack(skill, aim).hits.filter(h => h.down).length, 2);
@@ -79,4 +98,4 @@ assert.equal(mixedResult.skill.power, 30);
 assert.equal(mixedResult.skill.power2, 22);
 assert.equal(mixedResult.skill.slotTurns2, 4);
 assert.equal(mixedResult.effects.find(e => e.kind === 'buff' && e.field === 'def').value, -22);
-console.log('[boost artifact] 关键模块、8个内嵌原版音效、单脚本与零外部import通过；产物真实规则的射程、扣费、预览/溅射、锁档、多杀返还与延迟冻结通过');
+console.log('[boost artifact] 关键模块、8个内嵌原版音效、单脚本与零外部import通过；产物真实规则的射程、连续Boost独立扣费、预览/溅射、多杀返还与延迟冻结通过');

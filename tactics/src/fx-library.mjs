@@ -68,8 +68,9 @@ function ringHtml(x, y, d, inner, outer) {
 const FX_WEBM_KEY_MAX = 960;
 export { FX_WEBM_KEY_MAX, webm as playWebmFx, playSupportEffects };
 // audio>0：按原版 audioUrl:'none' 口径开启视频原声，经混音器以该增益播放（原版 applyAudioVolume(vw, 2.5)）
-function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1, cover = 0, audio = 0 } = {}) {
-  const layer = ctx.fx.top('', ms);
+function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1, cover = 0, audio = 0, fullLength = false } = {}) {
+  const scope = fullLength ? ctx.sandbox.getScope() : null;
+  const layer = ctx.fx.top('', fullLength ? undefined : ms);
   const v = document.createElement('video');
   v.muted = !audio; v.playsInline = true; v.preload = 'auto'; v.crossOrigin = 'anonymous'; v.loop = false;
   v.style.display = 'none';
@@ -91,19 +92,22 @@ function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1, cover 
     cv.style.width = cssW + 'px';
     cv.style.height = Math.round(cssW / aspect) + 'px';
   };
-  let released = false;
-  const release = () => {
+  let released = false, unbind = null;
+  const release = (ok = true) => {
     if (released) return; released = true;
+    if (unbind) unbind();
     if (raf) cancelAnimationFrame(raf);
     cv.remove(); v.pause(); v.removeAttribute('src'); v.load(); v.remove();
-    cv.handle.onFinish.forEach(fn => fn(true));
+    if (scope) scope.removeNode(layer);
+    cv.handle.onFinish.forEach(fn => fn(fullLength ? ok : true));
   };
+  if (scope) unbind = scope.onDispose(() => release(false));
   const next = () => {
     if (typeof v.requestVideoFrameCallback === 'function') v.requestVideoFrameCallback(frame);
     else raf = requestAnimationFrame(frame);
   };
   function frame() {
-    if (!cv.isConnected || v.paused || v.ended) { release(); return; }
+    if (!cv.isConnected || v.paused || v.ended) { release(v.ended); return; }
     const cw = cv.width, ch = cv.height;
     if (!cw || !ch) { next(); return; }
     let fade = 1;
@@ -126,15 +130,15 @@ function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1, cover 
     } else cv.style.opacity = String(opacity * fade);
     next();
   }
-  v.onended = release;
-  v.onerror = release;
+  v.onended = () => release(true);
+  v.onerror = () => release(false);
   v.src = ctx.av.ASSET_BASE + '/' + file;
   v.playbackRate = rate * getTimeScale();
   layer.appendChild(v);
   layer.appendChild(cv);
   if (audio) ctx.av.CombatAudioMixer.media(v, audio, 'skill', { audioContext: ctx.audioContext });
   const p = v.play();
-  if (p && typeof p.then === 'function') p.then(next, () => release());
+  if (p && typeof p.then === 'function') p.then(next, () => release(false));
   else next();
   return cv;
 }
@@ -3227,7 +3231,7 @@ const sanctumVeil = {
     fx.sfx('weimu', 0.70); fx.shake('heavy');
     ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
     revealBarriers(ctx);
-    webm(ctx, 'weimu.webm', c.x, c.y, R * 2, { ms: 1600, cover: R * 2 });
+    webm(ctx, 'weimu.webm', c.x, c.y, R * 2, { cover: R * 2, fullLength: true });
     fx.top(ringHtml(c.x, c.y, R * 2, 'rgba(186,230,253,0.9)', 'rgba(56,189,248,0.35)'), 900)
       .firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 860, fill: 'forwards' });
     return ctx.wait(1900);

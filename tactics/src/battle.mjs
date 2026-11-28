@@ -1267,7 +1267,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   function boostState() {
     const u = actor(), r = currentResources();
     return { tier: u?.ref.hp > 0 && !state.combatState.clock?.terminal ? r?.boostTier || 0 : 0, canChange: !!(u && u.side === 'hero' && !isAiControlled(u) && u.ref.hp > 0 && r
-      && !r.boostUsed && !state.combatState.charges?.[u.id]?.preparing && !state.combatState.clock?.terminal) };
+      && !state.combatState.charges?.[u.id]?.preparing && !state.combatState.clock?.terminal) };
   }
   function setBoostTier(tier, skill = null) {
     const before = boostState();
@@ -1285,7 +1285,6 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
   function consumeBoost(skill, preparing = false) {
     if (skill.isItem || skill.isReaction) return;
-    resources.boostUsed = true;
     resources.boostTier = 0;
     if (skill.boostTier) emit(preparing ? 'boost-prepared' : 'boost-cast', {
       unitId: actor().id, tier: skill.boostTier, skillName: skill.name,
