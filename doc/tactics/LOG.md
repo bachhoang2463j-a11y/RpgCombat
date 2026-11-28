@@ -998,3 +998,14 @@
 - 文件：`tactics/src/{threat,battle,range,range-overlay,sandbox,main,ui-sfx}.mjs`、`tactics/tactics.css`、`tactics/tools/run-tests.cjs`、`tactics/mvp-standalone.html`、`integration-test/fixtures/tactics/av-polish-node-cases.mjs`、产物报告、`doc/tactics/FX-INFER-WHITELIST.md`。
 - 验证：`av-polish` 新增威胁 8 项 + 残血 2 项（含 32×26 带立柱全尺寸地图单个远程敌人计算 < 250ms）；唯一一次全量 57 组 1558 项一次通过；重建单文件 65 模块，8 项产物断言通过。自动化浏览器实页：悬停食尸鬼画出单个威胁区、移开即清、T 键全体热度（6 名敌人首次计算约 21ms）、移动提示「进入 3 名敌人射程」，零 JS 报错；残血外环与心跳未在实页触发（需真实掉血，至 30% 以下），仅由用例覆盖；未做听感验证，未接入真实酒馆。
 - 目的 vs 现状：阶段 B 与目的一致。
+
+## 2026-11-28 · 视听强化阶段 C：特效推断、敌人徽章、战斗留痕、法术照亮（acde996）
+- 核心目的：LLM 临场生成的敌人与技能"各有面貌"——没写/写错特效也有贴切演出，敌人一眼可辨档次、主元素与关键特性，战斗在地面留下痕迹、法术照亮周围；不改任何规则结算。
+- C1 推断：新增 `fx-infer.mjs`，按 `FX-INFER-WHITELIST.md` 顺序：显式「无」与合法名不动 → 非法名先别名后就近纠正（只在可推断集合内）→ 未写按技能名 + 状态标签关键词（元素优先于枪械）→ 范围 × 伤害类型兜底 → 不给（走通用兜底）。升档 = Charge / 首领 / 单段 power≥140 任一；专属演出永不推断；弹药与无效果槽载体不推断。挂在 `loadYaml` 建视图后，只写 `fxTag` + `fxTagInferred`；编辑器下拉显示「（推断）」，手动选「特效:无」存为「无」不再被补回，编辑覆写清推断标记。
+- C2 徽章：敌方奖章新增分级外框（杂兵单层红环 / 精英银色双环刻痕 / 首领金色尖冠 + 呼吸微光）、主元素底色（威力最高攻击技能的元素）、至多 3 个特性角标（复活/蜕皮/自爆/钢体/流体/虚形/破法，悬停有说明）；复活用尽、蜕皮已触发灰显；倒地隐藏。显式 `等级` 优先于强度推算；自爆同时识别特性与死亡触发技能。`头像` 字段沿用既有 emoji/头像通道，本轮未新增字段。
+- C3 留痕：新增 `battle-marks.mjs`，地图底图之上、单位之下一层；命中造成 HP 伤害时按元素落焦痕/霜斑/腐液/圣光余烬圈/弹孔/雷击焦纹/暗色溅痕（不画红色血迹），爆炸在爆心加大坑；旋转与形状由段 ID 种子决定；3 个回合（虚拟时钟 ROUND_TIME×3）线性淡出，上限 40 处先删最旧，随视图作用域清空。
+- C4 照亮：单位层下滤色光照层。元素类技能蓄力时出手者弱光，命中时落点强光（L3/L4 8m 600ms、L2 4m 450ms、其余 2m 300ms，同目标一次）；枪械枪口闪光 1m 160ms + 落点 1.2m 220ms。
+- 文件：`tactics/src/{fx-infer,battle-marks,action-director,editor-panel,main,status-ui,unit-view}.mjs`、`tactics/tactics.css`、`tactics/tools/{run-tests,verify-typical-artifact}.cjs`、`tactics/mvp-standalone.html`、`integration-test/fixtures/tactics/{av-polish,guard-director,hit-feedback}-node-cases.mjs`（后两者 dom 桩补 `art`）、产物报告。
+- 验证：`av-polish` 新增推断 8 项 + 外观 3 项，共 32 项；唯一一次全量 57 组 1569 项一次通过（之后只改徽章分级与自爆识别两处表现代码，复跑 av-polish 通过）；重建单文件 67 模块，8 项产物断言通过（典型对局断言随编辑器签名更新为压缩形态）。真页：6 名敌人徽章正确（深潜者杂兵、眷族首领金冠、犹格索托斯之子/食尸鬼精英外框 + 角标，食尸鬼含 ✨💥💧），一轮敌方行动出现诅咒痕迹 1 处、光照 2 次，零 JS 报错（截图 `workspace/artifacts/stage_c_badges.png`）。未做流畅度/听感验证，未接入真实酒馆。
+- 分级口径：YAML 显式 `等级`（首领/精英/杂兵）优先，缺省才用强度推算；真页复测食尸鬼 A/B 由精英改回杂兵外框（✨💥💧 角标不变）。
+- 目的 vs 现状：阶段 C 与目的一致。
