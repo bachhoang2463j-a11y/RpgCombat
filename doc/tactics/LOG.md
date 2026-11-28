@@ -1025,3 +1025,11 @@
 - 文件：`tactics/src/{battle,av-host,action-director,main,range-overlay,sandbox,status-ui,ui-sfx,unit-view}.mjs`、`tactics/tactics.css`、`tactics/tools/run-tests.cjs`、`integration-test/fixtures/tactics/av-polish-node-cases.mjs`、`tactics/mvp-standalone.html`。
 - 验证：源码唯一全量回归 **57 阶段 1576 项**通过；只读子代理审查后修复 3 项 P1/2 项 P2，复跑 `av-polish`（39/39）、`counter-av`（12/12）、`status-variant`（19/19）通过；重建单文件（67 模块，2,132,936 字节，sha256 `80686170...`），`verify-typical-artifact.cjs`（63/63）与 `verify-fx-polish-artifact.cjs`（36 项）通过；内置浏览器实机打开 `127.0.0.1:8123/tactics/mvp-standalone.html` 验证食尸鬼 `💥 自爆·群火`、选招隐藏单个威胁区、`T` 键淡化热力图、玛德琳移动扣费及全程 0 JS 报错（仅外部音效服 `192.168.110.83:8766` 未连）。
 - 目的 vs 现状：阶段 D 与本轮交互/视觉目标全部达成。
+
+## 2026-11-28 · 特效技能按需技术参考（a67d62e）
+- 核心目的：把外部 VFX 资料中经过核验且适合本项目的知识纳入现有 `svg-skill-vfx`，按任务本地读取，不安装引擎专用技能，也不把 API 指南误当成现成算法。
+- 变更：主技能新增三类读取路由和简短决策指引；`references/curve-motion.md` 整理参数/弧长/切线与现有轨迹衔接，`ribbon-trails.md` 整理世界坐标历史与拖尾构型，`svg-masks.md` 整理遮罩语义、软边配方与项目适配；保留来源及已核实/待实现/待验证边界。
+- 文件：`.agents/skills/svg-skill-vfx/SKILL.md`、`.agents/skills/svg-skill-vfx/references/{curve-motion,ribbon-trails,svg-masks}.md`。
+- 决策原因：Phaser/melonJS 技能主要是引擎 API 与配置说明，不提供原生 LUT 或 ribbon 实现；项目已有 Canvas 粒子与归一化路径推进，不能重复写成待新增能力；外部 SVG 示例需纠正 SMIL 控制点取值，并适配 UID、坐标、倍速和清场。原有演出、美术与音效纪律不变。
+- 验证：技能身份与结构、3 个参考链接、参考中的项目路径及 3 类路由内容静态检查通过，`git diff --check` 通过；主技能 133 行，参考分别 54/47/48 行。本轮仅技能/技术文档，未执行模型实际触发测试、运行时测试、浏览器验证或重新打包，未更新 README。
+- 目的 vs 现状：一致；已形成精简主技能与本地按需参考，未新增运行时能力，也未把未运行的配方标为已验证原语。
