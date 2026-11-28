@@ -968,3 +968,10 @@
 - 文件：`tactics/src/{bgm-library,bgm-director,main,ui-shell,action-director}.mjs`、`tactics/tactics.css`、`tactics/tools/build-demo-html.cjs`、`tactics/mvp-standalone.html`、`integration-test/fixtures/tactics/bgm-director-node-cases.mjs`。
 - 验证：改名后 11 首原曲经 ffprobe 及 HTTP/CORS 检查；唯一一次 Node 全量 1524 通过。IAB 发现旧终局接口残留，修正后相关回归 25/25、最终单文件结构门槛、内联 BGM 10/10，IAB 起播、暂停/音量/恢复自动、390 像素宽面板、重开保留手动、实际走格与短局击杀胜利通过。未进行外部浏览器、酒馆宿主或真人听感验证。
 - 目的 vs 现状：一致。
+
+## 2026-11-28 · 冲刺落点、近战走打与场地撤销（42494ca）
+- 预览与执行：当前移动额度走不了新格且能支付冲刺时，用黄色标出真实冲刺落点，仍是同格点两次确认。选定近战技能后，瞄准敌人显示最低移动消耗的合法进攻路线，在目标旁显示用量和余额；点一次走打，不自动冲刺，若借机截停或目标失效则不出手。
+- 场地：只在敌方施法者确实死亡时移除其领域和结界；我方倒地保留。我方效果生效期间点原技能或物品卡撤销，只移除当前角色的同名效果，不消耗次数或资源。两个深潜者的造雾从 5 回合改为 3 回合，玩家同名技能不变。
+- 文件：`tactics/src/{barriers,battle,main,range-overlay,regions,ui-shell}.mjs`、`doc/tactics/典型对局-战棋版.yaml`、`tactics/tools/{build-demo-html,run-tests}.cjs`、`tactics/mvp-standalone.html`、战棋专项及 UI 连线用例和产物报告。
+- 验证：新专项 13 项；单次全量停在旧冲刺实现文本断言，修正后 UIR-W 5 项与剩余 35 阶段 1263 项通过，未重新跑全量。重建单文件结构与 63 项产物断言通过，新专项在内联后端 13 项通过。IAB 在独立局面实测近战预览 3.0m/剩 1.0m，单击走打后扣费一致、敌人 -19 HP；重开按钮操作超时，未补测黄色格的页面显示。未接管前台正在运行其它应用的雷电，也未操作真实酒馆。
+- 目的 vs 现状：规则、单文件和近战页面验收与本轮目标一致。
