@@ -18978,6 +18978,10 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       if (url) return playCustomAudio(url, volume, rate, opts);
     };
     function playRandomStandardGunshot(owner = null) {
+      if (owner?.audioContext?.demoRangedHeavy) {
+        owner.attackCue = playSound("shot", 0.8, 1, { track: "skill", sync: true, owner, audioContext: owner.audioContext });
+        return "shot";
+      }
       const candidates = ["gunshot1", "gunshot2", "gunshot3"];
       const previous = playRandomStandardGunshot.last;
       const available = candidates.filter((key) => key !== previous);
@@ -30620,6 +30624,7 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
     osc.stop(now + ms / 1e3);
   }
   var MELEE_SUB_BASS = { type: "triangle", f0: 160, f1: 36, gain: 0.75, ms: 300 };
+  var playDemoRangedHeavyBass = (ctx) => subBass(ctx, RANGED_SUB_BASS);
   var RANGED_SUB_BASS = { type: "sine", f0: 140, f1: 32, gain: 0.8, ms: 350 };
   function meleeHeavyBurst(fx, p, ang, { D = 2.6 * PX2, stun = true } = {}) {
     const k2 = D / 240, uid = fx.uid(), box2 = "position:absolute;left:" + -D / 2 + "px;top:" + -D / 2 + "px;width:" + D + "px;height:" + D + "px;overflow:visible;";
@@ -36339,6 +36344,8 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
       const input = actionInput({ ...result, skill });
       const entry = registry.resolve(input);
       const kill = planKillBeat({ ...result, skill }, casterUnit, vd.units);
+      const demoRangedHeavy = [...kill.lethal].some((seg) => (seg.damageType || result.incomingType || skill.damageType) === "\u8FDC\u7A0B");
+      if (demoRangedHeavy) audioContext.demoRangedHeavy = true;
       const killSound = (seg) => {
         const key = KILL_IMPACT[seg.damageType || result.incomingType || skill.damageType || "\u8FD1\u6218"];
         return key === "parry_heavy" && (seg.guardBroken || seg.shieldDmg > 0 && seg.shieldAfter === 0) ? "hitDown" : key;
@@ -36700,6 +36707,7 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
             floatText2(makeFx("B"), p.x, p.y - 36, "\u{1FA78} \u6BC5\u529B \xB7 1HP!", "#fca5a5", "#7f1d1d", { ms: 1e3, size: 14 });
           }
         }
+        if (finisher && demoRangedHeavy) playDemoRangedHeavyBass({ av, audioContext });
         if (!healed && !seg.barrierHitId && (fatalReason !== "avoid-fatal" || seg.shieldDmg > 0 || seg.guardBroken)) av.CombatAudioDirector.publish(r);
         if (wave) av.CombatAudioDirector.completeTarget(wave, targetId);
         if (onReveal) onReveal({ ...h, ...hitSnap, targetId, heal: healed, segmentIndex: i, segmentCount: segs.length }, Object.assign({ result, identity, entryId: entry.id }, meta));
@@ -43011,11 +43019,11 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
     "      \u79FB\u52A8: 6",
     "      \u5360\u683C: 1x1",
     "    \u6280\u80FD:",
-    "      - \u540D\u5B57: \u8BD5\u5C04",
+    "      - \u540D\u5B57: \u8FDC\u7A0B\u8BD5\u5C04",
     "        \u52A8\u4F5C: \u4E3B",
     '        \u6807\u7B7E: "[\u67AA\u51FB;power:45][\u8FDC\u7A0B][\u5FC5\u4E2D][\u7279\u6548:\u67AA\u51FB]"',
     "        \u8303\u56F4: { \u7C7B\u578B: \u5355\u4F53, \u5C04\u7A0B: 15 }",
-    "      - \u540D\u5B57: \u75BE\u98CE\u91CD\u65A9",
+    "      - \u540D\u5B57: \u8FD1\u6218\u91CD\u65A9",
     "        \u52A8\u4F5C: \u4E3B",
     '        \u6807\u7B7E: "[\u4F24\u5BB3;power:70][\u8FD1\u6218][\u5FC5\u4E2D][\u7279\u6548:\u8FD1\u6218\u91CD\u51FB]"',
     "        \u8303\u56F4: { \u7C7B\u578B: \u5355\u4F53, \u5C04\u7A0B: 15 }",
@@ -43377,9 +43385,9 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
     '<button data-mode="B" class="active">B \u516B\u65B9\u5747\u8861\u7248</button>',
     '<button data-mode="C">C \u516B\u65B9\u91CD\u51FB\u7248</button>',
     '<span class="sep"></span>',
-    '<button data-preset="normal">\u666E\u653B\u547D\u4E2D</button>',
-    '<button data-preset="fodder">\u51FB\u6740\u6742\u5175</button>',
-    '<button data-preset="elite">\u51FB\u6740\u7CBE\u82F1</button>',
+    '<button data-preset="normal">\u666E\u653B\u547D\u4E2D\xB7\u8FDC\u7A0B</button>',
+    '<button data-preset="fodder">\u51FB\u6740\u6742\u5175\xB7\u8FD1\u6218</button>',
+    '<button data-preset="elite">\u51FB\u6740\u7CBE\u82F1\xB7\u8FDC\u7A0B</button>',
     '<button data-preset="swordUlt">\u5251\u6280\u84C4\u52BF\u65A9</button>',
     '<button data-preset="spellUlt">\u5723\u5149\u84C4\u52BF</button>',
     '<button id="hd-reset">\u91CD\u7F6E\u9776\u573A</button>'
@@ -43402,9 +43410,9 @@ button.t-res-lab.t-aux.t-filter-on { background: #7dd3fc; box-shadow: 0 0 8px rg
     const frank = units.find((u) => u.id.includes("\u5F17\u5170\u514B"));
     const findEnemy = (kw) => units.find((u) => u.side === "enemy" && u.name.includes(kw));
     const map = {
-      normal: { skill: "\u8BD5\u5C04", target: findEnemy("\u575A\u97E7\u6728\u6869") },
-      fodder: { skill: "\u75BE\u98CE\u91CD\u65A9", target: findEnemy("\u6742\u5175\u9776") },
-      elite: { skill: "\u8BD5\u5C04", target: findEnemy("\u7CBE\u82F1\u9776") },
+      normal: { skill: "\u8FDC\u7A0B\u8BD5\u5C04", target: findEnemy("\u575A\u97E7\u6728\u6869") },
+      fodder: { skill: "\u8FD1\u6218\u91CD\u65A9", target: findEnemy("\u6742\u5175\u9776") },
+      elite: { skill: "\u8FDC\u7A0B\u8BD5\u5C04", target: findEnemy("\u7CBE\u82F1\u9776") },
       swordUlt: { skill: "\u6781\u5251\xB7\u7834\u754C\u65A9", target: findEnemy("\u9996\u9886\u9776") },
       spellUlt: { skill: "\u5723\u5149\u5BA1\u5224", target: findEnemy("\u9996\u9886\u9776") }
     }[kind];

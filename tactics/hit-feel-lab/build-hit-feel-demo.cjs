@@ -209,6 +209,13 @@ export function startKillCamera(sandbox, from, to, fx) {
       );
       for (const [target, replacement, label] of [
         ['      if (entry.finisherOwnImpact) return null;\n', '', 'fixedImpact'],
+        ['playObstacleBreak, playBackstabMark }', 'playObstacleBreak, playBackstabMark, playDemoRangedHeavyBass }', 'rangedHeavyBassImport'],
+        ['    const killSound = seg => {',
+          `    const demoRangedHeavy = [...kill.lethal].some(seg => (seg.damageType || result.incomingType || skill.damageType) === '远程');
+    if (demoRangedHeavy) audioContext.demoRangedHeavy = true;
+    const killSound = seg => {`, 'director:demoRangedHeavy'],
+        ['      if (!healed && !seg.barrierHitId && (fatalReason',
+          "      if (finisher && demoRangedHeavy) playDemoRangedHeavyBass({ av, audioContext });\n      if (!healed && !seg.barrierHitId && (fatalReason", 'rangedHeavyBassBeat'],
         ['    if (!entry.finisherOwnImpact) ruleKeys.push(...new Set([...kill.lethal].map(killSound).filter(Boolean)));',
           `    if (kill.lethal.size) ruleKeys.push(...new Set([...kill.lethal].flatMap(seg => {
       const key = killSound(seg);
@@ -349,6 +356,7 @@ export function startKillCamera(sandbox, from, to, fx) {
         ["fx.sfx('hitDown', heavy ? 0.6 : 0.52); subBass(ctx, { type: 'sine', f0: 120, f1: 34, gain: heavy ? 0.6 : 0.45, ms: 260 });", 'slugImpact'],
       ]) s = mustReplace(s, cue, 'if (!ctx.demoLethal) { ' + cue + ' }', 'fxlib:' + label);
       s = mustReplace(s, "fx.sfx('herocharge', 0.4);", "if (!ctx.demoChargeScheduled) fx.sfx('herocharge', 0.4);", 'fxlib:rangedCharge');
+      s = mustReplace(s, 'const RANGED_SUB_BASS = {', 'export const playDemoRangedHeavyBass = ctx => subBass(ctx, RANGED_SUB_BASS);\nconst RANGED_SUB_BASS = {', 'fxlib:rangedHeavyBass');
       return { contents: s, loader: 'js' };
     });
 
@@ -368,6 +376,13 @@ export function startKillCamera(sandbox, from, to, fx) {
                 if (key === 'parry_heavy') after(80, () => playSound('hitDown', 0.6, 1, impactOpts));
                 else if (key === 'light01') playSound('light_impact', 0.60, 1, impactOpts);
             }`, 'av:fixedKillMix');
+      s = mustReplace(s,
+        "    const candidates = ['gunshot1', 'gunshot2', 'gunshot3'];",
+        `    if (owner?.audioContext?.demoRangedHeavy) {
+        owner.attackCue = playSound('shot', 0.8, 1, { track:'skill', sync:true, owner, audioContext:owner.audioContext });
+        return 'shot';
+    }
+    const candidates = ['gunshot1', 'gunshot2', 'gunshot3'];`, 'av:rangedHeavyLaunch');
       return { contents: s, loader: 'js' };
     });
   },
