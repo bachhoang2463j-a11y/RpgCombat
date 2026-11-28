@@ -353,7 +353,24 @@ function drawBackstabSector(g, viewData, unitId) {
   g.restore();
 }
 
-export function drawOverlay(g, pv, viewData, selectedId, intents = [], backstabHoverId = null) {
+// 敌方威胁区：单个 = 可走暗红薄面 + 跳跃落点小点 + 冲刺可达虚线 + 可打红描边；合集 = 被覆盖人数越多越深
+const TH = { move: 'rgba(239,68,68,0.14)', moveEdge: 'rgba(248,113,113,0.5)', sprint: 'rgba(248,113,113,0.42)',
+  atk: 'rgba(220,38,38,0.07)', atkEdge: 'rgba(252,165,165,0.85)', dot: 'rgba(254,202,202,0.7)' };
+function drawThreat(g, th) {
+  if (th.heat) {
+    for (const c of th.heat.values()) { g.fillStyle = 'rgba(220,38,38,' + Math.min(0.42, 0.06 + 0.08 * c.n).toFixed(3) + ')'; g.fillRect(c.col * Q + 1, c.row * Q + 1, Q - 2, Q - 2); }
+    strokeCellOutline(g, [...th.heat.values()], TH.atkEdge, 1.6);
+    return;
+  }
+  if (th.attack.length) { fillCells(g, th.attack, TH.atk); strokeCellOutline(g, th.attack, TH.atkEdge, 1.8); }
+  if (th.move.length) { fillCells(g, th.move, TH.move); strokeCellOutline(g, [...th.move, ...th.jump], TH.moveEdge, 1.2); }
+  if (th.sprint.length) { g.save(); g.setLineDash([4, 4]); strokeCellOutline(g, th.sprint, TH.sprint, 1.2); g.restore(); }
+  g.fillStyle = TH.dot;
+  for (const c of th.jump) { g.beginPath(); g.arc((c.col + 0.5) * Q, (c.row + 0.5) * Q, 2.4, 0, Math.PI * 2); g.fill(); }
+}
+
+export function drawOverlay(g, pv, viewData, selectedId, intents = [], backstabHoverId = null, threat = null) {
+  if (threat) drawThreat(g, threat);
   if (backstabHoverId) drawBackstabSector(g, viewData, backstabHoverId);
   for (const intent of intents) drawChargeIntent(g, intent);
   if (pv && viewData) {

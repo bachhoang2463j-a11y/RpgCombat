@@ -101,7 +101,7 @@ function buildLiveOcc(ctx) {
   return occ;
 }
 
-function rayFirst(ctx, x0, y0, x1, y1, { skipUnitIds = [], blockUnits = false, passSide = null } = {}) {
+export function rayFirst(ctx, x0, y0, x1, y1, { skipUnitIds = [], blockUnits = false, passSide = null } = {}) {
   const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy);
   const steps = Math.max(1, Math.ceil(len / SAMPLE_STEP));
   const skip = new Set(skipUnitIds);

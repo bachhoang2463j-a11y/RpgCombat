@@ -26,7 +26,9 @@ import { CHAPEL_SCENE } from './chapel-scene.mjs';
 import { resolveUnitStyles, isUnitFlying, resolveFlightStyle, JUMP_LAND_HEAVY_POOL } from './unit-style.mjs';
 import { createEditorPanel } from './editor-panel.mjs';
 import { autoPickChoice } from './reaction-prompt.mjs';
-import { unitCenter } from './geometry.mjs';
+import { unitCenter, occupiedCells, cellKey } from './geometry.mjs';
+import { threatOf, threatHeat } from './threat.mjs';
+import { canSeeUnit } from './perception.mjs';
 import { createEncounterScenario, createScenarioData, createSeededRandom } from './scenario-data.mjs';
 import { statusBadges, compactStatusHtml, iconStatusHtml, inspectorHtml, auraList } from './status-ui.mjs';
 import { passiveGainLabel } from './fx-library.mjs';
@@ -833,12 +835,14 @@ export function createApp(rootEl, opts = {}) {
     }
     if (!sceneHeld) syncScene();
     sandbox.update(currentViewData);
+    threatCache.clear();
     const view = sandbox.getUnitView();
     const targets = new Set(Object.values(snap.focusOrders).map(order => order.targetId));
     for (const u of currentViewData.units) {
       view.setFlag(u.id, 't-unit-focus-target', targets.has(u.id));
       view.setFlag(u.id, 't-unit-alert-pending', !!snap.focusOrders[u.id]);
       view.setFlag(u.id, 't-unit-down', shownOf(u).hp <= 0);
+      view.setFlag(u.id, 't-unit-lowhp', u.side === 'hero' && lowHp(u));
       view.setFlag(u.id, 't-unit-current', u.id === snap.currentId && !snap.terminal);
       view.setFlag(u.id, 't-unit-channel', !!battle.battleState.combatState.charges?.[u.id]?.preparing);
       const ch = snap.units.find(x => x.id === u.id)?.charge;
@@ -890,11 +894,58 @@ export function createApp(rootEl, opts = {}) {
     if (aim) { sandbox.setPreview({ kind: 'attack', casterId: battle.snapshot().currentId, skill: aim.skill, query: null }); return; }
     sandbox.setPreview(movementOverlay());
   }
+  // ---------- 敌方威胁区：悬停敌人 = 单个；T 键 = 全体合集；只画我方看得见的敌人；状态变化后重算 ----------
+  const threatCache = new Map();
+  let threatAll = false, threatHoverId = null;
+  function threatFor(id) {
+    let t = threatCache.get(id);
+    if (!t) {
+      const eff = battle.getEffectiveUnit(id);
+      t = threatOf(battle.ctx, id, { moveDistance: eff.effectiveMoveDistance, jumpDistance: eff.jumpDistance || 0, skills: battle.threatSkills(id) });
+      threatCache.set(id, t);
+    }
+    return t;
+  }
+  function threatEnemies() {
+    const units = battle.ctx.units, heroes = units.filter(u => u.side === 'hero' && u.ref.hp > 0);
+    return units.filter(u => u.side !== 'hero' && u.ref.hp > 0 && battle.ctx.placementsById[u.id] && heroes.some(h => canSeeUnit(battle.ctx, h.id, u.id)));
+  }
+  function updateThreat() {
+    if (!battle || !currentViewData || busy || !isHeroTurn()) { sandbox.setThreat(null); return; }
+    const visible = threatEnemies();
+    if (threatAll) { sandbox.setThreat({ heat: threatHeat(visible.map(u => threatFor(u.id))) }); return; }
+    const u = threatHoverId && visible.find(v => v.id === threatHoverId);
+    sandbox.setThreat(u ? threatFor(u.id) : null);
+  }
+  function threatCount(cell) {
+    const id = battle.snapshot().currentId, fp = battle.ctx.footprintsById[id] || { width: 1, height: 1 };
+    const keys = occupiedCells(cell, fp).map(c => cellKey(c.col, c.row));
+    return threatEnemies().filter(u => { const t = threatFor(u.id); return keys.some(k => t.attackKeys.has(k)); }).length;
+  }
+  // ---------- 残血预警（HP≤30%）：地图外环慢闪；本人行动开始或被敌方锁定时心跳 + 边缘泛红（每次行动一次） ----------
+  const lowHpAlarms = new Set();
+  function lowHp(u) { const s = shownOf(u), max = u.ref.maxHp || 0; return s.hp > 0 && max > 0 && s.hp / max <= 0.3; }
+  function lowHpAlarm(key) {
+    if (lowHpAlarms.has(key)) return;
+    lowHpAlarms.add(key);
+    ui('heartbeat');
+    const dom = sandbox.getDom(), s = sandbox.getScope();
+    if (!dom || !s || !s.isLive) return;
+    const d = document.createElement('div');
+    d.className = 't-lowhp-vignette';
+    dom.viewport.appendChild(d); s.addNode(d);
+    s.animate(d.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0.7, offset: 0.45 }, { opacity: 0.95, offset: 0.6 }, { opacity: 0 }], { duration: 1200, easing: 'ease-out' }));
+    s.after(1200, () => s.removeNode(d));
+  }
   function moveEval(hit) {
     const id = battle.snapshot().currentId;
     const r = battle.snapshot().resources;
     const cell = battle.previewMove(hit.col, hit.row);
-    if (cell && cell.cost > 0) return { ok: true, cell, html: '移动 <b>' + cell.cost.toFixed(1) + 'm</b> · 余 ' + (r.moveRemaining - cell.cost).toFixed(1) + 'm' + (cell.opportunityIds?.length ? '<br><b class="t-kill">⚠ 将触发 ' + cell.opportunityIds.length + ' 次借机攻击</b>' : '') };
+    if (cell && cell.cost > 0) {
+      const n = threatCount(cell);
+      return { ok: true, cell, html: '移动 <b>' + cell.cost.toFixed(1) + 'm</b> · 余 ' + (r.moveRemaining - cell.cost).toFixed(1) + 'm' + (cell.opportunityIds?.length ? '<br><b class="t-kill">⚠ 将触发 ' + cell.opportunityIds.length + ' 次借机攻击</b>' : '')
+        + (n ? '<br><b class="t-kill">⚠ 进入 ' + n + ' 名敌人射程</b>' : '') };
+    }
     const p = currentViewData.placementsById[id];
     if (p.col === hit.col && p.row === hit.row) return { ok: false, quiet: true };
     const full = fullReach && fullReach.byKey.get(hit.col + ',' + hit.row);
@@ -1027,6 +1078,8 @@ export function createApp(rootEl, opts = {}) {
   sandbox.onHover(hit => {
     const hov = hit && hit.targetId || null;
     if (hov !== inspectHover) { inspectHover = hov; renderInspector(); }
+    const threatId = hov && unitById(hov)?.side !== 'hero' ? hov : null;
+    if (threatId !== threatHoverId) { threatHoverId = threatId; updateThreat(); }
     if (!pending) sandbox.getUnitView()?.clearPredict();
     if (retargetPrompt) {
       if (!hit) { sandbox.setHint(null); return; }
@@ -1596,6 +1649,7 @@ export function createApp(rootEl, opts = {}) {
       if (!hasNaturalTurnAudio) avHost.playTurnVoice(u, snap.actionSerial);
       fullReach = findReachable(battle.ctx, u.id, Infinity);
       setBusy(false);
+      if (lowHp(u)) lowHpAlarm('turn:' + snap.actionSerial + ':' + u.id);
       renderCommand();
       if (!offerPreparedRelease()) idleOverlay();
       return;
@@ -1662,6 +1716,8 @@ export function createApp(rootEl, opts = {}) {
         }
         const q = battle.previewAttack(plan.skill, plan.aim);
         if (!q.ok) break;
+        const lowTarget = (q.damageTargetIds || q.targetIds || []).map(unitById).find(t => t && t.side === 'hero' && lowHp(t));
+        if (lowTarget) lowHpAlarm('aim:' + battle.snapshot().actionSerial + ':' + actorId + ':' + lowTarget.id);
         const before = progress();
         sandbox.setPreview({ kind: 'attack', casterId: actorId, skill: plan.skill, query: q, locked: true });
         // 满充能大招：Cut-in → 原技能前摇/演出 → 命中与结果（未满不站桩；普通攻击与[延迟]准备照旧）
@@ -1788,6 +1844,7 @@ export function createApp(rootEl, opts = {}) {
     u.bars = { ...u.bars, hp: hit.hpAfter, shield: next.shield };
     const rec = sandbox.getUnitView() && sandbox.getUnitView().nodes.get(u.id);
     if (rec) { rec.bars = u.bars; sandbox.getUnitView().setShield(u.id, next.shield || 0); }
+    if (rec) sandbox.getUnitView().setFlag(u.id, 't-unit-lowhp', u.side === 'hero' && lowHp(u));
     if (u.side === 'hero') shell.setHeroBars(u.id, u.bars, hit.heal ? { heal: true } : { hit: hit.hit });
     for (let i = hit.logIndex; i < hit.logEnd; i++) hiddenLog.delete(i);
     shell.setHistory(visibleLog());
@@ -1990,7 +2047,7 @@ export function createApp(rootEl, opts = {}) {
     });
   }
 
-  function setBusy(on) { busy = !!on; shell.setBusy(busy); }
+  function setBusy(on) { busy = !!on; shell.setBusy(busy); updateThreat(); }
 
   function editorSkillRows(skills) {
     return (skills || []).filter(s => s && !s._inGroup).map(s => {
@@ -2194,6 +2251,11 @@ export function createApp(rootEl, opts = {}) {
     if (e.key === 'Escape') { if (retargetPrompt) { retargetPrompt.finish(null); return; } cancelStep(); return; }
     if (e.key === 'Enter' && retargetPrompt) { e.preventDefault(); retargetPrompt.finish(null); return; }
     if ((e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.metaKey && !e.altKey) { toggleMute(); return; }
+    if ((e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      threatAll = !threatAll; updateThreat();
+      shell.showLog(threatAll ? '⚠ 敌方威胁区：全体（颜色越深，覆盖的敌人越多 · 再按 T 关闭）' : '敌方威胁区已关闭', 'act', 1800);
+      return;
+    }
     if (!battle || !isHeroTurn()) return;
     if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); if (busy) { ui('deny'); return; } requestEnd(); return; }
     if (e.key === 'Enter' && pending) { e.preventDefault(); if (!busy) firePending(); return; }

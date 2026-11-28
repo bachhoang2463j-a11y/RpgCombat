@@ -40,6 +40,7 @@ export function createSandbox(rootEl, deps = {}) {
   let onMapClickCb = null;
   let onHoverCb = null;
   let preview = null;
+  let threat = null;
   let persistentIntents = [];
   const intentBorn = new Map();   // unitId → 危险区开始淡入的时刻（先让本体蓄力前摇播一拍）
   let intentFadeRaf = 0;
@@ -116,7 +117,7 @@ export function createSandbox(rootEl, deps = {}) {
       if (alpha < 1) fading = true;
       return { ...it, alpha };
     });
-    drawOverlay(g, preview, viewData, selectedId, intents, backstabHoverId);
+    drawOverlay(g, preview, viewData, selectedId, intents, backstabHoverId, threat);
     if (fading && !intentFadeRaf) intentFadeRaf = requestAnimationFrame(() => { intentFadeRaf = 0; redrawOverlay(); });
   }
 
@@ -443,6 +444,7 @@ export function createSandbox(rootEl, deps = {}) {
     onHover: (cb) => { onHoverCb = cb; },
     onCamera: (fn) => { cameraListeners.add(fn); return () => cameraListeners.delete(fn); },
     setPreview: (data) => { preview = data; redrawOverlay(); },
+    setThreat: (data) => { if (data === threat) return; threat = data; redrawOverlay(); },
     setPersistentIntents: (data) => {
       persistentIntents = data;
       const live = new Set(data.map(it => it.unitId));

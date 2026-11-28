@@ -206,6 +206,12 @@ export function createUiSfx(mixer) {
       tick(c, t + 0.3, { freq: 5200, q: 3, dur: 0.4, vol: 0.03 });
     },
     jumpCrouch(c, t) { tick(c, t, { freq: 320, q: 0.9, dur: 0.08, vol: 0.10, type: 'lowpass' }); },
+    heartbeat(c, t) {           // 残血心跳：两声低频闷击（扑通-通）
+      for (const [dt, v] of [[0, 0.34], [0.26, 0.24]]) {
+        tick(c, t + dt, { freq: 90, q: 0.8, dur: 0.13, vol: v, type: 'lowpass' });
+        tone(c, t + dt, { type: 'sine', f0: 62, f1: 40, dur: 0.17, vol: v * 0.42 });
+      }
+    },
     jumpTakeoff(c, t) {         // 起跳：蹬地 + 风声上扫
       tick(c, t, { freq: 160, q: 0.8, dur: 0.09, vol: 0.24, type: 'lowpass' });
       tick(c, t + 0.02, { freq: 1400, q: 0.5, dur: 0.30, vol: 0.06 });

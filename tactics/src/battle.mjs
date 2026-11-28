@@ -1322,6 +1322,26 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   function skillCooldownAt(unitId, key) {
     return state.cooldowns?.[unitId]?.[key] || 0;
   }
+  // 威胁区只读查询：该单位下一次自然行动能用的敌对技能（同 canUseSkill 的资源/限次/冷却/充能/准备口径，不读当前行动点）
+  function threatSkills(unitId) {
+    const u = byId.get(unitId);
+    if (!u || u.ref.hp <= 0) return [];
+    const charge = chargeState(u.id), cs = chargeSkillOf(u);
+    const items = (u.items || []).filter(it => it.category !== '弹药' && !it.bindings?.length)
+      .flatMap(it => it.children?.length ? it.children.map(c => itemAsSkill(it, c)) : [itemAsSkill(it)]);
+    return [...(u.skills || []), ...items, BASIC_ATTACK].filter(skill => {
+      if (!skill || skill.isReaction || (skill.isItem && skill.children?.length)) return false;
+      if (!skillSupport(effectiveSkill(skill)).ok) return false;
+      const key = skillKey(skill), preparing = charge.preparing && charge.preparing.skillKey === key;
+      if (skill.charge > 0 && isAiControlled(u) && !(cs && skillKey(cs) === key && (charge.current || 0) >= cs.charge)) return false;
+      if (skill.delay > 0 && !(preparing && charge.preparing.remaining <= 0)) return false;
+      if (!preparing && !itemStockStatus(u, skill).ok) return false;
+      if (!preparing && usesLeft(u.id, skill) <= 0) return false;
+      if (!preparing && skill.cooldownTurns > 0 && skillCooldownAt(u.id, key) > state.combatState.clock.now + 1e-9) return false;
+      if (!preparing && (u.ref.mp < (skill.cost || 0) || u.ref.hp <= (skill.hpCost || 0) || (u.ref.tp || 0) < (skill.tpCost || 0))) return false;
+      return skillSlots(skill).some(s => s.attack || s.definition.side === 'enemy');
+    }).map(effectiveSkill);
+  }
 
   function skillStatus(skill, mp) {
     const status = canUseSkill(skill, mp);
@@ -2883,5 +2903,5 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       return ctx.barriers.map(barrier => queryAttack(ctx, currentId(), effectiveSkill(skill), { barrierId: barrier.id }))
         .filter(q => q.ok).map(q => ({ ...q.barrierTargets[0], query: q }));
     },
-    endAction, planEnemyAction, beginEnemyTurn, runEnemyTurn, finishBattle, destroy, reset };
+    endAction, planEnemyAction, beginEnemyTurn, runEnemyTurn, finishBattle, destroy, reset, threatSkills };
 }

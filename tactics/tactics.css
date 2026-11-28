@@ -311,6 +311,10 @@ button:disabled { opacity: .42; cursor: default; }
 .t-topbtn:hover { color: var(--text); border-color: var(--line-2); }
 @media (max-width: 1400px) { .t-toplabel { display: none; } }
 /* 演出倍速：非 1× 时金色高亮；窄屏也保留倍率读数 */
+/* 残血预警（HP≤30%）：地图外环红光慢闪；行动开始/被敌方锁定时视口边缘泛红 */
+.t-side-hero.t-unit-lowhp:not(.t-unit-down) .t-unit-medal::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid rgba(239,68,68,.85); box-shadow: 0 0 14px rgba(239,68,68,.55); pointer-events: none; animation: t-lowhp-ring 1.4s ease-in-out infinite; }
+@keyframes t-lowhp-ring { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+.t-lowhp-vignette { position: absolute; inset: 0; pointer-events: none; z-index: 6; opacity: 0; background: radial-gradient(ellipse at center, transparent 52%, rgba(153,27,27,.28) 78%, rgba(185,28,28,.55) 100%); }
 .t-topbtn-on { color: var(--gold); border-color: var(--gold-2); }
 @media (max-width: 1400px) { #btn-speed .t-toplabel { display: inline; } }
 
