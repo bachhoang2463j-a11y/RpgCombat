@@ -1072,3 +1072,10 @@
 - 文件：`tactics/src/{action-director,battle,bgm-director,fx-library}.mjs`、`tactics/src/vendor/rpg-av/rpg-av.mjs`、`tactics/tools/{extract-rpg-av,run-tests,verify-fx-polish-artifact}.cjs`、`integration-test/fixtures/tactics/{audio-gait-passive,bgm-director,hit-feedback}-node-cases.mjs`、`tactics/mvp-standalone.html`。
 - 验证：源码全量首次停在旧兜底音字面量断言，更新后从该阶段续跑，合计 57 阶段 1588 项通过；BGM 15、受击 51。独立审查所提的待起播取消窗口补行为断言确认。单文件 67 模块、SHA256 `127f0828…`，入包/单脚本/零外部导入断言通过，直接对产物的配乐模块跑 15/15。内置浏览器默认对局未越过开局敌方回合，先手切片的基础行动定位超时，独立的点击走格通过（6.0m→5.0m）。
 - 目的 vs 现状：交付逻辑已覆盖；未进酒馆或安卓模拟器，自动升温/反击的实机听感与曲首尾留白留待用户另验，README 未改。
+
+## 2026-11-28 · 我方直接击杀的命中演出（9bf9497）
+- 核心目的：在旧击杀特写之前，让真正致死的接触拍点可辨；只读规则已经结算的伤害段，不改伤害和行动钟。
+- 试播方案：单体单发短推我方棋子、释放时拉到双方构图，仅显式精英／首领加地图内头像横切；多段／群攻不追加运镜。致死拍局部停 70ms、实际 HP 数字 1.3 倍、结果轨切重击，已有专属重击不叠通用受击音；保命、复活、制服、结界不当成击杀。现有击杀特写和高阶技能镜头保留。
+- 文件：`tactics/src/{action-director,cinematic,fx-library}.mjs`、`tactics/src/vendor/rpg-av/rpg-av.mjs`、`tactics/tools/{extract-rpg-av,run-tests,verify-fx-polish-artifact}.cjs`、`integration-test/fixtures/tactics/hit-feedback-node-cases.mjs`、`tactics/mvp-standalone.html`。
+- 验证：源码全量 1599 项通过；复核后的受击定向 62 项通过。单文件 67 模块、48 项专项符号、单脚本和零外部 import 验证通过，SHA256 `ad2997e7…`。IAB 对最终包用既有载入接口置入两靶场景，实页选技能、锁定、发射，确认精英横切 → `-7` → 旧特写，精英 7→0、杂兵仍为 7；复位供试播。
+- 目的 vs 现状：致死拍已在结算之前独立呈现。真 Chrome 帧感和听感、酒馆宿主与安卓未验；README 未改。
