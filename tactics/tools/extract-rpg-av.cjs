@@ -276,6 +276,20 @@ function build() {
     "const __p = opts.pan != null ? opts.pan : (cue.track === 'skill' || cue.track === 'result') ? __panHint : null;\n            if (__p != null && audioCtx.createStereoPanner) { pan = audioCtx.createStereoPanner(); pan.pan.value = __p;", 1, '战斗音效声像提示');
   mixer = patch(mixer, '    return { context, skillContext, output,',
     '    function setBusVolume(name, v) { __busVol[name] = v; if (ctx && tracks[name]) tracks[name].gain.setTargetAtTime(v, ctx.currentTime, 0.015); }\n    function setPanHint(p) { __panHint = p; }\n    return { setBusVolume, setPanHint, context, skillContext, output,', 1, '混音器分轨音量与声像接口');
+  mixer = patch(mixer, '    function capture(fallback', '    const combatOf = opts => opts.combat ?? opts.audioContext?.combat ?? opts.owner?.audioContext?.combat ?? audioScope?.combat ?? false;\n    function capture(fallback', 1, '攻防混音上下文');
+  mixer = patch(mixer, "{ category:typeof value === 'string' ? value : value.category }", "typeof value === 'string' ? { category:value } : { ...value }", 1, '攻防混音上下文');
+  mixer = patch(mixer, "function output(track = 'skill', category = null)", "function output(track = 'skill', category = null, combat = false)", 1, '攻防角色分轨');
+  mixer = patch(mixer, "const key = track + ':' + category;", "const key = track + ':' + category + (combat ? ':combat' : '');", 1, '攻防角色分轨');
+  mixer = patch(mixer, '{ node, category, envelope:[] }', '{ node, category, combat, envelope:[] }', 1, '攻防角色分轨');
+  mixer = patch(mixer, 'const gap = p.priority - settings.priority;', 'const gap = p.combat && entry.combat ? 0 : p.priority - settings.priority;', 1, '攻防角色之间不削音');
+  mixer = patch(mixer, "function protect(profile = 'short', when, owner = null, category = null)", "function protect(profile = 'short', when, owner = null, category = null, combat = combatOf({ owner }))", 1, '记录削音来源角色');
+  mixer = patch(mixer, 'owner, category:name, priority, holdMs };', 'owner, category:name, priority, holdMs, combat };', 1, '记录削音来源角色');
+  mixer = patch(mixer, 'opts = Object.assign({}, opts, { category:categoryOf(opts) });', 'opts = Object.assign({}, opts, { category:categoryOf(opts) });\n        const combat = combatOf(opts);', 1, '采样保留攻防角色');
+  mixer = patch(mixer, 'output(cue.track, cue.category)', 'output(cue.track, cue.category, combat)', 2, '采样走攻防角色分轨');
+  mixer = patch(mixer, 'when, cue.owner, cue.category);', 'when, cue.owner, cue.category, combat);', 1, '采样保留攻防削音角色');
+  mixer = patch(mixer, 'const category = categoryOf(Object.assign({ track }, opts));', 'const category = categoryOf(Object.assign({ track }, opts)), combat = combatOf(opts);', 1, '媒体保留攻防角色');
+  mixer = patch(mixer, 'gain.connect(output(track, category));', 'gain.connect(output(track, category, combat));', 1, '媒体走攻防角色分轨');
+  mixer = patch(mixer, 'audioCtx.currentTime, opts.owner, category);', 'audioCtx.currentTime, opts.owner, category, combat);', 1, '媒体保留攻防削音角色');
   const applyVol = topBlock(L, l => l.startsWith('function applyAudioVolume('), 'applyAudioVolume');
   const playCustom = topBlock(L, l => l.startsWith('function playCustomAudio('), 'playCustomAudio');
   const audioUrls = topBlock(L, l => l.startsWith('const audioUrls = {'), 'audioUrls', /^\};\s*$/);
@@ -525,6 +539,60 @@ ${supportBranches.join('\n').replace('else if', 'if')}
   mod = patch(mod, "document.getElementById('battle-scene')", '__STAGE.shakeEl()', 3, '舞台震动独立层');
   mod = patch(mod, /window\.(playSound|playRandomStandardGunshot|playShotgunSound|AudioContext|webkitAudioContext)\b/g,
     (m, n) => (n.endsWith('AudioContext') ? m : n), 14, 'window.* 声音函数改为工厂内本地');
+  // 同一接触可同时破防和掉血；敌方同波只合并同一音档，不推迟或覆盖其他结果。
+  mod = patch(mod, 'hpDmg, shieldDmg, shieldBroken, crit:', 'hpDmg, shieldDmg, shieldBroken, guardBroken:!!r.guardBroken, crit:', 1, '受击分类透传免伤破防');
+  mod = patch(mod, /^    function impactAudioScore\(hit\) \{[\s\S]*?^    \}\n\n/gm, '', 1, '去掉波次全类择强');
+  mod = patch(mod, /^    function publishImpactAudio\(result\) \{[\s\S]*?^    \}/gm, `    function publishImpactAudio(result) {
+        if (_pipelineFrozen || impactAudioEvents.has(result.eventId)) return;
+        const wave = impactWaves.get(result.waveId);
+        if (result.waveId && !wave) return;
+        impactAudioEvents.add(result.eventId);
+        hitAudio(result, result.isHero ? null : wave?.played);
+    }`, 1, '接触拍点按音档播结果');
+  mod = patch(mod, 'results:new Map(), closed:false', 'played:new Set(), closed:false', 1, '波次只记已播音档');
+  mod = patch(mod, /^        const results = \[\.\.\.wave.results.values\(\)\];\n[^\n]+\n[^\n]+\n[^\n]+\n/gm, '', 1, '波次收口不再补播');
+  mod = patch(mod, '        const targets = new Set(targetIds);\n', '', 1, '波次重定向只保留待结算目标');
+  mod = patch(mod, '        for (const id of wave.results.keys()) if (!targets.has(id)) wave.results.delete(id);\n', '', 1, '波次不缓存结算结果');
+  mod = patch(mod, "classified.shieldBroken ? 'ShieldBroken'", "classified.shieldBroken ? 'ShieldBroken' : classified.guardBroken ? 'GuardBroken'", 1, '区分盾与免伤破防');
+  mod = patch(mod, 'targetId:result.targetId, sourceId:result.sourceId || null, source, resultType, isHero:!!result.isHero,',
+    'targetId:result.targetId, sourceId:result.sourceId || null, source, resultType, isHero:!!result.isHero, pan:result.pan,', 1, '结果音保留各接触对象声像');
+  mod = patch(mod, 'function playHitTierAudio(tier)', 'function playHitTierAudio(tier, opts)', 1, '受击采样保留播放选项');
+  mod = patch(mod, "t === 3 ? 0.94 : t === 2 ? 0.88 : 0.82, 1, { track:'result', category:'F' }", "t === 3 ? 0.94 : t === 2 ? 0.88 : 0.82, 1, { ...opts, category:'F' }", 1, '受击采样保留播放选项');
+  mod = patch(mod, /^    function hitAudio\(list\) \{[\s\S]*?^    \}/gm, `    function hitAudio(h, played) {
+        if (!identitySfxOn || h.kind === 'prevented') return;
+        const take = key => {
+            if (played?.has(key)) return false;
+            played?.add(key);
+            return true;
+        };
+        const opts = { track:'result', combat:true, pan:h.pan };
+        if (h.kind === 'dodge') {
+            const key = 'dodge_' + h.dodgeTier;
+            if (take(key)) playSound(key, h.dodgeTier === 3 ? 0.92 : 0.82, 1, { ...opts, category:'H' });
+            return;
+        }
+        const defense = h.shieldBroken || h.guardBroken ? 'parry_3'
+            : h.kind === 'block' ? 'parry_' + h.blockTier : h.kind === 'shield' ? 'parryShield' : null;
+        if (defense && take(defense)) playSound(defense, defense === 'parry_3' ? 0.95 : defense === 'parryShield' ? 0.55 : 0.85, 1,
+            { ...opts, category:'G' });
+        if (h.kind !== 'hp' || !take('hit_' + h.tier)) return;
+        playHitTierAudio(h.tier, opts);
+        if (h.burst || h.crit) {
+            resultOutput = true;
+            try { CombatAudioMixer.withContext({ category:'F', combat:true }, () => {
+                if (h.burst) { chime(0, 1320, 0.6, 0.07); tone(0, { f0:660, f1:990, dur:0.25, vol:0.05, wet:0.6 }); }
+                else { tone(0, { type:'square', f0:2400, f1:1500, dur:0.07, vol:0.05 }); click(0, 0.6, 7000, 0.006); crystal(0.012, 3200, 0.07); }
+            }); } finally { resultOutput = false; }
+        }
+    }`, 1, '攻防结果分层播放');
+  mod = patch(mod, "CombatAudioMixer.withContext('L', () => omenSound(kind));",
+    "CombatAudioMixer.withContext({ category:'L', combat:kind !== 'rose-self' && kind !== 'gloom-foe' }, () => omenSound(kind));", 1, '敌方攻击前摇纳入攻防混音');
+  mod = patch(mod, "function synthBus(category) {\n        if (!synthBuses.has(category)) {",
+    "function synthBus(category) {\n        const combat = CombatAudioMixer.capture().combat, key = combat ? category + ':combat' : category;\n        if (!synthBuses.has(key)) {", 1, '合成攻击声音保留分轨角色');
+  mod = patch(mod, 'CombatAudioMixer.output(CombatAudioMixer.trackOf(category), category)', 'CombatAudioMixer.output(CombatAudioMixer.trackOf(category), category, combat)', 1, '合成攻击声音保留分轨角色');
+  mod = patch(mod, 'synthBuses.set(category, { bus, verb });', 'synthBuses.set(key, { bus, verb });', 1, '合成节点按角色缓存');
+  mod = patch(mod, 'return synthBuses.get(category);', 'return synthBuses.get(key);', 1, '合成节点按角色缓存');
+  mod = patch(mod, "resultOutput ? CombatAudioMixer.output('result', category)", "resultOutput ? CombatAudioMixer.output('result', category, CombatAudioMixer.capture().combat)", 1, '重音跟随结算分轨');
   mod = patch(mod, 'arcaneAtmoModule.stopAmbientAudio(true);', 'atmoAudio.stop(true);', 1, '环境氛围音随清场停止');
   mod = patch(mod, 'window.playVariantResistFx = playVariantResistFx;', '', 1, '去抗性全局挂载');
   mod = patch(mod, "return dom.querySelector('.portrait')", "return dom.querySelector('.t-unit-avatar') || dom.querySelector('.t-unit-medal') || dom.querySelector('.portrait')", 1, '毅力血幕挂圆形棋子内框');

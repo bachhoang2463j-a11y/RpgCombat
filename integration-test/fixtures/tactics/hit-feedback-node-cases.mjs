@@ -50,17 +50,71 @@ function unit(id, side, hp = 100, shield = 0) {
   return { id, name: id, side, footprint: { width: 1, height: 1 }, skills: [], ref: { hp, maxHp: hp, shield, mp: 100, maxMp: 100,
     tp: 0, maxTp: 100, atk: 10, def: 0, spd: side === 'hero' ? 300 : 1, evasion: 0, moveDistance: 6 } };
 }
-function resolved(tags, shield = 20) {
+function resolved(tags, shield = 20, guard = 0, armor = 0) {
   const caster = unit('c', 'hero'), target = unit('t', 'enemy', 100, shield);
+  target.ref.def = armor;
+  if (guard) target.skills.push(parseSkill('【测试免伤】[免伤;power:' + guard + '][反应:远程][法术][范围:自身]'));
   const battle = createBattle({ units: [caster, target], placementsById: { c: { col: 2, row: 2 }, t: { col: 4, row: 2 } },
     scene: { sceneId: 'hit-test', grid: { columns: 10, rows: 10, metersPerCell: 1 }, objects: [] }, random: () => 0.5 });
   battle.start();
   const skill = parseSkill('【受击回归】' + tags + '[必中][远程][特效:枪击][范围:单体;射程:10]');
-  const action = battle.attack(skill, { x: 4.5, y: 2.5, targetId: 't' });
+  const action = battle.attack(skill, { x: 4.5, y: 2.5, targetId: 't' }, { policy: guard ? 'auto' : 'none' });
   return { action, target, segment: action.hits[0].segments[0] };
 }
 
 export const groups = {
+  'THIT-05': { async run() {
+    const cases = [], played = [];
+    const { createRpgAv } = await import('../../../tactics/src/vendor/rpg-av/rpg-av.mjs');
+    const gain = () => ({ value: 1, values: [], cancelScheduledValues() { this.values = []; },
+      setValueAtTime(v) { this.values.push(v); }, linearRampToValueAtTime(v) { this.values.push(v); } });
+    const soundNode = () => ({ gain: gain(), connect(next) { this.next = next; }, disconnect() {} });
+    class FakeContext {
+      state = 'running'; currentTime = 0; destination = soundNode();
+      createGain() { return soundNode(); }
+      createMediaElementSource(audio) { return audio.output = soundNode(); }
+      removeEventListener() {} close() {}
+    }
+    const previous = { window: globalThis.window, document: globalThis.document, Audio: globalThis.Audio };
+    let av;
+    try {
+      globalThis.window = { __RPG_ASSET_BASE__: 'https://audio.invalid', AudioContext: FakeContext };
+      globalThis.document = { createElement: () => ({ ...node(), getContext: () => ({}) }) };
+      globalThis.Audio = class {
+        duration = 1;
+        play() { played.push(this); this.onplaying?.(); return Promise.resolve(); }
+        pause() {} removeAttribute() {} load() {}
+      };
+      av = createRpgAv({ stage: { el: node(), w: 480, h: 320, onResize() {} }, rectSymbol: Symbol('rect'), initialToken: 1,
+        clock: { now: performance.now.bind(performance), dateNow: Date.now, timeout: setTimeout, interval: setInterval, scale: () => 1 } });
+      const director = av.CombatAudioDirector, mixer = av.CombatAudioMixer;
+      const clips = () => played.map(a => a.src.split('/').at(-1));
+      const starts = (key, category, track, combat) => av.playSound(key, 0.8, 1, { category, track, combat });
+      starts('atk1', 'A', 'skill', true);
+      starts('monsterAttack', 'L', 'skill', true);
+      starts('atkUp', 'K', 'aux', false);
+      const wave = director.beginWave(['h', 't', 'u', 'v', 'dup']);
+      director.publish(result(0, { wave, targetId: 'h', isHero: true, guardBroken: true }));
+      director.publish(result(20, { wave, guardBroken: true, shieldDmg: 10, shieldBefore: 10, shieldAfter: 0 }));
+      director.publish(result(0, { wave, targetId: 'u', outcome: 'dodge', incomingDmg: 55 }));
+      director.publish(result(0, { wave, targetId: 'v', incomingDmg: 5 }));
+      const first = clips().slice(3);
+      cases.push(ok('THIT 双方破防、掉血、闪避、格挡在接触拍点独立播，双层同破只响一次', first.length === 5 &&
+        first[0] === 'parry_Weapon_GuardBreak.wav' && first[1] === first[0] && /^hit_2[abc]\.wav$/.test(first[2]) &&
+        first[3] === 'dodge_3.mp3' && first[4] === 'parry_Weapon_1.wav', json(first)));
+      director.publish(result(25, { wave, targetId: 'dup' }));
+      for (const target of ['h', 't', 'u', 'v', 'dup']) director.completeTarget(wave, target);
+      director.closeWave(wave);
+      cases.push(ok('THIT 同波同一受击音档不重复，收口不补播', clips().length === 8, json(clips())));
+      const low = (track, cat, combat) => Math.min(...mixer.output(track, cat, combat).gain.values);
+      cases.push(ok('THIT 出招和闪避／受伤／防御不相互压音，UI 优先级仍生效',
+        low('skill', 'L', true) === 1 && ['F', 'G', 'H'].every(c => low('result', c, true) === 1) && low('aux', 'K', false) === 0.4));
+    } finally {
+      av?.CombatAudioMixer.clear();
+      Object.assign(globalThis, previous);
+    }
+    return { cases };
+  } },
   'THIT-01': { run() {
     const cases = [], h = originalHitHarness();
     const locked = originalHitHarness(1, true);
@@ -82,6 +136,15 @@ export const groups = {
     cases.push(ok('THIT 真实拦截不冒充闪避', h.classifyHit(result(0, { outcome: 'prevented' })).kind === 'prevented'));
     cases.push(ok('THIT 纯护盾与免伤分类', h.classifyHit(result(0, { shieldDmg: 20, shieldBefore: 20, shieldAfter: 0 })).kind === 'shield' &&
       h.classifyHit(result(0, { guardDmg: 60, blockedDmg: 60 })).blockTier === 3));
+    for (const [guard, broken] of [[10, false], [5, true]]) {
+      const { action, segment } = resolved('[枪击;power:20]', 0, guard, 15);
+      const feedback = buildHitFeedback(action, action.hits[0], segment);
+      cases.push(ok('THIT 全挡按原伤分档，免伤只有被实际打空才破防 ' + guard,
+        segment.guardDmg === 5 && segment.hpDmg === 0 && feedback.guardBroken === broken && h.classifyHit(feedback).blockTier === 2, json(segment)));
+    }
+    const through = resolved('[穿透;power:40]', 100, 8).segment;
+    cases.push(ok('THIT 穿透绕过个人护盾但可击破免伤', through.guardBroken && through.guardDmg === 8 &&
+      through.shieldAfter === 100 && through.hpDmg === 32, json(through)));
     return { cases };
   } },
   'THIT-02': { run() {

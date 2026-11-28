@@ -7,6 +7,9 @@ const LEVELS = ['low', 'medium', 'high'];
 const RANK = { low: 0, medium: 1, high: 2 };
 const VOLUME_KEY = 'tactics.bgm.volume';
 const THEME_KEY = 'tactics.bgm.theme';
+const NEXT_TRACK_LEAD = 1.2;
+const CROSSFADE = 0.30;
+const DRAMATIC_CROSSFADE = 0.40;
 const hpRatio = unit => unit.status === 'active' ? unit.hp / unit.maxHp : 0;
 
 function partyState(frame) {
@@ -92,7 +95,7 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
   let ctx, master, analyser = null, freqBuf = null, decks = [], current = null;
   let battle = null, terminal = false, lastSettlement = null, settledFrame = null;
   let mode = 'auto', paused = false, error = null;
-  let unlocked = false, destroyed = false, job = null, queued = null, pendingTurnCue = null;
+  let unlocked = false, destroyed = false, job = null, queued = null;
 
   const activeTheme = () => BGM_THEMES[theme] || BGM_THEMES[DEFAULT_BGM_THEME];
   const themeSummary = () => Object.values(BGM_THEMES).map(t => ({ id: t.id, label: t.label, tracks: t.tracks }));
@@ -168,21 +171,33 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
     }
   }
 
-  function ready(op) {
+  function mediaReady(op, reached, ...events) {
     const audio = op.incoming.audio;
     if (audio.error) throw new Error('media');
-    if (audio.readyState >= 3) return true;
+    if (reached(audio)) return true;
     return new Promise((resolve, reject) => {
       const cleanup = () => {
-        audio.removeEventListener('canplay', success);
+        for (const event of events) audio.removeEventListener(event, success);
         audio.removeEventListener('error', failure);
         op.cancelWait = null;
       };
-      const success = () => { cleanup(); resolve(true); };
+      const success = () => { if (reached(audio)) { cleanup(); resolve(true); } };
       const failure = () => { cleanup(); reject(new Error('media')); };
-      audio.addEventListener('canplay', success);
+      for (const event of events) audio.addEventListener(event, success);
       audio.addEventListener('error', failure);
       op.cancelWait = () => { cleanup(); resolve(false); };
+    });
+  }
+
+  function waitForTurnCue(op) {
+    if (!op.deferred) return true;
+    return new Promise(resolve => {
+      const release = value => {
+        op.cancelWait = op.releaseCue = null;
+        resolve(value);
+      };
+      op.cancelWait = () => release(false);
+      op.releaseCue = () => release(true);
     });
   }
 
@@ -267,48 +282,50 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
     } catch (_) { /* 过渡音合成失败不阻塞切歌 */ }
   }
 
-  function startOffset(audio, track, dramatic) {
-    if (!dramatic) return 0;
-    const cue = Number(track?.cueIn) || 0;
+  function startOffset(audio, track) {
+    const cue = Number(track.cueIn) || 0;
     if (Number.isFinite(audio.duration) && audio.duration > 6) return Math.min(cue, audio.duration - 5);
     return cue;
   }
 
   async function switchTrack(op) {
     const { incoming, outgoing, track, dramatic } = op;
+    const audio = incoming.audio;
     try {
-      if (!await ready(op) || job !== op) return;
+      if (op.useCue && track.cueIn) {
+        if (!await mediaReady(op, a => a.readyState >= 1, 'loadedmetadata', 'canplay') || job !== op) return;
+        const offset = startOffset(audio, track);
+        if (audio.currentTime !== offset) audio.currentTime = offset;
+      }
+      if (!await mediaReady(op, a => a.readyState >= 3 && !a.seeking, 'canplay', 'seeked') || job !== op) return;
+      if (!await waitForTurnCue(op) || job !== op) return;
+      resetFilter(incoming);
+      gain(incoming, 0);
+      // play() 确认入轨已起播；在此之前不碰旧轨的增益或滤波。
+      await audio.play();
+      if (job !== op) return;
       const overlap = outgoing && !outgoing.audio.paused && !outgoing.audio.ended && outgoing !== incoming;
       if (overlap) {
         op.fading = true;
         const t0 = ctx.currentTime;
-        if (dramatic) playTransitionStinger(t0);
-        if (outgoing.filter?.frequency) {
-          outgoing.filter.frequency.cancelScheduledValues?.(t0);
-          outgoing.filter.frequency.setValueAtTime?.(20000, t0);
-          outgoing.filter.frequency.exponentialRampToValueAtTime?.(420, t0 + 0.95);
+        const end = t0 + (dramatic ? DRAMATIC_CROSSFADE : CROSSFADE);
+        if (dramatic) {
+          playTransitionStinger(t0);
+          if (outgoing.filter) {
+            resetFilter(outgoing, t0);
+            outgoing.filter.frequency.exponentialRampToValueAtTime?.(420, end);
+          }
         }
         gain(outgoing, 1, t0);
-        outgoing.gain.gain.linearRampToValueAtTime(0, t0 + 0.95);
-        if (!await audioTime(op, t0 + 0.50) || job !== op) return;
-        resetFilter(incoming, ctx.currentTime);
-        incoming.audio.currentTime = startOffset(incoming.audio, track, dramatic);
-        gain(incoming, 0, ctx.currentTime);
-        await incoming.audio.play();
-        if (job !== op) return;
-        const t1 = ctx.currentTime;
-        gain(incoming, 0, t1);
-        incoming.gain.gain.linearRampToValueAtTime(1, t1 + 0.32);
+        outgoing.gain.gain.linearRampToValueAtTime(0, end);
+        gain(incoming, 0, t0);
+        incoming.gain.gain.linearRampToValueAtTime(1, end);
         markStarted(incoming);
-        if (!await audioTime(op, Math.max(t1 + 0.32, t0 + 0.95)) || job !== op) return;
+        if (!await audioTime(op, end) || job !== op) return;
         clear(outgoing);
       } else {
         if (outgoing && outgoing !== incoming) clear(outgoing);
-        resetFilter(incoming, ctx.currentTime);
-        incoming.audio.currentTime = startOffset(incoming.audio, track, dramatic);
-        await incoming.audio.play();
-        if (job !== op) return;
-        gain(incoming, 1, ctx.currentTime);
+        gain(incoming, 1);
         markStarted(incoming);
       }
     } catch (_) {
@@ -338,7 +355,8 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
       : intent.id ? TRACK_BY_ID.get(intent.id) : canReuse ? standby.track : draw(intent.level);
     if (!track || (current?.track === track && !current.audio.ended && !current.audio.paused)) return;
     load(standby, track);
-    job = { incoming: standby, outgoing: current, track, dramatic: Boolean(intent.dramatic), fading: false, cancelWait: null };
+    job = { incoming: standby, outgoing: current, track, dramatic: Boolean(intent.dramatic),
+      useCue: Boolean(intent.dramatic || intent.useCue), deferred: Boolean(intent.deferred), fading: false, cancelWait: null };
     void switchTrack(job);
   }
 
@@ -349,11 +367,18 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
     pump();
   }
 
+  function queueNaturalNext(deck) {
+    if (deck !== current || mode !== 'auto' || paused || job || queued || terminal) return;
+    if (deck.audio.ended || deck.audio.duration - deck.audio.currentTime <= NEXT_TRACK_LEAD) {
+      enqueue({ level: mood.level(), reuse: true });
+    }
+  }
+
   function ended(deck) {
     if (deck !== current) return;
     if (mode === 'manual' && !job) paused = true;
     notify();
-    if (!job && mode === 'auto' && !paused) enqueue({ level: mood.level(), reuse: true });
+    queueNaturalNext(deck);
   }
 
   async function unlock() {
@@ -396,8 +421,9 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
         source.connect(node);
       }
       node.connect(master);
-      const deck = { audio, gain: node, filter, source, track: null, onEnded: () => ended(deck) };
+      const deck = { audio, gain: node, filter, source, track: null, onEnded: () => ended(deck), onTime: () => queueNaturalNext(deck) };
       audio.addEventListener('ended', deck.onEnded);
+      audio.addEventListener('timeupdate', deck.onTime);
       gain(deck, 0);
       return deck;
     });
@@ -405,7 +431,7 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
   }
 
   function stopBattle() {
-    battle = settledFrame = current = queued = pendingTurnCue = null;
+    battle = settledFrame = current = queued = null;
     terminal = false;
     lastSettlement = null;
     error = null;
@@ -430,7 +456,6 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
     if (frame.terminal) {
       terminal = true;
       queued = null;
-      pendingTurnCue = null;
       if (job && !job.fading) cancelJob();
       if (!job) for (const deck of decks) if (deck !== current) clear(deck);
       notify();
@@ -442,32 +467,27 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
     settledFrame = frame;
     if (mode === 'auto' && !paused) {
       const special = isComeback(current?.track) || isComeback(job?.track) || queued?.comeback;
-      if (result.urgent) {
-        pendingTurnCue = null;
-        if (!special) enqueue(result.comeback ? { comeback: true, dramatic: true } : { level: result.level, dramatic: true });
-      } else if (result.upgraded && !special) {
-        if (deferMedium) pendingTurnCue = { level: result.level, dramatic: true };
-        else enqueue({ level: result.level, dramatic: true });
+      if (!special) {
+        if (result.urgent) enqueue(result.comeback ? { comeback: true, dramatic: true } : { level: result.level, dramatic: true });
+        else if (result.upgraded) enqueue({ level: result.level, dramatic: true, deferred: deferMedium });
       }
     }
     notify();
   }
 
   function flushTurnCue() {
-    if (!pendingTurnCue || mode !== 'auto' || paused || !battle || terminal) return;
-    pendingTurnCue = null;
-    const special = isComeback(current?.track) || isComeback(job?.track) || queued?.comeback;
-    if (special) return;
-    const lv = mood.level();
-    const pool = activeTheme().pools[lv] || [];
-    if (!current || !pool.includes(current.track?.id)) enqueue({ level: lv, dramatic: true });
+    if (mode !== 'auto' || paused || !battle || terminal) return;
+    if (queued?.deferred) queued.deferred = false;
+    if (job?.deferred) {
+      job.deferred = false;
+      job.releaseCue?.();
+    }
   }
 
   function selectTrack(id) {
     if (!TRACK_BY_ID.has(id)) return;
     mode = 'manual';
     paused = false;
-    pendingTurnCue = null;
     error = null;
     enqueue({ id });
     notify();
@@ -476,9 +496,8 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
   function nextTrack() {
     mode = 'manual';
     paused = false;
-    pendingTurnCue = null;
     error = null;
-    enqueue({ level: mood.level() || 'low', dramatic: Boolean(current && !current.audio.paused) });
+    enqueue({ level: mood.level() || 'low', useCue: Boolean(current && !current.audio.paused) });
     notify();
   }
 
@@ -486,7 +505,7 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
     mode = 'manual';
     paused = !paused;
     if (paused) {
-      queued = pendingTurnCue = null;
+      queued = null;
       for (const deck of decks) deck.audio.pause();
       cancelJob();
       for (const deck of decks) if (deck !== current) clear(deck);
@@ -506,7 +525,6 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
   function resumeAuto() {
     mode = 'auto';
     paused = false;
-    pendingTurnCue = null;
     error = null;
     if (battle && !terminal) {
       const pool = activeTheme().pools[mood.level()] || [];
@@ -521,7 +539,6 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
     if (!BGM_THEMES[nextTheme] || nextTheme === theme) return;
     theme = nextTheme;
     recent.length = 0;
-    pendingTurnCue = null;
     error = null;
     try { storage?.setItem(THEME_KEY, theme); } catch (_) { /* sandbox without storage */ }
     if (paused && current && !activeTheme().tracks.some(t => t.id === current.track?.id)) {
@@ -530,7 +547,7 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
     }
     if (battle && !terminal && !paused) {
       mode = 'auto';
-      enqueue({ level: mood.level() || 'low', dramatic: Boolean(current && !current.audio.paused) });
+      enqueue({ level: mood.level() || 'low', useCue: Boolean(current && !current.audio.paused) });
     }
     notify();
   }
@@ -564,6 +581,7 @@ export function createBgmDirector({ assetBase, context, output = null, createAud
     stopBattle();
     for (const deck of decks) {
       deck.audio.removeEventListener('ended', deck.onEnded);
+      deck.audio.removeEventListener('timeupdate', deck.onTime);
       deck.source.disconnect();
       deck.filter?.disconnect();
       deck.gain.disconnect();

@@ -169,7 +169,7 @@ const STAGES = {
   },
   'hit-feedback': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'hit-feedback-node-cases.mjs'),
-    groups: ['THIT-01', 'THIT-02', 'THIT-03', 'THIT-04'], modules: [], requiredExports: [],
+    groups: ['THIT-01', 'THIT-02', 'THIT-03', 'THIT-04', 'THIT-05'], modules: [], requiredExports: [],
   },
   'av-polish': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'av-polish-node-cases.mjs'),

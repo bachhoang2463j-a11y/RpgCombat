@@ -4,7 +4,7 @@
 // arcaneVfxModule 行区间(源 5729–14230): 5730–5924, 5932–6356, 6431–6485, 6565–7584, 7596–11500, 11829–12083, 12201–12562, 12565–14208
 // 入选语句 316 段 / 7861 行；入口: playEnemyWindup, playAttackIdentityFx, playArcaneProjectile, playHitFeedback, classifyHit, syncHitBar, CombatAudioDirector, clearHitFeedback, warmIdentitySample, playArsenicShot, clearArcaneFx, syncStatusLayers, clearStatusLayers, playStatusTickFx, syncVariantState, clearVariantState, playVariantTriggerFx, isEntityVariantLocked, playSummonEnter, playSummonExit, playSummonGuard, clearSummonState, playLingFeng, playIsis, playFeiShaHuaJia, playXieYanKey, playHarmonyShelter, playSilenceDomain, playShatterResonance, playZheYingBu, playStrangeConch, playMeleeGroup, playRangedGroup, playSpellGroup, playRescueGrit, playRescueAvoidFatal, clearRescueState, playVariantResistFx, playCounterAttackL1, playSelfDestructWindup, playSelfDestructBurst, playSelfDestructInterrupt, clearSelfDestructState, syncSelfDestructWarning, setIdentitySfx, setVariantSfx, setStatusSfx, setSelfDestructSfx
 // 显式存根: 
-// 宿主适配补丁: 混音器分轨音量与声像提示状态×1; 混音器主总线与五轨×1; 语音独立轨×1; 战斗音效声像提示×1; 混音器分轨音量与声像接口×1; 枪击采样相邻去重×1; 远程击杀隐藏我方名称×1; 特写挂屏幕宿主×2; 特写收尾登记×2; 特写震屏走舞台震动层×1; 特写计时可随重开清理×6; 环境音脱离#battle-scene DOM×1; 环境音独立轨×1; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 重击数字不等定帧×1; 蝎眼钥匙落点参数×1; 蝎眼钥匙裂隙钉召唤落点×1; 蝎眼钥匙裂隙舞台定位×1; 折影步去卡片横移×1; 折影步落点参数×1; 折影步落点涟漪×1; 折影步残影保留圆形尺度×1; 奇异海螺去顿帧×1; 谐律之庇音叉悬于受益者上方×1; 屏幕矩形 → 特效舞台坐标×14; innerWidth → 舞台宽×22; innerHeight → 舞台高×15; body 挂载 → 特效舞台×6; JS position:fixed → absolute×2; arcane canvas resize 走舞台×1; 舞台震动独立层×3; window.* 声音函数改为工厂内本地×14; 环境氛围音随清场停止×1; 去抗性全局挂载×1; 毅力血幕挂圆形棋子内框×1; 致命回避残影保留圆形尺度×1; 反击残影保留圆形尺度×1; 灵风术法阵按头像尺度×1; 灵风术法阵透视原点钉在阵心×1; 灵风术收尾羽翼按头像尺度×1; 技能视频随演出倍速×1; 强力反击原版震屏函数×1; 强力反击震屏宿主×1; 强力反击震屏清理登记×1; 强力反击震屏代际×1; 强力反击震屏帧登记×2; 强力反击爆发粒子注入×1; 强力反击蓄力粒子注入×1; 强力反击回调契约×1; 强力反击代际句柄×1; 强力反击取消结果×1; 强力反击闪避缓冲可取消×1; 强力反击蓄力可取消×1; 强力反击预载取消×1; 强力反击起播等待可取消×1; 强力反击登记蓄力光×1; 强力反击音效取消登记×1; 强力反击阶段取消结果×1; 强力反击舞台坐标×1; 强力反击实体DOM蓄力光×1; 强力反击实体DOM×1; 强力反击蓄力粒子×1; 强力反击聚气使用本地函数×1; 强力反击蓄力坐标×1; 强力反击方向坐标×1; 强力反击锁定读取本地模块×1; 强力反击白闪舞台挂载×1; 强力反击白闪计时×1; 强力反击准星舞台坐标×1; 强力反击准星舞台挂载×1; 强力反击准星计时×1; 强力反击爆发与命中回调×1; 强力反击攻击方向实体×1; 强力反击目标震动清理×1; 强力反击原版震屏调用×1; 强力反击余波等待可取消×1; 强力反击保留余波并返回成功×1; CSS position:fixed → absolute×13; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1; CSS 残留视口单位(按舞台尺度保留)×42; 底座计时随演出倍速×12; 底座间隔随演出倍速×1; 底座时刻随演出倍速×19; 底座句柄时刻随演出倍速×23
+// 宿主适配补丁: 混音器分轨音量与声像提示状态×1; 混音器主总线与五轨×1; 语音独立轨×1; 战斗音效声像提示×1; 混音器分轨音量与声像接口×1; 攻防混音上下文×1; 攻防混音上下文×1; 攻防角色分轨×1; 攻防角色分轨×1; 攻防角色分轨×1; 攻防角色之间不削音×1; 记录削音来源角色×1; 记录削音来源角色×1; 采样保留攻防角色×1; 采样走攻防角色分轨×2; 采样保留攻防削音角色×1; 媒体保留攻防角色×1; 媒体走攻防角色分轨×1; 媒体保留攻防削音角色×1; 枪击采样相邻去重×1; 远程击杀隐藏我方名称×1; 特写挂屏幕宿主×2; 特写收尾登记×2; 特写震屏走舞台震动层×1; 特写计时可随重开清理×6; 环境音脱离#battle-scene DOM×1; 环境音独立轨×1; 辅助粒子注入所属句柄×1; fxEngine 不复用页面全局 canvas×1; fxEngine canvas 舞台内绝对定位×1; fxEngine canvas 挂特效舞台×1; fxEngine resize 走舞台×1; fxEngine 宽×1; fxEngine 高×1; fxEngine 去蓄力 overlay×1; fxEngine 去蓄力循环保持×1; 事件总线读宿主 combatToken×1; 连续数字上下错位保留可读×1; 受击数字世界锚点与类型格式×1; 受击数字类型标记×2; 受击数字贴身右侧对齐×1; 闪避残影保留主体尺度×1; 受击数字宿主缩放×1; 受击数字保持原版时序与远景可读×8; 受击数字分层间距×1; 破盾词牌间距×1; 暴击词牌间距×1; 护盾副数字间距×1; 混合破盾词牌间距×1; 受击视觉数字适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 战棋攻击身份适配×1; 重击数字不等定帧×1; 蝎眼钥匙落点参数×1; 蝎眼钥匙裂隙钉召唤落点×1; 蝎眼钥匙裂隙舞台定位×1; 折影步去卡片横移×1; 折影步落点参数×1; 折影步落点涟漪×1; 折影步残影保留圆形尺度×1; 奇异海螺去顿帧×1; 谐律之庇音叉悬于受益者上方×1; 屏幕矩形 → 特效舞台坐标×14; innerWidth → 舞台宽×22; innerHeight → 舞台高×15; body 挂载 → 特效舞台×6; JS position:fixed → absolute×2; arcane canvas resize 走舞台×1; 舞台震动独立层×3; window.* 声音函数改为工厂内本地×14; 受击分类透传免伤破防×1; 去掉波次全类择强×1; 接触拍点按音档播结果×1; 波次只记已播音档×1; 波次收口不再补播×1; 波次重定向只保留待结算目标×1; 波次不缓存结算结果×1; 区分盾与免伤破防×1; 结果音保留各接触对象声像×1; 受击采样保留播放选项×1; 受击采样保留播放选项×1; 攻防结果分层播放×1; 敌方攻击前摇纳入攻防混音×1; 合成攻击声音保留分轨角色×1; 合成攻击声音保留分轨角色×1; 合成节点按角色缓存×1; 合成节点按角色缓存×1; 重音跟随结算分轨×1; 环境氛围音随清场停止×1; 去抗性全局挂载×1; 毅力血幕挂圆形棋子内框×1; 致命回避残影保留圆形尺度×1; 反击残影保留圆形尺度×1; 灵风术法阵按头像尺度×1; 灵风术法阵透视原点钉在阵心×1; 灵风术收尾羽翼按头像尺度×1; 技能视频随演出倍速×1; 强力反击原版震屏函数×1; 强力反击震屏宿主×1; 强力反击震屏清理登记×1; 强力反击震屏代际×1; 强力反击震屏帧登记×2; 强力反击爆发粒子注入×1; 强力反击蓄力粒子注入×1; 强力反击回调契约×1; 强力反击代际句柄×1; 强力反击取消结果×1; 强力反击闪避缓冲可取消×1; 强力反击蓄力可取消×1; 强力反击预载取消×1; 强力反击起播等待可取消×1; 强力反击登记蓄力光×1; 强力反击音效取消登记×1; 强力反击阶段取消结果×1; 强力反击舞台坐标×1; 强力反击实体DOM蓄力光×1; 强力反击实体DOM×1; 强力反击蓄力粒子×1; 强力反击聚气使用本地函数×1; 强力反击蓄力坐标×1; 强力反击方向坐标×1; 强力反击锁定读取本地模块×1; 强力反击白闪舞台挂载×1; 强力反击白闪计时×1; 强力反击准星舞台坐标×1; 强力反击准星舞台挂载×1; 强力反击准星计时×1; 强力反击爆发与命中回调×1; 强力反击攻击方向实体×1; 强力反击目标震动清理×1; 强力反击原版震屏调用×1; 强力反击余波等待可取消×1; 强力反击保留余波并返回成功×1; CSS position:fixed → absolute×13; CSS 100vw → 舞台宽×1; CSS 100vh/dvh → 舞台高×1; CSS 残留视口单位(按舞台尺度保留)×42; 底座计时随演出倍速×12; 底座间隔随演出倍速×1; 底座时刻随演出倍速×19; 底座句柄时刻随演出倍速×23
 // ==========================================
 /* eslint-disable */
 // ---- 纯数据导出（原样，供宿主在工厂创建前解析人物头像/语音与预载清单） ----
@@ -36,7 +36,7 @@ export const RPG_HERO_VOICE_LINES = {
     low: ['弗兰克/弗兰克_半血1.wav', '弗兰克/弗兰克_半血2.wav', '弗兰克/弗兰克_半血3.wav']
   }
 };
-export const RPG_USED_AUDIO_KEYS = ["defDown","atk2","atk1","taunt","hide","hitDown","shieldUp","defUp","burst","shot","monsterAttack","kanpo","gunshot1","gunshot2","gunshot3","gunshot_pierce","xiandan","enemySwingGroup","enemyRanged","enemyRangedGroup","enemyMagic","enemyMagicGroup","enemyBuff","enemyDebuff","enemyMeleeGroupHit","enemyRangedGroupHit","light_charge","light_impact","thunder_charge","thunder_single_hit","thunder_aoe_hit","bomb_throw","explosion_single","explosion_aoe_charge","explosion_aoe_blast","slash_whoosh_hit_fs434873","claw_bloody_blade_fs323526","frost_crystal_impact_fs550267","aoe_gun_burst_fs482122","aoe_poison_spell_fs219566","aoe_wind_spin_fs772867","fire01","freeze01","wolfman","creature_slime_01","swish_3","parry_3","dodge_2","hit_1a","hit_1b","hit_1c","hit_2a","hit_2b","hit_2c","hit_3a","hit_3b","hit_3c","mx_sand_swish","mx_stygian_whoosh","mx_sword_metal","mx_gear_lock","mx_tunnel","mx_rift_charge","mx_deep_impact","mx_giant_roar","mx_dino_roar","mx_golem_stomp","revive_gather","revive_bloom","molt_crack","molt_snap","molt_empower","rage_exit","link_dash","link_chime","leech_flow","regen_hum","thorn_parry","resist_fluid","resist_phantom","resist_antimagic","resist_vital","resist_fireproof","resist_poisonproof","resist_ironbody","ranshao","fog","mx_rift_tear","mx_vacuum","mx_armor_strike","sd_ring_blast","sd_shatter_blast","huoyan01","parry_perfect","avoid_dash_perfect","sheshen_armor_step","fork432","forkHum","forkMute","bowlBronze","bowlClear","bellPing","crystalSnap","mirrorRing","mirrorStream","bastetChime","bastetCast","bastetHeal","conchCharge","conchMist","windHum","crystalChime","dodgeWind"];
+export const RPG_USED_AUDIO_KEYS = ["defDown","atk2","atk1","taunt","hide","hitDown","shieldUp","defUp","burst","shot","monsterAttack","kanpo","gunshot1","gunshot2","gunshot3","gunshot_pierce","xiandan","enemySwingGroup","enemyRanged","enemyRangedGroup","enemyMagic","enemyMagicGroup","enemyBuff","enemyDebuff","enemyMeleeGroupHit","enemyRangedGroupHit","light_charge","light_impact","thunder_charge","thunder_single_hit","thunder_aoe_hit","bomb_throw","explosion_single","explosion_aoe_charge","explosion_aoe_blast","slash_whoosh_hit_fs434873","claw_bloody_blade_fs323526","frost_crystal_impact_fs550267","aoe_gun_burst_fs482122","aoe_poison_spell_fs219566","aoe_wind_spin_fs772867","fire01","freeze01","wolfman","creature_slime_01","swish_3","parry_3","dodge_2","hit_1a","hit_1b","hit_1c","hit_2a","hit_2b","hit_2c","hit_3a","hit_3b","hit_3c","mx_sand_swish","mx_stygian_whoosh","mx_sword_metal","mx_gear_lock","mx_tunnel","mx_rift_charge","mx_deep_impact","mx_giant_roar","mx_dino_roar","mx_golem_stomp","revive_gather","revive_bloom","molt_crack","molt_snap","molt_empower","rage_exit","link_dash","link_chime","leech_flow","regen_hum","thorn_parry","resist_fluid","resist_phantom","resist_antimagic","resist_vital","resist_fireproof","resist_poisonproof","resist_ironbody","ranshao","fog","mx_rift_tear","mx_vacuum","mx_armor_strike","sd_ring_blast","sd_shatter_blast","huoyan01","parry_perfect","avoid_dash_perfect","sheshen_armor_step","fork432","forkHum","forkMute","bowlBronze","bowlClear","bellPing","crystalSnap","mirrorRing","mirrorStream","bastetChime","bastetCast","bastetHeal","conchCharge","conchMist","windHum","crystalChime","dodgeWind","parryShield"];
 
 export function createRpgAv(host) {
   // ---- 宿主注入（战棋舞台、单位视图、代际令牌） ----
@@ -427,10 +427,11 @@ const CombatAudioMixer = (function () {
     const trackOf = category => category === 'N' ? 'voice' : ['F','G','H','I'].includes(category) ? 'result' : ['A','B','C','D','E'].includes(category) ? 'skill' : 'aux';
     const categoryOf = opts => opts.category || opts.audioContext?.category || opts.owner?.audioContext?.category || audioScope?.category
         || (opts.track === 'skill' ? 'D' : opts.track === 'result' ? 'F' : 'K');
+    const combatOf = opts => opts.combat ?? opts.audioContext?.combat ?? opts.owner?.audioContext?.combat ?? audioScope?.combat ?? false;
     function capture(fallback = 'K') { return audioScope || Object.freeze({ category:fallback }); }
     function withContext(value, fn) {
         const previous = audioScope;
-        audioScope = Object.freeze({ category:typeof value === 'string' ? value : value.category });
+        audioScope = Object.freeze(typeof value === 'string' ? { category:value } : { ...value });
         try { return fn(); } finally { audioScope = previous; }
     }
     function classify(skill) {
@@ -449,13 +450,13 @@ const CombatAudioMixer = (function () {
         }
         return ctx;
     }
-    function output(track = 'skill', category = null) {
+    function output(track = 'skill', category = null, combat = false) {
         context();
         if (!category) return tracks[track];
-        const key = track + ':' + category;
+        const key = track + ':' + category + (combat ? ':combat' : '');
         if (!categoryTracks.has(key)) {
             const node = ctx.createGain(); node.gain.value = categories[category].gain; node.connect(tracks[track]);
-            categoryTracks.set(key, { node, category, envelope:[] }); duck();
+            categoryTracks.set(key, { node, category, combat, envelope:[] }); duck();
         }
         return categoryTracks.get(key).node;
     }
@@ -498,7 +499,7 @@ const CombatAudioMixer = (function () {
             for (const t of boundaries) {
                 const active = [...protections].filter(p => p.start <= t && p.end > t);
                 const factor = Math.min(1, ...active.map(p => {
-                    const gap = p.priority - settings.priority;
+                    const gap = p.combat && entry.combat ? 0 : p.priority - settings.priority;
                     return gap <= 0 ? 1 : gap === 1 ? 0.85 : gap < 4 ? 0.65 : 0.40;
                 }));
                 const target = base * factor, current = valueAt(points, t);
@@ -510,13 +511,13 @@ const CombatAudioMixer = (function () {
             points.slice(1).forEach(p => gain.linearRampToValueAtTime(p.v, p.t)); entry.envelope = points;
         }
     }
-    function protect(profile = 'short', when, owner = null, category = null) {
+    function protect(profile = 'short', when, owner = null, category = null, combat = combatOf({ owner })) {
         const audioCtx = context(); if (!audioCtx) return () => {};
         const name = category || owner?.audioContext?.category || audioScope?.category || (profile === 'special' ? 'A' : 'D');
         const priority = categories[name].priority;
         if (!priority) return () => {};
         const holdMs = ['A','B','C'].includes(name) ? profiles.special.holdMs : profiles.short.holdMs;
-        const p = { start:when == null ? audioCtx.currentTime : when, owner, category:name, priority, holdMs };
+        const p = { start:when == null ? audioCtx.currentTime : when, owner, category:name, priority, holdMs, combat };
         p.end = p.start + holdMs / 1000; protections.add(p); duck();
         const cancel = () => { protections.delete(p); duck(); };
         atTime(p.end + 0.120, () => { protections.delete(p); }, false);
@@ -558,6 +559,7 @@ const CombatAudioMixer = (function () {
     }
     function play(url, opts = {}) {
         opts = Object.assign({}, opts, { category:categoryOf(opts) });
+        const combat = combatOf(opts);
         let source = null, gain = null, pan = null, media = null, stopped = false, cancelStart = null, cancelProtect = null;
         let resolveReady, resolveStarted, resolveDone;
         const token = combatToken, gen = generation;
@@ -578,8 +580,8 @@ const CombatAudioMixer = (function () {
         function route(audioCtx) {
             gain = audioCtx.createGain();
             const __p = opts.pan != null ? opts.pan : (cue.track === 'skill' || cue.track === 'result') ? __panHint : null;
-            if (__p != null && audioCtx.createStereoPanner) { pan = audioCtx.createStereoPanner(); pan.pan.value = __p; gain.connect(pan); pan.connect(output(cue.track, cue.category)); }
-            else gain.connect(output(cue.track, cue.category));
+            if (__p != null && audioCtx.createStereoPanner) { pan = audioCtx.createStereoPanner(); pan.pan.value = __p; gain.connect(pan); pan.connect(output(cue.track, cue.category, combat)); }
+            else gain.connect(output(cue.track, cue.category, combat));
         }
         function started(when, duration) {
             cue.when = when;
@@ -589,7 +591,7 @@ const CombatAudioMixer = (function () {
                 if (fadeIn) { gain.gain.setValueAtTime(0.0001, when); gain.gain.linearRampToValueAtTime(opts.vol == null ? 0.5 : opts.vol, when + Math.min(fadeIn, duration * 0.25)); }
                 if (fadeOut) { gain.gain.setValueAtTime(opts.vol == null ? 0.5 : opts.vol, when + duration - fadeOut); gain.gain.linearRampToValueAtTime(0.0001, when + duration); }
             }
-            cancelProtect = protect(opts.profile || 'short', when, cue.owner, cue.category);
+            cancelProtect = protect(opts.profile || 'short', when, cue.owner, cue.category, combat);
             resolveReady(true);
             cancelStart = atTime(when, () => { if (valid()) resolveStarted(true); else finish(false); });
         }
@@ -633,11 +635,11 @@ const CombatAudioMixer = (function () {
         launch().catch(e => { console.warn('[Audio] 起播失败:', url, e); finish(false); }); return cue;
     }
     function media(element, volume, track = 'skill', opts = {}) {
-        const category = categoryOf(Object.assign({ track }, opts));
+        const category = categoryOf(Object.assign({ track }, opts)), combat = combatOf(opts);
         const audioCtx = context(); if (!audioCtx) { element.volume = Math.min(1, volume * categories[category].gain); return () => {}; }
         const source = audioCtx.createMediaElementSource(element), gain = audioCtx.createGain();
         let released = false, cancelProtect = null;
-        gain.gain.value = volume; source.connect(gain); gain.connect(output(track, category));
+        gain.gain.value = volume; source.connect(gain); gain.connect(output(track, category, combat));
         function release(stop) {
             if (released) return; released = true;
             if (stop) element.pause();
@@ -647,7 +649,7 @@ const CombatAudioMixer = (function () {
         const cue = () => release(true);
         voices.add(cue);
         element.addEventListener('ended', () => release(false), { once:true });
-        element.addEventListener('playing', () => { cancelProtect = protect('special', audioCtx.currentTime, opts.owner, category); }, { once:true });
+        element.addEventListener('playing', () => { cancelProtect = protect('special', audioCtx.currentTime, opts.owner, category, combat); }, { once:true });
         if (audioCtx.state === 'suspended') audioCtx.resume();
         return cue;
     }
@@ -1811,16 +1813,17 @@ const CombatEvents = {
         return audioCtx;
     }
     function synthBus(category) {
-        if (!synthBuses.has(category)) {
+        const combat = CombatAudioMixer.capture().combat, key = combat ? category + ':combat' : category;
+        if (!synthBuses.has(key)) {
             const ctx = audioCtx, comp = ctx.createDynamicsCompressor();
             comp.threshold.value = -10; comp.knee.value = 4; comp.ratio.value = 6; comp.attack.value = 0.001; comp.release.value = 0.12;
-            comp.connect(CombatAudioMixer.output(CombatAudioMixer.trackOf(category), category));
+            comp.connect(CombatAudioMixer.output(CombatAudioMixer.trackOf(category), category, combat));
             const sat = shaper(ctx, 1.6); sat.connect(comp);
             const bus = ctx.createGain(); bus.gain.value = identitySfxOn ? 0.9 : 0; bus.connect(sat);
             const verb = ctx.createConvolver(); verb.buffer = sfxIR; const vg = ctx.createGain(); vg.gain.value = 0.5; verb.connect(vg); vg.connect(comp);
-            synthBuses.set(category, { bus, verb });
+            synthBuses.set(key, { bus, verb });
         }
-        return synthBuses.get(category);
+        return synthBuses.get(key);
     }
     function shaper(ctx, drive) { const ws = ctx.createWaveShaper(), c = new Float32Array(2048); for (let i = 0; i < 2048; i++) c[i] = Math.tanh((i / 1024 - 1) * drive) / Math.tanh(drive); ws.curve = c; ws.oversample = '2x'; return ws; }
     function chain(ctx, src, t, o) {
@@ -1831,7 +1834,7 @@ const CombatEvents = {
         const p = ctx.createStereoPanner(); p.pan.setValueAtTime(o.pan || 0, t); if (o.pan1 !== undefined) p.pan.linearRampToValueAtTime(o.pan1, t + o.dur);
         const category = resultOutput ? CombatAudioMixer.capture('F').category : CombatAudioMixer.capture('D').category;
         const sound = synthBus(category);
-        src.connect(gn); gn.connect(p); p.connect(resultOutput ? CombatAudioMixer.output('result', category) : groupChargeOutput || identityOutput || sound.bus);
+        src.connect(gn); gn.connect(p); p.connect(resultOutput ? CombatAudioMixer.output('result', category, CombatAudioMixer.capture().combat) : groupChargeOutput || identityOutput || sound.bus);
         if (o.wet && !resultOutput && !groupChargeOutput && !identityOutput) { const w = ctx.createGain(); w.gain.value = o.wet; p.connect(w); w.connect(sound.verb); }
         if (!resultOutput && !identityOutput && !groupChargeOutput) CombatAudioMixer.protect('short', t, null, category);
     }
@@ -2605,7 +2608,7 @@ const CombatEvents = {
         void dom.offsetWidth;
         dom.classList.add(cls);
         omenAura(kind, owner, bag);
-        CombatAudioMixer.withContext('L', () => omenSound(kind));
+        CombatAudioMixer.withContext({ category:'L', combat:kind !== 'rose-self' && kind !== 'gloom-foe' }, () => omenSound(kind));
 
         const restore = () => {
             dom.classList.remove(cls);
@@ -5201,7 +5204,7 @@ const CombatEvents = {
         const dodgeTier = r.dodgeTier || (inRatio < 0.10 ? 1 : inRatio < 0.50 ? 2 : 3);
         const shieldBroken = shieldDmg > 0 && (r.shieldBefore || 0) > 0 && (r.shieldAfter || 0) === 0;
         const landed = kind === 'hp' || kind === 'shield';
-        return { kind, tier, blockTier, dodgeTier, incomingDmg, hpDmg, shieldDmg, shieldBroken, crit: landed && !!r.isCrit, burst: landed && !!r.isBurst };
+        return { kind, tier, blockTier, dodgeTier, incomingDmg, hpDmg, shieldDmg, shieldBroken, guardBroken:!!r.guardBroken, crit: landed && !!r.isCrit, burst: landed && !!r.isBurst };
     }
 
     function syncHitBar(id, hp, maxHp, force = false) {
@@ -5499,31 +5502,17 @@ const CombatEvents = {
     const impactAudioEvents = new Set();
     let nextImpactWaveId = 0, nextImpactEventId = 0, nextAudioActionId = 0;
 
-    function impactAudioScore(hit) {
-        if (hit.shieldBroken) return 1000;
-        if (hit.kind === 'hp') return 700 + (hit.tier || 1);
-        if (hit.kind === 'shield') return 600;
-        if (hit.kind === 'block') return 400 + (hit.blockTier || 1);
-        if (hit.kind === 'dodge') return 200 + (hit.dodgeTier || 1);
-        return 0;
-    }
-
     function publishImpactAudio(result) {
-        if (impactAudioEvents.has(result.eventId)) return;
+        if (_pipelineFrozen || impactAudioEvents.has(result.eventId)) return;
+        const wave = impactWaves.get(result.waveId);
+        if (result.waveId && !wave) return;
         impactAudioEvents.add(result.eventId);
-        if (result.waveId) {
-            const wave = impactWaves.get(result.waveId);
-            if (!wave) return;
-            if (result.isHero) { if (!_pipelineFrozen) hitAudio([result]); }
-            else wave.results.set(result.targetId, result);
-            return;
-        }
-        if (!_pipelineFrozen) hitAudio([result]);
+        hitAudio(result, result.isHero ? null : wave?.played);
     }
 
     function beginImpactWave(targetIds, actionId) {
         const id = 'impact-' + (++nextImpactWaveId);
-        const wave = { id, actionId:actionId || ('audio-action-' + (++nextAudioActionId)), pending:new Set(targetIds), completed:new Set(), results:new Map(), closed:false };
+        const wave = { id, actionId:actionId || ('audio-action-' + (++nextAudioActionId)), pending:new Set(targetIds), completed:new Set(), played:new Set(), closed:false };
         impactWaves.set(id, wave);
         return wave;
     }
@@ -5531,17 +5520,11 @@ const CombatEvents = {
     function flushImpactWave(wave) {
         if (!wave || impactWaves.get(wave.id) !== wave || !wave.closed || wave.pending.size) return;
         impactWaves.delete(wave.id);
-        const results = [...wave.results.values()];
-        if (!results.length || !identitySfxOn || _pipelineFrozen) return;
-        const score = Math.max(...results.map(impactAudioScore));
-        hitAudio(results.filter(result => impactAudioScore(result) === score));
     }
 
     function replaceImpactWaveTargets(wave, targetIds) {
         if (!wave || wave.closed || impactWaves.get(wave.id) !== wave) return;
-        const targets = new Set(targetIds);
         wave.pending = new Set(targetIds.filter(id => !wave.completed.has(id)));
-        for (const id of wave.results.keys()) if (!targets.has(id)) wave.results.delete(id);
     }
 
     function completeImpactWaveTarget(wave, targetId) {
@@ -5573,11 +5556,11 @@ const CombatEvents = {
         publish(result) {
             const classified = classifyHit(result);
             const source = result.source || 'attack';
-            const resultType = classified.kind === 'prevented' ? 'DamagePrevented' : classified.kind === 'dodge' ? 'Dodge' : classified.shieldBroken ? 'ShieldBroken'
+            const resultType = classified.kind === 'prevented' ? 'DamagePrevented' : classified.kind === 'dodge' ? 'Dodge' : classified.shieldBroken ? 'ShieldBroken' : classified.guardBroken ? 'GuardBroken'
                 : classified.kind === 'block' ? 'Block' : classified.kind === 'shield' ? 'ShieldHit'
                 : source === 'counter' ? 'CounterHit' : source === 'dot' ? 'PeriodicDamage' : source === 'reflect' ? 'ReflectDamage' : 'Hit';
             const event = Object.freeze(Object.assign({}, classified, {
-                targetId:result.targetId, sourceId:result.sourceId || null, source, resultType, isHero:!!result.isHero,
+                targetId:result.targetId, sourceId:result.sourceId || null, source, resultType, isHero:!!result.isHero, pan:result.pan,
                 maxHp:result.maxHp, hpBefore:result.hpBefore, hpAfter:result.hpAfter,
                 shieldBefore:result.shieldBefore || 0, shieldAfter:result.shieldAfter || 0,
                 damageType:result.damageType || '近战',
@@ -5597,7 +5580,7 @@ const CombatEvents = {
         clear: clearCombatAudio
     };
 
-    function playHitTierAudio(tier) {
+    function playHitTierAudio(tier, opts) {
         const t = tier >= 3 ? 3 : tier === 2 ? 2 : 1;
         const list = HIT_AUDIO_POOL[t] || HIT_AUDIO_POOL[1];
         let idx = Math.floor(Math.random() * list.length);
@@ -5605,26 +5588,34 @@ const CombatEvents = {
             idx = (idx + 1 + Math.floor(Math.random() * (list.length - 1))) % list.length;
         }
         _lastHitAudioIdx[t] = idx;
-        playSound(list[idx], t === 3 ? 0.94 : t === 2 ? 0.88 : 0.82, 1, { track:'result', category:'F' });
+        playSound(list[idx], t === 3 ? 0.94 : t === 2 ? 0.88 : 0.82, 1, { ...opts, category:'F' });
     }
-    function hitAudio(list) {
-        list = list.filter(h => h.kind !== 'prevented');
-        if (!identitySfxOn || !list.length) return;
-        const anyBreak = list.some(h => h.shieldBroken), anyCrit = list.some(h => h.crit), anyBurst = list.some(h => h.burst);
-        // 破盾瞬间无论多少伤害均播最大档 (GuardBreak)
-        if (anyBreak) { playSound('parry_3', 0.95, 1, { track:'result', category:'G' }); return; }
-        const score = h => h.kind === 'hp' ? 10 + h.tier * 10 : h.kind === 'shield' ? (h.shieldBroken ? 15 : 5) : h.kind === 'block' ? 3 : 1;
-        const top = list.reduce((a, b) => score(b) > score(a) ? b : a);
-        if (top.kind === 'dodge') { playSound('dodge_' + (top.dodgeTier || 1), (top.dodgeTier || 1) === 3 ? 0.92 : 0.82, 1, { track:'result', category:'H' }); return; }
-        if (top.kind === 'block') { playSound('parry_' + (top.blockTier || 1), (top.blockTier || 1) === 3 ? 0.95 : 0.85, 1, { track:'result', category:'G' }); return; }
-        resultOutput = true;
-        try { CombatAudioMixer.withContext(top.kind === 'shield' ? 'G' : 'F', () => {
-            CombatAudioMixer.protect('short', audio().currentTime, null, top.kind === 'shield' ? 'G' : 'F');
-            if (top.kind === 'shield') { crystal(0, 1900, 0.1); tone(0, { f0: 1200, f1: 900, dur: 0.16, vol: 0.05, wet: 0.5 }); }
-            if (top.kind === 'hp') playHitTierAudio(top.tier || 1);
-            if (anyBurst) { chime(0, 1320, 0.6, 0.07); tone(0, { f0: 660, f1: 990, dur: 0.25, vol: 0.05, wet: 0.6 }); }
-            else if (anyCrit) { tone(0, { type: 'square', f0: 2400, f1: 1500, dur: 0.07, vol: 0.05 }); click(0, 0.6, 7000, 0.006); crystal(0.012, 3200, 0.07); }
-        }); } finally { resultOutput = false; }
+    function hitAudio(h, played) {
+        if (!identitySfxOn || h.kind === 'prevented') return;
+        const take = key => {
+            if (played?.has(key)) return false;
+            played?.add(key);
+            return true;
+        };
+        const opts = { track:'result', combat:true, pan:h.pan };
+        if (h.kind === 'dodge') {
+            const key = 'dodge_' + h.dodgeTier;
+            if (take(key)) playSound(key, h.dodgeTier === 3 ? 0.92 : 0.82, 1, { ...opts, category:'H' });
+            return;
+        }
+        const defense = h.shieldBroken || h.guardBroken ? 'parry_3'
+            : h.kind === 'block' ? 'parry_' + h.blockTier : h.kind === 'shield' ? 'parryShield' : null;
+        if (defense && take(defense)) playSound(defense, defense === 'parry_3' ? 0.95 : defense === 'parryShield' ? 0.55 : 0.85, 1,
+            { ...opts, category:'G' });
+        if (h.kind !== 'hp' || !take('hit_' + h.tier)) return;
+        playHitTierAudio(h.tier, opts);
+        if (h.burst || h.crit) {
+            resultOutput = true;
+            try { CombatAudioMixer.withContext({ category:'F', combat:true }, () => {
+                if (h.burst) { chime(0, 1320, 0.6, 0.07); tone(0, { f0:660, f1:990, dur:0.25, vol:0.05, wet:0.6 }); }
+                else { tone(0, { type:'square', f0:2400, f1:1500, dur:0.07, vol:0.05 }); click(0, 0.6, 7000, 0.006); crystal(0.012, 3200, 0.07); }
+            }); } finally { resultOutput = false; }
+        }
     }
 
     function playHitFeedback(results, opts = {}) {

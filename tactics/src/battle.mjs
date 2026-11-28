@@ -2546,6 +2546,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       guard.value -= used; remainingGuardCost -= used;
       if (guard.value <= 0) removeBuffRecord(target.id, guard);
     }
+    const guardBroken = guardDmg > 0 && guards.every(guard => guard.value <= 0);
     if (guardDmg > 0) addLog('🛡️ ' + target.name + ' 的【免伤】抵消 ' + guardDmg);
     let fatalResult = null;
     // 致死保命被动（毅力/回避致命）
@@ -2623,10 +2624,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     }
     emit('segment-resolved', { attackId: currentAttackId(), casterId: caster.id, targetId: target.id,
       slotIndex, segmentIndex, originalTargetId: segBase.originalTargetId, contactPoint: segBase.contactPoint,
-      maxHp, hpDmg: dealt, shieldDmg, guardDmg, shieldBefore, shieldAfter, rawBeforeResist: raw0, rawDmg: raw, resistance, fatalResult,
+      maxHp, hpDmg: dealt, shieldDmg, guardDmg, guardBroken, shieldBefore, shieldAfter, rawBeforeResist: raw0, rawDmg: raw, resistance, fatalResult,
       hpBefore, hpAfter: target.ref.hp, isCrit: crit, isPierce: pierce, backstab: tactics.backstab, lowCover: tactics.lowCover,
       damageType: incomingType, down, damageCategory: slot.definition.damageCategory || null });
-    return Object.assign(segBase, { hit: true, outcome: 'hit', maxHp, hpDmg: dealt, shieldDmg, guardDmg, shieldBefore, shieldAfter,
+    return Object.assign(segBase, { hit: true, outcome: 'hit', maxHp, hpDmg: dealt, shieldDmg, guardDmg, guardBroken, shieldBefore, shieldAfter,
       rawBeforeResist: raw0, rawDmg: raw, resistance, fatalResult, finalTargetId: target.id,
       hpBefore, hpAfter: target.ref.hp, down, reaction: reaction || undefined, logEnd: log.length });
   }

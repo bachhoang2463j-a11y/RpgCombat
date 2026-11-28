@@ -52,7 +52,7 @@ export function buildHitFeedback(result, hit, segment = hit, incomingDmg = resul
     targetId: hit.targetId, sourceId: result.casterId, outcome: segment.outcome || (segment.hit ? 'hit' : 'dodge'),
     maxHp: segment.maxHp ?? hit.maxHp, hpBefore: segment.hpBefore, hpAfter: segment.hpAfter, hpDmg: segment.hpDmg,
     shieldBefore: segment.shieldBefore || 0, shieldAfter: segment.shieldAfter || 0, shieldDmg: segment.shieldDmg || 0,
-    blockedDmg: segment.guardDmg > 0 ? segment.guardDmg : undefined, incomingDmg: segment.rawDmg ?? incomingDmg,
+    guardBroken: !!segment.guardBroken, incomingDmg: segment.rawDmg ?? incomingDmg,
     isHero: (segment.side || hit.side) === 'hero', isCrit: segment.isCrit ?? !!result.crit, isBurst: segment.isBurst ?? !!result.isBurst,
     isPierce: !!segment.isPierce, damageType: segment.damageType || result.incomingType || result.skill?.damageType || null,
     damageCategory: segment.damageCategory || null, segmentId: segment.segmentId || null,
@@ -335,7 +335,7 @@ export function createActionDirector(deps) {
     return layersFor;
   }
   const SHAKE = { light: [180, 3], medium: [250, 5], heavy: [320, 7], quake: [500, 10] };
-  function makeFx(category) {
+  function makeFx(category, audioContext) {
     const L = fxLayers();
     return {
       uid: () => ++fxUid,
@@ -354,10 +354,10 @@ export function createActionDirector(deps) {
       shake: level => {
         const [ms, amp] = SHAKE[level];
         const frames = [];
-        for (let i = 0; i <= 8; i++) { const k = amp * (1 - i / 8); frames.push({ transform: i === 8 ? 'translate3d(0,0,0)' : 'translate3d(' + ((i % 2 ? -1 : 1) * k).toFixed(1) + 'px,' + ((i % 3 - 1) * k * 0.6).toFixed(1) + 'px,0)' }); }
+        for (let i = 0; i <= 8; i++) { const k = amp * (1 - i / 8); frames.push({ transform: i === 8 ? 'translate3d(0,0,0)' : 'translate3d(' + ((i % 2 ? 1 : -1) * k).toFixed(1) + 'px,' + ((i % 3 - 1) * k * 0.6).toFixed(1) + 'px,0)' }); }
         L.dom.shake.animate(frames, { duration: ms });
       },
-      sfx: (key, vol) => av.playSound(key, vol, 1, { track: 'skill', category }),
+      sfx: (key, vol) => av.playSound(key, vol, 1, { track: 'skill', category, audioContext, pan: audioContext?.pan }),
     };
   }
   function prepareAudio(keys) {
@@ -375,6 +375,7 @@ export function createActionDirector(deps) {
   // ---------- 声像与局部顿帧 ----------
   // 声像：发声单位在视口中的横向位置 → [-0.6, 0.6]（只作用于战斗音效轨，界面/语音不偏）
   function panOf(id) {
+    if (!avHost.setPanHint) return null;
     const c = centerOf(id);
     if (!c) return null;
     const vp = sandbox.getDom().viewport.getBoundingClientRect(), s = sandbox.worldToScreenClient(c.x, c.y);
@@ -460,7 +461,7 @@ export function createActionDirector(deps) {
     const moveEvs = (result.events || []).filter(ev => ev.type === 'unit-charged' || ev.type === 'unit-displaced');
     const charge = moveEvs.find(ev => ev.type === 'unit-charged');
     let chargeStep = 0;
-    const audioContext = { category: av.CombatAudioMixer.classify(skill) };
+    const audioContext = { category: av.CombatAudioMixer.classify(skill), combat: skillSlots(skill).some(s => s.attack), pan: panOf(result.casterId) };
     const actionId = av.CombatAudioDirector.beginAction();
     const waveTargets = new Map();
     hits.forEach(h => (h.segments || [h]).forEach((seg, i) => {
@@ -644,8 +645,9 @@ export function createActionDirector(deps) {
       const reviveEv = segEvents.find(ev => ev.trigger === 'revive' && ev.unitId === targetId && ev.hpBeforeDeath === 0);
       const moltEv = segEvents.find(ev => ev.trigger === 'molt' && ev.unitId === targetId && Number.isFinite(ev.hpBefore));
       const hitSnap = reviveEv ? { ...seg, hpAfter: 0, shieldAfter: 0 } : moltEv ? { ...seg, hpAfter: moltEv.hpBefore } : seg;
-      const r = { ...buildHitFeedback({ ...result, skill }, h, hitSnap, incoming), actionId, waveId: wave ? wave.id : null };
-      avHost.setPanHint?.(panOf(targetId));
+      const pan = panOf(targetId);
+      const r = { ...buildHitFeedback({ ...result, skill }, h, hitSnap, incoming), actionId, pan, waveId: wave ? wave.id : null };
+      avHost.setPanHint?.(pan);
       if (seg.resistance?.layers?.length) revealRule({ ...seg.resistance, segmentId: seg.segmentId, targetId }, 'resistance');
       if (seg.barrierHitId) {
         const event = (result.events || []).find(ev => ev.eventId === seg.barrierHitId);
@@ -661,7 +663,6 @@ export function createActionDirector(deps) {
         if (seg.shieldDmg > 0) {
           const sr = { ...r, hpDmg: 0, hpAfter: seg.hpBefore };
           av.playHitFeedback(sr, { suppressShake: true, suppressRecoil: true });
-          av.CombatAudioDirector.publish(sr);
         }
         const ent = avHost.entity(targetId);
         const rescue = ent && av.playRescueAvoidFatal ? av.playRescueAvoidFatal(ent) : null;
@@ -692,7 +693,7 @@ export function createActionDirector(deps) {
         const c = centerOf(targetId);
         if (c) { const p = worldPx(c); floatText(makeFx('B'), p.x, p.y - 36, '🩸 毅力 · 1HP!', '#fca5a5', '#7f1d1d', { ms: 1000, size: 14 }); }
       }
-      if (!healed && !seg.barrierHitId) av.CombatAudioDirector.publish(r);
+      if (!healed && !seg.barrierHitId && (fatalReason !== 'avoid-fatal' || seg.shieldDmg > 0 || seg.guardBroken)) av.CombatAudioDirector.publish(r);
       if (wave) av.CombatAudioDirector.completeTarget(wave, targetId);
       if (onReveal) onReveal({ ...h, ...hitSnap, targetId, heal: healed, segmentIndex: i, segmentCount: segs.length }, Object.assign({ result, identity, entryId: entry.id }, meta));
       if (seg.segmentId) queueCounters(seg.segmentId, Promise.all(segmentReactions).then(values => values.every(value => value !== false)));
@@ -777,7 +778,7 @@ export function createActionDirector(deps) {
       result, skill, hits, identity, input, casterId: result.casterId, casterEnt, av, avHost, sandbox,
       charge: charge && { ...charge, footprint: vd.footprintsById[charge.unitId] }, playCharge,
       audioContext, outcomeMap: new Map(hits.map(h => [h.targetId, h.hit ? 'hit' : 'dodge'])),
-      fx: makeFx(audioContext.category),
+      fx: makeFx(audioContext.category, audioContext),
       wait, tween, awaitHandle, hold, after: (ms, fn) => scope().after(ms, fn),
       reveal, revealSegment, revealEffect, revealGuard, revealRule, revealRegion,
       awaitCounters: () => counterRun,
@@ -1110,7 +1111,7 @@ export function createActionDirector(deps) {
   }
   // 规则原因驱动的演出：舍身格挡 / 结界展开·受击·隔绝·破碎·移除 / 变体抗性 / 燃烧禁疗（各事件 eventId 唯一，由 revealRule 去重）
   function playRuleFx(value, kind, result = null) {
-    const s = scope(), fx = makeFx('D'), after = (ms, fn) => s.after(ms, fn);
+    const s = scope(), fx = makeFx('D', kind === 'guard' ? { combat: true, pan: panOf(value.guardianId) } : undefined), after = (ms, fn) => s.after(ms, fn);
     // 宿主自带 presentGuard 时由其承担整段舍身演出（冲刺→格挡）；默认实现：冲刺并行起跑，格挡在受击揭示拍点
     if (kind === 'guard') return deps.presentGuard ? undefined : playGuardBlock({ fx, view: sandbox.getUnitView(), tween }, value);
     if (kind === 'resistance') {

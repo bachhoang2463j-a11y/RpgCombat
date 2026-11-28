@@ -89,7 +89,9 @@ function integrationCases() {
     && /av\.playSelfDestructWindup/.test(dirSrc) && /av\.playSelfDestructBurst/.test(dirSrc)
     && /av\.playSound\('hpHeal'/.test(dirSrc)
     && BARRIER_AUDIO_KEYS.includes('shieldUp')
-    && /taunt: \['taunt', 'taunt'\]/.test(fxSrc) && /effect\.field === 'taunt'/.test(fxSrc) && /cue = sk\.damageType === '法术' \? 'light_impact'/.test(fxSrc)
+    && /taunt: \['taunt', 'taunt'\]/.test(fxSrc) && /effect\.field === 'taunt'/.test(fxSrc)
+    && /BASIC_ATTACK_AUDIO = \{ '近战': 'slash_whoosh_hit_fs434873', '远程': 'swish_3', '法术': 'light_impact' \}/.test(fxSrc)
+    && /ctx\.fx\.sfx\(BASIC_ATTACK_AUDIO\[sk\.damageType\]/.test(fxSrc)
     && /avHost\.sfx\('defUp'/.test(mainSrc) && /data-audio-pref/.test(mainSrc)));
   return out;
 }

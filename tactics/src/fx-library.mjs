@@ -132,7 +132,7 @@ function webm(ctx, file, x, y, width, { ms = 1600, rate = 1, opacity = 1, cover 
   v.playbackRate = rate * getTimeScale();
   layer.appendChild(v);
   layer.appendChild(cv);
-  if (audio) ctx.av.CombatAudioMixer.media(v, audio, 'skill', { category: ctx.audioContext?.category });
+  if (audio) ctx.av.CombatAudioMixer.media(v, audio, 'skill', { audioContext: ctx.audioContext });
   const p = v.play();
   if (p && typeof p.then === 'function') p.then(next, () => release());
   else next();
@@ -528,15 +528,15 @@ const RANGED_SPLAT_DRIPS = [['right:25%', 6, 140, 150, 1250], ['left:22%', 8, 18
 
 // 未知或缺失标签：按伤害类型与范围补通用出手音，由导演播放统一命中反馈。
 // 敌方无专属特效的范围攻击按原版 resolveEnemyGroupAttackFx 走兜底群攻（近战/远程/法术）。
+const BASIC_ATTACK_AUDIO = { '近战': 'slash_whoosh_hit_fs434873', '远程': 'swish_3', '法术': 'light_impact' };
 const neutralImpact = {
   id: 'neutral-impact', grade: 'identity', fallback: true,
-  prepareKeys: () => ['atk1', 'atk2', 'light_impact', 'enemyMeleeGroupHit', 'enemyRangedGroupHit'],
+  prepareKeys: () => [...Object.values(BASIC_ATTACK_AUDIO), 'enemyMeleeGroupHit', 'enemyRangedGroupHit', 'atk1'],
   async play(ctx) {
     const sk = ctx.skill || {};
     const wide = !!(sk.range && sk.range.type !== '单体' && sk.range.type !== '自身');
     if (wide && !sk.fxTag && ctx.hits.length && ctx.casterEnt && ctx.casterEnt.side !== 'hero') return enemyGroupAttack.play(ctx);
-    const cue = sk.damageType === '法术' ? 'light_impact' : (wide ? 'atk1' : 'atk2');
-    ctx.fx.sfx(cue, 0.55);
+    ctx.fx.sfx(BASIC_ATTACK_AUDIO[sk.damageType] || BASIC_ATTACK_AUDIO['近战'], 0.55);
     for (const h of ctx.hits) ctx.reveal(h.targetId);
     return true;
   },
@@ -721,7 +721,7 @@ const arsenicShot = {
         fx.top(ringHtml(c.x, c.y, 0.9 * PX, 'rgba(217,249,157,0.5)', 'rgba(132,204,22,0.2)'), 300).firstChild.animate([{ transform: 'scale(.5)', opacity: 0.8 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 280, fill: 'forwards' });
         return;
       }
-      ctx.av.playSound('creature_slime_01', 0.32, rnd(0.9, 1.1), { track: 'skill', category: audioContext.category });
+      ctx.av.playSound('creature_slime_01', 0.32, rnd(0.9, 1.1), { track: 'skill', audioContext });
       fx.top(ringHtml(c.x, c.y, 1.1 * PX, 'rgba(163,230,53,0.95)', 'rgba(9,13,22,0.65)'), 360).firstChild.animate([{ transform: 'scale(.2)', opacity: 1 }, { transform: 'scale(1)', opacity: 0 }], { duration: 340, fill: 'forwards' });
       particles(fx, Array.from({ length: 16 }, () => { const t = dir + rnd(-0.55, 0.55), d = rnd(0.5, 1.3) * PX; return { x: c.x + ux * 10, y: c.y + uy * 10, dx: Math.cos(t) * d, dy: Math.sin(t) * d + rnd(4, 12), size: rnd(4, 9), color: pick(ACID), core: '#f7fee7', s0: 1, s1: 0.35, dur: rnd(380, 560) }; }), 640);
       particles(fx, Array.from({ length: 7 }, () => ({ x: c.x + rnd(-14, 14), y: c.y + rnd(-6, 10), dx: rnd(-6, 6), dy: -rnd(26, 46), size: rnd(5, 9), color: '#65a30d', core: '#d9f99d', s0: 0.6, s1: 1.1, o0: 0.9, dur: rnd(620, 860), delay: rnd(60, 220) })), 1100);
@@ -738,7 +738,7 @@ const arsenicShot = {
     // 终点：地面腐蚀斑（毒液嘶响）
     ctx.after(CHARGE + FLIGHT + 40, () => {
       const p = landed.length ? worldPx(ctx.centerOf(landed[0].targetId)) : z;
-      ctx.av.playSound('aoe_poison_spell_fs219566', 0.3, 1.15, { track: 'skill', category: audioContext.category });
+      ctx.av.playSound('aoe_poison_spell_fs219566', 0.3, 1.15, { track: 'skill', audioContext });
       const st = fx.ground('<i style="position:absolute;left:' + p.x + 'px;top:' + (p.y + 0.3 * PX) + 'px;width:' + 1.9 * PX + 'px;height:' + 1.1 * PX + 'px;margin:' + (-0.55 * PX) + 'px 0 0 ' + (-0.95 * PX) + 'px;border-radius:46% 54% 50% 50%;' +
         'background:radial-gradient(ellipse,rgba(26,46,5,.75),rgba(77,124,15,.5) 45%,rgba(132,204,22,.18) 65%,transparent 75%);pointer-events:none;"></i>', 1700);
       st.firstChild.animate([{ transform: 'scale(.2)', opacity: 0 }, { transform: 'scale(1)', opacity: 1, offset: 0.2 }, { transform: 'scale(1.05)', opacity: 0.85, offset: 0.7 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 1650, fill: 'forwards' });

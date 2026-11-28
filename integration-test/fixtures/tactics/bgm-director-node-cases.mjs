@@ -10,8 +10,8 @@ const frame = (hp, units = [enemy(100)]) => ({ terminal: null, units: [...hp.map
 const calm = frame([100, 100, 100, 100]);
 const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
 
-function audioHarness(Director, { ready = true, random = () => 0, initialTheme = null } = {}) {
-  const calls = [], decks = [], timers = new Set(), saved = new Map();
+function audioHarness(Director, { ready = true, random = () => 0, initialTheme = null, seekHold = false, playHold = false } = {}) {
+  const calls = [], decks = [], timers = new Set(), saved = new Map(), pendingSeeks = [], pendingPlays = [];
   if (initialTheme) saved.set('tactics.bgm.theme', initialTheme);
   const gain = () => ({ connect() {}, disconnect() {}, gain: {
     value: 1,
@@ -58,11 +58,35 @@ function audioHarness(Director, { ready = true, random = () => 0, initialTheme =
     }; },
   };
   class FakeAudio extends EventTarget {
-    src = ''; currentTime = 0; duration = 200; paused = true; ended = false; readyState = 0;
-    load() { this.readyState = this.src && ready ? 3 : 0; this.ended = false; this.currentTime = 0; }
-    play() { assert.ok(this.readyState >= 3); calls.push(['play', this.src, this.currentTime]); this.paused = this.ended = false; return Promise.resolve(); }
+    src = ''; _currentTime = 0; duration = 200; paused = true; ended = false; readyState = 0;
+    get currentTime() { return this._currentTime; }
+    set currentTime(value) {
+      this._currentTime = value;
+      this.seeking = true;
+      this.dispatchEvent(new Event('seeking'));
+      if (seekHold) pendingSeeks.push(this);
+      else this.finishSeek();
+    }
+    finishSeek() { this.seeking = false; this.dispatchEvent(new Event('seeked')); }
+    metadata() { this.readyState = 1; this.dispatchEvent(new Event('loadedmetadata')); }
+    canPlay() { this.readyState = 3; this.dispatchEvent(new Event('canplay')); }
+    timeupdate(time = this.currentTime) { this._currentTime = time; this.dispatchEvent(new Event('timeupdate')); }
+    load() { this.readyState = this.src && ready ? 3 : 0; this.ended = false; this._currentTime = 0; }
+    play() {
+      assert.ok(this.readyState >= 3);
+      calls.push(['play', this.src, this.currentTime]);
+      this.paused = this.ended = false;
+      return playHold ? new Promise((resolve, reject) => pendingPlays.push({ audio: this, resolve, reject })) : Promise.resolve();
+    }
     pause() { this.paused = true; }
     removeAttribute() { this.src = ''; }
+    releasePlay(success = true) {
+      const idx = pendingPlays.findIndex(item => item.audio === this);
+      if (idx < 0) return;
+      const item = pendingPlays.splice(idx, 1)[0];
+      if (success) item.resolve(); else item.reject(new Error('play rejected'));
+    }
+    releaseSeek() { const idx = pendingSeeks.indexOf(this); if (idx >= 0) pendingSeeks.splice(idx, 1); this.finishSeek(); }
     end() { this.ended = this.paused = true; this.dispatchEvent(new Event('ended')); }
   }
   const director = Director({ assetBase: 'https://assets.invalid/', context: () => ctx, random,
@@ -80,7 +104,7 @@ function audioHarness(Director, { ready = true, random = () => 0, initialTheme =
     }
     ctx.currentTime = time;
   }
-  return { director, calls, decks, saved, advance, active: () => decks.find(deck => !deck.paused) };
+  return { director, calls, decks, saved, advance, active: () => decks.find(deck => !deck.paused), pendingSeeks, pendingPlays };
 }
 
 export async function runBgmCases({ tracks = BGM_TRACKS, pools = BGM_POOLS, comeback = COMEBACK_POOL,
@@ -247,33 +271,32 @@ export async function runBgmCases({ tracks = BGM_TRACKS, pools = BGM_POOLS, come
     h2.director.destroy();
   });
 
-  await check('BGM-07 低通暗化快收 0.95s、cueIn 强拍直入与过渡掩蔽音', async () => {
+  await check('BGM-07 起播即从 cueIn 交接，低通暗化与过渡重音随 0.40s 淡化', async () => {
     const { director, calls, advance } = audioHarness(Director, { random: () => 0.99 });
     director.startBattle(calm);
     await director.unlock(); await flush();
     assert.equal(calls.find(([k]) => k === 'play')[2], 0);
     assert.equal(director.sampleSpectrum(24).length, 24);
 
-    // 戏剧升温：触发 20kHz -> 420Hz 低通暗化 + 过渡重音 + 0.50s 处从 cueIn 强拍起播
     director.syncBattle(frame([100, 100, 100, 70]), 1, calm);
     await flush();
-    assert.ok(calls.some(([k, v, t]) => k === 'framp' && v === 420 && Math.abs(t - 0.95) < 1e-6));
-    assert.ok(calls.some(([k]) => k === 'stinger-noise'));
-    assert.ok(calls.some(([k]) => k === 'stinger-osc'));
-    await advance(0.55);
     const medTrack = themes.octopath.tracks.find(t => t.id === pools.medium.at(-1));
     assert.equal(director.state().track.id, medTrack.id);
-    assert.ok(Math.abs(calls.filter(([k]) => k === 'play').at(-1)[2] - medTrack.cueIn) < 1e-6);
+    assert.equal(calls.filter(([k]) => k === 'play').at(-1)[2], medTrack.cueIn);
+    assert.ok(calls.some(([k, v, t]) => k === 'framp' && v === 420 && t === 0.40));
+    assert.ok(calls.some(([k]) => k === 'stinger-noise'));
+    assert.ok(calls.some(([k]) => k === 'stinger-osc'));
     await advance(1.1);
 
-    // 手动选曲：保留短滤波过渡但从 0s 起播，不插过渡掩蔽音
-    const beforeStinger = calls.filter(([k]) => k === 'stinger-osc').length;
+    // 手动点名从 0s 起播，只做 0.30s 交叉淡化。
+    const from = calls.length;
     director.selectTrack(pools.medium[0]);
     await flush();
-    await advance(1.7);
     assert.equal(director.state().track.id, pools.medium[0]);
     assert.equal(calls.filter(([k]) => k === 'play').at(-1)[2], 0);
-    assert.equal(calls.filter(([k]) => k === 'stinger-osc').length, beforeStinger);
+    assert.ok(calls.slice(from).some(([k, v, t]) => k === 'linear' && v === 0 && Math.abs(t - 1.40) < 1e-6));
+    assert.ok(!calls.slice(from).some(([k]) => k === 'framp' || k.startsWith('stinger-')));
+    await advance(1.7);
     director.togglePause();
     assert.equal(director.sampleSpectrum(24), null);
     director.destroy();
@@ -352,6 +375,117 @@ export async function runBgmCases({ tracks = BGM_TRACKS, pools = BGM_POOLS, come
     await h3.advance(0.6);
     assert.ok(pools.medium.includes(h3.director.state().track.id));
     h3.director.destroy();
+  });
+
+  await check('BGM-11 慢 seek 与慢 play 期间旧轨保持原增益，兑现后才交接', async () => {
+    for (const hold of ['seek', 'play']) {
+      const h = audioHarness(Director, { random: () => 0, seekHold: hold === 'seek', playHold: hold === 'play' });
+      const d = h.director;
+      d.startBattle(calm); await d.unlock(); await flush();
+      if (hold === 'play') { h.pendingPlays[0].audio.releasePlay(); await flush(); }
+      const old = h.active(), oldTrack = d.state().track;
+      const from = h.calls.length;
+      d.syncBattle(frame([100, 100, 100, 70]), 1, calm); await flush();
+      await h.advance(2);
+      assert.equal(old.paused, false);
+      assert.equal(d.state().track, oldTrack);
+      assert.ok(!h.calls.slice(from).some(([kind, value]) => kind === 'framp' || (kind === 'linear' && value === 0)));
+      if (hold === 'seek') {
+        assert.equal(h.pendingSeeks.length, 1);
+        h.pendingSeeks[0].releaseSeek();
+      } else {
+        assert.equal(h.pendingPlays.length, 1);
+        h.pendingPlays[0].audio.releasePlay();
+      }
+      await flush();
+      assert.ok(pools.medium.includes(d.state().track.id));
+      assert.ok(h.calls.slice(from).some(([kind, value, at]) => kind === 'linear' && value === 0 && at === 2.40));
+      await h.advance(2.40);
+      assert.equal(old.paused, true);
+      d.destroy();
+    }
+  });
+
+  await check('BGM-12 自然续播备用轨单次交接，普通升温预热待横幅，紧急请求可取代', async () => {
+    const h = audioHarness(Director, { random: () => 0 });
+    const d = h.director;
+    d.startBattle(calm); await d.unlock(); await flush();
+    const old = h.active(), standby = h.decks.find(deck => deck !== old);
+    assert.ok(standby.src);
+    const startCount = h.calls.filter(([kind]) => kind === 'play').length;
+    old.timeupdate(old.duration - 1);
+    await flush(); await h.advance(0.4);
+    assert.equal(h.calls.filter(([kind]) => kind === 'play').length, startCount + 1);
+    d.destroy();
+
+    const h2 = audioHarness(Director, { random: () => 0 });
+    const d2 = h2.director;
+    d2.startBattle(calm); await d2.unlock(); await flush();
+    const base = frame([100, 100, 100, 100], [enemy(90)]);
+    const medium = frame([100, 100, 100, 70]);
+    d2.syncBattle(base, 1, calm, { deferMedium: true });
+    d2.syncBattle(medium, 2, base, { deferMedium: true }); await flush();
+    assert.ok(!pools.medium.includes(d2.state().track.id));
+    assert.equal(decodeURIComponent(h2.decks.find(deck => deck !== h2.active()).src).split('/').slice(-2).join('/'), tracks.find(t => t.id === pools.medium[0]).path);
+    const before = h2.calls.filter(([kind]) => kind === 'play').length;
+    d2.flushTurnCue(); await flush(); await h2.advance(0.5);
+    assert.ok(pools.medium.includes(d2.state().track.id));
+    assert.equal(h2.calls.filter(([kind]) => kind === 'play').length, before + 1);
+    d2.destroy();
+
+    const h3 = audioHarness(Director, { random: () => 0 });
+    const d3 = h3.director;
+    d3.startBattle(calm); await d3.unlock(); await flush();
+    d3.syncBattle(medium, 1, calm, { deferMedium: true }); await flush();
+    const turning = frame([100, 100, 100, 65], [enemy(0), unit('survivor', 'enemy', 100)]);
+    d3.syncBattle(turning, 2, medium, { deferMedium: true }); await flush();
+    assert.ok(comeback.includes(d3.state().track.id));
+    assert.equal(h3.calls.filter(([kind]) => kind === 'play').length, 2);
+    d3.flushTurnCue(); await h3.advance(0.4);
+    assert.ok(comeback.includes(d3.state().track.id));
+    d3.destroy();
+  });
+
+  await check('BGM-13 快速暂停和终局取消等待中的跳转或起播', async () => {
+    for (const hold of ['seek', 'play']) {
+      for (const stop of [d => d.togglePause(), d => d.syncBattle({ ...calm, terminal: { type: 'victory' } })]) {
+        const h = audioHarness(Director, { seekHold: hold === 'seek', playHold: hold === 'play' });
+        const d = h.director;
+        d.startBattle(calm); await d.unlock(); await flush();
+        if (hold === 'play') { h.pendingPlays[0].audio.releasePlay(); await flush(); }
+        const track = d.state().track, standby = h.decks.find(deck => deck !== h.active());
+        d.syncBattle(frame([100, 100, 100, 70]), 1, calm); await flush();
+        assert.equal((hold === 'seek' ? h.pendingSeeks : h.pendingPlays).length, 1);
+        stop(d);
+        assert.ok(standby.paused && !standby.src);
+        if (hold === 'seek') standby.releaseSeek(); else standby.releasePlay();
+        await flush();
+        assert.equal(d.state().track, track);
+        assert.ok(standby.paused && !standby.src);
+        d.destroy();
+      }
+    }
+  });
+
+  await check('BGM-14 新请求替换未起播任务，旧 play 完成不抢同一备用轨', async () => {
+    const h = audioHarness(Director, { playHold: true });
+    const d = h.director;
+    d.startBattle(calm); await d.unlock(); await flush();
+    h.pendingPlays[0].audio.releasePlay(); await flush();
+    const track = d.state().track;
+    d.syncBattle(frame([100, 100, 100, 70]), 1, calm); await flush();
+    const standby = h.pendingPlays[0].audio;
+    d.selectTrack(pools.high[0]);
+    assert.ok(standby.paused);
+    await flush();
+    assert.equal(h.pendingPlays.length, 2);
+    assert.equal(h.pendingPlays[1].audio, standby);
+    standby.releasePlay(); await flush();
+    assert.equal(d.state().track, track);
+    assert.ok(!h.calls.some(([kind, value]) => kind === 'linear' && value === 0));
+    standby.releasePlay(); await flush();
+    assert.equal(d.state().track.id, pools.high[0]);
+    d.destroy();
   });
 
   return { cases };
