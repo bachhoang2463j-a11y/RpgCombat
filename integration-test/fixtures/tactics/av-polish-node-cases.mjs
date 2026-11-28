@@ -382,7 +382,7 @@ async function stageD() {
     for (const k of ['revive_gather', 'revive_bloom', 'molt_crack', 'molt_snap', 'molt_empower', 'rage_exit', 'leech_flow', 'regen_hum', 'thorn_parry'])
       assert.ok(DEMO_AUDIO_KEYS.includes(k), k);
   });
-  await check('AVP-SD02 连动/蜕皮清除列表/再生/吸血/荆棘真实事件发射', () => {
+  await check('AVP-SD02 连动/蜕皮清除列表/吸血/荆棘真实事件发射', () => {
     const b1 = createBattle({ units: [mk('h', 'hero'), mk('e', 'enemy', { attrTags: ['[连动]', '[蜕皮]'] })],
       placementsById: { h: { col: 1, row: 1 }, e: { col: 3, row: 1 } }, scene: { sceneId: 'sd1', grid: { columns: 8, rows: 6, metersPerCell: 1 }, objects: [] }, random: () => 0.5 });
     b1.start();
@@ -405,12 +405,28 @@ async function stageD() {
     assert.ok(leech && leech.unitId === 'h' && leech.sourceId === 'e' && leech.healed > 0 && leech.segmentId, JSON.stringify(leech));
     assert.ok(thorn && thorn.sourceId === 'e' && thorn.targetId === 'h' && thorn.isMelee && thorn.reflected && thorn.hpDmg > 0, JSON.stringify(thorn));
 
-    let regenEv = null;
-    for (let i = 0; i < 6 && !regenEv; i++) {
-      const snap = b2.endAction();
-      regenEv = snap.events.find(e => e.type === 'variant-trigger' && e.trigger === 'regen' && e.unitId === 'e');
+  });
+  await check('AVP-SD06 再生按100时间周期结算，事件与实际HP一致且满血截断', () => {
+    const b = createBattle({ units: [mk('h', 'hero', { spd: 200 }), mk('e', 'enemy', { attrTags: ['[再生]'], hp: 75, spd: 100 })],
+      placementsById: { h: { col: 1, row: 1 }, e: { col: 2, row: 1 } }, scene: { sceneId: 'sd6', grid: { columns: 8, rows: 6, metersPerCell: 1 }, objects: [] }, random: () => 0.5 });
+    const expected = [
+      { at: 100, hpBefore: 75, hpAfter: 85, healed: 10 },
+      { at: 200, hpBefore: 85, hpAfter: 95, healed: 10 },
+      { at: 300, hpBefore: 95, hpAfter: 100, healed: 5 },
+    ];
+    let snap = b.start();
+    assert.equal(snap.now, 50);
+    for (let i = 0; i < 13; i++) {
+      const due = expected.filter(ev => ev.at <= snap.now);
+      const events = snap.events.filter(ev => ev.type === 'variant-trigger' && ev.trigger === 'regen' && ev.unitId === 'e');
+      assert.deepEqual(events.map(({ at, hpBefore, hpAfter, healed }) => ({ at, hpBefore, hpAfter, healed })), due, '周期事件不能提前、遗漏或重复');
+      assert.equal(snap.units.find(u => u.id === 'e').hp, due.at(-1)?.hpAfter ?? 75, '快照HP应与周期事件一致');
+      assert.equal(snap.terminal, null);
+      if (snap.now >= 400) break;
+      snap = b.endAction();
     }
-    assert.ok(regenEv && regenEv.healed > 0 && regenEv.hpAfter > regenEv.hpBefore, JSON.stringify(regenEv));
+    assert.ok(snap.now >= 400, '应覆盖满血后的下一周期');
+    assert.equal(snap.events.filter(ev => ev.type === 'variant-trigger' && ev.trigger === 'regen').length, 3, '满血不能发射虚假回血事件');
   });
   await check('AVP-SD03 眩晕跳过发 stun-skipped，增减益区分自然到期与驱散', () => {
     const b = createBattle({ units: [mk('h', 'hero', { spd: 2 }), mk('e', 'enemy', { spd: 1 })],
