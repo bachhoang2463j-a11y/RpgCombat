@@ -1050,3 +1050,10 @@
 - 文件：`tactics/src/{bgm-library,bgm-director,main,ui-shell}.mjs`、`tactics/tactics.css`、`integration-test/fixtures/tactics/bgm-director-node-cases.mjs`、`tactics/mvp-standalone.html`（另外部资源目录新增 `D:\Project\my_assets\BGM_OCTOPATH\bgm_*.mp3` 共 11 首）。
 - 验证：源码定向 `bgm-director 10/10`、`p02 70/70`、`ui-readability 23/23`；全量回归停在 `TP7AV-K` 旧字面量匹配后修正，复跑 `TP7AV-K 23/23` 与剩余 26 个阶段全部通过；只读 `flash` 子代理审查发现 2 中危（`closePanel` 隐藏 `rAF` 空转、`#tactics-topbar` `z-index:115` 高于弹窗遮罩）及 3 低危（切歌清旧错、暂停止 stinger、暂停切主题清旧曲），全部修复后复跑 `bgm-director 10/10`、`p02 70/70`、`ui-readability 23/23`；重打 `mvp-standalone.html`（2,156,268 字节，67 模块/48 断言/127 符号），`verify-demo.cjs` 全部阶段与 `verify-typical-artifact.cjs 63/63` 通过；内置浏览器实测 `127.0.0.1:8123` + `8766` 资源服 0 JS 报错、SVG 暗金顶栏、默认八方主题、24 柱频谱音量/静音联动、双主题切换与玛德琳走格保持 `低烈度 · 自动`（标签页已留页，未实机打完高烈度/反击全战斗听感，未连真实酒馆）。
 - 目的 vs 现状：一致；本轮未改动 `README.md` 待用户验收后确认。
+
+## 2026-11-28 · 修复战斗外音乐面板手动播放（aba1040）
+- 根因：`enqueue()` 与 `pump()` 将所有播放请求都绑定到活跃战斗；因此主界面音乐面板的手动选曲、下一首及暂停恢复在战斗外无法启动曲目。
+- 变更：仅在手动模式允许无战斗调度；自动模式仍要求活跃战斗，终局仍禁止启动新曲。新增 BGM-05 覆盖战斗外手动选曲、下一首、暂停/恢复。
+- 文件：`tactics/src/bgm-director.mjs`、`integration-test/fixtures/tactics/bgm-director-node-cases.mjs`、`tactics/mvp-standalone.html`。
+- 验证：`bgm-director` 11/11；唯一一次全量 1578 项通过；重打单文件 2,156,302 字节，`verify-demo.cjs` 与 `verify-typical-artifact.cjs` 产物断言通过。当前 IAB 与用户已打开页面列表均为空，本轮未做真实页面交互验收。
+- 目的 vs 现状：战斗外音乐面板手动控制已由回归用例与产物验证覆盖；真实页面交互验收仍未完成。
