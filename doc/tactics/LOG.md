@@ -1097,6 +1097,11 @@
 - 变更：采用 Mixkit 免版税物理音效库重新裁剪规范化（44.1kHz / 192kbps / 去前导静音 / loudnorm）并同步至 `资源/tactics-jump-sfx-candidates/` 与 `D:\Project\my_assets\`：`jump_crouch_3.mp3` 换为 `#534`（轻柔垫步）、`jump_land_heavy_1.mp3` 换为 `#3057`（末日重踏冲击）、`jump_land_heavy_3.mp3` 换为 `#756`（碎石地面重砸），并更新 `JUMP-SFX-MANIFEST.md` 来源说明。
 - 边界：仅替换音频资源与清单，战棋源码与单文件产物未改、无需重打包。
 
+## 2026-11-28 · 去掉靶场蓄力原声起振延迟（9be4bf2）
+- 原因：实听反馈仍有滞后；测得 `herocharge.mp3` 开头约 327ms 低于 -36dB，增益无法去掉前导。
+- 改动：仅独立 Demo 在蓄力拍从原样本 315ms 处起播，并内嵌仓库原有 `herocharge` 与 `light_charge`；不改增益及 B/C 380/450ms 蓄势节奏。文件：`tactics/hit-feel-lab/{build-hit-feel-demo.cjs,hit-feel-demo-entry.mjs}`、`tactics/demo-hit-feel-compare.html`。
+- 验证：源码与单文件语法、两个内嵌原样本及 offset 断言通过；IAB 精英试射与圣光按钮两条实际起播，浏览器报告约 54–61ms。正式产物不变。
+
 ## 2026-11-28 · 正式战棋击杀节拍与自爆爆点（f4762c1）
 - 原因：移植定稿靶场效果；死亡自爆替代尸体碎裂，而不是先扣资源再补演出。
 - 变更：杂兵 B／精英首领 C，单段实扣 50% 最大生命触发非击杀时停；同波只停一次、只播一套血屏，各非自爆者独立破碎。按伤害类型叠加击杀音，内嵌完整 1.2s 蓄力 WAV，移除旧头像横切，保留原技能及结算特写音轨。直击真击杀自爆在解冻接蓄势，尾拍结束后到爆点才真实结算；持续伤害自爆不变。
@@ -1127,3 +1132,10 @@
 - 验证：最终定向 24/24，新增混合技能预览/实际伤害/降防断言；重包后产物专项实测延迟伤害 50%/Aim70、混合伤害50%/减益10%与4回合，阶段4产物11/11。未再跑全量（本轮唯一全量1639在此前已通过）。最终 SHA256 `71f7ce0b2a3afa3c6cf5c26a9762848f97b801484edf7d79fc915eeb13542587`。
 - 真页：新包重新加载且实际含 `debuffPowerMultiplier`；在当前典型对局再次实际防御积累TP25、点击头像升LV1并释放无迹可寻，TP10/MP12、castTier1、归零锁档、8音频解码ok；无JavaScript错误，既有favicon404不动。上一包MAX火焰及锁定换档演出不变，规则新口径由新包自身专项执行验证。
 - 目的 vs 现状：保底与专属的叠加语义已按用户确认落实；最终定向、产物和新包真实流程通过，README继续等待用户实际验收。
+
+## 2026-11-28 · 精简「生体流转」特效为完整原声视频与轻量粒子（ee4c03a）
+- 原因：原 `vitalFlow` 叠加地面法阵、心核 SVG、8 条血管、∞ 环流血珠及心电图等多层视觉且将 `heart.mp4` 截断在 1150ms，显得臃肿；用户要求回归回合制原版完整视频与原声，同时保留战棋尺寸并辅以轻量战棋粒子。
+- 行为：保留 `4.4 * PX` 视频尺寸，开启 `heart.mp4` 原声（`audio: 2.5`）并移除额外 `herocharge` 音效；以 `ms: 6000` + `ctx.awaitHandle(cv.handle, 5000)` 等待视频自然播完；移除臃肿 SVG，改为 1 圈柔和血色扩散环与 16 颗血色/暖金上浮微散光粒脉冲；条目分级调整为 `grade: 'identity'` + `reuseAudio: true`。
+- 文件：`tactics/src/fx-library.mjs`、`tactics/mvp-standalone.html`。
+- 验证：`node tactics/tools/run-tests.cjs --stage=fx01` 3 组 51 项全绿；`node tactics/tools/build-demo-html.cjs` 重打包 70 模块/51 断言/133 符号，SHA256 `c8316b327b33d72f0d67f2ed86575be6dfabf00c8e739f052b7dd5bff3c9b027`；内置浏览器实页触发索恩「生体流转」验证扣血 30、获得万能行动点、播放 `heart.mp4` 与轻量粒子及浮字，控制台无报错，标签页保留供用户预览。
+
