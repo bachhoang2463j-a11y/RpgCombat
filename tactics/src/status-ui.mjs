@@ -142,7 +142,7 @@ export function effectFloat(e) {
 }
 
 // 原版 showEnemyInfo VARIANT_TAG_CONFIG（index.html L26424）：名称 / 说明 / 图标 / 主色
-export const VARIANT_TAGS = {
+const VARIANT_TAGS = {
   复活: ['✨', '死后以 30% 生命值复活一次', '#6ee7b7'], 智慧: ['🧠', '三档智慧旁白（回合开始/低血/死亡）', '#fda4af'],
   蜕皮: ['🐍', '首次跌破50%：清除全部debuff + 回血30% + 永久攻击+50%', '#fcd34d'], 荆棘: ['🌵', '被近战命中反弹 50% 实际伤害（护甲减免后保底10）', '#86efac'],
   连动: ['⚡', 'HP≤30% 时获得 1 个万能行动点（一次性）', '#f0abfc'], 狂暴: ['🩸', 'HP≤30% 时攻击力 +50%', '#fca5a5'],

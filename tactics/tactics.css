@@ -317,7 +317,7 @@ button:disabled { opacity: .42; cursor: default; }
 .t-lowhp-vignette { position: absolute; inset: 0; pointer-events: none; z-index: 6; opacity: 0; background: radial-gradient(ellipse at center, transparent 52%, rgba(153,27,27,.28) 78%, rgba(185,28,28,.55) 100%); }
 .t-topbtn-on { color: var(--gold); border-color: var(--gold-2); }
 @media (max-width: 1400px) { #btn-speed .t-toplabel { display: inline; } }
-/* C2 敌方徽章：分级外框（杂兵单层红环 / 精英银色双环刻痕 / 首领金色尖冠 + 微光）、主元素底色、特性角标 */
+/* C2 敌方徽章：分级外框（杂兵单层红环 / 精英银色双环刻痕 / 首领金色尖冠 + 微光）、主元素底色 */
 .t-side-enemy .t-unit-medal { --elem: #ef4444; }
 .t-side-enemy .t-unit-emoji { background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--elem) 38%, #1a0d10) 0%, #120a0d 78%); }
 .t-unit-tierframe { position: absolute; inset: -5px; border-radius: 50%; pointer-events: none; z-index: 1; }
@@ -325,12 +325,7 @@ button:disabled { opacity: .42; cursor: default; }
 .t-badge-boss .t-unit-tierframe { inset: -8px; border: 2.5px solid #f5c451; box-shadow: 0 0 0 2px rgba(7,9,13,.85), 0 0 16px rgba(245,196,81,.55); animation: t-boss-crown 2.6s ease-in-out infinite; }
 .t-badge-boss .t-unit-tierframe::before { content: ''; position: absolute; left: 50%; top: -9px; width: 22px; height: 10px; transform: translateX(-50%); background: #f5c451; clip-path: polygon(0 100%, 0 30%, 25% 70%, 50% 0, 75% 70%, 100% 30%, 100% 100%); filter: drop-shadow(0 0 3px rgba(245,196,81,.8)); }
 @keyframes t-boss-crown { 0%, 100% { box-shadow: 0 0 0 2px rgba(7,9,13,.85), 0 0 10px rgba(245,196,81,.35); } 50% { box-shadow: 0 0 0 2px rgba(7,9,13,.85), 0 0 20px rgba(245,196,81,.7); } }
-.t-unit-traits { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
-.t-trait { position: absolute; width: 15px; height: 15px; border-radius: 50%; display: grid; place-items: center; font-size: 9px; line-height: 1; font-style: normal; pointer-events: auto;
-  left: calc(50% + var(--d) * 0.5 * cos(calc(-45deg + var(--i) * 32deg)) - 7.5px); top: calc(50% + var(--d) * 0.5 * sin(calc(-45deg + var(--i) * 32deg)) - 7.5px);
-  background: #0b0f15; border: 1.5px solid var(--c); box-shadow: 0 0 5px color-mix(in srgb, var(--c) 60%, transparent); }
-.t-trait-spent { filter: grayscale(1) brightness(.6); opacity: .55; }
-.t-unit-down .t-unit-traits, .t-unit-down .t-unit-tierframe { display: none; }
+.t-unit-down .t-unit-tierframe { display: none; }
 
 /* ---- 右侧支援单位：贴屏幕右缘的竖排收纳签（单个目标一签，只放 emoji，不显示血条）；点签展开右上图鉴检视卡 ---- */
 #tactics-allies { position: absolute; top: 52px; right: 0; bottom: 218px; z-index: 46; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;

@@ -332,12 +332,11 @@ async function infer() {
 async function looks() {
   const cases = [], check = checker(cases);
   const main = read('main.mjs'), uv = read('unit-view.mjs'), css = readFileSync(path.join(SRC, '..', 'tactics.css'), 'utf8'), marks = read('battle-marks.mjs'), ad = read('action-director.mjs');
-  await check('AVP-E01 敌人徽章：显式首领/精英优先于强度分级；特性至多 3 个，复活用尽与蜕皮已触发灰显', () => {
+  await check('AVP-E01 敌人徽章：显式等级优先于强度分级；奖章上不叠特性角标', () => {
     assert.ok(main.includes("const tier = u.level === '首领' ? 'boss' : u.level === '精英' ? 'elite' : u.level === '杂兵' ? 'fodder'"));
-    assert.ok(main.includes('.slice(0, 3)'));
-    assert.ok(main.includes("(n === '复活' && !((u.ref.reviveCount || 0) > 0)) || (n === '蜕皮' && !!u.ref.molted)"));
-    assert.ok(uv.includes("'<i class=\"t-unit-tierframe\" aria-hidden=\"true\"></i><b class=\"t-unit-traits\"></b>'"));
-    for (const k of ['.t-badge-elite .t-unit-tierframe', '.t-badge-boss .t-unit-tierframe', '.t-trait-spent']) assert.ok(css.includes(k), k);
+    assert.ok(uv.includes("'<i class=\"t-unit-tierframe\" aria-hidden=\"true\"></i>'") && !uv.includes('t-unit-traits'));
+    for (const k of ['.t-badge-elite .t-unit-tierframe', '.t-badge-boss .t-unit-tierframe']) assert.ok(css.includes(k), k);
+    assert.ok(!css.includes('.t-trait'));
   });
   await check('AVP-E02 留痕：上限 40、3 回合淡出、种子决定形态（同键同种子）', () => {
     assert.ok(marks.includes('MAX_MARKS = 40') && marks.includes('LIFE = ROUND_TIME * 3'));

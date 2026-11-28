@@ -30,10 +30,9 @@ import { unitCenter, occupiedCells, cellKey } from './geometry.mjs';
 import { threatOf, threatHeat } from './threat.mjs';
 import { canSeeUnit } from './perception.mjs';
 import { createEncounterScenario, createScenarioData, createSeededRandom } from './scenario-data.mjs';
-import { statusBadges, compactStatusHtml, iconStatusHtml, inspectorHtml, auraList, VARIANT_TAGS } from './status-ui.mjs';
+import { statusBadges, compactStatusHtml, iconStatusHtml, inspectorHtml, auraList } from './status-ui.mjs';
 import { passiveGainLabel, getFxTagOptions } from './fx-library.mjs';
 import { applyFxInference, unitElement, ELEMENT_COLORS } from './fx-infer.mjs';
-import { activeVariantNames } from './variant-rules.mjs';
 import { resolveLore } from './lore.mjs';
 import { getEffectiveStats } from './class-passives.mjs';
 import { hitChance } from './damage.mjs';
@@ -953,22 +952,12 @@ export function createApp(rootEl, opts = {}) {
     s.animate(d.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0.7, offset: 0.45 }, { opacity: 0.95, offset: 0.6 }, { opacity: 0 }], { duration: 1200, easing: 'ease-out' }));
     s.after(1200, () => s.removeNode(d));
   }
-  // ---------- 敌方徽章（C2）：分级外框 / 主元素底色 / 关键特性角标（复活用尽、蜕皮已触发灰显） ----------
-  const TRAIT_ORDER = ['复活', '蜕皮', '自爆', '钢体', '流体', '虚形', '破法'];
+  // ---------- 敌方徽章（C2）：分级外框 / 主元素底色（特性只在检视面板列出，不压在奖章上） ----------
   function enemyBadge(u) {
     const tier = u.level === '首领' ? 'boss' : u.level === '精英' ? 'elite' : u.level === '杂兵' ? 'fodder'
       : ({ legend: 'boss', elite: 'elite' }[unitStyles[u.id]?.tier] || 'fodder');
     const el = unitElement(u);
-    const names = activeVariantNames(u, battle.getEffectiveUnit(u.id)?.buffs || []);
-    const blast = [...(u.attrTags || []), ...(u.skills || []).filter(s => s.isDeathTrigger).map(s => s.deathTag)]
-      .map(t => /^\[自爆[:：]([^\];]+)/.exec(String(t || ''))).find(Boolean);
-    if (blast) names.add('自爆');
-    const traits = TRAIT_ORDER.filter(n => names.has(n)).slice(0, 3).map(n => {
-      const [icon, tip, color] = n === '自爆' ? ['💥', '死亡自爆（' + blast[1] + '）：对周围我方造成伤害或状态', '#fca5a5'] : VARIANT_TAGS[n];
-      const spent = (n === '复活' && !((u.ref.reviveCount || 0) > 0)) || (n === '蜕皮' && !!u.ref.molted);
-      return { name: n === '自爆' ? '自爆·' + blast[1] : n, icon, tip, color, spent };
-    });
-    return { tier, color: el ? ELEMENT_COLORS[el] : null, traits };
+    return { tier, color: el ? ELEMENT_COLORS[el] : null };
   }
   function moveEval(hit) {
     const id = battle.snapshot().currentId;
