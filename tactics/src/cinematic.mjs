@@ -25,21 +25,27 @@ export function letterbox(fx, ms, { h = 9, inMs = 280, outMs = 340 } = {}) {
     el.animate([{ transform: off }, { transform: 'translateY(0)', offset: inMs / ms }, { transform: 'translateY(0)', offset: 1 - outMs / ms }, { transform: off }], { duration: ms, easing: 'cubic-bezier(.3,.7,.2,1)', fill: 'forwards' });
   });
 }
-// 时停定格画面（与 hold 同拍）：去色高对比（filter 可换暖调）+ 焦点放射速度线 + 焦点白闪，解冻后 200ms 褪去
-export function timeStop(sandbox, fx, ms, m, { tint = 'rgba(254,243,199,.95)', lines = 30, filter = 'grayscale(1) contrast(1.45) brightness(1.06)' } = {}) {
-  const p = viewPt(sandbox, m), R = Math.hypot(p.w, p.h), total = ms + 200;
+// 击中时停只压暗降饱和；甩镜复用放射线，首帧就出现，不冻结时钟。
+export function timeStop(sandbox, fx, ms, m, { tint = 'rgba(254,243,199,.95)', lines = 30, filter = 'brightness(0.88) saturate(0.9)', rush = false } = {}) {
+  const p = viewPt(sandbox, m), R = Math.hypot(p.w, p.h), total = ms + (rush ? 70 : 200);
   const ls = Array.from({ length: lines }, (_, i) => {
     const a = i / lines * TAU + rnd(-0.08, 0.08), r0 = R * rnd(0.14, 0.28);
     return '<line x1="' + (p.x + Math.cos(a) * r0).toFixed(1) + '" y1="' + (p.y + Math.sin(a) * r0).toFixed(1) + '" x2="' + (p.x + Math.cos(a) * R).toFixed(1) + '" y2="' + (p.y + Math.sin(a) * R).toFixed(1) +
       '" stroke="' + tint + '" stroke-width="' + rnd(1.2, 4.5).toFixed(1) + '" stroke-linecap="round"/>';
   }).join('');
-  const root = fx.screen('<i style="position:absolute;inset:0;backdrop-filter:' + filter + ';-webkit-backdrop-filter:' + filter + ';"></i>' +
-    '<svg width="100%" height="100%" style="position:absolute;inset:0;overflow:visible;transform-origin:' + p.x.toFixed(0) + 'px ' + p.y.toFixed(0) + 'px;mix-blend-mode:screen;">' + ls + '</svg>' +
-    '<i style="position:absolute;inset:0;background:radial-gradient(circle at ' + p.x.toFixed(0) + 'px ' + p.y.toFixed(0) + 'px,rgba(255,255,255,.9) 0%,rgba(255,251,235,.35) 9%,rgba(255,255,255,0) 24%);mix-blend-mode:screen;"></i>', total);
-  const [gray, svg, flash] = root.children, k = ms / total;
-  gray.animate([{ opacity: 1 }, { opacity: 1, offset: k }, { opacity: 0 }], { duration: total, fill: 'forwards' });
-  svg.animate([{ opacity: 0, transform: 'scale(1.18)' }, { opacity: 1, transform: 'scale(1)', offset: 0.22 }, { opacity: 0.85, offset: k }, { opacity: 0, transform: 'scale(.94)' }], { duration: total, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' });
-  flash.animate([{ opacity: 1 }, { opacity: 0.4, offset: k }, { opacity: 0 }], { duration: total, fill: 'forwards' });
+  const root = fx.screen('<svg width="100%" height="100%" style="position:absolute;inset:0;overflow:visible;transform-origin:' + p.x.toFixed(0) + 'px ' + p.y.toFixed(0) + 'px;mix-blend-mode:screen;">' + ls + '</svg>', total);
+  root.dataset.tacticsFx = rush ? 'camera-rush' : 'hit-time-stop';
+  const svg = root.firstChild;
+  if (!rush) {
+    const shade = root.ownerDocument.createElement('i');
+    shade.style.cssText = 'position:absolute;inset:0;backdrop-filter:' + filter + ';-webkit-backdrop-filter:' + filter;
+    root.prepend(shade);
+    shade.animate([{ opacity: 1 }, { opacity: 1, offset: ms / total }, { opacity: 0 }], { duration: total, fill: 'forwards' });
+  }
+  svg.animate(rush
+    ? [{ opacity: 0.96, transform: 'scale(.98)' }, { opacity: 0.84, transform: 'scale(1.05)', offset: 0.32 }, { opacity: 0, transform: 'scale(1.14)' }]
+    : [{ opacity: 1, transform: 'scale(1.06)' }, { opacity: 0.85, transform: 'scale(1)', offset: ms / total }, { opacity: 0, transform: 'scale(.94)' }],
+  { duration: total, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'both' });
 }
 // 末击白闪（顿帧画面）：世界层锚定目标的白芯红晕光团，随镜头不漂移
 export function hitFlash(fx, m, { ms = 260, color = 'rgba(254,202,202,.55)' } = {}) {
@@ -87,42 +93,51 @@ export function planKillBeat(result, caster, units) {
     }
     if (hits.length === 1 && segments.filter(s => !s.heal).length === 1 && lethal.size && (result.shots?.length || 0) <= 1
       && (result.skill?.range?.type || '单体') === '单体') {
-      focus = { targetId: h.targetId, cutin: target.level === '精英' || target.level === '首领' };
+      focus = { targetId: h.targetId, timing: killTimingFor(target) };
     }
   }
   return { lethal, focus };
 }
 
-export const KILL_TIMING = { push: 345, pull: 435, cutin: 570, stop: 210, tail: 500 };
+export const KILL_TIMING = {
+  B: { rush: 90, cast: 380, pull: 340, hit: 120, stop: 460, tail: 820, zoom: 1.9, whip: 2.1, filter: 'brightness(0.88) saturate(0.9)' },
+  C: { rush: 72, cast: 450, pull: 380, hit: 170, stop: 560, tail: 980, zoom: 2.2, whip: 2.35, filter: 'brightness(0.82) saturate(0.85)' },
+};
+export function killTimingFor(target) {
+  return target?.level === '精英' || target?.level === '首领' ? KILL_TIMING.C : KILL_TIMING.B;
+}
 
-export function startKillCamera(sandbox, from, to) {
+// 同一发只选一次全场定格；只有真正参与定格的命中可抬高档位。
+export function planHitStopWaves(result, units, lethal) {
+  const waves = new Map();
+  const unitById = new Map(units.map(u => [u.id, u]));
+  for (const h of result.hits || []) (h.segments || [h]).forEach((segment, i) => {
+    const kill = lethal.has(segment);
+    if (!kill && (!segment.hit || segment.heal || segment.barrierHitId || !(segment.hpAfter > 0)
+      || !(segment.hpDmg > 0 && segment.hpDmg * 2 >= (segment.maxHp ?? h.maxHp)))) return;
+    const key = segment.shotIndex ?? i, timing = killTimingFor(unitById.get(h.targetId));
+    let wave = waves.get(key);
+    if (!wave) waves.set(key, wave = { timing, anchorId: h.targetId, lethal: [], segments: new Set(), ms: timing.hit });
+    if (timing.stop > wave.timing.stop) { wave.timing = timing; wave.anchorId = h.targetId; }
+    wave.segments.add(segment);
+    if (kill) wave.lethal.push({ targetId: h.targetId, segment });
+    wave.ms = wave.lethal.length ? wave.timing.stop : wave.timing.hit;
+  });
+  return waves;
+}
+
+function rushFocus(sb, fx, at, ms) {
+  if (!sb.cameraTouched?.()) timeStop(sb, fx, ms, at, { tint: 'rgba(255,242,218,.88)', lines: 32, rush: true });
+}
+export function startKillCamera(sandbox, from, to, fx, timing) {
   const home = sandbox.getPose();
-  sandbox.cameraTo(sandbox.poseAt(from.x, from.y, home.scale * 1.24), KILL_TIMING.push);
+  rushFocus(sandbox, fx, from, timing.rush);
+  sandbox.cameraTo(sandbox.poseAt(from.x, from.y, home.scale * timing.zoom), timing.rush);
   return () => {
     const frame = sandbox.poseFrame([from, to], { pad: 2 });
     const pose = frame.scale <= home.scale ? frame : sandbox.poseAt((from.x + to.x) / 2, (from.y + to.y) / 2, home.scale);
-    return sandbox.cameraTo(pose, KILL_TIMING.pull);
+    return sandbox.cameraTo(pose, timing.pull);
   };
-}
-
-// 窄带只压暗地图上部；头像四边渐隐，不盖住命中区或接管 HUD。
-export function killPortraitSweep(fx, portrait, ms, scale) {
-  const root = fx.screen('<div style="position:absolute;left:0;right:0;top:14%;height:clamp(72px,23%,155px);overflow:hidden;' +
-    'background:linear-gradient(90deg,transparent,rgba(27,16,18,.93) 30%,rgba(48,24,20,.82) 58%,transparent),' +
-    'linear-gradient(0deg,transparent,rgba(252,164,88,.16),transparent);' +
-    'mask-image:linear-gradient(0deg,transparent,#000 19%,#000 81%,transparent);"><img alt="" ' +
-    'style="position:absolute;left:50%;top:50%;width:min(60%,360px);height:210%;object-fit:cover;object-position:center 35%;' +
-    'transform:translate(-50%,-48%);mask-image:radial-gradient(ellipse,black 23%,transparent 72%);' +
-    'filter:brightness(1.23) saturate(.81);"></div>', ms);
-  root.dataset.tacticsFx = 'kill-cutin';
-  root.style.zIndex = '6';
-  const band = root.firstChild;
-  band.firstChild.src = portrait;
-  band.animate([{ transform: 'translateX(-60%) skewX(-12deg)', opacity: 0 },
-    { transform: 'translateX(-5%) skewX(-8deg)', opacity: 1, offset: 0.28 },
-    { transform: 'translateX(4%) skewX(-8deg)', opacity: 1, offset: 0.68 },
-    { transform: 'translateX(56%) skewX(-12deg)', opacity: 0 }], { duration: ms / scale, easing: 'cubic-bezier(.19,.62,.42,1)', fill: 'both' });
-  return root;
 }
 
 // env: { sandbox, fx, hold, after, style, freeze, grade, totalMs, chargeMs, result, hits, regions, shape, centerOf }
@@ -153,7 +168,12 @@ export function startCine(env) {
       if (ok && !bursted && untilMs > whipMs + 80) sb.cameraTo(P(at.x, at.y, home.scale * k * 1.1), untilMs - whipMs);
     });
   }
-  if (style === 'lock') env.after(casterMs, () => { if (!bursted) whip(I, epic ? 1.8 : 1.65, 240, env.chargeMs - casterMs); });
+  if (style === 'lock') env.after(casterMs, () => {
+    if (bursted || sb.cameraTouched?.()) return;
+    const timing = env.lockTiming || KILL_TIMING.B;
+    rushFocus(sb, fx, I, timing.rush);
+    whip(I, epic ? timing.whip : 1.7, timing.rush, env.chargeMs - casterMs);
+  });
 
   // 打击爆发：打击点时停定格（白闪 + 速度线）→ 解冻瞬间大震 + 猛拉远过冲 → 回落到框住爆区的构图
   // freeze:false 时不定格不闪白，直接拉远（震屏交由条目自身）

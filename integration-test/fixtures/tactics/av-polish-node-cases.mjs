@@ -1,4 +1,4 @@
-// 视听强化：阶段 A 演出倍速 / 分轨音量与声像 / 局部顿帧 / 精简运镜；阶段 B 敌方威胁区 / 残血预警
+// 视听强化：阶段 A 演出倍速 / 分轨音量与声像 / 全场时停 / 精简运镜；阶段 B 敌方威胁区 / 残血预警
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -82,15 +82,16 @@ async function vendor() {
 }
 
 function directorHarness() {
-  const paused = [], played = [], stops = [], recoil = [], pans = [];
+  const paused = [], played = [], stops = [], pans = [];
   const anim = id => ({ id, playState: 'running', pause() { this.playState = 'paused'; paused.push(id); }, play() { this.playState = 'running'; played.push(id); } });
-  const nodes = new Map(['c', 'a'].map(id => [id, { root: { getAnimations: () => [anim(id)] }, sprite: { animate: (frames, opts) => { recoil.push({ id, frames, opts }); return {}; } } }]));
-  const scope = { isLive: true, addNode() {}, removeNode() {}, after: (_, fn) => fn(), settleOnDispose: () => () => {}, animate() {} };
+  const animations = ['c', 'a', 'elsewhere'].map(anim);
+  const scope = { isLive: true, addNode() {}, removeNode() {}, after: (_, fn) => fn(),
+    hold: (_, fn) => setTimeout(fn, 0), settleOnDispose: () => () => {}, animate() {} };
   const units = [{ id: 'c', side: 'hero', ref: { atk: 10 } }, { id: 'a', side: 'enemy' }];
   const director = createActionDirector({
-    sandbox: { getScope: () => scope, getUnitView: () => ({ setDisplayFacing() {}, updateUnit() {}, nodes }),
+    sandbox: { getScope: () => scope, getUnitView: () => ({ setDisplayFacing() {}, updateUnit() {} }),
       unitWorldCenter: id => ({ x: id === 'c' ? 1 : 4, y: 2 }), worldToScreenClient: x => ({ x: x * 100, y: 0 }), async guideTo() {},
-      getDom: () => ({ world: { insertBefore() {}, appendChild() {} }, art: {}, unitLayer: {}, viewport: { getBoundingClientRect: () => ({ left: 0, width: 500 }) } }) },
+      getDom: () => ({ world: { insertBefore() {}, appendChild() {} }, art: {}, unitLayer: {}, viewport: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 500, height: 400 }), getAnimations: () => animations, querySelectorAll: () => [], appendChild() {} } }) },
     getViewData: () => ({ units, placementsById: { c: {}, a: {} }, footprintsById: {} }),
     avHost: { syncRoster() {}, entity: id => ({ id }), particleStop: ms => stops.push(ms), setPanHint: p => pans.push(p),
       av: { CombatAudioMixer: { classify: () => 'B' },
@@ -98,41 +99,23 @@ function directorHarness() {
         playHitFeedback() {} } },
     registry: { resolve: () => ({ prepareKeys: () => [], async play(ctx) { ctx.revealSegment('a', 0); return true; } }) },
   });
-  return { director, paused, played, stops, recoil, pans };
+  return { director, paused, played, stops, pans };
 }
 
 async function director() {
   const cases = [], check = checker(cases);
   const src = read('action-director.mjs');
-  const fnText = src.slice(src.indexOf('function hitStopMs(r) {'), src.indexOf('  // 只冻结出手者与受击者'));
-  const hitStopMs = new Function(fnText + '\nreturn hitStopMs;')();
-  await check('AVP-D01 顿帧分档：<10% 不顿 / 10–25% 40 / ≥25% 70 / 暴击或击杀 110 / 闪避与护盾全挡不顿', () => {
-    const r = (hpDmg, extra = {}) => ({ outcome: 'hit', hpDmg, maxHp: 100, hpBefore: 100, hpAfter: 100 - hpDmg, ...extra });
-    assert.equal(hitStopMs(r(9)), 0);
-    assert.equal(hitStopMs(r(10)), 40);
-    assert.equal(hitStopMs(r(24)), 40);
-    assert.equal(hitStopMs(r(25)), 70);
-    assert.equal(hitStopMs(r(60)), 70);
-    assert.equal(hitStopMs(r(5, { isCrit: true })), 110);
-    assert.equal(hitStopMs(r(5, { hpBefore: 5, hpAfter: 0 })), 110);
-    assert.equal(hitStopMs(r(30, { outcome: 'dodge' })), 0);
-    assert.equal(hitStopMs(r(0)), 0);
-  });
   const previousDocument = globalThis.document;
-  globalThis.document = { createElement: () => ({ style: {}, setAttribute() {}, appendChild() {}, insertBefore() {}, remove() {} }) };
+  globalThis.document = { createElement: () => ({ style: {}, dataset: {}, ownerDocument: globalThis.document, firstChild: { animate() {} }, animate() {}, prepend() {}, setAttribute() {}, appendChild() {}, insertBefore() {}, remove() {} }) };
   try {
-    await check('AVP-D02 局部顿帧只冻结出手者与受击者 + 粒子层，解冻后受击者沿来袭方向回弹', async () => {
+    await check('AVP-D02 50% 命中暂停整个视口，解冻恢复全部动画', async () => {
       const h = directorHarness();
-      const ok = await h.director.playAttack({ ok: true, casterId: 'c', skill: { name: '重击', fxTag: 'x', power: 30 }, effects: [], events: [],
-        hits: [{ targetId: 'a', side: 'enemy', maxHp: 100, segments: [{ hit: true, outcome: 'hit', hpBefore: 100, hpAfter: 70, hpDmg: 30, maxHp: 100 }] }] });
+      const ok = await h.director.playAttack({ ok: true, casterId: 'c', skill: { name: '重击', fxTag: 'x', power: 50 }, effects: [], events: [],
+        hits: [{ targetId: 'a', side: 'enemy', maxHp: 100, segments: [{ hit: true, outcome: 'hit', hpBefore: 100, hpAfter: 50, hpDmg: 50, maxHp: 100 }] }] });
       assert.equal(ok, true);
-      assert.deepEqual(h.stops, [70]);
-      assert.deepEqual(h.paused.sort(), ['a', 'c']);
-      assert.deepEqual(h.played.sort(), ['a', 'c']);
-      assert.equal(h.recoil.length, 1);
-      assert.equal(h.recoil[0].id, 'a');
-      assert.equal(h.recoil[0].opts.composite, 'add');
-      assert.ok(/translate\(4\.0px,0\.0px\)/.test(h.recoil[0].frames[1].transform), h.recoil[0].frames[1].transform);
+      assert.deepEqual(h.stops, [120]);
+      assert.deepEqual(h.paused.sort(), ['a', 'c', 'elsewhere']);
+      assert.deepEqual(h.played.sort(), ['a', 'c', 'elsewhere']);
     });
     await check('AVP-D03 声像：出手者 → 受击者 → 收尾清空，取视口横向位置压到 ±0.6', async () => {
       const h = directorHarness();
@@ -149,7 +132,7 @@ async function director() {
   }
   await check('AVP-D04 精简运镜：同出手者同技能本场再次施放不建运镜，氛围层保留', () => {
     assert.ok(src.includes("const liteCine = !!deps.liteRepeatCine?.() && cineSeen.keys.has(cineKey);"));
-    assert.ok(src.includes('const cine = atmos && entry.cine !== false && !liteCine ? startCine({'));
+    assert.ok(src.includes('const cine = atmos && entry.cine !== false && !liteCine && !useKillCamera ? startCine({'));
     assert.ok(read('main.mjs').includes("liteRepeatCine: () => audioPrefs.liteCine !== false"));
   });
   return { cases };

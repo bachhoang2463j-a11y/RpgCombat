@@ -21,7 +21,7 @@ const REQUIRED_INPUTS = [
   'src/av-host.mjs', 'src/action-director.mjs', 'src/motion.mjs', 'src/range-overlay.mjs',
   'src/vendor/rpg-av/rpg-av.mjs', 'src/chapel-scene.mjs', 'src/chapel-art.mjs', 'src/ui-sfx.mjs',
   'src/vendor/rpg-ui/rpg-ui.mjs', 'src/unit-style.mjs', 'src/editor-panel.mjs',
-  'src/fx-registry.mjs', 'src/fx-library.mjs', 'src/vfx-host.mjs',
+  'src/fx-registry.mjs', 'src/fx-library.mjs', 'src/vfx-host.mjs', 'src/cinematic.mjs', 'src/kill-fx.mjs',
   'src/effect-definitions.mjs', 'src/effect-handlers.mjs', 'src/class-passives.mjs', 'src/variant-rules.mjs',
   'src/reaction-prompt.mjs', 'src/ui-shell.mjs', 'src/hero-flame-fx.mjs',
   'src/screen-atmos.mjs', 'src/screen-showpiece.mjs', 'src/guard-barrier-fx.mjs', 'src/status-ui.mjs', 'src/lore.mjs',
@@ -83,10 +83,12 @@ const entry = [
   for (const [name, text] of [['rpg-ui.mjs', ui.js], ['rpg-ui.css', ui.css]]) {
     if (readFileSync(path.join(uiDir, name), 'utf8').replace(/\r\n/g, '\n') !== text) throw new Error('原版界面生成物过期: ' + name + '（先运行 node tactics/tools/extract-rpg-ui.cjs）');
   }
+  const killChargeUrl = 'data:audio/wav;base64,' + readFileSync(path.join(tacticsDir, 'assets', 'tackle_start.wav')).toString('base64');
   const result = await esbuild.build({
     absWorkingDir: tacticsDir,
     stdin: { contents: entry, resolveDir: tacticsDir, sourcefile: 'demo-entry.mjs' },
     loader: { '.yaml': 'text' },
+    define: { __TACTICS_KILL_CHARGE_URL__: JSON.stringify(killChargeUrl) },
     bundle: true, format: 'iife', platform: 'browser', target: 'es2020',
     minifyWhitespace: true, minifySyntax: true, minifyIdentifiers: false, legalComments: 'none', metafile: true, write: false,
   });

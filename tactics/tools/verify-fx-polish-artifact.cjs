@@ -19,7 +19,8 @@ const symbols = [
   'stationaryStatus', 't-prep-pips', 't-prep-still', '驻足起咏', '驻足继续',
   'reaction-sonic-jam', '声波干扰雷', '净蚀反冲', 'seerEyeHtml', 'slamSeal', 't-card-still', 't-ally-tab', 'onAllyPin', 'inspectPin', 'creature_slime_01',
   'guardBroken', 'GuardBroken', 'parry_Weapon_GuardBreak.wav', 'combatOf', 'queueNaturalNext', 'waitForTurnCue', 'seeked',
-  'function planKillBeat(', 'function startKillCamera(', 'kill-cutin', 'releaseFinisher', 'finisherSound',
+  'function planKillBeat(', 'function startKillCamera(', 'function planHitStopWaves(', 'releaseFinisher', 'playKillCharge', 'playUnitShatter',
+  'kill-blood', 'hit-time-stop', 'self-destruct-pending', 'resolveSelfDestruct', 'playRangedKillBass',
 ];
 // 产物经压缩：去空白、非 ASCII 字符转 \uXXXX
 const esc = s => [...s].map(c => c.codePointAt(0) > 0xffff ? '\\u{' + c.codePointAt(0).toString(16).toUpperCase() + '}' : c.charCodeAt(0) > 127 ? '\\u' + c.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0') : c).join('');
@@ -27,6 +28,10 @@ const has = s => [s, s.replace(/ /g, ''), esc(s)].some(x => html.includes(x));
 for (const s of symbols) assert.ok(has(s), s + ' 未入包');
 assert.doesNotMatch(html, /translateX\(-90px\)\s*skewX/);
 assert.ok(!html.includes('t-stationary-start'), '旧的独立驻足卡仍在包内');
+assert.doesNotMatch(scripts[0][1], /kill-cutin|__HIT_DEMO_(?:FX|CFG)__|data-hit-demo-cue/);
+const [charge] = scripts[0][1].match(/data:audio\/wav;base64,[A-Za-z0-9+/=]+/g) || [];
+const wav = readFileSync(path.join(__dirname, '..', 'assets', 'tackle_start.wav'));
+assert.equal(charge, 'data:audio/wav;base64,' + wav.toString('base64'), '蓄力 WAV 未完整原样入包');
 const conch = scripts[0][1].indexOf('function playStrangeConch(');
 assert.doesNotMatch(scripts[0][1].slice(conch, conch + 6000), /hitStop = 80/);
 console.log('[fx-polish artifact] 单脚本、零外部 import，' + symbols.length + ' 项新代码入包，折影步无卡片横移、海螺无顿帧');

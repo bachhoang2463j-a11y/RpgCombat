@@ -171,6 +171,10 @@ const STAGES = {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'hit-feedback-node-cases.mjs'),
     groups: ['THIT-01', 'THIT-02', 'THIT-03', 'THIT-04', 'THIT-05', 'THIT-06'], modules: [], requiredExports: [],
   },
+  'kill-finisher': {
+    file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'kill-finisher-node-cases.mjs'),
+    groups: ['KILL-FINISHER-01'], modules: [], requiredExports: [],
+  },
   'av-polish': {
     file: path.join(ROOT, 'integration-test', 'fixtures', 'tactics', 'av-polish-node-cases.mjs'),
     groups: ['AVP-SPEED', 'AVP-VENDOR', 'AVP-DIRECTOR', 'AVP-THREAT', 'AVP-LOWHP', 'AVP-INFER', 'AVP-LOOKS', 'AVP-STAGE-D'], modules: [], requiredExports: [],

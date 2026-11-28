@@ -126,6 +126,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   }
   let attackSerial = 0;
   const attackStack = [];
+  const pendingSelfDestructs = new Map();
   let actionSerial = 0;
   let summonSerial = 0;
   const byId = new Map(units.map(u => [u.id, u]));
@@ -280,16 +281,26 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
   // 【自爆】敌方死亡自爆（原版 doEnemySelfDestruct L20911 战棋收口）：[自爆:群伤/群火/群毒/群穿;power:N]（缺省 50）
   // 群伤→[群攻]法术群伤；群火/群毒→[群燃烧/群中毒]纯减益（逐目标闪避，未命中连状态也不中）；群穿→[群穿透]无视护甲。
   // 攻击者已死不可被反击/反应拦截；致死目标走毅力/回避致命保命 → handleDown（复活拦截成功则不自爆）。
-  function doEnemySelfDestruct(enemy) {
+  function selfDestructProfile(enemy) {
     const eventSkill = (enemy.skills || []).find(s => s.isDeathTrigger);
     const tag = (enemy.attrTags || []).find(t => /^\[自爆:/.test(String(t))) || eventSkill?.deathTag || '';
     const m = tag.match(/^\[自爆:([^\];]+?)(?:;power:(\d+))?\]$/);
-    if (!m) return;
-    const sub = m[1], power = m[2] ? parseInt(m[2]) : 50;
+    return m && { sub: m[1], power: m[2] ? parseInt(m[2]) : 50, radius: eventSkill?.range?.radius ?? 3 };
+  }
+  function resolveSelfDestruct(event) {
+    const pending = pendingSelfDestructs.get(event.eventId);
+    if (!pending || pending.runId !== runId) return null;
+    pendingSelfDestructs.delete(event.eventId);
+    // 爆点仍属于原攻击，不能把其状态事件当作下一动作的场外反馈。
+    attackStack.push({ id: pending.attackId });
+    try { return doEnemySelfDestruct(byId.get(pending.unitId), pending); }
+    finally { attackStack.pop(); }
+  }
+  function doEnemySelfDestruct(enemy, { sub, power, radius }) {
+    const logFrom = log.length;
     addLog('☠️ ' + enemy.name + ' 触发【自爆·' + sub + '】！（威力 ' + power + '）');
     const boomSkill = { name: '自爆·' + sub, hit: 100, cost: 0, damageType: '法术', type: sub === '群火' ? '[群燃烧]' : sub === '群毒' ? '[群中毒]' : sub === '群穿' ? '[群穿透]' : '[群攻]' };
     const eStats = statsOf(enemy);
-    const radius = eventSkill?.range?.radius ?? 3;
     const area = queryAttack({ ...ctx, units: ctx.units.map(u => u.id === enemy.id ? { ...u, ref: { ...u.ref, hp: 1 } } : u) }, enemy.id,
       { type: '[伤害]', power, range: { type: '圆形', radius } });
     const affectedTargets = [];
@@ -312,9 +323,10 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       const roll = resolveHit({ hitBonus: 0 }, { evasion: hero.ref.evasion || 0, evaBonus: tStats.eva }, boomSkill, random);
       if (!roll.hit) { addLog(hero.name + ' 闪避了自爆'); affectedTargets.push({ targetId: hero.id, hit: false, hpDmg: 0 }); continue; }
       if (sub === '群火' || sub === '群毒') {
-        registerDot(hero, sub === '群火' ? 'burn' : 'poison', { strength: power, turns: 3, casterId: enemy.id, skillKey: '自爆', slotTag: '自爆' });
+        const dot = sub === '群火' ? 'burn' : 'poison';
+        const applied = !registerDot(hero, dot, { strength: power, turns: 3, casterId: enemy.id, skillKey: '自爆', slotTag: '自爆' })?.immune;
         addLog(hero.name + ' 被【自爆·' + sub + '】' + (sub === '群火' ? '灼烧' : '毒素侵蚀') + '（' + power + '/回合 ×3）');
-        affectedTargets.push({ targetId: hero.id, hit: true, hpDmg: 0, dot: sub === '群火' ? 'burn' : 'poison', strength: power });
+        affectedTargets.push({ targetId: hero.id, hit: true, hpDmg: 0, dot, strength: power, applied });
       } else {
         const raw0 = computeSegmentRawDamage(eStats, enemy.ref.atk, power, 1, 0.8 + random() * 0.4, {}, { caster: enemy, target: hero, skill: boomSkill });
         const resistance = {};
@@ -347,8 +359,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
         }
       }
     }
-    emit('self-destruct', {
-      attackId: currentAttackId(), unitId: enemy.id, sub, power, radius,
+    return emit('self-destruct', {
+      attackId: currentAttackId(), unitId: enemy.id, sub, power, radius, logFrom,
       center: unitCenter(placementsById[enemy.id], enemy.footprint), targets: affectedTargets,
     });
   }
@@ -599,6 +611,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     removed.forEach(barrier => removeBarrierResult(barrier, 'destroyed'));
     generation++; runId = 'battle:' + instanceId + ':' + generation;
     activeSegment = null;
+    pendingSelfDestructs.clear();
     attackStack.length = 0;
     resources = null;
     if (state.combatState.clock) state.combatState.clock.terminal = { type: 'destroyed', at: ctx.now() };
@@ -701,7 +714,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     units.filter(u => u.ref.hp <= 0).forEach(u => dispatchBattleClock({ type: 'exitUnit', unitId: u.id, cause: 'down' }));
   }
 
-  function handleDown(target, cause, sourceId = null) {
+  function handleDown(target, cause, sourceId = null, deferKillSelfDestruct = false) {
     // 复活变种（原版复活流程）：致死时消耗次数复活
     if (canReviveLocal(target)) {
       target.ref.reviveCount -= 1;
@@ -729,7 +742,14 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       position: { ...placementsById[target.id] }, hpAfter: target.ref.hp });
     addLog(target.name + (target.side === 'hero' ? ' 倒地' : ' 死亡'));
     creditEnemyDefeat(target, sourceId);
-    if (target.side === 'enemy') doEnemySelfDestruct(target); // 【自爆】真正死亡收口（复活拦截成功不会走到这里）
+    const selfDestruct = target.side === 'enemy' && selfDestructProfile(target);
+    if (selfDestruct) {
+      if (deferKillSelfDestruct) {
+        const ev = emit('self-destruct-pending', { ...selfDestruct, unitId: target.id,
+          center: unitCenter(placementsById[target.id], target.footprint) });
+        pendingSelfDestructs.set(ev.eventId, ev);
+      } else doEnemySelfDestruct(target, selfDestruct);
+    }
     return true;
   }
   function canReviveLocal(unit) {
@@ -2613,7 +2633,8 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
       }
     }
     let down = false;
-    if (target.ref.hp <= 0) down = handleDown(target, 'attack', caster.id);
+    if (target.ref.hp <= 0) down = handleDown(target, 'attack', caster.id,
+      options.deferKillSelfDestruct && caster.side === 'hero' && !caster.isSummon && hpBefore > 0 && dealt > 0 && !fatalResult);
     else runEnemyThresholdVariants(target); // 蜕皮/连动阈值（原版受击后收口）
     if (down && target.side === 'enemy') {
       const kp = CLASS_PASSIVES[caster.classType];
@@ -2930,6 +2951,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     rageVisualActive.clear();
     fieldBlocks.clear();
     resources = null; log = []; domainEvents = []; actionSerial = 0; attackSerial = 0; summonSerial = 0;
+    pendingSelfDestructs.clear();
     attackStack.length = 0;
     ctx.scene = scene;
     ctx.compiled = compileScene(scene);
@@ -2943,7 +2965,7 @@ export function createBattle({ units, placementsById, scene, battleState, visibl
     hasActiveField, dismissField,
     setVisibleUnitIds(ids) { visibleIds = ids ? ids.slice() : null; },
     canUseSkill, skillStatus, canUseReaction, canUseItem, itemSkill: itemAsSkill, startPreparation, canStationaryPrepare, stationaryStatus, previewStationaryStart, canAdvancePreparation, advancePreparation, cancelPreparation,
-    previewAttack, previewApproach, previewRetarget, teleportCells, beginAttack, attack, beginUseItem, useItem, predictAttack, defend, recoverEnemyMp, previewReady, ready,
+    previewAttack, previewApproach, previewRetarget, teleportCells, beginAttack, attack, beginUseItem, useItem, resolveSelfDestruct, predictAttack, defend, recoverEnemyMp, previewReady, ready,
     getEffectiveUnit, statsOf, buffsOf,
     previewGuardCandidates, queryBarrierTargets(skill) {
       return ctx.barriers.map(barrier => queryAttack(ctx, currentId(), effectiveSkill(skill), { barrierId: barrier.id }))

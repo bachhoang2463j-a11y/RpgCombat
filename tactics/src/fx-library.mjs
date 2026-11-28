@@ -338,6 +338,7 @@ function screenBlood(fx, ms, { pos: P = SPLAT_POS, drips: DR = SPLAT_DRIPS, each
     el.animate([{ transform: 'scaleY(0)', opacity: 0 }, { transform: 'scaleY(1)', opacity: 0.95, offset: 0.25 }, { transform: 'translateY(8px) scaleY(1.06)', opacity: 0.85, offset: 0.7 }, { transform: 'translateY(18px) scaleY(1.12)', opacity: 0 }],
       { duration: DR[i][4] || ms - dl, delay: dl, easing: 'ease-out', fill: 'both' });
   });
+  return root;
 }
 // 弱点锁定准星（回合制 pierce-weakpoint-lock）：菱形虚线框 + 内圈 + 十字分划，由大旋入收紧
 // snap：命中拍点即刻满亮出现（与伤害同帧），只做急速收紧与外扩淡出
@@ -470,6 +471,7 @@ function subBass(ctx, { type = 'sine', f0, f1, gain, ms }) {
 }
 const MELEE_SUB_BASS = { type: 'triangle', f0: 160, f1: 36, gain: 0.75, ms: 300 };
 const RANGED_SUB_BASS = { type: 'sine', f0: 140, f1: 32, gain: 0.8, ms: 350 };
+export function playRangedKillBass(ctx) { subBass(ctx, RANGED_SUB_BASS); }
 // 近战重击·盾击推撞（原版 createMeleeHeavyHtml，原尺寸 240px）：双圈冲击环 + 沿冲撞方向的推撞新月波 + 碎裂线 + 8 向火星 + 金色爆核 + 眩晕星环
 function meleeHeavyBurst(fx, p, ang, { D = 2.6 * PX, stun = true } = {}) {
   const k = D / 240, uid = fx.uid(), box = 'position:absolute;left:' + (-D / 2) + 'px;top:' + (-D / 2) + 'px;width:' + D + 'px;height:' + D + 'px;overflow:visible;';
@@ -521,6 +523,13 @@ const RANGED_SPLAT_POS = [
   { top: '38%', left: '46%', size: 150, rot: 8, delay: 50 },
 ];
 const RANGED_SPLAT_DRIPS = [['right:25%', 6, 140, 150, 1250], ['left:22%', 8, 180, 100, 1350]];
+const KILL_SPLAT_DELAYS = [40, 80, 60, 95, 15];
+export function playScreenBlood(fx, heavy) {
+  screenBlood(fx, heavy ? 1150 : 980, {
+    pos: RANGED_SPLAT_POS.map((s, i) => ({ ...s, delay: KILL_SPLAT_DELAYS[i] })),
+    drips: [['right:25%', 6, 140, 90, 1050], ['left:22%', 8, 180, 60, 1100]],
+  }).dataset.tacticsFx = 'kill-blood';
+}
 
 // ==========================================
 // 条目
@@ -603,7 +612,7 @@ function attackAreaBounds(result, shot, range) {
 
 function basicAttack(name, { subtype = name, area = false, projectile, directional, gap = 0, fire, impactFx } = {}) {
   return {
-    id: 'basic-' + name, grade: 'identity', fxTags: [name],
+    id: 'basic-' + name, grade: 'identity', fxTags: [name], finisherShotCue: true,
     prepareKeys: () => PREPARE_KEYS[name] || [],
     async play(ctx) {
       const { av, casterEnt, audioContext } = ctx;
@@ -622,6 +631,7 @@ function basicAttack(name, { subtype = name, area = false, projectile, direction
           if (impactFx) impactFx(ctx, impact);
         };
         if (i && gap && !(await ctx.wait(gap))) return false;
+        ctx.launchKillShot?.(shot.shotIndex);
         const aimAnchor = () => ctx.anchorAt(aim.x, aim.y);
         const playIdentity = async (...args) => ctx.awaitHandle(identity(...args), scope === 'aoe' ? 1400 : 900);
         if (directional && range?.type === '扇形') {
@@ -680,7 +690,7 @@ const basicAttacks = [
 // 战棋层补齐 20 米直线贯穿：弹头经过时沿射线拉出酸绿曳光（黑芯 + 绿辉）并留下腐蚀残痕滴落毒液、毒雾团滞留；
 // 每名被贯穿者在弹头经过拍点：入射穿孔环 + 沿弹道方向喷出毒液锥 + 毒泡上浮（停滞者叠灰青时轮缓转），闪开者只擦出风痕；终点地面腐蚀斑
 const arsenicShot = {
-  id: 'arsenic-shot', grade: 'identity', fxTags: ['砷弹射击'],
+  id: 'arsenic-shot', grade: 'identity', fxTags: ['砷弹射击'], finisherShotCue: true,
   prepareKeys: () => ['gunshot_pierce', 'creature_slime_01', 'aoe_poison_spell_fs219566'],
   async play(ctx) {
     const { av, hits, audioContext, casterEnt, fx, result } = ctx;
@@ -698,6 +708,7 @@ const arsenicShot = {
     const ACID = ['#a3e635', '#84cc16', '#d9f99d'];
     const band = (inner, ms) => fx.top('<div style="position:absolute;left:' + a.x + 'px;top:' + a.y + 'px;width:0;height:0;transform:rotate(' + rotD + 'deg);">' + inner + '</div>', ms).firstChild;
     ctx.after(CHARGE, () => {
+      ctx.launchKillShot?.();
       // 曳光：黑芯 + 酸绿辉自枪口推进到弹尾（与弹头同 160ms），随后残痕腐蚀淡出
       const tr = band('<i style="position:absolute;left:0;top:-5px;width:' + L + 'px;height:10px;border-radius:5px;transform-origin:0 50%;' +
         'background:linear-gradient(90deg,rgba(132,204,22,0),rgba(163,230,53,.85) 12%,rgba(217,249,157,.95) 50%,rgba(132,204,22,.7) 88%,rgba(132,204,22,0));box-shadow:0 0 14px 3px rgba(132,204,22,.55);mix-blend-mode:screen;"></i>' +
@@ -2580,7 +2591,7 @@ const sandArmor = {
 // 近战重击（移植回合制 spawnMeleeHeavyParticles，弗兰克【重击推撞】）：蓄力下压 → 沿直线冲撞（冲锋路径真值，逐接触步结算）→
 // 每次命中：破防音 parry_heavy + 80ms 后 hitDown，原版重震屏、金色平闪、盾击推撞爆发（新月波沿冲撞方向）、目标推撞踉跄 + 眩晕星环；落空只擦出火星
 const meleeHeavy = {
-  id: 'melee-heavy', grade: 'L2', fxTags: ['近战重击'], finisherCue: true, finisherOwnImpact: true,
+  id: 'melee-heavy', grade: 'L2', fxTags: ['近战重击'], finisherCue: true, finisherShotCue: true,
   timeline: { totalMs: 1100, fullscreen: false, darken: false },
   cues: [{ key: 'parry_heavy', vol: 0.72 }, { key: 'hitDown', vol: 0.6 }],
   prepareKeys() { return ['parry_heavy', 'hitDown', 'swish_3']; },
@@ -2592,7 +2603,8 @@ const meleeHeavy = {
     const strike = (p, list) => {
       const landed = list.filter(t => t.hit);
       if (!landed.length) { spray(fx, p, 6, { kind: 'spark', ang: ang + Math.PI, spread: 2.4, dist: [16, 46], size: [2, 3], ms: [220, 320] }); return; }
-      fx.sfx('parry_heavy', 0.72); subBass(ctx, MELEE_SUB_BASS); ctx.after(80, () => fx.sfx('hitDown', 0.6));
+      if (landed.some(t => !ctx.finisherBreakOn?.(t.id))) fx.sfx('parry_heavy', 0.72);
+      subBass(ctx, MELEE_SUB_BASS); ctx.after(80, () => fx.sfx('hitDown', 0.6));
       heavyShake(ctx, MELEE_HEAVY_SHAKE, 440);
       screenFlash(fx, 'rgba(251,191,36,0.9)', 0.22, 300);
       meleeHeavyBurst(fx, p, ang);
@@ -2606,6 +2618,7 @@ const meleeHeavy = {
       .animate([{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(.6)', opacity: 0.9 }], { duration: windup + 20, fill: 'forwards' });
     if (!(await ctx.wait(windup))) return false;
     ctx.releaseFinisher?.();
+    ctx.launchKillShot?.();
     fx.sfx('swish_3', 0.5);
     if (!charge) {
       const t = hits[0] ? worldPx(ctx.centerOf(hits[0].targetId)) : e;
@@ -2654,7 +2667,7 @@ function armorCrack(fx, p, ang) {
     .animate([{ strokeDashoffset: 1, opacity: 1 }, { strokeDashoffset: 0, opacity: 1, offset: 0.25 }, { strokeDashoffset: 0, opacity: 0.9, offset: 0.7 }, { strokeDashoffset: 0, opacity: 0 }], { duration: 800, easing: 'ease-out', fill: 'forwards' });
 }
 const slugShot = {
-  id: 'slug-shot', grade: 'L2', fxTags: ['独头弹'], reuseAudio: true, finisherOwnImpact: true,
+  id: 'slug-shot', grade: 'L2', fxTags: ['独头弹'], reuseAudio: true, finisherShotCue: true,
   timeline: { totalMs: 1150, fullscreen: false, darken: false },
   cues: [{ key: 'xiandan', vol: 0.75 }, { key: 'hitDown', vol: 0.6 }, { key: 'mx_gear_lock', vol: 0.5 }],
   prepareKeys() { return ['xiandan', 'hitDown', 'mx_gear_lock']; },
@@ -2676,6 +2689,7 @@ const slugShot = {
       const m = { x: c.x + ux * 22, y: c.y + uy * 22 }, hit = !!impact?.hit;
       const end = hit ? t : { x: t.x + ux * 70, y: t.y + uy * 70 };
       // 出膛
+      ctx.launchKillShot?.(shot.shotIndex);
       fx.sfx('xiandan', heavy ? 0.75 : 0.68); fx.shake(heavy ? 'heavy' : 'medium');
       gunFlash(fx, m, ang, { size: heavy ? 58 : 50, ms: 190 });
       smokeRing(fx, m, ang, 1.4 * PX);
@@ -2706,7 +2720,7 @@ const slugShot = {
 // 远程重击（弗兰克【皇家猎象枪】，移植回合制 spawnRangedHeavyParticles）：枪口红光快速聚能 → shot01 击发 + 重枪口焰 + 后坐，
 // 粗红色弹道直射目标 → 命中拍 hitDown + 低频冲击 + 白闪 + 原版双管重爆、原版重震屏、屏幕血花（无论命中/闪避都溅，闪避在目标身后炸开）+ 目标后仰
 const rangedHeavy = {
-  id: 'ranged-heavy', grade: 'L2', fxTags: ['远程重击'], reuseAudio: true, finisherCue: true, finisherOwnImpact: true,
+  id: 'ranged-heavy', grade: 'L2', fxTags: ['远程重击'], reuseAudio: true, finisherCue: true, finisherShotCue: true,
   timeline: { totalMs: 980, fullscreen: false, darken: false },
   cues: [{ key: 'herocharge', vol: 0.4 }, { key: 'shot', vol: 0.8 }, { key: 'hitDown', vol: 0.75 }],
   prepareKeys() { return ['herocharge', 'shot', 'hitDown']; },
@@ -2725,6 +2739,7 @@ const rangedHeavy = {
     if (!(await ctx.wait(CHARGE))) return false;
     // ② 击发：重枪口焰 + 后坐 + 粗红色弹道
     ctx.releaseFinisher?.();
+    ctx.launchKillShot?.();
     fx.sfx('shot', 0.8); fx.shake('heavy');
     gunFlash(fx, m, ang, { size: 52, ms: 200 });
     jolt(ctx, ctx.casterId, { amp: 5, ms: 55, glow: '#ef4444' });
@@ -2733,10 +2748,10 @@ const rangedHeavy = {
     // ③ 命中拍：原版双管重爆 + 白闪 + 重震屏 + 屏幕血花 + 后仰
     hits.forEach(h => ctx.reveal(h.targetId));
     fx.sfx('hitDown', 0.75); subBass(ctx, RANGED_SUB_BASS);
-    screenFlash(fx, '#fff', 0.45, 300);
+    if (!ctx.hasKillBeat) screenFlash(fx, '#fff', 0.45, 300);
     rangedHeavyBurst(fx, ip);
     heavyShake(ctx, RANGED_HEAVY_SHAKE, 480);
-    screenBlood(fx, 1400, { pos: RANGED_SPLAT_POS, drips: RANGED_SPLAT_DRIPS, each: 1150 });
+    if (!ctx.hasKillBeat) screenBlood(fx, 1400, { pos: RANGED_SPLAT_POS, drips: RANGED_SPLAT_DRIPS, each: 1150 });
     landed.forEach(h => heavyFlinch(ctx, h.targetId, RECOIL_FLINCH, ang));
     if (landed.length) spray(fx, t, 14, { kind: 'gore', ang, spread: 1.4, dist: [24, 96], size: [3, 7] });
     return ctx.wait(560);
@@ -2746,7 +2761,7 @@ const rangedHeavy = {
 // 枪击穿透（移植回合制 gunshot_pierce）：枪口青光聚能 → 击发：重枪口焰 + 抛壳后坐 + 超音速青色贯穿光束
 // → 命中：菱形弱点准星与伤害同帧锁定 + 双圈激波星芒 + 背部破片锥 + 出口血雾喷溅 + 受击硬直 + 重震（L2 预算内，不用暗场/全屏）
 const gunshotPierce = {
-  id: 'gunshot-pierce', grade: 'L2', fxTags: ['枪击穿透'], reuseAudio: true, finisherCue: true,
+  id: 'gunshot-pierce', grade: 'L2', fxTags: ['枪击穿透'], reuseAudio: true, finisherCue: true, finisherShotCue: true,
   timeline: { totalMs: 1160, fullscreen: false, darken: false },
   cues: [{ key: 'gunshot_pierce', vol: 0.75 }],
   prepareKeys() { return ['gunshot_pierce']; },
@@ -2761,6 +2776,7 @@ const gunshotPierce = {
     particles(fx, Array.from({ length: 10 }, () => { const a = rnd(0, TAU), d = rnd(26, 46); return { x: m.x + Math.cos(a) * d, y: m.y + Math.sin(a) * d, dx: -Math.cos(a) * d, dy: -Math.sin(a) * d, size: rnd(4, 7), color: '#38bdf8', core: '#ffffff', s0: 1, s1: 0.3, dur: rnd(220, windup - 10) }; }), windup + 20);
     if (!(await ctx.wait(windup))) return false;
     ctx.releaseFinisher?.();
+    ctx.launchKillShot?.();
     fx.sfx('gunshot_pierce', 0.75); fx.shake('heavy');
     gunFlash(fx, m, ang, { size: 48, ms: 210 });
     casing(fx, c, ang);
@@ -2785,7 +2801,7 @@ const gunshotPierce = {
 // 每发：枪口焰 + 曳光 + 抛壳 + 跳弹火星 + 血雾，偶数发副枪交叉射向相邻目标；施法者后坐 / 目标弹雨硬直 / 持续后坐震屏；全程屏幕血块覆盖。
 // 运镜：遮幅入场 + 推近玛德琳（偏向射向）→（时停 ATTACK_STOP_MS）→ 拉开框住全部目标并随扫射摆镜 → 末击（顿帧 ATTACK_HIT_MS）急推 + 白闪 → 回位
 const strafeBurst = {
-  id: 'strafe-burst', grade: 'L3', fxTags: ['连续扫射'], cine: false,
+  id: 'strafe-burst', grade: 'L3', fxTags: ['连续扫射'], cine: false, finisherShotCue: true,
   timeline: { chargeMs: 800, totalMs: 3830, fullscreen: true, darken: false },   // 800 蓄势 + 2600 扫射 + 60 + 360 回位（攻击类时停/顿帧为 0）
   cues: [{ key: 'aoe_gun_burst_fs482122', vol: 0.68 }],
   prepareKeys() { return ['aoe_gun_burst_fs482122', 'gunshot1', 'gunshot2', 'gunshot3']; },
@@ -2812,7 +2828,7 @@ const strafeBurst = {
     // ③ 开火：镜头拉开框住出手者与全部目标，随扫射主目标缓摆；持续高频后坐震屏
     fx.sfx('aoe_gun_burst_fs482122', 0.68); fx.shake('heavy');
     ctx.atmos?.burst();   // 屏幕主演出爆发与本条目冲击同拍（替代原通用径向闪屏）
-    screenBlood(fx, 2750);
+    if (!ctx.hasKillBeat) screenBlood(fx, 2750);
     const pts = [cm, ...(targets.length ? targets.map(t => t.m) : [am])];
     const C = { x: (Math.min(...pts.map(p => p.x)) + Math.max(...pts.map(p => p.x))) / 2, y: (Math.min(...pts.map(p => p.y)) + Math.max(...pts.map(p => p.y))) / 2 };
     const S = Math.min(sb.poseFrame(pts, { pad: 2.4, tight: 1.08 }).scale, home.scale * 1.5);
@@ -2828,6 +2844,7 @@ const strafeBurst = {
     const show = id => { if (shown.has(id)) return; shown.add(id); ctx.reveal(id); };
     // 单发：命中目标溅血 + 硬直，闪避则子弹擦过目标后方落空只溅火星；无目标时沿扇面往返扫射
     const shoot = (g, tg, sp, go, k) => {
+      if (tg && ctx.isKillTarget?.(tg.id)) ctx.launchKillShot?.();
       let end;
       if (tg) end = tg.hit ? { x: tg.p.x + rnd(-14, 14), y: tg.p.y + rnd(-14, 14) } : { x: tg.p.x + (tg.p.x - g.x) * 0.35 + rnd(-30, 30), y: tg.p.y + (tg.p.y - g.y) * 0.35 + rnd(-30, 30) };
       else { const an = baseAng + Math.sin(k / N * Math.PI * 3) * half * 0.9 + rnd(-0.06, 0.06), d = reach * rnd(0.7, 1); end = { x: c.x + Math.cos(an) * d, y: c.y + Math.sin(an) * d }; }

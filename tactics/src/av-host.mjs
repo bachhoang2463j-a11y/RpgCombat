@@ -130,6 +130,7 @@ export function createAvHost({ getUnitView, getUnits, getEffectiveUnit = () => n
   };
 
   const av = createRpgAv(host);
+  av.audioUrls.tackle_start = typeof __TACTICS_KILL_CHARGE_URL__ === 'string' ? __TACTICS_KILL_CHARGE_URL__ : './assets/tackle_start.wav';
   for (const [k, file] of Object.entries({ ...MOVE_AUDIO_FILES, ...JUMP_AUDIO_FILES })) {
     if (!av.audioUrls[k]) av.audioUrls[k] = av.ASSET_BASE + '/' + file;
   }

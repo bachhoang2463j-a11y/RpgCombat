@@ -451,7 +451,19 @@ export function createApp(rootEl, opts = {}) {
     onEffectReveal: (e) => revealEffect(e),
     onMoveFeedback: (id, kind, p) => moveFeedback(id, kind, p),
     onRuleReveal: (value, { kind }) => { if (kind === 'reaction-damage') revealCounter(value); },
-    onSelfDestruct: () => { syncShown(); refreshBattle(); },
+    onSelfDestruct: (event, deferred) => {
+      if (!deferred) { syncShown(); refreshBattle(); return; }
+      // 自爆可发生在多发技能中途，只揭示这次爆点的受害者。
+      for (const t of event.targets) {
+        if (!t.hit) continue;
+        const u = unitById(t.targetId);
+        shownEff.set(u.id, battle.getEffectiveUnit(u.id));
+        renderStatus(u.id);
+        if (t.hpDmg > 0 || t.shieldDmg > 0) revealCounter({ ...t, casterId: event.unitId });
+      }
+      shell.setHistory(visibleLog());
+      shell.showLog(battle.snapshot().log[event.logFrom], 'hit');
+    },
     onObstacleBreak: () => releaseScene(),
     onPassiveGain: (ev) => { if (unitById(ev.unitId)?.side === 'hero') shell.flashHeroPassive(ev.unitId, passiveGainLabel(ev), PASSIVE_CARD_COLOR[ev.kind]); },
     promptRetarget: (req) => {
@@ -1713,7 +1725,7 @@ export function createApp(rootEl, opts = {}) {
     // 玩家攻击统一走 battle.beginAttack generator（反应弹窗在导演驱动内弹出）；同步 attack 不再用于真实 UI
     const beforeBgm = bgmFrame();
     const res = act.item
-      ? await director.driveAttack(battle.beginUseItem(act.item, p.aim, { child: act.child, reuseTarget }))
+      ? await director.driveAttack(battle.beginUseItem(act.item, p.aim, { child: act.child, reuseTarget, deferKillSelfDestruct: true }))
       : await director.runAttackLive(act.skill, p.aim, { reuseTarget });
     if (myFlow !== flow) return;
     if (!res) { setBusy(false); return; }
@@ -2024,7 +2036,7 @@ export function createApp(rootEl, opts = {}) {
       const res = meta && meta.result, killer = res && unitById(res.casterId);
       downTag(u.id, killer && killer.id !== u.id ? '☠ ' + killer.name + (res.skill?.name ? '【' + res.skill.name + '】' : '') + ' 击倒' : '☠ 倒下');
     }
-    if (hit.down) playDown(u);
+    if (hit.down && !meta?.finisher) playDown(u);
     const maxHp = u.bars.maxHp || u.ref?.maxHp || 1;
     if (hit.down || (u.side === 'hero' && hit.hit && (hit.hpAfter <= maxHp * 0.55 || (prev.hp - hit.hpAfter) >= maxHp * 0.30))) settleLiveBgm();
   }

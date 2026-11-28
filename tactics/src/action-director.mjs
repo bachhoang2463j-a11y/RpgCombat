@@ -2,7 +2,7 @@
 // 战棋动作协调（玩家与敌方共用）：
 //   取得行动 → 镜头引导 → 连续移动 → 前摇（敌方，复用回合制八类） → 攻击身份演出（复用） →
 //   各目标在各自接触拍点展示结果（血条/浮字/受击或闪避/倒地） → 收尾 → 交还控制
-// 规则命令（battle.move/attack）已先一次性结算：本层只把确定结果在对应拍点"揭示"，不重掷骰、不重复扣费。
+// 规则先结算，导演按接触拍点揭示快照；直击触发的自爆例外，由规则在爆点结算。
 // 特效函数不负责扣血；动画时长不推进虚拟时间。scope 失活（重置/换场）时所有等待以 false 结算。
 // 攻击演出统一经 fx-registry 分发（fxTag → 形状/效果槽谓词 → 兜底身份演出），本层不再为任何单个技能写特判。
 // ==========================================
@@ -12,21 +12,22 @@ import { unitCenter } from './geometry.mjs';
 import { createFxRegistry, actionInput, reactionInput, prepareInput } from './fx-registry.mjs';
 import { registerDefaultFx, EXTRA_AUDIO, fogFieldHtml, animateFogField, elementFieldHtml, animateElementField,
   playRegionPulse, REGION_PULSE_AUDIO, playPassiveGain, PASSIVE_AUDIO, playEnemyAlarm, ALARM_AUDIO, playJumpDust, glide, READY_AUDIO, playReadyFx,
-  playObstacleBreak, playBackstabMark } from './fx-library.mjs';
+  playObstacleBreak, playBackstabMark, playScreenBlood, playRangedKillBass } from './fx-library.mjs';
+import { playKillCharge, playUnitShatter } from './kill-fx.mjs';
 import { createVfxHost } from './vfx-host.mjs';
 import { skillSlots } from './effect-definitions.mjs';
 import { startAtmos, atmosStyleOf } from './screen-atmos.mjs';
-import { startCine, planKillBeat, startKillCamera, killPortraitSweep, KILL_TIMING } from './cinematic.mjs';
+import { startCine, planKillBeat, startKillCamera, killTimingFor, planHitStopWaves, timeStop, KILL_TIMING } from './cinematic.mjs';
 import { GUARD_AUDIO_KEYS, BARRIER_AUDIO_KEYS, playGuardDash, playGuardBlock, mountBarrierDome, updateBarrierBadge,
   playBarrierRaise, playBarrierHit, playBarrierBlocked, playBarrierShatter, fadeBarrierDome } from './guard-barrier-fx.mjs';
 import { effectFloat, variantFloat, expireFloat } from './status-ui.mjs';
 import { floatText, worldPx } from './vfx-primitives.mjs';
-import { fxDateNow, getTimeScale } from './time-scale.mjs';
+import { fxDateNow, fxTimeout, getTimeScale } from './time-scale.mjs';
 import { createBattleMarks, lightTier, seedOf } from './battle-marks.mjs';
 import { skillElement, ELEMENT_COLORS } from './fx-infer.mjs';
 
 export const WINDUP_BEAT_MS = 330;   // 回合制敌方前摇拍点（OMEN_BEAT）：起手后此刻出手
-const KILL_IMPACT = { '近战': 'parry_heavy', '远程': 'hitDown', '法术': 'mx_deep_impact' };
+const KILL_IMPACT = { '近战': 'parry_heavy', '远程': 'hitDown', '法术': 'light_impact' };
 
 // 演出身份只来自显式特效标签；伤害类型与旧括号不参与选择。
 export function resolveAttackIdentity(skill) {
@@ -383,32 +384,6 @@ export function createActionDirector(deps) {
     if (!s || !vp.width) return null;
     return Math.max(-0.6, Math.min(0.6, ((s.x - vp.left) / vp.width * 2 - 1) * 0.6));
   }
-  // 顿帧分档：本段实际掉血 / 最大生命 <10% 不顿、10–25% 40ms、25–50% 及以上 70ms；暴击或击杀 110ms
-  function hitStopMs(r) {
-    if (r.outcome !== 'hit' || !(r.hpDmg > 0)) return 0;
-    if (r.isCrit || (r.hpBefore > 0 && r.hpAfter <= 0)) return 110;
-    const k = r.hpDmg / Math.max(1, r.maxHp || 1);
-    return k >= 0.25 ? 70 : k >= 0.10 ? 40 : 0;
-  }
-  // 只冻结出手者与受击者（及粒子层），画面其余部分与声音照常；解冻后受击者沿来袭方向位移 0.08 格回弹
-  function microStop(casterId, targetId, ms) {
-    const s = scope();
-    if (!s || !s.isLive || !(ms > 0)) return;
-    const view = sandbox.getUnitView();
-    const frozen = [...new Set([casterId, targetId])].map(id => view.nodes.get(id)?.root).filter(Boolean)
-      .flatMap(el => el.getAnimations({ subtree: true }).filter(a => a.playState === 'running'));
-    frozen.forEach(a => a.pause());
-    avHost.particleStop?.(ms);
-    s.after(ms, () => {
-      frozen.forEach(a => { if (a.playState === 'paused') a.play(); });
-      const a = centerOf(casterId), b = centerOf(targetId), rec = view.nodes.get(targetId);
-      if (!a || !b || !rec || casterId === targetId) return;
-      const d = Math.hypot(b.x - a.x, b.y - a.y) || 1, px = 0.08 * 50;
-      s.animate(rec.sprite.animate([{ transform: 'translate(0,0)' },
-        { transform: 'translate(' + ((b.x - a.x) / d * px).toFixed(1) + 'px,' + ((b.y - a.y) / d * px).toFixed(1) + 'px)', offset: 0.35 },
-        { transform: 'translate(0,0)' }], { duration: 160, easing: 'ease-out', composite: 'add' }));
-    });
-  }
   let cineSeen = { scope: null, keys: new Set() };
   // ---------- 战斗留痕（C3）与法术照亮（C4） ----------
   const marks = createBattleMarks();
@@ -476,14 +451,33 @@ export function createActionDirector(deps) {
     const input = actionInput({ ...result, skill });
     const entry = registry.resolve(input);
     const kill = planKillBeat({ ...result, skill }, casterUnit, vd.units);
-    const killSound = seg => {
-      if (entry.finisherOwnImpact) return null;
-      const key = KILL_IMPACT[seg.damageType || result.incomingType || skill.damageType || '近战'];
-      // 近战原重击的金属音与破防共用采样；同拍破防时换成重落点，避免同一文件叠响。
-      return key === 'parry_heavy' && (seg.guardBroken || (seg.shieldDmg > 0 && seg.shieldAfter === 0)) ? 'hitDown' : key;
-    };
-    const killWaves = new Set();
-    let killTail = null;
+    const impactWaves = planHitStopWaves(result, vd.units, kill.lethal);
+    const selfDestructs = (result.events || []).filter(ev => ev.type === 'self-destruct' || ev.type === 'self-destruct-pending');
+    const destructByTarget = new Map(selfDestructs.map(ev => [ev.unitId, ev]));
+    const damageType = seg => seg.damageType || result.incomingType || skill.damageType || '近战';
+    const rangedKillWaves = new Set([...impactWaves].filter(([, w]) => w.lethal.some(({ segment }) => damageType(segment) === '远程')).map(([key]) => key));
+    const killFx = makeFx(audioContext.category, audioContext);
+    const launched = new Set();
+    function launchKillShot(shot = result.shots?.[0]?.shotIndex ?? 0) {
+      if (!rangedKillWaves.has(shot) || launched.has(shot)) return;
+      launched.add(shot);
+      killFx.sfx('shot', 0.8);
+    }
+    function killSound(seg) {
+      const key = KILL_IMPACT[damageType(seg)];
+      // 同拍破防已经播金属音；近战击杀只补重落点。
+      if (key === 'parry_heavy' && (seg.guardBroken || (seg.shieldDmg > 0 && seg.shieldAfter === 0))) return 'hitDown';
+      return key;
+    }
+    function playKillImpact(seg, pan) {
+      const key = killSound(seg);
+      const opts = { track: 'skill', category: 'F', pan };
+      av.playSound(key, 0.86, 1, opts);
+      if (key === 'parry_heavy') fxTimeout(() => { if (isCurrent()) av.playSound('hitDown', 0.60, 1, opts); }, 80);
+      if (damageType(seg) === '远程') playRangedKillBass({ av, audioContext });
+    }
+    const impactRuns = [];
+    let deferredBurstRun = Promise.resolve(true);
 
     sandbox.getUnitView().setDisplayFacing(result.casterId, null);
     sandbox.getUnitView().updateUnit(result.casterId, { placement: vd.placementsById[result.casterId] });
@@ -498,7 +492,10 @@ export function createActionDirector(deps) {
     await sandbox.guideTo(pts);
     avHost.setPanHint?.(panOf(result.casterId));
     const ruleKeys = [...(guardEvents.length && !deps.presentGuard ? GUARD_AUDIO_KEYS : []), ...((result.events || []).some(ev => ev.type.startsWith('barrier-')) ? BARRIER_AUDIO_KEYS : [])];
-    if (!entry.finisherOwnImpact) ruleKeys.push(...new Set([...kill.lethal].map(killSound).filter(Boolean)));
+    ruleKeys.push(...new Set([...kill.lethal].map(killSound).filter(Boolean)));
+    if (kill.lethal.size) ruleKeys.push('hitDown');
+    if (kill.focus) ruleKeys.push('tackle_start');
+    if (rangedKillWaves.size) ruleKeys.push('shot');
     if (!isCurrent() || !(await prepareAudio([...(entry.prepareKeys ? entry.prepareKeys({ identity }) : []), ...ruleKeys])) || !isCurrent()) return false;
 
     // L3/L4 屏幕氛围层（视口宿主）：与条目同风格的边缘围压；首个真实揭示即降低遮挡，条目结束即外撤
@@ -523,19 +520,25 @@ export function createActionDirector(deps) {
     const cineKey = result.casterId + '|' + (skill.name || entry.id);
     const liteCine = !!deps.liteRepeatCine?.() && cineSeen.keys.has(cineKey);
     cineSeen.keys.add(cineKey);
-    const cine = atmos && entry.cine !== false && !liteCine ? startCine({
-      sandbox, fx: makeFx(audioContext.category), hold, after: (ms, fn) => scope().after(ms, fn), style: entry.cine, freeze: entry.cineHold, grade, result, hits, centerOf,
+    const useKillCamera = kill.focus && entry.cine !== 'lock';
+    const lockTiming = hits.some(h => killTimingFor(vd.units.find(u => u.id === h.targetId)) === KILL_TIMING.C) ? KILL_TIMING.C : KILL_TIMING.B;
+    const cine = atmos && entry.cine !== false && !liteCine && !useKillCamera ? startCine({
+      sandbox, fx: makeFx(audioContext.category), hold, after: (ms, fn) => scope().after(ms, fn), style: entry.cine, freeze: entry.cineHold, grade, result, hits, centerOf, lockTiming,
       shape: shape && shape.radius > 0 ? { center: shape.center || result.aim, radius: shape.radius } : null,
       regions: (result.events || []).filter(ev => ev.type === 'region-created'), chargeMs: entry.timeline?.chargeMs || 600, totalMs: entry.timeline?.totalMs || 2000,
     }) : null;
     if (cine) { const burst = atmos.burst; atmos.burst = () => { burst(); cine.burst(); }; }
 
-    // 高阶技能保留原镜头；已有发射拍点的技能将推近借给自己的前摇。
-    const killFrom = kill.focus && centerOf(result.casterId), killTo = kill.focus && centerOf(kill.focus.targetId);
-    let pullKill = !atmos && killFrom && killTo && !sandbox.cameraTouched?.() ? startKillCamera(sandbox, killFrom, killTo) : null;
-    const portrait = kill.focus?.cutin ? portraitOf(result.casterId)?.img : null;
-    if (portrait) killPortraitSweep(makeFx(audioContext.category), portrait, KILL_TIMING.cutin, getTimeScale());
-    const finisherWindupMs = atmos ? 0 : portrait ? KILL_TIMING.cutin : pullKill ? KILL_TIMING.push : 0;
+    // 有独立发射拍点的技能在释放时拉回双方构图；其余技能在进条目前先走完前摇。
+    const killFrom = useKillCamera && centerOf(result.casterId), killTo = useKillCamera && centerOf(kill.focus.targetId);
+    const focusTiming = useKillCamera && kill.focus.timing;
+    let pullKill = killFrom && killTo && !sandbox.cameraTouched?.() ? startKillCamera(sandbox, killFrom, killTo, killFx, focusTiming) : null;
+    const finisherWindupMs = focusTiming ? focusTiming.rush + focusTiming.cast : 0;
+    if (focusTiming) actionScope.after(focusTiming.rush, () => {
+      if (!isCurrent()) return;
+      killFx.sfx('tackle_start', 1.4);
+      playKillCharge(killFx, sandbox, result.casterId, focusTiming.cast);
+    });
     function releaseFinisher() {
       if (!pullKill || !isCurrent()) return;
       pullKill();
@@ -544,6 +547,37 @@ export function createActionDirector(deps) {
     if (!entry.finisherCue && finisherWindupMs) {
       if (!(await wait(finisherWindupMs)) || !isCurrent()) return false;
       releaseFinisher();
+    }
+
+    function scheduleImpactWave(waveIndex, seg) {
+      const wave = impactWaves.get(waveIndex);
+      if (!wave?.segments.delete(seg) || wave.segments.size) return;
+      const { anchorId, ms, timing, lethal } = wave;
+      avHost.particleStop?.(ms);
+      impactRuns.push(hold(ms, () => {
+        const at = centerOf(anchorId);
+        if (isCurrent() && at) timeStop(sandbox, killFx, ms, at, { filter: timing.filter, lines: lethal.length ? 36 : 26 });
+      }).then(ok => {
+        if (!ok || !isCurrent()) return false;
+        if (!lethal.length) return true;
+        // tail 自致死拍起算，解冻后只等剩余时间。自爆预演可以与这段并行。
+        const killTail = wait(timing.tail - ms);
+        const from = centerOf(result.casterId);
+        for (const { targetId } of lethal) {
+          const sd = destructByTarget.get(targetId);
+          if (sd?.type === 'self-destruct-pending') {
+            deferredBurstRun = deferredBurstRun.then(ready => ready && isCurrent() && playSelfDestruct(sd, killTail));
+          } else if (!sd) {
+            const to = centerOf(targetId), dx = to && from ? to.x - from.x : 1, dy = to && from ? to.y - from.y : 0;
+            const distance = Math.hypot(dx, dy) || 1;
+            playUnitShatter(killFx, sandbox, targetId, dx / distance, dy / distance,
+              killTimingFor(vd.units.find(u => u.id === targetId)) === KILL_TIMING.C);
+          }
+        }
+        playScreenBlood(killFx, timing === KILL_TIMING.C);
+        killFx.shake(timing === KILL_TIMING.C ? 'quake' : 'heavy');
+        return killTail;
+      }));
     }
 
     const revealed = new Map();      // targetId → 已揭示段序号集合
@@ -676,7 +710,7 @@ export function createActionDirector(deps) {
       const finisher = kill.lethal.has(seg);
       if (finisher) releaseFinisher();
       const r = { ...buildHitFeedback({ ...result, skill }, h, hitSnap, incoming), actionId, pan, waveId: wave ? wave.id : null,
-        finisher, finisherSound: finisher ? killSound(seg) : null };
+        finisher };
       avHost.setPanHint?.(pan);
       if (seg.resistance?.layers?.length) revealRule({ ...seg.resistance, segmentId: seg.segmentId, targetId }, 'resistance');
       if (seg.barrierHitId) {
@@ -703,15 +737,8 @@ export function createActionDirector(deps) {
         wave: hitWaves[waveIndex] || (hitWaves[waveIndex] = { shook: false, hitStopped: false, classified: [] }),
         suppressDodgeFx: !!reaction?.shift || !!guardianReaction?.shift,
       });
-      if (finisher) {
-        if (!killWaves.has(waveIndex)) {
-          killWaves.add(waveIndex);
-          // 同拍新挂的后仰／后坐也纳入定格；不拦飘字和重击声。
-          queueMicrotask(() => { if (isCurrent()) microStop(result.casterId, targetId, KILL_TIMING.stop); });
-        }
-        // 短技能也等倒下动作露出来，再交给旧击杀特写。
-        killTail = wait(KILL_TIMING.tail);
-      } else if (!healed && !seg.barrierHitId) microStop(result.casterId, targetId, hitStopMs(r));
+      if (finisher) playKillImpact(seg, pan);
+      scheduleImpactWave(waveIndex, seg);
       if (!healed && !seg.barrierHitId) {
         const c = centerOf(targetId);
         if (element === 'gun') flash(centerOf(result.casterId), 'gun', { radius: 1, ms: 160 }, 0.7);
@@ -733,7 +760,7 @@ export function createActionDirector(deps) {
       }
       if (!healed && !seg.barrierHitId && (fatalReason !== 'avoid-fatal' || seg.shieldDmg > 0 || seg.guardBroken)) av.CombatAudioDirector.publish(r);
       if (wave) av.CombatAudioDirector.completeTarget(wave, targetId);
-      if (onReveal) onReveal({ ...h, ...hitSnap, targetId, heal: healed, segmentIndex: i, segmentCount: segs.length }, Object.assign({ result, identity, entryId: entry.id }, meta));
+      if (onReveal) onReveal({ ...h, ...hitSnap, targetId, heal: healed, segmentIndex: i, segmentCount: segs.length }, Object.assign({ result, identity, entryId: entry.id, finisher }, meta));
       if (seg.segmentId) queueCounters(seg.segmentId, Promise.all(segmentReactions).then(values => values.every(value => value !== false)));
     }
     function reveal(targetId, meta) {
@@ -817,7 +844,11 @@ export function createActionDirector(deps) {
       charge: charge && { ...charge, footprint: vd.footprintsById[charge.unitId] }, playCharge,
       audioContext, outcomeMap: new Map(hits.map(h => [h.targetId, h.hit ? 'hit' : 'dodge'])),
       fx: makeFx(audioContext.category, audioContext),
-      wait, tween, awaitHandle, hold, releaseFinisher, finisherWindupMs, after: (ms, fn) => scope().after(ms, fn),
+      wait, tween, awaitHandle, hold, releaseFinisher, finisherWindupMs, launchKillShot,
+      hasKillBeat: kill.lethal.size > 0,
+      isKillTarget: id => { const h = byId.get(id); return !!h && (h.segments || [h]).some(seg => kill.lethal.has(seg)); },
+      finisherBreakOn: id => (byId.get(id)?.segments || [byId.get(id)]).some(seg => kill.lethal.has(seg) && damageType(seg) === '近战' && killSound(seg) === 'hitDown'),
+      after: (ms, fn) => scope().after(ms, fn),
       reveal, revealSegment, revealEffect, revealGuard, revealRule, revealRegion,
       awaitCounters: () => counterRun,
       awaitShotFeedback: async () => {
@@ -828,6 +859,7 @@ export function createActionDirector(deps) {
       anchorAt: (x, y) => makeAnchor(x, y), aimAnchor: () => aimAnchor(result.aim), lineEndAnchor: () => lineEndAnchor(result),
     };
     guardEvents.forEach(ev => revealGuard(ev));
+    if (!entry.finisherShotCue) launchKillShot();
     const ok = await entry.play(ctx);
     if (atmos) atmos.end();
     if (cine && isCurrent() && ok !== false) await cine.end();
@@ -881,9 +913,8 @@ export function createActionDirector(deps) {
       const exit = ent && av.playSummonExit(ent, { exitCause: 'killed', side: ent.side });
       if (exit && !(await awaitHandle(exit, 900))) return false;
     }
-    // 死亡自爆领域事件演出（食尸鬼等：原版三幕四形态 + 世界层范围环）
-    const selfDestructs = (result.events || []).filter(ev => ev.type === 'self-destruct');
-    for (const sd of selfDestructs) {
+    // 自爆前奏可接在解冻拍，但真实结算必须等尾拍和前奏都到位。
+    async function playSelfDestruct(sd, killTail) {
       const fx = makeFx('B'), px = sd.center.x * 50, py = sd.center.y * 50, rPx = (sd.radius || 3) * 50;
       const sdEnt = avHost.entity(sd.unitId);
       const sdForm = sd.sub || '群伤';
@@ -893,6 +924,11 @@ export function createActionDirector(deps) {
       if (wHandle) {
         wHandle.release?.();
         if (!(await untilScope(wHandle.burstReady || wait(820)))) return false;
+      }
+      if (killTail) {
+        if (!(await killTail) || !isCurrent()) return false;
+        sd = battleOf().resolveSelfDestruct(sd);
+        if (!sd) return false;
       }
       const ring = '<i style="position:absolute;left:' + px + 'px;top:' + py + 'px;width:' + (rPx * 2) + 'px;height:' + (rPx * 2) + 'px;margin:' + (-rPx) + 'px 0 0 ' + (-rPx) + 'px;border-radius:50%;background:radial-gradient(circle,rgba(251,146,60,0.35),rgba(239,68,68,0.45) 60%,transparent 75%);mix-blend-mode:screen;"></i>';
       fx.top(ring, 560).firstChild.animate([{ transform: 'scale(0.15)', opacity: 1 }, { transform: 'scale(1.1)', opacity: 0 }], { duration: 540, fill: 'forwards' });
@@ -910,28 +946,36 @@ export function createActionDirector(deps) {
         av.CombatAudioDirector.publish(r);
         sandbox.getUnitView()?.setShield?.(tid, tInfo.shieldAfter || 0);
       };
+      const rescue = (tInfo, ent) => {
+        if (tInfo?.fatalResult?.reason === 'grit') av.playRescueGrit?.(ent);
+        else if (tInfo?.fatalResult?.reason === 'avoid-fatal') av.playRescueAvoidFatal?.(ent);
+      };
       const bHandle = sdEnt && av.playSelfDestructBurst
         ? av.playSelfDestructBurst(sdEnt, targetList, { form: sdForm, outcomes }, (beat, meta) => {
-          if (beat === 'target_hit' || beat === 'target_attach') {
+          if (!killTail && (beat === 'target_hit' || beat === 'target_attach')) {
             const tid = meta?.target?.id;
             emitSdHit(tid);
-            const tInfo = (sd.targets || []).find(x => x.targetId === tid);
-            if (tInfo?.fatalResult?.reason === 'grit' && av.playRescueGrit) av.playRescueGrit(meta.target);
-            else if (tInfo?.fatalResult?.reason === 'avoid-fatal' && av.playRescueAvoidFatal) av.playRescueAvoidFatal(meta.target);
+            rescue((sd.targets || []).find(x => x.targetId === tid), meta.target);
           }
         }, wHandle?.stageCtx || null)
         : null;
-      if (!bHandle) {
-        fx.sfx('explosion_aoe_blast', 0.65); fx.shake('medium');
-        (sd.targets || []).forEach(t => emitSdHit(t.targetId));
-      }
-      if (onSelfDestruct) onSelfDestruct(sd);
-      if (bHandle && !(await awaitHandle(bHandle, 950))) return false;
-      else if (!bHandle && !(await wait(620))) return false;
+      if (!bHandle) { fx.sfx('explosion_aoe_blast', 0.65); fx.shake('medium'); }
+      if (killTail || !bHandle) (sd.targets || []).forEach(t => {
+        emitSdHit(t.targetId);
+        if (killTail) {
+          rescue(t, avHost.entity(t.targetId));
+          if (t.dot) floatEffect(t.targetId, effectFloat({ kind: 'dot', dot: t.dot, strength: t.strength, turns: 3, immune: !t.applied }));
+        }
+      });
+      onSelfDestruct?.(sd, !!killTail);
+      return bHandle ? awaitHandle(bHandle, 950) : wait(620);
+    }
+    if ((await Promise.all(impactRuns)).some(ok => !ok) || !(await deferredBurstRun) || !isCurrent()) return false;
+    for (const sd of (result.events || []).filter(ev => ev.type === 'self-destruct')) {
+      if (!(await playSelfDestruct(sd))) return false;
     }
     waves.forEach(wave => { if (wave) av.CombatAudioDirector.closeWave(wave); });
     dropAnchors();
-    if (killTail && (!(await killTail) || !isCurrent())) return false;
     return ok;
   }
 
@@ -1271,7 +1315,7 @@ export function createActionDirector(deps) {
   async function runAttackLive(skill, aim, options) {
     const battle = battleOf();
     if (!battle || typeof battle.beginAttack !== 'function') return { ok: false, reason: '反应接口未接线：battle.beginAttack 待规则代理落地', pending: false };
-    return driveAttack(battle.beginAttack(skill, aim, options));
+    return driveAttack(battle.beginAttack(skill, aim, { ...options, deferKillSelfDestruct: true }));
   }
   // 重置/换场：取消活动驱动（generator.return），弹窗由宿主 shell.cancelReactionPrompt() 关闭
   function cancelAttack() {

@@ -6,7 +6,7 @@ import { buildHitFeedback, resolveWindupKind, createActionDirector } from '../..
 import { avatarScaleForZoom } from '../../../tactics/src/unit-view.mjs';
 import { linkSkillGroupRows } from '../../../tactics/src/main.mjs';
 import { skillSlots } from '../../../tactics/src/effect-definitions.mjs';
-import { planKillBeat, startKillCamera, killPortraitSweep, KILL_TIMING } from '../../../tactics/src/cinematic.mjs';
+import { planKillBeat, startKillCamera, KILL_TIMING } from '../../../tactics/src/cinematic.mjs';
 
 const source = readFileSync(new URL('../../../tactics/src/vendor/rpg-av/rpg-av.mjs', import.meta.url), 'utf8');
 const start = source.indexOf('    const HIT_HOLD_MS =');
@@ -161,11 +161,11 @@ export const groups = {
     const lethal = { shotIndex: 0, hit: true, down: true, outcome: 'hit', hpBefore: 10, hpAfter: 0, hpDmg: 10 };
     const result = { casterId: 'c', skill: { range: { type: '单体' } }, hits: [{ targetId: 'e', segments: [lethal] }] };
     const planned = planKillBeat(result, caster, [enemy]);
-    cases.push(ok('THIT 单体单发致死段形成 focus 且精英显式 level 触发 cutin', planned.lethal instanceof Set && planned.lethal.has(lethal) &&
-      planned.focus?.targetId === 'e' && planned.focus.cutin === true, json({ lethal: [...planned.lethal || []], focus: planned.focus })));
+    cases.push(ok('THIT 单体单发致死段形成 focus，精英用 C 运镜', planned.lethal instanceof Set && planned.lethal.has(lethal) &&
+      planned.focus?.targetId === 'e' && planned.focus.timing === KILL_TIMING.C, json({ lethal: [...planned.lethal || []], focus: planned.focus })));
     const normal = planKillBeat(result, caster, [{ ...enemy, level: '杂兵' }]);
     const boss = planKillBeat(result, caster, [{ ...enemy, level: '首领' }]);
-    cases.push(ok('THIT 普通敌人不横切、首领横切', normal.focus?.cutin === false && boss.focus?.cutin === true));
+    cases.push(ok('THIT 杂兵 B、首领 C，不保留旧头像横切', normal.focus?.timing === KILL_TIMING.B && boss.focus?.timing === KILL_TIMING.C));
     const summon = planKillBeat(result, { ...caster, isSummon: true }, [enemy]);
     cases.push(ok('THIT 召唤者不安排击杀节拍', summon.lethal.size === 0 && summon.focus === null));
     const nonlethal = { ...lethal, hpBefore: 20, hpAfter: 10, down: false };
@@ -178,16 +178,15 @@ export const groups = {
     }
     const moves = [];
     const from = { x: 2, y: 3 }, to = { x: 7, y: 3 };
-    const pull = startKillCamera({ getPose: () => ({ scale: 1 }), poseAt: (x, y, scale) => ({ x, y, scale }),
-      poseFrame: () => ({ x: 4.5, y: 3, scale: 0.8 }), cameraTo: (pose, ms) => moves.push({ pose, ms }) }, from, to);
-    cases.push(ok('THIT 前推独立占 345ms，直到出手才启动 435ms 拉远', moves.length === 1 && moves[0].pose.x === from.x && moves[0].ms === 345));
+    const sb = { getPose: () => ({ scale: 1 }), poseAt: (x, y, scale) => ({ x, y, scale }),
+      getDom: () => ({ viewport: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }) } }),
+      worldToScreenClient: (x, y) => ({ x, y }),
+      poseFrame: () => ({ x: 4.5, y: 3, scale: 0.8 }), cameraTo: (pose, ms) => moves.push({ pose, ms }) };
+    const fx = { screen: html => { moves.push({ lines: html.startsWith('<svg') }); return { dataset: {}, firstChild: { animate() {} } }; } };
+    const pull = startKillCamera(sb, from, to, fx, KILL_TIMING.B);
+    cases.push(ok('THIT 首帧挂速度线、同拍急推 90ms，释放前不拉远', moves.length === 2 && moves[0].lines && moves[1].pose.x === from.x && moves[1].ms === 90));
     pull();
-    cases.push(ok('THIT 拉远直接构图至双方，不跳回全图', moves.length === 2 && moves[1].pose.x === 4.5 && moves[1].ms === 435, json(moves)));
-    let bandMs, visibleMs;
-    const band = { firstChild: {}, animate: (_, options) => { bandMs = options.duration; } };
-    killPortraitSweep({ screen: (_, ms) => { visibleMs = ms; return { firstChild: band, dataset: {}, style: {} }; } }, 'portrait.png', KILL_TIMING.cutin, 1);
-    cases.push(ok('THIT 头像横切显示 570ms、致死局部停 210ms，特写在顿帧后接管',
-      bandMs === 570 && visibleMs === 570 && KILL_TIMING.stop === 210 && KILL_TIMING.tail > KILL_TIMING.stop));
+    cases.push(ok('THIT 释放急拉 340ms 直接构图至双方', moves.length === 3 && moves[2].pose.x === 4.5 && moves[2].ms === 340, json(moves)));
     return { cases };
   } },
   'THIT-02': { run() {
