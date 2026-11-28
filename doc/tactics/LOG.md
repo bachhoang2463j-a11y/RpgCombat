@@ -975,3 +975,16 @@
 - 文件：`tactics/src/{barriers,battle,main,range-overlay,regions,ui-shell}.mjs`、`doc/tactics/典型对局-战棋版.yaml`、`tactics/tools/{build-demo-html,run-tests}.cjs`、`tactics/mvp-standalone.html`、战棋专项及 UI 连线用例和产物报告。
 - 验证：新专项 13 项；单次全量停在旧冲刺实现文本断言，修正后 UIR-W 5 项与剩余 35 阶段 1263 项通过，未重新跑全量。重建单文件结构与 63 项产物断言通过，新专项在内联后端 13 项通过。IAB 在独立局面实测近战预览 3.0m/剩 1.0m，单击走打后扣费一致、敌人 -19 HP；重开按钮操作超时，未补测黄色格的页面显示。未接管前台正在运行其它应用的雷电，也未操作真实酒馆。
 - 目的 vs 现状：规则、单文件和近战页面验收与本轮目标一致。
+
+## 2026-11-28 · 视听强化阶段 A：演出倍速、分轨音量与声像、局部顿帧、精简运镜（0d0d1d9）
+- 核心目的：不改任何规则结算，让 LLM 临场生成的战斗节奏可控、打击有分量、声音有方位；本阶段是视听强化方案的 A 段（B 威胁区/残血、C 推断/徽章/留痕/光照、D 变种转折/状态补全待后续）。
+- 演出倍速：新增 `time-scale.mjs` 表现层虚拟时钟（1.0/1.2/1.5/2.0，顶栏按钮循环、全局、记忆）。演出作用域计时/冻结/间隔按倍速换算；移动、镜头与导演补间逐帧按倍速累加；视听底座经提取器把混音器以外的 `setTimeout/setInterval/performance.now/Date.now` 统一换成宿主虚拟时钟，技能视频随倍速；地图与特效层内有限次 Web/CSS 动画同步倍速，无限待机动效与界面层保持 1×；音频不变调。规则模块不引用演出时钟（用例断言）。
+- 分轨音量：提取器为混音器加主总线 + 技能/结果/界面/语音/环境五轨（语音 N 类改走独立轨，环境音改走 atmo 轨），配乐主增益接入主总线；设置面板加五个推子、静音勾选、M 键静音与「重复技能精简运镜」开关。
+- 声像：战斗音效轨未显式声像时取导演声像提示（出手者 → 受击者 → 收尾清空，视口横向位置压到 ±0.6），界面与语音不偏。
+- 局部顿帧：只冻结出手者与受击者单位动画 + 粒子层（底座自带 60/80ms 抬高仍被忽略），按本段掉血占比 <10% 不顿 / 10–25% 40ms / ≥25% 70ms / 暴击或击杀 110ms，解冻后受击者沿来袭方向位移 0.08 格回弹；时长随倍速。
+- 精简运镜：同一出手者同一技能本场再次施放只保留氛围层与爆发，不再遮幅/推近/拉远（可关）。
+- 并行产出：`doc/tactics/FX-INFER-WHITELIST.md`（C1 特效推断白名单草案，待用户审）。
+- 文件：`tactics/src/{time-scale,view-scope,motion,sandbox,action-director,fx-library,av-host,bgm-director,main,ui-shell}.mjs`、`tactics/src/vendor/rpg-av/rpg-av.mjs`（提取器重生成）、`tactics/tools/{extract-rpg-av,run-tests}.cjs`、`tactics/tactics.css`、`tactics/mvp-standalone.html`、`integration-test/fixtures/tactics/{av-polish,hit-feedback,feedback-av}-node-cases.mjs`、产物报告。
+- 验证：新增 `av-polish` 11 项。唯一一次全量在第 23 组静默中止（补间改读虚拟时钟后不再消费循环时间戳，`guard-director`/`audio-gait-passive` 等待永不结算），改为逐帧累加后定向复跑与未执行组续跑 35 组 1324 项全部通过，并复跑前 22 组中涉及导演/补间的 14 组通过；未重新跑一次完整全量。重建单文件（64 模块/48 入包/127 符号）后 8 项产物断言全部通过。自动化浏览器实页（单文件经本机服务）：倍速按钮循环与记忆、有限动画升至 2×/无限动画保持 1×、敌方回合与反应弹窗跳过、弗兰克碎骨连打命中触发局部顿帧（冻结 17 个单位动画 + 1 次回弹）、五推子/M 静音，零 JS 报错；该窗口 rAF 被系统节流（约 1 帧/秒），未做帧率与听感验证，未接入真实酒馆。
+- 过程事故：曾用 PowerShell `Get-Content/Set-Content` 回写 `action-director.mjs` 导致 GBK 误读乱码，已从 HEAD 恢复后重打补丁，最终 diff 只含本轮改动。
+- 目的 vs 现状：阶段 A 与目的一致。
